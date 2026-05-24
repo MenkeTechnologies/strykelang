@@ -445,13 +445,50 @@ Parallel fold with identity value.
 
 \section{\texorpdfstring{\texttt{pmap\_reduce}}{pmap\_reduce}}\label{pmap_reduce}
 
-Fused parallel map + tree reduce.
+Fused parallel map + tree reduce. Each input element is mapped in
+parallel via rayon; results are combined pairwise by the reducer block.
+The reducer must be associative (\texttt{(a⊕b)⊕c\ ==\ a⊕(b⊕c)}) ---
+order of pairwise combines is not fixed.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $sum = pmap\_reduce \{ \_*2 \} \{ \_ + \_1 \} @list}
+\NormalTok{\# Two{-}block form: pmap\_reduce \{ MAPPER \} \{ REDUCER \} LIST}
+\NormalTok{my $sum = pmap\_reduce \{ \_ * 2 \} \{ \_ + \_1 \} @list}
+
+\NormalTok{\# Chunked aggregation — mapper returns a per{-}chunk arrayref, reducer merges.}
+\NormalTok{my $grads = @batches |\textgreater{} pmap\_reduce \{}
+\NormalTok{    my $idxs = \_}
+\NormalTok{    [ batch\_grad($w, $b, $XS, $YS, $idxs), len(@$idxs) ]}
+\NormalTok{\} \{}
+\NormalTok{    [ \_{-}\textgreater{}[0] + \_1{-}\textgreater{}[0], \_{-}\textgreater{}[1] + \_1{-}\textgreater{}[1] ]}
+\NormalTok{\};   \# ← trailing \textasciigrave{};\textasciigrave{} required (see CAVEAT below)}
 \end{Highlighting}
 \end{Shaded}
+
+\textbf{Caveats:}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Trailing \texttt{;} required} when followed by another
+  statement. The parser keeps looking for an optional third block after
+  the reducer, and at file scope it silently absorbs the next statement
+  (e.g. a \texttt{p\ "…"} or \texttt{my\ \$x\ =\ …}). Always terminate
+  with \texttt{;}. Tracked in \texttt{docs/BUGS.md} as BUG-301.
+\item
+  \textbf{Closure capture of large arrays is unreliable.} Pre-capture an
+  arrayref outside the call (\texttt{my\ \$XS\ =\ \textbackslash{}@xs})
+  and dereference inside the worker rather than relying on direct
+  \texttt{@xs} lexical capture.
+\item
+  \textbf{\texttt{rand()} in the mapper is parallel-correlated.}
+  Per-task \texttt{rand()} calls across workers produce statistically
+  correlated values; prefer chunked Monte-Carlo where each task runs its
+  own inner loop.
+\end{itemize}
+
+See also: \texttt{pmap} (eager parallel map), \texttt{pmaps}
+(streaming), \texttt{par\_reduce} (verbose builder).
 
 \section{\texorpdfstring{\texttt{pany}}{pany}}\label{pany}
 
@@ -4104,6 +4141,24 @@ Algebraic pattern matching (stryke extension).
 
 Patterns: regex, array, hash, literal, wildcard \texttt{\_}. Optional
 \texttt{if} guard per arm.
+
+\textbf{Caveat --- topic shadowing inside arms:} inside each arm,
+\texttt{\_} rebinds to the *matched* value (a regex string, an array
+element, a hash slot), \textbf{not} the outer function\textquotesingle s
+\texttt{\_} topic. If you need both the matched value and the outer
+topic, capture the outer one before the \texttt{match}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{fn process\_event \{}
+\NormalTok{    my $e = \_                    \# capture outer topic}
+\NormalTok{    match ($e{-}\textgreater{}\{type\}) \{}
+\NormalTok{        "LOGIN" =\textgreater{} "user \#\{ $e{-}\textgreater{}\{user\} \} logged in",   \# ← $e, not \_}
+\NormalTok{        \_       =\textgreater{} "unknown",}
+\NormalTok{    \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
 
 \section{\texorpdfstring{\texttt{frozen}}{frozen}}\label{frozen}
 

@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.14.20 · 10245 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.14.20 · 10250 topics · 164 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -330,7 +330,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8573</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8578</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -433,27 +433,66 @@ my $product = preduce { _ * _1 } 1:100
       </article>
       <article class="doc-entry" id="doc-preduce-init">
         <h3><a class="doc-anchor" href="#doc-preduce-init">#</a> <code>preduce_init</code></h3>
-        <p>Parallel fold with identity value.</p>
-        <pre><code class="lang-perl">my $total = preduce_init 0, { _ + _1 } @list
+        <p>Parallel tree-fold with an explicit identity element. Same engine as <code>preduce</code> (rayon&#39;s <code>reduce_with</code>), but <code>INIT</code> seeds every chunk so empty / single-element inputs return a sensible value instead of <code>undef</code>. The combining operation <strong>must be associative AND</strong> <code>INIT</code> must be its identity (<code>INIT ⊕ x == x</code>); otherwise different chunk boundaries produce different sums.</p>
+        <pre><code class="lang-perl">my $total   = preduce_init 0, { _ + _1 } @nums      # sum, identity 0
+my $product = preduce_init 1, { _ * _1 } @nums      # product, identity 1
+my $biggest = preduce_init -inf, { _ &gt; _1 ? _ : _1 } @vals
+
+# Histogram merge — identity is the empty hash.
+my %h = %{ preduce_init +{}, { merge_hash(_, _1) } @per_chunk_hashes }
 </code></pre>
+        <p>Without an identity, prefer <code>preduce</code> (no init) or <code>pmap_reduce</code> (fused mapper + reducer).</p>
+        <p>See also: <code>preduce</code>, <code>pmap_reduce</code>, <code>reduce</code> (sequential), <code>fold</code> (sequential with init).</p>
       </article>
       <article class="doc-entry" id="doc-pmap-reduce">
         <h3><a class="doc-anchor" href="#doc-pmap-reduce">#</a> <code>pmap_reduce</code></h3>
-        <p>Fused parallel map + tree reduce.</p>
-        <pre><code class="lang-perl">my $sum = pmap_reduce { _*2 } { _ + _1 } @list
+        <p>Fused parallel map + tree reduce. Each input element is mapped in parallel via rayon; results are combined pairwise by the reducer block. The reducer must be associative (<code>(a⊕b)⊕c == a⊕(b⊕c)</code>) — order of pairwise combines is not fixed.</p>
+        <pre><code class="lang-perl"># Two-block form: pmap_reduce { MAPPER } { REDUCER } LIST
+my $sum = pmap_reduce { _ * 2 } { _ + _1 } @list
+
+# Chunked aggregation — mapper returns a per-chunk arrayref, reducer merges.
+my $grads = @batches |&gt; pmap_reduce {
+    my $idxs = _
+    [ batch_grad($w, $b, $XS, $YS, $idxs), len(@$idxs) ]
+} {
+    [ _-&gt;[0] + _1-&gt;[0], _-&gt;[1] + _1-&gt;[1] ]
+};   # ← trailing `;` required (see CAVEAT below)
 </code></pre>
+        <p><strong>Caveats:</strong></p>
+        <ul>
+          <li><strong>Trailing <code>;</code> required</strong> when followed by another statement. The parser keeps looking for an optional third block after the reducer, and at file scope it silently absorbs the next statement (e.g. a <code>p &quot;…&quot;</code> or <code>my $x = …</code>). Always terminate with <code>;</code>. Tracked in <code>docs/BUGS.md</code> as BUG-301.</li>
+          <li><strong>Closure capture of large arrays is unreliable.</strong> Pre-capture an arrayref outside the call (<code>my $XS = \@xs</code>) and dereference inside the worker rather than relying on direct <code>@xs</code> lexical capture.</li>
+          <li><strong><code>rand()</code> in the mapper is parallel-correlated.</strong> Per-task <code>rand()</code> calls across workers produce statistically correlated values; prefer chunked Monte-Carlo where each task runs its own inner loop.</li>
+        </ul>
+        <p>See also: <code>pmap</code> (eager parallel map), <code>pmaps</code> (streaming), <code>par_reduce</code> (verbose builder).</p>
       </article>
       <article class="doc-entry" id="doc-pany">
         <h3><a class="doc-anchor" href="#doc-pany">#</a> <code>pany</code></h3>
-        <p><code>pany { COND } @list</code> — parallel short-circuit <code>any</code>.</p>
+        <p><code>pany { COND } @list</code> — parallel short-circuit <code>any</code>. Splits the list across cores via rayon, evaluates <code>COND</code> on each element, returns truthy as soon as <strong>any</strong> chunk reports a hit and cancels the rest. Returns the matching element (truthy) or <code>0</code> (no match).</p>
+        <pre><code class="lang-perl"># Found in O(N/cores), often much faster — early-stops once any worker hits.
+if (pany { _ &gt; 1_000_000 } @samples) { p &quot;found a large sample&quot; }
+pany { is_prime(_) } 10**9 : 10**9 + 50    # &quot;is there a prime in this range?&quot;
+</code></pre>
+        <p>See also: <code>pall</code> (parallel <code>all</code>), <code>pfirst</code> (return the matching value), <code>any</code> (sequential), <code>pgrep</code> (full filter).</p>
       </article>
       <article class="doc-entry" id="doc-pfirst">
         <h3><a class="doc-anchor" href="#doc-pfirst">#</a> <code>pfirst</code></h3>
-        <p><code>pfirst { COND } @list</code> — parallel first matching element.</p>
+        <p><code>pfirst { COND } @list</code> — parallel <code>first</code>. Like <code>pany</code> but returns the <strong>matching element</strong> rather than just a truthy flag. Workers run concurrently across chunks; the first hit (by *completion order*, not input order) wins and the remaining workers are cancelled. Returns <code>undef</code> if no element matches.</p>
+        <pre><code class="lang-perl">my $hit = pfirst { _-&gt;{status} eq &quot;FAILED&quot; } @records
+my $prime = pfirst { is_prime(_) } 10**12 : 10**12 + 1000
+</code></pre>
+        <p><strong>Note:</strong> output is non-deterministic when multiple elements match — workers race. For first-by-input-order use sequential <code>first</code> or <code>pfirst_in_order</code> (where supported).</p>
+        <p>See also: <code>pany</code>, <code>first</code>, <code>pgrep</code>.</p>
       </article>
       <article class="doc-entry" id="doc-puniq">
         <h3><a class="doc-anchor" href="#doc-puniq">#</a> <code>puniq</code></h3>
-        <p><code>puniq @list</code> — parallel unique elements.</p>
+        <p><code>puniq @list</code> — parallel deduplication. Returns the unique elements of <code>@list</code>, with the original input order preserved (first occurrence wins). Elements are keyed by stringification (<code>&quot;$_&quot;</code>), so <code>1</code> and <code>&quot;1&quot;</code> deduplicate together. Backed by a concurrent hash set.</p>
+        <pre><code class="lang-perl">my @uniq    = puniq @log_lines
+my @hosts   = puniq map { _-&gt;{host} } @records
+my @hashes  = puniq pmap sha256, @files     # parallel hash + dedup
+</code></pre>
+        <p>For exact-key (no stringification) dedup, build the set manually with <code>mysync %seen</code> + <code>pmaps</code>. For *count* of unique items use <code>hll_count</code> (HyperLogLog) which is O(1) memory.</p>
+        <p>See also: <code>uniq</code> (sequential), <code>dedup</code>, <code>hll_count</code>.</p>
       </article>
       <article class="doc-entry" id="doc-pflat-map">
         <h3><a class="doc-anchor" href="#doc-pflat-map">#</a> <code>pflat_map</code></h3>
@@ -469,9 +508,18 @@ my @r = pflat_map expand, (1, 2, 3)   # (1, 10, 2, 20, 3, 30)
       </article>
       <article class="doc-entry" id="doc-pflat-maps">
         <h3><a class="doc-anchor" href="#doc-pflat-maps">#</a> <code>pflat_maps</code></h3>
-        <p>Streaming parallel flat-map — like <code>pmaps</code> but flattens array results. Returns a lazy iterator.</p>
-        <pre><code class="lang-perl">range(0, 1e6) |&gt; pflat_maps { [_, _ * 10] } |&gt; ep
+        <p>Streaming parallel flat-map. Like <code>pmaps</code> but each block iteration may emit zero or more values, all of which are spliced into the downstream iterator (no intermediate vec). Runs on the persistent worker-thread pool, output order is non-deterministic, and downstream <code>take</code>/<code>head</code> cancels remaining work.</p>
+        <pre><code class="lang-perl"># One-to-many expansion in parallel
+range(0, 1e6) |&gt; pflat_maps { [_, _ * 10] } |&gt; ep
+
+# Drop and explode: yield only odd-derived pairs
+1:1_000_000 |&gt; pflat_maps { _ % 2 ? (_, _ * _) : () } |&gt; take 20 |&gt; ep
+
+# Tokenize a big corpus in parallel
+glob(&quot;*.txt&quot;) |&gt; pflat_maps { slurp(_) |&gt; split /\s+/ } |&gt; pgreps { len _ } |&gt; ep
 </code></pre>
+        <p>For eager flat-map use <code>pflat_map</code> (returns a vec). For sequential lazy flat-map use <code>flat_maps</code>.</p>
+        <p>See also: <code>pmaps</code>, <code>pflat_map</code>, <code>flat_maps</code>, <code>flat_map</code>.</p>
       </article>
       <article class="doc-entry" id="doc-fan">
         <h3><a class="doc-anchor" href="#doc-fan">#</a> <code>fan</code></h3>
@@ -571,7 +619,22 @@ undef $tx  # drop original so channel closes when workers finish
       </article>
       <article class="doc-entry" id="doc-pselect">
         <h3><a class="doc-anchor" href="#doc-pselect">#</a> <code>pselect</code></h3>
-        <p><code>pselect(@channels)</code> — wait on multiple <code>pchannel</code> receivers.</p>
+        <p><code>pselect(@receivers)</code> / <code>pselect(timeout_ms =&gt; N, @receivers)</code> — wait on multiple <code>pchannel</code> receivers; returns <code>($index, $value)</code> for the first receiver to produce a value. Equivalent to Go&#39;s <code>select { case v := &lt;-ch1: … case v := &lt;-ch2: … }</code>.</p>
+        <p>The optional <code>timeout_ms</code> clause returns <code>(-1, undef)</code> if no receiver delivers within the deadline. Closed channels (all senders dropped) return <code>(i, undef)</code> so the caller can detect end-of-stream per receiver.</p>
+        <pre><code class="lang-perl">my ($tx_a, $rx_a) = pchannel(8)
+my ($tx_b, $rx_b) = pchannel(8)
+spawn { $tx_a-&gt;send($_) for 1:100 }
+spawn { $tx_b-&gt;send($_ * 10) for 1:100 }
+while (1) {
+    my ($idx, $val) = pselect $rx_a, $rx_b
+    last unless defined $val
+    p &quot;from #$idx: $val&quot;
+}
+
+# With deadline:
+my ($idx, $val) = pselect timeout_ms =&gt; 500, $rx_a, $rx_b
+</code></pre>
+        <p>See also: <code>pchannel</code>, <code>spawn</code>, <code>async</code>, <code>barrier</code>.</p>
       </article>
       <article class="doc-entry" id="doc-barrier">
         <h3><a class="doc-anchor" href="#doc-barrier">#</a> <code>barrier</code></h3>
@@ -2259,6 +2322,15 @@ typed my %cfg : Str = (host =&gt; &quot;localhost&quot;, port =&gt; &quot;8080&q
 }
 </code></pre>
         <p>Patterns: regex, array, hash, literal, wildcard <code>_</code>. Optional <code>if</code> guard per arm.</p>
+        <p><strong>Caveat — topic shadowing inside arms:</strong> inside each arm, <code>_</code> rebinds to the *matched* value (a regex string, an array element, a hash slot), <strong>not</strong> the outer function&#39;s <code>_</code> topic. If you need both the matched value and the outer topic, capture the outer one before the <code>match</code>:</p>
+        <pre><code class="lang-perl">fn process_event {
+    my $e = _                    # capture outer topic
+    match ($e-&gt;{type}) {
+        &quot;LOGIN&quot; =&gt; &quot;user #{ $e-&gt;{user} } logged in&quot;,   # ← $e, not _
+        _       =&gt; &quot;unknown&quot;,
+    }
+}
+</code></pre>
       </article>
       <article class="doc-entry" id="doc-frozen">
         <h3><a class="doc-anchor" href="#doc-frozen">#</a> <code>frozen</code></h3>
@@ -2286,11 +2358,18 @@ filef |&gt; sorted |&gt; ep      # print sorted file list
       </article>
       <article class="doc-entry" id="doc-p">
         <h3><a class="doc-anchor" href="#doc-p">#</a> <code>p</code></h3>
-        <p><code>p</code> — alias for <code>say</code> (print with newline).</p>
-        <pre><code class="lang-perl">p &quot;hello&quot;       # hello\n
-p 42            # 42\n
-1:5 |&gt; e p     # prints each on its own line
+        <p><strong><code>p</code> — the stryke print-with-newline verb.</strong> Costs one character, has the record separator built in, and is the canonical output primitive: every example, hover doc, and rosetta program in the corpus uses <code>p</code>. With multiple args, joins them with <code>$,</code> (default empty) and appends <code>$\</code> (default <code>\n</code>). Stringifies refs as <code>HASH(0x…)</code> / <code>ARRAY(0x…)</code>; use <code>ep</code> / <code>ddump</code> / <code>to_json</code> for structured dumps.</p>
+        <pre><code class="lang-perl">p &quot;hello&quot;          # hello\n
+p 42               # 42\n
+p &quot;x=&quot;, $x, &quot; y=&quot;, $y      # multi-arg, joined by $,
+1:5 |&gt; e p              # iterate + p — prints one per line
+@xs |&gt; ep                # shorthand for `|&gt; e p`
+p &quot;#{ sum @arr }&quot;       # interpolation
 </code></pre>
+        <p><strong><code>p</code> is preferred over Perl 5&#39;s <code>print</code> and <code>say</code> in every stryke context:</strong></p>
+        <p>| Form | Status | |---|---| | <code>p &quot;x&quot;</code> | <strong>stryke canonical</strong> — one char, includes newline, no flags | | <code>print &quot;x\n&quot;</code> | Perl 5 compat — keeps working under <code>--compat</code>, but reads as legacy | | <code>say &quot;x&quot;</code> | <strong>Rejected by <code>--no-interop</code>.</strong> Perl 5.10 keyword; <code>p</code> exists precisely to replace it |</p>
+        <p><code>p</code> is NOT &quot;an alias for say&quot; — it&#39;s the <strong>primary</strong> spelling. <code>say</code> is the rejected Perl 5 form. Use <code>p</code>.</p>
+        <p>See also: <code>ep</code> (each-then-p), <code>pp</code> (pretty-print), <code>ddump</code> (full structure dump), <code>warn</code> (stderr equivalent of <code>p</code>).</p>
       </article>
       <article class="doc-entry" id="doc-gen">
         <h3><a class="doc-anchor" href="#doc-gen">#</a> <code>gen</code></h3>
@@ -2317,15 +2396,34 @@ for (1:10) {
       </article>
       <article class="doc-entry" id="doc-trace">
         <h3><a class="doc-anchor" href="#doc-trace">#</a> <code>trace</code></h3>
-        <p>Trace <code>mysync</code> mutations to stderr (tagged with worker index under <code>fan</code>).</p>
-        <pre><code class="lang-perl">trace { fan 10 { $counter++ } }
+        <p><code>trace { BLOCK }</code> — enable shared-state mutation tracing for the duration of <code>BLOCK</code>. Every read/write of a <code>mysync</code>/<code>oursync</code> variable (including compound ops like <code>++</code>, <code>+=</code>, <code>.=</code>) is logged to STDERR with the worker index, value before, and value after. Invaluable for debugging races, dropped updates, or compound-op atomicity violations.</p>
+        <p>Outside <code>trace</code>, the same operations run with zero overhead — <code>trace</code> is the only way to switch the instrumentation on.</p>
+        <pre><code class="lang-perl">mysync $counter = 0
+trace {
+    fan 10 { $counter++ }       # 10 workers, each prints &quot;&lt;w&gt; ++ : N → N+1&quot;
+}
+p $counter                       # 10
+
+# Diagnose a missed update:
+mysync %hits = ()
+trace { fan 100 { $hits{rand(10)}++ } }
 </code></pre>
+        <p>For function-call tracing (every named-fn entry/exit) use <code>--profile</code> or AOP <code>before</code>/<code>after</code>. For low-level VM op tracing use <code>--trace-ops</code>.</p>
+        <p>See also: <code>mysync</code>, <code>oursync</code>, <code>fan</code>, AOP <code>before</code>/<code>after</code>.</p>
       </article>
       <article class="doc-entry" id="doc-timer">
         <h3><a class="doc-anchor" href="#doc-timer">#</a> <code>timer</code></h3>
-        <p>Measure wall-clock milliseconds for a block.</p>
-        <pre><code class="lang-perl">my $ms = timer { heavy_work() }
+        <p><code>timer { BLOCK }</code> — measure the wall-clock elapsed time of <code>BLOCK</code> and return the duration in <strong>milliseconds</strong> (<code>f64</code>). The block&#39;s own return value is discarded; use <code>timed</code> if you need both. Internally <code>std::time::Instant::now</code> brackets the block, so resolution is the host&#39;s monotonic clock (sub-microsecond on modern CPUs).</p>
+        <pre><code class="lang-perl">my $ms = timer { sort_huge_list() }
+printf &quot;sort took %.2f ms\n&quot;, $ms
+
+# Compare two implementations:
+my $a = timer { algorithm_a(@data) }
+my $b = timer { algorithm_b(@data) }
+printf &quot;speedup: %.2fx\n&quot;, $a / $b
 </code></pre>
+        <p>For statistical benchmarking (warmup, min / mean / p99), use <code>bench</code> instead. For per-operation profiling use <code>--profile</code> or <code>trace</code>.</p>
+        <p>See also: <code>bench</code>, <code>eval_timeout</code>, <code>time</code>, <code>now_ns</code>.</p>
       </article>
       <article class="doc-entry" id="doc-bench">
         <h3><a class="doc-anchor" href="#doc-bench">#</a> <code>bench</code></h3>
@@ -2347,21 +2445,69 @@ for (1:10) {
       </article>
       <article class="doc-entry" id="doc-rate-limit">
         <h3><a class="doc-anchor" href="#doc-rate-limit">#</a> <code>rate_limit</code></h3>
-        <p>Limit invocations per time window.</p>
-        <pre><code class="lang-perl">rate_limit(10, &quot;1s&quot;) { hit_api() }
+        <p><code>rate_limit(N, &quot;WINDOW&quot;) { BLOCK }</code> — token-bucket throttle: run the body at most <code>N</code> times per <code>WINDOW</code>. Excess calls block until a token is available rather than failing — guarantees the rate without dropping work. <code>WINDOW</code> accepts <code>&quot;500ms&quot;</code>, <code>&quot;1s&quot;</code>, <code>&quot;5m&quot;</code>, <code>&quot;1h&quot;</code>, or a bare number of seconds. The throttle state is per-call-site, so multiple <code>rate_limit</code> blocks at different sites have independent buckets.</p>
+        <pre><code class="lang-perl"># Cap API calls at 10/sec — the 11th waits until a token frees up.
+for my $url (@urls) {
+    rate_limit(10, &quot;1s&quot;) { fetch($url) }
+}
+
+# Long window — at most 1 nightly job per hour even under retries.
+rate_limit(1, &quot;1h&quot;) { nightly_compaction() }
+
+# Inside a parallel iter (mysync bucket — actually shared across workers).
+pfor { rate_limit(50, &quot;1s&quot;) { ingest($_) } } @records
 </code></pre>
+        <p>For non-blocking probe-style throttling (test if a token is available, drop instead of waiting) use <code>try_acquire</code>. For bulk burst handling use a <code>pchannel</code> of capacity N as a hand-rolled bucket.</p>
+        <p>See also: <code>every</code>, <code>retry</code>, <code>circuit_breaker</code>, <code>semaphore</code>.</p>
       </article>
       <article class="doc-entry" id="doc-every">
         <h3><a class="doc-anchor" href="#doc-every">#</a> <code>every</code></h3>
-        <p>Run a block at a fixed interval.</p>
-        <pre><code class="lang-perl">every &quot;500ms&quot; { tick() }
+        <p><code>every &quot;INTERVAL&quot; { BLOCK }</code> — run <code>BLOCK</code> repeatedly with at least <code>INTERVAL</code> between iterations. <code>INTERVAL</code> accepts <code>&quot;500ms&quot;</code>, <code>&quot;1s&quot;</code>, <code>&quot;5m&quot;</code>, etc. Runs *forever* on the calling thread by default; combine with <code>last</code>/<code>die</code> from inside the block to exit, or with <code>spawn { every … }</code> to run in the background.</p>
+        <pre><code class="lang-perl"># Tick the heartbeat every second.
+every &quot;1s&quot; { p &quot;alive at &quot; . now }
+
+# Background poll — quits cleanly when state.done.
+spawn {
+    every &quot;500ms&quot; {
+        last if $shared-&gt;{done}
+        update_dashboard()
+    }
+}
+
+# Fixed-delta scheduler — actually-tick exactly every N ms even if BLOCK is slow.
+every &quot;100ms&quot; { check_health() }       # next tick = previous start + 100ms
 </code></pre>
+        <p>For one-shot delayed execution use <code>sleep</code> + a normal call. For wall-clock-aligned ticks (every minute at :00) use <code>cron</code>.</p>
+        <p>See also: <code>sleep</code>, <code>rate_limit</code>, <code>eval_timeout</code>, <code>cron</code>.</p>
       </article>
       <article class="doc-entry" id="doc-watch">
         <h3><a class="doc-anchor" href="#doc-watch">#</a> <code>watch</code></h3>
-        <p>Watch a single file for changes (non-parallel).</p>
-        <pre><code class="lang-perl">watch &quot;/tmp/x&quot;, fn { process }
+        <p><code>watch PATH, fn { … }</code> — register a filesystem watcher on <code>PATH</code> (file or directory) and invoke the callback whenever the path is modified. Inside the callback, <code>_</code> is the absolute path of the changed file. Blocks the calling thread; combine with <code>spawn</code> to watch in the background.</p>
+        <p>Uses the OS-native facility (<code>FSEvents</code> on macOS, <code>inotify</code> on Linux). Recursive on directories; not recursive on files. The callback fires for every event, so debounce inside the body if you only want a single rebuild after a burst.</p>
+        <pre><code class="lang-perl"># Live recompile loop
+watch &quot;src/&quot;, fn {
+    next unless _ =~ /\.rs$/
+    p &quot;changed: $_&quot;
+    system &quot;cargo&quot;, &quot;build&quot;
+}
+
+# Background watcher
+spawn {
+    watch &quot;config.toml&quot;, fn { reload_config() }
+}
+
+# Debounce trailing edge — coalesce bursts into one rebuild every 250ms.
+mysync $last = 0
+watch &quot;.&quot;, fn {
+    my $now = now_ns()
+    if ($now - $last &gt; 250_000_000) {
+        $last = $now
+        rebuild()
+    }
+}
 </code></pre>
+        <p>For parallel multi-path watching use <code>par_watch</code>. For poll-based watching that doesn&#39;t need OS support use <code>every &quot;1s&quot; { stat … }</code>.</p>
+        <p>See also: <code>par_watch</code>, <code>every</code>, <code>spawn</code>.</p>
       </article>
       <article class="doc-entry" id="doc-capture">
         <h3><a class="doc-anchor" href="#doc-capture">#</a> <code>capture</code></h3>
@@ -8932,7 +9078,18 @@ my @results = pmap_on $cl, { fetch(&quot;https://api.example.com/$_&quot;) } 1:1
       </article>
       <article class="doc-entry" id="doc-pflat-map-on">
         <h3><a class="doc-anchor" href="#doc-pflat-map-on">#</a> <code>pflat_map_on</code></h3>
-        <p>Distributed parallel flat-map over <code>cluster</code>.</p>
+        <p><code>pflat_map_on(CLUSTER, BLOCK, LIST)</code> — distributed parallel flat-map: ships each input item over the wire to a worker in <code>CLUSTER</code> (a list of <code>&quot;host:port&quot;</code> strings registered with <code>cluster_init</code>), evaluates the block remotely, and streams flattened results back. Output is concatenated by completion order across workers. Drop-in distributed analog of local <code>pflat_map</code>.</p>
+        <p>The cluster handle is a normal stryke value, so you can have several pools targeting different host sets. Each remote eval runs in the worker&#39;s own interpreter, so be explicit about closure values — they&#39;re serialized via the wire protocol, not captured by reference. Builtins are available remotely; user-defined <code>fn</code>s must be installed on the worker via <code>cluster_install_code</code>.</p>
+        <pre><code class="lang-perl">my $cluster = cluster_init(&quot;worker01:7878&quot;, &quot;worker02:7878&quot;, &quot;worker03:7878&quot;)
+
+my @hashes = pflat_map_on $cluster, { sha256(slurp(_)) } @big_files
+
+fn explode = (_, _ * 10, _ * 100)
+cluster_install_code($cluster, \&amp;explode)
+my @out = pflat_map_on $cluster, explode, 1:100
+</code></pre>
+        <p>For distributed <code>map</code> (1:1) use <code>pmap_on</code>. For local flat-map use <code>pflat_map</code>. For streaming variant use <code>pflat_maps_on</code>.</p>
+        <p>See also: <code>pflat_map</code>, <code>pmap_on</code>, <code>cluster_init</code>, <code>cluster_install_code</code>.</p>
       </article>
       <article class="doc-entry" id="doc-ssh">
         <h3><a class="doc-anchor" href="#doc-ssh">#</a> <code>ssh</code></h3>
@@ -9801,13 +9958,20 @@ if (fork() == 0) {
       </article>
       <article class="doc-entry" id="doc-syscall">
         <h3><a class="doc-anchor" href="#doc-syscall">#</a> <code>syscall</code></h3>
-        <p>Invoke a raw system call by its numeric identifier, passing arguments directly to the kernel. This is an escape hatch for system calls that have no Perl wrapper. The call number is platform-specific and the arguments must be correctly typed (integers or string buffers). Use with caution — incorrect arguments can crash the process.</p>
-        <pre><code class="lang-perl"># SYS_getpid on Linux x86_64 is 39
-my $pid = syscall(39)
-p $pid                     # same as $$
-# SYS_sync on Linux is 162
-syscall(162)               # flush filesystem caches
+        <p><code>syscall(NUM [, ARG ...])</code> — raw <code>syscall(2)</code> entry point. Calls the kernel with the platform-specific syscall number <code>NUM</code> and up to six arguments. Integer args pass as <code>c_long</code>; string args pass as pointer-to-bytes (so <code>read</code>-style scratch buffers work). Returns the kernel return value (or <code>-1</code> on error).</p>
+        <p>Syscall numbers are <strong>not normalized across platforms</strong> — pass the exact number for the host kernel (see <code>&lt;sys/syscall.h&gt;</code> for the <code>SYS_*</code> constants). Wrong numbers can crash the process; this is an escape hatch, not a portability layer. Use the wrapper builtins (<code>getpid</code>, <code>kill</code>, <code>fork</code>, <code>system</code>, file ops) for portable code.</p>
+        <pre><code class="lang-perl"># macOS aarch64: SYS_getpid = 20
+my $pid = syscall(20)
+p $pid == $$ ? &quot;matches \$\$&quot; : &quot;mismatch&quot;
+
+# Linux x86_64: SYS_getpid = 39
+# my $pid = syscall(39)
+
+# Linux: SYS_sync = 162 — flush filesystem caches.
+# syscall(162)
 </code></pre>
+        <p>On non-Unix platforms (Windows) <code>syscall</code> returns <code>-1</code> and is otherwise inert.</p>
+        <p>See also: <code>getpid</code>, <code>getppid</code>, <code>kill</code>, <code>fork</code>, <code>system</code>, <code>$!</code>.</p>
       </article>
       <article class="doc-entry" id="doc-process-list">
         <h3><a class="doc-anchor" href="#doc-process-list">#</a> <code>process_list</code></h3>
@@ -12014,7 +12178,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8573 topics</p>
+      <p class="chapter-meta">8578 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -12543,6 +12707,17 @@ keys %stryke::aliases |&gt; grep /^p/ |&gt; sort |&gt; e p   # every alias start
 </code></pre>
         <p>See also: <code>%stryke::aliases</code>, <code>%p</code> / <code>%stryke::primaries</code>.</p>
       </article>
+      <article class="doc-entry" id="doc-all">
+        <h3><a class="doc-anchor" href="#doc-all">#</a> <code>%all</code></h3>
+        <p><code>%all</code> — short alias for <code>%stryke::all</code>. Every callable *spelling* (primaries <strong>and</strong> aliases) → category. Aliases inherit their primary&#39;s category.</p>
+        <p>Use <code>%all</code> when you want &quot;how many names can I type?&quot; or want to look up an alias&#39;s category without hopping through <code>%a</code>. Use <code>%b</code> when you want unique operations only.</p>
+        <pre><code class="lang-perl">p scalar keys %all                            # total callable-spellings count
+p $all{tj}                                    # &quot;serialization&quot;  (alias inherits)
+p $all{to_json}                               # &quot;serialization&quot;
+keys %all |&gt; pager                            # browse every spelling
+</code></pre>
+        <p>See also: <code>%stryke::all</code>, <code>%b</code> / <code>%stryke::builtins</code> (primaries-only), <code>%a</code> / <code>%stryke::aliases</code> (alias→primary).</p>
+      </article>
       <article class="doc-entry" id="doc-b">
         <h3><a class="doc-anchor" href="#doc-b">#</a> <code>%b</code></h3>
         <p><code>%b</code> — short alias for <code>%stryke::builtins</code>. Maps every <strong>primary</strong> callable name to its category string. Primaries-only — aliases live in <code>%a</code> / <code>%stryke::aliases</code>. <code>scalar keys %b</code> is the clean unique-operation count of stryke&#39;s runtime.</p>
@@ -12553,6 +12728,16 @@ keys %stryke::builtins |&gt; grep { $stryke::builtins{$_} eq &#39;parallel&#39; 
 </code></pre>
         <p>See also: <code>%stryke::builtins</code>, <code>%c</code> / <code>%stryke::categories</code>, <code>%a</code> / <code>%stryke::aliases</code>.</p>
       </article>
+      <article class="doc-entry" id="doc-c">
+        <h3><a class="doc-anchor" href="#doc-c">#</a> <code>%c</code></h3>
+        <p><code>%c</code> — short alias for <code>%stryke::categories</code>. Inverted index on <code>%b</code>: category string → arrayref of names in that category. Gives O(1) reverse-lookup for &quot;list every op of kind X&quot; queries that would otherwise be O(n) <code>grep</code>s. Name lists are alphabetized.</p>
+        <pre><code class="lang-perl">$c{parallel} |&gt; e p                          # every parallel op
+p scalar @{ $c{parallel} }                   # how many?
+p join &quot;, &quot;, @{ $c{&quot;array / list&quot;} }       # joined roster
+keys %c |&gt; sort |&gt; e p                        # every category name
+</code></pre>
+        <p>See also: <code>%stryke::categories</code>, <code>%b</code> / <code>%stryke::builtins</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-d">
         <h3><a class="doc-anchor" href="#doc-d">#</a> <code>%d</code></h3>
         <p><code>%d</code> — short alias for <code>%stryke::descriptions</code>. Maps each callable name to its one-line summary (the first sentence of its LSP hover doc). Sparse — only names that have a hand-written hover doc appear, so <code>exists $d{$name}</code> doubles as &quot;is this documented?&quot;.</p>
@@ -12562,6 +12747,15 @@ p scalar keys %d                 # count of documented ops
 keys %d |&gt; grep { $d{_} =~ /parallel/i } |&gt; sort |&gt; e p
 </code></pre>
         <p>See also: <code>%stryke::descriptions</code>, the LSP hover system.</p>
+      </article>
+      <article class="doc-entry" id="doc-e">
+        <h3><a class="doc-anchor" href="#doc-e">#</a> <code>%e</code></h3>
+        <p><code>%e</code> — short alias for <code>%stryke::extensions</code>. Stryke-only names, name → category. Disjoint from <code>%pc</code> (Perl 5 core). Everything <code>--compat</code> mode rejects at parse time, plus dispatch primaries (like <code>basename</code>, <code>ddump</code>) that are extensions at runtime even without a parser entry.</p>
+        <pre><code class="lang-perl">p $e{pmap}                                    # &quot;parallel&quot;
+p scalar keys %e                              # stryke-only name count
+keys %e |&gt; grep /^p/ |&gt; sort |&gt; e p           # every p* parallel op
+</code></pre>
+        <p>See also: <code>%stryke::extensions</code>, <code>%pc</code> / <code>%stryke::perl_compats</code>, <code>%b</code> / <code>%stryke::builtins</code>.</p>
       </article>
       <article class="doc-entry" id="doc-k">
         <h3><a class="doc-anchor" href="#doc-k">#</a> <code>%k</code></h3>
@@ -12602,6 +12796,17 @@ keys %o |&gt; grep { $o{_} eq &quot;assign&quot; } |&gt; sort |&gt; e p
 </code></pre>
         <p>See also: <code>use overload</code>, <code>overload::Method</code>, <code>overload::Overloaded</code>.</p>
       </article>
+      <article class="doc-entry" id="doc-p">
+        <h3><a class="doc-anchor" href="#doc-p">#</a> <code>%p</code></h3>
+        <p><code>%p</code> — short alias for <code>%stryke::primaries</code>. Primary dispatcher name → arrayref of its aliases. Inverted <code>%a</code> / <code>%stryke::aliases</code>. Primaries with no aliases still have an entry (empty arrayref), so <code>exists $p{foo}</code> reliably answers &quot;is foo a dispatch primary?&quot; in O(1).</p>
+        <pre><code class="lang-perl">$p{to_json} |&gt; e p                                       # [&quot;tj&quot;]
+p scalar @{ $p{basename} }                               # alias count for basename
+# every primary that has at least one alias:
+keys %p |&gt; grep { scalar @{$p{_}} } |&gt; sort |&gt; e p
+</code></pre>
+        <p>Not to be confused with the <strong><code>p</code> builtin</strong> (stryke print-with-newline) — <code>%p</code> is the *reflection hash*, <code>p &quot;…&quot;</code> is the *output verb*. The sigil disambiguates.</p>
+        <p>See also: <code>%stryke::primaries</code>, <code>%a</code> / <code>%stryke::aliases</code>, <code>%b</code> / <code>%stryke::builtins</code>.</p>
+      </article>
       <article class="doc-entry" id="doc-parameters">
         <h3><a class="doc-anchor" href="#doc-parameters">#</a> <code>%parameters</code></h3>
         <p><code>%parameters</code> — reflection hash mapping each stryke builtin to its parameter signature (argument names, types, optionality, default values). Populated at build time from the function definitions in <code>strykelang/builtins*.rs</code>. Drives LSP signature help and type checking.</p>
@@ -12613,10 +12818,13 @@ keys %parameters |&gt; grep { @{$parameters{_}} &gt; 3 } |&gt; e p   # 4+ arg bu
       </article>
       <article class="doc-entry" id="doc-pc">
         <h3><a class="doc-anchor" href="#doc-pc">#</a> <code>%pc</code></h3>
-        <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
-        <pre><code class="lang-perl">p pc        # 3.0856775814913673e16 m
-p pc / ly   # ~3.26 light years
+        <p><code>%pc</code> — short alias for <code>%stryke::perl_compats</code>. Perl 5 core names only, name → category. Subset of <code>%b</code> restricted to names from <code>is_perl5_core</code>. Direct O(1) access for the &quot;show me just Perl core&quot; query.</p>
+        <pre><code class="lang-perl">p $pc{map}                                    # &quot;array / list&quot;
+p scalar keys %pc                             # core-only count
+keys %pc |&gt; sort |&gt; e p                       # enumerate every Perl core name
+keys %pc |&gt; grep { $pc{$_} eq &quot;array / list&quot; } |&gt; sort |&gt; e p
 </code></pre>
+        <p>See also: <code>%stryke::perl_compats</code>, <code>%e</code> / <code>%stryke::extensions</code>, <code>%b</code> / <code>%stryke::builtins</code>.</p>
       </article>
       <article class="doc-entry" id="doc-stryke-aliases">
         <h3><a class="doc-anchor" href="#doc-stryke-aliases">#</a> <code>%stryke::aliases</code></h3>
@@ -18675,6 +18883,12 @@ p bond_price(1000, 0.05, 0.06, 10)   # ~926 (discount)
         <pre><code class="lang-perl">p cci(\@hi, \@lo, \@cl, 20)
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-ccomp">
+        <h3><a class="doc-anchor" href="#doc-ccomp">#</a> <code>ccomp</code></h3>
+        <p><code>continuous_compound($principal, $rate, $time)</code> (alias <code>ccomp</code>) — computes future value with continuous compounding: P × e^(rt).</p>
+        <pre><code class="lang-perl">p ccomp(1000, 0.05, 10)   # ~1648.72
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-ccompl">
         <h3><a class="doc-anchor" href="#doc-ccompl">#</a> <code>ccompl</code></h3>
         <p><code>ccompl</code> — operation <code>ccompl</code>. Alias for <code>color_complement</code>. Category: *color operations*.</p>
@@ -19871,6 +20085,13 @@ p $s[$i : len($s) - 1]      # &quot;world&quot; — slice bounds line up
         <pre><code class="lang-perl">p cir_bond $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-circ3">
+        <h3><a class="doc-anchor" href="#doc-circ3">#</a> <code>circ3</code></h3>
+        <p><code>circle_from_three_points($x1, $y1, $x2, $y2, $x3, $y3)</code> (alias <code>circ3</code>) — finds the unique circle passing through three non-collinear points. Returns [$cx, $cy, $radius] or undef if collinear.</p>
+        <pre><code class="lang-perl">my $c = circ3(0, 0, 1, 0, 0.5, 0.866)
+p &quot;center=($c-&gt;[0], $c-&gt;[1]) r=$c-&gt;[2]&quot;
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-circ3pt">
         <h3><a class="doc-anchor" href="#doc-circ3pt">#</a> <code>circ3pt</code></h3>
         <p><code>circ3pt</code> — operation <code>circ3pt</code>. Alias for <code>circle_from_three_points</code>. Category: *geometry (extended)*.</p>
@@ -19893,13 +20114,6 @@ p $s[$i : len($s) - 1]      # &quot;world&quot; — slice bounds line up
         <h3><a class="doc-anchor" href="#doc-circle-circumference">#</a> <code>circle_circumference</code></h3>
         <p><code>circle_circumference</code> — circle geometry op <code>circumference</code>. Category: *complex / geom / color / trig*.</p>
         <pre><code class="lang-perl">p circle_circumference $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-circle-from-three-points">
-        <h3><a class="doc-anchor" href="#doc-circle-from-three-points">#</a> <code>circle_from_three_points</code></h3>
-        <p><code>circle_from_three_points($x1, $y1, $x2, $y2, $x3, $y3)</code> (alias <code>circ3</code>) — finds the unique circle passing through three non-collinear points. Returns [$cx, $cy, $radius] or undef if collinear.</p>
-        <pre><code class="lang-perl">my $c = circ3(0, 0, 1, 0, 0.5, 0.866)
-p &quot;center=($c-&gt;[0], $c-&gt;[1]) r=$c-&gt;[2]&quot;
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-circle-intersects-circle">
@@ -21252,12 +21466,6 @@ my $owner = hr_get($hr, &quot;user-42&quot;)
         <h3><a class="doc-anchor" href="#doc-continued-fraction-sqrt">#</a> <code>continued_fraction_sqrt</code></h3>
         <p><code>continued_fraction_sqrt</code> — operation <code>continued fraction sqrt</code>. Category: *cryptanalysis &amp; number theory deep*.</p>
         <pre><code class="lang-perl">p continued_fraction_sqrt $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-continuous-compound">
-        <h3><a class="doc-anchor" href="#doc-continuous-compound">#</a> <code>continuous_compound</code></h3>
-        <p><code>continuous_compound($principal, $rate, $time)</code> (alias <code>ccomp</code>) — computes future value with continuous compounding: P × e^(rt).</p>
-        <pre><code class="lang-perl">p ccomp(1000, 0.05, 10)   # ~1648.72
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-contour-area">
@@ -23833,6 +24041,12 @@ p date_is_leap(2100)  # 0
         <pre><code class="lang-perl">p decibel_ratio $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-decimate">
+        <h3><a class="doc-anchor" href="#doc-decimate">#</a> <code>decimate</code></h3>
+        <p><code>downsample(\@signal, $factor)</code> (alias <code>decimate</code>) — reduces sample rate by keeping every nth sample. Apply anti-aliasing filter first to avoid aliasing.</p>
+        <pre><code class="lang-perl">my $decimated = decimate(\@signal, 4)  # keep every 4th sample
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-decimate-step">
         <h3><a class="doc-anchor" href="#doc-decimate-step">#</a> <code>decimate_step</code></h3>
         <p><code>decimate_step</code> — single-step update of <code>decimate</code>. Category: *economics + game theory*.</p>
@@ -25618,12 +25832,6 @@ p doppler(440, 30, 0)    # ~405 Hz (ambulance receding)
         <h3><a class="doc-anchor" href="#doc-downcase-each">#</a> <code>downcase_each</code></h3>
         <p><code>downcase_each</code> — operation <code>downcase each</code>. Category: *trivial numeric helpers*.</p>
         <pre><code class="lang-perl">p downcase_each $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-downsample">
-        <h3><a class="doc-anchor" href="#doc-downsample">#</a> <code>downsample</code></h3>
-        <p><code>downsample(\@signal, $factor)</code> (alias <code>decimate</code>) — reduces sample rate by keeping every nth sample. Apply anti-aliasing filter first to avoid aliasing.</p>
-        <pre><code class="lang-perl">my $decimated = decimate(\@signal, 4)  # keep every 4th sample
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-downto">
@@ -34463,6 +34671,12 @@ class Item impl Printable {
         <pre><code class="lang-perl">p interp_linear([0,1,2], [0,10,20], 0.5)  # 5
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-interpolate">
+        <h3><a class="doc-anchor" href="#doc-interpolate">#</a> <code>interpolate</code></h3>
+        <p><code>upsample(\@signal, $factor)</code> (alias <code>interpolate</code>) — increases sample rate by inserting zeros and filtering. Factor must be positive integer.</p>
+        <pre><code class="lang-perl">my $upsampled = interpolate(\@signal, 4)  # 4x sample rate
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-interpolation-search">
         <h3><a class="doc-anchor" href="#doc-interpolation-search">#</a> <code>interpolation_search</code></h3>
         <p><code>interpolation_search(sorted, target) → int</code> — estimate position by linear interpolation. <code>O(log log n)</code> on uniform data.</p>
@@ -43071,6 +43285,12 @@ spurt($p, &quot;…&quot;)
         <pre><code class="lang-perl">p mobius_poset_two $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-mod-dur">
+        <h3><a class="doc-anchor" href="#doc-mod-dur">#</a> <code>mod_dur</code></h3>
+        <p><code>modified_duration($face, $coupon_rate, $ytm, $periods)</code> (alias <code>mod_dur</code>) — computes modified duration, which directly measures price sensitivity to yield changes. Equal to Macaulay duration / (1 + ytm).</p>
+        <pre><code class="lang-perl">p mod_dur(1000, 0.05, 0.05, 10)   # ~7.3
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-mod-exp">
         <h3><a class="doc-anchor" href="#doc-mod-exp">#</a> <code>mod_exp</code></h3>
         <p><code>mod_exp</code> (aliases <code>modexp</code>, <code>powmod</code>) computes modular exponentiation: base^exp mod m, using fast binary exponentiation.</p>
@@ -43178,12 +43398,6 @@ p powmod(3, 13, 50)    # 7
         <h3><a class="doc-anchor" href="#doc-modhex-encode">#</a> <code>modhex_encode</code></h3>
         <p><code>modhex_encode</code> — encode of <code>modhex</code>. Category: *archive/encoding format primitives*.</p>
         <pre><code class="lang-perl">p modhex_encode $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-modified-duration">
-        <h3><a class="doc-anchor" href="#doc-modified-duration">#</a> <code>modified_duration</code></h3>
-        <p><code>modified_duration($face, $coupon_rate, $ytm, $periods)</code> (alias <code>mod_dur</code>) — computes modified duration, which directly measures price sensitivity to yield changes. Equal to Macaulay duration / (1 + ytm).</p>
-        <pre><code class="lang-perl">p mod_dur(1000, 0.05, 0.05, 10)   # ~7.3
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-modified-irr">
@@ -47617,6 +47831,13 @@ p page_size                              # 4096 (x86_64)
         <pre><code class="lang-perl">p parse_int $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-parsec">
+        <h3><a class="doc-anchor" href="#doc-parsec">#</a> <code>parsec</code></h3>
+        <p><code>parsec</code> (alias <code>pc</code>) — pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly. Common astronomical distance unit.</p>
+        <pre><code class="lang-perl">p pc        # 3.0856775814913673e16 m
+p pc / ly   # ~3.26 light years
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-partial-pressure">
         <h3><a class="doc-anchor" href="#doc-partial-pressure">#</a> <code>partial_pressure</code></h3>
         <p><code>partial_pressure</code> — operation <code>partial pressure</code>. Category: *misc*.</p>
@@ -48685,6 +48906,14 @@ p pexp(5, 0.5)   # P(wait ≤ 5 with avg wait 2)
         <pre><code class="lang-perl">p pint $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-pip">
+        <h3><a class="doc-anchor" href="#doc-pip">#</a> <code>pip</code></h3>
+        <p><code>point_in_polygon($x, $y, @polygon)</code> (alias <code>pip</code>) — tests if a point lies inside a polygon. Polygon is given as flat list [x1,y1,x2,y2,...]. Returns 1 if inside, 0 if outside. Uses ray-casting algorithm.</p>
+        <pre><code class="lang-perl">my @square = (0,0, 4,0, 4,4, 0,4)
+p pip(2, 2, @square)   # 1 (inside)
+p pip(5, 5, @square)   # 0 (outside)
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-pipe-pressure-drop">
         <h3><a class="doc-anchor" href="#doc-pipe-pressure-drop">#</a> <code>pipe_pressure_drop</code></h3>
         <p><code>pipe_pressure_drop</code> — operation <code>pipe pressure drop</code>. Category: *misc*.</p>
@@ -48920,14 +49149,6 @@ p pnorm(100, 90, 15) # z-score for IQ 100
         <h3><a class="doc-anchor" href="#doc-point-distance">#</a> <code>point_distance</code></h3>
         <p><code>point_distance</code> — distance / dissimilarity metric of <code>point</code>. Category: *geometry / physics*.</p>
         <pre><code class="lang-perl">p point_distance $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-point-in-polygon">
-        <h3><a class="doc-anchor" href="#doc-point-in-polygon">#</a> <code>point_in_polygon</code></h3>
-        <p><code>point_in_polygon($x, $y, @polygon)</code> (alias <code>pip</code>) — tests if a point lies inside a polygon. Polygon is given as flat list [x1,y1,x2,y2,...]. Returns 1 if inside, 0 if outside. Uses ray-casting algorithm.</p>
-        <pre><code class="lang-perl">my @square = (0,0, 4,0, 4,4, 0,4)
-p pip(2, 2, @square)   # 1 (inside)
-p pip(5, 5, @square)   # 0 (outside)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-point-in-polygon-ray">
@@ -57962,7 +58183,18 @@ p tpdf(2.228, 10)
       </article>
       <article class="doc-entry" id="doc-sub">
         <h3><a class="doc-anchor" href="#doc-sub">#</a> <code>sub</code></h3>
-        <p>The <code>sub</code> keyword is not supported in stryke. Use <code>fn</code> instead to define functions.</p>
+        <p><strong><code>sub</code> is a Perl 5 idiom that stryke rejects under <code>--no-interop</code>.</strong> Use <code>fn</code> instead — it opens the stryke topic-variable protocol (<code>_</code>, <code>_0</code>, <code>_1</code>, <code>_&lt;</code>) and supports expression-bodied one-liners (<code>fn name = expr</code>).</p>
+        <pre><code class="lang-perl"># WRONG (legacy Perl 5)
+sub double { my $x = shift; $x * 2 }
+sub area($w, $h) { return $w * $h }
+
+# RIGHT (stryke)
+fn double = _ * 2                         # expression-bodied
+fn area($w, $h) = $w * $h                 # named params, one-liner
+fn shout { my $s = _; uc($s) . &quot;!&quot; }   # block body, multi-statement
+</code></pre>
+        <p>In <code>--compat</code> mode <code>sub</code> still parses for Perl-5 ports, but <strong>all new stryke code should use <code>fn</code></strong>.</p>
+        <p>See also: <code>fn</code>, <code>_</code>, <code>_0</code>, <code>_1</code>, style-guide §0 rule 1.</p>
       </article>
       <article class="doc-entry" id="doc-sub-script">
         <h3><a class="doc-anchor" href="#doc-sub-script">#</a> <code>sub_script</code></h3>
@@ -60907,12 +61139,6 @@ $uf = union_find_union($uf, 0, 1)
         <h3><a class="doc-anchor" href="#doc-uppercase">#</a> <code>uppercase</code></h3>
         <p><code>uppercase</code> — operation <code>uppercase</code>. Category: *string*.</p>
         <pre><code class="lang-perl">p uppercase $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-upsample">
-        <h3><a class="doc-anchor" href="#doc-upsample">#</a> <code>upsample</code></h3>
-        <p><code>upsample(\@signal, $factor)</code> (alias <code>interpolate</code>) — increases sample rate by inserting zeros and filtering. Factor must be positive integer.</p>
-        <pre><code class="lang-perl">my $upsampled = interpolate(\@signal, 4)  # 4x sample rate
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-uptime-secs">

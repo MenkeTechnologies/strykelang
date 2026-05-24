@@ -13851,7 +13851,7 @@ impl Parser {
             | "shmctl" | "shmget" | "shmread" | "shmwrite"
             // ── process / system ────────────────────────────────────────
             | "system" | "exec" | "exit" | "die" | "warn" | "dump"
-            | "fork" | "wait" | "waitpid" | "kill" | "alarm" | "sleep"
+            | "fork" | "wait" | "waitpid" | "kill" | "syscall" | "alarm" | "sleep"
             | "chroot" | "times" | "umask" | "reset"
             | "getpgrp" | "setpgrp" | "getppid"
             | "getpriority" | "setpriority"
@@ -14988,9 +14988,9 @@ impl Parser {
             | "polygon_area" | "slope" | "sphere_surface" | "sphere_volume" | "triangle_hypotenuse"
             // ── geometry (extended) ───────────────────────────────────────────
             | "angle_between" | "arc_length" | "bounding_box" | "centroid"
-            | "circle_from_three_points" | "convex_hull" | "ellipse_perimeter"
+            | "circle_from_three_points" | "circ3" | "convex_hull" | "ellipse_perimeter" | "ellper"
             | "frustum_volume" | "haversine_distance" | "line_intersection"
-            | "point_in_polygon" | "polygon_perimeter" | "pyramid_volume"
+            | "point_in_polygon" | "pip" | "polygon_perimeter" | "polyper" | "pyramid_volume"
             | "reflect_point" | "scale_point" | "sector_area"
             | "torus_surface" | "torus_volume" | "translate_point"
             | "vector_angle" | "vector_cross" | "vector_dot" | "vector_magnitude" | "vector_normalize"
@@ -15002,9 +15002,9 @@ impl Parser {
             | "bac_estimate" | "bmi" | "break_even" | "margin" | "markup" | "roi" | "tax" | "tip"
             // ── finance (extended) ────────────────────────────────────────────
             | "amortization_schedule" | "black_scholes_call" | "black_scholes_put"
-            | "bond_price" | "bond_yield" | "capm" | "continuous_compound"
+            | "bond_price" | "bond_yield" | "capm" | "continuous_compound" | "ccomp"
             | "discounted_payback" | "duration" | "irr"
-            | "max_drawdown" | "modified_duration" | "nper" | "num_periods" | "payback_period"
+            | "max_drawdown" | "mdd" | "modified_duration" | "mod_dur" | "nper" | "num_periods" | "payback_period"
             | "pmt" | "pv" | "rule_of_72" | "sharpe_ratio" | "sortino_ratio"
             | "wacc" | "xirr"
             // ── string processing extras ──────────────────────────────────────
@@ -15039,9 +15039,9 @@ impl Parser {
             | "zero_crossings"
             // ── DSP / signal (extended) ───────────────────────────────────────
             | "apply_window" | "bandpass_filter" | "cross_correlation" | "dft"
-            | "downsample" | "energy" | "envelope" | "highpass_filter" | "idft"
+            | "downsample" | "decimate" | "energy" | "envelope" | "hilbert_env" | "highpass_filter" | "idft"
             | "lowpass_filter" | "median_filter" | "normalize_signal" | "phase_spectrum"
-            | "power_spectrum" | "resample" | "spectral_centroid" | "spectrogram" | "upsample"
+            | "power_spectrum" | "psd" | "resample" | "spectral_centroid" | "spectrogram" | "stft" | "upsample" | "interpolate"
             | "window_blackman" | "window_hamming" | "window_hann" | "window_kaiser"
             // ── validation predicates extras ──────────────────────────────────
             | "is_anagram" | "is_balanced_parens" | "is_control" | "is_numeric_string"

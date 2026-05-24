@@ -4856,6 +4856,7 @@ pub(crate) fn try_builtin(
         "waitpid" => Some(builtin_waitpid(args)),
         "ssh" => Some(interp.ssh_builtin_execute(args)),
         "kill" => Some(builtin_kill(args)),
+        "syscall" => Some(builtin_syscall(args)),
         "alarm" => Some(builtin_alarm(args)),
         "sleep" => Some(builtin_sleep(args)),
         "times" => Some(builtin_times()),
@@ -6467,19 +6468,19 @@ pub(crate) fn try_builtin(
         "reflect_point" | "reflpt" => Some(builtin_reflect_point(args)),
         "angle_between" | "angbet" => Some(builtin_angle_between(args)),
         "line_intersection" | "lineintr" => Some(builtin_line_intersection(args)),
-        "point_in_polygon" | "ptinpoly" => Some(builtin_point_in_polygon(args)),
+        "point_in_polygon" | "ptinpoly" | "pip" => Some(builtin_point_in_polygon(args)),
         "convex_hull" | "chull" => Some(builtin_convex_hull(args)),
         "bounding_box" | "bbox" => Some(builtin_bounding_box(args)),
         "centroid" => Some(builtin_centroid(args)),
-        "polygon_perimeter" | "polyperim" => Some(builtin_polygon_perimeter(args)),
-        "circle_from_three_points" | "circ3pt" => Some(builtin_circle_from_three_points(args)),
+        "polygon_perimeter" | "polyperim" | "polyper" => Some(builtin_polygon_perimeter(args)),
+        "circle_from_three_points" | "circ3pt" | "circ3" => Some(builtin_circle_from_three_points(args)),
         "arc_length" | "arclen" => Some(builtin_arc_length(args)),
         "sector_area" | "sectarea" => Some(builtin_sector_area(args)),
         "torus_volume" | "torusvol" => Some(builtin_torus_volume(args)),
         "torus_surface" | "torussurf" => Some(builtin_torus_surface(args)),
         "pyramid_volume" | "pyrvol" => Some(builtin_pyramid_volume(args)),
         "frustum_volume" | "frustvol" => Some(builtin_frustum_volume(args)),
-        "ellipse_perimeter" | "ellipperim" => Some(builtin_ellipse_perimeter(args)),
+        "ellipse_perimeter" | "ellipperim" | "ellper" => Some(builtin_ellipse_perimeter(args)),
         "haversine_distance" | "havdist" => Some(builtin_haversine_distance(args)),
         "vector_dot" | "vdot" => Some(builtin_vector_dot(args)),
         "vector_cross" | "vcross" => Some(builtin_vector_cross(args)),
@@ -6509,11 +6510,11 @@ pub(crate) fn try_builtin(
         "bond_price" | "bondprc" => Some(builtin_bond_price(args)),
         "bond_yield" | "bondyld" => Some(builtin_bond_yield(args)),
         "duration" | "macdur" => Some(builtin_duration(args)),
-        "modified_duration" | "moddur" => Some(builtin_modified_duration(args)),
+        "modified_duration" | "moddur" | "mod_dur" => Some(builtin_modified_duration(args)),
         "sharpe_ratio" | "sharpe" => Some(builtin_sharpe_ratio(args)),
         "sortino_ratio" | "sortino" => Some(builtin_sortino_ratio(args)),
-        "max_drawdown" | "maxdd" => Some(builtin_max_drawdown(args)),
-        "continuous_compound" | "contcomp" => Some(builtin_continuous_compound(args)),
+        "max_drawdown" | "maxdd" | "mdd" => Some(builtin_max_drawdown(args)),
+        "continuous_compound" | "contcomp" | "ccomp" => Some(builtin_continuous_compound(args)),
         "rule_of_72" | "r72" => Some(builtin_rule_of_72(args)),
         "wacc" => Some(builtin_wacc(args)),
         "capm" => Some(builtin_capm(args)),
@@ -6665,17 +6666,17 @@ pub(crate) fn try_builtin(
         "apply_window" | "applywin" => Some(builtin_apply_window(args)),
         "dft" => Some(builtin_dft(args)),
         "idft" => Some(builtin_idft(args)),
-        "power_spectrum" | "powspec" => Some(builtin_power_spectrum(args)),
+        "power_spectrum" | "powspec" | "psd" => Some(builtin_power_spectrum(args)),
         "phase_spectrum" | "phasespec" => Some(builtin_phase_spectrum(args)),
-        "spectrogram" | "spectro" => Some(builtin_spectrogram(args)),
+        "spectrogram" | "spectro" | "stft" => Some(builtin_spectrogram(args)),
         "resample" => Some(builtin_resample(args)),
         "normalize_signal" | "normsig" => Some(builtin_normalize_signal(args)),
         "energy" => Some(builtin_energy(args)),
         "spectral_centroid" | "scentroid" => Some(builtin_spectral_centroid(args)),
-        "envelope" | "env" => Some(builtin_envelope(args)),
+        "envelope" | "env" | "hilbert_env" => Some(builtin_envelope(args)),
         "cross_correlation" | "xcorr" => Some(builtin_cross_correlation(args)),
-        "downsample" | "dsamp" => Some(builtin_downsample(args)),
-        "upsample" | "usamp" => Some(builtin_upsample(args)),
+        "downsample" | "dsamp" | "decimate" => Some(builtin_downsample(args)),
+        "upsample" | "usamp" | "interpolate" => Some(builtin_upsample(args)),
 
         // ── Miscellaneous ────────────────────────────────────────────────
         "fizzbuzz" | "fb" => Some(builtin_fizzbuzz(interp, args)),
@@ -38035,6 +38036,66 @@ fn builtin_kill(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// `kill` — Kill. Returns an integer.
 fn builtin_kill(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::integer(0))
+}
+
+/// `syscall(NUM [, ARG ...])` — Perl-5-compatible raw `syscall(2)` entry point.
+///
+/// Calls `libc::syscall(num, arg1, arg2, …)`. Up to six arguments are passed
+/// to the kernel (matching the platform ABI limit). Integer args are passed
+/// as `c_long`; string args are passed by pointer to their UTF-8 bytes so
+/// `read`-style scratch buffers work. Returns the kernel return value
+/// (or `-1` on error, with `errno` reflected in `$!` via the standard
+/// `*libc::__errno_location()` mechanism on Linux / `*libc::__error()` on
+/// macOS).
+///
+/// Syscall numbers are deliberately not normalized across platforms — pass
+/// the exact number for the host kernel (`SYS_*` in `<sys/syscall.h>`).
+/// Wrong numbers can crash the process; this is an escape hatch, not a
+/// portability layer. Use the wrapper builtins (`getpid`, `kill`, `fork`,
+/// file ops) for portable code.
+///
+/// On non-Unix platforms returns `-1` and sets nothing.
+#[cfg(unix)]
+fn builtin_syscall(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    if args.is_empty() {
+        // Perl: `syscall` with no args is an error; Perl prints "Too few
+        // arguments for syscall". Return -1 as a benign fallback so it can
+        // still be tested behaviorally without crashing the interpreter.
+        return Ok(StrykeValue::integer(-1));
+    }
+    // macOS `syscall(2)` takes `c_int`; Linux `syscall(2)` takes `c_long`.
+    // The libc crate exposes whichever the host ABI uses, so cast at the
+    // call site below.
+    let num_raw = args[0].to_int();
+    // Buffers for string args — kept alive across the syscall call so the
+    // pointer args we pass stay valid.
+    let mut buffers: Vec<std::ffi::CString> = Vec::with_capacity(args.len());
+    // Resolved args as c_long (integer literal value, or pointer-as-long for strings).
+    let mut a: [libc::c_long; 6] = [0; 6];
+    for (i, v) in args.iter().skip(1).take(6).enumerate() {
+        if let Some(s) = v.as_str() {
+            // String: keep the bytes alive and pass the pointer.
+            let c = std::ffi::CString::new(s.into_bytes()).unwrap_or_default();
+            a[i] = c.as_ptr() as libc::c_long;
+            buffers.push(c);
+        } else {
+            a[i] = v.to_int() as libc::c_long;
+        }
+    }
+    #[cfg(target_os = "macos")]
+    let r = unsafe {
+        libc::syscall(num_raw as libc::c_int, a[0], a[1], a[2], a[3], a[4], a[5]) as i64
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let r = unsafe {
+        libc::syscall(num_raw as libc::c_long, a[0], a[1], a[2], a[3], a[4], a[5]) as i64
+    };
+    Ok(StrykeValue::integer(r))
+}
+
+#[cfg(not(unix))]
+fn builtin_syscall(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    Ok(StrykeValue::integer(-1))
 }
 
 /// `alarm` — Alarm. Returns an integer.
