@@ -9899,6 +9899,24 @@ fn completions(
     let byte_col = utf16_col_to_byte_idx(line_text, pos.character);
     let mode = line_completion_mode(line_text, byte_col);
 
+    // Gate: inside a string literal the only useful completion is
+    // sigil-prefixed (Perl-style `$x` / `@x` / `%x` interpolation in
+    // `"..."`). Bare identifiers / snippets are noise — the user is
+    // typing prose / JSON / a regex. Single-quoted is fully opaque
+    // — no completion fires at all. Comments suppress unconditionally.
+    // `#{…}` and backticks reopen Code context (handled in walker).
+    let ctx = cursor_string_context(line_text, byte_col);
+    let suppress = match (ctx, &mode) {
+        (CursorStringContext::Comment, _) => true,
+        (CursorStringContext::SqLiteral, _) => true,
+        (CursorStringContext::DqLiteral, LineCompletionMode::Bare(_)) => true,
+        (CursorStringContext::DqLiteral, LineCompletionMode::HashKey { .. }) => true,
+        _ => false,
+    };
+    if suppress {
+        return Some(CompletionResponse::Array(Vec::new()));
+    }
+
     let mut idx = CompletionIndex::default();
     // Mid-typing falls into a recoverable parse error (`Demo::` waiting
     // for a name). Try the live text first; if it doesn't parse, retry
@@ -9952,6 +9970,131 @@ fn completions(
     items.sort_by(|a, b| a.label.cmp(&b.label));
     items.truncate(384);
     Some(CompletionResponse::Array(items))
+}
+
+/// Where the cursor sits w.r.t. string / comment context. Drives the
+/// completion gate — inside literal string text the only useful
+/// completion is sigil-prefixed (Perl-style `$var` / `@arr` / `%h`
+/// interpolation in `"..."`); everything else is noise (the user is
+/// typing prose / a regex / JSON inside the literal).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CursorStringContext {
+    /// Top-level code — fire all completion normally.
+    Code,
+    /// Inside `"..."` literal text. Sigil completion (`$`/`@`/`%`)
+    /// still fires — that's interpolation. Bare + snippet does NOT.
+    DqLiteral,
+    /// Inside `'...'` opaque single-quote string. No interpolation
+    /// happens here, so NO completion fires at all.
+    SqLiteral,
+    /// Inside a `#…` comment to end of line.
+    Comment,
+}
+
+/// Walk the line up to `byte_col` tracking string / interpolation
+/// state. Mirrors the gate added to zshrs (`cursor_in_uninterpolated_string`),
+/// adapted to stryke's Perl-style syntax:
+///   * `"…"` is interpolating — sigil vars (`$x` / `@x` / `%x`) and
+///     `#{EXPR}` blocks reopen code context inside.
+///   * `'…'` is opaque — no escapes interpreted beyond `\\` / `\'`,
+///     no completion useful.
+///   * `` `…` `` is command substitution (shell exec). Treat the
+///     INSIDE as code so command names complete.
+///   * `#{…}` inside `"…"` is code interpolation — re-opens Code.
+///   * Bare `#` outside a string starts a comment.
+fn cursor_string_context(line: &str, byte_col: usize) -> CursorStringContext {
+    let bytes = line.as_bytes();
+    let cap = byte_col.min(bytes.len());
+    // Stack: '"', '\'', '`' for strings; '{' for `#{…}` code interp.
+    let mut stack: Vec<u8> = Vec::new();
+    let mut i = 0;
+    while i < cap {
+        let c = bytes[i];
+        let top = stack.last().copied();
+        // Backslash escape — only inside `"..."` / `` `...` ``. Single
+        // quotes only escape `\\` and `\'` in Perl-ish syntax, but
+        // skipping any 2-char escape there is harmless for cursor
+        // tracking.
+        if matches!(top, Some(b'"') | Some(b'`') | Some(b'\'')) && c == b'\\' && i + 1 < cap {
+            i += 2;
+            continue;
+        }
+        match top {
+            // Inside single-quote — only `'` closes; no interpolation.
+            Some(b'\'') => {
+                if c == b'\'' {
+                    stack.pop();
+                }
+                i += 1;
+                continue;
+            }
+            // Inside double-quote — `"` closes, OR `#{` opens code.
+            // Sigil-prefixed vars (`$x`, `@x`, `%x`) interpolate
+            // in-place; they do NOT push a new container — the
+            // cursor staying after the sigil chars is still inside
+            // the string for our purposes, but the completion mode
+            // logic in line_completion_mode() already picks up the
+            // sigil so the gate will let those through anyway.
+            Some(b'"') => {
+                if c == b'"' {
+                    stack.pop();
+                    i += 1;
+                    continue;
+                }
+                if c == b'#' && i + 1 < cap && bytes[i + 1] == b'{' {
+                    stack.push(b'{');
+                    i += 2;
+                    continue;
+                }
+                i += 1;
+                continue;
+            }
+            // Inside backtick — `` ` `` closes; otherwise treat as
+            // shell-code context.
+            Some(b'`') => {
+                if c == b'`' {
+                    stack.pop();
+                }
+                i += 1;
+                continue;
+            }
+            // Inside `#{…}` — `}` closes, nested strings allowed.
+            Some(b'{') => {
+                if c == b'}' {
+                    stack.pop();
+                    i += 1;
+                    continue;
+                }
+                // Fall through to top-level handling for nested
+                // strings / nested `#{...}`.
+            }
+            _ => {}
+        }
+        // Top-level (or inside `#{…}`).
+        match c {
+            b'"' => stack.push(b'"'),
+            b'\'' => stack.push(b'\''),
+            b'`' => stack.push(b'`'),
+            b'#' => {
+                // `#{` inside `"..."` is handled above. At top-level
+                // a bare `#` starts a comment unless it's already
+                // inside something. Check it's not the start of a
+                // `#{…}` block at top level (which is unusual; we
+                // still treat it as a comment to match Perl-ish
+                // tokenization where bare `#{` outside a string is a
+                // comment).
+                return CursorStringContext::Comment;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    match stack.last().copied() {
+        Some(b'"') => CursorStringContext::DqLiteral,
+        Some(b'\'') => CursorStringContext::SqLiteral,
+        // Inside `#{…}` or backtick → real code, allow completion.
+        _ => CursorStringContext::Code,
+    }
 }
 
 fn line_completion_mode(line: &str, byte_col: usize) -> LineCompletionMode {
@@ -11290,6 +11433,99 @@ mod completion_tests {
         let (m, s) = raw_at("$", 1);
         assert!(matches!(m, LineCompletionMode::Scalar(_)));
         assert_eq!(s, "");
+    }
+
+    // ── string-context gate ──────────────────────────────────────────
+    //
+    // Mirror of zshrs's `cursor_in_uninterpolated_string` gate: inside
+    // a `"..."` literal the only useful completion is sigil-prefixed
+    // (Perl-style `$x` / `@x` / `%x` interpolation) or inside a
+    // `#{...}` code block. Bare identifier / snippet completion is
+    // noise when the user is typing prose / a regex / JSON. Single-
+    // quoted strings are opaque — suppress completion entirely.
+    // Backticks are command exec — re-open code context.
+
+    #[test]
+    fn cursor_context_top_level_code() {
+        assert_eq!(super::cursor_string_context("print", 5), super::CursorStringContext::Code);
+    }
+
+    #[test]
+    fn cursor_context_inside_dq_literal_text() {
+        // Cursor right after `if` inside `"..."`.
+        assert_eq!(
+            super::cursor_string_context(r#"p "hello if"#, 11),
+            super::CursorStringContext::DqLiteral,
+        );
+    }
+
+    #[test]
+    fn cursor_context_inside_sq_literal() {
+        assert_eq!(
+            super::cursor_string_context("p 'hello if", 11),
+            super::CursorStringContext::SqLiteral,
+        );
+    }
+
+    #[test]
+    fn cursor_context_inside_hash_brace_interp_reopens_code() {
+        // `"hello #{ f"` — cursor inside `#{...}` is real code.
+        assert_eq!(
+            super::cursor_string_context(r#"p "hello #{ f"#, 13),
+            super::CursorStringContext::Code,
+        );
+    }
+
+    #[test]
+    fn cursor_context_inside_backtick_reopens_code() {
+        // Perl-style backtick = command exec → code context inside.
+        assert_eq!(
+            super::cursor_string_context("p `ls", 5),
+            super::CursorStringContext::Code,
+        );
+    }
+
+    #[test]
+    fn cursor_context_after_closed_dq() {
+        // Cursor crosses the closing quote → back to code.
+        assert_eq!(
+            super::cursor_string_context(r#"p "x" if"#, 8),
+            super::CursorStringContext::Code,
+        );
+    }
+
+    #[test]
+    fn cursor_context_inside_comment() {
+        assert_eq!(
+            super::cursor_string_context("# todo: if", 10),
+            super::CursorStringContext::Comment,
+        );
+    }
+
+    #[test]
+    fn cursor_context_dq_then_hash_brace_then_dq_again() {
+        // `"x #{f()} y"` — after the `}`, cursor is back in literal
+        // text. Pin both halves so the depth-tracking is correct.
+        let line = r#""x #{f()} y"#;
+        // Inside `#{f()}` — cursor right after `f`.
+        assert_eq!(
+            super::cursor_string_context(line, 6),
+            super::CursorStringContext::Code,
+        );
+        // After the closing `}` and a space — back in DqLiteral.
+        assert_eq!(
+            super::cursor_string_context(line, 10),
+            super::CursorStringContext::DqLiteral,
+        );
+    }
+
+    #[test]
+    fn cursor_context_escaped_quote_inside_dq() {
+        // `"hello \"world` — the escaped `"` does NOT close the string.
+        assert_eq!(
+            super::cursor_string_context(r#""hello \"world"#, 14),
+            super::CursorStringContext::DqLiteral,
+        );
     }
 
     #[test]
