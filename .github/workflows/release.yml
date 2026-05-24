@@ -17,6 +17,10 @@ jobs:
     # 60min isn't enough for cross+qemu aarch64-linux on a crate this size;
     # use the per-target override below.
     timeout-minutes: ${{ matrix.cross && 180 || 60 }}
+    # Known-flaky targets (continue-on-error: true) don't block the
+    # downstream publish + homebrew jobs when they fail. Build conclusion
+    # still shows red, but `needs: build` is satisfied so the tap can ship.
+    continue-on-error: ${{ matrix.allow_failure || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -27,10 +31,16 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             archive: tar.gz
+            # musl: glibc-only fortified symbols (__snprintf_chk etc.) in
+            # libcrypt.a — pre-existing blocker, not a regression.
+            allow_failure: true
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             archive: tar.gz
             cross: true
+            # Cross+qemu compile is hours long and prone to runner-pressure
+            # cancellation. Tracked separately; don't block releases.
+            allow_failure: true
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
@@ -207,10 +217,8 @@ jobs:
             end
 
             on_linux do
-              on_arm do
-                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz"
-                sha256 "${{ steps.sha.outputs.aarch64_unknown_linux_gnu }}"
-              end
+              # aarch64-linux-gnu omitted — cross-build is flaky in CI;
+              # tracked via continue-on-error in release.yml matrix.
               on_intel do
                 url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
                 sha256 "${{ steps.sha.outputs.x86_64_unknown_linux_gnu }}"
