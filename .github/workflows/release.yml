@@ -14,9 +14,10 @@ jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    # 60min isn't enough for cross+qemu aarch64-linux on a crate this size;
-    # use the per-target override below.
-    timeout-minutes: ${{ matrix.cross && 180 || 60 }}
+    # strykelang is large enough that even native aarch64 release builds
+    # run past 60min on first run (cold cache, fresh deps). 180 across
+    # the board prevents per-target timeout cancellations.
+    timeout-minutes: 180
     # Known-flaky targets (continue-on-error: true) don't block the
     # downstream publish + homebrew jobs when they fail. Build conclusion
     # still shows red, but `needs: build` is satisfied so the tap can ship.
