@@ -992,6 +992,8 @@ pub enum BuiltinId {
     Seekdir,
     /// Read entire file as UTF-8 (`slurp $path`).
     Slurp,
+    /// Glob-to-hash bytes reader (`swallow $pattern`).
+    Swallow,
     /// Blocking HTTP GET (`fetch_url $url`).
     FetchUrl,
     /// `pchannel()` — `(tx, rx)` as a two-element list.

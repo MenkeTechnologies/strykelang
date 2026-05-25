@@ -873,6 +873,41 @@ pub fn glob_patterns(patterns: &[String]) -> StrykeValue {
     StrykeValue::array(paths.into_iter().map(StrykeValue::string).collect())
 }
 
+/// `swallow PATTERN` — expand `pattern` through the zsh glob engine (same one
+/// `glob`/`slurp` use, full qualifier support), read every matched regular file
+/// as raw bytes, and return a hash `{ canonicalized_abspath => bytes }`.
+///
+/// Symlinks are flattened (`fs::canonicalize`) so a symlink farm collapses to
+/// the underlying real paths. Hard-fails on a non-regular-file match the same
+/// way [`read_file_text_or_glob`] does — users opt into silence with the `(N)`
+/// null-glob qualifier (`swallow "missing*(N)"` returns an empty hash).
+///
+/// Literal (non-glob) paths are treated as a one-element match so
+/// `swallow("README.md")` is equivalent to a single-key hash.
+pub fn swallow_to_hash(pattern: &str) -> io::Result<StrykeValue> {
+    let paths: Vec<String> = if pattern_is_glob(pattern) {
+        stryke_glob(pattern)
+    } else {
+        vec![pattern.to_string()]
+    };
+    let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+    for p in &paths {
+        let meta = std::fs::metadata(p)?;
+        if !meta.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("swallow: not a regular file: {}", p),
+            ));
+        }
+        let canon = std::fs::canonicalize(p)?
+            .to_string_lossy()
+            .into_owned();
+        let bytes = read_file_bytes(p)?;
+        out.insert(canon, StrykeValue::bytes(bytes));
+    }
+    Ok(StrykeValue::hash(out))
+}
+
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
 /// filesystem with rayon per directory (and parallelizes across patterns).
 pub fn glob_par_patterns(patterns: &[String]) -> StrykeValue {
