@@ -34,13 +34,12 @@ jobs:
             # musl: glibc-only fortified symbols (__snprintf_chk etc.) in
             # libcrypt.a — pre-existing blocker, not a regression.
             allow_failure: true
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             archive: tar.gz
-            cross: true
-            # Cross+qemu compile is hours long and prone to runner-pressure
-            # cancellation. Tracked separately; don't block releases.
-            allow_failure: true
+            # Native arm64 runner (free for public repos since Aug 2025).
+            # Replaces ubuntu-latest + cross+qemu which took hours and was
+            # silently killed by GitHub's runner monitor.
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
@@ -206,8 +205,10 @@ jobs:
             end
 
             on_linux do
-              # aarch64-linux-gnu omitted — cross-build is flaky in CI;
-              # tracked via continue-on-error in release.yml matrix.
+              on_arm do
+                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz"
+                sha256 "${{ steps.sha.outputs.aarch64_unknown_linux_gnu }}"
+              end
               on_intel do
                 url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
                 sha256 "${{ steps.sha.outputs.x86_64_unknown_linux_gnu }}"
