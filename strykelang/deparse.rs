@@ -1407,6 +1407,10 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             buf.push_str("slurp ");
             deparse_expr_into(buf, e);
         }
+        ExprKind::Swallow(e) => {
+            buf.push_str("swallow ");
+            deparse_expr_into(buf, e);
+        }
         ExprKind::Capture(e) => {
             buf.push_str("capture ");
             deparse_expr_into(buf, e);

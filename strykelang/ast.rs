@@ -1208,6 +1208,11 @@ pub enum ExprKind {
     Await(Box<Expr>),
     /// Read entire file as UTF-8 (`slurp $path`).
     Slurp(Box<Expr>),
+    /// `swallow PATTERN` — expand a zsh-style glob and return a hash
+    /// `{ canonicalized_abspath => raw_bytes }`. Per-file body never decodes,
+    /// so binary files round-trip cleanly. Hard-fails on non-regular matches
+    /// the same way `slurp` does; opt out with the `(N)` null-glob qualifier.
+    Swallow(Box<Expr>),
     /// Run shell command and return structured output (`capture "cmd"`).
     Capture(Box<Expr>),
     /// `` `cmd` `` / `qx{cmd}` — run via `sh -c`, return **stdout as a string** (Perl); updates `$?`.

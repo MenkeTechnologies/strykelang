@@ -1364,6 +1364,7 @@ pub fn format_expr(e: &Expr) -> String {
         ),
         ExprKind::Await(e) => format!("await {}", format_expr(e)),
         ExprKind::Slurp(e) => format!("slurp {}", format_expr(e)),
+        ExprKind::Swallow(e) => format!("swallow {}", format_expr(e)),
         ExprKind::Capture(e) => format!("capture {}", format_expr(e)),
         ExprKind::Qx(e) => format!("qx {}", format_expr(e)),
         ExprKind::FetchUrl(e) => format!("fetch_url {}", format_expr(e)),

@@ -498,6 +498,7 @@ pub const KEYWORDS: &[&str] = &[
     "bench",
     "await",
     "slurp",
+    "swallow",
     "capture",
     "fetch_url",
     "fetch",

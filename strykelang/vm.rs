@@ -9918,6 +9918,16 @@ impl<'a> VM<'a> {
                     .map(StrykeValue::string)
                     .map_err(|e| StrykeError::runtime(format!("slurp: {}", e), line))
             }
+            Some(BuiltinId::Swallow) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let path = self.interp.resolve_stryke_path_string(&path);
+                crate::perl_fs::swallow_to_hash(&path)
+                    .map_err(|e| StrykeError::runtime(format!("swallow: {}", e), line))
+            }
             Some(BuiltinId::Capture) => {
                 let cmd = args
                     .into_iter()

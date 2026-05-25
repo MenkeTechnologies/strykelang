@@ -12515,6 +12515,13 @@ impl VMHelper {
                         FlowOrError::Error(StrykeError::runtime(format!("slurp: {}", e), line))
                     })
             }
+            ExprKind::Swallow(e) => {
+                let path = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&path);
+                crate::perl_fs::swallow_to_hash(&path).map_err(|e| {
+                    FlowOrError::Error(StrykeError::runtime(format!("swallow: {}", e), line))
+                })
+            }
             ExprKind::Capture(e) => {
                 let cmd = self.eval_expr(e)?.to_string();
                 let output = Command::new("sh")

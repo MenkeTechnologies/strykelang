@@ -825,6 +825,10 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             segments.push("slurp".into());
             extract_pipe_source(inner, segments)
         }
+        ExprKind::Swallow(inner) => {
+            segments.push("swallow".into());
+            extract_pipe_source(inner, segments)
+        }
         ExprKind::Chdir(inner) => {
             segments.push("chdir".into());
             extract_pipe_source(inner, segments)

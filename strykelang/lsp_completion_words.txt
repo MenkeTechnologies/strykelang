@@ -9415,6 +9415,8 @@ CORE::slug
 CORE::slugify
 CORE::slurp
 CORE::slurp_raw
+CORE::swa
+CORE::swallow
 CORE::slutsky_decompose
 CORE::sma
 CORE::small_schroder
@@ -20500,6 +20502,8 @@ slug
 slugify
 slurp
 slurp_raw
+swa
+swallow
 slutsky_decompose
 sma
 small_schroder

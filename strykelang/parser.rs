@@ -1783,6 +1783,7 @@ impl Parser {
                 | "shift"
                 | "sin"
                 | "slurp"
+                | "swallow"
                 | "sockets"
                 | "sort"
                 | "splice"
@@ -3095,6 +3096,7 @@ impl Parser {
             },
             // File functions
             "slurp" | "sl" => ExprKind::Slurp(Box::new(arg)),
+            "swallow" | "swa" => ExprKind::Swallow(Box::new(arg)),
             "glob" => ExprKind::Glob(vec![arg]),
             "chdir" => ExprKind::Chdir(Box::new(arg)),
             "stat" => ExprKind::Stat(Box::new(arg)),
@@ -7126,6 +7128,7 @@ impl Parser {
             ExprKind::ReverseExpr(_) => ExprKind::ReverseExpr(Box::new(lhs)),
             ExprKind::Rev(_) => ExprKind::Rev(Box::new(lhs)),
             ExprKind::Slurp(_) => ExprKind::Slurp(Box::new(lhs)),
+            ExprKind::Swallow(_) => ExprKind::Swallow(Box::new(lhs)),
             ExprKind::Capture(_) => ExprKind::Capture(Box::new(lhs)),
             ExprKind::Qx(_) => ExprKind::Qx(Box::new(lhs)),
             ExprKind::FetchUrl(_) => ExprKind::FetchUrl(Box::new(lhs)),
@@ -11597,6 +11600,16 @@ impl Parser {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Slurp(Box::new(a)),
+                    line,
+                })
+            }
+            "swallow" | "swa" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Swallow(Box::new(a)),
                     line,
                 })
             }
