@@ -1,15 +1,20 @@
 //! Unix `crypt(3)` wrapper for Perl `crypt` (DES / system hashing).
 
-// On Linux, `crypt(3)` is in libcrypt; the default link line does not include it, so lld fails
-// with undefined `crypt` unless we name the library explicitly (see CI on ubuntu-latest).
-#[cfg(target_os = "linux")]
+// On Linux glibc, `crypt(3)` is in libcrypt; the default link line does
+// not include it, so lld fails with undefined `crypt` unless we name the
+// library explicitly. Skipped on musl: the only libcrypt.a present in
+// CI is glibc-built and references fortified glibc-only symbols
+// (__snprintf_chk, __explicit_bzero_chk, __isoc23_strtoul) that don't
+// exist in musl → undefined-reference storm. `perl_crypt` returns "" on
+// musl, which is acceptable for a portable static binary.
+#[cfg(all(target_os = "linux", not(target_env = "musl")))]
 #[link(name = "crypt")]
 unsafe extern "C" {}
 
 /// Hash `plaintext` with `salt` using the platform libc `crypt`.
-/// On non-Unix targets, returns an empty string.
+/// On non-Unix targets and on musl Linux, returns an empty string.
 pub fn perl_crypt(plaintext: &str, salt: &str) -> String {
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_env = "musl")))]
     {
         use std::ffi::{CStr, CString};
 
@@ -33,7 +38,7 @@ pub fn perl_crypt(plaintext: &str, salt: &str) -> String {
             CStr::from_ptr(ptr).to_string_lossy().into_owned()
         }
     }
-    #[cfg(not(unix))]
+    #[cfg(any(not(unix), target_env = "musl"))]
     {
         let _ = (plaintext, salt);
         String::new()
