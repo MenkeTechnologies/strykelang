@@ -51,14 +51,14 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use indexmap::IndexMap;
 // StrykeValue's array/hash refs are parking_lot RwLocks — use the same so
 // `array_ref` / `hash_ref` constructors accept the produced `Arc<RwLock<…>>`.
 use parking_lot::RwLock;
 
-use crate::value::StrykeValue;
+use crate::value::{HeapObject, StrykeValue};
 
 /// Set to `true` on first `mark(...)` call. Every post-dispatch hook in
 /// `try_builtin` checks this via `LEDGER_ACTIVE.load(Relaxed)` — when false
@@ -66,9 +66,36 @@ use crate::value::StrykeValue;
 /// entire `record_op` path elides.
 pub static LEDGER_ACTIVE: AtomicBool = AtomicBool::new(false);
 
-fn ledger() -> &'static Mutex<HashMap<usize, ProvNode>> {
-    static LEDGER: OnceLock<Mutex<HashMap<usize, ProvNode>>> = OnceLock::new();
+/// Each ledger entry pairs the lineage record with a `Weak<HeapObject>`
+/// that points at the SAME heap object the entry's `usize` key refers to.
+/// On lookup we upgrade the weak ref and verify the resulting `Arc`'s
+/// pointer still equals the key — if not, the original object was dropped
+/// and the address has been recycled by a fresh allocation, so the entry
+/// is stale and must be discarded.
+///
+/// Without this check, a script (or test) can hit a false positive when
+/// the allocator reuses an address. Pre-fix symptom: parallel tests
+/// occasionally fail `provenance($unmarked)` returning a hashref from a
+/// long-dropped sibling test. The weak-ref check is the GC mechanism the
+/// v1 docstring deferred to "v2" — promoted to v1.1 because pointer reuse
+/// is a real correctness issue, not just a test artifact.
+struct LedgerEntry {
+    weak: Weak<HeapObject>,
+    node: ProvNode,
+}
+
+fn ledger() -> &'static Mutex<HashMap<usize, LedgerEntry>> {
+    static LEDGER: OnceLock<Mutex<HashMap<usize, LedgerEntry>>> = OnceLock::new();
     LEDGER.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Return a `Weak<HeapObject>` for a heap value. `None` for immediates
+/// (no Arc exists to downgrade). Used by `mark` / `record_op` to capture
+/// a non-owning reference we can later verify on lookup.
+fn value_arc_weak(v: &StrykeValue) -> Option<Weak<HeapObject>> {
+    v.with_heap(|_| ())?;
+    let arc = v.heap_arc();
+    Some(Arc::downgrade(&arc))
 }
 
 /// One operation in a value's lineage chain. Lines correspond to the
@@ -141,13 +168,16 @@ pub fn mark(v: &StrykeValue, line: usize) -> bool {
     let Some(ptr) = value_arc_ptr(v) else {
         return false;
     };
+    let Some(weak) = value_arc_weak(v) else {
+        return false;
+    };
     let node = ProvNode {
         origin: short_summary(v),
         origin_line: line,
         ops: Vec::new(),
     };
     if let Ok(mut g) = ledger().lock() {
-        g.insert(ptr, node);
+        g.insert(ptr, LedgerEntry { weak, node });
         LEDGER_ACTIVE.store(true, Ordering::Relaxed);
         true
     } else {
@@ -155,16 +185,27 @@ pub fn mark(v: &StrykeValue, line: usize) -> bool {
     }
 }
 
-/// Return true if the value's Arc is currently in the ledger.
+/// Return true if the value's Arc is currently in the ledger AND the
+/// weak-ref check confirms the entry isn't stale (pointer reuse from a
+/// dropped Arc). Stale entries are reaped during this check.
 pub fn is_marked(v: &StrykeValue) -> bool {
     let Some(ptr) = value_arc_ptr(v) else {
         return false;
     };
-    if let Ok(g) = ledger().lock() {
-        g.contains_key(&ptr)
-    } else {
-        false
+    let Ok(mut g) = ledger().lock() else {
+        return false;
+    };
+    let still_valid = match g.get(&ptr) {
+        Some(entry) => match entry.weak.upgrade() {
+            Some(arc) => Arc::as_ptr(&arc) as usize == ptr,
+            None => false,
+        },
+        None => return false,
+    };
+    if !still_valid {
+        g.remove(&ptr);
     }
+    still_valid
 }
 
 /// Record a builtin-call op on the result's ledger entry. Caller must
@@ -189,43 +230,77 @@ pub fn record_op(
     let Ok(mut g) = ledger().lock() else {
         return;
     };
-    let mut chosen: Option<&ProvNode> = None;
+    // Reap any stale entries among the arg ptrs while scanning. `chosen`
+    // is the longest-chain LIVE parent.
+    let mut chosen: Option<ProvNode> = None;
+    let mut stale_keys: Vec<usize> = Vec::new();
     for a in args {
         if let Some(p) = value_arc_ptr(a) {
-            if let Some(node) = g.get(&p) {
-                if chosen.map_or(true, |c| node.ops.len() > c.ops.len()) {
-                    chosen = Some(node);
+            if let Some(entry) = g.get(&p) {
+                let live = entry
+                    .weak
+                    .upgrade()
+                    .map(|arc| Arc::as_ptr(&arc) as usize == p)
+                    .unwrap_or(false);
+                if !live {
+                    stale_keys.push(p);
+                    continue;
+                }
+                if chosen
+                    .as_ref()
+                    .map_or(true, |c| entry.node.ops.len() > c.ops.len())
+                {
+                    chosen = Some(entry.node.clone());
                 }
             }
         }
     }
-    // Clone the chosen parent's chain (need owned copy since we'll mutate
-    // a different entry).
+    for k in stale_keys {
+        g.remove(&k);
+    }
     let (origin, origin_line, mut ops) = match chosen {
-        Some(c) => (c.origin.clone(), c.origin_line, c.ops.clone()),
-        None => return, // none of the args were actually marked
+        Some(c) => (c.origin, c.origin_line, c.ops),
+        None => return, // no LIVE marked args
     };
     ops.push(ProvOp {
         op: op.to_string(),
         args: args.iter().map(short_summary).collect(),
         line,
     });
+    let Some(result_weak) = value_arc_weak(result) else {
+        return;
+    };
     g.insert(
         result_ptr,
-        ProvNode {
-            origin,
-            origin_line,
-            ops,
+        LedgerEntry {
+            weak: result_weak,
+            node: ProvNode {
+                origin,
+                origin_line,
+                ops,
+            },
         },
     );
 }
 
-/// Look up a value's lineage. Returns the node clone for serialization
-/// to a stryke-side hashref.
+/// Look up a value's lineage. Returns a node clone for serialization to
+/// a stryke-side hashref. Returns `None` if the entry is stale (the
+/// original Arc was dropped and this `ptr` belongs to a new allocation
+/// at the recycled address) — stale entries are reaped during lookup to
+/// bound ledger growth without an explicit sweep.
 pub fn lookup(v: &StrykeValue) -> Option<ProvNode> {
     let ptr = value_arc_ptr(v)?;
-    let g = ledger().lock().ok()?;
-    g.get(&ptr).cloned()
+    let mut g = ledger().lock().ok()?;
+    let entry = g.get(&ptr)?;
+    match entry.weak.upgrade() {
+        Some(arc) if Arc::as_ptr(&arc) as usize == ptr => Some(entry.node.clone()),
+        _ => {
+            // Stale: heap object gone OR address reused by a fresh
+            // allocation. Reap and report missing.
+            g.remove(&ptr);
+            None
+        }
+    }
 }
 
 /// Drop a value's ledger entry. Idempotent.

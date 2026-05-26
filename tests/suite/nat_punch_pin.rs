@@ -220,6 +220,97 @@ fn stun_against_silent_port_returns_undef() {
     );
 }
 
+/// `stun_classify` end-to-end through stryke source: two in-process fake
+/// STUN servers reporting DIFFERENT ports → result hashref's `nat_type`
+/// is `"symmetric"`. Pins the full path: stryke → dispatch → opts hash
+/// parse → nat_punch::classify_nat → response shape conversion.
+#[test]
+fn stun_classify_symmetric_via_stryke_source() {
+    use std::net::UdpSocket;
+    use std::thread;
+    use stryke::nat_punch::STUN_MAGIC_COOKIE;
+
+    fn spawn(claim_port: u16) -> std::net::SocketAddr {
+        let s = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let a = s.local_addr().unwrap();
+        thread::spawn(move || {
+            let mut buf = [0u8; 1024];
+            let (_, src) = s.recv_from(&mut buf).unwrap();
+            let tx_id = &buf[8..20];
+            let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 11);
+            let xp = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+            let xa = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+            let mut r = vec![0u8; 32];
+            r[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+            r[2..4].copy_from_slice(&12u16.to_be_bytes());
+            r[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+            r[8..20].copy_from_slice(tx_id);
+            r[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+            r[22..24].copy_from_slice(&8u16.to_be_bytes());
+            r[24] = 0x00;
+            r[25] = 0x01;
+            r[26..28].copy_from_slice(&xp.to_be_bytes());
+            r[28..32].copy_from_slice(&xa.to_be_bytes());
+            let _ = s.send_to(&r, src);
+        });
+        a
+    }
+    let a = spawn(40010);
+    let b = spawn(40020); // DIFFERENT port → symmetric
+
+    let code = format!(
+        r#"
+        my $sock = udp_open()
+        my $r = stun_classify($sock, {{
+            servers => [ ["{a_ip}", {a_port}], ["{b_ip}", {b_port}] ],
+            timeout_ms => 2000,
+        }})
+        udp_close($sock)
+        sprintf("%s|%d|%d", $r->{{nat_type}}, $r->{{queried}}, $r->{{succeeded}})
+        "#,
+        a_ip = a.ip(),
+        a_port = a.port(),
+        b_ip = b.ip(),
+        b_port = b.port()
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts.len(), 3, "expected 3 fields, got: {s}");
+    assert_eq!(parts[0], "symmetric");
+    assert_eq!(parts[1], "2");
+    assert_eq!(parts[2], "2");
+}
+
+/// `stun_classify` with no responding servers → `succeeded=0`,
+/// `nat_type="unknown"`. Defensive contract: the caller can detect
+/// "couldn't reach any STUN" via `succeeded == 0`.
+#[test]
+fn stun_classify_unknown_when_all_servers_silent() {
+    // Bind+drop a port nothing is listening on.
+    use std::net::UdpSocket;
+    let probe = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let dead = probe.local_addr().unwrap().port();
+    drop(probe);
+
+    let code = format!(
+        r#"
+        my $sock = udp_open()
+        my $r = stun_classify($sock, {{
+            servers    => [ ["127.0.0.1", {dead}] ],
+            timeout_ms => 200,
+        }})
+        udp_close($sock)
+        sprintf("%s|%d|%d", $r->{{nat_type}}, $r->{{queried}}, $r->{{succeeded}})
+        "#,
+        dead = dead
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts[0], "unknown");
+    assert_eq!(parts[1], "1");
+    assert_eq!(parts[2], "0");
+}
+
 /// Loopback hole-punch: two stryke-side sockets simultaneously punch each
 /// other (via `spawn { ... }`), both report `established=1`. Mirrors the
 /// real internet flow but on 127.0.0.1 so there's no STUN / NAT involved.

@@ -224,6 +224,112 @@ pub fn stun_query(
     }
 }
 
+/// Default STUN servers used by `classify_nat` when the caller doesn't
+/// supply a list. Mix of Google + Cloudflare + Nextcloud means at least
+/// one survives any single-provider outage; the diverse paths make
+/// symmetric-NAT detection more reliable than a same-provider trio
+/// (some symmetric NATs use destination-IP-buckets, so two STUN servers
+/// in the same /24 may produce matching ports even on a symmetric NAT).
+pub const DEFAULT_STUN_SERVERS: &[(&str, u16)] = &[
+    ("stun.l.google.com", 19302),
+    ("stun.cloudflare.com", 3478),
+    ("stun.nextcloud.com", 443),
+];
+
+/// Per-server STUN observation collected during NAT classification.
+#[derive(Debug, Clone)]
+pub struct StunObservation {
+    pub server: String,
+    pub ok: bool,
+    pub public_ip: Option<std::net::IpAddr>,
+    pub public_port: Option<u16>,
+}
+
+/// Result of NAT classification.
+///
+/// `nat_type` interpretation:
+///   * `"cone"`      — all responding servers reported the SAME public
+///                     port → the NAT uses a single mapping per source
+///                     socket regardless of destination. `punch` will
+///                     work to any peer.
+///   * `"symmetric"` — responding servers reported DIFFERENT public
+///                     ports → the NAT allocates a fresh public port per
+///                     destination. `punch` will FAIL because the port
+///                     the peer punches at (learned from one STUN
+///                     server) won't be the port your traffic to them
+///                     uses. Requires a TURN relay to recover.
+///   * `"unknown"`   — fewer than 2 servers responded → can't classify;
+///                     don't draw conclusions.
+#[derive(Debug, Clone)]
+pub struct NatClassification {
+    pub nat_type: &'static str,
+    pub public_ip: Option<std::net::IpAddr>,
+    pub observations: Vec<StunObservation>,
+    pub queried: u32,
+    pub succeeded: u32,
+}
+
+/// Query multiple STUN servers via the SAME socket and classify the NAT
+/// based on whether the reported public ports match across servers. All
+/// queries must use the same socket so we're testing the SAME NAT
+/// mapping behaviour across destinations — that's the whole point.
+pub fn classify_nat(
+    socket_id: u64,
+    servers: &[(&str, u16)],
+    timeout: Duration,
+) -> NatClassification {
+    let mut observations: Vec<StunObservation> = Vec::with_capacity(servers.len());
+    let mut ports_seen: Vec<u16> = Vec::with_capacity(servers.len());
+    let mut ip_seen: Option<std::net::IpAddr> = None;
+
+    for (host, port) in servers {
+        let result = stun_query(socket_id, host, *port, timeout);
+        let observation = match result {
+            Some((ip, p)) => {
+                ports_seen.push(p);
+                // The public IP should be identical across all servers
+                // (it's our outbound interface IP). If they disagree
+                // something weird is happening (multi-WAN load balancing?)
+                // — record the first.
+                if ip_seen.is_none() {
+                    ip_seen = Some(ip);
+                }
+                StunObservation {
+                    server: format!("{}:{}", host, port),
+                    ok: true,
+                    public_ip: Some(ip),
+                    public_port: Some(p),
+                }
+            }
+            None => StunObservation {
+                server: format!("{}:{}", host, port),
+                ok: false,
+                public_ip: None,
+                public_port: None,
+            },
+        };
+        observations.push(observation);
+    }
+
+    let queried = servers.len() as u32;
+    let succeeded = ports_seen.len() as u32;
+    let nat_type = if succeeded < 2 {
+        "unknown"
+    } else if ports_seen.iter().all(|p| *p == ports_seen[0]) {
+        "cone"
+    } else {
+        "symmetric"
+    };
+
+    NatClassification {
+        nat_type,
+        public_ip: ip_seen,
+        observations,
+        queried,
+        succeeded,
+    }
+}
+
 /// Result of a hole-punch attempt.
 #[derive(Debug, Clone)]
 pub struct PunchResult {
@@ -467,6 +573,160 @@ mod tests {
         );
         assert_eq!(port, 50001);
         udp_sockets::close(client);
+    }
+
+    /// Multi-server NAT classification using TWO in-process fake STUN
+    /// servers that DISAGREE on the port they report. This is the
+    /// "symmetric NAT" signature: same socket, different destinations,
+    /// different reported public ports. Pins the classifier's logic
+    /// end-to-end through the real STUN protocol path.
+    #[test]
+    fn classify_nat_detects_symmetric_when_servers_report_different_ports() {
+        use std::net::UdpSocket;
+        use std::thread;
+
+        // Helper: spin up a fake STUN that always claims the requester
+        // is at `claim_ip:claim_port`. Returns server's bound addr.
+        fn spawn_fake_stun(claim_port: u16) -> std::net::SocketAddr {
+            let server = UdpSocket::bind("127.0.0.1:0").expect("bind fake");
+            let addr = server.local_addr().unwrap();
+            thread::spawn(move || {
+                let mut buf = [0u8; 1024];
+                let (_, src) = server.recv_from(&mut buf).expect("recv");
+                let tx_id = &buf[8..20];
+                let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 1);
+                let xor_port = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+                let xor_addr =
+                    u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+                let mut resp = vec![0u8; 32];
+                resp[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+                resp[2..4].copy_from_slice(&12u16.to_be_bytes());
+                resp[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+                resp[8..20].copy_from_slice(tx_id);
+                resp[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+                resp[22..24].copy_from_slice(&8u16.to_be_bytes());
+                resp[24] = 0x00;
+                resp[25] = 0x01;
+                resp[26..28].copy_from_slice(&xor_port.to_be_bytes());
+                resp[28..32].copy_from_slice(&xor_addr.to_be_bytes());
+                let _ = server.send_to(&resp, src);
+            });
+            addr
+        }
+
+        let a = spawn_fake_stun(40001);
+        let b = spawn_fake_stun(40002); // DIFFERENT port → symmetric signature
+
+        let client = udp_sockets::open("127.0.0.1", 0).expect("bind client");
+        let a_host = a.ip().to_string();
+        let b_host = b.ip().to_string();
+        let servers = [
+            (a_host.as_str(), a.port()),
+            (b_host.as_str(), b.port()),
+        ];
+        let result = classify_nat(client, &servers, Duration::from_secs(2));
+        udp_sockets::close(client);
+
+        assert_eq!(result.nat_type, "symmetric");
+        assert_eq!(result.queried, 2);
+        assert_eq!(result.succeeded, 2);
+        assert_eq!(result.observations.len(), 2);
+        assert_eq!(
+            result.public_ip,
+            Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(198, 51, 100, 1)))
+        );
+    }
+
+    /// Two fake STUN servers that REPORT THE SAME port → cone NAT.
+    #[test]
+    fn classify_nat_detects_cone_when_servers_agree() {
+        use std::net::UdpSocket;
+        use std::thread;
+        fn spawn(claim_port: u16) -> std::net::SocketAddr {
+            let s = UdpSocket::bind("127.0.0.1:0").unwrap();
+            let a = s.local_addr().unwrap();
+            thread::spawn(move || {
+                let mut buf = [0u8; 1024];
+                let (_, src) = s.recv_from(&mut buf).unwrap();
+                let tx_id = &buf[8..20];
+                let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 9);
+                let xp = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+                let xa = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+                let mut r = vec![0u8; 32];
+                r[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+                r[2..4].copy_from_slice(&12u16.to_be_bytes());
+                r[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+                r[8..20].copy_from_slice(tx_id);
+                r[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+                r[22..24].copy_from_slice(&8u16.to_be_bytes());
+                r[24] = 0x00;
+                r[25] = 0x01;
+                r[26..28].copy_from_slice(&xp.to_be_bytes());
+                r[28..32].copy_from_slice(&xa.to_be_bytes());
+                let _ = s.send_to(&r, src);
+            });
+            a
+        }
+        let a = spawn(45000);
+        let b = spawn(45000); // SAME port → cone
+        let client = udp_sockets::open("127.0.0.1", 0).unwrap();
+        let aip = a.ip().to_string();
+        let bip = b.ip().to_string();
+        let servers = [(aip.as_str(), a.port()), (bip.as_str(), b.port())];
+        let result = classify_nat(client, &servers, Duration::from_secs(2));
+        udp_sockets::close(client);
+        assert_eq!(result.nat_type, "cone");
+        assert_eq!(result.succeeded, 2);
+    }
+
+    /// Only one STUN server responded → can't classify, returns
+    /// "unknown". Important contract: the caller shouldn't conclude
+    /// "punch will work" from a single-server result.
+    #[test]
+    fn classify_nat_returns_unknown_when_only_one_server_responds() {
+        use std::net::UdpSocket;
+        use std::thread;
+        // One working fake.
+        let s = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let working = s.local_addr().unwrap();
+        thread::spawn(move || {
+            let mut buf = [0u8; 1024];
+            let (_, src) = s.recv_from(&mut buf).unwrap();
+            let tx_id = &buf[8..20];
+            let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 9);
+            let xp = 12345u16 ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+            let xa = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+            let mut r = vec![0u8; 32];
+            r[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+            r[2..4].copy_from_slice(&12u16.to_be_bytes());
+            r[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+            r[8..20].copy_from_slice(tx_id);
+            r[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+            r[22..24].copy_from_slice(&8u16.to_be_bytes());
+            r[24] = 0x00;
+            r[25] = 0x01;
+            r[26..28].copy_from_slice(&xp.to_be_bytes());
+            r[28..32].copy_from_slice(&xa.to_be_bytes());
+            let _ = s.send_to(&r, src);
+        });
+
+        // Silent fake (bind, never reply).
+        let silent_sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let silent = silent_sock.local_addr().unwrap();
+        drop(silent_sock);
+
+        let client = udp_sockets::open("127.0.0.1", 0).unwrap();
+        let wip = working.ip().to_string();
+        let sip = silent.ip().to_string();
+        let servers = [
+            (wip.as_str(), working.port()),
+            (sip.as_str(), silent.port()),
+        ];
+        let result = classify_nat(client, &servers, Duration::from_millis(300));
+        udp_sockets::close(client);
+        assert_eq!(result.nat_type, "unknown");
+        assert_eq!(result.queried, 2);
+        assert_eq!(result.succeeded, 1, "exactly one server responded");
     }
 
     /// Two pool sockets bombard each other → first to receive returns

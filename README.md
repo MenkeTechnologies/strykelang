@@ -2744,6 +2744,7 @@ udp_close($sock)
 | `udp_recv_from($id [, $timeout_ms=1000])` | receive one datagram + source address | `{ payload, src_ip, src_port }` or undef |
 | `udp_close($id)` | release socket from pool | 1 if present, 0 if unknown |
 | `stun($id [, $stun_host, $stun_port, $timeout_ms])` | query STUN server via socket | `{ public_ip, public_port }` or undef |
+| `stun_classify($id [, $opts])` | query multiple STUN servers, detect symmetric NAT | `{ nat_type, public_ip, queried, succeeded, observations }` |
 | `punch($id, $peer_ip, $peer_port [, $opts])` | hole-punching state machine | `{ established, latency_ms, bombards, peer_msg, peer_addr }` |
 
 **Protocol details**: RFC 8489 STUN Binding Request with XOR-MAPPED-ADDRESS parsing (modern form) + MAPPED-ADDRESS fallback (legacy servers). Default STUN server is `stun.l.google.com:19302` — Google's public, free, reliable. The same socket handle MUST flow through STUN → punch → application traffic because the NAT mapping is tied to the socket's `(local_ip, local_port)`.
