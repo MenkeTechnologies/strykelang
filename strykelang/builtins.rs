@@ -1144,7 +1144,19 @@ pub(crate) fn try_builtin(
     // arms so we never list every prefixed alternate below.
     let name = name.strip_prefix("CORE::").unwrap_or(name);
     let undef = StrykeValue::UNDEF;
-    match name {
+
+    // Provenance hook precheck: if any heap arg is in the provenance ledger
+    // AND we're not calling one of the provenance meta-ops, we'll need to
+    // append an op record to the result's lineage after dispatch returns.
+    // Fast path: `LEDGER_ACTIVE` is `false` (no `mark` ever called in this
+    // process) → the `iter().any` is skipped, single-branch overhead per
+    // dispatch. See `provenance::record_op` for the propagation logic.
+    let prov_record = crate::provenance::LEDGER_ACTIVE
+        .load(std::sync::atomic::Ordering::Relaxed)
+        && !matches!(name, "mark" | "provenance" | "unmark")
+        && args.iter().any(crate::provenance::is_marked);
+
+    let result = match name {
         "basename" | "bn" => Some(builtin_basename(args)),
         "check" => Some(builtin_check(args)),
         "check_no_interop" | "check_ni" => Some(builtin_check_no_interop(args)),
@@ -5297,6 +5309,9 @@ pub(crate) fn try_builtin(
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
         "controller" => Some(builtin_controller(args)),
         "agent" => Some(builtin_agent(args)),
+        "mark" => Some(builtin_mark(args, line)),
+        "provenance" => Some(builtin_provenance(args)),
+        "unmark" => Some(builtin_unmark(args)),
         "hide" => Some(builtin_hide(args, line)),
         "reveal" => Some(builtin_reveal(args, line)),
         "hide_capacity" => Some(builtin_hide_capacity(args, line)),
@@ -12167,7 +12182,17 @@ pub(crate) fn try_builtin(
         "kde_logistic_kernel" => Some(builtin_kde_logistic_kernel(args)),
 
         _ => crate::rust_ffi::try_call(name, args, line),
+    };
+
+    // Provenance post-hook: extend the lineage of the result if any input was
+    // marked. Only fires on successful builtin returns (`Some(Ok(_))`); errors
+    // and "not a builtin" paths bypass entirely.
+    if prov_record {
+        if let Some(Ok(v)) = &result {
+            crate::provenance::record_op(v, name, args, line);
+        }
     }
+    result
 }
 
 fn jwt_hash_alg_opt(h: &StrykeValue, line: usize) -> StrykeResult<Option<String>> {
@@ -13011,6 +13036,54 @@ fn builtin_agent(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .map(|v| v.to_string());
     let code = crate::agent::run_agent_with_explicit(&host, port, name.as_deref());
     Ok(StrykeValue::integer(code as i64))
+}
+
+/// `mark($val)` — tag a heap value's Arc so subsequent builtin calls that
+/// consume it accumulate a lineage record. Returns `$val` unchanged for
+/// pipeline-friendly use (`my $x = mark({ ... })`). No-op (returns the
+/// value) for immediates (integers, floats, undef) since they have no
+/// stable Arc to key on. Idempotent — marking a value already in the
+/// ledger resets the origin to the current call site.
+fn builtin_mark(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    let Some(v) = args.first() else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    let _ = crate::provenance::mark(v, line);
+    Ok(v.clone())
+}
+
+/// `provenance($val)` — return a hashref describing how `$val` was created
+/// and which builtins have touched it since `mark`, or `undef` if the
+/// value was never marked. Schema:
+///
+///   {
+///     origin       => "HASH entries=3",     # god-style summary at mark time
+///     origin_line  => 7,                    # call-site line of mark($val)
+///     ops          => [
+///       { op => "to_array", args => ["HASH entries=3"], line => 8 },
+///       { op => "pack",     args => ["ARRAY len=3"],    line => 9 },
+///       ...
+///     ],
+///   }
+fn builtin_provenance(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let Some(v) = args.first() else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    match crate::provenance::lookup(v) {
+        Some(node) => Ok(crate::provenance::node_to_value(&node)),
+        None => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `unmark($val)` — drop `$val`'s ledger entry. Returns `$val` unchanged.
+/// Use to bound ledger growth in long-running scripts; v2 will add a sweep
+/// based on Arc weak refs but v1 requires explicit unmark.
+fn builtin_unmark(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let Some(v) = args.first() else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    let _ = crate::provenance::unmark(v);
+    Ok(v.clone())
 }
 
 /// `hide(CARRIER, SECRET [, KEY])` — embed SECRET into CARRIER. PNG bytes (detected by

@@ -2657,6 +2657,34 @@ exit controller("127.0.0.1", 9999)   # blocks on REPL
 
 Wrap either in `spawn { ... }` to run in the background while the calling script continues. Useful for in-process integration tests and local REPL development against a real agent without bringing up a second machine.
 
+### Builtins: `mark(...)` / `provenance(...)` / `unmark(...)` — value lineage as a first-class feature
+
+**World-first** for scripting languages: no major scripting language (Perl, Python, Ruby, JavaScript, Lua, PHP) ships automatic value-lineage tracking as a first-class builtin. Closest analogs are research dataflow languages (LIO, Adapton) which surface lineage as a type-system feature, never as a plain `provenance($x)` call. Stryke ships the trio as a normal dispatch builtin with O(1) HashMap-keyed lookup and zero overhead until any value is marked.
+
+```perl
+my $config = mark({ host => "prod", retries => 3 })       # tag the Arc
+my $p      = provenance($config)
+# { origin => "HASH entries=2", origin_line => 1, ops => [] }
+unmark($config)                                            # reclaim ledger entry
+```
+
+| Builtin | Signature | Returns |
+|---|---|---|
+| `mark($val)` | tag a heap value's Arc; idempotent | `$val` unchanged (pipeline-friendly) |
+| `provenance($val)` | look up `$val`'s lineage | `{ origin, origin_line, ops => [...] }` or `undef` |
+| `unmark($val)` | drop the ledger entry | `$val` unchanged |
+
+**Cost model**: zero when unused. A process-global `LEDGER_ACTIVE` `AtomicBool` flips to `true` on the first `mark(...)` call. Until then every dispatch's post-hook elides via a single inlined `load(Relaxed)` branch.
+
+**v1 scope** (intentional — documented in `strykelang/provenance.rs` and the LSP hover doc):
+- Tracks builtin-call op chains only. User-sub call boundaries aren't recorded yet.
+- Keys on heap Arc pointer — two structurally-equal values with different origins have independent lineages; two refs to the SAME Arc share lineage (the aliasing model `god` already uses).
+- Immediates (integers, floats, undef) have no Arc — `provenance` on them returns `undef`. Wrap in a hashref if you need to track a scalar.
+- String results from builtins (`to_json`, `sha256`, `base64_*`, ...) lose Arc identity in the VM's scalar-return path. Workaround: wrap the string in a one-key hashref so the container's stable Arc carries the lineage. Heap-container results (arrays, hashes, atomics, sets, deques, byte buffers) propagate correctly.
+- Ledger entries persist until `unmark($val)`. A v2 sweep based on Arc weak refs is on the roadmap.
+
+Demo: [`examples/provenance_basics.stk`](examples/provenance_basics.stk) walks through each shape end-to-end.
+
 ### Agent (Worker Daemon)
 
 ```sh

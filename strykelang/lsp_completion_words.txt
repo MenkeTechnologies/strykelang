@@ -6051,6 +6051,7 @@ CORE::mapping_class_torus
 CORE::maps
 CORE::mapw
 CORE::marcum_q
+CORE::mark
 CORE::margalef_richness
 CORE::margin
 CORE::margin_price
@@ -8008,6 +8009,7 @@ CORE::proceed
 CORE::process_list
 CORE::procs
 CORE::producer_surplus
+CORE::provenance
 CORE::product
 CORE::product_digits
 CORE::product_list
@@ -10449,6 +10451,7 @@ CORE::underline
 CORE::unfold
 CORE::unfoldr
 CORE::unfr
+CORE::unmark
 CORE::unicode_codepoints
 CORE::unicode_to_native
 CORE::unification_robinson
@@ -17142,6 +17145,7 @@ marcum_q
 margalef_richness
 margin
 margin_price
+mark
 margrabe
 markdown_render
 markdown_to_html
@@ -19104,6 +19108,7 @@ producer_surplus
 product
 product_digits
 product_list
+provenance
 product_of
 productlog
 profile_hmm_score
@@ -21552,6 +21557,7 @@ unfold
 unfoldr
 unfr
 unicode_codepoints
+unmark
 unicode_to_native
 unification_robinson
 union_find_components
