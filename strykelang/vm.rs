@@ -9928,6 +9928,16 @@ impl<'a> VM<'a> {
                 crate::perl_fs::swallow_to_hash(&path)
                     .map_err(|e| StrykeError::runtime(format!("swallow: {}", e), line))
             }
+            Some(BuiltinId::Ingest) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let path = self.interp.resolve_stryke_path_string(&path);
+                crate::perl_fs::ingest_iterator(&path)
+                    .map_err(|e| StrykeError::runtime(format!("ingest: {}", e), line))
+            }
             Some(BuiltinId::Capture) => {
                 let cmd = args
                     .into_iter()

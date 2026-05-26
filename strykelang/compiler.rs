@@ -8262,6 +8262,14 @@ impl Compiler {
                     Some(root),
                 );
             }
+            ExprKind::Ingest(e) => {
+                self.compile_expr(e)?;
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Ingest as u16, 1),
+                    line,
+                    Some(root),
+                );
+            }
             ExprKind::Capture(e) => {
                 self.compile_expr(e)?;
                 self.emit_op(

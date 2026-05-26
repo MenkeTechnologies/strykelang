@@ -4766,6 +4766,8 @@ CORE::infinite_well_energy
 CORE::information_bottleneck_step
 CORE::information_gain
 CORE::information_ratio
+CORE::ing
+CORE::ingest
 CORE::init_list
 CORE::initial_bearing
 CORE::initials
@@ -15841,6 +15843,8 @@ infinite_well_energy
 information_bottleneck_step
 information_gain
 information_ratio
+ing
+ingest
 init_list
 initial_bearing
 initials
