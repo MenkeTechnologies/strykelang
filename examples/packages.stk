@@ -141,7 +141,12 @@ fn shared_between($a, $b) {
 
 # ── 8. Functions declared via fully-qualified names ───────────────────
 # You can also bind into a package without ever using `package` — the
-# `Pkg::fn` form on the decl is sufficient.
+# `Pkg::fn` form on the decl is sufficient. Declare the package globals
+# the fns reference BEFORE the fns themselves so strict-vars accepts the
+# `$Mailer::Format::VERSION` lookup at lint time (the runtime tolerates
+# either order, but the IDE's static analyzer is single-pass).
+package Mailer::Format
+our $VERSION = "1.0.0"
 
 fn Mailer::Format::greeting($name) {
     "Hello, " . ($name // "friend") . "!"
@@ -150,8 +155,6 @@ fn Mailer::Format::greeting($name) {
 fn Mailer::Format::footer {
     "— sent via Stryke v" . $Mailer::Format::VERSION
 }
-package Mailer::Format
-our $VERSION = "1.0.0"
 
 
 # ── 9. Driver code ────────────────────────────────────────────────────

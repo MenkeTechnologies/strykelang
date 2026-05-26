@@ -28,6 +28,13 @@ spurt($tmp, join("\n",
 ))
 my $rc3 = run($tmp, "arg1", "arg2", "arg3")
 p "  parent exit code  : $rc3"
+# Predeclare `$secret` as a package global so strict-vars accepts the
+# lookup. The point of the test is that the child's `my $secret` (declared
+# inside the spawned interpreter) does NOT leak back into the parent —
+# `defined $secret` must return false because nothing in THIS process ever
+# assigns to it. `our` makes the symbol known to strict-vars without
+# defining the value, so the deliberate "is it leaked?" check stays valid.
+our $secret
 p "  parent sees \$secret? ", (defined $secret ? "yes (BUG)" : "no")
 unlink($tmp)
 
@@ -42,6 +49,16 @@ spurt($lib, join("\n",
     'fn Demo::Lib::add($x, $y) { $x + $y }',
     "",
 ))
+
+# Static-analysis stubs for the package globals + subs that `source($lib)`
+# defines at runtime — the IDE's strict-subs / strict-vars walker can't see
+# inside string-literal payloads, so without these the editor flags the
+# `Demo::Lib::greet(...)` calls below as "undefined subroutine". The
+# runtime `source()` call replaces these stubs with the real definitions.
+our $LIB_NAME
+our $LIB_VERSION
+fn Demo::Lib::greet { undef }
+fn Demo::Lib::add   { undef }
 
 source($lib)
 p "  after source:"
@@ -61,6 +78,10 @@ spurt($lib2, join("\n",
     'fn Demo::Newfn::three { 3 }',
     "",
 ))
+# Static-analysis stubs (same rationale as the Demo::Lib trio above).
+fn Demo::Newfn::one   { undef }
+fn Demo::Newfn::two   { undef }
+fn Demo::Newfn::three { undef }
 source($lib2)
 my $sum = Demo::Newfn::one() + Demo::Newfn::two() + Demo::Newfn::three()
 p "  one()+two()+three() after source : $sum"
