@@ -328,6 +328,22 @@ impl Controller {
                 Err(_) => break,
             };
 
+            // `@` prefix: ship the rest of the line as stryke source to every
+            // agent. Matches the sigil the user already associates with `@` in
+            // the language, and saves four keystrokes vs the explicit `eval`
+            // verb. `@   code`, `@code`, `@code with args` all work — the `@`
+            // is stripped and the remainder is sent verbatim.
+            let trimmed = line.trim_start();
+            if let Some(rest) = trimmed.strip_prefix('@') {
+                let code = rest.trim();
+                if code.is_empty() {
+                    println!("usage: @CODE  (alias for `eval CODE`)");
+                } else {
+                    self.eval_all(code);
+                }
+                continue;
+            }
+
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.is_empty() {
                 continue;
@@ -363,6 +379,7 @@ impl Controller {
                     println!("  status (s)           List connected agents");
                     println!("  fire [SECS] (f)      Start stress test (default: 10s)");
                     println!("  eval CODE (e)        Run arbitrary stryke source on every agent (state persists across calls)");
+                    println!("  @CODE                Shorthand for `eval CODE` — `@<source>` ships <source> to every agent");
                     println!("  terminate (t)        Stop stress test");
                     println!("  shutdown (q)         Disconnect all and exit");
                     println!("  help (h)             Show this help");
