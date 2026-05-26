@@ -300,7 +300,7 @@ echo a:b:c | stryke -aF: -ne 'print $F[1]'  # auto-split
 
 `-l` chomps each record and sets `$\`. `eof` with no args is true on the last line of stdin or each `@ARGV` file (Perl-compat).
 
-**Text decoding** — script reads, `require`, `do`, `slurp`, `<>`, backticks, `par_lines`, etc. all use UTF-8 when valid, else Latin-1 octets per line/chunk (matches stock `perl` tolerance). `use open ':encoding(UTF-8)'` switches `<>` to UTF-8 with `U+FFFD` replacement.
+**Text decoding** — script reads, `require`, `do`, `<>`, backticks, `par_lines`, etc. all use UTF-8 when valid, else Latin-1 octets per line/chunk (matches stock `perl` tolerance). `use open ':encoding(UTF-8)'` switches `<>` to UTF-8 with `U+FFFD` replacement. **`slurp` returns raw bytes** (Perl-default byte-string semantics — `length` is byte count, `spew` round-trips exact bytes); text ops (`eq`, regex, `substr`) still work because byte values stringify via the same UTF-8-or-Latin-1 decoder on demand.
 
 ---
 

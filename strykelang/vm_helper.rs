@@ -12509,8 +12509,8 @@ impl VMHelper {
             ExprKind::Slurp(e) => {
                 let path = self.eval_expr(e)?.to_string();
                 let path = self.resolve_stryke_path_string(&path);
-                crate::perl_fs::read_file_text_or_glob(&path)
-                    .map(StrykeValue::string)
+                crate::perl_fs::read_bytes_or_glob(&path)
+                    .map(StrykeValue::bytes)
                     .map_err(|e| {
                         FlowOrError::Error(StrykeError::runtime(format!("slurp: {}", e), line))
                     })

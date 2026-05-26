@@ -205,6 +205,39 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
     Ok(out)
 }
 
+/// Bytes-faithful slurp: matches Perl's default byte-string semantics. Returns the
+/// concatenated raw bytes for a glob, or the raw bytes of a single file. The
+/// returned [`StrykeValue::bytes`] stringifies via `decode_utf8_or_latin1` so
+/// `eq`/regex/substr on text content still match, while `length()` reports byte
+/// count and `spew`/encoders see the original bytes — making `slurp` byte-perfect
+/// for binary files without changing text-file behaviour.
+pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
+    let (stripped, qual) = zsh::glob::split_qualifier(path);
+    let is_glob = qual.is_some() || zsh::glob::haswilds(stripped);
+    if !is_glob {
+        return read_file_bytes(path);
+    }
+    let paths = stryke_glob(path);
+    if paths.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no files matched glob: {}", path),
+        ));
+    }
+    let mut out = Vec::new();
+    for p in &paths {
+        let meta = std::fs::metadata(p)?;
+        if !meta.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("slurp: not a regular file: {}", p),
+            ));
+        }
+        out.extend_from_slice(&std::fs::read(p)?);
+    }
+    Ok(Arc::new(out))
+}
+
 /// Pattern routes to [`zsh::glob`] when it has wildcards or a bare qualifier
 /// suffix; literal paths short-circuit so callers can preserve "no such
 /// file" diagnostics. Wraps zshrs's own predicates so stryke owns no

@@ -108,6 +108,82 @@ fn slurp_empty_file_returns_empty_string() {
     assert_eq!(eval_int(&code), 1);
 }
 
+// ── slurp on binary content is byte-faithful ────────────────────────
+
+#[test]
+fn slurp_preserves_arbitrary_bytes_through_spew_roundtrip() {
+    // Write a binary payload that includes:
+    //   * 0x00 — embedded NUL (would terminate a C string but not a Perl byte string)
+    //   * 0xFF / 0xFE — high bytes invalid as a UTF-8 leading byte in isolation
+    //   * 0x80 — valid UTF-8 continuation byte appearing without a leader
+    //   * mixed printable + control + high bytes
+    // After slurp + spew the on-disk bytes must be byte-identical.
+    let src = tmp_path("bin_src");
+    let dst = tmp_path("bin_dst");
+    let payload: Vec<u8> = vec![
+        0x00, 0x01, 0x7F, 0x80, 0xC3, 0x28, 0xFF, 0xFE, b'A', b'\n', 0xE2, 0x82, 0xAC,
+    ];
+    std::fs::write(&src, &payload).expect("seed binary src");
+    let code = format!(
+        r#"
+            my $bytes = slurp("{src}");
+            spew("{dst}", $bytes);
+            length($bytes)
+        "#,
+        src = src,
+        dst = dst,
+    );
+    let reported_len = eval_int(&code);
+    let copied = std::fs::read(&dst).expect("read dst");
+    let _ = std::fs::remove_file(&src);
+    let _ = std::fs::remove_file(&dst);
+    assert_eq!(
+        reported_len as usize,
+        payload.len(),
+        "length(slurp) should report raw byte count (Perl-default byte-string semantics)",
+    );
+    assert_eq!(
+        copied, payload,
+        "slurp -> spew must round-trip arbitrary bytes byte-for-byte",
+    );
+}
+
+#[test]
+fn slurp_supports_regex_and_substr_on_text_content() {
+    // Regression: when slurp switched to returning bytes (Perl-default byte
+    // strings), text ops on the result still have to work. This pins the
+    // round-trip through regex match + substr against a normal text file.
+    let path = tmp_path("regex");
+    std::fs::write(&path, "alpha=1\nbeta=22\ngamma=333\n").expect("seed");
+    let code = format!(
+        r#"
+            my $body = slurp("{path}");
+            my $matched = ($body =~ /beta=(\d+)/) ? $1 : "";
+            my $first6 = substr($body, 0, 6);
+            unlink "{path}";
+            ($matched eq "22" && $first6 eq "alpha=") ? 1 : 0
+        "#,
+        path = path,
+    );
+    assert_eq!(
+        eval_int(&code),
+        1,
+        "regex capture and substr must work on slurp's bytes return value"
+    );
+}
+
+#[test]
+fn slurp_length_reports_bytes_not_chars_on_multibyte_utf8() {
+    // Three-byte UTF-8 sequence (€ = 0xE2 0x82 0xAC). Perl default and Rust
+    // bytes semantics: length() == 3. Char-based length would report 1.
+    let path = tmp_path("euro");
+    std::fs::write(&path, "\u{20AC}".as_bytes()).expect("seed euro file");
+    let code = format!(r#"length(slurp("{path}"))"#, path = path);
+    let n = eval_int(&code);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(n, 3, "expected byte count (3) not char count (1)");
+}
+
 // ── -e / -s file tests ──────────────────────────────────────────────
 
 #[test]
