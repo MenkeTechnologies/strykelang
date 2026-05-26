@@ -741,6 +741,66 @@ mod tests {
     use std::net::{TcpListener, TcpStream};
     use std::thread;
 
+    /// `AgentHello` round-trips through bincode with every field intact —
+    /// including `Option<String>` agent_name for both Some/None shapes. This is
+    /// the FIRST frame of every connection; any schema drift here breaks
+    /// every v1↔v2 controller↔agent handshake silently. The TCP loopback test
+    /// covers the protocol layer end-to-end; this pin isolates the serialization
+    /// layer so a regression in either gets a focused diagnostic instead of a
+    /// generic "handshake timeout" failure.
+    #[test]
+    fn agent_hello_bincode_roundtrip_preserves_all_fields() {
+        let hello = AgentHello {
+            proto_version: AGENT_PROTO_VERSION,
+            stryke_version: "0.14.30".to_string(),
+            hostname: "lab-node-07.example.com".to_string(),
+            cores: 32,
+            memory_bytes: 256u64 * 1024 * 1024 * 1024, // 256 GiB
+            agent_name: Some("gpu-worker-α".to_string()), // unicode in name
+        };
+        let bytes = bincode::serialize(&hello).expect("serialize Some-name");
+        let back: AgentHello = bincode::deserialize(&bytes).expect("deserialize");
+        assert_eq!(back.proto_version, AGENT_PROTO_VERSION);
+        assert_eq!(back.stryke_version, "0.14.30");
+        assert_eq!(back.hostname, "lab-node-07.example.com");
+        assert_eq!(back.cores, 32);
+        assert_eq!(back.memory_bytes, 256u64 * 1024 * 1024 * 1024);
+        assert_eq!(back.agent_name.as_deref(), Some("gpu-worker-α"));
+
+        // None branch — agent with no `[agent] name` in config.
+        let anon = AgentHello {
+            proto_version: AGENT_PROTO_VERSION,
+            stryke_version: "0.14.30".to_string(),
+            hostname: "anon".to_string(),
+            cores: 1,
+            memory_bytes: 0,
+            agent_name: None,
+        };
+        let bytes = bincode::serialize(&anon).unwrap();
+        let back: AgentHello = bincode::deserialize(&bytes).unwrap();
+        assert!(back.agent_name.is_none(), "None must round-trip as None");
+    }
+
+    /// `AgentHelloAck` round-trips. Same rationale as the HELLO pin — this is
+    /// the second frame of every connection, and a schema break here means
+    /// every agent fails to interpret the controller's accept/reject signal.
+    #[test]
+    fn agent_hello_ack_bincode_roundtrip_preserves_all_fields() {
+        let ack = AgentHelloAck {
+            session_id: u64::MAX,
+            accepted: false,
+            message: "incompatible proto_version: agent=1 controller=2".to_string(),
+        };
+        let bytes = bincode::serialize(&ack).expect("serialize ack");
+        let back: AgentHelloAck = bincode::deserialize(&bytes).expect("deserialize ack");
+        assert_eq!(back.session_id, u64::MAX);
+        assert!(!back.accepted);
+        assert_eq!(
+            back.message,
+            "incompatible proto_version: agent=1 controller=2"
+        );
+    }
+
     /// `EvalCommand` and `EvalResult` round-trip cleanly through bincode (the
     /// serializer the rest of the agent protocol already uses).
     #[test]
