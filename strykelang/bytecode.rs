@@ -994,6 +994,8 @@ pub enum BuiltinId {
     Slurp,
     /// Glob-to-hash bytes reader (`swallow $pattern`).
     Swallow,
+    /// Streaming glob-to-`[path,bytes]` iterator (`ingest $pattern`).
+    Ingest,
     /// Blocking HTTP GET (`fetch_url $url`).
     FetchUrl,
     /// `pchannel()` — `(tx, rx)` as a two-element list.

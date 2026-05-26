@@ -7950,6 +7950,64 @@ impl VMHelper {
                 continue_block,
             } => {
                 let list_val = self.eval_expr_ctx(list, WantarrayCtx::List)?;
+                // Lazy iterator special-case: drive `next_item()` without
+                // calling `to_list()`, which would materialise every value
+                // into a `Vec` and defeat the streaming promise of producers
+                // like `ingest` / `FsWalkIterator`. Existing producers were
+                // already lazy when piped to `|> e`; this extends streaming
+                // to plain `for my $x (iter)` loops without changing any
+                // other type's behaviour.
+                if list_val.is_iterator() {
+                    let iter = list_val.into_iterator();
+                    self.scope_push_hook();
+                    self.scope.declare_scalar(var, StrykeValue::UNDEF);
+                    self.english_note_lexical_scalar(var);
+                    'outer_iter: loop {
+                        let next = match iter.next_item() {
+                            Some(v) => v,
+                            None => break 'outer_iter,
+                        };
+                        if var == "_" {
+                            self.scope.set_topic(next);
+                        } else {
+                            self.scope
+                                .set_scalar(var, next)
+                                .map_err(|e| FlowOrError::Error(e.at_line(stmt.line)))?;
+                        }
+                        'inner_iter: loop {
+                            match self.exec_block_smart(body) {
+                                Ok(_) => break 'inner_iter,
+                                Err(FlowOrError::Flow(Flow::Last(ref l)))
+                                    if l == label || l.is_none() =>
+                                {
+                                    break 'outer_iter;
+                                }
+                                Err(FlowOrError::Flow(Flow::Next(ref l)))
+                                    if l == label || l.is_none() =>
+                                {
+                                    if let Some(cb) = continue_block {
+                                        let _ = self.exec_block_smart(cb);
+                                    }
+                                    continue 'outer_iter;
+                                }
+                                Err(FlowOrError::Flow(Flow::Redo(ref l)))
+                                    if l == label || l.is_none() =>
+                                {
+                                    continue 'inner_iter;
+                                }
+                                Err(e) => {
+                                    self.scope_pop_hook();
+                                    return Err(e);
+                                }
+                            }
+                        }
+                        if let Some(cb) = continue_block {
+                            let _ = self.exec_block_smart(cb);
+                        }
+                    }
+                    self.scope_pop_hook();
+                    return Ok(StrykeValue::UNDEF);
+                }
                 let items = list_val.to_list();
                 self.scope_push_hook();
                 self.scope.declare_scalar(var, StrykeValue::UNDEF);
@@ -12520,6 +12578,13 @@ impl VMHelper {
                 let path = self.resolve_stryke_path_string(&path);
                 crate::perl_fs::swallow_to_hash(&path).map_err(|e| {
                     FlowOrError::Error(StrykeError::runtime(format!("swallow: {}", e), line))
+                })
+            }
+            ExprKind::Ingest(e) => {
+                let path = self.eval_expr(e)?.to_string();
+                let path = self.resolve_stryke_path_string(&path);
+                crate::perl_fs::ingest_iterator(&path).map_err(|e| {
+                    FlowOrError::Error(StrykeError::runtime(format!("ingest: {}", e), line))
                 })
             }
             ExprKind::Capture(e) => {
@@ -17582,6 +17647,29 @@ impl VMHelper {
                     )));
                 }
                 return Some(self.generator_next(&g));
+            }
+            return None;
+        }
+        // `iter->next` mirrors `generator->next` shape: returns
+        // `[value, more_flag]` where `more_flag` is 1 while items remain and 0
+        // once the source is exhausted. Lets every `StrykeIterator` (ingest,
+        // FsWalkIterator, etc.) be driven explicitly without forcing users to
+        // pick between `for`-loop materialisation and pipe terminals.
+        if receiver.is_iterator() {
+            if method == "next" {
+                if !args.is_empty() {
+                    return Some(Err(StrykeError::runtime(
+                        "iterator->next takes no arguments",
+                        line,
+                    )));
+                }
+                let it = receiver.clone().into_iterator();
+                let (value, more) = match it.next_item() {
+                    Some(v) => (v, 1i64),
+                    None => (StrykeValue::UNDEF, 0i64),
+                };
+                let pair = vec![value, StrykeValue::integer(more)];
+                return Some(Ok(StrykeValue::array_ref(Arc::new(RwLock::new(pair)))));
             }
             return None;
         }

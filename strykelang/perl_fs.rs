@@ -10,7 +10,7 @@ use std::time::UNIX_EPOCH;
 
 use crate::pmap_progress::PmapProgress;
 use crate::value::StrykeValue;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 
 /// zshrs `glob()` and [`StrykeGlobOptsGuard`] both touch zshrs process-global option
 /// state. `glob_par` invokes `stryke_glob` from rayon workers while other threads run
@@ -939,6 +939,70 @@ pub fn swallow_to_hash(pattern: &str) -> io::Result<StrykeValue> {
         out.insert(canon, StrykeValue::bytes(bytes));
     }
     Ok(StrykeValue::hash(out))
+}
+
+/// Streaming sibling of [`swallow_to_hash`]: pre-resolves the glob match set
+/// (same zsh engine, same hard-fail-on-non-regular policy, same canonicalize),
+/// then defers the bytes read until each `next_item()` call. Only one file's
+/// bytes are resident at any time — useful when iterating directories whose
+/// concatenated contents would not fit in memory.
+///
+/// Per-yield value: `[canonical_abspath, raw_bytes]` as an array ref so users
+/// can destructure with `for my ($p, $b) (ingest "**/*.log") { ... }`.
+pub struct IngestIterator {
+    queue: Mutex<std::collections::VecDeque<String>>,
+}
+
+impl IngestIterator {
+    pub fn new(paths: Vec<String>) -> Self {
+        Self {
+            queue: Mutex::new(paths.into_iter().collect()),
+        }
+    }
+}
+
+impl crate::value::StrykeIterator for IngestIterator {
+    fn next_item(&self) -> Option<StrykeValue> {
+        let path = self.queue.lock().pop_front()?;
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => Arc::new(b),
+            // Pre-flight stat/canonicalize already happened in `ingest_iterator`,
+            // so a read failure here means the file was removed mid-iteration.
+            // End the stream rather than panicking — matches Perl/Unix tradition.
+            Err(_) => return None,
+        };
+        let pair = vec![StrykeValue::string(path), StrykeValue::bytes(bytes)];
+        Some(StrykeValue::array_ref(Arc::new(RwLock::new(pair))))
+    }
+}
+
+/// `ingest PATTERN` — same surface as [`swallow_to_hash`] but returns a lazy
+/// iterator instead of materializing a hash. Path discovery + stat +
+/// canonicalize are eager (so qualifier support is identical to swallow/slurp
+/// and non-regular matches hard-fail immediately); file content reads are
+/// deferred to per-iteration `next_item()` calls via [`IngestIterator`].
+pub fn ingest_iterator(pattern: &str) -> io::Result<StrykeValue> {
+    let raw_paths: Vec<String> = if pattern_is_glob(pattern) {
+        stryke_glob(pattern)
+    } else {
+        vec![pattern.to_string()]
+    };
+    let mut canon: Vec<String> = Vec::with_capacity(raw_paths.len());
+    for p in &raw_paths {
+        let meta = std::fs::metadata(p)?;
+        if !meta.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("ingest: not a regular file: {}", p),
+            ));
+        }
+        canon.push(
+            std::fs::canonicalize(p)?
+                .to_string_lossy()
+                .into_owned(),
+        );
+    }
+    Ok(StrykeValue::iterator(Arc::new(IngestIterator::new(canon))))
 }
 
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
