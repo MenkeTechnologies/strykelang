@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+#
+# Nested `my $x = …` in conditions — the "read a row, parse a field"
+# shape that shows up constantly in ETL / log-processing / DB-row code.
+#
+#     while (my $row = $cursor->fetch) {
+#         if (my $tag = parse_tag($row->{summary})) {
+#             $by_tag{$tag}++;
+#         }
+#     }
+#
+# Both decls propagate into their respective bodies; the outer var
+# (`$row`) stays reachable from inside the inner if-body, so the
+# common pattern of mixing both ("$row" plus "$tag from $row") just
+# works.
+#
+# Pinned by `static_analysis::tests::nested_my_in_conditions_both_scopes_propagate`
+# (after the analyzer fix that taught `ExprKind::MyExpr` to register
+# vars in scope — previously every body reference tripped strict-vars).
+
+# Inputs — a stream of access-log-like records, some malformed.
+my @records = (
+    "GET   /api/users         200 12ms",
+    "POST  /api/login         200 47ms",
+    "GET   /api/users/42      404 5ms",
+    "BOGUS",                                    # parser-trip
+    "GET   /api/orders        500 230ms",
+    "DELETE /api/sessions/xyz 204 8ms",
+    "",                                         # empty — outer loop body fires, inner skips
+    "PATCH /api/users/42      200 33ms",
+)
+
+# Extract the HTTP status code if the line looks like a real log row.
+fn status_for_line($line) {
+    return undef unless defined $line && len($line) > 0
+    return undef unless $line =~ /^[A-Z]+\s+\S+\s+(\d{3})/
+    $1 + 0
+}
+
+my %by_status = ()
+my $skipped   = 0
+
+# Drain the queue. `shift @records` returns undef when the queue is empty,
+# which is the loop's exit condition.
+while (defined(my $line = shift @records)) {
+    if (my $status = status_for_line($line)) {
+        # Both `$line` (outer) and `$status` (inner) are visible here.
+        $by_status{$status}++
+        printf "  %-3d  %s\n", $status, $line
+    } else {
+        # Inner MyExpr was falsy — `$line` (outer) is still in scope so
+        # we can report what got skipped.
+        $skipped++
+        printf "  --   %s   (no parse)\n", $line || "(empty)"
+    }
+}
+
+p ""
+p "── Summary ────────────────────────────────────────────"
+printf "  by status code: %s\n", join(", ", map { "$_:$by_status{$_}" } sort keys %by_status)
+printf "  unparseable   : %d\n", $skipped
