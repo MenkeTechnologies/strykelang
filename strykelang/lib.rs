@@ -95,6 +95,7 @@ pub mod pkg;
 mod pmap_progress;
 pub mod ppool;
 pub mod profiler;
+pub mod provenance;
 pub mod pwatch;
 pub mod remote_wire;
 pub mod rust_ffi;

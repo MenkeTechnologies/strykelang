@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+#
+# `provenance($val)` — value lineage as a first-class builtin.
+#
+# No major scripting language (Perl, Python, Ruby, JavaScript, Lua, PHP)
+# ships automatic value-lineage tracking. Closest analogs are research
+# dataflow languages (LIO, Adapton) that surface it as a type-system
+# feature. Stryke ships it as a `mark`/`provenance`/`unmark` builtin trio
+# that's free when unused and one O(1) HashMap lookup per dispatch when
+# active.
+#
+# Use cases:
+#   * "Where did this bad value come from?" — trace transformations back
+#     to the origin call site.
+#   * Audit trails — keep the lineage of credentials / signed payloads
+#     alongside them.
+#   * Test introspection — assert a value was produced by the expected
+#     sequence of ops without coupling to intermediate state.
+#
+# Cost model: a process-global LEDGER_ACTIVE flag flips to true on the
+# first `mark(...)` call. Until then the post-dispatch hook elides via a
+# single inlined AtomicBool::load branch — zero overhead for any script
+# that doesn't opt in.
+
+p "── 1. mark + provenance round trip ────────────────────"
+my $config = mark({ host => "prod", retries => 3, timeout => 30 })
+my $p = provenance($config)
+printf "  origin       : %s\n", $p->{origin}
+printf "  origin_line  : %d\n", $p->{origin_line}
+printf "  ops chain    : %d entries (none yet — fresh mark)\n", len(@{$p->{ops}})
+
+p ""
+p "── 2. unmarked values return undef ────────────────────"
+my $bare = { kind => "unmarked" }
+p "  defined provenance(\$bare)? ", (defined provenance($bare) ? "yes" : "no")
+
+p ""
+p "── 3. immediates can't be tracked (no heap Arc) ───────"
+my $n = mark(42)
+p "  mark(42) returns: $n"
+p "  defined provenance(\$n)?    ", (defined provenance($n) ? "yes" : "no")
+
+p ""
+p "── 4. two refs to same hash share lineage ─────────────"
+my $shared = mark({ count => 1 })
+my $alias = $shared
+my $pa = provenance($shared)
+my $pb = provenance($alias)
+printf "  origin via \$shared : %s (line %d)\n", $pa->{origin}, $pa->{origin_line}
+printf "  origin via \$alias  : %s (line %d)\n", $pb->{origin}, $pb->{origin_line}
+p "  same lineage?      : ", ($pa->{origin_line} == $pb->{origin_line} ? "yes" : "no")
+
+p ""
+p "── 5. unmark clears the ledger entry ──────────────────"
+my $temp = mark({ scratch => 1 })
+p "  before unmark      : ", (defined provenance($temp) ? "tracked" : "cleared")
+unmark($temp)
+p "  after unmark       : ", (defined provenance($temp) ? "tracked" : "cleared")
+
+p ""
+p "── 6. v1 limit: string results don't auto-propagate ───"
+# Builtins that return STRINGS (to_json, sha256, base64_*, …) lose Arc
+# identity in the VM's scalar-return path, so the post-dispatch hook
+# stores under a stale pointer. The v1 idiom: wrap the string in a
+# container so the container's stable Arc carries the lineage.
+my $orig = mark({ user => "jamenk", roles => ["admin"] })
+my $j_unwrapped = to_json($orig)
+p "  bare-string return : ", (defined provenance($j_unwrapped) ? "tracked" : "lost (expected)")
+
+my $envelope = mark({ payload => to_json($orig) })
+p "  wrapped in hashref : ", (defined provenance($envelope) ? "tracked" : "lost")
+# Heap containers (arrays, hashes, atomics, sets, deques, byte buffers)
+# preserve Arc identity through the VM — they're the v1 sweet spot.
+
+p ""
+p "── 7. the debug shape — find where a value came from ──"
+# Real-world pattern: when you discover a suspicious value, query its
+# lineage to see the call-site that originated it.
+my $suspicious = mark({ user_id => -1, requested_at => "1970-01-01" })
+# ... downstream code passes $suspicious through layers ...
+my $report = provenance($suspicious)
+printf "  origin summary : %s\n", $report->{origin}
+printf "  marked at line : %d  (open src here to inspect the call site)\n",
+    $report->{origin_line}
+
+p ""
+p "── done ───────────────────────────────────────────────"
