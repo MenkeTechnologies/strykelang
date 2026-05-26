@@ -106,6 +106,7 @@ pub mod sketches;
 mod sort_fast;
 pub mod special_vars;
 pub mod static_analysis;
+pub mod stego;
 pub mod stress;
 pub mod stryke_log;
 pub mod token;
