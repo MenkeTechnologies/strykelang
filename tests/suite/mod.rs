@@ -199,6 +199,7 @@ mod controller_agent_builtins_pin;
 mod examples_compile_lint;
 mod examples_strict_lint;
 mod kick_pin;
+mod nat_punch_pin;
 mod provenance_pin;
 mod stego_pin;
 mod swallow_pin;
