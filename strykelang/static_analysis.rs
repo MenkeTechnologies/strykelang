@@ -1267,6 +1267,46 @@ impl StaticAnalyzer {
                 }
                 self.analyze_expr(value);
             }
+            // `my $x = …` / `our @y = …` / `state %z = …` / `local …` used in
+            // EXPRESSION position — the canonical case is `while (my $job = ...)
+            // { … $job … }` and `if (my $row = $db->fetch) { … $row … }`. The
+            // parser surfaces it as `ExprKind::MyExpr` (see parser.rs:8927); without
+            // this arm the var is silently dropped from scope tracking and any
+            // reference in the loop / branch body trips strict-vars. Mirrors the
+            // `StmtKind::My`/`Our`/`State`/`Local` registration above (qualified
+            // spelling for `our`, then analyze each initializer).
+            ExprKind::MyExpr { keyword, decls } => {
+                let is_package_global = keyword == "our";
+                for d in decls {
+                    match d.sigil {
+                        Sigil::Scalar => {
+                            self.declare_scalar(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_scalar(&q);
+                            }
+                        }
+                        Sigil::Array => {
+                            self.declare_array(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_array(&q);
+                            }
+                        }
+                        Sigil::Hash => {
+                            self.declare_hash(&d.name);
+                            if is_package_global {
+                                let q = format!("{}::{}", self.current_package, d.name);
+                                self.declare_hash(&q);
+                            }
+                        }
+                        Sigil::Typeglob => {}
+                    }
+                    if let Some(init) = &d.initializer {
+                        self.analyze_expr(init);
+                    }
+                }
+            }
             ExprKind::CompoundAssign { target, value, .. } => {
                 self.analyze_expr(target);
                 self.analyze_expr(value);
@@ -1687,6 +1727,22 @@ fn is_special_var(name: &str) -> bool {
     if name == "$$" {
         return true;
     }
+    // Sigil-agnostic check against the canonical SPECIAL_VARS registry in
+    // builtins.rs (the single source of truth used by `%v` / `%stryke::special_vars`
+    // and runtime `is_special_var`). The registry stores spellings WITH sigil
+    // (`%all`, `%limits`, `%stryke::aliases`, `$stryke::VERSION`, …); the
+    // strict-vars walker calls us with sigil STRIPPED, so we test all three
+    // sigil prefixes. Catches the reflection hashes (`%all`, `%limits`,
+    // `%parameters`, `%pc`, `%term`, `%uname`, the `%stryke::*` family,
+    // `%overload::`), `__FILE__`/`__LINE__`/`__PACKAGE__`/`__SUB__`, and any
+    // future special-var addition without further edits here.
+    if crate::builtins::is_special_var(&format!("${}", name))
+        || crate::builtins::is_special_var(&format!("@{}", name))
+        || crate::builtins::is_special_var(&format!("%{}", name))
+        || crate::builtins::is_special_var(name)
+    {
+        return true;
+    }
     matches!(
         name,
         "ARGV"
@@ -1935,6 +1991,49 @@ mod tests {
         assert!(lint("p $_").is_ok());
         assert!(lint("p @_").is_ok());
         assert!(lint("p $a <=> $b").is_ok());
+    }
+
+    /// Multi-character reflection hash names (`%all`, `%limits`, `%pc`, the
+    /// `%stryke::*` family, `%overload::`) and the `__FILE__` / `__LINE__` /
+    /// `__PACKAGE__` / `__SUB__` script-position pseudo-vars must NOT trip
+    /// strict-vars. They live in the canonical `SPECIAL_VARS` registry in
+    /// builtins.rs and are surfaced via `%v` / `%stryke::special_vars`. This
+    /// pin guards against regression of the sigil-agnostic delegation added
+    /// to `is_special_var` — without it, `keys %all` and friends fail in the
+    /// IDE diagnostic path (always strict) and in any script that opts in
+    /// with `use strict`.
+    #[test]
+    fn reflection_and_meta_special_vars_ok_under_strict() {
+        for src in [
+            "p scalar keys %all",
+            "p scalar keys %b",
+            "p scalar keys %limits",
+            "p scalar keys %parameters",
+            "p scalar keys %pc",
+            "p scalar keys %term",
+            "p scalar keys %uname",
+            "p scalar keys %stryke::all",
+            "p scalar keys %stryke::builtins",
+            "p scalar keys %stryke::aliases",
+            "p scalar keys %stryke::categories",
+            "p scalar keys %stryke::descriptions",
+            "p scalar keys %stryke::extensions",
+            "p scalar keys %stryke::keywords",
+            "p scalar keys %stryke::operators",
+            "p scalar keys %stryke::perl_compats",
+            "p scalar keys %stryke::primaries",
+            "p scalar keys %stryke::special_vars",
+            "p scalar keys %overload::",
+            "p $stryke::VERSION",
+            "p __FILE__",
+            "p __LINE__",
+            "p __PACKAGE__",
+        ] {
+            assert!(
+                lint(src).is_ok(),
+                "strict-vars false-positive on legitimate stryke special var: {src}"
+            );
+        }
     }
 
     #[test]
