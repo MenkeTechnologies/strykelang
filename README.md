@@ -2685,6 +2685,33 @@ unmark($config)                                            # reclaim ledger entr
 
 Demo: [`examples/provenance_basics.stk`](examples/provenance_basics.stk) walks through each shape end-to-end.
 
+### Builtins: `kick(...)` / `udp_send(...)` — TCP knock + UDP multi-shot
+
+Convenience builtins over standard socket calls. Both capabilities exist in every language's stdlib; stryke ships them as bare builtins so service probes / Wake-on-LAN scripts / NAT keepalives don't need a socket import. (`punch` — full NAT hole-punching with STUN discovery for peer-to-peer UDP between stryke instances behind NAT — lands in a follow-on commit.)
+
+```perl
+# TCP service-health sweep — 250 ms per probe, returns 1 / 0.
+for my $pair (([ "db",  5432 ], [ "redis", 6379 ], [ "api", 8080 ])) {
+    printf "  %-6s :%d  %s\n", $pair->[0], $pair->[1],
+        kick($pair->[0], $pair->[1], 250) ? "UP" : "down"
+}
+
+# Wake-on-LAN magic packet, 3× for reliability.
+my @mac_bytes = map { hex($_) } split /:/, "aa:bb:cc:dd:ee:ff"
+my @packet = (0xff) x 6
+push @packet, @mac_bytes for 1:16
+udp_send("255.255.255.255", 9, pack("C*", @packet), 3)
+```
+
+| Builtin | Signature | Returns |
+|---|---|---|
+| `kick($host, $port [, $timeout_ms])` | TCP connect with timeout (default 1000 ms) | `1` on success, `0` on any failure |
+| `udp_send($host, $port, $payload [, $retries=1, $interval_ms=20])` | bind ephemeral, `sendto` the payload N times | count of successful sends |
+
+Both fail soft — bad host, closed port, DNS failure, invalid port all return 0 without raising, so callers can write `if (kick(...))` and `if (udp_send(...))` idiomatically.
+
+Demo: [`examples/kick_probe.stk`](examples/kick_probe.stk).
+
 ### Agent (Worker Daemon)
 
 ```sh

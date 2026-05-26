@@ -5456,6 +5456,7 @@ CORE::khinchin
 CORE::khinchin_constant
 CORE::khovanov_q_grading
 CORE::khovanov_rasmussen_s
+CORE::kick
 CORE::kill
 CORE::killing_form_su2
 CORE::killing_vector_lie_step
@@ -10433,6 +10434,7 @@ CORE::ucfirst
 CORE::ucm_unobserved_components
 CORE::ud
 CORE::ue
+CORE::udp_send
 CORE::ugz
 CORE::uid
 CORE::uin
@@ -16543,6 +16545,7 @@ khinchin
 khinchin_constant
 khovanov_q_grading
 khovanov_rasmussen_s
+kick
 kill
 killing_form_su2
 killing_vector_lie_step
@@ -21538,6 +21541,7 @@ ucfirst
 ucm_unobserved_components
 ud
 ue
+udp_send
 ugz
 uid
 uin

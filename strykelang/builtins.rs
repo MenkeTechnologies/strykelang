@@ -5309,6 +5309,8 @@ pub(crate) fn try_builtin(
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
         "controller" => Some(builtin_controller(args)),
         "agent" => Some(builtin_agent(args)),
+        "kick" => Some(builtin_kick(args)),
+        "udp_send" => Some(builtin_udp_send(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
         "unmark" => Some(builtin_unmark(args)),
@@ -13036,6 +13038,152 @@ fn builtin_agent(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .map(|v| v.to_string());
     let code = crate::agent::run_agent_with_explicit(&host, port, name.as_deref());
     Ok(StrykeValue::integer(code as i64))
+}
+
+/// `kick($host, $port [, $timeout_ms])` — TCP liveness probe. Attempts a
+/// connect to `$host:$port` with a wall-clock timeout (default 1000ms,
+/// matching `nc -zw1` convention). Returns `1` if the connect succeeds,
+/// `0` on any failure: closed port, refused connection, name-resolution
+/// failure, timeout. Never raises — failure is signalled by the return
+/// value so callers can write `if (kick("db", 5432)) { ... }`.
+///
+/// Resolves `$host` via the OS resolver — accepts hostnames, IPv4 and
+/// IPv6 literals, plus per-OS aliases (`localhost`, `127.0.0.1`, `::1`,
+/// `dbprod.example.com`). When DNS returns multiple addresses, each is
+/// tried in turn until one succeeds OR all fail within the timeout.
+fn builtin_kick(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let host = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if host.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    let port_raw = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    if !(1..=65535).contains(&port_raw) {
+        return Ok(StrykeValue::integer(0));
+    }
+    let port = port_raw as u16;
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u64)
+        .unwrap_or(1000);
+    let timeout = Duration::from_millis(timeout_ms);
+
+    let addrs: Vec<_> = match (host.as_str(), port).to_socket_addrs() {
+        Ok(it) => it.collect(),
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    for addr in addrs {
+        if TcpStream::connect_timeout(&addr, timeout).is_ok() {
+            return Ok(StrykeValue::integer(1));
+        }
+    }
+    Ok(StrykeValue::integer(0))
+}
+
+/// `udp_send($host, $port, $payload [, $retries=1, $interval_ms=20])` — send
+/// `$payload` as a UDP datagram to `$host:$port`. Returns the number of
+/// datagrams successfully sent (0 = total failure, `$retries` = full success).
+///
+/// `$payload` can be a string (sent as UTF-8 bytes) or a byte buffer (sent
+/// as-is). When `$retries > 1`, the same datagram is sent that many times
+/// at `$interval_ms` apart — useful for Wake-on-LAN magic packets (commonly
+/// sent 3× for reliability), NAT keepalives, and best-effort IoT discovery
+/// broadcasts.
+///
+/// For peer-to-peer NAT traversal (where both endpoints are behind NAT and
+/// need to discover their public `ip:port` via STUN before exchanging
+/// packets), use `punch($peer_ip, $peer_port)` which handles the full
+/// hole-punching protocol.
+fn builtin_udp_send(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::net::{SocketAddr, UdpSocket};
+    use std::time::Duration;
+
+    let host = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if host.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    let port_raw = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    if !(1..=65535).contains(&port_raw) {
+        return Ok(StrykeValue::integer(0));
+    }
+    let port = port_raw as u16;
+
+    let payload: Vec<u8> = match args.get(2).filter(|v| !v.is_undef()) {
+        Some(v) => {
+            if let Some(arc) = v.as_bytes_arc() {
+                (*arc).clone()
+            } else {
+                v.to_string().into_bytes()
+            }
+        }
+        None => Vec::new(),
+    };
+    let retries = args
+        .get(3)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u32)
+        .unwrap_or(1);
+    let interval_ms = args
+        .get(4)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(0) as u64)
+        .unwrap_or(20);
+
+    let addrs: Vec<SocketAddr> = match (host.as_str(), port).to_socket_addrs() {
+        Ok(it) => it.collect(),
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    if addrs.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    // Bind once, use for every shot. `0.0.0.0:0` picks an ephemeral port
+    // that the kernel rotates per call — fine for outbound-only.
+    let socket = match UdpSocket::bind("0.0.0.0:0") {
+        Ok(s) => s,
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    // Enable broadcast in case the caller is targeting 255.255.255.255 for
+    // local-subnet WoL. Failure to set is non-fatal — the call may still
+    // succeed for unicast.
+    let _ = socket.set_broadcast(true);
+
+    let mut sent: u32 = 0;
+    let interval = Duration::from_millis(interval_ms);
+    for shot in 0..retries {
+        let mut shot_ok = false;
+        for addr in &addrs {
+            if socket.send_to(&payload, addr).is_ok() {
+                shot_ok = true;
+                break;
+            }
+        }
+        if shot_ok {
+            sent += 1;
+        }
+        if shot + 1 < retries && interval_ms > 0 {
+            std::thread::sleep(interval);
+        }
+    }
+    Ok(StrykeValue::integer(sent as i64))
 }
 
 /// `mark($val)` — tag a heap value's Arc so subsequent builtin calls that
