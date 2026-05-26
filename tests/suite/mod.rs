@@ -196,6 +196,7 @@ mod feature_integration_pin;
 mod file_io_pin;
 mod ingest_pin;
 mod controller_agent_builtins_pin;
+mod examples_compile_lint;
 mod examples_strict_lint;
 mod stego_pin;
 mod swallow_pin;
