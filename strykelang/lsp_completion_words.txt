@@ -8077,6 +8077,7 @@ CORE::pty_strip_ansi
 CORE::pubip
 CORE::public_goods_game_payoff
 CORE::pulse_pressure
+CORE::punch
 CORE::punct
 CORE::punctuation
 CORE::punif
@@ -9845,6 +9846,7 @@ CORE::struve_l
 CORE::student_pdf
 CORE::study
 CORE::stulz_min_call
+CORE::stun
 CORE::sturmian_word
 CORE::sub
 CORE::sub_script
@@ -10434,7 +10436,11 @@ CORE::ucfirst
 CORE::ucm_unobserved_components
 CORE::ud
 CORE::ue
+CORE::udp_close
+CORE::udp_open
+CORE::udp_recv
 CORE::udp_send
+CORE::udp_send_to
 CORE::ugz
 CORE::uid
 CORE::uin
@@ -19176,6 +19182,7 @@ pub
 pubip
 public_goods_game_payoff
 pulse_pressure
+punch
 punct
 punctuation
 punif
@@ -20948,6 +20955,7 @@ struve_l
 student_pdf
 study
 stulz_min_call
+stun
 sturmian_word
 sub
 sub_script
@@ -21541,7 +21549,11 @@ ucfirst
 ucm_unobserved_components
 ud
 ue
+udp_close
+udp_open
+udp_recv
 udp_send
+udp_send_to
 ugz
 uid
 uin

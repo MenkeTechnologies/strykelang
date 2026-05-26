@@ -2712,6 +2712,50 @@ Both fail soft — bad host, closed port, DNS failure, invalid port all return 0
 
 Demo: [`examples/kick_probe.stk`](examples/kick_probe.stk).
 
+### Builtins: `udp_open` / `stun` / `punch` / `udp_send_to` / `udp_recv` / `udp_close` — P2P over the open internet
+
+Stryke-to-stryke communication between two hosts behind arbitrary NATs, no infrastructure required. STUN client + UDP hole-punching state machine, both rolled in-tree (~500 lines of Rust, no third-party network crate dependency). Bytecode-VM-direct dispatch — same path as the rest of the builtins.
+
+```perl
+# Side A (any host, runs first):
+my $sock = udp_open()
+my $info = stun($sock)                       # → { public_ip, public_port }
+printf "Tell peer to: stryke peer.stk %s %d\n",
+    $info->{public_ip}, $info->{public_port}
+my $first = udp_recv($sock, 60_000)          # wait for peer's bombards
+p "Peer connected: $first"
+udp_close($sock)
+
+# Side B (peer host):
+my $sock = udp_open()
+my $r = punch($sock, $peer_ip, $peer_port, { payload => "hello!" })
+if ($r->{established}) {
+    printf "Connected in %d bombards (%dms)\n", $r->{bombards}, $r->{latency_ms}
+    p "Peer replied: $r->{peer_msg}"
+}
+udp_close($sock)
+```
+
+| Builtin | Signature | Returns |
+|---|---|---|
+| `udp_open([$bind_host, $bind_port])` | bind a UDP socket, register in pool | integer handle (0 on bind failure) |
+| `udp_send_to($id, $host, $port, $payload)` | send via pool socket | bytes sent (0 on failure) |
+| `udp_recv($id [, $timeout_ms=1000])` | receive one datagram | payload string / bytes / undef on timeout |
+| `udp_close($id)` | release socket from pool | 1 if present, 0 if unknown |
+| `stun($id [, $stun_host, $stun_port, $timeout_ms])` | query STUN server via socket | `{ public_ip, public_port }` or undef |
+| `punch($id, $peer_ip, $peer_port [, $opts])` | hole-punching state machine | `{ established, latency_ms, bombards, peer_msg, peer_addr }` |
+
+**Protocol details**: RFC 8489 STUN Binding Request with XOR-MAPPED-ADDRESS parsing (modern form) + MAPPED-ADDRESS fallback (legacy servers). Default STUN server is `stun.l.google.com:19302` — Google's public, free, reliable. The same socket handle MUST flow through STUN → punch → application traffic because the NAT mapping is tied to the socket's `(local_ip, local_port)`.
+
+**Real-world success rate is ~70-80%**. Failures (no language-level workaround):
+- **Symmetric NATs** — some mobile carriers, some corporate firewalls assign a different public port per destination, so the port revealed by STUN ≠ the port the peer's traffic arrives on.
+- **UDP-blocking firewalls** — drop all UDP outright.
+- **Timing misalignment** — if one peer punches 30s before the other, the first peer's NAT mapping may time out before the second peer starts.
+
+For guaranteed delivery you need a TURN relay (relay every packet through a public server). Out of scope for stryke builtins — run a [coturn](https://github.com/coturn/coturn) server and relay manually via `udp_send_to`.
+
+Demo: [`examples/p2p_chat.stk`](examples/p2p_chat.stk) — runnable two-process flow.
+
 ### Agent (Worker Daemon)
 
 ```sh
