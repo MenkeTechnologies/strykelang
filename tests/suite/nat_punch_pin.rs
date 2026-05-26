@@ -66,6 +66,56 @@ fn udp_loopback_send_recv_round_trip() {
     assert_eq!(s.trim(), "ping", "loopback datagram payload must round-trip");
 }
 
+/// `udp_recv_from` returns a hashref `{ payload, src_ip, src_port }` for
+/// the v2 bidirectional-chat path. The src_ip / src_port carry the
+/// sender's address — for a NAT'd peer this is the public ip:port the
+/// kernel reported on recvfrom(2).
+#[test]
+fn udp_recv_from_surfaces_source_address() {
+    use std::net::UdpSocket;
+    let probe = UdpSocket::bind("127.0.0.1:0").expect("probe");
+    let recv_port = probe.local_addr().unwrap().port();
+    drop(probe);
+
+    let code = format!(
+        r#"
+        my $recv = udp_open("127.0.0.1", {port})
+        my $send = udp_open()
+        udp_send_to($send, "127.0.0.1", {port}, "ping-from-known")
+        my $msg = udp_recv_from($recv, 500)
+        udp_close($recv); udp_close($send)
+        if (!defined $msg) {{ "TIMEOUT" }}
+        else {{
+            sprintf("%s|%s|%d",
+                $msg->{{payload}}, $msg->{{src_ip}}, $msg->{{src_port}})
+        }}
+        "#,
+        port = recv_port
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts.len(), 3, "expected 3 fields, got: {:?}", s.trim());
+    assert_eq!(parts[0], "ping-from-known", "payload field");
+    assert_eq!(parts[1], "127.0.0.1", "src_ip field");
+    let src_port: u16 = parts[2].parse().expect("src_port parse");
+    assert!(src_port > 0, "src_port must be positive, got {src_port}");
+}
+
+/// `udp_recv_from` on timeout returns `undef` (same null contract as
+/// `udp_recv`). Caller can use `defined` to branch.
+#[test]
+fn udp_recv_from_returns_undef_on_timeout() {
+    let s = eval_string(
+        r#"
+        my $sock = udp_open()
+        my $msg = udp_recv_from($sock, 100)
+        udp_close($sock)
+        defined $msg ? "got" : "timeout"
+        "#,
+    );
+    assert_eq!(s.trim(), "timeout");
+}
+
 /// `udp_recv` with a short timeout returns `undef` when nothing arrives.
 /// Wall time should be bounded by the timeout (caller's contract for
 /// non-hang behaviour).

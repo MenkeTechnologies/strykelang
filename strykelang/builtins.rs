@@ -5314,6 +5314,7 @@ pub(crate) fn try_builtin(
         "udp_open" => Some(builtin_udp_open(args)),
         "udp_send_to" => Some(builtin_udp_send_to(args)),
         "udp_recv" => Some(builtin_udp_recv(args)),
+        "udp_recv_from" => Some(builtin_udp_recv_from(args)),
         "udp_close" => Some(builtin_udp_close(args)),
         "stun" => Some(builtin_stun(args)),
         "punch" => Some(builtin_punch(args)),
@@ -13286,6 +13287,64 @@ fn builtin_udp_recv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         },
         None => Ok(StrykeValue::UNDEF),
     }
+}
+
+/// `udp_recv_from($id [, $timeout_ms=1000])` — read one datagram from
+/// socket `$id` and surface the source address alongside the payload.
+/// Returns a hashref:
+///
+///   { payload  => "hello",        # string if UTF-8 valid, else bytes
+///     src_ip   => "203.0.113.45",
+///     src_port => 51234 }
+///
+/// Returns `undef` on timeout / unknown id / recv error. Default timeout
+/// 1000ms; `0` blocks indefinitely. The src fields are exactly what the
+/// kernel reported on `recvfrom(2)` — for a peer behind NAT this is the
+/// peer's PUBLIC address as seen from this side, not their private LAN
+/// address. Pair with `udp_send_to($id, $src_ip, $src_port, $reply)` to
+/// answer the sender.
+fn builtin_udp_recv_from(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let timeout_ms = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(0) as u64)
+        .unwrap_or(1000);
+    let timeout = if timeout_ms == 0 {
+        None
+    } else {
+        Some(Duration::from_millis(timeout_ms))
+    };
+    let (bytes, src) = match crate::udp_sockets::recv(id, timeout) {
+        Some(pair) => pair,
+        None => return Ok(StrykeValue::UNDEF),
+    };
+    let payload = match String::from_utf8(bytes.clone()) {
+        Ok(s) => StrykeValue::string(s),
+        Err(_) => StrykeValue::bytes(StdArc::new(bytes)),
+    };
+    let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+    m.insert("payload".into(), payload);
+    m.insert(
+        "src_ip".into(),
+        StrykeValue::string(src.ip().to_string()),
+    );
+    m.insert(
+        "src_port".into(),
+        StrykeValue::integer(src.port() as i64),
+    );
+    Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
 }
 
 /// `udp_close($id)` — release socket `$id` from the pool. Returns `1` if

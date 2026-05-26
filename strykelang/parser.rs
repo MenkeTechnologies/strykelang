@@ -14011,8 +14011,8 @@ impl Parser {
             // ── network probes (TCP knock, UDP send) ───────────────────────
             | "kick" | "udp_send"
             // ── P2P NAT traversal (persistent socket pool + STUN + punch) ──
-            | "udp_open" | "udp_send_to" | "udp_recv" | "udp_close"
-            | "stun" | "punch"
+            | "udp_open" | "udp_send_to" | "udp_recv" | "udp_recv_from"
+            | "udp_close" | "stun" | "punch"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
