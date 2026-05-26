@@ -1993,6 +1993,62 @@ mod tests {
         assert!(lint("p $a <=> $b").is_ok());
     }
 
+    /// `my $x = …` / `our $x = …` / `state $x = …` in expression position —
+    /// canonical case is `while (my $job = ...) { … $job … }`. Before the
+    /// `ExprKind::MyExpr` arm in `analyze_expr`, the declaration was silently
+    /// dropped from scope tracking and any body reference tripped
+    /// strict-vars. Pin all the conditional-expression contexts where the
+    /// pattern is idiomatic so regressions get caught at unit-test time
+    /// rather than waiting for the full `examples_strict_lint` sweep.
+    #[test]
+    fn my_in_while_condition_scopes_var_for_body() {
+        assert!(lint("while (my $line = readline(STDIN)) { p $line; }").is_ok());
+    }
+
+    #[test]
+    fn my_in_if_condition_scopes_var_for_body() {
+        assert!(lint("if (my $x = 42) { p $x; }").is_ok());
+    }
+
+    #[test]
+    fn my_in_until_condition_scopes_var_for_body() {
+        assert!(lint("until (my $done = 1) { p $done; last; }").is_ok());
+    }
+
+    /// `our` in expression position must register BOTH the bare spelling and
+    /// the package-qualified spelling so a sibling fn can reach the global
+    /// either way. Mirrors the `StmtKind::Our` branch.
+    #[test]
+    fn our_in_expression_position_registers_qualified_spelling() {
+        assert!(
+            lint("package Foo; if (our $cfg = 1) { p $cfg; p $Foo::cfg; }").is_ok(),
+            "expression-position `our` should register both `$cfg` and `$Foo::cfg`"
+        );
+    }
+
+    /// `MyExpr` scoping logic must work for array and hash sigils too, not
+    /// just scalar. NOTE: the bytecode compiler currently rejects non-scalar
+    /// MyExpr (`compiler.rs:8367` — `Unsupported`), so these scripts won't
+    /// run end-to-end yet. The analyzer pin still holds — it asserts the
+    /// SCOPING behaviour (decl-in-condition propagates to body) which is
+    /// correct regardless of code-gen support, and will stay correct when
+    /// the compiler restriction is eventually lifted.
+    #[test]
+    fn my_in_expression_position_array_and_hash() {
+        assert!(lint("if (my @rows = (1, 2, 3)) { p $_ for @rows; }").is_ok());
+        assert!(lint("if (my %m = (a => 1)) { p $_ for keys %m; }").is_ok());
+    }
+
+    /// Negative pin: the analyzer must STILL flag a genuinely undefined var
+    /// even after the MyExpr/sigil-agnostic-special-var changes. Guards
+    /// against an over-broad allowlist regressing to "everything passes".
+    #[test]
+    fn undefined_var_still_flagged_after_relaxations() {
+        let r = lint("p $deliberately_never_declared");
+        assert!(r.is_err(), "strict-vars must still catch real undefs");
+        assert_eq!(r.unwrap_err().kind, ErrorKind::UndefinedVariable);
+    }
+
     /// Multi-character reflection hash names (`%all`, `%limits`, `%pc`, the
     /// `%stryke::*` family, `%overload::`) and the `__FILE__` / `__LINE__` /
     /// `__PACKAGE__` / `__SUB__` script-position pseudo-vars must NOT trip
