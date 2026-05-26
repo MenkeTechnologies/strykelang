@@ -447,6 +447,24 @@ pub fn run_agent(config_path: Option<&str>) -> i32 {
     run_agent_with_overrides(config_path, None, None)
 }
 
+/// Drive the agent loop with **fully explicit** controller + name — used by the
+/// `agent(...)` stryke builtin. Skips the config-file load entirely so a script
+/// invoking `agent("controller.local:9999", "node-01")` is completely
+/// self-describing and doesn't depend on `~/.config/stryke/agent.toml`.
+pub fn run_agent_with_explicit(host: &str, port: u16, name: Option<&str>) -> i32 {
+    let config = AgentConfig {
+        controller: ControllerConfig {
+            host: host.to_string(),
+            port,
+        },
+        limits: LimitsConfig::default(),
+        agent: AgentIdentity {
+            name: name.map(|s| s.to_string()),
+        },
+    };
+    run_agent_with_config(config)
+}
+
 /// Main agent loop with CLI overrides
 pub fn run_agent_with_overrides(
     config_path: Option<&str>,
@@ -462,6 +480,14 @@ pub fn run_agent_with_overrides(
         config.controller.port = port;
     }
 
+    run_agent_with_config(config)
+}
+
+/// Shared agent session: connect to controller, handshake, then run the frame
+/// loop (FIRE / TERMINATE / STATUS / EVAL / SHUTDOWN) until the controller
+/// disconnects or sends SHUTDOWN. Caller supplies the fully-resolved config;
+/// no file I/O or CLI parsing happens here.
+fn run_agent_with_config(config: AgentConfig) -> i32 {
     let addr = format!("{}:{}", config.controller.host, config.controller.port);
 
     eprintln!("stryke agent: connecting to controller at {}", addr);

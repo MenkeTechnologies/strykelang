@@ -5295,6 +5295,8 @@ pub(crate) fn try_builtin(
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
         "http_request" | "hr" => Some(builtin_http_request(args, line)),
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
+        "controller" => Some(builtin_controller(args)),
+        "agent" => Some(builtin_agent(args)),
         "hide" => Some(builtin_hide(args, line)),
         "reveal" => Some(builtin_reveal(args, line)),
         "hide_capacity" => Some(builtin_hide_capacity(args, line)),
@@ -12955,6 +12957,60 @@ fn stego_optional_key(v: Option<&StrykeValue>) -> Option<Vec<u8>> {
         Some(val) if !val.is_undef() => Some(stego_value_to_bytes(val)),
         _ => None,
     }
+}
+
+/// `controller([bind, [port]])` — drop this stryke process into controller mode,
+/// binding to `bind:port` and running the interactive REPL on stdin. Blocking;
+/// returns the controller's exit code (`0` on clean shutdown via the `shutdown`
+/// verb, `1` if the bind fails). Defaults: `bind="0.0.0.0"`, `port=9999`.
+///
+/// Wrap in `spawn { controller(...) }` to run a controller in the background
+/// while the calling script continues.
+fn builtin_controller(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let bind = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "0.0.0.0".to_string());
+    let port = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().clamp(0, 65535) as u16)
+        .unwrap_or(9999);
+    let code = crate::controller::run_controller(&bind, port);
+    Ok(StrykeValue::integer(code as i64))
+}
+
+/// `agent([controller_addr, [name]])` — drop this stryke process into agent mode,
+/// connecting to `controller_addr` (defaults to `localhost:9999`) and entering
+/// the persistent EVAL/FIRE/STATUS frame loop. Blocking; returns the agent's
+/// exit code (`0` clean disconnect, `1` connection or handshake failure).
+/// `controller_addr` may be `host` or `host:port`; if no port is present, 9999
+/// is used. `name` is the display name shown in the controller's status table —
+/// defaults to the local hostname if omitted.
+///
+/// Wrap in `spawn { agent(...) }` to run an agent in the background while the
+/// calling script continues (e.g. local controller + local agent in one
+/// process for testing).
+fn builtin_agent(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let addr = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "localhost:9999".to_string());
+    let (host, port) = match addr.rsplit_once(':') {
+        Some((h, p)) => match p.parse::<u16>() {
+            Ok(n) => (h.to_string(), n),
+            Err(_) => (addr.clone(), 9999),
+        },
+        None => (addr.clone(), 9999),
+    };
+    let name = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string());
+    let code = crate::agent::run_agent_with_explicit(&host, port, name.as_deref());
+    Ok(StrykeValue::integer(code as i64))
 }
 
 /// `hide(CARRIER, SECRET [, KEY])` — embed SECRET into CARRIER. PNG bytes (detected by
