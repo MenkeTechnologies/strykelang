@@ -9914,8 +9914,8 @@ impl<'a> VM<'a> {
                     .unwrap_or(StrykeValue::UNDEF)
                     .to_string();
                 let path = self.interp.resolve_stryke_path_string(&path);
-                crate::perl_fs::read_file_text_or_glob(&path)
-                    .map(StrykeValue::string)
+                crate::perl_fs::read_bytes_or_glob(&path)
+                    .map(StrykeValue::bytes)
                     .map_err(|e| StrykeError::runtime(format!("slurp: {}", e), line))
             }
             Some(BuiltinId::Swallow) => {
