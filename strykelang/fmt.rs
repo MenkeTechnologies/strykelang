@@ -1366,6 +1366,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Slurp(e) => format!("slurp {}", format_expr(e)),
         ExprKind::Swallow(e) => format!("swallow {}", format_expr(e)),
         ExprKind::Burp(e) => format!("burp {}", format_expr(e)),
+        ExprKind::God(e) => format!("god {}", format_expr(e)),
         ExprKind::Ingest(e) => format!("ingest {}", format_expr(e)),
         ExprKind::Capture(e) => format!("capture {}", format_expr(e)),
         ExprKind::Qx(e) => format!("qx {}", format_expr(e)),

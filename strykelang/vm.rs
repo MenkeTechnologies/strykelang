@@ -9944,6 +9944,10 @@ impl<'a> VM<'a> {
                     .map(StrykeValue::integer)
                     .map_err(|e| StrykeError::runtime(format!("burp: {}", e), line))
             }
+            Some(BuiltinId::God) => {
+                let v = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(crate::god::god_dump(&v)))
+            }
             Some(BuiltinId::Capture) => {
                 let cmd = args
                     .into_iter()

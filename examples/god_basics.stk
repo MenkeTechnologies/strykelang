@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# `god` basics — omniscient runtime introspection.
+#
+# Demonstrates:
+#   * `god EXPR` returns a structured multi-line dump string
+#   * heap pointer + Arc strong/weak counts visible per heap object
+#   * aliasing surfaces: two refs to the same Arc print the SAME 0x… pointer
+#   * cycles are detected and annotated (no stack overflow on self-references)
+#   * BYTES values render a hex preview of the first ~32 bytes
+#   * works on scalars, hashes, arrays, code refs, generators
+#   * pure: returns a string, no stdout side effect — pipe to `p`/`warn` to surface
+#
+# Run: stryke examples/god_basics.stk
+
+p "── god basics ─────────────────────────────────────────"
+
+# 1. Immediates render compactly on one line.
+p god 42
+p god 3.14
+p god undef
+
+# 2. Hash + recursive descent into values.
+my $h = { a => 1, b => [10, 20, 30], c => "hi" }
+p "── god \$h (hash with array + string + int) ──"
+p god $h
+
+# 3. Aliasing — both prints show the SAME inner-hash 0x… pointer.
+my $shared = { count => 1, label => "shared" }
+my $a = $shared
+my $b = $shared
+p "── god \$a vs god \$b (same Arc, strong should be >= 3) ──"
+p god $a
+p god $b
+
+# 4. Cycle — burst-tested for non-termination via cycle annotation.
+my %cyc
+$cyc{self} = \%cyc
+p "── god \\%cyc (self-referential, must annotate cycle) ──"
+p god \%cyc
+
+# 5. Bytes — slurp returns bytes; god shows hex preview + length.
+my $tmp = "/tmp/stryke_god_demo.bin"
+spurt($tmp, pack("C*", 0x00, 0xff, 0x7f, 0x80, 0x01))
+p "── god slurp(\$bin_file) (hex preview) ──"
+p god slurp($tmp)
+unlink $tmp
+
+# 6. Code ref — surface params, body length, closure captures.
+my $heavy = [1..100]
+my $closure = fn { length(@$heavy) }
+p "── god \$closure (with captured \$heavy array) ──"
+p god $closure
+
+# 7. Generator state — pc / exhausted / body length.
+my $gen = gen { yield 1; yield 2; yield 3 }
+$gen->next                                  # advance one yield
+p "── god \$gen (mid-iteration, pc should be 1) ──"
+p god $gen
+
+# 8. Pure — god is composable, can be matched / asserted on.
+my $dump = god { a => 1 }
+($dump =~ /HASH \@ 0x/) |> aok "god returns a string with a heap ptr"
+($dump =~ /entries=1/)  |> aok "god dump shows the entry count"
+
+# 9. Cycle detection terminates (this test would stack-overflow on a naive impl).
+my %selfref
+$selfref{me} = \%selfref
+my $cyc_dump = god \%selfref
+($cyc_dump =~ /cycle/) |> aok "god annotates cycles without infinite recursion"
+
+test_run

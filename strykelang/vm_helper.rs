@@ -12595,6 +12595,10 @@ impl VMHelper {
                         FlowOrError::Error(StrykeError::runtime(format!("burp: {}", e), line))
                     })
             }
+            ExprKind::God(e) => {
+                let v = self.eval_expr(e)?;
+                Ok(StrykeValue::string(crate::god::god_dump(&v)))
+            }
             ExprKind::Capture(e) => {
                 let cmd = self.eval_expr(e)?.to_string();
                 let output = Command::new("sh")

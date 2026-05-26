@@ -1219,6 +1219,12 @@ pub enum ExprKind {
     /// error. Accepts plain hashes and hash refs; values may be bytes or any
     /// scalar that stringifies (matches `spew`/`spurt` conventions).
     Burp(Box<Expr>),
+    /// `god EXPR` — omniscient runtime introspection. Returns a structured
+    /// multi-line dump showing the type tag, heap pointer, Arc strong/weak
+    /// counts, byte hex previews, generator/pipeline state, and closure
+    /// captures. Cycle-safe via per-pointer recursion tracking. Sibling to
+    /// `pp` (human-friendly) and `ddump` (deep structure).
+    God(Box<Expr>),
     /// `ingest PATTERN` — streaming variant of `swallow`: returns a lazy
     /// iterator yielding `[canonicalized_abspath, raw_bytes]` per file. Only
     /// one file's bytes are resident at a time. Path list and stat/canonicalize

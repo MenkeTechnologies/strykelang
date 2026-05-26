@@ -998,6 +998,8 @@ pub enum BuiltinId {
     Ingest,
     /// Hash-to-disk writer — inverse of `swallow` (`burp %h`).
     Burp,
+    /// Omniscient runtime introspection (`god $x`).
+    God,
     /// Blocking HTTP GET (`fetch_url $url`).
     FetchUrl,
     /// `pchannel()` — `(tx, rx)` as a two-element list.
