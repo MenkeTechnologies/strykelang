@@ -14004,6 +14004,8 @@ impl Parser {
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
             | "glob_par" | "ppool" | "barrier" | "pipeline" | "cluster"
             | "pmaps" | "pflat_maps" | "pgreps"
+            // ── controller / agent (script-level mode entry) ────────────────
+            | "controller" | "agent"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
@@ -14135,6 +14137,8 @@ impl Parser {
             | "x25519_keygen" | "x_keygen" | "x25519_dh" | "x_dh"
             | "base64_encode" | "base64_decode"
             | "hex_encode" | "hex_decode"
+            // ── steganography ───────────────────────────────────────────────
+            | "hide" | "reveal" | "hide_capacity"
             | "url_encode" | "url_decode"
             | "gzip" | "gunzip" | "gz" | "ugz" | "zstd" | "zstd_decode" | "zst" | "uzst"
             | "brotli" | "br" | "brotli_decode" | "ubr"
