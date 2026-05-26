@@ -1,0 +1,85 @@
+#!/usr/bin/env stryke
+#
+# `kick($host, $port [, $timeout_ms])` — TCP liveness probe.
+# `udp_send($host, $port, $payload [, $retries, $interval_ms])` — UDP multi-shot send.
+#
+# Both are convenience builtins over standard socket calls — capability
+# is in every language's stdlib, stryke ships them as bare builtins so
+# service probes / Wake-on-LAN scripts / NAT keepalives don't need an
+# import. For peer-to-peer NAT traversal with STUN discovery and
+# bidirectional flow, see the `punch` builtin (forthcoming).
+#
+# Run: stryke examples/kick_probe.stk
+
+p "── 1. kick(): TCP service-health sweep ───────────────"
+
+# A typical service-mesh probe: walk a list of (host, port) pairs and
+# report alive/dead. The `kick(host, port, 500)` returns 1 in <500ms if
+# the port answers, 0 otherwise.
+my @services = (
+    ["localhost",  22,   "ssh"],
+    ["localhost",  80,   "http"],
+    ["localhost",  443,  "https"],
+    ["localhost",  5432, "postgres"],
+    ["localhost",  6379, "redis"],
+    ["localhost",  9999, "stryke-controller"],
+)
+
+printf "  %-20s %-6s %-8s\n", "endpoint", "port", "status"
+printf "  %-20s %-6s %-8s\n", "─" x 20, "─" x 6, "─" x 8
+for my $svc (@services) {
+    my $alive = kick($svc->[0], $svc->[1], 250)
+    printf "  %-20s %-6d %s\n",
+        $svc->[2] . " @ " . $svc->[0],
+        $svc->[1],
+        $alive ? "UP" : "down"
+}
+
+p ""
+p "── 2. kick(): closed vs open port latency ────────────"
+
+# Closed-port returns IMMEDIATELY thanks to TCP RST — useful for
+# fast service discovery sweeps. Open port returns after the
+# 3-way handshake completes (~1 RTT). Both well under timeout.
+my $closed_start = now_ns()
+my $closed = kick("127.0.0.1", 1, 1000)
+my $closed_ms = (now_ns() - $closed_start) / 1_000_000
+
+printf "  closed port (127.0.0.1:1)    → %s in %.1f ms\n",
+    $closed ? "UP" : "down", $closed_ms
+
+p ""
+p "── 3. udp_send(): single-shot ────────────────────────"
+
+# Fire one datagram. Returns 1 on success, 0 on failure.
+my $sent1 = udp_send("127.0.0.1", 9999, "hello")
+printf "  single send to 127.0.0.1:9999 → %d datagram(s) sent\n", $sent1
+
+p ""
+p "── 4. udp_send(): Wake-on-LAN magic packet ───────────"
+
+# WoL packet format: 6 bytes 0xFF followed by the target MAC (6 bytes)
+# repeated 16 times = 102-byte payload. Sent to UDP/9 on the broadcast
+# address so the NIC's WoL firmware sees it regardless of which host has
+# the IP. We use 127.0.0.1 here so the demo doesn't actually spam the LAN.
+my $mac = "aa:bb:cc:dd:ee:ff"
+my @mac_bytes = map { hex($_) } split /:/, $mac
+my @packet = (0xff) x 6
+for (1:16) { push @packet, @mac_bytes }
+my $magic = pack("C*", @packet)
+printf "  WoL packet length: %d bytes (expected 102)\n", len($magic)
+
+my $sent_wol = udp_send("127.0.0.1", 9999, $magic, 3, 10)
+printf "  bombard 3× to 127.0.0.1:9999  → %d datagram(s) sent\n", $sent_wol
+
+p ""
+p "── 5. udp_send(): NAT keepalive pattern ──────────────"
+
+# Empty payload bombard — what you'd send to keep a NAT mapping warm
+# (WireGuard does this every 25s). 5 shots × 100ms apart simulates the
+# burst pattern that beats packet loss on lossy links.
+my $sent_keep = udp_send("127.0.0.1", 9999, "", 5, 50)
+printf "  keepalive 5× @ 50ms intervals → %d datagram(s) sent\n", $sent_keep
+
+p ""
+p "── done ───────────────────────────────────────────────"
