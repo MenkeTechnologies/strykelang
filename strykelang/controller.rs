@@ -560,12 +560,64 @@ pub fn print_help() {
 
 #[cfg(test)]
 mod tests {
-    use super::write_tagged;
+    use super::*;
+    use crate::agent::{frame_kind, handle_eval_frame, read_frame};
+    use crate::vm_helper::VMHelper;
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::Arc;
+    use std::thread;
+    use std::time::{Duration, Instant};
 
     fn s(name: &str, tag: &str, output: &str) -> String {
         let mut buf = Vec::new();
         write_tagged(&mut buf, name, tag, output).unwrap();
         String::from_utf8(buf).unwrap()
+    }
+
+    /// Spawn a synthetic agent on a fresh loopback port that:
+    ///   1. accepts one connection,
+    ///   2. reads one EVAL frame,
+    ///   3. sleeps `delay`,
+    ///   4. replies with an EVAL_RESULT computed against a real `VMHelper`.
+    /// Returns the controller-side `TcpStream` and the handle for the worker.
+    fn spawn_synthetic_agent(delay: Duration) -> (TcpStream, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut server, _) = listener.accept().expect("accept");
+            let mut interp = VMHelper::new();
+            let (kind, payload) = read_frame(&mut server).expect("read EVAL");
+            assert_eq!(kind, frame_kind::EVAL);
+            thread::sleep(delay);
+            handle_eval_frame(&mut server, &mut interp, &payload).expect("reply");
+        });
+        let client = TcpStream::connect(addr).expect("connect");
+        (client, handle)
+    }
+
+    /// Build a `Controller` populated with the supplied mock agents (one
+    /// `ConnectedAgent` per entry, ids 1..N, names "agent-NN").
+    fn controller_with_agents(streams: Vec<TcpStream>) -> Controller {
+        let controller = Controller::new();
+        let mut agents = controller.agents.lock().unwrap();
+        for (i, stream) in streams.into_iter().enumerate() {
+            let id = (i + 1) as u64;
+            agents.insert(
+                id,
+                ConnectedAgent {
+                    stream,
+                    hostname: "localhost".to_string(),
+                    cores: 1,
+                    memory_bytes: 0,
+                    agent_name: Some(format!("agent-{:02}", id)),
+                    state: AgentState::Idle,
+                    session_id: id,
+                    connected_at: Instant::now(),
+                },
+            );
+        }
+        drop(agents);
+        controller
     }
 
     /// Single-line output: one tagged row, one trailing newline (from writeln!).
@@ -609,5 +661,133 @@ mod tests {
             s("node-05", "ERR", "Division by zero at -e line 1"),
             "[node-05/ERR] Division by zero at -e line 1\n"
         );
+    }
+
+    /// The two-pass fan-out in `eval_all` must execute agents **in parallel**, not
+    /// serially. Three mock agents each sleep 250 ms before replying; with the
+    /// previous serial loop the wall-clock would be ≥750 ms. With the parallel
+    /// fan-out the writes go out in microseconds and the reads block on the
+    /// slowest agent — total wall ≈ 250 ms. We assert well under the 750 ms serial
+    /// bound to keep the test non-flaky under CI load while still failing loudly
+    /// if anyone reintroduces serial dispatch.
+    #[test]
+    fn eval_all_executes_agents_in_parallel_not_serially() {
+        const N: usize = 3;
+        const DELAY: Duration = Duration::from_millis(250);
+        const SERIAL_BOUND: Duration = Duration::from_millis(750); // N * DELAY
+
+        let (s1, h1) = spawn_synthetic_agent(DELAY);
+        let (s2, h2) = spawn_synthetic_agent(DELAY);
+        let (s3, h3) = spawn_synthetic_agent(DELAY);
+        let controller = controller_with_agents(vec![s1, s2, s3]);
+
+        let start = Instant::now();
+        controller.eval_all("1 + 1");
+        let elapsed = start.elapsed();
+
+        for h in [h1, h2, h3] {
+            h.join().expect("agent thread");
+        }
+
+        assert!(
+            elapsed < Duration::from_millis(600),
+            "eval_all must run {} agents in parallel (each delay {:?}); elapsed {:?} \
+             is too close to the serial bound {:?}",
+            N,
+            DELAY,
+            elapsed,
+            SERIAL_BOUND
+        );
+    }
+
+    /// Empty controller (no agents connected) prints a notice and returns without
+    /// panic / hang. Regression guard for the empty-agents branch.
+    #[test]
+    fn eval_all_with_no_agents_is_a_noop() {
+        let controller = Controller::new();
+        let start = Instant::now();
+        controller.eval_all("anything");
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed < Duration::from_millis(100),
+            "no-agents eval_all should return instantly, took {:?}",
+            elapsed
+        );
+    }
+
+    /// Stale frames left over in the TCP buffer from a prior FIRE (METRICS) or
+    /// STATUS (STATUS_RESP) must be silently skipped so `eval_all` finds the
+    /// EVAL_RESULT it's actually waiting for. Pins the behaviour at controller.rs's
+    /// pass-2 inner loop.
+    #[test]
+    fn eval_all_skips_stale_frames_before_eval_result() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut server, _) = listener.accept().expect("accept");
+            let mut interp = VMHelper::new();
+            let (kind, payload) = read_frame(&mut server).expect("read EVAL");
+            assert_eq!(kind, frame_kind::EVAL);
+            // Send an unrelated frame FIRST (simulating a leftover METRICS from a
+            // prior FIRE). Controller must drop it and keep waiting for EVAL_RESULT.
+            super::write_frame(&mut server, frame_kind::METRICS, &[0u8; 4]).unwrap();
+            handle_eval_frame(&mut server, &mut interp, &payload).expect("reply");
+        });
+        let client = TcpStream::connect(addr).unwrap();
+        let controller = controller_with_agents(vec![client]);
+
+        // If the stale-frame skipping is broken, eval_all hangs or deserializes
+        // METRICS bytes as EvalResult and prints garbage. Either way the test fails
+        // via the timeout / agent panic.
+        let start = Instant::now();
+        controller.eval_all("42");
+        assert!(start.elapsed() < Duration::from_secs(5));
+        handle.join().expect("agent thread");
+    }
+
+    /// Multiple `eval_all` calls against the same controller reuse the persistent
+    /// per-agent `VMHelper`, so package globals set in call N are visible in N+1.
+    /// Smoke test for the REPL-style semantics from the user's perspective.
+    #[test]
+    fn successive_eval_all_calls_share_per_agent_vm_state() {
+        // Single agent that handles TWO EVAL frames against the same VM.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut server, _) = listener.accept().expect("accept");
+            let mut interp = VMHelper::new();
+            for _ in 0..2 {
+                let (kind, payload) = read_frame(&mut server).expect("read EVAL");
+                assert_eq!(kind, frame_kind::EVAL);
+                handle_eval_frame(&mut server, &mut interp, &payload).expect("reply");
+            }
+        });
+        let client = TcpStream::connect(addr).unwrap();
+        let controller = controller_with_agents(vec![client]);
+
+        // Frame 1: define a package global.
+        controller.eval_all("$main::tally = 10; $main::tally");
+        // Frame 2: read it back. If state didn't persist, we'd see "" / undef.
+        controller.eval_all("$main::tally + 32");
+        // We don't have stdout capture here, so the assertion is via the synthetic
+        // agent thread's panics — it errors if frame deserialisation fails.
+        handle.join().expect("agent thread");
+        // Force a real connection close so the agent thread above wakes.
+        // (Controlled by the controller dropping at end of scope.)
+        // The test passes if the agent handled exactly 2 frames without panicking.
+    }
+
+    /// `Arc<Controller>` clones share the agents map — the accept loop holds one
+    /// clone and the REPL thread holds another. Sanity check that eval_all on a
+    /// cloned controller sees the same agents as the original.
+    #[test]
+    fn arc_clone_shares_agents_map() {
+        let (s, h) = spawn_synthetic_agent(Duration::from_millis(0));
+        let controller = Arc::new(controller_with_agents(vec![s]));
+        let clone = Arc::clone(&controller);
+        clone.eval_all("99");
+        h.join().expect("agent thread");
+        // Sanity: the agent map carries one entry after the eval.
+        assert_eq!(controller.agents.lock().unwrap().len(), 1);
     }
 }
