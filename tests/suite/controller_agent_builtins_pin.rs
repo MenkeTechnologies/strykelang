@@ -123,6 +123,97 @@ fn controller_builtin_with_undef_args_does_not_crash() {
     );
 }
 
+/// End-to-end protocol smoke pin: stand up a hand-rolled fake-controller on
+/// a loopback port that accepts ONE connection, parses the `AGENT_HELLO`
+/// frame, verifies the `agent_name` override the script passed actually
+/// made it onto the wire, then replies with `AGENT_HELLO_ACK` + `SHUTDOWN`.
+/// The script-side `agent(...)` builtin should connect, complete the
+/// handshake, drain the SHUTDOWN frame, and exit 0.
+///
+/// What this pins that the unit / unreachable-port tests don't:
+///   * The protocol layer composes — script → agent.rs:run_agent_with_explicit
+///     → frame I/O → real TcpStream → controller-side bincode decode.
+///   * `name` argument propagates all the way to `AgentHello.agent_name`
+///     (regression catcher for any future refactor of the name plumbing).
+///   * Clean shutdown returns exit 0, not 1 (the "connection refused" code).
+///   * The plugin's "spawn an agent from a script" pattern works end-to-end,
+///     not just in the synthetic in-Rust unit tests.
+#[test]
+fn agent_builtin_end_to_end_hello_handshake_and_clean_shutdown() {
+    use std::io::ErrorKind;
+    use std::net::TcpListener;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering as AtomicOrdering},
+        Arc,
+    };
+    use std::thread;
+    use stryke::agent::{frame_kind, read_frame, write_frame, AgentHello, AgentHelloAck};
+
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake controller");
+    let port = listener.local_addr().unwrap().port();
+    let name_seen = Arc::new(AtomicBool::new(false));
+    let name_seen_clone = Arc::clone(&name_seen);
+
+    let server = thread::spawn(move || {
+        // Single-shot accept.
+        listener
+            .set_nonblocking(false)
+            .expect("set blocking listener");
+        let (mut stream, _) = match listener.accept() {
+            Ok(p) => p,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => return,
+            Err(e) => panic!("fake controller accept: {e}"),
+        };
+
+        let (kind, payload) = read_frame(&mut stream).expect("read AGENT_HELLO");
+        assert_eq!(
+            kind,
+            frame_kind::AGENT_HELLO,
+            "first frame must be AGENT_HELLO, got kind=0x{:02x}",
+            kind
+        );
+        let hello: AgentHello = bincode::deserialize(&payload).expect("decode AgentHello");
+        if hello.agent_name.as_deref() == Some("e2e-smoke-agent") {
+            name_seen_clone.store(true, AtomicOrdering::Relaxed);
+        }
+
+        let ack = AgentHelloAck {
+            session_id: 1,
+            accepted: true,
+            message: "welcome".to_string(),
+        };
+        let ack_bytes = bincode::serialize(&ack).expect("serialize ack");
+        write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &ack_bytes)
+            .expect("write HELLO_ACK");
+        write_frame(&mut stream, frame_kind::SHUTDOWN, &[]).expect("write SHUTDOWN");
+        // Let the agent process SHUTDOWN — connection drops when `stream`
+        // falls out of scope here.
+    });
+
+    let code = format!(
+        r#"agent("127.0.0.1:{}", "e2e-smoke-agent")"#,
+        port
+    );
+    let start = std::time::Instant::now();
+    let exit = eval_int(&code);
+    let elapsed = start.elapsed();
+
+    server.join().expect("fake controller thread");
+    assert!(
+        name_seen.load(AtomicOrdering::Relaxed),
+        "fake controller never observed `agent_name = e2e-smoke-agent` in AGENT_HELLO"
+    );
+    assert_eq!(
+        exit, 0,
+        "agent() should exit 0 on clean controller-side SHUTDOWN"
+    );
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "handshake + shutdown round-trip should be sub-second, took {:?}",
+        elapsed
+    );
+}
+
 #[test]
 fn agent_builtin_parses_bare_host_with_default_port() {
     // Same as the connection-refused test but with the port omitted so the
