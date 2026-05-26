@@ -14006,6 +14006,8 @@ impl Parser {
             | "pmaps" | "pflat_maps" | "pgreps"
             // ── controller / agent (script-level mode entry) ────────────────
             | "controller" | "agent"
+            // ── provenance / lineage ───────────────────────────────────────
+            | "mark" | "provenance" | "unmark"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
