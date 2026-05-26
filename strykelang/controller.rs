@@ -186,6 +186,16 @@ impl Controller {
     /// etc.) are quietly skipped so the next visible line is always the eval result.
     /// A 30-second read timeout guards against agents that ignore the frame entirely
     /// (e.g. an old agent version with no EVAL handler).
+    ///
+    /// Output ordering: agents are visited in **stable alphabetical order by display
+    /// name** (agent_name if set, else hostname) so successive controllers and
+    /// successive `@eval` calls within one controller produce comparable transcripts.
+    /// HashMap iteration order would shuffle per controller run otherwise (Rust
+    /// randomizes the hash seed per process).
+    ///
+    /// Multi-line output is prefixed **per line**: each `\n`-separated line of an
+    /// agent's stringified result carries its own `[name/ok|ERR]` tag so grepping
+    /// or diffing transcripts by agent stays trivial regardless of result shape.
     fn eval_all(&self, code: &str) {
         let cmd = EvalCommand {
             code: code.to_string(),
@@ -198,13 +208,27 @@ impl Controller {
             return;
         }
 
-        for agent in agents.values_mut() {
-            let name = agent
-                .agent_name
-                .clone()
-                .unwrap_or_else(|| agent.hostname.clone());
+        // Build a stable visit order by display name. Done inside the mutex guard
+        // so the (id → name) snapshot can't be invalidated by an accept thread.
+        let mut order: Vec<(u64, String)> = agents
+            .iter()
+            .map(|(id, a)| {
+                let name = a
+                    .agent_name
+                    .clone()
+                    .unwrap_or_else(|| a.hostname.clone());
+                (*id, name)
+            })
+            .collect();
+        order.sort_by(|a, b| a.1.cmp(&b.1));
+
+        for (id, name) in &order {
+            let agent = match agents.get_mut(id) {
+                Some(a) => a,
+                None => continue, // agent vanished between snapshot and iteration
+            };
             if let Err(e) = write_frame(&mut agent.stream, frame_kind::EVAL, &cmd_bytes) {
-                println!("[{}] write error: {}", name, e);
+                print_tagged(name, "ERR", &format!("write error: {}", e));
                 continue;
             }
             let _ = agent.stream.set_read_timeout(Some(Duration::from_secs(30)));
@@ -214,9 +238,13 @@ impl Controller {
                         match bincode::deserialize::<EvalResult>(&payload) {
                             Ok(r) => {
                                 let tag = if r.ok { "ok" } else { "ERR" };
-                                println!("[{}/{}] {}", name, tag, r.output);
+                                print_tagged(name, tag, &r.output);
                             }
-                            Err(e) => println!("[{}] malformed EVAL_RESULT: {}", name, e),
+                            Err(e) => print_tagged(
+                                name,
+                                "ERR",
+                                &format!("malformed EVAL_RESULT: {}", e),
+                            ),
                         }
                         break;
                     }
@@ -227,7 +255,7 @@ impl Controller {
                         );
                     }
                     Err(e) => {
-                        println!("[{}] read error: {}", name, e);
+                        print_tagged(name, "ERR", &format!("read error: {}", e));
                         break;
                     }
                 }
@@ -391,6 +419,34 @@ impl Controller {
 }
 
 /// Read a framed message
+/// Print `output` to stdout with every line prefixed `[name/tag] `. Empty
+/// output produces a single bare `[name/tag]` line so the caller always sees
+/// a row per agent even when the eval returned void.
+fn print_tagged(name: &str, tag: &str, output: &str) {
+    let stdout = std::io::stdout();
+    let mut handle = stdout.lock();
+    let _ = write_tagged(&mut handle, name, tag, output);
+}
+
+/// Inner workhorse for [`print_tagged`], generic over `Write` so tests can
+/// observe the exact bytes that go to stdout.
+fn write_tagged<W: Write>(w: &mut W, name: &str, tag: &str, output: &str) -> std::io::Result<()> {
+    if output.is_empty() {
+        writeln!(w, "[{}/{}]", name, tag)?;
+        return Ok(());
+    }
+    for ln in output.lines() {
+        writeln!(w, "[{}/{}] {}", name, tag, ln)?;
+    }
+    // Preserve a trailing newline in the source output (e.g. `p "x"` ends with \n)
+    // by emitting a bare prefixed line, so successive evals don't visually run
+    // into each other.
+    if output.ends_with('\n') {
+        writeln!(w, "[{}/{}]", name, tag)?;
+    }
+    Ok(())
+}
+
 fn read_frame<R: Read>(r: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
     let mut len_buf = [0u8; 8];
     r.read_exact(&mut len_buf)?;
@@ -473,4 +529,58 @@ pub fn print_help() {
     println!("    controller> status");
     println!("    controller> fire 60      # 60 second stress test");
     println!("    controller> terminate");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_tagged;
+
+    fn s(name: &str, tag: &str, output: &str) -> String {
+        let mut buf = Vec::new();
+        write_tagged(&mut buf, name, tag, output).unwrap();
+        String::from_utf8(buf).unwrap()
+    }
+
+    /// Single-line output: one tagged row, one trailing newline (from writeln!).
+    #[test]
+    fn single_line_output_emits_one_tagged_row() {
+        assert_eq!(s("node-01", "ok", "42"), "[node-01/ok] 42\n");
+    }
+
+    /// Multi-line output: EVERY line carries the prefix — the wart this commit fixes.
+    /// Without per-line prefixing, only the first line would have `[name/tag]` and a
+    /// pipeline like `@p "a"; p "b"; p "c"; 0` would print three orphan lines.
+    #[test]
+    fn multi_line_output_prefixes_every_line() {
+        let got = s("node-02", "ok", "alpha\nbeta\ngamma");
+        assert_eq!(
+            got, "[node-02/ok] alpha\n[node-02/ok] beta\n[node-02/ok] gamma\n",
+            "every line must carry the [name/tag] prefix"
+        );
+    }
+
+    /// Empty output is NOT swallowed — the caller still sees one bare prefixed line
+    /// so void returns ("undef" stringifies to "") produce visible per-agent rows.
+    #[test]
+    fn empty_output_still_emits_a_row() {
+        assert_eq!(s("node-03", "ok", ""), "[node-03/ok]\n");
+    }
+
+    /// Trailing newline in source (e.g. `p "x"` returns `"x\n"`) emits the visible
+    /// content's tagged line plus one bare prefixed line so successive evals don't
+    /// visually run into each other.
+    #[test]
+    fn trailing_newline_emits_blank_prefixed_terminator() {
+        let got = s("node-04", "ok", "x\n");
+        assert_eq!(got, "[node-04/ok] x\n[node-04/ok]\n");
+    }
+
+    /// Error tag formatting parallels the ok tag — no special casing.
+    #[test]
+    fn error_tag_format_matches_ok() {
+        assert_eq!(
+            s("node-05", "ERR", "Division by zero at -e line 1"),
+            "[node-05/ERR] Division by zero at -e line 1\n"
+        );
+    }
 }
