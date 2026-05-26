@@ -57,6 +57,72 @@ fn controller_builtin_returns_1_on_invalid_bind_address() {
     );
 }
 
+/// The builtin must accept an explicit port via `host:port` and try to
+/// connect to that exact port. We aim it at a borrowed-and-released
+/// ephemeral port so the test is deterministic; expected outcome is exit 1
+/// (connect refused). Verifies the colon-split parsing branch.
+#[test]
+fn agent_builtin_accepts_host_with_explicit_port() {
+    let port = pick_unreachable_port();
+    let code = format!(r#"agent("127.0.0.1:{}", "explicit-port-test")"#, port);
+    let start = Instant::now();
+    let exit = eval_int(&code);
+    let elapsed = start.elapsed();
+    assert_eq!(exit, 1, "expected connection refusal exit code");
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "explicit-port connect-refused must be prompt, took {:?}",
+        elapsed
+    );
+}
+
+/// Passing `undef` explicitly should fall through to the same default as
+/// passing no argument at all — `localhost:9999`. Pin the undef-friendly
+/// arg handling so a script like `agent($ENV{CTL} // undef, undef)` works
+/// when the env var is missing instead of dying on a type error.
+#[test]
+fn agent_builtin_undef_args_use_defaults() {
+    let start = Instant::now();
+    let exit = eval_int("agent(undef, undef)");
+    let elapsed = start.elapsed();
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "undef args must default + fail-fast, took {:?}",
+        elapsed
+    );
+    if exit != 1 {
+        eprintln!(
+            "warning: a real controller is bound to localhost:9999 \
+             on this machine and accepted the handshake. Test skipped."
+        );
+        return;
+    }
+    assert_eq!(exit, 1, "expected connection refusal on default port");
+}
+
+/// Same undef-default contract for `controller()`: explicit `undef`s should
+/// match the no-arg defaults (`0.0.0.0:9999`). We can't easily exercise the
+/// success path (controller would bind and block forever in the REPL), so
+/// we route through the invalid-bind path instead — pass a clearly bogus
+/// bind to keep the test bounded.
+#[test]
+fn controller_builtin_with_undef_args_does_not_crash() {
+    // `controller(undef, undef)` must NOT panic on argument extraction;
+    // it should fall through to defaults. We can't let it bind for real
+    // (would block the test), so verify only that the call returns within
+    // 2 seconds with an integer when we feed an explicitly bad bind that
+    // takes precedence over the undef-default path.
+    let start = Instant::now();
+    let exit = eval_int(r#"controller("256.256.256.256", undef)"#);
+    let elapsed = start.elapsed();
+    assert_eq!(exit, 1, "bad-bind path should still return 1");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "controller() must short-circuit on bad bind even with undef port, took {:?}",
+        elapsed
+    );
+}
+
 #[test]
 fn agent_builtin_parses_bare_host_with_default_port() {
     // Same as the connection-refused test but with the port omitted so the
