@@ -5311,6 +5311,12 @@ pub(crate) fn try_builtin(
         "agent" => Some(builtin_agent(args)),
         "kick" => Some(builtin_kick(args)),
         "udp_send" => Some(builtin_udp_send(args)),
+        "udp_open" => Some(builtin_udp_open(args)),
+        "udp_send_to" => Some(builtin_udp_send_to(args)),
+        "udp_recv" => Some(builtin_udp_recv(args)),
+        "udp_close" => Some(builtin_udp_close(args)),
+        "stun" => Some(builtin_stun(args)),
+        "punch" => Some(builtin_punch(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
         "unmark" => Some(builtin_unmark(args)),
@@ -13184,6 +13190,299 @@ fn builtin_udp_send(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
     }
     Ok(StrykeValue::integer(sent as i64))
+}
+
+/// `udp_open([$bind_host="0.0.0.0", $bind_port=0])` — bind a UDP socket,
+/// return an opaque integer handle. The socket is held in a process-
+/// global pool until `udp_close($id)`. `$bind_port = 0` lets the kernel
+/// assign an ephemeral port (the common case). Returns `0` on bind
+/// failure.
+fn builtin_udp_open(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let bind_host = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "0.0.0.0".to_string());
+    let bind_port = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().clamp(0, 65535) as u16)
+        .unwrap_or(0);
+    match crate::udp_sockets::open(&bind_host, bind_port) {
+        Some(id) => Ok(StrykeValue::integer(id as i64)),
+        None => Ok(StrykeValue::integer(0)),
+    }
+}
+
+/// `udp_send_to($id, $host, $port, $payload)` — send `$payload` via the
+/// pool socket identified by `$id` to `$host:$port`. Returns bytes sent
+/// on success, `0` on any failure (unknown id, DNS failure, send error).
+fn builtin_udp_send_to(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    let host = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let port_raw = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    if id == 0 || host.is_empty() || !(1..=65535).contains(&port_raw) {
+        return Ok(StrykeValue::integer(0));
+    }
+    let port = port_raw as u16;
+    let payload: Vec<u8> = match args.get(3).filter(|v| !v.is_undef()) {
+        Some(v) => {
+            if let Some(arc) = v.as_bytes_arc() {
+                (*arc).clone()
+            } else {
+                v.to_string().into_bytes()
+            }
+        }
+        None => Vec::new(),
+    };
+    match crate::udp_sockets::send_to(id, &host, port, &payload) {
+        Some(n) => Ok(StrykeValue::integer(n as i64)),
+        None => Ok(StrykeValue::integer(0)),
+    }
+}
+
+/// `udp_recv($id [, $timeout_ms])` — read one datagram from socket `$id`.
+/// Returns the payload as a string (UTF-8 if valid, otherwise raw bytes
+/// — callers can pass through `unpack` if they need binary). Returns
+/// `undef` on timeout / unknown id / recv error. Default timeout 1000ms;
+/// `0` blocks indefinitely.
+fn builtin_udp_recv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let timeout_ms = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(0) as u64)
+        .unwrap_or(1000);
+    let timeout = if timeout_ms == 0 {
+        None
+    } else {
+        Some(Duration::from_millis(timeout_ms))
+    };
+    match crate::udp_sockets::recv(id, timeout) {
+        Some((bytes, _)) => match String::from_utf8(bytes.clone()) {
+            Ok(s) => Ok(StrykeValue::string(s)),
+            // Non-UTF8 payload — return as bytes so the caller can `unpack`.
+            Err(_) => Ok(StrykeValue::bytes(std::sync::Arc::new(bytes))),
+        },
+        None => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `udp_close($id)` — release socket `$id` from the pool. Returns `1` if
+/// the socket was present, `0` if `$id` was unknown.
+fn builtin_udp_close(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::integer(0));
+    }
+    let dropped = crate::udp_sockets::close(id);
+    Ok(StrykeValue::integer(if dropped { 1 } else { 0 }))
+}
+
+/// `stun($id [, $stun_host="stun.l.google.com", $stun_port=19302, $timeout_ms=2000])`
+/// — query a STUN server via the pool socket `$id` and return the public
+/// `(ip, port)` the server reports it observed. Returns a hashref:
+///
+///   { public_ip => "203.0.113.45", public_port => 51234 }
+///
+/// or `undef` on timeout / parse failure / unknown id.
+///
+/// The socket the query goes through MUST be the same socket subsequent
+/// `punch($id, ...)` and peer traffic use — the NAT mapping the STUN
+/// response reveals is tied to that socket's (local_ip, local_port).
+fn builtin_stun(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let stun_host = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "stun.l.google.com".to_string());
+    let stun_port = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().clamp(1, 65535) as u16)
+        .unwrap_or(19302);
+    let timeout_ms = args
+        .get(3)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u64)
+        .unwrap_or(2000);
+
+    match crate::nat_punch::stun_query(id, &stun_host, stun_port, Duration::from_millis(timeout_ms))
+    {
+        Some((ip, port)) => {
+            let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+            m.insert("public_ip".into(), StrykeValue::string(ip.to_string()));
+            m.insert("public_port".into(), StrykeValue::integer(port as i64));
+            Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
+        }
+        None => Ok(StrykeValue::UNDEF),
+    }
+}
+
+/// `punch($id, $peer_ip, $peer_port [, $opts])` — UDP hole-punching state
+/// machine. Bombards `$peer_ip:$peer_port` via socket `$id` at a fixed
+/// interval, listens for any inbound datagram, returns when bidirectional
+/// flow is established OR timeout fires.
+///
+/// `$opts` (hashref, all keys optional):
+///   * `timeout_ms` (default 5000)  — wall-clock punch budget
+///   * `interval_ms` (default 50)   — gap between bombards
+///   * `payload` (default "stryke-punch") — probe payload sent each round
+///
+/// Returns a hashref:
+///
+///   { established  => 1,         # 0 on timeout
+///     latency_ms   => 380,       # time to first reply (or budget on fail)
+///     bombards     => 8,         # count of datagrams we sent
+///     peer_msg     => "hi from b",   # first received payload (or undef)
+///     peer_addr    => "203.0.113.45:51234" }   # source addr (or undef)
+///
+/// Real-world success rate is ~70-80% on arbitrary internet. Symmetric
+/// NATs (some mobile carriers, some corporate firewalls) and UDP-blocking
+/// firewalls cause failure with no language-level workaround short of
+/// allocating a TURN relay.
+fn builtin_punch(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    let peer_host = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let peer_port_raw = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    if id == 0 || peer_host.is_empty() || !(1..=65535).contains(&peer_port_raw) {
+        let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+        m.insert("established".into(), StrykeValue::integer(0));
+        m.insert("latency_ms".into(), StrykeValue::integer(0));
+        m.insert("bombards".into(), StrykeValue::integer(0));
+        m.insert("peer_msg".into(), StrykeValue::UNDEF);
+        m.insert("peer_addr".into(), StrykeValue::UNDEF);
+        return Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))));
+    }
+    let peer_port = peer_port_raw as u16;
+
+    // Opts hash (optional, 4th arg).
+    let (timeout_ms, interval_ms, payload) = match args.get(3).filter(|v| !v.is_undef()) {
+        Some(opts) => {
+            let h = opts.as_hash_ref();
+            let mut timeout = 5000u64;
+            let mut interval = 50u64;
+            let mut payload = b"stryke-punch".to_vec();
+            if let Some(arc) = h {
+                let guard = arc.read();
+                if let Some(v) = guard.get("timeout_ms") {
+                    if !v.is_undef() {
+                        timeout = v.to_int().max(1) as u64;
+                    }
+                }
+                if let Some(v) = guard.get("interval_ms") {
+                    if !v.is_undef() {
+                        interval = v.to_int().max(1) as u64;
+                    }
+                }
+                if let Some(v) = guard.get("payload") {
+                    if !v.is_undef() {
+                        if let Some(b) = v.as_bytes_arc() {
+                            payload = (*b).clone();
+                        } else {
+                            payload = v.to_string().into_bytes();
+                        }
+                    }
+                }
+            }
+            (timeout, interval, payload)
+        }
+        None => (5000u64, 50u64, b"stryke-punch".to_vec()),
+    };
+
+    let result = crate::nat_punch::hole_punch(
+        id,
+        &peer_host,
+        peer_port,
+        Duration::from_millis(timeout_ms),
+        Duration::from_millis(interval_ms),
+        &payload,
+    );
+    let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+    m.insert(
+        "established".into(),
+        StrykeValue::integer(if result.established { 1 } else { 0 }),
+    );
+    m.insert(
+        "latency_ms".into(),
+        StrykeValue::integer(result.latency_ms as i64),
+    );
+    m.insert(
+        "bombards".into(),
+        StrykeValue::integer(result.bombards_sent as i64),
+    );
+    m.insert(
+        "peer_msg".into(),
+        match result.peer_msg {
+            Some(b) => match String::from_utf8(b.clone()) {
+                Ok(s) => StrykeValue::string(s),
+                Err(_) => StrykeValue::bytes(StdArc::new(b)),
+            },
+            None => StrykeValue::UNDEF,
+        },
+    );
+    m.insert(
+        "peer_addr".into(),
+        match result.peer_addr {
+            Some(a) => StrykeValue::string(a.to_string()),
+            None => StrykeValue::UNDEF,
+        },
+    );
+    Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
 }
 
 /// `mark($val)` — tag a heap value's Arc so subsequent builtin calls that
