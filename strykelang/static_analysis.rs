@@ -2049,6 +2049,63 @@ mod tests {
         assert_eq!(r.unwrap_err().kind, ErrorKind::UndefinedVariable);
     }
 
+    /// Sigil-agnostic `is_special_var` delegation to builtins::SPECIAL_VARS must
+    /// be a WHITELIST, not a blanket pass. A made-up name that ISN'T in the
+    /// canonical registry must still trip strict-vars in contexts the analyzer
+    /// inspects. Pin guards against a future "always return true" regression in
+    /// the delegation path, which would silently mask typo'd hash / array /
+    /// scalar names.
+    ///
+    /// Scope note: the analyzer currently treats bare assignment (`$x = …`) as
+    /// auto-vivification (Perl-style — declares on first write) and doesn't
+    /// recurse into every builtin's arguments (`keys %x` doesn't check `%x`).
+    /// Those are independent, pre-existing behaviours; this pin uses contexts
+    /// the analyzer DOES walk — bare scalar/array/hash references — so the
+    /// delegation negative path is exercised cleanly.
+    #[test]
+    fn sigil_agnostic_special_var_does_not_pass_arbitrary_names() {
+        for src in [
+            "p $absolutely_not_a_special_var",
+            "my %x = %totally_made_up_reflection_hash",
+            "my @y = @arr_that_was_never_declared",
+        ] {
+            let r = lint(src);
+            assert!(
+                r.is_err(),
+                "strict-vars must still flag arbitrary undef vars, accepted: {src}"
+            );
+            assert_eq!(r.unwrap_err().kind, ErrorKind::UndefinedVariable);
+        }
+    }
+
+    /// Nested MyExpr — `while (my $a = …) { if (my $b = …) { … $a … $b … } }`
+    /// is the natural shape for "read a row, parse a field" pipelines. Both
+    /// outer (`$a`) and inner (`$b`) decls must be visible inside the inner
+    /// body. Pins the scope-stack arithmetic for the recursive `analyze_block`
+    /// calls under the `ExprKind::MyExpr` arm — outer-scope vars from a prior
+    /// MyExpr stay reachable from inside a deeper push_scope/pop_scope frame.
+    ///
+    /// Visibility scope note: a MyExpr decl in `if`/`while` condition position
+    /// is declared in the *surrounding* scope (the condition is analyzed before
+    /// `push_scope` for the body), so the var remains visible after the block
+    /// closes. That's the analyzer's current model — Perl scopes it more
+    /// tightly to the block, but tightening here would require condition-only
+    /// scope frames. Pin captures the propagation-into-body behaviour that
+    /// matters for the strict-vars false-positive fix; the post-block leak
+    /// is left as-is for now.
+    #[test]
+    fn nested_my_in_conditions_both_scopes_propagate() {
+        assert!(
+            lint(
+                "while (my $a = readline(STDIN)) { \
+                   if (my $b = length($a)) { p \"$a → $b\"; } \
+                 }"
+            )
+            .is_ok(),
+            "nested MyExpr in while+if must scope both decls correctly"
+        );
+    }
+
     /// Multi-character reflection hash names (`%all`, `%limits`, `%pc`, the
     /// `%stryke::*` family, `%overload::`) and the `__FILE__` / `__LINE__` /
     /// `__PACKAGE__` / `__SUB__` script-position pseudo-vars must NOT trip
