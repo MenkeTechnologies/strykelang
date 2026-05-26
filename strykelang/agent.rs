@@ -62,10 +62,17 @@ pub mod frame_kind {
     pub const SHUTDOWN: u8 = 0x16;
     pub const STATUS: u8 = 0x17;
     pub const STATUS_RESP: u8 = 0x18;
+    /// Controller → agent: arbitrary stryke source to run against the agent's persistent VM.
+    pub const EVAL: u8 = 0x19;
+    /// Agent → controller: result of an EVAL frame (success output or error message).
+    pub const EVAL_RESULT: u8 = 0x1A;
     pub const ERROR: u8 = 0xFF;
 }
 
-pub const AGENT_PROTO_VERSION: u32 = 1;
+/// Bumped to 2 when the `EVAL` / `EVAL_RESULT` frame kinds were added so an old
+/// (v1) agent refuses the handshake against a new controller and vice versa,
+/// rather than silently hanging on an unrecognised frame.
+pub const AGENT_PROTO_VERSION: u32 = 2;
 
 /// Agent configuration (from TOML file)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -194,8 +201,54 @@ pub struct TermAck {
     pub peak_cpu: f64,
 }
 
+/// `EVAL` frame payload: source to be parsed and run against the agent's persistent
+/// `VMHelper`. Package globals (`$main::name`) and `sub` declarations carry across
+/// frames so successive `eval` commands compose into a remote REPL session.
+/// (Per-frame lexical `my`/`our` bindings are scoped to their parse unit — the same
+/// constraint a Perl `-de0` debugger session has — use `$main::name` to persist.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvalCommand {
+    pub code: String,
+}
+
+/// `EVAL_RESULT` frame payload: outcome of an `EvalCommand`. `ok=true` carries the
+/// stringified return value of the script; `ok=false` carries the error message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EvalResult {
+    pub ok: bool,
+    pub output: String,
+}
+
+/// Stateless EVAL handler — extracted so tests can exercise it without spinning up
+/// the full controller/agent connect dance. Takes a payload, the persistent
+/// interpreter, and writes the `EVAL_RESULT` frame straight back to `stream`.
+pub fn handle_eval_frame<W: Write>(
+    stream: &mut W,
+    interp: &mut crate::vm_helper::VMHelper,
+    payload: &[u8],
+) -> std::io::Result<()> {
+    let result = match bincode::deserialize::<EvalCommand>(payload) {
+        Ok(cmd) => match crate::parse_and_run_string(&cmd.code, interp) {
+            Ok(v) => EvalResult {
+                ok: true,
+                output: v.to_string(),
+            },
+            Err(e) => EvalResult {
+                ok: false,
+                output: format!("{}", e),
+            },
+        },
+        Err(e) => EvalResult {
+            ok: false,
+            output: format!("malformed EVAL frame: {}", e),
+        },
+    };
+    let bytes = bincode::serialize(&result).expect("serialize EvalResult");
+    write_frame(stream, frame_kind::EVAL_RESULT, &bytes)
+}
+
 /// Read a framed message from a stream
-fn read_frame<R: Read>(r: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
+pub fn read_frame<R: Read>(r: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
     let mut len_buf = [0u8; 8];
     r.read_exact(&mut len_buf)?;
     let len = u64::from_le_bytes(len_buf) as usize;
@@ -212,7 +265,7 @@ fn read_frame<R: Read>(r: &mut R) -> std::io::Result<(u8, Vec<u8>)> {
 }
 
 /// Write a framed message to a stream
-fn write_frame<W: Write>(w: &mut W, kind: u8, payload: &[u8]) -> std::io::Result<()> {
+pub fn write_frame<W: Write>(w: &mut W, kind: u8, payload: &[u8]) -> std::io::Result<()> {
     let total_len = 1 + payload.len();
     w.write_all(&(total_len as u64).to_le_bytes())?;
     w.write_all(&[kind])?;
@@ -482,6 +535,9 @@ pub fn run_agent_with_overrides(
     let terminate = Arc::new(AtomicBool::new(false));
     #[allow(unused_assignments)]
     let mut state = AgentState::Idle;
+    // Persistent interpreter — state from one EVAL frame survives to the next so
+    // successive `eval` commands compose into a remote REPL session.
+    let mut interp = crate::vm_helper::VMHelper::new();
     let mut session_start: Option<Instant> = None;
     let mut total_hashes: u64 = 0;
     let mut peak_cpu: f64 = 0.0;
@@ -597,6 +653,13 @@ pub fn run_agent_with_overrides(
                 let _ = write_frame(&mut stream, frame_kind::STATUS_RESP, &metrics_bytes);
             }
 
+            frame_kind::EVAL => {
+                eprintln!("stryke agent: EVAL received ({} bytes)", payload.len());
+                if let Err(e) = handle_eval_frame(&mut stream, &mut interp, &payload) {
+                    eprintln!("stryke agent: failed to write EVAL_RESULT: {}", e);
+                }
+            }
+
             frame_kind::SHUTDOWN => {
                 eprintln!("stryke agent: SHUTDOWN received, exiting");
                 terminate.store(true, Ordering::Relaxed);
@@ -643,4 +706,147 @@ pub fn print_help() {
     println!("EXAMPLE:");
     println!("    stryke agent                           # use config file");
     println!("    stryke agent --controller 10.0.0.1     # connect to specific host");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+
+    /// `EvalCommand` and `EvalResult` round-trip cleanly through bincode (the
+    /// serializer the rest of the agent protocol already uses).
+    #[test]
+    fn eval_command_result_bincode_roundtrip() {
+        let cmd = EvalCommand {
+            code: "1 + 2".to_string(),
+        };
+        let bytes = bincode::serialize(&cmd).unwrap();
+        let back: EvalCommand = bincode::deserialize(&bytes).unwrap();
+        assert_eq!(back.code, "1 + 2");
+
+        let res = EvalResult {
+            ok: false,
+            output: "die at -e line 1".to_string(),
+        };
+        let bytes = bincode::serialize(&res).unwrap();
+        let back: EvalResult = bincode::deserialize(&bytes).unwrap();
+        assert!(!back.ok);
+        assert_eq!(back.output, "die at -e line 1");
+    }
+
+    /// `handle_eval_frame` against an in-memory writer: success path produces a
+    /// well-formed `EVAL_RESULT` whose payload deserializes to `ok=true` with the
+    /// stringified return value.
+    #[test]
+    fn handle_eval_frame_success_writes_eval_result() {
+        let mut interp = crate::vm_helper::VMHelper::new();
+        let cmd = EvalCommand {
+            code: "21 * 2".to_string(),
+        };
+        let payload = bincode::serialize(&cmd).unwrap();
+
+        let mut out = Vec::new();
+        handle_eval_frame(&mut out, &mut interp, &payload).expect("write EVAL_RESULT");
+
+        let mut cur = Cursor::new(out);
+        let (kind, body) = read_frame(&mut cur).expect("read back");
+        assert_eq!(kind, frame_kind::EVAL_RESULT);
+        let r: EvalResult = bincode::deserialize(&body).unwrap();
+        assert!(r.ok, "expected ok=true, got {:?}", r);
+        assert_eq!(r.output, "42");
+    }
+
+    /// Error path: a parse failure becomes `ok=false` carrying the formatted error.
+    #[test]
+    fn handle_eval_frame_error_writes_eval_result_with_ok_false() {
+        let mut interp = crate::vm_helper::VMHelper::new();
+        let cmd = EvalCommand {
+            code: "this is not valid stryke @@@".to_string(),
+        };
+        let payload = bincode::serialize(&cmd).unwrap();
+
+        let mut out = Vec::new();
+        handle_eval_frame(&mut out, &mut interp, &payload).expect("write");
+
+        let mut cur = Cursor::new(out);
+        let (kind, body) = read_frame(&mut cur).expect("read back");
+        assert_eq!(kind, frame_kind::EVAL_RESULT);
+        let r: EvalResult = bincode::deserialize(&body).unwrap();
+        assert!(!r.ok, "expected ok=false on parse failure, got {:?}", r);
+        assert!(!r.output.is_empty(), "error output must not be empty");
+    }
+
+    /// State across EVAL frames: the `VMHelper` persists, so subs defined in one
+    /// frame remain callable, and package globals (`$main::name`) carry their
+    /// values to the next frame. This pin proves the REPL semantics the
+    /// controller relies on.
+    ///
+    /// Note: `my`/`our` lexical bindings are scoped to their parse_and_run_string
+    /// call (the parse unit is the scope), so cross-frame persistence requires
+    /// package-qualified names. That's the same constraint a Perl `-de0` REPL has.
+    #[test]
+    fn successive_eval_frames_share_persistent_vm_state() {
+        let mut interp = crate::vm_helper::VMHelper::new();
+
+        // Frame 1: define a package global + a sub.
+        let cmd1 = EvalCommand {
+            code: "$main::counter = 100; sub bump { $main::counter + 7 } $main::counter"
+                .to_string(),
+        };
+        let mut out1 = Vec::new();
+        handle_eval_frame(&mut out1, &mut interp, &bincode::serialize(&cmd1).unwrap()).unwrap();
+        let (_, body1) = read_frame(&mut Cursor::new(out1)).unwrap();
+        let r1: EvalResult = bincode::deserialize(&body1).unwrap();
+        assert!(r1.ok, "frame 1 must succeed, got {:?}", r1);
+        assert_eq!(r1.output, "100");
+
+        // Frame 2: the package global AND the sub from frame 1 must still be live.
+        let cmd2 = EvalCommand {
+            code: "bump()".to_string(),
+        };
+        let mut out2 = Vec::new();
+        handle_eval_frame(&mut out2, &mut interp, &bincode::serialize(&cmd2).unwrap()).unwrap();
+        let (_, body2) = read_frame(&mut Cursor::new(out2)).unwrap();
+        let r2: EvalResult = bincode::deserialize(&body2).unwrap();
+        assert!(r2.ok, "frame 2 must succeed, got {:?}", r2);
+        assert_eq!(
+            r2.output, "107",
+            "frame 2 must call the sub defined in frame 1 and see $main::counter"
+        );
+    }
+
+    /// Full TCP round-trip: a real `TcpListener` accepts one connection, an
+    /// "agent" thread runs `handle_eval_frame` against the frame, the client side
+    /// gets back the expected `EVAL_RESULT`. This pins the wire path the
+    /// controller's `eval_all` walks at runtime, sans the controller setup.
+    #[test]
+    fn tcp_loopback_eval_roundtrip() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let addr = listener.local_addr().unwrap();
+
+        let agent_handle = thread::spawn(move || {
+            let (mut server, _) = listener.accept().expect("accept");
+            let mut interp = crate::vm_helper::VMHelper::new();
+            let (kind, payload) = read_frame(&mut server).expect("read EVAL");
+            assert_eq!(kind, frame_kind::EVAL);
+            handle_eval_frame(&mut server, &mut interp, &payload).expect("reply");
+        });
+
+        let mut client = TcpStream::connect(addr).expect("connect");
+        let cmd = EvalCommand {
+            code: "join(\",\", 1:5)".to_string(),
+        };
+        let body = bincode::serialize(&cmd).unwrap();
+        write_frame(&mut client, frame_kind::EVAL, &body).expect("send EVAL");
+
+        let (kind, payload) = read_frame(&mut client).expect("read EVAL_RESULT");
+        assert_eq!(kind, frame_kind::EVAL_RESULT);
+        let r: EvalResult = bincode::deserialize(&payload).unwrap();
+        assert!(r.ok, "expected ok=true, got {:?}", r);
+        assert_eq!(r.output, "1,2,3,4,5");
+
+        agent_handle.join().expect("agent thread");
+    }
 }
