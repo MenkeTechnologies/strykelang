@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+#
+# Multi-agent controller + N agents in a single stryke process. Combines
+# `controller(...)` (blocks on REPL stdin) with `spawn { agent(...) }`
+# (background frame loop, one per agent name) to bring up a full
+# controller-plus-fleet fixture without a second machine.
+#
+# Run:
+#   stryke examples/controller_three_agents.stk
+#
+# What you'll see at the REPL:
+#
+#   > status
+#   3 agents connected:
+#     worker-a   localhost   idle
+#     worker-b   localhost   idle
+#     worker-c   localhost   idle
+#
+#   > @1 + 41                            # one-shot eval, all agents in parallel
+#   [worker-a/ok] 42
+#   [worker-b/ok] 42
+#   [worker-c/ok] 42
+#
+#   > @$main::counter = 0; $main::counter
+#   [worker-a/ok] 0
+#   [worker-b/ok] 0
+#   [worker-c/ok] 0
+#
+#   > @$main::counter += 10; $main::counter
+#   [worker-a/ok] 10                     # state persists per-agent across @CODE calls
+#   [worker-b/ok] 10
+#   [worker-c/ok] 10
+#
+#   > shutdown
+#
+# Override the port with `PORT=N` if 9999 is busy on this machine.
+#
+# Output is alphabetical because the controller sorts agents by name
+# before dispatch (so transcripts diff cleanly between runs). Wall time
+# for an `@CODE` line is max(per-agent latency), not sum — the controller
+# fans out all writes first, then collects replies (see the parallel
+# `eval_all` fan-out in strykelang/controller.rs).
+
+my $port = $ENV{PORT} // 9999
+
+# Spawn three named agents. The leading `sleep 1` lets the main thread
+# bind the controller listener before each agent's `connect()` runs —
+# without it, agents would race the controller and `agent(...)` would
+# return 1 (connection refused) for whichever lost the race.
+for my $name (qw(worker-a worker-b worker-c)) {
+    spawn {
+        sleep 1
+        agent("localhost:$port", $name)
+    }
+}
+
+# Block on the REPL. `shutdown` (typed at the prompt) disconnects every
+# agent cleanly and returns 0; the spawned threads exit when their
+# `agent(...)` call sees the controller-side disconnect.
+exit controller("127.0.0.1", $port)
