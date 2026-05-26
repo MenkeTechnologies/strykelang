@@ -1,0 +1,30 @@
+#!/usr/bin/env stryke
+#
+# Drop this stryke process into agent mode and connect to a controller.
+# Identical to running `stryke agent --controller HOST --port PORT` from the
+# CLI, but invokable from any script so you can wrap it in custom startup
+# logic (logging, env validation, secrets fetching, exponential-backoff
+# reconnect loops, etc.).
+#
+# Usage:
+#   CONTROLLER_ADDR=ctl.example.com:9999 AGENT_NAME=node-01 \
+#       stryke examples/agent_become.stk
+#
+# Defaults:
+#   CONTROLLER_ADDR  →  localhost:9999
+#   AGENT_NAME       →  the local hostname
+#
+# Exit codes from `agent(...)`:
+#   0  clean disconnect (controller sent SHUTDOWN)
+#   1  connection / handshake failure
+#
+# Reconnect-on-failure loop is one extra line if you want a daemon that
+# survives controller restarts:
+#
+#   while (1) { agent($addr, $name) == 0 ? last : sleep 5 }
+
+my $addr = $ENV{CONTROLLER_ADDR} // "localhost:9999"
+my $name = $ENV{AGENT_NAME}      // $ENV{HOSTNAME} // "anonymous"
+
+p "joining controller at $addr as '$name'"
+exit agent($addr, $name)

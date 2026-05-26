@@ -263,6 +263,7 @@ CORE::age_at_z
 CORE::age_from_birthdate
 CORE::age_in_years
 CORE::ageyrs
+CORE::agent
 CORE::ai
 CORE::ai_agent
 CORE::ai_batch
@@ -1997,6 +1998,7 @@ CORE::contour_find
 CORE::contour_perimeter
 CORE::contrast_ratio
 CORE::contrast_ratio_wcag
+CORE::controller
 CORE::conv
 CORE::conv1d_apply
 CORE::conv2d_apply
@@ -11321,6 +11323,7 @@ age_at_date
 age_at_z
 age_from_birthdate
 age_in_years
+agent
 ageyrs
 ai
 ai_agent
@@ -13064,6 +13067,7 @@ contour_find
 contour_perimeter
 contrast_ratio
 contrast_ratio_wcag
+controller
 conv
 conv1d_apply
 conv2d_apply

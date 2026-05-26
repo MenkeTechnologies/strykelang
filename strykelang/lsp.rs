@@ -5186,6 +5186,8 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         // ── QR Code ──
         "qr_ascii" | "qr" => "`qr_ascii` (alias `qr`) generates a QR code as ASCII art. Perfect for terminal output.\n\n```perl\np qr(\"https://example.com\")\np qr(\"otpauth://totp/App:user?secret=$secret&issuer=App\")\n```",
         "qr_png" => "`qr_png` generates a QR code as PNG image data (base64 encoded). Optional size parameter. Save to file or embed in HTML.\n\n```perl\nmy $png = qr_png(\"https://example.com\")\nspurt(\"qr.png\", base64_decode($png))\n# Larger QR\nmy $big = qr_png($url, 16)\n```",
+        "controller" => "`controller([bind, [port]])` — drop this stryke process into **controller mode**: bind a TCP listener at `bind:port`, accept agent connections, and run the interactive REPL on stdin so commands like `status`, `@CODE`, `eval CODE`, `fire`, `terminate`, and `shutdown` can be typed at the prompt. Blocking; returns the exit code (`0` on a clean `shutdown`, `1` if bind fails). Defaults: `bind=\"0.0.0.0\"`, `port=9999`.\n\nEquivalent to the `stryke controller` CLI subcommand but invokable from any stryke source file. Combine with `agent()` and `spawn` to run controller + local agent in a single process for testing.\n\n```perl\n# Bare invocation — bind 0.0.0.0:9999, REPL on stdin\ncontroller()\n\n# Explicit\nexit controller(\"127.0.0.1\", 8888)\n\n# Controller + local agent in one process (testing pattern)\nspawn {\n    sleep 1\n    agent(\"localhost:9999\", \"local-worker\")\n}\ncontroller(\"127.0.0.1\", 9999)\n```\n\nSee also: `agent`.",
+        "agent" => "`agent([controller_addr, [name]])` — drop this stryke process into **agent mode**: connect to `controller_addr` (default `localhost:9999`), send `AGENT_HELLO`, and enter the persistent frame loop handling `FIRE` / `EVAL` / `TERMINATE` / `STATUS` / `SHUTDOWN` from the controller. EVAL frames carry arbitrary stryke source that runs against a persistent per-agent `VMHelper`, so `sub` definitions and `$main::name` globals survive across calls — the controller becomes a remote REPL.\n\n`controller_addr` may be a bare host (port defaults to 9999) or `host:port`. `name` is what shows in the controller's `status` table — defaults to the local hostname if omitted.\n\nBlocking; returns the exit code (`0` clean disconnect, `1` connection or handshake failure). Wrap in `spawn { agent(...) }` to run an agent in the background.\n\n```perl\n#!/usr/bin/env stryke\n# Become an agent on boot\nexit agent($ENV{CONTROLLER_ADDR} // \"ctl.local:9999\", $ENV{HOSTNAME})\n\n# Multi-agent test fixture in one process\nspawn { agent(\"localhost:9999\", \"worker-1\") }\nspawn { agent(\"localhost:9999\", \"worker-2\") }\ncontroller(\"127.0.0.1\", 9999)\n```\n\nSee also: `controller`.",
         "qr_svg" => "`qr_svg` generates a QR code as SVG string. Scalable vector graphics, ideal for web.\n\n```perl\nmy $svg = qr_svg(\"https://example.com\")\nspurt(\"qr.svg\", $svg)\n```",
         // ── Barcode ──
         "barcode_code128" | "code128" => "`barcode_code128` (alias `code128`) generates a Code 128 barcode as ASCII. Code 128 supports alphanumeric data and is widely used in shipping labels.\n\n```perl\np code128(\"ABC-123\")\n```",
@@ -7904,6 +7906,8 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "aes_cbc_decrypt",
             "qr_ascii",
             "qr_png",
+            "controller",
+            "agent",
             "qr_svg",
             "barcode_code128",
             "barcode_code39",
