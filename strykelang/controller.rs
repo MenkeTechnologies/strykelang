@@ -196,6 +196,19 @@ impl Controller {
     /// Multi-line output is prefixed **per line**: each `\n`-separated line of an
     /// agent's stringified result carries its own `[name/ok|ERR]` tag so grepping
     /// or diffing transcripts by agent stays trivial regardless of result shape.
+    ///
+    /// **Concurrent execution.** Done as a two-pass loop with no threading or
+    /// concurrency primitives:
+    ///
+    ///   * **Pass 1** writes the EVAL frame to every agent in rapid succession
+    ///     (each `write_frame` is just a kernel send, no waiting for the reply).
+    ///     By the end of pass 1 every agent is already executing in parallel.
+    ///   * **Pass 2** reads the EVAL_RESULT back from each agent in the same
+    ///     sorted order.
+    ///
+    /// Total wall time = max(per-agent latency), not sum — three agents that
+    /// each take 5 s now finish in ~5 s wall, not 15. Output stays alphabetical
+    /// because pass 2 reads in the same order pass 1 wrote.
     fn eval_all(&self, code: &str) {
         let cmd = EvalCommand {
             code: code.to_string(),
@@ -222,16 +235,30 @@ impl Controller {
             .collect();
         order.sort_by(|a, b| a.1.cmp(&b.1));
 
+        // Pass 1 — fan out: write EVAL to every agent, set its read timeout.
+        // Tracks (id, name) pairs we successfully dispatched to, so pass 2 only
+        // tries to read from agents that actually received the frame.
+        let mut dispatched: Vec<(u64, String)> = Vec::with_capacity(order.len());
         for (id, name) in &order {
             let agent = match agents.get_mut(id) {
                 Some(a) => a,
-                None => continue, // agent vanished between snapshot and iteration
+                None => continue,
             };
             if let Err(e) = write_frame(&mut agent.stream, frame_kind::EVAL, &cmd_bytes) {
                 print_tagged(name, "ERR", &format!("write error: {}", e));
                 continue;
             }
             let _ = agent.stream.set_read_timeout(Some(Duration::from_secs(30)));
+            dispatched.push((*id, name.clone()));
+        }
+        // At this point every dispatched agent is executing concurrently.
+
+        // Pass 2 — collect: read EVAL_RESULT from each agent in sorted order.
+        for (id, name) in &dispatched {
+            let agent = match agents.get_mut(id) {
+                Some(a) => a,
+                None => continue,
+            };
             loop {
                 match read_frame(&mut agent.stream) {
                     Ok((frame_kind::EVAL_RESULT, payload)) => {

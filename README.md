@@ -2590,7 +2590,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 |---------|-------------|
 | `status` | List connected agents with cores, memory, state |
 | `fire [SECS]` | Start stress test on all agents (default: 10s) |
-| `eval CODE` | Run arbitrary stryke source on **every** agent. Each agent parses & executes against its own persistent `VMHelper`, so `sub` definitions and `$main::name` globals carry across calls (lexical `my`/`our` are per-frame, like a Perl `-de0` session). Output: `[agent/ok\|ERR] <result>` per agent. Controller pulls EVAL_RESULT synchronously with a 30s read timeout. |
+| `eval CODE` | Run arbitrary stryke source on **every** agent **in parallel**. Each agent parses & executes against its own persistent `VMHelper`, so `sub` definitions and `$main::name` globals carry across calls (lexical `my`/`our` are per-frame, like a Perl `-de0` session). Controller fans out via a two-pass loop — pass 1 writes all EVAL frames (kernel sends, no waiting), pass 2 collects each `EvalResult` in sorted name order. Wall time = max(per-agent latency), not sum. Output: `[agent/ok\|ERR] <result>` per agent, each output line tagged. 30s read timeout per agent. |
 | `@CODE` | Shorthand for `eval CODE`. Any line in the REPL starting with `@` ships the rest as stryke source to every agent — `@1+1`, `@sub bump { ... } bump()`, `@$main::counter += 5` all work. Saves four keystrokes vs the explicit verb. |
 | `terminate` | Stop stress test immediately |
 | `shutdown` | Disconnect all agents and exit |
