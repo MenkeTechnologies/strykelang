@@ -1,0 +1,101 @@
+#!/usr/bin/env stryke
+
+# `ingest` basics
+#
+# Demonstrates:
+#   * `ingest PATTERN` — streaming sibling of `swallow`; yields
+#     `[canonical_abspath, raw_bytes]` one file at a time
+#   * `ing` alias
+#   * three iteration models: foreach (lazy pull), explicit `->next`,
+#     pipe terminals
+#   * eager pre-flight: full zsh qualifier support + hard-fail on
+#     non-regular up-front
+#   * `(N)` null-glob qualifier
+#   * `**` recursive glob
+#   * binary-safe (raw bytes, no decoding)
+#   * memory profile vs `swallow`
+#
+# Run: stryke examples/ingest_basics.stk
+
+p "── ingest basics ─────────────────────────────────────"
+
+my $dir = "/tmp/stryke_ingest_demo"
+system "rm", "-rf", $dir       # clean any prior run
+mkdir $dir
+mkdir "$dir/nested"
+
+# Seed a small tree of fixtures.
+spurt "$dir/a.txt",        "hello\n"
+spurt "$dir/b.txt",        "world\n"
+spurt "$dir/nested/c.txt", "deep\n"
+spurt "$dir/logo.bin",     pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01)   # exactly 5 raw bytes
+
+# 1. Foreach destructure — the natural Perl form. The for-loop pulls
+#    one pair from the iterator per iteration, so only one file's
+#    bytes are resident at a time.
+p "\n1. foreach pull (one file's bytes resident at any moment):"
+my $total_bytes = 0
+my $count = 0
+for my $pair (ingest "$dir/*.txt") {
+    my ($path, $bytes) = @$pair
+    $total_bytes += length $bytes
+    $count += 1
+    p "   pulled $path  → #{length $bytes} bytes"
+}
+p "   summary: $count files, $total_bytes total bytes"
+
+# 2. `ing` alias.
+p "\n2. `ing` alias (short form):"
+for my $pair (ing "$dir/*.txt") {
+    p "   ing yielded ", $pair->[0]
+}
+
+# 3. Explicit `->next` driving — useful for early-termination loops
+#    that don't fit a foreach.
+p "\n3. explicit ->next driving (first 1 file then stop):"
+my $it = ingest "$dir/**/*.txt"
+my $r = $it->next
+my ($p1, $b1) = @{$r->[0]}
+p "   first pull: $p1  → #{length $b1} bytes  (more=$r->[1])"
+p "   stopping early — remaining files never read."
+
+# 4. Binary-safe: raw bytes preserved through the iterator.
+p "\n4. binary file (5 raw bytes including 0x00, 0xff, 0x80):"
+for my $pair (ingest "$dir/logo.bin") {
+    my ($path, $bytes) = @$pair
+    p "   $path  → #{length $bytes} raw bytes"
+}
+
+# 5. Recursive `**` walks the whole subtree.
+p "\n5. recursive '**/*.txt' across nested dirs:"
+my $deep_count = 0
+for my $pair (ingest "$dir/**/*.txt") { $deep_count += 1 }
+p "   $deep_count files reached (top + nested)"
+
+# 6. `(N)` null-glob: zero iterations, no error.
+p "\n6. (N) null-glob on no-match: silent zero iterations"
+my $miss = 0
+for my $pair (ingest "$dir/no_such_*(N)") { $miss += 1 }
+p "   $miss iterations (expected 0)"
+
+# 7. Compare with swallow's memory profile.
+p "\n── memory profile: ingest vs swallow ──"
+p "swallow: every file's bytes resident simultaneously in the hash."
+p "ingest:  one file's bytes at a time; iterator drops the prior pair"
+p "         before yielding the next. Use ingest when the concatenated"
+p "         bytes wouldn't fit in RAM (giant log directories, image"
+p "         corpora, model checkpoints, …)."
+
+# Cleanup
+system "rm", "-rf", $dir
+
+# ── Tests ──────────────────────────────────────────────────────────
+
+$count == 2                |> aok "foreach visited two .txt files"
+$total_bytes == 12         |> aok "byte total preserved (6+6)"
+length($b1) > 0            |> aok "->next yielded a non-empty file"
+$r->[1] == 1               |> aok "->next more=1 while items remain"
+$deep_count == 3           |> aok "recursive reached nested"
+$miss == 0                 |> aok "(N) yields zero iterations silently"
+
+test_run
