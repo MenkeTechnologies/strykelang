@@ -1213,6 +1213,12 @@ pub enum ExprKind {
     /// so binary files round-trip cleanly. Hard-fails on non-regular matches
     /// the same way `slurp` does; opt out with the `(N)` null-glob qualifier.
     Swallow(Box<Expr>),
+    /// `ingest PATTERN` — streaming variant of `swallow`: returns a lazy
+    /// iterator yielding `[canonicalized_abspath, raw_bytes]` per file. Only
+    /// one file's bytes are resident at a time. Path list and stat/canonicalize
+    /// are eager (full zsh qualifier support); file reads are lazy. Hard-fails
+    /// on non-regular matches up-front, matching `slurp`/`swallow` policy.
+    Ingest(Box<Expr>),
     /// Run shell command and return structured output (`capture "cmd"`).
     Capture(Box<Expr>),
     /// `` `cmd` `` / `qx{cmd}` — run via `sh -c`, return **stdout as a string** (Perl); updates `$?`.

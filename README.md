@@ -78,7 +78,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - **PTY-driven interactive automation** — `pty_spawn`/`pty_expect`/`pty_send`/`pty_interact`, the modern Tcl/Expect successor with cluster fanout ([§ 0x17](#0x17-expect--interactive-automation))
 - **rkyv KV store** — *world-first*. First-class CRUD store with rkyv as the on-disk codec. `kv_open`/`kv_put`/`kv_get`/`kv_del`/`kv_exists`/`kv_keys`/`kv_scan`/`kv_len`/`kv_commit`/`kv_batch`/`kv_close`/`kv_stats` ship as native builtins. Reads are `mmap + validate + cast` (zero-copy, no parse, no allocate per row) — the same primitive `script_cache.rs` already uses for bytecode. SQLite-shaped API ergonomics, beats SQLite on reads for any store that fits comfortably in RAM. Atomic rewrite on commit (tmp + rename), versioned format header (`STKV` magic + `format_version`), all-or-nothing `kv_batch`. Phase 2 ships `stryke kvd` server + remote `kv_connect` client over the same archive bytes.
 - **Sketch algebra** — *world-first*. Probabilistic data structures are first-class operands for `+ | & ^ -`: `$bloom_a + $bloom_b` (Bloom union), `$hll_a + $hll_b` (HyperLogLog union), `$cms_a + $cms_b` (Count-Min counter sum), `$topk_a + $topk_b` (SpaceSaving merge), `$td_a + $td_b` (t-digest centroid merge), `$rb_a | $rb_b` / `& ^ -` (Roaring set algebra). Operators are functional — operands are never mutated. No other language treats these as syntactic primitives; everywhere else they are library function calls.
-- **All zsh glob qualifiers in a scripting language** — world-first. Every qualifier from zsh's `zshexpn(1)` works wherever stryke takes a glob (`glob`, `glob_par`, `slurp`/`c`/`cat`, `swallow`/`swa`, `pwatch`, `<...>`, `par_find_files`): file-type, permission, ownership, size/links/time numerics, sort + descending sort, `[N,M]` selection, `(N)` null-glob, `(D)` dotfiles, `(F)` non-empty dir, `(f<bits>)` mode match, `(d<N>)` device, `(e'CMD')` eval, `(P…)`/`(Q…)` join words, `^` negate, `-` follow-symlinks toggle, `,` OR, `:` colon modifiers. Backed by the zshrs glob engine — single source of truth, zero stryke-side reimplementation.
+- **All zsh glob qualifiers in a scripting language** — world-first. Every qualifier from zsh's `zshexpn(1)` works wherever stryke takes a glob (`glob`, `glob_par`, `slurp`/`c`/`cat`, `swallow`/`swa`, `ingest`/`ing`, `pwatch`, `<...>`, `par_find_files`): file-type, permission, ownership, size/links/time numerics, sort + descending sort, `[N,M]` selection, `(N)` null-glob, `(D)` dotfiles, `(F)` non-empty dir, `(f<bits>)` mode match, `(d<N>)` device, `(e'CMD')` eval, `(P…)`/`(Q…)` join words, `^` negate, `-` follow-symlinks toggle, `,` OR, `:` colon modifiers. Backed by the zshrs glob engine — single source of truth, zero stryke-side reimplementation.
 - **Package manager** — Cargo-shaped `stryke.toml` + `stryke.lock`, `s add`/`s install`/`s tree` resolver, hash-pinned reproducible builds ([§ 0x14](#0x14-package-manager))
 - **New Parallel Subroutines and |> Pipeline Syntactic Sugar**
 - **Runtime values** — `StrykeValue` is a NaN-boxed `u64`: immediates (`undef`, `i32`, raw `f64` bits) and tagged `Arc<HeapObject>` pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.
@@ -1111,7 +1111,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `unpack_first` / `unpack1` / `up1` (first decoded element — `--no-interop` replacement for `scalar unpack`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
-| I/O | `print`, `p`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->p/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `swallow`/`swa` (glob → hash `{abspath => bytes}`), `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
+| I/O | `print`, `p`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->p/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `swallow`/`swa` (glob → hash `{abspath => bytes}`), `ingest`/`ing` (streaming `[path, bytes]` iterator), `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
 | Directory | `opendir`, `readdir`, `closedir`, `rewinddir`, `telldir`, `seekdir`, `files`, `filesf`/`f`, `fr` (recursive files, lazy iterator), `dirs`/`d`, `dr` (recursive dirs, lazy iterator), `sym_links`, `sockets`, `pipes`, `block_devices`, `char_devices` |
 | File tests | `-e`, `-f`, `-d`, `-l`, `-r`, `-w`, `-s`, `-z`, `-x`, `-t` (defaults to `$_`) |
 | System | `system`, `exec`, `exit`, `chdir`, `mkdir`, `unlink`, `rename`, `chmod`, `chown`, `chroot`, `stat`, `lstat`, `link`, `symlink`, `readlink`, `glob`, `glob_par`, `glob_match`, `which_all`, `par_sed`, `par_find_files`, `par_line_count`, `ppool`, `barrier`, `fork`, `wait`, `waitpid`, `kill`, `alarm`, `sleep`, `times`, `dump`, `reset` |
@@ -1420,9 +1420,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # ── zsh glob qualifiers — world's first in a scripting language ────
   # Stryke imports the full zshrs glob engine (zsh-compatible). Every
   # builtin that accepts a glob — `glob`, `glob_par`, `slurp`/`c`/`cat`,
-  # `swallow`/`swa`, `pwatch`, `par_find_files`, `<*.txt>`, … — applies
-  # the qualifiers without a single line of stryke-side parsing. Source
-  # of truth is `zsh::glob` from `../zshrs`.
+  # `swallow`/`swa`, `ingest`/`ing`, `pwatch`, `par_find_files`,
+  # `<*.txt>`, … — applies the qualifiers without a single line of
+  # stryke-side parsing. Source of truth is `zsh::glob` from `../zshrs`.
   my @dirs = glob "**(/)"          # directories only, recursive
   my @files = glob "**(.)"         # regular files only, recursive
   my @links = glob "**(@)"         # symlinks only
@@ -1443,6 +1443,19 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my %src = swallow "src/**/*.rs"   # every Rust source file, raw bytes
   my %imgs = swa "assets/**/*.{png,jpg}"
   my %safe = swallow "missing*(N)"  # (N) null-glob → empty hash
+
+  # `ingest` is the streaming variant of `swallow` — yields
+  # `[abspath, bytes]` one file at a time so only one file's bytes are
+  # resident at any moment. Same eager glob expansion (full qualifier
+  # support, hard-fail on non-regular up-front), but file reads are
+  # deferred to each iteration step. For-loops over an ingest iterator
+  # pull lazily (no `to_list()` materialisation); use `|>` pipes or
+  # explicit `->next` driving the same way.
+  for my $pair (ingest "data/**/*.bin") {
+      my ($path, $bytes) = @$pair
+      # process one file's bytes, then they go out of scope
+  }
+  my $it = ing "logs/*.log"; while (my $p = $it->next->[0]) { ... }
   ```
 
   **Full qualifier reference** — stryke supports **every** zsh glob qualifier (`man zshexpn`, _Filename Generation > Glob Qualifiers_), inherited verbatim from `zsh::glob`:
@@ -1745,6 +1758,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   | `rl` | `read_lines` | `uid` | `uuid` | `hxe` | `hex_encode` |
   | `rb` | `read_bytes` | | | `hxd` | `hex_decode` |
   | `swa` | `swallow` | | | | |
+  | `ing` | `ingest` | | | | |
   | `af` | `append_file` | **HTTP** | | `ue` | `url_encode` |
   | `rj` | `read_json` | `ft` | `fetch` | `ud` | `url_decode` |
   | `wj` | `write_json` | `ftj` | `fetch_json` | `gz` | `gzip` |
