@@ -26,9 +26,10 @@ use std::thread;
 use std::time::Instant;
 
 use crate::agent::{
-    frame_kind, AgentHello, AgentHelloAck, AgentState, FireCommand, WorkloadType,
-    AGENT_PROTO_VERSION,
+    frame_kind, AgentHello, AgentHelloAck, AgentState, EvalCommand, EvalResult, FireCommand,
+    WorkloadType, AGENT_PROTO_VERSION,
 };
+use std::time::Duration;
 
 /// Connected agent state
 struct ConnectedAgent {
@@ -179,6 +180,62 @@ impl Controller {
         eprintln!("[fire] {} agents, duration={}s", fired, duration_secs);
     }
 
+    /// Send EVAL to every connected agent, then synchronously collect each agent's
+    /// `EvalResult` and print it to stdout. Per-agent the path is request/response:
+    /// stale frames from previous commands (`METRICS` after a long-running `FIRE`,
+    /// etc.) are quietly skipped so the next visible line is always the eval result.
+    /// A 30-second read timeout guards against agents that ignore the frame entirely
+    /// (e.g. an old agent version with no EVAL handler).
+    fn eval_all(&self, code: &str) {
+        let cmd = EvalCommand {
+            code: code.to_string(),
+        };
+        let cmd_bytes = bincode::serialize(&cmd).expect("serialize EvalCommand");
+
+        let mut agents = self.agents.lock().unwrap();
+        if agents.is_empty() {
+            println!("[eval] no agents connected");
+            return;
+        }
+
+        for agent in agents.values_mut() {
+            let name = agent
+                .agent_name
+                .clone()
+                .unwrap_or_else(|| agent.hostname.clone());
+            if let Err(e) = write_frame(&mut agent.stream, frame_kind::EVAL, &cmd_bytes) {
+                println!("[{}] write error: {}", name, e);
+                continue;
+            }
+            let _ = agent.stream.set_read_timeout(Some(Duration::from_secs(30)));
+            loop {
+                match read_frame(&mut agent.stream) {
+                    Ok((frame_kind::EVAL_RESULT, payload)) => {
+                        match bincode::deserialize::<EvalResult>(&payload) {
+                            Ok(r) => {
+                                let tag = if r.ok { "ok" } else { "ERR" };
+                                println!("[{}/{}] {}", name, tag, r.output);
+                            }
+                            Err(e) => println!("[{}] malformed EVAL_RESULT: {}", name, e),
+                        }
+                        break;
+                    }
+                    Ok((other_kind, _)) => {
+                        eprintln!(
+                            "[{}] (dropped stale frame kind 0x{:02X} while awaiting EVAL_RESULT)",
+                            name, other_kind
+                        );
+                    }
+                    Err(e) => {
+                        println!("[{}] read error: {}", name, e);
+                        break;
+                    }
+                }
+            }
+            let _ = agent.stream.set_read_timeout(None);
+        }
+    }
+
     /// Send TERMINATE to all agents
     fn terminate_all(&self) {
         let mut agents = self.agents.lock().unwrap();
@@ -282,6 +339,20 @@ impl Controller {
                     let duration = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(10.0);
                     self.fire_all(duration);
                 }
+                "eval" | "e" => {
+                    // Everything after the verb (preserving inner whitespace) is the source.
+                    let after = line
+                        .trim_start()
+                        .splitn(2, char::is_whitespace)
+                        .nth(1)
+                        .unwrap_or("")
+                        .trim();
+                    if after.is_empty() {
+                        println!("usage: eval CODE  (sends CODE to every connected agent for execution against its persistent VM)");
+                    } else {
+                        self.eval_all(after);
+                    }
+                }
                 "terminate" | "t" | "stop" => self.terminate_all(),
                 "shutdown" | "quit" | "exit" | "q" => {
                     self.shutdown_all();
@@ -291,6 +362,7 @@ impl Controller {
                     println!("Commands:");
                     println!("  status (s)           List connected agents");
                     println!("  fire [SECS] (f)      Start stress test (default: 10s)");
+                    println!("  eval CODE (e)        Run arbitrary stryke source on every agent (state persists across calls)");
                     println!("  terminate (t)        Stop stress test");
                     println!("  shutdown (q)         Disconnect all and exit");
                     println!("  help (h)             Show this help");

@@ -2590,8 +2590,27 @@ stryke controller --bind 10.0.0.1    # specific interface
 |---------|-------------|
 | `status` | List connected agents with cores, memory, state |
 | `fire [SECS]` | Start stress test on all agents (default: 10s) |
+| `eval CODE` | Run arbitrary stryke source on **every** agent. Each agent parses & executes against its own persistent `VMHelper`, so `sub` definitions and `$main::name` globals carry across calls (lexical `my`/`our` are per-frame, like a Perl `-de0` session). Output: `[agent/ok\|ERR] <result>` per agent. Controller pulls EVAL_RESULT synchronously with a 30s read timeout. |
 | `terminate` | Stop stress test immediately |
 | `shutdown` | Disconnect all agents and exit |
+
+**`eval` example session:**
+
+```text
+stryke controller v0.14.30
+> status
+node-01    16   64GB         idle      120s
+> eval sub greet { "hello from " . $main::ENV{HOSTNAME} } greet()
+[node-01/ok] hello from node-01
+> eval $main::counter = 0
+[node-01/ok] 0
+> eval $main::counter += 5; $main::counter
+[node-01/ok] 5
+> eval die "boom"
+[node-01/ERR] boom at -e line 1
+```
+
+Wire-level: a new pair of frame kinds is added to the agent protocol — `EVAL` (controller → agent, payload = bincode `EvalCommand { code }`) and `EVAL_RESULT` (agent → controller, payload = `EvalResult { ok, output }`). `AGENT_PROTO_VERSION` is bumped to 2 so a v1 agent refuses the handshake against a v2 controller rather than silently hanging on an unrecognised frame kind.
 
 ### Agent (Worker Daemon)
 
