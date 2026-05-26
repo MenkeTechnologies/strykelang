@@ -55,6 +55,7 @@ mod fib_like_tail;
 pub mod fmt;
 pub mod format;
 pub mod getopts;
+pub mod god;
 mod jit;
 mod jwt;
 pub mod kvstore;
