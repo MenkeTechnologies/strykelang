@@ -196,6 +196,7 @@ mod feature_integration_pin;
 mod file_io_pin;
 mod ingest_pin;
 mod swallow_pin;
+mod burp_pin;
 mod fix_regressions;
 mod flat_map_pin;
 mod fn_in_package_no_builtin_shadow_pin;

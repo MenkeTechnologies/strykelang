@@ -1005,6 +1005,53 @@ pub fn ingest_iterator(pattern: &str) -> io::Result<StrykeValue> {
     Ok(StrykeValue::iterator(Arc::new(IngestIterator::new(canon))))
 }
 
+/// `burp HASH` — inverse of `swallow`. Walk a `{ path => content }` hash and
+/// write each entry to disk. Parent directories are created on the fly so the
+/// canonical `swallow %h |> mutate |> burp` round-trip works even when the
+/// destination tree doesn't yet exist. Values that are byte buffers
+/// (`StrykeValue::bytes`) write raw bytes; any other scalar stringifies via
+/// `to_string()` before being written (matches `spew`/`spurt` semantics).
+///
+/// Returns the count of files written. Hard-fails on the first I/O error so a
+/// half-applied burp surfaces immediately rather than silently dropping
+/// entries.
+pub fn burp_hash_to_disk(v: &StrykeValue) -> io::Result<i64> {
+    let entries: Vec<(String, Vec<u8>)> = if let Some(h) = v.as_hash_map() {
+        h.into_iter().map(|(k, val)| (k, value_to_bytes(&val))).collect()
+    } else if let Some(href) = v.as_hash_ref() {
+        href.read()
+            .iter()
+            .map(|(k, val)| (k.clone(), value_to_bytes(val)))
+            .collect()
+    } else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "burp: expected a HASH or HASHREF, got {} \
+                 — pass `\\%h` or an inline hashref `{{ ... }}`",
+                v.type_name()
+            ),
+        ));
+    };
+    let mut written: i64 = 0;
+    for (path, bytes) in &entries {
+        spurt_path(path, bytes, /*mkdir_parents=*/ true, /*atomic=*/ false)?;
+        written += 1;
+    }
+    Ok(written)
+}
+
+/// Bytes-faithful conversion mirroring `builtins::perl_scalar_as_bytes`: a
+/// `bytes` value writes its raw bytes; anything else stringifies through the
+/// standard `to_string()` path (which itself byte-decodes a bytes value, so
+/// strings written via `burp` round-trip the way Perl callers expect).
+fn value_to_bytes(v: &StrykeValue) -> Vec<u8> {
+    if let Some(b) = v.as_bytes_arc() {
+        return b.as_ref().clone();
+    }
+    v.to_string().into_bytes()
+}
+
 /// Parallel recursive glob: same pattern semantics as [`glob_patterns`], but walks the
 /// filesystem with rayon per directory (and parallelizes across patterns).
 pub fn glob_par_patterns(patterns: &[String]) -> StrykeValue {

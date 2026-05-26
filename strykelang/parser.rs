@@ -1547,6 +1547,7 @@ impl Parser {
                 | "await"
                 | "barrier"
                 | "bless"
+                | "burp"
                 | "caller"
                 | "capture"
                 | "cat"
@@ -3099,6 +3100,7 @@ impl Parser {
             "slurp" | "sl" => ExprKind::Slurp(Box::new(arg)),
             "swallow" | "swa" => ExprKind::Swallow(Box::new(arg)),
             "ingest" | "ing" => ExprKind::Ingest(Box::new(arg)),
+            "burp" => ExprKind::Burp(Box::new(arg)),
             "glob" => ExprKind::Glob(vec![arg]),
             "chdir" => ExprKind::Chdir(Box::new(arg)),
             "stat" => ExprKind::Stat(Box::new(arg)),
@@ -7132,6 +7134,7 @@ impl Parser {
             ExprKind::Slurp(_) => ExprKind::Slurp(Box::new(lhs)),
             ExprKind::Swallow(_) => ExprKind::Swallow(Box::new(lhs)),
             ExprKind::Ingest(_) => ExprKind::Ingest(Box::new(lhs)),
+            ExprKind::Burp(_) => ExprKind::Burp(Box::new(lhs)),
             ExprKind::Capture(_) => ExprKind::Capture(Box::new(lhs)),
             ExprKind::Qx(_) => ExprKind::Qx(Box::new(lhs)),
             ExprKind::FetchUrl(_) => ExprKind::FetchUrl(Box::new(lhs)),
@@ -11623,6 +11626,16 @@ impl Parser {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Ingest(Box::new(a)),
+                    line,
+                })
+            }
+            "burp" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::Burp(Box::new(a)),
                     line,
                 })
             }

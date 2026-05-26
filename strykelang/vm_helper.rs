@@ -12587,6 +12587,14 @@ impl VMHelper {
                     FlowOrError::Error(StrykeError::runtime(format!("ingest: {}", e), line))
                 })
             }
+            ExprKind::Burp(e) => {
+                let v = self.eval_expr(e)?;
+                crate::perl_fs::burp_hash_to_disk(&v)
+                    .map(StrykeValue::integer)
+                    .map_err(|e| {
+                        FlowOrError::Error(StrykeError::runtime(format!("burp: {}", e), line))
+                    })
+            }
             ExprKind::Capture(e) => {
                 let cmd = self.eval_expr(e)?.to_string();
                 let output = Command::new("sh")
