@@ -14008,6 +14008,10 @@ impl Parser {
             | "controller" | "agent"
             // ── provenance / lineage ───────────────────────────────────────
             | "mark" | "provenance" | "unmark"
+            // ── network probes (TCP knock, UDP send) ───────────────────────
+            // `punch` (full NAT hole-punching via STUN) lands separately in a
+            // follow-on commit — keep this arm in sync with `try_builtin`.
+            | "kick" | "udp_send"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
