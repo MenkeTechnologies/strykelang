@@ -833,6 +833,10 @@ fn extract_pipe_source(e: &Expr, segments: &mut Vec<String>) -> String {
             segments.push("burp".into());
             extract_pipe_source(inner, segments)
         }
+        ExprKind::God(inner) => {
+            segments.push("god".into());
+            extract_pipe_source(inner, segments)
+        }
         ExprKind::Ingest(inner) => {
             segments.push("ingest".into());
             extract_pipe_source(inner, segments)

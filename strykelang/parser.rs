@@ -1593,6 +1593,7 @@ impl Parser {
                 | "glob_par"
                 | "par_sed"
                 | "glob"
+                | "god"
                 | "grep"
                 | "greps"
                 | "heap"
@@ -3101,6 +3102,7 @@ impl Parser {
             "swallow" | "swa" => ExprKind::Swallow(Box::new(arg)),
             "ingest" | "ing" => ExprKind::Ingest(Box::new(arg)),
             "burp" => ExprKind::Burp(Box::new(arg)),
+            "god" => ExprKind::God(Box::new(arg)),
             "glob" => ExprKind::Glob(vec![arg]),
             "chdir" => ExprKind::Chdir(Box::new(arg)),
             "stat" => ExprKind::Stat(Box::new(arg)),
@@ -7135,6 +7137,7 @@ impl Parser {
             ExprKind::Swallow(_) => ExprKind::Swallow(Box::new(lhs)),
             ExprKind::Ingest(_) => ExprKind::Ingest(Box::new(lhs)),
             ExprKind::Burp(_) => ExprKind::Burp(Box::new(lhs)),
+            ExprKind::God(_) => ExprKind::God(Box::new(lhs)),
             ExprKind::Capture(_) => ExprKind::Capture(Box::new(lhs)),
             ExprKind::Qx(_) => ExprKind::Qx(Box::new(lhs)),
             ExprKind::FetchUrl(_) => ExprKind::FetchUrl(Box::new(lhs)),
@@ -11636,6 +11639,16 @@ impl Parser {
                 let a = self.parse_one_arg_or_default()?;
                 Ok(Expr {
                     kind: ExprKind::Burp(Box::new(a)),
+                    line,
+                })
+            }
+            "god" => {
+                if let Some(e) = self.fat_arrow_autoquote(&name, line) {
+                    return Ok(e);
+                }
+                let a = self.parse_one_arg_or_default()?;
+                Ok(Expr {
+                    kind: ExprKind::God(Box::new(a)),
                     line,
                 })
             }

@@ -3992,6 +3992,7 @@ CORE::glob_match
 CORE::glob_par
 CORE::glob_to_regex
 CORE::global_efficiency
+CORE::god
 CORE::glog
 CORE::glorot_init
 CORE::glquad
@@ -15084,6 +15085,7 @@ gmtime
 gnomonic_number
 go_enrichment_p
 goals_above_avg
+god
 goertzel
 goldb
 goldbach
