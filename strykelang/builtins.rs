@@ -5317,6 +5317,7 @@ pub(crate) fn try_builtin(
         "udp_recv_from" => Some(builtin_udp_recv_from(args)),
         "udp_close" => Some(builtin_udp_close(args)),
         "stun" => Some(builtin_stun(args)),
+        "stun_classify" => Some(builtin_stun_classify(args)),
         "punch" => Some(builtin_punch(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
@@ -13413,6 +13414,158 @@ fn builtin_stun(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
         None => Ok(StrykeValue::UNDEF),
     }
+}
+
+/// `stun_classify($id [, $opts])` — query multiple STUN servers via the
+/// SAME socket and classify the local NAT based on whether the reported
+/// public ports match across servers. Returns:
+///
+///   { nat_type     => "cone" | "symmetric" | "unknown",
+///     public_ip    => "203.0.113.45" | undef,
+///     queried      => 3,
+///     succeeded    => 3,
+///     observations => [
+///       { server => "stun.l.google.com:19302", ok => 1,
+///         public_ip => "203.0.113.45", public_port => 51234 },
+///       { server => "stun.cloudflare.com:3478", ok => 1,
+///         public_ip => "203.0.113.45", public_port => 51234 },
+///       ... ] }
+///
+/// `nat_type` semantics:
+///   * `"cone"` — every responding server reported the SAME port → NAT
+///     uses one public mapping per source socket regardless of dest →
+///     `punch` will work to any peer.
+///   * `"symmetric"` — servers reported DIFFERENT ports → NAT allocates
+///     a fresh public port per destination → `punch` will FAIL because
+///     the port the peer punches at (learned from STUN server X) won't
+///     be the port your traffic to the peer uses. The only recovery is
+///     a TURN relay (not yet shipped — out of scope for v1).
+///   * `"unknown"` — fewer than 2 servers responded → can't classify.
+///
+/// `$opts` (hashref, all keys optional):
+///   * `servers` (arrayref of `["host", port]` pairs) — defaults to a
+///     diverse set: Google, Cloudflare, Nextcloud STUN. Diversity
+///     matters: some symmetric NATs bucket by destination /24, so
+///     same-provider servers can falsely produce matching ports on a
+///     symmetric NAT. Three different ASNs catches more cases.
+///   * `timeout_ms` (default 2000) — per-server timeout.
+///
+/// Recommended pattern: classify BEFORE calling `punch`, bail early if
+/// symmetric to give the user a useful error rather than a 30s timeout:
+///
+/// ```perl
+/// my $sock = udp_open()
+/// my $nat = stun_classify($sock)
+/// if ($nat->{nat_type} eq "symmetric") {
+///     die "behind symmetric NAT — hole-punching impossible, need TURN"
+/// }
+/// my $info = stun($sock)   # one of the queries above already learned this;
+///                          # we re-query for the canonical (ip, port) handoff
+/// # … signaling … then punch …
+/// ```
+fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+
+    // Parse opts hashref: { servers => [["host", port], …], timeout_ms => N }.
+    // Default servers list lives in nat_punch::DEFAULT_STUN_SERVERS.
+    let mut timeout_ms: u64 = 2000;
+    let mut server_owned: Vec<(String, u16)> = Vec::new();
+    if let Some(opts) = args.get(1).filter(|v| !v.is_undef()) {
+        if let Some(h) = opts.as_hash_ref() {
+            let g = h.read();
+            if let Some(t) = g.get("timeout_ms") {
+                if !t.is_undef() {
+                    timeout_ms = t.to_int().max(1) as u64;
+                }
+            }
+            if let Some(s) = g.get("servers") {
+                if let Some(arr) = s.as_array_ref() {
+                    let arr_g = arr.read();
+                    for entry in arr_g.iter() {
+                        // Each entry should be [host, port].
+                        if let Some(inner) = entry.as_array_ref() {
+                            let inner_g = inner.read();
+                            if inner_g.len() >= 2 {
+                                let host = inner_g[0].to_string();
+                                let port = inner_g[1].to_int().clamp(1, 65535) as u16;
+                                if !host.is_empty() {
+                                    server_owned.push((host, port));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if server_owned.is_empty() {
+        server_owned = crate::nat_punch::DEFAULT_STUN_SERVERS
+            .iter()
+            .map(|(h, p)| ((*h).to_string(), *p))
+            .collect();
+    }
+    let servers: Vec<(&str, u16)> = server_owned
+        .iter()
+        .map(|(h, p)| (h.as_str(), *p))
+        .collect();
+
+    let result = crate::nat_punch::classify_nat(id, &servers, Duration::from_millis(timeout_ms));
+
+    let mut top: IndexMap<String, StrykeValue> = IndexMap::new();
+    top.insert("nat_type".into(), StrykeValue::string(result.nat_type.into()));
+    top.insert(
+        "public_ip".into(),
+        match result.public_ip {
+            Some(ip) => StrykeValue::string(ip.to_string()),
+            None => StrykeValue::UNDEF,
+        },
+    );
+    top.insert("queried".into(), StrykeValue::integer(result.queried as i64));
+    top.insert(
+        "succeeded".into(),
+        StrykeValue::integer(result.succeeded as i64),
+    );
+    let mut obs_list: Vec<StrykeValue> = Vec::with_capacity(result.observations.len());
+    for obs in &result.observations {
+        let mut h: IndexMap<String, StrykeValue> = IndexMap::new();
+        h.insert("server".into(), StrykeValue::string(obs.server.clone()));
+        h.insert(
+            "ok".into(),
+            StrykeValue::integer(if obs.ok { 1 } else { 0 }),
+        );
+        h.insert(
+            "public_ip".into(),
+            match obs.public_ip {
+                Some(ip) => StrykeValue::string(ip.to_string()),
+                None => StrykeValue::UNDEF,
+            },
+        );
+        h.insert(
+            "public_port".into(),
+            match obs.public_port {
+                Some(p) => StrykeValue::integer(p as i64),
+                None => StrykeValue::UNDEF,
+            },
+        );
+        obs_list.push(StrykeValue::hash_ref(StdArc::new(RwLock::new(h))));
+    }
+    top.insert(
+        "observations".into(),
+        StrykeValue::array_ref(StdArc::new(RwLock::new(obs_list))),
+    );
+    Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(top))))
 }
 
 /// `punch($id, $peer_ip, $peer_port [, $opts])` — UDP hole-punching state

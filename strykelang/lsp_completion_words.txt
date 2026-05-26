@@ -9847,6 +9847,7 @@ CORE::student_pdf
 CORE::study
 CORE::stulz_min_call
 CORE::stun
+CORE::stun_classify
 CORE::sturmian_word
 CORE::sub
 CORE::sub_script
@@ -20957,6 +20958,7 @@ student_pdf
 study
 stulz_min_call
 stun
+stun_classify
 sturmian_word
 sub
 sub_script

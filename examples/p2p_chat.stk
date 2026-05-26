@@ -38,9 +38,26 @@
 my $mode = $ARGV[0] // "listen"
 
 if ($mode eq "listen") {
-    p "[A] Bound local socket; querying stun.l.google.com:19302 …"
+    p "[A] Bound local socket; classifying NAT type via 3 STUN servers …"
     my $sock = udp_open()
     if ($sock == 0) { p "[A] bind failed"; exit 1 }
+
+    # Detect symmetric NAT BEFORE doing anything else — if we're behind
+    # one, hole-punching won't work and we should bail with a useful
+    # message rather than letting the peer hammer us for 30s.
+    my $nat = stun_classify($sock)
+    printf "[A] NAT type: %s (succeeded %d/%d)\n",
+        $nat->{nat_type}, $nat->{succeeded}, $nat->{queried}
+    if ($nat->{nat_type} eq "symmetric") {
+        p "[A] Behind a symmetric NAT — peer-to-peer hole-punching impossible."
+        p "[A] Would need a TURN relay (not yet shipped). Exiting."
+        udp_close($sock)
+        exit 1
+    }
+    if ($nat->{nat_type} eq "unknown") {
+        p "[A] Only $nat->{succeeded} STUN servers reached — classification"
+        p "[A] uncertain. Proceeding anyway, but punch may fail."
+    }
 
     my $info = stun($sock)
     if (!defined $info) {
