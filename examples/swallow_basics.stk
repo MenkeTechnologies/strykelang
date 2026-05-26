@@ -1,0 +1,70 @@
+#!/usr/bin/env stryke
+
+# `swallow` basics
+#
+# Demonstrates:
+#   * `swallow PATTERN` — zsh glob → hash `{ canonical_abspath => raw_bytes }`
+#   * `swa` alias
+#   * `(N)` null-glob qualifier
+#   * `**` recursive glob
+#   * binary-safe (raw bytes, no decoding)
+#   * comparison with `slurp` (concatenated bytes) and `glob` (paths only)
+#
+# Run: stryke examples/swallow_basics.stk
+
+p "── swallow basics ─────────────────────────────────────"
+
+my $dir = "/tmp/stryke_swallow_demo"
+system "rm", "-rf", $dir       # clean any prior run
+mkdir $dir
+mkdir "$dir/nested"
+
+# Seed a small tree of fixtures.
+spurt "$dir/a.txt",        "hello\n"
+spurt "$dir/b.txt",        "world\n"
+spurt "$dir/nested/c.txt", "deep\n"
+spurt "$dir/logo.bin",     pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01)   # exactly 5 raw bytes
+
+# 1. Basic glob → hash. Keys are absolute paths.
+my %txt = swallow "$dir/*.txt"
+p "swallow '*.txt' → ", scalar keys %txt, " files"
+for my $path (sort keys %txt) {
+    p "  $path  (#{length $txt{$path}} bytes)"
+}
+
+# 2. `swa` alias.
+my %same = swa "$dir/*.txt"
+p "\nswa alias → ", scalar keys %same, " files (matches `swallow`)"
+
+# 3. Binary-safe — no decoding, raw bytes preserved.
+my %bin   = swallow "$dir/*.bin"
+my @bkeys = keys %bin
+my $bpath = $bkeys[0]
+my $bbytes = $bin{$bpath}
+p "\nbinary file: $bpath → #{length $bbytes} raw bytes"
+
+# 4. Recursive `**` reaches nested files.
+my %deep = swallow "$dir/**/*.txt"
+p "\nrecursive '**/*.txt' → ", scalar keys %deep, " files (top + nested)"
+
+# 5. `(N)` null-glob: empty hash on no match, no error.
+my %empty = swallow "$dir/no_such_*(N)"
+p "\n(N) null-glob on no-match → ", scalar keys %empty, " files (silent)"
+
+# 6. Compare the three glob-aware primitives.
+p "\n── glob / slurp / swallow on the same pattern ──"
+p "glob       → list of paths       : ", scalar glob("$dir/*.txt"),   " entries"
+p "slurp      → one concatenated buf: ", length(slurp("$dir/*.txt")), " bytes"
+p "swallow    → per-file hash        : ", scalar keys swallow("$dir/*.txt"), " entries"
+
+# Cleanup
+system "rm", "-rf", $dir
+
+# ── Tests ──────────────────────────────────────────────────────────
+
+scalar(keys %txt) == 2          |> aok "two .txt files"
+length($bbytes) == 5             |> aok "binary 5 bytes preserved"
+scalar(keys %deep) == 3          |> aok "recursive picks up nested"
+scalar(keys %empty) == 0         |> aok "(N) returns empty hash"
+
+test_run
