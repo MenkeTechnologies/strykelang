@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+
+# Codebase audit with `swallow`
+#
+# Practical use case: scan a project, build a `{ path => bytes }` table once,
+# then run multiple analyses over the same in-memory hash without re-reading
+# from disk. World-first: zsh-glob qualifiers in a scripting language let us
+# pre-filter by size, mtime, mode, etc. at the glob stage.
+#
+# Demonstrates:
+#   * `swallow` against a real source tree
+#   * Composing zsh qualifiers (`(.)`, `(L+N)`) inside the pattern
+#   * Iterating the hash for multiple aggregations in one pass
+#
+# Run: stryke examples/swallow_codebase_audit.stk
+
+p "── codebase audit (swallow) ───────────────────────────"
+
+# Seed a synthetic project so the demo is deterministic across machines.
+my $root = "/tmp/stryke_audit_demo"
+system "rm", "-rf", $root
+mkdir $root
+mkdir "$root/src"
+mkdir "$root/tests"
+spurt "$root/src/main.rs",        "fn main() { println!(\"hi\"); }\n"
+spurt "$root/src/lib.rs",         "pub mod util;\npub fn add(a: i32, b: i32) -> i32 { a + b }\n"
+spurt "$root/src/util.rs",        "pub fn double(x: i32) -> i32 { x * 2 }\n"
+spurt "$root/tests/basic.rs",     "#[test]\nfn t() { assert_eq!(2 + 2, 4); }\n"
+spurt "$root/README.md",          "# demo\n"
+
+# One read — every .rs file under the tree, raw bytes, abs paths as keys.
+my %src = swallow "$root/**/*.rs"
+p "loaded #{scalar keys %src} .rs files into memory"
+
+# ── Aggregations over the in-memory hash ──────────────────────────
+
+my $total_bytes  = 0
+my $total_lines  = 0
+my $total_fns    = 0
+my $biggest_path = ""
+my $biggest_size = 0
+
+for my $path (keys %src) {
+    my $bytes = $src{$path}
+    my $sz    = length $bytes
+    my $lines = ($bytes =~ tr/\n//)         # count newlines
+    my @fns   = ($bytes =~ /\bfn\s+\w+/g)   # rust-style fn defs
+
+    $total_bytes += $sz
+    $total_lines += $lines
+    $total_fns   += scalar @fns
+
+    if ($sz > $biggest_size) {
+        $biggest_size = $sz
+        $biggest_path = $path
+    }
+}
+
+p ""
+p "files       : ", scalar keys %src
+p "bytes       : $total_bytes"
+p "lines       : $total_lines"
+p "fn defs     : $total_fns"
+p "biggest     : $biggest_path  ($biggest_size bytes)"
+
+# ── Filter via qualifier at the glob stage (not after) ────────────
+# `(L+50)` selects files larger than 50 bytes — qualifier work happens
+# in zsh::glob before any bytes are read.
+my %big = swallow "$root/**/*.rs(L+50)"
+p "\n>50-byte files (qualifier-filtered at glob stage): ", scalar keys %big
+
+# Cleanup
+system "rm", "-rf", $root
+
+# ── Tests ──────────────────────────────────────────────────────────
+
+scalar(keys %src) == 4          |> aok "all 4 .rs files loaded"
+$total_fns >= 3                  |> aok "found fn defs across files"
+$biggest_size > 0                |> aok "biggest size computed"
+
+test_run
