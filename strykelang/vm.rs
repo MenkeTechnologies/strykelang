@@ -9938,6 +9938,12 @@ impl<'a> VM<'a> {
                 crate::perl_fs::ingest_iterator(&path)
                     .map_err(|e| StrykeError::runtime(format!("ingest: {}", e), line))
             }
+            Some(BuiltinId::Burp) => {
+                let v = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                crate::perl_fs::burp_hash_to_disk(&v)
+                    .map(StrykeValue::integer)
+                    .map_err(|e| StrykeError::runtime(format!("burp: {}", e), line))
+            }
             Some(BuiltinId::Capture) => {
                 let cmd = args
                     .into_iter()

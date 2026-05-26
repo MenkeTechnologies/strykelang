@@ -1213,6 +1213,12 @@ pub enum ExprKind {
     /// so binary files round-trip cleanly. Hard-fails on non-regular matches
     /// the same way `slurp` does; opt out with the `(N)` null-glob qualifier.
     Swallow(Box<Expr>),
+    /// `burp HASH` — inverse of `swallow`. Take a hash `{ path => bytes }`,
+    /// write each entry to disk (creates parent directories automatically),
+    /// and return the number of files written. Hard-fails on the first I/O
+    /// error. Accepts plain hashes and hash refs; values may be bytes or any
+    /// scalar that stringifies (matches `spew`/`spurt` conventions).
+    Burp(Box<Expr>),
     /// `ingest PATTERN` — streaming variant of `swallow`: returns a lazy
     /// iterator yielding `[canonicalized_abspath, raw_bytes]` per file. Only
     /// one file's bytes are resident at a time. Path list and stat/canonicalize

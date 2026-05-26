@@ -1203,6 +1203,7 @@ CORE::bulirsch_stoer_step
 CORE::bunzip2
 CORE::buoyancy_force
 CORE::burr_xii_cdf
+CORE::burp
 CORE::burr_xii_pdf
 CORE::business_days_between
 CORE::busy_beaver
@@ -12260,6 +12261,7 @@ bulirsch_stoer_step
 bunzip2
 buoyancy_force
 burr_xii_cdf
+burp
 burr_xii_pdf
 business_days_between
 busy_beaver

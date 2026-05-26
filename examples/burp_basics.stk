@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+
+# `burp` basics
+#
+# Demonstrates:
+#   * `burp HASH` — inverse of `swallow`. Hash `{ path => content }` → files on disk.
+#   * Auto-creates parent directories (mkdir -p)
+#   * Bytes and strings both work as values (binary-safe via `swallow` → `burp` round-trip)
+#   * Hash refs (`\%h`, inline `{ ... }`) — `burp %h` bare form is not supported;
+#     pass a reference (matches Perl Best Practices for hash-as-arg)
+#   * Returns the integer count of files written
+#   * Hard-fails on first I/O error
+#
+# Run: stryke examples/burp_basics.stk
+
+p "── burp basics ────────────────────────────────────────"
+
+my $dir = "/tmp/stryke_burp_demo"
+system "rm", "-rf", $dir       # clean any prior run
+
+# 1. Write a hash literal directly. Parent dir doesn't exist yet — burp
+#    creates `$dir/`, `$dir/src/`, `$dir/docs/` automatically.
+my $n = burp {
+    "$dir/README.md"    => "# Demo\n",
+    "$dir/src/main.rs"  => "fn main() { println!(\"hi\"); }\n",
+    "$dir/docs/INTRO.md" => "Welcome.\n",
+}
+p "burp { ... } → wrote $n files (parent dirs created on the fly)"
+
+# 2. Round-trip via swallow: read everything back, mutate, burp.
+#    `(.)` qualifier = regular files only — skips the `src/` and `docs/` dirs.
+my %tree = swallow "$dir/**/*(.)"
+p "\nswallow → ", scalar keys %tree, " files re-read"
+
+for my $path (keys %tree) {
+    $tree{$path} = uc $tree{$path}        # bytes are mutable scalars in stryke
+}
+my $m = burp \%tree                       # always pass via reference
+p "burp \\%tree (mutated) → wrote $m files"
+
+# 3. Confirm the round-trip landed: read one file back and look at content.
+my $readme = slurp "$dir/README.md"
+p "\nREADME after round-trip: ", substr($readme, 0, 20), "..."
+
+# 4. Binary-safe round-trip — pack arbitrary bytes, burp them, swallow, verify.
+my $binpath = "$dir/payload.bin"
+my %bin     = ( $binpath => pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01) )
+burp \%bin
+my %back     = swallow $binpath
+my $restored = $back{(keys %back)[0]}
+p "\nbinary round-trip: original ", length($bin{$binpath}),
+  " bytes; restored ", length($restored), " bytes"
+
+# 5. Empty hash returns 0 without touching the filesystem.
+my $z = burp {}
+p "\nburp {} (empty) → $z files written"
+
+# 6. Inverse-of-swallow symmetry — write the file table that swallow returned.
+#    Copy the entire demo tree under a new root, file-for-file.
+my $copy_root = "/tmp/stryke_burp_copy"
+system "rm", "-rf", $copy_root
+my %copy = map { my $k = $_; $k =~ s{^$dir}{$copy_root}; ($k => $tree{$_}) } keys %tree
+my $c = burp \%copy
+p "\nrelocated $c files: $dir → $copy_root"
+
+# Cleanup
+system "rm", "-rf", $dir, $copy_root
+
+# ── Tests ──────────────────────────────────────────────────────────
+
+$n == 3                                |> aok "burp wrote 3 hash-literal entries"
+$m == scalar(keys %tree)               |> aok "burp \\%tree returned full count"
+length($restored) == 5                 |> aok "binary 5 bytes survived round-trip"
+$z == 0                                |> aok "burp {} returns 0"
+$c == 3                                |> aok "relocated tree wrote every file"
+
+test_run

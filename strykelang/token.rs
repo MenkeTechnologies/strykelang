@@ -500,6 +500,7 @@ pub const KEYWORDS: &[&str] = &[
     "slurp",
     "swallow",
     "ingest",
+    "burp",
     "capture",
     "fetch_url",
     "fetch",

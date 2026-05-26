@@ -3097,6 +3097,7 @@ impl Lexer {
                     | "slurp"
                     | "swallow"
                     | "ingest"
+                    | "burp"
                     | "capture"
                     | "fetch_url"
                     | "fetch"
