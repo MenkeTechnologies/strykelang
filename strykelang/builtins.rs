@@ -5295,6 +5295,9 @@ pub(crate) fn try_builtin(
         "fetch_json" | "ftj" => Some(builtin_fetch_json(args, line)),
         "http_request" | "hr" => Some(builtin_http_request(args, line)),
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
+        "hide" => Some(builtin_hide(args, line)),
+        "reveal" => Some(builtin_reveal(args, line)),
+        "hide_capacity" => Some(builtin_hide_capacity(args, line)),
         "move" | "mv" => Some(builtin_move(interp, args, line)),
         "which" | "wh" => Some(builtin_which(args, line)),
         "json_encode" | "je" => Some(builtin_json_encode(args)),
@@ -12933,6 +12936,99 @@ fn builtin_read_bytes(
     let b = crate::perl_fs::read_file_bytes(&path)
         .map_err(|e| StrykeError::runtime(format!("read_bytes: {}", e), line))?;
     Ok(StrykeValue::bytes(b))
+}
+
+/// Convert a `StrykeValue` to raw bytes for steganography: bytes pass through
+/// verbatim, anything else is read as its UTF-8 stringification. Unlike
+/// `native_codec::bytes_from_value`, this does NOT auto-load file paths — the
+/// carrier is always an in-memory value (use `slurp` explicitly to bring a file in).
+fn stego_value_to_bytes(v: &StrykeValue) -> Vec<u8> {
+    if let Some(b) = v.as_bytes_arc() {
+        return b.as_ref().clone();
+    }
+    v.to_string().into_bytes()
+}
+
+/// Optional key arg: undef → None; anything else → bytes.
+fn stego_optional_key(v: Option<&StrykeValue>) -> Option<Vec<u8>> {
+    match v {
+        Some(val) if !val.is_undef() => Some(stego_value_to_bytes(val)),
+        _ => None,
+    }
+}
+
+/// `hide(CARRIER, SECRET [, KEY])` — embed SECRET into CARRIER. PNG bytes (detected by
+/// `\x89PNG` magic) use LSB embedding on the R/G/B channels; everything else is treated
+/// as a text carrier with zero-width-char encoding. Returns bytes for PNG carriers and
+/// a string for text carriers. Optional KEY enables SHA-256-keyed XOR masking of the
+/// secret prior to embedding.
+fn builtin_hide(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    if args.len() < 2 {
+        return Err(StrykeError::runtime(
+            "hide needs CARRIER and SECRET (optional 3rd KEY)",
+            line,
+        ));
+    }
+    let carrier_bytes = stego_value_to_bytes(&args[0]);
+    let secret_bytes = stego_value_to_bytes(&args[1]);
+    let key = stego_optional_key(args.get(2));
+    let envelope = crate::stego::wrap_payload(&secret_bytes, key.as_deref());
+    if crate::stego::is_png(&carrier_bytes) {
+        let out = crate::stego::png_hide(&carrier_bytes, &envelope)
+            .map_err(|e| StrykeError::runtime(e, line))?;
+        Ok(StrykeValue::bytes(Arc::new(out)))
+    } else {
+        let carrier_text = String::from_utf8_lossy(&carrier_bytes);
+        let out = crate::stego::text_hide(&carrier_text, &envelope)
+            .map_err(|e| StrykeError::runtime(e, line))?;
+        Ok(StrykeValue::string(out))
+    }
+}
+
+/// `reveal(STEGO [, KEY])` — extract the hidden secret. Auto-detects carrier kind
+/// the same way `hide` does. Returns raw bytes (callers do their own decoding).
+/// Errors on missing/corrupt payload (CRC32 mismatch) or wrong carrier kind.
+fn builtin_reveal(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    if args.is_empty() {
+        return Err(StrykeError::runtime(
+            "reveal needs a STEGO carrier (optional 2nd KEY)",
+            line,
+        ));
+    }
+    let carrier_bytes = stego_value_to_bytes(&args[0]);
+    let key = stego_optional_key(args.get(1));
+    let envelope = if crate::stego::is_png(&carrier_bytes) {
+        crate::stego::png_reveal(&carrier_bytes).map_err(|e| StrykeError::runtime(e, line))?
+    } else {
+        let carrier_text = String::from_utf8_lossy(&carrier_bytes);
+        crate::stego::text_reveal(&carrier_text).map_err(|e| StrykeError::runtime(e, line))?
+    };
+    let secret = crate::stego::unwrap_payload(&envelope, key.as_deref())
+        .map_err(|e| StrykeError::runtime(e, line))?;
+    Ok(StrykeValue::bytes(Arc::new(secret)))
+}
+
+/// `hide_capacity(CARRIER)` — return how many bytes of secret payload CARRIER can hold,
+/// accounting for the 8-byte envelope overhead (length + CRC32). Useful for sizing
+/// before calling `hide`.
+fn builtin_hide_capacity(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
+    if args.is_empty() {
+        return Err(StrykeError::runtime(
+            "hide_capacity needs a CARRIER",
+            line,
+        ));
+    }
+    let carrier_bytes = stego_value_to_bytes(&args[0]);
+    let bits = if crate::stego::is_png(&carrier_bytes) {
+        crate::stego::png_capacity_bits(&carrier_bytes)
+            .map_err(|e| StrykeError::runtime(e, line))?
+    } else {
+        let carrier_text = String::from_utf8_lossy(&carrier_bytes);
+        crate::stego::text_capacity_bits(&carrier_text)
+    };
+    let total_bytes = bits / 8;
+    let secret_bytes = total_bytes.saturating_sub(8);
+    Ok(StrykeValue::integer(secret_bytes as i64))
 }
 
 /// `move` — Move.

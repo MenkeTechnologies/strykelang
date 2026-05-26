@@ -4350,6 +4350,8 @@ CORE::hex_of
 CORE::hex_to_bytes
 CORE::hex_to_rgb
 CORE::hex_upper
+CORE::hide
+CORE::hide_capacity
 CORE::hexagonal_number
 CORE::hget
 CORE::hgetall
@@ -8548,6 +8550,7 @@ CORE::rev_lines
 CORE::rev_str
 CORE::rev_vec
 CORE::revenue_equivalence_check
+CORE::reveal
 CORE::reverse
 CORE::reverse_complement_dna
 CORE::reverse_delete_step
@@ -15424,6 +15427,8 @@ hex_decode
 hex_encode
 hex_lower
 hex_of
+hide
+hide_capacity
 hex_to_bytes
 hex_to_rgb
 hex_upper
@@ -19637,6 +19642,7 @@ rev_lines
 rev_str
 rev_vec
 revenue_equivalence_check
+reveal
 reverse
 reverse_complement_dna
 reverse_delete_step

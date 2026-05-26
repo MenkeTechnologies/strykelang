@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+
+# `hide` / `reveal` — polymorphic steganography
+#
+# Demonstrates:
+#   * Text carrier — zero-width chars (U+200B / U+200C) between visible chars,
+#     invisible in rendered output but byte-detectable.
+#   * PNG carrier — LSB embed on R/G/B channels (alpha skipped).
+#   * Optional key — SHA-256(key||counter)-derived XOR mask on the secret.
+#   * `hide_capacity` — pre-flight check before embedding.
+#   * CRC32 footer catches tampering or wrong-carrier mistakes.
+#
+# Run: stryke examples/stego_hide_reveal.stk
+
+p "── hide / reveal demo ─────────────────────────────────"
+
+# ── 1. Text carrier ───────────────────────────────────────────────
+my $carrier = "The quick brown fox jumps over the lazy dog. " x 6
+my $secret  = "meet at midnight"
+
+my $stego = hide($carrier, $secret)
+p "carrier visible length: ", length $carrier
+p "stego visible length:   ", length $stego, " (extra bytes are zero-width chars)"
+p "recovered: ", reveal($stego)
+
+# ── 2. Key-XOR mode ───────────────────────────────────────────────
+my $keyed = hide($carrier, "classified", "shared-passphrase")
+p "\nwith right key:  ", reveal($keyed, "shared-passphrase")
+my $bad = reveal($keyed, "wrong-key")
+p "with wrong key:  recovered ", length($bad), " bytes of garbage (not the plaintext)"
+
+# ── 3. PNG carrier ────────────────────────────────────────────────
+# Generate a small PNG fixture via stryke's QR code builtin (returns base64),
+# decode to raw bytes, then hide a binary payload inside it.
+my $png = base64_decode(qr_png("stryke demo carrier", 6))
+my $sz  = length $png
+p "\nPNG carrier:    $sz bytes"
+p "PNG capacity:   ", hide_capacity($png), " bytes for the secret payload"
+
+my $stego_png = hide($png, pack("C*", 0xde, 0xad, 0xbe, 0xef))
+spurt "/tmp/stryke_stego_demo.png", $stego_png
+
+my $back = reveal(slurp "/tmp/stryke_stego_demo.png")
+p "PNG round-trip: ", length($back), " bytes recovered (hex: ", hex_encode($back), ")"
+
+# Cleanup
+unlink "/tmp/stryke_stego_demo.png"
+
+# ── 4. Tampering is caught ────────────────────────────────────────
+my $tampered = "\x{200B}" . hide($carrier, "x" x 4)   # prepend an extra ZW bit
+my $err
+try {
+    reveal($tampered)
+} catch ($e) {
+    $err = "$e"
+}
+p "\ntamper test: ", defined($err) ? "detected ($err)" : "MISSED (bug!)"
+
+# ── Tests ──────────────────────────────────────────────────────────
+
+reveal(hide($carrier, "abc")) eq "abc"                    |> aok "text round-trip"
+reveal(hide($png, "xy")) eq "xy"                          |> aok "PNG round-trip"
+reveal(hide($carrier, "k", "key"), "key") eq "k"          |> aok "key round-trip"
+hide_capacity("x" x 200) == 17                             |> aok "text capacity arithmetic"
+
+test_run
