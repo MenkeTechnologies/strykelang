@@ -190,6 +190,15 @@ fn provenance_hash_always_has_three_keys() {
 /// The origin summary captures the value's god-style type+shape at mark
 /// time. Pin the format so downstream consumers (debuggers, audit log
 /// renderers) can rely on the prefix.
+///
+/// Hash + arrayref forms are the reliable trackable kinds because each
+/// expression evaluates to the SAME underlying Arc on repeat access. A
+/// bare `\@arr` reference operator produces a fresh SCALARREF Arc per
+/// call, so `mark(\@a)` then `provenance(\@a)` looks up a DIFFERENT ptr
+/// — the v1.1 weak-ref guard now correctly returns undef rather than
+/// false-positiving via pointer reuse. Demos that need array lineage
+/// should use anonymous arrayref `[10, 20, 30]` (one heap allocation) or
+/// wrap the array as a hashref value.
 #[test]
 fn provenance_origin_summary_uses_god_style_prefix() {
     let h_origin = eval_string(
@@ -206,17 +215,14 @@ fn provenance_origin_summary_uses_god_style_prefix() {
 
     let arr_origin = eval_string(
         r#"
-        my @a = (10, 20, 30)
-        mark(\@a)
-        provenance(\@a)->{origin}
+        my $a = mark([10, 20, 30])
+        provenance($a)->{origin}
         "#,
     );
-    // `\@a` is a SCALARREF wrapping the array — the god-style summary
-    // reflects the ref's type. Pin the cross-cutting invariant: origin is
-    // non-empty and contains the type tag.
     assert!(
-        !arr_origin.trim().is_empty(),
-        "array-via-ref origin must be a non-empty summary, got {:?}",
+        arr_origin.trim().starts_with("ARRAY len=")
+            || arr_origin.trim().starts_with("ARRAYREF"),
+        "anonymous arrayref origin must start with ARRAY-family prefix, got {:?}",
         arr_origin.trim()
     );
 }
