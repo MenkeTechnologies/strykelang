@@ -2601,16 +2601,31 @@ stryke controller --bind 10.0.0.1    # specific interface
 stryke controller v0.14.30
 > status
 node-01    16   64GB         idle      120s
+node-02    16   64GB         idle      118s
 > @sub greet { "hello from " . $main::ENV{HOSTNAME} } greet()
 [node-01/ok] hello from node-01
+[node-02/ok] hello from node-02
 > @$main::counter = 0
 [node-01/ok] 0
+[node-02/ok] 0
 > @$main::counter += 5; $main::counter
 [node-01/ok] 5
+[node-02/ok] 5
+> @p "a"; p "b"; p "c"; 0
+[node-01/ok] a
+[node-01/ok] b
+[node-01/ok] c
+[node-01/ok] 0
+[node-02/ok] a
+[node-02/ok] b
+[node-02/ok] c
+[node-02/ok] 0
 > @die "boom"
 [node-01/ERR] boom at -e line 1
+[node-02/ERR] boom at -e line 1
 > eval $main::counter             # explicit verb form still works
 [node-01/ok] 5
+[node-02/ok] 5
 ```
 
 Wire-level: a new pair of frame kinds is added to the agent protocol — `EVAL` (controller → agent, payload = bincode `EvalCommand { code }`) and `EVAL_RESULT` (agent → controller, payload = `EvalResult { ok, output }`). `AGENT_PROTO_VERSION` is bumped to 2 so a v1 agent refuses the handshake against a v2 controller rather than silently hanging on an unrecognised frame kind.
