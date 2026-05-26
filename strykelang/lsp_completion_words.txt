@@ -10439,6 +10439,7 @@ CORE::ue
 CORE::udp_close
 CORE::udp_open
 CORE::udp_recv
+CORE::udp_recv_from
 CORE::udp_send
 CORE::udp_send_to
 CORE::ugz
@@ -21552,6 +21553,7 @@ ue
 udp_close
 udp_open
 udp_recv
+udp_recv_from
 udp_send
 udp_send_to
 ugz
