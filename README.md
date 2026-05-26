@@ -2630,6 +2630,33 @@ node-02    16   64GB         idle      118s
 
 Wire-level: a new pair of frame kinds is added to the agent protocol — `EVAL` (controller → agent, payload = bincode `EvalCommand { code }`) and `EVAL_RESULT` (agent → controller, payload = `EvalResult { ok, output }`). `AGENT_PROTO_VERSION` is bumped to 2 so a v1 agent refuses the handshake against a v2 controller rather than silently hanging on an unrecognised frame kind.
 
+### Builtins: `controller(...)` and `agent(...)` — go into either mode from a script
+
+The CLI subcommands `stryke controller` and `stryke agent` are mirrored by the **`controller`** and **`agent`** builtins so any `.stk` script can drop itself into either mode without going through the CLI dispatch. Both block (the controller on its REPL stdin loop, the agent on its frame loop) and return the exit code as an integer (`0` clean shutdown, `1` bind / connect / handshake failure).
+
+```perl
+# examples/agent_become.stk — script equivalent of `stryke agent`
+my $addr = $ENV{CONTROLLER_ADDR} // "localhost:9999"
+my $name = $ENV{AGENT_NAME}      // $ENV{HOSTNAME} // "anonymous"
+exit agent($addr, $name)
+
+# examples/controller_with_local_agent.stk — controller + local agent in one process
+spawn {
+    sleep 1                          # let controller bind
+    agent("localhost:9999", "local-worker")
+}
+exit controller("127.0.0.1", 9999)   # blocks on REPL
+```
+
+**Signatures**:
+
+| Builtin | Args | Defaults |
+|---|---|---|
+| `controller(bind?, port?)` | `bind`: bind address, `port`: TCP port | `bind="0.0.0.0"`, `port=9999` |
+| `agent(addr?, name?)` | `addr`: `host` or `host:port`, `name`: display label | `addr="localhost:9999"`, `name=hostname` |
+
+Wrap either in `spawn { ... }` to run in the background while the calling script continues. Useful for in-process integration tests and local REPL development against a real agent without bringing up a second machine.
+
 ### Agent (Worker Daemon)
 
 ```sh

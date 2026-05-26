@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+#
+# Run a controller AND a local agent in the same stryke process. Useful for
+# REPL-style local development without bringing up a second machine — type
+# `@1+1` at the controller prompt and watch the local agent reply.
+#
+# Architecture:
+#   * main thread       — runs the controller REPL on stdin
+#   * background thread — runs an agent connecting to localhost:9999
+#
+# Run:
+#   stryke examples/controller_with_local_agent.stk
+#
+# Inside the REPL try:
+#   status
+#   @1 + 41
+#   @sub greet { "hello from " . $main::ENV{USER} } greet()
+#   @$main::counter = 0
+#   @$main::counter += 5; $main::counter
+#   shutdown
+#
+# Override the port with PORT=N if 9999 is busy.
+
+my $port = $ENV{PORT} // 9999
+
+# Spawn the agent first so it can race ahead and connect once the controller
+# binds. The `sleep 1` gives the controller's listener time to come up — agent
+# `connect()` would fail otherwise with "connection refused".
+spawn {
+    sleep 1
+    agent("localhost:$port", "local-worker")
+}
+
+# Block here on the REPL. When the user types `shutdown`, the controller
+# disconnects the agent and returns; the spawned thread exits cleanly.
+exit controller("127.0.0.1", $port)
