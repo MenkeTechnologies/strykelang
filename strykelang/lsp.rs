@@ -9260,7 +9260,14 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     ),
     (
         "Cluster / Distributed",
-        &["cluster", "pmap_on", "pflat_map_on", "ssh"],
+        &[
+            "cluster",
+            "pmap_on",
+            "pflat_map_on",
+            "ssh",
+            "controller",
+            "agent",
+        ],
     ),
     (
         "Datetime",
