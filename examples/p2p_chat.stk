@@ -53,31 +53,32 @@ if ($mode eq "listen") {
         $info->{public_ip}, $info->{public_port}
     p "[A] Waiting for peer (60s budget) …"
 
-    # Wait for the peer's first datagram.
-    my $first = udp_recv($sock, 60_000)
+    # Wait for the peer's first datagram AND learn their public address
+    # in one call. `udp_recv_from` returns { payload, src_ip, src_port }
+    # so we can reply via udp_send_to without needing them to send their
+    # address in-band.
+    my $first = udp_recv_from($sock, 60_000)
     if (!defined $first) {
         p "[A] Timed out — peer never punched, or NAT blocked the bombards"
         udp_close($sock)
         exit 1
     }
-    p "[A] Got first datagram: $first"
+    printf "[A] Got first datagram from %s:%d: %s\n",
+        $first->{src_ip}, $first->{src_port}, $first->{payload}
+
+    # Reply through the same NAT pinhole the peer just punched open.
     p "[A] Replying with 'hello from A!' …"
+    udp_send_to($sock, $first->{src_ip}, $first->{src_port}, "hello from A!")
 
-    # Peer's address isn't directly returned from udp_recv (the builtin's
-    # current return is just payload). For a real chat client we'd extend
-    # the surface to return (payload, src). For this demo we rely on the
-    # peer's next round of bombards arriving — they'll keep punching
-    # until they get our reply, so a second recv loop completes the
-    # handshake. v2 of the builtin will return source addr.
-
-    # As a workaround for v1: respond by punching back at the peer's
-    # public address. The peer's STUN-side script needs to share its
-    # address here too. In the simplest version, we can't fully reply
-    # because we don't know it. So this demo's listen side just
-    # acknowledges receipt and exits — the connect side gets a single
-    # one-way "you reached me" signal via the bombards going through.
-
-    p "[A] Handshake confirmed. (v1: one-way only from listen side; v2 will return src addr.)"
+    # Keep the conversation going for a few rounds so the peer can see
+    # bidirectional flow.
+    for my $i (1:3) {
+        my $reply = udp_recv_from($sock, 5_000)
+        if (!defined $reply) { last }
+        printf "[A] %d/3 — peer said: %s\n", $i, $reply->{payload}
+        udp_send_to($sock, $reply->{src_ip}, $reply->{src_port}, "round $i ack")
+    }
+    p "[A] Done. Connection was bidirectional."
     udp_close($sock)
 }
 elsif ($mode eq "connect") {
@@ -102,6 +103,19 @@ elsif ($mode eq "connect") {
             $r->{bombards}, $r->{latency_ms}
         printf "[B] Peer sent: %s\n", $r->{peer_msg}
         printf "[B] Peer addr: %s\n", $r->{peer_addr}
+
+        # Now the punch is open in both directions. Listen for the peer's
+        # reply and bounce a few rounds.
+        for my $i (1:3) {
+            my $reply = udp_recv_from($sock, 5_000)
+            if (!defined $reply) {
+                p "[B] No reply (timed out on round $i)"
+                last
+            }
+            printf "[B] %d/3 — peer said: %s\n", $i, $reply->{payload}
+            udp_send_to($sock, $reply->{src_ip}, $reply->{src_port}, "round $i from B")
+        }
+        p "[B] Done. Bidirectional flow confirmed."
     } else {
         printf "[B] Punch FAILED after %d bombards (%dms budget)\n",
             $r->{bombards}, $r->{latency_ms}

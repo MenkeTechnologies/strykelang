@@ -57,13 +57,19 @@ pub fn build_binding_request(tx_id: &[u8; 12]) -> [u8; 20] {
     pkt
 }
 
-/// Parse a STUN Binding Response, returning the public (IP, port) the
-/// server saw us coming from. Returns `None` on:
+/// Parse a STUN Binding Response, returning the public (`IpAddr`, port)
+/// the server saw us coming from. Handles both IPv4 (family=0x01,
+/// 4-byte address) and IPv6 (family=0x02, 16-byte address). The IPv6
+/// XOR computation per RFC 8489 §14.2 is: byte 0..3 of the XOR-addr is
+/// XOR'd with the magic cookie, bytes 4..15 are XOR'd with the
+/// transaction ID — so we need the 12-byte tx_id for IPv6 unscrambling.
+///
+/// Returns `None` on:
 ///   * not a Binding Response (msg type ≠ 0x0101)
 ///   * truncated packet
 ///   * no XOR-MAPPED-ADDRESS or MAPPED-ADDRESS attribute
-///   * non-IPv4 address family (v1 skips IPv6)
-pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::Ipv4Addr, u16)> {
+///   * unknown family
+pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::IpAddr, u16)> {
     if pkt.len() < 20 {
         return None;
     }
@@ -80,7 +86,8 @@ pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::Ipv4Addr, u16)> {
     if magic_cookie != STUN_MAGIC_COOKIE {
         return None;
     }
-    // Tx ID (8..20) is opaque to us here.
+    let mut tx_id = [0u8; 12];
+    tx_id.copy_from_slice(&pkt[8..20]);
 
     // Iterate attributes. Each attribute: 2B type, 2B length, N bytes
     // value, then padded to 4-byte boundary.
@@ -95,32 +102,67 @@ pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::Ipv4Addr, u16)> {
         }
         match attr_type {
             // XOR-MAPPED-ADDRESS (RFC 8489 §14.2) — preferred form.
-            // Layout: 1B reserved, 1B family (0x01 = IPv4), 2B xor_port,
-            // 4B xor_addr.
-            0x0020 if attr_len >= 8 && pkt[val_start + 1] == 0x01 => {
+            // Layout: 1B reserved, 1B family (0x01 = IPv4, 0x02 = IPv6),
+            // 2B xor_port, then 4B (IPv4) or 16B (IPv6) xor_addr.
+            0x0020 if attr_len >= 8 => {
+                let family = pkt[val_start + 1];
                 let xor_port =
                     u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
                 let port = xor_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
-                let xor_addr = u32::from_be_bytes([
-                    pkt[val_start + 4],
-                    pkt[val_start + 5],
-                    pkt[val_start + 6],
-                    pkt[val_start + 7],
-                ]);
-                let addr = xor_addr ^ STUN_MAGIC_COOKIE;
-                return Some((std::net::Ipv4Addr::from(addr.to_be_bytes()), port));
+                match family {
+                    0x01 => {
+                        let xor_addr = u32::from_be_bytes([
+                            pkt[val_start + 4],
+                            pkt[val_start + 5],
+                            pkt[val_start + 6],
+                            pkt[val_start + 7],
+                        ]);
+                        let addr = xor_addr ^ STUN_MAGIC_COOKIE;
+                        let ip = std::net::Ipv4Addr::from(addr.to_be_bytes());
+                        return Some((std::net::IpAddr::V4(ip), port));
+                    }
+                    0x02 if attr_len >= 20 => {
+                        // IPv6: 16-byte XOR address. First 4 bytes XOR'd
+                        // with the magic cookie, remaining 12 XOR'd with
+                        // the transaction ID.
+                        let mut octets = [0u8; 16];
+                        octets.copy_from_slice(&pkt[val_start + 4..val_start + 20]);
+                        let cookie_be = STUN_MAGIC_COOKIE.to_be_bytes();
+                        for i in 0..4 {
+                            octets[i] ^= cookie_be[i];
+                        }
+                        for i in 0..12 {
+                            octets[4 + i] ^= tx_id[i];
+                        }
+                        let ip = std::net::Ipv6Addr::from(octets);
+                        return Some((std::net::IpAddr::V6(ip), port));
+                    }
+                    _ => {}
+                }
             }
             // MAPPED-ADDRESS (legacy, RFC 3489) — same layout sans XOR.
-            0x0001 if attr_len >= 8 && pkt[val_start + 1] == 0x01 => {
+            0x0001 if attr_len >= 8 => {
+                let family = pkt[val_start + 1];
                 let port =
                     u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
-                let addr = std::net::Ipv4Addr::new(
-                    pkt[val_start + 4],
-                    pkt[val_start + 5],
-                    pkt[val_start + 6],
-                    pkt[val_start + 7],
-                );
-                return Some((addr, port));
+                match family {
+                    0x01 => {
+                        let ip = std::net::Ipv4Addr::new(
+                            pkt[val_start + 4],
+                            pkt[val_start + 5],
+                            pkt[val_start + 6],
+                            pkt[val_start + 7],
+                        );
+                        return Some((std::net::IpAddr::V4(ip), port));
+                    }
+                    0x02 if attr_len >= 20 => {
+                        let mut octets = [0u8; 16];
+                        octets.copy_from_slice(&pkt[val_start + 4..val_start + 20]);
+                        let ip = std::net::Ipv6Addr::from(octets);
+                        return Some((std::net::IpAddr::V6(ip), port));
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         }
@@ -151,13 +193,15 @@ fn fresh_tx_id() -> [u8; 12] {
 }
 
 /// Query a STUN server via socket `id`. Returns `(public_ip, public_port)`
-/// the server reports it saw, or `None` on timeout / parse failure.
+/// the server reports it saw, or `None` on timeout / parse failure. The
+/// returned IP is `IpAddr::V4` or `IpAddr::V6` depending on the server's
+/// XOR-MAPPED-ADDRESS family.
 pub fn stun_query(
     socket_id: u64,
     stun_host: &str,
     stun_port: u16,
     timeout: Duration,
-) -> Option<(std::net::Ipv4Addr, u16)> {
+) -> Option<(std::net::IpAddr, u16)> {
     let socket = udp_sockets::get(socket_id)?;
     let addr = udp_sockets::resolve_one(stun_host, stun_port)?;
     let tx_id = fresh_tx_id();
@@ -296,7 +340,46 @@ mod tests {
         pkt[28..32].copy_from_slice(&xor_addr.to_be_bytes());
 
         let parsed = parse_binding_response(&pkt).expect("must parse");
-        assert_eq!(parsed.0, real_ip);
+        assert_eq!(parsed.0, std::net::IpAddr::V4(real_ip));
+        assert_eq!(parsed.1, real_port);
+    }
+
+    /// IPv6 XOR-MAPPED-ADDRESS: 16-byte address scrambled with magic-
+    /// cookie || tx_id. Pin the full round-trip so future RFC 8489 reads
+    /// don't accidentally regress the encoding.
+    #[test]
+    fn parse_xor_mapped_address_ipv6_round_trip() {
+        let real_ip = std::net::Ipv6Addr::new(
+            0x2001, 0x0db8, 0xdead, 0xbeef, 0xcafe, 0xface, 0x1234, 0x5678,
+        );
+        let real_port: u16 = 51234;
+        let tx_id: [u8; 12] = [
+            0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+        ];
+        let xor_port = real_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+        let mut xor_addr = real_ip.octets();
+        let cookie_be = STUN_MAGIC_COOKIE.to_be_bytes();
+        for i in 0..4 {
+            xor_addr[i] ^= cookie_be[i];
+        }
+        for i in 0..12 {
+            xor_addr[4 + i] ^= tx_id[i];
+        }
+
+        let mut pkt = vec![0u8; 44]; // 20 header + 4 attr_hdr + 20 attr_val
+        pkt[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+        pkt[2..4].copy_from_slice(&24u16.to_be_bytes()); // 4 + 20 = 24 bytes of attrs
+        pkt[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+        pkt[8..20].copy_from_slice(&tx_id);
+        pkt[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+        pkt[22..24].copy_from_slice(&20u16.to_be_bytes()); // attr len = 20
+        pkt[24] = 0x00; // reserved
+        pkt[25] = 0x02; // family IPv6
+        pkt[26..28].copy_from_slice(&xor_port.to_be_bytes());
+        pkt[28..44].copy_from_slice(&xor_addr);
+
+        let parsed = parse_binding_response(&pkt).expect("must parse IPv6 XOR-MAPPED");
+        assert_eq!(parsed.0, std::net::IpAddr::V6(real_ip));
         assert_eq!(parsed.1, real_port);
     }
 
@@ -378,7 +461,10 @@ mod tests {
             Duration::from_secs(2),
         );
         let (ip, port) = result.expect("STUN query must round-trip");
-        assert_eq!(ip, std::net::Ipv4Addr::new(198, 51, 100, 7));
+        assert_eq!(
+            ip,
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(198, 51, 100, 7))
+        );
         assert_eq!(port, 50001);
         udp_sockets::close(client);
     }
