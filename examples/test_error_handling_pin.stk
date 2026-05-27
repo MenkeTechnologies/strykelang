@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Error handling — try/catch, die, finally, retry, structured
+# exceptions, nested handlers, rethrow.
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Basic try/catch ────────────────────────────────────────────────────────
+
+my $caught1 = 0
+try {
+    die "basic error"
+} catch ($e) {
+    $caught1 = 1
+}
+$caught1 |> aok "try/catch: executes catch block"
+
+# ── Error message accessible in catch ──────────────────────────────────────
+
+my $msg = ""
+try {
+    die "specific message\n"
+} catch ($e) {
+    $msg = $e
+}
+$msg |> aeq "specific message\n", "try/catch: error message accessible"
+
+# ── No-throw path skips catch ──────────────────────────────────────────────
+
+my $ok = 0
+try {
+    $ok = 42
+} catch ($e) {
+    $ok = -1
+}
+$ok |> aeq 42, "try: no-throw path skips catch"
+
+# ── Finally always runs ────────────────────────────────────────────────────
+
+my $finally_ran = 0
+try {
+    die "oops\n"
+} catch ($e) {
+    1
+} finally {
+    $finally_ran = 1
+}
+$finally_ran |> aok "finally: runs after catch"
+
+my $finally2 = 0
+try {
+    1 + 1
+} catch ($e) {
+} finally {
+    $finally2 = 1
+}
+$finally2 |> aok "finally: runs on success too"
+
+# ── Structured exceptions (hashref) ────────────────────────────────────────
+
+my $code = 0
+my $errmsg = ""
+try {
+    die +{ code => 404, msg => "Not Found" }
+} catch ($e) {
+    if (ref($e) eq "HASH") {
+        $code   = $e->{code}
+        $errmsg = $e->{msg}
+    }
+}
+$code   |> aeq 404,         "structured: error code"
+$errmsg |> aeq "Not Found", "structured: error msg"
+
+# ── Rethrow ────────────────────────────────────────────────────────────────
+
+my $outer_caught = 0
+my $outer_msg    = ""
+try {
+    try {
+        die "inner error\n"
+    } catch ($e) {
+        die $e     # rethrow
+    }
+} catch ($e) {
+    $outer_caught = 1
+    $outer_msg    = $e
+}
+$outer_caught   |> aok "rethrow: outer catch fires"
+$outer_msg      |> aeq "inner error\n", "rethrow: message preserved"
+
+# ── Nested try/catch with different errors ──────────────────────────────────
+
+my @log = ()
+fn maybe_fail($x) {
+    die "fail:#{$x}\n" if $x % 2 == 0
+    $x * 10
+}
+
+for my $n (1:4) {
+    my $result = 0
+    try {
+        $result = maybe_fail($n)
+    } catch ($e) {
+        $result = -1
+        push @log, $e
+    }
+    push @log, "ok:$result" if $result > 0
+}
+join(",", @log)
+    |> aeq "ok:10,fail:2\n,ok:30,fail:4\n", "nested: alternating ok/fail"
+
+# ── retry — succeed on Nth attempt ────────────────────────────────────────
+
+my $attempts = 0
+my $val = retry {
+    $attempts++
+    die "not yet\n" if $attempts < 3
+    99
+} times => 5, backoff => none
+$val      |> aeq 99, "retry: succeeds on 3rd attempt"
+$attempts |> aeq 3,  "retry: exactly 3 attempts made"
+
+test_run

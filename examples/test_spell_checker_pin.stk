@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+
+# Pinning test for the spell_checker.stk demo.
+# Verifies dictionary lookup and Levenshtein-based suggestions.
+# Compliance: docs/STYLE_GUIDE.md
+
+my @dict = qw(
+    the quick brown fox jumps over lazy dog
+    hello world program code function variable
+    stryke language syntax feature builtin range
+    array hash string integer float boolean
+    algorithm data structure sort search filter
+    class object method trait impl enum match
+    pipeline parallel async concurrent thread
+    error catch retry timeout die finally
+)
+
+fn Spell::known($word) {
+    my %dict_set = ()
+    for my $w (@dict) { $dict_set{$w} = 1 }
+    exists $dict_set{lc($word)}
+}
+
+fn Spell::suggest($word, $n) {
+    my $w = lc($word)
+    my @scored = ()
+    for my $entry (@dict) {
+        push @scored, [$entry, levenshtein($w, $entry)]
+    }
+    my @sorted = sort { _->[1] <=> _1->[1] } @scored
+    my @top = ()
+    for my $pair (@sorted[0:$n-1]) {
+        push @top, $pair->[0]
+    }
+    \@top
+}
+
+# ── Levenshtein builtin sanity ────────────────────────────────────────────
+
+levenshtein("kitten", "sitting") |> aeq 3, "lev: kitten→sitting"
+levenshtein("saturday", "sunday") |> aeq 3, "lev: saturday→sunday"
+levenshtein("stryke", "stryke") |> aeq 0, "lev: identical = 0"
+levenshtein("", "abc") |> aeq 3, "lev: '' to abc = 3"
+levenshtein("abc", "") |> aeq 3, "lev: abc to '' = 3"
+levenshtein("a", "b") |> aeq 1, "lev: substitute"
+
+# ── Dictionary lookup ─────────────────────────────────────────────────────
+
+Spell::known("hello")  |> aok "known: hello"
+Spell::known("stryke") |> aok "known: stryke"
+Spell::known("HELLO")  |> aok "known: HELLO (case-insensitive)"
+Spell::known("zzzzz")  |> aeq 0, "known: zzzzz is unknown"
+Spell::known("xyzqqq") |> aeq 0, "known: xyzqqq is unknown"
+
+# ── Suggestions: closest match is the correct word ────────────────────────
+
+my $s1 = Spell::suggest("helo", 1)
+$s1->[0] |> aeq "hello", "suggest helo → hello"
+
+my $s2 = Spell::suggest("strke", 1)
+$s2->[0] |> aeq "stryke", "suggest strke → stryke"
+
+my $s3 = Spell::suggest("progam", 1)
+$s3->[0] |> aeq "program", "suggest progam → program"
+
+my $s4 = Spell::suggest("fnction", 1)
+$s4->[0] |> aeq "function", "suggest fnction → function"
+
+my $s5 = Spell::suggest("algoithm", 1)
+$s5->[0] |> aeq "algorithm", "suggest algoithm → algorithm"
+
+my $s6 = Spell::suggest("vaiable", 1)
+$s6->[0] |> aeq "variable", "suggest vaiable → variable"
+
+# ── Suggestion count ──────────────────────────────────────────────────────
+
+my $s_top3 = Spell::suggest("helo", 3)
+len(@$s_top3) |> aeq 3, "suggest: returns 3 results"
+$s_top3->[0]  |> aeq "hello", "top-3: first is hello"
+
+my $s_top5 = Spell::suggest("strke", 5)
+len(@$s_top5) |> aeq 5, "suggest: returns 5 results"
+$s_top5->[0]  |> aeq "stryke", "top-5: first is stryke"
+
+# ── Case-insensitive suggestion ───────────────────────────────────────────
+
+my $up = Spell::suggest("HELO", 1)
+$up->[0] |> aeq "hello", "suggest: HELO → hello (case-fold)"
+
+test_run
