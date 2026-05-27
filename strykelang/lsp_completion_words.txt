@@ -526,6 +526,7 @@ CORE::arrhenius
 CORE::arrhenius_k
 CORE::arrhenius_rate
 CORE::arrhenius_temp_q10
+CORE::arrive
 CORE::arrow_impossibility_check
 CORE::arrow_independence
 CORE::arrow_pareto_check
@@ -10049,6 +10050,7 @@ CORE::te
 CORE::tee
 CORE::tee_iter
 CORE::teei
+CORE::teleport
 CORE::tell
 CORE::tema
 CORE::temp_dir
@@ -11609,6 +11611,7 @@ arrhenius
 arrhenius_k
 arrhenius_rate
 arrhenius_temp_q10
+arrive
 arrow_impossibility_check
 arrow_independence
 arrow_pareto_check
@@ -21168,6 +21171,7 @@ te
 tee
 tee_iter
 teei
+teleport
 tell
 tema
 temp_dir

@@ -5326,6 +5326,8 @@ pub(crate) fn try_builtin(
         "turn_send" => Some(builtin_turn_send(args)),
         "turn_recv" => Some(builtin_turn_recv(args)),
         "turn_refresh" => Some(builtin_turn_refresh(args)),
+        "teleport" => Some(builtin_teleport(args)),
+        "arrive" => Some(builtin_arrive(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
         "unmark" => Some(builtin_unmark(args)),
@@ -14193,6 +14195,172 @@ fn builtin_turn_refresh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     match crate::turn_client::refresh(&alloc, lifetime, Duration::from_millis(timeout_ms)) {
         Some(n) => Ok(StrykeValue::integer(n as i64)),
         None => Ok(StrykeValue::integer(0)),
+    }
+}
+
+/// `teleport($val, @receiver_pids [, { hold_ms => 500 }])` — broadcast a
+/// value to N stryke processes via POSIX shared memory + per-receiver
+/// UDS notification. Returns the count of receivers whose notification
+/// landed (their UDS socket exists + accepted the 40-byte notify).
+///
+/// Data-first signature so the prefix thread macro composes naturally:
+///
+///   ~> $huge teleport(@worker_pids)   # ~> threads $huge as arg 0
+///
+/// Standalone with literal PIDs:
+///
+///   teleport($payload, $pid1, $pid2, $pid3)
+///   teleport($payload, [@pids])       # arrayref also flattens
+///   teleport($payload, $pid, { hold_ms => 1500 })
+///
+/// Receivers must be stryke processes running an `arrive()` loop.
+/// Non-stryke processes (or stryke processes without an `arrive` call)
+/// have no bound UDS socket and count as unreachable.
+///
+/// `$hold_ms` (default 500) is how long the sender holds the SHM segment
+/// alive after notifying so receivers can `shm_open` + `mmap` + read.
+/// Receivers slower than `hold_ms` miss the window.
+///
+/// Serialization: `StrykeValue → serde_json::Value → bincode → SHM`.
+/// Receivers reverse this. Same lossy-but-portable shape as
+/// `dist_thread`/`cluster` IPC — closures and blessed objects don't
+/// round-trip; scalars / arrays / hashes / nested combos do.
+fn builtin_teleport(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let Some(val) = args.first() else {
+        return Ok(StrykeValue::integer(0));
+    };
+
+    let mut pids: Vec<i32> = Vec::new();
+    let mut hold_ms: u64 = 500;
+
+    // args[1..] may be: (a) bare integers (PIDs spread by callsite),
+    // (b) an arrayref `\@pids`, (c) an inline array value `[@pids]`.
+    // Last numeric arg gets treated as hold_ms ONLY if it's a hash with
+    // explicit `hold_ms => N` key — otherwise everything numeric is a
+    // PID. Keeps the variadic surface unambiguous.
+    let mut tail = args[1..].iter().peekable();
+    while let Some(arg) = tail.next() {
+        if arg.is_undef() {
+            continue;
+        }
+        if let Some(href) = arg.as_hash_ref() {
+            // Options hash — currently only `hold_ms` is recognized.
+            if let Some(v) = href.read().get("hold_ms") {
+                hold_ms = v.to_int().max(0) as u64;
+            }
+            continue;
+        }
+        if let Some(arr) = arg.as_array_ref() {
+            for v in arr.read().iter() {
+                if !v.is_undef() {
+                    pids.push(v.to_int() as i32);
+                }
+            }
+            continue;
+        }
+        if let Some(arr) = arg.as_array_vec() {
+            for v in arr {
+                if !v.is_undef() {
+                    pids.push(v.to_int() as i32);
+                }
+            }
+            continue;
+        }
+        pids.push(arg.to_int() as i32);
+    }
+
+    if pids.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+
+    // StrykeValue → serde_json::Value → JSON bytes. JSON beats bincode here
+    // because bincode can't round-trip a free-standing serde_json::Value
+    // (Value needs `deserialize_any`, which bincode doesn't implement).
+    // Single payload per teleport — no point bundling into a larger frame
+    // just to wrap with bincode.
+    let json = match crate::remote_wire::perl_to_json_value(val) {
+        Ok(j) => j,
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    let bytes = match serde_json::to_vec(&json) {
+        Ok(b) => b,
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+
+    let delivered = crate::teleport::send(&bytes, &pids, hold_ms);
+    Ok(StrykeValue::integer(delivered as i64))
+}
+
+/// `arrive([$timeout_ms=5000])` — block up to `$timeout_ms` for a
+/// teleport notification from any sender, then read + return the value.
+/// Returns `undef` on timeout, malformed notification, or stale SHM
+/// segment (sender unlinked before this receiver got around to reading).
+///
+/// First call lazy-binds the per-process UDS socket at
+/// `/tmp/stryke_teleport_$$.sock`; subsequent calls reuse it. The socket
+/// file is cleaned up best-effort on bind (stale file from a prior
+/// crashed instance gets unlinked).
+///
+/// Idiomatic receiver loop:
+///
+///   while (1) {
+///       my $msg = arrive(1000)
+///       last unless defined $msg
+///       process($msg)
+///   }
+fn builtin_arrive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let timeout_ms = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u64)
+        .unwrap_or(5000);
+
+    let Some(bytes) = crate::teleport::recv(Duration::from_millis(timeout_ms)) else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    let json: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(j) => j,
+        Err(_) => return Ok(StrykeValue::UNDEF),
+    };
+    // Build refs at every nesting level so `$msg->{outer}->{inner}->[i]`
+    // chains compose without re-wrapping. Matches decode_json's
+    // convention — JSON Object → hashref, JSON Array → arrayref, both
+    // recursively. The default json_to_perl returns flat hash/array,
+    // which is right for cluster IPC (consumer iterates with %{ } / @{ })
+    // but wrong for teleport's primary use shape.
+    Ok(json_to_deep_refs(&json))
+}
+
+fn json_to_deep_refs(v: &serde_json::Value) -> StrykeValue {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    match v {
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if *b { 1 } else { 0 }),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                StrykeValue::integer(i)
+            } else if let Some(u) = n.as_u64() {
+                StrykeValue::integer(u as i64)
+            } else {
+                StrykeValue::float(n.as_f64().unwrap_or(0.0))
+            }
+        }
+        serde_json::Value::String(s) => StrykeValue::string(s.clone()),
+        serde_json::Value::Array(a) => {
+            let items: Vec<StrykeValue> = a.iter().map(json_to_deep_refs).collect();
+            StrykeValue::array_ref(StdArc::new(RwLock::new(items)))
+        }
+        serde_json::Value::Object(o) => {
+            let mut map: IndexMap<String, StrykeValue> = IndexMap::new();
+            for (k, val) in o {
+                map.insert(k.clone(), json_to_deep_refs(val));
+            }
+            StrykeValue::hash_ref(StdArc::new(RwLock::new(map)))
+        }
     }
 }
 

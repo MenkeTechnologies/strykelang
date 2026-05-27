@@ -112,6 +112,7 @@ pub mod static_analysis;
 pub mod stego;
 pub mod stress;
 pub mod stryke_log;
+pub mod teleport;
 pub mod token;
 pub mod turn_client;
 pub mod udp_sockets;
