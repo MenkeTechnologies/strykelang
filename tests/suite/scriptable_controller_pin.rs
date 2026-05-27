@@ -1050,3 +1050,177 @@ fn welcome_with_target_equal_to_count_returns_instantly() {
     );
     dismiss(&handle, children);
 }
+
+// ─── Round-3 pins ─────────────────────────────────────────────────────────
+
+/// `pilgrimage` with empty agent list returns true (vacuous truth — zero
+/// agents trivially all rendezvous). Pin the edge case so a barrier
+/// against an empty congregation doesn't block or error.
+#[test]
+fn pilgrimage_with_empty_agents_returns_true_vacuously() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    let ok = handle.pilgrimage("'noop'", &[], Duration::from_millis(100));
+    assert!(ok, "pilgrimage(@empty) is vacuously true");
+    handle.shutdown();
+}
+
+/// `excommunicate` returns the count of agents successfully notified —
+/// dead/missing session_ids in the list don't crash; they just don't
+/// count. Pin the "subset already gone" path.
+#[test]
+fn excommunicate_count_skips_unknown_session_ids() {
+    let (handle, children) = forge_congregation(2);
+    let session_ids = handle.muster();
+
+    // Excommunicate a mix: 1 real session_id + 2 bogus ones.
+    let mix = vec![session_ids[0], 99_001, 99_002];
+    let count = handle.excommunicate(&mix);
+    assert_eq!(count, 1, "only the one real agent was notified");
+
+    // Roster now has just the second agent.
+    let remaining = handle.muster();
+    assert_eq!(remaining, vec![session_ids[1]]);
+
+    // Reap the excommunicated child + dismiss the survivor.
+    use nix::sys::wait::waitpid;
+    let _ = waitpid(children[0], None);
+    dismiss(&handle, vec![children[1]]);
+}
+
+/// `welcome` with timeout=0 returns the current state immediately
+/// without sleeping. Pin the zero-timeout fast-path.
+#[test]
+fn welcome_with_zero_timeout_returns_current_state_immediately() {
+    let (handle, children) = forge_congregation(2);
+
+    let start = Instant::now();
+    let met = handle.welcome(5, Duration::from_millis(0));
+    let elapsed = start.elapsed();
+    assert!(!met, "welcome(5) with 2 connected and zero timeout is false");
+    assert!(
+        elapsed < Duration::from_millis(60),
+        "zero timeout should not block longer than one poll-cycle (50ms); got {:?}",
+        elapsed
+    );
+
+    dismiss(&handle, children);
+}
+
+/// Multiple back-to-back harvest-style scatters on the same congregation
+/// produce independent divinations — gather of one doesn't affect the
+/// other. Pin the multi-petition concurrency claim.
+#[test]
+fn back_to_back_scatters_yield_independent_divinations() {
+    let (handle, children) = forge_congregation(2);
+    let session_ids = handle.muster();
+
+    let pid1 = handle.scatter("11 + 22", &session_ids).expect("scatter 1");
+    let pid2 = handle.scatter("100 - 1", &session_ids).expect("scatter 2");
+    assert_ne!(pid1, pid2, "distinct petition_ids");
+
+    // Gather in reverse order — pid2 first, then pid1.
+    // (Note: replies are FIFO per-agent socket buffer, so gather(pid2)
+    // actually consumes the EARLIER reply on each agent. This pins the
+    // wire-level FIFO behaviour documented in TODO.md Tier 5 — until
+    // EVAL_RESULT carries a petition_id, gather demux is by call order
+    // not by id. The TEST verifies the bytes-flow, not the semantic
+    // demux that Tier 5 will add.)
+    let r2 = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("gather 2");
+    let r1 = handle
+        .gather(pid1, Duration::from_secs(5))
+        .expect("gather 1");
+
+    assert_eq!(r1.len(), 2, "first gather returns 2 replies");
+    assert_eq!(r2.len(), 2, "second gather returns 2 replies");
+    // Outputs are 33 and 99 in SOME order across the two gathers.
+    let mut all_outputs: Vec<String> = Vec::new();
+    for v in r1.values().chain(r2.values()) {
+        all_outputs.push(v.output.trim().to_string());
+    }
+    all_outputs.sort();
+    assert_eq!(
+        all_outputs,
+        vec!["33", "33", "99", "99"],
+        "both prayers' answers landed (2 agents × 2 prayers = 4 outputs)"
+    );
+
+    dismiss(&handle, children);
+}
+
+/// `anoint(N)` returns session_ids from a SEPARATE controller than the
+/// primary `congregation`. Confirm by checking that anoint's returned
+/// ids correspond to a controller distinct from `get_current_controller`.
+#[test]
+fn anoint_session_ids_belong_to_separate_controller() {
+    use stryke::controller::{get_controller, get_current_controller};
+
+    // Primary pool — congregation sets the current controller.
+    let _primary_handle = spawn_controller("127.0.0.1", 0).expect("primary");
+    // Register it so get_current_controller has something to return.
+    let primary_id = stryke::controller::register_controller(std::sync::Arc::clone(
+        &_primary_handle,
+    ));
+    stryke::controller::set_current_controller(primary_id);
+
+    // Spawn a SECOND controller (simulating what anoint does internally
+    // — it spawns its own controller). Both should resolve via registry.
+    let secondary_handle = spawn_controller("127.0.0.1", 0).expect("secondary");
+    let secondary_id =
+        stryke::controller::register_controller(std::sync::Arc::clone(&secondary_handle));
+    assert_ne!(primary_id, secondary_id, "distinct ids in registry");
+
+    // Current controller stays the primary (anoint preserves it).
+    assert_eq!(
+        get_current_controller(),
+        Some(primary_id),
+        "anoint does not change current controller"
+    );
+
+    // Both controllers reachable via registry.
+    let p = get_controller(primary_id).expect("primary in registry");
+    let s = get_controller(secondary_id).expect("secondary in registry");
+    assert_ne!(
+        p.listen_addr(),
+        s.listen_addr(),
+        "primary and secondary bind to different ports"
+    );
+
+    _primary_handle.shutdown();
+    secondary_handle.shutdown();
+}
+
+/// `Controller::set_quiet_accept` toggle is observable end-to-end:
+/// when set to true before a fork burst, the per-agent "[agent connected]"
+/// eprintln suppression eliminates the fork-stdio RefCell race. Pin
+/// the new public method on ControllerHandle (commit 6a6ae6a498 added).
+#[test]
+fn set_quiet_accept_toggles_without_breaking_subsequent_accepts() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+
+    // Toggle on, then off — must not panic, must not leak.
+    handle.set_quiet_accept(true);
+    handle.set_quiet_accept(false);
+    handle.set_quiet_accept(true);
+
+    // Spawn one fork-child agent under quiet mode (no per-agent eprintln).
+    use nix::unistd::{fork, ForkResult};
+    let listen_addr = handle.listen_addr();
+    let host = listen_addr.ip().to_string();
+    let port = listen_addr.port();
+    let child = match unsafe { fork() }.expect("fork") {
+        ForkResult::Parent { child } => child,
+        ForkResult::Child => {
+            let code = stryke::agent::run_agent_with_explicit(&host, port, Some("quiet-test"));
+            std::process::exit(code);
+        }
+    };
+    assert!(
+        handle.welcome(1, Duration::from_secs(5)),
+        "agent registered even with quiet_accept=true"
+    );
+
+    handle.set_quiet_accept(false); // restore for subsequent connections
+    dismiss(&handle, vec![child]);
+}

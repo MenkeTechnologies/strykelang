@@ -1,0 +1,49 @@
+#!/usr/bin/env stryke
+#
+# Live metrics dashboard — workers each report their per-process
+# metrics (via the `interrogate($pid)` polymorphic builtin); master
+# tabulates them. Demonstrates the polling-monitor + fleet-summary
+# pattern (every worker reports its own state; master rolls up).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── live metrics dashboard ──"
+
+my @workers = congregation(4)
+printf "spawned %d workers\n", len(@workers)
+
+# Have each worker report its own PID via a single-character prayer.
+# (Workers know their own $$ — agent's persistent VM exposes it.)
+my %pids = harvest "\$\$", @workers, 5_000
+
+# For each reported PID, master runs interrogate($pid) locally to
+# pull the OS-level process state.
+p "── per-worker dashboard ──"
+printf "  %-10s %-8s %-12s %-12s\n", "worker", "pid", "mem_MB", "status"
+for my $sid (sort { _ <=> _1 } keys %pids) {
+    my $pid = $pids{$sid}
+    my $info = interrogate(0 + $pid)
+    if (defined $info) {
+        my $mb = int($info->{memory_bytes} / 1024 / 1024)
+        printf "  worker %-3d %-8d %-12d %s\n", $sid, $pid, $mb, $info->{status}
+    } else {
+        printf "  worker %-3d %-8d (not visible)\n", $sid, $pid
+    }
+}
+
+# Fleet totals.
+my $total_mb = 0
+my $alive_count = 0
+for my $sid (keys %pids) {
+    my $info = interrogate(0 + $pids{$sid})
+    next unless defined $info
+    $total_mb += int($info->{memory_bytes} / 1024 / 1024)
+    $alive_count++
+}
+
+p "── fleet summary ──"
+printf "  alive workers:  %d / %d\n", $alive_count, len(@workers)
+printf "  fleet memory:   %d MB\n", $total_mb
+
+excommunicate(@workers)
+p "done"
