@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+#
+# Distributed cache warmer — N workers each preload entries into
+# their local cache and return the contents via the prayer reply.
+# Models the cache-rehydration pattern: warm up worker caches before
+# serving traffic, master verifies all workers got the same data.
+#
+# Uses bestow (push key set) + harvest (worker builds cache and
+# returns it inline) — avoids the agent-side `%main::name = ...`
+# assignment-from-EVAL parser limitation by returning the cache
+# directly rather than storing it in a package global.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed cache warmer ──"
+
+my @workers = congregation(3)
+printf "spawned %d workers\n", len(@workers)
+
+# Master pushes the cache key set to all workers as %gift.
+my %seed_keys = (
+    user_count => "expensive_compute",
+    item_count => "expensive_compute",
+    order_count => "expensive_compute",
+    revenue_total => "expensive_compute",
+)
+bestow(\%seed_keys, @workers)
+printf "bestowed %d cache keys to all workers\n", len(keys %seed_keys)
+
+# Each worker computes its cache and returns it inline as JSON.
+my %caches = harvest "
+our %gift;
+my %built;
+for my \$k (keys %gift) {
+    \$built{\$k} = len(\$k) * 100;
+}
+to_json(\\%built)
+", @workers, 10_000
+
+p "── per-worker cache contents ──"
+my $first_sid = (sort { _ <=> _1 } keys %caches)[0]
+my $first_cache = from_json($caches{$first_sid})
+for my $k (sort keys %$first_cache) {
+    printf "  %s = %s\n", $k, $first_cache->{$k}
+}
+
+# Verify all workers got identical cache contents.
+my $all_same = 1
+for my $sid (keys %caches) {
+    my $c = from_json($caches{$sid})
+    for my $k (keys %$first_cache) {
+        $all_same = 0 unless ($c->{$k} // -1) == $first_cache->{$k}
+    }
+}
+p $all_same ? "✓ all 3 workers built identical warm cache" : "✗ caches diverged"
+
+excommunicate(@workers)
+p "done"

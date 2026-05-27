@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+#
+# Distributed regex matching — workers each match a regex against
+# their shard of input strings; master aggregates which strings
+# matched.
+#
+# Real shape: each worker is a search node holding a slice of a
+# corpus; the master fans the query out to all nodes and collects
+# the matching documents. Classic distributed search.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed regex match ──"
+
+my @corpus = (
+    "POST /login HTTP/1.1",
+    "GET /index.html HTTP/1.1",
+    "POST /api/v1/users HTTP/1.1",
+    "GET /static/app.js HTTP/1.1",
+    "PUT /api/v1/users/42 HTTP/1.1",
+    "DELETE /api/v1/users/7 HTTP/1.1",
+    "GET /api/v1/status HTTP/1.1",
+    "POST /api/v1/events HTTP/1.1",
+)
+my $pattern = "^P.*\\/api"   # matches POST/PUT lines to /api
+
+printf "corpus: %d lines  ·  pattern: /%s/\n", len(@corpus), $pattern
+
+my @workers = congregation(4)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard the corpus. Each worker returns the indices that matched.
+my $per = int((len(@corpus) + len(@sorted_workers) - 1) / len(@sorted_workers))
+my @all_matches
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = len(@corpus) - 1 if $end >= len(@corpus)
+    next if $start >= len(@corpus)
+    my @shard
+    for my $r ($start:$end) { push @shard, $corpus[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$arr = from_json(q{$shard_json});
+        my %matches;
+        for my \$local_idx (0:len(\@\$arr) - 1) {
+            my \$line = \$arr->[\$local_idx];
+            if (\$line =~ /$pattern/) {
+                \$matches{$start + \$local_idx} = \$line;
+            }
+        }
+        to_json(\\%matches)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    my $h = from_json($reply{$w})
+    for my $k (keys %$h) {
+        push @all_matches, [0 + $k, $h->{$k}]
+    }
+}
+
+@all_matches = sort { _->[0] <=> _1->[0] } @all_matches
+
+p "── matched lines ──"
+for my $m (@all_matches) {
+    my ($idx, $line) = @$m
+    printf "  doc %d: %s\n", $idx, $line
+}
+printf "%d lines matched out of %d\n", len(@all_matches), len(@corpus)
+
+excommunicate(@workers)
+p "done"

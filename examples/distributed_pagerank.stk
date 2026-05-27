@@ -1,0 +1,91 @@
+#!/usr/bin/env stryke
+#
+# Distributed PageRank (one power-iteration step) — workers each
+# compute new rank for a subset of nodes given the current rank
+# vector. Master assembles the updated vector. Repeat to convergence.
+#
+# This demo runs ONE iteration on a 6-node toy graph to keep the
+# wire dance compact; the structure scales to N iterations + N nodes
+# the same way (loop the harvest, check for convergence).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed PageRank (1 iteration) ──"
+
+# 6-node directed graph. Edges by source: adj[src] = [dst, dst, ...].
+my @adj = (
+    [1, 2],         # node 0 → 1, 2
+    [2],            # node 1 → 2
+    [0, 3],         # node 2 → 0, 3
+    [4],            # node 3 → 4
+    [3, 5],         # node 4 → 3, 5
+    [0, 4],         # node 5 → 0, 4
+)
+my $n = len(@adj)
+my $damp = 0.85
+
+# Initial rank: uniform.
+my @rank = (1.0 / $n) x $n
+printf "graph: %d nodes  ·  damping: %.2f  ·  initial uniform rank: %.4f\n",
+    $n, $damp, 1.0 / $n
+
+my @workers = congregation(3)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard nodes across workers. Each worker computes new rank for its
+# assigned nodes given the CURRENT rank vector (passed via prayer).
+my $rank_json = to_json(\@rank)
+my $adj_json = to_json(\@adj)
+my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+my %new_ranks
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = $n - 1 if $end >= $n
+    next if $start >= $n
+    my $code = "
+        my \$rank = from_json(q{$rank_json});
+        my \$adj = from_json(q{$adj_json});
+        my \$n = len(\@\$rank);
+        my \$damp = $damp;
+        my \$base = (1.0 - \$damp) / \$n;
+        my %nr;
+        for my \$v ($start:$end) {
+            my \$sum = 0.0;
+            for my \$u (0:\$n - 1) {
+                my \$out = \$adj->[\$u];
+                my \$outdeg = len(\@\$out);
+                next if \$outdeg == 0;
+                for my \$dst (\@\$out) {
+                    if (\$dst == \$v) { \$sum += \$rank->[\$u] / \$outdeg }
+                }
+            }
+            \$nr{\$v} = \$base + \$damp * \$sum;
+        }
+        to_json(\\%nr)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    my $partial = from_json($reply{$w})
+    for my $k (keys %$partial) {
+        $new_ranks{$k} = $partial->{$k}
+    }
+}
+
+# Assemble updated rank vector.
+my @new_rank
+for my $v (0:$n - 1) {
+    push @new_rank, $new_ranks{$v}
+}
+
+p "── updated ranks (after 1 iteration) ──"
+my $sum = 0
+for my $v (0:$n - 1) {
+    printf "  node %d: %.4f\n", $v, $new_rank[$v]
+    $sum += $new_rank[$v]
+}
+printf "rank sum: %.4f (should be ≈1.0 for normalized PR)\n", $sum
+
+excommunicate(@workers)
+p "done"
