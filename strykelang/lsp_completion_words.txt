@@ -10402,6 +10402,11 @@ CORE::turbulence_intensity_step
 CORE::turbulence_noise_2d
 CORE::turbulent_dissipation_eps
 CORE::turbulent_kinetic_energy_step
+CORE::turn_allocate
+CORE::turn_permission
+CORE::turn_recv
+CORE::turn_refresh
+CORE::turn_send
 CORE::tvals
 CORE::tversky
 CORE::tversky_index
@@ -21516,6 +21521,11 @@ turbulence_intensity_step
 turbulence_noise_2d
 turbulent_dissipation_eps
 turbulent_kinetic_energy_step
+turn_allocate
+turn_permission
+turn_recv
+turn_refresh
+turn_send
 tvals
 tversky
 tversky_index

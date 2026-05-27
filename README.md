@@ -2754,9 +2754,56 @@ udp_close($sock)
 - **UDP-blocking firewalls** — drop all UDP outright.
 - **Timing misalignment** — if one peer punches 30s before the other, the first peer's NAT mapping may time out before the second peer starts.
 
-For guaranteed delivery you need a TURN relay (relay every packet through a public server). Out of scope for stryke builtins — run a [coturn](https://github.com/coturn/coturn) server and relay manually via `udp_send_to`.
+For guaranteed delivery use the **TURN relay** builtins below (`turn_allocate`, `turn_permission`, `turn_send`, `turn_recv`, `turn_refresh`) — relay every packet through a public coturn server, works regardless of NAT type.
 
 Demo: [`examples/p2p_chat.stk`](examples/p2p_chat.stk) — runnable two-process flow.
+
+### Builtins: `turn_allocate` / `turn_permission` / `turn_send` / `turn_recv` / `turn_refresh` — TURN relay fallback (RFC 8656)
+
+When `stun_classify` reports `symmetric` (~20-30% of real-world NAT scenarios — mobile carriers, some corporate firewalls), pure hole-punching cannot succeed. TURN routes every packet through a public relay server you trust, working regardless of NAT type at the cost of one network hop and the bandwidth budget of whoever runs the TURN server.
+
+RFC 8656 client implemented in-tree (~600 lines, no third-party network crate — reuses the existing `hmac` + `sha1` + `md-5` from RustCrypto for MESSAGE-INTEGRITY auth). Builds on the STUN binary protocol from `nat_punch.rs`; TURN messages are STUN-formatted frames with different message types and attributes.
+
+```perl
+# Side A (the listener):
+my $sock = udp_open()
+my $alloc = turn_allocate($sock, "turn.example.com", 3478, "alice", "hunter2")
+printf "Tell peer my relay is: %s:%d\n", $alloc->{relay_ip}, $alloc->{relay_port}
+while (defined(my $msg = turn_recv($sock, 0))) {
+    p "from $msg->{peer_ip}:$msg->{peer_port}: $msg->{payload}"
+    turn_send($sock, $msg->{peer_ip}, $msg->{peer_port}, "ack")
+}
+
+# Side B (the sender):
+my $sock = udp_open()
+my $alloc = turn_allocate($sock, "turn.example.com", 3478, "bob", "trustno1")
+turn_permission($sock, $peer_relay_ip)
+turn_send($sock, $peer_relay_ip, $peer_relay_port, "hello via turn!")
+my $reply = turn_recv($sock, 5_000)
+```
+
+| Builtin | Signature | Returns |
+|---|---|---|
+| `turn_allocate($id, $server, $port, $user, $pass [, $timeout_ms])` | two-roundtrip auth + Allocate | `{ relay_ip, relay_port, lifetime_secs, realm, nonce_len }` or undef |
+| `turn_permission($id, $peer_ip [, $timeout_ms])` | install CreatePermission for peer | 1 / 0 |
+| `turn_send($id, $peer_ip, $peer_port, $payload)` | wrap in SEND-INDICATION, ship via relay | bytes sent to TURN server / 0 |
+| `turn_recv($id [, $timeout_ms])` | parse next DATA-INDICATION | `{ payload, peer_ip, peer_port }` or undef |
+| `turn_refresh($id [, $lifetime_secs, $timeout_ms])` | extend allocation (or release with `lifetime_secs=0`) | new lifetime / 0 |
+
+**Protocol scope** (RFC 8656 core, deliberately bounded):
+- ✅ Allocate with long-term HMAC-SHA1 auth + nonce/realm exchange
+- ✅ CreatePermission
+- ✅ SendIndication / DataIndication
+- ✅ Refresh
+- ✅ IPv4 + IPv6 XOR address parsing
+- ❌ ChannelBind / ChannelData — bandwidth optimization, not v1
+- ❌ TLS/DTLS transport — plain UDP for v1
+- ❌ SHA-256 / SHA-384 MESSAGE-INTEGRITY — coturn defaults to SHA1
+- ❌ ALTERNATE-SERVER redirect handling
+
+Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration pins) — for real coturn interop you should test against your own server.
+
+Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
 ### Agent (Worker Daemon)
 

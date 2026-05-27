@@ -1,0 +1,143 @@
+#!/usr/bin/env stryke
+#
+# Stryke-to-stryke P2P with TURN-relay fallback for symmetric NATs.
+#
+# Three modes, by argument:
+#
+#   stryke examples/turn_relay_chat.stk classify
+#     → just classify the local NAT and exit. Useful for "do I need TURN
+#       at all?" diagnostics.
+#
+#   stryke examples/turn_relay_chat.stk listen TURN_HOST TURN_PORT USER PASS
+#     → allocate a TURN relay, print our relay address, wait for messages.
+#
+#   stryke examples/turn_relay_chat.stk send TURN_HOST TURN_PORT USER PASS \
+#         PEER_RELAY_IP PEER_RELAY_PORT MESSAGE
+#     → allocate our OWN TURN relay, install permission for the peer's
+#       relay address, send MESSAGE, wait briefly for a reply.
+#
+# Why TURN: pure hole-punching (`punch`) fails ~20-30% of the time on
+# symmetric NATs (mobile carriers, some corporate firewalls). TURN
+# routes every packet through a public relay server you trust, so it
+# works regardless of NAT type — at the cost of one network hop and the
+# bandwidth budget of whoever runs the TURN server.
+#
+# You need credentials for a TURN server. Public free TURN servers
+# rotate frequently; the most reliable route is running your own coturn
+# (https://github.com/coturn/coturn) or paying a service.
+
+my $mode = $ARGV[0] // "classify"
+
+if ($mode eq "classify") {
+    my $sock = udp_open()
+    if ($sock == 0) { p "bind failed"; exit 1 }
+    my $nat = stun_classify($sock)
+    udp_close($sock)
+    printf "NAT type: %s (succeeded %d of %d STUN queries)\n",
+        $nat->{nat_type}, $nat->{succeeded}, $nat->{queried}
+    if ($nat->{nat_type} eq "symmetric") {
+        p "→ Hole-punching WILL FAIL. Use TURN relay mode instead."
+    } elsif ($nat->{nat_type} eq "cone") {
+        p "→ Hole-punching SHOULD WORK. TURN is unnecessary unless the peer"
+        p "  is also symmetric, which neither side can detect alone."
+    } else {
+        p "→ NAT classification incomplete (fewer than 2 STUN servers reached)."
+        p "  Try TURN if punch fails."
+    }
+    exit 0
+}
+
+# Common setup for listen/send modes.
+my $turn_host = $ARGV[1]
+my $turn_port = $ARGV[2]
+my $user      = $ARGV[3]
+my $pass      = $ARGV[4]
+if (!defined $turn_host || !defined $turn_port || !defined $user || !defined $pass) {
+    p "usage:"
+    p "  classify mode: stryke examples/turn_relay_chat.stk classify"
+    p "  listen mode  : stryke examples/turn_relay_chat.stk listen \\"
+    p "                   TURN_HOST TURN_PORT USER PASS"
+    p "  send mode    : stryke examples/turn_relay_chat.stk send \\"
+    p "                   TURN_HOST TURN_PORT USER PASS \\"
+    p "                   PEER_RELAY_IP PEER_RELAY_PORT MESSAGE"
+    exit 1
+}
+
+my $sock = udp_open()
+if ($sock == 0) { p "bind failed"; exit 1 }
+
+printf "Allocating TURN relay at %s:%s …\n", $turn_host, $turn_port
+my $alloc = turn_allocate($sock, $turn_host, $turn_port, $user, $pass, 5000)
+if (!defined $alloc) {
+    p "TURN allocation failed — check credentials and that $turn_host:$turn_port is reachable."
+    udp_close($sock)
+    exit 1
+}
+printf "Allocated relay: %s:%d (lifetime %ds, realm '%s')\n",
+    $alloc->{relay_ip}, $alloc->{relay_port},
+    $alloc->{lifetime_secs}, $alloc->{realm}
+
+if ($mode eq "listen") {
+    p "→ Tell peer to: stryke examples/turn_relay_chat.stk send \\"
+    printf "      %s %s %s %s %s %d \"your message\"\n",
+        $turn_host, $turn_port, $user, $pass,
+        $alloc->{relay_ip}, $alloc->{relay_port}
+    p "Waiting for messages (60s timeout per recv) …"
+
+    # Loop and reply. Each round receives one DATA-INDICATION and replies.
+    for my $i (1:5) {
+        my $msg = turn_recv($sock, 60_000)
+        if (!defined $msg) {
+            p "  $i/5 — no message received in 60s, giving up."
+            last
+        }
+        printf "  %d/5 — from %s:%d: %s\n",
+            $i, $msg->{peer_ip}, $msg->{peer_port}, $msg->{payload}
+        # Install permission for the peer's RELAY address so we can reply
+        # via TURN. The first turn_send will piggyback the permission
+        # (server may auto-install on first send), but explicit is safer.
+        turn_permission($sock, $msg->{peer_ip})
+        turn_send($sock, $msg->{peer_ip}, $msg->{peer_port},
+            "ack round $i from listener")
+    }
+    p "Done. Releasing TURN allocation."
+    turn_refresh($sock, 0)
+    udp_close($sock)
+}
+elsif ($mode eq "send") {
+    my $peer_ip   = $ARGV[5]
+    my $peer_port = $ARGV[6]
+    my $message   = $ARGV[7] // "hello via TURN"
+    if (!defined $peer_ip || !defined $peer_port) {
+        p "send mode needs PEER_RELAY_IP PEER_RELAY_PORT MESSAGE"
+        udp_close($sock)
+        exit 1
+    }
+    printf "Installing permission for peer %s …\n", $peer_ip
+    if (!turn_permission($sock, $peer_ip)) {
+        p "permission install failed"
+        udp_close($sock)
+        exit 1
+    }
+    printf "Sending '%s' to %s:%s via TURN relay …\n",
+        $message, $peer_ip, $peer_port
+    my $sent = turn_send($sock, $peer_ip, $peer_port, $message)
+    printf "  %d bytes sent to TURN server\n", $sent
+
+    p "Waiting up to 30s for peer reply …"
+    my $reply = turn_recv($sock, 30_000)
+    if (defined $reply) {
+        printf "  peer replied (%s:%d): %s\n",
+            $reply->{peer_ip}, $reply->{peer_port}, $reply->{payload}
+    } else {
+        p "  no reply (peer not listening, or relay path one-way)"
+    }
+    p "Done. Releasing TURN allocation."
+    turn_refresh($sock, 0)
+    udp_close($sock)
+}
+else {
+    printf "unknown mode: %s\n", $mode
+    udp_close($sock)
+    exit 1
+}
