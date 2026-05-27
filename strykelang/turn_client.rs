@@ -128,16 +128,27 @@ pub struct TurnAllocation {
     pub lifetime_secs: u32,
 }
 
+/// Same time + counter + PID strategy as `nat_punch::fresh_tx_id`. The
+/// counter is what guarantees back-to-back calls within the same
+/// nanosecond produce different IDs — observed empirically in the full
+/// test suite where the time-only XOR-with-PID approach produced
+/// identical consecutive IDs.
 fn fresh_tx_id() -> [u8; 12] {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     let mut id = [0u8; 12];
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    id[0..12].copy_from_slice(&nanos.to_le_bytes()[..12]);
-    let pid = std::process::id() as u64;
-    for (i, b) in pid.to_le_bytes().iter().take(8).enumerate() {
-        id[i] ^= b;
+    let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+    id[0..8].copy_from_slice(&(nanos as u64).to_le_bytes());
+    id[8..12].copy_from_slice(&(counter as u32).to_le_bytes());
+    let pid = std::process::id();
+    let pid_be = pid.to_le_bytes();
+    for i in 0..4 {
+        id[i] ^= pid_be[i];
     }
     id
 }
