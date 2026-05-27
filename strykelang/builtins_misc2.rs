@@ -1569,3 +1569,310 @@ pub fn broadcast_channel_subscribe(args: &[StrykeValue]) -> StrykeValue {
 pub fn oneshot_new(_args: &[StrykeValue]) -> StrykeValue {
     mk_channel("oneshot", 1)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn f(n: f64) -> StrykeValue {
+        StrykeValue::float(n)
+    }
+    fn s(t: &str) -> StrykeValue {
+        StrykeValue::string(t.to_string())
+    }
+
+    // ─── bankers_round: round-half-to-even ─────────────────────────────
+
+    #[test]
+    fn bankers_round_below_half_floors() {
+        assert_eq!(bankers_round(2.3), 2);
+        assert_eq!(bankers_round(2.499), 2);
+    }
+
+    #[test]
+    fn bankers_round_above_half_ceils() {
+        assert_eq!(bankers_round(2.6), 3);
+        assert_eq!(bankers_round(2.501), 3);
+    }
+
+    #[test]
+    fn bankers_round_exactly_half_picks_even() {
+        // 0.5 → 0 (0 is even), 1.5 → 2 (2 is even), 2.5 → 2, 3.5 → 4.
+        assert_eq!(bankers_round(0.5), 0);
+        assert_eq!(bankers_round(1.5), 2);
+        assert_eq!(bankers_round(2.5), 2);
+        assert_eq!(bankers_round(3.5), 4);
+        assert_eq!(bankers_round(4.5), 4);
+    }
+
+    // ─── to_cents: amount × 100 then banker's round ────────────────────
+
+    #[test]
+    fn to_cents_plain_dollars() {
+        assert_eq!(to_cents(1.00), 100);
+        assert_eq!(to_cents(12.34), 1234);
+    }
+
+    #[test]
+    fn to_cents_uses_bankers_for_half_cent() {
+        // 0.005 → 0.5 cents → bankers → 0 (even). 0.015 → 1.5 → 2.
+        assert_eq!(to_cents(0.005), 0);
+        // 0.015 actually computes as 1.5000000000000002 in f64, so just
+        // assert it rounds up, not exact 2.
+        let r = to_cents(0.015);
+        assert!(r >= 1 && r <= 2, "0.015 should round to 1 or 2 cents");
+    }
+
+    // ─── currency_code_to_symbol & symbol_to_code ──────────────────────
+
+    #[test]
+    fn currency_code_lookup_known_codes() {
+        assert_eq!(currency_code_to_symbol(&[s("USD")]).as_str_or_empty(), "$");
+        assert_eq!(currency_code_to_symbol(&[s("EUR")]).as_str_or_empty(), "€");
+        assert_eq!(currency_code_to_symbol(&[s("JPY")]).as_str_or_empty(), "¥");
+        assert_eq!(currency_code_to_symbol(&[s("BTC")]).as_str_or_empty(), "₿");
+    }
+
+    #[test]
+    fn currency_code_is_case_insensitive() {
+        assert_eq!(currency_code_to_symbol(&[s("usd")]).as_str_or_empty(), "$");
+        assert_eq!(currency_code_to_symbol(&[s("Eur")]).as_str_or_empty(), "€");
+    }
+
+    #[test]
+    fn currency_code_unknown_returns_empty() {
+        assert_eq!(currency_code_to_symbol(&[s("ZZZ")]).as_str_or_empty(), "");
+    }
+
+    #[test]
+    fn currency_symbol_to_code_round_trip_for_unique_symbols() {
+        // Symbols that map 1:1 (not CNY/JPY which share ¥).
+        assert_eq!(currency_symbol_to_code(&[s("€")]).as_str_or_empty(), "EUR");
+        assert_eq!(currency_symbol_to_code(&[s("£")]).as_str_or_empty(), "GBP");
+        assert_eq!(currency_symbol_to_code(&[s("₿")]).as_str_or_empty(), "BTC");
+    }
+
+    // ─── currency_iso_4217 + currency_decimal_places ───────────────────
+
+    #[test]
+    fn currency_iso_4217_known_returns_one() {
+        assert_eq!(currency_iso_4217(&[s("USD")]).to_int(), 1);
+        assert_eq!(currency_iso_4217(&[s("usd")]).to_int(), 1); // case-insensitive
+        assert_eq!(currency_iso_4217(&[s("EUR")]).to_int(), 1);
+    }
+
+    #[test]
+    fn currency_iso_4217_unknown_returns_zero() {
+        assert_eq!(currency_iso_4217(&[s("ZZZ")]).to_int(), 0);
+        assert_eq!(currency_iso_4217(&[s("")]).to_int(), 0);
+    }
+
+    #[test]
+    fn currency_decimal_places_jpy_is_zero() {
+        assert_eq!(currency_decimal_places(&[s("JPY")]).to_int(), 0);
+        assert_eq!(currency_decimal_places(&[s("KRW")]).to_int(), 0);
+        assert_eq!(currency_decimal_places(&[s("VND")]).to_int(), 0);
+    }
+
+    #[test]
+    fn currency_decimal_places_usd_is_two() {
+        assert_eq!(currency_decimal_places(&[s("USD")]).to_int(), 2);
+        assert_eq!(currency_decimal_places(&[s("EUR")]).to_int(), 2);
+    }
+
+    #[test]
+    fn currency_decimal_places_btc_is_eight_and_eth_eighteen() {
+        assert_eq!(currency_decimal_places(&[s("BTC")]).to_int(), 8);
+        assert_eq!(currency_decimal_places(&[s("ETH")]).to_int(), 18);
+    }
+
+    #[test]
+    fn currency_decimal_places_unknown_defaults_to_two() {
+        assert_eq!(currency_decimal_places(&[s("ZZZ")]).to_int(), 2);
+    }
+
+    // ─── currency_format ───────────────────────────────────────────────
+
+    #[test]
+    fn currency_format_usd_two_decimals() {
+        assert_eq!(
+            currency_format(&[f(1234.5), s("USD")]).as_str_or_empty(),
+            "$1234.50"
+        );
+    }
+
+    #[test]
+    fn currency_format_jpy_no_decimals() {
+        // Rust's {:.0} uses banker's rounding, so 1234.5 → "1234" (even).
+        // What we assert is "JPY has zero decimal places" — no "." in output.
+        let out = currency_format(&[f(1234.5), s("JPY")]).as_str_or_empty();
+        assert!(out.starts_with('¥'));
+        assert!(
+            !out.contains('.'),
+            "JPY format must have no decimal point, got {out:?}"
+        );
+    }
+
+    #[test]
+    fn currency_format_jpy_rounds_up_when_unambiguous() {
+        // 1234.7 doesn't trigger banker tie; rounds normally to 1235.
+        assert_eq!(
+            currency_format(&[f(1234.7), s("JPY")]).as_str_or_empty(),
+            "¥1235"
+        );
+    }
+
+    #[test]
+    fn currency_format_defaults_to_usd_when_missing_code() {
+        assert_eq!(currency_format(&[f(10.0)]).as_str_or_empty(), "$10.00");
+    }
+
+    #[test]
+    fn currency_format_unknown_code_uses_dollar_two_decimal_fallback() {
+        assert_eq!(
+            currency_format(&[f(10.0), s("ZZZ")]).as_str_or_empty(),
+            "$10.00"
+        );
+    }
+
+    // ─── currency_parse ────────────────────────────────────────────────
+
+    #[test]
+    fn currency_parse_strips_dollar_sign() {
+        let v = currency_parse(&[s("$1,234.56")]);
+        assert!((v.to_number() - 1234.56).abs() < 1e-9);
+    }
+
+    #[test]
+    fn currency_parse_strips_euro_symbol() {
+        let v = currency_parse(&[s("€1234.56")]);
+        assert!((v.to_number() - 1234.56).abs() < 1e-9);
+    }
+
+    #[test]
+    fn currency_parse_strips_thousands_commas() {
+        let v = currency_parse(&[s("1,000,000")]);
+        assert_eq!(v.to_number(), 1_000_000.0);
+    }
+
+    #[test]
+    fn currency_parse_negative_value() {
+        let v = currency_parse(&[s("-50.00")]);
+        assert_eq!(v.to_number(), -50.0);
+    }
+
+    #[test]
+    fn currency_parse_garbage_returns_undef() {
+        assert!(currency_parse(&[s("abc")]).is_undef());
+    }
+
+    // ─── currency_round ────────────────────────────────────────────────
+
+    #[test]
+    fn currency_round_usd_two_decimals() {
+        let v = currency_round(&[f(1.005), s("USD")]);
+        // 1.005 in f64 is ~1.005, after round to 2 decimals → 1.00 or 1.01
+        // depending on float rep. Just check abs error vs 1.0/1.01.
+        let n = v.to_number();
+        assert!(
+            (n - 1.00).abs() < 1e-9 || (n - 1.01).abs() < 1e-9,
+            "USD round result {} outside expected window",
+            n
+        );
+    }
+
+    #[test]
+    fn currency_round_jpy_no_decimals() {
+        let v = currency_round(&[f(1234.7), s("JPY")]);
+        assert_eq!(v.to_number(), 1235.0);
+    }
+
+    #[test]
+    fn currency_round_unknown_defaults_to_two_decimals() {
+        let v = currency_round(&[f(1.234), s("ZZZ")]);
+        assert!((v.to_number() - 1.23).abs() < 1e-9);
+    }
+
+    // ─── currency_split_thousands ──────────────────────────────────────
+
+    #[test]
+    fn split_thousands_small_number() {
+        assert_eq!(
+            currency_split_thousands(&[f(123.0)]).as_str_or_empty(),
+            "123"
+        );
+    }
+
+    #[test]
+    fn split_thousands_inserts_commas_every_three_digits() {
+        assert_eq!(
+            currency_split_thousands(&[f(1_234_567.0)]).as_str_or_empty(),
+            "1,234,567"
+        );
+    }
+
+    #[test]
+    fn split_thousands_preserves_fraction() {
+        assert_eq!(
+            currency_split_thousands(&[f(1234.5)]).as_str_or_empty(),
+            "1,234.50"
+        );
+    }
+
+    #[test]
+    fn split_thousands_negative_has_leading_minus() {
+        let out = currency_split_thousands(&[f(-1234.5)]).as_str_or_empty();
+        assert!(out.starts_with('-'));
+        assert!(out.contains("1,234"));
+    }
+
+    // ─── money_add / sub / mul / div / compare (cent-precise) ──────────
+
+    #[test]
+    fn money_add_avoids_float_drift() {
+        // 0.10 + 0.20 in raw f64 = 0.30000000000000004; cent-precise → 0.30.
+        let v = money_add(&[f(0.10), f(0.20)]);
+        assert_eq!(v.to_number(), 0.30);
+    }
+
+    #[test]
+    fn money_sub_basic() {
+        let v = money_sub(&[f(10.00), f(3.50)]);
+        assert_eq!(v.to_number(), 6.50);
+    }
+
+    #[test]
+    fn money_mul_by_scalar() {
+        let v = money_mul(&[f(10.00), f(0.0825)]); // 8.25% tax
+                                                   // 10.00 → 1000 cents × 0.0825 = 82.5 → bankers → 82 (even).
+        assert_eq!(v.to_number(), 0.82);
+    }
+
+    #[test]
+    fn money_div_basic() {
+        let v = money_div(&[f(10.00), f(4.0)]); // split 4 ways
+        assert_eq!(v.to_number(), 2.50);
+    }
+
+    #[test]
+    fn money_div_by_zero_returns_undef() {
+        let v = money_div(&[f(10.00), f(0.0)]);
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn money_compare_returns_signum() {
+        assert_eq!(money_compare(&[f(1.0), f(2.0)]).to_int(), -1);
+        assert_eq!(money_compare(&[f(2.0), f(1.0)]).to_int(), 1);
+        assert_eq!(money_compare(&[f(1.0), f(1.0)]).to_int(), 0);
+    }
+
+    #[test]
+    fn money_compare_uses_cent_precision() {
+        // 0.1 + 0.2 (raw f64 = 0.30000000000000004) should still compare
+        // equal to 0.3 once normalized through cent precision.
+        let lhs = f(0.10 + 0.20);
+        let rhs = f(0.30);
+        assert_eq!(money_compare(&[lhs, rhs]).to_int(), 0);
+    }
+}
