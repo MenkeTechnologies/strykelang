@@ -175,19 +175,32 @@ pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::IpAddr, u16)> {
     None
 }
 
-/// Generate a 12-byte transaction ID from `std::time` jitter — good enough
-/// for client-side STUN where uniqueness within one client is all we need.
+/// Generate a 12-byte transaction ID from time + a process-monotonic
+/// counter + PID. Back-to-back calls within the same nanosecond MUST
+/// produce different IDs — the counter is what guarantees that (time
+/// alone wasn't enough; modern CPUs can issue many calls per nanosecond
+/// granularity, observed empirically in the full test suite).
+///
+/// Layout: bytes 0..8 = time nanos (low 64 bits), bytes 8..12 = atomic
+/// counter (low 32 bits). PID XOR'd into the time region so two
+/// concurrent processes that happen to issue at the same nanosecond
+/// with the same counter value still differ.
 fn fresh_tx_id() -> [u8; 12] {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
     let mut id = [0u8; 12];
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    id[0..16.min(12)].copy_from_slice(&nanos.to_le_bytes()[..12]);
-    // Mix in process id so concurrent processes don't collide.
-    let pid = std::process::id() as u64;
-    for (i, b) in pid.to_le_bytes().iter().take(8).enumerate() {
-        id[i] ^= b;
+    let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+    id[0..8].copy_from_slice(&(nanos as u64).to_le_bytes());
+    id[8..12].copy_from_slice(&(counter as u32).to_le_bytes());
+    let pid = std::process::id();
+    let pid_be = pid.to_le_bytes();
+    for i in 0..4 {
+        id[i] ^= pid_be[i];
     }
     id
 }
