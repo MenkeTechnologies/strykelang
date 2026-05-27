@@ -1,0 +1,108 @@
+#!/usr/bin/env stryke
+
+fn LFU::new($cap) {
+    +{ cap => $cap, store => +{}, freq => +{}, tick => +{}, t => 0 }
+}
+
+fn LFU::get($c, $k) {
+    return undef unless exists $c->{store}->{$k}
+    $c->{freq}->{$k} = $c->{freq}->{$k} + 1
+    $c->{t} = $c->{t} + 1
+    $c->{tick}->{$k} = $c->{t}
+    $c->{store}->{$k}
+}
+
+fn LFU::_evict($c) {
+    my @ks = keys %{$c->{store}}
+    return if len(@ks) == 0
+    my $best = $ks[0]
+    for my $k (@ks) {
+        my $fb = $c->{freq}->{$best}
+        my $fk = $c->{freq}->{$k}
+        if ($fk < $fb || ($fk == $fb && $c->{tick}->{$k} < $c->{tick}->{$best})) {
+            $best = $k
+        }
+    }
+    delete $c->{store}->{$best}
+    delete $c->{freq}->{$best}
+    delete $c->{tick}->{$best}
+}
+
+fn LFU::put($c, $k, $v) {
+    $c->{t} = $c->{t} + 1
+    if (exists $c->{store}->{$k}) {
+        $c->{store}->{$k} = $v
+        $c->{freq}->{$k} = $c->{freq}->{$k} + 1
+        $c->{tick}->{$k} = $c->{t}
+        return
+    }
+    if (len(keys %{$c->{store}}) >= $c->{cap}) {
+        LFU::_evict($c)
+    }
+    $c->{store}->{$k} = $v
+    $c->{freq}->{$k}  = 1
+    $c->{tick}->{$k}  = $c->{t}
+}
+
+fn LFU::size($c) { len(keys %{$c->{store}}) }
+fn LFU::has($c, $k) { exists $c->{store}->{$k} ? 1 : 0 }
+
+# Empty
+my $e = LFU::new(2)
+LFU::size($e) |> aeq 0, "empty"
+(defined LFU::get($e, "x") ? 1 : 0) |> aeq 0, "miss"
+
+# Basic put/get
+my $c = LFU::new(3)
+LFU::put($c, "a", 1)
+LFU::put($c, "b", 2)
+LFU::put($c, "c", 3)
+LFU::size($c) |> aeq 3, "three"
+LFU::get($c, "a") |> aeq 1, "get a"
+LFU::get($c, "b") |> aeq 2, "get b"
+LFU::get($c, "c") |> aeq 3, "get c"
+
+# Update existing keeps key (no eviction)
+LFU::put($c, "a", 10)
+LFU::get($c, "a") |> aeq 10, "updated value"
+LFU::size($c) |> aeq 3, "size unchanged"
+
+# LFU eviction: lowest-freq evicted
+my $c2 = LFU::new(3)
+LFU::put($c2, "a", 1)
+LFU::put($c2, "b", 2)
+LFU::put($c2, "c", 3)
+LFU::get($c2, "a")   # freq a=2
+LFU::get($c2, "a")   # freq a=3
+LFU::get($c2, "b")   # freq b=2
+# freq: a=3, b=2, c=1
+LFU::put($c2, "d", 4)
+LFU::has($c2, "c") |> aeq 0, "c evicted (lowest freq)"
+LFU::has($c2, "a") |> aeq 1, "a kept"
+LFU::has($c2, "b") |> aeq 1, "b kept"
+LFU::has($c2, "d") |> aeq 1, "d added"
+
+# Tie-break by LRU (older tick evicted)
+my $c3 = LFU::new(3)
+LFU::put($c3, "x", 1)
+LFU::put($c3, "y", 2)
+LFU::put($c3, "z", 3)
+# All freq=1, insertion order x,y,z so x is oldest
+LFU::put($c3, "w", 4)
+LFU::has($c3, "x") |> aeq 0, "x evicted on tie"
+LFU::has($c3, "y") |> aeq 1, "y kept"
+LFU::has($c3, "z") |> aeq 1, "z kept"
+LFU::has($c3, "w") |> aeq 1, "w added"
+
+# Capacity 1
+my $c4 = LFU::new(1)
+LFU::put($c4, "a", 1)
+LFU::get($c4, "a") |> aeq 1, "cap1 a"
+LFU::put($c4, "b", 2)
+LFU::has($c4, "a") |> aeq 0, "cap1 evicted a"
+LFU::get($c4, "b") |> aeq 2, "cap1 b"
+
+# Miss returns undef
+(defined LFU::get($c, "ghost") ? 1 : 0) |> aeq 0, "ghost miss"
+
+test_run

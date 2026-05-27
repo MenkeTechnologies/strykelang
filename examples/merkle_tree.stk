@@ -1,0 +1,88 @@
+#!/usr/bin/env stryke
+
+# merkle_tree.stk - Build a Merkle root and inclusion-proof list.
+#
+# Uses a deterministic ASCII hash (sum + xor + len) so tests don't depend
+# on an external crypto library.
+#
+# Run: stryke --no-interop examples/merkle_tree.stk
+
+fn MT::hash($s) {
+    my $h = 0
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = (($h * 31) + $c) % 1000000007
+    }
+    sprintf("%08x", $h)
+}
+
+fn MT::combine($aa, $bb) {
+    MT::hash("(" . $aa . "|" . $bb . ")")
+}
+
+fn MT::build($leaves) {
+    my @first = ()
+    for my $x (@$leaves) { push @first, MT::hash($x) }
+    my @levels = ()
+    my @copy0 = @first
+    push @levels, \@copy0
+    my @level = @first
+    while (len(@level) > 1) {
+        my @next = ()
+        my $i = 0
+        my $n = len(@level)
+        while ($i < $n) {
+            my $left  = $level[$i]
+            my $right = ($i + 1 < $n) ? $level[$i + 1] : $left
+            push @next, MT::combine($left, $right)
+            $i = $i + 2
+        }
+        my @copy = @next
+        push @levels, \@copy
+        @level = @next
+    }
+    +{ levels => \@levels, root => $level[0] }
+}
+
+fn MT::proof($tree, $idx) {
+    my @proof = ()
+    my $levels = $tree->{levels}
+    my $depth = len(@$levels) - 1
+    for my $d (0:$depth-1) {
+        my $level = $levels->[$d]
+        my $sib   = ($idx % 2 == 0) ? $idx + 1 : $idx - 1
+        if ($sib >= len(@$level)) { $sib = $idx }   # odd-leaf duplication
+        my $side  = ($idx % 2 == 0) ? "right" : "left"
+        push @proof, +{ hash => $level->[$sib], side => $side }
+        $idx = int($idx / 2)
+    }
+    \@proof
+}
+
+fn MT::verify($leaf, $proof, $root) {
+    my $h = MT::hash($leaf)
+    for my $step (@$proof) {
+        if ($step->{side} eq "right") {
+            $h = MT::combine($h, $step->{hash})
+        } else {
+            $h = MT::combine($step->{hash}, $h)
+        }
+    }
+    $h eq $root ? 1 : 0
+}
+
+p "=== Merkle Tree Demo ==="
+my @leaves = ("alice", "bob", "carol", "dave")
+my $t = MT::build(\@leaves)
+p "root: " . $t->{root}
+for my $i (0:3) {
+    my $proof = MT::proof($t, $i)
+    my $ok = MT::verify($leaves[$i], $proof, $t->{root})
+    p "leaf " . $i . " (" . $leaves[$i] . "): proof len=" . len(@$proof) . " verify=" . $ok
+}
+
+# Tamper detection
+my $proof0 = MT::proof($t, 0)
+my $bad = MT::verify("eve", $proof0, $t->{root})
+p "tampered leaf 'eve' verifies? " . $bad
