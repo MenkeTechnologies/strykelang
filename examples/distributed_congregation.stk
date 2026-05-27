@@ -1,0 +1,54 @@
+#!/usr/bin/env stryke
+#
+# Scriptable distributed compute — congregation/pray/annex demo.
+#
+# Spawns N stryke worker processes locally via congregation(N), scatters a
+# computation to each via pray(), gathers the results via annex(). The
+# whole loop runs in one .stk file with no manual controller/agent setup,
+# no REPL, no external infrastructure.
+#
+# Usage:
+#   stryke examples/distributed_congregation.stk            # smoke: 2 workers
+#   stryke examples/distributed_congregation.stk 4          # 4 workers
+#   stryke examples/distributed_congregation.stk 8 "fib(20)" # custom code
+#
+# CI-safe: pure loopback, no network, no external deps. Fork-based — Unix
+# only (Windows hits the not-supported error from builtin_congregation).
+#
+# How it works:
+#   1. congregation(N) auto-spawns a controller on 127.0.0.1, forks N agent
+#      child processes that connect back, waits for all N to register.
+#      Returns an array of N session-id integer handles.
+#   2. pray($code, @handles) sends the code string to every handle as an
+#      EVAL frame, returns a divination id.
+#   3. annex($div) blocks for each worker's EVAL_RESULT, returns a hash
+#      keyed by session-id (stringified) with the eval output per worker.
+
+my $n = $ARGV[0] // 2
+my $code = $ARGV[1] // "2 + 3"
+
+printf "── distributed_congregation: N=%d code=%s ──\n", $n, $code
+
+# 1. Spawn N workers locally. Returns an array of session-id handles.
+my @workers = congregation($n)
+printf "spawned %d workers: %s\n", len(@workers), join(",", @workers)
+
+# 2. Scatter the prayer (one EVAL frame per worker, all in parallel).
+my $div = pray $code, @workers
+printf "divination id: %d\n", $div
+
+# 3. Gather results. Hash keys are session-ids (as strings); values are
+#    each worker's eval output string.
+my %answers = annex $div
+for my $sid (sort keys %answers) {
+    printf "  worker %s → %s\n", $sid, $answers{$sid}
+}
+
+# Sanity — every worker should have produced the same answer for a pure
+# expression. Different expressions / per-worker state would diverge.
+my @unique = uniq values %answers
+if (len(@unique) == 1) {
+    printf "✓ all %d workers returned: %s\n", $n, $unique[0]
+} else {
+    printf "✗ workers diverged: %s\n", join(" | ", @unique)
+}

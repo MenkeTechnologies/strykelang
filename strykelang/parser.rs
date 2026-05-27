@@ -13951,6 +13951,13 @@ impl Parser {
             // reflection_registry. Section label kept under 40 chars
             // per build.rs:parse_section_header's length cap.)
             | "burp" | "god" | "swallow" | "ingest"
+            // ── distributed / congregation ─────────────────────────────────
+            // Scriptable distributed-compute primitives. Wrap the existing
+            // controller.rs / agent.rs TCP+bincode infrastructure with a
+            // scatter-gather API. See builtins.rs::builtin_congregation /
+            // builtin_pray / builtin_annex and docs/killer-features-
+            // brainstorm.md "Scriptable Master/Slave" for the full design.
+            | "congregation" | "ordain" | "muster" | "pray" | "annex"
             // ── numerical stability + modern IDs ───────────────────────────
             | "ulid" | "is_ulid" | "ulid_timestamp"
             | "kahan_sum" | "welford_mean" | "welford_variance"
