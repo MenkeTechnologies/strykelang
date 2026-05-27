@@ -5308,6 +5308,11 @@ pub(crate) fn try_builtin(
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
         "controller" => Some(builtin_controller(args)),
         "agent" => Some(builtin_agent(args)),
+        "congregation" => Some(builtin_congregation(args)),
+        "ordain" => Some(builtin_ordain(args)),
+        "muster" => Some(builtin_muster(args)),
+        "pray" => Some(builtin_pray(args)),
+        "annex" => Some(builtin_annex(args)),
         "kick" => Some(builtin_kick(args)),
         "tcp_probe" => Some(builtin_tcp_probe(args)),
         "tcp_banner" => Some(builtin_tcp_banner(args)),
@@ -13054,6 +13059,282 @@ fn builtin_agent(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let name = args.get(1).filter(|v| !v.is_undef()).map(|v| v.to_string());
     let code = crate::agent::run_agent_with_explicit(&host, port, name.as_deref());
     Ok(StrykeValue::integer(code as i64))
+}
+
+// ============================================================================
+//        Scriptable distributed compute — congregation/ordain/muster/
+//        pray/annex. Layered on top of controller.rs's programmatic API
+//        (Controller::spawn → ControllerHandle), and routes worker code
+//        through the existing EvalCommand / EvalResult wire frames in
+//        agent.rs. See docs/killer-features-brainstorm.md "Scriptable
+//        Master/Slave" section for the full vocab + design rationale.
+// ============================================================================
+
+/// `congregation(N)` — spawn N stryke worker processes locally, wait for them
+/// to register with an auto-created controller on `127.0.0.1`, return an
+/// array of N worker handles (the agent session_ids). Sets the current
+/// controller so subsequent `pray` / `annex` calls don't need an explicit
+/// controller handle.
+///
+/// The returned handles are integers — pass them (singly or as a list) to
+/// `pray` to scatter work, then `annex` the resulting divination to collect.
+///
+/// Implementation: fork(2) one child per worker; child re-enters this stryke
+/// process as a connected agent via `run_agent_with_explicit`. Default
+/// connect-wait is 5 seconds — if fewer than N workers register in that
+/// window the call returns an error rather than a short congregation.
+#[cfg(unix)]
+fn builtin_congregation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let n = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(1);
+    if !(1..=10_000).contains(&n) {
+        return Err(StrykeError::runtime(
+            format!("congregation: N must be 1..10000, got {}", n),
+            0,
+        ));
+    }
+    let n = n as usize;
+
+    // 1. Spawn a controller on 127.0.0.1 with an OS-assigned port.
+    let handle = crate::controller::spawn_controller("127.0.0.1", 0).map_err(|e| {
+        StrykeError::runtime(format!("congregation: spawn controller failed: {}", e), 0)
+    })?;
+    let listen_addr = handle.listen_addr();
+    let controller_id = crate::controller::register_controller(Arc::clone(&handle));
+    crate::controller::set_current_controller(controller_id);
+
+    // 2. Fork N agent children. Each child re-enters this stryke process as a
+    //    connected agent pointed at the parent's controller. The accept thread
+    //    in the parent registers them as they connect.
+    let host = listen_addr.ip().to_string();
+    let port = listen_addr.port();
+    for i in 0..n {
+        match unsafe { nix::unistd::fork() } {
+            Ok(nix::unistd::ForkResult::Parent { .. }) => {
+                // Parent: continue spawning.
+            }
+            Ok(nix::unistd::ForkResult::Child) => {
+                // Child: run as an agent against the parent's controller. This
+                // call blocks until disconnect; on return the child exits with
+                // the agent's exit code so its slot in the process table is
+                // reclaimed by reaper logic.
+                let name = format!("congregant-{:03}", i);
+                let code = crate::agent::run_agent_with_explicit(&host, port, Some(&name));
+                std::process::exit(code);
+            }
+            Err(e) => {
+                return Err(StrykeError::runtime(
+                    format!("congregation: fork failed at child {}: {}", i, e),
+                    0,
+                ));
+            }
+        }
+    }
+
+    // 3. Wait for all N agents to register. 5 second cap covers loopback fork
+    //    + connect + AGENT_HELLO comfortably; short-congregation is a real
+    //    error worth surfacing rather than silently working with fewer.
+    if !handle.welcome(n, Duration::from_secs(5)) {
+        return Err(StrykeError::runtime(
+            format!(
+                "congregation: only {}/{} agents registered within 5s",
+                handle.agent_count(),
+                n
+            ),
+            0,
+        ));
+    }
+
+    // 4. Return the session_ids as an array of integer handles.
+    let session_ids = handle.muster();
+    let handles: Vec<StrykeValue> = session_ids
+        .iter()
+        .map(|sid| StrykeValue::integer(*sid as i64))
+        .collect();
+    Ok(StrykeValue::array(handles))
+}
+
+#[cfg(not(unix))]
+fn builtin_congregation(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    Err(StrykeError::runtime(
+        "congregation: requires Unix fork() — not supported on this platform",
+        0,
+    ))
+}
+
+/// `ordain([$name, [$bind, [$port]]])` — explicit lower-level form of
+/// `congregation`. Spawns a controller (no agent processes), returns the
+/// controller handle ID. Use when you want to manage worker lifecycle
+/// yourself (e.g. agents started on remote hosts via `STRYKE_CATHEDRAL`).
+/// Sets the current controller; subsequent `pray` / `annex` route to it.
+fn builtin_ordain(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let _name = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let bind = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "127.0.0.1".to_string());
+    let port = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().clamp(0, 65535) as u16)
+        .unwrap_or(0);
+
+    let handle = crate::controller::spawn_controller(&bind, port)
+        .map_err(|e| StrykeError::runtime(format!("ordain: spawn failed: {}", e), 0))?;
+    let id = crate::controller::register_controller(Arc::clone(&handle));
+    crate::controller::set_current_controller(id);
+    Ok(StrykeValue::integer(id as i64))
+}
+
+/// `muster([$controller_id])` — return the current congregation's worker
+/// handles as an array of session_ids, sorted ascending. With no argument,
+/// uses the current controller (set by the most recent `congregation` or
+/// `ordain` call).
+fn builtin_muster(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let controller_id = match args.first().filter(|v| !v.is_undef()) {
+        Some(v) => v.to_int() as u64,
+        None => crate::controller::get_current_controller().ok_or_else(|| {
+            StrykeError::runtime(
+                "muster: no current controller; call congregation() or ordain() first",
+                0,
+            )
+        })?,
+    };
+    let handle = crate::controller::get_controller(controller_id).ok_or_else(|| {
+        StrykeError::runtime(format!("muster: controller {} not found", controller_id), 0)
+    })?;
+    let ids = handle.muster();
+    let arr: Vec<StrykeValue> = ids
+        .iter()
+        .map(|i| StrykeValue::integer(*i as i64))
+        .collect();
+    Ok(StrykeValue::array(arr))
+}
+
+/// `pray($code_string, @agent_handles)` — scatter `$code_string` to every
+/// agent in `@agent_handles`, return a divination ID for `annex` to consume.
+/// Agents start executing immediately in parallel; this call returns as
+/// soon as the EVAL frame is on every wire (no result waiting).
+///
+/// `@agent_handles` may be passed flat (`pray $code, $h1, $h2, $h3`) or
+/// as an array (`pray $code, @cong`) — both are flattened.
+fn builtin_pray(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let code = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if code.is_empty() {
+        return Err(StrykeError::runtime(
+            "pray: code (first argument) required",
+            0,
+        ));
+    }
+
+    // Flatten any arrays in the remaining args into a single Vec<u64>.
+    let mut agent_ids: Vec<u64> = Vec::new();
+    for v in &args[1..] {
+        if v.is_undef() {
+            continue;
+        }
+        if let Some(arr) = v.as_array_vec() {
+            for item in arr {
+                if !item.is_undef() {
+                    agent_ids.push(item.to_int() as u64);
+                }
+            }
+        } else {
+            agent_ids.push(v.to_int() as u64);
+        }
+    }
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "pray: at least one agent handle required",
+            0,
+        ));
+    }
+
+    let controller_id = crate::controller::get_current_controller().ok_or_else(|| {
+        StrykeError::runtime(
+            "pray: no current controller; call congregation() or ordain() first",
+            0,
+        )
+    })?;
+    let handle = crate::controller::get_controller(controller_id).ok_or_else(|| {
+        StrykeError::runtime(format!("pray: controller {} not found", controller_id), 0)
+    })?;
+
+    let petition_id = handle
+        .scatter(&code, &agent_ids)
+        .map_err(|e| StrykeError::runtime(format!("pray: scatter failed: {}", e), 0))?;
+    let divination_id = crate::controller::register_divination(controller_id, petition_id);
+    Ok(StrykeValue::integer(divination_id as i64))
+}
+
+/// `annex($divination_id [, $timeout_ms])` — block until every agent that
+/// received the prayer has replied (or the per-agent timeout elapses).
+/// Returns a hash keyed by agent session_id (stringified), with the agent's
+/// eval output as the value. Default timeout is 30s per agent.
+///
+/// Consumes the divination — calling `annex` twice on the same ID is an
+/// error. Agents that timed out or disconnected are omitted from the hash
+/// (rather than producing an error or a sentinel value).
+fn builtin_annex(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let divination_id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .ok_or_else(|| {
+            StrykeError::runtime("annex: divination ID (first argument) required", 0)
+        })?;
+    let timeout_ms = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(30_000);
+
+    let (controller_id, petition_id) = crate::controller::unregister_divination(divination_id)
+        .ok_or_else(|| {
+            StrykeError::runtime(
+                format!(
+                    "annex: divination {} not found (already annexed or never created)",
+                    divination_id
+                ),
+                0,
+            )
+        })?;
+    let handle = crate::controller::get_controller(controller_id).ok_or_else(|| {
+        StrykeError::runtime(format!("annex: controller {} gone", controller_id), 0)
+    })?;
+
+    let results = handle
+        .gather(petition_id, Duration::from_millis(timeout_ms))
+        .map_err(|e| StrykeError::runtime(format!("annex: gather failed: {}", e), 0))?;
+
+    // Convert HashMap<session_id, EvalResult> → stryke hash. Keys are
+    // stringified session_ids (stryke hash keys are always strings).
+    let mut hash = indexmap::IndexMap::new();
+    let mut sorted_ids: Vec<u64> = results.keys().copied().collect();
+    sorted_ids.sort_unstable();
+    for sid in sorted_ids {
+        let r = &results[&sid];
+        // Tier 0: value is just the output string. Tier 1 will return a
+        // {ok=>1/0, output=>"..."} hash so error paths are observable.
+        hash.insert(sid.to_string(), StrykeValue::string(r.output.clone()));
+    }
+    Ok(StrykeValue::hash(hash))
 }
 
 /// `kick($host, $port [, $timeout_ms])` — TCP liveness probe. Attempts a
