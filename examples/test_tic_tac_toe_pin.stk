@@ -1,0 +1,121 @@
+#!/usr/bin/env stryke
+
+# Pinning test for tic_tac_toe.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+my @LINES = (
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6],
+)
+
+fn TTT::winner($board) {
+    for my $line (@LINES) {
+        my $aa  = $board->[$line->[0]]
+        my $bb = $board->[$line->[1]]
+        my $cc = $board->[$line->[2]]
+        if ($aa ne "." && $aa eq $bb && $aa eq $cc) {
+            return $aa
+        }
+    }
+    "."
+}
+
+fn TTT::full($board) {
+    for my $cell (@$board) {
+        return 0 if $cell eq "."
+    }
+    1
+}
+
+fn TTT::status($board) {
+    my $w = TTT::winner($board)
+    return "win:$w" if $w ne "."
+    return "draw" if TTT::full($board)
+    "in_progress"
+}
+
+fn TTT::available($board) {
+    my @out = ()
+    my $n = len @$board
+    for my $i (0:$n-1) {
+        push @out, $i if $board->[$i] eq "."
+    }
+    \@out
+}
+
+fn TTT::play($board, $pos, $mark) {
+    my @new = ()
+    for my $x (@$board) { push @new, $x }
+    $new[$pos] = $mark
+    \@new
+}
+
+# ── Empty board ──────────────────────────────────────────────────────────
+
+my $empty = [".",".",".",".",".",".",".",".","."]
+TTT::winner($empty)  |> aeq ".",            "empty: no winner"
+TTT::full($empty)    |> aeq 0,              "empty: not full"
+TTT::status($empty)  |> aeq "in_progress",  "empty: in progress"
+len(@{TTT::available($empty)}) |> aeq 9,    "empty: 9 available"
+
+# ── Row wins ─────────────────────────────────────────────────────────────
+
+TTT::winner(["X","X","X",".",".",".",".",".","."]) |> aeq "X", "row 0 X wins"
+TTT::winner([".",".",".","O","O","O",".",".","."]) |> aeq "O", "row 1 O wins"
+TTT::winner([".",".",".",".",".",".","X","X","X"]) |> aeq "X", "row 2 X wins"
+
+# ── Column wins ──────────────────────────────────────────────────────────
+
+TTT::winner(["X",".",".","X",".",".","X",".","."]) |> aeq "X", "col 0 X wins"
+TTT::winner([".","O",".",".","O",".",".","O","."]) |> aeq "O", "col 1 O wins"
+TTT::winner([".",".","X",".",".","X",".",".","X"]) |> aeq "X", "col 2 X wins"
+
+# ── Diagonal wins ────────────────────────────────────────────────────────
+
+TTT::winner(["X",".",".",".","X",".",".",".","X"]) |> aeq "X", "main diag"
+TTT::winner([".",".","O",".","O",".","O",".","."]) |> aeq "O", "anti diag"
+
+# ── No winner ────────────────────────────────────────────────────────────
+
+TTT::winner(["X","O","X","X","O","O","O","X","X"]) |> aeq ".", "draw: no winner"
+
+# ── Draw detection ───────────────────────────────────────────────────────
+
+my $draw = ["X","X","O","O","O","X","X","O","X"]
+TTT::full($draw)   |> aeq 1,      "draw: full"
+TTT::status($draw) |> aeq "draw", "draw: status"
+
+# ── Available cells ──────────────────────────────────────────────────────
+
+my $partial = ["X",".","O",".","X",".","O",".","."]
+my $avail   = TTT::available($partial)
+len(@$avail) |> aeq 5,  "5 cells available"
+join(",", @$avail) |> aeq "1,3,5,7,8", "specific positions"
+
+# ── play() is immutable (returns new board) ──────────────────────────────
+
+my $b0 = [".",".",".",".",".",".",".",".","."]
+my $b1 = TTT::play($b0, 4, "X")
+$b1->[4] |> aeq "X", "play sets cell"
+$b0->[4] |> aeq ".", "original unmodified"
+
+my $b2 = TTT::play($b1, 0, "O")
+$b2->[0] |> aeq "O", "play 2nd move"
+$b2->[4] |> aeq "X", "first move preserved"
+
+# ── Status pipeline ──────────────────────────────────────────────────────
+
+TTT::status(["X","X",".",".","O",".",".",".","."]) |> aeq "in_progress", "early game"
+
+# Winning move test
+my $almost = ["X","X",".",".","O",".",".",".","O"]
+my $win    = TTT::play($almost, 2, "X")
+TTT::status($win) |> aeq "win:X", "winning move"
+
+# ── Mark consistency ─────────────────────────────────────────────────────
+
+# Only mark matching across full line counts
+TTT::winner(["X","O","X","O","X","O","X","O","X"]) |> aeq "X", "diagonal X (overlapping)"
+
+test_run

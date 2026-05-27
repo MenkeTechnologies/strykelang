@@ -1,0 +1,115 @@
+#!/usr/bin/env stryke
+
+# Pinning test for base_converter.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+my $DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+fn Base::to($n, $base) {
+    return "0" if $n == 0
+    my $neg = $n < 0 ? 1 : 0
+    my $v   = $neg ? 0 - $n : $n
+    my $out = ""
+    while ($v > 0) {
+        my $d = $v % $base
+        $out = $DIGITS[$d] . $out
+        $v = int($v / $base)
+    }
+    $neg ? "-" . $out : $out
+}
+
+fn Base::digit_val($ch) {
+    my $c = uc($ch)
+    my $n = len $DIGITS
+    for my $i (0:$n-1) {
+        return $i if $DIGITS[$i] eq $c
+    }
+    -1
+}
+
+fn Base::from($s, $base) {
+    my $idx = 0
+    my $neg = 0
+    if ($s[0] eq "-") {
+        $neg = 1
+        $idx = 1
+    }
+    my $total = 0
+    my $n = len $s
+    for my $i ($idx:$n-1) {
+        my $d = Base::digit_val($s[$i])
+        $total = $total * $base + $d
+    }
+    $neg ? 0 - $total : $total
+}
+
+# ── to() basics ───────────────────────────────────────────────────────────
+
+Base::to(0, 10)    |> aeq "0",      "0 in base 10"
+Base::to(1, 10)    |> aeq "1",      "1 in base 10"
+Base::to(255, 16)  |> aeq "FF",     "255 in hex"
+Base::to(10, 2)    |> aeq "1010",   "10 in binary"
+Base::to(8, 8)     |> aeq "10",     "8 in octal"
+Base::to(1000, 10) |> aeq "1000",   "1000 in base 10"
+Base::to(35, 36)   |> aeq "Z",      "35 in base 36"
+Base::to(36, 36)   |> aeq "10",     "36 in base 36"
+Base::to(3735928559, 16) |> aeq "DEADBEEF", "deadbeef"
+
+# ── Negative numbers ──────────────────────────────────────────────────────
+
+Base::to(-1, 10)   |> aeq "-1",     "-1 in base 10"
+Base::to(-255, 16) |> aeq "-FF",    "-255 in hex"
+Base::to(-10, 2)   |> aeq "-1010",  "-10 in binary"
+
+# ── digit_val ─────────────────────────────────────────────────────────────
+
+Base::digit_val("0") |> aeq 0,  "digit 0"
+Base::digit_val("9") |> aeq 9,  "digit 9"
+Base::digit_val("A") |> aeq 10, "digit A=10"
+Base::digit_val("F") |> aeq 15, "digit F=15"
+Base::digit_val("Z") |> aeq 35, "digit Z=35"
+Base::digit_val("a") |> aeq 10, "lowercase a=10"
+Base::digit_val("f") |> aeq 15, "lowercase f=15"
+
+# ── from() basics ─────────────────────────────────────────────────────────
+
+Base::from("0", 10)        |> aeq 0,    "parse 0"
+Base::from("FF", 16)       |> aeq 255,  "parse FF=255"
+Base::from("1010", 2)      |> aeq 10,   "parse 1010=10"
+Base::from("100", 8)       |> aeq 64,   "parse 100 oct=64"
+Base::from("1000", 10)     |> aeq 1000, "parse 1000 dec"
+Base::from("DEADBEEF", 16) |> aeq 3735928559, "parse DEADBEEF"
+Base::from("ABCDEF", 16)   |> aeq 11259375, "parse ABCDEF"
+Base::from("Z", 36)        |> aeq 35,   "parse Z=35"
+Base::from("10", 36)       |> aeq 36,   "parse 10 base36 = 36"
+
+# ── from() negatives ──────────────────────────────────────────────────────
+
+Base::from("-FF", 16) |> aeq -255, "parse -FF"
+Base::from("-10", 2)  |> aeq -2,   "parse -10 bin = -2"
+
+# ── Round-trip 0..200 in various bases ────────────────────────────────────
+
+for my $bs (2, 3, 7, 16, 36) {
+    my $all = 1
+    for my $n (0:200) {
+        my $s = Base::to($n, $bs)
+        my $d = Base::from($s, $bs)
+        $all = 0 if $d != $n
+    }
+    $all |> aeq 1, "round-trip 0..200 base $bs"
+}
+
+# ── Round-trip negatives ──────────────────────────────────────────────────
+
+for my $n (-100, -50, -7, -1) {
+    my $s = Base::to($n, 16)
+    Base::from($s, 16) |> aeq $n, "round-trip $n base 16"
+}
+
+# ── Lowercase parsing ─────────────────────────────────────────────────────
+
+Base::from("ff", 16)      |> aeq 255, "parse ff (lowercase)"
+Base::from("deadbeef", 16) |> aeq 3735928559, "parse deadbeef"
+
+test_run

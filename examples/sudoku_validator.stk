@@ -1,0 +1,123 @@
+#!/usr/bin/env stryke
+
+# sudoku_validator.stk - Validate a 9x9 Sudoku board.
+#
+# Demonstrates:
+#   * 2D arrays via array-of-arrayrefs
+#   * Set-based uniqueness via hash
+#   * Nested iteration
+#
+# Run: stryke --no-interop examples/sudoku_validator.stk
+
+fn Sud::has_dupes($cells) {
+    my %seen = ()
+    for my $v (@$cells) {
+        next if $v == 0
+        return 1 if exists $seen{$v}
+        $seen{$v} = 1
+    }
+    0
+}
+
+fn Sud::row($board, $r) {
+    my @cells = ()
+    for my $c (0:8) { push @cells, $board->[$r][$c] }
+    \@cells
+}
+
+fn Sud::col($board, $c) {
+    my @cells = ()
+    for my $r (0:8) { push @cells, $board->[$r][$c] }
+    \@cells
+}
+
+fn Sud::box($board, $br, $bc) {
+    my @cells = ()
+    for my $r (0:2) {
+        for my $c (0:2) {
+            push @cells, $board->[$br * 3 + $r][$bc * 3 + $c]
+        }
+    }
+    \@cells
+}
+
+fn Sud::valid($board) {
+    for my $i (0:8) {
+        return 0 if Sud::has_dupes(Sud::row($board, $i))
+        return 0 if Sud::has_dupes(Sud::col($board, $i))
+    }
+    for my $br (0:2) {
+        for my $bc (0:2) {
+            return 0 if Sud::has_dupes(Sud::box($board, $br, $bc))
+        }
+    }
+    1
+}
+
+fn Sud::print_board($board) {
+    for my $r (0:8) {
+        my @row = ()
+        for my $c (0:8) {
+            my $v = $board->[$r][$c]
+            push @row, $v == 0 ? "." : "$v"
+        }
+        p "  " . join(" ", @row)
+    }
+}
+
+p "==============================================="
+p " Stryke Sudoku Validator Demo"
+p "==============================================="
+p ""
+
+my $partial = [
+    [5,3,0, 0,7,0, 0,0,0],
+    [6,0,0, 1,9,5, 0,0,0],
+    [0,9,8, 0,0,0, 0,6,0],
+    [8,0,0, 0,6,0, 0,0,3],
+    [4,0,0, 8,0,3, 0,0,1],
+    [7,0,0, 0,2,0, 0,0,6],
+    [0,6,0, 0,0,0, 2,8,0],
+    [0,0,0, 4,1,9, 0,0,5],
+    [0,0,0, 0,8,0, 0,7,9],
+]
+
+p "── Partial board (valid in-progress) ──────────"
+Sud::print_board($partial)
+my $r1 = Sud::valid($partial) ? "VALID" : "INVALID"
+p ""
+p "  result: $r1"
+
+my $bad = [
+    [5,3,0, 0,7,0, 0,0,0],
+    [6,0,0, 1,9,5, 0,0,0],
+    [0,9,8, 0,0,0, 0,6,0],
+    [8,0,0, 0,6,0, 0,0,3],
+    [4,0,0, 8,0,3, 0,0,1],
+    [7,0,0, 0,2,0, 0,0,6],
+    [0,6,0, 0,0,0, 2,8,0],
+    [0,0,0, 4,1,9, 0,0,5],
+    [0,0,0, 0,8,0, 0,7,5],   # duplicate 5 in col 8
+]
+
+p ""
+p "── Bad board (dup 5 in last col) ──────────────"
+my $r2 = Sud::valid($bad) ? "VALID" : "INVALID"
+p "  result: $r2"
+
+my $solved = [
+    [5,3,4, 6,7,8, 9,1,2],
+    [6,7,2, 1,9,5, 3,4,8],
+    [1,9,8, 3,4,2, 5,6,7],
+    [8,5,9, 7,6,1, 4,2,3],
+    [4,2,6, 8,5,3, 7,9,1],
+    [7,1,3, 9,2,4, 8,5,6],
+    [9,6,1, 5,3,7, 2,8,4],
+    [2,8,7, 4,1,9, 6,3,5],
+    [3,4,5, 2,8,6, 1,7,9],
+]
+
+p ""
+p "── Completed valid board ─────────────────────"
+my $r3 = Sud::valid($solved) ? "VALID" : "INVALID"
+p "  result: $r3"

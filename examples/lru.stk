@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+
+# lru.stk - Least-Recently-Used cache with capacity bound.
+#
+# Demonstrates:
+#   * Hash for O(1) lookup
+#   * Array as recency queue
+#   * Capacity-based eviction
+#
+# Run: stryke --no-interop examples/lru.stk
+
+fn LRU::new($cap) {
+    +{ cap => $cap, store => +{}, order => [] }
+}
+
+fn LRU::touch($cache, $key) {
+    my @new_order = ()
+    for my $k (@{$cache->{order}}) {
+        push @new_order, $k if $k ne $key
+    }
+    push @new_order, $key
+    $cache->{order} = \@new_order
+}
+
+fn LRU::get($cache, $key) {
+    return undef unless exists $cache->{store}->{$key}
+    LRU::touch($cache, $key)
+    $cache->{store}->{$key}
+}
+
+fn LRU::put($cache, $key, $val) {
+    if (exists $cache->{store}->{$key}) {
+        $cache->{store}->{$key} = $val
+        LRU::touch($cache, $key)
+        return
+    }
+    $cache->{store}->{$key} = $val
+    push @{$cache->{order}}, $key
+    while (len(@{$cache->{order}}) > $cache->{cap}) {
+        my $evict = shift @{$cache->{order}}
+        delete $cache->{store}->{$evict}
+    }
+}
+
+fn LRU::keys($cache) { $cache->{order} }
+fn LRU::size($cache) { len @{$cache->{order}} }
+
+p "==============================================="
+p " Stryke LRU Cache Demo (capacity = 3)"
+p "==============================================="
+p ""
+
+my $c = LRU::new(3)
+
+LRU::put($c, "a", 1)
+LRU::put($c, "b", 2)
+LRU::put($c, "c", 3)
+p "After put a,b,c:"
+p "  keys: " . join(",", @{LRU::keys($c)})
+
+my $v = LRU::get($c, "a")
+p ""
+p "After get(a) = $v:"
+p "  keys: " . join(",", @{LRU::keys($c)})
+
+LRU::put($c, "d", 4)
+p ""
+p "After put d (evicts LRU):"
+p "  keys: " . join(",", @{LRU::keys($c)})
+p "  b still present? " . (defined LRU::get($c, "b") ? "yes" : "no - evicted")
+
+LRU::put($c, "a", 99)
+p ""
+p "After put a=99 (update):"
+my $sz = LRU::size($c)
+p "  size: $sz"
+my $av = LRU::get($c, "a")
+p "  a = $av"
