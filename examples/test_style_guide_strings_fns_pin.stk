@@ -24,7 +24,7 @@ my $base = "file"
 
 # Nested `#{}` — expression inside expression.
 my $n = 5
-my $fact = (1:$n) |> reduce { $a * $b }
+my $fact = (1:$n) |> reduce { _ * _1 }
 "factorial $n! = $fact" |> aeq "factorial 5! = 120", "factorial via reduce + interp"
 
 # ── § 3. Function definition forms ─────────────────────────────────────────
@@ -105,7 +105,8 @@ $counter |> aeq 5000, "pfor + mysync counter"
 # ── Builtin-name shadowing — namespaced fn ok, bare not ────────────────────
 # `fn helper` is fine because nothing called `helper` exists in %b.
 # Verify by querying %b.
-exists($b{helper}) |> aeq 0, "no builtin named `helper` to shadow"
+my %_bcopy = %b
+exists($_bcopy{helper}) |> aeq 0, "no builtin named `helper` to shadow"
 
 fn helper = _ + 100
 helper(5) |> aeq 105, "user-defined `helper` callable when not a builtin"
