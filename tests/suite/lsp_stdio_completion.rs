@@ -1554,7 +1554,10 @@ fn audit_goto_definition_struct_lands_on_struct_name() {
         .pointer("/range/start/character")
         .and_then(Value::as_u64)
         .unwrap_or_else(|| panic!("no struct goto definition: {r}"));
-    assert_eq!(character, 13, "expected col 13 (start of `Point`), got: {r}");
+    assert_eq!(
+        character, 13,
+        "expected col 13 (start of `Point`), got: {r}"
+    );
 }
 
 /// Go to Declaration on an enum variant (`Op::Add`) must land on the

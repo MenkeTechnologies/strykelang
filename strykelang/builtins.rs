@@ -1151,8 +1151,7 @@ pub(crate) fn try_builtin(
     // Fast path: `LEDGER_ACTIVE` is `false` (no `mark` ever called in this
     // process) → the `iter().any` is skipped, single-branch overhead per
     // dispatch. See `provenance::record_op` for the propagation logic.
-    let prov_record = crate::provenance::LEDGER_ACTIVE
-        .load(std::sync::atomic::Ordering::Relaxed)
+    let prov_record = crate::provenance::LEDGER_ACTIVE.load(std::sync::atomic::Ordering::Relaxed)
         && !matches!(name, "mark" | "provenance" | "unmark")
         && args.iter().any(crate::provenance::is_marked);
 
@@ -6508,7 +6507,9 @@ pub(crate) fn try_builtin(
         "bounding_box" | "bbox" => Some(builtin_bounding_box(args)),
         "centroid" => Some(builtin_centroid(args)),
         "polygon_perimeter" | "polyperim" | "polyper" => Some(builtin_polygon_perimeter(args)),
-        "circle_from_three_points" | "circ3pt" | "circ3" => Some(builtin_circle_from_three_points(args)),
+        "circle_from_three_points" | "circ3pt" | "circ3" => {
+            Some(builtin_circle_from_three_points(args))
+        }
         "arc_length" | "arclen" => Some(builtin_arc_length(args)),
         "sector_area" | "sectarea" => Some(builtin_sector_area(args)),
         "torus_volume" | "torusvol" => Some(builtin_torus_volume(args)),
@@ -13045,10 +13046,7 @@ fn builtin_agent(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         },
         None => (addr.clone(), 9999),
     };
-    let name = args
-        .get(1)
-        .filter(|v| !v.is_undef())
-        .map(|v| v.to_string());
+    let name = args.get(1).filter(|v| !v.is_undef()).map(|v| v.to_string());
     let code = crate::agent::run_agent_with_explicit(&host, port, name.as_deref());
     Ok(StrykeValue::integer(code as i64))
 }
@@ -13342,14 +13340,8 @@ fn builtin_udp_recv_from(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     };
     let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
     m.insert("payload".into(), payload);
-    m.insert(
-        "src_ip".into(),
-        StrykeValue::string(src.ip().to_string()),
-    );
-    m.insert(
-        "src_port".into(),
-        StrykeValue::integer(src.port() as i64),
-    );
+    m.insert("src_ip".into(), StrykeValue::string(src.ip().to_string()));
+    m.insert("src_port".into(), StrykeValue::integer(src.port() as i64));
     Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
 }
 
@@ -13521,15 +13513,15 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
             .map(|(h, p)| ((*h).to_string(), *p))
             .collect();
     }
-    let servers: Vec<(&str, u16)> = server_owned
-        .iter()
-        .map(|(h, p)| (h.as_str(), *p))
-        .collect();
+    let servers: Vec<(&str, u16)> = server_owned.iter().map(|(h, p)| (h.as_str(), *p)).collect();
 
     let result = crate::nat_punch::classify_nat(id, &servers, Duration::from_millis(timeout_ms));
 
     let mut top: IndexMap<String, StrykeValue> = IndexMap::new();
-    top.insert("nat_type".into(), StrykeValue::string(result.nat_type.into()));
+    top.insert(
+        "nat_type".into(),
+        StrykeValue::string(result.nat_type.into()),
+    );
     top.insert(
         "public_ip".into(),
         match result.public_ip {
@@ -13537,7 +13529,10 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
             None => StrykeValue::UNDEF,
         },
     );
-    top.insert("queried".into(), StrykeValue::integer(result.queried as i64));
+    top.insert(
+        "queried".into(),
+        StrykeValue::integer(result.queried as i64),
+    );
     top.insert(
         "succeeded".into(),
         StrykeValue::integer(result.succeeded as i64),
@@ -13710,13 +13705,10 @@ fn builtin_punch(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 // allocation against the TURN server. The 5 turn_* builtins look up the
 // allocation by socket_id and delegate to crate::turn_client.
 
-fn turn_alloc_pool() -> &'static std::sync::Mutex<
-    std::collections::HashMap<u64, crate::turn_client::TurnAllocation>,
-> {
+fn turn_alloc_pool(
+) -> &'static std::sync::Mutex<std::collections::HashMap<u64, crate::turn_client::TurnAllocation>> {
     static POOL: std::sync::OnceLock<
-        std::sync::Mutex<
-            std::collections::HashMap<u64, crate::turn_client::TurnAllocation>,
-        >,
+        std::sync::Mutex<std::collections::HashMap<u64, crate::turn_client::TurnAllocation>>,
     > = std::sync::OnceLock::new();
     POOL.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
@@ -13846,11 +13838,8 @@ fn builtin_turn_permission(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let Some(alloc) = turn_alloc_get(id) else {
         return Ok(StrykeValue::integer(0));
     };
-    let ok = crate::turn_client::create_permission(
-        &alloc,
-        peer_ip,
-        Duration::from_millis(timeout_ms),
-    );
+    let ok =
+        crate::turn_client::create_permission(&alloc, peer_ip, Duration::from_millis(timeout_ms));
     Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
 }
 
@@ -13929,27 +13918,19 @@ fn builtin_turn_recv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let Some(alloc) = turn_alloc_get(id) else {
         return Ok(StrykeValue::UNDEF);
     };
-    let (peer_ip, peer_port, payload) = match crate::turn_client::recv_indication(
-        &alloc,
-        Duration::from_millis(timeout_ms),
-    ) {
-        Some(r) => r,
-        None => return Ok(StrykeValue::UNDEF),
-    };
+    let (peer_ip, peer_port, payload) =
+        match crate::turn_client::recv_indication(&alloc, Duration::from_millis(timeout_ms)) {
+            Some(r) => r,
+            None => return Ok(StrykeValue::UNDEF),
+        };
     let payload_v = match String::from_utf8(payload.clone()) {
         Ok(s) => StrykeValue::string(s),
         Err(_) => StrykeValue::bytes(StdArc::new(payload)),
     };
     let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
     m.insert("payload".into(), payload_v);
-    m.insert(
-        "peer_ip".into(),
-        StrykeValue::string(peer_ip.to_string()),
-    );
-    m.insert(
-        "peer_port".into(),
-        StrykeValue::integer(peer_port as i64),
-    );
+    m.insert("peer_ip".into(), StrykeValue::string(peer_ip.to_string()));
+    m.insert("peer_port".into(), StrykeValue::integer(peer_port as i64));
     Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
 }
 
@@ -14090,10 +14071,7 @@ fn builtin_reveal(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue
 /// before calling `hide`.
 fn builtin_hide_capacity(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> {
     if args.is_empty() {
-        return Err(StrykeError::runtime(
-            "hide_capacity needs a CARRIER",
-            line,
-        ));
+        return Err(StrykeError::runtime("hide_capacity needs a CARRIER", line));
     }
     let carrier_bytes = stego_value_to_bytes(&args[0]);
     let bits = if crate::stego::is_png(&carrier_bytes) {
@@ -39256,9 +39234,8 @@ fn builtin_syscall(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
     }
     #[cfg(target_os = "macos")]
-    let r = unsafe {
-        libc::syscall(num_raw as libc::c_int, a[0], a[1], a[2], a[3], a[4], a[5]) as i64
-    };
+    let r =
+        unsafe { libc::syscall(num_raw as libc::c_int, a[0], a[1], a[2], a[3], a[4], a[5]) as i64 };
     #[cfg(all(unix, not(target_os = "macos")))]
     let r = unsafe {
         libc::syscall(num_raw as libc::c_long, a[0], a[1], a[2], a[3], a[4], a[5]) as i64

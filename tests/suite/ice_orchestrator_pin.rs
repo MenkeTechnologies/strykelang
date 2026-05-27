@@ -148,8 +148,13 @@ fn ice_connect_returns_failure_hash_when_no_rung_works() {
     let dead = probe.local_addr().unwrap().port();
     drop(probe);
 
-    let orch = std::fs::read_to_string("examples/ice_orchestrator.stk")
-        .expect("read");
+    let orch_path = {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("examples/ice_orchestrator.stk");
+        p
+    };
+    let orch = std::fs::read_to_string(&orch_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", orch_path.display()));
     let cutoff = orch
         .find("# ── Demo")
         .or_else(|| orch.find("package main"))

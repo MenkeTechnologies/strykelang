@@ -215,12 +215,7 @@ pub fn is_marked(v: &StrykeValue) -> bool {
 ///   $a = mark({ ... })            ← origin
 ///   $b = some_builtin($a)         ← record_op(b, "some_builtin", [a]) carries ops from a
 ///   $c = another_builtin($b)      ← record_op(c, ...) carries ops from b (which has a's origin)
-pub fn record_op(
-    result: &StrykeValue,
-    op: &str,
-    args: &[StrykeValue],
-    line: usize,
-) {
+pub fn record_op(result: &StrykeValue, op: &str, args: &[StrykeValue], line: usize) {
     let Some(result_ptr) = value_arc_ptr(result) else {
         return;
     };
@@ -403,7 +398,10 @@ mod tests {
         let final_v = StrykeValue::bytes(Arc::new(vec![1u8, 2, 3]));
         record_op(&final_v, "pack", &[intermediate.clone()], 12);
         let n2 = lookup(&final_v).expect("final inherited extended lineage");
-        assert_eq!(n2.origin_line, 10, "origin still points at original mark site");
+        assert_eq!(
+            n2.origin_line, 10,
+            "origin still points at original mark site"
+        );
         assert_eq!(n2.ops.len(), 2, "chain length is op count, not just last");
         assert_eq!(n2.ops[1].op, "pack");
     }
@@ -414,6 +412,9 @@ mod tests {
         let b = StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())));
         // Neither marked.
         record_op(&b, "noop_demo", &[a.clone()], 1);
-        assert!(lookup(&b).is_none(), "result must not gain a lineage from unmarked args");
+        assert!(
+            lookup(&b).is_none(),
+            "result must not gain a lineage from unmarked args"
+        );
     }
 }

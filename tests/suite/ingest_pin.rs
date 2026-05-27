@@ -126,7 +126,10 @@ fn ingest_flattens_symlink_to_real_path() {
     );
     let ok = eval_int(&code);
     rm_rf(&dir);
-    assert_eq!(ok, 1, "ingest must canonicalize symlinks to their real paths");
+    assert_eq!(
+        ok, 1,
+        "ingest must canonicalize symlinks to their real paths"
+    );
 }
 
 #[test]

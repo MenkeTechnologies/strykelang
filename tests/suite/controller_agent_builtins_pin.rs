@@ -183,17 +183,13 @@ fn agent_builtin_end_to_end_hello_handshake_and_clean_shutdown() {
             message: "welcome".to_string(),
         };
         let ack_bytes = bincode::serialize(&ack).expect("serialize ack");
-        write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &ack_bytes)
-            .expect("write HELLO_ACK");
+        write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &ack_bytes).expect("write HELLO_ACK");
         write_frame(&mut stream, frame_kind::SHUTDOWN, &[]).expect("write SHUTDOWN");
         // Let the agent process SHUTDOWN — connection drops when `stream`
         // falls out of scope here.
     });
 
-    let code = format!(
-        r#"agent("127.0.0.1:{}", "e2e-smoke-agent")"#,
-        port
-    );
+    let code = format!(r#"agent("127.0.0.1:{}", "e2e-smoke-agent")"#, port);
     let start = std::time::Instant::now();
     let exit = eval_int(&code);
     let elapsed = start.elapsed();

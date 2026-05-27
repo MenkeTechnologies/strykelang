@@ -932,9 +932,7 @@ pub fn swallow_to_hash(pattern: &str) -> io::Result<StrykeValue> {
                 format!("swallow: not a regular file: {}", p),
             ));
         }
-        let canon = std::fs::canonicalize(p)?
-            .to_string_lossy()
-            .into_owned();
+        let canon = std::fs::canonicalize(p)?.to_string_lossy().into_owned();
         let bytes = read_file_bytes(p)?;
         out.insert(canon, StrykeValue::bytes(bytes));
     }
@@ -996,11 +994,7 @@ pub fn ingest_iterator(pattern: &str) -> io::Result<StrykeValue> {
                 format!("ingest: not a regular file: {}", p),
             ));
         }
-        canon.push(
-            std::fs::canonicalize(p)?
-                .to_string_lossy()
-                .into_owned(),
-        );
+        canon.push(std::fs::canonicalize(p)?.to_string_lossy().into_owned());
     }
     Ok(StrykeValue::iterator(Arc::new(IngestIterator::new(canon))))
 }
@@ -1017,7 +1011,9 @@ pub fn ingest_iterator(pattern: &str) -> io::Result<StrykeValue> {
 /// entries.
 pub fn burp_hash_to_disk(v: &StrykeValue) -> io::Result<i64> {
     let entries: Vec<(String, Vec<u8>)> = if let Some(h) = v.as_hash_map() {
-        h.into_iter().map(|(k, val)| (k, value_to_bytes(&val))).collect()
+        h.into_iter()
+            .map(|(k, val)| (k, value_to_bytes(&val)))
+            .collect()
     } else if let Some(href) = v.as_hash_ref() {
         href.read()
             .iter()
@@ -1035,7 +1031,9 @@ pub fn burp_hash_to_disk(v: &StrykeValue) -> io::Result<i64> {
     };
     let mut written: i64 = 0;
     for (path, bytes) in &entries {
-        spurt_path(path, bytes, /*mkdir_parents=*/ true, /*atomic=*/ false)?;
+        spurt_path(
+            path, bytes, /*mkdir_parents=*/ true, /*atomic=*/ false,
+        )?;
         written += 1;
     }
     Ok(written)
