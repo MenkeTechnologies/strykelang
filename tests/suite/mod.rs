@@ -352,6 +352,7 @@ mod subs;
 mod subst_env_interpolate;
 mod substr_pin;
 mod swallow_pin;
+mod teleport_pin;
 mod thread_last_pin;
 mod thread_macro_stage_acceptance;
 mod threading_macro_pin;
