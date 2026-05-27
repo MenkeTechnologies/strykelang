@@ -1,0 +1,109 @@
+#!/usr/bin/env stryke
+
+# treap.stk - Randomized BST keyed by ($key, $priority) with heap-ordered
+# priorities to keep expected height O(log n).
+#
+# Run: stryke --no-interop examples/treap.stk
+
+package TP;
+
+mysync $rng = 12345
+
+fn _rand() {
+    $rng = ($rng * 1103515245 + 12345) % 2147483648
+    $rng
+}
+
+fn _node($k) {
+    { key => $k, prio => TP::_rand(), left => undef, right => undef }
+}
+
+fn _rot_right($t) {
+    my $l = $t->{left}
+    $t->{left} = $l->{right}
+    $l->{right} = $t
+    $l
+}
+
+fn _rot_left($t) {
+    my $r = $t->{right}
+    $t->{right} = $r->{left}
+    $r->{left} = $t
+    $r
+}
+
+fn insert($t, $k) {
+    return TP::_node($k) if !defined $t
+    if ($k < $t->{key}) {
+        $t->{left} = TP::insert($t->{left}, $k)
+        if ($t->{left}->{prio} < $t->{prio}) {
+            return TP::_rot_right($t)
+        }
+    } elsif ($k > $t->{key}) {
+        $t->{right} = TP::insert($t->{right}, $k)
+        if ($t->{right}->{prio} < $t->{prio}) {
+            return TP::_rot_left($t)
+        }
+    }
+    $t
+}
+
+fn contains($t, $k) {
+    return 0 if !defined $t
+    return 1 if $t->{key} == $k
+    return TP::contains($t->{left}, $k) if $k < $t->{key}
+    TP::contains($t->{right}, $k)
+}
+
+fn _inorder($t, $out) {
+    return if !defined $t
+    TP::_inorder($t->{left}, $out)
+    push @$out, $t->{key}
+    TP::_inorder($t->{right}, $out)
+}
+
+fn inorder($t) {
+    my @out = ()
+    TP::_inorder($t, \@out)
+    \@out
+}
+
+fn size($t) {
+    return 0 if !defined $t
+    1 + TP::size($t->{left}) + TP::size($t->{right})
+}
+
+fn height($t) {
+    return 0 if !defined $t
+    my $hl = TP::height($t->{left})
+    my $hr = TP::height($t->{right})
+    1 + ($hl > $hr ? $hl : $hr)
+}
+
+# Heap property: every child priority >= parent priority.
+fn _check_heap($t) {
+    return 1 if !defined $t
+    if (defined $t->{left}) {
+        return 0 if $t->{left}->{prio} < $t->{prio}
+        return 0 if !TP::_check_heap($t->{left})
+    }
+    if (defined $t->{right}) {
+        return 0 if $t->{right}->{prio} < $t->{prio}
+        return 0 if !TP::_check_heap($t->{right})
+    }
+    1
+}
+
+package main;
+
+p "=== Treap Demo ==="
+my $t = undef
+for my $k (5, 2, 8, 1, 7, 3, 9, 4, 6) {
+    $t = TP::insert($t, $k)
+}
+p "size:   " . TP::size($t)
+p "height: " . TP::height($t)
+p "sorted: " . join(",", @{TP::inorder($t)})
+p "heap-ordered: " . TP::_check_heap($t)
+p "contains 7: " . TP::contains($t, 7)
+p "contains 99: " . TP::contains($t, 99)
