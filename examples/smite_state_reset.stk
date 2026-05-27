@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+#
+# smite — destroy worker state without disconnecting. Sets %soul on
+# every worker, licks to verify, smites to reset, licks again to verify
+# the reset took.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── smite (state reset, keep connection) ──"
+
+my @workers = congregation(3)
+printf "spawned %d workers\n", len(@workers)
+
+# 1. Populate %soul on every worker.
+my $set = pray "%main::soul = (k => 'v', count => 42); 'set'", @workers
+my %_acks = annex $set
+
+# 2. Lick — confirm state is there.
+my %before = lick(@workers)
+p "── %soul BEFORE smite ──"
+for my $sid (sort { _ <=> _1 } keys %before) {
+    my $h = $before{$sid}
+    if (ref($h) eq 'HASH' && len(keys %$h) > 0) {
+        my @pairs = map { "$_=$h->{$_}" } sort keys %$h
+        printf "  worker %d: %s\n", $sid, join(" ", @pairs)
+    } else {
+        printf "  worker %d: (empty)\n", $sid
+    }
+}
+
+# 3. Smite — reset %soul and %gift on every worker.
+my $smitten = smite(@workers)
+printf "smite → %d workers acknowledged the reset\n", $smitten
+
+# 4. Lick again — confirm the reset took.
+my %after = lick(@workers)
+p "── %soul AFTER smite ──"
+my $all_empty = 1
+for my $sid (sort { _ <=> _1 } keys %after) {
+    my $h = $after{$sid}
+    my $n = ref($h) eq 'HASH' ? len(keys %$h) : 0
+    printf "  worker %d: %d keys\n", $sid, $n
+    $all_empty = 0 if $n > 0
+}
+p $all_empty ? "✓ smite cleared every worker's %soul" : "✗ some workers still have state"
+
+# 5. Workers are still alive in the roster (smite ≠ excommunicate).
+my @still_alive = muster()
+printf "muster: %d workers still connected after smite\n", len(@still_alive)
+
+excommunicate(@workers)
+p "done"

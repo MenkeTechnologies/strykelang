@@ -13138,6 +13138,13 @@ fn builtin_congregation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let controller_id = crate::controller::register_controller(Arc::clone(&handle));
     crate::controller::set_current_controller(controller_id);
 
+    // Silence the accept-loop's per-agent eprintln during the bulk fork.
+    // Without this, the background accept thread may hold stderr's RefCell
+    // borrowed at the instant the main thread forks; the child inherits a
+    // borrowed RefCell and panics on its first stdio call. Restored after
+    // the welcome() returns.
+    handle.set_quiet_accept(true);
+
     // 2. Fork N agent children. Each child re-enters this stryke process as a
     //    connected agent pointed at the parent's controller. The accept thread
     //    in the parent registers them as they connect.
@@ -13166,15 +13173,24 @@ fn builtin_congregation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
     }
 
-    // 3. Wait for all N agents to register. 5 second cap covers loopback fork
-    //    + connect + AGENT_HELLO comfortably; short-congregation is a real
-    //    error worth surfacing rather than silently working with fewer.
-    if !handle.welcome(n, Duration::from_secs(5)) {
+    // 3. Wait for all N agents to register. Timeout scales with N to handle
+    //    larger congregations on slower hosts: 2s baseline + 100ms per agent.
+    //    For N=10 this is 3s, for N=100 it's 12s, for N=1000 it's 102s.
+    //    Short-congregation is a real error worth surfacing rather than
+    //    silently working with fewer.
+    let welcome_secs = 2u64 + (n as u64 / 10).max(1);
+    let welcomed = handle.welcome(n, Duration::from_secs(welcome_secs));
+    // Restore the REPL UX after the bulk fork — subsequent post-spawn
+    // connections (e.g. profess() from a separately-launched script) get
+    // the normal "[agent connected]" eprintln.
+    handle.set_quiet_accept(false);
+    if !welcomed {
         return Err(StrykeError::runtime(
             format!(
-                "congregation: only {}/{} agents registered within 5s",
+                "congregation: only {}/{} agents registered within {}s",
                 handle.agent_count(),
-                n
+                n,
+                welcome_secs
             ),
             0,
         ));
@@ -13645,7 +13661,13 @@ fn builtin_exhume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         };
         hash.insert(k.clone(), StrykeValue::string(value_str));
     }
-    Ok(StrykeValue::hash(hash))
+    // Return hash_ref (not bare hash) so `%{exhume($path)}` deref works
+    // and `$h = exhume($path); $h->{k}` subscripting works — the standard
+    // Perl idiom for "function returning a complex value." Same pattern
+    // as json_value_to_stryke / interrogate(PID).
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        hash,
+    ))))
 }
 
 /// `smother(\%souls)` — securely zero a local hash. Walks every key and
@@ -13743,6 +13765,10 @@ fn builtin_anoint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let _controller_id = crate::controller::register_controller(Arc::clone(&handle));
     // Intentionally do NOT call set_current_controller here.
 
+    // Same fork-stdio race guard as congregation — quiet the accept-loop
+    // eprintln during the bulk fork burst.
+    handle.set_quiet_accept(true);
+
     let host = listen_addr.ip().to_string();
     let port = listen_addr.port();
     for i in 0..n {
@@ -13762,12 +13788,17 @@ fn builtin_anoint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
     }
 
-    if !handle.welcome(n, Duration::from_secs(5)) {
+    // Timeout scales with N — same formula as congregation().
+    let welcome_secs = 2u64 + (n as u64 / 10).max(1);
+    let welcomed = handle.welcome(n, Duration::from_secs(welcome_secs));
+    handle.set_quiet_accept(false);
+    if !welcomed {
         return Err(StrykeError::runtime(
             format!(
-                "anoint: only {}/{} agents registered within 5s",
+                "anoint: only {}/{} agents registered within {}s",
                 handle.agent_count(),
-                n
+                n,
+                welcome_secs
             ),
             0,
         ));

@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+#
+# Distributed log aggregation — workers count per-event types over their
+# local stream, master scatter-gathers the JSON-encoded counts and sums
+# them across the fleet. Models a real telemetry pipeline (each agent
+# is a server reporting metrics; master is the aggregator).
+#
+# Each worker returns its counts directly via the prayer return value
+# (rather than via %soul + lick), which avoids the %main::soul = %counts
+# assignment-from-EVAL parse limitation in current stryke. Cleaner shape
+# for any MapReduce where each worker can return its result inline.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed log aggregation ──"
+
+my @workers = congregation(4)
+printf "spawned %d workers\n", len(@workers)
+
+# Each worker simulates a service emitting events and returns the JSON-
+# encoded per-event-type counts directly.
+my $simulate = "
+my %counts;
+my \@events = ('http_200', 'http_200', 'http_200', 'http_404', 'http_500', 'http_200');
+for my \$e (\@events) { \$counts{\$e}++ }
+to_json(\\%counts)
+"
+my %replies = harvest $simulate, @workers, 5_000
+
+p "── per-worker event counts ──"
+for my $sid (sort { _ <=> _1 } keys %replies) {
+    my $h = from_json($replies{$sid})
+    if (ref($h) eq 'HASH') {
+        my @pairs = map { "$_=$h->{$_}" } sort keys %$h
+        printf "  worker %d: %s\n", $sid, join(" ", @pairs)
+    }
+}
+
+# Aggregate across the fleet — sum each event type across all workers.
+my %fleet
+for my $sid (keys %replies) {
+    my $h = from_json($replies{$sid})
+    next unless ref($h) eq 'HASH'
+    for my $event (keys %$h) {
+        $fleet{$event} = ($fleet{$event} // 0) + $h->{$event}
+    }
+}
+
+p "── fleet-wide aggregate ──"
+for my $event (sort keys %fleet) {
+    printf "  %-10s %d\n", $event, $fleet{$event}
+}
+
+# Sanity: 4 workers × 4 http_200 each = 16 total.
+p $fleet{http_200} == 16 ? "✓ 4 workers × 4 http_200 = 16" : "✗ aggregation off"
+
+excommunicate(@workers)
+p "done"

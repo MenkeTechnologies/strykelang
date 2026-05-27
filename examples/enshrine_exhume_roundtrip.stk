@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+#
+# enshrine + exhume round-trip — harvest worker state, persist to disk,
+# read it back into a fresh hash, verify identity. Shows the persistence
+# pair: enshrine writes JSON, exhume parses it back.
+#
+# CI-safe: writes to /tmp, no network. Clean under --no-interop.
+
+p "── enshrine + exhume round-trip ──"
+
+my @workers = congregation(2)
+printf "spawned %d workers\n", len(@workers)
+
+# 1. Bestow a config hash and have workers copy it into %soul.
+my %original = (
+    region => "us-east-1",
+    env => "prod",
+    replicas => "3",
+)
+bestow(\%original, @workers)
+my $copy = pray "our %gift; %main::soul = %gift; 'ok'", @workers
+my %_acks = annex $copy
+
+# 2. Lick %soul from one worker — that's the hash we'll enshrine.
+my %souls = lick(@workers)
+my $first_sid = (sort { _ <=> _1 } keys %souls)[0]
+my $soul_ref = $souls{$first_sid}
+
+# 3. Enshrine the soul to disk as JSON.
+my $path = "/tmp/stryke_enshrine_demo_$$.json"
+my $bytes = enshrine($soul_ref, $path)
+printf "enshrined %d bytes → %s\n", $bytes, $path
+
+# 4. Exhume the file back into a fresh hash.
+my $restored_ref = exhume($path)
+p "── exhumed hash ──"
+for my $k (sort keys %$restored_ref) {
+    printf "  %-10s %s\n", $k, $restored_ref->{$k}
+}
+
+# 5. Verify exhumed == original.
+my $all_match = 1
+for my $k (keys %original) {
+    $all_match = 0 unless ($restored_ref->{$k} // "") eq $original{$k}
+}
+p $all_match ? "✓ exhumed hash matches original" : "✗ round-trip lost data"
+
+# 6. Clean up the file.
+unlink $path
+
+excommunicate(@workers)
+p "done"
