@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# semver.stk - Semantic Versioning 2.0.0 parser and comparator.
+# Supports MAJOR.MINOR.PATCH with optional -prerelease and +build.
+#
+# Run: stryke --no-interop examples/semver.stk
+
+package SV;
+
+fn parse($s) {
+    my $rest = $s
+    # Strip optional +build metadata first (ignored for precedence).
+    my $plus = index($rest, "+")
+    my $build = ""
+    if ($plus >= 0) {
+        $build = substr($rest, $plus + 1)
+        $rest = substr($rest, 0, $plus)
+    }
+    # Then optional -prerelease.
+    my $dash = index($rest, "-")
+    my $pre = ""
+    if ($dash >= 0) {
+        $pre = substr($rest, $dash + 1)
+        $rest = substr($rest, 0, $dash)
+    }
+    my @nums = split(/\./, $rest)
+    return undef if len(@nums) != 3
+    for my $nn (@nums) {
+        return undef if $nn !~ /^\d+$/
+    }
+    {
+        major => $nums[0] + 0,
+        minor => $nums[1] + 0,
+        patch => $nums[2] + 0,
+        pre => $pre,
+        build => $build,
+    }
+}
+
+fn format($v) {
+    my $s = $v->{major} . "." . $v->{minor} . "." . $v->{patch}
+    $s = $s . "-" . $v->{pre} if (len $v->{pre}) > 0
+    $s = $s . "+" . $v->{build} if (len $v->{build}) > 0
+    $s
+}
+
+fn _cmp_pre_id($x, $y) {
+    my $xn = $x =~ /^\d+$/
+    my $yn = $y =~ /^\d+$/
+    if ($xn && $yn) {
+        my $av = $x + 0
+        my $bv = $y + 0
+        return -1 if $av < $bv
+        return 1 if $av > $bv
+        return 0
+    }
+    # Numeric identifiers have lower precedence than non-numeric.
+    return -1 if $xn && !$yn
+    return 1 if !$xn && $yn
+    return -1 if $x lt $y
+    return 1 if $x gt $y
+    0
+}
+
+fn compare($av, $bv) {
+    return -1 if $av->{major} < $bv->{major}
+    return 1 if $av->{major} > $bv->{major}
+    return -1 if $av->{minor} < $bv->{minor}
+    return 1 if $av->{minor} > $bv->{minor}
+    return -1 if $av->{patch} < $bv->{patch}
+    return 1 if $av->{patch} > $bv->{patch}
+    # Pre-release rules: version WITH pre-release is LOWER than without.
+    my $ap = len $av->{pre}
+    my $bp = len $bv->{pre}
+    return 1 if $ap == 0 && $bp > 0
+    return -1 if $ap > 0 && $bp == 0
+    return 0 if $ap == 0 && $bp == 0
+    my @ai = split(/\./, $av->{pre})
+    my @bi = split(/\./, $bv->{pre})
+    my $n = len(@ai) < len(@bi) ? len(@ai) : len(@bi)
+    for my $i (0:$n-1) {
+        my $c = SV::_cmp_pre_id($ai[$i], $bi[$i])
+        return $c if $c != 0
+    }
+    return -1 if len(@ai) < len(@bi)
+    return 1 if len(@ai) > len(@bi)
+    0
+}
+
+fn satisfies_caret($v, $base) {
+    # ^X.Y.Z: same major, and (vmajor>0 ? v >= base) else (minor==base.minor && patch>=base.patch)
+    return 0 if $v->{major} != $base->{major}
+    if ($base->{major} > 0) {
+        return SV::compare($v, $base) >= 0 ? 1 : 0
+    }
+    if ($base->{minor} > 0) {
+        return 0 if $v->{minor} != $base->{minor}
+        return SV::compare($v, $base) >= 0 ? 1 : 0
+    }
+    SV::compare($v, $base) == 0 ? 1 : 0
+}
+
+package main;
+
+p "=== SemVer Demo ==="
+for my $s ("1.2.3", "1.0.0-alpha", "1.0.0-rc.1", "1.0.0", "2.0.0+build.42") {
+    my $v = SV::parse($s)
+    p $s . " -> " . SV::format($v)
+}
+
+my @pairs = (
+    ["1.0.0", "2.0.0"],
+    ["1.0.0", "1.0.0"],
+    ["1.0.0-alpha", "1.0.0"],
+    ["1.0.0-alpha", "1.0.0-beta"],
+    ["1.0.0-rc.1", "1.0.0-rc.2"],
+)
+for my $pair (@pairs) {
+    my $aa = SV::parse($pair->[0])
+    my $bb = SV::parse($pair->[1])
+    p $pair->[0] . " vs " . $pair->[1] . " = " . SV::compare($aa, $bb)
+}
+
+my $base = SV::parse("1.2.3")
+for my $sv ("1.2.4", "1.9.0", "1.2.2", "2.0.0") {
+    my $v = SV::parse($sv)
+    p "^1.2.3 satisfied by " . $sv . " ? " . SV::satisfies_caret($v, $base)
+}
