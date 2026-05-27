@@ -1875,4 +1875,246 @@ mod tests {
         let rhs = f(0.30);
         assert_eq!(money_compare(&[lhs, rhs]).to_int(), 0);
     }
+
+    // ─── tokenize_simple / tokenize_word / tokenize_subword / tokenize_sentencepiece ──
+
+    fn out_strings(v: &StrykeValue) -> Vec<String> {
+        list_elements(v).iter().map(|x| x.to_string()).collect()
+    }
+
+    #[test]
+    fn tokenize_simple_splits_on_whitespace() {
+        let out = tokenize_simple(&[s("hello world foo")]);
+        assert_eq!(out_strings(&out), vec!["hello", "world", "foo"]);
+    }
+
+    #[test]
+    fn tokenize_simple_collapses_multiple_spaces() {
+        let out = tokenize_simple(&[s("a  b\t\tc\nd")]);
+        assert_eq!(out_strings(&out), vec!["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn tokenize_simple_empty_input_is_empty() {
+        let out = tokenize_simple(&[s("")]);
+        assert!(out_strings(&out).is_empty());
+    }
+
+    #[test]
+    fn tokenize_word_extracts_word_chars_only() {
+        // \w+ matches [A-Za-z0-9_], strips punctuation.
+        let out = tokenize_word(&[s("hello, world! foo123_bar")]);
+        assert_eq!(out_strings(&out), vec!["hello", "world", "foo123_bar"]);
+    }
+
+    #[test]
+    fn tokenize_word_empty_input_is_empty() {
+        let out = tokenize_word(&[s("")]);
+        assert!(out_strings(&out).is_empty());
+    }
+
+    #[test]
+    fn tokenize_subword_splits_on_non_alphanumeric_then_chunks() {
+        // Default max_len = 4; words longer than 4 chars get chunked.
+        let out = tokenize_subword(&[s("hello world!a-bc"), StrykeValue::integer(4)]);
+        // "hello" → [hell, o], "world" → [worl, d], "a" → [a], "bc" → [bc].
+        let want = vec!["hell", "o", "worl", "d", "a", "bc"];
+        assert_eq!(out_strings(&out), want);
+    }
+
+    #[test]
+    fn tokenize_subword_max_len_clamped_to_one() {
+        // max_len = 0 should clamp to 1 (each char becomes a token).
+        let out = tokenize_subword(&[s("abc"), StrykeValue::integer(0)]);
+        assert_eq!(out_strings(&out), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn tokenize_sentencepiece_prepends_underscore_marker() {
+        // SentencePiece-style: each word gets a leading ▁ (U+2581).
+        let out = tokenize_sentencepiece(&[s("hello world")]);
+        let toks = out_strings(&out);
+        assert_eq!(toks.len(), 2);
+        assert!(toks[0].starts_with('▁'));
+        assert!(toks[1].starts_with('▁'));
+        assert!(toks[0].ends_with("hello"));
+    }
+
+    // ─── tokenize_bpe: byte-pair encoding ─────────────────────────────
+
+    #[test]
+    fn tokenize_bpe_no_merges_returns_individual_chars() {
+        // Empty merges → each char is its own token.
+        use parking_lot::RwLock;
+        use std::sync::Arc;
+        let empty_merges = StrykeValue::array_ref(Arc::new(RwLock::new(vec![])));
+        let out = tokenize_bpe(&[s("abc"), empty_merges]);
+        assert_eq!(out_strings(&out), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn tokenize_bpe_applies_merge_greedy_by_rank() {
+        // Merges: [("a","b")] → "ab" merges. "abc" → "ab", "c".
+        use parking_lot::RwLock;
+        use std::sync::Arc;
+        let pair = StrykeValue::array_ref(Arc::new(RwLock::new(vec![s("a"), s("b")])));
+        let merges = StrykeValue::array_ref(Arc::new(RwLock::new(vec![pair])));
+        let out = tokenize_bpe(&[s("abc"), merges]);
+        assert_eq!(out_strings(&out), vec!["ab", "c"]);
+    }
+
+    // ─── embed_text ────────────────────────────────────────────────────
+
+    #[test]
+    fn embed_text_returns_dim_sized_vector() {
+        let out = embed_text(&[s("hello world"), StrykeValue::integer(32)]);
+        let v = list_elements(&out);
+        assert_eq!(v.len(), 32);
+    }
+
+    #[test]
+    fn embed_text_deterministic_for_same_input() {
+        let a = embed_text(&[s("hello world"), StrykeValue::integer(16)]);
+        let b = embed_text(&[s("hello world"), StrykeValue::integer(16)]);
+        let av: Vec<f64> = list_elements(&a).iter().map(|x| x.to_number()).collect();
+        let bv: Vec<f64> = list_elements(&b).iter().map(|x| x.to_number()).collect();
+        assert_eq!(av, bv);
+    }
+
+    #[test]
+    fn embed_text_empty_input_returns_zero_vector() {
+        let out = embed_text(&[s(""), StrykeValue::integer(8)]);
+        let v: Vec<f64> = list_elements(&out).iter().map(|x| x.to_number()).collect();
+        assert_eq!(v.len(), 8);
+        assert!(v.iter().all(|x| *x == 0.0));
+    }
+
+    #[test]
+    fn embed_text_total_mass_equals_word_count() {
+        // Hashing trick: each word adds 1.0 to exactly one slot. Sum of
+        // all slots = word count.
+        let out = embed_text(&[s("a b c d e"), StrykeValue::integer(64)]);
+        let v: Vec<f64> = list_elements(&out).iter().map(|x| x.to_number()).collect();
+        let sum: f64 = v.iter().sum();
+        assert_eq!(sum, 5.0);
+    }
+
+    // ─── vector distances / dot product / normalize ──────────────────
+
+    fn vec_arg(v: &[f64]) -> StrykeValue {
+        use parking_lot::RwLock;
+        use std::sync::Arc;
+        StrykeValue::array_ref(Arc::new(RwLock::new(
+            v.iter().map(|x| StrykeValue::float(*x)).collect(),
+        )))
+    }
+
+    #[test]
+    fn cosine_similarity_identical_vectors_is_one() {
+        let v = vec_arg(&[1.0, 2.0, 3.0]);
+        let sim = cosine_similarity(&[v.clone(), v]);
+        assert!((sim.to_number() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn cosine_similarity_orthogonal_vectors_is_zero() {
+        let a = vec_arg(&[1.0, 0.0]);
+        let b = vec_arg(&[0.0, 1.0]);
+        assert!((cosine_similarity(&[a, b]).to_number()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn cosine_similarity_opposite_vectors_is_neg_one() {
+        let a = vec_arg(&[1.0, 2.0, 3.0]);
+        let b = vec_arg(&[-1.0, -2.0, -3.0]);
+        assert!((cosine_similarity(&[a, b]).to_number() + 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn cosine_similarity_zero_norm_returns_zero() {
+        // Guard: avoid division by zero.
+        let a = vec_arg(&[0.0, 0.0]);
+        let b = vec_arg(&[1.0, 1.0]);
+        assert_eq!(cosine_similarity(&[a, b]).to_number(), 0.0);
+    }
+
+    #[test]
+    fn cosine_similarity_missing_args_returns_undef() {
+        assert!(cosine_similarity(&[]).is_undef());
+        assert!(cosine_similarity(&[vec_arg(&[1.0])]).is_undef());
+    }
+
+    #[test]
+    fn euclidean_distance_zero_for_identical_vectors() {
+        let v = vec_arg(&[1.0, 2.0, 3.0]);
+        let d = euclidean_distance(&[v.clone(), v]);
+        assert_eq!(d.to_number(), 0.0);
+    }
+
+    #[test]
+    fn euclidean_distance_unit_axis_apart() {
+        // sqrt((1-0)² + (0-0)²) = 1.
+        let a = vec_arg(&[1.0, 0.0]);
+        let b = vec_arg(&[0.0, 0.0]);
+        assert!((euclidean_distance(&[a, b]).to_number() - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn manhattan_distance_sum_of_abs_diffs() {
+        // |3-1| + |4-1| = 2 + 3 = 5.
+        let a = vec_arg(&[3.0, 4.0]);
+        let b = vec_arg(&[1.0, 1.0]);
+        assert_eq!(manhattan_distance(&[a, b]).to_number(), 5.0);
+    }
+
+    #[test]
+    fn manhattan_distance_zero_for_identical() {
+        let v = vec_arg(&[5.0, 10.0]);
+        assert_eq!(manhattan_distance(&[v.clone(), v]).to_number(), 0.0);
+    }
+
+    #[test]
+    fn dot_product_basic() {
+        // [1, 2, 3] · [4, 5, 6] = 4 + 10 + 18 = 32.
+        let a = vec_arg(&[1.0, 2.0, 3.0]);
+        let b = vec_arg(&[4.0, 5.0, 6.0]);
+        assert_eq!(dot_product(&[a, b]).to_number(), 32.0);
+    }
+
+    #[test]
+    fn dot_product_orthogonal_is_zero() {
+        let a = vec_arg(&[1.0, 0.0]);
+        let b = vec_arg(&[0.0, 1.0]);
+        assert_eq!(dot_product(&[a, b]).to_number(), 0.0);
+    }
+
+    #[test]
+    fn dot_product_uses_min_len_when_dims_differ() {
+        // Defensive: take elementwise min(len_a, len_b).
+        let a = vec_arg(&[1.0, 2.0, 3.0, 4.0]);
+        let b = vec_arg(&[2.0, 2.0]);
+        // Only first 2 pairs: 1*2 + 2*2 = 6.
+        assert_eq!(dot_product(&[a, b]).to_number(), 6.0);
+    }
+
+    #[test]
+    fn normalize_vector_unit_length() {
+        // [3, 4] → norm 5 → [0.6, 0.8].
+        let v = vec_arg(&[3.0, 4.0]);
+        let out = normalize_vector(&[v]);
+        let nv: Vec<f64> = list_elements(&out).iter().map(|x| x.to_number()).collect();
+        assert!((nv[0] - 0.6).abs() < 1e-9);
+        assert!((nv[1] - 0.8).abs() < 1e-9);
+        // Norm of result is 1.
+        let n: f64 = nv.iter().map(|x| x * x).sum::<f64>().sqrt();
+        assert!((n - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalize_vector_zero_returns_zero() {
+        let v = vec_arg(&[0.0, 0.0]);
+        let out = normalize_vector(&[v]);
+        let nv: Vec<f64> = list_elements(&out).iter().map(|x| x.to_number()).collect();
+        assert!(nv.iter().all(|x| *x == 0.0));
+    }
 }
