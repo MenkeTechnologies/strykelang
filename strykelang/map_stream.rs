@@ -1683,6 +1683,49 @@ impl StrykeIterator for PGrepStreamIterator {
     }
 }
 
+/// Throttled passthrough — `weep(SOURCE, INTERVAL_MS)`. Each call to
+/// `next_item` pulls one item from the source, then sleeps until
+/// `interval` has elapsed since the previous emission. The first item
+/// emits immediately; only subsequent items are paced. Zero interval
+/// degenerates to a pure passthrough.
+///
+/// `last_emit_at` is held in a `Mutex` because `StrykeIterator::next_item`
+/// takes `&self`; the lock is held across the sleep, which serializes
+/// concurrent consumers (the intended behavior — a "trickle" can't
+/// burst if two callers race).
+pub(crate) struct WeepIterator {
+    source: Arc<dyn StrykeIterator>,
+    interval: std::time::Duration,
+    last_emit_at: Mutex<Option<std::time::Instant>>,
+}
+
+impl WeepIterator {
+    pub(crate) fn new(source: Arc<dyn StrykeIterator>, interval: std::time::Duration) -> Self {
+        Self {
+            source,
+            interval,
+            last_emit_at: Mutex::new(None),
+        }
+    }
+}
+
+impl StrykeIterator for WeepIterator {
+    fn next_item(&self) -> Option<StrykeValue> {
+        let item = self.source.next_item()?;
+        if self.interval.as_nanos() > 0 {
+            let mut last = self.last_emit_at.lock();
+            if let Some(prev) = *last {
+                let elapsed = prev.elapsed();
+                if elapsed < self.interval {
+                    std::thread::sleep(self.interval - elapsed);
+                }
+            }
+            *last = Some(std::time::Instant::now());
+        }
+        Some(item)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

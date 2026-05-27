@@ -14044,6 +14044,10 @@ impl Parser {
             | "turn_recv" | "turn_refresh"
             // ── ipc / shared memory teleport ───────────────────────────────
             | "teleport" | "arrive"
+            // ── peer-pair keepalive ────────────────────────────────────────
+            | "turnbuckle" | "tb_alive" | "tb_ping" | "tb_close"
+            // ── slow-trickle emitter ───────────────────────────────────────
+            | "weep"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
