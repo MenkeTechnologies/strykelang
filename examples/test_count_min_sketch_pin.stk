@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+fn CMS::new($w, $d) {
+    my @rows = ()
+    for my $i (1:$d) {
+        my @row = ()
+        for my $j (1:$w) { push @row, 0 }
+        push @rows, \@row
+    }
+    +{ w => $w, d => $d, table => \@rows }
+}
+
+fn CMS::_h($cms, $row, $s) {
+    my $h = 2166136261 + $row * 2654435761
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = ($h ^ $c)
+        $h = ($h * 16777619) % 4294967296
+    }
+    $h % $cms->{w}
+}
+
+fn CMS::add($cms, $key, $count) {
+    for my $r (0:$cms->{d}-1) {
+        my $idx = CMS::_h($cms, $r, $key)
+        $cms->{table}->[$r]->[$idx] = $cms->{table}->[$r]->[$idx] + $count
+    }
+}
+
+fn CMS::estimate($cms, $key) {
+    my $min = -1
+    for my $r (0:$cms->{d}-1) {
+        my $idx = CMS::_h($cms, $r, $key)
+        my $v = $cms->{table}->[$r]->[$idx]
+        $min = $v if $min < 0 || $v < $min
+    }
+    $min
+}
+
+# Empty sketch returns 0 for any key
+my $e = CMS::new(64, 3)
+CMS::estimate($e, "anything") |> aeq 0, "empty estimate"
+CMS::estimate($e, "")         |> aeq 0, "empty key empty estimate"
+
+# Single increment
+my $s = CMS::new(256, 4)
+CMS::add($s, "x", 1)
+CMS::estimate($s, "x") |> aeq 1, "single add"
+# unknown key estimate <= sketch total mass
+(CMS::estimate($s, "ghost") <= 1 ? 1 : 0) |> aeq 1, "ghost <= mass"
+
+# Exact small alphabet stream → small w/d collision risk; w=512,d=5 should be exact
+my $cms = CMS::new(512, 5)
+my @stream = ("a","b","a","c","a","b","a","d","a")
+for my $x (@stream) { CMS::add($cms, $x, 1) }
+# Count-min is a *lower-bound-friendly upper bound*: est >= true count
+(CMS::estimate($cms, "a") >= 5 ? 1 : 0) |> aeq 1, "a est >= true"
+(CMS::estimate($cms, "b") >= 2 ? 1 : 0) |> aeq 1, "b est >= true"
+(CMS::estimate($cms, "c") >= 1 ? 1 : 0) |> aeq 1, "c est >= true"
+(CMS::estimate($cms, "d") >= 1 ? 1 : 0) |> aeq 1, "d est >= true"
+
+# Determinism: same sketch same input gives same estimate
+CMS::estimate($cms, "a") |> aeq CMS::estimate($cms, "a"), "deterministic est"
+
+# Bulk add
+my $bulk = CMS::new(256, 4)
+CMS::add($bulk, "x", 100)
+(CMS::estimate($bulk, "x") >= 100 ? 1 : 0) |> aeq 1, "bulk add >= 100"
+
+# Add accumulates
+CMS::add($bulk, "x", 50)
+(CMS::estimate($bulk, "x") >= 150 ? 1 : 0) |> aeq 1, "accumulates"
+
+# Estimate is monotone non-decreasing under more adds
+my $before = CMS::estimate($cms, "a")
+CMS::add($cms, "a", 1)
+(CMS::estimate($cms, "a") >= $before ? 1 : 0) |> aeq 1, "monotone"
+
+# Different keys yield different table cells most of the time (high probability)
+# Just verify the sketch returns some non-zero for many keys
+my $c2 = CMS::new(512, 4)
+for my $i (1:100) { CMS::add($c2, "k" . $i, 1) }
+my $nonzero = 0
+for my $i (1:100) {
+    $nonzero = $nonzero + 1 if CMS::estimate($c2, "k" . $i) >= 1
+}
+$nonzero |> aeq 100, "every inserted key has estimate >= 1"
+
+# Sketch dimensions are honored
+$e->{w} |> aeq 64, "width"
+$e->{d} |> aeq 3,  "depth"
+len(@{$e->{table}}) |> aeq 3, "row count"
+len(@{$e->{table}->[0]}) |> aeq 64, "col count"
+
+test_run

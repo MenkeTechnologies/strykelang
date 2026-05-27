@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+
+# consistent_hashing.stk - Ring-based consistent hashing with virtual nodes.
+#
+# Run: stryke --no-interop examples/consistent_hashing.stk
+
+fn CH::hash($s) {
+    my $h = 2166136261
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = ($h ^ $c)
+        $h = ($h * 16777619) % 4294967296
+    }
+    $h
+}
+
+fn CH::new($vnodes) {
+    +{ vnodes => $vnodes, ring => +{}, sorted => [] }
+}
+
+fn CH::_resort($ch) {
+    my @ks = sort { _ <=> _1 } keys %{$ch->{ring}}
+    $ch->{sorted} = \@ks
+}
+
+fn CH::add($ch, $node) {
+    for my $i (1:$ch->{vnodes}) {
+        my $key = $node . "#" . $i
+        my $h   = CH::hash($key)
+        while (exists $ch->{ring}->{$h}) { $h = ($h + 1) % 4294967296 }
+        $ch->{ring}->{$h} = $node
+    }
+    CH::_resort($ch)
+}
+
+fn CH::remove($ch, $node) {
+    my @to_del = ()
+    for my $h (keys %{$ch->{ring}}) {
+        push @to_del, $h if $ch->{ring}->{$h} eq $node
+    }
+    for my $h (@to_del) { delete $ch->{ring}->{$h} }
+    CH::_resort($ch)
+}
+
+fn CH::lookup($ch, $key) {
+    my @sorted = @{$ch->{sorted}}
+    return undef if len(@sorted) == 0
+    my $h = CH::hash($key)
+    for my $rh (@sorted) {
+        return $ch->{ring}->{$rh} if $rh >= $h
+    }
+    $ch->{ring}->{$sorted[0]}
+}
+
+fn CH::nodes($ch) {
+    my %seen = ()
+    for my $h (keys %{$ch->{ring}}) {
+        $seen{$ch->{ring}->{$h}} = 1
+    }
+    my @ns = sort keys %seen
+    \@ns
+}
+
+p "=== Consistent Hashing Demo (vnodes=8) ==="
+my $ch = CH::new(8)
+CH::add($ch, "node-a")
+CH::add($ch, "node-b")
+CH::add($ch, "node-c")
+p "nodes: " . join(",", @{CH::nodes($ch)})
+for my $k ("apple", "banana", "cherry", "date", "eggplant") {
+    p "$k -> " . CH::lookup($ch, $k)
+}
+p "--- remove node-b ---"
+CH::remove($ch, "node-b")
+for my $k ("apple", "banana", "cherry", "date", "eggplant") {
+    p "$k -> " . CH::lookup($ch, $k)
+}
