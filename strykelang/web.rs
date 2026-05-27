@@ -3565,3 +3565,220 @@ fn http_status_text(status: u16) -> &'static str {
         _ => "OK",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(t: &str) -> StrykeValue {
+        StrykeValue::string(t.to_string())
+    }
+
+    // ─── compile_pattern: Rails-style URL pattern → regex ─────────────
+
+    #[test]
+    fn compile_pattern_static_path_anchors_with_caret_dollar() {
+        let (re, caps) = compile_pattern("/posts");
+        assert_eq!(re, "^/posts$");
+        assert!(caps.is_empty());
+    }
+
+    #[test]
+    fn compile_pattern_named_capture_for_colon_segment() {
+        let (re, caps) = compile_pattern("/posts/:id");
+        assert_eq!(re, "^/posts/(?P<__id__>[^/]+)$");
+        assert_eq!(caps, vec!["id"]);
+    }
+
+    #[test]
+    fn compile_pattern_glob_capture_for_star_segment() {
+        let (re, caps) = compile_pattern("/files/*path");
+        // `*name` captures everything (including slashes).
+        assert_eq!(re, "^/files/(?P<__path__>.+)$");
+        assert_eq!(caps, vec!["path"]);
+    }
+
+    #[test]
+    fn compile_pattern_multiple_named_captures_in_order() {
+        let (re, caps) = compile_pattern("/users/:user_id/posts/:post_id");
+        assert!(re.contains("(?P<__user_id__>[^/]+)"));
+        assert!(re.contains("(?P<__post_id__>[^/]+)"));
+        assert_eq!(caps, vec!["user_id", "post_id"]);
+    }
+
+    #[test]
+    fn compile_pattern_colon_without_identifier_passes_through_literal() {
+        // `:` followed by a non-identifier char (or end of string) is
+        // preserved as a literal colon — the route-param branch only fires
+        // when alphanumeric/underscore chars follow the colon.
+        let (re, caps) = compile_pattern("/foo:");
+        assert!(caps.is_empty(), "no capture when nothing follows the colon");
+        assert!(re.contains(':'), "literal colon preserved");
+    }
+
+    #[test]
+    fn compile_pattern_alphanumeric_after_colon_does_capture() {
+        // Verify the inverse to make the previous edge-case meaningful:
+        // colon followed by alphanumeric DOES become a route param.
+        let (_, caps) = compile_pattern("/foo:bar");
+        assert_eq!(caps, vec!["bar"]);
+    }
+
+    #[test]
+    fn compile_pattern_escapes_special_regex_chars() {
+        // `.` is a regex metachar, not in the safe set → escaped with `\`.
+        let (re, _) = compile_pattern("/api/v1.json");
+        assert!(re.contains("\\."), "dot must be escaped, got {re:?}");
+    }
+
+    #[test]
+    fn compile_pattern_underscore_and_hyphen_are_safe() {
+        let (re, caps) = compile_pattern("/api-v2/foo_bar");
+        // Underscore and hyphen are explicitly allowed as literal chars.
+        assert!(re.contains("api-v2"));
+        assert!(re.contains("foo_bar"));
+        assert!(caps.is_empty());
+    }
+
+    #[test]
+    fn compile_pattern_root_path() {
+        let (re, caps) = compile_pattern("/");
+        assert_eq!(re, "^/$");
+        assert!(caps.is_empty());
+    }
+
+    #[test]
+    fn compile_pattern_capture_name_supports_alphanumeric_and_underscore() {
+        let (_, caps) = compile_pattern("/items/:item_id_42");
+        assert_eq!(caps, vec!["item_id_42"]);
+    }
+
+    // ─── parse_render_opts / parse_opts: kv-pair flatten ──────────────
+
+    #[test]
+    fn parse_render_opts_empty_is_empty() {
+        let out = parse_render_opts(&[]);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn parse_render_opts_basic_kv_pairs() {
+        let args = vec![
+            s("html"),
+            s("<h1>hi</h1>"),
+            s("status"),
+            StrykeValue::integer(201),
+        ];
+        let out = parse_render_opts(&args);
+        assert_eq!(out.len(), 2);
+        assert_eq!(
+            out.get("html").map(|v| v.to_string()).as_deref(),
+            Some("<h1>hi</h1>")
+        );
+        assert_eq!(out.get("status").map(|v| v.to_int()), Some(201));
+    }
+
+    #[test]
+    fn parse_render_opts_odd_dangling_key_dropped() {
+        let args = vec![s("a"), s("1"), s("dangling")];
+        let out = parse_render_opts(&args);
+        assert_eq!(out.len(), 1);
+        assert!(!out.contains_key("dangling"));
+    }
+
+    #[test]
+    fn parse_render_opts_preserves_insertion_order() {
+        // IndexMap iteration order = insertion order — verify for params + status.
+        let args = vec![s("z"), s("1"), s("a"), s("2"), s("m"), s("3")];
+        let out = parse_render_opts(&args);
+        let keys: Vec<&str> = out.keys().map(|s| s.as_str()).collect();
+        assert_eq!(keys, vec!["z", "a", "m"]);
+    }
+
+    #[test]
+    fn parse_opts_matches_parse_render_opts_shape() {
+        // parse_opts is the route-filter variant; same alternating semantics.
+        let args = vec![s("only"), s("edit"), s("except"), s("index")];
+        let out = parse_opts(&args);
+        assert_eq!(out.len(), 2);
+        assert!(out.contains_key("only"));
+        assert!(out.contains_key("except"));
+    }
+
+    // ─── split_action_list ────────────────────────────────────────────
+
+    #[test]
+    fn split_action_list_from_array_ref() {
+        use parking_lot::RwLock;
+        use std::sync::Arc;
+        let arr = StrykeValue::array_ref(Arc::new(RwLock::new(vec![
+            s("edit"),
+            s("update"),
+            s("destroy"),
+        ])));
+        let out = split_action_list(&arr);
+        assert_eq!(out, vec!["edit", "update", "destroy"]);
+    }
+
+    #[test]
+    fn split_action_list_falls_back_to_to_list() {
+        // Non-array-ref values still produce a list via to_list().
+        let scalar = s("single");
+        let out = split_action_list(&scalar);
+        // to_list on a string typically yields a 1-element list containing the string.
+        assert!(!out.is_empty());
+        assert!(out.iter().any(|x| x == "single"));
+    }
+
+    // ─── http_status_text: full status code matrix ────────────────────
+
+    #[test]
+    fn http_status_text_2xx_successes() {
+        assert_eq!(http_status_text(200), "OK");
+        assert_eq!(http_status_text(201), "Created");
+        assert_eq!(http_status_text(202), "Accepted");
+        assert_eq!(http_status_text(204), "No Content");
+    }
+
+    #[test]
+    fn http_status_text_3xx_redirects() {
+        assert_eq!(http_status_text(301), "Moved Permanently");
+        assert_eq!(http_status_text(302), "Found");
+        assert_eq!(http_status_text(303), "See Other");
+        assert_eq!(http_status_text(304), "Not Modified");
+        assert_eq!(http_status_text(307), "Temporary Redirect");
+        assert_eq!(http_status_text(308), "Permanent Redirect");
+    }
+
+    #[test]
+    fn http_status_text_4xx_client_errors() {
+        assert_eq!(http_status_text(400), "Bad Request");
+        assert_eq!(http_status_text(401), "Unauthorized");
+        assert_eq!(http_status_text(403), "Forbidden");
+        assert_eq!(http_status_text(404), "Not Found");
+        assert_eq!(http_status_text(405), "Method Not Allowed");
+        assert_eq!(http_status_text(409), "Conflict");
+        assert_eq!(http_status_text(422), "Unprocessable Entity");
+    }
+
+    #[test]
+    fn http_status_text_5xx_server_errors() {
+        assert_eq!(http_status_text(500), "Internal Server Error");
+        assert_eq!(http_status_text(501), "Not Implemented");
+        assert_eq!(http_status_text(502), "Bad Gateway");
+        assert_eq!(http_status_text(503), "Service Unavailable");
+    }
+
+    #[test]
+    fn http_status_text_unknown_falls_back_to_ok() {
+        // Defensive: unknown codes return "OK" so the response line never
+        // contains an empty reason phrase.
+        assert_eq!(http_status_text(999), "OK");
+        assert_eq!(http_status_text(0), "OK");
+        assert_eq!(
+            http_status_text(418),
+            "OK",
+            "I'm a teapot is not in the map"
+        );
+    }
+}
