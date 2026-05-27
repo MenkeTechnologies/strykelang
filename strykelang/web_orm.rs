@@ -1434,3 +1434,447 @@ pub(crate) fn web_job_purge(args: &[StrykeValue], line: usize) -> Result<StrykeV
     )?;
     Ok(StrykeValue::integer(n))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── parse_db_url ──────────────────────────────────────────────────
+
+    #[test]
+    fn parse_db_url_sqlite_prefix_strips_scheme() {
+        assert_eq!(parse_db_url("sqlite:///tmp/foo.db").unwrap(), "/tmp/foo.db");
+        assert_eq!(parse_db_url("sqlite://relative.db").unwrap(), "relative.db");
+    }
+
+    #[test]
+    fn parse_db_url_bare_path_passes_through() {
+        assert_eq!(parse_db_url("/var/lib/app.db").unwrap(), "/var/lib/app.db");
+        assert_eq!(
+            parse_db_url("development.sqlite3").unwrap(),
+            "development.sqlite3"
+        );
+    }
+
+    #[test]
+    fn parse_db_url_postgres_rejected_until_pass_5() {
+        assert!(parse_db_url("postgres://user@host/db").is_err());
+        assert!(parse_db_url("postgresql://user@host/db").is_err());
+    }
+
+    // ─── pluralize_simple ─────────────────────────────────────────────
+
+    #[test]
+    fn pluralize_consonant_y_becomes_ies() {
+        assert_eq!(pluralize_simple("category"), "categories");
+        assert_eq!(pluralize_simple("city"), "cities");
+        assert_eq!(pluralize_simple("party"), "parties");
+    }
+
+    #[test]
+    fn pluralize_vowel_y_just_adds_s() {
+        // ay/ey/oy/uy keep the y and get +s.
+        assert_eq!(pluralize_simple("day"), "days");
+        assert_eq!(pluralize_simple("key"), "keys");
+        assert_eq!(pluralize_simple("boy"), "boys");
+        assert_eq!(pluralize_simple("buy"), "buys");
+    }
+
+    #[test]
+    fn pluralize_sibilant_endings_get_es() {
+        assert_eq!(pluralize_simple("bus"), "buses");
+        assert_eq!(pluralize_simple("box"), "boxes");
+        assert_eq!(pluralize_simple("buzz"), "buzzes");
+        assert_eq!(pluralize_simple("brush"), "brushes");
+        assert_eq!(pluralize_simple("watch"), "watches");
+    }
+
+    #[test]
+    fn pluralize_regular_gets_simple_s() {
+        assert_eq!(pluralize_simple("user"), "users");
+        assert_eq!(pluralize_simple("post"), "posts");
+        assert_eq!(pluralize_simple("comment"), "comments");
+    }
+
+    // ─── parse_range ──────────────────────────────────────────────────
+
+    #[test]
+    fn parse_range_two_bounds_dot_dot() {
+        assert_eq!(parse_range("1..100"), Some((1, 100)));
+        assert_eq!(parse_range("0..1"), Some((0, 1)));
+        assert_eq!(parse_range("-5..5"), Some((-5, 5)));
+    }
+
+    #[test]
+    fn parse_range_single_int_defaults_min_to_zero() {
+        assert_eq!(parse_range("100"), Some((0, 100)));
+    }
+
+    #[test]
+    fn parse_range_garbage_returns_none() {
+        assert_eq!(parse_range("not a range"), None);
+        assert_eq!(parse_range("..."), None);
+    }
+
+    #[test]
+    fn parse_range_with_whitespace_around_bounds() {
+        assert_eq!(parse_range("1 .. 100"), Some((1, 100)));
+    }
+
+    // ─── quote_ident ──────────────────────────────────────────────────
+
+    #[test]
+    fn quote_ident_safe_identifier_unquoted() {
+        assert_eq!(quote_ident("users"), "users");
+        assert_eq!(quote_ident("table_1"), "table_1");
+        assert_eq!(quote_ident("CamelCase"), "CamelCase");
+    }
+
+    #[test]
+    fn quote_ident_unsafe_chars_wrapped_in_double_quotes() {
+        // Anything outside [A-Za-z0-9_] forces quoting.
+        assert_eq!(quote_ident("user-table"), "\"user-table\"");
+        assert_eq!(quote_ident("with space"), "\"with space\"");
+    }
+
+    #[test]
+    fn quote_ident_escapes_internal_double_quotes() {
+        // SQLite escape rule: " → "".
+        assert_eq!(quote_ident("foo\"bar"), "\"foo\"\"bar\"");
+    }
+
+    // ─── stryke_type_to_sql ───────────────────────────────────────────
+
+    #[test]
+    fn type_string_aliases_to_text() {
+        for t in ["string", "str", "varchar", "STRING", "Str", "VarChar"] {
+            assert_eq!(stryke_type_to_sql(t), "TEXT", "{t:?}");
+        }
+    }
+
+    #[test]
+    fn type_int_aliases_to_integer() {
+        for t in ["int", "integer", "bigint", "INT", "BigInt"] {
+            assert_eq!(stryke_type_to_sql(t), "INTEGER", "{t:?}");
+        }
+    }
+
+    #[test]
+    fn type_bool_maps_to_integer() {
+        // SQLite has no bool — bool/boolean compile to INTEGER (0/1).
+        assert_eq!(stryke_type_to_sql("bool"), "INTEGER");
+        assert_eq!(stryke_type_to_sql("boolean"), "INTEGER");
+    }
+
+    #[test]
+    fn type_float_aliases_to_real() {
+        for t in ["float", "decimal", "real", "double"] {
+            assert_eq!(stryke_type_to_sql(t), "REAL", "{t:?}");
+        }
+    }
+
+    #[test]
+    fn type_date_variants_to_text() {
+        for t in ["date", "datetime", "timestamp"] {
+            assert_eq!(stryke_type_to_sql(t), "TEXT", "{t:?}");
+        }
+    }
+
+    #[test]
+    fn type_blob_aliases() {
+        assert_eq!(stryke_type_to_sql("blob"), "BLOB");
+        assert_eq!(stryke_type_to_sql("bytes"), "BLOB");
+    }
+
+    #[test]
+    fn type_references_maps_to_integer() {
+        // FK column type — stored as the parent row's INTEGER id.
+        assert_eq!(stryke_type_to_sql("references"), "INTEGER");
+    }
+
+    #[test]
+    fn type_unknown_defaults_to_text() {
+        assert_eq!(stryke_type_to_sql("nonsense"), "TEXT");
+        assert_eq!(stryke_type_to_sql(""), "TEXT");
+    }
+
+    // ─── sanitize_order ───────────────────────────────────────────────
+
+    #[test]
+    fn sanitize_order_clean_clause_passes_through() {
+        assert_eq!(sanitize_order("name"), "name");
+        assert_eq!(sanitize_order("name DESC"), "name DESC");
+        assert_eq!(sanitize_order("col1 ASC, col2 DESC"), "col1 ASC, col2 DESC");
+    }
+
+    #[test]
+    fn sanitize_order_rejects_sql_injection_chars() {
+        // Semicolons / parens / quotes signal injection → safe fallback.
+        assert_eq!(sanitize_order("name; DROP TABLE users"), "id DESC");
+        assert_eq!(sanitize_order("name)"), "id DESC");
+        assert_eq!(sanitize_order("'name'"), "id DESC");
+        assert_eq!(sanitize_order("\"name\""), "id DESC");
+    }
+
+    // ─── parse_kv: alternating arg pairs → map ────────────────────────
+
+    #[test]
+    fn parse_kv_pairs() {
+        let args = vec![
+            StrykeValue::string("a".into()),
+            StrykeValue::integer(1),
+            StrykeValue::string("b".into()),
+            StrykeValue::integer(2),
+        ];
+        let kv = parse_kv(&args);
+        assert_eq!(kv.len(), 2);
+        assert_eq!(kv.get("a").map(|v| v.to_int()), Some(1));
+        assert_eq!(kv.get("b").map(|v| v.to_int()), Some(2));
+    }
+
+    #[test]
+    fn parse_kv_odd_count_drops_dangling_key() {
+        // Loop condition `i + 1 < args.len()` skips lone trailing key.
+        let args = vec![
+            StrykeValue::string("a".into()),
+            StrykeValue::integer(1),
+            StrykeValue::string("dangling".into()),
+        ];
+        let kv = parse_kv(&args);
+        assert_eq!(kv.len(), 1);
+        assert!(!kv.contains_key("dangling"));
+    }
+
+    #[test]
+    fn parse_kv_empty() {
+        assert_eq!(parse_kv(&[]).len(), 0);
+    }
+
+    // ─── check_one_validator ──────────────────────────────────────────
+
+    fn empty_attrs() -> IndexMap<String, StrykeValue> {
+        IndexMap::new()
+    }
+
+    #[test]
+    fn validator_presence_blank_rejects() {
+        let err = check_one_validator(
+            "name",
+            "",
+            &StrykeValue::UNDEF,
+            &empty_attrs(),
+            "presence",
+            "",
+        );
+        assert!(err.is_some());
+        assert!(err.unwrap().contains("can't be blank"));
+    }
+
+    #[test]
+    fn validator_presence_nonblank_passes() {
+        let err = check_one_validator(
+            "name",
+            "alice",
+            &StrykeValue::string("alice".into()),
+            &empty_attrs(),
+            "presence",
+            "",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_length_too_short() {
+        let err = check_one_validator(
+            "name",
+            "ab",
+            &StrykeValue::string("ab".into()),
+            &empty_attrs(),
+            "length",
+            "5..10",
+        );
+        assert!(err.unwrap().contains("too short"));
+    }
+
+    #[test]
+    fn validator_length_too_long() {
+        let err = check_one_validator(
+            "name",
+            "abcdefghij",
+            &StrykeValue::string("abcdefghij".into()),
+            &empty_attrs(),
+            "length",
+            "1..5",
+        );
+        assert!(err.unwrap().contains("too long"));
+    }
+
+    #[test]
+    fn validator_length_within_bounds_passes() {
+        let err = check_one_validator(
+            "name",
+            "abc",
+            &StrykeValue::string("abc".into()),
+            &empty_attrs(),
+            "length",
+            "1..10",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_format_regex_match() {
+        let err = check_one_validator(
+            "code",
+            "ABC123",
+            &StrykeValue::string("ABC123".into()),
+            &empty_attrs(),
+            "format",
+            r"^[A-Z]+\d+$",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_format_regex_no_match_fails() {
+        let err = check_one_validator(
+            "code",
+            "lower",
+            &StrykeValue::string("lower".into()),
+            &empty_attrs(),
+            "format",
+            r"^[A-Z]+$",
+        );
+        assert!(err.unwrap().contains("format is invalid"));
+    }
+
+    #[test]
+    fn validator_numericality_undef_fails() {
+        let err = check_one_validator(
+            "price",
+            "",
+            &StrykeValue::UNDEF,
+            &empty_attrs(),
+            "numericality",
+            "",
+        );
+        assert!(err.unwrap().contains("not a number"));
+    }
+
+    #[test]
+    fn validator_numericality_non_numeric_fails() {
+        let err = check_one_validator(
+            "price",
+            "abc",
+            &StrykeValue::string("abc".into()),
+            &empty_attrs(),
+            "numericality",
+            "",
+        );
+        assert!(err.unwrap().contains("not a number"));
+    }
+
+    #[test]
+    fn validator_numericality_int_passes() {
+        let err = check_one_validator(
+            "price",
+            "42",
+            &StrykeValue::integer(42),
+            &empty_attrs(),
+            "numericality",
+            "",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_inclusion_in_list_passes() {
+        let err = check_one_validator(
+            "status",
+            "active",
+            &StrykeValue::string("active".into()),
+            &empty_attrs(),
+            "inclusion",
+            "active|pending|done",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_inclusion_not_in_list_fails() {
+        let err = check_one_validator(
+            "status",
+            "other",
+            &StrykeValue::string("other".into()),
+            &empty_attrs(),
+            "inclusion",
+            "active|pending|done",
+        );
+        assert!(err.unwrap().contains("not in the list"));
+    }
+
+    #[test]
+    fn validator_confirmation_matches_passes() {
+        let mut attrs = empty_attrs();
+        attrs.insert(
+            "password_confirmation".into(),
+            StrykeValue::string("secret".into()),
+        );
+        let err = check_one_validator(
+            "password",
+            "secret",
+            &StrykeValue::string("secret".into()),
+            &attrs,
+            "confirmation",
+            "password_confirmation",
+        );
+        assert!(err.is_none());
+    }
+
+    #[test]
+    fn validator_confirmation_mismatch_fails() {
+        let mut attrs = empty_attrs();
+        attrs.insert(
+            "password_confirmation".into(),
+            StrykeValue::string("different".into()),
+        );
+        let err = check_one_validator(
+            "password",
+            "secret",
+            &StrykeValue::string("secret".into()),
+            &attrs,
+            "confirmation",
+            "password_confirmation",
+        );
+        assert!(err.unwrap().contains("doesn't match"));
+    }
+
+    #[test]
+    fn validator_unknown_kind_passes() {
+        // Unknown validator silently passes (forward-compat for new rules).
+        let err = check_one_validator(
+            "field",
+            "x",
+            &StrykeValue::string("x".into()),
+            &empty_attrs(),
+            "future_validator",
+            "",
+        );
+        assert!(err.is_none());
+    }
+
+    // ─── current_timestamp: format check (don't pin value) ────────────
+
+    #[test]
+    fn current_timestamp_iso_8601_minus_tz_shape() {
+        let s = current_timestamp();
+        // "YYYY-MM-DD HH:MM:SS" is 19 chars.
+        assert_eq!(s.len(), 19, "{s:?}");
+        let bytes = s.as_bytes();
+        assert_eq!(bytes[4], b'-');
+        assert_eq!(bytes[7], b'-');
+        assert_eq!(bytes[10], b' ');
+        assert_eq!(bytes[13], b':');
+        assert_eq!(bytes[16], b':');
+    }
+}
