@@ -1,0 +1,130 @@
+#!/usr/bin/env stryke
+
+fn IP::parse($s) {
+    my @parts = split(/\./, $s)
+    return undef if len(@parts) != 4
+    my $val = 0
+    for my $p (@parts) {
+        return undef if $p !~ /^\d+$/
+        my $n = $p + 0
+        return undef if $n < 0 || $n > 255
+        $val = $val * 256 + $n
+    }
+    $val
+}
+
+fn IP::format($n) {
+    my $oa = int($n / 16777216) % 256
+    my $ob = int($n / 65536) % 256
+    my $oc = int($n / 256) % 256
+    my $od = $n % 256
+    $oa . "." . $ob . "." . $oc . "." . $od
+}
+
+fn IP::cidr_parse($s) {
+    my @parts = split(/\//, $s)
+    return undef if len(@parts) != 2
+    my $addr = IP::parse($parts[0])
+    return undef if !defined $addr
+    my $bits = $parts[1] + 0
+    return undef if $bits < 0 || $bits > 32
+    my $mask = $bits == 0 ? 0 : 4294967295 - (2 ** (32 - $bits)) + 1
+    my $net = $addr - ($addr % (2 ** (32 - $bits)))
+    $net = 0 if $bits == 0
+    { net => $net, bits => $bits, mask => $mask }
+}
+
+fn IP::in_cidr($addr, $cidr) {
+    return 1 if $cidr->{bits} == 0
+    my $shift = 2 ** (32 - $cidr->{bits})
+    int($addr / $shift) == int($cidr->{net} / $shift)
+}
+
+fn IP::broadcast($cidr) {
+    my $size = 2 ** (32 - $cidr->{bits})
+    $cidr->{net} + $size - 1
+}
+
+fn IP::num_hosts($cidr) {
+    2 ** (32 - $cidr->{bits})
+}
+
+# --- parse valid ---
+IP::parse("0.0.0.0")         |> aeq 0, "parse zero"
+IP::parse("255.255.255.255") |> aeq 4294967295, "parse all-ones"
+IP::parse("1.2.3.4")         |> aeq 16909060, "parse 1.2.3.4"
+IP::parse("192.168.1.1")     |> aeq 3232235777, "parse 192.168.1.1"
+IP::parse("10.0.0.1")        |> aeq 167772161, "parse 10.0.0.1"
+IP::parse("127.0.0.1")       |> aeq 2130706433, "parse loopback"
+
+# --- parse invalid ---
+(defined IP::parse("1.2.3")) |> aeq 0, "parse 3 octets fails"
+(defined IP::parse("1.2.3.4.5")) |> aeq 0, "parse 5 octets fails"
+(defined IP::parse("256.0.0.0")) |> aeq 0, "parse 256 out of range"
+(defined IP::parse("abc.0.0.0")) |> aeq 0, "parse non-numeric fails"
+(defined IP::parse("")) |> aeq 0, "parse empty"
+(defined IP::parse("1.2.3.-1")) |> aeq 0, "parse negative fails"
+
+# --- format ---
+IP::format(0)          |> aeq "0.0.0.0", "format zero"
+IP::format(4294967295) |> aeq "255.255.255.255", "format all-ones"
+IP::format(16909060)   |> aeq "1.2.3.4", "format 1.2.3.4"
+IP::format(3232235777) |> aeq "192.168.1.1", "format 192.168.1.1"
+
+# --- round-trip ---
+for my $s ("0.0.0.0", "1.2.3.4", "10.20.30.40", "192.168.1.1",
+           "172.16.254.1", "255.255.255.0", "8.8.8.8") {
+    IP::format(IP::parse($s)) |> aeq $s, "round-trip: " . $s
+}
+
+# --- CIDR parse ---
+my $c24 = IP::cidr_parse("192.168.1.0/24")
+$c24->{bits} |> aeq 24, "cidr bits 24"
+$c24->{net}  |> aeq IP::parse("192.168.1.0"), "cidr net /24"
+
+my $c16 = IP::cidr_parse("172.16.0.0/16")
+$c16->{bits} |> aeq 16, "cidr bits 16"
+$c16->{net}  |> aeq IP::parse("172.16.0.0"), "cidr net /16"
+
+# CIDR normalizes host bits
+my $cn = IP::cidr_parse("10.1.2.3/8")
+$cn->{net} |> aeq IP::parse("10.0.0.0"), "cidr normalizes host bits"
+
+# Bad CIDR
+(defined IP::cidr_parse("not-cidr")) |> aeq 0, "cidr no slash"
+(defined IP::cidr_parse("1.2.3.4/33")) |> aeq 0, "cidr bits too large"
+
+# --- in_cidr ---
+IP::in_cidr(IP::parse("192.168.1.42"), $c24) |> aeq 1, "in /24 yes"
+IP::in_cidr(IP::parse("192.168.2.1"), $c24)  |> aeq 0, "in /24 no neighbor"
+IP::in_cidr(IP::parse("192.168.1.0"), $c24)  |> aeq 1, "in /24 net addr"
+IP::in_cidr(IP::parse("192.168.1.255"), $c24) |> aeq 1, "in /24 broadcast"
+
+my $c8 = IP::cidr_parse("10.0.0.0/8")
+IP::in_cidr(IP::parse("10.1.2.3"), $c8)   |> aeq 1, "in /8 yes"
+IP::in_cidr(IP::parse("10.255.255.255"), $c8) |> aeq 1, "in /8 top"
+IP::in_cidr(IP::parse("11.0.0.1"), $c8)   |> aeq 0, "in /8 no"
+
+my $c32 = IP::cidr_parse("1.2.3.4/32")
+IP::in_cidr(IP::parse("1.2.3.4"), $c32) |> aeq 1, "in /32 self"
+IP::in_cidr(IP::parse("1.2.3.5"), $c32) |> aeq 0, "in /32 not self"
+
+# /0 contains everything
+my $c0 = IP::cidr_parse("0.0.0.0/0")
+IP::in_cidr(IP::parse("8.8.8.8"), $c0) |> aeq 1, "in /0 google"
+IP::in_cidr(IP::parse("255.255.255.255"), $c0) |> aeq 1, "in /0 max"
+IP::in_cidr(0, $c0) |> aeq 1, "in /0 zero"
+
+# --- broadcast & num_hosts ---
+IP::broadcast($c24) |> aeq IP::parse("192.168.1.255"), "broadcast /24"
+IP::num_hosts($c24) |> aeq 256, "hosts /24"
+
+IP::broadcast($c16) |> aeq IP::parse("172.16.255.255"), "broadcast /16"
+IP::num_hosts($c16) |> aeq 65536, "hosts /16"
+
+IP::num_hosts($c32) |> aeq 1, "hosts /32"
+IP::broadcast($c32) |> aeq IP::parse("1.2.3.4"), "broadcast /32 = self"
+
+IP::num_hosts($c0) |> aeq 4294967296, "hosts /0"
+
+test_run
