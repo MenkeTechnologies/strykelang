@@ -1,0 +1,91 @@
+#!/usr/bin/env stryke
+#
+# Provenance audit-log pattern: tag a value with `mark()`, chain it
+# through builtin transformations, then serialize the lineage as a JSON
+# audit-log entry to disk. The motivating use case is "where did this
+# value come from?" investigations — when a bad config / wrong payload
+# / corrupted state shows up downstream, the audit log shows the exact
+# call sites that produced it.
+#
+# Pattern shape:
+#
+#   1. mark($value) at the IDE of origin (config load, HTTP body parse,
+#      user-input intake, etc.).
+#   2. Let stryke's per-builtin post-dispatch hook auto-record every
+#      builtin that consumes the marked value — chain extends naturally.
+#   3. At the audit boundary (commit, persist, send-to-third-party),
+#      pull `provenance($value)` and serialize it as a structured log
+#      entry alongside whatever you're persisting.
+#
+# This file demonstrates the full pipeline against a synthetic config
+# value, writes the audit entry to a tempfile, then reads it back to
+# show what the on-disk shape looks like.
+#
+# Run: stryke examples/provenance_audit_log.stk
+
+p "── provenance audit-log demo ──────────────────────────"
+
+# ── 1. Origin: load a config hash from "userspace" and mark it ─────────
+my $raw_config = mark({
+    user_id  => 42,
+    api_url  => "https://api.example.com/v2",
+    features => ["beta", "metrics"],
+})
+my $origin_p = provenance($raw_config)
+printf "  origin       : %s\n",      $origin_p->{origin}
+printf "  origin_line  : %d\n",      $origin_p->{origin_line}
+printf "  ops at origin: %d (none yet — fresh mark)\n",
+    len(@{$origin_p->{ops}})
+
+# ── 2. Transform: encode as JSON, then hash via SHA-256 ───────────────
+# The string return from to_json doesn't auto-propagate (v1 limit —
+# strings lose Arc identity through the VM's scalar-return path; the
+# main demo provenance_basics.stk documents this). Wrap in a container
+# to preserve trackability.
+my $envelope = mark({
+    payload => to_json($raw_config),
+})
+printf "\n  after wrap   : provenance lineage now %d ops\n",
+    len(@{provenance($envelope)->{ops}})
+
+# ── 3. Audit boundary: serialize the lineage alongside the payload ────
+my $audit_entry = {
+    timestamp_unix => time(),
+    event          => "config_persisted",
+    payload_sha256 => sha256($envelope->{payload}),
+    payload_size   => length($envelope->{payload}),
+    provenance     => provenance($envelope),
+}
+my $audit_path = "/tmp/stryke_provenance_audit_demo.jsonl"
+spurt($audit_path, to_json($audit_entry) . "\n")
+printf "\n  wrote audit  : %s (%d bytes)\n",
+    $audit_path, -s $audit_path
+
+# ── 4. Read it back to show on-disk shape ─────────────────────────────
+p ""
+p "── on-disk audit entry (pretty-printed) ───────────────"
+my $read_back = from_json(slurp($audit_path))
+printf "  timestamp_unix : %d\n",      $read_back->{timestamp_unix}
+printf "  event          : %s\n",      $read_back->{event}
+printf "  payload_sha256 : %s…\n",     substr($read_back->{payload_sha256}, 0, 16)
+printf "  payload_size   : %d\n",      $read_back->{payload_size}
+printf "  provenance:\n"
+printf "    origin       : %s (line %d)\n",
+    $read_back->{provenance}->{origin},
+    $read_back->{provenance}->{origin_line}
+printf "    ops chain    : %d entries\n",
+    len(@{$read_back->{provenance}->{ops}})
+
+p ""
+p "── why this matters ──────────────────────────────────"
+p "  If a downstream system rejects this payload, the audit log shows"
+p "  EXACTLY which call site originated the value (line $origin_p->{origin_line}"
+p "  of this script), what builtin operations touched it, and the SHA"
+p "  of the final serialized form. Pair with structured log shipping"
+p "  (Loki, Splunk, etc.) for fleet-wide value-lineage debugging."
+
+# Clean up.
+unlink $audit_path
+
+p ""
+p "── done ───────────────────────────────────────────────"
