@@ -3410,15 +3410,29 @@ impl<'a> VM<'a> {
                     }
                     Op::DeclareHash(idx) => {
                         let val = self.pop();
-                        let items = val.to_list();
-                        let mut map = IndexMap::new();
-                        let mut i = 0;
-                        while i + 1 < items.len() {
-                            map.insert(items[i].to_string(), items[i + 1].clone());
-                            i += 2;
-                        }
+                        // `our %h;` (no initializer) is compiled as LoadUndef
+                        // + DeclareHash. We must NOT clobber an existing
+                        // hash when the "value" is undef — that's the
+                        // declare-only path and should be idempotent so
+                        // re-declaring an `our %h` in a subsequent EVAL
+                        // doesn't wipe out data set by a prior EVAL on the
+                        // same persistent VMHelper. (Bug fix 2026-05-27.)
                         let n = names[*idx as usize].as_str();
-                        self.interp.scope.declare_hash(n, map);
+                        if val.is_undef() {
+                            // Declare-only — make sure the slot exists,
+                            // preserve any existing data.
+                            let existing = self.interp.scope.get_hash(n);
+                            self.interp.scope.declare_hash(n, existing);
+                        } else {
+                            let items = val.to_list();
+                            let mut map = IndexMap::new();
+                            let mut i = 0;
+                            while i + 1 < items.len() {
+                                map.insert(items[i].to_string(), items[i + 1].clone());
+                                i += 2;
+                            }
+                            self.interp.scope.declare_hash(n, map);
+                        }
                         Ok(())
                     }
                     Op::DeclareHashFrozen(idx) => {

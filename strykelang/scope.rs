@@ -1669,10 +1669,19 @@ impl Scope {
     }
 
     pub fn declare_array_frozen(&mut self, name: &str, val: Vec<StrykeValue>, frozen: bool) {
+        // Bug fix 2026-05-27: must capture is-package-qualified BEFORE
+        // canon_main! strips the `main::` prefix. Without this check, the
+        // post-strip `name.contains("::")` is false for `main::a` (which
+        // becomes "a"), so `our @a` was incorrectly storing in the
+        // innermost lexical frame instead of frame[0]. (Cross-package
+        // names like `Foo::BAR` worked because canon_main only strips
+        // `main::`.) Same root cause as the hash bug fixed above.
+        let is_package_qualified = name.contains("::");
         canon_main!(name);
-        // Package stash names (`Foo::BAR`) live in the outermost frame so nested blocks/subs
-        // cannot shadow `@C::ISA` with an empty array (breaks inheritance / SUPER).
-        let idx = if name.contains("::") {
+        // Package stash names (`Foo::BAR` / `main::name` via `our`) live in
+        // the outermost frame so nested blocks/subs cannot shadow them and
+        // so they persist across EVALs on a persistent VMHelper.
+        let idx = if is_package_qualified {
             0
         } else {
             self.frames.len().saturating_sub(1)
@@ -1809,6 +1818,15 @@ impl Scope {
         &mut self,
         name: &str,
     ) -> Arc<parking_lot::RwLock<Vec<StrykeValue>>> {
+        // Bug fix 2026-05-27: same `main::` prefix-stripping bug that bit
+        // promote_hash_to_shared. Without canonicalization, `\@main::a` (or
+        // `\@a` when the compiler attaches the `main::` qualifier for
+        // package globals) would look up the literal `"main::a"` key in
+        // `frame.arrays`, fail to find the canonically-stored `"a"` entry,
+        // and return an empty Arc — breaking every reference take on an
+        // `our`-declared array.
+        let name = strip_main_prefix(name).unwrap_or(name);
+
         // Atomic (mysync) arrays: snapshot current data into a separate Arc.
         // Can't share the Mutex-backed storage directly.
         if let Some(aa) = self.find_atomic_array(name) {
@@ -1842,6 +1860,17 @@ impl Scope {
         &mut self,
         name: &str,
     ) -> Arc<parking_lot::RwLock<IndexMap<String, StrykeValue>>> {
+        // Bug fix 2026-05-27: this function used to compare the raw `name`
+        // arg against `frame.hashes`/`shared_hashes` entry keys. But entries
+        // are stored canonically (the `main::` prefix already stripped via
+        // `canon_main!` in `set_hash`/`declare_hash`/etc), so a call like
+        // `promote_hash_to_shared("main::h")` would fail to find the
+        // existing `"h"` entry and return an empty Arc — breaking every
+        // `\%h` / `\%main::h` reference take in Tier 3 lick/peruse paths.
+        // Canonicalize at entry so the find/position/push all use the
+        // same key as the rest of the scope machinery.
+        let name = strip_main_prefix(name).unwrap_or(name);
+
         let idx = self.resolve_hash_frame_idx(name).unwrap_or_default();
         let frame = &mut self.frames[idx];
         if let Some(entry) = frame.shared_hashes.iter().find(|(k, _)| k == name) {
@@ -2226,8 +2255,14 @@ impl Scope {
         val: IndexMap<String, StrykeValue>,
         frozen: bool,
     ) {
+        let is_package_qualified = name.contains("::");
         canon_main!(name);
-        if let Some(frame) = self.frames.last_mut() {
+        let frame_opt = if is_package_qualified {
+            self.frames.first_mut()
+        } else {
+            self.frames.last_mut()
+        };
+        if let Some(frame) = frame_opt {
             // Remove any existing shared Arc — re-declaration disconnects old refs.
             frame.shared_hashes.retain(|(k, _)| k != name);
             frame.set_hash(name, val);
