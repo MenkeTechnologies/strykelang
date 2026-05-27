@@ -115,6 +115,7 @@ pub mod stryke_log;
 pub mod teleport;
 pub mod token;
 pub mod turn_client;
+pub mod turnbuckle;
 pub mod udp_sockets;
 pub mod value;
 pub mod vm;
