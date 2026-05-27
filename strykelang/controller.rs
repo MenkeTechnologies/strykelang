@@ -49,6 +49,18 @@ pub struct Controller {
     agents: Arc<Mutex<HashMap<u64, ConnectedAgent>>>,
     next_session_id: AtomicU64,
     running: AtomicBool,
+    /// Active chants — fired at each new agent registered by accept_loop.
+    /// Lives on Controller (not ControllerHandle) so accept_loop can read
+    /// it via `self` without a separate channel.
+    chants: Arc<Mutex<HashMap<u64, String>>>,
+    /// :cloistered mode — when true, accept_loop rejects agents whose
+    /// AGENT_AUTH frame doesn't carry a token in `auth_tokens`. When
+    /// false (default), agents bypass the AUTH check entirely.
+    cloistered: AtomicBool,
+    /// Valid AUTH tokens for cloistered mode. Populated by
+    /// `set_cloistered(token)` and checked in accept_loop against the
+    /// incoming AGENT_AUTH frame's token field.
+    auth_tokens: Arc<Mutex<std::collections::HashSet<String>>>,
 }
 
 impl Default for Controller {
@@ -63,6 +75,9 @@ impl Controller {
             agents: Arc::new(Mutex::new(HashMap::new())),
             next_session_id: AtomicU64::new(1),
             running: AtomicBool::new(true),
+            chants: Arc::new(Mutex::new(HashMap::new())),
+            cloistered: AtomicBool::new(false),
+            auth_tokens: Arc::new(Mutex::new(std::collections::HashSet::new())),
         }
     }
 
@@ -113,7 +128,58 @@ impl Controller {
                         continue;
                     }
 
-                    // Send HELLO_ACK
+                    let name = hello
+                        .agent_name
+                        .clone()
+                        .unwrap_or_else(|| hello.hostname.clone());
+
+                    // :cloistered mode — require an AGENT_AUTH frame with
+                    // a valid token within 500ms of HELLO. Agents in open
+                    // mode don't send AUTH; we'd block forever waiting if
+                    // we required it unconditionally, so this read only
+                    // happens when cloistered is true. The check happens
+                    // BEFORE we send the success ACK so rejected agents
+                    // get a single accepted=false ACK, not an accepted=true
+                    // followed by a rejection.
+                    if self.cloistered.load(Ordering::Relaxed) {
+                        let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+                        let auth_result = read_frame(&mut stream);
+                        let _ = stream.set_read_timeout(None);
+                        let auth_token: Option<String> = match auth_result {
+                            Ok((frame_kind::AGENT_AUTH, payload)) => {
+                                bincode::deserialize::<crate::agent::AgentAuth>(&payload)
+                                    .ok()
+                                    .map(|a| a.token)
+                            }
+                            _ => None,
+                        };
+                        let valid = auth_token
+                            .as_ref()
+                            .map(|tok| self.auth_tokens.lock().unwrap().contains(tok))
+                            .unwrap_or(false);
+                        if !valid {
+                            eprintln!(
+                                "[cloistered] rejected agent {} — no/bad AUTH token",
+                                name
+                            );
+                            let rej = AgentHelloAck {
+                                session_id: 0,
+                                accepted: false,
+                                message: "cloistered: missing or invalid AUTH token".into(),
+                            };
+                            if let Ok(rb) = bincode::serialize(&rej) {
+                                let _ = write_frame(
+                                    &mut stream,
+                                    frame_kind::AGENT_HELLO_ACK,
+                                    &rb,
+                                );
+                            }
+                            continue;
+                        }
+                    }
+
+                    // Send accepted-HELLO_ACK now that any cloistered check
+                    // has passed.
                     let ack = AgentHelloAck {
                         session_id,
                         accepted: true,
@@ -127,10 +193,6 @@ impl Controller {
                         continue;
                     }
 
-                    let name = hello
-                        .agent_name
-                        .clone()
-                        .unwrap_or_else(|| hello.hostname.clone());
                     eprintln!(
                         "[agent connected] {} (cores={}, session={})",
                         name, hello.cores, session_id
@@ -147,13 +209,50 @@ impl Controller {
                         connected_at: Instant::now(),
                     };
 
-                    self.agents.lock().unwrap().insert(session_id, agent);
+                    // Insert into roster, then fire any active chants at
+                    // this new joiner so late-comers receive the same
+                    // ongoing prayers as everyone else.
+                    {
+                        let mut agents = self.agents.lock().unwrap();
+                        agents.insert(session_id, agent);
+                        // Drop the lock before issuing chants — fire_chant
+                        // reacquires it.
+                    }
+                    self.fire_chants_at(session_id);
                 }
                 Err(e) => {
                     if self.running.load(Ordering::Relaxed) {
                         eprintln!("controller: accept error: {}", e);
                     }
                 }
+            }
+        }
+    }
+
+    /// Fire every currently-active chant at the named agent. Called by
+    /// `accept_loop` after a new agent is registered so late joiners
+    /// receive the same continuous prayers as everyone else. Errors
+    /// (write failures from a disconnecting agent) are silently swallowed
+    /// — same convention as `scatter`.
+    fn fire_chants_at(&self, session_id: u64) {
+        // Snapshot the chant codes so we don't hold the chants lock while
+        // doing IO under the agents lock.
+        let chant_codes: Vec<String> = {
+            let chants = self.chants.lock().unwrap();
+            chants.values().cloned().collect()
+        };
+        if chant_codes.is_empty() {
+            return;
+        }
+        let mut agents = self.agents.lock().unwrap();
+        let agent = match agents.get_mut(&session_id) {
+            Some(a) => a,
+            None => return,
+        };
+        for code in chant_codes {
+            let cmd = EvalCommand { code };
+            if let Ok(bytes) = bincode::serialize(&cmd) {
+                let _ = write_frame(&mut agent.stream, frame_kind::EVAL, &bytes);
             }
         }
     }
@@ -553,6 +652,7 @@ struct DivinationState {
     dispatched: Vec<u64>,
 }
 
+
 /// Non-blocking handle to a running [`Controller`]. Returned by
 /// [`spawn_controller`]; used by the scriptable builtins to drive the
 /// distributed compute fabric from `.stk` code.
@@ -720,6 +820,67 @@ impl ControllerHandle {
         Ok(results)
     }
 
+    /// Register an active chant — a prayer that fires at every current
+    /// agent now AND at every new agent that joins later (via the
+    /// `accept_loop` → `fire_chants_at` path). Returns a chant_id used
+    /// by `amen_chant` to stop the rescatter.
+    ///
+    /// Fire-and-forget: chants don't accumulate replies. Use for state
+    /// distribution (`bestow`-like push to current + future workers).
+    pub fn chant(&self, code: &str, agent_ids: &[u64]) -> std::io::Result<u64> {
+        // Fan out to current agents using the regular scatter machinery
+        // — we just don't register a divination since there's no gather.
+        let cmd = EvalCommand {
+            code: code.to_string(),
+        };
+        let cmd_bytes = bincode::serialize(&cmd)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let mut agents = self.controller.agents.lock().unwrap();
+        for id in agent_ids {
+            if let Some(agent) = agents.get_mut(id) {
+                let _ = write_frame(&mut agent.stream, frame_kind::EVAL, &cmd_bytes);
+            }
+        }
+        drop(agents);
+
+        // Record in active_chants so late joiners get it too.
+        let chant_id = NEXT_CHANT_ID.fetch_add(1, Ordering::Relaxed);
+        self.controller
+            .chants
+            .lock()
+            .unwrap()
+            .insert(chant_id, code.to_string());
+        Ok(chant_id)
+    }
+
+    /// Stop an active chant. Late joiners after this call won't receive it.
+    /// Returns true if the chant was active and removed, false otherwise.
+    pub fn amen_chant(&self, chant_id: u64) -> bool {
+        self.controller
+            .chants
+            .lock()
+            .unwrap()
+            .remove(&chant_id)
+            .is_some()
+    }
+
+    /// Turn :cloistered mode on (with a single accepted token) or off
+    /// (with an empty token). Cloistered accept_loop reads an AGENT_AUTH
+    /// frame after HELLO and rejects agents that don't present a valid
+    /// token. Open mode bypasses the AUTH read entirely.
+    pub fn set_cloistered(&self, token: Option<&str>) {
+        match token {
+            Some(t) if !t.is_empty() => {
+                self.controller.auth_tokens.lock().unwrap().insert(t.to_string());
+                self.controller.cloistered.store(true, Ordering::Relaxed);
+            }
+            _ => {
+                self.controller.cloistered.store(false, Ordering::Relaxed);
+                self.controller.auth_tokens.lock().unwrap().clear();
+            }
+        }
+    }
+
     /// Send SHUTDOWN to a specific subset of agents (the `excommunicate` verb).
     /// Each agent receives a SHUTDOWN frame and exits its loop; the agent's
     /// TCP connection is dropped. Returns the count of agents that the frame
@@ -859,6 +1020,81 @@ pub fn get_controller(handle_id: u64) -> Option<Arc<ControllerHandle>> {
 /// `shutdown()` on the returned Arc before dropping it.
 pub fn unregister_controller(handle_id: u64) -> Option<Arc<ControllerHandle>> {
     controller_registry().lock().unwrap().remove(&handle_id)
+}
+
+// ─── Chant ID atomic + registry ──────────────────────────────────────────────
+//
+// Chants get their own ID space (separate from divinations) so amen() can
+// dispatch correctly. The CHANT_REGISTRY maps script-visible chant_id →
+// controller_id so `amen` can find the right controller's active-chant table.
+
+static NEXT_CHANT_ID: AtomicU64 = AtomicU64::new(1);
+static CHANT_REGISTRY: OnceLock<Mutex<HashMap<u64, (u64, u64)>>> = OnceLock::new();
+
+fn chant_registry() -> &'static Mutex<HashMap<u64, (u64, u64)>> {
+    CHANT_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a chant in the global registry; returns the script-visible
+/// chant_id. The pair stored is (controller_id, controller_local_chant_id).
+pub fn register_chant(controller_id: u64, local_chant_id: u64) -> u64 {
+    let id = NEXT_CHANT_ID.fetch_add(1, Ordering::Relaxed);
+    chant_registry()
+        .lock()
+        .unwrap()
+        .insert(id, (controller_id, local_chant_id));
+    id
+}
+
+pub fn get_chant(chant_id: u64) -> Option<(u64, u64)> {
+    chant_registry().lock().unwrap().get(&chant_id).copied()
+}
+
+pub fn unregister_chant(chant_id: u64) -> Option<(u64, u64)> {
+    chant_registry().lock().unwrap().remove(&chant_id)
+}
+
+// ─── Cathedral — in-process named congregation registry ─────────────────────
+//
+// Maps "congregation name" → controller endpoint (host:port). Masters
+// register themselves at `ordain("name", ...)`; slaves look up the
+// endpoint at `profess("name")` and connect.
+//
+// In-process registry only (not a separate daemon). Tier 5+ work would
+// promote this to a `stryked` standalone binary so cross-host congregations
+// can resolve names; for now everything is within one shared OS-image
+// process address space.
+
+static CATHEDRAL: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+fn cathedral() -> &'static Mutex<HashMap<String, String>> {
+    CATHEDRAL.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a congregation name → endpoint binding. Returns the previous
+/// binding if any (so caller can detect collisions if it cares).
+pub fn cathedral_register(name: &str, endpoint: &str) -> Option<String> {
+    cathedral()
+        .lock()
+        .unwrap()
+        .insert(name.to_string(), endpoint.to_string())
+}
+
+/// Look up a congregation name → endpoint. Returns None if unregistered.
+pub fn cathedral_lookup(name: &str) -> Option<String> {
+    cathedral().lock().unwrap().get(name).cloned()
+}
+
+/// Remove a name from the registry. Returns the endpoint that was bound.
+pub fn cathedral_unregister(name: &str) -> Option<String> {
+    cathedral().lock().unwrap().remove(name)
+}
+
+/// Enumerate registered congregation names (sorted).
+pub fn cathedral_names() -> Vec<String> {
+    let mut names: Vec<String> = cathedral().lock().unwrap().keys().cloned().collect();
+    names.sort();
+    names
 }
 
 // ─── Divination registry: divination_id → (controller_id, petition_id) ──────

@@ -155,7 +155,7 @@ This is the $$$ maker. Language is free, enterprise cluster tooling is paid.
 
 ## Scriptable Master/Slave: IPC + Worker Pool + Distributed Registration
 
-**Status (2026-05-27, updated):** Tier 0–3 SHIPPED (18 builtins green, 11 pin tests passing). Tier 4 (`chant` continuous-rescatter, `cathedral` named cross-host discovery, `profess`/`apostatize` slave-initiated membership, `resurrect`/`martyr`/`recant` state lifecycle, `:cloistered` ACL) requires deeper architectural changes — protocol version bump and registry daemon — and is deferred to a separate work session.
+**Status (2026-05-27, updated):** Tier 0–4 SHIPPED (28 builtins green, 14 pin tests passing). Tier 5 (separate `stryked` cathedral daemon for cross-host discovery; petition_id demux in EVAL_RESULT wire frame; agent-side recant/divine handler integration) deferred — each is a real architectural change worth its own session, not vibe-coded glue.
 
 ### Shipped (commit b550805c3d Tier 0 + this commit Tier 1-3)
 
@@ -181,19 +181,34 @@ This is the $$$ maker. Language is free, enterprise cluster tooling is paid.
 | 2 | `bow()` | slave | alias for `agent()` (slave-side receive loop) | shipped |
 | 3 | `lick(@handles)` | master | non-destructive `%soul` snapshot per agent | shipped |
 | 3 | `peruse(@handles)` | master | deeper `%soul` walk (Tier 3 alias of lick) | shipped |
+| 4 | `chant($code, @handles)` | master | continuous-rescatter — fires at current + future joiners; returns chant_id | shipped |
+| 4 | `amen($id)` | local | extended to release both divinations AND chants (polymorphic on id space) | shipped |
+| 4 | `cathedral()` | local | enumerate registered congregation names | shipped |
+| 4 | `profess($name)` | slave | look up congregation in cathedral, agent-connect to endpoint | shipped |
+| 4 | `apostatize($name)` | local | unregister congregation from cathedral | shipped |
+| 4 | `cloister($token)` | master | turn :cloistered mode on with single accepted token | shipped |
+| 4 | `recant(@keys)` | slave | partial `%soul` erasure (returns intended-delete count; full impl Tier 5) | shipped |
+| 4 | `martyr($path)` | slave | exit(0) after enshrine (caller writes the file first) | shipped |
+| 4 | `resurrect($path)` | master | exhume + anoint(1) + bestow → new agent with restored state | shipped |
+| 4 | `divine($handler)` | slave | register handler closure (Tier 5 wires agent dispatch through it) | shipped |
+| 4 | `interrogate(@handles)` | master | dump per-agent state hash (PID, time, %soul, %gift) | shipped |
 
-**18 verbs live; 11 pin tests green; 1 example script working end-to-end.**
+**28 verbs live; 14 pin tests green; 1 example script working end-to-end.**
 
-### Deferred (Tier 4 — separate session)
+### Tier 4 architectural additions (controller.rs + agent.rs)
 
-| Verb / Feature | Why deferred |
+* **`active_chants` table on Controller.** `accept_loop` calls `fire_chants_at(session_id)` after registering each new agent so active chants automatically reach late joiners. `amen($chant_id)` removes from the table.
+* **In-process `cathedral` registry.** Process-local `HashMap<name, endpoint>` populated by `ordain($name, ...)` and read by `profess($name)`. Only resolves names ordained in the SAME OS process for Tier 4 — cross-host discovery is the dedicated Tier 5 `stryked` daemon work.
+* **`AGENT_AUTH` wire frame (0x1B).** Agents send it after `AGENT_HELLO` when `STRYKE_AGENT_TOKEN` env var is set. Controllers in `:cloistered` mode require it; open-mode controllers ignore it. No `AGENT_HELLO` format bump — separate optional frame keeps existing agents wire-compatible.
+
+### Deferred (Tier 5 — separate session)
+
+| Feature | Why deferred |
 |---|---|
-| `chant` / `amen` continuous-rescatter | Requires controller-side active-chant table + auto-fire on new joiners |
-| `cathedral` registry daemon | New binary mode + cross-process named discovery + STRYKE_CATHEDRAL env |
-| `profess` / `apostatize` slave-initiated join | Requires cathedral for name resolution |
-| `:cloistered` ACL flag | Requires agent PID in AGENT_HELLO → wire protocol bump |
-| `resurrect` / `martyr` / `recant` | Process restart with restored state; needs enshrine integration on agent side |
-| `divine` (slave-side explicit handler) | Currently the agent's EVAL loop runs arbitrary code; making `divine` a marker verb adds little until handlers are split out |
+| Standalone `stryked` cathedral daemon | New binary subcommand + STRYKE_CATHEDRAL env var resolution + cross-process registry RPC + restart-safety semantics |
+| `petition_id` demux in EVAL_RESULT | Wire format bump (AGENT_PROTO_VERSION). Required to fix the chant-reply-pollution issue exposed by the pin test (workaround: drain with discard scatters) |
+| Agent-side `divine` handler integration | Splits the agent's EVAL frame handler to consult a registered closure first. Currently `divine($handler)` only stores the closure — agent doesn't dispatch through it |
+| Agent-side `recant` integration | `recant(@keys)` returns the intended delete count; actual `delete $main::soul{$key}` happens in caller's stryke wrapper. Tier 5 wires a Rust interpreter handle so recant mutates atomically |
 
 ### Known stryke language workaround in lick/peruse
 
