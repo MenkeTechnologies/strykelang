@@ -2805,6 +2805,47 @@ Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration p
 
 Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
+### ICE-lite: orchestrating direct → punch → relay in stryke source
+
+The v1.3 primitives (`udp_open` / `stun` / `stun_classify` / `punch` / `turn_*`) compose into a complete NAT-traversal orchestrator. The orchestration algorithm — which transport to try first, when to fall back — is intentionally **stryke source** rather than a Rust builtin: the wire-protocol code is already builtins, and keeping the ladder logic as user-editable source means you can read it, adapt it, and inline custom rules without recompiling.
+
+[`examples/ice_orchestrator.stk`](examples/ice_orchestrator.stk) implements the three-rung ladder per RFC 8445 §5 (the connectivity-check core):
+
+| Rung | Transport | Works when |
+|---|---|---|
+| 1. host | `udp_send_to` direct to peer's host:port | peer has no NAT (public IP / same LAN) |
+| 2. server-reflexive | `punch` using STUN-discovered address | both sides behind cone NAT (~70% of pairs) |
+| 3. relayed | `turn_*` via TURN server | always (assuming TURN is reachable) |
+
+```perl
+require "examples/ice_orchestrator.stk"
+
+my $conn = ice::connect({
+    peer_host_addr   => "192.0.2.50:9000",      # try direct first
+    peer_srflx_addr  => "203.0.113.45:51234",   # peer's STUN-discovered
+    peer_relay_addr  => "198.51.100.99:49000",  # peer's TURN allocation
+    turn_server      => "turn.example.com:3478",
+    turn_user        => "alice",
+    turn_pass        => "hunter2",
+    timeout_ms       => 3000,
+})
+die "no transport: $conn->{reason}" unless $conn->{ok}
+# $conn->{method} is "direct" | "punch" | "relay"; $conn->{socket} is the
+# bound socket to use for subsequent send/recv (udp_send_to OR turn_send
+# per method).
+```
+
+`ice::gather_candidates({ turn_server, turn_user, turn_pass })` gathers the local side's three candidates so you can publish them via signaling (email, paste, IRC, anything) for the peer to use.
+
+What this ICE-lite does NOT cover (RFC 8445 proper):
+- Full priority math + role tie-breakers (8445 §5.1.2 / §5.2)
+- Regular vs aggressive nomination (§8)
+- Conflict resolution when both peers think they're the controller (§7.1.3.3)
+- TCP candidates (RFC 6544)
+- Trickle ICE (RFC 8838)
+
+These are useful in WebRTC where the orchestrator runs autonomously; for stryke's typical "two peers with manual signaling" case the three-rung ladder + first-success wins is enough and stays in ~200 lines of inspectable code.
+
 ### Agent (Worker Daemon)
 
 ```sh
