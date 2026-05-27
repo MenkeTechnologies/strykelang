@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+# polynomial_mult.stk - Polynomial arithmetic via coefficient arrays.
+# arr[i] is the coefficient of x^i. Includes add, scale, mul, eval, derivative.
+#
+# Run: stryke --no-interop examples/polynomial_mult.stk
+
+fn PM::trim($p) {
+    my @r = @$p
+    while (len(@r) > 1 && $r[len(@r) - 1] == 0) {
+        pop @r
+    }
+    \@r
+}
+
+fn PM::add($pa, $pb) {
+    my $n = len(@$pa)
+    my $m = len(@$pb)
+    my $k = $n > $m ? $n : $m
+    my @r = ()
+    for my $i (0:$k-1) {
+        my $av = $i < $n ? $pa->[$i] : 0
+        my $bv = $i < $m ? $pb->[$i] : 0
+        push @r, $av + $bv
+    }
+    PM::trim(\@r)
+}
+
+fn PM::scale($p, $c) {
+    my @r = ()
+    for my $x (@$p) { push @r, $x * $c }
+    PM::trim(\@r)
+}
+
+fn PM::mul($pa, $pb) {
+    my $n = len(@$pa)
+    my $m = len(@$pb)
+    my @r = ()
+    for my $i (0:$n+$m-2) { push @r, 0 }
+    for my $i (0:$n-1) {
+        for my $j (0:$m-1) {
+            $r[$i + $j] = $r[$i + $j] + $pa->[$i] * $pb->[$j]
+        }
+    }
+    PM::trim(\@r)
+}
+
+fn PM::evalp($p, $x) {
+    # Horner: start from highest degree.
+    my $i = len(@$p) - 1
+    my $acc = 0
+    while ($i >= 0) {
+        $acc = $acc * $x + $p->[$i]
+        $i = $i - 1
+    }
+    $acc
+}
+
+fn PM::deriv($p) {
+    my $n = len(@$p)
+    return [0] if $n <= 1
+    my @r = ()
+    for my $i (1:$n-1) { push @r, $p->[$i] * $i }
+    PM::trim(\@r)
+}
+
+fn PM::show($p) {
+    # 3x^2 + 2x + 1 style, low-to-high.
+    my @parts = ()
+    my $i = 0
+    for my $c (@$p) {
+        if ($c != 0) {
+            if ($i == 0) {
+                push @parts, "" . $c
+            } elsif ($i == 1) {
+                push @parts, $c . "x"
+            } else {
+                push @parts, $c . "x^" . $i
+            }
+        }
+        $i = $i + 1
+    }
+    return "0" if len(@parts) == 0
+    join(" + ", @parts)
+}
+
+p "=== Polynomial Demo ==="
+my $aa = [1, 2, 3]      # 1 + 2x + 3x^2
+my $bb = [4, 5]         # 4 + 5x
+p "a = " . PM::show($aa)
+p "b = " . PM::show($bb)
+p "a+b = " . PM::show(PM::add($aa, $bb))
+my $mul = PM::show(PM::mul($aa, $bb))
+p "axb: " . $mul
+p "a(2) = " . PM::evalp($aa, 2)
+p "a'   = " . PM::show(PM::deriv($aa))
