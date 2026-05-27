@@ -2819,6 +2819,54 @@ Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration p
 
 Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
+### NAT traversal — quick reference
+
+Compact decision sheet. Each rung has a different cost / success / failure profile; pick by `stun_classify` outcome + your tolerance for infrastructure.
+
+**Rungs ranked by cost (low → high) and success rate (network-dependent):**
+
+| Rung | Cost | Success rate | Fails when | Use when |
+|---|---|---|---|---|
+| 1. host (direct UDP) | 0 (just `udp_send_to`) | LAN: 100% · public IP: 100% · NAT: 0% | both peers behind any NAT | LAN or one-side-public-IP |
+| 2. server-reflexive (`punch`) | 1 STUN RTT + ~5-30 hole-punch bombards | cone NAT: ~95% · symmetric NAT: 0% · UDP-blocked: 0% | symmetric NAT or UDP-blocked firewall | `stun_classify` returned `cone` |
+| 3. relayed (`turn_*`) | TURN allocation + 1 hop per packet | ~100% (assuming TURN reachable) | TURN server unreachable / unauthenticated | symmetric NAT, UDP-blocked firewall, OR cone-NAT fallback when rung 2 fails |
+
+**Decision tree** (codifies the same logic `ice::connect` automates):
+
+```
+                  stun_classify($sock)
+                          ↓
+        ┌─────────────────┼─────────────────┐
+        ↓                 ↓                 ↓
+     "cone"           "symmetric"        "unknown"
+        ↓                 ↓                 ↓
+   try host first      skip punch       try host, then
+   then punch          go straight      punch, then
+                       to turn          turn (probe-best)
+```
+
+**Per-step latency** (rough, on a normal home connection):
+
+| Operation | Typical wall time |
+|---|---|
+| `udp_open` | < 1 ms |
+| `stun_classify` (3 servers in parallel) | ~30-80 ms (slowest STUN RTT + handshake) |
+| `stun` (single server) | ~10-50 ms |
+| `punch` (cone-to-cone) | 100 ms - 5 s (timeout governs) |
+| `turn_allocate` (incl. 401 + auth retry) | ~40-100 ms |
+| `turn_send` / `turn_recv` data path | +5-30 ms vs direct (TURN relay hop) |
+
+**What can go wrong + what to do**:
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `stun_classify` returns `"unknown"` | < 2 STUN servers reached | Check internet, add more servers in `$opts->{servers}` |
+| `punch` returns `established=0` after timeout | One side behind symmetric NAT, OR misaligned bombard timing | Fall back to TURN; or have peers retry simultaneously |
+| `turn_allocate` returns undef | Bad credentials, server unreachable, or non-RFC-8656 server | Test with `examples/turn_health_check.stk` against your server |
+| Data arrives but `udp_recv_from` returns wrong `src_ip` | NAT rewrote the source — normal | Use the address as-is; that's the public address the peer's NAT mapped to |
+
+Demos showing each shape: [`p2p_chat.stk`](examples/p2p_chat.stk) (raw primitives) · [`p2p_chat_v2.stk`](examples/p2p_chat_v2.stk) (`ice::connect`) · [`turn_relay_chat.stk`](examples/turn_relay_chat.stk) (TURN path) · [`turn_health_check.stk`](examples/turn_health_check.stk) (TURN server probe) · [`port_scanner.stk`](examples/port_scanner.stk) (`kick`+`pmap`) · [`network_introspect.stk`](examples/network_introspect.stk) (reflection-driven builtin discovery)
+
 ### P2P walkthrough: pick the right rung for YOUR network
 
 Decision tree for stryke-to-stryke P2P over the open internet — what to call, in what order, what each return value means:
