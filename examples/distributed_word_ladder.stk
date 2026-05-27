@@ -1,0 +1,90 @@
+#!/usr/bin/env stryke
+#
+# Distributed word-ladder one-step expansion — given a current word,
+# workers each generate all 1-letter neighbors that exist in their
+# shard of the dictionary. Master concatenates the per-shard
+# neighbors for the next BFS step.
+#
+# Real BFS shape: this is one frontier-expansion step. A full
+# word-ladder solver loops harvest until the target is found,
+# tracking visited globally on master.
+#
+# CI-safe: pure loopback fork, synthetic small dictionary. Clean
+# under --no-interop.
+
+p "── distributed word-ladder frontier expansion ──"
+
+my @dict = (
+    "cat", "bat", "rat", "hat", "mat", "sat", "fat", "pat", "vat",
+    "cot", "cut", "cab", "can", "cap", "car",
+    "bag", "bad", "ban", "bar",
+    "hot", "hit", "had", "his", "her",
+    "rot", "rod", "rim", "rib",
+    "log", "low", "law", "lay",
+    "dog", "dim", "did", "dot",
+)
+my $current = "cat"
+my $alphabet = "abcdefghijklmnopqrstuvwxyz"
+
+printf "dictionary: %d words  ·  current word: %s\n", len(@dict), $current
+printf "alphabet: %s\n", $alphabet
+
+my @workers = congregation(4)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Each worker checks dictionary membership for its candidate set.
+# Candidates: all 1-letter changes to "cat".
+# Worker i handles position i (round-robin across word positions).
+my $per = int((len(@dict) + len(@sorted_workers) - 1) / len(@sorted_workers))
+my @neighbors
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = len(@dict) - 1 if $end >= len(@dict)
+    next if $start >= len(@dict)
+    my @shard
+    for my $r ($start:$end) { push @shard, $dict[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$dict = from_json(q{$shard_json});
+        my %dset = map { (\$_, 1) } \@\$dict;
+        my \$cur = q{$current};
+        my \@out;
+        # Generate every 1-letter neighbor of \$cur, keep those in dict.
+        for my \$pos (0:len(\$cur) - 1) {
+            for my \$ch (split //, q{$alphabet}) {
+                next if \$ch eq substr(\$cur, \$pos, 1);
+                my \$cand = \$cur;
+                substr(\$cand, \$pos, 1) = \$ch;
+                push \@out, \$cand if exists \$dset{\$cand};
+            }
+        }
+        to_json(\\\@out)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    my $arr = from_json($reply{$w})
+    push @neighbors, @$arr
+}
+
+# Dedupe (different shards may have produced overlapping neighbors
+# since the lookup is by word, not position).
+my %seen
+my @unique_neighbors
+for my $n (@neighbors) {
+    next if exists $seen{$n}
+    $seen{$n} = 1
+    push @unique_neighbors, $n
+}
+@unique_neighbors = sort @unique_neighbors
+
+printf "── 1-letter neighbors of '%s' in dictionary ──\n", $current
+for my $n (@unique_neighbors) {
+    printf "  %s\n", $n
+}
+printf "%d distinct neighbors found across %d worker shards\n",
+    len(@unique_neighbors), len(@sorted_workers)
+
+excommunicate(@workers)
+p "done"

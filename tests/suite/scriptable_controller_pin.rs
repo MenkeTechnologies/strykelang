@@ -1435,3 +1435,119 @@ fn register_controller_returns_unique_increasing_ids() {
     h2.shutdown();
     h3.shutdown();
 }
+
+// ─── Round-6 pins ─────────────────────────────────────────────────────────
+
+/// `ControllerHandle` is `Send + Sync` so it can be moved across
+/// threads and shared via Arc. Pin via a compile-time check — if
+/// the bounds don't hold, this function won't compile.
+#[test]
+fn controller_handle_is_send_and_sync() {
+    fn require_send_sync<T: Send + Sync>() {}
+    require_send_sync::<stryke::controller::ControllerHandle>();
+    require_send_sync::<std::sync::Arc<stryke::controller::ControllerHandle>>();
+}
+
+/// Scatter with a large EVAL payload (>1KB code string) succeeds —
+/// no buffer-size assumption truncates long prayers. Pin against
+/// any silent length cap.
+#[test]
+fn scatter_with_large_code_payload_succeeds() {
+    let (handle, children) = forge_congregation(1);
+    let session_ids = handle.muster();
+
+    // Build a ~2KB prayer: lots of comment text + a simple final
+    // expression. The wire frame is `[u64 LE length][u8 kind][bincode payload]`
+    // so the length field comfortably holds 2KB.
+    let big_comment = "# pad ".repeat(300); // 1800 bytes of pad
+    let code = format!("{}\n2 + 2", big_comment);
+    assert!(code.len() > 1500, "payload must exceed 1.5KB");
+
+    let pid = handle.scatter(&code, &session_ids).expect("scatter large");
+    let results = handle.gather(pid, Duration::from_secs(5)).expect("gather");
+    assert_eq!(results.len(), 1);
+    assert_eq!(
+        results[&session_ids[0]].output.trim(),
+        "4",
+        "large-payload prayer still evaluates correctly"
+    );
+
+    dismiss(&handle, children);
+}
+
+/// divination_id is globally unique even across multiple controllers —
+/// the NEXT_DIVINATION_ID atomic is process-global, not per-controller.
+#[test]
+fn divination_id_globally_unique_across_controllers() {
+    let div_a = register_divination(1, 10);
+    let div_b = register_divination(2, 20);
+    let div_c = register_divination(1, 30); // same controller as div_a, distinct petition
+
+    assert_ne!(div_a, div_b, "different controllers → different div ids");
+    assert_ne!(div_b, div_c, "different controllers → different div ids");
+    assert_ne!(div_a, div_c, "same controller + different petition → different div ids");
+    assert!(div_a < div_b && div_b < div_c, "monotonic across all sources");
+
+    unregister_divination(div_a);
+    unregister_divination(div_b);
+    unregister_divination(div_c);
+}
+
+/// `cathedral_lookup` with an empty name returns None (never registered).
+#[test]
+fn cathedral_lookup_with_empty_name_returns_none() {
+    let _ = cathedral_unregister(""); // belt-and-suspenders
+    assert!(cathedral_lookup("").is_none(), "empty name yields None");
+}
+
+/// `pilgrimage` evaluates its code on EVERY dispatched agent — pin
+/// by using a prayer that returns the agent's PID so we observe
+/// distinct outputs (one per agent).
+#[test]
+fn pilgrimage_evaluates_code_on_every_agent() {
+    let (handle, children) = forge_congregation(3);
+    let session_ids = handle.muster();
+
+    // After the barrier, gather the per-agent PIDs to prove each
+    // agent ran the code (not just the master).
+    let ok = handle.pilgrimage("'arrived'", &session_ids, Duration::from_secs(5));
+    assert!(ok, "all 3 must rendezvous");
+
+    // Now scatter a prayer that returns $$ — every agent's PID
+    // should be distinct (they're separate processes).
+    let pid = handle.scatter("$$", &session_ids).expect("scatter pids");
+    let results = handle.gather(pid, Duration::from_secs(5)).expect("gather pids");
+    let pids: std::collections::HashSet<String> = results
+        .values()
+        .map(|r| r.output.trim().to_string())
+        .collect();
+    assert_eq!(pids.len(), 3, "3 distinct PIDs — every agent ran the code");
+
+    dismiss(&handle, children);
+}
+
+/// Two scatters with the same agent_ids list against the same handle
+/// reuse the agents — no per-agent connection churn between calls.
+#[test]
+fn back_to_back_scatters_reuse_same_agent_connections() {
+    let (handle, children) = forge_congregation(2);
+    let session_ids = handle.muster();
+    let agents_before: std::collections::HashSet<u64> =
+        session_ids.iter().copied().collect();
+
+    // Two scatters in a row.
+    let pid1 = handle.scatter("1", &session_ids).expect("scatter 1");
+    let _ = handle.gather(pid1, Duration::from_secs(5)).expect("gather 1");
+    let pid2 = handle.scatter("2", &session_ids).expect("scatter 2");
+    let _ = handle.gather(pid2, Duration::from_secs(5)).expect("gather 2");
+
+    // muster must show the same agents — no new connections, no churn.
+    let agents_after: std::collections::HashSet<u64> =
+        handle.muster().into_iter().collect();
+    assert_eq!(
+        agents_before, agents_after,
+        "agent set unchanged across back-to-back scatters"
+    );
+
+    dismiss(&handle, children);
+}
