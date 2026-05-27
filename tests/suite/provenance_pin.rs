@@ -172,6 +172,26 @@ fn re_mark_after_unmark_overwrites_origin_line() {
     assert_eq!(s.trim(), "overwritten");
 }
 
+/// `provenance($v)` hashref key set is EXACTLY `origin, origin_line, ops`
+/// — no extras, no missing. Pin the API surface so a future refactor
+/// can't silently add fields users would start depending on, or rename
+/// one and break every caller that reads `$p->{origin}`.
+#[test]
+fn provenance_return_value_key_set_is_stable() {
+    let s = eval_string(
+        r#"
+        my $h = mark({ stable => 1 })
+        my $p = provenance($h)
+        join(",", sort keys %$p)
+        "#,
+    );
+    assert_eq!(
+        s.trim(),
+        "ops,origin,origin_line",
+        "provenance() return value's keys must be exactly {{origin, origin_line, ops}}"
+    );
+}
+
 /// Chained re-mark across container-type changes is the realistic pipeline
 /// shape — most builtins that return new collections don't auto-propagate
 /// lineage (the v1 auto-hook fires only for `try_builtin`-routed ops that

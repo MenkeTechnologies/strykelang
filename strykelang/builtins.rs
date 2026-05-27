@@ -13477,8 +13477,16 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
     // Parse opts hashref: { servers => [["host", port], …], timeout_ms => N }.
     // Default servers list lives in nat_punch::DEFAULT_STUN_SERVERS.
+    //
+    // KEY-PRESENCE semantics: distinguish "servers not provided" (fall back
+    // to defaults) from "servers explicitly set to []" (respect, return
+    // immediately with queried=0). Tracking `servers_explicit` rather than
+    // "is the parsed list empty" lets users say `servers => []` to disable
+    // the implicit-default fallback when probing whether their explicit
+    // list works.
     let mut timeout_ms: u64 = 2000;
     let mut server_owned: Vec<(String, u16)> = Vec::new();
+    let mut servers_explicit = false;
     if let Some(opts) = args.get(1).filter(|v| !v.is_undef()) {
         if let Some(h) = opts.as_hash_ref() {
             let g = h.read();
@@ -13488,17 +13496,21 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
                 }
             }
             if let Some(s) = g.get("servers") {
-                if let Some(arr) = s.as_array_ref() {
-                    let arr_g = arr.read();
-                    for entry in arr_g.iter() {
-                        // Each entry should be [host, port].
-                        if let Some(inner) = entry.as_array_ref() {
-                            let inner_g = inner.read();
-                            if inner_g.len() >= 2 {
-                                let host = inner_g[0].to_string();
-                                let port = inner_g[1].to_int().clamp(1, 65535) as u16;
-                                if !host.is_empty() {
-                                    server_owned.push((host, port));
+                if !s.is_undef() {
+                    servers_explicit = true;
+                    if let Some(arr) = s.as_array_ref() {
+                        let arr_g = arr.read();
+                        for entry in arr_g.iter() {
+                            // Each entry should be [host, port].
+                            if let Some(inner) = entry.as_array_ref() {
+                                let inner_g = inner.read();
+                                if inner_g.len() >= 2 {
+                                    let host = inner_g[0].to_string();
+                                    let port =
+                                        inner_g[1].to_int().clamp(1, 65535) as u16;
+                                    if !host.is_empty() {
+                                        server_owned.push((host, port));
+                                    }
                                 }
                             }
                         }
@@ -13507,7 +13519,7 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
             }
         }
     }
-    if server_owned.is_empty() {
+    if !servers_explicit && server_owned.is_empty() {
         server_owned = crate::nat_punch::DEFAULT_STUN_SERVERS
             .iter()
             .map(|(h, p)| ((*h).to_string(), *p))

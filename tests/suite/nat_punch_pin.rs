@@ -226,6 +226,69 @@ fn stun_against_silent_port_returns_undef() {
     );
 }
 
+/// `stun_classify` with an EMPTY server list returns `{ nat_type=>"unknown",
+/// queried=>0, succeeded=>0, observations=>[] }`. Pin the contract for
+/// the "I passed empty" case so callers can rely on `queried==0` as a
+/// signal to add servers vs. interpret a negative result.
+#[test]
+fn stun_classify_with_empty_server_list_returns_unknown_zero_queried() {
+    let s = eval_string(
+        r#"
+        my $sock = udp_open()
+        my $r = stun_classify($sock, { servers => [], timeout_ms => 200 })
+        udp_close($sock)
+        sprintf("%s|q=%d|s=%d|obs=%d",
+            $r->{nat_type}, $r->{queried}, $r->{succeeded}, len(@{$r->{observations}}))
+        "#,
+    );
+    // Implementation defaults to a 3-server STUN list when `servers` is
+    // unset; passing an EXPLICIT empty list should be respected. If the
+    // implementation falls back to defaults on empty, this catches it.
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts[0], "unknown", "empty server list → unknown");
+    assert_eq!(parts[1], "q=0", "empty server list → queried=0");
+    assert_eq!(parts[2], "s=0", "empty server list → succeeded=0");
+    assert_eq!(parts[3], "obs=0", "empty server list → observations=[]");
+}
+
+/// `punch` against own socket — bombards hit own recv buffer, the loop
+/// detects "got an inbound packet" and reports `established=1`. Real
+/// edge case used in self-test patterns where you want to verify the
+/// bombard machinery without coordinating a second peer.
+#[test]
+fn punch_to_self_establishes_via_own_recv_buffer() {
+    use std::net::UdpSocket;
+    // Pick a known port via Rust, then have stryke re-bind it for the
+    // self-punch (so we know the address to pass to punch).
+    let probe = UdpSocket::bind("127.0.0.1:0").expect("probe");
+    let port = probe.local_addr().unwrap().port();
+    drop(probe);
+    let code = format!(
+        r#"
+        my $sock = udp_open("127.0.0.1", {port})
+        if ($sock == 0) {{ "BIND-FAIL" }}
+        else {{
+            my $r = punch($sock, "127.0.0.1", {port}, {{
+                timeout_ms => 1000,
+                interval_ms => 20,
+                payload => "self-probe",
+            }})
+            udp_close($sock)
+            sprintf("est=%d|msg=%s", $r->{{established}}, $r->{{peer_msg}} // "(none)")
+        }}
+        "#,
+        port = port
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts[0], "est=1", "self-punch must establish via own recv buffer");
+    assert!(
+        parts[1] == "msg=self-probe",
+        "first recv'd datagram must be the bombard payload, got: {}",
+        parts[1]
+    );
+}
+
 /// IPv6 loopback round-trip via stryke source — verifies `udp_open` /
 /// `udp_send_to` / `udp_recv_from` handle bare-`::1` syntax and that the
 /// underlying `(host, port).to_socket_addrs()` resolution path works
