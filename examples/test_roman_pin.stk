@@ -1,0 +1,92 @@
+#!/usr/bin/env stryke
+
+# Pinning test for roman.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+my @vals    = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+my @symbols = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+
+fn Roman::encode($n) {
+    my $out = ""
+    my $r = $n
+    for my $i (0:12) {
+        while ($r >= $vals[$i]) {
+            $out = $out . $symbols[$i]
+            $r = $r - $vals[$i]
+        }
+    }
+    $out
+}
+
+fn Roman::decode($s) {
+    my %val = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
+    my $total = 0
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c    = $s[$i]
+        my $cur  = $val{$c}
+        my $next = $i + 1 < $n ? $val{$s[$i+1]} : 0
+        if ($cur < $next) {
+            $total = $total - $cur
+        } else {
+            $total = $total + $cur
+        }
+    }
+    $total
+}
+
+# ── Encode basics ─────────────────────────────────────────────────────────
+
+Roman::encode(1)    |> aeq "I",      "encode 1"
+Roman::encode(2)    |> aeq "II",     "encode 2"
+Roman::encode(3)    |> aeq "III",    "encode 3"
+Roman::encode(4)    |> aeq "IV",     "encode 4"
+Roman::encode(5)    |> aeq "V",      "encode 5"
+Roman::encode(9)    |> aeq "IX",     "encode 9"
+Roman::encode(10)   |> aeq "X",      "encode 10"
+Roman::encode(14)   |> aeq "XIV",    "encode 14"
+Roman::encode(40)   |> aeq "XL",     "encode 40"
+Roman::encode(49)   |> aeq "XLIX",   "encode 49"
+Roman::encode(50)   |> aeq "L",      "encode 50"
+Roman::encode(90)   |> aeq "XC",     "encode 90"
+Roman::encode(100)  |> aeq "C",      "encode 100"
+Roman::encode(400)  |> aeq "CD",     "encode 400"
+Roman::encode(500)  |> aeq "D",      "encode 500"
+Roman::encode(900)  |> aeq "CM",     "encode 900"
+Roman::encode(1000) |> aeq "M",      "encode 1000"
+Roman::encode(1994) |> aeq "MCMXCIV","encode 1994"
+Roman::encode(2024) |> aeq "MMXXIV", "encode 2024"
+Roman::encode(3999) |> aeq "MMMCMXCIX", "encode 3999"
+
+# ── Decode basics ─────────────────────────────────────────────────────────
+
+Roman::decode("I")    |> aeq 1,    "decode I"
+Roman::decode("IV")   |> aeq 4,    "decode IV"
+Roman::decode("IX")   |> aeq 9,    "decode IX"
+Roman::decode("XIV")  |> aeq 14,   "decode XIV"
+Roman::decode("XL")   |> aeq 40,   "decode XL"
+Roman::decode("XC")   |> aeq 90,   "decode XC"
+Roman::decode("CD")   |> aeq 400,  "decode CD"
+Roman::decode("CM")   |> aeq 900,  "decode CM"
+Roman::decode("MCMXCIV") |> aeq 1994, "decode MCMXCIV"
+Roman::decode("MMXXIV")  |> aeq 2024, "decode MMXXIV"
+Roman::decode("MMMCMXCIX") |> aeq 3999, "decode MMMCMXCIX"
+
+# ── Round-trip ────────────────────────────────────────────────────────────
+
+my $all_match = 1
+for my $n (1:100) {
+    my $r = Roman::encode($n)
+    my $d = Roman::decode($r)
+    $all_match = 0 if $d != $n
+}
+$all_match |> aeq 1, "round-trip 1..100 all match"
+
+my $hi_match = 1
+for my $n (500:520) {
+    my $d = Roman::decode(Roman::encode($n))
+    $hi_match = 0 if $d != $n
+}
+$hi_match |> aeq 1, "round-trip 500..520 all match"
+
+test_run

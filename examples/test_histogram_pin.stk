@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+
+# Pinning test for histogram.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn Hist::buckets($xs, $n_bins) {
+    my $lo = $xs->[0]
+    my $hi = $xs->[0]
+    for my $x (@$xs) {
+        $lo = $x if $x < $lo
+        $hi = $x if $x > $hi
+    }
+    my $span = ($hi - $lo) + 0.0001
+    my $w    = $span / $n_bins
+    my @counts = ()
+    for (1:$n_bins) { push @counts, 0 }
+    for my $x (@$xs) {
+        my $idx = int(($x - $lo) / $w)
+        $idx = $n_bins - 1 if $idx >= $n_bins
+        $counts[$idx] = $counts[$idx] + 1
+    }
+    +{ lo => $lo, hi => $hi, w => $w, counts => \@counts }
+}
+
+fn Stats::mean($xs) {
+    my $sum = 0
+    for my $x (@$xs) { $sum = $sum + $x }
+    $sum / len(@$xs)
+}
+
+fn Stats::median($xs) {
+    my @s = sort { _ <=> _1 } @$xs
+    my $n = len @s
+    $n % 2 == 1 ? $s[int($n/2)] : ($s[$n/2 - 1] + $s[$n/2]) / 2
+}
+
+fn Stats::mode($xs) {
+    my %freq = ()
+    for my $x (@$xs) { $freq{$x} = ($freq{$x} // 0) + 1 }
+    my @keys = keys %freq
+    my @sorted = sort { $freq{_1} <=> $freq{_} } @keys
+    $sorted[0] + 0
+}
+
+fn Stats::range($xs) {
+    my $lo = $xs->[0]
+    my $hi = $xs->[0]
+    for my $x (@$xs) {
+        $lo = $x if $x < $lo
+        $hi = $x if $x > $hi
+    }
+    $hi - $lo
+}
+
+# ── Stats: mean ───────────────────────────────────────────────────────────
+
+Stats::mean([1, 2, 3, 4, 5])  |> aeq 3, "mean 1..5"
+Stats::mean([10, 20, 30])     |> aeq 20, "mean 10,20,30"
+Stats::mean([5])              |> aeq 5,  "mean single"
+Stats::mean([0, 100])         |> aeq 50, "mean 0,100"
+
+# ── Stats: median ─────────────────────────────────────────────────────────
+
+Stats::median([1, 2, 3, 4, 5])    |> aeq 3, "median odd count"
+Stats::median([1, 2, 3, 4])       |> aeq 2.5, "median even count"
+Stats::median([7])                |> aeq 7,  "median single"
+Stats::median([5, 1, 3, 2, 4])    |> aeq 3, "median unsorted"
+
+# ── Stats: mode ───────────────────────────────────────────────────────────
+
+Stats::mode([1, 2, 2, 3, 2, 4])   |> aeq 2, "mode = 2"
+Stats::mode([5, 5, 5, 1, 2])      |> aeq 5, "mode = 5"
+Stats::mode([42])                 |> aeq 42, "mode single"
+
+# ── Stats: range ──────────────────────────────────────────────────────────
+
+Stats::range([1, 5, 3, 9, 2])     |> aeq 8, "range 1..9"
+Stats::range([100])               |> aeq 0, "range single = 0"
+Stats::range([-5, 5])             |> aeq 10, "range negative"
+
+# ── Histogram: total counts preserved ─────────────────────────────────────
+
+my $h1 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
+my $sum1 = 0
+for my $c (@{$h1->{counts}}) { $sum1 = $sum1 + $c }
+$sum1 |> aeq 10, "buckets: count preservation"
+len(@{$h1->{counts}}) |> aeq 5, "buckets: 5 bins"
+
+my $h2 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 10)
+len(@{$h2->{counts}}) |> aeq 10, "buckets: 10 bins"
+
+# ── Histogram: lo/hi ──────────────────────────────────────────────────────
+
+my $h3 = Hist::buckets([5, 10, 15, 20, 25], 5)
+$h3->{lo} |> aeq 5,  "buckets lo"
+$h3->{hi} |> aeq 25, "buckets hi"
+
+# ── Histogram on uniform data ─────────────────────────────────────────────
+
+my $h4 = Hist::buckets([10, 10, 10, 10], 4)
+my $sum4 = 0
+for my $c (@{$h4->{counts}}) { $sum4 = $sum4 + $c }
+$sum4 |> aeq 4, "uniform data: total preserved"
+$h4->{lo} |> aeq 10, "uniform lo == hi"
+$h4->{hi} |> aeq 10, "uniform hi == lo"
+
+# ── Histogram: monotonic data ─────────────────────────────────────────────
+
+my $h5 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8], 4)
+my $cnts = $h5->{counts}
+$cnts->[0] |> aeq 2, "bin 0: 2 items (1,2)"
+$cnts->[1] |> aeq 2, "bin 1: 2 items"
+$cnts->[2] |> aeq 2, "bin 2: 2 items"
+$cnts->[3] |> aeq 2, "bin 3: 2 items"
+
+test_run

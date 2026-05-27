@@ -1,0 +1,92 @@
+#!/usr/bin/env stryke
+
+# bst.stk — Binary search tree.
+#
+# Demonstrates:
+#   * Recursive data structure via hashrefs
+#   * Recursive functions
+#   * In-order traversal
+#   * Tree size and depth
+#
+# Run: stryke --no-interop examples/bst.stk
+
+fn BST::node($v) { +{ val => $v, left => undef, right => undef } }
+
+fn BST::insert($root, $v) {
+    return BST::node($v) unless defined $root
+    if ($v < $root->{val}) {
+        $root->{left} = BST::insert($root->{left}, $v)
+    } elsif ($v > $root->{val}) {
+        $root->{right} = BST::insert($root->{right}, $v)
+    }
+    $root
+}
+
+fn BST::contains($root, $v) {
+    return 0 unless defined $root
+    return 1 if $root->{val} == $v
+    return BST::contains($root->{left}, $v)  if $v < $root->{val}
+    return BST::contains($root->{right}, $v)
+}
+
+fn BST::inorder($root) {
+    my @out = ()
+    return \@out unless defined $root
+    for my $x (@{BST::inorder($root->{left})})  { push @out, $x }
+    push @out, $root->{val}
+    for my $x (@{BST::inorder($root->{right})}) { push @out, $x }
+    \@out
+}
+
+fn BST::size($root) {
+    return 0 unless defined $root
+    1 + BST::size($root->{left}) + BST::size($root->{right})
+}
+
+fn BST::depth($root) {
+    return 0 unless defined $root
+    my $l = BST::depth($root->{left})
+    my $r = BST::depth($root->{right})
+    1 + ($l > $r ? $l : $r)
+}
+
+fn BST::min($root) {
+    return undef unless defined $root
+    my $n = $root
+    while (defined $n->{left}) { $n = $n->{left} }
+    $n->{val}
+}
+
+fn BST::max($root) {
+    return undef unless defined $root
+    my $n = $root
+    while (defined $n->{right}) { $n = $n->{right} }
+    $n->{val}
+}
+
+p "═══════════════════════════════════════════════"
+p " Stryke BST Demo"
+p "═══════════════════════════════════════════════"
+p ""
+
+my $tree = undef
+for my $v (50, 30, 70, 20, 40, 60, 80, 10, 25, 45) {
+    $tree = BST::insert($tree, $v)
+}
+
+p "── In-order traversal (sorted output) ─────────"
+p "  #{join(', ', @{BST::inorder($tree)})}"
+
+p ""
+p "── Stats ──────────────────────────────────────"
+p "  size  : #{BST::size($tree)}"
+p "  depth : #{BST::depth($tree)}"
+p "  min   : #{BST::min($tree)}"
+p "  max   : #{BST::max($tree)}"
+
+p ""
+p "── Lookups ────────────────────────────────────"
+for my $q (45, 80, 10, 999, 0) {
+    my $found = BST::contains($tree, $q) ? "✓" : "✗"
+    p "  #{$found}  contains($q)"
+}

@@ -1,0 +1,145 @@
+#!/usr/bin/env stryke
+
+# Pinning test for csv.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn CSV::parse_line($line) {
+    my @fields = ()
+    my $field  = ""
+    my $in_q   = 0
+    my $n      = len $line
+    my $i      = 0
+    while ($i < $n) {
+        my $c = $line[$i]
+        if ($in_q) {
+            if ($c eq "\"") {
+                if ($i + 1 < $n && $line[$i+1] eq "\"") {
+                    $field = $field . "\""
+                    $i = $i + 2
+                    next
+                }
+                $in_q = 0
+                $i = $i + 1
+                next
+            }
+            $field = $field . $c
+            $i = $i + 1
+            next
+        }
+        if ($c eq "\"") { $in_q = 1; $i = $i + 1; next }
+        if ($c eq ",") {
+            push @fields, $field
+            $field = ""
+            $i = $i + 1
+            next
+        }
+        $field = $field . $c
+        $i = $i + 1
+    }
+    push @fields, $field
+    \@fields
+}
+
+fn CSV::parse($text) {
+    my @rows = ()
+    for my $line (split /\n/, $text) {
+        next if len($line) == 0
+        push @rows, CSV::parse_line($line)
+    }
+    \@rows
+}
+
+fn CSV::quote($field) {
+    my $needs = ($field =~ /[,"\n]/) ? 1 : 0
+    if ($needs) {
+        my $esc = ""
+        my $n = len $field
+        for my $i (0:$n-1) {
+            my $c = $field[$i]
+            if ($c eq "\"") { $esc = $esc . "\"\"" } else { $esc = $esc . $c }
+        }
+        "\"" . $esc . "\""
+    } else {
+        $field
+    }
+}
+
+fn CSV::serialize($rows) {
+    my @lines = ()
+    for my $row (@$rows) {
+        my @quoted = ()
+        for my $f (@$row) { push @quoted, CSV::quote($f) }
+        push @lines, join(",", @quoted)
+    }
+    join("\n", @lines)
+}
+
+# ── parse_line basics ─────────────────────────────────────────────────────
+
+my $r1 = CSV::parse_line("a,b,c")
+len(@$r1) |> aeq 3, "parse 3 fields"
+$r1->[0]  |> aeq "a", "field 0=a"
+$r1->[1]  |> aeq "b", "field 1=b"
+$r1->[2]  |> aeq "c", "field 2=c"
+
+my $r2 = CSV::parse_line("Alice,30,New York")
+$r2->[0] |> aeq "Alice", "name"
+$r2->[1] |> aeq "30",    "age"
+$r2->[2] |> aeq "New York", "city"
+
+# ── Quoted fields ─────────────────────────────────────────────────────────
+
+my $r3 = CSV::parse_line("Bob,25,\"San Francisco, CA\"")
+$r3->[0] |> aeq "Bob", "quoted: name"
+$r3->[1] |> aeq "25",  "quoted: age"
+$r3->[2] |> aeq "San Francisco, CA", "quoted: city with comma"
+
+# ── Escaped quote inside quoted field ─────────────────────────────────────
+
+my $r4 = CSV::parse_line("\"O\"\"Brien\",40,Boston")
+$r4->[0] |> aeq "O\"Brien", "escaped double-quote"
+$r4->[1] |> aeq "40",       "age"
+$r4->[2] |> aeq "Boston",   "city"
+
+# ── Empty fields ──────────────────────────────────────────────────────────
+
+my $r5 = CSV::parse_line("a,,c")
+len(@$r5) |> aeq 3, "empty middle field counted"
+$r5->[0]  |> aeq "a", "first"
+$r5->[1]  |> aeq "",  "empty"
+$r5->[2]  |> aeq "c", "last"
+
+my $r6 = CSV::parse_line(",,")
+len(@$r6) |> aeq 3, "three empty fields"
+
+# ── Multi-row parse ───────────────────────────────────────────────────────
+
+my $text = "h1,h2\na,b\nc,d"
+my $rows = CSV::parse($text)
+len(@$rows)     |> aeq 3, "3 rows"
+$rows->[0][0]   |> aeq "h1", "header h1"
+$rows->[1][1]   |> aeq "b",  "row 1 col 1"
+$rows->[2][0]   |> aeq "c",  "row 2 col 0"
+
+# ── Quoting on serialize ──────────────────────────────────────────────────
+
+CSV::quote("plain")          |> aeq "plain",         "no quote needed"
+CSV::quote("with,comma")     |> aeq "\"with,comma\"", "quote on comma"
+CSV::quote("has\"quote")     |> aeq "\"has\"\"quote\"", "escape internal quote"
+
+# ── Round-trip ────────────────────────────────────────────────────────────
+
+my $rt_text = "a,b,c\nd,\"e,f\",g"
+my $parsed = CSV::parse($rt_text)
+my $serial = CSV::serialize($parsed)
+my $reparsed = CSV::parse($serial)
+$reparsed->[0][0] |> aeq "a", "rt row 0 col 0"
+$reparsed->[1][1] |> aeq "e,f", "rt preserved comma in quoted"
+$reparsed->[1][2] |> aeq "g", "rt row 1 col 2"
+
+# ── Serialize multiple rows ───────────────────────────────────────────────
+
+my $multi = [["x", "y"], ["1", "2"]]
+CSV::serialize($multi) |> aeq "x,y\n1,2", "serialize 2 rows"
+
+test_run

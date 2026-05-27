@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# Pinning test for rpn.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn RPN::eval($expr) {
+    my @stack = ()
+    for my $tok (split / +/, $expr) {
+        next if len($tok) == 0
+        if ($tok eq "+") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x + $y
+        } elsif ($tok eq "-") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x - $y
+        } elsif ($tok eq "*") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x * $y
+        } elsif ($tok eq "/") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x / $y
+        } elsif ($tok eq "neg") {
+            my $x = pop @stack
+            push @stack, 0 - $x
+        } elsif ($tok eq "dup") {
+            my $x = $stack[-1]
+            push @stack, $x
+        } elsif ($tok eq "swap") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $y
+            push @stack, $x
+        } else {
+            push @stack, $tok + 0
+        }
+    }
+    $stack[-1]
+}
+
+# ── Basic ops ─────────────────────────────────────────────────────────────
+
+RPN::eval("3 4 +")       |> aeq 7,    "add 3+4"
+RPN::eval("10 2 -")      |> aeq 8,    "sub 10-2"
+RPN::eval("6 7 *")       |> aeq 42,   "mul 6*7"
+RPN::eval("20 4 /")      |> aeq 5,    "div 20/4"
+RPN::eval("100 25 /")    |> aeq 4,    "div 100/25"
+
+# ── Compound expressions ──────────────────────────────────────────────────
+
+RPN::eval("2 3 4 * +")           |> aeq 14,  "2 + 3*4"
+RPN::eval("2 3 + 4 *")           |> aeq 20,  "(2+3) * 4"
+RPN::eval("5 1 2 + 4 * + 3 -")   |> aeq 14,  "5 + (1+2)*4 - 3"
+RPN::eval("3 5 * 2 + 4 * 7 -")   |> aeq 61,  "((3*5+2)*4-7)"
+RPN::eval("10 20 + 5 *")         |> aeq 150, "(10+20)*5"
+
+# ── Negation ──────────────────────────────────────────────────────────────
+
+RPN::eval("10 neg")              |> aeq -10, "neg 10"
+RPN::eval("5 neg 3 +")           |> aeq -2,  "-5 + 3"
+
+# ── dup / swap ────────────────────────────────────────────────────────────
+
+RPN::eval("5 dup *")             |> aeq 25,  "5² via dup"
+RPN::eval("7 dup +")             |> aeq 14,  "2·7 via dup+add"
+RPN::eval("8 3 swap -")          |> aeq -5,  "3 - 8 via swap"
+RPN::eval("10 5 swap -")         |> aeq -5,  "5 - 10 via swap"
+
+# ── Pythagoras ─────────────────────────────────────────────────────────────
+
+RPN::eval("3 dup * 4 dup * +")   |> aeq 25,  "3² + 4²"
+RPN::eval("5 dup * 12 dup * +")  |> aeq 169, "5² + 12²"
+
+# ── Single number ─────────────────────────────────────────────────────────
+
+RPN::eval("42")                  |> aeq 42,  "single number"
+RPN::eval("0")                   |> aeq 0,   "zero"
+
+# ── Negative literal in expression ────────────────────────────────────────
+
+RPN::eval("100 50 - 10 /")       |> aeq 5,   "chained ops"
+
+test_run

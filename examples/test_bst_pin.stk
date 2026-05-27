@@ -1,0 +1,125 @@
+#!/usr/bin/env stryke
+
+# Pinning test for bst.stk demo.
+# Compliance: docs/STYLE_GUIDE.md
+
+fn BST::node($v) { +{ val => $v, left => undef, right => undef } }
+
+fn BST::insert($root, $v) {
+    return BST::node($v) unless defined $root
+    if ($v < $root->{val}) {
+        $root->{left} = BST::insert($root->{left}, $v)
+    } elsif ($v > $root->{val}) {
+        $root->{right} = BST::insert($root->{right}, $v)
+    }
+    $root
+}
+
+fn BST::contains($root, $v) {
+    return 0 unless defined $root
+    return 1 if $root->{val} == $v
+    return BST::contains($root->{left}, $v)  if $v < $root->{val}
+    return BST::contains($root->{right}, $v)
+}
+
+fn BST::inorder($root) {
+    my @out = ()
+    return \@out unless defined $root
+    for my $x (@{BST::inorder($root->{left})})  { push @out, $x }
+    push @out, $root->{val}
+    for my $x (@{BST::inorder($root->{right})}) { push @out, $x }
+    \@out
+}
+
+fn BST::size($root) {
+    return 0 unless defined $root
+    1 + BST::size($root->{left}) + BST::size($root->{right})
+}
+
+fn BST::depth($root) {
+    return 0 unless defined $root
+    my $l = BST::depth($root->{left})
+    my $r = BST::depth($root->{right})
+    1 + ($l > $r ? $l : $r)
+}
+
+fn BST::min($root) {
+    return undef unless defined $root
+    my $n = $root
+    while (defined $n->{left}) { $n = $n->{left} }
+    $n->{val}
+}
+
+fn BST::max($root) {
+    return undef unless defined $root
+    my $n = $root
+    while (defined $n->{right}) { $n = $n->{right} }
+    $n->{val}
+}
+
+# ── Empty tree ────────────────────────────────────────────────────────────
+
+BST::size(undef)       |> aeq 0, "size: empty = 0"
+BST::depth(undef)      |> aeq 0, "depth: empty = 0"
+BST::contains(undef,5) |> aeq 0, "contains: empty = 0"
+
+# ── Single node ───────────────────────────────────────────────────────────
+
+my $one = BST::insert(undef, 42)
+BST::size($one)      |> aeq 1, "size: single = 1"
+BST::depth($one)     |> aeq 1, "depth: single = 1"
+BST::contains($one, 42) |> aeq 1, "contains: 42 yes"
+BST::contains($one, 99) |> aeq 0, "contains: 99 no"
+BST::min($one)       |> aeq 42, "min: single"
+BST::max($one)       |> aeq 42, "max: single"
+
+# ── Multi-insert ──────────────────────────────────────────────────────────
+
+my $t = undef
+for my $v (50, 30, 70, 20, 40, 60, 80) {
+    $t = BST::insert($t, $v)
+}
+
+BST::size($t)  |> aeq 7, "size: 7 nodes"
+BST::depth($t) |> aeq 3, "depth: balanced=3"
+BST::min($t)   |> aeq 20, "min of tree"
+BST::max($t)   |> aeq 80, "max of tree"
+
+# ── In-order yields sorted ────────────────────────────────────────────────
+
+join(",", @{BST::inorder($t)}) |> aeq "20,30,40,50,60,70,80", "inorder = sorted"
+
+# ── Contains for all inserted ─────────────────────────────────────────────
+
+BST::contains($t, 20) |> aeq 1, "contains 20"
+BST::contains($t, 50) |> aeq 1, "contains 50"
+BST::contains($t, 80) |> aeq 1, "contains 80"
+BST::contains($t, 45) |> aeq 0, "missing 45"
+BST::contains($t, 0)  |> aeq 0, "missing 0"
+
+# ── Duplicates don't grow the tree ────────────────────────────────────────
+
+my $dup = $t
+$dup = BST::insert($dup, 50)
+$dup = BST::insert($dup, 30)
+BST::size($dup) |> aeq 7, "dup inserts: still 7 nodes"
+
+# ── Degenerate (sorted input) → linked list ───────────────────────────────
+
+my $line = undef
+for my $v (1, 2, 3, 4, 5) {
+    $line = BST::insert($line, $v)
+}
+BST::size($line)  |> aeq 5, "degenerate size"
+BST::depth($line) |> aeq 5, "degenerate depth = 5 (linked list)"
+join(",", @{BST::inorder($line)}) |> aeq "1,2,3,4,5", "degenerate inorder"
+
+# ── Random insertion order yields sorted output ───────────────────────────
+
+my $r = undef
+for my $v (8, 3, 10, 1, 6, 14, 4, 7, 13) {
+    $r = BST::insert($r, $v)
+}
+join(",", @{BST::inorder($r)}) |> aeq "1,3,4,6,7,8,10,13,14", "random insert → sorted"
+
+test_run

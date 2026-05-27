@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+# csv.stk — CSV parser/serializer with quote handling.
+#
+# Demonstrates:
+#   * Manual lexer-style state tracking
+#   * Array-of-arrays records
+#   * Quote escaping
+#
+# Run: stryke --no-interop examples/csv.stk
+
+fn CSV::parse_line($line) {
+    my @fields = ()
+    my $field  = ""
+    my $in_q   = 0
+    my $n      = len $line
+    my $i      = 0
+    while ($i < $n) {
+        my $c = $line[$i]
+        if ($in_q) {
+            if ($c eq "\"") {
+                if ($i + 1 < $n && $line[$i+1] eq "\"") {
+                    $field = $field . "\""
+                    $i = $i + 2
+                    next
+                }
+                $in_q = 0
+                $i = $i + 1
+                next
+            }
+            $field = $field . $c
+            $i = $i + 1
+            next
+        }
+        if ($c eq "\"") { $in_q = 1; $i = $i + 1; next }
+        if ($c eq ",") {
+            push @fields, $field
+            $field = ""
+            $i = $i + 1
+            next
+        }
+        $field = $field . $c
+        $i = $i + 1
+    }
+    push @fields, $field
+    \@fields
+}
+
+fn CSV::parse($text) {
+    my @rows = ()
+    for my $line (split /\n/, $text) {
+        next if len($line) == 0
+        push @rows, CSV::parse_line($line)
+    }
+    \@rows
+}
+
+fn CSV::quote($field) {
+    my $needs = ($field =~ /[,"\n]/) ? 1 : 0
+    if ($needs) {
+        my $esc = ""
+        my $n = len $field
+        for my $i (0:$n-1) {
+            my $c = $field[$i]
+            if ($c eq "\"") { $esc = $esc . "\"\"" } else { $esc = $esc . $c }
+        }
+        "\"" . $esc . "\""
+    } else {
+        $field
+    }
+}
+
+fn CSV::serialize($rows) {
+    my @lines = ()
+    for my $row (@$rows) {
+        my @quoted = ()
+        for my $f (@$row) { push @quoted, CSV::quote($f) }
+        push @lines, join(",", @quoted)
+    }
+    join("\n", @lines)
+}
+
+p "═══════════════════════════════════════════════"
+p " Stryke CSV Demo"
+p "═══════════════════════════════════════════════"
+p ""
+
+my $sample = "name,age,city\nAlice,30,New York\nBob,25,\"San Francisco, CA\"\n\"O\"\"Brien\",40,Boston"
+
+p "── Input ──────────────────────────────────────"
+p $sample
+p ""
+
+my $rows = CSV::parse($sample)
+p "── Parsed (#{len @$rows} rows) ────────────────"
+for my $r (@$rows) {
+    p "  [" . join(" | ", @$r) . "]"
+}
+
+p ""
+p "── Round-trip ─────────────────────────────────"
+p CSV::serialize($rows)
