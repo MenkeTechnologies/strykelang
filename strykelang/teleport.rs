@@ -9,14 +9,14 @@
 //! ## Wire protocol
 //!
 //! For each teleport:
-//!   1. Sender JSON-serializes the value (one copy: rust heap → Vec<u8>).
+//!   1. Sender JSON-serializes the value (one copy: rust heap → `Vec<u8>`).
 //!      Bincode can't round-trip a free-standing serde_json::Value
 //!      (the Value type needs `deserialize_any`), and bundling into a
 //!      bincode frame just for one payload buys nothing — so we go
 //!      straight to JSON bytes.
 //!   2. Sender creates a POSIX SHM segment named `/stryke_tp_PID_SEQ`,
 //!      ftruncates to payload size, mmaps writable, copies payload in
-//!      (second copy: Vec<u8> → SHM).
+//!      (second copy: `Vec<u8>` → SHM).
 //!   3. For each receiver PID, sender connects to the receiver's
 //!      well-known UDS at `/tmp/stryke_teleport_PID.sock` and sends a
 //!      40-byte notification: `[shm_name (32B, NUL-terminated)][size (8B LE)]`.

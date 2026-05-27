@@ -3410,17 +3410,22 @@ impl<'a> VM<'a> {
                     }
                     Op::DeclareHash(idx) => {
                         let val = self.pop();
-                        // `our %h;` (no initializer) is compiled as LoadUndef
-                        // + DeclareHash. We must NOT clobber an existing
-                        // hash when the "value" is undef — that's the
-                        // declare-only path and should be idempotent so
-                        // re-declaring an `our %h` in a subsequent EVAL
-                        // doesn't wipe out data set by a prior EVAL on the
-                        // same persistent VMHelper. (Bug fix 2026-05-27.)
                         let n = names[*idx as usize].as_str();
-                        if val.is_undef() {
-                            // Declare-only — make sure the slot exists,
-                            // preserve any existing data.
+                        // `our %h;` (no initializer) compiles as
+                        // LoadUndef + DeclareHash. For package-qualified
+                        // names (the `our` form), we must NOT clobber
+                        // existing data — re-declaring in a subsequent
+                        // EVAL on the same persistent VMHelper should
+                        // preserve cross-EVAL state. For lexical names
+                        // (the `my` form, no `::` qualifier), the
+                        // declare-only path SHOULD initialize to empty
+                        // every time (a fresh `my %h;` inside a loop
+                        // must reset per iteration; preserving prior
+                        // data would silently leak state across loops
+                        // and break demos like de_bruijn_sequence).
+                        // Bug fix 2026-05-27, refined to gate on
+                        // package-qualification after de_bruijn regression.
+                        if val.is_undef() && n.contains("::") {
                             let existing = self.interp.scope.get_hash(n);
                             self.interp.scope.declare_hash(n, existing);
                         } else {
