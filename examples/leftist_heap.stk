@@ -1,0 +1,105 @@
+#!/usr/bin/env stryke
+
+# leftist_heap.stk — Leftist (mergeable) min-heap.
+#
+# A persistent-style leftist heap where every node tracks its
+# `rank` (distance to nearest null on the right spine) and the
+# left subtree's rank is always >= right's. Merge is O(log n).
+# Insert, find-min, and extract-min all reduce to merge.
+#
+# Run: stryke --no-interop examples/leftist_heap.stk
+
+package LH;
+
+fn make_node($val, $left, $right, $rank) {
+    { val => $val, left => $left, right => $right, rank => $rank }
+}
+
+fn rank_of($h) {
+    return 0 if !defined $h
+    $h->{rank}
+}
+
+fn merge_h($ha, $hb) {
+    return $hb if !defined $ha
+    return $ha if !defined $hb
+    my $lo
+    my $hi
+    if ($ha->{val} <= $hb->{val}) {
+        $lo = $ha
+        $hi = $hb
+    } else {
+        $lo = $hb
+        $hi = $ha
+    }
+    my $new_right = merge_h($lo->{right}, $hi)
+    my $rl = rank_of($lo->{left})
+    my $rr = rank_of($new_right)
+    my $left
+    my $right
+    if ($rl >= $rr) {
+        $left = $lo->{left}
+        $right = $new_right
+    } else {
+        $left = $new_right
+        $right = $lo->{left}
+    }
+    make_node($lo->{val}, $left, $right, rank_of($right) + 1)
+}
+
+fn empty() { undef }
+
+fn is_empty($h) { !defined $h }
+
+fn insert($h, $v) {
+    merge_h($h, make_node($v, undef, undef, 1))
+}
+
+fn find_min($h) {
+    return undef if !defined $h
+    $h->{val}
+}
+
+# Returns the new heap after popping the min.
+fn delete_min($h) {
+    return undef if !defined $h
+    merge_h($h->{left}, $h->{right})
+}
+
+fn heap_size($h) {
+    return 0 if !defined $h
+    1 + heap_size($h->{left}) + heap_size($h->{right})
+}
+
+# Build from arrayref by repeated insert.
+fn from_array($arr) {
+    my $h = undef
+    for my $v (@$arr) {
+        $h = insert($h, $v)
+    }
+    $h
+}
+
+# Drain to sorted array.
+fn drain($h) {
+    my @out = ()
+    my $cur = $h
+    while (defined $cur) {
+        push @out, find_min($cur)
+        $cur = delete_min($cur)
+    }
+    \@out
+}
+
+package main;
+
+my $ha = LH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
+p "heap_size: " . LH::heap_size($ha)
+p "min: " . LH::find_min($ha)
+my $sorted = LH::drain($ha)
+p "drain: @$sorted"
+
+my $h1 = LH::from_array([10, 30, 50])
+my $h2 = LH::from_array([20, 40, 60])
+my $m = LH::merge_h($h1, $h2)
+p "merged drain: @{LH::drain($m)}"
