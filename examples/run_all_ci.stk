@@ -182,6 +182,14 @@ fn Ci::run_test_tree($phase, $root, $label) {
     p "$phase: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
 }
 
+# Returns a result HASH instead of mutating globals — so the body is safe
+# to call concurrently from `pmap` in phase_exercism. Aggregation (counter
+# updates, FAIL/OK printing in stable order) happens serially after all
+# workers finish. Was previously `maps` (sequential) per the original
+# header comment "Exercism dirs stay sequential — each dir calls test"
+# which assumed `test` wasn't safe to invoke concurrently. Empirically
+# it is: `test($d/t)` walks one self-contained directory; nothing shared
+# beyond the stryke worker pool inside the test runner.
 fn Ci::exercism_one($d) {
     my $name    = (split m{/}, $d)[-1]
     my $tests_n = Ci::count_tests_tree("$d/t")
@@ -196,14 +204,12 @@ fn Ci::exercism_one($d) {
 
     $err = "test" if !$err && test("$d/t", { quiet => 1 }) != 0
 
-    if ($err) {
-        Ci::fail("exercism", "$name [$err]")
-        Ci::add_tests(0, $tests_n)
-        return 0
+    +{
+        name    => $name,
+        pass    => $err ? 0 : 1,
+        tests_n => $tests_n,
+        err     => $err,
     }
-    Ci::add_tests($tests_n, $tests_n)
-    p "  OK   $name" unless $summary
-    1
 }
 
 fn Ci::phase_exercism {
@@ -212,7 +218,25 @@ fn Ci::phase_exercism {
     my @dirs    = ~> "$ex_root/*/" glob sort
     die "no exercises in $ex_root" unless len(@dirs)
 
-    my $pass = ~> @dirs maps { Ci::exercism_one } sum
+    # Parallel fan-out — 173 dirs across the worker pool. Each call is
+    # self-contained (returns a hash, no shared-state mutation), so
+    # `pmap` is the right primitive. Aggregation is serial below.
+    my @results = pmap { Ci::exercism_one($_) } @dirs
+
+    # Sort by name so OK/FAIL output stays deterministic even though
+    # workers finish in random order. Then walk + update counters.
+    my @sorted = sort { $a->{name} cmp $b->{name} } @results
+    my $pass = 0
+    for my $r (@sorted) {
+        if ($r->{pass}) {
+            Ci::add_tests($r->{tests_n}, $r->{tests_n})
+            $pass++
+            p "  OK   $r->{name}" unless $summary
+        } else {
+            Ci::fail("exercism", "$r->{name} [$r->{err}]")
+            Ci::add_tests(0, $r->{tests_n})
+        }
+    }
     Ci::add_files($pass, len(@dirs))
     p "exercism: $pass/#{len(@dirs)} passed"
 }
