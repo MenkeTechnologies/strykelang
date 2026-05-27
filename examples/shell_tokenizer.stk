@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+
+# shell_tokenizer.stk - POSIX-ish shell-style word tokenizer.
+# Splits on whitespace, supports 'single' and "double" quoted strings
+# and backslash-escapes.
+#
+# Run: stryke --no-interop examples/shell_tokenizer.stk
+
+fn ST::tokenize($s) {
+    my @out = ()
+    my $cur = ""
+    my $in_word = 0
+    my $i = 0
+    my $n = len $s
+    while ($i < $n) {
+        my $c = substr($s, $i, 1)
+        if ($c eq " " || $c eq "\t" || $c eq "\n") {
+            if ($in_word) {
+                push @out, $cur
+                $cur = ""
+                $in_word = 0
+            }
+            $i = $i + 1
+            next
+        }
+        if ($c eq "\\") {
+            if ($i + 1 < $n) {
+                $cur = $cur . substr($s, $i + 1, 1)
+                $in_word = 1
+                $i = $i + 2
+                next
+            } else {
+                $i = $i + 1
+                next
+            }
+        }
+        if ($c eq "'") {
+            $i = $i + 1
+            $in_word = 1
+            while ($i < $n) {
+                my $cc = substr($s, $i, 1)
+                last if $cc eq "'"
+                $cur = $cur . $cc
+                $i = $i + 1
+            }
+            $i = $i + 1
+            next
+        }
+        if ($c eq '"') {
+            $i = $i + 1
+            $in_word = 1
+            while ($i < $n) {
+                my $cc = substr($s, $i, 1)
+                last if $cc eq '"'
+                if ($cc eq "\\" && $i + 1 < $n) {
+                    my $nx = substr($s, $i + 1, 1)
+                    if ($nx eq '"' || $nx eq "\\" || $nx eq "n") {
+                        if ($nx eq "n") {
+                            $cur = $cur . "\n"
+                        } else {
+                            $cur = $cur . $nx
+                        }
+                        $i = $i + 2
+                        next
+                    }
+                }
+                $cur = $cur . $cc
+                $i = $i + 1
+            }
+            $i = $i + 1
+            next
+        }
+        $cur = $cur . $c
+        $in_word = 1
+        $i = $i + 1
+    }
+    if ($in_word) { push @out, $cur }
+    \@out
+}
+
+p "=== Shell Tokenizer Demo ==="
+my $line1 = "ls -la /tmp"
+p "in:  " . $line1
+my $t1 = ST::tokenize($line1)
+for my $tok (@$t1) { p "  tok: " . $tok }
+
+my $line2 = "echo 'hello world' \"foo bar\" baz"
+p "in:  " . $line2
+my $t2 = ST::tokenize($line2)
+for my $tok (@$t2) { p "  tok: " . $tok }
+
+my $line3 = 'grep -e "a\"b" /etc/file\ with\ space'
+p "in:  " . $line3
+my $t3 = ST::tokenize($line3)
+for my $tok (@$t3) { p "  tok: " . $tok }

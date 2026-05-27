@@ -1,0 +1,111 @@
+#!/usr/bin/env stryke
+
+fn RX::max($arr) {
+    my $m = 0
+    for my $x (@$arr) { $m = $x if $x > $m }
+    $m
+}
+
+fn RX::sort($arr) {
+    return [@$arr] if len(@$arr) <= 1
+    my $mx = RX::max($arr)
+    my @cur = @$arr
+    my $exp = 1
+    while (int($mx / $exp) > 0) {
+        my @buckets = ()
+        for my $i (0:9) { push @buckets, [] }
+        for my $x (@cur) {
+            my $d = int($x / $exp) % 10
+            push @{$buckets[$d]}, $x
+        }
+        my @next = ()
+        for my $bkt (@buckets) {
+            for my $x (@$bkt) { push @next, $x }
+        }
+        @cur = @next
+        $exp = $exp * 10
+    }
+    \@cur
+}
+
+fn RX::sort_str($arr, $width) {
+    return [@$arr] if len(@$arr) <= 1
+    my @cur = @$arr
+    my $pos = $width - 1
+    while ($pos >= 0) {
+        my @buckets = ()
+        for my $i (0:127) { push @buckets, [] }
+        for my $s (@cur) {
+            my $c = ord(substr($s, $pos, 1))
+            push @{$buckets[$c]}, $s
+        }
+        my @next = ()
+        for my $bkt (@buckets) {
+            for my $s (@$bkt) { push @next, $s }
+        }
+        @cur = @next
+        $pos = $pos - 1
+    }
+    \@cur
+}
+
+# Empty
+my $e = RX::sort([])
+len(@$e) |> aeq 0, "empty"
+
+# Single
+my $r1 = RX::sort([42])
+join(",", @$r1) |> aeq "42", "single"
+
+# Already sorted
+join(",", @{RX::sort([1,2,3,4,5])}) |> aeq "1,2,3,4,5", "already sorted"
+
+# Reverse sorted
+join(",", @{RX::sort([5,4,3,2,1])}) |> aeq "1,2,3,4,5", "reverse"
+
+# Duplicates preserved (stable)
+join(",", @{RX::sort([3,1,2,1,3,2])}) |> aeq "1,1,2,2,3,3", "dups"
+
+# Classic example
+join(",", @{RX::sort([170,45,75,90,802,24,2,66])}) |> aeq "2,24,45,66,75,90,170,802", "classic"
+
+# All zeros
+join(",", @{RX::sort([0,0,0,0])}) |> aeq "0,0,0,0", "zeros"
+
+# Mixed orders of magnitude
+join(",", @{RX::sort([1, 100, 10, 1000, 10000])}) |> aeq "1,10,100,1000,10000", "magnitudes"
+
+# Large array correctness
+my @big = ()
+my $seed = 7
+for my $i (1:200) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    push @big, $seed % 10000
+}
+my $sb = RX::sort(\@big)
+len(@$sb) |> aeq 200, "size preserved"
+my $ok = 1
+for my $i (0:198) { $ok = 0 if $sb->[$i] > $sb->[$i+1] }
+$ok |> aeq 1, "200 ints sorted"
+
+# Verify sum invariant
+my $s1 = 0; for my $x (@big) { $s1 = $s1 + $x }
+my $s2 = 0; for my $x (@$sb) { $s2 = $s2 + $x }
+$s1 |> aeq $s2, "sum invariant"
+
+# String radix sort
+join(",", @{RX::sort_str(["cat","ant","bat","ape","bee","cow"], 3)})
+    |> aeq "ant,ape,bat,bee,cat,cow", "strings sorted"
+
+# Single-char strings
+join(",", @{RX::sort_str(["c","a","b","e","d"], 1)}) |> aeq "a,b,c,d,e", "single-char"
+
+# Strings with mixed case (ASCII order: upper < lower)
+join(",", @{RX::sort_str(["abc","Abc","bbc","Bbc"], 3)})
+    |> aeq "Abc,Bbc,abc,bbc", "case-sensitive ASCII"
+
+# Strings with duplicates
+join(",", @{RX::sort_str(["dog","cat","dog","ant","cat"], 3)})
+    |> aeq "ant,cat,cat,dog,dog", "string dups"
+
+test_run
