@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+
+# count_min_sketch.stk - Probabilistic frequency estimator.
+#
+# Run: stryke --no-interop examples/count_min_sketch.stk
+
+fn CMS::new($w, $d) {
+    my @rows = ()
+    for my $i (1:$d) {
+        my @row = ()
+        for my $j (1:$w) { push @row, 0 }
+        push @rows, \@row
+    }
+    +{ w => $w, d => $d, table => \@rows }
+}
+
+fn CMS::_h($cms, $row, $s) {
+    my $h = 2166136261 + $row * 2654435761
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = ($h ^ $c)
+        $h = ($h * 16777619) % 4294967296
+    }
+    $h % $cms->{w}
+}
+
+fn CMS::add($cms, $key, $count) {
+    for my $r (0:$cms->{d}-1) {
+        my $idx = CMS::_h($cms, $r, $key)
+        $cms->{table}->[$r]->[$idx] = $cms->{table}->[$r]->[$idx] + $count
+    }
+}
+
+fn CMS::estimate($cms, $key) {
+    my $min = -1
+    for my $r (0:$cms->{d}-1) {
+        my $idx = CMS::_h($cms, $r, $key)
+        my $v = $cms->{table}->[$r]->[$idx]
+        $min = $v if $min < 0 || $v < $min
+    }
+    $min
+}
+
+p "=== Count-Min Sketch Demo (w=256, d=4) ==="
+my $cms = CMS::new(256, 4)
+my @stream = ("apple","banana","apple","cherry","apple","banana","apple","date","apple")
+for my $x (@stream) { CMS::add($cms, $x, 1) }
+for my $k ("apple","banana","cherry","date","ghost") {
+    p "est " . $k . " = " . CMS::estimate($cms, $k)
+}

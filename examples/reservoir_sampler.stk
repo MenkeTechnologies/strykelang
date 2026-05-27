@@ -1,0 +1,48 @@
+#!/usr/bin/env stryke
+
+# reservoir_sampler.stk - Algorithm R: uniform sample of k from a stream
+# of unknown length, in O(n) time and O(k) space.
+#
+# Uses a seedable LCG so the demo is deterministic.
+#
+# Run: stryke --no-interop examples/reservoir_sampler.stk
+
+fn Rng::new($seed) {
+    +{ state => $seed }
+}
+
+fn Rng::next($r) {
+    $r->{state} = ($r->{state} * 1103515245 + 12345) % 2147483648
+    $r->{state}
+}
+
+fn Rng::range($r, $lo, $hi) {
+    my $span = $hi - $lo + 1
+    $lo + (Rng::next($r) % $span)
+}
+
+fn RS::new($k, $rng) {
+    +{ k => $k, n => 0, buf => [], rng => $rng }
+}
+
+fn RS::offer($rs, $x) {
+    $rs->{n} = $rs->{n} + 1
+    if ($rs->{n} <= $rs->{k}) {
+        push @{$rs->{buf}}, $x
+        return
+    }
+    my $j = Rng::range($rs->{rng}, 0, $rs->{n} - 1)
+    if ($j < $rs->{k}) {
+        $rs->{buf}->[$j] = $x
+    }
+}
+
+fn RS::sample($rs) { $rs->{buf} }
+fn RS::seen($rs)   { $rs->{n} }
+
+p "=== Reservoir Sampler Demo (k=5, n=20) ==="
+my $rng = Rng::new(42)
+my $rs  = RS::new(5, $rng)
+for my $i (1:20) { RS::offer($rs, $i) }
+p "sampled (size=" . len(@{RS::sample($rs)}) . "): " . join(",", @{RS::sample($rs)})
+p "seen: " . RS::seen($rs)
