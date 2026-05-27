@@ -1,0 +1,124 @@
+#!/usr/bin/env stryke
+#
+# Parallel TCP port scanner — pmap-fanout over (host, port) pairs using
+# the `kick` builtin. Real-world tool: drop into deploy / sanity checks
+# to verify a fleet of services is up.
+#
+# Three input modes:
+#
+#   1. argv pairs (host:port repeats):
+#      stryke examples/port_scanner.stk localhost:22 localhost:80 db:5432
+#
+#   2. CSV stdin:
+#      cat targets.csv | stryke examples/port_scanner.stk -
+#      # CSV format: one "host,port" per line; lines starting with # ignored
+#
+#   3. host + port range:
+#      stryke examples/port_scanner.stk --host nas.local --ports 80,443,5000-5010
+#
+# Default per-probe timeout: 250ms (override with --timeout-ms N).
+# Exit code: 0 if every target answered, 1 if any were unreachable —
+# usable in deploy gates.
+
+# Parse args.
+my $timeout_ms = 250
+my @targets
+
+my $i = 0
+while ($i < scalar(@ARGV)) {
+    my $arg = $ARGV[$i]
+    if ($arg eq "--timeout-ms") {
+        $timeout_ms = $ARGV[$i + 1] + 0
+        $i += 2
+    }
+    elsif ($arg eq "--host") {
+        my $host = $ARGV[$i + 1]
+        my $spec = $ARGV[$i + 3]   # after --ports
+        if ($ARGV[$i + 2] ne "--ports" || !defined $spec) {
+            p "usage: --host HOST --ports 80,443,5000-5010"
+            exit 1
+        }
+        # Expand port spec: comma-separated, each item N or N-M range.
+        for (split /,/, $spec) {
+            if (_ =~ /^(\d+)-(\d+)$/) {
+                push @targets, [$host, $_] for $1:$2
+            } else {
+                push @targets, [$host, $_ + 0]
+            }
+        }
+        $i += 4
+    }
+    elsif ($arg eq "-") {
+        # Read CSV from stdin.
+        while (my $line = readline(STDIN)) {
+            chomp $line
+            next if $line eq "" || $line =~ /^\s*#/
+            my ($h, $p) = split /,/, $line
+            push @targets, [$h, $p + 0] if defined $p
+        }
+        $i += 1
+    }
+    elsif ($arg =~ /^(.+):(\d+)$/) {
+        push @targets, [$1, $2 + 0]
+        $i += 1
+    }
+    else {
+        printf "ignoring unrecognized arg: %s\n", $arg
+        $i += 1
+    }
+}
+
+if (!len(@targets)) {
+    p "port_scanner — no targets specified"
+    p "  argv pairs : stryke ... host1:port1 host2:port2 ..."
+    p "  CSV stdin  : echo 'host,port\\nhost2,port2' | stryke ... -"
+    p "  range form : stryke ... --host HOST --ports 80,443,5000-5010"
+    p "  options    : --timeout-ms N  (default 250)"
+    exit 0
+}
+
+printf "── scanning %d targets (timeout %dms) ──\n", len(@targets), $timeout_ms
+
+# Per-target probe — self-contained for pmap. Returns a hash with
+# status + latency.
+fn Scan::probe($tgt) {
+    my $host = $tgt->[0]
+    my $port = $tgt->[1]
+    my $t0 = now_ns()
+    my $alive = kick($host, $port, $timeout_ms)
+    my $latency_ms = (now_ns() - $t0) / 1_000_000
+    return {
+        host       => $host,
+        port       => $port,
+        alive      => $alive,
+        latency_ms => $latency_ms,
+    }
+}
+
+# Parallel fan-out.
+my @results = pmap { Scan::probe($_) } @targets
+
+# Sort + report: open ports first, then closed.
+my @open   = grep { $_->{alive} } @results
+my @closed = grep { !$_->{alive} } @results
+my @open_sorted   = sort { $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} } @open
+my @closed_sorted = sort { $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} } @closed
+
+if (len(@open_sorted)) {
+    p ""
+    p "── open ───────────────────────────────────────────"
+    for my $r (@open_sorted) {
+        printf "  %s:%d  %3dms\n", $r->{host}, $r->{port}, $r->{latency_ms}
+    }
+}
+if (len(@closed_sorted)) {
+    p ""
+    p "── closed/unreachable ─────────────────────────────"
+    for my $r (@closed_sorted) {
+        printf "  %s:%d  (%dms)\n", $r->{host}, $r->{port}, $r->{latency_ms}
+    }
+}
+
+p ""
+printf "── summary: %d / %d open ──\n", len(@open), len(@results)
+exit(len(@closed) == 0 ? 0 : 1)

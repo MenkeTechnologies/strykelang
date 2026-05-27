@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+#
+# Reflection-driven discoverability of the NAT-traversal builtin set —
+# walks `%b` (primaries) + `%d` (one-line docs) and `%c` (category map)
+# to produce a categorized listing of every builtin you'd reach for
+# when building stryke-to-stryke P2P.
+#
+# Useful for:
+#   * Interactive learning ("what builtins exist for X?")
+#   * Build-time validation ("does my fork still ship the full surface?")
+#   * Reverse-doc generation ("update the README's signatures table
+#     from the registry, not hand-edited")
+#
+# Pairs with examples/reflection_hashes.stk (which surveys the registry
+# shapes themselves) and examples/reflection_search.stk (free-text grep
+# across `%d`).
+
+p "── network-introspect: NAT traversal builtin set ─────"
+p ""
+
+# Names we care about — the v1-v1.4 NAT traversal stack.
+my @groups = (
+    +{ title => "1. Network probes",
+       names => [qw(kick udp_send)] },
+    +{ title => "2. Persistent UDP socket pool",
+       names => [qw(udp_open udp_send_to udp_recv udp_recv_from udp_close)] },
+    +{ title => "3. STUN — public address discovery + NAT classification",
+       names => [qw(stun stun_classify)] },
+    +{ title => "4. UDP hole-punching",
+       names => [qw(punch)] },
+    +{ title => "5. TURN relay (RFC 8656)",
+       names => [qw(turn_allocate turn_permission turn_send turn_recv turn_refresh)] },
+    +{ title => "6. Value lineage (cross-cutting, not network-specific)",
+       names => [qw(mark provenance unmark)] },
+)
+
+my $total_documented = 0
+for my $g (@groups) {
+    printf "── %s ───────────────────────\n", $g->{title}
+    for my $name (@{$g->{names}}) {
+        my $exists  = exists $b{$name}
+        my $cat     = $exists ? ($b{$name} // "(no category)") : "(missing!)"
+        my $doc     = $d{$name} // "(no LSP doc)"
+        # Trim the doc to the first sentence-ish for compactness.
+        my $snip = $doc
+        if (length($snip) > 88) {
+            $snip = substr($snip, 0, 85) . "..."
+        }
+        printf "  %-18s %-22s\n    %s\n",
+            $name, $cat, $snip
+        $total_documented++ if $exists
+    }
+    p ""
+}
+
+# Summary stats.
+printf "── summary ───────────────────────────────────────\n"
+printf "  %d builtins surveyed across %d groups\n",
+    $total_documented,
+    len(@groups)
+printf "  registry stats — primaries: %d, aliases: %d, docs: %d\n",
+    scalar(keys %b),
+    scalar(keys %a),
+    scalar(keys %d)
+
+# Quick free-text grep example — show that you can find related builtins
+# via the %d doc index. Lifted from reflection_search.stk's pattern.
+my @hole_punch_mentions = sort grep {
+    defined $d{$_} && $d{$_} =~ /hole.punch|relay|NAT/i
+} keys %b
+printf "\n  builtins mentioning hole-punch / relay / NAT: %d\n",
+    len(@hole_punch_mentions)
+if (len(@hole_punch_mentions) > 0) {
+    printf "    %s\n", join(", ", @hole_punch_mentions[0:5])
+    if (len(@hole_punch_mentions) > 5) {
+        printf "    (...and %d more)\n", len(@hole_punch_mentions) - 5
+    }
+}
+
+p ""
+p "──────────────────────────────────────────────────────"
+p "Tip: `keys %b` for every primary, `%d{NAME}` for hover doc,"
+p "  `%c{CATEGORY}` for category → name list. See"
+p "  examples/reflection_hashes.stk for the full registry tour."

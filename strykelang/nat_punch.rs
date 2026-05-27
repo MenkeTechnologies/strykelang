@@ -496,6 +496,50 @@ mod tests {
         assert_eq!(parsed.1, real_port);
     }
 
+    /// RFC 8489 §14: "Clients MUST ignore comprehension-optional
+    /// attributes they don't understand". Pin via a Binding Response
+    /// that has an unknown attribute (type 0x9001 — high bit set
+    /// indicates comprehension-optional per §14) sandwiched between
+    /// the header and the XOR-MAPPED-ADDRESS. Parser must skip the
+    /// junk attribute and still recover the address correctly.
+    ///
+    /// Catches a future regression where the attribute-walk loop
+    /// accidentally bails on unknown types instead of skipping them.
+    #[test]
+    fn parse_ignores_unknown_optional_attributes() {
+        let real_ip = std::net::Ipv4Addr::new(192, 0, 2, 99);
+        let real_port: u16 = 12345;
+        let xor_port = real_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+        let xor_addr =
+            u32::from_be_bytes(real_ip.octets()) ^ STUN_MAGIC_COOKIE;
+
+        // Layout: header (20) + UNKNOWN attr (8) + XOR-MAPPED-ADDR (12)
+        // unknown attr: type=0x9001 (comprehension-optional), len=4,
+        // value="JUNK"
+        let mut pkt = vec![0u8; 40];
+        pkt[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+        pkt[2..4].copy_from_slice(&20u16.to_be_bytes()); // 8 + 12 = 20 bytes of attrs
+        pkt[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+
+        // Unknown attr at offset 20.
+        pkt[20..22].copy_from_slice(&0x9001u16.to_be_bytes());
+        pkt[22..24].copy_from_slice(&4u16.to_be_bytes());
+        pkt[24..28].copy_from_slice(b"JUNK");
+
+        // XOR-MAPPED-ADDRESS at offset 28.
+        pkt[28..30].copy_from_slice(&0x0020u16.to_be_bytes());
+        pkt[30..32].copy_from_slice(&8u16.to_be_bytes());
+        pkt[32] = 0x00; // reserved
+        pkt[33] = 0x01; // family IPv4
+        pkt[34..36].copy_from_slice(&xor_port.to_be_bytes());
+        pkt[36..40].copy_from_slice(&xor_addr.to_be_bytes());
+
+        let parsed = parse_binding_response(&pkt)
+            .expect("must parse despite unknown attribute");
+        assert_eq!(parsed.0, std::net::IpAddr::V4(real_ip));
+        assert_eq!(parsed.1, real_port);
+    }
+
     #[test]
     fn parse_rejects_wrong_message_type() {
         let mut pkt = [0u8; 20];

@@ -406,6 +406,51 @@ mod tests {
         assert_eq!(n2.ops[1].op, "pack");
     }
 
+    /// 8 threads concurrently mark / lookup / record_op on a shared
+    /// hash. No data races, no deadlocks, all threads observe the
+    /// final lineage as a coherent state. Pins the `Mutex<HashMap>`
+    /// ledger's thread-safety claim at the Rust level — stryke's
+    /// own threading (spawn / pchannel) has its own quirks that
+    /// would muddy a stryke-source version of this test.
+    #[test]
+    fn concurrent_mark_lookup_threads_observe_consistent_state() {
+        use std::thread;
+
+        let h = StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())));
+        assert!(mark(&h, 1));
+
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let h = h.clone();
+                thread::spawn(move || {
+                    // Mix of operations: lookup, record_op, is_marked.
+                    // Loop a few times so we have actual contention on
+                    // the ledger Mutex, not just one-shot calls.
+                    for _ in 0..50 {
+                        let node = lookup(&h).expect("origin must be live");
+                        assert!(node.origin.starts_with("HASH"));
+                        assert!(
+                            is_marked(&h),
+                            "thread {i}: is_marked must return true for the origin"
+                        );
+                        // Synthetic result value that we use to record an op —
+                        // a fresh array per call (different Arc each loop).
+                        let result = StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new())));
+                        record_op(&result, &format!("thread{i}_op"), &[h.clone()], i as usize);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("thread");
+        }
+
+        // Origin is still there + still keyed by the same Arc ptr.
+        let final_node = lookup(&h).expect("origin still live after concurrency");
+        assert_eq!(final_node.origin_line, 1);
+    }
+
     #[test]
     fn record_op_no_op_when_no_args_marked() {
         let a = StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())));
