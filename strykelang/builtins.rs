@@ -5357,6 +5357,11 @@ pub(crate) fn try_builtin(
         "turn_refresh" => Some(builtin_turn_refresh(args)),
         "teleport" => Some(builtin_teleport(args)),
         "arrive" => Some(builtin_arrive(args)),
+        "turnbuckle" => Some(builtin_turnbuckle(args)),
+        "tb_alive" => Some(builtin_tb_alive(args)),
+        "tb_ping" => Some(builtin_tb_ping(args)),
+        "tb_close" => Some(builtin_tb_close(args)),
+        "weep" => Some(builtin_weep(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
         "unmark" => Some(builtin_unmark(args)),
@@ -15637,6 +15642,135 @@ fn builtin_arrive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     // which is right for cluster IPC (consumer iterates with %{ } / @{ })
     // but wrong for teleport's primary use shape.
     Ok(json_to_deep_refs(&json))
+}
+
+/// `turnbuckle($peer_pid [, { interval_ms => 50, timeout_ms => 200 }])` —
+/// open a 1:1 peer-pair keepalive against `$peer_pid`. Spawns a
+/// background heartbeat thread; returns a handle hashref
+/// `{ _tb_id => N, peer_pid => P }` to pass to [`builtin_tb_alive`] /
+/// [`builtin_tb_ping`] / [`builtin_tb_close`]. Returns `undef` if
+/// `$peer_pid` is non-positive or if the UDS bind failed.
+fn builtin_turnbuckle(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock as PRwLock;
+    use std::sync::Arc as StdArc;
+
+    let peer_pid = match args.first() {
+        Some(v) if !v.is_undef() => v.to_int() as i32,
+        _ => return Ok(StrykeValue::UNDEF),
+    };
+
+    let mut interval_ms: u64 = 50;
+    let mut timeout_ms: u64 = 200;
+    if let Some(opts) = args.get(1).and_then(|v| v.as_hash_ref()) {
+        let g = opts.read();
+        if let Some(v) = g.get("interval_ms") {
+            interval_ms = v.to_int().max(1) as u64;
+        }
+        if let Some(v) = g.get("timeout_ms") {
+            timeout_ms = v.to_int().max(1) as u64;
+        }
+    }
+
+    let id = crate::turnbuckle::open(peer_pid, interval_ms, timeout_ms);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let mut map: IndexMap<String, StrykeValue> = IndexMap::new();
+    map.insert("_tb_id".into(), StrykeValue::integer(id as i64));
+    map.insert("peer_pid".into(), StrykeValue::integer(peer_pid as i64));
+    Ok(StrykeValue::hash_ref(StdArc::new(PRwLock::new(map))))
+}
+
+fn turnbuckle_id_from(v: Option<&StrykeValue>) -> u64 {
+    v.and_then(|v| v.as_hash_ref())
+        .and_then(|h| h.read().get("_tb_id").map(|v| v.to_int()))
+        .filter(|n| *n > 0)
+        .map(|n| n as u64)
+        .unwrap_or(0)
+}
+
+/// `tb_alive($handle)` — return 1 if the peer has heartbeated within
+/// the configured timeout window, else 0.
+fn builtin_tb_alive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = turnbuckle_id_from(args.first());
+    Ok(StrykeValue::integer(
+        if crate::turnbuckle::alive(id) { 1 } else { 0 },
+    ))
+}
+
+/// `tb_ping($handle)` — force an immediate heartbeat in addition to the
+/// background cadence. Returns 1 on send success, 0 otherwise.
+fn builtin_tb_ping(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = turnbuckle_id_from(args.first());
+    Ok(StrykeValue::integer(
+        if crate::turnbuckle::ping(id) { 1 } else { 0 },
+    ))
+}
+
+/// `weep(@source, $interval_ms)` — slow-trickle emitter. Wraps any of
+/// {variadic items, range like `1:N`, arrayref, iterator, scalar} into a
+/// streaming iterator that emits each item paced at `$interval_ms`
+/// between emissions. The FIRST item emits immediately; only the gap
+/// between successive items is throttled. Zero interval = passthrough.
+///
+/// **Call shape**: the LAST argument is always `interval_ms`. Everything
+/// before it is the source. This handles stryke's range-flattening
+/// convention — `weep(1:5, 100)` arrives as `[1,2,3,4,5,100]`, we
+/// split off the last as interval and use the rest as items. To pass
+/// a single-element source where that element is numeric, wrap it:
+/// `weep([42], 100)`. A 1-arg call `weep($x)` is source-only, no throttle.
+///
+/// Lazy by construction — the sleep happens at each consumer pull, not
+/// up-front. Compose with `take`, `map`, prefix `~>`, etc.
+fn builtin_weep(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    if args.is_empty() {
+        return Ok(StrykeValue::iterator(crate::map_stream::into_pull_iter(
+            StrykeValue::array(vec![]),
+        )));
+    }
+
+    // Split: last arg is interval (when ≥ 2 args), rest is source.
+    let (source_args, interval_ms): (&[StrykeValue], u64) = if args.len() >= 2 {
+        let last = &args[args.len() - 1];
+        (&args[..args.len() - 1], last.to_int().max(0) as u64)
+    } else {
+        (args, 0)
+    };
+
+    // Build source iterator. Single-arg source uses type-aware deref;
+    // multi-arg source is treated as a flat item list (the natural shape
+    // when stryke flattens ranges / @lists into positional args).
+    let source: Arc<dyn crate::value::StrykeIterator> = if source_args.len() == 1 {
+        let v = &source_args[0];
+        if v.is_iterator() {
+            v.clone().into_iterator()
+        } else if let Some(arr) = v.as_array_ref() {
+            // Arrayref deref — `to_list()` doesn't unwrap `HeapObject::ArrayRef`
+            // (it falls through to wrapping the ref itself as a 1-elem list),
+            // so without this `weep([1,2,3], …)` would emit one item: the ref.
+            let items = arr.read().clone();
+            crate::map_stream::into_pull_iter(StrykeValue::array(items))
+        } else {
+            crate::map_stream::into_pull_iter(v.clone())
+        }
+    } else {
+        crate::map_stream::into_pull_iter(StrykeValue::array(source_args.to_vec()))
+    };
+
+    Ok(StrykeValue::iterator(Arc::new(
+        crate::map_stream::WeepIterator::new(source, Duration::from_millis(interval_ms)),
+    )))
+}
+
+/// `tb_close($handle)` — tear down the pair: stop the heartbeat thread,
+/// unbind the UDS socket, drop registry entry. Returns 1 if the handle
+/// was known, 0 if it was already closed or never opened.
+fn builtin_tb_close(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = turnbuckle_id_from(args.first());
+    Ok(StrykeValue::integer(
+        if crate::turnbuckle::close(id) { 1 } else { 0 },
+    ))
 }
 
 fn json_to_deep_refs(v: &serde_json::Value) -> StrykeValue {
