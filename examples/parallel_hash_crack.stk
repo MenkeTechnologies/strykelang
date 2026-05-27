@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+#
+# Parallel hash crack — each worker tries a different range of integer
+# candidate keys; the worker that finds a SHA256 collision with the
+# target hash returns the key. Master gathers, reports which worker
+# found it.
+#
+# Demonstrates the find-needle-in-haystack scatter pattern: every
+# worker runs the same search code over a different range; only one
+# worker finds the answer; master picks it out of the result hash.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+# Small N for fast CI; bump for real cracking.
+
+my $n_workers = $ARGV[0] // 4
+my $max_key = $ARGV[1] // 10_000
+
+# Pick a target key in the range and hash it; workers will try to find
+# the pre-image.
+my $secret = 7777
+my $target_hash = sha256("key-$secret")
+printf "── parallel hash crack ──\n"
+printf "  workers: %d  ·  range: 0..%d  ·  target: %s...%s\n",
+    $n_workers, $max_key, substr($target_hash, 0, 8), substr($target_hash, -8)
+printf "  (secret key planted at: %d)\n", $secret
+
+my @workers = congregation($n_workers)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard the key range across workers.
+my $chunk = int(($max_key + $n_workers) / $n_workers)
+my %ranges
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $chunk
+    my $end = $start + $chunk
+    $end = $max_key if $end > $max_key
+    $ranges{$w} = "$start,$end,$target_hash"
+}
+
+# Each worker tries its range and returns either the found key or "no".
+my %found
+for my $w (@sorted_workers) {
+    my ($s, $e, $h) = split /,/, $ranges{$w}
+    my $code = "
+        my \$start = $s; my \$end = $e; my \$target = '$h';
+        my \$ans = 'no';
+        for my \$k (\$start:\$end - 1) {
+            if (sha256('key-' . \$k) eq \$target) { \$ans = \$k; last }
+        }
+        \$ans
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    $found{$w} = $reply{$w}
+}
+
+p "── per-worker search results ──"
+my $winner = -1
+for my $w (@sorted_workers) {
+    my ($s, $e, $_h) = split /,/, $ranges{$w}
+    my $r = $found{$w}
+    if ($r eq 'no') {
+        printf "  worker %d  [%d..%d):  not found\n", $w, $s, $e
+    } else {
+        printf "  worker %d  [%d..%d):  FOUND key=%s ✓\n", $w, $s, $e, $r
+        $winner = $w
+    }
+}
+
+if ($winner > 0) {
+    printf "✓ pre-image cracked — key was %s (planted: %d)\n", $found{$winner}, $secret
+} else {
+    p "✗ secret not in any worker's range"
+}
+
+excommunicate(@workers)
+p "done"
