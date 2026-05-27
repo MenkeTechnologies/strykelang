@@ -2819,6 +2819,32 @@ Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration p
 
 Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
+### Active probes — `tcp_probe` / `tcp_banner` / `whois_query`
+
+Sibling to `kick` (which returns `1`/`0`) — pick by what you need:
+
+| Builtin | Returns | When to use |
+|---|---|---|
+| [`kick($host, $port)`](#builtins-kick--udp_send--tcp-knock--udp-multi-shot) | `1` / `0` | Fast service-mesh sweep, don't care about latency |
+| `tcp_probe($host, $port [, $timeout_ms])` | `{ alive, latency_ms }` | Same probe, but with the RTT measurement |
+| `tcp_banner($host, $port [, $timeout_ms, $max_bytes])` | `{ alive, latency_ms, banner }` | Service fingerprint (SSH version, HTTP server header, SMTP greeting) |
+| `whois_query($domain [, $server, $timeout_ms])` | response string or `undef` | Domain registration / IP-ownership investigation (RFC 3912) |
+
+```perl
+# SSH version sniff across a fleet.
+for my $host (qw(web1 web2 db1)) {
+    my $r = tcp_banner($host, 22, 500)
+    printf "  %-8s %s\n", $host, $1 if $r->{alive} && $r->{banner} =~ /^SSH-(\S+)/
+}
+
+# Find the authoritative WHOIS server for a TLD, then chase the refer:
+my $iana = whois_query("example.com")
+my ($registry) = $iana =~ /^refer:\s+(\S+)/m
+my $detail = whois_query("example.com", $registry // "whois.verisign-grs.com")
+```
+
+Demo: [`examples/network_recon.stk`](examples/network_recon.stk) chains `tcp_probe` + `tcp_banner` via `pmap` for parallel asset discovery + service fingerprinting.
+
 ### Common pitfalls — friction points worth knowing upfront
 
 These are real bumps I hit while building the NAT-traversal stack — surfacing them so you don't waste time on the same investigations.

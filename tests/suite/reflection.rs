@@ -236,6 +236,38 @@ fn every_dispatch_primary_is_categorized() {
     );
 }
 
+/// ExprKind-special builtins (`burp` / `god` / `swallow` / `ingest`) are
+/// parsed to dedicated AST variants rather than routed through
+/// `try_builtin` dispatch arms — they bypass the primary/alias scheme.
+/// That means they need EXPLICIT registration in
+/// `parser.rs::stryke_extension_name` for build.rs to put them in
+/// `ALL_CATEGORY_MAP`. User bug report 2026-05-27 found `burp` missing
+/// from `%all` because the names lived only in
+/// `is_reserved_special_var_name` (shadow protection) and never reached
+/// the category extractor. This pin keeps them registered.
+///
+/// If you add a new ExprKind-special builtin, add it to BOTH
+/// `stryke_extension_name` (under a section comment whose label is < 40
+/// chars per build.rs:parse_section_header's cap) AND this test's name
+/// list. The pin catches the asymmetric case (registered as ExprKind
+/// but forgotten in categorization).
+#[test]
+fn exprkind_special_builtins_present_in_reflection_registry() {
+    for name in ["burp", "god", "swallow", "ingest"] {
+        let in_b = eval_int(&format!(r#"exists $b{{{name}}} ? 1 : 0"#));
+        let in_all = eval_int(&format!(r#"exists $all{{{name}}} ? 1 : 0"#));
+        assert_eq!(
+            in_b, 1,
+            "ExprKind-special builtin `{name}` must be in %b — \
+             add to stryke_extension_name in parser.rs"
+        );
+        assert_eq!(
+            in_all, 1,
+            "ExprKind-special builtin `{name}` must be in %all"
+        );
+    }
+}
+
 /// Catastrophic-regression floors on each hash.
 #[test]
 fn reflection_hashes_have_reasonable_sizes() {
