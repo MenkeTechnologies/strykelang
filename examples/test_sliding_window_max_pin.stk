@@ -1,0 +1,194 @@
+#!/usr/bin/env stryke
+
+package SWM;
+
+fn max_window($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    my @dq = ()
+    for my $i (0:$n-1) {
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) {
+            shift @dq
+        }
+        while (len(@dq) > 0 && $arr->[$dq[(len(@dq)) - 1]] <= $arr->[$i]) {
+            pop @dq
+        }
+        push @dq, $i
+        if ($i >= $k - 1) {
+            push @out, $arr->[$dq[0]]
+        }
+    }
+    \@out
+}
+
+fn min_window($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    my @dq = ()
+    for my $i (0:$n-1) {
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) {
+            shift @dq
+        }
+        while (len(@dq) > 0 && $arr->[$dq[(len(@dq)) - 1]] >= $arr->[$i]) {
+            pop @dq
+        }
+        push @dq, $i
+        if ($i >= $k - 1) {
+            push @out, $arr->[$dq[0]]
+        }
+    }
+    \@out
+}
+
+# Brute-force reference: O(nk)
+fn brute_max($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    for my $i (0:$n-$k) {
+        my $m = $arr->[$i]
+        for my $j ($i:$i+$k-1) {
+            $m = $arr->[$j] if $arr->[$j] > $m
+        }
+        push @out, $m
+    }
+    \@out
+}
+
+fn brute_min($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    for my $i (0:$n-$k) {
+        my $m = $arr->[$i]
+        for my $j ($i:$i+$k-1) {
+            $m = $arr->[$j] if $arr->[$j] < $m
+        }
+        push @out, $m
+    }
+    \@out
+}
+
+package main;
+
+# --- Empty / degenerate inputs ---
+my $r1 = SWM::max_window([], 3)
+len(@$r1) |> aeq 0, "empty arr returns empty"
+
+my $r2 = SWM::max_window([1,2,3], 0)
+len(@$r2) |> aeq 0, "k=0 returns empty"
+
+my $r3 = SWM::max_window([1,2,3], 5)
+len(@$r3) |> aeq 0, "k>n returns empty"
+
+# --- Single-element windows (k=1 echoes input) ---
+my $a4 = [4, 2, 9, 1, 7]
+my $r4 = SWM::max_window($a4, 1)
+len(@$r4) |> aeq 5, "k=1 len matches"
+$r4->[0] |> aeq 4, "k=1 idx0"
+$r4->[2] |> aeq 9, "k=1 idx2"
+$r4->[4] |> aeq 7, "k=1 idx4"
+
+# --- Whole-array window (k=n yields single max) ---
+my $r5 = SWM::max_window([3, 1, 4, 1, 5, 9, 2, 6], 8)
+len(@$r5) |> aeq 1, "k=n single window"
+$r5->[0] |> aeq 9, "k=n max"
+
+my $r5b = SWM::min_window([3, 1, 4, 1, 5, 9, 2, 6], 8)
+$r5b->[0] |> aeq 1, "k=n min"
+
+# --- Canonical Leetcode example ---
+my $arr = [1, 3, -1, -3, 5, 3, 6, 7]
+my $mx = SWM::max_window($arr, 3)
+len(@$mx) |> aeq 6, "k=3 len"
+$mx->[0] |> aeq 3, "win[0..2] max"
+$mx->[1] |> aeq 3, "win[1..3] max"
+$mx->[2] |> aeq 5, "win[2..4] max"
+$mx->[3] |> aeq 5, "win[3..5] max"
+$mx->[4] |> aeq 6, "win[4..6] max"
+$mx->[5] |> aeq 7, "win[5..7] max"
+
+my $mn = SWM::min_window($arr, 3)
+$mn->[0] |> aeq -1, "win[0..2] min"
+$mn->[1] |> aeq -3, "win[1..3] min"
+$mn->[2] |> aeq -3, "win[2..4] min"
+$mn->[3] |> aeq -3, "win[3..5] min"
+$mn->[4] |> aeq 3, "win[4..6] min"
+$mn->[5] |> aeq 3, "win[5..7] min"
+
+# --- Strictly increasing array (max = last, min = first of window) ---
+my $inc = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+my $im = SWM::max_window($inc, 4)
+$im->[0] |> aeq 4, "inc max win0"
+$im->[3] |> aeq 7, "inc max win3"
+$im->[6] |> aeq 10, "inc max win6"
+my $in = SWM::min_window($inc, 4)
+$in->[0] |> aeq 1, "inc min win0"
+$in->[6] |> aeq 7, "inc min win6"
+
+# --- Strictly decreasing (max = first, min = last) ---
+my $dec = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+my $dm = SWM::max_window($dec, 4)
+$dm->[0] |> aeq 10, "dec max win0"
+$dm->[6] |> aeq 4, "dec max win6"
+my $dn = SWM::min_window($dec, 4)
+$dn->[0] |> aeq 7, "dec min win0"
+$dn->[6] |> aeq 1, "dec min win6"
+
+# --- Constant array (max == min == constant for every window) ---
+my $cn = [5, 5, 5, 5, 5, 5]
+my $cm = SWM::max_window($cn, 3)
+my $cmn = SWM::min_window($cn, 3)
+len(@$cm) |> aeq 4, "const max len"
+my $all_five = 1
+for my $i (0:3) {
+    $all_five = 0 if $cm->[$i] != 5 || $cmn->[$i] != 5
+}
+$all_five |> aeq 1, "const max==min==5"
+
+# --- Negative-only array ---
+my $neg = [-7, -3, -10, -1, -5, -2, -8]
+my $nm = SWM::max_window($neg, 3)
+$nm->[0] |> aeq -3, "neg max win0"
+$nm->[4] |> aeq -2, "neg max win4"
+my $nmn = SWM::min_window($neg, 3)
+$nmn->[0] |> aeq -10, "neg min win0"
+$nmn->[4] |> aeq -8, "neg min win4"
+
+# --- Randomised stress vs brute (LCG seed) ---
+my $seed = 12345
+my @big = ()
+for my $i (1:200) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    push @big, ($seed % 400) - 200
+}
+my $bm5 = SWM::max_window(\@big, 5)
+my $br5 = SWM::brute_max(\@big, 5)
+my $bn5 = SWM::min_window(\@big, 5)
+my $brn5 = SWM::brute_min(\@big, 5)
+len(@$bm5) |> aeq len(@$br5), "stress max len match"
+len(@$bn5) |> aeq len(@$brn5), "stress min len match"
+
+my $okmx = 1
+my $okmn = 1
+my $lim = (len(@$bm5)) - 1
+for my $i (0:$lim) {
+    $okmx = 0 if $bm5->[$i] != $br5->[$i]
+    $okmn = 0 if $bn5->[$i] != $brn5->[$i]
+}
+$okmx |> aeq 1, "stress k=5 max matches brute"
+$okmn |> aeq 1, "stress k=5 min matches brute"
+
+# Larger window
+my $bm17 = SWM::max_window(\@big, 17)
+my $br17 = SWM::brute_max(\@big, 17)
+my $okmx17 = 1
+my $lim17 = (len(@$bm17)) - 1
+for my $i (0:$lim17) {
+    $okmx17 = 0 if $bm17->[$i] != $br17->[$i]
+}
+$okmx17 |> aeq 1, "stress k=17 max matches brute"
+
+test_run
