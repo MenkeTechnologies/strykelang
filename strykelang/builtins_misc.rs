@@ -1281,3 +1281,323 @@ pub fn geohash_precision(args: &[StrykeValue]) -> StrykeValue {
 fn placeholder_use() {
     let _ = arg_str(&[]);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helpers — build StrykeValue from i64 or &str for test args.
+    fn i(n: i64) -> StrykeValue {
+        StrykeValue::integer(n)
+    }
+    fn s(t: &str) -> StrykeValue {
+        StrykeValue::string(t.to_string())
+    }
+
+    // Inspect output uniformly — bignum_* either returns StrykeValue::string
+    // (for ret_bigint outputs) or StrykeValue::integer (for bit_length /
+    // test_bit / to_int). Try string first, fall back to integer Display.
+    fn as_string(v: &StrykeValue) -> String {
+        let s = v.as_str_or_empty();
+        if !s.is_empty() {
+            return s;
+        }
+        format!("{}", v)
+    }
+
+    // ─── arg helpers ─────────────────────────────────────────────────
+
+    #[test]
+    fn arg_str_first_or_empty() {
+        assert_eq!(arg_str(&[]), "");
+        assert_eq!(arg_str(&[s("hello"), s("world")]), "hello");
+    }
+
+    #[test]
+    fn arg_f64_returns_none_when_missing() {
+        assert_eq!(arg_f64(&[], 0), None);
+    }
+
+    #[test]
+    fn arg_i64_returns_none_when_missing() {
+        assert_eq!(arg_i64(&[], 5), None);
+    }
+
+    #[test]
+    fn parse_bigint_decimal() {
+        let n = parse_bigint("12345").unwrap();
+        assert_eq!(n.to_string(), "12345");
+    }
+
+    #[test]
+    fn parse_bigint_negative_decimal() {
+        let n = parse_bigint("-999").unwrap();
+        assert_eq!(n.to_string(), "-999");
+    }
+
+    #[test]
+    fn parse_bigint_garbage_returns_none() {
+        assert!(parse_bigint("not a number").is_none());
+    }
+
+    // ─── bignum_add / sub / mul / div / mod ─────────────────────────
+
+    #[test]
+    fn bignum_add_basic() {
+        assert_eq!(as_string(&bignum_add(&[i(2), i(3)])), "5");
+    }
+
+    #[test]
+    fn bignum_add_carries_beyond_i64() {
+        // 9_999_999_999_999_999_999 + 1 = 10^19 (just past i64::MAX).
+        let r = bignum_add(&[s("9999999999999999999"), s("1")]);
+        assert_eq!(as_string(&r), "10000000000000000000");
+    }
+
+    #[test]
+    fn bignum_sub_negative_result() {
+        assert_eq!(as_string(&bignum_sub(&[i(3), i(5)])), "-2");
+    }
+
+    #[test]
+    fn bignum_mul_two_big_numbers() {
+        // 100^100 has 200 digits. Multiplication beyond i128 must work.
+        let r = bignum_mul(&[s("100000000000000000000"), s("100000000000000000000")]);
+        assert_eq!(as_string(&r), "10000000000000000000000000000000000000000");
+    }
+
+    #[test]
+    fn bignum_div_basic() {
+        assert_eq!(as_string(&bignum_div(&[i(10), i(3)])), "3");
+    }
+
+    #[test]
+    fn bignum_div_by_zero_undef() {
+        assert!(bignum_div(&[i(10), i(0)]).is_undef());
+    }
+
+    #[test]
+    fn bignum_mod_basic() {
+        assert_eq!(as_string(&bignum_mod(&[i(10), i(3)])), "1");
+    }
+
+    #[test]
+    fn bignum_mod_by_zero_undef() {
+        assert!(bignum_mod(&[i(10), i(0)]).is_undef());
+    }
+
+    // ─── bignum_pow / modpow ────────────────────────────────────────
+
+    #[test]
+    fn bignum_pow_two_to_the_tenth() {
+        assert_eq!(as_string(&bignum_pow(&[i(2), i(10)])), "1024");
+    }
+
+    #[test]
+    fn bignum_pow_two_to_the_hundredth() {
+        // 2^100 = 1267650600228229401496703205376
+        assert_eq!(
+            as_string(&bignum_pow(&[i(2), i(100)])),
+            "1267650600228229401496703205376"
+        );
+    }
+
+    #[test]
+    fn bignum_pow_negative_exp_treated_as_zero() {
+        // Impl clamps negative exp to 0 (.max(0)) → x^0 = 1.
+        assert_eq!(as_string(&bignum_pow(&[i(7), i(-5)])), "1");
+    }
+
+    #[test]
+    fn bignum_modpow_basic() {
+        // 2^10 mod 1000 = 1024 mod 1000 = 24.
+        assert_eq!(as_string(&bignum_modpow(&[i(2), i(10), i(1000)])), "24");
+    }
+
+    #[test]
+    fn bignum_modpow_zero_modulus_undef() {
+        assert!(bignum_modpow(&[i(2), i(10), i(0)]).is_undef());
+    }
+
+    // ─── bignum_gcd / lcm ───────────────────────────────────────────
+
+    #[test]
+    fn bignum_gcd_basic() {
+        assert_eq!(as_string(&bignum_gcd(&[i(48), i(18)])), "6");
+    }
+
+    #[test]
+    fn bignum_gcd_coprime_is_one() {
+        assert_eq!(as_string(&bignum_gcd(&[i(17), i(31)])), "1");
+    }
+
+    #[test]
+    fn bignum_gcd_with_zero_returns_other() {
+        // gcd(0, n) = n by convention.
+        assert_eq!(as_string(&bignum_gcd(&[i(0), i(42)])), "42");
+    }
+
+    #[test]
+    fn bignum_lcm_basic() {
+        // lcm(4, 6) = 12.
+        assert_eq!(as_string(&bignum_lcm(&[i(4), i(6)])), "12");
+    }
+
+    #[test]
+    fn bignum_lcm_with_zero_is_zero() {
+        // Standard convention: lcm(0, n) = 0.
+        assert_eq!(as_string(&bignum_lcm(&[i(0), i(42)])), "0");
+    }
+
+    // ─── bignum_factorial ───────────────────────────────────────────
+
+    #[test]
+    fn bignum_factorial_zero_is_one() {
+        // 0! = 1 by definition (the empty product).
+        assert_eq!(as_string(&bignum_factorial(&[i(0)])), "1");
+    }
+
+    #[test]
+    fn bignum_factorial_five() {
+        assert_eq!(as_string(&bignum_factorial(&[i(5)])), "120");
+    }
+
+    #[test]
+    fn bignum_factorial_twenty_overflows_u64() {
+        // 20! = 2432902008176640000 — fits in u64 but just barely.
+        assert_eq!(
+            as_string(&bignum_factorial(&[i(20)])),
+            "2432902008176640000"
+        );
+    }
+
+    #[test]
+    fn bignum_factorial_thirty_beyond_u64() {
+        // 30! = 265252859812191058636308480000000 (33 digits, beyond u64).
+        assert_eq!(
+            as_string(&bignum_factorial(&[i(30)])),
+            "265252859812191058636308480000000"
+        );
+    }
+
+    #[test]
+    fn bignum_factorial_negative_undef() {
+        assert!(bignum_factorial(&[i(-3)]).is_undef());
+    }
+
+    // ─── bignum_sqrt ────────────────────────────────────────────────
+
+    #[test]
+    fn bignum_sqrt_perfect_square() {
+        assert_eq!(as_string(&bignum_sqrt(&[i(100)])), "10");
+    }
+
+    #[test]
+    fn bignum_sqrt_non_perfect_truncates() {
+        // 10! = 3628800; sqrt ≈ 1904.939... → integer truncate = 1904.
+        assert_eq!(as_string(&bignum_sqrt(&[i(3_628_800)])), "1904");
+    }
+
+    #[test]
+    fn bignum_sqrt_negative_undef() {
+        assert!(bignum_sqrt(&[i(-1)]).is_undef());
+    }
+
+    #[test]
+    fn bignum_sqrt_zero() {
+        assert_eq!(as_string(&bignum_sqrt(&[i(0)])), "0");
+    }
+
+    // ─── bit ops ────────────────────────────────────────────────────
+
+    #[test]
+    fn bignum_bit_length_powers_of_two() {
+        // 1 has 1 bit, 2 has 2, 4 has 3, 255 has 8.
+        assert_eq!(as_string(&bignum_bit_length(&[i(1)])), "1");
+        assert_eq!(as_string(&bignum_bit_length(&[i(2)])), "2");
+        assert_eq!(as_string(&bignum_bit_length(&[i(255)])), "8");
+        assert_eq!(as_string(&bignum_bit_length(&[i(256)])), "9");
+    }
+
+    #[test]
+    fn bignum_bit_length_zero_is_zero() {
+        assert_eq!(as_string(&bignum_bit_length(&[i(0)])), "0");
+    }
+
+    #[test]
+    fn bignum_set_bit_then_test_round_trip() {
+        // Start with 0, set bit 5 → value 32 (2^5). Test bit 5 → 1.
+        let v = bignum_set_bit(&[i(0), i(5)]);
+        assert_eq!(as_string(&v), "32");
+        assert_eq!(as_string(&bignum_test_bit(&[i(32), i(5)])), "1");
+    }
+
+    #[test]
+    fn bignum_clear_bit_then_test_round_trip() {
+        let v = bignum_clear_bit(&[i(255), i(0)]);
+        assert_eq!(as_string(&v), "254");
+        assert_eq!(as_string(&bignum_test_bit(&[i(254), i(0)])), "0");
+    }
+
+    #[test]
+    fn bignum_test_bit_returns_zero_or_one_only() {
+        for b in 0..10 {
+            let v = bignum_test_bit(&[i(0b1010101010), i(b)]);
+            let s = as_string(&v);
+            assert!(
+                s == "0" || s == "1",
+                "test_bit returned {} for bit {}",
+                s,
+                b
+            );
+        }
+    }
+
+    #[test]
+    fn bignum_and_or_xor_basic() {
+        assert_eq!(as_string(&bignum_and(&[i(0b1100), i(0b1010)])), "8"); // 0b1000
+        assert_eq!(as_string(&bignum_or(&[i(0b1100), i(0b1010)])), "14"); // 0b1110
+        assert_eq!(as_string(&bignum_xor(&[i(0b1100), i(0b1010)])), "6"); // 0b0110
+    }
+
+    #[test]
+    fn bignum_xor_with_self_is_zero() {
+        // Identity: x XOR x = 0.
+        assert_eq!(as_string(&bignum_xor(&[i(12345), i(12345)])), "0");
+    }
+
+    // ─── bignum_to_int (downcast or UNDEF) ──────────────────────────
+
+    #[test]
+    fn bignum_to_int_fits() {
+        let r = bignum_to_int(&[i(42)]);
+        // Returned as a regular integer; integer should be 42 stringified.
+        assert_eq!(as_string(&r), "42");
+    }
+
+    #[test]
+    fn bignum_to_int_beyond_i64_undef() {
+        // 10^20 doesn't fit in i64; to_i64() returns None → UNDEF.
+        assert!(bignum_to_int(&[s("100000000000000000000")]).is_undef());
+    }
+
+    // ─── arg shape robustness ───────────────────────────────────────
+
+    #[test]
+    fn bignum_add_missing_args_undef() {
+        assert!(bignum_add(&[]).is_undef());
+        assert!(bignum_add(&[i(1)]).is_undef());
+    }
+
+    #[test]
+    fn bignum_modpow_missing_args_undef() {
+        assert!(bignum_modpow(&[i(2)]).is_undef());
+        assert!(bignum_modpow(&[i(2), i(3)]).is_undef());
+    }
+
+    // Silence dead_code warning on placeholder_use without removing it.
+    #[test]
+    fn placeholder_compiles() {
+        placeholder_use();
+    }
+}
