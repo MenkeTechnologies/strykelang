@@ -1,0 +1,97 @@
+#!/usr/bin/env stryke
+#
+# Distributed inverted index — workers each index their local document
+# shard (term → list of doc_ids), master merges shards into a global
+# inverted index. Then the master can answer "which docs contain term X"
+# in one hash lookup.
+#
+# Classic search-engine indexing shape. Real impls (Lucene, Tantivy)
+# also store per-term positions + TF/IDF weights.
+#
+# CI-safe: pure loopback fork, synthetic corpus. Clean under
+# --no-interop.
+
+my $n_workers = $ARGV[0] // 3
+
+p "── distributed inverted index ──"
+
+# Synthetic document corpus.
+my @docs = (
+    "the quick brown fox",
+    "jumped over the lazy dog",
+    "the dog slept all day",
+    "brown fox quick jump",
+    "lazy dog sleeps under tree",
+    "quick brown dog jumps over fox",
+)
+printf "corpus: %d documents  ·  workers: %d\n", len(@docs), $n_workers
+
+my @workers = congregation($n_workers)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard documents by index. Each worker indexes its shard, returns
+# term→[doc_ids] hash as JSON. doc_ids are GLOBAL (so master can
+# merge without re-keying).
+my $per = int((len(@docs) + $n_workers - 1) / $n_workers)
+my @partials
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = len(@docs) - 1 if $end >= len(@docs)
+    next if $start >= len(@docs)
+    my @shard
+    for my $r ($start:$end) { push @shard, $docs[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$arr = from_json(q{$shard_json});
+        my %index;
+        for my \$local_idx (0:len(\@\$arr) - 1) {
+            my \$global_id = $start + \$local_idx;
+            my \$doc = \$arr->[\$local_idx];
+            for my \$term (split /\\s+/, \$doc) {
+                if (exists \$index{\$term}) {
+                    push \@{\$index{\$term}}, \$global_id;
+                } else {
+                    \$index{\$term} = [\$global_id];
+                }
+            }
+        }
+        to_json(\\%index)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    push @partials, from_json($reply{$w})
+}
+
+# Master merges per-worker indices into one global inverted index.
+my %global_index
+for my $p (@partials) {
+    for my $term (keys %$p) {
+        if (exists $global_index{$term}) {
+            push @{$global_index{$term}}, @{$p->{$term}}
+        } else {
+            $global_index{$term} = [@{$p->{$term}}]
+        }
+    }
+}
+
+# Sort posting lists for nicer display.
+for my $term (keys %global_index) {
+    $global_index{$term} = [sort { _ <=> _1 } @{$global_index{$term}}]
+}
+
+p "── global inverted index (sample) ──"
+my @terms = sort keys %global_index
+for my $term (@terms) {
+    printf "  %-10s → docs %s\n", $term, join(",", @{$global_index{$term}})
+}
+
+# Sanity query: "which docs contain 'brown'?"
+my $q = "brown"
+if (exists $global_index{$q}) {
+    printf "\nquery '%s' → docs %s\n", $q, join(",", @{$global_index{$q}})
+}
+
+excommunicate(@workers)
+p "done"

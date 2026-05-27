@@ -1,0 +1,105 @@
+#!/usr/bin/env stryke
+#
+# Distributed k-means (one Lloyd iteration) — workers each get a
+# shard of points + the current centroids, compute the nearest
+# centroid for every point in their shard, return per-centroid
+# (count, x_sum, y_sum). Master aggregates and computes the next
+# centroid set as weighted means.
+#
+# Real k-means runs many iterations until convergence; this demo
+# shows ONE iteration to keep the wire dance compact.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+my $n_workers = $ARGV[0] // 4
+
+p "── distributed k-means (1 iteration) ──"
+
+# Synthetic 2D points and initial centroids.
+my @points
+for my $i (0:39) {
+    my $x = ($i * 7 + 3) % 100
+    my $y = ($i * 11 + 5) % 100
+    push @points, [$x, $y]
+}
+my @centroids = ([20, 20], [80, 80], [20, 80])
+printf "points: %d  ·  centroids: %d  ·  workers: %d\n",
+    len(@points), len(@centroids), $n_workers
+
+my @workers = congregation($n_workers)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard the points by index. Each worker gets a chunk; returns the
+# per-centroid (count, x_sum, y_sum) as JSON.
+my $per = int((len(@points) + $n_workers - 1) / $n_workers)
+my $centroids_json = to_json(\@centroids)
+my @partials
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = len(@points) - 1 if $end >= len(@points)
+    next if $start >= len(@points)
+    my @shard
+    for my $r ($start:$end) { push @shard, $points[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$pts = from_json(q{$shard_json});
+        my \$cs  = from_json(q{$centroids_json});
+        my \@cnt = (0) x len(\@\$cs);
+        my \@sx  = (0) x len(\@\$cs);
+        my \@sy  = (0) x len(\@\$cs);
+        for my \$p (\@\$pts) {
+            my \$best = 0;
+            my \$best_d = 1e18;
+            for my \$ci (0:len(\@\$cs) - 1) {
+                my \$dx = \$p->[0] - \$cs->[\$ci][0];
+                my \$dy = \$p->[1] - \$cs->[\$ci][1];
+                my \$d = \$dx * \$dx + \$dy * \$dy;
+                if (\$d < \$best_d) { \$best = \$ci; \$best_d = \$d }
+            }
+            \$cnt[\$best]++;
+            \$sx[\$best] += \$p->[0];
+            \$sy[\$best] += \$p->[1];
+        }
+        to_json([\\\@cnt, \\\@sx, \\\@sy])
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    push @partials, from_json($reply{$w})
+}
+
+# Aggregate partials into fleet totals.
+my @total_cnt = (0) x len(@centroids)
+my @total_sx  = (0) x len(@centroids)
+my @total_sy  = (0) x len(@centroids)
+for my $p (@partials) {
+    my ($c, $sx, $sy) = @$p
+    for my $ci (0:len(@centroids) - 1) {
+        $total_cnt[$ci] += $c->[$ci]
+        $total_sx[$ci]  += $sx->[$ci]
+        $total_sy[$ci]  += $sy->[$ci]
+    }
+}
+
+p "── new centroids (Lloyd update) ──"
+for my $ci (0:len(@centroids) - 1) {
+    my $n = $total_cnt[$ci]
+    if ($n == 0) {
+        printf "  centroid %d  (no assigned points)\n", $ci
+        next
+    }
+    my $nx = $total_sx[$ci] / $n
+    my $ny = $total_sy[$ci] / $n
+    printf "  centroid %d  count=%-3d  new=(%.1f, %.1f)\n", $ci, $n, $nx, $ny
+}
+
+# Total assigned points must equal input.
+my $total = 0
+for my $c (@total_cnt) { $total += $c }
+printf "total points assigned: %d / %d %s\n",
+    $total, len(@points),
+    $total == len(@points) ? "✓" : "✗"
+
+excommunicate(@workers)
+p "done"

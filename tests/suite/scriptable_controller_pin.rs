@@ -1224,3 +1224,108 @@ fn set_quiet_accept_toggles_without_breaking_subsequent_accepts() {
     handle.set_quiet_accept(false); // restore for subsequent connections
     dismiss(&handle, vec![child]);
 }
+
+// ─── Round-4 pins ─────────────────────────────────────────────────────────
+
+/// `spawn_controller` on an already-bound port returns an io::Error
+/// (AddrInUse), not a panic. Pin the bind-failure path.
+#[test]
+fn spawn_controller_on_already_bound_port_returns_error() {
+    // Bind one controller on port 0 (OS-assigned).
+    let first = spawn_controller("127.0.0.1", 0).expect("first spawn");
+    let port = first.listen_addr().port();
+
+    // Try to bind a second controller on the SAME port — must error.
+    let second = spawn_controller("127.0.0.1", port);
+    assert!(
+        second.is_err(),
+        "second bind on port {} must fail",
+        port
+    );
+    // Pattern-match (unwrap_err requires Ok: Debug and
+    // Arc<ControllerHandle> doesn't impl Debug).
+    let err = match second {
+        Err(e) => e,
+        Ok(_) => panic!("second bind should have failed"),
+    };
+    assert!(
+        !err.to_string().is_empty(),
+        "error must have a non-empty message"
+    );
+
+    first.shutdown();
+}
+
+/// `get_controller` for a never-registered id returns None (not panic,
+/// not a default handle). Pin the registry's negative case.
+#[test]
+fn get_controller_for_unknown_id_returns_none() {
+    use stryke::controller::get_controller;
+    let result = get_controller(99_999_999);
+    assert!(result.is_none(), "unknown id yields None");
+}
+
+/// `welcome(0, ...)` always returns true regardless of current agent
+/// count — zero is the trivial lower bound.
+#[test]
+fn welcome_with_target_zero_always_true() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+
+    // No agents at all — welcome(0) instant true.
+    assert!(handle.welcome(0, Duration::from_millis(10)));
+    handle.shutdown();
+}
+
+/// Multiple back-to-back `spawn_controller` calls produce distinct
+/// controllers with distinct ports. Pin the no-port-collision property.
+#[test]
+fn multiple_back_to_back_spawns_yield_distinct_ports() {
+    let h1 = spawn_controller("127.0.0.1", 0).expect("spawn 1");
+    let h2 = spawn_controller("127.0.0.1", 0).expect("spawn 2");
+    let h3 = spawn_controller("127.0.0.1", 0).expect("spawn 3");
+
+    let p1 = h1.listen_addr().port();
+    let p2 = h2.listen_addr().port();
+    let p3 = h3.listen_addr().port();
+
+    assert_ne!(p1, p2, "ports 1 and 2 distinct");
+    assert_ne!(p2, p3, "ports 2 and 3 distinct");
+    assert_ne!(p1, p3, "ports 1 and 3 distinct");
+    assert!(p1 > 0 && p2 > 0 && p3 > 0, "OS assigned non-zero ports");
+
+    h1.shutdown();
+    h2.shutdown();
+    h3.shutdown();
+}
+
+/// petition_id increments monotonically within a single ControllerHandle.
+/// Pin the AtomicU64 fetch-and-add semantics — even if scatters fail
+/// to dispatch (empty agent list), the id still advances.
+#[test]
+fn petition_id_increments_monotonically_within_handle() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    let pid_a = handle.scatter("noop", &[]).expect("scatter a");
+    let pid_b = handle.scatter("noop", &[]).expect("scatter b");
+    let pid_c = handle.scatter("noop", &[]).expect("scatter c");
+    assert!(
+        pid_a < pid_b && pid_b < pid_c,
+        "petition ids must be strictly increasing: got {} {} {}",
+        pid_a,
+        pid_b,
+        pid_c
+    );
+    handle.shutdown();
+}
+
+/// `ControllerHandle::shutdown` is idempotent — calling it a second
+/// time does not panic. Pin the safe-multi-call property so cleanup
+/// code can be defensive.
+#[test]
+fn shutdown_is_idempotent() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    handle.shutdown();
+    // Second call must not panic.
+    handle.shutdown();
+    // Third for good measure.
+    handle.shutdown();
+}

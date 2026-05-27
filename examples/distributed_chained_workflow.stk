@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+#
+# Distributed chained workflow — master runs two harvest stages where
+# stage 2's prayer depends on stage 1's results. Each stage scatters
+# to the same congregation; the second uses bestow to push stage 1
+# results back to workers as %gift before scattering stage 2.
+#
+# Real-world shape: stage 1 fetches per-worker partial data, master
+# aggregates and computes a derived parameter, stage 2 uses the
+# parameter for the next compute (e.g. iterative refinement, ML
+# minibatch epochs).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed chained workflow ──"
+
+my @workers = congregation(4)
+printf "spawned %d workers\n", len(@workers)
+
+# Stage 1: each worker computes its local mean of values 1..100.
+my %stage1 = harvest "
+my \$s = 0;
+for my \$i (1:100) { \$s += \$i }
+\$s / 100
+", @workers, 5_000
+
+p "── stage 1 (local means) ──"
+my $fleet_sum = 0
+for my $sid (sort { _ <=> _1 } keys %stage1) {
+    printf "  worker %d: local mean = %s\n", $sid, $stage1{$sid}
+    $fleet_sum += $stage1{$sid}
+}
+my $fleet_mean = $fleet_sum / len(keys %stage1)
+printf "fleet mean from stage 1: %.2f\n", $fleet_mean
+
+# Master pushes the fleet mean to all workers as %gift.
+my %config = (fleet_mean => "$fleet_mean")
+bestow(\%config, @workers)
+p "bestowed fleet_mean to all workers as %gift"
+
+# Stage 2: each worker computes its local sum-of-squared-distances
+# from the fleet mean (variance contribution).
+my %stage2 = harvest "
+our %gift;
+my \$mean = 0 + \$gift{fleet_mean};
+my \$sq = 0;
+for my \$i (1:100) {
+    my \$d = \$i - \$mean;
+    \$sq += \$d * \$d;
+}
+\$sq
+", @workers, 5_000
+
+p "── stage 2 (per-worker SSE from fleet mean) ──"
+my $total_sse = 0
+for my $sid (sort { _ <=> _1 } keys %stage2) {
+    printf "  worker %d: SSE = %s\n", $sid, $stage2{$sid}
+    $total_sse += $stage2{$sid}
+}
+
+my $n_workers = len(keys %stage2)
+my $variance = $total_sse / (100 * $n_workers)
+printf "── fleet variance: %.2f ──\n", $variance
+
+# Known: variance of uniform 1..100 = 833.25
+my $expected = 833.25
+my $diff = abs($variance - $expected)
+p $diff < 1.0 ? "✓ variance within 1.0 of expected $expected" : "△ variance off by $diff"
+
+excommunicate(@workers)
+p "done"
