@@ -1,0 +1,43 @@
+#!/usr/bin/env stryke
+#
+# Progress monitor — workers each run a short compute job, master
+# polls them via repeated harvest() calls to show progress. Real
+# implementations would use chant + periodic lick; this version uses
+# a simpler "ping each worker for status" pattern that works without
+# the Tier 5 EVAL_RESULT petition_id demux fix.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── progress monitor ──"
+
+my @workers = congregation(3)
+printf "spawned %d workers\n", len(@workers)
+
+# Each worker runs a 3-step compute, updating a per-step counter.
+# We ping all workers between steps to see progress.
+for my $step (1:3) {
+    printf "── step %d ──\n", $step
+    my %results = harvest "'step-' . $step . '-done'", @workers, 5_000
+    for my $sid (sort { _ <=> _1 } keys %results) {
+        printf "  worker %d: %s\n", $sid, $results{$sid}
+    }
+}
+
+# Final status check: all workers should be alive and reachable.
+my @alive = muster()
+printf "final muster: %d workers still alive\n", len(@alive)
+
+# Bonus: interrogate each worker's process state via the agent-handle
+# form of interrogate. Returns a bare hash keyed by session-id (with
+# per-session values as hash refs).
+p "── per-worker agent state ──"
+my %state = interrogate(@workers)
+for my $sid (sort { _ <=> _1 } keys %state) {
+    my $h = $state{$sid}
+    if (ref($h) eq 'HASH') {
+        printf "  worker %d: pid=%s time=%s\n", $sid, $h->{pid}, $h->{time}
+    }
+}
+
+excommunicate(@workers)
+p "done"

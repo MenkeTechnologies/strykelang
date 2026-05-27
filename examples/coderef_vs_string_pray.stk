@@ -1,0 +1,61 @@
+#!/usr/bin/env stryke
+#
+# Coderef pray vs string pray — both forms produce the same prayer on
+# the wire. The coderef form is more ergonomic for short bodies; the
+# string form is needed when the prayer is built dynamically.
+#
+# Coderef body deparses through `crate::deparse::deparse_block` before
+# shipping. Closure captures (`closure_env`) are NOT shipped — body
+# must be self-contained. This is documented in the README §0x10c
+# limitations and the pin test `deparse_block_produces_evaluable_source`.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── coderef pray vs string pray ──"
+
+my @workers = congregation(2)
+printf "spawned %d workers\n", len(@workers)
+
+# Form 1: string prayer — the basic form.
+p "── form 1: string prayer ──"
+my $div1 = pray "2 * 21", @workers
+my %r1 = annex $div1
+for my $sid (sort { _ <=> _1 } keys %r1) {
+    printf "  worker %d: %s\n", $sid, $r1{$sid}
+}
+
+# Form 2: coderef prayer — the ergonomic form. The closure body is
+# deparsed before shipping. `fn { 6 * 7 }` deparses to `6 * 7` then
+# ships as the EVAL source. (Style-guide rule 1: `fn` not `sub` —
+# `sub` is rejected by --no-interop.)
+p "── form 2: coderef prayer ──"
+my $code = fn { 6 * 7 }
+my $div2 = pray $code, @workers
+my %r2 = annex $div2
+for my $sid (sort { _ <=> _1 } keys %r2) {
+    printf "  worker %d: %s\n", $sid, $r2{$sid}
+}
+
+# Verify both forms returned the same answer (42).
+my $all_42 = 1
+for my $sid (keys %r1) {
+    $all_42 = 0 unless $r1{$sid} eq "42"
+}
+for my $sid (keys %r2) {
+    $all_42 = 0 unless $r2{$sid} eq "42"
+}
+p $all_42 ? "✓ both forms returned 42 (= 2*21 = 6*7)" : "✗ forms diverged"
+
+# Caveat demo: coderef closures CANNOT capture lexical variables.
+# Variables from the master's scope are NOT shipped to the worker —
+# only the deparsed body source is.
+p "── form 3 caveat: closure captures not shipped ──"
+my $multiplier = 100   # this won't be visible to workers
+my $bad_capture = fn { 6 * $multiplier }   # would fail on worker
+# We don't run the prayer because the worker would error on undefined
+# $multiplier. Just print the caveat.
+p "  (closure capturing master-scope vars would fail on worker)"
+p "  (workaround: bake the value into the body or use bestow)"
+
+excommunicate(@workers)
+p "done"
