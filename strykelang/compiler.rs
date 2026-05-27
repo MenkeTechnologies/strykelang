@@ -986,6 +986,9 @@ impl Compiler {
     /// block that takes positional arguments — exempt them too so
     /// `$_1[0]` / `@_1[0]` / etc. compile under `use strict 'vars'`.
     fn strict_array_exempt(name: &str) -> bool {
+        if name.starts_with("__topicstr__") {
+            return true;
+        }
         if matches!(
             name,
             "_" | "ARGV" | "INC" | "ENV" | "ISA" | "EXPORT" | "EXPORT_OK" | "EXPORT_FAIL"
