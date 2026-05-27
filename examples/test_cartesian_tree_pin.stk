@@ -1,0 +1,205 @@
+#!/usr/bin/env stryke
+
+package CT;
+
+fn build($arr) {
+    my $n = len(@$arr)
+    my @nodes = ()
+    for my $i (0:$n-1) {
+        push @nodes, {
+            val => $arr->[$i], idx => $i,
+            parent => -1, left => -1, right => -1
+        }
+    }
+    return { nodes => \@nodes, root => -1 } if $n == 0
+    my @stack = (0)
+    my $root_i = 0
+    for my $i (1:$n-1) {
+        my $last_popped = -1
+        while (len(@stack) > 0 && $nodes[$stack[(len(@stack)) - 1]]->{val} > $arr->[$i]) {
+            $last_popped = pop @stack
+        }
+        if (len(@stack) == 0) {
+            $nodes[$i]->{left} = $last_popped
+            $nodes[$last_popped]->{parent} = $i if $last_popped >= 0
+            $root_i = $i
+        } else {
+            my $top = $stack[(len(@stack)) - 1]
+            my $old_right = $nodes[$top]->{right}
+            $nodes[$top]->{right} = $i
+            $nodes[$i]->{parent} = $top
+            if ($old_right >= 0) {
+                $nodes[$i]->{left} = $old_right
+                $nodes[$old_right]->{parent} = $i
+            }
+        }
+        push @stack, $i
+    }
+    { nodes => \@nodes, root => $root_i }
+}
+
+fn rmq($t, $l, $r) {
+    return undef if $l > $r
+    my $nodes = $t->{nodes}
+    my %anc_of_l = ()
+    my $cur = $l
+    while ($cur >= 0) {
+        $anc_of_l{$cur} = 1
+        $cur = $nodes->[$cur]->{parent}
+    }
+    my $u = $r
+    while (!exists $anc_of_l{$u}) {
+        $u = $nodes->[$u]->{parent}
+    }
+    { val => $nodes->[$u]->{val}, idx => $nodes->[$u]->{idx} }
+}
+
+fn inorder($t) {
+    my @out = ()
+    return \@out if $t->{root} < 0
+    my @stack = ()
+    my $cur = $t->{root}
+    my $nodes = $t->{nodes}
+    while ($cur >= 0 || len(@stack) > 0) {
+        while ($cur >= 0) {
+            push @stack, $cur
+            $cur = $nodes->[$cur]->{left}
+        }
+        $cur = pop @stack
+        push @out, $nodes->[$cur]->{val}
+        $cur = $nodes->[$cur]->{right}
+    }
+    \@out
+}
+
+# Heap invariant: every parent's val <= its children's val.
+fn heap_ok($t) {
+    my $nodes = $t->{nodes}
+    my $n = len(@$nodes)
+    for my $i (0:$n-1) {
+        my $l = $nodes->[$i]->{left}
+        my $r = $nodes->[$i]->{right}
+        return 0 if $l >= 0 && $nodes->[$l]->{val} < $nodes->[$i]->{val}
+        return 0 if $r >= 0 && $nodes->[$r]->{val} < $nodes->[$i]->{val}
+    }
+    1
+}
+
+# Brute-force reference: min value in arr[l..r]
+fn brute_min($arr, $l, $r) {
+    my $m = $arr->[$l]
+    for my $i ($l:$r) {
+        $m = $arr->[$i] if $arr->[$i] < $m
+    }
+    $m
+}
+
+package main;
+
+# --- Empty array ---
+my $t0 = CT::build([])
+$t0->{root} |> aeq -1, "empty root"
+len(@{CT::inorder($t0)}) |> aeq 0, "empty inorder"
+
+# --- Single element ---
+my $t1 = CT::build([42])
+$t1->{root} |> aeq 0, "single root"
+my $io1 = CT::inorder($t1)
+len(@$io1) |> aeq 1, "single inorder len"
+$io1->[0] |> aeq 42, "single inorder val"
+CT::rmq($t1, 0, 0)->{val} |> aeq 42, "single rmq"
+
+# --- Increasing array (root = 0, all right children) ---
+my $ti = CT::build([1, 2, 3, 4, 5])
+$ti->{root} |> aeq 0, "inc root"
+my $ioi = CT::inorder($ti)
+$ioi->[0] |> aeq 1, "inc io[0]"
+$ioi->[4] |> aeq 5, "inc io[4]"
+CT::heap_ok($ti) |> aeq 1, "inc heap ok"
+
+# --- Decreasing array (root = last, all left children) ---
+my $td = CT::build([5, 4, 3, 2, 1])
+$td->{root} |> aeq 4, "dec root"
+my $iod = CT::inorder($td)
+$iod->[0] |> aeq 5, "dec io[0]"
+$iod->[4] |> aeq 1, "dec io[4]"
+CT::heap_ok($td) |> aeq 1, "dec heap ok"
+
+# --- Canonical: 3 1 4 1 5 9 2 6 ---
+my $arr = [3, 1, 4, 1, 5, 9, 2, 6]
+my $t = CT::build($arr)
+my $io = CT::inorder($t)
+my $eq = 1
+for my $i (0:7) { $eq = 0 if $io->[$i] != $arr->[$i] }
+$eq |> aeq 1, "canonical inorder == original"
+CT::heap_ok($t) |> aeq 1, "canonical heap ok"
+
+# Spot-check RMQ
+CT::rmq($t, 0, 0)->{val} |> aeq 3, "rmq[0..0]"
+CT::rmq($t, 0, 1)->{val} |> aeq 1, "rmq[0..1]"
+CT::rmq($t, 2, 2)->{val} |> aeq 4, "rmq[2..2]"
+CT::rmq($t, 4, 6)->{val} |> aeq 2, "rmq[4..6]"
+CT::rmq($t, 4, 5)->{val} |> aeq 5, "rmq[4..5]"
+CT::rmq($t, 5, 5)->{val} |> aeq 9, "rmq[5..5]"
+CT::rmq($t, 5, 7)->{val} |> aeq 2, "rmq[5..7]"
+CT::rmq($t, 0, 7)->{val} |> aeq 1, "rmq[0..7] full min"
+CT::rmq($t, 6, 7)->{val} |> aeq 2, "rmq[6..7]"
+
+# --- Constant array ---
+my $tc = CT::build([7, 7, 7, 7, 7])
+CT::heap_ok($tc) |> aeq 1, "const heap ok"
+for my $l (0:4) {
+    for my $r ($l:4) {
+        CT::rmq($tc, $l, $r)->{val} |> aeq 7, "const rmq[$l..$r]"
+    }
+}
+
+# --- Negative and zero values ---
+my $tn = CT::build([0, -3, 5, -10, 2, -1])
+CT::heap_ok($tn) |> aeq 1, "neg heap ok"
+CT::rmq($tn, 0, 5)->{val} |> aeq -10, "neg full min"
+CT::rmq($tn, 0, 2)->{val} |> aeq -3, "neg [0..2]"
+CT::rmq($tn, 4, 5)->{val} |> aeq -1, "neg [4..5]"
+
+# --- Stress: random array, all O(n^2) ranges vs brute ---
+my $seed = 7777
+my @rand = ()
+for my $i (1:40) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    push @rand, ($seed % 200) - 100
+}
+my $tr = CT::build(\@rand)
+CT::heap_ok($tr) |> aeq 1, "random heap ok"
+my $ior = CT::inorder($tr)
+my $ioeq = 1
+for my $i (0:39) { $ioeq = 0 if $ior->[$i] != $rand[$i] }
+$ioeq |> aeq 1, "random inorder == original"
+
+my $all_match = 1
+for my $l (0:39) {
+    for my $r ($l:39) {
+        my $got = CT::rmq($tr, $l, $r)->{val}
+        my $exp = CT::brute_min(\@rand, $l, $r)
+        $all_match = 0 if $got != $exp
+    }
+}
+$all_match |> aeq 1, "stress: all RMQ ranges match brute"
+
+# --- Parent pointers form a tree (no cycles, root has parent -1) ---
+my $valid = 1
+my $nodes_r = $tr->{nodes}
+for my $i (0:39) {
+    my $depth = 0
+    my $cur = $i
+    while ($cur >= 0 && $depth < 100) {
+        $cur = $nodes_r->[$cur]->{parent}
+        $depth = $depth + 1
+    }
+    $valid = 0 if $cur != -1
+}
+$valid |> aeq 1, "random: all nodes reach root via parents"
+
+# Root has parent -1
+$nodes_r->[$tr->{root}]->{parent} |> aeq -1, "root parent = -1"
+
+test_run

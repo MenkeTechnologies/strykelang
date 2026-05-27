@@ -1,0 +1,206 @@
+#!/usr/bin/env stryke
+
+package SA;
+
+fn build($s) {
+    my $n = len($s)
+    my @idx = ()
+    for my $i (0:$n-1) { push @idx, $i }
+    my @sorted = sort { substr($s, _) cmp substr($s, _1) } @idx
+    \@sorted
+}
+
+fn lcp($s, $sa) {
+    my $n = len($s)
+    my @rank = ()
+    for my $i (0:$n-1) { push @rank, 0 }
+    for my $i (0:$n-1) { $rank[$sa->[$i]] = $i }
+    my @lcp = ()
+    for my $i (0:$n-1) { push @lcp, 0 }
+    my $h = 0
+    for my $i (0:$n-1) {
+        if ($rank[$i] > 0) {
+            my $j = $sa->[$rank[$i] - 1]
+            while ($i + $h < $n && $j + $h < $n
+                   && substr($s, $i + $h, 1) eq substr($s, $j + $h, 1)) {
+                $h = $h + 1
+            }
+            $lcp[$rank[$i]] = $h
+            $h = $h - 1 if $h > 0
+        } else {
+            $h = 0
+        }
+    }
+    \@lcp
+}
+
+fn lb_suffix($s, $sa, $pat) {
+    my $lo = 0
+    my $hi = len(@$sa)
+    my $m = len($pat)
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        my $suf = substr($s, $sa->[$mid], $m)
+        if ($suf lt $pat) {
+            $lo = $mid + 1
+        } else {
+            $hi = $mid
+        }
+    }
+    $lo
+}
+
+fn find_all($s, $sa, $pat) {
+    my $m = len($pat)
+    my $n = len(@$sa)
+    return [] if $m == 0
+    my $lo = lb_suffix($s, $sa, $pat)
+    my @hits = ()
+    my $i = $lo
+    while ($i < $n) {
+        my $suf = substr($s, $sa->[$i], $m)
+        last if $suf ne $pat
+        push @hits, $sa->[$i]
+        $i = $i + 1
+    }
+    my @sorted = sort { _ <=> _1 } @hits
+    \@sorted
+}
+
+fn longest_repeated($s) {
+    my $sa = SA::build($s)
+    my $lc = SA::lcp($s, $sa)
+    my $best_i = 0
+    my $best_h = 0
+    for my $i (1:(len(@$lc))-1) {
+        if ($lc->[$i] > $best_h) {
+            $best_h = $lc->[$i]
+            $best_i = $i
+        }
+    }
+    substr($s, $sa->[$best_i], $best_h)
+}
+
+# Brute-force reference: all start positions where $pat occurs in $s
+fn brute_find($s, $pat) {
+    my $n = len($s)
+    my $m = len($pat)
+    my @out = ()
+    return \@out if $m == 0 || $m > $n
+    for my $i (0:$n-$m) {
+        push @out, $i if substr($s, $i, $m) eq $pat
+    }
+    \@out
+}
+
+package main;
+
+# --- build: banana ---
+my $s1 = "banana"
+my $sa1 = SA::build($s1)
+len(@$sa1) |> aeq 6, "banana sa len"
+$sa1->[0] |> aeq 5, "banana sa[0] = 'a'(5)"
+$sa1->[1] |> aeq 3, "banana sa[1] = 'ana'(3)"
+$sa1->[2] |> aeq 1, "banana sa[2] = 'anana'(1)"
+$sa1->[3] |> aeq 0, "banana sa[3] = 'banana'(0)"
+$sa1->[4] |> aeq 4, "banana sa[4] = 'na'(4)"
+$sa1->[5] |> aeq 2, "banana sa[5] = 'nana'(2)"
+
+# --- lcp: banana ---
+my $lc1 = SA::lcp($s1, $sa1)
+$lc1->[0] |> aeq 0, "lcp[0]=0 (no previous)"
+$lc1->[1] |> aeq 1, "lcp[1]: 'a' vs 'ana' = 1"
+$lc1->[2] |> aeq 3, "lcp[2]: 'ana' vs 'anana' = 3"
+$lc1->[3] |> aeq 0, "lcp[3]: 'anana' vs 'banana' = 0"
+$lc1->[4] |> aeq 0, "lcp[4]: 'banana' vs 'na' = 0"
+$lc1->[5] |> aeq 2, "lcp[5]: 'na' vs 'nana' = 2"
+
+# --- find_all: banana ---
+my $f1 = SA::find_all($s1, $sa1, "ana")
+len(@$f1) |> aeq 2, "find ana count"
+$f1->[0] |> aeq 1, "find ana[0]"
+$f1->[1] |> aeq 3, "find ana[1]"
+
+my $f2 = SA::find_all($s1, $sa1, "na")
+len(@$f2) |> aeq 2, "find na count"
+$f2->[0] |> aeq 2, "find na[0]"
+$f2->[1] |> aeq 4, "find na[1]"
+
+my $f3 = SA::find_all($s1, $sa1, "ban")
+len(@$f3) |> aeq 1, "find ban count"
+$f3->[0] |> aeq 0, "find ban pos"
+
+my $f4 = SA::find_all($s1, $sa1, "xy")
+len(@$f4) |> aeq 0, "find absent"
+
+my $f5 = SA::find_all($s1, $sa1, "")
+len(@$f5) |> aeq 0, "find empty pat"
+
+# --- single-char string ---
+my $sx = "z"
+my $sax = SA::build($sx)
+len(@$sax) |> aeq 1, "single-char sa len"
+$sax->[0] |> aeq 0, "single-char sa[0]"
+my $fx = SA::find_all($sx, $sax, "z")
+len(@$fx) |> aeq 1, "single-char find self"
+$fx->[0] |> aeq 0, "single-char find pos"
+
+# --- all same chars: aaaa ---
+my $sa4 = SA::build("aaaa")
+$sa4->[0] |> aeq 3, "aaaa sa[0]"
+$sa4->[1] |> aeq 2, "aaaa sa[1]"
+$sa4->[2] |> aeq 1, "aaaa sa[2]"
+$sa4->[3] |> aeq 0, "aaaa sa[3]"
+my $lc4 = SA::lcp("aaaa", $sa4)
+$lc4->[1] |> aeq 1, "aaaa lcp[1]"
+$lc4->[2] |> aeq 2, "aaaa lcp[2]"
+$lc4->[3] |> aeq 3, "aaaa lcp[3]"
+
+# --- longest repeated ---
+SA::longest_repeated("mississippi") |> aeq "issi", "lrs mississippi"
+SA::longest_repeated("banana") |> aeq "ana", "lrs banana"
+SA::longest_repeated("abcdef") |> aeq "", "lrs unique"
+SA::longest_repeated("aaaa") |> aeq "aaa", "lrs aaaa"
+
+# --- Stress vs brute ---
+my $stress = "ababcabcabcabcdabcde"
+my $sa_st = SA::build($stress)
+for my $pat ("abc", "ab", "a", "abcd", "abcde", "z", "cab") {
+    my $got = SA::find_all($stress, $sa_st, $pat)
+    my $exp = SA::brute_find($stress, $pat)
+    len(@$got) |> aeq len(@$exp), "stress '$pat' count"
+    my $eq = 1
+    my $hi = (len(@$got)) - 1
+    if ($hi >= 0) {
+        for my $i (0:$hi) {
+            $eq = 0 if $got->[$i] != $exp->[$i]
+        }
+    }
+    $eq |> aeq 1, "stress '$pat' positions"
+}
+
+# --- Larger random string ---
+my $rs = ""
+my $seed = 4242
+for my $i (1:120) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    $rs = $rs . chr(97 + ($seed % 4))
+}
+my $sa_r = SA::build($rs)
+len(@$sa_r) |> aeq 120, "random sa len"
+
+# Verify ordering: substr($rs, sa[i]) lt substr($rs, sa[i+1])
+my $ordered = 1
+for my $i (0:118) {
+    my $sx = substr($rs, $sa_r->[$i])
+    my $sy = substr($rs, $sa_r->[$i+1])
+    $ordered = 0 if $sx ge $sy
+}
+$ordered |> aeq 1, "random sa lex order"
+
+# Verify all suffixes present (sa is a permutation of 0..n-1)
+my %seen = ()
+for my $v (@$sa_r) { $seen{$v} = 1 }
+len(keys %seen) |> aeq 120, "random sa permutation"
+
+test_run
