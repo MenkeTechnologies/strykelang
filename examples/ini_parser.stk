@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+
+# ini_parser.stk - Tiny INI file parser.
+#
+# Run: stryke --no-interop examples/ini_parser.stk
+
+fn Ini::parse($text) {
+    my @lines = split /\n/, $text
+    my $section = ""
+    my %out = ( "" => +{} )
+    for my $raw (@lines) {
+        my $line = $raw
+        $line =~ s/^\s+//
+        $line =~ s/\s+$//
+        next if $line eq ""
+        next if substr($line, 0, 1) eq "#"
+        next if substr($line, 0, 1) eq ";"
+        if (substr($line, 0, 1) eq "[") {
+            my $rb = index($line, "]")
+            if ($rb > 0) {
+                $section = substr($line, 1, $rb - 1)
+                $section =~ s/^\s+//
+                $section =~ s/\s+$//
+                $out{$section} = +{} unless exists $out{$section}
+            }
+            next
+        }
+        my $eq = index($line, "=")
+        next if $eq < 0
+        my $key = substr($line, 0, $eq)
+        my $val = substr($line, $eq + 1)
+        $key =~ s/^\s+//
+        $key =~ s/\s+$//
+        $val =~ s/^\s+//
+        $val =~ s/\s+$//
+        if (substr($val, 0, 1) eq '"' && substr($val, -1, 1) eq '"') {
+            $val = substr($val, 1, len($val) - 2)
+        }
+        $out{$section} = +{} unless exists $out{$section}
+        $out{$section}->{$key} = $val
+    }
+    \%out
+}
+
+fn Ini::get($cfg, $section, $key) {
+    return undef unless exists $cfg->{$section}
+    $cfg->{$section}->{$key}
+}
+
+fn Ini::sections($cfg) {
+    my @s = sort keys %$cfg
+    \@s
+}
+
+p "=== INI Parser Demo ==="
+my $sample = "
+# Sample config
+host = localhost
+port = 8080
+
+[database]
+url = postgres://localhost/db
+user = admin
+password = \"s3cr et\"
+
+[logging]
+level = info
+file  = /var/log/app.log
+"
+my $cfg = Ini::parse($sample)
+p "sections: " . join(",", @{Ini::sections($cfg)})
+p "host = " . Ini::get($cfg, "", "host")
+p "db.url = " . Ini::get($cfg, "database", "url")
+p "db.password = " . Ini::get($cfg, "database", "password")
+p "log.level = " . Ini::get($cfg, "logging", "level")
