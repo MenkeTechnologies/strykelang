@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+
+# bit_vector.stk - Packed bit set on an array of 32-bit words.
+#
+# Run: stryke --no-interop examples/bit_vector.stk
+
+fn BV::new($nbits) {
+    my $nw = int(($nbits + 31) / 32)
+    my @w = ()
+    for my $i (1:$nw) { push @w, 0 }
+    +{ n => $nbits, w => \@w }
+}
+
+fn BV::set($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    $bv->{w}->[$wi] = $bv->{w}->[$wi] | (1 << $bi)
+}
+
+fn BV::clear($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    my $mask = (~(1 << $bi)) & 0xFFFFFFFF
+    $bv->{w}->[$wi] = $bv->{w}->[$wi] & $mask
+}
+
+fn BV::flip($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    $bv->{w}->[$wi] = ($bv->{w}->[$wi] ^ (1 << $bi)) & 0xFFFFFFFF
+}
+
+fn BV::get($bv, $i) {
+    return 0 if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    (($bv->{w}->[$wi] >> $bi) & 1)
+}
+
+fn BV::popcount($bv) {
+    my $c = 0
+    for my $w (@{$bv->{w}}) {
+        my $x = $w
+        while ($x != 0) {
+            $c = $c + ($x & 1)
+            $x = $x >> 1
+        }
+    }
+    $c
+}
+
+fn BV::indices($bv) {
+    my @out = ()
+    for my $i (0:$bv->{n}-1) {
+        push @out, $i if BV::get($bv, $i)
+    }
+    \@out
+}
+
+fn BV::union($aa, $bb) {
+    my $r = BV::new($aa->{n})
+    my $nw = len @{$aa->{w}}
+    for my $i (0:$nw-1) {
+        $r->{w}->[$i] = ($aa->{w}->[$i] | $bb->{w}->[$i]) & 0xFFFFFFFF
+    }
+    $r
+}
+
+fn BV::intersect($aa, $bb) {
+    my $r = BV::new($aa->{n})
+    my $nw = len @{$aa->{w}}
+    for my $i (0:$nw-1) {
+        $r->{w}->[$i] = ($aa->{w}->[$i] & $bb->{w}->[$i]) & 0xFFFFFFFF
+    }
+    $r
+}
+
+p "=== Bit Vector Demo (n=80) ==="
+my $bv = BV::new(80)
+for my $i (0, 1, 2, 5, 31, 32, 33, 64, 79) { BV::set($bv, $i) }
+p "indices: " . join(",", @{BV::indices($bv)})
+p "popcount: " . BV::popcount($bv)
+BV::clear($bv, 2)
+BV::flip($bv, 64)
+p "after clear(2) flip(64): " . join(",", @{BV::indices($bv)})
+
+my $aa = BV::new(40)
+my $bb = BV::new(40)
+for my $i (0, 1, 2, 3) { BV::set($aa, $i) }
+for my $i (2, 3, 4, 5) { BV::set($bb, $i) }
+p "a OR b: " . join(",", @{BV::indices(BV::union($aa, $bb))})
+p "a AND b: " . join(",", @{BV::indices(BV::intersect($aa, $bb))})
