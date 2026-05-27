@@ -220,6 +220,98 @@ fn stun_against_silent_port_returns_undef() {
     );
 }
 
+/// Full socket-lifecycle composition through stryke source: one socket
+/// flows through `udp_open` → `stun(fake)` → `udp_send_to` →
+/// `udp_recv_from` → `udp_close`. Verifies the SAME socket id threads
+/// through every step and that intermediate state (STUN binding) doesn't
+/// disrupt subsequent application traffic on the same socket.
+///
+/// This is the canonical "I want stryke-to-stryke after STUN discovery"
+/// shape — if every per-builtin pin passes but composition is broken,
+/// users can't actually build P2P apps. This pin catches that gap.
+#[test]
+fn full_socket_lifecycle_composition_through_stryke_source() {
+    use std::net::UdpSocket;
+    use std::thread;
+    use stryke::nat_punch::STUN_MAGIC_COOKIE;
+
+    // Fake STUN server claims caller is at 198.51.100.7:50001.
+    let stun = UdpSocket::bind("127.0.0.1:0").expect("bind stun");
+    let stun_addr = stun.local_addr().unwrap();
+    thread::spawn(move || {
+        let mut buf = [0u8; 1024];
+        let (_, src) = stun.recv_from(&mut buf).expect("stun recv");
+        let tx_id = &buf[8..20];
+        let xor_port = 50001u16 ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+        let xor_addr = u32::from_be_bytes([198, 51, 100, 7]) ^ STUN_MAGIC_COOKIE;
+        let mut r = vec![0u8; 32];
+        r[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+        r[2..4].copy_from_slice(&12u16.to_be_bytes());
+        r[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+        r[8..20].copy_from_slice(tx_id);
+        r[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+        r[22..24].copy_from_slice(&8u16.to_be_bytes());
+        r[24] = 0x00;
+        r[25] = 0x01;
+        r[26..28].copy_from_slice(&xor_port.to_be_bytes());
+        r[28..32].copy_from_slice(&xor_addr.to_be_bytes());
+        let _ = stun.send_to(&r, src);
+    });
+
+    // Loopback peer for the application-traffic phase (after STUN).
+    let peer = UdpSocket::bind("127.0.0.1:0").expect("bind peer");
+    peer.set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .ok();
+    let peer_addr = peer.local_addr().unwrap();
+    thread::spawn(move || {
+        let mut buf = [0u8; 1500];
+        if let Ok((n, src)) = peer.recv_from(&mut buf) {
+            let _ = peer.send_to(&buf[..n], src);
+        }
+    });
+
+    let code = format!(
+        r#"
+        # 1. Open a socket once; it stays bound through the whole flow.
+        my $sock = udp_open()
+
+        # 2. STUN query — proves the public binding (in the test, the fake
+        #    server reports 198.51.100.7:50001 regardless of who calls).
+        my $info = stun($sock, "{stun_ip}", {stun_port}, 1000)
+        my $stun_ok = (defined $info
+            && $info->{{public_ip}}   eq "198.51.100.7"
+            && $info->{{public_port}} == 50001) ? 1 : 0
+
+        # 3. Application traffic on the SAME socket — send to loopback peer,
+        #    receive the echo. If STUN somehow corrupted the socket binding,
+        #    this fails.
+        udp_send_to($sock, "127.0.0.1", {peer_port}, "after-stun")
+        my $reply = udp_recv_from($sock, 1000)
+        my $echo_ok = (defined $reply && $reply->{{payload}} eq "after-stun") ? 1 : 0
+
+        # 4. Clean up.
+        my $closed = udp_close($sock)
+
+        sprintf("stun=%d|echo=%d|closed=%d|sock=%d", $stun_ok, $echo_ok, $closed, $sock)
+        "#,
+        stun_ip = stun_addr.ip(),
+        stun_port = stun_addr.port(),
+        peer_port = peer_addr.port()
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts.len(), 4, "expected 4 fields, got: {s}");
+    assert_eq!(parts[0], "stun=1", "STUN query must report the expected public address");
+    assert_eq!(parts[1], "echo=1", "post-STUN echo round-trip on the same socket must succeed");
+    assert_eq!(parts[2], "closed=1", "udp_close must report removal");
+    // Socket id is a positive integer (just confirm parse).
+    assert!(
+        parts[3].starts_with("sock=") && parts[3][5..].parse::<i64>().unwrap_or(0) > 0,
+        "socket id must be a positive integer, got: {}",
+        parts[3]
+    );
+}
+
 /// `stun_classify` end-to-end through stryke source: two in-process fake
 /// STUN servers reporting DIFFERENT ports → result hashref's `nat_type`
 /// is `"symmetric"`. Pins the full path: stryke → dispatch → opts hash

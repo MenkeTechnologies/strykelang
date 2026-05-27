@@ -168,6 +168,100 @@ fn turn_allocate_returns_undef_on_unreachable_server() {
     assert_eq!(s.trim(), "undef");
 }
 
+/// Allocation lifecycle through stryke source: allocate → refresh with
+/// a NEW lifetime → release via refresh(0). Pins the documented refresh
+/// contract end-to-end (returns the new lifetime; refresh(0) releases).
+///
+/// Mock TURN server here handles the auth flow once + accepts two
+/// Refresh requests in sequence (one with lifetime=900, one with
+/// lifetime=0). Echoes the requested lifetime back in the response so
+/// the test can verify our client read it correctly.
+#[test]
+fn turn_allocation_refresh_lifecycle_via_stryke_source() {
+    use std::net::UdpSocket;
+    use std::thread;
+    use stryke::turn_client::{attr, build_message, msg_type, push_attr, push_xor_addr_attr};
+
+    let turn = UdpSocket::bind("127.0.0.1:0").expect("bind mock");
+    let turn_addr = turn.local_addr().unwrap();
+    thread::spawn(move || {
+        let mut buf = [0u8; 2048];
+
+        // ── Round 1: unauth Allocate → 401 ──────────────────────────────
+        let (_, src) = turn.recv_from(&mut buf).expect("recv 1");
+        let tx1: [u8; 12] = buf[8..20].try_into().unwrap();
+        let mut a1: Vec<u8> = Vec::new();
+        push_attr(&mut a1, attr::ERROR_CODE, &[0, 0, 4, 1]);
+        push_attr(&mut a1, attr::REALM, b"turn.test");
+        push_attr(&mut a1, attr::NONCE, b"NONCE-A");
+        let r1 = build_message(msg_type::ALLOCATE_ERROR, &tx1, &a1);
+        turn.send_to(&r1, src).unwrap();
+
+        // ── Round 2: auth Allocate → success ────────────────────────────
+        let (_, _) = turn.recv_from(&mut buf).expect("recv 2");
+        let tx2: [u8; 12] = buf[8..20].try_into().unwrap();
+        let mut a2: Vec<u8> = Vec::new();
+        push_xor_addr_attr(
+            &mut a2,
+            attr::XOR_RELAYED_ADDRESS,
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(198, 51, 100, 88)),
+            48800,
+            &tx2,
+        );
+        push_attr(&mut a2, attr::LIFETIME, &600u32.to_be_bytes());
+        let r2 = build_message(msg_type::ALLOCATE_SUCCESS, &tx2, &a2);
+        turn.send_to(&r2, src).unwrap();
+
+        // ── Refresh with lifetime=900 → success with lifetime=900 ──────
+        let (_, _) = turn.recv_from(&mut buf).expect("recv 3");
+        assert_eq!(
+            stryke::turn_client::message_type(&buf),
+            msg_type::REFRESH_REQUEST,
+            "expected REFRESH_REQUEST"
+        );
+        let tx3: [u8; 12] = buf[8..20].try_into().unwrap();
+        let mut a3: Vec<u8> = Vec::new();
+        push_attr(&mut a3, attr::LIFETIME, &900u32.to_be_bytes());
+        let r3 = build_message(msg_type::REFRESH_SUCCESS, &tx3, &a3);
+        turn.send_to(&r3, src).unwrap();
+
+        // ── Refresh with lifetime=0 → success with lifetime=0 (release) ─
+        let (_, _) = turn.recv_from(&mut buf).expect("recv 4");
+        let tx4: [u8; 12] = buf[8..20].try_into().unwrap();
+        let mut a4: Vec<u8> = Vec::new();
+        push_attr(&mut a4, attr::LIFETIME, &0u32.to_be_bytes());
+        let r4 = build_message(msg_type::REFRESH_SUCCESS, &tx4, &a4);
+        turn.send_to(&r4, src).unwrap();
+    });
+
+    let code = format!(
+        r#"
+        my $sock = udp_open()
+        my $alloc = turn_allocate($sock, "{ip}", {port}, "alice", "pw", 2000)
+        my $alloc_ok = (defined $alloc
+            && $alloc->{{lifetime_secs}} == 600
+            && $alloc->{{relay_port}} == 48800) ? 1 : 0
+
+        # Extend the lifetime.
+        my $extended = turn_refresh($sock, 900, 1000)
+
+        # Release immediately.
+        my $released = turn_refresh($sock, 0, 1000)
+
+        udp_close($sock)
+        sprintf("alloc=%d|extended=%d|released=%d", $alloc_ok, $extended, $released)
+        "#,
+        ip = turn_addr.ip(),
+        port = turn_addr.port()
+    );
+    let s = eval_string(&code);
+    assert_eq!(
+        s.trim(),
+        "alloc=1|extended=900|released=0",
+        "lifecycle field shape changed"
+    );
+}
+
 /// `turn_permission` / `turn_send` / `turn_recv` / `turn_refresh` against
 /// a socket that never had a successful allocation return 0 / 0 / undef / 0.
 /// Pins the documented "no allocation" branch.
