@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+
+# event_emitter.stk - Pub/sub event bus with on/off/emit and once-handlers.
+#
+# Run: stryke --no-interop examples/event_emitter.stk
+
+fn EE::new() {
+    +{ listeners => +{}, once => +{}, next_id => 1 }
+}
+
+fn EE::on($ee, $event, $cb) {
+    my $id = $ee->{next_id}
+    $ee->{next_id} = $id + 1
+    $ee->{listeners}->{$event} = [] unless exists $ee->{listeners}->{$event}
+    push @{$ee->{listeners}->{$event}}, +{ id => $id, cb => $cb }
+    $id
+}
+
+fn EE::once($ee, $event, $cb) {
+    my $id = EE::on($ee, $event, $cb)
+    $ee->{once}->{$id} = 1
+    $id
+}
+
+fn EE::off($ee, $event, $id) {
+    return unless exists $ee->{listeners}->{$event}
+    my @kept = ()
+    for my $l (@{$ee->{listeners}->{$event}}) {
+        push @kept, $l unless $l->{id} == $id
+    }
+    $ee->{listeners}->{$event} = \@kept
+    delete $ee->{once}->{$id}
+}
+
+fn EE::emit($ee, $event, $payload) {
+    return 0 unless exists $ee->{listeners}->{$event}
+    my @ls = @{$ee->{listeners}->{$event}}
+    my $count = 0
+    my @kept = ()
+    for my $l (@ls) {
+        $l->{cb}->($payload)
+        $count = $count + 1
+        if (exists $ee->{once}->{$l->{id}}) {
+            delete $ee->{once}->{$l->{id}}
+        } else {
+            push @kept, $l
+        }
+    }
+    $ee->{listeners}->{$event} = \@kept
+    $count
+}
+
+fn EE::count($ee, $event) {
+    return 0 unless exists $ee->{listeners}->{$event}
+    len @{$ee->{listeners}->{$event}}
+}
+
+p "=== Event Emitter Demo ==="
+my $bus = EE::new()
+mysync @log = ()
+EE::on($bus, "data", fn ($x) { push @log, "A:" . $x })
+EE::on($bus, "data", fn ($x) { push @log, "B:" . $x })
+EE::once($bus, "data", fn ($x) { push @log, "ONCE:" . $x })
+my $n1 = EE::emit($bus, "data", 1)
+my $n2 = EE::emit($bus, "data", 2)
+p "first emit fired: " . $n1
+p "second emit fired: " . $n2
+p "log: " . join(",", @log)

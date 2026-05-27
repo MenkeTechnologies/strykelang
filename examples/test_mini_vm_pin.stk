@@ -1,0 +1,151 @@
+#!/usr/bin/env stryke
+
+fn VM::run($prog) {
+    my @stack = ()
+    my %regs  = ()
+    my @output = ()
+    my $ip = 0
+    my $n  = len @$prog
+    while ($ip < $n) {
+        my $inst = $prog->[$ip]
+        my $op   = $inst->[0]
+        if ($op eq "PUSH") {
+            push @stack, $inst->[1]
+            $ip = $ip + 1
+        } elsif ($op eq "ADD") {
+            my $bb = pop @stack
+            my $aa = pop @stack
+            push @stack, $aa + $bb
+            $ip = $ip + 1
+        } elsif ($op eq "SUB") {
+            my $bb = pop @stack
+            my $aa = pop @stack
+            push @stack, $aa - $bb
+            $ip = $ip + 1
+        } elsif ($op eq "MUL") {
+            my $bb = pop @stack
+            my $aa = pop @stack
+            push @stack, $aa * $bb
+            $ip = $ip + 1
+        } elsif ($op eq "DIV") {
+            my $bb = pop @stack
+            my $aa = pop @stack
+            push @stack, int($aa / $bb)
+            $ip = $ip + 1
+        } elsif ($op eq "DUP") {
+            my $aa = $stack[len(@stack) - 1]
+            push @stack, $aa
+            $ip = $ip + 1
+        } elsif ($op eq "SWAP") {
+            my $bb = pop @stack
+            my $aa = pop @stack
+            push @stack, $bb
+            push @stack, $aa
+            $ip = $ip + 1
+        } elsif ($op eq "POP") {
+            pop @stack
+            $ip = $ip + 1
+        } elsif ($op eq "PRINT") {
+            my $aa = pop @stack
+            push @output, "$aa"
+            $ip = $ip + 1
+        } elsif ($op eq "JMP") {
+            $ip = $ip + $inst->[1]
+        } elsif ($op eq "JZ") {
+            my $aa = pop @stack
+            if ($aa == 0) { $ip = $ip + $inst->[1] } else { $ip = $ip + 1 }
+        } elsif ($op eq "LOAD") {
+            push @stack, ($regs{$inst->[1]} // 0)
+            $ip = $ip + 1
+        } elsif ($op eq "STORE") {
+            $regs{$inst->[1]} = pop @stack
+            $ip = $ip + 1
+        } elsif ($op eq "HALT") {
+            $ip = $n
+        } else {
+            $ip = $ip + 1
+        }
+    }
+    +{ stack => \@stack, output => \@output, regs => \%regs }
+}
+
+# PUSH only
+my $r1 = VM::run([ ["PUSH", 42] ])
+join(",", @{$r1->{stack}}) |> aeq "42", "single push"
+
+# Arithmetic
+my $r2 = VM::run([ ["PUSH",2], ["PUSH",3], ["ADD"] ])
+$r2->{stack}->[0] |> aeq 5, "2+3=5"
+my $r3 = VM::run([ ["PUSH",10], ["PUSH",3], ["SUB"] ])
+$r3->{stack}->[0] |> aeq 7, "10-3=7"
+my $r4 = VM::run([ ["PUSH",6], ["PUSH",7], ["MUL"] ])
+$r4->{stack}->[0] |> aeq 42, "6*7=42"
+my $r5 = VM::run([ ["PUSH",20], ["PUSH",3], ["DIV"] ])
+$r5->{stack}->[0] |> aeq 6, "20/3=6 (int)"
+
+# Multi-op composition
+my $r6 = VM::run([
+    ["PUSH",2], ["PUSH",3], ["ADD"],     # 5
+    ["PUSH",4], ["MUL"],                  # 20
+    ["PUSH",2], ["SUB"],                  # 18
+])
+$r6->{stack}->[0] |> aeq 18, "(2+3)*4-2=18"
+
+# DUP / SWAP
+my $r7 = VM::run([ ["PUSH",5], ["DUP"], ["MUL"] ])
+$r7->{stack}->[0] |> aeq 25, "5 dup * = 25"
+my $r8 = VM::run([ ["PUSH",1], ["PUSH",2], ["SWAP"], ["SUB"] ])
+$r8->{stack}->[0] |> aeq 1, "swap then sub"
+
+# POP
+my $r9 = VM::run([ ["PUSH",1], ["PUSH",2], ["PUSH",3], ["POP"] ])
+len(@{$r9->{stack}}) |> aeq 2, "popped one"
+$r9->{stack}->[1]    |> aeq 2, "top now 2"
+
+# PRINT
+my $ra = VM::run([ ["PUSH",7], ["PRINT"], ["PUSH",8], ["PRINT"] ])
+join(",", @{$ra->{output}}) |> aeq "7,8", "print output"
+
+# HALT skips remainder
+my $rb = VM::run([ ["PUSH",1], ["HALT"], ["PUSH",99] ])
+join(",", @{$rb->{stack}}) |> aeq "1", "halt stops"
+
+# JMP forward
+my $rc = VM::run([ ["PUSH",1], ["JMP",2], ["PUSH",2], ["PUSH",3] ])
+join(",", @{$rc->{stack}}) |> aeq "1,3", "jmp skips push 2"
+
+# JZ taken when 0
+my $rd = VM::run([ ["PUSH",0], ["JZ",2], ["PUSH",99], ["PUSH",7] ])
+join(",", @{$rd->{stack}}) |> aeq "7", "jz takes branch"
+
+# JZ not taken when non-zero
+my $re = VM::run([ ["PUSH",1], ["JZ",2], ["PUSH",99], ["PUSH",7] ])
+join(",", @{$re->{stack}}) |> aeq "99,7", "jz no branch"
+
+# LOAD/STORE registers
+my $rf = VM::run([
+    ["PUSH",13], ["STORE","x"],
+    ["PUSH",4],  ["STORE","y"],
+    ["LOAD","x"], ["LOAD","y"], ["ADD"],
+])
+$rf->{stack}->[0] |> aeq 17, "13+4 via regs"
+$rf->{regs}->{"x"} |> aeq 13, "regs.x"
+$rf->{regs}->{"y"} |> aeq 4,  "regs.y"
+
+# LOAD missing yields 0
+my $rg = VM::run([ ["LOAD","none"], ["PUSH",5], ["ADD"] ])
+$rg->{stack}->[0] |> aeq 5, "missing reg defaults to 0"
+
+# Countdown loop
+my $loop = [
+    ["PUSH", 3], ["STORE", "i"],
+    ["LOAD", "i"], ["PRINT"],
+    ["LOAD", "i"], ["PUSH", 1], ["SUB"], ["STORE", "i"],
+    ["LOAD", "i"], ["JZ", 2],
+    ["JMP", -8],
+    ["HALT"],
+]
+my $rh = VM::run($loop)
+join(",", @{$rh->{output}}) |> aeq "3,2,1", "countdown 3..1"
+
+test_run
