@@ -2,32 +2,29 @@
 #
 # cloistered ACL demo — master enables :cloistered mode with a token;
 # agents must send AGENT_AUTH (via STRYKE_AGENT_TOKEN env var) matching
-# the token, or they're rejected at AGENT_HELLO. Shows both the accept
-# and reject paths.
+# the token, or they're rejected at AGENT_HELLO. This demo shows the
+# cathedral registration + cloister + apostatize lifecycle; the
+# reject path is exercised by the pin test at tests/suite/
+# scriptable_controller_pin.rs::cloistered_controller_rejects_agents.
 #
-# This demo uses ordain (not congregation) because congregation forks
-# children before we can set their AUTH env var. The pin test at
-# tests/suite/scriptable_controller_pin.rs::cloistered_controller_rejects
-# exercises the rejection path with real forks.
-#
-# CI-safe: pure ordain (no agents).
+# CI-safe: pure ordain (no agents). Clean under --no-interop.
 
-printf "── cloistered ACL demo ──\n"
+p "── cloistered ACL lifecycle ──"
 
 # 1. Open congregation (default).
 my $open_cong = ordain "open_pool"
-printf "ordained 'open_pool' (open mode — any STRYKE_AGENT_TOKEN accepted, or none)\n"
+p "ordained 'open_pool' (open mode — no AUTH required)"
 
 # 2. Cloistered congregation with a specific token.
 my $secured_cong = ordain "audit_pool"
 cloister "secret-token-xyz789"
-printf "ordained 'audit_pool' (cloistered — only STRYKE_AGENT_TOKEN=secret-token-xyz789 accepted)\n"
+p "ordained 'audit_pool' (cloistered — STRYKE_AGENT_TOKEN=secret-token-xyz789 required)"
 
 # 3. Show registered congregations.
 my @names = cathedral()
-say "── cathedral registry ──"
-for my $n (sort @names) {
-    printf "  %s\n", $n
+p "── cathedral registry ──"
+for my $name (sort @names) {
+    printf "  %s\n", $name
 }
 
 # 4. Apostatize one of them (unregister from cathedral, doesn't kill agents).
@@ -36,9 +33,9 @@ printf "apostatize 'open_pool' → %d (1=was registered)\n", $forgotten
 
 # 5. Verify it's gone from cathedral.
 @names = cathedral()
-say "── after apostatize ──"
-for my $n (sort @names) {
-    printf "  %s\n", $n
+p "── after apostatize ──"
+for my $name (sort @names) {
+    printf "  %s\n", $name
 }
 
-say "done — see tests/suite/scriptable_controller_pin.rs::cloistered_controller_rejects_agents_without_valid_auth_token for the full reject-path pin"
+p "done — pin test exercises the AUTH reject path end-to-end"

@@ -5,9 +5,9 @@
 # bulk-synchronous parallel (BSP) pattern: each stage scatters work,
 # waits for ALL replies (the barrier), then proceeds.
 #
-# CI-safe: pure loopback fork, no network.
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-printf "── pilgrimage barrier demo ──\n"
+p "── pilgrimage barrier demo ──"
 
 my @workers = congregation(4)
 printf "spawned %d workers for 3-stage BSP\n", len(@workers)
@@ -28,15 +28,15 @@ for my $i (0:2) {
     printf "── stage %d (%s): ", $i + 1, $desc
     my $code = "\$main::stage_count++; 'stage-' . \$main::stage_count"
     my $ok = pilgrimage($code, @workers, 5_000)
-    say $ok ? "all workers rendezvoused ✓" : "BARRIER FAILED ✗"
+    p $ok ? "all workers rendezvoused ✓" : "BARRIER FAILED ✗"
     last unless $ok
 }
 
 # Verify every worker completed all 3 stages.
 my $verify = pray "\$main::stage_count", @workers
 my %counts = annex $verify
-say "── final stage counts ──"
-for my $sid (sort { $a <=> $b } keys %counts) {
+p "── final stage counts ──"
+for my $sid (sort { _ <=> _1 } keys %counts) {
     printf "  worker %d: %s\n", $sid, $counts{$sid}
 }
 
@@ -44,7 +44,7 @@ my $all_three = 1
 for my $sid (keys %counts) {
     $all_three = 0 unless $counts{$sid} eq "3" || $counts{$sid} eq "stage-3"
 }
-say $all_three ? "✓ every worker completed exactly 3 stages" : "✗ stage counts diverged"
+p $all_three ? "✓ every worker completed exactly 3 stages" : "✗ stage counts diverged"
 
 excommunicate(@workers)
-say "done"
+p "done"

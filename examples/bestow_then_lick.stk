@@ -5,9 +5,9 @@
 # Demonstrates the master→worker (bestow) and worker→master (lick) data
 # flows that the religious-vocab API is built on.
 #
-# CI-safe: pure loopback fork, no network.
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-printf "── bestow + lick round-trip ──\n"
+p "── bestow + lick round-trip ──"
 
 my @workers = congregation(3)
 printf "spawned %d workers\n", len(@workers)
@@ -25,13 +25,13 @@ printf "bestow → %d workers accepted the %%gift hash\n", $bestowed
 # 2. Each worker reads %gift and stores it into %main::soul.
 my $copy_div = pray "our %gift; %main::soul = %gift; 'copied'", @workers
 my %copy_acks = annex $copy_div
-printf "copy → %d workers acknowledged\n", scalar(keys %copy_acks)
+printf "copy → %d workers acknowledged\n", len(keys %copy_acks)
 
 # 3. Lick %soul from every worker — non-destructive snapshot.
 my %souls = lick(@workers)
 
-say "── per-worker %soul snapshots ──"
-for my $sid (sort { $a <=> $b } keys %souls) {
+p "── per-worker %soul snapshots ──"
+for my $sid (sort { _ <=> _1 } keys %souls) {
     my $h = $souls{$sid}
     printf "  worker %d:\n", $sid
     if (ref($h) eq 'HASH') {
@@ -44,14 +44,14 @@ for my $sid (sort { $a <=> $b } keys %souls) {
 }
 
 # 4. Verify all 3 workers see the same config (since bestow shipped to all).
-my $first_sid = (sort { $a <=> $b } keys %souls)[0]
+my $first_sid = (sort { _ <=> _1 } keys %souls)[0]
 my $first_keys = ref($souls{$first_sid}) eq 'HASH' ? join(",", sort keys %{$souls{$first_sid}}) : ""
 my $all_same = 1
 for my $sid (keys %souls) {
     my $k = ref($souls{$sid}) eq 'HASH' ? join(",", sort keys %{$souls{$sid}}) : ""
     $all_same = 0 unless $k eq $first_keys
 }
-say $all_same ? "✓ all workers see identical config keys" : "✗ workers diverged"
+p $all_same ? "✓ all workers see identical config keys" : "✗ workers diverged"
 
 excommunicate(@workers)
-say "done"
+p "done"
