@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+
+# bencode_codec.stk - BitTorrent bencode encoder/decoder.
+# Supports ints (i…e), byte strings (len:bytes), lists (l…e), dicts (d…e).
+#
+# Run: stryke --no-interop examples/bencode_codec.stk
+
+fn BC::encode($v) {
+    my $t = ref $v
+    if ($t eq "ARRAY") {
+        my $out = "l"
+        for my $x (@$v) { $out = $out . BC::encode($x) }
+        return $out . "e"
+    }
+    if ($t eq "HASH") {
+        my @ks = sort keys %$v
+        my $out = "d"
+        for my $k (@ks) {
+            $out = $out . (len $k) . ":" . $k . BC::encode($v->{$k})
+        }
+        return $out . "e"
+    }
+    # Plain scalar: int if matches ^-?\d+$, else byte string.
+    if ("$v" =~ /^-?\d+$/) {
+        return "i" . $v . "e"
+    }
+    return (len "$v") . ":" . $v
+}
+
+fn BC::_dec($s, $i) {
+    my $c = substr($s, $i, 1)
+    if ($c eq "i") {
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") { $j = $j + 1 }
+        my $num = substr($s, $i + 1, $j - $i - 1)
+        return { v => $num + 0, n => $j + 1 }
+    }
+    if ($c eq "l") {
+        my @out = ()
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") {
+            my $r = BC::_dec($s, $j)
+            push @out, $r->{v}
+            $j = $r->{n}
+        }
+        return { v => \@out, n => $j + 1 }
+    }
+    if ($c eq "d") {
+        my %out = ()
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") {
+            my $kr = BC::_dec($s, $j)
+            my $vr = BC::_dec($s, $kr->{n})
+            $out{$kr->{v}} = $vr->{v}
+            $j = $vr->{n}
+        }
+        return { v => \%out, n => $j + 1 }
+    }
+    # byte string: digits ':' bytes
+    my $j = $i
+    while (substr($s, $j, 1) ne ":") { $j = $j + 1 }
+    my $ln = substr($s, $i, $j - $i) + 0
+    my $bytes = substr($s, $j + 1, $ln)
+    return { v => $bytes, n => $j + 1 + $ln }
+}
+
+fn BC::decode($s) {
+    my $r = BC::_dec($s, 0)
+    $r->{v}
+}
+
+p "=== Bencode Demo ==="
+my $enc = BC::encode({
+    cow => "moo",
+    spam => ["a", "b"],
+    count => 42,
+})
+p "encoded: " . $enc
+my $dec = BC::decode($enc)
+p "decoded cow=" . $dec->{cow} . " count=" . $dec->{count}
+p "decoded spam=" . join(",", @{$dec->{spam}})
