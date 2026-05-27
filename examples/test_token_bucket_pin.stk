@@ -1,0 +1,135 @@
+#!/usr/bin/env stryke
+
+package TB;
+
+fn new($capacity, $rate_per_sec) {
+    {
+        cap => $capacity,
+        rate => $rate_per_sec,
+        tokens => $capacity,
+        last => 0,
+    }
+}
+
+fn _refill($bk, $now) {
+    my $elapsed = $now - $bk->{last}
+    if ($elapsed > 0) {
+        my $add = $elapsed * $bk->{rate}
+        my $new = $bk->{tokens} + $add
+        $bk->{tokens} = $new > $bk->{cap} ? $bk->{cap} : $new
+        $bk->{last} = $now
+    }
+}
+
+fn try_consume($bk, $now, $n) {
+    TB::_refill($bk, $now)
+    if ($bk->{tokens} >= $n) {
+        $bk->{tokens} = $bk->{tokens} - $n
+        return 1
+    }
+    0
+}
+
+fn available($bk, $now) {
+    TB::_refill($bk, $now)
+    $bk->{tokens}
+}
+
+fn time_until($bk, $now, $n) {
+    TB::_refill($bk, $now)
+    return 0 if $bk->{tokens} >= $n
+    my $deficit = $n - $bk->{tokens}
+    $deficit / $bk->{rate}
+}
+
+package main;
+
+# --- New bucket starts full ---
+my $b1 = TB::new(10, 2)
+TB::available($b1, 0) |> aeq 10, "starts full"
+$b1->{cap} |> aeq 10, "capacity stored"
+$b1->{rate} |> aeq 2, "rate stored"
+
+# --- Consume within budget ---
+TB::try_consume($b1, 0, 5) |> aeq 1, "consume 5 ok"
+TB::available($b1, 0) |> aeq 5, "5 left after consume"
+TB::try_consume($b1, 0, 5) |> aeq 1, "consume final 5 ok"
+TB::available($b1, 0) |> aeq 0, "empty after"
+
+# --- Consume more than available fails ---
+TB::try_consume($b1, 0, 1) |> aeq 0, "empty bucket rejects 1"
+TB::available($b1, 0) |> aeq 0, "unchanged on reject"
+
+# --- Refill over time ---
+TB::available($b1, 1) |> aeq 2, "1s refills 2"
+TB::available($b1, 3) |> aeq 6, "3s total refills to 6"
+TB::try_consume($b1, 3, 4) |> aeq 1, "consume 4 ok"
+TB::available($b1, 3) |> aeq 2, "2 left at t=3"
+
+# --- Refill caps at capacity ---
+my $b2 = TB::new(5, 1)
+TB::try_consume($b2, 0, 5) |> aeq 1, "drain b2"
+TB::available($b2, 100) |> aeq 5, "long wait caps at capacity"
+TB::available($b2, 1000) |> aeq 5, "still capped"
+
+# --- Reject when only one shy ---
+my $b3 = TB::new(3, 1)
+TB::try_consume($b3, 0, 3) |> aeq 1, "drain 3"
+TB::try_consume($b3, 0, 1) |> aeq 0, "1 rejected when 0"
+TB::try_consume($b3, 1, 2) |> aeq 0, "2 rejected when 1 avail"
+TB::available($b3, 1) |> aeq 1, "still 1 available"
+TB::try_consume($b3, 1, 1) |> aeq 1, "1 ok when 1 avail"
+TB::available($b3, 1) |> aeq 0, "0 after"
+
+# --- Burst then sustained ---
+my $b4 = TB::new(10, 1)
+# burst 10
+TB::try_consume($b4, 0, 10) |> aeq 1, "burst 10 ok"
+TB::try_consume($b4, 0, 1)  |> aeq 0, "post-burst 1 rejected"
+# 5 seconds later: 5 tokens
+TB::try_consume($b4, 5, 5)  |> aeq 1, "5s later get 5"
+TB::try_consume($b4, 5, 1)  |> aeq 0, "post 5s rejected"
+# 1 token per second sustainable
+TB::try_consume($b4, 6, 1)  |> aeq 1, "sustain t=6"
+TB::try_consume($b4, 7, 1)  |> aeq 1, "sustain t=7"
+TB::try_consume($b4, 8, 1)  |> aeq 1, "sustain t=8"
+TB::try_consume($b4, 8, 1)  |> aeq 0, "double take rejected"
+
+# --- time_until ---
+my $b5 = TB::new(10, 2)
+TB::try_consume($b5, 0, 10) |> aeq 1, "drain b5"
+TB::time_until($b5, 0, 1) |> aeq 0.5, "wait 0.5s for 1 token"
+TB::time_until($b5, 0, 4) |> aeq 2, "wait 2s for 4 tokens"
+TB::time_until($b5, 0, 0) |> aeq 0, "wait 0 for 0 tokens"
+# Already enough -> 0
+my $b6 = TB::new(10, 1)
+TB::time_until($b6, 0, 5) |> aeq 0, "already enough -> 0"
+TB::time_until($b6, 0, 10) |> aeq 0, "exactly enough -> 0"
+
+# --- Different rates ---
+my $b7 = TB::new(100, 10)
+TB::try_consume($b7, 0, 100) |> aeq 1, "drain fast bucket"
+TB::available($b7, 1) |> aeq 10, "fast refills 10/s"
+TB::available($b7, 5) |> aeq 50, "fast refills 50 by t=5"
+TB::available($b7, 100) |> aeq 100, "fast caps at 100"
+
+# --- Multiple buckets independent ---
+my $bA = TB::new(5, 1)
+my $bB = TB::new(5, 1)
+TB::try_consume($bA, 0, 5) |> aeq 1, "A drain"
+TB::available($bA, 0) |> aeq 0, "A is 0"
+TB::available($bB, 0) |> aeq 5, "B still 5"
+
+# --- Edge: capacity 1 ---
+my $b8 = TB::new(1, 1)
+TB::try_consume($b8, 0, 1) |> aeq 1, "cap1 first ok"
+TB::try_consume($b8, 0, 1) |> aeq 0, "cap1 second rejected"
+TB::try_consume($b8, 1, 1) |> aeq 1, "cap1 refills"
+TB::try_consume($b8, 1, 1) |> aeq 0, "cap1 still 1 cap"
+
+# --- Time going backward: refill is no-op, no negative drain ---
+my $b9 = TB::new(10, 1)
+TB::try_consume($b9, 5, 3) |> aeq 1, "consume at t=5"
+TB::available($b9, 3) |> aeq 7, "backward time -> no extra refill"
+
+test_run
