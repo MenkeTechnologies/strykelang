@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+
+# spell_checker.stk — interactive spell checker using Levenshtein distance.
+#
+# Demonstrates:
+#   * levenshtein builtin for edit distance
+#   * Hash-based dictionary lookup
+#   * Sort by computed key (distance)
+#   * Pipeline composition
+#   * String interpolation with #{}
+#
+# Run: stryke --no-interop examples/spell_checker.stk
+
+my @dict = qw(
+    the quick brown fox jumps over lazy dog
+    hello world program code function variable
+    stryke language syntax feature builtin range
+    array hash string integer float boolean
+    algorithm data structure sort search filter
+    class object method trait impl enum match
+    pipeline parallel async concurrent thread
+    error catch retry timeout die finally
+)
+
+fn Spell::known($word) {
+    my %dict_set = ()
+    for my $w (@dict) { $dict_set{$w} = 1 }
+    exists $dict_set{lc($word)}
+}
+
+fn Spell::suggest($word, $n) {
+    my $w = lc($word)
+    my @scored = ()
+    for my $entry (@dict) {
+        push @scored, [$entry, levenshtein($w, $entry)]
+    }
+    my @sorted = sort { _->[1] <=> _1->[1] } @scored
+    my @top = ()
+    for my $pair (@sorted[0:$n-1]) {
+        push @top, $pair->[0]
+    }
+    \@top
+}
+
+fn Spell::check($word) {
+    if (Spell::known($word)) {
+        "  ✓  '$word'"
+    } else {
+        my $suggestions = join(", ", @{Spell::suggest($word, 3)})
+        "  ✗  '$word' — did you mean: $suggestions?"
+    }
+}
+
+p "═══════════════════════════════════════════════"
+p " Stryke Spell Checker Demo"
+p "═══════════════════════════════════════════════"
+p ""
+p "Dictionary has #{len @dict} words."
+p ""
+
+my @test_words = (
+    "stryke",    # correct
+    "strke",     # missing 'y'
+    "helo",      # missing 'l'
+    "teh",       # transposition
+    "progam",    # missing 'r'
+    "vaiable",   # transposition
+    "fnction",   # missing 'u'
+    "boolena",   # transposition
+    "algoithm",  # missing 'r'
+    "clss",      # missing 'a'
+)
+
+for my $word (@test_words) {
+    p Spell::check($word)
+}
+
+p ""
+p "── Distance table for 'helo' ─────────────────"
+my @ranked = sort { levenshtein("helo", _) <=> levenshtein("helo", _1) } @dict
+for my $w (@ranked[0:4]) {
+    my $d = levenshtein("helo", $w)
+    p "  #{$d}  $w"
+}
+
+p ""
+p "── Pipeline: words within distance 2 of 'sort' ─"
+my @close = ()
+for my $w (@dict) {
+    push @close, $w if levenshtein("sort", $w) <= 2
+}
+p "  #{join(', ', sort @close)}"
+
+p ""
+p "── Levenshtein sanity checks ─────────────────"
+p "  kitten → sitting : #{levenshtein('kitten', 'sitting')}"
+p "  saturday → sunday : #{levenshtein('saturday', 'sunday')}"
+p "  stryke → stryke  : #{levenshtein('stryke', 'stryke')}"
+p "  abc → ''         : #{levenshtein('abc', '')}"
