@@ -534,6 +534,53 @@ fn cloistered_controller_rejects_agents_without_valid_auth_token() {
     dismiss(&handle, vec![accept_child]);
 }
 
+/// `interrogate($pid)` dumps OS-level process state. Asserts self-PID
+/// interrogation produces a hash with at least the core metadata fields
+/// populated. Pins the polymorphic dispatch (single scalar = PID path)
+/// and the sysinfo-backed return shape.
+#[test]
+fn interrogate_self_pid_returns_process_state_hash() {
+    use crate::common::*;
+    let pid = std::process::id();
+    let code = format!(
+        r#"
+        my $h = interrogate({});
+        defined($h) ? "pid=" . $h->{{pid}} . "|name=" . $h->{{name}} . "|has_exe=" . (defined $h->{{exe}} ? 1 : 0) : "undef"
+        "#,
+        pid
+    );
+    let out = eval_string(&code);
+    let trimmed = out.trim();
+    assert!(
+        trimmed.contains(&format!("pid={}", pid)),
+        "interrogate(self) must return our own pid: {:?}",
+        trimmed
+    );
+    assert!(
+        trimmed.contains("|name="),
+        "interrogate must return process name: {:?}",
+        trimmed
+    );
+    assert!(
+        trimmed.contains("|has_exe=1"),
+        "interrogate must return exe path: {:?}",
+        trimmed
+    );
+}
+
+/// `interrogate($bogus_pid)` returns undef cleanly — no panic, no error.
+/// Pins the not-found path so callers can `unless defined` to detect
+/// dead processes.
+#[test]
+fn interrogate_nonexistent_pid_returns_undef() {
+    use crate::common::*;
+    // 99999999 is larger than kern.maxproc on any reasonable system,
+    // so guaranteed-absent. (kern.maxproc is 16k on this Darwin box;
+    // pid_max defaults to 32k or 4M on Linux.)
+    let out = eval_string("defined(interrogate(99999999)) ? 'defined' : 'undef'");
+    assert_eq!(out.trim(), "undef");
+}
+
 /// Cathedral registry: register, lookup, unregister, names — the in-process
 /// name → endpoint binding that `profess` resolves against.
 #[test]
