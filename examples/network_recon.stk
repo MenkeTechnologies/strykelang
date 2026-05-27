@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+#
+# Network reconnaissance — combines `tcp_probe` + `tcp_banner` to scan
+# a target across a port list, report alive services, and fingerprint
+# whoever greets us. Useful as an asset-discovery / deploy-sanity tool.
+#
+# Usage:
+#   stryke examples/network_recon.stk HOST [PORTS]
+#     PORTS: comma list (22,80,443) or range (80-90) or both (22,80-90,443)
+#
+# Default ports if none specified: 21,22,25,53,80,110,143,443,3306,5432,5900,6379,8080
+#
+# Bare-args invocation (no host): smoke mode against 127.0.0.1 with a
+# tiny port list — keeps the run_all_ci demo runner happy without
+# requiring network.
+
+my $host = $ARGV[0] // "127.0.0.1"
+my $port_spec = $ARGV[1]
+my $smoke = !defined $ARGV[0]
+
+# Default ports — common service set.
+my @default_ports = (21, 22, 25, 53, 80, 110, 143, 443, 3306, 5432, 5900, 6379, 8080)
+my @smoke_ports = (1, 22)   # 1 = closed, 22 = sometimes open
+
+my @ports
+if ($smoke) {
+    @ports = @smoke_ports
+} elsif (defined $port_spec) {
+    for (split /,/, $port_spec) {
+        if (_ =~ /^(\d+)-(\d+)$/) {
+            push @ports, $_ for $1:$2
+        } else {
+            push @ports, $_ + 0
+        }
+    }
+} else {
+    @ports = @default_ports
+}
+
+printf "── network_recon: %s × %d ports ──\n", $host, len(@ports)
+
+# Parallel probe — each fn runs in its own pmap slot.
+fn Recon::probe_port($p) {
+    my $tp = tcp_probe($host, $p, 250)
+    if (!$tp->{alive}) {
+        return { port => $p, alive => 0 }
+    }
+    # Service is up — try to read its greeting.
+    my $tb = tcp_banner($host, $p, 1000, 256)
+    # Take the first line of the banner, strip whitespace.
+    my $first_line = (split /\r?\n/, $tb->{banner})[0] // ""
+    return {
+        port       => $p,
+        alive      => 1,
+        latency_ms => $tp->{latency_ms},
+        banner     => $first_line,
+    }
+}
+
+my @results = pmap { Recon::probe_port($_) } @ports
+my @open    = grep { $_->{alive} } @results
+my @sorted  = sort { $a->{port} <=> $b->{port} } @open
+
+if (len(@sorted)) {
+    p ""
+    p "── open ports ────────────────────────────────────────"
+    for my $r (@sorted) {
+        if (length($r->{banner}) > 0) {
+            printf "  %5d  %3dms  %s\n", $r->{port}, $r->{latency_ms}, $r->{banner}
+        } else {
+            printf "  %5d  %3dms  (silent — no greeting in 200ms)\n",
+                $r->{port}, $r->{latency_ms}
+        }
+    }
+} else {
+    p ""
+    p "  no open ports in the scanned range"
+}
+
+p ""
+printf "── %d / %d open ──\n", len(@open), len(@results)
