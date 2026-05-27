@@ -226,9 +226,7 @@ fn receiver_socket() -> Arc<UnixDatagram> {
     // Best-effort cleanup of a stale socket file from a prior crashed
     // instance (or a prior child of this same PID). Ignore failure.
     let _ = std::fs::remove_file(&path);
-    let sock = Arc::new(
-        UnixDatagram::bind(&path).expect("teleport: bind receiver UDS"),
-    );
+    let sock = Arc::new(UnixDatagram::bind(&path).expect("teleport: bind receiver UDS"));
     *guard = Some((pid, Arc::clone(&sock)));
     sock
 }
@@ -374,8 +372,11 @@ mod tests {
         let mut result_paths: Vec<String> = Vec::new();
 
         for i in 0..2 {
-            let result_path =
-                format!("/tmp/stryke_teleport_fanout_{}_{}.txt", std::process::id(), i);
+            let result_path = format!(
+                "/tmp/stryke_teleport_fanout_{}_{}.txt",
+                std::process::id(),
+                i
+            );
             let _ = std::fs::remove_file(&result_path);
             result_paths.push(result_path.clone());
             match unsafe { fork() }.expect("fork") {

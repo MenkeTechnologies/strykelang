@@ -281,7 +281,10 @@ fn punch_to_self_establishes_via_own_recv_buffer() {
     );
     let s = eval_string(&code);
     let parts: Vec<&str> = s.trim().split('|').collect();
-    assert_eq!(parts[0], "est=1", "self-punch must establish via own recv buffer");
+    assert_eq!(
+        parts[0], "est=1",
+        "self-punch must establish via own recv buffer"
+    );
     assert!(
         parts[1] == "msg=self-probe",
         "first recv'd datagram must be the bombard payload, got: {}",

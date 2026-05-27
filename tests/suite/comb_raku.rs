@@ -132,10 +132,10 @@ fn comb_negative_limit_means_unlimited() {
 
 #[test]
 fn comb_empty_input_yields_empty_array() {
-    assert_eq!(eval_int(r#"len(comb(""))"#),               0);
-    assert_eq!(eval_int(r#"len(comb(3, ""))"#),            0);
-    assert_eq!(eval_int(r#"len(comb("x", ""))"#),          0);
-    assert_eq!(eval_int(r#"len(comb(qr/./, ""))"#),        0);
+    assert_eq!(eval_int(r#"len(comb(""))"#), 0);
+    assert_eq!(eval_int(r#"len(comb(3, ""))"#), 0);
+    assert_eq!(eval_int(r#"len(comb("x", ""))"#), 0);
+    assert_eq!(eval_int(r#"len(comb(qr/./, ""))"#), 0);
 }
 
 #[test]

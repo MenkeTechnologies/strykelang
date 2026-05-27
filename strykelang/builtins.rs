@@ -13298,10 +13298,7 @@ fn extract_prayer_text(v: &StrykeValue, verb: &str) -> StrykeResult<String> {
     }
     let s = v.to_string();
     if s.is_empty() {
-        Err(StrykeError::runtime(
-            format!("{}: code is empty", verb),
-            0,
-        ))
+        Err(StrykeError::runtime(format!("{}: code is empty", verb), 0))
     } else {
         Ok(s)
     }
@@ -13332,10 +13329,15 @@ fn flatten_agent_handles(args: &[StrykeValue]) -> Vec<u64> {
 
 /// Resolve the current controller handle, or error if no congregation has
 /// been ordained / spawned yet in this process.
-fn require_current_controller(verb: &str) -> StrykeResult<std::sync::Arc<crate::controller::ControllerHandle>> {
+fn require_current_controller(
+    verb: &str,
+) -> StrykeResult<std::sync::Arc<crate::controller::ControllerHandle>> {
     let id = crate::controller::get_current_controller().ok_or_else(|| {
         StrykeError::runtime(
-            format!("{}: no current controller; call congregation() or ordain() first", verb),
+            format!(
+                "{}: no current controller; call congregation() or ordain() first",
+                verb
+            ),
             0,
         )
     })?;
@@ -13346,7 +13348,9 @@ fn require_current_controller(verb: &str) -> StrykeResult<std::sync::Arc<crate::
 /// Convert HashMap<session_id, EvalResult> to a stryke hash keyed by
 /// stringified session_id, sorted ascending. Values are the agent's
 /// output string. Used by annex / harvest / pilgrimage to return results.
-fn results_to_hash(results: std::collections::HashMap<u64, crate::agent::EvalResult>) -> StrykeValue {
+fn results_to_hash(
+    results: std::collections::HashMap<u64, crate::agent::EvalResult>,
+) -> StrykeValue {
     let mut hash = indexmap::IndexMap::new();
     let mut sorted_ids: Vec<u64> = results.keys().copied().collect();
     sorted_ids.sort_unstable();
@@ -13411,9 +13415,7 @@ fn builtin_annex(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .first()
         .filter(|v| !v.is_undef())
         .map(|v| v.to_int() as u64)
-        .ok_or_else(|| {
-            StrykeError::runtime("annex: divination ID (first argument) required", 0)
-        })?;
+        .ok_or_else(|| StrykeError::runtime("annex: divination ID (first argument) required", 0))?;
     let timeout_ms = args
         .get(1)
         .filter(|v| !v.is_undef())
@@ -13555,9 +13557,10 @@ fn builtin_smite(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 fn builtin_bestow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::time::Duration;
 
-    let hash_value = args.first().filter(|v| !v.is_undef()).ok_or_else(|| {
-        StrykeError::runtime("bestow: hash (first argument) required", 0)
-    })?;
+    let hash_value = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .ok_or_else(|| StrykeError::runtime("bestow: hash (first argument) required", 0))?;
 
     // Build a JSON object from the hash. Accept hash value AND hash ref —
     // as_hash_map only handles bare hash values, so fall back through
@@ -13588,10 +13591,7 @@ fn builtin_bestow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     // backslashes and single-quotes so the agent's parser sees a clean
     // literal. (Stryke single-quotes are interpolation-free.)
     let escaped = json_str.replace('\\', "\\\\").replace('\'', "\\'");
-    let code = format!(
-        "our %gift = %{{from_json('{}')}}; 'bestowed'",
-        escaped
-    );
+    let code = format!("our %gift = %{{from_json('{}')}}; 'bestowed'", escaped);
     let petition_id = handle
         .scatter(&code, &agent_ids)
         .map_err(|e| StrykeError::runtime(format!("bestow: scatter failed: {}", e), 0))?;
@@ -13605,9 +13605,10 @@ fn builtin_bestow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// later `exhume`. Format: `{ "session_id_str": "output_str", ... }`.
 /// Returns the number of bytes written.
 fn builtin_enshrine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let hash_value = args.first().filter(|v| !v.is_undef()).ok_or_else(|| {
-        StrykeError::runtime("enshrine: hash (first argument) required", 0)
-    })?;
+    let hash_value = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .ok_or_else(|| StrykeError::runtime("enshrine: hash (first argument) required", 0))?;
     let path = args
         .get(1)
         .filter(|v| !v.is_undef())
@@ -13618,8 +13619,8 @@ fn builtin_enshrine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .as_hash_map()
         .or_else(|| hash_value.as_hash_ref().map(|r| r.read().clone()))
         .ok_or_else(|| {
-        StrykeError::runtime("enshrine: first argument must be a hash or hash ref", 0)
-    })?;
+            StrykeError::runtime("enshrine: first argument must be a hash or hash ref", 0)
+        })?;
 
     let mut json_obj = serde_json::Map::new();
     for (k, v) in &hash_map {
@@ -13627,9 +13628,8 @@ fn builtin_enshrine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     }
     let json_str = serde_json::Value::Object(json_obj).to_string();
 
-    std::fs::write(&path, &json_str).map_err(|e| {
-        StrykeError::runtime(format!("enshrine: write {} failed: {}", path, e), 0)
-    })?;
+    std::fs::write(&path, &json_str)
+        .map_err(|e| StrykeError::runtime(format!("enshrine: write {} failed: {}", path, e), 0))?;
     Ok(StrykeValue::integer(json_str.len() as i64))
 }
 
@@ -13643,15 +13643,13 @@ fn builtin_exhume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .map(|v| v.to_string())
         .ok_or_else(|| StrykeError::runtime("exhume: path (first argument) required", 0))?;
 
-    let json_str = std::fs::read_to_string(&path).map_err(|e| {
-        StrykeError::runtime(format!("exhume: read {} failed: {}", path, e), 0)
-    })?;
-    let val: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
-        StrykeError::runtime(format!("exhume: parse {} failed: {}", path, e), 0)
-    })?;
-    let obj = val.as_object().ok_or_else(|| {
-        StrykeError::runtime(format!("exhume: {} is not a JSON object", path), 0)
-    })?;
+    let json_str = std::fs::read_to_string(&path)
+        .map_err(|e| StrykeError::runtime(format!("exhume: read {} failed: {}", path, e), 0))?;
+    let val: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| StrykeError::runtime(format!("exhume: parse {} failed: {}", path, e), 0))?;
+    let obj = val
+        .as_object()
+        .ok_or_else(|| StrykeError::runtime(format!("exhume: {} is not a JSON object", path), 0))?;
 
     let mut hash = indexmap::IndexMap::new();
     for (k, v) in obj {
@@ -13699,10 +13697,7 @@ fn builtin_smother(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         // Return the count anyway so the caller can verify the size.
         return Ok(StrykeValue::integer(map.len() as i64));
     }
-    Err(StrykeError::runtime(
-        "smother: argument must be a hash",
-        0,
-    ))
+    Err(StrykeError::runtime("smother: argument must be a hash", 0))
 }
 
 /// `amen($id)` — release a pending divination OR stop an active chant.
@@ -13758,9 +13753,8 @@ fn builtin_anoint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     // becoming the implicit target is suppressed.
     let prior_controller = crate::controller::get_current_controller();
 
-    let handle = crate::controller::spawn_controller("127.0.0.1", 0).map_err(|e| {
-        StrykeError::runtime(format!("anoint: spawn controller failed: {}", e), 0)
-    })?;
+    let handle = crate::controller::spawn_controller("127.0.0.1", 0)
+        .map_err(|e| StrykeError::runtime(format!("anoint: spawn controller failed: {}", e), 0))?;
     let listen_addr = handle.listen_addr();
     let _controller_id = crate::controller::register_controller(Arc::clone(&handle));
     // Intentionally do NOT call set_current_controller here.
@@ -14209,9 +14203,9 @@ fn builtin_resurrect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     //    controller so resurrect doesn't disrupt the calling script's
     //    primary congregation.
     let new_workers = builtin_anoint(&[StrykeValue::integer(1)])?;
-    let worker_handles = new_workers.as_array_vec().ok_or_else(|| {
-        StrykeError::runtime("resurrect: anoint did not return an array", 0)
-    })?;
+    let worker_handles = new_workers
+        .as_array_vec()
+        .ok_or_else(|| StrykeError::runtime("resurrect: anoint did not return an array", 0))?;
     if worker_handles.is_empty() {
         return Err(StrykeError::runtime(
             "resurrect: anoint returned an empty congregation",
@@ -14242,9 +14236,10 @@ fn builtin_resurrect(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// (requires splitting the agent's frame handler to consult the
 /// registered divine handler).
 fn builtin_divine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let _handler = args.first().filter(|v| !v.is_undef()).ok_or_else(|| {
-        StrykeError::runtime("divine: handler (coderef) required", 0)
-    })?;
+    let _handler = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .ok_or_else(|| StrykeError::runtime("divine: handler (coderef) required", 0))?;
     // Tier 4 limitation: we can't store the closure into the VM's package
     // globals from this builtin without an interpreter handle. Document
     // the intended pattern and return success — the caller is expected
@@ -14314,7 +14309,10 @@ fn interrogate_os_pid(pid: u32) -> StrykeResult<StrykeValue> {
         "virtual_memory_bytes".into(),
         StrykeValue::integer(proc.virtual_memory() as i64),
     );
-    hash.insert("cpu_usage".into(), StrykeValue::float(proc.cpu_usage() as f64));
+    hash.insert(
+        "cpu_usage".into(),
+        StrykeValue::float(proc.cpu_usage() as f64),
+    );
     hash.insert(
         "status".into(),
         StrykeValue::string(format!("{:?}", proc.status())),
@@ -14331,7 +14329,9 @@ fn interrogate_os_pid(pid: u32) -> StrykeResult<StrykeValue> {
     // with `%{$h}` — the typical Perl idiom for "function returning a
     // hash." A bare hash value works for `my %h = interrogate($pid)` but
     // breaks `%{interrogate($pid)}` deref. Ref form supports both shapes.
-    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(hash))))
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(
+        hash,
+    ))))
 }
 
 /// `interrogate($pid_or_handles)` — polymorphic process-state dump.
@@ -15077,8 +15077,7 @@ fn builtin_stun_classify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
                                 let inner_g = inner.read();
                                 if inner_g.len() >= 2 {
                                     let host = inner_g[0].to_string();
-                                    let port =
-                                        inner_g[1].to_int().clamp(1, 65535) as u16;
+                                    let port = inner_g[1].to_int().clamp(1, 65535) as u16;
                                     if !host.is_empty() {
                                         server_owned.push((host, port));
                                     }
@@ -15735,18 +15734,22 @@ fn turnbuckle_id_from(v: Option<&StrykeValue>) -> u64 {
 /// the configured timeout window, else 0.
 fn builtin_tb_alive(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let id = turnbuckle_id_from(args.first());
-    Ok(StrykeValue::integer(
-        if crate::turnbuckle::alive(id) { 1 } else { 0 },
-    ))
+    Ok(StrykeValue::integer(if crate::turnbuckle::alive(id) {
+        1
+    } else {
+        0
+    }))
 }
 
 /// `tb_ping($handle)` — force an immediate heartbeat in addition to the
 /// background cadence. Returns 1 on send success, 0 otherwise.
 fn builtin_tb_ping(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let id = turnbuckle_id_from(args.first());
-    Ok(StrykeValue::integer(
-        if crate::turnbuckle::ping(id) { 1 } else { 0 },
-    ))
+    Ok(StrykeValue::integer(if crate::turnbuckle::ping(id) {
+        1
+    } else {
+        0
+    }))
 }
 
 /// `weep(@source, $interval_ms)` — slow-trickle emitter. Wraps any of
@@ -15809,9 +15812,11 @@ fn builtin_weep(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// was known, 0 if it was already closed or never opened.
 fn builtin_tb_close(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let id = turnbuckle_id_from(args.first());
-    Ok(StrykeValue::integer(
-        if crate::turnbuckle::close(id) { 1 } else { 0 },
-    ))
+    Ok(StrykeValue::integer(if crate::turnbuckle::close(id) {
+        1
+    } else {
+        0
+    }))
 }
 
 fn json_to_deep_refs(v: &serde_json::Value) -> StrykeValue {

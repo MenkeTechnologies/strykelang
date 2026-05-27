@@ -1,5 +1,6 @@
 //! Interpreter integration tests grouped by area. See `tests/integration.rs` for the harness.
 
+mod active_probes_pin;
 mod ai_extract_contract;
 mod algebraic_match;
 mod aop;
@@ -168,12 +169,10 @@ mod comments;
 mod completion_zsh_shim;
 mod concurrency_pin;
 mod control_advanced;
-mod active_probes_pin;
 mod control_flow;
 mod control_flow_pin;
 mod control_try_given;
 mod controller_agent_builtins_pin;
-mod scriptable_controller_pin;
 mod csv_codec_pin;
 mod data_structures;
 mod datetime_pin;
@@ -322,6 +321,7 @@ mod runtime_quality_batch3;
 mod runtime_quality_batch4;
 mod scope_pin;
 mod scoping;
+mod scriptable_controller_pin;
 mod semantic_edge;
 mod serialization;
 mod shell_repl;

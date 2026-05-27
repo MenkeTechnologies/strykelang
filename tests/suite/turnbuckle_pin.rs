@@ -120,10 +120,7 @@ fn fork_pair_detects_alive_then_drop() {
     use nix::unistd::{fork, ForkResult};
     use std::time::Duration;
 
-    let result_path = format!(
-        "/tmp/stryke_turnbuckle_pin_{}.txt",
-        std::process::id()
-    );
+    let result_path = format!("/tmp/stryke_turnbuckle_pin_{}.txt", std::process::id());
     let _ = std::fs::remove_file(&result_path);
     let result_path_for_child = result_path.clone();
     let parent_pid = std::process::id() as i64;
