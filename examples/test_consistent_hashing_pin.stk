@@ -1,0 +1,133 @@
+#!/usr/bin/env stryke
+
+fn CH::hash($s) {
+    my $h = 2166136261
+    my $n = len $s
+    for my $i (0:$n-1) {
+        my $c = ord(substr($s, $i, 1))
+        $h = ($h ^ $c)
+        $h = ($h * 16777619) % 4294967296
+    }
+    $h
+}
+
+fn CH::new($vnodes) {
+    +{ vnodes => $vnodes, ring => +{}, sorted => [] }
+}
+
+fn CH::_resort($ch) {
+    my @ks = sort { _ <=> _1 } keys %{$ch->{ring}}
+    $ch->{sorted} = \@ks
+}
+
+fn CH::add($ch, $node) {
+    for my $i (1:$ch->{vnodes}) {
+        my $key = $node . "#" . $i
+        my $h   = CH::hash($key)
+        while (exists $ch->{ring}->{$h}) { $h = ($h + 1) % 4294967296 }
+        $ch->{ring}->{$h} = $node
+    }
+    CH::_resort($ch)
+}
+
+fn CH::remove($ch, $node) {
+    my @to_del = ()
+    for my $h (keys %{$ch->{ring}}) {
+        push @to_del, $h if $ch->{ring}->{$h} eq $node
+    }
+    for my $h (@to_del) { delete $ch->{ring}->{$h} }
+    CH::_resort($ch)
+}
+
+fn CH::lookup($ch, $key) {
+    my @sorted = @{$ch->{sorted}}
+    return undef if len(@sorted) == 0
+    my $h = CH::hash($key)
+    for my $rh (@sorted) {
+        return $ch->{ring}->{$rh} if $rh >= $h
+    }
+    $ch->{ring}->{$sorted[0]}
+}
+
+fn CH::nodes($ch) {
+    my %seen = ()
+    for my $h (keys %{$ch->{ring}}) {
+        $seen{$ch->{ring}->{$h}} = 1
+    }
+    my @ns = sort keys %seen
+    \@ns
+}
+
+# Determinism
+CH::hash("abc") |> aeq CH::hash("abc"), "hash deterministic"
+(CH::hash("a") == CH::hash("b") ? 1 : 0) |> aeq 0, "different strings differ"
+
+# Empty ring
+my $e = CH::new(4)
+(defined CH::lookup($e, "x") ? 1 : 0) |> aeq 0, "empty ring undef"
+len(@{CH::nodes($e)}) |> aeq 0, "no nodes"
+
+# Single node lookups always return it
+my $s = CH::new(8)
+CH::add($s, "only")
+CH::lookup($s, "a") |> aeq "only", "single lookup a"
+CH::lookup($s, "zzz") |> aeq "only", "single lookup zzz"
+CH::lookup($s, "12345") |> aeq "only", "single lookup numeric"
+
+# Three nodes, 8 vnodes
+my $ch = CH::new(8)
+CH::add($ch, "node-a")
+CH::add($ch, "node-b")
+CH::add($ch, "node-c")
+len(@{CH::nodes($ch)}) |> aeq 3, "three nodes"
+len(keys %{$ch->{ring}}) |> aeq 24, "24 ring entries"
+join(",", @{CH::nodes($ch)}) |> aeq "node-a,node-b,node-c", "node list sorted"
+
+# Lookups are stable (deterministic)
+CH::lookup($ch, "apple")    |> aeq CH::lookup($ch, "apple"), "stable lookup"
+CH::lookup($ch, "banana")   |> aeq CH::lookup($ch, "banana"), "stable lookup 2"
+
+# Distribution: with random keys we should hit >=2 different nodes
+my %hit = ()
+for my $i (1:50) {
+    my $node = CH::lookup($ch, "key" . $i)
+    $hit{$node} = 1
+}
+(len(keys %hit) >= 2 ? 1 : 0) |> aeq 1, "lookups hit multiple nodes"
+
+# Remove behaves correctly
+my @before = ()
+for my $i (1:20) { push @before, CH::lookup($ch, "k" . $i) }
+CH::remove($ch, "node-b")
+len(@{CH::nodes($ch)}) |> aeq 2, "two nodes after remove"
+len(keys %{$ch->{ring}}) |> aeq 16, "16 entries after remove"
+
+# After removing node-b, no key returns node-b
+my $bcount = 0
+for my $i (1:30) {
+    $bcount = $bcount + 1 if CH::lookup($ch, "k" . $i) eq "node-b"
+}
+$bcount |> aeq 0, "no key returns removed node"
+
+# Keys that hit a/c before should still hit same node now
+my @after = ()
+for my $i (1:20) { push @after, CH::lookup($ch, "k" . $i) }
+my $unchanged = 0
+for my $i (0:19) {
+    if ($before[$i] ne "node-b") {
+        $unchanged = $unchanged + 1 if $before[$i] eq $after[$i]
+    }
+}
+my $kept_non_b = 0
+for my $i (0:19) { $kept_non_b = $kept_non_b + 1 if $before[$i] ne "node-b" }
+$unchanged |> aeq $kept_non_b, "non-b keys remain stable after removal"
+
+# Re-adding restores nodes
+CH::add($ch, "node-b")
+len(@{CH::nodes($ch)}) |> aeq 3, "three nodes after readd"
+
+# Remove non-existent is no-op
+CH::remove($ch, "ghost")
+len(@{CH::nodes($ch)}) |> aeq 3, "remove ghost no-op"
+
+test_run

@@ -1,0 +1,103 @@
+#!/usr/bin/env stryke
+
+fn Rng::new($seed) { +{ state => $seed } }
+
+fn Rng::next($r) {
+    $r->{state} = ($r->{state} * 1103515245 + 12345) % 2147483648
+    $r->{state}
+}
+
+fn Rng::range($r, $lo, $hi) {
+    my $span = $hi - $lo + 1
+    $lo + (Rng::next($r) % $span)
+}
+
+fn RS::new($k, $rng) {
+    +{ k => $k, n => 0, buf => [], rng => $rng }
+}
+
+fn RS::offer($rs, $x) {
+    $rs->{n} = $rs->{n} + 1
+    if ($rs->{n} <= $rs->{k}) {
+        push @{$rs->{buf}}, $x
+        return
+    }
+    my $j = Rng::range($rs->{rng}, 0, $rs->{n} - 1)
+    if ($j < $rs->{k}) {
+        $rs->{buf}->[$j] = $x
+    }
+}
+
+fn RS::sample($rs) { $rs->{buf} }
+fn RS::seen($rs)   { $rs->{n} }
+
+# RNG determinism
+my $r1 = Rng::new(123)
+my $r2 = Rng::new(123)
+Rng::next($r1) |> aeq Rng::next($r2), "rng determinism"
+Rng::next($r1) |> aeq Rng::next($r2), "rng determinism 2"
+
+# Empty sampler
+my $rng = Rng::new(7)
+my $rs0 = RS::new(5, $rng)
+RS::seen($rs0) |> aeq 0, "empty seen"
+len(@{RS::sample($rs0)}) |> aeq 0, "empty sample"
+
+# Fewer than k → sample is everything
+my $rs1 = RS::new(10, Rng::new(7))
+for my $i (1:3) { RS::offer($rs1, $i) }
+RS::seen($rs1) |> aeq 3, "seen 3"
+join(",", @{RS::sample($rs1)}) |> aeq "1,2,3", "sample exactly inputs"
+
+# Exactly k → sample is full
+my $rs2 = RS::new(5, Rng::new(7))
+for my $i (1:5) { RS::offer($rs2, $i) }
+len(@{RS::sample($rs2)}) |> aeq 5, "sample size = k"
+RS::seen($rs2) |> aeq 5, "seen = k"
+
+# More than k → sample size stays k
+my $rs3 = RS::new(5, Rng::new(42))
+for my $i (1:100) { RS::offer($rs3, $i) }
+len(@{RS::sample($rs3)}) |> aeq 5, "size capped at k after 100"
+RS::seen($rs3) |> aeq 100, "seen 100"
+
+# Determinism: same seed + same stream = same sample
+my $sa = RS::new(5, Rng::new(99))
+my $sb = RS::new(5, Rng::new(99))
+for my $i (1:50) { RS::offer($sa, $i); RS::offer($sb, $i) }
+join(",", @{RS::sample($sa)}) |> aeq join(",", @{RS::sample($sb)}), "deterministic"
+
+# Sample with seed=42, n=20, k=5 (pinned)
+my $rs4 = RS::new(5, Rng::new(42))
+for my $i (1:20) { RS::offer($rs4, $i) }
+join(",", @{RS::sample($rs4)}) |> aeq "7,8,15,17,5", "pinned sample"
+
+# All sampled values come from input stream
+my $rs5 = RS::new(7, Rng::new(13))
+for my $i (1:1000) { RS::offer($rs5, $i) }
+my $all_in = 1
+for my $v (@{RS::sample($rs5)}) {
+    $all_in = 0 if $v < 1 || $v > 1000
+}
+$all_in |> aeq 1, "all sampled in 1..1000"
+
+# No duplicates within the sampled set (since inputs were unique)
+my %dup = ()
+my $has_dup = 0
+for my $v (@{RS::sample($rs5)}) {
+    $has_dup = 1 if exists $dup{$v}
+    $dup{$v} = 1
+}
+$has_dup |> aeq 0, "no dups in sample"
+
+# k=1 reservoir always has one item
+my $rs6 = RS::new(1, Rng::new(5))
+for my $i (1:10) { RS::offer($rs6, $i) }
+len(@{RS::sample($rs6)}) |> aeq 1, "k=1 has one"
+
+# Large k larger than stream
+my $rs7 = RS::new(50, Rng::new(1))
+for my $i (1:5) { RS::offer($rs7, $i) }
+len(@{RS::sample($rs7)}) |> aeq 5, "stream shorter than k"
+
+test_run
