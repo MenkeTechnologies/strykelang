@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+
+# skew_heap.stk — Skew (mergeable) min-heap.
+#
+# A simpler cousin of the leftist heap with no rank metadata: every
+# merge unconditionally swaps the children of the visited node. The
+# self-adjusting structure has amortised O(log n) per op even
+# though worst-case is O(n).
+#
+# Run: stryke --no-interop examples/skew_heap.stk
+
+package SH;
+
+fn make($val, $left, $right) {
+    { val => $val, left => $left, right => $right }
+}
+
+fn merge_h($ha, $hb) {
+    return $hb if !defined $ha
+    return $ha if !defined $hb
+    my $lo
+    my $hi
+    if ($ha->{val} <= $hb->{val}) {
+        $lo = $ha
+        $hi = $hb
+    } else {
+        $lo = $hb
+        $hi = $ha
+    }
+    # Skew step: recurse into RIGHT spine and unconditionally swap
+    my $merged_right = merge_h($lo->{right}, $hi)
+    make($lo->{val}, $merged_right, $lo->{left})
+}
+
+fn empty() { undef }
+fn is_empty($h) { !defined $h }
+fn insert($h, $v) { merge_h($h, make($v, undef, undef)) }
+fn find_min($h) {
+    return undef if !defined $h
+    $h->{val}
+}
+fn delete_min($h) {
+    return undef if !defined $h
+    merge_h($h->{left}, $h->{right})
+}
+
+fn heap_size($h) {
+    return 0 if !defined $h
+    1 + heap_size($h->{left}) + heap_size($h->{right})
+}
+
+fn from_array($arr) {
+    my $h = undef
+    for my $v (@$arr) {
+        $h = insert($h, $v)
+    }
+    $h
+}
+
+fn drain($h) {
+    my @out = ()
+    my $cur = $h
+    while (defined $cur) {
+        push @out, find_min($cur)
+        $cur = delete_min($cur)
+    }
+    \@out
+}
+
+package main;
+
+my $h = SH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
+p "size: " . SH::heap_size($h)
+p "min: " . SH::find_min($h)
+p "drain: @{SH::drain($h)}"
+
+my $ha = SH::from_array([10, 30, 50])
+my $hb = SH::from_array([20, 40, 60])
+my $hm = SH::merge_h($ha, $hb)
+p "merged drain: @{SH::drain($hm)}"
