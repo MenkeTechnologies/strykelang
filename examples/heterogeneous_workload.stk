@@ -1,0 +1,56 @@
+#!/usr/bin/env stryke
+#
+# Heterogeneous workload — different prayer per worker, master gathers
+# the per-worker results into a labeled report. Each worker runs a
+# distinct computation (factorial, fibonacci, sum-of-squares, primes
+# in range), all in parallel.
+#
+# Shows the per-worker `pray $code, $worker` shape — the unary form
+# of pray that targets one specific worker. Different from harvest
+# (same code on all) and chant (continuous register).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── heterogeneous workload (4 workers, 4 different jobs) ──"
+
+my @workers = congregation(4)
+my @sorted_workers = sort { _ <=> _1 } @workers
+printf "spawned %d workers: %s\n", len(@workers), join(",", @sorted_workers)
+
+# Define 4 distinct jobs. Each is (name, code-as-string).
+my @jobs = (
+    ["factorial(10)",       "my \$f = 1; for my \$i (1:10) { \$f *= \$i } \$f"],
+    ["fibonacci(20)",       "my \@f = (0, 1); for my \$i (2:20) { push \@f, \$f[\$i-1] + \$f[\$i-2] } \$f[20]"],
+    ["sum_of_squares(100)", "my \$s = 0; for my \$i (1:100) { \$s += \$i * \$i } \$s"],
+    ["primes_below(50)",    "my \$c = 0; for my \$n (2:49) { my \$ok = 1; for my \$d (2:int(sqrt(\$n))) { if (\$n % \$d == 0) { \$ok = 0; last } } \$c++ if \$ok } \$c"],
+)
+
+# Scatter one job per worker (unary pray, one worker handle each).
+my %results
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $name = $jobs[$i][0]
+    my $code = $jobs[$i][1]
+    my $div = pray $code, $w
+    my %reply = annex $div
+    $results{$w} = [$name, $reply{$w}]
+}
+
+p "── results ──"
+for my $w (@sorted_workers) {
+    my ($name, $value) = @{$results{$w}}
+    printf "  worker %d: %-25s = %s\n", $w, $name, $value
+}
+
+# Sanity checks against known values.
+my $fac_w = $sorted_workers[0]
+my $fib_w = $sorted_workers[1]
+my $sos_w = $sorted_workers[2]
+my $pri_w = $sorted_workers[3]
+p $results{$fac_w}[1] eq "3628800" ? "✓ 10! = 3628800" : "✗ factorial wrong"
+p $results{$fib_w}[1] eq "6765"    ? "✓ fib(20) = 6765" : "✗ fibonacci wrong"
+p $results{$sos_w}[1] eq "338350"  ? "✓ Σi² for 1..100 = 338350" : "✗ sum_of_squares wrong"
+p $results{$pri_w}[1] eq "15"      ? "✓ π(50) = 15" : "✗ primes_below wrong"
+
+excommunicate(@workers)
+p "done"

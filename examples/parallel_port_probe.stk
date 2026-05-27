@@ -1,0 +1,57 @@
+#!/usr/bin/env stryke
+#
+# Parallel port probe — each worker probes a different TCP port on
+# 127.0.0.1, master gathers per-port status. Models a real network
+# scan across multiple targets distributed over a worker pool.
+#
+# CI-safe: probes loopback only. Some ports may be open (system
+# services), most will be closed. Clean under --no-interop.
+
+p "── parallel TCP port probe ──"
+
+my @ports = (1, 22, 53, 80, 443, 631, 5432, 6379, 8080, 9999)
+my $n_workers = len(@ports)
+
+my @workers = congregation($n_workers)
+printf "spawned %d workers (one per port)\n", len(@workers)
+
+# Each worker probes one port. Use kick() — TCP liveness probe with
+# 250ms timeout. We pair workers with ports by sort order so we know
+# which worker got which port.
+my @sorted_workers = sort { _ <=> _1 } @workers
+my %port_for_worker
+for my $i (0:len(@sorted_workers) - 1) {
+    $port_for_worker{$sorted_workers[$i]} = $ports[$i]
+}
+
+# Per-worker prayer: probe the assigned port via kick().
+my %results
+for my $w (@sorted_workers) {
+    my $port = $port_for_worker{$w}
+    my $code = "kick('127.0.0.1', $port, 250) ? 'open' : 'closed'"
+    my $div = pray $code, $w
+    my %reply = annex $div
+    $results{$w} = $reply{$w}
+}
+
+p "── port status (127.0.0.1) ──"
+for my $w (@sorted_workers) {
+    my $port = $port_for_worker{$w}
+    my $status = $results{$w}
+    printf "  port %-5d %s   (worker %d)\n", $port, $status, $w
+}
+
+# Count opens/closes for a summary.
+my $open_count = 0
+my $closed_count = 0
+for my $w (keys %results) {
+    if ($results{$w} eq 'open') {
+        $open_count++
+    } else {
+        $closed_count++
+    }
+}
+printf "summary: %d open, %d closed (of %d probed)\n", $open_count, $closed_count, len(@ports)
+
+excommunicate(@workers)
+p "done"
