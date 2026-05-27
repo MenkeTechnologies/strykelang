@@ -244,7 +244,9 @@ pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
 /// pattern-parsing logic of its own.
 fn pattern_is_glob(path: &str) -> bool {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    qual.is_some() || zsh::ported::pattern::haswilds(stripped) || zsh::glob::hasbraces(stripped, true)
+    qual.is_some()
+        || zsh::ported::pattern::haswilds(stripped)
+        || zsh::glob::hasbraces(stripped, true)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).

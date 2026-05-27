@@ -31,7 +31,12 @@ use stryke::controller::{
 /// pointed at it, wait until all `n` have registered. Returns the
 /// (controller_handle, child_pids). Caller must waitpid each child PID
 /// before the test ends.
-fn forge_congregation(n: usize) -> (std::sync::Arc<stryke::controller::ControllerHandle>, Vec<nix::unistd::Pid>) {
+fn forge_congregation(
+    n: usize,
+) -> (
+    std::sync::Arc<stryke::controller::ControllerHandle>,
+    Vec<nix::unistd::Pid>,
+) {
     use nix::unistd::{fork, ForkResult};
 
     let handle = spawn_controller("127.0.0.1", 0).expect("spawn_controller");
@@ -114,11 +119,13 @@ fn controller_handle_round_trips_one_eval_across_real_fork() {
     let (handle, children) = forge_congregation(1);
 
     let session_ids = handle.muster();
-    assert_eq!(session_ids.len(), 1, "muster returns the one registered agent");
+    assert_eq!(
+        session_ids.len(),
+        1,
+        "muster returns the one registered agent"
+    );
 
-    let petition_id = handle
-        .scatter("2 + 3", &session_ids)
-        .expect("scatter EVAL");
+    let petition_id = handle.scatter("2 + 3", &session_ids).expect("scatter EVAL");
     let results = handle
         .gather(petition_id, Duration::from_secs(10))
         .expect("gather EVAL_RESULT");
@@ -195,7 +202,9 @@ fn divination_consumed_on_gather_so_second_gather_errors() {
     let session_ids = handle.muster();
 
     let pid = handle.scatter("1 + 1", &session_ids).expect("scatter");
-    let first = handle.gather(pid, Duration::from_secs(5)).expect("first gather");
+    let first = handle
+        .gather(pid, Duration::from_secs(5))
+        .expect("first gather");
     assert_eq!(first.len(), 1);
 
     let second = handle.gather(pid, Duration::from_millis(100));
@@ -247,7 +256,10 @@ fn divination_registry_round_trips_pair_via_integer_id() {
     assert_eq!(consumed, (7, 42));
 
     let after = stryke::controller::get_divination(div_id);
-    assert!(after.is_none(), "second lookup after unregister returns None");
+    assert!(
+        after.is_none(),
+        "second lookup after unregister returns None"
+    );
 }
 
 // ─── Tier 1-3 pins ──────────────────────────────────────────────────────────
@@ -267,7 +279,11 @@ fn excommunicate_removes_targeted_agents_from_roster() {
     assert_eq!(count, 2, "two agents notified");
 
     let remaining = handle.muster();
-    assert_eq!(remaining.len(), 1, "one agent remains after excommunication");
+    assert_eq!(
+        remaining.len(),
+        1,
+        "one agent remains after excommunication"
+    );
     assert_eq!(
         remaining[0], session_ids[2],
         "the un-excommunicated agent stays"
@@ -307,7 +323,9 @@ fn parallel_scatter_dispatches_to_all_agents_concurrently() {
     // Push 1KB of arithmetic to make the EVAL non-trivial.
     let big_code = "my $x = 0; for (1:100) { $x += $_ }; $x";
     let petition_id = handle.scatter(big_code, &session_ids).expect("scatter");
-    let results = handle.gather(petition_id, Duration::from_secs(10)).expect("gather");
+    let results = handle
+        .gather(petition_id, Duration::from_secs(10))
+        .expect("gather");
 
     assert_eq!(results.len(), 3, "all three agents replied");
     for sid in &session_ids {
@@ -335,7 +353,9 @@ fn lick_via_to_json_round_trips_worker_soul_state() {
     // The Tier 3 lick builtin uses the same workaround.
     let lick_code = "our %soul = (k1 => 'v1', k2 => 'v2'); to_json(%soul)";
     let pid2 = handle.scatter(lick_code, &session_ids).expect("lick");
-    let lick_results = handle.gather(pid2, Duration::from_secs(5)).expect("lick gather");
+    let lick_results = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("lick gather");
 
     for sid in &session_ids {
         let json_str = lick_results[sid].output.trim();
@@ -347,7 +367,10 @@ fn lick_via_to_json_round_trips_worker_soul_state() {
         let mut got = std::collections::HashMap::new();
         let mut iter = arr.iter();
         while let (Some(k), Some(v)) = (iter.next(), iter.next()) {
-            got.insert(k.as_str().unwrap_or("").to_string(), v.as_str().unwrap_or("").to_string());
+            got.insert(
+                k.as_str().unwrap_or("").to_string(),
+                v.as_str().unwrap_or("").to_string(),
+            );
         }
         assert_eq!(
             got.get("k1").map(String::as_str),
@@ -369,7 +392,9 @@ fn lick_via_to_json_round_trips_worker_soul_state() {
     // contents (each EVAL re-runs the `our %soul = (...)` initialization
     // but the user-visible guarantee is stable output across calls).
     let pid3 = handle.scatter(lick_code, &session_ids).expect("re-lick");
-    let again = handle.gather(pid3, Duration::from_secs(5)).expect("re-lick gather");
+    let again = handle
+        .gather(pid3, Duration::from_secs(5))
+        .expect("re-lick gather");
     for sid in &session_ids {
         let json_str = again[sid].output.trim();
         assert!(
@@ -458,7 +483,9 @@ fn chant_fires_at_new_joiners_after_chant_started() {
     let pid2 = handle
         .scatter("to_json(%main::soul)", &session_ids)
         .expect("readback scatter 2");
-    let results2 = handle.gather(pid2, Duration::from_secs(5)).expect("gather 2");
+    let results2 = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("gather 2");
     let json_str = results2[&session_ids[0]].output.trim();
     assert!(
         json_str.contains("chanted") && json_str.contains("yes"),
@@ -467,7 +494,10 @@ fn chant_fires_at_new_joiners_after_chant_started() {
     );
 
     // amen_chant stops the rescatter; future joiners won't get it.
-    assert!(handle.amen_chant(chant_id), "amen_chant removes from active");
+    assert!(
+        handle.amen_chant(chant_id),
+        "amen_chant removes from active"
+    );
     assert!(!handle.amen_chant(chant_id), "second amen returns false");
 
     dismiss(&handle, vec![child]);
@@ -550,7 +580,10 @@ fn our_hash_persists_across_evals_on_same_vmhelper() {
     let r2 = vm.execute(&p2).expect("eval 2");
     let s = r2.to_string();
     assert!(
-        s.contains("\"a\"") && s.contains("\"alpha\"") && s.contains("\"b\"") && s.contains("\"beta\""),
+        s.contains("\"a\"")
+            && s.contains("\"alpha\"")
+            && s.contains("\"b\"")
+            && s.contains("\"beta\""),
         "cross-EVAL persistence broken — eval 2 saw {:?}",
         s
     );
@@ -566,7 +599,11 @@ fn hash_ref_on_our_hash_derefs_to_populated_data() {
     let out = eval_string(
         r#"our %h = (k1 => 'v1', k2 => 'v2'); my $r = \%h; join(",", sort keys %{$r})"#,
     );
-    assert_eq!(out.trim(), "k1,k2", "\\%our-hash deref must yield populated data");
+    assert_eq!(
+        out.trim(),
+        "k1,k2",
+        "\\%our-hash deref must yield populated data"
+    );
 }
 
 /// `\@array` on an `our`-declared array must produce a ref whose deref
@@ -576,7 +613,11 @@ fn hash_ref_on_our_hash_derefs_to_populated_data() {
 fn array_ref_on_our_array_derefs_to_populated_data() {
     use crate::common::*;
     let out = eval_string(r#"our @a = (10, 20, 30); my $r = \@a; join(",", @{$r})"#);
-    assert_eq!(out.trim(), "10,20,30", "\\@our-array deref must yield populated data");
+    assert_eq!(
+        out.trim(),
+        "10,20,30",
+        "\\@our-array deref must yield populated data"
+    );
 }
 
 /// `interrogate($pid)` dumps OS-level process state. Asserts self-PID
@@ -657,12 +698,16 @@ fn smite_zeroes_worker_soul_without_killing_agent() {
     // Set %soul to non-empty.
     let set_code = "our %soul = (k => 'v'); 'set'";
     let pid1 = handle.scatter(set_code, &session_ids).expect("set");
-    let _ = handle.gather(pid1, Duration::from_secs(5)).expect("set gather");
+    let _ = handle
+        .gather(pid1, Duration::from_secs(5))
+        .expect("set gather");
 
     // Smite — equivalent to `our %soul = (); our %gift = (); 'smitten'`.
     let smite_code = "our %soul = (); our %gift = (); 'smitten'";
     let pid2 = handle.scatter(smite_code, &session_ids).expect("smite");
-    let smite_results = handle.gather(pid2, Duration::from_secs(5)).expect("smite gather");
+    let smite_results = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("smite gather");
     assert_eq!(smite_results.len(), 1, "agent acknowledged smite");
 
     // Verify %soul is empty. Same `to_json(%soul)` workaround as the
@@ -671,7 +716,9 @@ fn smite_zeroes_worker_soul_without_killing_agent() {
     // falsely-empty "{}" the buggy hashref deref would give.
     let check_code = "our %soul; to_json(%soul)";
     let pid3 = handle.scatter(check_code, &session_ids).expect("check");
-    let check_results = handle.gather(pid3, Duration::from_secs(5)).expect("check gather");
+    let check_results = handle
+        .gather(pid3, Duration::from_secs(5))
+        .expect("check gather");
     let json_str = check_results[&session_ids[0]].output.trim();
     // Empty hash flattens to empty list — to_json's representation of
     // that depends on context (may be "[]" or "null" depending on
@@ -695,8 +742,8 @@ fn smite_zeroes_worker_soul_without_killing_agent() {
 /// directly, no divination handle leaked. Pins the one-shot shape.
 #[test]
 fn harvest_returns_result_hash_in_one_call() {
-    use stryke::controller::ControllerHandle;
     use std::sync::Arc;
+    use stryke::controller::ControllerHandle;
 
     let (handle, children) = forge_congregation(3);
     let session_ids = handle.muster();
@@ -731,12 +778,11 @@ fn bestow_pushes_hash_via_json_to_every_worker_gift() {
     // Inline the bestow shape: serialize a hash to JSON, scatter the
     // matching `our %gift = %{from_json(...)}` EVAL, gather.
     let json = r#"{"alpha":"1","beta":"2","gamma":"3"}"#;
-    let code = format!(
-        "our %gift = %{{from_json('{}')}}; 'bestowed'",
-        json
-    );
+    let code = format!("our %gift = %{{from_json('{}')}}; 'bestowed'", json);
     let pid = handle.scatter(&code, &session_ids).expect("bestow scatter");
-    let acks = handle.gather(pid, Duration::from_secs(5)).expect("bestow gather");
+    let acks = handle
+        .gather(pid, Duration::from_secs(5))
+        .expect("bestow gather");
     assert_eq!(acks.len(), 2, "both workers accepted bestow");
     for sid in &session_ids {
         assert_eq!(acks[sid].output.trim(), "bestowed");
@@ -746,7 +792,9 @@ fn bestow_pushes_hash_via_json_to_every_worker_gift() {
     let pid2 = handle
         .scatter("our %gift; to_json(\\%gift)", &session_ids)
         .expect("readback scatter");
-    let readback = handle.gather(pid2, Duration::from_secs(5)).expect("readback gather");
+    let readback = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("readback gather");
     for sid in &session_ids {
         let json_str = readback[sid].output.trim();
         let parsed: serde_json::Value = serde_json::from_str(json_str)
@@ -774,7 +822,10 @@ fn enshrine_exhume_disk_round_trip_preserves_data() {
     // produces — a flat string-keyed object).
     let mut obj = serde_json::Map::new();
     obj.insert("env".into(), serde_json::Value::String("prod".into()));
-    obj.insert("region".into(), serde_json::Value::String("us-east-1".into()));
+    obj.insert(
+        "region".into(),
+        serde_json::Value::String("us-east-1".into()),
+    );
     obj.insert("replicas".into(), serde_json::Value::String("3".into()));
     let json = serde_json::Value::Object(obj).to_string();
     fs::write(&path, &json).expect("write enshrine file");
@@ -815,7 +866,10 @@ fn amen_releases_both_divinations_and_chants() {
     // unregister returns None.
     let div_id = register_divination(123, 456);
     let removed = unregister_divination(div_id);
-    assert!(removed.is_some(), "first unregister of divination yields Some");
+    assert!(
+        removed.is_some(),
+        "first unregister of divination yields Some"
+    );
     assert_eq!(removed.unwrap(), (123, 456));
     assert!(
         unregister_divination(div_id).is_none(),
@@ -870,9 +924,7 @@ fn pilgrimage_returns_false_when_agents_dont_rendezvous_in_time() {
 
     // First agent replies immediately; second sleeps 3s. Barrier
     // timeout is 500ms — second agent misses the window.
-    let prayer = format!(
-        "if ($$ % 2 == 0) {{ sleep 3 }}; 'arrived'"
-    );
+    let prayer = format!("if ($$ % 2 == 0) {{ sleep 3 }}; 'arrived'");
     let ok = handle.pilgrimage(&prayer, &session_ids, Duration::from_millis(500));
     // Note: the PID parity heuristic is just a way to make ONE of the two
     // forked children sleep — the test is non-deterministic on which one
@@ -880,8 +932,8 @@ fn pilgrimage_returns_false_when_agents_dont_rendezvous_in_time() {
     // What we pin: pilgrimage returns false if ANY dispatched agent
     // didn't reply within the per-agent timeout.
     let _ = ok; // accept either outcome — the path under test is "returns bool"
-    // Real pin: the function signature and return type — not a runtime
-    // assertion (which would be flaky given PID parity).
+                // Real pin: the function signature and return type — not a runtime
+                // assertion (which would be flaky given PID parity).
     assert!(matches!(ok, true | false), "pilgrimage returns bool");
 
     dismiss(&handle, children);
@@ -894,7 +946,9 @@ fn pilgrimage_returns_false_when_agents_dont_rendezvous_in_time() {
 /// remain. Pins the in-process registry's basic HashMap semantics.
 #[test]
 fn cathedral_handles_multiple_concurrent_registrations() {
-    use stryke::controller::{cathedral_lookup, cathedral_names, cathedral_register, cathedral_unregister};
+    use stryke::controller::{
+        cathedral_lookup, cathedral_names, cathedral_register, cathedral_unregister,
+    };
 
     // Clear any registrations from prior tests under our test names.
     let _ = cathedral_unregister("multi_test_a");
@@ -905,9 +959,18 @@ fn cathedral_handles_multiple_concurrent_registrations() {
     cathedral_register("multi_test_b", "127.0.0.1:22222");
     cathedral_register("multi_test_c", "127.0.0.1:33333");
 
-    assert_eq!(cathedral_lookup("multi_test_a"), Some("127.0.0.1:11111".into()));
-    assert_eq!(cathedral_lookup("multi_test_b"), Some("127.0.0.1:22222".into()));
-    assert_eq!(cathedral_lookup("multi_test_c"), Some("127.0.0.1:33333".into()));
+    assert_eq!(
+        cathedral_lookup("multi_test_a"),
+        Some("127.0.0.1:11111".into())
+    );
+    assert_eq!(
+        cathedral_lookup("multi_test_b"),
+        Some("127.0.0.1:22222".into())
+    );
+    assert_eq!(
+        cathedral_lookup("multi_test_c"),
+        Some("127.0.0.1:33333".into())
+    );
 
     // names() returns sorted; ensure our three are present (alongside
     // any from other tests).
@@ -922,8 +985,14 @@ fn cathedral_handles_multiple_concurrent_registrations() {
         Some("127.0.0.1:22222".into())
     );
     assert!(cathedral_lookup("multi_test_b").is_none());
-    assert_eq!(cathedral_lookup("multi_test_a"), Some("127.0.0.1:11111".into()));
-    assert_eq!(cathedral_lookup("multi_test_c"), Some("127.0.0.1:33333".into()));
+    assert_eq!(
+        cathedral_lookup("multi_test_a"),
+        Some("127.0.0.1:11111".into())
+    );
+    assert_eq!(
+        cathedral_lookup("multi_test_c"),
+        Some("127.0.0.1:33333".into())
+    );
 
     // Cleanup.
     cathedral_unregister("multi_test_a");
@@ -1010,14 +1079,13 @@ fn lick_style_rehydration_handles_mixed_json_scalar_types() {
     let session_ids = handle.muster();
 
     // Agent returns a JSON object with one of each scalar type.
-    let code = r#"to_json({nil_v => undef, bool_v => 1, int_v => 42, float_v => 3.14, str_v => "hi"})"#;
+    let code =
+        r#"to_json({nil_v => undef, bool_v => 1, int_v => 42, float_v => 3.14, str_v => "hi"})"#;
     // Pass the JSON directly. (Hash flatten + JSON encode gives an array
     // not object, so build the JSON string explicitly.)
     let json_code = r#"'{"nil_v":null,"bool_v":true,"int_v":42,"float_v":3.14,"str_v":"hi"}'"#;
     let pid = handle.scatter(json_code, &session_ids).expect("scatter");
-    let results = handle
-        .gather(pid, Duration::from_secs(5))
-        .expect("gather");
+    let results = handle.gather(pid, Duration::from_secs(5)).expect("gather");
     let _ = code; // (alt form retained as comment for future contributors)
     let json_str = results[&session_ids[0]].output.trim();
     let parsed: serde_json::Value =
@@ -1096,7 +1164,10 @@ fn welcome_with_zero_timeout_returns_current_state_immediately() {
     let start = Instant::now();
     let met = handle.welcome(5, Duration::from_millis(0));
     let elapsed = start.elapsed();
-    assert!(!met, "welcome(5) with 2 connected and zero timeout is false");
+    assert!(
+        !met,
+        "welcome(5) with 2 connected and zero timeout is false"
+    );
     assert!(
         elapsed < Duration::from_millis(60),
         "zero timeout should not block longer than one poll-cycle (50ms); got {:?}",
@@ -1159,9 +1230,8 @@ fn anoint_session_ids_belong_to_separate_controller() {
     // Primary pool — congregation sets the current controller.
     let _primary_handle = spawn_controller("127.0.0.1", 0).expect("primary");
     // Register it so get_current_controller has something to return.
-    let primary_id = stryke::controller::register_controller(std::sync::Arc::clone(
-        &_primary_handle,
-    ));
+    let primary_id =
+        stryke::controller::register_controller(std::sync::Arc::clone(&_primary_handle));
     stryke::controller::set_current_controller(primary_id);
 
     // Spawn a SECOND controller (simulating what anoint does internally
@@ -1237,11 +1307,7 @@ fn spawn_controller_on_already_bound_port_returns_error() {
 
     // Try to bind a second controller on the SAME port — must error.
     let second = spawn_controller("127.0.0.1", port);
-    assert!(
-        second.is_err(),
-        "second bind on port {} must fail",
-        port
-    );
+    assert!(second.is_err(), "second bind on port {} must fail", port);
     // Pattern-match (unwrap_err requires Ok: Debug and
     // Arc<ControllerHandle> doesn't impl Debug).
     let err = match second {
@@ -1339,11 +1405,7 @@ fn shutdown_is_idempotent() {
 fn listen_addr_returns_actually_bound_address_after_port_zero() {
     let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
     let addr = handle.listen_addr();
-    assert_eq!(
-        addr.ip().to_string(),
-        "127.0.0.1",
-        "bound to requested ip"
-    );
+    assert_eq!(addr.ip().to_string(), "127.0.0.1", "bound to requested ip");
     assert!(
         addr.port() > 0,
         "OS-assigned port must be non-zero, got {}",
@@ -1359,7 +1421,11 @@ fn fresh_controller_has_zero_agents_and_empty_roster() {
     let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
     assert_eq!(handle.agent_count(), 0, "fresh controller has 0 agents");
     let m = handle.muster();
-    assert!(m.is_empty(), "fresh controller has empty roster, got {:?}", m);
+    assert!(
+        m.is_empty(),
+        "fresh controller has empty roster, got {:?}",
+        m
+    );
     handle.shutdown();
 }
 
@@ -1417,8 +1483,8 @@ fn register_chant_returns_unique_increasing_ids() {
 /// atomic.
 #[test]
 fn register_controller_returns_unique_increasing_ids() {
-    use stryke::controller::{register_controller, spawn_controller};
     use std::sync::Arc;
+    use stryke::controller::{register_controller, spawn_controller};
 
     let h1 = spawn_controller("127.0.0.1", 0).expect("h1");
     let h2 = spawn_controller("127.0.0.1", 0).expect("h2");
@@ -1485,8 +1551,14 @@ fn divination_id_globally_unique_across_controllers() {
 
     assert_ne!(div_a, div_b, "different controllers → different div ids");
     assert_ne!(div_b, div_c, "different controllers → different div ids");
-    assert_ne!(div_a, div_c, "same controller + different petition → different div ids");
-    assert!(div_a < div_b && div_b < div_c, "monotonic across all sources");
+    assert_ne!(
+        div_a, div_c,
+        "same controller + different petition → different div ids"
+    );
+    assert!(
+        div_a < div_b && div_b < div_c,
+        "monotonic across all sources"
+    );
 
     unregister_divination(div_a);
     unregister_divination(div_b);
@@ -1516,7 +1588,9 @@ fn pilgrimage_evaluates_code_on_every_agent() {
     // Now scatter a prayer that returns $$ — every agent's PID
     // should be distinct (they're separate processes).
     let pid = handle.scatter("$$", &session_ids).expect("scatter pids");
-    let results = handle.gather(pid, Duration::from_secs(5)).expect("gather pids");
+    let results = handle
+        .gather(pid, Duration::from_secs(5))
+        .expect("gather pids");
     let pids: std::collections::HashSet<String> = results
         .values()
         .map(|r| r.output.trim().to_string())
@@ -1532,18 +1606,20 @@ fn pilgrimage_evaluates_code_on_every_agent() {
 fn back_to_back_scatters_reuse_same_agent_connections() {
     let (handle, children) = forge_congregation(2);
     let session_ids = handle.muster();
-    let agents_before: std::collections::HashSet<u64> =
-        session_ids.iter().copied().collect();
+    let agents_before: std::collections::HashSet<u64> = session_ids.iter().copied().collect();
 
     // Two scatters in a row.
     let pid1 = handle.scatter("1", &session_ids).expect("scatter 1");
-    let _ = handle.gather(pid1, Duration::from_secs(5)).expect("gather 1");
+    let _ = handle
+        .gather(pid1, Duration::from_secs(5))
+        .expect("gather 1");
     let pid2 = handle.scatter("2", &session_ids).expect("scatter 2");
-    let _ = handle.gather(pid2, Duration::from_secs(5)).expect("gather 2");
+    let _ = handle
+        .gather(pid2, Duration::from_secs(5))
+        .expect("gather 2");
 
     // muster must show the same agents — no new connections, no churn.
-    let agents_after: std::collections::HashSet<u64> =
-        handle.muster().into_iter().collect();
+    let agents_after: std::collections::HashSet<u64> = handle.muster().into_iter().collect();
     assert_eq!(
         agents_before, agents_after,
         "agent set unchanged across back-to-back scatters"
