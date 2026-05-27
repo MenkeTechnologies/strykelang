@@ -174,13 +174,13 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
 /// meaningless and asking for it is a bug.
 ///
 /// Routing: a path goes through the glob expander when it has wildcards
-/// (per zshrs's [`zsh::glob::haswilds`]) OR a trailing bare qualifier
+/// (per zshrs's [`zsh::ported::pattern::haswilds`]) OR a trailing bare qualifier
 /// suffix (`dir(/)` / `name(.)`). Otherwise we read the literal path so a
 /// missing file produces the proper `No such file or directory` instead of
 /// a silent empty.
 pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    let is_glob = qual.is_some() || zsh::glob::haswilds(stripped);
+    let is_glob = qual.is_some() || zsh::ported::pattern::haswilds(stripped);
     if !is_glob {
         return read_file_text_perl_compat(path);
     }
@@ -213,7 +213,7 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
 /// for binary files without changing text-file behaviour.
 pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    let is_glob = qual.is_some() || zsh::glob::haswilds(stripped);
+    let is_glob = qual.is_some() || zsh::ported::pattern::haswilds(stripped);
     if !is_glob {
         return read_file_bytes(path);
     }
@@ -244,7 +244,7 @@ pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
 /// pattern-parsing logic of its own.
 fn pattern_is_glob(path: &str) -> bool {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    qual.is_some() || zsh::glob::haswilds(stripped) || zsh::glob::hasbraces(stripped, true)
+    qual.is_some() || zsh::ported::pattern::haswilds(stripped) || zsh::glob::hasbraces(stripped, true)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
