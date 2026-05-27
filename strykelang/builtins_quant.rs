@@ -2052,4 +2052,239 @@ mod tests {
             assert!(approx(*x, 3.0, 1e-9));
         }
     }
+
+    // ─── atr / true_range ─────────────────────────────────────────────
+
+    #[test]
+    fn true_range_first_bar_is_high_minus_low() {
+        let v = true_range(&[data(&[10.0]), data(&[5.0]), data(&[8.0])]);
+        let out = as_vec(&v);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0], 5.0);
+    }
+
+    #[test]
+    fn true_range_uses_max_of_three_formulas() {
+        // Bar 2: H=20, L=18, prev_close=10 → TR = max(2, 10, 8) = 10.
+        let h = vec![10.0, 20.0];
+        let l = vec![5.0, 18.0];
+        let c = vec![10.0, 19.0];
+        let v = true_range(&[data(&h), data(&l), data(&c)]);
+        let out = as_vec(&v);
+        assert_eq!(out, vec![5.0, 10.0]);
+    }
+
+    #[test]
+    fn atr_too_short_returns_empty() {
+        // p=5 but only 3 bars → returns empty array.
+        let v = atr(&[
+            data(&[1.0, 2.0, 3.0]),
+            data(&[1.0, 2.0, 3.0]),
+            data(&[1.0, 2.0, 3.0]),
+            i(5),
+        ]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    #[test]
+    fn atr_constant_bars_zero() {
+        // Identical OHLC each bar → TR = 0 → ATR = 0.
+        let bars = vec![100.0; 20];
+        let v = atr(&[data(&bars), data(&bars), data(&bars), i(14)]);
+        let out = as_vec(&v);
+        // Warm-up is zero-filled; the seeded value at index p-1 is also 0.
+        for x in &out[13..] {
+            assert!(
+                approx(*x, 0.0, 1e-9),
+                "ATR of constant should be 0, got {x}"
+            );
+        }
+    }
+
+    // ─── bollinger / keltner / donchian ───────────────────────────────
+
+    #[test]
+    fn bollinger_middle_equals_sma() {
+        let input: Vec<f64> = (1..=30).map(|i| i as f64).collect();
+        let mid = as_vec(&bollinger_middle(&[data(&input), i(5)]));
+        let sma_v = as_vec(&sma(&[data(&input), i(5)]));
+        assert_eq!(mid, sma_v);
+    }
+
+    #[test]
+    fn bollinger_upper_above_middle_above_lower() {
+        let input: Vec<f64> = (0..30).map(|i| (i as f64).sin() * 10.0 + 50.0).collect();
+        let mid = as_vec(&bollinger_middle(&[data(&input), i(10)]));
+        let up = as_vec(&bollinger_upper(&[data(&input), i(10)]));
+        let lo = as_vec(&bollinger_lower(&[data(&input), i(10)]));
+        for i in 0..mid.len() {
+            assert!(up[i] >= mid[i], "upper >= middle at {i}");
+            assert!(mid[i] >= lo[i], "middle >= lower at {i}");
+        }
+    }
+
+    #[test]
+    fn bollinger_constant_input_zero_width() {
+        // Stddev of constant series = 0 → upper = middle = lower.
+        let input = vec![50.0; 20];
+        let mid = as_vec(&bollinger_middle(&[data(&input), i(10)]));
+        let up = as_vec(&bollinger_upper(&[data(&input), i(10)]));
+        let lo = as_vec(&bollinger_lower(&[data(&input), i(10)]));
+        for i in 0..mid.len() {
+            assert!(approx(up[i], mid[i], 1e-9));
+            assert!(approx(lo[i], mid[i], 1e-9));
+        }
+    }
+
+    #[test]
+    fn donchian_upper_picks_window_max() {
+        // Period 3 over [1,5,3,7,2] → windows [1,5,3]=5, [5,3,7]=7, [3,7,2]=7.
+        let v = donchian_upper(&[data(&[1.0, 5.0, 3.0, 7.0, 2.0]), i(3)]);
+        assert_eq!(as_vec(&v), vec![5.0, 7.0, 7.0]);
+    }
+
+    #[test]
+    fn donchian_lower_picks_window_min() {
+        // Period 3 over [5,1,3,2,7] → windows [5,1,3]=1, [1,3,2]=1, [3,2,7]=2.
+        let v = donchian_lower(&[data(&[5.0, 1.0, 3.0, 2.0, 7.0]), i(3)]);
+        assert_eq!(as_vec(&v), vec![1.0, 1.0, 2.0]);
+    }
+
+    #[test]
+    fn donchian_period_larger_than_data_returns_empty() {
+        let v = donchian_upper(&[data(&[1.0, 2.0]), i(5)]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    // ─── adx ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn adx_too_short_returns_empty() {
+        let v = adx(&[
+            data(&[1.0, 2.0, 3.0]),
+            data(&[1.0, 2.0, 3.0]),
+            data(&[1.0, 2.0, 3.0]),
+            i(14),
+        ]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    #[test]
+    fn adx_constant_bars_zero_directional_strength() {
+        // No direction → ADX should stay near 0 across the series.
+        let bars = vec![100.0; 60];
+        let v = adx(&[data(&bars), data(&bars), data(&bars), i(14)]);
+        let out = as_vec(&v);
+        // The first 14 + warm-up will be zero-filled; tail must be zero too.
+        if let Some(last) = out.last() {
+            assert!(
+                approx(*last, 0.0, 1e-6),
+                "ADX of constant bars must be 0, got {last}"
+            );
+        }
+    }
+
+    // ─── cci ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn cci_constant_typical_price_returns_zeros() {
+        // All H=L=C → TP constant → SMA(TP) = TP → numerator = 0 → CCI = 0.
+        let bars = vec![100.0; 30];
+        let v = cci(&[data(&bars), data(&bars), data(&bars), i(20)]);
+        let out = as_vec(&v);
+        for x in &out {
+            assert!(approx(*x, 0.0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn cci_too_short_returns_empty() {
+        let v = cci(&[data(&[1.0; 5]), data(&[1.0; 5]), data(&[1.0; 5]), i(20)]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    // ─── roc / momentum ───────────────────────────────────────────────
+
+    #[test]
+    fn roc_basic_percent_change() {
+        // (100 → 110) → 10%.
+        let v = roc(&[data(&[100.0, 105.0, 110.0]), i(2)]);
+        let out = as_vec(&v);
+        assert_eq!(out.len(), 1);
+        assert!(approx(out[0], 10.0, 1e-9));
+    }
+
+    #[test]
+    fn roc_division_by_zero_returns_zero() {
+        let v = roc(&[data(&[0.0, 5.0, 10.0]), i(2)]);
+        let out = as_vec(&v);
+        assert_eq!(out, vec![0.0]);
+    }
+
+    #[test]
+    fn roc_too_short_returns_empty() {
+        // len == p is too short — need len > p.
+        let v = roc(&[data(&[1.0, 2.0]), i(2)]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    #[test]
+    fn momentum_is_simple_difference() {
+        // momentum_p[i] = data[i] - data[i - p].
+        let v = momentum(&[data(&[1.0, 2.0, 5.0, 8.0]), i(2)]);
+        let out = as_vec(&v);
+        // i=2: 5-1=4. i=3: 8-2=6.
+        assert_eq!(out, vec![4.0, 6.0]);
+    }
+
+    // ─── williams_r ───────────────────────────────────────────────────
+
+    #[test]
+    fn williams_r_at_window_low_is_neg_100() {
+        // close = lowest in window → -100·(hi-close)/(hi-lo) = -100.
+        let highs = vec![10.0, 10.0, 10.0];
+        let lows = vec![5.0, 5.0, 5.0];
+        let closes = vec![10.0, 10.0, 5.0]; // last close = window low
+        let v = williams_r(&[data(&highs), data(&lows), data(&closes), i(3)]);
+        let out = as_vec(&v);
+        assert_eq!(out.len(), 1);
+        assert!(approx(out[0], -100.0, 1e-9));
+    }
+
+    #[test]
+    fn williams_r_at_window_high_is_zero() {
+        let highs = vec![10.0, 10.0, 10.0];
+        let lows = vec![5.0, 5.0, 5.0];
+        let closes = vec![5.0, 5.0, 10.0]; // last close = window high
+        let v = williams_r(&[data(&highs), data(&lows), data(&closes), i(3)]);
+        let out = as_vec(&v);
+        assert!(approx(out[0], 0.0, 1e-9));
+    }
+
+    #[test]
+    fn williams_r_zero_range_returns_zero() {
+        // hi == lo → guarded → 0.
+        let v = williams_r(&[
+            data(&[10.0, 10.0, 10.0]),
+            data(&[10.0, 10.0, 10.0]),
+            data(&[10.0, 10.0, 10.0]),
+            i(3),
+        ]);
+        assert_eq!(as_vec(&v), vec![0.0]);
+    }
+
+    // ─── obv ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn obv_empty_returns_empty() {
+        let v = obv(&[data(&[]), data(&[])]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    #[test]
+    fn obv_first_value_is_first_volume() {
+        let v = obv(&[data(&[100.0, 101.0]), data(&[1000.0, 500.0])]);
+        let out = as_vec(&v);
+        assert_eq!(out[0], 1000.0);
+    }
 }
