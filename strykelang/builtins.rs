@@ -13543,11 +13543,15 @@ fn builtin_bestow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         StrykeError::runtime("bestow: hash (first argument) required", 0)
     })?;
 
-    // Build a JSON object from the hash. Accept hash, hash_ref, or single
-    // (k=>v, k=>v) flat list — the as_hash_map() helper handles all three.
-    let hash_map = hash_value.as_hash_map().ok_or_else(|| {
-        StrykeError::runtime("bestow: first argument must be a hash", 0)
-    })?;
+    // Build a JSON object from the hash. Accept hash value AND hash ref —
+    // as_hash_map only handles bare hash values, so fall back through
+    // as_hash_ref for `bestow(\%h, ...)` callers.
+    let hash_map = hash_value
+        .as_hash_map()
+        .or_else(|| hash_value.as_hash_ref().map(|r| r.read().clone()))
+        .ok_or_else(|| {
+            StrykeError::runtime("bestow: first argument must be a hash or hash ref", 0)
+        })?;
 
     let mut json_obj = serde_json::Map::new();
     for (k, v) in &hash_map {
@@ -13594,8 +13598,11 @@ fn builtin_enshrine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .map(|v| v.to_string())
         .ok_or_else(|| StrykeError::runtime("enshrine: path (second argument) required", 0))?;
 
-    let hash_map = hash_value.as_hash_map().ok_or_else(|| {
-        StrykeError::runtime("enshrine: first argument must be a hash", 0)
+    let hash_map = hash_value
+        .as_hash_map()
+        .or_else(|| hash_value.as_hash_ref().map(|r| r.read().clone()))
+        .ok_or_else(|| {
+        StrykeError::runtime("enshrine: first argument must be a hash or hash ref", 0)
     })?;
 
     let mut json_obj = serde_json::Map::new();
@@ -13868,6 +13875,9 @@ fn builtin_pilgrimage(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 /// Recursively convert a serde_json::Value into a StrykeValue. Used by
 /// `lick` / `peruse` / `exhume` to rehydrate JSON-encoded soul snapshots.
+/// Objects and arrays come back as REFs (hash_ref / array_ref) so they
+/// can be subscripted with `->{...}` / `->[N]` in stryke without an
+/// outer copy. Scalars come back as bare values.
 fn json_value_to_stryke(v: serde_json::Value) -> StrykeValue {
     match v {
         serde_json::Value::Null => StrykeValue::UNDEF,
@@ -13884,14 +13894,14 @@ fn json_value_to_stryke(v: serde_json::Value) -> StrykeValue {
         serde_json::Value::String(s) => StrykeValue::string(s),
         serde_json::Value::Array(arr) => {
             let items: Vec<StrykeValue> = arr.into_iter().map(json_value_to_stryke).collect();
-            StrykeValue::array(items)
+            StrykeValue::array_ref(Arc::new(parking_lot::RwLock::new(items)))
         }
         serde_json::Value::Object(obj) => {
             let mut map = indexmap::IndexMap::new();
             for (k, v) in obj {
                 map.insert(k, json_value_to_stryke(v));
             }
-            StrykeValue::hash(map)
+            StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(map)))
         }
     }
 }

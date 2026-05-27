@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+#
+# Distributed wordcount — MapReduce over the congregation API.
+#
+# Each worker counts words in its own copy of the text; master gathers
+# per-worker counts and verifies they agree. Demonstrates the scatter-
+# gather shape (every worker runs identical compute, master reduces
+# the answers).
+#
+# Real shard-distribution would split input across workers using
+# bestow(per-worker-shard, @workers) and per-worker indexed prayers —
+# kept out of this demo to focus on the core scatter+gather+reduce.
+#
+# CI-safe: pure loopback fork, no network.
+
+my $n = $ARGV[0] // 2
+my $text = $ARGV[1] // "the quick brown fox jumped over the lazy dog the dog slept"
+
+printf "── distributed_wordcount: N=%d text=%s ──\n", $n, $text
+
+my @workers = congregation($n)
+say "spawned ", len(@workers), " workers"
+
+# Each worker counts words in the text (passed inline in the prayer).
+# This shows the simplest scatter shape: identical compute on every
+# worker, master reduces the per-worker counts.
+my $text_escaped = $text
+my $code = "my \$t = q{$text_escaped}; my %counts; for my \$w (split /\\s+/, \$t) { \$counts{\$w}++ } to_json(\\%counts)"
+my $div = pray $code, @workers
+my %replies = annex $div
+
+# Each worker computed the SAME counts (they all saw the same text),
+# so we can take any one worker's hash as the answer. Print it ranked
+# by count descending, ties alphabetical.
+my $first_sid = (sort { $a <=> $b } keys %replies)[0]
+my $h = from_json($replies{$first_sid})
+
+say "── word counts (each worker independently computed) ──"
+my @keys = sort { $h->{$b} <=> $h->{$a} || $a cmp $b } keys %$h
+for my $k (@keys) {
+    printf "  %-12s %d\n", $k, $h->{$k}
+}
+
+# Verify all workers agree.
+my $all_agree = 1
+for my $sid (keys %replies) {
+    my $other = from_json($replies{$sid})
+    for my $k (keys %$h) {
+        $all_agree = 0 unless ($other->{$k} // -1) == $h->{$k}
+    }
+}
+say $all_agree ? "✓ all $n workers computed identical counts" : "✗ workers diverged"
+
+excommunicate(@workers)
+say "done — ", len(@keys), " distinct words"
