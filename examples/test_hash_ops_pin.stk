@@ -1,0 +1,184 @@
+#!/usr/bin/env stryke
+
+# Pinning batch: Hash operations — merge, invert, slice, filter, map_vals,
+# group_by, zip, freq, diff, top-N.
+# Compliance: docs/STYLE_GUIDE.md
+
+# ── Basics ─────────────────────────────────────────────────────────────────
+
+my %h = (a => 1, b => 2, c => 3)
+
+len(keys %h) |> aeq 3, "hash size"
+$h{a}        |> aeq 1, "hash get a"
+$h{b}        |> aeq 2, "hash get b"
+$h{c}        |> aeq 3, "hash get c"
+($h{z} // "undef") |> aeq "undef", "missing key returns undef"
+
+# ── Merge ──────────────────────────────────────────────────────────────────
+
+fn Hash::merge($h1, $h2) { my %r = (%$h1, %$h2); \%r }
+
+my $m = Hash::merge(\%h, +{ c => 99, d => 4 })
+$m->{a}       |> aeq 1,  "merge: a preserved"
+$m->{c}       |> aeq 99, "merge: c overwritten by h2"
+$m->{d}       |> aeq 4,  "merge: d added"
+len(keys %$m) |> aeq 4,  "merge: 4 keys"
+
+# ── Invert ─────────────────────────────────────────────────────────────────
+
+fn Hash::invert($h) {
+    my %r = ()
+    for my $k (keys %$h) { $r{$h->{$k}} = $k }
+    \%r
+}
+
+my $inv = Hash::invert(\%h)
+$inv->{1} |> aeq "a", "invert 1→a"
+$inv->{2} |> aeq "b", "invert 2→b"
+$inv->{3} |> aeq "c", "invert 3→c"
+
+# ── Slice ──────────────────────────────────────────────────────────────────
+
+fn Hash::slice($h, @keys) {
+    my %r = ()
+    for my $k (@keys) { $r{$k} = $h->{$k} }
+    \%r
+}
+
+my $sl = Hash::slice(\%h, "a", "c")
+len(keys %$sl) |> aeq 2, "slice: 2 keys"
+$sl->{a}       |> aeq 1, "slice: a=1"
+$sl->{c}       |> aeq 3, "slice: c=3"
+($sl->{b} // "absent") |> aeq "absent", "slice: b absent"
+
+# ── Filter by value predicate ──────────────────────────────────────────────
+
+fn Hash::filter_vals($h, $pred) {
+    my %r = ()
+    for my $k (keys %$h) {
+        $r{$k} = $h->{$k} if $pred->($h->{$k})
+    }
+    \%r
+}
+
+my $even = Hash::filter_vals(\%h, fn { _ % 2 == 0 })
+len(keys %$even) |> aeq 1,  "filter even: 1 key"
+$even->{b}       |> aeq 2,  "filter even: b=2"
+
+my $gt1 = Hash::filter_vals(\%h, fn { _ > 1 })
+len(keys %$gt1)  |> aeq 2, "filter >1: 2 keys"
+
+# ── Map values ─────────────────────────────────────────────────────────────
+
+fn Hash::map_vals($h, $f) {
+    my %r = ()
+    for my $k (keys %$h) { $r{$k} = $f->($h->{$k}) }
+    \%r
+}
+
+my $doubled = Hash::map_vals(\%h, fn { _ * 2 })
+$doubled->{a} |> aeq 2, "map_vals a*2"
+$doubled->{b} |> aeq 4, "map_vals b*2"
+$doubled->{c} |> aeq 6, "map_vals c*2"
+
+my $upped = Hash::map_vals(+{ x => "hi", y => "bye" }, fn { uc _ })
+$upped->{x} |> aeq "HI",  "map_vals uc x"
+$upped->{y} |> aeq "BYE", "map_vals uc y"
+
+# ── Group by ───────────────────────────────────────────────────────────────
+
+fn Hash::group_by($xs, $key_fn) {
+    my %r = ()
+    for my $x (@$xs) {
+        my $k = $key_fn->($x)
+        push @{$r{$k}}, $x
+    }
+    \%r
+}
+
+my $words = ["cat", "car", "bat", "bar", "can"]
+my $by_first = Hash::group_by($words, fn { _[0] })
+join(",", sort @{$by_first->{c}}) |> aeq "can,car,cat", "group_by: c-words"
+join(",", sort @{$by_first->{b}}) |> aeq "bar,bat",     "group_by: b-words"
+
+my $by_len = Hash::group_by($words, fn { len _ })
+len(@{$by_len->{3}})  |> aeq 5, "group_by: all 5 words have len 3"
+
+my @nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+my $parity = Hash::group_by(\@nums, fn { _ % 2 == 0 ? "even" : "odd" })
+len(@{$parity->{even}}) |> aeq 5, "group_by: 5 evens"
+len(@{$parity->{odd}})  |> aeq 5, "group_by: 5 odds"
+
+# ── Zip keys + values ──────────────────────────────────────────────────────
+
+fn Hash::zip($keys, $vals) {
+    my %r = ()
+    my $n = len @$keys
+    for my $i (0:$n-1) {
+        $r{$keys->[$i]} = $vals->[$i]
+    }
+    \%r
+}
+
+my $z = Hash::zip(["x", "y", "z"], [10, 20, 30])
+$z->{x} |> aeq 10, "zip: x=10"
+$z->{y} |> aeq 20, "zip: y=20"
+$z->{z} |> aeq 30, "zip: z=30"
+
+# ── Frequency table ─────────────────────────────────────────────────────────
+
+fn Hash::freq(@xs) {
+    my %r = ()
+    for my $x (@xs) { $r{$x} = ($r{$x} // 0) + 1 }
+    \%r
+}
+
+my $f = Hash::freq(qw(a b a c b a d b))
+$f->{a} |> aeq 3, "freq: a=3"
+$f->{b} |> aeq 3, "freq: b=3"
+$f->{c} |> aeq 1, "freq: c=1"
+$f->{d} |> aeq 1, "freq: d=1"
+
+# ── Diff between two hashes ─────────────────────────────────────────────────
+
+fn Hash::diff($h1, $h2) {
+    my @r_added   = ()
+    my @r_removed = ()
+    my @r_changed = ()
+    for my $k (keys %$h2) {
+        push @r_added, $k unless exists $h1->{$k}
+    }
+    for my $k (keys %$h1) {
+        push @r_removed, $k unless exists $h2->{$k}
+        push @r_changed, $k if exists $h2->{$k} && $h1->{$k} ne $h2->{$k}
+    }
+    @r_added   = sort @r_added
+    @r_removed = sort @r_removed
+    @r_changed = sort @r_changed
+    +{ added => \@r_added, removed => \@r_removed, changed => \@r_changed }
+}
+
+my $old = +{ a => 1, b => 2, c => 3 }
+my $new = +{ a => 1, b => 99, d => 4 }
+my $delta = Hash::diff($old, $new)
+join(",", @{$delta->{added}})   |> aeq "d", "diff: added"
+join(",", @{$delta->{removed}}) |> aeq "c", "diff: removed"
+join(",", @{$delta->{changed}}) |> aeq "b", "diff: changed"
+
+# ── Pipeline: top-N keys by value ─────────────────────────────────────────
+
+my %scores = (alice => 85, bob => 92, carol => 78, dave => 92, eve => 88)
+my @ranked = sort { $scores{_1} <=> $scores{_} } keys %scores
+join(",", @ranked[0:1]) |> aeq "bob,dave", "top-2 by score (tied 92)"
+
+# ── Accumulate with default ─────────────────────────────────────────────────
+
+my %word_count = ()
+for my $w (qw(apple banana apple cherry banana apple)) {
+    $word_count{$w} = ($word_count{$w} // 0) + 1
+}
+my @wc_pairs = ()
+for my $k (sort keys %word_count) { push @wc_pairs, "$k:$word_count{$k}" }
+join(",", @wc_pairs) |> aeq "apple:3,banana:2,cherry:1", "accumulate word counts"
+
+test_run
