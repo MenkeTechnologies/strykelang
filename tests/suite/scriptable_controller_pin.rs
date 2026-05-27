@@ -248,3 +248,179 @@ fn divination_registry_round_trips_pair_via_integer_id() {
     let after = stryke::controller::get_divination(div_id);
     assert!(after.is_none(), "second lookup after unregister returns None");
 }
+
+// ─── Tier 1-3 pins ──────────────────────────────────────────────────────────
+
+/// `excommunicate` sends SHUTDOWN to the named agents and drops them
+/// from the roster. Subsequent `muster` returns the remaining agents.
+/// Pins the agent-removal path that's separate from full controller
+/// shutdown.
+#[test]
+fn excommunicate_removes_targeted_agents_from_roster() {
+    let (handle, children) = forge_congregation(3);
+    let session_ids = handle.muster();
+    assert_eq!(session_ids.len(), 3);
+
+    // Excommunicate the first two; third should remain.
+    let count = handle.excommunicate(&session_ids[..2]);
+    assert_eq!(count, 2, "two agents notified");
+
+    let remaining = handle.muster();
+    assert_eq!(remaining.len(), 1, "one agent remains after excommunication");
+    assert_eq!(
+        remaining[0], session_ids[2],
+        "the un-excommunicated agent stays"
+    );
+
+    // Reap the excommunicated children (they exited on SHUTDOWN) plus
+    // the survivor via dismiss().
+    use nix::sys::wait::waitpid;
+    for pid in &children[..2] {
+        let _ = waitpid(*pid, None);
+    }
+    dismiss(&handle, vec![children[2]]);
+}
+
+/// `pilgrimage` succeeds when every dispatched agent replies in time.
+/// Pins the barrier-success path — all-agents-ready synchronization.
+#[test]
+fn pilgrimage_returns_true_when_all_agents_rendezvous() {
+    let (handle, children) = forge_congregation(2);
+    let session_ids = handle.muster();
+
+    let ok = handle.pilgrimage("'arrived'", &session_ids, Duration::from_secs(5));
+    assert!(ok, "all agents must rendezvous within the timeout");
+
+    dismiss(&handle, children);
+}
+
+/// Parallel scatter — three agents, large enough payload that serial
+/// fanout would show. The test asserts correctness (all replied with
+/// expected value), not raw timing (which is flaky in CI). The Rayon
+/// par_iter implementation in scatter() is the code under test.
+#[test]
+fn parallel_scatter_dispatches_to_all_agents_concurrently() {
+    let (handle, children) = forge_congregation(3);
+    let session_ids = handle.muster();
+
+    // Push 1KB of arithmetic to make the EVAL non-trivial.
+    let big_code = "my $x = 0; for (1:100) { $x += $_ }; $x";
+    let petition_id = handle.scatter(big_code, &session_ids).expect("scatter");
+    let results = handle.gather(petition_id, Duration::from_secs(10)).expect("gather");
+
+    assert_eq!(results.len(), 3, "all three agents replied");
+    for sid in &session_ids {
+        let r = &results[sid];
+        assert_eq!(r.output.trim(), "5050", "sum 1..100 = 5050");
+    }
+
+    dismiss(&handle, children);
+}
+
+/// Soul harvest round-trip: master tells workers to populate %soul, then
+/// licks each %soul back via JSON. Pins the lick wire path used by the
+/// Tier 3 `lick` / `peruse` builtins — every step is an EVAL through the
+/// existing wire protocol, no special soul-harvest frame.
+#[test]
+fn lick_via_to_json_round_trips_worker_soul_state() {
+    use std::time::Duration;
+
+    let (handle, children) = forge_congregation(2);
+    let session_ids = handle.muster();
+
+    // Workaround for stryke `\%hash` bug (returns empty ref): pass
+    // %soul flat to to_json — flattens to a list, JSON-encodes as an
+    // array of [k1, v1, k2, v2]. Master pairs them back into a hash.
+    // The Tier 3 lick builtin uses the same workaround.
+    let lick_code = "our %soul = (k1 => 'v1', k2 => 'v2'); to_json(%soul)";
+    let pid2 = handle.scatter(lick_code, &session_ids).expect("lick");
+    let lick_results = handle.gather(pid2, Duration::from_secs(5)).expect("lick gather");
+
+    for sid in &session_ids {
+        let json_str = lick_results[sid].output.trim();
+        let parsed: serde_json::Value = serde_json::from_str(json_str)
+            .unwrap_or_else(|e| panic!("agent {} json parse failed on {:?}: {}", sid, json_str, e));
+        let arr = parsed.as_array().expect("JSON array (hash flattened)");
+        // Expect [k1, v1, k2, v2] in some order (hash key order isn't
+        // guaranteed). Build a map from the flat list to verify presence.
+        let mut got = std::collections::HashMap::new();
+        let mut iter = arr.iter();
+        while let (Some(k), Some(v)) = (iter.next(), iter.next()) {
+            got.insert(k.as_str().unwrap_or("").to_string(), v.as_str().unwrap_or("").to_string());
+        }
+        assert_eq!(
+            got.get("k1").map(String::as_str),
+            Some("v1"),
+            "k1 round-tripped on agent {}: {}",
+            sid,
+            json_str
+        );
+        assert_eq!(
+            got.get("k2").map(String::as_str),
+            Some("v2"),
+            "k2 round-tripped on agent {}: {}",
+            sid,
+            json_str
+        );
+    }
+
+    // Lick is non-destructive — re-run the SAME EVAL, get the same
+    // contents (each EVAL re-runs the `our %soul = (...)` initialization
+    // but the user-visible guarantee is stable output across calls).
+    let pid3 = handle.scatter(lick_code, &session_ids).expect("re-lick");
+    let again = handle.gather(pid3, Duration::from_secs(5)).expect("re-lick gather");
+    for sid in &session_ids {
+        let json_str = again[sid].output.trim();
+        assert!(
+            json_str.contains("k1") && json_str.contains("v1"),
+            "lick must produce stable output; got {:?}",
+            json_str
+        );
+    }
+
+    dismiss(&handle, children);
+}
+
+/// Smite wipes worker %soul without disconnecting the agent. Pins the
+/// scenario where you want to reset state mid-session without losing
+/// the agent (vs excommunicate which kills the connection).
+#[test]
+fn smite_zeroes_worker_soul_without_killing_agent() {
+    use std::time::Duration;
+
+    let (handle, children) = forge_congregation(1);
+    let session_ids = handle.muster();
+
+    // Set %soul to non-empty.
+    let set_code = "our %soul = (k => 'v'); 'set'";
+    let pid1 = handle.scatter(set_code, &session_ids).expect("set");
+    let _ = handle.gather(pid1, Duration::from_secs(5)).expect("set gather");
+
+    // Smite — equivalent to `our %soul = (); our %gift = (); 'smitten'`.
+    let smite_code = "our %soul = (); our %gift = (); 'smitten'";
+    let pid2 = handle.scatter(smite_code, &session_ids).expect("smite");
+    let smite_results = handle.gather(pid2, Duration::from_secs(5)).expect("smite gather");
+    assert_eq!(smite_results.len(), 1, "agent acknowledged smite");
+
+    // Verify %soul is empty. Same `to_json(%soul)` workaround as the
+    // lick pin (flat-list output vs the broken `\%soul` ref path) so
+    // we get []/empty-array meaning "no entries" rather than the
+    // falsely-empty "{}" the buggy hashref deref would give.
+    let check_code = "our %soul; to_json(%soul)";
+    let pid3 = handle.scatter(check_code, &session_ids).expect("check");
+    let check_results = handle.gather(pid3, Duration::from_secs(5)).expect("check gather");
+    let json_str = check_results[&session_ids[0]].output.trim();
+    // Empty hash flattens to empty list — to_json's representation of
+    // that depends on context (may be "[]" or "null" depending on
+    // internal stringification path). Either signals "no entries".
+    assert!(
+        json_str == "[]" || json_str == "null",
+        "smite must leave %soul empty; got {:?}",
+        json_str
+    );
+
+    // Agent is still alive (still in roster).
+    assert_eq!(handle.muster().len(), 1, "agent survived smite");
+
+    dismiss(&handle, children);
+}

@@ -155,7 +155,49 @@ This is the $$$ maker. Language is free, enterprise cluster tooling is paid.
 
 ## Scriptable Master/Slave: IPC + Worker Pool + Distributed Registration
 
-**Status (2026-05-27):** Design in flight. Captures the religious-vocab proposal for a scriptable master/slave distributed-compute API layered on top of the existing controller/agent infrastructure.
+**Status (2026-05-27, updated):** Tier 0–3 SHIPPED (18 builtins green, 11 pin tests passing). Tier 4 (`chant` continuous-rescatter, `cathedral` named cross-host discovery, `profess`/`apostatize` slave-initiated membership, `resurrect`/`martyr`/`recant` state lifecycle, `:cloistered` ACL) requires deeper architectural changes — protocol version bump and registry daemon — and is deferred to a separate work session.
+
+### Shipped (commit b550805c3d Tier 0 + this commit Tier 1-3)
+
+| Tier | Verb | Side | Effect | Status |
+|---|---|---|---|---|
+| 0 | `congregation(N)` | master | fork N agents locally, return handles | shipped |
+| 0 | `ordain([name,bind,port])` | master | spawn bare controller, return handle | shipped |
+| 0 | `muster([handle])` | master | list current congregation | shipped |
+| 0 | `pray($code, @handles)` | master | scatter, return divination; coderef OR string | shipped |
+| 0 | `annex($div [, ms])` | master | gather replies as hash, consume divination | shipped |
+| 1 | `harvest($code, @handles [, ms])` | master | one-shot pray+annex fused | shipped |
+| 1 | `excommunicate(@handles)` | master | SHUTDOWN frames to subset, drop from roster | shipped |
+| 1 | `smite(@handles)` | master | reset workers' `%soul` and `%gift` | shipped |
+| 1 | `bestow(\%hash, @handles)` | master | push hash to workers' `%gift` via JSON | shipped |
+| 1 | `enshrine(\%hash, $path)` | local | persist hash as JSON to disk | shipped |
+| 1 | `exhume($path)` | local | read enshrined JSON back as hash | shipped |
+| 1 | `smother(\%hash)` | local | securely zero a local hash in place | shipped |
+| 1 | `amen($div)` | local | release divination without gathering | shipped |
+| 1 | `anoint($n)` | master | like congregation but don't set current | shipped |
+| 1 | `welcome($n [, ms])` | master | block until $n agents joined | shipped |
+| 1 | `pilgrimage($code, @handles [, ms])` | master | scatter+gather barrier — true if all rendezvous | shipped |
+| 2 | parallel scatter | infra | Rayon par_iter over per-PID writes | shipped |
+| 2 | `bow()` | slave | alias for `agent()` (slave-side receive loop) | shipped |
+| 3 | `lick(@handles)` | master | non-destructive `%soul` snapshot per agent | shipped |
+| 3 | `peruse(@handles)` | master | deeper `%soul` walk (Tier 3 alias of lick) | shipped |
+
+**18 verbs live; 11 pin tests green; 1 example script working end-to-end.**
+
+### Deferred (Tier 4 — separate session)
+
+| Verb / Feature | Why deferred |
+|---|---|
+| `chant` / `amen` continuous-rescatter | Requires controller-side active-chant table + auto-fire on new joiners |
+| `cathedral` registry daemon | New binary mode + cross-process named discovery + STRYKE_CATHEDRAL env |
+| `profess` / `apostatize` slave-initiated join | Requires cathedral for name resolution |
+| `:cloistered` ACL flag | Requires agent PID in AGENT_HELLO → wire protocol bump |
+| `resurrect` / `martyr` / `recant` | Process restart with restored state; needs enshrine integration on agent side |
+| `divine` (slave-side explicit handler) | Currently the agent's EVAL loop runs arbitrary code; making `divine` a marker verb adds little until handlers are split out |
+
+### Known stryke language workaround in lick/peruse
+
+`\%hash` on an `our` hash currently produces a ref whose deref reads as empty (verified 2026-05-27 via `to_json(\%soul)` returning `"{}"` even when `keys %soul` shows entries). Workaround: `lick`/`peruse` pass `%soul` flat to `to_json`, which flattens to a JSON array of `[k1, v1, k2, v2, ...]`. Master rehydrates by pairing alternate elements. This is a stryke language bug to fix separately; the lick/peruse wire shape becomes more elegant once `\%hash` works.
 
 ### The Gap
 
