@@ -1,0 +1,67 @@
+#!/usr/bin/env stryke
+
+# lfu_cache.stk - Least-Frequently-Used cache with capacity bound.
+#
+# Run: stryke --no-interop examples/lfu_cache.stk
+
+fn LFU::new($cap) {
+    +{ cap => $cap, store => +{}, freq => +{}, tick => +{}, t => 0 }
+}
+
+fn LFU::get($c, $k) {
+    return undef unless exists $c->{store}->{$k}
+    $c->{freq}->{$k} = $c->{freq}->{$k} + 1
+    $c->{t} = $c->{t} + 1
+    $c->{tick}->{$k} = $c->{t}
+    $c->{store}->{$k}
+}
+
+fn LFU::_evict($c) {
+    my @ks = keys %{$c->{store}}
+    return if len(@ks) == 0
+    my $best = $ks[0]
+    for my $k (@ks) {
+        my $fb = $c->{freq}->{$best}
+        my $fk = $c->{freq}->{$k}
+        if ($fk < $fb || ($fk == $fb && $c->{tick}->{$k} < $c->{tick}->{$best})) {
+            $best = $k
+        }
+    }
+    delete $c->{store}->{$best}
+    delete $c->{freq}->{$best}
+    delete $c->{tick}->{$best}
+}
+
+fn LFU::put($c, $k, $v) {
+    $c->{t} = $c->{t} + 1
+    if (exists $c->{store}->{$k}) {
+        $c->{store}->{$k} = $v
+        $c->{freq}->{$k} = $c->{freq}->{$k} + 1
+        $c->{tick}->{$k} = $c->{t}
+        return
+    }
+    if (len(keys %{$c->{store}}) >= $c->{cap}) {
+        LFU::_evict($c)
+    }
+    $c->{store}->{$k} = $v
+    $c->{freq}->{$k}  = 1
+    $c->{tick}->{$k}  = $c->{t}
+}
+
+fn LFU::size($c) { len(keys %{$c->{store}}) }
+fn LFU::has($c, $k) { exists $c->{store}->{$k} ? 1 : 0 }
+
+p "=== LFU Cache Demo (cap=3) ==="
+my $c = LFU::new(3)
+LFU::put($c, "a", 1)
+LFU::put($c, "b", 2)
+LFU::put($c, "c", 3)
+p "get a -> " . LFU::get($c, "a")
+p "get a -> " . LFU::get($c, "a")
+p "get b -> " . LFU::get($c, "b")
+# Now freq: a=3, b=2, c=1. Inserting d should evict c.
+LFU::put($c, "d", 4)
+p "has c? " . LFU::has($c, "c")
+p "has a? " . LFU::has($c, "a")
+p "has b? " . LFU::has($c, "b")
+p "has d? " . LFU::has($c, "d")
