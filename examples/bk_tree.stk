@@ -1,0 +1,93 @@
+#!/usr/bin/env stryke
+
+# bk_tree.stk - Burkhard-Keller metric tree for approximate string search.
+# Uses Levenshtein distance. Find all dictionary words within edit distance k.
+#
+# Run: stryke --no-interop examples/bk_tree.stk
+
+package BK;
+
+fn lev($s1, $s2) {
+    my $n = len $s1
+    my $m = len $s2
+    return $m if $n == 0
+    return $n if $m == 0
+    my @prev = ()
+    for my $j (0:$m) { push @prev, $j }
+    for my $i (1:$n) {
+        my @cur = ($i)
+        for my $j (1:$m) {
+            my $cost = substr($s1, $i - 1, 1) eq substr($s2, $j - 1, 1) ? 0 : 1
+            my $del = $prev[$j] + 1
+            my $ins = $cur[$j - 1] + 1
+            my $sub = $prev[$j - 1] + $cost
+            my $mn = $del
+            $mn = $ins if $ins < $mn
+            $mn = $sub if $sub < $mn
+            push @cur, $mn
+        }
+        @prev = @cur
+    }
+    $prev[$m]
+}
+
+fn new() { { root => undef } }
+
+fn _node($w) { { word => $w, ch => {} } }
+
+fn add($t, $w) {
+    if (!defined $t->{root}) {
+        $t->{root} = BK::_node($w)
+        return
+    }
+    my $node = $t->{root}
+    while (1) {
+        my $d = BK::lev($w, $node->{word})
+        return if $d == 0    # already in tree
+        if (exists $node->{ch}->{$d}) {
+            $node = $node->{ch}->{$d}
+        } else {
+            $node->{ch}->{$d} = BK::_node($w)
+            return
+        }
+    }
+}
+
+fn _search($node, $w, $k, $out) {
+    return if !defined $node
+    my $d = BK::lev($w, $node->{word})
+    push @$out, $node->{word} if $d <= $k
+    my $lo = $d - $k
+    my $hi = $d + $k
+    my @keys = sort keys %{$node->{ch}}
+    for my $dk (@keys) {
+        if ($dk >= $lo && $dk <= $hi) {
+            BK::_search($node->{ch}->{$dk}, $w, $k, $out)
+        }
+    }
+}
+
+fn search($t, $w, $k) {
+    my @out = ()
+    BK::_search($t->{root}, $w, $k, \@out)
+    @out = sort @out
+    \@out
+}
+
+package main;
+
+p "=== BK-Tree Demo ==="
+my $t = BK::new()
+for my $w ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart") {
+    BK::add($t, $w)
+}
+
+for my $q ("book", "bookk", "boon", "caqe") {
+    my $r = BK::search($t, $q, 1)
+    p "within 1 of '" . $q . "': " . join(",", @$r)
+}
+
+my $r2 = BK::search($t, "boook", 2)
+p "within 2 of 'boook': " . join(",", @$r2)
+
+p "lev(kitten,sitting) = " . BK::lev("kitten", "sitting")

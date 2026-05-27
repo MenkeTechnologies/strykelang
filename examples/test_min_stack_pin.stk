@@ -1,0 +1,200 @@
+#!/usr/bin/env stryke
+
+package MS;
+
+fn new() {
+    { data => [], mins => [], maxs => [] }
+}
+
+fn size($s) { len(@{$s->{data}}) }
+fn is_empty($s) { len(@{$s->{data}}) == 0 }
+
+fn push($s, $v) {
+    push @{$s->{data}}, $v
+    my $nm = len(@{$s->{mins}})
+    my $nx = len(@{$s->{maxs}})
+    if ($nm == 0 || $v <= $s->{mins}->[$nm - 1]) {
+        push @{$s->{mins}}, $v
+    } else {
+        push @{$s->{mins}}, $s->{mins}->[$nm - 1]
+    }
+    if ($nx == 0 || $v >= $s->{maxs}->[$nx - 1]) {
+        push @{$s->{maxs}}, $v
+    } else {
+        push @{$s->{maxs}}, $s->{maxs}->[$nx - 1]
+    }
+}
+
+fn pop($s) {
+    return undef if len(@{$s->{data}}) == 0
+    pop @{$s->{mins}}
+    pop @{$s->{maxs}}
+    pop @{$s->{data}}
+}
+
+fn top($s) {
+    my $n = len(@{$s->{data}})
+    return undef if $n == 0
+    $s->{data}->[$n - 1]
+}
+
+fn min($s) {
+    my $n = len(@{$s->{mins}})
+    return undef if $n == 0
+    $s->{mins}->[$n - 1]
+}
+
+fn max($s) {
+    my $n = len(@{$s->{maxs}})
+    return undef if $n == 0
+    $s->{maxs}->[$n - 1]
+}
+
+package main;
+
+# --- Empty ---
+my $s0 = MS::new()
+MS::size($s0) |> aeq 0, "empty size"
+MS::is_empty($s0) |> aeq 1, "empty is_empty"
+(defined MS::top($s0)) |> aeq 0, "empty top undef"
+(defined MS::min($s0)) |> aeq 0, "empty min undef"
+(defined MS::max($s0)) |> aeq 0, "empty max undef"
+(defined MS::pop($s0)) |> aeq 0, "empty pop undef"
+
+# --- Single ---
+my $s1 = MS::new()
+MS::push($s1, 42)
+MS::size($s1) |> aeq 1, "single size"
+MS::is_empty($s1) |> aeq 0, "single not empty"
+MS::top($s1) |> aeq 42, "single top"
+MS::min($s1) |> aeq 42, "single min"
+MS::max($s1) |> aeq 42, "single max"
+MS::pop($s1)
+MS::is_empty($s1) |> aeq 1, "empty after pop"
+
+# --- Tracking min ---
+my $s2 = MS::new()
+MS::push($s2, 5)
+MS::min($s2) |> aeq 5, "min after 5"
+MS::push($s2, 3)
+MS::min($s2) |> aeq 3, "min after 3"
+MS::push($s2, 8)
+MS::min($s2) |> aeq 3, "min unchanged after 8"
+MS::push($s2, 1)
+MS::min($s2) |> aeq 1, "min after 1"
+MS::push($s2, 9)
+MS::min($s2) |> aeq 1, "min unchanged after 9"
+
+# Pop tracks min restoring
+MS::pop($s2)
+MS::min($s2) |> aeq 1, "min still 1 after pop 9"
+MS::pop($s2)
+MS::min($s2) |> aeq 3, "min back to 3 after pop 1"
+MS::pop($s2)
+MS::min($s2) |> aeq 3, "min still 3 after pop 8"
+MS::pop($s2)
+MS::min($s2) |> aeq 5, "min back to 5 after pop 3"
+
+# --- Tracking max ---
+my $s3 = MS::new()
+MS::push($s3, 5)
+MS::max($s3) |> aeq 5, "max after 5"
+MS::push($s3, 3)
+MS::max($s3) |> aeq 5, "max unchanged after 3"
+MS::push($s3, 8)
+MS::max($s3) |> aeq 8, "max after 8"
+MS::push($s3, 1)
+MS::max($s3) |> aeq 8, "max unchanged after 1"
+MS::pop($s3)
+MS::max($s3) |> aeq 8, "max still 8 after pop 1"
+MS::pop($s3)
+MS::max($s3) |> aeq 5, "max back to 5 after pop 8"
+
+# --- Duplicates (with <= and >= preserves stack semantics) ---
+my $s4 = MS::new()
+MS::push($s4, 3)
+MS::push($s4, 3)
+MS::push($s4, 3)
+MS::min($s4) |> aeq 3, "dup min"
+MS::max($s4) |> aeq 3, "dup max"
+MS::pop($s4)
+MS::min($s4) |> aeq 3, "dup min still 3"
+MS::pop($s4)
+MS::min($s4) |> aeq 3, "dup min still 3 after 2nd pop"
+MS::pop($s4)
+MS::is_empty($s4) |> aeq 1, "dup empty after 3 pops"
+
+# --- Negatives ---
+my $s5 = MS::new()
+for my $v (-1, -5, 3, 0, -10, 7) { MS::push($s5, $v) }
+MS::min($s5) |> aeq -10, "min with negatives"
+MS::max($s5) |> aeq 7, "max with negatives"
+MS::pop($s5)
+MS::min($s5) |> aeq -10, "after pop 7 min same"
+MS::pop($s5)
+MS::min($s5) |> aeq -5, "after pop -10 min back"
+MS::max($s5) |> aeq 3, "after pop -10 max back"
+
+# --- Sequence top + size ---
+my $s6 = MS::new()
+MS::push($s6, 1)
+MS::push($s6, 2)
+MS::push($s6, 3)
+MS::top($s6) |> aeq 3, "top 3"
+MS::size($s6) |> aeq 3, "size 3"
+MS::pop($s6)
+MS::top($s6) |> aeq 2, "top 2"
+MS::size($s6) |> aeq 2, "size 2"
+MS::pop($s6)
+MS::top($s6) |> aeq 1, "top 1"
+MS::pop($s6)
+MS::is_empty($s6) |> aeq 1, "empty done"
+
+# --- Interleaved push/pop ---
+my $s7 = MS::new()
+MS::push($s7, 10)
+MS::min($s7) |> aeq 10, "interleave min 10"
+MS::push($s7, 5)
+MS::min($s7) |> aeq 5, "interleave min 5"
+MS::pop($s7)
+MS::min($s7) |> aeq 10, "interleave min back to 10"
+MS::push($s7, 1)
+MS::min($s7) |> aeq 1, "interleave min 1"
+MS::push($s7, 20)
+MS::max($s7) |> aeq 20, "interleave max 20"
+MS::pop($s7)
+MS::max($s7) |> aeq 10, "max back to 10"
+
+# --- Stress: random-ish sequence, brute force compare ---
+my $ss = MS::new()
+my @arr = ()
+my $seed = 31
+for my $i (1:100) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    my $v = ($seed % 200) - 100
+    MS::push($ss, $v)
+    push @arr, $v
+}
+
+# Compute true min/max
+my $tm = $arr[0]
+my $tx = $arr[0]
+for my $v (@arr) {
+    $tm = $v if $v < $tm
+    $tx = $v if $v > $tx
+}
+MS::min($ss) |> aeq $tm, "stress min equals brute"
+MS::max($ss) |> aeq $tx, "stress max equals brute"
+MS::size($ss) |> aeq 100, "stress size"
+
+# Pop everything, ensure top matches reversed @arr
+my $ok = 1
+for my $i (1:100) {
+    my $expected = $arr[100 - $i]
+    $ok = 0 if MS::top($ss) != $expected
+    MS::pop($ss)
+}
+$ok |> aeq 1, "stress pop order correct"
+MS::is_empty($ss) |> aeq 1, "empty after drain"
+
+test_run
