@@ -1377,3 +1377,236 @@ pub fn xpath_to_selector(args: &[StrykeValue]) -> StrykeValue {
     let s = regex::Regex::new(r"^//(\w+)$").unwrap().replace(&s, "$1");
     StrykeValue::string(s.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(t: &str) -> StrykeValue {
+        StrykeValue::string(t.to_string())
+    }
+
+    // ─── split_path: dot-path tokenizer ────────────────────────────────
+
+    #[test]
+    fn split_path_simple_dot() {
+        assert_eq!(split_path("a.b.c"), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn split_path_filters_empty_segments() {
+        // Leading/trailing/double dots produce empties; all filtered out.
+        assert_eq!(split_path(".a..b."), vec!["a", "b"]);
+        assert_eq!(split_path(""), Vec::<&str>::new());
+        assert_eq!(split_path("."), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn split_path_single_key() {
+        assert_eq!(split_path("name"), vec!["name"]);
+    }
+
+    // ─── jq_get: navigate nested JSON via dot path ─────────────────────
+
+    #[test]
+    fn jq_get_top_level_key() {
+        let v = jq_get(&[s(r#"{"name":"Alice"}"#), s("name")]);
+        assert_eq!(v.as_str_or_empty(), "Alice");
+    }
+
+    #[test]
+    fn jq_get_nested_object_path() {
+        let v = jq_get(&[
+            s(r#"{"user":{"profile":{"city":"Tokyo"}}}"#),
+            s("user.profile.city"),
+        ]);
+        assert_eq!(v.as_str_or_empty(), "Tokyo");
+    }
+
+    #[test]
+    fn jq_get_numeric_segment_indexes_array() {
+        let v = jq_get(&[s(r#"{"items":[10,20,30]}"#), s("items.1")]);
+        assert_eq!(v.to_int(), 20);
+    }
+
+    #[test]
+    fn jq_get_missing_key_returns_undef() {
+        let v = jq_get(&[s(r#"{"name":"Alice"}"#), s("missing")]);
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn jq_get_array_index_out_of_bounds_returns_undef() {
+        let v = jq_get(&[s(r#"{"items":[1,2]}"#), s("items.10")]);
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn jq_get_invalid_json_returns_undef() {
+        let v = jq_get(&[s("not json"), s("foo")]);
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn jq_get_empty_path_returns_root() {
+        let v = jq_get(&[s(r#"{"name":"Alice"}"#), s("")]);
+        // Empty path → no descent → returns the root object as a hash.
+        assert!(v.as_hash_ref().is_some());
+    }
+
+    // ─── jq_set: write to a path, creating intermediates ───────────────
+
+    #[test]
+    fn jq_set_existing_top_level_key() {
+        let v = jq_set(&[s(r#"{"a":1}"#), s("a"), s("99")]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        assert_eq!(out["a"], serde_json::json!(99));
+    }
+
+    #[test]
+    fn jq_set_creates_missing_intermediate_objects() {
+        let v = jq_set(&[s("{}"), s("a.b.c"), s(r#""hello""#)]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        assert_eq!(out["a"]["b"]["c"], serde_json::json!("hello"));
+    }
+
+    #[test]
+    fn jq_set_extends_array_with_nulls() {
+        let v = jq_set(&[s(r#"{"items":[1,2]}"#), s("items.5"), s("99")]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        // index 5 set to 99, gap (idx 2,3,4) padded with null.
+        assert_eq!(out["items"][5], serde_json::json!(99));
+        assert!(out["items"][2].is_null());
+    }
+
+    #[test]
+    fn jq_set_invalid_json_returns_undef() {
+        let v = jq_set(&[s("not json"), s("foo"), s("1")]);
+        assert!(v.is_undef());
+    }
+
+    // ─── jq_delete: remove key or array index ─────────────────────────
+
+    #[test]
+    fn jq_delete_top_level_key() {
+        let v = jq_delete(&[s(r#"{"a":1,"b":2}"#), s("a")]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        assert!(out["a"].is_null() && !out.as_object().unwrap().contains_key("a"));
+        assert_eq!(out["b"], serde_json::json!(2));
+    }
+
+    #[test]
+    fn jq_delete_array_index_shifts_remainder() {
+        let v = jq_delete(&[s(r#"{"items":[10,20,30]}"#), s("items.1")]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        assert_eq!(out["items"], serde_json::json!([10, 30]));
+    }
+
+    #[test]
+    fn jq_delete_nonexistent_key_is_noop() {
+        let v = jq_delete(&[s(r#"{"a":1}"#), s("nonexistent")]);
+        let out: serde_json::Value = serde_json::from_str(&v.as_str_or_empty()).unwrap();
+        assert_eq!(out, serde_json::json!({"a": 1}));
+    }
+
+    // ─── jq_type: serde Value variant → name ──────────────────────────
+
+    #[test]
+    fn jq_type_matrix() {
+        assert_eq!(jq_type(&[s("null")]).as_str_or_empty(), "null");
+        assert_eq!(jq_type(&[s("true")]).as_str_or_empty(), "boolean");
+        assert_eq!(jq_type(&[s("42")]).as_str_or_empty(), "number");
+        assert_eq!(jq_type(&[s("3.14")]).as_str_or_empty(), "number");
+        assert_eq!(jq_type(&[s(r#""hi""#)]).as_str_or_empty(), "string");
+        assert_eq!(jq_type(&[s("[1,2]")]).as_str_or_empty(), "array");
+        assert_eq!(jq_type(&[s("{}")]).as_str_or_empty(), "object");
+    }
+
+    #[test]
+    fn jq_type_invalid_json_returns_invalid() {
+        assert_eq!(jq_type(&[s("not json")]).as_str_or_empty(), "invalid");
+    }
+
+    // ─── jq_has: 0 / 1 boolean style ──────────────────────────────────
+
+    #[test]
+    fn jq_has_present_returns_one() {
+        assert_eq!(jq_has(&[s(r#"{"a":1}"#), s("a")]).to_int(), 1);
+    }
+
+    #[test]
+    fn jq_has_missing_returns_zero() {
+        assert_eq!(jq_has(&[s(r#"{"a":1}"#), s("b")]).to_int(), 0);
+    }
+
+    // ─── jq_length_at: collection size ────────────────────────────────
+
+    #[test]
+    fn jq_length_of_array() {
+        assert_eq!(
+            jq_length_at(&[s(r#"{"items":[1,2,3,4,5]}"#), s("items")]).to_int(),
+            5
+        );
+    }
+
+    #[test]
+    fn jq_length_of_object_counts_keys() {
+        assert_eq!(
+            jq_length_at(&[s(r#"{"a":{"x":1,"y":2,"z":3}}"#), s("a")]).to_int(),
+            3
+        );
+    }
+
+    #[test]
+    fn jq_length_of_missing_returns_zero() {
+        assert_eq!(jq_length_at(&[s(r#"{}"#), s("missing")]).to_int(), 0);
+    }
+
+    // ─── jq_keys_at / jq_values_at ────────────────────────────────────
+
+    #[test]
+    fn jq_keys_at_returns_object_keys_in_insertion_order() {
+        let v = jq_keys_at(&[s(r#"{"a":1,"b":2,"c":3}"#), s("")]);
+        let arr = v.as_array_ref().unwrap();
+        let keys: Vec<String> = arr.read().iter().map(|v| v.as_str_or_empty()).collect();
+        assert_eq!(keys, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn jq_keys_at_on_non_object_returns_undef() {
+        let v = jq_keys_at(&[s(r#"[1,2,3]"#), s("")]);
+        assert!(v.is_undef());
+    }
+
+    // ─── json_to_stryke: type coercion ────────────────────────────────
+
+    #[test]
+    fn json_to_stryke_null_becomes_undef() {
+        let v = json_to_stryke(&serde_json::Value::Null);
+        assert!(v.is_undef());
+    }
+
+    #[test]
+    fn json_to_stryke_bool_becomes_zero_or_one() {
+        assert_eq!(json_to_stryke(&serde_json::json!(true)).to_int(), 1);
+        assert_eq!(json_to_stryke(&serde_json::json!(false)).to_int(), 0);
+    }
+
+    #[test]
+    fn json_to_stryke_integer_preserves_value() {
+        assert_eq!(json_to_stryke(&serde_json::json!(42)).to_int(), 42);
+        assert_eq!(json_to_stryke(&serde_json::json!(-7)).to_int(), -7);
+    }
+
+    #[test]
+    fn json_to_stryke_float_preserves_value() {
+        let v = json_to_stryke(&serde_json::json!(3.14));
+        assert!((v.to_number() - 3.14).abs() < 1e-9);
+    }
+
+    #[test]
+    fn json_to_stryke_string_passes_through() {
+        let v = json_to_stryke(&serde_json::json!("hello"));
+        assert_eq!(v.as_str_or_empty(), "hello");
+    }
+}
