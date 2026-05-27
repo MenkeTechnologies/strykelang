@@ -1,40 +1,35 @@
 #!/usr/bin/env stryke
 #
-# chant + late-joiner demo — start a chant, then spawn a second wave of
-# workers via anoint(). The accept-loop's fire_chants_at hook delivers
-# the active chant to the late joiners automatically.
+# chant + amen lifecycle — register an ongoing prayer, inspect its
+# presence, then stop it. The accept-loop's fire_chants_at hook
+# delivers the active chant to any agent that joins between register
+# and amen — verified end-to-end by the pin test at tests/suite/
+# scriptable_controller_pin.rs::chant_fires_at_new_joiners.
 #
 # Wire-protocol caveat: EVAL_RESULT frames don't carry petition_ids in
 # Tier 4, so the chant's "ok" replies queue in each worker's socket
-# buffer ahead of any subsequent pray's gather. The pin test at
-# tests/suite/scriptable_controller_pin.rs::chant_fires_at_new_joiners
-# verifies the late-join state delivery using a drain pattern; this
-# demo just shows the chant lifecycle (register → spawn late joiners →
-# stop the chant) without trying to read back state.
+# buffer ahead of any subsequent pray's gather. This demo shows the
+# lifecycle without reading back state (the pin test handles that with
+# the drain pattern).
 #
-# CI-safe: pure loopback fork, no network.
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-printf "── chant late-joiner demo ──\n"
+p "── chant + amen lifecycle ──"
 
-# 1. Spawn 2 initial workers.
-my @first_wave = congregation(2)
-printf "first wave (%d workers): %s\n", len(@first_wave), join(",", @first_wave)
+my @workers = congregation(2)
+printf "spawned %d workers\n", len(@workers)
 
-# 2. Start a chant — sets a config hash that workers retain across EVALs.
-my $chant_id = chant("%main::config = (mode => 'render', quality => 'high')", @first_wave)
+# 1. Start a chant — sets a config hash that workers retain across EVALs.
+my $chant_id = chant("%main::config = (mode => 'render', quality => 'high')", @workers)
 printf "chant id: %d (registered as active rescatter)\n", $chant_id
 
-# 3. Verify the chant is in the cathedral.
-my @congs = cathedral()
-printf "cathedral has %d registered congregation(s)\n", len(@congs)
-
-# 4. Stop the chant — late joiners after this won't auto-receive it.
+# 2. amen — stop the chant.
 my $stopped = amen $chant_id
 printf "amen returned %d (1 = chant was active)\n", $stopped
 
-# 5. Confirm amen is idempotent — second call returns 0.
+# 3. amen again — idempotent, returns 0.
 my $stopped_again = amen $chant_id
 printf "amen second call returned %d (0 = already removed)\n", $stopped_again
 
-excommunicate(@first_wave)
-say "done"
+excommunicate(@workers)
+p "done"
