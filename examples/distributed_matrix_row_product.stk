@@ -1,0 +1,99 @@
+#!/usr/bin/env stryke
+#
+# Distributed matrix-row dot products — each worker computes one row
+# of a matrix-vector product C = A * v. Master assembles the rows
+# into the final column vector. Demonstrates per-worker computation
+# of an independent piece of a larger result.
+#
+# Real matrix multiply (A * B) would scatter row-of-A + B to each
+# worker; this demo simplifies to A * v for clarity.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+my $n_workers = $ARGV[0] // 4
+
+p "── distributed matrix-row dot products ──"
+
+# Build a synthetic 8x8 matrix A and an 8-vector v.
+my $dim = 8
+my @A
+for my $r (0:$dim - 1) {
+    my @row
+    for my $c (0:$dim - 1) {
+        push @row, ($r * $dim + $c + 1)   # 1, 2, ..., 64
+    }
+    push @A, \@row
+}
+my @v = (1, 0, -1, 2, -2, 3, -3, 1)
+
+printf "matrix A: %dx%d  ·  vector v: %d elements\n", $dim, $dim, len(@v)
+printf "v = (%s)\n", join(",", @v)
+
+my @workers = congregation($n_workers)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard rows across workers — each worker gets a band of rows to
+# compute. Worker returns the per-row dot products as JSON.
+my $rows_per = int(($dim + $n_workers - 1) / $n_workers)
+my %row_results
+my $v_json = to_json(\@v)
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $rows_per
+    my $end = $start + $rows_per - 1
+    $end = $dim - 1 if $end >= $dim
+    next if $start >= $dim
+    # Extract the rows assigned to this worker.
+    my @worker_rows
+    for my $r ($start:$end) {
+        push @worker_rows, $A[$r]
+    }
+    my $rows_json = to_json(\@worker_rows)
+    my $code = "
+        my \$v = from_json(q{$v_json});
+        my \$rows = from_json(q{$rows_json});
+        my \@results;
+        for my \$row (\@\$rows) {
+            my \$dot = 0;
+            for my \$j (0:len(\@\$v) - 1) {
+                \$dot += \$row->[\$j] * \$v->[\$j];
+            }
+            push \@results, \$dot;
+        }
+        to_json(\\\@results)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    my $partial = from_json($reply{$w})
+    # Store rows with their absolute row index.
+    for my $offset (0:len(@$partial) - 1) {
+        $row_results{$start + $offset} = $partial->[$offset]
+    }
+}
+
+# Assemble the final vector.
+my @c
+for my $r (0:$dim - 1) {
+    push @c, $row_results{$r}
+}
+printf "C = A * v = (%s)\n", join(",", @c)
+
+# Verify against local compute.
+my @c_local
+for my $r (0:$dim - 1) {
+    my $dot = 0
+    for my $j (0:$dim - 1) {
+        $dot += $A[$r][$j] * $v[$j]
+    }
+    push @c_local, $dot
+}
+printf "local:     (%s)\n", join(",", @c_local)
+
+my $matches = 1
+for my $r (0:$dim - 1) {
+    $matches = 0 unless $c[$r] == $c_local[$r]
+}
+p $matches ? "✓ distributed matrix product matches local" : "✗ matrix product diverged"
+
+excommunicate(@workers)
+p "done"
