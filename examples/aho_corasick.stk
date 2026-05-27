@@ -1,0 +1,95 @@
+#!/usr/bin/env stryke
+
+# aho_corasick.stk - Multi-pattern string matching via Aho-Corasick automaton.
+#
+# Run: stryke --no-interop examples/aho_corasick.stk
+
+package AC;
+
+fn _node() { { ch => {}, fail => 0, out => [] } }
+
+fn build($patterns) {
+    my @nodes = ()
+    push @nodes, AC::_node()    # node 0 is root
+    # Build trie
+    my $pi = 0
+    for my $pat (@$patterns) {
+        my $cur = 0
+        my $n = len $pat
+        for my $i (0:$n-1) {
+            my $c = substr($pat, $i, 1)
+            if (!exists $nodes[$cur]->{ch}->{$c}) {
+                push @nodes, AC::_node()
+                $nodes[$cur]->{ch}->{$c} = len(@nodes) - 1
+            }
+            $cur = $nodes[$cur]->{ch}->{$c}
+        }
+        push @{$nodes[$cur]->{out}}, $pi
+        $pi = $pi + 1
+    }
+    # BFS to set fail links
+    my @queue = ()
+    my @kids0 = sort keys %{$nodes[0]->{ch}}
+    for my $c (@kids0) {
+        my $idx = $nodes[0]->{ch}->{$c}
+        $nodes[$idx]->{fail} = 0
+        push @queue, $idx
+    }
+    while (len(@queue) > 0) {
+        my $u = shift @queue
+        my @ks = sort keys %{$nodes[$u]->{ch}}
+        for my $c (@ks) {
+            my $v = $nodes[$u]->{ch}->{$c}
+            push @queue, $v
+            my $f = $nodes[$u]->{fail}
+            while ($f != 0 && !exists $nodes[$f]->{ch}->{$c}) {
+                $f = $nodes[$f]->{fail}
+            }
+            if (exists $nodes[$f]->{ch}->{$c} && $nodes[$f]->{ch}->{$c} != $v) {
+                $nodes[$v]->{fail} = $nodes[$f]->{ch}->{$c}
+            } else {
+                $nodes[$v]->{fail} = 0
+            }
+            # Merge outputs from fail link
+            for my $o (@{$nodes[$nodes[$v]->{fail}]->{out}}) {
+                push @{$nodes[$v]->{out}}, $o
+            }
+        }
+    }
+    { nodes => \@nodes, patterns => $patterns }
+}
+
+fn search($ac, $text) {
+    my @out = ()    # each: { pat => idx, pos => start_index }
+    my $cur = 0
+    my $n = len $text
+    my $nodes = $ac->{nodes}
+    my $pats = $ac->{patterns}
+    for my $i (0:$n-1) {
+        my $c = substr($text, $i, 1)
+        while ($cur != 0 && !exists $nodes->[$cur]->{ch}->{$c}) {
+            $cur = $nodes->[$cur]->{fail}
+        }
+        if (exists $nodes->[$cur]->{ch}->{$c}) {
+            $cur = $nodes->[$cur]->{ch}->{$c}
+        }
+        for my $pi (@{$nodes->[$cur]->{out}}) {
+            my $plen = len $pats->[$pi]
+            push @out, { pat => $pi, pos => $i - $plen + 1 }
+        }
+    }
+    \@out
+}
+
+package main;
+
+p "=== Aho-Corasick Demo ==="
+my @pats = ("he", "she", "his", "hers")
+my $ac = AC::build(\@pats)
+my $text = "ushers"
+p "text:     " . $text
+p "patterns: " . join(",", @pats)
+my $hits = AC::search($ac, $text)
+for my $h (@$hits) {
+    p "  match pat='" . $pats[$h->{pat}] . "' at pos " . $h->{pos}
+}

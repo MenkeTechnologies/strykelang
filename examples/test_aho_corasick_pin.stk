@@ -1,0 +1,181 @@
+#!/usr/bin/env stryke
+
+package AC;
+
+fn _node() { { ch => {}, fail => 0, out => [] } }
+
+fn build($patterns) {
+    my @nodes = ()
+    push @nodes, AC::_node()
+    my $pi = 0
+    for my $pat (@$patterns) {
+        my $cur = 0
+        my $n = len $pat
+        for my $i (0:$n-1) {
+            my $c = substr($pat, $i, 1)
+            if (!exists $nodes[$cur]->{ch}->{$c}) {
+                push @nodes, AC::_node()
+                $nodes[$cur]->{ch}->{$c} = len(@nodes) - 1
+            }
+            $cur = $nodes[$cur]->{ch}->{$c}
+        }
+        push @{$nodes[$cur]->{out}}, $pi
+        $pi = $pi + 1
+    }
+    my @queue = ()
+    my @kids0 = sort keys %{$nodes[0]->{ch}}
+    for my $c (@kids0) {
+        my $idx = $nodes[0]->{ch}->{$c}
+        $nodes[$idx]->{fail} = 0
+        push @queue, $idx
+    }
+    while (len(@queue) > 0) {
+        my $u = shift @queue
+        my @ks = sort keys %{$nodes[$u]->{ch}}
+        for my $c (@ks) {
+            my $v = $nodes[$u]->{ch}->{$c}
+            push @queue, $v
+            my $f = $nodes[$u]->{fail}
+            while ($f != 0 && !exists $nodes[$f]->{ch}->{$c}) {
+                $f = $nodes[$f]->{fail}
+            }
+            if (exists $nodes[$f]->{ch}->{$c} && $nodes[$f]->{ch}->{$c} != $v) {
+                $nodes[$v]->{fail} = $nodes[$f]->{ch}->{$c}
+            } else {
+                $nodes[$v]->{fail} = 0
+            }
+            for my $o (@{$nodes[$nodes[$v]->{fail}]->{out}}) {
+                push @{$nodes[$v]->{out}}, $o
+            }
+        }
+    }
+    { nodes => \@nodes, patterns => $patterns }
+}
+
+fn search($ac, $text) {
+    my @out = ()
+    my $cur = 0
+    my $n = len $text
+    my $nodes = $ac->{nodes}
+    my $pats = $ac->{patterns}
+    for my $i (0:$n-1) {
+        my $c = substr($text, $i, 1)
+        while ($cur != 0 && !exists $nodes->[$cur]->{ch}->{$c}) {
+            $cur = $nodes->[$cur]->{fail}
+        }
+        if (exists $nodes->[$cur]->{ch}->{$c}) {
+            $cur = $nodes->[$cur]->{ch}->{$c}
+        }
+        for my $pi (@{$nodes->[$cur]->{out}}) {
+            my $plen = len $pats->[$pi]
+            push @out, { pat => $pi, pos => $i - $plen + 1 }
+        }
+    }
+    \@out
+}
+
+package main;
+
+# Helper: render hits as "pat@pos" sorted by pos then pat
+fn render($hits, $pats) {
+    my @parts = ()
+    for my $h (@$hits) {
+        push @parts, $pats->[$h->{pat}] . "@" . $h->{pos}
+    }
+    @parts = sort @parts
+    join(",", @parts)
+}
+
+# Empty patterns
+my $ac0 = AC::build([])
+my $r0 = AC::search($ac0, "abcdef")
+len(@$r0) |> aeq 0, "empty patterns no matches"
+
+# Empty text
+my $ac1 = AC::build(["foo", "bar"])
+my $r1 = AC::search($ac1, "")
+len(@$r1) |> aeq 0, "empty text no matches"
+
+# Single pattern, single match
+my $pp = ["foo"]
+my $a2 = AC::build($pp)
+my $r2 = AC::search($a2, "foobar")
+len(@$r2) |> aeq 1, "single match count"
+$r2->[0]->{pat} |> aeq 0, "single match pat idx"
+$r2->[0]->{pos} |> aeq 0, "single match pos 0"
+
+# Single pattern, multiple occurrences
+my $r3 = AC::search($a2, "foofoofoo")
+len(@$r3) |> aeq 3, "overlapping foo count"
+$r3->[0]->{pos} |> aeq 0, "foo pos 0"
+$r3->[1]->{pos} |> aeq 3, "foo pos 3"
+$r3->[2]->{pos} |> aeq 6, "foo pos 6"
+
+# Multiple patterns - classic ushers example
+my $pats4 = ["he", "she", "his", "hers"]
+my $a4 = AC::build($pats4)
+my $hits4 = AC::search($a4, "ushers")
+render($hits4, $pats4) |> aeq "he\@2,hers\@2,she\@1", "ushers classic"
+
+# Patterns where one is suffix of another
+my $pats5 = ["abc", "bc", "c"]
+my $a5 = AC::build($pats5)
+my $hits5 = AC::search($a5, "xabcy")
+render($hits5, $pats5) |> aeq "abc\@1,bc\@2,c\@3", "suffix patterns"
+
+# Patterns where one is prefix of another
+my $pats6 = ["ab", "abc", "abcd"]
+my $a6 = AC::build($pats6)
+my $hits6 = AC::search($a6, "abcde")
+render($hits6, $pats6) |> aeq "ab\@0,abc\@0,abcd\@0", "prefix patterns"
+
+# Pattern not found
+my $a7 = AC::build(["xyz"])
+my $r7 = AC::search($a7, "abcdef")
+len(@$r7) |> aeq 0, "pattern not found"
+
+# Overlapping but not nested
+my $pats8 = ["aba", "bab"]
+my $a8 = AC::build($pats8)
+my $hits8 = AC::search($a8, "ababab")
+# aba at 0, bab at 1, aba at 2, bab at 3
+render($hits8, $pats8) |> aeq "aba\@0,aba\@2,bab\@1,bab\@3", "overlapping patterns"
+
+# Single char pattern
+my $a9 = AC::build(["a"])
+my $r9 = AC::search($a9, "banana")
+len(@$r9) |> aeq 3, "single char count"
+$r9->[0]->{pos} |> aeq 1, "a pos 1"
+$r9->[1]->{pos} |> aeq 3, "a pos 3"
+$r9->[2]->{pos} |> aeq 5, "a pos 5"
+
+# Repeated identical patterns
+my $a10 = AC::build(["xx"])
+my $r10 = AC::search($a10, "xxxx")
+len(@$r10) |> aeq 3, "xx in xxxx count"
+$r10->[0]->{pos} |> aeq 0, "xx pos 0"
+$r10->[1]->{pos} |> aeq 1, "xx pos 1"
+$r10->[2]->{pos} |> aeq 2, "xx pos 2"
+
+# Realistic dictionary
+my $pats11 = ["cat", "car", "card", "care", "careful"]
+my $a11 = AC::build($pats11)
+my $hits11 = AC::search($a11, "i am careful with the card and cat")
+render($hits11, $pats11)
+    |> aeq "car\@22,car\@5,card\@22,care\@5,careful\@5,cat\@31", "dictionary matches"
+
+# Case sensitivity
+my $a12 = AC::build(["Foo"])
+my $r12 = AC::search($a12, "foo Foo FOO")
+len(@$r12) |> aeq 1, "case sensitive match count"
+$r12->[0]->{pos} |> aeq 4, "case match at 4"
+
+# Position correctness on long text
+my $a13 = AC::build(["needle"])
+my $haystack = "...........needle...........needle.."
+my $r13 = AC::search($a13, $haystack)
+len(@$r13) |> aeq 2, "two needles in haystack"
+$r13->[0]->{pos} |> aeq 11, "needle 1 pos"
+$r13->[1]->{pos} |> aeq 28, "needle 2 pos"
+
+test_run
