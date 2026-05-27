@@ -1,0 +1,98 @@
+#!/usr/bin/env stryke
+
+# cartesian_tree.stk — Build a min Cartesian tree from an array in O(n)
+# using a monotonic stack, then support range-min query (RMQ) by
+# walking up to the lowest common ancestor.
+#
+# Each node {val, idx, parent, left, right}; root has parent=-1.
+# Min-heap property on val; in-order traversal yields original array.
+#
+# Run: stryke --no-interop examples/cartesian_tree.stk
+
+package CT;
+
+fn build($arr) {
+    my $n = len(@$arr)
+    my @nodes = ()
+    for my $i (0:$n-1) {
+        push @nodes, {
+            val => $arr->[$i], idx => $i,
+            parent => -1, left => -1, right => -1
+        }
+    }
+    return { nodes => \@nodes, root => -1 } if $n == 0
+    my @stack = (0)
+    my $root_i = 0
+    for my $i (1:$n-1) {
+        my $last_popped = -1
+        while (len(@stack) > 0 && $nodes[$stack[(len(@stack)) - 1]]->{val} > $arr->[$i]) {
+            $last_popped = pop @stack
+        }
+        if (len(@stack) == 0) {
+            $nodes[$i]->{left} = $last_popped
+            $nodes[$last_popped]->{parent} = $i if $last_popped >= 0
+            $root_i = $i
+        } else {
+            my $top = $stack[(len(@stack)) - 1]
+            my $old_right = $nodes[$top]->{right}
+            $nodes[$top]->{right} = $i
+            $nodes[$i]->{parent} = $top
+            if ($old_right >= 0) {
+                $nodes[$i]->{left} = $old_right
+                $nodes[$old_right]->{parent} = $i
+            }
+        }
+        push @stack, $i
+    }
+    { nodes => \@nodes, root => $root_i }
+}
+
+# Naive RMQ via Cartesian tree: ancestors of l, then descend toward r.
+# Returns the (value, index) of the minimum in arr[l..r] inclusive.
+fn rmq($t, $l, $r) {
+    return undef if $l > $r
+    my $nodes = $t->{nodes}
+    # Collect ancestors of l up to root
+    my %anc_of_l = ()
+    my $cur = $l
+    while ($cur >= 0) {
+        $anc_of_l{$cur} = 1
+        $cur = $nodes->[$cur]->{parent}
+    }
+    # Walk up from r until we hit a common ancestor
+    my $u = $r
+    while (!exists $anc_of_l{$u}) {
+        $u = $nodes->[$u]->{parent}
+    }
+    { val => $nodes->[$u]->{val}, idx => $nodes->[$u]->{idx} }
+}
+
+fn inorder($t) {
+    my @out = ()
+    return \@out if $t->{root} < 0
+    my @stack = ()
+    my $cur = $t->{root}
+    my $nodes = $t->{nodes}
+    while ($cur >= 0 || len(@stack) > 0) {
+        while ($cur >= 0) {
+            push @stack, $cur
+            $cur = $nodes->[$cur]->{left}
+        }
+        $cur = pop @stack
+        push @out, $nodes->[$cur]->{val}
+        $cur = $nodes->[$cur]->{right}
+    }
+    \@out
+}
+
+package main;
+
+my $arr = [3, 1, 4, 1, 5, 9, 2, 6]
+my $t = CT::build($arr)
+p "array: @$arr"
+my $io = CT::inorder($t)
+p "in-order: @$io"
+my $q = CT::rmq($t, 2, 6)
+p "rmq[2..6] = val=" . $q->{val} . " idx=" . $q->{idx}
+my $q2 = CT::rmq($t, 0, 7)
+p "rmq[0..7] = val=" . $q2->{val} . " idx=" . $q2->{idx}
