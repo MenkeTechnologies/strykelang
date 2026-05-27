@@ -510,8 +510,7 @@ mod tests {
         let real_ip = std::net::Ipv4Addr::new(192, 0, 2, 99);
         let real_port: u16 = 12345;
         let xor_port = real_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
-        let xor_addr =
-            u32::from_be_bytes(real_ip.octets()) ^ STUN_MAGIC_COOKIE;
+        let xor_addr = u32::from_be_bytes(real_ip.octets()) ^ STUN_MAGIC_COOKIE;
 
         // Layout: header (20) + UNKNOWN attr (8) + XOR-MAPPED-ADDR (12)
         // unknown attr: type=0x9001 (comprehension-optional), len=4,
@@ -534,8 +533,7 @@ mod tests {
         pkt[34..36].copy_from_slice(&xor_port.to_be_bytes());
         pkt[36..40].copy_from_slice(&xor_addr.to_be_bytes());
 
-        let parsed = parse_binding_response(&pkt)
-            .expect("must parse despite unknown attribute");
+        let parsed = parse_binding_response(&pkt).expect("must parse despite unknown attribute");
         assert_eq!(parsed.0, std::net::IpAddr::V4(real_ip));
         assert_eq!(parsed.1, real_port);
     }

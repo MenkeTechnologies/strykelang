@@ -67,10 +67,7 @@ fn fork_teleport_round_trip_via_st_dispatch() {
     use nix::unistd::{fork, ForkResult};
     use std::time::Duration;
 
-    let result_path = format!(
-        "/tmp/stryke_teleport_pin_{}.txt",
-        std::process::id()
-    );
+    let result_path = format!("/tmp/stryke_teleport_pin_{}.txt", std::process::id());
     let _ = std::fs::remove_file(&result_path);
     let result_path_for_child = result_path.clone();
 
@@ -247,7 +244,10 @@ fn fork_teleport_arrayref_pids_with_opts_hash() {
         "#
     );
     let delivered = eval_int(&code);
-    assert_eq!(delivered, 2, "both children notified via arrayref-form PIDs");
+    assert_eq!(
+        delivered, 2,
+        "both children notified via arrayref-form PIDs"
+    );
 
     for c in children {
         let _ = waitpid(c, None);
@@ -255,6 +255,9 @@ fn fork_teleport_arrayref_pids_with_opts_hash() {
     for p in &paths {
         let got = std::fs::read_to_string(p).unwrap_or_default();
         let _ = std::fs::remove_file(p);
-        assert_eq!(got, "arrayref-opts", "deep-refs round-trip works in arrayref form");
+        assert_eq!(
+            got, "arrayref-opts",
+            "deep-refs round-trip works in arrayref form"
+        );
     }
 }

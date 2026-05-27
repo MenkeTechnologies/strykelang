@@ -92,7 +92,10 @@ fn tcp_banner_silent_server_returns_empty_banner() {
     );
     let s = eval_string(&code);
     assert!(s.contains("alive=1"));
-    assert!(s.contains("banner_len=0"), "silent server → empty banner, got: {s}");
+    assert!(
+        s.contains("banner_len=0"),
+        "silent server → empty banner, got: {s}"
+    );
 }
 
 /// `whois_query` against an in-process loopback "WHOIS server" that
@@ -107,9 +110,7 @@ fn whois_query_reads_canned_response_from_loopback_server() {
             // Read the request (best-effort), reply with a canned
             // multi-line response, then close.
             std::thread::sleep(std::time::Duration::from_millis(20));
-            let _ = stream.write_all(
-                b"Domain Name: EXAMPLE.COM\r\nRegistrar: TEST-REG\r\n\r\n",
-            );
+            let _ = stream.write_all(b"Domain Name: EXAMPLE.COM\r\nRegistrar: TEST-REG\r\n\r\n");
             // Close drops the socket; whois_query returns when read hits 0.
         }
     });
@@ -139,5 +140,8 @@ fn whois_query_reads_canned_response_from_loopback_server() {
         );
         return;
     }
-    assert!(s.contains("got|match"), "expected canned response match, got: {s}");
+    assert!(
+        s.contains("got|match"),
+        "expected canned response match, got: {s}"
+    );
 }

@@ -167,21 +167,14 @@ impl Controller {
                             .map(|tok| self.auth_tokens.lock().unwrap().contains(tok))
                             .unwrap_or(false);
                         if !valid {
-                            eprintln!(
-                                "[cloistered] rejected agent {} — no/bad AUTH token",
-                                name
-                            );
+                            eprintln!("[cloistered] rejected agent {} — no/bad AUTH token", name);
                             let rej = AgentHelloAck {
                                 session_id: 0,
                                 accepted: false,
                                 message: "cloistered: missing or invalid AUTH token".into(),
                             };
                             if let Ok(rb) = bincode::serialize(&rej) {
-                                let _ = write_frame(
-                                    &mut stream,
-                                    frame_kind::AGENT_HELLO_ACK,
-                                    &rb,
-                                );
+                                let _ = write_frame(&mut stream, frame_kind::AGENT_HELLO_ACK, &rb);
                             }
                             continue;
                         }
@@ -663,7 +656,6 @@ struct DivinationState {
     dispatched: Vec<u64>,
 }
 
-
 /// Non-blocking handle to a running [`Controller`]. Returned by
 /// [`spawn_controller`]; used by the scriptable builtins to drive the
 /// distributed compute fabric from `.stk` code.
@@ -881,9 +873,7 @@ impl ControllerHandle {
     /// children at N>~50 on macOS Rust stdio. Set back to false after
     /// the spawn loop completes if you want the REPL UX back.
     pub fn set_quiet_accept(&self, quiet: bool) {
-        self.controller
-            .quiet_accept
-            .store(quiet, Ordering::Relaxed);
+        self.controller.quiet_accept.store(quiet, Ordering::Relaxed);
     }
 
     /// Turn :cloistered mode on (with a single accepted token) or off
@@ -893,7 +883,11 @@ impl ControllerHandle {
     pub fn set_cloistered(&self, token: Option<&str>) {
         match token {
             Some(t) if !t.is_empty() => {
-                self.controller.auth_tokens.lock().unwrap().insert(t.to_string());
+                self.controller
+                    .auth_tokens
+                    .lock()
+                    .unwrap()
+                    .insert(t.to_string());
                 self.controller.cloistered.store(true, Ordering::Relaxed);
             }
             _ => {
