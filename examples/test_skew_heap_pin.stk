@@ -1,0 +1,211 @@
+#!/usr/bin/env stryke
+
+package SH;
+
+fn make($val, $left, $right) {
+    { val => $val, left => $left, right => $right }
+}
+
+fn merge_h($ha, $hb) {
+    return $hb if !defined $ha
+    return $ha if !defined $hb
+    my $lo
+    my $hi
+    if ($ha->{val} <= $hb->{val}) {
+        $lo = $ha
+        $hi = $hb
+    } else {
+        $lo = $hb
+        $hi = $ha
+    }
+    my $merged_right = merge_h($lo->{right}, $hi)
+    make($lo->{val}, $merged_right, $lo->{left})
+}
+
+fn empty() { undef }
+fn is_empty($h) { !defined $h }
+fn insert($h, $v) { merge_h($h, make($v, undef, undef)) }
+fn find_min($h) {
+    return undef if !defined $h
+    $h->{val}
+}
+fn delete_min($h) {
+    return undef if !defined $h
+    merge_h($h->{left}, $h->{right})
+}
+
+fn heap_size($h) {
+    return 0 if !defined $h
+    1 + heap_size($h->{left}) + heap_size($h->{right})
+}
+
+fn from_array($arr) {
+    my $h = undef
+    for my $v (@$arr) {
+        $h = insert($h, $v)
+    }
+    $h
+}
+
+fn drain($h) {
+    my @out = ()
+    my $cur = $h
+    while (defined $cur) {
+        push @out, find_min($cur)
+        $cur = delete_min($cur)
+    }
+    \@out
+}
+
+# Min-heap invariant: every parent <= its children
+fn heap_ok($h) {
+    return 1 if !defined $h
+    if (defined $h->{left} && $h->{left}->{val} < $h->{val}) {
+        return 0
+    }
+    if (defined $h->{right} && $h->{right}->{val} < $h->{val}) {
+        return 0
+    }
+    heap_ok($h->{left}) && heap_ok($h->{right})
+}
+
+package main;
+
+# --- Empty heap ---
+my $e = SH::empty()
+SH::is_empty($e) |> aeq 1, "empty is_empty"
+SH::heap_size($e) |> aeq 0, "empty size"
+(defined SH::find_min($e)) |> aeq 0, "empty find_min undef"
+(defined SH::delete_min($e)) |> aeq 0, "empty delete_min undef"
+
+# --- Single ---
+my $s1 = SH::insert(SH::empty(), 42)
+SH::is_empty($s1) |> aeq 0, "single not empty"
+SH::heap_size($s1) |> aeq 1, "single size"
+SH::find_min($s1) |> aeq 42, "single min"
+SH::heap_ok($s1) |> aeq 1, "single heap ok"
+SH::is_empty(SH::delete_min($s1)) |> aeq 1, "delete-min single -> empty"
+
+# --- Inserts ---
+my $h2 = SH::empty()
+for my $v (5, 2, 8, 1, 9, 3, 7, 4, 6) {
+    $h2 = SH::insert($h2, $v)
+}
+SH::heap_size($h2) |> aeq 9, "9 inserts size"
+SH::find_min($h2) |> aeq 1, "min after inserts"
+SH::heap_ok($h2) |> aeq 1, "inserts heap ok"
+
+# --- Drain is sorted ---
+my $sorted = SH::drain($h2)
+len(@$sorted) |> aeq 9, "drain len"
+my $is_sorted = 1
+for my $i (0:7) {
+    $is_sorted = 0 if $sorted->[$i] > $sorted->[$i+1]
+}
+$is_sorted |> aeq 1, "drain sorted"
+$sorted->[0] |> aeq 1, "drain[0]"
+$sorted->[8] |> aeq 9, "drain[8]"
+
+# --- Merge two heaps ---
+my $ha = SH::from_array([10, 30, 50])
+my $hb = SH::from_array([20, 40, 60])
+my $hm = SH::merge_h($ha, $hb)
+SH::heap_size($hm) |> aeq 6, "merge size"
+SH::find_min($hm) |> aeq 10, "merge min"
+SH::heap_ok($hm) |> aeq 1, "merge heap ok"
+my $md = SH::drain($hm)
+$md->[0] |> aeq 10, "merge drain[0]"
+$md->[5] |> aeq 60, "merge drain[5]"
+
+# --- Merge with empty (identity both sides) ---
+my $ne = SH::merge_h(SH::empty(), $ha)
+SH::heap_size($ne) |> aeq 3, "merge empty L = orig"
+my $en = SH::merge_h($ha, SH::empty())
+SH::heap_size($en) |> aeq 3, "merge empty R = orig"
+
+# --- Duplicates ---
+my $hd = SH::from_array([3, 3, 3, 1, 1, 2])
+SH::heap_size($hd) |> aeq 6, "dup size"
+SH::heap_ok($hd) |> aeq 1, "dup heap ok"
+my $dd = SH::drain($hd)
+$dd->[0] |> aeq 1, "dup drain[0]"
+$dd->[1] |> aeq 1, "dup drain[1]"
+$dd->[2] |> aeq 2, "dup drain[2]"
+$dd->[5] |> aeq 3, "dup drain[5]"
+
+# --- Negative values ---
+my $hn = SH::from_array([0, -5, 3, -10, 7, -2])
+SH::find_min($hn) |> aeq -10, "neg min"
+my $dn = SH::drain($hn)
+$dn->[0] |> aeq -10, "neg drain[0]"
+$dn->[5] |> aeq 7, "neg drain[5]"
+
+# --- Worst-case input: monotonically decreasing inserts ---
+# (skew heap absorbs it via self-adjustment)
+my $hw = SH::empty()
+for my $v (100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0) {
+    $hw = SH::insert($hw, $v)
+}
+SH::heap_size($hw) |> aeq 11, "decreasing size"
+SH::find_min($hw) |> aeq 0, "decreasing min"
+SH::heap_ok($hw) |> aeq 1, "decreasing heap ok"
+my $dw = SH::drain($hw)
+$dw->[0] |> aeq 0, "decreasing drain[0]"
+$dw->[10] |> aeq 100, "decreasing drain[10]"
+
+# --- Monotonically increasing inserts ---
+my $hi = SH::empty()
+for my $v (1:20) { $hi = SH::insert($hi, $v) }
+SH::heap_size($hi) |> aeq 20, "increasing size"
+SH::heap_ok($hi) |> aeq 1, "increasing heap ok"
+my $di = SH::drain($hi)
+$di->[0] |> aeq 1, "increasing drain[0]"
+$di->[19] |> aeq 20, "increasing drain[19]"
+
+# --- Stress: random vs sort ---
+my $seed = 271828
+my @big = ()
+for my $i (1:200) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    push @big, ($seed % 1000) - 500
+}
+my $bh = SH::from_array(\@big)
+SH::heap_size($bh) |> aeq 200, "stress size"
+SH::heap_ok($bh) |> aeq 1, "stress heap ok"
+
+my $drained = SH::drain($bh)
+my @ref = sort { _ <=> _1 } @big
+my $bmatch = 1
+for my $i (0:199) {
+    $bmatch = 0 if $drained->[$i] != $ref[$i]
+}
+$bmatch |> aeq 1, "stress drain == sort ref"
+
+# --- Merge-stress: 10 random batches of 15, then drain ---
+my $seed2 = 1729
+my $big_h = SH::empty()
+for my $batch (1:10) {
+    my @bunch = ()
+    for my $j (1:15) {
+        $seed2 = ($seed2 * 1103515245 + 12345) % 2147483648
+        push @bunch, $seed2 % 100
+    }
+    my $bnh = SH::from_array(\@bunch)
+    $big_h = SH::merge_h($big_h, $bnh)
+}
+SH::heap_size($big_h) |> aeq 150, "merge-stress size"
+SH::heap_ok($big_h) |> aeq 1, "merge-stress heap ok"
+my $msd = SH::drain($big_h)
+my $msort = 1
+for my $i (0:148) { $msort = 0 if $msd->[$i] > $msd->[$i+1] }
+$msort |> aeq 1, "merge-stress drain sorted"
+
+# --- Single delete_min after insert leaves remaining elements intact ---
+my $hk = SH::from_array([5, 3, 8, 1, 4])
+SH::find_min($hk) |> aeq 1, "pre-pop min = 1"
+my $hk2 = SH::delete_min($hk)
+SH::heap_size($hk2) |> aeq 4, "post-pop size = 4"
+SH::find_min($hk2) |> aeq 3, "post-pop new min = 3"
+SH::heap_ok($hk2) |> aeq 1, "post-pop heap ok"
+
+test_run
