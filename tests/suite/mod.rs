@@ -163,6 +163,7 @@ mod codec_roundtrip_pin;
 mod codecs_crypto_extra_pin;
 mod coderef_pin;
 mod collections;
+mod comb_raku;
 mod comments;
 mod completion_zsh_shim;
 mod concurrency_pin;
