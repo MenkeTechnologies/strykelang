@@ -246,8 +246,7 @@ pub fn parse_xor_addr(value: &[u8], tx_id: &[u8; 12]) -> Option<(IpAddr, u16)> {
     let port = xor_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
     match family {
         0x01 => {
-            let xor_addr =
-                u32::from_be_bytes([value[4], value[5], value[6], value[7]]);
+            let xor_addr = u32::from_be_bytes([value[4], value[5], value[6], value[7]]);
             let addr = xor_addr ^ STUN_MAGIC_COOKIE;
             Some((IpAddr::V4(Ipv4Addr::from(addr.to_be_bytes())), port))
         }
@@ -408,9 +407,7 @@ pub fn parse_allocate_401(pkt: &[u8]) -> Option<(String, Vec<u8>)> {
 
 /// Parse an Allocate Success response, extracting the XOR-RELAYED-ADDRESS
 /// and LIFETIME.
-pub fn parse_allocate_success(
-    pkt: &[u8],
-) -> Option<(IpAddr, u16, u32)> {
+pub fn parse_allocate_success(pkt: &[u8]) -> Option<(IpAddr, u16, u32)> {
     if message_type(pkt) != msg_type::ALLOCATE_SUCCESS {
         return None;
     }
@@ -525,11 +522,7 @@ pub fn build_create_permission(
 /// Install a permission for `peer_ip` so subsequent SEND_INDICATIONs from
 /// the allocated relay toward that peer succeed. Returns `true` on
 /// CREATE_PERMISSION_SUCCESS, `false` otherwise.
-pub fn create_permission(
-    allocation: &TurnAllocation,
-    peer_ip: IpAddr,
-    timeout: Duration,
-) -> bool {
+pub fn create_permission(allocation: &TurnAllocation, peer_ip: IpAddr, timeout: Duration) -> bool {
     let Some(socket) = udp_sockets::get(allocation.socket_id) else {
         return false;
     };
@@ -566,7 +559,13 @@ pub fn build_send_indication(
     payload: &[u8],
 ) -> Vec<u8> {
     let mut attrs = Vec::new();
-    push_xor_addr_attr(&mut attrs, attr::XOR_PEER_ADDRESS, peer_ip, peer_port, tx_id);
+    push_xor_addr_attr(
+        &mut attrs,
+        attr::XOR_PEER_ADDRESS,
+        peer_ip,
+        peer_port,
+        tx_id,
+    );
     push_attr(&mut attrs, attr::DATA, payload);
     build_message(msg_type::SEND_INDICATION, tx_id, &attrs)
 }
@@ -731,8 +730,7 @@ mod tests {
         );
         push_attr(&mut attrs, attr::LIFETIME, &600u32.to_be_bytes());
         let pkt = build_message(msg_type::ALLOCATE_SUCCESS, &tx, &attrs);
-        let (ip, port, lifetime) =
-            parse_allocate_success(&pkt).expect("success must parse");
+        let (ip, port, lifetime) = parse_allocate_success(&pkt).expect("success must parse");
         assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(198, 51, 100, 7)));
         assert_eq!(port, 50001);
         assert_eq!(lifetime, 600);
@@ -753,8 +751,7 @@ mod tests {
         );
         // Flip the message type to DATA_INDICATION so we can parse it.
         send[0..2].copy_from_slice(&msg_type::DATA_INDICATION.to_be_bytes());
-        let (peer_ip, peer_port, payload) =
-            parse_data_indication(&send).expect("DATA must parse");
+        let (peer_ip, peer_port, payload) = parse_data_indication(&send).expect("DATA must parse");
         assert_eq!(peer_ip, IpAddr::V4(Ipv4Addr::new(192, 0, 2, 99)));
         assert_eq!(peer_port, 42424);
         assert_eq!(payload, b"hello peer");
@@ -913,10 +910,7 @@ mod tests {
         .expect("allocate must succeed against mock");
         assert_eq!(alloc.realm, REALM);
         assert_eq!(alloc.nonce, NONCE);
-        assert_eq!(
-            alloc.relay_ip,
-            IpAddr::V4(Ipv4Addr::new(198, 51, 100, 99))
-        );
+        assert_eq!(alloc.relay_ip, IpAddr::V4(Ipv4Addr::new(198, 51, 100, 99)));
         assert_eq!(alloc.relay_port, 49999);
         assert_eq!(alloc.lifetime_secs, 600);
 

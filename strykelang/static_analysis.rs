@@ -2460,14 +2460,14 @@ mod tests {
         // `_N<M` patterns qualify. Anything with a letter after the
         // optional digit/chevron run is NOT a topic var.
         for bad in [
-            "_x",              // underscore + letter
-            "_foo",            // underscore + word
-            "_3abc",           // digits then letters
-            "_<bad",           // chevron then letters
-            "_2<xyz",          // positional + chevron + letters
-            "x_",              // doesn't start with underscore
-            "__",              // double underscore — not a topic form
-            "_<<<x",           // chevrons then letters
+            "_x",     // underscore + letter
+            "_foo",   // underscore + word
+            "_3abc",  // digits then letters
+            "_<bad",  // chevron then letters
+            "_2<xyz", // positional + chevron + letters
+            "x_",     // doesn't start with underscore
+            "__",     // double underscore — not a topic form
+            "_<<<x",  // chevrons then letters
         ] {
             assert!(
                 !super::is_topic_var(bad),
@@ -2509,7 +2509,8 @@ mod tests {
         a.type_fields.insert("Animal".to_string(), HashSet::new());
         a.type_methods.insert("Dog".to_string(), HashSet::new());
         a.type_fields.insert("Dog".to_string(), HashSet::new());
-        a.type_parents.insert("Dog".to_string(), vec!["Animal".to_string()]);
+        a.type_parents
+            .insert("Dog".to_string(), vec!["Animal".to_string()]);
         assert!(
             a.method_resolves_in_hierarchy("Dog", "trail"),
             "`trail` on Dog must resolve via Animal in extends chain",
@@ -2530,8 +2531,10 @@ mod tests {
         a.type_fields.insert("A".to_string(), HashSet::new());
         a.type_methods.insert("B".to_string(), HashSet::new());
         a.type_fields.insert("B".to_string(), HashSet::new());
-        a.type_parents.insert("A".to_string(), vec!["B".to_string()]);
-        a.type_parents.insert("B".to_string(), vec!["A".to_string()]);
+        a.type_parents
+            .insert("A".to_string(), vec!["B".to_string()]);
+        a.type_parents
+            .insert("B".to_string(), vec!["A".to_string()]);
         // Should return false (method nowhere) without hanging.
         assert!(!a.method_resolves_in_hierarchy("A", "missing"));
         assert!(!a.method_resolves_in_hierarchy("B", "missing"));
@@ -2544,13 +2547,11 @@ mod tests {
         // positive when the method name happens to look like a typo
         // (since strict-vars-on-by-default skips simple sigil-vars
         // in InterpolatedString but DOES walk `#{ EXPR }`).
-        assert!(
-            lint(
-                "class P { x: Int = 0\n fn show { $self->x } }\n\
+        assert!(lint(
+            "class P { x: Int = 0\n fn show { $self->x } }\n\
                  my $p = P(x => 5)\np \"got #{ $p->show }\""
-            )
-            .is_ok(),
-        );
+        )
+        .is_ok(),);
     }
 
     #[test]
@@ -2578,11 +2579,11 @@ mod tests {
     fn is_topic_var_accepts_extra_grammar_variants() {
         // Edge cases of the grammar not covered by the main test:
         for good in [
-            "_99",                  // many positional digits
-            "_<<<<<<<<<<",          // very deep outer chain (10 chevrons)
-            "_<999",                // multi-digit indexed ascent
-            "_42<<<",               // 2-digit positional + chevrons
-            "_42<42",               // 2-digit positional + 2-digit index
+            "_99",         // many positional digits
+            "_<<<<<<<<<<", // very deep outer chain (10 chevrons)
+            "_<999",       // multi-digit indexed ascent
+            "_42<<<",      // 2-digit positional + chevrons
+            "_42<42",      // 2-digit positional + 2-digit index
         ] {
             assert!(
                 super::is_topic_var(good),

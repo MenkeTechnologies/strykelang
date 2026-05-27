@@ -1819,11 +1819,7 @@ fn goto_definition(
                 }) {
                     return Some(location_link_response(
                         uri.clone(),
-                        name_range_on_decl_line(
-                            text,
-                            type_sym.decl_line as usize,
-                            &type_sym.name,
-                        ),
+                        name_range_on_decl_line(text, type_sym.decl_line as usize, &type_sym.name),
                     ));
                 }
             }
@@ -1842,11 +1838,7 @@ fn goto_definition(
             {
                 return Some(location_link_response(
                     uri.clone(),
-                    name_range_on_decl_line(
-                        text,
-                        field_sym.decl_line as usize,
-                        &field_sym.name,
-                    ),
+                    name_range_on_decl_line(text, field_sym.decl_line as usize, &field_sym.name),
                 ));
             }
         }
@@ -9287,10 +9279,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "agent",
         ],
     ),
-    (
-        "Provenance / Lineage",
-        &["mark", "provenance", "unmark"],
-    ),
+    ("Provenance / Lineage", &["mark", "provenance", "unmark"]),
     (
         "Datetime",
         &[
@@ -11104,8 +11093,14 @@ mod name_range_tests {
         let src = "fn Algo::binary_search($target, @list) {\n    -1\n}\n";
         let r = name_range_on_decl_line(src, 0, "Algo::binary_search");
         assert_eq!(r.start.line, 0);
-        assert_eq!(r.start.character, 9, "expected col 9 (start of `binary_search`), got {r:?}");
-        assert_eq!(r.end.character, 22, "expected col 22 (end of `binary_search`)");
+        assert_eq!(
+            r.start.character, 9,
+            "expected col 9 (start of `binary_search`), got {r:?}"
+        );
+        assert_eq!(
+            r.end.character, 22,
+            "expected col 22 (end of `binary_search`)"
+        );
     }
 
     #[test]
@@ -11115,7 +11110,10 @@ mod name_range_tests {
         let src = "fn Project::Foo::Bar::deeply_nested {\n    1\n}\n";
         let r = name_range_on_decl_line(src, 0, "Project::Foo::Bar::deeply_nested");
         assert_eq!(r.start.line, 0);
-        assert_eq!(r.start.character, 22, "expected col 22 (start of `deeply_nested`)");
+        assert_eq!(
+            r.start.character, 22,
+            "expected col 22 (start of `deeply_nested`)"
+        );
         assert_eq!(r.end.character, 35);
     }
 
@@ -11145,7 +11143,10 @@ mod name_range_tests {
         // Either the fallback (col 0..len) OR the leftmost real
         // occurrence — for this source there's only the suffix-match
         // (rejected by word boundary), so we get the fallback.
-        assert_eq!(r.start.character, 0, "must NOT match `search` inside `my_search`");
+        assert_eq!(
+            r.start.character, 0,
+            "must NOT match `search` inside `my_search`"
+        );
     }
 
     #[test]
@@ -11218,8 +11219,14 @@ mod location_link_tests {
     fn location_link_response_carries_target_selection_range() {
         let uri: lsp_types::Uri = "file:///tmp/x.stk".parse().unwrap();
         let range = Range {
-            start: Position { line: 0, character: 9 },
-            end: Position { line: 0, character: 22 },
+            start: Position {
+                line: 0,
+                character: 9,
+            },
+            end: Position {
+                line: 0,
+                character: 22,
+            },
         };
         let resp = location_link_response(uri.clone(), range);
         match resp {
@@ -11513,7 +11520,10 @@ mod completion_tests {
 
     #[test]
     fn cursor_context_top_level_code() {
-        assert_eq!(super::cursor_string_context("print", 5), super::CursorStringContext::Code);
+        assert_eq!(
+            super::cursor_string_context("print", 5),
+            super::CursorStringContext::Code
+        );
     }
 
     #[test]

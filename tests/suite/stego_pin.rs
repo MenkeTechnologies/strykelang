@@ -35,7 +35,12 @@ fn write_gradient_png(path: &str) {
     }
     let file = std::fs::File::create(path).expect("create PNG file");
     image::codecs::png::PngEncoder::new(file)
-        .write_image(img.as_raw(), img.width(), img.height(), ExtendedColorType::Rgba8)
+        .write_image(
+            img.as_raw(),
+            img.width(),
+            img.height(),
+            ExtendedColorType::Rgba8,
+        )
         .expect("encode PNG");
 }
 
@@ -83,7 +88,11 @@ fn text_carrier_corruption_caught_by_crc32() {
         try { reveal($stego); } catch ($e) { $err = \"$e\"; }
         defined($err) && $err =~ /corrupt|exceeds/ ? 1 : 0
     ";
-    assert_eq!(eval_int(code), 1, "tampered stego must surface as a reveal error");
+    assert_eq!(
+        eval_int(code),
+        1,
+        "tampered stego must surface as a reveal error"
+    );
 }
 
 #[test]

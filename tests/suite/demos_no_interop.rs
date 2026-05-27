@@ -214,7 +214,10 @@ demo_runs_no_interop!(demo_braille_transcoder, "examples/braille_transcoder.stk"
 demo_runs_no_interop!(demo_phyllotaxis_spiral, "examples/phyllotaxis_spiral.stk");
 demo_runs_no_interop!(demo_prime_factorization, "examples/prime_factorization.stk");
 demo_runs_no_interop!(demo_bit_set_arith, "examples/bit_set_arith.stk");
-demo_runs_no_interop!(demo_maze_recursive_backtrack, "examples/maze_recursive_backtrack.stk");
+demo_runs_no_interop!(
+    demo_maze_recursive_backtrack,
+    "examples/maze_recursive_backtrack.stk"
+);
 demo_runs_no_interop!(demo_dragon_curve, "examples/dragon_curve.stk");
 demo_runs_no_interop!(demo_heronian_triangles, "examples/heronian_triangles.stk");
 demo_runs_no_interop!(demo_look_and_say, "examples/look_and_say.stk");

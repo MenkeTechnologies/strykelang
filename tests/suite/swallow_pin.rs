@@ -100,7 +100,10 @@ fn swallow_flattens_symlinks_to_real_path_key() {
     );
     let ok = eval_int(&code);
     rm_rf(&dir);
-    assert_eq!(ok, 1, "expected hash key to be the symlink target's real path");
+    assert_eq!(
+        ok, 1,
+        "expected hash key to be the symlink target's real path"
+    );
 }
 
 #[test]

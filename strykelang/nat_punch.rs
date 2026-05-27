@@ -106,8 +106,7 @@ pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::IpAddr, u16)> {
             // 2B xor_port, then 4B (IPv4) or 16B (IPv6) xor_addr.
             0x0020 if attr_len >= 8 => {
                 let family = pkt[val_start + 1];
-                let xor_port =
-                    u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
+                let xor_port = u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
                 let port = xor_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
                 match family {
                     0x01 => {
@@ -143,8 +142,7 @@ pub fn parse_binding_response(pkt: &[u8]) -> Option<(std::net::IpAddr, u16)> {
             // MAPPED-ADDRESS (legacy, RFC 3489) — same layout sans XOR.
             0x0001 if attr_len >= 8 => {
                 let family = pkt[val_start + 1];
-                let port =
-                    u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
+                let port = u16::from_be_bytes([pkt[val_start + 2], pkt[val_start + 3]]);
                 match family {
                     0x01 => {
                         let ip = std::net::Ipv4Addr::new(
@@ -427,11 +425,7 @@ mod tests {
         assert_eq!(pkt.len(), 20);
         assert_eq!(&pkt[0..2], &[0x00, 0x01], "msg type = Binding Request");
         assert_eq!(&pkt[2..4], &[0x00, 0x00], "msg length = 0");
-        assert_eq!(
-            &pkt[4..8],
-            &STUN_MAGIC_COOKIE.to_be_bytes(),
-            "magic cookie"
-        );
+        assert_eq!(&pkt[4..8], &STUN_MAGIC_COOKIE.to_be_bytes(), "magic cookie");
         assert_eq!(&pkt[8..20], &tx, "transaction ID");
     }
 
@@ -609,8 +603,7 @@ mod tests {
                 let tx_id = &buf[8..20];
                 let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 1);
                 let xor_port = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
-                let xor_addr =
-                    u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+                let xor_addr = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
                 let mut resp = vec![0u8; 32];
                 resp[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
                 resp[2..4].copy_from_slice(&12u16.to_be_bytes());
@@ -633,10 +626,7 @@ mod tests {
         let client = udp_sockets::open("127.0.0.1", 0).expect("bind client");
         let a_host = a.ip().to_string();
         let b_host = b.ip().to_string();
-        let servers = [
-            (a_host.as_str(), a.port()),
-            (b_host.as_str(), b.port()),
-        ];
+        let servers = [(a_host.as_str(), a.port()), (b_host.as_str(), b.port())];
         let result = classify_nat(client, &servers, Duration::from_secs(2));
         udp_sockets::close(client);
 
@@ -646,7 +636,9 @@ mod tests {
         assert_eq!(result.observations.len(), 2);
         assert_eq!(
             result.public_ip,
-            Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(198, 51, 100, 1)))
+            Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+                198, 51, 100, 1
+            )))
         );
     }
 

@@ -226,10 +226,7 @@ impl Controller {
         let mut order: Vec<(u64, String)> = agents
             .iter()
             .map(|(id, a)| {
-                let name = a
-                    .agent_name
-                    .clone()
-                    .unwrap_or_else(|| a.hostname.clone());
+                let name = a.agent_name.clone().unwrap_or_else(|| a.hostname.clone());
                 (*id, name)
             })
             .collect();
@@ -267,11 +264,9 @@ impl Controller {
                                 let tag = if r.ok { "ok" } else { "ERR" };
                                 print_tagged(name, tag, &r.output);
                             }
-                            Err(e) => print_tagged(
-                                name,
-                                "ERR",
-                                &format!("malformed EVAL_RESULT: {}", e),
-                            ),
+                            Err(e) => {
+                                print_tagged(name, "ERR", &format!("malformed EVAL_RESULT: {}", e))
+                            }
                         }
                         break;
                     }

@@ -40,7 +40,10 @@ fn kick_returns_0_on_closed_port() {
     let start = Instant::now();
     let n = eval_int(&code);
     let elapsed = start.elapsed();
-    assert_eq!(n, 0, "kick to port 1 (privileged, unlisteneable) should return 0, got {n}");
+    assert_eq!(
+        n, 0,
+        "kick to port 1 (privileged, unlisteneable) should return 0, got {n}"
+    );
     // Local RST or unreachable should arrive well within the 500ms budget.
     assert!(
         elapsed < Duration::from_millis(500),
@@ -82,7 +85,8 @@ fn kick_returns_0_on_dns_failure() {
 #[test]
 fn udp_send_delivers_requested_retries() {
     let sock = UdpSocket::bind("127.0.0.1:0").expect("bind recv socket");
-    sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+    sock.set_read_timeout(Some(Duration::from_millis(500)))
+        .unwrap();
     let port = sock.local_addr().unwrap().port();
     let (tx, rx) = mpsc::channel::<Vec<u8>>();
     thread::spawn(move || {
@@ -99,10 +103,7 @@ fn udp_send_delivers_requested_retries() {
         }
     });
 
-    let code = format!(
-        r#"udp_send("127.0.0.1", {}, "ping", 3, 10)"#,
-        port
-    );
+    let code = format!(r#"udp_send("127.0.0.1", {}, "ping", 3, 10)"#, port);
     let sent = eval_int(&code);
     assert_eq!(sent, 3, "expected 3 datagrams sent, got {sent}");
 
@@ -135,7 +136,10 @@ fn udp_send_default_retries_is_one() {
     let port = sock.local_addr().unwrap().port();
     let code = format!(r#"udp_send("127.0.0.1", {}, "x")"#, port);
     let sent = eval_int(&code);
-    assert_eq!(sent, 1, "single-shot send should report 1 datagram, got {sent}");
+    assert_eq!(
+        sent, 1,
+        "single-shot send should report 1 datagram, got {sent}"
+    );
 }
 
 /// `udp_send` with invalid port returns 0 without raising.

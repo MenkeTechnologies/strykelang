@@ -43,12 +43,11 @@ fn examples_dir() -> PathBuf {
 /// state of the file — the cleanest reproduction of the editor diagnostic is
 /// to make the file itself opt in.
 fn lint_strict(path: &PathBuf) -> Result<(), String> {
-    let original = fs::read_to_string(path)
-        .map_err(|e| format!("read {}: {e}", path.display()))?;
+    let original = fs::read_to_string(path).map_err(|e| format!("read {}: {e}", path.display()))?;
     let with_strict = format!("use strict;\n{}", original);
     let display = path.display().to_string();
-    let program = parse_with_file(&with_strict, &display)
-        .map_err(|e| format!("parse error: {e}"))?;
+    let program =
+        parse_with_file(&with_strict, &display).map_err(|e| format!("parse error: {e}"))?;
     analyze_program_with_strict(&program, &display, true)
         .map_err(|e| format!("strict-mode static-analysis error: {e}"))
 }
