@@ -120,6 +120,35 @@ max_duration = 3600 # max seconds per stress session
 name = "node-01"    # optional, defaults to hostname
 ```
 
+### Scriptable Distributed Compute (28-verb religious-vocab API)
+
+The REPL controller above is for human-typed interactive sessions. **Scripts** drive the same TCP+bincode infrastructure via a 28-verb religious-themed builtin API — scatter work, gather results, manage worker state, all from inside a `.stk` file:
+
+```perl
+my @workers = congregation(4);                # fork 4 agents locally, wait for them to register
+my %results = harvest "render_frame()", @workers, 30_000;   # scatter+gather one-shot
+excommunicate(@workers);                      # clean shutdown
+```
+
+Key verbs (full taxonomy in [README §0x10c](../README.md#0x10c-scriptable-distributed-compute--congregation--pray--annex)):
+
+| Verb | Effect |
+|---|---|
+| `congregation($n)` | spawn N local agent children, return handles |
+| `ordain($name, $bind, $port)` | bare controller + cathedral name registration |
+| `pray($code, @handles)` | scatter, return divination id |
+| `annex($div)` | block-and-gather, return hash keyed by session-id |
+| `harvest($code, @handles)` | fused `pray + annex` |
+| `chant($code, @handles)` | continuous rescatter — fires at late joiners too |
+| `lick(@handles)` | non-destructive snapshot of every worker's `%soul` |
+| `bestow(\%hash, @handles)` | push hash to each worker's `%gift` |
+| `smite(@handles)` | reset workers' `%soul` and `%gift` |
+| `excommunicate(@handles)` | SHUTDOWN frame to subset |
+| `interrogate($pid)` | OS-level process state dump via sysinfo |
+| `cloister($token)` | enable :cloistered ACL with shared-secret auth |
+
+Workers maintain `our %soul` (their externally-visible state) and `our %gift` (master-pushed config). Pin tests cover scatter/gather, chant rescatter, cloistered auth rejection, and bug-fixed `\%hash` deref + cross-EVAL persistence — see `tests/suite/scriptable_controller_pin.rs`. Example: `examples/distributed_congregation.stk`.
+
 ### Example Session
 
 ```
