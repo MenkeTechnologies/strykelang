@@ -5309,6 +5309,9 @@ pub(crate) fn try_builtin(
         "controller" => Some(builtin_controller(args)),
         "agent" => Some(builtin_agent(args)),
         "kick" => Some(builtin_kick(args)),
+        "tcp_probe" => Some(builtin_tcp_probe(args)),
+        "tcp_banner" => Some(builtin_tcp_banner(args)),
+        "whois_query" => Some(builtin_whois_query(args)),
         "udp_send" => Some(builtin_udp_send(args)),
         "udp_open" => Some(builtin_udp_open(args)),
         "udp_send_to" => Some(builtin_udp_send_to(args)),
@@ -13100,6 +13103,220 @@ fn builtin_kick(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         }
     }
     Ok(StrykeValue::integer(0))
+}
+
+/// `tcp_probe($host, $port [, $timeout_ms=1000])` — TCP connect probe
+/// that returns RTT, not just bool. Companion to `kick` (which returns
+/// `1`/`0` for fast service-mesh sweeps); use `tcp_probe` when you want
+/// the latency measurement too.
+///
+/// Returns a hashref:
+///   { alive      => 1 | 0,
+///     latency_ms => N (or 0 on failure) }
+///
+/// Same fail-soft semantics as `kick` — bad host, closed port, DNS
+/// failure, timeout all give `{ alive=>0, latency_ms=>... }` without
+/// raising.
+fn builtin_tcp_probe(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::net::TcpStream;
+    use std::sync::Arc as StdArc;
+    use std::time::{Duration, Instant};
+
+    let host = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let port_raw = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u64)
+        .unwrap_or(1000);
+    let mk = |alive: bool, ms: u64| {
+        let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+        m.insert(
+            "alive".into(),
+            StrykeValue::integer(if alive { 1 } else { 0 }),
+        );
+        m.insert("latency_ms".into(), StrykeValue::integer(ms as i64));
+        StrykeValue::hash_ref(StdArc::new(RwLock::new(m)))
+    };
+    if host.is_empty() || !(1..=65535).contains(&port_raw) {
+        return Ok(mk(false, 0));
+    }
+    let port = port_raw as u16;
+    let timeout = Duration::from_millis(timeout_ms);
+    let addrs: Vec<_> = match (host.as_str(), port).to_socket_addrs() {
+        Ok(it) => it.collect(),
+        Err(_) => return Ok(mk(false, 0)),
+    };
+    let start = Instant::now();
+    for addr in addrs {
+        if TcpStream::connect_timeout(&addr, timeout).is_ok() {
+            return Ok(mk(true, start.elapsed().as_millis() as u64));
+        }
+    }
+    Ok(mk(false, start.elapsed().as_millis() as u64))
+}
+
+/// `tcp_banner($host, $port [, $timeout_ms=1000, $max_bytes=512])` —
+/// connect + read the first `$max_bytes` bytes the server sends. Classic
+/// service-fingerprint pattern (SSH version line, HTTP server header,
+/// SMTP greeting). Returns a hashref:
+///   { alive      => 1 | 0,
+///     latency_ms => N,
+///     banner     => "SSH-2.0-OpenSSH_9.7" (UTF-8 if valid, else bytes) }
+///
+/// Servers that DON'T greet (HTTP for example — expects a request first)
+/// return `banner => ""` with alive=1. Caller can branch on `length($r->{banner}) > 0`
+/// to distinguish "greeted" from "silent".
+fn builtin_tcp_banner(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::io::Read;
+    use std::net::TcpStream;
+    use std::sync::Arc as StdArc;
+    use std::time::{Duration, Instant};
+
+    let host = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let port_raw = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1) as u64)
+        .unwrap_or(1000);
+    let max_bytes = args
+        .get(3)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(1).min(65_536) as usize)
+        .unwrap_or(512);
+    let mk = |alive: bool, ms: u64, banner: Vec<u8>| {
+        let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+        m.insert(
+            "alive".into(),
+            StrykeValue::integer(if alive { 1 } else { 0 }),
+        );
+        m.insert("latency_ms".into(), StrykeValue::integer(ms as i64));
+        let banner_v = match String::from_utf8(banner.clone()) {
+            Ok(s) => StrykeValue::string(s),
+            Err(_) => StrykeValue::bytes(StdArc::new(banner)),
+        };
+        m.insert("banner".into(), banner_v);
+        StrykeValue::hash_ref(StdArc::new(RwLock::new(m)))
+    };
+    if host.is_empty() || !(1..=65535).contains(&port_raw) {
+        return Ok(mk(false, 0, Vec::new()));
+    }
+    let port = port_raw as u16;
+    let timeout = Duration::from_millis(timeout_ms);
+    let addrs: Vec<_> = match (host.as_str(), port).to_socket_addrs() {
+        Ok(it) => it.collect(),
+        Err(_) => return Ok(mk(false, 0, Vec::new())),
+    };
+    let start = Instant::now();
+    for addr in addrs {
+        let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
+            continue;
+        };
+        let connect_ms = start.elapsed().as_millis() as u64;
+        // Set short read timeout — servers that DON'T greet shouldn't
+        // hold us. Banner-greeting servers (SSH, FTP, SMTP) reply
+        // within ~50ms on the same network.
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
+        let mut buf = vec![0u8; max_bytes];
+        let n = stream.read(&mut buf).unwrap_or(0);
+        buf.truncate(n);
+        return Ok(mk(true, connect_ms, buf));
+    }
+    Ok(mk(false, start.elapsed().as_millis() as u64, Vec::new()))
+}
+
+/// `whois_query($domain [, $server="whois.iana.org", $timeout_ms=5000])`
+/// — RFC 3912 WHOIS query. Connects to `$server:43`, sends `$domain\r\n`,
+/// reads the response until the server closes (or timeout fires).
+/// Returns the full response as a string, `undef` on failure.
+///
+/// Default server is IANA's referral server — for most TLDs the response
+/// includes a `Refer:` line pointing to the authoritative registry. For
+/// definitive results, query the registry directly (e.g. `whois.verisign-grs.com`
+/// for `.com`, `whois.nic.io` for `.io`).
+fn builtin_whois_query(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let domain = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if domain.is_empty() {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let server = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "whois.iana.org".to_string());
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(5000);
+    let timeout = Duration::from_millis(timeout_ms);
+
+    let addrs: Vec<_> = match (server.as_str(), 43u16).to_socket_addrs() {
+        Ok(it) => it.collect(),
+        Err(_) => return Ok(StrykeValue::UNDEF),
+    };
+    for addr in addrs {
+        let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
+            continue;
+        };
+        let _ = stream.set_write_timeout(Some(timeout));
+        let _ = stream.set_read_timeout(Some(timeout));
+        if stream
+            .write_all(format!("{}\r\n", domain).as_bytes())
+            .is_err()
+        {
+            continue;
+        }
+        let mut response = Vec::new();
+        // Read until server closes or we hit a reasonable cap (256 KB).
+        let mut buf = [0u8; 4096];
+        loop {
+            match stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    response.extend_from_slice(&buf[..n]);
+                    if response.len() > 256 * 1024 {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        return match String::from_utf8(response.clone()) {
+            Ok(s) => Ok(StrykeValue::string(s)),
+            Err(_) => Ok(StrykeValue::bytes(std::sync::Arc::new(response))),
+        };
+    }
+    Ok(StrykeValue::UNDEF)
 }
 
 /// `udp_send($host, $port, $payload [, $retries=1, $interval_ms=20])` — send

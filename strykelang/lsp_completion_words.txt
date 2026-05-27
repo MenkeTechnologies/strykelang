@@ -10014,6 +10014,8 @@ CORE::taylor_microscale_step
 CORE::taylor_window
 CORE::tbl
 CORE::tc
+CORE::tcp_banner
+CORE::tcp_probe
 CORE::tcplat
 CORE::tcrossprod
 CORE::td
@@ -10935,6 +10937,7 @@ CORE::white_test_stat
 CORE::whittaker_m
 CORE::whoami
 CORE::whois
+CORE::whois_query
 CORE::whole_life_a
 CORE::wi
 CORE::wieferich_check
@@ -21130,6 +21133,8 @@ taylor_microscale_step
 taylor_window
 tbl
 tc
+tcp_banner
+tcp_probe
 tcplat
 tcrossprod
 td
@@ -22056,6 +22061,7 @@ white_test_stat
 whittaker_m
 whoami
 whois
+whois_query
 whole_life_a
 wi
 wieferich_check

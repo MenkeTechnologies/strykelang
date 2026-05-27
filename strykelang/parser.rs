@@ -13939,6 +13939,18 @@ impl Parser {
     /// Used by `--compat` to reject extensions at parse time.
     fn stryke_extension_name(name: &str) -> Option<&str> {
         match name {
+            // ── persistence / introspection ───────────────────────────────
+            // ExprKind-special builtins (parsed as Burp / God / Swallow /
+            // Ingest variants, not routed through try_builtin dispatch).
+            // Registered HERE so the reflection registry (%b, %all, %c)
+            // sees them via build.rs's category extractor.
+            // (User bug 2026-05-27: "burp doesnt show up in %all" —
+            // these names lived only in is_reserved_special_var_name
+            // (shadow protection) and never reached the categorizer.
+            // Pinned by reflection::exprkind_special_builtins_present_in_
+            // reflection_registry. Section label kept under 40 chars
+            // per build.rs:parse_section_header's length cap.)
+            | "burp" | "god" | "swallow" | "ingest"
             // ── numerical stability + modern IDs ───────────────────────────
             | "ulid" | "is_ulid" | "ulid_timestamp"
             | "kahan_sum" | "welford_mean" | "welford_variance"
@@ -14008,8 +14020,9 @@ impl Parser {
             | "controller" | "agent"
             // ── provenance / lineage ───────────────────────────────────────
             | "mark" | "provenance" | "unmark"
-            // ── network probes (TCP knock, UDP send) ───────────────────────
+            // ── network probes (TCP knock, UDP send, active probes) ───────
             | "kick" | "udp_send"
+            | "tcp_probe" | "tcp_banner" | "whois_query"
             // ── P2P NAT traversal (persistent socket pool + STUN + punch) ──
             | "udp_open" | "udp_send_to" | "udp_recv" | "udp_recv_from"
             | "udp_close" | "stun" | "stun_classify" | "punch"

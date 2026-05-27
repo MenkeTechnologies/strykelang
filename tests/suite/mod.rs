@@ -167,6 +167,7 @@ mod comments;
 mod completion_zsh_shim;
 mod concurrency_pin;
 mod control_advanced;
+mod active_probes_pin;
 mod control_flow;
 mod control_flow_pin;
 mod control_try_given;
