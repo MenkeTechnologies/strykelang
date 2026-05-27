@@ -172,6 +172,7 @@ mod control_flow;
 mod control_flow_pin;
 mod control_try_given;
 mod controller_agent_builtins_pin;
+mod scriptable_controller_pin;
 mod csv_codec_pin;
 mod data_structures;
 mod datetime_pin;

@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Instant;
 
@@ -494,37 +494,360 @@ fn write_frame<W: Write>(w: &mut W, kind: u8, payload: &[u8]) -> std::io::Result
     w.flush()
 }
 
-/// Main entry point
+/// Main entry point — back-compat wrapper that delegates to
+/// [`spawn_controller`] + [`ControllerHandle::run_repl_blocking`]. Preserves
+/// the historical CLI behaviour: bind, accept agents in a background thread,
+/// run the interactive REPL on the main thread, cleanly join the accept thread
+/// on REPL exit. Scripts that want non-REPL programmatic access use
+/// [`spawn_controller`] directly.
 pub fn run_controller(bind: &str, port: u16) -> i32 {
-    let addr = format!("{}:{}", bind, port);
-
-    let listener = match TcpListener::bind(&addr) {
-        Ok(l) => l,
+    let handle = match spawn_controller(bind, port) {
+        Ok(h) => h,
         Err(e) => {
-            eprintln!("controller: cannot bind to {}: {}", addr, e);
+            eprintln!("controller: cannot bind to {}:{}: {}", bind, port, e);
             return 1;
         }
     };
 
-    eprintln!("stryke controller listening on {}", addr);
+    eprintln!("stryke controller listening on {}", handle.listen_addr());
     eprintln!("Waiting for agents...\n");
 
-    let controller = Arc::new(Controller::new());
+    handle.run_repl_blocking();
+    0
+}
 
-    // Spawn accept thread
+// ============================================================================
+//                  Programmatic / Scriptable API (Tier 0)
+// ============================================================================
+//
+// Lets `.stk` scripts drive the controller without the REPL. Builtins in
+// `builtins.rs` (`ordain`, `muster`, `pray`, `annex`) wrap these methods and
+// expose opaque integer IDs to script code via the registries below.
+//
+// Semantics:
+//   * `spawn_controller(bind, port)` — bind listener, start accept thread,
+//     return `Arc<ControllerHandle>`. Non-blocking.
+//   * `ControllerHandle::muster()` — current session IDs of connected agents.
+//   * `ControllerHandle::welcome(n, timeout)` — block until >= n agents have
+//     connected, or the timeout elapses.
+//   * `ControllerHandle::scatter(code, &[id])` — write EVAL to each agent in
+//     parallel (fan-out pass), return a `petition_id`. Agents start executing
+//     immediately; results are NOT collected here.
+//   * `ControllerHandle::gather(petition_id, timeout)` — read EVAL_RESULT
+//     from every agent dispatched in that scatter, in parallel, return a
+//     HashMap<session_id, EvalResult>. Removes the divination from the
+//     pending table once consumed (so the same petition_id can't be
+//     gathered twice).
+//   * `ControllerHandle::shutdown()` — send SHUTDOWN to all agents, mark
+//     accept loop done, wake it with a self-connect, join the accept thread.
+//
+// Threading note: scatter + gather both lock the `agents` map for the duration
+// of the operation. This serializes against the accept loop briefly, but lets
+// us reuse the same TcpStream for both write and read passes without cloning
+// or per-agent reader threads. Multi-outstanding-petition concurrency is a
+// Tier 1 problem.
+
+/// One outstanding scatter. Records the session IDs the EVAL was actually
+/// written to so `gather` only reads from agents that received the frame.
+struct DivinationState {
+    dispatched: Vec<u64>,
+}
+
+/// Non-blocking handle to a running [`Controller`]. Returned by
+/// [`spawn_controller`]; used by the scriptable builtins to drive the
+/// distributed compute fabric from `.stk` code.
+pub struct ControllerHandle {
+    controller: Arc<Controller>,
+    listen_addr: std::net::SocketAddr,
+    accept_handle: Mutex<Option<thread::JoinHandle<()>>>,
+    next_petition_id: AtomicU64,
+    pending_divinations: Mutex<HashMap<u64, DivinationState>>,
+}
+
+impl ControllerHandle {
+    /// Returns the address the listener is actually bound to (port may have
+    /// been auto-assigned if 0 was passed in).
+    pub fn listen_addr(&self) -> std::net::SocketAddr {
+        self.listen_addr
+    }
+
+    /// Current count of connected agents.
+    pub fn agent_count(&self) -> usize {
+        self.controller.agents.lock().unwrap().len()
+    }
+
+    /// Return session IDs of all currently connected agents, in numerically
+    /// sorted order (deterministic for tests and scripts).
+    pub fn muster(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self
+            .controller
+            .agents
+            .lock()
+            .unwrap()
+            .keys()
+            .copied()
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Block until at least `target_count` agents are connected, or `timeout`
+    /// elapses. Returns `true` if the count was reached. Polls every 50ms.
+    pub fn welcome(&self, target_count: usize, timeout: Duration) -> bool {
+        let start = Instant::now();
+        loop {
+            if self.agent_count() >= target_count {
+                return true;
+            }
+            if start.elapsed() >= timeout {
+                return self.agent_count() >= target_count;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    /// Fan EVAL out to `agent_ids` in parallel. Returns a `petition_id` used
+    /// later with [`gather`](Self::gather) to collect results. Agents that
+    /// don't exist in the roster or whose write fails are silently dropped
+    /// from the dispatched set, so a stale agent_id in `agent_ids` does NOT
+    /// cause the whole scatter to fail.
+    ///
+    /// Returns `Err` only if the EvalCommand fails to bincode-serialize
+    /// (which should never happen for plain strings).
+    pub fn scatter(&self, code: &str, agent_ids: &[u64]) -> std::io::Result<u64> {
+        let cmd = EvalCommand {
+            code: code.to_string(),
+        };
+        let cmd_bytes = bincode::serialize(&cmd)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        let mut agents = self.controller.agents.lock().unwrap();
+        let mut dispatched: Vec<u64> = Vec::with_capacity(agent_ids.len());
+        for id in agent_ids {
+            if let Some(agent) = agents.get_mut(id) {
+                if write_frame(&mut agent.stream, frame_kind::EVAL, &cmd_bytes).is_ok() {
+                    dispatched.push(*id);
+                }
+            }
+        }
+        drop(agents);
+
+        let petition_id = self.next_petition_id.fetch_add(1, Ordering::Relaxed);
+        self.pending_divinations
+            .lock()
+            .unwrap()
+            .insert(petition_id, DivinationState { dispatched });
+        Ok(petition_id)
+    }
+
+    /// Block for results of `petition_id` up to `timeout` (per-agent read
+    /// timeout, not total wall time). Returns a HashMap of session_id →
+    /// EvalResult for every agent that replied with a valid EVAL_RESULT
+    /// frame in time. Agents that timed out, errored, or disconnected are
+    /// omitted from the map.
+    ///
+    /// Stale frames in the per-agent socket buffer (e.g. METRICS left over
+    /// from a prior FIRE) are silently skipped — same loop pattern as
+    /// `eval_all` so manual REPL behaviour stays consistent with scripted.
+    ///
+    /// Removes the divination from the pending table on return, so a
+    /// second `gather` on the same petition_id is an error.
+    pub fn gather(
+        &self,
+        petition_id: u64,
+        timeout: Duration,
+    ) -> std::io::Result<HashMap<u64, EvalResult>> {
+        let state = self
+            .pending_divinations
+            .lock()
+            .unwrap()
+            .remove(&petition_id)
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("no pending divination for petition_id {}", petition_id),
+                )
+            })?;
+
+        let mut results: HashMap<u64, EvalResult> = HashMap::new();
+        let mut agents = self.controller.agents.lock().unwrap();
+        for id in &state.dispatched {
+            let agent = match agents.get_mut(id) {
+                Some(a) => a,
+                None => continue, // agent disconnected between scatter and gather
+            };
+            let _ = agent.stream.set_read_timeout(Some(timeout));
+            loop {
+                match read_frame(&mut agent.stream) {
+                    Ok((frame_kind::EVAL_RESULT, payload)) => {
+                        if let Ok(r) = bincode::deserialize::<EvalResult>(&payload) {
+                            results.insert(*id, r);
+                        }
+                        break;
+                    }
+                    Ok(_) => continue, // stale frame, skip
+                    Err(_) => break,   // timeout or disconnect
+                }
+            }
+            let _ = agent.stream.set_read_timeout(None);
+        }
+        Ok(results)
+    }
+
+    /// SHUTDOWN every agent, stop the accept loop, join the accept thread.
+    /// Wakes the blocking `listener.incoming()` call by self-connecting to
+    /// the bound address (the connection's HELLO read will fail and the
+    /// accept thread will exit its loop now that `running` is false).
+    pub fn shutdown(&self) {
+        self.controller.shutdown_all();
+        // Wake the accept loop by self-connecting; it'll see running=false
+        // and break. We swallow any connect error — the listener may already
+        // be gone if shutdown_all races with another shutdown call.
+        let _ = TcpStream::connect(self.listen_addr);
+        if let Some(h) = self.accept_handle.lock().unwrap().take() {
+            let _ = h.join();
+        }
+    }
+
+    /// Run the existing REPL on the calling thread, then clean shutdown.
+    /// Used by [`run_controller`] for back-compat with the CLI subcommand.
+    pub fn run_repl_blocking(&self) {
+        self.controller.run_repl();
+        self.controller.running.store(false, Ordering::Relaxed);
+        let _ = TcpStream::connect(self.listen_addr);
+        if let Some(h) = self.accept_handle.lock().unwrap().take() {
+            let _ = h.join();
+        }
+    }
+}
+
+/// Bind a listener and start the accept thread, return a non-blocking handle.
+/// Pass `port = 0` to let the OS pick a free port; recover the chosen one via
+/// [`ControllerHandle::listen_addr`].
+pub fn spawn_controller(bind: &str, port: u16) -> std::io::Result<Arc<ControllerHandle>> {
+    let addr = format!("{}:{}", bind, port);
+    let listener = TcpListener::bind(&addr)?;
+    let listen_addr = listener.local_addr()?;
+
+    let controller = Arc::new(Controller::new());
     let ctrl_clone = Arc::clone(&controller);
     let accept_handle = thread::spawn(move || {
         ctrl_clone.accept_loop(listener);
     });
 
-    // Run REPL on main thread
-    controller.run_repl();
+    Ok(Arc::new(ControllerHandle {
+        controller,
+        listen_addr,
+        accept_handle: Mutex::new(Some(accept_handle)),
+        next_petition_id: AtomicU64::new(1),
+        pending_divinations: Mutex::new(HashMap::new()),
+    }))
+}
 
-    // Cleanup
-    controller.running.store(false, Ordering::Relaxed);
-    let _ = accept_handle.join();
+// ─── Global handle registries (script ↔ Rust bridge) ────────────────────────
+//
+// Stryke scripts can't hold `Arc<ControllerHandle>` directly — they only see
+// `StrykeValue`s. So we stash the live handle in a process-global registry
+// and hand the script an opaque integer ID. Same pattern for divination
+// handles (each `pray` call returns a divination ID).
+//
+// Both registries are `OnceLock<Mutex<HashMap>>` — initialised on first use,
+// shared across all threads. The script-visible IDs are monotonic atomics
+// so they never collide within a single process.
 
-    0
+static CONTROLLER_REGISTRY: OnceLock<Mutex<HashMap<u64, Arc<ControllerHandle>>>> = OnceLock::new();
+static NEXT_HANDLE_ID: AtomicU64 = AtomicU64::new(1);
+
+fn controller_registry() -> &'static Mutex<HashMap<u64, Arc<ControllerHandle>>> {
+    CONTROLLER_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a controller handle; returns a script-visible u64 ID.
+pub fn register_controller(handle: Arc<ControllerHandle>) -> u64 {
+    let id = NEXT_HANDLE_ID.fetch_add(1, Ordering::Relaxed);
+    controller_registry().lock().unwrap().insert(id, handle);
+    id
+}
+
+/// Look up a controller by its script-visible ID. Returns `None` if the ID
+/// was never registered or has been unregistered.
+pub fn get_controller(handle_id: u64) -> Option<Arc<ControllerHandle>> {
+    controller_registry()
+        .lock()
+        .unwrap()
+        .get(&handle_id)
+        .map(Arc::clone)
+}
+
+/// Remove a controller from the registry. Caller typically also calls
+/// `shutdown()` on the returned Arc before dropping it.
+pub fn unregister_controller(handle_id: u64) -> Option<Arc<ControllerHandle>> {
+    controller_registry().lock().unwrap().remove(&handle_id)
+}
+
+// ─── Divination registry: divination_id → (controller_id, petition_id) ──────
+
+static DIVINATION_REGISTRY: OnceLock<Mutex<HashMap<u64, (u64, u64)>>> = OnceLock::new();
+static NEXT_DIVINATION_ID: AtomicU64 = AtomicU64::new(1);
+
+fn divination_registry() -> &'static Mutex<HashMap<u64, (u64, u64)>> {
+    DIVINATION_REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Register a divination; returns a script-visible u64 ID that resolves back
+/// to (controller_id, petition_id) via [`get_divination`].
+pub fn register_divination(controller_id: u64, petition_id: u64) -> u64 {
+    let id = NEXT_DIVINATION_ID.fetch_add(1, Ordering::Relaxed);
+    divination_registry()
+        .lock()
+        .unwrap()
+        .insert(id, (controller_id, petition_id));
+    id
+}
+
+/// Look up a divination's (controller_id, petition_id) pair.
+pub fn get_divination(divination_id: u64) -> Option<(u64, u64)> {
+    divination_registry()
+        .lock()
+        .unwrap()
+        .get(&divination_id)
+        .copied()
+}
+
+/// Remove a divination from the registry. Returns the (controller_id,
+/// petition_id) pair so the caller can route the actual gather request.
+pub fn unregister_divination(divination_id: u64) -> Option<(u64, u64)> {
+    divination_registry().lock().unwrap().remove(&divination_id)
+}
+
+// ─── Current-controller tracking for ergonomic script API ───────────────────
+//
+// Scripts that work with a single congregation (the overwhelmingly common
+// case) shouldn't have to thread a controller handle through every `pray` /
+// `muster` / `annex` call. We stash the most-recently-created controller
+// here and `pray` / `muster` / `annex` fall back to it when no explicit
+// controller is named.
+//
+// Scripts juggling multiple concurrent congregations pass the controller
+// handle explicitly via the low-level `ordain` return value.
+
+static CURRENT_CONTROLLER_ID: AtomicU64 = AtomicU64::new(0);
+
+/// Make `controller_id` the implicit target for subsequent `pray` / `muster`
+/// / `annex` calls that don't name a controller.
+pub fn set_current_controller(controller_id: u64) {
+    CURRENT_CONTROLLER_ID.store(controller_id, Ordering::Relaxed);
+}
+
+/// Return the current implicit controller, or `None` if no congregation /
+/// ordination has happened yet in this process.
+pub fn get_current_controller() -> Option<u64> {
+    let id = CURRENT_CONTROLLER_ID.load(Ordering::Relaxed);
+    if id == 0 {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 /// Print controller help
