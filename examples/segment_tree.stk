@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+
+# segment_tree.stk - Range-sum segment tree with point update.
+#
+# Run: stryke --no-interop examples/segment_tree.stk
+
+fn Seg::build($values) {
+    my $n = len @$values
+    my @tree = ()
+    for my $i (0:4*$n) { push @tree, 0 }
+    if ($n > 0) {
+        Seg::_build(\@tree, $values, 1, 0, $n - 1)
+    }
+    +{ n => $n, tree => \@tree }
+}
+
+fn Seg::_build($tree, $values, $node, $l, $r) {
+    if ($l == $r) {
+        $tree->[$node] = $values->[$l]
+        return
+    }
+    my $m = ($l + $r) / 2
+    $m = int($m)
+    Seg::_build($tree, $values, 2*$node,   $l,   $m)
+    Seg::_build($tree, $values, 2*$node+1, $m+1, $r)
+    $tree->[$node] = $tree->[2*$node] + $tree->[2*$node+1]
+}
+
+fn Seg::sum($seg, $ql, $qr) {
+    return 0 if $seg->{n} == 0
+    Seg::_sum($seg->{tree}, 1, 0, $seg->{n} - 1, $ql, $qr)
+}
+
+fn Seg::_sum($tree, $node, $l, $r, $ql, $qr) {
+    return 0 if $qr < $l || $r < $ql
+    return $tree->[$node] if $ql <= $l && $r <= $qr
+    my $m = int(($l + $r) / 2)
+    Seg::_sum($tree, 2*$node,   $l,   $m, $ql, $qr) +
+    Seg::_sum($tree, 2*$node+1, $m+1, $r, $ql, $qr)
+}
+
+fn Seg::update($seg, $idx, $val) {
+    Seg::_update($seg->{tree}, 1, 0, $seg->{n} - 1, $idx, $val)
+}
+
+fn Seg::_update($tree, $node, $l, $r, $idx, $val) {
+    if ($l == $r) {
+        $tree->[$node] = $val
+        return
+    }
+    my $m = int(($l + $r) / 2)
+    if ($idx <= $m) {
+        Seg::_update($tree, 2*$node,   $l,   $m, $idx, $val)
+    } else {
+        Seg::_update($tree, 2*$node+1, $m+1, $r, $idx, $val)
+    }
+    $tree->[$node] = $tree->[2*$node] + $tree->[2*$node+1]
+}
+
+p "=== Segment Tree (range sum) ==="
+my @vals = (1, 3, 5, 7, 9, 11)
+my $seg = Seg::build(\@vals)
+p "values: " . join(",", @vals)
+p "sum[0..5] = " . Seg::sum($seg, 0, 5)
+p "sum[1..3] = " . Seg::sum($seg, 1, 3)
+p "sum[2..4] = " . Seg::sum($seg, 2, 4)
+Seg::update($seg, 2, 100)
+p "after update [2] = 100"
+p "sum[1..3] = " . Seg::sum($seg, 1, 3)

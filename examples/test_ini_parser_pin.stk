@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+fn Ini::parse($text) {
+    my @lines = split /\n/, $text
+    my $section = ""
+    my %out = ( "" => +{} )
+    for my $raw (@lines) {
+        my $line = $raw
+        $line =~ s/^\s+//
+        $line =~ s/\s+$//
+        next if $line eq ""
+        next if substr($line, 0, 1) eq "#"
+        next if substr($line, 0, 1) eq ";"
+        if (substr($line, 0, 1) eq "[") {
+            my $rb = index($line, "]")
+            if ($rb > 0) {
+                $section = substr($line, 1, $rb - 1)
+                $section =~ s/^\s+//
+                $section =~ s/\s+$//
+                $out{$section} = +{} unless exists $out{$section}
+            }
+            next
+        }
+        my $eq = index($line, "=")
+        next if $eq < 0
+        my $key = substr($line, 0, $eq)
+        my $val = substr($line, $eq + 1)
+        $key =~ s/^\s+//
+        $key =~ s/\s+$//
+        $val =~ s/^\s+//
+        $val =~ s/\s+$//
+        if (substr($val, 0, 1) eq '"' && substr($val, -1, 1) eq '"') {
+            $val = substr($val, 1, len($val) - 2)
+        }
+        $out{$section} = +{} unless exists $out{$section}
+        $out{$section}->{$key} = $val
+    }
+    \%out
+}
+
+fn Ini::get($cfg, $section, $key) {
+    return undef unless exists $cfg->{$section}
+    $cfg->{$section}->{$key}
+}
+
+fn Ini::sections($cfg) {
+    my @s = sort keys %$cfg
+    \@s
+}
+
+# Simple key=value with no section
+my $c1 = Ini::parse("a = 1\nb = 2")
+Ini::get($c1, "", "a") |> aeq "1", "simple a"
+Ini::get($c1, "", "b") |> aeq "2", "simple b"
+
+# Sections
+my $c2 = Ini::parse("[s1]\nx = hello\n[s2]\ny = world")
+Ini::get($c2, "s1", "x") |> aeq "hello", "s1.x"
+Ini::get($c2, "s2", "y") |> aeq "world", "s2.y"
+(defined Ini::get($c2, "s1", "y") ? 1 : 0) |> aeq 0, "s1.y missing"
+
+# Comments
+my $c3 = Ini::parse("# comment\n; also comment\nkey = val\n")
+Ini::get($c3, "", "key") |> aeq "val", "skip comments"
+
+# Whitespace
+my $c4 = Ini::parse("  key   =    spaced value   ")
+Ini::get($c4, "", "key") |> aeq "spaced value", "trim k/v"
+
+# Quoted values preserve inner whitespace
+my $c5 = Ini::parse("k = \"  spaced  \"")
+Ini::get($c5, "", "k") |> aeq "  spaced  ", "quoted preserves spaces"
+
+# Empty value
+my $c6 = Ini::parse("empty =")
+Ini::get($c6, "", "empty") |> aeq "", "empty value"
+
+# Section header whitespace
+my $c7 = Ini::parse("[  myname  ]\nz = 9")
+Ini::get($c7, "myname", "z") |> aeq "9", "trimmed section name"
+
+# Missing section returns undef
+(defined Ini::get($c7, "ghost", "z") ? 1 : 0) |> aeq 0, "missing section"
+
+# Multiple sections + global
+my $cfg = Ini::parse("g=1\n[a]\nx=10\n[b]\ny=20\n[a]\nz=30")
+Ini::get($cfg, "", "g")  |> aeq "1",  "global g"
+Ini::get($cfg, "a", "x") |> aeq "10", "a.x"
+Ini::get($cfg, "a", "z") |> aeq "30", "a.z (reopened section)"
+Ini::get($cfg, "b", "y") |> aeq "20", "b.y"
+
+# Sections() lists in sorted order
+my $secs = Ini::sections($cfg)
+join(",", @$secs) |> aeq ",a,b", "sorted sections"
+
+# Equals in value
+my $c8 = Ini::parse("url = http://x?a=1&b=2")
+Ini::get($c8, "", "url") |> aeq "http://x?a=1&b=2", "= in value"
+
+# Empty input
+my $c9 = Ini::parse("")
+len(@{Ini::sections($c9)}) |> aeq 1, "empty has only global section"
+
+test_run

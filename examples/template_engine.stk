@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+
+# template_engine.stk - Tiny {{var}} substitution + {{#each list}}...{{/each}} blocks.
+#
+# Run: stryke --no-interop examples/template_engine.stk
+
+fn Tpl::render($tpl, $ctx) {
+    my $out = ""
+    my $i = 0
+    my $n = len $tpl
+    while ($i < $n) {
+        my $c1 = substr($tpl, $i, 2)
+        if ($c1 eq "{{") {
+            my $end = index($tpl, "}}", $i + 2)
+            if ($end < 0) {
+                $out = $out . substr($tpl, $i, 1)
+                $i = $i + 1
+                next
+            }
+            my $tag = substr($tpl, $i + 2, $end - $i - 2)
+            $tag =~ s/^\s+//
+            $tag =~ s/\s+$//
+            if (substr($tag, 0, 5) eq "#each") {
+                my $name = substr($tag, 5)
+                $name =~ s/^\s+//
+                my $close = "{{/each}}"
+                my $bodyStart = $end + 2
+                my $bodyEnd = index($tpl, $close, $bodyStart)
+                my $body = substr($tpl, $bodyStart, $bodyEnd - $bodyStart)
+                my $items = $ctx->{$name}
+                if (defined $items) {
+                    for my $item (@$items) {
+                        my $sub = +{}
+                        for my $k (keys %$ctx) { $sub->{$k} = $ctx->{$k} }
+                        $sub->{"."} = $item
+                        if (ref($item) eq "HASH") {
+                            for my $k (keys %$item) { $sub->{$k} = $item->{$k} }
+                        }
+                        $out = $out . Tpl::render($body, $sub)
+                    }
+                }
+                $i = $bodyEnd + len($close)
+            } else {
+                my $val = $ctx->{$tag}
+                $val = "" unless defined $val
+                $out = $out . $val
+                $i = $end + 2
+            }
+        } else {
+            $out = $out . substr($tpl, $i, 1)
+            $i = $i + 1
+        }
+    }
+    $out
+}
+
+p "=== Template Engine ==="
+my $t1 = "Hello, {{name}}! You have {{count}} messages."
+p Tpl::render($t1, +{ name => "World", count => 5 })
+
+my $t2 = "Fruits: {{#each fruits}}[{{.}}]{{/each}}"
+p Tpl::render($t2, +{ fruits => ["apple", "banana", "cherry"] })
+
+my $t3 = "Users:\n{{#each users}}- {{name}} ({{age}})\n{{/each}}"
+my @users = (
+    +{ name => "Alice", age => 30 },
+    +{ name => "Bob",   age => 25 },
+)
+p Tpl::render($t3, +{ users => \@users })
