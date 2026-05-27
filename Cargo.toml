@@ -208,3 +208,32 @@ version = "0.9.1"
 edition = "2021"
 license = "MIT"
 authors = ["MenkeTechnologies"]
+
+[workspace.lints.clippy]
+approx_constant = "allow"
+borrow_deref_ref = "allow"
+cloned_ref_to_slice_refs = "allow"
+collapsible_if = "allow"
+collapsible_match = "allow"
+deref_addrof = "allow"
+doc_lazy_continuation = "allow"
+doc_overindented_list_items = "allow"
+manual_clamp = "allow"
+manual_range_contains = "allow"
+manual_split_once = "allow"
+map_clone = "allow"
+match_like_matches_macro = "allow"
+mutable_key_type = "allow"
+needless_borrow = "allow"
+needless_range_loop = "allow"
+single_char_pattern = "allow"
+too_many_arguments = "allow"
+unnecessary_cast = "allow"
+unnecessary_map_or = "allow"
+unneeded_struct_pattern = "allow"
+useless_format = "allow"
+while_let_loop = "allow"
+while_let_on_iterator = "allow"
+
+[lints]
+workspace = true
