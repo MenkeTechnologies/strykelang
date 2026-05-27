@@ -2776,9 +2776,28 @@ my %frames = harvest "render_frame()", muster();
 profess "renderfarm";                          # blocks in agent loop
 ```
 
-### Live demo
+### Live demos
 
-[`examples/distributed_congregation.stk`](examples/distributed_congregation.stk) runs a 2-worker scatter-gather end-to-end (CI-safe loopback, no external deps):
+13 demos under `examples/`, all CI-safe (loopback fork only, no network) and clean under `--no-interop`:
+
+| Demo | What it shows |
+|---|---|
+| `distributed_congregation.stk` | Tier 0 minimum-viable scatter-gather (2 workers, 1 prayer) |
+| `congregation_100x_scale.stk` | Large-fleet scatter-gather; tested clean at **100 and 250 workers** |
+| `distributed_prime_sieve.stk` | Real CPU work — shard 0..10000 across N workers, verify π(10000)=1229 |
+| `distributed_wordcount.stk` | MapReduce shape — every worker counts words, master verifies agreement |
+| `distributed_log_aggregation.stk` | Telemetry pattern — per-event JSON counts, master sums fleet-wide |
+| `harvest_oneshot.stk` | The ergonomic shape (`harvest $code, @workers` = `pray + annex` fused) |
+| `bestow_then_lick.stk` | Master pushes config via `bestow`, reads worker state back via `lick` |
+| `pilgrimage_barrier.stk` | 3-stage BSP barrier across 4 workers |
+| `chant_late_joiners.stk` | `chant`/`amen` continuous-rescatter lifecycle |
+| `smite_state_reset.stk` | Reset workers' `%soul` without disconnecting (vs `excommunicate`) |
+| `enshrine_exhume_roundtrip.stk` | Persist hash to disk as JSON, exhume back, verify identity |
+| `cloistered_acl_demo.stk` | `:cloistered` ACL + cathedral inspection + `apostatize` cleanup |
+| `interrogate_pids.stk` | Polymorphic `interrogate($pid)` (OS) vs `interrogate(@handles)` (agent VM state) |
+| `multi_congregation.stk` | `anoint` spawns secondary congregation alongside primary |
+
+Sample run (the original Tier 0 demo):
 
 ```text
 $ stryke examples/distributed_congregation.stk 2 "5 * 8"
@@ -2788,6 +2807,19 @@ divination id: 1
   worker 1 → 40
   worker 2 → 40
 ✓ all 2 workers returned: 40
+```
+
+100-worker scale demo:
+
+```text
+$ stryke examples/congregation_100x_scale.stk 100
+── 100x scale: spawning 100 worker processes ──
+spawned 100 / 100 workers (fork + connect + register)
+harvested 100 / 100 replies
+  matched:  100 / 100 replies
+  diverged: 0
+✓ every spawned worker returned the correct answer
+excommunicated 100 workers
 ```
 
 ### Project-bar position

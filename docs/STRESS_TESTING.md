@@ -147,7 +147,26 @@ Key verbs (full taxonomy in [README §0x10c](../README.md#0x10c-scriptable-distr
 | `interrogate($pid)` | OS-level process state dump via sysinfo |
 | `cloister($token)` | enable :cloistered ACL with shared-secret auth |
 
-Workers maintain `our %soul` (their externally-visible state) and `our %gift` (master-pushed config). Pin tests cover scatter/gather, chant rescatter, cloistered auth rejection, and bug-fixed `\%hash` deref + cross-EVAL persistence — see `tests/suite/scriptable_controller_pin.rs`. Example: `examples/distributed_congregation.stk`.
+Workers maintain `our %soul` (their externally-visible state) and `our %gift` (master-pushed config). Pin tests cover scatter/gather, chant rescatter, cloistered auth rejection, and bug-fixed `\%hash` deref + cross-EVAL persistence — see `tests/suite/scriptable_controller_pin.rs`.
+
+**13 demos** in `examples/`, all clean under `--no-interop`:
+
+| Demo | Pattern |
+|---|---|
+| `distributed_congregation.stk` | minimum-viable scatter-gather (Tier 0) |
+| `congregation_100x_scale.stk` | tested clean at **100 and 250 workers** |
+| `distributed_prime_sieve.stk` | per-worker range shards, π(10000)=1229 |
+| `distributed_wordcount.stk` | MapReduce — every worker counts, verify agreement |
+| `distributed_log_aggregation.stk` | telemetry — JSON counts → fleet-wide sums |
+| `harvest_oneshot.stk` | `pray + annex` fused into one call |
+| `bestow_then_lick.stk` | push config → read state back |
+| `pilgrimage_barrier.stk` | 3-stage BSP barrier across 4 workers |
+| `chant_late_joiners.stk` | continuous-rescatter lifecycle |
+| `smite_state_reset.stk` | reset `%soul` without disconnecting |
+| `enshrine_exhume_roundtrip.stk` | JSON persist + reload + verify |
+| `cloistered_acl_demo.stk` | ACL + cathedral + apostatize |
+| `interrogate_pids.stk` | polymorphic `interrogate($pid)` vs `interrogate(@handles)` |
+| `multi_congregation.stk` | secondary congregation via `anoint` |
 
 ### Example Session
 
