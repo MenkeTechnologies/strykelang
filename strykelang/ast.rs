@@ -1606,4 +1606,140 @@ mod tests {
         assert!(s.contains("\"statements\""));
         assert!(s.contains("BinOp"));
     }
+
+    // ─── GrepBuiltinKeyword ───────────────────────────────────────────
+
+    #[test]
+    fn grep_keyword_as_str_matrix() {
+        assert_eq!(GrepBuiltinKeyword::Grep.as_str(), "grep");
+        assert_eq!(GrepBuiltinKeyword::Greps.as_str(), "greps");
+        assert_eq!(GrepBuiltinKeyword::Filter.as_str(), "filter");
+        assert_eq!(GrepBuiltinKeyword::FindAll.as_str(), "find_all");
+    }
+
+    #[test]
+    fn grep_keyword_is_stream_only_false_for_grep() {
+        // `grep` is the collecting (non-streaming) variant; everything else streams.
+        assert!(!GrepBuiltinKeyword::Grep.is_stream());
+        assert!(GrepBuiltinKeyword::Greps.is_stream());
+        assert!(GrepBuiltinKeyword::Filter.is_stream());
+        assert!(GrepBuiltinKeyword::FindAll.is_stream());
+    }
+
+    // ─── PerlTypeName byte encoding ───────────────────────────────────
+
+    #[test]
+    fn perl_type_name_byte_roundtrip() {
+        // 0..7 → simple types → back to same byte.
+        for b in 0..=7u8 {
+            let t = PerlTypeName::from_byte(b).unwrap_or_else(|| panic!("byte {b} unknown"));
+            assert_eq!(t.as_byte(), Some(b), "round-trip failed for byte {b}");
+        }
+    }
+
+    #[test]
+    fn perl_type_name_unknown_bytes_return_none() {
+        assert!(PerlTypeName::from_byte(8).is_none());
+        assert!(PerlTypeName::from_byte(255).is_none());
+    }
+
+    #[test]
+    fn perl_type_name_struct_and_enum_have_no_byte_encoding() {
+        // Named types require name-pool lookup, not byte encoding.
+        assert_eq!(PerlTypeName::Struct("Point".into()).as_byte(), None);
+        assert_eq!(PerlTypeName::Enum("Color".into()).as_byte(), None);
+    }
+
+    #[test]
+    fn perl_type_name_simple_byte_assignments_are_stable() {
+        // Pin the byte ordering so VM bytecode doesn't shift accidentally.
+        assert_eq!(PerlTypeName::Int.as_byte(), Some(0));
+        assert_eq!(PerlTypeName::Str.as_byte(), Some(1));
+        assert_eq!(PerlTypeName::Float.as_byte(), Some(2));
+        assert_eq!(PerlTypeName::Bool.as_byte(), Some(3));
+        assert_eq!(PerlTypeName::Array.as_byte(), Some(4));
+        assert_eq!(PerlTypeName::Hash.as_byte(), Some(5));
+        assert_eq!(PerlTypeName::Ref.as_byte(), Some(6));
+        assert_eq!(PerlTypeName::Any.as_byte(), Some(7));
+    }
+
+    #[test]
+    fn perl_type_name_display_name_simple_types() {
+        assert_eq!(PerlTypeName::Int.display_name(), "Int");
+        assert_eq!(PerlTypeName::Str.display_name(), "Str");
+        assert_eq!(PerlTypeName::Float.display_name(), "Float");
+        assert_eq!(PerlTypeName::Bool.display_name(), "Bool");
+        assert_eq!(PerlTypeName::Array.display_name(), "Array");
+        assert_eq!(PerlTypeName::Hash.display_name(), "Hash");
+        assert_eq!(PerlTypeName::Ref.display_name(), "Ref");
+        assert_eq!(PerlTypeName::Any.display_name(), "Any");
+    }
+
+    #[test]
+    fn perl_type_name_display_name_named_types() {
+        assert_eq!(PerlTypeName::Struct("Point".into()).display_name(), "Point");
+        assert_eq!(PerlTypeName::Enum("Color".into()).display_name(), "Color");
+    }
+
+    // ─── PerlTypeName::check_value runtime type-check ─────────────────
+
+    #[test]
+    fn perl_type_int_accepts_integer_like() {
+        let v = crate::value::StrykeValue::integer(42);
+        assert!(PerlTypeName::Int.check_value(&v).is_ok());
+    }
+
+    #[test]
+    fn perl_type_int_rejects_string() {
+        let v = crate::value::StrykeValue::string("hi".into());
+        let err = PerlTypeName::Int.check_value(&v);
+        assert!(err.is_err());
+        assert!(err.unwrap_err().contains("Int"));
+    }
+
+    #[test]
+    fn perl_type_str_accepts_string() {
+        let v = crate::value::StrykeValue::string("hi".into());
+        assert!(PerlTypeName::Str.check_value(&v).is_ok());
+    }
+
+    #[test]
+    fn perl_type_float_accepts_both_int_and_float() {
+        // Float is permissive — accepts integer-like too (numeric promotion).
+        assert!(PerlTypeName::Float
+            .check_value(&crate::value::StrykeValue::integer(7))
+            .is_ok());
+        assert!(PerlTypeName::Float
+            .check_value(&crate::value::StrykeValue::float(3.14))
+            .is_ok());
+    }
+
+    #[test]
+    fn perl_type_bool_accepts_anything() {
+        // Bool's check_value returns Ok(()) for everything (perl truthiness).
+        assert!(PerlTypeName::Bool
+            .check_value(&crate::value::StrykeValue::integer(0))
+            .is_ok());
+        assert!(PerlTypeName::Bool
+            .check_value(&crate::value::StrykeValue::string("".into()))
+            .is_ok());
+        assert!(PerlTypeName::Bool
+            .check_value(&crate::value::StrykeValue::UNDEF)
+            .is_ok());
+    }
+
+    // ─── Statement::new constructor ───────────────────────────────────
+
+    #[test]
+    fn statement_new_preserves_line_and_kind() {
+        let kind = StmtKind::Expression(Expr {
+            kind: ExprKind::Integer(42),
+            line: 7,
+        });
+        let s = Statement::new(kind, 7);
+        assert_eq!(s.line, 7);
+        // Round-trip the kind via debug formatting since pattern-match would
+        // require StmtKind to be PartialEq.
+        assert!(format!("{:?}", s.kind).contains("Expression"));
+    }
 }
