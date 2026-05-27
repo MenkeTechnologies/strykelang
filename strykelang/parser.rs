@@ -14029,6 +14029,8 @@ impl Parser {
             // ── TURN relay fallback (RFC 8656) for symmetric NATs ──────────
             | "turn_allocate" | "turn_permission" | "turn_send"
             | "turn_recv" | "turn_refresh"
+            // ── ipc / shared memory teleport ───────────────────────────────
+            | "teleport" | "arrive"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"

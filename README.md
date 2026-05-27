@@ -64,9 +64,9 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x18\] Documentation](#0x18-documentation)
 - [\[0xFF\] License](#0xff-license)
 
-### What's new — NAT traversal + value lineage
+### What's new — NAT traversal + value lineage + multi-target teleport
 
-Stack added across `v1` → `v1.4` (under [\[0x10b\] Agent/Controller](#0x10b-agentcontroller-architecture)):
+Stack added across `v1` → `v1.5` (under [\[0x10b\] Agent/Controller](#0x10b-agentcontroller-architecture)):
 
 | Layer | Builtins | What it does |
 |---|---|---|
@@ -75,8 +75,9 @@ Stack added across `v1` → `v1.4` (under [\[0x10b\] Agent/Controller](#0x10b-ag
 | TURN fallback | [`turn_allocate` / `turn_permission` / `turn_send` / `turn_recv` / `turn_refresh`](#builtins-turn_allocate--turn_permission--turn_send--turn_recv--turn_refresh--turn-relay-fallback-rfc-8656) | RFC 8656 TURN client (HMAC-SHA1 auth) for when hole-punching fails (~20-30% of cases: symmetric NATs, UDP-blocking firewalls) |
 | Orchestration | [`ice::connect`](#ice-lite-orchestrating-direct--punch--relay-in-stryke-source) (stryke source) | Three-rung ladder: direct → punch → relay, first-success wins |
 | Value lineage | [`mark` / `provenance` / `unmark`](#builtins-mark--provenance--unmark--value-lineage-as-a-first-class-feature) | Arc-keyed per-value lineage tracking with weak-ref GC, zero overhead when unused |
+| Multi-target IPC | [`teleport` / `arrive`](#builtins-teleport--arrive--multi-target-shm-ipc) | POSIX-SHM broadcast value to N stryke processes + per-receiver UDS notify. One segment, N readers — beats N×bincode-over-pipe for big payloads |
 
-Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2p_chat_v2.stk) / [`turn_relay_chat.stk`](examples/turn_relay_chat.stk) / [`ice_orchestrator.stk`](examples/ice_orchestrator.stk) / [`turn_health_check.stk`](examples/turn_health_check.stk) / [`provenance_basics.stk`](examples/provenance_basics.stk) / [`provenance_audit_log.stk`](examples/provenance_audit_log.stk) / [`provenance_chain_walkthrough.stk`](examples/provenance_chain_walkthrough.stk)
+Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2p_chat_v2.stk) / [`turn_relay_chat.stk`](examples/turn_relay_chat.stk) / [`ice_orchestrator.stk`](examples/ice_orchestrator.stk) / [`turn_health_check.stk`](examples/turn_health_check.stk) / [`provenance_basics.stk`](examples/provenance_basics.stk) / [`provenance_audit_log.stk`](examples/provenance_audit_log.stk) / [`provenance_chain_walkthrough.stk`](examples/provenance_chain_walkthrough.stk) / [`teleport_broadcast.stk`](examples/teleport_broadcast.stk)
 
 ---
 
@@ -2844,6 +2845,48 @@ my $detail = whois_query("example.com", $registry // "whois.verisign-grs.com")
 ```
 
 Demo: [`examples/network_recon.stk`](examples/network_recon.stk) chains `tcp_probe` + `tcp_banner` via `pmap` for parallel asset discovery + service fingerprinting.
+
+### Builtins `teleport` / `arrive` — multi-target SHM IPC
+
+Broadcast a value to N stryke processes via one POSIX shared-memory segment plus per-receiver Unix-domain-socket notification. For big payloads, only one process copies the bytes into kernel memory; each receiver `mmap`s the same backing pages.
+
+**World-first**: no other scripting language ships single-call zero-copy(ish) multi-target value teleportation as a primitive. Closest analogs — Python `multiprocessing.shared_memory`, Perl `IPC::Shareable`, Ruby `mmap` — are single-target, require manual segment lifecycle + per-process attach plumbing, and don't bundle a notification primitive. `teleport` is one call.
+
+| Builtin | Signature | Returns |
+|---|---|---|
+| `teleport` | `teleport($val, @receiver_pids [, { hold_ms => 500 }])` | count of receivers whose UDS accepted the notify |
+| `arrive` | `arrive([$timeout_ms=5000])` | the teleported value (deeply ref-wrapped) or `undef` on timeout |
+
+**Surfaces** — all four forms are supported:
+
+```perl
+# Standalone with literal PIDs:
+teleport($payload, $pid1, $pid2, $pid3)
+
+# Arrayref of PIDs:
+teleport($payload, [@worker_pids])
+
+# Opts hash for hold window:
+teleport($payload, @pids, { hold_ms => 1500 })
+
+# Prefix thread macro (data-first signature makes this natural):
+~> $payload teleport(@worker_pids)
+```
+
+**Wire path**: `StrykeValue → serde_json::Value → JSON bytes → POSIX SHM segment named `/stryke_tp_PID_SEQ` → 40-byte notify over UDS at `/tmp/stryke_teleport_PID.sock` per receiver`. Receivers reverse this. Same lossy-but-portable shape as `cluster` / `dist_thread` IPC — scalars, arrays, hashes, and nested combos round-trip; closures and blessed objects don't.
+
+**Top-level + nested containers always arrive as refs** (matching `decode_json`'s convention) so `$msg->{key}->[i]->{inner}` Just Works without re-wrapping.
+
+**Wire format limits** (v1, intentional):
+
+- Receivers must be stryke processes running an `arrive()` loop. Non-stryke processes or stryke processes without `arrive()` have no bound UDS and count as unreachable.
+- macOS POSIX SHM names cap at 30 chars; `/stryke_tp_99999_99` is 19 chars so we have headroom for billions of segments per PID.
+- Sender holds the SHM segment alive for `hold_ms` (default 500), not ack-based. Receivers slower than `hold_ms` get a stale-name `shm_open` failure.
+- No encryption — receivers are cooperating processes; payload is visible to anything that knows the SHM name.
+
+**Fork-safety**: the receiver's UDS socket is PID-aware. After `fork()`, the child rebinds at its own `/tmp/stryke_teleport_PID.sock` on first `arrive()` call (the parent's inherited fd is dropped). So fork-then-arrive in the child Just Works without manual reinitialization.
+
+Demo: [`examples/teleport_broadcast.stk`](examples/teleport_broadcast.stk) — parent forks N workers, builds a sharded corpus hashref, teleports the whole thing once; each worker reconstructs and processes its slice.
 
 ### Common pitfalls — friction points worth knowing upfront
 
