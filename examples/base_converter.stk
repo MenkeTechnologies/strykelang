@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# base_converter.stk - Convert integers to and from arbitrary bases (2..36).
+#
+# Demonstrates:
+#   * Integer arithmetic
+#   * String building from char indexing
+#   * Multi-base round-trip
+#
+# Run: stryke --no-interop examples/base_converter.stk
+
+my $DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+fn Base::to($n, $base) {
+    return "0" if $n == 0
+    my $neg = $n < 0 ? 1 : 0
+    my $v   = $neg ? 0 - $n : $n
+    my $out = ""
+    while ($v > 0) {
+        my $d = $v % $base
+        $out = $DIGITS[$d] . $out
+        $v = int($v / $base)
+    }
+    $neg ? "-" . $out : $out
+}
+
+fn Base::digit_val($ch) {
+    my $c = uc($ch)
+    my $n = len $DIGITS
+    for my $i (0:$n-1) {
+        return $i if $DIGITS[$i] eq $c
+    }
+    -1
+}
+
+fn Base::from($s, $base) {
+    my $idx = 0
+    my $neg = 0
+    if ($s[0] eq "-") {
+        $neg = 1
+        $idx = 1
+    }
+    my $total = 0
+    my $n = len $s
+    for my $i ($idx:$n-1) {
+        my $d = Base::digit_val($s[$i])
+        $total = $total * $base + $d
+    }
+    $neg ? 0 - $total : $total
+}
+
+p "==============================================="
+p " Stryke Base Converter Demo"
+p "==============================================="
+p ""
+
+p "── 255 in various bases ───────────────────────"
+for my $bs (2, 8, 10, 16, 36) {
+    my $s = Base::to(255, $bs)
+    p "  base $bs : $s"
+}
+
+p ""
+p "── 1000 in various bases ──────────────────────"
+for my $bs (2, 8, 10, 16, 36) {
+    my $s = Base::to(1000, $bs)
+    p "  base $bs : $s"
+}
+
+p ""
+p "── Round-trip 0..50 in base 7 ─────────────────"
+my $all_ok = 1
+for my $n (0:50) {
+    my $s = Base::to($n, 7)
+    my $d = Base::from($s, 7)
+    $all_ok = 0 if $d != $n
+}
+my $status = $all_ok ? "OK" : "FAIL"
+p "  $status"
+
+p ""
+p "── Parse hex strings ──────────────────────────"
+for my $h ("FF", "DEADBEEF", "100", "ABCDEF") {
+    my $v = Base::from($h, 16)
+    p "  0x$h = $v"
+}
