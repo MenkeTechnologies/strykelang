@@ -28,23 +28,23 @@ fn kick_returns_1_on_listening_port() {
     assert_eq!(n, 1, "kick to listening port should return 1, got {n}");
 }
 
-/// Closed-port (nothing listening) returns 0. We pick an ephemeral port,
-/// release it, then immediately try to kick it — race window is microsecond
-/// scale on a quiet test machine.
+/// Closed-port (nothing listening) returns 0. Uses port 1 — privileged
+/// (won't be auto-assigned to any ephemeral bind) AND no service ever
+/// listens there on a sane test host. Was previously a grab-and-release
+/// pattern but that races with other parallel tests' ephemeral binds:
+/// any test that bound after the release could grab the same port, and
+/// `kick` would succeed against IT instead of returning 0.
 #[test]
 fn kick_returns_0_on_closed_port() {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind ephemeral");
-    let port = listener.local_addr().unwrap().port();
-    drop(listener);
-    let code = format!(r#"kick("127.0.0.1", {}, 500)"#, port);
+    let code = r#"kick("127.0.0.1", 1, 500)"#.to_string();
     let start = Instant::now();
     let n = eval_int(&code);
     let elapsed = start.elapsed();
-    assert_eq!(n, 0, "kick to closed port should return 0, got {n}");
-    // Local-RST should arrive almost instantly — far below the 500ms timeout.
+    assert_eq!(n, 0, "kick to port 1 (privileged, unlisteneable) should return 0, got {n}");
+    // Local RST or unreachable should arrive well within the 500ms budget.
     assert!(
         elapsed < Duration::from_millis(500),
-        "closed-port kick should return immediately on local RST, took {:?}",
+        "closed-port kick should return promptly, took {:?}",
         elapsed
     );
 }

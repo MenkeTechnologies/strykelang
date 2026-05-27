@@ -1,0 +1,131 @@
+#!/usr/bin/env stryke
+#
+# P2P chat v2 — same shape as examples/p2p_chat.stk but using the
+# `ice::connect` orchestrator from examples/ice_orchestrator.stk
+# instead of hand-wiring `punch` directly.
+#
+# Why two demos:
+#   * p2p_chat.stk    — explicit primitives, shows the wire-protocol
+#                        details (good for understanding what's happening)
+#   * p2p_chat_v2.stk — uses ice::connect, shows the abstraction layer
+#                        users would actually adopt (good for copying
+#                        into your own code)
+#
+# Three modes, by argument:
+#
+#   stryke examples/p2p_chat_v2.stk listen
+#     → Allocate a TURN relay (optional, if creds in env), STUN-discover
+#       public address, gather candidates, print them for out-of-band
+#       sharing with the peer, then wait for messages.
+#
+#   stryke examples/p2p_chat_v2.stk connect HOST_ADDR SRFLX_ADDR RELAY_ADDR
+#     → Call ice::connect with the peer's three candidate addresses;
+#       send a greeting; bounce a few rounds.
+#
+# Optional env for the relayed rung:
+#   TURN_SERVER  (e.g. "turn.example.com:3478")
+#   TURN_USER
+#   TURN_PASS
+#
+# Run with the listen side first, paste the printed candidates to the
+# peer's connect command line.
+
+# Static-analysis stubs for the ice::* functions that `require` will
+# load below — the IDE-strict and `--lint` static analyzer can't peek
+# inside string-loaded files, so without these stubs it flags every
+# `ice::connect` / `ice::gather_candidates` call as "undefined sub".
+# Runtime `require` replaces the stubs with the real definitions from
+# the orchestrator file. Pattern matches examples/run_source.stk.
+fn ice::connect            { undef }
+fn ice::gather_candidates  { undef }
+
+# Pull in the real ice::connect / ice::gather_candidates definitions.
+require "examples/ice_orchestrator.stk"
+
+my $mode = $ARGV[0] // "listen"
+
+if ($mode eq "listen") {
+    p "[A] Gathering local candidates …"
+    my $opts = {}
+    if (defined $ENV{TURN_SERVER}) {
+        $opts->{turn_server} = $ENV{TURN_SERVER}
+        $opts->{turn_user}   = $ENV{TURN_USER}
+        $opts->{turn_pass}   = $ENV{TURN_PASS}
+    }
+    my $cands = ice::gather_candidates($opts)
+    if ($cands->{socket} == 0) {
+        p "[A] candidate gather failed"
+        exit 1
+    }
+    printf "[A] NAT type    : %s\n", $cands->{nat_type}
+    printf "[A] srflx       : %s\n", $cands->{srflx_addr} // "(not gathered — symmetric NAT or STUN unreachable)"
+    printf "[A] relay       : %s\n", $cands->{relay_addr} // "(no TURN creds in env)"
+    p "[A] Tell peer to run:"
+    printf "    stryke examples/p2p_chat_v2.stk connect HOST_ADDR %s %s\n",
+        $cands->{srflx_addr} // "_",
+        $cands->{relay_addr} // "_"
+    p "[A] (Replace HOST_ADDR with your LAN ip:port if you want the direct rung tried.)"
+    p "[A] Waiting for inbound (60s) …"
+
+    my $msg = udp_recv_from($cands->{socket}, 60_000)
+    if (!defined $msg) {
+        p "[A] timed out — peer never reached us"
+        udp_close($cands->{socket})
+        exit 1
+    }
+    printf "[A] from %s:%d: %s\n", $msg->{src_ip}, $msg->{src_port}, $msg->{payload}
+    p "[A] Replying …"
+    udp_send_to($cands->{socket}, $msg->{src_ip}, $msg->{src_port}, "hello from A!")
+    udp_close($cands->{socket})
+}
+elsif ($mode eq "connect") {
+    my $host_addr  = $ARGV[1]
+    my $srflx_addr = $ARGV[2]
+    my $relay_addr = $ARGV[3]
+    if (!defined $host_addr) {
+        p "usage: stryke examples/p2p_chat_v2.stk connect HOST_ADDR SRFLX_ADDR RELAY_ADDR"
+        p "       Use '_' to skip a rung (e.g. '_' for HOST_ADDR if peer is on the public internet)."
+        exit 1
+    }
+    # Convert "_" placeholders to undef so ice::connect skips that rung.
+    my $h = ($host_addr  eq "_") ? undef : $host_addr
+    my $s = ($srflx_addr eq "_") ? undef : $srflx_addr
+    my $r = ($relay_addr eq "_") ? undef : $relay_addr
+
+    my $opts = {
+        peer_host_addr  => $h,
+        peer_srflx_addr => $s,
+        peer_relay_addr => $r,
+        timeout_ms      => 5000,
+    }
+    if (defined $ENV{TURN_SERVER}) {
+        $opts->{turn_server} = $ENV{TURN_SERVER}
+        $opts->{turn_user}   = $ENV{TURN_USER}
+        $opts->{turn_pass}   = $ENV{TURN_PASS}
+    }
+    p "[B] Trying ice::connect ladder (direct → punch → relay) …"
+    my $conn = ice::connect($opts)
+    if (!$conn->{ok}) {
+        printf "[B] No rung worked: %s\n", $conn->{reason}
+        exit 1
+    }
+    printf "[B] Connected via %s (socket=%d)\n", $conn->{method}, $conn->{socket}
+    # Send a greeting via the method-appropriate primitive.
+    if ($conn->{method} eq "relay") {
+        # Relay path requires turn_send + turn_recv.
+        turn_send($conn->{socket}, $h, 9999, "hello from B (relayed)")
+        my $reply = turn_recv($conn->{socket}, 5000)
+        printf "[B] reply: %s\n", defined $reply ? $reply->{payload} : "(none)"
+    } else {
+        # Direct + punch both use udp_send_to/udp_recv_from.
+        my ($peer_ip, $peer_port) = split /:/, $h // $s
+        udp_send_to($conn->{socket}, $peer_ip, $peer_port, "hello from B!")
+        my $reply = udp_recv_from($conn->{socket}, 5000)
+        printf "[B] reply: %s\n", defined $reply ? $reply->{payload} : "(none)"
+    }
+    udp_close($conn->{socket})
+}
+else {
+    p "usage: stryke examples/p2p_chat_v2.stk [listen|connect ...]"
+    exit 1
+}

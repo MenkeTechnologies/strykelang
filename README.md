@@ -2805,6 +2805,51 @@ Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration p
 
 Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
+### P2P walkthrough: pick the right rung for YOUR network
+
+Decision tree for stryke-to-stryke P2P over the open internet — what to call, in what order, what each return value means:
+
+```perl
+my $sock = udp_open()                          # 1. Bind a UDP socket once
+                                                #    (used for STUN + the data path)
+
+my $nat = stun_classify($sock)                 # 2. Detect NAT type (~3-server query)
+if ($nat->{nat_type} eq "symmetric") {         #    Symmetric → hole-punching can't work
+    die "need TURN — see turn_allocate below"  #    (room for a TURN fallback here)
+}
+
+my $me = stun($sock)                           # 3. Discover OWN public address
+printf "my address: %s:%d — send this to peer\n",
+    $me->{public_ip}, $me->{public_port}
+# ... exchange addresses with peer via email/paste/IRC/anything ...
+my $peer_ip   = "203.0.113.45"
+my $peer_port = 51234
+
+my $r = punch($sock, $peer_ip, $peer_port,     # 4. Hole-punch the peer
+    { timeout_ms => 5000 })
+if (!$r->{established}) {
+    die "punch failed — peer NAT too restrictive; need TURN"
+}
+printf "connected: %s\n", $r->{peer_msg}      # 5. Bidirectional flow established
+
+# Now send/recv as normal UDP via the same socket:
+udp_send_to($sock, $peer_ip, $peer_port, "hello")
+my $reply = udp_recv_from($sock, 5000)        # → { payload, src_ip, src_port }
+p "peer said: $reply->{payload}"
+udp_close($sock)
+```
+
+| If `stun_classify` returns | Then you can | Otherwise |
+|---|---|---|
+| `cone` | use `punch` directly (~70-80% success) | — |
+| `symmetric` | skip `punch` — it WILL fail | use `turn_allocate` + `turn_send` / `turn_recv` |
+| `unknown` | try `punch` first, fall back to TURN on failure | — |
+
+The orchestrator at [`examples/ice_orchestrator.stk`](examples/ice_orchestrator.stk) automates this whole ladder — see the next subsection. The two runnable demos pair like this:
+
+- [`examples/p2p_chat.stk`](examples/p2p_chat.stk) — uses raw primitives (`udp_open`, `stun`, `punch`, `udp_send_to`, `udp_recv_from`). Read this first to understand what's happening on the wire.
+- [`examples/p2p_chat_v2.stk`](examples/p2p_chat_v2.stk) — uses `ice::connect` from the orchestrator. Copy this into your own code.
+
 ### ICE-lite: orchestrating direct → punch → relay in stryke source
 
 The v1.3 primitives (`udp_open` / `stun` / `stun_classify` / `punch` / `turn_*`) compose into a complete NAT-traversal orchestrator. The orchestration algorithm — which transport to try first, when to fall back — is intentionally **stryke source** rather than a Rust builtin: the wire-protocol code is already builtins, and keeping the ladder logic as user-editable source means you can read it, adapt it, and inline custom rules without recompiling.
