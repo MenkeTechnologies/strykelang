@@ -24,7 +24,10 @@ fn udp_open_returns_handle_and_close_succeeds() {
         ($id > 0 && $closed == 1) ? 1 : 0
         "#,
     );
-    assert_eq!(n, 1, "open should return a positive handle and close should report 1");
+    assert_eq!(
+        n, 1,
+        "open should return a positive handle and close should report 1"
+    );
 }
 
 /// `udp_close` on a never-opened handle returns 0 without error.
@@ -63,7 +66,11 @@ fn udp_loopback_send_recv_round_trip() {
         port = port
     );
     let s = eval_string(&code);
-    assert_eq!(s.trim(), "ping", "loopback datagram payload must round-trip");
+    assert_eq!(
+        s.trim(),
+        "ping",
+        "loopback datagram payload must round-trip"
+    );
 }
 
 /// `udp_recv_from` returns a hashref `{ payload, src_ip, src_port }` for
@@ -154,8 +161,7 @@ fn stun_against_in_process_server_returns_public_address() {
         let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 42);
         let claim_port: u16 = 54321;
         let xor_port = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
-        let xor_addr =
-            u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+        let xor_addr = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
         let mut resp = vec![0u8; 32];
         resp[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
         resp[2..4].copy_from_slice(&12u16.to_be_bytes());
@@ -318,13 +324,19 @@ fn stun_classify_mixed_responders_cone_on_majority() {
         udp_close($sock)
         sprintf("%s|q=%d|s=%d", $r->{{nat_type}}, $r->{{queried}}, $r->{{succeeded}})
         "#,
-        a_ip = a.ip(), a_port = a.port(),
-        b_ip = b.ip(), b_port = b.port(),
-        s_ip = silent.ip(), s_port = silent.port()
+        a_ip = a.ip(),
+        a_port = a.port(),
+        b_ip = b.ip(),
+        b_port = b.port(),
+        s_ip = silent.ip(),
+        s_port = silent.port()
     );
     let s = eval_string(&code);
     let parts: Vec<&str> = s.trim().split('|').collect();
-    assert_eq!(parts[0], "cone", "2-of-3 matching ports must classify as cone");
+    assert_eq!(
+        parts[0], "cone",
+        "2-of-3 matching ports must classify as cone"
+    );
     assert_eq!(parts[1], "q=3");
     assert_eq!(parts[2], "s=2", "exactly 2 of 3 servers responded");
 }
@@ -410,8 +422,14 @@ fn full_socket_lifecycle_composition_through_stryke_source() {
     let s = eval_string(&code);
     let parts: Vec<&str> = s.trim().split('|').collect();
     assert_eq!(parts.len(), 4, "expected 4 fields, got: {s}");
-    assert_eq!(parts[0], "stun=1", "STUN query must report the expected public address");
-    assert_eq!(parts[1], "echo=1", "post-STUN echo round-trip on the same socket must succeed");
+    assert_eq!(
+        parts[0], "stun=1",
+        "STUN query must report the expected public address"
+    );
+    assert_eq!(
+        parts[1], "echo=1",
+        "post-STUN echo round-trip on the same socket must succeed"
+    );
     assert_eq!(parts[2], "closed=1", "udp_close must report removal");
     // Socket id is a positive integer (just confirm parse).
     assert!(
@@ -581,5 +599,9 @@ fn punch_with_invalid_args_returns_failed_result_hash() {
         $r->{established}
         "#,
     );
-    assert_eq!(s.trim(), "0", "punch on invalid socket id should report established=0");
+    assert_eq!(
+        s.trim(),
+        "0",
+        "punch on invalid socket id should report established=0"
+    );
 }

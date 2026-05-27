@@ -223,7 +223,10 @@ fn chained_re_mark_each_stage_has_independent_lineage() {
     assert!(parts[0].starts_with("h="));
     assert!(parts[1].starts_with("a="));
     assert!(parts[2].starts_with("h3="));
-    assert_eq!(parts[3], "distinct=1", "each stage's origin_line must differ");
+    assert_eq!(
+        parts[3], "distinct=1",
+        "each stage's origin_line must differ"
+    );
 }
 
 /// Weak-ref GC: drop the original heap value, then look up provenance on
@@ -312,8 +315,7 @@ fn provenance_origin_summary_uses_god_style_prefix() {
         "#,
     );
     assert!(
-        arr_origin.trim().starts_with("ARRAY len=")
-            || arr_origin.trim().starts_with("ARRAYREF"),
+        arr_origin.trim().starts_with("ARRAY len=") || arr_origin.trim().starts_with("ARRAYREF"),
         "anonymous arrayref origin must start with ARRAY-family prefix, got {:?}",
         arr_origin.trim()
     );

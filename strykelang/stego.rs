@@ -54,8 +54,9 @@ pub fn unwrap_payload(envelope: &[u8], key: Option<&[u8]>) -> Result<Vec<u8>, St
     }
     let len = u32::from_be_bytes([envelope[0], envelope[1], envelope[2], envelope[3]]) as usize;
     if envelope.len() < 4 + len + 4 {
-        return Err("reveal: corrupt or absent payload (declared length exceeds embedded bits)"
-            .into());
+        return Err(
+            "reveal: corrupt or absent payload (declared length exceeds embedded bits)".into(),
+        );
     }
     let body = &envelope[4..4 + len];
     let stored_crc = u32::from_be_bytes([

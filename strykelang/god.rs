@@ -187,11 +187,7 @@ fn dump_into(out: &mut String, v: &StrykeValue, depth: usize, visited: &mut Hash
         let proto = sub.prototype.clone().unwrap_or_else(|| "-".to_string());
         let params = sub.params.len();
         let body_stmts = sub.body.len();
-        let captures = sub
-            .closure_env
-            .as_ref()
-            .map(|env| env.len())
-            .unwrap_or(0);
+        let captures = sub.closure_env.as_ref().map(|env| env.len()).unwrap_or(0);
         let _ = writeln!(
             out,
             "{prefix}CODE @ 0x{ptr:x} (strong={strong}, weak={weak}) name={name} params={params} stmts={body_stmts} prototype={proto} captures={captures}"
@@ -285,11 +281,7 @@ fn dump_into(out: &mut String, v: &StrykeValue, depth: usize, visited: &mut Hash
     // Catches everything else (sketches, channels, deques, kvstores, etc.) at
     // a uniform low resolution.
     let s = v.to_string();
-    let _ = writeln!(
-        out,
-        "{prefix}{tag} {:?}",
-        short_string(&s, 80),
-    );
+    let _ = writeln!(out, "{prefix}{tag} {:?}", short_string(&s, 80),);
 }
 
 fn hex_preview(b: &[u8], cap: usize) -> String {

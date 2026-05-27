@@ -61,7 +61,10 @@ fn god_hash_ref_surfaces_entries_and_recurses() {
     assert!(s.contains("HASH @ 0x"), "no hash header: {s}");
     assert!(s.contains("entries=3"), "wrong entry count: {s}");
     assert!(s.contains(r#""a" =>"#), "no key \"a\": {s}");
-    assert!(s.contains("INTEGER 1 (immediate)"), "no descent to value: {s}");
+    assert!(
+        s.contains("INTEGER 1 (immediate)"),
+        "no descent to value: {s}"
+    );
 }
 
 #[test]
@@ -95,7 +98,10 @@ fn god_aliasing_two_refs_show_same_pointer() {
             ($pa eq $pb) ? 1 : 0
         "#,
     );
-    assert_eq!(n, 1, "two aliases of the same hash must show the same 0x… pointer");
+    assert_eq!(
+        n, 1,
+        "two aliases of the same hash must show the same 0x… pointer"
+    );
 }
 
 #[test]

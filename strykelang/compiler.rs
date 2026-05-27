@@ -8272,19 +8272,11 @@ impl Compiler {
             }
             ExprKind::Burp(e) => {
                 self.compile_expr(e)?;
-                self.emit_op(
-                    Op::CallBuiltin(BuiltinId::Burp as u16, 1),
-                    line,
-                    Some(root),
-                );
+                self.emit_op(Op::CallBuiltin(BuiltinId::Burp as u16, 1), line, Some(root));
             }
             ExprKind::God(e) => {
                 self.compile_expr(e)?;
-                self.emit_op(
-                    Op::CallBuiltin(BuiltinId::God as u16, 1),
-                    line,
-                    Some(root),
-                );
+                self.emit_op(Op::CallBuiltin(BuiltinId::God as u16, 1), line, Some(root));
             }
             ExprKind::Capture(e) => {
                 self.compile_expr(e)?;

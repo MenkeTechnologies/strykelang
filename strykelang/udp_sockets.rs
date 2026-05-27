@@ -98,7 +98,10 @@ pub fn recv(id: u64, timeout: Option<Duration>) -> Option<(Vec<u8>, SocketAddr)>
 /// Drop a socket from the pool. Returns true if the id was present.
 /// Idempotent — calling on an unknown id returns false without error.
 pub fn close(id: u64) -> bool {
-    pool().lock().ok().is_some_and(|mut g| g.remove(&id).is_some())
+    pool()
+        .lock()
+        .ok()
+        .is_some_and(|mut g| g.remove(&id).is_some())
 }
 
 /// Count of live sockets — used by tests to verify cleanup.
@@ -130,8 +133,8 @@ mod tests {
         let n = send_to(sender, "127.0.0.1", port, b"hello").expect("send");
         assert_eq!(n, 5);
 
-        let (payload, src) = recv(receiver, Some(Duration::from_millis(500)))
-            .expect("recv must arrive on loopback");
+        let (payload, src) =
+            recv(receiver, Some(Duration::from_millis(500))).expect("recv must arrive on loopback");
         assert_eq!(&payload, b"hello");
         // src port should be the sender's ephemeral port.
         let sender_local = local_addr(sender).unwrap();

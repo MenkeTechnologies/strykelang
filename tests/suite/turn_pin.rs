@@ -65,8 +65,7 @@ mod helpers {
             // Walk attributes — replicate iter_attrs since it's private.
             let mut peer: Option<(IpAddr, u16)> = None;
             let mut data: Option<Vec<u8>> = None;
-            let body_end = 20
-                + u16::from_be_bytes([buf[2], buf[3]]) as usize;
+            let body_end = 20 + u16::from_be_bytes([buf[2], buf[3]]) as usize;
             let mut off = 20;
             while off + 4 <= body_end {
                 let t = u16::from_be_bytes([buf[off], buf[off + 1]]);
@@ -142,7 +141,10 @@ fn turn_full_session_via_stryke_source() {
     assert!(s.contains("lifetime=600"), "lifetime field, got: {s}");
     assert!(s.contains("perm=1"), "permission success, got: {s}");
     assert!(s.contains("sent="), "send byte count, got: {s}");
-    assert!(s.contains("payload=hello via turn"), "echo payload, got: {s}");
+    assert!(
+        s.contains("payload=hello via turn"),
+        "echo payload, got: {s}"
+    );
     assert!(s.contains("peer=192.0.2.10:9999"), "peer addr, got: {s}");
 }
 

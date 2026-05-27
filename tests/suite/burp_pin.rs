@@ -75,14 +75,8 @@ fn swallow_then_burp_is_byte_identical_roundtrip() {
     // regex so the substitution actually matches the keys.
     let src = fresh_dir("rt_src");
     let dst = fresh_dir("rt_dst");
-    let canon_src = std::fs::canonicalize(&src)
-        .unwrap()
-        .display()
-        .to_string();
-    let canon_dst = std::fs::canonicalize(&dst)
-        .unwrap()
-        .display()
-        .to_string();
+    let canon_src = std::fs::canonicalize(&src).unwrap().display().to_string();
+    let canon_dst = std::fs::canonicalize(&dst).unwrap().display().to_string();
     let payload_a: Vec<u8> = vec![0x00, 0xFF, 0x80, 0x7F, 0x01];
     let payload_b: Vec<u8> = vec![0xC3, 0x28, 0xFE, 0x0A]; // invalid UTF-8 prefix + LF
     std::fs::write(format!("{src}/a.bin"), &payload_a).unwrap();
@@ -132,7 +126,6 @@ fn burp_accepts_inline_hashref_literal() {
     assert_eq!(y, b"yy");
 }
 
-
 #[test]
 fn burp_empty_hash_returns_zero_and_touches_nothing() {
     let dir = fresh_dir("empty");
@@ -143,7 +136,10 @@ fn burp_empty_hash_returns_zero_and_touches_nothing() {
     let after = std::fs::read(&marker).expect("marker still present");
     rm_rf(&dir);
     assert_eq!(n, 0, "burp on empty hash should return 0");
-    assert_eq!(after, b"unchanged", "burp {{}} must not touch the filesystem");
+    assert_eq!(
+        after, b"unchanged",
+        "burp {{}} must not touch the filesystem"
+    );
 }
 
 #[test]
