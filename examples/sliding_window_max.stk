@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# sliding_window_max.stk — O(n) sliding window maximum via monotonic deque.
+#
+# Run: stryke --no-interop examples/sliding_window_max.stk
+
+package SWM;
+
+# Returns arrayref of max over each window of size $k in @$arr.
+# Deque holds indices; values at those indices are strictly decreasing.
+fn max_window($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    my @dq = ()
+    for my $i (0:$n-1) {
+        # Drop indices out of window
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) {
+            shift @dq
+        }
+        # Maintain decreasing order
+        while (len(@dq) > 0 && $arr->[$dq[(len(@dq)) - 1]] <= $arr->[$i]) {
+            pop @dq
+        }
+        push @dq, $i
+        if ($i >= $k - 1) {
+            push @out, $arr->[$dq[0]]
+        }
+    }
+    \@out
+}
+
+fn min_window($arr, $k) {
+    my $n = len(@$arr)
+    my @out = ()
+    return \@out if $n == 0 || $k <= 0 || $k > $n
+    my @dq = ()
+    for my $i (0:$n-1) {
+        while (len(@dq) > 0 && $dq[0] <= $i - $k) {
+            shift @dq
+        }
+        while (len(@dq) > 0 && $arr->[$dq[(len(@dq)) - 1]] >= $arr->[$i]) {
+            pop @dq
+        }
+        push @dq, $i
+        if ($i >= $k - 1) {
+            push @out, $arr->[$dq[0]]
+        }
+    }
+    \@out
+}
+
+package main;
+
+my $arr = [1, 3, -1, -3, 5, 3, 6, 7]
+my $mx = SWM::max_window($arr, 3)
+my $mn = SWM::min_window($arr, 3)
+p "arr: @$arr"
+p "max windows (k=3): @$mx"
+p "min windows (k=3): @$mn"

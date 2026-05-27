@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+
+# misra_gries.stk — Misra-Gries heavy-hitters algorithm.
+#
+# Given a stream and parameter k, identifies items occurring more
+# than n/k times using O(k) space. False positives possible; a
+# verification pass over the stream rules them out.
+#
+# Run: stryke --no-interop examples/misra_gries.stk
+
+package MG;
+
+fn new($k) {
+    { k => $k, counters => {} }
+}
+
+fn observe($mg, $x) {
+    my $c = $mg->{counters}
+    if (exists $c->{$x}) {
+        $c->{$x} = $c->{$x} + 1
+        return
+    }
+    if (len(keys %$c) < $mg->{k} - 1) {
+        $c->{$x} = 1
+        return
+    }
+    # Decrement all counters; remove any that reach zero
+    my @drop = ()
+    for my $key (keys %$c) {
+        $c->{$key} = $c->{$key} - 1
+        push @drop, $key if $c->{$key} <= 0
+    }
+    for my $key (@drop) {
+        delete $c->{$key}
+    }
+}
+
+fn candidates($mg) {
+    [sort keys %{$mg->{counters}}]
+}
+
+# Verify candidates over the stream and keep only those whose true
+# frequency exceeds n/k.
+fn heavy_hitters($mg, $stream) {
+    my $n = len(@$stream)
+    my $thresh = int($n / $mg->{k})
+    my %true = ()
+    for my $x (@$stream) {
+        $true{$x} = ($true{$x} // 0) + 1
+    }
+    my @out = ()
+    for my $cand (@{candidates($mg)}) {
+        push @out, $cand if ($true{$cand} // 0) > $thresh
+    }
+    \@out
+}
+
+package main;
+
+my $stream = ["a","b","a","c","a","d","a","b","a","c","a","b","a"]
+my $mg = MG::new(3)
+for my $x (@$stream) {
+    MG::observe($mg, $x)
+}
+my $cands = MG::candidates($mg)
+my $heavy = MG::heavy_hitters($mg, $stream)
+p "stream: @$stream"
+p "candidates: @$cands"
+p "verified heavy hitters (>n/k=" . int(len(@$stream)/3) . "): @$heavy"
