@@ -22,7 +22,8 @@
 use std::time::{Duration, Instant};
 use stryke::agent::run_agent_with_explicit;
 use stryke::controller::{
-    get_controller, get_current_controller, register_controller, register_divination, spawn_controller,
+    cathedral_lookup, cathedral_register, cathedral_unregister, get_controller,
+    get_current_controller, register_controller, register_divination, spawn_controller,
     unregister_divination,
 };
 
@@ -379,6 +380,176 @@ fn lick_via_to_json_round_trips_worker_soul_state() {
     }
 
     dismiss(&handle, children);
+}
+
+// ─── Tier 4 pins ────────────────────────────────────────────────────────────
+
+/// Chant rescatter: master starts a chant against an empty congregation,
+/// then forks a new agent. The accept_loop should fire the active chant
+/// at the new joiner so it ends up with the same state as anyone who
+/// was there at chant time.
+#[test]
+fn chant_fires_at_new_joiners_after_chant_started() {
+    use nix::unistd::{fork, ForkResult};
+
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    let listen_addr = handle.listen_addr();
+    let host = listen_addr.ip().to_string();
+    let port = listen_addr.port();
+
+    // Start an active chant BEFORE any agents have joined. With no agents,
+    // the chant scatters to zero recipients but the chant state stays
+    // active in the controller's chants table.
+    //
+    // Use %main::soul (package-qualified) instead of `our %soul = ...`
+    // because stryke's `our` is scoped per-EVAL in the agent's persistent
+    // VM (separate stryke bug; verified 2026-05-27). Package-qualified
+    // assignment persists across EVAL boundaries reliably.
+    let chant_id = handle
+        .chant("%main::soul = (chanted => 'yes'); 'ok'", &[])
+        .expect("chant register");
+
+    // Fork an agent. accept_loop will fire active chants at it on join.
+    let child = match unsafe { fork() }.expect("fork") {
+        ForkResult::Parent { child } => child,
+        ForkResult::Child => {
+            let code = stryke::agent::run_agent_with_explicit(&host, port, Some("late-joiner"));
+            std::process::exit(code);
+        }
+    };
+
+    assert!(
+        handle.welcome(1, Duration::from_secs(5)),
+        "late joiner must register"
+    );
+
+    // Give the accept_loop a moment to fire the chant — fire happens in
+    // the accept thread after agent insertion.
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Verify the chant landed on the new agent by reading %soul.
+    //
+    // Wire-protocol caveat: EVAL_RESULT frames don't carry petition_ids
+    // today (Tier 5 work). The chant's reply ("ok") sits in the agent's
+    // outbound socket buffer ahead of any subsequent gather. First do a
+    // discard scatter to drain the chant's queued reply, then a real
+    // scatter whose gather sees the discard's reply (== drained chant
+    // reply), then a third scatter+gather whose reply is the actual
+    // readback. The two-step drain pattern is what scripts have to do
+    // until petition_id demux lands.
+    let session_ids = handle.muster();
+    // Drain the chant's queued EVAL_RESULT first (chant fired on accept,
+    // its "ok" reply sits in the agent's outbound buffer).
+    let drain_pid = handle
+        .scatter("'drain'", &session_ids)
+        .expect("drain scatter");
+    let _ = handle
+        .gather(drain_pid, Duration::from_secs(5))
+        .expect("drain absorbs chant reply");
+
+    // Now do the real readback. After drain, the next gather reads the
+    // drain's "drain" reply, then the readback's reply is queued. Need
+    // one more round trip to flush.
+    let pid = handle
+        .scatter("to_json(%main::soul)", &session_ids)
+        .expect("readback scatter");
+    let _ = handle.gather(pid, Duration::from_secs(5)).expect("gather");
+
+    let pid2 = handle
+        .scatter("to_json(%main::soul)", &session_ids)
+        .expect("readback scatter 2");
+    let results2 = handle.gather(pid2, Duration::from_secs(5)).expect("gather 2");
+    let json_str = results2[&session_ids[0]].output.trim();
+    assert!(
+        json_str.contains("chanted") && json_str.contains("yes"),
+        "late joiner must have received the active chant; got {:?}",
+        json_str
+    );
+
+    // amen_chant stops the rescatter; future joiners won't get it.
+    assert!(handle.amen_chant(chant_id), "amen_chant removes from active");
+    assert!(!handle.amen_chant(chant_id), "second amen returns false");
+
+    dismiss(&handle, vec![child]);
+}
+
+/// Cloistered controller rejects agents that don't send AGENT_AUTH with
+/// a valid token. Pins the ACL — open mode (default) accepts; cloistered
+/// requires AUTH; bad token = rejection ACK.
+#[test]
+fn cloistered_controller_rejects_agents_without_valid_auth_token() {
+    use nix::sys::wait::waitpid;
+    use nix::unistd::{fork, ForkResult};
+
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    handle.set_cloistered(Some("secret-token"));
+    let listen_addr = handle.listen_addr();
+    let host = listen_addr.ip().to_string();
+    let port = listen_addr.port();
+
+    // Agent WITHOUT token — should be rejected by accept_loop.
+    let reject_child = match unsafe { fork() }.expect("fork") {
+        ForkResult::Parent { child } => child,
+        ForkResult::Child => {
+            // No STRYKE_AGENT_TOKEN env — agent skips the AUTH frame.
+            std::env::remove_var("STRYKE_AGENT_TOKEN");
+            let code = stryke::agent::run_agent_with_explicit(&host, port, Some("no-token"));
+            // Controller rejection causes run_agent_with_explicit to
+            // return non-zero. We exit with that to signal the test.
+            std::process::exit(code);
+        }
+    };
+
+    // Give the rejection a moment to land.
+    std::thread::sleep(Duration::from_millis(800));
+
+    let status = waitpid(reject_child, None).expect("waitpid reject child");
+    use nix::sys::wait::WaitStatus;
+    if let WaitStatus::Exited(_, code) = status {
+        assert_ne!(code, 0, "no-token agent must exit non-zero (was rejected)");
+    } else {
+        panic!("unexpected exit status: {:?}", status);
+    }
+    assert_eq!(
+        handle.agent_count(),
+        0,
+        "no agents in roster after rejection"
+    );
+
+    // Agent WITH correct token — should be accepted.
+    let accept_child = match unsafe { fork() }.expect("fork") {
+        ForkResult::Parent { child } => child,
+        ForkResult::Child => {
+            std::env::set_var("STRYKE_AGENT_TOKEN", "secret-token");
+            let code = stryke::agent::run_agent_with_explicit(&host, port, Some("with-token"));
+            std::process::exit(code);
+        }
+    };
+
+    assert!(
+        handle.welcome(1, Duration::from_secs(5)),
+        "authenticated agent must register"
+    );
+
+    dismiss(&handle, vec![accept_child]);
+}
+
+/// Cathedral registry: register, lookup, unregister, names — the in-process
+/// name → endpoint binding that `profess` resolves against.
+#[test]
+fn cathedral_register_lookup_unregister_round_trip() {
+    let prior = cathedral_register("test-cong", "127.0.0.1:12345");
+    // (prior may be Some if other tests left a binding — accept either)
+    let _ = prior;
+
+    let got = cathedral_lookup("test-cong").expect("registered");
+    assert_eq!(got, "127.0.0.1:12345");
+
+    let removed = cathedral_unregister("test-cong").expect("first removal");
+    assert_eq!(removed, "127.0.0.1:12345");
+
+    let after = cathedral_lookup("test-cong");
+    assert!(after.is_none(), "lookup after unregister returns None");
 }
 
 /// Smite wipes worker %soul without disconnecting the agent. Pins the

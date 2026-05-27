@@ -66,6 +66,10 @@ pub mod frame_kind {
     pub const EVAL: u8 = 0x19;
     /// Agent → controller: result of an EVAL frame (success output or error message).
     pub const EVAL_RESULT: u8 = 0x1A;
+    /// Agent → controller: optional auth token sent right after AGENT_HELLO.
+    /// Controllers in `:cloistered` mode reject any agent whose AUTH token
+    /// isn't in their accepted-token set. Payload: bincode-serialized AgentAuth.
+    pub const AGENT_AUTH: u8 = 0x1B;
     pub const ERROR: u8 = 0xFF;
 }
 
@@ -156,6 +160,14 @@ pub struct AgentHelloAck {
     pub session_id: u64,
     pub accepted: bool,
     pub message: String,
+}
+
+/// Optional AUTH token frame — sent by an agent right after AGENT_HELLO when
+/// the `STRYKE_AGENT_TOKEN` env var is set. Controllers in `:cloistered`
+/// mode require this; controllers in open mode ignore it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentAuth {
+    pub token: String,
 }
 
 /// Fire command — start stress test
@@ -517,6 +529,19 @@ fn run_agent_with_config(config: AgentConfig) -> i32 {
     if let Err(e) = write_frame(&mut stream, frame_kind::AGENT_HELLO, &hello_bytes) {
         eprintln!("stryke agent: failed to send hello: {}", e);
         return 1;
+    }
+
+    // If the controller is in :cloistered mode, it expects an AGENT_AUTH
+    // frame right after HELLO. We send one unconditionally when the
+    // STRYKE_AGENT_TOKEN env var is set; open-mode controllers ignore
+    // unexpected AUTH frames (they don't read one). Costs nothing if the
+    // controller is open, gates the connection if it's cloistered.
+    if let Ok(token) = std::env::var("STRYKE_AGENT_TOKEN") {
+        if !token.is_empty() {
+            let auth = AgentAuth { token };
+            let auth_bytes = bincode::serialize(&auth).expect("serialize auth");
+            let _ = write_frame(&mut stream, frame_kind::AGENT_AUTH, &auth_bytes);
+        }
     }
 
     // Wait for HELLO_ACK
