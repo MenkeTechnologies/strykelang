@@ -153,6 +153,235 @@ Stryke Master REPL
 
 This is the $$$ maker. Language is free, enterprise cluster tooling is paid.
 
+## Scriptable Master/Slave: IPC + Worker Pool + Distributed Registration
+
+**Status (2026-05-27):** Design in flight. Captures the religious-vocab proposal for a scriptable master/slave distributed-compute API layered on top of the existing controller/agent infrastructure.
+
+### The Gap
+
+The infrastructure already exists in `strykelang/controller.rs` (788 lines) + `strykelang/agent.rs` (938 lines):
+
+- TCP listener daemon (`controller.rs:498` `run_controller`)
+- Persistent outbound-connecting agents (`agent.rs:446` `run_agent`)
+- Bincode-framed wire protocol: `[u64 LE length][u8 kind][bincode payload]` (`agent.rs:30-46`)
+- Message types: `AgentHello`, `AgentHelloAck`, `EvalCommand`, `EvalResult`, `FireCommand`, `WorkloadType`, `AgentState` (`controller.rs:33-36`)
+- Stryke builtins exposed: `controller()` (`builtins.rs:13015`), `agent()` (`builtins.rs:13041`)
+
+**Blocker:** both builtins block in their daemon loops. Scripts can launch them but cannot programmatically scatter work, collect results, or coordinate from inside a `.stk` file:
+
+```stryke
+controller("0.0.0.0", 9999);   # blocks forever in REPL loop
+say "unreachable";              # dead code
+```
+
+The infrastructure is real. The REPL-only operation surface is the gap.
+
+### The Religious Vocab (Master/Slave Asymmetric Distributed Compute)
+
+A 26-verb vocabulary mapped onto the existing controller/agent transport. Master = singular orchestrator, slaves = subordinate worker processes that chant in parallel under the master's hymn.
+
+**Master-side verbs (19):**
+
+| Verb | Operand | Effect |
+|---|---|---|
+| `pray` | `@congregation` → divination | scatter petition (closure/code), return handle |
+| `chant` | `@congregation` → divination | continuous re-scatter; late joiners receive the hymn too |
+| `amen` | divination | end a chant cleanly |
+| `lick` | `$div` or `%souls` | quick non-destructive sample of soul-state |
+| `peruse` | `$div` or `%souls` | deep non-destructive walk of soul-state |
+| `annex` | `$div` → `%souls` | destructive transfer — workers' `%soul` becomes `()` after |
+| `harvest` | `@congregation` → `%souls` | `pray + annex` fused (one-shot scatter+gather) |
+| `smother` | `%souls` | secure-erase the master's local hash |
+| `smite` | `@congregation` | remote-destroy workers' `%soul` without harvesting |
+| `pilgrimage` | `@congregation` | sync barrier — all members rendezvous before continuing |
+| `resurrect` | enshrined path → PID | spawn new worker with pre-loaded `%soul` from snapshot |
+| `anoint` | N → `@congregation` | spawn N new slave processes, register their PIDs |
+| `excommunicate` | `@congregation` | kill workers, free their reply channels |
+| `bestow` | `%value, @cong` | master-side push — broadcast value to each worker's `%gift` hash |
+| `enshrine` | `%souls, $path` | persist annexed souls to disk for later resurrection |
+| `exhume` | `$path` → `%souls` | read enshrined souls back without resurrecting |
+| `ordain` | `"name"` → handle | create named congregation, bind discovery channel |
+| `muster` | `$cong` → `@pids` | enumerate current congregation members |
+| `welcome` | `$cong, callback` | fire callback per join/leave event |
+
+**Slave-side verbs (6):**
+
+| Verb | Operand | Effect |
+|---|---|---|
+| `bow` | (none) | enter the obedient receive-loop, await petitions |
+| `divine` | `$petition` → answer | per-worker compute step inside the bow loop |
+| `profess` | `"name"` | join named congregation, advertise own PID |
+| `apostatize` | `"name"` | voluntary departure from congregation |
+| `martyr` | (none) | voluntary `enshrine` + exit on signal — last-rites snapshot |
+| `recant` | `%soul_subset` | partial self-erasure of own `%soul` |
+
+**Noun:** `congregation` — the typed roster handle (PID array under the hood).
+
+**Bless is reserved** — `bless` is Perl 5 core (`parser.rs:13862`'s `is_perl5_core` list) and unavailable. `bestow` is the master→workers push verb instead.
+
+### IPC and Process Worker Pool
+
+**Architectural model: master/slave asymmetric, slave execution parallel.**
+
+```
+              Master holds the hymn (petition/closure)
+                          │
+                          │  pray @congregation   (parallel scatter)
+            ┌─────────────┼─────────────┐
+            ▼             ▼             ▼
+        Slave 1       Slave 2  ...  Slave N
+        (divine)      (divine)      (divine)
+        ─ parallel ─ parallel ─ parallel ─
+            │             │             │
+            └─────────────┼─────────────┘
+                          │  replies (parallel gather)
+                          ▼
+                Master annexes %souls
+```
+
+**Transport: TCP + bincode (already exists, no SHM, no UDS, no /tmp sockets).** Uniform across single-box (loopback) and cluster (LAN). Same code path. The `teleport.rs` SHM/UDS subsystem is its own thing, not used here.
+
+**Parallel execution requirements:**
+
+| Phase | Current state | What "in parallel" requires |
+|---|---|---|
+| Scatter (master → slaves) | sequential `for pid in pids` loop pattern in TCP send code | Rayon `par_iter` over slave list — 10μs/send × 10k slaves drops from 100ms serial to ~1ms parallel on 8 cores |
+| Slave execution (divine) | each agent already its own OS process | Already parallel — process-per-slave gives SPMD parallelism free |
+| Gather (slaves → master) | single recv loop on controller | Multi-reader thread pool on master's reply channel, demuxed by petition-id |
+| Reduce (merging into `%souls`) | sequential | Per-key merge via Rayon when reducer is associative + commutative |
+
+**New wire-frame message types to add to the existing `[u64 LE length][u8 kind][bincode payload]` protocol:**
+
+```
+PRAY            — master scatters a petition (closure + petition_id) to a slave
+DIVINE_REPLY    — slave returns answer (petition_id + StrykeValue) 
+LICK_REQUEST    — master requests non-destructive %soul snapshot
+PERUSE_REQUEST  — master requests deep %soul read
+ANNEX_REQUEST   — master demands destructive transfer (slave clears own %soul)
+SMOTHER_NOTIFY  — master tells slave "I have securely erased my copy of your soul"
+SMITE           — master orders slave to zero own %soul without transfer
+AMEN            — master signals end of a chant; slave stops handling its frames
+CHANT_REGISTER  — slave subscribes to a continuous chant
+PILGRIMAGE_*    — barrier coordination frames (ARRIVE, RELEASE)
+PROFESS_OK/NO   — join verdict reply (for :cloistered mode)
+```
+
+**Process worker pool semantics:**
+
+- Slaves are **persistent processes** that profess once and serve many petitions over the lifetime of the congregation
+- One PID == one slave; no fork-per-petition tax
+- Slaves can hold long-lived state in `%soul` (the convention for harvest-target state) and `%gift` (the convention for master-broadcast state via `bestow`)
+- Slave crash leaves master + other slaves intact (fault isolation — true IPC, not threads)
+
+**Hard ceiling (verified on Darwin 25.5.0):** `sysctl kern.maxprocperuid = 10666` is the absolute cap on slaves per UID. Linux: typically `pid_max = 4194304`. Practical comfort band ~1k–10k slaves per master.
+
+### Distributed Computing / Registration
+
+**Scope: cluster (LAN, datacenter), not public-internet-with-NAT.** Trust model = private network. ICE/STUN/TURN already in repo (`strykelang/nat_punch.rs`, `turn_client.rs`, `udp_sockets.rs`) reserved for a v2 internet-scale transport plugin.
+
+**Discovery mechanism: `cathedral` (registry daemon).** Small TCP service that holds the directory of named congregations.
+
+```
+cathedral (daemon)
+  • listens on TCP (default 127.0.0.1:5550 single-box; configurable for cluster)
+  • holds (congregation_name → master_endpoint, ordainer_pid,
+           :cloistered flag, members[])
+  • masters POST registration at ordain
+  • slaves GET endpoint at profess
+  • NOT in the data path — once a slave has the master endpoint,
+    prayers go direct master ↔ slave
+```
+
+**Single-box vs cluster collapses to one design:**
+
+```stryke
+# Single-box (cathedral auto-starts on 127.0.0.1:5550):
+my $cong = ordain "renderfarm";
+profess "renderfarm";
+
+# Cluster (one node runs cathedral, others point at it via env var):
+$ STRYKE_CATHEDRAL=node1.cluster.local:5550 stryke master.stk
+$ STRYKE_CATHEDRAL=node1.cluster.local:5550 stryke slave.stk    # on node2, 3, ...
+```
+
+Same script. Different env var. Application has zero awareness of single-box vs cluster.
+
+**Membership ACL on `ordain`:**
+
+| Mode | Flag | Who may profess | Use case |
+|---|---|---|---|
+| Open | `ordain "name"` (default) | any reachable slave that knows the name | dev, trusted LAN, MapReduce |
+| Cloistered | `ordain "name", :cloistered` | only PIDs the master previously `anoint`ed | secure compute, audit pools |
+| Custom | `welcome $cong { |pid| ... }` | predicate returns accept/reject per join attempt | per-PID policy, blocklists |
+
+**Cathedral lifecycle:**
+
+| Mode | Behavior |
+|---|---|
+| Single-box dev | First `ordain`/`profess` call auto-spawns cathedral on 127.0.0.1:5550 if not already running. Exits when no congregations remain. |
+| Cluster | Cathedral runs as a long-lived daemon (systemd, k8s deployment). All masters/slaves point at it via `STRYKE_CATHEDRAL`. |
+| Multi-cathedral | Federated v2 — cathedrals could gossip rosters. Not in v1. |
+
+### Scriptable API
+
+The 26 verbs are stryke builtins. Each is a thin layer over a refactored `Controller::*` or `Agent::*` method API.
+
+**Refactor required in `controller.rs`:**
+
+| Today | What needs to exist |
+|---|---|
+| `pub fn run_controller(bind, port) -> i32` blocks in REPL (`controller.rs:498`) | `Controller::spawn(bind, port) -> ControllerHandle` — returns immediately, listener thread runs in background |
+| Operations driven only by REPL command parsing | Method API: `scatter(code, &[agent_id]) -> DivinationId`, `gather(div, timeout) -> HashMap<agent_id, StrykeValue>`, `terminate(&[agent_id])`, `shutdown()` |
+| `EvalCommand` / `EvalResult` only fired by REPL | Wired through `Controller::scatter`/`gather` so script-callable builtins use them |
+| `builtin_controller` blocks (`builtins.rs:13026`) | Replace with non-blocking handle-returning variants for each verb |
+
+**End-to-end scriptable example:**
+
+```stryke
+# Master script:
+my $cong = ordain "renderfarm", :bind => "0.0.0.0:9999";
+welcome $cong, 4;                                              # wait for 4 slaves
+my $div = pray { render_frame($_) }, @{ muster $cong };        # scatter
+my %frames = annex $div;                                        # block-and-gather
+say "rendered ${scalar keys %frames} frames";
+smother %frames;                                                # secure-erase
+excommunicate $cong;                                            # clean shutdown
+
+# Slave script (run on each compute node):
+profess "renderfarm";
+bow {                                                           # enter receive loop
+    divine { |petition|                                         # handler closure
+        return render_frame_locally($petition);
+    };
+};
+```
+
+**Tier 0 — minimum viable first slice (proves the architecture works):**
+
+1. Refactor `controller.rs:498` into `Controller::spawn` + method API (non-blocking)
+2. Keep existing REPL alive as a separate binary mode (`stryke controller --repl`) — don't break what works
+3. Add 4 builtins: `ordain`, `muster`, `pray`, `annex` — minimum end-to-end scriptable scatter-gather
+4. One example script: `examples/distributed_render.stk`
+5. One pin test: `tests/suite/scriptable_controller_pin.rs`
+
+Everything else (chant, lick, peruse, smother, smite, harvest, pilgrimage, resurrect, plus the 18 other verbs) becomes incremental adds on top of Tier 0.
+
+### Open Design Questions
+
+1. **Cathedral deployment** — separate daemon binary (`stryked` ships with stryke, users run it explicitly in cluster mode) OR embedded in the master process (first `ordain` auto-forks cathedral if none reachable)? Hybrid: embedded for single-box, separate for cluster.
+2. **Default ACL** — bare `ordain "name"` opens to any reachable slave (ergonomic for dev) OR requires explicit anointment (safer)?
+3. **Reducer registry** — closure-only or built-in symbols (`:sum`, `:union`, `:consensus`, `:first`, `:all`)?
+4. **`%soul` convention** — hardcoded variable name slaves must use, OR configurable per-congregation?
+5. **Annex ownership semantics** — destructive (move, slave's `%soul = ()` after) OR copy (both sides keep)? Destructive matches the territorial-conquest meaning of "annex" and earns `lick`/`peruse` slots as the non-destructive alternatives.
+
+### Project-Bar Check
+
+**World's first leg:** A scriptable, in-language, single-keyword scatter-gather + distributed state harvest + secure-erase API for cooperating cluster processes does not exist as a language primitive anywhere. MPI is a C library requiring `mpirun`; Erlang has process groups but no destructive-harvest or peek/commit pair; Spark/Hadoop require cluster bootstrap and JVM; nothing in shell-language space comes close. The full vocab (especially the `lick`/`annex`/`smother` triple and the `chant`/`amen` continuous-rescatter pair) is genuinely empty territory.
+
+**World's fastest leg:** TCP + bincode is fast enough for cluster scope. Parallel fanout (Rayon par_iter on the scatter) gets 100x over the existing serial controller `for pid in pids` pattern. SHM fast-path for same-host slaves can be added as v2 optimization.
+
+**Both legs clear.** Each verb earns its slot on either world-first novelty (most of them) or paired ergonomic with a world-first verb (`amen` pairs with `chant`, `exhume` pairs with `enshrine`).
+
 ## What's Left to Examine?
 
 Languages not yet fully mined for ideas:
