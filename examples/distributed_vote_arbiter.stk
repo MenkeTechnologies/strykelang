@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+#
+# Distributed vote arbiter — each worker independently classifies
+# the same input via a simple rule, master tallies votes and picks
+# the majority-class outcome. Models a consensus-via-quorum pattern:
+# workers act as independent classifiers, master arbitrates by
+# plurality.
+#
+# Real-world shape: ML ensemble (each worker is a model), distributed
+# fraud detection (each worker checks a rule), service-health quorum
+# (each agent reports up/down, master picks majority).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed vote arbiter ──"
+
+my @workers = congregation(5)
+printf "spawned %d workers (5-way quorum)\n", len(@workers)
+
+# The input each worker classifies. Pretend it's a temperature reading;
+# workers vote on (cold/warm/hot) using slightly different thresholds
+# to simulate independent classifiers.
+my $reading = 72
+
+# Each worker has its own thresholds (encoded via session_id parity
+# below). The vote is the worker's classification.
+my $code = "
+my \$reading = $reading;
+my \$cold_thr = 60 + (\$\$ % 5);
+my \$hot_thr  = 80 + (\$\$ % 5);
+if    (\$reading < \$cold_thr) { 'cold' }
+elsif (\$reading > \$hot_thr)  { 'hot'  }
+else                           { 'warm' }
+"
+
+my %votes = harvest $code, @workers, 5_000
+
+p "── per-worker votes ──"
+my %tally
+for my $sid (sort { _ <=> _1 } keys %votes) {
+    my $vote = $votes{$sid}
+    printf "  worker %d: %s\n", $sid, $vote
+    $tally{$vote} = ($tally{$vote} // 0) + 1
+}
+
+p "── tally ──"
+for my $class (sort keys %tally) {
+    printf "  %-5s  %d vote(s)\n", $class, $tally{$class}
+}
+
+# Pick the plurality winner.
+my @ranked = sort { $tally{_1} <=> $tally{_} || _ cmp _1 } keys %tally
+my $winner = $ranked[0]
+printf "── consensus (plurality): %s ──\n", $winner
+
+# Check for a clear majority (>50%) — quorum standard.
+my $n = len(keys %votes)
+my $winning_count = $tally{$winner}
+my $majority = $winning_count * 2 > $n
+printf "winning count: %d / %d  (majority: %s)\n",
+    $winning_count, $n, $majority ? "YES" : "no — only plurality"
+
+excommunicate(@workers)
+p "done"
