@@ -210,14 +210,38 @@ This is the $$$ maker. Language is free, enterprise cluster tooling is paid.
 | Agent-side `divine` handler integration | Splits the agent's EVAL frame handler to consult a registered closure first. Currently `divine($handler)` only stores the closure — agent doesn't dispatch through it |
 | Agent-side `recant` integration | `recant(@keys)` returns the intended delete count; actual `delete $main::soul{$key}` happens in caller's stryke wrapper. Tier 5 wires a Rust interpreter handle so recant mutates atomically |
 
-### Stryke language bugs found + fixed during this work (2026-05-27)
+### Stryke language + congregation bugs found + fixed during this work (2026-05-27)
 
-Two underlying VM bugs were discovered and fixed in `scope.rs` + `vm.rs` rather than papered over with workarounds. Both had been blocking the natural `\%soul` / `our %soul` patterns that the religious-vocab API was supposed to expose:
+Five underlying bugs discovered and fixed at root rather than papered over:
 
 1. **`\%hash` on `our` hashes derefed to empty.** `promote_hash_to_shared` / `promote_array_to_shared` compared the raw incoming `name` against `frame.hashes` / `frame.arrays` keys, but the entries are canonically stored without the `main::` prefix. A call like `promote_hash_to_shared("main::h")` failed to find the actual `"h"` entry and returned an empty `Arc`. Fix: strip `main::` at entry to both functions (matches the canonicalization done in every other scope path).
 2. **`our %hash` didn't persist across EVAL boundaries.** `declare_hash` stored into the innermost lexical frame regardless of whether the name was package-qualified, so an `our %soul = (...)` in EVAL 1 was destroyed when the script's lexical frame popped — EVAL 2's `our %soul` saw nothing. Additionally, `Op::DeclareHash` clobbered with empty when handling the no-initializer form (`our %h;`), wiping any data set by a prior EVAL. Fix: route package-qualified declarations to frame[0]; treat the no-initializer DeclareHash form as a declare-only op that preserves existing data. Same root cause in `declare_array_frozen` (post-canon check on `name.contains("::")` was always false for `main::`-prefixed names) — fixed in parallel.
+3. **`bestow`/`enshrine` rejected hashref arguments.** The `as_hash_map()` helper at `value.rs:1446` only matches `HeapObject::Hash` — bare hash values, NOT hashref-wrapped hashes. So `bestow(\%h, @workers)` and `enshrine(\%h, $path)` errored with "first argument must be a hash" even though `\%h` is the natural Perl idiom. Fix: both builtins now try `as_hash_map()` first then fall back to `as_hash_ref().map(|r| r.read().clone())`.
+4. **`lick`/`peruse`/`interrogate`/`exhume` returned bare hash VALUES for nested objects.** `json_value_to_stryke` (and `builtin_exhume`) returned `StrykeValue::hash(map)` — when stored in an outer hash (lick/peruse/interrogate-agents do per-session-id), `$h{$sid}` was bare hash → `ref()` returned "" and `$h{$sid}->{k}` didn't work; stringification gave flat concatenation. Fix: return `hash_ref` / `array_ref` so nested complex values are first-class refs the caller can subscript. Same pattern that interrogate(PID) already used.
+5. **`congregation(N>~50)` lost 1-3 children to a fork-stdio race.** The background `accept_loop` thread runs `eprintln!("[agent connected] ...")` on every successful HELLO. With 100+ tight `fork()` calls in `builtin_congregation`, sometimes the main thread forked while accept_loop held `std::io::stderr`'s RefCell — child inherits a borrowed RefCell, panics on first stdio call. Fix: new `Controller.quiet_accept: AtomicBool` toggled by `congregation`/`anoint` during bulk fork (silences the per-agent eprintln); restored after `welcome()` returns. Also: scale the welcome timeout with N: `2 + (N/10).max(1)` seconds (was hardcoded 5s). Tested clean at 100 + 250 workers.
 
-Tests pin both fixes (`hash_ref_on_our_hash_derefs_to_populated_data`, `array_ref_on_our_array_derefs_to_populated_data`, `our_hash_persists_across_evals_on_same_vmhelper`). `lick`/`peruse`/`interrogate` now use the natural `to_json(\%soul)` ref form instead of the prior `to_json(%soul)` flat-list workaround.
+Tests pin every fix (`hash_ref_on_our_hash_derefs_to_populated_data`, `array_ref_on_our_array_derefs_to_populated_data`, `our_hash_persists_across_evals_on_same_vmhelper`, plus 13 demos that exercise the harvest/lick/bestow/exhume/scale paths end-to-end). `lick`/`peruse`/`interrogate`/`exhume` now use the natural `to_json(\%soul)` ref form and return ref-typed values; `bestow`/`enshrine` accept both `%h` and `\%h` shapes.
+
+### Demo corpus (2026-05-27)
+
+13 demos in `examples/` covering every facet of the API. All CI-safe (loopback fork only, no network), all clean under `--no-interop`, all pass `examples_strict_lint` + `examples_compile_lint` + `demos_no_interop` suites:
+
+* `distributed_congregation.stk` — Tier 0 minimum-viable scatter-gather (the example referenced in the original commit b550805c3d)
+* `congregation_100x_scale.stk` — large-fleet stress (100/250/500 workers)
+* `distributed_prime_sieve.stk` — real CPU work, per-worker shard, verify π(10000)=1229
+* `distributed_wordcount.stk` — MapReduce shape (every worker counts, master verifies agreement)
+* `distributed_log_aggregation.stk` — telemetry (workers return JSON counts, master fleet-sums)
+* `harvest_oneshot.stk` — ergonomic shape (`harvest` = `pray + annex` fused)
+* `bestow_then_lick.stk` — push config + read state back
+* `pilgrimage_barrier.stk` — 3-stage BSP barrier
+* `chant_late_joiners.stk` — chant/amen lifecycle
+* `smite_state_reset.stk` — reset `%soul` without disconnecting
+* `enshrine_exhume_roundtrip.stk` — persist hash to disk as JSON, exhume back
+* `cloistered_acl_demo.stk` — `:cloistered` + cathedral inspection + apostatize
+* `interrogate_pids.stk` — polymorphic OS-PID vs agent-handles dispatch
+* `multi_congregation.stk` — `anoint` spawns secondary alongside primary
+
+Test verification: `cargo test --test integration -- suite::demos_no_interop suite::examples_strict_lint suite::examples_compile_lint suite::scriptable_controller_pin --test-threads=2` → 156 passed, 0 failed.
 
 ### The Gap
 
