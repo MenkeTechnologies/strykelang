@@ -61,6 +61,14 @@ pub struct Controller {
     /// `set_cloistered(token)` and checked in accept_loop against the
     /// incoming AGENT_AUTH frame's token field.
     auth_tokens: Arc<Mutex<std::collections::HashSet<String>>>,
+    /// When true, accept_loop suppresses the per-agent "[agent connected]"
+    /// eprintln. Used during bulk-spawn (large `congregation(N)` /
+    /// `anoint(N)`) where the main thread is in a tight fork loop and a
+    /// concurrent eprintln from this background thread can leave the
+    /// child with a borrowed `std::io::stderr` RefCell — guaranteed
+    /// panic on the child's first stdio call. Toggled via
+    /// [`ControllerHandle::set_quiet_accept`].
+    quiet_accept: AtomicBool,
 }
 
 impl Default for Controller {
@@ -78,6 +86,7 @@ impl Controller {
             chants: Arc::new(Mutex::new(HashMap::new())),
             cloistered: AtomicBool::new(false),
             auth_tokens: Arc::new(Mutex::new(std::collections::HashSet::new())),
+            quiet_accept: AtomicBool::new(false),
         }
     }
 
@@ -193,10 +202,12 @@ impl Controller {
                         continue;
                     }
 
-                    eprintln!(
-                        "[agent connected] {} (cores={}, session={})",
-                        name, hello.cores, session_id
-                    );
+                    if !self.quiet_accept.load(Ordering::Relaxed) {
+                        eprintln!(
+                            "[agent connected] {} (cores={}, session={})",
+                            name, hello.cores, session_id
+                        );
+                    }
 
                     let agent = ConnectedAgent {
                         stream,
@@ -862,6 +873,17 @@ impl ControllerHandle {
             .unwrap()
             .remove(&chant_id)
             .is_some()
+    }
+
+    /// Silence the accept_loop's per-agent "[agent connected]" eprintln.
+    /// Set to true before a bulk-spawn loop (`congregation(N)` / `anoint(N)`)
+    /// to prevent the fork-thread/stdio RefCell race that loses 1-3
+    /// children at N>~50 on macOS Rust stdio. Set back to false after
+    /// the spawn loop completes if you want the REPL UX back.
+    pub fn set_quiet_accept(&self, quiet: bool) {
+        self.controller
+            .quiet_accept
+            .store(quiet, Ordering::Relaxed);
     }
 
     /// Turn :cloistered mode on (with a single accepted token) or off

@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+#
+# Distributed prime sieve — each worker is assigned a range and reports
+# the count of primes it found. Master sums the counts. Shows REAL CPU
+# work being scattered (vs the toy 2+3 in the original demo).
+#
+# Usage:
+#   stryke examples/distributed_prime_sieve.stk          # smoke: 4 workers, 0..10000
+#   stryke examples/distributed_prime_sieve.stk 8 100000 # 8 workers, 0..100000
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+my $n_workers = $ARGV[0] // 4
+my $upper = $ARGV[1] // 10_000
+
+printf "── distributed prime sieve: N=%d workers, range 0..%d ──\n", $n_workers, $upper
+
+my @workers = congregation($n_workers)
+printf "spawned %d workers\n", len(@workers)
+
+# Shard the range across workers. Each worker gets [start, end) chunk.
+my $chunk = int(($upper + $n_workers - 1) / $n_workers)
+my %shards
+my @sorted_workers = sort { _ <=> _1 } @workers
+for my $i (0:len(@sorted_workers) - 1) {
+    my $start = $i * $chunk
+    my $end = $start + $chunk
+    $end = $upper if $end > $upper
+    $shards{$sorted_workers[$i]} = "${start},${end}"
+}
+
+# Bestow per-worker shard ranges (we use %gift to receive on slave side).
+# Actually bestow's same-hash-to-all model doesn't fit per-worker shards;
+# use per-worker prays instead.
+my %counts
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my ($start, $end) = split /,/, $shards{$w}
+    # Trial-division prime check inside the worker.
+    my $code = "
+        my \$start = $start;
+        my \$end = $end;
+        my \$count = 0;
+        for my \$n (\$start:\$end - 1) {
+            next if \$n < 2;
+            my \$is_prime = 1;
+            my \$lim = int(sqrt(\$n));
+            for my \$d (2:\$lim) {
+                if (\$n % \$d == 0) { \$is_prime = 0; last }
+            }
+            \$count++ if \$is_prime;
+        }
+        \$count
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    $counts{$w} = $reply{$w}
+}
+
+p "── per-worker prime counts ──"
+my $total = 0
+for my $sid (sort { _ <=> _1 } keys %counts) {
+    my ($start, $end) = split /,/, $shards{$sid}
+    printf "  worker %d  [%d..%d)  %s primes\n", $sid, $start, $end, $counts{$sid}
+    $total += $counts{$sid}
+}
+printf "── total primes in 0..%d: %d ──\n", $upper, $total
+
+# Sanity: 1229 primes below 10000.
+if ($upper == 10_000) {
+    p $total == 1229 ? "✓ matches known π(10000)=1229" : "✗ expected 1229, got $total"
+}
+
+excommunicate(@workers)
+p "done"
