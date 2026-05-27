@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+#
+# Distributed task queue — master holds a queue of N small jobs, fans
+# them out to M workers via per-worker prays in a round-robin loop.
+# Each worker processes its assigned job, returns the result. This
+# is a pull-shape master/worker pattern (vs harvest's broadcast-shape).
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed task queue ──"
+
+# 12 jobs, 4 workers — each worker gets 3 jobs (round-robin).
+my @jobs
+for my $i (1:12) {
+    push @jobs, $i
+}
+my $n_workers = 4
+my @workers = congregation($n_workers)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+printf "jobs: %d  ·  workers: %d  ·  per worker: %d\n",
+    len(@jobs), $n_workers, len(@jobs) / $n_workers
+
+# Round-robin assign: job i goes to worker (i % n_workers).
+my %assigned   # worker → list of job indices
+for my $i (0:len(@jobs) - 1) {
+    my $w = $sorted_workers[$i % $n_workers]
+    if (exists $assigned{$w}) {
+        push @{$assigned{$w}}, $i
+    } else {
+        $assigned{$w} = [$i]
+    }
+}
+
+# Each worker processes its job slice — for the demo, "process"
+# means compute job_value * job_value + worker_pid_mod (to show
+# the worker actually ran the code).
+my %results
+for my $w (@sorted_workers) {
+    my @worker_jobs
+    for my $i (@{$assigned{$w}}) {
+        push @worker_jobs, $jobs[$i]
+    }
+    my $job_json = to_json(\@worker_jobs)
+    my $code = "
+        my \$arr = from_json(q{$job_json});
+        my \@out;
+        for my \$j (\@\$arr) {
+            push \@out, \$j * \$j;
+        }
+        to_json(\\\@out)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    $results{$w} = from_json($reply{$w})
+}
+
+p "── per-worker results ──"
+my $total = 0
+for my $w (@sorted_workers) {
+    my @r = @{$results{$w}}
+    printf "  worker %d: %s\n", $w, join(",", @r)
+    for my $v (@r) { $total += $v }
+}
+
+# Sanity: sum of i*i for i=1..12 = 12*13*25/6 = 650.
+printf "fleet sum: %d (expected 650 = sum of i² for i=1..12)\n", $total
+p $total == 650 ? "✓ task queue produced correct fleet sum" : "✗ sum off"
+
+excommunicate(@workers)
+p "done"

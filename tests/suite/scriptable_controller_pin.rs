@@ -1329,3 +1329,109 @@ fn shutdown_is_idempotent() {
     // Third for good measure.
     handle.shutdown();
 }
+
+// ─── Round-5 pins ─────────────────────────────────────────────────────────
+
+/// `listen_addr` reports the actual bound address — when bind_port=0,
+/// the OS assigns a port; listen_addr returns the assigned port, not
+/// zero. Pin the discoverability property.
+#[test]
+fn listen_addr_returns_actually_bound_address_after_port_zero() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    let addr = handle.listen_addr();
+    assert_eq!(
+        addr.ip().to_string(),
+        "127.0.0.1",
+        "bound to requested ip"
+    );
+    assert!(
+        addr.port() > 0,
+        "OS-assigned port must be non-zero, got {}",
+        addr.port()
+    );
+    handle.shutdown();
+}
+
+/// Fresh controller has zero agents and an empty roster. Pin the
+/// initial state of `agent_count` and `muster`.
+#[test]
+fn fresh_controller_has_zero_agents_and_empty_roster() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    assert_eq!(handle.agent_count(), 0, "fresh controller has 0 agents");
+    let m = handle.muster();
+    assert!(m.is_empty(), "fresh controller has empty roster, got {:?}", m);
+    handle.shutdown();
+}
+
+/// `excommunicate(&[])` (empty list) is a no-op that returns 0.
+/// Pin the empty-input edge case.
+#[test]
+fn excommunicate_empty_list_returns_zero() {
+    let handle = spawn_controller("127.0.0.1", 0).expect("spawn");
+    let count = handle.excommunicate(&[]);
+    assert_eq!(count, 0);
+    handle.shutdown();
+}
+
+/// `cathedral_register` with an existing name overwrites — last call
+/// wins. Pin the upsert semantic.
+#[test]
+fn cathedral_register_overwrites_existing_name() {
+    use stryke::controller::{cathedral_lookup, cathedral_register, cathedral_unregister};
+
+    let _ = cathedral_unregister("overwrite_test");
+    let first = cathedral_register("overwrite_test", "127.0.0.1:11111");
+    assert!(first.is_none(), "first register has no prior binding");
+
+    let second = cathedral_register("overwrite_test", "127.0.0.1:22222");
+    assert_eq!(
+        second,
+        Some("127.0.0.1:11111".into()),
+        "second register returns prior binding"
+    );
+
+    assert_eq!(
+        cathedral_lookup("overwrite_test"),
+        Some("127.0.0.1:22222".into()),
+        "lookup returns the most-recent binding"
+    );
+
+    cathedral_unregister("overwrite_test");
+}
+
+/// `register_chant` returns strictly-increasing unique chant_ids on
+/// every call. Pin the global atomic.
+#[test]
+fn register_chant_returns_unique_increasing_ids() {
+    use stryke::controller::register_chant;
+
+    let id1 = register_chant(100, 1);
+    let id2 = register_chant(100, 2);
+    let id3 = register_chant(100, 3);
+    assert!(id1 < id2 && id2 < id3, "chant ids strictly increasing");
+    assert_ne!(id1, id2, "chant ids distinct");
+}
+
+/// Newly-spawned controller's `register_controller` returns
+/// monotonically-increasing handle ids. Pin the controller-registry
+/// atomic.
+#[test]
+fn register_controller_returns_unique_increasing_ids() {
+    use stryke::controller::{register_controller, spawn_controller};
+    use std::sync::Arc;
+
+    let h1 = spawn_controller("127.0.0.1", 0).expect("h1");
+    let h2 = spawn_controller("127.0.0.1", 0).expect("h2");
+    let h3 = spawn_controller("127.0.0.1", 0).expect("h3");
+
+    let id1 = register_controller(Arc::clone(&h1));
+    let id2 = register_controller(Arc::clone(&h2));
+    let id3 = register_controller(Arc::clone(&h3));
+
+    assert!(id1 < id2 && id2 < id3, "controller ids strictly increasing");
+    assert_ne!(id1, id2, "controller ids distinct");
+
+    h1.shutdown();
+    h2.shutdown();
+    h3.shutdown();
+}

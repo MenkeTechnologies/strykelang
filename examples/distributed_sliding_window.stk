@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+#
+# Distributed sliding-window aggregation — workers each compute the
+# rolling sum (window size W) over their shard. Master concatenates
+# per-shard rolling sums into a global rolling sum, handling shard
+# boundaries by overlap.
+#
+# Real shape: each worker handles a contiguous slice of a long time
+# series, returns rolling window aggregates; master assembles full
+# output.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed sliding window (rolling sum) ──"
+
+my $window = 5
+my @series
+for my $i (0:39) { push @series, ($i % 7) + 1 }
+my $n = len(@series)
+printf "series: %d values  ·  window: %d\n", $n, $window
+
+my @workers = congregation(4)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard with overlap (window-1) at the right edge so per-worker
+# rolling computations don't lose boundary windows.
+my $base_per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+my @rollups
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $base_per
+    my $end = ($i + 1) * $base_per - 1 + ($window - 1)
+    $end = $n - 1 if $end >= $n
+    next if $start >= $n
+    my @shard
+    for my $r ($start:$end) { push @shard, $series[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$arr = from_json(q{$shard_json});
+        my \$w = $window;
+        my \@out;
+        my \$lim = len(\@\$arr) - \$w;
+        for my \$i (0:\$lim) {
+            my \$s = 0;
+            for my \$j (0:\$w - 1) { \$s += \$arr->[\$i + \$j] }
+            push \@out, \$s;
+        }
+        to_json(\\\@out)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    push @rollups, [$start, from_json($reply{$w})]
+}
+
+# Concatenate per-shard rolling sums by base position.
+my @merged
+for my $r (@rollups) {
+    my ($base, $rolls) = @$r
+    for my $j (0:len(@$rolls) - 1) {
+        $merged[$base + $j] = $rolls->[$j]
+    }
+}
+
+# Local rolling sum for verification.
+my @local
+for my $i (0:$n - $window) {
+    my $s = 0
+    for my $j (0:$window - 1) { $s += $series[$i + $j] }
+    push @local, $s
+}
+
+p "── distributed rolling sums ──"
+my $expected_len = $n - $window + 1
+printf "expected length: %d  ·  got distributed: %d  ·  local: %d\n",
+    $expected_len, len(@merged), len(@local)
+
+# Print first 8 values side-by-side.
+p "── first 8 windows (distributed vs local) ──"
+for my $i (0:7) {
+    next if $i >= len(@local)
+    printf "  win %2d: distributed=%s  local=%d  %s\n",
+        $i, ($merged[$i] // "?"), $local[$i],
+        (defined $merged[$i] && $merged[$i] == $local[$i]) ? "✓" : "✗"
+}
+
+excommunicate(@workers)
+p "done"
