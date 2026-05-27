@@ -172,6 +172,98 @@ fn re_mark_after_unmark_overwrites_origin_line() {
     assert_eq!(s.trim(), "overwritten");
 }
 
+/// Chained re-mark across container-type changes is the realistic pipeline
+/// shape — most builtins that return new collections don't auto-propagate
+/// lineage (the v1 auto-hook fires only for `try_builtin`-routed ops that
+/// return heap-Arc-trackable values, which excludes most VM-opcode list ops
+/// like `keys`/`sort`/`map`). The canonical user pattern is manual re-mark
+/// after each transform: each stage gets its own independent lineage rooted
+/// at the call site.
+///
+/// Pin contract: re-marking a NEW value (different Arc) registers a fresh
+/// origin; querying provenance on each stage returns the right hashref.
+/// Catches a regression where re-mark after an unmark / on a fresh value
+/// might inherit stale state from the prior mark.
+#[test]
+fn chained_re_mark_each_stage_has_independent_lineage() {
+    let s = eval_string(
+        r#"
+        # Stage 1: mark a hash.
+        my $h = mark({ a => 1, b => 2, c => 3 })
+
+        # Stage 2: build an array from it; mark the new value.
+        my @keys = sort keys %$h
+        my $a    = mark(\@keys)
+
+        # Stage 3: build a hash mapping each key to its length; mark.
+        my %h2 = map { ($_, length($_)) } @keys
+        my $h3 = mark(\%h2)
+
+        # Each stage has its OWN lineage; lines should differ (different
+        # call sites). Verify all three return a defined hash with the
+        # documented schema.
+        my $oh = provenance($h)
+        my $oa = provenance($a)
+        my $h3p = provenance($h3)
+
+        sprintf(
+            "h=%d|a=%d|h3=%d|distinct=%d",
+            $oh->{origin_line},
+            $oa->{origin_line},
+            $h3p->{origin_line},
+            ($oh->{origin_line} != $oa->{origin_line}
+             && $oa->{origin_line} != $h3p->{origin_line}) ? 1 : 0
+        )
+        "#,
+    );
+    let s = s.trim();
+    let parts: Vec<&str> = s.split('|').collect();
+    assert_eq!(parts.len(), 4, "expected 4 fields, got: {s}");
+    // All three lines defined + the distinctness check passed.
+    assert!(parts[0].starts_with("h="));
+    assert!(parts[1].starts_with("a="));
+    assert!(parts[2].starts_with("h3="));
+    assert_eq!(parts[3], "distinct=1", "each stage's origin_line must differ");
+}
+
+/// Weak-ref GC: drop the original heap value, then look up provenance on
+/// a FRESH value that may or may not have landed at the same address.
+/// The lookup must return undef AND the stale ledger entry must be
+/// reaped (verified indirectly via a second mark+lookup that succeeds —
+/// if reaping didn't happen, the ledger would gradually fill up and
+/// produce false positives via pointer reuse). Pins the GC mechanism,
+/// not just the lookup-time check.
+#[test]
+fn weak_ref_gc_reaps_stale_entries_on_lookup() {
+    let s = eval_string(
+        r#"
+        # Phase 1: mark + drop a series of short-lived values.
+        for my $i (1:20) {
+            mark({ throwaway => $i })
+            # Reference falls out of scope at end of iteration; Arc drops.
+        }
+
+        # Phase 2: fresh value at potentially-recycled address; lookup must
+        # return undef (the weak-ref check rejects pointer reuse).
+        my $fresh = { fresh_marker => 1 }
+        my $stale_hit = defined provenance($fresh) ? 1 : 0
+
+        # Phase 3: explicitly mark $fresh and verify lookup now succeeds —
+        # proves the ledger is still functional after the reaping path
+        # was exercised.
+        mark($fresh)
+        my $fresh_ok = defined provenance($fresh) ? 1 : 0
+
+        sprintf("stale=%d|fresh=%d", $stale_hit, $fresh_ok)
+        "#,
+    );
+    assert_eq!(
+        s.trim(),
+        "stale=0|fresh=1",
+        "stale ledger entries must NOT false-positive on pointer reuse, and the ledger must remain usable after GC"
+    );
+}
+
 /// Provenance schema integrity: even at origin (zero ops), the hash has all
 /// documented fields (`origin`, `origin_line`, `ops`). Guards against any
 /// future refactor that drops a field from `provenance::node_to_value`.

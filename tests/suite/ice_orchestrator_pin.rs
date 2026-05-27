@@ -49,8 +49,16 @@ fn ice_orchestrator_demo_runs_end_to_end_via_subprocess() {
         eprintln!("no built stryke binary; skipping");
         return;
     };
+    // Use absolute path — `cargo test` is sometimes invoked from outside
+    // the repo root (e.g. via workspace nest, IDE runners, CI scripts),
+    // so a bare "examples/..." relative path fails with NotFound.
+    let demo = {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("examples/ice_orchestrator.stk");
+        p
+    };
     let output = Command::new(&bin)
-        .arg("examples/ice_orchestrator.stk")
+        .arg(&demo)
         .output()
         .unwrap_or_else(|e| panic!("invoke {}: {e}", bin.display()));
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -95,8 +103,13 @@ fn ice_connect_direct_rung_short_circuits_with_live_peer() {
 
     // Source the orchestrator's ice::connect (and helpers) inline by
     // reading the file and prepending it to our test snippet.
-    let orch = std::fs::read_to_string("examples/ice_orchestrator.stk")
-        .expect("read ice_orchestrator.stk");
+    let orch_path = {
+        let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        p.push("examples/ice_orchestrator.stk");
+        p
+    };
+    let orch = std::fs::read_to_string(&orch_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", orch_path.display()));
     // The file's bottom block spawns its own peer + prints stuff that'd
     // race our assertion. Strip from `## Demo` onward — keep only the
     // package + fn definitions.

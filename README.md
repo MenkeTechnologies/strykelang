@@ -64,6 +64,20 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x18\] Documentation](#0x18-documentation)
 - [\[0xFF\] License](#0xff-license)
 
+### What's new — NAT traversal + value lineage
+
+Stack added across `v1` → `v1.4` (under [\[0x10b\] Agent/Controller](#0x10b-agentcontroller-architecture)):
+
+| Layer | Builtins | What it does |
+|---|---|---|
+| Network probes | [`kick`](#builtins-kick--udp_send--tcp-knock--udp-multi-shot) / [`udp_send`](#builtins-kick--udp_send--tcp-knock--udp-multi-shot) | TCP liveness probe + fire-and-forget UDP send (Wake-on-LAN, NAT keepalive) |
+| P2P primitives | [`udp_open` / `udp_send_to` / `udp_recv` / `udp_recv_from` / `udp_close` / `stun` / `stun_classify` / `punch`](#builtins-udp_open--stun--punch--udp_send_to--udp_recv--udp_close--p2p-over-the-open-internet) | Persistent UDP socket pool, RFC 8489 STUN client (IPv4 + IPv6), UDP hole-punching, symmetric-NAT detection |
+| TURN fallback | [`turn_allocate` / `turn_permission` / `turn_send` / `turn_recv` / `turn_refresh`](#builtins-turn_allocate--turn_permission--turn_send--turn_recv--turn_refresh--turn-relay-fallback-rfc-8656) | RFC 8656 TURN client (HMAC-SHA1 auth) for when hole-punching fails (~20-30% of cases: symmetric NATs, UDP-blocking firewalls) |
+| Orchestration | [`ice::connect`](#ice-lite-orchestrating-direct--punch--relay-in-stryke-source) (stryke source) | Three-rung ladder: direct → punch → relay, first-success wins |
+| Value lineage | [`mark` / `provenance` / `unmark`](#builtins-mark--provenance--unmark--value-lineage-as-a-first-class-feature) | Arc-keyed per-value lineage tracking with weak-ref GC, zero overhead when unused |
+
+Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2p_chat_v2.stk) / [`turn_relay_chat.stk`](examples/turn_relay_chat.stk) / [`ice_orchestrator.stk`](examples/ice_orchestrator.stk) / [`turn_health_check.stk`](examples/turn_health_check.stk) / [`provenance_basics.stk`](examples/provenance_basics.stk) / [`provenance_audit_log.stk`](examples/provenance_audit_log.stk) / [`provenance_chain_walkthrough.stk`](examples/provenance_chain_walkthrough.stk)
+
 ---
 
 ## [0x00] OVERVIEW

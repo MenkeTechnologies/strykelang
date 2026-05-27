@@ -220,6 +220,115 @@ fn stun_against_silent_port_returns_undef() {
     );
 }
 
+/// IPv6 loopback round-trip via stryke source — verifies `udp_open` /
+/// `udp_send_to` / `udp_recv_from` handle bare-`::1` syntax and that the
+/// underlying `(host, port).to_socket_addrs()` resolution path works
+/// for IPv6 the same as IPv4. Empirical IPv6 binding was confirmed via
+/// shell probe; this pin locks it into CI so an IPv4-only regression
+/// (e.g. someone adding an `is_ipv4()` guard to udp_sockets) would
+/// fail-loud.
+#[test]
+fn ipv6_loopback_round_trip_via_stryke_source() {
+    use std::net::UdpSocket;
+    // Pick an IPv6-bindable ephemeral port; bind+drop pattern is fine here
+    // because we control the recv side and assert via the v6 address space
+    // (no v4 test can collide).
+    let probe = UdpSocket::bind("[::1]:0").expect("bind ipv6 probe");
+    let recv_port = probe.local_addr().unwrap().port();
+    drop(probe);
+
+    let code = format!(
+        r#"
+        my $recv = udp_open("::1", {port})
+        if ($recv == 0) {{ "BIND-FAIL" }}
+        else {{
+            my $send = udp_open("::1", 0)
+            udp_send_to($send, "::1", {port}, "v6-hello")
+            my $msg = udp_recv_from($recv, 1000)
+            udp_close($recv); udp_close($send)
+            if (!defined $msg) {{ "TIMEOUT" }}
+            else {{
+                sprintf("payload=%s|src_ip=%s", $msg->{{payload}}, $msg->{{src_ip}})
+            }}
+        }}
+        "#,
+        port = recv_port
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts.len(), 2, "expected 2 fields, got: {s}");
+    assert_eq!(parts[0], "payload=v6-hello", "payload round-trip");
+    assert_eq!(parts[1], "src_ip=::1", "src_ip must report IPv6 loopback");
+}
+
+/// `stun_classify` mixed-responder edge case: some servers respond, some
+/// silent. With 2-of-3 responding and matching ports → "cone" (succeeded
+/// >= 2 is enough to classify). All-silent and all-responding cases are
+/// covered by other pins; this pins the middle.
+#[test]
+fn stun_classify_mixed_responders_cone_on_majority() {
+    use std::net::UdpSocket;
+    use std::thread;
+    use stryke::nat_punch::STUN_MAGIC_COOKIE;
+
+    fn spawn_responder(claim_port: u16) -> std::net::SocketAddr {
+        let s = UdpSocket::bind("127.0.0.1:0").unwrap();
+        let a = s.local_addr().unwrap();
+        thread::spawn(move || {
+            let mut buf = [0u8; 1024];
+            let (_, src) = s.recv_from(&mut buf).unwrap();
+            let tx_id = &buf[8..20];
+            let claim_ip = std::net::Ipv4Addr::new(198, 51, 100, 200);
+            let xp = claim_port ^ ((STUN_MAGIC_COOKIE >> 16) as u16);
+            let xa = u32::from_be_bytes(claim_ip.octets()) ^ STUN_MAGIC_COOKIE;
+            let mut r = vec![0u8; 32];
+            r[0..2].copy_from_slice(&0x0101u16.to_be_bytes());
+            r[2..4].copy_from_slice(&12u16.to_be_bytes());
+            r[4..8].copy_from_slice(&STUN_MAGIC_COOKIE.to_be_bytes());
+            r[8..20].copy_from_slice(tx_id);
+            r[20..22].copy_from_slice(&0x0020u16.to_be_bytes());
+            r[22..24].copy_from_slice(&8u16.to_be_bytes());
+            r[24] = 0x00;
+            r[25] = 0x01;
+            r[26..28].copy_from_slice(&xp.to_be_bytes());
+            r[28..32].copy_from_slice(&xa.to_be_bytes());
+            let _ = s.send_to(&r, src);
+        });
+        a
+    }
+
+    // 2 servers reporting SAME port + 1 silent (bind+drop).
+    let a = spawn_responder(45100);
+    let b = spawn_responder(45100);
+    let silent_sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let silent = silent_sock.local_addr().unwrap();
+    drop(silent_sock);
+
+    let code = format!(
+        r#"
+        my $sock = udp_open()
+        my $r = stun_classify($sock, {{
+            servers => [
+                ["{a_ip}", {a_port}],
+                ["{b_ip}", {b_port}],
+                ["{s_ip}", {s_port}],
+            ],
+            timeout_ms => 300,
+        }})
+        udp_close($sock)
+        sprintf("%s|q=%d|s=%d", $r->{{nat_type}}, $r->{{queried}}, $r->{{succeeded}})
+        "#,
+        a_ip = a.ip(), a_port = a.port(),
+        b_ip = b.ip(), b_port = b.port(),
+        s_ip = silent.ip(), s_port = silent.port()
+    );
+    let s = eval_string(&code);
+    let parts: Vec<&str> = s.trim().split('|').collect();
+    assert_eq!(parts[0], "cone", "2-of-3 matching ports must classify as cone");
+    assert_eq!(parts[1], "q=3");
+    assert_eq!(parts[2], "s=2", "exactly 2 of 3 servers responded");
+}
+
 /// Full socket-lifecycle composition through stryke source: one socket
 /// flows through `udp_open` → `stun(fake)` → `udp_send_to` →
 /// `udp_recv_from` → `udp_close`. Verifies the SAME socket id threads

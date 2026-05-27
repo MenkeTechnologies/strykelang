@@ -1,0 +1,109 @@
+#!/usr/bin/env stryke
+#
+# TURN-server health check — parallel allocation against a configured
+# list of TURN servers, reporting per-server allocation latency +
+# success rate. Real-world utility: drop this into CI / monitoring to
+# verify your TURN fleet is healthy before depending on it for
+# fallback NAT traversal.
+#
+# Server list configuration:
+#   1. Pass servers as command-line args:
+#      stryke examples/turn_health_check.stk USER PASS server1:3478 server2:3478 ...
+#   2. Or read from env $TURN_SERVERS (comma-separated host:port pairs):
+#      TURN_USER=alice TURN_PASS=pw TURN_SERVERS=turn1:3478,turn2:3478 \
+#        stryke examples/turn_health_check.stk
+#
+# Exit code: 0 if EVERY server succeeded, 1 if any failed.
+#
+# Output: one line per server with status / latency / relay address.
+
+my $user = $ARGV[0] // $ENV{TURN_USER}
+my $pass = $ARGV[1] // $ENV{TURN_PASS}
+my @servers = scalar(@ARGV) > 2 ? @ARGV[2..$#ARGV]
+            : defined $ENV{TURN_SERVERS} ? split /,/, $ENV{TURN_SERVERS}
+            : ()
+
+# In CI / demo-runner context (no creds, no servers configured), exit
+# cleanly with a usage message. Only fail-exit when invoked with PARTIAL
+# config (some args supplied but others missing — likely a user mistake).
+if (!defined $user && !defined $pass && !len(@servers)) {
+    p "TURN health check — no TURN configured, skipping."
+    p "  To use: stryke examples/turn_health_check.stk USER PASS server1:3478 server2:3478 ..."
+    p "  Or env: TURN_USER=, TURN_PASS=, TURN_SERVERS=server1:3478,server2:3478"
+    exit 0
+}
+if (!defined $user || !defined $pass) {
+    p "TURN credentials missing. Pass via argv (USER PASS server1 server2 ...)"
+    p "or env (TURN_USER=, TURN_PASS=, optionally TURN_SERVERS=)."
+    exit 2
+}
+if (!len(@servers)) {
+    p "No TURN servers specified — pass as argv after USER PASS, or set TURN_SERVERS."
+    exit 2
+}
+
+p "── TURN health check ─────────────────────────────────"
+printf "  user            : %s\n", $user
+printf "  servers to test : %d\n", len(@servers)
+printf "  timeout per probe: 5000ms\n"
+p ""
+
+# Per-server probe: returns a hash describing the result. Self-contained
+# so it can run in pmap without sharing state with other probes.
+fn Hc::probe($server) {
+    my @parts = split /:/, $server
+    my $host  = $parts[0]
+    my $port  = scalar(@parts) > 1 ? $parts[1] + 0 : 3478
+    my $sock = udp_open()
+    if ($sock == 0) {
+        return { server => $server, ok => 0, latency_ms => 0, reason => "bind failed" }
+    }
+    my $t0 = now_ns()
+    my $alloc = turn_allocate($sock, $host, $port, $user, $pass, 5000)
+    my $latency_ms = (now_ns() - $t0) / 1_000_000
+    if (!defined $alloc) {
+        udp_close($sock)
+        return {
+            server     => $server,
+            ok         => 0,
+            latency_ms => $latency_ms,
+            reason     => "alloc failed (auth or unreachable)",
+        }
+    }
+    # Release immediately — we only wanted to verify allocation works.
+    turn_refresh($sock, 0)
+    udp_close($sock)
+    return {
+        server     => $server,
+        ok         => 1,
+        latency_ms => $latency_ms,
+        relay      => "$alloc->{relay_ip}:$alloc->{relay_port}",
+        lifetime   => $alloc->{lifetime_secs},
+    }
+}
+
+# Parallel fan-out — TURN allocations are independent across servers.
+my @results = pmap { Hc::probe($_) } @servers
+my @sorted  = sort { $a->{server} cmp $b->{server} } @results
+
+# Report per-server.
+my $ok_count = 0
+for my $r (@sorted) {
+    if ($r->{ok}) {
+        printf "  ✓ %-30s  %4dms  relay=%s  lifetime=%ds\n",
+            $r->{server}, $r->{latency_ms}, $r->{relay}, $r->{lifetime}
+        $ok_count++
+    } else {
+        printf "  ✗ %-30s  %4dms  %s\n",
+            $r->{server}, $r->{latency_ms}, $r->{reason}
+    }
+}
+
+p ""
+printf "── summary: %d/%d servers healthy ──────────────────\n",
+    $ok_count, len(@results)
+
+# Exit 0 only if EVERY server passed — useful for `&&` chains in deploy
+# scripts or as a CI prereq before deploying anything that depends on
+# TURN-relay fallback.
+exit($ok_count == len(@results) ? 0 : 1)
