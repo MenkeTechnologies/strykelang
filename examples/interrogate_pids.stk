@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+#
+# interrogate(PID) demo — OS-level process state dump via sysinfo. Shows
+# the polymorphic dispatch: single scalar arg = OS PID introspection;
+# array of agent handles = agent VM state introspection (different path).
+#
+# CI-safe: only inspects self + PID 1 (always exists).
+
+printf "── interrogate(PID) demo ──\n"
+
+# 1. Self-interrogation — dump our own process state.
+my $self_pid = $$
+say "── interrogating self (pid=$self_pid) ──"
+my $h = interrogate($self_pid)
+for my $k (sort keys %$h) {
+    my $v = $h->{$k}
+    if (ref($v) eq 'ARRAY') {
+        printf "  %-22s [%s]\n", $k, join(", ", @$v)
+    } else {
+        printf "  %-22s %s\n", $k, $v
+    }
+}
+
+# 2. Interrogate PID 1 (init/launchd) — always exists, partial under
+#    macOS perms for unprivileged readers.
+say "── interrogating PID 1 (init/launchd) ──"
+my $init = interrogate(1)
+if (defined $init) {
+    printf "  name:   %s\n", $init->{name}
+    printf "  status: %s\n", $init->{status}
+    if (defined $init->{exe}) {
+        printf "  exe:    %s\n", $init->{exe}
+    }
+} else {
+    say "  (not visible — permissions or PID 1 unreachable)"
+}
+
+# 3. Bogus PID — returns undef cleanly.
+say "── interrogating bogus PID 99999999 ──"
+my $bogus = interrogate(99999999)
+say "  result: ", (defined $bogus ? "defined" : "undef (as expected)")
+
+# 4. Agent-handle path — spawn a worker and interrogate its VM state.
+say "── interrogating an agent (different code path) ──"
+my @workers = congregation(1)
+my %agent_state = %{interrogate(@workers)}
+for my $sid (sort { $a <=> $b } keys %agent_state) {
+    my $h = $agent_state{$sid}
+    if (ref($h) eq 'HASH') {
+        printf "  agent %d:\n", $sid
+        for my $k (sort keys %$h) {
+            my $v = $h->{$k}
+            my $vs = ref($v) ? "(nested)" : $v
+            printf "    %-8s %s\n", $k, $vs
+        }
+    }
+}
+
+excommunicate(@workers)
+say "done"
