@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+#
+# Provenance chain walkthrough — watch the lineage grow through a
+# series of transformations. Demonstrates the canonical "manual re-mark
+# after each transform" pattern, which is the safe shape when you don't
+# know which builtins will auto-propagate.
+#
+# Companion demos:
+#   provenance_basics.stk     — surveys the API surface (mark / provenance / unmark)
+#   provenance_audit_log.stk  — persists lineage as a JSON audit-log entry
+#   THIS FILE                  — multi-stage chain: shows growing lineage
+#
+# Pattern: at each transformation boundary, re-mark the new value so
+# the lineage continues. Each stage establishes its OWN call-site line.
+# Query provenance($value) at any point to see the current chain.
+
+p "── provenance chain walkthrough ──────────────────────"
+
+fn dump_stage($val, $label) {
+    my $p = provenance($val)
+    if (!defined $p) {
+        printf "  [%-18s]  (no lineage)\n", $label
+        return
+    }
+    printf "  [%-18s]  origin='%s' (line %d), ops=%d\n",
+        $label, $p->{origin}, $p->{origin_line}, len(@{$p->{ops}})
+}
+
+# ── stage 1: origin ────────────────────────────────────────────────
+my $config = mark({
+    user    => "jamenk",
+    project => "strykelang",
+    started => time(),
+})
+dump_stage($config, "1. origin")
+
+# ── stage 2: extract a value, wrap to keep trackable ──────────────
+my $extracted = mark({ user => $config->{user} })
+dump_stage($extracted, "2. extracted")
+
+# ── stage 3: enrich with a derived field ──────────────────────────
+my $enriched = mark({
+    %$extracted,
+    user_upper => uc($extracted->{user}),
+})
+dump_stage($enriched, "3. enriched")
+
+# ── stage 4: serialize, then wrap the JSON in a container ─────────
+# (Bare-string returns from to_json lose Arc identity — v1 limit. Wrap
+# in a hash so the container's stable Arc carries the lineage forward.)
+my $packed = mark({ payload => to_json($enriched) })
+dump_stage($packed, "4. serialized")
+
+# ── stage 5: hash + attach metadata ───────────────────────────────
+my $sealed = mark({
+    payload      => $packed->{payload},
+    sha256       => sha256($packed->{payload}),
+    sealed_at    => time(),
+})
+dump_stage($sealed, "5. sealed")
+
+# ── stage 6: prepare for transport — what an outbound system sees ─
+my $envelope = mark({
+    body    => $sealed,
+    # Escape @ so stryke doesn't try to interpolate `@v0` as an array.
+    sender  => "stryke\@v0.14.30",
+    version => 1,
+})
+dump_stage($envelope, "6. envelope")
+
+p ""
+p "── insight ──────────────────────────────────────────"
+p "  Each stage has ITS OWN origin_line — re-marking establishes a"
+p "  fresh lineage rooted at the call site. To trace a downstream"
+p "  bug back through the pipeline, query provenance at any stage —"
+p "  the line number tells you which `mark()` call was the immediate"
+p "  upstream producer. Combine with logging at each `mark()` site for"
+p "  a complete value-flow audit trail."
+
+p ""
+p "── envelope structure for transport ─────────────────"
+printf "  body.sealed_at  : %s\n", $envelope->{body}->{sealed_at}
+printf "  body.sha256     : %s…\n", substr($envelope->{body}->{sha256}, 0, 16)
+printf "  body.payload    : %d bytes\n", length($envelope->{body}->{payload})
+printf "  sender          : %s\n", $envelope->{sender}
+printf "  version         : %d\n", $envelope->{version}
