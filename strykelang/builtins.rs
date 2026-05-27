@@ -14225,20 +14225,126 @@ fn builtin_divine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 // ─── Tier 4: interrogate ────────────────────────────────────────────────────
 
-/// `interrogate(@agent_handles)` — dump per-agent process state. Returns
-/// a hash keyed by session_id (stringified) where each value is a hash
-/// of the agent's PID, hostname, uptime, `%soul` contents, and `%gift`
-/// contents. Non-destructive — workers retain everything.
+/// OS-level process inspection via the `sysinfo` crate (already in deps,
+/// used by stress.rs and banner.rs). Returns a stryke hash with the
+/// process's metadata: pid, ppid, name, cmd, exe, cwd, uid,
+/// memory_bytes (RSS), virtual_memory_bytes (VSZ), cpu_usage (%),
+/// status (Run/Sleep/Zombie/Stop/...), start_time (unix epoch seconds),
+/// run_time_secs (seconds since process start). Returns the
+/// stryke-undef sentinel when the PID is not visible (terminated,
+/// permission denied, or invalid).
+fn interrogate_os_pid(pid: u32) -> StrykeResult<StrykeValue> {
+    use sysinfo::{Pid, ProcessesToUpdate, System};
+
+    let mut sys = System::new();
+    let pid_t = Pid::from_u32(pid);
+    // refresh_processes with a specific PID list is faster than full
+    // refresh — we only need this one process.
+    sys.refresh_processes(ProcessesToUpdate::Some(&[pid_t]), true);
+
+    let proc = match sys.process(pid_t) {
+        Some(p) => p,
+        None => return Ok(StrykeValue::UNDEF),
+    };
+
+    let mut hash = indexmap::IndexMap::new();
+    hash.insert("pid".into(), StrykeValue::integer(pid as i64));
+    if let Some(ppid) = proc.parent() {
+        hash.insert("ppid".into(), StrykeValue::integer(ppid.as_u32() as i64));
+    }
+    hash.insert(
+        "name".into(),
+        StrykeValue::string(proc.name().to_string_lossy().into_owned()),
+    );
+    let cmd_vec: Vec<StrykeValue> = proc
+        .cmd()
+        .iter()
+        .map(|s| StrykeValue::string(s.to_string_lossy().into_owned()))
+        .collect();
+    hash.insert("cmd".into(), StrykeValue::array(cmd_vec));
+    if let Some(exe) = proc.exe() {
+        hash.insert(
+            "exe".into(),
+            StrykeValue::string(exe.to_string_lossy().into_owned()),
+        );
+    }
+    if let Some(cwd) = proc.cwd() {
+        hash.insert(
+            "cwd".into(),
+            StrykeValue::string(cwd.to_string_lossy().into_owned()),
+        );
+    }
+    if let Some(uid) = proc.user_id() {
+        hash.insert("uid".into(), StrykeValue::integer(**uid as i64));
+    }
+    hash.insert(
+        "memory_bytes".into(),
+        StrykeValue::integer(proc.memory() as i64),
+    );
+    hash.insert(
+        "virtual_memory_bytes".into(),
+        StrykeValue::integer(proc.virtual_memory() as i64),
+    );
+    hash.insert("cpu_usage".into(), StrykeValue::float(proc.cpu_usage() as f64));
+    hash.insert(
+        "status".into(),
+        StrykeValue::string(format!("{:?}", proc.status())),
+    );
+    hash.insert(
+        "start_time".into(),
+        StrykeValue::integer(proc.start_time() as i64),
+    );
+    hash.insert(
+        "run_time_secs".into(),
+        StrykeValue::integer(proc.run_time() as i64),
+    );
+    // Return as a hash_ref so callers can store it in a scalar and deref
+    // with `%{$h}` — the typical Perl idiom for "function returning a
+    // hash." A bare hash value works for `my %h = interrogate($pid)` but
+    // breaks `%{interrogate($pid)}` deref. Ref form supports both shapes.
+    Ok(StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(hash))))
+}
+
+/// `interrogate($pid_or_handles)` — polymorphic process-state dump.
 ///
-/// Useful for debugging: snapshot every member of a congregation, dump
-/// their state, identify drift / divergence / hangs.
+/// * `interrogate($pid)` (single scalar arg): OS-level dump for an OS PID
+///   via the `sysinfo` crate. Returns a hash with `pid`, `ppid`, `name`,
+///   `cmd`, `exe`, `cwd`, `uid`, `memory_bytes`, `virtual_memory_bytes`,
+///   `cpu_usage`, `status`, `start_time`, `run_time_secs`. Works for ANY
+///   visible OS process — not just stryke agents. Returns `undef` if the
+///   PID isn't visible (terminated, permission denied, or invalid).
+///
+/// * `interrogate(@agent_handles)` (array / multi-arg): agent VM state
+///   dump via the scatter-EVAL path. Returns a hash keyed by session_id
+///   (stringified) where each value is a hash of the agent's PID, time,
+///   `%soul`, and `%gift`. Non-destructive.
+///
+/// Dispatch heuristic: single scalar arg → OS PID. Array or multiple args
+/// → agent handles. This matches the user-natural `interrogate($pid)`
+/// AND `interrogate(@cong)` invocations without needing two verb names.
 fn builtin_interrogate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // OS PID path — single scalar argument, no array.
+    if args.len() == 1 {
+        let arg = &args[0];
+        if !arg.is_undef() && arg.as_array_vec().is_none() {
+            let pid = arg.to_int();
+            if pid <= 0 {
+                return Err(StrykeError::runtime(
+                    format!("interrogate: invalid PID {}", pid),
+                    0,
+                ));
+            }
+            return interrogate_os_pid(pid as u32);
+        }
+    }
+
+    // Agent-handle path — fall through to the existing controller dump.
     use std::time::Duration;
 
     let agent_ids = flatten_agent_handles(args);
     if agent_ids.is_empty() {
         return Err(StrykeError::runtime(
-            "interrogate: at least one agent handle required",
+            "interrogate: at least one agent handle or OS PID required",
             0,
         ));
     }
