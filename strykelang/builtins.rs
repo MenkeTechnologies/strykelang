@@ -13905,15 +13905,12 @@ fn lick_souls_impl(args: &[StrykeValue], verb: &str) -> StrykeResult<StrykeValue
         ));
     }
     let handle = require_current_controller(verb)?;
-    // Why we pass `%soul` flat instead of `\%soul`: as of 2026-05-27,
-    // `\%hash` on an `our` hash produces a ref whose deref reads as empty
-    // (verified via /tmp/lick_debug2.stk — `to_json(\%soul)` returns
-    // `"{}"` even when %soul has entries). Workaround: pass the hash by
-    // value (flattens to a list `(k1, v1, k2, v2, ...)`), which to_json
-    // encodes as a JSON array. Master pairs the elements back into a
-    // hash. This is a workaround for a stryke language bug, not the
-    // long-term wire shape — see Tier 4 TODO.
-    let code = "our %soul; to_json(%soul)";
+    // `our %soul` ensures the hash exists (empty if never touched).
+    // `to_json(\%soul)` serializes the hashref to a JSON object.
+    // (Both `\%hash` deref AND cross-EVAL persistence were broken
+    // prior to the 2026-05-27 scope.rs fix; the workaround used to
+    // be `to_json(%soul)` + flat-pair parsing on master side.)
+    let code = "our %soul; to_json(\\%soul)";
     let petition_id = handle
         .scatter(code, &agent_ids)
         .map_err(|e| StrykeError::runtime(format!("{}: scatter failed: {}", verb, e), 0))?;
@@ -13928,20 +13925,6 @@ fn lick_souls_impl(args: &[StrykeValue], verb: &str) -> StrykeResult<StrykeValue
         let r = &results[&sid];
         let json_str = r.output.trim();
         let value = match serde_json::from_str::<serde_json::Value>(json_str) {
-            // Workaround for the \%hash bug: parse the JSON array of
-            // [k1, v1, k2, v2, ...] back into a hash.
-            Ok(serde_json::Value::Array(arr)) => {
-                let mut soul_hash = indexmap::IndexMap::new();
-                let mut iter = arr.into_iter();
-                while let (Some(k), Some(v)) = (iter.next(), iter.next()) {
-                    let key_str = match k {
-                        serde_json::Value::String(s) => s,
-                        other => other.to_string(),
-                    };
-                    soul_hash.insert(key_str, json_value_to_stryke(v));
-                }
-                StrykeValue::hash(soul_hash)
-            }
             Ok(parsed) => json_value_to_stryke(parsed),
             // Worker output wasn't valid JSON — surface the raw string so
             // the caller can debug rather than getting a silent UNDEF.
@@ -14349,13 +14332,13 @@ fn builtin_interrogate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         ));
     }
     let handle = require_current_controller("interrogate")?;
-    // Workaround for the \%hash bug: pass %soul / %gift flat so we get a
-    // JSON array of [k1, v1, k2, v2, ...] for each. Master pairs back.
+    // Use \%hash ref form (fixed 2026-05-27 in scope.rs::promote_hash_to_shared)
+    // so the JSON encodes as a proper object, not a flat key/value array.
     let code = r#"
         our %soul; our %gift;
         my $pid = $$;
         my $now = time();
-        '{"pid":' . $pid . ',"time":' . $now . ',"soul":' . to_json(%soul) . ',"gift":' . to_json(%gift) . '}'
+        '{"pid":' . $pid . ',"time":' . $now . ',"soul":' . to_json(\%soul) . ',"gift":' . to_json(\%gift) . '}'
     "#;
     let petition_id = handle
         .scatter(code, &agent_ids)

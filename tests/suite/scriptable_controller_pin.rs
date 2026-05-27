@@ -534,6 +534,51 @@ fn cloistered_controller_rejects_agents_without_valid_auth_token() {
     dismiss(&handle, vec![accept_child]);
 }
 
+/// `our %hash = (...)` in one EVAL must be visible to subsequent EVALs
+/// on the same VMHelper. Pins the cross-EVAL persistence semantics that
+/// lick/peruse / state-harvest rely on — previously broken (the workaround
+/// was to use `%main::soul` package-qualified).
+#[test]
+fn our_hash_persists_across_evals_on_same_vmhelper() {
+    use stryke::vm_helper::VMHelper;
+    let mut vm = VMHelper::new();
+
+    let p1 = stryke::parse("our %soul = (a => 'alpha', b => 'beta'); 'done'").expect("parse 1");
+    let _r1 = vm.execute(&p1).expect("eval 1");
+
+    let p2 = stryke::parse("our %soul; to_json(%soul)").expect("parse 2");
+    let r2 = vm.execute(&p2).expect("eval 2");
+    let s = r2.to_string();
+    assert!(
+        s.contains("\"a\"") && s.contains("\"alpha\"") && s.contains("\"b\"") && s.contains("\"beta\""),
+        "cross-EVAL persistence broken — eval 2 saw {:?}",
+        s
+    );
+}
+
+/// `\%hash` on an `our`-declared hash must produce a ref whose deref
+/// reads the populated data — not an empty hash. Bug fix 2026-05-27 in
+/// scope.rs::promote_hash_to_shared (was failing to strip `main::`
+/// prefix before the frame.hashes lookup).
+#[test]
+fn hash_ref_on_our_hash_derefs_to_populated_data() {
+    use crate::common::*;
+    let out = eval_string(
+        r#"our %h = (k1 => 'v1', k2 => 'v2'); my $r = \%h; join(",", sort keys %{$r})"#,
+    );
+    assert_eq!(out.trim(), "k1,k2", "\\%our-hash deref must yield populated data");
+}
+
+/// `\@array` on an `our`-declared array must produce a ref whose deref
+/// reads the populated data. Same bug class as the hash ref fix — both
+/// promote_*_to_shared functions had the prefix-stripping bug.
+#[test]
+fn array_ref_on_our_array_derefs_to_populated_data() {
+    use crate::common::*;
+    let out = eval_string(r#"our @a = (10, 20, 30); my $r = \@a; join(",", @{$r})"#);
+    assert_eq!(out.trim(), "10,20,30", "\\@our-array deref must yield populated data");
+}
+
 /// `interrogate($pid)` dumps OS-level process state. Asserts self-PID
 /// interrogation produces a hash with at least the core metadata fields
 /// populated. Pins the polymorphic dispatch (single scalar = PID path)
