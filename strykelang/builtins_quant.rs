@@ -1804,3 +1804,252 @@ pub fn fit_curve_least_squares(args: &[StrykeValue]) -> StrykeValue {
     h.insert("b".to_string(), StrykeValue::float(b));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn approx(a: f64, b: f64, eps: f64) -> bool {
+        (a - b).abs() < eps
+    }
+
+    fn data(v: &[f64]) -> StrykeValue {
+        arr_f64(v.to_vec())
+    }
+
+    fn i(n: i64) -> StrykeValue {
+        StrykeValue::integer(n)
+    }
+
+    // ─── sma_compute: simple moving average ────────────────────────────
+
+    #[test]
+    fn sma_period_one_returns_input_unchanged() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        assert_eq!(sma_compute(&data, 1), data);
+    }
+
+    #[test]
+    fn sma_constant_input_returns_constant_output() {
+        let out = sma_compute(&[5.0; 10], 3);
+        for v in &out {
+            assert!(approx(*v, 5.0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn sma_known_window_average() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        // period=3: windows [1,2,3]=2, [2,3,4]=3, [3,4,5]=4.
+        let out = sma_compute(&data, 3);
+        assert_eq!(out, vec![2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn sma_zero_period_returns_empty() {
+        assert!(sma_compute(&[1.0, 2.0], 0).is_empty());
+    }
+
+    #[test]
+    fn sma_period_larger_than_data_returns_empty() {
+        assert!(sma_compute(&[1.0, 2.0], 5).is_empty());
+    }
+
+    #[test]
+    fn sma_output_length_is_data_minus_period_plus_one() {
+        let data: Vec<f64> = (1..=20).map(|i| i as f64).collect();
+        assert_eq!(sma_compute(&data, 5).len(), 16);
+        assert_eq!(sma_compute(&data, 1).len(), 20);
+        assert_eq!(sma_compute(&data, 20).len(), 1);
+    }
+
+    // ─── ema_compute: exponential moving average ───────────────────────
+
+    #[test]
+    fn ema_first_value_equals_first_input() {
+        let out = ema_compute(&[10.0, 20.0, 30.0], 5);
+        assert_eq!(out[0], 10.0);
+    }
+
+    #[test]
+    fn ema_constant_input_returns_constant_output() {
+        let out = ema_compute(&[7.0; 20], 10);
+        for v in &out {
+            assert!(approx(*v, 7.0, 1e-12));
+        }
+    }
+
+    #[test]
+    fn ema_output_length_matches_input_length() {
+        let data: Vec<f64> = (1..=50).map(|i| i as f64).collect();
+        assert_eq!(ema_compute(&data, 10).len(), 50);
+    }
+
+    #[test]
+    fn ema_responds_more_to_recent_values_than_sma() {
+        // After a step jump, EMA tracks faster than SMA in the next bar.
+        let mut data = vec![100.0; 10];
+        data.push(200.0); // big jump on bar 11
+        let ema = ema_compute(&data, 5);
+        let sma = sma_compute(&data, 5);
+        // EMA at the jump bar absorbs more of the new value than SMA does.
+        assert!(ema[10] > sma[*&sma.len() - 1]);
+    }
+
+    #[test]
+    fn ema_empty_input_returns_empty() {
+        assert!(ema_compute(&[], 10).is_empty());
+    }
+
+    // ─── wma_compute_raw: weighted moving average ──────────────────────
+
+    #[test]
+    fn wma_period_one_returns_input_unchanged() {
+        let data = vec![1.0, 2.0, 3.0];
+        assert_eq!(wma_compute_raw(&data, 1), data);
+    }
+
+    #[test]
+    fn wma_zero_period_returns_empty() {
+        assert!(wma_compute_raw(&[1.0, 2.0], 0).is_empty());
+    }
+
+    #[test]
+    fn wma_period_too_large_returns_empty() {
+        assert!(wma_compute_raw(&[1.0, 2.0], 5).is_empty());
+    }
+
+    #[test]
+    fn wma_known_value() {
+        // Period 3: weights = 1, 2, 3. Denominator = 6.
+        // Window [1, 2, 3] → (1*1 + 2*2 + 3*3) / 6 = (1+4+9)/6 = 14/6 ≈ 2.333.
+        let out = wma_compute_raw(&[1.0, 2.0, 3.0], 3);
+        assert_eq!(out.len(), 1);
+        assert!(approx(out[0], 14.0 / 6.0, 1e-9));
+    }
+
+    // ─── Public sma/ema builtin wrappers ──────────────────────────────
+
+    #[test]
+    fn sma_builtin_with_default_period() {
+        // Default period is 10 — too small a dataset → empty array.
+        let v = sma(&[data(&[1.0, 2.0, 3.0])]);
+        let out = as_vec(&v);
+        assert!(out.is_empty(), "default period 10 > data len 3");
+    }
+
+    #[test]
+    fn sma_builtin_with_explicit_period_three() {
+        let v = sma(&[data(&[1.0, 2.0, 3.0, 4.0, 5.0]), i(3)]);
+        let out = as_vec(&v);
+        assert_eq!(out, vec![2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn sma_builtin_clamps_period_zero_to_one() {
+        // .max(1) in the wrapper protects from period=0.
+        let v = sma(&[data(&[1.0, 2.0, 3.0]), i(0)]);
+        let out = as_vec(&v);
+        assert_eq!(out, vec![1.0, 2.0, 3.0], "period 0 is clamped to 1");
+    }
+
+    #[test]
+    fn ema_builtin_returns_input_length_array() {
+        let input = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let v = ema(&[data(&input), i(2)]);
+        assert_eq!(as_vec(&v).len(), input.len());
+    }
+
+    // ─── trix: triple-EMA momentum oscillator ──────────────────────────
+
+    #[test]
+    fn trix_constant_input_is_all_zero() {
+        // EMA of constant = constant → consecutive deltas = 0 → TRIX = 0.
+        let v = trix(&[data(&[100.0; 30]), i(5)]);
+        let out = as_vec(&v);
+        for x in &out {
+            assert!(
+                approx(*x, 0.0, 1e-9),
+                "TRIX of constant should be 0, got {x}"
+            );
+        }
+    }
+
+    #[test]
+    fn trix_strong_uptrend_eventually_positive() {
+        let input: Vec<f64> = (1..=50).map(|i| 100.0 + i as f64).collect();
+        let v = trix(&[data(&input), i(5)]);
+        let out = as_vec(&v);
+        assert!(out[out.len() - 1] > 0.0, "uptrend → TRIX positive at end");
+    }
+
+    // ─── rsi: relative strength index in [0, 100] ──────────────────────
+
+    #[test]
+    fn rsi_strict_uptrend_approaches_100() {
+        let input: Vec<f64> = (1..=30).map(|i| 100.0 + i as f64).collect();
+        let v = rsi(&[data(&input), i(14)]);
+        let out = as_vec(&v);
+        // Strict uptrend → no losses → RSI = 100.
+        for x in &out {
+            assert!(approx(*x, 100.0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn rsi_strict_downtrend_approaches_zero() {
+        let input: Vec<f64> = (1..=30).map(|i| 200.0 - i as f64).collect();
+        let v = rsi(&[data(&input), i(14)]);
+        let out = as_vec(&v);
+        // Strict downtrend → no gains → RSI = 0.
+        for x in &out {
+            assert!(approx(*x, 0.0, 1e-9), "downtrend → RSI ~ 0, got {x}");
+        }
+    }
+
+    #[test]
+    fn rsi_short_data_returns_empty() {
+        let v = rsi(&[data(&[1.0, 2.0]), i(14)]);
+        assert!(as_vec(&v).is_empty());
+    }
+
+    // ─── macd: MACD line as EMA(fast) - EMA(slow) ─────────────────────
+
+    #[test]
+    fn macd_length_matches_short_ema() {
+        let input: Vec<f64> = (1..=100).map(|i| i as f64).collect();
+        let v = macd(&[data(&input), i(12), i(26)]);
+        // EMAs are full-length over the input; macd is their elementwise
+        // difference → also full input length.
+        assert_eq!(as_vec(&v).len(), input.len());
+    }
+
+    #[test]
+    fn macd_constant_input_yields_zero_line() {
+        let v = macd(&[data(&[50.0; 100]), i(12), i(26)]);
+        let out = as_vec(&v);
+        for x in &out {
+            assert!(approx(*x, 0.0, 1e-9));
+        }
+    }
+
+    // ─── dema/tema: weighted EMA composites ───────────────────────────
+
+    #[test]
+    fn dema_constant_input_returns_constant() {
+        let v = dema(&[data(&[7.0; 50]), i(10)]);
+        let out = as_vec(&v);
+        for x in &out {
+            assert!(approx(*x, 7.0, 1e-9));
+        }
+    }
+
+    #[test]
+    fn tema_constant_input_returns_constant() {
+        let v = tema(&[data(&[3.0; 50]), i(10)]);
+        let out = as_vec(&v);
+        for x in &out {
+            assert!(approx(*x, 3.0, 1e-9));
+        }
+    }
+}
