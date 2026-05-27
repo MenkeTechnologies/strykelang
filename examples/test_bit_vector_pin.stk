@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+fn BV::new($nbits) {
+    my $nw = int(($nbits + 31) / 32)
+    my @w = ()
+    for my $i (1:$nw) { push @w, 0 }
+    +{ n => $nbits, w => \@w }
+}
+
+fn BV::set($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    $bv->{w}->[$wi] = $bv->{w}->[$wi] | (1 << $bi)
+}
+
+fn BV::clear($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    my $mask = (~(1 << $bi)) & 0xFFFFFFFF
+    $bv->{w}->[$wi] = $bv->{w}->[$wi] & $mask
+}
+
+fn BV::flip($bv, $i) {
+    return if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    $bv->{w}->[$wi] = ($bv->{w}->[$wi] ^ (1 << $bi)) & 0xFFFFFFFF
+}
+
+fn BV::get($bv, $i) {
+    return 0 if $i < 0 || $i >= $bv->{n}
+    my $wi = int($i / 32)
+    my $bi = $i % 32
+    (($bv->{w}->[$wi] >> $bi) & 1)
+}
+
+fn BV::popcount($bv) {
+    my $c = 0
+    for my $w (@{$bv->{w}}) {
+        my $x = $w
+        while ($x != 0) {
+            $c = $c + ($x & 1)
+            $x = $x >> 1
+        }
+    }
+    $c
+}
+
+fn BV::indices($bv) {
+    my @out = ()
+    for my $i (0:$bv->{n}-1) {
+        push @out, $i if BV::get($bv, $i)
+    }
+    \@out
+}
+
+fn BV::union($aa, $bb) {
+    my $r = BV::new($aa->{n})
+    my $nw = len @{$aa->{w}}
+    for my $i (0:$nw-1) {
+        $r->{w}->[$i] = ($aa->{w}->[$i] | $bb->{w}->[$i]) & 0xFFFFFFFF
+    }
+    $r
+}
+
+fn BV::intersect($aa, $bb) {
+    my $r = BV::new($aa->{n})
+    my $nw = len @{$aa->{w}}
+    for my $i (0:$nw-1) {
+        $r->{w}->[$i] = ($aa->{w}->[$i] & $bb->{w}->[$i]) & 0xFFFFFFFF
+    }
+    $r
+}
+
+# Empty
+my $e = BV::new(64)
+BV::popcount($e) |> aeq 0, "empty popcount"
+BV::get($e, 0)   |> aeq 0, "empty get 0"
+BV::get($e, 63)  |> aeq 0, "empty get 63"
+len(@{BV::indices($e)}) |> aeq 0, "empty indices"
+
+# Set/get
+my $v = BV::new(80)
+BV::set($v, 0)
+BV::set($v, 5)
+BV::set($v, 31)
+BV::set($v, 32)
+BV::set($v, 79)
+BV::get($v, 0)   |> aeq 1, "get 0"
+BV::get($v, 5)   |> aeq 1, "get 5"
+BV::get($v, 31)  |> aeq 1, "word boundary 31"
+BV::get($v, 32)  |> aeq 1, "word boundary 32"
+BV::get($v, 79)  |> aeq 1, "last bit"
+BV::get($v, 1)   |> aeq 0, "unset 1"
+BV::get($v, 78)  |> aeq 0, "unset 78"
+BV::popcount($v) |> aeq 5, "popcount 5"
+join(",", @{BV::indices($v)}) |> aeq "0,5,31,32,79", "indices"
+
+# Clear
+BV::clear($v, 5)
+BV::get($v, 5)   |> aeq 0, "cleared"
+BV::popcount($v) |> aeq 4, "popcount after clear"
+
+# Idempotent set
+BV::set($v, 0)
+BV::set($v, 0)
+BV::popcount($v) |> aeq 4, "set idempotent"
+
+# Flip
+BV::flip($v, 10)
+BV::get($v, 10)  |> aeq 1, "flipped to 1"
+BV::flip($v, 10)
+BV::get($v, 10)  |> aeq 0, "flipped back to 0"
+
+# Out-of-range no-ops / safe
+BV::set($v, -1)
+BV::set($v, 999)
+BV::get($v, -1)  |> aeq 0, "neg get safe"
+BV::get($v, 999) |> aeq 0, "oob get safe"
+
+# Union / intersection
+my $a1 = BV::new(40)
+my $b1 = BV::new(40)
+for my $i (0, 1, 2, 3) { BV::set($a1, $i) }
+for my $i (2, 3, 4, 5) { BV::set($b1, $i) }
+join(",", @{BV::indices(BV::union($a1, $b1))})     |> aeq "0,1,2,3,4,5", "union"
+join(",", @{BV::indices(BV::intersect($a1, $b1))}) |> aeq "2,3", "intersect"
+
+# Disjoint intersect empty
+my $a2 = BV::new(20)
+my $b2 = BV::new(20)
+BV::set($a2, 0); BV::set($a2, 1)
+BV::set($b2, 5); BV::set($b2, 6)
+BV::popcount(BV::intersect($a2, $b2)) |> aeq 0, "disjoint intersect"
+
+# Multi-word
+my $big = BV::new(200)
+for my $i (0, 50, 100, 150, 199) { BV::set($big, $i) }
+BV::popcount($big) |> aeq 5, "multi-word popcount"
+join(",", @{BV::indices($big)}) |> aeq "0,50,100,150,199", "multi-word indices"
+
+# n=1
+my $tiny = BV::new(1)
+BV::set($tiny, 0)
+BV::get($tiny, 0) |> aeq 1, "n=1"
+BV::popcount($tiny) |> aeq 1, "n=1 popcount"
+
+test_run
