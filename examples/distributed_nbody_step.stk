@@ -1,0 +1,81 @@
+#!/usr/bin/env stryke
+#
+# Distributed N-body simulation step — workers each compute force /
+# acceleration for a subset of bodies given the current positions
+# of all bodies (passed via prayer). Master assembles updated
+# accelerations into one timestep. Real sims loop this for many
+# timesteps and integrate positions; this demo shows one step.
+#
+# CI-safe: pure loopback fork, no network. Clean under --no-interop.
+
+p "── distributed N-body simulation (1 step) ──"
+
+# 6 bodies in 2D. Each: [x, y, mass].
+my @bodies = (
+    [0.0,  0.0,  10.0],
+    [1.0,  0.0,  1.0],
+    [0.0,  1.0,  1.0],
+    [-1.0, 0.0,  1.0],
+    [0.0, -1.0,  1.0],
+    [2.0,  2.0,  5.0],
+)
+my $n = len(@bodies)
+my $g = 1.0
+printf "bodies: %d  ·  gravity G: %.2f\n", $n, $g
+
+my @workers = congregation(3)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard bodies across workers. Each worker computes acceleration for
+# its assigned bodies given the current full position list.
+my $bodies_json = to_json(\@bodies)
+my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+my %accelerations
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = $n - 1 if $end >= $n
+    next if $start >= $n
+    my $code = "
+        my \$bodies = from_json(q{$bodies_json});
+        my %acc;
+        my \$n = len(\@\$bodies);
+        my \$g = $g;
+        for my \$i ($start:$end) {
+            my \$ax = 0.0;
+            my \$ay = 0.0;
+            my \$bi = \$bodies->[\$i];
+            for my \$j (0:\$n - 1) {
+                next if \$j == \$i;
+                my \$bj = \$bodies->[\$j];
+                my \$dx = \$bj->[0] - \$bi->[0];
+                my \$dy = \$bj->[1] - \$bi->[1];
+                my \$r2 = \$dx * \$dx + \$dy * \$dy + 0.01;  # softening
+                my \$r = sqrt(\$r2);
+                my \$f = \$g * \$bj->[2] / \$r2;
+                \$ax += \$f * \$dx / \$r;
+                \$ay += \$f * \$dy / \$r;
+            }
+            \$acc{\$i} = sprintf('%.4f,%.4f', \$ax, \$ay);
+        }
+        to_json(\\%acc)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    my $h = from_json($reply{$w})
+    for my $k (keys %$h) {
+        $accelerations{0 + $k} = $h->{$k}
+    }
+}
+
+p "── accelerations per body ──"
+for my $i (0:$n - 1) {
+    my $body = $bodies[$i]
+    my $acc = $accelerations{$i}
+    printf "  body %d  pos=(%.1f,%.1f)  mass=%.1f  acc=(%s)\n",
+        $i, $body->[0], $body->[1], $body->[2], $acc
+}
+
+excommunicate(@workers)
+p "done"

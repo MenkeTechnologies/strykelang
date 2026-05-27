@@ -1,0 +1,101 @@
+#!/usr/bin/env stryke
+#
+# Distributed JSON aggregator — each worker parses a JSON record
+# from its shard and emits (status_code, latency) extracted fields.
+# Master aggregates into per-status-code latency stats (count + sum
+# for averaging).
+#
+# Real shape: each worker is parsing a slice of an access log /
+# event stream; master rolls per-shard stats into fleet-wide
+# percentiles / SLO dashboards.
+#
+# CI-safe: pure loopback fork, synthetic JSON records. Clean under
+# --no-interop.
+
+p "── distributed JSON aggregator ──"
+
+# Synthetic JSON records.
+my @records = (
+    '{"status":200,"latency_ms":12}',
+    '{"status":200,"latency_ms":18}',
+    '{"status":404,"latency_ms":5}',
+    '{"status":200,"latency_ms":25}',
+    '{"status":500,"latency_ms":300}',
+    '{"status":200,"latency_ms":11}',
+    '{"status":404,"latency_ms":7}',
+    '{"status":200,"latency_ms":15}',
+    '{"status":500,"latency_ms":250}',
+    '{"status":200,"latency_ms":22}',
+    '{"status":404,"latency_ms":6}',
+    '{"status":200,"latency_ms":19}',
+)
+my $n = len(@records)
+printf "records: %d JSON entries\n", $n
+
+my @workers = congregation(4)
+my @sorted_workers = sort { _ <=> _1 } @workers
+
+# Shard records, each worker parses + groups by status, returns
+# JSON: { "200": {count, sum}, "404": ..., "500": ... }.
+my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+my @partials
+for my $i (0:len(@sorted_workers) - 1) {
+    my $w = $sorted_workers[$i]
+    my $start = $i * $per
+    my $end = $start + $per - 1
+    $end = $n - 1 if $end >= $n
+    next if $start >= $n
+    my @shard
+    for my $r ($start:$end) { push @shard, $records[$r] }
+    my $shard_json = to_json(\@shard)
+    my $code = "
+        my \$arr = from_json(q{$shard_json});
+        my %stats;  # status_str → [count, sum]
+        for my \$rec (\@\$arr) {
+            my \$obj = from_json(\$rec);
+            my \$st = '' . \$obj->{status};
+            my \$lat = \$obj->{latency_ms};
+            if (exists \$stats{\$st}) {
+                \$stats{\$st}[0]++;
+                \$stats{\$st}[1] += \$lat;
+            } else {
+                \$stats{\$st} = [1, \$lat];
+            }
+        }
+        to_json(\\%stats)
+    "
+    my $div = pray $code, $w
+    my %reply = annex $div
+    push @partials, from_json($reply{$w})
+}
+
+# Fleet aggregate.
+my %fleet  # status → [count, sum]
+for my $p (@partials) {
+    for my $st (keys %$p) {
+        my $pair = $p->{$st}
+        if (exists $fleet{$st}) {
+            $fleet{$st}[0] += $pair->[0]
+            $fleet{$st}[1] += $pair->[1]
+        } else {
+            $fleet{$st} = [$pair->[0], $pair->[1]]
+        }
+    }
+}
+
+p "── per-status fleet stats ──"
+printf "  %-7s %-6s %-7s %s\n", "status", "count", "sum_ms", "avg_ms"
+for my $st (sort keys %fleet) {
+    my $pair = $fleet{$st}
+    my ($cnt, $sum) = @$pair
+    my $avg = $sum / $cnt
+    printf "  %-7s %-6d %-7d %.2f\n", $st, $cnt, $sum, $avg
+}
+
+# Sanity: total record count == input count.
+my $total = 0
+for my $st (keys %fleet) { $total += $fleet{$st}[0] }
+p $total == $n ? "✓ all $n records aggregated" : "✗ count mismatch"
+
+excommunicate(@workers)
+p "done"
