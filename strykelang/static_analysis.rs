@@ -1078,6 +1078,7 @@ impl StaticAnalyzer {
             }
             ExprKind::ArrayElement { array, index } => {
                 if self.strict_vars
+                    && !array.starts_with("__topicstr__")
                     && !self.is_array_defined(array)
                     && !self.is_scalar_defined(array)
                 {
