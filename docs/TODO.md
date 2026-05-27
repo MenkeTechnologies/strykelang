@@ -39,6 +39,61 @@
      See BUG-044. Use `around { proceed() }` and inspect the return value
      directly when you need the actual value.
 
+  ## Distributed-compute API (congregation/pray/annex) — Tier 5 deferrals
+
+  These limitations live alongside the 28-verb scriptable distributed API
+  (see README §0x10c). All are real architectural changes, not workaround
+  candidates. Tracking here so future sessions don't re-discover them.
+
+  7. **`EVAL_RESULT` carries no `petition_id`** — agent reply queue is FIFO
+     per-agent, so a chant fired on agent join leaves a stale "ok" reply
+     in the socket buffer that the next `pray + annex` consumes instead
+     of its own result. Workaround in scripts: drain with a discard
+     scatter before the real readback. Fix requires bumping
+     `AGENT_PROTO_VERSION` and adding a `petition_id` field to
+     `EvalCommand`/`EvalResult` so `gather` can demux by id. See
+     `tests/suite/scriptable_controller_pin.rs::chant_fires_at_new_joiners_*`
+     for the workaround pattern.
+
+  8. **Cathedral is in-process only (no `stryked` daemon yet)** —
+     `ordain($name)` registers `name → endpoint` in a process-local
+     `OnceLock<Mutex<HashMap>>`, so `profess($name)` only resolves
+     congregations ordained in the SAME OS process. Tier 5 promotes the
+     cathedral to a standalone `stryked` daemon for cross-host name
+     resolution. Workaround: pass the endpoint explicitly via env var
+     until then.
+
+  9. **`divine($handler)` is a no-op marker** — registers the closure but
+     the agent's EVAL loop doesn't yet dispatch through it. Workaround:
+     master sends EVAL code that calls `$divine_handler->($petition)`
+     explicitly. Tier 5 splits the agent's frame handler to consult the
+     registered handler first when present.
+
+  10. **`recant(@keys)` returns intended-delete count, doesn't actually
+      delete** — current implementation reports how many keys it would
+      delete; caller wraps with `for my $k (@keys) { delete $main::soul{$k} }`
+      to make it real. Tier 5 wires a Rust interpreter handle so the
+      delete is atomic from inside the builtin.
+
+  ### Two stryke language bugs fixed (2026-05-27)
+
+  Surfaced during the Tier 3 lick/peruse work; fixed at the VM level
+  rather than papered over. Listed here for the archeology.
+
+  - **`\%our-hash` derefed as empty.** `promote_hash_to_shared(name)` /
+    `promote_array_to_shared(name)` compared the raw `name` against
+    canonical entry keys without stripping the `main::` prefix → fell
+    through to empty Arc. Fixed in `scope.rs` by canonicalizing at
+    function entry.
+  - **`our %hash` didn't persist across EVAL boundaries.** Two parts:
+    (a) `declare_hash` always stored in `frames.last_mut()` regardless
+    of package qualification — fixed by routing package-qualified names
+    to `frames.first_mut()`. (b) `Op::DeclareHash` clobbered with
+    empty for the no-initializer form (`our %h;` compiles to
+    `LoadUndef + DeclareHash`) — fixed by detecting undef value AND
+    `n.contains("::")` to preserve existing data (lexical `my %h;`
+    still clobbers per iteration as required by loop-local semantics).
+
 
 
   ## What's still on the table

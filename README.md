@@ -55,6 +55,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x10\] Distributed `pmap_on` / `~d>` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
 - [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
 - [\[0x10b\] Agent/Controller Architecture](#0x10b-agentcontroller-architecture)
+- [\[0x10c\] Scriptable Distributed Compute — `congregation` / `pray` / `annex`](#0x10c-scriptable-distributed-compute--congregation--pray--annex)
 - [\[0x11\] Language Server (`stryke lsp`)](#0x11-language-server-stryke-lsp)
 - [\[0x12\] Language Reflection](#0x12-language-reflection)
 - [\[0x14\] Package Manager](#0x14-package-manager)
@@ -2671,6 +2672,129 @@ exit controller("127.0.0.1", 9999)   # blocks on REPL
 | `agent(addr?, name?)` | `addr`: `host` or `host:port`, `name`: display label | `addr="localhost:9999"`, `name=hostname` |
 
 Wrap either in `spawn { ... }` to run in the background while the calling script continues. Useful for in-process integration tests and local REPL development against a real agent without bringing up a second machine.
+
+## [0x10c] SCRIPTABLE DISTRIBUTED COMPUTE — `congregation` / `pray` / `annex`
+
+The controller/agent REPL at [0x10b] is for human-typed interactive load testing. Scripts that need programmatic distributed compute — scatter work to N workers, gather results, manage worker state — use the **28-verb religious-themed API** layered on top of the same TCP+bincode controller infrastructure. Each verb is a stryke builtin; the whole pipeline lives in a `.stk` file with no REPL, no manual orchestration, no external infrastructure.
+
+### Minimum-viable use
+
+```perl
+my @workers = congregation(4);                # fork 4 agents locally, wait for them to register
+my $div     = pray "compute()", @workers;     # scatter EVAL frames in parallel, return divination
+my %results = annex $div;                     # block-and-gather hash keyed by session-id
+excommunicate(@workers);                      # clean shutdown
+```
+
+`pray` accepts a string OR a coderef (closure body is deparsed and shipped — closure captures not supported in v1):
+
+```perl
+my $div = pray sub { 2 + $_ }, @workers;       # coderef form
+my $div = pray "2 + 3", @workers;              # string form
+```
+
+### Full verb taxonomy
+
+| Verb | Side | Effect |
+|---|---|---|
+| **Lifecycle** | | |
+| `congregation($n)` | master | fork N stryke agent children, auto-register them, return handle array |
+| `anoint($n)` | master | like `congregation` but doesn't take over as current controller (multi-cong scripts) |
+| `ordain([$name, [$bind, [$port]]])` | master | bare controller (no agents), register name in cathedral for remote `profess` |
+| `muster([$controller_id])` | master | enumerate currently-connected agent handles |
+| `welcome($n [, $timeout_ms])` | master | block until N agents have joined |
+| `excommunicate(@handles)` | master | SHUTDOWN frame to subset, drop from roster |
+| `bow()` | slave | enter agent receive loop (alias for `agent()`) |
+| `profess($name)` | slave | look up congregation in cathedral, connect as agent |
+| `apostatize($name)` | local | unregister congregation from cathedral |
+| `cathedral()` | local | enumerate registered congregation names |
+| **Scatter / gather** | | |
+| `pray($code, @handles)` | master | scatter, return divination id (closure or string) |
+| `annex($div [, $timeout_ms])` | master | block-and-gather, consume divination, return hash |
+| `harvest($code, @handles [, $timeout_ms])` | master | fused `pray + annex` one-shot |
+| `chant($code, @handles)` | master | continuous rescatter — fires at current AND future joiners; returns chant_id |
+| `amen($id)` | master | release pending divination OR stop active chant |
+| `pilgrimage($code, @handles [, $timeout_ms])` | master | scatter+gather barrier; returns 1 if all rendezvous, 0 otherwise |
+| **State inspection** | | |
+| `lick(@handles)` | master | non-destructive snapshot of every worker's `%soul` via `to_json(\%soul)` |
+| `peruse(@handles)` | master | deep `%soul` walk (Tier 3 alias of lick; god-style traversal in Tier 5) |
+| `interrogate($pid_or_handles)` | master | polymorphic dump — `$pid` (OS process via sysinfo) OR `@handles` (agent VM state) |
+| **State mutation** | | |
+| `bestow(\%hash, @handles)` | master | push hash to each worker's `%gift` via JSON round-trip |
+| `smite(@handles)` | master | reset workers' `%soul` and `%gift` without disconnecting |
+| `recant(@keys)` | slave | partial self-erasure of own `%soul` |
+| **Persistence** | | |
+| `enshrine(\%hash, $path)` | local | write hash to disk as JSON |
+| `exhume($path)` | local | read enshrined JSON back as hash |
+| `smother(\%hash)` | local | securely zero a local hash (overwrite + clear) |
+| `martyr($path)` | slave | exit(0) after caller has enshrined |
+| `resurrect($enshrine_path)` | master | exhume + anoint(1) + bestow → new agent with restored state |
+| **Security** | | |
+| `cloister($token)` | master | toggle :cloistered mode — agents must send `STRYKE_AGENT_TOKEN` matching `$token` |
+| `divine($handler)` | slave | register closure handler for incoming petitions (Tier 5 wires dispatch through it) |
+
+### Worker-side `%soul` convention
+
+Workers maintain `our %soul` as their externally-visible state. `lick`/`peruse`/`annex` serialize it; `smite` clears it; `bestow` populates a peer hash `our %gift` for pushed data:
+
+```perl
+# Slave script (run on each compute node):
+profess "renderfarm";
+bow {                                          # enter receive loop
+    our %soul;
+    our %gift;
+    our $frames_rendered = 0;
+};
+# Master can later: lick(@workers) sees the soul state; smite(@workers) resets it
+```
+
+### `:cloistered` ACL
+
+Open by default. To restrict membership to anointed-only workers, the master calls `cloister($token)` and workers set `STRYKE_AGENT_TOKEN` matching that token before calling `agent`/`bow`/`profess`. Wire-level: a new `AGENT_AUTH` frame (`frame_kind::AGENT_AUTH = 0x1B`) is sent post-HELLO when the env var is set; cloistered controllers reject any agent without a valid token within 500 ms.
+
+### Continuous rescatter via `chant`
+
+`chant` is the fire-and-forget cousin of `pray` — it registers an ongoing prayer that fires at every current agent AND at every new agent that joins later (via the accept-loop hook). Use for state distribution (`bestow`-like config push to current + future workers):
+
+```perl
+my $vigil = chant("our %config = (max_depth => 8); 'ok'", @workers);
+# ... new workers can join via profess(); they auto-receive the chant on join ...
+amen($vigil);                                  # stop the rescatter
+```
+
+### Cathedral (in-process v1)
+
+`ordain($name, ...)` registers `name → master_endpoint` in an in-process registry. `profess($name)` resolves the endpoint and connects. Tier 4 ships in-process only — Tier 5 promotes the cathedral to a standalone `stryked` daemon for cross-host name resolution.
+
+```perl
+# Master:
+ordain "renderfarm", "0.0.0.0", 9999;
+welcome 4, 30_000;                             # wait for 4 slaves
+my %frames = harvest "render_frame()", muster();
+
+# Slave (in any process, including a forked child):
+profess "renderfarm";                          # blocks in agent loop
+```
+
+### Live demo
+
+[`examples/distributed_congregation.stk`](examples/distributed_congregation.stk) runs a 2-worker scatter-gather end-to-end (CI-safe loopback, no external deps):
+
+```text
+$ stryke examples/distributed_congregation.stk 2 "5 * 8"
+── distributed_congregation: N=2 code=5 * 8 ──
+spawned 2 workers: 1,2
+divination id: 1
+  worker 1 → 40
+  worker 2 → 40
+✓ all 2 workers returned: 40
+```
+
+### Project-bar position
+
+Scriptable in-language single-keyword scatter-gather + distributed state harvest + secure-erase as a language primitive does not exist anywhere as of 2026-05-27. MPI is a C library requiring `mpirun`; Erlang has process groups but no destructive harvest or peek/commit pair; Spark/Hadoop require cluster bootstrap and JVM; nothing in shell-language space comes close. The `lick`/`annex`/`smother` triple and the `chant`/`amen` continuous-rescatter pair are genuinely empty territory — world-first language-keyword primitives, not yet-another-rewrite of an existing framework.
+
+See [`docs/killer-features-brainstorm.md`](docs/killer-features-brainstorm.md) "Scriptable Master/Slave" for the full design rationale, shipped/deferred status, and the two stryke language bugs fixed during this work (`\%our-hash` ref deref + `our %hash` cross-EVAL persistence).
 
 ### Builtins: `mark(...)` / `provenance(...)` / `unmark(...)` — value lineage as a first-class feature
 
