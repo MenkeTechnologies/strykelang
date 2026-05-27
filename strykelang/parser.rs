@@ -13962,6 +13962,8 @@ impl Parser {
             | "enshrine" | "exhume" | "smother" | "amen"
             | "anoint" | "welcome" | "pilgrimage" | "bow"
             | "lick" | "peruse"
+            | "chant" | "profess" | "apostatize" | "cathedral" | "cloister"
+            | "recant" | "martyr" | "resurrect" | "divine" | "interrogate"
             // ── numerical stability + modern IDs ───────────────────────────
             | "ulid" | "is_ulid" | "ulid_timestamp"
             | "kahan_sum" | "welford_mean" | "welford_variance"
