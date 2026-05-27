@@ -5319,6 +5319,11 @@ pub(crate) fn try_builtin(
         "stun" => Some(builtin_stun(args)),
         "stun_classify" => Some(builtin_stun_classify(args)),
         "punch" => Some(builtin_punch(args)),
+        "turn_allocate" => Some(builtin_turn_allocate(args)),
+        "turn_permission" => Some(builtin_turn_permission(args)),
+        "turn_send" => Some(builtin_turn_send(args)),
+        "turn_recv" => Some(builtin_turn_recv(args)),
+        "turn_refresh" => Some(builtin_turn_refresh(args)),
         "mark" => Some(builtin_mark(args, line)),
         "provenance" => Some(builtin_provenance(args)),
         "unmark" => Some(builtin_unmark(args)),
@@ -13695,6 +13700,290 @@ fn builtin_punch(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         },
     );
     Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
+}
+
+// ── TURN relay helpers ──────────────────────────────────────────────────
+//
+// The TURN allocation handle is stored in a process-global pool keyed by
+// the same `socket_id` the udp_sockets pool uses — so script code holds
+// ONE id that addresses BOTH the underlying UDP socket and the live
+// allocation against the TURN server. The 5 turn_* builtins look up the
+// allocation by socket_id and delegate to crate::turn_client.
+
+fn turn_alloc_pool() -> &'static std::sync::Mutex<
+    std::collections::HashMap<u64, crate::turn_client::TurnAllocation>,
+> {
+    static POOL: std::sync::OnceLock<
+        std::sync::Mutex<
+            std::collections::HashMap<u64, crate::turn_client::TurnAllocation>,
+        >,
+    > = std::sync::OnceLock::new();
+    POOL.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn turn_alloc_get(socket_id: u64) -> Option<crate::turn_client::TurnAllocation> {
+    turn_alloc_pool().lock().ok()?.get(&socket_id).cloned()
+}
+
+fn turn_alloc_store(socket_id: u64, alloc: crate::turn_client::TurnAllocation) {
+    if let Ok(mut g) = turn_alloc_pool().lock() {
+        g.insert(socket_id, alloc);
+    }
+}
+
+/// `turn_allocate($id, $server, $port, $username, $password [, $timeout_ms])`
+/// — drive the TURN two-roundtrip allocation flow on socket `$id`. On
+/// success returns a hashref describing the allocation and stores it in
+/// a process-global pool keyed by `$id` (so `turn_permission`, `turn_send`,
+/// `turn_recv`, `turn_refresh` find it via the same id). Returns `undef`
+/// on bind/auth/network failure.
+///
+///   { relay_ip      => "203.0.113.99",
+///     relay_port    => 49999,
+///     lifetime_secs => 600,
+///     realm         => "turn.example.org",
+///     nonce_len     => 13 }
+fn builtin_turn_allocate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    let server = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let port_raw = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    let user = args
+        .get(3)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let pass = args
+        .get(4)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if id == 0 || server.is_empty() || !(1..=65535).contains(&port_raw) {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let port = port_raw as u16;
+    let timeout_ms = args
+        .get(5)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(3000);
+
+    let alloc = match crate::turn_client::allocate(
+        id,
+        &server,
+        port,
+        &user,
+        &pass,
+        Duration::from_millis(timeout_ms),
+    ) {
+        Some(a) => a,
+        None => return Ok(StrykeValue::UNDEF),
+    };
+    let nonce_len = alloc.nonce.len();
+    let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+    m.insert(
+        "relay_ip".into(),
+        StrykeValue::string(alloc.relay_ip.to_string()),
+    );
+    m.insert(
+        "relay_port".into(),
+        StrykeValue::integer(alloc.relay_port as i64),
+    );
+    m.insert(
+        "lifetime_secs".into(),
+        StrykeValue::integer(alloc.lifetime_secs as i64),
+    );
+    m.insert("realm".into(), StrykeValue::string(alloc.realm.clone()));
+    m.insert("nonce_len".into(), StrykeValue::integer(nonce_len as i64));
+    turn_alloc_store(id, alloc);
+    Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
+}
+
+/// `turn_permission($id, $peer_ip [, $timeout_ms=2000])` — install a
+/// CreatePermission for `$peer_ip` on the TURN allocation associated
+/// with socket `$id`. Returns 1 on success, 0 on failure (no
+/// allocation, network error, or non-success response).
+fn builtin_turn_permission(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    let peer_ip_str = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if id == 0 || peer_ip_str.is_empty() {
+        return Ok(StrykeValue::integer(0));
+    }
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(2000);
+    let peer_ip: std::net::IpAddr = match peer_ip_str.parse() {
+        Ok(ip) => ip,
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    let Some(alloc) = turn_alloc_get(id) else {
+        return Ok(StrykeValue::integer(0));
+    };
+    let ok = crate::turn_client::create_permission(
+        &alloc,
+        peer_ip,
+        Duration::from_millis(timeout_ms),
+    );
+    Ok(StrykeValue::integer(if ok { 1 } else { 0 }))
+}
+
+/// `turn_send($id, $peer_ip, $peer_port, $payload)` — wrap `$payload` in
+/// a SEND_INDICATION and ship via the TURN allocation. Returns bytes
+/// sent to the TURN server (NOT bytes confirmed at the peer — peer
+/// receipt is implicit when a DATA_INDICATION reply arrives). Returns 0
+/// on failure.
+fn builtin_turn_send(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    let peer_ip_str = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let peer_port_raw = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(0);
+    if id == 0 || peer_ip_str.is_empty() || !(1..=65535).contains(&peer_port_raw) {
+        return Ok(StrykeValue::integer(0));
+    }
+    let peer_ip: std::net::IpAddr = match peer_ip_str.parse() {
+        Ok(ip) => ip,
+        Err(_) => return Ok(StrykeValue::integer(0)),
+    };
+    let peer_port = peer_port_raw as u16;
+    let payload: Vec<u8> = match args.get(3).filter(|v| !v.is_undef()) {
+        Some(v) => {
+            if let Some(arc) = v.as_bytes_arc() {
+                (*arc).clone()
+            } else {
+                v.to_string().into_bytes()
+            }
+        }
+        None => Vec::new(),
+    };
+    let Some(alloc) = turn_alloc_get(id) else {
+        return Ok(StrykeValue::integer(0));
+    };
+    match crate::turn_client::send_to_peer(&alloc, peer_ip, peer_port, &payload) {
+        Some(n) => Ok(StrykeValue::integer(n as i64)),
+        None => Ok(StrykeValue::integer(0)),
+    }
+}
+
+/// `turn_recv($id [, $timeout_ms=1000])` — wait for the next
+/// DATA_INDICATION on the TURN allocation's socket and return
+/// `{ payload, peer_ip, peer_port }`. Returns `undef` on timeout or if
+/// the next packet isn't a DATA_INDICATION (caller should call again to
+/// drain other indications).
+fn builtin_turn_recv(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use std::sync::Arc as StdArc;
+    use std::time::Duration;
+
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::UNDEF);
+    }
+    let timeout_ms = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(0) as u64)
+        .unwrap_or(1000);
+    let Some(alloc) = turn_alloc_get(id) else {
+        return Ok(StrykeValue::UNDEF);
+    };
+    let (peer_ip, peer_port, payload) = match crate::turn_client::recv_indication(
+        &alloc,
+        Duration::from_millis(timeout_ms),
+    ) {
+        Some(r) => r,
+        None => return Ok(StrykeValue::UNDEF),
+    };
+    let payload_v = match String::from_utf8(payload.clone()) {
+        Ok(s) => StrykeValue::string(s),
+        Err(_) => StrykeValue::bytes(StdArc::new(payload)),
+    };
+    let mut m: IndexMap<String, StrykeValue> = IndexMap::new();
+    m.insert("payload".into(), payload_v);
+    m.insert(
+        "peer_ip".into(),
+        StrykeValue::string(peer_ip.to_string()),
+    );
+    m.insert(
+        "peer_port".into(),
+        StrykeValue::integer(peer_port as i64),
+    );
+    Ok(StrykeValue::hash_ref(StdArc::new(RwLock::new(m))))
+}
+
+/// `turn_refresh($id [, $lifetime_secs=600, $timeout_ms=2000])` — send a
+/// Refresh to extend the allocation. Pass `$lifetime_secs=0` to release
+/// the allocation immediately. Returns the new lifetime on success, 0
+/// on failure.
+fn builtin_turn_refresh(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+    let id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .unwrap_or(0);
+    if id == 0 {
+        return Ok(StrykeValue::integer(0));
+    }
+    let lifetime = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(0) as u32)
+        .unwrap_or(600);
+    let timeout_ms = args
+        .get(2)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(2000);
+    let Some(alloc) = turn_alloc_get(id) else {
+        return Ok(StrykeValue::integer(0));
+    };
+    match crate::turn_client::refresh(&alloc, lifetime, Duration::from_millis(timeout_ms)) {
+        Some(n) => Ok(StrykeValue::integer(n as i64)),
+        None => Ok(StrykeValue::integer(0)),
+    }
 }
 
 /// `mark($val)` — tag a heap value's Arc so subsequent builtin calls that

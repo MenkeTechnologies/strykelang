@@ -98,6 +98,7 @@ pub mod nat_punch;
 pub mod profiler;
 pub mod provenance;
 pub mod pwatch;
+pub mod turn_client;
 pub mod udp_sockets;
 pub mod remote_wire;
 pub mod rust_ffi;

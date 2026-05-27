@@ -202,6 +202,7 @@ mod kick_pin;
 mod nat_punch_pin;
 mod provenance_pin;
 mod stego_pin;
+mod turn_pin;
 mod swallow_pin;
 mod burp_pin;
 mod god_pin;

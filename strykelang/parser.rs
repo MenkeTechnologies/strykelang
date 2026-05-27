@@ -14013,6 +14013,9 @@ impl Parser {
             // ── P2P NAT traversal (persistent socket pool + STUN + punch) ──
             | "udp_open" | "udp_send_to" | "udp_recv" | "udp_recv_from"
             | "udp_close" | "stun" | "stun_classify" | "punch"
+            // ── TURN relay fallback (RFC 8656) for symmetric NATs ──────────
+            | "turn_allocate" | "turn_permission" | "turn_send"
+            | "turn_recv" | "turn_refresh"
             // ── functional / iterator ───────────────────────────────────────
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
