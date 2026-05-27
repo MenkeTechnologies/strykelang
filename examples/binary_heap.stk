@@ -1,0 +1,87 @@
+#!/usr/bin/env stryke
+
+# binary_heap.stk - Min-heap based priority queue.
+#
+# Run: stryke --no-interop examples/binary_heap.stk
+
+package BH;
+
+fn new() { { data => [] } }
+
+fn _swap($self, $i, $j) {
+    my $arr = $self->{data}
+    my $t = $arr->[$i]
+    $arr->[$i] = $arr->[$j]
+    $arr->[$j] = $t
+}
+
+fn size($self) { len(@{$self->{data}}) }
+
+fn is_empty($self) { len(@{$self->{data}}) == 0 }
+
+fn peek($self) {
+    return undef if len(@{$self->{data}}) == 0
+    $self->{data}->[0]
+}
+
+fn push($self, $v) {
+    my $arr = $self->{data}
+    push @$arr, $v
+    my $i = len(@$arr) - 1
+    while ($i > 0) {
+        my $parent = int(($i - 1) / 2)
+        if ($arr->[$i] < $arr->[$parent]) {
+            BH::_swap($self, $i, $parent)
+            $i = $parent
+        } else {
+            last
+        }
+    }
+}
+
+fn pop($self) {
+    my $arr = $self->{data}
+    my $n = len(@$arr)
+    return undef if $n == 0
+    my $top = $arr->[0]
+    if ($n == 1) {
+        pop @$arr
+        return $top
+    }
+    $arr->[0] = pop @$arr
+    my $i = 0
+    my $sz = len(@$arr)
+    while (1) {
+        my $l = 2 * $i + 1
+        my $r = 2 * $i + 2
+        my $smallest = $i
+        $smallest = $l if $l < $sz && $arr->[$l] < $arr->[$smallest]
+        $smallest = $r if $r < $sz && $arr->[$r] < $arr->[$smallest]
+        last if $smallest == $i
+        BH::_swap($self, $i, $smallest)
+        $i = $smallest
+    }
+    $top
+}
+
+fn heapsort($arr) {
+    my $h = BH::new()
+    for my $x (@$arr) { BH::push($h, $x) }
+    my @out = ()
+    while (!BH::is_empty($h)) { push @out, BH::pop($h) }
+    \@out
+}
+
+package main;
+
+p "=== Binary Heap Demo ==="
+my $h = BH::new()
+for my $v (5, 3, 8, 1, 9, 2, 7) { BH::push($h, $v) }
+p "size: " . BH::size($h)
+p "peek: " . BH::peek($h)
+my @out = ()
+while (!BH::is_empty($h)) { push @out, BH::pop($h) }
+p "sorted: " . join(",", @out)
+
+my $s = BH::heapsort([42, 1, 33, 7, 19, 4, 18, 100, 0])
+p "heapsort: " . join(",", @$s)

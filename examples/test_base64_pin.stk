@@ -1,0 +1,126 @@
+#!/usr/bin/env stryke
+
+fn B64::_alphabet() {
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+}
+
+fn B64::encode($s) {
+    my $alph = B64::_alphabet()
+    my $n = len $s
+    my $out = ""
+    my $i = 0
+    while ($i < $n) {
+        my $b0 = ord(substr($s, $i, 1))
+        my $b1 = $i + 1 < $n ? ord(substr($s, $i + 1, 1)) : 0
+        my $b2 = $i + 2 < $n ? ord(substr($s, $i + 2, 1)) : 0
+        my $triple = $b0 * 65536 + $b1 * 256 + $b2
+        my $c0 = int($triple / 262144) % 64
+        my $c1 = int($triple / 4096) % 64
+        my $c2 = int($triple / 64) % 64
+        my $c3 = $triple % 64
+        $out = $out . substr($alph, $c0, 1) . substr($alph, $c1, 1)
+        if ($i + 1 < $n) { $out = $out . substr($alph, $c2, 1) } else { $out = $out . "=" }
+        if ($i + 2 < $n) { $out = $out . substr($alph, $c3, 1) } else { $out = $out . "=" }
+        $i = $i + 3
+    }
+    $out
+}
+
+fn B64::_idx($c) {
+    my $alph = B64::_alphabet()
+    my $n = len $alph
+    for my $i (0:$n-1) {
+        return $i if substr($alph, $i, 1) eq $c
+    }
+    -1
+}
+
+fn B64::decode($s) {
+    my $n = len $s
+    my $out = ""
+    my $i = 0
+    while ($i < $n) {
+        my $c0 = substr($s, $i, 1)
+        my $c1 = substr($s, $i + 1, 1)
+        my $c2 = substr($s, $i + 2, 1)
+        my $c3 = substr($s, $i + 3, 1)
+        my $v0 = B64::_idx($c0)
+        my $v1 = B64::_idx($c1)
+        my $v2 = $c2 eq "=" ? 0 : B64::_idx($c2)
+        my $v3 = $c3 eq "=" ? 0 : B64::_idx($c3)
+        my $triple = $v0 * 262144 + $v1 * 4096 + $v2 * 64 + $v3
+        my $b0 = int($triple / 65536) % 256
+        my $b1 = int($triple / 256) % 256
+        my $b2 = $triple % 256
+        $out = $out . chr($b0)
+        if ($c2 ne "=") { $out = $out . chr($b1) }
+        if ($c3 ne "=") { $out = $out . chr($b2) }
+        $i = $i + 4
+    }
+    $out
+}
+
+# --- Empty ---
+B64::encode("") |> aeq "", "encode empty"
+B64::decode("") |> aeq "", "decode empty"
+
+# --- Known RFC 4648 vectors ---
+B64::encode("f")      |> aeq "Zg==",     "encode f"
+B64::encode("fo")     |> aeq "Zm8=",     "encode fo"
+B64::encode("foo")    |> aeq "Zm9v",     "encode foo"
+B64::encode("foob")   |> aeq "Zm9vYg==", "encode foob"
+B64::encode("fooba")  |> aeq "Zm9vYmE=", "encode fooba"
+B64::encode("foobar") |> aeq "Zm9vYmFy", "encode foobar"
+
+B64::decode("Zg==")     |> aeq "f",      "decode f"
+B64::decode("Zm8=")     |> aeq "fo",     "decode fo"
+B64::decode("Zm9v")     |> aeq "foo",    "decode foo"
+B64::decode("Zm9vYg==") |> aeq "foob",   "decode foob"
+B64::decode("Zm9vYmE=") |> aeq "fooba",  "decode fooba"
+B64::decode("Zm9vYmFy") |> aeq "foobar", "decode foobar"
+
+# Classic
+B64::encode("Hello") |> aeq "SGVsbG8=", "encode Hello"
+B64::decode("SGVsbG8=") |> aeq "Hello", "decode Hello"
+
+B64::encode("Hi") |> aeq "SGk=", "encode Hi"
+
+# Length of encoded output is always multiple of 4
+(len(B64::encode("a")) % 4)        |> aeq 0, "pad mult4 len 1"
+(len(B64::encode("ab")) % 4)       |> aeq 0, "pad mult4 len 2"
+(len(B64::encode("abc")) % 4)      |> aeq 0, "pad mult4 len 3"
+(len(B64::encode("abcd")) % 4)     |> aeq 0, "pad mult4 len 4"
+(len(B64::encode("abcde")) % 4)    |> aeq 0, "pad mult4 len 5"
+
+# Pad-char counts: 1 byte → 2 '=', 2 bytes → 1 '=', 3 bytes → 0 '='
+my $e1 = B64::encode("a")
+my $e2 = B64::encode("ab")
+my $e3 = B64::encode("abc")
+substr($e1, len($e1) - 2, 2) |> aeq "==", "1-byte two pads"
+substr($e2, len($e2) - 1, 1) |> aeq "=",  "2-byte one pad"
+substr($e3, len($e3) - 1, 1) |> aeq "j",  "3-byte no pad (abc→…j)"
+
+# Round-trip many inputs
+for my $msg ("", "x", "xy", "xyz", "Hello, World!", "1234567890",
+             "the quick brown fox jumps over the lazy dog") {
+    my $rt = B64::decode(B64::encode($msg))
+    $rt |> aeq $msg, "round-trip: " . $msg
+}
+
+# Round-trip non-text bytes (ASCII < 32 and high bits)
+my $bin = chr(0) . chr(1) . chr(127) . chr(31) . chr(126)
+B64::decode(B64::encode($bin)) |> aeq $bin, "round-trip binary bytes"
+
+# Alphabet sanity: encode 0 byte
+B64::encode(chr(0)) |> aeq "AA==", "encode null byte"
+B64::decode("AA==") |> aeq chr(0),  "decode null byte"
+
+# Length growth: 3 input bytes -> 4 output bytes
+len(B64::encode("aaa"))   |> aeq 4,  "3 in -> 4 out"
+len(B64::encode("aaaaaa")) |> aeq 8, "6 in -> 8 out"
+
+# Specific known values
+B64::encode("pleasure.") |> aeq "cGxlYXN1cmUu", "encode pleasure."
+B64::decode("cGxlYXN1cmUu") |> aeq "pleasure.", "decode pleasure."
+
+test_run
