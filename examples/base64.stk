@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+
+# base64.stk - RFC 4648 base64 encoder/decoder using ASCII bytes.
+#
+# Run: stryke --no-interop examples/base64.stk
+
+fn B64::_alphabet() {
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+}
+
+fn B64::encode($s) {
+    my $alph = B64::_alphabet()
+    my $n = len $s
+    my $out = ""
+    my $i = 0
+    while ($i < $n) {
+        my $b0 = ord(substr($s, $i, 1))
+        my $b1 = $i + 1 < $n ? ord(substr($s, $i + 1, 1)) : 0
+        my $b2 = $i + 2 < $n ? ord(substr($s, $i + 2, 1)) : 0
+        my $triple = $b0 * 65536 + $b1 * 256 + $b2
+        my $c0 = int($triple / 262144) % 64
+        my $c1 = int($triple / 4096) % 64
+        my $c2 = int($triple / 64) % 64
+        my $c3 = $triple % 64
+        $out = $out . substr($alph, $c0, 1) . substr($alph, $c1, 1)
+        if ($i + 1 < $n) {
+            $out = $out . substr($alph, $c2, 1)
+        } else {
+            $out = $out . "="
+        }
+        if ($i + 2 < $n) {
+            $out = $out . substr($alph, $c3, 1)
+        } else {
+            $out = $out . "="
+        }
+        $i = $i + 3
+    }
+    $out
+}
+
+fn B64::_idx($c) {
+    my $alph = B64::_alphabet()
+    my $n = len $alph
+    for my $i (0:$n-1) {
+        return $i if substr($alph, $i, 1) eq $c
+    }
+    -1
+}
+
+fn B64::decode($s) {
+    my $n = len $s
+    my $out = ""
+    my $i = 0
+    while ($i < $n) {
+        my $c0 = substr($s, $i, 1)
+        my $c1 = substr($s, $i + 1, 1)
+        my $c2 = substr($s, $i + 2, 1)
+        my $c3 = substr($s, $i + 3, 1)
+        my $v0 = B64::_idx($c0)
+        my $v1 = B64::_idx($c1)
+        my $v2 = $c2 eq "=" ? 0 : B64::_idx($c2)
+        my $v3 = $c3 eq "=" ? 0 : B64::_idx($c3)
+        my $triple = $v0 * 262144 + $v1 * 4096 + $v2 * 64 + $v3
+        my $b0 = int($triple / 65536) % 256
+        my $b1 = int($triple / 256) % 256
+        my $b2 = $triple % 256
+        $out = $out . chr($b0)
+        if ($c2 ne "=") { $out = $out . chr($b1) }
+        if ($c3 ne "=") { $out = $out . chr($b2) }
+        $i = $i + 4
+    }
+    $out
+}
+
+p "=== Base64 Demo ==="
+for my $msg ("Hello", "Hi", "f", "foobar", "the quick brown fox") {
+    my $enc = B64::encode($msg)
+    my $dec = B64::decode($enc)
+    p "in:  " . $msg
+    p "enc: " . $enc
+    p "dec: " . $dec
+    p "---"
+}

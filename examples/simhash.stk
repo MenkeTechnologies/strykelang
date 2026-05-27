@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# simhash.stk - Charikar-style 32-bit simhash with shingles.
+# Useful for near-duplicate document detection.
+#
+# Run: stryke --no-interop examples/simhash.stk
+
+fn SH::hash32($s) {
+    # FNV-1a 32-bit
+    my $h = 2166136261
+    my $n = len $s
+    for my $i (0:$n-1) {
+        $h = $h ^ ord(substr($s, $i, 1))
+        $h = ($h * 16777619) % 4294967296
+    }
+    $h
+}
+
+fn SH::shingles($text, $k) {
+    my $n = len $text
+    return [$text] if $n <= $k
+    my @out = ()
+    for my $i (0:$n-$k) {
+        push @out, substr($text, $i, $k)
+    }
+    \@out
+}
+
+fn SH::compute($text, $k) {
+    my @v = ()
+    for my $i (0:31) { push @v, 0 }
+    my $sh = SH::shingles($text, $k)
+    for my $tok (@$sh) {
+        my $h = SH::hash32($tok)
+        for my $bi (0:31) {
+            my $bit = int($h / (2 ** $bi)) % 2
+            if ($bit == 1) {
+                $v[$bi] = $v[$bi] + 1
+            } else {
+                $v[$bi] = $v[$bi] - 1
+            }
+        }
+    }
+    my $sig = 0
+    for my $bi (0:31) {
+        if ($v[$bi] >= 0) { $sig = $sig + (2 ** $bi) }
+    }
+    $sig
+}
+
+fn SH::hamming($x, $y) {
+    my $z = $x ^ $y
+    my $cnt = 0
+    for my $bi (0:31) {
+        $cnt = $cnt + 1 if int($z / (2 ** $bi)) % 2 == 1
+    }
+    $cnt
+}
+
+p "=== SimHash Demo ==="
+my $t1 = "the quick brown fox jumps over the lazy dog"
+my $t2 = "the quick brown fox jumps over a lazy dog"
+my $t3 = "completely unrelated text about cats and weather"
+
+my $h1 = SH::compute($t1, 4)
+my $h2 = SH::compute($t2, 4)
+my $h3 = SH::compute($t3, 4)
+p "h1=" . $h1
+p "h2=" . $h2
+p "h3=" . $h3
+p "hamming(h1,h2)=" . SH::hamming($h1, $h2) . " (near-duplicate)"
+p "hamming(h1,h3)=" . SH::hamming($h1, $h3) . " (unrelated)"
