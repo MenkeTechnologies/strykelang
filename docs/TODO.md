@@ -75,10 +75,11 @@
       to make it real. Tier 5 wires a Rust interpreter handle so the
       delete is atomic from inside the builtin.
 
-  ### Two stryke language bugs fixed (2026-05-27)
+  ### Five stryke / congregation bugs fixed (2026-05-27)
 
-  Surfaced during the Tier 3 lick/peruse work; fixed at the VM level
-  rather than papered over. Listed here for the archeology.
+  Surfaced during the Tier 3 lick/peruse and the demo-corpus / 100x
+  scale work; fixed at root rather than papered over. Listed here for
+  archeology.
 
   - **`\%our-hash` derefed as empty.** `promote_hash_to_shared(name)` /
     `promote_array_to_shared(name)` compared the raw `name` against
@@ -93,6 +94,24 @@
     `LoadUndef + DeclareHash`) — fixed by detecting undef value AND
     `n.contains("::")` to preserve existing data (lexical `my %h;`
     still clobbers per iteration as required by loop-local semantics).
+  - **`bestow`/`enshrine` rejected hashref arguments.** `as_hash_map()`
+    at `value.rs:1446` only matches `HeapObject::Hash` (bare values),
+    not `HashRef`. Fixed: both builtins now try `as_hash_map()` first
+    then fall back to `as_hash_ref().map(|r| r.read().clone())`.
+  - **`lick`/`peruse`/`interrogate`/`exhume` returned bare hash VALUES
+    for nested objects.** When stored as values in an outer per-session
+    hash, `$h{$sid}->{k}` subscripting failed and stringification gave
+    flat concatenation. Fixed: `json_value_to_stryke` + `builtin_exhume`
+    now return `hash_ref` / `array_ref` so nested values are first-class
+    refs the caller can subscript.
+  - **`congregation(N>~50)` lost children to fork-stdio race.** Background
+    `accept_loop` thread's `eprintln!("[agent connected] ...")` could
+    leave `std::io::stderr`'s RefCell borrowed when the main thread
+    forked — child inherits borrowed state, panics on next stdio. Fixed:
+    new `Controller.quiet_accept: AtomicBool` toggled by `congregation`
+    / `anoint` during bulk fork; restored after `welcome()` returns.
+    Also: welcome timeout now scales with N (`2 + (N/10).max(1)` seconds,
+    was hardcoded 5s). Tested clean at 100 + 250 workers.
 
 
 
