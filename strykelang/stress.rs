@@ -1590,3 +1590,246 @@ fn days_to_ymd(days_since_epoch: i64) -> (i32, u32, u32) {
     let y = if m <= 2 { y + 1 } else { y };
     (y as i32, m, d)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample(ts: i64, name: &str, value: f64, labels: &[(&str, &str)]) -> MetricSample {
+        let mut m = IndexMap::new();
+        for (k, v) in labels {
+            m.insert(k.to_string(), v.to_string());
+        }
+        MetricSample {
+            ts_ms: ts,
+            name: name.to_string(),
+            value,
+            labels: m,
+        }
+    }
+
+    // ─── csv_escape: RFC 4180 escape ──────────────────────────────────
+
+    #[test]
+    fn csv_escape_plain_passes_through() {
+        assert_eq!(csv_escape("hello"), "hello");
+        assert_eq!(csv_escape(""), "");
+        assert_eq!(csv_escape("safe_label"), "safe_label");
+    }
+
+    #[test]
+    fn csv_escape_wraps_when_comma_present() {
+        assert_eq!(csv_escape("a,b"), "\"a,b\"");
+    }
+
+    #[test]
+    fn csv_escape_wraps_when_newline_present() {
+        assert_eq!(csv_escape("line1\nline2"), "\"line1\nline2\"");
+    }
+
+    #[test]
+    fn csv_escape_doubles_internal_quotes_and_wraps() {
+        // RFC 4180: " inside a quoted field is encoded as "".
+        assert_eq!(csv_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
+    }
+
+    // ─── json_escape: minimal JSON string escape ──────────────────────
+
+    #[test]
+    fn json_escape_plain_passes_through() {
+        assert_eq!(json_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn json_escape_named_escapes() {
+        assert_eq!(json_escape("\""), "\\\"");
+        assert_eq!(json_escape("\\"), "\\\\");
+        assert_eq!(json_escape("\n"), "\\n");
+        assert_eq!(json_escape("\r"), "\\r");
+        assert_eq!(json_escape("\t"), "\\t");
+    }
+
+    #[test]
+    fn json_escape_control_chars_use_unicode_escape() {
+        // BEL (0x07) → . SOH (0x01) → .
+        assert_eq!(json_escape("\x07"), "\\u0007");
+        assert_eq!(json_escape("\x01"), "\\u0001");
+    }
+
+    #[test]
+    fn json_escape_unicode_passthrough() {
+        // Non-control unicode chars (> 0x1f) pass through unchanged.
+        assert_eq!(json_escape("café"), "café");
+        assert_eq!(json_escape("日本"), "日本");
+    }
+
+    #[test]
+    fn json_escape_mixed() {
+        let s = "key\"=\"val\\n";
+        let out = json_escape(s);
+        assert!(out.contains("\\\""));
+        assert!(out.contains("\\\\"));
+    }
+
+    // ─── prom_safe_name: Prometheus name sanitizer ────────────────────
+
+    #[test]
+    fn prom_safe_name_alphanumeric_preserved() {
+        assert_eq!(prom_safe_name("cpu_usage"), "cpu_usage");
+        assert_eq!(prom_safe_name("Foo123"), "Foo123");
+    }
+
+    #[test]
+    fn prom_safe_name_underscore_and_colon_allowed() {
+        // Both _ and : are valid in Prometheus metric names.
+        assert_eq!(prom_safe_name("ns:metric_name"), "ns:metric_name");
+    }
+
+    #[test]
+    fn prom_safe_name_replaces_other_chars_with_underscore() {
+        assert_eq!(prom_safe_name("my-metric"), "my_metric");
+        assert_eq!(prom_safe_name("my.metric"), "my_metric");
+        assert_eq!(prom_safe_name("a b c"), "a_b_c");
+        assert_eq!(prom_safe_name("foo/bar"), "foo_bar");
+    }
+
+    #[test]
+    fn prom_safe_name_empty_preserved() {
+        assert_eq!(prom_safe_name(""), "");
+    }
+
+    // ─── format_csv: header + one row per sample ──────────────────────
+
+    #[test]
+    fn format_csv_empty_only_header() {
+        assert_eq!(format_csv(&[]), "ts_ms,name,value,labels\n");
+    }
+
+    #[test]
+    fn format_csv_one_sample_no_labels() {
+        let s = sample(1000, "cpu", 42.5, &[]);
+        let out = format_csv(&[s]);
+        assert_eq!(out, "ts_ms,name,value,labels\n1000,cpu,42.5,\n");
+    }
+
+    #[test]
+    fn format_csv_labels_joined_with_semicolons() {
+        let s = sample(1000, "cpu", 42.0, &[("host", "h1"), ("region", "us")]);
+        let out = format_csv(&[s]);
+        assert!(out.contains("host=h1;region=us"));
+    }
+
+    #[test]
+    fn format_csv_escapes_field_with_comma() {
+        // A label value containing a comma must wrap the joined-labels field in quotes.
+        let s = sample(1000, "cpu", 1.0, &[("host", "h,1")]);
+        let out = format_csv(&[s]);
+        // The labels column should appear quoted.
+        assert!(out.contains("\"host=h,1\""));
+    }
+
+    // ─── format_json: JSON array of objects ───────────────────────────
+
+    #[test]
+    fn format_json_empty_is_empty_array() {
+        assert_eq!(format_json(&[]), "[]");
+    }
+
+    #[test]
+    fn format_json_one_sample_has_required_fields() {
+        let s = sample(1700000000, "rps", 12.5, &[]);
+        let out = format_json(&[s]);
+        assert!(out.starts_with('['));
+        assert!(out.ends_with(']'));
+        assert!(out.contains("\"ts_ms\":1700000000"));
+        assert!(out.contains("\"name\":\"rps\""));
+        assert!(out.contains("\"value\":12.5"));
+        assert!(out.contains("\"labels\":{}"));
+    }
+
+    #[test]
+    fn format_json_two_samples_comma_separated() {
+        let s1 = sample(1, "a", 1.0, &[]);
+        let s2 = sample(2, "b", 2.0, &[]);
+        let out = format_json(&[s1, s2]);
+        // Exactly one comma at the top-level array separator.
+        let n_commas = out.matches(',').count();
+        assert!(n_commas >= 1);
+        assert!(out.contains("\"a\""));
+        assert!(out.contains("\"b\""));
+    }
+
+    #[test]
+    fn format_json_labels_object_with_quoted_keys() {
+        let s = sample(1, "m", 1.0, &[("host", "h1")]);
+        let out = format_json(&[s]);
+        assert!(out.contains("\"host\":\"h1\""));
+    }
+
+    #[test]
+    fn format_json_escapes_special_chars_in_label_value() {
+        let s = sample(1, "m", 1.0, &[("tag", "a\nb")]);
+        let out = format_json(&[s]);
+        assert!(out.contains("a\\nb"));
+    }
+
+    // ─── format_prometheus: text exposition format ────────────────────
+
+    #[test]
+    fn format_prometheus_empty_returns_empty_string() {
+        assert_eq!(format_prometheus(&[]), "");
+    }
+
+    #[test]
+    fn format_prometheus_emits_type_header_per_metric() {
+        let s = sample(1, "rps", 5.0, &[]);
+        let out = format_prometheus(&[s]);
+        assert!(out.contains("# TYPE rps gauge"));
+        assert!(out.contains("rps 5 1"));
+    }
+
+    #[test]
+    fn format_prometheus_latest_wins_for_same_labels() {
+        // Two samples with the same (name, labels) → only the latest value emitted.
+        let s1 = sample(100, "rps", 1.0, &[]);
+        let s2 = sample(200, "rps", 99.0, &[]);
+        let out = format_prometheus(&[s1, s2]);
+        // The 99 value is the survivor.
+        assert!(out.contains("99"));
+        // And the 1 value is gone (only ' 99 ' once).
+        let one_count = out.matches("rps 1 ").count();
+        assert_eq!(
+            one_count, 0,
+            "older sample 'rps 1' should have been replaced: {out:?}"
+        );
+    }
+
+    #[test]
+    fn format_prometheus_sanitizes_metric_name() {
+        // Hyphens become underscores.
+        let s = sample(1, "my-metric", 1.0, &[]);
+        let out = format_prometheus(&[s]);
+        assert!(out.contains("my_metric"));
+        assert!(!out.contains("my-metric"));
+    }
+
+    // ─── now_ms: monotonic-positive timestamp ─────────────────────────
+
+    #[test]
+    fn now_ms_is_positive() {
+        // Some plausible time post-1970.
+        let t = now_ms();
+        assert!(
+            t > 1_700_000_000_000,
+            "now_ms should be post-2023-11-14, got {t}"
+        );
+    }
+
+    #[test]
+    fn now_ms_is_monotonic_within_a_few_milliseconds() {
+        // Two consecutive calls don't go backwards.
+        let a = now_ms();
+        let b = now_ms();
+        assert!(b >= a, "{a} → {b}");
+    }
+}
