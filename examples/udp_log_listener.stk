@@ -1,0 +1,68 @@
+#!/usr/bin/env stryke
+#
+# UDP log listener — bind a UDP port + print each inbound datagram
+# with a timestamp + sender address prefix. Loki/syslog-style log
+# ingest pattern.
+#
+# Usage:
+#   stryke examples/udp_log_listener.stk [PORT] [--once]
+#
+#   PORT defaults to 5140 (syslog convention, non-privileged port).
+#   --once exits after the first datagram (useful for tests).
+#
+# Pair with `udp_send` to send log entries:
+#   stryke -e 'udp_send("127.0.0.1", 5140, "hello world")'
+#   logger -d --server 127.0.0.1 --port 5140 -t myapp "log line"
+#
+# For production deployment, fork into a background process and persist
+# datagrams (e.g. spurt to a rotating file, ship to a backend).
+
+# Bare-invocation (no argv) = smoke mode: bind ephemeral port, recv with
+# a short timeout, print one status line, exit. Keeps run_all_ci's `run`
+# phase happy. Real usage requires passing a port arg.
+my $smoke_mode = len(@ARGV) == 0
+my $port = $smoke_mode ? 0 : ($ARGV[0] // 5140)
+my $once = $smoke_mode || grep { $_ eq "--once" } @ARGV
+my $port_n = $port + 0
+if (!$smoke_mode && ($port_n <= 0 || $port_n > 65535)) {
+    p "udp_log_listener: invalid port '$port' (must be 1-65535)"
+    exit 1
+}
+
+my $sock = udp_open("0.0.0.0", $port_n)
+if ($sock == 0) {
+    printf "udp_log_listener: bind to UDP/%d failed (port in use?)\n", $port_n
+    exit 1
+}
+
+# Smoke mode: short recv timeout, print bound info, exit fast.
+# Normal mode: bind printed port, recv with 60s idle ticks.
+my $recv_timeout_ms = $smoke_mode ? 100 : 60_000
+if ($smoke_mode) {
+    p "udp_log_listener: smoke mode (no args) — bound ephemeral, exiting after short probe"
+} else {
+    printf "udp_log_listener: listening on UDP/%d (ctrl-C to exit)\n", $port_n
+    if ($once) { p "udp_log_listener: --once mode — will exit after first datagram" }
+}
+
+my $msgs = 0
+while (1) {
+    my $msg = udp_recv_from($sock, $recv_timeout_ms)
+    if (!defined $msg) {
+        # Idle tick — only useful in long-running mode.
+        if (!$once && !$smoke_mode) {
+            printf "  [idle] no datagrams in 60s — still listening on UDP/%d\n", $port_n
+        }
+        last if $smoke_mode
+        next
+    }
+    $msgs++
+    # Display: ISO-like timestamp + sender + payload (one line per datagram).
+    my @t = localtime(time())
+    printf "[%04d-%02d-%02d %02d:%02d:%02d] %s:%d  %s\n",
+        $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0],
+        $msg->{src_ip}, $msg->{src_port}, $msg->{payload}
+    last if $once
+}
+udp_close($sock)
+printf "udp_log_listener: exiting, %d datagram(s) received\n", $msgs

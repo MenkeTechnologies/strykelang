@@ -2819,6 +2819,24 @@ Verified end-to-end via an in-process mock TURN server (8 unit + 3 integration p
 
 Demo: [`examples/turn_relay_chat.stk`](examples/turn_relay_chat.stk) — three modes (classify NAT type / listen for messages via relay / send via relay).
 
+### Common pitfalls — friction points worth knowing upfront
+
+These are real bumps I hit while building the NAT-traversal stack — surfacing them so you don't waste time on the same investigations.
+
+| Pitfall | Symptom | What to do instead |
+|---|---|---|
+| **Postfix `for` after `printf`/`print`** | `printf "..." for @arr` fails with `Expected LParen, got ArrayVar(...)` | Use explicit block form: `for my $x (@arr) { printf "...", $x }` |
+| **Postfix `if` after `printf`** | Same parse failure as above | Same fix — wrap in explicit `if (...) { ... }` block |
+| **`$tx->clone` on pchannel** | "Can't call method on non-object" | Multi-producer channels aren't supported; use a different shape (multiple receivers, or one producer fanning to N consumers) |
+| **String return → provenance lost** | `mark({...}); my $j = to_json(...); provenance($j) → undef` | Wrap the string in a one-key hashref: `mark({ payload => to_json(...) })`. VM re-Arcs scalar string returns, breaking ptr-keyed lookup. Document in [provenance v1 limits](strykelang/provenance.rs#L40). |
+| **`grep { Pkg::fn }` doesn't auto-bind `$_`** | All elements pass / fail uniformly (predicate sees `$path = undef`) | Pass explicitly: `grep { Pkg::fn($_) } @list` |
+| **`fn($a, @b, @c)` slurps** | Second `@arr` param always empty; first `@arr` contains both | Pass arrayrefs + deref inside: `fn ... ($a, $b, $c) { my @b = @$b; my @c = @$c; ... }` |
+| **`mark(\@arr)` vs `mark([...])`** | `\@arr` produces a fresh SCALARREF Arc per access → provenance lookup misses | Use anonymous arrayrefs (`mark([10, 20])`) or hashrefs — they have stable Arc identity. `\@arr` operator semantics are subtle |
+| **`pack "a*"` for variable-length string** | `pack: 'A' and 'a' do not support '*'` | Concat: `pack("a4 n", $magic, $len) . $payload` — stryke's pack is stricter than Perl's |
+| **`par { Pkg::fn }` is chunked, not 1:1** | Result count = worker thread count, not input count | Use `pmap { Pkg::fn($_) } @list` for 1-result-per-input. `par` runs BLOCK once per chunk with `_` = whole chunk list |
+| **Tests that bind+drop a port then probe it** | Flaky under parallel-test load — another test grabs the freed port between drop and probe | Use port 1 (privileged, never auto-assigned) for "guaranteed closed" probes; or hold the listener for the test duration |
+| **Test file reads with CWD-relative paths** | Pass when `cargo test` is run from repo root, NotFound when run from elsewhere (IDE runner, `cargo test --manifest-path ...`) | Build absolute paths via `env!("CARGO_MANIFEST_DIR")`. See [tests/suite/examples_strict_lint.rs](tests/suite/examples_strict_lint.rs) for the pattern |
+
 ### NAT traversal — quick reference
 
 Compact decision sheet. Each rung has a different cost / success / failure profile; pick by `stun_classify` outcome + your tolerance for infrastructure.
