@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+
+fn Tpl::render($tpl, $ctx) {
+    my $out = ""
+    my $i = 0
+    my $n = len $tpl
+    while ($i < $n) {
+        my $c1 = substr($tpl, $i, 2)
+        if ($c1 eq "{{") {
+            my $end = index($tpl, "}}", $i + 2)
+            if ($end < 0) {
+                $out = $out . substr($tpl, $i, 1)
+                $i = $i + 1
+                next
+            }
+            my $tag = substr($tpl, $i + 2, $end - $i - 2)
+            $tag =~ s/^\s+//
+            $tag =~ s/\s+$//
+            if (substr($tag, 0, 5) eq "#each") {
+                my $name = substr($tag, 5)
+                $name =~ s/^\s+//
+                my $close = "{{/each}}"
+                my $bodyStart = $end + 2
+                my $bodyEnd = index($tpl, $close, $bodyStart)
+                my $body = substr($tpl, $bodyStart, $bodyEnd - $bodyStart)
+                my $items = $ctx->{$name}
+                if (defined $items) {
+                    for my $item (@$items) {
+                        my $sub = +{}
+                        for my $k (keys %$ctx) { $sub->{$k} = $ctx->{$k} }
+                        $sub->{"."} = $item
+                        if (ref($item) eq "HASH") {
+                            for my $k (keys %$item) { $sub->{$k} = $item->{$k} }
+                        }
+                        $out = $out . Tpl::render($body, $sub)
+                    }
+                }
+                $i = $bodyEnd + len($close)
+            } else {
+                my $val = $ctx->{$tag}
+                $val = "" unless defined $val
+                $out = $out . $val
+                $i = $end + 2
+            }
+        } else {
+            $out = $out . substr($tpl, $i, 1)
+            $i = $i + 1
+        }
+    }
+    $out
+}
+
+Tpl::render("Hello", +{}) |> aeq "Hello", "plain literal"
+Tpl::render("", +{}) |> aeq "", "empty"
+Tpl::render("{{x}}", +{ x => "Y" }) |> aeq "Y", "single var"
+Tpl::render("a{{x}}b", +{ x => "Z" }) |> aeq "aZb", "var in middle"
+Tpl::render("{{a}}{{b}}", +{ a => "1", b => "2" }) |> aeq "12", "two vars"
+Tpl::render("{{missing}}", +{}) |> aeq "", "missing var empty"
+Tpl::render("{{ spaced }}", +{ spaced => "ok" }) |> aeq "ok", "trim whitespace"
+Tpl::render("Hi {{name}}!", +{ name => "Bob" }) |> aeq "Hi Bob!", "greeting"
+
+# Each over scalars using {{.}}
+Tpl::render("{{#each xs}}[{{.}}]{{/each}}", +{ xs => ["a","b","c"] })
+    |> aeq "[a][b][c]", "each scalars"
+Tpl::render("{{#each xs}}{{.}},{{/each}}", +{ xs => [1,2,3] })
+    |> aeq "1,2,3,", "each ints"
+Tpl::render("{{#each xs}}x{{/each}}", +{ xs => [] }) |> aeq "", "each empty"
+
+# Each over hashes
+my @us = (+{ n => "A", v => 1 }, +{ n => "B", v => 2 })
+Tpl::render("{{#each us}}{{n}}={{v}};{{/each}}", +{ us => \@us })
+    |> aeq "A=1;B=2;", "each hashes"
+
+# Outer context available inside each
+Tpl::render("{{prefix}}:{{#each xs}}{{.}}{{/each}}",
+            +{ prefix => "L", xs => ["1","2"] })
+    |> aeq "L:12", "outer in body"
+
+# Each with surrounding text
+Tpl::render("Start [{{#each xs}}{{.}}{{/each}}] End",
+            +{ xs => ["a","b"] })
+    |> aeq "Start [ab] End", "surrounded each"
+
+test_run

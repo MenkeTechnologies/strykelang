@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+fn CB::new($cap) {
+    my @buf = ()
+    for my $i (0:$cap-1) { push @buf, undef }
+    +{ cap => $cap, buf => \@buf, head => 0, tail => 0, n => 0 }
+}
+
+fn CB::push($cb, $x) {
+    $cb->{buf}->[$cb->{tail}] = $x
+    $cb->{tail} = ($cb->{tail} + 1) % $cb->{cap}
+    if ($cb->{n} == $cb->{cap}) {
+        $cb->{head} = ($cb->{head} + 1) % $cb->{cap}
+    } else {
+        $cb->{n} = $cb->{n} + 1
+    }
+}
+
+fn CB::shift($cb) {
+    return undef if $cb->{n} == 0
+    my $v = $cb->{buf}->[$cb->{head}]
+    $cb->{head} = ($cb->{head} + 1) % $cb->{cap}
+    $cb->{n} = $cb->{n} - 1
+    $v
+}
+
+fn CB::peek($cb) {
+    return undef if $cb->{n} == 0
+    $cb->{buf}->[$cb->{head}]
+}
+
+fn CB::size($cb) { $cb->{n} }
+fn CB::is_full($cb)  { $cb->{n} == $cb->{cap} ? 1 : 0 }
+fn CB::is_empty($cb) { $cb->{n} == 0 ? 1 : 0 }
+
+fn CB::to_array($cb) {
+    my @out = ()
+    my $i = $cb->{head}
+    for my $k (0:$cb->{n}-1) {
+        push @out, $cb->{buf}->[$i]
+        $i = ($i + 1) % $cb->{cap}
+    }
+    \@out
+}
+
+# Empty buffer
+my $e = CB::new(3)
+CB::size($e)       |> aeq 0, "empty size"
+CB::is_empty($e)   |> aeq 1, "is_empty true"
+CB::is_full($e)    |> aeq 0, "is_full false"
+(defined CB::peek($e) ? 1 : 0)   |> aeq 0, "peek empty undef"
+(defined CB::shift($e) ? 1 : 0)  |> aeq 0, "shift empty undef"
+
+# Push within capacity
+my $c = CB::new(3)
+CB::push($c, 1)
+CB::push($c, 2)
+CB::size($c)       |> aeq 2, "size 2"
+CB::peek($c)       |> aeq 1, "peek front=1"
+CB::push($c, 3)
+CB::size($c)       |> aeq 3, "size 3"
+CB::is_full($c)    |> aeq 1, "is_full"
+join(",", @{CB::to_array($c)}) |> aeq "1,2,3", "contents 1,2,3"
+
+# Overflow rotates head
+CB::push($c, 4)
+CB::size($c)       |> aeq 3, "still cap"
+join(",", @{CB::to_array($c)}) |> aeq "2,3,4", "after overflow"
+CB::push($c, 5)
+join(",", @{CB::to_array($c)}) |> aeq "3,4,5", "after another overflow"
+
+# Shift sequence
+CB::shift($c)      |> aeq 3, "shift 3"
+CB::shift($c)      |> aeq 4, "shift 4"
+CB::size($c)       |> aeq 1, "size after shifts"
+CB::shift($c)      |> aeq 5, "shift 5"
+CB::is_empty($c)   |> aeq 1, "empty again"
+(defined CB::shift($c) ? 1 : 0) |> aeq 0, "shift past empty"
+
+# Mixed push/shift wrap-around
+my $w = CB::new(4)
+CB::push($w, "a")
+CB::push($w, "b")
+CB::shift($w) |> aeq "a", "shift a"
+CB::push($w, "c")
+CB::push($w, "d")
+CB::push($w, "e")
+join(",", @{CB::to_array($w)}) |> aeq "b,c,d,e", "wrap contents"
+CB::shift($w) |> aeq "b", "shift b"
+CB::shift($w) |> aeq "c", "shift c"
+CB::push($w, "f")
+CB::push($w, "g")
+join(",", @{CB::to_array($w)}) |> aeq "d,e,f,g", "after more pushes"
+
+# Capacity 1
+my $u = CB::new(1)
+CB::push($u, "x")
+CB::peek($u) |> aeq "x", "cap1 x"
+CB::push($u, "y")
+CB::peek($u) |> aeq "y", "cap1 overwrite"
+CB::shift($u) |> aeq "y", "cap1 shift"
+CB::size($u)  |> aeq 0, "cap1 empty"
+
+test_run

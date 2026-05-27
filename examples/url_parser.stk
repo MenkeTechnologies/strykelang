@@ -1,0 +1,80 @@
+#!/usr/bin/env stryke
+
+# url_parser.stk - Parse URL into scheme/host/port/path/query/fragment.
+#
+# Run: stryke --no-interop examples/url_parser.stk
+
+fn Url::parse($url) {
+    my %u = (
+        scheme   => "",
+        host     => "",
+        port     => "",
+        path     => "",
+        query    => "",
+        fragment => "",
+    )
+    my $s = $url
+    my $col = index($s, "://")
+    if ($col >= 0) {
+        $u{scheme} = substr($s, 0, $col)
+        $s = substr($s, $col + 3)
+    }
+    my $hash = index($s, "#")
+    if ($hash >= 0) {
+        $u{fragment} = substr($s, $hash + 1)
+        $s = substr($s, 0, $hash)
+    }
+    my $q = index($s, "?")
+    if ($q >= 0) {
+        $u{query} = substr($s, $q + 1)
+        $s = substr($s, 0, $q)
+    }
+    my $slash = index($s, "/")
+    my $hostpart = ""
+    if ($slash >= 0) {
+        $hostpart = substr($s, 0, $slash)
+        $u{path}  = substr($s, $slash)
+    } else {
+        $hostpart = $s
+        $u{path}  = ""
+    }
+    my $colon = index($hostpart, ":")
+    if ($colon >= 0) {
+        $u{host} = substr($hostpart, 0, $colon)
+        $u{port} = substr($hostpart, $colon + 1)
+    } else {
+        $u{host} = $hostpart
+    }
+    \%u
+}
+
+fn Url::query_params($url_obj) {
+    my %params = ()
+    return \%params if $url_obj->{query} eq ""
+    my @pairs = split /&/, $url_obj->{query}
+    for my $kv (@pairs) {
+        my $eq = index($kv, "=")
+        if ($eq >= 0) {
+            my $k = substr($kv, 0, $eq)
+            my $v = substr($kv, $eq + 1)
+            $params{$k} = $v
+        } else {
+            $params{$kv} = ""
+        }
+    }
+    \%params
+}
+
+p "=== URL Parser Demo ==="
+my $u = Url::parse("https://api.example.com:8443/users/42?fmt=json&pretty=1#top")
+p "scheme: " . $u->{scheme}
+p "host:   " . $u->{host}
+p "port:   " . $u->{port}
+p "path:   " . $u->{path}
+p "query:  " . $u->{query}
+p "frag:   " . $u->{fragment}
+my $p = Url::query_params($u)
+p "params:"
+for my $k (sort keys %$p) {
+    p "  " . $k . " = " . $p->{$k}
+}

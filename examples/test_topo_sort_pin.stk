@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+fn Topo::sort($edges, $nodes) {
+    my %indeg = ()
+    my %adj   = ()
+    for my $n (@$nodes) {
+        $indeg{$n} = 0
+        $adj{$n}   = []
+    }
+    for my $e (@$edges) {
+        my ($u, $v) = @$e
+        push @{$adj{$u}}, $v
+        $indeg{$v} = $indeg{$v} + 1
+    }
+    my @queue = ()
+    for my $n (sort @$nodes) {
+        push @queue, $n if $indeg{$n} == 0
+    }
+    my @order = ()
+    while (len(@queue) > 0) {
+        my $n = shift @queue
+        push @order, $n
+        my @nexts = sort @{$adj{$n}}
+        for my $m (@nexts) {
+            $indeg{$m} = $indeg{$m} - 1
+            push @queue, $m if $indeg{$m} == 0
+        }
+    }
+    if (len(@order) == len(@$nodes)) {
+        return \@order
+    }
+    return undef
+}
+
+my @nodes = ("a","b","c","d")
+my @edges = (["a","b"], ["a","c"], ["b","d"], ["c","d"])
+my $order = Topo::sort(\@edges, \@nodes)
+
+len(@$order)   |> aeq 4, "4 nodes ordered"
+$order->[0]    |> aeq "a", "a first"
+$order->[3]    |> aeq "d", "d last"
+
+my %pos = ()
+my $i = 0
+for my $n (@$order) {
+    $pos{$n} = $i
+    $i = $i + 1
+}
+
+(($pos{"a"} < $pos{"b"}) ? 1 : 0) |> aeq 1, "a before b"
+(($pos{"a"} < $pos{"c"}) ? 1 : 0) |> aeq 1, "a before c"
+(($pos{"b"} < $pos{"d"}) ? 1 : 0) |> aeq 1, "b before d"
+(($pos{"c"} < $pos{"d"}) ? 1 : 0) |> aeq 1, "c before d"
+
+my @cn = ("x","y","z")
+my @ce = (["x","y"], ["y","z"], ["z","x"])
+my $r = Topo::sort(\@ce, \@cn)
+
+(defined($r) ? 1 : 0) |> aeq 0, "cycle returns undef"
+
+my @s = ("only")
+my @se = ()
+my $sr = Topo::sort(\@se, \@s)
+
+len(@$sr)   |> aeq 1, "single node"
+$sr->[0]    |> aeq "only", "only node"
+
+my @dn = ("a","b","c","d")
+my @de = (["a","b"], ["c","d"])
+my $dr = Topo::sort(\@de, \@dn)
+
+len(@$dr)   |> aeq 4, "disconnected 4 nodes"
+
+my @ln = ("1","2","3","4","5")
+my @le = (["1","2"], ["2","3"], ["3","4"], ["4","5"])
+my $lr = Topo::sort(\@le, \@ln)
+
+join(",", @$lr) |> aeq "1,2,3,4,5", "linear chain order"
+
+my @en = ()
+my @ee = ()
+my $er = Topo::sort(\@ee, \@en)
+
+len(@$er)   |> aeq 0, "empty"
+
+test_run

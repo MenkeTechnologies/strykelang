@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+fn JP::escape($s) {
+    my $out = $s
+    $out =~ s/\\/\\\\/g
+    $out =~ s/"/\\"/g
+    $out =~ s/\n/\\n/g
+    $out =~ s/\t/\\t/g
+    $out
+}
+
+fn JP::is_num($n) {
+    return 0 unless defined $n
+    return 0 unless $n =~ /^-?\d+(\.\d+)?$/
+    1
+}
+
+fn JP::dump($v, $indent) {
+    my $pad   = "  " x $indent
+    my $inner = "  " x ($indent + 1)
+    if (!defined $v) {
+        return "null"
+    }
+    my $r = ref($v)
+    if ($r eq "ARRAY") {
+        return "[]" if len(@$v) == 0
+        my @parts = ()
+        for my $x (@$v) {
+            push @parts, $inner . JP::dump($x, $indent + 1)
+        }
+        return "[\n" . join(",\n", @parts) . "\n" . $pad . "]"
+    }
+    if ($r eq "HASH") {
+        my @ks = sort keys %$v
+        return "{}" if len(@ks) == 0
+        my @parts = ()
+        for my $k (@ks) {
+            push @parts, $inner . '"' . JP::escape($k) . '": ' . JP::dump($v->{$k}, $indent + 1)
+        }
+        return "{\n" . join(",\n", @parts) . "\n" . $pad . "}"
+    }
+    if (JP::is_num($v)) {
+        return "$v"
+    }
+    '"' . JP::escape($v) . '"'
+}
+
+fn JP::pretty($v) {
+    JP::dump($v, 0)
+}
+
+# Primitives
+JP::pretty(42)        |> aeq "42",      "int"
+JP::pretty(-7)        |> aeq "-7",      "neg int"
+JP::pretty("hello")   |> aeq "\"hello\"", "string"
+JP::pretty(undef)     |> aeq "null",    "null"
+JP::pretty(+{})       |> aeq "{}",      "empty hash"
+JP::pretty([])        |> aeq "[]",      "empty array"
+
+# Escapes
+JP::escape("a\"b")    |> aeq "a\\\"b", "escape quote"
+JP::escape("a\nb")    |> aeq "a\\nb",  "escape newline"
+
+# Flat array
+JP::pretty([1,2,3])   |> aeq "[\n  1,\n  2,\n  3\n]", "flat array"
+
+# Flat hash
+JP::pretty(+{ a => 1, b => 2 }) |> aeq "{\n  \"a\": 1,\n  \"b\": 2\n}", "flat hash sorted"
+
+# String values get quoted
+JP::pretty(+{ k => "v" }) |> aeq "{\n  \"k\": \"v\"\n}", "string value"
+
+# Mixed nested
+my $nested = +{ name => "Bob", nums => [10, 20] }
+JP::pretty($nested)
+    |> aeq "{\n  \"name\": \"Bob\",\n  \"nums\": [\n    10,\n    20\n  ]\n}",
+       "nested mixed"
+
+# Deep nest
+my $deep = +{ a => +{ b => +{ c => "x" } } }
+JP::pretty($deep)
+    |> aeq "{\n  \"a\": {\n    \"b\": {\n      \"c\": \"x\"\n    }\n  }\n}",
+       "deeply nested hashes"
+
+# Array of hashes
+my $aoh = [+{ id => 1 }, +{ id => 2 }]
+JP::pretty($aoh)
+    |> aeq "[\n  {\n    \"id\": 1\n  },\n  {\n    \"id\": 2\n  }\n]",
+       "array of hashes"
+
+# Undef in hash becomes null
+JP::pretty(+{ x => undef }) |> aeq "{\n  \"x\": null\n}", "null value"
+
+# Mixed types in array
+JP::pretty([1, "two", undef])
+    |> aeq "[\n  1,\n  \"two\",\n  null\n]",
+       "mixed array"
+
+# Float
+JP::pretty(3.14) |> aeq "3.14", "float"
+
+test_run
