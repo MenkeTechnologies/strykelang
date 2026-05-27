@@ -13958,6 +13958,10 @@ impl Parser {
             // builtin_pray / builtin_annex and docs/killer-features-
             // brainstorm.md "Scriptable Master/Slave" for the full design.
             | "congregation" | "ordain" | "muster" | "pray" | "annex"
+            | "harvest" | "excommunicate" | "smite" | "bestow"
+            | "enshrine" | "exhume" | "smother" | "amen"
+            | "anoint" | "welcome" | "pilgrimage" | "bow"
+            | "lick" | "peruse"
             // ── numerical stability + modern IDs ───────────────────────────
             | "ulid" | "is_ulid" | "ulid_timestamp"
             | "kahan_sum" | "welford_mean" | "welford_variance"

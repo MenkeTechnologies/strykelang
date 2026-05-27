@@ -5308,11 +5308,25 @@ pub(crate) fn try_builtin(
         "read_bytes" | "slurp_raw" | "rb" => Some(builtin_read_bytes(interp, args, line)),
         "controller" => Some(builtin_controller(args)),
         "agent" => Some(builtin_agent(args)),
+        "bow" => Some(builtin_agent(args)),
         "congregation" => Some(builtin_congregation(args)),
         "ordain" => Some(builtin_ordain(args)),
         "muster" => Some(builtin_muster(args)),
         "pray" => Some(builtin_pray(args)),
         "annex" => Some(builtin_annex(args)),
+        "harvest" => Some(builtin_harvest(args)),
+        "excommunicate" => Some(builtin_excommunicate(args)),
+        "smite" => Some(builtin_smite(args)),
+        "bestow" => Some(builtin_bestow(args)),
+        "enshrine" => Some(builtin_enshrine(args)),
+        "exhume" => Some(builtin_exhume(args)),
+        "smother" => Some(builtin_smother(args)),
+        "amen" => Some(builtin_amen(args)),
+        "anoint" => Some(builtin_anoint(args)),
+        "welcome" => Some(builtin_welcome(args)),
+        "pilgrimage" => Some(builtin_pilgrimage(args)),
+        "lick" => Some(builtin_lick(args)),
+        "peruse" => Some(builtin_peruse(args)),
         "kick" => Some(builtin_kick(args)),
         "tcp_probe" => Some(builtin_tcp_probe(args)),
         "tcp_banner" => Some(builtin_tcp_banner(args)),
@@ -13221,42 +13235,108 @@ fn builtin_muster(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::array(arr))
 }
 
-/// `pray($code_string, @agent_handles)` — scatter `$code_string` to every
-/// agent in `@agent_handles`, return a divination ID for `annex` to consume.
-/// Agents start executing immediately in parallel; this call returns as
-/// soon as the EVAL frame is on every wire (no result waiting).
-///
-/// `@agent_handles` may be passed flat (`pray $code, $h1, $h2, $h3`) or
-/// as an array (`pray $code, @cong`) — both are flattened.
-fn builtin_pray(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let code = args
-        .first()
-        .filter(|v| !v.is_undef())
-        .map(|v| v.to_string())
-        .unwrap_or_default();
-    if code.is_empty() {
+/// Extract the prayer text from a StrykeValue arg. Accepts either a string
+/// (used verbatim as EVAL source) or a coderef/sub (the body is deparsed
+/// to source via `crate::deparse::deparse_block` and that source is sent).
+/// Closure captures (`closure_env`) are NOT supported in Tier 1 — the body
+/// must be self-contained. Returns an error for undef / empty.
+fn extract_prayer_text(v: &StrykeValue, verb: &str) -> StrykeResult<String> {
+    if v.is_undef() {
         return Err(StrykeError::runtime(
-            "pray: code (first argument) required",
+            format!("{}: code (first argument) required", verb),
             0,
         ));
     }
+    if let Some(sub) = v.as_code_ref() {
+        // Coderef path: deparse the body back to stryke source. Closure
+        // captures are not shipped — the body must reference only globals
+        // or values pushed via `bestow`. (Tier 1 limitation; cross-process
+        // closure capture is a Tier 4 problem.)
+        return Ok(crate::deparse::deparse_block(&sub.body));
+    }
+    let s = v.to_string();
+    if s.is_empty() {
+        Err(StrykeError::runtime(
+            format!("{}: code is empty", verb),
+            0,
+        ))
+    } else {
+        Ok(s)
+    }
+}
 
-    // Flatten any arrays in the remaining args into a single Vec<u64>.
-    let mut agent_ids: Vec<u64> = Vec::new();
-    for v in &args[1..] {
+/// Flatten a slice of StrykeValue args into a Vec<u64> of agent handles.
+/// Accepts integers (each is one handle) and arrays (every non-undef
+/// element is one handle). Skips undef silently — matches Perl's
+/// arg-passing leniency.
+fn flatten_agent_handles(args: &[StrykeValue]) -> Vec<u64> {
+    let mut ids: Vec<u64> = Vec::new();
+    for v in args {
         if v.is_undef() {
             continue;
         }
         if let Some(arr) = v.as_array_vec() {
             for item in arr {
                 if !item.is_undef() {
-                    agent_ids.push(item.to_int() as u64);
+                    ids.push(item.to_int() as u64);
                 }
             }
         } else {
-            agent_ids.push(v.to_int() as u64);
+            ids.push(v.to_int() as u64);
         }
     }
+    ids
+}
+
+/// Resolve the current controller handle, or error if no congregation has
+/// been ordained / spawned yet in this process.
+fn require_current_controller(verb: &str) -> StrykeResult<std::sync::Arc<crate::controller::ControllerHandle>> {
+    let id = crate::controller::get_current_controller().ok_or_else(|| {
+        StrykeError::runtime(
+            format!("{}: no current controller; call congregation() or ordain() first", verb),
+            0,
+        )
+    })?;
+    crate::controller::get_controller(id)
+        .ok_or_else(|| StrykeError::runtime(format!("{}: controller {} not found", verb, id), 0))
+}
+
+/// Convert HashMap<session_id, EvalResult> to a stryke hash keyed by
+/// stringified session_id, sorted ascending. Values are the agent's
+/// output string. Used by annex / harvest / pilgrimage to return results.
+fn results_to_hash(results: std::collections::HashMap<u64, crate::agent::EvalResult>) -> StrykeValue {
+    let mut hash = indexmap::IndexMap::new();
+    let mut sorted_ids: Vec<u64> = results.keys().copied().collect();
+    sorted_ids.sort_unstable();
+    for sid in sorted_ids {
+        let r = &results[&sid];
+        hash.insert(sid.to_string(), StrykeValue::string(r.output.clone()));
+    }
+    StrykeValue::hash(hash)
+}
+
+/// `pray($code, @agent_handles)` — scatter `$code` to every agent in
+/// `@agent_handles`, return a divination ID for `annex` to consume.
+/// Agents start executing immediately in parallel; this call returns as
+/// soon as the EVAL frame is on every wire (no result waiting).
+///
+/// `$code` accepts either a string OR a coderef. Coderef body is deparsed
+/// to source via `crate::deparse::deparse_block` before shipping.
+///
+/// `@agent_handles` may be passed flat (`pray $code, $h1, $h2, $h3`) or
+/// as an array (`pray $code, @cong`) — both are flattened.
+fn builtin_pray(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let code = match args.first() {
+        Some(v) => extract_prayer_text(v, "pray")?,
+        None => {
+            return Err(StrykeError::runtime(
+                "pray: code (first argument) required",
+                0,
+            ))
+        }
+    };
+
+    let agent_ids = flatten_agent_handles(&args[1..]);
     if agent_ids.is_empty() {
         return Err(StrykeError::runtime(
             "pray: at least one agent handle required",
@@ -13264,15 +13344,8 @@ fn builtin_pray(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         ));
     }
 
-    let controller_id = crate::controller::get_current_controller().ok_or_else(|| {
-        StrykeError::runtime(
-            "pray: no current controller; call congregation() or ordain() first",
-            0,
-        )
-    })?;
-    let handle = crate::controller::get_controller(controller_id).ok_or_else(|| {
-        StrykeError::runtime(format!("pray: controller {} not found", controller_id), 0)
-    })?;
+    let handle = require_current_controller("pray")?;
+    let controller_id = crate::controller::get_current_controller().unwrap();
 
     let petition_id = handle
         .scatter(&code, &agent_ids)
@@ -13323,18 +13396,546 @@ fn builtin_annex(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .gather(petition_id, Duration::from_millis(timeout_ms))
         .map_err(|e| StrykeError::runtime(format!("annex: gather failed: {}", e), 0))?;
 
-    // Convert HashMap<session_id, EvalResult> → stryke hash. Keys are
-    // stringified session_ids (stryke hash keys are always strings).
+    Ok(results_to_hash(results))
+}
+
+// ─── Tier 1: ergonomic master-side verbs ────────────────────────────────────
+//
+// Each verb earns its slot on either (a) a distinct wire-frame action
+// (excommunicate→SHUTDOWN, smite→state-reset EVAL, bestow→push direction),
+// (b) a fused common-case ergonomic (harvest = pray+annex one-shot,
+// pilgrimage = scatter+gather barrier), or (c) a genuinely new local
+// operation (smother→zero hash, enshrine/exhume→disk persistence).
+//
+// Pure aliases (lick/peruse as synonyms for annex) are deferred to Tier 3
+// when %soul harvest gives them distinct non-destructive semantics.
+
+/// `harvest($code, @agent_handles [, $timeout_ms])` — fused `pray + annex`.
+/// One-shot scatter+gather: scatter $code to every handle, block for replies
+/// up to $timeout_ms (default 30s), return the result hash directly. No
+/// divination id leaked. Most common scatter-gather pattern in one call.
+fn builtin_harvest(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let code = match args.first() {
+        Some(v) => extract_prayer_text(v, "harvest")?,
+        None => return Err(StrykeError::runtime("harvest: code required", 0)),
+    };
+
+    // Last arg may be a timeout integer if it's bare (not in an array). We
+    // peek before the flatten to allow `harvest $code, @cong, 5000` syntax.
+    let mut handle_args: &[StrykeValue] = &args[1..];
+    let mut timeout_ms: u64 = 30_000;
+    if let Some(last) = handle_args.last() {
+        if !last.is_undef() && last.as_array_vec().is_none() && last.as_code_ref().is_none() {
+            let n = last.to_int();
+            // Heuristic: a bare integer >= 100 in the tail position is a
+            // timeout; a single agent handle is typically a small int (1..N).
+            // Treat values >= 100 as timeouts. Agents past 100 are still
+            // accessible via explicit array: `harvest $code, [@cong], 5000`.
+            if n >= 100 {
+                timeout_ms = n as u64;
+                handle_args = &handle_args[..handle_args.len() - 1];
+            }
+        }
+    }
+
+    let agent_ids = flatten_agent_handles(handle_args);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "harvest: at least one agent handle required",
+            0,
+        ));
+    }
+
+    let handle = require_current_controller("harvest")?;
+    let petition_id = handle
+        .scatter(&code, &agent_ids)
+        .map_err(|e| StrykeError::runtime(format!("harvest: scatter failed: {}", e), 0))?;
+    let results = handle
+        .gather(petition_id, Duration::from_millis(timeout_ms))
+        .map_err(|e| StrykeError::runtime(format!("harvest: gather failed: {}", e), 0))?;
+    Ok(results_to_hash(results))
+}
+
+/// `excommunicate(@agent_handles)` — send SHUTDOWN frames to every named
+/// agent. Each agent exits its loop and its connection drops. Returns the
+/// count of agents successfully notified. Use this for clean cleanup at
+/// end of a congregation's life.
+fn builtin_excommunicate(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let agent_ids = flatten_agent_handles(args);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "excommunicate: at least one agent handle required",
+            0,
+        ));
+    }
+    let handle = require_current_controller("excommunicate")?;
+    let count = handle.excommunicate(&agent_ids);
+    Ok(StrykeValue::integer(count as i64))
+}
+
+/// `smite(@agent_handles)` — destroy each agent's `%soul` hash (and any
+/// other state it considers volatile). Implemented as a synchronous EVAL
+/// that clears the conventional `our %soul` and any `our %gift` hash,
+/// then returns. Use when you want to wipe worker state without losing
+/// the connection (vs `excommunicate` which kills the workers).
+///
+/// Returns the count of agents that responded to the smiting.
+fn builtin_smite(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let agent_ids = flatten_agent_handles(args);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "smite: at least one agent handle required",
+            0,
+        ));
+    }
+    let handle = require_current_controller("smite")?;
+    let code = "our %soul = (); our %gift = (); 'smitten'";
+    let petition_id = handle
+        .scatter(code, &agent_ids)
+        .map_err(|e| StrykeError::runtime(format!("smite: scatter failed: {}", e), 0))?;
+    let results = handle
+        .gather(petition_id, Duration::from_secs(5))
+        .map_err(|e| StrykeError::runtime(format!("smite: gather failed: {}", e), 0))?;
+    Ok(StrykeValue::integer(results.len() as i64))
+}
+
+/// `bestow(\%hash, @agent_handles)` — push `%hash` to every named agent's
+/// `our %gift` hash. JSON-serialized on the master side, decoded on the
+/// agent via `from_json`. The agent's existing `%gift` is replaced (not
+/// merged) — for merge semantics, the agent's `divine` handler would
+/// pull from `%gift` and combine explicitly.
+///
+/// Returns the count of agents that accepted the bestowal.
+fn builtin_bestow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let hash_value = args.first().filter(|v| !v.is_undef()).ok_or_else(|| {
+        StrykeError::runtime("bestow: hash (first argument) required", 0)
+    })?;
+
+    // Build a JSON object from the hash. Accept hash, hash_ref, or single
+    // (k=>v, k=>v) flat list — the as_hash_map() helper handles all three.
+    let hash_map = hash_value.as_hash_map().ok_or_else(|| {
+        StrykeError::runtime("bestow: first argument must be a hash", 0)
+    })?;
+
+    let mut json_obj = serde_json::Map::new();
+    for (k, v) in &hash_map {
+        json_obj.insert(k.clone(), serde_json::Value::String(v.to_string()));
+    }
+    let json_str = serde_json::Value::Object(json_obj).to_string();
+
+    let agent_ids = flatten_agent_handles(&args[1..]);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "bestow: at least one agent handle required",
+            0,
+        ));
+    }
+    let handle = require_current_controller("bestow")?;
+
+    // Embed the JSON as a single-quoted stryke string literal. Escape
+    // backslashes and single-quotes so the agent's parser sees a clean
+    // literal. (Stryke single-quotes are interpolation-free.)
+    let escaped = json_str.replace('\\', "\\\\").replace('\'', "\\'");
+    let code = format!(
+        "our %gift = %{{from_json('{}')}}; 'bestowed'",
+        escaped
+    );
+    let petition_id = handle
+        .scatter(&code, &agent_ids)
+        .map_err(|e| StrykeError::runtime(format!("bestow: scatter failed: {}", e), 0))?;
+    let results = handle
+        .gather(petition_id, Duration::from_secs(10))
+        .map_err(|e| StrykeError::runtime(format!("bestow: gather failed: {}", e), 0))?;
+    Ok(StrykeValue::integer(results.len() as i64))
+}
+
+/// `enshrine(\%souls, $path)` — write the souls hash to disk as JSON for
+/// later `exhume`. Format: `{ "session_id_str": "output_str", ... }`.
+/// Returns the number of bytes written.
+fn builtin_enshrine(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let hash_value = args.first().filter(|v| !v.is_undef()).ok_or_else(|| {
+        StrykeError::runtime("enshrine: hash (first argument) required", 0)
+    })?;
+    let path = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .ok_or_else(|| StrykeError::runtime("enshrine: path (second argument) required", 0))?;
+
+    let hash_map = hash_value.as_hash_map().ok_or_else(|| {
+        StrykeError::runtime("enshrine: first argument must be a hash", 0)
+    })?;
+
+    let mut json_obj = serde_json::Map::new();
+    for (k, v) in &hash_map {
+        json_obj.insert(k.clone(), serde_json::Value::String(v.to_string()));
+    }
+    let json_str = serde_json::Value::Object(json_obj).to_string();
+
+    std::fs::write(&path, &json_str).map_err(|e| {
+        StrykeError::runtime(format!("enshrine: write {} failed: {}", path, e), 0)
+    })?;
+    Ok(StrykeValue::integer(json_str.len() as i64))
+}
+
+/// `exhume($path)` — read an `enshrine`d hash back from disk. Returns the
+/// hash with the same shape it was written with (string keys, string
+/// values). Errors if the file is missing or not valid JSON object.
+fn builtin_exhume(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let path = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_string())
+        .ok_or_else(|| StrykeError::runtime("exhume: path (first argument) required", 0))?;
+
+    let json_str = std::fs::read_to_string(&path).map_err(|e| {
+        StrykeError::runtime(format!("exhume: read {} failed: {}", path, e), 0)
+    })?;
+    let val: serde_json::Value = serde_json::from_str(&json_str).map_err(|e| {
+        StrykeError::runtime(format!("exhume: parse {} failed: {}", path, e), 0)
+    })?;
+    let obj = val.as_object().ok_or_else(|| {
+        StrykeError::runtime(format!("exhume: {} is not a JSON object", path), 0)
+    })?;
+
+    let mut hash = indexmap::IndexMap::new();
+    for (k, v) in obj {
+        let value_str = match v {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        };
+        hash.insert(k.clone(), StrykeValue::string(value_str));
+    }
+    Ok(StrykeValue::hash(hash))
+}
+
+/// `smother(\%souls)` — securely zero a local hash. Walks every key and
+/// replaces the value with an empty string, then clears the hash. Returns
+/// the count of entries scrubbed. Local operation only — no network.
+fn builtin_smother(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let hash_value = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .ok_or_else(|| StrykeError::runtime("smother: hash required", 0))?;
+
+    // Most useful smother target is a hash_ref — that we can mutate in place
+    // so the caller's hash is actually erased. A hash-by-value is a copy and
+    // scrubbing it has no visible effect on the caller's namespace.
+    if let Some(href) = hash_value.as_hash_ref() {
+        let mut guard = href.write();
+        let n = guard.len();
+        // Two-pass scrub: overwrite values with empty strings, then clear.
+        // (The overwrite reduces the window where freed allocations carry
+        // sensitive payload — Rust will reuse the slot after the clear.)
+        for (_, v) in guard.iter_mut() {
+            *v = StrykeValue::string(String::new());
+        }
+        guard.clear();
+        return Ok(StrykeValue::integer(n as i64));
+    }
+    if let Some(map) = hash_value.as_hash_map() {
+        // Pass-by-value: nothing to smother in the caller's namespace.
+        // Return the count anyway so the caller can verify the size.
+        return Ok(StrykeValue::integer(map.len() as i64));
+    }
+    Err(StrykeError::runtime(
+        "smother: argument must be a hash",
+        0,
+    ))
+}
+
+/// `amen($divination_id)` — release a pending divination without gathering.
+/// Use when you want to scatter a fire-and-forget prayer and don't care
+/// about replies (workers' EVAL_RESULTs queue up in their socket buffers
+/// until the next gather on that agent). Returns 1 if the divination was
+/// pending, 0 if it had already been consumed or never existed.
+fn builtin_amen(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let divination_id = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as u64)
+        .ok_or_else(|| StrykeError::runtime("amen: divination ID required", 0))?;
+    let removed = crate::controller::unregister_divination(divination_id).is_some();
+    Ok(StrykeValue::integer(removed as i64))
+}
+
+/// `anoint($n)` — like `congregation($n)` but does NOT set the current
+/// controller. Use when you want to keep a primary congregation as the
+/// implicit target while spawning a secondary one. Returns array of
+/// session_ids for the new workers; controller handle is registered in
+/// the registry but callers manage it explicitly via the returned ids.
+#[cfg(unix)]
+fn builtin_anoint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let n = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int())
+        .unwrap_or(1);
+    if !(1..=10_000).contains(&n) {
+        return Err(StrykeError::runtime(
+            format!("anoint: N must be 1..10000, got {}", n),
+            0,
+        ));
+    }
+    let n = n as usize;
+
+    // Stash the current controller, do the spawn, then restore. This is
+    // the only difference from congregation() — the side-effect of
+    // becoming the implicit target is suppressed.
+    let prior_controller = crate::controller::get_current_controller();
+
+    let handle = crate::controller::spawn_controller("127.0.0.1", 0).map_err(|e| {
+        StrykeError::runtime(format!("anoint: spawn controller failed: {}", e), 0)
+    })?;
+    let listen_addr = handle.listen_addr();
+    let _controller_id = crate::controller::register_controller(Arc::clone(&handle));
+    // Intentionally do NOT call set_current_controller here.
+
+    let host = listen_addr.ip().to_string();
+    let port = listen_addr.port();
+    for i in 0..n {
+        match unsafe { nix::unistd::fork() } {
+            Ok(nix::unistd::ForkResult::Parent { .. }) => {}
+            Ok(nix::unistd::ForkResult::Child) => {
+                let name = format!("anointed-{:03}", i);
+                let code = crate::agent::run_agent_with_explicit(&host, port, Some(&name));
+                std::process::exit(code);
+            }
+            Err(e) => {
+                return Err(StrykeError::runtime(
+                    format!("anoint: fork failed at child {}: {}", i, e),
+                    0,
+                ));
+            }
+        }
+    }
+
+    if !handle.welcome(n, Duration::from_secs(5)) {
+        return Err(StrykeError::runtime(
+            format!(
+                "anoint: only {}/{} agents registered within 5s",
+                handle.agent_count(),
+                n
+            ),
+            0,
+        ));
+    }
+
+    // Restore the prior current-controller (no-op if there was none).
+    if let Some(prior) = prior_controller {
+        crate::controller::set_current_controller(prior);
+    }
+
+    let session_ids = handle.muster();
+    let handles: Vec<StrykeValue> = session_ids
+        .iter()
+        .map(|sid| StrykeValue::integer(*sid as i64))
+        .collect();
+    Ok(StrykeValue::array(handles))
+}
+
+#[cfg(not(unix))]
+fn builtin_anoint(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    Err(StrykeError::runtime(
+        "anoint: requires Unix fork() — not supported on this platform",
+        0,
+    ))
+}
+
+/// `welcome($n [, $timeout_ms])` — block until at least $n agents have
+/// joined the current congregation, or $timeout_ms elapses (default 5s).
+/// Returns the actual agent count at return time. Useful for "wait for
+/// the slow joiner" patterns after `ordain`.
+fn builtin_welcome(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let n = args
+        .first()
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int() as usize)
+        .unwrap_or(1);
+    let timeout_ms = args
+        .get(1)
+        .filter(|v| !v.is_undef())
+        .map(|v| v.to_int().max(100) as u64)
+        .unwrap_or(5_000);
+
+    let handle = require_current_controller("welcome")?;
+    handle.welcome(n, Duration::from_millis(timeout_ms));
+    Ok(StrykeValue::integer(handle.agent_count() as i64))
+}
+
+/// `pilgrimage($code, @agent_handles [, $timeout_ms])` — sync barrier.
+/// Scatter `$code` to every named agent and block until every dispatched
+/// agent has replied, or `$timeout_ms` elapses (default 10s). Returns 1
+/// if every agent rendezvoused in time, 0 otherwise.
+///
+/// For a pure rendezvous (no work), pass `"1"` as the prayer — the
+/// agent's reply is the synchronization signal.
+fn builtin_pilgrimage(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let code = match args.first() {
+        Some(v) => extract_prayer_text(v, "pilgrimage")?,
+        None => return Err(StrykeError::runtime("pilgrimage: code required", 0)),
+    };
+
+    let mut handle_args: &[StrykeValue] = &args[1..];
+    let mut timeout_ms: u64 = 10_000;
+    if let Some(last) = handle_args.last() {
+        if !last.is_undef() && last.as_array_vec().is_none() && last.as_code_ref().is_none() {
+            let n = last.to_int();
+            if n >= 100 {
+                timeout_ms = n as u64;
+                handle_args = &handle_args[..handle_args.len() - 1];
+            }
+        }
+    }
+
+    let agent_ids = flatten_agent_handles(handle_args);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            "pilgrimage: at least one agent handle required",
+            0,
+        ));
+    }
+    let handle = require_current_controller("pilgrimage")?;
+    let rendezvoused = handle.pilgrimage(&code, &agent_ids, Duration::from_millis(timeout_ms));
+    Ok(StrykeValue::integer(rendezvoused as i64))
+}
+
+// ─── Tier 3: %soul harvest (non-destructive read) ──────────────────────────
+//
+// Convention: workers maintain an `our %soul` hash holding their externally-
+// visible state. `lick` and `peruse` snapshot every worker's `%soul` over
+// the wire, parse the JSON back into a stryke hash, return a `{session_id
+// => %soul-hash}` map per agent. Workers retain their `%soul` intact —
+// these are read-only operations.
+//
+// For destructive harvest (read then wipe), pair with `smite`:
+//
+//   my %snapshot = lick @cong;
+//   smite @cong;             # zero workers' %soul and %gift
+//
+// Future Tier 4 work: deeper distinction between lick (shallow) and peruse
+// (deep walk via `god` reflection), plus a `ANNEX_SOUL` wire frame that
+// fuses read+wipe atomically.
+
+/// Recursively convert a serde_json::Value into a StrykeValue. Used by
+/// `lick` / `peruse` / `exhume` to rehydrate JSON-encoded soul snapshots.
+fn json_value_to_stryke(v: serde_json::Value) -> StrykeValue {
+    match v {
+        serde_json::Value::Null => StrykeValue::UNDEF,
+        serde_json::Value::Bool(b) => StrykeValue::integer(if b { 1 } else { 0 }),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                StrykeValue::integer(i)
+            } else if let Some(f) = n.as_f64() {
+                StrykeValue::float(f)
+            } else {
+                StrykeValue::UNDEF
+            }
+        }
+        serde_json::Value::String(s) => StrykeValue::string(s),
+        serde_json::Value::Array(arr) => {
+            let items: Vec<StrykeValue> = arr.into_iter().map(json_value_to_stryke).collect();
+            StrykeValue::array(items)
+        }
+        serde_json::Value::Object(obj) => {
+            let mut map = indexmap::IndexMap::new();
+            for (k, v) in obj {
+                map.insert(k, json_value_to_stryke(v));
+            }
+            StrykeValue::hash(map)
+        }
+    }
+}
+
+/// Scatter `to_json(\%soul)` to every agent, gather, parse each reply's
+/// JSON back into a stryke hash. Used by `lick` and (currently as alias)
+/// `peruse`. Worker `%soul` is read-only; agents keep their state.
+fn lick_souls_impl(args: &[StrykeValue], verb: &str) -> StrykeResult<StrykeValue> {
+    use std::time::Duration;
+
+    let agent_ids = flatten_agent_handles(args);
+    if agent_ids.is_empty() {
+        return Err(StrykeError::runtime(
+            format!("{}: at least one agent handle required", verb),
+            0,
+        ));
+    }
+    let handle = require_current_controller(verb)?;
+    // Why we pass `%soul` flat instead of `\%soul`: as of 2026-05-27,
+    // `\%hash` on an `our` hash produces a ref whose deref reads as empty
+    // (verified via /tmp/lick_debug2.stk — `to_json(\%soul)` returns
+    // `"{}"` even when %soul has entries). Workaround: pass the hash by
+    // value (flattens to a list `(k1, v1, k2, v2, ...)`), which to_json
+    // encodes as a JSON array. Master pairs the elements back into a
+    // hash. This is a workaround for a stryke language bug, not the
+    // long-term wire shape — see Tier 4 TODO.
+    let code = "our %soul; to_json(%soul)";
+    let petition_id = handle
+        .scatter(code, &agent_ids)
+        .map_err(|e| StrykeError::runtime(format!("{}: scatter failed: {}", verb, e), 0))?;
+    let results = handle
+        .gather(petition_id, Duration::from_secs(10))
+        .map_err(|e| StrykeError::runtime(format!("{}: gather failed: {}", verb, e), 0))?;
+
     let mut hash = indexmap::IndexMap::new();
     let mut sorted_ids: Vec<u64> = results.keys().copied().collect();
     sorted_ids.sort_unstable();
     for sid in sorted_ids {
         let r = &results[&sid];
-        // Tier 0: value is just the output string. Tier 1 will return a
-        // {ok=>1/0, output=>"..."} hash so error paths are observable.
-        hash.insert(sid.to_string(), StrykeValue::string(r.output.clone()));
+        let json_str = r.output.trim();
+        let value = match serde_json::from_str::<serde_json::Value>(json_str) {
+            // Workaround for the \%hash bug: parse the JSON array of
+            // [k1, v1, k2, v2, ...] back into a hash.
+            Ok(serde_json::Value::Array(arr)) => {
+                let mut soul_hash = indexmap::IndexMap::new();
+                let mut iter = arr.into_iter();
+                while let (Some(k), Some(v)) = (iter.next(), iter.next()) {
+                    let key_str = match k {
+                        serde_json::Value::String(s) => s,
+                        other => other.to_string(),
+                    };
+                    soul_hash.insert(key_str, json_value_to_stryke(v));
+                }
+                StrykeValue::hash(soul_hash)
+            }
+            Ok(parsed) => json_value_to_stryke(parsed),
+            // Worker output wasn't valid JSON — surface the raw string so
+            // the caller can debug rather than getting a silent UNDEF.
+            Err(_) => StrykeValue::string(r.output.clone()),
+        };
+        hash.insert(sid.to_string(), value);
     }
     Ok(StrykeValue::hash(hash))
+}
+
+/// `lick(@agent_handles)` — non-destructive `%soul` snapshot per agent.
+/// Returns a hash keyed by stringified session_id; values are each
+/// worker's `%soul` rehydrated from JSON into a stryke hash.
+///
+/// Workers retain their `%soul` after lick — pair with `smite` for
+/// destructive harvest (`lick @cong; smite @cong;`).
+fn builtin_lick(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    lick_souls_impl(args, "lick")
+}
+
+/// `peruse(@agent_handles)` — deep non-destructive `%soul` walk. Tier 3
+/// ships as an alias for `lick`; Tier 4 will replace the body with a
+/// `god`-style recursive dump that captures blessed objects, references,
+/// and cycles (vs lick's flat JSON serialization).
+fn builtin_peruse(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    lick_souls_impl(args, "peruse")
 }
 
 /// `kick($host, $port [, $timeout_ms])` — TCP liveness probe. Attempts a
