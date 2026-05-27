@@ -48,7 +48,12 @@ fn Ci::basename($path) {
 
 fn Ci::is_meta($path) = exists $META{Ci::basename($path)}
 
-fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta } sort
+# Grep callback must explicitly pass `$_` — stryke's `grep { fn }` doesn't
+# auto-bind the topic to a positional `($path)` parameter the way Perl's
+# `grep { fn $_ }` shorthand would. Without `($_)` here the meta files
+# `check_no_interop`, `run_no_interop_demos`, `exercism_run_all`, and
+# `run_all_ci` slipped through the filter (caught by user 2026-05-26).
+fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta($_) } sort
 
 fn Ci::demo_stk_files = ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
 
@@ -110,7 +115,14 @@ fn Ci::count_tests_paths(@stk) {
 
 fn Ci::count_tests_tree($root) = Ci::count_tests_paths(Ci::find_test_stk($root))
 
-fn Ci::report_run_results($phase, @files, @oks) {
+# Takes arrayrefs (not bare arrays) because Perl/stryke slurps positional
+# `@arr` parameters — passing two arrays would put BOTH into `@files` and
+# leave `@oks` empty. Caller must pass `\@files, \@oks`. Caught when the
+# parse phase report doubled to 942/942 = 471 × 2 after the par→pmap fix
+# made the array-count visible.
+fn Ci::report_run_results($phase, $files, $oks) {
+    my @files = @$files
+    my @oks   = @$oks
     my $bad = 0
     for (0:len(@files) - 1) {
         if (!@oks[_]) {
@@ -130,23 +142,31 @@ fn Ci::phase_parse {
     Ci::header("parse")
     my @files = Ci::top_stk_files()
     die "no examples in $ex_dir" unless len(@files)
-    my @oks = ~> @files par { Ci::parse_file }
-    Ci::report_run_results("parse", @files, @oks)
+    # `par { Ci::FN }` chunks the input — block runs ONCE per chunk with
+    # `_` bound to the whole chunk list, not once per element. With a bare
+    # `Ci::parse_file` ref the block returns the function value (called
+    # with no args, `$f = undef`) and we lose the 1:1 input→result
+    # correspondence. `pmap` gives one parallel call per input, which is
+    # what `@oks[$i]` indexing needs.
+    my @oks = pmap { Ci::parse_file($_) } @files
+    Ci::report_run_results("parse", \@files, \@oks)
 }
 
 fn Ci::phase_run {
     Ci::header("run")
     my @files = Ci::top_stk_files()
-    my @oks = ~> @files par { Ci::run_file }
-    Ci::report_run_results("run", @files, @oks)
+    # Same fix as the parse phase — `pmap` for 1:1 input→result.
+    my @oks = pmap { Ci::run_file($_) } @files
+    Ci::report_run_results("run", \@files, \@oks)
 }
 
 fn Ci::phase_demos {
     Ci::header("demos")
     my @files = Ci::demo_stk_files()
     die "no *_no_interop.stk in $ex_dir" unless len(@files)
-    my @oks = ~> @files par { Ci::run_file }
-    Ci::report_run_results("demos", @files, @oks)
+    # Same fix as the parse / run phases — `pmap` for 1:1 input→result.
+    my @oks = pmap { Ci::run_file($_) } @files
+    Ci::report_run_results("demos", \@files, \@oks)
 }
 
 fn Ci::run_test_tree($phase, $root, $label) {
