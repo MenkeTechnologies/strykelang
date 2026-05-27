@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+# matrix.stk - Matrix operations (add, multiply, transpose, determinant).
+#
+# Demonstrates:
+#   * 2D arrays via array-of-arrayref
+#   * Nested iteration
+#   * Recursive determinant via cofactor expansion
+#
+# Run: stryke --no-interop examples/matrix.stk
+
+fn Mat::rows($m) { len @$m }
+fn Mat::cols($m) { len @{$m->[0]} }
+
+fn Mat::zeros($r, $c) {
+    my @out = ()
+    for (1:$r) {
+        my @row = ()
+        for (1:$c) { push @row, 0 }
+        push @out, \@row
+    }
+    \@out
+}
+
+fn Mat::add($x, $y) {
+    my $r = Mat::rows($x)
+    my $c = Mat::cols($x)
+    my $out = Mat::zeros($r, $c)
+    for my $i (0:$r-1) {
+        for my $j (0:$c-1) {
+            $out->[$i][$j] = $x->[$i][$j] + $y->[$i][$j]
+        }
+    }
+    $out
+}
+
+fn Mat::scale($x, $k) {
+    my $r = Mat::rows($x)
+    my $c = Mat::cols($x)
+    my $out = Mat::zeros($r, $c)
+    for my $i (0:$r-1) {
+        for my $j (0:$c-1) {
+            $out->[$i][$j] = $x->[$i][$j] * $k
+        }
+    }
+    $out
+}
+
+fn Mat::transpose($m) {
+    my $r = Mat::rows($m)
+    my $c = Mat::cols($m)
+    my $out = Mat::zeros($c, $r)
+    for my $i (0:$r-1) {
+        for my $j (0:$c-1) {
+            $out->[$j][$i] = $m->[$i][$j]
+        }
+    }
+    $out
+}
+
+fn Mat::mul($x, $y) {
+    my $r = Mat::rows($x)
+    my $k = Mat::cols($x)
+    my $c = Mat::cols($y)
+    my $out = Mat::zeros($r, $c)
+    for my $i (0:$r-1) {
+        for my $j (0:$c-1) {
+            my $sum = 0
+            for my $z (0:$k-1) {
+                $sum = $sum + $x->[$i][$z] * $y->[$z][$j]
+            }
+            $out->[$i][$j] = $sum
+        }
+    }
+    $out
+}
+
+fn Mat::minor($m, $skip_r, $skip_c) {
+    my $n = Mat::rows($m)
+    my @out = ()
+    for my $i (0:$n-1) {
+        next if $i == $skip_r
+        my @row = ()
+        for my $j (0:$n-1) {
+            next if $j == $skip_c
+            push @row, $m->[$i][$j]
+        }
+        push @out, \@row
+    }
+    \@out
+}
+
+fn Mat::det($m) {
+    my $n = Mat::rows($m)
+    return $m->[0][0] if $n == 1
+    return $m->[0][0] * $m->[1][1] - $m->[0][1] * $m->[1][0] if $n == 2
+    my $total = 0
+    my $sign = 1
+    for my $j (0:$n-1) {
+        $total = $total + $sign * $m->[0][$j] * Mat::det(Mat::minor($m, 0, $j))
+        $sign = 0 - $sign
+    }
+    $total
+}
+
+fn Mat::print($m) {
+    for my $row (@$m) {
+        p "  [" . join(", ", @$row) . "]"
+    }
+}
+
+p "==============================================="
+p " Stryke Matrix Demo"
+p "==============================================="
+p ""
+
+my $A = [[1, 2], [3, 4]]
+my $B = [[5, 6], [7, 8]]
+
+p "── A ──────────────────────────────────────────"
+Mat::print($A)
+p ""
+p "── B ──────────────────────────────────────────"
+Mat::print($B)
+
+p ""
+p "── A + B ──────────────────────────────────────"
+Mat::print(Mat::add($A, $B))
+
+p ""
+p "── A * B ──────────────────────────────────────"
+Mat::print(Mat::mul($A, $B))
+
+p ""
+p "── transpose(A) ───────────────────────────────"
+Mat::print(Mat::transpose($A))
+
+p ""
+my $detA = Mat::det($A)
+my $detB = Mat::det($B)
+p "── Determinants ───────────────────────────────"
+p "  det(A) = $detA"
+p "  det(B) = $detB"
+
+my $C = [[2,1,3],[4,5,6],[7,8,9]]
+p ""
+p "── 3x3 matrix C ───────────────────────────────"
+Mat::print($C)
+my $detC = Mat::det($C)
+p "  det(C) = $detC"
