@@ -75,15 +75,15 @@ my @squares
 # `$a` / `$b` are the magic comparison/reduction slots inside the block.
 
 my @words = ("apple", "fig", "banana", "kiwi")
-my @sorted = sort { len($a) <=> len($b) } @words
+my @sorted = sort { len(_) <=> len(_1) } @words
 $sorted[0] |> aeq "fig", "shortest sorted first"
 $sorted[-1] |> aeq "banana", "longest sorted last"
 
 # Reduce: rebuild the sum from raw elements.
-(1:5) |> reduce { $a + $b } |> aeq 15, "reduce sum 1:5 = 15"
+(1:5) |> reduce { _ + _1 } |> aeq 15, "reduce sum 1:5 = 15"
 
 # Multi-arg reduce with an initializer in pipeline form.
-(1:4) |> reduce { $a * $b } |> aeq 24, "reduce product 1:4 = 24 (4!)"
+(1:4) |> reduce { _ * _1 } |> aeq 24, "reduce product 1:4 = 24 (4!)"
 
 # ── § 12. Implicit closure params — `_`, `_N`, `_<` ────────────────────────
 # `_` = first arg (topic), `_1` = second, `_2` = third, etc.

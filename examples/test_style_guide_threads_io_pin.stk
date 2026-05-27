@@ -24,7 +24,7 @@ fn div_ll = _0 / _1
 
 mysync @out
 ~s> (1:5) map { _ * 10 } map { _ + 1 } ep { push @out, _ }
-my @sorted = sort { $a <=> $b } @out
+my @sorted = sort { _ <=> _1 } @out
 $sorted[0]  |> aeq 11, "~s> 1:5 map *10 map +1 ep → first sorted = 11"
 $sorted[-1] |> aeq 51, "~s> last sorted = 51"
 len(@out)   |> aeq 5, "~s> emitted 5 items total"

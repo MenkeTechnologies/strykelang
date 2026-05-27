@@ -1,0 +1,122 @@
+#!/usr/bin/env stryke
+
+# kd_tree.stk — 2D k-d tree with nearest-neighbor and
+# axis-aligned range search.
+#
+# Build is O(n log n) (recursive median split alternating axes).
+# Nearest-neighbor is O(log n) average via pruning.
+#
+# Run: stryke --no-interop examples/kd_tree.stk
+
+package KD;
+
+# Helper: sort indices by coordinate $axis.
+fn sort_by_axis($pts, $idxs, $axis) {
+    my @sorted = sort { $pts->[_]->[$axis] <=> $pts->[_1]->[$axis] } @$idxs
+    \@sorted
+}
+
+# Recursively build a balanced kd-tree from point indices.
+# axis=0 splits by x, axis=1 splits by y, alternating.
+fn build_rec($pts, $idxs, $axis) {
+    my $n = len(@$idxs)
+    return undef if $n == 0
+    if ($n == 1) {
+        return { idx => $idxs->[0], axis => $axis, left => undef, right => undef }
+    }
+    my $sorted = sort_by_axis($pts, $idxs, $axis)
+    my $mid = int($n / 2)
+    my @left_i = ()
+    my @right_i = ()
+    for my $i (0:$mid-1) { push @left_i, $sorted->[$i] }
+    my $median = $sorted->[$mid]
+    if ($mid + 1 <= $n - 1) {
+        for my $i ($mid+1:$n-1) { push @right_i, $sorted->[$i] }
+    }
+    my $next_axis = 1 - $axis
+    {
+        idx => $median,
+        axis => $axis,
+        left => build_rec($pts, \@left_i, $next_axis),
+        right => build_rec($pts, \@right_i, $next_axis)
+    }
+}
+
+fn build($pts) {
+    my @idxs = ()
+    for my $i (0:(len(@$pts))-1) { push @idxs, $i }
+    { pts => $pts, root => build_rec($pts, \@idxs, 0) }
+}
+
+fn sq_dist($p, $q) {
+    my $dx = $p->[0] - $q->[0]
+    my $dy = $p->[1] - $q->[1]
+    $dx * $dx + $dy * $dy
+}
+
+# Nearest-neighbor: returns hash {idx, dist2} or undef if tree empty.
+fn nearest_rec($node, $pts, $target, $best) {
+    return $best if !defined $node
+    my $here = $pts->[$node->{idx}]
+    my $d2 = sq_dist($here, $target)
+    if (!defined $best || $d2 < $best->{dist2}) {
+        $best = { idx => $node->{idx}, dist2 => $d2 }
+    }
+    my $axis = $node->{axis}
+    my $diff = $target->[$axis] - $here->[$axis]
+    my $near
+    my $far
+    if ($diff < 0) {
+        $near = $node->{left}
+        $far = $node->{right}
+    } else {
+        $near = $node->{right}
+        $far = $node->{left}
+    }
+    $best = nearest_rec($near, $pts, $target, $best)
+    if (!defined $best || $diff * $diff < $best->{dist2}) {
+        $best = nearest_rec($far, $pts, $target, $best)
+    }
+    $best
+}
+
+fn nearest($tree, $target) {
+    return undef if !defined $tree->{root}
+    nearest_rec($tree->{root}, $tree->{pts}, $target, undef)
+}
+
+# Axis-aligned range search: returns indices of points inside the
+# inclusive box [$xlo..$xhi] x [$ylo..$yhi].
+fn range_rec($node, $pts, $xlo, $xhi, $ylo, $yhi, $out) {
+    return if !defined $node
+    my $here = $pts->[$node->{idx}]
+    if ($here->[0] >= $xlo && $here->[0] <= $xhi
+        && $here->[1] >= $ylo && $here->[1] <= $yhi) {
+        push @$out, $node->{idx}
+    }
+    my $axis = $node->{axis}
+    my $lo = ($axis == 0 ? $xlo : $ylo)
+    my $hi = ($axis == 0 ? $xhi : $yhi)
+    if ($lo <= $here->[$axis]) {
+        range_rec($node->{left}, $pts, $xlo, $xhi, $ylo, $yhi, $out)
+    }
+    if ($hi >= $here->[$axis]) {
+        range_rec($node->{right}, $pts, $xlo, $xhi, $ylo, $yhi, $out)
+    }
+}
+
+fn range($tree, $xlo, $xhi, $ylo, $yhi) {
+    my @out = ()
+    range_rec($tree->{root}, $tree->{pts}, $xlo, $xhi, $ylo, $yhi, \@out)
+    my @sorted = sort { _ <=> _1 } @out
+    \@sorted
+}
+
+package main;
+
+my $pts = [[2,3],[5,4],[9,6],[4,7],[8,1],[7,2]]
+my $t = KD::build($pts)
+my $n = KD::nearest($t, [9, 2])
+p "nearest to (9,2): idx=" . $n->{idx} . " dist2=" . $n->{dist2}
+my $r = KD::range($t, 4, 9, 1, 5)
+p "range x[4..9] y[1..5]: @$r"
