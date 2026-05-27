@@ -1,0 +1,130 @@
+#!/usr/bin/env stryke
+
+fn BC::encode($v) {
+    my $t = ref $v
+    if ($t eq "ARRAY") {
+        my $out = "l"
+        for my $x (@$v) { $out = $out . BC::encode($x) }
+        return $out . "e"
+    }
+    if ($t eq "HASH") {
+        my @ks = sort keys %$v
+        my $out = "d"
+        for my $k (@ks) {
+            $out = $out . (len $k) . ":" . $k . BC::encode($v->{$k})
+        }
+        return $out . "e"
+    }
+    if ("$v" =~ /^-?\d+$/) {
+        return "i" . $v . "e"
+    }
+    return (len "$v") . ":" . $v
+}
+
+fn BC::_dec($s, $i) {
+    my $c = substr($s, $i, 1)
+    if ($c eq "i") {
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") { $j = $j + 1 }
+        my $num = substr($s, $i + 1, $j - $i - 1)
+        return { v => $num + 0, n => $j + 1 }
+    }
+    if ($c eq "l") {
+        my @out = ()
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") {
+            my $r = BC::_dec($s, $j)
+            push @out, $r->{v}
+            $j = $r->{n}
+        }
+        return { v => \@out, n => $j + 1 }
+    }
+    if ($c eq "d") {
+        my %out = ()
+        my $j = $i + 1
+        while (substr($s, $j, 1) ne "e") {
+            my $kr = BC::_dec($s, $j)
+            my $vr = BC::_dec($s, $kr->{n})
+            $out{$kr->{v}} = $vr->{v}
+            $j = $vr->{n}
+        }
+        return { v => \%out, n => $j + 1 }
+    }
+    my $j = $i
+    while (substr($s, $j, 1) ne ":") { $j = $j + 1 }
+    my $ln = substr($s, $i, $j - $i) + 0
+    my $bytes = substr($s, $j + 1, $ln)
+    return { v => $bytes, n => $j + 1 + $ln }
+}
+
+fn BC::decode($s) {
+    my $r = BC::_dec($s, 0)
+    $r->{v}
+}
+
+# --- Encoding tests ---
+BC::encode(42) |> aeq "i42e", "encode int"
+BC::encode(0) |> aeq "i0e", "encode zero"
+BC::encode(-7) |> aeq "i-7e", "encode neg"
+BC::encode("hello") |> aeq "5:hello", "encode str"
+BC::encode("") |> aeq "0:", "encode empty str"
+BC::encode([]) |> aeq "le", "encode empty list"
+BC::encode({}) |> aeq "de", "encode empty dict"
+
+BC::encode([1, 2, 3]) |> aeq "li1ei2ei3ee", "encode list of ints"
+BC::encode(["a", "b", "c"]) |> aeq "l1:a1:b1:ce", "encode list of strs"
+
+# Dict keys must be sorted
+BC::encode({ b => 2, a => 1 }) |> aeq "d1:ai1e1:bi2ee", "encode dict sorted"
+BC::encode({ name => "alice", age => 30 })
+    |> aeq "d3:agei30e4:name5:alicee", "encode mixed dict"
+
+# Nested
+BC::encode({ list => [1, 2], n => 5 })
+    |> aeq "d4:listli1ei2ee1:ni5ee", "encode nested"
+
+# --- Decoding tests ---
+BC::decode("i42e") |> aeq 42, "decode int"
+BC::decode("i0e") |> aeq 0, "decode zero"
+BC::decode("i-7e") |> aeq -7, "decode neg"
+BC::decode("5:hello") |> aeq "hello", "decode str"
+BC::decode("0:") |> aeq "", "decode empty str"
+
+my $li = BC::decode("li1ei2ei3ee")
+len(@$li) |> aeq 3, "decoded list len"
+$li->[0] |> aeq 1, "decoded list[0]"
+$li->[2] |> aeq 3, "decoded list[2]"
+
+my $dh = BC::decode("d1:ai1e1:bi2ee")
+$dh->{a} |> aeq 1, "decoded dict a"
+$dh->{b} |> aeq 2, "decoded dict b"
+
+# Nested
+my $dn = BC::decode("d4:listli1ei2ee1:ni5ee")
+$dn->{n} |> aeq 5, "nested n"
+len(@{$dn->{list}}) |> aeq 2, "nested list len"
+$dn->{list}->[1] |> aeq 2, "nested list[1]"
+
+# String containing 'e' (boundary check via length prefix)
+BC::encode("eee") |> aeq "3:eee", "encode str of e"
+BC::decode("3:eee") |> aeq "eee", "decode str of e"
+
+# Round-trip a complex structure
+my $orig = { name => "torrent", pieces => [10, 20, 30], owner => "x" }
+my $rt = BC::decode(BC::encode($orig))
+$rt->{name} |> aeq "torrent", "rt name"
+$rt->{owner} |> aeq "x", "rt owner"
+len(@{$rt->{pieces}}) |> aeq 3, "rt pieces len"
+$rt->{pieces}->[2] |> aeq 30, "rt pieces[2]"
+
+# List of dicts
+my $ld = BC::decode("ld1:ai1eed1:ai2eee")
+len(@$ld) |> aeq 2, "list-of-dicts len"
+$ld->[0]->{a} |> aeq 1, "lod[0].a"
+$ld->[1]->{a} |> aeq 2, "lod[1].a"
+
+# Round-trip strings with special characters (no colons/digits issues)
+my $w = "hello world"
+BC::decode(BC::encode($w)) |> aeq $w, "rt with space"
+
+test_run
