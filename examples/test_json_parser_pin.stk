@@ -1,0 +1,178 @@
+#!/usr/bin/env stryke
+
+fn JP::parse($s) {
+    my $st = +{ src => $s, pos => 0, n => len($s) }
+    JP::_ws($st)
+    my $v = JP::_value($st)
+    JP::_ws($st)
+    $v
+}
+
+fn JP::_ws($st) {
+    while ($st->{pos} < $st->{n}) {
+        my $c = substr($st->{src}, $st->{pos}, 1)
+        last if $c ne " " && $c ne "\t" && $c ne "\n" && $c ne "\r"
+        $st->{pos} = $st->{pos} + 1
+    }
+}
+
+fn JP::_peek($st) {
+    return "" if $st->{pos} >= $st->{n}
+    substr($st->{src}, $st->{pos}, 1)
+}
+
+fn JP::_take($st) {
+    my $c = substr($st->{src}, $st->{pos}, 1)
+    $st->{pos} = $st->{pos} + 1
+    $c
+}
+
+fn JP::_value($st) {
+    JP::_ws($st)
+    my $c = JP::_peek($st)
+    return JP::_string($st)  if $c eq '"'
+    return JP::_array($st)   if $c eq "["
+    return JP::_object($st)  if $c eq "{"
+    if ($c eq "-" || ($c ge "0" && $c le "9")) { return JP::_number($st) }
+    if (substr($st->{src}, $st->{pos}, 4) eq "true")  { $st->{pos} = $st->{pos} + 4; return 1 }
+    if (substr($st->{src}, $st->{pos}, 5) eq "false") { $st->{pos} = $st->{pos} + 5; return 0 }
+    if (substr($st->{src}, $st->{pos}, 4) eq "null")  { $st->{pos} = $st->{pos} + 4; return undef }
+    die "unexpected: " . $c . " at " . $st->{pos}
+}
+
+fn JP::_string($st) {
+    JP::_take($st)
+    my $out = ""
+    while ($st->{pos} < $st->{n}) {
+        my $c = JP::_take($st)
+        return $out if $c eq '"'
+        if ($c eq "\\") {
+            my $esc = JP::_take($st)
+            if    ($esc eq "n")  { $out = $out . "\n" }
+            elsif ($esc eq "t")  { $out = $out . "\t" }
+            elsif ($esc eq "r")  { $out = $out . "\r" }
+            elsif ($esc eq "\\") { $out = $out . "\\" }
+            elsif ($esc eq '"')  { $out = $out . '"' }
+            elsif ($esc eq "/")  { $out = $out . "/" }
+            else                 { $out = $out . $esc }
+        } else {
+            $out = $out . $c
+        }
+    }
+    die "unterminated string"
+}
+
+fn JP::_number($st) {
+    my $start = $st->{pos}
+    $st->{pos} = $st->{pos} + 1 if JP::_peek($st) eq "-"
+    while ($st->{pos} < $st->{n}) {
+        my $c = JP::_peek($st)
+        last unless ($c ge "0" && $c le "9") || $c eq "."
+        $st->{pos} = $st->{pos} + 1
+    }
+    my $raw = substr($st->{src}, $start, $st->{pos} - $start)
+    ($raw =~ /\./) ? ($raw + 0.0) : ($raw + 0)
+}
+
+fn JP::_array($st) {
+    JP::_take($st)
+    my @out = ()
+    JP::_ws($st)
+    if (JP::_peek($st) eq "]") { JP::_take($st); return \@out }
+    while (1) {
+        push @out, JP::_value($st)
+        JP::_ws($st)
+        my $c = JP::_take($st)
+        return \@out if $c eq "]"
+        die "expected , or ]" if $c ne ","
+        JP::_ws($st)
+    }
+}
+
+fn JP::_object($st) {
+    JP::_take($st)
+    my %out = ()
+    JP::_ws($st)
+    if (JP::_peek($st) eq "}") { JP::_take($st); return \%out }
+    while (1) {
+        JP::_ws($st)
+        my $key = JP::_string($st)
+        JP::_ws($st)
+        die "expected :" if JP::_take($st) ne ":"
+        my $val = JP::_value($st)
+        $out{$key} = $val
+        JP::_ws($st)
+        my $c = JP::_take($st)
+        return \%out if $c eq "}"
+        die "expected , or }" if $c ne ","
+    }
+}
+
+# Primitives
+JP::parse("42")       |> aeq 42,     "int"
+JP::parse("-7")       |> aeq -7,     "neg int"
+JP::parse("3.14")     |> aeq 3.14,   "float"
+JP::parse("true")     |> aeq 1,      "true"
+JP::parse("false")    |> aeq 0,      "false"
+(defined JP::parse("null") ? 1 : 0) |> aeq 0, "null"
+JP::parse('"hello"')  |> aeq "hello","string"
+JP::parse('""')       |> aeq "",     "empty string"
+
+# Whitespace
+JP::parse("  42  ")   |> aeq 42, "leading/trailing ws"
+JP::parse("\n\t42")   |> aeq 42, "newline tabs"
+
+# Escapes
+JP::parse('"a\nb"')   |> aeq "a\nb", "escape n"
+JP::parse('"a\tb"')   |> aeq "a\tb", "escape t"
+JP::parse('"a\"b"')   |> aeq "a\"b", "escape quote"
+JP::parse('"a\\\\b"') |> aeq "a\\b", "escape backslash"
+
+# Arrays
+my $a0 = JP::parse("[]")
+len(@$a0) |> aeq 0, "empty array"
+my $a1 = JP::parse("[1,2,3]")
+join(",", @$a1) |> aeq "1,2,3", "int array"
+my $a2 = JP::parse('["a","b","c"]')
+join(",", @$a2) |> aeq "a,b,c", "str array"
+my $a3 = JP::parse('[1, "two", true, null]')
+$a3->[0] |> aeq 1, "mixed 0"
+$a3->[1] |> aeq "two", "mixed 1"
+$a3->[2] |> aeq 1, "mixed true"
+(defined $a3->[3] ? 1 : 0) |> aeq 0, "mixed null"
+
+# Objects
+my $o0 = JP::parse("{}")
+len(keys %$o0) |> aeq 0, "empty object"
+my $o1 = JP::parse('{"a":1,"b":2}')
+$o1->{a} |> aeq 1, "obj a"
+$o1->{b} |> aeq 2, "obj b"
+
+# Nested
+my $n1 = JP::parse('{"name":"Bob","tags":["x","y"],"meta":{"k":7}}')
+$n1->{name} |> aeq "Bob", "nested name"
+join(",", @{$n1->{tags}}) |> aeq "x,y", "nested tags"
+$n1->{meta}->{k} |> aeq 7, "doubly nested int"
+
+# Deeply nested array
+my $d = JP::parse("[1,[2,[3,[4,[5]]]]]")
+$d->[1]->[1]->[1]->[1]->[0] |> aeq 5, "deep array"
+
+# Strings with spaces
+JP::parse('"hello world"') |> aeq "hello world", "string ws"
+
+# Numbers in arrays
+JP::parse("[1.5, -2.5, 0]")->[0] |> aeq 1.5, "float in arr"
+JP::parse("[1.5, -2.5, 0]")->[1] |> aeq -2.5, "neg float in arr"
+
+# Object inside array
+my $oa = JP::parse('[{"id":1},{"id":2}]')
+$oa->[0]->{id} |> aeq 1, "obj in arr 0"
+$oa->[1]->{id} |> aeq 2, "obj in arr 1"
+
+# Whitespace inside objects
+my $ow = JP::parse(' { "x" : 1 ,  "y" : 2 } ')
+$ow->{x} |> aeq 1, "ws obj x"
+$ow->{y} |> aeq 2, "ws obj y"
+
+test_run
