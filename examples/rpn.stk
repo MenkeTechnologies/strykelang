@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+
+# rpn.stk — Reverse Polish Notation calculator.
+#
+# Demonstrates:
+#   * Stack-based evaluation
+#   * String tokenization
+#   * Multi-branch dispatch
+#
+# Run: stryke --no-interop examples/rpn.stk
+
+fn RPN::eval($expr) {
+    my @stack = ()
+    for my $tok (split / +/, $expr) {
+        next if len($tok) == 0
+        if ($tok eq "+") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x + $y
+        } elsif ($tok eq "-") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x - $y
+        } elsif ($tok eq "*") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x * $y
+        } elsif ($tok eq "/") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $x / $y
+        } elsif ($tok eq "neg") {
+            my $x = pop @stack
+            push @stack, 0 - $x
+        } elsif ($tok eq "dup") {
+            my $x = $stack[-1]
+            push @stack, $x
+        } elsif ($tok eq "swap") {
+            my $y = pop @stack
+            my $x = pop @stack
+            push @stack, $y
+            push @stack, $x
+        } else {
+            push @stack, $tok + 0
+        }
+    }
+    $stack[-1]
+}
+
+p "═══════════════════════════════════════════════"
+p " Stryke RPN Calculator Demo"
+p "═══════════════════════════════════════════════"
+p ""
+
+my @progs = (
+    "3 4 +",
+    "10 2 -",
+    "6 7 *",
+    "20 4 /",
+    "2 3 4 * +",
+    "5 1 2 + 4 * + 3 -",
+    "5 dup *",
+    "8 3 swap -",
+    "10 neg",
+)
+
+p "── Program → Result ──────────────────────────"
+for my $p (@progs) {
+    p "  #{$p}  =  #{RPN::eval($p)}"
+}
+
+p ""
+p "── Polynomial: ((3·5+2)·4-7) ─────────────────"
+p "  3 5 * 2 + 4 * 7 -  =  #{RPN::eval('3 5 * 2 + 4 * 7 -')}"
+
+p ""
+p "── Distance via Pythagoras: √(3² + 4²) ──────"
+my $d2 = RPN::eval("3 dup * 4 dup * +")
+p "  3² + 4² = $d2  →  distance = 5"

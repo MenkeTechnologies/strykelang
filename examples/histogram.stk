@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+# histogram.stk - ASCII histogram of a dataset with bucketing.
+#
+# Demonstrates:
+#   * Numeric bucketing (linear binning)
+#   * Hash accumulation
+#   * ASCII bar rendering
+#   * Stats: mean, median, mode, range
+#
+# Run: stryke --no-interop examples/histogram.stk
+
+fn Hist::buckets($xs, $n_bins) {
+    my $lo = $xs->[0]
+    my $hi = $xs->[0]
+    for my $x (@$xs) {
+        $lo = $x if $x < $lo
+        $hi = $x if $x > $hi
+    }
+    my $span = ($hi - $lo) + 0.0001
+    my $w    = $span / $n_bins
+    my @counts = ()
+    for (1:$n_bins) { push @counts, 0 }
+    for my $x (@$xs) {
+        my $idx = int(($x - $lo) / $w)
+        $idx = $n_bins - 1 if $idx >= $n_bins
+        $counts[$idx] = $counts[$idx] + 1
+    }
+    +{ lo => $lo, hi => $hi, w => $w, counts => \@counts }
+}
+
+fn Hist::bar($n, $maxc, $width) {
+    return "" if $maxc == 0 || $n == 0
+    my $len = int($n * $width / $maxc)
+    return "" if $len <= 0
+    my $s = ""
+    for (1:$len) { $s = $s . "#" }
+    $s
+}
+
+fn Stats::mean($xs) {
+    my $sum = 0
+    for my $x (@$xs) { $sum = $sum + $x }
+    $sum / len(@$xs)
+}
+
+fn Stats::median($xs) {
+    my @s = sort { _ <=> _1 } @$xs
+    my $n = len @s
+    $n % 2 == 1 ? $s[int($n/2)] : ($s[$n/2 - 1] + $s[$n/2]) / 2
+}
+
+fn Stats::mode($xs) {
+    my %freq = ()
+    for my $x (@$xs) { $freq{$x} = ($freq{$x} // 0) + 1 }
+    my @keys = keys %freq
+    my @sorted = sort { $freq{_1} <=> $freq{_} } @keys
+    $sorted[0] + 0
+}
+
+p "-----------------------------------------------"
+p " Stryke Histogram Demo"
+p "-----------------------------------------------"
+p ""
+
+my @data = (
+    12, 14, 15, 18, 19, 21, 22, 22, 23, 24,
+    25, 26, 27, 27, 28, 29, 31, 32, 33, 35,
+    36, 38, 41, 42, 45, 47, 50, 52, 55, 60,
+    22, 26, 28, 30, 33, 27, 25, 24, 28, 31,
+)
+
+p "Samples: #{len @data}"
+p ""
+
+my $h = Hist::buckets(\@data, 8)
+my $counts = $h->{counts}
+
+my $maxc = 0
+for my $c (@$counts) { $maxc = $c if $c > $maxc }
+
+p "-- 8-bin histogram ----------------------------------"
+for my $i (0:7) {
+    my $bin_lo = $h->{lo} + $i * $h->{w}
+    my $bin_hi = $bin_lo + $h->{w}
+    my $c      = $counts->[$i]
+    my $bar    = Hist::bar($c, $maxc, 30)
+    p "  #{int($bin_lo)}-#{int($bin_hi)}: $bar (#{$c})"
+}
+
+p ""
+p "-- Stats --------------------------------------------"
+my $n_data = len @data
+my $mean   = Stats::mean(\@data)
+my $median = Stats::median(\@data)
+my $mode   = Stats::mode(\@data)
+p "  count : $n_data"
+p "  mean  : $mean"
+p "  median: $median"
+p "  mode  : $mode"
+p "  min   : #{$h->{lo}}"
+p "  max   : #{$h->{hi}}"
