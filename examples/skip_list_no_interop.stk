@@ -1,0 +1,128 @@
+#!/usr/bin/env stryke
+
+# skip_list_no_interop.stk — Probabilistic ordered data structure.
+#
+# A Skip List provides O(log n) average time for search, insert, and
+# delete by maintaining multiple levels of linked lists.
+#
+# Run: stryke --no-interop examples/skip_list_no_interop.stk
+
+package SkipList
+
+my $MAX_LEVEL = 16
+my $P = 0.5
+
+fn new_node($val, $level) {
+    my @next = (undef) x ($level + 1)
+    { val => $val, next => \@next }
+}
+
+fn new() {
+    {
+        head  => new_node(undef, $MAX_LEVEL),
+        level => 0
+    }
+}
+
+fn random_level() {
+    my $lvl = 0
+    while (rand() < $P && $lvl < $MAX_LEVEL) {
+        $lvl++
+    }
+    $lvl
+}
+
+fn insert($list, $val) {
+    my @update = (undef) x ($MAX_LEVEL + 1)
+    my $curr = $list->{head}
+    
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) {
+            $curr = $curr->{next}->[$i]
+        }
+        $update[$i] = $curr
+    }
+    
+    $curr = $curr->{next}->[0]
+    
+    if (!defined $curr || $curr->{val} != $val) {
+        my $lvl = random_level()
+        if ($lvl > $list->{level}) {
+            for my $i ($list->{level} + 1 : $lvl) {
+                $update[$i] = $list->{head}
+            }
+            $list->{level} = $lvl
+        }
+        
+        my $new = new_node($val, $lvl)
+        for my $i (0 : $lvl) {
+            $new->{next}->[$i] = $update[$i]->{next}->[$i]
+            $update[$i]->{next}->[$i] = $new
+        }
+    }
+}
+
+fn find($list, $val) {
+    my $curr = $list->{head}
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) {
+            $curr = $curr->{next}->[$i]
+        }
+    }
+    $curr = $curr->{next}->[0]
+    return (defined $curr && $curr->{val} == $val)
+}
+
+fn delete_v($list, $val) {
+    my @update = (undef) x ($MAX_LEVEL + 1)
+    my $curr = $list->{head}
+    
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) {
+            $curr = $curr->{next}->[$i]
+        }
+        $update[$i] = $curr
+    }
+    
+    $curr = $curr->{next}->[0]
+    
+    if (defined $curr && $curr->{val} == $val) {
+        for my $i (0 : $list->{level}) {
+            last if $update[$i]->{next}->[$i] != $curr
+            $update[$i]->{next}->[$i] = $curr->{next}->[$i]
+        }
+        while ($list->{level} > 0 && !defined $list->{head}->{next}->[$list->{level}]) {
+            $list->{level}--
+        }
+    }
+}
+
+fn to_array($list) {
+    my @out
+    my $curr = $list->{head}->{next}->[0]
+    while (defined $curr) {
+        push @out, $curr->{val}
+        $curr = $curr->{next}->[0]
+    }
+    \@out
+}
+
+package main
+
+p "── Skip List Demo ──"
+
+my $sl = SkipList::new()
+for my $v (3, 6, 7, 9, 12, 19, 17, 26, 21, 25) {
+    SkipList::insert $sl, $v
+}
+
+p "List: #{join ', ', @{SkipList::to_array $sl}}"
+
+p "Finding 19: #{SkipList::find($sl, 19) ? 'Yes' : 'No'}"
+p "Finding 10: #{SkipList::find($sl, 10) ? 'Yes' : 'No'}"
+
+p "Deleting 19..."
+SkipList::delete_v $sl, 19
+p "List: #{join ', ', @{SkipList::to_array $sl}}"
+
+p "Done."
