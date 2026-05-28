@@ -28,6 +28,7 @@ use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::request::SignatureHelpRequest;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
+    CompletionTextEdit,
     DeclarationCapability, Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentHighlight,
     DocumentHighlightKind, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
@@ -10088,9 +10089,9 @@ fn completions(
     }
 
     let mut items: Vec<CompletionItem> = match &mode {
-        LineCompletionMode::Scalar(f) => sigil_completions(f, '$', &idx.scalars, "scalar"),
-        LineCompletionMode::Array(f) => sigil_completions(f, '@', &idx.arrays, "array"),
-        LineCompletionMode::Hash(f) => sigil_completions(f, '%', &idx.hashes, "hash"),
+        LineCompletionMode::Scalar(f) => sigil_completions(f, '$', &idx.scalars, "scalar", pos),
+        LineCompletionMode::Array(f) => sigil_completions(f, '@', &idx.arrays, "array", pos),
+        LineCompletionMode::Hash(f) => sigil_completions(f, '%', &idx.hashes, "hash", pos),
         LineCompletionMode::HashKey { receiver, partial } => {
             hash_key_completions(receiver, partial, &idx)
         }
@@ -10444,7 +10445,57 @@ fn sigil_completions(
     sigil: char,
     names: &BTreeSet<String>,
     kind: &'static str,
+    pos: Position,
 ) -> Vec<CompletionItem> {
+    // IntelliJ's LSP client filters items by matching the user-typed
+    // prefix against `filter_text` (or `label` if absent). When the
+    // user types `$` and asks for completion, the prefix is `$` — so
+    // every `filter_text` must start with the sigil or the item gets
+    // hidden client-side, even though the LSP server returned it.
+    //
+    // Coupled fix: provide an explicit `text_edit` whose range spans
+    // [sigil_pos .. cursor]. That way the same LSP item that matches
+    // `$` in the filter ALSO replaces the typed `$` (instead of being
+    // inserted after it as `$$ARGV`). `insert_text` alone leaves the
+    // replacement range to the client's heuristic; `text_edit` pins
+    // it deterministically.
+    //
+    // The sigil sits at column `pos.character - 1 - filter.chars().count()`
+    // (one char before the partial-name span). Range end is the cursor.
+    let filter_chars = filter.chars().count() as u32;
+    let sigil_col = pos.character.saturating_sub(filter_chars + 1);
+    let edit_range = Range {
+        start: Position {
+            line: pos.line,
+            character: sigil_col,
+        },
+        end: pos,
+    };
+    let make_item = |display: String, bare: &str, builtin: bool| -> CompletionItem {
+        let new_text = format!("{sigil}{bare}");
+        CompletionItem {
+            label: display.clone(),
+            kind: Some(CompletionItemKind::VARIABLE),
+            detail: Some(if builtin {
+                format!("{kind} (builtin)")
+            } else {
+                kind.to_string()
+            }),
+            // `filter_text` includes the sigil so the client's prefix
+            // match (`$`, `$y`, `$yel`, …) keeps the item visible.
+            filter_text: Some(display.clone()),
+            // `text_edit` is authoritative — IntelliJ replaces the
+            // sigil+partial span with `new_text`, never producing the
+            // doubled-sigil bug regardless of word-boundary detection.
+            text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                range: edit_range,
+                new_text,
+            })),
+            documentation: if builtin { doc_for_label(&display) } else { None },
+            ..Default::default()
+        }
+    };
+
     let mut items = Vec::new();
     let mut seen: BTreeSet<String> = BTreeSet::new();
     for n in names {
@@ -10454,20 +10505,7 @@ fn sigil_completions(
         if !seen.insert(n.clone()) {
             continue;
         }
-        // `insert_text` is the BARE name (no sigil). The user already
-        // typed the sigil; IntelliJ's LSP client treats `$`/`@`/`%` as
-        // non-identifier so the replacement range starts AFTER the
-        // sigil. Including the sigil in `insert_text` produced `@@foo`
-        // / `$$foo` / `%%foo`.  Label keeps the sigil for display.
-        let display = format!("{sigil}{n}");
-        items.push(CompletionItem {
-            label: display,
-            kind: Some(CompletionItemKind::VARIABLE),
-            detail: Some(kind.to_string()),
-            filter_text: Some(n.clone()),
-            insert_text: Some(n.clone()),
-            ..Default::default()
-        });
+        items.push(make_item(format!("{sigil}{n}"), n, false));
     }
     // Seed perl-special / reflection vars (`%ENV`, `%INC`, `%stryke::*`,
     // `$stryke::VERSION`, `@ARGV`, etc.) from the bundled wordlist.
@@ -10490,15 +10528,7 @@ fn sigil_completions(
         if !seen.insert(bare.to_string()) {
             continue;
         }
-        items.push(CompletionItem {
-            label: w.clone(),
-            kind: Some(CompletionItemKind::VARIABLE),
-            detail: Some(format!("{kind} (builtin)")),
-            filter_text: Some(bare.to_string()),
-            insert_text: Some(bare.to_string()),
-            documentation: doc_for_label(w),
-            ..Default::default()
-        });
+        items.push(make_item(w.clone(), bare, true));
     }
     items
 }
