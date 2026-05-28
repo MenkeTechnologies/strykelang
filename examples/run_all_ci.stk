@@ -35,6 +35,7 @@ my %META = map { (_ => 1) } qw(
     run_no_interop_demos
     exercism_run_all
     run_all_ci
+    p2p_chat
 )
 
 my @all_phases = qw(parse run demos project rosetta exercism ruby scheme)
@@ -85,10 +86,16 @@ fn Ci::header($name) {
 
 fn Ci::parse_file($f) = system("$st --no-interop -c \"$f\" >/dev/null 2>&1") == 0
 
-fn Ci::run_file($f) = system("$st --no-interop \"$f\" </dev/null >/dev/null 2>&1") == 0
+# Per-file timeout cap so a single hung example (UDP listener, infinite
+# poll loop, etc.) can't stall the whole pmap. `timeout(1)` exits 124
+# when the inner command exceeds the deadline — count that as a fail
+# rather than blocking forever on collect.
+my $RUN_TIMEOUT = $ENV{RUN_ALL_CI_FILE_TIMEOUT} // 60
+
+fn Ci::run_file($f) = system("timeout $RUN_TIMEOUT $st --no-interop \"$f\" </dev/null >/dev/null 2>&1") == 0
 
 fn Ci::run_suite($path) {
-    my $cmd = "$st \"$path\" </dev/null"
+    my $cmd = "timeout $RUN_TIMEOUT $st \"$path\" </dev/null"
     return system("$cmd >/dev/null 2>&1") == 0 if $summary
     system($cmd) == 0
 }
