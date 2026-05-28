@@ -31,10 +31,10 @@ assert_eq $obs->{energy}, 50, "Observation halves energy"
 # ── 4. Wave Function Generator ────────────────────────────────────
 
 my $gen = Project::QuantumSim::wave_function_generator(10, 3)
-my $r1 = $gen->()
-my $r2 = $gen->()
-my $r3 = $gen->()
-my $r4 = $gen->()
+my $r1 = $gen()
+my $r2 = $gen()
+my $r3 = $gen()
+my $r4 = $gen()
 
 assert_true defined($r1->[0]), "Wave iter 1"
 assert_true $r1->[1], "Wave more 1"

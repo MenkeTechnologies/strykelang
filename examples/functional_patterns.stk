@@ -44,9 +44,9 @@ fn Demo::FuncPatterns::multiply = _ * _1
 
 # partial pre-fills arguments.
 my $triple = partial(\&Demo::FuncPatterns::multiply, 3)
-p "  Triple 10: ", $triple->(10)
+p "  Triple 10: ", $triple(10)
 
 # curry transforms to chainable single-arg calls.
 my $curried_mul = curry(\&Demo::FuncPatterns::multiply)
-my $times5 = $curried_mul->(5)
-p "  Curried 5 * 4: ", $times5->(4)
+my $times5 = $curried_mul(5)
+p "  Curried 5 * 4: ", $times5(4)

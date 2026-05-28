@@ -24,7 +24,7 @@ fn Rosetta::Game21::play(@strategies) {
     my $total = 0
     my $turn = 0
     while ($total < 21) {
-        my $p = $strategies[$turn]->($total)
+        my $p = $strategies[$turn]($total)
         $p = 1 if $p < 1
         $p = 3 if $p > 3
         $p = 21 - $total if $total + $p > 21

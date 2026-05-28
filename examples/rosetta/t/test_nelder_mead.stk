@@ -34,7 +34,7 @@ fn Rosetta::NM::centroid($simplex) {
 
 fn Rosetta::NM::sort_simplex($simplex, $f) {
     my @scored
-    for my $v (@$simplex) { push @scored, [$f->($v), $v] }
+    for my $v (@$simplex) { push @scored, [$f($v), $v] }
     @scored = sort { _0->[0] <=> _1->[0] } @scored
     my @out = map { _0->[1] } @scored
     \@out
@@ -61,14 +61,14 @@ fn Rosetta::NM::minimize($f, $start, $iters) {
         my $cent = Rosetta::NM::centroid(\@top)
         my $reflected = Rosetta::NM::vec_add($cent,
             Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($cent, $worst), $alpha))
-        my $fr = $f->($reflected)
-        my $fb = $f->($best)
-        my $fsw = $f->($second_worst)
-        my $fw = $f->($worst)
+        my $fr = $f($reflected)
+        my $fb = $f($best)
+        my $fsw = $f($second_worst)
+        my $fw = $f($worst)
         if ($fr < $fb) {
             my $expanded = Rosetta::NM::vec_add($cent,
                 Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($cent, $worst), $gamma))
-            my $fe = $f->($expanded)
+            my $fe = $f($expanded)
             $simplex[$n] = $fe < $fr ? $expanded : $reflected
             next
         }
@@ -85,7 +85,7 @@ fn Rosetta::NM::minimize($f, $start, $iters) {
             $contracted = Rosetta::NM::vec_add($cent,
                 Rosetta::NM::vec_scale(Rosetta::NM::vec_sub($worst, $cent), $rho))
         }
-        my $fc = $f->($contracted)
+        my $fc = $f($contracted)
         if ($fc < $fw) {
             $simplex[$n] = $contracted
             next

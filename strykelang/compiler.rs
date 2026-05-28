@@ -6128,25 +6128,44 @@ impl Compiler {
                 pass_caller_arglist,
             } => {
                 self.compile_expr(target)?;
-                if !pass_caller_arglist {
+                // When any arg is a bare `@arr` / `%hash`, route through
+                // ArrowCall so the array / hash flattens into call args
+                // the same way `$f->(@xs)` does. The plain IndirectCall
+                // op pops `args.len()` items, which collapses `@xs` to a
+                // single scalar — `Fn::apply($f, 5)` calling `$f(@xs)`
+                // reached `$f` with one arg (the array value) instead of
+                // flattened elements. For all-scalar args we keep the
+                // tighter IndirectCall path so `~> LHS head(3)` thread-
+                // first stages and `>{ … }` IIFEs keep their existing
+                // arg shapes (those depend on `argc` being the static
+                // arg count, not a flattened total).
+                let has_aggregate_arg = !pass_caller_arglist
+                    && args.iter().any(|a| {
+                        matches!(a.kind, ExprKind::ArrayVar(_) | ExprKind::HashVar(_))
+                    });
+                if *pass_caller_arglist {
+                    self.emit_op(
+                        Op::IndirectCall(0, ctx.as_byte(), 1),
+                        line,
+                        Some(root),
+                    );
+                } else if has_aggregate_arg {
+                    let list_expr = Expr {
+                        kind: ExprKind::List(args.clone()),
+                        line,
+                    };
+                    self.compile_expr_ctx(&list_expr, WantarrayCtx::List)?;
+                    self.emit_op(Op::ArrowCall(ctx.as_byte()), line, Some(root));
+                } else {
                     for a in args {
                         self.compile_expr_ctx(a, WantarrayCtx::List)?;
                     }
+                    self.emit_op(
+                        Op::IndirectCall(args.len() as u8, ctx.as_byte(), 0),
+                        line,
+                        Some(root),
+                    );
                 }
-                let argc = if *pass_caller_arglist {
-                    0
-                } else {
-                    args.len() as u8
-                };
-                self.emit_op(
-                    Op::IndirectCall(
-                        argc,
-                        ctx.as_byte(),
-                        if *pass_caller_arglist { 1 } else { 0 },
-                    ),
-                    line,
-                    Some(root),
-                );
             }
 
             // ── Print / Say / Printf ──

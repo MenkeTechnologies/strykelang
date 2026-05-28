@@ -74,7 +74,7 @@ fn Project::QuantumSim::qp_run_simulation($processor, $particles, $iterations) {
         my $gen = Project::QuantumSim::wave_function_generator($p->energy, $iterations);
         my $total_energy = 0;
         for (my $i = 0; $i < $iterations; $i++) {
-            my $res = $gen->();
+            my $res = $gen();
             if ($res->[1]) {
                 $total_energy = $total_energy + $res->[0];
             }

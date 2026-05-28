@@ -11,7 +11,7 @@ fn Rosetta::PairOrder::sort($items, $cmp) {
         while ($lo < $hi) {
             my $mid = int(($lo + $hi) / 2)
             $comparisons++
-            my $r = $cmp->($item, $sorted[$mid])
+            my $r = $cmp($item, $sorted[$mid])
             if ($r < 0) {
                 $hi = $mid
             } else {

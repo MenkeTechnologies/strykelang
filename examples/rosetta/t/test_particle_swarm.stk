@@ -30,7 +30,7 @@ fn Rosetta::PSO::optimize($f, $dim, $bounds, $opts) {
             push @p, Rosetta::PSO::random($lo, $hi)
             push @v, Rosetta::PSO::random(-($hi - $lo), $hi - $lo) * 0.1
         }
-        my $val = $f->(\@p)
+        my $val = $f(\@p)
         push @pos, \@p
         push @vel, \@v
         my @pcopy = @p
@@ -56,7 +56,7 @@ fn Rosetta::PSO::optimize($f, $dim, $bounds, $opts) {
                 if ($pos[$i][$d] < $bounds->[$d][0]) { $pos[$i][$d] = $bounds->[$d][0] }
                 if ($pos[$i][$d] > $bounds->[$d][1]) { $pos[$i][$d] = $bounds->[$d][1] }
             }
-            my $val = $f->($pos[$i])
+            my $val = $f($pos[$i])
             if ($val < $pbest_val[$i]) {
                 $pbest_val[$i] = $val
                 my @cp = @{$pos[$i]}

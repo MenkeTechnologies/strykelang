@@ -17,7 +17,7 @@ fn Rosetta::Pig::play($strategies, $target) {
         $rounds++
         my $banked = 0
         while (1) {
-            my $action = $strategies->[$turn]->($totals[$turn], $totals[1 - $turn], $banked)
+            my $action = $strategies->[$turn]($totals[$turn], $totals[1 - $turn], $banked)
             last if $action eq "hold"
             my $r = Rosetta::Pig::roll()
             if ($r == 1) { $banked = 0; last }
@@ -69,6 +69,6 @@ my $r2 = Rosetta::Pig::play([$aggro, $aggro], 100)
 assert_ok $r2->[0][0] >= 100 || $r2->[0][1] >= 100, "someone reaches 100"
 
 # Pipe form
-20 |> Rosetta::Pig::strat_hold_at |> fn { $_->(50, 50, 25) } |> assert_eq("hold", "pipe strategy")
+20 |> Rosetta::Pig::strat_hold_at |> fn { $_(50, 50, 25) } |> assert_eq("hold", "pipe strategy")
 
 test_run

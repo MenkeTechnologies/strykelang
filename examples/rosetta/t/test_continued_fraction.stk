@@ -5,12 +5,12 @@ fn Rosetta::ContinuedFraction::compute($gen, $n) {
     my $res = 0
     my $i = $n
     while ($i >= 1) {
-        my $ab = $gen->($i)
+        my $ab = $gen($i)
         my $a = $ab->[0]; my $b = $ab->[1]
         $res = $b / ($a + $res)
         $i = $i - 1
     }
-    my $ab0 = $gen->(0)
+    my $ab0 = $gen(0)
     $ab0->[0] + $res
 }
 

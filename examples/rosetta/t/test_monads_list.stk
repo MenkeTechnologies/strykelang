@@ -8,7 +8,7 @@ fn Rosetta::ListMonad::bind($list, $func) {
     # Using flat_map logic
     my @res
     for my $val (@$list) {
-        my $sub_list = $func->($val)
+        my $sub_list = $func($val)
         push @res, @$sub_list
     }
     \@res

@@ -6,14 +6,14 @@
 fn Rosetta::Cata::foldr($f, $z, @xs) {
     my $acc = $z
     for my $i (rev 0..len(@xs)-1) {
-        $acc = $f->($xs[$i], $acc)
+        $acc = $f($xs[$i], $acc)
     }
     $acc
 }
 
 fn Rosetta::Cata::foldl($f, $z, @xs) {
     my $acc = $z
-    for my $x (@xs) { $acc = $f->($acc, $x) }
+    for my $x (@xs) { $acc = $f($acc, $x) }
     $acc
 }
 

@@ -70,7 +70,7 @@ fn Demo::LB::simulate($name, $strategy_fn) {
     my $td_lat = t_digest(100)
     my $tk_hot = topk(3)
     for my $i (1:1000) {
-        my $picked = $strategy_fn->($backends, $state)
+        my $picked = $strategy_fn($backends, $state)
         last unless defined $picked
         $picked->{conns} = $picked->{conns} + 1
         # Simulate request latency proportional to current load.

@@ -4,9 +4,9 @@
 fn Rosetta::Newton::solve($f, $df, $x0, $tol) {
     my $x = $x0
     for my $i (1:100) {
-        my $fx = $f->($x)
+        my $fx = $f($x)
         if (abs($fx) < $tol) { return $x }
-        my $dfx = $df->($x)
+        my $dfx = $df($x)
         if ($dfx == 0) { return undef }
         $x = $x - $fx / $dfx
     }

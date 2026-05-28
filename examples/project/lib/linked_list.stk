@@ -55,7 +55,7 @@ fn Project::LinkedList::list_map($f, $l) {
     my @arr;
     my $curr = $l;
     while (!$curr->is_empty()) {
-        push @arr, $f->($curr->head());
+        push @arr, $f($curr->head());
         $curr = $curr->tail();
     }
     return Project::LinkedList::list_new(@arr);

@@ -49,7 +49,7 @@ my $grid = [
     [0, 0, 0]
 ]
 my $dist = Rosetta::AStar::solve($grid, [0, 0], [2, 2])
-# Path: (0,0)->(1,0)->(2,0)->(2,1)->(2,2) or similar, length 4
+# Path: (0,0)(1,0)(2,0)(2,1)(2,2) or similar, length 4
 assert_eq $dist, 4, "A* distance on 3x3 grid with obstacle"
 
 test_run

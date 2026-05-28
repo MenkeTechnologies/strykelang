@@ -10,7 +10,7 @@ fn Rosetta::KeyMacros::bind($sys, $key, $action) {
 
 fn Rosetta::KeyMacros::press($sys, $key, $state) {
     return undef if !exists $sys->{bindings}{$key}
-    $sys->{bindings}{$key}->($state)
+    $sys->{bindings}{$key}($state)
 }
 
 my $sys = Rosetta::KeyMacros::new()

@@ -798,7 +798,7 @@ fn Sch::sch_apply($proc, $args) {
                 die "apply: " . $proc->{name} . " expects at least " . (-$a) . " args, got " . len(@$args)
             }
         }
-        return $proc->{fn}->($args)
+        return $proc->{fn}($args)
     }
     if (Sch::is_lambda($proc)) {
         my $new_env = Sch::env_extend($proc->{env}, $proc->{params}, $proc->{rest}, $args)

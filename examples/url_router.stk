@@ -141,7 +141,7 @@ printf "── dispatching %d requests ─────────────�
 for my $req (@requests) {
     my $result = Demo::Router::dispatch($req->[0], $req->[1])
     if ($result->{ok}) {
-        my $response = $result->{handler}->($result->{params})
+        my $response = $result->{handler}($result->{params})
         printf "  %-6s %-30s -> %s\n", $req->[0], $req->[1], $response
     } else {
         printf "  %-6s %-30s -> 404 Not Found\n", $req->[0], $req->[1]

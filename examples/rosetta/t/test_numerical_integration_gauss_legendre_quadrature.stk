@@ -40,7 +40,7 @@ fn Rosetta::GaussLegendre::integrate($f, $a, $b, $n) {
     my $mid = ($a + $b) / 2
     my $sum = 0.0
     for my $i (0:$n - 1) {
-        $sum += $weights->[$i] * $f->($half * $nodes->[$i] + $mid)
+        $sum += $weights->[$i] * $f($half * $nodes->[$i] + $mid)
     }
     $half * $sum
 }

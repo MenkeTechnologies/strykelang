@@ -35,4 +35,4 @@ printf "Total Processed Risk: %.2f\n", $total_processed_risk
 
 # Typed anonymous functions.
 my $formatter = fn ($v: Float) : Str { sprintf "RISK: %.2f", $v }
-p $formatter->($risk)
+p $formatter($risk)

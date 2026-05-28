@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 
-fn Exercism::RpnCalculator::calculate_bang = _1->(_)
+fn Exercism::RpnCalculator::calculate_bang = _1(_)
 
 fn Exercism::RpnCalculator::calculate {
-    my $r = eval { _1->(_) }
+    my $r = eval { _1(_) }
     $@ ? "error" : ["ok", $r]
 }
 
 fn Exercism::RpnCalculator::calculate_verbose {
-    my $r = eval { _1->(_) }
+    my $r = eval { _1(_) }
     $@ ? ["error", "$@" =~ s/\s+at .*//rs] : ["ok", $r]
 }

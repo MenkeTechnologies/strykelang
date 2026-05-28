@@ -3,11 +3,11 @@
 # Functional combinators: compose, pipe, curry, flip, memoize.
 
 fn Fc::compose($f, $g) {
-    fn ($x) { $f->($g->($x)) }
+    fn ($x) { $f($g($x)) }
 }
 
 fn Fc::pipe2($f, $g) {
-    fn ($x) { $g->($f->($x)) }
+    fn ($x) { $g($f($x)) }
 }
 
 fn Fc::const($v) {
@@ -15,15 +15,15 @@ fn Fc::const($v) {
 }
 
 fn Fc::flip($f) {
-    fn ($x, $y) { $f->($y, $x) }
+    fn ($x, $y) { $f($y, $x) }
 }
 
 fn Fc::curry2($f) {
-    fn ($x) { fn ($y) { $f->($x, $y) } }
+    fn ($x) { fn ($y) { $f($x, $y) } }
 }
 
 fn Fc::twice($f) {
-    fn ($x) { $f->($f->($x)) }
+    fn ($x) { $f($f($x)) }
 }
 
 # Compose: (x+1) o (x*2) applied to 3 → 7
@@ -32,50 +32,50 @@ my $double   = fn ($n) { $n * 2 }
 my $tostr    = fn ($n) { "n=$n" }
 
 my $double_then_inc = Fc::compose($inc, $double)
-$double_then_inc->(3) |> aeq 7, "compose inc∘double on 3"
+$double_then_inc(3) |> aeq 7, "compose inc∘double on 3"
 
 my $inc_then_double = Fc::pipe2($inc, $double)
-$inc_then_double->(3) |> aeq 8, "pipe2 inc;double on 3"
+$inc_then_double(3) |> aeq 8, "pipe2 inc;double on 3"
 
 # Const
 my $always42 = Fc::const(42)
-$always42->()  |> aeq 42, "const no args"
+$always42()  |> aeq 42, "const no args"
 
 # Flip
 my $sub = fn ($x, $y) { $x - $y }
 my $flipped = Fc::flip($sub)
-$sub->(10, 3)     |> aeq 7,  "sub 10-3"
-$flipped->(10, 3) |> aeq -7, "flipped 3-10"
+$sub(10, 3)     |> aeq 7,  "sub 10-3"
+$flipped(10, 3) |> aeq -7, "flipped 3-10"
 
 # Curry
 my $add = fn ($x, $y) { $x + $y }
 my $cadd = Fc::curry2($add)
-$cadd->(5)->(3) |> aeq 8, "curry add 5 3"
-my $add10 = $cadd->(10)
-$add10->(7)  |> aeq 17, "partial add10 7"
-$add10->(-3) |> aeq 7,  "partial add10 -3"
+$cadd(5)(3) |> aeq 8, "curry add 5 3"
+my $add10 = $cadd(10)
+$add10(7)  |> aeq 17, "partial add10 7"
+$add10(-3) |> aeq 7,  "partial add10 -3"
 
 # Twice
-Fc::twice($inc)->(5)    |> aeq 7,  "twice inc on 5"
-Fc::twice($double)->(3) |> aeq 12, "twice double on 3"
+Fc::twice($inc)(5)    |> aeq 7,  "twice inc on 5"
+Fc::twice($double)(3) |> aeq 12, "twice double on 3"
 
 # Compose into a multi-step pipeline applied to a collection
 my $process = Fc::compose($tostr, Fc::compose($inc, $double))
-join(",", map { $process->(_) } 1, 2, 3) |> aeq "n=3,n=5,n=7", "pipeline over list"
+join(",", map { $process(_) } 1, 2, 3) |> aeq "n=3,n=5,n=7", "pipeline over list"
 
 # Composing pure functions with stdlib pipelines
 fn Fc::sq($n) { $n * $n }
 my $sumsq = fn (@xs) { sum(map { Fc::sq(_) } @xs) }
-$sumsq->(1, 2, 3, 4)  |> aeq 30,  "sum of squares 1..4"
-$sumsq->(0)           |> aeq 0,   "sum of squares 0"
+$sumsq(1, 2, 3, 4)  |> aeq 30,  "sum of squares 1..4"
+$sumsq(0)           |> aeq 0,   "sum of squares 0"
 
 # Builtin memoize
 mysync $count = 0
 my $slow = fn ($n) { $count++; $n * 2 }
 my $fast = memoize($slow)
-$fast->(5) |> aeq 10, "memoize first call"
-$fast->(5) |> aeq 10, "memoize repeated"
-$fast->(7) |> aeq 14, "memoize new arg"
+$fast(5) |> aeq 10, "memoize first call"
+$fast(5) |> aeq 10, "memoize repeated"
+$fast(7) |> aeq 14, "memoize new arg"
 $count |> aeq 2, "underlying called twice"
 
 test_run

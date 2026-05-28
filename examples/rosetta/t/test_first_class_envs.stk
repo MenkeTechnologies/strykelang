@@ -21,30 +21,30 @@ my @envs = (
 )
 
 # Drive each independently.
-$envs[0]->{inc}->()
-$envs[0]->{inc}->()
-$envs[0]->{inc}->()
-$envs[1]->{inc}->()
-$envs[2]->{dec}->()
+$envs[0]->{inc}()
+$envs[0]->{inc}()
+$envs[0]->{inc}()
+$envs[1]->{inc}()
+$envs[2]->{dec}()
 
-assert_eq $envs[0]->{get}->(),  3, "env 0 = 3"
-assert_eq $envs[1]->{get}->(),  1, "env 1 = 1"
-assert_eq $envs[2]->{get}->(), -1, "env 2 = -1"
+assert_eq $envs[0]->{get}(),  3, "env 0 = 3"
+assert_eq $envs[1]->{get}(),  1, "env 1 = 1"
+assert_eq $envs[2]->{get}(), -1, "env 2 = -1"
 
 # pipeline: snapshot all
-my @snap = ~> @envs map { _->{get}->() }
+my @snap = ~> @envs map { _->{get}() }
 assert_eq join(",", @snap), "3,1,-1", "snapshot"
 
 # Reset env 0, ensure others untouched.
-$envs[0]->{reset}->()
-assert_eq $envs[0]->{get}->(), 0, "env 0 reset"
-assert_eq $envs[1]->{get}->(), 1, "env 1 unaffected"
-assert_eq $envs[2]->{get}->(), -1, "env 2 unaffected"
+$envs[0]->{reset}()
+assert_eq $envs[0]->{get}(), 0, "env 0 reset"
+assert_eq $envs[1]->{get}(), 1, "env 1 unaffected"
+assert_eq $envs[2]->{get}(), -1, "env 2 unaffected"
 
 # Environments are first-class: pass into a function, store in a hash, etc.
 fn Rosetta::FCEnv::ramp_up($env, $n) {
-    for (1:$n) { $env->{inc}->() }
-    $env->{get}->()
+    for (1:$n) { $env->{inc}() }
+    $env->{get}()
 }
 
 my $fresh = Rosetta::FCEnv::make_counter()

@@ -2,7 +2,7 @@
 
 fn Exercism::RpnCalculatorInspection::start_reliability_check($op, $n) {
     my @results
-    for my $i (1:$n) { push @results, $op->($i) }
+    for my $i (1:$n) { push @results, $op($i) }
     \@results
 }
 
@@ -18,10 +18,10 @@ fn Exercism::RpnCalculatorInspection::reliability_check($op, $n, $retries) {
     $retries //= 0
     my @results
     for my $i (1:$n) {
-        my $r = $op->($i)
+        my $r = $op($i)
         if (!$r) {
             for my $t (1..$retries) {
-                $r = $op->($i)
+                $r = $op($i)
                 last if $r
             }
         }

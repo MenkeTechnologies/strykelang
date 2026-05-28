@@ -3,43 +3,43 @@
 # Pinning batch: Functional combinators — compose, curry, flip, memoize, pipe.
 # Compliance: docs/STYLE_GUIDE.md
 
-fn Fn::compose($f, $g) = fn { $f->($g->(_)) }
-fn Fn::compose3($f, $g, $h) = fn { $f->($g->($h->(_))) }
-fn Fn::flip($f)        = fn($x, $y) { $f->($y, $x) }
+fn Fn::compose($f, $g) = fn { $f($g(_)) }
+fn Fn::compose3($f, $g, $h) = fn { $f($g($h(_))) }
+fn Fn::flip($f)        = fn($x, $y) { $f($y, $x) }
 fn Fn::const($v)       = fn { $v }
 fn Fn::identity        = _
-fn Fn::apply($f, @xs)  = $f->(@xs)
+fn Fn::apply($f, @xs)  = $f(@xs)
 
 my $inc    = fn { _ + 1 }
 my $dbl    = fn { _ * 2 }
 my $neg    = fn { -_ }
 
-Fn::compose($inc, $dbl)->(3)   |> aeq 7,  "(inc∘dbl)(3) = 7"
-Fn::compose($dbl, $inc)->(3)   |> aeq 8,  "(dbl∘inc)(3) = 8"
-Fn::compose3($neg, $inc, $dbl)->(3) |> aeq -7, "(-∘inc∘dbl)(3)"
+Fn::compose($inc, $dbl)(3)   |> aeq 7,  "(inc∘dbl)(3) = 7"
+Fn::compose($dbl, $inc)(3)   |> aeq 8,  "(dbl∘inc)(3) = 8"
+Fn::compose3($neg, $inc, $dbl)(3) |> aeq -7, "(-∘inc∘dbl)(3)"
 
 fn Fn::sub2($x, $y) = $x - $y
 Fn::sub2(10, 3)              |> aeq 7,    "sub2 10,3"
-Fn::flip(\&Fn::sub2)->(10, 3)|> aeq -7,   "flip(sub2)(10,3)"
+Fn::flip(\&Fn::sub2)(10, 3)|> aeq -7,   "flip(sub2)(10,3)"
 
-Fn::const(42)->()    |> aeq 42, "const 42"
-Fn::const("x")->(1, 2, 3) |> aeq "x", "const ignores args"
+Fn::const(42)()    |> aeq 42, "const 42"
+Fn::const("x")(1, 2, 3) |> aeq "x", "const ignores args"
 Fn::identity(99)     |> aeq 99, "identity"
 
 Fn::apply($inc, 5)   |> aeq 6, "apply inc 5"
 Fn::apply(fn { _ * _1 }, 6, 7) |> aeq 42, "apply *(6,7)"
 
-fn Fn::curry($f) = fn($x) { fn($y) { $f->($x, $y) } }
+fn Fn::curry($f) = fn($x) { fn($y) { $f($x, $y) } }
 my $add  = fn { _ + _1 }
-my $add5 = Fn::curry($add)->(5)
-$add5->(3) |> aeq 8,  "curry add5(3)"
-$add5->(10)|> aeq 15, "curry add5(10)"
+my $add5 = Fn::curry($add)(5)
+$add5(3) |> aeq 8,  "curry add5(3)"
+$add5(10)|> aeq 15, "curry add5(10)"
 
 fn Fn::memoize($f) {
     mysync %cache = ()
     fn($x) {
         if (!exists $cache{$x}) {
-            $cache{$x} = $f->($x)
+            $cache{$x} = $f($x)
         }
         $cache{$x}
     }
@@ -48,68 +48,68 @@ fn Fn::memoize($f) {
 mysync $calls = 0
 my $slow = fn { $calls++; _ * _ }
 my $fast = Fn::memoize($slow)
-$fast->(5) |> aeq 25, "memo 5²"
-$fast->(5) |> aeq 25, "memo 5² cached"
-$fast->(6) |> aeq 36, "memo 6²"
+$fast(5) |> aeq 25, "memo 5²"
+$fast(5) |> aeq 25, "memo 5² cached"
+$fast(6) |> aeq 36, "memo 6²"
 $calls     |> aeq 2,  "only 2 actual calls"
 
 fn Fn::pipe(@fs) {
     fn {
         my $x = _
-        $x = $_->($x) for @fs
+        $x = $_($x) for @fs
         $x
     }
 }
 
-Fn::pipe($inc, $dbl, $neg)->(3) |> aeq -8, "pipe inc→dbl→neg of 3"
-Fn::pipe($dbl, $dbl, $dbl)->(1) |> aeq 8,  "dbl×3 of 1 = 8"
+Fn::pipe($inc, $dbl, $neg)(3) |> aeq -8, "pipe inc→dbl→neg of 3"
+Fn::pipe($dbl, $dbl, $dbl)(1) |> aeq 8,  "dbl×3 of 1 = 8"
 
 fn Fn::repeat($f, $n) {
     fn {
         my $x = _
-        $x = $f->($x) for (1:$n)
+        $x = $f($x) for (1:$n)
         $x
     }
 }
 
-Fn::repeat($inc, 10)->(0) |> aeq 10, "inc×10"
-Fn::repeat($dbl, 5)->(1)  |> aeq 32, "dbl×5 of 1 = 32"
+Fn::repeat($inc, 10)(0) |> aeq 10, "inc×10"
+Fn::repeat($dbl, 5)(1)  |> aeq 32, "dbl×5 of 1 = 32"
 
-fn Fn::partial($f, @bound) = fn(@rest) { $f->(@bound, @rest) }
+fn Fn::partial($f, @bound) = fn(@rest) { $f(@bound, @rest) }
 
 my $sum3 = fn($x, $y, $z) { $x + $y + $z }
-Fn::partial($sum3, 10)->(20, 30)    |> aeq 60, "partial(sum3, 10)(20,30)"
-Fn::partial($sum3, 1, 2)->(3)       |> aeq 6,  "partial(sum3,1,2)(3)"
+Fn::partial($sum3, 10)(20, 30)    |> aeq 60, "partial(sum3, 10)(20,30)"
+Fn::partial($sum3, 1, 2)(3)       |> aeq 6,  "partial(sum3,1,2)(3)"
 
-fn Fn::juxt(@fs) = fn { [map { $_->(_<) } @fs] }
+fn Fn::juxt(@fs) = fn { [map { $_(_<) } @fs] }
 
 my $j = Fn::juxt($inc, $dbl, $neg)
-join(",", @{$j->(5)}) |> aeq "6,10,-5", "juxt(inc,dbl,neg)(5)"
+join(",", @{$j(5)}) |> aeq "6,10,-5", "juxt(inc,dbl,neg)(5)"
 
-fn Fn::tap($f) = fn { $f->(_); _ }
+fn Fn::tap($f) = fn { $f(_); _ }
 
 mysync @log = ()
 my $tap = Fn::tap(fn { push @log, _ })
-$tap->(10) |> aeq 10, "tap returns input"
-$tap->(20) |> aeq 20, "tap returns input 2"
+$tap(10) |> aeq 10, "tap returns input"
+$tap(20) |> aeq 20, "tap returns input 2"
 join(",", @log) |> aeq "10,20", "tap captured side effect"
 
 # Y combinator (fixed-point) — recursive fact via combinator
 my $fact = fn($f) {
-    fn { _ <= 1 ? 1 : _ * $f->($f)->(_ - 1) }
+    fn { _ <= 1 ? 1 : _ * $f($f)(_ - 1) }
 }
-$fact->($fact)->(5)  |> aeq 120,     "Y-fact 5"
-$fact->($fact)->(10) |> aeq 3628800, "Y-fact 10"
+$fact($fact)(5)  |> aeq 120,     "Y-fact 5"
+$fact($fact)(10) |> aeq 3628800, "Y-fact 10"
 
 # fold / foldr
 fn Fn::foldl($f, $init, @xs) {
     my $acc = $init
-    $acc = $f->($acc, $_) for @xs
+    $acc = $f($acc, $_) for @xs
     $acc
 }
 fn Fn::foldr($f, $init, @xs) {
     my $acc = $init
-    $acc = $f->($_, $acc) for rev @xs
+    $acc = $f($_, $acc) for rev @xs
     $acc
 }
 

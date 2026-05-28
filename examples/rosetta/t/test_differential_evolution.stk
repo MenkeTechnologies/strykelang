@@ -22,7 +22,7 @@ fn Rosetta::DE::optimize($f, $dim, $bounds, $opts) {
             push @v, Rosetta::DE::random($bounds->[$d][0], $bounds->[$d][1])
         }
         push @pop, \@v
-        push @vals, $f->(\@v)
+        push @vals, $f(\@v)
     }
 
     for my $iter (~> 1:$iters) {
@@ -45,7 +45,7 @@ fn Rosetta::DE::optimize($f, $dim, $bounds, $opts) {
                 }
                 push @trial, $v
             }
-            my $tv = $f->(\@trial)
+            my $tv = $f(\@trial)
             if ($tv < $vals[$i]) {
                 $pop[$i] = \@trial
                 $vals[$i] = $tv

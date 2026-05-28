@@ -585,7 +585,7 @@ class DocumentNode impl Visitor {
         $d
     }
     
-    fn visit($visitor) { $visitor->($self) }
+    fn visit($visitor) { $visitor($self) }
     
     fn traverse($visitor) {
         $self->visit($visitor)

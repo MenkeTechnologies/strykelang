@@ -17,7 +17,7 @@ fn Rosetta::Logic::truth_table($f) {
     my @rows
     for my $a (0, 1) {
         for my $b (0, 1) {
-            push @rows, sprintf("%d %d → %d", $a, $b, $f->($a, $b))
+            push @rows, sprintf("%d %d → %d", $a, $b, $f($a, $b))
         }
     }
     join("\n", @rows)

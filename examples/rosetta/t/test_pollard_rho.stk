@@ -19,8 +19,8 @@ fn Rosetta::PollardRho::solve($n) {
     my $f = fn($v) { ($v * $v + $c) % $n }
     
     while ($d == 1) {
-        $x = $f->($x)
-        $y = $f->($f->($y))
+        $x = $f($x)
+        $y = $f($f($y))
         $d = Rosetta::PollardRho::gcd(abs($x - $y), $n)
         
         if ($d == $n) {

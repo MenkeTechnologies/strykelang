@@ -4,7 +4,7 @@
 fn Rosetta::GradientDescent::solve($df, $start_x, $learning_rate, $epsilon, $max_iter) {
     my $x = $start_x
     for my $i (1:$max_iter) {
-        my $grad = $df->($x)
+        my $grad = $df($x)
         my $new_x = $x - $learning_rate * $grad
         
         if (abs($new_x - $x) < $epsilon) {

@@ -6,7 +6,7 @@
 fn Rosetta::DistVerify::histogram($gen, $samples) {
     my %h
     for my $i (~> 1:$samples) {
-        $h{$gen->()}++
+        $h{$gen()}++
     }
     \%h
 }

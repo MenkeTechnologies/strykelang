@@ -22,7 +22,7 @@ fn Rosetta::SparseTable::build($arr, $op) {
         for my $i (~> 0:$n - $width) {
             my $left = $table[$j - 1][$i]
             my $right = $table[$j - 1][$i + (1 << ($j - 1))]
-            push @row, $op->($left, $right)
+            push @row, $op($left, $right)
         }
         push @table, \@row
     }
@@ -34,12 +34,12 @@ fn Rosetta::SparseTable::query($st, $lo, $hi) {
     my $j = Rosetta::SparseTable::log2_floor($len)
     my $left = $st->{table}[$j][$lo]
     my $right = $st->{table}[$j][$hi - (1 << $j) + 1]
-    $st->{op}->($left, $right)
+    $st->{op}($left, $right)
 }
 
 fn Rosetta::SparseTable::query_naive($arr, $op, $lo, $hi) {
     my $r = $arr->[$lo]
-    for my $i ($lo + 1:$hi) { $r = $op->($r, $arr->[$i]) }
+    for my $i ($lo + 1:$hi) { $r = $op($r, $arr->[$i]) }
     $r
 }
 

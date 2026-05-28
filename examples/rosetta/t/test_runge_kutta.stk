@@ -4,10 +4,10 @@
 fn Rosetta::RungeKutta::solve($f, $x, $y, $h, $steps) {
     my @res = ([$x, $y])
     for my $i (1:$steps) {
-        my $k1 = $h * $f->($x, $y)
-        my $k2 = $h * $f->($x + $h/2, $y + $k1/2)
-        my $k3 = $h * $f->($x + $h/2, $y + $k2/2)
-        my $k4 = $h * $f->($x + $h, $y + $k3)
+        my $k1 = $h * $f($x, $y)
+        my $k2 = $h * $f($x + $h/2, $y + $k1/2)
+        my $k3 = $h * $f($x + $h/2, $y + $k2/2)
+        my $k4 = $h * $f($x + $h, $y + $k3)
         
         $y += ($k1 + 2*$k2 + 2*$k3 + $k4) / 6
         $x += $h

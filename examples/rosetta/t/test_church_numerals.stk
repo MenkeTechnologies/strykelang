@@ -9,7 +9,7 @@ fn Rosetta::Church::succ($n) {
         my $f = _
         fn {
             my $x = _
-            $f->($n->($f)->($x))
+            $f($n($f)($x))
         }
     }
 }
@@ -19,7 +19,7 @@ fn Rosetta::Church::add($m, $n) {
         my $f = _
         fn {
             my $x = _
-            $m->($f)->($n->($f)->($x))
+            $m($f)($n($f)($x))
         }
     }
 }
@@ -27,16 +27,16 @@ fn Rosetta::Church::add($m, $n) {
 fn Rosetta::Church::mul($m, $n) {
     fn {
         my $f = _
-        $m->($n->($f))
+        $m($n($f))
     }
 }
 
 fn Rosetta::Church::pow($m, $n) {
-    $n->($m)
+    $n($m)
 }
 
 fn Rosetta::Church::to_int($n) {
-    $n->(fn { my $x = _; $x + 1 })->(0)
+    $n(fn { my $x = _; $x + 1 })(0)
 }
 
 fn Rosetta::Church::from_int($k) {

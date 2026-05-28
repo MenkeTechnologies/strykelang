@@ -13394,12 +13394,18 @@ impl Parser {
             // Exclude `$_` — it's virtually always the topic variable, not a handle.
             // Exclude `[` and `{` — those are array/hash subscripts on the variable
             // itself (`print $F[0]`, `print $h{k}`), not separate print arguments.
+            // Exclude `(` — `$f(...)` is a coderef call expression (`p $f(5)` is
+            // `p( $f(5) )`, not `print $f ARGS`). Without this guard, calling
+            // stored coderefs in print/say/printf/p position required parens
+            // wrappers (`p ( $f(5) )`) or a temporary scalar.
             // Exclude statement modifiers (`if`/`unless`/`while`/`until`/`for`/`foreach`)
             // — `print $_ if COND` prints `$_` to STDOUT, not to a handle named `$_`.
             // Exclude tokens on a later line — a newline ends the print statement
             // in stryke, so `p $j\nmy $k = …` must not absorb the following `my`.
             let v = v.clone();
             if v == "_" {
+                None
+            } else if matches!(self.peek_at(1), Token::LParen) {
                 None
             } else {
                 let saved = self.pos;

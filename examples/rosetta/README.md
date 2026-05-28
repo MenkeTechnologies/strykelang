@@ -795,8 +795,8 @@ typed my $n : Int = 42
 
 # Typed fn parameters — runtime type checking on call
 my $add = fn ($a: Int, $b: Int) { $a + $b }
-p $add->(3, 4)  # 7
-# $add->("x", 1)  # ERROR: sub parameter $a: expected Int
+p $add(3, 4)  # 7
+# $add("x", 1)  # ERROR: sub parameter $a: expected Int
 
 fn greet ($name: Str) { "Hello, $name!" }
 p greet("world")  # Hello, world!
@@ -811,7 +811,7 @@ p $copy->{a}[0]  # 1
 my $f = fn ($x: Int) { $x * 2 }
 p str $f  # fn ($x: Int) { $x * 2; }
 my $f2 = eval str $f  # round-trip: deserialize back to callable
-p $f2->(21)  # 42
+p $f2(21)  # 42
 
 # streaming range — bidirectional lazy iterator
 range(1, 5) |> e p                          # 1 2 3 4 5
@@ -1224,7 +1224,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # call on RHS prepends: `x |> f(a, b)` → `f(x, a, b)`
   # map/grep/filter/sort/join/reduce/fold/e — LHS fills the list slot
   # chunked/windowed — `LIST |> chunked(N)` prepends the list before the size
-  # scalar on RHS: `x |> $cr` → `$cr->(x)`
+  # scalar on RHS: `x |> $cr` → `$cr(x)`
 
   # regex ops in pipelines — s///, tr///, and m// work as RHS of |>
   # s/// and tr/// auto-inject /r so the modified string flows through:
@@ -1375,7 +1375,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # round-trip: str -> eval -> callable
   my $f = fn ($x: Int) { $x + 1 }
   my $f2 = $f |> str |> eval
-  $f2->(5) |> p  # 6
+  $f2(5) |> p  # 6
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
   my ($yes, $no) = partition { $_ > 5 } 1..10
@@ -1452,11 +1452,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   **Blockless `|>` rules for `grep`/`filter`**: string literals test `$_ eq EXPR`, numbers test `$_ == EXPR`, regexes test `$_ =~ EXPR`, anything else (e.g. `defined`) uses standard Perl grep semantics (sets `$_`, evaluates expression).
 
-  **Coderef-in-block-position** — wherever a `{ BLOCK }` is accepted (`grep`, `map`, `sort`, `first`, `any`, `all`, `none`, `take_while`, `drop_while`, `reject`, `partition`, `min_by`, `max_by`, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the `{ $f($_) }` / `{ $f->($_) }` boilerplate.
+  **Coderef-in-block-position** — wherever a `{ BLOCK }` is accepted (`grep`, `map`, `sort`, `first`, `any`, `all`, `none`, `take_while`, `drop_while`, `reject`, `partition`, `min_by`, `max_by`, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the `{ $f($_) }` / `{ $f($_) }` boilerplate.
 
   ```perl
   my $is_big = fn ($x) { $x > 3 }
-  my @r = grep $is_big, @l                # was: grep { $is_big->($_) } @l
+  my @r = grep $is_big, @l                # was: grep { $is_big($_) } @l
   my @r = @l |> grep $is_big              # pipe-forward variant
   my @r = first $is_big, @l               # tier-2 builtin, no parens, no block
   my @r = take_while $is_big, @l
@@ -1749,14 +1749,14 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p double(21)                    # 42
 
   my $f = fn { _ * 2 }
-  p $f->(21)                      # 42
+  p $f(21)                      # 42
 
   # implicit zero-arg coderef — at top-level, RHS starting with bare `_` / `_N`
   # auto-wraps as `fn { ... }`. Inside any block, `_` is still the topic.
   my $g = _ * 2
-  p $g->(21)                      # 42
+  p $g(21)                      # 42
   my $h = _ + _1
-  p $h->(3, 4)                    # 7
+  p $h(3, 4)                    # 7
   ```
 
 - **Closure arguments `$_0`, `$_1`, ... `$_N`** — numeric closure arguments inspired by Swift. All arguments passed to any fn (named or anonymous) are available as `$_0` (first), `$_1` (second), `$_2` (third), up to `$_N` for any number of arguments. These work alongside or instead of Perl's `@_`, `$_`, `$a`, `$b`. Both `$_`, bare `_`, and `$_0` refer to the first argument — `_ * 2`, `$_ * 2`, and `$_0 * 2` are all equivalent. Use bare `_` for maximum conciseness in blocks.
@@ -1781,17 +1781,17 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # Multi-arg anonymous subs: $_0, $_1, ... $_N
   my $add3 = fn { $_0 + $_1 + $_2 }
-  p $add3->(1, 2, 3)  # 6
+  p $add3(1, 2, 3)  # 6
 
   my $mul5 = fn { $_0 * $_1 * $_2 * $_3 * $_4 }
-  p $mul5->(1, 2, 3, 4, 5)  # 120
+  p $mul5(1, 2, 3, 4, 5)  # 120
 
   my $concat = fn { "$_0-$_1-$_2-$_3" }
-  p $concat->("a", "b", "c", "d")  # a-b-c-d
+  p $concat("a", "b", "c", "d")  # a-b-c-d
 
   # Direct access via @_ still works
   my $join_args = fn { join("-", @_) }
-  p $join_args->("x", "y", "z")  # x-y-z
+  p $join_args("x", "y", "z")  # x-y-z
 
   # Using $_0 closures with |> pipes
   my $double = fn { $_0 * 2 }
@@ -1800,15 +1800,15 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # Using $_0/$_1 closures in reduce
   my $add = fn { $_0 + $_1 }
-  (1..5) |> reduce { $add->($_0, $_1) } |> p # 15
+  (1..5) |> reduce { $add($_0, $_1) } |> p # 15
 
   # Using $_0/$_1/$_2 closure
   my $mul3 = fn { $_0 * $_1 * $_2 }
-  p $mul3->(2, 3, 4)  # 24
+  p $mul3(2, 3, 4)  # 24
 
   # Using $_0/$_1 closure as comparator
   my $cmp = fn { $_0 <=> $_1 }
-  (5,2,8,1) |> sort { $cmp->($_0, $_1) } |> join "," |> p  # 1,2,5,8
+  (5,2,8,1) |> sort { $cmp($_0, $_1) } |> join "," |> p  # 1,2,5,8
 
   # User-defined functions in ~> (bare stage, no block needed)
   fn double { $_0 * 2 }

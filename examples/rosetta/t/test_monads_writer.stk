@@ -5,7 +5,7 @@
 
 fn Rosetta::WriterMonad::bind($pair, $func) {
     my ($val, $log) = @$pair
-    my $res_pair = $func->($val)
+    my $res_pair = $func($val)
     my ($new_val, $new_log) = @$res_pair
     [$new_val, $log . $new_log]
 }
