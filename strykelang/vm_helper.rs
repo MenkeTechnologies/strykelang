@@ -11472,12 +11472,24 @@ impl VMHelper {
                 // list value (comma operator, `..`, `reverse`, `grep`, `@array`, `return
                 // wantarray-aware sub`, …) flattens into the output instead of collapsing to a
                 // scalar. Matches Perl's `perlfunc` note that the block is always list context.
+                //
+                // Save/restore the topic chain around the iter loop so this
+                // map expression doesn't leak its final `_` (and the chain
+                // shift it performed via the first set_topic) into the
+                // enclosing block. Without this, a nested
+                // `outer |> map { inner |> map { … }; sprintf("%d", _) }`
+                // sees outer's `_` corrupted to the inner pipe's last iter
+                // value once the inner completes — the per-iter outer
+                // block reads of `_` after an inner pipe stage return the
+                // wrong topic.
+                let saved_chain = self.scope.save_topic_chain();
                 let mut result = Vec::new();
                 for item in items {
                     self.scope.set_topic(item);
                     let val = self.exec_block_with_tail(block, WantarrayCtx::List)?;
                     result.extend(val.map_flatten_outputs(*flatten_array_refs));
                 }
+                self.scope.restore_topic_chain(saved_chain);
                 if ctx == WantarrayCtx::List {
                     Ok(StrykeValue::array(result))
                 } else {

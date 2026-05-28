@@ -11,7 +11,7 @@ fn Rosetta::ParallelCalc::factorize_all(@nums) {
                 push @factors, _ / $i if $i * $i != _
             }
         }
-        [sort { $a <=> $b } @factors]
+        [sort { _ <=> _1 } @factors]
     }
     \@res
 }

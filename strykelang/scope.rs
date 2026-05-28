@@ -1559,14 +1559,19 @@ impl Scope {
     pub fn set_sort_pair(&mut self, a: StrykeValue, b: StrykeValue) {
         let _ = self.set_scalar("a", a.clone());
         let _ = self.set_scalar("b", b.clone());
-        let _ = self.set_scalar("_0", a.clone());
-        let _ = self.set_scalar("_1", b);
-        // Bind `$_` to slot 0 too — per the four-way aliasing rule
-        // (`_`, `$_`, `_0`, `$_0` are all equivalent for slot 0),
-        // bare `_` inside `sort { _ <=> _1 }` must resolve to slot 0.
-        // Without this, `_` falls through to whatever the outer scope's
-        // topic was and the sort silently produces garbage order.
-        let _ = self.set_scalar("_", a);
+        // Use `declare_topic_slot` so slot 0 (`_` / `$_` / `_0` / `$_0`)
+        // and slot 1 (`_1` / `$_1`) become real topic slots in the
+        // current frame — not just CaptureCell scalars. In a pmap /
+        // spawn worker the per-item topic is set up via `set_topic`
+        // (declares only slot 0); writing `_1` through plain
+        // `set_scalar` lands in a non-slot scalar that the comparator
+        // block's frame walk doesn't reach, so `sort { _ <=> _1 }`
+        // silently returns the list unsorted. Routing both through
+        // the same slot-declaration path that `set_topic` uses makes
+        // `_/_1` work identically inside and outside parallel
+        // workers — matches the Perl `sort { $a <=> $b }` rebinding.
+        self.declare_topic_slot(0, 0, a);
+        self.declare_topic_slot(1, 0, b);
     }
 
     /// Save the entire topic slot 0 chain (`$_`, `$_<`, `$_<<`, ...) so it can
