@@ -298,4 +298,101 @@ mod tests {
         p.exit_sub(Duration::from_nanos(1));
         assert_eq!(p.sub_inclusive_total_ns("nope"), 0);
     }
+
+    // ── format_ns boundaries ─────────────────────────────────────────
+
+    #[test]
+    fn format_ns_sub_microsecond_uses_ns_suffix() {
+        assert_eq!(format_ns(0), "0ns");
+        assert_eq!(format_ns(1), "1ns");
+        assert_eq!(format_ns(999), "999ns");
+    }
+
+    #[test]
+    fn format_ns_microsecond_band_uses_us_one_decimal() {
+        assert_eq!(format_ns(1_000), "1.0µs");
+        assert_eq!(format_ns(1_500), "1.5µs");
+        assert_eq!(format_ns(999_999), "1000.0µs");
+    }
+
+    #[test]
+    fn format_ns_millisecond_band_uses_ms_one_decimal() {
+        assert_eq!(format_ns(1_000_000), "1.0ms");
+        assert_eq!(format_ns(2_500_000), "2.5ms");
+        assert_eq!(format_ns(999_999_999), "1000.0ms");
+    }
+
+    #[test]
+    fn format_ns_second_band_uses_s_one_decimal() {
+        assert_eq!(format_ns(1_000_000_000), "1.0s");
+        assert_eq!(format_ns(2_500_000_000), "2.5s");
+    }
+
+    // ── heat_color bands ─────────────────────────────────────────────
+
+    #[test]
+    fn heat_color_green_under_ten_pct() {
+        assert_eq!(heat_color(0.0), "\x1b[32m");
+        assert_eq!(heat_color(5.0), "\x1b[32m");
+        assert_eq!(heat_color(9.999), "\x1b[32m");
+    }
+
+    #[test]
+    fn heat_color_yellow_band_10_to_30() {
+        assert_eq!(heat_color(10.0), "\x1b[33m");
+        assert_eq!(heat_color(29.999), "\x1b[33m");
+    }
+
+    #[test]
+    fn heat_color_bright_yellow_band_30_to_60() {
+        assert_eq!(heat_color(30.0), "\x1b[1;93m");
+        assert_eq!(heat_color(59.999), "\x1b[1;93m");
+    }
+
+    #[test]
+    fn heat_color_red_band_at_or_above_60() {
+        assert_eq!(heat_color(60.0), "\x1b[1;91m");
+        assert_eq!(heat_color(100.0), "\x1b[1;91m");
+        assert_eq!(heat_color(1e6), "\x1b[1;91m");
+    }
+
+    // ── Profiler aggregation behaviors ───────────────────────────────
+
+    #[test]
+    fn on_line_distinct_files_kept_separate() {
+        let mut p = Profiler::new("first.pl");
+        p.on_line("first.pl", 1, Duration::from_nanos(10));
+        p.on_line("second.pl", 1, Duration::from_nanos(20));
+        assert_eq!(p.line_total_ns("first.pl", 1), 10);
+        assert_eq!(p.line_total_ns("second.pl", 1), 20);
+        assert_eq!(p.line_total_ns("first.pl", 2), 0);
+    }
+
+    #[test]
+    fn enter_exit_three_deep_folds_full_path() {
+        let mut p = Profiler::new("a.pl");
+        p.enter_sub("a");
+        p.enter_sub("b");
+        p.enter_sub("c");
+        p.exit_sub(Duration::from_nanos(3));
+        assert_eq!(p.folded_total_ns("a;b;c"), 3);
+        p.exit_sub(Duration::from_nanos(5));
+        assert_eq!(p.folded_total_ns("a;b"), 5);
+        p.exit_sub(Duration::from_nanos(7));
+        assert_eq!(p.folded_total_ns("a"), 7);
+        assert_eq!(p.sub_inclusive_total_ns("a"), 7);
+        assert_eq!(p.sub_inclusive_total_ns("b"), 5);
+        assert_eq!(p.sub_inclusive_total_ns("c"), 3);
+    }
+
+    #[test]
+    fn repeated_calls_to_same_sub_accumulate() {
+        let mut p = Profiler::new("a.pl");
+        p.enter_sub("f");
+        p.exit_sub(Duration::from_nanos(4));
+        p.enter_sub("f");
+        p.exit_sub(Duration::from_nanos(6));
+        assert_eq!(p.sub_inclusive_total_ns("f"), 10);
+        assert_eq!(p.folded_total_ns("f"), 10);
+    }
 }
