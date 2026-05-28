@@ -85,6 +85,11 @@
         <!-- Commenter (line comment with #) -->
         <lang.commenter language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeCommenter"/>
 
+        <!-- Complete Current Statement (Cmd-Shift-Enter):
+             `fn Foo::bar($x|)` → `fn Foo::bar($x) {\n    |\n}`. -->
+        <lang.smartEnterProcessor language="Stryke"
+            implementationClass="com.menketechnologies.stryke.StrykeSmartEnterProcessor"/>
+
         <!-- Brace / quote auto-pairing -->
         <lang.braceMatcher language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeBraceMatcher"/>
         <lang.quoteHandler language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeQuoteHandler"/>
