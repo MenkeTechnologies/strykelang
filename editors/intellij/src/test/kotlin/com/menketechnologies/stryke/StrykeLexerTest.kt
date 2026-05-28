@@ -706,4 +706,40 @@ class StrykeLexerTest {
             toks.any { it.first == StrykeTokenTypes.COMMENT && it.second.startsWith("# actual") },
         )
     }
+
+    // ── caret-style special vars (`%^HOOK`, `%main::^HOOK`) ──
+
+    @Test
+    fun bare_sigil_caret_special_var_keeps_tail() {
+        // `%^HOOK` was previously split into `%^` (SPECIAL_VAR) + `HOOK`
+        // (IDENTIFIER). The lexer must consume the entire caret-tail
+        // identifier as part of the SPECIAL_VAR token.
+        val toks = lex("p %^HOOK")
+        assertTrue("expected SPECIAL_VAR `%^HOOK`: $toks", has(toks, StrykeTokenTypes.SPECIAL_VAR, "%^HOOK"))
+        assertTrue("no stray IDENTIFIER `HOOK`: $toks", toks.none { it.second == "HOOK" })
+    }
+
+    @Test
+    fun pkg_qualified_caret_special_var_is_one_token() {
+        // `%main::^HOOK` was tokenized as `%main::` + `^` + `HOOK`. The
+        // whole sequence should be one HASH_VAR token instead.
+        val toks = lex("p %main::^HOOK")
+        assertTrue(
+            "expected HASH_VAR `%main::^HOOK`: $toks",
+            has(toks, StrykeTokenTypes.HASH_VAR, "%main::^HOOK"),
+        )
+        assertTrue(
+            "no stray OPERATOR `^`: $toks",
+            toks.none { it.first == StrykeTokenTypes.OPERATOR && it.second == "^" },
+        )
+    }
+
+    @Test
+    fun scalar_pkg_qualified_caret_special_var_is_one_token() {
+        val toks = lex("p \$main::^W")
+        assertTrue(
+            "expected SCALAR_VAR `\$main::^W`: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$main::^W"),
+        )
+    }
 }
