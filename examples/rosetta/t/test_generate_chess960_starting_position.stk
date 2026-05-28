@@ -29,7 +29,7 @@ fn Rosetta::Chess960::generate() {
     
     # 4. Rooks and King: R-K-R on remaining squares
     # @empty should have 3 elements left, sorted
-    @empty = sort { $a <=> $b } @empty
+    @empty = sort { _ <=> _1 } @empty
     $backline[$empty[0]] = "R"
     $backline[$empty[1]] = "K"
     $backline[$empty[2]] = "R"

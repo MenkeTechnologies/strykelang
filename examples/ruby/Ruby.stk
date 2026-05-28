@@ -103,8 +103,8 @@ fn Rb::v_eq($a, $b) {
     return $a->{val} == $b->{val}     if Rb::is_bool($a) && Rb::is_bool($b)
     if (Rb::is_array($a) && Rb::is_array($b)) {
         my $ai = $a->{items}; my $bi = $b->{items}
-        return 0 if scalar(@$ai) != scalar(@$bi)
-        for (my $i = 0; $i < scalar(@$ai); $i++) {
+        return 0 if len(@$ai) != len(@$bi)
+        for (my $i = 0; $i < len(@$ai); $i++) {
             return 0 unless Rb::v_eq($ai->[$i], $bi->[$i])
         }
         return 1
@@ -174,7 +174,7 @@ fn Rb::inspect($v) {
         for my $k (sort keys %{$v->{ivars}}) {
             push @parts, "@" . $k . "=" . Rb::inspect($v->{ivars}{$k})
         }
-        my $body = scalar(@parts) ? " " . join(", ", @parts) : ""
+        my $body = len(@parts) ? " " . join(", ", @parts) : ""
         return "#<" . $v->{klass}{name} . $body . ">"
     }
     if (Rb::is_exception($v)) {
@@ -343,7 +343,7 @@ fn Rb::tokenize($src) {
                 $i++
             }
             $i++ if $i < $n
-            if (scalar(@parts) == 1) {
+            if (len(@parts) == 1) {
                 push @toks, +{ kind => "STR", val => $parts[0][1], line => $line }
             } else {
                 push @toks, +{ kind => "STRINTERP", val => \@parts, line => $line }
@@ -1243,7 +1243,7 @@ fn Rb::parse_yield($p) {
 
 fn Rb::env_new()              { [+{}] }
 fn Rb::env_lookup($env, $name) {
-    for my $frame (reverse @$env) {
+    for my $frame (rev @$env) {
         return $frame->{$name} if exists $frame->{$name}
     }
     undef
@@ -1255,7 +1255,7 @@ fn Rb::env_has($env, $name) {
     0
 }
 fn Rb::env_set($env, $name, $val) {
-    for my $frame (reverse @$env) {
+    for my $frame (rev @$env) {
         if (exists $frame->{$name}) { $frame->{$name} = $val; return $val }
     }
     $env->[-1]{$name} = $val
@@ -1283,9 +1283,9 @@ fn Rb::call_block($block, $args, $ctx) {
     my @new   = (@{$block->{env}}, +{})
     $ctx->{env} = \@new
     my $params = $block->{params}
-    my $n = scalar(@$params)
+    my $n = len(@$params)
     # Auto-splat: `[k, v]` block param against pair argument.
-    if ($n > 1 && scalar(@$args) == 1 && Rb::is_array($args->[0])) {
+    if ($n > 1 && len(@$args) == 1 && Rb::is_array($args->[0])) {
         $args = $args->[0]{items}
     }
     for (my $i = 0; $i < $n; $i++) {
@@ -1667,7 +1667,7 @@ fn Rb::do_assign($target, $val, $ctx) {
         return $val
     }
     # `obj.foo = val` desugars to `obj.foo=(val)` setter dispatch.
-    if ($k eq "Call" && defined($target->{recv}) && !scalar(@{$target->{args}})) {
+    if ($k eq "Call" && defined($target->{recv}) && !len(@{$target->{args}})) {
         my $recv = Rb::eval_node($target->{recv}, $ctx)
         return Rb::dispatch($recv, $target->{name} . "=", [$val], undef, $ctx, 0)
     }
@@ -1795,7 +1795,7 @@ fn Rb::iter_items($it) {
 
 fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
     if ($name eq "puts") {
-        if (scalar(@$args) == 0) { print "\n"; return Rb::v_nil() }
+        if (len(@$args) == 0) { print "\n"; return Rb::v_nil() }
         for my $a (@$args) {
             if (Rb::is_array($a)) {
                 for my $e (@{$a->{items}}) { print Rb::to_s($e), "\n" }
@@ -1813,7 +1813,7 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
     }
     if ($name eq "p") {
         print Rb::inspect($_), "\n" for @$args
-        return scalar(@$args) == 1 ? $args->[0] : Rb::v_array($args)
+        return len(@$args) == 1 ? $args->[0] : Rb::v_array($args)
     }
     if ($name eq "raise") {
         # raise                       — bare re-raise / RuntimeError
@@ -1822,12 +1822,12 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         # raise Class, "msg"          — instance of Class with message
         # raise instance              — re-raise instance
         my $exc
-        if (!scalar(@$args)) {
+        if (!len(@$args)) {
             $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, "RuntimeError")
         } elsif (Rb::is_exception($args->[0])) {
             $exc = $args->[0]
         } elsif (Rb::is_class($args->[0])) {
-            my $msg = scalar(@$args) > 1 ? Rb::to_s($args->[1]) : $args->[0]{name}
+            my $msg = len(@$args) > 1 ? Rb::to_s($args->[1]) : $args->[0]{name}
             $exc = Rb::v_exception($args->[0], $msg)
         } else {
             $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, Rb::to_s($args->[0]))
@@ -1836,13 +1836,13 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
     }
     if ($name eq "pp") {
         print Rb::inspect($_), "\n" for @$args
-        return scalar(@$args) == 1 ? $args->[0] : Rb::v_array($args)
+        return len(@$args) == 1 ? $args->[0] : Rb::v_array($args)
     }
     if ($name eq "Integer") { return Rb::v_int(int(Rb::nv($args->[0]))) }
     if ($name eq "Float")   { return Rb::v_float(Rb::nv($args->[0]) + 0.0) }
     if ($name eq "String")  { return Rb::v_str(Rb::to_s($args->[0])) }
     if ($name eq "Array") {
-        return Rb::v_array([])    if scalar(@$args) == 0 || Rb::is_nil($args->[0])
+        return Rb::v_array([])    if len(@$args) == 0 || Rb::is_nil($args->[0])
         return $args->[0]         if Rb::is_array($args->[0])
         return Rb::v_array([$args->[0]])
     }
@@ -1982,14 +1982,14 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
     }
 
     # Universal `is_a?` / `kind_of?` / `instance_of?` against a class arg.
-    if (($name eq "is_a?" || $name eq "kind_of?") && scalar(@$args) > 0 && Rb::is_class($args->[0])) {
+    if (($name eq "is_a?" || $name eq "kind_of?") && len(@$args) > 0 && Rb::is_class($args->[0])) {
         return Rb::v_bool(Rb::value_is_a($recv, $args->[0], $ctx) ? 1 : 0)
     }
-    if ($name eq "instance_of?" && scalar(@$args) > 0 && Rb::is_class($args->[0])) {
+    if ($name eq "instance_of?" && len(@$args) > 0 && Rb::is_class($args->[0])) {
         my $cls = Rb::value_class($recv, $ctx)
         return Rb::v_bool(defined($cls) && $cls->{name} eq $args->[0]{name} ? 1 : 0)
     }
-    if ($name eq "respond_to?" && scalar(@$args) > 0) {
+    if ($name eq "respond_to?" && len(@$args) > 0) {
         my $sym = Rb::is_sym($args->[0]) ? $args->[0]{val} : Rb::to_s($args->[0])
         # Check built-in dispatch first.
         my $tries = Rb::call_builtin_method($recv, $sym, [], undef, $ctx)
@@ -2055,7 +2055,7 @@ fn Rb::class_method($klass, $name) {
     while (defined $c) {
         return $c->{methods}{$name} if exists $c->{methods}{$name}
         # Mixed-in modules: most-recently-included takes precedence (matches MRI's MRO).
-        for my $mod (reverse @{$c->{includes} // []}) {
+        for my $mod (rev @{$c->{includes} // []}) {
             return $mod->{methods}{$name} if exists $mod->{methods}{$name}
         }
         $c = $c->{parent}
@@ -2078,7 +2078,7 @@ fn Rb::call_method($proc, $recv, $args, $block, $ctx, $mname) {
     my $params = $proc->{params}
     $ctx->{cur_method_params} = $params
     Rb::env_define($ctx->{env}, "__method__", Rb::v_sym($mname)) if defined $mname
-    for (my $i = 0; $i < scalar(@$params); $i++) {
+    for (my $i = 0; $i < len(@$params); $i++) {
         Rb::env_define($ctx->{env}, $params->[$i], $args->[$i] // Rb::v_nil())
     }
     my $r = eval { Rb::eval_body($proc->{body}, $ctx) }
@@ -2116,28 +2116,28 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         my $idx = $args->[0]
         if (Rb::is_int($idx)) {
             # [start, length] form: arr[1, 2]
-            if (scalar(@$args) >= 2 && Rb::is_int($args->[1])) {
+            if (len(@$args) >= 2 && Rb::is_int($args->[1])) {
                 my $s = $idx->{val}
-                $s += scalar(@$items) if $s < 0
+                $s += len(@$items) if $s < 0
                 my $len = $args->[1]{val}
-                return Rb::v_nil() if $s < 0 || $s > scalar(@$items) || $len < 0
+                return Rb::v_nil() if $s < 0 || $s > len(@$items) || $len < 0
                 my $e = $s + $len - 1
-                $e = scalar(@$items) - 1 if $e >= scalar(@$items)
+                $e = len(@$items) - 1 if $e >= len(@$items)
                 return Rb::v_array([]) if $e < $s
                 return Rb::v_array([@$items[$s..$e]])
             }
             my $i = $idx->{val}
-            $i += scalar(@$items) if $i < 0
-            return ($i < 0 || $i >= scalar(@$items)) ? Rb::v_nil() : $items->[$i]
+            $i += len(@$items) if $i < 0
+            return ($i < 0 || $i >= len(@$items)) ? Rb::v_nil() : $items->[$i]
         }
         if (Rb::is_range($idx)) {
             my $lo = Rb::nv($idx->{lo})
             my $hi = Rb::nv($idx->{hi})
-            $lo += scalar(@$items) if $lo < 0
-            $hi += scalar(@$items) if $hi < 0
+            $lo += len(@$items) if $lo < 0
+            $hi += len(@$items) if $hi < 0
             $hi-- if $idx->{exclusive}
-            return Rb::v_nil() if $lo < 0 || $lo > scalar(@$items)
-            $hi = scalar(@$items) - 1 if $hi >= scalar(@$items)
+            return Rb::v_nil() if $lo < 0 || $lo > len(@$items)
+            $hi = len(@$items) - 1 if $hi >= len(@$items)
             return Rb::v_array([]) if $hi < $lo
             return Rb::v_array([@$items[$lo..$hi]])
         }
@@ -2149,53 +2149,53 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $args->[1]
     }
     if ($name eq "length" || $name eq "size") {
-        return Rb::v_int(scalar(@$items))
+        return Rb::v_int(len(@$items))
     }
-    if ($name eq "count" && !defined($block) && !scalar(@$args)) {
-        return Rb::v_int(scalar(@$items))
+    if ($name eq "count" && !defined($block) && !len(@$args)) {
+        return Rb::v_int(len(@$items))
     }
-    if ($name eq "empty?") { return Rb::v_bool(scalar(@$items) == 0 ? 1 : 0) }
+    if ($name eq "empty?") { return Rb::v_bool(len(@$items) == 0 ? 1 : 0) }
     if ($name eq "first") {
-        if (scalar(@$args) && Rb::is_int($args->[0])) {
+        if (len(@$args) && Rb::is_int($args->[0])) {
             my $n = $args->[0]{val}
-            $n = scalar(@$items) if $n > scalar(@$items)
+            $n = len(@$items) if $n > len(@$items)
             return Rb::v_array([]) if $n <= 0
             return Rb::v_array([@$items[0..$n - 1]])
         }
         return $items->[0]  // Rb::v_nil()
     }
     if ($name eq "last") {
-        if (scalar(@$args) && Rb::is_int($args->[0])) {
+        if (len(@$args) && Rb::is_int($args->[0])) {
             my $n = $args->[0]{val}
-            $n = scalar(@$items) if $n > scalar(@$items)
+            $n = len(@$items) if $n > len(@$items)
             return Rb::v_array([]) if $n <= 0
-            my $start = scalar(@$items) - $n
-            return Rb::v_array([@$items[$start..scalar(@$items) - 1]])
+            my $start = len(@$items) - $n
+            return Rb::v_array([@$items[$start..len(@$items) - 1]])
         }
         return $items->[-1] // Rb::v_nil()
     }
     if ($name eq "push" || $name eq "append") { push @$items, @$args; return $a }
-    if ($name eq "pop")    { return scalar(@$items) ? pop(@$items)   : Rb::v_nil() }
-    if ($name eq "shift")  { return scalar(@$items) ? shift(@$items) : Rb::v_nil() }
+    if ($name eq "pop")    { return len(@$items) ? pop(@$items)   : Rb::v_nil() }
+    if ($name eq "shift")  { return len(@$items) ? shift(@$items) : Rb::v_nil() }
     if ($name eq "unshift") { unshift @$items, @$args; return $a }
-    if ($name eq "reverse") { return Rb::v_array([reverse @$items]) }
+    if ($name eq "reverse") { return Rb::v_array([rev @$items]) }
     if ($name eq "include?") {
         for my $e (@$items) { return Rb::v_bool(1) if Rb::v_eq($e, $args->[0]) }
         return Rb::v_bool(0)
     }
     if ($name eq "join") {
-        my $sep = scalar(@$args) ? $args->[0]{val} : ""
+        my $sep = len(@$args) ? $args->[0]{val} : ""
         return Rb::v_str(join($sep, map {Rb::to_s} @$items))
     }
     if ($name eq "sort") {
         if (defined $block) {
             my @s = sort {
-                my $r = Rb::call_block($block, [$a, $b], $ctx)
+                my $r = Rb::call_block($block, [_, _1], $ctx)
                 Rb::is_int($r) ? $r->{val} : 0
             } @$items
             return Rb::v_array(\@s)
         }
-        my @s = sort { Rb::v_cmp($a, $b) } @$items
+        my @s = sort { Rb::v_cmp(_, _1) } @$items
         return Rb::v_array(\@s)
     }
     if ($name eq "uniq") {
@@ -2219,7 +2219,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $a
     }
     if ($name eq "each_with_index") {
-        for (my $i = 0; $i < scalar(@$items); $i++) {
+        for (my $i = 0; $i < len(@$items); $i++) {
             Rb::call_block($block, [$items->[$i], Rb::v_int($i)], $ctx)
         }
         return $a
@@ -2272,15 +2272,15 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "reduce" || $name eq "inject") {
         my @rest = @$items
         my $acc
-        if (scalar(@$args)) { $acc = $args->[0] }
-        else                { return Rb::v_nil() unless scalar(@rest); $acc = shift @rest }
+        if (len(@$args)) { $acc = $args->[0] }
+        else                { return Rb::v_nil() unless len(@rest); $acc = shift @rest }
         for my $e (@rest) {
             $acc = Rb::call_block($block, [$acc, $e], $ctx)
         }
         return $acc
     }
     if ($name eq "min") {
-        return Rb::v_nil() unless scalar(@$items)
+        return Rb::v_nil() unless len(@$items)
         my $m = $items->[0]
         if (defined $block) {
             for my $e (@$items) {
@@ -2294,7 +2294,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $m
     }
     if ($name eq "max") {
-        return Rb::v_nil() unless scalar(@$items)
+        return Rb::v_nil() unless len(@$items)
         my $m = $items->[0]
         if (defined $block) {
             for my $e (@$items) {
@@ -2308,7 +2308,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $m
     }
     if ($name eq "sum") {
-        my $init = scalar(@$args) ? Rb::nv($args->[0]) : 0
+        my $init = len(@$args) ? Rb::nv($args->[0]) : 0
         my $s = $init
         my $is_float = (defined($args->[0]) && Rb::is_float($args->[0])) ? 1 : 0
         for my $e (@$items) {
@@ -2328,12 +2328,12 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "find_index") {
         if (defined $block) {
-            for (my $i = 0; $i < scalar(@$items); $i++) {
+            for (my $i = 0; $i < len(@$items); $i++) {
                 return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
             }
             return Rb::v_nil()
         }
-        for (my $i = 0; $i < scalar(@$items); $i++) {
+        for (my $i = 0; $i < len(@$items); $i++) {
             return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
         }
         return Rb::v_nil()
@@ -2367,26 +2367,26 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "index") {
         if (defined $block) {
-            for (my $i = 0; $i < scalar(@$items); $i++) {
+            for (my $i = 0; $i < len(@$items); $i++) {
                 return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
             }
             return Rb::v_nil()
         }
-        for (my $i = 0; $i < scalar(@$items); $i++) {
+        for (my $i = 0; $i < len(@$items); $i++) {
             return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
         }
         return Rb::v_nil()
     }
     if ($name eq "take") {
         my $n = $args->[0]{val}
-        $n = scalar(@$items) if $n > scalar(@$items)
+        $n = len(@$items) if $n > len(@$items)
         return Rb::v_array([@$items[0..$n - 1]]) if $n > 0
         return Rb::v_array([])
     }
     if ($name eq "drop") {
         my $n = $args->[0]{val}
-        return Rb::v_array([]) if $n >= scalar(@$items)
-        return Rb::v_array([@$items[$n..scalar(@$items) - 1]])
+        return Rb::v_array([]) if $n >= len(@$items)
+        return Rb::v_array([@$items[$n..len(@$items) - 1]])
     }
     if ($name eq "take_while") {
         my @out
@@ -2421,7 +2421,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         for my $e (@$items) {
             my $k = Rb::call_block($block, [$e], $ctx)
             my $found = 0
-            for (my $i = 0; $i < scalar(@keys); $i++) {
+            for (my $i = 0; $i < len(@keys); $i++) {
                 if (Rb::v_eq($keys[$i], $k)) {
                     push @{$groups[$i]}, $e
                     $found = 1
@@ -2434,7 +2434,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
             }
         }
         my @pairs
-        for (my $i = 0; $i < scalar(@keys); $i++) {
+        for (my $i = 0; $i < len(@keys); $i++) {
             push @pairs, [$keys[$i], Rb::v_array($groups[$i])]
         }
         return Rb::v_hash(\@pairs)
@@ -2443,7 +2443,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         my @keys; my @counts
         for my $e (@$items) {
             my $found = 0
-            for (my $i = 0; $i < scalar(@keys); $i++) {
+            for (my $i = 0; $i < len(@keys); $i++) {
                 if (Rb::v_eq($keys[$i], $e)) {
                     $counts[$i]++
                     $found = 1
@@ -2456,7 +2456,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
             }
         }
         my @pairs
-        for (my $i = 0; $i < scalar(@keys); $i++) {
+        for (my $i = 0; $i < len(@keys); $i++) {
             push @pairs, [$keys[$i], Rb::v_int($counts[$i])]
         }
         return Rb::v_hash(\@pairs)
@@ -2464,14 +2464,14 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "to_h") {
         my @pairs
         for my $e (@$items) {
-            die "to_h requires pair" unless Rb::is_array($e) && scalar(@{$e->{items}}) == 2
+            die "to_h requires pair" unless Rb::is_array($e) && len(@{$e->{items}}) == 2
             push @pairs, [$e->{items}[0], $e->{items}[1]]
         }
         return Rb::v_hash(\@pairs)
     }
     if ($name eq "zip") {
         my @result
-        for (my $i = 0; $i < scalar(@$items); $i++) {
+        for (my $i = 0; $i < len(@$items); $i++) {
             my @row = ($items->[$i])
             for my $other (@$args) {
                 push @row, ($other->{items}[$i] // Rb::v_nil())
@@ -2481,10 +2481,10 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array(\@result)
     }
     if ($name eq "min_by") {
-        return Rb::v_nil() unless scalar(@$items)
+        return Rb::v_nil() unless len(@$items)
         my $best = $items->[0]
         my $bk = Rb::call_block($block, [$best], $ctx)
-        for (my $i = 1; $i < scalar(@$items); $i++) {
+        for (my $i = 1; $i < len(@$items); $i++) {
             my $e = $items->[$i]
             my $k = Rb::call_block($block, [$e], $ctx)
             if (Rb::v_cmp($k, $bk) < 0) { $best = $e; $bk = $k }
@@ -2492,10 +2492,10 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $best
     }
     if ($name eq "max_by") {
-        return Rb::v_nil() unless scalar(@$items)
+        return Rb::v_nil() unless len(@$items)
         my $best = $items->[0]
         my $bk = Rb::call_block($block, [$best], $ctx)
-        for (my $i = 1; $i < scalar(@$items); $i++) {
+        for (my $i = 1; $i < len(@$items); $i++) {
             my $e = $items->[$i]
             my $k = Rb::call_block($block, [$e], $ctx)
             if (Rb::v_cmp($k, $bk) > 0) { $best = $e; $bk = $k }
@@ -2504,7 +2504,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "sort_by") {
         my @decorated = map { [Rb::call_block($block, [$_], $ctx), $_] } @$items
-        my @sorted = sort { Rb::v_cmp($a->[0], $b->[0]) } @decorated
+        my @sorted = sort { Rb::v_cmp(_->[0], _1->[0]) } @decorated
         return Rb::v_array([map { $_->[1] } @sorted])
     }
     if ($name eq "flat_map" || $name eq "collect_concat") {
@@ -2516,7 +2516,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array(\@out)
     }
     if ($name eq "flatten") {
-        my $depth = scalar(@$args) ? $args->[0]{val} : -1
+        my $depth = len(@$args) ? $args->[0]{val} : -1
         return Rb::v_array(Rb::array_flatten($items, $depth))
     }
     if ($name eq "concat") {
@@ -2529,26 +2529,26 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array([@$items])
     }
     if ($name eq "rotate") {
-        my $by = scalar(@$args) ? $args->[0]{val} : 1
-        my $n = scalar(@$items)
+        my $by = len(@$args) ? $args->[0]{val} : 1
+        my $n = len(@$items)
         return $a if $n == 0
         $by = (($by % $n) + $n) % $n
         return Rb::v_array([@$items[$by..$n - 1], @$items[0..$by - 1]])
     }
     if ($name eq "sample") {
-        return Rb::v_nil() unless scalar(@$items)
-        return $items->[int(rand(scalar(@$items)))]
+        return Rb::v_nil() unless len(@$items)
+        return $items->[int(rand(len(@$items)))]
     }
     if ($name eq "shuffle") {
         my @out = @$items
-        for (my $i = scalar(@out) - 1; $i > 0; $i--) {
+        for (my $i = len(@out) - 1; $i > 0; $i--) {
             my $j = int(rand($i + 1))
             ($out[$i], $out[$j]) = ($out[$j], $out[$i])
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "minmax") {
-        return Rb::v_array([Rb::v_nil(), Rb::v_nil()]) unless scalar(@$items)
+        return Rb::v_array([Rb::v_nil(), Rb::v_nil()]) unless len(@$items)
         my $min = $items->[0]; my $max = $items->[0]
         for my $e (@$items) {
             $min = $e if Rb::v_cmp($e, $min) < 0
@@ -2565,9 +2565,9 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "chunk_while") {
         my @groups
-        return Rb::v_array(\@groups) unless scalar(@$items)
+        return Rb::v_array(\@groups) unless len(@$items)
         my @cur = ($items->[0])
-        for (my $i = 1; $i < scalar(@$items); $i++) {
+        for (my $i = 1; $i < len(@$items); $i++) {
             if (Rb::is_truthy(Rb::call_block($block, [$items->[$i - 1], $items->[$i]], $ctx))) {
                 push @cur, $items->[$i]
             } else {
@@ -2581,9 +2581,9 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "each_slice") {
         my $n = $args->[0]{val}
         my @out
-        for (my $i = 0; $i < scalar(@$items); $i += $n) {
+        for (my $i = 0; $i < len(@$items); $i += $n) {
             my $end = $i + $n - 1
-            $end = scalar(@$items) - 1 if $end >= scalar(@$items)
+            $end = len(@$items) - 1 if $end >= len(@$items)
             push @out, Rb::v_array([@$items[$i..$end]])
         }
         if (defined $block) {
@@ -2595,7 +2595,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "each_cons") {
         my $n = $args->[0]{val}
         my @out
-        for (my $i = 0; $i + $n <= scalar(@$items); $i++) {
+        for (my $i = 0; $i + $n <= len(@$items); $i++) {
             push @out, Rb::v_array([@$items[$i..$i + $n - 1]])
         }
         if (defined $block) {
@@ -2627,11 +2627,11 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "upcase")    { return Rb::v_str(uc($v)) }
     if ($name eq "downcase")  { return Rb::v_str(lc($v)) }
     if ($name eq "capitalize"){ return Rb::v_str(uc(substr($v, 0, 1)) . lc(substr($v, 1))) }
-    if ($name eq "reverse")   { return Rb::v_str(scalar reverse $v) }
+    if ($name eq "reverse")   { return Rb::v_str(rev $v) }
     if ($name eq "chars")     { return Rb::v_array([map {Rb::v_str} split //, $v]) }
     if ($name eq "split") {
         # Bare split / split(" ") — split on runs of whitespace, drop leading empties.
-        if (!scalar(@$args) || (Rb::is_str($args->[0]) && $args->[0]{val} eq " ")) {
+        if (!len(@$args) || (Rb::is_str($args->[0]) && $args->[0]{val} eq " ")) {
             my $r = $v
             $r =~ s/^\s+//
             return Rb::v_array([map {Rb::v_str} split /\s+/, $r])
@@ -2653,7 +2653,7 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "[]") {
         my $idx = $args->[0]
         if (Rb::is_int($idx)) {
-            if (scalar(@$args) >= 2 && Rb::is_int($args->[1])) {
+            if (len(@$args) >= 2 && Rb::is_int($args->[1])) {
                 my $s = $idx->{val}
                 $s += length($v) if $s < 0
                 my $len = $args->[1]{val}
@@ -2778,7 +2778,7 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     }
     if ($name eq "center") {
         my $w = $args->[0]{val}
-        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
         my $deficit = $w - length($v)
         return $s if $deficit <= 0
         my $left = int($deficit / 2)
@@ -2787,12 +2787,12 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     }
     if ($name eq "ljust") {
         my $w = $args->[0]{val}
-        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
         return Rb::v_str(length($v) >= $w ? $v : $v . ($pad x ($w - length($v))))
     }
     if ($name eq "rjust") {
         my $w = $args->[0]{val}
-        my $pad = scalar(@$args) > 1 ? $args->[1]{val} : " "
+        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
         return Rb::v_str(length($v) >= $w ? $v : ($pad x ($w - length($v))) . $v)
     }
     if ($name eq "match?") {
@@ -2860,11 +2860,11 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return $args->[1]
     }
     if ($name eq "length" || $name eq "size" || $name eq "count") {
-        return Rb::v_int(scalar(@$pairs))
+        return Rb::v_int(len(@$pairs))
     }
     if ($name eq "keys")     { return Rb::v_array([map { $_->[0] } @$pairs]) }
     if ($name eq "values")   { return Rb::v_array([map { $_->[1] } @$pairs]) }
-    if ($name eq "empty?")   { return Rb::v_bool(scalar(@$pairs) == 0 ? 1 : 0) }
+    if ($name eq "empty?")   { return Rb::v_bool(len(@$pairs) == 0 ? 1 : 0) }
     if ($name eq "has_key?" || $name eq "key?" || $name eq "include?") {
         for my $p (@$pairs) { return Rb::v_bool(1) if Rb::v_eq($p->[0], $args->[0]) }
         return Rb::v_bool(0)
@@ -2892,7 +2892,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash(\@m)
     }
     if ($name eq "delete") {
-        for (my $i = 0; $i < scalar(@$pairs); $i++) {
+        for (my $i = 0; $i < len(@$pairs); $i++) {
             if (Rb::v_eq($pairs->[$i][0], $args->[0])) {
                 my $val = $pairs->[$i][1]
                 splice @$pairs, $i, 1
@@ -2905,7 +2905,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         for my $p (@$pairs) {
             return $p->[1] if Rb::v_eq($p->[0], $args->[0])
         }
-        return $args->[1] if scalar(@$args) > 1
+        return $args->[1] if len(@$args) > 1
         return Rb::call_block($block, [$args->[0]], $ctx) if defined $block
         die "key not found"
     }
@@ -2956,7 +2956,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
                 return Rb::v_bool(1)
                     if Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))
             } else {
-                return Rb::v_bool(scalar(@$pairs) > 0 ? 1 : 0)
+                return Rb::v_bool(len(@$pairs) > 0 ? 1 : 0)
             }
         }
         return Rb::v_bool(0)
@@ -2970,20 +2970,20 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_bool(1)
     }
     if ($name eq "min_by") {
-        return Rb::v_nil() unless scalar(@$pairs)
+        return Rb::v_nil() unless len(@$pairs)
         my $best = $pairs->[0]
         my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
-        for (my $i = 1; $i < scalar(@$pairs); $i++) {
+        for (my $i = 1; $i < len(@$pairs); $i++) {
             my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
             if (Rb::v_cmp($k, $bk) < 0) { $best = $pairs->[$i]; $bk = $k }
         }
         return Rb::v_array([$best->[0], $best->[1]])
     }
     if ($name eq "max_by") {
-        return Rb::v_nil() unless scalar(@$pairs)
+        return Rb::v_nil() unless len(@$pairs)
         my $best = $pairs->[0]
         my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
-        for (my $i = 1; $i < scalar(@$pairs); $i++) {
+        for (my $i = 1; $i < len(@$pairs); $i++) {
             my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
             if (Rb::v_cmp($k, $bk) > 0) { $best = $pairs->[$i]; $bk = $k }
         }
@@ -3004,10 +3004,10 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash(\@out)
     }
     if ($name eq "count") {
-        return Rb::v_int(scalar(@$pairs))
+        return Rb::v_int(len(@$pairs))
     }
     if ($name eq "min") {
-        return Rb::v_nil() unless scalar(@$pairs)
+        return Rb::v_nil() unless len(@$pairs)
         my $best = $pairs->[0]
         for my $p (@$pairs) {
             $best = $p if Rb::v_cmp($p->[0], $best->[0]) < 0
@@ -3015,7 +3015,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_array([$best->[0], $best->[1]])
     }
     if ($name eq "max") {
-        return Rb::v_nil() unless scalar(@$pairs)
+        return Rb::v_nil() unless len(@$pairs)
         my $best = $pairs->[0]
         for my $p (@$pairs) {
             $best = $p if Rb::v_cmp($p->[0], $best->[0]) > 0
@@ -3063,7 +3063,7 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
     }
     if ($name eq "step") {
         my $hi = $args->[0]{val}
-        my $step = scalar(@$args) > 1 ? $args->[1]{val} : 1
+        my $step = len(@$args) > 1 ? $args->[1]{val} : 1
         if ($step > 0) {
             for (my $i = $v; $i <= $hi; $i += $step) {
                 Rb::call_block($block, [Rb::v_int($i)], $ctx)
@@ -3095,7 +3095,7 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
         return Rb::v_array([Rb::v_int($q), Rb::v_int($r)])
     }
     if ($name eq "digits") {
-        my $base = scalar(@$args) ? $args->[0]{val} : 10
+        my $base = len(@$args) ? $args->[0]{val} : 10
         my @d
         my $x = abs($v)
         if ($x == 0) { @d = (0) }
@@ -3148,7 +3148,7 @@ fn Rb::float_m($f, $name, $args, $block, $ctx) {
     if ($name eq "positive?") { return Rb::v_bool($v > 0  ? 1 : 0) }
     if ($name eq "negative?") { return Rb::v_bool($v < 0  ? 1 : 0) }
     if ($name eq "round") {
-        my $digits = scalar(@$args) ? $args->[0]{val} : 0
+        my $digits = len(@$args) ? $args->[0]{val} : 0
         if ($digits > 0) {
             my $f10 = 10 ** $digits
             return Rb::v_float(int($v * $f10 + ($v >= 0 ? 0.5 : -0.5)) / $f10)
@@ -3177,7 +3177,7 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
     if ($name eq "last")    { return $r->{hi} }
     if ($name eq "min")     { return $r->{lo} }
     if ($name eq "max")     { return $r->{exclusive} ? Rb::v_int(Rb::nv($r->{hi}) - 1) : $r->{hi} }
-    if ($name eq "size" || $name eq "length" || $name eq "count") { return Rb::v_int(scalar(@$items)) }
+    if ($name eq "size" || $name eq "length" || $name eq "count") { return Rb::v_int(len(@$items)) }
     if ($name eq "include?" || $name eq "cover?") {
         return Rb::v_bool(Rb::case_match($r, $args->[0]) ? 1 : 0)
     }
@@ -3186,7 +3186,7 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
         return $r
     }
     if ($name eq "step") {
-        my $stride = scalar(@$args) ? Rb::nv($args->[0]) : 1
+        my $stride = len(@$args) ? Rb::nv($args->[0]) : 1
         my $lo = Rb::nv($r->{lo})
         my $hi = Rb::nv($r->{hi})
         $hi-- if $r->{exclusive}
@@ -3218,7 +3218,7 @@ fn Rb::proc_m($p, $name, $args, $block, $ctx) {
     if ($name eq "call" || $name eq "[]" || $name eq "()") {
         return Rb::call_block($p, $args, $ctx)
     }
-    if ($name eq "arity")    { return Rb::v_int(scalar(@{$p->{params}})) }
+    if ($name eq "arity")    { return Rb::v_int(len(@{$p->{params}})) }
     if ($name eq "lambda?")  { return Rb::v_bool(0) }   # all are non-lambda for now
     if ($name eq "curry")    { return $p }              # simplified
     if ($name eq "to_proc")  { return $p }
@@ -3795,9 +3795,9 @@ rb_test "rescue base catches subclass",
 
 # ── FINAL SUMMARY ──────────────────────────────────────────────────────────
 
-print "\n"
-print "╔══════════════════════════════════════════════════════════════════╗\n"
-print "║              RUBY-IN-STRYKE — TEST SUITE COMPLETE                 ║\n"
-print "╚══════════════════════════════════════════════════════════════════╝\n"
+p ""
+p "╔══════════════════════════════════════════════════════════════════╗"
+p "║              RUBY-IN-STRYKE — TEST SUITE COMPLETE                 ║"
+p "╚══════════════════════════════════════════════════════════════════╝"
 
 test_run

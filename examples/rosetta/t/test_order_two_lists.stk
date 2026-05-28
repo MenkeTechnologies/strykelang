@@ -16,7 +16,7 @@ fn Rosetta::OrderLists::compare($x, $y) {
 }
 
 fn Rosetta::OrderLists::sort_lists($lists) {
-    sort { Rosetta::OrderLists::compare($a, $b) } @$lists
+    sort { Rosetta::OrderLists::compare(_, _1) } @$lists
 }
 
 # Direct

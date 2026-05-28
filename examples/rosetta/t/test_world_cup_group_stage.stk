@@ -42,7 +42,7 @@ fn Rosetta::WorldCup::rank_distribution() {
     my $standings = Rosetta::WorldCup::all_standings()
     my @rank_counts = (0, 0, 0, 0)
     for my $std (@$standings) {
-        my @sorted = sort { $b <=> $a } @$std
+        my @sorted = sort { _1 <=> _ } @$std
         my $team0_pts = $std->[0]
         my $rank = 0
         for my $i (0:3) {

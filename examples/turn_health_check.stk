@@ -19,7 +19,7 @@
 
 my $user = $ARGV[0] // $ENV{TURN_USER}
 my $pass = $ARGV[1] // $ENV{TURN_PASS}
-my @servers = scalar(@ARGV) > 2 ? @ARGV[2..$#ARGV]
+my @servers = len(@ARGV) > 2 ? @ARGV[2..$#ARGV]
             : defined $ENV{TURN_SERVERS} ? split /,/, $ENV{TURN_SERVERS}
             : ()
 
@@ -53,7 +53,7 @@ p ""
 fn Hc::probe($server) {
     my @parts = split /:/, $server
     my $host  = $parts[0]
-    my $port  = scalar(@parts) > 1 ? $parts[1] + 0 : 3478
+    my $port  = len(@parts) > 1 ? $parts[1] + 0 : 3478
     my $sock = udp_open()
     if ($sock == 0) {
         return { server => $server, ok => 0, latency_ms => 0, reason => "bind failed" }
@@ -84,7 +84,7 @@ fn Hc::probe($server) {
 
 # Parallel fan-out — TURN allocations are independent across servers.
 my @results = pmap { Hc::probe($_) } @servers
-my @sorted  = sort { $a->{server} cmp $b->{server} } @results
+my @sorted  = sort { _->{server} cmp _1->{server} } @results
 
 # Report per-server.
 my $ok_count = 0

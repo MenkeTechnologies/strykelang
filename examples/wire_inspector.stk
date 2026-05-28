@@ -16,7 +16,7 @@
 my $bind_port = 0
 my $self_test = 1
 my $i = 0
-while ($i < scalar(@ARGV)) {
+while ($i < len(@ARGV)) {
     if ($ARGV[$i] eq "--bind") {
         $bind_port = $ARGV[$i + 1] + 0
         $self_test = 0

@@ -85,7 +85,7 @@ my @big = ~> 1:1000
 assert_eq Rosetta::Inv::count(\@big), 0, "1:1000 sorted = 0"
 
 # Reverse 1..100 — n*(n-1)/2 = 4950
-my @rev_100 = reverse @big[0:99]
+my @rev_100 = rev @big[0:99]
 assert_eq Rosetta::Inv::count(\@rev_100), 4950, "reverse 100 = 4950"
 
 test_run

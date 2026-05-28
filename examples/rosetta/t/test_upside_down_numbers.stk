@@ -11,7 +11,7 @@ fn Rosetta::UpsideDown::is($n) {
     my $s = "$n"
     my @chars = split //, $s
     my @rev
-    for my $c (reverse @chars) {
+    for my $c (rev @chars) {
         return 0 unless exists $map{$c}
         push @rev, $map{$c}
     }

@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+package SimulatedAnnealing
+
+fn distance($city1, $city2) {
+    my $dx = $city1->{x} - $city2->{x}; my $dy = $city1->{y} - $city2->{y}
+    sqrt($dx * $dx + $dy * $dy)
+}
+
+fn tour_distance($tour, $cities) {
+    my $dist = 0.0; my $n = len @$tour
+    for (my $i = 0; $i < $n; $i++) {
+        my $c1 = $cities->[$tour->[$i]]
+        my $next_idx = ($i + 1) % $n
+        my $c2 = $cities->[$tour->[$next_idx]]
+        $dist += SimulatedAnnealing::distance($c1, $c2)
+    }
+    $dist
+}
+
+fn solve($cities, $init_temp, $cooling_rate, $iterations) {
+    my $n = len @$cities
+    return [] if $n == 0
+    my @current_tour
+    for my $i (0 : $n - 1) { push @current_tour, $i }
+    my $current_dist = SimulatedAnnealing::tour_distance(\@current_tour, $cities)
+    my @best_tour = @current_tour
+    my $best_dist = $current_dist
+    my $temp = $init_temp
+    
+    for (my $iter = 0; $iter < $iterations; $iter++) {
+        my $idx1 = int(rand($n)); my $idx2 = int(rand($n))
+        while ($idx1 == $idx2) { $idx2 = int(rand($n)) }
+        my @new_tour = @current_tour
+        my $tmp = $new_tour[$idx1]; $new_tour[$idx1] = $new_tour[$idx2]; $new_tour[$idx2] = $tmp
+        my $new_dist = SimulatedAnnealing::tour_distance(\@new_tour, $cities)
+        
+        if ($new_dist < $current_dist) {
+            @current_tour = @new_tour; $current_dist = $new_dist
+            if ($new_dist < $best_dist) { @best_tour = @new_tour; $best_dist = $new_dist }
+        } else {
+            my $acceptance_prob = exp(-($new_dist - $current_dist) / $temp)
+            if (rand(1.0) < $acceptance_prob) { @current_tour = @new_tour; $current_dist = $new_dist }
+        }
+        $temp = $temp * $cooling_rate
+    }
+    { tour => \@best_tour, distance => $best_dist }
+}
+
+package main
+
+srand(42)
+
+my @square = (
+    { x => 0.0,  y => 0.0 },
+    { x => 10.0, y => 0.0 },
+    { x => 10.0, y => 10.0 },
+    { x => 0.0,  y => 10.0 }
+)
+# Optimal distance for 10x10 square is 40.0
+my $res1 = SimulatedAnnealing::solve(\@square, 1000.0, 0.95, 5000)
+~> abs($res1->{distance} - 40.0) <(1e-5) aeq(1, "optimal square distance")
+
+my @line = (
+    { x => 0.0, y => 0.0 },
+    { x => 1.0, y => 0.0 },
+    { x => 2.0, y => 0.0 }
+)
+# Optimal distance is 2 (0->1->2) + 2 (2->0) = 4
+my $res2 = SimulatedAnnealing::solve(\@line, 100.0, 0.9, 1000)
+~> abs($res2->{distance} - 4.0) <(1e-5) aeq(1, "optimal line distance")
+
+test_run

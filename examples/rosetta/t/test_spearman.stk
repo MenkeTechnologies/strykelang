@@ -3,7 +3,7 @@
 
 fn Rosetta::Stats::rank(@data) {
     my $n = cnt(@data)
-    my @indices = sort { $data[$a] <=> $data[$b] } 0:($n - 1)
+    my @indices = sort { $data[_] <=> $data[_1] } 0:($n - 1)
     
     my @ranks = (0) x $n
     my $i = 0
