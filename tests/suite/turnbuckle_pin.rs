@@ -134,17 +134,22 @@ fn fork_pair_detects_alive_then_drop() {
             //
             // Timeline (child wall-clock from fork):
             //   t=~0:     child binds + bg thread starts
-            //   t=400ms:  parent opens (after its 400ms wait); first
+            //   t=1000ms: parent opens (after its 1000ms wait); first
             //             heartbeats land in child's socket within ~30ms
-            //   t=600ms:  child checks alive — sees ~5 heartbeats
-            //   t=900ms:  child closes (parent has gotten ~450ms of
+            //   t=1500ms: child checks alive — sees ~15 heartbeats
+            //   t=2000ms: child closes (parent has gotten ~1000ms of
             //             child's heartbeats by now)
+            //
+            // Timing was bumped (200ms→500ms on inner sleeps, 400ms→1000ms
+            // on parent's pre-open wait) after macOS CI flakes where the
+            // child's fork+exec+stryke-parse+bind didn't complete inside
+            // the original 400ms parent window.
             let code = format!(
                 r#"
-                my $tb = turnbuckle({parent_pid}, {{ interval_ms => 30, timeout_ms => 150 }})
-                sleep(0.6)
+                my $tb = turnbuckle({parent_pid}, {{ interval_ms => 30, timeout_ms => 300 }})
+                sleep(1.5)
                 my $saw_alive = tb_alive($tb)
-                sleep(0.3)
+                sleep(0.5)
                 tb_close($tb)
                 sprintf("child_saw_parent_alive=%d", $saw_alive)
                 "#,
@@ -156,22 +161,25 @@ fn fork_pair_detects_alive_then_drop() {
         ForkResult::Parent { child } => {
             // Give the child time to fork, parse stryke, bind UDS, and
             // start its heartbeat thread before we open our own side.
-            std::thread::sleep(Duration::from_millis(400));
+            // 1000ms is generous for macOS CI runners; original 400ms was
+            // tight enough that slow child boot flaked the initial alive
+            // check (saw 0 heartbeats inside the window).
+            std::thread::sleep(Duration::from_millis(1000));
             let kid_pid = child.as_raw() as i64;
 
             // Parent timeline (wall-clock from fork):
-            //   t=400ms:  open (child has been heartbeating ~400ms)
-            //   t=800ms:  alive check — child's heartbeats have been
-            //             landing for ~400ms, last_heard is ~30ms ago
-            //   t=1800ms: alive check after drop — child closed at
-            //             ~900ms wall, so last_heard is ~900ms ago,
-            //             well past 150ms timeout
+            //   t=1000ms: open (child has been heartbeating ~1000ms)
+            //   t=2000ms: alive check — child's heartbeats have been
+            //             landing for ~1000ms, last_heard is ~30ms ago
+            //   t=3500ms: alive check after drop — child closed at
+            //             ~2000ms wall, so last_heard is ~1500ms ago,
+            //             well past 300ms timeout
             let code = format!(
                 r#"
-                my $tb = turnbuckle({kid_pid}, {{ interval_ms => 30, timeout_ms => 150 }})
-                sleep(0.4)
-                my $alive_initial = tb_alive($tb)
+                my $tb = turnbuckle({kid_pid}, {{ interval_ms => 30, timeout_ms => 300 }})
                 sleep(1.0)
+                my $alive_initial = tb_alive($tb)
+                sleep(1.5)
                 my $alive_after_drop = tb_alive($tb)
                 tb_close($tb)
                 sprintf("%d,%d", $alive_initial, $alive_after_drop)

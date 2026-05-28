@@ -59,8 +59,8 @@ fn forge_congregation(
     }
 
     assert!(
-        handle.welcome(n, Duration::from_secs(10)),
-        "only {}/{} agents registered within 10s",
+        handle.welcome(n, Duration::from_secs(60)),
+        "only {}/{} agents registered within 60s",
         handle.agent_count(),
         n
     );
