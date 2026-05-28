@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~425k-line Rust slice (production + tests + tooling), 10,365 builtins (11,093 keys in %all), 347-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~463k-line Rust slice (production + tests + tooling), 10,431 builtins (11,159 keys in %all), 347-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -496,7 +496,8 @@ substr $s, 9, 5              <span class="comment"># "world" — byte substr</sp
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>10,365 primaries in <code>%b</code> (11,093 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
+        <p>10,431 primaries in <code>%b</code> (11,159 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
+        <!-- %b / %all counts derived from: stryke -e 'say scalar keys %b; say scalar keys %all' -->
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
           <div class="cat-card"><h4>String (129+)</h4><p><code>chomp chop length substr index rindex split join uc lc ucfirst lcfirst chr ord trim lines words chars snake_case camel_case kebab_case pascal_case constant_case capitalize swap_case title_case squish pad_left pad_right center truncate_at reverse_str rot13 rot47 caesar_shift count_vowels count_consonants first_word last_word left_str right_str wrap_text dedent indent strip_html levenshtein soundex extract_numbers extract_emails extract_urls</code> &hellip;</p></div>
@@ -663,12 +664,12 @@ scp load_test node{1:100}:/tmp/</pre>
  │ SYSTEM  status: ONLINE // os: macos arch: aarch64 pid: 30386   │
  │ CORES   18    MEM  56.2 / 64.0 GiB available                   │
  ├────────────────────────────────────────────────────────────────┤
- │ %b  builtins   10365  %a  aliases    643    %all 11093         │
+ │ %b  builtins   10431  %a  aliases    643    %all 11159         │
  │ %k  keywords   85     %o  operators  70     %v   97            │
- │ %pc perl5 core 186    %e  stryke ext 10179  %d   4291          │
- │ %c  categories 309    %p  primaries  8851                      │
+ │ %pc perl5 core 186    %e  stryke ext 10245  %d   4360          │
+ │ %c  categories 316    %p  primaries  8914                      │
  └────────────────────────────────────────────────────────────────┘
-  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.14.20 &lt;&lt;
+  >> PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.16.0 &lt;&lt;
 </pre>
 
         <h3 style="color:#39ff14;">Shell-Like Builtins (no PATH walk, no fork)</h3>
