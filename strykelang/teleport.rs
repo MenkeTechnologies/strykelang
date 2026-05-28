@@ -330,7 +330,12 @@ mod tests {
                 } else {
                     let _ = std::fs::write(&result_path, "TIMEOUT");
                 }
-                std::process::exit(0);
+                // `_exit` not `std::process::exit` — Rust runtime
+                // cleanup is NOT async-signal-safe in a fork child;
+                // rayon/channel/mutex state from the pre-fork parent
+                // hangs forever in `std::rt::cleanup`. Same fix
+                // applied across tests/suite/*.
+                unsafe { libc::_exit(0) }
             }
             ForkResult::Parent { child } => {
                 // Give the child a moment to bind its UDS.
@@ -386,7 +391,8 @@ mod tests {
                         .map(|b| String::from_utf8_lossy(&b).into_owned())
                         .unwrap_or_else(|| "TIMEOUT".into());
                     let _ = std::fs::write(&result_path, s);
-                    std::process::exit(0);
+                    // `_exit` not `std::process::exit` — see sibling.
+                    unsafe { libc::_exit(0) }
                 }
                 ForkResult::Parent { child } => {
                     children.push(child);

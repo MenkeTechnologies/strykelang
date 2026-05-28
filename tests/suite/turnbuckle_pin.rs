@@ -156,7 +156,10 @@ fn fork_pair_detects_alive_then_drop() {
             );
             let got = eval_string(&code);
             let _ = std::fs::write(&result_path_for_child, got);
-            std::process::exit(0);
+            // `_exit` over `std::process::exit` in fork children — Rust
+            // runtime cleanup is NOT async-signal-safe. See
+            // scriptable_controller_pin for the full rationale.
+            unsafe { libc::_exit(0) }
         }
         ForkResult::Parent { child } => {
             // Give the child time to fork, parse stryke, bind UDS, and

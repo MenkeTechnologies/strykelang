@@ -169,15 +169,20 @@ mod tests {
         assert!(get(99_999_999).is_none());
     }
 
-    /// Stress: open 100 sockets, verify all IDs are unique + pool grows
-    /// to 100, close all, pool shrinks back to its starting size. Catches
-    /// future id-collision bugs (e.g. if NEXT_ID wraps or fetch_add
-    /// races break) and fd-leak regressions (if close() doesn't actually
-    /// remove from the pool).
+    /// Stress: open 100 sockets, verify all IDs are unique + every
+    /// id we opened is retrievable + every close succeeds + every
+    /// id is gone afterwards. Catches NEXT_ID collisions, fd-leak
+    /// regressions (close() doesn't remove from pool), and
+    /// double-allocation races (two opens returning the same id).
+    ///
+    /// Self-contained: every assertion references only the ids we
+    /// allocated here, never the absolute `pool_size()`. The pool
+    /// is process-global and concurrent tests in OTHER modules
+    /// (`nat_punch`, etc.) churn it in parallel; a baseline-relative
+    /// `pool_size() == baseline + 100` assertion races them off-by-N.
     #[test]
     fn pool_handles_100_socket_churn_without_id_collision() {
         use std::collections::HashSet;
-        let baseline = pool_size();
         let mut ids: Vec<u64> = Vec::with_capacity(100);
         for _ in 0..100 {
             let id = open("127.0.0.1", 0).expect("bind");
@@ -185,11 +190,12 @@ mod tests {
         }
         let unique: HashSet<u64> = ids.iter().copied().collect();
         assert_eq!(unique.len(), 100, "all 100 socket ids must be unique");
-        assert_eq!(
-            pool_size(),
-            baseline + 100,
-            "pool must grow by 100 after opens"
-        );
+        for id in &ids {
+            assert!(
+                get(*id).is_some(),
+                "socket {id} must be in pool after open",
+            );
+        }
         let mut closed = 0;
         for id in &ids {
             if close(*id) {
@@ -197,10 +203,11 @@ mod tests {
             }
         }
         assert_eq!(closed, 100, "all 100 closes must report success");
-        assert_eq!(
-            pool_size(),
-            baseline,
-            "pool must shrink back to baseline after closes"
-        );
+        for id in &ids {
+            assert!(
+                get(*id).is_none(),
+                "socket {id} must be gone after close",
+            );
+        }
     }
 }
