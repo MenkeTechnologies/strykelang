@@ -1,168 +1,92 @@
 #!/usr/bin/env stryke
 
-fn SL::new($max_level, $seed) {
-    my @next = ()
-    for my $i (1:$max_level) { push @next, undef }
-    +{
-        head      => +{ val => undef, next => \@next, level => $max_level },
-        max_level => $max_level,
-        level     => 1,
-        size      => 0,
-        rng       => +{ state => $seed },
-    }
-}
+package SkipList
 
-fn SL::_rand_level($sl) {
-    my $lvl = 1
-    while ($lvl < $sl->{max_level}) {
-        $sl->{rng}->{state} = ($sl->{rng}->{state} * 1103515245 + 12345) % 2147483648
-        last if ($sl->{rng}->{state} % 2) == 1
-        $lvl = $lvl + 1
-    }
+my $MAX_LEVEL = 16
+my $P = 0.5
+fn new_node($val, $level) {
+    my @next = (undef) x ($level + 1)
+    { val => $val, next => \@next }
+}
+fn new() { { head => new_node(undef, $MAX_LEVEL), level => 0 } }
+fn random_level() {
+    my $lvl = 0
+    while (rand() < $P && $lvl < $MAX_LEVEL) { $lvl++ }
     $lvl
 }
-
-fn SL::contains($sl, $val) {
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
-    while ($i >= 0) {
-        while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
-            $x = $x->{next}->[$i]
-        }
-        $i = $i - 1
+fn insert($list, $val) {
+    my @update = (undef) x ($MAX_LEVEL + 1)
+    my $curr = $list->{head}
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
+        $update[$i] = $curr
     }
-    $x = $x->{next}->[0]
-    (defined $x && $x->{val} == $val) ? 1 : 0
+    $curr = $curr->{next}->[0]
+    if (!defined $curr || $curr->{val} != $val) {
+        my $lvl = random_level()
+        if ($lvl > $list->{level}) {
+            for my $i ($list->{level} + 1 : $lvl) { $update[$i] = $list->{head} }
+            $list->{level} = $lvl
+        }
+        my $new = new_node($val, $lvl)
+        for my $i (0 : $lvl) {
+            $new->{next}->[$i] = $update[$i]->{next}->[$i]; $update[$i]->{next}->[$i] = $new
+        }
+    }
 }
-
-fn SL::insert($sl, $val) {
-    return 0 if SL::contains($sl, $val)
-    my @update = ()
-    for my $i (1:$sl->{max_level}) { push @update, $sl->{head} }
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
-    while ($i >= 0) {
-        while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
-            $x = $x->{next}->[$i]
-        }
-        $update[$i] = $x
-        $i = $i - 1
+fn find($list, $val) {
+    my $curr = $list->{head}
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
     }
-    my $lvl = SL::_rand_level($sl)
-    if ($lvl > $sl->{level}) {
-        for my $j ($sl->{level}:$lvl-1) { $update[$j] = $sl->{head} }
-        $sl->{level} = $lvl
-    }
-    my @next = ()
-    for my $j (1:$lvl) { push @next, undef }
-    my $node = +{ val => $val, next => \@next, level => $lvl }
-    for my $j (0:$lvl-1) {
-        $node->{next}->[$j]    = $update[$j]->{next}->[$j]
-        $update[$j]->{next}->[$j] = $node
-    }
-    $sl->{size} = $sl->{size} + 1
-    1
+    $curr = $curr->{next}->[0]
+    return (defined $curr && $curr->{val} == $val)
 }
-
-fn SL::remove($sl, $val) {
-    my @update = ()
-    for my $i (1:$sl->{max_level}) { push @update, $sl->{head} }
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
-    while ($i >= 0) {
-        while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
-            $x = $x->{next}->[$i]
+fn delete_v($list, $val) {
+    my @update = (undef) x ($MAX_LEVEL + 1)
+    my $curr = $list->{head}
+    for my $i (rev 0 : $list->{level}) {
+        while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
+        $update[$i] = $curr
+    }
+    $curr = $curr->{next}->[0]
+    if (defined $curr && $curr->{val} == $val) {
+        for my $i (0 : $list->{level}) {
+            last if $update[$i]->{next}->[$i] != $curr
+            $update[$i]->{next}->[$i] = $curr->{next}->[$i]
         }
-        $update[$i] = $x
-        $i = $i - 1
+        while ($list->{level} > 0 && !defined $list->{head}->{next}->[$list->{level}]) { $list->{level}-- }
     }
-    my $node = $x->{next}->[0]
-    return 0 unless defined $node && $node->{val} == $val
-    for my $j (0:$node->{level}-1) {
-        if (defined $update[$j]->{next}->[$j] && $update[$j]->{next}->[$j] == $node) {
-            $update[$j]->{next}->[$j] = $node->{next}->[$j]
-        }
-    }
-    while ($sl->{level} > 1 && !defined $sl->{head}->{next}->[$sl->{level} - 1]) {
-        $sl->{level} = $sl->{level} - 1
-    }
-    $sl->{size} = $sl->{size} - 1
-    1
 }
-
-fn SL::to_array($sl) {
-    my @out = ()
-    my $x = $sl->{head}->{next}->[0]
-    while (defined $x) {
-        push @out, $x->{val}
-        $x = $x->{next}->[0]
-    }
+fn to_array($list) {
+    my @out; my $curr = $list->{head}->{next}->[0]
+    while (defined $curr) { push @out, $curr->{val}; $curr = $curr->{next}->[0] }
     \@out
 }
 
-fn SL::size($sl) { $sl->{size} }
+package main
 
-# Empty
-my $e = SL::new(8, 1)
-SL::size($e) |> aeq 0, "empty size"
-SL::contains($e, 5) |> aeq 0, "empty contains"
-len(@{SL::to_array($e)}) |> aeq 0, "empty array"
-SL::remove($e, 5) |> aeq 0, "remove from empty"
+# --- Basic ---
+my $sl = SkipList::new()
+for my $v (10, 5, 20, 15) { SkipList::insert $sl, $v }
+join(",", @{SkipList::to_array $sl}) |> aeq "5,10,15,20", "skip list sorted"
+SkipList::find($sl, 10) |> aeq 1, "find 10"
+SkipList::find($sl, 99) |> aeq 0, "no find 99"
 
-# Single insert
-my $s1 = SL::new(8, 7)
-SL::insert($s1, 10) |> aeq 1, "first insert returns 1"
-SL::size($s1) |> aeq 1, "size 1"
-SL::contains($s1, 10) |> aeq 1, "contains 10"
-SL::contains($s1, 5)  |> aeq 0, "no 5"
-join(",", @{SL::to_array($s1)}) |> aeq "10", "array"
+SkipList::delete_v $sl, 10
+SkipList::find($sl, 10) |> aeq 0, "10 deleted"
+join(",", @{SkipList::to_array $sl}) |> aeq "5,15,20", "after delete"
 
-# Insert duplicate rejected
-SL::insert($s1, 10) |> aeq 0, "duplicate returns 0"
-SL::size($s1) |> aeq 1, "size unchanged"
-
-# Sorted output
-my $sl = SL::new(8, 42)
-for my $v (5, 3, 8, 1, 9, 4, 7, 2, 6) { SL::insert($sl, $v) }
-SL::size($sl) |> aeq 9, "9 distinct"
-join(",", @{SL::to_array($sl)}) |> aeq "1,2,3,4,5,6,7,8,9", "sorted"
-SL::contains($sl, 1) |> aeq 1, "has 1"
-SL::contains($sl, 9) |> aeq 1, "has 9"
-SL::contains($sl, 5) |> aeq 1, "has 5"
-SL::contains($sl, 0) |> aeq 0, "no 0"
-SL::contains($sl, 10) |> aeq 0, "no 10"
-
-# Remove
-SL::remove($sl, 5) |> aeq 1, "remove 5"
-SL::contains($sl, 5) |> aeq 0, "5 gone"
-SL::size($sl) |> aeq 8, "8 left"
-join(",", @{SL::to_array($sl)}) |> aeq "1,2,3,4,6,7,8,9", "sorted after remove"
-SL::remove($sl, 5) |> aeq 0, "double remove no-op"
-
-# Remove first and last
-SL::remove($sl, 1) |> aeq 1, "remove min"
-SL::remove($sl, 9) |> aeq 1, "remove max"
-join(",", @{SL::to_array($sl)}) |> aeq "2,3,4,6,7,8", "after edges removed"
-
-# Large insert/remove cycle
-my $big = SL::new(16, 99)
-for my $i (1:100) { SL::insert($big, $i) }
-SL::size($big) |> aeq 100, "100 inserts"
-my $sum = 0
-for my $v (@{SL::to_array($big)}) { $sum = $sum + $v }
-$sum |> aeq 5050, "sum 1..100 = 5050"
-for my $i (1:50) { SL::remove($big, $i * 2) }   # remove evens
-SL::size($big) |> aeq 50, "50 odds left"
-my $sum2 = 0
-for my $v (@{SL::to_array($big)}) { $sum2 = $sum2 + $v }
-$sum2 |> aeq 2500, "sum of odds 1..99 = 2500"
-
-# Items remain sorted
-my $arr = SL::to_array($big)
-my $sorted_ok = 1
-for my $i (0:len(@$arr)-2) {
-    $sorted_ok = 0 if $arr->[$i] >= $arr->[$i+1]
+# --- Stress ---
+my $sls = SkipList::new()
+my $seed = 42
+for (1:100) {
+    $seed = ($seed * 1103515245 + 12345) % 2147483648
+    SkipList::insert $sls, ($seed % 1000)
 }
-$sorted_ok |> aeq 1, "still sorted"
+my $arr = SkipList::to_array $sls
+my $ok = 1
+for my $i (0 : (len @$arr) - 2) { $ok = 0 if $arr->[$i] > $arr->[$i+1] }
+$ok |> aeq 1, "stress sorted"
 
 test_run

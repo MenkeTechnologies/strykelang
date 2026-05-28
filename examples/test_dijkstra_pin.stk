@@ -1,0 +1,76 @@
+#!/usr/bin/env stryke
+
+package Dijkstra
+
+fn pq_new = []
+fn pq_push($q, $pair) {
+    push @$q, $pair
+    my $idx = (len @$q) - 1
+    while ($idx > 0) {
+        my $p = int(($idx - 1) / 2)
+        last if $q->[$p]->[0] <= $q->[$idx]->[0]
+        ($q->[$p], $q->[$idx]) = ($q->[$idx], $q->[$p])
+        $idx = $p
+    }
+}
+fn pq_pop($q) {
+    return undef if !@$q
+    my $res = $q->[0]
+    my $last = pop @$q
+    if (@$q) {
+        $q->[0] = $last
+        my $idx = 0
+        my $n = len @$q
+        while (1) {
+            my $l = 2 * $idx + 1
+            my $r = 2 * $idx + 2
+            my $smallest = $idx
+            $smallest = $l if $l < $n && $q->[$l]->[0] < $q->[$smallest]->[0]
+            $smallest = $r if $r < $n && $q->[$r]->[0] < $q->[$smallest]->[0]
+            last if $smallest == $idx
+            ($q->[$idx], $q->[$smallest]) = ($q->[$smallest], $q->[$idx])
+            $idx = $smallest
+        }
+    }
+    $res
+}
+
+fn shortest_paths($graph, $start) {
+    my %dist; my %prev; my $pq = pq_new()
+    $dist{$start} = 0; pq_push $pq, [0, $start]
+    while (my $pair = pq_pop $pq) {
+        my ($d, $u) = @$pair
+        next if defined $dist{$u} && $d > $dist{$u}
+        my $neighbors = $graph->{$u} // []
+        for my $edge (@$neighbors) {
+            my ($v, $w) = @$edge
+            my $new_d = $d + $w
+            if (!defined $dist{$v} || $new_d < $dist{$v}) {
+                $dist{$v} = $new_d; $prev{$v} = $u; pq_push $pq, [$new_d, $v]
+            }
+        }
+    }
+    { dist => \%dist, prev => \%prev }
+}
+
+package main
+
+# --- Basic E2E ---
+my %g1 = ( A => [["B", 1], ["C", 4]], B => [["C", 2], ["D", 5]], C => [["D", 1]] )
+my $r1 = Dijkstra::shortest_paths \%g1, "A"
+$r1->{dist}->{D} |> aeq 4, "A -> B -> C -> D = 1+2+1 = 4"
+$r1->{prev}->{D} |> aeq "C", "D prev is C"
+
+# --- Disconnected ---
+my %g2 = ( A => [["B", 1]], C => [["D", 1]] )
+my $r2 = Dijkstra::shortest_paths \%g2, "A"
+$r2->{dist}->{A} |> aeq 0, "dist A=0"
+$r2->{dist}->{B} |> aeq 1, "dist B=1"
+defined($r2->{dist}->{C}) |> aeq 0, "C unreachable"
+
+# --- Cyclic ---
+my %g3 = ( A => [["B", 1]], B => [["A", 1], ["C", 1]] )
+my $r3 = Dijkstra::shortest_paths \%g3, "A"
+$r3->{dist}->{C} |> aeq 2, "cyclic path A-B-C"
+
+test_run

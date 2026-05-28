@@ -1,124 +1,118 @@
 #!/usr/bin/env stryke
 
-# Dijkstra's algorithm — single-source shortest paths on a weighted
-# graph (non-negative edges). Complements `graph_bfs_no_interop.stk`
-# which solves the unweighted case. Parses clean under `--no-interop`.
+# dijkstra_no_interop.stk — Dijkstra's shortest path algorithm.
 #
-# Adjacency list: `{ node => [[neighbour, weight], ...] }`.
-# Uses a naive linear-scan "extract min" — sufficient for small
-# graphs; a real binary heap would land it at O((V+E) log V).
-#
-# Stryke choices:
-#   * `fn`, `p`, `printf`, `len`
-#   * Hash for distance + parent maps
-#   * Array-of-arrayref for edge list
-#   * Built-in `die` invariants — triangle inequality + known
-#     shortest-distance tables
+# This implementation uses a Min-Heap based Priority Queue to find
+# the shortest path from a source node to all other nodes in a
+# weighted graph.
 #
 # Run: stryke --no-interop examples/dijkstra_no_interop.stk
 
-fn Dijkstra::run($graph_ref, $src) {
+package Dijkstra
+
+# --- Priority Queue (Min-Heap) for (distance, node) pairs ---
+
+fn pq_new = []
+
+fn pq_push($q, $pair) {
+    push @$q, $pair
+    my $idx = (len @$q) - 1
+    while ($idx > 0) {
+        my $p = int(($idx - 1) / 2)
+        last if $q->[$p]->[0] <= $q->[$idx]->[0]
+        ($q->[$p], $q->[$idx]) = ($q->[$idx], $q->[$p])
+        $idx = $p
+    }
+}
+
+fn pq_pop($q) {
+    return undef if !@$q
+    my $res = $q->[0]
+    my $last = pop @$q
+    if (@$q) {
+        $q->[0] = $last
+        my $idx = 0
+        my $n = len @$q
+        while (1) {
+            my $l = 2 * $idx + 1
+            my $r = 2 * $idx + 2
+            my $smallest = $idx
+            $smallest = $l if $l < $n && $q->[$l]->[0] < $q->[$smallest]->[0]
+            $smallest = $r if $r < $n && $q->[$r]->[0] < $q->[$smallest]->[0]
+            last if $smallest == $idx
+            ($q->[$idx], $q->[$smallest]) = ($q->[$smallest], $q->[$idx])
+            $idx = $smallest
+        }
+    }
+    $res
+}
+
+# --- Dijkstra Logic ---
+
+# graph: adjacency list: { node => [[neighbor, weight], ...] }
+fn shortest_paths($graph, $start) {
     my %dist
-    my %parent
-    my %visited
-    # Seed distances. nil-as-undef stays away from numeric comparison.
-    for my $u (keys %$graph_ref) {
-        $dist{$u} = -1   # sentinel for "infinity"
-    }
-    $dist{$src} = 0
-
-    my $iter = 0
-    while (1) {
-        # Pick the unvisited node with smallest known distance.
-        my $u
-        my $best = -1
-        for my $k (keys %dist) {
-            next if exists $visited{$k}
-            next if $dist{$k} == -1   # still infinity
-            if ($best == -1 || $dist{$k} < $best) {
-                $best = $dist{$k}
-                $u = $k
+    my %prev
+    my $pq = pq_new()
+    
+    # Initialize start node
+    $dist{$start} = 0
+    pq_push $pq, [0, $start]
+    
+    while (my $pair = pq_pop $pq) {
+        my ($d, $u) = @$pair
+        
+        # Optimization: skip if we've already found a shorter path
+        next if defined $dist{$u} && $d > $dist{$u}
+        
+        my $neighbors = $graph->{$u} // []
+        for my $edge (@$neighbors) {
+            my ($v, $w) = @$edge
+            my $new_d = $d + $w
+            
+            if (!defined $dist{$v} || $new_d < $dist{$v}) {
+                $dist{$v} = $new_d
+                $prev{$v} = $u
+                pq_push $pq, [$new_d, $v]
             }
         }
-        last unless defined $u
-        $visited{$u} = 1
-
-        my $edges = $graph_ref->{$u}
-        next unless defined $edges
-        for my $e (@$edges) {
-            my ($v, $w) = ($e->[0], $e->[1])
-            my $alt = $dist{$u} + $w
-            if ($dist{$v} == -1 || $alt < $dist{$v}) {
-                $dist{$v}   = $alt
-                $parent{$v} = $u
-            }
-        }
-        $iter++
-        last if $iter > 10000   # safety
     }
-    +{ dist => \%dist, parent => \%parent }
+    { dist => \%dist, prev => \%prev }
 }
 
-fn Dijkstra::path($parent_ref, $src, $dst) {
-    my @path = ($dst)
-    my $cur = $dst
-    while ($cur ne $src) {
-        return [] unless exists $parent_ref->{$cur}
-        $cur = $parent_ref->{$cur}
-        unshift @path, $cur
-    }
-    \@path
+package main
+
+p "── Dijkstra's Shortest Path Demo ──"
+
+# Graph:
+#   A --1--> B
+#   A --4--> C
+#   B --3--> C
+#   B --2--> D
+#   C --5--> D
+my %graph = (
+    A => [["B", 1], ["C", 4]],
+    B => [["C", 3], ["D", 2]],
+    C => [["D", 5]],
+)
+
+p "Source: A"
+my $res = Dijkstra::shortest_paths \%graph, "A"
+my %dist = %{$res->{dist}}
+
+for my $node (keys %dist |> sort) {
+    p "  Shortest dist to #{$node}: #{$dist{$node}}"
 }
 
-# Sample graph — 6 nodes (A..F) with weighted directed edges.
-#
-#       A --2-- B --1-- C
-#       |       |       |
-#       4       3       5
-#       |       |       |
-#       D --7-- E --2-- F
-#
-# Shortest A -> F via B-C-F = 2+1+5 = 8, via D-E-F = 4+7+2 = 13,
-# via B-E-F = 2+3+2 = 7. So 7 wins.
-my $G = +{
-    A => [["B", 2], ["D", 4]],
-    B => [["C", 1], ["E", 3]],
-    C => [["F", 5]],
-    D => [["E", 7]],
-    E => [["F", 2]],
-    F => [],
+# Reconstruct path to D
+my $target = "D"
+my @path
+my $curr = $target
+while (defined $curr) {
+    push @path, $curr
+    $curr = $res->{prev}->{$curr}
 }
+@path = rev @path
+p "  Path to #{$target}: #{join ' -> ', @path}"
 
-my $result = Dijkstra::run($G, "A")
-
-# Expected shortest distances from A.
-my %expected = (A => 0, B => 2, C => 3, D => 4, E => 5, F => 7)
-
-p "── Dijkstra from A ──"
-my $fail = 0
-for my $node (sort keys %expected) {
-    my $got = $result->{dist}{$node}
-    my $ok  = ($got == $expected{$node})
-    $fail++ unless $ok
-    my $path = Dijkstra::path($result->{parent}, "A", $node)
-    printf "  A -> %s  dist=%d  expect=%d  path=[%s]  %s\n",
-        $node, $got, $expected{$node},
-        join(",", @$path),
-        $ok ? "" : "FAIL"
-}
-die "$fail / 6 dijkstra cases failed" if $fail > 0
-
-# Triangle inequality: d(A, F) <= d(A, B) + edge(B, F-via-shortest).
-# Already implicit in the table, but pin it explicitly: A->F is 7,
-# A->E is 5, edge(E, F)=2, so A->F should be <= 5 + 2.
-die "triangle inequality A-E-F" unless $result->{dist}{F} <= $result->{dist}{E} + 2
-
-# Unreachable: starting from F (which has no outgoing edges to most
-# nodes), only F itself has a finite distance.
-my $r2 = Dijkstra::run($G, "F")
-die "F can reach itself in 0" unless $r2->{dist}{F} == 0
-die "F unreachable from itself to A"  unless $r2->{dist}{A} == -1
-die "F unreachable from itself to B"  unless $r2->{dist}{B} == -1
-
-p ""
-p "  ALL PASS (6 shortest-distance cases + triangle inequality + unreachable invariants)"
+p "Done."

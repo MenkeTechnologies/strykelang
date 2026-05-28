@@ -1,0 +1,165 @@
+#!/usr/bin/env stryke
+
+# mini_lisp_no_interop.stk — A small Lisp interpreter.
+#
+# Features:
+# - Tokenizer (regex based).
+# - Recursive parser (S-expressions).
+# - Evaluator with lexical scoping.
+# - Builtins: +, -, *, /, =, <, >, list, car, cdr, define, if, fn.
+#
+# Run: stryke --no-interop examples/mini_lisp_no_interop.stk
+
+package Lisp
+
+# --- Tokenizer ---
+
+fn tokenize($code) {
+    my $c = $code
+    $c =~ s/\(/ ( /g
+    $c =~ s/\)/ ) /g
+    my @tokens = split /\s+/, $c
+    my @clean = grep { len(_) > 0 } @tokens
+    \@clean
+}
+
+# --- Parser ---
+
+fn parse($tokens) {
+    return undef if !@$tokens
+    my $token = shift @$tokens
+    
+    if ($token eq "(") {
+        my @list
+        while (@$tokens && $tokens->[0] ne ")") {
+            push @list, parse($tokens)
+        }
+        if (@$tokens && $tokens->[0] eq ")") {
+            shift @$tokens # pop ")"
+        }
+        \@list
+    } else {
+        # Number or Symbol
+        if ($token =~ /^-?\d+$/) {
+            return int($token)
+        }
+        $token
+    }
+}
+
+# --- Evaluator ---
+
+fn new_env($outer) {
+    { vars => {}, outer => $outer }
+}
+
+fn env_find($env, $var) {
+    if (exists $env->{vars}->{$var}) {
+        return $env
+    }
+    return undef if !defined $env->{outer}
+    env_find $env->{outer}, $var
+}
+
+fn eval_v($x, $env) {
+    # 1. Symbol (variable lookup)
+    if (ref($x) eq "") {
+        if ($x =~ /^-?\d+$/) { return $x }
+        my $found = env_find $env, $x
+        die "Undefined symbol: #{$x}" if !defined $found
+        return $found->{vars}->{$x}
+    }
+    
+    # 2. Literal (not a list)
+    return $x if ref($x) ne "ARRAY"
+    
+    # 3. List (form)
+    my @list = @$x
+    return [] if !@list
+    
+    my $op = $list[0]
+    
+    # Special forms
+    if ($op eq "define") {
+        my $val = eval_v $list[2], $env
+        $env->{vars}->{$list[1]} = $val
+        return $val
+    }
+    
+    if ($op eq "if") {
+        my $cond = eval_v $list[1], $env
+        return eval_v(($cond ? $list[2] : $list[3]), $env)
+    }
+    
+    if ($op eq "fn") {
+        # Return a closure hash
+        return { params => $list[1], body => $list[2], env => $env }
+    }
+    
+    # Function application
+    my $proc = eval_v $op, $env
+    
+    # Evaluate arguments
+    my @args
+    for my $i (1 : (len @list) - 1) {
+        push @args, eval_v($list[$i], $env)
+    }
+    
+    if (ref($proc) eq "HASH") {
+        # Closure application
+        my $new_e = new_env $proc->{env}
+        my @params = @{$proc->{params}}
+        for my $i (0 : (len @params) - 1) {
+            $new_e->{vars}->{$params[$i]} = $args[$i]
+        }
+        return eval_v $proc->{body}, $new_e
+    } else {
+        # Builtin application (proc is a code ref)
+        return $proc->(@args)
+    }
+}
+
+# --- Standard Library ---
+
+fn setup_env($env) {
+    $env->{vars}->{"+"} = fn { my $s = 0; for my $val (@_) { $s = $s + $val } $s }
+    $env->{vars}->{"-"} = fn { _0 - _1 }
+    $env->{vars}->{"*"} = fn { my $p = 1; for my $val (@_) { $p = $p * $val } $p }
+    $env->{vars}->{"/"} = fn { _1 == 0 ? 0 : _0 / _1 }
+    $env->{vars}->{"="} = fn { _0 == _1 ? 1 : 0 }
+    $env->{vars}->{">"} = fn { _0 > _1 ? 1 : 0 }
+    $env->{vars}->{"<"} = fn { _0 < _1 ? 1 : 0 }
+    $env->{vars}->{"list"} = fn { \@_ }
+    $env->{vars}->{"car"} = fn { _0->[0] }
+    $env->{vars}->{"cdr"} = fn {
+        my $ref = _0
+        my $n = len @$ref
+        $n > 1 ? [ @$ref[1 : $n-1] ] : []
+    }
+}
+
+package main
+
+p "── Mini-Lisp Interpreter Demo ──"
+
+my $global = Lisp::new_env undef
+Lisp::setup_env $global
+
+my @programs = (
+    "(define x 10)",
+    "(define square (fn (n) (* n n)))",
+    "(square x)",
+    "(if (> x 5) 100 200)",
+    "(define fact (fn (n) (if (= n 0) 1 (* n (fact (- n 1))))))",
+    "(fact 5)"
+)
+
+for my $code (@programs) {
+    my $tokens = Lisp::tokenize $code
+    my $ast = Lisp::parse $tokens
+    my $res = Lisp::eval_v $ast, $global
+    p "Input:  #{$code}"
+    p "Output: #{$res // 'nil'}"
+}
+
+p "Done."

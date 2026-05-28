@@ -16,7 +16,7 @@ fn mat_rand($r, $c) {
 }
 fn new($in_n, $hid_n, $out_n) {
     { ih_weights => mat_rand($hid_n, $in_n), ho_weights => mat_rand($out_n, $hid_n),
-      h_bias => mat_rand($hid_n, 1), o_bias => mat_rand($out_n, 1), lr => 0.2 }
+      h_bias => mat_rand($hid_n, 1), o_bias => mat_rand($out_n, 1), lr => 0.3 }
 }
 fn nn_predict($nn, $inputs) {
     my $ih = $nn->{ih_weights}; my $ho = $nn->{ho_weights}
@@ -63,7 +63,7 @@ my $nn = NN::new 2, 4, 1
 my @data = ( {in=>[0,0], out=>[0]}, {in=>[0,1], out=>[1]}, {in=>[1,0], out=>[1]}, {in=>[1,1], out=>[0]} )
 
 # Train
-for (1:10000) {
+for (1:20000) {
     my $d = $data[int(rand 4)]
     NN::train $nn, $d->{in}, $d->{out}
 }
@@ -74,6 +74,6 @@ for my $d (@data) {
     my $res = NN::nn_predict $nn, $d->{in}
     $total_err = $total_err + abs($d->{out}->[0] - $res->{output}->[0])
 }
-($total_err < 1.0) |> aeq 1, "NN learned XOR (total error #{$total_err} < 1.0)"
+($total_err < 0.5) |> aeq 1, "NN learned XOR (total error #{$total_err} < 0.5)"
 
 test_run
