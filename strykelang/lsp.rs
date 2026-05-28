@@ -1400,6 +1400,70 @@ fn documentation_to_string(doc: &Documentation) -> String {
     }
 }
 
+/// Collect contiguous `##` doc-comment lines immediately above the
+/// 0-based source line `decl_line_0based`. Returns the joined doc
+/// text (with `##` / `## ` prefix stripped per line, blank `##` lines
+/// preserved as paragraph breaks), or `None` when no `##` block sits
+/// directly above.
+///
+/// Walks backwards from `decl_line_0based - 1` until it hits the
+/// first non-`##` line or top-of-file. A `##` line is one whose
+/// first non-whitespace content starts with `##`. Plain `#` line
+/// comments (a single `#`) are NOT counted — they're regular code
+/// comments, not docs.
+///
+/// Used by [`hover_markdown_for_word`] to surface `## ... ## ... fn
+/// foo() { ... }` rustdoc-style headers in the LSP hover card for
+/// `foo` (or `package Foo`, `class Foo`, etc.).
+pub(crate) fn doc_comments_above(text: &str, decl_line_0based: usize) -> Option<String> {
+    if decl_line_0based == 0 {
+        return None;
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    let mut collected: Vec<String> = Vec::new();
+    let mut i = decl_line_0based as i64 - 1;
+    while i >= 0 {
+        let line = lines.get(i as usize).copied().unwrap_or("");
+        let trimmed = line.trim_start();
+        if !trimmed.starts_with("##") {
+            break;
+        }
+        // Strip leading `##` (with optional single space). `### …`
+        // stays as `# …` — caller renders as markdown so the extra
+        // `#` becomes a heading marker.
+        let body = trimmed.strip_prefix("##").unwrap_or(trimmed);
+        let body = body.strip_prefix(' ').unwrap_or(body);
+        collected.push(body.to_string());
+        i -= 1;
+    }
+    if collected.is_empty() {
+        return None;
+    }
+    collected.reverse();
+    Some(collected.join("\n"))
+}
+
+/// Find the 0-based declaration line of a top-level `package NAME`
+/// statement in `text`. Used by hover so `package Foo { ... }` (or
+/// the bare `package Foo` form) surfaces its `##` doc-comment block.
+pub(crate) fn package_decl_line(text: &str, name: &str) -> Option<usize> {
+    for (i, line) in text.lines().enumerate() {
+        let t = line.trim_start();
+        if let Some(rest) = t.strip_prefix("package") {
+            let after = rest.trim_start();
+            // package NAME ; / package NAME { / package NAME (eol)
+            let first_word = after
+                .split(|c: char| c.is_whitespace() || c == ';' || c == '{')
+                .next()
+                .unwrap_or("");
+            if first_word == name {
+                return Some(i);
+            }
+        }
+    }
+    None
+}
+
 fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
     // Sigil-prefixed identifiers are variables, not builtins. Don't let
     // `$pass`/`@pass`/`%pass` fall through to `doc_for_label("pass")` —
@@ -1422,10 +1486,15 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
                         crate::lsp_symbols::SymbolKind::Label => "loop label",
                         crate::lsp_symbols::SymbolKind::Field => "field",
                     };
-                    return Some(format!(
+                    let header = format!(
                         "{kind_str} `{}` — declared at line {}.",
                         sym.name,
                         sym.decl_line + 1
+                    );
+                    return Some(format_with_doc_comments(
+                        text,
+                        sym.decl_line as usize,
+                        header,
                     ));
                 }
             }
@@ -1435,7 +1504,17 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
     let program = crate::parse_with_file(text, path).ok()?;
     let sub_map = collect_sub_fqn_map(&program);
     if let Some(ln) = resolve_sub_decl_line(&sub_map, word) {
-        return Some(format!("Subroutine `{word}` — declared at line {ln}."));
+        // `ln` is 1-based source line as stored by the parser; convert
+        // to 0-based for the doc-comment walk.
+        let decl_0 = ln.saturating_sub(1);
+        let header = format!("Subroutine `{word}` — declared at line {ln}.");
+        return Some(format_with_doc_comments(text, decl_0, header));
+    }
+    // Bare-word package / type lookup — surface the `## …` header
+    // block above `package Foo` / `class Foo` / `struct Foo` etc.
+    if let Some(decl_0) = package_decl_line(text, word) {
+        let header = format!("Package `{word}` — declared at line {}.", decl_0 + 1);
+        return Some(format_with_doc_comments(text, decl_0, header));
     }
     if let Some(doc) = doc_for_label(word) {
         return Some(documentation_to_string(&doc));
@@ -1443,6 +1522,19 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
     // Category-based fallback so every builtin in `CATEGORY_MAP` gets a hover
     // card — same path `stryke docs <name>` uses for un-hand-written names.
     doc_stub_for(word)
+}
+
+/// Wrap a hover header with the `##` doc-comment block that sits
+/// directly above `decl_line_0based`, when present. Doc block goes
+/// first (it's the most useful content); the synthetic
+/// "Subroutine X — declared at line N" header follows after a
+/// markdown `---` separator. When no `##` block is present, return
+/// the header unchanged.
+fn format_with_doc_comments(text: &str, decl_line_0based: usize, header: String) -> String {
+    match doc_comments_above(text, decl_line_0based) {
+        Some(doc) => format!("{doc}\n\n---\n\n{header}"),
+        None => header,
+    }
 }
 
 /// Classification of the textual context around the cursor identifier.
@@ -11991,6 +12083,77 @@ mod rename_hover_tests {
                 "hover for $pass must not show builtin card, got: {md}"
             );
         }
+    }
+
+    // ── ## doc-comments above declarations surface in hover ──────────
+
+    #[test]
+    fn doc_comments_above_collects_contiguous_block() {
+        let text = "## First line.\n## Second line.\nfn foo() {}\n";
+        let doc = super::doc_comments_above(text, 2)
+            .expect("expected to extract doc block above line 2");
+        assert!(doc.contains("First line."), "missing first line in {doc:?}");
+        assert!(doc.contains("Second line."), "missing second line in {doc:?}");
+    }
+
+    #[test]
+    fn doc_comments_above_stops_at_first_non_doc_line() {
+        // Plain `# comment` (single `#`) is code, not docs — must stop.
+        let text = "# regular comment\n## doc line\nfn foo() {}\n";
+        let doc = super::doc_comments_above(text, 2)
+            .expect("doc block should still be picked up");
+        assert!(doc.contains("doc line"));
+        assert!(
+            !doc.contains("regular comment"),
+            "must stop at first single-`#` comment line, got: {doc}"
+        );
+    }
+
+    #[test]
+    fn doc_comments_above_returns_none_when_no_doc_block() {
+        let text = "fn foo() {}\n";
+        assert!(super::doc_comments_above(text, 0).is_none());
+        assert!(super::doc_comments_above("fn foo() {}\n", 0).is_none());
+    }
+
+    #[test]
+    fn hover_for_sub_surfaces_doc_comments_above() {
+        let text = "## Short description.\n## Second paragraph.\nfn greeter() { p \"hi\" }\n";
+        let h = hover_markdown_for_word("greeter", text, "a.stk")
+            .expect("hover should resolve `greeter` to a sub");
+        assert!(h.contains("Short description."), "hover missing first line: {h}");
+        assert!(h.contains("Second paragraph."), "hover missing second line: {h}");
+        assert!(h.contains("Subroutine `greeter`"), "hover missing header: {h}");
+    }
+
+    #[test]
+    fn hover_for_package_surfaces_doc_comments_above() {
+        let text = "## Foo wraps the bar API.\n## Multi-line OK.\npackage Foo;\n";
+        let h = hover_markdown_for_word("Foo", text, "a.stk")
+            .expect("hover should resolve `Foo` to a package");
+        assert!(h.contains("Foo wraps the bar API."), "hover missing doc: {h}");
+        assert!(h.contains("Multi-line OK."), "hover missing 2nd line: {h}");
+        assert!(h.contains("Package `Foo`"), "hover missing package header: {h}");
+    }
+
+    #[test]
+    fn hover_for_sub_without_doc_comments_still_shows_header() {
+        let text = "fn lonely() {}\n";
+        let h = hover_markdown_for_word("lonely", text, "a.stk")
+            .expect("hover should still resolve the sub");
+        assert!(h.contains("Subroutine `lonely`"));
+        assert!(
+            !h.contains("---"),
+            "no doc block means no separator, got: {h}"
+        );
+    }
+
+    #[test]
+    fn hover_for_sigil_var_with_doc_comments_above_surfaces_them() {
+        let text = "## Configuration table.\nour %CONFIG = (a => 1);\n";
+        let h = hover_markdown_for_word("%CONFIG", text, "a.stk")
+            .expect("hover should resolve `%CONFIG` to an our var");
+        assert!(h.contains("Configuration table."), "missing doc: {h}");
     }
 
     #[test]
