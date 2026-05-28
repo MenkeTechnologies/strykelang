@@ -133,23 +133,19 @@ Router::register "GET", "/", fn {
 }
 
 Router::register "GET", "/users/:id", fn {
-    my $req = _
-    +{ status => 200, body => "user #{ $req->{params}{id} } viewed by #{ $req->{user}{name} }" }
+    +{ status => 200, body => "user #{ _->{params}{id} } viewed by #{ _->{user}{name} }" }
 }
 
 Router::register "GET", "/orders/:oid/items/:iid", fn {
-    my $req = _
-    +{ status => 200, body => "order=#{ $req->{params}{oid} } item=#{ $req->{params}{iid} }" }
+    +{ status => 200, body => "order=#{ _->{params}{oid} } item=#{ _->{params}{iid} }" }
 }
 
 Router::register "POST", "/users", fn {
-    my $req = _
-    +{ status => 201, body => "created user from " . $req->{body} }
+    +{ status => 201, body => "created user from " . _->{body} }
 }
 
 Router::register "DELETE", "/users/:id", fn {
-    my $req = _
-    +{ status => 204, body => "deleted #{ $req->{params}{id} }" }
+    +{ status => 204, body => "deleted #{ _->{params}{id} }" }
 }
 
 # ── 6. Drive a sequence of requests ───────────────────────────────
