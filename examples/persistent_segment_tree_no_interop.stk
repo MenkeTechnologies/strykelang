@@ -1,0 +1,84 @@
+#!/usr/bin/env stryke
+
+# persistent_segment_tree_no_interop.stk — Versioned segment tree.
+#
+# A persistent segment tree allows point updates that produce a new
+# root while sharing unchanged nodes with the previous version.
+# Each version can be queried independently.
+#
+# Run: stryke --no-interop examples/persistent_segment_tree_no_interop.stk
+
+package PersistentSegTree
+
+# Node: { val, left, right }
+fn new_node($v, $l, $r) {
+    { val => $v, left => $l, right => $r }
+}
+
+fn build($arr, $l, $r) {
+    if ($l == $r) {
+        return new_node($arr->[$l], undef, undef)
+    }
+    
+    my $mid = int(($l + $r) / 2)
+    my $left_child = build($arr, $l, $mid)
+    my $right_child = build($arr, $mid + 1, $r)
+    
+    new_node($left_child->{val} + $right_child->{val}, $left_child, $right_child)
+}
+
+# Update: returns new root
+fn update($old_node, $l, $r, $idx, $new_val) {
+    if ($l == $r) {
+        return new_node($new_val, undef, undef)
+    }
+    
+    my $mid = int(($l + $r) / 2)
+    my $left_child = $old_node->{left}
+    my $right_child = $old_node->{right}
+    
+    if ($idx <= $mid) {
+        $left_child = update($left_child, $l, $mid, $idx, $new_val)
+    } else {
+        $right_child = update($right_child, $mid + 1, $r, $idx, $new_val)
+    }
+    
+    new_node($left_child->{val} + $right_child->{val}, $left_child, $right_child)
+}
+
+fn query($node, $l, $r, $ql, $qr) {
+    return 0 if !defined $node || $ql > $r || $qr < $l
+    return $node->{val} if $ql <= $l && $r <= $qr
+    
+    my $mid = int(($l + $r) / 2)
+    my $s1 = query($node->{left},  $l, $mid, $ql, $qr)
+    my $s2 = query($node->{right}, $mid + 1, $r, $ql, $qr)
+    $s1 + $s2
+}
+
+package main
+
+p "── Persistent Segment Tree Demo ──"
+
+my @data = (1, 2, 3, 4)
+my $n = len @data
+my $v0 = PersistentSegTree::build \@data, 0, $n - 1
+
+p "Version 0 (initial): [1, 2, 3, 4]"
+p "  sum [0:3]: #{PersistentSegTree::query $v0, 0, $n-1, 0, 3}"
+p "  sum [1:2]: #{PersistentSegTree::query $v0, 0, $n-1, 1, 2}"
+
+# Update index 1 to 10 producing version 1
+my $v1 = PersistentSegTree::update $v0, 0, $n - 1, 1, 10
+p "\nVersion 1 (idx 1 -> 10): [1, 10, 3, 4]"
+p "  sum [0:3]: #{PersistentSegTree::query $v1, 0, $n-1, 0, 3}"
+p "  v0 sum [0:3] (unchanged): #{PersistentSegTree::query $v0, 0, $n-1, 0, 3}"
+
+# Update index 3 to 0 producing version 2 from version 1
+my $v2 = PersistentSegTree::update $v1, 0, $n - 1, 3, 0
+p "\nVersion 2 (idx 3 -> 0 from v1): [1, 10, 3, 0]"
+p "  sum [0:3]: #{PersistentSegTree::query $v2, 0, $n-1, 0, 3}"
+p "  v1 sum [0:3] (unchanged): #{PersistentSegTree::query $v1, 0, $n-1, 0, 3}"
+p "  v0 sum [0:3] (unchanged): #{PersistentSegTree::query $v0, 0, $n-1, 0, 3}"
+
+p "Done."

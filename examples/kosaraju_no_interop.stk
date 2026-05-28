@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+# kosaraju_no_interop.stk — Strongly Connected Components (SCC).
+#
+# Run: stryke --no-interop examples/kosaraju_no_interop.stk
+
+package Kosaraju
+
+fn dfs1($u, $g, $visited, $stack) {
+    $visited->{$u} = 1
+    my $neighbors = $g->{$u} // []
+    for my $v (@$neighbors) {
+        if (!$visited->{$v}) { Kosaraju::dfs1($v, $g, $visited, $stack) }
+    }
+    push @$stack, $u
+}
+
+fn dfs2($u, $rg, $visited, $comp) {
+    $visited->{$u} = 1
+    push @$comp, $u
+    my $neighbors = $rg->{$u} // []
+    for my $v (@$neighbors) {
+        if (!$visited->{$v}) { Kosaraju::dfs2($v, $rg, $visited, $comp) }
+    }
+}
+
+fn solve($names, $g) {
+    my %visited1
+    my @stack
+    for my $u (@$names) {
+        if (!$visited1{$u}) { Kosaraju::dfs1($u, $g, \%visited1, \@stack) }
+    }
+    
+    my %rg
+    for my $u (@$names) {
+        my $neighbors = $g->{$u} // []
+        for my $v (@$neighbors) { push @{$rg{$v}}, $u }
+    }
+    
+    my %visited2
+    my @sccs
+    while ((len @stack) > 0) {
+        my $u = pop @stack
+        if (!$visited2{$u}) {
+            my @comp
+            Kosaraju::dfs2($u, \%rg, \%visited2, \@comp)
+            push @sccs, \@comp
+        }
+    }
+    \@sccs
+}
+
+package main
+
+p "── Kosaraju's SCC Demo ──"
+my @nodes = ("0", "1", "2", "3", "4")
+my %graph = ("0"=>["2", "3"], "1"=>["0"], "2"=>["1"], "3"=>["4"], "4"=>[])
+my $sccs = Kosaraju::solve(\@nodes, \%graph)
+p "SCC Count: #{len @$sccs}"
+p "Done."

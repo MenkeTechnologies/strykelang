@@ -1,0 +1,159 @@
+#!/usr/bin/env stryke
+
+# btree_no_interop.stk — B-Tree data structure (Order T).
+#
+# A B-Tree is a self-balancing tree that maintains sorted data and
+# allows searches, insertions, and deletions in logarithmic time.
+# This implementation uses a fixed minimum degree T=3.
+#
+# Run: stryke --no-interop examples/btree_no_interop.stk
+
+package BTree
+
+# Order T
+my $T = 3
+
+fn node_new($leaf) {
+    {
+        keys => [],
+        children => [],
+        leaf => $leaf
+    }
+}
+
+fn search($node, $k) {
+    my $v1 = 0
+    my $keys = $node->{keys}
+    while ($v1 < (len @$keys) && $k > $keys->[$v1]) {
+        $v1++
+    }
+    
+    if ($v1 < (len @$keys) && $k == $keys->[$v1]) {
+        return $node
+    }
+    
+    if ($node->{leaf}) {
+        return undef
+    }
+    
+    my $child = $node->{children}->[$v1]
+    search($child, $k)
+}
+
+fn split_child($parent, $v1) {
+    my $t = $T
+    my $y = $parent->{children}->[$v1]
+    my $z = node_new($y->{leaf})
+    
+    # Move keys
+    my $y_keys = $y->{keys}
+    my @z_keys = @$y_keys[$t : 2 * $t - 2]
+    $z->{keys} = [ @z_keys ]
+    
+    # Move children
+    if (!$y->{leaf}) {
+        my $y_children = $y->{children}
+        my @z_children = @$y_children[$t : 2 * $t - 1]
+        $z->{children} = [ @z_children ]
+    }
+    
+    # Truncate y
+    my $mid_key = $y->{keys}->[$t - 1]
+    my @y_keys_new = @$y_keys[0 : $t - 2]
+    $y->{keys} = [ @y_keys_new ]
+    
+    if (!$y->{leaf}) {
+        my $y_children = $y->{children}
+        my @y_children_new = @$y_children[0 : $t - 1]
+        $y->{children} = [ @y_children_new ]
+    }
+    
+    # Insert z into parent's children
+    splice @{$parent->{children}}, $v1 + 1, 0, $z
+    
+    # Insert mid_key into parent's keys
+    splice @{$parent->{keys}}, $v1, 0, $mid_key
+}
+
+fn insert_non_full($node, $k) {
+    my $node_keys = $node->{keys}
+    my $v1 = (len @$node_keys) - 1
+    
+    if ($node->{leaf}) {
+        while ($v1 >= 0 && $k < $node_keys->[$v1]) {
+            $v1--
+        }
+        splice @$node_keys, $v1 + 1, 0, $k
+    } else {
+        while ($v1 >= 0 && $k < $node_keys->[$v1]) {
+            $v1--
+        }
+        $v1++
+        
+        my $child = $node->{children}->[$v1]
+        my $child_keys = $child->{keys}
+        if ((len @$child_keys) == 2 * $T - 1) {
+            split_child($node, $v1)
+            if ($k > $node->{keys}->[$v1]) {
+                $v1++
+            }
+        }
+        insert_non_full($node->{children}->[$v1], $k)
+    }
+}
+
+fn insert($btree, $k) {
+    if (!defined $btree->{root}) {
+        $btree->{root} = node_new(1)
+        push @{$btree->{root}->{keys}}, $k
+        return
+    }
+    
+    my $root = $btree->{root}
+    my $root_keys = $root->{keys}
+    if ((len @$root_keys) == 2 * $T - 1) {
+        my $s = node_new(0)
+        $btree->{root} = $s
+        $s->{children}->[0] = $root
+        split_child($s, 0)
+        insert_non_full($s, $k)
+    } else {
+        insert_non_full($root, $k)
+    }
+}
+
+fn inorder($node, $out) {
+    return if !defined $node
+    my $keys = $node->{keys}
+    my $n = len @$keys
+    for (my $v1 = 0; $v1 < $n; $v1++) {
+        if (!$node->{leaf}) {
+            inorder($node->{children}->[$v1], $out)
+        }
+        push @$out, $keys->[$v1]
+    }
+    if (!$node->{leaf}) {
+        inorder($node->{children}->[$n], $out)
+    }
+}
+
+package main
+
+p "── B-Tree Demo ──"
+
+my $bt = { root => undef }
+for my $v (10, 20, 5, 6, 12, 30, 7, 17) {
+    p "Inserting #{$v}..."
+    BTree::insert($bt, $v)
+}
+
+my @vals
+BTree::inorder($bt->{root}, \@vals)
+p "Inorder: #{join ', ', @vals}"
+
+for my $s (6, 15) {
+    my $res = BTree::search($bt->{root}, $s)
+    p "Search #{$s}: #{defined $res ? 'FOUND' : 'NOT FOUND'}"
+}
+
+p "Done."

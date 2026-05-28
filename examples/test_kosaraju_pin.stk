@@ -1,0 +1,47 @@
+#!/usr/bin/env stryke
+
+package Kosaraju
+
+fn dfs1($u, $g, $visited, $stack) {
+    $visited->{$u} = 1; my $ns = $g->{$u} // []
+    for my $v (@$ns) { if (!$visited->{$v}) { Kosaraju::dfs1($v, $g, $visited, $stack) } }
+    push @$stack, $u
+}
+fn dfs2($u, $rg, $visited, $comp) {
+    $visited->{$u} = 1; push @$comp, $u; my $ns = $rg->{$u} // []
+    for my $v (@$ns) { if (!$visited->{$v}) { Kosaraju::dfs2($v, $rg, $visited, $comp) } }
+}
+fn solve($names, $g) {
+    my %v1; my @stack
+    for my $u (@$names) { if (!$v1{$u}) { Kosaraju::dfs1($u, $g, \%v1, \@stack) } }
+    my %rg
+    for my $u (@$names) { my $ns = $g->{$u} // []; for my $v (@$ns) { push @{$rg{$v}}, $u } }
+    my %v2; my @sccs
+    while ((len @stack) > 0) {
+        my $u = pop @stack
+        if (!$v2{$u}) { my @comp; Kosaraju::dfs2($u, \%rg, \%v2, \@comp); push @sccs, \@comp }
+    }
+    \@sccs
+}
+
+package main
+
+# --- Basic E2E ---
+my @n1 = ("0", "1", "2", "3", "4")
+my %g1 = ("1"=>["0"], "0"=>["2", "3"], "2"=>["1"], "3"=>["4"])
+my $s1 = Kosaraju::solve \@n1, \%g1
+len(@$s1) |> aeq 3, "scc count 3"
+
+# --- Complete Graph ---
+my @n2 = ("A", "B", "C")
+my %g2 = ("A"=>["B", "C"], "B"=>["A", "C"], "C"=>["A", "B"])
+my $s2 = Kosaraju::solve \@n2, \%g2
+len(@$s2) |> aeq 1, "complete graph scc=1"
+
+# --- Disconnected ---
+my @n3 = ("X", "Y")
+my %g3 = ("X"=>[], "Y"=>[])
+my $s3 = Kosaraju::solve \@n3, \%g3
+len(@$s3) |> aeq 2, "disconnected scc=2"
+
+test_run

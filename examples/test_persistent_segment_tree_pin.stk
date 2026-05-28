@@ -1,0 +1,60 @@
+#!/usr/bin/env stryke
+
+package PersistentSegTree
+
+fn new_node($v, $l, $r) { { val => $v, left => $l, right => $r } }
+
+fn build($arr, $l, $r) {
+    if ($l == $r) { return new_node($arr->[$l], undef, undef) }
+    my $mid = int(($l + $r) / 2)
+    my $lc = PersistentSegTree::build($arr, $l, $mid)
+    my $rc = PersistentSegTree::build($arr, $mid + 1, $r)
+    new_node($lc->{val} + $rc->{val}, $lc, $rc)
+}
+
+fn update($old_node, $l, $r, $idx, $new_val) {
+    if ($l == $r) { return new_node($new_val, undef, undef) }
+    my $mid = int(($l + $r) / 2)
+    my $lc = $old_node->{left}; my $rc = $old_node->{right}
+    if ($idx <= $mid) { $lc = PersistentSegTree::update($lc, $l, $mid, $idx, $new_val) }
+    else { $rc = PersistentSegTree::update($rc, $mid + 1, $r, $idx, $new_val) }
+    new_node($lc->{val} + $rc->{val}, $lc, $rc)
+}
+
+fn query($node, $l, $r, $ql, $qr) {
+    return 0 if !defined $node || $ql > $r || $qr < $l
+    return $node->{val} if $ql <= $l && $r <= $qr
+    my $mid = int(($l + $r) / 2)
+    PersistentSegTree::query($node->{left}, $l, $mid, $ql, $qr) + 
+    PersistentSegTree::query($node->{right}, $mid + 1, $r, $ql, $qr)
+}
+
+package main
+
+# --- Basic Persistence E2E ---
+my @data = (1, 2, 3, 4, 5)
+my $n = len @data
+my $v0 = PersistentSegTree::build \@data, 0, $n - 1
+
+PersistentSegTree::query($v0, 0, $n - 1, 0, 4) |> aeq 15, "v0 sum [0:4]"
+PersistentSegTree::query($v0, 0, $n - 1, 1, 3) |> aeq 9, "v0 sum [1:3]"
+
+# v1: change index 2 from 3 to 10. New sum = 15 - 3 + 10 = 22
+my $v1 = PersistentSegTree::update $v0, 0, $n - 1, 2, 10
+PersistentSegTree::query($v1, 0, $n - 1, 0, 4) |> aeq 22, "v1 sum [0:4]"
+PersistentSegTree::query($v1, 0, $n - 1, 1, 3) |> aeq 16, "v1 sum [1:3]"
+
+# verify v0 still original
+PersistentSegTree::query($v0, 0, $n - 1, 0, 4) |> aeq 15, "v0 still 15"
+
+# v2: change index 0 from 1 to 0 in v1. New sum = 22 - 1 = 21
+my $v2 = PersistentSegTree::update $v1, 0, $n - 1, 0, 0
+PersistentSegTree::query($v2, 0, $n - 1, 0, 4) |> aeq 21, "v2 sum [0:4]"
+PersistentSegTree::query($v1, 0, $n - 1, 0, 4) |> aeq 22, "v1 still 22"
+
+# --- Edge Cases ---
+# single element
+my $v_single = PersistentSegTree::build [42], 0, 0
+PersistentSegTree::query($v_single, 0, 0, 0, 0) |> aeq 42, "single element"
+
+test_run
