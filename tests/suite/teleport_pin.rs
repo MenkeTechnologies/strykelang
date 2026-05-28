@@ -90,7 +90,11 @@ fn fork_teleport_round_trip_via_st_dispatch() {
             "#;
             let got = eval_string(code);
             let _ = std::fs::write(&result_path_for_child, got);
-            std::process::exit(0);
+            // `_exit` over `std::process::exit` in fork children — Rust
+            // runtime cleanup is NOT async-signal-safe, and pre-fork
+            // global state (rayon, channels) hangs forever in
+            // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
+            unsafe { libc::_exit(0) }
         }
         ForkResult::Parent { child } => {
             // Give the child time to parse + execute its eval, reach
@@ -98,7 +102,7 @@ fn fork_teleport_round_trip_via_st_dispatch() {
             // test runtime kills all worker threads in the child;
             // re-initializing the parse pipeline takes noticeably
             // longer than the same code under a fresh `st` invocation.
-            std::thread::sleep(Duration::from_millis(2000));
+            std::thread::sleep(Duration::from_millis(4000));
             let kid_pid = child.as_raw() as i64;
             let code = format!(
                 r#"
@@ -155,7 +159,11 @@ fn fork_teleport_fan_out_to_three_children() {
                 "#;
                 let got = eval_string(code);
                 let _ = std::fs::write(&path, got);
-                std::process::exit(0);
+                // `_exit` over `std::process::exit` in fork children — Rust
+            // runtime cleanup is NOT async-signal-safe, and pre-fork
+            // global state (rayon, channels) hangs forever in
+            // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
+            unsafe { libc::_exit(0) }
             }
             ForkResult::Parent { child } => {
                 children.push(child);
@@ -163,7 +171,7 @@ fn fork_teleport_fan_out_to_three_children() {
         }
     }
 
-    std::thread::sleep(Duration::from_millis(2000));
+    std::thread::sleep(Duration::from_millis(4000));
     let pid_list = children
         .iter()
         .map(|c| c.as_raw().to_string())
@@ -221,7 +229,11 @@ fn fork_teleport_arrayref_pids_with_opts_hash() {
                     defined $msg ? $msg->{tag} : "TIMEOUT"
                 "#;
                 let _ = std::fs::write(&p, eval_string(code));
-                std::process::exit(0);
+                // `_exit` over `std::process::exit` in fork children — Rust
+            // runtime cleanup is NOT async-signal-safe, and pre-fork
+            // global state (rayon, channels) hangs forever in
+            // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
+            unsafe { libc::_exit(0) }
             }
             ForkResult::Parent { child } => {
                 children.push(child);
@@ -229,7 +241,7 @@ fn fork_teleport_arrayref_pids_with_opts_hash() {
         }
     }
 
-    std::thread::sleep(Duration::from_millis(2000));
+    std::thread::sleep(Duration::from_millis(4000));
     let pid_arr = children
         .iter()
         .map(|c| c.as_raw().to_string())
