@@ -1,0 +1,77 @@
+#!/usr/bin/env stryke
+
+package BTree
+
+my $T = 3
+
+fn node_new($leaf) { { keys => [], children => [], leaf => $leaf } }
+
+fn search($node, $k) {
+    my $v1 = 0; my $keys = $node->{keys}
+    while ($v1 < (len @$keys) && $k > $keys->[$v1]) { $v1++ }
+    return $node if $v1 < (len @$keys) && $k == $keys->[$v1]
+    return undef if $node->{leaf}
+    search($node->{children}->[$v1], $k)
+}
+
+fn split_child($parent, $v1) {
+    my $t = $T; my $y = $parent->{children}->[$v1]; my $z = node_new($y->{leaf})
+    my $y_keys = $y->{keys}; my @zk = @$y_keys[$t : 2 * $t - 2]
+    $z->{keys} = [ @zk ]
+    if (!$y->{leaf}) { my $yc = $y->{children}; my @zc = @$yc[$t : 2 * $t - 1]; $z->{children} = [ @zc ] }
+    my $mid_key = $y->{keys}->[$t - 1]
+    my @yk = @$y_keys[0 : $t - 2]; $y->{keys} = [ @yk ]
+    if (!$y->{leaf}) { my $yc = $y->{children}; my @ycn = @$yc[0 : $t - 1]; $y->{children} = [ @ycn ] }
+    splice @{$parent->{children}}, $v1 + 1, 0, $z
+    splice @{$parent->{keys}}, $v1, 0, $mid_key
+}
+
+fn insert_non_full($node, $k) {
+    my $keys = $node->{keys}; my $v1 = (len @$keys) - 1
+    if ($node->{leaf}) {
+        while ($v1 >= 0 && $k < $keys->[$v1]) { $v1-- }
+        splice @$keys, $v1 + 1, 0, $k
+    } else {
+        while ($v1 >= 0 && $k < $keys->[$v1]) { $v1-- }
+        $v1++
+        my $child = $node->{children}->[$v1]
+        if ((len @{$child->{keys}}) == 2 * $T - 1) {
+            split_child($node, $v1)
+            $v1++ if $k > $node->{keys}->[$v1]
+        }
+        insert_non_full($node->{children}->[$v1], $k)
+    }
+}
+
+fn insert($btree, $k) {
+    if (!defined $btree->{root}) { $btree->{root} = node_new(1); push @{$btree->{root}->{keys}}, $k; return }
+    my $root = $btree->{root}
+    if ((len @{$root->{keys}}) == 2 * $T - 1) {
+        my $s = node_new(0); $btree->{root} = $s; $s->{children}->[0] = $root
+        split_child($s, 0); insert_non_full($s, $k)
+    } else { insert_non_full($root, $k) }
+}
+
+fn inorder($node, $out) {
+    return if !defined $node
+    my $keys = $node->{keys}; my $n = len @$keys
+    for (my $v1 = 0; $v1 < $n; $v1++) {
+        inorder($node->{children}->[$v1], $out) if !$node->{leaf}
+        push @$out, $keys->[$v1]
+    }
+    inorder($node->{children}->[$n], $out) if !$node->{leaf}
+}
+
+package main
+
+# --- Basic E2E ---
+my $bt = { root => undef }
+for my $v (10, 20, 5, 6, 12, 30, 7, 17) { BTree::insert($bt, $v) }
+my @vals
+BTree::inorder($bt->{root}, \@vals)
+join(",", @vals) |> aeq "5,6,7,10,12,17,20,30", "inorder sorted"
+
+defined(BTree::search($bt->{root}, 6)) |> aeq 1, "found 6"
+defined(BTree::search($bt->{root}, 15)) |> aeq 0, "not found 15"
+
+test_run

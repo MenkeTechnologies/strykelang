@@ -1,0 +1,74 @@
+#!/usr/bin/env stryke
+
+# fenwick_2d_no_interop.stk — 2D Binary Indexed Tree.
+#
+# Supports point updates and range sum queries on a 2D grid.
+# Time Complexity: O(log N * log M) for both operations.
+#
+# Run: stryke --no-interop examples/fenwick_2d_no_interop.stk
+
+package Fenwick2D
+
+fn new($rows, $cols) {
+    my $tree = []
+    for (0 : $rows) {
+        my $row = []
+        for (0 : $cols) { push @$row, 0 }
+        push @$tree, $row
+    }
+    { tree => $tree, rows => $rows, cols => $cols }
+}
+
+fn update($bit, $r, $c, $val) {
+    my $tree = $bit->{tree}
+    my $rows = $bit->{rows}
+    my $cols = $bit->{cols}
+    
+    # Fenwick indices are 1-based internally
+    for (my $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
+        my $row = $tree->[$i]
+        for (my $j = $c + 1; $j <= $cols; $j += ($j & -$j)) {
+            $row->[$j] += $val
+        }
+    }
+}
+
+fn query($bit, $r, $c) {
+    my $tree = $bit->{tree}
+    my $sum = 0
+    
+    for (my $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
+        my $row = $tree->[$i]
+        for (my $j = $c + 1; $j > 0; $j -= ($j & -$j)) {
+            $sum += $row->[$j]
+        }
+    }
+    $sum
+}
+
+fn query_range($bit, $r1, $c1, $r2, $c2) {
+    my $res = query($bit, $r2, $c2)
+    $res -= query($bit, $r1 - 1, $c2) if $r1 > 0
+    $res -= query($bit, $r2, $c1 - 1) if $c1 > 0
+    $res += query($bit, $r1 - 1, $c1 - 1) if $r1 > 0 && $c1 > 0
+    $res
+}
+
+package main
+
+p "── 2D Fenwick Tree Demo ──"
+
+my $bit = Fenwick2D::new(5, 5)
+
+p "Updating grid: (1,1) += 5, (2,2) += 10, (3,3) += 2"
+Fenwick2D::update($bit, 1, 1, 5)
+Fenwick2D::update($bit, 2, 2, 10)
+Fenwick2D::update($bit, 3, 3, 2)
+
+my $sum = Fenwick2D::query_range($bit, 0, 0, 4, 4)
+p "Sum of grid [0,0] to [4,4]: #{$sum}"
+
+my $sub_sum = Fenwick2D::query_range($bit, 1, 1, 2, 2)
+p "Sum of subgrid [1,1] to [2,2]: #{$sub_sum}"
+
+p "Done."

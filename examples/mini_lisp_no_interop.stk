@@ -123,18 +123,17 @@ fn eval_v($x, $env) {
 
 fn setup_env($env) {
     $env->{vars}->{"+"} = fn { my $s = 0; for my $val (@_) { $s = $s + $val } $s }
-    $env->{vars}->{"-"} = fn { _0 - _1 }
+    $env->{vars}->{"-"} = fn { _ - _1 }
     $env->{vars}->{"*"} = fn { my $p = 1; for my $val (@_) { $p = $p * $val } $p }
     $env->{vars}->{"/"} = fn { _1 == 0 ? 0 : _0 / _1 }
     $env->{vars}->{"="} = fn { _0 == _1 ? 1 : 0 }
-    $env->{vars}->{">"} = fn { _0 > _1 ? 1 : 0 }
-    $env->{vars}->{"<"} = fn { _0 < _1 ? 1 : 0 }
+    $env->{vars}->{">"} = fn { _ > _1 ? 1 : 0 }
+    $env->{vars}->{"<"} = fn { _ < _1 ? 1 : 0 }
     $env->{vars}->{"list"} = fn { \@_ }
     $env->{vars}->{"car"} = fn { _0->[0] }
     $env->{vars}->{"cdr"} = fn {
-        my $ref = _0
-        my $n = len @$ref
-        $n > 1 ? [ @$ref[1 : $n-1] ] : []
+        my $n = len @$_
+        $n > 1 ? [ @{$_}[1 : $n - 1] ] : []
     }
 }
 

@@ -1,0 +1,104 @@
+#!/usr/bin/env stryke
+
+# dinic_no_interop.stk — Dinic's Maximum Flow algorithm.
+#
+# Efficiently finds maximum flow in a network using level graphs and
+# blocking flows.
+# Time Complexity: O(V^2 * E).
+#
+# Run: stryke --no-interop examples/dinic_no_interop.stk
+
+package Dinic
+
+fn bfs($n, $s, $t, $adj, $level) {
+    for (my $v1 = 0; $v1 < $n; $v1++) { $level->[$v1] = -1 }
+    $level->[$s] = 0
+    my @queue = ($s)
+    
+    while ((len @queue) > 0) {
+        my $u = shift @queue
+        my $u_adj = $adj->[$u]
+        my $u_n = len @$u_adj
+        for (my $v1 = 0; $v1 < $u_n; $v1++) {
+            my $edge = $u_adj->[$v1]
+            my $v = $edge->{to}
+            if ($level->[$v] < 0 && $edge->{cap} > $edge->{flow}) {
+                $level->[$v] = $level->[$u] + 1
+                push @queue, $v
+            }
+        }
+    }
+    return $level->[$t] >= 0
+}
+
+fn dfs($u, $t, $flow, $adj, $level, $ptr) {
+    if ($flow == 0 || $u == $t) { return $flow }
+    
+    my $u_adj = $adj->[$u]
+    my $u_n = len @$u_adj
+    for (my $v1 = $ptr->[$u]; $v1 < $u_n; $v1++) {
+        $ptr->[$u] = $v1
+        my $edge = $u_adj->[$v1]
+        my $v = $edge->{to}
+        
+        if ($level->[$v] == $level->[$u] + 1 && $edge->{cap} > $edge->{flow}) {
+            my $pushed = Dinic::dfs($v, $t, min($flow, $edge->{cap} - $edge->{flow}), $adj, $level, $ptr)
+            if ($pushed > 0) {
+                $edge->{flow} += $pushed
+                # Update reverse edge
+                my $rev_idx = $edge->{rev}
+                $adj->[$v]->[$rev_idx]->{flow} -= $pushed
+                return $pushed
+            }
+        }
+    }
+    0
+}
+
+fn solve($n, $s, $t, $adj_orig) {
+    # Transform adj_orig into edge objects with rev links
+    my $adj = []
+    for (my $v1 = 0; $v1 < $n; $v1++) { push @$adj, [] }
+    
+    for (my $u = 0; $u < $n; $u++) {
+        my $u_row = $adj_orig->[$u]
+        my $row_n = len @$u_row
+        for (my $v = 0; $v < $row_n; $v++) {
+            my $cap = $u_row->[$v]
+            if ($cap > 0) {
+                my $u_idx = len @{$adj->[$u]}
+                my $v_idx = len @{$adj->[$v]}
+                push @{$adj->[$u]}, { to => $v, cap => $cap, flow => 0, rev => $v_idx }
+                push @{$adj->[$v]}, { to => $u, cap => 0,   flow => 0, rev => $u_idx }
+            }
+        }
+    }
+    
+    my $max_flow = 0
+    my @level = (0) x $n
+    while (Dinic::bfs($n, $s, $t, $adj, \@level)) {
+        my @ptr = (0) x $n
+        while (my $pushed = Dinic::dfs($s, $t, 1000000000, $adj, \@level, \@ptr)) {
+            $max_flow += $pushed
+        }
+    }
+    $max_flow
+}
+
+package main
+
+p "── Dinic's Max Flow Demo ──"
+
+my $adj = [
+    [0, 16, 13, 0, 0, 0],
+    [0, 0, 10, 12, 0, 0],
+    [0, 4, 0, 0, 14, 0],
+    [0, 0, 9, 0, 0, 20],
+    [0, 0, 0, 7, 0, 4],
+    [0, 0, 0, 0, 0, 0]
+]
+
+my $flow = Dinic::solve(6, 0, 5, $adj)
+p "Max Flow: #{$flow}"
+
+p "Done."

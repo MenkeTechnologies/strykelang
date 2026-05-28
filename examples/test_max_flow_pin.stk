@@ -1,0 +1,78 @@
+#!/usr/bin/env stryke
+
+package MaxFlow
+
+fn ek_bfs($capacity, $n, $s, $t, $parent) {
+    for my $i (0 : $n - 1) { $parent->[$i] = -1 }
+    $parent->[$s] = -2
+    my @queue = ($s)
+    my $head = 0
+    while ($head < len @queue) {
+        my $u = $queue[$head++]
+        my $row = $capacity->[$u]
+        for my $v (0 : $n - 1) {
+            my $cap = $row->[$v] // 0
+            if ($parent->[$v] == -1 && $cap > 0) {
+                $parent->[$v] = $u; return 1 if $v == $t; push @queue, $v
+            }
+        }
+    }
+    0
+}
+
+fn solve($cap_orig, $n, $s, $t) {
+    my $capacity = []
+    for my $i (0 : $n - 1) {
+        my $row = []
+        for my $j (0 : $n - 1) {
+            my $v = $cap_orig->[$i]->[$j] // 0
+            push @$row, int($v)
+        }
+        push @$capacity, $row
+    }
+    my $max_flow = 0; my $parent = []; for (0 : $n-1) { push @$parent, 0 }
+    my $safety = 0
+    while (MaxFlow::ek_bfs($capacity, $n, $s, $t, $parent) && $safety++ < 500) {
+        my $path_flow = 2000000000; my $curr = $t
+        while ($curr != $s) {
+            my $prev = $parent->[$curr]; my $val = $capacity->[$prev]->[$curr]
+            $path_flow = $val if $val < $path_flow; $curr = $prev
+        }
+        $curr = $t
+        while ($curr != $s) {
+            my $prev = $parent->[$curr]
+            $capacity->[$prev]->[$curr] = $capacity->[$prev]->[$curr] - $path_flow
+            $capacity->[$curr]->[$prev] = $capacity->[$curr]->[$prev] + $path_flow
+            $curr = $prev
+        }
+        $max_flow = $max_flow + $path_flow
+    }
+    $max_flow
+}
+
+package main
+
+# --- Basic E2E ---
+my $adj1 = [ [0, 10, 10, 0], [0, 0, 1, 10], [0, 0, 0, 10], [0, 0, 0, 0] ]
+MaxFlow::solve($adj1, 4, 0, 3) |> aeq 20, "max flow 20"
+
+# --- Disconnected ---
+my $adj2 = [ [0, 10, 0, 0], [0, 0, 0, 0], [0, 0, 0, 10], [0, 0, 0, 0] ]
+MaxFlow::solve($adj2, 4, 0, 3) |> aeq 0, "max flow 0 (no path)"
+
+# --- Chain ---
+my $adj3 = [ [0, 10, 0], [0, 0, 5], [0, 0, 0] ]
+MaxFlow::solve($adj3, 3, 0, 2) |> aeq 5, "max flow 5 (bottleneck)"
+
+# --- Complex set ---
+my $adj4 = [
+    [0, 16, 13, 0, 0, 0],
+    [0, 0, 10, 12, 0, 0],
+    [0, 4, 0, 0, 14, 0],
+    [0, 0, 9, 0, 0, 20],
+    [0, 0, 0, 7, 0, 4],
+    [0, 0, 0, 0, 0, 0]
+]
+MaxFlow::solve($adj4, 6, 0, 5) |> aeq 23, "max flow 23 (complex)"
+
+test_run

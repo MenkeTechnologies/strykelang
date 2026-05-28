@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+
+package Fenwick2D
+
+fn new($rows, $cols) {
+    my $tree = []
+    for (0 : $rows) {
+        my $row = []
+        for (0 : $cols) { push @$row, 0 }
+        push @$tree, $row
+    }
+    { tree => $tree, rows => $rows, cols => $cols }
+}
+
+fn update($bit, $r, $c, $val) {
+    my $tree = $bit->{tree}; my $rows = $bit->{rows}; my $cols = $bit->{cols}
+    for (my $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
+        my $row = $tree->[$i]
+        for (my $j = $c + 1; $j <= $cols; $j += ($j & -$j)) { $row->[$j] += $val }
+    }
+}
+
+fn query($bit, $r, $c) {
+    my $tree = $bit->{tree}; my $sum = 0
+    for (my $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
+        my $row = $tree->[$i]
+        for (my $j = $c + 1; $j > 0; $j -= ($j & -$j)) { $sum += $row->[$j] }
+    }
+    $sum
+}
+
+fn query_range($bit, $r1, $c1, $r2, $c2) {
+    my $res = query($bit, $r2, $c2)
+    $res -= query($bit, $r1 - 1, $c2) if $r1 > 0
+    $res -= query($bit, $r2, $c1 - 1) if $c1 > 0
+    $res += query($bit, $r1 - 1, $c1 - 1) if $r1 > 0 && $c1 > 0
+    $res
+}
+
+package main
+
+# --- Basic E2E ---
+my $bit = Fenwick2D::new(10, 10)
+Fenwick2D::update($bit, 2, 2, 5)
+Fenwick2D::update($bit, 5, 5, 10)
+Fenwick2D::query_range($bit, 0, 0, 9, 9) |> aeq 15, "full range sum"
+Fenwick2D::query_range($bit, 2, 2, 2, 2) |> aeq 5, "point query"
+Fenwick2D::query_range($bit, 3, 3, 4, 4) |> aeq 0, "empty subgrid"
+Fenwick2D::query_range($bit, 0, 0, 5, 5) |> aeq 15, "partial overlap sum"
+
+# --- Overlap test ---
+Fenwick2D::update($bit, 2, 5, 3)
+Fenwick2D::query_range($bit, 2, 2, 5, 5) |> aeq 18, "subgrid with 3 points"
+
+test_run

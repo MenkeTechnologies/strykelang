@@ -67,6 +67,7 @@ fn setup_env($env) {
     $env->{vars}->{"-"} = fn { _0 - _1 }
     $env->{vars}->{"*"} = fn { my $p = 1; for (@_) { $p = $p * _ } $p }
     $env->{vars}->{"="} = fn { _0 == _1 ? 1 : 0 }
+    $env->{vars}->{">"} = fn { _0 > _1 ? 1 : 0 }
 }
 
 package main

@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+package Manacher
+
+fn solve($s) {
+    my $t = "#"; my $n = len $s
+    for my $i (0 : $n - 1) { $t = $t . $s[$i] . "#" }
+    my $m = len $t; my @p = (0) x $m; my $c = 0; my $r = 0
+    for my $i (0 : $m - 1) {
+        my $mirr = 2 * $c - $i
+        $p[$i] = min($r - $i, $p[$mirr]) if $i < $r
+        my $v1 = $i + (1 + $p[$i]); my $v2 = $i - (1 + $p[$i])
+        while ($v1 < $m && $v2 >= 0 && $t[$v1] eq $t[$v2]) { $p[$i]++; $v1++; $v2-- }
+        if ($i + $p[$i] > $r) { $c = $i; $r = $i + $p[$i] }
+    }
+    my $max_r = 0; my $best_c = 0
+    for my $i (0 : $m - 1) { if ($p[$i] > $max_r) { $max_r = $p[$i]; $best_c = $i } }
+    my $start = int(($best_c - $max_r) / 2)
+    substr($s, $start, $max_r)
+}
+
+package main
+
+# --- Basic E2E ---
+Manacher::solve("babad") |> aeq "bab", "babad -> bab" # or "aba"
+Manacher::solve("cbbd")  |> aeq "bb",  "cbbd -> bb"
+Manacher::solve("a")     |> aeq "a",   "single char"
+Manacher::solve("ac")    |> aeq "a",   "two unique" # or "c"
+Manacher::solve("racecar") |> aeq "racecar", "odd palindrome"
+Manacher::solve("noon")    |> aeq "noon", "even palindrome"
+
+# --- Stress: 500 chars ---
+my $s = "a" x 500
+Manacher::solve($s) |> aeq $s, "all same 500"
+
+test_run

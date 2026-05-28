@@ -1,0 +1,66 @@
+#!/usr/bin/env stryke
+
+package Dinic
+
+fn bfs($n, $s, $t, $adj, $level) {
+    for (my $v1 = 0; $v1 < $n; $v1++) { $level->[$v1] = -1 }
+    $level->[$s] = 0; my @q = ($s)
+    while ((len @q) > 0) {
+        my $u = shift @q; my $ua = $adj->[$u]; my $un = len @$ua
+        for (my $v1 = 0; $v1 < $un; $v1++) {
+            my $e = $ua->[$v1]; my $v = $e->{to}
+            if ($level->[$v] < 0 && $e->{cap} > $e->{flow}) {
+                $level->[$v] = $level->[$u] + 1; push @q, $v
+            }
+        }
+    }
+    return $level->[$t] >= 0
+}
+
+fn dfs($u, $t, $flow, $adj, $level, $ptr) {
+    return $flow if $flow == 0 || $u == $t
+    my $ua = $adj->[$u]; my $un = len @$ua
+    for (my $v1 = $ptr->[$u]; $v1 < $un; $v1++) {
+        $ptr->[$u] = $v1; my $e = $ua->[$v1]; my $v = $e->{to}
+        if ($level->[$v] == $level->[$u] + 1 && $e->{cap} > $e->{flow}) {
+            my $pushed = Dinic::dfs($v, $t, min($flow, $e->{cap} - $e->{flow}), $adj, $level, $ptr)
+            if ($pushed > 0) {
+                $e->{flow} += $pushed; my $ri = $e->{rev}; $adj->[$v]->[$ri]->{flow} -= $pushed; return $pushed
+            }
+        }
+    }
+    0
+}
+
+fn solve($n, $s, $t, $adj_orig) {
+    my $adj = []; for (0:$n-1) { push @$adj, [] }
+    for (my $u = 0; $u < $n; $u++) {
+        my $ur = $adj_orig->[$u]; my $rn = len @$ur
+        for (my $v = 0; $v < $rn; $v++) {
+            my $cap = $ur->[$v]
+            if ($cap > 0) {
+                my $ui = len @{$adj->[$u]}; my $vi = len @{$adj->[$v]}
+                push @{$adj->[$u]}, { to => $v, cap => $cap, flow => 0, rev => $vi }
+                push @{$adj->[$v]}, { to => $u, cap => 0,   flow => 0, rev => $ui }
+            }
+        }
+    }
+    my $max_flow = 0; my @level = (0) x $n
+    while (Dinic::bfs($n, $s, $t, $adj, \@level)) {
+        my @ptr = (0) x $n
+        while (my $pushed = Dinic::dfs($s, $t, 2000000000, $adj, \@level, \@ptr)) { $max_flow += $pushed }
+    }
+    $max_flow
+}
+
+package main
+
+# --- Basic E2E ---
+my $adj1 = [ [0, 10, 10, 0], [0, 0, 1, 10], [0, 0, 0, 10], [0, 0, 0, 0] ]
+Dinic::solve(4, 0, 3, $adj1) |> aeq 20, "max flow 20"
+
+# --- Disconnected ---
+my $adj2 = [ [0, 10, 0, 0], [0, 0, 0, 0], [0, 0, 0, 10], [0, 0, 0, 0] ]
+Dinic::solve(4, 0, 3, $adj2) |> aeq 0, "max flow 0"
+
+test_run
