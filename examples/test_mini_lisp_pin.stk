@@ -64,10 +64,10 @@ fn eval_v($x, $env) {
 
 fn setup_env($env) {
     $env->{vars}->{"+"} = fn { my $s = 0; for (@_) { $s = $s + _ } $s }
-    $env->{vars}->{"-"} = fn { _0 - _1 }
+    $env->{vars}->{"-"} = fn { _ - _1 }
     $env->{vars}->{"*"} = fn { my $p = 1; for (@_) { $p = $p * _ } $p }
-    $env->{vars}->{"="} = fn { _0 == _1 ? 1 : 0 }
-    $env->{vars}->{">"} = fn { _0 > _1 ? 1 : 0 }
+    $env->{vars}->{"="} = fn { _ == _1 ? 1 : 0 }
+    $env->{vars}->{">"} = fn { _ > _1 ? 1 : 0 }
 }
 
 package main

@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+# dpll_sat_no_interop.stk — Davis-Putnam-Logemann-Loveland SAT solver.
+#
+# Solves the Boolean satisfiability problem for formulas in CNF.
+#
+# Run: stryke --no-interop examples/dpll_sat_no_interop.stk
+
+package DPLL
+
+fn simplify($clauses, $literal) {
+    my @new_clauses
+    for my $clause (@$clauses) {
+        my $keep = 1
+        my @new_clause
+        for my $l_val (@$clause) {
+            if ($l_val == $literal) {
+                $keep = 0; last
+            } elsif ($l_val == -$literal) {
+                # drop
+            } else {
+                push @new_clause, $l_val
+            }
+        }
+        push @new_clauses, \@new_clause if $keep
+    }
+    \@new_clauses
+}
+
+fn solve($clauses, $assignment) {
+    return $assignment if (len @$clauses) == 0
+    for my $clause (@$clauses) { return undef if (len @$clause) == 0 }
+    
+    for my $clause (@$clauses) {
+        if ((len @$clause) == 1) {
+            my $l_val = $clause->[0]
+            my $new_assignment = { %$assignment }
+            $new_assignment->{abs($l_val)} = ($l_val > 0 ? 1 : 0)
+            my $new_clauses = DPLL::simplify($clauses, $l_val)
+            return DPLL::solve($new_clauses, $new_assignment)
+        }
+    }
+    
+    my $first_clause = $clauses->[0]
+    my $l_val = $first_clause->[0]
+    my $var = abs($l_val)
+    
+    my $assign_t = { %$assignment }; $assign_t->{$var} = 1
+    my $res_t = DPLL::solve(DPLL::simplify($clauses, $var), $assign_t)
+    return $res_t if defined $res_t
+    
+    my $assign_f = { %$assignment }; $assign_f->{$var} = 0
+    return DPLL::solve(DPLL::simplify($clauses, -$var), $assign_f)
+}
+
+package main
+
+p "── DPLL SAT Solver Demo ──"
+# (x1 OR x2) AND (-x1 OR x2) AND (x1 OR -x2) AND (-x1 OR -x2) -> unsatisfiable
+my $unsat = [[1, 2], [-1, 2], [1, -2], [-1, -2]]
+my $res1 = DPLL::solve($unsat, {})
+p "Unsat test: #{defined $res1 ? 'FAIL' : 'PASS'}"
+
+# (x1 OR -x2) AND (-x1 OR x2 OR x3) AND (-x3) -> x3=0, x1=x2
+my $sat = [[1, -2], [-1, 2, 3], [-3]]
+my $res2 = DPLL::solve($sat, {})
+p "Sat test: #{defined $res2 ? 'PASS' : 'FAIL'}"
+if (defined $res2) {
+    for my $k (keys %$res2 |> sort) {
+        p "  x#{$k} = #{$res2->{$k}}"
+    }
+}
+p "Done."
