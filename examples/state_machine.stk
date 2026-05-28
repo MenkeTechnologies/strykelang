@@ -41,7 +41,7 @@ fn Demo::FSM::transition($from, $event, $ctx) {
     return undef unless exists $transitions{$from}
     return undef unless exists $transitions{$from}->{$event}
     my $rule = $transitions{$from}->{$event}
-    return undef unless $rule->{guard}->($ctx)
+    return undef unless $rule->{guard}($ctx)
     $rule->{to}
 }
 

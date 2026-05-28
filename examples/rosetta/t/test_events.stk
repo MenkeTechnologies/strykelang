@@ -17,7 +17,7 @@ fn Rosetta::Events::on($emitter, $event, $callback) {
 fn Rosetta::Events::emit($emitter, $event, $data) {
     if (exists $emitter->{listeners}->{$event}) {
         for my $cb (@{$emitter->{listeners}->{$event}}) {
-            $cb->($data)
+            $cb($data)
         }
     }
 }

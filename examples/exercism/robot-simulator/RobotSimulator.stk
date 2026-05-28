@@ -13,6 +13,6 @@ fn Exercism::RobotSimulator::advance($r)    { $r->{x} += $_D{$r->{direction}}[0]
 
 fn Exercism::RobotSimulator::execute($r, $cmds) {
     my %do = (R => \&Exercism::RobotSimulator::turn_right, L => \&Exercism::RobotSimulator::turn_left, A => \&Exercism::RobotSimulator::advance)
-    $do{_}->($r) for chars($cmds)
+    $do{_}($r) for chars($cmds)
     $r
 }

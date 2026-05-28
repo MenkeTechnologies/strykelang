@@ -34,7 +34,7 @@ fn EE::emit($ee, $event, $payload) {
     my $count = 0
     my @kept = ()
     for my $l (@ls) {
-        $l->{cb}->($payload)
+        $l->{cb}($payload)
         $count = $count + 1
         if (exists $ee->{once}->{$l->{id}}) {
             delete $ee->{once}->{$l->{id}}

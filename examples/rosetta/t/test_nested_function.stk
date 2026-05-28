@@ -16,7 +16,7 @@ fn Rosetta::Nested::make_adder($x) {
 }
 
 fn Rosetta::Nested::compose($f, $g) {
-    fn ($x) { $f->($g->($x)) }
+    fn ($x) { $f($g($x)) }
 }
 
 fn Rosetta::Nested::wrap($base) {
@@ -30,35 +30,35 @@ fn Rosetta::Nested::wrap($base) {
 
 # Counter starts at 0 → 1, 2, 3 …
 my $c = Rosetta::Nested::make_counter(0)
-assert_eq $c->(), 1, "first call"
-assert_eq $c->(), 2, "second call"
-assert_eq $c->(), 3, "third call"
+assert_eq $c(), 1, "first call"
+assert_eq $c(), 2, "second call"
+assert_eq $c(), 3, "third call"
 
 # Independent counters do not share state
 my $c2 = Rosetta::Nested::make_counter(100)
-assert_eq $c2->(), 101, "independent counter"
-assert_eq $c2->(), 102, "independent #2"
-assert_eq $c->(),  4,   "original still incrementing"
+assert_eq $c2(), 101, "independent counter"
+assert_eq $c2(), 102, "independent #2"
+assert_eq $c(),  4,   "original still incrementing"
 
 # Adder factory
 my $add5 = Rosetta::Nested::make_adder(5)
-assert_eq $add5->(3), 8, "add5(3) = 8"
-assert_eq $add5->(7), 12, "add5(7) = 12"
+assert_eq $add5(3), 8, "add5(3) = 8"
+assert_eq $add5(7), 12, "add5(7) = 12"
 
 # Compose
 my $double = fn ($x) { $x * 2 }
 my $inc    = fn ($x) { $x + 1 }
 my $f = Rosetta::Nested::compose($double, $inc)    # double(inc(x)) = (x+1)*2
-assert_eq $f->(3), 8,  "(3+1)*2 = 8"
-assert_eq $f->(0), 2,  "(0+1)*2 = 2"
+assert_eq $f(3), 8,  "(3+1)*2 = 8"
+assert_eq $f(0), 2,  "(0+1)*2 = 2"
 
 # Wrapped state with multiple closures sharing the same `log`
 my $wrap = Rosetta::Nested::wrap()
-$wrap->{record}->("a")
-$wrap->{record}->("b")
-$wrap->{record}->("c")
+$wrap->{record}("a")
+$wrap->{record}("b")
+$wrap->{record}("c")
 # Calling all() through closure returns a flat list — collect via array
-my @rec = ($wrap->{all}->())
+my @rec = ($wrap->{all}())
 assert_ok len(@rec) == 3 || $rec[0] == 3, "shared log accumulated 3 entries"
 
 # Pipe form

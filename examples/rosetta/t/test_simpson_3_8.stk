@@ -4,11 +4,11 @@
 fn Rosetta::Simpson38::integrate($f, $a, $b, $n) {
     return undef if $n <= 0 || $n % 3 != 0
     my $h = ($b - $a) / $n
-    my $sum = $f->($a) + $f->($b)
+    my $sum = $f($a) + $f($b)
     for my $i (1:$n - 1) {
         my $x = $a + $i * $h
         my $w = ($i % 3 == 0) ? 2 : 3
-        $sum += $w * $f->($x)
+        $sum += $w * $f($x)
     }
     3 * $h / 8 * $sum
 }

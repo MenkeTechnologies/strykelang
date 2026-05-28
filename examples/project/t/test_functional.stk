@@ -32,14 +32,14 @@ assert_eq $zipped[2]->[0], 3, "zip 2-0"
 
 # ── Fn::curry2 ─────────────────────────────────────────────────────────
 my $c_add = Fn::curry2($add)
-my $add10 = $c_add->(10)
-assert_eq $add10->(5), 15, "curried add"
+my $add10 = $c_add(10)
+assert_eq $add10(5), 15, "curried add"
 
 # ── Fn::flip ───────────────────────────────────────────────────────────
 my $sub = fn ($x, $y) { $x - $y }
 my $f_sub = Fn::flip($sub)
-assert_eq $sub->(10, 3), 7, "normal sub"
-assert_eq $f_sub->(10, 3), -7, "flipped sub (3 - 10)"
+assert_eq $sub(10, 3), 7, "normal sub"
+assert_eq $f_sub(10, 3), -7, "flipped sub (3 - 10)"
 
 # ── Fn::partition ──────────────────────────────────────────────────────
 my $res = Fn::partition($is_even, 1, 2, 3, 4, 5, 6)

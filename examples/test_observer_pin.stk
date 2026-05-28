@@ -20,7 +20,7 @@ fn Pubsub::publish($bus, $topic, $msg) {
     my $count = 0
     if (exists $bus->{subs}{$topic}) {
         for my $cb (values %{$bus->{subs}{$topic}}) {
-            $cb->($msg)
+            $cb($msg)
             $count++
         }
     }
@@ -82,7 +82,7 @@ Pubsub::publish_all($bus, "broadcast") > 0 |> aok "publish_all delivered"
 
 # Filtered subscribe via wrapper
 fn Pubsub::subscribe_where($bus, $topic, $pred, $cb) {
-    Pubsub::subscribe($bus, $topic, fn($m) { $cb->($m) if $pred->($m) })
+    Pubsub::subscribe($bus, $topic, fn($m) { $cb($m) if $pred($m) })
 }
 
 my $bus2 = Pubsub::new()

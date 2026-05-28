@@ -6,7 +6,7 @@ fn Rosetta::JensensDevice::sum($n, $term_func) {
     my $total = 0
     for (my $i = 1; $i <= $n; $i++) {
         # The term_func is a closure that may depend on external state
-        $total += $term_func->($i)
+        $total += $term_func($i)
     }
     $total
 }

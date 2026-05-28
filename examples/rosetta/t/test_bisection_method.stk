@@ -5,16 +5,16 @@ fn Rosetta::BisectionMethod::solve($f, $a, $b) {
     my $tol = 0.0001
     
     my $c = ($a + $b) / 2
-    my $y_c = $f->($c)
+    my $y_c = $f($c)
     
     while (abs($y_c) > $tol) {
-        if ($f->($a) * $y_c < 0) {
+        if ($f($a) * $y_c < 0) {
             $b = $c
         } else {
             $a = $c
         }
         $c = ($a + $b) / 2
-        $y_c = $f->($c)
+        $y_c = $f($c)
     }
     
     $c

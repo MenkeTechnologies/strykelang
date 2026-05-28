@@ -9,10 +9,10 @@ fn Rosetta::Orient::orient($a, $b, $c) {
 }
 
 # Counter-clockwise triangle
-assert_eq Rosetta::Orient::orient([0,0], [1,0], [0,1]), 1, "(0,0)->(1,0)->(0,1) is CCW"
+assert_eq Rosetta::Orient::orient([0,0], [1,0], [0,1]), 1, "(0,0)(1,0)(0,1) is CCW"
 
 # Clockwise triangle
-assert_eq Rosetta::Orient::orient([0,0], [0,1], [1,0]), -1, "(0,0)->(0,1)->(1,0) is CW"
+assert_eq Rosetta::Orient::orient([0,0], [0,1], [1,0]), -1, "(0,0)(0,1)(1,0) is CW"
 
 # Collinear
 assert_eq Rosetta::Orient::orient([0,0], [1,1], [2,2]), 0, "collinear diagonal"

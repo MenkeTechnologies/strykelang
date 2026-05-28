@@ -7,38 +7,38 @@
 fn Rosetta::Integrate::rect_left($f, $a, $b, $n) {
     my $h = ($b - $a) / $n
     my $s = 0
-    for my $i (~> 0:$n - 1) { $s += $f->($a + $i * $h) }
+    for my $i (~> 0:$n - 1) { $s += $f($a + $i * $h) }
     $s * $h
 }
 
 fn Rosetta::Integrate::rect_right($f, $a, $b, $n) {
     my $h = ($b - $a) / $n
     my $s = 0
-    for my $i (~> 1:$n) { $s += $f->($a + $i * $h) }
+    for my $i (~> 1:$n) { $s += $f($a + $i * $h) }
     $s * $h
 }
 
 fn Rosetta::Integrate::midpoint($f, $a, $b, $n) {
     my $h = ($b - $a) / $n
     my $s = 0
-    for my $i (~> 0:$n - 1) { $s += $f->($a + ($i + 0.5) * $h) }
+    for my $i (~> 0:$n - 1) { $s += $f($a + ($i + 0.5) * $h) }
     $s * $h
 }
 
 fn Rosetta::Integrate::trapezoid($f, $a, $b, $n) {
     my $h = ($b - $a) / $n
-    my $s = 0.5 * ($f->($a) + $f->($b))
-    for my $i (~> 1:$n - 1) { $s += $f->($a + $i * $h) }
+    my $s = 0.5 * ($f($a) + $f($b))
+    for my $i (~> 1:$n - 1) { $s += $f($a + $i * $h) }
     $s * $h
 }
 
 fn Rosetta::Integrate::simpson($f, $a, $b, $n) {
     return undef if $n % 2 != 0
     my $h = ($b - $a) / $n
-    my $s = $f->($a) + $f->($b)
+    my $s = $f($a) + $f($b)
     for my $i (~> 1:$n - 1) {
         my $coeff = ($i % 2 == 1) ? 4 : 2
-        $s += $coeff * $f->($a + $i * $h)
+        $s += $coeff * $f($a + $i * $h)
     }
     $s * $h / 3
 }

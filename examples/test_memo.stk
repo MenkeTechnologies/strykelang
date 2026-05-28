@@ -1,1 +1,1 @@
-my $m = memoize(fn { 1 }); p $m->()
+my $m = memoize(fn { 1 }); p $m()

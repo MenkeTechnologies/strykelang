@@ -43,7 +43,7 @@ fn Demo::Bus::emit($topic, $payload) {
         if (Demo::Bus::pattern_matches($pat, $topic)) {
             push @matched, $pat
             for my $handler (@{$subs{$pat}}) {
-                $handler->($topic, $payload)
+                $handler($topic, $payload)
                 $handler_calls++
             }
         }

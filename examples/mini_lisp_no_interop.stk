@@ -115,7 +115,7 @@ fn eval_v($x, $env) {
         return eval_v $proc->{body}, $new_e
     } else {
         # Builtin application (proc is a code ref)
-        return $proc->(@args)
+        return $proc(@args)
     }
 }
 

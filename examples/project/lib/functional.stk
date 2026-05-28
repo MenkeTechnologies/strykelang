@@ -3,7 +3,7 @@
 # ── Fn::every: returns true if all elements satisfy the predicate ─────
 fn Fn::every($pred, @list) {
     for my $item (@list) {
-        return 0 unless $pred->($item)
+        return 0 unless $pred($item)
     }
     1
 }
@@ -11,7 +11,7 @@ fn Fn::every($pred, @list) {
 # ── Fn::some: returns true if at least one element satisfies the predicate ─────
 fn Fn::some($pred, @list) {
     for my $item (@list) {
-        return 1 if $pred->($item)
+        return 1 if $pred($item)
     }
     0
 }
@@ -20,7 +20,7 @@ fn Fn::some($pred, @list) {
 fn Fn::reduce($func, $initial, @list) {
     my $acc = $initial
     for my $item (@list) {
-        $acc = $func->($acc, $item)
+        $acc = $func($acc, $item)
     }
     $acc
 }
@@ -39,7 +39,7 @@ fn Fn::zip(\@a, \@b) {
 fn Fn::curry2($f) {
     fn ($a) {
         fn ($b) {
-            $f->($a, $b)
+            $f($a, $b)
         }
     }
 }
@@ -47,7 +47,7 @@ fn Fn::curry2($f) {
 # ── Fn::flip: flips the first two arguments of a function ─────
 fn Fn::flip($f) {
     fn ($a, $b) {
-        $f->($b, $a)
+        $f($b, $a)
     }
 }
 
@@ -56,7 +56,7 @@ fn Fn::partition($pred, @list) {
     my $t = [];
     my $f = [];
     ~> @list ep {
-        if ($pred->(_)) {
+        if ($pred(_)) {
             push @$t, _;
         } else {
             push @$f, _;
@@ -73,7 +73,7 @@ fn Fn::pluck($key, @list) {
 # ── Fn::find: returns the first element satisfying the predicate ─────
 fn Fn::find($pred, @list) {
     for my $item (@list) {
-        return $item if $pred->($item)
+        return $item if $pred($item)
     }
     undef
 }

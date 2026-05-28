@@ -103,8 +103,8 @@ join(",", map { $_->{v} } @byn) |> aeq "1,2,3", "sort by n"
 
 # ── pipeline reuse ──────────────────────────────────────────────────────
 my $process = fn { $_ |> uc |> rev }
-$process->("abc") |> aeq "CBA", "fn-wrapped pipeline"
-$process->("xy")  |> aeq "YX",  "fn-wrapped pipeline 2"
+$process("abc") |> aeq "CBA", "fn-wrapped pipeline"
+$process("xy")  |> aeq "YX",  "fn-wrapped pipeline 2"
 
 # ── max-min in pipeline ─────────────────────────────────────────────────
 (7, 2, 9, 4, 1, 8) |> max |> aeq 9, "max"

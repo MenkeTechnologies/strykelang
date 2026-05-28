@@ -6,7 +6,7 @@ fn Rosetta::Golden::min($f, $a, $b, $eps) {
     my $c = $b - $phi * ($b - $a)
     my $d = $a + $phi * ($b - $a)
     while (abs($b - $a) > $eps) {
-        if ($f->($c) < $f->($d)) {
+        if ($f($c) < $f($d)) {
             $b = $d
         } else {
             $a = $c
@@ -18,7 +18,7 @@ fn Rosetta::Golden::min($f, $a, $b, $eps) {
 }
 
 fn Rosetta::Golden::max($f, $a, $b, $eps) {
-    Rosetta::Golden::min(fn { -$f->(_) }, $a, $b, $eps)
+    Rosetta::Golden::min(fn { -$f(_) }, $a, $b, $eps)
 }
 
 fn Rosetta::Golden::close($x, $y, $eps) { abs($x - $y) < $eps }

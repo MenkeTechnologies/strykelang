@@ -7,7 +7,7 @@ fn Exercism::Newsletter::read_emails($text) = [grep { len($_) > 0 } map { $_ =~ 
 # email; on `"ok"` return, append to `log` arrayref.
 fn Exercism::Newsletter::send_newsletter($emails, $log, $send_fn) {
     for my $e (@{$emails}) {
-        push @{$log}, $e if $send_fn->($e) eq "ok"
+        push @{$log}, $e if $send_fn($e) eq "ok"
     }
     $log
 }

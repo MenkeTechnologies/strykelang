@@ -3,8 +3,8 @@
 # Collection / array / hash operations.
 
 fn Coll::partition($pred, @xs) {
-    my @t = grep { $pred->(_) } @xs
-    my @f = grep { !$pred->(_) } @xs
+    my @t = grep { $pred(_) } @xs
+    my @f = grep { !$pred(_) } @xs
     (\@t, \@f)
 }
 
@@ -48,7 +48,7 @@ fn Coll::flatten($ref) {
 fn Coll::group_by($keyfn, @xs) {
     my %g
     for my $x (@xs) {
-        my $k = $keyfn->($x)
+        my $k = $keyfn($x)
         $g{$k} ||= []
         push @{$g{$k}}, $x
     }
@@ -57,7 +57,7 @@ fn Coll::group_by($keyfn, @xs) {
 
 fn Coll::count_if($pred, @xs) {
     my $n = 0
-    $pred->(_) && $n++ for @xs
+    $pred(_) && $n++ for @xs
     $n
 }
 

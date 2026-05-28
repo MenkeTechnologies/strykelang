@@ -7,7 +7,7 @@
 fn Rosetta::Visitor::accept($node, $visitor) {
     my $kind = $node->{kind}
     return undef unless exists $visitor->{$kind}
-    $visitor->{$kind}->($node, $visitor)
+    $visitor->{$kind}($node, $visitor)
 }
 
 fn Rosetta::Visitor::sum_visitor() {

@@ -20,7 +20,7 @@ fn Rosetta::Unbias::unbiased($p) {
 fn Rosetta::Unbias::frequency($coin_fn, $trials) {
     my $heads = 0
     for my $i (~> 1:$trials) {
-        $heads++ if $coin_fn->()
+        $heads++ if $coin_fn()
     }
     $heads / $trials
 }
