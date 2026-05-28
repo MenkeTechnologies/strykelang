@@ -314,3 +314,196 @@ fn constant_name_of(e: &crate::ast::Expr) -> Option<String> {
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{Expr, ExprKind, Statement, StmtKind};
+
+    fn expr(kind: ExprKind) -> Expr {
+        Expr { kind, line: 1 }
+    }
+
+    fn pkg_stmt(name: &str) -> Statement {
+        Statement::new(
+            StmtKind::Package {
+                name: name.to_string(),
+            },
+            1,
+        )
+    }
+
+    // ─── format_sub_signature ────────────────────────────────────────────
+
+    #[test]
+    fn format_sub_signature_no_params_returns_bare_name() {
+        assert_eq!(format_sub_signature("foo", &[]), "foo");
+    }
+
+    #[test]
+    fn format_sub_signature_scalar_array_hash_sigils() {
+        let params = vec![
+            SubSigParam::Scalar("a".into(), None, None),
+            SubSigParam::Array("xs".into(), None),
+            SubSigParam::Hash("h".into(), None),
+        ];
+        assert_eq!(format_sub_signature("f", &params), "f($a, @xs, %h)");
+    }
+
+    #[test]
+    fn format_sub_signature_destructure_placeholders() {
+        let params = vec![
+            SubSigParam::ArrayDestruct(vec![]),
+            SubSigParam::HashDestruct(vec![]),
+        ];
+        // Destructure params are rendered as ellipsis placeholders.
+        assert_eq!(format_sub_signature("g", &params), "g([…], {…})");
+    }
+
+    // ─── derive_module_title ─────────────────────────────────────────────
+
+    #[test]
+    fn derive_module_title_prefers_first_package_declaration() {
+        let prog = Program {
+            statements: vec![pkg_stmt("My::Mod"), pkg_stmt("Other")],
+        };
+        assert_eq!(derive_module_title("/tmp/x.stk", &prog), "My::Mod");
+    }
+
+    #[test]
+    fn derive_module_title_falls_back_to_file_stem() {
+        let prog = Program { statements: vec![] };
+        assert_eq!(derive_module_title("/tmp/my_file.stk", &prog), "my_file");
+    }
+
+    #[test]
+    fn derive_module_title_no_extension_uses_full_basename() {
+        let prog = Program { statements: vec![] };
+        assert_eq!(derive_module_title("/tmp/Makefile", &prog), "Makefile");
+    }
+
+    // ─── extract_doc_above ───────────────────────────────────────────────
+
+    #[test]
+    fn extract_doc_above_picks_up_consecutive_hash_hash_lines() {
+        let src = vec!["## line one", "## line two", "fn foo {}"];
+        // decl is on line 3 (1-based) → walks up from line 2.
+        let r = extract_doc_above(&src, 3);
+        assert_eq!(r, "line one\nline two");
+    }
+
+    #[test]
+    fn extract_doc_above_stops_at_non_doc_line() {
+        let src = vec!["## kept", "fn bar {}", "## not for next", "fn foo {}"];
+        let r = extract_doc_above(&src, 4);
+        // Line 3 is "## not for next", line 2 is `fn bar {}` → only line 3 collected.
+        assert_eq!(r, "not for next");
+    }
+
+    #[test]
+    fn extract_doc_above_returns_empty_when_decl_is_line_one() {
+        // Nothing above line 1; helper guards against decl_line < 2.
+        assert_eq!(extract_doc_above(&["fn foo {}"], 1), "");
+    }
+
+    #[test]
+    fn extract_doc_above_bare_double_hash_yields_blank_line() {
+        let src = vec!["## first", "##", "## third", "fn foo {}"];
+        let r = extract_doc_above(&src, 4);
+        assert_eq!(r, "first\n\nthird");
+    }
+
+    // ─── leading_module_doc ──────────────────────────────────────────────
+
+    #[test]
+    fn leading_module_doc_collects_top_block() {
+        let src = vec!["## module doc", "## second line", "", "fn x {}"];
+        assert_eq!(
+            leading_module_doc(&src),
+            Some("module doc\nsecond line".into())
+        );
+    }
+
+    #[test]
+    fn leading_module_doc_skips_shebang() {
+        let src = vec!["#!/usr/bin/env stryke", "## after shebang", "", "fn x {}"];
+        assert_eq!(leading_module_doc(&src), Some("after shebang".into()));
+    }
+
+    #[test]
+    fn leading_module_doc_returns_none_if_starts_with_code() {
+        let src = vec!["fn x {}", "## not module doc"];
+        assert!(leading_module_doc(&src).is_none());
+    }
+
+    // ─── extract_constant_names / constant_name_of ───────────────────────
+
+    #[test]
+    fn extract_constant_names_from_list_takes_keys_only() {
+        // `use constant ( FOO => 1, BAR => 2 )` → ["FOO", "BAR"]
+        let imports = vec![expr(ExprKind::List(vec![
+            expr(ExprKind::Bareword("FOO".into())),
+            expr(ExprKind::Integer(1)),
+            expr(ExprKind::Bareword("BAR".into())),
+            expr(ExprKind::Integer(2)),
+        ]))];
+        assert_eq!(extract_constant_names(&imports), vec!["FOO", "BAR"]);
+    }
+
+    #[test]
+    fn extract_constant_names_from_hashref_takes_keys() {
+        let imports = vec![expr(ExprKind::HashRef(vec![
+            (
+                expr(ExprKind::String("PI".into())),
+                expr(ExprKind::Float(3.14)),
+            ),
+            (
+                expr(ExprKind::Bareword("E".into())),
+                expr(ExprKind::Float(2.71)),
+            ),
+        ]))];
+        assert_eq!(extract_constant_names(&imports), vec!["PI", "E"]);
+    }
+
+    #[test]
+    fn constant_name_of_only_accepts_string_or_bareword() {
+        assert_eq!(
+            constant_name_of(&expr(ExprKind::String("X".into()))),
+            Some("X".into())
+        );
+        assert_eq!(
+            constant_name_of(&expr(ExprKind::Bareword("Y".into()))),
+            Some("Y".into())
+        );
+        // Integer is not a name → None.
+        assert_eq!(constant_name_of(&expr(ExprKind::Integer(7))), None);
+    }
+
+    // ─── generate_markdown (integration) ─────────────────────────────────
+
+    #[test]
+    fn generate_markdown_emits_header_with_module_title() {
+        let prog = Program { statements: vec![] };
+        let md = generate_markdown("/some/path/foo.stk", "", &prog);
+        assert!(md.starts_with("# Module: foo\n\n"), "got: {md:?}");
+    }
+
+    #[test]
+    fn generate_markdown_includes_packages_section_when_present() {
+        let prog = Program {
+            statements: vec![pkg_stmt("My::Pkg")],
+        };
+        let md = generate_markdown("anon.stk", "", &prog);
+        // Title pulled from first package; Packages section also rendered.
+        assert!(md.contains("# Module: My::Pkg"));
+        assert!(md.contains("## Packages"));
+        assert!(md.contains("### `package My::Pkg`"));
+    }
+
+    #[test]
+    fn generate_markdown_no_subs_skips_subroutines_section() {
+        let prog = Program { statements: vec![] };
+        let md = generate_markdown("x.stk", "", &prog);
+        assert!(!md.contains("## Subroutines"));
+    }
+}
