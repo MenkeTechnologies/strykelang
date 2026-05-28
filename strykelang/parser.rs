@@ -19758,13 +19758,23 @@ impl Parser {
                             i += 1;
                         }
                     }
-                    // `"$main::!"`, `"$main::@"`, `"$main::?"` — per Perl,
-                    // punctuation vars reside in main. After the `::`
-                    // chain stops, accept a single punctuation / digit
-                    // char (or `^LETTER`) as the leaf so the interp
-                    // sees one ScalarVar token. The runtime
-                    // canonicalizes `main::PUNCT` → `PUNCT`.
-                    if name.ends_with("::") && i < chars.len() {
+                    // `"$main::!"`, `"$main::@"`, `"$main::?"` — stryke
+                    // implements the Perl docs faithfully ("All
+                    // punctuation variables like $_ reside in main"):
+                    // after the `::` chain stops, accept a single
+                    // punctuation / digit char (or `^LETTER`) as the
+                    // leaf so the interp sees one ScalarVar token.
+                    // The runtime canonicalizes `main::PUNCT` →
+                    // `PUNCT`.
+                    //
+                    // Disabled in `--compat`: Perl 5.42 doesn't parse
+                    // `$main::!` as a var; the trailing punct is left
+                    // as literal string text. Match that behavior in
+                    // compat mode.
+                    if name.ends_with("::")
+                        && i < chars.len()
+                        && !crate::compat_mode()
+                    {
                         if chars[i] == '^'
                             && i + 1 < chars.len()
                             && chars[i + 1].is_ascii_alphabetic()
