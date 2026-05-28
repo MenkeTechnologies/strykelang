@@ -494,4 +494,99 @@ mod tests {
         let parts = r.split_strings("a b  c");
         assert_eq!(parts, vec!["a", "b", "c"]);
     }
+
+    // ── perl_quotemeta exhaustive contract ──────────────────────────
+
+    #[test]
+    fn perl_quotemeta_empty_returns_empty() {
+        assert_eq!(perl_quotemeta(""), "");
+    }
+
+    #[test]
+    fn perl_quotemeta_passes_through_ascii_word_chars() {
+        // [A-Za-z0-9_] are Perl word characters and must NOT be escaped.
+        let plain = "abcXYZ_0123";
+        assert_eq!(perl_quotemeta(plain), plain);
+    }
+
+    #[test]
+    fn perl_quotemeta_escapes_ascii_punct_each_char() {
+        let punct = "!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~";
+        let q = perl_quotemeta(punct);
+        // Every char gets a leading backslash → twice the length.
+        assert_eq!(q.len(), punct.len() * 2);
+        // Spot-check a few characters land at expected positions.
+        assert!(q.starts_with(r"\!"));
+        assert!(q.contains(r"\@"));
+        assert!(q.contains(r"\\"));
+    }
+
+    #[test]
+    fn perl_quotemeta_escapes_whitespace_and_control() {
+        assert_eq!(perl_quotemeta(" "), r"\ ");
+        assert_eq!(perl_quotemeta("\t"), "\\\t");
+        assert_eq!(perl_quotemeta("\n"), "\\\n");
+    }
+
+    #[test]
+    fn perl_quotemeta_preserves_unicode_word_chars() {
+        // Latin small letter e with acute is a Perl \w character.
+        assert_eq!(perl_quotemeta("é"), "é");
+        assert_eq!(perl_quotemeta("naïve"), "naïve");
+        // Cyrillic letters are also \w.
+        assert_eq!(perl_quotemeta("Привет"), "Привет");
+    }
+
+    #[test]
+    fn perl_quotemeta_escapes_unicode_punctuation() {
+        // U+00A1 INVERTED EXCLAMATION MARK is not a word char.
+        assert_eq!(perl_quotemeta("¡"), "\\¡");
+        // U+2014 EM DASH is punctuation, not a word char.
+        assert_eq!(perl_quotemeta("—"), "\\—");
+    }
+
+    // ── numbered_capture_flat semantics ──────────────────────────────
+
+    #[test]
+    fn numbered_capture_flat_returns_one_entry_per_group() {
+        let r = PerlCompiledRegex::compile(r"(\d+)-(\w+)").unwrap();
+        let caps = r.captures("42-foo").unwrap();
+        let flat = numbered_capture_flat(&caps);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[0].to_string(), "42");
+        assert_eq!(flat[1].to_string(), "foo");
+    }
+
+    #[test]
+    fn numbered_capture_flat_emits_undef_for_unmatched_group() {
+        // Alternation with two branches; only one captures.
+        let r = PerlCompiledRegex::compile(r"(foo)|(bar)").unwrap();
+        let caps = r.captures("bar").unwrap();
+        let flat = numbered_capture_flat(&caps);
+        assert_eq!(flat.len(), 2);
+        assert!(flat[0].is_undef(), "first branch did not match → UNDEF");
+        assert_eq!(flat[1].to_string(), "bar");
+    }
+
+    #[test]
+    fn numbered_capture_flat_zero_groups_yields_empty_vec() {
+        let r = PerlCompiledRegex::compile(r"abc").unwrap();
+        let caps = r.captures("abc").unwrap();
+        let flat = numbered_capture_flat(&caps);
+        assert!(flat.is_empty(), "no groups → no entries");
+    }
+
+    // ── replace_all variable expansion via Rust engine ───────────────
+
+    #[test]
+    fn replace_all_expands_numbered_backreference() {
+        let r = PerlCompiledRegex::compile(r"(\w+)\s(\w+)").unwrap();
+        assert_eq!(r.replace_all("john doe", "$2 $1"), "doe john");
+    }
+
+    #[test]
+    fn replace_keeps_unmatched_substring_intact() {
+        let r = PerlCompiledRegex::compile(r"nothing").unwrap();
+        assert_eq!(r.replace("plain text", "X"), "plain text");
+    }
 }
