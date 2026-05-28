@@ -31517,7 +31517,12 @@ fn builtin_lsp_completion_words(
     // pseudo-package — `CORE::print`, `CORE::sum`, `CORE::sprintf`, etc.
     // all dispatch identically at runtime (`try_builtin` strips the
     // prefix). Surface the prefixed spelling so tab-complete on
-    // `CORE::<TAB>` finds every builtin.
+    // `CORE::<TAB>` finds every builtin. `main::{name}` is NOT emitted
+    // here: builtins live in CORE::, not main::. A user calling
+    // `main::sort()` resolves to a *user-defined* sub in package main
+    // (if any), not the builtin — so seeding `main::sort` would
+    // promise something the runtime doesn't deliver. User-defined
+    // subs in main are picked up live from the AST walk.
     let bare_names: Vec<String> = set
         .iter()
         .filter(|n| {
