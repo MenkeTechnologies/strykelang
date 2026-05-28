@@ -503,3 +503,94 @@ impl SlotSession {
 pub fn perl_items_to_json(items: &[StrykeValue]) -> Result<Vec<serde_json::Value>, String> {
     items.iter().map(perl_to_json_value).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── perl_items_to_json ──────────────────────────────────────────────
+
+    #[test]
+    fn perl_items_to_json_empty_slice_yields_empty_vec() {
+        let r = perl_items_to_json(&[]).unwrap();
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn perl_items_to_json_preserves_order_and_length() {
+        let items = [
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+            StrykeValue::integer(3),
+        ];
+        let r = perl_items_to_json(&items).unwrap();
+        assert_eq!(r.len(), 3);
+        assert_eq!(r[0], serde_json::json!(1));
+        assert_eq!(r[1], serde_json::json!(2));
+        assert_eq!(r[2], serde_json::json!(3));
+    }
+
+    #[test]
+    fn perl_items_to_json_marshals_string_values() {
+        let items = [
+            StrykeValue::string("a".into()),
+            StrykeValue::string("b".into()),
+        ];
+        let r = perl_items_to_json(&items).unwrap();
+        assert_eq!(r, vec![serde_json::json!("a"), serde_json::json!("b")]);
+    }
+
+    #[test]
+    fn perl_items_to_json_undef_becomes_json_null() {
+        let items = [StrykeValue::UNDEF];
+        let r = perl_items_to_json(&items).unwrap();
+        assert_eq!(r, vec![serde_json::Value::Null]);
+    }
+
+    #[test]
+    fn perl_items_to_json_float_preserved() {
+        let items = [StrykeValue::float(2.5)];
+        let r = perl_items_to_json(&items).unwrap();
+        assert!((r[0].as_f64().unwrap() - 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn perl_items_to_json_mixed_types_in_one_call() {
+        let items = [
+            StrykeValue::integer(7),
+            StrykeValue::string("x".into()),
+            StrykeValue::UNDEF,
+        ];
+        let r = perl_items_to_json(&items).unwrap();
+        assert_eq!(
+            r,
+            vec![
+                serde_json::json!(7),
+                serde_json::json!("x"),
+                serde_json::Value::Null,
+            ]
+        );
+    }
+
+    #[test]
+    fn perl_items_to_json_handles_array_ref_element() {
+        use parking_lot::RwLock;
+        use std::sync::Arc;
+        let inner = StrykeValue::array_ref(Arc::new(RwLock::new(vec![
+            StrykeValue::integer(1),
+            StrykeValue::integer(2),
+        ])));
+        let r = perl_items_to_json(&[inner]).unwrap();
+        assert_eq!(r, vec![serde_json::json!([1, 2])]);
+    }
+
+    #[test]
+    fn perl_items_to_json_length_matches_input_for_large_batch() {
+        // Pin contract: output length is always input length.
+        let items: Vec<StrykeValue> = (0..256).map(StrykeValue::integer).collect();
+        let r = perl_items_to_json(&items).unwrap();
+        assert_eq!(r.len(), 256);
+        assert_eq!(r[0], serde_json::json!(0));
+        assert_eq!(r[255], serde_json::json!(255));
+    }
+}
