@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+
+fn DBSCAN::dist($p1, $p2) {
+    my $dx = $p1->{x} - $p2->{x}
+    my $dy = $p1->{y} - $p2->{y}
+    sqrt($dx * $dx + $dy * $dy)
+}
+
+fn DBSCAN::region_query($points, $p, $eps) {
+    my @neighbors
+    for my $q (@$points) {
+        push @neighbors, $q if DBSCAN::dist($p, $q) <= $eps
+    }
+    \@neighbors
+}
+
+fn DBSCAN::solve($points, $eps, $min_pts) {
+    my $c = 0
+    my %label
+    for my $p (@$points) { $label{$p->{id}} = 0 }
+
+    for my $p (@$points) {
+        next if $label{$p->{id}} != 0
+        my $neighbors = DBSCAN::region_query($points, $p, $eps)
+        if (len(@$neighbors) < $min_pts) {
+            $label{$p->{id}} = -1
+            next
+        }
+        $c++
+        $label{$p->{id}} = $c
+        my @seed_set
+        my %in_seed
+        for my $n (@$neighbors) {
+            if ($n->{id} ne $p->{id}) {
+                push @seed_set, $n
+                $in_seed{$n->{id}} = 1
+            }
+        }
+        my $head = 0
+        while ($head < len(@seed_set)) {
+            my $q = $seed_set[$head++]
+            $label{$q->{id}} = $c if $label{$q->{id}} == -1
+            next if $label{$q->{id}} != 0
+            $label{$q->{id}} = $c
+            my $qn = DBSCAN::region_query($points, $q, $eps)
+            next if len(@$qn) < $min_pts
+            for my $r (@$qn) {
+                if ($label{$r->{id}} == 0 && !$in_seed{$r->{id}}) {
+                    push @seed_set, $r
+                    $in_seed{$r->{id}} = 1
+                }
+            }
+        }
+    }
+
+    my %clusters
+    my @noise
+    for my $p (@$points) {
+        my $l = $label{$p->{id}}
+        if ($l == -1) {
+            push @noise, $p
+        } elsif ($l > 0) {
+            $clusters{$l} //= []
+            push @{$clusters{$l}}, $p
+        }
+    }
+    +{ clusters => \%clusters, noise => \@noise }
+}
+
+my @points = (
+    +{ id => "A", x => 0.0, y => 0.0 },
+    +{ id => "B", x => 0.1, y => 0.0 },
+    +{ id => "C", x => 5.0, y => 5.0 },
+    +{ id => "D", x => 5.1, y => 5.0 },
+    +{ id => "E", x => 10.0, y => 10.0 },
+)
+my $res = DBSCAN::solve(\@points, 0.5, 2)
+
+~> len(keys %{$res->{clusters}}) aeq(2, "2 clusters found")
+~> len(@{$res->{noise}}) aeq(1, "1 noise point found")
+~> $res->{noise}->[0]->{id} aeq("E", "noise point is E")
+
+test_run

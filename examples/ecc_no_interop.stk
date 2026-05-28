@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+# ecc_no_interop.stk — Elliptic-curve arithmetic over a prime field.
+#
+# Curve form: y^2 = x^3 + a*x + b mod p. Implements point addition,
+# doubling, and scalar multiplication via double-and-add. The point
+# at infinity is the identity, modelled as +{ inf => 1 }.
+# Parses clean under `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `~>` thread macro chains (rule 7.2)
+#   * `len`, colon ranges (rules 4, 5)
+#
+# Namespaced UDFs `ECC::*` (avoids shadowing builtins).
+#
+# Run: stryke --no-interop examples/ecc_no_interop.stk
+
+# Always-positive remainder, even for negative dividends.
+fn ECC::mod($n, $p) {
+    my $r = $n % $p
+    $r < 0 ? $r + $p : $r
+}
+
+# Extended-Euclidean modular inverse. Returns undef if gcd != 1.
+fn ECC::mod_inv($n, $p) {
+    my $t = 0
+    my $newt = 1
+    my $r = $p
+    my $newr = ECC::mod($n, $p)
+    while ($newr != 0) {
+        my $q = int($r / $newr)
+        my $tmp_t = $t - $q * $newt; $t = $newt; $newt = $tmp_t
+        my $tmp_r = $r - $q * $newr; $r = $newr; $newr = $tmp_r
+    }
+    return undef if $r > 1
+    ECC::mod($t, $p)
+}
+
+# Point addition on the affine curve. Doubling collapses into the
+# tangent-slope branch (p1 == p2). Returns the point at infinity
+# when the two points are inverses.
+fn ECC::add_points($p1, $p2, $ca, $p) {
+    return $p2 if $p1->{inf}
+    return $p1 if $p2->{inf}
+    return +{ inf => 1 } if $p1->{x} == $p2->{x} && $p1->{y} != $p2->{y}
+
+    my $m
+    if ($p1->{x} == $p2->{x}) {
+        return +{ inf => 1 } if $p1->{y} == 0
+        my $num = ECC::mod(3 * $p1->{x} * $p1->{x} + $ca, $p)
+        my $den = ECC::mod_inv(2 * $p1->{y}, $p)
+        $m = ECC::mod($num * $den, $p)
+    } else {
+        my $num = ECC::mod($p2->{y} - $p1->{y}, $p)
+        my $den = ECC::mod_inv(ECC::mod($p2->{x} - $p1->{x}, $p), $p)
+        $m = ECC::mod($num * $den, $p)
+    }
+
+    my $x3 = ECC::mod($m * $m - $p1->{x} - $p2->{x}, $p)
+    my $y3 = ECC::mod($m * ($p1->{x} - $x3) - $p1->{y}, $p)
+    +{ x => $x3, y => $y3, inf => 0 }
+}
+
+# Double-and-add: O(log k) point multiplications.
+fn ECC::scalar_mult($k, $pt, $ca, $p) {
+    my $res = +{ inf => 1 }
+    my $addend = +{ %$pt }
+    my $n = $k
+    while ($n > 0) {
+        $res = ECC::add_points($res, $addend, $ca, $p) if $n % 2 == 1
+        $addend = ECC::add_points($addend, $addend, $ca, $p)
+        $n = int($n / 2)
+    }
+    $res
+}
+
+p "── Elliptic Curve Math demo ──"
+# Curve: y^2 = x^3 + 2x + 2 mod 17. Base point order is 19.
+my $ca = 2
+my $p = 17
+my $G = +{ x => 5, y => 1, inf => 0 }
+
+p "Curve: y^2 = x^3 + 2x + 2 mod 17"
+p "Base point G: (#{$G->{x}}, #{$G->{y}})"
+
+my $G2 = ECC::scalar_mult(2, $G, $ca, $p)
+p "2G  = (#{$G2->{x}}, #{$G2->{y}})"
+
+my $G3 = ECC::scalar_mult(3, $G, $ca, $p)
+p "3G  = (#{$G3->{x}}, #{$G3->{y}})"
+
+my $G19 = ECC::scalar_mult(19, $G, $ca, $p)
+p "19G = #{ $G19->{inf} ? 'Infinity' : '(' . $G19->{x} . ', ' . $G19->{y} . ')' }"
+
+p "Done."

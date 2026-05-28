@@ -1,0 +1,96 @@
+#!/usr/bin/env stryke
+
+# bwt_no_interop.stk — Burrows-Wheeler Transform + inverse.
+#
+# Forward: enumerate all N rotations of the input string, sort them
+# lexicographically, take the last column + the row index of the
+# original string. Inverse: O(N) LF-mapping — for each row in the
+# (implicit) first column, the next character comes from the row in
+# the last column whose occurrence-count matches. Parses clean under
+# `--no-interop`.
+#
+# Idiomatic stryke per docs/STYLE_GUIDE.md:
+#   * implicit return on tail (rule 7)
+#   * `~>` thread macro chains (rule 7.2)
+#   * `len`, colon ranges (rules 4, 5)
+#
+# Namespaced UDFs `BWT::*`.
+#
+# Run: stryke --no-interop examples/bwt_no_interop.stk
+
+fn BWT::transform($s) {
+    my $n = len $s
+    return +{ bwt => "", idx => 0 } if $n == 0
+
+    my @rotations
+    for my $i (0 : $n - 1) {
+        my $rot = $i == 0 ? $s : $s[$i : $n - 1] . $s[0 : $i - 1]
+        push @rotations, $rot
+    }
+    my @sorted = ~> @rotations sort { _0 cmp _1 }
+
+    my $last_col = ""
+    for my $r (@sorted) { $last_col = $last_col . $r[-1] }
+
+    my $idx = 0
+    for my $i (0 : $n - 1) {
+        if ($sorted[$i] eq $s) { $idx = $i; last }
+    }
+    +{ bwt => $last_col, idx => $idx }
+}
+
+fn BWT::inverse($bwt, $idx) {
+    my $n = len $bwt
+    return "" if $n == 0
+
+    my @bwt_arr
+    for my $i (0 : $n - 1) { push @bwt_arr, $bwt[$i] }
+    my @first_col = ~> @bwt_arr sort { _0 cmp _1 }
+
+    # occ_bwt[i] / occ_first[j] = how many times that char has been
+    # seen in column up to and including row i / j. LF mapping is
+    # (char, occ) → row-in-first-column.
+    my %counts_bwt
+    my @occ_bwt
+    for my $c (@bwt_arr) {
+        $counts_bwt{$c} = ($counts_bwt{$c} // 0) + 1
+        push @occ_bwt, $counts_bwt{$c}
+    }
+    my %counts_first
+    my @occ_first
+    for my $c (@first_col) {
+        $counts_first{$c} = ($counts_first{$c} // 0) + 1
+        push @occ_first, $counts_first{$c}
+    }
+
+    my %first_occ_idx
+    for my $j (0 : $n - 1) {
+        my $key = "#{$first_col[$j]}_#{$occ_first[$j]}"
+        $first_occ_idx{$key} = $j
+    }
+
+    my @lf = (0) x $n
+    for my $i (0 : $n - 1) {
+        $lf[$i] = $first_occ_idx{"#{$bwt_arr[$i]}_#{$occ_bwt[$i]}"}
+    }
+
+    my $res = ""
+    my $cur = $idx
+    for (0 : $n - 1) {
+        $res = $bwt_arr[$cur] . $res
+        $cur = $lf[$cur]
+    }
+    $res
+}
+
+p "── Burrows-Wheeler Transform demo ──"
+my $msg = "banana"
+p "Original: '#{$msg}'"
+
+my $t = BWT::transform($msg)
+p "BWT:      '#{$t->{bwt}}' (idx: #{$t->{idx}})"
+
+my $inv = BWT::inverse($t->{bwt}, $t->{idx})
+p "Inverse:  '#{$inv}'"
+p "Match:    #{$msg eq $inv ? 'YES' : 'NO'}"
+p "Done."

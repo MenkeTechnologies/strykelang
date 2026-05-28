@@ -1,0 +1,71 @@
+#!/usr/bin/env stryke
+
+fn BWT::transform($s) {
+    my $n = len $s
+    return +{ bwt => "", idx => 0 } if $n == 0
+    my @rotations
+    for my $i (0 : $n - 1) {
+        my $rot = $i == 0 ? $s : $s[$i : $n - 1] . $s[0 : $i - 1]
+        push @rotations, $rot
+    }
+    my @sorted = ~> @rotations sort { _0 cmp _1 }
+    my $last_col = ""
+    for my $r (@sorted) { $last_col = $last_col . $r[-1] }
+    my $idx = 0
+    for my $i (0 : $n - 1) {
+        if ($sorted[$i] eq $s) { $idx = $i; last }
+    }
+    +{ bwt => $last_col, idx => $idx }
+}
+
+fn BWT::inverse($bwt, $idx) {
+    my $n = len $bwt
+    return "" if $n == 0
+    my @bwt_arr
+    for my $i (0 : $n - 1) { push @bwt_arr, $bwt[$i] }
+    my @first_col = ~> @bwt_arr sort { _0 cmp _1 }
+    my %cb
+    my @ob
+    for my $c (@bwt_arr) {
+        $cb{$c} = ($cb{$c} // 0) + 1
+        push @ob, $cb{$c}
+    }
+    my %cf
+    my @of
+    for my $c (@first_col) {
+        $cf{$c} = ($cf{$c} // 0) + 1
+        push @of, $cf{$c}
+    }
+    my %first_occ_idx
+    for my $j (0 : $n - 1) {
+        $first_occ_idx{"#{$first_col[$j]}_#{$of[$j]}"} = $j
+    }
+    my @lf = (0) x $n
+    for my $i (0 : $n - 1) {
+        $lf[$i] = $first_occ_idx{"#{$bwt_arr[$i]}_#{$ob[$i]}"}
+    }
+    my $res = ""
+    my $cur = $idx
+    for (0 : $n - 1) {
+        $res = $bwt_arr[$cur] . $res
+        $cur = $lf[$cur]
+    }
+    $res
+}
+
+my $t1 = BWT::transform("banana")
+~> $t1->{bwt} aeq("nnbaaa", "bwt of banana")
+~> $t1->{idx} aeq(3, "bwt idx of banana")
+
+my $inv1 = BWT::inverse($t1->{bwt}, $t1->{idx})
+~> $inv1 aeq("banana", "inverse of banana bwt")
+
+my $t2 = BWT::transform("abracadabra")
+my $inv2 = BWT::inverse($t2->{bwt}, $t2->{idx})
+~> $inv2 aeq("abracadabra", "roundtrip abracadabra")
+
+my $t3 = BWT::transform("A")
+my $inv3 = BWT::inverse($t3->{bwt}, $t3->{idx})
+~> $inv3 aeq("A", "roundtrip A")
+
+test_run

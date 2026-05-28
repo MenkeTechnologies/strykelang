@@ -1,0 +1,73 @@
+#!/usr/bin/env stryke
+
+fn AlgX::solve($X, $Y, $solution, $results) {
+    my @cols = keys %$X
+    if (len(@cols) == 0) {
+        my @copy = @$solution
+        push @$results, \@copy
+        return undef
+    }
+    my $min_c = $cols[0]
+    my $min_len = len @{$X->{$min_c}}
+    for my $c (@cols) {
+        my $l = len @{$X->{$c}}
+        if ($l < $min_len) { $min_len = $l; $min_c = $c }
+    }
+    my @rows_for_c = @{$X->{$min_c}}
+    for my $r (@rows_for_c) {
+        push @$solution, $r
+        my %new_X
+        for my $k (keys %$X) {
+            my @arr = @{$X->{$k}}
+            $new_X{$k} = \@arr
+        }
+        for my $j (@{$Y->{$r}}) {
+            if (exists $new_X{$j}) {
+                for my $i (@{$new_X{$j}}) {
+                    for my $k (@{$Y->{$i}}) {
+                        if ($k ne $j && exists $new_X{$k}) {
+                            my @filtered = ~> @{$new_X{$k}} grep { _ ne $i }
+                            $new_X{$k} = \@filtered
+                        }
+                    }
+                }
+                delete $new_X{$j}
+            }
+        }
+        AlgX::solve(\%new_X, $Y, $solution, $results)
+        pop @$solution
+    }
+}
+
+fn AlgX::exact_cover($universe, $subsets) {
+    my %X
+    for my $item (@$universe) { $X{$item} = [] }
+    for my $row (keys %$subsets) {
+        for my $item (@{$subsets->{$row}}) { push @{$X{$item}}, $row }
+    }
+    my @solution
+    my @results
+    AlgX::solve(\%X, $subsets, \@solution, \@results)
+    \@results
+}
+
+my @u1 = ("1", "2", "3", "4", "5", "6", "7")
+my %s1 = (
+    "A" => ["1", "4", "7"],
+    "B" => ["1", "4"],
+    "C" => ["4", "5", "7"],
+    "D" => ["3", "5", "6"],
+    "E" => ["2", "3", "6", "7"],
+    "F" => ["2", "7"],
+)
+my $r1 = AlgX::exact_cover(\@u1, \%s1)
+~> len(@$r1) aeq(1, "1 solution")
+my @sol_sorted = ~> @{$r1->[0]} sort { _0 cmp _1 }
+~> join(",", @sol_sorted) aeq("B,D,F", "Solution is B, D, F")
+
+my @u2 = ("1", "2")
+my %s2 = ( "A" => ["1"], "B" => ["1"] )
+my $r2 = AlgX::exact_cover(\@u2, \%s2)
+~> len(@$r2) aeq(0, "0 solutions")
+
+test_run

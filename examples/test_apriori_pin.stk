@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+fn Apriori::l1($transactions, $min_support) {
+    my %counts
+    for my $t (@$transactions) {
+        for my $item (@$t) { $counts{$item} = ($counts{$item} // 0) + 1 }
+    }
+    my @l1
+    for my $item (keys %counts) {
+        push @l1, [$item] if $counts{$item} >= $min_support
+    }
+    my @sorted = ~> @l1 sort { _0->[0] cmp _1->[0] }
+    \@sorted
+}
+
+fn Apriori::join($lk, $k) {
+    my @candidates
+    my %seen
+    my $n = len @$lk
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1 : $n - 1) {
+            my $s1 = $lk->[$i]
+            my $s2 = $lk->[$j]
+            my $match = 1
+            for my $idx (0 : $k - 3) {
+                if ($s1->[$idx] ne $s2->[$idx]) { $match = 0; last }
+            }
+            next unless $match
+            my @new_set = @$s1
+            push @new_set, $s2->[-1]
+            my @sorted_set = ~> @new_set sort { _0 cmp _1 }
+            my $key = join(",", @sorted_set)
+            if (!$seen{$key}) {
+                $seen{$key} = 1
+                push @candidates, \@sorted_set
+            }
+        }
+    }
+    \@candidates
+}
+
+fn Apriori::support($candidates, $transactions) {
+    my %support
+    for my $t (@$transactions) {
+        my %in_t
+        for my $item (@$t) { $in_t{$item} = 1 }
+        for my $i (0 : len(@$candidates) - 1) {
+            my $c = $candidates->[$i]
+            my $all = 1
+            for my $item (@$c) {
+                if (!$in_t{$item}) { $all = 0; last }
+            }
+            $support{$i} = ($support{$i} // 0) + 1 if $all
+        }
+    }
+    \%support
+}
+
+fn Apriori::solve($transactions, $min_support) {
+    my @result
+    my $lk = Apriori::l1($transactions, $min_support)
+    push @result, $lk
+    my $k = 2
+    while (len(@$lk) > 0) {
+        my $candidates = Apriori::join($lk, $k)
+        my $counts = Apriori::support($candidates, $transactions)
+        my @next
+        for my $i (0 : len(@$candidates) - 1) {
+            my $cnt = $counts->{$i} // 0
+            push @next, $candidates->[$i] if $cnt >= $min_support
+        }
+        last if len(@next) == 0
+        push @result, \@next
+        $lk = \@next
+        $k++
+    }
+    \@result
+}
+
+my @transactions = (
+    ["apple", "beer", "rice", "chicken"],
+    ["apple", "beer", "rice"],
+    ["apple", "beer"],
+    ["apple", "mango"],
+    ["milk", "beer", "rice", "chicken"],
+    ["milk", "beer", "rice"],
+    ["milk", "beer"],
+    ["milk", "mango"],
+)
+
+my $res = Apriori::solve(\@transactions, 3)
+
+# L1: apple (4), beer (6), rice (4), milk (4) — 4 singletons
+~> len(@{$res->[0]}) aeq(4, "L1 has 4 frequent items")
+
+# L2: [apple,beer] (3), [beer,milk] (3), [beer,rice] (4) — 3 pairs
+~> len(@{$res->[1]}) aeq(3, "L2 has 3 frequent pairs")
+
+# No triples meet min_support=3
+~> len(@$res) aeq(2, "only up to L2")
+
+test_run
