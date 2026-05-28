@@ -10112,7 +10112,14 @@ fn completions(
     }
 
     items.sort_by(|a, b| a.label.cmp(&b.label));
-    items.truncate(384);
+    // The wordlist is ~22k entries; truncating to a small fixed bound
+    // alphabetically clipped real builtins (`sort`, `printf`, `push`,
+    // `pop`, etc. live deep into their letter buckets — `printf` is the
+    // 576th `p*` word, `sort` is the 668th `s*` word). The cap stays so
+    // a runaway index doesn't dump the entire universe over the wire,
+    // but it's high enough that every realistic prefix bucket
+    // (filter="s" → 1115, filter="p" → 688) survives in full.
+    items.truncate(30000);
     Some(CompletionResponse::Array(items))
 }
 
@@ -10376,6 +10383,7 @@ fn qualified_sub_completions(
     idx: &CompletionIndex,
 ) -> Vec<CompletionItem> {
     let mut items = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
     for fqn in &idx.subs_qualified {
         if !fqn_matches(pkg_prefix, partial, fqn) {
             continue;
@@ -10387,6 +10395,9 @@ fn qualified_sub_completions(
         // to the SUFFIX-only form and `filter_text` so user-typed
         // text still matches; keep the FQN as the visible label.
         let suffix = fqn.strip_prefix(pkg_prefix).unwrap_or(fqn).to_string();
+        if !seen.insert(fqn.clone()) {
+            continue;
+        }
         let doc = doc_for_label(fqn.rsplit("::").next().unwrap_or(fqn.as_str()));
         items.push(CompletionItem {
             label: fqn.clone(),
@@ -10395,6 +10406,33 @@ fn qualified_sub_completions(
             insert_text: Some(suffix.clone()),
             filter_text: Some(suffix),
             documentation: doc,
+            ..Default::default()
+        });
+    }
+    // Seed `CORE::*` (and any other bare-name qualified entries from
+    // the wordlist — sigil-qualified `$main::ARGV` etc. flow through
+    // sigil_completions instead). Without this, `CORE::<tab>` lists
+    // only the empty user-declared FQ set.
+    for w in builtin_completion_words() {
+        if !fqn_matches(pkg_prefix, partial, w) {
+            continue;
+        }
+        // Skip sigil-prefixed entries — they belong to sigil_completions.
+        if matches!(w.chars().next(), Some('$') | Some('@') | Some('%') | Some('&')) {
+            continue;
+        }
+        if !seen.insert(w.clone()) {
+            continue;
+        }
+        let suffix = w.strip_prefix(pkg_prefix).unwrap_or(w).to_string();
+        let leaf = w.rsplit("::").next().unwrap_or(w.as_str());
+        items.push(CompletionItem {
+            label: w.clone(),
+            kind: Some(CompletionItemKind::FUNCTION),
+            detail: Some("builtin (qualified)".to_string()),
+            insert_text: Some(suffix.clone()),
+            filter_text: Some(suffix),
+            documentation: doc_for_label(leaf),
             ..Default::default()
         });
     }
@@ -10408,17 +10446,57 @@ fn sigil_completions(
     kind: &'static str,
 ) -> Vec<CompletionItem> {
     let mut items = Vec::new();
+    let mut seen: BTreeSet<String> = BTreeSet::new();
     for n in names {
         if !filter.is_empty() && !n.starts_with(filter) {
             continue;
         }
-        let insert = format!("{sigil}{n}");
+        if !seen.insert(n.clone()) {
+            continue;
+        }
+        // `insert_text` is the BARE name (no sigil). The user already
+        // typed the sigil; IntelliJ's LSP client treats `$`/`@`/`%` as
+        // non-identifier so the replacement range starts AFTER the
+        // sigil. Including the sigil in `insert_text` produced `@@foo`
+        // / `$$foo` / `%%foo`.  Label keeps the sigil for display.
+        let display = format!("{sigil}{n}");
         items.push(CompletionItem {
-            label: insert.clone(),
+            label: display,
             kind: Some(CompletionItemKind::VARIABLE),
             detail: Some(kind.to_string()),
             filter_text: Some(n.clone()),
-            insert_text: Some(insert),
+            insert_text: Some(n.clone()),
+            ..Default::default()
+        });
+    }
+    // Seed perl-special / reflection vars (`%ENV`, `%INC`, `%stryke::*`,
+    // `$stryke::VERSION`, `@ARGV`, etc.) from the bundled wordlist.
+    // Without this, `$<tab>` / `%<tab>` in a fresh file emits zero items
+    // — user-declared names only — and the reflection surface is
+    // unreachable through sigil completion.
+    for w in builtin_completion_words() {
+        let mut chars = w.chars();
+        let Some(sig0) = chars.next() else { continue };
+        if sig0 != sigil {
+            continue;
+        }
+        let bare = &w[sig0.len_utf8()..];
+        if bare.is_empty() {
+            continue;
+        }
+        if !filter.is_empty() && !bare.starts_with(filter) {
+            continue;
+        }
+        if !seen.insert(bare.to_string()) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: w.clone(),
+            kind: Some(CompletionItemKind::VARIABLE),
+            detail: Some(format!("{kind} (builtin)")),
+            filter_text: Some(bare.to_string()),
+            insert_text: Some(bare.to_string()),
+            documentation: doc_for_label(w),
             ..Default::default()
         });
     }

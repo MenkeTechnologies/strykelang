@@ -2937,6 +2937,143 @@ fn audit_hover_inside_string_interpolation_still_fires() {
     );
 }
 
+// ── Sigil completion: insertText must NOT include the sigil ───────
+//
+// IntelliJ's LSP client treats `$` / `@` / `%` as non-identifier
+// characters, so the completion replacement range starts AFTER the
+// typed sigil. If `insertText` includes the sigil, the result is
+// doubled — `@<tab>` inserts `@yellow_submarine` and the rendered
+// text becomes `@@yellow_submarine`. Pin the bare-name form so the
+// fix doesn't silently regress.
+
+#[test]
+fn audit_completion_scalar_insert_text_has_no_sigil() {
+    let mut h = LspHarness::new("my $yellow_submarine = 1\n$");
+    let items = h.completion_items(1, 1);
+    h.finish();
+    let found = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("$yellow_submarine"))
+        .expect("missing $yellow_submarine in sigil items");
+    assert_eq!(
+        found.get("insertText").and_then(Value::as_str),
+        Some("yellow_submarine"),
+        "scalar sigil completion must use bare-name insertText: {found}",
+    );
+}
+
+#[test]
+fn audit_completion_array_insert_text_has_no_sigil() {
+    let mut h = LspHarness::new("my @colors = ()\n@");
+    let items = h.completion_items(1, 1);
+    h.finish();
+    let found = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("@colors"))
+        .expect("missing @colors in sigil items");
+    assert_eq!(
+        found.get("insertText").and_then(Value::as_str),
+        Some("colors"),
+        "array sigil completion must use bare-name insertText: {found}",
+    );
+}
+
+#[test]
+fn audit_completion_hash_insert_text_has_no_sigil() {
+    let mut h = LspHarness::new("my %config = ()\n%");
+    let items = h.completion_items(1, 1);
+    h.finish();
+    let found = items
+        .iter()
+        .find(|it| it.get("label").and_then(Value::as_str) == Some("%config"))
+        .expect("missing %config in sigil items");
+    assert_eq!(
+        found.get("insertText").and_then(Value::as_str),
+        Some("config"),
+        "hash sigil completion must use bare-name insertText: {found}",
+    );
+}
+
+// ── Sigil completion: reflection vars seeded from the wordlist ────
+//
+// `$<tab>` / `%<tab>` in a fresh file used to return only the
+// user-declared names. Perl special vars (`%ENV`, `%INC`, `$ARGV`,
+// `$stryke::VERSION`, `%stryke::*`) live in `lsp_completion_words.txt`
+// sigil-prefixed; sigil completion now seeds from that wordlist.
+
+#[test]
+fn audit_completion_hash_includes_env_inc_from_wordlist() {
+    let mut h = LspHarness::new("%");
+    let labels = h.completion(0, 1);
+    h.finish();
+    for v in &["%ENV", "%INC", "%SIG"] {
+        assert!(
+            labels.contains(&v.to_string()),
+            "{v} must appear in `%<tab>` completion: {labels:?}",
+        );
+    }
+}
+
+#[test]
+fn audit_completion_hash_includes_stryke_reflection_hashes() {
+    let mut h = LspHarness::new("%");
+    let labels = h.completion(0, 1);
+    h.finish();
+    for v in &["%stryke::all", "%stryke::builtins", "%stryke::keywords"] {
+        assert!(
+            labels.contains(&v.to_string()),
+            "{v} must appear in `%<tab>` completion: {labels:?}",
+        );
+    }
+}
+
+#[test]
+fn audit_completion_scalar_includes_stryke_version() {
+    let mut h = LspHarness::new("$");
+    let labels = h.completion(0, 1);
+    h.finish();
+    assert!(
+        labels.contains(&"$stryke::VERSION".to_string()),
+        "$stryke::VERSION must appear in `$<tab>` completion: {labels:?}",
+    );
+}
+
+// ── Bare completion: perl-compat builtins must not be truncated ───
+//
+// Before the truncate ceiling was raised, `sort` (the 668th `s*`
+// word) and `printf` (the 576th `p*` word) fell off the end of the
+// alphabetically-sorted 384-item cap and never reached the IDE.
+
+#[test]
+fn audit_completion_bare_includes_sort_printf_push_pop() {
+    // Empty-prefix bare completion. Document needs at least one line
+    // for the LSP server to find the cursor position.
+    let mut h = LspHarness::new("\n");
+    let labels = h.completion(0, 0);
+    h.finish();
+    for w in &["sort", "printf", "push", "pop", "shift", "split"] {
+        assert!(
+            labels.contains(&w.to_string()),
+            "{w} must appear in bare completion (truncate cap should not clip it): {labels:?}",
+        );
+    }
+}
+
+// ── Qualified completion: CORE:: seeded from the wordlist ─────────
+
+#[test]
+fn audit_completion_core_namespace_emits_wordlist_entries() {
+    let mut h = LspHarness::new("CORE::");
+    let labels = h.completion(0, 6);
+    h.finish();
+    for w in &["CORE::PI", "CORE::TAU", "CORE::E"] {
+        assert!(
+            labels.contains(&w.to_string()),
+            "{w} must appear in `CORE::<tab>` completion: {labels:?}",
+        );
+    }
+}
+
 // ── LSP strict-vars diagnostics on by default ──────────────────────
 
 #[test]
