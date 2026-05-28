@@ -2943,11 +2943,57 @@ fn audit_hover_inside_string_interpolation_still_fires() {
 // characters, so the completion replacement range starts AFTER the
 // typed sigil. If `insertText` includes the sigil, the result is
 // doubled — `@<tab>` inserts `@yellow_submarine` and the rendered
-// text becomes `@@yellow_submarine`. Pin the bare-name form so the
-// fix doesn't silently regress.
+// text becomes `@@yellow_submarine`. Fix: each sigil item carries an
+// explicit `textEdit` whose range covers `[sigil_pos .. cursor]` and
+// whose `new_text` is the full `$name` / `@name` / `%name`. The
+// `filter_text` ALSO includes the sigil so IntelliJ's prefix-match
+// (user types `$` → prefix is `$`) keeps the item visible.
+
+fn check_sigil_item(item: &Value, expected_label: &str, expected_new_text: &str, sigil_char: u64) {
+    assert_eq!(
+        item.get("label").and_then(Value::as_str),
+        Some(expected_label),
+        "label mismatch: {item}"
+    );
+    assert_eq!(
+        item.get("filterText").and_then(Value::as_str),
+        Some(expected_label),
+        "filterText must include the sigil so client-side prefix match keeps the item: {item}"
+    );
+    // insertText is replaced by textEdit — should be absent
+    assert!(
+        item.get("insertText").is_none(),
+        "insertText must be omitted when textEdit is used: {item}"
+    );
+    let edit = item
+        .get("textEdit")
+        .expect("textEdit must be present for sigil items");
+    assert_eq!(
+        edit.get("newText").and_then(Value::as_str),
+        Some(expected_new_text),
+        "textEdit.newText must be the full sigil+name: {edit}"
+    );
+    let range = edit.get("range").expect("textEdit must have range");
+    let start_char = range
+        .pointer("/start/character")
+        .and_then(Value::as_u64)
+        .unwrap();
+    let end_char = range
+        .pointer("/end/character")
+        .and_then(Value::as_u64)
+        .unwrap();
+    assert_eq!(
+        start_char, sigil_char,
+        "textEdit range must start at the sigil column: {edit}"
+    );
+    assert!(
+        end_char > start_char,
+        "textEdit range must span the typed sigil: {edit}"
+    );
+}
 
 #[test]
-fn audit_completion_scalar_insert_text_has_no_sigil() {
+fn audit_completion_scalar_text_edit_covers_sigil() {
     let mut h = LspHarness::new("my $yellow_submarine = 1\n$");
     let items = h.completion_items(1, 1);
     h.finish();
@@ -2955,15 +3001,11 @@ fn audit_completion_scalar_insert_text_has_no_sigil() {
         .iter()
         .find(|it| it.get("label").and_then(Value::as_str) == Some("$yellow_submarine"))
         .expect("missing $yellow_submarine in sigil items");
-    assert_eq!(
-        found.get("insertText").and_then(Value::as_str),
-        Some("yellow_submarine"),
-        "scalar sigil completion must use bare-name insertText: {found}",
-    );
+    check_sigil_item(found, "$yellow_submarine", "$yellow_submarine", 0);
 }
 
 #[test]
-fn audit_completion_array_insert_text_has_no_sigil() {
+fn audit_completion_array_text_edit_covers_sigil() {
     let mut h = LspHarness::new("my @colors = ()\n@");
     let items = h.completion_items(1, 1);
     h.finish();
@@ -2971,15 +3013,11 @@ fn audit_completion_array_insert_text_has_no_sigil() {
         .iter()
         .find(|it| it.get("label").and_then(Value::as_str) == Some("@colors"))
         .expect("missing @colors in sigil items");
-    assert_eq!(
-        found.get("insertText").and_then(Value::as_str),
-        Some("colors"),
-        "array sigil completion must use bare-name insertText: {found}",
-    );
+    check_sigil_item(found, "@colors", "@colors", 0);
 }
 
 #[test]
-fn audit_completion_hash_insert_text_has_no_sigil() {
+fn audit_completion_hash_text_edit_covers_sigil() {
     let mut h = LspHarness::new("my %config = ()\n%");
     let items = h.completion_items(1, 1);
     h.finish();
@@ -2987,11 +3025,7 @@ fn audit_completion_hash_insert_text_has_no_sigil() {
         .iter()
         .find(|it| it.get("label").and_then(Value::as_str) == Some("%config"))
         .expect("missing %config in sigil items");
-    assert_eq!(
-        found.get("insertText").and_then(Value::as_str),
-        Some("config"),
-        "hash sigil completion must use bare-name insertText: {found}",
-    );
+    check_sigil_item(found, "%config", "%config", 0);
 }
 
 // ── Sigil completion: reflection vars seeded from the wordlist ────
