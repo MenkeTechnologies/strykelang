@@ -3074,6 +3074,38 @@ fn audit_completion_core_namespace_emits_wordlist_entries() {
     }
 }
 
+// ── Qualified completion: sigil-prefixed main:: from wordlist ─────
+//
+// `main` is the default package (per Perl). Builtins live in CORE::
+// not main::, so bare `main::<tab>` does NOT promise builtin names —
+// only user-declared subs in package main surface there. Sigil-vars
+// in package main (`$main::ARGV`, `%main::ENV`, …) ARE in the
+// wordlist and must come through sigil completion.
+
+#[test]
+fn audit_completion_scalar_main_namespace_includes_argv() {
+    let mut h = LspHarness::new("$main::");
+    let labels = h.completion(0, 7);
+    h.finish();
+    assert!(
+        labels.contains(&"$main::ARGV".to_string()),
+        "$main::ARGV must appear in `$main::<tab>` completion: {labels:?}",
+    );
+}
+
+#[test]
+fn audit_completion_hash_main_namespace_includes_env() {
+    let mut h = LspHarness::new("%main::");
+    let labels = h.completion(0, 7);
+    h.finish();
+    for w in &["%main::ENV", "%main::INC", "%main::SIG"] {
+        assert!(
+            labels.contains(&w.to_string()),
+            "{w} must appear in `%main::<tab>` completion: {labels:?}",
+        );
+    }
+}
+
 // ── LSP strict-vars diagnostics on by default ──────────────────────
 
 #[test]
