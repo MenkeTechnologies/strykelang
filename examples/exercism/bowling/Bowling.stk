@@ -15,8 +15,7 @@ fn Exercism::Bowling::roll {
 }
 
 fn Exercism::Bowling::_check_complete {
-    my $g = _
-    my @r = @{$g->{rolls}}
+    my @r = @{_->{rolls}}
     my ($frame, $i) = (0, 0)
     while ($frame < 9 && $i < @r) {
         if ($r[$i] == 10) { $i++ } else { $i += 2 }
@@ -26,18 +25,17 @@ fn Exercism::Bowling::_check_complete {
     # 10th frame: 2 normal rolls, +1 bonus if strike/spare
     my $remaining = @r - $i
     if ($r[$i] == 10) {
-        $g->{finished} = 1 if $remaining >= 3
+        _->{finished} = 1 if $remaining >= 3
     } elsif ($i + 1 < @r && $r[$i] + $r[$i + 1] == 10) {
-        $g->{finished} = 1 if $remaining >= 3
+        _->{finished} = 1 if $remaining >= 3
     } else {
-        $g->{finished} = 1 if $remaining >= 2
+        _->{finished} = 1 if $remaining >= 2
     }
 }
 
 fn Exercism::Bowling::score {
-    my $g = _
-    die "Game is incomplete" unless $g->{finished}
-    my @r = @{$g->{rolls}}
+    die "Game is incomplete" unless _->{finished}
+    my @r = @{_->{rolls}}
     my $total = 0
     my ($i, $frame) = (0, 0)
     while ($frame < 10) {

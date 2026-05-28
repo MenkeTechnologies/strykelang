@@ -11,9 +11,8 @@ fn Exercism::RpgCharacterSheet::ask_name      { p "What is your character's name
 fn Exercism::RpgCharacterSheet::ask_class     { p "What is your character's class?"; "Class" }
 
 fn Exercism::RpgCharacterSheet::confirm_character {
-    my $h = _
-    p "Your character: #{$h->{name}}, the #{$h->{class}}, hitpoints #{$h->{hitpoints}}"
-    $h
+    p "Your character: #{_->{name}}, the #{_->{class}}, hitpoints #{_->{hitpoints}}"
+    _
 }
 
 fn Exercism::RpgCharacterSheet::run = { name => "Hero", class => "Wizard", hitpoints => 10 }

@@ -5,8 +5,7 @@ fn Exercism::SaddlePoints::saddle_points($m) {
     my $cols = 0 + @{$m->[0]}
     my @row_max = ~> 0:$rows-1 map { max(@{$m->[_]}) }
     my @col_min = ~> 0:$cols-1 map {
-        my $c = _
-        ~> 0:$rows-1 map { $m->[_][$c] } min
+        ~> 0:$rows-1 map { $m->[_][_<] } min
     }
     my @out
     for my $r (0:$rows - 1) {

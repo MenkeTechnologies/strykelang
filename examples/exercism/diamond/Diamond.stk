@@ -4,8 +4,7 @@
 # top and bottom; each row is the same total width (2N+1) where N is
 # the letter's 0-based offset from 'A'.
 fn Exercism::Diamond::build_shape {
-    my $letter = _0
-    my $n      = ord($letter) - ord('A')
+    my $n      = ord(_0) - ord('A')
     my @rows
     for my $i (0:$n) {
         my $c   = chr(ord('A') + $i)

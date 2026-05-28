@@ -6,8 +6,7 @@ fn Exercism::LibraryFees::datetime_from_string = _
 fn Exercism::LibraryFees::before_noon = (split /T/, _)[1] lt "12:00:00"
 
 fn Exercism::LibraryFees::return_date {
-    my $iso  = _
-    my @ymd  = split /-/, $iso
+    my @ymd  = split /-/, _
     my $days = Exercism::LibraryFees::_days($ymd[0], $ymd[1], $ymd[2]) + 28
     Exercism::LibraryFees::_from_days($days)
 }
@@ -41,17 +40,16 @@ fn Exercism::LibraryFees::_days {
 }
 
 fn Exercism::LibraryFees::_from_days {
-    my $days = _
     my $y = 1970
-    while ($days >= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)) {
-        $days -= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)
+    while (_ >= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)) {
+        _ -= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)
         $y++
     }
     my @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
                 31,30,31,30,31,31,30,31,30,31)
     my $m = 1
-    while ($days >= $mlen[$m - 1]) { $days -= $mlen[$m - 1]; $m++ }
-    sprintf("%04d-%02d-%02d", $y, $m, $days + 1)
+    while (_ >= $mlen[$m - 1]) { _ -= $mlen[$m - 1]; $m++ }
+    sprintf("%04d-%02d-%02d", $y, $m, _ + 1)
 }
 
 fn Exercism::LibraryFees::_dow {
