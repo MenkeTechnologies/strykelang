@@ -4,10 +4,7 @@
 fn Rosetta::ChiSquared::solve($observed, $expected) {
     # Parallel map to compute terms
     ~> zip($observed, $expected) map {
-        my $pair = _0
-        my $obs = $pair->[0]
-        my $exp = $pair->[1]
-        (($obs - $exp) ** 2) / $exp
+        ((_0->[0] - _0->[1]) ** 2) / _0->[1]
     } |> reduce { _0 + _1 }
 }
 

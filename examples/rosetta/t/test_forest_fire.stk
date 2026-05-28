@@ -9,10 +9,9 @@ fn Rosetta::ForestFire::step($grid, $p, $f) {
     
     # Use pmap (~> map) for row updates to follow idiomatic stryke patterns
     ~> 0..($rows - 1) map {
-        my $r = _
         my @new_row
         for my $c (0..($cols - 1)) {
-            my $cell = $grid->[$r][$c]
+            my $cell = $grid->[_][$c]
             if ($cell == 2) {
                 # 1. Any burning cell turns into an empty cell
                 $new_row[$c] = 0
@@ -22,7 +21,7 @@ fn Rosetta::ForestFire::step($grid, $p, $f) {
                 for my $dr (-1:1) {
                     for my $dc (-1:1) {
                         next if $dr == 0 && $dc == 0
-                        my $nr = $r + $dr
+                        my $nr = _ + $dr
                         my $nc = $c + $dc
                         if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
                             if ($grid->[$nr][$nc] == 2) { $on_fire = 1 }

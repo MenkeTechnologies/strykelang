@@ -2,14 +2,13 @@
 # Rosetta Code: Matrix Transpose
 
 fn Rosetta::Transpose::transpose {
-    my $m = _
-    my $rows = len(@$m)
-    my $cols = len(@{$m->[0]})
+    my $rows = len(@$_)
+    my $cols = len(@{_->[0]})
     my @res
     for my $j (0:$cols-1) {
         my @new_row
         for my $i (0:$rows-1) {
-            push @new_row, $m->[$i][$j]
+            push @new_row, _->[$i][$j]
         }
         push @res, [@new_row]
     }
@@ -17,9 +16,8 @@ fn Rosetta::Transpose::transpose {
 }
 
 fn Rosetta::Transpose::to_string {
-    my $m = _
     my @rows
-    for my $row (@$m) {
+    for my $row (@$_) {
         push @rows, join(",", @$row)
     }
     join(";", @rows)
