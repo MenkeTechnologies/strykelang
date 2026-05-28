@@ -137,9 +137,8 @@ while ($i < len(@parsed)) {
 }
 
 my $agg = @chunks |> pmap_reduce {
-    my $rows = _
     my %h
-    for my $r (@$rows) {
+    for my $r (@$_) {
         my $key = "$r->{region}|$r->{category}"
         $h{$key} //= +{ rows => 0, units => 0, revenue => 0, profit => 0 }
         $h{$key}{rows}    += 1
