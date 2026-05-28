@@ -13160,9 +13160,15 @@ fn builtin_congregation(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
                 // call blocks until disconnect; on return the child exits with
                 // the agent's exit code so its slot in the process table is
                 // reclaimed by reaper logic.
+                //
+                // `libc::_exit` (not `std::process::exit`) — Rust runtime
+                // cleanup is NOT async-signal-safe in a fork child. The
+                // agent VM's rayon / channel / mutex state inherited
+                // from the pre-fork parent deadlocks in
+                // `std::rt::cleanup` after the child's final EVAL.
                 let name = format!("congregant-{:03}", i);
                 let code = crate::agent::run_agent_with_explicit(&host, port, Some(&name));
-                std::process::exit(code);
+                unsafe { libc::_exit(code) }
             }
             Err(e) => {
                 return Err(StrykeError::runtime(
@@ -13769,9 +13775,11 @@ fn builtin_anoint(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         match unsafe { nix::unistd::fork() } {
             Ok(nix::unistd::ForkResult::Parent { .. }) => {}
             Ok(nix::unistd::ForkResult::Child) => {
+                // See `congregation` above for the `libc::_exit`
+                // rationale (fork-child Rust cleanup deadlock).
                 let name = format!("anointed-{:03}", i);
                 let code = crate::agent::run_agent_with_explicit(&host, port, Some(&name));
-                std::process::exit(code);
+                unsafe { libc::_exit(code) }
             }
             Err(e) => {
                 return Err(StrykeError::runtime(
