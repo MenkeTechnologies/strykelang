@@ -84,7 +84,7 @@
   \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 % Cyberpunk dark theme for docs/reference.pdf, mirroring docs/index.html.
 % Injected by scripts/reference_pdf.sh via --include-in-header. The bash
-% script substitutes /Users/wizard/RustroverProjects/strykelang/docs/.fonts/ with an absolute path to docs/.fonts/.
+% script substitutes /Users/wizard/RustroverProjects/MenkeTechnologiesMeta/strykelang/docs/.fonts/ with an absolute path to docs/.fonts/.
 
 \usepackage{xcolor}
 \usepackage{pagecolor}
@@ -107,7 +107,7 @@
 
 % Variable Orbitron — wght axis, 400 regular / 700 bold / 900 black.
 \setsansfont{Orbitron}[
-    Path=/Users/wizard/RustroverProjects/strykelang/docs/.fonts/,
+    Path=/Users/wizard/RustroverProjects/MenkeTechnologiesMeta/strykelang/docs/.fonts/,
     Extension=.ttf,
     UprightFont=Orbitron-VF,
     UprightFeatures={RawFeature={+axis={wght=400}}},
@@ -118,7 +118,7 @@
 
 % Static Share Tech Mono — single weight.
 \setmonofont{ShareTechMono}[
-    Path=/Users/wizard/RustroverProjects/strykelang/docs/.fonts/,
+    Path=/Users/wizard/RustroverProjects/MenkeTechnologiesMeta/strykelang/docs/.fonts/,
     Extension=.ttf,
     UprightFont=ShareTechMono-Regular,
     Scale=MatchLowercase,
@@ -222,9 +222,9 @@
   \apptocmd{\@title}{\par {\large #1 \par}}{}{}
 }
 \makeatother
-\subtitle{v0.14.20}
+\subtitle{v0.16.1}
 \author{MenkeTechnologies}
-\date{2026-05-24}
+\date{2026-05-28}
 
 \begin{document}
 \maketitle
@@ -435,13 +435,30 @@ structure allows O(log n) merge depth across cores.
 
 \section{\texorpdfstring{\texttt{preduce\_init}}{preduce\_init}}\label{preduce_init}
 
-Parallel fold with identity value.
+Parallel tree-fold with an explicit identity element. Same engine as
+\texttt{preduce} (rayon\textquotesingle s \texttt{reduce\_with}), but
+\texttt{INIT} seeds every chunk so empty / single-element inputs return
+a sensible value instead of \texttt{undef}. The combining operation
+\textbf{must be associative AND} \texttt{INIT} must be its identity
+(\texttt{INIT\ ⊕\ x\ ==\ x}); otherwise different chunk boundaries
+produce different sums.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $total = preduce\_init 0, \{ \_ + \_1 \} @list}
+\NormalTok{my $total   = preduce\_init 0, \{ \_ + \_1 \} @nums      \# sum, identity 0}
+\NormalTok{my $product = preduce\_init 1, \{ \_ * \_1 \} @nums      \# product, identity 1}
+\NormalTok{my $biggest = preduce\_init {-}inf, \{ \_ \textgreater{} \_1 ? \_ : \_1 \} @vals}
+
+\NormalTok{\# Histogram merge — identity is the empty hash.}
+\NormalTok{my \%h = \%\{ preduce\_init +\{\}, \{ merge\_hash(\_, \_1) \} @per\_chunk\_hashes \}}
 \end{Highlighting}
 \end{Shaded}
+
+Without an identity, prefer \texttt{preduce} (no init) or
+\texttt{pmap\_reduce} (fused mapper + reducer).
+
+See also: \texttt{preduce}, \texttt{pmap\_reduce}, \texttt{reduce}
+(sequential), \texttt{fold} (sequential with init).
 
 \section{\texorpdfstring{\texttt{pmap\_reduce}}{pmap\_reduce}}\label{pmap_reduce}
 
@@ -493,16 +510,66 @@ See also: \texttt{pmap} (eager parallel map), \texttt{pmaps}
 \section{\texorpdfstring{\texttt{pany}}{pany}}\label{pany}
 
 \texttt{pany\ \{\ COND\ \}\ @list} --- parallel short-circuit
-\texttt{any}.
+\texttt{any}. Splits the list across cores via rayon, evaluates
+\texttt{COND} on each element, returns truthy as soon as \textbf{any}
+chunk reports a hit and cancels the rest. Returns the matching element
+(truthy) or \texttt{0} (no match).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Found in O(N/cores), often much faster — early{-}stops once any worker hits.}
+\NormalTok{if (pany \{ \_ \textgreater{} 1\_000\_000 \} @samples) \{ p "found a large sample" \}}
+\NormalTok{pany \{ is\_prime(\_) \} 10**9 : 10**9 + 50    \# "is there a prime in this range?"}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{pall} (parallel \texttt{all}), \texttt{pfirst} (return
+the matching value), \texttt{any} (sequential), \texttt{pgrep} (full
+filter).
 
 \section{\texorpdfstring{\texttt{pfirst}}{pfirst}}\label{pfirst}
 
-\texttt{pfirst\ \{\ COND\ \}\ @list} --- parallel first matching
-element.
+\texttt{pfirst\ \{\ COND\ \}\ @list} --- parallel \texttt{first}. Like
+\texttt{pany} but returns the \textbf{matching element} rather than just
+a truthy flag. Workers run concurrently across chunks; the first hit (by
+*completion order*, not input order) wins and the remaining workers are
+cancelled. Returns \texttt{undef} if no element matches.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $hit = pfirst \{ \_{-}\textgreater{}\{status\} eq "FAILED" \} @records}
+\NormalTok{my $prime = pfirst \{ is\_prime(\_) \} 10**12 : 10**12 + 1000}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Note:} output is non-deterministic when multiple elements match
+--- workers race. For first-by-input-order use sequential \texttt{first}
+or \texttt{pfirst\_in\_order} (where supported).
+
+See also: \texttt{pany}, \texttt{first}, \texttt{pgrep}.
 
 \section{\texorpdfstring{\texttt{puniq}}{puniq}}\label{puniq}
 
-\texttt{puniq\ @list} --- parallel unique elements.
+\texttt{puniq\ @list} --- parallel deduplication. Returns the unique
+elements of \texttt{@list}, with the original input order preserved
+(first occurrence wins). Elements are keyed by stringification
+(\texttt{"\$\_"}), so \texttt{1} and \texttt{"1"} deduplicate together.
+Backed by a concurrent hash set.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @uniq    = puniq @log\_lines}
+\NormalTok{my @hosts   = puniq map \{ \_{-}\textgreater{}\{host\} \} @records}
+\NormalTok{my @hashes  = puniq pmap sha256, @files     \# parallel hash + dedup}
+\end{Highlighting}
+\end{Shaded}
+
+For exact-key (no stringification) dedup, build the set manually with
+\texttt{mysync\ \%seen} + \texttt{pmaps}. For *count* of unique items
+use \texttt{hll\_count} (HyperLogLog) which is O(1) memory.
+
+See also: \texttt{uniq} (sequential), \texttt{dedup},
+\texttt{hll\_count}.
 
 \section{\texorpdfstring{\texttt{pflat\_map}}{pflat\_map}}\label{pflat_map}
 
@@ -526,14 +593,30 @@ Two equivalent surface syntaxes: \texttt{pflat\_map\ BLOCK\ LIST} or
 
 \section{\texorpdfstring{\texttt{pflat\_maps}}{pflat\_maps}}\label{pflat_maps}
 
-Streaming parallel flat-map --- like \texttt{pmaps} but flattens array
-results. Returns a lazy iterator.
+Streaming parallel flat-map. Like \texttt{pmaps} but each block
+iteration may emit zero or more values, all of which are spliced into
+the downstream iterator (no intermediate vec). Runs on the persistent
+worker-thread pool, output order is non-deterministic, and downstream
+\texttt{take}/\texttt{head} cancels remaining work.
 
 \begin{Shaded}
 \begin{Highlighting}[]
+\NormalTok{\# One{-}to{-}many expansion in parallel}
 \NormalTok{range(0, 1e6) |\textgreater{} pflat\_maps \{ [\_, \_ * 10] \} |\textgreater{} ep}
+
+\NormalTok{\# Drop and explode: yield only odd{-}derived pairs}
+\NormalTok{1:1\_000\_000 |\textgreater{} pflat\_maps \{ \_ \% 2 ? (\_, \_ * \_) : () \} |\textgreater{} take 20 |\textgreater{} ep}
+
+\NormalTok{\# Tokenize a big corpus in parallel}
+\NormalTok{glob("*.txt") |\textgreater{} pflat\_maps \{ slurp(\_) |\textgreater{} split /\textbackslash{}s+/ \} |\textgreater{} pgreps \{ len \_ \} |\textgreater{} ep}
 \end{Highlighting}
 \end{Shaded}
+
+For eager flat-map use \texttt{pflat\_map} (returns a vec). For
+sequential lazy flat-map use \texttt{flat\_maps}.
+
+See also: \texttt{pmaps}, \texttt{pflat\_map}, \texttt{flat\_maps},
+\texttt{flat\_map}.
 
 \section{\texorpdfstring{\texttt{fan}}{fan}}\label{fan}
 
@@ -713,8 +796,37 @@ between \texttt{async}/\texttt{spawn} tasks.
 
 \section{\texorpdfstring{\texttt{pselect}}{pselect}}\label{pselect}
 
-\texttt{pselect(@channels)} --- wait on multiple \texttt{pchannel}
-receivers.
+\texttt{pselect(@receivers)} /
+\texttt{pselect(timeout\_ms\ =\textgreater{}\ N,\ @receivers)} --- wait
+on multiple \texttt{pchannel} receivers; returns
+\texttt{(\$index,\ \$value)} for the first receiver to produce a value.
+Equivalent to Go\textquotesingle s
+\texttt{select\ \{\ case\ v\ :=\ \textless{}-ch1:\ …\ case\ v\ :=\ \textless{}-ch2:\ …\ \}}.
+
+The optional \texttt{timeout\_ms} clause returns \texttt{(-1,\ undef)}
+if no receiver delivers within the deadline. Closed channels (all
+senders dropped) return \texttt{(i,\ undef)} so the caller can detect
+end-of-stream per receiver.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my ($tx\_a, $rx\_a) = pchannel(8)}
+\NormalTok{my ($tx\_b, $rx\_b) = pchannel(8)}
+\NormalTok{spawn \{ $tx\_a{-}\textgreater{}send($\_) for 1:100 \}}
+\NormalTok{spawn \{ $tx\_b{-}\textgreater{}send($\_ * 10) for 1:100 \}}
+\NormalTok{while (1) \{}
+\NormalTok{    my ($idx, $val) = pselect $rx\_a, $rx\_b}
+\NormalTok{    last unless defined $val}
+\NormalTok{    p "from \#$idx: $val"}
+\NormalTok{\}}
+
+\NormalTok{\# With deadline:}
+\NormalTok{my ($idx, $val) = pselect timeout\_ms =\textgreater{} 500, $rx\_a, $rx\_b}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{pchannel}, \texttt{spawn}, \texttt{async},
+\texttt{barrier}.
 
 \section{\texorpdfstring{\texttt{barrier}}{barrier}}\label{barrier}
 
@@ -4202,15 +4314,45 @@ Iterates the list and prints each element.
 
 \section{\texorpdfstring{\texttt{p}}{p}}\label{p-1}
 
-\texttt{p} --- alias for \texttt{say} (print with newline).
+\textbf{\texttt{p} --- the stryke print-with-newline verb.} Costs one
+character, has the record separator built in, and is the canonical
+output primitive: every example, hover doc, and rosetta program in the
+corpus uses \texttt{p}. With multiple args, joins them with \texttt{\$,}
+(default empty) and appends \texttt{\$\textbackslash{}} (default
+\texttt{\textbackslash{}n}). Stringifies refs as \texttt{HASH(0x…)} /
+\texttt{ARRAY(0x…)}; use \texttt{ep} / \texttt{ddump} /
+\texttt{to\_json} for structured dumps.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{p "hello"       \# hello\textbackslash{}n}
-\NormalTok{p 42            \# 42\textbackslash{}n}
-\NormalTok{1:5 |\textgreater{} e p     \# prints each on its own line}
+\NormalTok{p "hello"          \# hello\textbackslash{}n}
+\NormalTok{p 42               \# 42\textbackslash{}n}
+\NormalTok{p "x=", $x, " y=", $y      \# multi{-}arg, joined by $,}
+\NormalTok{1:5 |\textgreater{} e p              \# iterate + p — prints one per line}
+\NormalTok{@xs |\textgreater{} ep                \# shorthand for \textasciigrave{}|\textgreater{} e p\textasciigrave{}}
+\NormalTok{p "\#\{ sum @arr \}"       \# interpolation}
 \end{Highlighting}
 \end{Shaded}
+
+\textbf{\texttt{p} is preferred over Perl 5\textquotesingle s
+\texttt{print} and \texttt{say} in every stryke context:}
+
+\textbar{} Form \textbar{} Status \textbar{}
+\textbar-\/-\/-\textbar-\/-\/-\textbar{} \textbar{} \texttt{p\ "x"}
+\textbar{} \textbf{stryke canonical} --- one char, includes newline, no
+flags \textbar{} \textbar{} \texttt{print\ "x\textbackslash{}n"}
+\textbar{} Perl 5 compat --- keeps working under \texttt{-\/-compat},
+but reads as legacy \textbar{} \textbar{} \texttt{say\ "x"} \textbar{}
+\textbf{Rejected by \texttt{-\/-no-interop}.} Perl 5.10 keyword;
+\texttt{p} exists precisely to replace it \textbar{}
+
+\texttt{p} is NOT "an alias for say" --- it\textquotesingle s the
+\textbf{primary} spelling. \texttt{say} is the rejected Perl 5 form. Use
+\texttt{p}.
+
+See also: \texttt{ep} (each-then-p), \texttt{pp} (pretty-print),
+\texttt{ddump} (full structure dump), \texttt{warn} (stderr equivalent
+of \texttt{p}).
 
 \section{\texorpdfstring{\texttt{gen}}{gen}}\label{gen}
 
@@ -4251,24 +4393,65 @@ Python\textquotesingle s \texttt{yield} or Rust\textquotesingle s
 
 \section{\texorpdfstring{\texttt{trace}}{trace}}\label{trace}
 
-Trace \texttt{mysync} mutations to stderr (tagged with worker index
-under \texttt{fan}).
+\texttt{trace\ \{\ BLOCK\ \}} --- enable shared-state mutation tracing
+for the duration of \texttt{BLOCK}. Every read/write of a
+\texttt{mysync}/\texttt{oursync} variable (including compound ops like
+\texttt{++}, \texttt{+=}, \texttt{.=}) is logged to STDERR with the
+worker index, value before, and value after. Invaluable for debugging
+races, dropped updates, or compound-op atomicity violations.
+
+Outside \texttt{trace}, the same operations run with zero overhead ---
+\texttt{trace} is the only way to switch the instrumentation on.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{trace \{ fan 10 \{ $counter++ \} \}}
+\NormalTok{mysync $counter = 0}
+\NormalTok{trace \{}
+\NormalTok{    fan 10 \{ $counter++ \}       \# 10 workers, each prints "\textless{}w\textgreater{} ++ : N → N+1"}
+\NormalTok{\}}
+\NormalTok{p $counter                       \# 10}
+
+\NormalTok{\# Diagnose a missed update:}
+\NormalTok{mysync \%hits = ()}
+\NormalTok{trace \{ fan 100 \{ $hits\{rand(10)\}++ \} \}}
 \end{Highlighting}
 \end{Shaded}
+
+For function-call tracing (every named-fn entry/exit) use
+\texttt{-\/-profile} or AOP \texttt{before}/\texttt{after}. For
+low-level VM op tracing use \texttt{-\/-trace-ops}.
+
+See also: \texttt{mysync}, \texttt{oursync}, \texttt{fan}, AOP
+\texttt{before}/\texttt{after}.
 
 \section{\texorpdfstring{\texttt{timer}}{timer}}\label{timer}
 
-Measure wall-clock milliseconds for a block.
+\texttt{timer\ \{\ BLOCK\ \}} --- measure the wall-clock elapsed time of
+\texttt{BLOCK} and return the duration in \textbf{milliseconds}
+(\texttt{f64}). The block\textquotesingle s own return value is
+discarded; use \texttt{timed} if you need both. Internally
+\texttt{std::time::Instant::now} brackets the block, so resolution is
+the host\textquotesingle s monotonic clock (sub-microsecond on modern
+CPUs).
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{my $ms = timer \{ heavy\_work() \}}
+\NormalTok{my $ms = timer \{ sort\_huge\_list() \}}
+\NormalTok{printf "sort took \%.2f ms\textbackslash{}n", $ms}
+
+\NormalTok{\# Compare two implementations:}
+\NormalTok{my $a = timer \{ algorithm\_a(@data) \}}
+\NormalTok{my $b = timer \{ algorithm\_b(@data) \}}
+\NormalTok{printf "speedup: \%.2fx\textbackslash{}n", $a / $b}
 \end{Highlighting}
 \end{Shaded}
+
+For statistical benchmarking (warmup, min / mean / p99), use
+\texttt{bench} instead. For per-operation profiling use
+\texttt{-\/-profile} or \texttt{trace}.
+
+See also: \texttt{bench}, \texttt{eval\_timeout}, \texttt{time},
+\texttt{now\_ns}.
 
 \section{\texorpdfstring{\texttt{bench}}{bench}}\label{bench}
 
@@ -4302,33 +4485,113 @@ Retry a block on failure.
 
 \section{\texorpdfstring{\texttt{rate\_limit}}{rate\_limit}}\label{rate_limit}
 
-Limit invocations per time window.
+\texttt{rate\_limit(N,\ "WINDOW")\ \{\ BLOCK\ \}} --- token-bucket
+throttle: run the body at most \texttt{N} times per \texttt{WINDOW}.
+Excess calls block until a token is available rather than failing ---
+guarantees the rate without dropping work. \texttt{WINDOW} accepts
+\texttt{"500ms"}, \texttt{"1s"}, \texttt{"5m"}, \texttt{"1h"}, or a bare
+number of seconds. The throttle state is per-call-site, so multiple
+\texttt{rate\_limit} blocks at different sites have independent buckets.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{rate\_limit(10, "1s") \{ hit\_api() \}}
+\NormalTok{\# Cap API calls at 10/sec — the 11th waits until a token frees up.}
+\NormalTok{for my $url (@urls) \{}
+\NormalTok{    rate\_limit(10, "1s") \{ fetch($url) \}}
+\NormalTok{\}}
+
+\NormalTok{\# Long window — at most 1 nightly job per hour even under retries.}
+\NormalTok{rate\_limit(1, "1h") \{ nightly\_compaction() \}}
+
+\NormalTok{\# Inside a parallel iter (mysync bucket — actually shared across workers).}
+\NormalTok{pfor \{ rate\_limit(50, "1s") \{ ingest($\_) \} \} @records}
 \end{Highlighting}
 \end{Shaded}
+
+For non-blocking probe-style throttling (test if a token is available,
+drop instead of waiting) use \texttt{try\_acquire}. For bulk burst
+handling use a \texttt{pchannel} of capacity N as a hand-rolled bucket.
+
+See also: \texttt{every}, \texttt{retry}, \texttt{circuit\_breaker},
+\texttt{semaphore}.
 
 \section{\texorpdfstring{\texttt{every}}{every}}\label{every}
 
-Run a block at a fixed interval.
+\texttt{every\ "INTERVAL"\ \{\ BLOCK\ \}} --- run \texttt{BLOCK}
+repeatedly with at least \texttt{INTERVAL} between iterations.
+\texttt{INTERVAL} accepts \texttt{"500ms"}, \texttt{"1s"},
+\texttt{"5m"}, etc. Runs *forever* on the calling thread by default;
+combine with \texttt{last}/\texttt{die} from inside the block to exit,
+or with \texttt{spawn\ \{\ every\ …\ \}} to run in the background.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{every "500ms" \{ tick() \}}
+\NormalTok{\# Tick the heartbeat every second.}
+\NormalTok{every "1s" \{ p "alive at " . now \}}
+
+\NormalTok{\# Background poll — quits cleanly when state.done.}
+\NormalTok{spawn \{}
+\NormalTok{    every "500ms" \{}
+\NormalTok{        last if $shared{-}\textgreater{}\{done\}}
+\NormalTok{        update\_dashboard()}
+\NormalTok{    \}}
+\NormalTok{\}}
+
+\NormalTok{\# Fixed{-}delta scheduler — actually{-}tick exactly every N ms even if BLOCK is slow.}
+\NormalTok{every "100ms" \{ check\_health() \}       \# next tick = previous start + 100ms}
 \end{Highlighting}
 \end{Shaded}
+
+For one-shot delayed execution use \texttt{sleep} + a normal call. For
+wall-clock-aligned ticks (every minute at :00) use \texttt{cron}.
+
+See also: \texttt{sleep}, \texttt{rate\_limit}, \texttt{eval\_timeout},
+\texttt{cron}.
 
 \section{\texorpdfstring{\texttt{watch}}{watch}}\label{watch}
 
-Watch a single file for changes (non-parallel).
+\texttt{watch\ PATH,\ fn\ \{\ …\ \}} --- register a filesystem watcher
+on \texttt{PATH} (file or directory) and invoke the callback whenever
+the path is modified. Inside the callback, \texttt{\_} is the absolute
+path of the changed file. Blocks the calling thread; combine with
+\texttt{spawn} to watch in the background.
+
+Uses the OS-native facility (\texttt{FSEvents} on macOS,
+\texttt{inotify} on Linux). Recursive on directories; not recursive on
+files. The callback fires for every event, so debounce inside the body
+if you only want a single rebuild after a burst.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{watch "/tmp/x", fn \{ process \}}
+\NormalTok{\# Live recompile loop}
+\NormalTok{watch "src/", fn \{}
+\NormalTok{    next unless \_ =\textasciitilde{} /\textbackslash{}.rs$/}
+\NormalTok{    p "changed: $\_"}
+\NormalTok{    system "cargo", "build"}
+\NormalTok{\}}
+
+\NormalTok{\# Background watcher}
+\NormalTok{spawn \{}
+\NormalTok{    watch "config.toml", fn \{ reload\_config() \}}
+\NormalTok{\}}
+
+\NormalTok{\# Debounce trailing edge — coalesce bursts into one rebuild every 250ms.}
+\NormalTok{mysync $last = 0}
+\NormalTok{watch ".", fn \{}
+\NormalTok{    my $now = now\_ns()}
+\NormalTok{    if ($now {-} $last \textgreater{} 250\_000\_000) \{}
+\NormalTok{        $last = $now}
+\NormalTok{        rebuild()}
+\NormalTok{    \}}
+\NormalTok{\}}
 \end{Highlighting}
 \end{Shaded}
+
+For parallel multi-path watching use \texttt{par\_watch}. For poll-based
+watching that doesn\textquotesingle t need OS support use
+\texttt{every\ "1s"\ \{\ stat\ …\ \}}.
+
+See also: \texttt{par\_watch}, \texttt{every}, \texttt{spawn}.
 
 \section{\texorpdfstring{\texttt{capture}}{capture}}\label{capture}
 
@@ -5612,7 +5875,7 @@ byte order. This resolves well-known service names like \texttt{http},
 \protect\phantomsection\label{ch-crypto-encoding}
 \chapter{Crypto \& Encoding}\label{crypto-encoding}
 
-133 topics
+138 topics
 
 \section{\texorpdfstring{\texttt{sha256}}{sha256}}\label{sha256}
 
@@ -6150,6 +6413,109 @@ characters (0-9, a-f, A-F) or an exception is raised.
 \NormalTok{p hex\_decode(hex\_encode("round trip"))  \# round trip}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{hide}}{hide}}\label{hide}
+
+\texttt{hide(CARRIER,\ SECRET\ {[},\ KEY{]})} --- polymorphic
+steganography. Embeds SECRET inside CARRIER and returns the modified
+carrier. Carrier kind is detected from the input bytes: data starting
+with the PNG magic (\texttt{\textbackslash{}x89PNG}) uses LSB embedding
+on the R/G/B channels (alpha skipped so transparent pixels
+can\textquotesingle t leak); anything else is treated as text and SECRET
+bits are encoded as zero-width chars (U+200B for 0, U+200C for 1)
+inserted between visible characters. Optional KEY enables
+SHA-256(key\textbar\textbar counter)-derived XOR masking of the secret
+prior to embedding.
+
+\textbf{Wire format} (so \texttt{reveal} knows where to stop):
+\texttt{{[}4-byte\ BE\ length{]}{[}secret\ bytes{]}{[}4-byte\ BE\ CRC32-IEEE{]}}.
+A CRC mismatch on \texttt{reveal} means the carrier was re-encoded,
+truncated, or never contained a payload.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Text carrier — invisible in rendered output, survives copy{-}paste in most channels.}
+\NormalTok{my $stego = hide("Lorem ipsum dolor sit amet " x 6, "secret message")}
+\NormalTok{reveal($stego) eq "secret message"   \# 1}
+
+\NormalTok{\# PNG carrier — LSB embed survives a re{-}save through any lossless tool.}
+\NormalTok{"carrier.png" |\textgreater{} slurp |\textgreater{} hide("hidden data") |\textgreater{} spew("out.png")}
+\NormalTok{slurp("out.png") |\textgreater{} reveal |\textgreater{} p     \# hidden data}
+
+\NormalTok{\# Key{-}XOR mode — wrong key still passes CRC but recovers garbage.}
+\NormalTok{hide($png\_bytes, $secret, "shared{-}passphrase") |\textgreater{} spew("out.png")}
+\NormalTok{reveal(slurp("out.png"), "shared{-}passphrase")}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{World-first}: no other major scripting language ships
+polymorphic steganography (text + image) as a single first-class
+builtin. Python needs \texttt{stegano} + \texttt{stegcloak}, Perl needs
+\texttt{Image::PNG::Libpng} + hand-rolled bit twiddling.
+
+See also: \texttt{reveal}, \texttt{hide\_capacity}.
+
+\section{\texorpdfstring{\texttt{reveal}}{reveal}}\label{reveal}
+
+\texttt{reveal(STEGO\ {[},\ KEY{]})} --- extract the secret embedded by
+\texttt{hide}. Auto-detects carrier kind the same way \texttt{hide} does
+(PNG magic vs text). Returns raw bytes; wrap with
+\texttt{decode\_utf8(...)} if you know the secret is text.
+
+Errors with a \texttt{corrupt\ or\ absent\ payload} message on:
+
+\begin{itemize}
+\tightlist
+\item
+  CRC32 mismatch (carrier re-encoded by a lossy tool, or no payload was
+  ever embedded)
+\item
+  declared length exceeding the carrier\textquotesingle s embedded bit
+  capacity
+\item
+  carrier too small to even hold a 4-byte length prefix
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $secret = reveal($stego)                  \# bytes}
+\NormalTok{p $secret                                    \# auto{-}stringifies via UTF{-}8 decode}
+
+\NormalTok{my $hidden = slurp("image.png") |\textgreater{} reveal}
+\NormalTok{my $keyed  = reveal($stego, "shared{-}passphrase")}
+
+\NormalTok{\# Detect tampering: anything that mutates the embedded bits fails the CRC32.}
+\NormalTok{try \{ reveal($maybe\_stego) \} catch ($e) \{}
+\NormalTok{    warn "no valid payload: $e"}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{hide}, \texttt{hide\_capacity}.
+
+\section{\texorpdfstring{\texttt{hide\_capacity}}{hide\_capacity}}\label{hide_capacity}
+
+\texttt{hide\_capacity(CARRIER)} --- return how many bytes of secret
+payload CARRIER can hold, accounting for the 8-byte envelope overhead
+(4-byte length + 4-byte CRC32). Useful for sizing before calling
+\texttt{hide}.
+
+For PNG carriers: \texttt{(width\ *\ height\ *\ 3)\ /\ 8\ -\ 8} (R+G+B
+LSBs, alpha skipped). For text carriers:
+\texttt{(visible\_chars\ /\ 8)\ -\ 8} (one bit per visible code point).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $cap = hide\_capacity(slurp("carrier.png"))}
+\NormalTok{p "can hide up to $cap bytes"}
+\NormalTok{if (length($secret) \textgreater{} $cap) \{}
+\NormalTok{    die "secret too large for this carrier"}
+\NormalTok{\}}
+\NormalTok{hide\_capacity("x" x 100)   \# 4}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{hide}, \texttt{reveal}.
 
 \section{\texorpdfstring{\texttt{uuid}}{uuid}}\label{uuid}
 
@@ -6857,6 +7223,77 @@ Optional size parameter. Save to file or embed in HTML.
 \NormalTok{my $big = qr\_png($url, 16)}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{controller}}{controller}}\label{controller}
+
+\texttt{controller({[}bind,\ {[}port{]}{]})} --- drop this stryke
+process into \textbf{controller mode}: bind a TCP listener at
+\texttt{bind:port}, accept agent connections, and run the interactive
+REPL on stdin so commands like \texttt{status}, \texttt{@CODE},
+\texttt{eval\ CODE}, \texttt{fire}, \texttt{terminate}, and
+\texttt{shutdown} can be typed at the prompt. Blocking; returns the exit
+code (\texttt{0} on a clean \texttt{shutdown}, \texttt{1} if bind
+fails). Defaults: \texttt{bind="0.0.0.0"}, \texttt{port=9999}.
+
+Equivalent to the \texttt{stryke\ controller} CLI subcommand but
+invokable from any stryke source file. Combine with \texttt{agent()} and
+\texttt{spawn} to run controller + local agent in a single process for
+testing.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Bare invocation — bind 0.0.0.0:9999, REPL on stdin}
+\NormalTok{controller()}
+
+\NormalTok{\# Explicit}
+\NormalTok{exit controller("127.0.0.1", 8888)}
+
+\NormalTok{\# Controller + local agent in one process (testing pattern)}
+\NormalTok{spawn \{}
+\NormalTok{    sleep 1}
+\NormalTok{    agent("localhost:9999", "local{-}worker")}
+\NormalTok{\}}
+\NormalTok{controller("127.0.0.1", 9999)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{agent}.
+
+\section{\texorpdfstring{\texttt{agent}}{agent}}\label{agent}
+
+\texttt{agent({[}controller\_addr,\ {[}name{]}{]})} --- drop this stryke
+process into \textbf{agent mode}: connect to \texttt{controller\_addr}
+(default \texttt{localhost:9999}), send \texttt{AGENT\_HELLO}, and enter
+the persistent frame loop handling \texttt{FIRE} / \texttt{EVAL} /
+\texttt{TERMINATE} / \texttt{STATUS} / \texttt{SHUTDOWN} from the
+controller. EVAL frames carry arbitrary stryke source that runs against
+a persistent per-agent \texttt{VMHelper}, so \texttt{sub} definitions
+and \texttt{\$main::name} globals survive across calls --- the
+controller becomes a remote REPL.
+
+\texttt{controller\_addr} may be a bare host (port defaults to 9999) or
+\texttt{host:port}. \texttt{name} is what shows in the
+controller\textquotesingle s \texttt{status} table --- defaults to the
+local hostname if omitted.
+
+Blocking; returns the exit code (\texttt{0} clean disconnect, \texttt{1}
+connection or handshake failure). Wrap in
+\texttt{spawn\ \{\ agent(...)\ \}} to run an agent in the background.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\#!/usr/bin/env stryke}
+\NormalTok{\# Become an agent on boot}
+\NormalTok{exit agent($ENV\{CONTROLLER\_ADDR\} // "ctl.local:9999", $ENV\{HOSTNAME\})}
+
+\NormalTok{\# Multi{-}agent test fixture in one process}
+\NormalTok{spawn \{ agent("localhost:9999", "worker{-}1") \}}
+\NormalTok{spawn \{ agent("localhost:9999", "worker{-}2") \}}
+\NormalTok{controller("127.0.0.1", 9999)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{controller}.
 
 \section{\texorpdfstring{\texttt{qr\_svg}}{qr\_svg}}\label{qr_svg}
 
@@ -11836,7 +12273,7 @@ be hashrefs carrying
 \protect\phantomsection\label{ch-file-i-o}
 \chapter{File I/O}\label{file-io}
 
-35 topics
+38 topics
 
 \section{\texorpdfstring{\texttt{open}}{open}}\label{open}
 
@@ -12134,11 +12571,20 @@ The return value is always a string. All format specifiers from
 
 \section{\texorpdfstring{\texttt{slurp}}{slurp}}\label{slurp}
 
-Read an entire file into memory as a single UTF-8 string, or --- when
-the path is a glob pattern --- concatenate the contents of every
-matching regular file. Aliases: \texttt{sl}, \texttt{cat}, \texttt{c}.
-Dies if the file is missing or unreadable. For binary data use
-\texttt{read\_bytes}/\texttt{slurp\_raw}.
+Read an entire file into memory as a \textbf{byte string} (Perl-default
+semantics --- strings are bytes), or --- when the path is a glob pattern
+--- concatenate the bytes of every matching regular file. Aliases:
+\texttt{sl}, \texttt{cat}, \texttt{c}. Dies if the file is missing or
+unreadable.
+
+\textbf{Binary-safe.} The result is a byte buffer that stringifies via
+UTF-8-or-Latin-1 decoding, so \texttt{eq}/regex/substr still match on
+text content, but \texttt{length()} reports the byte count and writing
+back via \texttt{spew} round-trips the exact bytes. Use directly on
+binary files (images, archives, etc.) --- no separate
+\texttt{read\_bytes}/\texttt{slurp\_raw} call needed.
+\texttt{read\_bytes}/\texttt{slurp\_raw} remain available as
+explicit-intent aliases.
 
 When the path contains glob metacharacters (\texttt{*} \texttt{?}
 \texttt{{[}} \texttt{**}) or a trailing zsh qualifier suffix
@@ -12153,13 +12599,20 @@ reference.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{my $text = slurp("config.yaml")}
-\NormalTok{my $all = c("**(.)")               \# every regular file recursively, concatenated}
+\NormalTok{my $png = slurp("logo.png")         \# binary{-}safe; bytes preserved}
+\NormalTok{spew("copy.png", $png)              \# round{-}trips exactly}
+\NormalTok{my $all = c("**(.)")                \# every regular file recursively, concatenated bytes}
 \NormalTok{my $logs = c("logs/*.log")          \# all logs in one go}
 \NormalTok{my $json = sl("data.json")}
 \NormalTok{my $data = decode\_json($json)}
-\NormalTok{"README.md" |\textgreater{} sl |\textgreater{} length |\textgreater{} p    \# character count}
+\NormalTok{"README.md" |\textgreater{} sl |\textgreater{} length |\textgreater{} p    \# byte count (Perl{-}default)}
 \end{Highlighting}
 \end{Shaded}
+
+\textbf{Per-file hash sibling:} see \texttt{swallow}/\texttt{swa} ---
+same glob engine but returns
+\texttt{\{\ canonical\_abspath\ =\textgreater{}\ bytes\ \}} instead of
+concatenating.
 
 \section{\texorpdfstring{\texttt{slurp\_raw}}{slurp\_raw}}\label{slurp_raw}
 
@@ -12178,6 +12631,166 @@ The alias \texttt{slurp\_raw} emphasizes the raw nature.
 \NormalTok{p $text}
 \end{Highlighting}
 \end{Shaded}
+
+\section{\texorpdfstring{\texttt{swallow}}{swallow}}\label{swallow}
+
+\texttt{swallow\ PATTERN} --- expand a zsh-style glob and return a hash
+\texttt{\{\ canonical\_abspath\ =\textgreater{}\ raw\_bytes\ \}}.
+Aliases: \texttt{swa}. The per-file body never decodes, so text and
+binary files round-trip uniformly --- wrap with
+\texttt{decode\_utf8(...)} when you want a string.
+
+\textbf{Symmetry table:}
+
+\textbar{} \textbar{} concat / single value \textbar{} per-file hash
+\textbar{} streaming iterator \textbar{}
+\textbar-\/-\/-\textbar-\/-\/-\textbar-\/-\/-\textbar-\/-\/-\textbar{}
+\textbar{} text (UTF-8) \textbar{} \texttt{slurp} / \texttt{sl} /
+\texttt{cat} / \texttt{c} \textbar{} --- \textbar{} --- \textbar{}
+\textbar{} bytes (raw) \textbar{} \texttt{read\_bytes} /
+\texttt{slurp\_raw} / \texttt{rb} \textbar{} \textbf{\texttt{swallow} /
+\texttt{swa}} \textbar{} \textbf{\texttt{ingest} / \texttt{ing}}
+\textbar{}
+
+Uses the \textbf{same} zshrs glob engine as \texttt{glob} and
+\texttt{slurp}, so every qualifier (\texttt{(N)}, \texttt{(.)},
+\texttt{(/)}, \texttt{(L+1024)}, \texttt{(om{[}1{]})}, \texttt{(f644)},
+\ldots) is supported. Hash keys are absolute paths produced by
+\texttt{fs::canonicalize}, which flattens symlinks to their real targets
+--- a symlink farm collapses to the underlying files.
+
+\textbf{Hard-fails} on a non-regular-file match the same way
+\texttt{slurp} does (\texttt{swallow:\ not\ a\ regular\ file:\ ./sub}).
+Opt into silence with the \texttt{(N)} null-glob qualifier
+(\texttt{swallow\ "missing*(N)"} returns an empty hash).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%src = swallow("src/**/*.rs")               \# every Rust file, raw bytes}
+\NormalTok{swallow("**(.)") |\textgreater{} keys |\textgreater{} p                  \# every regular file\textquotesingle{}s abs path}
+\NormalTok{my \%imgs = swa("assets/**/*.\{png,jpg\}")        \# binary files work uniformly}
+\NormalTok{for my ($path, $bytes) (swallow "*.log") \{}
+\NormalTok{    p "$path: ", length($bytes), " bytes"}
+\NormalTok{\}}
+\NormalTok{my \%recent = swallow("**(.om[1,5])")           \# 5 newest files (zsh qualifier)}
+\NormalTok{my \%safe = swallow("missing*(N)")              \# empty hash, no error}
+\end{Highlighting}
+\end{Shaded}
+
+For giant trees where every file\textquotesingle s bytes
+don\textquotesingle t fit in RAM at once, use \texttt{ingest} --- it
+streams \texttt{{[}path,\ bytes{]}} one file at a time instead of
+materialising the full hash.
+
+See also: \texttt{ingest} (streaming variant), \texttt{slurp} (concat
+text), \texttt{read\_bytes} (single-file bytes), \texttt{glob} (paths
+only), \texttt{glob\_par} (parallel paths).
+
+\section{\texorpdfstring{\texttt{ingest}}{ingest}}\label{ingest}
+
+\texttt{ingest\ PATTERN} --- streaming variant of \texttt{swallow}.
+Returns a lazy iterator that yields
+\texttt{{[}canonical\_abspath,\ raw\_bytes{]}} one file at a time.
+Aliases: \texttt{ing}. Only one file\textquotesingle s bytes are
+resident at any moment --- usable on directory trees whose total
+contents won\textquotesingle t fit in memory.
+
+\textbf{Pipeline shape}: path discovery + stat + canonicalize run
+eagerly up front (so qualifier support is identical to
+\texttt{glob}/\texttt{slurp}/\texttt{swallow} and non-regular matches
+hard-fail immediately). File content reads are deferred to each
+\texttt{next\_item()} call.
+
+\textbf{Iteration models}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{for\ my\ (\$path,\ \$bytes)\ (ingest\ "…")\ \{\ …\ \}} ---
+  streams (the foreach loop pulls one pair at a time from the iterator,
+  never materialising a list).
+\item
+  \texttt{ingest\ "…"\ \textbar{}\textgreater{}\ e\ \{\ …\ \}} ---
+  streams through stryke\textquotesingle s pipe terminals.
+\item
+  \texttt{my\ \$it\ =\ ingest\ "…";\ while\ (my\ \$pair\ =\ \$it-\textgreater{}next-\textgreater{}{[}0{]})\ \{\ …\ \}}
+  --- explicit driving via the standard iterator
+  \texttt{-\textgreater{}next} protocol.
+\end{itemize}
+
+Hard-fails on non-regular matches up-front
+(\texttt{ingest:\ not\ a\ regular\ file:\ ./sub}). Opt into silence with
+the \texttt{(N)} null-glob qualifier.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Hash every file in a tree without ever loading two files\textquotesingle{} bytes at once.}
+\NormalTok{use Digest::SHA qw(sha256\_hex);}
+\NormalTok{for my ($path, $bytes) (ingest "data/**/*.bin") \{}
+\NormalTok{    p "$path  ", sha256\_hex($bytes)}
+\NormalTok{\}}
+
+\NormalTok{\# Streaming pipe — counts total bytes without materialising any file twice.}
+\NormalTok{my $total = 0;}
+\NormalTok{for my ($p, $b) (ingest "logs/**/*.log") \{ $total += length($b) \}}
+\NormalTok{p "$total bytes across ", scalar(glob "logs/**/*.log"), " files"}
+
+\NormalTok{\# Explicit driving + early termination.}
+\NormalTok{my $it = ingest "src/**/*.rs";}
+\NormalTok{while (my $pair = $it{-}\textgreater{}next{-}\textgreater{}[0]) \{}
+\NormalTok{    my ($path, $bytes) = @$pair;}
+\NormalTok{    last if length($bytes) \textgreater{} 100\_000;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{swallow} (eager hash variant), \texttt{slurp}
+(concat), \texttt{read\_bytes} (single-file).
+
+\section{\texorpdfstring{\texttt{burp}}{burp}}\label{burp}
+
+\texttt{burp\ HASH} --- inverse of \texttt{swallow}. Walk a
+\texttt{\{\ path\ =\textgreater{}\ content\ \}} hash, write each entry
+to disk (parent directories created automatically), and return the
+integer count of files written.
+
+Values that are byte buffers (\texttt{StrykeValue::bytes} --- the type
+returned by \texttt{swallow}/\texttt{read\_bytes}/\texttt{ingest}) write
+raw bytes. Any other scalar stringifies through \texttt{to\_string()}
+first (matches \texttt{spew}/\texttt{spurt} conventions). Pass the hash
+by reference: \texttt{burp\ \textbackslash{}\%h} or
+\texttt{burp\ \{\ ...\ \}} (inline hashref). The bare \texttt{burp\ \%h}
+form is not supported --- the parser binds it as a scalar, not a hash.
+
+\textbf{Hard-fails on the first I/O error}, so a half-applied burp
+surfaces immediately instead of silently dropping entries. Empty hash
+returns \texttt{0} without touching the filesystem.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Canonical swallow → modify → burp round{-}trip}
+\NormalTok{my \%src = swallow "src/**/*.rs";}
+\NormalTok{for my $path (keys \%src) \{}
+\NormalTok{    $src\{$path\} = uc $src\{$path\};       \# bytes are mutable scalars in stryke}
+\NormalTok{\}}
+\NormalTok{my $n = burp \textbackslash{}\%src;}
+\NormalTok{p "$n files updated";}
+
+\NormalTok{\# Snapshot{-}restore: copy an entire tree under a new root.}
+\NormalTok{my \%tree = swallow "old/**/*";}
+\NormalTok{my \%dest = map \{ my $k = $\_; $k =\textasciitilde{} s\{\^{}/abs/old\}\{/abs/new\}; ($k =\textgreater{} $tree\{$\_\}) \} keys \%tree;}
+\NormalTok{burp \%dest;                              \# parent dirs in /abs/new/... created on the fly}
+
+\NormalTok{\# Project scaffold from inline literals.}
+\NormalTok{burp \{}
+\NormalTok{    "./out/README.md"   =\textgreater{} "\# Hello\textbackslash{}n",}
+\NormalTok{    "./out/src/main.rs" =\textgreater{} "fn main() \{ println!(\textbackslash{}"hi\textbackslash{}"); \}\textbackslash{}n",}
+\NormalTok{\};}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{swallow} (read side), \texttt{spew}/\texttt{spurt}
+(single-file write), \texttt{ingest} (streaming read).
 
 \section{\texorpdfstring{\texttt{input}}{input}}\label{input}
 
@@ -14753,7 +15366,39 @@ lifetime of the cluster.
 
 \section{\texorpdfstring{\texttt{pflat\_map\_on}}{pflat\_map\_on}}\label{pflat_map_on}
 
-Distributed parallel flat-map over \texttt{cluster}.
+\texttt{pflat\_map\_on(CLUSTER,\ BLOCK,\ LIST)} --- distributed parallel
+flat-map: ships each input item over the wire to a worker in
+\texttt{CLUSTER} (a list of \texttt{"host:port"} strings registered with
+\texttt{cluster\_init}), evaluates the block remotely, and streams
+flattened results back. Output is concatenated by completion order
+across workers. Drop-in distributed analog of local \texttt{pflat\_map}.
+
+The cluster handle is a normal stryke value, so you can have several
+pools targeting different host sets. Each remote eval runs in the
+worker\textquotesingle s own interpreter, so be explicit about closure
+values --- they\textquotesingle re serialized via the wire protocol, not
+captured by reference. Builtins are available remotely; user-defined
+\texttt{fn}s must be installed on the worker via
+\texttt{cluster\_install\_code}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $cluster = cluster\_init("worker01:7878", "worker02:7878", "worker03:7878")}
+
+\NormalTok{my @hashes = pflat\_map\_on $cluster, \{ sha256(slurp(\_)) \} @big\_files}
+
+\NormalTok{fn explode = (\_, \_ * 10, \_ * 100)}
+\NormalTok{cluster\_install\_code($cluster, \textbackslash{}\&explode)}
+\NormalTok{my @out = pflat\_map\_on $cluster, explode, 1:100}
+\end{Highlighting}
+\end{Shaded}
+
+For distributed \texttt{map} (1:1) use \texttt{pmap\_on}. For local
+flat-map use \texttt{pflat\_map}. For streaming variant use
+\texttt{pflat\_maps\_on}.
+
+See also: \texttt{pflat\_map}, \texttt{pmap\_on},
+\texttt{cluster\_init}, \texttt{cluster\_install\_code}.
 
 \section{\texorpdfstring{\texttt{ssh}}{ssh}}\label{ssh}
 
@@ -14776,6 +15421,585 @@ environment before building a cluster.
 \NormalTok{my $free = ssh("gpu{-}box", "nvidia{-}smi {-}{-}query{-}gpu=memory.free {-}{-}format=csv,noheader")}
 \end{Highlighting}
 \end{Shaded}
+
+\protect\phantomsection\label{ch-scriptable-distributed-compute-congregation}
+\chapter{Scriptable Distributed Compute
+(congregation)}\label{scriptable-distributed-compute-congregation}
+
+29 topics
+
+\section{\texorpdfstring{\texttt{congregation}}{congregation}}\label{congregation}
+
+\texttt{congregation(\$n)} --- fork N stryke worker children locally,
+wait for them to register with an auto-spawned controller on
+\texttt{127.0.0.1}, return an array of N worker handles (the agent
+session\_ids). Sets the current controller so subsequent
+\texttt{pray}/\texttt{annex} calls don\textquotesingle t need an
+explicit handle.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @workers = congregation(4)}
+\NormalTok{my \%results = harvest "compute()", @workers}
+\NormalTok{excommunicate(@workers)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{anoint}, \texttt{ordain}, \texttt{pray},
+\texttt{harvest}, \texttt{excommunicate}.
+
+\section{\texorpdfstring{\texttt{ordain}}{ordain}}\label{ordain}
+
+\texttt{ordain({[}\$name,\ {[}\$bind,\ {[}\$port{]}{]}{]})} --- explicit
+lower-level form of \texttt{congregation}. Spawns a controller (no agent
+processes), registers \texttt{\$name\ →\ endpoint} in the in-process
+cathedral so subsequent \texttt{profess(\$name)} calls can resolve.
+Returns controller handle ID; sets the current controller.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ordain "renderfarm", "0.0.0.0", 9999}
+\NormalTok{welcome 4, 30\_000     \# wait for 4 slaves to profess}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{congregation}, \texttt{anoint}, \texttt{profess},
+\texttt{cathedral}.
+
+\section{\texorpdfstring{\texttt{muster}}{muster}}\label{muster}
+
+\texttt{muster({[}\$controller\_id{]})} --- return the current
+congregation\textquotesingle s worker handles as an array of session-ids
+(sorted ascending). With no argument, uses the current controller (set
+by the most recent \texttt{congregation} or \texttt{ordain}).
+
+See also: \texttt{congregation}, \texttt{welcome}.
+
+\section{\texorpdfstring{\texttt{pray}}{pray}}\label{pray}
+
+\texttt{pray(\$code,\ @agent\_handles)} --- scatter \texttt{\$code} to
+every agent in \texttt{@agent\_handles}, return a divination ID for
+\texttt{annex} to consume. Agents start executing immediately in
+parallel; this call returns as soon as the EVAL frame is on every wire.
+
+\texttt{\$code} accepts either a string OR a coderef. Coderef body is
+deparsed via \texttt{crate::deparse::deparse\_block} before shipping.
+Closure captures are NOT supported in v1 --- body must be
+self-contained.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $div = pray sub \{ 2 + $\_ \}, @workers      \# coderef form}
+\NormalTok{my $div = pray "2 + 3", @workers              \# string form}
+\NormalTok{my \%results = annex $div}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{annex}, \texttt{harvest}, \texttt{chant}.
+
+\section{\texorpdfstring{\texttt{annex}}{annex}}\label{annex}
+
+\texttt{annex(\$divination\_id\ {[},\ \$timeout\_ms{]})} --- block until
+every agent that received the prayer has replied (or per-agent timeout,
+default 30s). Returns a hash keyed by stringified session-id; values are
+each agent\textquotesingle s eval output. Consumes the divination ---
+calling \texttt{annex} twice on the same ID is an error.
+
+Agents that timed out or disconnected are silently omitted from the
+result hash.
+
+See also: \texttt{pray}, \texttt{harvest}, \texttt{lick}
+(non-destructive peer alternative).
+
+\section{\texorpdfstring{\texttt{harvest}}{harvest}}\label{harvest}
+
+\texttt{harvest(\$code,\ @agent\_handles\ {[},\ \$timeout\_ms{]})} ---
+fused \texttt{pray\ +\ annex}. Scatters \$code to every handle, blocks
+for replies up to \$timeout\_ms (default 30s), returns the result hash
+directly. No divination id leaked. The common scatter-gather pattern in
+one call.
+
+Last arg is treated as a timeout if it\textquotesingle s a bare integer
+≥ 100 (heuristic; for unambiguous form pass \texttt{{[}@cong{]}} as an
+array literal).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%frames = harvest "render\_frame()", @workers, 60\_000}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{pray}, \texttt{annex}.
+
+\section{\texorpdfstring{\texttt{excommunicate}}{excommunicate}}\label{excommunicate}
+
+\texttt{excommunicate(@agent\_handles)} --- send \texttt{SHUTDOWN}
+frames to every named agent. Each agent exits its loop and its TCP
+connection drops. Returns the count of agents successfully notified. Use
+for clean cleanup at end of a congregation\textquotesingle s life.
+
+See also: \texttt{smite} (state-only reset, agent stays connected),
+\texttt{apostatize} (cathedral cleanup).
+
+\section{\texorpdfstring{\texttt{smite}}{smite}}\label{smite}
+
+\texttt{smite(@agent\_handles)} --- destroy each agent\textquotesingle s
+\texttt{\%soul} and \texttt{\%gift} hashes (volatile worker state)
+without disconnecting. Implemented as a synchronous EVAL that clears the
+conventional \texttt{our\ \%soul} / \texttt{our\ \%gift} then returns.
+Use when you want to wipe worker state without losing the connection.
+
+Returns the count of agents that responded to the smiting.
+
+See also: \texttt{excommunicate} (full disconnect), \texttt{recant}
+(slave-side partial erasure).
+
+\section{\texorpdfstring{\texttt{bestow}}{bestow}}\label{bestow}
+
+\texttt{bestow(\textbackslash{}\%hash,\ @agent\_handles)} --- push
+\texttt{\%hash} to every named agent\textquotesingle s
+\texttt{our\ \%gift} hash. JSON-serialized on master, decoded on agent
+via \texttt{from\_json}. The agent\textquotesingle s existing
+\texttt{\%gift} is replaced (not merged) --- for merge semantics the
+agent\textquotesingle s \texttt{divine} handler would pull from
+\texttt{\%gift} and combine explicitly.
+
+Returns the count of agents that accepted the bestowal.
+
+See also: \texttt{smite} (destroy \%gift), \texttt{lick} (read \%soul
+back).
+
+\section{\texorpdfstring{\texttt{enshrine}}{enshrine}}\label{enshrine}
+
+\texttt{enshrine(\textbackslash{}\%hash,\ \$path)} --- write the souls
+hash to disk as JSON for later \texttt{exhume}. Format:
+\texttt{\{\ "session\_id\_str":\ "output\_str",\ ...\ \}}. Returns the
+number of bytes written.
+
+See also: \texttt{exhume}, \texttt{martyr}, \texttt{resurrect}.
+
+\section{\texorpdfstring{\texttt{exhume}}{exhume}}\label{exhume}
+
+\texttt{exhume(\$path)} --- read an \texttt{enshrine}d hash back from
+disk. Returns the hash with the same shape it was written with (string
+keys, string values). Errors if file is missing or not a valid JSON
+object.
+
+See also: \texttt{enshrine}, \texttt{resurrect}.
+
+\section{\texorpdfstring{\texttt{smother}}{smother}}\label{smother}
+
+\texttt{smother(\textbackslash{}\%hash)} --- securely zero a local hash.
+Walks every key and overwrites the value with an empty string, then
+clears the hash. Returns the count of entries scrubbed. Local-only ---
+no network.
+
+Most useful with a hash\_ref (mutates caller\textquotesingle s hash in
+place). Pass-by-value hash returns the count but can\textquotesingle t
+actually scrub the caller\textquotesingle s namespace.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%souls = harvest "compute()", @workers}
+\NormalTok{use\_results(\textbackslash{}\%souls)}
+\NormalTok{smother(\textbackslash{}\%souls)    \# secure{-}erase before drop}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{amen}}{amen}}\label{amen}
+
+\texttt{amen(\$id)} --- release a pending divination OR stop an active
+chant. Tries divination registry first, then chant registry. For chants,
+also stops the rescatter at the new-joiner path so late joiners stop
+receiving the prayer.
+
+Returns 1 if the ID was found (in either registry), 0 if already
+consumed or never existed.
+
+See also: \texttt{pray}, \texttt{chant}.
+
+\section{\texorpdfstring{\texttt{anoint}}{anoint}}\label{anoint}
+
+\texttt{anoint(\$n)} --- like \texttt{congregation(\$n)} but does NOT
+take over as the current controller. Use when you want to keep a primary
+congregation as the implicit target while spawning a secondary one.
+Returns array of session-ids; controller handle is registered but
+callers manage it explicitly.
+
+See also: \texttt{congregation}, \texttt{ordain}.
+
+\section{\texorpdfstring{\texttt{welcome}}{welcome}}\label{welcome}
+
+\texttt{welcome(\$n\ {[},\ \$timeout\_ms{]})} --- block until at least
+\$n agents have joined the current congregation, or \$timeout\_ms
+elapses (default 5s). Returns the actual agent count at return time.
+Useful for "wait for the slow joiner" patterns after \texttt{ordain}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ordain "renderfarm"}
+\NormalTok{welcome 4, 30\_000}
+\NormalTok{my @workers = muster()}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{congregation}, \texttt{muster}.
+
+\section{\texorpdfstring{\texttt{pilgrimage}}{pilgrimage}}\label{pilgrimage}
+
+\texttt{pilgrimage(\$code,\ @agent\_handles\ {[},\ \$timeout\_ms{]})}
+--- sync barrier. Scatter \$code to every named agent and block until
+every dispatched agent has replied, or \$timeout\_ms elapses (default
+10s). Returns 1 if every agent rendezvoused in time, 0 otherwise.
+
+For a pure rendezvous (no work), pass \texttt{"1"} as the prayer --- the
+agent\textquotesingle s reply is the synchronization signal.
+
+See also: \texttt{pray}, \texttt{harvest}.
+
+\section{\texorpdfstring{\texttt{bow}}{bow}}\label{bow}
+
+\texttt{bow()} --- drop this stryke process into agent mode and enter
+the receive loop. Slave-side alias for \texttt{agent()}. Completes the
+master/slave verb pair (master \texttt{pray}s, slave \texttt{bow}s and
+\texttt{divine}s).
+
+See also: \texttt{agent}, \texttt{divine}, \texttt{profess}.
+
+\section{\texorpdfstring{\texttt{lick}}{lick}}\label{lick}
+
+\texttt{lick(@agent\_handles)} --- non-destructive snapshot of every
+worker\textquotesingle s \texttt{\%soul}. Scatters
+\texttt{to\_json(\textbackslash{}\%soul)} and gathers; workers retain
+their \texttt{\%soul} intact. Returns hash keyed by stringified
+session-id; values are each worker\textquotesingle s \texttt{\%soul}
+rehydrated from JSON.
+
+For destructive harvest (read then wipe): pair with \texttt{smite}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my \%snapshot = lick @workers}
+\NormalTok{smite @workers     \# zero workers\textquotesingle{} \%soul and \%gift}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{peruse} (deeper walk), \texttt{annex} (destructive on
+pray-result), \texttt{smite}.
+
+\section{\texorpdfstring{\texttt{peruse}}{peruse}}\label{peruse}
+
+\texttt{peruse(@agent\_handles)} --- deep non-destructive
+\texttt{\%soul} walk. Tier 3 ships as an alias for \texttt{lick}; Tier 5
+will replace the body with a \texttt{god}-style recursive dump that
+captures blessed objects, references, and cycles (vs
+lick\textquotesingle s flat JSON serialization).
+
+See also: \texttt{lick}.
+
+\section{\texorpdfstring{\texttt{chant}}{chant}}\label{chant}
+
+\texttt{chant(\$code,\ @agent\_handles)} --- register an ongoing prayer
+that fires at every current agent AND every new agent that joins later
+(via the accept-loop hook). Returns a chant\_id used by \texttt{amen} to
+stop the rescatter. Fire-and-forget --- no gather.
+
+Use for state distribution --- a \texttt{bestow}-like push to current
+AND future workers without a master-side polling loop.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $vigil = chant "our \%config = (max\_depth =\textgreater{} 8)", @workers}
+\NormalTok{\# new workers can profess() and auto{-}receive the chant on join}
+\NormalTok{amen $vigil}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{pray}, \texttt{amen}, \texttt{bestow}.
+
+\section{\texorpdfstring{\texttt{profess}}{profess}}\label{profess}
+
+\texttt{profess(\$congregation\_name)} --- slave-side: look up the
+congregation in the in-process cathedral registry, drop this process
+into agent mode pointed at the resolved endpoint. Blocks for the
+lifetime of the agent session.
+
+Tier 4: cathedral is in-process only --- \texttt{profess} only succeeds
+when the master ran \texttt{ordain(\$name,\ ...)} in the same OS
+process. Tier 5+ promotes the cathedral to a standalone \texttt{stryked}
+daemon for cross-host name resolution.
+
+See also: \texttt{ordain}, \texttt{cathedral}, \texttt{apostatize},
+\texttt{bow}.
+
+\section{\texorpdfstring{\texttt{apostatize}}{apostatize}}\label{apostatize}
+
+\texttt{apostatize(\$congregation\_name)} --- master-side: unregister
+the named congregation from the cathedral so future \texttt{profess}
+calls won\textquotesingle t find it. Does NOT excommunicate
+currently-connected agents (use \texttt{excommunicate(muster())} for
+that). Returns 1 if the name was registered, 0 if it
+wasn\textquotesingle t.
+
+See also: \texttt{ordain}, \texttt{excommunicate}.
+
+\section{\texorpdfstring{\texttt{cathedral}}{cathedral}}\label{cathedral}
+
+\texttt{cathedral()} --- return an array of currently-registered
+congregation names. Diagnostic helper for inspecting the cathedral
+registry.
+
+See also: \texttt{ordain}, \texttt{profess}, \texttt{apostatize}.
+
+\section{\texorpdfstring{\texttt{cloister}}{cloister}}\label{cloister}
+
+\texttt{cloister(\$token)} --- turn the current
+controller\textquotesingle s \texttt{:cloistered} mode on (when called
+with a non-empty token) or off (when called with undef/empty). In
+\texttt{:cloistered} mode, agents must send an \texttt{AGENT\_AUTH}
+frame carrying \texttt{\$token} within 500ms of HELLO or
+they\textquotesingle re rejected. Open mode (default) skips the AUTH
+read entirely.
+
+Slaves opt into AUTH by setting \texttt{STRYKE\_AGENT\_TOKEN} env var
+before calling \texttt{agent()} / \texttt{bow()} / \texttt{profess()}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ordain "audit\_pool"}
+\NormalTok{cloister "s3cret{-}t0ken"}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{ordain}, \texttt{welcome}.
+
+\section{\texorpdfstring{\texttt{recant}}{recant}}\label{recant}
+
+\texttt{recant(@keys)} --- partial self-erasure of \texttt{\%soul}:
+delete the named keys from the package-global \texttt{\%soul}.
+Slave-side primitive (runs in the agent\textquotesingle s persistent
+VM). Returns the count of keys requested.
+
+Tier 4 limitation: returns the intended-delete count; caller wraps with
+\texttt{for\ my\ \$k\ (@keys)\ \{\ delete\ \$main::soul\{\$k\}\ \}} to
+actually mutate. Tier 5 wires a Rust interpreter handle for atomic
+delete.
+
+For full erasure, use \texttt{smite(@me)} from the master side.
+
+See also: \texttt{smite}, \texttt{martyr}.
+
+\section{\texorpdfstring{\texttt{martyr}}{martyr}}\label{martyr}
+
+\texttt{martyr(\$path)} --- slave-side: enshrine current \texttt{\%soul}
+to \texttt{\$path} then \texttt{exit(0)}. Returns only if enshrine
+fails; on success the process terminates.
+
+Tier 4 limitation: caller must call
+\texttt{enshrine(\textbackslash{}\%soul,\ \$path)} first;
+\texttt{martyr} is just the "exit after enshrine" half. Tier 5 fuses
+them.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{enshrine \textbackslash{}\%soul, "/tmp/soul.json"}
+\NormalTok{martyr "/tmp/soul.json"    \# never returns}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{enshrine}, \texttt{resurrect}.
+
+\section{\texorpdfstring{\texttt{resurrect}}{resurrect}}\label{resurrect}
+
+\texttt{resurrect(\$enshrine\_path)} --- master-side: read enshrined
+state, anoint one new agent, bestow the state to it. Returns the new
+agent\textquotesingle s session-id. Composable: just
+\texttt{exhume\ +\ anoint\ +\ bestow} in one call.
+
+See also: \texttt{exhume}, \texttt{anoint}, \texttt{bestow},
+\texttt{martyr}.
+
+\section{\texorpdfstring{\texttt{divine}}{divine}}\label{divine}
+
+\texttt{divine(\$handler)} --- slave-side: register a closure handler
+for incoming petitions. The handler is stored in a global slot; the
+caller wraps the agent\textquotesingle s EVAL dispatch to call this
+handler instead of evaluating arbitrary code.
+
+Tier 4 ships divine as a closure-registration primitive only; full
+dispatch integration with the agent\textquotesingle s EVAL loop is Tier
+5 work (requires splitting the agent\textquotesingle s frame handler).
+
+See also: \texttt{bow}, \texttt{pray}.
+
+\section{\texorpdfstring{\texttt{interrogate}}{interrogate}}\label{interrogate}
+
+\texttt{interrogate(\$pid\_or\_handles)} --- polymorphic process-state
+dump.
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{interrogate(\$pid)} (single scalar): OS-level dump for an OS
+  PID via the \texttt{sysinfo} crate. Returns a hash\_ref with
+  \texttt{pid}, \texttt{ppid}, \texttt{name}, \texttt{cmd},
+  \texttt{exe}, \texttt{cwd}, \texttt{uid}, \texttt{memory\_bytes},
+  \texttt{virtual\_memory\_bytes}, \texttt{cpu\_usage}, \texttt{status},
+  \texttt{start\_time}, \texttt{run\_time\_secs}. Works for ANY visible
+  OS process --- not just stryke agents. Returns \texttt{undef} if the
+  PID isn\textquotesingle t visible (terminated, permission denied, or
+  invalid).
+\end{itemize}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{interrogate(@agent\_handles)} (array / multi-arg): agent VM
+  state dump via the scatter-EVAL path. Returns hash keyed by
+  session-id; values are each agent\textquotesingle s
+  \texttt{\{pid,\ time,\ soul,\ gift\}}.
+\end{itemize}
+
+Dispatch heuristic: single scalar = OS PID; array/multi-arg = agent
+handles.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $h = interrogate($$)             \# self{-}introspection}
+\NormalTok{say $h{-}\textgreater{}\{name\}, " using ", $h{-}\textgreater{}\{memory\_bytes\}, " bytes"}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{lick}, \texttt{peruse}.
+
+\protect\phantomsection\label{ch-provenance-lineage}
+\chapter{Provenance / Lineage}\label{provenance-lineage}
+
+3 topics
+
+\section{\texorpdfstring{\texttt{mark}}{mark}}\label{mark}
+
+\texttt{mark(\$val)} --- tag a heap value\textquotesingle s \texttt{Arc}
+pointer so subsequent builtin calls that consume it accumulate a lineage
+record in the provenance ledger. Returns \texttt{\$val} unchanged, so it
+composes inline:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $config = mark(\{ host =\textgreater{} "prod", retries =\textgreater{} 3 \})}
+\end{Highlighting}
+\end{Shaded}
+
+Value-lineage tracking as a first-class scripting-language builtin is
+\textbf{new ground} --- no major scripting language (Perl, Python, Ruby,
+JavaScript, Lua, PHP) ships this. Closest analogs are research dataflow
+languages (LIO, Adapton) which surface it as a type-system feature,
+never as a \texttt{mark}/\texttt{provenance} call pair.
+
+Cost model is zero when unused: a process-global \texttt{LEDGER\_ACTIVE}
+flag flips to \texttt{true} on the first \texttt{mark(...)} call. Until
+then, the post-dispatch hook in every builtin call elides via a single
+inlined \texttt{AtomicBool::load(Relaxed)} branch.
+
+Marks only apply to \textbf{heap values} --- hashes, arrays, byte
+buffers, atomics, generators, pipelines. Immediates (integers, floats,
+undef) have no stable \texttt{Arc} to key on and return \texttt{\$val}
+unchanged from \texttt{mark} (silently no-op). Wrap a number in a
+one-element array if you need to track it.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $payload = mark(\{ user =\textgreater{} "jamenk", roles =\textgreater{} ["admin"] \})}
+\NormalTok{my $jwt     = jwt\_encode($payload, $secret)          \# tracked op}
+\NormalTok{my $cookie  = base64\_encode($jwt)                    \# tracked op}
+\NormalTok{p provenance($cookie)}
+\NormalTok{\# \{ origin      =\textgreater{} "HASH entries=2",}
+\NormalTok{\#   origin\_line =\textgreater{} 1,}
+\NormalTok{\#   ops         =\textgreater{} [ \{ op =\textgreater{} "jwt\_encode",    args =\textgreater{} ["HASH entries=2", ...], line =\textgreater{} 2 \},}
+\NormalTok{\#                    \{ op =\textgreater{} "base64\_encode", args =\textgreater{} ["BYTES len=..."],       line =\textgreater{} 3 \} ] \}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{provenance}, \texttt{unmark}, \texttt{god} (for
+runtime introspection without lineage).
+
+\section{\texorpdfstring{\texttt{provenance}}{provenance}}\label{provenance}
+
+\texttt{provenance(\$val)} --- return the lineage hash for a marked
+value, or \texttt{undef} if the value was never tagged via
+\texttt{mark(\$val)}. Schema:
+
+\begin{verbatim}
+{
+  origin       => "HASH entries=3",   # god-style summary at mark time
+  origin_line  => 7,                  # call-site line of mark($val)
+  ops          => [
+    { op => "to_array", args => ["HASH entries=3"], line => 8 },
+    { op => "pack",     args => ["ARRAY len=3"],    line => 9 },
+    ...
+  ],
+}
+\end{verbatim}
+
+The \texttt{ops} array is append-only --- each entry records one builtin
+call site that consumed a marked value (or a value whose lineage extends
+from one). Origin and \texttt{origin\_line} propagate through the entire
+chain so you can trace the most-transformed value back to where it
+started.
+
+Use cases:
+
+\begin{itemize}
+\tightlist
+\item
+  Debugging "where did this bad value come from?" ---
+  \texttt{p\ provenance(\$corrupt)} shows the op chain.
+\item
+  Audit trails --- capture the lineage of a credential or signed payload
+  alongside it.
+\item
+  Test introspection --- assert that a value was produced via the
+  expected sequence of ops without coupling to intermediate state.
+\end{itemize}
+
+Ops performed against an unmarked value do NOT add to the ledger. Mark
+the leaf value at the START of the chain you care about; downstream
+transformations inherit and extend automatically.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $start = mark([1, 2, 3])}
+\NormalTok{my $sum   = reduce \{ $a + $b \} @$start}
+\NormalTok{p provenance($sum)        \# undef — sum is an INTEGER (immediate), not heap{-}Arc\textquotesingle{}d}
+\NormalTok{p provenance($start)      \# \{ origin =\textgreater{} "ARRAY len=3", ops =\textgreater{} [\{ op =\textgreater{} "reduce", ... \}] \}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{mark}, \texttt{unmark}, \texttt{god}.
+
+\section{\texorpdfstring{\texttt{unmark}}{unmark}}\label{unmark}
+
+\texttt{unmark(\$val)} --- drop \texttt{\$val}\textquotesingle s entry
+from the provenance ledger. Returns \texttt{\$val} unchanged. Idempotent
+--- \texttt{unmark} on an unmarked value is a no-op.
+
+Use to bound ledger growth in long-running scripts that
+don\textquotesingle t want a value\textquotesingle s lineage tracked
+past a known point (e.g. once a value has been serialized to a sink).
+The ledger is process-global and v1 has no automatic sweep, so explicit
+\texttt{unmark} is the only way to reclaim entries until v2 ships
+Arc-weak-ref-based GC.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $req  = mark(\{ url =\textgreater{} $url \})}
+\NormalTok{my $body = curl\_get($req{-}\textgreater{}\{url\})       \# lineage tracked}
+\NormalTok{\# ... downstream code ...}
+\NormalTok{unmark($req)                            \# we\textquotesingle{}re done tracing; drop the entry}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{mark}, \texttt{provenance}.
 
 \protect\phantomsection\label{ch-datetime}
 \chapter{Datetime}\label{datetime}
@@ -16326,21 +17550,40 @@ deprioritize background batch work or boost latency-sensitive tasks.
 
 \section{\texorpdfstring{\texttt{syscall}}{syscall}}\label{syscall}
 
-Invoke a raw system call by its numeric identifier, passing arguments
-directly to the kernel. This is an escape hatch for system calls that
-have no Perl wrapper. The call number is platform-specific and the
-arguments must be correctly typed (integers or string buffers). Use with
-caution --- incorrect arguments can crash the process.
+\texttt{syscall(NUM\ {[},\ ARG\ ...{]})} --- raw \texttt{syscall(2)}
+entry point. Calls the kernel with the platform-specific syscall number
+\texttt{NUM} and up to six arguments. Integer args pass as
+\texttt{c\_long}; string args pass as pointer-to-bytes (so
+\texttt{read}-style scratch buffers work). Returns the kernel return
+value (or \texttt{-1} on error).
+
+Syscall numbers are \textbf{not normalized across platforms} --- pass
+the exact number for the host kernel (see
+\texttt{\textless{}sys/syscall.h\textgreater{}} for the \texttt{SYS\_*}
+constants). Wrong numbers can crash the process; this is an escape
+hatch, not a portability layer. Use the wrapper builtins
+(\texttt{getpid}, \texttt{kill}, \texttt{fork}, \texttt{system}, file
+ops) for portable code.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{\# SYS\_getpid on Linux x86\_64 is 39}
-\NormalTok{my $pid = syscall(39)}
-\NormalTok{p $pid                     \# same as $$}
-\NormalTok{\# SYS\_sync on Linux is 162}
-\NormalTok{syscall(162)               \# flush filesystem caches}
+\NormalTok{\# macOS aarch64: SYS\_getpid = 20}
+\NormalTok{my $pid = syscall(20)}
+\NormalTok{p $pid == $$ ? "matches \textbackslash{}$\textbackslash{}$" : "mismatch"}
+
+\NormalTok{\# Linux x86\_64: SYS\_getpid = 39}
+\NormalTok{\# my $pid = syscall(39)}
+
+\NormalTok{\# Linux: SYS\_sync = 162 — flush filesystem caches.}
+\NormalTok{\# syscall(162)}
 \end{Highlighting}
 \end{Shaded}
+
+On non-Unix platforms (Windows) \texttt{syscall} returns \texttt{-1} and
+is otherwise inert.
+
+See also: \texttt{getpid}, \texttt{getppid}, \texttt{kill},
+\texttt{fork}, \texttt{system}, \texttt{\$!}.
 
 \section{\texorpdfstring{\texttt{process\_list}}{process\_list}}\label{process_list}
 
@@ -16842,7 +18085,872 @@ file from a hashref.
 \protect\phantomsection\label{ch-network-utilities}
 \chapter{Network Utilities}\label{network-utilities}
 
-18 topics
+43 topics
+
+\section{\texorpdfstring{\texttt{kick}}{kick}}\label{kick}
+
+\texttt{kick(\$host,\ \$port\ {[},\ \$timeout\_ms{]})} --- TCP liveness
+probe. Returns \texttt{1} if a TCP connect to \texttt{\$host:\$port}
+succeeds within the timeout, \texttt{0} otherwise. Default timeout
+1000ms (matches \texttt{nc\ -zw1} convention).
+
+Resolves \texttt{\$host} via the OS resolver --- accepts hostnames, IPv4
+/ IPv6 literals, \texttt{localhost}. When DNS returns multiple
+addresses, each is tried in turn until one succeeds OR all fail within
+the timeout window.
+
+Does not raise on failure --- wrong host, closed port, refused
+connection, DNS failure, and timeout all return \texttt{0}, so callers
+can write boolean-style code:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{if (kick("db.prod", 5432, 500)) \{}
+\NormalTok{    p "postgres is up"}
+\NormalTok{\} else \{}
+\NormalTok{    warn "postgres unreachable"}
+\NormalTok{\}}
+
+\NormalTok{\# Quick service{-}mesh health sweep:}
+\NormalTok{for my $pair ((["web", 80], ["api", 8080], ["db", 5432])) \{}
+\NormalTok{    printf "  \%{-}6s :\%d  \%s\textbackslash{}n", $pair{-}\textgreater{}[0], $pair{-}\textgreater{}[1],}
+\NormalTok{        kick($pair{-}\textgreater{}[0], $pair{-}\textgreater{}[1]) ? "up" : "down"}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+This is a \textbf{convenience builtin} --- the underlying capability
+(TCP connect with timeout) is in every language\textquotesingle s
+stdlib. Stryke ships it as a bare builtin so script-level service probes
+don\textquotesingle t need a socket import.
+
+See also: \texttt{punch} (UDP send), \texttt{net\_port\_open} (older
+alias-style probe).
+
+\section{\texorpdfstring{\texttt{tcp\_probe}}{tcp\_probe}}\label{tcp_probe}
+
+\texttt{tcp\_probe(\$host,\ \$port\ {[},\ \$timeout\_ms=1000{]})} ---
+TCP connect probe returning RTT, not just bool. Returns
+\texttt{\{\ alive,\ latency\_ms\ \}}. Use \texttt{kick} for fast 1/0
+sweeps, \texttt{tcp\_probe} when you want latency, \texttt{tcp\_banner}
+for service fingerprinting.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $r = tcp\_probe("db.prod", 5432, 500)}
+\NormalTok{printf "postgres up — \%dms\textbackslash{}n", $r{-}\textgreater{}\{latency\_ms\} if $r{-}\textgreater{}\{alive\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{kick}, \texttt{tcp\_banner}, \texttt{whois\_query}.
+
+\section{\texorpdfstring{\texttt{tcp\_banner}}{tcp\_banner}}\label{tcp_banner}
+
+\texttt{tcp\_banner(\$host,\ \$port\ {[},\ \$timeout\_ms=1000,\ \$max\_bytes=512{]})}
+--- connect + read first \texttt{\$max\_bytes} bytes the server sends.
+Classic service-fingerprint pattern.
+
+Returns \texttt{\{\ alive,\ latency\_ms,\ banner\ \}}. Servers that
+don\textquotesingle t greet (HTTP) return
+\texttt{banner\ =\textgreater{}\ ""} with \texttt{alive=1}. Read timeout
+hardcoded to 200ms after connect.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $r = tcp\_banner("web1", 22)}
+\NormalTok{printf "SSH \%s\textbackslash{}n", $1 if $r{-}\textgreater{}\{alive\} \&\& $r{-}\textgreater{}\{banner\} =\textasciitilde{} /\^{}SSH{-}(\textbackslash{}S+)/}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{tcp\_probe}, \texttt{kick}.
+
+\section{\texorpdfstring{\texttt{whois\_query}}{whois\_query}}\label{whois_query}
+
+\texttt{whois\_query(\$domain\ {[},\ \$server="whois.iana.org",\ \$timeout\_ms=5000{]})}
+--- RFC 3912 WHOIS query. Connects \texttt{\$server:43}, sends
+\texttt{\$domain\textbackslash{}r\textbackslash{}n}, reads response
+until close. Returns string, \texttt{undef} on failure.
+
+Default server is IANA\textquotesingle s referral --- chase the
+\texttt{Refer:} line for definitive registry results. 256 KB response
+cap.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $iana = whois\_query("example.com")}
+\NormalTok{my ($registry) = $iana =\textasciitilde{} /\^{}refer:\textbackslash{}s+(\textbackslash{}S+)/m}
+\NormalTok{my $detail = whois\_query("example.com", $registry // "whois.verisign{-}grs.com")}
+\end{Highlighting}
+\end{Shaded}
+
+Common registries: \texttt{.com}/\texttt{.net} →
+\texttt{whois.verisign-grs.com}, \texttt{.io} → \texttt{whois.nic.io},
+IP/ASN → \texttt{whois.arin.net} / \texttt{whois.ripe.net} /
+\texttt{whois.apnic.net}.
+
+See also: \texttt{tcp\_probe}, \texttt{tcp\_banner}.
+
+\section{\texorpdfstring{\texttt{udp\_send}}{udp\_send}}\label{udp_send}
+
+\texttt{udp\_send(\$host,\ \$port,\ \$payload\ {[},\ \$retries=1,\ \$interval\_ms=20{]})}
+--- send \texttt{\$payload} as a UDP datagram to \texttt{\$host:\$port}.
+Returns the number of datagrams successfully sent (0 = total failure,
+\texttt{\$retries} = full success).
+
+\texttt{\$payload} can be a string (sent as UTF-8 bytes) or a byte
+buffer (sent as-is). When \texttt{\$retries\ \textgreater{}\ 1}, the
+same datagram is sent that many times at \texttt{\$interval\_ms} apart
+--- useful for Wake-on-LAN magic packets (commonly sent 3× for
+reliability), NAT keepalives, and best-effort IoT discovery broadcasts.
+Broadcast addresses (\texttt{255.255.255.255}, subnet broadcasts) are
+enabled automatically.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Wake{-}on{-}LAN: 6× 0xFF + target MAC × 16 = 102{-}byte magic packet on UDP/9.}
+\NormalTok{my $mac = "aa:bb:cc:dd:ee:ff"}
+\NormalTok{my @bytes = (0xff) x 6}
+\NormalTok{push @bytes, (map \{ hex $\_ \} split /:/, $mac) for 1:16}
+\NormalTok{my $packet = pack("C*", @bytes)}
+\NormalTok{udp\_send("255.255.255.255", 9, $packet, 3)  \# send 3× for reliability}
+
+\NormalTok{\# NAT keepalive.}
+\NormalTok{udp\_send("203.0.113.45", 51820, "", 5, 100)  \# 5 shots × 100ms apart}
+
+\NormalTok{\# IoT discovery (SSDP).}
+\NormalTok{udp\_send("239.255.255.250", 1900, $ssdp\_query)}
+\end{Highlighting}
+\end{Shaded}
+
+For peer-to-peer NAT traversal where both endpoints are behind NAT and
+need STUN discovery + bidirectional flow establishment, see
+\texttt{punch} (forthcoming).
+
+See also: \texttt{kick} (TCP probe).
+
+\section{\texorpdfstring{\texttt{udp\_open}}{udp\_open}}\label{udp_open}
+
+\texttt{udp\_open({[}\$bind\_host="0.0.0.0",\ \$bind\_port=0{]})} ---
+bind a UDP socket and return an opaque integer handle (0 on bind
+failure). The socket lives in a process-global pool until
+\texttt{udp\_close(\$id)}.
+
+\texttt{\$bind\_port\ =\ 0} lets the kernel assign an ephemeral port ---
+the normal case. Passing a fixed port is useful when you want a stable
+inbound address.
+
+Returned handle plugs into the persistent-socket family:
+\texttt{udp\_send\_to}, \texttt{udp\_recv}, \texttt{udp\_close},
+\texttt{stun}, \texttt{punch}. The same handle MUST be used across a
+STUN-discover → punch → peer-to-peer-traffic flow because the NAT
+mapping the STUN response reveals is tied to that
+socket\textquotesingle s \texttt{(local\_ip,\ local\_port)} --- using a
+different socket invalidates the mapping.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open()                          \# ephemeral inbound}
+\NormalTok{my $info = stun($sock)                          \# discover public ip:port}
+\NormalTok{udp\_send\_to($sock, $peer\_ip, $peer\_port, "hi")  \# send via same socket}
+\NormalTok{my $reply = udp\_recv($sock, 1000)               \# receive on same socket}
+\NormalTok{udp\_close($sock)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{udp\_send} (fire-and-forget one-shot), \texttt{stun},
+\texttt{punch}.
+
+\section{\texorpdfstring{\texttt{udp\_send\_to}}{udp\_send\_to}}\label{udp_send_to}
+
+\texttt{udp\_send\_to(\$id,\ \$host,\ \$port,\ \$payload)} --- send
+\texttt{\$payload} to \texttt{\$host:\$port} via the pool socket
+\texttt{\$id}. Returns bytes sent on success, \texttt{0} on any failure
+(unknown id, DNS failure, send error).
+
+\texttt{\$payload} is sent verbatim --- pass strings as UTF-8 or byte
+buffers as-is. For broadcast (\texttt{255.255.255.255}, subnet
+broadcasts) the socket\textquotesingle s SO\_BROADCAST is already
+enabled by \texttt{udp\_open}.
+
+This is the \textbf{persistent-socket} counterpart to \texttt{udp\_send}
+--- use this when you need to send from a specific local port (e.g., one
+whose NAT mapping was discovered via STUN). Use \texttt{udp\_send} for
+fire-and-forget sends where the local port doesn\textquotesingle t
+matter.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open("0.0.0.0", 51820)}
+\NormalTok{udp\_send\_to($sock, "203.0.113.45", 51820, $wg\_keepalive\_pkt)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{udp\_open}, \texttt{udp\_recv}, \texttt{udp\_send}
+(one-shot variant).
+
+\section{\texorpdfstring{\texttt{udp\_recv}}{udp\_recv}}\label{udp_recv}
+
+\texttt{udp\_recv(\$id\ {[},\ \$timeout\_ms=1000{]})} --- read one
+datagram from socket \texttt{\$id}. Returns the payload as a UTF-8
+string if valid, otherwise as raw bytes the caller can \texttt{unpack}.
+Returns \texttt{undef} on timeout, unknown id, or recv error.
+
+Default timeout is 1000 ms. Pass \texttt{0} to block indefinitely
+(useful for daemon-style listeners). The blocked thread is the calling
+stryke task; for concurrent recv loops, wrap in
+\texttt{spawn\ \{\ ...\ \}}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open("0.0.0.0", 5683)        \# CoAP port for IoT inbound}
+\NormalTok{while (defined(my $payload = udp\_recv($sock, 0))) \{}
+\NormalTok{    p "received " . length($payload) . " bytes"}
+\NormalTok{    handle($payload)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{udp\_open}, \texttt{udp\_send\_to}.
+
+\section{\texorpdfstring{\texttt{udp\_recv\_from}}{udp\_recv\_from}}\label{udp_recv_from}
+
+\texttt{udp\_recv\_from(\$id\ {[},\ \$timeout\_ms=1000{]})} --- read one
+datagram from socket \texttt{\$id} and surface the source address
+alongside the payload. Returns a hashref:
+
+\begin{verbatim}
+{ payload  => "hello",          # string if UTF-8 valid, else bytes
+  src_ip   => "203.0.113.45",
+  src_port => 51234 }
+\end{verbatim}
+
+Or \texttt{undef} on timeout / unknown id / recv error. Default timeout
+1000 ms; \texttt{0} blocks indefinitely.
+
+\texttt{src\_ip} / \texttt{src\_port} are exactly what the kernel
+reported on \texttt{recvfrom(2)} --- for a peer behind NAT this is the
+peer\textquotesingle s PUBLIC address as seen from this side, not their
+private LAN address. That\textquotesingle s the address you want to pair
+with \texttt{udp\_send\_to(\$id,\ \$src\_ip,\ \$src\_port,\ \$reply)} to
+answer back through the same NAT pinhole the peer punched open.
+
+This is the bidirectional-chat counterpart to \texttt{udp\_recv} --- use
+this when you need to reply to whoever sent the datagram. Use
+\texttt{udp\_recv} when you just want the payload and
+don\textquotesingle t care about the source.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open("0.0.0.0", 5683)}
+\NormalTok{while (defined(my $msg = udp\_recv\_from($sock, 0))) \{}
+\NormalTok{    p "from $msg{-}\textgreater{}\{src\_ip\}:$msg{-}\textgreater{}\{src\_port\}: $msg{-}\textgreater{}\{payload\}"}
+\NormalTok{    udp\_send\_to($sock, $msg{-}\textgreater{}\{src\_ip\}, $msg{-}\textgreater{}\{src\_port\}, "ack")}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{udp\_recv} (payload-only variant), \texttt{udp\_open},
+\texttt{udp\_send\_to}, \texttt{punch}.
+
+\section{\texorpdfstring{\texttt{udp\_close}}{udp\_close}}\label{udp_close}
+
+\texttt{udp\_close(\$id)} --- release the socket handle \texttt{\$id}
+from the pool. Returns \texttt{1} if the handle was present, \texttt{0}
+if unknown. Idempotent --- calling on an already-closed handle is safe.
+
+Long-running scripts should close sockets they no longer need to bound
+the pool size and free the underlying file descriptor. Process exit also
+releases all sockets, so short-lived scripts can skip the close.
+
+See also: \texttt{udp\_open}.
+
+\section{\texorpdfstring{\texttt{stun}}{stun}}\label{stun}
+
+\texttt{stun(\$id\ {[},\ \$stun\_host="stun.l.google.com",\ \$stun\_port=19302,\ \$timeout\_ms=2000{]})}
+--- query a STUN server via socket \texttt{\$id} and return the public
+\texttt{(ip,\ port)} the server reports observing the request from.
+Returns:
+
+\begin{verbatim}
+{ public_ip => "203.0.113.45", public_port => 51234 }
+\end{verbatim}
+
+Or \texttt{undef} on timeout / parse failure / unknown id. The STUN
+protocol (RFC 8489) is implemented in-tree --- no external crate
+dependency.
+
+\textbf{Critical}: subsequent \texttt{punch(\$id,\ ...)} and
+\texttt{udp\_send\_to(\$id,\ ...)} calls MUST use the same socket
+\texttt{\$id}. The NAT mapping the STUN response reveals is tied to that
+socket\textquotesingle s local \texttt{(ip,\ port)}; using a different
+socket gets you a different public port (or none at all) and the punch
+will fail.
+
+Default STUN server is \texttt{stun.l.google.com:19302} ---
+Google\textquotesingle s public, free, and reliable. Other public
+options: \texttt{stun.cloudflare.com:3478},
+\texttt{stun.nextcloud.com:443}. Hosted internally for privacy-sensitive
+deployments.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open()}
+\NormalTok{if (defined(my $info = stun($sock))) \{}
+\NormalTok{    p "I\textquotesingle{}m at $info{-}\textgreater{}\{public\_ip\}:$info{-}\textgreater{}\{public\_port\}"}
+\NormalTok{    \# Now tell the peer this address via signaling (out{-}of{-}band — email,}
+\NormalTok{    \# paste, shared file, IRC, anything that gets bytes from A to B).}
+\NormalTok{    \# The peer does the same, then both call punch() pointing at each}
+\NormalTok{    \# other\textquotesingle{}s discovered ip:port.}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{punch}, \texttt{udp\_open}.
+
+\section{\texorpdfstring{\texttt{stun\_classify}}{stun\_classify}}\label{stun_classify}
+
+\texttt{stun\_classify(\$id\ {[},\ \$opts{]})} --- query multiple STUN
+servers via the SAME socket and classify the local NAT based on whether
+the reported public ports match across servers. Returns a hashref:
+
+\begin{verbatim}
+{ nat_type     => "cone" | "symmetric" | "unknown",
+  public_ip    => "203.0.113.45" | undef,
+  queried      => 3,
+  succeeded    => 3,
+  observations => [
+    { server => "stun.l.google.com:19302", ok => 1,
+      public_ip => "203.0.113.45", public_port => 51234 },
+    { server => "stun.cloudflare.com:3478", ok => 1,
+      public_ip => "203.0.113.45", public_port => 51234 },
+    ... ] }
+\end{verbatim}
+
+\textbf{\texttt{nat\_type} interpretation}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{"cone"} --- every responding server reported the SAME port →
+  NAT uses one public mapping per source socket regardless of
+  destination. \texttt{punch} will work to any peer.
+\item
+  \texttt{"symmetric"} --- servers reported DIFFERENT ports → NAT
+  allocates a fresh public port per destination. \texttt{punch} will
+  FAIL because the port the peer punches at (learned from STUN server X)
+  won\textquotesingle t be the port your traffic to the peer uses. The
+  only recovery is a TURN relay (not yet shipped).
+\item
+  \texttt{"unknown"} --- fewer than 2 servers responded →
+  can\textquotesingle t classify.
+\end{itemize}
+
+\texttt{\$opts} (hashref, all optional):
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{servers} (arrayref of \texttt{{[}"host",\ port{]}} pairs) ---
+  defaults to a diverse set: Google, Cloudflare, Nextcloud STUN.
+  Diversity matters --- some symmetric NATs bucket by destination /24,
+  so same-provider servers can falsely produce matching ports. Three
+  different ASNs catches more cases.
+\item
+  \texttt{timeout\_ms} (default 2000) --- per-server timeout.
+\end{itemize}
+
+\textbf{Recommended pattern} --- classify BEFORE calling \texttt{punch},
+bail early on symmetric to give the user a useful error rather than a
+30s \texttt{punch} timeout:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open()}
+\NormalTok{my $nat = stun\_classify($sock)}
+\NormalTok{printf "NAT type: \%s (succeeded \%d/\%d)\textbackslash{}n",}
+\NormalTok{    $nat{-}\textgreater{}\{nat\_type\}, $nat{-}\textgreater{}\{succeeded\}, $nat{-}\textgreater{}\{queried\}}
+\NormalTok{if ($nat{-}\textgreater{}\{nat\_type\} eq "symmetric") \{}
+\NormalTok{    die "behind symmetric NAT — hole{-}punching impossible without TURN relay"}
+\NormalTok{\}}
+\NormalTok{if ($nat{-}\textgreater{}\{nat\_type\} eq "unknown") \{}
+\NormalTok{    warn "only $nat{-}\textgreater{}\{succeeded\} STUN servers reached — proceeding cautiously"}
+\NormalTok{\}}
+\NormalTok{\# ... continue with stun() + signaling + punch() ...}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{stun} (single-server query), \texttt{punch}.
+
+\section{\texorpdfstring{\texttt{punch}}{punch}}\label{punch}
+
+\texttt{punch(\$id,\ \$peer\_ip,\ \$peer\_port\ {[},\ \$opts{]})} ---
+UDP NAT hole-punching state machine. Bombards
+\texttt{\$peer\_ip:\$peer\_port} via socket \texttt{\$id} at
+\texttt{\$opts\{interval\_ms\}} apart, listens for any inbound datagram,
+returns when bidirectional flow is established OR the timeout fires.
+
+\texttt{\$opts} (hashref, all keys optional):
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{timeout\_ms} (default 5000) --- wall-clock punch budget
+\item
+  \texttt{interval\_ms} (default 50) --- gap between bombards
+\item
+  \texttt{payload} (default \texttt{"stryke-punch"}) --- probe payload
+  sent each round
+\end{itemize}
+
+Returns:
+
+\begin{verbatim}
+{ established => 1,         # 0 on timeout
+  latency_ms  => 380,       # time to first reply
+  bombards    => 8,         # count of datagrams we sent
+  peer_msg    => "hi from b",  # first received payload (or undef)
+  peer_addr   => "203.0.113.45:51234" }   # source addr (or undef)
+\end{verbatim}
+
+\textbf{The full P2P flow}: both peers run \texttt{udp\_open} →
+\texttt{stun} → exchange their discovered \texttt{(ip,\ port)} via an
+out-of-band signaling channel (email, paste, shared file, anything) →
+simultaneously call \texttt{punch} pointing at each
+other\textquotesingle s discovered address. The first few bombards from
+each side are dropped by the other\textquotesingle s NAT (no inbound
+mapping yet); the act of sending establishes the mapping, and subsequent
+packets get through.
+
+\textbf{Real-world success rate is \textasciitilde70-80\%}. Failures
+(with no language-level workaround short of allocating a TURN relay):
+
+\begin{itemize}
+\tightlist
+\item
+  Symmetric NATs --- some mobile carriers, some corporate firewalls ---
+  assign a different public port per destination, so the port revealed
+  by STUN ≠ the port the peer\textquotesingle s traffic actually arrives
+  on
+\item
+  UDP-blocking firewalls --- drop all UDP outright
+\item
+  Misaligned timing --- if one peer punches 30s before the other, the
+  first peer\textquotesingle s NAT mapping may time out before the
+  second peer starts
+\end{itemize}
+
+For a guaranteed-delivery fallback you need TURN (relay every packet
+through a public server) --- out of scope for stryke\textquotesingle s
+builtin set; if you need it, run a coturn server and use
+\texttt{udp\_send\_to} to relay manually.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Side A:}
+\NormalTok{my $sock = udp\_open()}
+\NormalTok{my $me = stun($sock)}
+\NormalTok{printf "Tell peer to: stryke peer.stk \%s \%d\textbackslash{}n",}
+\NormalTok{    $me{-}\textgreater{}\{public\_ip\}, $me{-}\textgreater{}\{public\_port\}}
+\NormalTok{\# ... peer signals back their (ip, port) via email/paste ...}
+\NormalTok{my $peer\_ip   = "203.0.113.45"}
+\NormalTok{my $peer\_port = 51234}
+\NormalTok{my $r = punch($sock, $peer\_ip, $peer\_port, \{ timeout\_ms =\textgreater{} 10\_000 \})}
+\NormalTok{if ($r{-}\textgreater{}\{established\}) \{}
+\NormalTok{    p "connected after $r{-}\textgreater{}\{bombards\} bombards (" . $r{-}\textgreater{}\{latency\_ms\} . "ms)"}
+\NormalTok{    p "first message from peer: $r{-}\textgreater{}\{peer\_msg\}"}
+\NormalTok{    udp\_send\_to($sock, $peer\_ip, $peer\_port, "reply from A")}
+\NormalTok{    p "reply: " . udp\_recv($sock, 5000)}
+\NormalTok{\}}
+\NormalTok{udp\_close($sock)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{stun}, \texttt{udp\_open}, \texttt{udp\_send\_to},
+\texttt{udp\_recv}.
+
+\section{\texorpdfstring{\texttt{turn\_allocate}}{turn\_allocate}}\label{turn_allocate}
+
+\texttt{turn\_allocate(\$id,\ \$server,\ \$port,\ \$username,\ \$password\ {[},\ \$timeout\_ms=3000{]})}
+--- drive the TURN (RFC 8656) two-roundtrip allocation flow on socket
+\texttt{\$id}. Returns a hashref on success, \texttt{undef} on auth /
+network / parse failure.
+
+\begin{verbatim}
+{ relay_ip      => "203.0.113.99",  # the public address the TURN server allocated to us
+  relay_port    => 49999,
+  lifetime_secs => 600,               # how long the allocation lives before needing refresh
+  realm         => "turn.example",    # server-supplied auth realm
+  nonce_len     => 13 }               # length of opaque nonce stored in pool
+\end{verbatim}
+
+The allocation is registered in a process-global pool keyed by
+\texttt{\$id} so subsequent \texttt{turn\_permission},
+\texttt{turn\_send}, \texttt{turn\_recv}, \texttt{turn\_refresh} all
+find it via the same socket id. \textbf{The socket must be the one you
+intend to use for the full TURN session} --- TURN\textquotesingle s NAT
+mapping is tied to the source (ip, port) of the original Allocate
+request.
+
+Protocol: client sends Allocate (no auth) → server responds 401 with
+REALM + NONCE → client retries with USERNAME + REALM + NONCE +
+MESSAGE-INTEGRITY (HMAC-SHA1 of MD5(user:realm:pass) over the message
+bytes) → server replies success with XOR-RELAYED-ADDRESS.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open()}
+\NormalTok{my $alloc = turn\_allocate($sock, "turn.example.com", 3478, "alice", "hunter2")}
+\NormalTok{if (!defined $alloc) \{ die "TURN allocation failed" \}}
+\NormalTok{printf "Relay address: \%s:\%d (lifetime \%ds)\textbackslash{}n",}
+\NormalTok{    $alloc{-}\textgreater{}\{relay\_ip\}, $alloc{-}\textgreater{}\{relay\_port\}, $alloc{-}\textgreater{}\{lifetime\_secs\}}
+\NormalTok{\# Share $alloc{-}\textgreater{}\{relay\_ip\}:$alloc{-}\textgreater{}\{relay\_port\} with the peer via signaling.}
+\NormalTok{\# They install a permission for our relay address and send to it; the TURN}
+\NormalTok{\# server forwards their packets to us as DATA{-}INDICATION wrappers.}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{turn\_permission}, \texttt{turn\_send},
+\texttt{turn\_recv}, \texttt{turn\_refresh}, \texttt{punch} (direct
+hole-punching, faster when it works), \texttt{stun\_classify} (detect
+when TURN is necessary).
+
+\section{\texorpdfstring{\texttt{turn\_permission}}{turn\_permission}}\label{turn_permission}
+
+\texttt{turn\_permission(\$id,\ \$peer\_ip\ {[},\ \$timeout\_ms=2000{]})}
+--- install a TURN CreatePermission for \texttt{\$peer\_ip} on the
+allocation associated with socket \texttt{\$id}. Required before the
+TURN server will accept SEND-INDICATIONs targeting that
+peer\textquotesingle s address (per RFC 8656 §9 --- the server uses
+permissions to prevent generic relay abuse).
+
+Returns \texttt{1} on CreatePermission\_Success, \texttt{0} on failure
+(no allocation, network error, server rejection).
+
+Permissions last \textasciitilde5 minutes by default; call
+\texttt{turn\_permission} again to refresh. Permission is keyed by peer
+IP only --- any port from that IP is accepted, but a different IP
+requires a separate permission.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $sock = udp\_open()}
+\NormalTok{my $alloc = turn\_allocate($sock, $turn\_host, 3478, $user, $pass) or die}
+\NormalTok{if (!turn\_permission($sock, "203.0.113.45")) \{}
+\NormalTok{    die "could not install permission for peer"}
+\NormalTok{\}}
+\NormalTok{turn\_send($sock, "203.0.113.45", 51820, "hello via relay")}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{turn\_allocate}, \texttt{turn\_send},
+\texttt{turn\_recv}.
+
+\section{\texorpdfstring{\texttt{turn\_send}}{turn\_send}}\label{turn_send}
+
+\texttt{turn\_send(\$id,\ \$peer\_ip,\ \$peer\_port,\ \$payload)} ---
+wrap \texttt{\$payload} in a TURN SEND-INDICATION and ship via the
+allocation associated with socket \texttt{\$id}. The TURN server
+forwards the payload to \texttt{\$peer\_ip:\$peer\_port} from the relay
+address.
+
+Returns bytes written to the TURN server (NOT bytes confirmed at the
+peer --- peer receipt is best-effort UDP; confirmation comes only when a
+DATA-INDICATION reply arrives, surfaced via \texttt{turn\_recv}).
+
+A permission for \texttt{\$peer\_ip} MUST be installed via
+\texttt{turn\_permission} first, or the server silently drops the send.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{turn\_send($sock, $peer\_ip, $peer\_port, "control message")}
+\NormalTok{turn\_send($sock, $peer\_ip, $peer\_port, pack("V", $frame\_number))}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{turn\_allocate}, \texttt{turn\_permission},
+\texttt{turn\_recv}.
+
+\section{\texorpdfstring{\texttt{turn\_recv}}{turn\_recv}}\label{turn_recv}
+
+\texttt{turn\_recv(\$id\ {[},\ \$timeout\_ms=1000{]})} --- wait for the
+next DATA-INDICATION on the TURN allocation\textquotesingle s socket.
+Returns:
+
+\begin{verbatim}
+{ payload  => "reply from peer",   # string if UTF-8 valid, else bytes
+  peer_ip  => "203.0.113.45",      # the peer's address as the TURN server saw it
+  peer_port => 51820 }
+\end{verbatim}
+
+Or \texttt{undef} on timeout, if the next packet isn\textquotesingle t a
+DATA-INDICATION (e.g. a late CreatePermission\_Success), or if no
+allocation exists for \texttt{\$id}. Caller should call again to drain
+non-data frames.
+
+Default timeout 1000 ms; \texttt{0} blocks indefinitely.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{while (defined(my $msg = turn\_recv($sock, 0))) \{}
+\NormalTok{    printf "from \%s:\%d: \%s\textbackslash{}n", $msg{-}\textgreater{}\{peer\_ip\}, $msg{-}\textgreater{}\{peer\_port\}, $msg{-}\textgreater{}\{payload\}}
+\NormalTok{    turn\_send($sock, $msg{-}\textgreater{}\{peer\_ip\}, $msg{-}\textgreater{}\{peer\_port\}, "ack")}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{turn\_allocate}, \texttt{turn\_send},
+\texttt{udp\_recv\_from} (direct-UDP counterpart).
+
+\section{\texorpdfstring{\texttt{turn\_refresh}}{turn\_refresh}}\label{turn_refresh}
+
+\texttt{turn\_refresh(\$id\ {[},\ \$lifetime\_secs=600,\ \$timeout\_ms=2000{]})}
+--- send a Refresh request to extend the TURN
+allocation\textquotesingle s lifetime. Pass \texttt{\$lifetime\_secs=0}
+to release the allocation immediately.
+
+Returns the new lifetime on success, \texttt{0} on failure. Call before
+the previous \texttt{lifetime\_secs} elapses --- typical cadence is
+refresh at \textasciitilde⅔ of the current lifetime so a single network
+hiccup doesn\textquotesingle t drop the allocation.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Background keepalive: refresh every 5 minutes (allocation has 10{-}min lifetime).}
+\NormalTok{spawn \{}
+\NormalTok{    while (1) \{}
+\NormalTok{        sleep 300}
+\NormalTok{        last unless turn\_refresh($sock)}
+\NormalTok{    \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Releasing on shutdown is good citizenship --- it frees the TURN
+server\textquotesingle s relay port immediately instead of waiting for
+the timeout:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{turn\_refresh($sock, 0)}
+\NormalTok{udp\_close($sock)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{turn\_allocate}.
+
+\section{\texorpdfstring{\texttt{teleport}}{teleport}}\label{teleport}
+
+\texttt{teleport(\$val,\ @receiver\_pids\ {[},\ \{\ hold\_ms\ =\textgreater{}\ 500\ \}{]})}
+--- broadcast a value to N stryke processes via POSIX shared memory +
+per-receiver UDS notification. Returns the count of receivers whose
+notification landed (their UDS socket exists + accepted the notify).
+
+Data-first signature so the prefix thread macro composes naturally:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\textasciitilde{}\textgreater{} $huge teleport(@worker\_pids)     \# prefix \textasciitilde{}\textgreater{}: threads $huge as arg 0}
+\NormalTok{teleport($payload, $pid1, $pid2)    \# standalone, literal PIDs}
+\NormalTok{teleport($payload, [@pids])         \# arrayref also flattens}
+\NormalTok{teleport($payload, $pid, \{ hold\_ms =\textgreater{} 1500 \})   \# opts hash for hold window}
+\end{Highlighting}
+\end{Shaded}
+
+Receivers must be stryke processes running an \texttt{arrive()} loop.
+Non-stryke processes (or stryke processes without an \texttt{arrive}
+call) have no bound UDS socket and count as unreachable.
+
+\texttt{hold\_ms} (default 500) is how long the sender holds the SHM
+segment alive after notifying so receivers can \texttt{shm\_open} +
+\texttt{mmap} + read. Receivers slower than \texttt{hold\_ms} miss the
+window.
+
+\textbf{Wire path}:
+\texttt{StrykeValue\ →\ serde\_json::Value\ →\ JSON\ bytes\ →\ SHM\ segment\ named\ }/stryke\_tp\_PID\_SEQ\texttt{\ →\ 40-byte\ notify\ over\ UDS\ to\ }/tmp/stryke\_teleport\_PID.sock\texttt{\ per\ receiver}.
+Receivers reverse this. Same lossy-but-portable shape as
+\texttt{cluster} / \texttt{dist\_thread} IPC --- closures and blessed
+objects don\textquotesingle t round-trip; scalars, arrays, hashes, and
+nested combos do. JSON beats bincode here because bincode
+can\textquotesingle t deserialize a free-standing serde\_json::Value
+(Value needs \texttt{deserialize\_any}).
+
+\textbf{Top-level convention}: arrays / hashes always arrive as refs
+(\texttt{@a} → arrayref, \texttt{\%h} → hashref), matching
+\texttt{decode\_json}. So \texttt{\$msg-\textgreater{}\{key\}} and
+\texttt{\$msg-\textgreater{}{[}i{]}} Just Work without re-wrapping.
+
+\textbf{World-first capability}: no other scripting language ships
+zero-copy(ish) multi-target value teleportation as a single builtin.
+Closest analogs (Python multiprocessing.shared\_memory, Perl
+IPC::Shareable) require manual segment lifecycle + per-process attach
+plumbing, single-target only, no notification primitive bundled in.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Parent forks workers, then teleports a 100MB hashref to all of them.}
+\NormalTok{my @worker\_pids = map \{ fork\_worker() \} 1:8}
+\NormalTok{my $huge = build\_corpus()           \# 100MB hashref}
+\NormalTok{teleport($huge, @worker\_pids, \{ hold\_ms =\textgreater{} 1500 \})}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{arrive}, \texttt{fork}, \texttt{cluster}.
+
+\section{\texorpdfstring{\texttt{arrive}}{arrive}}\label{arrive}
+
+\texttt{arrive({[}\$timeout\_ms=5000{]})} --- block up to
+\texttt{\$timeout\_ms} for the next \texttt{teleport} notification from
+any sender, then read + return the value. Returns \texttt{undef} on
+timeout, malformed notification, or stale SHM (sender unlinked before
+this receiver got around to reading).
+
+First call lazy-binds the per-process UDS socket at
+\texttt{/tmp/stryke\_teleport\_\$\$.sock}; subsequent calls reuse it.
+The socket file is best-effort cleaned up on bind (stale file from a
+prior crashed instance gets unlinked).
+
+Idiomatic receiver loop:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{while (1) \{}
+\NormalTok{    my $msg = arrive(1000)}
+\NormalTok{    last unless defined $msg}
+\NormalTok{    process($msg)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Returned value is whatever the sender passed to
+\texttt{teleport(\$val,\ ...)} after a JSON → bincode → SHM → bincode →
+JSON → StrykeValue round-trip. Numbers, strings, arrays, hashes
+round-trip exactly; coderefs and blessed objects do not.
+
+See also: \texttt{teleport}, \texttt{cluster\_recv}.
+
+\section{\texorpdfstring{\texttt{turnbuckle}}{turnbuckle}}\label{turnbuckle}
+
+\texttt{turnbuckle(\$peer\_pid\ {[},\ \{\ interval\_ms\ =\textgreater{}\ 50,\ timeout\_ms\ =\textgreater{}\ 200\ \}{]})}
+--- open a 1:1 peer-pair keepalive against another stryke process.
+Spawns a background thread that exchanges single-byte heartbeats with
+the peer over symmetric UDS sockets:
+
+\begin{verbatim}
+this side binds:  /tmp/stryke_turnbuckle_<my_pid>_<peer_pid>.sock
+this side sends:  /tmp/stryke_turnbuckle_<peer_pid>_<my_pid>.sock
+\end{verbatim}
+
+Returns a handle hashref
+\texttt{\{\ \_tb\_id\ =\textgreater{}\ N,\ peer\_pid\ =\textgreater{}\ P\ \}}
+for use with \texttt{tb\_alive} / \texttt{tb\_ping} /
+\texttt{tb\_close}. Returns \texttt{undef} on bind failure or
+non-positive \texttt{\$peer\_pid}.
+
+Companion to \texttt{teleport} / \texttt{arrive}: where teleport is 1:N
+value broadcast, turnbuckle is a 1:1 liveness primitive. Carries no
+payload --- use teleport to send data through the pair.
+
+\texttt{interval\_ms} (default 50) is how often the background thread
+heartbeats; \texttt{timeout\_ms} (default 200) is the liveness window.
+\texttt{timeout\_ms} is auto-bumped to \texttt{2\ ×\ interval\_ms} if
+the caller specifies a tighter value, to absorb a single missed
+heartbeat without flapping.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Each side opens against the other.}
+\NormalTok{my $tb = turnbuckle($peer\_pid, \{ interval\_ms =\textgreater{} 100, timeout\_ms =\textgreater{} 500 \})}
+\NormalTok{while (tb\_alive($tb)) \{ do\_work() \}}
+\NormalTok{tb\_close($tb)}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{tb\_alive}, \texttt{tb\_ping}, \texttt{tb\_close},
+\texttt{teleport}.
+
+\section{\texorpdfstring{\texttt{tb\_alive}}{tb\_alive}}\label{tb_alive}
+
+\texttt{tb\_alive(\$handle)} --- return 1 if the peer has heartbeated
+within the configured \texttt{timeout\_ms} window, else 0. Non-blocking.
+The handle is the hashref returned by \texttt{turnbuckle(\$peer\_pid)}.
+Unknown handles (already-closed or never-opened) return 0.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $tb = turnbuckle($peer\_pid)}
+\NormalTok{sleep\_ms(150)              \# let one heartbeat exchange happen}
+\NormalTok{p tb\_alive($tb)            \# 1 if peer is up, 0 otherwise}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{tb\_ping}}{tb\_ping}}\label{tb_ping}
+
+\texttt{tb\_ping(\$handle)} --- send one extra heartbeat to the peer
+right now, in addition to the background cadence. Returns 1 on send
+success, 0 otherwise. Useful when you want to pre-warm the
+peer\textquotesingle s \texttt{last\_heard} timestamp ahead of a
+deadline rather than waiting for the next \texttt{interval\_ms} tick.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tb\_ping($tb)               \# peer should see us alive within \textasciitilde{}1 RTT}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{tb\_close}}{tb\_close}}\label{tb_close}
+
+\texttt{tb\_close(\$handle)} --- tear down the pair: signal the
+heartbeat thread to exit, join it, unbind the UDS socket file, drop the
+registry entry. Returns 1 if the handle was known, 0 if it was already
+closed or never opened. Idempotent.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{tb\_close($tb)}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{weep}}{weep}}\label{weep}
+
+\texttt{weep(@source,\ \$interval\_ms)} --- slow-trickle emitter. The
+LAST argument is always \texttt{interval\_ms}; everything before it is
+the source. Wraps the source into a streaming iterator that emits each
+item paced at \texttt{\$interval\_ms} between emissions. The FIRST item
+emits immediately; only the gap between successive items is throttled.
+Zero interval = passthrough (no sleep).
+
+\textbf{Call shapes}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{weep(1:5, 100)              \# range flattens → 5 items, throttle 100ms}
+\NormalTok{weep([1, 2, 3], 100)        \# arrayref → 3 items, throttle 100ms}
+\NormalTok{weep(@list, 100)            \# @list flattens → N items, throttle 100ms}
+\NormalTok{weep($iter, 100)            \# iterator (e.g. from another builtin) → use as{-}is}
+\NormalTok{weep("a", "b", "c", 100)    \# 3 string items, throttle 100ms}
+\end{Highlighting}
+\end{Shaded}
+
+Single-arg form \texttt{weep(\$x)} is source-only (no throttle). To pass
+a 1-item numeric source where the value would otherwise be parsed as the
+interval, wrap it: \texttt{weep({[}42{]},\ 0)}.
+
+Lazy by construction --- the sleep happens at each consumer pull, not
+up-front. The throttle counts wall-clock time SINCE THE LAST EMISSION,
+so if a downstream consumer is already slow, weep adds nothing.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# Drip every 100ms.}
+\NormalTok{for my $item (weep([1, 2, 3, 4, 5], 100)) \{ p $item \}}
+
+\NormalTok{\# Lazy chain — take(3) pulls only 3 items, paying for only 2 sleeps.}
+\NormalTok{\textasciitilde{}\textgreater{} 1:1000 weep(50) take(10) collect()}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{take}, \texttt{map}, \texttt{tap},
+\texttt{turnbuckle}.
 
 \section{\texorpdfstring{\texttt{net\_interfaces}}{net\_interfaces}}\label{net_interfaces}
 
@@ -20211,7 +22319,7 @@ list.
 \protect\phantomsection\label{ch-other}
 \chapter{Other}\label{other}
 
-8573 topics
+8580 topics
 
 \section{\texorpdfstring{\texttt{\$!}}{\$!}}\label{section-55}
 
@@ -21251,6 +23359,29 @@ For O(1) *reverse* lookup (primary → all its aliases), use \texttt{\%p}
 See also: \texttt{\%stryke::aliases}, \texttt{\%p} /
 \texttt{\%stryke::primaries}.
 
+\section{\texorpdfstring{\texttt{\%all}}{\%all}}\label{all-1}
+
+\texttt{\%all} --- short alias for \texttt{\%stryke::all}. Every
+callable *spelling* (primaries \textbf{and} aliases) → category. Aliases
+inherit their primary\textquotesingle s category.
+
+Use \texttt{\%all} when you want "how many names can I type?" or want to
+look up an alias\textquotesingle s category without hopping through
+\texttt{\%a}. Use \texttt{\%b} when you want unique operations only.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p scalar keys \%all                            \# total callable{-}spellings count}
+\NormalTok{p $all\{tj\}                                    \# "serialization"  (alias inherits)}
+\NormalTok{p $all\{to\_json\}                               \# "serialization"}
+\NormalTok{keys \%all |\textgreater{} pager                            \# browse every spelling}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{\%stryke::all}, \texttt{\%b} /
+\texttt{\%stryke::builtins} (primaries-only), \texttt{\%a} /
+\texttt{\%stryke::aliases} (alias→primary).
+
 \section{\texorpdfstring{\texttt{\%b}}{\%b}}\label{b}
 
 \texttt{\%b} --- short alias for \texttt{\%stryke::builtins}. Maps every
@@ -21272,6 +23403,26 @@ See also: \texttt{\%stryke::builtins}, \texttt{\%c} /
 \texttt{\%stryke::categories}, \texttt{\%a} /
 \texttt{\%stryke::aliases}.
 
+\section{\texorpdfstring{\texttt{\%c}}{\%c}}\label{c-1}
+
+\texttt{\%c} --- short alias for \texttt{\%stryke::categories}. Inverted
+index on \texttt{\%b}: category string → arrayref of names in that
+category. Gives O(1) reverse-lookup for "list every op of kind X"
+queries that would otherwise be O(n) \texttt{grep}s. Name lists are
+alphabetized.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{$c\{parallel\} |\textgreater{} e p                          \# every parallel op}
+\NormalTok{p scalar @\{ $c\{parallel\} \}                   \# how many?}
+\NormalTok{p join ", ", @\{ $c\{"array / list"\} \}       \# joined roster}
+\NormalTok{keys \%c |\textgreater{} sort |\textgreater{} e p                        \# every category name}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{\%stryke::categories}, \texttt{\%b} /
+\texttt{\%stryke::builtins}.
+
 \section{\texorpdfstring{\texttt{\%d}}{\%d}}\label{d-2}
 
 \texttt{\%d} --- short alias for \texttt{\%stryke::descriptions}. Maps
@@ -21290,6 +23441,26 @@ documented?".
 \end{Shaded}
 
 See also: \texttt{\%stryke::descriptions}, the LSP hover system.
+
+\section{\texorpdfstring{\texttt{\%e}}{\%e}}\label{e-1}
+
+\texttt{\%e} --- short alias for \texttt{\%stryke::extensions}.
+Stryke-only names, name → category. Disjoint from \texttt{\%pc} (Perl 5
+core). Everything \texttt{-\/-compat} mode rejects at parse time, plus
+dispatch primaries (like \texttt{basename}, \texttt{ddump}) that are
+extensions at runtime even without a parser entry.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p $e\{pmap\}                                    \# "parallel"}
+\NormalTok{p scalar keys \%e                              \# stryke{-}only name count}
+\NormalTok{keys \%e |\textgreater{} grep /\^{}p/ |\textgreater{} sort |\textgreater{} e p           \# every p* parallel op}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{\%stryke::extensions}, \texttt{\%pc} /
+\texttt{\%stryke::perl\_compats}, \texttt{\%b} /
+\texttt{\%stryke::builtins}.
 
 \section{\texorpdfstring{\texttt{\%k}}{\%k}}\label{k}
 
@@ -21381,6 +23552,30 @@ have overloaded operators registered. Rarely accessed directly; use the
 See also: \texttt{use\ overload}, \texttt{overload::Method},
 \texttt{overload::Overloaded}.
 
+\section{\texorpdfstring{\texttt{\%p}}{\%p}}\label{p-3}
+
+\texttt{\%p} --- short alias for \texttt{\%stryke::primaries}. Primary
+dispatcher name → arrayref of its aliases. Inverted \texttt{\%a} /
+\texttt{\%stryke::aliases}. Primaries with no aliases still have an
+entry (empty arrayref), so \texttt{exists\ \$p\{foo\}} reliably answers
+"is foo a dispatch primary?" in O(1).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{$p\{to\_json\} |\textgreater{} e p                                       \# ["tj"]}
+\NormalTok{p scalar @\{ $p\{basename\} \}                               \# alias count for basename}
+\NormalTok{\# every primary that has at least one alias:}
+\NormalTok{keys \%p |\textgreater{} grep \{ scalar @\{$p\{\_\}\} \} |\textgreater{} sort |\textgreater{} e p}
+\end{Highlighting}
+\end{Shaded}
+
+Not to be confused with the \textbf{\texttt{p} builtin} (stryke
+print-with-newline) --- \texttt{\%p} is the *reflection hash*,
+\texttt{p\ "…"} is the *output verb*. The sigil disambiguates.
+
+See also: \texttt{\%stryke::primaries}, \texttt{\%a} /
+\texttt{\%stryke::aliases}, \texttt{\%b} / \texttt{\%stryke::builtins}.
+
 \section{\texorpdfstring{\texttt{\%parameters}}{\%parameters}}\label{parameters}
 
 \texttt{\%parameters} --- reflection hash mapping each stryke builtin to
@@ -21402,15 +23597,23 @@ provider.
 
 \section{\texorpdfstring{\texttt{\%pc}}{\%pc}}\label{pc}
 
-\texttt{parsec} (alias \texttt{pc}) --- pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly.
-Common astronomical distance unit.
+\texttt{\%pc} --- short alias for \texttt{\%stryke::perl\_compats}. Perl
+5 core names only, name → category. Subset of \texttt{\%b} restricted to
+names from \texttt{is\_perl5\_core}. Direct O(1) access for the "show me
+just Perl core" query.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{p pc        \# 3.0856775814913673e16 m}
-\NormalTok{p pc / ly   \# \textasciitilde{}3.26 light years}
+\NormalTok{p $pc\{map\}                                    \# "array / list"}
+\NormalTok{p scalar keys \%pc                             \# core{-}only count}
+\NormalTok{keys \%pc |\textgreater{} sort |\textgreater{} e p                       \# enumerate every Perl core name}
+\NormalTok{keys \%pc |\textgreater{} grep \{ $pc\{$\_\} eq "array / list" \} |\textgreater{} sort |\textgreater{} e p}
 \end{Highlighting}
 \end{Shaded}
+
+See also: \texttt{\%stryke::perl\_compats}, \texttt{\%e} /
+\texttt{\%stryke::extensions}, \texttt{\%b} /
+\texttt{\%stryke::builtins}.
 
 \section{\texorpdfstring{\texttt{\%stryke::aliases}}{\%stryke::aliases}}\label{strykealiases}
 
@@ -22045,7 +24248,7 @@ next VM op so destructors run in deterministic order.
 See also: \texttt{BUILD}, \texttt{bless},
 \texttt{\$\{\^{}GLOBAL\_PHASE\}}, \texttt{class}.
 
-\section{\texorpdfstring{\texttt{E}}{E}}\label{e-1}
+\section{\texorpdfstring{\texttt{E}}{E}}\label{e-2}
 
 \texttt{E} --- operation \texttt{E}. Alias for \texttt{euler\_number}.
 Category: *math / numeric extras*.
@@ -32589,6 +34792,18 @@ Channel Index:
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{ccomp}}{ccomp}}\label{ccomp}
+
+\texttt{continuous\_compound(\$principal,\ \$rate,\ \$time)} (alias
+\texttt{ccomp}) --- computes future value with continuous compounding: P
+× e\^{}(rt).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p ccomp(1000, 0.05, 10)   \# \textasciitilde{}1648.72}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{ccompl}}{ccompl}}\label{ccompl}
 
 \texttt{ccompl} --- operation \texttt{ccompl}. Alias for
@@ -34710,6 +36925,20 @@ counterpart.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{circ3}}{circ3}}\label{circ3}
+
+\texttt{circle\_from\_three\_points(\$x1,\ \$y1,\ \$x2,\ \$y2,\ \$x3,\ \$y3)}
+(alias \texttt{circ3}) --- finds the unique circle passing through three
+non-collinear points. Returns {[}\$cx, \$cy, \$radius{]} or undef if
+collinear.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $c = circ3(0, 0, 1, 0, 0.5, 0.866)}
+\NormalTok{p "center=($c{-}\textgreater{}[0], $c{-}\textgreater{}[1]) r=$c{-}\textgreater{}[2]"}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{circ3pt}}{circ3pt}}\label{circ3pt}
 
 \texttt{circ3pt} --- operation \texttt{circ3pt}. Alias for
@@ -34751,20 +36980,6 @@ Category: *more extensions (2)*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p circle\_circumference $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{circle\_from\_three\_points}}{circle\_from\_three\_points}}\label{circle_from_three_points}
-
-\texttt{circle\_from\_three\_points(\$x1,\ \$y1,\ \$x2,\ \$y2,\ \$x3,\ \$y3)}
-(alias \texttt{circ3}) --- finds the unique circle passing through three
-non-collinear points. Returns {[}\$cx, \$cy, \$radius{]} or undef if
-collinear.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my $c = circ3(0, 0, 1, 0, 0.5, 0.866)}
-\NormalTok{p "center=($c{-}\textgreater{}[0], $c{-}\textgreater{}[1]) r=$c{-}\textgreater{}[2]"}
 \end{Highlighting}
 \end{Shaded}
 
@@ -36212,14 +38427,33 @@ scheduling*.
 
 \section{\texorpdfstring{\texttt{comb}}{comb}}\label{comb}
 
-\texttt{combinations(\$n,\ \$r)} (alias \texttt{comb}) --- number of
-ways to choose r items from n. Formula: n!/(r!(n-r)!). Order
-doesn\textquotesingle t matter.
+\texttt{comb} --- Raku string decomposition. Four signatures:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{comb(\$str)} --- split into individual characters
+\item
+  \texttt{comb(\$size:Int,\ \$str\ {[},\ \$limit{]})} --- fixed-size
+  character chunks
+\item
+  \texttt{comb(\$needle:Str,\ \$str\ {[},\ \$limit{]})} --- every
+  literal occurrence of \texttt{\$needle}
+\item
+  \texttt{comb(qr/PAT/,\ \$str\ {[},\ \$limit{]})} --- every regex match
+  (\texttt{m/.../g} semantics)
+\end{itemize}
+
+\texttt{\$limit} caps the number of returned pieces; a negative limit
+means unlimited.
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\NormalTok{p comb(5, 3)    \# 10 (ways to choose 3 items from 5)}
-\NormalTok{p comb(52, 5)   \# 2598960 (poker hands)}
+\NormalTok{p comb("abc")                \# ("a","b","c")}
+\NormalTok{p comb(3, "abcdefghijk")     \# ("abc","def","ghi","jk")}
+\NormalTok{p comb("ab", "ababab")       \# ("ab","ab","ab")}
+\NormalTok{p comb(qr/\textbackslash{}w+/, "a;b;;c")    \# ("a","b","c")}
+\NormalTok{p comb(qr/\textbackslash{}d+/, "a1b22c333", 2) \# ("1","22")}
 \end{Highlighting}
 \end{Shaded}
 
@@ -36227,6 +38461,20 @@ doesn\textquotesingle t matter.
 
 \texttt{comb\_filter(signal,\ delay=441,\ gain=0.5)\ →\ array} ---
 feedback comb: \texttt{y{[}n{]}\ =\ x{[}n{]}\ +\ g·y{[}n-delay{]}}.
+
+\section{\texorpdfstring{\texttt{combinations}}{combinations}}\label{combinations}
+
+\texttt{combinations(\$n,\ @list)} --- all \texttt{\$n}-element
+combinations of \texttt{@list} (Python\textquotesingle s
+\texttt{itertools.combinations}). Returns an array of array-refs. Order
+within each combination preserves the list order.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p combinations(2, 1, 2, 3)        \# [[1,2],[1,3],[2,3]]}
+\NormalTok{p combinations(3, qw(a b c d))    \# [[a,b,c],[a,b,d],[a,c,d],[b,c,d]]}
+\end{Highlighting}
+\end{Shaded}
 
 \section{\texorpdfstring{\texttt{combinations\_rep}}{combinations\_rep}}\label{combinations_rep}
 
@@ -37202,18 +39450,6 @@ theory deep*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p continued\_fraction\_sqrt $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{continuous\_compound}}{continuous\_compound}}\label{continuous_compound}
-
-\texttt{continuous\_compound(\$principal,\ \$rate,\ \$time)} (alias
-\texttt{ccomp}) --- computes future value with continuous compounding: P
-× e\^{}(rt).
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p ccomp(1000, 0.05, 10)   \# \textasciitilde{}1648.72}
 \end{Highlighting}
 \end{Shaded}
 
@@ -41937,6 +44173,18 @@ Category: *cosmology / gr / flrw*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{decimate}}{decimate}}\label{decimate}
+
+\texttt{downsample(\textbackslash{}@signal,\ \$factor)} (alias
+\texttt{decimate}) --- reduces sample rate by keeping every nth sample.
+Apply anti-aliasing filter first to avoid aliasing.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $decimated = decimate(\textbackslash{}@signal, 4)  \# keep every 4th sample}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{decimate\_step}}{decimate\_step}}\label{decimate_step}
 
 \texttt{decimate\_step} --- single-step update of \texttt{decimate}.
@@ -45203,18 +47451,6 @@ health*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p downcase\_each $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{downsample}}{downsample}}\label{downsample}
-
-\texttt{downsample(\textbackslash{}@signal,\ \$factor)} (alias
-\texttt{decimate}) --- reduces sample rate by keeping every nth sample.
-Apply anti-aliasing filter first to avoid aliasing.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my $decimated = decimate(\textbackslash{}@signal, 4)  \# keep every 4th sample}
 \end{Highlighting}
 \end{Shaded}
 
@@ -54523,6 +56759,65 @@ Category: *astronomy / astrometry*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{god}}{god}}\label{god}
+
+\texttt{god\ EXPR} --- omniscient runtime introspection. Returns a
+structured multi-line dump string showing information that
+\texttt{pp}/\texttt{ddump} do not surface: the canonical type tag, the
+heap pointer (so two refs to the same heap object are visibly aliases),
+the \texttt{Arc} strong / weak counts, a byte hex preview for byte
+buffers, generator state (\texttt{pc}, \texttt{exhausted}), pipeline
+state (queued ops, source length), and closure captures.
+
+\textbf{Cycle-safe.} Every heap pointer descended through is tracked in
+a per-call \texttt{HashSet}; a back-edge to an already-visited pointer
+is annotated \texttt{...cycle} instead of recursing, so \texttt{god}
+terminates on self-referential structures.
+
+\textbf{Pure} --- returns the dump as a string. Pipe through \texttt{p}
+/ \texttt{warn} / \texttt{die} when you want output. Cleanly composable
+with assertions:
+\texttt{god(\$x)\ =\textasciitilde{}\ /strong=2/\ \textbar{}\textgreater{}\ aok}.
+
+\textbf{Sibling reflectors:}
+
+\textbar{} Builtin \textbar{} What it shows \textbar{}
+\textbar-\/-\/-\textbar-\/-\/-\textbar{} \textbar{} \texttt{pp}
+\textbar{} Human-friendly value formatting \textbar{} \textbar{}
+\texttt{ddump} \textbar{} Deep structural dump (recursive value
+structure) \textbar{} \textbar{} \texttt{god} \textbar{} Runtime
+metadata (type tag, heap ptr, refcounts, internals) \textbar{}
+
+Reach for \texttt{god} when debugging refcount surprises, aliasing bugs,
+closure-capture leaks, generator-pc state, or pipeline-op accumulation.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $h = \{ a =\textgreater{} 1, b =\textgreater{} [10, 20], c =\textgreater{} "hi" \};}
+\NormalTok{p god $h;                          \# HASH @ 0xXXXX (strong=1, ..., entries=3) + recursive}
+
+\NormalTok{\# Detect aliasing — two refs to the same Arc show identical heap pointers.}
+\NormalTok{my $shared = [];}
+\NormalTok{my $a = \textbackslash{}$shared;}
+\NormalTok{my $b = \textbackslash{}$shared;}
+\NormalTok{warn god $a;}
+\NormalTok{warn god $b;                       \# same 0x… for the inner ARRAY}
+
+\NormalTok{\# Cycle handling — self{-}referential hash terminates with an annotation.}
+\NormalTok{my \%cyc;}
+\NormalTok{$cyc\{self\} = \textbackslash{}\%cyc;}
+\NormalTok{p god \textbackslash{}\%cyc;                       \# ...cycle at the back{-}edge, no stack overflow}
+
+\NormalTok{\# Generator state mid{-}iteration.}
+\NormalTok{my $g = gen \{ yield 1; yield 2; yield 3 \};}
+\NormalTok{$g{-}\textgreater{}next;}
+\NormalTok{p god $g;                          \# Generator @ 0xXXXX pc=1/3 exhausted=false}
+\end{Highlighting}
+\end{Shaded}
+
+See also: \texttt{pp} (pretty), \texttt{ddump} (deep structure),
+\texttt{ref} (just the type tag).
+
 \section{\texorpdfstring{\texttt{goertzel}}{goertzel}}\label{goertzel}
 
 \texttt{goertzel} computes the magnitude of a single DFT frequency bin
@@ -56096,7 +58391,7 @@ Category: *networkx graph algorithms*.
 \section{\texorpdfstring{\texttt{gz}}{gz}}\label{gz}
 
 \texttt{gz} --- operation \texttt{gz}. Alias for \texttt{gzip}.
-Category: *crypto / encoding*.
+Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -61446,6 +63741,18 @@ interval.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p interp\_linear([0,1,2], [0,10,20], 0.5)  \# 5}
+\end{Highlighting}
+\end{Shaded}
+
+\section{\texorpdfstring{\texttt{interpolate}}{interpolate}}\label{interpolate}
+
+\texttt{upsample(\textbackslash{}@signal,\ \$factor)} (alias
+\texttt{interpolate}) --- increases sample rate by inserting zeros and
+filtering. Factor must be positive integer.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my $upsampled = interpolate(\textbackslash{}@signal, 4)  \# 4x sample rate}
 \end{Highlighting}
 \end{Shaded}
 
@@ -77134,6 +79441,19 @@ Category: *econometrics*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{mod\_dur}}{mod\_dur}}\label{mod_dur}
+
+\texttt{modified\_duration(\$face,\ \$coupon\_rate,\ \$ytm,\ \$periods)}
+(alias \texttt{mod\_dur}) --- computes modified duration, which directly
+measures price sensitivity to yield changes. Equal to Macaulay duration
+/ (1 + ytm).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p mod\_dur(1000, 0.05, 0.05, 10)   \# \textasciitilde{}7.3}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{mod\_exp}}{mod\_exp}}\label{mod_exp}
 
 \texttt{mod\_exp} (aliases \texttt{modexp}, \texttt{powmod}) computes
@@ -77334,19 +79654,6 @@ theory*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p modhex\_encode $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{modified\_duration}}{modified\_duration}}\label{modified_duration}
-
-\texttt{modified\_duration(\$face,\ \$coupon\_rate,\ \$ytm,\ \$periods)}
-(alias \texttt{mod\_dur}) --- computes modified duration, which directly
-measures price sensitivity to yield changes. Equal to Macaulay duration
-/ (1 + ytm).
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{p mod\_dur(1000, 0.05, 0.05, 10)   \# \textasciitilde{}7.3}
 \end{Highlighting}
 \end{Shaded}
 
@@ -85672,6 +87979,18 @@ distribution PDF at x with minimum xm and shape alpha.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{parsec}}{parsec}}\label{parsec}
+
+\texttt{parsec} (alias \texttt{pc}) --- pc ≈ 3.086×10¹⁶ m ≈ 3.26 ly.
+Common astronomical distance unit.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p pc        \# 3.0856775814913673e16 m}
+\NormalTok{p pc / ly   \# \textasciitilde{}3.26 light years}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{partial\_pressure}}{partial\_pressure}}\label{partial_pressure}
 
 \texttt{partial\_pressure} --- operation \texttt{partial\ pressure}.
@@ -87623,6 +89942,21 @@ processing extras*.
 \end{Highlighting}
 \end{Shaded}
 
+\section{\texorpdfstring{\texttt{pip}}{pip}}\label{pip}
+
+\texttt{point\_in\_polygon(\$x,\ \$y,\ @polygon)} (alias \texttt{pip})
+--- tests if a point lies inside a polygon. Polygon is given as flat
+list {[}x1,y1,x2,y2,...{]}. Returns 1 if inside, 0 if outside. Uses
+ray-casting algorithm.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{my @square = (0,0, 4,0, 4,4, 0,4)}
+\NormalTok{p pip(2, 2, @square)   \# 1 (inside)}
+\NormalTok{p pip(5, 5, @square)   \# 0 (outside)}
+\end{Highlighting}
+\end{Shaded}
+
 \section{\texorpdfstring{\texttt{pipe\_pressure\_drop}}{pipe\_pressure\_drop}}\label{pipe_pressure_drop}
 
 \texttt{pipe\_pressure\_drop} --- operation
@@ -88048,21 +90382,6 @@ Category: *econometrics*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p point\_distance $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{point\_in\_polygon}}{point\_in\_polygon}}\label{point_in_polygon}
-
-\texttt{point\_in\_polygon(\$x,\ \$y,\ @polygon)} (alias \texttt{pip})
---- tests if a point lies inside a polygon. Polygon is given as flat
-list {[}x1,y1,x2,y2,...{]}. Returns 1 if inside, 0 if outside. Uses
-ray-casting algorithm.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my @square = (0,0, 4,0, 4,4, 0,4)}
-\NormalTok{p pip(2, 2, @square)   \# 1 (inside)}
-\NormalTok{p pip(5, 5, @square)   \# 0 (outside)}
 \end{Highlighting}
 \end{Shaded}
 
@@ -104553,8 +106872,30 @@ Category: *financial pricing models*.
 
 \section{\texorpdfstring{\texttt{sub}}{sub}}\label{sub}
 
-The \texttt{sub} keyword is not supported in stryke. Use \texttt{fn}
-instead to define functions.
+\textbf{\texttt{sub} is a Perl 5 idiom that stryke rejects under
+\texttt{-\/-no-interop}.} Use \texttt{fn} instead --- it opens the
+stryke topic-variable protocol (\texttt{\_}, \texttt{\_0}, \texttt{\_1},
+\texttt{\_\textless{}}) and supports expression-bodied one-liners
+(\texttt{fn\ name\ =\ expr}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\# WRONG (legacy Perl 5)}
+\NormalTok{sub double \{ my $x = shift; $x * 2 \}}
+\NormalTok{sub area($w, $h) \{ return $w * $h \}}
+
+\NormalTok{\# RIGHT (stryke)}
+\NormalTok{fn double = \_ * 2                         \# expression{-}bodied}
+\NormalTok{fn area($w, $h) = $w * $h                 \# named params, one{-}liner}
+\NormalTok{fn shout \{ my $s = \_; uc($s) . "!" \}   \# block body, multi{-}statement}
+\end{Highlighting}
+\end{Shaded}
+
+In \texttt{-\/-compat} mode \texttt{sub} still parses for Perl-5 ports,
+but \textbf{all new stryke code should use \texttt{fn}}.
+
+See also: \texttt{fn}, \texttt{\_}, \texttt{\_0}, \texttt{\_1},
+style-guide §0 rule 1.
 
 \section{\texorpdfstring{\texttt{sub\_script}}{sub\_script}}\label{sub_script}
 
@@ -109177,7 +111518,7 @@ selection: \texttt{Q\ +\ c·√(ln(N)/n\_i)}. Unvisited arms get +∞.
 \section{\texorpdfstring{\texttt{ud}}{ud}}\label{ud}
 
 \texttt{ud} --- operation \texttt{ud}. Alias for \texttt{url\_decode}.
-Category: *crypto / encoding*.
+Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -109188,7 +111529,7 @@ Category: *crypto / encoding*.
 \section{\texorpdfstring{\texttt{ue}}{ue}}\label{ue}
 
 \texttt{ue} --- operation \texttt{ue}. Alias for \texttt{url\_encode}.
-Category: *crypto / encoding*.
+Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -109199,7 +111540,7 @@ Category: *crypto / encoding*.
 \section{\texorpdfstring{\texttt{ugz}}{ugz}}\label{ugz}
 
 \texttt{ugz} --- operation \texttt{ugz}. Alias for \texttt{gunzip}.
-Category: *crypto / encoding*.
+Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -109783,7 +112124,7 @@ string-distance extras*.
 \section{\texorpdfstring{\texttt{unzip\_archive}}{unzip\_archive}}\label{unzip_archive}
 
 \texttt{unzip\_archive} --- operation \texttt{unzip\ archive}. Alias for
-\texttt{zip\_extract}. Category: *crypto / encoding*.
+\texttt{zip\_extract}. Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -109908,18 +112249,6 @@ Category: *economics + game theory*.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{p uppercase $x}
-\end{Highlighting}
-\end{Shaded}
-
-\section{\texorpdfstring{\texttt{upsample}}{upsample}}\label{upsample}
-
-\texttt{upsample(\textbackslash{}@signal,\ \$factor)} (alias
-\texttt{interpolate}) --- increases sample rate by inserting zeros and
-filtering. Factor must be positive integer.
-
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{my $upsampled = interpolate(\textbackslash{}@signal, 4)  \# 4x sample rate}
 \end{Highlighting}
 \end{Shaded}
 
@@ -110233,7 +112562,7 @@ helpers*.
 \section{\texorpdfstring{\texttt{uzst}}{uzst}}\label{uzst}
 
 \texttt{uzst} --- operation \texttt{uzst}. Alias for
-\texttt{zstd\_decode}. Category: *crypto / encoding*.
+\texttt{zstd\_decode}. Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -113922,7 +116251,7 @@ functional utilities*.
 \section{\texorpdfstring{\texttt{zip\_archive}}{zip\_archive}}\label{zip_archive}
 
 \texttt{zip\_archive} --- operation \texttt{zip\ archive}. Alias for
-\texttt{zip\_create}. Category: *crypto / encoding*.
+\texttt{zip\_create}. Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -114187,7 +116516,7 @@ Category: *ml extensions*.
 \section{\texorpdfstring{\texttt{zst}}{zst}}\label{zst}
 
 \texttt{zst} --- operation \texttt{zst}. Alias for \texttt{zstd}.
-Category: *crypto / encoding*.
+Category: *steganography*.
 
 \begin{Shaded}
 \begin{Highlighting}[]
