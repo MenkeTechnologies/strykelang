@@ -16,8 +16,7 @@ p ""
 p "── Fan-out — spawn N tasks, await in order ────────────"
 my $t2 = now_ns()
 my @handles = map {
-    my $i = _
-    async { sleep 0.05; $i * $i }
+    async { sleep 0.05; _ * _ }
 } (1:8)
 my @results = map {await} @handles
 my $elapsed = (now_ns() - $t2) / 1e9
@@ -52,12 +51,11 @@ p ""
 p "── Cross-feature: async tasks each write to a sketch ──"
 my $bloom = bloom_filter(10_000, 0.01)
 my @ingestors = map {
-    my $shard = _
     async {
         for my $i (1:100) {
-            bloom_add($bloom, "shard-$shard-key-$i")
+            bloom_add($bloom, "shard-#{_}-key-$i")
         }
-        "shard-$shard done"
+        "shard-#{_} done"
     }
 } (1:4)
 my @done2 = map {await} @ingestors

@@ -43,8 +43,7 @@ printf "  %d total words across all chunks\n", $total_words
 p ""
 p "── per-chunk sketches (parallel) ──────────────────────"
 my @per_chunk = pmap {
-    my $chunk = _
-    my @words = split(/\s+/, $chunk)
+    my @words = split(/\s+/, _)
     my $cms_c  = cms(2048, 5)
     # `topk(50)` per chunk so the merge has enough capacity to keep
     # accurate counts for the corpus's full vocabulary. With small k

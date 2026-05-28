@@ -81,7 +81,7 @@ my $sum3 = fn($x, $y, $z) { $x + $y + $z }
 Fn::partial($sum3, 10)->(20, 30)    |> aeq 60, "partial(sum3, 10)(20,30)"
 Fn::partial($sum3, 1, 2)->(3)       |> aeq 6,  "partial(sum3,1,2)(3)"
 
-fn Fn::juxt(@fs) = fn { my $x = _; [map { $_->($x) } @fs] }
+fn Fn::juxt(@fs) = fn { [map { $_->(_<) } @fs] }
 
 my $j = Fn::juxt($inc, $dbl, $neg)
 join(",", @{$j->(5)}) |> aeq "6,10,-5", "juxt(inc,dbl,neg)(5)"
@@ -96,7 +96,7 @@ join(",", @log) |> aeq "10,20", "tap captured side effect"
 
 # Y combinator (fixed-point) — recursive fact via combinator
 my $fact = fn($f) {
-    fn { my $n = _; $n <= 1 ? 1 : $n * $f->($f)->($n - 1) }
+    fn { _ <= 1 ? 1 : _ * $f->($f)->(_ - 1) }
 }
 $fact->($fact)->(5)  |> aeq 120,     "Y-fact 5"
 $fact->($fact)->(10) |> aeq 3628800, "Y-fact 10"

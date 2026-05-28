@@ -35,15 +35,14 @@ p "  evens 1..20:              @evens_sorted"
 die "evens" unless len(@evens_sorted) == 10
 
 my $how_many_primes_ish = len pgreps {
-    my $n = _
-    $n < 2  ? 0
-    : $n == 2 ? 1
-    : $n % 2 == 0 ? 0
+    _ < 2  ? 0
+    : _ == 2 ? 1
+    : _ % 2 == 0 ? 0
     : do {
         my $is_prime = 1
         my $i = 3
-        while ($i * $i <= $n) {
-            if ($n % $i == 0) { $is_prime = 0; last }
+        while ($i * $i <= _) {
+            if (_ % $i == 0) { $is_prime = 0; last }
             $i += 2
         }
         $is_prime
@@ -80,9 +79,8 @@ Pack my box with five dozen liquor jugs 89.
 # parallel, then sum totals.
 my @lines = split /\n/, $corpus
 my @counts = pmaps {
-    my $line = _
     my $na = 0; my $nd = 0; my $ns = 0
-    for my $c (split //, $line) {
+    for my $c (split //, _) {
         $na++ if $c =~ /[a-zA-Z]/
         $nd++ if $c =~ /\d/
         $ns++ if $c =~ /\s/

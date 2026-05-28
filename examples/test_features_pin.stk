@@ -27,8 +27,7 @@ Pin::Features::target_fn(2) |> aeq 25, "AOP around + proceed"
 my $matrix_sum = 0
 # Use map (list materializing) to ensure side effects happen
 (1:2) |> map {
-    my $outer = _
-    (1:2) |> map { $matrix_sum += $outer + _ }
+    (1:2) |> map { $matrix_sum += _< + _ }
 }
 $matrix_sum |> aeq 12, "Nested loops with implicit _"
 

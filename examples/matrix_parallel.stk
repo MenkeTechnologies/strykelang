@@ -30,9 +30,8 @@ fn Math::matrix_mul_parallel($A, $B) {
     
     # Use pmap to process rows of A in parallel.
     my $C = [ pmap {
-        my $row_A = _
         # For each column in B (row in BT), compute dot product
-        [ (@$BT |> map { Math::dot_product($row_A, _) }) ]
+        [ (@$BT |> map { Math::dot_product(_<, _) }) ]
     } @$A ]
     
     $C

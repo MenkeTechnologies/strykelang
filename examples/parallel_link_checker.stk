@@ -24,14 +24,13 @@ my @urls = (
 p "Checking status codes for #{len @urls} sites..."
 
 my @results = pmap {
-    my $url = _
-    my $res = eval { http_request($url, +{ timeout => 5 }) }
-    
+    my $res = eval { http_request(_, +{ timeout => 5 }) }
+
     if ($@) {
         my $err = $@ =~ s/ at .*//r
-        +{ url => $url, ok => 0, status => 0, err => $err }
+        +{ url => _, ok => 0, status => 0, err => $err }
     } else {
-        +{ url => $url, ok => ($res->{status} < 400), status => $res->{status} }
+        +{ url => _, ok => ($res->{status} < 400), status => $res->{status} }
     }
 } @urls
 

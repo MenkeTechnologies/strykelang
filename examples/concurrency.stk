@@ -29,8 +29,7 @@ p "Task 2 result: $res2"
 # You can also await a list of tasks
 p "\nRunning multiple parallel tasks..."
 my @task_list = map {
-    my $val = _
-    async { Demo::Concurrency::slow_operation($val, 0.2) }
+    async { Demo::Concurrency::slow_operation(_, 0.2) }
 } (1:5)
 
 my @results = map { await _ } @task_list

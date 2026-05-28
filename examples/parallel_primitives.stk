@@ -16,9 +16,8 @@ p "  results: ", join(",", @squares)
 p ""
 p "── pgrep — parallel grep ─────────────────────────────"
 my @primes = pgrep {
-    my $n = _
-    return 0 if $n < 2
-    for my $d (2:(~> $n sqrt int)) { return 0 if $n % $d == 0 }
+    return 0 if _ < 2
+    for my $d (2:(~> _ sqrt int)) { return 0 if _ % $d == 0 }
     1
 } (1:50)
 p "  primes ≤ 50 : ", join(",", @primes)

@@ -93,15 +93,14 @@ for my $epoch (1:$epochs) {
     # NOTE: trailing `;` required — pmap_reduce otherwise greedily consumes
     # the following statement as a third block argument.
     my $grads = @batches |> pmap_reduce {
-        my $idxs = _
         my $sum_dw = 0
         my $sum_db = 0
-        for my $i (@$idxs) {
+        for my $i (@$_) {
             my $err = $w * $XS->[$i] + $b - $YS->[$i]
             $sum_dw += 2 * $err * $XS->[$i]
             $sum_db += 2 * $err
         }
-        [ $sum_dw, $sum_db, len(@$idxs) ]
+        [ $sum_dw, $sum_db, len(@$_) ]
     } {
         [ _->[0] + _1->[0], _->[1] + _1->[1], _->[2] + _1->[2] ]
     };
