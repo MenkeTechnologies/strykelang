@@ -1110,3 +1110,137 @@ fn shell_split(s: &str) -> Vec<String> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── shell_split ─────────────────────────────────────────────────────
+
+    #[test]
+    fn shell_split_simple_whitespace_tokens() {
+        assert_eq!(shell_split("a b c"), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn shell_split_collapses_consecutive_whitespace() {
+        // Multiple spaces / tabs should NOT produce empty tokens.
+        assert_eq!(shell_split("a   b\tc"), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn shell_split_keeps_double_quoted_segment_with_spaces() {
+        assert_eq!(
+            shell_split("cmd \"arg with spaces\" tail"),
+            vec!["cmd", "arg with spaces", "tail"]
+        );
+    }
+
+    #[test]
+    fn shell_split_single_quotes_disable_backslash_escape() {
+        // Inside '...' a backslash is literal (matches sh/bash POSIX behavior).
+        assert_eq!(shell_split("'a\\b'"), vec!["a\\b"]);
+    }
+
+    #[test]
+    fn shell_split_backslash_escapes_space_outside_quotes() {
+        assert_eq!(shell_split("foo\\ bar baz"), vec!["foo bar", "baz"]);
+    }
+
+    #[test]
+    fn shell_split_empty_input_yields_empty_vec() {
+        assert!(shell_split("").is_empty());
+        assert!(shell_split("   ").is_empty());
+    }
+
+    // ─── json_to_perl ────────────────────────────────────────────────────
+
+    #[test]
+    fn json_to_perl_null_becomes_undef() {
+        let r = json_to_perl(&serde_json::Value::Null);
+        assert!(r.is_undef());
+    }
+
+    #[test]
+    fn json_to_perl_bool_becomes_integer_one_or_zero() {
+        // Perl-style: true→1, false→0 (no native Bool).
+        assert_eq!(json_to_perl(&serde_json::json!(true)).to_int(), 1);
+        assert_eq!(json_to_perl(&serde_json::json!(false)).to_int(), 0);
+    }
+
+    #[test]
+    fn json_to_perl_integer_preferred_over_float() {
+        let r = json_to_perl(&serde_json::json!(42));
+        assert_eq!(r.as_integer(), Some(42));
+    }
+
+    #[test]
+    fn json_to_perl_fractional_number_becomes_float() {
+        let r = json_to_perl(&serde_json::json!(2.5));
+        assert!(r.as_float().is_some());
+        assert!((r.to_number() - 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn json_to_perl_string_passes_through() {
+        let r = json_to_perl(&serde_json::json!("hello"));
+        assert_eq!(r.to_string(), "hello");
+    }
+
+    #[test]
+    fn json_to_perl_array_yields_array_ref_of_same_length() {
+        let r = json_to_perl(&serde_json::json!([1, 2, 3]));
+        let arr = r.as_array_ref().expect("array_ref");
+        assert_eq!(arr.read().len(), 3);
+    }
+
+    #[test]
+    fn json_to_perl_object_yields_hash_ref_with_preserved_keys() {
+        let r = json_to_perl(&serde_json::json!({"k": "v", "n": 7}));
+        let h = r.as_hash_ref().expect("hash_ref");
+        let g = h.read();
+        assert_eq!(g.get("k").unwrap().to_string(), "v");
+        assert_eq!(g.get("n").unwrap().to_int(), 7);
+    }
+
+    // ─── perl_to_json ────────────────────────────────────────────────────
+
+    #[test]
+    fn perl_to_json_undef_becomes_null() {
+        assert_eq!(perl_to_json(&StrykeValue::UNDEF), serde_json::Value::Null);
+    }
+
+    #[test]
+    fn perl_to_json_integer_is_json_number() {
+        let r = perl_to_json(&StrykeValue::integer(42));
+        assert_eq!(r, serde_json::json!(42));
+    }
+
+    #[test]
+    fn perl_to_json_string_is_json_string() {
+        let r = perl_to_json(&StrykeValue::string("abc".into()));
+        assert_eq!(r, serde_json::json!("abc"));
+    }
+
+    #[test]
+    fn perl_to_json_array_ref_roundtrips_through_json() {
+        let pv = json_to_perl(&serde_json::json!([1, 2, "three"]));
+        let back = perl_to_json(&pv);
+        assert_eq!(back, serde_json::json!([1, 2, "three"]));
+    }
+
+    #[test]
+    fn perl_to_json_hash_ref_roundtrips_through_json() {
+        let original = serde_json::json!({"a": 1, "b": "two"});
+        let pv = json_to_perl(&original);
+        let back = perl_to_json(&pv);
+        assert_eq!(back, original);
+    }
+
+    #[test]
+    fn perl_to_json_non_finite_float_becomes_null() {
+        // serde_json::Number::from_f64(NaN) returns None → Null per source.
+        let r = perl_to_json(&StrykeValue::float(f64::NAN));
+        assert_eq!(r, serde_json::Value::Null);
+    }
+}
