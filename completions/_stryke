@@ -61,11 +61,12 @@ _stryke_debug_flags() {
     'v[verbose: use abs path when printing file names]'
 }
 
-# `s build [--project DIR] SCRIPT [-o OUT]` — bake a Perl script into a standalone executable
+# `s build [--project DIR] SCRIPT [-o OUT] [--mcp-server]` — bake a Perl script into a standalone executable
 _stryke_build() {
   _arguments -s -S \
     '(-o --output)'{-o+,--output=}'[output binary path]:output:_files' \
     '(-p --project)'{-p+,--project=}'[bundle project directory (main.stk + lib/)]:directory:_directories' \
+    '--mcp-server[wrap output as an MCP server over stdio JSON-RPC]' \
     '(-h --help)'{-h,--help}'[show s build usage]' \
     '1:script file:_files -g "*.stk *.pl *.pm"'
 }
