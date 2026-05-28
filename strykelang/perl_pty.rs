@@ -1012,3 +1012,124 @@ pub fn close_all() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── shell_split ─────────────────────────────────────────────────────
+
+    #[test]
+    fn shell_split_basic_whitespace_tokens() {
+        assert_eq!(shell_split("ssh user@host"), vec!["ssh", "user@host"]);
+    }
+
+    #[test]
+    fn shell_split_preserves_double_quoted_spaces() {
+        assert_eq!(shell_split("cmd \"a b\" c"), vec!["cmd", "a b", "c"]);
+    }
+
+    #[test]
+    fn shell_split_single_quoted_keeps_backslash_literal() {
+        // Inside single quotes, `\` is literal — quote != Some('\'') gate.
+        assert_eq!(shell_split("'a\\b' c"), vec!["a\\b", "c"]);
+    }
+
+    #[test]
+    fn shell_split_backslash_outside_quotes_escapes_next_char() {
+        assert_eq!(shell_split("a\\ b"), vec!["a b"]);
+    }
+
+    #[test]
+    fn shell_split_empty_or_whitespace_only_yields_no_tokens() {
+        assert!(shell_split("").is_empty());
+        assert!(shell_split("   \t  ").is_empty());
+    }
+
+    #[test]
+    fn shell_split_unterminated_quote_collects_remainder() {
+        // No closing `"` means the rest of the input is one token (cur).
+        assert_eq!(shell_split("a \"hello"), vec!["a", "hello"]);
+    }
+
+    // ─── strip_ansi ──────────────────────────────────────────────────────
+
+    #[test]
+    fn strip_ansi_removes_csi_color_sequence() {
+        // ESC[31m red ESC[0m
+        let s = "\x1b[31mred\x1b[0m";
+        assert_eq!(strip_ansi(s), "red");
+    }
+
+    #[test]
+    fn strip_ansi_removes_bel_and_backspace() {
+        // Both 0x07 (BEL) and 0x08 (BS) are dropped per source comment.
+        assert_eq!(strip_ansi("a\x07b\x08c"), "abc");
+    }
+
+    #[test]
+    fn strip_ansi_passes_through_plain_ascii() {
+        assert_eq!(strip_ansi("plain text 123"), "plain text 123");
+    }
+
+    #[test]
+    fn strip_ansi_handles_osc_terminated_by_bel() {
+        // ESC ] ... BEL — common for terminal title sequences.
+        let s = "before\x1b]0;title\x07after";
+        assert_eq!(strip_ansi(s), "beforeafter");
+    }
+
+    #[test]
+    fn strip_ansi_handles_osc_terminated_by_st() {
+        // ESC ] ... ESC \ (ST = String Terminator)
+        let s = "x\x1b]0;ttl\x1b\\y";
+        assert_eq!(strip_ansi(s), "xy");
+    }
+
+    #[test]
+    fn strip_ansi_handles_multi_param_csi() {
+        // ESC [ 1 ; 31 ; 42 m
+        let s = "\x1b[1;31;42mhi";
+        assert_eq!(strip_ansi(s), "hi");
+    }
+
+    #[test]
+    fn strip_ansi_empty_input_empty_output() {
+        assert_eq!(strip_ansi(""), "");
+    }
+
+    // ─── make_handle_value ───────────────────────────────────────────────
+
+    #[test]
+    fn make_handle_value_populates_required_keys() {
+        let v = make_handle_value(42, "echo hi", 12345);
+        let h = v.as_hash_ref().expect("hashref");
+        let g = h.read();
+        assert_eq!(g.get("__pty_id__").unwrap().to_int(), 42);
+        assert_eq!(g.get("__pty__").unwrap().to_int(), 1);
+        assert_eq!(g.get("cmd").unwrap().to_string(), "echo hi");
+        assert_eq!(g.get("pid").unwrap().to_int(), 12345);
+    }
+
+    // ─── handle_id ───────────────────────────────────────────────────────
+
+    #[test]
+    fn handle_id_extracts_from_pty_handle_hashref() {
+        let v = make_handle_value(99, "cmd", 7);
+        assert_eq!(handle_id(&v), Some(99));
+    }
+
+    #[test]
+    fn handle_id_non_hash_returns_none() {
+        assert_eq!(handle_id(&StrykeValue::integer(123)), None);
+    }
+
+    #[test]
+    fn handle_id_hash_without_marker_returns_none() {
+        // A plain hashref without `__pty_id__` key → None.
+        let mut m = IndexMap::new();
+        m.insert("other".to_string(), StrykeValue::integer(1));
+        let v = StrykeValue::hash_ref(Arc::new(parking_lot::RwLock::new(m)));
+        assert_eq!(handle_id(&v), None);
+    }
+}
