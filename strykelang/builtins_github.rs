@@ -488,3 +488,125 @@ pub fn gh_zen(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         None => Ok(StrykeValue::UNDEF),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── build_url ───────────────────────────────────────────────────────
+
+    #[test]
+    fn build_url_prepends_api_root_for_leading_slash() {
+        assert_eq!(build_url("/users/foo"), format!("{}/users/foo", API_ROOT));
+    }
+
+    #[test]
+    fn build_url_prepends_api_root_for_bare_path() {
+        assert_eq!(build_url("users/foo"), format!("{}/users/foo", API_ROOT));
+    }
+
+    #[test]
+    fn build_url_passes_through_absolute_https() {
+        let abs = "https://example.com/x";
+        assert_eq!(build_url(abs), abs);
+    }
+
+    #[test]
+    fn build_url_passes_through_absolute_http() {
+        let abs = "http://example.com/x";
+        assert_eq!(build_url(abs), abs);
+    }
+
+    // ─── url_encode ──────────────────────────────────────────────────────
+
+    #[test]
+    fn url_encode_preserves_unreserved_chars() {
+        // RFC 3986 unreserved set: ALPHA / DIGIT / "-" / "_" / "." / "~"
+        assert_eq!(url_encode("AZaz09-_.~"), "AZaz09-_.~");
+    }
+
+    #[test]
+    fn url_encode_percent_encodes_space() {
+        assert_eq!(url_encode("a b"), "a%20b");
+    }
+
+    #[test]
+    fn url_encode_percent_encodes_slash_and_question() {
+        assert_eq!(url_encode("a/b?c"), "a%2Fb%3Fc");
+    }
+
+    #[test]
+    fn url_encode_multibyte_utf8_per_byte() {
+        // é is U+00E9 → UTF-8 bytes C3 A9
+        assert_eq!(url_encode("é"), "%C3%A9");
+    }
+
+    #[test]
+    fn url_encode_empty_is_empty() {
+        assert_eq!(url_encode(""), "");
+    }
+
+    // ─── split_owner_repo ────────────────────────────────────────────────
+
+    #[test]
+    fn split_owner_repo_single_arg_with_slash() {
+        let (o, r) = split_owner_repo(&[StrykeValue::string("MenkeTechnologies/zpwr".into())]);
+        assert_eq!(o, "MenkeTechnologies");
+        assert_eq!(r, "zpwr");
+    }
+
+    #[test]
+    fn split_owner_repo_two_args_no_slash() {
+        let (o, r) = split_owner_repo(&[
+            StrykeValue::string("Owner".into()),
+            StrykeValue::string("Repo".into()),
+        ]);
+        assert_eq!(o, "Owner");
+        assert_eq!(r, "Repo");
+    }
+
+    #[test]
+    fn split_owner_repo_missing_repo_returns_empty_string() {
+        // arg_str returns "" when arg missing → repo half is empty.
+        let (o, r) = split_owner_repo(&[StrykeValue::string("only_owner".into())]);
+        assert_eq!(o, "only_owner");
+        assert_eq!(r, "");
+    }
+
+    // ─── json_to_perl ────────────────────────────────────────────────────
+
+    #[test]
+    fn json_to_perl_null_becomes_undef() {
+        assert!(json_to_perl(serde_json::Value::Null).is_undef());
+    }
+
+    #[test]
+    fn json_to_perl_bool_maps_to_one_or_zero() {
+        assert_eq!(json_to_perl(serde_json::json!(true)).to_int(), 1);
+        assert_eq!(json_to_perl(serde_json::json!(false)).to_int(), 0);
+    }
+
+    #[test]
+    fn json_to_perl_object_round_trip_keys_preserved() {
+        let v = json_to_perl(serde_json::json!({"k": 1, "name": "x"}));
+        let h = v.as_hash_ref().expect("hash_ref");
+        let g = h.read();
+        assert_eq!(g.get("k").unwrap().to_int(), 1);
+        assert_eq!(g.get("name").unwrap().to_string(), "x");
+    }
+
+    #[test]
+    fn json_to_perl_array_length_preserved() {
+        let v = json_to_perl(serde_json::json!([1, 2, 3, 4]));
+        let arr = v.as_array_ref().unwrap();
+        assert_eq!(arr.read().len(), 4);
+    }
+
+    // ─── arg_str ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn arg_str_missing_index_returns_empty_string() {
+        assert_eq!(arg_str(&[], 0), "");
+        assert_eq!(arg_str(&[StrykeValue::string("x".into())], 5), "");
+    }
+}
