@@ -4,19 +4,34 @@
 fn Rosetta::UnixLS::list($dir) {
     # Use glob to list files in the directory
     my @files = glob("$dir/*")
-    
+
     # Strip directory prefix for the output
     ~> @files map {
-        my $f = _
-        $f =~ s/^$dir\///
-        $f
+        _ =~ s/^$dir\///
+       _
     }
 }
 
-# Test with 't' directory
-my @t_files = Rosetta::UnixLS::list("t")
+# Build a known fixture in a tmpdir so the test is CWD-independent
+# (the prior `glob("t/*")` form was relative to CWD and depended on
+# stryke being invoked from the project root — fragile under
+# `cargo test` vs. running the test file directly).
+my $tmp = tempdir()
+for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
+    open(my $fh, ">", "$tmp/$name") or die "create: $!"
+    close($fh)
+}
 
-assert_ok len(@t_files) > 0, "Found files in t/"
-assert_ok len(grep { _ eq "test_a_plus_b.stk" } @t_files) > 0, "Found test_a_plus_b.stk"
+my @t_files = Rosetta::UnixLS::list($tmp)
+
+# Cleanup before assertions so they fire even on partial cleanup.
+for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
+    unlink("$tmp/$name")
+}
+rmdir($tmp)
+
+assert_ok len(@t_files) == 3, "Listed 3 files in fixture dir"
+assert_ok len(grep { _ eq "beta.txt" } @t_files) > 0, "Found beta.txt"
+assert_ok len(grep { _ eq "alpha.txt" } @t_files) > 0, "Found alpha.txt"
 
 test_run
