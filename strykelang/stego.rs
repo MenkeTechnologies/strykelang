@@ -274,4 +274,139 @@ mod tests {
         let result = text_hide("short", &env);
         assert!(result.is_err());
     }
+
+    // ── envelope structure ───────────────────────────────────────────
+
+    #[test]
+    fn wrap_payload_layout_len_body_crc() {
+        let env = wrap_payload(b"abcd", None);
+        // 4-byte BE length + 4-byte body + 4-byte BE CRC = 12 bytes.
+        assert_eq!(env.len(), 12);
+        assert_eq!(&env[0..4], &[0, 0, 0, 4]);
+        assert_eq!(&env[4..8], b"abcd");
+    }
+
+    #[test]
+    fn wrap_payload_empty_secret_still_carries_len_and_crc() {
+        let env = wrap_payload(&[], None);
+        assert_eq!(env.len(), 8);
+        assert_eq!(&env[0..4], &[0, 0, 0, 0]);
+        // CRC over the four length bytes alone.
+        let mut h = Crc32::new();
+        h.update(&[0, 0, 0, 0]);
+        let crc = h.finalize().to_be_bytes();
+        assert_eq!(&env[4..8], &crc);
+        // And it roundtrips back to empty.
+        assert_eq!(unwrap_payload(&env, None).unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn wrap_payload_with_key_differs_from_unkeyed() {
+        let env_a = wrap_payload(b"hello", None);
+        let env_b = wrap_payload(b"hello", Some(b"k"));
+        // Length prefix matches, body differs (XOR mask applied), CRC differs too.
+        assert_eq!(&env_a[0..4], &env_b[0..4]);
+        assert_ne!(&env_a[4..9], &env_b[4..9]);
+    }
+
+    #[test]
+    fn unwrap_payload_rejects_short_envelope() {
+        for n in 0..8 {
+            let buf = vec![0u8; n];
+            assert!(
+                unwrap_payload(&buf, None).is_err(),
+                "len {n} should fail short-envelope check"
+            );
+        }
+    }
+
+    #[test]
+    fn unwrap_payload_rejects_declared_len_exceeding_buffer() {
+        // Declared length = 1000 but the body bytes don't exist.
+        let mut env = vec![0u8; 12];
+        env[0..4].copy_from_slice(&1000u32.to_be_bytes());
+        assert!(unwrap_payload(&env, None).is_err());
+    }
+
+    #[test]
+    fn unwrap_payload_rejects_flipped_body_byte() {
+        let mut env = wrap_payload(b"abcd", None);
+        env[5] ^= 0xFF; // flip a body bit → CRC mismatch
+        assert!(unwrap_payload(&env, None).is_err());
+    }
+
+    // ── XOR stream determinism ───────────────────────────────────────
+
+    #[test]
+    fn xor_stream_is_self_inverse() {
+        let mut buf = b"the quick brown fox jumps over the lazy dog".to_vec();
+        let original = buf.clone();
+        xor_stream(&mut buf, b"secret");
+        assert_ne!(buf, original, "first XOR should mutate the buffer");
+        xor_stream(&mut buf, b"secret");
+        assert_eq!(buf, original, "second XOR with same key must restore");
+    }
+
+    #[test]
+    fn xor_stream_first_block_is_sha256_key_counter() {
+        let mut buf = [0u8; 32];
+        xor_stream(&mut buf, b"k");
+        let mut h = Sha256::new();
+        h.update(b"k");
+        h.update(0u32.to_be_bytes());
+        let block = h.finalize();
+        // XOR'ing zeros yields the keystream block directly.
+        assert_eq!(&buf[..], &block[..]);
+    }
+
+    #[test]
+    fn xor_stream_handles_partial_trailing_block() {
+        // 33 bytes → block 0 covers 32, block 1 contributes 1 byte.
+        let mut buf = vec![0u8; 33];
+        xor_stream(&mut buf, b"key");
+        let mut h0 = Sha256::new();
+        h0.update(b"key");
+        h0.update(0u32.to_be_bytes());
+        let b0 = h0.finalize();
+        let mut h1 = Sha256::new();
+        h1.update(b"key");
+        h1.update(1u32.to_be_bytes());
+        let b1 = h1.finalize();
+        assert_eq!(&buf[0..32], &b0[..]);
+        assert_eq!(buf[32], b1[0]);
+    }
+
+    // ── PNG / text carrier classification ────────────────────────────
+
+    #[test]
+    fn is_png_detects_magic_bytes() {
+        assert!(is_png(b"\x89PNG\r\n\x1a\nrest..."));
+        assert!(!is_png(b"GIF89a..."));
+        assert!(!is_png(b""));
+        assert!(!is_png(b"\x89PNG\r\n")); // truncated magic
+    }
+
+    #[test]
+    fn is_zero_width_covers_all_four_codepoints() {
+        for c in ['\u{200B}', '\u{200C}', '\u{200D}', '\u{FEFF}'] {
+            assert!(
+                is_zero_width(c),
+                "expected {:04X} to count as zero-width",
+                c as u32
+            );
+        }
+        for c in ['a', ' ', '\n', '\t', '\u{200A}', '\u{200E}', '\u{FFFD}'] {
+            assert!(!is_zero_width(c), "expected {:04X} to NOT count", c as u32);
+        }
+    }
+
+    #[test]
+    fn text_capacity_bits_counts_visible_chars_only() {
+        assert_eq!(text_capacity_bits(""), 0);
+        assert_eq!(text_capacity_bits("abc"), 3);
+        // Existing zero-widths in the carrier do not contribute capacity.
+        assert_eq!(text_capacity_bits("a\u{200B}b\u{200C}c\u{FEFF}"), 3);
+        // Multi-byte visible chars count once each (no UTF-8 byte inflation).
+        assert_eq!(text_capacity_bits("aé你"), 3);
+    }
 }
