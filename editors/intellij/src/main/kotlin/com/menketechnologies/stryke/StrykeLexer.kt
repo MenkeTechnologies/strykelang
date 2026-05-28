@@ -663,8 +663,16 @@ class StrykeLexer : LexerBase() {
         }
         // Punctuation specials — single char tail.
         if (isSpecialVarChar(buf[p])) {
-            val name = "$sigil${buf[p]}"
+            val first = buf[p]
+            val name = "$sigil$first"
             p++
+            // Caret specials like `$^X`, `@^CAPTURE`, `%^HOOK`,
+            // `$^WARNING_BITS` — a single `^` carries an uppercase
+            // identifier tail. Without this the lexer stopped at
+            // `%^` and colored the trailing `HOOK` as a bareword.
+            if (first == '^') {
+                while (p < endOffset && (buf[p] == '_' || buf[p].isLetterOrDigit())) p++
+            }
             tokenEnd = p; pos = p
             tokenType = when {
                 name == "\$_" || name == "@_" -> StrykeTokenTypes.TOPIC_VAR
@@ -706,11 +714,25 @@ class StrykeLexer : LexerBase() {
             tokenType = StrykeTokenTypes.TOPIC_VAR
             return
         }
-        // Regular identifier (with optional ::name segments).
+        // Regular identifier (with optional ::name segments). A
+        // segment may start with `^` for caret-style special var
+        // names (`%main::^HOOK`, `${^OPEN}`, `@main::^CAPTURE`), or
+        // with the regular `_` / letter set. Without the `^` branch
+        // the lexer split `%main::^HOOK` into `%main::` + `^` +
+        // `HOOK`, coloring `^HOOK` as operator + identifier.
         while (p < endOffset) {
             val c = buf[p]
             if (c == '_' || c.isLetterOrDigit()) { p++; continue }
-            if (c == ':' && p + 1 < endOffset && buf[p + 1] == ':') { p += 2; continue }
+            if (c == ':' && p + 1 < endOffset && buf[p + 1] == ':') {
+                // Look ahead past the `::` for a caret-special name.
+                if (p + 2 < endOffset && buf[p + 2] == '^') {
+                    p += 3 // consume `::^`
+                    while (p < endOffset && (buf[p] == '_' || buf[p].isLetterOrDigit())) p++
+                    continue
+                }
+                p += 2
+                continue
+            }
             break
         }
         // If the sigil consumed nothing past itself, treat as an operator (e.g. `%` modulo).
