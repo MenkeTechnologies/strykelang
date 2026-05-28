@@ -1421,16 +1421,24 @@ impl Lexer {
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let mut ident = self.read_package_qualified_identifier();
-                // `$main::!`, `$main::?`, `$main::0` — Perl says all
-                // punctuation / digit vars reside in main, so
-                // `$main::PUNCT` must lex as one token. The qualified
-                // identifier ends with the trailing `::` (because the
-                // punctuation leaf isn't alphanumeric); pick up a
-                // single punctuation / digit char or a caret-prefixed
-                // letter (`$main::^O`) as the leaf. The scope getter
-                // canonicalizes `main::PUNCT` → `PUNCT` via
-                // `strip_main_prefix` so storage stays unified.
-                if ident.ends_with("::") {
+                // `$main::!`, `$main::?`, `$main::0` — stryke
+                // implements the Perl docs faithfully ("All
+                // punctuation variables like $_ reside in main"). The
+                // qualified identifier ends with the trailing `::`
+                // (because the punctuation leaf isn't alphanumeric);
+                // pick up a single punctuation / digit char or a
+                // caret-prefixed letter (`$main::^O`) as the leaf.
+                // The scope getter canonicalizes `main::PUNCT` →
+                // `PUNCT` via `strip_main_prefix` so storage stays
+                // unified.
+                //
+                // Disabled in `--compat`: Perl 5.42's parser rejects
+                // `$main::!` (treats `$main::` as the empty-name var
+                // and leaves `!` for the next token). To stay
+                // byte-identical to perl(1) we don't consume the
+                // punct leaf when compat mode is on. Stryke-strict
+                // default mode still gets the docs-faithful behavior.
+                if ident.ends_with("::") && !crate::compat_mode() {
                     match self.peek() {
                         Some('^') if self.input.get(self.pos + 1).is_some_and(|c| c.is_alphabetic()) => {
                             self.advance();
