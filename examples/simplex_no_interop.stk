@@ -1,0 +1,142 @@
+#!/usr/bin/env stryke
+
+# simplex_no_interop.stk — Simplex Algorithm for Linear Programming.
+#
+# Solves maximization problems in standard form:
+# Maximize C^T x subject to Ax <= b and x >= 0.
+#
+# Run: stryke --no-interop examples/simplex_no_interop.stk
+
+package Simplex
+
+fn solve($c, $A, $b) {
+    my $num_vars = len @$c
+    my $num_constraints = len @$A
+
+    # Build tableau
+    my $tableau = []
+    
+    # Objective row (index 0)
+    my $obj_row = []
+    for my $v (@$c) { push @$obj_row, -$v }
+    for (0 : $num_constraints) { push @$obj_row, 0.0 } # slack vars + RHS
+    push @$tableau, $obj_row
+
+    # Constraint rows
+    for my $i (0 : $num_constraints - 1) {
+        my $row = []
+        for my $v (@{$A->[$i]}) { push @$row, $v }
+        for my $j (0 : $num_constraints - 1) {
+            push @$row, ($i == $j ? 1.0 : 0.0)
+        }
+        push @$row, $b->[$i]
+        push @$tableau, $row
+    }
+
+    my $cols = (len @{$tableau->[0]}) - 1
+
+    while (1) {
+        # Find pivot column (most negative in objective row)
+        my $pivot_col = -1
+        my $min_val = -1e-9 # small threshold to avoid precision issues
+        my $obj = $tableau->[0]
+        
+        for my $j (0 : $cols - 1) {
+            if ($obj->[$j] < $min_val) {
+                $min_val = $obj->[$j]
+                $pivot_col = $j
+            }
+        }
+
+        # If no negative value, we are at optimal
+        last if $pivot_col == -1
+
+        # Find pivot row (minimum positive ratio)
+        my $pivot_row = -1
+        my $min_ratio = 1e18 # arbitrary large number
+        
+        for my $i (1 : $num_constraints) {
+            my $val = $tableau->[$i]->[$pivot_col]
+            if ($val > 1e-9) {
+                my $ratio = $tableau->[$i]->[$cols] / $val
+                if ($ratio < $min_ratio) {
+                    $min_ratio = $ratio
+                    $pivot_row = $i
+                }
+            }
+        }
+
+        # If no valid pivot row, problem is unbounded
+        return undef if $pivot_row == -1
+
+        # Pivot operation
+        my $pivot_val = $tableau->[$pivot_row]->[$pivot_col]
+        
+        # Divide pivot row by pivot value
+        for my $j (0 : $cols) {
+            $tableau->[$pivot_row]->[$j] /= $pivot_val
+        }
+
+        # Eliminate pivot column from other rows
+        for my $i (0 : $num_constraints) {
+            if ($i != $pivot_row) {
+                my $factor = $tableau->[$i]->[$pivot_col]
+                for my $j (0 : $cols) {
+                    $tableau->[$i]->[$j] -= $factor * $tableau->[$pivot_row]->[$j]
+                }
+            }
+        }
+    }
+
+    # Extract solution
+    my @solution = (0.0) x $num_vars
+    for my $j (0 : $num_vars - 1) {
+        my $one_count = 0
+        my $one_row = -1
+        my $other_count = 0
+        
+        for my $i (1 : $num_constraints) {
+            my $val = $tableau->[$i]->[$j]
+            if (abs($val - 1.0) < 1e-9) {
+                $one_count++
+                $one_row = $i
+            } elsif (abs($val) > 1e-9) {
+                $other_count++
+            }
+        }
+        
+        if ($one_count == 1 && $other_count == 0) {
+            $solution[$j] = $tableau->[$one_row]->[$cols]
+        }
+    }
+
+    { max_value => $tableau->[0]->[$cols], solution => \@solution }
+}
+
+package main
+
+p "── Simplex Algorithm Demo ──"
+# Maximize 3x + 2y
+my @c = (3.0, 2.0)
+
+# Subject to:
+# 2x + y <= 18
+# 2x + 3y <= 42
+# 3x + y <= 24
+my $A = [
+    [2.0, 1.0],
+    [2.0, 3.0],
+    [3.0, 1.0]
+]
+my @rhs = (18.0, 42.0, 24.0)
+
+my $res = Simplex::solve(\@c, $A, \@rhs)
+
+if (defined $res) {
+    p "Optimal Value: #{$res->{max_value}}"
+    p "Solution: x = #{$res->{solution}->[0]}, y = #{$res->{solution}->[1]}"
+} else {
+    p "Problem is unbounded."
+}
+
+p "Done."

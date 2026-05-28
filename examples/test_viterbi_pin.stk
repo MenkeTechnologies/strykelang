@@ -1,0 +1,83 @@
+#!/usr/bin/env stryke
+
+package Viterbi
+
+fn solve($obs, $states, $start_p, $trans_p, $emit_p) {
+    my $t = len @$obs
+    my $num_states = len @$states
+    return [] if $t == 0
+
+    my $v = []
+    my $path = {}
+
+    my $v_0 = {}
+    my $obs_0 = $obs->[0]
+    for my $y (@$states) {
+        $v_0->{$y} = $start_p->{$y} * $emit_p->{$y}->{$obs_0}
+        $path->{$y} = [$y]
+    }
+    push @$v, $v_0
+
+    for my $i (1:$t-1) {
+        my $obs_i = $obs->[$i]
+        my $v_i = {}
+        my $newpath = {}
+
+        for my $y (@$states) {
+            my $prob = -1.0
+            my $state = ""
+            for my $y0 (@$states) {
+                my $prev_v = $v->[$i - 1]->{$y0}
+                my $trans = $trans_p->{$y0}->{$y}
+                my $emit = $emit_p->{$y}->{$obs_i}
+                my $calc = $prev_v * $trans * $emit
+                if ($calc > $prob) {
+                    $prob = $calc
+                    $state = $y0
+                }
+            }
+            $v_i->{$y} = $prob
+            my $prev_path = $path->{$state}
+            my @next_path = @$prev_path
+            push @next_path, $y
+            $newpath->{$y} = \@next_path
+        }
+        push @$v, $v_i
+        $path = $newpath
+    }
+
+    my $prob = -1.0
+    my $state = ""
+    my $v_last = $v->[$t - 1]
+    for my $y (@$states) {
+        my $val = $v_last->{$y}
+        if ($val > $prob) {
+            $prob = $val
+            $state = $y
+        }
+    }
+
+    { prob => $prob, path => $path->{$state} }
+}
+
+package main
+
+my @obs = ("normal", "cold", "dizzy")
+my @states = ("Healthy", "Fever")
+
+my %start_p = ("Healthy" => 0.6, "Fever" => 0.4)
+my %trans_p = (
+    "Healthy" => { "Healthy" => 0.7, "Fever" => 0.3 },
+    "Fever"   => { "Healthy" => 0.4, "Fever" => 0.6 }
+)
+my %emit_p = (
+    "Healthy" => { "normal" => 0.5, "cold" => 0.4, "dizzy" => 0.1 },
+    "Fever"   => { "normal" => 0.1, "cold" => 0.3, "dizzy" => 0.6 }
+)
+
+my $res = Viterbi::solve(\@obs, \@states, \%start_p, \%trans_p, \%emit_p)
+my $path = join(",", @{$res->{path}})
+
+$path |> aeq "Healthy,Healthy,Fever", "correct viterbi path"
+
+test_run
