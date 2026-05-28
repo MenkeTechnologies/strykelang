@@ -3093,6 +3093,24 @@ fn audit_completion_scalar_main_namespace_includes_argv() {
     );
 }
 
+// Reserved bareword filehandles forced into main per Perl semantics
+// (STDIN/STDOUT/STDERR/ARGV/ARGVOUT/DATA). These have no sigil and
+// no `main::` alias — `print main::STDOUT "hi"` is a parser error
+// because `main::STDOUT` resolves as a sub call, not a filehandle.
+
+#[test]
+fn audit_completion_bare_includes_special_filehandles() {
+    let mut h = LspHarness::new("\n");
+    let labels = h.completion(0, 0);
+    h.finish();
+    for fh in &["STDIN", "STDOUT", "STDERR", "ARGV", "ARGVOUT", "DATA"] {
+        assert!(
+            labels.contains(&fh.to_string()),
+            "{fh} must appear in bare completion: {labels:?}",
+        );
+    }
+}
+
 #[test]
 fn audit_completion_hash_main_namespace_includes_env() {
     let mut h = LspHarness::new("%main::");
