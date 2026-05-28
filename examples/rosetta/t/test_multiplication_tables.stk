@@ -7,9 +7,8 @@ fn Rosetta::Math::multiplication_table($n) {
     
     # Generate each row
     my @rows = 1:$n |> map {
-        my $row_num = _
-        my $cells = 1:$n |> map { sprintf("%4d", $row_num * _) } |> join("")
-        sprintf("%2d:", $row_num) . $cells
+        my $cells = 1:$n |> map { sprintf("%4d", _< * _) } |> join("")
+        sprintf("%2d:", _) . $cells
     }
     
     $header . "\n" . join("\n", @rows)
