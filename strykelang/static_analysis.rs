@@ -1710,6 +1710,17 @@ impl StaticAnalyzer {
 }
 
 fn is_special_var(name: &str) -> bool {
+    // `main::X` is the qualified form of `X` for every reserved
+    // variable — `$main::ARGV`, `@main::INC`, `%main::ENV`, `$main::_`,
+    // etc. (per the Perl Documentation: "certain built-in identifiers
+    // are forced into the main package"). Strip the prefix and test
+    // the bare name so the linter doesn't flag the qualified form as
+    // an undeclared global. Recursing also handles
+    // `%main::stryke::all` — strip `main::` once, then `stryke::all`
+    // resolves through the registry's `%stryke::*` reflection family.
+    if let Some(rest) = name.strip_prefix("main::") {
+        return is_special_var(rest);
+    }
     if name.len() == 1 {
         return true;
     }
@@ -2142,6 +2153,25 @@ mod tests {
             "p __FILE__",
             "p __LINE__",
             "p __PACKAGE__",
+            // `main::X` qualified form of every reserved variable.
+            // Per the Perl Documentation: "certain built-in identifiers
+            // are forced into the main package". The linter must not
+            // flag the qualified spelling as undeclared. Mirrors the
+            // runtime canonicalization via `strip_main_prefix` in
+            // `scope.rs`.
+            "p $main::ARGV",
+            "p $main::_",
+            "p $main::!",
+            "p $main::@",
+            "p $main::/",
+            "p $main::0",
+            "p @main::ARGV",
+            "p @main::INC",
+            "p @main::F",
+            "p %main::ENV",
+            "p %main::INC",
+            "p %main::SIG",
+            "p %main::stryke::all",
         ] {
             assert!(
                 lint(src).is_ok(),
