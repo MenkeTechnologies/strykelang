@@ -13246,15 +13246,43 @@ impl Parser {
         let Token::Ident(h) = self.peek().clone() else {
             return None;
         };
-        let mut chars = h.chars();
-        let first = chars.next()?;
+        // `main::STDOUT` is the qualified form of `STDOUT` — `main` is
+        // the default package for special filehandles per Perl. The
+        // lexer emits this as three tokens (Ident("main"), PackageSep,
+        // Ident("STDOUT")), so detect the trio and consume the prefix
+        // up front, then check the leaf as a normal uppercase handle.
+        let saved = self.pos;
+        let qualified = h == "main"
+            && matches!(self.peek_at(1), Token::PackageSep)
+            && matches!(self.peek_at(2), Token::Ident(s) if !s.is_empty());
+        if qualified {
+            self.advance(); // main
+            self.advance(); // ::
+        }
+        let leaf = match self.peek().clone() {
+            Token::Ident(s) => s,
+            _ => {
+                self.pos = saved;
+                return None;
+            }
+        };
+        let mut chars = leaf.chars();
+        let first = match chars.next() {
+            Some(c) => c,
+            None => {
+                self.pos = saved;
+                return None;
+            }
+        };
         if !(first.is_ascii_uppercase() || first == '_') {
+            self.pos = saved;
             return None;
         }
-        if !h
+        if !leaf
             .chars()
             .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
         {
+            self.pos = saved;
             return None;
         }
         let next = self.peek_at(1);
@@ -13274,10 +13302,11 @@ impl Parser {
                 .any(|t| std::mem::discriminant(t) == std::mem::discriminant(next))
         };
         if !ok {
+            self.pos = saved;
             return None;
         }
         self.advance();
-        Some(h)
+        Some(leaf)
     }
 
     /// `open FH, …` — bareword filehandle followed by a comma.
@@ -13302,10 +13331,30 @@ impl Parser {
         let line = self.peek_line();
         // Check for filehandle: print STDERR "msg"  /  print $fh "msg"
         let handle = if let Token::Ident(ref h) = self.peek().clone() {
+            // `print main::STDERR "msg"` — `main` is the default package
+            // for special filehandles per Perl. The lexer emits
+            // `main::STDOUT` as three tokens (Ident("main"), PackageSep,
+            // Ident("STDOUT")), so peek + lookahead for the qualified
+            // form and consume the `main::` prefix up front so the
+            // existing uppercase-bareword path picks up the bare leaf.
+            if h == "main"
+                && matches!(self.peek_at(1), Token::PackageSep)
+                && matches!(
+                    self.peek_at(2),
+                    Token::Ident(s) if !s.is_empty()
+                        && s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+                        && s.chars().next().is_some_and(|c| c.is_ascii_uppercase() || c == '_'))
+            {
+                self.advance(); // main
+                self.advance(); // ::
+            }
+            let h = match self.peek().clone() {
+                Token::Ident(s) => s,
+                _ => h.clone(),
+            };
             if h.chars().all(|c| c.is_uppercase() || c == '_')
                 && !matches!(self.peek(), Token::LParen)
             {
-                let h = h.clone();
                 let saved = self.pos;
                 self.advance();
                 // Verify next token is a term start (not operator).
@@ -19705,6 +19754,27 @@ impl Parser {
                         name.push_str("::");
                         i += 2;
                         while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                            name.push(chars[i]);
+                            i += 1;
+                        }
+                    }
+                    // `"$main::!"`, `"$main::@"`, `"$main::?"` — per Perl,
+                    // punctuation vars reside in main. After the `::`
+                    // chain stops, accept a single punctuation / digit
+                    // char (or `^LETTER`) as the leaf so the interp
+                    // sees one ScalarVar token. The runtime
+                    // canonicalizes `main::PUNCT` → `PUNCT`.
+                    if name.ends_with("::") && i < chars.len() {
+                        if chars[i] == '^'
+                            && i + 1 < chars.len()
+                            && chars[i + 1].is_ascii_alphabetic()
+                        {
+                            name.push('^');
+                            name.push(chars[i + 1]);
+                            i += 2;
+                        } else if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}"
+                            .contains(chars[i])
+                        {
                             name.push(chars[i]);
                             i += 1;
                         }

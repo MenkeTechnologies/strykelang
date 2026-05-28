@@ -31668,6 +31668,15 @@ fn builtin_lsp_completion_words(
         }
     }
 
+    // Source 5: Special bareword filehandles forced into main per Perl
+    // semantics. These have NO sigil — `print STDOUT "hi"` works,
+    // `print main::STDOUT "hi"` does NOT (the parser sees it as a sub
+    // call). Only the bare forms go in the wordlist; no `main::` alias.
+    const SPECIAL_FILEHANDLES: &[&str] = &["STDIN", "STDOUT", "STDERR", "ARGV", "ARGVOUT", "DATA"];
+    for fh in SPECIAL_FILEHANDLES {
+        set.insert((*fh).to_string());
+    }
+
     Ok(StrykeValue::array(
         set.into_iter().map(StrykeValue::string).collect(),
     ))
