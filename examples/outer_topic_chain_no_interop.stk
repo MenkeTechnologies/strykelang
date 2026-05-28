@@ -60,8 +60,7 @@ p "── grep inside outer map: threshold drawn from _< ──"
 my @thresholds = (10, 50, 100)
 my @data = (5, 15, 60, 99, 200, 300)
 my @hits = map {
-    my $threshold = _
-    [$threshold, [grep { _ > _< } @data]]
+    [_, [grep { _ > _< } @data]]
 } @thresholds
 
 for my $pair (@hits) {

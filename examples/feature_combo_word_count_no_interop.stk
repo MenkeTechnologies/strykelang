@@ -52,11 +52,10 @@ fn WC::seq($text) {
 
 fn WC::par_char_classes($text) {
     my @per_chunk = par {
-        my $clean = _
         my $alpha = 0
         my $digit = 0
         my $space = 0
-        for my $c (split //, $clean) {
+        for my $c (split //, _) {
             $alpha++ if $c =~ /[a-zA-Z]/
             $digit++ if $c =~ /\d/
             $space++ if $c =~ /\s/

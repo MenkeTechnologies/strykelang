@@ -25,8 +25,7 @@ fn Zip::n(@lists) {
     return () if len(@lists) == 0
     my $n = min(map { len(@{_}) } @lists)
     0:$n - 1 |> maps {
-        my $i = _
-        [map { _->[$i] } @lists]
+        [map { _->[_<] } @lists]
     }
 }
 

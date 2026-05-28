@@ -85,10 +85,9 @@ my $evens_count = @nums |> greps { _ % 2 == 0 } |> len
 $evens_count |> aeq 10, "10 evens"
 
 my $primes_count = @nums |> greps { _ > 1 } |> greps {
-    my $x = $_
     my $is_prime = 1
-    for my $k (2:int(sqrt($x))) {
-        if ($x % $k == 0) { $is_prime = 0; last }
+    for my $k (2:int(sqrt(_))) {
+        if (_ % $k == 0) { $is_prime = 0; last }
     }
     $is_prime
 } |> len
