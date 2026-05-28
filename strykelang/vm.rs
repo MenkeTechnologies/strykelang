@@ -599,26 +599,39 @@ impl<'a> VM<'a> {
             if let Some(&(start, end)) =
                 self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
             {
+                // Save / restore the topic chain across the iter loop so
+                // this map stage doesn't leak its final `_` into the
+                // enclosing block's topic. Without this, a per-iter outer
+                // block reading `_` after `inner |> map { … }` returns the
+                // inner pipe's last iter value instead of the outer iter.
+                // Mirrors the sort-block save/restore in vm_helper.rs.
+                let saved_chain = self.interp.scope.save_topic_chain();
                 let mut result = Vec::new();
                 for item in list {
                     self.interp.scope.set_topic(item);
                     let val = self.run_block_region(start, end, op_count)?;
                     Self::extend_map_outputs(&mut result, val, peel_array_ref);
                 }
+                self.interp.scope.restore_topic_chain(saved_chain);
                 self.push(StrykeValue::array(result));
                 return Ok(());
             }
         }
         let block = self.blocks[idx].clone();
+        let saved_chain = self.interp.scope.save_topic_chain();
         let mut result = Vec::new();
         for item in list {
             self.interp.scope.set_topic(item);
             match self.interp.exec_block_with_tail(&block, WantarrayCtx::List) {
                 Ok(val) => Self::extend_map_outputs(&mut result, val, peel_array_ref),
-                Err(FlowOrError::Error(e)) => return Err(e),
+                Err(FlowOrError::Error(e)) => {
+                    self.interp.scope.restore_topic_chain(saved_chain);
+                    return Err(e);
+                }
                 Err(_) => {}
             }
         }
+        self.interp.scope.restore_topic_chain(saved_chain);
         self.push(StrykeValue::array(result));
         Ok(())
     }
@@ -6980,6 +6993,11 @@ impl<'a> VM<'a> {
                             }
                         }
                         let idx = *block_idx as usize;
+                        // Save / restore the topic chain across the iter
+                        // loop so this grep stage doesn't leak its final
+                        // `_` (or chain shift) into the enclosing block.
+                        // Mirror of the map fix above.
+                        let saved_chain = self.interp.scope.save_topic_chain();
                         if let Some(&(start, end)) =
                             self.block_bytecode_ranges.get(idx).and_then(|r| r.as_ref())
                         {
@@ -6997,6 +7015,7 @@ impl<'a> VM<'a> {
                                     result.push(item);
                                 }
                             }
+                            self.interp.scope.restore_topic_chain(saved_chain);
                             self.push(StrykeValue::array(result));
                             Ok(())
                         } else {
@@ -7015,10 +7034,14 @@ impl<'a> VM<'a> {
                                             result.push(item);
                                         }
                                     }
-                                    Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                                        self.interp.scope.restore_topic_chain(saved_chain);
+                                        return Err(e);
+                                    }
                                     Err(_) => {}
                                 }
                             }
+                            self.interp.scope.restore_topic_chain(saved_chain);
                             self.push(StrykeValue::array(result));
                             Ok(())
                         }
@@ -7026,6 +7049,10 @@ impl<'a> VM<'a> {
                     Op::ForEachWithBlock(block_idx) => {
                         let val = self.pop();
                         let idx = *block_idx as usize;
+                        // Save / restore the topic chain so this foreach
+                        // doesn't leak its final `_` into the enclosing
+                        // block (mirror of the map/grep fix above).
+                        let saved_chain = self.interp.scope.save_topic_chain();
                         // Lazy iterator: consume one-at-a-time without materializing.
                         if val.is_iterator() {
                             let iter = val.into_iterator();
@@ -7036,7 +7063,12 @@ impl<'a> VM<'a> {
                                 while let Some(item) = iter.next_item() {
                                     count += 1;
                                     self.interp.scope.set_topic(item);
-                                    self.run_block_region(start, end, op_count)?;
+                                    if let Err(e) =
+                                        self.run_block_region(start, end, op_count)
+                                    {
+                                        self.interp.scope.restore_topic_chain(saved_chain);
+                                        return Err(e);
+                                    }
                                 }
                             } else {
                                 let block = self.blocks[idx].clone();
@@ -7046,12 +7078,14 @@ impl<'a> VM<'a> {
                                     match self.interp.exec_block(&block) {
                                         Ok(_) => {}
                                         Err(crate::vm_helper::FlowOrError::Error(e)) => {
-                                            return Err(e)
+                                            self.interp.scope.restore_topic_chain(saved_chain);
+                                            return Err(e);
                                         }
                                         Err(_) => {}
                                     }
                                 }
                             }
+                            self.interp.scope.restore_topic_chain(saved_chain);
                             self.push(StrykeValue::integer(count));
                             return Ok(());
                         }
@@ -7062,7 +7096,10 @@ impl<'a> VM<'a> {
                         {
                             for item in list {
                                 self.interp.scope.set_topic(item);
-                                self.run_block_region(start, end, op_count)?;
+                                if let Err(e) = self.run_block_region(start, end, op_count) {
+                                    self.interp.scope.restore_topic_chain(saved_chain);
+                                    return Err(e);
+                                }
                             }
                         } else {
                             let block = self.blocks[idx].clone();
@@ -7070,11 +7107,15 @@ impl<'a> VM<'a> {
                                 self.interp.scope.set_topic(item);
                                 match self.interp.exec_block(&block) {
                                     Ok(_) => {}
-                                    Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+                                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                                        self.interp.scope.restore_topic_chain(saved_chain);
+                                        return Err(e);
+                                    }
                                     Err(_) => {}
                                 }
                             }
                         }
+                        self.interp.scope.restore_topic_chain(saved_chain);
                         self.push(StrykeValue::integer(count));
                         Ok(())
                     }
