@@ -2,20 +2,17 @@
 # Rosetta Code: Pancake Sort
 
 fn Rosetta::PancakeSort::flip {
-    my $list = _
-    my $k = _1
-    my @arr = @$list
-    my @sub = @arr[0:$k]
+    my @arr = @$_
+    my @sub = @arr[0:_1]
     my @flipped = ~> @sub rev
-    for my $i (0:$k) {
+    for my $i (0:_1) {
         $arr[$i] = $flipped[$i]
     }
     \@arr
 }
 
 fn Rosetta::PancakeSort::pancake_sort {
-    my $list = _
-    my @arr = @$list
+    my @arr = @$_
     my $n = len(@arr)
     
     if ($n < 2) {

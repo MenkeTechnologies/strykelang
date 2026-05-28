@@ -2,11 +2,10 @@
 # Rosetta Code: Median
 
 fn Rosetta::Median::median {
-    my $list = _
-    if (len(@$list) == 0) {
+    if (len(@$_) == 0) {
         0
     } else {
-        my @sorted = sort { _0 <=> _1 } @$list
+        my @sorted = sort { _0 <=> _1 } @$_
         my $len = len(@sorted)
         my $mid = int($len / 2)
         if ($len % 2 == 0) {

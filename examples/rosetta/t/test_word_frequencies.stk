@@ -2,10 +2,8 @@
 # Rosetta Code: Word frequency
 
 fn Rosetta::WordFrequencies::word_frequency {
-    my $s = _
     my $counts = {}
-    my $l = lc($s)
-    my @words = split(/[^a-z]+/, $l)
+    my @words = split(/[^a-z]+/, lc(_))
     ~> @words grep { _ ne "" } map { $counts->{_} = $counts->{_} + 1 }
     $counts
 }

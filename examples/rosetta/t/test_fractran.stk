@@ -35,11 +35,10 @@ my $primes_prog = [
 my @seq = Rosetta::Fractran::run($primes_prog, 2, 1000)
 
 # Filter out powers of 2
-my @powers_of_2 = ~> @seq grep { 
-    my $v = _
-    # Check if $v is a power of 2 > 1
-    if ($v > 1) {
-        ($v & ($v - 1)) == 0
+my @powers_of_2 = ~> @seq grep {
+    # Check if _ is a power of 2 > 1
+    if (_ > 1) {
+        (_ & (_ - 1)) == 0
     } else {
         0
     }

@@ -24,8 +24,7 @@ fn Project::SpecialVars::default_in_grep {
 
 fn Project::SpecialVars::default_explicit_set {
     _ = "hello"
-    my $result = _
-    $result
+    _
 }
 
 fn Project::SpecialVars::default_in_regex {

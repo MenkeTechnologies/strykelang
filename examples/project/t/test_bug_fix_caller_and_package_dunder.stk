@@ -52,9 +52,8 @@ Demo::B::who() |> assert_eq("Demo::B", "Demo::B keeps its name")
 # Closure body also captures the defining package.
 package Demo::Closure
 fn make_logger {
-    my $prefix = _
-    my $pkg    = __PACKAGE__
-    fn { "$pkg" . "[$prefix]: #{_}" }
+    my $pkg = __PACKAGE__
+    fn { "$pkg" . "[#{_<}]: #{_}" }
 }
 package main
 my $log = Demo::Closure::make_logger("svc")
