@@ -15754,6 +15754,11 @@ impl VMHelper {
 
     /// True when [`get_special_var`] must run instead of [`Scope::get_scalar`].
     pub(crate) fn is_special_scalar_name_for_get(name: &str) -> bool {
+        // Per Perl semantics every punctuation / reserved scalar
+        // resides in main. `$main::!` ≡ `$!`, `$main::@` ≡ `$@`, etc.
+        // Canonicalize before matching so the qualified spelling
+        // routes to the same special-var dispatch as the bare form.
+        let name = crate::scope::strip_main_prefix(name).unwrap_or(name);
         (name.starts_with('#') && name.len() > 1)
             || name.starts_with('^')
             || matches!(
@@ -15874,6 +15879,10 @@ impl VMHelper {
     }
 
     pub(crate) fn get_special_var(&self, name: &str) -> StrykeValue {
+        // Per Perl: every punctuation / reserved scalar lives in main.
+        // Canonicalize `$main::!` → `$!`, `$main::@` → `$@`, etc. so
+        // the dispatch matches the bare key.
+        let name = crate::scope::strip_main_prefix(name).unwrap_or(name);
         // AWK-style aliases always available (no `-MEnglish` needed) — disabled in --compat
         let name = if !crate::compat_mode() {
             match name {

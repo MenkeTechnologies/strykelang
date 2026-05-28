@@ -130,6 +130,8 @@ $~
 @main::path
 @p
 @path
+ARGV
+ARGVOUT
 BEGIN
 BUILD
 CHECK
@@ -11240,11 +11242,15 @@ CORE::zstd_decode
 CORE::zstd_encode_step
 CORE::zstd_frame_header
 CORE::zstd_window_size_log
+DATA
 DESTROY
 E
 END
 INIT
 PI
+STDERR
+STDIN
+STDOUT
 TAU
 UNITCHECK
 __DATA__

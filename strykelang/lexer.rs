@@ -1420,7 +1420,33 @@ impl Lexer {
                 s
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
-                let ident = self.read_package_qualified_identifier();
+                let mut ident = self.read_package_qualified_identifier();
+                // `$main::!`, `$main::?`, `$main::0` — Perl says all
+                // punctuation / digit vars reside in main, so
+                // `$main::PUNCT` must lex as one token. The qualified
+                // identifier ends with the trailing `::` (because the
+                // punctuation leaf isn't alphanumeric); pick up a
+                // single punctuation / digit char or a caret-prefixed
+                // letter (`$main::^O`) as the leaf. The scope getter
+                // canonicalizes `main::PUNCT` → `PUNCT` via
+                // `strip_main_prefix` so storage stays unified.
+                if ident.ends_with("::") {
+                    match self.peek() {
+                        Some('^') if self.input.get(self.pos + 1).is_some_and(|c| c.is_alphabetic()) => {
+                            self.advance();
+                            let c2 = self.advance().unwrap();
+                            ident.push('^');
+                            ident.push(c2);
+                        }
+                        Some(c)
+                            if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}".contains(c) =>
+                        {
+                            self.advance();
+                            ident.push(c);
+                        }
+                        _ => {}
+                    }
+                }
                 // `$_<`, `$_<<`, … — outer topic chain (stryke extension). Also
                 // applies to positional slots: `$_0<<<<<`, `$_1<<<<<`, etc. The
                 // canonical scope key is `_<<<<<` (slot 0) or `_N<<<<<` (slot N).
@@ -1915,6 +1941,33 @@ impl Lexer {
                     // followed by ident. For simplicity, return the ident separately.
                     self.last_was_term = false;
                     return Ok(Token::NumLt);
+                }
+                // `<main::STDIN>` — `main` is the default package for
+                // special filehandles. Accept the qualified form and
+                // strip the prefix so the runtime sees `STDIN`.
+                if self.peek() == Some('m')
+                    && self.input.get(after_lt + 1) == Some(&'a')
+                    && self.input.get(after_lt + 2) == Some(&'i')
+                    && self.input.get(after_lt + 3) == Some(&'n')
+                    && self.input.get(after_lt + 4) == Some(&':')
+                    && self.input.get(after_lt + 5) == Some(&':')
+                    && self
+                        .input
+                        .get(after_lt + 6)
+                        .is_some_and(|c| c.is_uppercase())
+                {
+                    // Consume `main::`.
+                    for _ in 0..6 {
+                        self.advance();
+                    }
+                    let name = self.read_identifier();
+                    if self.peek() == Some('>') {
+                        self.advance();
+                        self.last_was_term = true;
+                        return Ok(Token::ReadLine(name));
+                    }
+                    // Restore and fall through if it wasn't actually a readline.
+                    self.pos = after_lt;
                 }
                 if self.peek() == Some('=') {
                     self.advance();
