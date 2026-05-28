@@ -11,12 +11,10 @@ fn Exercism::OcrNumbers::convert($rows) {
     die "Number of input columns is not a multiple of three" if fi { length(_) % 3 != 0 } @$rows
     my $blocks = int(len(@$rows) / 4)
     ~> 0:$blocks-1 map {
-        my $i = _ * 4
-        my @block = @$rows[$i:$i+3]
+        my @block = @$rows[_*4 : _*4 + 3]
         my $cols = int(length($block[0]) / 3)
         ~> 0:$cols-1 map {
-            my $col = _
-            $_DIG{~> @block map { substr(_, $col * 3, 3) } join("")} // "?"
+            $_DIG{~> @block map { substr(_, _< * 3, 3) } join("")} // "?"
         } join("")
     } join(",")
 }

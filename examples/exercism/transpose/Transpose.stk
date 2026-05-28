@@ -4,8 +4,7 @@
 # stays rectangular up to the *earliest* row that's longer than the
 # current — see Elixir reference for exact padding behavior.
 fn Exercism::Transpose::transpose {
-    my $input = _0
-    my @rows = split(/\n/, $input, -1)
+    my @rows = split(/\n/, _0, -1)
     # Drop trailing empty line from final newline if present.
     my @lines = @rows
     # Compute width per column: a column exists iff at least one row

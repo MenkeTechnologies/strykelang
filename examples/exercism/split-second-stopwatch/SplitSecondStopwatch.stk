@@ -6,23 +6,20 @@ fn Exercism::SplitSecondStopwatch::new = {
 }
 
 fn Exercism::SplitSecondStopwatch::start {
-    my $sw = _
-    die "cannot start an already running stopwatch" if $sw->{state} eq "running"
-    +{ %{$sw}, state => "running", start => 0 }
+    die "cannot start an already running stopwatch" if _->{state} eq "running"
+    +{ %{_}, state => "running", start => 0 }
 }
 
 fn Exercism::SplitSecondStopwatch::stop {
-    my $sw = _
-    die "cannot stop a stopwatch that is not running" unless $sw->{state} eq "running"
-    +{ %{$sw}, state => "stopped" }
+    die "cannot stop a stopwatch that is not running" unless _->{state} eq "running"
+    +{ %{_}, state => "stopped" }
 }
 
 fn Exercism::SplitSecondStopwatch::reset = Exercism::SplitSecondStopwatch::new()
 
 fn Exercism::SplitSecondStopwatch::lap {
-    my $sw = _
-    die "cannot lap unless running" unless $sw->{state} eq "running"
-    +{ %{$sw}, laps => [@{$sw->{laps}}, $sw->{current_lap}], current_lap => 0 }
+    die "cannot lap unless running" unless _->{state} eq "running"
+    +{ %{_}, laps => [@{_->{laps}}, _->{current_lap}], current_lap => 0 }
 }
 
 fn Exercism::SplitSecondStopwatch::state = _->{state}
