@@ -1,0 +1,69 @@
+#!/usr/bin/env stryke
+
+# lzw_no_interop.stk — Lempel-Ziv-Welch compression algorithm.
+#
+# A dictionary-based compression algorithm that replaces repeated
+# occurrences of data with references to a dictionary.
+#
+# Run: stryke --no-interop examples/lzw_no_interop.stk
+
+package LZW
+
+fn compress($uncompressed) {
+    my $dict_size = 256
+    my %dictionary
+    for my $i (0:255) { $dictionary{chr($i)} = $i }
+
+    my $w = ""
+    my @result
+    my $n = len $uncompressed
+    for my $i (0:$n-1) {
+        my $c = $uncompressed[$i]
+        my $wc = $w . $c
+        if (exists $dictionary{$wc}) {
+            $w = $wc
+        } else {
+            push @result, $dictionary{$w}
+            $dictionary{$wc} = $dict_size++
+            $w = $c
+        }
+    }
+    push @result, $dictionary{$w} if $w ne ""
+    \@result
+}
+
+fn decompress($compressed) {
+    my $dict_size = 256
+    my %dictionary
+    for my $i (0:255) { $dictionary{$i} = chr($i) }
+
+    my $w = chr($compressed->[0])
+    my $result = $w
+    my $n = len @$compressed
+    for my $i (1:$n-1) {
+        my $k = $compressed->[$i]
+        my $entry = ""
+        if (exists $dictionary{$k}) {
+            $entry = $dictionary{$k}
+        } elsif ($k == $dict_size) {
+            $entry = $w . $w[0]
+        } else {
+            die "Bad compressed k: #{$k}"
+        }
+        
+        $result = $result . $entry
+        $dictionary{$dict_size++} = $w . $entry[0]
+        $w = $entry
+    }
+    $result
+}
+
+package main
+
+p "── LZW Compression Demo ──"
+my $msg = "TOBEORNOTTOBEORTOBEORNOT"
+my $compressed = LZW::compress($msg)
+p "Compressed: #{join ', ', @$compressed}"
+my $decompressed = LZW::decompress($compressed)
+p "Decompressed: #{$decompressed}"
+p "Match: #{$msg eq $decompressed ? 'YES' : 'NO'}"
