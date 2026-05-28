@@ -14,7 +14,7 @@ assert_eq Rosetta::CallFunc::variadic(1,2,3,4,5),    5,        "variadic count"
 
 # Indirect call via coderef
 my $cr = \&Rosetta::CallFunc::add
-assert_eq $cr->(7, 8), 15, "via coderef"
+assert_eq $cr(7, 8), 15, "via coderef"
 
 # Pipeline call
 my $piped = 9 |> Rosetta::CallFunc::add(1)

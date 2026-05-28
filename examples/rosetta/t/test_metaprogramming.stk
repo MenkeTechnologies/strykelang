@@ -3,7 +3,7 @@
 
 my $code = 'fn($a, $b) { $a * $b + 10 }'
 my $dynamic_fn = eval($code)
-assert_eq $dynamic_fn->(5, 2), 20, "dynamic fn (5*2+10)"
+assert_eq $dynamic_fn(5, 2), 20, "dynamic fn (5*2+10)"
 
 my $name = "generated_fn"
 eval("fn $name { 42 }")

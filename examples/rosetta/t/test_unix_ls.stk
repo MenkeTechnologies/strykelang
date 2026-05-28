@@ -2,11 +2,8 @@
 # Rosetta Code: Unix/ls
 
 fn Rosetta::UnixLS::list($dir) {
-    # Use glob to list files in the directory
-    my @files = glob("$dir/*")
-
     # Strip directory prefix for the output
-    ~> @files map {
+    ~> glob("$dir/*") map {
         _ =~ s/^$dir\///
        _
     }
@@ -19,14 +16,14 @@ fn Rosetta::UnixLS::list($dir) {
 my $tmp = tempdir()
 for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
     open(my $fh, ">", "$tmp/$name") or die "create: $!"
-    close($fh)
+    close $fh
 }
 
 my @t_files = Rosetta::UnixLS::list($tmp)
 
 # Cleanup before assertions so they fire even on partial cleanup.
 for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
-    unlink("$tmp/$name")
+    unlink "$tmp/$name"
 }
 rmdir($tmp)
 

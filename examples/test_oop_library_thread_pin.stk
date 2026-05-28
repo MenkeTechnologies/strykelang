@@ -244,7 +244,7 @@ $sum_age |> aeq 991, "sum age"
 # ── ->> thread-last passing book list to a custom fn ──────────────────
 fn match_countz($pred, @bs) {
     my $n = 0
-    $n++ for grep { $pred->($_) } @bs
+    $n++ for grep { $pred($_) } @bs
     $n
 }
 my $cheap_n = ~>> @lib match_countz(fn ($bk) { $bk->price() < 10 })

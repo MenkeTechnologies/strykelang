@@ -156,7 +156,7 @@ p "Intensity Signature: $final_report"
 
 # Integration test with builtins
 my $sys = Project::Scanner::scan_system()
-p $recon_logger->("SYSTEM RECON COMPLETE: " . ($sys->{hostname} // "localhost") . " (" . ($sys->{os} // "unknown") . ")") . ""
+p $recon_logger("SYSTEM RECON COMPLETE: " . ($sys->{hostname} // "localhost") . " (" . ($sys->{os} // "unknown") . ")") . ""
 
 # Closure with state
 fn Project::QuantumCyberRecon::make_counter {
@@ -165,7 +165,7 @@ fn Project::QuantumCyberRecon::make_counter {
 }
 
 my $tick = Project::QuantumCyberRecon::make_counter()
-p "T-Minus: " . $tick->() . "... " . $tick->() . "... " . $tick->() . " LAUNCH."
+p "T-Minus: " . $tick() . "... " . $tick() . "... " . $tick() . " LAUNCH."
 
 # Final complex verification
 if ($is_critical_quantum(0.99)("QuantumNode")) {

@@ -39,7 +39,7 @@ fn Demo::Sched::tick($delta) {
     @ready = sort { _->{next_run} <=> _1->{next_run} } @ready
     for my $task (@ready) {
         my $t0 = now_ns()
-        $task->{callback}->($task, $now_virtual)
+        $task->{callback}($task, $now_virtual)
         td_add($task->{td}, (now_ns() - $t0) / 1000.0)
         $task->{fires}    = $task->{fires} + 1
         $task->{next_run} = $now_virtual + $task->{cadence}

@@ -22,7 +22,7 @@ glob("*(.L+0)") |> join(",") |> aeq "file.txt", "glob qualifier (.L+0)"
 
 my @arr = (1, 2, 3)
 my $f = fn { push @arr, 4; len(@arr) }
-$f->() |> aeq 4, "closure mutates its copy"
+$f() |> aeq 4, "closure mutates its copy"
 len(@arr) |> aeq 3, "outer array remains 3 (copied, not shared)"
 
 # ── AOP Final Expression ───────────────────────────────────────────────────

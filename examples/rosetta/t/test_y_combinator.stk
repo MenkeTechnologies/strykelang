@@ -8,15 +8,15 @@
 
 fn Rosetta::YCombinator::Z($f) {
     my $g = fn ($h) {
-        $f->(fn ($x) { $h->($h)->($x) })
+        $f(fn ($x) { $h($h)($x) })
     };
-    $g->($g)
+    $g($g)
 }
 
 # Factorial using Z combinator (single recursion - works correctly)
 my $fac = Rosetta::YCombinator::Z(fn ($recurse) {
     fn ($n) {
-        $n <= 1 ? 1 : $n * $recurse->($n - 1)
+        $n <= 1 ? 1 : $n * $recurse($n - 1)
     }
 });
 
@@ -25,8 +25,8 @@ fn Rosetta::YCombinator::fib_impl($n) {
     $n <= 1 ? $n : Rosetta::YCombinator::fib_impl($n - 1) + Rosetta::YCombinator::fib_impl($n - 2)
 }
 
-assert_eq $fac->(5), 120, "factorial(5) via Z combinator"
-assert_eq $fac->(10), 3628800, "factorial(10) via Z combinator"
+assert_eq $fac(5), 120, "factorial(5) via Z combinator"
+assert_eq $fac(10), 3628800, "factorial(10) via Z combinator"
 assert_eq Rosetta::YCombinator::fib_impl(10), 55, "fibonacci(10) via direct recursion"
 
 test_run

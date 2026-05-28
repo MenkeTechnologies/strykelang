@@ -7,8 +7,8 @@
 fn Rosetta::Steffensen::find($g, $x0, $eps, $max_iter) {
     my $x = $x0
     for my $i (~> 1:$max_iter) {
-        my $gx = $g->($x)
-        my $ggx = $g->($gx)
+        my $gx = $g($x)
+        my $ggx = $g($gx)
         my $denom = $ggx - 2 * $gx + $x
         return [$x, $i, "stalled"] if abs($denom) < 1e-30
         my $next = $x - ($gx - $x) * ($gx - $x) / $denom

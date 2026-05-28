@@ -4,14 +4,14 @@
 # ── Higher-Order Functions & Combinators ───────────────────────────────
 
 fn Fn::compose($f, $g) {
-    fn ($x) { $f->($g->($x)) }
+    fn ($x) { $f($g($x)) }
 }
 
 fn Fn::pipe(@funcs) {
     fn ($x) {
         my $result = $x
         for my $func (@funcs) {
-            $result = $func->($result)
+            $result = $func($result)
         }
         $result
     }
@@ -22,11 +22,11 @@ my $add5 = fn ($x) { $x + 5 }
 my $mul2 = fn ($x) { $x * 2 }
 my $composed = Fn::compose($add5, $mul2)
 
-assert_eq $composed->(3), 11, "Fn::compose: add5(mul2(3))"
+assert_eq $composed(3), 11, "Fn::compose: add5(mul2(3))"
 
 # Test pipe
 my $pipeline = Fn::pipe($mul2, $add5, fn ($x) { $x ** 2 })
-assert_eq $pipeline->(3), 121, "pipe: ((3*2)+5)^2"
+assert_eq $pipeline(3), 121, "pipe: ((3*2)+5)^2"
 
 # ── Maybe Monad for Error Handling ─────────────────────────────────────
 
@@ -52,7 +52,7 @@ class Maybe {
 
     fn map($func) {
         if ($self->is_some()) {
-            Maybe::some($func->($self->value))
+            Maybe::some($func($self->value))
         } else {
             Maybe::none()
         }
@@ -60,7 +60,7 @@ class Maybe {
 
     fn flat_map($func) {
         if ($self->is_some()) {
-            $func->($self->value)
+            $func($self->value)
         } else {
             Maybe::none()
         }
@@ -91,22 +91,22 @@ assert_eq $fail_result->unwrap_or(-1), -1, "maybe chain failure"
 
 fn Fn::partial($func, $arg1) {
     fn ($arg2) {
-        $func->($arg1, $arg2)
+        $func($arg1, $arg2)
     }
 }
 
 fn Fn::flip($func) {
     fn ($a, $b, @rest) {
-        $func->($b, $a, @rest)
+        $func($b, $a, @rest)
     }
 }
 
 my $subtract = fn ($a, $b) { $a - $b }
 my $subtract_from_10 = Fn::partial($subtract, 10)
-assert_eq $subtract_from_10->(3), 7, "partial application"
+assert_eq $subtract_from_10(3), 7, "partial application"
 
 my $flipped_subtract = Fn::flip($subtract)
-assert_eq $flipped_subtract->(3, 10), 7, "flipped function"
+assert_eq $flipped_subtract(3, 10), 7, "flipped function"
 
 # ── Memoization ────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ fn Fn::memoize($func) {
         if (exists $cache{$key}) {
             $cache{$key}
         } else {
-            $cache{$key} = $func->(@args)
+            $cache{$key} = $func(@args)
         }
     }
 }
@@ -131,8 +131,8 @@ fn Test::expensive_computation($n) {
 }
 
 my $memoized = Fn::memoize(\&Test::expensive_computation)
-my $result1 = $memoized->(10)
-my $result2 = $memoized->(10)
+my $result1 = $memoized(10)
+my $result2 = $memoized(10)
 
 assert_eq $result1, $result2, "memoized results equal"
 

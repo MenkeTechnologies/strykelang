@@ -44,12 +44,12 @@ fn Ll::reverse($l) {
 
 fn Ll::map($f, $l) {
     return undef unless defined $l
-    Ll::cons($f->($l->{head}), Ll::map($f, $l->{tail}))
+    Ll::cons($f($l->{head}), Ll::map($f, $l->{tail}))
 }
 
 fn Ll::filter($p, $l) {
     return undef unless defined $l
-    if ($p->($l->{head})) {
+    if ($p($l->{head})) {
         Ll::cons($l->{head}, Ll::filter($p, $l->{tail}))
     } else {
         Ll::filter($p, $l->{tail})
@@ -60,7 +60,7 @@ fn Ll::fold($f, $init, $l) {
     my $acc = $init
     my $c = $l
     while (defined $c) {
-        $acc = $f->($acc, $c->{head})
+        $acc = $f($acc, $c->{head})
         $c = $c->{tail}
     }
     $acc

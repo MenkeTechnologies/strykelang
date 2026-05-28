@@ -92,9 +92,9 @@ fn Router::dispatch($req) {
     # the outermost (runs first).
     for my $mw (rev @middlewares) {
         my $next = $handler
-        $handler = fn { $mw->(_, $next) }
+        $handler = fn { $mw(_, $next) }
     }
-    $handler->($req)
+    $handler($req)
 }
 
 # ── 4. Middleware: logger, auth, rate-limit ─────────────────────
@@ -104,7 +104,7 @@ mysync @access_log = ()
 Router::use fn {
     my ($req, $next) = (_, _1)
     push @access_log, "$req->{method} $req->{path}"
-    my $res = $next->($req)
+    my $res = $next($req)
     $res
 }
 
@@ -113,7 +113,7 @@ Router::use fn {
     return +{ status => 401, body => "missing token" } unless $req->{headers}{authorization}
     return +{ status => 403, body => "bad token"     } unless $req->{headers}{authorization} eq "Bearer secret-xyz"
     $req->{user} = +{ id => 42, name => "alice" }
-    $next->($req)
+    $next($req)
 }
 
 mysync %rate
@@ -123,7 +123,7 @@ Router::use fn {
     $rate{$ip} //= 0
     $rate{$ip}++
     return +{ status => 429, body => "rate limited" } if $rate{$ip} > 5
-    $next->($req)
+    $next($req)
 }
 
 # ── 5. Routes ─────────────────────────────────────────────────────

@@ -86,7 +86,7 @@ die "cherry" unless $freq->{cherry} == 1
 p ""
 p "── 6. group-by via reduce + hash<key, arrayref> ──"
 fn Stat::group_by($xs, $keyfn) = reduce {
-    my $k = $keyfn->(_1)
+    my $k = $keyfn(_1)
     _->{$k} //= []
     push @{_->{$k}}, _1
     _

@@ -12,7 +12,7 @@ fn Rosetta::CsvData::add_column($csv, $col_name, $val_sub) {
     # Data
     my $i = 0
     for my $line (@lines) {
-        my $new_val = $val_sub->($line, $i)
+        my $new_val = $val_sub($line, $i)
         push @new_lines, "$line,$new_val"
         $i++
     }

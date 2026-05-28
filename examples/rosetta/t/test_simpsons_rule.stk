@@ -9,7 +9,7 @@ fn Rosetta::SimpsonsRule::integrate($f, $a, $b, $n) {
     my @evens = ~> 1:$half_n-1 map { $a + 2*_ * $h }
     my $sum_odds  = @odds  |> map $f |> sum
     my $sum_evens = @evens |> map $f |> sum
-    my $sum_ends  = $f->($a) + $f->($b)
+    my $sum_ends  = $f($a) + $f($b)
     ($h / 3) * ($sum_ends + 4 * $sum_odds + 2 * $sum_evens)
 }
 

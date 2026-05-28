@@ -22,7 +22,7 @@ fn Math::subtract($x, $y) { $x - $y }
 
 # Positional arguments _, _1
 my $add3 = fn { _ + _1 + _2 }
-$add3->(1, 2, 3) |> aeq 6, "Positional _, _1, _2"
+$add3(1, 2, 3) |> aeq 6, "Positional _, _1, _2"
 
 # Outer scope topic _<
 my @r = ~> (1:2) map { 

@@ -59,7 +59,7 @@ fn eval_v($x, $env) {
         my @p = @{$proc->{params}}
         for my $i (0 : (len @p) - 1) { $new_e->{vars}->{$p[$i]} = $args[$i] }
         return eval_v $proc->{body}, $new_e
-    } else { return $proc->(@args) }
+    } else { return $proc(@args) }
 }
 
 fn setup_env($env) {

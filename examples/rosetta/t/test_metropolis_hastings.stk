@@ -15,11 +15,11 @@ fn Rosetta::MH::randn() {
 fn Rosetta::MH::sample($target, $start, $sigma, $n_samples) {
     my @chain
     my $cur = $start
-    my $cur_p = $target->($cur)
+    my $cur_p = $target($cur)
     my $accepted = 0
     for my $i (~> 1:$n_samples) {
         my $cand = $cur + Rosetta::MH::randn() * $sigma
-        my $cand_p = $target->($cand)
+        my $cand_p = $target($cand)
         my $ratio = $cur_p > 0 ? $cand_p / $cur_p : 1.0
         if (rand() < $ratio) {
             $cur = $cand

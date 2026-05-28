@@ -5,7 +5,7 @@
 
 fn Rosetta::Delegates::execute($delegate, $value) {
     # Call the delegate with the provided value
-    $delegate->($value)
+    $delegate($value)
 }
 
 # Define a delegate (fn reference)

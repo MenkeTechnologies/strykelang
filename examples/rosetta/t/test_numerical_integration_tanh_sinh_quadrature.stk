@@ -28,7 +28,7 @@ fn Rosetta::TanhSinh::integrate($f, $lower, $upper, $steps, $acc) {
             my $th = Rosetta::TanhSinh::tanh($sh * $pi_half)
             my $dx = ($ch * $pi_half) / (Rosetta::TanhSinh::cosh($sh * $pi_half) ** 2)
             my $xi = $h1 + $h0 * $th
-            $ss += $f->($xi) * $h * $dx
+            $ss += $f($xi) * $h * $dx
         }
         $rr = $h0 * $ss
     }

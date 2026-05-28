@@ -2,8 +2,8 @@
 # Rosetta Code: Secant method
 
 fn Rosetta::SecantMethod::solve($f, $x0, $x1, $epsilon, $max_iter) {
-    my $f0 = $f->($x0)
-    my $f1 = $f->($x1)
+    my $f0 = $f($x0)
+    my $f1 = $f($x1)
     
     for my $i (1:$max_iter) {
         if (abs($f1 - $f0) < $epsilon) {
@@ -11,7 +11,7 @@ fn Rosetta::SecantMethod::solve($f, $x0, $x1, $epsilon, $max_iter) {
         }
         
         my $x2 = $x1 - $f1 * ($x1 - $x0) / ($f1 - $f0)
-        my $f2 = $f->($x2)
+        my $f2 = $f($x2)
         
         if (abs($x2 - $x1) < $epsilon) {
             return $x2

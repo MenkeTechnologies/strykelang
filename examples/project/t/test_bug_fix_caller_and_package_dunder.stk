@@ -57,6 +57,6 @@ fn make_logger {
 }
 package main
 my $log = Demo::Closure::make_logger("svc")
-$log->("hello") |> assert_eq("Demo::Closure[svc]: hello", "closure body __PACKAGE__")
+$log("hello") |> assert_eq("Demo::Closure[svc]: hello", "closure body __PACKAGE__")
 
 test_run

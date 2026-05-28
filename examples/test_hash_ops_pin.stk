@@ -56,7 +56,7 @@ $sl->{c}       |> aeq 3, "slice: c=3"
 fn Hash::filter_vals($h, $pred) {
     my %r = ()
     for my $k (keys %$h) {
-        $r{$k} = $h->{$k} if $pred->($h->{$k})
+        $r{$k} = $h->{$k} if $pred($h->{$k})
     }
     \%r
 }
@@ -72,7 +72,7 @@ len(keys %$gt1)  |> aeq 2, "filter >1: 2 keys"
 
 fn Hash::map_vals($h, $f) {
     my %r = ()
-    for my $k (keys %$h) { $r{$k} = $f->($h->{$k}) }
+    for my $k (keys %$h) { $r{$k} = $f($h->{$k}) }
     \%r
 }
 
@@ -90,7 +90,7 @@ $upped->{y} |> aeq "BYE", "map_vals uc y"
 fn Hash::group_by($xs, $key_fn) {
     my %r = ()
     for my $x (@$xs) {
-        my $k = $key_fn->($x)
+        my $k = $key_fn($x)
         push @{$r{$k}}, $x
     }
     \%r

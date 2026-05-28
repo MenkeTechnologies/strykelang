@@ -3,10 +3,10 @@
 
 fn Rosetta::Trapezoid::integrate($f, $a, $b, $n) {
     my $h = ($b - $a) / $n
-    my $sum = ($f->($a) + $f->($b)) / 2
+    my $sum = ($f($a) + $f($b)) / 2
     for my $i (1:$n-1) {
         my $x = $a + $i * $h
-        my $v = $f->($x)
+        my $v = $f($x)
         $sum += $v
     }
     $sum * $h

@@ -9,19 +9,19 @@
 
 fn Rosetta::Beam::search($start, $goal_fn, $successors_fn, $cost_fn, $beam_width, $max_depth) {
     my @beam = ([0, $start, [$start]])  # [cost_so_far, state, path]
-    if ($goal_fn->($start)) {
+    if ($goal_fn($start)) {
         return { path => [$start], cost => 0 }
     }
     for my $depth (~> 1:$max_depth) {
         my @candidates
         for my $entry (@beam) {
             my ($cost, $state, $path) = @$entry
-            for my $succ (@{$successors_fn->($state)}) {
+            for my $succ (@{$successors_fn($state)}) {
                 my ($ns, $c) = @$succ
                 my $new_cost = $cost + $c
                 my @new_path = @$path
                 push @new_path, $ns
-                if ($goal_fn->($ns)) {
+                if ($goal_fn($ns)) {
                     return { path => \@new_path, cost => $new_cost }
                 }
                 push @candidates, [$new_cost, $ns, \@new_path]
