@@ -175,3 +175,132 @@ pub fn semaphore_limit(args: &[StrykeValue], line: usize) -> StrykeResult<Stryke
     };
     Ok(StrykeValue::integer(s.limit))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── mutex_new / mutex_is_locked ─────────────────────────────────────
+
+    #[test]
+    fn mutex_new_starts_unlocked() {
+        let m = mutex_new(&[], 0).unwrap();
+        assert_eq!(mutex_is_locked(&[m], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn mutex_is_locked_wrong_type_returns_runtime_err() {
+        let r = mutex_is_locked(&[StrykeValue::integer(7)], 42);
+        assert!(r.is_err());
+    }
+
+    // ─── mutex_try_lock / mutex_unlock ───────────────────────────────────
+
+    #[test]
+    fn mutex_try_lock_acquires_first_then_fails_second() {
+        let m = mutex_new(&[], 0).unwrap();
+        // First try succeeds.
+        assert_eq!(mutex_try_lock(&[m.clone()], 0).unwrap().to_int(), 1);
+        // Now held → state reflects.
+        assert_eq!(mutex_is_locked(&[m.clone()], 0).unwrap().to_int(), 1);
+        // Second try fails (returns 0, not error).
+        assert_eq!(mutex_try_lock(&[m], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn mutex_unlock_releases_so_try_lock_succeeds_again() {
+        let m = mutex_new(&[], 0).unwrap();
+        mutex_try_lock(&[m.clone()], 0).unwrap();
+        mutex_unlock(&[m.clone()], 0).unwrap();
+        assert_eq!(mutex_is_locked(&[m.clone()], 0).unwrap().to_int(), 0);
+        assert_eq!(mutex_try_lock(&[m], 0).unwrap().to_int(), 1);
+    }
+
+    #[test]
+    fn mutex_unlock_when_unheld_is_idempotent() {
+        // Contract documented in the source: unlocking an unheld mutex is a no-op
+        // (we take the forgiving stance).
+        let m = mutex_new(&[], 0).unwrap();
+        let r = mutex_unlock(&[m.clone()], 0);
+        assert!(r.is_ok());
+        assert_eq!(mutex_is_locked(&[m], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn mutex_lock_returns_undef() {
+        let m = mutex_new(&[], 0).unwrap();
+        // Lock on a fresh mutex should not block.
+        let r = mutex_lock(&[m], 0).unwrap();
+        assert!(r.is_undef());
+    }
+
+    #[test]
+    fn mutex_try_lock_no_args_errors() {
+        // First arg missing → no mutex → runtime error.
+        assert!(mutex_try_lock(&[], 0).is_err());
+    }
+
+    // ─── semaphore_new ───────────────────────────────────────────────────
+
+    #[test]
+    fn semaphore_new_default_zero_permits() {
+        let s = semaphore_new(&[], 0).unwrap();
+        assert_eq!(semaphore_permits(&[s.clone()], 0).unwrap().to_int(), 0);
+        assert_eq!(semaphore_limit(&[s], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn semaphore_new_rejects_negative_permits() {
+        let r = semaphore_new(&[StrykeValue::integer(-1)], 0);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn semaphore_new_preserves_initial_count() {
+        let s = semaphore_new(&[StrykeValue::integer(3)], 0).unwrap();
+        assert_eq!(semaphore_permits(&[s.clone()], 0).unwrap().to_int(), 3);
+        assert_eq!(semaphore_limit(&[s], 0).unwrap().to_int(), 3);
+    }
+
+    // ─── semaphore acquire / release ─────────────────────────────────────
+
+    #[test]
+    fn semaphore_try_acquire_decrements_permits() {
+        let s = semaphore_new(&[StrykeValue::integer(2)], 0).unwrap();
+        assert_eq!(semaphore_try_acquire(&[s.clone()], 0).unwrap().to_int(), 1);
+        assert_eq!(semaphore_permits(&[s.clone()], 0).unwrap().to_int(), 1);
+        assert_eq!(semaphore_try_acquire(&[s.clone()], 0).unwrap().to_int(), 1);
+        // Empty now.
+        assert_eq!(semaphore_try_acquire(&[s], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn semaphore_release_increments_above_initial_limit() {
+        // Contract: release does not cap at limit (semaphore_limit is just the
+        // initial value, not a max).
+        let s = semaphore_new(&[StrykeValue::integer(1)], 0).unwrap();
+        semaphore_release(&[s.clone()], 0).unwrap();
+        semaphore_release(&[s.clone()], 0).unwrap();
+        assert_eq!(semaphore_permits(&[s.clone()], 0).unwrap().to_int(), 3);
+        // Limit unchanged.
+        assert_eq!(semaphore_limit(&[s], 0).unwrap().to_int(), 1);
+    }
+
+    #[test]
+    fn semaphore_acquire_on_available_does_not_block() {
+        let s = semaphore_new(&[StrykeValue::integer(1)], 0).unwrap();
+        let r = semaphore_acquire(&[s.clone()], 0).unwrap();
+        assert!(r.is_undef());
+        assert_eq!(semaphore_permits(&[s], 0).unwrap().to_int(), 0);
+    }
+
+    #[test]
+    fn semaphore_wrong_type_errors_on_each_op() {
+        let bad = StrykeValue::integer(7);
+        assert!(semaphore_permits(&[bad.clone()], 0).is_err());
+        assert!(semaphore_limit(&[bad.clone()], 0).is_err());
+        assert!(semaphore_acquire(&[bad.clone()], 0).is_err());
+        assert!(semaphore_release(&[bad.clone()], 0).is_err());
+        assert!(semaphore_try_acquire(&[bad], 0).is_err());
+    }
+}
