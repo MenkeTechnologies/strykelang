@@ -29,7 +29,7 @@ fn Rosetta::SCC::strongconnect($u, $adj, $data) {
             push @scc, $w
             last if ($w == $u)
         }
-        my @sorted_scc = sort { $a <=> $b } @scc
+        my @sorted_scc = sort { _ <=> _1 } @scc
         push @{$data->{sccs}}, \@sorted_scc
     }
 }
@@ -54,7 +54,7 @@ fn Rosetta::SCC::solve($n, $adj) {
         }
     }
     
-    my @res = sort { $a->[0] <=> $b->[0] } @{$data->{sccs}}
+    my @res = sort { _->[0] <=> _1->[0] } @{$data->{sccs}}
     \@res
 }
 

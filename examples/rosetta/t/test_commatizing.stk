@@ -11,13 +11,13 @@ fn Rosetta::Commatize::insert($n) {
     my $dot = index($s, ".")
     my $int_part = $dot < 0 ? $s : substr($s, 0, $dot)
     my $rest = $dot < 0 ? "" : substr($s, $dot)
-    my @rev = reverse split("", $int_part)
+    my @rev = rev split("", $int_part)
     my @grouped
     for my $i (0..len(@rev)-1) {
         push @grouped, "," if $i > 0 && $i % 3 == 0
         push @grouped, $rev[$i]
     }
-    $sign . join("", reverse @grouped) . $rest
+    $sign . join("", rev @grouped) . $rest
 }
 
 assert_eq Rosetta::Commatize::insert(1),         "1",         "single"

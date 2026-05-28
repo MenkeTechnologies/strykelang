@@ -2,7 +2,7 @@
 # Rosetta Code: Rosetta Code/Rank languages by popularity
 
 fn Rosetta::RankPopularity::rank($rows) {
-    my @sorted = sort { $b->{popularity} <=> $a->{popularity} || $a->{language} cmp $b->{language} } @$rows
+    my @sorted = sort { _1->{popularity} <=> _->{popularity} || _->{language} cmp _1->{language} } @$rows
     \@sorted
 }
 

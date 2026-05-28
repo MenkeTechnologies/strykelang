@@ -27,7 +27,7 @@ fn Rosetta::MergeAggregate::process($patients, $visits) {
     
     # 2. Aggregate (calculate average)
     my @results
-    for my $id (sort { $a <=> $b } keys %agg) {
+    for my $id (sort { _ <=> _1 } keys %agg) {
         my $data = $agg{$id}
         my $avg = $data->{sum} / $data->{visits}
         push @results, {

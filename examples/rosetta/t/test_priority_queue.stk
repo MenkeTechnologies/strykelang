@@ -8,7 +8,7 @@ fn Rosetta::PriorityQueue::new() {
 fn Rosetta::PriorityQueue::push($pq, $item, $priority) {
     push @{$pq->{items}}, { item => $item, priority => $priority }
     # Keep it sorted by priority descending
-    @{$pq->{items}} = sort { $b->{priority} <=> $a->{priority} } @{$pq->{items}}
+    @{$pq->{items}} = sort { _1->{priority} <=> _->{priority} } @{$pq->{items}}
 }
 
 fn Rosetta::PriorityQueue::pop($pq) {

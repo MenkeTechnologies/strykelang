@@ -43,7 +43,7 @@ fn Rosetta::Hierholzer::find_circuit($n, $edges, $directed) {
     }
     # Validate: every edge must be used (otherwise no Eulerian trail exists).
     for my $u (@used) { return [] if !$u }
-    @circuit = reverse @circuit
+    @circuit = rev @circuit
     # Eulerian *circuit* requires the trail to close at the start vertex.
     return [] if $circuit[0] != $circuit[-1]
     \@circuit

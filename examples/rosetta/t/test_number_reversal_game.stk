@@ -4,7 +4,7 @@
 fn Rosetta::NumberReversal::solve(@items) {
     my $start = join("", @items)
     
-    my @target_arr = sort { $a <=> $b } @items
+    my @target_arr = sort { _ <=> _1 } @items
     my $target = join("", @target_arr)
     
     return 0 if $start eq $target

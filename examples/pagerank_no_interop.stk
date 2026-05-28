@@ -1,0 +1,86 @@
+#!/usr/bin/env stryke
+
+# pagerank_no_interop.stk — PageRank Algorithm.
+#
+# Computes the PageRank of nodes in a directed graph.
+#
+# Run: stryke --no-interop examples/pagerank_no_interop.stk
+
+package PageRank
+
+fn solve($nodes, $edges, $d, $iterations) {
+    my $n = len @$nodes
+    return {} if $n == 0
+    
+    my %pr
+    my $initial_pr = 1.0 / $n
+    for my $node (@$nodes) {
+        $pr{$node} = $initial_pr
+    }
+    
+    my %out_degree
+    for my $node (@$nodes) { $out_degree{$node} = 0 }
+    
+    my %incoming
+    for my $node (@$nodes) { $incoming{$node} = [] }
+    
+    for my $edge (@$edges) {
+        my $u = $edge->[0]
+        my $v = $edge->[1]
+        $out_degree{$u}++
+        push @{$incoming{$v}}, $u
+    }
+    
+    my @sink_nodes
+    for my $node (@$nodes) {
+        if ($out_degree{$node} == 0) {
+            push @sink_nodes, $node
+        }
+    }
+    
+    for (my $iter = 0; $iter < $iterations; $iter++) {
+        my %new_pr
+        my $sink_pr = 0.0
+        for my $sink (@sink_nodes) {
+            $sink_pr += $pr{$sink}
+        }
+        
+        for my $node (@$nodes) {
+            my $sum = 0.0
+            my $inc = $incoming{$node}
+            for my $in_node (@$inc) {
+                $sum += $pr{$in_node} / $out_degree{$in_node}
+            }
+            $sum += $sink_pr / $n
+            $new_pr{$node} = (1.0 - $d) / $n + $d * $sum
+        }
+        
+        for my $node (@$nodes) {
+            $pr{$node} = $new_pr{$node}
+        }
+    }
+    
+    \%pr
+}
+
+package main
+
+p "── PageRank Demo ──"
+
+my @nodes = ("A", "B", "C", "D")
+my @edges = (
+    ["A", "B"],
+    ["A", "C"],
+    ["B", "C"],
+    ["C", "A"],
+    ["D", "C"]
+)
+
+my $pr = PageRank::solve(\@nodes, \@edges, 0.85, 20)
+
+p "PageRanks after 20 iterations:"
+for my $node (keys %$pr |> sort) {
+    p "  #{$node}: #{sprintf '%.4f', $pr->{$node}}"
+}
+
+p "Done."

@@ -38,7 +38,7 @@ fn Rosetta::JordanPolya::sequence_up_to($limit) {
         }
         @frontier = @next
     }
-    my @sorted = sort { $a <=> $b } keys %set
+    my @sorted = sort { _ <=> _1 } keys %set
     @sorted
 }
 

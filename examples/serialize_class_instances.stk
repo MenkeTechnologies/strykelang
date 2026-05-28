@@ -57,7 +57,7 @@ p "── 3. from_json round-trip → plain hashrefs ─────────
 my $back = from_json($json)
 printf "  org name  : %s\n", $back->{name}
 printf "  open flag : %s\n", $back->{open}
-printf "  members   : %d\n", scalar @{$back->{members}}
+printf "  members   : %d\n", len @{$back->{members}}
 for my $m (@{$back->{members}}) {
     printf "    - %-6s in %s  (backup: %s)\n",
         $m->{name},
@@ -82,5 +82,5 @@ for my $a (@addrs) {
 }
 p to_json(\%by_city)
 
-aeq scalar @{$back->{members}}, 2, "member count survives round-trip"
+aeq len @{$back->{members}}, 2, "member count survives round-trip"
 aeq $back->{members}->[0]->{address}->{city}, "Portland", "nested field intact"

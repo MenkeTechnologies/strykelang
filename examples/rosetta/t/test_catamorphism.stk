@@ -5,7 +5,7 @@
 
 fn Rosetta::Cata::foldr($f, $z, @xs) {
     my $acc = $z
-    for my $i (reverse 0..len(@xs)-1) {
+    for my $i (rev 0..len(@xs)-1) {
         $acc = $f->($xs[$i], $acc)
     }
     $acc

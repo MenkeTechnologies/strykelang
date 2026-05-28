@@ -16,7 +16,7 @@ fn Rosetta::KlarnerRado::up_to($limit) {
             push @stack, $y
         }
     }
-    sort { $a <=> $b } keys %seen
+    sort { _ <=> _1 } keys %seen
 }
 
 # Closure under 2x and 3x+2 starting from 1, up to 30

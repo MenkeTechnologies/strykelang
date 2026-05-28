@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+
+package BarnesHut
+
+fn new_node($x, $y, $size) {
+    { x => $x, y => $y, size => $size, mass => 0.0, center_x => 0.0, center_y => 0.0, body => undef, nw => undef, ne => undef, sw => undef, se => undef }
+}
+
+fn insert($node, $body) {
+    if ($node->{mass} == 0.0) {
+        $node->{body} = $body; $node->{mass} = $body->{mass}; $node->{center_x} = $body->{x}; $node->{center_y} = $body->{y}; return
+    }
+    my $new_mass = $node->{mass} + $body->{mass}
+    $node->{center_x} = ($node->{center_x} * $node->{mass} + $body->{x} * $body->{mass}) / $new_mass
+    $node->{center_y} = ($node->{center_y} * $node->{mass} + $body->{y} * $body->{mass}) / $new_mass
+    $node->{mass} = $new_mass
+
+    if (!defined $node->{body}) { BarnesHut::insert_into_quadrant($node, $body); return }
+    my $existing_body = $node->{body}; $node->{body} = undef
+    BarnesHut::insert_into_quadrant($node, $existing_body); BarnesHut::insert_into_quadrant($node, $body)
+}
+
+fn insert_into_quadrant($node, $body) {
+    my $half = $node->{size} / 2.0; my $left = $body->{x} < $node->{x}; my $top = $body->{y} < $node->{y}
+    if ($left) {
+        if ($top) { $node->{nw} = new_node($node->{x} - $half / 2.0, $node->{y} - $half / 2.0, $half) if !defined $node->{nw}; BarnesHut::insert($node->{nw}, $body) }
+        else { $node->{sw} = new_node($node->{x} - $half / 2.0, $node->{y} + $half / 2.0, $half) if !defined $node->{sw}; BarnesHut::insert($node->{sw}, $body) }
+    } else {
+        if ($top) { $node->{ne} = new_node($node->{x} + $half / 2.0, $node->{y} - $half / 2.0, $half) if !defined $node->{ne}; BarnesHut::insert($node->{ne}, $body) }
+        else { $node->{se} = new_node($node->{x} + $half / 2.0, $node->{y} + $half / 2.0, $half) if !defined $node->{se}; BarnesHut::insert($node->{se}, $body) }
+    }
+}
+
+fn calculate_force($node, $body, $theta, $g) {
+    return [0.0, 0.0] if $node->{mass} == 0.0
+    my $dx = $node->{center_x} - $body->{x}; my $dy = $node->{center_y} - $body->{y}
+    my $dist_sq = $dx * $dx + $dy * $dy + 1e-9; my $dist = sqrt($dist_sq)
+    if (defined $node->{body}) {
+        return [0.0, 0.0] if $node->{body}->{id} == $body->{id}
+        my $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
+        return [ $f * $dx / $dist, $f * $dy / $dist ]
+    }
+    if ($node->{size} / $dist < $theta) {
+        my $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
+        return [ $f * $dx / $dist, $f * $dy / $dist ]
+    }
+    my @total_f = (0.0, 0.0)
+    for my $child ($node->{nw}, $node->{ne}, $node->{sw}, $node->{se}) {
+        if (defined $child) {
+            my $f = BarnesHut::calculate_force($child, $body, $theta, $g)
+            $total_f[0] += $f->[0]; $total_f[1] += $f->[1]
+        }
+    }
+    \@total_f
+}
+
+fn step($bodies, $size, $theta, $dt) {
+    my $root = new_node(0.0, 0.0, $size)
+    for my $body (@$bodies) { BarnesHut::insert($root, $body) }
+    my $g = 6.674e-11
+    for my $body (@$bodies) {
+        my $f = BarnesHut::calculate_force($root, $body, $theta, $g)
+        $body->{vx} += ($f->[0] / $body->{mass}) * $dt; $body->{vy} += ($f->[1] / $body->{mass}) * $dt
+    }
+    for my $body (@$bodies) { $body->{x} += $body->{vx} * $dt; $body->{y} += $body->{vy} * $dt }
+}
+
+package main
+
+my @bodies = (
+    { id => 1, mass => 1e12, x => -100.0, y => 0.0, vx => 0.0, vy => 0.0 },
+    { id => 2, mass => 1e12, x => 100.0,  y => 0.0, vx => 0.0, vy => 0.0 }
+)
+BarnesHut::step(\@bodies, 1000.0, 0.5, 1000.0)
+# They should attract each other towards x=0
+~> $bodies[0]->{x} >(-100.0) aeq(1, "body 1 moved right")
+~> $bodies[1]->{x} <(100.0)  aeq(1, "body 2 moved left")
+
+test_run

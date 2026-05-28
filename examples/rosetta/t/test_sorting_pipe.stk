@@ -6,7 +6,7 @@ fn Rosetta::Sort::string(@arr) {
 }
 
 fn Rosetta::Sort::numeric(@arr) {
-    sort { $a <=> $b } @arr
+    sort { _ <=> _1 } @arr
 }
 
 my @strings = qw(banana apple cherry date)
