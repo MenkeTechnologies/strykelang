@@ -9,20 +9,18 @@ fn Exercism::Markdown::parse {
 }
 
 fn Exercism::Markdown::_process {
-    my $line = _
-    if ($line =~ /^(#{1,6})\s+(.*)$/) {
+    if (_ =~ /^(#{1,6})\s+(.*)$/) {
         my $n = len($1)
         "<h$n>" . Exercism::Markdown::_inline($2) . "</h$n>"
-    } elsif ($line =~ /^\*\s+(.*)$/) {
+    } elsif (_ =~ /^\*\s+(.*)$/) {
         "<li>" . Exercism::Markdown::_inline($1) . "</li>"
     } else {
-        "<p>" . Exercism::Markdown::_inline($line) . "</p>"
+        "<p>" . Exercism::Markdown::_inline(_) . "</p>"
     }
 }
 
 fn Exercism::Markdown::_inline {
-    my $s = _
-    $s =~ s|__(.+?)__|<strong>$1</strong>|g
-    $s =~ s|_(.+?)_|<em>$1</em>|g
-    $s
+    _ =~ s|__(.+?)__|<strong>$1</strong>|g
+    _ =~ s|_(.+?)_|<em>$1</em>|g
+    _
 }

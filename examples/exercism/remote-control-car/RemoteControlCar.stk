@@ -8,8 +8,7 @@ fn Exercism::RemoteControlCar::display_battery =
     _->{battery_percentage} == 0 ? "Battery empty" : "Battery at #{_->{battery_percentage}}%"
 
 fn Exercism::RemoteControlCar::drive {
-    my $c = _
-    return $c if $c->{battery_percentage} == 0
-    +{ %{$c}, battery_percentage => $c->{battery_percentage} - 1,
-              distance_driven_in_meters => $c->{distance_driven_in_meters} + 20 }
+    return _ if _->{battery_percentage} == 0
+    +{ %{_}, battery_percentage => _->{battery_percentage} - 1,
+              distance_driven_in_meters => _->{distance_driven_in_meters} + 20 }
 }
