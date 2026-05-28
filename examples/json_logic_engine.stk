@@ -1,0 +1,116 @@
+#!/usr/bin/env stryke
+
+# json_logic_engine.stk — Recursive rule engine for data-driven logic.
+#
+# This engine evaluates "Logic Rules" defined as nested hashes/arrays.
+# Inspired by JsonLogic.
+#
+# Operators supported:
+#   ==, !=, >, <, >=, <=, and, or, !, if, var, +, -, *, /, %
+#
+# Run: stryke --no-interop examples/json_logic_engine.stk
+
+package JsonLogic
+
+fn evaluate($rule, $data) {
+    # If rule is not a hash, it's a literal value
+    return $rule if ref($rule) ne "HASH"
+    
+    my ($op) = keys %$rule
+    my $args = $rule->{$op}
+    
+    # Ensure args is an array
+    my @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
+    
+    # 1. Variable access
+    if ($op eq "var") {
+        my $path = $arr_args[0]
+        return $data->{$path} // $arr_args[1]
+    }
+    
+    # 2. Logic & Comparison
+    if ($op eq "==") { return evaluate($arr_args[0], $data) == evaluate($arr_args[1], $data) ? 1 : 0 }
+    if ($op eq "!=") { return evaluate($arr_args[0], $data) != evaluate($arr_args[1], $data) ? 1 : 0 }
+    if ($op eq ">")  { return evaluate($arr_args[0], $data) >  evaluate($arr_args[1], $data) ? 1 : 0 }
+    if ($op eq "<")  { return evaluate($arr_args[0], $data) <  evaluate($arr_args[1], $data) ? 1 : 0 }
+    if ($op eq ">=") { return evaluate($arr_args[0], $data) >= evaluate($arr_args[1], $data) ? 1 : 0 }
+    if ($op eq "<=") { return evaluate($arr_args[0], $data) <= evaluate($arr_args[1], $data) ? 1 : 0 }
+    
+    if ($op eq "and") {
+        for my $arg (@arr_args) {
+            return 0 if !evaluate($arg, $data)
+        }
+        return 1
+    }
+    
+    if ($op eq "or") {
+        for my $arg (@arr_args) {
+            return 1 if evaluate($arg, $data)
+        }
+        return 0
+    }
+    
+    if ($op eq "!") { return !evaluate($arr_args[0], $data) ? 1 : 0 }
+    
+    # 3. Control Flow
+    if ($op eq "if") {
+        # if [cond, true_val, false_val]
+        if (evaluate($arr_args[0], $data)) {
+            return evaluate($arr_args[1], $data)
+        }
+        return evaluate($arr_args[2], $data)
+    }
+    
+    # 4. Math
+    if ($op eq "+") {
+        my $sum = 0
+        for my $arg (@arr_args) { $sum = $sum + evaluate($arg, $data) }
+        return $sum
+    }
+    if ($op eq "-") {
+        return evaluate($arr_args[0], $data) - evaluate($arr_args[1], $data)
+    }
+    if ($op eq "*") {
+        my $prod = 1
+        for my $arg (@arr_args) { $prod = $prod * evaluate($arg, $data) }
+        return $prod
+    }
+    if ($op eq "/") {
+        my $v2 = evaluate($arr_args[1], $data)
+        return ($v2 == 0 ? 0 : evaluate($arr_args[0], $data) / $v2)
+    }
+    
+    return undef
+}
+
+package main
+
+p "── JSON-Logic Engine Demo ──"
+
+my $data = {
+    temp => 25,
+    user => "wizard",
+    role => "admin"
+}
+
+my @rules = (
+    { "==" => [{ var => "temp" }, 25] },
+    { "and" => [
+        { ">" => [{ var => "temp" }, 20] },
+        { "==" => [{ var => "role" }, "admin"] }
+    ] },
+    { "if" => [
+        { "<" => [{ var => "temp" }, 10] },
+        "cold",
+        "warm"
+    ] },
+    { "+" => [1, 2, { var => "temp" }] }
+)
+
+for my $rule (@rules) {
+    my $res = JsonLogic::evaluate $rule, $data
+    p "Rule: #{to_json $rule}"
+    p "Result: #{$res // 'null'}"
+}
+
+p "Done."

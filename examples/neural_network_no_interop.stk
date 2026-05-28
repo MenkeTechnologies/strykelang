@@ -1,0 +1,150 @@
+#!/usr/bin/env stryke
+
+# neural_network_no_interop.stk — Multilayer Perceptron from scratch.
+#
+# This example implements a basic Neural Network with:
+# - Matrix math foundation.
+# - Sigmoid activation function.
+# - Forward and Backward propagation.
+# - Training on the XOR problem.
+#
+# Run: stryke --no-interop examples/neural_network_no_interop.stk
+
+package NN
+
+# --- Matrix Helpers (Internal) ---
+
+fn mat_new($r, $c) {
+    my @m
+    for my $i (0 : $r - 1) {
+        my @row = (0.0) x $c
+        push @m, \@row
+    }
+    \@m
+}
+
+fn mat_rand($r, $c) {
+    my $m = mat_new($r, $c)
+    for my $i (0 : $r - 1) {
+        for my $j (0 : $c - 1) {
+            $m->[$i]->[$j] = (rand(2.0) - 1.0) # Random in [-1, 1]
+        }
+    }
+    $m
+}
+
+fn sigmoid($x) { 1.0 / (1.0 + exp(-$x)) }
+fn d_sigmoid($y) { $y * (1.0 - $y) }
+
+# --- Network Implementation ---
+
+fn new($input_n, $hidden_n, $output_n) {
+    {
+        ih_weights => mat_rand($hidden_n, $input_n),
+        ho_weights => mat_rand($output_n, $hidden_n),
+        h_bias => mat_rand($hidden_n, 1),
+        o_bias => mat_rand($output_n, 1),
+        lr => 0.1
+    }
+}
+
+fn nn_predict($nn, $inputs_arr) {
+    my $ih = $nn->{ih_weights}
+    my $ho = $nn->{ho_weights}
+    my $hb = $nn->{h_bias}
+    my $ob = $nn->{o_bias}
+    
+    # 1. Hidden Layer
+    my @h_vals
+    for my $i (0 : (len @$ih) - 1) {
+        my $sum = $hb->[$i]->[0]
+        for my $j (0 : (len @$inputs_arr) - 1) {
+            $sum = $sum + $ih->[$i]->[$j] * $inputs_arr->[$j]
+        }
+        push @h_vals, sigmoid($sum)
+    }
+    
+    # 2. Output Layer
+    my @o_vals
+    for my $i (0 : (len @$ho) - 1) {
+        my $sum = $ob->[$i]->[0]
+        for my $j (0 : (len @h_vals) - 1) {
+            $sum = $sum + $ho->[$i]->[$j] * @h_vals[$j]
+        }
+        push @o_vals, sigmoid($sum)
+    }
+    
+    { output => \@o_vals, hidden => \@h_vals }
+}
+
+fn train($nn, $inputs, $targets) {
+    my $res = nn_predict $nn, $inputs
+    my $h_vals = $res->{hidden}
+    my $o_vals = $res->{output}
+    
+    # 1. Calculate Output Errors
+    my @o_deltas
+    for my $i (0 : (len @$o_vals) - 1) {
+        my $err = $targets->[$i] - $o_vals->[$i]
+        push @o_deltas, $err * d_sigmoid($o_vals->[$i])
+    }
+    
+    # 2. Calculate Hidden Errors
+    my @h_deltas
+    my $ho = $nn->{ho_weights}
+    for my $j (0 : (len @$h_vals) - 1) {
+        my $err = 0.0
+        for my $i (0 : (len @o_deltas) - 1) {
+            $err = $err + $o_deltas[$i] * $ho->[$i]->[$j]
+        }
+        push @h_deltas, $err * d_sigmoid($h_vals->[$j])
+    }
+    
+    # 3. Update HO Weights & Biases
+    for my $i (0 : (len @o_deltas) - 1) {
+        for my $j (0 : (len @$h_vals) - 1) {
+            $nn->{ho_weights}->[$i]->[$j] += $nn->{lr} * $o_deltas[$i] * $h_vals->[$j]
+        }
+        $nn->{o_bias}->[$i]->[0] += $nn->{lr} * $o_deltas[$i]
+    }
+    
+    # 4. Update IH Weights & Biases
+    for my $i (0 : (len @h_deltas) - 1) {
+        for my $j (0 : (len @$inputs) - 1) {
+            $nn->{ih_weights}->[$i]->[$j] += $nn->{lr} * $h_deltas[$i] * $inputs->[$j]
+        }
+        $nn->{h_bias}->[$i]->[0] += $nn->{lr} * $h_deltas[$i]
+    }
+}
+
+package main
+
+# Rule 1a: Interpolation
+# Rule 8: No parens on simple calls
+
+p "── Neural Network Demo (XOR) ──"
+
+srand(42)
+my $nn = NN::new 2, 4, 1
+
+my @data = (
+    { in => [0, 0], out => [0] },
+    { in => [0, 1], out => [1] },
+    { in => [1, 0], out => [1] },
+    { in => [1, 1], out => [0] }
+)
+
+p "Training for 5000 epochs..."
+for (1 : 5000) {
+    my $d = $data[int(rand 4)]
+    NN::train $nn, $d->{in}, $d->{out}
+}
+
+p "\nPredictions:"
+for my $d (@data) {
+    my $res = NN::nn_predict $nn, $d->{in}
+    my $pred = $res->{output}->[0]
+    p "  Input: [#{join ', ', @{$d->{in}}}]  Target: #{$d->{out}->[0]}  Pred: #{sprintf '%.4f', $pred}"
+}
+
+p "Done."
