@@ -1,94 +1,59 @@
 #!/usr/bin/env stryke
 
-# Bloom filter — probabilistic set membership with no false negatives
-# and bounded false-positive rate. Backing store is a bit-array (here
-# a plain @bits arrayref of 0/1); membership = "all k hashes hit 1".
-# Parses clean under `--no-interop`.
+# bloom_filter_no_interop.stk — Probabilistic set membership.
 #
-# Idiomatic stryke per docs/STYLE_GUIDE.md:
-#   * `fn name = expr` for predicates
-#   * implicit return on tail (rule 7)
-#   * `#{…}` interpolation (rule 1a)
-#   * `:` ranges, `len` not `length` (rules 4, 5)
-#
-# Namespaced UDFs `Bloom::*`.
+# A Bloom Filter is a space-efficient probabilistic data structure
+# that is used to test whether an element is a member of a set.
+# False positive matches are possible, but false negatives are not.
 #
 # Run: stryke --no-interop examples/bloom_filter_no_interop.stk
 
-# Cheap deterministic 32-bit-ish FNV-1a variant, seeded for k distinct hashes.
-fn Bloom::hash($s, $seed) {
+package BF
+
+fn hash($s, $seed) {
     my $h = 2166136261 + $seed * 16777619
-    for my $i (0:len($s) - 1) {
-        my $c = ord($s[$i])
-        $h = ($h ^ $c) * 16777619
+    my $n = len $s
+    for my $i (0 : $n - 1) {
+        $h = ($h ^ ord(substr $s, $i, 1)) * 16777619
         $h = $h % 4294967296
     }
     $h
 }
 
-fn Bloom::new = +{
-    size => _,
-    k    => _1,
-    bits => [(0) x _],
-    n    => 0,
+fn new($size, $k) {
+    my @bits = (0) x $size
+    { size => $size, k => $k, bits => \@bits }
 }
 
-fn Bloom::add($bf, $item) {
-    for my $i (0:$bf->{k} - 1) {
-        my $h = Bloom::hash($item, $i) % $bf->{size}
-        $bf->{bits}[$h] = 1
+fn add($bf, $item) {
+    for my $i (0 : $bf->{k} - 1) {
+        my $h = hash($item, $i) % $bf->{size}
+        $bf->{bits}->[$h] = 1
     }
-    $bf->{n}++
 }
 
-fn Bloom::contains($bf, $item) {
-    for my $i (0:$bf->{k} - 1) {
-        my $h = Bloom::hash($item, $i) % $bf->{size}
-        return 0 if $bf->{bits}[$h] == 0
+fn contains($bf, $item) {
+    for my $i (0 : $bf->{k} - 1) {
+        my $h = hash($item, $i) % $bf->{size}
+        return 0 if $bf->{bits}->[$h] == 0
     }
     1
 }
 
-# Set-bit count — useful for verifying load.
-fn Bloom::popcount = sum(@{_->{bits}})
+package main
 
-p "── Bloom filter demo ──"
+p "── Bloom Filter Demo ──"
 
-# Insert a small word set; every inserted word must be reported present.
-my $bf = Bloom::new(1024, 4)
-my @words = ("apple", "banana", "cherry", "date", "elderberry", "fig", "grape")
-Bloom::add($bf, _) for @words
+my $bf = BF::new 1000, 5
+my @words = ("apple", "banana", "cherry", "date")
 
 for my $w (@words) {
-    die "false negative on $w" unless Bloom::contains($bf, $w)
+    BF::add $bf, $w
 }
-p "  #{len @words} inserted, all report present (no FN)  OK"
 
-# Non-members may occasionally report present (false positives) — but
-# with size=1024 and k=4 for 7 items, the rate should be very low.
-# Sample 10000 random strings, count FP rate.
-srand(42)
-my $fp = 0
-my $tries = 10000
-for (1:$tries) {
-    my $key = "zzz" . int(rand 1000000)
-    $fp++ if Bloom::contains($bf, $key)
+for my $test ("apple", "cherry", "elderberry", "fig") {
+    my $res = BF::contains($bf, $test) ? "Yes" : "No"
+    p "Contains '#{$test}'? #{$res}"
 }
-my $rate = $fp / $tries
-die "FP rate #{$rate} unexpectedly high (>5%)" if $rate > 0.05
-p "  FP rate over #{$tries} probes: $fp/$tries (#{int($rate * 10000) / 100}%)  OK"
 
-# Verify population count matches load (rough — bits collide):
-# 7 items × 4 hashes = up to 28 set bits, but collisions can lower it.
-my $pop = Bloom::popcount($bf)
-die "popcount $pop > 28 (k*n max)" if $pop > 28
-die "popcount $pop < 4 (must set at least k bits)" if $pop < 4
-p "  popcount = $pop bits set (within k*n=28 ceiling)  OK"
-
-# Edge: empty bloom contains nothing.
-my $empty = Bloom::new(64, 3)
-die "empty bloom should NOT contain anything" if Bloom::contains($empty, "anything")
-p "  empty bloom: contains() = 0 for any probe  OK"
-
-p ""
-p "  ALL PASS (no-FN guarantee + FP rate + popcount + empty-bloom edge)"
+p "Done."

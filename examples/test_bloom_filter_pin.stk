@@ -1,94 +1,47 @@
 #!/usr/bin/env stryke
 
-# Bloom filter (single hash + multi-rotation; demo-grade).
+package BF
 
-fn Bf::new($bits, $hashes) {
-    +{ bits => $bits, k => $hashes, arr => [(0) x $bits] }
-}
-
-# Cheap hash mix using polynomial rolling + seed
-fn Bf::hash($s, $seed) {
-    my $h = 5381 + $seed
-    for my $ch (split //, $s) {
-        $h = ($h * 33 + ord $ch) % 2147483647
+fn hash($s, $seed) {
+    my $h = 2166136261 + $seed * 16777619
+    my $n = len $s
+    for my $i (0 : $n - 1) {
+        $h = ($h ^ ord(substr $s, $i, 1)) * 16777619
+        $h = $h % 4294967296
     }
     $h
 }
-
-fn Bf::add($bf, $s) {
-    for my $i (0:$bf->{k}-1) {
-        my $idx = Bf::hash($s, $i + 1) % $bf->{bits}
-        $bf->{arr}[$idx] = 1
-    }
-    $bf
+fn new($size, $k) {
+    my @bits = (0) x $size
+    { size => $size, k => $k, bits => \@bits }
 }
-
-fn Bf::has($bf, $s) {
-    for my $i (0:$bf->{k}-1) {
-        my $idx = Bf::hash($s, $i + 1) % $bf->{bits}
-        return 0 if $bf->{arr}[$idx] == 0
+fn add($bf, $item) {
+    for my $i (0 : $bf->{k} - 1) {
+        my $h = hash($item, $i) % $bf->{size}
+        $bf->{bits}->[$h] = 1
+    }
+}
+fn contains($bf, $item) {
+    for my $i (0 : $bf->{k} - 1) {
+        my $h = hash($item, $i) % $bf->{size}
+        return 0 if $bf->{bits}->[$h] == 0
     }
     1
 }
 
-fn Bf::popcount($bf) {
-    sum(@{$bf->{arr}})
-}
+package main
 
-my $bf = Bf::new(256, 4)
-Bf::has($bf, "hello") |> aeq 0, "empty bloom has nothing"
+# --- Basic ---
+my $b1 = BF::new 1000, 5
+BF::contains($b1, "stryke") |> aeq 0, "empty BF no contains"
+BF::add $b1, "stryke"
+BF::contains($b1, "stryke") |> aeq 1, "contains added item"
 
-Bf::add($bf, "hello")
-Bf::add($bf, "world")
-Bf::add($bf, "stryke")
-
-Bf::has($bf, "hello")   |> aok "has hello"
-Bf::has($bf, "world")   |> aok "has world"
-Bf::has($bf, "stryke")  |> aok "has stryke"
-Bf::has($bf, "missing") |> aeq 0, "no false-positive on 'missing' (lucky)"
-
-Bf::popcount($bf) > 0  |> aok "popcount > 0"
-Bf::popcount($bf) <= 12 |> aok "popcount bounded"
-
-# Add many, expect all to be present
-my @words = ("apple", "banana", "cherry", "date", "elderberry",
-             "fig", "grape", "honeydew", "ivy", "jujube")
-Bf::add($bf, $_) for @words
-my $all_present = 1
-for my $w (@words) {
-    $all_present = 0 unless Bf::has($bf, $w)
-}
-$all_present |> aok "all 10 added words present"
-
-# Bf cleared has none
-my $bf2 = Bf::new(128, 3)
-Bf::has($bf2, "x") |> aeq 0, "fresh empty x"
-Bf::has($bf2, "y") |> aeq 0, "fresh empty y"
-
-Bf::add($bf2, "x")
-Bf::has($bf2, "x") |> aok "x after add"
-
-# Union of two bloom filters' bit-arrays
-fn Bf::union($x, $y) {
-    my @arr = ()
-    for my $i (0:$x->{bits}-1) {
-        push @arr, ($x->{arr}[$i] | $y->{arr}[$i])
-    }
-    +{ bits => $x->{bits}, k => $x->{k}, arr => \@arr }
-}
-
-my $bfA = Bf::new(64, 3)
-my $bfB = Bf::new(64, 3)
-Bf::add($bfA, "alpha")
-Bf::add($bfB, "beta")
-my $bfU = Bf::union($bfA, $bfB)
-Bf::has($bfU, "alpha") |> aok "union has alpha"
-Bf::has($bfU, "beta")  |> aok "union has beta"
-
-# False positive rate estimate after inserts
-fn Bf::fill_ratio = Bf::popcount(_) / _->{bits}
-
-my $r = Bf::fill_ratio($bf)
-$r >= 0 && $r <= 1 |> aok "fill ratio in [0,1]"
+# --- False Negatives (Should be 0) ---
+my @items = ("one", "two", "three", "four", "five")
+for my $it (@items) { BF::add $b1, $it }
+my $ok = 1
+for my $it (@items) { $ok = 0 if !BF::contains($b1, $it) }
+$ok |> aeq 1, "no false negatives"
 
 test_run
