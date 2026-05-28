@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.16.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -41,6 +47,11 @@ jobs:
             # Native arm64 runner (free for public repos since Aug 2025).
             # Replaces ubuntu-latest + cross+qemu which took hours and was
             # silently killed by GitHub's runner monitor.
+            # The runner OOM-kills mid-build (~63min) on 463k-LOC trees;
+            # mark allow_failure so the publish + tap update still ship
+            # from the 4 working targets. Re-evaluate when GitHub bumps
+            # arm runner RAM.
+            allow_failure: true
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
