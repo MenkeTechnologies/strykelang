@@ -1094,3 +1094,303 @@ pub fn str_suffix_array(args: &[StrykeValue]) -> StrykeValue {
         .map(|i| StrykeValue::integer(i as i64))
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn list(xs: &[i64]) -> StrykeValue {
+        arr(xs.iter().copied().map(StrykeValue::integer).collect())
+    }
+
+    fn strlist(xs: &[&str]) -> StrykeValue {
+        arr(xs
+            .iter()
+            .map(|s| StrykeValue::string((*s).into()))
+            .collect())
+    }
+
+    fn ints(v: &StrykeValue) -> Vec<i64> {
+        list_elements(v).iter().map(|x| x.to_int()).collect()
+    }
+
+    fn floats(v: &StrykeValue) -> Vec<f64> {
+        list_elements(v).iter().map(|x| x.to_number()).collect()
+    }
+
+    // ─── triples / n_tuples ──────────────────────────────────────────────
+
+    #[test]
+    fn triples_emits_n_minus_2_groups_of_three() {
+        let r = list_elements(&triples(&[list(&[1, 2, 3, 4, 5])]));
+        assert_eq!(r.len(), 3);
+        assert_eq!(ints(&r[0]), [1, 2, 3]);
+        assert_eq!(ints(&r[1]), [2, 3, 4]);
+        assert_eq!(ints(&r[2]), [3, 4, 5]);
+    }
+
+    #[test]
+    fn triples_too_short_yields_empty() {
+        // windows(3) on 2 elements is empty.
+        assert!(list_elements(&triples(&[list(&[1, 2])])).is_empty());
+    }
+
+    #[test]
+    fn n_tuples_zero_or_one_clamps_to_one() {
+        // arg <= 0 should clamp via .max(1) and not panic.
+        let r = list_elements(&n_tuples(&[list(&[7, 8, 9]), StrykeValue::integer(0)]));
+        assert_eq!(r.len(), 3);
+        assert_eq!(ints(&r[0]), [7]);
+    }
+
+    // ─── runs / unique_consecutive ───────────────────────────────────────
+
+    #[test]
+    fn unique_consecutive_collapses_adjacent_dups_only() {
+        let r = unique_consecutive(&[list(&[1, 1, 2, 3, 3, 1])]);
+        // Non-adjacent 1 is preserved.
+        assert_eq!(ints(&r), [1, 2, 3, 1]);
+    }
+
+    // ─── sliding window family ───────────────────────────────────────────
+
+    #[test]
+    fn sliding_sum_window_2() {
+        let r = sliding_sum(&[list(&[1, 2, 3, 4]), StrykeValue::integer(2)]);
+        assert_eq!(floats(&r), [3.0, 5.0, 7.0]);
+    }
+
+    #[test]
+    fn sliding_average_window_3() {
+        let r = sliding_average(&[list(&[3, 6, 9, 12]), StrykeValue::integer(3)]);
+        assert_eq!(floats(&r), [6.0, 9.0]);
+    }
+
+    #[test]
+    fn sliding_max_and_min_pair() {
+        let xs = list(&[5, 1, 9, 3, 7]);
+        let mx = sliding_max(&[xs.clone(), StrykeValue::integer(3)]);
+        let mn = sliding_min(&[xs, StrykeValue::integer(3)]);
+        assert_eq!(floats(&mx), [9.0, 9.0, 9.0]);
+        assert_eq!(floats(&mn), [1.0, 1.0, 3.0]);
+    }
+
+    #[test]
+    fn sliding_window_larger_than_input_is_empty() {
+        let r = sliding_sum(&[list(&[1, 2]), StrykeValue::integer(5)]);
+        assert!(floats(&r).is_empty());
+    }
+
+    // ─── top_n_by / bottom_n_by ──────────────────────────────────────────
+
+    #[test]
+    fn top_n_by_returns_descending_by_numeric_value() {
+        let r = top_n_by(&[list(&[3, 1, 4, 1, 5, 9, 2, 6]), StrykeValue::integer(3)]);
+        assert_eq!(ints(&r), [9, 6, 5]);
+    }
+
+    #[test]
+    fn bottom_n_by_returns_ascending_by_numeric_value() {
+        let r = bottom_n_by(&[list(&[3, 1, 4, 1, 5, 9, 2, 6]), StrykeValue::integer(3)]);
+        assert_eq!(ints(&r), [1, 1, 2]);
+    }
+
+    // ─── all_equal ───────────────────────────────────────────────────────
+
+    #[test]
+    fn all_equal_empty_is_true() {
+        // Contract: empty list returns 1 (vacuously true).
+        assert_eq!(all_equal(&[list(&[])]).to_int(), 1);
+    }
+
+    #[test]
+    fn all_equal_distinguishes_uniform_from_mixed() {
+        assert_eq!(all_equal(&[list(&[7, 7, 7])]).to_int(), 1);
+        assert_eq!(all_equal(&[list(&[7, 7, 8])]).to_int(), 0);
+    }
+
+    // ─── boyer_moore_majority ────────────────────────────────────────────
+
+    #[test]
+    fn boyer_moore_returns_strict_majority_only() {
+        // Strict > n/2: 5 out of 9 = majority.
+        let r = boyer_moore_majority(&[list(&[1, 2, 1, 1, 3, 1, 1, 2, 1])]);
+        assert_eq!(r.to_int(), 1);
+    }
+
+    #[test]
+    fn boyer_moore_no_majority_returns_undef() {
+        // 4 out of 8 is NOT strict majority.
+        let r = boyer_moore_majority(&[list(&[1, 1, 1, 1, 2, 2, 2, 2])]);
+        assert!(r.is_undef());
+    }
+
+    // ─── quickselect ─────────────────────────────────────────────────────
+
+    #[test]
+    fn quickselect_median_odd_length() {
+        // Sorted: [1,2,3,4,5] → mid index 2 → 3.0
+        let r = quickselect_median(&[list(&[5, 1, 4, 2, 3])]);
+        assert_eq!(r.to_number(), 3.0);
+    }
+
+    #[test]
+    fn quickselect_nth_out_of_range_returns_undef() {
+        let r = quickselect_nth(&[list(&[1, 2, 3]), StrykeValue::integer(99)]);
+        assert!(r.is_undef());
+    }
+
+    // ─── top_k_min_heap / bottom_k_max_heap ──────────────────────────────
+
+    #[test]
+    fn top_k_min_heap_yields_k_largest_descending() {
+        let r = top_k_min_heap(&[list(&[3, 1, 4, 1, 5, 9, 2, 6]), StrykeValue::integer(3)]);
+        assert_eq!(ints(&r), [9, 6, 5]);
+    }
+
+    #[test]
+    fn bottom_k_max_heap_yields_k_smallest_ascending() {
+        let r = bottom_k_max_heap(&[list(&[3, 1, 4, 1, 5, 9, 2, 6]), StrykeValue::integer(3)]);
+        assert_eq!(ints(&r), [1, 1, 2]);
+    }
+
+    // ─── pad_left_n / pad_right_n ────────────────────────────────────────
+
+    #[test]
+    fn pad_left_n_pads_only_if_shorter() {
+        let r = pad_left_n(&[
+            list(&[1, 2]),
+            StrykeValue::integer(4),
+            StrykeValue::integer(0),
+        ]);
+        assert_eq!(ints(&r), [0, 0, 1, 2]);
+    }
+
+    #[test]
+    fn pad_left_n_noop_if_already_long_enough() {
+        let r = pad_left_n(&[
+            list(&[1, 2, 3]),
+            StrykeValue::integer(2),
+            StrykeValue::integer(0),
+        ]);
+        assert_eq!(ints(&r), [1, 2, 3]);
+    }
+
+    #[test]
+    fn pad_right_n_appends_pad_value() {
+        let r = pad_right_n(&[list(&[1]), StrykeValue::integer(3), StrykeValue::integer(9)]);
+        assert_eq!(ints(&r), [1, 9, 9]);
+    }
+
+    // ─── roundrobin / unzip3 ─────────────────────────────────────────────
+
+    #[test]
+    fn roundrobin_interleaves_with_jagged_lengths() {
+        let r = roundrobin(&[list(&[1, 4, 7]), list(&[2, 5]), list(&[3, 6, 8, 9])]);
+        assert_eq!(ints(&r), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn unzip3_splits_triples_into_three_columns() {
+        let r = unzip3(&[arr(vec![
+            list(&[1, 2, 3]),
+            list(&[4, 5, 6]),
+            list(&[7, 8, 9]),
+        ])]);
+        let cols = list_elements(&r);
+        assert_eq!(cols.len(), 3);
+        assert_eq!(ints(&cols[0]), [1, 4, 7]);
+        assert_eq!(ints(&cols[1]), [2, 5, 8]);
+        assert_eq!(ints(&cols[2]), [3, 6, 9]);
+    }
+
+    // ─── position_max / position_min ─────────────────────────────────────
+
+    #[test]
+    fn position_max_returns_first_occurrence_index() {
+        // Strict `>` in source means first occurrence wins on ties.
+        let r = position_max(&[list(&[1, 5, 3, 5, 2])]);
+        assert_eq!(r.to_int(), 1);
+    }
+
+    #[test]
+    fn position_min_empty_returns_undef() {
+        let r = position_min(&[list(&[])]);
+        assert!(r.is_undef());
+    }
+
+    // ─── levenshtein_normalized ──────────────────────────────────────────
+
+    #[test]
+    fn levenshtein_normalized_identical_is_zero() {
+        let r = levenshtein_normalized(&[
+            StrykeValue::string("kitten".into()),
+            StrykeValue::string("kitten".into()),
+        ]);
+        assert_eq!(r.to_number(), 0.0);
+    }
+
+    #[test]
+    fn levenshtein_normalized_both_empty_is_zero() {
+        let r = levenshtein_normalized(&[
+            StrykeValue::string("".into()),
+            StrykeValue::string("".into()),
+        ]);
+        assert_eq!(r.to_number(), 0.0);
+    }
+
+    #[test]
+    fn levenshtein_normalized_completely_different_is_one() {
+        // distance 3 / max(3,3) = 1.0
+        let r = levenshtein_normalized(&[
+            StrykeValue::string("abc".into()),
+            StrykeValue::string("xyz".into()),
+        ]);
+        assert_eq!(r.to_number(), 1.0);
+    }
+
+    // ─── str_lcs / str_lcs_length ────────────────────────────────────────
+
+    #[test]
+    fn str_lcs_length_matches_known_pair() {
+        // LCS("ABCBDAB","BDCABA") == "BCBA" or "BDAB" — length 4.
+        let r = str_lcs_length(&[
+            StrykeValue::string("ABCBDAB".into()),
+            StrykeValue::string("BDCABA".into()),
+        ]);
+        assert_eq!(r.to_int(), 4);
+    }
+
+    // ─── unique_by / mode_iter ───────────────────────────────────────────
+
+    #[test]
+    fn unique_by_keeps_first_occurrence() {
+        let r = unique_by(&[strlist(&["a", "b", "a", "c", "b"])]);
+        let got: Vec<String> = list_elements(&r).iter().map(|v| v.to_string()).collect();
+        assert_eq!(got, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn mode_iter_returns_most_frequent_value() {
+        let r = mode_iter(&[list(&[1, 2, 2, 3, 2, 1])]);
+        assert_eq!(r.to_int(), 2);
+    }
+
+    // ─── exclude / exclude_first / exclude_last ──────────────────────────
+
+    #[test]
+    fn exclude_drops_listed_values() {
+        let r = exclude(&[
+            list(&[1, 2, 3, 4, 5]),
+            StrykeValue::integer(2),
+            StrykeValue::integer(4),
+        ]);
+        assert_eq!(ints(&r), [1, 3, 5]);
+    }
+
+    #[test]
+    fn exclude_last_pops_one_element() {
+        let r = exclude_last(&[list(&[10, 20, 30])]);
+        assert_eq!(ints(&r), [10, 20]);
+    }
+}
