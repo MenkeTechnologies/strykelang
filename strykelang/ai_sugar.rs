@@ -705,3 +705,238 @@ fn sanitize(s: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ─── sanitize ────────────────────────────────────────────────────────
+
+    #[test]
+    fn sanitize_preserves_alnum_and_underscore() {
+        assert_eq!(sanitize("abc_123_XYZ"), "abc_123_XYZ");
+    }
+
+    #[test]
+    fn sanitize_replaces_punctuation_and_space_with_underscore() {
+        assert_eq!(sanitize("a.b-c d/e"), "a_b_c_d_e");
+    }
+
+    #[test]
+    fn sanitize_empty_string_is_empty() {
+        assert_eq!(sanitize(""), "");
+    }
+
+    #[test]
+    fn sanitize_non_ascii_becomes_underscore() {
+        // Unicode letters are not ASCII alphanumeric per the helper's rule.
+        let r = sanitize("café");
+        // c, a, f, é → é is non-ASCII so becomes _.
+        assert_eq!(r, "caf_");
+    }
+
+    // ─── normalize_type ──────────────────────────────────────────────────
+
+    #[test]
+    fn normalize_type_maps_aliases_to_canonical() {
+        assert_eq!(normalize_type("str"), "string");
+        assert_eq!(normalize_type("String"), "string");
+        assert_eq!(normalize_type("i64"), "int");
+        assert_eq!(normalize_type("integer"), "int");
+        assert_eq!(normalize_type("number"), "number");
+        assert_eq!(normalize_type("f64"), "number");
+        assert_eq!(normalize_type("Boolean"), "bool");
+        assert_eq!(normalize_type("arrayref"), "array");
+        assert_eq!(normalize_type("hashref"), "object");
+    }
+
+    #[test]
+    fn normalize_type_unknown_falls_back_to_string() {
+        // Contract: any unrecognized type defaults to "string".
+        assert_eq!(normalize_type("Frobnicator"), "string");
+        assert_eq!(normalize_type(""), "string");
+    }
+
+    #[test]
+    fn normalize_type_trims_and_is_case_insensitive() {
+        assert_eq!(normalize_type("  STRING  "), "string");
+        assert_eq!(normalize_type("BOOL"), "bool");
+    }
+
+    // ─── escape_double_quoted ────────────────────────────────────────────
+
+    #[test]
+    fn escape_double_quoted_escapes_quote_backslash_newline() {
+        // Each special char gets a leading backslash.
+        let r = escape_double_quoted("a\"b\\c\n");
+        assert_eq!(r, "a\\\"b\\\\c\\n");
+    }
+
+    #[test]
+    fn escape_double_quoted_escapes_sigils() {
+        // $ and @ are interpolation triggers in Perl-style strings.
+        let r = escape_double_quoted("$x@y");
+        assert_eq!(r, "\\$x\\@y");
+    }
+
+    #[test]
+    fn escape_double_quoted_passes_through_plain_ascii() {
+        let r = escape_double_quoted("hello world 123");
+        assert_eq!(r, "hello world 123");
+    }
+
+    // ─── matches_word ────────────────────────────────────────────────────
+
+    #[test]
+    fn matches_word_requires_non_ident_boundary() {
+        let s = b"tool fn foo";
+        assert!(matches_word(s, 0, b"tool"));
+        // "to" appears but the next byte 'o' is alphanumeric → no match.
+        assert!(!matches_word(s, 0, b"to"));
+    }
+
+    #[test]
+    fn matches_word_at_eof_matches() {
+        let s = b"foo";
+        // EOF boundary is treated as non-ident (helper substitutes 0).
+        assert!(matches_word(s, 0, b"foo"));
+    }
+
+    #[test]
+    fn matches_word_rejects_underscore_boundary() {
+        let s = b"tool_chain";
+        assert!(!matches_word(s, 0, b"tool"));
+    }
+
+    // ─── find_matching ───────────────────────────────────────────────────
+
+    #[test]
+    fn find_matching_returns_pos_of_balanced_close() {
+        let s = b"(a(b)c)";
+        assert_eq!(find_matching(s, 0, b'(', b')'), Some(6));
+    }
+
+    #[test]
+    fn find_matching_returns_none_if_unbalanced() {
+        let s = b"(a(b)c";
+        assert_eq!(find_matching(s, 0, b'(', b')'), None);
+    }
+
+    #[test]
+    fn find_matching_skips_braces_inside_strings() {
+        // The brace inside "..." must NOT be counted.
+        let s = b"{a\"}\"b}";
+        assert_eq!(find_matching(s, 0, b'{', b'}'), Some(6));
+    }
+
+    #[test]
+    fn find_matching_skips_braces_in_line_comment() {
+        let s = b"{# }\nx}";
+        assert_eq!(find_matching(s, 0, b'{', b'}'), Some(6));
+    }
+
+    #[test]
+    fn find_matching_wrong_open_returns_none() {
+        // start byte must equal open.
+        assert_eq!(find_matching(b"x()", 0, b'(', b')'), None);
+    }
+
+    // ─── find_quote_close ────────────────────────────────────────────────
+
+    #[test]
+    fn find_quote_close_finds_terminator() {
+        assert_eq!(find_quote_close(b"\"hi\"", 0), Some(3));
+    }
+
+    #[test]
+    fn find_quote_close_skips_escaped_quote() {
+        // \" inside string should not close.
+        let s = br#""a\"b""#;
+        assert_eq!(find_quote_close(s, 0), Some(5));
+    }
+
+    #[test]
+    fn find_quote_close_unterminated_returns_none() {
+        assert_eq!(find_quote_close(b"\"abc", 0), None);
+    }
+
+    // ─── find_param_colon ────────────────────────────────────────────────
+
+    #[test]
+    fn find_param_colon_finds_single_colon_for_type() {
+        assert_eq!(find_param_colon("$x: string"), Some(2));
+    }
+
+    #[test]
+    fn find_param_colon_skips_double_colon() {
+        // `::` is not a type-annotation colon.
+        assert_eq!(find_param_colon("Foo::Bar"), None);
+    }
+
+    #[test]
+    fn find_param_colon_skips_colon_in_brackets() {
+        // `:` inside `(...)` should be ignored.
+        assert_eq!(find_param_colon("$x = (a:b): string"), Some(10));
+    }
+
+    // ─── parse_param_list ────────────────────────────────────────────────
+
+    #[test]
+    fn parse_param_list_extracts_typed_specs() {
+        let (stripped, specs) = parse_param_list("$city: string, $n: int");
+        assert_eq!(stripped, "$city, $n");
+        assert_eq!(
+            specs,
+            vec![
+                ("city".to_string(), "string".to_string()),
+                ("n".to_string(), "int".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_param_list_defaults_missing_type_to_any() {
+        // No `: Type` → normalize_type("Any") falls back to "string".
+        let (_, specs) = parse_param_list("$x");
+        assert_eq!(specs, vec![("x".to_string(), "string".to_string())]);
+    }
+
+    #[test]
+    fn parse_param_list_empty_yields_empty() {
+        let (stripped, specs) = parse_param_list("");
+        assert_eq!(stripped, "");
+        assert!(specs.is_empty());
+    }
+
+    #[test]
+    fn parse_param_list_strips_sigils_for_schema_name() {
+        let (_, specs) = parse_param_list("@xs: array, %h: object");
+        assert_eq!(specs[0].0, "xs");
+        assert_eq!(specs[1].0, "h");
+    }
+
+    // ─── build_params_hash ───────────────────────────────────────────────
+
+    #[test]
+    fn build_params_hash_empty_is_empty_hash() {
+        assert_eq!(build_params_hash(&[]), "+{}");
+    }
+
+    #[test]
+    fn build_params_hash_emits_perl_hashref_syntax() {
+        let h = build_params_hash(&[
+            ("a".to_string(), "string".to_string()),
+            ("b".to_string(), "int".to_string()),
+        ]);
+        assert_eq!(h, "+{ a => \"string\", b => \"int\" }");
+    }
+
+    // ─── desugar (no-op path) ────────────────────────────────────────────
+
+    #[test]
+    fn desugar_passes_through_code_without_triggers() {
+        // No `tool fn` and no `mcp_server` → unchanged.
+        let src = "fn add($a, $b) { $a + $b }";
+        assert_eq!(desugar(src), src);
+    }
+}
