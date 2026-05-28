@@ -262,8 +262,8 @@ CORE::age_at_date
 CORE::age_at_z
 CORE::age_from_birthdate
 CORE::age_in_years
-CORE::ageyrs
 CORE::agent
+CORE::ageyrs
 CORE::ai
 CORE::ai_agent
 CORE::ai_batch
@@ -383,6 +383,7 @@ CORE::am_synth
 CORE::amari_alpha_div
 CORE::amatch
 CORE::amax
+CORE::amen
 CORE::amicable_pair_q
 CORE::amin
 CORE::amo_index_step
@@ -415,10 +416,12 @@ CORE::angle_bracket
 CORE::angular_diameter_distance
 CORE::angular_velocity
 CORE::angvel
+CORE::annex
 CORE::annuity_due_an
 CORE::annuity_future_value
 CORE::annuity_immediate_an
 CORE::annuity_present_value
+CORE::anoint
 CORE::anova
 CORE::anova1
 CORE::anova_one_way
@@ -449,6 +452,7 @@ CORE::ap_jonker_volgenant_step
 CORE::aperture_stop_to_fnumber
 CORE::apery
 CORE::apery_constant
+CORE::apostatize
 CORE::apparent_horizon_step
 CORE::apparent_magnitude
 CORE::append_elem
@@ -782,6 +786,7 @@ CORE::bessel_y
 CORE::best_rational
 CORE::best_rational_approximation
 CORE::best_response_dynamic
+CORE::bestow
 CORE::beta_binomial_pmf
 CORE::beta_binomial_update
 CORE::beta_fn
@@ -1103,6 +1108,7 @@ CORE::both
 CORE::bottom_k_max_heap
 CORE::bottom_n_by
 CORE::bounding_box
+CORE::bow
 CORE::bowley_skewness
 CORE::box_blur_kernel
 CORE::box_keygen
@@ -1204,8 +1210,8 @@ CORE::buffer_capacity_acid_base
 CORE::bulirsch_stoer_step
 CORE::bunzip2
 CORE::buoyancy_force
-CORE::burr_xii_cdf
 CORE::burp
+CORE::burr_xii_cdf
 CORE::burr_xii_pdf
 CORE::business_days_between
 CORE::busy_beaver
@@ -1435,6 +1441,7 @@ CORE::catalan_constant
 CORE::catalan_number
 CORE::categorical_cross_entropy
 CORE::categorical_sample
+CORE::cathedral
 CORE::catmull_rom_eval
 CORE::catn
 CORE::cauchy_pdf
@@ -1528,6 +1535,7 @@ CORE::channel_sync
 CORE::channel_try_recv
 CORE::channel_try_send
 CORE::channel_unbounded
+CORE::chant
 CORE::chapman_estimator
 CORE::char_at
 CORE::char_count
@@ -1746,6 +1754,7 @@ CORE::clip
 CORE::clipboard
 CORE::clique_count_3
 CORE::clique_number_lower
+CORE::cloister
 CORE::close
 CORE::closed_pipe_harmonic
 CORE::closedir
@@ -1946,6 +1955,7 @@ CORE::confint
 CORE::confint_lm
 CORE::conformal_compactification_step
 CORE::confusion_counts
+CORE::congregation
 CORE::conj
 CORE::conjugate_gradient
 CORE::connect
@@ -2794,6 +2804,7 @@ CORE::distinct_count
 CORE::distinct_partition_count
 CORE::distinct_sample
 CORE::divergence_omega_step
+CORE::divine
 CORE::divisible_goods_proportional
 CORE::divisor_count
 CORE::divisor_sum
@@ -3112,6 +3123,7 @@ CORE::english_auction
 CORE::english_auction_step
 CORE::english_chi2
 CORE::english_likeness
+CORE::enshrine
 CORE::enso_index_step
 CORE::ensure_prefix
 CORE::ensure_suffix
@@ -3221,10 +3233,12 @@ CORE::exchange_current_density
 CORE::exclude
 CORE::exclude_first
 CORE::exclude_last
+CORE::excommunicate
 CORE::exe
 CORE::exec
 CORE::exec_script
 CORE::executables
+CORE::exhume
 CORE::exists
 CORE::exists_key
 CORE::exit
@@ -3995,7 +4009,6 @@ CORE::glob_match
 CORE::glob_par
 CORE::glob_to_regex
 CORE::global_efficiency
-CORE::god
 CORE::glog
 CORE::glorot_init
 CORE::glquad
@@ -4009,6 +4022,7 @@ CORE::gmtime
 CORE::gnomonic_number
 CORE::go_enrichment_p
 CORE::goals_above_avg
+CORE::god
 CORE::goertzel
 CORE::goldb
 CORE::goldbach
@@ -4247,6 +4261,7 @@ CORE::harmonics_partial
 CORE::harris_corners
 CORE::harris_response
 CORE::hartle_thorne_metric
+CORE::harvest
 CORE::has_all_keys
 CORE::has_any_key
 CORE::has_cycle_directed
@@ -4354,8 +4369,6 @@ CORE::hex_of
 CORE::hex_to_bytes
 CORE::hex_to_rgb
 CORE::hex_upper
-CORE::hide
-CORE::hide_capacity
 CORE::hexagonal_number
 CORE::hget
 CORE::hgetall
@@ -4364,6 +4377,8 @@ CORE::hhi
 CORE::hhi_concentration
 CORE::hicksian_demand
 CORE::hidden
+CORE::hide
+CORE::hide_capacity
 CORE::highpass_filter
 CORE::highway_hash
 CORE::hilbert_env
@@ -4773,7 +4788,6 @@ CORE::infinite_well_energy
 CORE::information_bottleneck_step
 CORE::information_gain
 CORE::information_ratio
-CORE::ing
 CORE::ingest
 CORE::init_list
 CORE::initial_bearing
@@ -4813,6 +4827,7 @@ CORE::interp_linear
 CORE::interpolate
 CORE::interpolation_search
 CORE::interpose
+CORE::interrogate
 CORE::intersect_list
 CORE::intersperse
 CORE::intersperse_char
@@ -5716,6 +5731,7 @@ CORE::lgamma
 CORE::li
 CORE::li_int
 CORE::liang_barsky_clip
+CORE::lick
 CORE::lie_derivative_scalar_step
 CORE::lie_derivative_vector_step
 CORE::lie_split
@@ -6053,11 +6069,11 @@ CORE::mapping_class_torus
 CORE::maps
 CORE::mapw
 CORE::marcum_q
-CORE::mark
 CORE::margalef_richness
 CORE::margin
 CORE::margin_price
 CORE::margrabe
+CORE::mark
 CORE::markdown_render
 CORE::markdown_to_html
 CORE::markov_decision_value
@@ -6069,6 +6085,7 @@ CORE::markup
 CORE::markup_pct
 CORE::markup_price
 CORE::marshallian_demand
+CORE::martyr
 CORE::mask
 CORE::mask_string
 CORE::mass_transport_overpotential
@@ -6730,6 +6747,7 @@ CORE::murmur3
 CORE::murmur3_128
 CORE::murmur3_32
 CORE::murmurhash3_x32
+CORE::muster
 CORE::mutation_bit_flip_prob
 CORE::mutation_rate
 CORE::mutex
@@ -7277,6 +7295,7 @@ CORE::orbital_velocity
 CORE::orbper
 CORE::orbvel
 CORE::ord
+CORE::ordain
 CORE::order_modulo
 CORE::ordered_probit_threshold
 CORE::ordered_set
@@ -7684,6 +7703,7 @@ CORE::perrin_number
 CORE::persian_arithmetic_leap
 CORE::persist
 CORE::personalized_pagerank
+CORE::peruse
 CORE::petersen_estimator
 CORE::peukert_capacity
 CORE::peukert_exponent_fit
@@ -7753,6 +7773,7 @@ CORE::pie_svg
 CORE::pielou_evenness
 CORE::pig_latin
 CORE::piglat
+CORE::pilgrimage
 CORE::pin
 CORE::ping
 CORE::pint
@@ -7961,6 +7982,7 @@ CORE::ppt
 CORE::prandtl_number
 CORE::prandtl_number_step
 CORE::pratt_parse_step
+CORE::pray
 CORE::prcomp
 CORE::precession_iau2006
 CORE::prect
@@ -8011,12 +8033,12 @@ CORE::proceed
 CORE::process_list
 CORE::procs
 CORE::producer_surplus
-CORE::provenance
 CORE::product
 CORE::product_digits
 CORE::product_list
 CORE::product_of
 CORE::productlog
+CORE::profess
 CORE::profile_hmm_score
 CORE::profit_margin_pct
 CORE::proj
@@ -8043,6 +8065,7 @@ CORE::protein_molecular_weight
 CORE::protein_pI
 CORE::proton_mass
 CORE::prototype
+CORE::provenance
 CORE::proximal_gradient_step
 CORE::prvp
 CORE::ps
@@ -8405,6 +8428,7 @@ CORE::realpath
 CORE::rearth
 CORE::recaman
 CORE::recaman_seq
+CORE::recant
 CORE::received
 CORE::recip
 CORE::reciprocal
@@ -8550,6 +8574,7 @@ CORE::rest_energy
 CORE::restenergy
 CORE::restore_random_state
 CORE::resultant
+CORE::resurrect
 CORE::retry
 CORE::return
 CORE::rev
@@ -8557,8 +8582,8 @@ CORE::rev_comp_dna
 CORE::rev_lines
 CORE::rev_str
 CORE::rev_vec
-CORE::revenue_equivalence_check
 CORE::reveal
+CORE::revenue_equivalence_check
 CORE::reverse
 CORE::reverse_complement_dna
 CORE::reverse_delete_step
@@ -9429,8 +9454,6 @@ CORE::slug
 CORE::slugify
 CORE::slurp
 CORE::slurp_raw
-CORE::swa
-CORE::swallow
 CORE::slutsky_decompose
 CORE::sma
 CORE::small_schroder
@@ -9438,6 +9461,7 @@ CORE::small_schroder_number
 CORE::smap
 CORE::smem
 CORE::smembers
+CORE::smite
 CORE::smith_normal_2x2_step
 CORE::smith_predictor_step
 CORE::smith_q
@@ -9445,6 +9469,7 @@ CORE::smith_waterman
 CORE::smith_waterman_score
 CORE::smmap
 CORE::smoothstep
+CORE::smother
 CORE::smst
 CORE::smt_qf_lia_solve_step
 CORE::smt_qf_uf_combine
@@ -9918,6 +9943,7 @@ CORE::svals
 CORE::sw
 CORE::sw_align
 CORE::sw_score
+CORE::swallow
 CORE::swamee_jain_factor
 CORE::swampland_distance_check
 CORE::swap_bits
@@ -10013,6 +10039,9 @@ CORE::tax_incidence
 CORE::taylor_diagram_score
 CORE::taylor_microscale_step
 CORE::taylor_window
+CORE::tb_alive
+CORE::tb_close
+CORE::tb_ping
 CORE::tbl
 CORE::tc
 CORE::tcp_banner
@@ -10411,6 +10440,7 @@ CORE::turn_permission
 CORE::turn_recv
 CORE::turn_refresh
 CORE::turn_send
+CORE::turnbuckle
 CORE::tvals
 CORE::tversky
 CORE::tversky_index
@@ -10445,13 +10475,13 @@ CORE::ucb1_choose
 CORE::ucfirst
 CORE::ucm_unobserved_components
 CORE::ud
-CORE::ue
 CORE::udp_close
 CORE::udp_open
 CORE::udp_recv
 CORE::udp_recv_from
 CORE::udp_send
 CORE::udp_send_to
+CORE::ue
 CORE::ugz
 CORE::uid
 CORE::uin
@@ -10470,7 +10500,6 @@ CORE::underline
 CORE::unfold
 CORE::unfoldr
 CORE::unfr
-CORE::unmark
 CORE::unicode_codepoints
 CORE::unicode_to_native
 CORE::unification_robinson
@@ -10513,6 +10542,7 @@ CORE::unlns
 CORE::unlz4
 CORE::unlzma
 CORE::unlzw
+CORE::unmark
 CORE::unpack
 CORE::unpack1
 CORE::unpack_first
@@ -10887,6 +10917,7 @@ CORE::weekday_name
 CORE::weekday_name_short
 CORE::weekday_short
 CORE::weeks_between
+CORE::weep
 CORE::weibpdf
 CORE::weibull_pdf
 CORE::weierstrass_p
@@ -10905,6 +10936,7 @@ CORE::welch_psd_avg
 CORE::welch_ttest
 CORE::welch_window
 CORE::welcht
+CORE::welcome
 CORE::welford_mean
 CORE::welford_pop_variance
 CORE::welford_pvar
@@ -11467,6 +11499,7 @@ am_synth
 amari_alpha_div
 amatch
 amax
+amen
 amicable_pair_q
 amin
 amo_index_step
@@ -11499,10 +11532,12 @@ angle_bracket
 angular_diameter_distance
 angular_velocity
 angvel
+annex
 annuity_due_an
 annuity_future_value
 annuity_immediate_an
 annuity_present_value
+anoint
 anova
 anova1
 anova_one_way
@@ -11533,6 +11568,7 @@ ap_jonker_volgenant_step
 aperture_stop_to_fnumber
 apery
 apery_constant
+apostatize
 apparent_horizon_step
 apparent_magnitude
 append_elem
@@ -11869,6 +11905,7 @@ bessel_y
 best_rational
 best_rational_approximation
 best_response_dynamic
+bestow
 beta_binomial_pmf
 beta_binomial_update
 beta_fn
@@ -12190,6 +12227,7 @@ both
 bottom_k_max_heap
 bottom_n_by
 bounding_box
+bow
 bowley_skewness
 box_blur_kernel
 box_keygen
@@ -12291,8 +12329,8 @@ buffer_capacity_acid_base
 bulirsch_stoer_step
 bunzip2
 buoyancy_force
-burr_xii_cdf
 burp
+burr_xii_cdf
 burr_xii_pdf
 business_days_between
 busy_beaver
@@ -12523,6 +12561,7 @@ catalan_number
 catch
 categorical_cross_entropy
 categorical_sample
+cathedral
 catmull_rom_eval
 catn
 cauchy_pdf
@@ -12616,6 +12655,7 @@ channel_sync
 channel_try_recv
 channel_try_send
 channel_unbounded
+chant
 chapman_estimator
 char_at
 char_count
@@ -12835,6 +12875,7 @@ clip
 clipboard
 clique_count_3
 clique_number_lower
+cloister
 close
 closed_pipe_harmonic
 closedir
@@ -13036,6 +13077,7 @@ confint
 confint_lm
 conformal_compactification_step
 confusion_counts
+congregation
 conj
 conjugate_gradient
 connect
@@ -13888,6 +13930,7 @@ distinct_count
 distinct_partition_count
 distinct_sample
 divergence_omega_step
+divine
 divisible_goods_proportional
 divisor_count
 divisor_sum
@@ -14208,6 +14251,7 @@ english_auction
 english_auction_step
 english_chi2
 english_likeness
+enshrine
 enso_index_step
 ensure_prefix
 ensure_suffix
@@ -14319,10 +14363,12 @@ exchange_current_density
 exclude
 exclude_first
 exclude_last
+excommunicate
 exe
 exec
 exec_script
 executables
+exhume
 exists
 exists_key
 exit
@@ -15353,6 +15399,7 @@ harmonics_partial
 harris_corners
 harris_response
 hartle_thorne_metric
+harvest
 has_all_keys
 has_any_key
 has_cycle_directed
@@ -15457,8 +15504,6 @@ hex_decode
 hex_encode
 hex_lower
 hex_of
-hide
-hide_capacity
 hex_to_bytes
 hex_to_rgb
 hex_upper
@@ -15470,6 +15515,8 @@ hhi
 hhi_concentration
 hicksian_demand
 hidden
+hide
+hide_capacity
 highpass_filter
 highway_hash
 hilbert_env
@@ -15880,7 +15927,6 @@ infinite_well_energy
 information_bottleneck_step
 information_gain
 information_ratio
-ing
 ingest
 init_list
 initial_bearing
@@ -15920,6 +15966,7 @@ interp_linear
 interpolate
 interpolation_search
 interpose
+interrogate
 intersect_list
 intersperse
 intersperse_char
@@ -16824,6 +16871,7 @@ lgamma
 li
 li_int
 liang_barsky_clip
+lick
 lie_derivative_scalar_step
 lie_derivative_vector_step
 lie_split
@@ -17167,8 +17215,8 @@ marcum_q
 margalef_richness
 margin
 margin_price
-mark
 margrabe
+mark
 markdown_render
 markdown_to_html
 markov_decision_value
@@ -17180,6 +17228,7 @@ markup
 markup_pct
 markup_price
 marshallian_demand
+martyr
 mask
 mask_string
 mass_transport_overpotential
@@ -17841,6 +17890,7 @@ murmur3
 murmur3_128
 murmur3_32
 murmurhash3_x32
+muster
 mutation_bit_flip_prob
 mutation_rate
 mutex
@@ -18390,6 +18440,7 @@ orbital_velocity
 orbper
 orbvel
 ord
+ordain
 order_modulo
 ordered_probit_threshold
 ordered_set
@@ -18799,6 +18850,7 @@ perrin_number
 persian_arithmetic_leap
 persist
 personalized_pagerank
+peruse
 petersen_estimator
 peukert_capacity
 peukert_exponent_fit
@@ -18868,6 +18920,7 @@ pie_svg
 pielou_evenness
 pig_latin
 piglat
+pilgrimage
 pin
 ping
 pint
@@ -19076,6 +19129,7 @@ ppt
 prandtl_number
 prandtl_number_step
 pratt_parse_step
+pray
 prcomp
 precession_iau2006
 prect
@@ -19130,9 +19184,9 @@ producer_surplus
 product
 product_digits
 product_list
-provenance
 product_of
 productlog
+profess
 profile_hmm_score
 profit_margin_pct
 proj
@@ -19159,6 +19213,7 @@ protein_molecular_weight
 protein_pI
 proton_mass
 prototype
+provenance
 proximal_gradient_step
 prvp
 ps
@@ -19523,6 +19578,7 @@ realpath
 rearth
 recaman
 recaman_seq
+recant
 received
 recip
 reciprocal
@@ -19668,6 +19724,7 @@ rest_energy
 restenergy
 restore_random_state
 resultant
+resurrect
 retry
 return
 rev
@@ -19675,8 +19732,8 @@ rev_comp_dna
 rev_lines
 rev_str
 rev_vec
-revenue_equivalence_check
 reveal
+revenue_equivalence_check
 reverse
 reverse_complement_dna
 reverse_delete_step
@@ -20548,8 +20605,6 @@ slug
 slugify
 slurp
 slurp_raw
-swa
-swallow
 slutsky_decompose
 sma
 small_schroder
@@ -20557,6 +20612,7 @@ small_schroder_number
 smap
 smem
 smembers
+smite
 smith_normal_2x2_step
 smith_predictor_step
 smith_q
@@ -20564,6 +20620,7 @@ smith_waterman
 smith_waterman_score
 smmap
 smoothstep
+smother
 smst
 smt_qf_lia_solve_step
 smt_qf_uf_combine
@@ -21039,6 +21096,7 @@ svals
 sw
 sw_align
 sw_score
+swallow
 swamee_jain_factor
 swampland_distance_check
 swap_bits
@@ -21134,6 +21192,9 @@ tax_incidence
 taylor_diagram_score
 taylor_microscale_step
 taylor_window
+tb_alive
+tb_close
+tb_ping
 tbl
 tc
 tcp_banner
@@ -21535,6 +21596,7 @@ turn_permission
 turn_recv
 turn_refresh
 turn_send
+turnbuckle
 tvals
 tversky
 tversky_index
@@ -21570,13 +21632,13 @@ ucb1_choose
 ucfirst
 ucm_unobserved_components
 ud
-ue
 udp_close
 udp_open
 udp_recv
 udp_recv_from
 udp_send
 udp_send_to
+ue
 ugz
 uid
 uin
@@ -21596,7 +21658,6 @@ unfold
 unfoldr
 unfr
 unicode_codepoints
-unmark
 unicode_to_native
 unification_robinson
 union_find_components
@@ -21638,6 +21699,7 @@ unlns
 unlz4
 unlzma
 unlzw
+unmark
 unpack
 unpack1
 unpack_first
@@ -22012,6 +22074,7 @@ weekday_name
 weekday_name_short
 weekday_short
 weeks_between
+weep
 weibpdf
 weibull_pdf
 weierstrass_p
@@ -22030,6 +22093,7 @@ welch_psd_avg
 welch_ttest
 welch_window
 welcht
+welcome
 welford_mean
 welford_pop_variance
 welford_pvar
@@ -22337,61 +22401,3 @@ zstd_decode
 zstd_encode_step
 zstd_frame_header
 zstd_window_size_log
-amen
-CORE::amen
-anoint
-CORE::anoint
-annex
-CORE::annex
-apostatize
-CORE::apostatize
-bestow
-CORE::bestow
-bow
-CORE::bow
-cathedral
-CORE::cathedral
-chant
-CORE::chant
-cloister
-CORE::cloister
-congregation
-CORE::congregation
-divine
-CORE::divine
-enshrine
-CORE::enshrine
-excommunicate
-CORE::excommunicate
-exhume
-CORE::exhume
-harvest
-CORE::harvest
-interrogate
-CORE::interrogate
-lick
-CORE::lick
-martyr
-CORE::martyr
-muster
-CORE::muster
-ordain
-CORE::ordain
-peruse
-CORE::peruse
-pilgrimage
-CORE::pilgrimage
-pray
-CORE::pray
-profess
-CORE::profess
-recant
-CORE::recant
-resurrect
-CORE::resurrect
-smite
-CORE::smite
-smother
-CORE::smother
-welcome
-CORE::welcome
