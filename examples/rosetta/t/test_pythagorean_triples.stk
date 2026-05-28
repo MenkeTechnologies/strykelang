@@ -2,20 +2,18 @@
 # Rosetta Code: Pythagorean Triples
 
 fn Rosetta::IsSquare::is_square {
-    my $n = _
-    my $root = int($n ** 0.5)
-    $root * $root == $n
+    my $root = int(_ ** 0.5)
+    $root * $root == _
 }
 
 fn Rosetta::PythagoreanTriples::pythagorean_triples {
-    my $max = _
     my @triples
-    for my $a (1:$max) {
-        for my $b ($a:$max) {
+    for my $a (1:_) {
+        for my $b ($a:_) {
             my $c2 = $a*$a + $b*$b
             if (Rosetta::IsSquare::is_square($c2)) {
                 my $c = int($c2 ** 0.5)
-                if ($c <= $max) {
+                if ($c <= _) {
                     push @triples, "$a,$b,$c"
                 }
             }

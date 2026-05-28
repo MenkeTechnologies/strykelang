@@ -15,7 +15,7 @@ fn Rosetta::AlignColumns::solve($text, $align) {
             $widths{$col} = $w if $w > $widths{$col}
         }
     }
-    
+
     # Format lines
     ~> @lines map {
         my $row = _

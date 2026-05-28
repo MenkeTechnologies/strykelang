@@ -86,8 +86,7 @@ p "Initializing Quantum Neural Grid..."
 
 my @input_range = (1:100);
 my @grid_nodes = @input_range |> pmap {
-    my $id = _
-    my $node = NeuralQuantumLink(id => $id)
+    my $node = NeuralQuantumLink(id => _)
     for (1:5) {
         $node->add_qubit(Qubit(alpha => rand(), beta => rand()))
     }

@@ -8,8 +8,7 @@ fn Rosetta::ActiveObj::new() {
     my $state = { log => [], count => 0 }
     {
         add => fn {
-            my $item = _
-            push @{$state->{log}}, $item
+            push @{$state->{log}}, _
             $state->{count} += 1
             $state->{count}
         },

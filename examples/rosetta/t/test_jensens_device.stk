@@ -12,10 +12,7 @@ fn Rosetta::JensensDevice::sum($n, $term_func) {
 }
 
 # Example: Sum of i^2 for i=1..10
-my $sum_sq = Rosetta::JensensDevice::sum(10, fn {
-    my $i = _
-    $i * $i
-})
+my $sum_sq = Rosetta::JensensDevice::sum(10, fn { _ * _ })
 
 assert_eq $sum_sq, 385, "Sum of squares 1:10"
 

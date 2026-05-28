@@ -6,15 +6,14 @@ fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
     my %abbrevs
     
     @commands |> map {
-        my $cmd = _
         my $last_upper = -1
-        for (my $i = 0; $i < length($cmd); $i++) {
-            if (substr($cmd, $i, 1) =~ /[A-Z]/) {
+        for (my $i = 0; $i < length(_); $i++) {
+            if (substr(_, $i, 1) =~ /[A-Z]/) {
                 $last_upper = $i
             }
         }
-        
-        my $full = lc($cmd)
+
+        my $full = lc(_)
         my $min_len = $last_upper + 1
         
         if ($min_len == 0 && length($full) > 0) {

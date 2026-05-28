@@ -12,9 +12,8 @@ fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
         # Parallel update of positions? 
         # Using ~> map to simulate movement in parallel turns
         @horses = ~> @horses map {
-            my $h = _
-            $h->{pos} += int(rand(5)) + 1 # move 1-5 units
-            $h
+            _->{pos} += int(rand(5)) + 1 # move 1-5 units
+            _
         }
         
         # Check for winners

@@ -2,8 +2,7 @@
 # Rosetta Code: Middle three digits
 
 fn Rosetta::MiddleThreeDigits::middle_three_digits {
-    my $n = _
-    my $s = ~> $n abs >{ sprintf("%d", _) }
+    my $s = ~> _ abs >{ sprintf("%d", _) }
     my $len = length($s)
     
     if ($len < 3 || $len % 2 == 0) {
