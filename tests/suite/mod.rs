@@ -245,6 +245,7 @@ mod local_scope_pin;
 mod loop_control_pin;
 mod lsp_stdio_completion;
 mod lsp_words_filter_and_specials;
+mod main_namespace_perl_parity;
 mod main_pkg_aliasing;
 mod math_builtins_pin;
 mod misc_extensions;
