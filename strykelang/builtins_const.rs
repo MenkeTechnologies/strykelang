@@ -501,3 +501,223 @@ pub fn rt(args: &[StrykeValue]) -> StrykeValue {
         args.first().cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn approx(a: f64, b: f64, eps: f64) -> bool {
+        (a - b).abs() < eps
+    }
+
+    // ─── http_status_* ───────────────────────────────────────────────────
+
+    #[test]
+    fn http_status_macro_pins_canonical_codes() {
+        assert_eq!(http_status_ok(&[]).to_int(), 200);
+        assert_eq!(http_status_not_found(&[]).to_int(), 404);
+        assert_eq!(http_status_internal_server_error(&[]).to_int(), 500);
+        assert_eq!(http_status_im_a_teapot(&[]).to_int(), 418);
+        assert_eq!(http_status_too_many_requests(&[]).to_int(), 429);
+    }
+
+    #[test]
+    fn http_status_ignores_args() {
+        // _args is unused — passing junk must not crash and must return code.
+        assert_eq!(
+            http_status_ok(&[StrykeValue::string("ignored".into())]).to_int(),
+            200
+        );
+    }
+
+    // ─── http_method_* ───────────────────────────────────────────────────
+
+    #[test]
+    fn http_method_macro_emits_uppercase_verb() {
+        assert_eq!(http_method_get(&[]).to_string(), "GET");
+        assert_eq!(http_method_post(&[]).to_string(), "POST");
+        assert_eq!(http_method_delete(&[]).to_string(), "DELETE");
+        assert_eq!(http_method_options(&[]).to_string(), "OPTIONS");
+    }
+
+    // ─── dbeta / qbeta ───────────────────────────────────────────────────
+
+    #[test]
+    fn dbeta_uniform_special_case() {
+        // Beta(1,1) is Uniform(0,1) — pdf is 1.0 everywhere in (0,1).
+        let r = dbeta(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(1.0),
+            StrykeValue::float(1.0),
+        ]);
+        assert!(approx(r.to_number(), 1.0, 1e-9));
+    }
+
+    #[test]
+    fn dbeta_invalid_params_returns_undef() {
+        // Beta requires a,b > 0. Zero is invalid.
+        let r = dbeta(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(0.0),
+            StrykeValue::float(1.0),
+        ]);
+        assert!(r.is_undef());
+    }
+
+    #[test]
+    fn qbeta_median_of_uniform_is_half() {
+        let r = qbeta(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(1.0),
+            StrykeValue::float(1.0),
+        ]);
+        assert!(approx(r.to_number(), 0.5, 1e-9));
+    }
+
+    // ─── dexp / qexp ─────────────────────────────────────────────────────
+
+    #[test]
+    fn dexp_at_zero_equals_rate() {
+        // Exponential PDF at x=0: f(0) = lambda.
+        let r = dexp(&[StrykeValue::float(0.0), StrykeValue::float(2.0)]);
+        assert!(approx(r.to_number(), 2.0, 1e-9));
+    }
+
+    #[test]
+    fn qexp_quartile_relation() {
+        // Exp(1) quantile: F^{-1}(p) = -ln(1-p). p=0.5 → ln(2).
+        let r = qexp(&[StrykeValue::float(0.5), StrykeValue::float(1.0)]);
+        assert!(approx(r.to_number(), 2f64.ln(), 1e-9));
+    }
+
+    #[test]
+    fn dexp_negative_rate_returns_undef() {
+        let r = dexp(&[StrykeValue::float(1.0), StrykeValue::float(-1.0)]);
+        assert!(r.is_undef());
+    }
+
+    // ─── qnorm ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn qnorm_median_is_mean() {
+        // qnorm(0.5, mu, sigma) = mu for any sigma > 0.
+        let r = qnorm(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(7.0),
+            StrykeValue::float(3.0),
+        ]);
+        assert!(approx(r.to_number(), 7.0, 1e-9));
+    }
+
+    #[test]
+    fn qnorm_invalid_sigma_returns_undef() {
+        let r = qnorm(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(0.0),
+            StrykeValue::float(-1.0),
+        ]);
+        assert!(r.is_undef());
+    }
+
+    // ─── qunif / runif ───────────────────────────────────────────────────
+
+    #[test]
+    fn qunif_linear_in_p() {
+        // U[2,10] median = 6.
+        let r = qunif(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(2.0),
+            StrykeValue::float(10.0),
+        ]);
+        assert!(approx(r.to_number(), 6.0, 1e-9));
+    }
+
+    #[test]
+    fn runif_within_range() {
+        // 1000 samples must all fall in [lo, hi).
+        for _ in 0..1000 {
+            let r = runif(&[StrykeValue::float(-5.0), StrykeValue::float(5.0)]).to_number();
+            assert!((-5.0..5.0).contains(&r), "out of range: {r}");
+        }
+    }
+
+    // ─── qlogis ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn qlogis_median_returns_location() {
+        // Logistic median = loc.
+        let r = qlogis(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(4.0),
+            StrykeValue::float(2.0),
+        ]);
+        assert!(approx(r.to_number(), 4.0, 1e-6));
+    }
+
+    // ─── dlogis ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn dlogis_at_location_is_quarter_over_scale() {
+        // f(loc) = 1/(4*scale) for logistic distribution.
+        let r = dlogis(&[
+            StrykeValue::float(0.0),
+            StrykeValue::float(0.0),
+            StrykeValue::float(1.0),
+        ]);
+        assert!(approx(r.to_number(), 0.25, 1e-9));
+    }
+
+    // ─── dpois ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn dpois_k_zero_equals_exp_neg_lambda() {
+        // P(X=0) = e^{-lambda}.
+        let r = dpois(&[StrykeValue::float(0.0), StrykeValue::float(2.5)]);
+        assert!(approx(r.to_number(), (-2.5f64).exp(), 1e-9));
+    }
+
+    #[test]
+    fn dpois_invalid_lambda_returns_undef() {
+        let r = dpois(&[StrykeValue::float(0.0), StrykeValue::float(-1.0)]);
+        assert!(r.is_undef());
+    }
+
+    // ─── qgeom ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn qgeom_min_zero() {
+        // Quantile clamped to >= 0.
+        let r = qgeom(&[StrykeValue::float(0.0), StrykeValue::float(0.5)]);
+        assert!(r.to_int() >= 0);
+    }
+
+    // ─── qbinom ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn qbinom_median_balanced() {
+        // Binomial(n=10, p=0.5) median ≈ 5.
+        let r = qbinom(&[
+            StrykeValue::float(0.5),
+            StrykeValue::float(10.0),
+            StrykeValue::float(0.5),
+        ]);
+        let k = r.to_int();
+        assert!((4..=5).contains(&k), "expected 4 or 5, got {k}");
+    }
+
+    // ─── qchisq ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn qchisq_invalid_df_returns_undef() {
+        let r = qchisq(&[StrykeValue::float(0.5), StrykeValue::float(0.0)]);
+        assert!(r.is_undef());
+    }
+
+    // ─── arg_f64 ────────────────────────────────────────────────────────
+
+    #[test]
+    fn arg_f64_missing_index_returns_none() {
+        assert!(arg_f64(&[], 0).is_none());
+        assert!(arg_f64(&[StrykeValue::float(1.0)], 5).is_none());
+    }
+}
