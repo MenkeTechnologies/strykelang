@@ -110,7 +110,7 @@
       <div style="margin:1.2rem 0;">
         <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 465,930 lines</p>
         <div class="bar-wrap" style="height:26px;">
-          <div class="bar-fill cyan" style="width:72.0%;"></div>
+          <div class="bar-fill cyan" style="width:75.4%;"></div>
           <span class="bar-pct" style="font-size:12px;">351,333 strykelang / 109,133 tests / 5,464 tooling &middot; 75.4% strykelang</span>
         </div>
         <p style="font-size:10px;color:var(--text-muted);margin-top:4px;">Production: 197 files across <code>strykelang/</code> (including <code>strykelang/pkg/</code> + <code>strykelang/bins/</code>) excluding <code>*_tests.rs</code>. Tests: 20 inline <code>*_tests.rs</code> modules in <code>strykelang/</code> + 358 integration modules in <code>tests/</code>. Tooling: <code>build.rs</code> + <code>benches/</code> + <code>fuzz/</code>.</p>
@@ -276,7 +276,7 @@
           <tr><td style="color:var(--accent);">CLI &amp; REPL</td><td><code>main, repl, cli_runners, getopts</code></td><td class="num">8,943</td><td class="num">2.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:2.0%"></div></div></td><td>CLI entry: argv parsing, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), reedline-based REPL with utop-style menu, columnar completion, history; subcommand runners and Getopt::Long-compatible flag parser</td></tr>
           <tr><td style="color:var(--accent);">JIT</td><td><code>jit</code></td><td class="num">5,174</td><td class="num">1.2%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.2%"></div></div></td><td>Cranelift block-level JIT: hot-path detection, native code emission for tight numeric loops, deoptimization stubs back to bytecode VM</td></tr>
           <tr><td style="color:var(--accent);">Format / Deparse</td><td><code>fmt, deparse, format, minify</code></td><td class="num">4,781</td><td class="num">1.1%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.1%"></div></div></td><td><code>perltidy</code>-compatible code formatter, AST&rarr;source deparser (<code>B::Deparse</code> equivalent), Perl <code>format</code>/<code>write</code> system, source minifier</td></tr>
-          <tr><td style="color:var(--accent);">Parallel Runtime</td><td><code>par_lines, par_list, par_pipeline, par_walk, ppool, pchannel, pwatch, pmap_progress, parallel_trace, stress, builtins_sync</code></td><td class="num">4,393</td><td class="num">1.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.0%"></div></div></td><td>Rayon work-stealing: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>, parallel file walking, async pipelines, progress tracking, channels, stress-testing primitives (<code>heat</code>, <code>fire</code>). Blocking sync primitives backed by <code>parking_lot::Mutex</code> + <code>Condvar</code>: <code>mutex</code> / <code>mutex_lock</code> / <code>mutex_try_lock</code>, <code>semaphore</code> / <code>sem_acquire</code> / <code>sem_release</code> / <code>sem_try_acquire</code>; cross-process <code>flock($fh, OP)</code> for advisory file locks (POSIX <code>flock(2)</code>).</td></tr>
+          <tr><td style="color:var(--accent);">Parallel Runtime</td><td><code>par_lines, par_list, par_pipeline, par_walk, ppool, pchannel, pwatch, pmap_progress, parallel_trace, stress, builtins_sync</code></td><td class="num">4,803</td><td class="num">1.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.0%"></div></div></td><td>Rayon work-stealing: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>, parallel file walking, async pipelines, progress tracking, channels, stress-testing primitives (<code>heat</code>, <code>fire</code>). Blocking sync primitives backed by <code>parking_lot::Mutex</code> + <code>Condvar</code>: <code>mutex</code> / <code>mutex_lock</code> / <code>mutex_try_lock</code>, <code>semaphore</code> / <code>sem_acquire</code> / <code>sem_release</code> / <code>sem_try_acquire</code>; cross-process <code>flock($fh, OP)</code> for advisory file locks (POSIX <code>flock(2)</code>).</td></tr>
           <tr><td style="color:var(--accent);">Perl Compat</td><td><code>perl_decode, perl_fs, perl_inc, perl_regex, perl_signal, perl_pty, special_vars, english</code></td><td class="num">3,667</td><td class="num">0.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.8%"></div></div></td><td><code>@INC</code>, <code>%ENV</code>, <code>%SIG</code>, file ops, Perl regex engine, signal handling, PTY support, magic special variables, <code>use English</code></td></tr>
           <tr><td style="color:var(--accent);">Lexer</td><td><code>lexer</code></td><td class="num">4,122</td><td class="num">0.9%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.9%"></div></div></td><td>Tokenizer for Perl 5 + stryke extensions: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, Unicode identifiers, sigil disambiguation</td></tr>
           <tr><td style="color:var(--accent);">Misc / Error</td><td><code>error, mro, lib, bench_fusion, fib_like_tail, pending_destroy, kvstore, banner, doc_render, docs, bins/{gen_docs,s,st}, serialize_normalize, parse_smoke_*, run_semantics_more</code></td><td class="num">5,868</td><td class="num">1.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:1.3%"></div></div></td><td>Rich error reporter, MRO (C3 / DFS), library entry, fusion-pass optimizers, finalizer queue, key-value store, banner, doc generator + renderer, thin bin shims, smoke tests</td></tr>
@@ -300,13 +300,13 @@
       <table class="file-table">
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
         <tbody>
-          <tr><td>strykelang/builtins.rs</td><td class="num">43,749</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 10,431 builtins in %b (11,159 keys in %all)</td></tr>
+          <tr><td>strykelang/builtins.rs</td><td class="num">43,763</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 10,431 builtins in %b (11,159 keys in %all)</td></tr>
           <tr><td>strykelang/math_wolfram*.rs</td><td class="num">58,672</td><td>82 batch files (math_wolfram, math_wolfram2&hellip;82) <code>include!</code>'d into builtins.rs: 4,643 fns spanning Wolfram-class math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, calendrical, astronomy, BLAS/LAPACK, sabermetrics, Excel/financial, GIS, robotics/control, actuarial, epidemiology, archive/encoding, music theory, geology, logic/SAT/SMT, compilers/parsing, linguistics, Postgres SQL/JSON, Redis, scipy.special, economics/game theory</td></tr>
           <tr><td>strykelang/vm_helper.rs</td><td class="num">22,424</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks (used by both <code>-d</code> TTY REPL and <code>--dap</code> server), special-variable handling, reflection-hash population, package-stash refresh</td></tr>
-          <tr><td>strykelang/parser.rs</td><td class="num">22,402</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
+          <tr><td>strykelang/parser.rs</td><td class="num">22,641</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
           <tr><td>strykelang/builtins_extended.rs</td><td class="num">12,643</td><td>Extended builtins: crypto, JWT, codecs (JSON/YAML/TOML/CSV/MsgPack), HTTP, email, QR, compression</td></tr>
-          <tr><td>strykelang/vm.rs</td><td class="num">10,691</td><td>Bytecode VM: register+stack hybrid, 347 opcodes, hot-path detection, exception unwinder, debugger <code>should_stop</code> hook on every op</td></tr>
-          <tr><td>strykelang/compiler.rs</td><td class="num">9,848</td><td>AST&rarr;bytecode: constant folding, register allocation, peephole optimization, basic-block formation</td></tr>
+          <tr><td>strykelang/vm.rs</td><td class="num">10,858</td><td>Bytecode VM: register+stack hybrid, 347 opcodes, hot-path detection, exception unwinder, debugger <code>should_stop</code> hook on every op</td></tr>
+          <tr><td>strykelang/compiler.rs</td><td class="num">9,894</td><td>AST&rarr;bytecode: constant folding, register allocation, peephole optimization, basic-block formation</td></tr>
           <tr><td>tests/suite/fix_regressions.rs</td><td class="num">7,654</td><td>Regression test suite &mdash; one test per fixed bug; pin behaviors so refactors can&rsquo;t silently re-break</td></tr>
           <tr><td>strykelang/lsp.rs</td><td class="num">12,094</td><td>LSP server core — hover, completion (hash-key from builtin schemas, type/enum/constant/loop-label categories, qualified-suffix insertText, parse-error recovery, <code>{</code> trigger), diagnostics, semantic tokens, signature help, code actions (Extract V/C/P/M, caret-only, inside-string aware), goto/refs/rename (package-aware, AST-only field rename, defensive <code>::</code>-strip on newName, cross-file via require graph), document symbols. Hover suppressed inside string literals.</td></tr>
           <tr><td>strykelang/static_analysis.rs</td><td class="num">2,850</td><td>Linter / strict-vars: OOP-aware <code>$self-&gt;X</code>/<code>$obj-&gt;X</code> checks walking <code>extends + impl</code> chains, universal-method whitelist (isa/can/clone/with/to_hash/...), constructor key validation with parent fields, match-arm enum-variant typo detection, positional vs keyed constructor auto-detect, exemptions for Perl special vars (<code>$^X</code>-family, <code>$$</code>, <code>$#arr</code>), AOP intercept context, block-param grammar, open-my-fh declarations, exists(&amp;sub) introspection, _thread_par_run parser-emitted calls. Cross-file <code>require</code> resolution walks up to project root (sibling <code>lib/</code> detection).</td></tr>
@@ -317,10 +317,10 @@
           <tr><td>strykelang/crate_api_tests.rs</td><td class="num">5,164</td><td>Public crate-API test suite: validates the embeddable interface (<code>stryke::eval</code>, <code>VMHelper</code>, ...)</td></tr>
           <tr><td>strykelang/main.rs</td><td class="num">5,461</td><td>CLI: argv, script loading, one-liner mode (<code>-e</code>/<code>-E</code>/<code>-n</code>/<code>-p</code>), shebang dispatch, builtin-as-command, <code>--lsp</code> / <code>--dap</code> / <code>-d</code> dispatch</td></tr>
           <tr><td>strykelang/value.rs</td><td class="num">5,050</td><td><code>StrykeValue</code>: NaN-boxed union, conversions, stringify / numify, magic context handling</td></tr>
-          <tr><td>strykelang/lexer.rs</td><td class="num">4,122</td><td>Tokenizer: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, sigil disambiguation</td></tr>
+          <tr><td>strykelang/lexer.rs</td><td class="num">4,187</td><td>Tokenizer: heredocs, regex literals, <code>q/qq/qw/qr</code>, string interpolation, sigil disambiguation</td></tr>
           <tr><td>strykelang/web.rs</td><td class="num">3,567</td><td>Web framework: route DSL, controllers, sessions, cookies, flash, multipart parsing, static / template rendering</td></tr>
           <tr><td>strykelang/native_codec.rs</td><td class="num">3,602</td><td>Built-in JSON / YAML / TOML / CSV / MessagePack encode-decode</td></tr>
-          <tr><td>strykelang/scope.rs</td><td class="num">3,230</td><td>Lexical scoping: pad slots, closures, <code>my</code>/<code>local</code>/<code>our</code>/<code>oursync</code>, <code>BEGIN</code>/<code>END</code>/<code>INIT</code>/<code>CHECK</code></td></tr>
+          <tr><td>strykelang/scope.rs</td><td class="num">3,270</td><td>Lexical scoping: pad slots, closures, <code>my</code>/<code>local</code>/<code>our</code>/<code>oursync</code>, <code>BEGIN</code>/<code>END</code>/<code>INIT</code>/<code>CHECK</code></td></tr>
           <tr><td>strykelang/bytecode.rs</td><td class="num">2,474</td><td>Opcode definitions (347 variants), instruction encoding, disassembler</td></tr>
         </tbody>
                 <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOP 20 SUBTOTAL</td><td class="num">198,224</td><td>42.8% of 465,930-line Rust slice</td></tr></tfoot>
@@ -340,7 +340,7 @@
        ▼
   ┌─────────────┐     ┌─────────────┐     ┌──────────────┐
   │  lexer.rs   │────▶│  parser.rs  │────▶│ compiler.rs  │
-  │  (3,768)    │     │  (20,428)   │     │  (9,550)     │
+  │  (4,187)    │     │  (22,641)   │     │  (9,894)     │
   │  Tokenizer  │     │  AST node   │     │  347 opcodes │
   │  heredocs   │     │  variants   │     │  const fold  │
   │  regex lit  │     │  prec climb │     │  reg alloc   │
@@ -352,7 +352,7 @@
                               ▼                    ▼
                      ┌──────────────┐     ┌──────────────┐
                      │    vm.rs     │     │   jit.rs     │
-                     │   (10,516)   │     │  (5,174)     │
+                     │   (10,858)   │     │  (5,174)     │
                      │  Bytecode VM │     │  Cranelift   │
                      │  reg + stack │     │  block JIT   │
                      │  hot detect  │────▶│  native code │
@@ -362,20 +362,20 @@
                             ▼
                   ┌───────────────────┐
                   │   builtins.rs     │
-                  │   (39,754)        │
+                  │   (43,763)        │
                   │   10,431 builtins  │
                   │   11,159 spellings │
                   │   + extended      │
-                  │   (12,642)        │
+                  │   (12,643)        │
                   │   + math_wolfram* │
-                  │   (58,669 / 82 f) │
+                  │   (58,672 / 82 f) │
                   └─────────┬─────────┘
                             │
            ┌────────────────┼─────────────────┐
            │                │                 │
     ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐
     │  value.rs   │  │  scope.rs   │  │  parallel   │
-    │  (4,547)    │  │  (3,085)    │  │  (4,212)    │
+    │  (5,050)    │  │  (3,270)    │  │  (4,803)    │
     │  NaN-boxed  │  │  my/local/  │  │  pmap/pgrep │
     │  StrykeValue  │  │  oursync    │  │  rayon work │
     └─────────────┘  └─────────────┘  └─────────────┘</pre>
@@ -488,7 +488,7 @@
       <!-- SECTION 8: PARALLEL RUNTIME             -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">%</span>PARALLEL RUNTIME</h2>
-      <p class="tutorial-subtitle">11 modules listed below sum to 2,843 lines; the full parallel subsystem (helpers + <code>stress.rs</code> + orchestration) is 4,212 lines in the roll-up table. Every parallel builtin is a streaming iterator under the hood: <code>pmap</code>, <code>pgrep</code>, and <code>pflat_map</code> produce lazy results that flow into pipe-forward chains without materializing intermediate vectors. <code>builtins_sync.rs</code> adds blocking mutex + counting semaphore primitives backed by <code>parking_lot::Mutex</code> + <code>Condvar</code> for cases where lockless <code>mysync</code> isn't enough (compound multi-statement critical sections, bounded-concurrency throttles).</p>
+      <p class="tutorial-subtitle">11 modules listed below sum to 2,968 lines; the full parallel subsystem (helpers + <code>stress.rs</code> + orchestration) is 4,803 lines in the roll-up table. Every parallel builtin is a streaming iterator under the hood: <code>pmap</code>, <code>pgrep</code>, and <code>pflat_map</code> produce lazy results that flow into pipe-forward chains without materializing intermediate vectors. <code>builtins_sync.rs</code> adds blocking mutex + counting semaphore primitives backed by <code>parking_lot::Mutex</code> + <code>Condvar</code> for cases where lockless <code>mysync</code> isn't enough (compound multi-statement critical sections, bounded-concurrency throttles).</p>
 
       <table class="file-table">
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
@@ -496,16 +496,16 @@
           <tr><td>pmap_progress.rs</td><td class="num">755</td><td>Progress reporting for long-running parallel maps; ETA estimation; cancellation tokens</td></tr>
           <tr><td>par_pipeline.rs</td><td class="num">642</td><td>Multi-stage parallel pipelines: stage fusion, cross-stage work-stealing</td></tr>
           <tr><td>ppool.rs</td><td class="num">265</td><td>Worker pool wrapper around rayon: thread-count tuning, panic isolation</td></tr>
-          <tr><td>pchannel.rs</td><td class="num">247</td><td>Bounded MPMC channels for cross-stage handoff in <code>par_pipeline</code></td></tr>
-          <tr><td>par_list.rs</td><td class="num">229</td><td>Parallel list operations: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code> on plain arrays</td></tr>
-          <tr><td>pwatch.rs</td><td class="num">218</td><td>Filesystem-watcher integration: parallel reload on file change</td></tr>
-          <tr><td>builtins_sync.rs</td><td class="num">177</td><td>Blocking sync primitives: <code>mutex()</code> / <code>mutex_lock</code> / <code>mutex_unlock</code> / <code>mutex_try_lock</code> / <code>mutex_is_locked</code>; <code>semaphore($n)</code> / <code>sem_acquire</code> / <code>sem_release</code> / <code>sem_try_acquire</code> / <code>sem_permits</code> / <code>sem_limit</code>. <code>parking_lot::Mutex</code> + <code>Condvar</code> — no busy-wait. Cross-process locking via the Perl-compat <code>flock($fh, OP)</code> builtin in <code>builtins.rs:39185</code>.</td></tr>
+          <tr><td>pchannel.rs</td><td class="num">251</td><td>Bounded MPMC channels for cross-stage handoff in <code>par_pipeline</code></td></tr>
+          <tr><td>par_list.rs</td><td class="num">232</td><td>Parallel list operations: <code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code> on plain arrays</td></tr>
+          <tr><td>pwatch.rs</td><td class="num">205</td><td>Filesystem-watcher integration: parallel reload on file change</td></tr>
+          <tr><td>builtins_sync.rs</td><td class="num">306</td><td>Blocking sync primitives: <code>mutex()</code> / <code>mutex_lock</code> / <code>mutex_unlock</code> / <code>mutex_try_lock</code> / <code>mutex_is_locked</code>; <code>semaphore($n)</code> / <code>sem_acquire</code> / <code>sem_release</code> / <code>sem_try_acquire</code> / <code>sem_permits</code> / <code>sem_limit</code>. <code>parking_lot::Mutex</code> + <code>Condvar</code> — no busy-wait. Cross-process locking via the Perl-compat <code>flock($fh, OP)</code> builtin in <code>builtins.rs:39185</code>.</td></tr>
           <tr><td>par_lines.rs</td><td class="num">144</td><td>Parallel line-oriented file processing: chunked reads, line-boundary recovery</td></tr>
           <tr><td>par_walk.rs</td><td class="num">69</td><td>Parallel filesystem walking: <code>walk</code>, <code>fr</code> (file rec), parallel <code>find</code></td></tr>
           <tr><td>parallel_trace.rs</td><td class="num">61</td><td>Tracer that records work-steal events for debugging contention</td></tr>
           <tr><td>pcache.rs</td><td class="num">38</td><td>Per-worker thread-local result cache; avoids cross-thread coordination on hot reads</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">PARALLEL TOTAL</td><td class="num">2,843</td><td>11 modules</td></tr></tfoot>
+        <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">PARALLEL TOTAL</td><td class="num">2,968</td><td>11 modules</td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
