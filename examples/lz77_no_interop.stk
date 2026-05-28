@@ -1,0 +1,79 @@
+#!/usr/bin/env stryke
+
+# lz77_no_interop.stk — Lempel-Ziv 77 Compression.
+#
+# Implements sliding window compression.
+#
+# Run: stryke --no-interop examples/lz77_no_interop.stk
+
+package LZ77
+
+fn compress($text, $window_size, $lookahead_size) {
+    my $n = len $text
+    my @compressed
+    my $i = 0
+    
+    while ($i < $n) {
+        my $match_dist = 0
+        my $match_len = 0
+        
+        my $start_window = $i > $window_size ? $i - $window_size : 0
+        
+        for (my $j = $start_window; $j < $i; $j++) {
+            my $l = 0
+            while ($l < $lookahead_size && $i + $l < $n && $text[$j + $l] eq $text[$i + $l]) {
+                $l++
+            }
+            if ($l > $match_len) {
+                $match_len = $l
+                $match_dist = $i - $j
+            }
+        }
+        
+        my $next_char = ""
+        if ($i + $match_len < $n) {
+            $next_char = $text[$i + $match_len]
+        }
+        
+        push @compressed, [$match_dist, $match_len, $next_char]
+        $i += $match_len + 1
+    }
+    
+    \@compressed
+}
+
+fn decompress($compressed) {
+    my $text = ""
+    for my $token (@$compressed) {
+        my $dist = $token->[0]
+        my $length = $token->[1]
+        my $next_char = $token->[2]
+        
+        if ($length > 0) {
+            my $start = (len $text) - $dist
+            for (my $i = 0; $i < $length; $i++) {
+                $text = $text . $text[$start + $i]
+            }
+        }
+        $text = $text . $next_char
+    }
+    $text
+}
+
+package main
+
+p "── LZ77 Compression Demo ──"
+my $msg = "ABRACADABRAABRACADABRA"
+p "Original: #{$msg}"
+
+my $comp = LZ77::compress($msg, 12, 10)
+p "\nCompressed Tokens:"
+for my $t (@$comp) {
+    p "  <#{$t->[0]}, #{$t->[1]}, '#{$t->[2]}'>"
+}
+
+my $decomp = LZ77::decompress($comp)
+p "\nDecompressed: #{$decomp}"
+p "Matches: #{$msg eq $decomp ? 'YES' : 'NO'}"
+
+p "Done."

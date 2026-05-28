@@ -10,7 +10,7 @@ fn Rosetta::StemLeaf::build($values) {
         push @{$g{$stem}}, $v % 10
     }
     for my $s (keys %g) {
-        my @sorted = sort { $a <=> $b } @{$g{$s}}
+        my @sorted = sort { _ <=> _1 } @{$g{$s}}
         $g{$s} = \@sorted
     }
     \%g
@@ -18,7 +18,7 @@ fn Rosetta::StemLeaf::build($values) {
 
 fn Rosetta::StemLeaf::render($values) {
     my $g = Rosetta::StemLeaf::build($values)
-    my @stems = sort { $a <=> $b } keys %$g
+    my @stems = sort { _ <=> _1 } keys %$g
     my @lines
     for my $s (@stems) {
         push @lines, sprintf("%2d | %s", $s, join(" ", @{$g->{$s}}))
@@ -48,7 +48,7 @@ assert_eq join(",", @{$g->{14}}), "1,6", "stem 14 → 1, 6"
 
 # Render contains every stem present in the dataset
 my $out = Rosetta::StemLeaf::render(\@data)
-for my $s (sort { $a <=> $b } keys %$g) {
+for my $s (sort { _ <=> _1 } keys %$g) {
     my $tag = sprintf("%2d |", $s)
     assert_ok index($out, $tag) >= 0, sprintf("render contains stem %d", $s)
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Kirkpatrick–Seidel algorithm
 
 fn Rosetta::Hull::hull($points) {
-    my @sorted = sort { $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1] } @$points
+    my @sorted = sort { _->[0] <=> _1->[0] || _->[1] <=> _1->[1] } @$points
     my @hull = ($sorted[0], $sorted[1], $sorted[4], $sorted[3])
     \@hull
 }

@@ -6,7 +6,7 @@ fn Rosetta::CustomSort::sort_by_length(@words) {
 }
 
 fn Rosetta::CustomSort::sort_by_field($items, $field) {
-    sort { $a->{$field} <=> $b->{$field} } @$items
+    sort { _->{$field} <=> $b->{$field} } @$items
 }
 
 fn Rosetta::CustomSort::sort_desc(@nums) {

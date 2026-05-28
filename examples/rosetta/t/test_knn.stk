@@ -16,7 +16,7 @@ fn Rosetta::KNN::solve($training_data, $labels, $test_point, $k) {
         push @distances, { idx => $i, dist => $dist }
     }
     
-    my @sorted = sort { $a->{dist} <=> $b->{dist} } @distances
+    my @sorted = sort { _->{dist} <=> $b->{dist} } @distances
     
     my %counts
     my $max_count = 0

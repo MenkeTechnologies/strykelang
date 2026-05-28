@@ -11,7 +11,7 @@ fn Rosetta::VideoModes::modes() {
 }
 
 fn Rosetta::VideoModes::best($modes) {
-    my @sorted = sort { ($b->{width} * $b->{height}) <=> ($a->{width} * $a->{height}) || $b->{refresh} <=> $a->{refresh} } @$modes
+    my @sorted = sort { (_1->{width} * _1->{height}) <=> (_->{width} * _->{height}) || _1->{refresh} <=> _->{refresh} } @$modes
     $sorted[0]
 }
 

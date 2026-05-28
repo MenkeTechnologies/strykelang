@@ -1,0 +1,64 @@
+#!/usr/bin/env stryke
+
+package PageRank
+
+fn solve($nodes, $edges, $d, $iterations) {
+    my $n = len @$nodes
+    return {} if $n == 0
+    
+    my %pr
+    my $initial_pr = 1.0 / $n
+    for my $node (@$nodes) { $pr{$node} = $initial_pr }
+    
+    my %out_degree
+    for my $node (@$nodes) { $out_degree{$node} = 0 }
+    
+    my %incoming
+    for my $node (@$nodes) { $incoming{$node} = [] }
+    
+    for my $edge (@$edges) {
+        my $u = $edge->[0]; my $v = $edge->[1]
+        $out_degree{$u}++
+        push @{$incoming{$v}}, $u
+    }
+    
+    my @sink_nodes
+    for my $node (@$nodes) {
+        if ($out_degree{$node} == 0) { push @sink_nodes, $node }
+    }
+    
+    for (my $iter = 0; $iter < $iterations; $iter++) {
+        my %new_pr
+        my $sink_pr = 0.0
+        for my $sink (@sink_nodes) { $sink_pr += $pr{$sink} }
+        
+        for my $node (@$nodes) {
+            my $sum = 0.0
+            my $inc = $incoming{$node}
+            for my $in_node (@$inc) { $sum += $pr{$in_node} / $out_degree{$in_node} }
+            $sum += $sink_pr / $n
+            $new_pr{$node} = (1.0 - $d) / $n + $d * $sum
+        }
+        
+        for my $node (@$nodes) { $pr{$node} = $new_pr{$node} }
+    }
+    
+    \%pr
+}
+
+package main
+
+my @nodes = ("A", "B", "C")
+my @edges = ( ["A", "B"], ["B", "C"], ["C", "A"] )
+
+my $pr = PageRank::solve(\@nodes, \@edges, 0.85, 50)
+~> abs($pr->{"A"} - 0.3333) <(1e-3) aeq(1, "A has ~1/3 PR")
+~> abs($pr->{"B"} - 0.3333) <(1e-3) aeq(1, "B has ~1/3 PR")
+~> abs($pr->{"C"} - 0.3333) <(1e-3) aeq(1, "C has ~1/3 PR")
+
+my @nodes2 = ("A", "B")
+my @edges2 = ( ["A", "B"] )
+my $pr2 = PageRank::solve(\@nodes2, \@edges2, 0.85, 50)
+~> $pr2->{"B"} >($pr2->{"A"}) aeq(1, "B has higher PR than A")
+
+test_run

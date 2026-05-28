@@ -30,7 +30,7 @@ spurt "$root/README.md",          "# demo\n"
 
 # One read — every .rs file under the tree, raw bytes, abs paths as keys.
 my %src = swallow "$root/**/*.rs"
-p "loaded #{scalar keys %src} .rs files into memory"
+p "loaded #{len keys %src} .rs files into memory"
 
 # ── Aggregations over the in-memory hash ──────────────────────────
 
@@ -48,7 +48,7 @@ for my $path (keys %src) {
 
     $total_bytes += $sz
     $total_lines += $lines
-    $total_fns   += scalar @fns
+    $total_fns   += len @fns
 
     if ($sz > $biggest_size) {
         $biggest_size = $sz
@@ -57,7 +57,7 @@ for my $path (keys %src) {
 }
 
 p ""
-p "files       : ", scalar keys %src
+p "files       : ", len keys %src
 p "bytes       : $total_bytes"
 p "lines       : $total_lines"
 p "fn defs     : $total_fns"
@@ -67,14 +67,14 @@ p "biggest     : $biggest_path  ($biggest_size bytes)"
 # `(L+50)` selects files larger than 50 bytes — qualifier work happens
 # in zsh::glob before any bytes are read.
 my %big = swallow "$root/**/*.rs(L+50)"
-p "\n>50-byte files (qualifier-filtered at glob stage): ", scalar keys %big
+p "\n>50-byte files (qualifier-filtered at glob stage): ", len keys %big
 
 # Cleanup
 system "rm", "-rf", $root
 
 # ── Tests ──────────────────────────────────────────────────────────
 
-scalar(keys %src) == 4          |> aok "all 4 .rs files loaded"
+len(keys %src) == 4          |> aok "all 4 .rs files loaded"
 $total_fns >= 3                  |> aok "found fn defs across files"
 $biggest_size > 0                |> aok "biggest size computed"
 

@@ -44,7 +44,7 @@ assert_eq Rosetta::FourRings::count(0, 9, 0),  2860, "non-unique 0:9"
 my $u = ~> 1 fn { Rosetta::FourRings::count(_, 7, 1) }
 assert_eq $u, 8, "threaded unique 1:7"
 
-# Symmetry check: solutions come in pairs (reverse the chain)
+# Symmetry check: solutions come in pairs (rev the chain)
 # so the count for unique 1..7 should be even.
 assert_eq Rosetta::FourRings::count(1, 7, 1) % 2, 0, "unique solutions are paired"
 

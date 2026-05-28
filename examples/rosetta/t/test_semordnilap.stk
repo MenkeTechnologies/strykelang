@@ -4,7 +4,7 @@
 # Both must appear in the supplied dictionary.
 
 fn Rosetta::Semord::reverse_str($s) {
-    join("", reverse split //, $s)
+    join("", rev split //, $s)
 }
 
 fn Rosetta::Semord::pairs($words) {

@@ -2,7 +2,7 @@
 # Rosetta Code: Rosetta Code/Rank languages by number of users
 
 fn Rosetta::RankUsers::rank($rows) {
-    my @sorted = sort { $b->{users} <=> $a->{users} || $a->{language} cmp $b->{language} } @$rows
+    my @sorted = sort { _1->{users} <=> _->{users} || _->{language} cmp _1->{language} } @$rows
     \@sorted
 }
 

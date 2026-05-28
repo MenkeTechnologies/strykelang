@@ -25,7 +25,7 @@ fn Rosetta::BitmapHistogram::demo() {
     
     "Bitmap Histogram (Color Counts):" |> p
     "Red channel counts:" |> p
-    for my $val (sort { $a <=> $b } keys %{$h->{r}}) {
+    for my $val (sort { _ <=> _1 } keys %{$h->{r}}) {
         p "  $val: " . $h->{r}->{$val}
     }
     

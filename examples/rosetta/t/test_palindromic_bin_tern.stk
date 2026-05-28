@@ -16,7 +16,7 @@ fn Rosetta::PalBinTer::base($n, $b) {
 }
 
 fn Rosetta::PalBinTer::is_pal($s) {
-    $s eq scalar reverse($s)
+    $s eq rev($s)
 }
 
 fn Rosetta::PalBinTer::is($n) {

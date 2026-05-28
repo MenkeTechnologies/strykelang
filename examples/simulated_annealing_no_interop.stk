@@ -1,0 +1,102 @@
+#!/usr/bin/env stryke
+
+# simulated_annealing_no_interop.stk — Simulated Annealing for TSP.
+#
+# Solves the Traveling Salesperson Problem (TSP) using a probabilistic
+# optimization algorithm inspired by the annealing process in metallurgy.
+#
+# Run: stryke --no-interop examples/simulated_annealing_no_interop.stk
+
+package SimulatedAnnealing
+
+fn distance($city1, $city2) {
+    my $dx = $city1->{x} - $city2->{x}
+    my $dy = $city1->{y} - $city2->{y}
+    sqrt($dx * $dx + $dy * $dy)
+}
+
+fn tour_distance($tour, $cities) {
+    my $dist = 0.0
+    my $n = len @$tour
+    for (my $i = 0; $i < $n; $i++) {
+        my $c1 = $cities->[$tour->[$i]]
+        my $next_idx = ($i + 1) % $n
+        my $c2 = $cities->[$tour->[$next_idx]]
+        $dist += SimulatedAnnealing::distance($c1, $c2)
+    }
+    $dist
+}
+
+fn solve($cities, $init_temp, $cooling_rate, $iterations) {
+    my $n = len @$cities
+    return [] if $n == 0
+    
+    my @current_tour
+    for my $i (0 : $n - 1) { push @current_tour, $i }
+    my $current_dist = SimulatedAnnealing::tour_distance(\@current_tour, $cities)
+    
+    my @best_tour = @current_tour
+    my $best_dist = $current_dist
+    
+    my $temp = $init_temp
+    
+    for (my $iter = 0; $iter < $iterations; $iter++) {
+        # Propose a new tour by swapping two random cities
+        my $idx1 = int(rand($n))
+        my $idx2 = int(rand($n))
+        while ($idx1 == $idx2) {
+            $idx2 = int(rand($n))
+        }
+        
+        my @new_tour = @current_tour
+        my $tmp = $new_tour[$idx1]
+        $new_tour[$idx1] = $new_tour[$idx2]
+        $new_tour[$idx2] = $tmp
+        
+        my $new_dist = SimulatedAnnealing::tour_distance(\@new_tour, $cities)
+        
+        # Decide whether to accept the new tour
+        if ($new_dist < $current_dist) {
+            @current_tour = @new_tour
+            $current_dist = $new_dist
+            if ($new_dist < $best_dist) {
+                @best_tour = @new_tour
+                $best_dist = $new_dist
+            }
+        } else {
+            my $acceptance_prob = exp(-($new_dist - $current_dist) / $temp)
+            if (rand(1.0) < $acceptance_prob) {
+                @current_tour = @new_tour
+                $current_dist = $new_dist
+            }
+        }
+        
+        $temp = $temp * $cooling_rate
+    }
+    
+    { tour => \@best_tour, distance => $best_dist }
+}
+
+package main
+
+p "── Simulated Annealing (TSP) Demo ──"
+srand(42)
+
+my @cities = (
+    { x => 0.0,  y => 0.0 },
+    { x => 10.0, y => 0.0 },
+    { x => 10.0, y => 10.0 },
+    { x => 0.0,  y => 10.0 },
+    { x => 5.0,  y => 5.0 }
+)
+
+p "Cities:"
+for my $i (0 : (len @cities) - 1) {
+    p "  #{$i}: (#{$cities[$i]->{x}}, #{$cities[$i]->{y}})"
+}
+
+my $res = SimulatedAnnealing::solve(\@cities, 1000.0, 0.99, 10000)
+
+p "\nBest Tour Found: #{join ' -> ', @{$res->{tour}}}"
+p "Total Distance:  #{sprintf '%.2f', $res->{distance}}"
+p "Done."

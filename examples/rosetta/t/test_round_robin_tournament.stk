@@ -53,7 +53,7 @@ my %pair_seen
 my $unique = 1
 for my $round (@$sched4) {
     for my $g (@$round) {
-        my @sorted = sort { $a <=> $b } ($g->[0], $g->[1])
+        my @sorted = sort { _ <=> _1 } ($g->[0], $g->[1])
         my $key = "$sorted[0]-$sorted[1]"
         $unique = 0 if exists $pair_seen{$key}
         $pair_seen{$key} = 1

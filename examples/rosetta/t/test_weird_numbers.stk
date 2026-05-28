@@ -15,7 +15,7 @@ fn Rosetta::Weird::proper_divisors($n) {
         }
         $i++
     }
-    sort { $a <=> $b } @d
+    sort { _ <=> _1 } @d
 }
 
 fn Rosetta::Weird::sum_subset_to($target, $divisors) {

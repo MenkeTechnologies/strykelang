@@ -25,7 +25,7 @@ my $timeout_ms = 250
 my @targets
 
 my $i = 0
-while ($i < scalar(@ARGV)) {
+while ($i < len(@ARGV)) {
     my $arg = $ARGV[$i]
     if ($arg eq "--timeout-ms") {
         $timeout_ms = $ARGV[$i + 1] + 0
@@ -101,8 +101,8 @@ my @results = pmap { Scan::probe($_) } @targets
 # Sort + report: open ports first, then closed.
 my @open   = grep { $_->{alive} } @results
 my @closed = grep { !$_->{alive} } @results
-my @open_sorted   = sort { $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} } @open
-my @closed_sorted = sort { $a->{host} cmp $b->{host} || $a->{port} <=> $b->{port} } @closed
+my @open_sorted   = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @open
+my @closed_sorted = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @closed
 
 if (len(@open_sorted)) {
     p ""

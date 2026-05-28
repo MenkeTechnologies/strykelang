@@ -46,7 +46,7 @@ p "decode round-trip: ", uri_unescape(uri_escape("http://x/y z?q=1#f"))
 
 p "\n--- BUG-099 / 026: reverse() and \$s x= N ---"
 my @empty = reverse()
-p "reverse() len:    ", scalar @empty                  # 0
+p "reverse() len:    ", len @empty                  # 0
 
 my $s = "ab"
 $s x= 4
@@ -85,7 +85,7 @@ p "list-form 'exit 9': \$? >> 8 = ", $? >> 8           # 9
 
 p "\n--- BUG-013: backticks list context = one element per line ---"
 my @lines = `printf "a\nb\nc\n"`
-p "lines len:        ", scalar @lines                  # 3
+p "lines len:        ", len @lines                  # 3
 p "lines join '|':   ", join("|", @lines)              # a\n|b\n|c\n
 
 p "\n--- BUG-014: %ENV propagates to subprocesses ---"

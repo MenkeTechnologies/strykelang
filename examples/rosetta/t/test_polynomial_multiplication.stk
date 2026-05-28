@@ -20,7 +20,7 @@ fn Rosetta::PolyMul::mul($p, $q) {
 fn Rosetta::PolyMul::eval_at($p, $x) {
     # Horner's rule on the reversed coefficient list (high → low).
     my $acc = 0
-    for my $c (reverse @$p) { $acc = $acc * $x + $c }
+    for my $c (rev @$p) { $acc = $acc * $x + $c }
     $acc
 }
 

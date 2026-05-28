@@ -187,7 +187,7 @@ $Config::debug = 1
 push @Config::tiers, "platinum"
 $Config::env{stage} = "canary"
 aeq $Config::debug, 1, "main can write Config::debug"
-aeq scalar @Config::tiers, 4, "main can push onto Config::tiers"
+aeq len @Config::tiers, 4, "main can push onto Config::tiers"
 aeq $Config::env{stage}, "canary", "main can mutate Config::env"
 
 p ""
@@ -229,10 +229,10 @@ my $u = Tags::all_distinct()
 my $s12 = Tags::shared_between("post-1", "post-2")
 my @u_els  = sort($u->elements)
 my @s_els  = sort($s12->elements)
-printf "  all distinct : %d  (%s)\n",  scalar($u),   join(",", @u_els)
-printf "  shared (1,2) : %d  (%s)\n",  scalar($s12), join(",", @s_els)
-aeq scalar($u),   4, "union over Tags::catalog"
-aeq scalar($s12), 1, "post-1 ∩ post-2 == {perl}"
+printf "  all distinct : %d  (%s)\n",  len($u),   join(",", @u_els)
+printf "  shared (1,2) : %d  (%s)\n",  len($s12), join(",", @s_els)
+aeq len($u),   4, "union over Tags::catalog"
+aeq len($s12), 1, "post-1 ∩ post-2 == {perl}"
 
 p ""
 p "── Qualified-name fn decls (no `package` line needed) ─"
