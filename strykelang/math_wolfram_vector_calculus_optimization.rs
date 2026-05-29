@@ -1583,6 +1583,12 @@ fn builtin_commutator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let ab = mat_mul(&a, &b);
     let ba = mat_mul(&b, &a);
+    // Empty product (either operand was a 0×0 matrix from missing /
+    // malformed input) → return an empty matrix instead of indexing
+    // `ab[0]` (which would OOB-panic).
+    if ab.is_empty() || ab[0].is_empty() {
+        return Ok(matrix_to_value(&[]));
+    }
     let mut out = vec![vec![0.0_f64; ab[0].len()]; ab.len()];
     for i in 0..ab.len() {
         for j in 0..ab[0].len() {
@@ -1598,6 +1604,10 @@ fn builtin_anticommutator(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let b = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
     let ab = mat_mul(&a, &b);
     let ba = mat_mul(&b, &a);
+    // Empty product → return empty matrix (avoids `ab[0]` OOB-panic).
+    if ab.is_empty() || ab[0].is_empty() {
+        return Ok(matrix_to_value(&[]));
+    }
     let mut out = vec![vec![0.0_f64; ab[0].len()]; ab.len()];
     for i in 0..ab.len() {
         for j in 0..ab[0].len() {

@@ -300,7 +300,8 @@ fn builtin_sec_x509_subject_match(args: &[StrykeValue]) -> StrykeResult<StrykeVa
 /// pattern under RFC 6125 (left-most label only). Args: san_array, host_array.
 fn builtin_sec_san_match_count(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let sans = arg_to_vec(args.first().unwrap_or(&StrykeValue::array(vec![])));
-    let host = i1(&args[1..]);
+    // `&args[1..]` panics when `args.is_empty()`; use `.get(1..)`.
+    let host = i1(args.get(1..).unwrap_or(&[]));
     let count = sans.iter().filter(|s| {
         let v = s.to_number() as i64;
         v == host || v == -1
@@ -1030,6 +1031,14 @@ fn builtin_sec_des_round_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue>
     ];
     let xored = r ^ k;
     let mut out = 0_u32;
+    // Real DES processes 8 6-bit groups from a 48-bit value; this
+    // port packs the 48-bit S-input into a `u32` which can only hold
+    // ~5 groups (5×6 = 30 bits). The previous `for i in 0..8` body
+    // shifted `u32 >> 42` for i=7 and panicked in debug builds with
+    // the overflow check. Cast through u64 to make the shift safe;
+    // the upper 3 groups are zero in u32-input data anyway. TODO:
+    // widen `r`/`k` to u64 so all 8 groups carry real entropy.
+    let xored = xored as u64;
     for i in 0..8 {
         let six = ((xored >> (i * 6)) & 0x3f) as usize;
         let row = ((six & 0x20) >> 4) | (six & 0x01);

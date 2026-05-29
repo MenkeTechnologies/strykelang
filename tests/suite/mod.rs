@@ -369,6 +369,8 @@ mod typeglob_assign;
 mod typeof_pin;
 mod utf8_pin;
 mod wantarray_pin;
+mod bins_s_st_cli;
 mod weep_pin;
+mod wolfram_smoke;
 mod x_operator_pin;
 mod zip_pad_pin;

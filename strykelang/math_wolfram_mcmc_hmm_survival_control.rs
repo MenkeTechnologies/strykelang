@@ -371,6 +371,16 @@ fn builtin_kaplan_meier(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 /// Log-rank test on two arms. Args: t1, e1, t2, e2.
 fn builtin_log_rank_test(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // Empty input groups → chi-square = 0, p-value = 1.0 (no
+    // evidence of difference between survival curves). Without this
+    // guard the downstream `gamma_ur(0.5, 0.0)` call panics on some
+    // statrs builds when both input arrays are empty.
+    if args.is_empty() {
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::float(0.0),
+            StrykeValue::float(1.0),
+        ]));
+    }
     let t1: Vec<f64> = arg_to_vec(&args.first().cloned().unwrap_or(StrykeValue::UNDEF))
         .iter()
         .map(|v| v.to_number())
@@ -668,6 +678,13 @@ fn builtin_lqr_2x2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 fn builtin_nash_eq_2x2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p2 = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
+    // Both matrices must be at least 2×2 — the iteration below
+    // unconditionally indexes `p1[i][j]` for i,j ∈ {0,1}. Empty or
+    // smaller matrices OOB-panic, so short-circuit to "no equilibria".
+    let ok_shape = |m: &[Vec<f64>]| m.len() >= 2 && m[0].len() >= 2 && m[1].len() >= 2;
+    if !ok_shape(&p1) || !ok_shape(&p2) {
+        return Ok(StrykeValue::array(vec![]));
+    }
     let mut out: Vec<StrykeValue> = Vec::new();
     for i in 0..2 {
         for j in 0..2 {
@@ -1165,6 +1182,13 @@ fn builtin_bspline_basis(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .iter()
         .map(|v| v.to_number())
         .collect();
+    // The Cox–de Boor recursion below indexes `knots[i + k]` — need at
+    // least `i + k + 1` entries. Without enough knots the recursion
+    // panics with index OOB; return 0.0 (the basis function's
+    // identity-element value outside its support) instead.
+    if knots.len() < i + k + 1 {
+        return Ok(StrykeValue::float(0.0));
+    }
     fn n_basis(i: usize, k: usize, t: f64, knots: &[f64]) -> f64 {
         if k == 1 {
             return if t >= knots[i] && t < knots[i + 1] { 1.0 } else { 0.0 };

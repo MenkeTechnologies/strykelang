@@ -210,6 +210,11 @@ fn builtin_polynomial_roots_dk(args: &[StrykeValue]) -> StrykeResult<StrykeValue
         .iter()
         .map(|v| v.to_number())
         .collect();
+    // Empty polynomial → no roots; without this guard `coeffs.len()
+    // - 1` usize-underflows and panics.
+    if coeffs.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
     let n = coeffs.len() - 1;
     if n == 0 {
         return Ok(StrykeValue::array(vec![]));
@@ -395,11 +400,19 @@ fn builtin_segment_tree_sum(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .iter()
         .map(|v| v.to_number())
         .collect();
+    // Empty array → sum is 0; avoid the `arr.len() - 1` underflow
+    // panic below.
+    if arr.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
     let l = args.get(1).map(|v| v.to_number() as usize).unwrap_or(0);
     let r = args
         .get(2)
         .map(|v| v.to_number() as usize)
         .unwrap_or_else(|| arr.len().saturating_sub(1));
+    // Clamp `l` to the in-range region to avoid slicing past the
+    // array end (which panics on `arr[l..=...]` when `l >= arr.len()`).
+    let l = l.min(arr.len() - 1);
     let s: f64 = arr[l..=r.min(arr.len() - 1)].iter().sum();
     Ok(StrykeValue::float(s))
 }
