@@ -209,3 +209,246 @@ pub fn file_stem(name: &str) -> String {
 pub fn plural_snake(name: &str) -> String {
     pluralize(name).to_snake_case()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pluralize_simple_s() {
+        assert_eq!(pluralize("post"), "posts");
+        assert_eq!(pluralize("book"), "books");
+        assert_eq!(pluralize("tag"), "tags");
+    }
+
+    #[test]
+    fn pluralize_irregulars() {
+        assert_eq!(pluralize("person"), "people");
+        assert_eq!(pluralize("child"), "children");
+        assert_eq!(pluralize("mouse"), "mice");
+        assert_eq!(pluralize("goose"), "geese");
+    }
+
+    #[test]
+    fn pluralize_y_to_ies_consonant() {
+        assert_eq!(pluralize("category"), "categories");
+        assert_eq!(pluralize("policy"), "policies");
+        assert_eq!(pluralize("city"), "cities");
+    }
+
+    #[test]
+    fn pluralize_y_to_s_vowel() {
+        assert_eq!(pluralize("day"), "days");
+        assert_eq!(pluralize("key"), "keys");
+        assert_eq!(pluralize("toy"), "toys");
+    }
+
+    #[test]
+    fn pluralize_ss_ch_sh_x_z_to_es() {
+        assert_eq!(pluralize("class"), "classes");
+        assert_eq!(pluralize("watch"), "watches");
+        assert_eq!(pluralize("dish"), "dishes");
+        assert_eq!(pluralize("box"), "boxes");
+        assert_eq!(pluralize("buzz"), "buzzes");
+    }
+
+    #[test]
+    fn pluralize_accepts_pascal_case_input() {
+        // pluralize first snake-cases the input.
+        assert_eq!(pluralize("BlogPost"), "blog_posts");
+        assert_eq!(pluralize("CartItem"), "cart_items");
+    }
+
+    #[test]
+    fn singularize_irregulars() {
+        assert_eq!(singularize("people"), "person");
+        assert_eq!(singularize("children"), "child");
+        assert_eq!(singularize("mice"), "mouse");
+        assert_eq!(singularize("geese"), "goose");
+    }
+
+    #[test]
+    fn singularize_ies_to_y() {
+        assert_eq!(singularize("categories"), "category");
+        assert_eq!(singularize("policies"), "policy");
+        assert_eq!(singularize("cities"), "city");
+    }
+
+    #[test]
+    fn singularize_strip_trailing_s() {
+        assert_eq!(singularize("posts"), "post");
+        assert_eq!(singularize("books"), "book");
+        assert_eq!(singularize("tags"), "tag");
+    }
+
+    #[test]
+    fn singularize_keeps_ss_words() {
+        // "class" ends in "ss" so it shouldn't be stripped to "cla".
+        assert_eq!(singularize("class"), "class");
+        assert_eq!(singularize("dress"), "dress");
+    }
+
+    #[test]
+    fn singularize_pluralize_roundtrip() {
+        for word in &["post", "book", "tag", "category", "user", "comment"] {
+            let round = singularize(&pluralize(word));
+            assert_eq!(round, *word, "roundtrip broke for {}", word);
+        }
+    }
+
+    #[test]
+    fn parse_field_with_explicit_type() {
+        assert_eq!(parse_field("title:string"), ("title".into(), "string".into()));
+        assert_eq!(parse_field("body:text"), ("body".into(), "text".into()));
+        assert_eq!(
+            parse_field("user_id:references"),
+            ("user_id".into(), "references".into())
+        );
+    }
+
+    #[test]
+    fn parse_field_default_type_is_string() {
+        assert_eq!(parse_field("name"), ("name".into(), "string".into()));
+    }
+
+    #[test]
+    fn parse_field_snake_cases_name() {
+        assert_eq!(parse_field("PostTitle:string"), ("post_title".into(), "string".into()));
+    }
+
+    #[test]
+    fn sql_type_for_known_types() {
+        assert_eq!(sql_type_for("string"), "TEXT");
+        assert_eq!(sql_type_for("text"), "TEXT");
+        assert_eq!(sql_type_for("int"), "INTEGER");
+        assert_eq!(sql_type_for("integer"), "INTEGER");
+        assert_eq!(sql_type_for("bigint"), "INTEGER");
+        assert_eq!(sql_type_for("references"), "INTEGER");
+        assert_eq!(sql_type_for("float"), "REAL");
+        assert_eq!(sql_type_for("decimal"), "REAL");
+        assert_eq!(sql_type_for("bool"), "INTEGER");
+        assert_eq!(sql_type_for("boolean"), "INTEGER");
+        assert_eq!(sql_type_for("date"), "TEXT");
+        assert_eq!(sql_type_for("datetime"), "TEXT");
+        assert_eq!(sql_type_for("timestamp"), "TEXT");
+        assert_eq!(sql_type_for("blob"), "BLOB");
+        assert_eq!(sql_type_for("binary"), "BLOB");
+    }
+
+    #[test]
+    fn sql_type_for_unknown_falls_back_to_text() {
+        assert_eq!(sql_type_for("frobnicate"), "TEXT");
+        assert_eq!(sql_type_for(""), "TEXT");
+    }
+
+    #[test]
+    fn class_name_pascalizes_singular() {
+        assert_eq!(class_name("post"), "Post");
+        assert_eq!(class_name("posts"), "Post");
+        assert_eq!(class_name("blog_post"), "BlogPost");
+        assert_eq!(class_name("BlogPosts"), "BlogPost");
+    }
+
+    #[test]
+    fn file_stem_is_snake_singular() {
+        assert_eq!(file_stem("Post"), "post");
+        assert_eq!(file_stem("posts"), "post");
+        assert_eq!(file_stem("BlogPost"), "blog_post");
+    }
+
+    #[test]
+    fn plural_snake_for_table_names() {
+        assert_eq!(plural_snake("Post"), "posts");
+        assert_eq!(plural_snake("BlogPost"), "blog_posts");
+        assert_eq!(plural_snake("Category"), "categories");
+        assert_eq!(plural_snake("Person"), "people");
+    }
+
+    #[test]
+    fn ends_with_vowel_y_basic() {
+        assert!(ends_with_vowel_y("day"));
+        assert!(ends_with_vowel_y("key"));
+        assert!(ends_with_vowel_y("boy"));
+        assert!(!ends_with_vowel_y("city"));
+        assert!(!ends_with_vowel_y("policy"));
+        assert!(!ends_with_vowel_y("post"));
+        assert!(!ends_with_vowel_y(""));
+        assert!(!ends_with_vowel_y("a"));
+    }
+
+    #[test]
+    fn migration_timestamp_is_14_digits() {
+        let ts = migration_timestamp();
+        assert_eq!(ts.len(), 14, "timestamp = {ts:?}");
+        assert!(ts.chars().all(|c| c.is_ascii_digit()), "timestamp = {ts:?}");
+    }
+
+    #[test]
+    fn migration_timestamp_is_monotonic_within_a_second() {
+        // Even at the same instant the output must be sortable and parseable.
+        let a = migration_timestamp();
+        let b = migration_timestamp();
+        assert!(b >= a, "{b:?} < {a:?}");
+    }
+
+    #[test]
+    fn days_to_ymd_epoch() {
+        assert_eq!(days_to_ymd(0), (1970, 1, 1));
+    }
+
+    #[test]
+    fn days_to_ymd_known_anchors() {
+        // 2000-01-01 is day 10957 since epoch.
+        assert_eq!(days_to_ymd(10957), (2000, 1, 1));
+        // 2026-01-01 is day 20454 since epoch.
+        assert_eq!(days_to_ymd(20454), (2026, 1, 1));
+    }
+
+    #[test]
+    fn days_to_ymd_handles_leap_years() {
+        // 2000 is a leap year (div by 400). Feb has 29 days. 2000-02-29
+        // is day 10957 + 31 + 28 = 11016.
+        assert_eq!(days_to_ymd(10957 + 31 + 28), (2000, 2, 29));
+        // 2100 is NOT a leap year (div by 100 but not 400) — Feb has 28
+        // days. 2100-03-01 = 2100-01-01 + 31 + 28 = day 47482 + 59 = 47541.
+        // 2100-01-01 day-number: 130 years from 1970, 32 of which are
+        // leap (1972..=2096 step 4 = 32, minus century 2000 still counts,
+        // minus century 2100 not yet reached) = 32 leaps. 130*365 + 32 = 47482.
+        assert_eq!(days_to_ymd(47482 + 31 + 28), (2100, 3, 1));
+    }
+
+    #[test]
+    fn write_file_creates_and_skips_identical() {
+        let tmp = std::env::temp_dir().join(format!("stryke_web_util_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let path = tmp.join("nested/dir/file.txt");
+        write_file(&path, "hello").expect("first write");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
+        // Identical re-write is a no-op (no error).
+        write_file(&path, "hello").expect("identical re-write");
+        // Different content is rejected.
+        assert!(write_file(&path, "different").is_err());
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn force_write_overwrites() {
+        let tmp = std::env::temp_dir().join(format!("stryke_web_util_force_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let path = tmp.join("file.txt");
+        force_write(&path, "first").expect("first");
+        force_write(&path, "second").expect("overwrite");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "second");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn ensure_dir_idempotent() {
+        let tmp = std::env::temp_dir().join(format!("stryke_web_util_dir_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        ensure_dir(&tmp).expect("create");
+        ensure_dir(&tmp).expect("idempotent");
+        assert!(tmp.is_dir());
+        let _ = fs::remove_dir_all(&tmp);
+    }
+}
