@@ -875,7 +875,7 @@ mod tests {
     #[test]
     fn read_framed_rejects_oversized_frame() {
         // Synthesise a header claiming MAX_FRAME+1 bytes follow.
-        let mut buf = ((MAX_FRAME + 1) as u64).to_le_bytes().to_vec();
+        let buf = ((MAX_FRAME + 1) as u64).to_le_bytes().to_vec();
         // No body — we expect the size check to fire BEFORE the body read.
         let err = read_framed(&mut buf.as_slice()).expect_err("oversize must fail");
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
