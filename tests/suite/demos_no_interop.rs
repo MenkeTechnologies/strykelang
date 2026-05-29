@@ -252,3 +252,8 @@ demo_runs_no_interop!(demo_rotating_calipers, "examples/rotating_calipers_no_int
 demo_runs_no_interop!(demo_boyer_moore_majority, "examples/boyer_moore_majority_no_interop.stk");
 demo_runs_no_interop!(demo_lazy_segment_tree, "examples/lazy_segment_tree_no_interop.stk");
 demo_runs_no_interop!(demo_bsgs, "examples/bsgs_no_interop.stk");
+demo_runs_no_interop!(demo_xor_basis, "examples/xor_basis_no_interop.stk");
+demo_runs_no_interop!(demo_ntt, "examples/ntt_no_interop.stk");
+demo_runs_no_interop!(demo_edmonds_blossom, "examples/edmonds_blossom_no_interop.stk");
+demo_runs_no_interop!(demo_adam_optimizer, "examples/adam_optimizer_no_interop.stk");
+demo_runs_no_interop!(demo_chinese_postman, "examples/chinese_postman_no_interop.stk");
