@@ -104,6 +104,7 @@ pub fn conv2d_apply(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `conv1d_apply` — see implementation.
 
 pub fn conv1d_apply(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -159,6 +160,7 @@ pub fn correlate2d(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `gaussian_kernel` — see implementation.
 
 pub fn gaussian_kernel(args: &[StrykeValue]) -> StrykeValue {
     let size = arg_i64(args, 0).unwrap_or(5).max(3) as usize | 1;
@@ -182,6 +184,7 @@ pub fn gaussian_kernel(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&k)
 }
+/// `sobel_x_kernel` — see implementation.
 
 pub fn sobel_x_kernel(_args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&[
@@ -190,6 +193,7 @@ pub fn sobel_x_kernel(_args: &[StrykeValue]) -> StrykeValue {
         vec![-1.0, 0.0, 1.0],
     ])
 }
+/// `sobel_y_kernel` — see implementation.
 
 pub fn sobel_y_kernel(_args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&[
@@ -198,6 +202,7 @@ pub fn sobel_y_kernel(_args: &[StrykeValue]) -> StrykeValue {
         vec![1.0, 2.0, 1.0],
     ])
 }
+/// `laplacian_kernel` — see implementation.
 
 pub fn laplacian_kernel(_args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&[
@@ -206,6 +211,7 @@ pub fn laplacian_kernel(_args: &[StrykeValue]) -> StrykeValue {
         vec![0.0, 1.0, 0.0],
     ])
 }
+/// `gradient_magnitude_2d` — see implementation.
 
 pub fn gradient_magnitude_2d(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -230,6 +236,7 @@ pub fn gradient_magnitude_2d(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `non_max_suppression` — see implementation.
 
 pub fn non_max_suppression(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -261,6 +268,7 @@ pub fn non_max_suppression(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `otsu_threshold` — see implementation.
 
 pub fn otsu_threshold(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -304,6 +312,7 @@ pub fn otsu_threshold(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(best as f64)
 }
+/// `adaptive_threshold` — see implementation.
 
 pub fn adaptive_threshold(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -336,6 +345,7 @@ pub fn adaptive_threshold(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `canny_edges_simple` — see implementation.
 
 pub fn canny_edges_simple(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -405,6 +415,7 @@ pub fn harris_response(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `integral_image` — see implementation.
 
 pub fn integral_image(args: &[StrykeValue]) -> StrykeValue {
     let img = args.first().map(as_matrix).unwrap_or_default();
@@ -428,6 +439,7 @@ pub fn integral_image(args: &[StrykeValue]) -> StrykeValue {
     }
     matrix_to_sv(&out)
 }
+/// `sliding_dot_product` — see implementation.
 
 pub fn sliding_dot_product(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -448,6 +460,7 @@ pub fn sliding_dot_product(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Information retrieval / distance metrics
 // ══════════════════════════════════════════════════════════════════════
+/// `tfidf_compute` — see implementation.
 
 pub fn tfidf_compute(args: &[StrykeValue]) -> StrykeValue {
     // Args: docs (array of token arrays). Returns matrix [doc][term_idx] of TF-IDF.
@@ -508,6 +521,7 @@ pub fn tfidf_compute(args: &[StrykeValue]) -> StrykeValue {
         ("matrix", matrix_to_sv(&matrix)),
     ])
 }
+/// `bm25_score` — see implementation.
 
 pub fn bm25_score(args: &[StrykeValue]) -> StrykeValue {
     let query: Vec<String> = args
@@ -544,6 +558,7 @@ pub fn bm25_score(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(score)
 }
+/// `cosine_sim_sparse` — see implementation.
 
 pub fn cosine_sim_sparse(args: &[StrykeValue]) -> StrykeValue {
     // Cosine similarity over sparse `[[index, value], ...]` representations.
@@ -580,6 +595,7 @@ pub fn cosine_sim_sparse(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(dot / (na * nb))
 }
+/// `jaccard_sim` — see implementation.
 
 pub fn jaccard_sim(args: &[StrykeValue]) -> StrykeValue {
     let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
@@ -599,6 +615,7 @@ pub fn jaccard_sim(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(inter as f64 / uni as f64)
 }
+/// `overlap_coeff` — see implementation.
 
 pub fn overlap_coeff(args: &[StrykeValue]) -> StrykeValue {
     let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
@@ -618,6 +635,7 @@ pub fn overlap_coeff(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(inter as f64 / m as f64)
 }
+/// `dice_coeff` — see implementation.
 
 pub fn dice_coeff(args: &[StrykeValue]) -> StrykeValue {
     let a: Vec<String> = as_vec_sv(args.first().unwrap_or(&StrykeValue::UNDEF))
@@ -637,6 +655,7 @@ pub fn dice_coeff(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(2.0 * inter as f64 / total as f64)
 }
+/// `tanimoto_coeff` — see implementation.
 
 pub fn tanimoto_coeff(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
@@ -651,6 +670,7 @@ pub fn tanimoto_coeff(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(dot / denom)
 }
+/// `tversky_index` — see implementation.
 
 pub fn tversky_index(args: &[StrykeValue]) -> StrykeValue {
     let a: std::collections::HashSet<String> =
@@ -674,16 +694,19 @@ pub fn tversky_index(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(inter / denom)
 }
+/// `manhattan_norm` — see implementation.
 
 pub fn manhattan_norm(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec_f64).unwrap_or_default();
     StrykeValue::float(v.iter().map(|x| x.abs()).sum())
 }
+/// `chebyshev_norm` — see implementation.
 
 pub fn chebyshev_norm(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec_f64).unwrap_or_default();
     StrykeValue::float(v.iter().map(|x| x.abs()).fold(0.0_f64, f64::max))
 }
+/// `minkowski_norm` — see implementation.
 
 pub fn minkowski_norm(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec_f64).unwrap_or_default();
@@ -691,6 +714,7 @@ pub fn minkowski_norm(args: &[StrykeValue]) -> StrykeValue {
     let s: f64 = v.iter().map(|x| x.abs().powf(p)).sum();
     StrykeValue::float(s.powf(1.0 / p))
 }
+/// `mahalanobis_sq` — see implementation.
 
 pub fn mahalanobis_sq(args: &[StrykeValue]) -> StrykeValue {
     let x = args.first().map(as_vec_f64).unwrap_or_default();
@@ -709,6 +733,7 @@ pub fn mahalanobis_sq(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(sum)
 }
+/// `canberra_dist` — see implementation.
 
 pub fn canberra_dist(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
@@ -720,6 +745,7 @@ pub fn canberra_dist(args: &[StrykeValue]) -> StrykeValue {
         .sum();
     StrykeValue::float(sum)
 }
+/// `braycurtis_dist` — see implementation.
 
 pub fn braycurtis_dist(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
@@ -732,6 +758,7 @@ pub fn braycurtis_dist(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(num / denom)
 }
+/// `earth_mover_1d` — see implementation.
 
 pub fn earth_mover_1d(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
@@ -751,6 +778,7 @@ pub fn earth_mover_1d(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Bayesian inference
 // ══════════════════════════════════════════════════════════════════════
+/// `bayesian_beta_update` — see implementation.
 
 pub fn bayesian_beta_update(args: &[StrykeValue]) -> StrykeValue {
     let alpha = arg_f64(args, 0).unwrap_or(1.0);
@@ -762,6 +790,7 @@ pub fn bayesian_beta_update(args: &[StrykeValue]) -> StrykeValue {
         ("beta", StrykeValue::float(beta + failures)),
     ])
 }
+/// `bayesian_normal_update` — see implementation.
 
 pub fn bayesian_normal_update(args: &[StrykeValue]) -> StrykeValue {
     let prior_mean = arg_f64(args, 0).unwrap_or(0.0);
@@ -776,18 +805,21 @@ pub fn bayesian_normal_update(args: &[StrykeValue]) -> StrykeValue {
         ("variance", StrykeValue::float(post_var)),
     ])
 }
+/// `bayes_factor` — see implementation.
 
 pub fn bayes_factor(args: &[StrykeValue]) -> StrykeValue {
     let likelihood_h1 = arg_f64(args, 0).unwrap_or(1.0).max(1e-30);
     let likelihood_h0 = arg_f64(args, 1).unwrap_or(1.0).max(1e-30);
     StrykeValue::float(likelihood_h1 / likelihood_h0)
 }
+/// `posterior_predictive_beta` — see implementation.
 
 pub fn posterior_predictive_beta(args: &[StrykeValue]) -> StrykeValue {
     let alpha = arg_f64(args, 0).unwrap_or(1.0);
     let beta = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(alpha / (alpha + beta))
 }
+/// `posterior_predictive_normal` — see implementation.
 
 pub fn posterior_predictive_normal(args: &[StrykeValue]) -> StrykeValue {
     let mean = arg_f64(args, 0).unwrap_or(0.0);
@@ -797,6 +829,7 @@ pub fn posterior_predictive_normal(args: &[StrykeValue]) -> StrykeValue {
         ("variance", StrykeValue::float(var)),
     ])
 }
+/// `prior_jeffreys_uniform` — see implementation.
 
 pub fn prior_jeffreys_uniform(_args: &[StrykeValue]) -> StrykeValue {
     make_hash(vec![
@@ -804,6 +837,7 @@ pub fn prior_jeffreys_uniform(_args: &[StrykeValue]) -> StrykeValue {
         ("beta", StrykeValue::float(0.5)),
     ])
 }
+/// `maximum_a_posteriori` — see implementation.
 
 pub fn maximum_a_posteriori(args: &[StrykeValue]) -> StrykeValue {
     let posterior = args.first().map(as_vec_f64).unwrap_or_default();
@@ -817,6 +851,7 @@ pub fn maximum_a_posteriori(args: &[StrykeValue]) -> StrykeValue {
         .unwrap();
     StrykeValue::integer(idx as i64)
 }
+/// `credible_interval_beta` — see implementation.
 
 pub fn credible_interval_beta(args: &[StrykeValue]) -> StrykeValue {
     use statrs::distribution::{Beta, ContinuousCDF};
@@ -830,6 +865,7 @@ pub fn credible_interval_beta(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => arr_f64(vec![0.0, 1.0]),
     }
 }
+/// `credible_interval_normal` — see implementation.
 
 pub fn credible_interval_normal(args: &[StrykeValue]) -> StrykeValue {
     use statrs::distribution::{ContinuousCDF, Normal};
@@ -845,6 +881,7 @@ pub fn credible_interval_normal(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Reinforcement learning
 // ══════════════════════════════════════════════════════════════════════
+/// `qlearning_step` — see implementation.
 
 pub fn qlearning_step(args: &[StrykeValue]) -> StrykeValue {
     let q = arg_f64(args, 0).unwrap_or(0.0);
@@ -854,6 +891,7 @@ pub fn qlearning_step(args: &[StrykeValue]) -> StrykeValue {
     let max_next = arg_f64(args, 4).unwrap_or(0.0);
     StrykeValue::float(q + alpha * (reward + gamma * max_next - q))
 }
+/// `sarsa_step` — see implementation.
 
 pub fn sarsa_step(args: &[StrykeValue]) -> StrykeValue {
     let q = arg_f64(args, 0).unwrap_or(0.0);
@@ -863,6 +901,7 @@ pub fn sarsa_step(args: &[StrykeValue]) -> StrykeValue {
     let q_next = arg_f64(args, 4).unwrap_or(0.0);
     StrykeValue::float(q + alpha * (reward + gamma * q_next - q))
 }
+/// `epsilon_greedy_choose` — see implementation.
 
 pub fn epsilon_greedy_choose(args: &[StrykeValue]) -> StrykeValue {
     let values = args.first().map(as_vec_f64).unwrap_or_default();
@@ -888,6 +927,7 @@ pub fn epsilon_greedy_choose(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::integer(idx as i64)
     }
 }
+/// `ucb1_choose` — see implementation.
 
 pub fn ucb1_choose(args: &[StrykeValue]) -> StrykeValue {
     let q_values = args.first().map(as_vec_f64).unwrap_or_default();
@@ -910,6 +950,7 @@ pub fn ucb1_choose(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(best as i64)
 }
+/// `thompson_beta_choose` — see implementation.
 
 pub fn thompson_beta_choose(args: &[StrykeValue]) -> StrykeValue {
     use statrs::distribution::{Beta, ContinuousCDF};
@@ -936,6 +977,7 @@ pub fn thompson_beta_choose(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(best as i64)
 }
+/// `softmax_choose` — see implementation.
 
 pub fn softmax_choose(args: &[StrykeValue]) -> StrykeValue {
     let logits = args.first().map(as_vec_f64).unwrap_or_default();
@@ -961,6 +1003,7 @@ pub fn softmax_choose(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer((probs.len() - 1) as i64)
 }
+/// `rl_n_step_return` — see implementation.
 
 pub fn rl_n_step_return(args: &[StrykeValue]) -> StrykeValue {
     let rewards = args.first().map(as_vec_f64).unwrap_or_default();
@@ -973,6 +1016,7 @@ pub fn rl_n_step_return(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(g)
 }
+/// `rl_td_error` — see implementation.
 
 pub fn rl_td_error(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
@@ -981,6 +1025,7 @@ pub fn rl_td_error(args: &[StrykeValue]) -> StrykeValue {
     let gamma = arg_f64(args, 3).unwrap_or(0.9);
     StrykeValue::float(r + gamma * v_next - v)
 }
+/// `rl_discount_returns` — see implementation.
 
 pub fn rl_discount_returns(args: &[StrykeValue]) -> StrykeValue {
     let rewards = args.first().map(as_vec_f64).unwrap_or_default();
@@ -1032,6 +1077,7 @@ fn rgb_to_lab_inner(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let b2 = 200.0 * (fy - fz);
     (l, a, b2)
 }
+/// `rgb_to_lch` — see implementation.
 
 pub fn rgb_to_lch(args: &[StrykeValue]) -> StrykeValue {
     let xs = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1046,6 +1092,7 @@ pub fn rgb_to_lch(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(vec![l, c, h])
 }
+/// `lch_to_rgb` — see implementation.
 
 pub fn lch_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     let xs = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1090,6 +1137,7 @@ fn lab_to_rgb_inner(l: f64, a: f64, b: f64) -> StrykeValue {
     };
     arr_f64(vec![to_srgb(r), to_srgb(g), to_srgb(bl)])
 }
+/// `rgb_to_oklch` — see implementation.
 
 pub fn rgb_to_oklch(args: &[StrykeValue]) -> StrykeValue {
     let xs = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1135,6 +1183,7 @@ fn rgb_to_oklab_internal(r: f64, g: f64, b: f64) -> StrykeValue {
         0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
     ])
 }
+/// `oklch_to_rgb` — see implementation.
 
 pub fn oklch_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     let xs = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1169,6 +1218,7 @@ fn oklab_to_rgb_internal(l: f64, a: f64, b: f64) -> StrykeValue {
     };
     arr_f64(vec![to_srgb(r), to_srgb(g), to_srgb(bl)])
 }
+/// `ciede76_color_distance` — see implementation.
 
 pub fn ciede76_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let a = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1180,6 +1230,7 @@ pub fn ciede76_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let (l2, a2, b2) = rgb_to_lab_inner(b[0], b[1], b[2]);
     StrykeValue::float(((l1 - l2).powi(2) + (a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt())
 }
+/// `ciede94_color_distance` — see implementation.
 
 pub fn ciede94_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let a = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1205,6 +1256,7 @@ pub fn ciede94_color_distance(args: &[StrykeValue]) -> StrykeValue {
     let total = (dl / (kl * sl)).powi(2) + (dc / sc).powi(2) + dh2 / (sh * sh);
     StrykeValue::float(total.sqrt())
 }
+/// `ciede2000_color_distance` — see implementation.
 
 pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
     // Full CIEDE2000 ΔE color distance per Sharma/Wu/Dalal 2005.
@@ -1279,6 +1331,7 @@ pub fn ciede2000_color_distance(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Window functions
 // ══════════════════════════════════════════════════════════════════════
+/// `window_blackman_harris` — see implementation.
 
 pub fn window_blackman_harris(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(64).max(1) as usize;
@@ -1292,6 +1345,7 @@ pub fn window_blackman_harris(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `window_gaussian` — see implementation.
 
 pub fn window_gaussian(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(64).max(1) as usize;
@@ -1306,6 +1360,7 @@ pub fn window_gaussian(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `window_flat_top` — see implementation.
 
 pub fn window_flat_top(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(64).max(1) as usize;
@@ -1321,6 +1376,7 @@ pub fn window_flat_top(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `window_bartlett` — see implementation.
 
 pub fn window_bartlett(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(64).max(1) as usize;
@@ -1331,6 +1387,7 @@ pub fn window_bartlett(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `window_welch` — see implementation.
 
 pub fn window_welch(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(64).max(1) as usize;
@@ -1345,6 +1402,7 @@ pub fn window_welch(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Trie / Fenwick tree / Union-Find
 // ══════════════════════════════════════════════════════════════════════
+/// `trie_new` — see implementation.
 
 pub fn trie_new(_args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
@@ -1354,6 +1412,7 @@ pub fn trie_new(_args: &[StrykeValue]) -> StrykeValue {
         ("children", StrykeValue::hash_ref(Arc::new(RwLock::new(h)))),
     ])
 }
+/// `trie_insert` — see implementation.
 
 pub fn trie_insert(args: &[StrykeValue]) -> StrykeValue {
     let trie = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1385,6 +1444,7 @@ pub fn trie_insert(args: &[StrykeValue]) -> StrykeValue {
     }
     trie
 }
+/// `trie_lookup` — see implementation.
 
 pub fn trie_lookup(args: &[StrykeValue]) -> StrykeValue {
     let trie = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1407,6 +1467,7 @@ pub fn trie_lookup(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(0);
     StrykeValue::integer(end)
 }
+/// `trie_prefix_search` — see implementation.
 
 pub fn trie_prefix_search(args: &[StrykeValue]) -> StrykeValue {
     let trie = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1449,6 +1510,7 @@ pub fn trie_prefix_search(args: &[StrykeValue]) -> StrykeValue {
     walk(&cur, prefix, &mut results);
     arr_sv(results)
 }
+/// `trie_remove` — see implementation.
 
 pub fn trie_remove(args: &[StrykeValue]) -> StrykeValue {
     let trie = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1470,6 +1532,7 @@ pub fn trie_remove(args: &[StrykeValue]) -> StrykeValue {
     }
     trie
 }
+/// `trie_keys` — see implementation.
 
 pub fn trie_keys(args: &[StrykeValue]) -> StrykeValue {
     trie_prefix_search(&[
@@ -1477,16 +1540,19 @@ pub fn trie_keys(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::string(String::new()),
     ])
 }
+/// `trie_count` — see implementation.
 
 pub fn trie_count(args: &[StrykeValue]) -> StrykeValue {
     let keys_v = trie_keys(args);
     StrykeValue::integer(as_vec_sv(&keys_v).len() as i64)
 }
+/// `fenwick_new` — see implementation.
 
 pub fn fenwick_new(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     arr_sv(vec![StrykeValue::integer(0); n + 1])
 }
+/// `fenwick_update` — see implementation.
 
 pub fn fenwick_update(args: &[StrykeValue]) -> StrykeValue {
     let tree = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1502,6 +1568,7 @@ pub fn fenwick_update(args: &[StrykeValue]) -> StrykeValue {
     }
     tree
 }
+/// `fenwick_query_prefix` — see implementation.
 
 pub fn fenwick_query_prefix(args: &[StrykeValue]) -> StrykeValue {
     let tree = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1516,6 +1583,7 @@ pub fn fenwick_query_prefix(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(sum)
 }
+/// `fenwick_query_range` — see implementation.
 
 pub fn fenwick_query_range(args: &[StrykeValue]) -> StrykeValue {
     let tree = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1525,6 +1593,7 @@ pub fn fenwick_query_range(args: &[StrykeValue]) -> StrykeValue {
     let p_l = fenwick_query_prefix(&[tree, StrykeValue::integer(l - 1)]).to_int();
     StrykeValue::integer(p_r - p_l)
 }
+/// `union_find_new` — see implementation.
 
 pub fn union_find_new(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -1540,6 +1609,7 @@ fn uf_find(parent: &mut Vec<i64>, x: usize) -> usize {
     }
     parent[x] as usize
 }
+/// `union_find_find` — see implementation.
 
 pub fn union_find_find(args: &[StrykeValue]) -> StrykeValue {
     let uf = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1556,6 +1626,7 @@ pub fn union_find_find(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(-1)
 }
+/// `union_find_union` — see implementation.
 
 pub fn union_find_union(args: &[StrykeValue]) -> StrykeValue {
     let uf = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1587,6 +1658,7 @@ pub fn union_find_union(args: &[StrykeValue]) -> StrykeValue {
     }
     uf
 }
+/// `union_find_components` — see implementation.
 
 pub fn union_find_components(args: &[StrykeValue]) -> StrykeValue {
     let uf = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
@@ -1606,6 +1678,7 @@ pub fn union_find_components(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Network / IP extras
 // ══════════════════════════════════════════════════════════════════════
+/// `ip_subnet_split` — see implementation.
 
 pub fn ip_subnet_split(args: &[StrykeValue]) -> StrykeValue {
     let cidr = arg_str(args, 0).unwrap_or_default();
@@ -1639,6 +1712,7 @@ pub fn ip_subnet_split(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_sv(out)
 }
+/// `ipv6_global_unicast` — see implementation.
 
 pub fn ipv6_global_unicast(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
@@ -1648,6 +1722,7 @@ pub fn ipv6_global_unicast(args: &[StrykeValue]) -> StrykeValue {
     let is_global = (prefix >> 13) == 0b001;
     StrykeValue::integer(if is_global { 1 } else { 0 })
 }
+/// `cidr_to_range` — see implementation.
 
 pub fn cidr_to_range(args: &[StrykeValue]) -> StrykeValue {
     let cidr = arg_str(args, 0).unwrap_or_default();
@@ -1682,6 +1757,7 @@ pub fn cidr_to_range(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::string(fmt(bcast)),
     ])
 }
+/// `range_to_cidr` — see implementation.
 
 pub fn range_to_cidr(args: &[StrykeValue]) -> StrykeValue {
     let start = arg_str(args, 0).unwrap_or_default();

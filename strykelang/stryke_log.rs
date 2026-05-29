@@ -46,6 +46,7 @@ const DEFAULT_MAX_BYTES: u64 = 5 * 1024 * 1024;
 /// Number of rotated generations to keep (`stryke.log.1` … `stryke.log.5`).
 /// The active file plus 5 rotations bounds the log dir at ~30 MB by default.
 const DEFAULT_MAX_FILES: u32 = 5;
+/// `Level` — see variants.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
@@ -57,6 +58,7 @@ pub enum Level {
 }
 
 impl Level {
+    /// `as_str` — see implementation.
     pub fn as_str(self) -> &'static str {
         match self {
             Level::Trace => "TRACE",

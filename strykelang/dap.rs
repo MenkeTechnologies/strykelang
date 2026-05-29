@@ -111,13 +111,19 @@ struct SharedInner {
     snapshot: PauseSnapshot,
     pause_request: bool, // client asked us to pause asap
 }
+/// `DapShared` — see fields for layout.
 
 pub struct DapShared {
+    /// `inner` field.
     inner: Mutex<SharedInner>,
+    /// `cv` field.
     cv: Condvar,
+    /// `seq` field.
     seq: AtomicU64,
     writer: Mutex<Box<dyn Write + Send>>,
+    /// `configuration_done` field.
     pub configuration_done: AtomicBool,
+    /// `disconnected` field.
     pub disconnected: AtomicBool,
 }
 
@@ -175,10 +181,12 @@ impl DapShared {
         guard.is_paused = false;
         action
     }
+    /// `was_disconnected` — see implementation.
 
     pub fn was_disconnected(&self) -> bool {
         self.disconnected.load(Ordering::SeqCst)
     }
+    /// `want_pause` — see implementation.
 
     pub fn want_pause(&self) -> bool {
         self.inner.lock().map(|g| g.pause_request).unwrap_or(false)
@@ -213,6 +221,7 @@ impl DapShared {
         });
         self.write_message(msg);
     }
+    /// `emit_event` — see implementation.
 
     pub fn emit_event(&self, event: &str, body: Value) {
         let seq = self.next_seq();
@@ -302,22 +311,32 @@ fn read_message<R: Read>(reader: &mut BufReader<R>) -> io::Result<Option<Vec<u8>
 }
 
 // ─── Launch + breakpoint state ──────────────────────────────────────────────
+/// `LaunchParams` — see fields for layout.
 
 #[derive(Debug, Clone, Default)]
 pub struct LaunchParams {
+    /// `program` field.
     pub program: String,
+    /// `args` field.
     pub args: Vec<String>,
+    /// `cwd` field.
     pub cwd: Option<String>,
+    /// `no_debug` field.
     pub no_debug: bool,
+    /// `stop_on_entry` field.
     pub stop_on_entry: bool,
+    /// `interpreter_args` field.
     pub interpreter_args: Vec<String>,
+    /// `no_interop` field.
     pub no_interop: bool,
 }
+/// `BreakpointState` — see fields for layout.
 
 #[derive(Debug, Default)]
 pub struct BreakpointState {
     /// Line breakpoints keyed by absolute file path → set of lines.
     pub line_breakpoints: HashMap<String, Vec<usize>>,
+    /// `function_breakpoints` field.
     pub function_breakpoints: Vec<String>,
     /// Step mode set by the reader thread; consumed by `Debugger::prompt`
     /// after it wakes from condvar.
@@ -646,11 +665,15 @@ fn handle_request(
         }
     }
 }
+/// `StepKind` — see variants.
 
 #[derive(Debug, Clone, Copy)]
 pub enum StepKind {
+    /// `Over` variant.
     Over,
+    /// `Into` variant.
     Into,
+    /// `Out` variant.
     Out,
 }
 
@@ -1512,6 +1535,7 @@ fn is_builtin_like(name: &str) -> bool {
 pub fn run() -> i32 {
     run_with_args(&[])
 }
+/// `run_with_args` — see implementation.
 
 pub fn run_with_args(args: &[String]) -> i32 {
     crate::slog_info!(

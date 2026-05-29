@@ -56,12 +56,19 @@ pub const KV_FORMAT_VERSION: u32 = 1;
 #[archive_attr(check_bytes(
     bound = "__C: rkyv::validation::ArchiveContext, <__C as rkyv::Fallible>::Error: std::error::Error"
 ))]
+/// `WireValue` — see variants.
 pub enum WireValue {
+    /// `Undef` variant.
     Undef,
+    /// `Bool` variant.
     Bool(bool),
+    /// `Int` variant.
     Int(i64),
+    /// `Float` variant.
     Float(f64),
+    /// `Str` variant.
     Str(String),
+    /// `Bytes` variant.
     Bytes(Vec<u8>),
     Array(
         #[omit_bounds]
@@ -153,15 +160,22 @@ impl WireValue {
 }
 
 // ── rkyv-archived store root ─────────────────────────────────────────
+/// `KvHeader` — see fields for layout.
 
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct KvHeader {
+    /// `magic` field.
     pub magic: u32,
+    /// `format_version` field.
     pub format_version: u32,
+    /// `stryke_version` field.
     pub stryke_version: String,
+    /// `created_at_secs` field.
     pub created_at_secs: u64,
+    /// `last_commit_secs` field.
     pub last_commit_secs: u64,
+    /// `commit_count` field.
     pub commit_count: u64,
 }
 
@@ -177,11 +191,14 @@ impl Default for KvHeader {
         }
     }
 }
+/// `KvRoot` — see fields for layout.
 
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone, Default)]
 #[archive(check_bytes)]
 pub struct KvRoot {
+    /// `header` field.
     pub header: KvHeader,
+    /// `entries` field.
     pub entries: HashMap<String, WireValue>,
 }
 
@@ -193,8 +210,11 @@ pub struct KvRoot {
 /// `kv_put`/`kv_get` from different threads is safe.
 #[derive(Debug)]
 pub struct KvStore {
+    /// `path` field.
     pub path: PathBuf,
+    /// `root` field.
     pub root: KvRoot,
+    /// `dirty` field.
     pub dirty: bool,
 }
 
@@ -249,15 +269,18 @@ impl KvStore {
             dirty: false,
         })
     }
+    /// `put` — see implementation.
 
     pub fn put(&mut self, key: String, value: WireValue) {
         self.root.entries.insert(key, value);
         self.dirty = true;
     }
+    /// `get` — see implementation.
 
     pub fn get(&self, key: &str) -> Option<&WireValue> {
         self.root.entries.get(key)
     }
+    /// `del` — see implementation.
 
     pub fn del(&mut self, key: &str) -> bool {
         let existed = self.root.entries.remove(key).is_some();
@@ -266,14 +289,17 @@ impl KvStore {
         }
         existed
     }
+    /// `exists` — see implementation.
 
     pub fn exists(&self, key: &str) -> bool {
         self.root.entries.contains_key(key)
     }
+    /// `len` — see implementation.
 
     pub fn len(&self) -> usize {
         self.root.entries.len()
     }
+    /// `is_empty` — see implementation.
 
     pub fn is_empty(&self) -> bool {
         self.root.entries.is_empty()
@@ -339,6 +365,7 @@ impl KvStore {
         self.dirty = false;
         Ok(())
     }
+    /// `stats` — see implementation.
 
     pub fn stats(&self) -> Vec<(String, StrykeValue)> {
         vec![

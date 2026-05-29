@@ -12,9 +12,13 @@ pub(crate) type SpliceExprEntry = (Expr, Option<Expr>, Option<Expr>, Vec<Expr>);
 /// [`crate::vm_helper::VMHelper::exec_statement`] `StmtKind::SubDecl`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeSubDecl {
+    /// `name` field.
     pub name: String,
+    /// `params` field.
     pub params: Vec<SubSigParam>,
+    /// `body` field.
     pub body: Block,
+    /// `prototype` field.
     pub prototype: Option<String>,
 }
 
@@ -30,9 +34,13 @@ pub struct RuntimeSubDecl {
 /// advice exactly as it does outside. See `tests/tree_walker_absent_aop.rs`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeAdviceDecl {
+    /// `kind` field.
     pub kind: AdviceKind,
+    /// `pattern` field.
     pub pattern: String,
+    /// `body` field.
     pub body: Block,
+    /// `body_block_idx` field.
     pub body_block_idx: u16,
 }
 
@@ -40,15 +48,22 @@ pub struct RuntimeAdviceDecl {
 /// Operands use u16 for pool indices (64k names/constants) and i32 for jumps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Op {
+    /// `Nop` variant.
     Nop,
     // ── Constants ──
+    /// `LoadInt` variant.
     LoadInt(i64),
+    /// `LoadFloat` variant.
     LoadFloat(f64),
+    /// `LoadConst` variant.
     LoadConst(u16), // index into constant pool
+    /// `LoadUndef` variant.
     LoadUndef,
 
     // ── Stack ──
+    /// `Pop` variant.
     Pop,
+    /// `Dup` variant.
     Dup,
     /// Duplicate the top two stack values: \[a, b\] (b on top) → \[a, b, a, b\].
     Dup2,
@@ -62,12 +77,15 @@ pub enum Op {
     ListFirst,
 
     // ── Scalars (u16 = name pool index) ──
+    /// `GetScalar` variant.
     GetScalar(u16),
     /// Like `GetScalar` but reads `scope.get_scalar` only (no Perl special-variable dispatch).
     GetScalarPlain(u16),
+    /// `SetScalar` variant.
     SetScalar(u16),
     /// Like `SetScalar` but calls `scope.set_scalar` only (no special-variable dispatch).
     SetScalarPlain(u16),
+    /// `DeclareScalar` variant.
     DeclareScalar(u16),
     /// Like `DeclareScalar` but the binding is immutable after initialization.
     DeclareScalarFrozen(u16),
@@ -92,17 +110,27 @@ pub enum Op {
     DeclareStateHash(u16),
 
     // ── Arrays ──
+    /// `GetArray` variant.
     GetArray(u16),
+    /// `SetArray` variant.
     SetArray(u16),
+    /// `DeclareArray` variant.
     DeclareArray(u16),
+    /// `DeclareArrayFrozen` variant.
     DeclareArrayFrozen(u16),
+    /// `GetArrayElem` variant.
     GetArrayElem(u16), // stack: [index] → value
+    /// `SetArrayElem` variant.
     SetArrayElem(u16), // stack: [value, index]
     /// Like [`Op::SetArrayElem`] but leaves the assigned value on the stack (e.g. `$a[$i] //=`).
     SetArrayElemKeep(u16),
+    /// `PushArray` variant.
     PushArray(u16),  // stack: [value] → push to named array
+    /// `PopArray` variant.
     PopArray(u16),   // → popped value
+    /// `ShiftArray` variant.
     ShiftArray(u16), // → shifted value
+    /// `ArrayLen` variant.
     ArrayLen(u16),   // → integer length
     /// Pop index spec (scalar or array from [`Op::Range`]); push one `StrykeValue::array` of elements
     /// read from the named array. Used for `@name[...]` slice rvalues.
@@ -119,13 +147,19 @@ pub enum Op {
     DeleteArrayElem(u16),
 
     // ── Hashes ──
+    /// `GetHash` variant.
     GetHash(u16),
+    /// `SetHash` variant.
     SetHash(u16),
+    /// `DeclareHash` variant.
     DeclareHash(u16),
+    /// `DeclareHashFrozen` variant.
     DeclareHashFrozen(u16),
     /// Dynamic `local $x` — save previous binding, assign TOS (same stack shape as DeclareScalar).
     LocalDeclareScalar(u16),
+    /// `LocalDeclareArray` variant.
     LocalDeclareArray(u16),
+    /// `LocalDeclareHash` variant.
     LocalDeclareHash(u16),
     /// `local $h{key} = val` — stack: `[value, key]` (key on top), same as [`Op::SetHashElem`].
     LocalDeclareHashElement(u16),
@@ -135,11 +169,15 @@ pub enum Op {
     LocalDeclareTypeglob(u16, Option<u16>),
     /// `local *{EXPR}` / `local *$x` — LHS glob name string on stack (TOS); optional static `*rhs` pool index.
     LocalDeclareTypeglobDynamic(Option<u16>),
+    /// `GetHashElem` variant.
     GetHashElem(u16), // stack: [key] → value
+    /// `SetHashElem` variant.
     SetHashElem(u16), // stack: [value, key]
     /// Like [`Op::SetHashElem`] but leaves the assigned value on the stack (e.g. `$h{k} //=`).
     SetHashElemKeep(u16),
+    /// `DeleteHashElem` variant.
     DeleteHashElem(u16), // stack: [key] → deleted value
+    /// `ExistsHashElem` variant.
     ExistsHashElem(u16), // stack: [key] → 0/1
     /// `delete $href->{key}` — stack: `[container, key]` (key on top) → deleted value.
     DeleteArrowHashElem,
@@ -149,7 +187,9 @@ pub enum Op {
     ExistsArrowArrayElem,
     /// `delete $aref->[$i]` — stack: `[container, index]` → deleted value (or undef).
     DeleteArrowArrayElem,
+    /// `HashKeys` variant.
     HashKeys(u16),   // → array of keys
+    /// `HashValues` variant.
     HashValues(u16), // → array of values
     /// Scalar `keys %h` — push integer key count.
     HashKeysScalar(u16),
@@ -178,12 +218,19 @@ pub enum Op {
     SpliceArrayDeref(u8),
 
     // ── Arithmetic ──
+    /// `Add` variant.
     Add,
+    /// `Sub` variant.
     Sub,
+    /// `Mul` variant.
     Mul,
+    /// `Div` variant.
     Div,
+    /// `Mod` variant.
     Mod,
+    /// `Pow` variant.
     Pow,
+    /// `Negate` variant.
     Negate,
     /// `inc EXPR` — pop value, push value + 1 (integer if input is integer, else float).
     Inc,
@@ -191,10 +238,12 @@ pub enum Op {
     Dec,
 
     // ── String ──
+    /// `Concat` variant.
     Concat,
     /// Pop array (or value coerced with [`StrykeValue::to_list`]), join element strings with
     /// [`Interpreter::list_separator`] (`$"`), push one string. Used for `@a` in `"` / `qq`.
     ArrayStringifyListSep,
+    /// `StringRepeat` variant.
     StringRepeat,
     /// Pop count (top), pop list (below — flattened to `Vec<StrykeValue>` via
     /// [`StrykeValue::as_array_vec`] or wrapped as a 1-elt list), push the list
@@ -205,35 +254,59 @@ pub enum Op {
     ProcessCaseEscapes,
 
     // ── Comparison (numeric) ──
+    /// `NumEq` variant.
     NumEq,
+    /// `NumNe` variant.
     NumNe,
+    /// `NumLt` variant.
     NumLt,
+    /// `NumGt` variant.
     NumGt,
+    /// `NumLe` variant.
     NumLe,
+    /// `NumGe` variant.
     NumGe,
+    /// `Spaceship` variant.
     Spaceship,
 
     // ── Comparison (string) ──
+    /// `StrEq` variant.
     StrEq,
+    /// `StrNe` variant.
     StrNe,
+    /// `StrLt` variant.
     StrLt,
+    /// `StrGt` variant.
     StrGt,
+    /// `StrLe` variant.
     StrLe,
+    /// `StrGe` variant.
     StrGe,
+    /// `StrCmp` variant.
     StrCmp,
 
     // ── Logical / Bitwise ──
+    /// `LogNot` variant.
     LogNot,
+    /// `BitAnd` variant.
     BitAnd,
+    /// `BitOr` variant.
     BitOr,
+    /// `BitXor` variant.
     BitXor,
+    /// `BitNot` variant.
     BitNot,
+    /// `Shl` variant.
     Shl,
+    /// `Shr` variant.
     Shr,
 
     // ── Control flow (absolute target addresses) ──
+    /// `Jump` variant.
     Jump(usize),
+    /// `JumpIfTrue` variant.
     JumpIfTrue(usize),
+    /// `JumpIfFalse` variant.
     JumpIfFalse(usize),
     /// Jump if TOS is falsy WITHOUT popping (for short-circuit &&)
     JumpIfFalseKeep(usize),
@@ -243,14 +316,21 @@ pub enum Op {
     JumpIfDefinedKeep(usize),
 
     // ── Increment / Decrement ──
+    /// `PreInc` variant.
     PreInc(u16),
+    /// `PreDec` variant.
     PreDec(u16),
+    /// `PostInc` variant.
     PostInc(u16),
+    /// `PostDec` variant.
     PostDec(u16),
     /// Pre-increment on a frame slot entry (compiled `my $x` fast path).
     PreIncSlot(u8),
+    /// `PreDecSlot` variant.
     PreDecSlot(u8),
+    /// `PostIncSlot` variant.
     PostIncSlot(u8),
+    /// `PostDecSlot` variant.
     PostDecSlot(u8),
 
     // ── Functions ──
@@ -260,7 +340,9 @@ pub enum Op {
     /// (entry IP + stack-args); `name_idx` duplicates the stash pool index for closure restore / JIT
     /// (same as in the table; kept in the opcode so JIT does not need the side table).
     CallStaticSubId(u16, u16, u8, u8),
+    /// `Return` variant.
     Return,
+    /// `ReturnValue` variant.
     ReturnValue,
     /// End of a compiled `map` / `grep` / `sort` block body (empty block or last statement an expression).
     /// Pops the synthetic call frame from [`crate::vm::VM::run_block_region`] and unwinds the
@@ -272,12 +354,15 @@ pub enum Op {
     BindSubClosure(u16),
 
     // ── Scope ──
+    /// `PushFrame` variant.
     PushFrame,
+    /// `PopFrame` variant.
     PopFrame,
 
     // ── I/O ──
     /// `print [HANDLE] LIST` — `None` uses [`crate::vm_helper::VMHelper::default_print_handle`].
     Print(Option<u16>, u8),
+    /// `Say` variant.
     Say(Option<u16>, u8),
     /// `printf [HANDLE] FMT, ARGS` — same shape as [`Op::Print`]; `None` uses
     /// the default handle. Format is the first argument on the stack.
@@ -294,6 +379,7 @@ pub enum Op {
     WantarrayPop,
 
     // ── List / Range ──
+    /// `MakeArray` variant.
     MakeArray(u16), // pop N values, push as Array
     /// `@$href{k1,k2}` — stack: `[container, key1, …, keyN]` (TOS = last key); pops `N+1` values; pushes array of slot values.
     HashSliceDeref(u16),
@@ -391,8 +477,11 @@ pub enum Op {
     /// to hard-reject constructs whose only valid response is a runtime error
     /// (e.g. `++@$r`, `%{...}--`) without AST fallback.
     RuntimeErrorConst(u16),
+    /// `MakeHash` variant.
     MakeHash(u16), // pop N key-value pairs, push as Hash
+    /// `Range` variant.
     Range,         // stack: [from, to] → Array
+    /// `RangeStep` variant.
     RangeStep,     // stack: [from, to, step] → Array (stepped range)
     /// Array slice via colon range — `@arr[FROM:TO:STEP]` / `@arr[::-1]`.
     /// Stack: `[from, to, step]` — each may be `Undef` to mean "omitted" (uses array bounds).
@@ -854,6 +943,7 @@ pub enum Op {
     // ── Special ──
     /// Set `${^GLOBAL_PHASE}` on the interpreter. See [`GP_START`] … [`GP_END`].
     SetGlobalPhase(u8),
+    /// `Halt` variant.
     Halt,
     /// Delegate an AST expression to `Interpreter::eval_expr_ctx` at runtime.
     /// Operand is an index into [`Chunk::ast_eval_exprs`].
@@ -878,9 +968,13 @@ pub enum Op {
 pub const GP_START: u8 = 0;
 /// Reserved; stock Perl 5 keeps `${^GLOBAL_PHASE}` as **`START`** during `UNITCHECK` blocks.
 pub const GP_UNITCHECK: u8 = 1;
+/// `GP_CHECK` constant.
 pub const GP_CHECK: u8 = 2;
+/// `GP_INIT` constant.
 pub const GP_INIT: u8 = 3;
+/// `GP_RUN` constant.
 pub const GP_RUN: u8 = 4;
+/// `GP_END` constant.
 pub const GP_END: u8 = 5;
 
 /// Built-in function IDs for CallBuiltin dispatch.
@@ -889,106 +983,181 @@ pub const GP_END: u8 = 5;
 pub enum BuiltinId {
     // String
     Length = 0,
+    /// `Chomp` variant.
     Chomp,
+    /// `Chop` variant.
     Chop,
+    /// `Substr` variant.
     Substr,
+    /// `Index` variant.
     Index,
+    /// `Rindex` variant.
     Rindex,
+    /// `Uc` variant.
     Uc,
+    /// `Lc` variant.
     Lc,
+    /// `Ucfirst` variant.
     Ucfirst,
+    /// `Lcfirst` variant.
     Lcfirst,
+    /// `Chr` variant.
     Chr,
+    /// `Ord` variant.
     Ord,
+    /// `Hex` variant.
     Hex,
+    /// `Oct` variant.
     Oct,
+    /// `Join` variant.
     Join,
+    /// `Split` variant.
     Split,
+    /// `Sprintf` variant.
     Sprintf,
 
     // Numeric
+    /// `Abs` variant.
     Abs,
+    /// `Int` variant.
     Int,
+    /// `Sqrt` variant.
     Sqrt,
 
     // Type
+    /// `Defined` variant.
     Defined,
+    /// `Ref` variant.
     Ref,
+    /// `Scalar` variant.
     Scalar,
 
     // Array
+    /// `Splice` variant.
     Splice,
+    /// `Reverse` variant.
     Reverse,
+    /// `Sort` variant.
     Sort,
+    /// `Unshift` variant.
     Unshift,
 
     // Hash
 
     // I/O
+    /// `Open` variant.
     Open,
+    /// `Close` variant.
     Close,
+    /// `Eof` variant.
     Eof,
+    /// `ReadLine` variant.
     ReadLine,
+    /// `Printf` variant.
     Printf,
 
     // System
+    /// `System` variant.
     System,
+    /// `Exec` variant.
     Exec,
+    /// `Exit` variant.
     Exit,
+    /// `Die` variant.
     Die,
+    /// `Warn` variant.
     Warn,
+    /// `Chdir` variant.
     Chdir,
+    /// `Mkdir` variant.
     Mkdir,
+    /// `Unlink` variant.
     Unlink,
 
     // Control
+    /// `Eval` variant.
     Eval,
+    /// `Do` variant.
     Do,
+    /// `Require` variant.
     Require,
 
     // OOP
+    /// `Bless` variant.
     Bless,
+    /// `Caller` variant.
     Caller,
 
     // Parallel
+    /// `PMap` variant.
     PMap,
+    /// `PGrep` variant.
     PGrep,
+    /// `PFor` variant.
     PFor,
+    /// `PSort` variant.
     PSort,
+    /// `Fan` variant.
     Fan,
 
     // Map/Grep (block-based — need special handling)
+    /// `MapBlock` variant.
     MapBlock,
+    /// `GrepBlock` variant.
     GrepBlock,
+    /// `SortBlock` variant.
     SortBlock,
 
     // Math (appended — do not reorder earlier IDs)
+    /// `Sin` variant.
     Sin,
+    /// `Cos` variant.
     Cos,
+    /// `Atan2` variant.
     Atan2,
+    /// `Exp` variant.
     Exp,
+    /// `Log` variant.
     Log,
+    /// `Rand` variant.
     Rand,
+    /// `Srand` variant.
     Srand,
 
     // String (appended)
+    /// `Crypt` variant.
     Crypt,
+    /// `Fc` variant.
     Fc,
+    /// `Pos` variant.
     Pos,
+    /// `Study` variant.
     Study,
+    /// `Stat` variant.
 
     Stat,
+    /// `Lstat` variant.
     Lstat,
+    /// `Link` variant.
     Link,
+    /// `Symlink` variant.
     Symlink,
+    /// `Readlink` variant.
     Readlink,
+    /// `Glob` variant.
     Glob,
+    /// `Opendir` variant.
 
     Opendir,
+    /// `Readdir` variant.
     Readdir,
+    /// `Closedir` variant.
     Closedir,
+    /// `Rewinddir` variant.
     Rewinddir,
+    /// `Telldir` variant.
     Telldir,
+    /// `Seekdir` variant.
     Seekdir,
     /// Read entire file as UTF-8 (`slurp $path`).
     Slurp,
@@ -1092,6 +1261,7 @@ pub enum BuiltinId {
 }
 
 impl BuiltinId {
+    /// `from_u16` — see implementation.
     pub fn from_u16(v: u16) -> Option<Self> {
         if v <= Self::Executables as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
@@ -1104,6 +1274,7 @@ impl BuiltinId {
 /// A compiled chunk of bytecode with its constant pools.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
+    /// `ops` field.
     pub ops: Vec<Op>,
     /// Constant pool: string literals, regex patterns, etc.
     #[serde(with = "crate::script_cache::constants_pool_codec")]
@@ -1181,6 +1352,7 @@ pub struct Chunk {
     pub keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `values EXPR` when not bare `%h`.
     pub values_expr_entries: Vec<Expr>,
+    /// `values_expr_bytecode_ranges` field.
     pub values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// `delete EXPR` when not the fast `%h{k}` lowering.
     pub delete_expr_entries: Vec<Expr>,
@@ -1188,9 +1360,13 @@ pub struct Chunk {
     pub exists_expr_entries: Vec<Expr>,
     /// `push` when the array operand is not a bare `@name` (e.g. `push $aref, ...`).
     pub push_expr_entries: Vec<(Expr, Vec<Expr>)>,
+    /// `pop_expr_entries` field.
     pub pop_expr_entries: Vec<Expr>,
+    /// `shift_expr_entries` field.
     pub shift_expr_entries: Vec<Expr>,
+    /// `unshift_expr_entries` field.
     pub unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
+    /// `splice_expr_entries` field.
     pub splice_expr_entries: Vec<SpliceExprEntry>,
     /// `map EXPR, LIST` — map expression (list context) with `$_` set to each element.
     pub map_expr_entries: Vec<Expr>,
@@ -1223,6 +1399,7 @@ impl Chunk {
             .find(|(n, _, _)| *n == name_idx)
             .map(|(_, ip, stack_args)| (*ip, *stack_args))
     }
+    /// `new` — see implementation.
 
     pub fn new() -> Self {
         Self {
@@ -1349,30 +1526,35 @@ impl Chunk {
         self.exists_expr_entries.push(expr);
         idx
     }
+    /// `add_push_expr_entry` — see implementation.
 
     pub fn add_push_expr_entry(&mut self, array: Expr, values: Vec<Expr>) -> u16 {
         let idx = self.push_expr_entries.len() as u16;
         self.push_expr_entries.push((array, values));
         idx
     }
+    /// `add_pop_expr_entry` — see implementation.
 
     pub fn add_pop_expr_entry(&mut self, array: Expr) -> u16 {
         let idx = self.pop_expr_entries.len() as u16;
         self.pop_expr_entries.push(array);
         idx
     }
+    /// `add_shift_expr_entry` — see implementation.
 
     pub fn add_shift_expr_entry(&mut self, array: Expr) -> u16 {
         let idx = self.shift_expr_entries.len() as u16;
         self.shift_expr_entries.push(array);
         idx
     }
+    /// `add_unshift_expr_entry` — see implementation.
 
     pub fn add_unshift_expr_entry(&mut self, array: Expr, values: Vec<Expr>) -> u16 {
         let idx = self.unshift_expr_entries.len() as u16;
         self.unshift_expr_entries.push((array, values));
         idx
     }
+    /// `add_splice_expr_entry` — see implementation.
 
     pub fn add_splice_expr_entry(
         &mut self,
@@ -1545,6 +1727,7 @@ impl Chunk {
             _ => panic!("patch_jump_to on non-jump op at {}", idx),
         }
     }
+    /// `patch_try_push_catch` — see implementation.
 
     pub fn patch_try_push_catch(&mut self, idx: usize, catch_ip: usize) {
         match &mut self.ops[idx] {
@@ -1552,6 +1735,7 @@ impl Chunk {
             _ => panic!("patch_try_push_catch on non-TryPush op at {}", idx),
         }
     }
+    /// `patch_try_push_finally` — see implementation.
 
     pub fn patch_try_push_finally(&mut self, idx: usize, finally_ip: Option<usize>) {
         match &mut self.ops[idx] {
@@ -1559,6 +1743,7 @@ impl Chunk {
             _ => panic!("patch_try_push_finally on non-TryPush op at {}", idx),
         }
     }
+    /// `patch_try_push_after` — see implementation.
 
     pub fn patch_try_push_after(&mut self, idx: usize, after_ip: usize) {
         match &mut self.ops[idx] {
@@ -1572,6 +1757,7 @@ impl Chunk {
     pub fn len(&self) -> usize {
         self.ops.len()
     }
+    /// `is_empty` — see implementation.
 
     #[inline]
     pub fn is_empty(&self) -> bool {

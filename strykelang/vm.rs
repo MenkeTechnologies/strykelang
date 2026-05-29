@@ -276,13 +276,19 @@ struct CallFrame {
 pub struct VM<'a> {
     /// Shared with parallel workers via [`Self::new_parallel_worker`] (cheap `Arc` clones).
     names: Arc<Vec<String>>,
+    /// `constants` field.
     constants: Arc<Vec<StrykeValue>>,
+    /// `ops` field.
     ops: Arc<Vec<Op>>,
+    /// `lines` field.
     lines: Arc<Vec<usize>>,
+    /// `sub_entries` field.
     sub_entries: Vec<(u16, usize, bool)>,
     /// See [`Chunk::static_sub_calls`] (`Op::CallStaticSubId`).
     static_sub_calls: Vec<(usize, bool, u16)>,
+    /// `blocks` field.
     blocks: Vec<Block>,
+    /// `code_ref_sigs` field.
     code_ref_sigs: Vec<Vec<SubSigParam>>,
     /// Optional `ops[start..end]` lowering for [`Self::blocks`] (see [`Chunk::block_bytecode_ranges`]).
     block_bytecode_ranges: Vec<Option<(usize, usize)>>,
@@ -290,42 +296,76 @@ pub struct VM<'a> {
     map_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
     /// Optional lowering for [`Chunk::grep_expr_entries`] (see [`Chunk::grep_expr_bytecode_ranges`]).
     grep_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `given_entries` field.
     given_entries: Vec<(Expr, Block)>,
+    /// `given_topic_bytecode_ranges` field.
     given_topic_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `eval_timeout_entries` field.
     eval_timeout_entries: Vec<(Expr, Block)>,
+    /// `eval_timeout_expr_bytecode_ranges` field.
     eval_timeout_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `algebraic_match_entries` field.
     algebraic_match_entries: Vec<(Expr, Vec<MatchArm>)>,
+    /// `algebraic_match_subject_bytecode_ranges` field.
     algebraic_match_subject_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `par_lines_entries` field.
     par_lines_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    /// `par_walk_entries` field.
     par_walk_entries: Vec<(Expr, Expr, Option<Expr>)>,
+    /// `pwatch_entries` field.
     pwatch_entries: Vec<(Expr, Expr)>,
+    /// `substr_four_arg_entries` field.
     substr_four_arg_entries: Vec<(Expr, Expr, Option<Expr>, Expr)>,
+    /// `keys_expr_entries` field.
     keys_expr_entries: Vec<Expr>,
+    /// `keys_expr_bytecode_ranges` field.
     keys_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `map_expr_entries` field.
     map_expr_entries: Vec<Expr>,
+    /// `grep_expr_entries` field.
     grep_expr_entries: Vec<Expr>,
+    /// `regex_flip_flop_rhs_expr_entries` field.
     regex_flip_flop_rhs_expr_entries: Vec<Expr>,
+    /// `regex_flip_flop_rhs_expr_bytecode_ranges` field.
     regex_flip_flop_rhs_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `values_expr_entries` field.
     values_expr_entries: Vec<Expr>,
+    /// `values_expr_bytecode_ranges` field.
     values_expr_bytecode_ranges: Vec<Option<(usize, usize)>>,
+    /// `delete_expr_entries` field.
     delete_expr_entries: Vec<Expr>,
+    /// `exists_expr_entries` field.
     exists_expr_entries: Vec<Expr>,
+    /// `push_expr_entries` field.
     push_expr_entries: Vec<(Expr, Vec<Expr>)>,
+    /// `pop_expr_entries` field.
     pop_expr_entries: Vec<Expr>,
+    /// `shift_expr_entries` field.
     shift_expr_entries: Vec<Expr>,
+    /// `unshift_expr_entries` field.
     unshift_expr_entries: Vec<(Expr, Vec<Expr>)>,
+    /// `splice_expr_entries` field.
     splice_expr_entries: Vec<SpliceExprEntry>,
+    /// `lvalues` field.
     lvalues: Vec<Expr>,
+    /// `ast_eval_exprs` field.
     ast_eval_exprs: Vec<Expr>,
+    /// `format_decls` field.
     format_decls: Vec<(String, Vec<String>)>,
+    /// `use_overload_entries` field.
     use_overload_entries: Vec<Vec<(String, String)>>,
+    /// `runtime_sub_decls` field.
     runtime_sub_decls: Arc<Vec<RuntimeSubDecl>>,
+    /// `runtime_advice_decls` field.
     runtime_advice_decls: Arc<Vec<crate::bytecode::RuntimeAdviceDecl>>,
     pub(crate) ip: usize,
+    /// `stack` field.
     stack: Vec<StrykeValue>,
+    /// `call_stack` field.
     call_stack: Vec<CallFrame>,
     /// Paired with [`Op::WantarrayPush`] / [`Op::WantarrayPop`] (e.g. `splice` list vs scalar return).
     wantarray_stack: Vec<WantarrayCtx>,
+    /// `interp` field.
     interp: &'a mut VMHelper,
     /// When `false`, [`VM::execute`] skips Cranelift JIT (linear, block, and subroutine linear) and
     /// uses only the opcode interpreter. Default `true`.
@@ -343,7 +383,9 @@ pub struct VM<'a> {
     jit_sub_invoke_threshold: u32,
     /// Reused `i64` tables for sub-JIT / top-level JIT attempts (avoids `vec![0; n]` on every try).
     jit_buf_slot: Vec<i64>,
+    /// `jit_buf_plain` field.
     jit_buf_plain: Vec<i64>,
+    /// `jit_buf_arg` field.
     jit_buf_arg: Vec<i64>,
     /// Set when running [`VM::jit_trampoline_run_sub`]; [`Op::ReturnValue`] stores here and exits dispatch.
     jit_trampoline_out: Option<StrykeValue>,
@@ -367,11 +409,14 @@ pub struct VM<'a> {
     sub_entry_by_name: HashMap<u16, (usize, bool)>,
     /// When executing [`Chunk::block_bytecode_ranges`] via [`Self::run_block_region`].
     block_region_mode: bool,
+    /// `block_region_end` field.
     block_region_end: usize,
+    /// `block_region_return` field.
     block_region_return: Option<StrykeValue>,
 }
 
 impl<'a> VM<'a> {
+    /// `new` — see implementation.
     pub fn new(chunk: &Chunk, interp: &'a mut VMHelper) -> Self {
         let static_sub_closure_subs: Vec<Option<Arc<StrykeSub>>> = chunk
             .static_sub_calls

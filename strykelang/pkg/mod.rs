@@ -15,9 +15,13 @@
 //! - [`commands`] — `s {init,new,add,remove,install,tree,info}` impls.
 
 pub mod commands;
+/// `lockfile` submodule.
 pub mod lockfile;
+/// `manifest` submodule.
 pub mod manifest;
+/// `resolver` submodule.
 pub mod resolver;
+/// `store` submodule.
 pub mod store;
 
 /// `Result` alias used throughout the package manager. Errors are stringly-typed

@@ -7,8 +7,10 @@ use crate::parser::parse_format_value_line;
 /// Parsed `format NAME = ... .` body (after registration).
 #[derive(Debug, Clone)]
 pub struct FormatTemplate {
+    /// `records` field.
     pub records: Vec<FormatRecord>,
 }
+/// `FormatRecord` — see variants.
 
 #[derive(Debug, Clone)]
 pub enum FormatRecord {
@@ -20,26 +22,39 @@ pub enum FormatRecord {
         exprs: Vec<Expr>,
     },
 }
+/// `FieldAlign` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldAlign {
+    /// `Left` variant.
     Left,
+    /// `Right` variant.
     Right,
+    /// `Center` variant.
     Center,
+    /// `Numeric` variant.
     Numeric,
+    /// `Multiline` variant.
     Multiline,
 }
+/// `FieldKind` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldKind {
+    /// `Text` variant.
     Text,
+    /// `Numeric` variant.
     Numeric,
+    /// `Multiline` variant.
     Multiline,
 }
+/// `PictureSegment` — see variants.
 
 #[derive(Debug, Clone)]
 pub enum PictureSegment {
+    /// `Literal` variant.
     Literal(String),
+    /// `Field` variant.
     Field {
         width: usize,
         align: FieldAlign,

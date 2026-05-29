@@ -422,6 +422,7 @@ impl Prompt for StrykePrompt {
 pub fn print_cyberpunk_banner() {
     stryke::banner::print_banner(true);
 }
+/// `run` — see implementation.
 
 pub fn run(cli: &Cli) {
     let mut interp = VMHelper::new();
