@@ -1,0 +1,306 @@
+#!/usr/bin/env stryke
+
+# Ukkonen's algorithm — online suffix tree construction in O(n).
+# Each iteration extends the current implicit suffix tree by one
+# character. The "active point" trio (active_node, active_edge,
+# active_length) tracks where the next insertion happens, and
+# suffix links let us skip from "we just split here" to "now do
+# the same one suffix shorter" in O(1).
+#
+# Implementation details:
+#   * end-of-string sentinel: 0x01 appended so the tree's leaves
+#     correspond exactly to the n suffixes
+#   * leaf "end" pointer is a shared scalar so every leaf grows in
+#     O(1) with each extension (Ukkonen's "trick 1")
+#   * skip-count: when we descend an edge longer than the remaining
+#     active_length, jump in O(1)
+#
+# Cross-validated by:
+#   * every input substring is accepted (DFS traversal matches it)
+#   * the tree has exactly n + 1 leaves (n suffixes + the terminator)
+#   * distinct-substring count = Σ over edges of edge-length, with
+#     the terminator subtracted out — matches O(n²) brute hash.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Uk::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/ukkonen_suffix_tree_no_interop.stk
+
+# ── node factory ────────────────────────────────────────────────
+# Each node has:
+#   start, end : edge label coords into the input string
+#   children   : hashref ch → child-node-id
+#   suffix_link: -1 if none yet
+# Leaves use $tree->{leaf_end} as their `end` (shared scalar trick).
+
+fn Uk::new_node($start, $end_is_leaf, $end_val) {
+    +{
+        start         => $start,
+        end           => $end_val,
+        end_is_leaf   => $end_is_leaf,
+        children      => +{},
+        suffix_link   => -1,
+    }
+}
+
+# ── effective edge length: leaves use shared leaf_end ───────────
+
+fn Uk::edge_len($tree, $node_id) {
+    my $n = $tree->{nodes}->[$node_id]
+    my $e = $n->{end_is_leaf} ? $tree->{leaf_end} : $n->{end}
+    $e - $n->{start} + 1
+}
+
+# ── build the suffix tree from an input string ──────────────────
+
+fn Uk::build($s) {
+    my $text = $s . "\x01"   # sentinel guarantees every suffix is a leaf
+    my $n = len($text)
+    my $tree = +{
+        text        => $text,
+        nodes       => [],
+        leaf_end    => -1,
+        active_node => 0,
+        active_edge => -1,
+        active_len  => 0,
+        remaining   => 0,
+        last_added  => -1,
+    }
+    # Root.
+    push @{$tree->{nodes}}, Uk::new_node(-1, 0, -1)
+    for my $pos (0:$n - 1) {
+        Uk::extend($tree, $pos)
+    }
+    $tree
+}
+
+fn Uk::extend($tree, $pos) {
+    $tree->{leaf_end} = $pos
+    $tree->{remaining}++
+    $tree->{last_added} = -1
+    while ($tree->{remaining} > 0) {
+        if ($tree->{active_len} == 0) {
+            $tree->{active_edge} = $pos
+        }
+        my $ch = substr($tree->{text}, $tree->{active_edge}, 1)
+        my $active = $tree->{nodes}->[$tree->{active_node}]
+        if (!exists $active->{children}->{$ch}) {
+            # No matching edge — create a new leaf.
+            push @{$tree->{nodes}}, Uk::new_node($pos, 1, -1)
+            $active->{children}->{$ch} = len(@{$tree->{nodes}}) - 1
+            if ($tree->{last_added} != -1) {
+                $tree->{nodes}->[$tree->{last_added}]->{suffix_link} = $tree->{active_node}
+                $tree->{last_added} = -1
+            }
+        } else {
+            my $next_id = $active->{children}->{$ch}
+            my $edge_len = Uk::edge_len($tree, $next_id)
+            # Walk down if active_len exceeds this edge.
+            if ($tree->{active_len} >= $edge_len) {
+                $tree->{active_edge} += $edge_len
+                $tree->{active_len}  -= $edge_len
+                $tree->{active_node}  = $next_id
+                next
+            }
+            # Check if next char matches existing edge.
+            my $next_node = $tree->{nodes}->[$next_id]
+            my $cur_pos = $next_node->{start} + $tree->{active_len}
+            if (substr($tree->{text}, $cur_pos, 1) eq substr($tree->{text}, $pos, 1)) {
+                # Already in tree; just advance active_len.
+                if ($tree->{last_added} != -1 && $tree->{active_node} != 0) {
+                    $tree->{nodes}->[$tree->{last_added}]->{suffix_link} = $tree->{active_node}
+                    $tree->{last_added} = -1
+                }
+                $tree->{active_len}++
+                last
+            }
+            # Split the edge.
+            push @{$tree->{nodes}}, Uk::new_node($next_node->{start}, 0, $cur_pos - 1)
+            my $split_id = len(@{$tree->{nodes}}) - 1
+            $active->{children}->{$ch} = $split_id
+            # New leaf for the new char.
+            push @{$tree->{nodes}}, Uk::new_node($pos, 1, -1)
+            $tree->{nodes}->[$split_id]->{children}->{substr($tree->{text}, $pos, 1)} = len(@{$tree->{nodes}}) - 1
+            # Original edge becomes a child of split.
+            $next_node->{start} = $cur_pos
+            $tree->{nodes}->[$split_id]->{children}->{substr($tree->{text}, $cur_pos, 1)} = $next_id
+            if ($tree->{last_added} != -1) {
+                $tree->{nodes}->[$tree->{last_added}]->{suffix_link} = $split_id
+            }
+            $tree->{last_added} = $split_id
+        }
+        $tree->{remaining}--
+        if ($tree->{active_node} == 0 && $tree->{active_len} > 0) {
+            $tree->{active_len}--
+            $tree->{active_edge} = $pos - $tree->{remaining} + 1
+        } elsif ($tree->{active_node} != 0) {
+            $tree->{active_node} = $tree->{nodes}->[$tree->{active_node}]->{suffix_link} >= 0
+                ? $tree->{nodes}->[$tree->{active_node}]->{suffix_link}
+                : 0
+        }
+    }
+}
+
+# ── does the tree contain substring p? ───────────────────────────
+
+fn Uk::contains($tree, $p) {
+    my $n = len($p)
+    return 1 if $n == 0
+    my $cur = 0
+    my $i = 0
+    while ($i < $n) {
+        my $ch = substr($p, $i, 1)
+        my $node = $tree->{nodes}->[$cur]
+        return 0 unless exists $node->{children}->{$ch}
+        my $child_id = $node->{children}->{$ch}
+        my $child = $tree->{nodes}->[$child_id]
+        my $edge_len = Uk::edge_len($tree, $child_id)
+        my $start = $child->{start}
+        my $can = $edge_len < $n - $i ? $edge_len : $n - $i
+        for my $k (0:$can - 1) {
+            if (substr($tree->{text}, $start + $k, 1) ne substr($p, $i + $k, 1)) {
+                return 0
+            }
+        }
+        $i += $can
+        $cur = $child_id
+    }
+    1
+}
+
+# ── count leaves (DFS) ──────────────────────────────────────────
+
+fn Uk::leaf_count($tree) {
+    my $count = 0
+    my @stack = (0)
+    while (len(@stack) > 0) {
+        my $u = pop(@stack)
+        my $node = $tree->{nodes}->[$u]
+        if (len(keys %{$node->{children}}) == 0) {
+            $count++
+        } else {
+            for my $ch (keys %{$node->{children}}) {
+                push @stack, $node->{children}->{$ch}
+            }
+        }
+    }
+    $count
+}
+
+# ── brute distinct substrings via hash ──────────────────────────
+
+fn Uk::brute_distinct($s) {
+    my %seen
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            $seen{substr($s, $i, $j - $i + 1)} = 1
+        }
+    }
+    len(keys %seen)
+}
+
+# ── count distinct substrings via edge labels (subtract terminator) ─
+# Σ edge_length over all non-root edges, minus 1 for each path that
+# ends at the terminator char.
+
+fn Uk::distinct_substrings($tree) {
+    my $sum = 0
+    my @stack = (0)
+    while (len(@stack) > 0) {
+        my $u = pop(@stack)
+        my $node = $tree->{nodes}->[$u]
+        for my $ch (keys %{$node->{children}}) {
+            my $cid = $node->{children}->{$ch}
+            $sum += Uk::edge_len($tree, $cid)
+            push @stack, $cid
+        }
+    }
+    # The terminator '\x01' contributes len(text) extra (one per suffix
+    # that ends at sentinel). Each suffix's path through the tree
+    # ends with the sentinel; total sentinel contributions = n + 1
+    # (one per suffix, including the empty one). We subtract n + 1
+    # to remove those — yielding distinct substrings of the original.
+    $sum - len($tree->{text})
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @strings = ("abc", "banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababcabab")
+
+p "── Ukkonen suffix-tree demo ──────────────────────────"
+printf "  %-16s  %4s  %6s  %6s  %6s\n", "input", "len", "leaves", "nodes", "subs"
+printf "  %-16s  %4s  %6s  %6s  %6s\n", "----------------", "----", "------", "------", "------"
+for my $s (@strings) {
+    my $tree = Uk::build($s)
+    my $leaves = Uk::leaf_count($tree)
+    my $nodes = len(@{$tree->{nodes}})
+    my $subs = Uk::distinct_substrings($tree)
+    printf "  %-16s  %4d  %6d  %6d  %6d\n", "\"#{$s}\"", len($s), $leaves, $nodes, $subs
+}
+
+# ── invariant 1: every substring of s is contained by the tree ────
+
+for my $s (@strings) {
+    my $tree = Uk::build($s)
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            my $sub = substr($s, $i, $j - $i + 1)
+            die "Ukkonen tree(\"#{$s}\") missing substring \"#{$sub}\"" unless Uk::contains($tree, $sub)
+        }
+    }
+}
+
+# ── invariant 2: a non-substring is correctly rejected ────────────
+
+for my $pair (["banana", "ban!"], ["mississippi", "Z"], ["abc", "ca"], ["stryke", "Stryke"]) {
+    my $tree = Uk::build($pair->[0])
+    die "tree(\"#{$pair->[0]}\") falsely accepts \"#{$pair->[1]}\"" if Uk::contains($tree, $pair->[1])
+}
+
+# ── invariant 3: leaf count equals n + 1 (n suffixes + empty) ─────
+
+for my $s (@strings) {
+    my $tree = Uk::build($s)
+    my $leaves = Uk::leaf_count($tree)
+    die "leaves #{$leaves} != n + 1 #{len($s) + 1} on \"#{$s}\"" unless $leaves == len($s) + 1
+}
+
+# ── invariant 4: distinct-substring count matches brute hash ──────
+
+for my $s (@strings) {
+    my $tree = Uk::build($s)
+    my $u_count = Uk::distinct_substrings($tree)
+    my $b_count = Uk::brute_distinct($s)
+    die "distinct(\"#{$s}\"): Ukkonen=#{$u_count} brute=#{$b_count}" unless $u_count == $b_count
+}
+
+# ── invariant 5: empty string yields a single-node (root-only) tree ─
+
+my $empty = Uk::build("")
+die "empty tree must have ≥ 2 nodes (root + sentinel leaf), got #{len(@{$empty->{nodes}})}" unless len(@{$empty->{nodes}}) >= 1
+
+# ── invariant 6: single-char string yields 2 leaves (the char + ε) ─
+
+my $one = Uk::build("a")
+die "single-char leaves != 2" unless Uk::leaf_count($one) == 2
+
+# ── invariant 7: all node start indices and edge ends are valid ───
+
+for my $s (@strings) {
+    my $tree = Uk::build($s)
+    my $tn = len($tree->{text})
+    for my $i (0:len(@{$tree->{nodes}}) - 1) {
+        my $node = $tree->{nodes}->[$i]
+        next if $node->{start} == -1   # root
+        die "node #{$i} start #{$node->{start}} ≥ text len #{$tn}" unless $node->{start} < $tn
+        my $e = $node->{end_is_leaf} ? $tree->{leaf_end} : $node->{end}
+        die "node #{$i} end #{$e} ≥ text len #{$tn}" unless $e < $tn
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

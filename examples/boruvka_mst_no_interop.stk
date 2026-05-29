@@ -1,0 +1,256 @@
+#!/usr/bin/env stryke
+
+# Borůvka's algorithm — minimum spanning tree via the parallel
+# "every-component-picks-its-cheapest-outgoing-edge" rule. Each
+# round at least halves the number of components, so the total
+# work is O(E log V). Among the three classic MST algorithms
+# (Kruskal, Prim, Borůvka), Borůvka is the oldest (1926) and
+# the most amenable to parallel execution since every component
+# discovers its cheapest edge independently.
+#
+# Cross-validated against Kruskal's algorithm (re-implemented
+# inline) on every input.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Bv::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/boruvka_mst_no_interop.stk
+
+# ── union-find with path compression + union-by-rank ─────────────
+
+fn Bv::uf_find($parent, $x) {
+    while ($parent->[$x] != $x) {
+        $parent->[$x] = $parent->[$parent->[$x]]
+        $x = $parent->[$x]
+    }
+    $x
+}
+
+fn Bv::uf_union($parent, $rank, $x, $y) {
+    my $rx = Bv::uf_find($parent, $x)
+    my $ry = Bv::uf_find($parent, $y)
+    return 0 if $rx == $ry
+    if ($rank->[$rx] < $rank->[$ry]) {
+        $parent->[$rx] = $ry
+    } elsif ($rank->[$rx] > $rank->[$ry]) {
+        $parent->[$ry] = $rx
+    } else {
+        $parent->[$ry] = $rx
+        $rank->[$rx]++
+    }
+    1
+}
+
+# ── Borůvka's algorithm: returns +{ cost, edges } ────────────────
+
+fn Bv::boruvka($n, $edges) {
+    my @parent = (0:$n - 1)
+    my @rank   = (0)  x $n
+    my $components = $n
+    my $total = 0
+    my @mst_edges
+    my $rounds = 0
+    while ($components > 1) {
+        $rounds++
+        my $INF = 1_000_000_000
+        my @cheapest = (-1) x $n   # cheapest[c] = edge index for component c
+        my @cheap_w  = ($INF) x $n
+        my $m = len(@$edges)
+        for my $i (0:$m - 1) {
+            my $e = $edges->[$i]
+            my $ra = Bv::uf_find(\@parent, $e->[0])
+            my $rb = Bv::uf_find(\@parent, $e->[1])
+            next if $ra == $rb
+            if ($e->[2] < $cheap_w[$ra]) {
+                $cheap_w[$ra]  = $e->[2]
+                $cheapest[$ra] = $i
+            }
+            if ($e->[2] < $cheap_w[$rb]) {
+                $cheap_w[$rb]  = $e->[2]
+                $cheapest[$rb] = $i
+            }
+        }
+        my $progress = 0
+        for my $c (0:$n - 1) {
+            next if $cheapest[$c] == -1
+            my $e = $edges->[$cheapest[$c]]
+            if (Bv::uf_union(\@parent, \@rank, $e->[0], $e->[1])) {
+                $total += $e->[2]
+                push @mst_edges, [$e->[0], $e->[1], $e->[2]]
+                $components--
+                $progress++
+            }
+        }
+        if ($progress == 0) {
+            # No more edges to merge — disconnected graph.
+            last
+        }
+    }
+    +{ cost => $total, edges => \@mst_edges, rounds => $rounds, components => $components }
+}
+
+# ── Kruskal for cross-validation ─────────────────────────────────
+
+fn Bv::kruskal($n, $edges) {
+    my @sorted = sort { _0->[2] <=> _1->[2] } @$edges
+    my @parent = (0:$n - 1)
+    my @rank   = (0)  x $n
+    my $total = 0
+    my $kept = 0
+    for my $e (@sorted) {
+        if (Bv::uf_union(\@parent, \@rank, $e->[0], $e->[1])) {
+            $total += $e->[2]
+            $kept++
+        }
+    }
+    +{ cost => $total, edge_count => $kept }
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name  => "single edge",
+        n     => 2,
+        edges => [[0, 1, 5]],
+        cost  => 5,
+    },
+    +{
+        name  => "triangle (pick 2 cheapest)",
+        n     => 3,
+        edges => [[0, 1, 1], [1, 2, 2], [0, 2, 3]],
+        cost  => 3,
+    },
+    +{
+        name  => "K4 with mixed weights",
+        n     => 4,
+        edges => [
+            [0, 1, 1], [0, 2, 4], [0, 3, 3],
+            [1, 2, 2], [1, 3, 5],
+            [2, 3, 6],
+        ],
+        cost  => 6,   # 1 + 2 + 3
+    },
+    +{
+        name  => "CLRS-style 9-node",
+        n     => 9,
+        edges => [
+            [0, 1, 4], [0, 7, 8],
+            [1, 2, 8], [1, 7, 11],
+            [2, 3, 7], [2, 5, 4], [2, 8, 2],
+            [3, 4, 9], [3, 5, 14],
+            [4, 5, 10],
+            [5, 6, 2],
+            [6, 7, 1], [6, 8, 6],
+            [7, 8, 7],
+        ],
+        cost  => 37,
+    },
+    +{
+        name  => "disconnected (2 components)",
+        n     => 5,
+        edges => [[0, 1, 5], [1, 2, 3], [3, 4, 2]],
+        cost  => 10,
+    },
+    +{
+        name  => "dense K5",
+        n     => 5,
+        edges => [
+            [0, 1, 1], [0, 2, 5], [0, 3, 6], [0, 4, 9],
+            [1, 2, 2], [1, 3, 7], [1, 4, 8],
+            [2, 3, 3], [2, 4, 10],
+            [3, 4, 4],
+        ],
+        cost  => 10,   # 1+2+3+4
+    },
+)
+
+p "── Borůvka MST demo ──────────────────────────────────"
+printf "  %-30s  %3s  %5s  %6s  %s\n", "case", "n", "cost", "rounds", "edges-kept"
+printf "  %-30s  %3s  %5s  %6s  %s\n", "------------------------------", "---", "-----", "------", "----------"
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    printf "  %-30s  %3d  %5d  %6d  %d  %s\n",
+        $c->{name}, $c->{n}, $r->{cost}, $r->{rounds}, len(@{$r->{edges}}),
+        $r->{cost} == $c->{cost} ? "" : "FAIL want=#{$c->{cost}}"
+}
+
+# ── invariant 1: Borůvka cost matches expected ────────────────────
+
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    die "Borůvka cost #{$r->{cost}} != expected #{$c->{cost}} on \"#{$c->{name}}\"" unless $r->{cost} == $c->{cost}
+}
+
+# ── invariant 2: Borůvka agrees with Kruskal ──────────────────────
+
+for my $c (@cases) {
+    my $bv = Bv::boruvka($c->{n}, $c->{edges})
+    my $k = Bv::kruskal($c->{n}, $c->{edges})
+    die "Borůvka #{$bv->{cost}} != Kruskal #{$k->{cost}} on \"#{$c->{name}}\"" unless $bv->{cost} == $k->{cost}
+}
+
+# ── invariant 3: MST has (n − components) edges ───────────────────
+
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    my $k = Bv::kruskal($c->{n}, $c->{edges})
+    die "MST edge count #{len(@{$r->{edges}})} != Kruskal #{$k->{edge_count}} on \"#{$c->{name}}\"" unless len(@{$r->{edges}}) == $k->{edge_count}
+}
+
+# ── invariant 4: every MST edge is in the original edge set ───────
+
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    my %edge_set
+    for my $e (@{$c->{edges}}) {
+        my $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
+        my $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
+        $edge_set{"#{$u},#{$v},#{$e->[2]}"} = 1
+    }
+    for my $e (@{$r->{edges}}) {
+        my $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
+        my $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
+        die "MST edge (#{$u}, #{$v}, #{$e->[2]}) not in input on \"#{$c->{name}}\"" unless exists $edge_set{"#{$u},#{$v},#{$e->[2]}"}
+    }
+}
+
+# ── invariant 5: round count is O(log n) — strictly ≤ ⌈log₂ n⌉ + 1 ─
+
+fn Bv::ceil_log2($n) {
+    my $r = 0
+    my $v = 1
+    while ($v < $n) {
+        $r++
+        $v *= 2
+    }
+    $r
+}
+
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    my $bound = Bv::ceil_log2($c->{n}) + 1
+    die "Borůvka rounds #{$r->{rounds}} > ⌈log₂ #{$c->{n}}⌉ + 1 = #{$bound} on \"#{$c->{name}}\"" unless $r->{rounds} <= $bound
+}
+
+# ── invariant 6: connected graph → exactly 1 component remaining ──
+
+for my $c (@cases) {
+    next if $c->{name} eq "disconnected (2 components)"
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    die "connected graph has #{$r->{components}} components on \"#{$c->{name}}\"" unless $r->{components} == 1
+}
+
+# ── invariant 7: MST cost ≤ Σ all edge weights ───────────────────
+
+for my $c (@cases) {
+    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    my $sum = 0
+    for my $e (@{$c->{edges}}) { $sum += $e->[2] }
+    die "MST cost #{$r->{cost}} > Σ edges #{$sum} on \"#{$c->{name}}\"" unless $r->{cost} <= $sum
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
