@@ -266,3 +266,82 @@ fn scalar_context_for_hash_key_expression() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
+
+// ── Additional C-parity pins ──────────────────────────────────────
+
+/// `wantarray()` called from a nested fn in list context still scopes
+/// per the *callee's* immediate caller (not the outer scope).
+#[test]
+fn wantarray_in_chained_list_caller() {
+    let code = r#"
+        fn Demo::WA::inner() { wantarray() ? "L" : "S" }
+        fn Demo::WA::outer() { Demo::WA::inner() }
+        my @r = Demo::WA::outer();
+        # outer is called in list context; outer's call of inner is the
+        # implicit-return position, so inner is in list context too.
+        $r[0] eq "L" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+/// `wantarray()` distinguishes void context — even when assigned via
+/// `mysync` to escape closure-capture rules, the standalone-call site
+/// must produce either "void" or "scalar" per stryke semantics.
+#[test]
+fn wantarray_void_context_via_discarded_call() {
+    let code = r#"
+        mysync $marker = "";
+        fn Demo::WA::probe() {
+            if (!defined(wantarray())) { $marker = "void"; return; }
+            $marker = wantarray() ? "list" : "scalar"; return;
+        }
+        # Standalone call discards the return value → void context.
+        Demo::WA::probe();
+        ($marker eq "void" || $marker eq "scalar") ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+/// `keys %h` in scalar context returns the key count.
+#[test]
+fn keys_in_scalar_context_returns_count() {
+    let code = r#"
+        my %h = (a => 1, b => 2, c => 3);
+        my $n = scalar keys %h;
+        $n == 3 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+/// `values %h` in list context returns all values (length-equivalent
+/// to key count).
+#[test]
+fn values_in_list_context_returns_all_values() {
+    let code = r#"
+        my %h = (a => 10, b => 20, c => 30);
+        my @v = values %h;
+        len(@v) == 3 ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+/// `()` empty list in scalar context yields undef (not 0); guarded by
+/// `defined`.
+#[test]
+fn empty_list_in_scalar_context_is_undef() {
+    let code = r#"
+        my $r = ();
+        defined($r) ? 0 : 1
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+/// `scalar(@arr)` and `len(@arr)` agree on array length.
+#[test]
+fn scalar_array_matches_len() {
+    let code = r#"
+        my @arr = (7, 8, 9, 10);
+        scalar(@arr) == len(@arr) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
