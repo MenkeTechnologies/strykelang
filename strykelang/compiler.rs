@@ -8475,7 +8475,11 @@ impl Compiler {
                 self.check_array_mutable(&q, line)?;
                 let idx = self.chunk.intern_name(&q);
                 self.compile_expr(index)?;
-                self.emit_op(Op::SetArrayElem(idx), line, ast);
+                if keep {
+                    self.emit_op(Op::SetArrayElemKeep(idx), line, ast);
+                } else {
+                    self.emit_op(Op::SetArrayElem(idx), line, ast);
+                }
             }
             ExprKind::ArraySlice { array, indices } => {
                 if indices.is_empty() {
