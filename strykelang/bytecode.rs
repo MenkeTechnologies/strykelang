@@ -125,13 +125,13 @@ pub enum Op {
     /// Like [`Op::SetArrayElem`] but leaves the assigned value on the stack (e.g. `$a[$i] //=`).
     SetArrayElemKeep(u16),
     /// `PushArray` variant.
-    PushArray(u16),  // stack: [value] → push to named array
+    PushArray(u16), // stack: [value] → push to named array
     /// `PopArray` variant.
-    PopArray(u16),   // → popped value
+    PopArray(u16), // → popped value
     /// `ShiftArray` variant.
     ShiftArray(u16), // → shifted value
     /// `ArrayLen` variant.
-    ArrayLen(u16),   // → integer length
+    ArrayLen(u16), // → integer length
     /// Pop index spec (scalar or array from [`Op::Range`]); push one `StrykeValue::array` of elements
     /// read from the named array. Used for `@name[...]` slice rvalues.
     ArraySlicePart(u16),
@@ -188,7 +188,7 @@ pub enum Op {
     /// `delete $aref->[$i]` — stack: `[container, index]` → deleted value (or undef).
     DeleteArrowArrayElem,
     /// `HashKeys` variant.
-    HashKeys(u16),   // → array of keys
+    HashKeys(u16), // → array of keys
     /// `HashValues` variant.
     HashValues(u16), // → array of values
     /// Scalar `keys %h` — push integer key count.
@@ -480,9 +480,9 @@ pub enum Op {
     /// `MakeHash` variant.
     MakeHash(u16), // pop N key-value pairs, push as Hash
     /// `Range` variant.
-    Range,         // stack: [from, to] → Array
+    Range, // stack: [from, to] → Array
     /// `RangeStep` variant.
-    RangeStep,     // stack: [from, to, step] → Array (stepped range)
+    RangeStep, // stack: [from, to, step] → Array (stepped range)
     /// Array slice via colon range — `@arr[FROM:TO:STEP]` / `@arr[::-1]`.
     /// Stack: `[from, to, step]` — each may be `Undef` to mean "omitted" (uses array bounds).
     /// `u16` is the array name pool index. Endpoints must coerce to integer cleanly; otherwise
@@ -725,10 +725,7 @@ pub enum Op {
     /// pflat_maps { BLOCK } LIST — streaming parallel flat map; stack: \[list\] → \[iterator\]
     PFlatMapsWithBlock(u16),
     /// `pmap_on` / `pflat_map_on` over SSH — stack: \[progress_flag, list, cluster\] → \[mapped\]; `flat` = 1 for flatten
-    PMapRemote {
-        block_idx: u16,
-        flat: u8,
-    },
+    PMapRemote { block_idx: u16, flat: u8 },
     /// puniq LIST — hash-partition parallel distinct (first occurrence order); stack: \[progress_flag, list\] → \[array\]
     Puniq,
     /// pfirst { BLOCK } LIST — short-circuit parallel; stack: \[progress_flag, list\] → value or undef
@@ -758,10 +755,7 @@ pub enum Op {
     /// `pcache { BLOCK } @list` — block_idx; stack: \[progress_flag, list\] → \[array\]
     PcacheWithBlock(u16),
     /// `pselect($rx1, ... [, timeout => SECS])` — stack: \[rx0, …, rx_{n-1}\] with optional timeout on top
-    Pselect {
-        n_rx: u8,
-        has_timeout: bool,
-    },
+    Pselect { n_rx: u8, has_timeout: bool },
     /// `par_lines PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_lines_entries`]; stack: \[\] → `undef`
     ParLines(u16),
     /// `par_walk PATH, fn { } [, progress => EXPR]` — index into [`Chunk::par_walk_entries`]; stack: \[\] → `undef`
@@ -935,10 +929,7 @@ pub enum Op {
     UseOverload(u16),
     /// Scalar `$x OP= $rhs` — uses [`Scope::atomic_mutate`] so `mysync` scalars are RMW-safe.
     /// Stack: `[rhs]` → `[result]`. `op` byte is from [`crate::compiler::scalar_compound_op_to_byte`].
-    ScalarCompoundAssign {
-        name_idx: u16,
-        op: u8,
-    },
+    ScalarCompoundAssign { name_idx: u16, op: u8 },
 
     // ── Special ──
     /// Set `${^GLOBAL_PHASE}` on the interpreter. See [`GP_START`] … [`GP_END`].
@@ -1134,7 +1125,6 @@ pub enum BuiltinId {
     /// `Study` variant.
     Study,
     /// `Stat` variant.
-
     Stat,
     /// `Lstat` variant.
     Lstat,
@@ -1147,7 +1137,6 @@ pub enum BuiltinId {
     /// `Glob` variant.
     Glob,
     /// `Opendir` variant.
-
     Opendir,
     /// `Readdir` variant.
     Readdir,
@@ -1400,7 +1389,6 @@ impl Chunk {
             .map(|(_, ip, stack_args)| (*ip, *stack_args))
     }
     /// `new` — see implementation.
-
     pub fn new() -> Self {
         Self {
             ops: Vec::with_capacity(256),
@@ -1527,35 +1515,30 @@ impl Chunk {
         idx
     }
     /// `add_push_expr_entry` — see implementation.
-
     pub fn add_push_expr_entry(&mut self, array: Expr, values: Vec<Expr>) -> u16 {
         let idx = self.push_expr_entries.len() as u16;
         self.push_expr_entries.push((array, values));
         idx
     }
     /// `add_pop_expr_entry` — see implementation.
-
     pub fn add_pop_expr_entry(&mut self, array: Expr) -> u16 {
         let idx = self.pop_expr_entries.len() as u16;
         self.pop_expr_entries.push(array);
         idx
     }
     /// `add_shift_expr_entry` — see implementation.
-
     pub fn add_shift_expr_entry(&mut self, array: Expr) -> u16 {
         let idx = self.shift_expr_entries.len() as u16;
         self.shift_expr_entries.push(array);
         idx
     }
     /// `add_unshift_expr_entry` — see implementation.
-
     pub fn add_unshift_expr_entry(&mut self, array: Expr, values: Vec<Expr>) -> u16 {
         let idx = self.unshift_expr_entries.len() as u16;
         self.unshift_expr_entries.push((array, values));
         idx
     }
     /// `add_splice_expr_entry` — see implementation.
-
     pub fn add_splice_expr_entry(
         &mut self,
         array: Expr,
@@ -1728,7 +1711,6 @@ impl Chunk {
         }
     }
     /// `patch_try_push_catch` — see implementation.
-
     pub fn patch_try_push_catch(&mut self, idx: usize, catch_ip: usize) {
         match &mut self.ops[idx] {
             Op::TryPush { catch_ip: c, .. } => *c = catch_ip,
@@ -1736,7 +1718,6 @@ impl Chunk {
         }
     }
     /// `patch_try_push_finally` — see implementation.
-
     pub fn patch_try_push_finally(&mut self, idx: usize, finally_ip: Option<usize>) {
         match &mut self.ops[idx] {
             Op::TryPush { finally_ip: f, .. } => *f = finally_ip,
@@ -1744,7 +1725,6 @@ impl Chunk {
         }
     }
     /// `patch_try_push_after` — see implementation.
-
     pub fn patch_try_push_after(&mut self, idx: usize, after_ip: usize) {
         match &mut self.ops[idx] {
             Op::TryPush { after_ip: a, .. } => *a = after_ip,
@@ -1758,7 +1738,6 @@ impl Chunk {
         self.ops.len()
     }
     /// `is_empty` — see implementation.
-
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.ops.is_empty()

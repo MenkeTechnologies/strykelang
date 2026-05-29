@@ -69,7 +69,6 @@ fn make_hash(pairs: Vec<(&str, StrykeValue)>) -> StrykeValue {
 // Game theory
 // ══════════════════════════════════════════════════════════════════════
 /// `minimax_value` — see implementation.
-
 pub fn minimax_value(args: &[StrykeValue]) -> StrykeValue {
     let leaves = args.first().map(as_vec_f64).unwrap_or_default();
     let depth = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -92,7 +91,6 @@ pub fn minimax_value(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(helper(&leaves, depth, true))
 }
 /// `alphabeta_value` — see implementation.
-
 pub fn alphabeta_value(args: &[StrykeValue]) -> StrykeValue {
     let leaves = args.first().map(as_vec_f64).unwrap_or_default();
     let depth = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -141,7 +139,6 @@ pub fn alphabeta_value(args: &[StrykeValue]) -> StrykeValue {
     ))
 }
 /// `expectiminimax_value` — see implementation.
-
 pub fn expectiminimax_value(args: &[StrykeValue]) -> StrykeValue {
     let leaves = args.first().map(as_vec_f64).unwrap_or_default();
     let depth = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -165,7 +162,6 @@ pub fn expectiminimax_value(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(helper(&leaves, depth, 0, chance_prob))
 }
 /// `mixed_strategy_2x2` — see implementation.
-
 pub fn mixed_strategy_2x2(args: &[StrykeValue]) -> StrykeValue {
     // 2x2 zero-sum game with row player payoff matrix [[a,b],[c,d]].
     // For non-zero-sum games the col strategy formula is wrong; this only
@@ -190,7 +186,6 @@ pub fn mixed_strategy_2x2(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `zero_sum_value` — see implementation.
-
 pub fn zero_sum_value(args: &[StrykeValue]) -> StrykeValue {
     // Zero-sum game value for row player's payoff matrix.
     // Pure-strategy: maximin (row) == minmax (col) → that value.
@@ -234,7 +229,6 @@ pub fn zero_sum_value(args: &[StrykeValue]) -> StrykeValue {
 // Operations research
 // ══════════════════════════════════════════════════════════════════════
 /// `knapsack_unbounded` — see implementation.
-
 pub fn knapsack_unbounded(args: &[StrykeValue]) -> StrykeValue {
     let values: Vec<i64> = args
         .first()
@@ -263,7 +257,6 @@ pub fn knapsack_unbounded(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(dp[cap])
 }
 /// `knapsack_fractional` — see implementation.
-
 pub fn knapsack_fractional(args: &[StrykeValue]) -> StrykeValue {
     let values: Vec<f64> = args.first().map(as_vec_f64).unwrap_or_default();
     let weights: Vec<f64> = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -288,7 +281,6 @@ pub fn knapsack_fractional(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(total)
 }
 /// `tsp_2opt` — see implementation.
-
 pub fn tsp_2opt(args: &[StrykeValue]) -> StrykeValue {
     let dist = args.first().map(as_matrix).unwrap_or_default();
     let n = dist.len();
@@ -326,7 +318,6 @@ pub fn tsp_2opt(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `lp_simplex_max` — see implementation.
-
 pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
     // Revised simplex method for LP max c·x  subject to  Ax ≤ b, x ≥ 0.
     // Builds the standard-form tableau with slack columns, then pivots
@@ -392,7 +383,6 @@ pub fn lp_simplex_max(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(tab[m][n + m])
 }
 /// `lp_simplex_min` — see implementation.
-
 pub fn lp_simplex_min(args: &[StrykeValue]) -> StrykeValue {
     // Convert to max by negating c
     let c: Vec<f64> = args
@@ -413,7 +403,6 @@ pub fn lp_simplex_min(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(-lp_simplex_max(&new_args).to_number())
 }
 /// `job_schedule_spt` — see implementation.
-
 pub fn job_schedule_spt(args: &[StrykeValue]) -> StrykeValue {
     // Shortest processing time first
     let durations: Vec<(usize, f64)> = args
@@ -433,7 +422,6 @@ pub fn job_schedule_spt(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `job_schedule_ljf` — see implementation.
-
 pub fn job_schedule_ljf(args: &[StrykeValue]) -> StrykeValue {
     // Longest job first
     let durations: Vec<(usize, f64)> = args
@@ -484,7 +472,6 @@ fn bfs_augment(capacity: &mut [Vec<f64>], s: usize, t: usize) -> Option<(Vec<usi
     None
 }
 /// `edmonds_karp_max_flow` — see implementation.
-
 pub fn edmonds_karp_max_flow(args: &[StrykeValue]) -> StrykeValue {
     let mut cap = args.first().map(as_matrix).unwrap_or_default();
     let s = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -504,7 +491,6 @@ pub fn edmonds_karp_max_flow(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(flow)
 }
 /// `matching_bipartite_greedy` — see implementation.
-
 pub fn matching_bipartite_greedy(args: &[StrykeValue]) -> StrykeValue {
     let edges = args.first().map(as_vec_sv).unwrap_or_default();
     let mut matched_left: HashMap<i64, i64> = HashMap::new();
@@ -528,7 +514,6 @@ pub fn matching_bipartite_greedy(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(result)
 }
 /// `matching_bipartite_hungarian` — see implementation.
-
 pub fn matching_bipartite_hungarian(args: &[StrykeValue]) -> StrykeValue {
     // Hungarian algorithm for min-cost bipartite matching on a square cost matrix
     let cost = args.first().map(as_matrix).unwrap_or_default();
@@ -601,25 +586,21 @@ pub fn matching_bipartite_hungarian(args: &[StrykeValue]) -> StrykeValue {
 // ML inference primitives
 // ══════════════════════════════════════════════════════════════════════
 /// `ml_sigmoid_layer` — see implementation.
-
 pub fn ml_sigmoid_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect())
 }
 /// `ml_tanh_layer` — see implementation.
-
 pub fn ml_tanh_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| x.tanh()).collect())
 }
 /// `ml_relu_layer` — see implementation.
-
 pub fn ml_relu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| x.max(0.0)).collect())
 }
 /// `ml_leaky_relu_layer` — see implementation.
-
 pub fn ml_leaky_relu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let slope = arg_f64(args, 1).unwrap_or(0.01);
@@ -630,7 +611,6 @@ pub fn ml_leaky_relu_layer(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `ml_elu_layer` — see implementation.
-
 pub fn ml_elu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let alpha = arg_f64(args, 1).unwrap_or(1.0);
@@ -647,7 +627,6 @@ pub fn ml_elu_layer(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `ml_softmax_layer` — see implementation.
-
 pub fn ml_softmax_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     if xs.is_empty() {
@@ -659,19 +638,16 @@ pub fn ml_softmax_layer(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(exps.iter().map(|x| x / sum).collect())
 }
 /// `ml_softplus_layer` — see implementation.
-
 pub fn ml_softplus_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| (1.0 + x.exp()).ln()).collect())
 }
 /// `ml_swish_layer` — see implementation.
-
 pub fn ml_swish_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| x / (1.0 + (-x).exp())).collect())
 }
 /// `ml_gelu_layer` — see implementation.
-
 pub fn ml_gelu_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(
@@ -685,13 +661,11 @@ pub fn ml_gelu_layer(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `ml_mish_layer` — see implementation.
-
 pub fn ml_mish_layer(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     arr_f64(xs.iter().map(|x| x * (1.0 + x.exp()).ln().tanh()).collect())
 }
 /// `ml_dropout_mask` — see implementation.
-
 pub fn ml_dropout_mask(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let p = arg_f64(args, 1).unwrap_or(0.5).clamp(0.0, 1.0);
@@ -708,7 +682,6 @@ pub fn ml_dropout_mask(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(out)
 }
 /// `ml_batch_norm` — see implementation.
-
 pub fn ml_batch_norm(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     if xs.is_empty() {
@@ -721,7 +694,6 @@ pub fn ml_batch_norm(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(xs.iter().map(|x| (x - mean) / std).collect())
 }
 /// `ml_attention_score` — see implementation.
-
 pub fn ml_attention_score(args: &[StrykeValue]) -> StrykeValue {
     let q = args.first().map(as_vec_f64).unwrap_or_default();
     let k = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -732,7 +704,6 @@ pub fn ml_attention_score(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(dot / (q.len() as f64).sqrt())
 }
 /// `ml_dot_product_attention` — see implementation.
-
 pub fn ml_dot_product_attention(args: &[StrykeValue]) -> StrykeValue {
     let q = args.first().map(as_vec_f64).unwrap_or_default();
     let keys = args.get(1).map(as_matrix).unwrap_or_default();
@@ -760,7 +731,6 @@ pub fn ml_dot_product_attention(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(out)
 }
 /// `ml_self_attention` — see implementation.
-
 pub fn ml_self_attention(args: &[StrykeValue]) -> StrykeValue {
     let x = args.first().map(as_matrix).unwrap_or_default();
     if x.is_empty() {
@@ -786,7 +756,6 @@ pub fn ml_self_attention(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `ml_position_encoding` — see implementation.
-
 pub fn ml_position_encoding(args: &[StrykeValue]) -> StrykeValue {
     let seq_len = arg_i64(args, 0).unwrap_or(10).max(1) as usize;
     let dim = arg_i64(args, 1).unwrap_or(8).max(2) as usize;
@@ -801,7 +770,6 @@ pub fn ml_position_encoding(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `ml_mse_loss` — see implementation.
-
 pub fn ml_mse_loss(args: &[StrykeValue]) -> StrykeValue {
     let pred = args.first().map(as_vec_f64).unwrap_or_default();
     let target = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -813,7 +781,6 @@ pub fn ml_mse_loss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum / n as f64)
 }
 /// `ml_mae_loss` — see implementation.
-
 pub fn ml_mae_loss(args: &[StrykeValue]) -> StrykeValue {
     let pred = args.first().map(as_vec_f64).unwrap_or_default();
     let target = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -825,7 +792,6 @@ pub fn ml_mae_loss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum / n as f64)
 }
 /// `ml_huber_loss` — see implementation.
-
 pub fn ml_huber_loss(args: &[StrykeValue]) -> StrykeValue {
     let pred = args.first().map(as_vec_f64).unwrap_or_default();
     let target = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -847,7 +813,6 @@ pub fn ml_huber_loss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum / n as f64)
 }
 /// `ml_hinge_loss` — see implementation.
-
 pub fn ml_hinge_loss(args: &[StrykeValue]) -> StrykeValue {
     let pred = args.first().map(as_vec_f64).unwrap_or_default();
     let target = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -859,7 +824,6 @@ pub fn ml_hinge_loss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum / n as f64)
 }
 /// `ml_kl_div_loss` — see implementation.
-
 pub fn ml_kl_div_loss(args: &[StrykeValue]) -> StrykeValue {
     let p = args.first().map(as_vec_f64).unwrap_or_default();
     let q = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -871,7 +835,6 @@ pub fn ml_kl_div_loss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 /// `ml_one_hot_encode` — see implementation.
-
 pub fn ml_one_hot_encode(args: &[StrykeValue]) -> StrykeValue {
     let idx = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let n_classes = arg_i64(args, 1).unwrap_or(10).max(1) as usize;
@@ -882,7 +845,6 @@ pub fn ml_one_hot_encode(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(out)
 }
 /// `ml_label_smooth` — see implementation.
-
 pub fn ml_label_smooth(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let smoothing = arg_f64(args, 1).unwrap_or(0.1);
@@ -959,7 +921,6 @@ fn parse_formula(formula: &str) -> Vec<(String, u32)> {
     out
 }
 /// `chem_formula_parse` — see implementation.
-
 pub fn chem_formula_parse(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let parsed = parse_formula(&s);
@@ -970,7 +931,6 @@ pub fn chem_formula_parse(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(entries)
 }
 /// `chem_molar_mass` — see implementation.
-
 pub fn chem_molar_mass(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let masses: HashMap<&str, f64> = ATOMIC_MASSES.iter().cloned().collect();
@@ -982,7 +942,6 @@ pub fn chem_molar_mass(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(total)
 }
 /// `chem_balance_check` — see implementation.
-
 pub fn chem_balance_check(args: &[StrykeValue]) -> StrykeValue {
     let lhs = arg_str(args, 0).unwrap_or_default();
     let rhs = arg_str(args, 1).unwrap_or_default();
@@ -997,7 +956,6 @@ pub fn chem_balance_check(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if left_count == right_count { 1 } else { 0 })
 }
 /// `chem_pka_lookup` — see implementation.
-
 pub fn chem_pka_lookup(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let lookup: HashMap<&str, f64> = [
@@ -1021,7 +979,6 @@ pub fn chem_pka_lookup(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `chem_isoelectric_estimate` — see implementation.
-
 pub fn chem_isoelectric_estimate(args: &[StrykeValue]) -> StrykeValue {
     // For simple amino-acid input: pI = (pK1 + pK2)/2
     let pk1 = arg_f64(args, 0).unwrap_or(2.0);
@@ -1029,12 +986,10 @@ pub fn chem_isoelectric_estimate(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((pk1 + pk2) / 2.0)
 }
 /// `chem_avogadro` — see implementation.
-
 pub fn chem_avogadro(_args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(6.022_140_76e23)
 }
 /// `chem_ideal_gas_volume` — see implementation.
-
 pub fn chem_ideal_gas_volume(args: &[StrykeValue]) -> StrykeValue {
     // PV = nRT => V = nRT/P, in liters with R = 0.08206 L·atm/(mol·K)
     let n = arg_f64(args, 0).unwrap_or(1.0);
@@ -1043,14 +998,12 @@ pub fn chem_ideal_gas_volume(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(n * 0.08206 * t_k / p_atm)
 }
 /// `chem_partial_pressure` — see implementation.
-
 pub fn chem_partial_pressure(args: &[StrykeValue]) -> StrykeValue {
     let total = arg_f64(args, 0).unwrap_or(1.0);
     let mole_frac = arg_f64(args, 1).unwrap_or(0.5);
     StrykeValue::float(total * mole_frac)
 }
 /// `chem_henderson_hasselbalch` — see implementation.
-
 pub fn chem_henderson_hasselbalch(args: &[StrykeValue]) -> StrykeValue {
     let pka = arg_f64(args, 0).unwrap_or(0.0);
     let conj_base = arg_f64(args, 1).unwrap_or(1.0);
@@ -1061,7 +1014,6 @@ pub fn chem_henderson_hasselbalch(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(pka + (conj_base / acid).log10())
 }
 /// `chem_buffer_capacity` — see implementation.
-
 pub fn chem_buffer_capacity(args: &[StrykeValue]) -> StrykeValue {
     // β = 2.303 * (Kw/[H+] + [H+] + Ca*Ka*[H+]/(Ka+[H+])^2)
     let h = arg_f64(args, 0).unwrap_or(1e-7);
@@ -1072,7 +1024,6 @@ pub fn chem_buffer_capacity(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(beta)
 }
 /// `chem_dilution` — see implementation.
-
 pub fn chem_dilution(args: &[StrykeValue]) -> StrykeValue {
     // C1V1 = C2V2 — solve for V2 given C1, V1, C2
     let c1 = arg_f64(args, 0).unwrap_or(1.0);
@@ -1084,7 +1035,6 @@ pub fn chem_dilution(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(c1 * v1 / c2)
 }
 /// `chem_concentration_to_molarity` — see implementation.
-
 pub fn chem_concentration_to_molarity(args: &[StrykeValue]) -> StrykeValue {
     let mass_g = arg_f64(args, 0).unwrap_or(0.0);
     let molar_mass = arg_f64(args, 1).unwrap_or(1.0).max(1e-12);
@@ -1092,73 +1042,60 @@ pub fn chem_concentration_to_molarity(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(mass_g / molar_mass / volume_l)
 }
 /// `chem_ph_from_h` — see implementation.
-
 pub fn chem_ph_from_h(args: &[StrykeValue]) -> StrykeValue {
     let h = arg_f64(args, 0).unwrap_or(1e-7).max(1e-30);
     StrykeValue::float(-h.log10())
 }
 /// `chem_h_from_ph` — see implementation.
-
 pub fn chem_h_from_ph(args: &[StrykeValue]) -> StrykeValue {
     let ph = arg_f64(args, 0).unwrap_or(7.0);
     StrykeValue::float(10f64.powf(-ph))
 }
 /// `chem_kelvin_to_celsius` — see implementation.
-
 pub fn chem_kelvin_to_celsius(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0) - 273.15)
 }
 /// `chem_celsius_to_kelvin` — see implementation.
-
 pub fn chem_celsius_to_kelvin(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0) + 273.15)
 }
 /// `chem_fahrenheit_to_celsius` — see implementation.
-
 pub fn chem_fahrenheit_to_celsius(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((arg_f64(args, 0).unwrap_or(32.0) - 32.0) * 5.0 / 9.0)
 }
 /// `chem_celsius_to_fahrenheit` — see implementation.
-
 pub fn chem_celsius_to_fahrenheit(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0) * 9.0 / 5.0 + 32.0)
 }
 /// `chem_kelvin_to_fahrenheit` — see implementation.
-
 pub fn chem_kelvin_to_fahrenheit(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((arg_f64(args, 0).unwrap_or(0.0) - 273.15) * 9.0 / 5.0 + 32.0)
 }
 /// `chem_fahrenheit_to_kelvin` — see implementation.
-
 pub fn chem_fahrenheit_to_kelvin(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((arg_f64(args, 0).unwrap_or(32.0) - 32.0) * 5.0 / 9.0 + 273.15)
 }
 /// `chem_rankine_to_kelvin` — see implementation.
-
 pub fn chem_rankine_to_kelvin(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0) * 5.0 / 9.0)
 }
 /// `chem_kelvin_to_rankine` — see implementation.
-
 pub fn chem_kelvin_to_rankine(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0) * 9.0 / 5.0)
 }
 /// `chem_molality` — see implementation.
-
 pub fn chem_molality(args: &[StrykeValue]) -> StrykeValue {
     let moles = arg_f64(args, 0).unwrap_or(0.0);
     let kg_solvent = arg_f64(args, 1).unwrap_or(1.0).max(1e-12);
     StrykeValue::float(moles / kg_solvent)
 }
 /// `chem_molarity_to_normality` — see implementation.
-
 pub fn chem_molarity_to_normality(args: &[StrykeValue]) -> StrykeValue {
     let molarity = arg_f64(args, 0).unwrap_or(0.0);
     let equiv_per_mole = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(molarity * equiv_per_mole)
 }
 /// `chem_freezing_point_depression` — see implementation.
-
 pub fn chem_freezing_point_depression(args: &[StrykeValue]) -> StrykeValue {
     // ΔTf = Kf * m * i
     let kf = arg_f64(args, 0).unwrap_or(1.86);
@@ -1167,7 +1104,6 @@ pub fn chem_freezing_point_depression(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(kf * molality * i)
 }
 /// `chem_boiling_point_elevation` — see implementation.
-
 pub fn chem_boiling_point_elevation(args: &[StrykeValue]) -> StrykeValue {
     let kb = arg_f64(args, 0).unwrap_or(0.512);
     let molality = arg_f64(args, 1).unwrap_or(1.0);
@@ -1175,7 +1111,6 @@ pub fn chem_boiling_point_elevation(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(kb * molality * i)
 }
 /// `chem_arrhenius_k` — see implementation.
-
 pub fn chem_arrhenius_k(args: &[StrykeValue]) -> StrykeValue {
     // k = A * exp(-Ea/(RT)), R = 8.314 J/(mol·K)
     let a = arg_f64(args, 0).unwrap_or(1.0);
@@ -1188,7 +1123,6 @@ pub fn chem_arrhenius_k(args: &[StrykeValue]) -> StrykeValue {
 // Language modeling / information theory
 // ══════════════════════════════════════════════════════════════════════
 /// `ngram_train` — see implementation.
-
 pub fn ngram_train(args: &[StrykeValue]) -> StrykeValue {
     let tokens: Vec<String> = args
         .first()
@@ -1230,7 +1164,6 @@ pub fn ngram_train(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(model)))
 }
 /// `ngram_prob` — see implementation.
-
 pub fn ngram_prob(args: &[StrykeValue]) -> StrykeValue {
     let model = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let ctx = arg_str(args, 1).unwrap_or_default();
@@ -1249,7 +1182,6 @@ pub fn ngram_prob(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(0.0)
 }
 /// `ngram_perplexity` — see implementation.
-
 pub fn ngram_perplexity(args: &[StrykeValue]) -> StrykeValue {
     let model = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let tokens: Vec<String> = args
@@ -1287,7 +1219,6 @@ pub fn ngram_perplexity(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((-log_sum / count as f64).exp())
 }
 /// `ngram_top_k_next` — see implementation.
-
 pub fn ngram_top_k_next(args: &[StrykeValue]) -> StrykeValue {
     let model = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
     let ctx = arg_str(args, 1).unwrap_or_default();
@@ -1312,7 +1243,6 @@ pub fn ngram_top_k_next(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(vec![])
 }
 /// `kl_divergence_distributions` — see implementation.
-
 pub fn kl_divergence_distributions(args: &[StrykeValue]) -> StrykeValue {
     let p = args.first().map(as_vec_f64).unwrap_or_default();
     let q = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -1324,7 +1254,6 @@ pub fn kl_divergence_distributions(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 /// `js_divergence_distributions` — see implementation.
-
 pub fn js_divergence_distributions(args: &[StrykeValue]) -> StrykeValue {
     let p = args.first().map(as_vec_f64).unwrap_or_default();
     let q = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -1341,7 +1270,6 @@ pub fn js_divergence_distributions(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(0.5 * (kl_pm + kl_qm))
 }
 /// `conditional_entropy` — see implementation.
-
 pub fn conditional_entropy(args: &[StrykeValue]) -> StrykeValue {
     let joint = args.first().map(as_matrix).unwrap_or_default();
     if joint.is_empty() {
@@ -1362,7 +1290,6 @@ pub fn conditional_entropy(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(total)
 }
 /// `joint_entropy` — see implementation.
-
 pub fn joint_entropy(args: &[StrykeValue]) -> StrykeValue {
     let joint = args.first().map(as_matrix).unwrap_or_default();
     let total: f64 = joint
@@ -1374,7 +1301,6 @@ pub fn joint_entropy(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(total)
 }
 /// `relative_entropy` — see implementation.
-
 pub fn relative_entropy(args: &[StrykeValue]) -> StrykeValue {
     kl_divergence_distributions(args)
 }

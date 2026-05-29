@@ -6452,7 +6452,6 @@ impl VMHelper {
         n.abs()
     }
     /// `set_file` — see implementation.
-
     pub fn set_file(&mut self, file: &str) {
         self.file = file.to_string();
     }
@@ -6526,7 +6525,6 @@ impl VMHelper {
         )))
     }
     /// `execute` — see implementation.
-
     pub fn execute(&mut self, program: &Program) -> StrykeResult<StrykeValue> {
         // Snapshot the (possibly empty) class registry into the
         // thread-local that the free-function serializers consult, so

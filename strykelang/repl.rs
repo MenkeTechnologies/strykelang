@@ -423,7 +423,6 @@ pub fn print_cyberpunk_banner() {
     stryke::banner::print_banner(true);
 }
 /// `run` — see implementation.
-
 pub fn run(cli: &Cli) {
     let mut interp = VMHelper::new();
     crate::configure_interpreter(cli, &mut interp, "repl");

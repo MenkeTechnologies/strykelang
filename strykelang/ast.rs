@@ -7,14 +7,12 @@ fn default_delim() -> char {
     '/'
 }
 /// `Program` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {
     /// `statements` field.
     pub statements: Vec<Statement>,
 }
 /// `Statement` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Statement {
     /// Leading `LABEL:` on this statement (Perl convention: `FOO:`).
@@ -86,7 +84,6 @@ pub enum SubSigParam {
     HashDestruct(Vec<(String, String)>),
 }
 /// `StmtKind` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StmtKind {
     /// `Expression` variant.
@@ -120,10 +117,7 @@ pub enum StmtKind {
         continue_block: Option<Block>,
     },
     /// `DoWhile` variant.
-    DoWhile {
-        body: Block,
-        condition: Expr,
-    },
+    DoWhile { body: Block, condition: Expr },
     /// `For` variant.
     For {
         init: Option<Box<Statement>>,
@@ -151,27 +145,15 @@ pub enum StmtKind {
         prototype: Option<String>,
     },
     /// `Package` variant.
-    Package {
-        name: String,
-    },
+    Package { name: String },
     /// `Use` variant.
-    Use {
-        module: String,
-        imports: Vec<Expr>,
-    },
+    Use { module: String, imports: Vec<Expr> },
     /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in stryke).
-    UsePerlVersion {
-        version: f64,
-    },
+    UsePerlVersion { version: f64 },
     /// `use overload '""' => 'as_string', '+' => 'add';` — operator maps (method names in current package).
-    UseOverload {
-        pairs: Vec<(String, String)>,
-    },
+    UseOverload { pairs: Vec<(String, String)> },
     /// `No` variant.
-    No {
-        module: String,
-        imports: Vec<Expr>,
-    },
+    No { module: String, imports: Vec<Expr> },
     /// `Return` variant.
     Return(Option<Expr>),
     /// `Last` variant.
@@ -216,32 +198,19 @@ pub enum StmtKind {
     /// Empty statement (bare semicolon)
     Empty,
     /// `goto EXPR` — expression evaluates to a label name in the same block.
-    Goto {
-        target: Box<Expr>,
-    },
+    Goto { target: Box<Expr> },
     /// Standalone `continue { BLOCK }` (normally follows a loop; parsed for acceptance).
     Continue(Block),
     /// `struct Name { field => Type, ... }` — fixed-field records (`Name->new`, `$x->field`).
-    StructDecl {
-        def: StructDef,
-    },
+    StructDecl { def: StructDef },
     /// `enum Name { Variant1 => Type, Variant2, ... }` — algebraic data types.
-    EnumDecl {
-        def: EnumDef,
-    },
+    EnumDecl { def: EnumDef },
     /// `class Name extends Parent impl Trait { fields; methods }` — full OOP.
-    ClassDecl {
-        def: ClassDef,
-    },
+    ClassDecl { def: ClassDef },
     /// `trait Name { fn required; fn with_default { } }` — interface/mixin.
-    TraitDecl {
-        def: TraitDef,
-    },
+    TraitDecl { def: TraitDef },
     /// `eval_timeout SECS { ... }` — run block on a worker thread; main waits up to SECS (portable timeout).
-    EvalTimeout {
-        timeout: Expr,
-        body: Block,
-    },
+    EvalTimeout { timeout: Expr, body: Block },
     /// `try { } catch ($err) { } [ finally { } ]` — catch runtime/die errors (not `last`/`next`/`return` flow).
     /// `finally` runs after a successful `try` or after `catch` completes (including if `catch` rethrows).
     TryCatch {
@@ -251,19 +220,11 @@ pub enum StmtKind {
         finally_block: Option<Block>,
     },
     /// `given (EXPR) { when ... default ... }` — topic in `$_`, `when` matches with regex / eq / smartmatch.
-    Given {
-        topic: Expr,
-        body: Block,
-    },
+    Given { topic: Expr, body: Block },
     /// `when (COND) { }` — only valid inside `given` (handled by given dispatcher).
-    When {
-        cond: Expr,
-        body: Block,
-    },
+    When { cond: Expr, body: Block },
     /// `default { }` — only valid inside `given`.
-    DefaultCase {
-        body: Block,
-    },
+    DefaultCase { body: Block },
     /// `tie %hash` / `tie @arr` / `tie $x` — TIEHASH / TIEARRAY / TIESCALAR (FETCH/STORE).
     Tie {
         target: TieTarget,
@@ -271,10 +232,7 @@ pub enum StmtKind {
         args: Vec<Expr>,
     },
     /// `format NAME =` picture/value lines … `.` — report templates for `write`.
-    FormatDecl {
-        name: String,
-        lines: Vec<String>,
-    },
+    FormatDecl { name: String, lines: Vec<String> },
     /// `before|after|around "<glob>" { ... }` — register AOP advice on user subs.
     /// Pattern is a glob (`*`, `?`) matched against the called sub's bare name.
     AdviceDecl {
@@ -379,7 +337,6 @@ impl EnumDef {
         self.variants.iter().position(|v| v.name == name)
     }
     /// `variant` — see implementation.
-
     #[inline]
     pub fn variant(&self, name: &str) -> Option<&EnumVariant> {
         self.variants.iter().find(|v| v.name == name)
@@ -458,7 +415,6 @@ impl TraitDef {
         self.methods.iter().find(|m| m.name == name)
     }
     /// `required_methods` — see implementation.
-
     #[inline]
     pub fn required_methods(&self) -> impl Iterator<Item = &ClassMethod> {
         self.methods.iter().filter(|m| m.body.is_none())
@@ -516,25 +472,21 @@ impl ClassDef {
         self.fields.iter().position(|f| f.name == name)
     }
     /// `field` — see implementation.
-
     #[inline]
     pub fn field(&self, name: &str) -> Option<&ClassField> {
         self.fields.iter().find(|f| f.name == name)
     }
     /// `method` — see implementation.
-
     #[inline]
     pub fn method(&self, name: &str) -> Option<&ClassMethod> {
         self.methods.iter().find(|m| m.name == name)
     }
     /// `static_methods` — see implementation.
-
     #[inline]
     pub fn static_methods(&self) -> impl Iterator<Item = &ClassMethod> {
         self.methods.iter().filter(|m| m.is_static)
     }
     /// `instance_methods` — see implementation.
-
     #[inline]
     pub fn instance_methods(&self) -> impl Iterator<Item = &ClassMethod> {
         self.methods.iter().filter(|m| !m.is_static)
@@ -724,7 +676,6 @@ impl PerlTypeName {
     }
 }
 /// `VarDecl` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VarDecl {
     /// `sigil` field.
@@ -743,7 +694,6 @@ pub struct VarDecl {
     pub list_context: bool,
 }
 /// `Sigil` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Sigil {
     /// `Scalar` variant.
@@ -756,7 +706,6 @@ pub enum Sigil {
     Typeglob,
 }
 /// `Block` type alias.
-
 pub type Block = Vec<Statement>;
 
 /// Comparator for `sort` — `{ $a <=> $b }`, or a code ref / expression (Perl `sort $cmp LIST`).
@@ -785,7 +734,6 @@ pub struct MatchArm {
 /// `retry { } backoff => exponential` — sleep policy between attempts (after failure).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RetryBackoff {
-    /// No delay between attempts.
     None,
     /// Delay grows linearly: `base_ms * attempt` (attempt starts at 1).
     Linear,
@@ -812,7 +760,6 @@ pub enum MatchPattern {
     OptionSome(String),
 }
 /// `MatchArrayElem` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchArrayElem {
     /// `Expr` variant.
@@ -826,7 +773,6 @@ pub enum MatchArrayElem {
     RestBind(String),
 }
 /// `MatchHashPair` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchHashPair {
     /// `key => _` — key must exist.
@@ -835,7 +781,6 @@ pub enum MatchHashPair {
     Capture { key: Expr, name: String },
 }
 /// `MagicConstKind` — see variants.
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum MagicConstKind {
     /// Current source path (`$0`-style script name or `-e`).
@@ -846,7 +791,6 @@ pub enum MagicConstKind {
     Sub,
 }
 /// `Expr` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Expr {
     /// `kind` field.
@@ -855,7 +799,6 @@ pub struct Expr {
     pub line: usize,
 }
 /// `ExprKind` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExprKind {
     // Literals
@@ -1544,7 +1487,6 @@ pub enum ExprKind {
     /// `Eof` variant.
     Eof(Option<Box<Expr>>),
     /// `Opendir` variant.
-
     Opendir {
         handle: Box<Expr>,
         path: Box<Expr>,
@@ -1602,7 +1544,6 @@ pub enum ExprKind {
     /// `chown UID, GID, @files` — first two are uid/gid, rest are paths.
     Chown(Vec<Expr>),
     /// `Stat` variant.
-
     Stat(Box<Expr>),
     /// `Lstat` variant.
     Lstat(Box<Expr>),
@@ -1733,7 +1674,6 @@ pub enum ExprKind {
     },
 }
 /// `StringPart` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StringPart {
     /// `Literal` variant.
@@ -1746,7 +1686,6 @@ pub enum StringPart {
     Expr(Expr),
 }
 /// `DerefKind` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum DerefKind {
     /// `Array` variant.
@@ -1757,7 +1696,6 @@ pub enum DerefKind {
     Call,
 }
 /// `BinOp` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BinOp {
     /// `Add` variant.
@@ -1828,7 +1766,6 @@ pub enum BinOp {
     BindNotMatch,
 }
 /// `UnaryOp` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOp {
     /// `Negate` variant.
@@ -1847,7 +1784,6 @@ pub enum UnaryOp {
     Ref,
 }
 /// `PostfixOp` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PostfixOp {
     /// `Increment` variant.

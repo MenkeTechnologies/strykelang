@@ -70,10 +70,7 @@ fn parity_stdout_with_stdin(code: &str, stdin_data: &str) -> Option<(String, Str
         .stderr(Stdio::null())
         .spawn()
         .ok()?;
-    perl.stdin
-        .as_mut()?
-        .write_all(stdin_data.as_bytes())
-        .ok()?;
+    perl.stdin.as_mut()?.write_all(stdin_data.as_bytes()).ok()?;
     let perl_out = perl.wait_with_output().ok()?;
 
     let mut stk = Command::new(&stryke)
@@ -204,10 +201,7 @@ parity!(
     r#"print main::STDOUT "stdout-via-main\n""#
 );
 
-parity!(
-    print_to_bare_stdout,
-    r#"print STDOUT "stdout-bare\n""#
-);
+parity!(print_to_bare_stdout, r#"print STDOUT "stdout-bare\n""#);
 
 parity!(
     printf_via_main_stdout,
@@ -288,8 +282,7 @@ fn stryke_strict_main_qualified_errno_matches_bare() {
         return;
     };
     assert!(
-        stdout.contains("|[No such file or directory")
-            || stdout.contains("|[No such file"),
+        stdout.contains("|[No such file or directory") || stdout.contains("|[No such file"),
         "$main::! must canonicalize to $! in non-compat (stryke docs-faithful extension): {stdout}",
     );
 }

@@ -36,18 +36,15 @@ impl Profiler {
         }
     }
     /// `on_line` — see implementation.
-
     pub fn on_line(&mut self, file: &str, line: usize, dt: Duration) {
         let ns = dt.as_nanos() as u64;
         *self.line_ns.entry((file.to_string(), line)).or_insert(0) += ns;
     }
     /// `enter_sub` — see implementation.
-
     pub fn enter_sub(&mut self, name: &str) {
         self.sub_stack.push(name.to_string());
     }
     /// `exit_sub` — see implementation.
-
     pub fn exit_sub(&mut self, dt: Duration) {
         let ns = dt.as_nanos() as u64;
         let Some(name) = self.sub_stack.pop() else {

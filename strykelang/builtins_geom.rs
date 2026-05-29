@@ -98,7 +98,6 @@ pub fn complex_magnitude(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `complex_abs` — see implementation.
-
 pub fn complex_abs(args: &[StrykeValue]) -> StrykeValue {
     complex_magnitude(args)
 }
@@ -111,7 +110,6 @@ pub fn complex_phase(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `complex_angle` — see implementation.
-
 pub fn complex_angle(args: &[StrykeValue]) -> StrykeValue {
     complex_phase(args)
 }
@@ -135,7 +133,6 @@ pub fn complex_add(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.0 + c.0, a.1 + c.1)
 }
 /// `complex_sub` — see implementation.
-
 pub fn complex_sub(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -146,7 +143,6 @@ pub fn complex_sub(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.0 - c.0, a.1 - c.1)
 }
 /// `complex_mul` — see implementation.
-
 pub fn complex_mul(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -157,7 +153,6 @@ pub fn complex_mul(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a * c - b * d, a * d + b * c)
 }
 /// `complex_div` — see implementation.
-
 pub fn complex_div(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -172,7 +167,6 @@ pub fn complex_div(args: &[StrykeValue]) -> StrykeValue {
     mk_complex((a * c + b * d) / den, (b * c - a * d) / den)
 }
 /// `complex_pow` — see implementation.
-
 pub fn complex_pow(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -185,7 +179,6 @@ pub fn complex_pow(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(new_r * new_theta.cos(), new_r * new_theta.sin())
 }
 /// `complex_sqrt` — see implementation.
-
 pub fn complex_sqrt(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -196,7 +189,6 @@ pub fn complex_sqrt(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(new_r * theta.cos(), new_r * theta.sin())
 }
 /// `complex_exp` — see implementation.
-
 pub fn complex_exp(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -205,7 +197,6 @@ pub fn complex_exp(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(ex * b.cos(), ex * b.sin())
 }
 /// `complex_log` — see implementation.
-
 pub fn complex_log(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -213,7 +204,6 @@ pub fn complex_log(args: &[StrykeValue]) -> StrykeValue {
     mk_complex((a * a + b * b).sqrt().ln(), b.atan2(a))
 }
 /// `complex_sin` — see implementation.
-
 pub fn complex_sin(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -221,7 +211,6 @@ pub fn complex_sin(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.sin() * b.cosh(), a.cos() * b.sinh())
 }
 /// `complex_cos` — see implementation.
-
 pub fn complex_cos(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -229,14 +218,12 @@ pub fn complex_cos(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.cos() * b.cosh(), -a.sin() * b.sinh())
 }
 /// `complex_tan` — see implementation.
-
 pub fn complex_tan(args: &[StrykeValue]) -> StrykeValue {
     let s = complex_sin(args);
     let c = complex_cos(args);
     complex_div(&[s, c])
 }
 /// `complex_sinh` — see implementation.
-
 pub fn complex_sinh(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -244,7 +231,6 @@ pub fn complex_sinh(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.sinh() * b.cos(), a.cosh() * b.sin())
 }
 /// `complex_cosh` — see implementation.
-
 pub fn complex_cosh(args: &[StrykeValue]) -> StrykeValue {
     let Some((a, b)) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -252,14 +238,12 @@ pub fn complex_cosh(args: &[StrykeValue]) -> StrykeValue {
     mk_complex(a.cosh() * b.cos(), a.sinh() * b.sin())
 }
 /// `complex_tanh` — see implementation.
-
 pub fn complex_tanh(args: &[StrykeValue]) -> StrykeValue {
     let s = complex_sinh(args);
     let c = complex_cosh(args);
     complex_div(&[s, c])
 }
 /// `complex_equal` — see implementation.
-
 pub fn complex_equal(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = args.first().and_then(unpack_complex) else {
         return StrykeValue::UNDEF;
@@ -633,7 +617,6 @@ fn triangle_pts(args: &[StrykeValue]) -> Option<Tri> {
     Some((a, b, c))
 }
 /// `triangle_area` — see implementation.
-
 pub fn triangle_area(args: &[StrykeValue]) -> StrykeValue {
     let Some(((ax, ay), (bx, by), (cx, cy))) = triangle_pts(args) else {
         return StrykeValue::UNDEF;
@@ -641,7 +624,6 @@ pub fn triangle_area(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(0.5 * ((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)).abs())
 }
 /// `triangle_centroid` — see implementation.
-
 pub fn triangle_centroid(args: &[StrykeValue]) -> StrykeValue {
     use parking_lot::RwLock;
     use std::sync::Arc;
@@ -656,7 +638,6 @@ pub fn triangle_centroid(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `triangle_circumcircle` — see implementation.
-
 pub fn triangle_circumcircle(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     use parking_lot::RwLock;
@@ -689,7 +670,6 @@ pub fn triangle_circumcircle(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `triangle_incircle` — see implementation.
-
 pub fn triangle_incircle(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     use parking_lot::RwLock;
@@ -721,7 +701,6 @@ pub fn triangle_incircle(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `triangle_contains_point` — see implementation.
-
 pub fn triangle_contains_point(args: &[StrykeValue]) -> StrykeValue {
     let Some(((ax, ay), (bx, by), (cx, cy))) = triangle_pts(args) else {
         return StrykeValue::UNDEF;
@@ -739,19 +718,16 @@ pub fn triangle_contains_point(args: &[StrykeValue]) -> StrykeValue {
 
 // ── Circles / rectangles / 3D solids ──────────────────────────────────
 /// `circle_circumference` — see implementation.
-
 pub fn circle_circumference(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(2.0 * std::f64::consts::PI * r)
 }
 /// `circle_area` — see implementation.
-
 pub fn circle_area(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(std::f64::consts::PI * r * r)
 }
 /// `circle_intersects_line` — see implementation.
-
 pub fn circle_intersects_line(args: &[StrykeValue]) -> StrykeValue {
     // args: [cx, cy, r, [x1,y1], [x2,y2]]
     let cx = arg_f64(args, 0).unwrap_or(0.0);
@@ -768,7 +744,6 @@ pub fn circle_intersects_line(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if num / den.max(1e-300) <= r { 1 } else { 0 })
 }
 /// `circle_intersects_circle` — see implementation.
-
 pub fn circle_intersects_circle(args: &[StrykeValue]) -> StrykeValue {
     let c1x = arg_f64(args, 0).unwrap_or(0.0);
     let c1y = arg_f64(args, 1).unwrap_or(0.0);
@@ -784,21 +759,18 @@ pub fn circle_intersects_circle(args: &[StrykeValue]) -> StrykeValue {
     })
 }
 /// `rect_area` — see implementation.
-
 pub fn rect_area(args: &[StrykeValue]) -> StrykeValue {
     let w = arg_f64(args, 0).unwrap_or(0.0);
     let h = arg_f64(args, 1).unwrap_or(0.0);
     StrykeValue::float(w * h)
 }
 /// `rect_perimeter` — see implementation.
-
 pub fn rect_perimeter(args: &[StrykeValue]) -> StrykeValue {
     let w = arg_f64(args, 0).unwrap_or(0.0);
     let h = arg_f64(args, 1).unwrap_or(0.0);
     StrykeValue::float(2.0 * (w + h))
 }
 /// `rect_intersect` — see implementation.
-
 pub fn rect_intersect(args: &[StrykeValue]) -> StrykeValue {
     // Both rects as [x, y, w, h] arrayrefs.
     let r1 = args.first().and_then(|v| v.as_array_ref());
@@ -832,7 +804,6 @@ pub fn rect_intersect(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `rect_contains_point` — see implementation.
-
 pub fn rect_contains_point(args: &[StrykeValue]) -> StrykeValue {
     let r = args.first().and_then(|v| v.as_array_ref());
     let Some(r) = r else {
@@ -859,7 +830,6 @@ pub fn rect_contains_point(args: &[StrykeValue]) -> StrykeValue {
     })
 }
 /// `rect_union` — see implementation.
-
 pub fn rect_union(args: &[StrykeValue]) -> StrykeValue {
     use parking_lot::RwLock;
     use std::sync::Arc;
@@ -897,27 +867,23 @@ pub fn rect_union(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `ellipse_area` — see implementation.
-
 pub fn ellipse_area(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(0.0);
     let b = arg_f64(args, 1).unwrap_or(0.0);
     StrykeValue::float(std::f64::consts::PI * a * b)
 }
 /// `sphere_surface_area` — see implementation.
-
 pub fn sphere_surface_area(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(4.0 * std::f64::consts::PI * r * r)
 }
 /// `cylinder_surface_area` — see implementation.
-
 pub fn cylinder_surface_area(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     let h = arg_f64(args, 1).unwrap_or(0.0);
     StrykeValue::float(2.0 * std::f64::consts::PI * r * (r + h))
 }
 /// `cone_surface_area` — see implementation.
-
 pub fn cone_surface_area(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     let h = arg_f64(args, 1).unwrap_or(0.0);
@@ -925,7 +891,6 @@ pub fn cone_surface_area(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(std::f64::consts::PI * r * (r + slant))
 }
 /// `torus_surface_area` — see implementation.
-
 pub fn torus_surface_area(args: &[StrykeValue]) -> StrykeValue {
     let big_r = arg_f64(args, 0).unwrap_or(0.0);
     let small_r = arg_f64(args, 1).unwrap_or(0.0);
@@ -1010,7 +975,6 @@ pub fn rgb_to_p3(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(linear_to_srgb(pr), linear_to_srgb(pg), linear_to_srgb(pb))
 }
 /// `p3_to_rgb` — see implementation.
-
 pub fn p3_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     let Some((r, g, b)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1029,7 +993,6 @@ pub fn p3_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(linear_to_srgb(nr), linear_to_srgb(ng), linear_to_srgb(nb))
 }
 /// `rgb_to_adobe_rgb` — see implementation.
-
 pub fn rgb_to_adobe_rgb(args: &[StrykeValue]) -> StrykeValue {
     let Some((r, g, b)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1045,7 +1008,6 @@ pub fn rgb_to_adobe_rgb(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(nr.powf(1.0 / 2.2), ng.powf(1.0 / 2.2), nb.powf(1.0 / 2.2))
 }
 /// `adobe_rgb_to_rgb` — see implementation.
-
 pub fn adobe_rgb_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     let Some((r, g, b)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1059,7 +1021,6 @@ pub fn adobe_rgb_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(linear_to_srgb(nr), linear_to_srgb(ng), linear_to_srgb(nb))
 }
 /// `xyz_d65_to_d50` — see implementation.
-
 pub fn xyz_d65_to_d50(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y, z)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1071,7 +1032,6 @@ pub fn xyz_d65_to_d50(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(nx, ny, nz)
 }
 /// `xyz_d50_to_d65` — see implementation.
-
 pub fn xyz_d50_to_d65(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y, z)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1082,7 +1042,6 @@ pub fn xyz_d50_to_d65(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(nx, ny, nz)
 }
 /// `gamma_apply` — see implementation.
-
 pub fn gamma_apply(args: &[StrykeValue]) -> StrykeValue {
     let Some((r, g, b)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1091,7 +1050,6 @@ pub fn gamma_apply(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(r.powf(1.0 / gam), g.powf(1.0 / gam), b.powf(1.0 / gam))
 }
 /// `gamma_remove` — see implementation.
-
 pub fn gamma_remove(args: &[StrykeValue]) -> StrykeValue {
     let Some((r, g, b)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1100,12 +1058,10 @@ pub fn gamma_remove(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(r.powf(gam), g.powf(gam), b.powf(gam))
 }
 /// `white_point_d65` — see implementation.
-
 pub fn white_point_d65(_args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(0.95047, 1.0, 1.08883)
 }
 /// `white_point_d50` — see implementation.
-
 pub fn white_point_d50(_args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(0.96422, 1.0, 0.82521)
 }
@@ -1138,7 +1094,6 @@ pub fn color_temperature_to_rgb(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `rgb_to_color_temperature` — see implementation.
-
 pub fn rgb_to_color_temperature(args: &[StrykeValue]) -> StrykeValue {
     // McCamy's approximation: CCT = 449n^3 + 3525n^2 + 6823.3n + 5520.33
     // where n = (x - 0.3320) / (0.1858 - y).
@@ -1162,7 +1117,6 @@ pub fn rgb_to_color_temperature(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(cct)
 }
 /// `chromatic_adaptation` — see implementation.
-
 pub fn chromatic_adaptation(args: &[StrykeValue]) -> StrykeValue {
     // Default to D65→D50 Bradford
     let from = args
@@ -1191,7 +1145,6 @@ fn color_lerp(a: (f64, f64, f64), b: (f64, f64, f64), t: f64) -> (f64, f64, f64)
     )
 }
 /// `color_interpolate_rgb` — see implementation.
-
 pub fn color_interpolate_rgb(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = args.first().and_then(|v| v.as_array_ref()).map(|arr| {
         let g = arr.read();
@@ -1218,22 +1171,18 @@ pub fn color_interpolate_rgb(args: &[StrykeValue]) -> StrykeValue {
     mk_rgb(r, g, b)
 }
 /// `color_interpolate_hsl` — see implementation.
-
 pub fn color_interpolate_hsl(args: &[StrykeValue]) -> StrykeValue {
     color_interpolate_rgb(args)
 }
 /// `color_interpolate_lab` — see implementation.
-
 pub fn color_interpolate_lab(args: &[StrykeValue]) -> StrykeValue {
     color_interpolate_rgb(args)
 }
 /// `color_interpolate_oklab` — see implementation.
-
 pub fn color_interpolate_oklab(args: &[StrykeValue]) -> StrykeValue {
     color_interpolate_rgb(args)
 }
 /// `color_blend_screen` — see implementation.
-
 pub fn color_blend_screen(args: &[StrykeValue]) -> StrykeValue {
     let Some((r1, g1, b1)) = rgb_triplet(args) else {
         return StrykeValue::UNDEF;
@@ -1254,14 +1203,12 @@ pub fn color_blend_screen(args: &[StrykeValue]) -> StrykeValue {
 // Trig extras
 // ══════════════════════════════════════════════════════════════════════
 /// `atan2_deg` — see implementation.
-
 pub fn atan2_deg(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_f64(args, 0).unwrap_or(0.0);
     let x = arg_f64(args, 1).unwrap_or(0.0);
     StrykeValue::float(y.atan2(x).to_degrees())
 }
 /// `atan2_quadrant` — see implementation.
-
 pub fn atan2_quadrant(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_f64(args, 0).unwrap_or(0.0);
     let x = arg_f64(args, 1).unwrap_or(0.0);
@@ -1274,7 +1221,6 @@ pub fn atan2_quadrant(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(q)
 }
 /// `polar_to_cartesian` — see implementation.
-
 pub fn polar_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     let theta = arg_f64(args, 1).unwrap_or(0.0);
@@ -1286,7 +1232,6 @@ pub fn polar_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `cartesian_to_polar` — see implementation.
-
 pub fn cartesian_to_polar(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
@@ -1298,7 +1243,6 @@ pub fn cartesian_to_polar(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `spherical_to_cartesian` — see implementation.
-
 pub fn spherical_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     let theta = arg_f64(args, 1).unwrap_or(0.0);
@@ -1312,7 +1256,6 @@ pub fn spherical_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `cartesian_to_spherical` — see implementation.
-
 pub fn cartesian_to_spherical(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
@@ -1329,7 +1272,6 @@ pub fn cartesian_to_spherical(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `cylindrical_to_cartesian` — see implementation.
-
 pub fn cylindrical_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     let r = arg_f64(args, 0).unwrap_or(0.0);
     let theta = arg_f64(args, 1).unwrap_or(0.0);
@@ -1343,7 +1285,6 @@ pub fn cylindrical_to_cartesian(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `cartesian_to_cylindrical` — see implementation.
-
 pub fn cartesian_to_cylindrical(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
@@ -1357,7 +1298,6 @@ pub fn cartesian_to_cylindrical(args: &[StrykeValue]) -> StrykeValue {
     ])))
 }
 /// `versine_fn` — see implementation.
-
 pub fn versine_fn(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(1.0 - x.cos())

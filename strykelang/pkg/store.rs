@@ -35,7 +35,6 @@ impl Store {
         Store { root: root.into() }
     }
     /// `root` — see implementation.
-
     pub fn root(&self) -> &Path {
         &self.root
     }

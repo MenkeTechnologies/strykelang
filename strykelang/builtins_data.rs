@@ -84,7 +84,6 @@ pub fn jq_get(args: &[StrykeValue]) -> StrykeValue {
     json_to_stryke(&v)
 }
 /// `jq_set` — see implementation.
-
 pub fn jq_set(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -122,7 +121,6 @@ pub fn jq_set(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(serde_json::to_string(&v).unwrap_or_default())
 }
 /// `jq_delete` — see implementation.
-
 pub fn jq_delete(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -169,12 +167,10 @@ pub fn jq_delete(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(serde_json::to_string(&v).unwrap_or_default())
 }
 /// `jq_select` — see implementation.
-
 pub fn jq_select(args: &[StrykeValue]) -> StrykeValue {
     jq_get(args)
 }
 /// `jq_keys_at` — see implementation.
-
 pub fn jq_keys_at(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(h) = v.as_hash_ref() {
@@ -184,7 +180,6 @@ pub fn jq_keys_at(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_values_at` — see implementation.
-
 pub fn jq_values_at(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(h) = v.as_hash_ref() {
@@ -197,7 +192,6 @@ pub fn jq_values_at(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_length_at` — see implementation.
-
 pub fn jq_length_at(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(h) = v.as_hash_ref() {
@@ -212,7 +206,6 @@ pub fn jq_length_at(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
 }
 /// `jq_type` — see implementation.
-
 pub fn jq_type(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -229,13 +222,11 @@ pub fn jq_type(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(t.to_string())
 }
 /// `jq_has` — see implementation.
-
 pub fn jq_has(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     StrykeValue::integer(if v.is_undef() { 0 } else { 1 })
 }
 /// `jq_paths` — see implementation.
-
 pub fn jq_paths(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -273,7 +264,6 @@ pub fn jq_paths(args: &[StrykeValue]) -> StrykeValue {
     arr(paths.into_iter().map(StrykeValue::string).collect())
 }
 /// `jq_leaf_paths` — see implementation.
-
 pub fn jq_leaf_paths(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -309,7 +299,6 @@ pub fn jq_leaf_paths(args: &[StrykeValue]) -> StrykeValue {
     arr(paths.into_iter().map(StrykeValue::string).collect())
 }
 /// `jq_walk` — see implementation.
-
 pub fn jq_walk(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -318,7 +307,6 @@ pub fn jq_walk(args: &[StrykeValue]) -> StrykeValue {
     json_to_stryke(&v)
 }
 /// `jq_map_values` — see implementation.
-
 pub fn jq_map_values(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -327,12 +315,10 @@ pub fn jq_map_values(args: &[StrykeValue]) -> StrykeValue {
     json_to_stryke(&v)
 }
 /// `jq_filter` — see implementation.
-
 pub fn jq_filter(args: &[StrykeValue]) -> StrykeValue {
     jq_get(args)
 }
 /// `jq_to_entries` — see implementation.
-
 pub fn jq_to_entries(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -354,7 +340,6 @@ pub fn jq_to_entries(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_from_entries` — see implementation.
-
 pub fn jq_from_entries(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let Some(arr_ref) = args.first().and_then(|v| v.as_array_ref()) else {
@@ -373,17 +358,14 @@ pub fn jq_from_entries(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `jq_with_entries` — see implementation.
-
 pub fn jq_with_entries(args: &[StrykeValue]) -> StrykeValue {
     jq_to_entries(args)
 }
 /// `jq_recurse` — see implementation.
-
 pub fn jq_recurse(args: &[StrykeValue]) -> StrykeValue {
     jq_paths(args)
 }
 /// `jq_min_by` — see implementation.
-
 pub fn jq_min_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -401,7 +383,6 @@ pub fn jq_min_by(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_max_by` — see implementation.
-
 pub fn jq_max_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -419,7 +400,6 @@ pub fn jq_max_by(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_sort_by` — see implementation.
-
 pub fn jq_sort_by(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -434,7 +414,6 @@ pub fn jq_sort_by(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_group_by` — see implementation.
-
 pub fn jq_group_by(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let v = jq_get(args);
@@ -449,7 +428,6 @@ pub fn jq_group_by(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_unique_by` — see implementation.
-
 pub fn jq_unique_by(args: &[StrykeValue]) -> StrykeValue {
     use std::collections::HashSet;
     let v = jq_get(args);
@@ -466,7 +444,6 @@ pub fn jq_unique_by(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_any` — see implementation.
-
 pub fn jq_any(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -479,7 +456,6 @@ pub fn jq_any(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
 }
 /// `jq_all` — see implementation.
-
 pub fn jq_all(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -492,7 +468,6 @@ pub fn jq_all(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
 }
 /// `jq_flatten` — see implementation.
-
 pub fn jq_flatten(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -514,7 +489,6 @@ pub fn jq_flatten(args: &[StrykeValue]) -> StrykeValue {
     v
 }
 /// `jq_index` — see implementation.
-
 pub fn jq_index(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     let needle = args.get(2).map(|v| v.to_string()).unwrap_or_default();
@@ -530,7 +504,6 @@ pub fn jq_index(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(-1)
 }
 /// `jq_indices` — see implementation.
-
 pub fn jq_indices(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     let needle = args.get(2).map(|v| v.to_string()).unwrap_or_default();
@@ -547,7 +520,6 @@ pub fn jq_indices(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_first` — see implementation.
-
 pub fn jq_first(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -560,7 +532,6 @@ pub fn jq_first(args: &[StrykeValue]) -> StrykeValue {
     v
 }
 /// `jq_last` — see implementation.
-
 pub fn jq_last(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     if let Some(arr_ref) = v.as_array_ref() {
@@ -569,7 +540,6 @@ pub fn jq_last(args: &[StrykeValue]) -> StrykeValue {
     v
 }
 /// `jq_split_at` — see implementation.
-
 pub fn jq_split_at(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     let n = args.get(2).map(|v| v.to_int() as usize).unwrap_or(0);
@@ -583,7 +553,6 @@ pub fn jq_split_at(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_chunks` — see implementation.
-
 pub fn jq_chunks(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     let n = args.get(2).map(|v| v.to_int().max(1) as usize).unwrap_or(1);
@@ -595,7 +564,6 @@ pub fn jq_chunks(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `jq_zip` — see implementation.
-
 pub fn jq_zip(args: &[StrykeValue]) -> StrykeValue {
     let a = jq_get(args);
     let b = jq_get(&[
@@ -614,7 +582,6 @@ pub fn jq_zip(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `jq_combinations` — see implementation.
-
 pub fn jq_combinations(args: &[StrykeValue]) -> StrykeValue {
     let v = jq_get(args);
     let k = args.get(2).map(|v| v.to_int() as usize).unwrap_or(2);
@@ -647,7 +614,6 @@ pub fn jq_combinations(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `json_diff` — see implementation.
-
 pub fn json_diff(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -666,7 +632,6 @@ pub fn json_diff(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `json_patch` — see implementation.
-
 pub fn json_patch(args: &[StrykeValue]) -> StrykeValue {
     // RFC 6902 — applied naively: only "replace" / "add" / "remove" ops.
     let s = arg_str(args);
@@ -724,7 +689,6 @@ pub fn json_patch(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(serde_json::to_string(&v).unwrap_or_default())
 }
 /// `json_merge_patch` — see implementation.
-
 pub fn json_merge_patch(args: &[StrykeValue]) -> StrykeValue {
     // RFC 7396 — recursive merge.
     let s = arg_str(args);
@@ -751,7 +715,6 @@ pub fn json_merge_patch(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(serde_json::to_string(&v).unwrap_or_default())
 }
 /// `json_pointer_resolve` — see implementation.
-
 pub fn json_pointer_resolve(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let ptr = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -762,7 +725,6 @@ pub fn json_pointer_resolve(args: &[StrykeValue]) -> StrykeValue {
     json_to_stryke(&resolved)
 }
 /// `json_pointer_set` — see implementation.
-
 pub fn json_pointer_set(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let ptr = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -781,7 +743,6 @@ pub fn json_pointer_set(args: &[StrykeValue]) -> StrykeValue {
 // HTML / DOM (scraper backed)
 // ══════════════════════════════════════════════════════════════════════
 /// `html_parse` — see implementation.
-
 pub fn html_parse(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let _doc = scraper::Html::parse_document(&s);
@@ -789,7 +750,6 @@ pub fn html_parse(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(s)
 }
 /// `html_to_text` — see implementation.
-
 pub fn html_to_text(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let doc = scraper::Html::parse_document(&s);
@@ -802,13 +762,11 @@ pub fn html_to_text(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(text.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 /// `html_pretty` — see implementation.
-
 pub fn html_pretty(args: &[StrykeValue]) -> StrykeValue {
     // No real pretty-printer without an additional crate; return as-is.
     StrykeValue::string(arg_str(args))
 }
 /// `html_minify` — see implementation.
-
 pub fn html_minify(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r">\s+<").unwrap();
@@ -816,7 +774,6 @@ pub fn html_minify(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(collapsed.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 /// `html_sanitize` — see implementation.
-
 pub fn html_sanitize(args: &[StrykeValue]) -> StrykeValue {
     // Strip scripts, styles, on* attrs, and javascript: URLs.
     let s = arg_str(args);
@@ -839,21 +796,18 @@ pub fn html_sanitize(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(s)
 }
 /// `html_strip_tags` — see implementation.
-
 pub fn html_strip_tags(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"<[^>]+>").unwrap();
     StrykeValue::string(re.replace_all(&s, "").to_string())
 }
 /// `html_strip_scripts` — see implementation.
-
 pub fn html_strip_scripts(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap();
     StrykeValue::string(re.replace_all(&s, "").to_string())
 }
 /// `html_strip_styles` — see implementation.
-
 pub fn html_strip_styles(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap();
@@ -870,24 +824,20 @@ fn extract_attrs(html: &str, selector: &str, attr: &str) -> Vec<String> {
         .collect()
 }
 /// `html_extract_links` — see implementation.
-
 pub fn html_extract_links(args: &[StrykeValue]) -> StrykeValue {
     let urls = extract_attrs(&arg_str(args), "a[href]", "href");
     arr(urls.into_iter().map(StrykeValue::string).collect())
 }
 /// `html_extract_images` — see implementation.
-
 pub fn html_extract_images(args: &[StrykeValue]) -> StrykeValue {
     let urls = extract_attrs(&arg_str(args), "img[src]", "src");
     arr(urls.into_iter().map(StrykeValue::string).collect())
 }
 /// `html_extract_text` — see implementation.
-
 pub fn html_extract_text(args: &[StrykeValue]) -> StrykeValue {
     html_to_text(args)
 }
 /// `html_extract_meta` — see implementation.
-
 pub fn html_extract_meta(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let doc = scraper::Html::parse_document(&arg_str(args));
@@ -904,7 +854,6 @@ pub fn html_extract_meta(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `html_extract_title` — see implementation.
-
 pub fn html_extract_title(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let sel = scraper::Selector::parse("title").unwrap();
@@ -916,7 +865,6 @@ pub fn html_extract_title(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(t.trim().to_string())
 }
 /// `html_extract_headings` — see implementation.
-
 pub fn html_extract_headings(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let sel = scraper::Selector::parse("h1, h2, h3, h4, h5, h6").unwrap();
@@ -927,7 +875,6 @@ pub fn html_extract_headings(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `html_extract_tables` — see implementation.
-
 pub fn html_extract_tables(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let table_sel = scraper::Selector::parse("table").unwrap();
@@ -950,12 +897,10 @@ pub fn html_extract_tables(args: &[StrykeValue]) -> StrykeValue {
     arr(tables)
 }
 /// `html_inner_text` — see implementation.
-
 pub fn html_inner_text(args: &[StrykeValue]) -> StrykeValue {
     html_to_text(args)
 }
 /// `html_canonical_url` — see implementation.
-
 pub fn html_canonical_url(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let sel = scraper::Selector::parse("link[rel='canonical']").unwrap();
@@ -968,7 +913,6 @@ pub fn html_canonical_url(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(url)
 }
 /// `html_meta_charset` — see implementation.
-
 pub fn html_meta_charset(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let sel = scraper::Selector::parse("meta[charset]").unwrap();
@@ -981,7 +925,6 @@ pub fn html_meta_charset(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(cs)
 }
 /// `html_meta_keywords` — see implementation.
-
 pub fn html_meta_keywords(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let doc = scraper::Html::parse_document(&s);
@@ -995,7 +938,6 @@ pub fn html_meta_keywords(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(kw)
 }
 /// `html_meta_description` — see implementation.
-
 pub fn html_meta_description(args: &[StrykeValue]) -> StrykeValue {
     let doc = scraper::Html::parse_document(&arg_str(args));
     let sel = scraper::Selector::parse("meta[name='description']").unwrap();
@@ -1008,7 +950,6 @@ pub fn html_meta_description(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(d)
 }
 /// `html_meta_og` — see implementation.
-
 pub fn html_meta_og(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let doc = scraper::Html::parse_document(&arg_str(args));
@@ -1025,7 +966,6 @@ pub fn html_meta_og(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `html_meta_twitter` — see implementation.
-
 pub fn html_meta_twitter(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let doc = scraper::Html::parse_document(&arg_str(args));
@@ -1042,7 +982,6 @@ pub fn html_meta_twitter(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `html_to_markdown` — see implementation.
-
 pub fn html_to_markdown(args: &[StrykeValue]) -> StrykeValue {
     // Best-effort: strip tags, preserve basic structure.
     let s = arg_str(args);
@@ -1057,7 +996,6 @@ pub fn html_to_markdown(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(re.replace_all(&s, "").to_string())
 }
 /// `markdown_to_html` — see implementation.
-
 pub fn markdown_to_html(args: &[StrykeValue]) -> StrykeValue {
     // Best-effort transform — for full markdown, ship pulldown-cmark.
     let s = arg_str(args);
@@ -1078,7 +1016,6 @@ pub fn markdown_to_html(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `markdown_render` — see implementation.
-
 pub fn markdown_render(args: &[StrykeValue]) -> StrykeValue {
     markdown_to_html(args)
 }
@@ -1087,12 +1024,10 @@ pub fn markdown_render(args: &[StrykeValue]) -> StrykeValue {
 // XML (regex-based; pragmatic, not RFC-perfect)
 // ══════════════════════════════════════════════════════════════════════
 /// `xml_parse` — see implementation.
-
 pub fn xml_parse(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(arg_str(args))
 }
 /// `xml_pretty` — see implementation.
-
 pub fn xml_pretty(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut out = String::new();
@@ -1138,14 +1073,12 @@ pub fn xml_pretty(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `xml_minify` — see implementation.
-
 pub fn xml_minify(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r">\s+<").unwrap();
     StrykeValue::string(re.replace_all(&s, "><").to_string())
 }
 /// `xml_namespace` — see implementation.
-
 pub fn xml_namespace(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r#"xmlns(?::\w+)?\s*=\s*"([^"]+)""#).unwrap();
@@ -1155,7 +1088,6 @@ pub fn xml_namespace(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `xml_text` — see implementation.
-
 pub fn xml_text(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"<[^>]+>").unwrap();
@@ -1163,7 +1095,6 @@ pub fn xml_text(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(stripped.split_whitespace().collect::<Vec<_>>().join(" "))
 }
 /// `xml_attrs` — see implementation.
-
 pub fn xml_attrs(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let s = arg_str(args);
@@ -1175,7 +1106,6 @@ pub fn xml_attrs(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `xml_children_by_tag` — see implementation.
-
 pub fn xml_children_by_tag(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let tag = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -1192,7 +1122,6 @@ pub fn xml_children_by_tag(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `xml_root` — see implementation.
-
 pub fn xml_root(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"<(\w+)").unwrap();
@@ -1207,7 +1136,6 @@ pub fn xml_root(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `xpath_select_one` — see implementation.
-
 pub fn xpath_select_one(args: &[StrykeValue]) -> StrykeValue {
     // Naive xpath: only supports //tagname.
     let s = arg_str(args);
@@ -1226,7 +1154,6 @@ pub fn xpath_select_one(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `xpath_attribute` — see implementation.
-
 pub fn xpath_attribute(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let attr = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -1237,12 +1164,10 @@ pub fn xpath_attribute(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `xpath_text` — see implementation.
-
 pub fn xpath_text(args: &[StrykeValue]) -> StrykeValue {
     xml_text(args)
 }
 /// `xml_to_json` — see implementation.
-
 pub fn xml_to_json(args: &[StrykeValue]) -> StrykeValue {
     // Very rough — wrap text content with tag names as JSON keys.
     let attrs = xml_attrs(args);
@@ -1257,7 +1182,6 @@ pub fn xml_to_json(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string("{}".to_string())
 }
 /// `json_to_xml` — see implementation.
-
 pub fn json_to_xml(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let Some(v) = parse_json(&s) else {
@@ -1276,7 +1200,6 @@ pub fn json_to_xml(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(render(&v, "root"))
 }
 /// `xml_canonicalize` — see implementation.
-
 pub fn xml_canonicalize(args: &[StrykeValue]) -> StrykeValue {
     xml_minify(args)
 }
@@ -1285,12 +1208,10 @@ pub fn xml_canonicalize(args: &[StrykeValue]) -> StrykeValue {
 // CSS basics (regex-based)
 // ══════════════════════════════════════════════════════════════════════
 /// `css_parse` — see implementation.
-
 pub fn css_parse(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(arg_str(args))
 }
 /// `css_minify` — see implementation.
-
 pub fn css_minify(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"/\*.*?\*/").unwrap();
@@ -1305,7 +1226,6 @@ pub fn css_minify(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(s)
 }
 /// `css_pretty` — see implementation.
-
 pub fn css_pretty(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let s = s
@@ -1315,7 +1235,6 @@ pub fn css_pretty(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(s)
 }
 /// `css_selector_parse` — see implementation.
-
 pub fn css_selector_parse(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let parts: Vec<StrykeValue> = s
@@ -1325,7 +1244,6 @@ pub fn css_selector_parse(args: &[StrykeValue]) -> StrykeValue {
     arr(parts)
 }
 /// `css_rule_extract` — see implementation.
-
 pub fn css_rule_extract(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"([^{}]+)\{([^}]*)\}").unwrap();
@@ -1339,7 +1257,6 @@ pub fn css_rule_extract(args: &[StrykeValue]) -> StrykeValue {
     arr(rules)
 }
 /// `css_specificity` — see implementation.
-
 pub fn css_specificity(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut id = 0i64;
@@ -1365,7 +1282,6 @@ pub fn css_specificity(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `css_var_resolve` — see implementation.
-
 pub fn css_var_resolve(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let var_re = regex::Regex::new(r"--([\w-]+)\s*:\s*([^;}]+)").unwrap();
@@ -1384,7 +1300,6 @@ pub fn css_var_resolve(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out.to_string())
 }
 /// `css_property_set` — see implementation.
-
 pub fn css_property_set(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let prop = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -1398,7 +1313,6 @@ pub fn css_property_set(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `css_property_get` — see implementation.
-
 pub fn css_property_get(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let prop = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -1409,7 +1323,6 @@ pub fn css_property_get(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `css_url_extract` — see implementation.
-
 pub fn css_url_extract(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r#"url\(\s*['"]?([^'")]+)['"]?\s*\)"#).unwrap();
@@ -1420,7 +1333,6 @@ pub fn css_url_extract(args: &[StrykeValue]) -> StrykeValue {
     arr(urls)
 }
 /// `css_import_extract` — see implementation.
-
 pub fn css_import_extract(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r#"@import\s+(?:url\()?['"]([^'"]+)['"]"#).unwrap();
@@ -1431,7 +1343,6 @@ pub fn css_import_extract(args: &[StrykeValue]) -> StrykeValue {
     arr(urls)
 }
 /// `css_font_extract` — see implementation.
-
 pub fn css_font_extract(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let re = regex::Regex::new(r"font-family\s*:\s*([^;}]+)").unwrap();
@@ -1442,7 +1353,6 @@ pub fn css_font_extract(args: &[StrykeValue]) -> StrykeValue {
     arr(fonts)
 }
 /// `selector_to_xpath` — see implementation.
-
 pub fn selector_to_xpath(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     // Very basic conversion: `a.b` → `//a[@class='b']`, `#id` → `//*[@id='id']`
@@ -1456,7 +1366,6 @@ pub fn selector_to_xpath(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(s.to_string())
 }
 /// `xpath_to_selector` — see implementation.
-
 pub fn xpath_to_selector(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let s = regex::Regex::new(r#"//(\w+)\[@class='([\w-]+)'\]"#)

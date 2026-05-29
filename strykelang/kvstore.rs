@@ -161,7 +161,6 @@ impl WireValue {
 
 // ── rkyv-archived store root ─────────────────────────────────────────
 /// `KvHeader` — see fields for layout.
-
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct KvHeader {
@@ -192,7 +191,6 @@ impl Default for KvHeader {
     }
 }
 /// `KvRoot` — see fields for layout.
-
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone, Default)]
 #[archive(check_bytes)]
 pub struct KvRoot {
@@ -270,18 +268,15 @@ impl KvStore {
         })
     }
     /// `put` — see implementation.
-
     pub fn put(&mut self, key: String, value: WireValue) {
         self.root.entries.insert(key, value);
         self.dirty = true;
     }
     /// `get` — see implementation.
-
     pub fn get(&self, key: &str) -> Option<&WireValue> {
         self.root.entries.get(key)
     }
     /// `del` — see implementation.
-
     pub fn del(&mut self, key: &str) -> bool {
         let existed = self.root.entries.remove(key).is_some();
         if existed {
@@ -290,17 +285,14 @@ impl KvStore {
         existed
     }
     /// `exists` — see implementation.
-
     pub fn exists(&self, key: &str) -> bool {
         self.root.entries.contains_key(key)
     }
     /// `len` — see implementation.
-
     pub fn len(&self) -> usize {
         self.root.entries.len()
     }
     /// `is_empty` — see implementation.
-
     pub fn is_empty(&self) -> bool {
         self.root.entries.is_empty()
     }
@@ -366,7 +358,6 @@ impl KvStore {
         Ok(())
     }
     /// `stats` — see implementation.
-
     pub fn stats(&self) -> Vec<(String, StrykeValue)> {
         vec![
             (

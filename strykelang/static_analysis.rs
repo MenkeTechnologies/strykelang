@@ -49,7 +49,6 @@ impl Scope {
     }
 }
 /// `StaticAnalyzer` — see fields for layout.
-
 pub struct StaticAnalyzer {
     /// `scopes` field.
     scopes: Vec<Scope>,
@@ -99,7 +98,6 @@ impl StaticAnalyzer {
         Self::with_strict_vars(file, false)
     }
     /// `with_strict_vars` — see implementation.
-
     pub fn with_strict_vars(file: &str, strict_vars: bool) -> Self {
         let mut global = Scope::default();
         for name in ["_", "a", "b", "ARGV", "ENV", "SIG", "INC"] {
@@ -271,7 +269,6 @@ impl StaticAnalyzer {
             .push(StrykeError::new(kind, msg, line, &self.file));
     }
     /// `analyze` — see implementation.
-
     pub fn analyze(mut self, program: &Program) -> StrykeResult<()> {
         for stmt in &program.statements {
             self.collect_declarations_stmt(stmt);
@@ -1939,7 +1936,6 @@ pub fn static_string_value(e: &Expr) -> Option<String> {
     }
 }
 /// `analyze_program` — see implementation.
-
 pub fn analyze_program(program: &Program, file: &str) -> StrykeResult<()> {
     StaticAnalyzer::new(file).analyze(program)
 }

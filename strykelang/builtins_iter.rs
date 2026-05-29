@@ -110,7 +110,6 @@ pub fn sliding_average(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `sliding_sum` — see implementation.
-
 pub fn sliding_sum(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let win = args.get(1).map(|v| v.to_int().max(1) as usize).unwrap_or(1);
@@ -122,7 +121,6 @@ pub fn sliding_sum(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `sliding_max` — see implementation.
-
 pub fn sliding_max(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let win = args.get(1).map(|v| v.to_int().max(1) as usize).unwrap_or(1);
@@ -134,7 +132,6 @@ pub fn sliding_max(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `sliding_min` — see implementation.
-
 pub fn sliding_min(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let win = args.get(1).map(|v| v.to_int().max(1) as usize).unwrap_or(1);
@@ -146,7 +143,6 @@ pub fn sliding_min(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `top_n_by` — see implementation.
-
 pub fn top_n_by(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
@@ -160,7 +156,6 @@ pub fn top_n_by(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `bottom_n_by` — see implementation.
-
 pub fn bottom_n_by(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
@@ -174,7 +169,6 @@ pub fn bottom_n_by(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `all_equal` — see implementation.
-
 pub fn all_equal(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     if xs.is_empty() {
@@ -188,7 +182,6 @@ pub fn all_equal(args: &[StrykeValue]) -> StrykeValue {
     })
 }
 /// `take_n_random` — see implementation.
-
 pub fn take_n_random(args: &[StrykeValue]) -> StrykeValue {
     use rand::seq::SliceRandom;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -199,7 +192,6 @@ pub fn take_n_random(args: &[StrykeValue]) -> StrykeValue {
     arr(shuffled.into_iter().take(n).collect())
 }
 /// `unzip3` — see implementation.
-
 pub fn unzip3(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut a: Vec<StrykeValue> = Vec::new();
@@ -216,7 +208,6 @@ pub fn unzip3(args: &[StrykeValue]) -> StrykeValue {
     arr(vec![arr(a), arr(b), arr(c)])
 }
 /// `roundrobin` — see implementation.
-
 pub fn roundrobin(args: &[StrykeValue]) -> StrykeValue {
     let lists: Vec<Vec<StrykeValue>> = args.iter().map(list_elements).collect();
     let max_len = lists.iter().map(|l| l.len()).max().unwrap_or(0);
@@ -231,7 +222,6 @@ pub fn roundrobin(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `mode_iter` — see implementation.
-
 pub fn mode_iter(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -250,7 +240,6 @@ pub fn mode_iter(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `distinct_sample` — see implementation.
-
 pub fn distinct_sample(args: &[StrykeValue]) -> StrykeValue {
     use rand::seq::SliceRandom;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -266,7 +255,6 @@ pub fn distinct_sample(args: &[StrykeValue]) -> StrykeValue {
     arr(s.into_iter().take(n).collect())
 }
 /// `ranked_choice` — see implementation.
-
 pub fn ranked_choice(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     // Each ballot is an arrayref of preferences (most preferred first).
@@ -315,7 +303,6 @@ pub fn ranked_choice(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `boyer_moore_majority` — see implementation.
-
 pub fn boyer_moore_majority(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut count = 0i64;
@@ -340,7 +327,6 @@ pub fn boyer_moore_majority(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `quickselect_nth` — see implementation.
-
 pub fn quickselect_nth(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
@@ -354,7 +340,6 @@ pub fn quickselect_nth(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(nums[n])
 }
 /// `quickselect_median` — see implementation.
-
 pub fn quickselect_median(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut nums: Vec<f64> = xs.iter().map(|v| v.to_number()).collect();
@@ -368,7 +353,6 @@ pub fn quickselect_median(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(nums[mid])
 }
 /// `top_k_min_heap` — see implementation.
-
 pub fn top_k_min_heap(args: &[StrykeValue]) -> StrykeValue {
     use std::cmp::Reverse;
     use std::collections::BinaryHeap;
@@ -394,7 +378,6 @@ pub fn top_k_min_heap(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `bottom_k_max_heap` — see implementation.
-
 pub fn bottom_k_max_heap(args: &[StrykeValue]) -> StrykeValue {
     use std::collections::BinaryHeap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -416,7 +399,6 @@ pub fn bottom_k_max_heap(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `unique_consecutive` — see implementation.
-
 pub fn unique_consecutive(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut out: Vec<StrykeValue> = Vec::new();
@@ -431,7 +413,6 @@ pub fn unique_consecutive(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `exclude` — see implementation.
-
 pub fn exclude(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let to_exclude: std::collections::HashSet<String> =
@@ -443,25 +424,21 @@ pub fn exclude(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `exclude_first` — see implementation.
-
 pub fn exclude_first(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     arr(xs.into_iter().skip(1).collect())
 }
 /// `exclude_last` — see implementation.
-
 pub fn exclude_last(args: &[StrykeValue]) -> StrykeValue {
     let mut xs = args.first().map(list_elements).unwrap_or_default();
     xs.pop();
     arr(xs)
 }
 /// `weave_n` — see implementation.
-
 pub fn weave_n(args: &[StrykeValue]) -> StrykeValue {
     roundrobin(args)
 }
 /// `pad_left_n` — see implementation.
-
 pub fn pad_left_n(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let target = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
@@ -478,7 +455,6 @@ pub fn pad_left_n(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `pad_right_n` — see implementation.
-
 pub fn pad_right_n(args: &[StrykeValue]) -> StrykeValue {
     let mut xs = args.first().map(list_elements).unwrap_or_default();
     let target = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
@@ -489,7 +465,6 @@ pub fn pad_right_n(args: &[StrykeValue]) -> StrykeValue {
     arr(xs)
 }
 /// `collect_into_string` — see implementation.
-
 pub fn collect_into_string(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let sep = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -497,7 +472,6 @@ pub fn collect_into_string(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(parts.join(&sep))
 }
 /// `collect_into_hashset` — see implementation.
-
 pub fn collect_into_hashset(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -508,7 +482,6 @@ pub fn collect_into_hashset(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `collect_into_btreeset` — see implementation.
-
 pub fn collect_into_btreeset(args: &[StrykeValue]) -> StrykeValue {
     use std::collections::BTreeSet;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -516,7 +489,6 @@ pub fn collect_into_btreeset(args: &[StrykeValue]) -> StrykeValue {
     arr(set.into_iter().map(StrykeValue::string).collect())
 }
 /// `collect_into_hashmap` — see implementation.
-
 pub fn collect_into_hashmap(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -530,7 +502,6 @@ pub fn collect_into_hashmap(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `collect_into_btreemap` — see implementation.
-
 pub fn collect_into_btreemap(args: &[StrykeValue]) -> StrykeValue {
     use std::collections::BTreeMap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -546,7 +517,6 @@ pub fn collect_into_btreemap(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `foldl1_iter` — see implementation.
-
 pub fn foldl1_iter(args: &[StrykeValue]) -> StrykeValue {
     // No real block-arg support here; treat second arg as binary builtin
     // name; folds via numeric addition by default (placeholder semantics).
@@ -561,7 +531,6 @@ pub fn foldl1_iter(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(acc)
 }
 /// `foldr1_iter` — see implementation.
-
 pub fn foldr1_iter(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     if xs.is_empty() {
@@ -574,14 +543,12 @@ pub fn foldr1_iter(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(acc)
 }
 /// `sort_by_cached_key` — see implementation.
-
 pub fn sort_by_cached_key(args: &[StrykeValue]) -> StrykeValue {
     let mut xs = args.first().map(list_elements).unwrap_or_default();
     xs.sort_by_key(|v| v.to_string());
     arr(xs)
 }
 /// `position_max` — see implementation.
-
 pub fn position_max(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut max_idx: Option<usize> = None;
@@ -598,7 +565,6 @@ pub fn position_max(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `position_min` — see implementation.
-
 pub fn position_min(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let mut min_idx: Option<usize> = None;
@@ -615,17 +581,14 @@ pub fn position_min(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `position_max_by` — see implementation.
-
 pub fn position_max_by(args: &[StrykeValue]) -> StrykeValue {
     position_max(args)
 }
 /// `position_min_by` — see implementation.
-
 pub fn position_min_by(args: &[StrykeValue]) -> StrykeValue {
     position_min(args)
 }
 /// `group_map` — see implementation.
-
 pub fn group_map(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -644,7 +607,6 @@ pub fn group_map(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `lookahead_n` — see implementation.
-
 pub fn lookahead_n(args: &[StrykeValue]) -> StrykeValue {
     multipeek(args)
 }
@@ -677,7 +639,6 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     prev[n]
 }
 /// `levenshtein_normalized` — see implementation.
-
 pub fn levenshtein_normalized(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -689,7 +650,6 @@ pub fn levenshtein_normalized(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(d as f64 / max as f64)
 }
 /// `ratcliff_obershelp` — see implementation.
-
 pub fn ratcliff_obershelp(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -734,7 +694,6 @@ pub fn ratcliff_obershelp(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(2.0 * m as f64 / (av.len() + bv.len()) as f64)
 }
 /// `match_rating` — see implementation.
-
 pub fn match_rating(args: &[StrykeValue]) -> StrykeValue {
     // Match Rating Approach (MRA) similarity score
     let a = arg_str(args);
@@ -843,21 +802,18 @@ fn lcs_str(a: &str, b: &str) -> String {
     out.iter().rev().collect()
 }
 /// `str_lcs` — see implementation.
-
 pub fn str_lcs(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     StrykeValue::string(lcs_str(&a, &b))
 }
 /// `str_lcs_length` — see implementation.
-
 pub fn str_lcs_length(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
     StrykeValue::integer(lcs_str(&a, &b).chars().count() as i64)
 }
 /// `str_longest_common_substring` — see implementation.
-
 pub fn str_longest_common_substring(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args);
     let b = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -883,7 +839,6 @@ pub fn str_longest_common_substring(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(av[start..end_i].iter().collect())
 }
 /// `str_kmp` — see implementation.
-
 pub fn str_kmp(args: &[StrykeValue]) -> StrykeValue {
     // KMP first-match index, or -1.
     let haystack = arg_str(args);
@@ -897,17 +852,14 @@ pub fn str_kmp(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `str_boyer_moore` — see implementation.
-
 pub fn str_boyer_moore(args: &[StrykeValue]) -> StrykeValue {
     str_kmp(args)
 }
 /// `str_rabin_karp` — see implementation.
-
 pub fn str_rabin_karp(args: &[StrykeValue]) -> StrykeValue {
     str_kmp(args)
 }
 /// `str_z_array` — see implementation.
-
 pub fn str_z_array(args: &[StrykeValue]) -> StrykeValue {
     let s: Vec<char> = arg_str(args).chars().collect();
     let n = s.len();
@@ -932,7 +884,6 @@ pub fn str_z_array(args: &[StrykeValue]) -> StrykeValue {
     arr(z.into_iter().map(StrykeValue::integer).collect())
 }
 /// `str_rotations` — see implementation.
-
 pub fn str_rotations(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let chars: Vec<char> = s.chars().collect();
@@ -945,7 +896,6 @@ pub fn str_rotations(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `str_compress_rle` — see implementation.
-
 pub fn str_compress_rle(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut out = String::new();
@@ -968,7 +918,6 @@ pub fn str_compress_rle(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `str_decompress_rle` — see implementation.
-
 pub fn str_decompress_rle(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut out = String::new();
@@ -987,7 +936,6 @@ pub fn str_decompress_rle(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `str_huffman_encode` — see implementation.
-
 pub fn str_huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     // Simplified: returns canonical-frequency-prefix Huffman as bit string.
     // For brevity, uses Vec-based binary heap.
@@ -1023,14 +971,12 @@ pub fn str_huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `str_huffman_decode` — see implementation.
-
 pub fn str_huffman_decode(_args: &[StrykeValue]) -> StrykeValue {
     // Without a code table the encoding above is irreversible.
     // Returning undef for now; a real impl needs the (code, source) pair.
     StrykeValue::UNDEF
 }
 /// `str_compress_lzss` — see implementation.
-
 pub fn str_compress_lzss(args: &[StrykeValue]) -> StrykeValue {
     // Simplified LZSS — token stream of (offset, length, char). Use back-references
     // up to 4095 bytes, min match length 3, max 18.
@@ -1062,7 +1008,6 @@ pub fn str_compress_lzss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `str_decompress_lzss` — see implementation.
-
 pub fn str_decompress_lzss(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let mut out: Vec<u8> = Vec::new();
@@ -1096,7 +1041,6 @@ pub fn str_decompress_lzss(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(String::from_utf8_lossy(&out).into_owned())
 }
 /// `str_isogram` — see implementation.
-
 pub fn str_isogram(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).to_ascii_lowercase();
     let chars: Vec<char> = s.chars().filter(|c| c.is_alphabetic()).collect();
@@ -1109,12 +1053,10 @@ pub fn str_isogram(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(1)
 }
 /// `fold_case` — see implementation.
-
 pub fn fold_case(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(arg_str(args).to_lowercase())
 }
 /// `str_aho_corasick` — see implementation.
-
 pub fn str_aho_corasick(args: &[StrykeValue]) -> StrykeValue {
     // Without the aho-corasick crate, fall back to a Vec of first-match
     // positions per needle.
@@ -1140,7 +1082,6 @@ pub fn str_aho_corasick(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `str_suffix_array` — see implementation.
-
 pub fn str_suffix_array(args: &[StrykeValue]) -> StrykeValue {
     // Naive O(n^2 log n) — fine for small inputs.
     let s = arg_str(args);

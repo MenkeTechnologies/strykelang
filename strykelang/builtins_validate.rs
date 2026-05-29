@@ -29,36 +29,30 @@ fn arg_str(args: &[StrykeValue]) -> String {
 // Character-class predicates
 // ══════════════════════════════════════════════════════════════════════
 /// `is_alpha_only` — see implementation.
-
 pub fn is_alpha_only(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(!s.is_empty() && s.chars().all(|c| c.is_ascii_alphabetic()))
 }
 /// `is_alphanumeric_only` — see implementation.
-
 pub fn is_alphanumeric_only(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(!s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric()))
 }
 /// `is_numeric_only` — see implementation.
-
 pub fn is_numeric_only(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(!s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
 }
 /// `is_ascii_only` — see implementation.
-
 pub fn is_ascii_only(args: &[StrykeValue]) -> StrykeValue {
     b(arg_str(args).is_ascii())
 }
 /// `is_printable_ascii` — see implementation.
-
 pub fn is_printable_ascii(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(!s.is_empty() && s.chars().all(|c| c.is_ascii() && !c.is_ascii_control()))
 }
 /// `is_utf8` — see implementation.
-
 pub fn is_utf8(args: &[StrykeValue]) -> StrykeValue {
     // strings in stryke are already utf-8; the question is whether they
     // contain valid utf-8 when interpreted as bytes. always true for
@@ -67,7 +61,6 @@ pub fn is_utf8(args: &[StrykeValue]) -> StrykeValue {
     b(std::str::from_utf8(s.as_bytes()).is_ok())
 }
 /// `is_lowercase` — see implementation.
-
 pub fn is_lowercase(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let has_letter = s.chars().any(|c| c.is_alphabetic());
@@ -77,7 +70,6 @@ pub fn is_lowercase(args: &[StrykeValue]) -> StrykeValue {
             .all(|c| c.is_lowercase()))
 }
 /// `is_uppercase` — see implementation.
-
 pub fn is_uppercase(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let has_letter = s.chars().any(|c| c.is_alphabetic());
@@ -87,7 +79,6 @@ pub fn is_uppercase(args: &[StrykeValue]) -> StrykeValue {
             .all(|c| c.is_uppercase()))
 }
 /// `is_titlecase` — see implementation.
-
 pub fn is_titlecase(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     if s.is_empty() {
@@ -107,7 +98,6 @@ pub fn is_titlecase(args: &[StrykeValue]) -> StrykeValue {
     b(true)
 }
 /// `is_palindrome_str` — see implementation.
-
 pub fn is_palindrome_str(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let clean: Vec<char> = s
@@ -131,47 +121,40 @@ pub fn is_palindrome_str(args: &[StrykeValue]) -> StrykeValue {
 // Numeric / encoding predicates
 // ══════════════════════════════════════════════════════════════════════
 /// `is_hex` — see implementation.
-
 pub fn is_hex(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned = s.trim_start_matches("0x").trim_start_matches("0X");
     b(!cleaned.is_empty() && cleaned.chars().all(|c| c.is_ascii_hexdigit()))
 }
 /// `is_octal` — see implementation.
-
 pub fn is_octal(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned = s.trim_start_matches("0o").trim_start_matches("0O");
     b(!cleaned.is_empty() && cleaned.chars().all(|c| ('0'..='7').contains(&c)))
 }
 /// `is_binary` — see implementation.
-
 pub fn is_binary(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned = s.trim_start_matches("0b").trim_start_matches("0B");
     b(!cleaned.is_empty() && cleaned.chars().all(|c| c == '0' || c == '1'))
 }
 /// `is_base32` — see implementation.
-
 pub fn is_base32(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned = s.trim_end_matches('=');
     b(!cleaned.is_empty() && cleaned.chars().all(|c| matches!(c, 'A'..='Z' | '2'..='7')))
 }
 /// `is_md5_hash` — see implementation.
-
 pub fn is_md5_hash(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(s.len() == 32 && s.chars().all(|c| c.is_ascii_hexdigit()))
 }
 /// `is_sha1_hash` — see implementation.
-
 pub fn is_sha1_hash(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit()))
 }
 /// `is_sha256_hash` — see implementation.
-
 pub fn is_sha256_hash(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     b(s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()))
@@ -181,12 +164,10 @@ pub fn is_sha256_hash(args: &[StrykeValue]) -> StrykeValue {
 // Address-form predicates
 // ══════════════════════════════════════════════════════════════════════
 /// `is_ipv6` — see implementation.
-
 pub fn is_ipv6(args: &[StrykeValue]) -> StrykeValue {
     b(arg_str(args).parse::<std::net::Ipv6Addr>().is_ok())
 }
 /// `is_cidr` — see implementation.
-
 pub fn is_cidr(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let s = s.trim();
@@ -206,7 +187,6 @@ pub fn is_cidr(args: &[StrykeValue]) -> StrykeValue {
     b(p <= max)
 }
 /// `is_mac` — see implementation.
-
 pub fn is_mac(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned: String = s.chars().filter(|c| c.is_ascii_hexdigit()).collect();
@@ -217,14 +197,12 @@ pub fn is_mac(args: &[StrykeValue]) -> StrykeValue {
 // URL / UUID / JWT
 // ══════════════════════════════════════════════════════════════════════
 /// `is_url_http` — see implementation.
-
 pub fn is_url_http(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let lower = s.trim().to_ascii_lowercase();
     b(lower.starts_with("http://") && s.len() > 7)
 }
 /// `is_url_https` — see implementation.
-
 pub fn is_url_https(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let lower = s.trim().to_ascii_lowercase();
@@ -253,17 +231,14 @@ fn uuid_version_check(s: &str, expected: u8) -> bool {
     version_char.to_digit(16) == Some(expected as u32)
 }
 /// `is_uuid_v4` — see implementation.
-
 pub fn is_uuid_v4(args: &[StrykeValue]) -> StrykeValue {
     b(uuid_version_check(&arg_str(args), 4))
 }
 /// `is_uuid_v7` — see implementation.
-
 pub fn is_uuid_v7(args: &[StrykeValue]) -> StrykeValue {
     b(uuid_version_check(&arg_str(args), 7))
 }
 /// `is_jwt` — see implementation.
-
 pub fn is_jwt(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let parts: Vec<&str> = s.split('.').collect();
@@ -285,7 +260,6 @@ pub fn is_jwt(args: &[StrykeValue]) -> StrykeValue {
     b(true)
 }
 /// `is_email_strict` — see implementation.
-
 pub fn is_email_strict(args: &[StrykeValue]) -> StrykeValue {
     // RFC 5322 dot-atom local-part + domain with at least one dot.
     let s = arg_str(args);
@@ -384,21 +358,18 @@ pub fn luhn_digit(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(check as i64)
 }
 /// `is_imei` — see implementation.
-
 pub fn is_imei(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digits_only: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
     b(digits_only.len() == 15 && luhn_valid(&digits_only))
 }
 /// `is_imsi` — see implementation.
-
 pub fn is_imsi(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digits_only: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
     b(matches!(digits_only.len(), 14..=15) && digits_only.chars().all(|c| c.is_ascii_digit()))
 }
 /// `is_vin` — see implementation.
-
 pub fn is_vin(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).to_ascii_uppercase();
     if s.len() != 17 {
@@ -505,7 +476,6 @@ pub fn vin_decode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `is_ean13` — see implementation.
-
 pub fn is_ean13(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digits: Vec<u32> = s
@@ -524,7 +494,6 @@ pub fn is_ean13(args: &[StrykeValue]) -> StrykeValue {
     b(check == digits[12])
 }
 /// `is_upc` — see implementation.
-
 pub fn is_upc(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digits: Vec<u32> = s
@@ -543,7 +512,6 @@ pub fn is_upc(args: &[StrykeValue]) -> StrykeValue {
     b(check == digits[11])
 }
 /// `is_isbn` — see implementation.
-
 pub fn is_isbn(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
@@ -592,7 +560,6 @@ fn isbn13_valid(s: &str) -> bool {
     check == digits[12]
 }
 /// `isbn10_to_isbn13` — see implementation.
-
 pub fn isbn10_to_isbn13(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
@@ -609,7 +576,6 @@ pub fn isbn10_to_isbn13(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}{}", body, check))
 }
 /// `isbn13_to_isbn10` — see implementation.
-
 pub fn isbn13_to_isbn10(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
@@ -659,7 +625,6 @@ pub fn iban_format(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `iban_country` — see implementation.
-
 pub fn iban_country(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let cleaned: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
@@ -718,7 +683,6 @@ pub fn is_bic(args: &[StrykeValue]) -> StrykeValue {
     b(true)
 }
 /// `is_swift` — see implementation.
-
 pub fn is_swift(args: &[StrykeValue]) -> StrykeValue {
     is_bic(args)
 }
@@ -727,7 +691,6 @@ pub fn is_swift(args: &[StrykeValue]) -> StrykeValue {
 // Phone / postal / SSN
 // ══════════════════════════════════════════════════════════════════════
 /// `is_phone` — see implementation.
-
 pub fn is_phone(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let digit_count = s.chars().filter(|c| c.is_ascii_digit()).count();
@@ -737,7 +700,6 @@ pub fn is_phone(args: &[StrykeValue]) -> StrykeValue {
             .all(|c| c.is_ascii_digit() || c.is_whitespace() || "+-().".contains(c)))
 }
 /// `is_phone_e164` — see implementation.
-
 pub fn is_phone_e164(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     let s = s.trim();
@@ -748,13 +710,11 @@ pub fn is_phone_e164(args: &[StrykeValue]) -> StrykeValue {
     b(digits.len() >= 8 && digits.len() <= 15 && s[1..].chars().all(|c| c.is_ascii_digit()))
 }
 /// `is_zip_us` — see implementation.
-
 pub fn is_zip_us(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).trim().to_string();
     b(s.len() == 5 && s.chars().all(|c| c.is_ascii_digit()))
 }
 /// `is_zip_plus4` — see implementation.
-
 pub fn is_zip_plus4(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).trim().to_string();
     if s.len() != 10 {
@@ -825,7 +785,6 @@ pub fn is_postal_code(args: &[StrykeValue]) -> StrykeValue {
     b(ok)
 }
 /// `is_ssn_us` — see implementation.
-
 pub fn is_ssn_us(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).trim().to_string();
     if s.len() != 11 && s.len() != 9 {
@@ -880,7 +839,6 @@ fn parse_semver(s: &str) -> Option<(u64, u64, u64, String, String)> {
     Some((major, minor, patch, pre, build))
 }
 /// `semver_compare` — see implementation.
-
 pub fn semver_compare(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(|v| v.to_string()).unwrap_or_default();
     let bs = args.get(1).map(|v| v.to_string()).unwrap_or_default();
@@ -949,7 +907,6 @@ pub fn semver_satisfies(args: &[StrykeValue]) -> StrykeValue {
     b(ok)
 }
 /// `semver_increment_major` — see implementation.
-
 pub fn semver_increment_major(args: &[StrykeValue]) -> StrykeValue {
     let Some((maj, _, _, _, _)) = parse_semver(&arg_str(args)) else {
         return StrykeValue::UNDEF;
@@ -957,7 +914,6 @@ pub fn semver_increment_major(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}.0.0", maj + 1))
 }
 /// `semver_increment_minor` — see implementation.
-
 pub fn semver_increment_minor(args: &[StrykeValue]) -> StrykeValue {
     let Some((maj, min, _, _, _)) = parse_semver(&arg_str(args)) else {
         return StrykeValue::UNDEF;
@@ -965,7 +921,6 @@ pub fn semver_increment_minor(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}.{}.0", maj, min + 1))
 }
 /// `semver_increment_patch` — see implementation.
-
 pub fn semver_increment_patch(args: &[StrykeValue]) -> StrykeValue {
     let Some((maj, min, pat, _, _)) = parse_semver(&arg_str(args)) else {
         return StrykeValue::UNDEF;

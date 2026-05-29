@@ -11,7 +11,6 @@ pub struct FormatTemplate {
     pub records: Vec<FormatRecord>,
 }
 /// `FormatRecord` — see variants.
-
 #[derive(Debug, Clone)]
 pub enum FormatRecord {
     /// Line with no `@` fields — printed as-is (newline added by `write`).
@@ -23,7 +22,6 @@ pub enum FormatRecord {
     },
 }
 /// `FieldAlign` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldAlign {
     /// `Left` variant.
@@ -38,7 +36,6 @@ pub enum FieldAlign {
     Multiline,
 }
 /// `FieldKind` — see variants.
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldKind {
     /// `Text` variant.
@@ -49,7 +46,6 @@ pub enum FieldKind {
     Multiline,
 }
 /// `PictureSegment` — see variants.
-
 #[derive(Debug, Clone)]
 pub enum PictureSegment {
     /// `Literal` variant.

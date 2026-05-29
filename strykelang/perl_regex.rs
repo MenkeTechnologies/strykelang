@@ -62,7 +62,6 @@ impl<'a> PerlCaptures<'a> {
         }
     }
     /// `get` — see implementation.
-
     #[inline]
     pub fn get(&self, i: usize) -> Option<RegexMatch<'a>> {
         match self {
@@ -72,7 +71,6 @@ impl<'a> PerlCaptures<'a> {
         }
     }
     /// `name` — see implementation.
-
     #[inline]
     pub fn name(&self, name: &str) -> Option<RegexMatch<'a>> {
         match self {
@@ -137,7 +135,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `is_match` — see implementation.
-
     #[inline]
     pub fn is_match(&self, s: &str) -> bool {
         match self {
@@ -147,7 +144,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `captures` — see implementation.
-
     pub fn captures<'t>(&self, text: &'t str) -> Option<PerlCaptures<'t>> {
         match self {
             Self::Rust(r) => r.captures(text).map(PerlCaptures::Rust),
@@ -174,7 +170,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `capture_names` — see implementation.
-
     pub fn capture_names(&self) -> CaptureNames<'_> {
         match self {
             Self::Rust(r) => CaptureNames::Rust(r.capture_names()),
@@ -183,7 +178,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `replace` — see implementation.
-
     pub fn replace(&self, s: &str, replacement: &str) -> String {
         match self {
             Self::Rust(r) => r.replace(s, replacement).to_string(),
@@ -192,7 +186,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `replace_all` — see implementation.
-
     pub fn replace_all(&self, s: &str, replacement: &str) -> String {
         match self {
             Self::Rust(r) => r.replace_all(s, replacement).to_string(),
@@ -201,7 +194,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `find_iter_count` — see implementation.
-
     pub fn find_iter_count(&self, s: &str) -> usize {
         match self {
             Self::Rust(r) => r.find_iter(s).count(),
@@ -223,7 +215,6 @@ impl PerlCompiledRegex {
         }
     }
     /// `splitn_strings` — see implementation.
-
     pub fn splitn_strings(&self, s: &str, limit: usize) -> Vec<String> {
         match self {
             Self::Rust(r) => r.splitn(s, limit).map(|x| x.to_string()).collect(),
@@ -237,7 +228,6 @@ impl PerlCompiledRegex {
     }
 }
 /// `CaptureIter` — see variants.
-
 pub enum CaptureIter<'r, 't> {
     /// `Rust` variant.
     Rust(regex::CaptureMatches<'r, 't>),
@@ -273,7 +263,6 @@ impl<'r, 't> Iterator for CaptureIter<'r, 't> {
     }
 }
 /// `CaptureNames` — see variants.
-
 pub enum CaptureNames<'a> {
     /// `Rust` variant.
     Rust(regex::CaptureNames<'a>),

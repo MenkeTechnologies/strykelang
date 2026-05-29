@@ -16,7 +16,6 @@ pub struct Resource {
     pub fields: &'static [&'static str],
 }
 /// `Preset` — see fields for layout.
-
 pub struct Preset {
     /// `name` field.
     pub name: &'static str,
@@ -1377,7 +1376,6 @@ pub const PRESETS: &[Preset] = &[
     },
 ];
 /// `lookup` — see implementation.
-
 pub fn lookup(name: &str) -> Option<&'static Preset> {
     PRESETS.iter().find(|p| p.name == name)
 }

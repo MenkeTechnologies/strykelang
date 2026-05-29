@@ -48,7 +48,6 @@ use crate::udp_sockets;
 ///             XOR-MAPPED-ADDRESS computation
 pub const STUN_MAGIC_COOKIE: u32 = 0x2112_A442;
 /// `build_binding_request` — see implementation.
-
 pub fn build_binding_request(tx_id: &[u8; 12]) -> [u8; 20] {
     let mut pkt = [0u8; 20];
     pkt[0..2].copy_from_slice(&0x0001u16.to_be_bytes()); // Binding Request

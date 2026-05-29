@@ -181,7 +181,10 @@ fn s_and_st_produce_identical_output_for_same_script() {
     let script = "my @a = (1,2,3); print join(',', @a)";
     let (s_out, _, s_code) = run("s", &["-e", script], None);
     let (st_out, _, st_code) = run("st", &["-e", script], None);
-    assert_eq!(s_code, st_code, "exit-code divergence: s={s_code}, st={st_code}");
+    assert_eq!(
+        s_code, st_code,
+        "exit-code divergence: s={s_code}, st={st_code}"
+    );
     assert_eq!(
         s_out, st_out,
         "stdout divergence between s and st aliases — `include!` form drifted?\n\

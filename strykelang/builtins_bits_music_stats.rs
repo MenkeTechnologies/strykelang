@@ -45,7 +45,6 @@ fn arr_sv(v: Vec<StrykeValue>) -> StrykeValue {
 // Bit manipulation
 // ══════════════════════════════════════════════════════════════════════
 /// `bit_extract` — see implementation.
-
 pub fn bit_extract(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as u32;
@@ -58,7 +57,6 @@ pub fn bit_extract(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(((x >> start) & mask) as i64)
 }
 /// `bit_insert` — see implementation.
-
 pub fn bit_insert(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let v = arg_u64(args, 1).unwrap_or(0);
@@ -73,57 +71,48 @@ pub fn bit_insert(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer((cleared | ((v & mask) << start)) as i64)
 }
 /// `bit_reverse_u8` — see implementation.
-
 pub fn bit_reverse_u8(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0) as u8;
     StrykeValue::integer(x.reverse_bits() as i64)
 }
 /// `bit_reverse_u16` — see implementation.
-
 pub fn bit_reverse_u16(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0) as u16;
     StrykeValue::integer(x.reverse_bits() as i64)
 }
 /// `bit_reverse_u32` — see implementation.
-
 pub fn bit_reverse_u32(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0) as u32;
     StrykeValue::integer(x.reverse_bits() as i64)
 }
 /// `bit_reverse_u64` — see implementation.
-
 pub fn bit_reverse_u64(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.reverse_bits() as i64)
 }
 /// `bit_rotate_left` — see implementation.
-
 pub fn bit_rotate_left(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let n = arg_i64(args, 1).unwrap_or(0) as u32;
     StrykeValue::integer(x.rotate_left(n & 63) as i64)
 }
 /// `bit_rotate_right` — see implementation.
-
 pub fn bit_rotate_right(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let n = arg_i64(args, 1).unwrap_or(0) as u32;
     StrykeValue::integer(x.rotate_right(n & 63) as i64)
 }
 /// `bit_count_ones` — see implementation.
-
 pub fn bit_count_ones(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.count_ones() as i64)
 }
 /// `bit_count_zeros` — see implementation.
-
 pub fn bit_count_zeros(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.count_zeros() as i64)
 }
 /// `bit_first_set` — see implementation.
-
 pub fn bit_first_set(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     if x == 0 {
@@ -132,7 +121,6 @@ pub fn bit_first_set(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(x.trailing_zeros() as i64)
 }
 /// `bit_last_set` — see implementation.
-
 pub fn bit_last_set(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     if x == 0 {
@@ -141,37 +129,31 @@ pub fn bit_last_set(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(63 - x.leading_zeros() as i64)
 }
 /// `bit_first_clear` — see implementation.
-
 pub fn bit_first_clear(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer((!x).trailing_zeros() as i64)
 }
 /// `bit_last_clear` — see implementation.
-
 pub fn bit_last_clear(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(63 - (!x).leading_zeros() as i64)
 }
 /// `bit_clz` — see implementation.
-
 pub fn bit_clz(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.leading_zeros() as i64)
 }
 /// `bit_ctz` — see implementation.
-
 pub fn bit_ctz(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.trailing_zeros() as i64)
 }
 /// `bit_parity` — see implementation.
-
 pub fn bit_parity(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer((x.count_ones() & 1) as i64)
 }
 /// `bit_log2_int` — see implementation.
-
 pub fn bit_log2_int(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     if x == 0 {
@@ -180,19 +162,16 @@ pub fn bit_log2_int(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer((63 - x.leading_zeros()) as i64)
 }
 /// `bit_swap_bytes` — see implementation.
-
 pub fn bit_swap_bytes(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer(x.swap_bytes() as i64)
 }
 /// `gray_code_encode` — see implementation.
-
 pub fn gray_code_encode(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     StrykeValue::integer((x ^ (x >> 1)) as i64)
 }
 /// `gray_code_decode` — see implementation.
-
 pub fn gray_code_decode(args: &[StrykeValue]) -> StrykeValue {
     let mut x = arg_u64(args, 0).unwrap_or(0);
     let mut mask = x >> 1;
@@ -203,13 +182,11 @@ pub fn gray_code_decode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(x as i64)
 }
 /// `popcount_u32` — see implementation.
-
 pub fn popcount_u32(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0) as u32;
     StrykeValue::integer(x.count_ones() as i64)
 }
 /// `popcount_u64` — see implementation.
-
 pub fn popcount_u64(args: &[StrykeValue]) -> StrykeValue {
     bit_count_ones(args)
 }
@@ -258,7 +235,6 @@ fn parse_note_name(s: &str) -> Option<i64> {
     Some((octave + 1) * 12 + base + accidental)
 }
 /// `midi_to_note_name` — see implementation.
-
 pub fn midi_to_note_name(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_i64(args, 0).unwrap_or(0);
     let name = NOTE_NAMES[m.rem_euclid(12) as usize];
@@ -266,7 +242,6 @@ pub fn midi_to_note_name(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{name}{octave}"))
 }
 /// `interval_name` — see implementation.
-
 pub fn interval_name(args: &[StrykeValue]) -> StrykeValue {
     let semitones = arg_i64(args, 0).unwrap_or(0).abs();
     let name = match semitones % 12 {
@@ -308,42 +283,34 @@ fn chord_root_arg(args: &[StrykeValue]) -> i64 {
     60
 }
 /// `chord_major` — see implementation.
-
 pub fn chord_major(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 4, 7])
 }
 /// `chord_minor` — see implementation.
-
 pub fn chord_minor(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 3, 7])
 }
 /// `chord_diminished` — see implementation.
-
 pub fn chord_diminished(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 3, 6])
 }
 /// `chord_augmented` — see implementation.
-
 pub fn chord_augmented(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 4, 8])
 }
 /// `chord_dominant7` — see implementation.
-
 pub fn chord_dominant7(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 4, 7, 10])
 }
 /// `chord_major7` — see implementation.
-
 pub fn chord_major7(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 4, 7, 11])
 }
 /// `chord_minor7` — see implementation.
-
 pub fn chord_minor7(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 3, 7, 10])
 }
 /// `chord_diminished7` — see implementation.
-
 pub fn chord_diminished7(args: &[StrykeValue]) -> StrykeValue {
     chord_notes(chord_root_arg(args), &[0, 3, 6, 9])
 }
@@ -358,73 +325,59 @@ fn scale_notes(root: i64, intervals: &[i64]) -> StrykeValue {
     arr_sv(out)
 }
 /// `scale_major` — see implementation.
-
 pub fn scale_major(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 2, 1, 2, 2, 2, 1])
 }
 /// `scale_minor` — see implementation.
-
 pub fn scale_minor(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 1, 2, 2, 1, 2, 2])
 }
 /// `scale_pentatonic` — see implementation.
-
 pub fn scale_pentatonic(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 2, 3, 2, 3])
 }
 /// `scale_blues` — see implementation.
-
 pub fn scale_blues(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[3, 2, 1, 1, 3, 2])
 }
 /// `scale_chromatic` — see implementation.
-
 pub fn scale_chromatic(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[1; 11])
 }
 /// `scale_dorian` — see implementation.
-
 pub fn scale_dorian(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 1, 2, 2, 2, 1, 2])
 }
 /// `scale_phrygian` — see implementation.
-
 pub fn scale_phrygian(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[1, 2, 2, 2, 1, 2, 2])
 }
 /// `scale_lydian` — see implementation.
-
 pub fn scale_lydian(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 2, 2, 1, 2, 2, 1])
 }
 /// `scale_mixolydian` — see implementation.
-
 pub fn scale_mixolydian(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 2, 1, 2, 2, 1, 2])
 }
 /// `scale_locrian` — see implementation.
-
 pub fn scale_locrian(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[1, 2, 2, 1, 2, 2, 2])
 }
 /// `scale_harmonic_minor` — see implementation.
-
 pub fn scale_harmonic_minor(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 1, 2, 2, 1, 3, 1])
 }
 /// `scale_melodic_minor` — see implementation.
-
 pub fn scale_melodic_minor(args: &[StrykeValue]) -> StrykeValue {
     scale_notes(chord_root_arg(args), &[2, 1, 2, 2, 2, 2, 1])
 }
 /// `seconds_per_beat` — see implementation.
-
 pub fn seconds_per_beat(args: &[StrykeValue]) -> StrykeValue {
     let bpm = arg_f64(args, 0).unwrap_or(120.0).max(1.0);
     StrykeValue::float(60.0 / bpm)
 }
 /// `tempo_to_ms_per_beat` — see implementation.
-
 pub fn tempo_to_ms_per_beat(args: &[StrykeValue]) -> StrykeValue {
     let bpm = arg_f64(args, 0).unwrap_or(120.0).max(1.0);
     StrykeValue::float(60_000.0 / bpm)
@@ -434,7 +387,6 @@ pub fn tempo_to_ms_per_beat(args: &[StrykeValue]) -> StrykeValue {
 // Hash functions
 // ══════════════════════════════════════════════════════════════════════
 /// `jenkins_hash` — see implementation.
-
 pub fn jenkins_hash(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut h = 0u32;
@@ -449,7 +401,6 @@ pub fn jenkins_hash(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(h as i64)
 }
 /// `loose_hash` — see implementation.
-
 pub fn loose_hash(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut h = 0u32;
@@ -459,7 +410,6 @@ pub fn loose_hash(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(h as i64)
 }
 /// `crc8` — see implementation.
-
 pub fn crc8(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut crc = 0u8;
@@ -476,7 +426,6 @@ pub fn crc8(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(crc as i64)
 }
 /// `crc16` — see implementation.
-
 pub fn crc16(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut crc = 0xFFFFu16;
@@ -493,7 +442,6 @@ pub fn crc16(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(crc as i64)
 }
 /// `crc16_xmodem` — see implementation.
-
 pub fn crc16_xmodem(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut crc = 0u16;
@@ -510,7 +458,6 @@ pub fn crc16_xmodem(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(crc as i64)
 }
 /// `crc32_zlib` — see implementation.
-
 pub fn crc32_zlib(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut crc = 0xFFFFFFFFu32;
@@ -527,7 +474,6 @@ pub fn crc32_zlib(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer((!crc) as i64)
 }
 /// `crc32c` — see implementation.
-
 pub fn crc32c(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut crc = 0xFFFFFFFFu32;
@@ -552,7 +498,6 @@ fn hex_of(bytes: &[u8]) -> String {
     out
 }
 /// `hmac_md5_hex` — see implementation.
-
 pub fn hmac_md5_hex(args: &[StrykeValue]) -> StrykeValue {
     use hmac::{Hmac, Mac};
     use md5::Md5;
@@ -565,7 +510,6 @@ pub fn hmac_md5_hex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(hex_of(&result))
 }
 /// `hmac_sha1_hex` — see implementation.
-
 pub fn hmac_sha1_hex(args: &[StrykeValue]) -> StrykeValue {
     use hmac::{Hmac, Mac};
     use sha1::Sha1;
@@ -578,7 +522,6 @@ pub fn hmac_sha1_hex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(hex_of(&result))
 }
 /// `hmac_sha256_hex` — see implementation.
-
 pub fn hmac_sha256_hex(args: &[StrykeValue]) -> StrykeValue {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
@@ -591,7 +534,6 @@ pub fn hmac_sha256_hex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(hex_of(&result))
 }
 /// `hmac_sha384_hex` — see implementation.
-
 pub fn hmac_sha384_hex(args: &[StrykeValue]) -> StrykeValue {
     use hmac::{Hmac, Mac};
     use sha2::Sha384;
@@ -604,7 +546,6 @@ pub fn hmac_sha384_hex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(hex_of(&result))
 }
 /// `hmac_sha512_hex` — see implementation.
-
 pub fn hmac_sha512_hex(args: &[StrykeValue]) -> StrykeValue {
     use hmac::{Hmac, Mac};
     use sha2::Sha512;
@@ -621,7 +562,6 @@ pub fn hmac_sha512_hex(args: &[StrykeValue]) -> StrykeValue {
 // Text utilities
 // ══════════════════════════════════════════════════════════════════════
 /// `detab` — see implementation.
-
 pub fn detab(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(8).max(1) as usize;
@@ -646,7 +586,6 @@ pub fn detab(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `entab` — see implementation.
-
 pub fn entab(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(8).max(1) as usize;
@@ -689,7 +628,6 @@ pub fn entab(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `word_wrap` — see implementation.
-
 pub fn word_wrap(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(80).max(1) as usize;
@@ -715,7 +653,6 @@ pub fn word_wrap(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `strip_indent` — see implementation.
-
 pub fn strip_indent(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let lines: Vec<&str> = s.split('\n').collect();
@@ -739,7 +676,6 @@ pub fn strip_indent(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `indent_block` — see implementation.
-
 pub fn indent_block(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let prefix = arg_str(args, 1).unwrap_or_else(|| "    ".to_string());
@@ -751,7 +687,6 @@ pub fn indent_block(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `justify_left` — see implementation.
-
 pub fn justify_left(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(s.chars().count() as i64).max(0) as usize;
@@ -762,7 +697,6 @@ pub fn justify_left(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}{}", s, " ".repeat(width - len)))
 }
 /// `justify_right` — see implementation.
-
 pub fn justify_right(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(s.chars().count() as i64).max(0) as usize;
@@ -773,7 +707,6 @@ pub fn justify_right(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}{}", " ".repeat(width - len), s))
 }
 /// `justify_center` — see implementation.
-
 pub fn justify_center(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(s.chars().count() as i64).max(0) as usize;
@@ -787,7 +720,6 @@ pub fn justify_center(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}{}{}", " ".repeat(left), s, " ".repeat(right)))
 }
 /// `truncate_middle` — see implementation.
-
 pub fn truncate_middle(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let width = arg_i64(args, 1).unwrap_or(20).max(3) as usize;
@@ -801,7 +733,6 @@ pub fn truncate_middle(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{left}…{right}"))
 }
 /// `unicode_codepoints` — see implementation.
-
 pub fn unicode_codepoints(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     arr_sv(s.chars().map(|c| StrykeValue::integer(c as i64)).collect())
@@ -872,7 +803,6 @@ fn normal_p_two_sided(z: f64) -> f64 {
     2.0 * (1.0 - n.cdf(z.abs()))
 }
 /// `t_test_paired` — see implementation.
-
 pub fn t_test_paired(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
     let b = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -892,7 +822,6 @@ pub fn t_test_paired(args: &[StrykeValue]) -> StrykeValue {
     make_result(t, df, p)
 }
 /// `chi_square_goodness_fit` — see implementation.
-
 pub fn chi_square_goodness_fit(args: &[StrykeValue]) -> StrykeValue {
     let obs = args.first().map(as_vec_f64).unwrap_or_default();
     let exp = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -909,7 +838,6 @@ pub fn chi_square_goodness_fit(args: &[StrykeValue]) -> StrykeValue {
     make_result(stat, df, p)
 }
 /// `chi_square_independence` — see implementation.
-
 pub fn chi_square_independence(args: &[StrykeValue]) -> StrykeValue {
     let m = args
         .first()
@@ -946,7 +874,6 @@ pub fn chi_square_independence(args: &[StrykeValue]) -> StrykeValue {
     make_result(stat, df, p)
 }
 /// `anova_one_way` — see implementation.
-
 pub fn anova_one_way(args: &[StrykeValue]) -> StrykeValue {
     let groups: Vec<Vec<f64>> = args
         .iter()
@@ -983,7 +910,6 @@ pub fn anova_one_way(args: &[StrykeValue]) -> StrykeValue {
     make_result(f_stat, df1, p)
 }
 /// `rank_data` — see implementation.
-
 pub fn rank_data(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let n = xs.len();
@@ -1009,7 +935,6 @@ pub fn rank_data(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(ranks)
 }
 /// `mann_whitney_u` — see implementation.
-
 pub fn mann_whitney_u(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
     let b = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -1036,7 +961,6 @@ pub fn mann_whitney_u(args: &[StrykeValue]) -> StrykeValue {
     make_result(u, (n1 + n2) as f64, p)
 }
 /// `kruskal_wallis` — see implementation.
-
 pub fn kruskal_wallis(args: &[StrykeValue]) -> StrykeValue {
     let groups: Vec<Vec<f64>> = args
         .iter()
@@ -1064,7 +988,6 @@ pub fn kruskal_wallis(args: &[StrykeValue]) -> StrykeValue {
     make_result(h_stat, df, p)
 }
 /// `ks_test_one_sample` — see implementation.
-
 pub fn ks_test_one_sample(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_f64).unwrap_or_default();
     let mu = arg_f64(args, 1).unwrap_or(0.0);
@@ -1088,7 +1011,6 @@ pub fn ks_test_one_sample(args: &[StrykeValue]) -> StrykeValue {
     make_result(d, n as f64, p)
 }
 /// `ks_test_two_sample` — see implementation.
-
 pub fn ks_test_two_sample(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
     let b = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -1131,7 +1053,6 @@ pub fn ks_test_two_sample(args: &[StrykeValue]) -> StrykeValue {
     make_result(d, (n1 + n2) as f64, p.clamp(0.0, 1.0))
 }
 /// `binomial_test` — see implementation.
-
 pub fn binomial_test(args: &[StrykeValue]) -> StrykeValue {
     let k = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
     let n = arg_i64(args, 1).unwrap_or(0).max(0) as u64;
@@ -1150,7 +1071,6 @@ pub fn binomial_test(args: &[StrykeValue]) -> StrykeValue {
     make_result(k as f64, n as f64, p_val)
 }
 /// `proportion_test` — see implementation.
-
 pub fn proportion_test(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let n = arg_f64(args, 1).unwrap_or(1.0).max(1.0);
@@ -1162,7 +1082,6 @@ pub fn proportion_test(args: &[StrykeValue]) -> StrykeValue {
     make_result(z, n - 1.0, p)
 }
 /// `fisher_exact_2x2` — see implementation.
-
 pub fn fisher_exact_2x2(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
     let b = arg_i64(args, 1).unwrap_or(0).max(0) as u64;
@@ -1206,7 +1125,6 @@ pub fn fisher_exact_2x2(args: &[StrykeValue]) -> StrykeValue {
     make_result(log_p_observed.exp(), (total - 1) as f64, p_sum.min(1.0))
 }
 /// `wilcoxon_signed_rank` — see implementation.
-
 pub fn wilcoxon_signed_rank(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
     let b = args.get(1).map(as_vec_f64).unwrap_or_default();

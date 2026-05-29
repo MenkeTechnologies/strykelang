@@ -102,7 +102,6 @@ pub struct AgentConfig {
     pub agent: AgentIdentity,
 }
 /// `ControllerConfig` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerConfig {
     /// `host` field.
@@ -129,7 +128,6 @@ impl Default for ControllerConfig {
     }
 }
 /// `LimitsConfig` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LimitsConfig {
     /// `max_temp` field.
@@ -156,7 +154,6 @@ impl Default for LimitsConfig {
     }
 }
 /// `AgentIdentity` — see fields for layout.
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AgentIdentity {
     /// `name` field.
@@ -211,16 +208,22 @@ pub struct FireCommand {
     pub intensity: f64, // 0.0-1.0, percentage of cores to use
 }
 /// `WorkloadType` — see variants.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkloadType {
     /// `Cpu` variant.
     Cpu,
-    Memory { bytes: u64 },
-    Io { dir: String, iterations: u64 },
+    Memory {
+        bytes: u64,
+    },
+    Io {
+        dir: String,
+        iterations: u64,
+    },
     /// `Combined` variant.
     Combined,
-    Custom { code: String },
+    Custom {
+        code: String,
+    },
 }
 
 /// Metrics report from agent
@@ -238,7 +241,6 @@ pub struct AgentMetrics {
     pub state: AgentState,
 }
 /// `AgentState` — see variants.
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum AgentState {
     /// `Idle` variant.

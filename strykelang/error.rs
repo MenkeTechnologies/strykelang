@@ -2,7 +2,6 @@ use std::fmt;
 
 use crate::value::StrykeValue;
 /// `StrykeError` — see fields for layout.
-
 #[derive(Debug, Clone)]
 pub struct StrykeError {
     /// `kind` field.
@@ -22,7 +21,6 @@ pub struct StrykeError {
     pub near: Option<String>,
 }
 /// `ErrorKind` — see variants.
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
     /// `Syntax` variant.
@@ -74,17 +72,14 @@ impl StrykeError {
         self
     }
     /// `syntax` — see implementation.
-
     pub fn syntax(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Syntax, message, line, "-e")
     }
     /// `runtime` — see implementation.
-
     pub fn runtime(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Runtime, message, line, "-e")
     }
     /// `type_error` — see implementation.
-
     pub fn type_error(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Type, message, line, "-e")
     }
@@ -95,7 +90,6 @@ impl StrykeError {
         self
     }
     /// `die` — see implementation.
-
     pub fn die(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Die, message, line, "-e")
     }
@@ -108,7 +102,6 @@ impl StrykeError {
         Self::new(ErrorKind::DivisionByZero, message, line, "-e")
     }
     /// `die_with_value` — see implementation.
-
     pub fn die_with_value(value: StrykeValue, message: String, line: usize) -> Self {
         let mut e = Self::new(ErrorKind::Die, message, line, "-e");
         e.die_value = Some(value);
@@ -150,7 +143,6 @@ impl fmt::Display for StrykeError {
 
 impl std::error::Error for StrykeError {}
 /// `StrykeResult` type alias.
-
 pub type StrykeResult<T> = Result<T, StrykeError>;
 
 /// Long-form hints for `stryke --explain CODE` (rustc-style).

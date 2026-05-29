@@ -79,7 +79,6 @@ fn destructure_expr_array_len(tmp: &str, line: usize) -> Expr {
     }
 }
 /// `Parser` — see fields for layout.
-
 pub struct Parser {
     /// `tokens` field.
     tokens: Vec<(Token, usize)>,
@@ -187,7 +186,6 @@ impl Parser {
         Self::new_with_file(tokens, "-e")
     }
     /// `new_with_file` — see implementation.
-
     pub fn new_with_file(tokens: Vec<(Token, usize)>, file: impl Into<String>) -> Self {
         Self {
             tokens,
@@ -541,7 +539,6 @@ impl Parser {
 
     // ── Top level ──
     /// `parse_program` — see implementation.
-
     pub fn parse_program(&mut self) -> StrykeResult<Program> {
         let mut statements = self.parse_statements()?;
         // Prepend any synthetic SubDecl stubs queued by anonymous overload
@@ -13409,9 +13406,7 @@ impl Parser {
             // Exclude tokens on a later line — a newline ends the print statement
             // in stryke, so `p $j\nmy $k = …` must not absorb the following `my`.
             let v = v.clone();
-            if v == "_" {
-                None
-            } else if matches!(self.peek_at(1), Token::LParen) {
+            if v == "_" || matches!(self.peek_at(1), Token::LParen) {
                 None
             } else {
                 let saved = self.pos;
@@ -19783,10 +19778,7 @@ impl Parser {
                     // `$main::!` as a var; the trailing punct is left
                     // as literal string text. Match that behavior in
                     // compat mode.
-                    if name.ends_with("::")
-                        && i < chars.len()
-                        && !crate::compat_mode()
-                    {
+                    if name.ends_with("::") && i < chars.len() && !crate::compat_mode() {
                         if chars[i] == '^'
                             && i + 1 < chars.len()
                             && chars[i + 1].is_ascii_alphabetic()
@@ -19794,9 +19786,7 @@ impl Parser {
                             name.push('^');
                             name.push(chars[i + 1]);
                             i += 2;
-                        } else if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}"
-                            .contains(chars[i])
-                        {
+                        } else if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}".contains(chars[i]) {
                             name.push(chars[i]);
                             i += 1;
                         }
@@ -20374,7 +20364,6 @@ pub fn parse_slice_indices_from_str(s: &str, file: &str) -> StrykeResult<Vec<Exp
     parser.parse_arg_list()
 }
 /// `parse_format_value_line` — see implementation.
-
 pub fn parse_format_value_line(line: &str) -> StrykeResult<Vec<Expr>> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
