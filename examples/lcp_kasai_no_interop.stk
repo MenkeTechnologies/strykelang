@@ -1,0 +1,181 @@
+#!/usr/bin/env stryke
+
+# Kasai's algorithm — longest-common-prefix array from suffix array
+# in O(n). The trick is the monotone amortization: as we walk suffixes
+# in input order (not in suffix-array order), the LCP between adjacent
+# suffixes in SA never drops by more than 1 between consecutive
+# input-order steps, so we can resume comparison from where the
+# previous step left off. Compute SA via plain sorting (O(n² log n))
+# since the demo's focus is Kasai itself; cross-validate every LCP
+# entry against a naive byte-by-byte prefix scan.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Lcp::`) under --no-interop (§18)
+#   * `_0`/`_1` in sort comparator (§11)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/lcp_kasai_no_interop.stk
+
+# ── build suffix array (sorted suffix-index permutation) ──────────
+
+fn Lcp::suffix_array($s) {
+    my $n = len($s)
+    my @idx = (0:$n - 1)
+    @idx = sort { substr($s, _0) cmp substr($s, _1) } @idx
+    \@idx
+}
+
+# ── Kasai's algorithm — O(n) LCP construction ─────────────────────
+# Returns +{ sa, lcp }. lcp[i] = LCP length of sa[i] and sa[i-1] for
+# i ≥ 1; lcp[0] = 0 by convention.
+
+fn Lcp::kasai($s, $sa) {
+    my $n = len($s)
+    my @rank = (0) x $n
+    for my $i (0:$n - 1) {
+        $rank[$sa->[$i]] = $i
+    }
+    my @lcp = (0) x $n
+    my $h = 0
+    for my $i (0:$n - 1) {
+        if ($rank[$i] > 0) {
+            my $j = $sa->[$rank[$i] - 1]
+            while ($i + $h < $n && $j + $h < $n && substr($s, $i + $h, 1) eq substr($s, $j + $h, 1)) {
+                $h++
+            }
+            $lcp[$rank[$i]] = $h
+            $h-- if $h > 0
+        } else {
+            $h = 0
+        }
+    }
+    +{ sa => $sa, lcp => \@lcp }
+}
+
+# ── naive LCP between two suffixes by index ──────────────────────
+
+fn Lcp::naive_pair($s, $pa, $pb) {
+    my $n = len($s)
+    my $k = 0
+    while ($pa + $k < $n && $pb + $k < $n && substr($s, $pa + $k, 1) eq substr($s, $pb + $k, 1)) {
+        $k++
+    }
+    $k
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @strings = ("banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababab")
+
+p "── Kasai LCP-array demo ──────────────────────────────"
+printf "  %-18s  %4s  %s\n", "input", "len", "sa[] / lcp[]"
+printf "  %-18s  %4s  %s\n", "------------------", "----", "------------"
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    printf "  %-18s  %4d  sa=[%s]\n", "\"#{$s}\"", len($s), join(",", @{$r->{sa}})
+    printf "  %-18s  %4s  lcp=[%s]\n", "", "", join(",", @{$r->{lcp}})
+}
+
+# ── invariant 1: sa is a permutation of 0..n-1 ────────────────────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $n = len($s)
+    my %seen
+    for my $idx (@$sa) {
+        die "sa index #{$idx} repeated on \"#{$s}\"" if exists $seen{$idx}
+        die "sa index #{$idx} out of [0, #{$n}) on \"#{$s}\"" unless $idx >= 0 && $idx < $n
+        $seen{$idx} = 1
+    }
+    die "sa missing entries on \"#{$s}\"" unless len(keys %seen) == $n
+}
+
+# ── invariant 2: sa puts suffixes in lexicographic order ──────────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $n = len($s)
+    next if $n < 2
+    for my $i (1:$n - 1) {
+        my $sa_a = substr($s, $sa->[$i - 1])
+        my $sa_b = substr($s, $sa->[$i])
+        die "sa not lex-ordered on \"#{$s}\" at i=#{$i}" unless $sa_a le $sa_b
+    }
+}
+
+# ── invariant 3: lcp[0] is always 0 by convention ─────────────────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    die "lcp[0] != 0 on \"#{$s}\"" unless $r->{lcp}->[0] == 0
+}
+
+# ── invariant 4: every lcp[i] for i≥1 matches naive byte-scan ─────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    my $n = len($s)
+    next if $n < 2
+    for my $i (1:$n - 1) {
+        my $naive = Lcp::naive_pair($s, $sa->[$i - 1], $sa->[$i])
+        die "lcp[#{$i}] = #{$r->{lcp}->[$i]} but naive says #{$naive} on \"#{$s}\"" unless $r->{lcp}->[$i] == $naive
+    }
+}
+
+# ── invariant 5: every lcp[i] bounds the suffix-length pair ───────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    my $n = len($s)
+    next if $n < 2
+    for my $i (1:$n - 1) {
+        my $max = $n - $sa->[$i - 1]
+        $max = $n - $sa->[$i] if $n - $sa->[$i] < $max
+        die "lcp[#{$i}] = #{$r->{lcp}->[$i]} > min-suffix-len #{$max} on \"#{$s}\"" unless $r->{lcp}->[$i] <= $max
+    }
+}
+
+# ── invariant 6: the (lcp[i] + 1)-th char actually differs ────────
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    my $n = len($s)
+    next if $n < 2
+    for my $i (1:$n - 1) {
+        my $L = $r->{lcp}->[$i]
+        my $a_pos = $sa->[$i - 1] + $L
+        my $b_pos = $sa->[$i] + $L
+        # If one suffix ends here, the other must have a char (lex order).
+        if ($a_pos < $n && $b_pos < $n) {
+            die "lcp ends at equal chars on \"#{$s}\" i=#{$i}" if substr($s, $a_pos, 1) eq substr($s, $b_pos, 1)
+        }
+    }
+}
+
+# ── invariant 7: distinct-substring count == n(n+1)/2 − Σ lcp[i] ──
+
+for my $s (@strings) {
+    my $sa = Lcp::suffix_array($s)
+    my $r = Lcp::kasai($s, $sa)
+    my $n = len($s)
+    my $sum_lcp = 0
+    for my $v (@{$r->{lcp}}) { $sum_lcp += $v }
+    my $count = int($n * ($n + 1) / 2) - $sum_lcp
+    # Cross-check by hashing every substring.
+    my %distinct
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            $distinct{substr($s, $i, $j - $i + 1)} = 1
+        }
+    }
+    die "distinct-substring count #{$count} != hash count #{len(keys %distinct)} on \"#{$s}\"" unless $count == len(keys %distinct)
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
