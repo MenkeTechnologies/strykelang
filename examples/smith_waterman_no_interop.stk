@@ -1,0 +1,269 @@
+#!/usr/bin/env stryke
+
+# Smith-Waterman — local sequence alignment in O(|s|·|t|). Builds a
+# 2D DP table H[i][j] where each cell is the best score among:
+#   * H[i-1][j-1] + match/mismatch
+#   * H[i-1][j]   + gap_in_t (vertical move)
+#   * H[i][j-1]   + gap_in_s (horizontal move)
+#   * 0           (start a fresh local alignment)
+# The optimum is the table-wide max; traceback from that cell, ending
+# when we hit a 0, recovers the aligned region. Cross-validated by
+# re-scoring the returned alignment.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sw::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/smith_waterman_no_interop.stk
+
+# ── full Smith-Waterman with traceback ────────────────────────────
+
+fn Sw::align($s, $t, $match, $mismatch, $gap) {
+    my $n = len($s)
+    my $m = len($t)
+    if ($n == 0 || $m == 0) {
+        return +{
+            score   => 0,
+            aligned_s => "",
+            aligned_t => "",
+            start_s => 0,
+            start_t => 0,
+            end_s   => 0,
+            end_t   => 0,
+        }
+    }
+    # H[i][j] table — (n+1) × (m+1), zero on borders.
+    my @H
+    for my $i (0:$n) {
+        my @row = (0) x ($m + 1)
+        push @H, \@row
+    }
+    # Traceback direction: 0=stop, 1=diag, 2=up (gap_in_t), 3=left (gap_in_s).
+    my @TB
+    for my $i (0:$n) {
+        my @row = (0) x ($m + 1)
+        push @TB, \@row
+    }
+    my $best_score = 0
+    my $best_i = 0
+    my $best_j = 0
+    for my $i (1:$n) {
+        my $sc = substr($s, $i - 1, 1)
+        for my $j (1:$m) {
+            my $tc = substr($t, $j - 1, 1)
+            my $diag_w = ($sc eq $tc ? $match : $mismatch)
+            my $diag = $H[$i - 1]->[$j - 1] + $diag_w
+            my $up   = $H[$i - 1]->[$j]     + $gap
+            my $left = $H[$i]->[$j - 1]     + $gap
+            my $best = 0
+            my $dir  = 0
+            if ($diag > $best) { $best = $diag; $dir = 1 }
+            if ($up   > $best) { $best = $up;   $dir = 2 }
+            if ($left > $best) { $best = $left; $dir = 3 }
+            $H[$i]->[$j]  = $best
+            $TB[$i]->[$j] = $dir
+            if ($best > $best_score) {
+                $best_score = $best
+                $best_i = $i
+                $best_j = $j
+            }
+        }
+    }
+    # Traceback: walk back from (best_i, best_j) until we hit 0.
+    my $aligned_s = ""
+    my $aligned_t = ""
+    my $i = $best_i
+    my $j = $best_j
+    while ($i > 0 && $j > 0 && $H[$i]->[$j] > 0) {
+        my $dir = $TB[$i]->[$j]
+        if ($dir == 1) {
+            $aligned_s = substr($s, $i - 1, 1) . $aligned_s
+            $aligned_t = substr($t, $j - 1, 1) . $aligned_t
+            $i--
+            $j--
+        } elsif ($dir == 2) {
+            $aligned_s = substr($s, $i - 1, 1) . $aligned_s
+            $aligned_t = "-" . $aligned_t
+            $i--
+        } elsif ($dir == 3) {
+            $aligned_s = "-" . $aligned_s
+            $aligned_t = substr($t, $j - 1, 1) . $aligned_t
+            $j--
+        } else {
+            last
+        }
+    }
+    +{
+        score     => $best_score,
+        aligned_s => $aligned_s,
+        aligned_t => $aligned_t,
+        start_s   => $i,
+        start_t   => $j,
+        end_s     => $best_i - 1,
+        end_t     => $best_j - 1,
+    }
+}
+
+# ── re-score an aligned-pair to validate the trace ────────────────
+
+fn Sw::rescore($as, $at, $match, $mismatch, $gap) {
+    my $n = len($as)
+    die "alignment-length mismatch" unless $n == len($at)
+    my $sc = 0
+    for my $i (0:$n - 1) {
+        my $ca = substr($as, $i, 1)
+        my $cb = substr($at, $i, 1)
+        if ($ca eq "-" || $cb eq "-") {
+            $sc += $gap
+        } elsif ($ca eq $cb) {
+            $sc += $match
+        } else {
+            $sc += $mismatch
+        }
+    }
+    $sc
+}
+
+# ── strip gap characters from an aligned string ──────────────────
+
+fn Sw::ungapped($s) {
+    my $out = ""
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        my $c = substr($s, $i, 1)
+        $out .= $c unless $c eq "-"
+    }
+    $out
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name  => "Wikipedia example",
+        s     => "GGTTGACTA",
+        t     => "TGTTACGG",
+        m     => 3, mm => -3, g => -2,
+        score => 13,
+    },
+    +{
+        name  => "identical strings",
+        s     => "ACGT",
+        t     => "ACGT",
+        m     => 2, mm => -1, g => -2,
+        score => 8,
+    },
+    +{
+        name  => "no shared chars",
+        s     => "AAAA",
+        t     => "BBBB",
+        m     => 1, mm => -1, g => -1,
+        score => 0,
+    },
+    +{
+        name  => "one-char overlap",
+        s     => "XAB",
+        t     => "ABX",
+        m     => 2, mm => -3, g => -2,
+        score => 4,
+    },
+    +{
+        name  => "internal alignment",
+        s     => "AAGCATAGCAAA",
+        t     => "GCATAGC",
+        m     => 2, mm => -1, g => -2,
+        score => 14,
+    },
+    +{
+        name  => "single match",
+        s     => "X",
+        t     => "X",
+        m     => 5, mm => -2, g => -3,
+        score => 5,
+    },
+    +{
+        name  => "empty s",
+        s     => "",
+        t     => "ACGT",
+        m     => 1, mm => -1, g => -1,
+        score => 0,
+    },
+)
+
+p "── Smith-Waterman local-alignment demo ───────────────"
+printf "  %-26s  %5s  %s\n", "case", "score", "alignment"
+printf "  %-26s  %5s  %s\n", "--------------------------", "-----", "---------"
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    my $ok = $r->{score} == $c->{score}
+    printf "  %-26s  %5d  %s | %s  %s\n",
+        $c->{name}, $r->{score}, $r->{aligned_s}, $r->{aligned_t},
+        $ok ? "" : "FAIL want=#{$c->{score}}"
+}
+
+# ── invariant 1: reported score matches known optimum ─────────────
+
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    die "score #{$r->{score}} != expected #{$c->{score}} on \"#{$c->{name}}\"" unless $r->{score} == $c->{score}
+}
+
+# ── invariant 2: re-scoring the alignment matches the reported score ─
+
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    my $rescored = Sw::rescore($r->{aligned_s}, $r->{aligned_t}, $c->{m}, $c->{mm}, $c->{g})
+    die "rescore #{$rescored} != reported #{$r->{score}} on \"#{$c->{name}}\"" unless $rescored == $r->{score}
+}
+
+# ── invariant 3: both aligned strings have the same length ────────
+
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    die "aligned-string length mismatch on \"#{$c->{name}}\"" unless len($r->{aligned_s}) == len($r->{aligned_t})
+}
+
+# ── invariant 4: ungapped-aligned ⊂ source as a contiguous slice ──
+
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    my $us = Sw::ungapped($r->{aligned_s})
+    my $ut = Sw::ungapped($r->{aligned_t})
+    if (len($us) > 0) {
+        my $ss = substr($c->{s}, $r->{start_s}, $r->{end_s} - $r->{start_s} + 1)
+        die "aligned_s ungapped \"#{$us}\" != s[start..end] \"#{$ss}\" on \"#{$c->{name}}\"" unless $us eq $ss
+    }
+    if (len($ut) > 0) {
+        my $ts = substr($c->{t}, $r->{start_t}, $r->{end_t} - $r->{start_t} + 1)
+        die "aligned_t ungapped \"#{$ut}\" != t[start..end] \"#{$ts}\" on \"#{$c->{name}}\"" unless $ut eq $ts
+    }
+}
+
+# ── invariant 5: score is non-negative ─────────────────────────────
+
+for my $c (@cases) {
+    my $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    die "score #{$r->{score}} < 0 on \"#{$c->{name}}\"" unless $r->{score} >= 0
+}
+
+# ── invariant 6: a string aligned with itself scores |s| × match ──
+
+for my $s ("ACGT", "MENKE", "stryke", "X", "GATTACA") {
+    my $r = Sw::align($s, $s, 2, -1, -2)
+    die "self-align \"#{$s}\" score #{$r->{score}} != #{2 * len($s)}" unless $r->{score} == 2 * len($s)
+    die "self-align \"#{$s}\" aligned mismatch" unless $r->{aligned_s} eq $s && $r->{aligned_t} eq $s
+}
+
+# ── invariant 7: empty input → zero score, empty alignment ────────
+
+for my $pair ([["", "abc"], ["abc", ""], ["", ""]]) {
+    for my $pp (@$pair) {
+        my $r = Sw::align($pp->[0], $pp->[1], 2, -1, -2)
+        die "empty-input score must be 0" unless $r->{score} == 0
+        die "empty-input aligned must be empty" unless $r->{aligned_s} eq "" && $r->{aligned_t} eq ""
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

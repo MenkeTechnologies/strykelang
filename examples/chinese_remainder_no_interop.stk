@@ -1,0 +1,206 @@
+#!/usr/bin/env stryke
+
+# Chinese Remainder Theorem — solve a system of simultaneous
+# congruences `x ≡ a_i (mod n_i)` for pairwise-coprime moduli n_i.
+# Uses the constructive algorithm with extended Euclidean for
+# modular inverses:
+#   N      = ∏ n_i
+#   N_i    = N / n_i
+#   y_i    = N_i⁻¹ (mod n_i)        (via extended Euclidean)
+#   x      = Σ a_i · N_i · y_i      (mod N)
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Crt::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/chinese_remainder_no_interop.stk
+
+# ── extended Euclidean: returns +{ g, x, y } with g = gcd(a, b) ───
+# and a·x + b·y = g. Works on non-negative integers ≥ 0.
+
+fn Crt::ext_gcd($ax, $bx) {
+    return +{ g => $ax, x => 1, y => 0 } if $bx == 0
+    my $q = int($ax / $bx)
+    my $r = $ax - $q * $bx
+    my $sub = Crt::ext_gcd($bx, $r)
+    +{
+        g => $sub->{g},
+        x => $sub->{y},
+        y => $sub->{x} - $q * $sub->{y},
+    }
+}
+
+# ── modular inverse via extended Euclidean ───────────────────────
+
+fn Crt::mod_inverse($ax, $m) {
+    my $r = Crt::ext_gcd($ax, $m)
+    die "no inverse: gcd(#{$ax}, #{$m}) = #{$r->{g}}" unless $r->{g} == 1
+    my $inv = $r->{x} % $m
+    $inv += $m if $inv < 0
+    $inv
+}
+
+# ── plain gcd for the pairwise-coprime invariant check ───────────
+
+fn Crt::gcd($ax, $bx) {
+    while ($bx) {
+        my $t = $bx
+        $bx = $ax % $bx
+        $ax = $t
+    }
+    $ax
+}
+
+# ── solve the system; returns +{ x, modulus } ────────────────────
+
+fn Crt::solve($residues, $moduli) {
+    my $k = len(@$moduli)
+    die "residue/modulus length mismatch" unless len(@$residues) == $k
+    # Pairwise-coprime check.
+    for my $i (0:$k - 1) {
+        for my $j ($i + 1:$k - 1) {
+            my $g = Crt::gcd($moduli->[$i], $moduli->[$j])
+            die "moduli #{$moduli->[$i]} and #{$moduli->[$j]} not coprime (gcd=#{$g})" unless $g == 1
+        }
+    }
+    my $N = 1
+    for my $m (@$moduli) {
+        $N *= $m
+    }
+    my $x = 0
+    for my $i (0:$k - 1) {
+        my $ni = $moduli->[$i]
+        my $Ni = int($N / $ni)
+        my $yi = Crt::mod_inverse($Ni % $ni, $ni)
+        $x = ($x + $residues->[$i] * $Ni * $yi) % $N
+    }
+    $x = $x % $N
+    $x += $N if $x < 0
+    +{ x => $x, modulus => $N }
+}
+
+# ── primary test cases ───────────────────────────────────────────
+
+my @cases = (
+    +{
+        name => "classic Sun Tzu",
+        a    => [2, 3, 2],
+        m    => [3, 5, 7],
+        x    => 23,
+        N    => 105,
+    },
+    +{
+        name => "two-moduli base",
+        a    => [1, 2],
+        m    => [3, 4],
+        x    => 10,
+        N    => 12,
+    },
+    +{
+        name => "four moduli",
+        a    => [1, 2, 3, 4],
+        m    => [5, 7, 9, 11],
+        x    => 1731,
+        N    => 3465,
+    },
+    +{
+        name => "all zeros (identity)",
+        a    => [0, 0, 0],
+        m    => [3, 5, 7],
+        x    => 0,
+        N    => 105,
+    },
+    +{
+        name => "max residue per modulus",
+        a    => [2, 4, 6],
+        m    => [3, 5, 7],
+        x    => 104,
+        N    => 105,
+    },
+    +{
+        name => "single modulus",
+        a    => [7],
+        m    => [13],
+        x    => 7,
+        N    => 13,
+    },
+    +{
+        name => "wide primes",
+        a    => [3, 4, 5, 6],
+        m    => [11, 13, 17, 19],
+        x    => 41825,
+        N    => 46189,
+    },
+)
+
+p "── Chinese Remainder Theorem demo ────────────────────"
+printf "  %-26s  %-26s  %-26s  %8s\n", "case", "residues", "moduli", "x"
+printf "  %-26s  %-26s  %-26s  %8s\n", "--------------------------", "--------------------------", "--------------------------", "--------"
+for my $c (@cases) {
+    my $r = Crt::solve($c->{a}, $c->{m})
+    my $ok = $r->{x} == $c->{x} && $r->{modulus} == $c->{N}
+    printf "  %-26s  %-26s  %-26s  %8d  %s\n",
+        $c->{name},
+        "[" . join(", ", @{$c->{a}}) . "]",
+        "[" . join(", ", @{$c->{m}}) . "]",
+        $r->{x},
+        $ok ? "" : "FAIL want=#{$c->{x}}"
+}
+
+# ── invariant 1: solver matches the closed-form expected answer ───
+
+for my $c (@cases) {
+    my $r = Crt::solve($c->{a}, $c->{m})
+    die "x #{$r->{x}} != expected #{$c->{x}} on \"#{$c->{name}}\"" unless $r->{x} == $c->{x}
+    die "N #{$r->{modulus}} != expected #{$c->{N}} on \"#{$c->{name}}\"" unless $r->{modulus} == $c->{N}
+}
+
+# ── invariant 2: x mod n_i == a_i for every congruence ────────────
+
+for my $c (@cases) {
+    my $r = Crt::solve($c->{a}, $c->{m})
+    my $k = len(@{$c->{a}})
+    for my $i (0:$k - 1) {
+        my $got = $r->{x} % $c->{m}->[$i]
+        die "x mod #{$c->{m}->[$i]} = #{$got}, want #{$c->{a}->[$i]} on \"#{$c->{name}}\"" unless $got == $c->{a}->[$i]
+    }
+}
+
+# ── invariant 3: 0 ≤ x < N (canonical representative) ─────────────
+
+for my $c (@cases) {
+    my $r = Crt::solve($c->{a}, $c->{m})
+    die "x #{$r->{x}} out of [0, #{$r->{modulus}}) on \"#{$c->{name}}\"" unless $r->{x} >= 0 && $r->{x} < $r->{modulus}
+}
+
+# ── invariant 4: N == ∏ moduli ────────────────────────────────────
+
+for my $c (@cases) {
+    my $r = Crt::solve($c->{a}, $c->{m})
+    my $prod = 1
+    for my $m (@{$c->{m}}) { $prod *= $m }
+    die "N #{$r->{modulus}} != ∏ moduli #{$prod} on \"#{$c->{name}}\"" unless $r->{modulus} == $prod
+}
+
+# ── invariant 5: extended Euclidean returns valid Bezout pair ─────
+# a·x + b·y == gcd(a, b).
+
+for my $pair ([10, 6], [12, 18], [17, 5], [100, 75], [1, 1], [97, 13]) {
+    my $r = Crt::ext_gcd($pair->[0], $pair->[1])
+    my $g = Crt::gcd($pair->[0], $pair->[1])
+    die "ext_gcd g #{$r->{g}} != gcd #{$g} on (#{$pair->[0]}, #{$pair->[1]})" unless $r->{g} == $g
+    my $lhs = $pair->[0] * $r->{x} + $pair->[1] * $r->{y}
+    die "Bezout: #{$pair->[0]}·#{$r->{x}} + #{$pair->[1]}·#{$r->{y}} = #{$lhs}, want #{$r->{g}}" unless $lhs == $r->{g}
+}
+
+# ── invariant 6: mod_inverse round-trip — a · a⁻¹ ≡ 1 (mod m) ─────
+
+for my $pair ([3, 7], [5, 12], [7, 26], [10, 17], [4, 9], [11, 100]) {
+    my $inv = Crt::mod_inverse($pair->[0], $pair->[1])
+    my $prod = ($pair->[0] * $inv) % $pair->[1]
+    die "#{$pair->[0]} · inv = #{$prod}, want 1 (mod #{$pair->[1]})" unless $prod == 1
+}
+
+p ""
+p "── all six invariants satisfied ──────────────────────"
