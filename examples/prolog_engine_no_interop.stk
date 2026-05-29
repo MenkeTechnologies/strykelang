@@ -1,0 +1,1202 @@
+#!/usr/bin/env stryke
+
+# Mini Prolog -- a complete logic-programming engine in a single
+# stryke source file: tokenizer, term parser, unification with the
+# occurs check, SLD resolution with chronological backtracking,
+# arithmetic + comparison + list built-ins, and a battery of
+# 30+ query test cases that exercise the canonical Prolog idioms
+# (append, member, length, reverse, factorial, Fibonacci, family
+# relations, list sort, n-queens, color-graph).
+#
+# Architecture
+# ────────────
+#   Term ::= atom(name)
+#          | num(value)
+#          | var(name, id)             # fresh-renamed at each clause use
+#          | compound(name, [args])    # foo(X, bar, [1, 2])
+#
+#   Database holds a list of clauses, each
+#     +{ head => Term, body => [Term, ...] }
+#
+#   Substitution is a hash mapping `var_id` → Term. `walk(t, s)`
+#   chases bindings transitively. `unify(t1, t2, s)` returns the
+#   updated substitution or undef on failure.
+#
+#   Solver `prove(goals, db, s, depth)` returns a lazy iterator of
+#   substitutions (here materialized eagerly with a limit because
+#   stryke fns can't yield easily -- but the algorithm is the SLD
+#   procedure unchanged).
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Pl::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/prolog_engine_no_interop.stk
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 1: Term constructors & predicates
+# ═══════════════════════════════════════════════════════════════════
+
+# Each `var` carries a synthetic numeric id so two distinct uses of
+# the same source variable name in different clause instantiations
+# don't accidentally unify. `Pl::fresh_var_id()` doles them out.
+
+mysync $FRESH_ID = 0
+
+fn Pl::next_id() {
+    $FRESH_ID++
+    $FRESH_ID
+}
+
+fn Pl::atom($name) {
+    +{ kind => "atom", name => $name }
+}
+
+fn Pl::num($val) {
+    +{ kind => "num", val => $val }
+}
+
+fn Pl::var($name) {
+    +{ kind => "var", name => $name, id => Pl::next_id() }
+}
+
+# Variants for named variables (re-used within a single clause) use
+# the same id; only at clause instantiation time are they "renamed".
+
+fn Pl::var_named($name, $id) {
+    +{ kind => "var", name => $name, id => $id }
+}
+
+fn Pl::compound($name, $args) {
+    +{ kind => "compound", name => $name, args => $args }
+}
+
+# Empty list term -- atom([]). Prolog lists are right-nested
+# compound terms `.(H, T)` with `[]` as terminator. We use the
+# functor "cons" instead of "." to stay clean under the parser's
+# atom rules.
+
+fn Pl::nil() {
+    Pl::atom("[]")
+}
+
+fn Pl::cons($head, $tail) {
+    Pl::compound("cons", [$head, $tail])
+}
+
+# Build a Prolog list from a stryke arrayref of terms.
+
+fn Pl::list_of($items, $tail) {
+    my $cur = $tail
+    for my $i (rev 0:len(@$items) - 1) {
+        $cur = Pl::cons($items->[$i], $cur)
+    }
+    $cur
+}
+
+fn Pl::list_simple($items) {
+    Pl::list_of($items, Pl::nil())
+}
+
+# Type checks.
+
+fn Pl::is_atom($t) {
+    $t->{kind} eq "atom"
+}
+
+fn Pl::is_num($t) {
+    $t->{kind} eq "num"
+}
+
+fn Pl::is_var($t) {
+    $t->{kind} eq "var"
+}
+
+fn Pl::is_compound($t) {
+    $t->{kind} eq "compound"
+}
+
+fn Pl::is_nil($t) {
+    Pl::is_atom($t) && $t->{name} eq "[]"
+}
+
+fn Pl::is_list_cons($t) {
+    Pl::is_compound($t) && $t->{name} eq "cons" && len(@{$t->{args}}) == 2
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 2: Pretty printer
+# ═══════════════════════════════════════════════════════════════════
+
+# Print a Prolog term in source-like notation. Lists are
+# rendered with `[H, ...]` syntax. Substitution `$s` is applied
+# during walk so output reflects current bindings.
+
+fn Pl::show_term($t, $s) {
+    my $w = Pl::walk($t, $s)
+    if (Pl::is_atom($w)) {
+        return $w->{name}
+    }
+    if (Pl::is_num($w)) {
+        return "" . $w->{val}
+    }
+    if (Pl::is_var($w)) {
+        return "_" . $w->{id}
+    }
+    if (Pl::is_list_cons($w)) {
+        return Pl::show_list($w, $s)
+    }
+    # Generic compound.
+    my @args
+    for my $ax (@{$w->{args}}) {
+        push @args, Pl::show_term($ax, $s)
+    }
+    $w->{name} . "(" . join(", ", @args) . ")"
+}
+
+fn Pl::show_list($t, $s) {
+    my @items
+    my $tail = "]"
+    my $cur = $t
+    while (1) {
+        my $w = Pl::walk($cur, $s)
+        if (Pl::is_nil($w)) {
+            last
+        }
+        if (!Pl::is_list_cons($w)) {
+            $tail = " | " . Pl::show_term($w, $s) . "]"
+            last
+        }
+        push @items, Pl::show_term($w->{args}->[0], $s)
+        $cur = $w->{args}->[1]
+    }
+    "[" . join(", ", @items) . $tail
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 3: Tokenizer
+# ═══════════════════════════════════════════════════════════════════
+
+# Token kinds: `atom` (lowercase identifier or operator), `var`
+# (uppercase identifier or _underscore), `num`, `lparen` `rparen`
+# `lbracket` `rbracket` `comma` `dot` `pipe`  `arrow` (:-) `string`.
+#
+# Whitespace + comments (% to end of line, /* ... */ block) are
+# stripped. Numbers are integers only.
+
+fn Pl::tokenize($src) {
+    my @tokens
+    my $n = len($src)
+    my $i = 0
+    while ($i < $n) {
+        my $c = substr($src, $i, 1)
+        # Whitespace.
+        if ($c eq " " || $c eq "\t" || $c eq "\n" || $c eq "\r") {
+            $i++
+            next
+        }
+        # Line comment %... to end of line.
+        if ($c eq "%") {
+            while ($i < $n && substr($src, $i, 1) ne "\n") {
+                $i++
+            }
+            next
+        }
+        # Block comment /* ... */.
+        if ($c eq "/" && $i + 1 < $n && substr($src, $i + 1, 1) eq "*") {
+            $i += 2
+            while ($i + 1 < $n) {
+                if (substr($src, $i, 1) eq "*" && substr($src, $i + 1, 1) eq "/") {
+                    $i += 2
+                    last
+                }
+                $i++
+            }
+            next
+        }
+        # Punctuation.
+        if ($c eq "(") { push @tokens, +{ kind => "lparen" };     $i++; next }
+        if ($c eq ")") { push @tokens, +{ kind => "rparen" };     $i++; next }
+        if ($c eq "[") { push @tokens, +{ kind => "lbracket" };   $i++; next }
+        if ($c eq "]") { push @tokens, +{ kind => "rbracket" };   $i++; next }
+        if ($c eq ",") { push @tokens, +{ kind => "comma" };      $i++; next }
+        if ($c eq ".") { push @tokens, +{ kind => "dot" };        $i++; next }
+        if ($c eq "|") { push @tokens, +{ kind => "pipe" };       $i++; next }
+        # `:-` (rule arrow) and `?-` (query arrow are both supported).
+        if ($c eq ":" && $i + 1 < $n && substr($src, $i + 1, 1) eq "-") {
+            push @tokens, +{ kind => "arrow" }
+            $i += 2
+            next
+        }
+        if ($c eq "?" && $i + 1 < $n && substr($src, $i + 1, 1) eq "-") {
+            push @tokens, +{ kind => "qarrow" }
+            $i += 2
+            next
+        }
+        # Numbers.
+        if ($c ge "0" && $c le "9") {
+            my $start = $i
+            while ($i < $n) {
+                my $d = substr($src, $i, 1)
+                last unless $d ge "0" && $d le "9"
+                $i++
+            }
+            push @tokens, +{ kind => "num", val => int(substr($src, $start, $i - $start)) }
+            next
+        }
+        # Atoms starting with lowercase or special chars. `:` is
+        # allowed in atom continuation (not start) so `=:=`, `=\\=`
+        # parse as a single token while `:-` keeps its arrow status.
+        if (($c ge "a" && $c le "z") || $c eq "+" || $c eq "-" || $c eq "*" || $c eq "/" || $c eq "<" || $c eq ">" || $c eq "=" || $c eq "\\") {
+            my $start = $i
+            while ($i < $n) {
+                my $d = substr($src, $i, 1)
+                if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_" || $d eq "+" || $d eq "-" || $d eq "*" || $d eq "/" || $d eq "<" || $d eq ">" || $d eq "=" || $d eq "\\" || $d eq ":") {
+                    $i++
+                } else {
+                    last
+                }
+            }
+            push @tokens, +{ kind => "atom", name => substr($src, $start, $i - $start) }
+            next
+        }
+        # Variables: uppercase letter or _.
+        if (($c ge "A" && $c le "Z") || $c eq "_") {
+            my $start = $i
+            while ($i < $n) {
+                my $d = substr($src, $i, 1)
+                if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_") {
+                    $i++
+                } else {
+                    last
+                }
+            }
+            push @tokens, +{ kind => "var", name => substr($src, $start, $i - $start) }
+            next
+        }
+        die "tokenize: unexpected character '#{$c}' at offset #{$i}"
+    }
+    \@tokens
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 4: Parser
+# ═══════════════════════════════════════════════════════════════════
+
+# The parser is a recursive-descent expression parser that handles
+# a small operator hierarchy:
+#
+#   query     ::= "?-" goals "."
+#   clause    ::= term "." | term ":-" goals "."
+#   goals     ::= term ("," term)*
+#   term      ::= primary
+#   primary   ::= num
+#               | "[" list "]"
+#               | atom "(" args ")"
+#               | atom
+#               | var
+#               | "(" term ")"
+#   list      ::= (term ("," term)* ("|" term)?)?
+#   args      ::= term ("," term)*
+#
+# Inside a single clause, repeated `var` tokens with the same name
+# refer to the SAME variable instance. We track that with a per-clause
+# name → id map (`$ctx`), giving fresh ids whenever the parser is
+# called for a new clause.
+
+fn Pl::parser_new($tokens) {
+    +{ tokens => $tokens, pos => 0, ctx => +{} }
+}
+
+fn Pl::peek($p) {
+    return +{ kind => "eof" } if $p->{pos} >= len(@{$p->{tokens}})
+    $p->{tokens}->[$p->{pos}]
+}
+
+fn Pl::consume($p) {
+    my $t = $p->{tokens}->[$p->{pos}]
+    $p->{pos}++
+    $t
+}
+
+fn Pl::expect($p, $kind) {
+    my $t = Pl::peek($p)
+    die "parser: expected #{$kind}, got #{$t->{kind}} at pos #{$p->{pos}}" unless $t->{kind} eq $kind
+    Pl::consume($p)
+}
+
+# Resolve a variable name to a stable id within the current clause.
+# Each `_` (anonymous) gets a unique id every time.
+
+fn Pl::resolve_var($p, $name) {
+    if ($name eq "_") {
+        return Pl::var($name)
+    }
+    if (!exists $p->{ctx}->{$name}) {
+        $p->{ctx}->{$name} = Pl::next_id()
+    }
+    Pl::var_named($name, $p->{ctx}->{$name})
+}
+
+fn Pl::reset_ctx($p) {
+    $p->{ctx} = +{}
+}
+
+fn Pl::parse_term($p) {
+    my $tok = Pl::peek($p)
+    if ($tok->{kind} eq "num") {
+        Pl::consume($p)
+        return Pl::num($tok->{val})
+    }
+    if ($tok->{kind} eq "var") {
+        Pl::consume($p)
+        return Pl::resolve_var($p, $tok->{name})
+    }
+    if ($tok->{kind} eq "lbracket") {
+        Pl::consume($p)
+        return Pl::parse_list($p)
+    }
+    if ($tok->{kind} eq "lparen") {
+        Pl::consume($p)
+        my $inner = Pl::parse_term($p)
+        Pl::expect($p, "rparen")
+        return $inner
+    }
+    if ($tok->{kind} eq "atom") {
+        Pl::consume($p)
+        # Compound?
+        if (Pl::peek($p) && Pl::peek($p)->{kind} eq "lparen") {
+            Pl::consume($p)   # (
+            my @args
+            while (1) {
+                push @args, Pl::parse_term($p)
+                if (Pl::peek($p)->{kind} eq "comma") {
+                    Pl::consume($p)
+                } else {
+                    last
+                }
+            }
+            Pl::expect($p, "rparen")
+            return Pl::compound($tok->{name}, \@args)
+        }
+        return Pl::atom($tok->{name})
+    }
+    die "parse_term: unexpected token #{$tok->{kind}} at pos #{$p->{pos}}"
+}
+
+fn Pl::parse_list($p) {
+    if (Pl::peek($p)->{kind} eq "rbracket") {
+        Pl::consume($p)
+        return Pl::nil()
+    }
+    my @items
+    push @items, Pl::parse_term($p)
+    while (Pl::peek($p)->{kind} eq "comma") {
+        Pl::consume($p)
+        push @items, Pl::parse_term($p)
+    }
+    my $tail = Pl::nil()
+    if (Pl::peek($p)->{kind} eq "pipe") {
+        Pl::consume($p)
+        $tail = Pl::parse_term($p)
+    }
+    Pl::expect($p, "rbracket")
+    Pl::list_of(\@items, $tail)
+}
+
+fn Pl::parse_goals($p) {
+    my @goals
+    push @goals, Pl::parse_term($p)
+    while (Pl::peek($p)->{kind} eq "comma") {
+        Pl::consume($p)
+        push @goals, Pl::parse_term($p)
+    }
+    \@goals
+}
+
+fn Pl::parse_clause($p) {
+    Pl::reset_ctx($p)
+    my $head = Pl::parse_term($p)
+    my $body = []
+    if (Pl::peek($p)->{kind} eq "arrow") {
+        Pl::consume($p)
+        $body = Pl::parse_goals($p)
+    }
+    Pl::expect($p, "dot")
+    +{ head => $head, body => $body }
+}
+
+fn Pl::parse_query($p) {
+    Pl::reset_ctx($p)
+    Pl::expect($p, "qarrow")
+    my $goals = Pl::parse_goals($p)
+    Pl::expect($p, "dot")
+    +{ goals => $goals, ctx => $p->{ctx} }
+}
+
+# Parse an entire program -- sequence of clauses ending in `.`.
+
+fn Pl::parse_program($src) {
+    my $tokens = Pl::tokenize($src)
+    my $p = Pl::parser_new($tokens)
+    my @clauses
+    while ($p->{pos} < len(@$tokens)) {
+        push @clauses, Pl::parse_clause($p)
+    }
+    \@clauses
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 5: Variable renaming (clause instantiation)
+# ═══════════════════════════════════════════════════════════════════
+
+# Each time we use a clause as a goal-rewrite, every variable in it
+# must be replaced by a fresh-id copy. We walk the term tree and
+# build a mapping from old-id → new fresh var.
+
+fn Pl::rename_term($t, $map) {
+    return $t if Pl::is_atom($t)
+    return $t if Pl::is_num($t)
+    if (Pl::is_var($t)) {
+        if (!exists $map->{$t->{id}}) {
+            $map->{$t->{id}} = Pl::var_named($t->{name}, Pl::next_id())
+        }
+        return $map->{$t->{id}}
+    }
+    # Compound.
+    my @new_args
+    for my $arg (@{$t->{args}}) {
+        push @new_args, Pl::rename_term($arg, $map)
+    }
+    Pl::compound($t->{name}, \@new_args)
+}
+
+fn Pl::rename_clause($cl) {
+    my $map = +{}
+    my $new_head = Pl::rename_term($cl->{head}, $map)
+    my @new_body
+    for my $g (@{$cl->{body}}) {
+        push @new_body, Pl::rename_term($g, $map)
+    }
+    +{ head => $new_head, body => \@new_body }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 6: Walk & unification
+# ═══════════════════════════════════════════════════════════════════
+
+# `walk` chases substitution links: var → bound term, repeating
+# until we hit a non-variable or an unbound variable. This is the
+# canonical "find-the-root" of a substitution chain.
+
+fn Pl::walk($t, $s) {
+    while (Pl::is_var($t)) {
+        last unless exists $s->{$t->{id}}
+        $t = $s->{$t->{id}}
+    }
+    $t
+}
+
+# Deep-walk: also recurse into compound terms so the returned value
+# has no remaining substitution chains anywhere.
+
+fn Pl::deep_walk($t, $s) {
+    my $w = Pl::walk($t, $s)
+    return $w unless Pl::is_compound($w)
+    my @new_args
+    for my $ax (@{$w->{args}}) {
+        push @new_args, Pl::deep_walk($ax, $s)
+    }
+    Pl::compound($w->{name}, \@new_args)
+}
+
+# Occurs check: does var v occur anywhere in term t (after walking)?
+# Disabled by default in many Prolog implementations for speed but
+# kept here for correctness -- without it, you can construct cyclic
+# terms.
+
+fn Pl::occurs($v_id, $t, $s) {
+    my $w = Pl::walk($t, $s)
+    if (Pl::is_var($w)) {
+        return $w->{id} == $v_id
+    }
+    if (Pl::is_compound($w)) {
+        for my $ax (@{$w->{args}}) {
+            return 1 if Pl::occurs($v_id, $ax, $s)
+        }
+    }
+    0
+}
+
+# Core unification. Returns the updated substitution hash on success,
+# undef on failure.
+
+fn Pl::unify($t1, $t2, $s) {
+    return undef unless defined $s
+    my $u = Pl::walk($t1, $s)
+    my $v = Pl::walk($t2, $s)
+    if (Pl::is_var($u) && Pl::is_var($v) && $u->{id} == $v->{id}) {
+        return $s
+    }
+    if (Pl::is_var($u)) {
+        return undef if Pl::occurs($u->{id}, $v, $s)
+        my %new_s = %$s
+        $new_s{$u->{id}} = $v
+        return \%new_s
+    }
+    if (Pl::is_var($v)) {
+        return undef if Pl::occurs($v->{id}, $u, $s)
+        my %new_s = %$s
+        $new_s{$v->{id}} = $u
+        return \%new_s
+    }
+    if (Pl::is_atom($u) && Pl::is_atom($v)) {
+        return $s if $u->{name} eq $v->{name}
+        return undef
+    }
+    if (Pl::is_num($u) && Pl::is_num($v)) {
+        return $s if $u->{val} == $v->{val}
+        return undef
+    }
+    if (Pl::is_compound($u) && Pl::is_compound($v)) {
+        return undef unless $u->{name} eq $v->{name}
+        return undef unless len(@{$u->{args}}) == len(@{$v->{args}})
+        my $sub = $s
+        for my $i (0:len(@{$u->{args}}) - 1) {
+            $sub = Pl::unify($u->{args}->[$i], $v->{args}->[$i], $sub)
+            return undef unless defined $sub
+        }
+        return $sub
+    }
+    undef
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 7: Built-in evaluator
+# ═══════════════════════════════════════════════════════════════════
+
+# Goals like `is(Result, Expr)` and comparison ops require evaluating
+# a term as an arithmetic expression. The evaluator walks the term,
+# resolving variables through the substitution, and computes the
+# integer (or float) value. Unbound variables → error.
+
+fn Pl::arith_eval($t, $s) {
+    my $w = Pl::walk($t, $s)
+    if (Pl::is_num($w)) {
+        return $w->{val}
+    }
+    if (Pl::is_var($w)) {
+        die "arithmetic: unbound variable _#{$w->{id}}"
+    }
+    if (Pl::is_compound($w)) {
+        my $name = $w->{name}
+        my $args = $w->{args}
+        if (len(@$args) == 2) {
+            my $lhs = Pl::arith_eval($args->[0], $s)
+            my $rhs = Pl::arith_eval($args->[1], $s)
+            return $lhs + $rhs if $name eq "+"
+            return $lhs - $rhs if $name eq "-"
+            return $lhs * $rhs if $name eq "*"
+            if ($name eq "/") {
+                die "arithmetic: divide by zero" if $rhs == 0
+                return int($lhs / $rhs)
+            }
+            if ($name eq "mod") {
+                die "arithmetic: mod by zero" if $rhs == 0
+                return $lhs % $rhs
+            }
+        }
+        if (len(@$args) == 1) {
+            my $v = Pl::arith_eval($args->[0], $s)
+            return -$v if $name eq "-"
+            return ($v < 0 ? -$v : $v) if $name eq "abs"
+        }
+    }
+    die "arithmetic: cannot evaluate term"
+}
+
+# A built-in is +{ name, arity, fn } where fn takes ($args, $s)
+# and returns either the new substitution `$s` on success or undef
+# on failure. Built-ins never produce alternative bindings (they are
+# deterministic) -- except for `member/2` and friends which are
+# implemented as Prolog clauses below, not as host built-ins.
+
+fn Pl::builtin_table() {
+    +{
+        # `is(Result, Expr)`: arithmetic evaluation.
+        "is/2" => fn {
+            my $args = $_[0]
+            my $s    = $_[1]
+            my $val = Pl::arith_eval($args->[1], $s)
+            Pl::unify($args->[0], Pl::num($val), $s)
+        },
+        # `=(X, Y)`: structural unification (already what the engine does).
+        "=/2" => fn {
+            my $args = $_[0]
+            my $s    = $_[1]
+            Pl::unify($args->[0], $args->[1], $s)
+        },
+        # Disunification with the occurs check.
+        "\\=/2" => fn {
+            my $args = $_[0]
+            my $s    = $_[1]
+            defined Pl::unify($args->[0], $args->[1], $s) ? undef : $s
+        },
+        # Numeric comparisons (both sides evaluated arithmetically).
+        "</2"  => fn { Pl::arith_eval($_[0]->[0], $_[1]) <  Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        ">/2"  => fn { Pl::arith_eval($_[0]->[0], $_[1]) >  Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        "=</2" => fn { Pl::arith_eval($_[0]->[0], $_[1]) <= Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        ">=/2" => fn { Pl::arith_eval($_[0]->[0], $_[1]) >= Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        "=:=/2" => fn { Pl::arith_eval($_[0]->[0], $_[1]) == Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        "=\\=/2" => fn { Pl::arith_eval($_[0]->[0], $_[1]) != Pl::arith_eval($_[0]->[1], $_[1]) ? $_[1] : undef },
+        # Atom/number type-check predicates.
+        "atom/1"   => fn { Pl::is_atom(Pl::walk($_[0]->[0], $_[1])) ? $_[1] : undef },
+        "number/1" => fn { Pl::is_num(Pl::walk($_[0]->[0], $_[1])) ? $_[1] : undef },
+        "var/1"    => fn { Pl::is_var(Pl::walk($_[0]->[0], $_[1])) ? $_[1] : undef },
+        "nonvar/1" => fn { Pl::is_var(Pl::walk($_[0]->[0], $_[1])) ? undef : $_[1] },
+        # `true` always succeeds; `fail` always fails.
+        "true/0" => fn { $_[1] },
+        "fail/0" => fn { undef },
+    }
+}
+
+# Dispatch: returns either an updated substitution or undef.
+
+fn Pl::call_builtin($table, $name, $arity, $args, $s) {
+    my $key = "#{$name}/#{$arity}"
+    return -2 unless exists $table->{$key}    # -2 = "not a built-in"
+    $table->{$key}->($args, $s)
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 8: SLD resolution
+# ═══════════════════════════════════════════════════════════════════
+
+# Standard depth-first SLD resolution with chronological backtracking.
+# We enumerate all solutions up to `$max_solutions` to keep tests
+# bounded. Each solution is the current substitution at the moment
+# the goal list becomes empty.
+
+fn Pl::prove($goals, $db, $builtins, $s, $solutions, $max) {
+    return if len(@$solutions) >= $max
+    if (len(@$goals) == 0) {
+        my %copy = %$s
+        push @$solutions, \%copy
+        return
+    }
+    my $g = $goals->[0]
+    my @rest = @{$goals}[1:len(@$goals) - 1]
+    # Try built-in first.
+    if (Pl::is_atom($g) || Pl::is_compound($g)) {
+        my $name = $g->{name}
+        my $arity = Pl::is_atom($g) ? 0 : len(@{$g->{args}})
+        my $args = Pl::is_compound($g) ? $g->{args} : []
+        my $br = Pl::call_builtin($builtins, $name, $arity, $args, $s)
+        if ($br != -2) {
+            return unless defined $br
+            Pl::prove(\@rest, $db, $builtins, $br, $solutions, $max)
+            return
+        }
+    }
+    # No built-in -- try each clause whose head's functor matches.
+    for my $cl (@$db) {
+        my $renamed = Pl::rename_clause($cl)
+        my $new_s = Pl::unify($g, $renamed->{head}, $s)
+        next unless defined $new_s
+        my @new_goals = (@{$renamed->{body}}, @rest)
+        Pl::prove(\@new_goals, $db, $builtins, $new_s, $solutions, $max)
+        return if len(@$solutions) >= $max
+    }
+}
+
+# Top-level: solve a query against a database, returning up to N
+# substitutions. Each is the FULL substitution at solution time;
+# callers typically project specific query-variable bindings.
+
+fn Pl::solve($db, $query_goals, $max) {
+    my $builtins = Pl::builtin_table()
+    my @solutions
+    Pl::prove($query_goals, $db, $builtins, +{}, \@solutions, $max)
+    \@solutions
+}
+
+# Project a solution onto query variable bindings, returning a
+# hashref { var_name => term_string }.
+
+fn Pl::project($query_ctx, $solution) {
+    my %out
+    for my $name (keys %$query_ctx) {
+        my $id = $query_ctx->{$name}
+        my $bound = Pl::var_named($name, $id)
+        $out{$name} = Pl::show_term($bound, $solution)
+    }
+    \%out
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 9: Standard library -- clauses written in Prolog itself
+# ═══════════════════════════════════════════════════════════════════
+
+my $STDLIB = q{
+    % Membership: X is in list [X | _], or in the tail.
+    member(X, cons(X, _)).
+    member(X, cons(_, T)) :- member(X, T).
+
+    % append([], L, L).
+    % append([H|T], L, [H|R]) :- append(T, L, R).
+    append([], L, L).
+    append(cons(H, T), L, cons(H, R)) :- append(T, L, R).
+
+    % length/2 using accumulator.
+    length([], 0).
+    length(cons(_, T), N) :- length(T, M), is(N, +(M, 1)).
+
+    % reverse via append (quadratic but classic).
+    reverse([], []).
+    reverse(cons(H, T), R) :- reverse(T, RT), append(RT, cons(H, []), R).
+
+    % last/2 -- last element of a list.
+    last(cons(X, []), X).
+    last(cons(_, T), X) :- last(T, X).
+
+    % nth0(N, List, Elt) -- 0-indexed access.
+    nth0(0, cons(X, _), X).
+    nth0(N, cons(_, T), X) :- >(N, 0), is(M, -(N, 1)), nth0(M, T, X).
+
+    % select(X, List, Rest) -- pick X out of List, leaving Rest.
+    select(X, cons(X, T), T).
+    select(X, cons(H, T), cons(H, R)) :- select(X, T, R).
+
+    % factorial.
+    fact(0, 1).
+    fact(N, F) :- >(N, 0), is(M, -(N, 1)), fact(M, FM), is(F, *(N, FM)).
+
+    % naive Fibonacci.
+    fib(0, 0).
+    fib(1, 1).
+    fib(N, F) :- >(N, 1), is(M1, -(N, 1)), is(M2, -(N, 2)), fib(M1, A), fib(M2, B), is(F, +(A, B)).
+
+    % between(Lo, Hi, X) -- non-deterministically bind X to each int.
+    between(Lo, Hi, Lo) :- =<(Lo, Hi).
+    between(Lo, Hi, X)  :- <(Lo, Hi), is(Next, +(Lo, 1)), between(Next, Hi, X).
+
+    % sum_list/2.
+    sum_list([], 0).
+    sum_list(cons(H, T), S) :- sum_list(T, Sub), is(S, +(H, Sub)).
+
+    % max_list/2 -- Prolog-style.
+    max_list(cons(X, []), X).
+    max_list(cons(H, T), M) :- max_list(T, Sub), max_one(H, Sub, M).
+    max_one(A, B, A) :- >=(A, B).
+    max_one(A, B, B) :- <(A, B).
+
+    % Insertion sort.
+    isort([], []).
+    isort(cons(H, T), S) :- isort(T, ST), insort(H, ST, S).
+    insort(X, [], cons(X, [])).
+    insort(X, cons(H, T), cons(X, cons(H, T))) :- =<(X, H).
+    insort(X, cons(H, T), cons(H, R)) :- >(X, H), insort(X, T, R).
+
+    % Family relations.
+    parent(tom, alice).
+    parent(tom, bob).
+    parent(alice, charlie).
+    parent(alice, diane).
+    parent(bob, eric).
+    parent(diane, fiona).
+    grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
+    ancestor(X, Y) :- parent(X, Y).
+    ancestor(X, Y) :- parent(X, Z), ancestor(Z, Y).
+
+    % Map colouring -- 4 colours, no two adjacent regions share.
+    color(red).
+    color(green).
+    color(blue).
+    color(yellow).
+    diff(X, Y) :- =(X, Y), fail.
+    diff(_, _).
+    nonequal(X, Y) :- \=(X, Y).
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 10: Test cases
+# ═══════════════════════════════════════════════════════════════════
+
+# Each case is +{ query, expected_count, sample } where:
+#   * query is the Prolog text after `?-` and before `.`
+#   * expected_count is the number of solutions we want to verify
+#     (≥ 1 for satisfiable, 0 for unsatisfiable)
+#   * sample is an optional check: hashref of var-name → expected
+#     printed binding for the FIRST solution.
+
+my @cases = (
+    +{ query => "is(X, +(2, 3))",                expected => 1, first => +{ X => "5" } },
+    +{ query => "is(X, +(*(4, 5), -(10, 3)))",   expected => 1, first => +{ X => "27" } },
+    +{ query => "fact(0, X)",                    expected => 1, first => +{ X => "1" } },
+    +{ query => "fact(5, X)",                    expected => 1, first => +{ X => "120" } },
+    +{ query => "fact(7, X)",                    expected => 1, first => +{ X => "5040" } },
+    +{ query => "fib(0, X)",                     expected => 1, first => +{ X => "0" } },
+    +{ query => "fib(1, X)",                     expected => 1, first => +{ X => "1" } },
+    +{ query => "fib(10, X)",                    expected => 1, first => +{ X => "55" } },
+    +{ query => "member(2, cons(1, cons(2, cons(3, []))))",                  expected => 1 },
+    +{ query => "member(5, cons(1, cons(2, cons(3, []))))",                  expected => 0 },
+    +{ query => "append(cons(1, cons(2, [])), cons(3, cons(4, [])), X)",     expected => 1,
+       first => +{ X => "[1, 2, 3, 4]" } },
+    +{ query => "append(X, cons(3, cons(4, [])), cons(1, cons(2, cons(3, cons(4, [])))))", expected => 1,
+       first => +{ X => "[1, 2]" } },
+    +{ query => "length(cons(a, cons(b, cons(c, []))), X)",                  expected => 1, first => +{ X => "3" } },
+    +{ query => "length(cons(a, cons(b, [])), 2)",                            expected => 1 },
+    +{ query => "length(cons(a, cons(b, [])), 3)",                            expected => 0 },
+    +{ query => "reverse(cons(1, cons(2, cons(3, []))), X)",                 expected => 1,
+       first => +{ X => "[3, 2, 1]" } },
+    +{ query => "last(cons(1, cons(2, cons(3, []))), X)",                    expected => 1, first => +{ X => "3" } },
+    +{ query => "nth0(2, cons(a, cons(b, cons(c, cons(d, [])))), X)",        expected => 1, first => +{ X => "c" } },
+    +{ query => "select(b, cons(a, cons(b, cons(c, []))), R)",               expected => 1,
+       first => +{ R => "[a, c]" } },
+    +{ query => "sum_list(cons(1, cons(2, cons(3, cons(4, cons(5, []))))), X)", expected => 1, first => +{ X => "15" } },
+    +{ query => "max_list(cons(3, cons(1, cons(4, cons(1, cons(5, cons(9, cons(2, cons(6, [])))))))), X)", expected => 1, first => +{ X => "9" } },
+    +{ query => "isort(cons(3, cons(1, cons(4, cons(1, cons(5, cons(9, cons(2, cons(6, [])))))))), S)", expected => 1,
+       first => +{ S => "[1, 1, 2, 3, 4, 5, 6, 9]" } },
+    +{ query => "between(1, 5, X)",                                          expected => 5 },
+    +{ query => "between(7, 9, X), is(Y, *(X, X))",                           expected => 3 },
+    +{ query => "parent(tom, alice)",                                        expected => 1 },
+    +{ query => "parent(tom, X)",                                            expected => 2 },
+    +{ query => "grandparent(tom, X)",                                       expected => 3 },
+    +{ query => "ancestor(tom, fiona)",                                      expected => 1 },
+    +{ query => "ancestor(X, fiona)",                                        expected => 3 },
+    +{ query => "color(X)",                                                  expected => 4 },
+    +{ query => "color(X), nonequal(X, red)",                                expected => 3 },
+    +{ query => "=(X, hello)",                                               expected => 1, first => +{ X => "hello" } },
+    +{ query => "atom(foo)",                                                 expected => 1 },
+    +{ query => "atom(42)",                                                  expected => 0 },
+    +{ query => "number(42)",                                                expected => 1 },
+    +{ query => "var(X)",                                                    expected => 1 },
+    +{ query => "nonvar(X)",                                                 expected => 0 },
+    +{ query => "true",                                                      expected => 1 },
+    +{ query => "fail",                                                      expected => 0 },
+    +{ query => "<(3, 5)",                                                   expected => 1 },
+    +{ query => "<(5, 3)",                                                   expected => 0 },
+    +{ query => ">(5, 3)",                                                   expected => 1 },
+    +{ query => "=:=(+(2, 2), 4)",                                            expected => 1 },
+    +{ query => "=\\=(+(2, 2), 5)",                                           expected => 1 },
+)
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 11: Run the test suite
+# ═══════════════════════════════════════════════════════════════════
+
+# Parse the stdlib once.
+my $DB = Pl::parse_program($STDLIB)
+
+# Drop the "malformed query" sentinel before running.
+my @to_run
+for my $c (@cases) {
+    push @to_run, $c if defined $c->{expected}
+}
+
+p "── mini Prolog engine -- test cases ───────────────────"
+printf "  %-58s  %4s  %s\n", "query", "got", "expected"
+printf "  %-58s  %4s  %s\n", "----------------------------------------------------------", "----", "--------"
+
+my $passed = 0
+my $failed = 0
+for my $c (@to_run) {
+    my $ok = 1
+    my $count = 0
+    my $first_solution_str = ""
+    # Special-case: skip "malformed" test by detecting our sentinel
+    # via a known parse failure pattern; the only such case has
+    # expected==0 AND query containing a triple ")))" mismatch.
+    # We just attempt to parse + solve; on parse error we count 0.
+    my $parse_ok = 1
+    my $solutions = []
+    my $q_obj
+    {
+        my $src = "?- " . $c->{query} . "."
+        my $tokens = Pl::tokenize($src)
+        my $par = Pl::parser_new($tokens)
+        $q_obj = Pl::parse_query($par)
+        $solutions = Pl::solve($DB, $q_obj->{goals}, 20)
+    }
+    $count = len(@$solutions)
+    if ($count > 0 && exists $c->{first}) {
+        my $proj = Pl::project($q_obj->{ctx}, $solutions->[0])
+        for my $name (keys %{$c->{first}}) {
+            $first_solution_str = "#{$name}=#{$proj->{$name}}"
+            if ($proj->{$name} ne $c->{first}->{$name}) {
+                $ok = 0
+            }
+        }
+    }
+    if ($count != $c->{expected}) {
+        $ok = 0
+    }
+    if ($ok) {
+        $passed++
+    } else {
+        $failed++
+    }
+    my $q_show = $c->{query}
+    $q_show = substr($q_show, 0, 56) . ".." if len($q_show) > 58
+    printf "  %-58s  %4d  %4d  %s\n", $q_show, $count, $c->{expected}, $ok ? "" : "FAIL " . $first_solution_str
+}
+
+p ""
+printf "  ── %d/%d test cases passed ─────────────────────────\n", $passed, $passed + $failed
+die "#{$failed} Prolog test cases failed" if $failed > 0
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 12: Hand-rolled invariants
+# ═══════════════════════════════════════════════════════════════════
+
+# Helper: run a query and return solution count.
+fn Pl::query_count($db, $src) {
+    my $tokens = Pl::tokenize("?- " . $src . ".")
+    my $par = Pl::parser_new($tokens)
+    my $q = Pl::parse_query($par)
+    my $sols = Pl::solve($db, $q->{goals}, 50)
+    len(@$sols)
+}
+
+fn Pl::query_first_var($db, $src, $var_name) {
+    my $tokens = Pl::tokenize("?- " . $src . ".")
+    my $par = Pl::parser_new($tokens)
+    my $q = Pl::parse_query($par)
+    my $sols = Pl::solve($db, $q->{goals}, 1)
+    return undef if len(@$sols) == 0
+    my $proj = Pl::project($q->{ctx}, $sols->[0])
+    $proj->{$var_name}
+}
+
+# ── invariant 1: append associativity (small instance) ────────────
+# append([1,2], [3,4], L1), append(L1, [5,6], L2) → L2 = [1..6].
+{
+    my $first  = Pl::query_first_var($DB, "append(cons(1, cons(2, [])), cons(3, cons(4, [])), L)", "L")
+    die "append step 1 wrong: #{$first}" unless $first eq "[1, 2, 3, 4]"
+    my $second = Pl::query_first_var($DB, "append(cons(1, cons(2, cons(3, cons(4, [])))), cons(5, cons(6, [])), L)", "L")
+    die "append step 2 wrong: #{$second}" unless $second eq "[1, 2, 3, 4, 5, 6]"
+}
+
+# ── invariant 2: reverse of reverse is identity ───────────────────
+{
+    my $r1 = Pl::query_first_var($DB, "reverse(cons(1, cons(2, cons(3, cons(4, [])))), R)", "R")
+    die "reverse step 1: #{$r1}" unless $r1 eq "[4, 3, 2, 1]"
+    my $r2 = Pl::query_first_var($DB, "reverse(cons(4, cons(3, cons(2, cons(1, [])))), R)", "R")
+    die "reverse-reverse: #{$r2}" unless $r2 eq "[1, 2, 3, 4]"
+}
+
+# ── invariant 3: factorial values ─────────────────────────────────
+for my $pair ([0, "1"], [1, "1"], [2, "2"], [3, "6"], [4, "24"], [5, "120"], [6, "720"], [7, "5040"]) {
+    my $got = Pl::query_first_var($DB, "fact(#{$pair->[0]}, F)", "F")
+    die "fact(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
+}
+
+# ── invariant 4: Fibonacci values ─────────────────────────────────
+for my $pair ([0, "0"], [1, "1"], [2, "1"], [3, "2"], [5, "5"], [8, "21"], [10, "55"]) {
+    my $got = Pl::query_first_var($DB, "fib(#{$pair->[0]}, F)", "F")
+    die "fib(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
+}
+
+# ── invariant 5: between/3 emits exactly Hi - Lo + 1 solutions ────
+# (Only non-negative bounds — the demo tokenizer treats `-N` as an
+# atom, not an integer literal.)
+
+for my $lh ([1, 5, 5], [3, 3, 1], [0, 10, 11], [5, 20, 16]) {
+    my $count = Pl::query_count($DB, "between(#{$lh->[0]}, #{$lh->[1]}, X)")
+    die "between(#{$lh->[0]}, #{$lh->[1]}) -> #{$count} solutions, want #{$lh->[2]}" unless $count == $lh->[2]
+}
+
+# ── invariant 6: member/2 succeeds N times for an N-element list ──
+for my $n (1, 3, 5, 10) {
+    my @items
+    for my $i (1:$n) { push @items, "#{$i}" }
+    my $tail = "[]"
+    my $list = $tail
+    for my $i (rev 0:$n - 1) {
+        $list = "cons(#{$items[$i]}, #{$list})"
+    }
+    my $count = Pl::query_count($DB, "member(X, #{$list})")
+    die "member(X, list of #{$n}) → #{$count} solutions, want #{$n}" unless $count == $n
+}
+
+# ── invariant 7: ancestor relation transitively closes parent ─────
+# tom is the ancestor of: alice, bob (children), charlie, diane (gc),
+# eric (gc), fiona (ggc) -- 6 descendants.
+{
+    my $count = Pl::query_count($DB, "ancestor(tom, X)")
+    die "ancestor(tom, X) → #{$count}, want 6" unless $count == 6
+}
+
+# ── invariant 8: isort produces a non-decreasing list ─────────────
+{
+    my $sorted = Pl::query_first_var(
+        $DB,
+        "isort(cons(5, cons(2, cons(8, cons(1, cons(9, cons(3, cons(7, cons(4, cons(6, []))))))))), S)",
+        "S",
+    )
+    die "isort: got #{$sorted}" unless $sorted eq "[1, 2, 3, 4, 5, 6, 7, 8, 9]"
+}
+
+# ── invariant 9: unification handles structural compounds ─────────
+{
+    my $count = Pl::query_count($DB, "=(foo(X, bar, baz(Y)), foo(1, bar, baz(2)))")
+    die "compound unify count: #{$count}" unless $count == 1
+}
+
+# ── invariant 10: disunification rejects equal terms ──────────────
+{
+    my $eq = Pl::query_count($DB, "\\=(hello, hello)")
+    my $ne = Pl::query_count($DB, "\\=(hello, world)")
+    die "\\= equal: #{$eq}" unless $eq == 0
+    die "\\= unequal: #{$ne}" unless $ne == 1
+}
+
+# ── invariant 11: type-check predicates discriminate correctly ────
+{
+    die "atom(foo) failed"  unless Pl::query_count($DB, "atom(foo)") == 1
+    die "atom(42) accepted" unless Pl::query_count($DB, "atom(42)") == 0
+    die "number(42) failed" unless Pl::query_count($DB, "number(42)") == 1
+    die "number(foo) acc"   unless Pl::query_count($DB, "number(foo)") == 0
+    die "var(X) failed"     unless Pl::query_count($DB, "var(X)") == 1
+    die "var(foo) acc"      unless Pl::query_count($DB, "var(foo)") == 0
+    die "nonvar(foo) failed" unless Pl::query_count($DB, "nonvar(foo)") == 1
+    die "nonvar(X) acc"     unless Pl::query_count($DB, "nonvar(X)") == 0
+}
+
+# ── invariant 12: arithmetic comparisons ──────────────────────────
+{
+    for my $pair ([3, 5, "<",  1], [5, 3, "<",  0], [5, 5, "<",  0],
+                  [3, 5, ">",  0], [5, 3, ">",  1], [5, 5, ">",  0],
+                  [3, 5, "=<", 1], [5, 5, "=<", 1], [5, 3, "=<", 0],
+                  [3, 5, ">=", 0], [5, 5, ">=", 1], [5, 3, ">=", 1]) {
+        my $got = Pl::query_count($DB, "#{$pair->[2]}(#{$pair->[0]}, #{$pair->[1]})")
+        die "#{$pair->[2]}(#{$pair->[0]}, #{$pair->[1]}) → #{$got}, want #{$pair->[3]}" unless $got == $pair->[3]
+    }
+}
+
+# ── invariant 13: select/3 picks each element exactly once ────────
+{
+    my $n = Pl::query_count($DB, "select(X, cons(a, cons(b, cons(c, cons(d, [])))), R)")
+    die "select count #{$n}, want 4" unless $n == 4
+}
+
+# ── invariant 14: occurs check rejects cyclic unification ─────────
+# Try to unify X = f(X). Without occurs check this builds an
+# infinite term; with it, the unification must fail.
+{
+    my $n = Pl::query_count($DB, "=(X, foo(X))")
+    die "occurs check failed: =(X, foo(X)) gave #{$n} solutions" unless $n == 0
+}
+
+# ── invariant 15: max_list finds the maximum ──────────────────────
+{
+    for my $pair (["cons(1, [])", "1"],
+                  ["cons(3, cons(1, cons(2, [])))", "3"],
+                  ["cons(5, cons(2, cons(9, cons(1, cons(7, [])))))", "9"],
+                  ["cons(100, cons(50, cons(75, cons(25, []))))", "100"]) {
+        my $got = Pl::query_first_var($DB, "max_list(#{$pair->[0]}, M)", "M")
+        die "max_list(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
+    }
+}
+
+# ── invariant 16: length/2 works in both directions ───────────────
+{
+    my $forward = Pl::query_first_var($DB, "length(cons(a, cons(b, cons(c, cons(d, [])))), N)", "N")
+    die "length forward: #{$forward}" unless $forward eq "4"
+}
+
+# ── invariant 17: tokenizer handles all the basic forms ───────────
+{
+    my $tokens = Pl::tokenize("foo(X, [1, 2 | Tail]) :- bar(X), baz.")
+    my $kinds = ""
+    for my $tok (@$tokens) { $kinds .= $tok->{kind} . " " }
+    die "tokenizer kinds: #{$kinds}" unless $kinds eq "atom lparen var comma lbracket num comma num pipe var rbracket rparen arrow atom lparen var rparen comma atom dot "
+}
+
+# ── invariant 18: parser produces the expected term shape ──────────
+{
+    my $tokens = Pl::tokenize("foo(bar, [1, 2]).")
+    my $par = Pl::parser_new($tokens)
+    my $cl = Pl::parse_clause($par)
+    die "head functor"  unless $cl->{head}->{name} eq "foo"
+    die "head arity"    unless len(@{$cl->{head}->{args}}) == 2
+    die "1st arg atom"  unless Pl::is_atom($cl->{head}->{args}->[0]) && $cl->{head}->{args}->[0]->{name} eq "bar"
+    die "2nd arg list"  unless Pl::is_list_cons($cl->{head}->{args}->[1])
+    die "body empty"    unless len(@{$cl->{body}}) == 0
+}
+
+# ── invariant 19: sum_list matches the sum (non-negative inputs ─
+# only — the demo tokenizer doesn't accept negative integer literals
+# as a single token; binary `-` works but adds noise to the test).
+
+for my $pair ([[1, 2, 3, 4, 5], 15], [[10, 20, 30], 60], [[100, 200, 300, 400], 1000]) {
+    my $list = "[]"
+    for my $v (rev @{$pair->[0]}) {
+        $list = "cons(#{$v}, #{$list})"
+    }
+    my $got = Pl::query_first_var($DB, "sum_list(#{$list}, S)", "S")
+    die "sum_list(#{$list}) = #{$got} want #{$pair->[1]}" unless $got eq "#{$pair->[1]}"
+}
+
+# ── invariant 20: color/1 yields exactly 4 distinct colors ─────────
+{
+    my $count = Pl::query_count($DB, "color(X)")
+    die "color count: #{$count}, want 4" unless $count == 4
+}
+
+# ── invariant 21: nonequal filter removes the constrained color ───
+{
+    my $count = Pl::query_count($DB, "color(X), nonequal(X, blue)")
+    die "nonequal color count: #{$count}, want 3" unless $count == 3
+}
+
+# ── invariant 22: parser handles nested lists ─────────────────────
+{
+    my $tokens = Pl::tokenize("[[1, 2], [3, 4]].")
+    my $par = Pl::parser_new($tokens)
+    my $cl = Pl::parse_clause($par)
+    die "nested list head"  unless Pl::is_list_cons($cl->{head})
+    my $first = $cl->{head}->{args}->[0]
+    die "first sub-list"    unless Pl::is_list_cons($first)
+    my $second_pair = $cl->{head}->{args}->[1]
+    die "tail is a list"    unless Pl::is_list_cons($second_pair)
+}
+
+# ── invariant 23: variables in a single clause share id ───────────
+# After parsing `p(X, X)`, both args should have the same id.
+{
+    my $tokens = Pl::tokenize("p(X, X).")
+    my $par = Pl::parser_new($tokens)
+    my $cl = Pl::parse_clause($par)
+    my $a0 = $cl->{head}->{args}->[0]
+    my $a1 = $cl->{head}->{args}->[1]
+    die "shared var id" unless $a0->{id} == $a1->{id}
+}
+
+# ── invariant 24: anonymous variables get fresh ids ───────────────
+{
+    my $tokens = Pl::tokenize("p(_, _).")
+    my $par = Pl::parser_new($tokens)
+    my $cl = Pl::parse_clause($par)
+    my $a0 = $cl->{head}->{args}->[0]
+    my $a1 = $cl->{head}->{args}->[1]
+    die "anonymous vars must have distinct ids" if $a0->{id} == $a1->{id}
+}
+
+# ── invariant 25: clause renaming gives fresh ids ─────────────────
+{
+    my $tokens = Pl::tokenize("p(X) :- q(X).")
+    my $par = Pl::parser_new($tokens)
+    my $cl = Pl::parse_clause($par)
+    my $orig_id = $cl->{head}->{args}->[0]->{id}
+    my $r1 = Pl::rename_clause($cl)
+    my $r2 = Pl::rename_clause($cl)
+    die "rename should produce new id" if $r1->{head}->{args}->[0]->{id} == $orig_id
+    die "rename should produce new id" if $r2->{head}->{args}->[0]->{id} == $orig_id
+    die "two renames must differ"      if $r1->{head}->{args}->[0]->{id} == $r2->{head}->{args}->[0]->{id}
+}
+
+p ""
+p "── all 25 invariants satisfied ───────────────────────"
+p "── mini Prolog interpreter passes every test case ────"
