@@ -268,3 +268,4 @@ demo_runs_no_interop!(demo_li_chao_tree, "examples/li_chao_tree_no_interop.stk")
 demo_runs_no_interop!(demo_berlekamp_massey, "examples/berlekamp_massey_no_interop.stk");
 demo_runs_no_interop!(demo_ukkonen_suffix_tree, "examples/ukkonen_suffix_tree_no_interop.stk");
 demo_runs_no_interop!(demo_prolog_engine, "examples/prolog_engine_no_interop.stk");
+demo_runs_no_interop!(demo_chess_engine, "examples/chess_engine_no_interop.stk");
