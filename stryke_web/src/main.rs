@@ -20,7 +20,11 @@ use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
 #[derive(Parser)]
-#[command(name = "s_web", version, about = "Stryke web — Rails-shaped framework CLI")]
+#[command(
+    name = "s_web",
+    version,
+    about = "Stryke web — Rails-shaped framework CLI"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -102,8 +106,8 @@ enum Cmd {
     Console,
 
     /// Build a single self-contained binary that ships every .stk file
-    /// + the stryke runtime. Writes a Rust wrapper crate; user runs
-    /// `cargo build --release` inside it for the fat binary.
+    /// plus the stryke runtime. Writes a Rust wrapper crate; user runs
+    /// cargo build --release inside it for the fat binary.
     Build {
         /// Output directory for the wrapper crate (default: `./dist`).
         #[arg(short, long)]
@@ -156,9 +160,7 @@ enum GenerateCmd {
     Admin,
     /// JSON API controller for an existing model. Each action returns
     /// `web_json` instead of HTML.
-    Api {
-        name: String,
-    },
+    Api { name: String },
     /// Mailer scaffold — `app/mailers/NAME_mailer.stk` with action stubs.
     Mailer {
         name: String,
@@ -166,13 +168,9 @@ enum GenerateCmd {
         actions: Vec<String>,
     },
     /// Background job scaffold — `app/jobs/NAME_job.stk`.
-    Job {
-        name: String,
-    },
+    Job { name: String },
     /// WebSocket / SSE channel scaffold — `app/channels/NAME_channel.stk`.
-    Channel {
-        name: String,
-    },
+    Channel { name: String },
     /// Dockerfile + .dockerignore.
     Docker,
     /// GitHub Actions CI workflow.
@@ -227,8 +225,7 @@ fn one_shot_new(
             stryke_web::cmd_extras::convert_to_api()?;
         }
         if let Some(spec) = app {
-            let words: Vec<String> =
-                spec.split_whitespace().map(|s| s.to_string()).collect();
+            let words: Vec<String> = spec.split_whitespace().map(|s| s.to_string()).collect();
             stryke_web::cmd_app::run(&words)?;
         }
         if auth {
@@ -299,9 +296,7 @@ fn main() -> ExitCode {
             GenerateCmd::Controller { name, actions } => {
                 stryke_web::cmd_generate::controller(&name, &actions)
             }
-            GenerateCmd::Model { name, fields } => {
-                stryke_web::cmd_generate::model(&name, &fields)
-            }
+            GenerateCmd::Model { name, fields } => stryke_web::cmd_generate::model(&name, &fields),
             GenerateCmd::Migration { name, fields } => {
                 stryke_web::cmd_generate::migration(&name, &fields)
             }
@@ -330,9 +325,7 @@ fn main() -> ExitCode {
             DbCmd::Reset => stryke_web::cmd_db::reset(),
         },
         Cmd::Console => stryke_web::cmd_server::console(),
-        Cmd::Build { out, name } => {
-            stryke_web::cmd_build::run(out.as_deref(), name.as_deref())
-        }
+        Cmd::Build { out, name } => stryke_web::cmd_build::run(out.as_deref(), name.as_deref()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

@@ -37,7 +37,7 @@ pub fn controller(name: &str, actions: &[String]) -> Result<()> {
     let actions: Vec<String> = if actions.is_empty() {
         vec!["index".into()]
     } else {
-        actions.iter().cloned().collect()
+        actions.to_vec()
     };
 
     // Build the action stubs for the controller body. Each stub renders a
@@ -316,7 +316,9 @@ fn write_migration_file(
         for (fname, fty) in &parsed {
             up.push_str(&format!(
                 "        web_add_column(\"{}\", \"{}\", \"{}\")\n",
-                table, fname, sql_type_for(fty)
+                table,
+                fname,
+                sql_type_for(fty)
             ));
         }
         let mut down = String::new();

@@ -43,10 +43,13 @@ pub fn render(template: &str, vars: &BTreeMap<&str, &str>) -> String {
 
 #[inline]
 fn utf8_char_len(b: u8) -> usize {
-    if b < 0x80 {
+    // Two distinct conceptual cases share return value 1 — ASCII (b < 0x80)
+    // and orphan continuation bytes (0x80..0xC0). Collapse the b<0xC0 arm
+    // into the ASCII arm so clippy's identical-blocks lint is satisfied;
+    // a stray continuation byte will be treated as a 1-byte step (defensive
+    // — caller should have caught the real lead earlier).
+    if b < 0xC0 {
         1
-    } else if b < 0xC0 {
-        1 // continuation byte — skip defensively; real lead found earlier
     } else if b < 0xE0 {
         2
     } else if b < 0xF0 {
