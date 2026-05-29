@@ -7,7 +7,7 @@
 //!
 //! Naming policy: preset names are short, lowercase, and describe a
 //! domain (`blog`, `ecommerce`, `saas`). The pseudo-preset `everything`
-//! concatenates every other preset — one command, ~70 resources.
+//! concatenates every other preset — one command, ~120 resources.
 
 pub struct Resource {
     /// `name` field.
@@ -1383,7 +1383,7 @@ pub fn lookup(name: &str) -> Option<&'static Preset> {
 }
 
 /// `everything` is the union of all real presets — one command,
-/// ~80 resources, every CRUD route a person could possibly want
+/// ~120 resources, every CRUD route a person could possibly want
 /// pre-wired. Useful for stress-testing the framework or as a
 /// sandbox to delete-down from.
 pub fn everything_resources() -> Vec<&'static Resource> {
@@ -1397,4 +1397,93 @@ pub fn everything_resources() -> Vec<&'static Resource> {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lookup_unknown_returns_none() {
+        assert!(lookup("definitely_not_a_preset").is_none());
+    }
+
+    #[test]
+    fn lookup_known_returns_some() {
+        for name in ["blog", "ecommerce", "saas", "amazon", "facebook", "learning"] {
+            assert!(lookup(name).is_some(), "missing preset: {name}");
+        }
+    }
+
+    #[test]
+    fn every_preset_has_resources() {
+        for p in PRESETS {
+            assert!(
+                !p.resources.is_empty(),
+                "preset {} has zero resources",
+                p.name
+            );
+        }
+    }
+
+    #[test]
+    fn every_resource_has_fields() {
+        for p in PRESETS {
+            for r in p.resources {
+                assert!(!r.fields.is_empty(), "{}/{} has zero fields", p.name, r.name);
+            }
+        }
+    }
+
+    #[test]
+    fn every_field_spec_has_colon_separator() {
+        for p in PRESETS {
+            for r in p.resources {
+                for f in r.fields {
+                    assert!(
+                        f.contains(':'),
+                        "{}/{} field {:?} missing `name:type` colon",
+                        p.name,
+                        r.name,
+                        f
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn preset_names_are_unique() {
+        let mut seen = std::collections::HashSet::new();
+        for p in PRESETS {
+            assert!(seen.insert(p.name), "duplicate preset name: {}", p.name);
+        }
+    }
+
+    #[test]
+    fn everything_resources_dedupes_by_name() {
+        let all = everything_resources();
+        let mut seen = std::collections::HashSet::new();
+        for r in &all {
+            assert!(
+                seen.insert(r.name),
+                "everything_resources returned duplicate Resource name: {}",
+                r.name
+            );
+        }
+    }
+
+    #[test]
+    fn everything_resources_covers_blog_preset() {
+        let all = everything_resources();
+        let names: std::collections::HashSet<&str> = all.iter().map(|r| r.name).collect();
+        let blog = lookup("blog").expect("blog preset");
+        for r in blog.resources {
+            assert!(
+                names.contains(r.name),
+                "everything is missing blog resource: {}",
+                r.name
+            );
+        }
+    }
 }
