@@ -1,0 +1,211 @@
+#!/usr/bin/env stryke
+
+# Mo's algorithm — offline range-query processing in O((n + q) · √n).
+# Sort the q queries by (block(l), r) where block(l) = ⌊l / √n⌋, then
+# walk a single moving window (cur_l, cur_r) across the array adjusting
+# one element at a time. Each query is answered in amortized O(√n)
+# add/remove operations on a maintained side-structure (here: a
+# distinct-count via a frequency hash). Cross-validated against an
+# O(q · n) brute force on every workload.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Mo::`) under --no-interop (§18)
+#   * `_0`/`_1` in sort comparator (§11)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/mo_algorithm_no_interop.stk
+
+# ── Mo's algorithm: distinct-element count over each query range ──
+
+fn Mo::distinct_count($arr, $queries) {
+    my $n = len(@$arr)
+    my $q = len(@$queries)
+    my $block = $n > 0 ? int(sqrt($n)) : 1
+    $block = 1 if $block < 1
+    # Stamp each query with its index so we can restore original order.
+    my @stamped
+    for my $i (0:$q - 1) {
+        my $ql = $queries->[$i]->[0]
+        my $qr = $queries->[$i]->[1]
+        push @stamped, [$ql, $qr, $i]
+    }
+    @stamped = sort {
+        my $ba = int(_0->[0] / $block)
+        my $bb = int(_1->[0] / $block)
+        $ba != $bb ? $ba <=> $bb : _0->[1] <=> _1->[1]
+    } @stamped
+    my @ans = (0) x $q
+    my %freq
+    my $cur_l = 0
+    my $cur_r = -1
+    my $distinct = 0
+    for my $sq (@stamped) {
+        my $ql = $sq->[0]
+        my $qr = $sq->[1]
+        my $idx = $sq->[2]
+        while ($cur_r < $qr) {
+            $cur_r++
+            my $v = $arr->[$cur_r]
+            $freq{$v} = 0 unless exists $freq{$v}
+            $distinct++ if $freq{$v} == 0
+            $freq{$v}++
+        }
+        while ($cur_r > $qr) {
+            my $v = $arr->[$cur_r]
+            $freq{$v}--
+            $distinct-- if $freq{$v} == 0
+            $cur_r--
+        }
+        while ($cur_l < $ql) {
+            my $v = $arr->[$cur_l]
+            $freq{$v}--
+            $distinct-- if $freq{$v} == 0
+            $cur_l++
+        }
+        while ($cur_l > $ql) {
+            $cur_l--
+            my $v = $arr->[$cur_l]
+            $freq{$v} = 0 unless exists $freq{$v}
+            $distinct++ if $freq{$v} == 0
+            $freq{$v}++
+        }
+        $ans[$idx] = $distinct
+    }
+    \@ans
+}
+
+# ── brute O(q · n) reference ─────────────────────────────────────
+
+fn Mo::brute_distinct($arr, $queries) {
+    my @ans
+    for my $q (@$queries) {
+        my %seen
+        for my $i ($q->[0]:$q->[1]) {
+            $seen{$arr->[$i]} = 1
+        }
+        push @ans, len(keys %seen)
+    }
+    \@ans
+}
+
+# ── primary test cases ──────────────────────────────────────────
+
+my @cases = (
+    +{
+        name    => "all distinct",
+        arr     => [1, 2, 3, 4, 5, 6, 7, 8],
+        queries => [[0, 7], [0, 3], [4, 7], [2, 5], [3, 3]],
+    },
+    +{
+        name    => "all identical",
+        arr     => [5, 5, 5, 5, 5, 5],
+        queries => [[0, 5], [0, 0], [2, 4], [1, 3]],
+    },
+    +{
+        name    => "alternating",
+        arr     => [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+        queries => [[0, 9], [0, 0], [0, 1], [3, 7], [5, 9], [2, 4]],
+    },
+    +{
+        name    => "permutation",
+        arr     => [4, 1, 3, 2, 5, 1, 3, 2],
+        queries => [[0, 7], [0, 4], [3, 6], [1, 5], [2, 7]],
+    },
+    +{
+        name    => "single element",
+        arr     => [42],
+        queries => [[0, 0], [0, 0]],
+    },
+    +{
+        name    => "zig-zag with repeats",
+        arr     => [1, 2, 1, 3, 2, 3, 1, 4, 2, 4, 3, 5],
+        queries => [[0, 11], [1, 4], [6, 10], [3, 8], [0, 0], [11, 11], [2, 6]],
+    },
+)
+
+p "── Mo's-algorithm distinct-count demo ────────────────"
+printf "  %-22s  %5s  %5s  %s\n", "case", "n", "q", "answers (l..r → distinct)"
+printf "  %-22s  %5s  %5s  %s\n", "----------------------", "-----", "-----", "------------------------"
+for my $c (@cases) {
+    my $r = Mo::distinct_count($c->{arr}, $c->{queries})
+    my @parts
+    for my $i (0:len(@$r) - 1) {
+        push @parts, "#{$c->{queries}->[$i]->[0]}..#{$c->{queries}->[$i]->[1]}→#{$r->[$i]}"
+    }
+    printf "  %-22s  %5d  %5d  %s\n",
+        $c->{name}, len(@{$c->{arr}}), len(@{$c->{queries}}),
+        join(", ", @parts)
+}
+
+# ── invariant 1: Mo answers agree with brute force on every case ──
+
+for my $c (@cases) {
+    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    my $br = Mo::brute_distinct($c->{arr}, $c->{queries})
+    my $q = len(@$mo)
+    for my $i (0:$q - 1) {
+        die "case \"#{$c->{name}}\" query #{$i}: mo=#{$mo->[$i]} brute=#{$br->[$i]}" unless $mo->[$i] == $br->[$i]
+    }
+}
+
+# ── invariant 2: distinct count ≤ range width and ≤ alphabet size ─
+
+for my $c (@cases) {
+    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    my %alpha
+    for my $v (@{$c->{arr}}) { $alpha{$v} = 1 }
+    my $alpha_size = len(keys %alpha)
+    for my $i (0:len(@$mo) - 1) {
+        my $q = $c->{queries}->[$i]
+        my $width = $q->[1] - $q->[0] + 1
+        die "distinct #{$mo->[$i]} > width #{$width}" unless $mo->[$i] <= $width
+        die "distinct #{$mo->[$i]} > alphabet #{$alpha_size}" unless $mo->[$i] <= $alpha_size
+    }
+}
+
+# ── invariant 3: distinct count ≥ 1 for any non-empty range ───────
+
+for my $c (@cases) {
+    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    for my $i (0:len(@$mo) - 1) {
+        die "distinct count must be ≥ 1, got #{$mo->[$i]}" unless $mo->[$i] >= 1
+    }
+}
+
+# ── invariant 4: a query covering the full array == total distinct ─
+
+for my $c (@cases) {
+    my $n = len(@{$c->{arr}})
+    my $full = Mo::distinct_count($c->{arr}, [[0, $n - 1]])
+    my %alpha
+    for my $v (@{$c->{arr}}) { $alpha{$v} = 1 }
+    die "full-range distinct mismatch on \"#{$c->{name}}\"" unless $full->[0] == len(keys %alpha)
+}
+
+# ── invariant 5: a single-element range has distinct = 1 ──────────
+
+for my $c (@cases) {
+    my $n = len(@{$c->{arr}})
+    my @qs
+    for my $i (0:$n - 1) { push @qs, [$i, $i] }
+    my $r = Mo::distinct_count($c->{arr}, \@qs)
+    for my $v (@$r) {
+        die "single-element distinct must be 1, got #{$v}" unless $v == 1
+    }
+}
+
+# ── invariant 6: ordering of queries doesn't affect the answer ────
+
+for my $c (@cases) {
+    my $forward = Mo::distinct_count($c->{arr}, $c->{queries})
+    my @reverse_qs = rev @{$c->{queries}}
+    my $reverse = Mo::distinct_count($c->{arr}, \@reverse_qs)
+    my $q = len(@$forward)
+    for my $i (0:$q - 1) {
+        die "order-dependence on \"#{$c->{name}}\": forward[#{$i}]=#{$forward->[$i]} reverse[#{$q - 1 - $i}]=#{$reverse->[$q - 1 - $i]}" unless $forward->[$i] == $reverse->[$q - 1 - $i]
+    }
+}
+
+p ""
+p "── all six invariants satisfied ──────────────────────"
