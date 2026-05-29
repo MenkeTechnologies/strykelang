@@ -242,3 +242,8 @@ demo_runs_no_interop!(demo_suffix_automaton, "examples/suffix_automaton_no_inter
 demo_runs_no_interop!(demo_hopcroft_dfa, "examples/hopcroft_dfa_no_interop.stk");
 demo_runs_no_interop!(demo_mo_algorithm, "examples/mo_algorithm_no_interop.stk");
 demo_runs_no_interop!(demo_splay_tree, "examples/splay_tree_no_interop.stk");
+demo_runs_no_interop!(demo_tonelli_shanks, "examples/tonelli_shanks_no_interop.stk");
+demo_runs_no_interop!(demo_lcp_kasai, "examples/lcp_kasai_no_interop.stk");
+demo_runs_no_interop!(demo_min_cost_max_flow, "examples/min_cost_max_flow_no_interop.stk");
+demo_runs_no_interop!(demo_regex_thompson_nfa, "examples/regex_thompson_nfa_no_interop.stk");
+demo_runs_no_interop!(demo_karger_min_cut, "examples/karger_min_cut_no_interop.stk");
