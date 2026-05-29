@@ -1,0 +1,238 @@
+#!/usr/bin/env stryke
+
+# Closest pair of points — divide-and-conquer in O(n log n). Sort by
+# x once, then recursively split: the closest pair is either in the
+# left half, the right half, or straddles the dividing line. The
+# "strip" trick — only candidate points within distance `d` of the
+# divider, sorted by y — needs at most 7 comparisons per point
+# regardless of n, dropping the bridge step to O(n) per level.
+# Cross-validated against an O(n²) brute force on every input.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Cp::`) under --no-interop (§18)
+#   * `_0`/`_1` in sort comparator (§11)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/closest_pair_no_interop.stk
+
+# ── squared distance — avoids sqrt in hot loops ───────────────────
+
+fn Cp::dist2($pa, $pb) {
+    my $dx = $pa->[0] - $pb->[0]
+    my $dy = $pa->[1] - $pb->[1]
+    $dx * $dx + $dy * $dy
+}
+
+# ── recursive divide-and-conquer over [lo, hi] in Px (x-sorted) ───
+# Returns +{ d2, pa, pb }. d2 is the squared distance.
+
+fn Cp::rec($px, $lo, $hi) {
+    my $n = $hi - $lo + 1
+    if ($n <= 3) {
+        my $best = 1_000_000_000_000_000
+        my $bp_a
+        my $bp_b
+        for my $i ($lo:$hi) {
+            for my $j ($i + 1:$hi) {
+                my $d = Cp::dist2($px->[$i], $px->[$j])
+                if ($d < $best) {
+                    $best = $d
+                    $bp_a = $px->[$i]
+                    $bp_b = $px->[$j]
+                }
+            }
+        }
+        return +{ d2 => $best, pa => $bp_a, pb => $bp_b }
+    }
+    my $mid = int(($lo + $hi) / 2)
+    my $mid_x = $px->[$mid]->[0]
+    my $left = Cp::rec($px, $lo, $mid)
+    my $right = Cp::rec($px, $mid + 1, $hi)
+    my $best
+    if ($left->{d2} < $right->{d2}) {
+        $best = $left
+    } else {
+        $best = $right
+    }
+    my $d2 = $best->{d2}
+    # Build the strip: points within sqrt(d2) of the divider x.
+    my @strip
+    for my $i ($lo:$hi) {
+        my $dx = $px->[$i]->[0] - $mid_x
+        push @strip, $px->[$i] if $dx * $dx < $d2
+    }
+    @strip = sort { _0->[1] <=> _1->[1] } @strip
+    my $sn = len(@strip)
+    for my $i (0:$sn - 1) {
+        my $j = $i + 1
+        while ($j < $sn && ($strip[$j]->[1] - $strip[$i]->[1]) * ($strip[$j]->[1] - $strip[$i]->[1]) < $d2) {
+            my $d = Cp::dist2($strip[$i], $strip[$j])
+            if ($d < $d2) {
+                $d2 = $d
+                $best = +{ d2 => $d, pa => $strip[$i], pb => $strip[$j] }
+            }
+            $j++
+        }
+    }
+    $best
+}
+
+# ── entry point: sort by x, then recurse ─────────────────────────
+
+fn Cp::closest($points) {
+    my $n = len(@$points)
+    die "need ≥ 2 points" if $n < 2
+    my @px = sort { _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1] } @$points
+    Cp::rec(\@px, 0, $n - 1)
+}
+
+# ── O(n²) brute force ────────────────────────────────────────────
+
+fn Cp::brute($points) {
+    my $n = len(@$points)
+    my $best = 1_000_000_000_000_000
+    my $bp_a
+    my $bp_b
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1:$n - 1) {
+            my $d = Cp::dist2($points->[$i], $points->[$j])
+            if ($d < $best) {
+                $best = $d
+                $bp_a = $points->[$i]
+                $bp_b = $points->[$j]
+            }
+        }
+    }
+    +{ d2 => $best, pa => $bp_a, pb => $bp_b }
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name   => "2-point line",
+        points => [[0, 0], [3, 4]],
+        d2     => 25,
+    },
+    +{
+        name   => "collinear cluster",
+        points => [[0, 0], [10, 0], [20, 0], [11, 0], [9, 0]],
+        d2     => 1,
+    },
+    +{
+        name   => "grid 4×4",
+        points => [
+            [0, 0], [1, 0], [2, 0], [3, 0],
+            [0, 1], [1, 1], [2, 1], [3, 1],
+            [0, 2], [1, 2], [2, 2], [3, 2],
+            [0, 3], [1, 3], [2, 3], [3, 3],
+        ],
+        d2     => 1,
+    },
+    +{
+        name   => "diagonal closest",
+        points => [[0, 0], [100, 100], [50, 50], [51, 51]],
+        d2     => 2,
+    },
+    +{
+        name   => "scattered 8 points",
+        points => [
+            [-5, -5], [10, 10], [-1, 3], [4, 7],
+            [-1, 4], [8, -2], [3, 8], [9, -3],
+        ],
+        d2     => 1,
+    },
+    +{
+        name   => "10-point cluster",
+        points => [
+            [10, 10], [10, 11], [11, 10], [50, 50],
+            [50, 60], [60, 50], [-10, -10], [-10, 0],
+            [100, 100], [200, 200],
+        ],
+        d2     => 1,
+    },
+    +{
+        name   => "very close pair amid sparsity",
+        points => [
+            [0, 0], [1000, 0], [0, 1000], [1000, 1000],
+            [500, 500], [501, 500],
+        ],
+        d2     => 1,
+    },
+)
+
+p "── closest-pair-of-points demo ───────────────────────"
+printf "  %-30s  %3s  %5s  %s\n", "case", "n", "d²", "pair"
+printf "  %-30s  %3s  %5s  %s\n", "------------------------------", "---", "-----", "----"
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    my $ok = $r->{d2} == $c->{d2}
+    printf "  %-30s  %3d  %5d  (%d,%d)-(%d,%d)  %s\n",
+        $c->{name}, len(@{$c->{points}}), $r->{d2},
+        $r->{pa}->[0], $r->{pa}->[1], $r->{pb}->[0], $r->{pb}->[1],
+        $ok ? "" : "FAIL want=#{$c->{d2}}"
+}
+
+# ── invariant 1: D&C result matches expected d² ───────────────────
+
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    die "d² #{$r->{d2}} != expected #{$c->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $c->{d2}
+}
+
+# ── invariant 2: D&C result matches brute force on every case ─────
+
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    my $br = Cp::brute($c->{points})
+    die "D&C d² #{$r->{d2}} != brute d² #{$br->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $br->{d2}
+}
+
+# ── invariant 3: returned pair actually has the reported distance ─
+
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    my $d_check = Cp::dist2($r->{pa}, $r->{pb})
+    die "pair distance #{$d_check} != reported #{$r->{d2}} on \"#{$c->{name}}\"" unless $d_check == $r->{d2}
+}
+
+# ── invariant 4: both points are present in the input ─────────────
+
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    my $found_a = 0
+    my $found_b = 0
+    for my $p (@{$c->{points}}) {
+        $found_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
+        $found_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
+    }
+    die "pa not in input on \"#{$c->{name}}\"" unless $found_a
+    die "pb not in input on \"#{$c->{name}}\"" unless $found_b
+}
+
+# ── invariant 5: no pair in input has smaller distance ────────────
+
+for my $c (@cases) {
+    my $r = Cp::closest($c->{points})
+    my $n = len(@{$c->{points}})
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1:$n - 1) {
+            my $d = Cp::dist2($c->{points}->[$i], $c->{points}->[$j])
+            die "found closer pair (#{$d} < #{$r->{d2}}) on \"#{$c->{name}}\"" if $d < $r->{d2}
+        }
+    }
+}
+
+# ── invariant 6: 2-point input returns exactly that pair ──────────
+
+my $two = Cp::closest([[7, 11], [19, 23]])
+die "2-point d² mismatch" unless $two->{d2} == (12 * 12 + 12 * 12)
+
+# ── invariant 7: a duplicated point yields d² = 0 ─────────────────
+
+my $dup = Cp::closest([[1, 2], [3, 4], [1, 2], [5, 6]])
+die "duplicate-point d² must be 0" unless $dup->{d2} == 0
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

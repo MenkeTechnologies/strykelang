@@ -1,0 +1,204 @@
+#!/usr/bin/env stryke
+
+# Suffix automaton (Blumer's online construction) — a minimal DFA
+# accepting every substring of the input string. Linear-size (≤ 2n
+# states, ≤ 3n edges) and constructed in amortized O(n · |Σ|). After
+# building, the path from `last` via suffix links enumerates the
+# distinct suffixes; the count of distinct substrings is
+# `Σ (len[v] − len[link[v]])` over all non-root states.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sam::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/suffix_automaton_no_interop.stk
+
+# ── construct a suffix automaton from string s ────────────────────
+# Returns +{ states => [...], last => idx } where each state is
+# +{ next => {ch => idx}, link => idx, len => n }.
+
+fn Sam::build($s) {
+    my @states
+    push @states, +{ next => +{}, link => -1, len => 0 }
+    my $last = 0
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        my $c = substr($s, $i, 1)
+        push @states, +{ next => +{}, link => -1, len => $states[$last]->{len} + 1 }
+        my $cur = len(@states) - 1
+        my $p = $last
+        while ($p != -1 && !exists $states[$p]->{next}->{$c}) {
+            $states[$p]->{next}->{$c} = $cur
+            $p = $states[$p]->{link}
+        }
+        if ($p == -1) {
+            $states[$cur]->{link} = 0
+        } else {
+            my $q = $states[$p]->{next}->{$c}
+            if ($states[$p]->{len} + 1 == $states[$q]->{len}) {
+                $states[$cur]->{link} = $q
+            } else {
+                my %cloned_next = %{$states[$q]->{next}}
+                push @states, +{
+                    next => \%cloned_next,
+                    link => $states[$q]->{link},
+                    len  => $states[$p]->{len} + 1,
+                }
+                my $clone = len(@states) - 1
+                while ($p != -1 && exists $states[$p]->{next}->{$c} && $states[$p]->{next}->{$c} == $q) {
+                    $states[$p]->{next}->{$c} = $clone
+                    $p = $states[$p]->{link}
+                }
+                $states[$q]->{link} = $clone
+                $states[$cur]->{link} = $clone
+            }
+        }
+        $last = $cur
+    }
+    +{ states => \@states, last => $last }
+}
+
+# ── does the automaton accept the substring t? ────────────────────
+
+fn Sam::contains($sam, $t) {
+    my $cur = 0
+    my $n = len($t)
+    for my $i (0:$n - 1) {
+        my $c = substr($t, $i, 1)
+        if (!exists $sam->{states}->[$cur]->{next}->{$c}) {
+            return 0
+        }
+        $cur = $sam->{states}->[$cur]->{next}->{$c}
+    }
+    1
+}
+
+# ── count distinct non-empty substrings via the link tree ─────────
+# Each non-root state v contributes (len[v] − len[link[v]]) substrings.
+
+fn Sam::distinct_substrings($sam) {
+    my $sum = 0
+    my $k = len(@{$sam->{states}})
+    for my $i (1:$k - 1) {
+        my $st = $sam->{states}->[$i]
+        $sum += $st->{len} - $sam->{states}->[$st->{link}]->{len}
+    }
+    $sum
+}
+
+# ── O(n²) brute force: every substring as a set key ──────────────
+
+fn Sam::brute_distinct($s) {
+    my %seen
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            $seen{substr($s, $i, $j - $i + 1)} = 1
+        }
+    }
+    len(keys %seen)
+}
+
+# ── brute substring test ─────────────────────────────────────────
+
+fn Sam::brute_contains($s, $t) {
+    return 1 if $t eq ""
+    my $n = len($s)
+    my $m = len($t)
+    return 0 if $m > $n
+    for my $i (0:$n - $m) {
+        return 1 if substr($s, $i, $m) eq $t
+    }
+    0
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @strings = ("abc", "aab", "abcabc", "banana", "mississippi", "aaaa", "abracadabra", "stryke")
+
+p "── suffix-automaton demo ─────────────────────────────"
+printf "  %-14s  %4s  %6s  %6s\n", "input", "len", "states", "substr"
+printf "  %-14s  %4s  %6s  %6s\n", "--------------", "----", "------", "------"
+for my $s (@strings) {
+    my $sam = Sam::build($s)
+    my $ds  = Sam::distinct_substrings($sam)
+    my $bn  = Sam::brute_distinct($s)
+    printf "  %-14s  %4d  %6d  %6d  %s\n",
+        "\"" . $s . "\"", len($s), len(@{$sam->{states}}), $ds,
+        $ds == $bn ? "" : "FAIL want=#{$bn}"
+}
+
+# ── invariant 1: state count ≤ 2 · |s| − 1 (for |s| ≥ 2) ──────────
+# (Tight bound: ≤ 2n − 1 states for n ≥ 2; ≤ n + 1 for n ≤ 1.)
+
+for my $s (@strings) {
+    my $sam = Sam::build($s)
+    my $k = len(@{$sam->{states}})
+    my $n = len($s)
+    my $bound = $n >= 2 ? 2 * $n - 1 : $n + 1
+    die "state count #{$k} > bound #{$bound} for \"#{$s}\"" unless $k <= $bound
+}
+
+# ── invariant 2: distinct-substring count agrees with O(n²) brute ─
+
+for my $s (@strings) {
+    my $sam = Sam::build($s)
+    my $ds = Sam::distinct_substrings($sam)
+    my $bn = Sam::brute_distinct($s)
+    die "distinct(#{$s}) sam=#{$ds} brute=#{$bn}" unless $ds == $bn
+}
+
+# ── invariant 3: every substring of s is accepted ─────────────────
+
+for my $s (@strings) {
+    my $sam = Sam::build($s)
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            my $t = substr($s, $i, $j - $i + 1)
+            die "substring \"#{$t}\" not accepted by SAM of \"#{$s}\"" unless Sam::contains($sam, $t)
+        }
+    }
+}
+
+# ── invariant 4: a random non-substring is rejected ───────────────
+
+for my $pair (["banana", "ban!"], ["mississippi", "mp"], ["abc", "ac"], ["stryke", "stryk_"]) {
+    my $sam = Sam::build($pair->[0])
+    die "SAM(\"#{$pair->[0]}\") falsely accepts \"#{$pair->[1]}\"" if Sam::contains($sam, $pair->[1])
+}
+
+# ── invariant 5: SAM agrees with brute on every short query ───────
+
+for my $s (@strings) {
+    my $sam = Sam::build($s)
+    # Probe a representative mix of substrings + a few crafted misses.
+    my @queries
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            push @queries, substr($s, $i, $j - $i + 1)
+        }
+    }
+    push @queries, $s . "Z", "Z" . $s, "ZZZ"
+    for my $q (@queries) {
+        my $sam_ans = Sam::contains($sam, $q)
+        my $bn_ans  = Sam::brute_contains($s, $q)
+        die "SAM(\"#{$s}\")(\"#{$q}\")=#{$sam_ans} brute=#{$bn_ans}" unless $sam_ans == $bn_ans
+    }
+}
+
+# ── invariant 6: empty string builds a single-state automaton ─────
+
+my $empty = Sam::build("")
+die "empty SAM must have 1 state" unless len(@{$empty->{states}}) == 1
+die "empty SAM has 0 distinct substrings" unless Sam::distinct_substrings($empty) == 0
+
+# ── invariant 7: distinct(\"aaaa\") = 4 (a, aa, aaa, aaaa) ────────
+
+my $aaaa = Sam::build("aaaa")
+die "distinct(\"aaaa\") must be 4" unless Sam::distinct_substrings($aaaa) == 4
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

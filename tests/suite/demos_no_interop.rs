@@ -237,3 +237,8 @@ demo_runs_no_interop!(demo_chinese_remainder, "examples/chinese_remainder_no_int
 demo_runs_no_interop!(demo_patience_sort_lis, "examples/patience_sort_lis_no_interop.stk");
 demo_runs_no_interop!(demo_smith_waterman, "examples/smith_waterman_no_interop.stk");
 demo_runs_no_interop!(demo_stoer_wagner, "examples/stoer_wagner_no_interop.stk");
+demo_runs_no_interop!(demo_closest_pair, "examples/closest_pair_no_interop.stk");
+demo_runs_no_interop!(demo_suffix_automaton, "examples/suffix_automaton_no_interop.stk");
+demo_runs_no_interop!(demo_hopcroft_dfa, "examples/hopcroft_dfa_no_interop.stk");
+demo_runs_no_interop!(demo_mo_algorithm, "examples/mo_algorithm_no_interop.stk");
+demo_runs_no_interop!(demo_splay_tree, "examples/splay_tree_no_interop.stk");
