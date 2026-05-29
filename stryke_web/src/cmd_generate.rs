@@ -362,3 +362,217 @@ fn stryke_type_for(ty: &str) -> &'static str {
         _ => "Any",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use std::sync::Mutex;
+
+    static CWD_LOCK: Mutex<()> = Mutex::new(());
+
+    struct CwdGuard(std::path::PathBuf);
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = std::env::set_current_dir(&self.0);
+        }
+    }
+
+    fn with_tmp_cwd<F, R>(f: F) -> R
+    where
+        F: FnOnce(&Path) -> R,
+    {
+        let _lock = CWD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let prev = std::env::current_dir().expect("cwd");
+        let _restore = CwdGuard(prev);
+        std::env::set_current_dir(&dir).expect("cd");
+        f(dir.path())
+    }
+
+    // ─── controller_class / controller_file_stem ────────────────────────
+
+    #[test]
+    fn controller_class_pluralizes_and_pascal_cases() {
+        // Rails convention: model `Post` (singular) → controller class
+        // `Posts`. Names are assumed to be the singular model form;
+        // passing a plural in double-pluralizes (caller's fault).
+        assert_eq!(controller_class("Post"), "Posts");
+        assert_eq!(controller_class("post"), "Posts");
+        assert_eq!(controller_class("BlogPost"), "BlogPosts");
+        assert_eq!(controller_class("blog_post"), "BlogPosts");
+        // Irregular plurals (pluralize special-cases).
+        assert_eq!(controller_class("Person"), "People");
+        assert_eq!(controller_class("mouse"), "Mice");
+    }
+
+    #[test]
+    fn controller_file_stem_is_snake_plural() {
+        // Files on disk go in snake_case_plural: posts_controller.stk.
+        assert_eq!(controller_file_stem("Post"), "posts");
+        assert_eq!(controller_file_stem("BlogPost"), "blog_posts");
+        assert_eq!(controller_file_stem("Person"), "people");
+    }
+
+    // ─── stryke_type_for ────────────────────────────────────────────────
+
+    #[test]
+    fn stryke_type_for_string_family() {
+        for ty in ["string", "text", "date", "datetime", "timestamp"] {
+            assert_eq!(stryke_type_for(ty), "Str", "{ty} should map to Str");
+        }
+    }
+
+    #[test]
+    fn stryke_type_for_int_family_collapses_references() {
+        for ty in ["int", "integer", "bigint", "references"] {
+            assert_eq!(stryke_type_for(ty), "Int", "{ty} should map to Int");
+        }
+    }
+
+    #[test]
+    fn stryke_type_for_float_decimal_to_float() {
+        assert_eq!(stryke_type_for("float"), "Float");
+        assert_eq!(stryke_type_for("decimal"), "Float");
+    }
+
+    #[test]
+    fn stryke_type_for_bool_aliases() {
+        assert_eq!(stryke_type_for("bool"), "Bool");
+        assert_eq!(stryke_type_for("boolean"), "Bool");
+    }
+
+    #[test]
+    fn stryke_type_for_unknown_falls_back_to_any() {
+        // Unknown types must not crash the generator — fall back to `Any`
+        // so a typo in a `s_web g model` invocation still produces a
+        // syntactically-valid model file.
+        assert_eq!(stryke_type_for("frobnicate"), "Any");
+        assert_eq!(stryke_type_for(""), "Any");
+        assert_eq!(stryke_type_for("blob"), "Any");
+    }
+
+    // ─── stryke_type_for must agree with sql_type_for on every keyword ──
+
+    #[test]
+    fn stryke_type_for_and_sql_type_for_cover_same_int_family() {
+        // Migration writes the SQL type; the model writes the stryke type.
+        // The two functions are populated from the same `parse_field`
+        // vocabulary, so the int-mapping families must align — otherwise
+        // a column gets a wrong type-annotation in the generated model.
+        for ty in ["int", "integer", "bigint", "references"] {
+            assert_eq!(sql_type_for(ty), "INTEGER", "sql_type_for({ty})");
+            assert_eq!(stryke_type_for(ty), "Int", "stryke_type_for({ty})");
+        }
+    }
+
+    #[test]
+    fn stryke_type_for_and_sql_type_for_cover_same_string_family() {
+        for ty in ["string", "text"] {
+            assert_eq!(sql_type_for(ty), "TEXT", "sql_type_for({ty})");
+            assert_eq!(stryke_type_for(ty), "Str", "stryke_type_for({ty})");
+        }
+    }
+
+    // ─── write_model_file / write_migration_file ────────────────────────
+
+    #[test]
+    fn write_model_file_creates_expected_path() {
+        with_tmp_cwd(|root| {
+            write_model_file(
+                "Post",
+                &["title:string".to_string(), "body:text".to_string()],
+            )
+            .expect("write model");
+            let p = root.join("app/models/post.stk");
+            assert!(p.exists(), "must write app/models/post.stk");
+            let body = std::fs::read_to_string(&p).expect("read");
+            // Stryke model class body must reference the model name.
+            assert!(body.contains("Post"), "model body must reference Post");
+        });
+    }
+
+    #[test]
+    fn write_model_file_pluralizes_path_irregulars() {
+        with_tmp_cwd(|root| {
+            // Even for irregular plurals the file path uses the *singular*
+            // snake form — `people` → file `person.stk` (model files are
+            // always singular per Rails convention).
+            write_model_file("Person", &[]).expect("write model");
+            assert!(root.join("app/models/person.stk").exists());
+            assert!(!root.join("app/models/people.stk").exists());
+        });
+    }
+
+    #[test]
+    fn write_migration_file_uses_timestamp_prefix_and_snake_table() {
+        with_tmp_cwd(|root| {
+            write_migration_file("CreatePosts", "posts", &[], true).expect("write migration");
+            let entries: Vec<_> = std::fs::read_dir(root.join("db/migrate"))
+                .expect("read migrate dir")
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect();
+            assert_eq!(
+                entries.len(),
+                1,
+                "expected exactly one migration file, got {entries:?}"
+            );
+            let name = &entries[0];
+            // Rails-style: 14-digit UTC timestamp prefix + _ + snake name + .stk.
+            assert!(name.ends_with(".stk"), "missing .stk extension: {name}");
+            assert!(name.contains("create_posts"), "missing snake name: {name}");
+            let prefix: String = name.chars().take_while(|c| c.is_ascii_digit()).collect();
+            assert_eq!(
+                prefix.len(),
+                14,
+                "expected 14-digit timestamp prefix, got {prefix}"
+            );
+        });
+    }
+
+    #[test]
+    fn migration_command_writes_file_with_fields_in_body() {
+        with_tmp_cwd(|root| {
+            migration("AddEmailToUsers", &["email:string".to_string()])
+                .expect("write migration via public api");
+            let entries: Vec<_> = std::fs::read_dir(root.join("db/migrate"))
+                .expect("read")
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .collect();
+            assert_eq!(entries.len(), 1);
+            let body = std::fs::read_to_string(&entries[0]).expect("read body");
+            assert!(
+                body.contains("email"),
+                "migration body must reference declared field name"
+            );
+        });
+    }
+
+    // ─── model command ───────────────────────────────────────────────────
+
+    #[test]
+    fn model_command_writes_both_model_and_migration() {
+        with_tmp_cwd(|root| {
+            model(
+                "Widget",
+                &["sku:string".to_string(), "price:int".to_string()],
+            )
+            .expect("model");
+            assert!(
+                root.join("app/models/widget.stk").exists(),
+                "model file must exist"
+            );
+            let migrations: Vec<_> = std::fs::read_dir(root.join("db/migrate"))
+                .expect("read")
+                .filter_map(|e| e.ok())
+                .collect();
+            assert_eq!(
+                migrations.len(),
+                1,
+                "model command must also create the create_<plural> migration"
+            );
+        });
+    }
+}
