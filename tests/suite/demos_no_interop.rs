@@ -262,3 +262,8 @@ demo_runs_no_interop!(demo_runge_kutta_4, "examples/runge_kutta_4_no_interop.stk
 demo_runs_no_interop!(demo_tarjan_articulation, "examples/tarjan_articulation_no_interop.stk");
 demo_runs_no_interop!(demo_brent_root_finding, "examples/brent_root_finding_no_interop.stk");
 demo_runs_no_interop!(demo_adaptive_simpson, "examples/adaptive_simpson_no_interop.stk");
+demo_runs_no_interop!(demo_boruvka_mst, "examples/boruvka_mst_no_interop.stk");
+demo_runs_no_interop!(demo_walsh_hadamard, "examples/walsh_hadamard_no_interop.stk");
+demo_runs_no_interop!(demo_li_chao_tree, "examples/li_chao_tree_no_interop.stk");
+demo_runs_no_interop!(demo_berlekamp_massey, "examples/berlekamp_massey_no_interop.stk");
+demo_runs_no_interop!(demo_ukkonen_suffix_tree, "examples/ukkonen_suffix_tree_no_interop.stk");

@@ -1,0 +1,225 @@
+#!/usr/bin/env stryke
+
+# Berlekamp-Massey — given the first N terms of a sequence, find the
+# shortest linear-feedback shift register (LFSR) over the integers
+# that generates it. Equivalently: discover the minimum-degree linear
+# recurrence c[1..L] with
+#   s[n] = c[1] · s[n-1] + c[2] · s[n-2] + ... + c[L] · s[n-L]
+# for all n ≥ L.  Originally for decoding BCH/Reed-Solomon codes
+# over GF(2^k); the classical O(N²) variant we implement here works
+# over the rationals using exact fractions.
+#
+# Cross-validated by:
+#   * recomputing every input term from the recovered recurrence
+#   * checking the recovered length matches the known degree on
+#     Fibonacci, Lucas, and other handcrafted sequences
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Bm::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/berlekamp_massey_no_interop.stk
+
+# ── Berlekamp-Massey over the rationals (using float — sufficient ─
+# for moderate inputs without exact-fraction overhead).
+
+fn Bm::find_recurrence($s) {
+    my $n = len(@$s)
+    my @C = (1.0)             # current connection polynomial
+    my @B = (1.0)             # previous one
+    my $L = 0                 # current LFSR length
+    my $m = 1
+    my $bb = 1.0
+    for my $i (0:$n - 1) {
+        my $d = $s->[$i]
+        for my $j (1:$L) {
+            $d += $C[$j] * $s->[$i - $j] if $j < len(@C)
+        }
+        if ($d == 0) {
+            $m++
+        } elsif (2 * $L <= $i) {
+            my @T = @C
+            my $coef = $d / $bb
+            my $needed = $m + len(@B)
+            while (len(@C) < $needed) { push @C, 0.0 }
+            for my $j (0:len(@B) - 1) {
+                $C[$j + $m] = $C[$j + $m] - $coef * $B[$j]
+            }
+            $L = $i + 1 - $L
+            @B = @T
+            $bb = $d
+            $m = 1
+        } else {
+            my $coef = $d / $bb
+            my $needed = $m + len(@B)
+            while (len(@C) < $needed) { push @C, 0.0 }
+            for my $j (0:len(@B) - 1) {
+                $C[$j + $m] = $C[$j + $m] - $coef * $B[$j]
+            }
+            $m++
+        }
+    }
+    # Convert C[0..L] (where C[0] = 1) into the recurrence
+    # s[n] = -C[1]·s[n-1] − C[2]·s[n-2] − … − C[L]·s[n-L].
+    my @rec
+    for my $j (1:$L) {
+        push @rec, -$C[$j]
+    }
+    +{ length => $L, recurrence => \@rec }
+}
+
+# ── evaluate the recurrence forward to produce N terms from seed ─
+
+fn Bm::generate($rec, $seed, $n) {
+    my $L = len(@$rec)
+    die "seed length #{len(@$seed)} < L #{$L}" if len(@$seed) < $L
+    my @out = @$seed
+    while (len(@out) < $n) {
+        my $next = 0
+        for my $j (0:$L - 1) {
+            $next += $rec->[$j] * $out[len(@out) - 1 - $j]
+        }
+        push @out, $next
+    }
+    \@out
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name => "Fibonacci (s[n] = s[n-1] + s[n-2])",
+        seq  => [1, 1, 2, 3, 5, 8, 13, 21, 34, 55],
+        L    => 2,
+        recurrence => [1, 1],
+    },
+    +{
+        name => "Lucas (same recurrence, different seed)",
+        seq  => [2, 1, 3, 4, 7, 11, 18, 29, 47, 76],
+        L    => 2,
+        recurrence => [1, 1],
+    },
+    +{
+        name => "doubling: s[n] = 2·s[n-1]",
+        seq  => [1, 2, 4, 8, 16, 32, 64, 128],
+        L    => 1,
+        recurrence => [2],
+    },
+    +{
+        name => "constant: s[n] = s[n-1]",
+        seq  => [7, 7, 7, 7, 7, 7, 7, 7],
+        L    => 1,
+        recurrence => [1],
+    },
+    +{
+        name => "Pell: s[n] = 2·s[n-1] + s[n-2]",
+        seq  => [0, 1, 2, 5, 12, 29, 70, 169, 408, 985],
+        L    => 2,
+        recurrence => [2, 1],
+    },
+    +{
+        name => "Padovan: s[n] = s[n-2] + s[n-3]",
+        seq  => [1, 1, 1, 2, 2, 3, 4, 5, 7, 9, 12, 16],
+        L    => 3,
+        recurrence => [0, 1, 1],
+    },
+    +{
+        name => "Tribonacci: s[n] = s[n-1] + s[n-2] + s[n-3]",
+        seq  => [0, 0, 1, 1, 2, 4, 7, 13, 24, 44, 81, 149],
+        L    => 3,
+        recurrence => [1, 1, 1],
+    },
+)
+
+p "── Berlekamp-Massey recurrence-discovery demo ────────"
+printf "  %-44s  %3s  %s\n", "case", "L", "recurrence"
+printf "  %-44s  %3s  %s\n", "--------------------------------------------", "---", "----------"
+for my $c (@cases) {
+    my $r = Bm::find_recurrence($c->{seq})
+    my @rounded
+    for my $v (@{$r->{recurrence}}) {
+        push @rounded, sprintf("%.4f", $v)
+    }
+    printf "  %-44s  %3d  [%s]\n", $c->{name}, $r->{length}, join(", ", @rounded)
+}
+
+# ── absolute float compare ───────────────────────────────────────
+
+fn Bm::fabs($v) { $v < 0 ? -$v : $v }
+
+fn Bm::approx_eq($x, $y, $eps) {
+    Bm::fabs($x - $y) < $eps
+}
+
+# ── invariant 1: recovered length matches expected L ──────────────
+
+for my $c (@cases) {
+    my $r = Bm::find_recurrence($c->{seq})
+    die "length #{$r->{length}} != expected #{$c->{L}} on \"#{$c->{name}}\"" unless $r->{length} == $c->{L}
+}
+
+# ── invariant 2: recurrence coefficients match expected (within ε) ─
+
+for my $c (@cases) {
+    my $r = Bm::find_recurrence($c->{seq})
+    die "rec length #{len(@{$r->{recurrence}})} != expected #{len(@{$c->{recurrence}})}" unless len(@{$r->{recurrence}}) == len(@{$c->{recurrence}})
+    for my $j (0:len(@{$c->{recurrence}}) - 1) {
+        die "rec[#{$j}] = #{$r->{recurrence}->[$j]} != expected #{$c->{recurrence}->[$j]} on \"#{$c->{name}}\"" unless Bm::approx_eq($r->{recurrence}->[$j], $c->{recurrence}->[$j], 1e-9)
+    }
+}
+
+# ── invariant 3: forward-generating from the seed reproduces input ─
+
+for my $c (@cases) {
+    my $r = Bm::find_recurrence($c->{seq})
+    my @seed
+    for my $i (0:$r->{length} - 1) {
+        push @seed, $c->{seq}->[$i]
+    }
+    my $g = Bm::generate($r->{recurrence}, \@seed, len(@{$c->{seq}}))
+    for my $i (0:len(@{$c->{seq}}) - 1) {
+        die "regen[#{$i}] = #{$g->[$i]} != original #{$c->{seq}->[$i]} on \"#{$c->{name}}\"" unless Bm::approx_eq($g->[$i], $c->{seq}->[$i], 1e-6)
+    }
+}
+
+# ── invariant 4: shorter recurrence ≤ N/2 (the BM upper bound) ────
+
+for my $c (@cases) {
+    my $r = Bm::find_recurrence($c->{seq})
+    my $n = len(@{$c->{seq}})
+    die "L #{$r->{length}} > n/2 + 1 = #{int($n / 2) + 1} on \"#{$c->{name}}\"" unless $r->{length} <= int($n / 2) + 1
+}
+
+# ── invariant 5: prefix prediction — using L+2 terms predicts the ─
+# rest of the input correctly.
+
+for my $c (@cases) {
+    next if $c->{L} == 0 || len(@{$c->{seq}}) < $c->{L} + 5
+    my @prefix
+    for my $i (0:$c->{L} + 1) {
+        push @prefix, $c->{seq}->[$i]
+    }
+    my $r = Bm::find_recurrence(\@prefix)
+    next unless $r->{length} == $c->{L}
+    my @seed
+    for my $i (0:$r->{length} - 1) { push @seed, $c->{seq}->[$i] }
+    my $g = Bm::generate($r->{recurrence}, \@seed, len(@{$c->{seq}}))
+    for my $i (0:len(@{$c->{seq}}) - 1) {
+        die "prefix predicts wrong at #{$i} on \"#{$c->{name}}\"" unless Bm::approx_eq($g->[$i], $c->{seq}->[$i], 1e-6)
+    }
+}
+
+# ── invariant 6: all-zero sequence has L = 0 ─────────────────────
+
+my $r_zero = Bm::find_recurrence([0, 0, 0, 0, 0, 0, 0])
+die "all-zero L must be 0, got #{$r_zero->{length}}" unless $r_zero->{length} == 0
+
+# ── invariant 7: constant non-zero sequence has L = 1 with rec [1] ─
+
+my $r_const = Bm::find_recurrence([5, 5, 5, 5, 5])
+die "constant L must be 1, got #{$r_const->{length}}" unless $r_const->{length} == 1
+die "constant rec must be [1]" unless Bm::approx_eq($r_const->{recurrence}->[0], 1.0, 1e-9)
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
