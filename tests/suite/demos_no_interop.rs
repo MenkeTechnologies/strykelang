@@ -232,3 +232,8 @@ demo_runs_no_interop!(demo_eulerian_circuit, "examples/eulerian_circuit_no_inter
 demo_runs_no_interop!(demo_two_sat, "examples/two_sat_no_interop.stk");
 demo_runs_no_interop!(demo_karatsuba, "examples/karatsuba_no_interop.stk");
 demo_runs_no_interop!(demo_wavelet_tree, "examples/wavelet_tree_no_interop.stk");
+demo_runs_no_interop!(demo_edmonds_karp, "examples/edmonds_karp_no_interop.stk");
+demo_runs_no_interop!(demo_chinese_remainder, "examples/chinese_remainder_no_interop.stk");
+demo_runs_no_interop!(demo_patience_sort_lis, "examples/patience_sort_lis_no_interop.stk");
+demo_runs_no_interop!(demo_smith_waterman, "examples/smith_waterman_no_interop.stk");
+demo_runs_no_interop!(demo_stoer_wagner, "examples/stoer_wagner_no_interop.stk");

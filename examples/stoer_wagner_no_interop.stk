@@ -1,0 +1,315 @@
+#!/usr/bin/env stryke
+
+# Stoer-Wagner global minimum cut — finds the cheapest s-t cut over
+# ALL possible (s, t) without specifying source/sink. O(V³) with the
+# adjacency-matrix variant. Each phase grows a "most-tightly-
+# connected" sequence; the cut between the last two added vertices is
+# a candidate min cut for that phase, and those two are then merged.
+# Iterate until one vertex remains; the minimum over phases is the
+# answer.  Cross-validated by enumerating every 2-partition on
+# small graphs.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sw::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/stoer_wagner_no_interop.stk
+
+# ── deep-copy a 2D adjacency matrix ──────────────────────────────
+
+fn Mc::clone($A) {
+    my @out
+    for my $row (@$A) {
+        my @r = @$row
+        push @out, \@r
+    }
+    \@out
+}
+
+# ── one Stoer-Wagner phase ───────────────────────────────────────
+# Operates on a copy of the weight matrix W (mutated by merges).
+# `alive` is the parallel "is this vertex still present?" array.
+# Returns +{ cut_value, last, prev } where `last`/`prev` are the
+# two final vertices in maximum-adjacency order.
+
+fn Mc::min_cut_phase($W, $alive, $n, $start) {
+    my @in_set = (0) x $n
+    $in_set[$start] = 1
+    my @weights = (0) x $n
+    for my $v (0:$n - 1) {
+        next unless $alive->[$v]
+        next if $v == $start
+        $weights[$v] = $W->[$start]->[$v]
+    }
+    my $prev = $start
+    my $last = $start
+    # Add the n_alive - 1 remaining vertices one at a time.
+    my $alive_count = 0
+    for my $v (0:$n - 1) { $alive_count++ if $alive->[$v] }
+    for my $step (1:$alive_count - 1) {
+        # Pick the not-yet-added live vertex with the maximum weight.
+        my $best = -1
+        my $best_w = -1
+        for my $v (0:$n - 1) {
+            next unless $alive->[$v]
+            next if $in_set[$v]
+            if ($weights[$v] > $best_w) {
+                $best_w = $weights[$v]
+                $best = $v
+            }
+        }
+        $prev = $last
+        $last = $best
+        $in_set[$best] = 1
+        for my $v (0:$n - 1) {
+            next unless $alive->[$v]
+            next if $in_set[$v]
+            $weights[$v] = $weights[$v] + $W->[$best]->[$v]
+        }
+    }
+    +{ cut_value => $weights[$last], last => $last, prev => $prev }
+}
+
+# ── full Stoer-Wagner: returns +{ value, partition_a, partition_b } ─
+
+fn Mc::min_cut($W_in) {
+    my $n = len(@$W_in)
+    return +{ value => 0, partition_a => [], partition_b => [] } if $n < 2
+    my $W = Mc::clone($W_in)
+    my @alive = (1) x $n
+    # `merged_into[i]` = list of original vertices that have been merged into i.
+    my @merged_into
+    for my $i (0:$n - 1) {
+        push @merged_into, [$i]
+    }
+    my $best_cut = 1_000_000_000
+    my $best_partition = []
+    while (1) {
+        # Find any alive starting vertex.
+        my $start = -1
+        my $alive_count = 0
+        for my $v (0:$n - 1) {
+            if ($alive[$v]) {
+                $alive_count++
+                $start = $v if $start < 0
+            }
+        }
+        last if $alive_count < 2
+        my $r = Mc::min_cut_phase($W, \@alive, $n, $start)
+        if ($r->{cut_value} < $best_cut) {
+            $best_cut = $r->{cut_value}
+            my @part = @{$merged_into[$r->{last}]}
+            $best_partition = \@part
+        }
+        # Merge `last` into `prev`: add row+col, then deactivate `last`.
+        my $p = $r->{prev}
+        my $l = $r->{last}
+        for my $v (0:$n - 1) {
+            next unless $alive[$v]
+            next if $v == $p || $v == $l
+            $W->[$p]->[$v] = $W->[$p]->[$v] + $W->[$l]->[$v]
+            $W->[$v]->[$p] = $W->[$p]->[$v]
+        }
+        push @{$merged_into[$p]}, @{$merged_into[$l]}
+        $alive[$l] = 0
+    }
+    my @b_part
+    my %in_a
+    for my $v (@$best_partition) { $in_a{$v} = 1 }
+    for my $v (0:$n - 1) {
+        push @b_part, $v unless exists $in_a{$v}
+    }
+    +{
+        value       => $best_cut,
+        partition_a => $best_partition,
+        partition_b => \@b_part,
+    }
+}
+
+# ── compute the cut weight between an explicit partition ──────────
+
+fn Mc::partition_weight($W, $part_a) {
+    my %in_a
+    for my $v (@$part_a) { $in_a{$v} = 1 }
+    my $n = len(@$W)
+    my $w = 0
+    for my $u (0:$n - 1) {
+        next unless exists $in_a{$u}
+        for my $v (0:$n - 1) {
+            next if exists $in_a{$v}
+            $w += $W->[$u]->[$v]
+        }
+    }
+    $w
+}
+
+# ── brute force min cut by enumerating every non-trivial subset ───
+
+fn Mc::brute_min_cut($W) {
+    my $n = len(@$W)
+    return 0 if $n < 2
+    my $best = 1_000_000_000
+    my $total = 1 << $n
+    for my $mask (1:$total - 2) {
+        # Mask must split — both halves non-empty.
+        my @part_a
+        for my $i (0:$n - 1) {
+            push @part_a, $i if ($mask >> $i) & 1
+        }
+        my $w = Mc::partition_weight($W, \@part_a)
+        $best = $w if $w < $best
+    }
+    $best
+}
+
+# ── build an n×n symmetric matrix from a list of weighted edges ───
+
+fn Mc::from_edges($n, $edges) {
+    my @m
+    for my $i (0:$n - 1) {
+        my @row = (0) x $n
+        push @m, \@row
+    }
+    for my $e (@$edges) {
+        $m[$e->[0]]->[$e->[1]] += $e->[2]
+        $m[$e->[1]]->[$e->[0]] += $e->[2]
+    }
+    \@m
+}
+
+# ── test cases ────────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name  => "Stoer-Wagner textbook 8-node",
+        n     => 8,
+        edges => [
+            [0, 1, 2], [0, 4, 3],
+            [1, 2, 3], [1, 4, 2], [1, 5, 2],
+            [2, 3, 4], [2, 6, 2],
+            [3, 6, 2], [3, 7, 2],
+            [4, 5, 3],
+            [5, 6, 1],
+            [6, 7, 3],
+        ],
+        cut   => 4,
+    },
+    +{
+        name  => "triangle",
+        n     => 3,
+        edges => [[0, 1, 1], [1, 2, 1], [0, 2, 1]],
+        cut   => 2,
+    },
+    +{
+        name  => "K4 uniform",
+        n     => 4,
+        edges => [
+            [0, 1, 1], [0, 2, 1], [0, 3, 1],
+            [1, 2, 1], [1, 3, 1],
+            [2, 3, 1],
+        ],
+        cut   => 3,
+    },
+    +{
+        name  => "path graph",
+        n     => 5,
+        edges => [[0,1,10], [1,2,20], [2,3,5], [3,4,15]],
+        cut   => 5,
+    },
+    +{
+        name  => "bridge graph",
+        n     => 6,
+        edges => [
+            [0, 1, 5], [0, 2, 5], [1, 2, 5],
+            [3, 4, 5], [3, 5, 5], [4, 5, 5],
+            [2, 3, 1],   # the bridge
+        ],
+        cut   => 1,
+    },
+    +{
+        name  => "two-vertex direct",
+        n     => 2,
+        edges => [[0, 1, 7]],
+        cut   => 7,
+    },
+)
+
+p "── Stoer-Wagner global min-cut demo ──────────────────"
+printf "  %-32s  %3s  %6s  %s\n", "case", "n", "cut", "partition"
+printf "  %-32s  %3s  %6s  %s\n", "--------------------------------", "---", "------", "---------"
+for my $c (@cases) {
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    printf "  %-32s  %3d  %6d  A=[%s]  B=[%s]  %s\n",
+        $c->{name}, $c->{n}, $r->{value},
+        join(",", @{$r->{partition_a}}),
+        join(",", @{$r->{partition_b}}),
+        $r->{value} == $c->{cut} ? "" : "FAIL want=#{$c->{cut}}"
+}
+
+# ── invariant 1: min cut equals expected value on every case ──────
+
+for my $c (@cases) {
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    die "cut #{$r->{value}} != expected #{$c->{cut}} on \"#{$c->{name}}\"" unless $r->{value} == $c->{cut}
+}
+
+# ── invariant 2: reported partition has the reported cut weight ───
+
+for my $c (@cases) {
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    my $w = Mc::partition_weight($W, $r->{partition_a})
+    die "partition weight #{$w} != reported #{$r->{value}} on \"#{$c->{name}}\"" unless $w == $r->{value}
+}
+
+# ── invariant 3: both sides of the partition are non-empty ────────
+
+for my $c (@cases) {
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    die "partition A empty on \"#{$c->{name}}\"" unless len(@{$r->{partition_a}}) > 0
+    die "partition B empty on \"#{$c->{name}}\"" unless len(@{$r->{partition_b}}) > 0
+}
+
+# ── invariant 4: partitions cover every vertex exactly once ───────
+
+for my $c (@cases) {
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    my $total = len(@{$r->{partition_a}}) + len(@{$r->{partition_b}})
+    die "partition cover #{$total} != n #{$c->{n}} on \"#{$c->{name}}\"" unless $total == $c->{n}
+    my %seen
+    for my $v (@{$r->{partition_a}}, @{$r->{partition_b}}) {
+        die "vertex #{$v} in both partitions on \"#{$c->{name}}\"" if exists $seen{$v}
+        $seen{$v} = 1
+    }
+}
+
+# ── invariant 5: Stoer-Wagner agrees with brute force (n ≤ 8) ─────
+
+for my $c (@cases) {
+    next if $c->{n} > 8
+    my $W = Mc::from_edges($c->{n}, $c->{edges})
+    my $r = Mc::min_cut($W)
+    my $bt = Mc::brute_min_cut($W)
+    die "Stoer-Wagner #{$r->{value}} != brute #{$bt} on \"#{$c->{name}}\"" unless $r->{value} == $bt
+}
+
+# ── invariant 6: bridge-graph cut chooses the bridge edge ─────────
+
+my $bridge = $cases[4]
+my $bW = Mc::from_edges($bridge->{n}, $bridge->{edges})
+my $br = Mc::min_cut($bW)
+my %a_set
+for my $v (@{$br->{partition_a}}) { $a_set{$v} = 1 }
+my $side_size = len(@{$br->{partition_a}})
+die "bridge partition must have one side of size 3" unless $side_size == 3
+# The two sides are {0,1,2} and {3,4,5}; check the partition is one of those.
+my $is_clean = (exists $a_set{0} && exists $a_set{1} && exists $a_set{2} && !exists $a_set{3} && !exists $a_set{4} && !exists $a_set{5}) || (!exists $a_set{0} && !exists $a_set{1} && !exists $a_set{2} && exists $a_set{3} && exists $a_set{4} && exists $a_set{5})
+die "bridge cut must split {0,1,2}|{3,4,5}" unless $is_clean
+
+p ""
+p "── all six invariants satisfied ──────────────────────"
