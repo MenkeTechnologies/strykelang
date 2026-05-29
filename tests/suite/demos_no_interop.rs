@@ -270,3 +270,4 @@ demo_runs_no_interop!(demo_ukkonen_suffix_tree, "examples/ukkonen_suffix_tree_no
 demo_runs_no_interop!(demo_prolog_engine, "examples/prolog_engine_no_interop.stk");
 demo_runs_no_interop!(demo_chess_engine, "examples/chess_engine_no_interop.stk");
 demo_runs_no_interop!(demo_hindley_milner, "examples/hindley_milner_no_interop.stk");
+demo_runs_no_interop!(demo_sql_engine, "examples/sql_engine_no_interop.stk");
