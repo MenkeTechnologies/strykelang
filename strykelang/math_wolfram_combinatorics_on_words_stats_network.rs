@@ -169,6 +169,12 @@ fn builtin_theil_sen_slope(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let ys: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
     let n = xs.len().min(ys.len());
+    // Need at least 2 points for a slope; `0..n - 1` usize-underflows
+    // when n=0, and is empty when n=1 (median lookup on empty
+    // slopes would panic). Bail with NaN to signal "undefined".
+    if n < 2 {
+        return Ok(StrykeValue::float(f64::NAN));
+    }
     let mut slopes: Vec<f64> = Vec::new();
     for i in 0..n - 1 { for j in i + 1..n {
         let dx = xs[j] - xs[i];

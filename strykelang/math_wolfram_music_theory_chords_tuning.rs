@@ -202,7 +202,9 @@ fn builtin_equal_tempered_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue
 /// freq, interval semitones (0..11). 5-limit JI ratios per ratio table.
 fn builtin_just_intonation_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
-    let semis = i1(&args[1..]).rem_euclid(12);
+    // Use `args.get(1..)` to avoid panicking when `args` is empty —
+    // `&args[1..]` requires `args.len() >= 1`.
+    let semis = i1(args.get(1..).unwrap_or(&[])).rem_euclid(12);
     let ratios = [
         1.0_f64, 16.0/15.0, 9.0/8.0, 6.0/5.0, 5.0/4.0, 4.0/3.0,
         45.0/32.0, 3.0/2.0, 8.0/5.0, 5.0/3.0, 9.0/5.0, 15.0/8.0,
@@ -213,7 +215,7 @@ fn builtin_just_intonation_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValu
 /// Pythagorean tuning: ratios via stacked perfect 5ths (3/2)^n / 2^k.
 fn builtin_pythagorean_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
-    let semis = i1(&args[1..]).rem_euclid(12);
+    let semis = i1(args.get(1..).unwrap_or(&[])).rem_euclid(12);
     let ratios = [
         1.0_f64, 256.0/243.0, 9.0/8.0, 32.0/27.0, 81.0/64.0, 4.0/3.0,
         729.0/512.0, 3.0/2.0, 128.0/81.0, 27.0/16.0, 16.0/9.0, 243.0/128.0,
@@ -225,7 +227,7 @@ fn builtin_pythagorean_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// 696.578 cents). Cleaner thirds at the cost of impure fifths.
 fn builtin_mean_tone_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
-    let semis = i1(&args[1..]).rem_euclid(12);
+    let semis = i1(args.get(1..).unwrap_or(&[])).rem_euclid(12);
     let fifth = 5f64.powf(1.0 / 4.0);
     let cents_per_step = [0.0_f64, 76.0, 193.0, 310.0, 386.0, 503.0, 580.0,
                           697.0, 773.0, 890.0, 1007.0, 1083.0];
@@ -236,7 +238,7 @@ fn builtin_mean_tone_freq(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// Werckmeister III "well-tempered": closest ratios from standard table.
 fn builtin_werckmeister_iii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
-    let semis = i1(&args[1..]).rem_euclid(12);
+    let semis = i1(args.get(1..).unwrap_or(&[])).rem_euclid(12);
     let cents = [0.0_f64, 90.225, 192.180, 294.135, 390.225, 498.045,
                  588.270, 696.090, 792.180, 888.270, 996.090, 1092.180];
     Ok(StrykeValue::float(tonic * 2f64.powf(cents[semis as usize] / 1200.0)))
@@ -245,7 +247,7 @@ fn builtin_werckmeister_iii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// Kirnberger III well-tempered tuning.
 fn builtin_kirnberger_iii(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let tonic = f1(args);
-    let semis = i1(&args[1..]).rem_euclid(12);
+    let semis = i1(args.get(1..).unwrap_or(&[])).rem_euclid(12);
     let cents = [0.0_f64, 90.225, 193.157, 294.135, 386.314, 498.045,
                  590.224, 696.578, 792.180, 889.735, 996.089, 1088.269];
     Ok(StrykeValue::float(tonic * 2f64.powf(cents[semis as usize] / 1200.0)))

@@ -1752,6 +1752,11 @@ fn builtin_histogram_equalize(args: &[StrykeValue]) -> StrykeResult<StrykeValue>
                 .collect()
         })
         .collect();
+    // Empty image → nothing to equalize. Without this guard the
+    // `img[0].len()` access below OOB-panics.
+    if img.is_empty() || img[0].is_empty() {
+        return Ok(matrix_to_value(&[]));
+    }
     let mut hist = [0_usize; 256];
     let mut total = 0_usize;
     for row in &img {

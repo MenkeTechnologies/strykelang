@@ -137,6 +137,11 @@ fn builtin_countif(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 /// AVERAGEIF
 fn builtin_averageif(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // Empty argv → no range to average. Without this guard the
+    // `args[0]` clone below OOB-panics.
+    if args.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
     let s = builtin_sumif(args)?.to_number();
     let n = builtin_countif(&[args[0].clone(),
         args.get(2).cloned().unwrap_or(StrykeValue::float(0.0)),

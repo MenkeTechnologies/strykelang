@@ -27,6 +27,12 @@ fn builtin_sparse_csr_mul_vec(args: &[StrykeValue]) -> StrykeResult<StrykeValue>
         .iter().map(|v| v.to_number() as usize).collect();
     let x: Vec<f64> = arg_to_vec(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF))
         .iter().map(|v| v.to_number()).collect();
+    // CSR row_ptr has one more entry than the number of rows. An
+    // empty row_ptr → no matrix; return an empty result vector.
+    // Without this guard `row_ptr.len() - 1` usize-underflows.
+    if row_ptr.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
     let n = row_ptr.len() - 1;
     let mut y = vec![0.0_f64; n];
     for i in 0..n {

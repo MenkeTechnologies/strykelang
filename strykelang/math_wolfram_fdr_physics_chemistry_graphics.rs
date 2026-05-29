@@ -144,12 +144,18 @@ fn builtin_wasserstein_1d(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         .collect();
     a.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
     b.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
-    let n = a.len().min(b.len()).max(1);
+    // Without this guard, `n = min(0,0).max(1) = 1` enters the loop
+    // and `a[0]`/`b[0]` OOB-panic on empty inputs. Wasserstein
+    // distance between empty distributions is conventionally 0.
+    let real_n = a.len().min(b.len());
+    if real_n == 0 {
+        return Ok(StrykeValue::float(0.0));
+    }
     let mut s = 0.0_f64;
-    for i in 0..n {
+    for i in 0..real_n {
         s += (a[i] - b[i]).abs();
     }
-    Ok(StrykeValue::float(s / n as f64))
+    Ok(StrykeValue::float(s / real_n as f64))
 }
 
 /// `chi_squared_divergence` — Chi squared divergence. Returns a float.
@@ -330,6 +336,16 @@ fn builtin_freezing_point_depression(args: &[StrykeValue]) -> StrykeResult<Stryk
 fn builtin_mixed_nash_2x2(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let p1 = matrix_from_value(&args.first().cloned().unwrap_or(StrykeValue::UNDEF));
     let p2 = matrix_from_value(&args.get(1).cloned().unwrap_or(StrykeValue::UNDEF));
+    // Both payoff matrices must be at least 2×2. Without this guard
+    // the `p1[0][0]` / `p2[1][1]` / etc. accesses below OOB-panic
+    // on missing or malformed inputs.
+    let ok_shape = |m: &[Vec<f64>]| m.len() >= 2 && m[0].len() >= 2 && m[1].len() >= 2;
+    if !ok_shape(&p1) || !ok_shape(&p2) {
+        return Ok(StrykeValue::array(vec![
+            StrykeValue::float(f64::NAN),
+            StrykeValue::float(f64::NAN),
+        ]));
+    }
     let denom_p = (p2[0][0] - p2[0][1] - p2[1][0] + p2[1][1]).abs();
     let denom_q = (p1[0][0] - p1[0][1] - p1[1][0] + p1[1][1]).abs();
     if denom_p < 1e-12 || denom_q < 1e-12 {

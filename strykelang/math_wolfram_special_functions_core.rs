@@ -2689,7 +2689,14 @@ fn builtin_debruijn_sequence(args: &[StrykeValue]) -> StrykeResult<StrykeValue> 
     let (k, n) = i2(args);
     let k = k.max(1) as usize;
     let n = n.max(1) as usize;
-    let mut a = vec![0_usize; k * n];
+    // Inner recursion's `a[t]` / `a[t - p]` indexing requires `a.len()
+    // >= n + 1` (the recursion walks `t` from 1 to n inclusive, then
+    // emits `seq.push(a[i])` for `i in 1..=p ≤ n`). The original
+    // allocator `vec![0; k * n]` produces only `k * n` slots which
+    // can be < `n + 1` for k=1; the worst case (k=1, n=1) allocates
+    // 1 slot but the recursion writes to `a[1]`. Pad to at least
+    // `n + 1` to keep the recursion safe for every (k, n) pair.
+    let mut a = vec![0_usize; (k * n).max(n + 1)];
     let mut sequence: Vec<i64> = Vec::new();
     fn db(t: usize, p: usize, k: usize, n: usize, a: &mut Vec<usize>, seq: &mut Vec<i64>) {
         if t > n {

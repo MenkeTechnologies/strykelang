@@ -121,7 +121,8 @@ fn builtin_ll1_follow_set(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 fn builtin_ll1_predict_table(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let nt = i1(args);
     let t = args.get(1).map(|v| v.to_number() as i64).unwrap_or(0);
-    let prods = i1(&args[2..]);
+    // `&args[2..]` panics when `args.len() < 2`; use `.get(2..)`.
+    let prods = i1(args.get(2..).unwrap_or(&[]));
     Ok(StrykeValue::integer(if nt > 0 && t >= 0 && prods > 0 { 1 } else { 0 }))
 }
 
