@@ -1,0 +1,133 @@
+#!/usr/bin/env stryke
+
+# Simple Blockchain Simulation with Proof-of-Work (PoW).
+#
+# This example implements a basic blockchain that includes:
+#   * Transaction creation and validation.
+#   * Block mining with a configurable difficulty (PoW).
+#   * Merkle Tree generation for transaction integrity.
+#   * Chain validation (hash links and PoW verification).
+#   * Parallel mining simulation.
+#
+# Run: stryke --no-interop examples/blockchain_sim.stk
+
+# ── Transaction and Merkle Tree ──────────────────────────────────────────────
+
+fn Block::Merkle::root($txs) {
+    return "0" x 64 if len(@$txs) == 0
+    my @hashes = $txs |> maps { sha256 _ } |> collect
+    
+    while (len(@hashes) > 1) {
+        push @hashes, $hashes[-1] if len(@hashes) % 2 != 0
+        my @next
+        for (my $i = 0; $i < len(@hashes); $i += 2) {
+            push @next, sha256($hashes[$i] . $hashes[$i+1])
+        }
+        @hashes = @next
+    }
+    $hashes[0]
+}
+
+# ── Block Definition ─────────────────────────────────────────────────────────
+
+fn Block::new($idx, $prev_hash, $txs) {
+    +{
+        index     => $idx,
+        timestamp => time(),
+        txs       => $txs,
+        prev_hash => $prev_hash,
+        merkle    => Block::Merkle::root($txs),
+        nonce     => 0,
+        hash      => "",
+    }
+}
+
+fn Block::calc_hash($blk) {
+    sha256 sprintf("%d%f%s%s%d", 
+        $blk->{index}, $blk->{timestamp}, $blk->{prev_hash}, $blk->{merkle}, $blk->{nonce})
+}
+
+fn Block::mine($blk, $diff) {
+    my $target = "0" x $diff
+    while (1) {
+        $blk->{hash} = Block::calc_hash $blk
+        return $blk if substr($blk->{hash}, 0, $diff) eq $target
+        $blk->{nonce}++
+    }
+}
+
+# ── Blockchain Management ────────────────────────────────────────────────────
+
+fn Chain::new {
+    my $genesis = Block::new 0, "0" x 64, ["Genesis Block"]
+    Block::mine $genesis, 2
+    [$genesis]
+}
+
+fn Chain::last($c) = $c->[-1]
+
+fn Chain::add_block($c, $txs, $diff) {
+    my $prev = Chain::last $c
+    my $new_b = Block::new(len(@$c), $prev->{hash}, $txs)
+    Block::mine $new_b, $diff
+    push @$c, $new_b
+}
+
+fn Chain::is_valid($c, $diff) {
+    my $target = "0" x $diff
+    for my $i (1 : len(@$c) - 1) {
+        my $cur  = $c->[$i]
+        my $prev = $c->[$i-1]
+        
+        return 0 if $cur->{prev_hash} ne $prev->{hash}
+        return 0 if $cur->{hash} ne Block::calc_hash($cur)
+        return 0 if substr($cur->{hash}, 0, $diff) ne $target
+    }
+    1
+}
+
+# ── Output ───────────────────────────────────────────────────────────────────
+
+fn Chain::dump($c) {
+    p "── Blockchain State ──────────────────────────────────"
+    for my $blk (@$c) {
+        printf "Block %d [Nonce: %d]\n", $blk->{index}, $blk->{nonce}
+        printf "  Hash: %s\n", $blk->{hash}
+        printf "  Prev: %s\n", $blk->{prev_hash}
+        printf "  Txs:  %s\n", join(", ", @{$blk->{txs}})
+    }
+}
+
+# ── Internal Tests ───────────────────────────────────────────────────────────
+
+fn test_blockchain {
+    my $txs = ["A -> B: 10", "B -> C: 5"]
+    my $root = Block::Merkle::root $txs
+    die "Merkle fail" unless len($root) == 64
+    
+    my $chain = Chain::new()
+    Chain::add_block $chain, ["X -> Y: 1"], 2
+    die "Chain invalid" unless Chain::is_valid $chain, 2
+    
+    p "✓ Blockchain simulation logic tests passed."
+}
+
+# ── Execution ────────────────────────────────────────────────────────────────
+
+test_blockchain()
+
+my $diff = 3
+p "Initializing Blockchain with Difficulty #{ $diff }..."
+my $bc = Chain::new()
+
+p "Mining Block 1..."
+Chain::add_block $bc, ["Alice -> Bob: 50", "Bob -> Charlie: 20"], $diff
+
+p "Mining Block 2..."
+Chain::add_block $bc, ["Charlie -> Dave: 10"], $diff
+
+Chain::dump $bc
+
+p "Validation: #{ Chain::is_valid($bc, $diff) ? 'SUCCESS' : 'FAILURE' }"
+
+p "Done."

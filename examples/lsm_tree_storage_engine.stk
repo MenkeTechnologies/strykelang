@@ -1,0 +1,279 @@
+#!/usr/bin/env stryke
+
+# Log-Structured Merge (LSM) Tree Storage Engine.
+#
+# A high-performance write-optimized storage engine simulation.
+# Features:
+#   * Memtable: In-memory sorted buffer (using Binary Search).
+#   * WAL (Write-Ahead Log): Durability for in-memory data.
+#   * SSTables (Sorted String Tables): Immutable on-disk files.
+#   * Bloom Filters: Probabilistic check to skip SSTable reads.
+#   * Compaction: Merging multiple SSTables into a single one (Level 0).
+#   * Versioning: Support for deletes (tombstones).
+#
+# Run: stryke --no-interop examples/lsm_tree_storage_engine.stk
+
+# ── Hashing for Bloom Filter ────────────────────────────────────────────────
+
+fn LSM::Hash::fnv1a($data) {
+    my $hash = 2166136261
+    for my $char (split "", $data) {
+        $hash ^= ord($char)
+        $hash *= 16777619
+        $hash &= 0xFFFFFFFF
+    }
+    $hash
+}
+
+fn LSM::Hash::murmur3($data) {
+    # Simple XOR-shift fallback for a second hash
+    my $hash = 3323198485
+    for my $char (split "", $data) {
+        $hash ^= ord($char)
+        $hash ^= ($hash >> 16)
+        $hash *= 0x85ebca6b
+        $hash &= 0xFFFFFFFF
+    }
+    $hash
+}
+
+# ── Bloom Filter ─────────────────────────────────────────────────────────────
+
+fn LSM::BloomFilter::new($size=1024) {
+    +{
+        bits => [(0) x $size],
+        size => $size
+    }
+}
+
+fn LSM::BloomFilter::add($bf, $key) {
+    my $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
+    my $h2 = LSM::Hash::murmur3($key) % $bf->{size}
+    $bf->{bits}->[$h1] = 1
+    $bf->{bits}->[$h2] = 1
+}
+
+fn LSM::BloomFilter::check($bf, $key) {
+    my $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
+    my $h2 = LSM::Hash::murmur3($key) % $bf->{size}
+    $bf->{bits}->[$h1] && $bf->{bits}->[$h2]
+}
+
+# ── Memtable (Sorted Array) ──────────────────────────────────────────────────
+
+fn LSM::Memtable::new = []
+
+fn LSM::Memtable::set($mem, $key, $val) {
+    # Find insertion point via binary search
+    my $low = 0
+    my $high = len(@$mem) - 1
+    while ($low <= $high) {
+        my $mid = int(($low + $high) / 2)
+        if ($mem->[$mid]->[0] eq $key) {
+            $mem->[$mid]->[1] = $val
+            return
+        }
+        $mem->[$mid]->[0] lt $key ? ($low = $mid + 1) : ($high = $mid - 1)
+    }
+    splice(@$mem, $low, 0, [$key, $val])
+}
+
+fn LSM::Memtable::get($mem, $key) {
+    my $low = 0
+    my $high = len(@$mem) - 1
+    while ($low <= $high) {
+        my $mid = int(($low + $high) / 2)
+        return $mem->[$mid]->[1] if $mem->[$mid]->[0] eq $key
+        $mem->[$mid]->[0] lt $key ? ($low = $mid + 1) : ($high = $mid - 1)
+    }
+    undef
+}
+
+# ── SSTable (Immutable) ──────────────────────────────────────────────────────
+
+fn LSM::SSTable::new($id, $data) {
+    my $bf = LSM::BloomFilter::new(len(@$data) * 10)
+    for my $entry (@$data) {
+        LSM::BloomFilter::add $bf, $entry->[0]
+    }
+    +{
+        id    => $id,
+        data  => $data, # In a real system, this would be on disk
+        bloom => $bf,
+        min   => $data->[0]->[0],
+        max   => $data->[-1]->[0]
+    }
+}
+
+fn LSM::SSTable::get($ss, $key) {
+    # 1. Check Bloom Filter
+    return undef unless LSM::BloomFilter::check $ss->{bloom}, $key
+    
+    # 2. Check Range
+    return undef if $key lt $ss->{min} || $key gt $ss->{max}
+    
+    # 3. Binary Search in data
+    my $low = 0
+    my $high = len(@{$ss->{data}}) - 1
+    while ($low <= $high) {
+        my $mid = int(($low + $high) / 2)
+        my $cur = $ss->{data}->[$mid]
+        return $cur->[1] if $cur->[0] eq $key
+        $cur->[0] lt $key ? ($low = $mid + 1) : ($high = $mid - 1)
+    }
+    undef
+}
+
+# ── LSM Engine ───────────────────────────────────────────────────────────────
+
+fn LSM::Engine::new($max_mem=5) {
+    +{
+        memtable  => LSM::Memtable::new(),
+        sstables  => [], # Level 0 SSTables (newest first)
+        max_mem   => $max_mem,
+        next_id   => 1,
+        wal       => [] # Simulated WAL
+    }
+}
+
+fn LSM::Engine::set($eng, $key, $val) {
+    # 1. Write to WAL
+    push @{$eng->{wal}}, [$key, $val]
+    
+    # 2. Write to Memtable
+    LSM::Memtable::set $eng->{memtable}, $key, $val
+    
+    # 3. Flush if Memtable full
+    if (len(@{$eng->{memtable}}) >= $eng->{max_mem}) {
+        LSM::Engine::flush $eng
+    }
+}
+
+fn LSM::Engine::flush($eng) {
+    return if len(@{$eng->{memtable}}) == 0
+    
+    p "Flushing memtable to SSTable #{$eng->{next_id}}..."
+    my $ss = LSM::SSTable::new($eng->{next_id}++, [ @{$eng->{memtable}} ])
+    unshift @{$eng->{sstables}}, $ss
+    
+    # Clear memtable and WAL
+    $eng->{memtable} = LSM::Memtable::new()
+    $eng->{wal} = []
+    
+    # Trigger compaction if too many SSTables
+    if (len(@{$eng->{sstables}}) >= 4) {
+        LSM::Engine::compact $eng
+    }
+}
+
+fn LSM::Engine::get($eng, $key) {
+    # 1. Check Memtable
+    my $val = LSM::Memtable::get $eng->{memtable}, $key
+    if (defined $val) {
+        return $val eq "__TOMBSTONE__" ? undef : $val
+    }
+    
+    # 2. Check SSTables (Level 0 - linear search newest to oldest)
+    for my $ss (@{$eng->{sstables}}) {
+        $val = LSM::SSTable::get $ss, $key
+        if (defined $val) {
+            return $val eq "__TOMBSTONE__" ? undef : $val
+        }
+    }
+    undef
+}
+
+fn LSM::Engine::delete($eng, $key) {
+    LSM::Engine::set $eng, $key, "__TOMBSTONE__"
+}
+
+# ── Compaction (Merge Sort) ──────────────────────────────────────────────────
+
+fn LSM::Engine::compact($eng) {
+    p "Compacting #{len(@{$eng->{sstables}})} SSTables..."
+    
+    # Merge all SSTables into one using K-way merge (simplified here)
+    my %merged
+    # We iterate newest to oldest so we keep the latest version
+    for my $ss (rev @{$eng->{sstables}}) {
+        for my $entry (@{$ss->{data}}) {
+            $merged{$entry->[0]} = $entry->[1]
+        }
+    }
+    
+    # Sort merged keys
+    my @sorted_keys = sort { _0 cmp _1 } keys %merged
+    my @merged_data = @sorted_keys |> maps { [_, $merged{_}] } |> collect
+    
+    # Filter tombstones at final level (simplified)
+    @merged_data = @merged_data |> greps { _->[1] ne "__TOMBSTONE__" } |> collect
+    
+    my $new_ss = LSM::SSTable::new($eng->{next_id}++, \@merged_data)
+    $eng->{sstables} = [$new_ss]
+    
+    p "Compaction complete. New SSTable ID: #{$new_ss->{id}}, Size: #{len @merged_data}"
+}
+
+# ── Internal Tests ───────────────────────────────────────────────────────────
+
+fn test_lsm_engine {
+    my $eng = LSM::Engine::new 3
+    
+    LSM::Engine::set $eng, "apple",  "10"
+    LSM::Engine::set $eng, "banana", "20"
+    LSM::Engine::set $eng, "cherry", "30" # This should trigger flush if max_mem was 3
+    
+    die "Memtable mismatch" unless LSM::Engine::get($eng, "apple")  eq "10"
+    die "Memtable mismatch" unless LSM::Engine::get($eng, "banana") eq "20"
+    
+    LSM::Engine::set $eng, "date",   "40"
+    LSM::Engine::set $eng, "elder",  "50"
+    LSM::Engine::set $eng, "fig",    "60" # Another flush
+    
+    LSM::Engine::delete $eng, "banana"
+    die "Delete fail" if defined LSM::Engine::get($eng, "banana")
+    
+    LSM::Engine::set $eng, "grape",  "70"
+    LSM::Engine::set $eng, "honey",  "80"
+    LSM::Engine::set $eng, "ice",    "90" # Another flush
+    
+    LSM::Engine::set $eng, "jelly",  "100"
+    LSM::Engine::set $eng, "kiwi",   "110"
+    LSM::Engine::set $eng, "lemon",  "120" # Another flush -> triggers compaction
+    
+    die "LSM Get fail" unless LSM::Engine::get($eng, "apple") eq "10"
+    die "LSM Get fail" unless LSM::Engine::get($eng, "lemon") eq "120"
+    die "LSM Get fail" if defined LSM::Engine::get($eng, "banana")
+    
+    p "✓ LSM Storage Engine tests passed."
+}
+
+# ── Main Execution ───────────────────────────────────────────────────────────
+
+test_lsm_engine()
+
+p ""
+p "── Interactive LSM Demo ──"
+my $db = LSM::Engine::new 10
+
+# Bulk insert
+p "Inserting 100 items..."
+for my $i (1 : 100) {
+    LSM::Engine::set $db, sprintf("user_%03d", $i), "data_#{rand()}"
+}
+
+# Update some
+LSM::Engine::set $db, "user_050", "UPDATED_VALUE"
+
+# Read back
+my $u50 = LSM::Engine::get $db, "user_050"
+p "user_050: $u50"
+
+my $u99 = LSM::Engine::get $db, "user_099"
+p "user_099: $u99"
+
+p "Current SSTable count: #{len @{$db->{sstables}}}"
+LSM::Engine::flush $db # Manual flush
+p "Final SSTable count: #{len @{$db->{sstables}}}"
+
+p "Done."

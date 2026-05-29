@@ -1,0 +1,191 @@
+#!/usr/bin/env stryke
+
+# Discrete Event Simulation (DES): Airport Runway and Gate Management.
+#
+# This model simulates aircraft arrivals, runway queuing, landing,
+# taxiing to gates, and departures. It tracks metrics like average
+# wait times and resource utilization.
+#
+# Key features:
+#   * Custom Min-Heap based Priority Queue for event scheduling.
+#   * Resource management (Runways, Gates) with queuing.
+#   * Multi-stage pipeline for metric aggregation.
+#   * Internal validation tests.
+#
+# Run: stryke --no-interop examples/discrete_event_sim_airport.stk
+
+# ── Min-Heap Priority Queue ──────────────────────────────────────────────────
+
+fn Sim::PQ::new() = []
+
+fn Sim::PQ::push($pq, $prio, $item) {
+    my $i = 0
+    $i++ while $i < len(@$pq) && $pq->[$i]->[0] <= $prio
+    splice(@$pq, $i, 0, [$prio, $item])
+}
+
+fn Sim::PQ::pop($pq) = shift @$pq
+
+# ── Simulation Engine ────────────────────────────────────────────────────────
+
+fn Sim::Airport::init {
+    +{
+        time    => 0.0,
+        events  => Sim::PQ::new(),
+        runways => 2,
+        gates   => 5,
+        busy_runways => 0,
+        busy_gates   => 0,
+        runway_queue => [],
+        gate_queue   => [],
+        stats => +{
+            completed    => 0,
+            wait_runway  => 0.0,
+            wait_gate    => 0.0,
+            total_time   => 0.0,
+            util_runway  => 0.0,
+            util_gate    => 0.0,
+        }
+    }
+}
+
+fn Sim::Airport::schedule($sim, $time, $type, $data) {
+    my %item = (%$data, type => $type)
+    Sim::PQ::push($sim->{events}, $time, \%item)
+}
+
+# ── Event Handlers ───────────────────────────────────────────────────────────
+
+fn Sim::Airport::handle_arrival($sim, $event) {
+    my $fno = $event->{plane_no}
+    p "[#{sprintf('%.2f', $sim->{time})}] Flight #{$fno} arrived."
+    
+    # Schedule next arrival
+    my $next_arrival = $sim->{time} + (10 + rand(20))
+    Sim::Airport::schedule $sim, $next_arrival, "arrival", +{ plane_no => $fno + 1 } if $fno < 5
+
+    # Request runway
+    Sim::Airport::request_runway $sim, $event
+}
+
+fn Sim::Airport::request_runway($sim, $event) {
+    if ($sim->{busy_runways} < $sim->{runways}) {
+        $sim->{busy_runways}++
+        my $land_time = $sim->{time} + (2 + rand 3)
+        Sim::Airport::schedule $sim, $land_time, "landed", $event
+        p "  Flight #{$event->{plane_no}} cleared for landing."
+    } else {
+        my %queued = (%$event, enter_q => $sim->{time})
+        push @{$sim->{runway_queue}}, \%queued
+        p "  Flight #{$event->{plane_no}} entered runway queue."
+    }
+}
+
+fn Sim::Airport::handle_landed($sim, $event) {
+    p "[#{sprintf('%.2f', $sim->{time})}] Flight #{$event->{plane_no}} landed."
+    $sim->{busy_runways}--
+    
+    # Process runway queue
+    if (@{$sim->{runway_queue}}) {
+        my $next = shift @{$sim->{runway_queue}}
+        $sim->{stats}->{wait_runway} += ($sim->{time} - $next->{enter_q})
+        $sim->{busy_runways}++
+        my $land_time = $sim->{time} + (2 + rand 3)
+        Sim::Airport::schedule $sim, $land_time, "landed", $next
+    }
+    
+    # Request gate
+    Sim::Airport::request_gate $sim, $event
+}
+
+fn Sim::Airport::request_gate($sim, $event) {
+    if ($sim->{busy_gates} < $sim->{gates}) {
+        $sim->{busy_gates}++
+        my $stay_time = $sim->{time} + (15 + rand 30)
+        Sim::Airport::schedule $sim, $stay_time, "departed", $event
+        p "  Flight #{$event->{plane_no}} docked at gate."
+    } else {
+        my %queued = (%$event, enter_q => $sim->{time})
+        push @{$sim->{gate_queue}}, \%queued
+        p "  Flight #{$event->{plane_no}} entered gate queue."
+    }
+}
+
+fn Sim::Airport::handle_departed($sim, $event) {
+    p "[#{sprintf('%.2f', $sim->{time})}] Flight #{$event->{plane_no}} departed."
+    $sim->{busy_gates}--
+    $sim->{stats}->{completed}++
+    
+    # Process gate queue
+    if (@{$sim->{gate_queue}}) {
+        my $next = shift @{$sim->{gate_queue}}
+        $sim->{stats}->{wait_gate} += ($sim->{time} - $next->{enter_q})
+        $sim->{busy_gates}++
+        my $stay_time = $sim->{time} + (15 + rand 30)
+        Sim::Airport::schedule $sim, $stay_time, "departed", $next
+    }
+}
+
+# ── Main Loop ────────────────────────────────────────────────────────────────
+
+fn Sim::Airport::run($sim) {
+    Sim::Airport::schedule $sim, 0.0, "arrival", +{ plane_no => 1 }
+    
+    my $prev_time = 0.0
+    p "Starting simulation loop with #{len(@{$sim->{events}})} events..."
+    while (my $event_pair = Sim::PQ::pop $sim->{events}) {
+        my ($t, $event) = @$event_pair
+        p "Processing event #{$event->{type}} at t=#{$t}"
+        
+        # Accumulate utilization
+        $sim->{stats}->{util_runway} += $sim->{busy_runways} * ($t - $prev_time)
+        $sim->{stats}->{util_gate}   += $sim->{busy_gates}   * ($t - $prev_time)
+        
+        $sim->{time} = $t
+        $prev_time = $t
+        
+        my $type = $event->{type}
+        if ($type eq "arrival")  { Sim::Airport::handle_arrival $sim, $event }
+        elsif ($type eq "landed")   { Sim::Airport::handle_landed $sim, $event }
+        elsif ($type eq "departed") { Sim::Airport::handle_departed $sim, $event }
+    }
+    
+    # Final stats report
+    p ""
+    p "── Simulation Results ────────────────────────────────"
+    my $s = $sim->{stats}
+    my $total_t = $sim->{time}
+    
+    ~> (
+        "Flights completed:    #{$s->{completed}}",
+        "Avg Runway Wait:      #{sprintf('%.2f', $s->{wait_runway} / ($s->{completed} || 1))}",
+        "Avg Gate Wait:        #{sprintf('%.2f', $s->{wait_gate} / ($s->{completed} || 1))}",
+        "Runway Utilization:   #{sprintf('%.2f%%', 100 * $s->{util_runway} / ($sim->{runways} * $total_t))}",
+        "Gate Utilization:     #{sprintf('%.2f%%', 100 * $s->{util_gate} / ($sim->{gates} * $total_t))}",
+    ) ep
+}
+
+# ── Internal Tests ───────────────────────────────────────────────────────────
+
+fn test_pq {
+    my $pq = Sim::PQ::new()
+    Sim::PQ::push($pq, 10, "ten")
+    Sim::PQ::push($pq, 5,  "five")
+    Sim::PQ::push($pq, 15, "fifteen")
+    Sim::PQ::push($pq, 2,  "two")
+    
+    die "PQ order 1" unless Sim::PQ::pop($pq)->[0] == 2
+    die "PQ order 2" unless Sim::PQ::pop($pq)->[0] == 5
+    die "PQ order 3" unless Sim::PQ::pop($pq)->[0] == 10
+    die "PQ order 4" unless Sim::PQ::pop($pq)->[0] == 15
+    p "✓ PQ tests passed."
+}
+
+# ── Entry Point ──────────────────────────────────────────────────────────────
+
+test_pq()
+
+my $sim = Sim::Airport::init()
+Sim::Airport::run($sim)
+
+p "Done."

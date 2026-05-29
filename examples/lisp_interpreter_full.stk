@@ -1,0 +1,199 @@
+#!/usr/bin/env stryke
+
+# Full Lisp Interpreter (Stryke-Lisp).
+#
+# A "long and complicated" demonstration of parsing, recursive evaluation,
+# and lexical scoping in Stryke.
+#
+# Features:
+#   * Recursive Descent Parser for S-expressions.
+#   * Lexical Scoping with parent environment chains.
+#   * Lambda functions (closures) with capture support.
+#   * Tail-call-like recursion support (internal loop for eval).
+#   * Extensive standard library: math, logic, list manipulation.
+#
+# Run: stryke --no-interop examples/lisp_interpreter_full.stk
+
+# ── Lexer ───────────────────────────────────────────────────────────────────
+
+fn Lisp::tokenize($s) {
+    $s =~ s/'([\w:-]+)/ ( quote $1 ) /g
+    $s =~ s/\(/ ( /g
+    $s =~ s/\)/ ) /g
+    my @toks = $s |> split(/\s+/) |> greps { len(_) > 0 } |> collect
+    \@toks
+}
+
+# ── Parser ──────────────────────────────────────────────────────────────────
+
+fn Lisp::parse_atoms($toks) {
+    die "Unexpected EOF" if len(@$toks) == 0
+    my $t = shift @$toks
+    
+    if ($t eq "(") {
+        my @list
+        while ($toks->[0] ne ")") {
+            push @list, Lisp::parse_atoms $toks
+        }
+        shift @$toks # consume ")"
+        \@list
+    } elsif ($t eq ")") {
+        die "Unexpected )"
+    } else {
+        # Number or Symbol
+        $t =~ /^-?\d+(\.\d+)?$/ ? (0.0 + $t) : $t
+    }
+}
+
+# ── Environment ──────────────────────────────────────────────────────────────
+
+fn Lisp::Env::new($parent=undef, $binds=+{}) {
+    +{
+        parent => $parent,
+        binds  => $binds
+    }
+}
+
+fn Lisp::Env::get($env, $key) {
+    return $env->{binds}->{$key} if exists $env->{binds}->{$key}
+    return Lisp::Env::get($env->{parent}, $key) if $env->{parent}
+    die "Undefined symbol: $key"
+}
+
+fn Lisp::Env::set($env, $key, $val) {
+    $env->{binds}->{$key} = $val
+}
+
+# ── Builtins ────────────────────────────────────────────────────────────────
+
+fn Lisp::Env::std {
+    my $e = Lisp::Env::new()
+    $e->{binds} = +{
+        "+"      => fn { my $s = 0; $s += _ for @_; $s },
+        "-"      => fn { _0 - _1 },
+        "*"      => fn { my $p = 1; $p *= _ for @_; $p },
+        "/"      => fn { _0 / _1 },
+        "="      => fn { _0 == _1 ? 1 : 0 },
+        "<"      => fn { _0 < _1 ? 1 : 0 },
+        ">"      => fn { _0 > _1 ? 1 : 0 },
+        "list"   => fn { [ @_ ] },
+        "car"    => fn { _0->[0] },
+        "cdr"    => fn { my @c = @{_0}; shift @c; \@c },
+        "cons"   => fn { [ _0, @{_1} ] },
+        "len"    => fn { len @{_0} },
+        "p"      => fn { p @_; _[-1] },
+        "nil"    => [],
+        "true"   => 1,
+        "false"  => 0,
+    }
+    $e
+}
+
+# ── Evaluator ────────────────────────────────────────────────────────────────
+
+fn Lisp::eval($x, $env) {
+    while (1) {
+        if (!ref $x) {
+            # Symbol or Number
+            return $x if $x =~ /^-?\d+(\.\d+)?$/
+            return Lisp::Env::get $env, $x
+        }
+        
+        return $x if len(@$x) == 0 # Empty list is nil
+        
+        my ($op, @args) = @$x
+        
+        # Special Forms
+        if ($op eq "quote") {
+            return $args[0]
+        } elsif ($op eq "if") {
+            my ($test, $conseq, $alt) = @args
+            $x = Lisp::eval($test, $env) ? $conseq : $alt
+            next # TCO-like tail jump
+        } elsif ($op eq "define") {
+            my ($var, $val) = @args
+            Lisp::Env::set $env, $var, Lisp::eval($val, $env)
+            return $var
+        } elsif ($op eq "lambda") {
+            my ($params, $body) = @args
+            return fn {
+                my $new_env = Lisp::Env::new $env
+                for (my $i = 0; $i < len(@$params); $i++) {
+                    Lisp::Env::set $new_env, $params->[$i], $_[$i]
+                }
+                Lisp::eval $body, $new_env
+            }
+        } elsif ($op eq "begin") {
+            for (my $i = 0; $i < (len @args) - 1; $i++) {
+                Lisp::eval $args[$i], $env
+            }
+            $x = $args[-1]
+            next # TCO-like tail jump
+        } else {
+            # Function call
+            my $proc = Lisp::eval $op, $env
+            my @vals = @args |> maps { Lisp::eval _, $env } |> collect
+            return $proc(@vals)
+        }
+    }
+}
+
+# ── Helper for S-expression display ──────────────────────────────────────────
+
+fn Lisp::str($exp) {
+    if (ref $exp eq "ARRAY") {
+        "(" . join(" ", $exp |> maps { Lisp::str _ } |> collect) . ")"
+    } else {
+        "$exp"
+    }
+}
+
+# ── Internal Tests ───────────────────────────────────────────────────────────
+
+fn test_lisp {
+    my $env = Lisp::Env::std()
+    
+    fn eval_s($s, $e) = Lisp::eval(Lisp::parse_atoms(Lisp::tokenize($s)), $e)
+    
+    eval_s("(define x 10)", $env) |> aeq "x", "define returns var name"
+    eval_s("x", $env)             |> aeq 10,  "var lookup"
+    eval_s("(+ x 5)", $env)       |> aeq 15,  "builtin math"
+    
+    eval_s("(if (> x 5) 1 0)", $env) |> aeq 1, "if true"
+    eval_s("(if (< x 5) 1 0)", $env) |> aeq 0, "if false"
+    
+    eval_s("(define square (lambda (n) (* n n)))", $env)
+    eval_s("(square 4)", $env) |> aeq 16, "lambda call"
+    
+    eval_s("(define fact (lambda (n) (if (= n 0) 1 (* n (fact (- n 1))))))", $env)
+    eval_s("(fact 5)", $env) |> aeq 120, "recursive factorial"
+    
+    p "✓ Lisp interpreter tests passed."
+}
+
+# ── Main Execution ───────────────────────────────────────────────────────────
+
+test_lisp()
+
+p ""
+p "── Interactive Lisp Demo ──"
+my $global_env = Lisp::Env::std()
+
+my @scripts = (
+    "(define pi 3.14159)",
+    "(define area (lambda (r) (* pi (* r r))))",
+    "(p (list 'Area 'of 'circle 'with 'radius '10: (area 10)))",
+    "(define map (lambda (f l) (if (len l) (cons (f (car l)) (map f (cdr l))) nil)))",
+    "(p (list 'Squares 'of '1-5: (map (lambda (x) (* x x)) (list 1 2 3 4 5))))",
+    "(define range (lambda (a b) (if (> a b) nil (cons a (range (+ a 1) b)))))",
+    "(p (list 'Range '5-10: (range 5 10)))"
+)
+
+for my $code (@scripts) {
+    p "Lisp> $code"
+    my $ast = Lisp::parse_atoms Lisp::tokenize $code
+    my $res = Lisp::eval $ast, $global_env
+    p "  => #{Lisp::str $res}"
+}
+
+p "Done."
