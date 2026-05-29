@@ -851,4 +851,227 @@ mod tests {
         assert!(r.ok, "{}", r.err_msg);
         assert_eq!(r.result, serde_json::json!(42));
     }
+
+    // ─── framed I/O ────────────────────────────────────────────────────
+
+    #[test]
+    fn write_then_read_framed_roundtrips_payload() {
+        let payload = b"hello powerline".to_vec();
+        let mut buf = Vec::new();
+        write_framed(&mut buf, &payload).expect("write");
+        let read = read_framed(&mut buf.as_slice()).expect("read");
+        assert_eq!(read, payload);
+    }
+
+    #[test]
+    fn write_framed_emits_le_length_prefix() {
+        let mut buf = Vec::new();
+        write_framed(&mut buf, b"abc").unwrap();
+        // First 8 bytes = little-endian u64 length = 3.
+        assert_eq!(&buf[..8], &3u64.to_le_bytes());
+        assert_eq!(&buf[8..], b"abc");
+    }
+
+    #[test]
+    fn read_framed_rejects_oversized_frame() {
+        // Synthesise a header claiming MAX_FRAME+1 bytes follow.
+        let mut buf = ((MAX_FRAME + 1) as u64).to_le_bytes().to_vec();
+        // No body — we expect the size check to fire BEFORE the body read.
+        let err = read_framed(&mut buf.as_slice()).expect_err("oversize must fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn read_framed_rejects_truncated_body() {
+        // Header says 100 bytes; we only ship 4.
+        let mut buf = 100u64.to_le_bytes().to_vec();
+        buf.extend_from_slice(b"shrt");
+        let err = read_framed(&mut buf.as_slice()).expect_err("truncated must fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn read_framed_zero_length_frame_is_empty_vec() {
+        let mut buf = 0u64.to_le_bytes().to_vec();
+        let body = read_framed(&mut buf.as_slice()).unwrap();
+        assert!(body.is_empty());
+    }
+
+    // ─── typed framed I/O (kind byte) ──────────────────────────────────
+
+    #[test]
+    fn write_typed_then_read_typed_preserves_kind_and_payload() {
+        let mut buf = Vec::new();
+        write_typed_frame(&mut buf, 0x42, b"hello").unwrap();
+        let (kind, body) = read_typed_frame(&mut buf.as_slice()).unwrap();
+        assert_eq!(kind, 0x42);
+        assert_eq!(body, b"hello");
+    }
+
+    #[test]
+    fn write_typed_frame_emits_kind_then_payload() {
+        let mut buf = Vec::new();
+        write_typed_frame(&mut buf, 0xAB, b"xyz").unwrap();
+        // Header (8 byte length) then kind (1) then payload (3) = 12 bytes.
+        assert_eq!(buf.len(), 12);
+        assert_eq!(&buf[..8], &4u64.to_le_bytes()); // 1 kind + 3 body
+        assert_eq!(buf[8], 0xAB);
+        assert_eq!(&buf[9..], b"xyz");
+    }
+
+    #[test]
+    fn read_typed_frame_rejects_empty_payload_missing_kind_byte() {
+        let buf = 0u64.to_le_bytes().to_vec(); // zero-length frame
+        let err = read_typed_frame(&mut buf.as_slice()).expect_err("empty kind must fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    // ─── send_msg / recv_msg helpers ───────────────────────────────────
+
+    #[test]
+    fn send_recv_msg_roundtrips_struct() {
+        let original = JobRespMsg {
+            seq: 42,
+            ok: true,
+            result: serde_json::json!({"foo": 1, "bar": [2, 3]}),
+            err_msg: String::new(),
+        };
+        let mut buf = Vec::new();
+        send_msg(&mut buf, 0x05, &original).expect("send");
+        let received: JobRespMsg = recv_msg(&mut buf.as_slice(), 0x05).expect("recv");
+        assert_eq!(received.seq, original.seq);
+        assert_eq!(received.ok, original.ok);
+        assert_eq!(received.result, original.result);
+        assert_eq!(received.err_msg, original.err_msg);
+    }
+
+    #[test]
+    fn recv_msg_with_wrong_kind_returns_descriptive_error() {
+        let mut buf = Vec::new();
+        send_msg(&mut buf, 0x01, &"hello".to_string()).unwrap();
+        let err: Result<String, _> = recv_msg(&mut buf.as_slice(), 0x99);
+        let msg = err.expect_err("wrong kind must fail");
+        assert!(
+            msg.contains("expected frame kind 0x99") && msg.contains("got 0x01"),
+            "unexpected message: {msg}"
+        );
+    }
+
+    // ─── encode_job / decode_job ──────────────────────────────────────
+
+    #[test]
+    fn encode_decode_job_roundtrips() {
+        let job = RemoteJobV1 {
+            seq: 7,
+            subs_prelude: "sub greet { p 'hi' }\n".into(),
+            block_src: "greet()".into(),
+            capture: vec![
+                ("x".into(), serde_json::json!(10)),
+                ("name".into(), serde_json::json!("bob")),
+            ],
+            item: serde_json::json!([1, 2, 3]),
+        };
+        let bytes = encode_job(&job).expect("encode");
+        let back = decode_job(&bytes).expect("decode");
+        assert_eq!(back.seq, job.seq);
+        assert_eq!(back.subs_prelude, job.subs_prelude);
+        assert_eq!(back.block_src, job.block_src);
+        assert_eq!(back.capture, job.capture);
+        assert_eq!(back.item, job.item);
+    }
+
+    #[test]
+    fn decode_job_rejects_garbage_bytes() {
+        let err = decode_job(b"this is not bincode").expect_err("garbage must fail");
+        assert!(!err.is_empty());
+    }
+
+    // ─── encode_resp / decode_resp ────────────────────────────────────
+
+    #[test]
+    fn encode_decode_resp_roundtrips_ok_case() {
+        let resp = RemoteRespV1 {
+            seq: 99,
+            ok: true,
+            result: serde_json::json!({"sum": 1234}),
+            err_msg: String::new(),
+        };
+        let bytes = encode_resp(&resp).expect("encode");
+        let back = decode_resp(&bytes).expect("decode");
+        assert_eq!(back.seq, resp.seq);
+        assert_eq!(back.ok, resp.ok);
+        assert_eq!(back.result, resp.result);
+        assert!(back.err_msg.is_empty());
+    }
+
+    #[test]
+    fn encode_decode_resp_roundtrips_error_case() {
+        let resp = RemoteRespV1 {
+            seq: 5,
+            ok: false,
+            result: serde_json::json!(null),
+            err_msg: "division by zero".into(),
+        };
+        let bytes = encode_resp(&resp).expect("encode");
+        let back = decode_resp(&bytes).expect("decode");
+        assert!(!back.ok);
+        assert_eq!(back.err_msg, "division by zero");
+    }
+
+    // ─── perl_to_json_value / json_to_perl ────────────────────────────
+
+    #[test]
+    fn perl_to_json_handles_undef_int_str() {
+        let undef = StrykeValue::UNDEF;
+        let i = StrykeValue::integer(42);
+        let s = StrykeValue::string("hello".to_string());
+        assert_eq!(perl_to_json_value(&undef).unwrap(), serde_json::Value::Null);
+        assert_eq!(perl_to_json_value(&i).unwrap(), serde_json::json!(42));
+        assert_eq!(perl_to_json_value(&s).unwrap(), serde_json::json!("hello"));
+    }
+
+    #[test]
+    fn json_to_perl_round_trips_through_perl_to_json() {
+        // Perl has no first-class bool — true/false collapse to 1/0 by
+        // design. Skip bool inputs here; covered separately below.
+        for j in [
+            serde_json::json!(null),
+            serde_json::json!(42),
+            serde_json::json!(3.5),
+            serde_json::json!("hello"),
+            serde_json::json!([1, 2, 3]),
+            serde_json::json!({"foo": "bar", "n": 7}),
+        ] {
+            let p = json_to_perl(&j).expect("json -> perl");
+            let back = perl_to_json_value(&p).expect("perl -> json");
+            assert_eq!(back, j, "roundtrip diverged for {j}");
+        }
+    }
+
+    #[test]
+    fn json_to_perl_collapses_bool_to_int_per_perl_semantics() {
+        // Documented Perl semantics — true/false are just 1/0.
+        let t = json_to_perl(&serde_json::json!(true)).unwrap();
+        let f = json_to_perl(&serde_json::json!(false)).unwrap();
+        assert_eq!(perl_to_json_value(&t).unwrap(), serde_json::json!(1));
+        assert_eq!(perl_to_json_value(&f).unwrap(), serde_json::json!(0));
+    }
+
+    // ─── build_subs_prelude ────────────────────────────────────────────
+
+    #[test]
+    fn build_subs_prelude_returns_empty_string_for_empty_map() {
+        let subs = HashMap::new();
+        let prelude = build_subs_prelude(&subs);
+        assert!(prelude.is_empty());
+    }
+
+    // ─── MAX_FRAME bound ───────────────────────────────────────────────
+
+    #[test]
+    fn max_frame_is_256mib() {
+        // Documented size cap — bumping it changes the wire-protocol's
+        // memory ceiling on every worker. Pin the value.
+        assert_eq!(MAX_FRAME, 256 * 1024 * 1024);
+    }
 }
