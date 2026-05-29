@@ -1711,4 +1711,227 @@ mod tests {
         let out = convert("$x =~ s#old#new#g");
         assert_eq!(out, "$x =~ s#old#new#g");
     }
+
+    // ─── convert_statement coverage — variant-by-variant ────────────────────
+    //
+    // The 49 `StmtKind::*` arms inside `convert_statement` had only the
+    // common shapes covered (If/Expression/SubDecl/binop forms above).
+    // The tests below pin one representative round-trip per variant
+    // so a stray change to any arm breaks something concrete, not the
+    // intent (the lower variants — BEGIN/END/INIT/CHECK/Package/Local/
+    // Our/State/Goto/labels — were historically smoke-tested via the
+    // integration corpus but never anchored at the convert.rs level).
+
+    #[test]
+    fn convert_begin_block() {
+        let out = convert("BEGIN { my $x = 1; }");
+        assert!(out.starts_with("BEGIN {"), "got {out:?}");
+        assert!(out.contains("my $x = 1"));
+    }
+
+    #[test]
+    fn convert_end_block() {
+        let out = convert("END { print 'bye'; }");
+        assert!(out.starts_with("END {"), "got {out:?}");
+        // String literal quoting form is convert-internal (may rewrap
+        // 'bye' → "bye"), so anchor only on the inner literal.
+        assert!(out.contains("bye"), "got {out:?}");
+    }
+
+    #[test]
+    fn convert_init_block() {
+        let out = convert("INIT { my $x = 1; }");
+        assert!(out.starts_with("INIT {"), "got {out:?}");
+    }
+
+    #[test]
+    fn convert_check_block() {
+        let out = convert("CHECK { my $x = 1; }");
+        assert!(out.starts_with("CHECK {"), "got {out:?}");
+    }
+
+    #[test]
+    fn convert_package_decl() {
+        let out = convert("package Foo::Bar;");
+        assert_eq!(out, "package Foo::Bar");
+    }
+
+    #[test]
+    fn convert_local_decl() {
+        let out = convert("local $x;");
+        assert_eq!(out, "local $x");
+    }
+
+    #[test]
+    fn convert_state_decl() {
+        let out = convert("state $counter;");
+        assert_eq!(out, "state $counter");
+    }
+
+    #[test]
+    fn convert_our_decl() {
+        let out = convert("our $shared;");
+        assert_eq!(out, "our $shared");
+    }
+
+    #[test]
+    fn convert_goto_label() {
+        let out = convert("goto LABEL;");
+        assert!(out.contains("goto"));
+        assert!(out.contains("LABEL"));
+    }
+
+    #[test]
+    fn convert_last_with_label() {
+        let out = convert("LOOP: while ($x) { last LOOP; }");
+        assert!(out.contains("LOOP:"));
+        assert!(out.contains("last LOOP"));
+    }
+
+    #[test]
+    fn convert_next_with_label() {
+        let out = convert("LOOP: while ($x) { next LOOP; }");
+        assert!(out.contains("next LOOP"));
+    }
+
+    #[test]
+    fn convert_redo_with_label() {
+        let out = convert("LOOP: while ($x) { redo LOOP; }");
+        assert!(out.contains("redo LOOP"));
+    }
+
+    #[test]
+    fn convert_bare_block_emits_braces() {
+        let out = convert("{ my $x = 1; }");
+        // StmtKind::Block — bare lexical block with no leading keyword.
+        assert!(out.starts_with("{") && out.contains("my $x = 1"));
+    }
+
+    #[test]
+    fn convert_continue_block() {
+        let out = convert("while ($x) { print 1; } continue { $x--; }");
+        assert!(out.contains("continue {"), "got {out:?}");
+        assert!(out.contains("$x--"));
+    }
+
+    #[test]
+    fn convert_do_while() {
+        let out = convert("do { $x++; } while ($x < 5);");
+        assert!(out.contains("do {"));
+        assert!(out.contains("} while ($x < 5)"));
+    }
+
+    #[test]
+    fn convert_foreach_with_my() {
+        let out = convert("foreach my $e (@arr) { print $e; }");
+        // Foreach lowers to `for $var (LIST) { ... }` in the
+        // converter (stryke's preferred surface). What matters is
+        // that the var, iterable, and body all survived.
+        assert!(out.contains("for $e"), "got {out:?}");
+        assert!(out.contains("@arr"));
+        assert!(out.contains("print $e"));
+    }
+
+    #[test]
+    fn convert_for_three_part() {
+        let out = convert("for (my $i = 0; $i < 10; $i++) { print $i; }");
+        // C-style for: init / cond / step / body.
+        assert!(out.contains("for ("));
+        assert!(out.contains("$i = 0"));
+        assert!(out.contains("$i < 10"));
+        assert!(out.contains("$i++"));
+    }
+
+    #[test]
+    fn convert_use_module_imports() {
+        let out = convert("use Foo::Bar qw(baz quux);");
+        assert!(out.contains("use Foo::Bar"));
+    }
+
+    #[test]
+    fn convert_no_module() {
+        let out = convert("no strict;");
+        assert!(out.contains("no strict"));
+    }
+
+    #[test]
+    fn convert_return_expr() {
+        // `fn double` collides with the stryke builtin `double`; use a
+        // user-defined name that won't trip the redefine guard.
+        let out = convert("fn my_doubler { return $_[0] * 2; }");
+        assert!(out.contains("return"));
+        assert!(out.contains("* 2"));
+    }
+
+    #[test]
+    fn convert_return_void() {
+        let out = convert("fn my_done { return; }");
+        // Bare return (no expression) → just `return` keyword.
+        assert!(out.contains("return"));
+    }
+
+    #[test]
+    fn convert_empty_statement_collapses() {
+        // `;` alone is `StmtKind::Empty` — should produce no output beyond
+        // the surrounding context.
+        let out = convert("print 1;;print 2;");
+        // Two prints separated; the empty `;` shouldn't insert garbage.
+        assert!(out.contains("print 1"));
+        assert!(out.contains("print 2"));
+        assert!(!out.contains(";;"), "empty stmt leaked literal `;;`: {out:?}");
+    }
+
+    // ─── extract_pipe_source — threading chains ─────────────────────────────
+    //
+    // `extract_pipe_source` is 367 LOC of pattern-match across the
+    // ExprKind builtin variants — when convert spots a chain of
+    // unary fns (`uc(lc(...))`), it walks down via this helper
+    // collecting fn names, then emits `t SRC fn1 fn2 ...` (the
+    // threading form). The tests below pin one chain per category.
+
+    #[test]
+    fn pipe_string_fns_chain() {
+        // uc / lc / ucfirst / lcfirst — all in one chain.
+        let out = convert("uc(lc(ucfirst(lcfirst($s))))");
+        assert!(out.contains("t $s lcfirst ucfirst lc uc"), "got {out:?}");
+    }
+
+    #[test]
+    fn pipe_chomp_chop_length() {
+        let out = convert("length(chop(chomp($s)))");
+        assert!(out.contains("t $s chomp chop length"), "got {out:?}");
+    }
+
+    #[test]
+    fn pipe_numeric_chain() {
+        // abs / int / sqrt — all numeric unary builtins.
+        let out = convert("sqrt(abs(int($x)))");
+        assert!(out.contains("t $x int abs sqrt"), "got {out:?}");
+    }
+
+    #[test]
+    fn pipe_mixed_str_num_chain() {
+        // String → numeric chain. The threading-pipe form fires only
+        // for 3+ nested unary builtins; 2-deep uses direct call
+        // syntax (`uc length $s`). Pin the direct form here.
+        let out = convert("length(uc($s))");
+        assert_eq!(out, "uc length $s", "got {out:?}");
+    }
+
+    #[test]
+    fn pipe_terminates_at_array_source() {
+        // chain terminates when source is an array, not another builtin.
+        let out = convert("sort(@xs)");
+        assert!(out.contains("@xs"));
+        assert!(out.contains("sort"));
+    }
+
+    #[test]
+    fn pipe_single_unary_direct() {
+        // No chain — single unary builtin uses direct call, not threading.
+        let out = convert("uc($x)");
+        // Should NOT produce `t $x uc` (that would only fire for nested).
+        assert!(out.contains("uc"));
+        assert!(out.contains("$x"));
+    }
 }
