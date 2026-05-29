@@ -892,7 +892,7 @@ mod tests {
 
     #[test]
     fn read_framed_zero_length_frame_is_empty_vec() {
-        let mut buf = 0u64.to_le_bytes().to_vec();
+        let buf = 0u64.to_le_bytes().to_vec();
         let body = read_framed(&mut buf.as_slice()).unwrap();
         assert!(body.is_empty());
     }
