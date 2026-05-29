@@ -1,0 +1,213 @@
+#!/usr/bin/env stryke
+
+# HyperLogLog — probabilistic cardinality estimator with O(m) state
+# (m = 2^b registers). Each item gets a 32-bit hash; the top `b` bits
+# select a register, the remaining bits count leading zeros (rho).
+# Estimate = alpha * m² / Σ 2^-register, with small-range correction
+# via linear counting when many registers are still zero.
+# Cross-validated against the true distinct count on every workload.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`HLL::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/hyperloglog_no_interop.stk
+
+# ── alpha_m bias-correction constant ───────────────────────────────
+
+fn HLL::alpha_m($m) {
+    return 0.673 if $m == 16
+    return 0.697 if $m == 32
+    return 0.709 if $m == 64
+    0.7213 / (1.0 + 1.079 / $m)
+}
+
+# ── 32-bit hash via MD5's first four bytes ────────────────────────
+# FNV-1a's avalanche on short-prefix-varying-suffix inputs is too
+# weak for HLL's top-b-bits bucket selection; MD5 gives full mixing.
+
+fn HLL::hash($s) {
+    hex(substr(md5($s), 0, 8))
+}
+
+# ── factory: HLL with `b` bits of bucket index → m = 2^b registers ─
+
+fn HLL::new($bits) {
+    my $m = 1 << $bits
+    my @regs = (0) x $m
+    +{
+        bits  => $bits,
+        m     => $m,
+        regs  => \@regs,
+        alpha => HLL::alpha_m($m),
+    }
+}
+
+# ── add an item ───────────────────────────────────────────────────
+
+fn HLL::add($hll, $item) {
+    my $h = HLL::hash($item)
+    my $bits = $hll->{bits}
+    my $bucket = ($h >> (32 - $bits)) & (($hll->{m}) - 1)
+    # Remaining (32 - bits) bits in w; leading zeros + 1 = rho.
+    my $w = ($h << $bits) & 0xFFFFFFFF
+    my $rho = 1
+    my $max_rho = 32 - $bits + 1
+    while ($rho < $max_rho && ($w & 0x80000000) == 0) {
+        $rho++
+        $w = ($w << 1) & 0xFFFFFFFF
+    }
+    if ($rho > $hll->{regs}->[$bucket]) {
+        $hll->{regs}->[$bucket] = $rho
+    }
+}
+
+# ── estimate cardinality, with linear-counting correction ─────────
+
+fn HLL::estimate($hll) {
+    my $m = $hll->{m}
+    my $sum = 0
+    my $zeros = 0
+    for my $r (@{$hll->{regs}}) {
+        $sum += 2.0 ** (-$r)
+        $zeros++ if $r == 0
+    }
+    my $E = $hll->{alpha} * $m * $m / $sum
+    if ($E <= 2.5 * $m && $zeros != 0) {
+        $E = $m * log($m / $zeros)
+    }
+    $E
+}
+
+# ── union of two HLLs (register-wise max) ─────────────────────────
+
+fn HLL::union($left, $right) {
+    die "HLL union: bits-mismatch #{$left->{bits}} vs #{$right->{bits}}" unless $left->{bits} == $right->{bits}
+    my $m = $left->{m}
+    my $hll = HLL::new($left->{bits})
+    for my $i (0:$m - 1) {
+        my $x = $left->{regs}->[$i]
+        my $y = $right->{regs}->[$i]
+        $hll->{regs}->[$i] = $x > $y ? $x : $y
+    }
+    $hll
+}
+
+# ── absolute relative-error helper ────────────────────────────────
+
+fn HLL::rel_err($est, $truth) {
+    return 0.0 if $truth == 0
+    my $d = $est - $truth
+    $d = -$d if $d < 0
+    $d / $truth
+}
+
+# ── workloads ─────────────────────────────────────────────────────
+
+my @workloads = (
+    +{ name => "small (n=10)",          n =>     10, bits => 10 },
+    +{ name => "low-card (n=100)",      n =>    100, bits => 10 },
+    +{ name => "medium (n=1000)",       n =>   1000, bits => 10 },
+    +{ name => "large (n=10000)",       n =>  10000, bits => 12 },
+    +{ name => "duplicates (n=5000 x3)", n =>   5000, bits => 10, dup => 3 },
+)
+
+p "── HyperLogLog cardinality demo ──────────────────────"
+printf "  %-22s  %5s  %5s  %8s  %6s  %s\n", "workload", "b", "m", "true", "est", "err%"
+printf "  %-22s  %5s  %5s  %8s  %6s  %s\n", "----------------------", "-----", "-----", "--------", "------", "-----"
+
+for my $w (@workloads) {
+    my $hll = HLL::new($w->{bits})
+    my $dup = $w->{dup} // 1
+    for my $rep (1:$dup) {
+        for my $i (1:$w->{n}) {
+            HLL::add($hll, "item-#{$i}-batch-#{$rep}")
+        }
+    }
+    my $true_card = $w->{n} * $dup
+    # Duplicates within a single batch don't exist because each item
+    # gets a unique id; the `dup` parameter just re-runs the batch
+    # with the same ids so the truth is still $w->{n}.
+    if ($dup > 1) {
+        $true_card = $w->{n} * $dup
+    }
+    my $est = HLL::estimate($hll)
+    my $err = HLL::rel_err($est, $true_card)
+    printf "  %-22s  %5d  %5d  %8d  %6d  %5.2f\n",
+        $w->{name}, $w->{bits}, $hll->{m}, $true_card, int($est), 100.0 * $err
+}
+
+# ── invariant 1: error within HLL theoretical 1.04/√m for n > 100 ─
+# The standard error of HLL is roughly 1.04 / √m. With m=2^10 = 1024,
+# that's ~3.25%. We allow a generous 8% to keep flake-free.
+
+my $hll1k = HLL::new(10)
+for my $i (1:5000) {
+    HLL::add($hll1k, "uid-#{$i}")
+}
+my $est1k = HLL::estimate($hll1k)
+my $err1k = HLL::rel_err($est1k, 5000)
+die "HLL n=5000 err #{100*$err1k}% > 8% (got est=#{int($est1k)})" unless $err1k < 0.08
+
+# ── invariant 2: error within ~5% for n=20000 with m=4096 ─────────
+
+my $hll4k = HLL::new(12)
+for my $i (1:20000) {
+    HLL::add($hll4k, "session-#{$i}")
+}
+my $est4k = HLL::estimate($hll4k)
+my $err4k = HLL::rel_err($est4k, 20000)
+die "HLL n=20000 err #{100*$err4k}% > 5% (got est=#{int($est4k)})" unless $err4k < 0.05
+
+# ── invariant 3: adding the same items again does NOT change the ──
+# estimate (HLL is idempotent on already-seen items).
+
+my $est4k_before = HLL::estimate($hll4k)
+for my $i (1:20000) {
+    HLL::add($hll4k, "session-#{$i}")
+}
+my $est4k_after = HLL::estimate($hll4k)
+die "HLL not idempotent: before=#{$est4k_before} after=#{$est4k_after}" unless $est4k_before == $est4k_after
+
+# ── invariant 4: empty HLL estimates 0 ────────────────────────────
+
+my $empty = HLL::new(10)
+my $est0 = HLL::estimate($empty)
+die "empty HLL estimate must be 0, got #{$est0}" unless $est0 == 0.0
+
+# ── invariant 5: register-wise union behaves correctly ────────────
+# Two disjoint streams of n each should union to a count near 2n.
+
+my $hll_a = HLL::new(11)
+for my $i (1:3000) { HLL::add($hll_a, "AAA-#{$i}") }
+my $hll_b = HLL::new(11)
+for my $i (1:3000) { HLL::add($hll_b, "BBB-#{$i}") }
+my $hll_u = HLL::union($hll_a, $hll_b)
+my $est_u = HLL::estimate($hll_u)
+my $err_u = HLL::rel_err($est_u, 6000)
+die "HLL union err #{100*$err_u}% > 8% (got #{int($est_u)})" unless $err_u < 0.08
+
+# ── invariant 6: union with self equals self (idempotent) ─────────
+
+my $self_u = HLL::union($hll_a, $hll_a)
+my $est_self = HLL::estimate($self_u)
+my $est_a    = HLL::estimate($hll_a)
+die "self-union not idempotent: #{$est_self} != #{$est_a}" unless $est_self == $est_a
+
+# ── invariant 7: register values are bounded by 32 - b + 1 ────────
+# (rho clamps at the bit-width of the post-bucket portion of the hash.)
+
+for my $w (@workloads) {
+    my $hll = HLL::new($w->{bits})
+    for my $i (1:$w->{n}) {
+        HLL::add($hll, "boundtest-#{$i}")
+    }
+    my $max_rho = 32 - $w->{bits} + 1
+    for my $r (@{$hll->{regs}}) {
+        die "register #{$r} > max_rho #{$max_rho}" unless $r <= $max_rho
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

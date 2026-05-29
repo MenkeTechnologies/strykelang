@@ -1,0 +1,193 @@
+#!/usr/bin/env stryke
+
+# Manacher's algorithm — O(n) longest palindromic substring with full
+# radii table. Uses the classic `^#a#b#c#$` sentinel transform so the
+# same code path handles odd and even-length palindromes uniformly;
+# walks the array maintaining a right-bound `R` and center `C`,
+# mirroring known radii through `2*C - i` to skip re-expansion inside
+# the current bound.  Cross-validated against an O(n²) brute force.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Mana::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/manacher_pal_no_interop.stk
+
+# ── compute palindromic radii on the sentinel array ──────────────
+
+fn Mana::radii($s) {
+    my $n_in = len($s)
+    if ($n_in == 0) {
+        return +{ p => [], n => 0 }
+    }
+    my @t = ("^", "#")
+    for my $i (0:$n_in - 1) {
+        push @t, substr($s, $i, 1)
+        push @t, "#"
+    }
+    push @t, "\$"
+    my $n = len(@t)
+    my @p = (0) x $n
+    my $C = 0
+    my $R = 0
+    for my $i (1:$n - 2) {
+        my $mirror = 2 * $C - $i
+        if ($i < $R) {
+            my $room = $R - $i
+            $p[$i] = $room < $p[$mirror] ? $room : $p[$mirror]
+        }
+        while ($t[$i + 1 + $p[$i]] eq $t[$i - 1 - $p[$i]]) {
+            $p[$i]++
+        }
+        if ($i + $p[$i] > $R) {
+            $C = $i
+            $R = $i + $p[$i]
+        }
+    }
+    +{ p => \@p, n => $n }
+}
+
+# ── extract the longest palindromic substring ─────────────────────
+
+fn Mana::longest($s) {
+    return +{ str => "", start => 0, len => 0 } if len($s) == 0
+    my $r = Mana::radii($s)
+    my $p = $r->{p}
+    my $n = $r->{n}
+    my $best = 0
+    my $center = 0
+    for my $i (1:$n - 2) {
+        if ($p->[$i] > $best) {
+            $best   = $p->[$i]
+            $center = $i
+        }
+    }
+    my $start = int(($center - $best) / 2)
+    +{
+        str   => substr($s, $start, $best),
+        start => $start,
+        len   => $best,
+    }
+}
+
+# ── O(n²) brute-force checker for cross-validation ────────────────
+
+fn Mana::brute_longest($s) {
+    my $n = len($s)
+    return +{ str => "", start => 0, len => 0 } if $n == 0
+    my $best_start = 0
+    my $best_len   = 1
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            my $sub = substr($s, $i, $j - $i + 1)
+            if ($sub eq join("", rev split(//, $sub))) {
+                if ($j - $i + 1 > $best_len) {
+                    $best_len   = $j - $i + 1
+                    $best_start = $i
+                }
+            }
+        }
+    }
+    +{
+        str   => substr($s, $best_start, $best_len),
+        start => $best_start,
+        len   => $best_len,
+    }
+}
+
+# ── primary cases with known answers ──────────────────────────────
+
+my @cases = (
+    +{ s => "babad",            lens => 3  },   # "bab" or "aba"
+    +{ s => "cbbd",             lens => 2  },   # "bb"
+    +{ s => "a",                lens => 1  },
+    +{ s => "ac",               lens => 1  },
+    +{ s => "racecar",          lens => 7  },   # whole word
+    +{ s => "abacdfgdcaba",     lens => 3  },   # "aba" or "aca"
+    +{ s => "abacdedcaba",      lens => 11 },
+    +{ s => "noonabba",         lens => 4  },   # "noon" or "abba"
+    +{ s => "ababababa",        lens => 9  },   # the whole string
+    +{ s => "forgeeksskeegfor", lens => 10 },   # "geeksskeeg"
+    +{ s => "abcd",             lens => 1  },
+    +{ s => "aaaa",             lens => 4  },
+)
+
+p "── Manacher's longest-palindrome demo ────────────────"
+printf "  %-22s  %-14s  %5s\n", "input", "longest", "len"
+printf "  %-22s  %-14s  %5s\n", "----------------------", "--------------", "-----"
+
+for my $c (@cases) {
+    my $r = Mana::longest($c->{s})
+    my $ok = $r->{len} == $c->{lens}
+    printf "  %-22s  %-14s  %5d  %s\n",
+        "\"" . $c->{s} . "\"",
+        "\"" . $r->{str} . "\"",
+        $r->{len},
+        $ok ? "" : "FAIL want=#{$c->{lens}}"
+    die "wrong length on \"#{$c->{s}}\": got #{$r->{len}} want #{$c->{lens}}" unless $ok
+}
+
+# ── invariant 1: returned substring is actually a palindrome ──────
+
+for my $c (@cases) {
+    my $r = Mana::longest($c->{s})
+    my $sub = $r->{str}
+    my $rev = join("", rev split(//, $sub))
+    die "result not palindromic: \"#{$sub}\"" unless $sub eq $rev
+}
+
+# ── invariant 2: the substring is at the reported start position ─
+
+for my $c (@cases) {
+    my $r = Mana::longest($c->{s})
+    my $check = substr($c->{s}, $r->{start}, $r->{len})
+    die "substring/position mismatch on \"#{$c->{s}}\"" unless $check eq $r->{str}
+}
+
+# ── invariant 3: Manacher agrees with the O(n²) brute force ───────
+
+for my $c (@cases) {
+    my $r = Mana::longest($c->{s})
+    my $br = Mana::brute_longest($c->{s})
+    die "len disagrees with brute on \"#{$c->{s}}\": manacher=#{$r->{len}} brute=#{$br->{len}}" unless $r->{len} == $br->{len}
+}
+
+# ── invariant 4: no longer palindrome exists in the input ─────────
+
+for my $c (@cases) {
+    my $r = Mana::longest($c->{s})
+    my $n = len($c->{s})
+    for my $i (0:$n - 1) {
+        for my $j ($i:$n - 1) {
+            my $cand_len = $j - $i + 1
+            next unless $cand_len > $r->{len}
+            my $sub = substr($c->{s}, $i, $cand_len)
+            my $rev = join("", rev split(//, $sub))
+            die "found longer palindrome \"#{$sub}\" (len #{$cand_len}) in \"#{$c->{s}}\"" if $sub eq $rev
+        }
+    }
+}
+
+# ── invariant 5: empty input → empty output ───────────────────────
+
+my $empty = Mana::longest("")
+die "empty input must yield empty result" unless $empty->{len} == 0 && $empty->{str} eq ""
+
+# ── invariant 6: single-character input → that character ──────────
+
+my $one = Mana::longest("Z")
+die "single-char input must yield itself" unless $one->{str} eq "Z"
+die "single-char len must be 1"            unless $one->{len} == 1
+
+# ── invariant 7: radii table sizes match the sentinel-array length ─
+
+for my $c (@cases) {
+    my $r = Mana::radii($c->{s})
+    die "radii length mismatch: p=#{len(@{$r->{p}})} n=#{$r->{n}}" unless len(@{$r->{p}}) == $r->{n}
+    # Sentinel array is `^ # c1 # c2 # ... # $` → 2*len+3 elements.
+    die "sentinel length wrong" unless $r->{n} == 2 * len($c->{s}) + 3
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
