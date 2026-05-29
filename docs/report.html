@@ -92,23 +92,23 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 347-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>351k production Rust lines + 184k .stk lines + 10,431 builtins (11,159 keys in %all) + 1,648 Rosetta tasks + 173 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 341-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>351k production Rust lines + 184k .stk lines + 10,431 builtins (11,159 keys in %all) + 1,648 Rosetta tasks + 173 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-val">465,930</div><div class="stat-label">Rust Lines</div></div>
-        <div class="stat-card"><div class="stat-val">184,642</div><div class="stat-label">Stryke Lines (.stk)</div></div>
+        <div class="stat-card"><div class="stat-val">469,845</div><div class="stat-label">Rust Lines</div></div>
+        <div class="stat-card"><div class="stat-val">204,004</div><div class="stat-label">Stryke Lines (.stk)</div></div>
         <div class="stat-card"><div class="stat-val accent">10,431</div><div class="stat-label">Builtins (Primary)</div></div>
-        <div class="stat-card"><div class="stat-val green">12,991</div><div class="stat-label">Test Functions</div></div>
-        <div class="stat-card"><div class="stat-val">347</div><div class="stat-label">VM Opcodes</div></div>
+        <div class="stat-card"><div class="stat-val green">13,158</div><div class="stat-label">Test Functions</div></div>
+        <div class="stat-card"><div class="stat-val">341</div><div class="stat-label">VM Opcodes</div></div>
         <div class="stat-card"><div class="stat-val">343</div><div class="stat-label">AST Variants</div></div>
         <div class="stat-card"><div class="stat-val">20,056</div><div class="stat-label">Parity Cases</div></div>
-        <div class="stat-card"><div class="stat-val">2,886</div><div class="stat-label">Example Scripts</div></div>
+        <div class="stat-card"><div class="stat-val">2,980</div><div class="stat-label">Example Scripts</div></div>
         <div class="stat-card"><div class="stat-val">133</div><div class="stat-label">Direct Dependencies</div></div>
-        <div class="stat-card"><div class="stat-val">1,347</div><div class="stat-label">Git Commits</div></div>
+        <div class="stat-card"><div class="stat-val">1,397</div><div class="stat-label">Git Commits</div></div>
       </div>
 
       <div style="margin:1.2rem 0;">
-        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 465,930 lines</p>
+        <p style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px;font-family:'Orbitron',sans-serif;font-weight:700;">Source Distribution &mdash; 469,845 lines</p>
         <div class="bar-wrap" style="height:26px;">
           <div class="bar-fill cyan" style="width:75.4%;"></div>
           <span class="bar-pct" style="font-size:12px;">351,333 strykelang / 109,133 tests / 5,464 tooling &middot; 75.4% strykelang</span>
@@ -141,7 +141,7 @@
             <td style="color:var(--green);"><strong>stryke</strong></td>
             <td>2026</td>
             <td class="num">0.09</td>
-            <td class="num">351,333 Rust + 184,642 stk</td>
+            <td class="num">351,333 Rust + 204,004 stk</td>
             <td class="num">10,431</td>
             <td>Cranelift</td>
             <td><strong>1,349 / 1,349 (100%)</strong></td>
@@ -210,7 +210,7 @@
         </div>
         <div class="feature-card">
           <h4>By Test Surface</h4>
-          <p><code>12,991</code> <code>#[test]</code> functions + <code>20,056</code> Perl-parity cases + <code>12,955</code> <code>assert_eq</code> / <code>assert_ok</code> checks in <code>examples/rosetta</code> + <code>examples/project</code>. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
+          <p><code>13,158</code> <code>#[test]</code> functions + <code>20,056</code> Perl-parity cases + <code>12,955</code> <code>assert_eq</code> / <code>assert_ok</code> checks in <code>examples/rosetta</code> + <code>examples/project</code>. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
         </div>
         <div class="feature-card">
           <h4>By Built-in Capability</h4>
@@ -264,7 +264,7 @@
         <thead><tr><th>Subsystem</th><th>Key Files</th><th class="num">Lines</th><th class="num">%</th><th style="min-width:120px;">Share</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins*, list_builtins, math_wolfram*</code></td><td class="num">152,367</td><td class="num">32.7%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:32.7%"></div></div></td><td>10,431 builtins in %b / 11,159 keys in %all: string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
-          <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">23,234</td><td class="num">5.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:5.0%"></div></div></td><td>347-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
+          <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">23,234</td><td class="num">5.0%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:5.0%"></div></div></td><td>341-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
           <tr><td style="color:var(--accent);">VM Runtime State (vm_helper)</td><td><code>vm_helper</code></td><td class="num">22,581</td><td class="num">4.8%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:4.8%"></div></div></td><td>Persistent state container for the bytecode VM: scope graph, sub table, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, &hellip;), reflection-hash population, package-stash refresh, AOP intercept registry, I/O handle map. <strong>Not a tree-walking interpreter</strong> &mdash; stryke has none. The absence is pinned by <code>tests/tree_walker_absent_aop.rs</code> as an architectural invariant.</td></tr>
           <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">25,043</td><td class="num">5.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:5.4%"></div></div></td><td>Recursive-descent parser, 196 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing, builtin-name whitelist</td></tr>
           <tr><td style="color:var(--accent);">AI / Web</td><td><code>ai, ai_sugar, web, web_orm, mcp</code></td><td class="num">14,483</td><td class="num">3.1%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:3.1%"></div></div></td><td>Anthropic / OpenAI client, tool-use protocol, AI sugar (<code>ai</code> as native verb), MCP server / client, web framework (route DSL, controllers, ORM, sessions, templates), JSON / form / multipart parsers</td></tr>
@@ -283,10 +283,10 @@
           <tr><td style="color:var(--accent);">Tooling</td><td><code>profiler, perf_recorder, stryke_log</code></td><td class="num">1,425</td><td class="num">0.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.3%"></div></div></td><td>Sampling profiler, perf event recorder, structured logger. (Static analyzer counts under the LSP row; the step debugger lives under the DAP Debugger row above so the TTY <code>-d</code> front-end and the DAP server count together.)</td></tr>
           <tr><td style="color:var(--accent);">FFI / AOT</td><td><code>rust_ffi, rust_sugar, aot, data_section, aop</code></td><td class="num">1,823</td><td class="num">0.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.4%"></div></div></td><td>Embed-Rust closure FFI, AOT bytecode caching, data-section relocations, AOP intercepts</td></tr>
           <tr><td style="color:var(--accent);">Crypto / Pack</td><td><code>crypt_util, jwt, pack, secrets</code></td><td class="num">1,834</td><td class="num">0.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.4%"></div></div></td><td>Symmetric / asymmetric encryption, password hashing, JWT encode/decode, <code>pack</code>/<code>unpack</code> templates, secret-store helpers</td></tr>
-          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">109,133</td><td class="num">23.4%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:23.4%"></div></div></td><td>12,991 <code>#[test]</code> functions across 378 Rust modules (20 inline + 358 integration): parser, lexer, builtins, parallel, sync (21 mutex / semaphore tests in <code>builtins_sync_tests.rs</code>), regex, values, OO, semantics, CLI, LSP, DAP, runtime, fix-regression suite, and 142 behavioral pin suites (incl. <code>reduce_pin</code>, <code>split_pin</code>, <code>zip_pad_pin</code>)</td></tr>
+          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">109,133</td><td class="num">23.4%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:23.4%"></div></div></td><td>13,158 <code>#[test]</code> functions across 378 Rust modules (20 inline + 358 integration): parser, lexer, builtins, parallel, sync (21 mutex / semaphore tests in <code>builtins_sync_tests.rs</code>), regex, values, OO, semantics, CLI, LSP, DAP, runtime, fix-regression suite, and 142 behavioral pin suites (incl. <code>reduce_pin</code>, <code>split_pin</code>, <code>zip_pad_pin</code>)</td></tr>
           <tr><td style="color:var(--text-muted);">Build / Bench</td><td><code>build.rs, benches/, fuzz/</code></td><td class="num">5,464</td><td class="num">1.2%</td><td><div class="bar-wrap"><div class="bar-fill yellow" style="width:1.2%"></div></div></td><td>Build-time reflection generator (<code>BUILTIN_ARMS</code>, <code>CATEGORY_MAP</code>, <code>DESCRIPTIONS</code>), JIT vs interpreter micro-bench, libfuzzer harnesses</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">465,930</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
+        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">469,845</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -305,7 +305,7 @@
           <tr><td>strykelang/vm_helper.rs</td><td class="num">22,424</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks (used by both <code>-d</code> TTY REPL and <code>--dap</code> server), special-variable handling, reflection-hash population, package-stash refresh</td></tr>
           <tr><td>strykelang/parser.rs</td><td class="num">22,641</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
           <tr><td>strykelang/builtins_extended.rs</td><td class="num">12,643</td><td>Extended builtins: crypto, JWT, codecs (JSON/YAML/TOML/CSV/MsgPack), HTTP, email, QR, compression</td></tr>
-          <tr><td>strykelang/vm.rs</td><td class="num">10,858</td><td>Bytecode VM: register+stack hybrid, 347 opcodes, hot-path detection, exception unwinder, debugger <code>should_stop</code> hook on every op</td></tr>
+          <tr><td>strykelang/vm.rs</td><td class="num">10,858</td><td>Bytecode VM: register+stack hybrid, 341 opcodes, hot-path detection, exception unwinder, debugger <code>should_stop</code> hook on every op</td></tr>
           <tr><td>strykelang/compiler.rs</td><td class="num">9,894</td><td>AST&rarr;bytecode: constant folding, register allocation, peephole optimization, basic-block formation</td></tr>
           <tr><td>tests/suite/fix_regressions.rs</td><td class="num">7,654</td><td>Regression test suite &mdash; one test per fixed bug; pin behaviors so refactors can&rsquo;t silently re-break</td></tr>
           <tr><td>strykelang/lsp.rs</td><td class="num">12,094</td><td>LSP server core — hover, completion (hash-key from builtin schemas, type/enum/constant/loop-label categories, qualified-suffix insertText, parse-error recovery, <code>{</code> trigger), diagnostics, semantic tokens, signature help, code actions (Extract V/C/P/M, caret-only, inside-string aware), goto/refs/rename (package-aware, AST-only field rename, defensive <code>::</code>-strip on newName, cross-file via require graph), document symbols. Hover suppressed inside string literals.</td></tr>
@@ -321,9 +321,9 @@
           <tr><td>strykelang/web.rs</td><td class="num">3,567</td><td>Web framework: route DSL, controllers, sessions, cookies, flash, multipart parsing, static / template rendering</td></tr>
           <tr><td>strykelang/native_codec.rs</td><td class="num">3,602</td><td>Built-in JSON / YAML / TOML / CSV / MessagePack encode-decode</td></tr>
           <tr><td>strykelang/scope.rs</td><td class="num">3,270</td><td>Lexical scoping: pad slots, closures, <code>my</code>/<code>local</code>/<code>our</code>/<code>oursync</code>, <code>BEGIN</code>/<code>END</code>/<code>INIT</code>/<code>CHECK</code></td></tr>
-          <tr><td>strykelang/bytecode.rs</td><td class="num">2,474</td><td>Opcode definitions (347 variants), instruction encoding, disassembler</td></tr>
+          <tr><td>strykelang/bytecode.rs</td><td class="num">2,474</td><td>Opcode definitions (341 variants), instruction encoding, disassembler</td></tr>
         </tbody>
-                <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOP 20 SUBTOTAL</td><td class="num">198,224</td><td>42.8% of 465,930-line Rust slice</td></tr></tfoot>
+                <tfoot><tr class="total-row"><td style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOP 20 SUBTOTAL</td><td class="num">198,224</td><td>42.8% of 469,845-line Rust slice</td></tr></tfoot>
       </table>
 
       <hr class="section-rule">
@@ -341,7 +341,7 @@
   ┌─────────────┐     ┌─────────────┐     ┌──────────────┐
   │  lexer.rs   │────▶│  parser.rs  │────▶│ compiler.rs  │
   │  (4,187)    │     │  (22,641)   │     │  (9,894)     │
-  │  Tokenizer  │     │  AST node   │     │  347 opcodes │
+  │  Tokenizer  │     │  AST node   │     │  341 opcodes │
   │  heredocs   │     │  variants   │     │  const fold  │
   │  regex lit  │     │  prec climb │     │  reg alloc   │
   │  q/qq/qw/qr │     │  whitelist  │     │  peephole    │
@@ -445,7 +445,7 @@
       <!-- SECTION 6: VM &amp; BYTECODE                -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">!</span>VM &amp; BYTECODE</h2>
-      <p class="tutorial-subtitle">347 opcodes grouped into 27 functional categories. The VM is a register+stack hybrid: frame-local scalar slots provide O(1) access for hot variables (no string lookup), while the operand stack handles temporaries and complex expressions. Frame-local slots win on tight loops; the stack wins on irregular control flow.</p>
+      <p class="tutorial-subtitle">341 opcodes grouped into 27 functional categories. The VM is a register+stack hybrid: frame-local scalar slots provide O(1) access for hot variables (no string lookup), while the operand stack handles temporaries and complex expressions. Frame-local slots win on tight loops; the stack wins on irregular control flow.</p>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1rem 0 0.5rem;">// OPCODE CATEGORIES</h3>
       <div class="mapping-grid">
@@ -540,12 +540,12 @@
       <p class="tutorial-subtitle">Two complementary suites. Unit + integration tests are <code>#[test]</code> functions in Rust; parity tests are <code>.pl</code> scripts that must produce byte-identical output between system perl and stryke. CI runs both on every push.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card"><div class="stat-val green">12,991</div><div class="stat-label">#[test] Functions</div></div>
+        <div class="stat-card"><div class="stat-val green">13,158</div><div class="stat-label">#[test] Functions</div></div>
         <div class="stat-card"><div class="stat-val">2,453</div><div class="stat-label">Unit Tests</div></div>
         <div class="stat-card"><div class="stat-val">8,611</div><div class="stat-label">Integration Tests</div></div>
         <div class="stat-card"><div class="stat-val accent">20,056</div><div class="stat-label">Parity Cases</div></div>
         <div class="stat-card"><div class="stat-val">213</div><div class="stat-label">Rust Test Modules</div></div>
-        <div class="stat-card"><div class="stat-val">2,886</div><div class="stat-label">Example Scripts</div></div>
+        <div class="stat-card"><div class="stat-val">2,980</div><div class="stat-label">Example Scripts</div></div>
       </div>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// TEST SURFACES</h3>
@@ -711,11 +711,11 @@
       <!-- SECTION 10b: EXAMPLES &amp; SOLVED PROBLEMS  -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">.</span>EXAMPLES &amp; SOLVED PROBLEMS</h2>
-      <p class="tutorial-subtitle">Stryke ships with the largest curated corpus of cross-language exemplars in any single-author Perl 5 work-alike: 2,886 <code>.stk</code> programs under <code>examples/</code> totaling 184,642 LOC. <strong>All 1,349 Rosetta Code tasks in <code>list.txt</code> are solved (100%)</strong> &mdash; every test compiles and runs against the current build, so any builtin regression surfaces as a failing test before it reaches the parity suite.</p>
+      <p class="tutorial-subtitle">Stryke ships with the largest curated corpus of cross-language exemplars in any single-author Perl 5 work-alike: 2,980 <code>.stk</code> programs under <code>examples/</code> totaling 204,004 LOC. <strong>All 1,349 Rosetta Code tasks in <code>list.txt</code> are solved (100%)</strong> &mdash; every test compiles and runs against the current build, so any builtin regression surfaces as a failing test before it reaches the parity suite.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card"><div class="stat-val accent">2,886</div><div class="stat-label">.stk Programs</div></div>
-        <div class="stat-card"><div class="stat-val">184,642</div><div class="stat-label">examples/ LOC</div></div>
+        <div class="stat-card"><div class="stat-val accent">2,980</div><div class="stat-label">.stk Programs</div></div>
+        <div class="stat-card"><div class="stat-val">204,004</div><div class="stat-label">examples/ LOC</div></div>
         <div class="stat-card"><div class="stat-val green">1,349</div><div class="stat-label">Rosetta Solved</div></div>
         <div class="stat-card"><div class="stat-val accent">100%</div><div class="stat-label">Rosetta Complete</div></div>
         <div class="stat-card"><div class="stat-val">173</div><div class="stat-label">Exercism Solutions</div></div>
@@ -732,7 +732,7 @@
           <tr><td style="color:var(--accent);">Top-level</td><td><code>examples/*.stk</code></td><td class="num">458</td><td class="num">46,439</td><td>Quick-start demos + worked end-to-end programs (TF-IDF search, mini-SQL executor, Kalman filter, Raft simulator, HTTP router with middleware, pub/sub bus, CSV ETL, …).</td></tr>
           <tr><td style="color:var(--accent);">Polyglot ports</td><td><code>examples/ruby/</code>, <code>examples/scheme/</code></td><td class="num">2</td><td class="num">9,077</td><td>Reference ports (not counted in Rosetta / Exercism rows).</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">EXAMPLES TOTAL</td><td class="num">2,886</td><td class="num">184,642</td><td>5 groups under <code>examples/</code> &middot; ~61 LOC/file avg</td></tr></tfoot>
+        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">EXAMPLES TOTAL</td><td class="num">2,980</td><td class="num">204,004</td><td>5 groups under <code>examples/</code> &middot; ~61 LOC/file avg</td></tr></tfoot>
       </table>
 
       <p style="font-size:11px;color:var(--text-muted);margin-top:0.8rem;">The Rosetta corpus is a complete cross-language reference port at 1,349/1,349 (100%). The full test runner (<code>s test examples/project/t examples/rosetta/t</code>) executes 1,751 <code>.stk</code> test files and 12,211 <code>assert_eq</code> / <code>assert_ok</code> checks across those trees; any builtin drift surfaces as a failing test before it reaches the parity suite. New Rosetta tasks land as fast as the canonical site adds them.</p>
@@ -802,7 +802,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 465,930 RUST LINES &middot; 184,642 STRYKE LINES &middot; 12,991 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 469,845 RUST LINES &middot; 204,004 STRYKE LINES &middot; 13,158 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 341 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
