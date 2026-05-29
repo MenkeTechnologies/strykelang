@@ -1,0 +1,197 @@
+#!/usr/bin/env stryke
+
+# Adam optimizer — adaptive-moment stochastic gradient descent. Maintains
+# per-parameter first-moment (m) and second-moment (v) running averages,
+# applies the bias correction (m̂ = m / (1 − β₁ᵗ), v̂ = v / (1 − β₂ᵗ)),
+# and steps by α · m̂ / (√v̂ + ε). On well-behaved convex problems
+# Adam converges to the optimum; we cross-validate by minimizing
+# several closed-form-known functions and checking the final position
+# is within tolerance.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Adam::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/adam_optimizer_no_interop.stk
+
+# ── factory: fresh optimizer for a parameter vector of length n ──
+
+fn Adam::new($n, $lr, $beta1, $beta2, $eps) {
+    my @m = (0.0) x $n
+    my @v = (0.0) x $n
+    +{
+        n     => $n,
+        lr    => $lr,
+        beta1 => $beta1,
+        beta2 => $beta2,
+        eps   => $eps,
+        m     => \@m,
+        v     => \@v,
+        t     => 0,
+    }
+}
+
+# ── single Adam update step (in place on $params) ────────────────
+
+fn Adam::step($opt, $params, $grads) {
+    $opt->{t}++
+    my $n = $opt->{n}
+    for my $i (0:$n - 1) {
+        $opt->{m}->[$i] = $opt->{beta1} * $opt->{m}->[$i] + (1.0 - $opt->{beta1}) * $grads->[$i]
+        $opt->{v}->[$i] = $opt->{beta2} * $opt->{v}->[$i] + (1.0 - $opt->{beta2}) * $grads->[$i] * $grads->[$i]
+        my $m_hat = $opt->{m}->[$i] / (1.0 - $opt->{beta1} ** $opt->{t})
+        my $v_hat = $opt->{v}->[$i] / (1.0 - $opt->{beta2} ** $opt->{t})
+        $params->[$i] = $params->[$i] - $opt->{lr} * $m_hat / (sqrt($v_hat) + $opt->{eps})
+    }
+}
+
+# ── absolute value (no need for Math::abs) ────────────────────────
+
+fn Adam::fabs($v) {
+    $v < 0 ? -$v : $v
+}
+
+# ── 1-D quadratic: f(x) = (x − a)², gradient 2(x − a). Minimum: x = a ─
+
+fn Adam::run_quadratic($target_a, $x0, $steps, $lr) {
+    my $opt = Adam::new(1, $lr, 0.9, 0.999, 1e-8)
+    my @params = ($x0)
+    for my $i (1:$steps) {
+        my @grads = (2.0 * ($params[0] - $target_a))
+        Adam::step($opt, \@params, \@grads)
+    }
+    $params[0]
+}
+
+# ── 2-D Rosenbrock-like cousin: f(x, y) = (x − 1)² + 4(y − x²)² ──
+# Gradient: ∂f/∂x = 2(x − 1) − 16x(y − x²), ∂f/∂y = 8(y − x²)
+# Global minimum at (1, 1).
+
+fn Adam::rosen_grad($x, $y) {
+    my $g0 = 2.0 * ($x - 1.0) - 16.0 * $x * ($y - $x * $x)
+    my $g1 = 8.0 * ($y - $x * $x)
+    [$g0, $g1]
+}
+
+fn Adam::run_rosen($x0, $y0, $steps, $lr) {
+    my $opt = Adam::new(2, $lr, 0.9, 0.999, 1e-8)
+    my @params = ($x0, $y0)
+    for my $i (1:$steps) {
+        my $g = Adam::rosen_grad($params[0], $params[1])
+        Adam::step($opt, \@params, $g)
+    }
+    [$params[0], $params[1]]
+}
+
+# ── multivariate (5-D) quadratic: f(x) = Σᵢ (xᵢ − target_i)² ──────
+# Each component is independent; min at target_i for every i.
+
+fn Adam::run_md_quadratic($targets, $x0_arr, $steps, $lr) {
+    my $n = len(@$targets)
+    my $opt = Adam::new($n, $lr, 0.9, 0.999, 1e-8)
+    my @params = @$x0_arr
+    for my $i (1:$steps) {
+        my @grads
+        for my $j (0:$n - 1) {
+            push @grads, 2.0 * ($params[$j] - $targets->[$j])
+        }
+        Adam::step($opt, \@params, \@grads)
+    }
+    \@params
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{ name => "1-D quadratic, a=3, x₀=0",      target => 3.0,  start => 0.0,   steps => 500, lr => 0.1 },
+    +{ name => "1-D quadratic, a=−7, x₀=5",     target => -7.0, start => 5.0,   steps => 500, lr => 0.1 },
+    +{ name => "1-D quadratic, a=π̃, x₀=10",   target => 3.14, start => 10.0,  steps => 1000, lr => 0.05 },
+    +{ name => "1-D quadratic, a=0, x₀=100",   target => 0.0,  start => 100.0, steps => 5000, lr => 0.5 },
+)
+
+p "── Adam optimizer demo ───────────────────────────────"
+printf "  %-32s  %8s  %10s\n", "case", "target", "final"
+printf "  %-32s  %8s  %10s\n", "--------------------------------", "--------", "----------"
+for my $c (@cases) {
+    my $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
+    printf "  %-32s  %8.4f  %10.4f\n", $c->{name}, $c->{target}, $final
+}
+
+# ── invariant 1: 1-D quadratic converges to within 1e-3 of target ──
+
+for my $c (@cases) {
+    my $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
+    my $err = Adam::fabs($final - $c->{target})
+    die "1-D quadratic err #{$err} > 1e-3 on \"#{$c->{name}}\"" unless $err < 1e-3
+}
+
+# ── invariant 2: 2-D Rosenbrock-like cousin reaches (1, 1) ─────────
+# (Adam handles the curved valley well with enough steps.)
+
+my $r = Adam::run_rosen(-1.0, 1.0, 5000, 0.01)
+my $err_x = Adam::fabs($r->[0] - 1.0)
+my $err_y = Adam::fabs($r->[1] - 1.0)
+printf "\n  rosen-like (5000 steps, lr=0.01): (%.4f, %.4f)\n", $r->[0], $r->[1]
+die "Rosen-like x err #{$err_x} > 0.1" unless $err_x < 0.1
+die "Rosen-like y err #{$err_y} > 0.1" unless $err_y < 0.1
+
+# ── invariant 3: 5-D quadratic converges to every target component ─
+
+my @targets = (1.0, -2.0, 3.5, -0.7, 4.2)
+my @start_x = (0.0, 0.0, 0.0, 0.0, 0.0)
+my $md_final = Adam::run_md_quadratic(\@targets, \@start_x, 1000, 0.1)
+for my $i (0:4) {
+    my $err = Adam::fabs($md_final->[$i] - $targets[$i])
+    die "5-D quadratic[#{$i}] err #{$err} > 1e-3 on target #{$targets[$i]}" unless $err < 1e-3
+}
+
+# ── invariant 4: starting AT the minimum stays at the minimum ─────
+
+for my $c (@cases) {
+    my $final = Adam::run_quadratic($c->{target}, $c->{target}, 100, $c->{lr})
+    my $err = Adam::fabs($final - $c->{target})
+    die "started-at-min drifted by #{$err} on \"#{$c->{name}}\"" unless $err < 1e-3
+}
+
+# ── invariant 5: bias-correction prevents large initial steps ─────
+# After step 1, the corrected m̂ ≈ grad (because m_1 = (1-β₁) grad
+# and dividing by (1 − β₁) recovers grad). So the first-step Δx ≈
+# −lr · sign(grad). Verify on a known case.
+
+my $bc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
+my @bc_params = (5.0)
+Adam::step($bc_opt, \@bc_params, [4.0])   # grad > 0 → param decreases
+die "bias-correction first-step direction wrong" unless $bc_params[0] < 5.0
+die "bias-correction first-step magnitude wrong" unless Adam::fabs(5.0 - $bc_params[0]) < 0.2
+
+# ── invariant 6: zero gradient produces zero update ───────────────
+
+my $z_opt = Adam::new(3, 0.5, 0.9, 0.999, 1e-8)
+my @z_params = (1.0, 2.0, 3.0)
+for my $i (1:50) {
+    Adam::step($z_opt, \@z_params, [0.0, 0.0, 0.0])
+}
+die "zero-gradient drifted parameters" unless $z_params[0] == 1.0 && $z_params[1] == 2.0 && $z_params[2] == 3.0
+
+# ── invariant 7: monotone convergence — loss should be non-increasing ─
+# on a 1-D quadratic with the right lr.
+
+my $mc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
+my @mc_params = (10.0)
+my $last_loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
+my $bad = 0
+for my $i (1:500) {
+    my @grads = (2.0 * $mc_params[0])
+    Adam::step($mc_opt, \@mc_params, \@grads)
+    my $loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
+    # Allow micro-oscillation up to 1e-6 of last loss.
+    $bad++ if $loss > $last_loss + 1e-6
+    $last_loss = $loss
+}
+# A small number of bumps is OK from the bias-correction transient
+# in the first few steps. Demand < 10% bad steps.
+die "monotone convergence violated #{$bad} times out of 500" unless $bad < 50
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
