@@ -15,9 +15,7 @@ const WRAPPER_CARGO: &str = include_str!("../templates/devops/wrapper_cargo.toml
 /// `run` — see implementation.
 pub fn run(out_dir: Option<&str>, app_name_override: Option<&str>) -> Result<()> {
     if !Path::new("config/application.stk").exists() {
-        return Err(
-            "config/application.stk not found — run from an app directory.".into(),
-        );
+        return Err("config/application.stk not found — run from an app directory.".into());
     }
 
     let cwd = std::env::current_dir()?;
@@ -38,19 +36,13 @@ pub fn run(out_dir: Option<&str>, app_name_override: Option<&str>) -> Result<()>
 
     // Walk the app dir and collect every file we want embedded.
     let mut entries: Vec<(String, String)> = Vec::new();
-    for top in [
-        "config",
-        "app",
-        "db/migrate",
-        "db/seeds.stk",
-        "public",
-    ] {
+    for top in ["config", "app", "db/migrate", "db/seeds.stk", "public"] {
         collect_files(&cwd, &cwd.join(top), &mut entries)?;
     }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
 
     let mut embedded_lit = String::new();
-    for (rel, body) in &entries {
+    for (rel, _body) in &entries {
         embedded_lit.push_str(&format!(
             "    ({:?}, include_str!({:?})),\n",
             rel,
@@ -66,12 +58,10 @@ pub fn run(out_dir: Option<&str>, app_name_override: Option<&str>) -> Result<()>
         .or_else(|| locate_strykelang_path(&cwd))
         .unwrap_or_else(|| PathBuf::from("../../strykelang"));
 
-    let cargo_toml = WRAPPER_CARGO
-        .replace("{{app_name}}", &app_name)
-        .replace(
-            "{{strykelang_path}}",
-            &strykelang_path.display().to_string(),
-        );
+    let cargo_toml = WRAPPER_CARGO.replace("{{app_name}}", &app_name).replace(
+        "{{strykelang_path}}",
+        &strykelang_path.display().to_string(),
+    );
     let main_rs = WRAPPER_MAIN.replace("{{embedded_entries}}", &embedded_lit);
 
     std::fs::write(out.join("Cargo.toml"), cargo_toml)?;
@@ -85,7 +75,11 @@ pub fn run(out_dir: Option<&str>, app_name_override: Option<&str>) -> Result<()>
     println!("  cd {}", out.display());
     println!("  cargo build --release");
     println!();
-    println!("Resulting binary: {}/target/release/{}", out.display(), app_name);
+    println!(
+        "Resulting binary: {}/target/release/{}",
+        out.display(),
+        app_name
+    );
     println!("Run with: ./{} (no other deps required)", app_name);
     Ok(())
 }
@@ -113,7 +107,11 @@ fn collect_files(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) -> Re
         return Ok(());
     }
     if dir.is_file() {
-        let rel = dir.strip_prefix(root).unwrap().to_string_lossy().to_string();
+        let rel = dir
+            .strip_prefix(root)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
         let body = std::fs::read_to_string(dir).unwrap_or_default();
         out.push((rel, body));
         return Ok(());
@@ -145,7 +143,11 @@ fn collect_files(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) -> Re
                 );
                 continue;
             }
-            let rel = path.strip_prefix(root).unwrap().to_string_lossy().to_string();
+            let rel = path
+                .strip_prefix(root)
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
             let body = std::fs::read_to_string(&path).unwrap_or_default();
             out.push((rel, body));
         }
