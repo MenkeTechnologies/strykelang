@@ -1,0 +1,243 @@
+#!/usr/bin/env stryke
+
+# Rotating calipers — diameter of a point set in O(n log n): first
+# compute the convex hull (Andrew's monotone chain), then sweep two
+# parallel support lines around the polygon. The diameter is always
+# realized by a pair of "antipodal" vertices, and the calipers
+# enumerate every antipodal pair in linear time. Cross-validated
+# against the O(n²) brute force on every input.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Cal::`) under --no-interop (§18)
+#   * `_0`/`_1` in sort comparator (§11)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/rotating_calipers_no_interop.stk
+
+# ── squared 2D distance ──────────────────────────────────────────
+
+fn Cal::dist2($pa, $pb) {
+    my $dx = $pa->[0] - $pb->[0]
+    my $dy = $pa->[1] - $pb->[1]
+    $dx * $dx + $dy * $dy
+}
+
+# ── cross product OA × OB ────────────────────────────────────────
+
+fn Cal::cross($o, $p1, $p2) {
+    ($p1->[0] - $o->[0]) * ($p2->[1] - $o->[1]) - ($p1->[1] - $o->[1]) * ($p2->[0] - $o->[0])
+}
+
+# ── Andrew's monotone-chain convex hull (CCW, no duplicate endpts) ─
+
+fn Cal::convex_hull($pts) {
+    my @sorted = sort {
+        _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
+    } @$pts
+    my $n = len(@sorted)
+    return [@sorted] if $n < 3
+    my @lo
+    for my $p (@sorted) {
+        while (len(@lo) >= 2 && Cal::cross($lo[-2], $lo[-1], $p) <= 0) {
+            pop(@lo)
+        }
+        push @lo, $p
+    }
+    my @up
+    for my $i (0:$n - 1) {
+        my $p = $sorted[$n - 1 - $i]
+        while (len(@up) >= 2 && Cal::cross($up[-2], $up[-1], $p) <= 0) {
+            pop(@up)
+        }
+        push @up, $p
+    }
+    pop(@lo)
+    pop(@up)
+    [@lo, @up]
+}
+
+# ── Twice the signed area of triangle (a, b, c). For rotating ─────
+# calipers, we don't care about sign — only magnitude.
+
+fn Cal::tri_area2($pa, $pb, $pc) {
+    my $v = ($pb->[0] - $pa->[0]) * ($pc->[1] - $pa->[1]) - ($pb->[1] - $pa->[1]) * ($pc->[0] - $pa->[0])
+    $v < 0 ? -$v : $v
+}
+
+# ── rotating calipers on a CCW convex polygon ────────────────────
+# Returns +{ d2 => squared diameter, pa, pb }.
+
+fn Cal::diameter($pts) {
+    my $hull = Cal::convex_hull($pts)
+    my $n = len(@$hull)
+    if ($n == 1) {
+        return +{ d2 => 0, pa => $hull->[0], pb => $hull->[0] }
+    }
+    if ($n == 2) {
+        return +{ d2 => Cal::dist2($hull->[0], $hull->[1]), pa => $hull->[0], pb => $hull->[1] }
+    }
+    my $j = 1
+    my $best = 0
+    my $bp_a = $hull->[0]
+    my $bp_b = $hull->[1]
+    for my $i (0:$n - 1) {
+        my $i_next = ($i + 1) % $n
+        while (Cal::tri_area2($hull->[$i], $hull->[$i_next], $hull->[($j + 1) % $n]) > Cal::tri_area2($hull->[$i], $hull->[$i_next], $hull->[$j])) {
+            $j = ($j + 1) % $n
+        }
+        my $d_a = Cal::dist2($hull->[$i], $hull->[$j])
+        if ($d_a > $best) {
+            $best = $d_a
+            $bp_a = $hull->[$i]
+            $bp_b = $hull->[$j]
+        }
+        my $d_b = Cal::dist2($hull->[$i_next], $hull->[$j])
+        if ($d_b > $best) {
+            $best = $d_b
+            $bp_a = $hull->[$i_next]
+            $bp_b = $hull->[$j]
+        }
+    }
+    +{ d2 => $best, pa => $bp_a, pb => $bp_b }
+}
+
+# ── O(n²) brute force diameter ───────────────────────────────────
+
+fn Cal::brute_diameter($pts) {
+    my $n = len(@$pts)
+    return +{ d2 => 0, pa => $pts->[0], pb => $pts->[0] } if $n < 2
+    my $best = 0
+    my $bp_a = $pts->[0]
+    my $bp_b = $pts->[1]
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1:$n - 1) {
+            my $d = Cal::dist2($pts->[$i], $pts->[$j])
+            if ($d > $best) {
+                $best = $d
+                $bp_a = $pts->[$i]
+                $bp_b = $pts->[$j]
+            }
+        }
+    }
+    +{ d2 => $best, pa => $bp_a, pb => $bp_b }
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{ name => "2-point line",      pts => [[0, 0], [10, 0]],                              d2 => 100 },
+    +{ name => "axis-aligned 4",    pts => [[0, 0], [4, 0], [0, 3], [4, 3]],               d2 => 25  },
+    +{ name => "regular triangle",  pts => [[0, 0], [4, 0], [2, 3]],                       d2 => 16  },
+    +{ name => "tight pentagon",    pts => [[5, 0], [11, 4], [9, 10], [2, 9], [0, 4]],     d2 => 121 },
+    +{ name => "scattered 8",       pts => [
+        [0, 0], [10, 0], [10, 10], [0, 10],
+        [3, 3], [7, 7], [5, 5], [2, 8],
+    ], d2 => 200 },
+    +{ name => "long thin set",     pts => [[0, 0], [100, 0], [50, 1]], d2 => 10000 },
+    +{ name => "internal noise",    pts => [
+        [-5, -5], [5, -5], [5, 5], [-5, 5],
+        [0, 0], [1, 1], [-1, -1], [2, -2],
+    ], d2 => 200 },
+)
+
+p "── rotating-calipers diameter demo ───────────────────"
+printf "  %-22s  %3s  %6s  %s\n", "case", "n", "d²", "pair"
+printf "  %-22s  %3s  %6s  %s\n", "----------------------", "---", "------", "----"
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    printf "  %-22s  %3d  %6d  (%d,%d)-(%d,%d)  %s\n",
+        $c->{name}, len(@{$c->{pts}}), $r->{d2},
+        $r->{pa}->[0], $r->{pa}->[1], $r->{pb}->[0], $r->{pb}->[1],
+        $r->{d2} == $c->{d2} ? "" : "FAIL want=#{$c->{d2}}"
+}
+
+# ── invariant 1: rotating calipers matches expected d² ────────────
+
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    die "d² #{$r->{d2}} != expected #{$c->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $c->{d2}
+}
+
+# ── invariant 2: rotating calipers matches O(n²) brute force ──────
+
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    my $br = Cal::brute_diameter($c->{pts})
+    die "calipers #{$r->{d2}} != brute #{$br->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $br->{d2}
+}
+
+# ── invariant 3: returned pair has the reported distance ──────────
+
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    my $d_check = Cal::dist2($r->{pa}, $r->{pb})
+    die "pair d² #{$d_check} != reported #{$r->{d2}} on \"#{$c->{name}}\"" unless $d_check == $r->{d2}
+}
+
+# ── invariant 4: both points of the pair are in the input ─────────
+
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    my $found_a = 0
+    my $found_b = 0
+    for my $p (@{$c->{pts}}) {
+        $found_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
+        $found_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
+    }
+    die "pa not in input on \"#{$c->{name}}\"" unless $found_a
+    die "pb not in input on \"#{$c->{name}}\"" unless $found_b
+}
+
+# ── invariant 5: no pair in input is farther apart ────────────────
+
+for my $c (@cases) {
+    my $r = Cal::diameter($c->{pts})
+    my $n = len(@{$c->{pts}})
+    for my $i (0:$n - 1) {
+        for my $j ($i + 1:$n - 1) {
+            my $d = Cal::dist2($c->{pts}->[$i], $c->{pts}->[$j])
+            die "found longer pair (#{$d} > #{$r->{d2}}) on \"#{$c->{name}}\"" if $d > $r->{d2}
+        }
+    }
+}
+
+# ── invariant 6: diameter pair endpoints lie on the convex hull ───
+
+for my $c (@cases) {
+    next if len(@{$c->{pts}}) < 3
+    my $r = Cal::diameter($c->{pts})
+    my $hull = Cal::convex_hull($c->{pts})
+    my $on_a = 0
+    my $on_b = 0
+    for my $p (@$hull) {
+        $on_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
+        $on_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
+    }
+    die "pa not on hull on \"#{$c->{name}}\"" unless $on_a
+    die "pb not on hull on \"#{$c->{name}}\"" unless $on_b
+}
+
+# ── invariant 7: a duplicated single point has d² = 0 ─────────────
+
+my $dup = Cal::diameter([[3, 4], [3, 4], [3, 4]])
+die "duplicate-only diameter must be 0" unless $dup->{d2} == 0
+
+# ── invariant 8: convex hull is CCW (sanity check) ────────────────
+
+for my $c (@cases) {
+    next if len(@{$c->{pts}}) < 3
+    my $hull = Cal::convex_hull($c->{pts})
+    my $n = len(@$hull)
+    next if $n < 3
+    for my $i (0:$n - 1) {
+        my $p0 = $hull->[$i]
+        my $p1 = $hull->[($i + 1) % $n]
+        my $p2 = $hull->[($i + 2) % $n]
+        my $cr = Cal::cross($p0, $p1, $p2)
+        die "hull not CCW at vertex #{$i} on \"#{$c->{name}}\": cross=#{$cr}" unless $cr > 0
+    }
+}
+
+p ""
+p "── all eight invariants satisfied ────────────────────"

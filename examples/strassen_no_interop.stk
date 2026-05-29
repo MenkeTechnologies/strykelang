@@ -1,0 +1,430 @@
+#!/usr/bin/env stryke
+
+# Strassen matrix multiplication — recursive divide-and-conquer that
+# computes the 2n×2n product with SEVEN n×n sub-multiplications
+# (instead of the textbook eight), giving the famous O(n^log₂7) ≈
+# O(n^2.807) bound. The seven Strassen products M1..M7 are derived
+# in the doc-block below; below a small base-case threshold we fall
+# back to O(n³) grade-school multiplication. Cross-validated against
+# grade-school on every input.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Str::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/strassen_no_interop.stk
+
+# ── grade-school multiplication for the base case ────────────────
+
+fn Str::grade_school($A, $B) {
+    my $n = len(@$A)
+    my $m = len(@{$B->[0]})
+    my $k = len(@{$A->[0]})
+    my @C
+    for my $i (0:$n - 1) {
+        my @row = (0) x $m
+        push @C, \@row
+    }
+    for my $i (0:$n - 1) {
+        for my $j (0:$m - 1) {
+            my $s = 0
+            for my $kk (0:$k - 1) {
+                $s += $A->[$i]->[$kk] * $B->[$kk]->[$j]
+            }
+            $C[$i]->[$j] = $s
+        }
+    }
+    \@C
+}
+
+# ── add two n×n matrices ─────────────────────────────────────────
+
+fn Str::add($A, $B) {
+    my $n = len(@$A)
+    my @C
+    for my $i (0:$n - 1) {
+        my @row = (0) x $n
+        push @C, \@row
+    }
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            $C[$i]->[$j] = $A->[$i]->[$j] + $B->[$i]->[$j]
+        }
+    }
+    \@C
+}
+
+# ── subtract two n×n matrices ────────────────────────────────────
+
+fn Str::sub($A, $B) {
+    my $n = len(@$A)
+    my @C
+    for my $i (0:$n - 1) {
+        my @row = (0) x $n
+        push @C, \@row
+    }
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            $C[$i]->[$j] = $A->[$i]->[$j] - $B->[$i]->[$j]
+        }
+    }
+    \@C
+}
+
+# ── split n×n matrix into four (n/2)×(n/2) blocks ────────────────
+# Returns [A11, A12, A21, A22] arrayrefs.
+
+fn Str::split($A) {
+    my $n = len(@$A)
+    my $half = int($n / 2)
+    my @blocks = ([], [], [], [])
+    for my $i (0:$half - 1) {
+        my @top_l = @{$A->[$i]}[0:$half - 1]
+        my @top_r = @{$A->[$i]}[$half:$n - 1]
+        my @bot_l = @{$A->[$i + $half]}[0:$half - 1]
+        my @bot_r = @{$A->[$i + $half]}[$half:$n - 1]
+        push @{$blocks[0]}, \@top_l
+        push @{$blocks[1]}, \@top_r
+        push @{$blocks[2]}, \@bot_l
+        push @{$blocks[3]}, \@bot_r
+    }
+    \@blocks
+}
+
+# ── join four (n/2)×(n/2) blocks into one n×n matrix ─────────────
+
+fn Str::join_blocks($C11, $C12, $C21, $C22) {
+    my $half = len(@$C11)
+    my @C
+    for my $i (0:$half - 1) {
+        my @row = (@{$C11->[$i]}, @{$C12->[$i]})
+        push @C, \@row
+    }
+    for my $i (0:$half - 1) {
+        my @row = (@{$C21->[$i]}, @{$C22->[$i]})
+        push @C, \@row
+    }
+    \@C
+}
+
+# ── Strassen recursive multiply ──────────────────────────────────
+# Strassen's seven products:
+#   M1 = (A11 + A22)(B11 + B22)
+#   M2 = (A21 + A22) B11
+#   M3 = A11 (B12 − B22)
+#   M4 = A22 (B21 − B11)
+#   M5 = (A11 + A12) B22
+#   M6 = (A21 − A11)(B11 + B12)
+#   M7 = (A12 − A22)(B21 + B22)
+# Then:
+#   C11 = M1 + M4 − M5 + M7
+#   C12 = M3 + M5
+#   C21 = M2 + M4
+#   C22 = M1 − M2 + M3 + M6
+
+fn Str::strassen($A, $B) {
+    my $n = len(@$A)
+    if ($n <= 2) {
+        return Str::grade_school($A, $B)
+    }
+    my $a_split = Str::split($A)
+    my $b_split = Str::split($B)
+    my $A11 = $a_split->[0]
+    my $A12 = $a_split->[1]
+    my $A21 = $a_split->[2]
+    my $A22 = $a_split->[3]
+    my $B11 = $b_split->[0]
+    my $B12 = $b_split->[1]
+    my $B21 = $b_split->[2]
+    my $B22 = $b_split->[3]
+    my $M1 = Str::strassen(Str::add($A11, $A22), Str::add($B11, $B22))
+    my $M2 = Str::strassen(Str::add($A21, $A22), $B11)
+    my $M3 = Str::strassen($A11, Str::sub($B12, $B22))
+    my $M4 = Str::strassen($A22, Str::sub($B21, $B11))
+    my $M5 = Str::strassen(Str::add($A11, $A12), $B22)
+    my $M6 = Str::strassen(Str::sub($A21, $A11), Str::add($B11, $B12))
+    my $M7 = Str::strassen(Str::sub($A12, $A22), Str::add($B21, $B22))
+    my $C11 = Str::add(Str::sub(Str::add($M1, $M4), $M5), $M7)
+    my $C12 = Str::add($M3, $M5)
+    my $C21 = Str::add($M2, $M4)
+    my $C22 = Str::add(Str::sub(Str::add($M1, $M3), $M2), $M6)
+    Str::join_blocks($C11, $C12, $C21, $C22)
+}
+
+# ── pad an n×n matrix up to the next power of 2 ──────────────────
+
+fn Str::next_pow2($n) {
+    my $p = 1
+    while ($p < $n) {
+        $p = $p * 2
+    }
+    $p
+}
+
+fn Str::pad($A, $size) {
+    my $n = len(@$A)
+    my @padded
+    for my $i (0:$size - 1) {
+        my @row = (0) x $size
+        push @padded, \@row
+    }
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            $padded[$i]->[$j] = $A->[$i]->[$j]
+        }
+    }
+    \@padded
+}
+
+# ── multiply two arbitrary-size square matrices via Strassen ──────
+
+fn Str::multiply($A, $B) {
+    my $n = len(@$A)
+    die "Strassen demo: square matrices only" unless len(@{$A->[0]}) == $n && len(@$B) == $n && len(@{$B->[0]}) == $n
+    my $p = Str::next_pow2($n)
+    my $Ap = Str::pad($A, $p)
+    my $Bp = Str::pad($B, $p)
+    my $Cp = Str::strassen($Ap, $Bp)
+    my @C
+    for my $i (0:$n - 1) {
+        my @row
+        for my $j (0:$n - 1) {
+            push @row, $Cp->[$i]->[$j]
+        }
+        push @C, \@row
+    }
+    \@C
+}
+
+# ── matrices for testing ─────────────────────────────────────────
+
+fn Str::identity($n) {
+    my @I
+    for my $i (0:$n - 1) {
+        my @row = (0) x $n
+        $row[$i] = 1
+        push @I, \@row
+    }
+    \@I
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{
+        name => "2x2 trivial",
+        A    => [[1, 2], [3, 4]],
+        B    => [[5, 6], [7, 8]],
+    },
+    +{
+        name => "3x3 mixed",
+        A    => [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+        B    => [[9, 8, 7], [6, 5, 4], [3, 2, 1]],
+    },
+    +{
+        name => "4x4 magic",
+        A    => [
+            [ 1,  2,  3,  4],
+            [ 5,  6,  7,  8],
+            [ 9, 10, 11, 12],
+            [13, 14, 15, 16],
+        ],
+        B    => [
+            [16, 15, 14, 13],
+            [12, 11, 10,  9],
+            [ 8,  7,  6,  5],
+            [ 4,  3,  2,  1],
+        ],
+    },
+    +{
+        name => "5x5 random",
+        A    => [
+            [3, 1, 4, 1, 5],
+            [9, 2, 6, 5, 3],
+            [5, 8, 9, 7, 9],
+            [3, 2, 3, 8, 4],
+            [6, 2, 6, 4, 3],
+        ],
+        B    => [
+            [3, 8, 3, 2, 7],
+            [9, 5, 0, 2, 8],
+            [8, 4, 1, 9, 7],
+            [1, 6, 9, 3, 9],
+            [9, 3, 7, 5, 1],
+        ],
+    },
+    +{
+        name => "8x8 sequential",
+        A    => [
+            [ 1,  2,  3,  4,  5,  6,  7,  8],
+            [ 9, 10, 11, 12, 13, 14, 15, 16],
+            [17, 18, 19, 20, 21, 22, 23, 24],
+            [25, 26, 27, 28, 29, 30, 31, 32],
+            [33, 34, 35, 36, 37, 38, 39, 40],
+            [41, 42, 43, 44, 45, 46, 47, 48],
+            [49, 50, 51, 52, 53, 54, 55, 56],
+            [57, 58, 59, 60, 61, 62, 63, 64],
+        ],
+        B    => [
+            [64, 63, 62, 61, 60, 59, 58, 57],
+            [56, 55, 54, 53, 52, 51, 50, 49],
+            [48, 47, 46, 45, 44, 43, 42, 41],
+            [40, 39, 38, 37, 36, 35, 34, 33],
+            [32, 31, 30, 29, 28, 27, 26, 25],
+            [24, 23, 22, 21, 20, 19, 18, 17],
+            [16, 15, 14, 13, 12, 11, 10,  9],
+            [ 8,  7,  6,  5,  4,  3,  2,  1],
+        ],
+    },
+)
+
+p "── Strassen matrix-multiply demo ─────────────────────"
+printf "  %-22s  %3s  %s\n", "case", "n", "first row of A·B"
+printf "  %-22s  %3s  %s\n", "----------------------", "---", "----------------"
+for my $c (@cases) {
+    my $C = Str::multiply($c->{A}, $c->{B})
+    my @vals = @{$C->[0]}
+    printf "  %-22s  %3d  [%s]\n", $c->{name}, len(@{$c->{A}}), join(",", @vals)
+}
+
+# ── invariant 1: Strassen matches grade-school on every product ───
+
+for my $c (@cases) {
+    my $strass = Str::multiply($c->{A}, $c->{B})
+    my $ref = Str::grade_school($c->{A}, $c->{B})
+    my $n = len(@$strass)
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            die "Strassen[#{$i}][#{$j}] = #{$strass->[$i]->[$j]} != grade-school = #{$ref->[$i]->[$j]} on \"#{$c->{name}}\"" unless $strass->[$i]->[$j] == $ref->[$i]->[$j]
+        }
+    }
+}
+
+# ── invariant 2: A · I == A for every size ────────────────────────
+
+for my $c (@cases) {
+    my $n = len(@{$c->{A}})
+    my $I = Str::identity($n)
+    my $AI = Str::multiply($c->{A}, $I)
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            die "A·I != A at (#{$i}, #{$j}) on \"#{$c->{name}}\"" unless $AI->[$i]->[$j] == $c->{A}->[$i]->[$j]
+        }
+    }
+}
+
+# ── invariant 3: I · B == B for every size ────────────────────────
+
+for my $c (@cases) {
+    my $n = len(@{$c->{A}})
+    my $I = Str::identity($n)
+    my $IB = Str::multiply($I, $c->{B})
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            die "I·B != B at (#{$i}, #{$j}) on \"#{$c->{name}}\"" unless $IB->[$i]->[$j] == $c->{B}->[$i]->[$j]
+        }
+    }
+}
+
+# ── invariant 4: A · (B + C) == A·B + A·C (distributivity) ────────
+
+for my $size (2, 4, 8) {
+    my @triple
+    for my $which (0:2) {
+        my @M
+        for my $i (0:$size - 1) {
+            my @row
+            for my $j (0:$size - 1) {
+                push @row, ($i * 13 + $j * 17 + $which * 23) % 19
+            }
+            push @M, \@row
+        }
+        push @triple, \@M
+    }
+    my $A = $triple[0]
+    my $B = $triple[1]
+    my $C = $triple[2]
+    my $BC = Str::add($B, $C)
+    my $left = Str::multiply($A, $BC)
+    my $AB = Str::multiply($A, $B)
+    my $AC = Str::multiply($A, $C)
+    my $right = Str::add($AB, $AC)
+    for my $i (0:$size - 1) {
+        for my $j (0:$size - 1) {
+            die "distributivity failed at size #{$size}, (#{$i}, #{$j})" unless $left->[$i]->[$j] == $right->[$i]->[$j]
+        }
+    }
+}
+
+# ── invariant 5: associativity (A · B) · C == A · (B · C) ─────────
+
+for my $size (2, 4, 8) {
+    my @triple
+    for my $which (0:2) {
+        my @M
+        for my $i (0:$size - 1) {
+            my @row
+            for my $j (0:$size - 1) {
+                push @row, ($i * 7 + $j * 11 + $which * 5) % 13
+            }
+            push @M, \@row
+        }
+        push @triple, \@M
+    }
+    my $left = Str::multiply(Str::multiply($triple[0], $triple[1]), $triple[2])
+    my $right = Str::multiply($triple[0], Str::multiply($triple[1], $triple[2]))
+    for my $i (0:$size - 1) {
+        for my $j (0:$size - 1) {
+            die "associativity failed at size #{$size}, (#{$i}, #{$j})" unless $left->[$i]->[$j] == $right->[$i]->[$j]
+        }
+    }
+}
+
+# ── invariant 6: zero-matrix multiplication yields zero ───────────
+
+for my $n (2, 3, 4, 5, 8) {
+    my @Z
+    for my $i (0:$n - 1) {
+        my @row = (0) x $n
+        push @Z, \@row
+    }
+    my @rand_M
+    for my $i (0:$n - 1) {
+        my @row
+        for my $j (0:$n - 1) {
+            push @row, ($i + 1) * ($j + 3)
+        }
+        push @rand_M, \@row
+    }
+    my $Z_M = Str::multiply(\@Z, \@rand_M)
+    my $M_Z = Str::multiply(\@rand_M, \@Z)
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            die "0·M not zero at size #{$n}" unless $Z_M->[$i]->[$j] == 0
+            die "M·0 not zero at size #{$n}" unless $M_Z->[$i]->[$j] == 0
+        }
+    }
+}
+
+# ── invariant 7: padding doesn't change the result (size 5 → 8) ──
+
+my $five = [
+    [1, 2, 3, 4, 5],
+    [5, 4, 3, 2, 1],
+    [2, 3, 5, 7, 11],
+    [13, 17, 19, 23, 29],
+    [31, 37, 41, 43, 47],
+]
+my $A_pad = Str::pad($five, 8)
+my $B_pad = Str::pad($five, 8)
+my $C_pad = Str::strassen($A_pad, $B_pad)
+my $C_direct = Str::multiply($five, $five)
+for my $i (0:4) {
+    for my $j (0:4) {
+        die "pad-vs-direct mismatch at (#{$i}, #{$j})" unless $C_pad->[$i]->[$j] == $C_direct->[$i]->[$j]
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
