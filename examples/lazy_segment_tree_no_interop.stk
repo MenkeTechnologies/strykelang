@@ -1,0 +1,310 @@
+#!/usr/bin/env stryke
+
+# Lazy segment tree — range update + range query in O(log n) each
+# via deferred propagation. Each node owns a partial-sum value AND a
+# "lazy" addend that will be applied to its subtree later; on every
+# query/update that passes through a node, we first push the lazy
+# value down one level so the invariants stay current. This demo
+# implements range-add + range-sum; the lazy delta is `+v` and the
+# combiner is summation. Cross-validated against a naive O(n) array
+# on every operation.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Lst::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/lazy_segment_tree_no_interop.stk
+
+# ── factory: build from initial array ────────────────────────────
+
+fn Lst::new($arr) {
+    my $n = len(@$arr)
+    my $tree = +{ n => $n, sum => [(0) x (4 * $n)], lazy => [(0) x (4 * $n)] }
+    Lst::build($tree, 1, 0, $n - 1, $arr) if $n > 0
+    $tree
+}
+
+# ── build the tree recursively at node `nd` over [l, r] ──────────
+
+fn Lst::build($tree, $nd, $l, $r, $arr) {
+    if ($l == $r) {
+        $tree->{sum}->[$nd] = $arr->[$l]
+        return
+    }
+    my $mid = int(($l + $r) / 2)
+    Lst::build($tree, 2 * $nd,     $l,      $mid, $arr)
+    Lst::build($tree, 2 * $nd + 1, $mid + 1, $r,  $arr)
+    $tree->{sum}->[$nd] = $tree->{sum}->[2 * $nd] + $tree->{sum}->[2 * $nd + 1]
+}
+
+# ── push the pending lazy delta down to children ─────────────────
+
+fn Lst::push_down($tree, $nd, $l, $r) {
+    return if $tree->{lazy}->[$nd] == 0
+    my $mid = int(($l + $r) / 2)
+    my $left_size  = $mid - $l + 1
+    my $right_size = $r - $mid
+    my $d = $tree->{lazy}->[$nd]
+    $tree->{sum}->[2 * $nd]      += $d * $left_size
+    $tree->{lazy}->[2 * $nd]     += $d
+    $tree->{sum}->[2 * $nd + 1]  += $d * $right_size
+    $tree->{lazy}->[2 * $nd + 1] += $d
+    $tree->{lazy}->[$nd] = 0
+}
+
+# ── range add: add `v` to every index in [ql, qr] ────────────────
+
+fn Lst::update($tree, $nd, $l, $r, $ql, $qr, $v) {
+    return if $qr < $l || $r < $ql
+    if ($ql <= $l && $r <= $qr) {
+        $tree->{sum}->[$nd]  += $v * ($r - $l + 1)
+        $tree->{lazy}->[$nd] += $v
+        return
+    }
+    Lst::push_down($tree, $nd, $l, $r)
+    my $mid = int(($l + $r) / 2)
+    Lst::update($tree, 2 * $nd,     $l,      $mid, $ql, $qr, $v)
+    Lst::update($tree, 2 * $nd + 1, $mid + 1, $r,  $ql, $qr, $v)
+    $tree->{sum}->[$nd] = $tree->{sum}->[2 * $nd] + $tree->{sum}->[2 * $nd + 1]
+}
+
+# ── range sum over [ql, qr] ──────────────────────────────────────
+
+fn Lst::query($tree, $nd, $l, $r, $ql, $qr) {
+    return 0 if $qr < $l || $r < $ql
+    if ($ql <= $l && $r <= $qr) {
+        return $tree->{sum}->[$nd]
+    }
+    Lst::push_down($tree, $nd, $l, $r)
+    my $mid = int(($l + $r) / 2)
+    my $left  = Lst::query($tree, 2 * $nd,     $l,      $mid, $ql, $qr)
+    my $right = Lst::query($tree, 2 * $nd + 1, $mid + 1, $r,  $ql, $qr)
+    $left + $right
+}
+
+# ── convenience wrappers ─────────────────────────────────────────
+
+fn Lst::range_add($tree, $ql, $qr, $v) {
+    Lst::update($tree, 1, 0, $tree->{n} - 1, $ql, $qr, $v)
+}
+
+fn Lst::range_sum($tree, $ql, $qr) {
+    Lst::query($tree, 1, 0, $tree->{n} - 1, $ql, $qr)
+}
+
+# ── reconstruct the underlying array via leaf-by-leaf queries ─────
+
+fn Lst::to_array($tree) {
+    my @out
+    for my $i (0:$tree->{n} - 1) {
+        push @out, Lst::range_sum($tree, $i, $i)
+    }
+    \@out
+}
+
+# ── O(n) reference: range add + range sum on a flat array ─────────
+
+fn Lst::ref_range_add($arr, $l, $r, $v) {
+    for my $i ($l:$r) {
+        $arr->[$i] = $arr->[$i] + $v
+    }
+}
+
+fn Lst::ref_range_sum($arr, $l, $r) {
+    my $s = 0
+    for my $i ($l:$r) {
+        $s += $arr->[$i]
+    }
+    $s
+}
+
+# ── test workloads ───────────────────────────────────────────────
+
+my @workloads = (
+    +{
+        name => "small mixed",
+        init => [1, 2, 3, 4, 5, 6, 7, 8],
+        ops  => [
+            ["q", 0, 7],
+            ["u", 2, 5, 10],
+            ["q", 0, 7],
+            ["q", 3, 4],
+            ["u", 0, 0, 100],
+            ["q", 0, 0],
+            ["q", 0, 7],
+        ],
+    },
+    +{
+        name => "all zeros + adds",
+        init => [(0) x 16],
+        ops  => [
+            ["u", 0, 15, 1],
+            ["u", 4, 11, 2],
+            ["q", 0, 15],
+            ["q", 4, 11],
+            ["u", 8, 8, 100],
+            ["q", 7, 9],
+        ],
+    },
+    +{
+        name => "alternating sign",
+        init => [10, -10, 10, -10, 10, -10, 10, -10],
+        ops  => [
+            ["q", 0, 7],
+            ["u", 1, 1, 20],
+            ["q", 0, 7],
+            ["u", 0, 6, -5],
+            ["q", 0, 7],
+        ],
+    },
+    +{
+        name => "many overlapping adds",
+        init => [(1) x 12],
+        ops  => [
+            ["u", 0, 5, 3],
+            ["u", 3, 8, 5],
+            ["u", 7, 11, 2],
+            ["q", 0, 11],
+            ["q", 4, 7],
+            ["u", 0, 11, -1],
+            ["q", 0, 11],
+        ],
+    },
+)
+
+p "── lazy segment-tree demo ────────────────────────────"
+printf "  %-22s  %5s  %5s\n", "workload", "ops", "final-sum"
+printf "  %-22s  %5s  %5s\n", "----------------------", "-----", "---------"
+for my $w (@workloads) {
+    my $tree = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        if ($op->[0] eq "u") {
+            Lst::range_add($tree, $op->[1], $op->[2], $op->[3])
+        }
+    }
+    my $total = Lst::range_sum($tree, 0, len(@{$w->{init}}) - 1)
+    printf "  %-22s  %5d  %5d\n", $w->{name}, len(@{$w->{ops}}), $total
+}
+
+# ── invariant 1: query result matches reference array on every op ─
+
+for my $w (@workloads) {
+    my @ref = @{$w->{init}}
+    my $tree = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        if ($op->[0] eq "u") {
+            Lst::ref_range_add(\@ref, $op->[1], $op->[2], $op->[3])
+            Lst::range_add($tree, $op->[1], $op->[2], $op->[3])
+        } else {
+            my $ref_s = Lst::ref_range_sum(\@ref, $op->[1], $op->[2])
+            my $tree_s = Lst::range_sum($tree, $op->[1], $op->[2])
+            die "q[#{$op->[1]}, #{$op->[2]}] tree=#{$tree_s} ref=#{$ref_s} on \"#{$w->{name}}\"" unless $tree_s == $ref_s
+        }
+    }
+}
+
+# ── invariant 2: per-leaf reconstruction matches reference ────────
+
+for my $w (@workloads) {
+    my @ref = @{$w->{init}}
+    my $tree = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        next unless $op->[0] eq "u"
+        Lst::ref_range_add(\@ref, $op->[1], $op->[2], $op->[3])
+        Lst::range_add($tree, $op->[1], $op->[2], $op->[3])
+    }
+    my $rebuilt = Lst::to_array($tree)
+    my $n = len(@$rebuilt)
+    for my $i (0:$n - 1) {
+        die "rebuilt[#{$i}] tree=#{$rebuilt->[$i]} ref=#{$ref[$i]} on \"#{$w->{name}}\"" unless $rebuilt->[$i] == $ref[$i]
+    }
+}
+
+# ── invariant 3: total = sum of every single-leaf query ───────────
+
+for my $w (@workloads) {
+    my $tree = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        Lst::range_add($tree, $op->[1], $op->[2], $op->[3]) if $op->[0] eq "u"
+    }
+    my $total = Lst::range_sum($tree, 0, $tree->{n} - 1)
+    my $sum_leaves = 0
+    for my $i (0:$tree->{n} - 1) {
+        $sum_leaves += Lst::range_sum($tree, $i, $i)
+    }
+    die "total #{$total} != Σ-leaves #{$sum_leaves} on \"#{$w->{name}}\"" unless $total == $sum_leaves
+}
+
+# ── invariant 4: range additivity — sum(l..m) + sum(m+1..r) = sum(l..r) ─
+
+for my $w (@workloads) {
+    my $tree = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        Lst::range_add($tree, $op->[1], $op->[2], $op->[3]) if $op->[0] eq "u"
+    }
+    my $n = $tree->{n}
+    for my $l (0:$n - 1) {
+        for my $r ($l:$n - 1) {
+            next if $l == $r
+            my $m = int(($l + $r) / 2)
+            my $whole = Lst::range_sum($tree, $l, $r)
+            my $left = Lst::range_sum($tree, $l, $m)
+            my $right = Lst::range_sum($tree, $m + 1, $r)
+            die "additivity broken (l=#{$l}, r=#{$r}, m=#{$m}) on \"#{$w->{name}}\"" unless $whole == $left + $right
+        }
+    }
+}
+
+# ── invariant 5: idempotent zero-add doesn't change anything ──────
+
+for my $w (@workloads) {
+    my $tree_a = Lst::new($w->{init})
+    my $tree_b = Lst::new($w->{init})
+    for my $op (@{$w->{ops}}) {
+        next unless $op->[0] eq "u"
+        Lst::range_add($tree_a, $op->[1], $op->[2], $op->[3])
+        Lst::range_add($tree_b, $op->[1], $op->[2], $op->[3])
+        Lst::range_add($tree_b, $op->[1], $op->[2], 0)   # extra zero-add
+    }
+    my $rebuilt_a = Lst::to_array($tree_a)
+    my $rebuilt_b = Lst::to_array($tree_b)
+    for my $i (0:len(@$rebuilt_a) - 1) {
+        die "zero-add changed result on \"#{$w->{name}}\"" unless $rebuilt_a->[$i] == $rebuilt_b->[$i]
+    }
+}
+
+# ── invariant 6: applying an op then its negation cancels out ─────
+
+my @init = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3)
+my $cancel_tree = Lst::new(\@init)
+Lst::range_add($cancel_tree, 2, 7, 42)
+Lst::range_add($cancel_tree, 2, 7, -42)
+my $cancel_arr = Lst::to_array($cancel_tree)
+for my $i (0:len(@init) - 1) {
+    die "cancel-out failed at #{$i}: got #{$cancel_arr->[$i]} want #{$init[$i]}" unless $cancel_arr->[$i] == $init[$i]
+}
+
+# ── invariant 7: many random ops produce same final state as ref ──
+
+srand 12345
+my @rnd_init
+for my $i (0:31) { push @rnd_init, int(rand() * 100) - 50 }
+my @rnd_ref = @rnd_init
+my $rnd_tree = Lst::new(\@rnd_init)
+for my $rep (1:200) {
+    my $l = int(rand() * 32)
+    my $r = $l + int(rand() * (32 - $l))
+    if (int(rand() * 2) == 0) {
+        my $v = int(rand() * 200) - 100
+        Lst::ref_range_add(\@rnd_ref, $l, $r, $v)
+        Lst::range_add($rnd_tree, $l, $r, $v)
+    } else {
+        my $ref_s = Lst::ref_range_sum(\@rnd_ref, $l, $r)
+        my $tree_s = Lst::range_sum($rnd_tree, $l, $r)
+        die "random q[#{$l}, #{$r}] tree=#{$tree_s} ref=#{$ref_s}" unless $tree_s == $ref_s
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
