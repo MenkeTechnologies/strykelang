@@ -257,3 +257,8 @@ demo_runs_no_interop!(demo_ntt, "examples/ntt_no_interop.stk");
 demo_runs_no_interop!(demo_edmonds_blossom, "examples/edmonds_blossom_no_interop.stk");
 demo_runs_no_interop!(demo_adam_optimizer, "examples/adam_optimizer_no_interop.stk");
 demo_runs_no_interop!(demo_chinese_postman, "examples/chinese_postman_no_interop.stk");
+demo_runs_no_interop!(demo_chu_liu_edmonds, "examples/chu_liu_edmonds_no_interop.stk");
+demo_runs_no_interop!(demo_runge_kutta_4, "examples/runge_kutta_4_no_interop.stk");
+demo_runs_no_interop!(demo_tarjan_articulation, "examples/tarjan_articulation_no_interop.stk");
+demo_runs_no_interop!(demo_brent_root_finding, "examples/brent_root_finding_no_interop.stk");
+demo_runs_no_interop!(demo_adaptive_simpson, "examples/adaptive_simpson_no_interop.stk");
