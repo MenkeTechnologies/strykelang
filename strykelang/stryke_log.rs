@@ -47,7 +47,6 @@ const DEFAULT_MAX_BYTES: u64 = 5 * 1024 * 1024;
 /// The active file plus 5 rotations bounds the log dir at ~30 MB by default.
 const DEFAULT_MAX_FILES: u32 = 5;
 /// `Level` — see variants.
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
     Trace = 0,

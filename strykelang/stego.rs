@@ -98,7 +98,6 @@ fn xor_stream(buf: &mut [u8], key: &[u8]) {
 
 // ── PNG carrier (LSB on R/G/B, alpha skipped) ────────────────────────────
 /// `is_png` — see implementation.
-
 pub fn is_png(bytes: &[u8]) -> bool {
     bytes.starts_with(PNG_MAGIC)
 }
@@ -110,7 +109,6 @@ pub fn png_capacity_bits(png_bytes: &[u8]) -> Result<usize, String> {
     Ok((img.width() as usize) * (img.height() as usize) * 3)
 }
 /// `png_hide` — see implementation.
-
 pub fn png_hide(png_bytes: &[u8], envelope: &[u8]) -> Result<Vec<u8>, String> {
     let img = image::load_from_memory(png_bytes)
         .map_err(|e| format!("hide: PNG decode failed: {}", e))?;
@@ -142,7 +140,6 @@ pub fn png_hide(png_bytes: &[u8], envelope: &[u8]) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 /// `png_reveal` — see implementation.
-
 pub fn png_reveal(png_bytes: &[u8]) -> Result<Vec<u8>, String> {
     let img = image::load_from_memory(png_bytes)
         .map_err(|e| format!("reveal: PNG decode failed: {}", e))?;
@@ -188,7 +185,6 @@ pub fn text_capacity_bits(text: &str) -> usize {
     text.chars().filter(|c| !is_zero_width(*c)).count()
 }
 /// `text_hide` — see implementation.
-
 pub fn text_hide(text: &str, envelope: &[u8]) -> Result<String, String> {
     let bits_needed = envelope.len() * 8;
     let cap = text_capacity_bits(text);
@@ -211,7 +207,6 @@ pub fn text_hide(text: &str, envelope: &[u8]) -> Result<String, String> {
     Ok(out)
 }
 /// `text_reveal` — see implementation.
-
 pub fn text_reveal(stego: &str) -> Result<Vec<u8>, String> {
     let mut bits = Vec::new();
     for ch in stego.chars() {

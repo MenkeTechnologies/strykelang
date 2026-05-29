@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 const WRAPPER_MAIN: &str = include_str!("../templates/devops/wrapper_main.rs");
 const WRAPPER_CARGO: &str = include_str!("../templates/devops/wrapper_cargo.toml");
 /// `run` — see implementation.
-
 pub fn run(out_dir: Option<&str>, app_name_override: Option<&str>) -> Result<()> {
     if !Path::new("config/application.stk").exists() {
         return Err(

@@ -72,7 +72,6 @@ const TY_MACRO: u32 = 9;
 
 const MOD_DEFAULT_LIBRARY: u32 = 1 << 5;
 /// `semantic_tokens_legend` — see implementation.
-
 pub fn semantic_tokens_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
         token_types: SEMANTIC_TYPES.to_vec(),
@@ -80,7 +79,6 @@ pub fn semantic_tokens_legend() -> SemanticTokensLegend {
     }
 }
 /// `semantic_tokens_options` — see implementation.
-
 pub fn semantic_tokens_options() -> SemanticTokensServerCapabilities {
     SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
         work_done_progress_options: WorkDoneProgressOptions::default(),

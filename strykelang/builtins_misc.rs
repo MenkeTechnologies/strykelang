@@ -60,7 +60,6 @@ fn ret_bigint(n: BigInt) -> StrykeValue {
     StrykeValue::string(n.to_string())
 }
 /// `bignum_new` — see implementation.
-
 pub fn bignum_new(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(n) => ret_bigint(n),
@@ -68,17 +67,14 @@ pub fn bignum_new(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_from_str` — see implementation.
-
 pub fn bignum_from_str(args: &[StrykeValue]) -> StrykeValue {
     bignum_new(args)
 }
 /// `bignum_to_str` — see implementation.
-
 pub fn bignum_to_str(args: &[StrykeValue]) -> StrykeValue {
     bignum_new(args)
 }
 /// `bignum_to_int` — see implementation.
-
 pub fn bignum_to_int(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(n) => n
@@ -89,7 +85,6 @@ pub fn bignum_to_int(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_add` — see implementation.
-
 pub fn bignum_add(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -97,7 +92,6 @@ pub fn bignum_add(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a + b)
 }
 /// `bignum_sub` — see implementation.
-
 pub fn bignum_sub(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -105,7 +99,6 @@ pub fn bignum_sub(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a - b)
 }
 /// `bignum_mul` — see implementation.
-
 pub fn bignum_mul(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -113,7 +106,6 @@ pub fn bignum_mul(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a * b)
 }
 /// `bignum_div` — see implementation.
-
 pub fn bignum_div(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -124,7 +116,6 @@ pub fn bignum_div(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a / b)
 }
 /// `bignum_mod` — see implementation.
-
 pub fn bignum_mod(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -135,7 +126,6 @@ pub fn bignum_mod(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a % b)
 }
 /// `bignum_pow` — see implementation.
-
 pub fn bignum_pow(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -144,7 +134,6 @@ pub fn bignum_pow(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a.pow(exp))
 }
 /// `bignum_modpow` — see implementation.
-
 pub fn bignum_modpow(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(e), Some(m)) = (
         arg_bigint(args, 0),
@@ -159,7 +148,6 @@ pub fn bignum_modpow(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a.modpow(&e, &m))
 }
 /// `bignum_gcd` — see implementation.
-
 pub fn bignum_gcd(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -181,7 +169,6 @@ pub fn bignum_gcd(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(gcd(a, b))
 }
 /// `bignum_lcm` — see implementation.
-
 pub fn bignum_lcm(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -207,7 +194,6 @@ pub fn bignum_lcm(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(product / g)
 }
 /// `bignum_factorial` — see implementation.
-
 pub fn bignum_factorial(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0);
     if n < 0 {
@@ -220,7 +206,6 @@ pub fn bignum_factorial(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(result)
 }
 /// `bignum_sqrt` — see implementation.
-
 pub fn bignum_sqrt(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -231,7 +216,6 @@ pub fn bignum_sqrt(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a.sqrt())
 }
 /// `bignum_bit_length` — see implementation.
-
 pub fn bignum_bit_length(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(n) => StrykeValue::integer(n.bits() as i64),
@@ -239,7 +223,6 @@ pub fn bignum_bit_length(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_set_bit` — see implementation.
-
 pub fn bignum_set_bit(args: &[StrykeValue]) -> StrykeValue {
     let Some(mut n) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -249,7 +232,6 @@ pub fn bignum_set_bit(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(n)
 }
 /// `bignum_clear_bit` — see implementation.
-
 pub fn bignum_clear_bit(args: &[StrykeValue]) -> StrykeValue {
     let Some(mut n) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -259,7 +241,6 @@ pub fn bignum_clear_bit(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(n)
 }
 /// `bignum_test_bit` — see implementation.
-
 pub fn bignum_test_bit(args: &[StrykeValue]) -> StrykeValue {
     let Some(n) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -268,7 +249,6 @@ pub fn bignum_test_bit(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if n.bit(bit) { 1 } else { 0 })
 }
 /// `bignum_and` — see implementation.
-
 pub fn bignum_and(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -276,7 +256,6 @@ pub fn bignum_and(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a & b)
 }
 /// `bignum_or` — see implementation.
-
 pub fn bignum_or(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -284,7 +263,6 @@ pub fn bignum_or(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a | b)
 }
 /// `bignum_xor` — see implementation.
-
 pub fn bignum_xor(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -292,7 +270,6 @@ pub fn bignum_xor(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a ^ b)
 }
 /// `bignum_not` — see implementation.
-
 pub fn bignum_not(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -300,7 +277,6 @@ pub fn bignum_not(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(!a)
 }
 /// `bignum_shl` — see implementation.
-
 pub fn bignum_shl(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -309,7 +285,6 @@ pub fn bignum_shl(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a << n)
 }
 /// `bignum_shr` — see implementation.
-
 pub fn bignum_shr(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = arg_bigint(args, 0) else {
         return StrykeValue::UNDEF;
@@ -318,7 +293,6 @@ pub fn bignum_shr(args: &[StrykeValue]) -> StrykeValue {
     ret_bigint(a >> n)
 }
 /// `bignum_compare` — see implementation.
-
 pub fn bignum_compare(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (arg_bigint(args, 0), arg_bigint(args, 1)) else {
         return StrykeValue::UNDEF;
@@ -331,7 +305,6 @@ pub fn bignum_compare(args: &[StrykeValue]) -> StrykeValue {
     })
 }
 /// `bignum_negate` — see implementation.
-
 pub fn bignum_negate(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(a) => ret_bigint(-a),
@@ -339,7 +312,6 @@ pub fn bignum_negate(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_abs` — see implementation.
-
 pub fn bignum_abs(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(a) => ret_bigint(a.abs()),
@@ -347,7 +319,6 @@ pub fn bignum_abs(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_sign` — see implementation.
-
 pub fn bignum_sign(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(a) => StrykeValue::integer(match a.sign() {
@@ -359,7 +330,6 @@ pub fn bignum_sign(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_is_zero` — see implementation.
-
 pub fn bignum_is_zero(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(a) => StrykeValue::integer(if a.is_zero() { 1 } else { 0 }),
@@ -367,7 +337,6 @@ pub fn bignum_is_zero(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_is_negative` — see implementation.
-
 pub fn bignum_is_negative(args: &[StrykeValue]) -> StrykeValue {
     match arg_bigint(args, 0) {
         Some(a) => StrykeValue::integer(if a.sign() == Sign::Minus { 1 } else { 0 }),
@@ -375,7 +344,6 @@ pub fn bignum_is_negative(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `bignum_is_prime` — see implementation.
-
 pub fn bignum_is_prime(args: &[StrykeValue]) -> StrykeValue {
     // Miller-Rabin with deterministic witnesses for n < 3,317,044,064,679,887,385,961,981
     let Some(n) = arg_bigint(args, 0) else {
@@ -421,7 +389,6 @@ pub fn bignum_is_prime(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(1)
 }
 /// `bignum_random` — see implementation.
-
 pub fn bignum_random(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let bits = arg_i64(args, 0).unwrap_or(64).max(1) as u32;
@@ -440,12 +407,10 @@ pub fn bignum_random(args: &[StrykeValue]) -> StrykeValue {
 // Physics / game primitives
 // ══════════════════════════════════════════════════════════════════════
 /// `gravity_constant` — see implementation.
-
 pub fn gravity_constant(_args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(9.80665)
 }
 /// `physics_apply_force` — see implementation.
-
 pub fn physics_apply_force(args: &[StrykeValue]) -> StrykeValue {
     // args: [mass, [fx, fy], dt] → [ax*dt, ay*dt] (acceleration*dt = Δv)
     let mass = arg_f64(args, 0).unwrap_or(1.0).max(1e-12);
@@ -459,7 +424,6 @@ pub fn physics_apply_force(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `physics_apply_impulse` — see implementation.
-
 pub fn physics_apply_impulse(args: &[StrykeValue]) -> StrykeValue {
     let mass = arg_f64(args, 0).unwrap_or(1.0).max(1e-12);
     let imp = args.get(1).map(list_elements).unwrap_or_default();
@@ -471,7 +435,6 @@ pub fn physics_apply_impulse(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `physics_collide_aabb` — see implementation.
-
 pub fn physics_collide_aabb(args: &[StrykeValue]) -> StrykeValue {
     // Two AABBs as [x, y, w, h]
     let a = args.first().map(list_elements).unwrap_or_default();
@@ -500,7 +463,6 @@ pub fn physics_collide_aabb(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `physics_collide_sphere` — see implementation.
-
 pub fn physics_collide_sphere(args: &[StrykeValue]) -> StrykeValue {
     // args: [c1x, c1y, r1, c2x, c2y, r2]
     let v: Vec<f64> = (0..6).map(|i| arg_f64(args, i).unwrap_or(0.0)).collect();
@@ -509,7 +471,6 @@ pub fn physics_collide_sphere(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if d2 <= sr * sr { 1 } else { 0 })
 }
 /// `physics_raycast` — see implementation.
-
 pub fn physics_raycast(args: &[StrykeValue]) -> StrykeValue {
     // Simplified: ray (origin, dir) vs axis-aligned segment (a, b).
     // Return distance to intersection or undef.
@@ -526,7 +487,6 @@ pub fn physics_raycast(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(max_dist) // placeholder; real impl needs scene
 }
 /// `physics_step` — see implementation.
-
 pub fn physics_step(args: &[StrykeValue]) -> StrykeValue {
     // [pos, vel, dt] → new [pos, vel]
     let pos = args.first().map(list_elements).unwrap_or_default();
@@ -544,7 +504,6 @@ pub fn physics_step(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `particle_emit` — see implementation.
-
 pub fn particle_emit(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -560,7 +519,6 @@ pub fn particle_emit(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
 /// `particle_update` — see implementation.
-
 pub fn particle_update(args: &[StrykeValue]) -> StrykeValue {
     let Some(p) = args.first().and_then(|v| v.as_hash_ref()) else {
         return StrykeValue::UNDEF;
@@ -581,7 +539,6 @@ pub fn particle_update(args: &[StrykeValue]) -> StrykeValue {
 
 // ── 2D vectors ────────────────────────────────────────────────────────
 /// `vector2_new` — see implementation.
-
 pub fn vector2_new(args: &[StrykeValue]) -> StrykeValue {
     arr(vec![
         StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0)),
@@ -597,7 +554,6 @@ fn v2(v: &StrykeValue) -> Option<(f64, f64)> {
     Some((e[0].to_number(), e[1].to_number()))
 }
 /// `vector2_add` — see implementation.
-
 pub fn vector2_add(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
@@ -608,7 +564,6 @@ pub fn vector2_add(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `vector2_sub` — see implementation.
-
 pub fn vector2_sub(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
@@ -619,7 +574,6 @@ pub fn vector2_sub(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `vector2_scale` — see implementation.
-
 pub fn vector2_scale(args: &[StrykeValue]) -> StrykeValue {
     let Some(a) = args.first().and_then(v2) else {
         return StrykeValue::UNDEF;
@@ -631,7 +585,6 @@ pub fn vector2_scale(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `vector2_dot` — see implementation.
-
 pub fn vector2_dot(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
@@ -639,7 +592,6 @@ pub fn vector2_dot(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(a.0 * b.0 + a.1 * b.1)
 }
 /// `vector2_cross` — see implementation.
-
 pub fn vector2_cross(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
@@ -647,7 +599,6 @@ pub fn vector2_cross(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(a.0 * b.1 - a.1 * b.0)
 }
 /// `vector2_length` — see implementation.
-
 pub fn vector2_length(args: &[StrykeValue]) -> StrykeValue {
     match args.first().and_then(v2) {
         Some((x, y)) => StrykeValue::float((x * x + y * y).sqrt()),
@@ -655,7 +606,6 @@ pub fn vector2_length(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `vector2_normalize` — see implementation.
-
 pub fn vector2_normalize(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y)) = args.first().and_then(v2) else {
         return StrykeValue::UNDEF;
@@ -670,7 +620,6 @@ pub fn vector2_normalize(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `vector2_distance` — see implementation.
-
 pub fn vector2_distance(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(v2), args.get(1).and_then(v2)) else {
         return StrykeValue::UNDEF;
@@ -678,7 +627,6 @@ pub fn vector2_distance(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt())
 }
 /// `vector2_rotate` — see implementation.
-
 pub fn vector2_rotate(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y)) = args.first().and_then(v2) else {
         return StrykeValue::UNDEF;
@@ -693,7 +641,6 @@ pub fn vector2_rotate(args: &[StrykeValue]) -> StrykeValue {
 
 // ── Quaternions ───────────────────────────────────────────────────────
 /// `quaternion_new` — see implementation.
-
 pub fn quaternion_new(args: &[StrykeValue]) -> StrykeValue {
     arr(vec![
         StrykeValue::float(arg_f64(args, 0).unwrap_or(0.0)),
@@ -716,7 +663,6 @@ fn q4(v: &StrykeValue) -> Option<(f64, f64, f64, f64)> {
     ))
 }
 /// `quaternion_from_axis_angle` — see implementation.
-
 pub fn quaternion_from_axis_angle(args: &[StrykeValue]) -> StrykeValue {
     let axis = args.first().map(list_elements).unwrap_or_default();
     let angle = arg_f64(args, 1).unwrap_or(0.0);
@@ -739,7 +685,6 @@ pub fn quaternion_from_axis_angle(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `quaternion_multiply` — see implementation.
-
 pub fn quaternion_multiply(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first().and_then(q4), args.get(1).and_then(q4)) else {
         return StrykeValue::UNDEF;
@@ -754,7 +699,6 @@ pub fn quaternion_multiply(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `quaternion_normalize` — see implementation.
-
 pub fn quaternion_normalize(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y, z, w)) = args.first().and_then(q4) else {
         return StrykeValue::UNDEF;
@@ -768,7 +712,6 @@ pub fn quaternion_normalize(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `quaternion_to_matrix` — see implementation.
-
 pub fn quaternion_to_matrix(args: &[StrykeValue]) -> StrykeValue {
     let Some((x, y, z, w)) = args.first().and_then(q4) else {
         return StrykeValue::UNDEF;
@@ -809,7 +752,6 @@ pub fn quaternion_to_matrix(args: &[StrykeValue]) -> StrykeValue {
 const A4_FREQ: f64 = 440.0;
 const A4_MIDI: f64 = 69.0;
 /// `freq_to_note` — see implementation.
-
 pub fn freq_to_note(args: &[StrykeValue]) -> StrykeValue {
     let f = arg_f64(args, 0).unwrap_or(A4_FREQ);
     if f <= 0.0 {
@@ -819,13 +761,11 @@ pub fn freq_to_note(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(midi as i64)
 }
 /// `note_to_freq` — see implementation.
-
 pub fn note_to_freq(args: &[StrykeValue]) -> StrykeValue {
     let midi = arg_f64(args, 0).unwrap_or(A4_MIDI);
     StrykeValue::float(A4_FREQ * 2f64.powf((midi - A4_MIDI) / 12.0))
 }
 /// `midi_note_to_name` — see implementation.
-
 pub fn midi_note_to_name(args: &[StrykeValue]) -> StrykeValue {
     let midi = arg_i64(args, 0).unwrap_or(69);
     if !(0..=127).contains(&midi) {
@@ -839,7 +779,6 @@ pub fn midi_note_to_name(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{}{}", n, octave))
 }
 /// `chord_notes` — see implementation.
-
 pub fn chord_notes(args: &[StrykeValue]) -> StrykeValue {
     let root = arg_i64(args, 0).unwrap_or(60);
     let kind = args
@@ -863,7 +802,6 @@ pub fn chord_notes(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `scale_notes` — see implementation.
-
 pub fn scale_notes(args: &[StrykeValue]) -> StrykeValue {
     let root = arg_i64(args, 0).unwrap_or(60);
     let kind = args
@@ -891,14 +829,12 @@ pub fn scale_notes(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `transpose_note` — see implementation.
-
 pub fn transpose_note(args: &[StrykeValue]) -> StrykeValue {
     let midi = arg_i64(args, 0).unwrap_or(60);
     let semitones = arg_i64(args, 1).unwrap_or(0);
     StrykeValue::integer(midi + semitones)
 }
 /// `window_tukey` — see implementation.
-
 pub fn window_tukey(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let alpha = arg_f64(args, 1).unwrap_or(0.5).clamp(0.0, 1.0);
@@ -917,7 +853,6 @@ pub fn window_tukey(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `zero_crossing_rate` — see implementation.
-
 pub fn zero_crossing_rate(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     if xs.len() < 2 {
@@ -934,7 +869,6 @@ pub fn zero_crossing_rate(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(count as f64 / (xs.len() - 1) as f64)
 }
 /// `peak_db` — see implementation.
-
 pub fn peak_db(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let peak = xs
@@ -947,7 +881,6 @@ pub fn peak_db(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(20.0 * peak.log10())
 }
 /// `audio_normalize` — see implementation.
-
 pub fn audio_normalize(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let peak = xs
@@ -965,7 +898,6 @@ pub fn audio_normalize(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `audio_fade_in` — see implementation.
-
 pub fn audio_fade_in(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = xs.len();
@@ -983,7 +915,6 @@ pub fn audio_fade_in(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `audio_fade_out` — see implementation.
-
 pub fn audio_fade_out(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let n = xs.len();
@@ -1001,7 +932,6 @@ pub fn audio_fade_out(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `audio_to_mono` — see implementation.
-
 pub fn audio_to_mono(args: &[StrykeValue]) -> StrykeValue {
     // Stereo: [[L,R], [L,R], ...] → mean
     let xs = args.first().map(list_elements).unwrap_or_default();
@@ -1019,7 +949,6 @@ pub fn audio_to_mono(args: &[StrykeValue]) -> StrykeValue {
         .collect())
 }
 /// `audio_to_stereo` — see implementation.
-
 pub fn audio_to_stereo(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     arr(xs
@@ -1094,7 +1023,6 @@ fn biquad_apply(xs: &[StrykeValue], coeffs: [f64; 5]) -> Vec<StrykeValue> {
     out
 }
 /// `biquad_lowpass` — see implementation.
-
 pub fn biquad_lowpass(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let cutoff = arg_f64(args, 1).unwrap_or(1000.0);
@@ -1103,7 +1031,6 @@ pub fn biquad_lowpass(args: &[StrykeValue]) -> StrykeValue {
     arr(biquad_apply(&xs, biquad_coeffs("lp", cutoff, sr, q)))
 }
 /// `biquad_highpass` — see implementation.
-
 pub fn biquad_highpass(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let cutoff = arg_f64(args, 1).unwrap_or(1000.0);
@@ -1112,7 +1039,6 @@ pub fn biquad_highpass(args: &[StrykeValue]) -> StrykeValue {
     arr(biquad_apply(&xs, biquad_coeffs("hp", cutoff, sr, q)))
 }
 /// `biquad_bandpass` — see implementation.
-
 pub fn biquad_bandpass(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let cutoff = arg_f64(args, 1).unwrap_or(1000.0);
@@ -1121,7 +1047,6 @@ pub fn biquad_bandpass(args: &[StrykeValue]) -> StrykeValue {
     arr(biquad_apply(&xs, biquad_coeffs("bp", cutoff, sr, q)))
 }
 /// `biquad_notch` — see implementation.
-
 pub fn biquad_notch(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(list_elements).unwrap_or_default();
     let cutoff = arg_f64(args, 1).unwrap_or(1000.0);
@@ -1142,22 +1067,18 @@ fn osc_samples<F: Fn(f64) -> f64>(args: &[StrykeValue], shape: F) -> StrykeValue
     arr(out)
 }
 /// `oscillator_sine` — see implementation.
-
 pub fn oscillator_sine(args: &[StrykeValue]) -> StrykeValue {
     osc_samples(args, |p| (2.0 * std::f64::consts::PI * p).sin())
 }
 /// `oscillator_square` — see implementation.
-
 pub fn oscillator_square(args: &[StrykeValue]) -> StrykeValue {
     osc_samples(args, |p| if p < 0.5 { 1.0 } else { -1.0 })
 }
 /// `oscillator_sawtooth` — see implementation.
-
 pub fn oscillator_sawtooth(args: &[StrykeValue]) -> StrykeValue {
     osc_samples(args, |p| 2.0 * p - 1.0)
 }
 /// `oscillator_triangle` — see implementation.
-
 pub fn oscillator_triangle(args: &[StrykeValue]) -> StrykeValue {
     osc_samples(args, |p| {
         if p < 0.5 {
@@ -1168,7 +1089,6 @@ pub fn oscillator_triangle(args: &[StrykeValue]) -> StrykeValue {
     })
 }
 /// `adsr_envelope` — see implementation.
-
 pub fn adsr_envelope(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(0.1);
     let d = arg_f64(args, 1).unwrap_or(0.1);
@@ -1198,7 +1118,6 @@ pub fn adsr_envelope(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `ar_envelope` — see implementation.
-
 pub fn ar_envelope(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(0.05);
     let r = arg_f64(args, 1).unwrap_or(0.1);
@@ -1215,7 +1134,6 @@ pub fn ar_envelope(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `crossfade` — see implementation.
-
 pub fn crossfade(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(list_elements).unwrap_or_default();
     let b = args.get(1).map(list_elements).unwrap_or_default();
@@ -1234,7 +1152,6 @@ pub fn crossfade(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `fade_curve_linear` — see implementation.
-
 pub fn fade_curve_linear(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let mut out = Vec::with_capacity(n);
@@ -1244,7 +1161,6 @@ pub fn fade_curve_linear(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `fade_curve_logarithmic` — see implementation.
-
 pub fn fade_curve_logarithmic(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let mut out = Vec::with_capacity(n);
@@ -1255,7 +1171,6 @@ pub fn fade_curve_logarithmic(args: &[StrykeValue]) -> StrykeValue {
     arr(out)
 }
 /// `fade_curve_exponential` — see implementation.
-
 pub fn fade_curve_exponential(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
     let mut out = Vec::with_capacity(n);
@@ -1270,7 +1185,6 @@ pub fn fade_curve_exponential(args: &[StrykeValue]) -> StrykeValue {
 // Geo extras (no new crate)
 // ══════════════════════════════════════════════════════════════════════
 /// `bbox_contains` — see implementation.
-
 pub fn bbox_contains(args: &[StrykeValue]) -> StrykeValue {
     // bbox: [minlat, minlon, maxlat, maxlon]; point: [lat, lon]
     let bbox = args.first().map(list_elements).unwrap_or_default();
@@ -1287,7 +1201,6 @@ pub fn bbox_contains(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if ok { 1 } else { 0 })
 }
 /// `bbox_union` — see implementation.
-
 pub fn bbox_union(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(list_elements).unwrap_or_default();
     let b = args.get(1).map(list_elements).unwrap_or_default();
@@ -1302,7 +1215,6 @@ pub fn bbox_union(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `bbox_intersect` — see implementation.
-
 pub fn bbox_intersect(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(list_elements).unwrap_or_default();
     let b = args.get(1).map(list_elements).unwrap_or_default();
@@ -1324,7 +1236,6 @@ pub fn bbox_intersect(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `bbox_center` — see implementation.
-
 pub fn bbox_center(args: &[StrykeValue]) -> StrykeValue {
     let bbox = args.first().map(list_elements).unwrap_or_default();
     if bbox.len() < 4 {
@@ -1336,7 +1247,6 @@ pub fn bbox_center(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `bbox_area` — see implementation.
-
 pub fn bbox_area(args: &[StrykeValue]) -> StrykeValue {
     let bbox = args.first().map(list_elements).unwrap_or_default();
     if bbox.len() < 4 {
@@ -1347,7 +1257,6 @@ pub fn bbox_area(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(dlat.abs() * dlon.abs())
 }
 /// `mercator_unproject` — see implementation.
-
 pub fn mercator_unproject(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let y = arg_f64(args, 1).unwrap_or(0.0);
@@ -1362,7 +1271,6 @@ pub fn mercator_unproject(args: &[StrykeValue]) -> StrykeValue {
     arr(vec![StrykeValue::float(lat), StrykeValue::float(lon)])
 }
 /// `geohash_precision` — see implementation.
-
 pub fn geohash_precision(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
     StrykeValue::integer(s.chars().count() as i64)

@@ -49,7 +49,6 @@ fn make_hash(pairs: Vec<(&str, StrykeValue)>) -> StrykeValue {
 // Phonetic algorithms
 // ══════════════════════════════════════════════════════════════════════
 /// `soundex_v1` — see implementation.
-
 pub fn soundex_v1(args: &[StrykeValue]) -> StrykeValue {
     // Classic American Soundex (4-char: letter + 3 digits)
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
@@ -92,7 +91,6 @@ pub fn soundex_v1(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `soundex_v2` — see implementation.
-
 pub fn soundex_v2(args: &[StrykeValue]) -> StrykeValue {
     // Apache "Refined Soundex" — finer-grained groups (1:BP 2:FV 3:CKS 4:GJ
     // 5:QXZ 6:DT 7:L 8:MN 9:R), no length cap, vowels and H/W skipped.
@@ -128,7 +126,6 @@ pub fn soundex_v2(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `nysiis` — see implementation.
-
 pub fn nysiis(args: &[StrykeValue]) -> StrykeValue {
     let mut s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     if s.is_empty() {
@@ -224,7 +221,6 @@ pub fn nysiis(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `caverphone` — see implementation.
-
 pub fn caverphone(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default().to_lowercase();
     if s.is_empty() {
@@ -292,7 +288,6 @@ pub fn caverphone(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(padded)
 }
 /// `caverphone2` — see implementation.
-
 pub fn caverphone2(args: &[StrykeValue]) -> StrykeValue {
     let s = caverphone(args).as_str_or_empty();
     let mut padded = s;
@@ -301,7 +296,6 @@ pub fn caverphone2(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(padded)
 }
 /// `phonex` — see implementation.
-
 pub fn phonex(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default().to_uppercase();
     if s.is_empty() {
@@ -347,7 +341,6 @@ pub fn phonex(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `match_rating_compare` — see implementation.
-
 pub fn match_rating_compare(args: &[StrykeValue]) -> StrykeValue {
     let s1 = arg_str(args, 0).unwrap_or_default();
     let s2 = arg_str(args, 1).unwrap_or_default();
@@ -412,7 +405,6 @@ pub(crate) fn match_rating_codex_impl(s: &str) -> String {
     chars.into_iter().collect()
 }
 /// `fuzzy_substring_match` — see implementation.
-
 pub fn fuzzy_substring_match(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args, 0).unwrap_or_default();
     let haystack = arg_str(args, 1).unwrap_or_default();
@@ -452,13 +444,11 @@ pub fn fuzzy_substring_match(args: &[StrykeValue]) -> StrykeValue {
 // Geo projections
 // ══════════════════════════════════════════════════════════════════════
 /// `mercator_project_x` — see implementation.
-
 pub fn mercator_project_x(args: &[StrykeValue]) -> StrykeValue {
     let lon = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(lon.to_radians() * 6378137.0)
 }
 /// `mercator_project_y` — see implementation.
-
 pub fn mercator_project_y(args: &[StrykeValue]) -> StrykeValue {
     let lat = arg_f64(args, 0)
         .unwrap_or(0.0)
@@ -467,20 +457,17 @@ pub fn mercator_project_y(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(6378137.0 * (std::f64::consts::FRAC_PI_4 + phi / 2.0).tan().ln())
 }
 /// `mercator_unproject_lat` — see implementation.
-
 pub fn mercator_unproject_lat(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_f64(args, 0).unwrap_or(0.0);
     let phi = 2.0 * (y / 6378137.0).exp().atan() - std::f64::consts::FRAC_PI_2;
     StrykeValue::float(phi.to_degrees())
 }
 /// `mercator_unproject_lon` — see implementation.
-
 pub fn mercator_unproject_lon(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float((x / 6378137.0).to_degrees())
 }
 /// `lambert_project` — see implementation.
-
 pub fn lambert_project(args: &[StrykeValue]) -> StrykeValue {
     // Lambert Conformal Conic with one standard parallel `lat0`, on a sphere.
     // n = sin(lat0); F = cos(lat0)·tan^n(π/4 + lat0/2)
@@ -572,7 +559,6 @@ pub fn vincenty_bearing(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(y.atan2(x).to_degrees().rem_euclid(360.0))
 }
 /// `destination_lat_lon` — see implementation.
-
 pub fn destination_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     let lat = arg_f64(args, 0).unwrap_or(0.0).to_radians();
     let lon = arg_f64(args, 1).unwrap_or(0.0).to_radians();
@@ -589,14 +575,12 @@ pub fn destination_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `utm_zone` — see implementation.
-
 pub fn utm_zone(args: &[StrykeValue]) -> StrykeValue {
     let lon = arg_f64(args, 0).unwrap_or(0.0);
     let zone = ((lon + 180.0) / 6.0).floor() as i64 + 1;
     StrykeValue::integer(zone.clamp(1, 60))
 }
 /// `lat_lon_to_utm` — see implementation.
-
 pub fn lat_lon_to_utm(args: &[StrykeValue]) -> StrykeValue {
     let lat = arg_f64(args, 0).unwrap_or(0.0);
     let lon = arg_f64(args, 1).unwrap_or(0.0);
@@ -630,7 +614,6 @@ pub fn lat_lon_to_utm(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `utm_to_lat_lon` — see implementation.
-
 pub fn utm_to_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     let zone = arg_i64(args, 0).unwrap_or(1).clamp(1, 60);
     let easting = arg_f64(args, 1).unwrap_or(0.0);
@@ -669,7 +652,6 @@ pub fn utm_to_lat_lon(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `geomag_declination` — see implementation.
-
 pub fn geomag_declination(args: &[StrykeValue]) -> StrykeValue {
     // Magnetic declination via a single-dipole model anchored at the geomagnetic
     // north pole. Not WMM/IGRF-accurate; useful only for rough azimuth correction.
@@ -752,7 +734,6 @@ fn sha256d(data: &[u8]) -> [u8; 32] {
     out
 }
 /// `base58check_encode` — see implementation.
-
 pub fn base58check_encode(args: &[StrykeValue]) -> StrykeValue {
     let payload = arg_str(args, 0).unwrap_or_default();
     let bytes = payload.into_bytes();
@@ -762,7 +743,6 @@ pub fn base58check_encode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(base58_encode_bytes(&all))
 }
 /// `base58check_decode` — see implementation.
-
 pub fn base58check_decode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let bytes = base58_decode_bytes(&s);
@@ -780,7 +760,6 @@ pub fn base58check_decode(args: &[StrykeValue]) -> StrykeValue {
 const BASE91_ALPHABET: &[u8] =
     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&()*+,./:;<=>?@[]^_`{|}~\"";
 /// `base91_encode` — see implementation.
-
 pub fn base91_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let input = s.as_bytes();
@@ -813,7 +792,6 @@ pub fn base91_encode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `base91_decode` — see implementation.
-
 pub fn base91_decode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut map = HashMap::new();
@@ -850,13 +828,11 @@ pub fn base91_decode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(String::from_utf8_lossy(&out).into_owned())
 }
 /// `basE91_encode` — see implementation.
-
 #[allow(non_snake_case)]
 pub fn basE91_encode(args: &[StrykeValue]) -> StrykeValue {
     base91_encode(args)
 }
 /// `basE91_decode` — see implementation.
-
 #[allow(non_snake_case)]
 pub fn basE91_decode(args: &[StrykeValue]) -> StrykeValue {
     base91_decode(args)
@@ -865,7 +841,6 @@ pub fn basE91_decode(args: &[StrykeValue]) -> StrykeValue {
 const Z85_ALPHABET: &[u8] =
     b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
 /// `z85_encode` — see implementation.
-
 pub fn z85_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let input = s.as_bytes();
@@ -888,7 +863,6 @@ pub fn z85_encode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `z85_decode` — see implementation.
-
 pub fn z85_decode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     if !s.len().is_multiple_of(5) {
@@ -915,27 +889,23 @@ pub fn z85_decode(args: &[StrykeValue]) -> StrykeValue {
 // Astronomy
 // ══════════════════════════════════════════════════════════════════════
 /// `modified_julian_date` — see implementation.
-
 pub fn modified_julian_date(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
     // MJD epoch is 1858-11-17, Unix epoch is 1970-01-01; difference is 40587 days.
     StrykeValue::float(40587.0 + unix as f64 / 86400.0)
 }
 /// `julian_to_unix` — see implementation.
-
 pub fn julian_to_unix(args: &[StrykeValue]) -> StrykeValue {
     let jd = arg_f64(args, 0).unwrap_or(2440587.5); // = unix 0
     let unix = (jd - 2440587.5) * 86400.0;
     StrykeValue::integer(unix as i64)
 }
 /// `unix_to_julian` — see implementation.
-
 pub fn unix_to_julian(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
     StrykeValue::float(2440587.5 + unix as f64 / 86400.0)
 }
 /// `sidereal_time_greenwich` — see implementation.
-
 pub fn sidereal_time_greenwich(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
     let jd = 2440587.5 + unix as f64 / 86400.0;
@@ -946,7 +916,6 @@ pub fn sidereal_time_greenwich(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(gst / 15.0)
 }
 /// `sidereal_time_local` — see implementation.
-
 pub fn sidereal_time_local(args: &[StrykeValue]) -> StrykeValue {
     let gst_hours = sidereal_time_greenwich(args).to_number();
     let lon = arg_f64(args, 1).unwrap_or(0.0);
@@ -954,7 +923,6 @@ pub fn sidereal_time_local(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(lst)
 }
 /// `solar_noon_unix` — see implementation.
-
 pub fn solar_noon_unix(args: &[StrykeValue]) -> StrykeValue {
     let lon = arg_f64(args, 0).unwrap_or(0.0);
     let unix = arg_i64(args, 1).unwrap_or(0);
@@ -968,7 +936,6 @@ pub fn solar_noon_unix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(noon)
 }
 /// `moon_age_days` — see implementation.
-
 pub fn moon_age_days(args: &[StrykeValue]) -> StrykeValue {
     let unix = arg_i64(args, 0).unwrap_or(0);
     let synodic = 29.530588853_f64;
@@ -994,7 +961,6 @@ pub fn moon_distance_km(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(384_400.0 - 21_000.0 * phase.cos())
 }
 /// `season_of_year` — see implementation.
-
 pub fn season_of_year(args: &[StrykeValue]) -> StrykeValue {
     let month = arg_i64(args, 0).unwrap_or(1);
     let day = arg_i64(args, 1).unwrap_or(1);
@@ -1028,7 +994,6 @@ pub fn season_of_year(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(result.to_string())
 }
 /// `new_moon_julian` — see implementation.
-
 pub fn new_moon_julian(args: &[StrykeValue]) -> StrykeValue {
     let cycle = arg_i64(args, 0).unwrap_or(0);
     let synodic = 29.530588853;
@@ -1036,7 +1001,6 @@ pub fn new_moon_julian(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(jd)
 }
 /// `full_moon_julian` — see implementation.
-
 pub fn full_moon_julian(args: &[StrykeValue]) -> StrykeValue {
     let cycle = arg_i64(args, 0).unwrap_or(0);
     let synodic = 29.530588853;
@@ -1089,13 +1053,11 @@ fn crc_bitwise(
     }
 }
 /// `crc24` — see implementation.
-
 pub fn crc24(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x864CFB, 0xB704CE, false, false, 0, 24) as i64)
 }
 /// `crc64_ecma` — see implementation.
-
 pub fn crc64_ecma(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(
@@ -1103,7 +1065,6 @@ pub fn crc64_ecma(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `crc64_xz` — see implementation.
-
 pub fn crc64_xz(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(
@@ -1117,25 +1078,21 @@ pub fn crc64_xz(args: &[StrykeValue]) -> StrykeValue {
     ) as i64)
 }
 /// `crc6_itu` — see implementation.
-
 pub fn crc6_itu(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x03, 0, true, true, 0, 6) as i64)
 }
 /// `crc10_atm` — see implementation.
-
 pub fn crc10_atm(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x233, 0, false, false, 0, 10) as i64)
 }
 /// `crc12_dect` — see implementation.
-
 pub fn crc12_dect(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x80F, 0, false, false, 0, 12) as i64)
 }
 /// `crc32_bzip2` — see implementation.
-
 pub fn crc32_bzip2(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(
@@ -1149,7 +1106,6 @@ pub fn crc32_bzip2(args: &[StrykeValue]) -> StrykeValue {
     ) as i64)
 }
 /// `crc32_jamcrc` — see implementation.
-
 pub fn crc32_jamcrc(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(
@@ -1157,7 +1113,6 @@ pub fn crc32_jamcrc(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `crc32_mpeg2` — see implementation.
-
 pub fn crc32_mpeg2(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(
@@ -1171,13 +1126,11 @@ pub fn crc32_mpeg2(args: &[StrykeValue]) -> StrykeValue {
     ) as i64)
 }
 /// `crc32_xfer` — see implementation.
-
 pub fn crc32_xfer(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     StrykeValue::integer(crc_bitwise(s.as_bytes(), 0x000000AF, 0, false, false, 0, 32) as i64)
 }
 /// `adler32_combine` — see implementation.
-
 pub fn adler32_combine(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_u64(args, 0).unwrap_or(0);
     let b = arg_u64(args, 1).unwrap_or(0);
@@ -1195,7 +1148,6 @@ pub fn adler32_combine(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(((sum2 << 16) | sum1) as i64)
 }
 /// `fletcher16` — see implementation.
-
 pub fn fletcher16(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut sum1: u16 = 0;
@@ -1207,7 +1159,6 @@ pub fn fletcher16(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(((sum2 as u32) << 8 | sum1 as u32) as i64)
 }
 /// `fletcher32` — see implementation.
-
 pub fn fletcher32(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let bytes = s.as_bytes();
@@ -1227,7 +1178,6 @@ pub fn fletcher32(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(((sum2 << 16) | sum1) as i64)
 }
 /// `fletcher64` — see implementation.
-
 pub fn fletcher64(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let bytes = s.as_bytes();
@@ -1266,7 +1216,6 @@ fn pack_rgb(r: f64, g: f64, b: f64) -> StrykeValue {
     ])
 }
 /// `rgb_blend_normal` — see implementation.
-
 pub fn rgb_blend_normal(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
@@ -1278,14 +1227,12 @@ pub fn rgb_blend_normal(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `rgb_blend_multiply` — see implementation.
-
 pub fn rgb_blend_multiply(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     pack_rgb(r1 * r2 / 255.0, g1 * g2 / 255.0, b1 * b2 / 255.0)
 }
 /// `rgb_blend_screen` — see implementation.
-
 pub fn rgb_blend_screen(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
@@ -1304,7 +1251,6 @@ fn overlay_channel(a: f64, b: f64) -> f64 {
     }
 }
 /// `rgb_blend_overlay` — see implementation.
-
 pub fn rgb_blend_overlay(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
@@ -1315,21 +1261,18 @@ pub fn rgb_blend_overlay(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `rgb_blend_darken` — see implementation.
-
 pub fn rgb_blend_darken(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     pack_rgb(r1.min(r2), g1.min(g2), b1.min(b2))
 }
 /// `rgb_blend_lighten` — see implementation.
-
 pub fn rgb_blend_lighten(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
     pack_rgb(r1.max(r2), g1.max(g2), b1.max(b2))
 }
 /// `rgb_blend_color_dodge` — see implementation.
-
 pub fn rgb_blend_color_dodge(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
@@ -1343,7 +1286,6 @@ pub fn rgb_blend_color_dodge(args: &[StrykeValue]) -> StrykeValue {
     pack_rgb(dodge(r1, r2), dodge(g1, g2), dodge(b1, b2))
 }
 /// `rgb_blend_color_burn` — see implementation.
-
 pub fn rgb_blend_color_burn(args: &[StrykeValue]) -> StrykeValue {
     let (r1, g1, b1) = unpack_rgb(args.first().unwrap_or(&StrykeValue::UNDEF));
     let (r2, g2, b2) = unpack_rgb(args.get(1).unwrap_or(&StrykeValue::UNDEF));
@@ -1357,14 +1299,12 @@ pub fn rgb_blend_color_burn(args: &[StrykeValue]) -> StrykeValue {
     pack_rgb(burn(r1, r2), burn(g1, g2), burn(b1, b2))
 }
 /// `gamma_correct` — see implementation.
-
 pub fn gamma_correct(args: &[StrykeValue]) -> StrykeValue {
     let v = arg_f64(args, 0).unwrap_or(0.0).clamp(0.0, 1.0);
     let gamma = arg_f64(args, 1).unwrap_or(2.2);
     StrykeValue::float(v.powf(1.0 / gamma))
 }
 /// `gamma_uncorrect` — see implementation.
-
 pub fn gamma_uncorrect(args: &[StrykeValue]) -> StrykeValue {
     let v = arg_f64(args, 0).unwrap_or(0.0).clamp(0.0, 1.0);
     let gamma = arg_f64(args, 1).unwrap_or(2.2);
@@ -1375,7 +1315,6 @@ pub fn gamma_uncorrect(args: &[StrykeValue]) -> StrykeValue {
 // Compression primitives
 // ══════════════════════════════════════════════════════════════════════
 /// `rle_compress` — see implementation.
-
 pub fn rle_compress(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut out = String::new();
@@ -1398,7 +1337,6 @@ pub fn rle_compress(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `rle_decompress` — see implementation.
-
 pub fn rle_decompress(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let mut out = String::new();
@@ -1415,7 +1353,6 @@ pub fn rle_decompress(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(out)
 }
 /// `delta_encode` — see implementation.
-
 pub fn delta_encode(args: &[StrykeValue]) -> StrykeValue {
     let xs: Vec<i64> = args
         .first()
@@ -1434,7 +1371,6 @@ pub fn delta_encode(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(out)
 }
 /// `delta_decode` — see implementation.
-
 pub fn delta_decode(args: &[StrykeValue]) -> StrykeValue {
     let xs: Vec<i64> = args
         .first()
@@ -1455,20 +1391,17 @@ pub fn delta_decode(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(out)
 }
 /// `zigzag_encode` — see implementation.
-
 pub fn zigzag_encode(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_i64(args, 0).unwrap_or(0);
     StrykeValue::integer((x << 1) ^ (x >> 63))
 }
 /// `zigzag_decode` — see implementation.
-
 pub fn zigzag_decode(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_u64(args, 0).unwrap_or(0);
     let result = (x >> 1) as i64 ^ -((x & 1) as i64);
     StrykeValue::integer(result)
 }
 /// `varint_encode` — see implementation.
-
 pub fn varint_encode(args: &[StrykeValue]) -> StrykeValue {
     let mut x = arg_u64(args, 0).unwrap_or(0);
     let mut out: Vec<StrykeValue> = Vec::new();
@@ -1480,7 +1413,6 @@ pub fn varint_encode(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(out)
 }
 /// `varint_decode` — see implementation.
-
 pub fn varint_decode(args: &[StrykeValue]) -> StrykeValue {
     let bytes: Vec<u8> = args
         .first()
@@ -1501,7 +1433,6 @@ pub fn varint_decode(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(result as i64)
 }
 /// `bwt_transform` — see implementation.
-
 pub fn bwt_transform(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let bytes = s.as_bytes();
@@ -1538,7 +1469,6 @@ pub fn bwt_transform(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `bwt_invert` — see implementation.
-
 pub fn bwt_invert(args: &[StrykeValue]) -> StrykeValue {
     let data = arg_str(args, 0).unwrap_or_default();
     let idx = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1569,7 +1499,6 @@ pub fn bwt_invert(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(String::from_utf8_lossy(&out).into_owned())
 }
 /// `huffman_encode` — see implementation.
-
 pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     if s.is_empty() {
@@ -1661,7 +1590,6 @@ pub fn huffman_encode(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `huffman_decode` — see implementation.
-
 pub fn huffman_decode(args: &[StrykeValue]) -> StrykeValue {
     let bits = arg_str(args, 0).unwrap_or_default();
     let table_v = args.get(1).map(as_vec_sv).unwrap_or_default();

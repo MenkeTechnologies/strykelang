@@ -7108,9 +7108,7 @@ impl<'a> VM<'a> {
                                 while let Some(item) = iter.next_item() {
                                     count += 1;
                                     self.interp.scope.set_topic(item);
-                                    if let Err(e) =
-                                        self.run_block_region(start, end, op_count)
-                                    {
+                                    if let Err(e) = self.run_block_region(start, end, op_count) {
                                         self.interp.scope.restore_topic_chain(saved_chain);
                                         return Err(e);
                                     }

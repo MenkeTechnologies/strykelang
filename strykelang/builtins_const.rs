@@ -83,7 +83,6 @@ http_method!(http_method_connect, "CONNECT");
 // Distribution PDF / quantile functions (statrs backed)
 // ══════════════════════════════════════════════════════════════════════
 /// `dbeta` — see implementation.
-
 pub fn dbeta(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let a = arg_f64(args, 1).unwrap_or(1.0);
@@ -97,7 +96,6 @@ pub fn dbeta(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qbeta` — see implementation.
-
 pub fn qbeta(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let a = arg_f64(args, 1).unwrap_or(1.0);
@@ -108,7 +106,6 @@ pub fn qbeta(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rbeta` — see implementation.
-
 pub fn rbeta(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let mut rng = rand::thread_rng();
@@ -120,7 +117,6 @@ pub fn rbeta(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dcauchy` — see implementation.
-
 pub fn dcauchy(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let loc = arg_f64(args, 1).unwrap_or(0.0);
@@ -134,7 +130,6 @@ pub fn dcauchy(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qcauchy` — see implementation.
-
 pub fn qcauchy(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let loc = arg_f64(args, 1).unwrap_or(0.0);
@@ -145,7 +140,6 @@ pub fn qcauchy(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rcauchy` — see implementation.
-
 pub fn rcauchy(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -156,7 +150,6 @@ pub fn rcauchy(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dexp` — see implementation.
-
 pub fn dexp(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let rate = arg_f64(args, 1).unwrap_or(1.0);
@@ -169,7 +162,6 @@ pub fn dexp(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qexp` — see implementation.
-
 pub fn qexp(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let rate = arg_f64(args, 1).unwrap_or(1.0);
@@ -179,7 +171,6 @@ pub fn qexp(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rexp` — see implementation.
-
 pub fn rexp(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -189,7 +180,6 @@ pub fn rexp(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dgamma` — see implementation.
-
 pub fn dgamma(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let shape = arg_f64(args, 1).unwrap_or(1.0);
@@ -203,7 +193,6 @@ pub fn dgamma(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qgamma` — see implementation.
-
 pub fn qgamma(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let shape = arg_f64(args, 1).unwrap_or(1.0);
@@ -214,7 +203,6 @@ pub fn qgamma(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rgamma` — see implementation.
-
 pub fn rgamma(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -225,7 +213,6 @@ pub fn rgamma(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dlnorm` — see implementation.
-
 pub fn dlnorm(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(1.0);
     let mu = arg_f64(args, 1).unwrap_or(0.0);
@@ -239,7 +226,6 @@ pub fn dlnorm(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qlnorm` — see implementation.
-
 pub fn qlnorm(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let mu = arg_f64(args, 1).unwrap_or(0.0);
@@ -250,7 +236,6 @@ pub fn qlnorm(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rlnorm` — see implementation.
-
 pub fn rlnorm(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -261,7 +246,6 @@ pub fn rlnorm(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dlogis` — see implementation.
-
 pub fn dlogis(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let loc = arg_f64(args, 1).unwrap_or(0.0);
@@ -271,7 +255,6 @@ pub fn dlogis(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(pdf)
 }
 /// `qlogis` — see implementation.
-
 pub fn qlogis(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5).clamp(1e-12, 1.0 - 1e-12);
     let loc = arg_f64(args, 1).unwrap_or(0.0);
@@ -279,7 +262,6 @@ pub fn qlogis(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(loc + scale * (p / (1.0 - p)).ln())
 }
 /// `rlogis` — see implementation.
-
 pub fn rlogis(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -290,7 +272,6 @@ pub fn rlogis(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dpois` — see implementation.
-
 pub fn dpois(args: &[StrykeValue]) -> StrykeValue {
     let k = arg_f64(args, 0).unwrap_or(0.0).max(0.0).round() as u64;
     let lambda = arg_f64(args, 1).unwrap_or(1.0);
@@ -300,7 +281,6 @@ pub fn dpois(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qpois` — see implementation.
-
 pub fn qpois(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let lambda = arg_f64(args, 1).unwrap_or(1.0);
@@ -315,7 +295,6 @@ pub fn qpois(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(k as i64)
 }
 /// `rpois` — see implementation.
-
 pub fn rpois(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -325,7 +304,6 @@ pub fn rpois(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `dweibull` — see implementation.
-
 pub fn dweibull(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     let shape = arg_f64(args, 1).unwrap_or(1.0);
@@ -339,7 +317,6 @@ pub fn dweibull(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `qweibull` — see implementation.
-
 pub fn qweibull(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let shape = arg_f64(args, 1).unwrap_or(1.0);
@@ -350,7 +327,6 @@ pub fn qweibull(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rweibull` — see implementation.
-
 pub fn rweibull(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -361,7 +337,6 @@ pub fn rweibull(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qnorm` — see implementation.
-
 pub fn qnorm(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let mu = arg_f64(args, 1).unwrap_or(0.0);
@@ -372,7 +347,6 @@ pub fn qnorm(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rnorm` — see implementation.
-
 pub fn rnorm(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -383,7 +357,6 @@ pub fn rnorm(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qunif` — see implementation.
-
 pub fn qunif(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let lo = arg_f64(args, 1).unwrap_or(0.0);
@@ -394,7 +367,6 @@ pub fn qunif(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `runif` — see implementation.
-
 pub fn runif(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let lo = arg_f64(args, 0).unwrap_or(0.0);
@@ -402,7 +374,6 @@ pub fn runif(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(rand::thread_rng().gen_range(lo..hi))
 }
 /// `qbinom` — see implementation.
-
 pub fn qbinom(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let n = arg_f64(args, 1).unwrap_or(10.0).max(0.0).round() as u64;
@@ -419,7 +390,6 @@ pub fn qbinom(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(n as i64)
 }
 /// `rbinom` — see implementation.
-
 pub fn rbinom(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -430,7 +400,6 @@ pub fn rbinom(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qgeom` — see implementation.
-
 pub fn qgeom(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let pr = arg_f64(args, 1).unwrap_or(0.5).clamp(1e-12, 1.0);
@@ -439,7 +408,6 @@ pub fn qgeom(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(k.max(0))
 }
 /// `rgeom` — see implementation.
-
 pub fn rgeom(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -449,7 +417,6 @@ pub fn rgeom(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qhyper` — see implementation.
-
 pub fn qhyper(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let pop = arg_f64(args, 1).unwrap_or(10.0).max(1.0).round() as u64;
@@ -468,7 +435,6 @@ pub fn qhyper(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(max as i64)
 }
 /// `rhyper` — see implementation.
-
 pub fn rhyper(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -480,7 +446,6 @@ pub fn rhyper(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qchisq` — see implementation.
-
 pub fn qchisq(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let df = arg_f64(args, 1).unwrap_or(1.0);
@@ -490,7 +455,6 @@ pub fn qchisq(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rchisq` — see implementation.
-
 pub fn rchisq(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -500,7 +464,6 @@ pub fn rchisq(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qf` — see implementation.
-
 pub fn qf(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let df1 = arg_f64(args, 1).unwrap_or(1.0);
@@ -511,7 +474,6 @@ pub fn qf(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rf` — see implementation.
-
 pub fn rf(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();
@@ -522,7 +484,6 @@ pub fn rf(args: &[StrykeValue]) -> StrykeValue {
     ])
 }
 /// `qt` — see implementation.
-
 pub fn qt(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
     let df = arg_f64(args, 1).unwrap_or(1.0);
@@ -532,7 +493,6 @@ pub fn qt(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `rt` — see implementation.
-
 pub fn rt(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
     let p: f64 = rand::thread_rng().gen();

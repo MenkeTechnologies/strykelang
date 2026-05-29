@@ -122,7 +122,6 @@ impl BloomFilter {
         (0..k).map(move |i| h1.wrapping_add((i as u64).wrapping_mul(h2)))
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, key: &[u8]) -> bool {
         let mut already_in = true;
         for p in self.probes(key) {
@@ -137,12 +136,10 @@ impl BloomFilter {
         !already_in
     }
     /// `contains` — see implementation.
-
     pub fn contains(&self, key: &[u8]) -> bool {
         self.probes(key).all(|p| self.bits.get(p))
     }
     /// `estimated_fpr` — see implementation.
-
     pub fn estimated_fpr(&self) -> f64 {
         // (1 - e^{-kn/m})^k
         let m = (1u64 << self.bits.log2_cap) as f64;
@@ -150,7 +147,6 @@ impl BloomFilter {
         (1.0 - (-kn_over_m).exp()).powi(self.k as i32)
     }
     /// `inserted` — see implementation.
-
     pub fn inserted(&self) -> u64 {
         self.inserted
     }
@@ -175,7 +171,6 @@ impl BloomFilter {
         self.bits.count_set()
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &BloomFilter) -> bool {
         if self.k != other.k || !self.bits.merge_or(&other.bits) {
             return false;
@@ -186,7 +181,6 @@ impl BloomFilter {
         true
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         for w in self.bits.bits.iter_mut() {
             *w = 0;
@@ -212,7 +206,6 @@ impl BloomFilter {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 8 || &bytes[..8] != b"STKBLOM\x01" {
             return None;
@@ -281,7 +274,6 @@ impl HllSketch {
         }
     }
     /// `precision` — see implementation.
-
     pub fn precision(&self) -> u32 {
         self.precision
     }
@@ -332,7 +324,6 @@ impl HllSketch {
         }
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &HllSketch) -> bool {
         if self.precision != other.precision {
             return false;
@@ -345,14 +336,12 @@ impl HllSketch {
         true
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         for r in self.registers.iter_mut() {
             *r = 0;
         }
     }
     /// `serialize` — see implementation.
-
     pub fn serialize(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(12 + self.registers.len());
         out.extend_from_slice(b"STKHLL\x00\x01");
@@ -361,7 +350,6 @@ impl HllSketch {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 12 || &bytes[..8] != b"STKHLL\x00\x01" {
             return None;
@@ -411,7 +399,6 @@ impl CmsSketch {
         }
     }
     /// `width` — see implementation.
-
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -457,7 +444,6 @@ impl CmsSketch {
         }
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &CmsSketch) -> bool {
         if self.width != other.width || self.depth != other.depth {
             return false;
@@ -468,14 +454,12 @@ impl CmsSketch {
         true
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         for c in self.counters.iter_mut() {
             *c = 0;
         }
     }
     /// `serialize` — see implementation.
-
     pub fn serialize(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(16 + self.counters.len() * 4);
         out.extend_from_slice(b"STKCMS\x00\x01");
@@ -487,7 +471,6 @@ impl CmsSketch {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 16 || &bytes[..8] != b"STKCMS\x00\x01" {
             return None;
@@ -539,7 +522,6 @@ impl TopKSketch {
         }
     }
     /// `k` — see implementation.
-
     pub fn k(&self) -> usize {
         self.k
     }
@@ -548,7 +530,6 @@ impl TopKSketch {
         self.entries.len()
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, key: &[u8]) {
         self.add_weighted(key, 1);
     }
@@ -600,7 +581,6 @@ impl TopKSketch {
         self.entries.get(key).map(|(c, _)| *c).unwrap_or(0)
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &TopKSketch) -> bool {
         // Merging two SpaceSaving sketches: drop into self by re-inserting
         // each (key, count) from `other`, treating count as a virtual
@@ -618,12 +598,10 @@ impl TopKSketch {
         true
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         self.entries.clear();
     }
     /// `serialize` — see implementation.
-
     pub fn serialize(&self) -> Vec<u8> {
         // 8-byte magic + version, 8-byte k, 8-byte entry count, then per
         // entry: 4-byte key-len + key bytes + 8-byte count + 8-byte error.
@@ -640,7 +618,6 @@ impl TopKSketch {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 24 || &bytes[..8] != b"STKTOP\x00\x01" {
             return None;
@@ -711,7 +688,6 @@ impl TDigestSketch {
         }
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, value: f64) {
         if value.is_finite() {
             self.pending.push(value);
@@ -721,7 +697,6 @@ impl TDigestSketch {
         }
     }
     /// `quantile` — see implementation.
-
     pub fn quantile(&mut self, q: f64) -> f64 {
         self.flush();
         if self.digest.is_empty() {
@@ -730,31 +705,26 @@ impl TDigestSketch {
         self.digest.estimate_quantile(q.clamp(0.0, 1.0))
     }
     /// `count` — see implementation.
-
     pub fn count(&mut self) -> u64 {
         self.flush();
         self.digest.count() as u64
     }
     /// `min` — see implementation.
-
     pub fn min(&mut self) -> f64 {
         self.flush();
         self.digest.min()
     }
     /// `max` — see implementation.
-
     pub fn max(&mut self) -> f64 {
         self.flush();
         self.digest.max()
     }
     /// `sum` — see implementation.
-
     pub fn sum(&mut self) -> f64 {
         self.flush();
         self.digest.sum()
     }
     /// `mean` — see implementation.
-
     pub fn mean(&mut self) -> f64 {
         self.flush();
         if self.digest.is_empty() {
@@ -764,7 +734,6 @@ impl TDigestSketch {
         }
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &mut TDigestSketch) {
         self.flush();
         other.flush();
@@ -772,18 +741,15 @@ impl TDigestSketch {
             tdigest::TDigest::merge_digests(vec![self.digest.clone(), other.digest.clone()]);
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         self.digest = tdigest::TDigest::new_with_size(self.digest.max_size());
         self.pending.clear();
     }
     /// `compression` — see implementation.
-
     pub fn compression(&self) -> usize {
         self.digest.max_size()
     }
     /// `serialize` — see implementation.
-
     pub fn serialize(&mut self) -> Vec<u8> {
         self.flush();
         let mut out = Vec::new();
@@ -794,7 +760,6 @@ impl TDigestSketch {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 12 || &bytes[..8] != b"STKTDG\x00\x01" {
             return None;
@@ -843,7 +808,6 @@ impl RoaringBitmapSketch {
         }
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, v: u32) -> bool {
         self.inner.insert(v)
     }
@@ -880,7 +844,6 @@ impl RoaringBitmapSketch {
         self.inner.rank(v)
     }
     /// `union_with` — see implementation.
-
     pub fn union_with(&mut self, other: &RoaringBitmapSketch) {
         self.inner |= &other.inner;
     }
@@ -901,7 +864,6 @@ impl RoaringBitmapSketch {
         self.inner.clear();
     }
     /// `serialize` — see implementation.
-
     pub fn serialize(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(8 + self.inner.serialized_size());
         out.extend_from_slice(b"STKRB\x00\x00\x01");
@@ -909,7 +871,6 @@ impl RoaringBitmapSketch {
         out
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < 8 || &bytes[..8] != b"STKRB\x00\x00\x01" {
             return None;
@@ -959,7 +920,6 @@ impl RateLimiterSketch {
         }
     }
     /// `leaky_bucket` — see implementation.
-
     pub fn leaky_bucket(capacity: f64, drain_per_sec: f64) -> Self {
         Self {
             capacity: capacity.max(1.0),
@@ -1004,7 +964,6 @@ impl RateLimiterSketch {
         }
     }
     /// `available` — see implementation.
-
     pub fn available(&mut self) -> f64 {
         self.refill();
         if self.leaky {
@@ -1051,7 +1010,6 @@ impl HashRingSketch {
         }
     }
     /// `add_node` — see implementation.
-
     pub fn add_node(&mut self, name: &str) -> bool {
         if self.nodes.iter().any(|n| n == name) {
             return false;
@@ -1067,7 +1025,6 @@ impl HashRingSketch {
         true
     }
     /// `remove_node` — see implementation.
-
     pub fn remove_node(&mut self, name: &str) -> bool {
         let idx = match self.nodes.iter().position(|n| n == name) {
             Some(i) => i as u32,
@@ -1081,7 +1038,6 @@ impl HashRingSketch {
         true
     }
     /// `get` — see implementation.
-
     pub fn get(&self, key: &[u8]) -> Option<&str> {
         if self.vnodes.is_empty() {
             return None;
@@ -1107,7 +1063,6 @@ impl HashRingSketch {
         }
     }
     /// `nodes` — see implementation.
-
     pub fn nodes(&self) -> Vec<String> {
         self.nodes
             .iter()
@@ -1116,7 +1071,6 @@ impl HashRingSketch {
             .collect()
     }
     /// `node_count` — see implementation.
-
     pub fn node_count(&self) -> usize {
         self.nodes.iter().filter(|n| !n.is_empty()).count()
     }
@@ -1145,7 +1099,6 @@ impl SimHashSketch {
         }
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, feature: &[u8], weight: i64) {
         let h = xxh3_64(feature);
         for i in 0..64 {
@@ -1158,7 +1111,6 @@ impl SimHashSketch {
         self.features = self.features.saturating_add(1);
     }
     /// `digest` — see implementation.
-
     pub fn digest(&self) -> u64 {
         let mut out = 0u64;
         for i in 0..64 {
@@ -1169,7 +1121,6 @@ impl SimHashSketch {
         out
     }
     /// `similarity` — see implementation.
-
     pub fn similarity(&self, other: &SimHashSketch) -> f64 {
         let h1 = self.digest();
         let h2 = other.digest();
@@ -1177,7 +1128,6 @@ impl SimHashSketch {
         (64 - hd) as f64 / 64.0
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &SimHashSketch) {
         for i in 0..64 {
             self.counters[i] = self.counters[i].saturating_add(other.counters[i]);
@@ -1185,13 +1135,11 @@ impl SimHashSketch {
         self.features = self.features.saturating_add(other.features);
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         self.counters = [0i64; 64];
         self.features = 0;
     }
     /// `feature_count` — see implementation.
-
     pub fn feature_count(&self) -> u64 {
         self.features
     }
@@ -1228,12 +1176,10 @@ impl MinHashSketch {
         }
     }
     /// `k` — see implementation.
-
     pub fn k(&self) -> u32 {
         self.k
     }
     /// `add` — see implementation.
-
     pub fn add(&mut self, item: &[u8]) {
         let h = xxh3_128(item);
         let h1 = h as u64;
@@ -1246,7 +1192,6 @@ impl MinHashSketch {
         }
     }
     /// `jaccard` — see implementation.
-
     pub fn jaccard(&self, other: &MinHashSketch) -> f64 {
         if self.k != other.k {
             return f64::NAN;
@@ -1260,7 +1205,6 @@ impl MinHashSketch {
         matches as f64 / self.k as f64
     }
     /// `merge` — see implementation.
-
     pub fn merge(&mut self, other: &MinHashSketch) -> bool {
         if self.k != other.k {
             return false;
@@ -1273,7 +1217,6 @@ impl MinHashSketch {
         true
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         for m in self.mins.iter_mut() {
             *m = u64::MAX;
@@ -1384,7 +1327,6 @@ impl BkTreeSketch {
         }
     }
     /// `len` — see implementation.
-
     pub fn len(&self) -> usize {
         self.size
     }
@@ -1393,7 +1335,6 @@ impl BkTreeSketch {
         self.size == 0
     }
     /// `insert` — see implementation.
-
     pub fn insert(&mut self, word: &str) -> bool {
         if let Some(ref mut r) = self.root {
             let d = damerau_levenshtein(&r.word, word);
@@ -1439,7 +1380,6 @@ impl BkTreeSketch {
         out
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         self.root = None;
         self.size = 0;
@@ -1527,12 +1467,10 @@ pub struct RopeSketch {
 impl RopeSketch {
     const MAX_CHUNK: usize = 1024;
     /// `new` — see implementation.
-
     pub fn new() -> Self {
         Self { chunks: Vec::new() }
     }
     /// `from_string` — see implementation.
-
     pub fn from_string(s: &str) -> Self {
         let mut r = Self::new();
         for chunk in s.as_bytes().chunks(Self::MAX_CHUNK) {
@@ -1558,17 +1496,14 @@ impl RopeSketch {
         r
     }
     /// `len` — see implementation.
-
     pub fn len(&self) -> usize {
         self.chunks.iter().map(|c| c.chars().count()).sum()
     }
     /// `is_empty` — see implementation.
-
     pub fn is_empty(&self) -> bool {
         self.chunks.iter().all(|c| c.is_empty())
     }
     /// `byte_len` — see implementation.
-
     pub fn byte_len(&self) -> usize {
         self.chunks.iter().map(|c| c.len()).sum()
     }
@@ -1608,7 +1543,6 @@ impl RopeSketch {
         self.rebalance();
     }
     /// `delete` — see implementation.
-
     pub fn delete(&mut self, start: usize, end: usize) {
         let total = self.len();
         let (start, end) = (start.min(total), end.min(total));
@@ -1624,7 +1558,6 @@ impl RopeSketch {
         *self = Self::from_string(&new_text);
     }
     /// `substring` — see implementation.
-
     pub fn substring(&self, start: usize, end: usize) -> String {
         let total = self.len();
         let (start, end) = (start.min(total), end.min(total));
@@ -1654,7 +1587,6 @@ impl RopeSketch {
         self.chunks = out;
     }
     /// `clear` — see implementation.
-
     pub fn clear(&mut self) {
         self.chunks.clear();
     }

@@ -46,7 +46,6 @@ pub struct SymbolId(pub u32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct ScopeId(u32);
 /// `SymbolKind` — see variants.
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SymbolKind {
     /// `Local` variant.
@@ -75,7 +74,6 @@ pub enum SymbolKind {
     Field,
 }
 /// `Symbol` — see fields for layout.
-
 #[derive(Clone, Debug)]
 pub struct Symbol {
     /// `id` field.
@@ -90,7 +88,6 @@ pub struct Symbol {
     pub decl_line: u32,
 }
 /// `SymbolRef` — see fields for layout.
-
 #[derive(Clone, Debug)]
 pub struct SymbolRef {
     /// `symbol` field.
@@ -101,7 +98,6 @@ pub struct SymbolRef {
     pub name: String,
 }
 /// `SymbolTable` — see fields for layout.
-
 pub struct SymbolTable {
     /// `symbols` field.
     pub symbols: Vec<Symbol>,

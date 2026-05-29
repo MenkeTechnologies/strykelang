@@ -29,7 +29,6 @@ fn controller_file_stem(name: &str) -> String {
     plural_snake(name)
 }
 /// `controller` — see implementation.
-
 pub fn controller(name: &str, actions: &[String]) -> Result<()> {
     let cn = controller_class(name);
     let fs = controller_file_stem(name);
@@ -86,7 +85,6 @@ pub fn controller(name: &str, actions: &[String]) -> Result<()> {
     Ok(())
 }
 /// `model` — see implementation.
-
 pub fn model(name: &str, fields: &[String]) -> Result<()> {
     write_model_file(name, fields)?;
     // Rails: migration class for `Post` model is `CreatePosts` (plural).
@@ -99,7 +97,6 @@ pub fn model(name: &str, fields: &[String]) -> Result<()> {
     Ok(())
 }
 /// `migration` — see implementation.
-
 pub fn migration(name: &str, fields: &[String]) -> Result<()> {
     // Standalone migration: name is e.g. "AddPublishedToPosts" — no model,
     // no scaffold. Body is empty up/down for the user to fill in unless
@@ -108,7 +105,6 @@ pub fn migration(name: &str, fields: &[String]) -> Result<()> {
     Ok(())
 }
 /// `scaffold` — see implementation.
-
 pub fn scaffold(name: &str, fields: &[String]) -> Result<()> {
     // Full Rails scaffold = model (singular) + migration (plural class
     // name) + controller (plural class name) + views (plural directory).

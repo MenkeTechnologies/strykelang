@@ -21,7 +21,6 @@ fn parse_unicode_name(name: &str) -> Option<char> {
 /// Flag letters after `m//`, `qr//`, etc. (`c` = `/gc`, `o` = compile once; CPAN uses both).
 const REGEX_FLAG_CHARS: &str = "gimsxecor";
 /// `Lexer` — see fields for layout.
-
 pub struct Lexer {
     /// `input` field.
     input: Vec<char>,
@@ -74,7 +73,6 @@ impl Lexer {
         Self::new_with_file(input, "-e")
     }
     /// `new_with_file` — see implementation.
-
     pub fn new_with_file(input: &str, file: impl Into<String>) -> Self {
         Self {
             input: input.chars().collect(),
@@ -1446,15 +1444,18 @@ impl Lexer {
                 // default mode still gets the docs-faithful behavior.
                 if ident.ends_with("::") && !crate::compat_mode() {
                     match self.peek() {
-                        Some('^') if self.input.get(self.pos + 1).is_some_and(|c| c.is_alphabetic()) => {
+                        Some('^')
+                            if self
+                                .input
+                                .get(self.pos + 1)
+                                .is_some_and(|c| c.is_alphabetic()) =>
+                        {
                             self.advance();
                             let c2 = self.advance().unwrap();
                             ident.push('^');
                             ident.push(c2);
                         }
-                        Some(c)
-                            if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}".contains(c) =>
-                        {
+                        Some(c) if "!@$&*+;',\"\\|?/<>.0123456789~%-=()[]{}".contains(c) => {
                             self.advance();
                             ident.push(c);
                         }
@@ -1573,7 +1574,6 @@ impl Lexer {
         Some(rest)
     }
     /// `next_token` — see implementation.
-
     pub fn next_token(&mut self) -> StrykeResult<Token> {
         self.skip_whitespace_and_comments();
         // Stamp the start line for [`Self::tokenize`]. Recursive calls

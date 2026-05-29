@@ -55,7 +55,6 @@ pub const SHARD_FORMAT_VERSION: u32 = 1;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.
-
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ShardHeader {
@@ -71,7 +70,6 @@ pub struct ShardHeader {
     pub built_at_secs: u64,
 }
 /// `ScriptEntry` — see fields for layout.
-
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ScriptEntry {
@@ -89,7 +87,6 @@ pub struct ScriptEntry {
     pub chunk_blob: Vec<u8>,
 }
 /// `ScriptShard` — see fields for layout.
-
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ScriptShard {
@@ -144,11 +141,9 @@ fn perl_from_cache_const(c: CacheConst) -> StrykeValue {
     }
 }
 /// `constants_pool_codec` submodule.
-
 pub mod constants_pool_codec {
     use super::*;
     /// `serialize` — see implementation.
-
     pub fn serialize<S>(values: &Vec<StrykeValue>, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -161,7 +156,6 @@ pub mod constants_pool_codec {
         out.serialize(ser)
     }
     /// `deserialize` — see implementation.
-
     pub fn deserialize<'de, D>(de: D) -> Result<Vec<StrykeValue>, D::Error>
     where
         D: Deserializer<'de>,

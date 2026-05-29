@@ -108,10 +108,7 @@ pub enum CompileError {
     /// `Unsupported` variant.
     Unsupported(String),
     /// Immutable binding reassignment (e.g. `frozen my $x` then `$x = 1`).
-    Frozen {
-        line: usize,
-        detail: String,
-    },
+    Frozen { line: usize, detail: String },
 }
 
 #[derive(Default, Clone)]
@@ -176,7 +173,6 @@ struct LoopCtx {
     continue_jumps: Vec<usize>,
 }
 /// `Compiler` — see fields for layout.
-
 pub struct Compiler {
     /// `chunk` field.
     pub chunk: Chunk,
@@ -313,7 +309,6 @@ impl Compiler {
         }
     }
     /// `new` — see implementation.
-
     pub fn new() -> Self {
         Self {
             chunk: Chunk::new(),
@@ -463,7 +458,6 @@ impl Compiler {
         self.frame_depth = self.frame_depth.saturating_sub(1);
     }
     /// `with_source_file` — see implementation.
-
     pub fn with_source_file(mut self, path: String) -> Self {
         self.source_file = path;
         self
@@ -1249,7 +1243,6 @@ impl Compiler {
             .any(|l| l.mysync_hashes.contains(hash_name))
     }
     /// `compile_program` — see implementation.
-
     pub fn compile_program(mut self, program: &Program) -> Result<Chunk, CompileError> {
         // Extract BEGIN/END blocks before compiling.
         for stmt in &program.statements {
@@ -6151,15 +6144,11 @@ impl Compiler {
                 // arg shapes (those depend on `argc` being the static
                 // arg count, not a flattened total).
                 let has_aggregate_arg = !pass_caller_arglist
-                    && args.iter().any(|a| {
-                        matches!(a.kind, ExprKind::ArrayVar(_) | ExprKind::HashVar(_))
-                    });
+                    && args
+                        .iter()
+                        .any(|a| matches!(a.kind, ExprKind::ArrayVar(_) | ExprKind::HashVar(_)));
                 if *pass_caller_arglist {
-                    self.emit_op(
-                        Op::IndirectCall(0, ctx.as_byte(), 1),
-                        line,
-                        Some(root),
-                    );
+                    self.emit_op(Op::IndirectCall(0, ctx.as_byte(), 1), line, Some(root));
                 } else if has_aggregate_arg {
                     let list_expr = Expr {
                         kind: ExprKind::List(args.clone()),
