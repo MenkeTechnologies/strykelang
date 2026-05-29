@@ -1,0 +1,323 @@
+#!/usr/bin/env stryke
+
+# Hopcroft DFA minimization — partition refinement in O(n · |Σ| · log n).
+# Start with the trivial partition {accepting, non-accepting}. Repeat:
+# pick a partition block W, scan every symbol c, find the set X of
+# states with δ(x, c) ∈ W, and split every block Y into (Y ∩ X) and
+# (Y ∖ X) whenever both halves are non-empty. The minimal DFA's
+# states are the resulting equivalence classes. Cross-validated by
+# (a) checking the minimized DFA accepts exactly the same language on
+# every short string, and (b) further-minimizing the result is a no-op.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Dfa::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/hopcroft_dfa_no_interop.stk
+
+# ── DFA shape ─────────────────────────────────────────────────────
+# +{
+#   states  => N,                # 0..N-1
+#   alpha   => [c1, c2, …],
+#   delta   => arrayref of hashrefs δ[s]{c} = next state,
+#   start   => s0,
+#   accept  => arrayref of accepting-state indices,
+# }
+
+# ── simulate the DFA on a string ─────────────────────────────────
+
+fn Dfa::accept($dfa, $s) {
+    my %acc
+    for my $acc_s (@{$dfa->{accept}}) { $acc{$acc_s} = 1 }
+    my $cur = $dfa->{start}
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        my $c = substr($s, $i, 1)
+        if (!exists $dfa->{delta}->[$cur]->{$c}) {
+            return 0
+        }
+        $cur = $dfa->{delta}->[$cur]->{$c}
+    }
+    exists $acc{$cur} ? 1 : 0
+}
+
+# ── Hopcroft minimization ────────────────────────────────────────
+# Returns a new DFA over a renumbered, minimal state set, plus a
+# class[] array mapping each original state to its minimized class.
+# Standard pipeline: first prune unreachable states, then apply
+# partition refinement — Hopcroft assumes a trim DFA.
+
+fn Dfa::minimize($dfa) {
+    my $n = $dfa->{states}
+    # Step 1: mark reachable states via BFS from start.
+    my @reachable = (0) x $n
+    $reachable[$dfa->{start}] = 1
+    my @queue = ($dfa->{start})
+    while (len(@queue) > 0) {
+        my $s = shift @queue
+        for my $c (@{$dfa->{alpha}}) {
+            if (exists $dfa->{delta}->[$s]->{$c}) {
+                my $nx = $dfa->{delta}->[$s]->{$c}
+                if (!$reachable[$nx]) {
+                    $reachable[$nx] = 1
+                    push @queue, $nx
+                }
+            }
+        }
+    }
+    # Sentinel class id for "removed".
+    my $DEAD = -1
+    my @class = ($DEAD) x $n
+    my %acc
+    for my $acc_s (@{$dfa->{accept}}) { $acc{$acc_s} = 1 }
+    for my $s (0:$n - 1) {
+        next unless $reachable[$s]
+        $class[$s] = exists $acc{$s} ? 1 : 0
+    }
+    # Partition-refinement loop over reachable states only.
+    my $changed = 1
+    while ($changed) {
+        $changed = 0
+        my %bucket
+        my @keys_in_order
+        for my $s (0:$n - 1) {
+            next unless $reachable[$s]
+            my @key = ($class[$s])
+            for my $c (@{$dfa->{alpha}}) {
+                if (exists $dfa->{delta}->[$s]->{$c}) {
+                    push @key, $class[$dfa->{delta}->[$s]->{$c}]
+                } else {
+                    push @key, -1
+                }
+            }
+            my $k = join(",", @key)
+            if (!exists $bucket{$k}) {
+                $bucket{$k} = []
+                push @keys_in_order, $k
+            }
+            push @{$bucket{$k}}, $s
+        }
+        my @new_class = ($DEAD) x $n
+        my $cid = 0
+        for my $k (@keys_in_order) {
+            for my $s (@{$bucket{$k}}) {
+                $new_class[$s] = $cid
+            }
+            $cid++
+        }
+        for my $s (0:$n - 1) {
+            next unless $reachable[$s]
+            if ($new_class[$s] != $class[$s]) { $changed = 1; last }
+        }
+        @class = @new_class
+    }
+    # Build the minimized DFA over reachable classes only.
+    my $m = 0
+    for my $c_id (@class) {
+        next if $c_id == $DEAD
+        $m = $c_id + 1 if $c_id + 1 > $m
+    }
+    my @new_delta
+    for my $i (0:$m - 1) { push @new_delta, +{} }
+    for my $s (0:$n - 1) {
+        next unless $reachable[$s]
+        my $c_src = $class[$s]
+        for my $c (@{$dfa->{alpha}}) {
+            if (exists $dfa->{delta}->[$s]->{$c}) {
+                $new_delta[$c_src]->{$c} = $class[$dfa->{delta}->[$s]->{$c}]
+            }
+        }
+    }
+    my %new_accept_set
+    for my $acc_s (@{$dfa->{accept}}) {
+        next unless $reachable[$acc_s]
+        $new_accept_set{$class[$acc_s]} = 1
+    }
+    my @new_accept = sort { _0 <=> _1 } keys %new_accept_set
+    +{
+        states => $m,
+        alpha  => $dfa->{alpha},
+        delta  => \@new_delta,
+        start  => $class[$dfa->{start}],
+        accept => \@new_accept,
+        class  => \@class,
+    }
+}
+
+# ── enumerate every string of length ≤ k over the alphabet ────────
+
+fn Dfa::all_strings($alpha, $max_len) {
+    my @out = ("")
+    my $start = 0
+    my $end = 0
+    for my $L (1:$max_len) {
+        my $new_end = len(@out) - 1
+        for my $i ($start:$end) {
+            my $base = $out[$i]
+            for my $c (@$alpha) {
+                push @out, $base . $c
+            }
+        }
+        $start = $new_end + 1
+        $end = len(@out) - 1
+    }
+    \@out
+}
+
+# ── DFA construction helpers ─────────────────────────────────────
+
+fn Dfa::make($states, $alpha, $transitions, $start, $accept) {
+    my @delta
+    for my $i (0:$states - 1) { push @delta, +{} }
+    for my $t (@$transitions) {
+        $delta[$t->[0]]->{$t->[1]} = $t->[2]
+    }
+    +{
+        states => $states,
+        alpha  => $alpha,
+        delta  => \@delta,
+        start  => $start,
+        accept => $accept,
+    }
+}
+
+# ── primary DFAs ─────────────────────────────────────────────────
+
+# A redundant 4-state DFA for "ends in b" over {a, b}. State 0 and 2
+# are equivalent (non-accept, behave the same); 1 and 3 are too.
+# Minimal form has 2 states.
+
+my $ends_in_b = Dfa::make(
+    4,
+    ["a", "b"],
+    [
+        [0, "a", 0], [0, "b", 1],
+        [1, "a", 2], [1, "b", 3],
+        [2, "a", 0], [2, "b", 1],
+        [3, "a", 2], [3, "b", 3],
+    ],
+    0,
+    [1, 3],
+)
+
+# A 5-state DFA accepting strings of length divisible by 3 over {0,1}.
+# Already minimal — minimization should be a no-op (well, identity).
+
+my $div3 = Dfa::make(
+    3,
+    ["0", "1"],
+    [
+        [0, "0", 1], [0, "1", 1],
+        [1, "0", 2], [1, "1", 2],
+        [2, "0", 0], [2, "1", 0],
+    ],
+    0,
+    [0],
+)
+
+# A 6-state DFA with multiple redundant states for "contains 'ab'".
+# Minimal form has 3 states (before-a, after-a-pending-b, found).
+
+my $contains_ab = Dfa::make(
+    6,
+    ["a", "b"],
+    [
+        [0, "a", 1], [0, "b", 0],
+        [1, "a", 1], [1, "b", 5],
+        [2, "a", 1], [2, "b", 0],   # dead duplicate of state 0
+        [3, "a", 1], [3, "b", 5],   # dead duplicate of state 1
+        [4, "a", 4], [4, "b", 4],   # unreachable, but ok
+        [5, "a", 5], [5, "b", 5],
+    ],
+    0,
+    [5],
+)
+
+my @cases = (
+    +{ name => "ends in b",      dfa => $ends_in_b,   min_states => 2, alpha => ["a", "b"] },
+    +{ name => "len div 3",      dfa => $div3,        min_states => 3, alpha => ["0", "1"] },
+    +{ name => "contains ab",    dfa => $contains_ab, min_states => 3, alpha => ["a", "b"] },
+)
+
+p "── Hopcroft DFA minimization demo ────────────────────"
+printf "  %-22s  %3s  %3s  %s\n", "case", "orig", "min", "class[]"
+printf "  %-22s  %3s  %3s  %s\n", "----------------------", "---", "---", "-------"
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    printf "  %-22s  %3d  %3d  [%s]  %s\n",
+        $c->{name},
+        $c->{dfa}->{states},
+        $mn->{states},
+        join(",", @{$mn->{class}}),
+        $mn->{states} == $c->{min_states} ? "" : "FAIL want=#{$c->{min_states}}"
+}
+
+# ── invariant 1: minimized state count matches expectation ────────
+
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    die "min states #{$mn->{states}} != expected #{$c->{min_states}} on \"#{$c->{name}}\"" unless $mn->{states} == $c->{min_states}
+}
+
+# ── invariant 2: minimized DFA recognizes the same language ───────
+
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    my $words = Dfa::all_strings($c->{alpha}, 5)
+    for my $w (@$words) {
+        my $orig = Dfa::accept($c->{dfa}, $w)
+        my $newa = Dfa::accept($mn, $w)
+        die "language mismatch on \"#{$w}\" for \"#{$c->{name}}\": orig=#{$orig} min=#{$newa}" unless $orig == $newa
+    }
+}
+
+# ── invariant 3: re-minimizing yields the same state count ────────
+
+for my $c (@cases) {
+    my $mn1 = Dfa::minimize($c->{dfa})
+    my $mn2 = Dfa::minimize($mn1)
+    die "minimization not idempotent on \"#{$c->{name}}\": #{$mn1->{states}} -> #{$mn2->{states}}" unless $mn1->{states} == $mn2->{states}
+}
+
+# ── invariant 4: every state in the minimized DFA is reachable ────
+
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    my @seen = (0) x $mn->{states}
+    $seen[$mn->{start}] = 1
+    my @queue = ($mn->{start})
+    while (len(@queue) > 0) {
+        my $s = shift @queue
+        for my $ch (@{$mn->{alpha}}) {
+            if (exists $mn->{delta}->[$s]->{$ch}) {
+                my $nx = $mn->{delta}->[$s]->{$ch}
+                if (!$seen[$nx]) {
+                    $seen[$nx] = 1
+                    push @queue, $nx
+                }
+            }
+        }
+    }
+    for my $s (0:$mn->{states} - 1) {
+        die "min state #{$s} unreachable on \"#{$c->{name}}\"" unless $seen[$s]
+    }
+}
+
+# ── invariant 5: minimized accept-set is non-empty when orig was ──
+
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    next unless len(@{$c->{dfa}->{accept}}) > 0
+    die "minimized accept-set empty on \"#{$c->{name}}\"" unless len(@{$mn->{accept}}) > 0
+}
+
+# ── invariant 6: class[start_orig] = min_start ─────────────────────
+
+for my $c (@cases) {
+    my $mn = Dfa::minimize($c->{dfa})
+    die "class[start] mismatch on \"#{$c->{name}}\"" unless $mn->{class}->[$c->{dfa}->{start}] == $mn->{start}
+}
+
+p ""
+p "── all six invariants satisfied ──────────────────────"

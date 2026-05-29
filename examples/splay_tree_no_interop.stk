@@ -1,0 +1,333 @@
+#!/usr/bin/env stryke
+
+# Splay tree — self-adjusting BST where every access rotates the
+# touched node to the root via zig (parent is root), zig-zig
+# (grandparent same direction), and zig-zag (grandparent opposite
+# direction) rotations. Amortized O(log n) for any access pattern
+# without per-node balance metadata.
+#
+# Implemented with a flat node arena (no pointer cycles, no GC
+# concerns) and parent indices for O(1) sibling navigation. Cross-
+# validated against a sorted-array reference on every operation.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sp::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/splay_tree_no_interop.stk
+
+# ── factory: a fresh empty splay tree ────────────────────────────
+# Tree is +{ nodes => [..], root => idx-or--1 }. Each node is
+# +{ key, parent, left, right } with sentinel -1 for "no child".
+
+fn Sp::new() {
+    +{ nodes => [], root => -1 }
+}
+
+fn Sp::is_empty($t) {
+    $t->{root} == -1
+}
+
+# ── rotate left — make `x`'s right child the new parent ──────────
+
+fn Sp::rotate_left($t, $x) {
+    my $y = $t->{nodes}->[$x]->{right}
+    return if $y == -1
+    my $beta = $t->{nodes}->[$y]->{left}
+    $t->{nodes}->[$x]->{right} = $beta
+    if ($beta != -1) {
+        $t->{nodes}->[$beta]->{parent} = $x
+    }
+    my $p = $t->{nodes}->[$x]->{parent}
+    $t->{nodes}->[$y]->{parent} = $p
+    if ($p == -1) {
+        $t->{root} = $y
+    } elsif ($t->{nodes}->[$p]->{left} == $x) {
+        $t->{nodes}->[$p]->{left} = $y
+    } else {
+        $t->{nodes}->[$p]->{right} = $y
+    }
+    $t->{nodes}->[$y]->{left} = $x
+    $t->{nodes}->[$x]->{parent} = $y
+}
+
+# ── rotate right — make `x`'s left child the new parent ──────────
+
+fn Sp::rotate_right($t, $x) {
+    my $y = $t->{nodes}->[$x]->{left}
+    return if $y == -1
+    my $beta = $t->{nodes}->[$y]->{right}
+    $t->{nodes}->[$x]->{left} = $beta
+    if ($beta != -1) {
+        $t->{nodes}->[$beta]->{parent} = $x
+    }
+    my $p = $t->{nodes}->[$x]->{parent}
+    $t->{nodes}->[$y]->{parent} = $p
+    if ($p == -1) {
+        $t->{root} = $y
+    } elsif ($t->{nodes}->[$p]->{left} == $x) {
+        $t->{nodes}->[$p]->{left} = $y
+    } else {
+        $t->{nodes}->[$p]->{right} = $y
+    }
+    $t->{nodes}->[$y]->{right} = $x
+    $t->{nodes}->[$x]->{parent} = $y
+}
+
+# ── splay node x to the root via zig / zig-zig / zig-zag ──────────
+
+fn Sp::splay($t, $x) {
+    while ($t->{nodes}->[$x]->{parent} != -1) {
+        my $p = $t->{nodes}->[$x]->{parent}
+        my $g = $t->{nodes}->[$p]->{parent}
+        if ($g == -1) {
+            # Zig.
+            if ($t->{nodes}->[$p]->{left} == $x) {
+                Sp::rotate_right($t, $p)
+            } else {
+                Sp::rotate_left($t, $p)
+            }
+        } else {
+            my $x_left = $t->{nodes}->[$p]->{left} == $x
+            my $p_left = $t->{nodes}->[$g]->{left} == $p
+            if ($x_left && $p_left) {
+                # Zig-zig left.
+                Sp::rotate_right($t, $g)
+                Sp::rotate_right($t, $p)
+            } elsif (!$x_left && !$p_left) {
+                # Zig-zig right.
+                Sp::rotate_left($t, $g)
+                Sp::rotate_left($t, $p)
+            } elsif ($x_left && !$p_left) {
+                # Zig-zag: right rotate on p, then left rotate on g.
+                Sp::rotate_right($t, $p)
+                Sp::rotate_left($t, $g)
+            } else {
+                # Zig-zag (mirror).
+                Sp::rotate_left($t, $p)
+                Sp::rotate_right($t, $g)
+            }
+        }
+    }
+}
+
+# ── insert k; splays the new node (or the existing match) to root ─
+
+fn Sp::insert($t, $k) {
+    if ($t->{root} == -1) {
+        push @{$t->{nodes}}, +{ key => $k, parent => -1, left => -1, right => -1 }
+        $t->{root} = len(@{$t->{nodes}}) - 1
+        return
+    }
+    my $cur = $t->{root}
+    while (1) {
+        my $ck = $t->{nodes}->[$cur]->{key}
+        if ($k == $ck) {
+            Sp::splay($t, $cur)
+            return
+        } elsif ($k < $ck) {
+            if ($t->{nodes}->[$cur]->{left} == -1) {
+                push @{$t->{nodes}}, +{ key => $k, parent => $cur, left => -1, right => -1 }
+                my $idx = len(@{$t->{nodes}}) - 1
+                $t->{nodes}->[$cur]->{left} = $idx
+                Sp::splay($t, $idx)
+                return
+            }
+            $cur = $t->{nodes}->[$cur]->{left}
+        } else {
+            if ($t->{nodes}->[$cur]->{right} == -1) {
+                push @{$t->{nodes}}, +{ key => $k, parent => $cur, left => -1, right => -1 }
+                my $idx = len(@{$t->{nodes}}) - 1
+                $t->{nodes}->[$cur]->{right} = $idx
+                Sp::splay($t, $idx)
+                return
+            }
+            $cur = $t->{nodes}->[$cur]->{right}
+        }
+    }
+}
+
+# ── contains: returns 0/1 and splays the (matched or near-match) ─
+
+fn Sp::contains($t, $k) {
+    return 0 if $t->{root} == -1
+    my $cur = $t->{root}
+    my $last = -1
+    while ($cur != -1) {
+        $last = $cur
+        my $ck = $t->{nodes}->[$cur]->{key}
+        if ($k == $ck) {
+            Sp::splay($t, $cur)
+            return 1
+        } elsif ($k < $ck) {
+            $cur = $t->{nodes}->[$cur]->{left}
+        } else {
+            $cur = $t->{nodes}->[$cur]->{right}
+        }
+    }
+    Sp::splay($t, $last) if $last != -1
+    0
+}
+
+# ── in-order traversal — returns sorted keys ─────────────────────
+
+fn Sp::inorder($t) {
+    return [] if $t->{root} == -1
+    my @stack
+    my @out
+    my $cur = $t->{root}
+    while ($cur != -1 || len(@stack) > 0) {
+        while ($cur != -1) {
+            push @stack, $cur
+            $cur = $t->{nodes}->[$cur]->{left}
+        }
+        my $x = pop(@stack)
+        push @out, $t->{nodes}->[$x]->{key}
+        $cur = $t->{nodes}->[$x]->{right}
+    }
+    \@out
+}
+
+# ── BST invariant check: in-order is strictly increasing ─────────
+
+fn Sp::is_bst($t) {
+    my $in = Sp::inorder($t)
+    my $n = len(@$in)
+    return 1 if $n < 2
+    for my $i (1:$n - 1) {
+        return 0 if $in->[$i - 1] >= $in->[$i]
+    }
+    1
+}
+
+# ── verify parent links are consistent ───────────────────────────
+
+fn Sp::check_parents($t) {
+    return 1 if $t->{root} == -1
+    die "root has non-(-1) parent" if $t->{nodes}->[$t->{root}]->{parent} != -1
+    my $n = len(@{$t->{nodes}})
+    for my $i (0:$n - 1) {
+        my $node = $t->{nodes}->[$i]
+        if ($node->{left} != -1) {
+            die "left child #{$node->{left}}'s parent != #{$i}" unless $t->{nodes}->[$node->{left}]->{parent} == $i
+        }
+        if ($node->{right} != -1) {
+            die "right child #{$node->{right}}'s parent != #{$i}" unless $t->{nodes}->[$node->{right}]->{parent} == $i
+        }
+    }
+    1
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @insert_orders = (
+    [5, 3, 8, 1, 4, 7, 9, 2, 6],
+    [1, 2, 3, 4, 5, 6, 7],            # already sorted — pathological
+    [7, 6, 5, 4, 3, 2, 1],            # reverse — pathological
+    [50, 25, 75, 10, 60, 90, 20, 80],
+    [42],
+    [3, 1, 4, 1, 5, 9, 2, 6, 5, 3],   # dups: only 6 distinct values
+)
+
+p "── splay tree demo ──────────────────────────────────"
+printf "  %-30s  %5s  %5s\n", "inserts", "n", "distinct"
+printf "  %-30s  %5s  %5s\n", "------------------------------", "-----", "--------"
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) {
+        Sp::insert($t, $k)
+    }
+    my $sorted = Sp::inorder($t)
+    printf "  %-30s  %5d  %5d  -> [%s]\n",
+        "[" . join(",", @$ord) . "]",
+        len(@$ord),
+        len(@$sorted),
+        join(",", @$sorted)
+}
+
+# ── invariant 1: BST invariant holds after every sequence ─────────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) {
+        Sp::insert($t, $k)
+    }
+    die "BST invariant broken on [#{join(',', @$ord)}]" unless Sp::is_bst($t)
+}
+
+# ── invariant 2: in-order matches the sorted distinct input ───────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) {
+        Sp::insert($t, $k)
+    }
+    my %seen
+    for my $k (@$ord) { $seen{$k} = 1 }
+    my @want = sort { _0 <=> _1 } keys %seen
+    my $got = Sp::inorder($t)
+    die "in-order mismatch on [#{join(',', @$ord)}]: want #{len(@want)} got #{len(@$got)}" unless len(@$got) == len(@want)
+    for my $i (0:len(@want) - 1) {
+        die "in-order[#{$i}] want #{$want[$i]} got #{$got->[$i]}" unless $got->[$i] == $want[$i]
+    }
+}
+
+# ── invariant 3: parent links are consistent everywhere ───────────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) {
+        Sp::insert($t, $k)
+    }
+    Sp::check_parents($t)
+}
+
+# ── invariant 4: most-recently-inserted key is at the root ────────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) {
+        Sp::insert($t, $k)
+        die "root key != last inserted on [#{join(',', @$ord)}]" unless $t->{nodes}->[$t->{root}]->{key} == $k
+    }
+}
+
+# ── invariant 5: contains(k) is 1 for every inserted key ──────────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) { Sp::insert($t, $k) }
+    for my $k (@$ord) {
+        die "contains(#{$k}) returned 0 after insert" unless Sp::contains($t, $k)
+    }
+}
+
+# ── invariant 6: contains(k) is 0 for keys never inserted ─────────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) { Sp::insert($t, $k) }
+    my %seen
+    for my $k (@$ord) { $seen{$k} = 1 }
+    for my $missing (-100, 999, 1234, -5, 0, 100000) {
+        next if exists $seen{$missing}
+        die "contains(#{$missing}) returned 1 but was never inserted" if Sp::contains($t, $missing)
+    }
+}
+
+# ── invariant 7: after lookup, looked-up key becomes new root ─────
+
+for my $ord (@insert_orders) {
+    my $t = Sp::new()
+    for my $k (@$ord) { Sp::insert($t, $k) }
+    my %seen
+    for my $k (@$ord) { $seen{$k} = 1 }
+    for my $k (keys %seen) {
+        Sp::contains($t, $k)
+        die "root != looked-up key #{$k}" unless $t->{nodes}->[$t->{root}]->{key} == $k
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
