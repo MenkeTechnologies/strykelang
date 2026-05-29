@@ -10,6 +10,7 @@ mod aot_build;
 mod array_interp_pin;
 mod array_negative_index_pin;
 mod array_ops_pin;
+mod nested_call_array_elem_assign_pin;
 mod array_ref_pin;
 mod array_slice_and_reduce;
 mod array_slice_pin;

@@ -84,33 +84,28 @@ fn Kar::shift_left($x, $n) {
 }
 
 # ── grade-school O(n²) multiplication for the base case ───────────
-# Uses an arrayref (not a my @res) to hold the partial-product
-# accumulator; in stryke (current), `my @res; $res[$i] = …` inside
-# a function whose result is then passed positionally to another
-# function can leak the array into the outer arglist. Arrayrefs
-# don't trigger that.
 
 fn Kar::grade_school($x, $y) {
     return "0" if $x eq "0" || $y eq "0"
     my $nx = len($x)
     my $ny = len($y)
-    my $res = [(0) x ($nx + $ny)]
+    my @res = (0) x ($nx + $ny)
     for my $i (0:$nx - 1) {
         my $ax = int(substr($x, $nx - 1 - $i, 1))
         for my $j (0:$ny - 1) {
             my $bx = int(substr($y, $ny - 1 - $j, 1))
-            $res->[$i + $j] = $res->[$i + $j] + $ax * $bx
+            $res[$i + $j] += $ax * $bx
         }
     }
     my $carry = 0
-    for my $k (0:len(@$res) - 1) {
-        my $v = $res->[$k] + $carry
-        $res->[$k] = $v % 10
+    for my $k (0:len(@res) - 1) {
+        my $v = $res[$k] + $carry
+        $res[$k] = $v % 10
         $carry = int($v / 10)
     }
     my $out = ""
-    for my $k (0:len(@$res) - 1) {
-        $out = $res->[$k] . $out
+    for my $k (0:len(@res) - 1) {
+        $out = $res[$k] . $out
     }
     Kar::strip($out)
 }
