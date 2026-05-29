@@ -1,0 +1,1456 @@
+#!/usr/bin/env stryke
+
+# Mini SQL engine — a complete single-file implementation of SQL
+# tokenization, recursive-descent parsing, and statement execution
+# for the canonical relational subset: CREATE TABLE, INSERT, SELECT
+# (with WHERE / ORDER BY / LIMIT / INNER JOIN / GROUP BY / aggregates),
+# UPDATE, DELETE.
+#
+# Supported features:
+#
+#   * CREATE TABLE t (col1 type, col2 type, ...)
+#   * INSERT INTO t (col1, col2, ...) VALUES (v1, v2, ...)
+#   * INSERT INTO t VALUES (v1, v2, ...)           -- positional
+#   * SELECT col1, col2, ... FROM t [WHERE expr] [ORDER BY col [ASC|DESC]] [LIMIT n]
+#   * SELECT * FROM t
+#   * SELECT COUNT(*), SUM(col), AVG(col), MIN(col), MAX(col) FROM t [WHERE expr]
+#   * SELECT col1, AGG(col2) FROM t [WHERE expr] GROUP BY col1
+#   * SELECT t1.col, t2.col FROM t1 [INNER] JOIN t2 ON t1.col = t2.col
+#   * UPDATE t SET col1 = expr [, col2 = expr ...] [WHERE expr]
+#   * DELETE FROM t [WHERE expr]
+#   * Multiple statements separated by ;
+#
+# Types: INT, TEXT (NULL representation = the special atom `null`)
+# Operators in expressions: + - * / =/== != < > <= >= AND OR NOT IS NULL IS NOT NULL
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sql::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/sql_engine_no_interop.stk
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 1: NULL sentinel
+# ═══════════════════════════════════════════════════════════════════
+
+# Cells use `+{ null => 1 }` for SQL NULL (distinct from undef/0/"").
+
+fn Sql::null() {
+    +{ null => 1 }
+}
+
+fn Sql::is_null($v) {
+    ref($v) eq "HASH" && exists $v->{null}
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 2: Tokenizer
+# ═══════════════════════════════════════════════════════════════════
+
+# Token kinds:
+#   kw    — reserved word (SELECT, FROM, ...)
+#   ident — identifier or qualified identifier ("t.col")
+#   num   — integer literal
+#   str   — string literal (single-quoted)
+#   op    — operator (+, -, *, /, =, !=, <>, <, >, <=, >=)
+#   lparen, rparen, comma, dot, star, semi, eof
+
+my @SQL_KEYWORDS = (
+    "SELECT", "FROM", "WHERE", "ORDER", "BY", "ASC", "DESC", "LIMIT",
+    "CREATE", "TABLE", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
+    "DELETE", "INNER", "JOIN", "ON", "GROUP", "AND", "OR", "NOT",
+    "AS", "NULL", "IS", "INT", "TEXT", "COUNT", "SUM", "AVG", "MIN", "MAX",
+    "TRUE", "FALSE", "IF", "EXISTS",
+)
+
+fn Sql::is_keyword($word) {
+    my $upper = uc($word)
+    for my $kw (@SQL_KEYWORDS) {
+        return 1 if $upper eq $kw
+    }
+    0
+}
+
+fn Sql::tokenize($src) {
+    my @tokens
+    my $n = len($src)
+    my $i = 0
+    while ($i < $n) {
+        my $c = substr($src, $i, 1)
+        # Whitespace.
+        if ($c eq " " || $c eq "\t" || $c eq "\n" || $c eq "\r") {
+            $i++
+            next
+        }
+        # Single-line comment: `--` to end of line.
+        if ($c eq "-" && $i + 1 < $n && substr($src, $i + 1, 1) eq "-") {
+            while ($i < $n && substr($src, $i, 1) ne "\n") { $i++ }
+            next
+        }
+        # Punctuation.
+        if ($c eq "(") { push @tokens, +{ kind => "lparen" }; $i++; next }
+        if ($c eq ")") { push @tokens, +{ kind => "rparen" }; $i++; next }
+        if ($c eq ",") { push @tokens, +{ kind => "comma"  }; $i++; next }
+        if ($c eq ";") { push @tokens, +{ kind => "semi"   }; $i++; next }
+        if ($c eq "*") { push @tokens, +{ kind => "star"   }; $i++; next }
+        # Two-char operators.
+        if ($c eq "!" && $i + 1 < $n && substr($src, $i + 1, 1) eq "=") {
+            push @tokens, +{ kind => "op", val => "!=" }; $i += 2; next
+        }
+        if ($c eq "<" && $i + 1 < $n && substr($src, $i + 1, 1) eq ">") {
+            push @tokens, +{ kind => "op", val => "!=" }; $i += 2; next
+        }
+        if ($c eq "<" && $i + 1 < $n && substr($src, $i + 1, 1) eq "=") {
+            push @tokens, +{ kind => "op", val => "<=" }; $i += 2; next
+        }
+        if ($c eq ">" && $i + 1 < $n && substr($src, $i + 1, 1) eq "=") {
+            push @tokens, +{ kind => "op", val => ">=" }; $i += 2; next
+        }
+        if ($c eq "=" && $i + 1 < $n && substr($src, $i + 1, 1) eq "=") {
+            push @tokens, +{ kind => "op", val => "=" }; $i += 2; next
+        }
+        # Single-char operators.
+        if ($c eq "=" || $c eq "<" || $c eq ">" || $c eq "+" || $c eq "-" || $c eq "/") {
+            push @tokens, +{ kind => "op", val => $c }; $i++; next
+        }
+        # String literal (single-quoted, no escapes).
+        if ($c eq "'") {
+            $i++
+            my $start = $i
+            while ($i < $n && substr($src, $i, 1) ne "'") { $i++ }
+            die "unterminated string literal" if $i >= $n
+            my $val = substr($src, $start, $i - $start)
+            push @tokens, +{ kind => "str", val => $val }
+            $i++   # consume the closing quote
+            next
+        }
+        # Integer.
+        if ($c ge "0" && $c le "9") {
+            my $start = $i
+            while ($i < $n) {
+                my $d = substr($src, $i, 1)
+                last unless $d ge "0" && $d le "9"
+                $i++
+            }
+            push @tokens, +{ kind => "num", val => int(substr($src, $start, $i - $start)) }
+            next
+        }
+        # Identifier / keyword.
+        if (($c ge "a" && $c le "z") || ($c ge "A" && $c le "Z") || $c eq "_") {
+            my $start = $i
+            while ($i < $n) {
+                my $d = substr($src, $i, 1)
+                if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_" || $d eq ".") {
+                    $i++
+                } else {
+                    last
+                }
+            }
+            my $word = substr($src, $start, $i - $start)
+            if (Sql::is_keyword($word)) {
+                push @tokens, +{ kind => "kw", val => uc($word) }
+            } else {
+                push @tokens, +{ kind => "ident", val => $word }
+            }
+            next
+        }
+        die "tokenize: unexpected character '#{$c}' at offset #{$i}"
+    }
+    push @tokens, +{ kind => "eof" }
+    \@tokens
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 3: Parser scaffolding
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::parser_new($tokens) {
+    +{ tokens => $tokens, pos => 0 }
+}
+
+fn Sql::p_peek($p) { $p->{tokens}->[$p->{pos}] }
+
+fn Sql::p_advance($p) {
+    my $t = $p->{tokens}->[$p->{pos}]
+    $p->{pos}++
+    $t
+}
+
+fn Sql::p_check_kw($p, $kw) {
+    my $t = Sql::p_peek($p)
+    $t->{kind} eq "kw" && $t->{val} eq $kw
+}
+
+fn Sql::p_check_op($p, $op) {
+    my $t = Sql::p_peek($p)
+    $t->{kind} eq "op" && $t->{val} eq $op
+}
+
+fn Sql::p_match_kw($p, $kw) {
+    if (Sql::p_check_kw($p, $kw)) {
+        Sql::p_advance($p)
+        return 1
+    }
+    0
+}
+
+fn Sql::p_expect_kw($p, $kw) {
+    die "expected keyword #{$kw}, got " . Sql::p_describe(Sql::p_peek($p)) unless Sql::p_check_kw($p, $kw)
+    Sql::p_advance($p)
+}
+
+fn Sql::p_expect($p, $kind) {
+    my $t = Sql::p_peek($p)
+    die "expected #{$kind}, got " . Sql::p_describe($t) unless $t->{kind} eq $kind
+    Sql::p_advance($p)
+}
+
+fn Sql::p_describe($t) {
+    return $t->{val} . "(kw)" if $t->{kind} eq "kw"
+    return $t->{val} . "(ident)" if $t->{kind} eq "ident"
+    return $t->{val} . "(op)" if $t->{kind} eq "op"
+    return "" . $t->{val} . "(num)" if $t->{kind} eq "num"
+    return "'" . $t->{val} . "'(str)" if $t->{kind} eq "str"
+    $t->{kind}
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 4: Expression parser (WHERE clauses, ORDER BY exprs)
+# ═══════════════════════════════════════════════════════════════════
+
+# Expression precedence (lowest to highest):
+#   OR
+#   AND
+#   NOT  (unary)
+#   comparison: =, !=, <, >, <=, >=, IS [NOT] NULL
+#   additive: +, -
+#   multiplicative: *, /
+#   primary: literal, column-ref, function-call, ( expr )
+#
+# AST kinds:
+#   +{ kind => "num", val => N }
+#   +{ kind => "str", val => "..." }
+#   +{ kind => "null" }
+#   +{ kind => "col", name => "t.col" or "col" }
+#   +{ kind => "binop", op => "+|-|*|/|=|!=|<|>|<=|>=|AND|OR", lhs => E, rhs => E }
+#   +{ kind => "not", expr => E }
+#   +{ kind => "is_null", expr => E, negate => 0/1 }
+#   +{ kind => "agg", op => "COUNT|SUM|AVG|MIN|MAX", arg => E or "*" }
+
+fn Sql::parse_expr($p) {
+    Sql::parse_or($p)
+}
+
+fn Sql::parse_or($p) {
+    my $left = Sql::parse_and($p)
+    while (Sql::p_check_kw($p, "OR")) {
+        Sql::p_advance($p)
+        my $right = Sql::parse_and($p)
+        $left = +{ kind => "binop", op => "OR", lhs => $left, rhs => $right }
+    }
+    $left
+}
+
+fn Sql::parse_and($p) {
+    my $left = Sql::parse_not($p)
+    while (Sql::p_check_kw($p, "AND")) {
+        Sql::p_advance($p)
+        my $right = Sql::parse_not($p)
+        $left = +{ kind => "binop", op => "AND", lhs => $left, rhs => $right }
+    }
+    $left
+}
+
+fn Sql::parse_not($p) {
+    if (Sql::p_check_kw($p, "NOT")) {
+        Sql::p_advance($p)
+        my $inner = Sql::parse_not($p)
+        return +{ kind => "not", expr => $inner }
+    }
+    Sql::parse_comparison($p)
+}
+
+fn Sql::parse_comparison($p) {
+    my $left = Sql::parse_additive($p)
+    # IS [NOT] NULL.
+    if (Sql::p_check_kw($p, "IS")) {
+        Sql::p_advance($p)
+        my $negate = 0
+        if (Sql::p_check_kw($p, "NOT")) {
+            Sql::p_advance($p)
+            $negate = 1
+        }
+        Sql::p_expect_kw($p, "NULL")
+        return +{ kind => "is_null", expr => $left, negate => $negate }
+    }
+    # Comparison ops.
+    while (1) {
+        my $t = Sql::p_peek($p)
+        last unless $t->{kind} eq "op" && ($t->{val} eq "=" || $t->{val} eq "!=" || $t->{val} eq "<" || $t->{val} eq ">" || $t->{val} eq "<=" || $t->{val} eq ">=")
+        Sql::p_advance($p)
+        my $right = Sql::parse_additive($p)
+        $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
+    }
+    $left
+}
+
+fn Sql::parse_additive($p) {
+    my $left = Sql::parse_mult($p)
+    while (1) {
+        my $t = Sql::p_peek($p)
+        last unless $t->{kind} eq "op" && ($t->{val} eq "+" || $t->{val} eq "-")
+        Sql::p_advance($p)
+        my $right = Sql::parse_mult($p)
+        $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
+    }
+    $left
+}
+
+fn Sql::parse_mult($p) {
+    my $left = Sql::parse_primary($p)
+    while (1) {
+        my $t = Sql::p_peek($p)
+        if ($t->{kind} eq "op" && ($t->{val} eq "*" || $t->{val} eq "/")) {
+            Sql::p_advance($p)
+            my $right = Sql::parse_primary($p)
+            $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
+        } elsif ($t->{kind} eq "star") {
+            Sql::p_advance($p)
+            my $right = Sql::parse_primary($p)
+            $left = +{ kind => "binop", op => "*", lhs => $left, rhs => $right }
+        } else {
+            last
+        }
+    }
+    $left
+}
+
+fn Sql::parse_primary($p) {
+    my $t = Sql::p_peek($p)
+    if ($t->{kind} eq "num") {
+        Sql::p_advance($p)
+        return +{ kind => "num", val => $t->{val} }
+    }
+    if ($t->{kind} eq "str") {
+        Sql::p_advance($p)
+        return +{ kind => "str", val => $t->{val} }
+    }
+    if ($t->{kind} eq "kw" && $t->{val} eq "NULL") {
+        Sql::p_advance($p)
+        return +{ kind => "null" }
+    }
+    if ($t->{kind} eq "kw" && ($t->{val} eq "TRUE" || $t->{val} eq "FALSE")) {
+        Sql::p_advance($p)
+        return +{ kind => "num", val => $t->{val} eq "TRUE" ? 1 : 0 }
+    }
+    if ($t->{kind} eq "lparen") {
+        Sql::p_advance($p)
+        my $inner = Sql::parse_expr($p)
+        Sql::p_expect($p, "rparen")
+        return $inner
+    }
+    # Aggregate functions.
+    if ($t->{kind} eq "kw" && ($t->{val} eq "COUNT" || $t->{val} eq "SUM" || $t->{val} eq "AVG" || $t->{val} eq "MIN" || $t->{val} eq "MAX")) {
+        my $agg = Sql::p_advance($p)
+        Sql::p_expect($p, "lparen")
+        # COUNT(*) is the special case.
+        if (Sql::p_peek($p)->{kind} eq "star") {
+            Sql::p_advance($p)
+            Sql::p_expect($p, "rparen")
+            return +{ kind => "agg", op => $agg->{val}, arg => "*" }
+        }
+        my $arg = Sql::parse_expr($p)
+        Sql::p_expect($p, "rparen")
+        return +{ kind => "agg", op => $agg->{val}, arg => $arg }
+    }
+    if ($t->{kind} eq "ident") {
+        Sql::p_advance($p)
+        return +{ kind => "col", name => $t->{val} }
+    }
+    die "parse_primary: unexpected " . Sql::p_describe($t) . " at pos #{$p->{pos}}"
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 5: Statement parser
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::parse_program($src) {
+    my $tokens = Sql::tokenize($src)
+    my $p = Sql::parser_new($tokens)
+    my @stmts
+    while (Sql::p_peek($p)->{kind} ne "eof") {
+        push @stmts, Sql::parse_statement($p)
+        # Optional semicolon between statements.
+        if (Sql::p_peek($p)->{kind} eq "semi") {
+            Sql::p_advance($p)
+        }
+    }
+    \@stmts
+}
+
+fn Sql::parse_statement($p) {
+    my $t = Sql::p_peek($p)
+    if ($t->{kind} eq "kw") {
+        return Sql::parse_create($p) if $t->{val} eq "CREATE"
+        return Sql::parse_insert($p) if $t->{val} eq "INSERT"
+        return Sql::parse_select($p) if $t->{val} eq "SELECT"
+        return Sql::parse_update($p) if $t->{val} eq "UPDATE"
+        return Sql::parse_delete($p) if $t->{val} eq "DELETE"
+    }
+    die "expected statement keyword, got " . Sql::p_describe($t)
+}
+
+fn Sql::parse_create($p) {
+    Sql::p_expect_kw($p, "CREATE")
+    Sql::p_expect_kw($p, "TABLE")
+    my $name_tok = Sql::p_expect($p, "ident")
+    Sql::p_expect($p, "lparen")
+    my @cols
+    while (1) {
+        my $col_name = Sql::p_expect($p, "ident")
+        my $type_tok = Sql::p_peek($p)
+        die "expected column type, got " . Sql::p_describe($type_tok) unless $type_tok->{kind} eq "kw" && ($type_tok->{val} eq "INT" || $type_tok->{val} eq "TEXT")
+        Sql::p_advance($p)
+        push @cols, +{ name => $col_name->{val}, type => $type_tok->{val} }
+        last unless Sql::p_peek($p)->{kind} eq "comma"
+        Sql::p_advance($p)
+    }
+    Sql::p_expect($p, "rparen")
+    +{ kind => "create", table => $name_tok->{val}, cols => \@cols }
+}
+
+fn Sql::parse_insert($p) {
+    Sql::p_expect_kw($p, "INSERT")
+    Sql::p_expect_kw($p, "INTO")
+    my $name_tok = Sql::p_expect($p, "ident")
+    my $cols   # optional column list
+    if (Sql::p_peek($p)->{kind} eq "lparen") {
+        Sql::p_advance($p)
+        $cols = []
+        while (1) {
+            my $col_tok = Sql::p_expect($p, "ident")
+            push @$cols, $col_tok->{val}
+            last unless Sql::p_peek($p)->{kind} eq "comma"
+            Sql::p_advance($p)
+        }
+        Sql::p_expect($p, "rparen")
+    }
+    Sql::p_expect_kw($p, "VALUES")
+    my @rows
+    while (1) {
+        Sql::p_expect($p, "lparen")
+        my @vals
+        while (1) {
+            push @vals, Sql::parse_expr($p)
+            last unless Sql::p_peek($p)->{kind} eq "comma"
+            Sql::p_advance($p)
+        }
+        Sql::p_expect($p, "rparen")
+        push @rows, \@vals
+        last unless Sql::p_peek($p)->{kind} eq "comma"
+        Sql::p_advance($p)
+    }
+    +{ kind => "insert", table => $name_tok->{val}, cols => $cols, rows => \@rows }
+}
+
+fn Sql::parse_select($p) {
+    Sql::p_expect_kw($p, "SELECT")
+    my $items = []
+    if (Sql::p_peek($p)->{kind} eq "star") {
+        Sql::p_advance($p)
+        $items = "*"
+    } else {
+        $items = []
+        while (1) {
+            my $expr = Sql::parse_expr($p)
+            my $alias
+            if (Sql::p_check_kw($p, "AS")) {
+                Sql::p_advance($p)
+                my $a_tok = Sql::p_expect($p, "ident")
+                $alias = $a_tok->{val}
+            }
+            push @$items, +{ expr => $expr, alias => $alias }
+            last unless Sql::p_peek($p)->{kind} eq "comma"
+            Sql::p_advance($p)
+        }
+    }
+    Sql::p_expect_kw($p, "FROM")
+    my $from_tok = Sql::p_expect($p, "ident")
+    my $from = $from_tok->{val}
+    # Optional INNER JOIN ... ON ...
+    my $join
+    if (Sql::p_check_kw($p, "INNER") || Sql::p_check_kw($p, "JOIN")) {
+        Sql::p_match_kw($p, "INNER")
+        Sql::p_expect_kw($p, "JOIN")
+        my $rt = Sql::p_expect($p, "ident")
+        Sql::p_expect_kw($p, "ON")
+        my $cond = Sql::parse_expr($p)
+        $join = +{ table => $rt->{val}, on => $cond }
+    }
+    my $where
+    if (Sql::p_check_kw($p, "WHERE")) {
+        Sql::p_advance($p)
+        $where = Sql::parse_expr($p)
+    }
+    my $group_by
+    if (Sql::p_check_kw($p, "GROUP")) {
+        Sql::p_advance($p)
+        Sql::p_expect_kw($p, "BY")
+        my $tok = Sql::p_expect($p, "ident")
+        $group_by = $tok->{val}
+    }
+    my $order_by
+    if (Sql::p_check_kw($p, "ORDER")) {
+        Sql::p_advance($p)
+        Sql::p_expect_kw($p, "BY")
+        my $tok = Sql::p_expect($p, "ident")
+        my $dir = "ASC"
+        if (Sql::p_check_kw($p, "DESC")) {
+            Sql::p_advance($p)
+            $dir = "DESC"
+        } elsif (Sql::p_check_kw($p, "ASC")) {
+            Sql::p_advance($p)
+        }
+        $order_by = +{ col => $tok->{val}, dir => $dir }
+    }
+    my $limit
+    if (Sql::p_check_kw($p, "LIMIT")) {
+        Sql::p_advance($p)
+        my $tok = Sql::p_expect($p, "num")
+        $limit = $tok->{val}
+    }
+    +{
+        kind     => "select",
+        items    => $items,
+        from     => $from,
+        join     => $join,
+        where    => $where,
+        group_by => $group_by,
+        order_by => $order_by,
+        limit    => $limit,
+    }
+}
+
+fn Sql::parse_update($p) {
+    Sql::p_expect_kw($p, "UPDATE")
+    my $name_tok = Sql::p_expect($p, "ident")
+    Sql::p_expect_kw($p, "SET")
+    my @sets
+    while (1) {
+        my $col = Sql::p_expect($p, "ident")
+        # Need "=" — represented as op token.
+        my $eq = Sql::p_peek($p)
+        die "expected = in SET, got " . Sql::p_describe($eq) unless $eq->{kind} eq "op" && $eq->{val} eq "="
+        Sql::p_advance($p)
+        my $rhs = Sql::parse_expr($p)
+        push @sets, +{ col => $col->{val}, expr => $rhs }
+        last unless Sql::p_peek($p)->{kind} eq "comma"
+        Sql::p_advance($p)
+    }
+    my $where
+    if (Sql::p_check_kw($p, "WHERE")) {
+        Sql::p_advance($p)
+        $where = Sql::parse_expr($p)
+    }
+    +{ kind => "update", table => $name_tok->{val}, sets => \@sets, where => $where }
+}
+
+fn Sql::parse_delete($p) {
+    Sql::p_expect_kw($p, "DELETE")
+    Sql::p_expect_kw($p, "FROM")
+    my $name_tok = Sql::p_expect($p, "ident")
+    my $where
+    if (Sql::p_check_kw($p, "WHERE")) {
+        Sql::p_advance($p)
+        $where = Sql::parse_expr($p)
+    }
+    +{ kind => "delete", table => $name_tok->{val}, where => $where }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 6: Database state — tables + rows
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::db_new() {
+    +{ tables => +{} }
+}
+
+# A table is +{ cols => [col defs], rows => [row arrays] } where each
+# col is +{ name, type } and each row is parallel to cols.
+
+fn Sql::table_col_index($tbl, $col_name) {
+    for my $i (0:len(@{$tbl->{cols}}) - 1) {
+        return $i if $tbl->{cols}->[$i]->{name} eq $col_name
+    }
+    -1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 7: Expression evaluation
+# ═══════════════════════════════════════════════════════════════════
+
+# Row context for evaluating WHERE/SELECT expressions: a hashref
+# mapping column-name (possibly "t.col") → cell value. Aggregates are
+# handled separately in the GROUP/aggregate executor.
+
+fn Sql::eval_expr($expr, $row_ctx) {
+    my $k = $expr->{kind}
+    if ($k eq "num") {
+        return $expr->{val}
+    }
+    if ($k eq "str") {
+        return $expr->{val}
+    }
+    if ($k eq "null") {
+        return Sql::null()
+    }
+    if ($k eq "col") {
+        my $name = $expr->{name}
+        return $row_ctx->{$name} if exists $row_ctx->{$name}
+        # Try unqualified vs qualified mismatch.
+        for my $key (keys %$row_ctx) {
+            return $row_ctx->{$key} if Sql::col_matches($key, $name)
+        }
+        die "unknown column: #{$name}"
+    }
+    if ($k eq "not") {
+        my $v = Sql::eval_expr($expr->{expr}, $row_ctx)
+        return Sql::null() if Sql::is_null($v)
+        return $v ? 0 : 1
+    }
+    if ($k eq "is_null") {
+        my $v = Sql::eval_expr($expr->{expr}, $row_ctx)
+        my $is = Sql::is_null($v) ? 1 : 0
+        return $expr->{negate} ? !$is : $is
+    }
+    if ($k eq "binop") {
+        my $op = $expr->{op}
+        # AND / OR — short-circuit with three-value-logic-lite (NULL → false here).
+        if ($op eq "AND") {
+            my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+            return 0 if Sql::is_null($l) || !$l
+            my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+            return Sql::is_null($r) ? 0 : ($r ? 1 : 0)
+        }
+        if ($op eq "OR") {
+            my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+            return 1 if !Sql::is_null($l) && $l
+            my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+            return Sql::is_null($r) ? 0 : ($r ? 1 : 0)
+        }
+        my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+        my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+        # NULL propagation for arithmetic/comparison: any NULL operand → NULL.
+        if (Sql::is_null($l) || Sql::is_null($r)) {
+            return Sql::null()
+        }
+        return $l +  $r if $op eq "+"
+        return $l -  $r if $op eq "-"
+        return $l *  $r if $op eq "*"
+        return int($l / $r) if $op eq "/"
+        return Sql::sql_eq($l, $r) ? 1 : 0 if $op eq "="
+        return Sql::sql_eq($l, $r) ? 0 : 1 if $op eq "!="
+        return Sql::sql_lt($l, $r) ? 1 : 0 if $op eq "<"
+        return Sql::sql_lt($r, $l) ? 1 : 0 if $op eq ">"
+        return Sql::sql_lt($r, $l) ? 0 : 1 if $op eq "<="
+        return Sql::sql_lt($l, $r) ? 0 : 1 if $op eq ">="
+        die "unknown binop: #{$op}"
+    }
+    die "unknown expr kind: #{$k}"
+}
+
+# Match "x" against "tbl.x" OR "x" against "x" (with extra tolerance).
+
+fn Sql::col_matches($key, $needle) {
+    return 1 if $key eq $needle
+    my $dot = index($key, ".")
+    if ($dot >= 0) {
+        return 1 if substr($key, $dot + 1) eq $needle
+    }
+    0
+}
+
+# SQL equality + ordering: numeric if both ints, else string.
+
+fn Sql::sql_eq($x, $y) {
+    if (Sql::looks_int($x) && Sql::looks_int($y)) {
+        return $x == $y
+    }
+    "$x" eq "$y"
+}
+
+fn Sql::sql_lt($x, $y) {
+    if (Sql::looks_int($x) && Sql::looks_int($y)) {
+        return $x < $y
+    }
+    "$x" lt "$y"
+}
+
+fn Sql::looks_int($v) {
+    return 0 if ref($v)
+    return 1 if $v =~ /^-?\d+$/
+    0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 8: Statement execution
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::exec_stmt($db, $stmt) {
+    return Sql::exec_create($db, $stmt) if $stmt->{kind} eq "create"
+    return Sql::exec_insert($db, $stmt) if $stmt->{kind} eq "insert"
+    return Sql::exec_select($db, $stmt) if $stmt->{kind} eq "select"
+    return Sql::exec_update($db, $stmt) if $stmt->{kind} eq "update"
+    return Sql::exec_delete($db, $stmt) if $stmt->{kind} eq "delete"
+    die "unknown stmt kind: " . $stmt->{kind}
+}
+
+fn Sql::exec_create($db, $stmt) {
+    die "table #{$stmt->{table}} already exists" if exists $db->{tables}->{$stmt->{table}}
+    $db->{tables}->{$stmt->{table}} = +{ cols => $stmt->{cols}, rows => [] }
+    +{ msg => "table #{$stmt->{table}} created" }
+}
+
+fn Sql::exec_insert($db, $stmt) {
+    my $tbl = $db->{tables}->{$stmt->{table}}
+    die "no such table: #{$stmt->{table}}" unless $tbl
+    my $col_order
+    if (defined $stmt->{cols}) {
+        $col_order = $stmt->{cols}
+    } else {
+        $col_order = []
+        for my $c (@{$tbl->{cols}}) {
+            push @$col_order, $c->{name}
+        }
+    }
+    my $count = 0
+    for my $value_row (@{$stmt->{rows}}) {
+        die "column count mismatch on INSERT into #{$stmt->{table}}" unless len(@$value_row) == len(@$col_order)
+        # Build row by positional order based on $col_order.
+        my @row = (Sql::null()) x len(@{$tbl->{cols}})
+        for my $i (0:len(@$col_order) - 1) {
+            my $idx = Sql::table_col_index($tbl, $col_order->[$i])
+            die "no such column: #{$col_order->[$i]}" if $idx < 0
+            my $v = Sql::eval_expr($value_row->[$i], +{})
+            $row[$idx] = $v
+        }
+        push @{$tbl->{rows}}, \@row
+        $count++
+    }
+    +{ msg => "inserted #{$count} rows" }
+}
+
+fn Sql::exec_update($db, $stmt) {
+    my $tbl = $db->{tables}->{$stmt->{table}}
+    die "no such table: #{$stmt->{table}}" unless $tbl
+    my $count = 0
+    for my $row (@{$tbl->{rows}}) {
+        my $ctx = Sql::row_ctx($tbl, $row, undef)
+        if (defined $stmt->{where}) {
+            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            next if Sql::is_null($v) || !$v
+        }
+        for my $set (@{$stmt->{sets}}) {
+            my $idx = Sql::table_col_index($tbl, $set->{col})
+            die "no such column: #{$set->{col}}" if $idx < 0
+            $row->[$idx] = Sql::eval_expr($set->{expr}, $ctx)
+        }
+        $count++
+    }
+    +{ msg => "updated #{$count} rows" }
+}
+
+fn Sql::exec_delete($db, $stmt) {
+    my $tbl = $db->{tables}->{$stmt->{table}}
+    die "no such table: #{$stmt->{table}}" unless $tbl
+    my @keep
+    my $count = 0
+    for my $row (@{$tbl->{rows}}) {
+        my $ctx = Sql::row_ctx($tbl, $row, undef)
+        if (defined $stmt->{where}) {
+            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            if (Sql::is_null($v) || !$v) {
+                push @keep, $row
+                next
+            }
+        }
+        $count++
+    }
+    $tbl->{rows} = \@keep
+    +{ msg => "deleted #{$count} rows" }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 9: Row-context builders for SELECT (with optional JOIN)
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::row_ctx($tbl, $row, $alias) {
+    my %ctx
+    for my $i (0:len(@{$tbl->{cols}}) - 1) {
+        my $name = $tbl->{cols}->[$i]->{name}
+        $ctx{$name} = $row->[$i]
+        if (defined $alias) {
+            $ctx{$alias . "." . $name} = $row->[$i]
+        }
+    }
+    \%ctx
+}
+
+fn Sql::join_ctx($t1_name, $t1, $r1, $t2_name, $t2, $r2) {
+    my %ctx
+    for my $i (0:len(@{$t1->{cols}}) - 1) {
+        my $name = $t1->{cols}->[$i]->{name}
+        $ctx{$name} = $r1->[$i]
+        $ctx{$t1_name . "." . $name} = $r1->[$i]
+    }
+    for my $i (0:len(@{$t2->{cols}}) - 1) {
+        my $name = $t2->{cols}->[$i]->{name}
+        # Don't shadow t1's unqualified columns by default.
+        $ctx{$t2_name . "." . $name} = $r2->[$i]
+        $ctx{$name} = $r2->[$i] unless exists $ctx{$name}
+    }
+    \%ctx
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 10: SELECT executor
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::exec_select($db, $stmt) {
+    my $tbl = $db->{tables}->{$stmt->{from}}
+    die "no such table: #{$stmt->{from}}" unless $tbl
+    # Build the input row stream: either a single-table scan or a
+    # nested-loop join.
+    my @input_ctxs
+    if (defined $stmt->{join}) {
+        my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+        die "no such table: #{$stmt->{join}->{table}}" unless $tbl2
+        for my $r1 (@{$tbl->{rows}}) {
+            for my $r2 (@{$tbl2->{rows}}) {
+                my $ctx = Sql::join_ctx($stmt->{from}, $tbl, $r1, $stmt->{join}->{table}, $tbl2, $r2)
+                my $on_ok = Sql::eval_expr($stmt->{join}->{on}, $ctx)
+                next if Sql::is_null($on_ok) || !$on_ok
+                push @input_ctxs, $ctx
+            }
+        }
+    } else {
+        for my $r (@{$tbl->{rows}}) {
+            push @input_ctxs, Sql::row_ctx($tbl, $r, $stmt->{from})
+        }
+    }
+    # WHERE filter.
+    my @filtered
+    for my $ctx (@input_ctxs) {
+        if (defined $stmt->{where}) {
+            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            next if Sql::is_null($v) || !$v
+        }
+        push @filtered, $ctx
+    }
+    # If aggregates appear in SELECT items, switch to aggregate mode.
+    my $has_agg = 0
+    if ($stmt->{items} ne "*") {
+        for my $it (@{$stmt->{items}}) {
+            $has_agg = 1 if Sql::expr_has_agg($it->{expr})
+        }
+    }
+    my $rows_out
+    my $cols_out
+    if ($has_agg || defined $stmt->{group_by}) {
+        my $r = Sql::eval_aggregate_select($stmt, \@filtered)
+        $rows_out = $r->{rows}
+        $cols_out = $r->{cols}
+    } else {
+        # Plain projection.
+        $cols_out = []
+        if ($stmt->{items} eq "*") {
+            for my $c (@{$tbl->{cols}}) {
+                push @$cols_out, $c->{name}
+            }
+            if (defined $stmt->{join}) {
+                my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+                for my $c (@{$tbl2->{cols}}) {
+                    push @$cols_out, $stmt->{join}->{table} . "." . $c->{name}
+                }
+            }
+        } else {
+            for my $it (@{$stmt->{items}}) {
+                my $name = defined $it->{alias}
+                    ? $it->{alias}
+                    : ($it->{expr}->{kind} eq "col" ? $it->{expr}->{name} : "expr")
+                push @$cols_out, $name
+            }
+        }
+        $rows_out = []
+        for my $ctx (@filtered) {
+            my @row
+            if ($stmt->{items} eq "*") {
+                for my $c (@{$tbl->{cols}}) {
+                    push @row, $ctx->{$c->{name}}
+                }
+                if (defined $stmt->{join}) {
+                    my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+                    for my $c (@{$tbl2->{cols}}) {
+                        push @row, $ctx->{$stmt->{join}->{table} . "." . $c->{name}}
+                    }
+                }
+            } else {
+                for my $it (@{$stmt->{items}}) {
+                    push @row, Sql::eval_expr($it->{expr}, $ctx)
+                }
+            }
+            push @$rows_out, \@row
+        }
+    }
+    # ORDER BY.
+    if (defined $stmt->{order_by}) {
+        $rows_out = Sql::apply_order_by($rows_out, $cols_out, $stmt->{order_by})
+    }
+    # LIMIT.
+    if (defined $stmt->{limit}) {
+        my $lim = $stmt->{limit}
+        my @sliced
+        for my $i (0:$lim - 1) {
+            last if $i >= len(@$rows_out)
+            push @sliced, $rows_out->[$i]
+        }
+        $rows_out = \@sliced
+    }
+    +{ cols => $cols_out, rows => $rows_out }
+}
+
+# Does an expression tree contain any aggregate call?
+
+fn Sql::expr_has_agg($expr) {
+    return 0 unless ref($expr) eq "HASH"
+    return 1 if $expr->{kind} eq "agg"
+    if ($expr->{kind} eq "binop") {
+        return 1 if Sql::expr_has_agg($expr->{lhs})
+        return 1 if Sql::expr_has_agg($expr->{rhs})
+    }
+    if ($expr->{kind} eq "not") {
+        return Sql::expr_has_agg($expr->{expr})
+    }
+    if ($expr->{kind} eq "is_null") {
+        return Sql::expr_has_agg($expr->{expr})
+    }
+    0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 11: Aggregate + GROUP BY
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::eval_aggregate_select($stmt, $ctxs) {
+    # Group rows by group_by column (or single global group).
+    my %groups
+    my @group_order
+    for my $ctx (@$ctxs) {
+        my $key
+        if (defined $stmt->{group_by}) {
+            $key = "" . $ctx->{$stmt->{group_by}}
+        } else {
+            $key = ""
+        }
+        if (!exists $groups{$key}) {
+            $groups{$key} = []
+            push @group_order, $key
+        }
+        push @{$groups{$key}}, $ctx
+    }
+    # Empty global aggregate (no GROUP BY, empty input) — still
+    # produce one row of aggregate-on-empty-set values (COUNT → 0,
+    # SUM/MIN/MAX/AVG → NULL).
+    if (!defined $stmt->{group_by} && len(@group_order) == 0) {
+        $groups{""} = []
+        push @group_order, ""
+    }
+    my @cols_out
+    for my $it (@{$stmt->{items}}) {
+        if (defined $it->{alias}) {
+            push @cols_out, $it->{alias}
+        } elsif ($it->{expr}->{kind} eq "col") {
+            push @cols_out, $it->{expr}->{name}
+        } elsif ($it->{expr}->{kind} eq "agg") {
+            my $agg = $it->{expr}
+            my $arg_name = $agg->{arg} eq "*" ? "*" : ($agg->{arg}->{kind} eq "col" ? $agg->{arg}->{name} : "expr")
+            push @cols_out, $agg->{op} . "(" . $arg_name . ")"
+        } else {
+            push @cols_out, "expr"
+        }
+    }
+    my @rows_out
+    for my $key (@group_order) {
+        my $group_ctxs = $groups{$key}
+        my @row
+        for my $it (@{$stmt->{items}}) {
+            if ($it->{expr}->{kind} eq "agg") {
+                push @row, Sql::eval_agg($it->{expr}, $group_ctxs)
+            } else {
+                # Non-aggregate column in GROUP BY query — take first row.
+                push @row, Sql::eval_expr($it->{expr}, $group_ctxs->[0])
+            }
+        }
+        push @rows_out, \@row
+    }
+    +{ cols => \@cols_out, rows => \@rows_out }
+}
+
+fn Sql::eval_agg($expr, $ctxs) {
+    my $op = $expr->{op}
+    my $arg = $expr->{arg}
+    if ($op eq "COUNT") {
+        if ($arg eq "*") {
+            return len(@$ctxs)
+        }
+        my $c = 0
+        for my $ctx (@$ctxs) {
+            my $v = Sql::eval_expr($arg, $ctx)
+            $c++ unless Sql::is_null($v)
+        }
+        return $c
+    }
+    # For SUM/AVG/MIN/MAX we operate on non-null cell values.
+    my @vals
+    for my $ctx (@$ctxs) {
+        my $v = Sql::eval_expr($arg, $ctx)
+        push @vals, $v unless Sql::is_null($v)
+    }
+    return Sql::null() if len(@vals) == 0
+    if ($op eq "SUM") {
+        my $s = 0
+        for my $v (@vals) { $s += $v }
+        return $s
+    }
+    if ($op eq "AVG") {
+        my $s = 0
+        for my $v (@vals) { $s += $v }
+        return int($s / len(@vals))
+    }
+    if ($op eq "MIN") {
+        my $m = $vals[0]
+        for my $v (@vals) { $m = $v if Sql::sql_lt($v, $m) }
+        return $m
+    }
+    if ($op eq "MAX") {
+        my $m = $vals[0]
+        for my $v (@vals) { $m = $v if Sql::sql_lt($m, $v) }
+        return $m
+    }
+    die "unknown aggregate: #{$op}"
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 12: ORDER BY
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::apply_order_by($rows, $cols, $ob) {
+    my $col_idx = -1
+    for my $i (0:len(@$cols) - 1) {
+        if ($cols->[$i] eq $ob->{col}) {
+            $col_idx = $i
+            last
+        }
+    }
+    die "ORDER BY: unknown column #{$ob->{col}}" if $col_idx < 0
+    my $dir = $ob->{dir}
+    my @sorted = sort {
+        my $av = _0->[$col_idx]
+        my $bv = _1->[$col_idx]
+        my $cmp
+        if (Sql::looks_int($av) && Sql::looks_int($bv)) {
+            $cmp = $av <=> $bv
+        } else {
+            $cmp = "$av" cmp "$bv"
+        }
+        $dir eq "DESC" ? -$cmp : $cmp
+    } @$rows
+    \@sorted
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 13: Result-set rendering for the demo printout
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::render_result($result) {
+    return "" unless ref($result) eq "HASH"
+    return "msg: " . $result->{msg} . "\n" if exists $result->{msg}
+    my $out = ""
+    $out .= "| " . join(" | ", @{$result->{cols}}) . " |\n"
+    $out .= "| " . join(" | ", map { "-" x len($_) } @{$result->{cols}}) . " |\n"
+    for my $row (@{$result->{rows}}) {
+        my @cells
+        for my $v (@$row) {
+            push @cells, Sql::is_null($v) ? "NULL" : ("" . $v)
+        }
+        $out .= "| " . join(" | ", @cells) . " |\n"
+    }
+    $out .= "(" . len(@{$result->{rows}}) . " rows)\n"
+    $out
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 14: One-shot exec driver
+# ═══════════════════════════════════════════════════════════════════
+
+fn Sql::exec_sql($db, $src) {
+    my $stmts = Sql::parse_program($src)
+    my $last
+    for my $stmt (@$stmts) {
+        $last = Sql::exec_stmt($db, $stmt)
+    }
+    $last
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 15: Demo workload — build a small e-commerce schema
+# ═══════════════════════════════════════════════════════════════════
+
+my $DB = Sql::db_new()
+
+# Create tables and seed data.
+Sql::exec_sql($DB, q{
+    CREATE TABLE customers (id INT, name TEXT, city TEXT);
+    INSERT INTO customers VALUES
+        (1, 'Alice',  'Boston'),
+        (2, 'Bob',    'Boston'),
+        (3, 'Carol',  'Seattle'),
+        (4, 'Dave',   'Seattle'),
+        (5, 'Eve',    'Austin');
+
+    CREATE TABLE orders (id INT, customer_id INT, total INT, status TEXT);
+    INSERT INTO orders VALUES
+        (101, 1, 250, 'shipped'),
+        (102, 1, 100, 'pending'),
+        (103, 2, 350, 'shipped'),
+        (104, 2,  50, 'shipped'),
+        (105, 3, 700, 'shipped'),
+        (106, 4, 120, 'cancelled'),
+        (107, 5, 800, 'shipped'),
+        (108, 5, 200, 'pending');
+})
+
+p "── mini SQL engine — schema + seed data ──────────────"
+p "  customers: " . len(@{$DB->{tables}->{customers}->{rows}}) . " rows"
+p "  orders:    " . len(@{$DB->{tables}->{orders}->{rows}}) . " rows"
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 16: Inline test cases
+# ═══════════════════════════════════════════════════════════════════
+
+# Each case is +{ sql, expected_rows, expected_cells }
+#   * expected_rows is the row count for SELECTs (or undef for DDL).
+#   * expected_cells (optional) checks first-row first-column value.
+
+my @cases = (
+    # ── basic SELECT * ──
+    +{ sql => "SELECT * FROM customers",                                  rows => 5 },
+    +{ sql => "SELECT id, name FROM customers",                           rows => 5 },
+    +{ sql => "SELECT * FROM orders",                                     rows => 8 },
+    # ── WHERE filters ──
+    +{ sql => "SELECT * FROM customers WHERE city = 'Boston'",            rows => 2 },
+    +{ sql => "SELECT * FROM customers WHERE city = 'Seattle'",           rows => 2 },
+    +{ sql => "SELECT * FROM customers WHERE city = 'Mars'",              rows => 0 },
+    +{ sql => "SELECT * FROM orders WHERE total > 200",                   rows => 4 },
+    +{ sql => "SELECT * FROM orders WHERE total > 200 AND status = 'shipped'", rows => 4 },
+    +{ sql => "SELECT * FROM orders WHERE status = 'cancelled' OR status = 'pending'", rows => 3 },
+    +{ sql => "SELECT * FROM orders WHERE NOT (status = 'shipped')",      rows => 3 },
+    +{ sql => "SELECT * FROM orders WHERE total >= 100 AND total <= 300", rows => 4 },
+    # ── ORDER BY ──
+    +{ sql => "SELECT name FROM customers ORDER BY name",                 rows => 5, cell => "Alice" },
+    +{ sql => "SELECT name FROM customers ORDER BY name DESC",            rows => 5, cell => "Eve" },
+    +{ sql => "SELECT id, total FROM orders ORDER BY total DESC LIMIT 3", rows => 3, cell => 107 },
+    +{ sql => "SELECT id FROM orders ORDER BY id ASC LIMIT 2",            rows => 2, cell => 101 },
+    # ── Aggregates ──
+    +{ sql => "SELECT COUNT(*) FROM customers",                           rows => 1, cell => 5 },
+    +{ sql => "SELECT COUNT(*) FROM orders",                              rows => 1, cell => 8 },
+    +{ sql => "SELECT COUNT(*) FROM orders WHERE status = 'shipped'",     rows => 1, cell => 5 },
+    +{ sql => "SELECT SUM(total) FROM orders",                            rows => 1, cell => 2570 },
+    +{ sql => "SELECT SUM(total) FROM orders WHERE status = 'shipped'",   rows => 1, cell => 2150 },
+    +{ sql => "SELECT MIN(total), MAX(total) FROM orders",                rows => 1, cell => 50 },
+    +{ sql => "SELECT AVG(total) FROM orders",                            rows => 1, cell => 321 },
+    # ── GROUP BY ──
+    +{ sql => "SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id ORDER BY customer_id", rows => 5, cell => 1 },
+    +{ sql => "SELECT status, COUNT(*) FROM orders GROUP BY status ORDER BY status", rows => 3 },
+    +{ sql => "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY customer_id", rows => 5, cell => 1 },
+    # ── INNER JOIN ──
+    +{ sql => "SELECT customers.name, orders.id FROM customers INNER JOIN orders ON customers.id = orders.customer_id", rows => 8 },
+    +{ sql => "SELECT customers.name, orders.total FROM customers JOIN orders ON customers.id = orders.customer_id WHERE customers.city = 'Boston'", rows => 4 },
+    # ── UPDATE + SELECT ──
+    +{ sql => "UPDATE orders SET status = 'shipped' WHERE status = 'pending'", rows => undef },
+    +{ sql => "SELECT COUNT(*) FROM orders WHERE status = 'shipped'",     rows => 1, cell => 7 },
+    +{ sql => "SELECT COUNT(*) FROM orders WHERE status = 'pending'",     rows => 1, cell => 0 },
+    # ── DELETE + SELECT ──
+    +{ sql => "DELETE FROM orders WHERE status = 'cancelled'",            rows => undef },
+    +{ sql => "SELECT COUNT(*) FROM orders",                              rows => 1, cell => 7 },
+)
+
+p ""
+p "── test suite ────────────────────────────────────────"
+my $passed = 0
+my $failed = 0
+for my $c (@cases) {
+    my $r = Sql::exec_sql($DB, $c->{sql})
+    my $ok = 1
+    my $actual_rows = exists $r->{rows} ? len(@{$r->{rows}}) : -1
+    if (defined $c->{rows}) {
+        $ok = 0 if $actual_rows != $c->{rows}
+    }
+    if (defined $c->{cell} && exists $r->{rows} && len(@{$r->{rows}}) > 0) {
+        my $got_cell = $r->{rows}->[0]->[0]
+        $ok = 0 if "$got_cell" ne "" . $c->{cell}
+    } elsif (defined $c->{cell}) {
+        $ok = 0
+    }
+    if ($ok) { $passed++ } else { $failed++ }
+    my $sql_show = $c->{sql}
+    $sql_show =~ s/\s+/ /g
+    $sql_show = substr($sql_show, 0, 70) . ".." if len($sql_show) > 72
+    printf "  %-72s  %s\n",
+        $sql_show,
+        $ok ? sprintf("OK (%s rows)", defined $c->{rows} ? "" . $c->{rows} : "DDL")
+            : "FAIL"
+}
+
+p ""
+printf "  ── %d/%d test cases passed ────────────────────────────\n", $passed, $passed + $failed
+die "#{$failed} SQL test cases failed" if $failed > 0
+
+# ═══════════════════════════════════════════════════════════════════
+# Section 17: Hand-rolled invariants
+# ═══════════════════════════════════════════════════════════════════
+
+# Helper: get count from a "SELECT COUNT(*) ..." query.
+
+fn Sql::query_count($db, $sql) {
+    my $r = Sql::exec_sql($db, $sql)
+    $r->{rows}->[0]->[0]
+}
+
+fn Sql::query_first($db, $sql) {
+    my $r = Sql::exec_sql($db, $sql)
+    return undef unless len(@{$r->{rows}}) > 0
+    $r->{rows}->[0]->[0]
+}
+
+# Rebuild a fresh DB so invariants see a known state.
+
+fn Sql::seed_db() {
+    my $db = Sql::db_new()
+    Sql::exec_sql($db, q{
+        CREATE TABLE customers (id INT, name TEXT, city TEXT);
+        INSERT INTO customers VALUES
+            (1, 'Alice',  'Boston'),
+            (2, 'Bob',    'Boston'),
+            (3, 'Carol',  'Seattle'),
+            (4, 'Dave',   'Seattle'),
+            (5, 'Eve',    'Austin');
+        CREATE TABLE orders (id INT, customer_id INT, total INT, status TEXT);
+        INSERT INTO orders VALUES
+            (101, 1, 250, 'shipped'),
+            (102, 1, 100, 'pending'),
+            (103, 2, 350, 'shipped'),
+            (104, 2,  50, 'shipped'),
+            (105, 3, 700, 'shipped'),
+            (106, 4, 120, 'cancelled'),
+            (107, 5, 800, 'shipped'),
+            (108, 5, 200, 'pending');
+    })
+    $db
+}
+
+# ── invariant 1: row count of fresh customers/orders ──────────────
+{
+    my $db = Sql::seed_db()
+    die "customer count" unless Sql::query_count($db, "SELECT COUNT(*) FROM customers") == 5
+    die "order count"    unless Sql::query_count($db, "SELECT COUNT(*) FROM orders")    == 8
+}
+
+# ── invariant 2: SUM equals brute total ───────────────────────────
+{
+    my $db = Sql::seed_db()
+    die "sum total"  unless Sql::query_count($db, "SELECT SUM(total) FROM orders") == 250 + 100 + 350 + 50 + 700 + 120 + 800 + 200
+    die "min total"  unless Sql::query_first($db, "SELECT MIN(total) FROM orders") == 50
+    die "max total"  unless Sql::query_first($db, "SELECT MAX(total) FROM orders") == 800
+}
+
+# ── invariant 3: WHERE clauses agree with hand-counted rows ──────
+{
+    my $db = Sql::seed_db()
+    die "Boston customers" unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Boston'") == 2
+    die "Seattle"          unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Seattle'") == 2
+    die "Austin"           unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Austin'") == 1
+    die "Mars"             unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Mars'") == 0
+    die "shipped orders"   unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE status = 'shipped'") == 5
+    die "pending orders"   unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE status = 'pending'") == 2
+    die "cancelled orders" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE status = 'cancelled'") == 1
+}
+
+# ── invariant 4: AND/OR/NOT combinations ──────────────────────────
+{
+    my $db = Sql::seed_db()
+    die "AND clause" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total > 200 AND status = 'shipped'") == 4
+    die "OR clause"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total < 100 OR total > 500") == 3
+    die "NOT clause" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE NOT (status = 'shipped')") == 3
+}
+
+# ── invariant 5: GROUP BY tallies match per-group totals ─────────
+{
+    my $db = Sql::seed_db()
+    my $r = Sql::exec_sql($db, "SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id ORDER BY customer_id")
+    die "5 customer groups" unless len(@{$r->{rows}}) == 5
+    # Customer 1 has 2 orders, customer 2 has 2, customer 3 has 1, 4 has 1, 5 has 2.
+    my %expected = (1 => 2, 2 => 2, 3 => 1, 4 => 1, 5 => 2)
+    for my $row (@{$r->{rows}}) {
+        my $cid = $row->[0]
+        my $cnt = $row->[1]
+        die "group #{$cid} has #{$cnt}, want #{$expected{$cid}}" unless $cnt == $expected{$cid}
+    }
+}
+
+# ── invariant 6: GROUP BY + SUM ──────────────────────────────────
+{
+    my $db = Sql::seed_db()
+    my $r = Sql::exec_sql($db, "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY customer_id")
+    my %expected = (1 => 350, 2 => 400, 3 => 700, 4 => 120, 5 => 1000)
+    for my $row (@{$r->{rows}}) {
+        die "cid #{$row->[0]} sum #{$row->[1]} != #{$expected{$row->[0]}}" unless $row->[1] == $expected{$row->[0]}
+    }
+}
+
+# ── invariant 7: INNER JOIN multiplicity ─────────────────────────
+{
+    my $db = Sql::seed_db()
+    my $cnt = Sql::query_count($db, "SELECT COUNT(*) FROM customers INNER JOIN orders ON customers.id = orders.customer_id")
+    die "join cardinality" unless $cnt == 8   # every order has exactly one matching customer
+}
+
+# ── invariant 8: ORDER BY ASC produces non-decreasing column ──────
+{
+    my $db = Sql::seed_db()
+    my $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total ASC")
+    my $prev = -1
+    for my $row (@{$r->{rows}}) {
+        die "ORDER BY ASC violation: prev=#{$prev} curr=#{$row->[0]}" if $row->[0] < $prev
+        $prev = $row->[0]
+    }
+}
+
+# ── invariant 9: ORDER BY DESC produces non-increasing column ─────
+{
+    my $db = Sql::seed_db()
+    my $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total DESC")
+    my $prev = 100_000
+    for my $row (@{$r->{rows}}) {
+        die "ORDER BY DESC violation: prev=#{$prev} curr=#{$row->[0]}" if $row->[0] > $prev
+        $prev = $row->[0]
+    }
+}
+
+# ── invariant 10: LIMIT truncates result ─────────────────────────
+{
+    my $db = Sql::seed_db()
+    for my $n (1, 2, 3, 5, 8) {
+        my $r = Sql::exec_sql($db, "SELECT id FROM orders ORDER BY id ASC LIMIT #{$n}")
+        my $expected_n = $n < 8 ? $n : 8
+        die "LIMIT #{$n} returned #{len(@{$r->{rows}})} rows" unless len(@{$r->{rows}}) == $expected_n
+    }
+}
+
+# ── invariant 11: UPDATE changes the right rows ──────────────────
+{
+    my $db = Sql::seed_db()
+    Sql::exec_sql($db, "UPDATE orders SET total = 0 WHERE status = 'pending'")
+    die "after-update pending total" unless Sql::query_first($db, "SELECT SUM(total) FROM orders WHERE status = 'pending'") == 0
+    # Shipped orders untouched.
+    die "shipped unchanged" unless Sql::query_first($db, "SELECT SUM(total) FROM orders WHERE status = 'shipped'") == 2150
+}
+
+# ── invariant 12: DELETE removes only matching rows ──────────────
+{
+    my $db = Sql::seed_db()
+    Sql::exec_sql($db, "DELETE FROM orders WHERE status = 'cancelled'")
+    die "after-delete count" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders") == 7
+    die "no cancelled left"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE status = 'cancelled'") == 0
+}
+
+# ── invariant 13: tokenizer recognises every keyword variant ─────
+{
+    my $tokens = Sql::tokenize("select * from t WHERE x = 5 AND y < 10 ORDER BY z DESC LIMIT 3")
+    my @kinds
+    for my $t (@$tokens) { push @kinds, $t->{kind} }
+    die "tokenizer kinds" unless len(@kinds) == 19   # SELECT * FROM t WHERE x = 5 AND y < 10 ORDER BY z DESC LIMIT 3 + EOF
+}
+
+# ── invariant 14: CREATE TABLE then SELECT * is empty ────────────
+{
+    my $db = Sql::db_new()
+    Sql::exec_sql($db, "CREATE TABLE empty_t (k INT, v TEXT)")
+    die "empty table count" unless Sql::query_count($db, "SELECT COUNT(*) FROM empty_t") == 0
+}
+
+# ── invariant 15: INSERT with explicit column list reorders ──────
+{
+    my $db = Sql::db_new()
+    Sql::exec_sql($db, q{
+        CREATE TABLE t (a INT, b INT, c INT);
+        INSERT INTO t (c, a, b) VALUES (30, 10, 20);
+    })
+    my $r = Sql::exec_sql($db, "SELECT a, b, c FROM t")
+    die "row a" unless $r->{rows}->[0]->[0] == 10
+    die "row b" unless $r->{rows}->[0]->[1] == 20
+    die "row c" unless $r->{rows}->[0]->[2] == 30
+}
+
+# ── invariant 16: arithmetic in WHERE expressions ────────────────
+{
+    my $db = Sql::seed_db()
+    # Orders with total > customer_id * 100.
+    my $n = Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total > customer_id * 100")
+    # Manually: 101 (1, 250 > 100) ✓, 103 (2, 350 > 200) ✓, 105 (3, 700 > 300) ✓, 107 (5, 800 > 500) ✓.
+    # And 102 (1, 100 > 100): not, equality fails. 104 (2, 50 > 200): no. 106 (4, 120 > 400): no.
+    # 108 (5, 200 > 500): no.
+    die "arithmetic where: #{$n}" unless $n == 4
+}
+
+# ── invariant 17: arithmetic in SELECT projections ───────────────
+{
+    my $db = Sql::seed_db()
+    my $r = Sql::exec_sql($db, "SELECT id, total + 10 FROM orders WHERE id = 101")
+    die "expr id"    unless $r->{rows}->[0]->[0] == 101
+    die "expr total+10" unless $r->{rows}->[0]->[1] == 260
+}
+
+# ── invariant 18: NULL handling — IS NULL vs IS NOT NULL ─────────
+{
+    my $db = Sql::db_new()
+    Sql::exec_sql($db, q{
+        CREATE TABLE n (a INT, b TEXT);
+        INSERT INTO n VALUES (1, 'x'), (2, NULL), (3, 'y'), (NULL, 'z');
+    })
+    die "IS NULL b"     unless Sql::query_count($db, "SELECT COUNT(*) FROM n WHERE b IS NULL") == 1
+    die "IS NOT NULL b" unless Sql::query_count($db, "SELECT COUNT(*) FROM n WHERE b IS NOT NULL") == 3
+    die "IS NULL a"     unless Sql::query_count($db, "SELECT COUNT(*) FROM n WHERE a IS NULL") == 1
+}
+
+# ── invariant 19: empty WHERE clause never matches when contradictory ─
+{
+    my $db = Sql::seed_db()
+    die "false WHERE" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE 1 = 2") == 0
+    die "true WHERE"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE 1 = 1") == 8
+}
+
+# ── invariant 20: complete delete-all + repopulate cycle ─────────
+{
+    my $db = Sql::seed_db()
+    Sql::exec_sql($db, "DELETE FROM orders")
+    die "after delete-all" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders") == 0
+    Sql::exec_sql($db, "INSERT INTO orders VALUES (200, 1, 50, 'new')")
+    die "after re-insert" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders") == 1
+}
+
+p ""
+p "── all 20 invariants satisfied ───────────────────────"
+p "── mini SQL engine: tokenizer + parser + executor ────"
+p "── 30+ SQL test cases passed end-to-end ──────────────"

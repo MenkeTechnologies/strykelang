@@ -55,8 +55,10 @@ fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
             # Secant.
             $s = $hi - $fb * ($hi - $lo) / ($fb - $fa)
         }
-        my $cond_a = ($s < (3 * $lo + $hi) / 4) || ($s > $hi) if $lo < $hi
-        if ($lo > $hi) {
+        my $cond_a = 0
+        if ($lo < $hi) {
+            $cond_a = ($s < (3 * $lo + $hi) / 4) || ($s > $hi)
+        } elsif ($lo > $hi) {
             $cond_a = ($s > (3 * $lo + $hi) / 4) || ($s < $hi)
         }
         my $delta = Br::fabs($s - $hi)
