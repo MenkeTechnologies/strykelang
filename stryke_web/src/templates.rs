@@ -128,7 +128,11 @@ pub const MIGRATION_STK: &str = include_str!("../templates/migration.stk.tmpl");
 
 /// Per-action view template (one per action: index/show/new/edit by default).
 pub const VIEW_INDEX_ERB: &str = include_str!("../templates/views/index.html.erb.tmpl");
+/// `VIEW_SHOW_ERB` constant.
 pub const VIEW_SHOW_ERB: &str = include_str!("../templates/views/show.html.erb.tmpl");
+/// `VIEW_NEW_ERB` constant.
 pub const VIEW_NEW_ERB: &str = include_str!("../templates/views/new.html.erb.tmpl");
+/// `VIEW_EDIT_ERB` constant.
 pub const VIEW_EDIT_ERB: &str = include_str!("../templates/views/edit.html.erb.tmpl");
+/// `VIEW_FORM_ERB` constant.
 pub const VIEW_FORM_ERB: &str = include_str!("../templates/views/_form.html.erb.tmpl");

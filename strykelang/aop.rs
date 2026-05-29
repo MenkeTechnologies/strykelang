@@ -18,6 +18,7 @@ use crate::ast::{AdviceKind, Block};
 pub struct Intercept {
     /// Auto-incremented removal id (1-based).
     pub id: u32,
+    /// `kind` field.
     pub kind: AdviceKind,
     /// Glob pointcut matched against the called sub's bare name.
     pub pattern: String,
@@ -34,7 +35,9 @@ pub struct Intercept {
 /// Read by the `proceed` builtin to invoke the original sub with saved args.
 #[derive(Debug, Clone)]
 pub struct InterceptCtx {
+    /// `name` field.
     pub name: String,
+    /// `args` field.
     pub args: Vec<crate::value::StrykeValue>,
     /// Set true when `proceed()` runs the original.
     pub proceeded: bool,

@@ -4,10 +4,13 @@ use std::cmp::Ordering;
 
 use crate::ast::{BinOp, Block, Expr, ExprKind, StmtKind};
 use crate::value::StrykeValue;
+/// `SortBlockFast` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortBlockFast {
+    /// `Numeric` variant.
     Numeric,
+    /// `String` variant.
     String,
     /// `{ $b <=> $a }` — reverse numeric order
     NumericRev,
@@ -56,6 +59,7 @@ pub fn detect_sort_block_fast(block: &Block) -> Option<SortBlockFast> {
         _ => None,
     }
 }
+/// `sort_magic_cmp` — see implementation.
 
 #[inline]
 pub fn sort_magic_cmp(a: &StrykeValue, b: &StrykeValue, mode: SortBlockFast) -> Ordering {

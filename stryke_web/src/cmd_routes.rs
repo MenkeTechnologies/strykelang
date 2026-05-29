@@ -6,6 +6,7 @@
 use crate::util::Result;
 use std::path::Path;
 use std::process::Command;
+/// `run` — see implementation.
 
 pub fn run() -> Result<()> {
     if !Path::new("config/routes.stk").exists() {

@@ -43,7 +43,9 @@ pub struct Lockfile {
 /// One resolved package in the lock graph.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LockedPackage {
+    /// `name` field.
     pub name: String,
+    /// `version` field.
     pub version: String,
     /// Source URL — `registry+https://...`, `path+file://...`, `git+https://...#REV`.
     pub source: String,

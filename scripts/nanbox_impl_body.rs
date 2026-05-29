@@ -1,4 +1,5 @@
 impl StrykeValue {
+    /// `UNDEF` constant.
     pub const UNDEF: StrykeValue = StrykeValue(nanbox::encode_imm_undef());
 
     #[inline]
@@ -16,6 +17,7 @@ impl StrykeValue {
             Arc::from_raw(p as *mut HeapObject)
         }
     }
+    /// `integer` — see implementation.
 
     #[inline]
     pub fn integer(n: i64) -> Self {
@@ -25,6 +27,7 @@ impl StrykeValue {
             Self::from_heap(Arc::new(HeapObject::Integer(n)))
         }
     }
+    /// `float` — see implementation.
 
     #[inline]
     pub fn float(f: f64) -> Self {
@@ -34,46 +37,55 @@ impl StrykeValue {
             StrykeValue(f.to_bits())
         }
     }
+    /// `string` — see implementation.
 
     #[inline]
     pub fn string(s: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::String(s)))
     }
+    /// `bytes` — see implementation.
 
     #[inline]
     pub fn bytes(b: Arc<Vec<u8>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Bytes(b)))
     }
+    /// `array` — see implementation.
 
     #[inline]
     pub fn array(v: Vec<StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Array(v)))
     }
+    /// `hash` — see implementation.
 
     #[inline]
     pub fn hash(h: IndexMap<String, StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Hash(h)))
     }
+    /// `array_ref` — see implementation.
 
     #[inline]
     pub fn array_ref(a: Arc<RwLock<Vec<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ArrayRef(a)))
     }
+    /// `hash_ref` — see implementation.
 
     #[inline]
     pub fn hash_ref(h: Arc<RwLock<IndexMap<String, StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashRef(h)))
     }
+    /// `scalar_ref` — see implementation.
 
     #[inline]
     pub fn scalar_ref(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarRef(r)))
     }
+    /// `code_ref` — see implementation.
 
     #[inline]
     pub fn code_ref(c: Arc<StrykeSub>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CodeRef(c)))
     }
+    /// `regex` — see implementation.
 
     #[inline]
     pub fn regex(
@@ -93,76 +105,91 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `blessed` — see implementation.
 
     #[inline]
     pub fn blessed(b: Arc<BlessedRef>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Blessed(b)))
     }
+    /// `io_handle` — see implementation.
 
     #[inline]
     pub fn io_handle(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::IOHandle(name)))
     }
+    /// `atomic` — see implementation.
 
     #[inline]
     pub fn atomic(a: Arc<Mutex<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Atomic(a)))
     }
+    /// `set` — see implementation.
 
     #[inline]
     pub fn set(s: Arc<PerlSet>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Set(s)))
     }
+    /// `channel_tx` — see implementation.
 
     #[inline]
     pub fn channel_tx(tx: Arc<Sender<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelTx(tx)))
     }
+    /// `channel_rx` — see implementation.
 
     #[inline]
     pub fn channel_rx(rx: Arc<Receiver<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelRx(rx)))
     }
+    /// `async_task` — see implementation.
 
     #[inline]
     pub fn async_task(t: Arc<StrykeAsyncTask>) -> Self {
         Self::from_heap(Arc::new(HeapObject::AsyncTask(t)))
     }
+    /// `deque` — see implementation.
 
     #[inline]
     pub fn deque(d: Arc<Mutex<VecDeque<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Deque(d)))
     }
+    /// `heap` — see implementation.
 
     #[inline]
     pub fn heap(h: Arc<Mutex<PerlHeap>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Heap(h)))
     }
+    /// `pipeline` — see implementation.
 
     #[inline]
     pub fn pipeline(p: Arc<Mutex<PipelineInner>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Pipeline(p)))
     }
+    /// `capture` — see implementation.
 
     #[inline]
     pub fn capture(c: Arc<CaptureResult>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Capture(c)))
     }
+    /// `ppool` — see implementation.
 
     #[inline]
     pub fn ppool(p: PerlPpool) -> Self {
         Self::from_heap(Arc::new(HeapObject::Ppool(p)))
     }
+    /// `barrier` — see implementation.
 
     #[inline]
     pub fn barrier(b: PerlBarrier) -> Self {
         Self::from_heap(Arc::new(HeapObject::Barrier(b)))
     }
+    /// `sqlite_conn` — see implementation.
 
     #[inline]
     pub fn sqlite_conn(c: Arc<Mutex<rusqlite::Connection>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::SqliteConn(c)))
     }
+    /// `struct_inst` — see implementation.
 
     #[inline]
     pub fn struct_inst(s: Arc<StructInstance>) -> Self {
@@ -181,6 +208,7 @@ impl StrykeValue {
             _ => None,
         }
     }
+    /// `append_to` — see implementation.
 
     #[inline]
     pub fn append_to(&self, buf: &mut String) {
@@ -225,6 +253,7 @@ impl StrykeValue {
             _ => buf.push_str(&self.to_string()),
         }
     }
+    /// `unwrap_atomic` — see implementation.
 
     #[inline]
     pub fn unwrap_atomic(&self) -> StrykeValue {
@@ -237,6 +266,7 @@ impl StrykeValue {
             _ => self.clone(),
         }
     }
+    /// `is_atomic` — see implementation.
 
     #[inline]
     pub fn is_atomic(&self) -> bool {
@@ -246,6 +276,7 @@ impl StrykeValue {
         let arc = self.heap_arc();
         matches!(&*arc, HeapObject::Atomic(_))
     }
+    /// `is_true` — see implementation.
 
     #[inline]
     pub fn is_true(&self) -> bool {
@@ -272,6 +303,7 @@ impl StrykeValue {
             _ => true,
         }
     }
+    /// `into_string` — see implementation.
 
     #[inline]
     pub fn into_string(self) -> String {
@@ -305,6 +337,7 @@ impl StrykeValue {
         }
         String::new()
     }
+    /// `as_str_or_empty` — see implementation.
 
     #[inline]
     pub fn as_str_or_empty(&self) -> String {
@@ -317,6 +350,7 @@ impl StrykeValue {
             _ => String::new(),
         }
     }
+    /// `to_number` — see implementation.
 
     #[inline]
     pub fn to_number(&self) -> f64 {
@@ -349,6 +383,7 @@ impl StrykeValue {
             _ => 0.0,
         }
     }
+    /// `to_int` — see implementation.
 
     #[inline]
     pub fn to_int(&self) -> i64 {
@@ -381,6 +416,7 @@ impl StrykeValue {
             _ => 0,
         }
     }
+    /// `type_name` — see implementation.
 
     pub fn type_name(&self) -> String {
         if nanbox::is_imm_undef(self.0) {
@@ -422,6 +458,7 @@ impl StrykeValue {
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
     }
+    /// `ref_type` — see implementation.
 
     pub fn ref_type(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
@@ -452,16 +489,19 @@ impl StrykeValue {
             _ => StrykeValue::string(String::new()),
         }
     }
+    /// `num_cmp` — see implementation.
 
     pub fn num_cmp(&self, other: &StrykeValue) -> Ordering {
         let a = self.to_number();
         let b = other.to_number();
         a.partial_cmp(&b).unwrap_or(Ordering::Equal)
     }
+    /// `str_cmp` — see implementation.
 
     pub fn str_cmp(&self, other: &StrykeValue) -> Ordering {
         self.to_string().cmp(&other.to_string())
     }
+    /// `to_list` — see implementation.
 
     pub fn to_list(&self) -> Vec<StrykeValue> {
         if nanbox::is_imm_undef(self.0) {
@@ -483,6 +523,7 @@ impl StrykeValue {
             _ => vec![self.clone()],
         }
     }
+    /// `scalar_context` — see implementation.
 
     pub fn scalar_context(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
@@ -652,6 +693,7 @@ pub fn set_member_key(v: &StrykeValue) -> String {
         HeapObject::Float(fl) => format!("f:{}", fl.to_bits()),
     }
 }
+/// `set_from_elements` — see implementation.
 
 pub fn set_from_elements<I: IntoIterator<Item = StrykeValue>>(items: I) -> StrykeValue {
     let mut map = PerlSet::new();
@@ -675,6 +717,7 @@ pub fn set_payload(v: &StrykeValue) -> Option<Arc<PerlSet>> {
         _ => None,
     }
 }
+/// `set_union` — see implementation.
 
 pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
@@ -685,6 +728,7 @@ pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     }
     Some(StrykeValue::set(Arc::new(m)))
 }
+/// `set_intersection` — see implementation.
 
 pub fn set_intersection(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;

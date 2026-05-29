@@ -10,6 +10,7 @@ use super::{PkgError, PkgResult};
 
 /// Resolves and (lazily) creates the standard `~/.stryke/...` layout.
 pub struct Store {
+    /// `root` field.
     root: PathBuf,
 }
 
@@ -33,22 +34,28 @@ impl Store {
     pub fn at(root: impl Into<PathBuf>) -> Store {
         Store { root: root.into() }
     }
+    /// `root` — see implementation.
 
     pub fn root(&self) -> &Path {
         &self.root
     }
+    /// `store_dir` — see implementation.
     pub fn store_dir(&self) -> PathBuf {
         self.root.join("store")
     }
+    /// `cache_dir` — see implementation.
     pub fn cache_dir(&self) -> PathBuf {
         self.root.join("cache")
     }
+    /// `git_dir` — see implementation.
     pub fn git_dir(&self) -> PathBuf {
         self.root.join("git")
     }
+    /// `bin_dir` — see implementation.
     pub fn bin_dir(&self) -> PathBuf {
         self.root.join("bin")
     }
+    /// `index_dir` — see implementation.
     pub fn index_dir(&self) -> PathBuf {
         self.root.join("index")
     }

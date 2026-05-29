@@ -48,13 +48,21 @@ use crate::vm_helper::{FlowOrError, VMHelper};
 /// rejected with a clean error rather than silently misparsed).
 #[allow(dead_code)]
 pub mod frame_kind {
+    /// `HELLO` constant.
     pub const HELLO: u8 = 0x01;
+    /// `HELLO_ACK` constant.
     pub const HELLO_ACK: u8 = 0x02;
+    /// `SESSION_INIT` constant.
     pub const SESSION_INIT: u8 = 0x03;
+    /// `SESSION_ACK` constant.
     pub const SESSION_ACK: u8 = 0x04;
+    /// `JOB` constant.
     pub const JOB: u8 = 0x05;
+    /// `JOB_RESP` constant.
     pub const JOB_RESP: u8 = 0x06;
+    /// `SHUTDOWN` constant.
     pub const SHUTDOWN: u8 = 0x07;
+    /// `ERROR` constant.
     pub const ERROR: u8 = 0xFF;
 }
 
@@ -65,6 +73,7 @@ pub const PROTO_VERSION: u32 = 3;
 
 mod json_value_bincode {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    /// `serialize` — see implementation.
 
     pub fn serialize<S>(value: &serde_json::Value, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -73,6 +82,7 @@ mod json_value_bincode {
         let buf = serde_json::to_vec(value).map_err(serde::ser::Error::custom)?;
         buf.serialize(serializer)
     }
+    /// `deserialize` — see implementation.
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<serde_json::Value, D::Error>
     where
@@ -85,6 +95,7 @@ mod json_value_bincode {
 
 mod capture_json_bincode {
     use serde::{de::Deserializer, ser::SerializeSeq, Deserialize, Serializer};
+    /// `serialize` — see implementation.
 
     pub fn serialize<S>(v: &[(String, serde_json::Value)], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -97,6 +108,7 @@ mod capture_json_bincode {
         }
         seq.end()
     }
+    /// `deserialize` — see implementation.
 
     pub fn deserialize<'de, D>(
         deserializer: D,
@@ -113,17 +125,24 @@ mod capture_json_bincode {
         Ok(out)
     }
 }
+/// `HelloMsg` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelloMsg {
+    /// `proto_version` field.
     pub proto_version: u32,
+    /// `pe_version` field.
     pub pe_version: String,
 }
+/// `HelloAck` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelloAck {
+    /// `proto_version` field.
     pub proto_version: u32,
+    /// `pe_version` field.
     pub pe_version: String,
+    /// `hostname` field.
     pub hostname: String,
 }
 
@@ -131,31 +150,45 @@ pub struct HelloAck {
 /// the user's named subs, the `pmap_on` block source, and the captured-lexical snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInit {
+    /// `subs_prelude` field.
     pub subs_prelude: String,
+    /// `block_src` field.
     pub block_src: String,
+    /// `capture` field.
     #[serde(with = "capture_json_bincode")]
     pub capture: Vec<(String, serde_json::Value)>,
 }
+/// `SessionAck` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionAck {
+    /// `ok` field.
     pub ok: bool,
+    /// `err_msg` field.
     pub err_msg: String,
 }
+/// `JobMsg` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobMsg {
+    /// `seq` field.
     pub seq: u64,
+    /// `item` field.
     #[serde(with = "json_value_bincode")]
     pub item: serde_json::Value,
 }
+/// `JobRespMsg` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobRespMsg {
+    /// `seq` field.
     pub seq: u64,
+    /// `ok` field.
     pub ok: bool,
+    /// `result` field.
     #[serde(with = "json_value_bincode")]
     pub result: serde_json::Value,
+    /// `err_msg` field.
     pub err_msg: String,
 }
 
@@ -207,25 +240,36 @@ pub fn recv_msg<R: Read, T: for<'de> Deserialize<'de>>(
 /// One unit of work executed on a remote `stryke --remote-worker`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteJobV1 {
+    /// `seq` field.
     pub seq: u64,
+    /// `subs_prelude` field.
     pub subs_prelude: String,
+    /// `block_src` field.
     pub block_src: String,
+    /// `capture` field.
     #[serde(with = "capture_json_bincode")]
     pub capture: Vec<(String, serde_json::Value)>,
+    /// `item` field.
     #[serde(with = "json_value_bincode")]
     pub item: serde_json::Value,
 }
+/// `RemoteRespV1` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteRespV1 {
+    /// `seq` field.
     pub seq: u64,
+    /// `ok` field.
     pub ok: bool,
+    /// `result` field.
     #[serde(with = "json_value_bincode")]
     pub result: serde_json::Value,
+    /// `err_msg` field.
     pub err_msg: String,
 }
 
 const MAX_FRAME: usize = 256 * 1024 * 1024;
+/// `write_framed` — see implementation.
 
 pub fn write_framed<W: Write>(w: &mut W, payload: &[u8]) -> std::io::Result<()> {
     w.write_all(&(payload.len() as u64).to_le_bytes())?;
@@ -233,6 +277,7 @@ pub fn write_framed<W: Write>(w: &mut W, payload: &[u8]) -> std::io::Result<()> 
     w.flush()?;
     Ok(())
 }
+/// `read_framed` — see implementation.
 
 pub fn read_framed<R: Read>(r: &mut R) -> std::io::Result<Vec<u8>> {
     let mut h = [0u8; 8];
@@ -248,22 +293,27 @@ pub fn read_framed<R: Read>(r: &mut R) -> std::io::Result<Vec<u8>> {
     r.read_exact(&mut v)?;
     Ok(v)
 }
+/// `encode_job` — see implementation.
 
 pub fn encode_job(job: &RemoteJobV1) -> Result<Vec<u8>, String> {
     bincode::serialize(job).map_err(|e| e.to_string())
 }
+/// `decode_job` — see implementation.
 
 pub fn decode_job(bytes: &[u8]) -> Result<RemoteJobV1, String> {
     bincode::deserialize(bytes).map_err(|e| e.to_string())
 }
+/// `encode_resp` — see implementation.
 
 pub fn encode_resp(resp: &RemoteRespV1) -> Result<Vec<u8>, String> {
     bincode::serialize(resp).map_err(|e| e.to_string())
 }
+/// `decode_resp` — see implementation.
 
 pub fn decode_resp(bytes: &[u8]) -> Result<RemoteRespV1, String> {
     bincode::deserialize(bytes).map_err(|e| e.to_string())
 }
+/// `perl_to_json_value` — see implementation.
 
 pub fn perl_to_json_value(v: &StrykeValue) -> Result<serde_json::Value, String> {
     if v.is_undef() {
@@ -318,6 +368,7 @@ pub fn perl_to_json_value(v: &StrykeValue) -> Result<serde_json::Value, String> 
         v.type_name()
     ))
 }
+/// `json_to_perl` — see implementation.
 
 pub fn json_to_perl(v: &serde_json::Value) -> Result<StrykeValue, String> {
     Ok(match v {
@@ -349,6 +400,7 @@ pub fn json_to_perl(v: &serde_json::Value) -> Result<StrykeValue, String> {
         }
     })
 }
+/// `capture_entries_to_json` — see implementation.
 
 pub fn capture_entries_to_json(
     entries: &[(String, StrykeValue)],
@@ -359,6 +411,7 @@ pub fn capture_entries_to_json(
     }
     Ok(out)
 }
+/// `build_subs_prelude` — see implementation.
 
 pub fn build_subs_prelude(subs: &HashMap<String, Arc<StrykeSub>>) -> String {
     let mut names: Vec<_> = subs.keys().cloned().collect();
@@ -735,6 +788,7 @@ pub fn run_remote_worker_stdio() -> i32 {
         2
     }
 }
+/// `ssh_invoke_remote_worker` — see implementation.
 
 pub fn ssh_invoke_remote_worker(
     host: &str,

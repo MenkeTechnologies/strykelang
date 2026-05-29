@@ -20,10 +20,14 @@ fn parse_unicode_name(name: &str) -> Option<char> {
 
 /// Flag letters after `m//`, `qr//`, etc. (`c` = `/gc`, `o` = compile once; CPAN uses both).
 const REGEX_FLAG_CHARS: &str = "gimsxecor";
+/// `Lexer` — see fields for layout.
 
 pub struct Lexer {
+    /// `input` field.
     input: Vec<char>,
+    /// `pos` field.
     pos: usize,
+    /// `line` field.
     pub line: usize,
     /// Line where the most recently-returned token starts. Set by
     /// [`Self::next_token`] right after its leading
@@ -65,9 +69,11 @@ pub struct Lexer {
 }
 
 impl Lexer {
+    /// `new` — see implementation.
     pub fn new(input: &str) -> Self {
         Self::new_with_file(input, "-e")
     }
+    /// `new_with_file` — see implementation.
 
     pub fn new_with_file(input: &str, file: impl Into<String>) -> Self {
         Self {
@@ -1566,6 +1572,7 @@ impl Lexer {
         }
         Some(rest)
     }
+    /// `next_token` — see implementation.
 
     pub fn next_token(&mut self) -> StrykeResult<Token> {
         self.skip_whitespace_and_comments();

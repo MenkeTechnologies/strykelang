@@ -73,6 +73,7 @@ fn currency_table() -> &'static [(&'static str, &'static str, u8)] {
         ("ETH", "Ξ", 18),
     ]
 }
+/// `currency_format` — see implementation.
 
 pub fn currency_format(args: &[StrykeValue]) -> StrykeValue {
     let amount = arg_f64(args, 0).unwrap_or(0.0);
@@ -86,6 +87,7 @@ pub fn currency_format(args: &[StrykeValue]) -> StrykeValue {
     let (symbol, places) = entry.map(|(_, s, p)| (*s, *p)).unwrap_or(("$", 2));
     StrykeValue::string(format!("{}{:.*}", symbol, places as usize, amount))
 }
+/// `currency_parse` — see implementation.
 
 pub fn currency_parse(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
@@ -99,6 +101,7 @@ pub fn currency_parse(args: &[StrykeValue]) -> StrykeValue {
         .map(StrykeValue::float)
         .unwrap_or(StrykeValue::UNDEF)
 }
+/// `currency_round` — see implementation.
 
 pub fn currency_round(args: &[StrykeValue]) -> StrykeValue {
     let amount = arg_f64(args, 0).unwrap_or(0.0);
@@ -113,6 +116,7 @@ pub fn currency_round(args: &[StrykeValue]) -> StrykeValue {
     let mult = 10f64.powi(places);
     StrykeValue::float((amount * mult).round() / mult)
 }
+/// `currency_split_thousands` — see implementation.
 
 pub fn currency_split_thousands(args: &[StrykeValue]) -> StrykeValue {
     let amount = arg_f64(args, 0).unwrap_or(0.0);
@@ -140,6 +144,7 @@ pub fn currency_split_thousands(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::string(format!("{}{}", sign, int_grouped))
     }
 }
+/// `currency_code_to_symbol` — see implementation.
 
 pub fn currency_code_to_symbol(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
@@ -150,6 +155,7 @@ pub fn currency_code_to_symbol(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(sym.to_string())
 }
+/// `currency_symbol_to_code` — see implementation.
 
 pub fn currency_symbol_to_code(args: &[StrykeValue]) -> StrykeValue {
     let sym = arg_str(args);
@@ -160,12 +166,14 @@ pub fn currency_symbol_to_code(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(code.to_string())
 }
+/// `currency_iso_4217` — see implementation.
 
 pub fn currency_iso_4217(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
     let exists = currency_table().iter().any(|(c, _, _)| *c == code.as_str());
     StrykeValue::integer(if exists { 1 } else { 0 })
 }
+/// `currency_decimal_places` — see implementation.
 
 pub fn currency_decimal_places(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
@@ -195,24 +203,28 @@ fn bankers_round(x: f64) -> i64 {
 fn to_cents(amount: f64) -> i64 {
     bankers_round(amount * 100.0)
 }
+/// `money_add` — see implementation.
 
 pub fn money_add(args: &[StrykeValue]) -> StrykeValue {
     let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
     let b = to_cents(arg_f64(args, 1).unwrap_or(0.0));
     StrykeValue::float(a.saturating_add(b) as f64 / 100.0)
 }
+/// `money_sub` — see implementation.
 
 pub fn money_sub(args: &[StrykeValue]) -> StrykeValue {
     let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
     let b = to_cents(arg_f64(args, 1).unwrap_or(0.0));
     StrykeValue::float(a.saturating_sub(b) as f64 / 100.0)
 }
+/// `money_mul` — see implementation.
 
 pub fn money_mul(args: &[StrykeValue]) -> StrykeValue {
     let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
     let factor = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(bankers_round(a as f64 * factor) as f64 / 100.0)
 }
+/// `money_div` — see implementation.
 
 pub fn money_div(args: &[StrykeValue]) -> StrykeValue {
     let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
@@ -222,6 +234,7 @@ pub fn money_div(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(bankers_round(a as f64 / divisor) as f64 / 100.0)
 }
+/// `money_compare` — see implementation.
 
 pub fn money_compare(args: &[StrykeValue]) -> StrykeValue {
     let a = to_cents(arg_f64(args, 0).unwrap_or(0.0));
@@ -238,6 +251,7 @@ pub fn money_compare(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // ML / embeddings helpers
 // ══════════════════════════════════════════════════════════════════════
+/// `tokenize_simple` — see implementation.
 
 pub fn tokenize_simple(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
@@ -246,6 +260,7 @@ pub fn tokenize_simple(args: &[StrykeValue]) -> StrykeValue {
         .map(|w| StrykeValue::string(w.to_string()))
         .collect())
 }
+/// `tokenize_word` — see implementation.
 
 pub fn tokenize_word(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args);
@@ -304,6 +319,7 @@ pub fn tokenize_bpe(args: &[StrykeValue]) -> StrykeValue {
     }
     arr(out)
 }
+/// `tokenize_subword` — see implementation.
 
 pub fn tokenize_subword(args: &[StrykeValue]) -> StrykeValue {
     // Naive subword: split on non-letter boundaries, then break long words into max_len-char chunks.
@@ -325,6 +341,7 @@ pub fn tokenize_subword(args: &[StrykeValue]) -> StrykeValue {
     }
     arr(out)
 }
+/// `tokenize_sentencepiece` — see implementation.
 
 pub fn tokenize_sentencepiece(args: &[StrykeValue]) -> StrykeValue {
     // sentencepiece-like: prepend ▁ to word starts
@@ -335,6 +352,7 @@ pub fn tokenize_sentencepiece(args: &[StrykeValue]) -> StrykeValue {
     }
     arr(out)
 }
+/// `embed_text` — see implementation.
 
 pub fn embed_text(args: &[StrykeValue]) -> StrykeValue {
     // Hashing trick — deterministic embedding for testing.
@@ -354,6 +372,7 @@ pub fn embed_text(args: &[StrykeValue]) -> StrykeValue {
 fn as_vec(v: &StrykeValue) -> Vec<f64> {
     list_elements(v).iter().map(|x| x.to_number()).collect()
 }
+/// `cosine_similarity` — see implementation.
 
 pub fn cosine_similarity(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first(), args.get(1)) else {
@@ -370,6 +389,7 @@ pub fn cosine_similarity(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(dot / (na * nb))
 }
+/// `euclidean_distance` — see implementation.
 
 pub fn euclidean_distance(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first(), args.get(1)) else {
@@ -381,6 +401,7 @@ pub fn euclidean_distance(args: &[StrykeValue]) -> StrykeValue {
     let sum: f64 = (0..n).map(|i| (a[i] - b[i]).powi(2)).sum();
     StrykeValue::float(sum.sqrt())
 }
+/// `manhattan_distance` — see implementation.
 
 pub fn manhattan_distance(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first(), args.get(1)) else {
@@ -392,6 +413,7 @@ pub fn manhattan_distance(args: &[StrykeValue]) -> StrykeValue {
     let sum: f64 = (0..n).map(|i| (a[i] - b[i]).abs()).sum();
     StrykeValue::float(sum)
 }
+/// `dot_product` — see implementation.
 
 pub fn dot_product(args: &[StrykeValue]) -> StrykeValue {
     let (Some(a), Some(b)) = (args.first(), args.get(1)) else {
@@ -403,6 +425,7 @@ pub fn dot_product(args: &[StrykeValue]) -> StrykeValue {
     let sum: f64 = (0..n).map(|i| a[i] * b[i]).sum();
     StrykeValue::float(sum)
 }
+/// `normalize_vector` — see implementation.
 
 pub fn normalize_vector(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
@@ -412,6 +435,7 @@ pub fn normalize_vector(args: &[StrykeValue]) -> StrykeValue {
     }
     arr(v.iter().map(|x| StrykeValue::float(x / norm)).collect())
 }
+/// `vector_add` — see implementation.
 
 pub fn vector_add(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec).unwrap_or_default();
@@ -419,6 +443,7 @@ pub fn vector_add(args: &[StrykeValue]) -> StrykeValue {
     let n = a.len().min(b.len());
     arr((0..n).map(|i| StrykeValue::float(a[i] + b[i])).collect())
 }
+/// `vector_sub` — see implementation.
 
 pub fn vector_sub(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec).unwrap_or_default();
@@ -426,12 +451,14 @@ pub fn vector_sub(args: &[StrykeValue]) -> StrykeValue {
     let n = a.len().min(b.len());
     arr((0..n).map(|i| StrykeValue::float(a[i] - b[i])).collect())
 }
+/// `vector_scale` — see implementation.
 
 pub fn vector_scale(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
     let s = arg_f64(args, 1).unwrap_or(1.0);
     arr(v.iter().map(|x| StrykeValue::float(x * s)).collect())
 }
+/// `vector_mean` — see implementation.
 
 pub fn vector_mean(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
@@ -441,6 +468,7 @@ pub fn vector_mean(args: &[StrykeValue]) -> StrykeValue {
     let sum: f64 = v.iter().sum();
     StrykeValue::float(sum / v.len() as f64)
 }
+/// `top_k_indices` — see implementation.
 
 pub fn top_k_indices(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
@@ -453,6 +481,7 @@ pub fn top_k_indices(args: &[StrykeValue]) -> StrykeValue {
         .map(|(i, _)| StrykeValue::integer(i as i64))
         .collect())
 }
+/// `softmax` — see implementation.
 
 pub fn softmax(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
@@ -467,11 +496,13 @@ pub fn softmax(args: &[StrykeValue]) -> StrykeValue {
         .map(|x| StrykeValue::float(x / sum))
         .collect())
 }
+/// `sigmoid` — see implementation.
 
 pub fn sigmoid(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     StrykeValue::float(1.0 / (1.0 + (-x).exp()))
 }
+/// `log_softmax` — see implementation.
 
 pub fn log_softmax(args: &[StrykeValue]) -> StrykeValue {
     let v = args.first().map(as_vec).unwrap_or_default();
@@ -485,6 +516,7 @@ pub fn log_softmax(args: &[StrykeValue]) -> StrykeValue {
         .map(|x| StrykeValue::float(x - log_sum_exp))
         .collect())
 }
+/// `cross_entropy` — see implementation.
 
 pub fn cross_entropy(args: &[StrykeValue]) -> StrykeValue {
     let p = args.first().map(as_vec).unwrap_or_default();
@@ -497,6 +529,7 @@ pub fn cross_entropy(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // File / path extras
 // ══════════════════════════════════════════════════════════════════════
+/// `path_canonical` — see implementation.
 
 pub fn path_canonical(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -506,6 +539,7 @@ pub fn path_canonical(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::string(s),
     }
 }
+/// `path_relative_to` — see implementation.
 
 pub fn path_relative_to(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -516,6 +550,7 @@ pub fn path_relative_to(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `path_components` — see implementation.
 
 pub fn path_components(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -526,6 +561,7 @@ pub fn path_components(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     arr(parts)
 }
+/// `path_filename` — see implementation.
 
 pub fn path_filename(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -535,6 +571,7 @@ pub fn path_filename(args: &[StrykeValue]) -> StrykeValue {
         .map(|s| StrykeValue::string(s.to_string_lossy().into_owned()))
         .unwrap_or(StrykeValue::UNDEF)
 }
+/// `path_stem` — see implementation.
 
 pub fn path_stem(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -544,6 +581,7 @@ pub fn path_stem(args: &[StrykeValue]) -> StrykeValue {
         .map(|s| StrykeValue::string(s.to_string_lossy().into_owned()))
         .unwrap_or(StrykeValue::UNDEF)
 }
+/// `path_extension` — see implementation.
 
 pub fn path_extension(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -553,6 +591,7 @@ pub fn path_extension(args: &[StrykeValue]) -> StrykeValue {
         .map(|s| StrykeValue::string(s.to_string_lossy().into_owned()))
         .unwrap_or(StrykeValue::string(String::new()))
 }
+/// `path_join_many` — see implementation.
 
 pub fn path_join_many(args: &[StrykeValue]) -> StrykeValue {
     use std::path::PathBuf;
@@ -562,6 +601,7 @@ pub fn path_join_many(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::string(buf.display().to_string())
 }
+/// `path_with_extension` — see implementation.
 
 pub fn path_with_extension(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -570,6 +610,7 @@ pub fn path_with_extension(args: &[StrykeValue]) -> StrykeValue {
     let result = Path::new(&p).with_extension(&ext);
     StrykeValue::string(result.display().to_string())
 }
+/// `path_with_filename` — see implementation.
 
 pub fn path_with_filename(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -578,6 +619,7 @@ pub fn path_with_filename(args: &[StrykeValue]) -> StrykeValue {
     let result = Path::new(&p).with_file_name(&name);
     StrykeValue::string(result.display().to_string())
 }
+/// `path_is_subdirectory` — see implementation.
 
 pub fn path_is_subdirectory(args: &[StrykeValue]) -> StrykeValue {
     let child = arg_str(args);
@@ -590,6 +632,7 @@ pub fn path_is_subdirectory(args: &[StrykeValue]) -> StrykeValue {
         },
     )
 }
+/// `path_common_ancestor` — see implementation.
 
 pub fn path_common_ancestor(args: &[StrykeValue]) -> StrykeValue {
     use std::path::Path;
@@ -619,6 +662,7 @@ pub fn path_common_ancestor(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::string(common.join("/"))
 }
+/// `path_glob_match_regex` — see implementation.
 
 pub fn path_glob_match_regex(args: &[StrykeValue]) -> StrykeValue {
     let glob = arg_str(args);
@@ -633,6 +677,7 @@ pub fn path_glob_match_regex(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     StrykeValue::string(format!("^{}$", pattern))
 }
+/// `file_mime` — see implementation.
 
 pub fn file_mime(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_str(args);
@@ -657,6 +702,7 @@ pub fn file_mime(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(mime.to_string())
 }
+/// `file_kind` — see implementation.
 
 pub fn file_kind(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_str(args);
@@ -676,6 +722,7 @@ pub fn file_kind(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `file_attr_get` — see implementation.
 
 pub fn file_attr_get(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
@@ -743,6 +790,7 @@ pub fn xattr_get(args: &[StrykeValue]) -> StrykeValue {
     buf.truncate(n as usize);
     StrykeValue::string(String::from_utf8_lossy(&buf).into_owned())
 }
+/// `xattr_get` — see implementation.
 #[cfg(not(unix))]
 pub fn xattr_get(_args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
@@ -787,6 +835,7 @@ pub fn xattr_set(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::integer(if rc == 0 { 1 } else { 0 })
 }
+/// `xattr_set` — see implementation.
 #[cfg(not(unix))]
 pub fn xattr_set(_args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
@@ -829,10 +878,12 @@ pub fn xattr_list(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     arr(names)
 }
+/// `xattr_list` — see implementation.
 #[cfg(not(unix))]
 pub fn xattr_list(_args: &[StrykeValue]) -> StrykeValue {
     arr(vec![])
 }
+/// `file_chmod_string` — see implementation.
 
 pub fn file_chmod_string(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_str(args);
@@ -848,6 +899,7 @@ pub fn file_chmod_string(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `file_chmod_octal` — see implementation.
 
 pub fn file_chmod_octal(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_str(args);
@@ -882,6 +934,7 @@ pub fn file_locked(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::integer(1)
     }
 }
+/// `file_locked` — see implementation.
 #[cfg(not(unix))]
 pub fn file_locked(_args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
@@ -967,6 +1020,7 @@ fn language_table() -> &'static [(&'static str, &'static str, &'static str, &'st
         ("uk", "ukr", "ukr", "Ukrainian"),
     ]
 }
+/// `locale_parse` — see implementation.
 
 pub fn locale_parse(args: &[StrykeValue]) -> StrykeValue {
     use indexmap::IndexMap;
@@ -993,6 +1047,7 @@ pub fn locale_parse(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
+/// `locale_format` — see implementation.
 
 pub fn locale_format(args: &[StrykeValue]) -> StrykeValue {
     let lang = args.first().map(|v| v.to_string()).unwrap_or_default();
@@ -1007,11 +1062,13 @@ pub fn locale_format(args: &[StrykeValue]) -> StrykeValue {
         ))
     }
 }
+/// `locale_language` — see implementation.
 
 pub fn locale_language(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
     StrykeValue::string(s.split('-').next().unwrap_or("").to_ascii_lowercase())
 }
+/// `locale_region` — see implementation.
 
 pub fn locale_region(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1020,6 +1077,7 @@ pub fn locale_region(args: &[StrykeValue]) -> StrykeValue {
         .map(|r| StrykeValue::string(r.to_ascii_uppercase()))
         .unwrap_or(StrykeValue::UNDEF)
 }
+/// `locale_script` — see implementation.
 
 pub fn locale_script(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1030,6 +1088,7 @@ pub fn locale_script(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::UNDEF
 }
+/// `locale_variant` — see implementation.
 
 pub fn locale_variant(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1038,6 +1097,7 @@ pub fn locale_variant(args: &[StrykeValue]) -> StrykeValue {
         .map(|v| StrykeValue::string(v.to_string()))
         .unwrap_or(StrykeValue::UNDEF)
 }
+/// `locale_canonical` — see implementation.
 
 pub fn locale_canonical(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1052,6 +1112,7 @@ pub fn locale_canonical(args: &[StrykeValue]) -> StrykeValue {
         .collect();
     StrykeValue::string(parts.join("-"))
 }
+/// `bcp47_validate` — see implementation.
 
 pub fn bcp47_validate(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1062,6 +1123,7 @@ pub fn bcp47_validate(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(false);
     StrykeValue::integer(if valid { 1 } else { 0 })
 }
+/// `language_tag_match` — see implementation.
 
 pub fn language_tag_match(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_str(args).to_ascii_lowercase().replace('_', "-");
@@ -1075,6 +1137,7 @@ pub fn language_tag_match(args: &[StrykeValue]) -> StrykeValue {
     let b_lang = b.split('-').next().unwrap_or("");
     StrykeValue::integer(if a_lang == b_lang { 1 } else { 0 })
 }
+/// `language_tag_subtags` — see implementation.
 
 pub fn language_tag_subtags(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args).replace('_', "-");
@@ -1083,6 +1146,7 @@ pub fn language_tag_subtags(args: &[StrykeValue]) -> StrykeValue {
         .map(|p| StrykeValue::string(p.to_string()))
         .collect())
 }
+/// `locale_likely_subtags` — see implementation.
 
 pub fn locale_likely_subtags(args: &[StrykeValue]) -> StrykeValue {
     // Naive: just add Latn script + US region for English.
@@ -1099,10 +1163,12 @@ pub fn locale_likely_subtags(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(canonical.to_string())
 }
+/// `locale_collation` — see implementation.
 
 pub fn locale_collation(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(arg_str(args))
 }
+/// `locale_calendar` — see implementation.
 
 pub fn locale_calendar(args: &[StrykeValue]) -> StrykeValue {
     let lang = locale_language(args).to_string();
@@ -1114,6 +1180,7 @@ pub fn locale_calendar(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(cal.to_string())
 }
+/// `locale_currency` — see implementation.
 
 pub fn locale_currency(args: &[StrykeValue]) -> StrykeValue {
     let region = locale_region(args).to_string();
@@ -1145,6 +1212,7 @@ pub fn locale_currency(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("USD");
     StrykeValue::string(code.to_string())
 }
+/// `locale_number_format` — see implementation.
 
 pub fn locale_number_format(args: &[StrykeValue]) -> StrykeValue {
     let lang = locale_language(args).to_string();
@@ -1155,6 +1223,7 @@ pub fn locale_number_format(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(fmt.to_string())
 }
+/// `locale_date_format` — see implementation.
 
 pub fn locale_date_format(args: &[StrykeValue]) -> StrykeValue {
     let region = locale_region(args).to_string();
@@ -1166,6 +1235,7 @@ pub fn locale_date_format(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(fmt.to_string())
 }
+/// `locale_time_format` — see implementation.
 
 pub fn locale_time_format(args: &[StrykeValue]) -> StrykeValue {
     let region = locale_region(args).to_string();
@@ -1175,6 +1245,7 @@ pub fn locale_time_format(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(fmt.to_string())
 }
+/// `locale_decimal_separator` — see implementation.
 
 pub fn locale_decimal_separator(args: &[StrykeValue]) -> StrykeValue {
     let lang = locale_language(args).to_string();
@@ -1184,6 +1255,7 @@ pub fn locale_decimal_separator(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(sep.to_string())
 }
+/// `locale_group_separator` — see implementation.
 
 pub fn locale_group_separator(args: &[StrykeValue]) -> StrykeValue {
     let lang = locale_language(args).to_string();
@@ -1194,6 +1266,7 @@ pub fn locale_group_separator(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(sep.to_string())
 }
+/// `locale_first_day_of_week` — see implementation.
 
 pub fn locale_first_day_of_week(args: &[StrykeValue]) -> StrykeValue {
     let region = locale_region(args).to_string();
@@ -1203,6 +1276,7 @@ pub fn locale_first_day_of_week(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::integer(day)
 }
+/// `locale_measurement_system` — see implementation.
 
 pub fn locale_measurement_system(args: &[StrykeValue]) -> StrykeValue {
     let region = locale_region(args).to_string();
@@ -1212,6 +1286,7 @@ pub fn locale_measurement_system(args: &[StrykeValue]) -> StrykeValue {
     };
     StrykeValue::string(sys.to_string())
 }
+/// `country_code_alpha2` — see implementation.
 
 pub fn country_code_alpha2(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_uppercase();
@@ -1227,6 +1302,7 @@ pub fn country_code_alpha2(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `country_code_alpha3` — see implementation.
 
 pub fn country_code_alpha3(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_uppercase();
@@ -1242,6 +1318,7 @@ pub fn country_code_alpha3(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `country_code_numeric` — see implementation.
 
 pub fn country_code_numeric(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_uppercase();
@@ -1254,6 +1331,7 @@ pub fn country_code_numeric(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `country_name` — see implementation.
 
 pub fn country_name(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_uppercase();
@@ -1266,6 +1344,7 @@ pub fn country_name(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `country_phone_prefix` — see implementation.
 
 pub fn country_phone_prefix(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_uppercase();
@@ -1278,6 +1357,7 @@ pub fn country_phone_prefix(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `country_languages` — see implementation.
 
 pub fn country_languages(args: &[StrykeValue]) -> StrykeValue {
     let code = arg_str(args).to_ascii_uppercase();
@@ -1304,6 +1384,7 @@ pub fn country_languages(args: &[StrykeValue]) -> StrykeValue {
         .map(|l| StrykeValue::string(l.to_string()))
         .collect())
 }
+/// `language_iso_639_1` — see implementation.
 
 pub fn language_iso_639_1(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_lowercase();
@@ -1319,6 +1400,7 @@ pub fn language_iso_639_1(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `language_iso_639_2` — see implementation.
 
 pub fn language_iso_639_2(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_lowercase();
@@ -1334,6 +1416,7 @@ pub fn language_iso_639_2(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `language_iso_639_3` — see implementation.
 
 pub fn language_iso_639_3(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_lowercase();
@@ -1349,6 +1432,7 @@ pub fn language_iso_639_3(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or("");
     StrykeValue::string(result.to_string())
 }
+/// `language_name` — see implementation.
 
 pub fn language_name(args: &[StrykeValue]) -> StrykeValue {
     let needle = arg_str(args).to_ascii_lowercase();
@@ -1381,15 +1465,18 @@ fn mk_channel(kind: &str, cap: i64) -> StrykeValue {
     h.insert("closed".to_string(), StrykeValue::integer(0));
     StrykeValue::hash_ref(Arc::new(RwLock::new(h)))
 }
+/// `channel_unbounded` — see implementation.
 
 pub fn channel_unbounded(_args: &[StrykeValue]) -> StrykeValue {
     mk_channel("unbounded", -1)
 }
+/// `channel_bounded` — see implementation.
 
 pub fn channel_bounded(args: &[StrykeValue]) -> StrykeValue {
     let cap = arg_i64(args, 0).unwrap_or(1024);
     mk_channel("bounded", cap)
 }
+/// `channel_sync` — see implementation.
 
 pub fn channel_sync(_args: &[StrykeValue]) -> StrykeValue {
     mk_channel("sync", 0)
@@ -1493,6 +1580,7 @@ pub fn channel_recv_timeout(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::UNDEF
 }
+/// `channel_drain` — see implementation.
 
 pub fn channel_drain(args: &[StrykeValue]) -> StrykeValue {
     let Some(ch) = args.first().and_then(|v| v.as_hash_ref()) else {
@@ -1508,6 +1596,7 @@ pub fn channel_drain(args: &[StrykeValue]) -> StrykeValue {
     }
     arr(vec![])
 }
+/// `channel_close` — see implementation.
 
 pub fn channel_close(args: &[StrykeValue]) -> StrykeValue {
     let Some(ch) = args.first().and_then(|v| v.as_hash_ref()) else {
@@ -1517,6 +1606,7 @@ pub fn channel_close(args: &[StrykeValue]) -> StrykeValue {
         .insert("closed".to_string(), StrykeValue::integer(1));
     StrykeValue::integer(1)
 }
+/// `channel_is_closed` — see implementation.
 
 pub fn channel_is_closed(args: &[StrykeValue]) -> StrykeValue {
     let Some(ch) = args.first().and_then(|v| v.as_hash_ref()) else {
@@ -1529,6 +1619,7 @@ pub fn channel_is_closed(args: &[StrykeValue]) -> StrykeValue {
         0
     })
 }
+/// `broadcast_channel_new` — see implementation.
 
 pub fn broadcast_channel_new(args: &[StrykeValue]) -> StrykeValue {
     let cap = arg_i64(args, 0).unwrap_or(1024);

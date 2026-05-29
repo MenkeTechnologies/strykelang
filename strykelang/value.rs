@@ -76,10 +76,12 @@ pub struct FsWalkIterator {
     buf: Mutex<Vec<(String, bool)>>, // (child_rel, is_dir)
     /// Pending subdirs to push (reversed, so first is popped next).
     pending_dirs: Mutex<Vec<(std::path::PathBuf, String)>>,
+    /// `files_only` field.
     files_only: bool,
 }
 
 impl FsWalkIterator {
+    /// `new` — see implementation.
     pub fn new(dir: &str, files_only: bool) -> Self {
         Self {
             stack: Mutex::new(vec![(std::path::PathBuf::from(dir), String::new())]),
@@ -180,11 +182,14 @@ impl StrykeIterator for FsWalkIterator {
 /// at the item level, not list reversal. `~> $s chars rev` and friends rely
 /// on this reversing the sequence (`a,b,c,d` → `d,c,b,a`).
 pub struct RevIterator {
+    /// `source` field.
     source: Arc<dyn StrykeIterator>,
+    /// `drained` field.
     drained: Mutex<Option<Vec<StrykeValue>>>,
 }
 
 impl RevIterator {
+    /// `new` — see implementation.
     pub fn new(source: Arc<dyn StrykeIterator>) -> Self {
         Self {
             source,
@@ -224,7 +229,9 @@ pub type PerlSet = IndexMap<String, StrykeValue>;
 /// Min-heap ordered by a Perl comparator (`$a` / `$b` in scope, like `sort { }`).
 #[derive(Debug, Clone)]
 pub struct PerlHeap {
+    /// `items` field.
     pub items: Vec<StrykeValue>,
+    /// `cmp` field.
     pub cmp: Arc<StrykeSub>,
 }
 
@@ -236,11 +243,14 @@ pub struct PerlHeap {
 /// [`StrykeValue`] across VM dispatch boundaries.
 #[derive(Debug)]
 pub struct MutexHandle {
+    /// `held` field.
     pub held: parking_lot::Mutex<bool>,
+    /// `condvar` field.
     pub condvar: parking_lot::Condvar,
 }
 
 impl MutexHandle {
+    /// `new` — see implementation.
     pub fn new() -> Self {
         Self {
             held: parking_lot::Mutex::new(false),
@@ -262,8 +272,11 @@ impl Default for MutexHandle {
 /// notifies one waiter.
 #[derive(Debug)]
 pub struct SemaphoreHandle {
+    /// `permits` field.
     pub permits: parking_lot::Mutex<i64>,
+    /// `limit` field.
     pub limit: i64,
+    /// `condvar` field.
     pub condvar: parking_lot::Condvar,
 }
 
@@ -405,15 +418,22 @@ mod cluster_parsing_tests {
 /// - `connect_timeout_ms` — `ssh -o ConnectTimeout=N`-equivalent for the initial handshake.
 #[derive(Debug, Clone)]
 pub struct RemoteCluster {
+    /// `slots` field.
     pub slots: Vec<RemoteSlot>,
+    /// `job_timeout_ms` field.
     pub job_timeout_ms: u64,
+    /// `max_attempts` field.
     pub max_attempts: u32,
+    /// `connect_timeout_ms` field.
     pub connect_timeout_ms: u64,
 }
 
 impl RemoteCluster {
+    /// `DEFAULT_JOB_TIMEOUT_MS` constant.
     pub const DEFAULT_JOB_TIMEOUT_MS: u64 = 60_000;
+    /// `DEFAULT_MAX_ATTEMPTS` constant.
     pub const DEFAULT_MAX_ATTEMPTS: u32 = 3;
+    /// `DEFAULT_CONNECT_TIMEOUT_MS` constant.
     pub const DEFAULT_CONNECT_TIMEOUT_MS: u64 = 10_000;
 
     /// Parse a list of cluster spec values into a [`RemoteCluster`]. Accepted forms (any may
@@ -567,30 +587,38 @@ impl fmt::Debug for PerlBarrier {
 /// Structured stdout/stderr/exit from `capture("cmd")`.
 #[derive(Debug, Clone)]
 pub struct CaptureResult {
+    /// `stdout` field.
     pub stdout: String,
+    /// `stderr` field.
     pub stderr: String,
+    /// `exitcode` field.
     pub exitcode: i64,
 }
 
 /// Columnar table from `dataframe(path)`; chain `filter`, `group_by`, `sum`, `nrow`.
 #[derive(Debug, Clone)]
 pub struct PerlDataFrame {
+    /// `columns` field.
     pub columns: Vec<String>,
+    /// `cols` field.
     pub cols: Vec<Vec<StrykeValue>>,
     /// When set, `sum(col)` aggregates rows by this column.
     pub group_by: Option<String>,
 }
 
 impl PerlDataFrame {
+    /// `nrows` — see implementation.
     #[inline]
     pub fn nrows(&self) -> usize {
         self.cols.first().map(|c| c.len()).unwrap_or(0)
     }
+    /// `ncols` — see implementation.
 
     #[inline]
     pub fn ncols(&self) -> usize {
         self.columns.len()
     }
+    /// `col_index` — see implementation.
 
     #[inline]
     pub fn col_index(&self, name: &str) -> Option<usize> {
@@ -806,11 +834,15 @@ pub struct FibLikeRecAddPattern {
     /// Right call uses `$param - right_k`.
     pub right_k: i64,
 }
+/// `StrykeSub` — see fields for layout.
 
 #[derive(Debug, Clone)]
 pub struct StrykeSub {
+    /// `name` field.
     pub name: String,
+    /// `params` field.
     pub params: Vec<SubSigParam>,
+    /// `body` field.
     pub body: Block,
     /// Captured lexical scope (for closures)
     pub closure_env: Option<Vec<(String, StrykeValue)>>,
@@ -824,10 +856,13 @@ pub struct StrykeSub {
 /// Operations queued on a [`StrykeValue::pipeline`](crate::value::StrykeValue::pipeline) value until `collect()`.
 #[derive(Debug, Clone)]
 pub enum PipelineOp {
+    /// `Filter` variant.
     Filter(Arc<StrykeSub>),
+    /// `Map` variant.
     Map(Arc<StrykeSub>),
     /// `tap` / `peek` — run block for side effects; `@_` is the current stage list; value unchanged.
     Tap(Arc<StrykeSub>),
+    /// `Take` variant.
     Take(i64),
     /// Parallel map (`pmap`) — optional stderr progress bar (same as `pmap ..., progress => 1`).
     PMap {
@@ -878,10 +913,13 @@ pub enum PipelineOp {
         progress: bool,
     },
 }
+/// `PipelineInner` — see fields for layout.
 
 #[derive(Debug)]
 pub struct PipelineInner {
+    /// `source` field.
     pub source: Vec<StrykeValue>,
+    /// `ops` field.
     pub ops: Vec<PipelineOp>,
     /// Set after `preduce` / `preduce_init` / `pmap_reduce` — no further `->` ops allowed.
     pub has_scalar_terminal: bool,
@@ -895,10 +933,13 @@ pub struct PipelineInner {
     /// Bounded channel capacity for streaming mode (default: 256).
     pub streaming_buffer: usize,
 }
+/// `BlessedRef` — see fields for layout.
 
 #[derive(Debug)]
 pub struct BlessedRef {
+    /// `class` field.
     pub class: String,
+    /// `data` field.
     pub data: RwLock<StrykeValue>,
     /// When true, dropping does not enqueue `DESTROY` (temporary invocant built while running a destructor).
     pub(crate) suppress_destroy_queue: AtomicBool,
@@ -949,7 +990,9 @@ impl Drop for BlessedRef {
 /// Instance of a `struct Name { ... }` definition; field access via `$obj->name`.
 #[derive(Debug)]
 pub struct StructInstance {
+    /// `def` field.
     pub def: Arc<StructDef>,
+    /// `values` field.
     pub values: RwLock<Vec<StrykeValue>>,
 }
 
@@ -995,13 +1038,16 @@ impl Clone for StructInstance {
 /// Instance of an `enum Name { Variant ... }` definition.
 #[derive(Debug)]
 pub struct EnumInstance {
+    /// `def` field.
     pub def: Arc<EnumDef>,
+    /// `variant_idx` field.
     pub variant_idx: usize,
     /// Data carried by this variant. For variants with no data, this is UNDEF.
     pub data: StrykeValue,
 }
 
 impl EnumInstance {
+    /// `new` — see implementation.
     pub fn new(def: Arc<EnumDef>, variant_idx: usize, data: StrykeValue) -> Self {
         Self {
             def,
@@ -1009,6 +1055,7 @@ impl EnumInstance {
             data,
         }
     }
+    /// `variant_name` — see implementation.
 
     pub fn variant_name(&self) -> &str {
         &self.def.variants[self.variant_idx].name
@@ -1028,13 +1075,16 @@ impl Clone for EnumInstance {
 /// Instance of a `class Name extends ... impl ... { ... }` definition.
 #[derive(Debug)]
 pub struct ClassInstance {
+    /// `def` field.
     pub def: Arc<ClassDef>,
+    /// `values` field.
     pub values: RwLock<Vec<StrykeValue>>,
     /// Full ISA chain for this class (all ancestors, computed at instantiation).
     pub isa_chain: Vec<String>,
 }
 
 impl ClassInstance {
+    /// `new` — see implementation.
     pub fn new(def: Arc<ClassDef>, values: Vec<StrykeValue>) -> Self {
         Self {
             def,
@@ -1042,6 +1092,7 @@ impl ClassInstance {
             isa_chain: Vec::new(),
         }
     }
+    /// `new_with_isa` — see implementation.
 
     pub fn new_with_isa(
         def: Arc<ClassDef>,
@@ -1060,11 +1111,13 @@ impl ClassInstance {
     pub fn isa(&self, name: &str) -> bool {
         self.def.name == name || self.isa_chain.contains(&name.to_string())
     }
+    /// `get_field` — see implementation.
 
     #[inline]
     pub fn get_field(&self, idx: usize) -> Option<StrykeValue> {
         self.values.read().get(idx).cloned()
     }
+    /// `set_field` — see implementation.
 
     #[inline]
     pub fn set_field(&self, idx: usize, val: StrykeValue) {
@@ -1072,6 +1125,7 @@ impl ClassInstance {
             *slot = val;
         }
     }
+    /// `get_values` — see implementation.
 
     #[inline]
     pub fn get_values(&self) -> Vec<StrykeValue> {
@@ -1107,6 +1161,7 @@ impl Clone for ClassInstance {
 }
 
 impl StrykeValue {
+    /// `UNDEF` constant.
     pub const UNDEF: StrykeValue = StrykeValue(nanbox::encode_imm_undef());
 
     #[inline]
@@ -1183,6 +1238,7 @@ impl StrykeValue {
             Some(true)
         )
     }
+    /// `integer` — see implementation.
 
     #[inline]
     pub fn integer(n: i64) -> Self {
@@ -1225,6 +1281,7 @@ impl StrykeValue {
         }
         BigInt::from(self.to_number() as i64)
     }
+    /// `float` — see implementation.
 
     #[inline]
     pub fn float(f: f64) -> Self {
@@ -1234,16 +1291,19 @@ impl StrykeValue {
             StrykeValue(f.to_bits())
         }
     }
+    /// `string` — see implementation.
 
     #[inline]
     pub fn string(s: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::String(s)))
     }
+    /// `bytes` — see implementation.
 
     #[inline]
     pub fn bytes(b: Arc<Vec<u8>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Bytes(b)))
     }
+    /// `array` — see implementation.
 
     #[inline]
     pub fn array(v: Vec<StrykeValue>) -> Self {
@@ -1274,51 +1334,61 @@ impl StrykeValue {
         }
         panic!("into_iterator on non-iterator value");
     }
+    /// `hash` — see implementation.
 
     #[inline]
     pub fn hash(h: IndexMap<String, StrykeValue>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Hash(h)))
     }
+    /// `array_ref` — see implementation.
 
     #[inline]
     pub fn array_ref(a: Arc<RwLock<Vec<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ArrayRef(a)))
     }
+    /// `hash_ref` — see implementation.
 
     #[inline]
     pub fn hash_ref(h: Arc<RwLock<IndexMap<String, StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashRef(h)))
     }
+    /// `scalar_ref` — see implementation.
 
     #[inline]
     pub fn scalar_ref(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarRef(r)))
     }
+    /// `capture_cell` — see implementation.
 
     #[inline]
     pub fn capture_cell(r: Arc<RwLock<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CaptureCell(r)))
     }
+    /// `scalar_binding_ref` — see implementation.
 
     #[inline]
     pub fn scalar_binding_ref(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::ScalarBindingRef(name)))
     }
+    /// `array_binding_ref` — see implementation.
 
     #[inline]
     pub fn array_binding_ref(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::ArrayBindingRef(name)))
     }
+    /// `hash_binding_ref` — see implementation.
 
     #[inline]
     pub fn hash_binding_ref(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashBindingRef(name)))
     }
+    /// `code_ref` — see implementation.
 
     #[inline]
     pub fn code_ref(c: Arc<StrykeSub>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CodeRef(c)))
     }
+    /// `as_code_ref` — see implementation.
 
     #[inline]
     pub fn as_code_ref(&self) -> Option<Arc<StrykeSub>> {
@@ -1328,6 +1398,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_regex` — see implementation.
 
     #[inline]
     pub fn as_regex(&self) -> Option<Arc<PerlCompiledRegex>> {
@@ -1337,6 +1408,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_blessed_ref` — see implementation.
 
     #[inline]
     pub fn as_blessed_ref(&self) -> Option<Arc<BlessedRef>> {
@@ -1356,6 +1428,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `is_undef` — see implementation.
 
     #[inline]
     pub fn is_undef(&self) -> bool {
@@ -1402,6 +1475,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_float` — see implementation.
 
     #[inline]
     pub fn as_float(&self) -> Option<f64> {
@@ -1414,6 +1488,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_array_vec` — see implementation.
 
     #[inline]
     pub fn as_array_vec(&self) -> Option<Vec<StrykeValue>> {
@@ -1441,6 +1516,7 @@ impl StrykeValue {
         }
         vec![self.clone()]
     }
+    /// `as_hash_map` — see implementation.
 
     #[inline]
     pub fn as_hash_map(&self) -> Option<IndexMap<String, StrykeValue>> {
@@ -1450,6 +1526,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_bytes_arc` — see implementation.
 
     #[inline]
     pub fn as_bytes_arc(&self) -> Option<Arc<Vec<u8>>> {
@@ -1459,6 +1536,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_async_task` — see implementation.
 
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
@@ -1468,6 +1546,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_generator` — see implementation.
 
     #[inline]
     pub fn as_generator(&self) -> Option<Arc<PerlGenerator>> {
@@ -1477,6 +1556,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_atomic_arc` — see implementation.
 
     #[inline]
     pub fn as_atomic_arc(&self) -> Option<Arc<Mutex<StrykeValue>>> {
@@ -1486,6 +1566,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_io_handle_name` — see implementation.
 
     #[inline]
     pub fn as_io_handle_name(&self) -> Option<String> {
@@ -1495,6 +1576,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_sqlite_conn` — see implementation.
 
     #[inline]
     pub fn as_sqlite_conn(&self) -> Option<Arc<Mutex<rusqlite::Connection>>> {
@@ -1504,6 +1586,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_struct_inst` — see implementation.
 
     #[inline]
     pub fn as_struct_inst(&self) -> Option<Arc<StructInstance>> {
@@ -1513,6 +1596,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_enum_inst` — see implementation.
 
     #[inline]
     pub fn as_enum_inst(&self) -> Option<Arc<EnumInstance>> {
@@ -1522,6 +1606,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_class_inst` — see implementation.
 
     #[inline]
     pub fn as_class_inst(&self) -> Option<Arc<ClassInstance>> {
@@ -1531,6 +1616,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_dataframe` — see implementation.
 
     #[inline]
     pub fn as_dataframe(&self) -> Option<Arc<Mutex<PerlDataFrame>>> {
@@ -1540,6 +1626,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_deque` — see implementation.
 
     #[inline]
     pub fn as_deque(&self) -> Option<Arc<Mutex<VecDeque<StrykeValue>>>> {
@@ -1549,6 +1636,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_heap_pq` — see implementation.
 
     #[inline]
     pub fn as_heap_pq(&self) -> Option<Arc<Mutex<PerlHeap>>> {
@@ -1558,6 +1646,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_pipeline` — see implementation.
 
     #[inline]
     pub fn as_pipeline(&self) -> Option<Arc<Mutex<PipelineInner>>> {
@@ -1567,6 +1656,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_capture` — see implementation.
 
     #[inline]
     pub fn as_capture(&self) -> Option<Arc<CaptureResult>> {
@@ -1576,6 +1666,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_ppool` — see implementation.
 
     #[inline]
     pub fn as_ppool(&self) -> Option<PerlPpool> {
@@ -1585,6 +1676,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_remote_cluster` — see implementation.
 
     #[inline]
     pub fn as_remote_cluster(&self) -> Option<Arc<RemoteCluster>> {
@@ -1594,6 +1686,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_barrier` — see implementation.
 
     #[inline]
     pub fn as_barrier(&self) -> Option<PerlBarrier> {
@@ -1603,6 +1696,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_channel_tx` — see implementation.
 
     #[inline]
     pub fn as_channel_tx(&self) -> Option<Arc<Sender<StrykeValue>>> {
@@ -1612,6 +1706,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_channel_rx` — see implementation.
 
     #[inline]
     pub fn as_channel_rx(&self) -> Option<Arc<Receiver<StrykeValue>>> {
@@ -1621,6 +1716,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_scalar_ref` — see implementation.
 
     #[inline]
     pub fn as_scalar_ref(&self) -> Option<Arc<RwLock<StrykeValue>>> {
@@ -1670,6 +1766,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_array_ref` — see implementation.
 
     #[inline]
     pub fn as_array_ref(&self) -> Option<Arc<RwLock<Vec<StrykeValue>>>> {
@@ -1679,6 +1776,7 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `as_hash_ref` — see implementation.
 
     #[inline]
     pub fn as_hash_ref(&self) -> Option<Arc<RwLock<IndexMap<String, StrykeValue>>>> {
@@ -1697,6 +1795,7 @@ impl StrykeValue {
             Some(true)
         )
     }
+    /// `regex` — see implementation.
 
     #[inline]
     pub fn regex(rx: Arc<PerlCompiledRegex>, pattern_src: String, flags: String) -> Self {
@@ -1712,51 +1811,61 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `blessed` — see implementation.
 
     #[inline]
     pub fn blessed(b: Arc<BlessedRef>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Blessed(b)))
     }
+    /// `io_handle` — see implementation.
 
     #[inline]
     pub fn io_handle(name: String) -> Self {
         Self::from_heap(Arc::new(HeapObject::IOHandle(name)))
     }
+    /// `atomic` — see implementation.
 
     #[inline]
     pub fn atomic(a: Arc<Mutex<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Atomic(a)))
     }
+    /// `set` — see implementation.
 
     #[inline]
     pub fn set(s: Arc<PerlSet>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Set(s)))
     }
+    /// `channel_tx` — see implementation.
 
     #[inline]
     pub fn channel_tx(tx: Arc<Sender<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelTx(tx)))
     }
+    /// `channel_rx` — see implementation.
 
     #[inline]
     pub fn channel_rx(rx: Arc<Receiver<StrykeValue>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ChannelRx(rx)))
     }
+    /// `async_task` — see implementation.
 
     #[inline]
     pub fn async_task(t: Arc<StrykeAsyncTask>) -> Self {
         Self::from_heap(Arc::new(HeapObject::AsyncTask(t)))
     }
+    /// `generator` — see implementation.
 
     #[inline]
     pub fn generator(g: Arc<PerlGenerator>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Generator(g)))
     }
+    /// `deque` — see implementation.
 
     #[inline]
     pub fn deque(d: Arc<Mutex<VecDeque<StrykeValue>>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Deque(d)))
     }
+    /// `heap` — see implementation.
 
     #[inline]
     pub fn heap(h: Arc<Mutex<PerlHeap>>) -> Self {
@@ -1798,11 +1907,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `bloom_filter` — see implementation.
 
     #[inline]
     pub fn bloom_filter(b: Arc<Mutex<crate::sketches::BloomFilter>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::BloomFilter(b)))
     }
+    /// `as_bloom_filter` — see implementation.
 
     #[inline]
     pub fn as_bloom_filter(&self) -> Option<Arc<Mutex<crate::sketches::BloomFilter>>> {
@@ -1812,11 +1923,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `hll_sketch` — see implementation.
 
     #[inline]
     pub fn hll_sketch(h: Arc<Mutex<crate::sketches::HllSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HllSketch(h)))
     }
+    /// `as_hll_sketch` — see implementation.
 
     #[inline]
     pub fn as_hll_sketch(&self) -> Option<Arc<Mutex<crate::sketches::HllSketch>>> {
@@ -1826,11 +1939,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `cms_sketch` — see implementation.
 
     #[inline]
     pub fn cms_sketch(c: Arc<Mutex<crate::sketches::CmsSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::CmsSketch(c)))
     }
+    /// `as_cms_sketch` — see implementation.
 
     #[inline]
     pub fn as_cms_sketch(&self) -> Option<Arc<Mutex<crate::sketches::CmsSketch>>> {
@@ -1840,11 +1955,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `topk_sketch` — see implementation.
 
     #[inline]
     pub fn topk_sketch(t: Arc<Mutex<crate::sketches::TopKSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::TopKSketch(t)))
     }
+    /// `as_topk_sketch` — see implementation.
 
     #[inline]
     pub fn as_topk_sketch(&self) -> Option<Arc<Mutex<crate::sketches::TopKSketch>>> {
@@ -1854,11 +1971,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `tdigest_sketch` — see implementation.
 
     #[inline]
     pub fn tdigest_sketch(t: Arc<Mutex<crate::sketches::TDigestSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::TDigestSketch(t)))
     }
+    /// `as_tdigest_sketch` — see implementation.
 
     #[inline]
     pub fn as_tdigest_sketch(&self) -> Option<Arc<Mutex<crate::sketches::TDigestSketch>>> {
@@ -1868,11 +1987,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `roaring_bitmap` — see implementation.
 
     #[inline]
     pub fn roaring_bitmap(r: Arc<Mutex<crate::sketches::RoaringBitmapSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::RoaringBitmap(r)))
     }
+    /// `as_roaring_bitmap` — see implementation.
 
     #[inline]
     pub fn as_roaring_bitmap(&self) -> Option<Arc<Mutex<crate::sketches::RoaringBitmapSketch>>> {
@@ -1882,11 +2003,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `rate_limiter` — see implementation.
 
     #[inline]
     pub fn rate_limiter(r: Arc<Mutex<crate::sketches::RateLimiterSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::RateLimiter(r)))
     }
+    /// `as_rate_limiter` — see implementation.
     #[inline]
     pub fn as_rate_limiter(&self) -> Option<Arc<Mutex<crate::sketches::RateLimiterSketch>>> {
         self.with_heap(|h| match h {
@@ -1895,11 +2018,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `hash_ring` — see implementation.
 
     #[inline]
     pub fn hash_ring(r: Arc<Mutex<crate::sketches::HashRingSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::HashRing(r)))
     }
+    /// `as_hash_ring` — see implementation.
     #[inline]
     pub fn as_hash_ring(&self) -> Option<Arc<Mutex<crate::sketches::HashRingSketch>>> {
         self.with_heap(|h| match h {
@@ -1908,11 +2033,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `simhash` — see implementation.
 
     #[inline]
     pub fn simhash(s: Arc<Mutex<crate::sketches::SimHashSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::SimHash(s)))
     }
+    /// `as_simhash` — see implementation.
     #[inline]
     pub fn as_simhash(&self) -> Option<Arc<Mutex<crate::sketches::SimHashSketch>>> {
         self.with_heap(|h| match h {
@@ -1921,11 +2048,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `minhash` — see implementation.
 
     #[inline]
     pub fn minhash(m: Arc<Mutex<crate::sketches::MinHashSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::MinHash(m)))
     }
+    /// `as_minhash` — see implementation.
     #[inline]
     pub fn as_minhash(&self) -> Option<Arc<Mutex<crate::sketches::MinHashSketch>>> {
         self.with_heap(|h| match h {
@@ -1934,11 +2063,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `interval_tree` — see implementation.
 
     #[inline]
     pub fn interval_tree(t: Arc<Mutex<crate::sketches::IntervalTreeSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::IntervalTree(t)))
     }
+    /// `as_interval_tree` — see implementation.
     #[inline]
     pub fn as_interval_tree(&self) -> Option<Arc<Mutex<crate::sketches::IntervalTreeSketch>>> {
         self.with_heap(|h| match h {
@@ -1947,11 +2078,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `bk_tree` — see implementation.
 
     #[inline]
     pub fn bk_tree(t: Arc<Mutex<crate::sketches::BkTreeSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::BkTree(t)))
     }
+    /// `as_bk_tree` — see implementation.
     #[inline]
     pub fn as_bk_tree(&self) -> Option<Arc<Mutex<crate::sketches::BkTreeSketch>>> {
         self.with_heap(|h| match h {
@@ -1960,11 +2093,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `rope` — see implementation.
 
     #[inline]
     pub fn rope(r: Arc<Mutex<crate::sketches::RopeSketch>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Rope(r)))
     }
+    /// `as_rope` — see implementation.
     #[inline]
     pub fn as_rope(&self) -> Option<Arc<Mutex<crate::sketches::RopeSketch>>> {
         self.with_heap(|h| match h {
@@ -1973,11 +2108,13 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `kv_store` — see implementation.
 
     #[inline]
     pub fn kv_store(k: Arc<Mutex<crate::kvstore::KvStore>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::KvStore(k)))
     }
+    /// `as_kv_store` — see implementation.
     #[inline]
     pub fn as_kv_store(&self) -> Option<Arc<Mutex<crate::kvstore::KvStore>>> {
         self.with_heap(|h| match h {
@@ -1986,51 +2123,61 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `pipeline` — see implementation.
 
     #[inline]
     pub fn pipeline(p: Arc<Mutex<PipelineInner>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Pipeline(p)))
     }
+    /// `capture` — see implementation.
 
     #[inline]
     pub fn capture(c: Arc<CaptureResult>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Capture(c)))
     }
+    /// `ppool` — see implementation.
 
     #[inline]
     pub fn ppool(p: PerlPpool) -> Self {
         Self::from_heap(Arc::new(HeapObject::Ppool(p)))
     }
+    /// `remote_cluster` — see implementation.
 
     #[inline]
     pub fn remote_cluster(c: Arc<RemoteCluster>) -> Self {
         Self::from_heap(Arc::new(HeapObject::RemoteCluster(c)))
     }
+    /// `barrier` — see implementation.
 
     #[inline]
     pub fn barrier(b: PerlBarrier) -> Self {
         Self::from_heap(Arc::new(HeapObject::Barrier(b)))
     }
+    /// `sqlite_conn` — see implementation.
 
     #[inline]
     pub fn sqlite_conn(c: Arc<Mutex<rusqlite::Connection>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::SqliteConn(c)))
     }
+    /// `struct_inst` — see implementation.
 
     #[inline]
     pub fn struct_inst(s: Arc<StructInstance>) -> Self {
         Self::from_heap(Arc::new(HeapObject::StructInst(s)))
     }
+    /// `enum_inst` — see implementation.
 
     #[inline]
     pub fn enum_inst(e: Arc<EnumInstance>) -> Self {
         Self::from_heap(Arc::new(HeapObject::EnumInst(e)))
     }
+    /// `class_inst` — see implementation.
 
     #[inline]
     pub fn class_inst(c: Arc<ClassInstance>) -> Self {
         Self::from_heap(Arc::new(HeapObject::ClassInst(c)))
     }
+    /// `dataframe` — see implementation.
 
     #[inline]
     pub fn dataframe(df: Arc<Mutex<PerlDataFrame>>) -> Self {
@@ -2066,6 +2213,7 @@ impl StrykeValue {
             _ => None,
         }
     }
+    /// `append_to` — see implementation.
 
     #[inline]
     pub fn append_to(&self, buf: &mut String) {
@@ -2116,6 +2264,7 @@ impl StrykeValue {
             _ => buf.push_str(&self.to_string()),
         }
     }
+    /// `unwrap_atomic` — see implementation.
 
     #[inline]
     pub fn unwrap_atomic(&self) -> StrykeValue {
@@ -2127,6 +2276,7 @@ impl StrykeValue {
             _ => self.clone(),
         }
     }
+    /// `is_atomic` — see implementation.
 
     #[inline]
     pub fn is_atomic(&self) -> bool {
@@ -2135,6 +2285,7 @@ impl StrykeValue {
         }
         matches!(unsafe { self.heap_ref() }, HeapObject::Atomic(_))
     }
+    /// `is_true` — see implementation.
 
     #[inline]
     pub fn is_true(&self) -> bool {
@@ -2252,6 +2403,7 @@ impl StrykeValue {
             did_append
         }
     }
+    /// `into_string` — see implementation.
 
     #[inline]
     pub fn into_string(self) -> String {
@@ -2285,6 +2437,7 @@ impl StrykeValue {
         }
         String::new()
     }
+    /// `as_str_or_empty` — see implementation.
 
     #[inline]
     pub fn as_str_or_empty(&self) -> String {
@@ -2297,6 +2450,7 @@ impl StrykeValue {
             _ => String::new(),
         }
     }
+    /// `to_number` — see implementation.
 
     #[inline]
     pub fn to_number(&self) -> f64 {
@@ -2342,6 +2496,7 @@ impl StrykeValue {
             _ => 0.0,
         }
     }
+    /// `to_int` — see implementation.
 
     #[inline]
     pub fn to_int(&self) -> i64 {
@@ -2387,6 +2542,7 @@ impl StrykeValue {
             _ => 0,
         }
     }
+    /// `type_name` — see implementation.
 
     pub fn type_name(&self) -> String {
         if nanbox::is_imm_undef(self.0) {
@@ -2453,6 +2609,7 @@ impl StrykeValue {
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
     }
+    /// `ref_type` — see implementation.
 
     pub fn ref_type(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
@@ -2509,6 +2666,7 @@ impl StrykeValue {
             _ => StrykeValue::string(String::new()),
         }
     }
+    /// `num_cmp` — see implementation.
 
     pub fn num_cmp(&self, other: &StrykeValue) -> Ordering {
         let a = self.to_number();
@@ -2528,6 +2686,7 @@ impl StrykeValue {
         }
         self.to_string() == other.to_string()
     }
+    /// `str_cmp` — see implementation.
 
     pub fn str_cmp(&self, other: &StrykeValue) -> Ordering {
         if nanbox::is_heap(self.0) && nanbox::is_heap(other.0) {
@@ -2631,6 +2790,7 @@ impl StrykeValue {
             _ => self.clone(),
         }
     }
+    /// `to_list` — see implementation.
 
     pub fn to_list(&self) -> Vec<StrykeValue> {
         if nanbox::is_imm_undef(self.0) {
@@ -2658,6 +2818,7 @@ impl StrykeValue {
             _ => vec![self.clone()],
         }
     }
+    /// `scalar_context` — see implementation.
 
     pub fn scalar_context(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
@@ -3072,6 +3233,7 @@ pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
         StrykeValue::integer(x.wrapping_mul(y))
     }
 }
+/// `compat_add` — see implementation.
 
 #[inline]
 pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
@@ -3090,6 +3252,7 @@ pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
         StrykeValue::integer(x.wrapping_add(y))
     }
 }
+/// `compat_sub` — see implementation.
 
 #[inline]
 pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
@@ -3131,6 +3294,7 @@ pub fn compat_pow(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     let result = BigInt::from(base).pow(exp as u32);
     StrykeValue::bigint(result)
 }
+/// `set_from_elements` — see implementation.
 
 pub fn set_from_elements<I: IntoIterator<Item = StrykeValue>>(items: I) -> StrykeValue {
     let mut map = PerlSet::new();
@@ -3153,6 +3317,7 @@ pub fn set_payload(v: &StrykeValue) -> Option<Arc<PerlSet>> {
         _ => None,
     }
 }
+/// `set_union` — see implementation.
 
 pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;
@@ -3163,6 +3328,7 @@ pub fn set_union(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     }
     Some(StrykeValue::set(Arc::new(m)))
 }
+/// `set_intersection` — see implementation.
 
 pub fn set_intersection(a: &StrykeValue, b: &StrykeValue) -> Option<StrykeValue> {
     let ia = set_payload(a)?;

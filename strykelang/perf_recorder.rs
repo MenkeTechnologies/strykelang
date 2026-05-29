@@ -117,14 +117,23 @@ fn argv_json(argv: &[String]) -> String {
 /// One row, ready to insert.
 #[derive(Debug, Clone)]
 pub struct RunRow {
+    /// `path` field.
     pub path: String,
+    /// `argv` field.
     pub argv: Vec<String>,
+    /// `started_ns` field.
     pub started_ns: i64,
+    /// `duration_ns` field.
     pub duration_ns: i64,
+    /// `exit_code` field.
     pub exit_code: i32,
+    /// `version` field.
     pub version: String,
+    /// `host` field.
     pub host: String,
+    /// `pid` field.
     pub pid: i64,
+    /// `parent_pid` field.
     pub parent_pid: i64,
 }
 
@@ -170,6 +179,7 @@ pub struct QueryFilter {
 }
 
 impl QueryFilter {
+    /// `slowest_top` — see implementation.
     pub fn slowest_top(n: usize) -> Self {
         Self {
             slowest_first: Some(true),
@@ -182,15 +192,25 @@ impl QueryFilter {
 /// One queried row.
 #[derive(Debug, Clone)]
 pub struct QueryRow {
+    /// `id` field.
     pub id: i64,
+    /// `path` field.
     pub path: String,
+    /// `argv` field.
     pub argv: String,
+    /// `started_ns` field.
     pub started_ns: i64,
+    /// `duration_ns` field.
     pub duration_ns: i64,
+    /// `exit_code` field.
     pub exit_code: i32,
+    /// `version` field.
     pub version: String,
+    /// `host` field.
     pub host: String,
+    /// `pid` field.
     pub pid: i64,
+    /// `parent_pid` field.
     pub parent_pid: i64,
 }
 

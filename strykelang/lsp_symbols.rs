@@ -45,15 +45,23 @@ pub struct SymbolId(pub u32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct ScopeId(u32);
+/// `SymbolKind` — see variants.
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SymbolKind {
+    /// `Local` variant.
     Local,
+    /// `Our` variant.
     Our,
+    /// `State` variant.
     State,
+    /// `Param` variant.
     Param,
+    /// `Sub` variant.
     Sub,
+    /// `Type` variant.
     Type,
+    /// `Package` variant.
     Package,
     /// `format Foo = ... .` — Perl report templates referenced by `write FOO`.
     /// Package-scoped, behaves like Sub for rename / goto-def.
@@ -66,26 +74,38 @@ pub enum SymbolKind {
     /// will all match — goto-def returns the first found.
     Field,
 }
+/// `Symbol` — see fields for layout.
 
 #[derive(Clone, Debug)]
 pub struct Symbol {
+    /// `id` field.
     pub id: SymbolId,
+    /// `name` field.
     pub name: String,
+    /// `kind` field.
     pub kind: SymbolKind,
+    /// `package` field.
     pub package: String,
     /// 0-based source line of the declaration.
     pub decl_line: u32,
 }
+/// `SymbolRef` — see fields for layout.
 
 #[derive(Clone, Debug)]
 pub struct SymbolRef {
+    /// `symbol` field.
     pub symbol: SymbolId,
+    /// `line` field.
     pub line: u32,
+    /// `name` field.
     pub name: String,
 }
+/// `SymbolTable` — see fields for layout.
 
 pub struct SymbolTable {
+    /// `symbols` field.
     pub symbols: Vec<Symbol>,
+    /// `refs` field.
     pub refs: Vec<SymbolRef>,
     /// Source line text, indexed by 0-based line number — used to map
     /// `(line, name)` pairs back to byte/UTF-16 character offsets when
@@ -94,6 +114,7 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
+    /// `build` — see implementation.
     pub fn build(text: &str, path: &str) -> Option<Self> {
         Self::build_with_extra_types(
             text,

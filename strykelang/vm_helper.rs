@@ -574,6 +574,7 @@ impl IoWrite for IoSharedFileWrite {
 
 /// There is no Tree walking Interpreter, this is Just a Virtual Machine helper struct
 pub struct VMHelper {
+    /// `scope` field.
     pub scope: Scope,
     pub(crate) subs: HashMap<String, Arc<StrykeSub>>,
     /// AOP advice registry — populated by `Op::RegisterAdvice` from `before|after|around` decls.
@@ -671,7 +672,9 @@ pub struct VMHelper {
     /// in a single process — embedders running multiple `.stk` programs in one
     /// `VMHelper` would see the previous run's counts contaminate the next.
     pub test_pass_count: std::sync::atomic::AtomicUsize,
+    /// `test_fail_count` field.
     pub test_fail_count: std::sync::atomic::AtomicUsize,
+    /// `test_skip_count` field.
     pub test_skip_count: std::sync::atomic::AtomicUsize,
     /// Cumulative-across-the-whole-run counters. The `test_pass_count` /
     /// `test_fail_count` / `test_skip_count` triplet above is reset by
@@ -683,7 +686,9 @@ pub struct VMHelper {
     /// give the harness an honest "how many assertions did this run
     /// actually do" number.
     pub test_pass_total: std::sync::atomic::AtomicUsize,
+    /// `test_fail_total` field.
     pub test_fail_total: std::sync::atomic::AtomicUsize,
+    /// `test_skip_total` field.
     pub test_skip_total: std::sync::atomic::AtomicUsize,
     /// Set to `true` by `test_run` when any assertion failed during the run.
     /// CLI driver (`main.rs`) reads this after `execute` returns and exits with
@@ -730,7 +735,9 @@ pub struct VMHelper {
     pub(crate) diamond_reader: Option<BufReader<File>>,
     /// `use strict` / `use strict 'refs'` / `qw(refs subs vars)` (Perl names).
     pub strict_refs: bool,
+    /// `strict_subs` field.
     pub strict_subs: bool,
+    /// `strict_vars` field.
     pub strict_vars: bool,
     /// `use utf8` — source is UTF-8 (reserved for future lexer/string semantics).
     pub utf8_pragma: bool,
@@ -903,8 +910,11 @@ pub struct VMHelper {
 /// Snapshot of stash + `@ISA` for REPL `$obj->method` tab-completion (no `Interpreter` handle needed).
 #[derive(Debug, Clone, Default)]
 pub struct ReplCompletionSnapshot {
+    /// `subs` field.
     pub subs: Vec<String>,
+    /// `blessed_scalars` field.
     pub blessed_scalars: HashMap<String, String>,
+    /// `isa_for_class` field.
     pub isa_for_class: HashMap<String, Vec<String>>,
 }
 
@@ -1407,6 +1417,7 @@ pub(crate) enum CaptureAllMode {
 }
 
 impl VMHelper {
+    /// `new` — see implementation.
     pub fn new() -> Self {
         let mut scope = Scope::new();
         scope.declare_array("INC", vec![StrykeValue::string(".".to_string())]);
@@ -6440,6 +6451,7 @@ impl VMHelper {
         self.rand_rng = StdRng::seed_from_u64(mag);
         n.abs()
     }
+    /// `set_file` — see implementation.
 
     pub fn set_file(&mut self, file: &str) {
         self.file = file.to_string();
@@ -6513,6 +6525,7 @@ impl VMHelper {
             n, min_ms, mean, p99_ms
         )))
     }
+    /// `execute` — see implementation.
 
     pub fn execute(&mut self, program: &Program) -> StrykeResult<StrykeValue> {
         // Snapshot the (possibly empty) class registry into the

@@ -86,30 +86,51 @@ use crate::udp_sockets;
 
 /// TURN message type constants (RFC 8656 §17).
 pub mod msg_type {
+    /// `ALLOCATE_REQUEST` constant.
     pub const ALLOCATE_REQUEST: u16 = 0x0003;
+    /// `ALLOCATE_SUCCESS` constant.
     pub const ALLOCATE_SUCCESS: u16 = 0x0103;
+    /// `ALLOCATE_ERROR` constant.
     pub const ALLOCATE_ERROR: u16 = 0x0113;
+    /// `REFRESH_REQUEST` constant.
     pub const REFRESH_REQUEST: u16 = 0x0004;
+    /// `REFRESH_SUCCESS` constant.
     pub const REFRESH_SUCCESS: u16 = 0x0104;
+    /// `CREATE_PERMISSION_REQUEST` constant.
     pub const CREATE_PERMISSION_REQUEST: u16 = 0x0008;
+    /// `CREATE_PERMISSION_SUCCESS` constant.
     pub const CREATE_PERMISSION_SUCCESS: u16 = 0x0108;
+    /// `SEND_INDICATION` constant.
     pub const SEND_INDICATION: u16 = 0x0016;
+    /// `DATA_INDICATION` constant.
     pub const DATA_INDICATION: u16 = 0x0017;
 }
 
 /// STUN/TURN attribute type constants.
 pub mod attr {
+    /// `MAPPED_ADDRESS` constant.
     pub const MAPPED_ADDRESS: u16 = 0x0001;
+    /// `USERNAME` constant.
     pub const USERNAME: u16 = 0x0006;
+    /// `MESSAGE_INTEGRITY` constant.
     pub const MESSAGE_INTEGRITY: u16 = 0x0008;
+    /// `ERROR_CODE` constant.
     pub const ERROR_CODE: u16 = 0x0009;
+    /// `REALM` constant.
     pub const REALM: u16 = 0x0014;
+    /// `NONCE` constant.
     pub const NONCE: u16 = 0x0015;
+    /// `XOR_MAPPED_ADDRESS` constant.
     pub const XOR_MAPPED_ADDRESS: u16 = 0x0020;
+    /// `XOR_PEER_ADDRESS` constant.
     pub const XOR_PEER_ADDRESS: u16 = 0x0012;
+    /// `XOR_RELAYED_ADDRESS` constant.
     pub const XOR_RELAYED_ADDRESS: u16 = 0x0016;
+    /// `DATA` constant.
     pub const DATA: u16 = 0x0013;
+    /// `LIFETIME` constant.
     pub const LIFETIME: u16 = 0x000d;
+    /// `REQUESTED_TRANSPORT` constant.
     pub const REQUESTED_TRANSPORT: u16 = 0x0019;
 }
 
@@ -117,14 +138,23 @@ pub mod attr {
 /// + the credentials + nonce/realm we need for subsequent requests.
 #[derive(Debug, Clone)]
 pub struct TurnAllocation {
+    /// `socket_id` field.
     pub socket_id: u64,
+    /// `server` field.
     pub server: std::net::SocketAddr,
+    /// `username` field.
     pub username: String,
+    /// `password` field.
     pub password: String,
+    /// `realm` field.
     pub realm: String,
+    /// `nonce` field.
     pub nonce: Vec<u8>,
+    /// `relay_ip` field.
     pub relay_ip: IpAddr,
+    /// `relay_port` field.
     pub relay_port: u16,
+    /// `lifetime_secs` field.
     pub lifetime_secs: u32,
 }
 

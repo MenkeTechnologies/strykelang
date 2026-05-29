@@ -1,29 +1,44 @@
+/// `Token` — see variants.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     // Literals
+    /// `Integer` variant.
     Integer(i64),
+    /// `Float` variant.
     Float(f64),
+    /// `SingleString` variant.
     SingleString(String),
+    /// `DoubleString` variant.
     DoubleString(String),
     /// `` `...` `` or `qx{...}` — interpolated like double quotes, then executed as `sh -c` (Perl `qx`).
     BacktickString(String),
     /// Regex pattern: (pattern, flags, delimiter)
     Regex(String, String, char),
+    /// `HereDoc` variant.
     HereDoc(String, String, bool),
+    /// `QW` variant.
     QW(Vec<String>),
 
     // Variables
+    /// `ScalarVar` variant.
     ScalarVar(String),
     /// `$$foo` — symbolic scalar deref (inner name is `foo` without sigil).
     DerefScalarVar(String),
+    /// `ArrayVar` variant.
     ArrayVar(String),
+    /// `HashVar` variant.
     HashVar(String),
+    /// `ArrayAt` variant.
     ArrayAt,
+    /// `HashPercent` variant.
     HashPercent,
 
     // Identifiers & keywords
+    /// `Ident` variant.
     Ident(String),
+    /// `Label` variant.
     Label(String),
+    /// `PackageSep` variant.
     PackageSep,
     /// `format NAME =` … body … `.` (body lines without the closing `.`)
     FormatDecl {
@@ -32,84 +47,139 @@ pub enum Token {
     },
 
     // Arithmetic
+    /// `Plus` variant.
     Plus,
+    /// `Minus` variant.
     Minus,
+    /// `Star` variant.
     Star,
+    /// `Slash` variant.
     Slash,
+    /// `Percent` variant.
     Percent,
+    /// `Power` variant.
     Power,
 
     // String
+    /// `Dot` variant.
     Dot,
+    /// `X` variant.
     X,
 
     // Comparison (numeric)
+    /// `NumEq` variant.
     NumEq,
+    /// `NumNe` variant.
     NumNe,
+    /// `NumLt` variant.
     NumLt,
+    /// `NumGt` variant.
     NumGt,
+    /// `NumLe` variant.
     NumLe,
+    /// `NumGe` variant.
     NumGe,
+    /// `Spaceship` variant.
     Spaceship,
 
     // Comparison (string)
+    /// `StrEq` variant.
     StrEq,
+    /// `StrNe` variant.
     StrNe,
+    /// `StrLt` variant.
     StrLt,
+    /// `StrGt` variant.
     StrGt,
+    /// `StrLe` variant.
     StrLe,
+    /// `StrGe` variant.
     StrGe,
+    /// `StrCmp` variant.
     StrCmp,
 
     // Logical
+    /// `LogAnd` variant.
     LogAnd,
+    /// `LogOr` variant.
     LogOr,
+    /// `LogNot` variant.
     LogNot,
+    /// `LogAndWord` variant.
     LogAndWord,
+    /// `LogOrWord` variant.
     LogOrWord,
+    /// `LogNotWord` variant.
     LogNotWord,
+    /// `DefinedOr` variant.
     DefinedOr,
 
     // Bitwise
+    /// `BitAnd` variant.
     BitAnd,
+    /// `BitOr` variant.
     BitOr,
+    /// `BitXor` variant.
     BitXor,
+    /// `BitNot` variant.
     BitNot,
+    /// `ShiftLeft` variant.
     ShiftLeft,
+    /// `ShiftRight` variant.
     ShiftRight,
 
     // Assignment
+    /// `Assign` variant.
     Assign,
+    /// `PlusAssign` variant.
     PlusAssign,
+    /// `MinusAssign` variant.
     MinusAssign,
+    /// `MulAssign` variant.
     MulAssign,
+    /// `DivAssign` variant.
     DivAssign,
+    /// `ModAssign` variant.
     ModAssign,
+    /// `PowAssign` variant.
     PowAssign,
+    /// `DotAssign` variant.
     DotAssign,
     /// `x=` — string-repetition compound assign (`$s x= 3`).
     XAssign,
+    /// `AndAssign` variant.
     AndAssign,
+    /// `OrAssign` variant.
     OrAssign,
+    /// `XorAssign` variant.
     XorAssign,
+    /// `ShiftLeftAssign` variant.
     ShiftLeftAssign,
+    /// `ShiftRightAssign` variant.
     ShiftRightAssign,
     /// Bitwise `&=`
     BitAndAssign,
     /// Bitwise `|=`
     BitOrAssign,
+    /// `DefinedOrAssign` variant.
     DefinedOrAssign,
 
     // Increment/Decrement
+    /// `Increment` variant.
     Increment,
+    /// `Decrement` variant.
     Decrement,
 
     // Regex binding
+    /// `BindMatch` variant.
     BindMatch,
+    /// `BindNotMatch` variant.
     BindNotMatch,
 
     // Arrows & separators
+    /// `Arrow` variant.
     Arrow,
+    /// `FatArrow` variant.
     FatArrow,
     /// `|>` — pipe-forward (F#/Elixir): `x |> f(a)` desugars to `f(x, a)` at parse time.
     PipeForward,
@@ -148,14 +218,21 @@ pub enum Token {
     Range,
     /// Three-dot range / exclusive flip-flop (`...`); list expansion matches `..` (Perl).
     RangeExclusive,
+    /// `Backslash` variant.
     Backslash,
 
     // Delimiters
+    /// `LParen` variant.
     LParen,
+    /// `RParen` variant.
     RParen,
+    /// `LBracket` variant.
     LBracket,
+    /// `RBracket` variant.
     RBracket,
+    /// `LBrace` variant.
     LBrace,
+    /// `RBrace` variant.
     RBrace,
     /// `>{` — standalone block in thread macro (not attached to a function)
     ArrowBrace,
@@ -179,6 +256,7 @@ pub enum Token {
 }
 
 impl Token {
+    /// `is_term_start` — see implementation.
     pub fn is_term_start(&self) -> bool {
         matches!(
             self,

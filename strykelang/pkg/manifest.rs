@@ -28,6 +28,7 @@ pub struct Manifest {
         default,
         skip_serializing_if = "IndexMap::is_empty"
     )]
+    /// `dev_deps` field.
     pub dev_deps: IndexMap<String, DepSpec>,
 
     /// `[groups.NAME]` — bundler-style arbitrary groups (e.g. `groups.bench`).
@@ -55,14 +56,20 @@ pub struct Manifest {
 /// `[package]` table.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageMeta {
+    /// `name` field.
     pub name: String,
+    /// `version` field.
     pub version: String,
+    /// `description` field.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
+    /// `authors` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authors: Vec<String>,
+    /// `license` field.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub license: String,
+    /// `repository` field.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub repository: String,
     /// Language edition pin (e.g. `"2026"`). Defaults are inferred at build time.
@@ -91,8 +98,10 @@ pub enum DepSpec {
 /// Inline-table form of a dep spec.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DetailedDep {
+    /// `version` field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// `features` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub features: Vec<String>,
     /// `path = "../mylib"` — local path dependency.
@@ -101,10 +110,13 @@ pub struct DetailedDep {
     /// `git = "https://..."` — git dependency. Combined with `branch`/`tag`/`rev`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<String>,
+    /// `branch` field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// `tag` field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
+    /// `rev` field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rev: Option<String>,
     /// `registry = "https://..."` — alternate registry for this dep.
@@ -119,6 +131,7 @@ pub struct DetailedDep {
         default = "default_true",
         skip_serializing_if = "is_true_default"
     )]
+    /// `default_features` field.
     pub default_features: bool,
     /// `workspace = true` — inherit version/features from workspace root.
     #[serde(default, skip_serializing_if = "is_false")]
@@ -138,8 +151,10 @@ fn is_true_default(b: &bool) -> bool {
 /// `[workspace]` table.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WorkspaceConfig {
+    /// `members` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub members: Vec<String>,
+    /// `deps` field.
     #[serde(rename = "deps", default, skip_serializing_if = "IndexMap::is_empty")]
     pub deps: IndexMap<String, DepSpec>,
     /// `[workspace.package]` — metadata defaults inherited by member packages.
@@ -249,8 +264,11 @@ impl DepSpec {
 /// Where a dep's source code lives. Drives which resolver branch handles it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DepSource {
+    /// `Registry` variant.
     Registry,
+    /// `Path` variant.
     Path,
+    /// `Git` variant.
     Git,
 }
 
