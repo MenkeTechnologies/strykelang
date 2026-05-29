@@ -413,6 +413,10 @@ fn builtin_mobius_poset_two(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> 
 fn builtin_mobius_function_pair(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let a = i1(args);
     let b = args.get(1).map(|v| v.to_number() as i64).unwrap_or(1);
+    // Möbius function μ(b/a) is only defined for a > 0 (a divides b).
+    // Without this guard, `b % a` and `b / a` below panic with
+    // "attempt to calculate the remainder with a divisor of zero".
+    if a <= 0 { return Ok(StrykeValue::integer(0)); }
     if a == b { return Ok(StrykeValue::integer(1)); }
     if b % a != 0 { return Ok(StrykeValue::integer(0)); }
     let mut q = b / a;

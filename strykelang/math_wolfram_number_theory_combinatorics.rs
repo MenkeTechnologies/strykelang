@@ -901,6 +901,12 @@ fn poly_strip(p: &[f64]) -> Vec<f64> {
 fn poly_div_real(num: &[f64], den: &[f64]) -> (Vec<f64>, Vec<f64>) {
     let num = poly_strip(num);
     let den = poly_strip(den);
+    // Empty divisor → indeterminate; treat as div-by-zero (matches the
+    // den-is-[0] branch below). Without this guard, the subsequent
+    // `den[dl - 1]` indexes `den[usize::MAX]` and panics.
+    if den.is_empty() {
+        return (vec![0.0], vec![0.0]);
+    }
     if den.len() == 1 && den[0].abs() < 1e-300 {
         return (vec![0.0], vec![0.0]);
     }
@@ -968,6 +974,13 @@ fn builtin_polynomial_resultant(args: &[StrykeValue]) -> StrykeResult<StrykeValu
     let b = poly_strip(&poly_from_value(
         &args.get(1).cloned().unwrap_or(StrykeValue::UNDEF),
     ));
+    // Either polynomial empty → resultant is conventionally 1 for
+    // both-empty (constant 1) and 0 when one is the zero polynomial.
+    // Either way, the `a.len() - 1` / `b.len() - 1` arithmetic below
+    // would usize-underflow-panic, so short-circuit.
+    if a.is_empty() || b.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
     let m = a.len() - 1;
     let n = b.len() - 1;
     if m == 0 && n == 0 {
@@ -1038,6 +1051,11 @@ fn builtin_polynomial_discriminant(args: &[StrykeValue]) -> StrykeResult<StrykeV
     let p = poly_strip(&poly_from_value(
         &args.first().cloned().unwrap_or(StrykeValue::UNDEF),
     ));
+    // Empty polynomial → discriminant undefined; return 0 to avoid
+    // `p.len() - 1` usize-underflow panic on empty input.
+    if p.is_empty() {
+        return Ok(StrykeValue::float(0.0));
+    }
     let n = p.len() - 1;
     let mut dp = vec![0.0_f64; n];
     for i in 1..=n {
@@ -1056,6 +1074,11 @@ fn builtin_polynomial_roots(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let coeffs: Vec<f64> = poly_strip(&poly_from_value(
         &args.first().cloned().unwrap_or(StrykeValue::UNDEF),
     ));
+    // Empty polynomial → no roots; avoid `coeffs.len() - 1`
+    // usize-underflow panic.
+    if coeffs.is_empty() {
+        return Ok(StrykeValue::array(vec![]));
+    }
     let n = coeffs.len() - 1;
     if n == 0 {
         return Ok(StrykeValue::array(vec![]));
