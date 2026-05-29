@@ -413,4 +413,158 @@ mod tests {
             "first "
         );
     }
+
+    // ─── parse_picture_segments — directly exercise the picture parser ──
+    //
+    // The picture parser drives `write()` / `format` template
+    // dispatch. Until now it was only smoke-tested through
+    // `parse_format_template` round-trips (a 1-line picture per
+    // test). These tests pin the parser's behaviour for every
+    // segment shape so a regression to one align type or to the
+    // literal-escape path can't sneak past CI by leaving
+    // `parse_format_template` plumbing intact.
+
+    fn fields_only(pic: &str) -> Vec<(usize, FieldAlign)> {
+        parse_picture_segments(pic)
+            .expect("parse picture")
+            .into_iter()
+            .filter_map(|s| match s {
+                PictureSegment::Field { width, align, .. } => Some((width, align)),
+                PictureSegment::Literal(_) => None,
+            })
+            .collect()
+    }
+
+    fn segments(pic: &str) -> Vec<PictureSegment> {
+        parse_picture_segments(pic).expect("parse picture")
+    }
+
+    #[test]
+    fn picture_empty_string_is_zero_segments() {
+        assert!(segments("").is_empty());
+    }
+
+    #[test]
+    fn picture_pure_literal_emits_single_literal_segment() {
+        let segs = segments("just text");
+        assert_eq!(segs.len(), 1);
+        assert!(matches!(&segs[0], PictureSegment::Literal(s) if s == "just text"));
+    }
+
+    #[test]
+    fn picture_bare_at_with_no_modifier_is_width_one_left_field() {
+        // `@` alone (no `<`/`>`/`|`/`#`/`*`) → width 1 left-aligned text.
+        let segs = segments("@");
+        assert_eq!(segs.len(), 1);
+        let PictureSegment::Field { width, align, kind } = &segs[0] else {
+            panic!("expected Field, got {:?}", segs[0])
+        };
+        assert_eq!(*width, 1);
+        assert_eq!(*align, FieldAlign::Left);
+        assert_eq!(*kind, FieldKind::Text);
+    }
+
+    #[test]
+    fn picture_left_align_lt_chain_counts_width_correctly() {
+        // `@<<<<` = `@` + four `<` = width 5 left-aligned.
+        assert_eq!(fields_only("@<<<<"), vec![(5, FieldAlign::Left)]);
+    }
+
+    #[test]
+    fn picture_right_align_gt_chain() {
+        // `@>>` = `@` + two `>` = width 3 right-aligned.
+        assert_eq!(fields_only("@>>"), vec![(3, FieldAlign::Right)]);
+    }
+
+    #[test]
+    fn picture_center_align_pipe_chain() {
+        assert_eq!(fields_only("@|||"), vec![(4, FieldAlign::Center)]);
+    }
+
+    #[test]
+    fn picture_numeric_align_hash_chain_carries_numeric_kind() {
+        let segs = segments("@###");
+        let PictureSegment::Field { width, align, kind } = &segs[0] else {
+            panic!("expected Field")
+        };
+        assert_eq!(*width, 4);
+        assert_eq!(*align, FieldAlign::Numeric);
+        assert_eq!(*kind, FieldKind::Numeric, "numeric align → numeric kind");
+    }
+
+    #[test]
+    fn picture_multiline_align_star_chain_carries_multiline_kind() {
+        let segs = segments("@**");
+        let PictureSegment::Field { width, align, kind } = &segs[0] else {
+            panic!("expected Field")
+        };
+        assert_eq!(*width, 3);
+        assert_eq!(*align, FieldAlign::Multiline);
+        assert_eq!(*kind, FieldKind::Multiline);
+    }
+
+    #[test]
+    fn picture_doubled_at_escapes_to_literal_at() {
+        // `@@` → literal `@` (no field emitted), no value-line entry needed.
+        let segs = segments("@@");
+        assert_eq!(segs.len(), 1);
+        assert!(matches!(&segs[0], PictureSegment::Literal(s) if s == "@"));
+    }
+
+    #[test]
+    fn picture_literal_around_field_preserves_both() {
+        // `[name: @<<<<]` → 3 segments: literal "[name: ", field, literal "]".
+        let segs = segments("[name: @<<<<]");
+        assert_eq!(segs.len(), 3);
+        assert!(matches!(&segs[0], PictureSegment::Literal(s) if s == "[name: "));
+        assert!(matches!(
+            &segs[1],
+            PictureSegment::Field {
+                width: 5,
+                align: FieldAlign::Left,
+                ..
+            }
+        ));
+        assert!(matches!(&segs[2], PictureSegment::Literal(s) if s == "]"));
+    }
+
+    #[test]
+    fn picture_multiple_fields_collect_in_order() {
+        // `@<< @>>> @###` → left(3), right(4), numeric(4) — separated by
+        // single-space literals.
+        let segs = segments("@<< @>>> @###");
+        let fields: Vec<_> = segs
+            .iter()
+            .filter_map(|s| match s {
+                PictureSegment::Field { width, align, .. } => Some((*width, *align)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            fields,
+            vec![
+                (3, FieldAlign::Left),
+                (4, FieldAlign::Right),
+                (4, FieldAlign::Numeric),
+            ],
+        );
+    }
+
+    #[test]
+    fn picture_at_followed_by_non_modifier_treats_as_width_one() {
+        // `@x` — `@` not followed by a known modifier byte falls into the
+        // width=1 left-align default arm; the `x` becomes part of the
+        // trailing literal.
+        let segs = segments("@x");
+        assert_eq!(segs.len(), 2);
+        assert!(matches!(
+            &segs[0],
+            PictureSegment::Field {
+                width: 1,
+                align: FieldAlign::Left,
+                ..
+            }
+        ));
+        assert!(matches!(&segs[1], PictureSegment::Literal(s) if s == "x"));
+    }
 }
