@@ -46,8 +46,11 @@ struct ConnectedAgent {
 
 /// Controller state
 pub struct Controller {
+    /// `agents` field.
     agents: Arc<Mutex<HashMap<u64, ConnectedAgent>>>,
+    /// `next_session_id` field.
     next_session_id: AtomicU64,
+    /// `running` field.
     running: AtomicBool,
     /// Active chants — fired at each new agent registered by accept_loop.
     /// Lives on Controller (not ControllerHandle) so accept_loop can read
@@ -78,6 +81,7 @@ impl Default for Controller {
 }
 
 impl Controller {
+    /// `new` — see implementation.
     pub fn new() -> Self {
         Self {
             agents: Arc::new(Mutex::new(HashMap::new())),
@@ -660,10 +664,15 @@ struct DivinationState {
 /// [`spawn_controller`]; used by the scriptable builtins to drive the
 /// distributed compute fabric from `.stk` code.
 pub struct ControllerHandle {
+    /// `controller` field.
     controller: Arc<Controller>,
+    /// `listen_addr` field.
     listen_addr: std::net::SocketAddr,
+    /// `accept_handle` field.
     accept_handle: Mutex<Option<thread::JoinHandle<()>>>,
+    /// `next_petition_id` field.
     next_petition_id: AtomicU64,
+    /// `pending_divinations` field.
     pending_divinations: Mutex<HashMap<u64, DivinationState>>,
 }
 
@@ -1061,10 +1070,12 @@ pub fn register_chant(controller_id: u64, local_chant_id: u64) -> u64 {
         .insert(id, (controller_id, local_chant_id));
     id
 }
+/// `get_chant` — see implementation.
 
 pub fn get_chant(chant_id: u64) -> Option<(u64, u64)> {
     chant_registry().lock().unwrap().get(&chant_id).copied()
 }
+/// `unregister_chant` — see implementation.
 
 pub fn unregister_chant(chant_id: u64) -> Option<(u64, u64)> {
     chant_registry().lock().unwrap().remove(&chant_id)

@@ -54,32 +54,48 @@ pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 pub const SHARD_FORMAT_VERSION: u32 = 1;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
+/// `ShardHeader` — see fields for layout.
 
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ShardHeader {
+    /// `magic` field.
     pub magic: u32,
+    /// `format_version` field.
     pub format_version: u32,
+    /// `stryke_version` field.
     pub stryke_version: String,
+    /// `pointer_width` field.
     pub pointer_width: u32,
+    /// `built_at_secs` field.
     pub built_at_secs: u64,
 }
+/// `ScriptEntry` — see fields for layout.
 
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ScriptEntry {
+    /// `mtime_secs` field.
     pub mtime_secs: i64,
+    /// `mtime_nsecs` field.
     pub mtime_nsecs: i64,
+    /// `binary_mtime_at_cache` field.
     pub binary_mtime_at_cache: i64,
+    /// `cached_at_secs` field.
     pub cached_at_secs: i64,
+    /// `program_blob` field.
     pub program_blob: Vec<u8>,
+    /// `chunk_blob` field.
     pub chunk_blob: Vec<u8>,
 }
+/// `ScriptShard` — see fields for layout.
 
 #[derive(Archive, RkyvDeserialize, RkyvSerialize, Debug, Clone)]
 #[archive(check_bytes)]
 pub struct ScriptShard {
+    /// `header` field.
     pub header: ShardHeader,
+    /// `entries` field.
     pub entries: HashMap<String, ScriptEntry>,
 }
 
@@ -127,9 +143,11 @@ fn perl_from_cache_const(c: CacheConst) -> StrykeValue {
         CacheConst::Str(s) => StrykeValue::string(s),
     }
 }
+/// `constants_pool_codec` submodule.
 
 pub mod constants_pool_codec {
     use super::*;
+    /// `serialize` — see implementation.
 
     pub fn serialize<S>(values: &Vec<StrykeValue>, ser: S) -> Result<S::Ok, S::Error>
     where
@@ -142,6 +160,7 @@ pub mod constants_pool_codec {
         }
         out.serialize(ser)
     }
+    /// `deserialize` — see implementation.
 
     pub fn deserialize<'de, D>(de: D) -> Result<Vec<StrykeValue>, D::Error>
     where
@@ -155,7 +174,9 @@ pub mod constants_pool_codec {
 /// Owned bundle handed back from `try_load` / `ScriptCache::get`.
 #[derive(Debug, Clone)]
 pub struct CachedScript {
+    /// `program` field.
     pub program: Program,
+    /// `chunk` field.
     pub chunk: Chunk,
 }
 
@@ -164,7 +185,9 @@ pub struct CachedScript {
 /// mmap + validated `*const ArchivedScriptShard`. Self-referential — the pointer
 /// is valid for the lifetime of the wrapping struct.
 pub struct MmappedShard {
+    /// `_mmap` field.
     _mmap: Mmap,
+    /// `archived` field.
     archived: *const ArchivedScriptShard,
 }
 
@@ -217,8 +240,11 @@ impl MmappedShard {
 
 /// Shard cache keyed by canonical script path. One per shard file.
 pub struct ScriptCache {
+    /// `path` field.
     path: PathBuf,
+    /// `lock_path` field.
     lock_path: PathBuf,
+    /// `mmap` field.
     mmap: Mutex<Option<MmappedShard>>,
 }
 

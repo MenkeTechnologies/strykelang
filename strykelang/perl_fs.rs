@@ -492,6 +492,7 @@ pub fn stat_path(path: &str, symlink: bool) -> StrykeValue {
         Err(_) => StrykeValue::array(vec![]),
     }
 }
+/// `perl_stat_from_metadata` — see implementation.
 
 pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<StrykeValue> {
     #[cfg(unix)]
@@ -533,6 +534,7 @@ pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<StrykeValue> {
         ]
     }
 }
+/// `link_hard` — see implementation.
 
 pub fn link_hard(old: &str, new: &str) -> StrykeValue {
     StrykeValue::integer(if std::fs::hard_link(old, new).is_ok() {
@@ -541,6 +543,7 @@ pub fn link_hard(old: &str, new: &str) -> StrykeValue {
         0
     })
 }
+/// `link_sym` — see implementation.
 
 pub fn link_sym(old: &str, new: &str) -> StrykeValue {
     #[cfg(unix)]
@@ -554,6 +557,7 @@ pub fn link_sym(old: &str, new: &str) -> StrykeValue {
         StrykeValue::integer(0)
     }
 }
+/// `read_link` — see implementation.
 
 pub fn read_link(path: &str) -> StrykeValue {
     match std::fs::read_link(path) {
@@ -891,6 +895,7 @@ pub fn list_char_devices(dir: &str) -> StrykeValue {
     names.sort();
     StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
+/// `glob_patterns` — see implementation.
 
 pub fn glob_patterns(patterns: &[String]) -> StrykeValue {
     let mut paths: Vec<String> = Vec::new();
@@ -950,10 +955,12 @@ pub fn swallow_to_hash(pattern: &str) -> io::Result<StrykeValue> {
 /// Per-yield value: `[canonical_abspath, raw_bytes]` as an array ref so users
 /// can destructure with `for my ($p, $b) (ingest "**/*.log") { ... }`.
 pub struct IngestIterator {
+    /// `queue` field.
     queue: Mutex<std::collections::VecDeque<String>>,
 }
 
 impl IngestIterator {
+    /// `new` — see implementation.
     pub fn new(paths: Vec<String>) -> Self {
         Self {
             queue: Mutex::new(paths.into_iter().collect()),

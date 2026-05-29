@@ -10,13 +10,19 @@
 //! concatenates every other preset — one command, ~70 resources.
 
 pub struct Resource {
+    /// `name` field.
     pub name: &'static str,
+    /// `fields` field.
     pub fields: &'static [&'static str],
 }
+/// `Preset` — see fields for layout.
 
 pub struct Preset {
+    /// `name` field.
     pub name: &'static str,
+    /// `description` field.
     pub description: &'static str,
+    /// `resources` field.
     pub resources: &'static [Resource],
 }
 
@@ -1370,6 +1376,7 @@ pub const PRESETS: &[Preset] = &[
         resources: LEARNING,
     },
 ];
+/// `lookup` — see implementation.
 
 pub fn lookup(name: &str) -> Option<&'static Preset> {
     PRESETS.iter().find(|p| p.name == name)

@@ -105,6 +105,7 @@ pub(crate) fn arrow_deref_arrow_subscript_is_plain_scalar_index(index: &Expr) ->
 /// Compilation error — halts compilation with an error.
 #[derive(Debug)]
 pub enum CompileError {
+    /// `Unsupported` variant.
     Unsupported(String),
     /// Immutable binding reassignment (e.g. `frozen my $x` then `$x = 1`).
     Frozen {
@@ -174,15 +175,22 @@ struct LoopCtx {
     /// `Op::Jump(0)` placeholders for `next` — patched to the loop increment / condition entry.
     continue_jumps: Vec<usize>,
 }
+/// `Compiler` — see fields for layout.
 
 pub struct Compiler {
+    /// `chunk` field.
     pub chunk: Chunk,
     /// During compilation: stable [`Expr`] pointer → [`Chunk::ast_expr_pool`] index.
     ast_expr_intern: HashMap<usize, u32>,
+    /// `begin_blocks` field.
     pub begin_blocks: Vec<Block>,
+    /// `unit_check_blocks` field.
     pub unit_check_blocks: Vec<Block>,
+    /// `check_blocks` field.
     pub check_blocks: Vec<Block>,
+    /// `init_blocks` field.
     pub init_blocks: Vec<Block>,
+    /// `end_blocks` field.
     pub end_blocks: Vec<Block>,
     /// Lexical `my` declarations per scope frame (mirrors `PushFrame` / sub bodies).
     scope_stack: Vec<ScopeLayer>,
@@ -304,6 +312,7 @@ impl Compiler {
             }
         }
     }
+    /// `new` — see implementation.
 
     pub fn new() -> Self {
         Self {
@@ -453,6 +462,7 @@ impl Compiler {
         self.chunk.emit(Op::PopFrame, line);
         self.frame_depth = self.frame_depth.saturating_sub(1);
     }
+    /// `with_source_file` — see implementation.
 
     pub fn with_source_file(mut self, path: String) -> Self {
         self.source_file = path;
@@ -1238,6 +1248,7 @@ impl Compiler {
             .rev()
             .any(|l| l.mysync_hashes.contains(hash_name))
     }
+    /// `compile_program` — see implementation.
 
     pub fn compile_program(mut self, program: &Program) -> Result<Chunk, CompileError> {
         // Extract BEGIN/END blocks before compiling.

@@ -24,13 +24,23 @@
 //! need a separate template tree on disk.
 
 pub mod cmd_app;
+/// `cmd_build` submodule.
 pub mod cmd_build;
+/// `cmd_new` submodule.
 pub mod cmd_new;
+/// `cmd_generate` submodule.
 pub mod cmd_generate;
+/// `cmd_extras` submodule.
 pub mod cmd_extras;
+/// `cmd_routes` submodule.
 pub mod cmd_routes;
+/// `cmd_server` submodule.
 pub mod cmd_server;
+/// `cmd_db` submodule.
 pub mod cmd_db;
+/// `presets` submodule.
 pub mod presets;
+/// `templates` submodule.
 pub mod templates;
+/// `util` submodule.
 pub mod util;

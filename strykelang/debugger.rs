@@ -60,7 +60,9 @@ pub struct Debugger {
 /// Kept as `Arc<dyn Any>` so debugger.rs does not depend on dap.rs at compile
 /// time (and tests work without DAP).
 pub struct DapBackendHandle {
+    /// `shared` field.
     pub shared: Arc<crate::dap::DapShared>,
+    /// `bp_state` field.
     pub bp_state: Arc<Mutex<crate::dap::BreakpointState>>,
 }
 
@@ -71,6 +73,7 @@ impl Default for Debugger {
 }
 
 impl Debugger {
+    /// `new` — see implementation.
     pub fn new() -> Self {
         Self {
             breakpoints: HashSet::new(),
@@ -635,8 +638,11 @@ Debugger Commands:
 /// Action to take after debugger prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DebugAction {
+    /// `Continue` variant.
     Continue,
+    /// `Quit` variant.
     Quit,
+    /// `Prompt` variant.
     Prompt,
 }
 

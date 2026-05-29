@@ -53,14 +53,23 @@ use std::time::{Duration, Instant};
 
 /// Agent protocol frame kinds
 pub mod frame_kind {
+    /// `AGENT_HELLO` constant.
     pub const AGENT_HELLO: u8 = 0x10;
+    /// `AGENT_HELLO_ACK` constant.
     pub const AGENT_HELLO_ACK: u8 = 0x11;
+    /// `FIRE` constant.
     pub const FIRE: u8 = 0x12;
+    /// `METRICS` constant.
     pub const METRICS: u8 = 0x13;
+    /// `TERMINATE` constant.
     pub const TERMINATE: u8 = 0x14;
+    /// `TERM_ACK` constant.
     pub const TERM_ACK: u8 = 0x15;
+    /// `SHUTDOWN` constant.
     pub const SHUTDOWN: u8 = 0x16;
+    /// `STATUS` constant.
     pub const STATUS: u8 = 0x17;
+    /// `STATUS_RESP` constant.
     pub const STATUS_RESP: u8 = 0x18;
     /// Controller → agent: arbitrary stryke source to run against the agent's persistent VM.
     pub const EVAL: u8 = 0x19;
@@ -70,6 +79,7 @@ pub mod frame_kind {
     /// Controllers in `:cloistered` mode reject any agent whose AUTH token
     /// isn't in their accepted-token set. Payload: bincode-serialized AgentAuth.
     pub const AGENT_AUTH: u8 = 0x1B;
+    /// `ERROR` constant.
     pub const ERROR: u8 = 0xFF;
 }
 
@@ -81,18 +91,24 @@ pub const AGENT_PROTO_VERSION: u32 = 2;
 /// Agent configuration (from TOML file)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AgentConfig {
+    /// `controller` field.
     #[serde(default)]
     pub controller: ControllerConfig,
+    /// `limits` field.
     #[serde(default)]
     pub limits: LimitsConfig,
+    /// `agent` field.
     #[serde(default)]
     pub agent: AgentIdentity,
 }
+/// `ControllerConfig` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ControllerConfig {
+    /// `host` field.
     #[serde(default = "default_host")]
     pub host: String,
+    /// `port` field.
     #[serde(default = "default_port")]
     pub port: u16,
 }
@@ -112,11 +128,14 @@ impl Default for ControllerConfig {
         }
     }
 }
+/// `LimitsConfig` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LimitsConfig {
+    /// `max_temp` field.
     #[serde(default = "default_max_temp")]
     pub max_temp: u32,
+    /// `max_duration` field.
     #[serde(default = "default_max_duration")]
     pub max_duration: u64,
 }
@@ -136,9 +155,11 @@ impl Default for LimitsConfig {
         }
     }
 }
+/// `AgentIdentity` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AgentIdentity {
+    /// `name` field.
     #[serde(default)]
     pub name: Option<String>,
 }
@@ -146,19 +167,28 @@ pub struct AgentIdentity {
 /// Hello message from agent to controller
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentHello {
+    /// `proto_version` field.
     pub proto_version: u32,
+    /// `stryke_version` field.
     pub stryke_version: String,
+    /// `hostname` field.
     pub hostname: String,
+    /// `cores` field.
     pub cores: usize,
+    /// `memory_bytes` field.
     pub memory_bytes: u64,
+    /// `agent_name` field.
     pub agent_name: Option<String>,
 }
 
 /// Acknowledgment from controller
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentHelloAck {
+    /// `session_id` field.
     pub session_id: u64,
+    /// `accepted` field.
     pub accepted: bool,
+    /// `message` field.
     pub message: String,
 }
 
@@ -167,22 +197,28 @@ pub struct AgentHelloAck {
 /// mode require this; controllers in open mode ignore it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentAuth {
+    /// `token` field.
     pub token: String,
 }
 
 /// Fire command — start stress test
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FireCommand {
+    /// `workload` field.
     pub workload: WorkloadType,
+    /// `duration_secs` field.
     pub duration_secs: f64,
     pub intensity: f64, // 0.0-1.0, percentage of cores to use
 }
+/// `WorkloadType` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkloadType {
+    /// `Cpu` variant.
     Cpu,
     Memory { bytes: u64 },
     Io { dir: String, iterations: u64 },
+    /// `Combined` variant.
     Combined,
     Custom { code: String },
 }
@@ -190,26 +226,39 @@ pub enum WorkloadType {
 /// Metrics report from agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentMetrics {
+    /// `cpu_percent` field.
     pub cpu_percent: f64,
+    /// `memory_used` field.
     pub memory_used: u64,
+    /// `hashes_per_sec` field.
     pub hashes_per_sec: u64,
+    /// `elapsed_secs` field.
     pub elapsed_secs: f64,
+    /// `state` field.
     pub state: AgentState,
 }
+/// `AgentState` — see variants.
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum AgentState {
+    /// `Idle` variant.
     Idle,
+    /// `Armed` variant.
     Armed,
+    /// `Firing` variant.
     Firing,
+    /// `Terminated` variant.
     Terminated,
 }
 
 /// Termination acknowledgment with final stats
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TermAck {
+    /// `total_hashes` field.
     pub total_hashes: u64,
+    /// `total_duration` field.
     pub total_duration: f64,
+    /// `peak_cpu` field.
     pub peak_cpu: f64,
 }
 
@@ -220,6 +269,7 @@ pub struct TermAck {
 /// constraint a Perl `-de0` debugger session has — use `$main::name` to persist.)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalCommand {
+    /// `code` field.
     pub code: String,
 }
 
@@ -227,7 +277,9 @@ pub struct EvalCommand {
 /// stringified return value of the script; `ok=false` carries the error message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvalResult {
+    /// `ok` field.
     pub ok: bool,
+    /// `output` field.
     pub output: String,
 }
 

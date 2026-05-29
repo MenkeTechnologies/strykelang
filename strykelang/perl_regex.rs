@@ -29,16 +29,22 @@ pub fn perl_quotemeta(s: &str) -> String {
 /// Compiled pattern: Rust [`regex`], [`fancy_regex`], or PCRE2.
 #[derive(Debug, Clone)]
 pub enum PerlCompiledRegex {
+    /// `Rust` variant.
     Rust(Arc<regex::Regex>),
+    /// `Fancy` variant.
     Fancy(Arc<fancy_regex::Regex>),
+    /// `Pcre2` variant.
     Pcre2(Arc<pcre2::bytes::Regex>),
 }
 
 /// Unified captures for match-variable setup (`$1`, `@-`, `%+`, …).
 #[derive(Debug)]
 pub enum PerlCaptures<'a> {
+    /// `Rust` variant.
     Rust(regex::Captures<'a>),
+    /// `Fancy` variant.
     Fancy(fancy_regex::Captures<'a>),
+    /// `Pcre2` variant.
     Pcre2 {
         caps: pcre2::bytes::Captures<'a>,
         hay: &'a str,
@@ -46,6 +52,7 @@ pub enum PerlCaptures<'a> {
 }
 
 impl<'a> PerlCaptures<'a> {
+    /// `len` — see implementation.
     #[inline]
     pub fn len(&self) -> usize {
         match self {
@@ -54,6 +61,7 @@ impl<'a> PerlCaptures<'a> {
             Self::Pcre2 { caps, .. } => caps.len(),
         }
     }
+    /// `get` — see implementation.
 
     #[inline]
     pub fn get(&self, i: usize) -> Option<RegexMatch<'a>> {
@@ -63,6 +71,7 @@ impl<'a> PerlCaptures<'a> {
             Self::Pcre2 { caps, hay } => caps.get(i).map(|m| regex_match_from_pcre(hay, m)),
         }
     }
+    /// `name` — see implementation.
 
     #[inline]
     pub fn name(&self, name: &str) -> Option<RegexMatch<'a>> {
@@ -84,8 +93,11 @@ fn regex_match_from_pcre<'a>(subject: &'a str, m: pcre2::bytes::Match<'a>) -> Re
 /// Minimal match view shared by engines.
 #[derive(Clone, Copy, Debug)]
 pub struct RegexMatch<'a> {
+    /// `start` field.
     pub start: usize,
+    /// `end` field.
     pub end: usize,
+    /// `text` field.
     pub text: &'a str,
 }
 
@@ -124,6 +136,7 @@ impl PerlCompiledRegex {
             Err(e) => Err(e.to_string()),
         }
     }
+    /// `is_match` — see implementation.
 
     #[inline]
     pub fn is_match(&self, s: &str) -> bool {
@@ -133,6 +146,7 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => r.is_match(s.as_bytes()).unwrap_or(false),
         }
     }
+    /// `captures` — see implementation.
 
     pub fn captures<'t>(&self, text: &'t str) -> Option<PerlCaptures<'t>> {
         match self {
@@ -159,6 +173,7 @@ impl PerlCompiledRegex {
             },
         }
     }
+    /// `capture_names` — see implementation.
 
     pub fn capture_names(&self) -> CaptureNames<'_> {
         match self {
@@ -167,6 +182,7 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => CaptureNames::Pcre2(r.capture_names().iter()),
         }
     }
+    /// `replace` — see implementation.
 
     pub fn replace(&self, s: &str, replacement: &str) -> String {
         match self {
@@ -175,6 +191,7 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => replace_once_pcre2(r, s, replacement),
         }
     }
+    /// `replace_all` — see implementation.
 
     pub fn replace_all(&self, s: &str, replacement: &str) -> String {
         match self {
@@ -183,6 +200,7 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => replace_all_pcre2(r, s, replacement),
         }
     }
+    /// `find_iter_count` — see implementation.
 
     pub fn find_iter_count(&self, s: &str) -> usize {
         match self {
@@ -204,6 +222,7 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => split_pcre2(r, s),
         }
     }
+    /// `splitn_strings` — see implementation.
 
     pub fn splitn_strings(&self, s: &str, limit: usize) -> Vec<String> {
         match self {
@@ -217,10 +236,14 @@ impl PerlCompiledRegex {
         }
     }
 }
+/// `CaptureIter` — see variants.
 
 pub enum CaptureIter<'r, 't> {
+    /// `Rust` variant.
     Rust(regex::CaptureMatches<'r, 't>),
+    /// `Fancy` variant.
     Fancy(fancy_regex::CaptureMatches<'r, 't>),
+    /// `Pcre2` variant.
     Pcre2 {
         hay: &'t str,
         it: pcre2::bytes::CaptureMatches<'r, 't>,
@@ -249,10 +272,14 @@ impl<'r, 't> Iterator for CaptureIter<'r, 't> {
         }
     }
 }
+/// `CaptureNames` — see variants.
 
 pub enum CaptureNames<'a> {
+    /// `Rust` variant.
     Rust(regex::CaptureNames<'a>),
+    /// `Fancy` variant.
     Fancy(fancy_regex::CaptureNames<'a>),
+    /// `Pcre2` variant.
     Pcre2(std::slice::Iter<'a, Option<String>>),
 }
 

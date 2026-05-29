@@ -994,10 +994,12 @@ pub(crate) fn pty_pending_events(_args: &[StrykeValue], _line: usize) -> Result<
 //
 // Drop-in stryke source the user can `require` to get the method-form
 // `$h->expect(...)`. Apps that prefer the bare-builtin form skip this.
+/// `PTY_HANDLE_CLASS_STK` constant.
 
 pub const PTY_HANDLE_CLASS_STK: &str = include_str!("perl_pty_class.stk");
 
 // ── Public API ────────────────────────────────────────────────────────
+/// `close_all` — see implementation.
 
 #[allow(dead_code)]
 pub fn close_all() {

@@ -102,8 +102,11 @@ fn value_arc_weak(v: &StrykeValue) -> Option<Weak<HeapObject>> {
 /// `line` field that `try_builtin` already threads through dispatch.
 #[derive(Debug, Clone)]
 pub struct ProvOp {
+    /// `op` field.
     pub op: String,
+    /// `args` field.
     pub args: Vec<String>,
+    /// `line` field.
     pub line: usize,
 }
 
@@ -113,6 +116,7 @@ pub struct ProvNode {
     /// Site that called `mark($val)`. The string is a god-style short form
     /// of the value at mark time (e.g. `"INTEGER 42"`, `"HASH entries=3"`).
     pub origin: String,
+    /// `origin_line` field.
     pub origin_line: usize,
     /// Append-only chain of operations that touched the value AFTER it was
     /// marked. Latest op last.

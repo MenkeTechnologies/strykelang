@@ -16,10 +16,12 @@ thread_local! {
 pub fn trace_enter() {
     TRACE_ENABLED.store(true, Ordering::SeqCst);
 }
+/// `trace_leave` — see implementation.
 
 pub fn trace_leave() {
     TRACE_ENABLED.store(false, Ordering::SeqCst);
 }
+/// `is_enabled` — see implementation.
 
 #[inline]
 pub fn is_enabled() -> bool {

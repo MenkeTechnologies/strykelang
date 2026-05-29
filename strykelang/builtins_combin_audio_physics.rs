@@ -58,6 +58,7 @@ fn arr_i64(v: Vec<i64>) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Combinatorics
 // ══════════════════════════════════════════════════════════════════════
+/// `derangement_count` — see implementation.
 
 pub fn derangement_count(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -74,6 +75,7 @@ pub fn derangement_count(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(d[n])
 }
+/// `partitions_count` — see implementation.
 
 pub fn partitions_count(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -99,6 +101,7 @@ pub fn partitions_count(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(p[n])
 }
+/// `compositions_count` — see implementation.
 
 pub fn compositions_count(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
@@ -107,6 +110,7 @@ pub fn compositions_count(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(1_i64 << (n - 1))
 }
+/// `lattice_paths` — see implementation.
 
 pub fn lattice_paths(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -121,6 +125,7 @@ pub fn lattice_paths(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(binom(m + n, m))
 }
+/// `multinomial_coefficient` — see implementation.
 
 pub fn multinomial_coefficient(args: &[StrykeValue]) -> StrykeValue {
     let parts: Vec<i64> = args
@@ -140,6 +145,7 @@ pub fn multinomial_coefficient(args: &[StrykeValue]) -> StrykeValue {
     let log_result = fact(n) - parts.iter().map(|&k| fact(k)).sum::<f64>();
     StrykeValue::float(log_result.exp().round())
 }
+/// `super_factorial` — see implementation.
 
 pub fn super_factorial(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -151,6 +157,7 @@ pub fn super_factorial(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(sf as i64)
 }
+/// `hyperfactorial` — see implementation.
 
 pub fn hyperfactorial(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -160,6 +167,7 @@ pub fn hyperfactorial(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(h as i64)
 }
+/// `primorial` — see implementation.
 
 pub fn primorial(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
@@ -186,6 +194,7 @@ pub fn primorial(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(result)
 }
+/// `fibonacci_matrix` — see implementation.
 
 pub fn fibonacci_matrix(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
@@ -222,6 +231,7 @@ pub fn fibonacci_matrix(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(result[0][1] as i64)
 }
+/// `lucas_nth` — see implementation.
 
 pub fn lucas_nth(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
@@ -240,6 +250,7 @@ pub fn lucas_nth(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(b)
 }
+/// `pell_nth` — see implementation.
 
 pub fn pell_nth(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as u64;
@@ -258,6 +269,7 @@ pub fn pell_nth(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(b)
 }
+/// `tetranacci` — see implementation.
 
 pub fn tetranacci(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -272,6 +284,7 @@ pub fn tetranacci(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(t[3])
 }
+/// `narayana_cow` — see implementation.
 
 pub fn narayana_cow(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0) as usize;
@@ -285,62 +298,74 @@ pub fn narayana_cow(args: &[StrykeValue]) -> StrykeValue {
         StrykeValue::integer(1)
     }
 }
+/// `hexagonal_number` — see implementation.
 
 pub fn hexagonal_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (2 * n - 1))
 }
+/// `heptagonal_number` — see implementation.
 
 pub fn heptagonal_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (5 * n - 3) / 2)
 }
+/// `octagonal_number` — see implementation.
 
 pub fn octagonal_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (3 * n - 2))
 }
+/// `nonagonal_number` — see implementation.
 
 pub fn nonagonal_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (7 * n - 5) / 2)
 }
+/// `decagonal_number` — see implementation.
 
 pub fn decagonal_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (4 * n - 3))
 }
+/// `centered_polygonal` — see implementation.
 
 pub fn centered_polygonal(args: &[StrykeValue]) -> StrykeValue {
     let k = arg_i64(args, 0).unwrap_or(3).max(3);
     let n = arg_i64(args, 1).unwrap_or(0).max(0);
     StrykeValue::integer(1 + k * n * (n - 1) / 2)
 }
+/// `square_pyramidal` — see implementation.
 
 pub fn square_pyramidal(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (n + 1) * (2 * n + 1) / 6)
 }
+/// `tetrahedral` — see implementation.
 
 pub fn tetrahedral(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (n + 1) * (n + 2) / 6)
 }
+/// `cube_number` — see implementation.
 
 pub fn cube_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0);
     StrykeValue::integer(n * n * n)
 }
+/// `icosahedral` — see implementation.
 
 pub fn icosahedral(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (5 * n * n - 5 * n + 2) / 2)
 }
+/// `dodecahedral` — see implementation.
 
 pub fn dodecahedral(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
     StrykeValue::integer(n * (3 * n - 1) * (3 * n - 2) / 2)
 }
+/// `gnomonic_number` — see implementation.
 
 pub fn gnomonic_number(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0).max(0);
@@ -410,6 +435,7 @@ impl PartialOrd for AstarNode {
         Some(self.cmp(other))
     }
 }
+/// `ida_star_search` — see implementation.
 
 pub fn ida_star_search(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_weighted).unwrap_or_default();
@@ -470,6 +496,7 @@ fn ida_star_dfs(
     }
     min
 }
+/// `bidirectional_bfs` — see implementation.
 
 pub fn bidirectional_bfs(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
@@ -539,6 +566,7 @@ pub fn bidirectional_bfs(args: &[StrykeValue]) -> StrykeValue {
         None => arr_sv(vec![]),
     }
 }
+/// `a_star_grid` — see implementation.
 
 pub fn a_star_grid(args: &[StrykeValue]) -> StrykeValue {
     let grid = args
@@ -612,6 +640,7 @@ pub fn a_star_grid(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_sv(vec![])
 }
+/// `greedy_best_first` — see implementation.
 
 pub fn greedy_best_first(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
@@ -649,6 +678,7 @@ pub fn greedy_best_first(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_sv(vec![])
 }
+/// `floyd_cycle_detect` — see implementation.
 
 pub fn floyd_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
     let xs: Vec<i64> = args
@@ -682,6 +712,7 @@ pub fn floyd_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
         }
     }
 }
+/// `ternary_search` — see implementation.
 
 pub fn ternary_search(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_sv).unwrap_or_default();
@@ -713,6 +744,7 @@ pub fn ternary_search(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(-1)
 }
+/// `exponential_search` — see implementation.
 
 pub fn exponential_search(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_sv).unwrap_or_default();
@@ -745,6 +777,7 @@ pub fn exponential_search(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(-1)
 }
+/// `interpolation_search` — see implementation.
 
 pub fn interpolation_search(args: &[StrykeValue]) -> StrykeValue {
     let xs = args.first().map(as_vec_sv).unwrap_or_default();
@@ -781,6 +814,7 @@ pub fn interpolation_search(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Audio synthesis primitives
 // ══════════════════════════════════════════════════════════════════════
+/// `wavetable_synth` — see implementation.
 
 pub fn wavetable_synth(args: &[StrykeValue]) -> StrykeValue {
     let table = args.first().map(as_vec_f64).unwrap_or_default();
@@ -803,6 +837,7 @@ pub fn wavetable_synth(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `fm_synth_2op` — see implementation.
 
 pub fn fm_synth_2op(args: &[StrykeValue]) -> StrykeValue {
     let carrier = arg_f64(args, 0).unwrap_or(440.0);
@@ -822,6 +857,7 @@ pub fn fm_synth_2op(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `am_synth` — see implementation.
 
 pub fn am_synth(args: &[StrykeValue]) -> StrykeValue {
     let carrier = arg_f64(args, 0).unwrap_or(440.0);
@@ -841,6 +877,7 @@ pub fn am_synth(args: &[StrykeValue]) -> StrykeValue {
             .collect(),
     )
 }
+/// `ring_modulate` — see implementation.
 
 pub fn ring_modulate(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_vec_f64).unwrap_or_default();
@@ -848,6 +885,7 @@ pub fn ring_modulate(args: &[StrykeValue]) -> StrykeValue {
     let n = a.len().min(b.len());
     arr_f64((0..n).map(|i| a[i] * b[i]).collect())
 }
+/// `chorus_simple` — see implementation.
 
 pub fn chorus_simple(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -871,6 +909,7 @@ pub fn chorus_simple(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `phaser_simple` — see implementation.
 
 pub fn phaser_simple(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -897,6 +936,7 @@ pub fn phaser_simple(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `comb_filter` — see implementation.
 
 pub fn comb_filter(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -914,6 +954,7 @@ pub fn comb_filter(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `all_pass_filter` — see implementation.
 
 pub fn all_pass_filter(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -928,6 +969,7 @@ pub fn all_pass_filter(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `fir_filter` — see implementation.
 
 pub fn fir_filter(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -944,6 +986,7 @@ pub fn fir_filter(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(out)
 }
+/// `schroeder_reverb` — see implementation.
 
 pub fn schroeder_reverb(args: &[StrykeValue]) -> StrykeValue {
     let signal = args.first().map(as_vec_f64).unwrap_or_default();
@@ -982,6 +1025,7 @@ pub fn schroeder_reverb(args: &[StrykeValue]) -> StrykeValue {
 // ══════════════════════════════════════════════════════════════════════
 // Physics 2D
 // ══════════════════════════════════════════════════════════════════════
+/// `projectile_position` — see implementation.
 
 pub fn projectile_position(args: &[StrykeValue]) -> StrykeValue {
     let v0 = arg_f64(args, 0).unwrap_or(0.0);
@@ -992,6 +1036,7 @@ pub fn projectile_position(args: &[StrykeValue]) -> StrykeValue {
     let y = v0 * angle.sin() * t - 0.5 * g * t * t;
     arr_f64(vec![x, y])
 }
+/// `projectile_velocity` — see implementation.
 
 pub fn projectile_velocity(args: &[StrykeValue]) -> StrykeValue {
     let v0 = arg_f64(args, 0).unwrap_or(0.0);
@@ -1002,6 +1047,7 @@ pub fn projectile_velocity(args: &[StrykeValue]) -> StrykeValue {
     let vy = v0 * angle.sin() - g * t;
     arr_f64(vec![vx, vy])
 }
+/// `spring_oscillator_pos` — see implementation.
 
 pub fn spring_oscillator_pos(args: &[StrykeValue]) -> StrykeValue {
     let amplitude = arg_f64(args, 0).unwrap_or(1.0);
@@ -1010,6 +1056,7 @@ pub fn spring_oscillator_pos(args: &[StrykeValue]) -> StrykeValue {
     let t = arg_f64(args, 3).unwrap_or(0.0);
     StrykeValue::float(amplitude * (omega * t + phase).cos())
 }
+/// `damping_factor` — see implementation.
 
 pub fn damping_factor(args: &[StrykeValue]) -> StrykeValue {
     let c = arg_f64(args, 0).unwrap_or(0.0);
@@ -1017,12 +1064,14 @@ pub fn damping_factor(args: &[StrykeValue]) -> StrykeValue {
     let k = arg_f64(args, 2).unwrap_or(1.0).max(1e-12);
     StrykeValue::float(c / (2.0 * (m * k).sqrt()))
 }
+/// `critical_damping` — see implementation.
 
 pub fn critical_damping(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_f64(args, 0).unwrap_or(1.0);
     let k = arg_f64(args, 1).unwrap_or(1.0).max(0.0);
     StrykeValue::float(2.0 * (m * k).sqrt())
 }
+/// `elastic_collision_1d` — see implementation.
 
 pub fn elastic_collision_1d(args: &[StrykeValue]) -> StrykeValue {
     let m1 = arg_f64(args, 0).unwrap_or(1.0);
@@ -1033,6 +1082,7 @@ pub fn elastic_collision_1d(args: &[StrykeValue]) -> StrykeValue {
     let v2p = ((m2 - m1) * v2 + 2.0 * m1 * v1) / (m1 + m2);
     arr_f64(vec![v1p, v2p])
 }
+/// `inelastic_collision_1d` — see implementation.
 
 pub fn inelastic_collision_1d(args: &[StrykeValue]) -> StrykeValue {
     let m1 = arg_f64(args, 0).unwrap_or(1.0);
@@ -1041,6 +1091,7 @@ pub fn inelastic_collision_1d(args: &[StrykeValue]) -> StrykeValue {
     let v2 = arg_f64(args, 3).unwrap_or(0.0);
     StrykeValue::float((m1 * v1 + m2 * v2) / (m1 + m2))
 }
+/// `collision_response_2d` — see implementation.
 
 pub fn collision_response_2d(args: &[StrykeValue]) -> StrykeValue {
     let v1 = as_vec_f64(args.first().unwrap_or(&StrykeValue::UNDEF));
@@ -1060,6 +1111,7 @@ pub fn collision_response_2d(args: &[StrykeValue]) -> StrykeValue {
     let new_v2 = vec![v2[0] - j * nx / m2, v2[1] - j * ny / m2];
     arr_sv(vec![arr_f64(new_v1), arr_f64(new_v2)])
 }
+/// `torque_arm` — see implementation.
 
 pub fn torque_arm(args: &[StrykeValue]) -> StrykeValue {
     let f = arg_f64(args, 0).unwrap_or(0.0);
@@ -1067,30 +1119,35 @@ pub fn torque_arm(args: &[StrykeValue]) -> StrykeValue {
     let angle = arg_f64(args, 2).unwrap_or(90.0).to_radians();
     StrykeValue::float(f * r * angle.sin())
 }
+/// `moment_of_inertia_disc` — see implementation.
 
 pub fn moment_of_inertia_disc(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_f64(args, 0).unwrap_or(1.0);
     let r = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(0.5 * m * r * r)
 }
+/// `moment_of_inertia_rod` — see implementation.
 
 pub fn moment_of_inertia_rod(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_f64(args, 0).unwrap_or(1.0);
     let l = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(m * l * l / 12.0)
 }
+/// `moment_of_inertia_sphere` — see implementation.
 
 pub fn moment_of_inertia_sphere(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_f64(args, 0).unwrap_or(1.0);
     let r = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(0.4 * m * r * r)
 }
+/// `moment_of_inertia_cylinder` — see implementation.
 
 pub fn moment_of_inertia_cylinder(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_f64(args, 0).unwrap_or(1.0);
     let r = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(0.5 * m * r * r)
 }
+/// `center_of_mass_2d` — see implementation.
 
 pub fn center_of_mass_2d(args: &[StrykeValue]) -> StrykeValue {
     let masses = args.first().map(as_vec_f64).unwrap_or_default();
@@ -1111,6 +1168,7 @@ pub fn center_of_mass_2d(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(vec![cx / total_m, cy / total_m])
 }
+/// `center_of_mass_3d` — see implementation.
 
 pub fn center_of_mass_3d(args: &[StrykeValue]) -> StrykeValue {
     let masses = args.first().map(as_vec_f64).unwrap_or_default();
@@ -1131,6 +1189,7 @@ pub fn center_of_mass_3d(args: &[StrykeValue]) -> StrykeValue {
     }
     arr_f64(vec![c[0] / total_m, c[1] / total_m, c[2] / total_m])
 }
+/// `buoyancy_force` — see implementation.
 
 pub fn buoyancy_force(args: &[StrykeValue]) -> StrykeValue {
     let rho = arg_f64(args, 0).unwrap_or(1000.0);
@@ -1138,6 +1197,7 @@ pub fn buoyancy_force(args: &[StrykeValue]) -> StrykeValue {
     let g = arg_f64(args, 2).unwrap_or(9.81);
     StrykeValue::float(rho * v * g)
 }
+/// `lift_force` — see implementation.
 
 pub fn lift_force(args: &[StrykeValue]) -> StrykeValue {
     let cl = arg_f64(args, 0).unwrap_or(0.0);
@@ -1146,6 +1206,7 @@ pub fn lift_force(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 3).unwrap_or(0.0);
     StrykeValue::float(0.5 * cl * rho * v * v * a)
 }
+/// `poisson_brackets` — see implementation.
 
 pub fn poisson_brackets(args: &[StrykeValue]) -> StrykeValue {
     // {f, g} for 1D: df/dq * dg/dp - df/dp * dg/dq
@@ -1181,6 +1242,7 @@ fn hash_xy(x: i32, y: i32) -> u32 {
     h ^= h >> 16;
     h
 }
+/// `perlin_2d` — see implementation.
 
 pub fn perlin_2d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1219,6 +1281,7 @@ fn perlin_grad3(hash: u32, x: f64, y: f64, z: f64) -> f64 {
     };
     (if h & 1 == 0 { u } else { -u }) + (if h & 2 == 0 { v } else { -v })
 }
+/// `perlin_3d` — see implementation.
 
 pub fn perlin_3d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1254,6 +1317,7 @@ pub fn perlin_3d(args: &[StrykeValue]) -> StrykeValue {
     let nxy1 = lerp(nx01, nx11, v);
     StrykeValue::float(lerp(nxy0, nxy1, w))
 }
+/// `simplex_2d` — see implementation.
 
 pub fn simplex_2d(args: &[StrykeValue]) -> StrykeValue {
     // 2D simplex noise (Stefan Gustavson 2005): skew → triangular cell
@@ -1283,6 +1347,7 @@ pub fn simplex_2d(args: &[StrykeValue]) -> StrykeValue {
     let n2 = t2.powi(4) * perlin_grad2(hash_xy(ii + 1, jj + 1), x2, y2);
     StrykeValue::float(70.0 * (n0 + n1 + n2))
 }
+/// `worley_2d` — see implementation.
 
 pub fn worley_2d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1303,6 +1368,7 @@ pub fn worley_2d(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(min_dist)
 }
+/// `value_noise_2d` — see implementation.
 
 pub fn value_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1320,6 +1386,7 @@ pub fn value_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let v = fade(yf);
     StrykeValue::float(lerp(lerp(v00, v10, u), lerp(v01, v11, u), v))
 }
+/// `fbm_noise_2d` — see implementation.
 
 pub fn fbm_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1341,11 +1408,13 @@ pub fn fbm_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(total / max_amp.max(1e-12))
 }
+/// `ridge_noise_2d` — see implementation.
 
 pub fn ridge_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let n = perlin_2d(args).to_number();
     StrykeValue::float(1.0 - n.abs())
 }
+/// `turbulence_noise_2d` — see implementation.
 
 pub fn turbulence_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -1364,6 +1433,7 @@ pub fn turbulence_noise_2d(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::float(total)
 }
+/// `hash_2d_int` — see implementation.
 
 pub fn hash_2d_int(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_i64(args, 0).unwrap_or(0) as i32;
@@ -1387,6 +1457,7 @@ pub fn mulberry32_next(args: &[StrykeValue]) -> StrykeValue {
     z ^= z.wrapping_add((z ^ (z >> 7)).wrapping_mul(z | 61));
     StrykeValue::integer((z ^ (z >> 14)) as i64)
 }
+/// `xorshift32_next` — see implementation.
 
 pub fn xorshift32_next(args: &[StrykeValue]) -> StrykeValue {
     let mut s = arg_u64(args, 0).unwrap_or(1) as u32;
@@ -1398,6 +1469,7 @@ pub fn xorshift32_next(args: &[StrykeValue]) -> StrykeValue {
     s ^= s << 5;
     StrykeValue::integer(s as i64)
 }
+/// `pcg32_next` — see implementation.
 
 pub fn pcg32_next(args: &[StrykeValue]) -> StrykeValue {
     // PCG32 (O'Neill 2014): output is derived from the OLD state via
@@ -1409,6 +1481,7 @@ pub fn pcg32_next(args: &[StrykeValue]) -> StrykeValue {
     let result = (xorshifted as u32).rotate_right(rot);
     StrykeValue::integer(result as i64)
 }
+/// `splitmix64_next` — see implementation.
 
 pub fn splitmix64_next(args: &[StrykeValue]) -> StrykeValue {
     let mut s = arg_u64(args, 0).unwrap_or(0);

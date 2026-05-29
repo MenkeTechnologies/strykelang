@@ -27,6 +27,7 @@ const PWA_MANIFEST: &str = include_str!("../templates/devops/manifest.json");
 const PWA_SW: &str = include_str!("../templates/devops/sw.js");
 
 // ── Theme ──────────────────────────────────────────────────────────────
+/// `apply_theme` — see implementation.
 
 pub fn apply_theme(theme: &str, api: bool) -> Result<()> {
     if api {
@@ -75,6 +76,7 @@ const AUTH_USERS_CONTROLLER: &str =
     include_str!("../templates/auth/users_controller.stk");
 const AUTH_SIGNUP_VIEW: &str = include_str!("../templates/auth/signup.html.erb");
 const AUTH_LOGIN_VIEW: &str = include_str!("../templates/auth/login.html.erb");
+/// `auth` — see implementation.
 
 pub fn auth() -> Result<()> {
     ensure_app_root()?;
@@ -152,6 +154,7 @@ const ADMIN_CONTROLLER: &str =
 const ADMIN_INDEX: &str = include_str!("../templates/admin/index.html.erb");
 const ADMIN_TABLE: &str = include_str!("../templates/admin/table.html.erb");
 const ADMIN_CSS: &str = include_str!("../templates/admin/admin.css");
+/// `admin` — see implementation.
 
 pub fn admin() -> Result<()> {
     ensure_app_root()?;
@@ -189,6 +192,7 @@ pub fn admin() -> Result<()> {
 // ── API controller (for an existing model) ─────────────────────────────
 
 const API_CONTROLLER: &str = include_str!("../templates/api/controller.stk");
+/// `api` — see implementation.
 
 pub fn api(name: &str) -> Result<()> {
     ensure_app_root()?;
@@ -247,6 +251,7 @@ pub fn api(name: &str) -> Result<()> {
 const MAILER_TMPL: &str = include_str!("../templates/extras/mailer.stk");
 const JOB_TMPL: &str = include_str!("../templates/extras/job.stk");
 const CHANNEL_TMPL: &str = include_str!("../templates/extras/channel.stk");
+/// `mailer` — see implementation.
 
 pub fn mailer(name: &str, actions: &[String]) -> Result<()> {
     ensure_app_root()?;
@@ -275,6 +280,7 @@ pub fn mailer(name: &str, actions: &[String]) -> Result<()> {
     println!("Mailer scaffolded: {}Mailer with {} action(s)", name.to_pascal_case(), actions.len());
     Ok(())
 }
+/// `job` — see implementation.
 
 pub fn job(name: &str) -> Result<()> {
     ensure_app_root()?;
@@ -287,6 +293,7 @@ pub fn job(name: &str) -> Result<()> {
     println!("Job scaffolded: {}Job", name.to_pascal_case());
     Ok(())
 }
+/// `channel` — see implementation.
 
 pub fn channel(name: &str) -> Result<()> {
     ensure_app_root()?;
@@ -304,6 +311,7 @@ pub fn channel(name: &str) -> Result<()> {
 }
 
 // ── DevOps generators (Dockerfile / GitHub Actions / PWA) ─────────────
+/// `docker` — see implementation.
 
 pub fn docker(app_name: &str) -> Result<()> {
     ensure_app_root()?;
@@ -313,6 +321,7 @@ pub fn docker(app_name: &str) -> Result<()> {
     println!("Wrote Dockerfile + .dockerignore. Build: docker build -t {} .", app_name);
     Ok(())
 }
+/// `ci` — see implementation.
 
 pub fn ci() -> Result<()> {
     ensure_app_root()?;
@@ -320,6 +329,7 @@ pub fn ci() -> Result<()> {
     println!("Wrote .github/workflows/ci.yml — pushes to main run health smoke.");
     Ok(())
 }
+/// `pwa` — see implementation.
 
 pub fn pwa(app_name: &str) -> Result<()> {
     ensure_app_root()?;
@@ -336,6 +346,7 @@ pub fn pwa(app_name: &str) -> Result<()> {
 }
 
 // ── API mode conversion ────────────────────────────────────────────────
+/// `convert_to_api` — see implementation.
 
 pub fn convert_to_api() -> Result<()> {
     // Drop the layout — API responses don't need HTML chrome.

@@ -82,6 +82,7 @@ http_method!(http_method_connect, "CONNECT");
 // ══════════════════════════════════════════════════════════════════════
 // Distribution PDF / quantile functions (statrs backed)
 // ══════════════════════════════════════════════════════════════════════
+/// `dbeta` — see implementation.
 
 pub fn dbeta(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -95,6 +96,7 @@ pub fn dbeta(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qbeta` — see implementation.
 
 pub fn qbeta(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -105,6 +107,7 @@ pub fn qbeta(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rbeta` — see implementation.
 
 pub fn rbeta(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -116,6 +119,7 @@ pub fn rbeta(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dcauchy` — see implementation.
 
 pub fn dcauchy(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -129,6 +133,7 @@ pub fn dcauchy(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qcauchy` — see implementation.
 
 pub fn qcauchy(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -139,6 +144,7 @@ pub fn qcauchy(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rcauchy` — see implementation.
 
 pub fn rcauchy(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -149,6 +155,7 @@ pub fn rcauchy(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dexp` — see implementation.
 
 pub fn dexp(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -161,6 +168,7 @@ pub fn dexp(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qexp` — see implementation.
 
 pub fn qexp(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -170,6 +178,7 @@ pub fn qexp(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rexp` — see implementation.
 
 pub fn rexp(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -179,6 +188,7 @@ pub fn rexp(args: &[StrykeValue]) -> StrykeValue {
         args.first().cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dgamma` — see implementation.
 
 pub fn dgamma(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -192,6 +202,7 @@ pub fn dgamma(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qgamma` — see implementation.
 
 pub fn qgamma(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -202,6 +213,7 @@ pub fn qgamma(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rgamma` — see implementation.
 
 pub fn rgamma(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -212,6 +224,7 @@ pub fn rgamma(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dlnorm` — see implementation.
 
 pub fn dlnorm(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(1.0);
@@ -225,6 +238,7 @@ pub fn dlnorm(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qlnorm` — see implementation.
 
 pub fn qlnorm(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -235,6 +249,7 @@ pub fn qlnorm(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rlnorm` — see implementation.
 
 pub fn rlnorm(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -245,6 +260,7 @@ pub fn rlnorm(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dlogis` — see implementation.
 
 pub fn dlogis(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -254,6 +270,7 @@ pub fn dlogis(args: &[StrykeValue]) -> StrykeValue {
     let pdf = (-z).exp() / (scale * (1.0 + (-z).exp()).powi(2));
     StrykeValue::float(pdf)
 }
+/// `qlogis` — see implementation.
 
 pub fn qlogis(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5).clamp(1e-12, 1.0 - 1e-12);
@@ -261,6 +278,7 @@ pub fn qlogis(args: &[StrykeValue]) -> StrykeValue {
     let scale = arg_f64(args, 2).unwrap_or(1.0);
     StrykeValue::float(loc + scale * (p / (1.0 - p)).ln())
 }
+/// `rlogis` — see implementation.
 
 pub fn rlogis(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -271,6 +289,7 @@ pub fn rlogis(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dpois` — see implementation.
 
 pub fn dpois(args: &[StrykeValue]) -> StrykeValue {
     let k = arg_f64(args, 0).unwrap_or(0.0).max(0.0).round() as u64;
@@ -280,6 +299,7 @@ pub fn dpois(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qpois` — see implementation.
 
 pub fn qpois(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -294,6 +314,7 @@ pub fn qpois(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(k as i64)
 }
+/// `rpois` — see implementation.
 
 pub fn rpois(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -303,6 +324,7 @@ pub fn rpois(args: &[StrykeValue]) -> StrykeValue {
         args.first().cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `dweibull` — see implementation.
 
 pub fn dweibull(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
@@ -316,6 +338,7 @@ pub fn dweibull(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `qweibull` — see implementation.
 
 pub fn qweibull(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -326,6 +349,7 @@ pub fn qweibull(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rweibull` — see implementation.
 
 pub fn rweibull(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -336,6 +360,7 @@ pub fn rweibull(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `qnorm` — see implementation.
 
 pub fn qnorm(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -346,6 +371,7 @@ pub fn qnorm(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rnorm` — see implementation.
 
 pub fn rnorm(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -356,6 +382,7 @@ pub fn rnorm(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `qunif` — see implementation.
 
 pub fn qunif(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -366,6 +393,7 @@ pub fn qunif(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `runif` — see implementation.
 
 pub fn runif(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -373,6 +401,7 @@ pub fn runif(args: &[StrykeValue]) -> StrykeValue {
     let hi = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(rand::thread_rng().gen_range(lo..hi))
 }
+/// `qbinom` — see implementation.
 
 pub fn qbinom(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -389,6 +418,7 @@ pub fn qbinom(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(n as i64)
 }
+/// `rbinom` — see implementation.
 
 pub fn rbinom(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -399,6 +429,7 @@ pub fn rbinom(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(0.5)),
     ])
 }
+/// `qgeom` — see implementation.
 
 pub fn qgeom(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -407,6 +438,7 @@ pub fn qgeom(args: &[StrykeValue]) -> StrykeValue {
     let k = ((1.0 - p).ln() / (1.0 - pr).max(1e-12).ln()).ceil() as i64 - 1;
     StrykeValue::integer(k.max(0))
 }
+/// `rgeom` — see implementation.
 
 pub fn rgeom(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -416,6 +448,7 @@ pub fn rgeom(args: &[StrykeValue]) -> StrykeValue {
         args.first().cloned().unwrap_or(StrykeValue::float(0.5)),
     ])
 }
+/// `qhyper` — see implementation.
 
 pub fn qhyper(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -434,6 +467,7 @@ pub fn qhyper(args: &[StrykeValue]) -> StrykeValue {
     }
     StrykeValue::integer(max as i64)
 }
+/// `rhyper` — see implementation.
 
 pub fn rhyper(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -445,6 +479,7 @@ pub fn rhyper(args: &[StrykeValue]) -> StrykeValue {
         args.get(2).cloned().unwrap_or(StrykeValue::float(3.0)),
     ])
 }
+/// `qchisq` — see implementation.
 
 pub fn qchisq(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -454,6 +489,7 @@ pub fn qchisq(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rchisq` — see implementation.
 
 pub fn rchisq(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -463,6 +499,7 @@ pub fn rchisq(args: &[StrykeValue]) -> StrykeValue {
         args.first().cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `qf` — see implementation.
 
 pub fn qf(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -473,6 +510,7 @@ pub fn qf(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rf` — see implementation.
 
 pub fn rf(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;
@@ -483,6 +521,7 @@ pub fn rf(args: &[StrykeValue]) -> StrykeValue {
         args.get(1).cloned().unwrap_or(StrykeValue::float(1.0)),
     ])
 }
+/// `qt` — see implementation.
 
 pub fn qt(args: &[StrykeValue]) -> StrykeValue {
     let p = arg_f64(args, 0).unwrap_or(0.5);
@@ -492,6 +531,7 @@ pub fn qt(args: &[StrykeValue]) -> StrykeValue {
         Err(_) => StrykeValue::UNDEF,
     }
 }
+/// `rt` — see implementation.
 
 pub fn rt(args: &[StrykeValue]) -> StrykeValue {
     use rand::Rng;

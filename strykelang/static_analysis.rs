@@ -48,11 +48,16 @@ impl Scope {
         self.subs.insert(name.to_string());
     }
 }
+/// `StaticAnalyzer` — see fields for layout.
 
 pub struct StaticAnalyzer {
+    /// `scopes` field.
     scopes: Vec<Scope>,
+    /// `errors` field.
     errors: Vec<StrykeError>,
+    /// `file` field.
     file: String,
+    /// `current_package` field.
     current_package: String,
     /// When `false` (the `stryke check` default), strict-vars-style
     /// "Global symbol \"$x\" requires explicit package name" errors are
@@ -89,9 +94,11 @@ pub struct StaticAnalyzer {
 }
 
 impl StaticAnalyzer {
+    /// `new` — see implementation.
     pub fn new(file: &str) -> Self {
         Self::with_strict_vars(file, false)
     }
+    /// `with_strict_vars` — see implementation.
 
     pub fn with_strict_vars(file: &str, strict_vars: bool) -> Self {
         let mut global = Scope::default();
@@ -263,6 +270,7 @@ impl StaticAnalyzer {
         self.errors
             .push(StrykeError::new(kind, msg, line, &self.file));
     }
+    /// `analyze` — see implementation.
 
     pub fn analyze(mut self, program: &Program) -> StrykeResult<()> {
         for stmt in &program.statements {
@@ -1930,6 +1938,7 @@ pub fn static_string_value(e: &Expr) -> Option<String> {
         _ => None,
     }
 }
+/// `analyze_program` — see implementation.
 
 pub fn analyze_program(program: &Program, file: &str) -> StrykeResult<()> {
     StaticAnalyzer::new(file).analyze(program)

@@ -22,6 +22,7 @@ fn set_output_delim(delim: Option<char>) {
 fn choose_delim() -> char {
     get_output_delim().unwrap_or('/')
 }
+/// `deparse_block` — see implementation.
 
 pub fn deparse_block(block: &Block) -> String {
     let mut buf = String::new();
@@ -37,6 +38,7 @@ pub fn deparse_block_with_delim(block: &Block, delim: char) -> String {
     set_output_delim(None);
     buf
 }
+/// `deparse_expr` — see implementation.
 
 pub fn deparse_expr(expr: &Expr) -> String {
     let mut buf = String::new();

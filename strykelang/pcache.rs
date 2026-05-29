@@ -5,8 +5,10 @@ use std::sync::LazyLock;
 use dashmap::DashMap;
 
 use crate::value::StrykeValue;
+/// `GLOBAL_PCACHE` static.
 
 pub static GLOBAL_PCACHE: LazyLock<DashMap<String, StrykeValue>> = LazyLock::new(DashMap::new);
+/// `cache_key` — see implementation.
 
 pub fn cache_key(v: &StrykeValue) -> String {
     v.to_string()

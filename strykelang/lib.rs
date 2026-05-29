@@ -5,122 +5,224 @@
 #![allow(rustdoc::private_intra_doc_links)]
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(clippy::needless_range_loop)]
+/// `agent` submodule.
 
 pub mod agent;
+/// `ai` submodule.
 pub mod ai;
+/// `ai_sugar` submodule.
 pub mod ai_sugar;
+/// `aop` submodule.
 pub mod aop;
+/// `aot` submodule.
 pub mod aot;
+/// `ast` submodule.
 pub mod ast;
+/// `banner` submodule.
 pub mod banner;
+/// `builtins` submodule.
 pub mod builtins;
+/// `builtins_bio_geom_markov` submodule.
 pub mod builtins_bio_geom_markov;
+/// `builtins_bits_music_stats` submodule.
 pub mod builtins_bits_music_stats;
+/// `builtins_combin_audio_physics` submodule.
 pub mod builtins_combin_audio_physics;
+/// `builtins_const` submodule.
 pub mod builtins_const;
+/// `builtins_data` submodule.
 pub mod builtins_data;
+/// `builtins_games_ml_chem` submodule.
 pub mod builtins_games_ml_chem;
+/// `builtins_geom` submodule.
 pub mod builtins_geom;
+/// `builtins_github` submodule.
 pub mod builtins_github;
+/// `builtins_iter` submodule.
 pub mod builtins_iter;
+/// `builtins_linalg_graph_date` submodule.
 pub mod builtins_linalg_graph_date;
+/// `builtins_mathx` submodule.
 pub mod builtins_mathx;
+/// `builtins_misc` submodule.
 pub mod builtins_misc;
+/// `builtins_misc2` submodule.
 pub mod builtins_misc2;
+/// `builtins_net` submodule.
 pub mod builtins_net;
+/// `builtins_phonetic_geo_codec` submodule.
 pub mod builtins_phonetic_geo_codec;
+/// `builtins_quant` submodule.
 pub mod builtins_quant;
+/// `builtins_ratings_geom_units` submodule.
 pub mod builtins_ratings_geom_units;
+/// `builtins_sync` submodule.
 pub mod builtins_sync;
+/// `builtins_validate` submodule.
 pub mod builtins_validate;
+/// `builtins_vision_ir_algorithms` submodule.
 pub mod builtins_vision_ir_algorithms;
+/// `bytecode` submodule.
 pub mod bytecode;
+/// `capture` submodule.
 pub mod capture;
+/// `cli_runners` submodule.
 pub mod cli_runners;
+/// `cluster` submodule.
 pub mod cluster;
+/// `compiler` submodule.
 pub mod compiler;
+/// `controller` submodule.
 pub mod controller;
+/// `convert` submodule.
 pub mod convert;
 mod crypt_util;
+/// `dap` submodule.
 pub mod dap;
+/// `data_section` submodule.
 pub mod data_section;
+/// `debugger` submodule.
 pub mod debugger;
+/// `deconvert` submodule.
 pub mod deconvert;
+/// `deparse` submodule.
 pub mod deparse;
+/// `doc_render` submodule.
 pub mod doc_render;
+/// `docs` submodule.
 pub mod docs;
+/// `english` submodule.
 pub mod english;
+/// `error` submodule.
 pub mod error;
 mod fib_like_tail;
+/// `fmt` submodule.
 pub mod fmt;
+/// `format` submodule.
 pub mod format;
+/// `getopts` submodule.
 pub mod getopts;
+/// `god` submodule.
 pub mod god;
 mod jit;
 mod jwt;
+/// `kvstore` submodule.
 pub mod kvstore;
+/// `lexer` submodule.
 pub mod lexer;
+/// `list_builtins` submodule.
 pub mod list_builtins;
+/// `lsp` submodule.
 pub mod lsp;
+/// `lsp_docs_domains` submodule.
 pub mod lsp_docs_domains;
+/// `lsp_extras` submodule.
 pub mod lsp_extras;
+/// `lsp_symbols` submodule.
 pub mod lsp_symbols;
 mod map_grep_fast;
 mod map_stream;
+/// `mcp` submodule.
 pub mod mcp;
+/// `minify` submodule.
 pub mod minify;
+/// `mro` submodule.
 pub mod mro;
 mod nanbox;
+/// `nat_punch` submodule.
 pub mod nat_punch;
 mod native_codec;
+/// `native_data` submodule.
 pub mod native_data;
+/// `pack` submodule.
 pub mod pack;
+/// `par_lines` submodule.
 pub mod par_lines;
 mod par_list;
+/// `par_pipeline` submodule.
 pub mod par_pipeline;
+/// `par_walk` submodule.
 pub mod par_walk;
+/// `parallel_trace` submodule.
 pub mod parallel_trace;
+/// `parser` submodule.
 pub mod parser;
+/// `pcache` submodule.
 pub mod pcache;
+/// `pchannel` submodule.
 pub mod pchannel;
 mod pending_destroy;
+/// `perf_recorder` submodule.
 pub mod perf_recorder;
+/// `perl_decode` submodule.
 pub mod perl_decode;
+/// `perl_fs` submodule.
 pub mod perl_fs;
+/// `perl_inc` submodule.
 pub mod perl_inc;
+/// `perl_pty` submodule.
 #[cfg(unix)]
 pub mod perl_pty;
 mod perl_regex;
+/// `perl_signal` submodule.
 pub mod perl_signal;
+/// `pkg` submodule.
 pub mod pkg;
 mod pmap_progress;
+/// `ppool` submodule.
 pub mod ppool;
+/// `profiler` submodule.
 pub mod profiler;
+/// `provenance` submodule.
 pub mod provenance;
+/// `pwatch` submodule.
 pub mod pwatch;
+/// `remote_wire` submodule.
 pub mod remote_wire;
+/// `rust_ffi` submodule.
 pub mod rust_ffi;
+/// `rust_sugar` submodule.
 pub mod rust_sugar;
+/// `scope` submodule.
 pub mod scope;
+/// `script_cache` submodule.
 pub mod script_cache;
+/// `secrets` submodule.
 pub mod secrets;
+/// `serialize_normalize` submodule.
 pub mod serialize_normalize;
+/// `sketches` submodule.
 pub mod sketches;
 mod sort_fast;
+/// `special_vars` submodule.
 pub mod special_vars;
+/// `static_analysis` submodule.
 pub mod static_analysis;
+/// `stego` submodule.
 pub mod stego;
+/// `stress` submodule.
 pub mod stress;
+/// `stryke_log` submodule.
 pub mod stryke_log;
+/// `teleport` submodule.
 pub mod teleport;
+/// `token` submodule.
 pub mod token;
+/// `turn_client` submodule.
 pub mod turn_client;
+/// `turnbuckle` submodule.
 pub mod turnbuckle;
+/// `udp_sockets` submodule.
 pub mod udp_sockets;
+/// `value` submodule.
 pub mod value;
+/// `vm` submodule.
 pub mod vm;
+/// `vm_helper` submodule.
 pub mod vm_helper;
+/// `web` submodule.
 pub mod web;
+/// `web_orm` submodule.
 pub mod web_orm;
 
 // Re-export shell components from the zsh crate
@@ -255,6 +357,7 @@ pub fn deconvert_to_perl_with_options(
 ) -> String {
     deconvert::deconvert_program_with_options(p, opts)
 }
+/// `parse` — see implementation.
 
 pub fn parse(code: &str) -> StrykeResult<ast::Program> {
     parse_with_file(code, "-e")

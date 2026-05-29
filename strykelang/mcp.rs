@@ -438,10 +438,14 @@ pub(crate) fn collect_attached_tools(line: usize) -> Vec<AttachedTool> {
     }
     out
 }
+/// `AttachedTool` — see fields for layout.
 
 pub struct AttachedTool {
+    /// `handle_id` field.
     pub handle_id: u64,
+    /// `server_name` field.
     pub server_name: String,
+    /// `spec` field.
     pub spec: serde_json::Value,
 }
 

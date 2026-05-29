@@ -71,6 +71,7 @@ const TY_REGEXP: u32 = 8;
 const TY_MACRO: u32 = 9;
 
 const MOD_DEFAULT_LIBRARY: u32 = 1 << 5;
+/// `semantic_tokens_legend` — see implementation.
 
 pub fn semantic_tokens_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
@@ -78,6 +79,7 @@ pub fn semantic_tokens_legend() -> SemanticTokensLegend {
         token_modifiers: SEMANTIC_MODS.to_vec(),
     }
 }
+/// `semantic_tokens_options` — see implementation.
 
 pub fn semantic_tokens_options() -> SemanticTokensServerCapabilities {
     SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {

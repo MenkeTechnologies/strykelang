@@ -47,6 +47,7 @@ use crate::udp_sockets;
 ///             clients can match responses to requests; also used in
 ///             XOR-MAPPED-ADDRESS computation
 pub const STUN_MAGIC_COOKIE: u32 = 0x2112_A442;
+/// `build_binding_request` — see implementation.
 
 pub fn build_binding_request(tx_id: &[u8; 12]) -> [u8; 20] {
     let mut pkt = [0u8; 20];
@@ -250,9 +251,13 @@ pub const DEFAULT_STUN_SERVERS: &[(&str, u16)] = &[
 /// Per-server STUN observation collected during NAT classification.
 #[derive(Debug, Clone)]
 pub struct StunObservation {
+    /// `server` field.
     pub server: String,
+    /// `ok` field.
     pub ok: bool,
+    /// `public_ip` field.
     pub public_ip: Option<std::net::IpAddr>,
+    /// `public_port` field.
     pub public_port: Option<u16>,
 }
 
@@ -273,10 +278,15 @@ pub struct StunObservation {
 ///                     don't draw conclusions.
 #[derive(Debug, Clone)]
 pub struct NatClassification {
+    /// `nat_type` field.
     pub nat_type: &'static str,
+    /// `public_ip` field.
     pub public_ip: Option<std::net::IpAddr>,
+    /// `observations` field.
     pub observations: Vec<StunObservation>,
+    /// `queried` field.
     pub queried: u32,
+    /// `succeeded` field.
     pub succeeded: u32,
 }
 
@@ -344,10 +354,15 @@ pub fn classify_nat(
 /// Result of a hole-punch attempt.
 #[derive(Debug, Clone)]
 pub struct PunchResult {
+    /// `established` field.
     pub established: bool,
+    /// `latency_ms` field.
     pub latency_ms: u64,
+    /// `bombards_sent` field.
     pub bombards_sent: u32,
+    /// `peer_msg` field.
     pub peer_msg: Option<Vec<u8>>,
+    /// `peer_addr` field.
     pub peer_addr: Option<SocketAddr>,
 }
 

@@ -18,10 +18,14 @@ use crate::vm_helper::{Flow, FlowOrError, VMHelper};
 pub struct PpoolInner {
     /// `None` after the pool is shut down.
     pub(crate) job_tx: Mutex<Option<Sender<PoolJob>>>,
+    /// `result_rx` field.
     result_rx: Mutex<Receiver<(u64, StrykeValue)>>,
+    /// `pending` field.
     pending: Mutex<VecDeque<(u64, StrykeValue)>>,
     pub(crate) next_order: AtomicU64,
+    /// `collect_from` field.
     collect_from: AtomicU64,
+    /// `workers` field.
     workers: Mutex<Option<Vec<JoinHandle<()>>>>,
 }
 

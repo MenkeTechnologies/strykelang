@@ -1,12 +1,17 @@
 use std::fmt;
 
 use crate::value::StrykeValue;
+/// `StrykeError` — see fields for layout.
 
 #[derive(Debug, Clone)]
 pub struct StrykeError {
+    /// `kind` field.
     pub kind: ErrorKind,
+    /// `message` field.
     pub message: String,
+    /// `line` field.
     pub line: usize,
+    /// `file` field.
     pub file: String,
     /// When `die` is called with a ref argument, the original value is preserved here
     /// so that `$@` can hold the ref (not just its stringification).
@@ -16,23 +21,36 @@ pub struct StrykeError {
     /// failed; absent (`None`) yields the standard period-terminated form.
     pub near: Option<String>,
 }
+/// `ErrorKind` — see variants.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
+    /// `Syntax` variant.
     Syntax,
+    /// `Runtime` variant.
     Runtime,
+    /// `Type` variant.
     Type,
+    /// `UndefinedVariable` variant.
     UndefinedVariable,
+    /// `UndefinedSubroutine` variant.
     UndefinedSubroutine,
+    /// `FileNotFound` variant.
     FileNotFound,
+    /// `IO` variant.
     IO,
+    /// `Regex` variant.
     Regex,
+    /// `DivisionByZero` variant.
     DivisionByZero,
+    /// `Die` variant.
     Die,
+    /// `Exit` variant.
     Exit(i32),
 }
 
 impl StrykeError {
+    /// `new` — see implementation.
     pub fn new(
         kind: ErrorKind,
         message: impl Into<String>,
@@ -55,14 +73,17 @@ impl StrykeError {
         self.near = Some(near.into());
         self
     }
+    /// `syntax` — see implementation.
 
     pub fn syntax(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Syntax, message, line, "-e")
     }
+    /// `runtime` — see implementation.
 
     pub fn runtime(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Runtime, message, line, "-e")
     }
+    /// `type_error` — see implementation.
 
     pub fn type_error(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Type, message, line, "-e")
@@ -73,6 +94,7 @@ impl StrykeError {
         self.line = line;
         self
     }
+    /// `die` — see implementation.
 
     pub fn die(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::Die, message, line, "-e")
@@ -85,6 +107,7 @@ impl StrykeError {
     pub fn division_by_zero(message: impl Into<String>, line: usize) -> Self {
         Self::new(ErrorKind::DivisionByZero, message, line, "-e")
     }
+    /// `die_with_value` — see implementation.
 
     pub fn die_with_value(value: StrykeValue, message: String, line: usize) -> Self {
         let mut e = Self::new(ErrorKind::Die, message, line, "-e");
@@ -126,6 +149,7 @@ impl fmt::Display for StrykeError {
 }
 
 impl std::error::Error for StrykeError {}
+/// `StrykeResult` type alias.
 
 pub type StrykeResult<T> = Result<T, StrykeError>;
 

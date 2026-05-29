@@ -174,6 +174,7 @@ pub(crate) struct PmapProgress {
 }
 
 impl PmapProgress {
+    /// `new` — see implementation.
     pub fn new(enabled: bool, total: usize) -> Self {
         let (stream, tty) = detect_stream();
         let force_plain_lines = env_force_plain_lines();
@@ -217,6 +218,7 @@ impl PmapProgress {
             finished: AtomicBool::new(false),
         }
     }
+    /// `tick` — see implementation.
 
     #[inline]
     pub fn tick(&self) {
@@ -239,6 +241,7 @@ impl PmapProgress {
             }
         }
     }
+    /// `finish` — see implementation.
 
     pub fn finish(&self) {
         if !self.enabled {
@@ -512,6 +515,7 @@ pub(crate) struct FanProgress {
 }
 
 impl FanProgress {
+    /// `new` — see implementation.
     pub fn new(enabled: bool, total: usize) -> Self {
         let (stream, tty) = detect_stream();
         let force_plain_lines = env_force_plain_lines();

@@ -78,9 +78,12 @@ fn destructure_expr_array_len(tmp: &str, line: usize) -> Expr {
         line,
     }
 }
+/// `Parser` — see fields for layout.
 
 pub struct Parser {
+    /// `tokens` field.
     tokens: Vec<(Token, usize)>,
+    /// `pos` field.
     pos: usize,
     /// Monotonic slot id for `rate_limit(...)` sliding-window state in the interpreter.
     next_rate_limit_slot: u32,
@@ -179,9 +182,11 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// `new` — see implementation.
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
         Self::new_with_file(tokens, "-e")
     }
+    /// `new_with_file` — see implementation.
 
     pub fn new_with_file(tokens: Vec<(Token, usize)>, file: impl Into<String>) -> Self {
         Self {
@@ -535,6 +540,7 @@ impl Parser {
     }
 
     // ── Top level ──
+    /// `parse_program` — see implementation.
 
     pub fn parse_program(&mut self) -> StrykeResult<Program> {
         let mut statements = self.parse_statements()?;
@@ -20367,6 +20373,7 @@ pub fn parse_slice_indices_from_str(s: &str, file: &str) -> StrykeResult<Vec<Exp
     let mut parser = Parser::new_with_file(tokens, file);
     parser.parse_arg_list()
 }
+/// `parse_format_value_line` — see implementation.
 
 pub fn parse_format_value_line(line: &str) -> StrykeResult<Vec<Expr>> {
     let trimmed = line.trim();

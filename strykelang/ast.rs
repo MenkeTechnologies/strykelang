@@ -6,21 +6,27 @@ use serde::{Deserialize, Serialize};
 fn default_delim() -> char {
     '/'
 }
+/// `Program` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Program {
+    /// `statements` field.
     pub statements: Vec<Statement>,
 }
+/// `Statement` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Statement {
     /// Leading `LABEL:` on this statement (Perl convention: `FOO:`).
     pub label: Option<String>,
+    /// `kind` field.
     pub kind: StmtKind,
+    /// `line` field.
     pub line: usize,
 }
 
 impl Statement {
+    /// `new` — see implementation.
     pub fn new(kind: StmtKind, line: usize) -> Self {
         Self {
             label: None,
@@ -36,14 +42,19 @@ impl Statement {
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum GrepBuiltinKeyword {
+    /// `Grep` variant.
     #[default]
     Grep,
+    /// `Greps` variant.
     Greps,
+    /// `Filter` variant.
     Filter,
+    /// `FindAll` variant.
     FindAll,
 }
 
 impl GrepBuiltinKeyword {
+    /// `as_str` — see implementation.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Grep => "grep",
@@ -74,21 +85,26 @@ pub enum SubSigParam {
     /// `{ k => $v, ... }` — next argument must be a hash or hashref; keys bind to listed scalars.
     HashDestruct(Vec<(String, String)>),
 }
+/// `StmtKind` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StmtKind {
+    /// `Expression` variant.
     Expression(Expr),
+    /// `If` variant.
     If {
         condition: Expr,
         body: Block,
         elsifs: Vec<(Expr, Block)>,
         else_block: Option<Block>,
     },
+    /// `Unless` variant.
     Unless {
         condition: Expr,
         body: Block,
         else_block: Option<Block>,
     },
+    /// `While` variant.
     While {
         condition: Expr,
         body: Block,
@@ -96,16 +112,19 @@ pub enum StmtKind {
         /// `while (...) { } continue { }`
         continue_block: Option<Block>,
     },
+    /// `Until` variant.
     Until {
         condition: Expr,
         body: Block,
         label: Option<String>,
         continue_block: Option<Block>,
     },
+    /// `DoWhile` variant.
     DoWhile {
         body: Block,
         condition: Expr,
     },
+    /// `For` variant.
     For {
         init: Option<Box<Statement>>,
         condition: Option<Expr>,
@@ -114,6 +133,7 @@ pub enum StmtKind {
         label: Option<String>,
         continue_block: Option<Block>,
     },
+    /// `Foreach` variant.
     Foreach {
         var: String,
         list: Expr,
@@ -121,6 +141,7 @@ pub enum StmtKind {
         label: Option<String>,
         continue_block: Option<Block>,
     },
+    /// `SubDecl` variant.
     SubDecl {
         name: String,
         params: Vec<SubSigParam>,
@@ -129,9 +150,11 @@ pub enum StmtKind {
         /// `None` when using structured [`SubSigParam`] signatures instead.
         prototype: Option<String>,
     },
+    /// `Package` variant.
     Package {
         name: String,
     },
+    /// `Use` variant.
     Use {
         module: String,
         imports: Vec<Expr>,
@@ -144,16 +167,24 @@ pub enum StmtKind {
     UseOverload {
         pairs: Vec<(String, String)>,
     },
+    /// `No` variant.
     No {
         module: String,
         imports: Vec<Expr>,
     },
+    /// `Return` variant.
     Return(Option<Expr>),
+    /// `Last` variant.
     Last(Option<String>),
+    /// `Next` variant.
     Next(Option<String>),
+    /// `Redo` variant.
     Redo(Option<String>),
+    /// `My` variant.
     My(Vec<VarDecl>),
+    /// `Our` variant.
     Our(Vec<VarDecl>),
+    /// `Local` variant.
     Local(Vec<VarDecl>),
     /// `state $x = 0` — persistent lexical variable (initialized once per sub)
     State(Vec<VarDecl>),
@@ -267,20 +298,30 @@ pub enum AdviceKind {
 /// Target of `tie` (hash, array, or scalar).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TieTarget {
+    /// `Hash` variant.
     Hash(String),
+    /// `Array` variant.
     Array(String),
+    /// `Scalar` variant.
     Scalar(String),
 }
 
 /// Optional type for `typed my $x : Int` — enforced at assignment time (runtime).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PerlTypeName {
+    /// `Int` variant.
     Int,
+    /// `Str` variant.
     Str,
+    /// `Float` variant.
     Float,
+    /// `Bool` variant.
     Bool,
+    /// `Array` variant.
     Array,
+    /// `Hash` variant.
     Hash,
+    /// `Ref` variant.
     Ref,
     /// Struct-typed field: `field => Point` where Point is a struct name.
     Struct(String),
@@ -293,7 +334,9 @@ pub enum PerlTypeName {
 /// Single field in a struct definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructField {
+    /// `name` field.
     pub name: String,
+    /// `ty` field.
     pub ty: PerlTypeName,
     /// Optional default value expression (evaluated at construction time if field not provided).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -303,14 +346,18 @@ pub struct StructField {
 /// Method defined inside a struct: `fn name { ... }` or `fn name($self, ...) { ... }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructMethod {
+    /// `name` field.
     pub name: String,
+    /// `params` field.
     pub params: Vec<SubSigParam>,
+    /// `body` field.
     pub body: Block,
 }
 
 /// Single variant in an enum definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumVariant {
+    /// `name` field.
     pub name: String,
     /// Optional type for data carried by this variant. If None, it carries no data.
     pub ty: Option<PerlTypeName>,
@@ -319,15 +366,19 @@ pub struct EnumVariant {
 /// Compile-time algebraic data type: `enum Name { Variant1 => Type, Variant2, ... }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnumDef {
+    /// `name` field.
     pub name: String,
+    /// `variants` field.
     pub variants: Vec<EnumVariant>,
 }
 
 impl EnumDef {
+    /// `variant_index` — see implementation.
     #[inline]
     pub fn variant_index(&self, name: &str) -> Option<usize> {
         self.variants.iter().position(|v| v.name == name)
     }
+    /// `variant` — see implementation.
 
     #[inline]
     pub fn variant(&self, name: &str) -> Option<&EnumVariant> {
@@ -338,7 +389,9 @@ impl EnumDef {
 /// Compile-time record type: `struct Name { field => Type, ... ; fn method { } }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructDef {
+    /// `name` field.
     pub name: String,
+    /// `fields` field.
     pub fields: Vec<StructField>,
     /// User-defined methods: `fn name { }` inside struct body.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -348,18 +401,25 @@ pub struct StructDef {
 /// Visibility modifier for class fields and methods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Visibility {
+    /// `Public` variant.
     #[default]
     Public,
+    /// `Private` variant.
     Private,
+    /// `Protected` variant.
     Protected,
 }
 
 /// Single field in a class definition: `name: Type = default` or `pub name: Type`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassField {
+    /// `name` field.
     pub name: String,
+    /// `ty` field.
     pub ty: PerlTypeName,
+    /// `visibility` field.
     pub visibility: Visibility,
+    /// `default` field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<Expr>,
 }
@@ -367,11 +427,17 @@ pub struct ClassField {
 /// Method defined inside a class: `fn name { }` or `pub fn name($self, ...) { }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassMethod {
+    /// `name` field.
     pub name: String,
+    /// `params` field.
     pub params: Vec<SubSigParam>,
+    /// `body` field.
     pub body: Option<Block>,
+    /// `visibility` field.
     pub visibility: Visibility,
+    /// `is_static` field.
     pub is_static: bool,
+    /// `is_final` field.
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_final: bool,
 }
@@ -379,15 +445,19 @@ pub struct ClassMethod {
 /// Trait definition: `trait Name { fn required; fn with_default { } }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TraitDef {
+    /// `name` field.
     pub name: String,
+    /// `methods` field.
     pub methods: Vec<ClassMethod>,
 }
 
 impl TraitDef {
+    /// `method` — see implementation.
     #[inline]
     pub fn method(&self, name: &str) -> Option<&ClassMethod> {
         self.methods.iter().find(|m| m.name == name)
     }
+    /// `required_methods` — see implementation.
 
     #[inline]
     pub fn required_methods(&self) -> impl Iterator<Item = &ClassMethod> {
@@ -398,9 +468,13 @@ impl TraitDef {
 /// A static (class-level) variable: `static count: Int = 0`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassStaticField {
+    /// `name` field.
     pub name: String,
+    /// `ty` field.
     pub ty: PerlTypeName,
+    /// `visibility` field.
     pub visibility: Visibility,
+    /// `default` field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<Expr>,
 }
@@ -408,17 +482,25 @@ pub struct ClassStaticField {
 /// Class definition: `class Name extends Parent impl Trait { fields; methods }`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClassDef {
+    /// `name` field.
     pub name: String,
+    /// `is_abstract` field.
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_abstract: bool,
+    /// `is_final` field.
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_final: bool,
+    /// `extends` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extends: Vec<String>,
+    /// `implements` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub implements: Vec<String>,
+    /// `fields` field.
     pub fields: Vec<ClassField>,
+    /// `methods` field.
     pub methods: Vec<ClassMethod>,
+    /// `static_fields` field.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub static_fields: Vec<ClassStaticField>,
 }
@@ -428,25 +510,30 @@ fn is_false(v: &bool) -> bool {
 }
 
 impl ClassDef {
+    /// `field_index` — see implementation.
     #[inline]
     pub fn field_index(&self, name: &str) -> Option<usize> {
         self.fields.iter().position(|f| f.name == name)
     }
+    /// `field` — see implementation.
 
     #[inline]
     pub fn field(&self, name: &str) -> Option<&ClassField> {
         self.fields.iter().find(|f| f.name == name)
     }
+    /// `method` — see implementation.
 
     #[inline]
     pub fn method(&self, name: &str) -> Option<&ClassMethod> {
         self.methods.iter().find(|m| m.name == name)
     }
+    /// `static_methods` — see implementation.
 
     #[inline]
     pub fn static_methods(&self) -> impl Iterator<Item = &ClassMethod> {
         self.methods.iter().filter(|m| m.is_static)
     }
+    /// `instance_methods` — see implementation.
 
     #[inline]
     pub fn instance_methods(&self) -> impl Iterator<Item = &ClassMethod> {
@@ -455,6 +542,7 @@ impl ClassDef {
 }
 
 impl StructDef {
+    /// `field_index` — see implementation.
     #[inline]
     pub fn field_index(&self, name: &str) -> Option<usize> {
         self.fields.iter().position(|f| f.name == name)
@@ -635,11 +723,15 @@ impl PerlTypeName {
         }
     }
 }
+/// `VarDecl` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VarDecl {
+    /// `sigil` field.
     pub sigil: Sigil,
+    /// `name` field.
     pub name: String,
+    /// `initializer` field.
     pub initializer: Option<Expr>,
     /// Set by `frozen my ...` — reassignments are rejected at compile time (bytecode) or runtime.
     pub frozen: bool,
@@ -650,22 +742,29 @@ pub struct VarDecl {
     #[serde(default)]
     pub list_context: bool,
 }
+/// `Sigil` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Sigil {
+    /// `Scalar` variant.
     Scalar,
+    /// `Array` variant.
     Array,
+    /// `Hash` variant.
     Hash,
     /// `local *FH` — filehandle slot alias (limited typeglob).
     Typeglob,
 }
+/// `Block` type alias.
 
 pub type Block = Vec<Statement>;
 
 /// Comparator for `sort` — `{ $a <=> $b }`, or a code ref / expression (Perl `sort $cmp LIST`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SortComparator {
+    /// `Block` variant.
     Block(Block),
+    /// `Code` variant.
     Code(Box<Expr>),
 }
 
@@ -674,10 +773,12 @@ pub enum SortComparator {
 /// One arm of [`ExprKind::AlgebraicMatch`]: `PATTERN [if EXPR] => EXPR`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchArm {
+    /// `pattern` field.
     pub pattern: MatchPattern,
     /// Optional guard (`if EXPR`) evaluated after pattern match; `$_` is the match subject.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub guard: Option<Box<Expr>>,
+    /// `body` field.
     pub body: Expr,
 }
 
@@ -710,9 +811,11 @@ pub enum MatchPattern {
     /// Perl-truthy (stryke: `$gen->next` yields `[value, more]` with `more` truthy while iterating).
     OptionSome(String),
 }
+/// `MatchArrayElem` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchArrayElem {
+    /// `Expr` variant.
     Expr(Expr),
     /// `$name` at the top of a pattern element — bind this position to a new lexical `$name`.
     /// Use `[($x)]` if you need smartmatch against the current value of `$x` instead.
@@ -722,6 +825,7 @@ pub enum MatchArrayElem {
     /// `@name` — bind remaining elements as a new array to `@name` (only valid as the last element).
     RestBind(String),
 }
+/// `MatchHashPair` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchHashPair {
@@ -730,6 +834,7 @@ pub enum MatchHashPair {
     /// `key => $name` — key must exist; value is bound to `$name` in the arm.
     Capture { key: Expr, name: String },
 }
+/// `MagicConstKind` — see variants.
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum MagicConstKind {
@@ -740,47 +845,65 @@ pub enum MagicConstKind {
     /// Reference to currently executing subroutine (for anonymous recursion).
     Sub,
 }
+/// `Expr` — see fields for layout.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Expr {
+    /// `kind` field.
     pub kind: ExprKind,
+    /// `line` field.
     pub line: usize,
 }
+/// `ExprKind` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExprKind {
     // Literals
+    /// `Integer` variant.
     Integer(i64),
+    /// `Float` variant.
     Float(f64),
+    /// `String` variant.
     String(String),
     /// Unquoted identifier used as an expression term (`if (FOO)`), distinct from quoted `'FOO'` / `"FOO"`.
     /// Resolved at runtime: nullary subroutine if defined, otherwise stringifies like Perl barewords.
     Bareword(String),
+    /// `Regex` variant.
     Regex(String, String),
+    /// `QW` variant.
     QW(Vec<String>),
+    /// `Undef` variant.
     Undef,
     /// `__FILE__` / `__LINE__` (Perl compile-time literals).
     MagicConst(MagicConstKind),
 
     // Interpolated string (mix of literal and variable parts)
+    /// `InterpolatedString` variant.
     InterpolatedString(Vec<StringPart>),
 
     // Variables
+    /// `ScalarVar` variant.
     ScalarVar(String),
+    /// `ArrayVar` variant.
     ArrayVar(String),
+    /// `HashVar` variant.
     HashVar(String),
+    /// `ArrayElement` variant.
     ArrayElement {
         array: String,
         index: Box<Expr>,
     },
+    /// `HashElement` variant.
     HashElement {
         hash: String,
         key: Box<Expr>,
     },
+    /// `ArraySlice` variant.
     ArraySlice {
         array: String,
         indices: Vec<Expr>,
     },
+    /// `HashSlice` variant.
     HashSlice {
         hash: String,
         keys: Vec<Expr>,
@@ -803,9 +926,12 @@ pub enum ExprKind {
     },
 
     // References
+    /// `ScalarRef` variant.
     ScalarRef(Box<Expr>),
+    /// `ArrayRef` variant.
     ArrayRef(Vec<Expr>),
     HashRef(Vec<(Expr, Expr)>),
+    /// `CodeRef` variant.
     CodeRef {
         params: Vec<SubSigParam>,
         body: Block,
@@ -816,10 +942,12 @@ pub enum ExprKind {
     SubroutineCodeRef(String),
     /// `\&{ EXPR }` — coderef to a subroutine whose name is given by `EXPR` (string or expression).
     DynamicSubCodeRef(Box<Expr>),
+    /// `Deref` variant.
     Deref {
         expr: Box<Expr>,
         kind: Sigil,
     },
+    /// `ArrowDeref` variant.
     ArrowDeref {
         expr: Box<Expr>,
         index: Box<Expr>,
@@ -827,28 +955,34 @@ pub enum ExprKind {
     },
 
     // Operators
+    /// `BinOp` variant.
     BinOp {
         left: Box<Expr>,
         op: BinOp,
         right: Box<Expr>,
     },
+    /// `UnaryOp` variant.
     UnaryOp {
         op: UnaryOp,
         expr: Box<Expr>,
     },
+    /// `PostfixOp` variant.
     PostfixOp {
         expr: Box<Expr>,
         op: PostfixOp,
     },
+    /// `Assign` variant.
     Assign {
         target: Box<Expr>,
         value: Box<Expr>,
     },
+    /// `CompoundAssign` variant.
     CompoundAssign {
         target: Box<Expr>,
         op: BinOp,
         value: Box<Expr>,
     },
+    /// `Ternary` variant.
     Ternary {
         condition: Box<Expr>,
         then_expr: Box<Expr>,
@@ -863,6 +997,7 @@ pub enum ExprKind {
     // `qw(...)`) immediately before `x` is list-repeat; everything else is
     // scalar-repeat. The parser sets `list_repeat=true` only in that case;
     // `f(args) x N` (function-call parens, not list parens) stays scalar.
+    /// `Repeat` variant.
     Repeat {
         expr: Box<Expr>,
         count: Box<Expr>,
@@ -871,6 +1006,7 @@ pub enum ExprKind {
 
     // Range: `1..10` / `1...10` — in scalar context, `...` is the exclusive flip-flop (Perl `sed`-style).
     // With step: `1..100:2` (1,3,5,...,99) or `100..1:-1` (100,99,...,1).
+    /// `Range` variant.
     Range {
         from: Box<Expr>,
         to: Box<Expr>,
@@ -904,12 +1040,14 @@ pub enum ExprKind {
     },
 
     // Function call
+    /// `FuncCall` variant.
     FuncCall {
         name: String,
         args: Vec<Expr>,
     },
 
     // Method call: $obj->method(args) or $obj->SUPER::method(args)
+    /// `MethodCall` variant.
     MethodCall {
         object: Box<Expr>,
         method: String,
@@ -935,22 +1073,28 @@ pub enum ExprKind {
     TypeglobExpr(Box<Expr>),
 
     // Special forms
+    /// `Print` variant.
     Print {
         handle: Option<String>,
         args: Vec<Expr>,
     },
+    /// `Say` variant.
     Say {
         handle: Option<String>,
         args: Vec<Expr>,
     },
+    /// `Printf` variant.
     Printf {
         handle: Option<String>,
         args: Vec<Expr>,
     },
+    /// `Die` variant.
     Die(Vec<Expr>),
+    /// `Warn` variant.
     Warn(Vec<Expr>),
 
     // Regex operations
+    /// `Match` variant.
     Match {
         expr: Box<Expr>,
         pattern: String,
@@ -960,6 +1104,7 @@ pub enum ExprKind {
         #[serde(default = "default_delim")]
         delim: char,
     },
+    /// `Substitution` variant.
     Substitution {
         expr: Box<Expr>,
         pattern: String,
@@ -968,6 +1113,7 @@ pub enum ExprKind {
         #[serde(default = "default_delim")]
         delim: char,
     },
+    /// `Transliterate` variant.
     Transliterate {
         expr: Box<Expr>,
         from: String,
@@ -978,6 +1124,7 @@ pub enum ExprKind {
     },
 
     // List operations
+    /// `MapExpr` variant.
     MapExpr {
         block: Block,
         list: Box<Expr>,
@@ -995,6 +1142,7 @@ pub enum ExprKind {
         #[serde(default)]
         stream: bool,
     },
+    /// `GrepExpr` variant.
     GrepExpr {
         block: Block,
         list: Box<Expr>,
@@ -1013,13 +1161,16 @@ pub enum ExprKind {
         cmp: Option<SortComparator>,
         list: Box<Expr>,
     },
+    /// `ReverseExpr` variant.
     ReverseExpr(Box<Expr>),
     /// `rev EXPR` — always string-reverse (scalar reverse), stryke extension.
     Rev(Box<Expr>),
+    /// `JoinExpr` variant.
     JoinExpr {
         separator: Box<Expr>,
         list: Box<Expr>,
     },
+    /// `SplitExpr` variant.
     SplitExpr {
         pattern: Box<Expr>,
         string: Box<Expr>,
@@ -1033,6 +1184,7 @@ pub enum ExprKind {
     },
 
     // Parallel extensions
+    /// `PMapExpr` variant.
     PMapExpr {
         block: Block,
         list: Box<Expr>,
@@ -1056,6 +1208,7 @@ pub enum ExprKind {
         list: Box<Expr>,
         progress: Option<Box<Expr>>,
     },
+    /// `PGrepExpr` variant.
     PGrepExpr {
         block: Block,
         list: Box<Expr>,
@@ -1244,76 +1397,107 @@ pub enum ExprKind {
     },
 
     // Array/Hash operations
+    /// `Push` variant.
     Push {
         array: Box<Expr>,
         values: Vec<Expr>,
     },
+    /// `Pop` variant.
     Pop(Box<Expr>),
+    /// `Shift` variant.
     Shift(Box<Expr>),
+    /// `Unshift` variant.
     Unshift {
         array: Box<Expr>,
         values: Vec<Expr>,
     },
+    /// `Splice` variant.
     Splice {
         array: Box<Expr>,
         offset: Option<Box<Expr>>,
         length: Option<Box<Expr>>,
         replacement: Vec<Expr>,
     },
+    /// `Delete` variant.
     Delete(Box<Expr>),
+    /// `Exists` variant.
     Exists(Box<Expr>),
+    /// `Keys` variant.
     Keys(Box<Expr>),
+    /// `Values` variant.
     Values(Box<Expr>),
+    /// `Each` variant.
     Each(Box<Expr>),
 
     // String operations
+    /// `Chomp` variant.
     Chomp(Box<Expr>),
+    /// `Chop` variant.
     Chop(Box<Expr>),
+    /// `Length` variant.
     Length(Box<Expr>),
+    /// `Substr` variant.
     Substr {
         string: Box<Expr>,
         offset: Box<Expr>,
         length: Option<Box<Expr>>,
         replacement: Option<Box<Expr>>,
     },
+    /// `Index` variant.
     Index {
         string: Box<Expr>,
         substr: Box<Expr>,
         position: Option<Box<Expr>>,
     },
+    /// `Rindex` variant.
     Rindex {
         string: Box<Expr>,
         substr: Box<Expr>,
         position: Option<Box<Expr>>,
     },
+    /// `Sprintf` variant.
     Sprintf {
         format: Box<Expr>,
         args: Vec<Expr>,
     },
 
     // Numeric
+    /// `Abs` variant.
     Abs(Box<Expr>),
+    /// `Int` variant.
     Int(Box<Expr>),
+    /// `Sqrt` variant.
     Sqrt(Box<Expr>),
+    /// `Sin` variant.
     Sin(Box<Expr>),
+    /// `Cos` variant.
     Cos(Box<Expr>),
+    /// `Atan2` variant.
     Atan2 {
         y: Box<Expr>,
         x: Box<Expr>,
     },
+    /// `Exp` variant.
     Exp(Box<Expr>),
+    /// `Log` variant.
     Log(Box<Expr>),
     /// `rand` with optional upper bound (none = Perl default 1.0).
     Rand(Option<Box<Expr>>),
     /// `srand` with optional seed (none = time-based).
     Srand(Option<Box<Expr>>),
+    /// `Hex` variant.
     Hex(Box<Expr>),
+    /// `Oct` variant.
     Oct(Box<Expr>),
 
     // Case
+    /// `Lc` variant.
     Lc(Box<Expr>),
+    /// `Uc` variant.
     Uc(Box<Expr>),
+    /// `Lcfirst` variant.
     Lcfirst(Box<Expr>),
+    /// `Ucfirst` variant.
     Ucfirst(Box<Expr>),
 
     /// Unicode case fold (Perl `fc`).
@@ -1329,12 +1513,17 @@ pub enum ExprKind {
     Study(Box<Expr>),
 
     // Type
+    /// `Defined` variant.
     Defined(Box<Expr>),
+    /// `Ref` variant.
     Ref(Box<Expr>),
+    /// `ScalarContext` variant.
     ScalarContext(Box<Expr>),
 
     // Char
+    /// `Chr` variant.
     Chr(Box<Expr>),
+    /// `Ord` variant.
     Ord(Box<Expr>),
 
     // I/O
@@ -1342,47 +1531,68 @@ pub enum ExprKind {
     OpenMyHandle {
         name: String,
     },
+    /// `Open` variant.
     Open {
         handle: Box<Expr>,
         mode: Box<Expr>,
         file: Option<Box<Expr>>,
     },
+    /// `Close` variant.
     Close(Box<Expr>),
+    /// `ReadLine` variant.
     ReadLine(Option<String>),
+    /// `Eof` variant.
     Eof(Option<Box<Expr>>),
+    /// `Opendir` variant.
 
     Opendir {
         handle: Box<Expr>,
         path: Box<Expr>,
     },
+    /// `Readdir` variant.
     Readdir(Box<Expr>),
+    /// `Closedir` variant.
     Closedir(Box<Expr>),
+    /// `Rewinddir` variant.
     Rewinddir(Box<Expr>),
+    /// `Telldir` variant.
     Telldir(Box<Expr>),
+    /// `Seekdir` variant.
     Seekdir {
         handle: Box<Expr>,
         position: Box<Expr>,
     },
 
     // File tests
+    /// `FileTest` variant.
     FileTest {
         op: char,
         expr: Box<Expr>,
     },
 
     // System
+    /// `System` variant.
     System(Vec<Expr>),
+    /// `Exec` variant.
     Exec(Vec<Expr>),
+    /// `Eval` variant.
     Eval(Box<Expr>),
+    /// `Do` variant.
     Do(Box<Expr>),
+    /// `Require` variant.
     Require(Box<Expr>),
+    /// `Exit` variant.
     Exit(Option<Box<Expr>>),
+    /// `Chdir` variant.
     Chdir(Box<Expr>),
+    /// `Mkdir` variant.
     Mkdir {
         path: Box<Expr>,
         mode: Option<Box<Expr>>,
     },
+    /// `Unlink` variant.
     Unlink(Vec<Expr>),
+    /// `Rename` variant.
     Rename {
         old: Box<Expr>,
         new: Box<Expr>,
@@ -1391,17 +1601,22 @@ pub enum ExprKind {
     Chmod(Vec<Expr>),
     /// `chown UID, GID, @files` — first two are uid/gid, rest are paths.
     Chown(Vec<Expr>),
+    /// `Stat` variant.
 
     Stat(Box<Expr>),
+    /// `Lstat` variant.
     Lstat(Box<Expr>),
+    /// `Link` variant.
     Link {
         old: Box<Expr>,
         new: Box<Expr>,
     },
+    /// `Symlink` variant.
     Symlink {
         old: Box<Expr>,
         new: Box<Expr>,
     },
+    /// `Readlink` variant.
     Readlink(Box<Expr>),
     /// `files` / `files DIR` — list file names in a directory (default: `.`).
     Files(Vec<Expr>),
@@ -1425,6 +1640,7 @@ pub enum ExprKind {
     CharDevices(Vec<Expr>),
     /// `exe` / `exe DIR` — list executable file names in a directory (default: `.`).
     Executables(Vec<Expr>),
+    /// `Glob` variant.
     Glob(Vec<Expr>),
     /// Parallel recursive glob (rayon); same patterns as `glob`, different walk strategy.
     /// Optional `, progress => EXPR` — stderr progress bar (one tick per pattern).
@@ -1439,37 +1655,46 @@ pub enum ExprKind {
     },
 
     // Bless
+    /// `Bless` variant.
     Bless {
         ref_expr: Box<Expr>,
         class: Option<Box<Expr>>,
     },
 
     // Caller
+    /// `Caller` variant.
     Caller(Option<Box<Expr>>),
 
     // Wantarray
+    /// `Wantarray` variant.
     Wantarray,
 
     // List / Context
+    /// `List` variant.
     List(Vec<Expr>),
 
     // Postfix if/unless/while/until/for
+    /// `PostfixIf` variant.
     PostfixIf {
         expr: Box<Expr>,
         condition: Box<Expr>,
     },
+    /// `PostfixUnless` variant.
     PostfixUnless {
         expr: Box<Expr>,
         condition: Box<Expr>,
     },
+    /// `PostfixWhile` variant.
     PostfixWhile {
         expr: Box<Expr>,
         condition: Box<Expr>,
     },
+    /// `PostfixUntil` variant.
     PostfixUntil {
         expr: Box<Expr>,
         condition: Box<Expr>,
     },
+    /// `PostfixForeach` variant.
     PostfixForeach {
         expr: Box<Expr>,
         list: Box<Expr>,
@@ -1507,73 +1732,127 @@ pub enum ExprKind {
         arms: Vec<MatchArm>,
     },
 }
+/// `StringPart` — see variants.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StringPart {
+    /// `Literal` variant.
     Literal(String),
+    /// `ScalarVar` variant.
     ScalarVar(String),
+    /// `ArrayVar` variant.
     ArrayVar(String),
+    /// `Expr` variant.
     Expr(Expr),
 }
+/// `DerefKind` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum DerefKind {
+    /// `Array` variant.
     Array,
+    /// `Hash` variant.
     Hash,
+    /// `Call` variant.
     Call,
 }
+/// `BinOp` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BinOp {
+    /// `Add` variant.
     Add,
+    /// `Sub` variant.
     Sub,
+    /// `Mul` variant.
     Mul,
+    /// `Div` variant.
     Div,
+    /// `Mod` variant.
     Mod,
+    /// `Pow` variant.
     Pow,
+    /// `Concat` variant.
     Concat,
+    /// `NumEq` variant.
     NumEq,
+    /// `NumNe` variant.
     NumNe,
+    /// `NumLt` variant.
     NumLt,
+    /// `NumGt` variant.
     NumGt,
+    /// `NumLe` variant.
     NumLe,
+    /// `NumGe` variant.
     NumGe,
+    /// `Spaceship` variant.
     Spaceship,
+    /// `StrEq` variant.
     StrEq,
+    /// `StrNe` variant.
     StrNe,
+    /// `StrLt` variant.
     StrLt,
+    /// `StrGt` variant.
     StrGt,
+    /// `StrLe` variant.
     StrLe,
+    /// `StrGe` variant.
     StrGe,
+    /// `StrCmp` variant.
     StrCmp,
+    /// `LogAnd` variant.
     LogAnd,
+    /// `LogOr` variant.
     LogOr,
+    /// `DefinedOr` variant.
     DefinedOr,
+    /// `BitAnd` variant.
     BitAnd,
+    /// `BitOr` variant.
     BitOr,
+    /// `BitXor` variant.
     BitXor,
+    /// `ShiftLeft` variant.
     ShiftLeft,
+    /// `ShiftRight` variant.
     ShiftRight,
+    /// `LogAndWord` variant.
     LogAndWord,
+    /// `LogOrWord` variant.
     LogOrWord,
+    /// `BindMatch` variant.
     BindMatch,
+    /// `BindNotMatch` variant.
     BindNotMatch,
 }
+/// `UnaryOp` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOp {
+    /// `Negate` variant.
     Negate,
+    /// `LogNot` variant.
     LogNot,
+    /// `BitNot` variant.
     BitNot,
+    /// `LogNotWord` variant.
     LogNotWord,
+    /// `PreIncrement` variant.
     PreIncrement,
+    /// `PreDecrement` variant.
     PreDecrement,
+    /// `Ref` variant.
     Ref,
 }
+/// `PostfixOp` — see variants.
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum PostfixOp {
+    /// `Increment` variant.
     Increment,
+    /// `Decrement` variant.
     Decrement,
 }
 

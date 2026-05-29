@@ -60,8 +60,11 @@ use crate::value::{RemoteCluster, RemoteSlot, StrykeValue};
 /// order-preserving result collection plus an attempt counter for retry accounting.
 #[derive(Debug, Clone)]
 pub struct DispatchJob {
+    /// `seq` field.
     pub seq: u64,
+    /// `item` field.
     pub item: serde_json::Value,
+    /// `attempts` field.
     pub attempts: u32,
 }
 
@@ -69,7 +72,9 @@ pub struct DispatchJob {
 /// [`DispatchJob::seq`] so the dispatcher can stitch results back into source order.
 #[derive(Debug)]
 pub struct DispatchResult {
+    /// `seq` field.
     pub seq: u64,
+    /// `outcome` field.
     pub outcome: Result<StrykeValue, String>,
 }
 

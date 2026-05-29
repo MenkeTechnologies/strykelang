@@ -553,6 +553,7 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
     };
     format!("{}{}{}", prefix, lab, body)
 }
+/// `format_block` — see implementation.
 
 pub fn format_block(b: &Block) -> String {
     format_block_indent(b, 0)

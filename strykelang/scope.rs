@@ -416,6 +416,7 @@ impl Frame {
 /// Innermost frame is last in the vector.
 #[derive(Debug, Clone)]
 pub struct Scope {
+    /// `frames` field.
     frames: Vec<Frame>,
     /// Recycled frames to avoid allocation on every push_frame/pop_frame cycle.
     frame_pool: Vec<Frame>,
@@ -449,6 +450,7 @@ impl Default for Scope {
 }
 
 impl Scope {
+    /// `new` — see implementation.
     pub fn new() -> Self {
         let mut s = Self {
             frames: Vec::with_capacity(32),
@@ -470,6 +472,7 @@ impl Scope {
         self.parallel_guard = enabled;
         self.parallel_guard_baseline = if enabled { self.frames.len() } else { 0 };
     }
+    /// `parallel_guard` — see implementation.
 
     #[inline]
     pub fn parallel_guard(&self) -> bool {
@@ -554,6 +557,7 @@ impl Scope {
             0,
         ))
     }
+    /// `depth` — see implementation.
 
     #[inline]
     pub fn depth(&self) -> usize {
@@ -568,6 +572,7 @@ impl Scope {
             self.pop_frame();
         }
     }
+    /// `push_frame` — see implementation.
 
     #[inline]
     pub fn push_frame(&mut self) {
@@ -752,6 +757,7 @@ impl Scope {
             let _ = self.scalar_slot_concat_inplace(slot, &pv);
         }
     }
+    /// `scalar_slot_concat_inplace` — see implementation.
 
     #[inline]
     pub fn scalar_slot_concat_inplace(&mut self, slot: u8, rhs: &StrykeValue) -> StrykeValue {
@@ -798,6 +804,7 @@ impl Scope {
     pub(crate) fn can_pop_frame(&self) -> bool {
         self.frames.len() > 1
     }
+    /// `pop_frame` — see implementation.
 
     #[inline]
     pub fn pop_frame(&mut self) {
@@ -949,6 +956,7 @@ impl Scope {
     }
 
     // ── Scalars ──
+    /// `declare_scalar` — see implementation.
 
     #[inline]
     pub fn declare_scalar(&mut self, name: &str, val: StrykeValue) {
@@ -1038,6 +1046,7 @@ impl Scope {
             _ => None,
         }
     }
+    /// `get_scalar` — see implementation.
 
     #[inline]
     pub fn get_scalar(&self, name: &str) -> StrykeValue {
@@ -1314,6 +1323,7 @@ impl Scope {
         self.frames[0].set_scalar(name, val.shallow_clone());
         Ok(val)
     }
+    /// `set_scalar` — see implementation.
 
     #[inline]
     pub fn set_scalar(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
@@ -1619,6 +1629,7 @@ impl Scope {
     }
 
     // ── Atomic array/hash declarations ──
+    /// `declare_atomic_array` — see implementation.
 
     pub fn declare_atomic_array(&mut self, name: &str, val: Vec<StrykeValue>) {
         canon_main!(name);
@@ -1628,6 +1639,7 @@ impl Scope {
                 .push((name.to_string(), AtomicArray(Arc::new(Mutex::new(val)))));
         }
     }
+    /// `declare_atomic_hash` — see implementation.
 
     pub fn declare_atomic_hash(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         canon_main!(name);
@@ -1668,10 +1680,12 @@ impl Scope {
     pub fn take_sub_underscore(&mut self) -> Option<Vec<StrykeValue>> {
         self.frames.last_mut()?.sub_underscore.take()
     }
+    /// `declare_array` — see implementation.
 
     pub fn declare_array(&mut self, name: &str, val: Vec<StrykeValue>) {
         self.declare_array_frozen(name, val, false);
     }
+    /// `declare_array_frozen` — see implementation.
 
     pub fn declare_array_frozen(&mut self, name: &str, val: Vec<StrykeValue>, frozen: bool) {
         // Bug fix 2026-05-27: must capture is-package-qualified BEFORE
@@ -1703,6 +1717,7 @@ impl Scope {
             }
         }
     }
+    /// `get_array` — see implementation.
 
     pub fn get_array(&self, name: &str) -> Vec<StrykeValue> {
         // `@main::X` aliases the bare `@X` because `main` is the default
@@ -1924,6 +1939,7 @@ impl Scope {
         }
         None
     }
+    /// `get_array_mut` — see implementation.
 
     pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<StrykeValue>, StrykeError> {
         // Note: can't return &mut into a Mutex. Callers needing atomic array
@@ -2085,6 +2101,7 @@ impl Scope {
         }
         0
     }
+    /// `set_array` — see implementation.
 
     pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
         if let Some(aa) = self.find_atomic_array(name) {
@@ -2140,6 +2157,7 @@ impl Scope {
         }
         StrykeValue::UNDEF
     }
+    /// `set_array_element` — see implementation.
 
     pub fn set_array_element(
         &mut self,
@@ -2248,11 +2266,13 @@ impl Scope {
     }
 
     // ── Hashes ──
+    /// `declare_hash` — see implementation.
 
     #[inline]
     pub fn declare_hash(&mut self, name: &str, val: IndexMap<String, StrykeValue>) {
         self.declare_hash_frozen(name, val, false);
     }
+    /// `declare_hash_frozen` — see implementation.
 
     pub fn declare_hash_frozen(
         &mut self,
@@ -2305,6 +2325,7 @@ impl Scope {
         canon_main!(name);
         self.frames.iter().any(|f| f.has_hash(name))
     }
+    /// `get_hash` — see implementation.
 
     pub fn get_hash(&self, name: &str) -> IndexMap<String, StrykeValue> {
         // `%main::X` aliases the bare `%X` (default-package equivalence).
@@ -2361,6 +2382,7 @@ impl Scope {
             Some(_) => Ok(()),
         }
     }
+    /// `get_hash_mut` — see implementation.
 
     pub fn get_hash_mut(
         &mut self,
@@ -2380,6 +2402,7 @@ impl Scope {
         }
         Ok(frame.get_hash_mut(name).unwrap())
     }
+    /// `set_hash` — see implementation.
 
     pub fn set_hash(
         &mut self,
@@ -2400,6 +2423,7 @@ impl Scope {
         self.frames[0].set_hash(name, val);
         Ok(())
     }
+    /// `get_hash_element` — see implementation.
 
     #[inline]
     pub fn get_hash_element(&self, name: &str, key: &str) -> StrykeValue {
@@ -2468,6 +2492,7 @@ impl Scope {
         self.set_array_element(name, index, new_val.clone())?;
         Ok(new_val)
     }
+    /// `set_hash_element` — see implementation.
 
     pub fn set_hash_element(
         &mut self,
@@ -2537,6 +2562,7 @@ impl Scope {
         }
         Ok(())
     }
+    /// `delete_hash_element` — see implementation.
 
     pub fn delete_hash_element(
         &mut self,
@@ -2554,6 +2580,7 @@ impl Scope {
         let hash = self.get_hash_mut(name)?;
         Ok(hash.shift_remove(key).unwrap_or(StrykeValue::UNDEF))
     }
+    /// `exists_hash_element` — see implementation.
 
     #[inline]
     pub fn exists_hash_element(&self, name: &str, key: &str) -> bool {
@@ -2730,6 +2757,7 @@ impl Scope {
         out.sort();
         out
     }
+    /// `capture` — see implementation.
 
     pub fn capture(&mut self) -> Vec<(String, StrykeValue)> {
         // Capture wraps simple scalars in CaptureCell so repeat calls of the
@@ -2890,6 +2918,7 @@ impl Scope {
         }
         (scalars, arrays, hashes)
     }
+    /// `restore_capture` — see implementation.
 
     pub fn restore_capture(&mut self, captured: &[(String, StrykeValue)]) {
         for (name, val) in captured {

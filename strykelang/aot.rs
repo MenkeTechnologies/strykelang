@@ -44,6 +44,7 @@ pub const AOT_VERSION_V1: u32 = 1;
 pub const AOT_VERSION_V2: u32 = 2;
 /// Fixed trailer length in bytes: `8 (cl) + 8 (ul) + 4 (ver) + 4 (rsv) + 8 (magic)`.
 pub const TRAILER_LEN: u64 = 32;
+/// `EmbeddedScript` — see fields for layout.
 
 #[derive(Debug, Clone)]
 pub struct EmbeddedScript {
@@ -207,7 +208,9 @@ pub fn append_embedded_bundle(
 /// Result of loading an embedded payload — either a single script (v1) or a bundle (v2).
 #[derive(Debug, Clone)]
 pub enum EmbeddedPayload {
+    /// `Script` variant.
     Script(EmbeddedScript),
+    /// `Bundle` variant.
     Bundle(EmbeddedBundle),
 }
 

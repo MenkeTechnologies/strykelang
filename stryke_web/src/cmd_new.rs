@@ -9,6 +9,7 @@ use crate::util::{ensure_dir, write_file, Result};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+/// `run` — see implementation.
 
 pub fn run(name: &str, skip_git: bool, database: &str) -> Result<()> {
     let root = PathBuf::from(name);
