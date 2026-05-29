@@ -1,0 +1,138 @@
+#!/usr/bin/env stryke
+
+# Simplified CHIP-8 Emulator.
+#
+# CHIP-8 is an interpreted programming language from the 1970s.
+# This emulator implements a subset of the CHIP-8 specification:
+#   * 4096 bytes of memory.
+#   * 16 8-bit registers (V0-VF).
+#   * 16-bit Index register (I) and Program Counter (PC).
+#   * 64x32 monochrome display (rendered as ASCII).
+#   * Stack for 16 levels of subroutines.
+#
+# Run: stryke --no-interop examples/chip8_emulator.stk
+
+# ── Emulator State ───────────────────────────────────────────────────────────
+
+fn Chip8::init {
+    +{
+        memory => [(0) x 4096],
+        v      => [(0) x 16],
+        i      => 0,
+        pc     => 0x200,
+        stack  => [],
+        display => [(0) x (64 * 32)],
+        delay_timer => 0,
+        sound_timer => 0,
+    }
+}
+
+# ── Opcode Decoding and Execution ────────────────────────────────────────────
+
+fn Chip8::step($s) {
+    # Fetch opcode (2 bytes)
+    my $op = ($s->{memory}->[$s->{pc}] << 8) | $s->{memory}->[$s->{pc} + 1]
+    # p sprintf("PC: %04X, OP: %04X", $s->{pc}, $op)
+    $s->{pc} += 2
+    
+    my $n   = $op & 0x000F
+    my $nn  = $op & 0x00FF
+    my $nnn = $op & 0x0FFF
+    my $x   = ($op & 0x0F00) >> 8
+    my $y   = ($op & 0x00F0) >> 4
+    
+    my $kind = $op & 0xF000
+    p "OP: " . sprintf("%04X", $op) . " KIND: " . sprintf("%04X", $kind)
+    if ($kind == 0) {
+        if ($nn == 224) { $s->{display} = [(0) x (64 * 32)] } # CLS 0x00E0
+        elsif ($nn == 238) { $s->{pc} = pop @{$s->{stack}} } # RET 0x00EE
+    }
+    elsif ($kind == 4096)  { $s->{pc} = $nnn }                     # JP addr 0x1000
+    elsif ($kind == 8192)  { push @{$s->{stack}}, $s->{pc}; $s->{pc} = $nnn } # CALL addr 0x2000
+    elsif ($kind == 12288) { $s->{pc} += 2 if $s->{v}->[$x] == $nn } # SE Vx, byte 0x3000
+    elsif ($kind == 24576) { $s->{v}->[$x] = $nn }                 # LD Vx, byte 0x6000
+    elsif ($kind == 28672) { $s->{v}->[$x] = ($s->{v}->[$x] + $nn) & 0xFF } # ADD Vx, byte 0x7000
+    elsif ($kind == 40960) { $s->{i} = $nnn }                      # LD I, addr 0xA000
+    elsif ($kind == 53248) { Chip8::draw $s, $x, $y, $n }          # DRW Vx, Vy, nibble 0xD000
+    else { die sprintf("Unknown Opcode: %04X", $op) }
+}
+
+# ── Graphics ─────────────────────────────────────────────────────────────────
+
+fn Chip8::draw($s, $vx, $vy, $height) {
+    my $x = $s->{v}->[$vx] % 64
+    my $y = $s->{v}->[$vy] % 32
+    $s->{v}->[0xF] = 0
+    
+    for my $row (0 : $height - 1) {
+        my $sprite = $s->{memory}->[$s->{i} + $row]
+        for my $col (0 : 7) {
+            if (($sprite & (0x80 >> $col)) != 0) {
+                my $idx = (($y + $row) % 32) * 64 + (($x + $col) % 64)
+                if ($s->{display}->[$idx] == 1) { $s->{v}->[0xF] = 1 }
+                $s->{display}->[$idx] ^= 1
+            }
+        }
+    }
+}
+
+fn Chip8::render($s) {
+    for my $y (0 : 31) {
+        my $line = ""
+        for my $x (0 : 63) {
+            $line .= $s->{display}->[$y * 64 + $x] ? "█" : " "
+        }
+        p $line
+    }
+}
+
+# ── Mock Program ─────────────────────────────────────────────────────────────
+
+fn Chip8::load_demo($s) {
+    # Program: Draw a 4x4 box at (10, 10)
+    # 600A -> LD V0, 10
+    # 610A -> LD V1, 10
+    # A208 -> LD I, 0x208
+    # D014 -> DRW V0, V1, 4
+    # 1206 -> JP 0x206 (infinite loop)
+    # Sprite data (4 bytes) at 0x208: F0, 90, 90, F0 (box)
+    
+    my @prog = (0x60, 0x0A, 0x61, 0x0A, 0xA2, 0x08, 0xD0, 0x14, 0x12, 0x06, 0xF0, 0x90, 0x90, 0xF0)
+    for my $i (0 : len(@prog) - 1) {
+        $s->{memory}->[0x200 + $i] = $prog[$i]
+    }
+}
+
+# ── Internal Tests ───────────────────────────────────────────────────────────
+
+fn test_chip8 {
+    my $s = Chip8::init()
+    # Test LD Vx, byte
+    $s->{memory}->[0x200] = 0x62
+    $s->{memory}->[0x201] = 0x42
+    Chip8::step $s
+    p "V2: #{$s->{v}->[2]}"
+    die "LD fail" unless $s->{v}->[2] == 0x42
+    
+    # Test ADD Vx, byte
+    $s->{memory}->[0x202] = 0x72
+    $s->{memory}->[0x203] = 0x01
+    Chip8::step $s
+    die "ADD fail" unless $s->{v}->[2] == 0x43
+    
+    p "✓ Chip8 emulator logic tests passed."
+}
+
+# ── Execution ────────────────────────────────────────────────────────────────
+
+test_chip8()
+
+my $vm = Chip8::init()
+Chip8::load_demo $vm
+
+p "Running CHIP-8 Demo (Draw Box at 10,10)..."
+for (1 : 5) { Chip8::step $vm }
+
+Chip8::render $vm
+
+p "Done."
