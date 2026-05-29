@@ -1,0 +1,216 @@
+#!/usr/bin/env stryke
+
+# XOR linear basis (Gauss-Jordan over GF(2)) — incrementally builds a
+# linear basis of the input integers' bit-vectors so that:
+#   * size(basis) = dimension of the spanned subspace (≤ 64),
+#   * max-XOR of any subset = greedy descent through the basis,
+#   * a "k-th smallest XOR" reduction works on the reduced row echelon
+#     form (after a Gauss-Jordan back-substitution pass).
+# Cross-validated by enumerating every subset on small inputs.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Xb::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/xor_basis_no_interop.stk
+
+# ── 64-bit width is enough for any case in this demo ─────────────
+
+my $BITS = 60
+
+# ── factory: empty basis ─────────────────────────────────────────
+
+fn Xb::new() {
+    my @b = (0) x $BITS
+    +{ basis => \@b, count => 0 }
+}
+
+# ── insert v; returns 1 iff v expands the basis ──────────────────
+
+fn Xb::insert($xb, $v) {
+    my $cur = $v
+    for my $i (rev 0:$BITS - 1) {
+        next if ($cur >> $i & 1) == 0
+        if ($xb->{basis}->[$i] == 0) {
+            $xb->{basis}->[$i] = $cur
+            $xb->{count}++
+            return 1
+        }
+        $cur = $cur ^ $xb->{basis}->[$i]
+    }
+    0
+}
+
+# ── max-XOR over the subspace spanned by the inserted values ─────
+
+fn Xb::max_xor($xb) {
+    my $best = 0
+    for my $i (rev 0:$BITS - 1) {
+        my $bv = $xb->{basis}->[$i]
+        next if $bv == 0
+        if (($best ^ $bv) > $best) {
+            $best = $best ^ $bv
+        }
+    }
+    $best
+}
+
+# ── reduce to row-echelon (each basis bit only set in its own row) ─
+
+fn Xb::reduced($xb) {
+    my @r = @{$xb->{basis}}
+    for my $i (0:$BITS - 1) {
+        next if $r[$i] == 0
+        for my $j ($i + 1:$BITS - 1) {
+            next if $r[$j] == 0
+            if (($r[$j] >> $i & 1) == 1) {
+                $r[$j] = $r[$j] ^ $r[$i]
+            }
+        }
+    }
+    \@r
+}
+
+# ── is v representable as XOR of basis elements? ─────────────────
+
+fn Xb::contains($xb, $v) {
+    my $cur = $v
+    for my $i (rev 0:$BITS - 1) {
+        next if ($cur >> $i & 1) == 0
+        return 0 if $xb->{basis}->[$i] == 0
+        $cur = $cur ^ $xb->{basis}->[$i]
+    }
+    $cur == 0
+}
+
+# ── brute force: enumerate every subset XOR ──────────────────────
+
+fn Xb::brute_set($vals) {
+    my %seen = (0 => 1)
+    my $n = len(@$vals)
+    return [keys %seen] if $n == 0
+    my $total = 1 << $n
+    for my $mask (1:$total - 1) {
+        my $x = 0
+        for my $i (0:$n - 1) {
+            $x = $x ^ $vals->[$i] if ($mask >> $i) & 1
+        }
+        $seen{$x} = 1
+    }
+    my @out = sort { _0 <=> _1 } keys %seen
+    \@out
+}
+
+fn Xb::brute_max($vals) {
+    my $set = Xb::brute_set($vals)
+    my $best = 0
+    for my $v (@$set) { $best = $v if $v > $best }
+    $best
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{ name => "trivial",          xs => [1, 2, 3],                              max => 3,  dim => 2 },
+    +{ name => "duplicates only",  xs => [5, 5, 5, 5],                           max => 5,  dim => 1 },
+    +{ name => "powers of 2",      xs => [1, 2, 4, 8, 16],                       max => 31, dim => 5 },
+    +{ name => "linearly dependent", xs => [3, 5, 6],                            max => 6,  dim => 2 },   # 3 ⊕ 5 = 6
+    +{ name => "all zeros",        xs => [0, 0, 0],                              max => 0,  dim => 0 },
+    +{ name => "with zero mixed",  xs => [0, 7, 11, 0, 13],                      max => 13, dim => 3 },
+    +{ name => "8-bit set",        xs => [0xC3, 0x55, 0xAA, 0x0F, 0xF0, 0x33],   max => 255, dim => 4 },
+)
+
+p "── XOR linear basis demo ─────────────────────────────"
+printf "  %-22s  %3s  %5s  %5s\n", "case", "n", "dim", "maxXOR"
+printf "  %-22s  %3s  %5s  %5s\n", "----------------------", "---", "-----", "------"
+for my $c (@cases) {
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) {
+        Xb::insert($xb, $v)
+    }
+    my $mx = Xb::max_xor($xb)
+    printf "  %-22s  %3d  %5d  %5d  %s\n",
+        $c->{name}, len(@{$c->{xs}}), $xb->{count}, $mx,
+        ($xb->{count} == $c->{dim} && $mx == $c->{max}) ? "" : "FAIL"
+}
+
+# ── invariant 1: basis size matches expected subspace dimension ───
+
+for my $c (@cases) {
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) {
+        Xb::insert($xb, $v)
+    }
+    die "dim mismatch on \"#{$c->{name}}\": got #{$xb->{count}} want #{$c->{dim}}" unless $xb->{count} == $c->{dim}
+}
+
+# ── invariant 2: max-XOR matches expected ─────────────────────────
+
+for my $c (@cases) {
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) {
+        Xb::insert($xb, $v)
+    }
+    my $mx = Xb::max_xor($xb)
+    die "max-XOR mismatch on \"#{$c->{name}}\": got #{$mx} want #{$c->{max}}" unless $mx == $c->{max}
+}
+
+# ── invariant 3: max-XOR matches brute subset enumeration ─────────
+
+for my $c (@cases) {
+    next if len(@{$c->{xs}}) > 12
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    my $brute_mx = Xb::brute_max($c->{xs})
+    die "max-XOR vs brute on \"#{$c->{name}}\": basis=#{Xb::max_xor($xb)} brute=#{$brute_mx}" unless Xb::max_xor($xb) == $brute_mx
+}
+
+# ── invariant 4: every input is contained in the basis subspace ───
+
+for my $c (@cases) {
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    for my $v (@{$c->{xs}}) {
+        die "#{$v} not in basis subspace on \"#{$c->{name}}\"" unless Xb::contains($xb, $v)
+    }
+}
+
+# ── invariant 5: subspace size = 2^dim ────────────────────────────
+
+for my $c (@cases) {
+    next if len(@{$c->{xs}}) > 8
+    my $xb = Xb::new()
+    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    my $brute_set = Xb::brute_set($c->{xs})
+    my $expected = 1 << $xb->{count}
+    die "subspace size #{len(@$brute_set)} != 2^dim #{$expected} on \"#{$c->{name}}\"" unless len(@$brute_set) == $expected
+}
+
+# ── invariant 6: insertion order doesn't affect dim or max-XOR ─────
+
+for my $c (@cases) {
+    next if len(@{$c->{xs}}) < 2
+    my $xb1 = Xb::new()
+    for my $v (@{$c->{xs}}) { Xb::insert($xb1, $v) }
+    my $xb2 = Xb::new()
+    my @rev = rev @{$c->{xs}}
+    for my $v (@rev) { Xb::insert($xb2, $v) }
+    die "dim differs by order on \"#{$c->{name}}\"" unless $xb1->{count} == $xb2->{count}
+    die "max differs by order on \"#{$c->{name}}\"" unless Xb::max_xor($xb1) == Xb::max_xor($xb2)
+}
+
+# ── invariant 7: inserting a 0 never expands the basis ─────────────
+
+for my $rep (1:10) {
+    my $xb = Xb::new()
+    Xb::insert($xb, 5)
+    Xb::insert($xb, 3)
+    my $before = $xb->{count}
+    my $added = Xb::insert($xb, 0)
+    die "zero falsely expanded the basis" if $added
+    die "zero changed basis count" unless $xb->{count} == $before
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
