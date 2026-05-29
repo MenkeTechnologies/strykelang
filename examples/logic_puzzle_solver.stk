@@ -1,0 +1,166 @@
+#!/usr/bin/env stryke
+
+# Logic Puzzle Solver: Constraint Satisfaction Problem (CSP).
+#
+# Solves the classic "Zebra Puzzle" (Einstein's Riddle) using
+# backtracking search and constraint propagation.
+#
+# Rules:
+#   1. There are five houses.
+#   2. The Englishman lives in the red house.
+#   3. The Spaniard owns the dog.
+#   4. Coffee is drunk in the green house.
+#   5. The Ukrainian drinks tea.
+#   6. The green house is immediately to the right of the ivory house.
+#   7. The Old Gold smoker owns snails.
+#   8. Kools are smoked in the yellow house.
+#   9. Milk is drunk in the middle house.
+#   10. The Norwegian lives in the first house.
+#   11. The man who smokes Chesterfields lives in the house next to the man with the fox.
+#   12. Kools are smoked in the house next to the house where the horse is kept.
+#   13. The Lucky Strike smoker drinks orange juice.
+#   14. The Japanese smokes Parliaments.
+#   15. The Norwegian lives next to the blue house.
+#
+# Question: Who drinks water? Who owns the zebra?
+#
+# Run: stryke --no-interop examples/logic_puzzle_solver.stk
+
+# ── CSP Solver Engine ────────────────────────────────────────────────────────
+
+fn Solver::solve($variables, $constraints) {
+    Solver::backtrack +{}, $variables, $constraints
+}
+
+fn Solver::backtrack($assignment, $variables, $constraints) {
+    return $assignment if len(keys %$assignment) == len @$variables
+
+    my $var = Solver::select_unassigned_variable $assignment, $variables
+    for my $val (1:5) {
+        if (Solver::is_consistent $var, $val, $assignment, $constraints) {
+            $assignment->{$var} = $val
+            my $result = Solver::backtrack $assignment, $variables, $constraints
+            return $result if defined $result
+            delete $assignment->{$var}
+        }
+    }
+    undef
+}
+
+fn Solver::select_unassigned_variable($assignment, $variables) {
+    for my $v (@$variables) {
+        return $v unless exists $assignment->{$v}
+    }
+}
+
+fn Solver::is_consistent($var, $val, $assignment, $constraints) {
+    # 1. Unique value constraint for variables in the same category
+    my @parts = split "_", $var
+    my $category = $parts[0]
+    my $prefix = $category . "_"
+    for my $v (keys %$assignment) {
+        if (index($v, $prefix) == 0) {
+            return 0 if $assignment->{$v} == $val
+        }
+    }
+
+    # 2. Custom puzzle constraints
+    for my $c (@$constraints) {
+        my ($v1_name, $v2_name, $type) = @$c
+        
+        # We can only check the constraint if both variables are assigned (or one is current)
+        my $v1 = $v1_name eq $var ? $val : $assignment->{$v1_name}
+        my $v2 = $v2_name eq $var ? $val : $assignment->{$v2_name}
+        
+        next unless defined $v1 && defined $v2
+        
+        my $ok = match ($type) {
+            "eq"    => $v1 == $v2,
+            "next"  => abs($v1 - $v2) == 1,
+            "right" => $v1 == $v2 + 1,
+            _       => 1,
+        }
+        return 0 unless $ok
+    }
+    1
+}
+
+# ── Zebra Puzzle Definition ──────────────────────────────────────────────────
+
+my @vars = (
+    "nat_english", "nat_spaniard", "nat_ukrainian", "nat_norwegian", "nat_japanese",
+    "color_red", "color_green", "color_ivory", "color_yellow", "color_blue",
+    "pet_dog", "pet_snails", "pet_fox", "pet_horse", "pet_zebra",
+    "drink_coffee", "drink_tea", "drink_milk", "drink_orange", "drink_water",
+    "smoke_oldgold", "smoke_kools", "smoke_chesterfields", "smoke_luckystrike", "smoke_parliaments"
+)
+
+# Constraints: [Var1, Var2, Type]
+my @constraints = (
+    ["nat_english",   "color_red",      "eq"],    # 2
+    ["nat_spaniard",  "pet_dog",        "eq"],    # 3
+    ["drink_coffee",  "color_green",    "eq"],    # 4
+    ["nat_ukrainian", "drink_tea",      "eq"],    # 5
+    ["color_green",   "color_ivory",    "right"], # 6
+    ["smoke_oldgold", "pet_snails",     "eq"],    # 7
+    ["smoke_kools",   "color_yellow",   "eq"],    # 8
+    ["smoke_chesterfields", "pet_fox",  "next"],  # 11
+    ["smoke_kools",   "pet_horse",      "next"],  # 12
+    ["smoke_luckystrike", "drink_orange", "eq"],  # 13
+    ["nat_japanese",  "smoke_parliaments", "eq"], # 14
+    ["nat_norwegian", "color_blue",     "next"],  # 15
+)
+
+# ── Main Execution ───────────────────────────────────────────────────────────
+
+p "Solving Zebra Puzzle..."
+my $start_time = time()
+
+# Static assignments from rules
+my %fixed = (
+    "drink_milk"    => 3,  # 9: middle house
+    "nat_norwegian" => 1,  # 10: first house
+)
+
+# Seed the assignment
+my $result = Solver::backtrack \%fixed, \@vars, \@constraints
+
+if ($result) {
+    my $elapsed = time() - $start_time
+    p "Solution found in #{sprintf('%.3f', $elapsed)}s:"
+    p ""
+
+    # Pivot results for display
+    my %houses
+    for (1:5) { $houses{_} = +{} }
+    for my $k (keys %$result) {
+        if ($k =~ /^(\w+)_(\w+)$/) {
+            $houses{$result->{$k}}->{$1} = $2
+        }
+    }
+
+    p "House | Nationality | Color  | Pet    | Drink  | Smoke"
+    p "------|-------------|--------|--------|--------|------------"
+    for my $i (1:5) {
+        my $h = $houses{$i}
+        printf "%-5d | %-11s | %-6s | %-6s | %-6s | %s\n",
+            $i, $h->{nat}, $h->{color}, $h->{pet}, $h->{drink}, $h->{smoke}
+    }
+
+    p ""
+    # Find the answers
+    my $water_drinker = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{drink_water} }
+    my $zebra_owner   = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{pet_zebra} }
+    
+    $water_drinker =~ s/^nat_//
+    $zebra_owner   =~ s/^nat_//
+
+    p "Result: The $water_drinker drinks water. The $zebra_owner owns the zebra."
+    
+    # Internal validation
+    die "Wrong water drinker" unless $water_drinker eq "norwegian"
+    die "Wrong zebra owner"   unless $zebra_owner   eq "japanese"
+    p "✓ Validation tests passed."
+} else {
+    p "No solution found."
+}
