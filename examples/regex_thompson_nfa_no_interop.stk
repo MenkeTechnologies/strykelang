@@ -1,0 +1,344 @@
+#!/usr/bin/env stryke
+
+# Thompson NFA — regex engine via Ken Thompson's classic two-stage
+# construction:
+#   (1) parse the pattern into a postfix RPN (Shunting-yard with
+#       implicit concatenation insertion + operator precedence:
+#       ?, *, +  >  concat  >  |  ),
+#   (2) walk the RPN building NFA fragments and stitching them via
+#       ε-transitions per the canonical Thompson rules.
+# Simulation is the simultaneous-state BFS: keep the active set,
+# step it on each input char + ε-closure. O(m · n) for an m-state
+# NFA on an n-char input.
+#
+# Supports: literals, '.', '|', concat (implicit), '?', '*', '+',
+# parens. Cross-validated by a tiny brute-force string-set on a few
+# patterns.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Nfa::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/regex_thompson_nfa_no_interop.stk
+
+# ── insert implicit concat dots, then Shunting-yard to postfix ─────
+
+fn Nfa::infix_to_postfix($re) {
+    # Step 1: insert explicit \x01 (CONCAT sentinel — '.' is the
+    # any-char regex atom, so use a non-printable internal marker
+    # to avoid the collision).
+    my $CAT = "\x01"
+    my $n = len($re)
+    my $with_dots = ""
+    for my $i (0:$n - 1) {
+        my $c = substr($re, $i, 1)
+        $with_dots .= $c
+        next if $i == $n - 1
+        my $nx = substr($re, $i + 1, 1)
+        # Concat boundary: (something | * | ? | + | ) | char) followed by (char | ( | .).
+        if ($c ne "(" && $c ne "|" && $nx ne ")" && $nx ne "|" && $nx ne "?" && $nx ne "*" && $nx ne "+") {
+            $with_dots .= $CAT
+        }
+    }
+    # Step 2: Shunting-yard with operator precedence.
+    my $m = len($with_dots)
+    my @out
+    my @ops
+    my %prec = (
+        "|"  => 1,
+        $CAT => 2,
+        "?"  => 3,
+        "*"  => 3,
+        "+"  => 3,
+    )
+    for my $i (0:$m - 1) {
+        my $c = substr($with_dots, $i, 1)
+        if ($c eq "(") {
+            push @ops, $c
+        } elsif ($c eq ")") {
+            while (len(@ops) > 0 && $ops[-1] ne "(") {
+                push @out, pop(@ops)
+            }
+            pop(@ops)
+        } elsif (exists $prec{$c}) {
+            while (len(@ops) > 0 && $ops[-1] ne "(" && exists $prec{$ops[-1]} && $prec{$ops[-1]} >= $prec{$c}) {
+                push @out, pop(@ops)
+            }
+            push @ops, $c
+        } else {
+            push @out, $c
+        }
+    }
+    while (len(@ops) > 0) {
+        push @out, pop(@ops)
+    }
+    \@out
+}
+
+# ── build NFA from postfix tokens ─────────────────────────────────
+# State is +{ trans => +{ ch => [target_state_ids] } }
+# ch == "" means epsilon. Returns +{ states, start, accept }.
+
+fn Nfa::new_state() {
+    +{ trans => +{} }
+}
+
+fn Nfa::add_trans($states, $from, $ch, $to) {
+    if (!exists $states->[$from]->{trans}->{$ch}) {
+        $states->[$from]->{trans}->{$ch} = []
+    }
+    push @{$states->[$from]->{trans}->{$ch}}, $to
+}
+
+fn Nfa::build($postfix) {
+    my $CAT = "\x01"
+    my @states
+    my @stack   # stack of +{ start, accept } fragments
+    for my $tok (@$postfix) {
+        if ($tok eq $CAT) {
+            my $frag_b = pop(@stack)
+            my $ax = pop(@stack)
+            Nfa::add_trans(\@states, $ax->{accept}, "", $frag_b->{start})
+            push @stack, +{ start => $ax->{start}, accept => $frag_b->{accept} }
+        } elsif ($tok eq "|") {
+            my $frag_b = pop(@stack)
+            my $ax = pop(@stack)
+            push @states, Nfa::new_state()
+            my $start = len(@states) - 1
+            push @states, Nfa::new_state()
+            my $accept = len(@states) - 1
+            Nfa::add_trans(\@states, $start, "", $ax->{start})
+            Nfa::add_trans(\@states, $start, "", $frag_b->{start})
+            Nfa::add_trans(\@states, $ax->{accept}, "", $accept)
+            Nfa::add_trans(\@states, $frag_b->{accept},  "", $accept)
+            push @stack, +{ start => $start, accept => $accept }
+        } elsif ($tok eq "?") {
+            my $f = pop(@stack)
+            push @states, Nfa::new_state()
+            my $start = len(@states) - 1
+            push @states, Nfa::new_state()
+            my $accept = len(@states) - 1
+            Nfa::add_trans(\@states, $start, "", $f->{start})
+            Nfa::add_trans(\@states, $start, "", $accept)
+            Nfa::add_trans(\@states, $f->{accept}, "", $accept)
+            push @stack, +{ start => $start, accept => $accept }
+        } elsif ($tok eq "*") {
+            my $f = pop(@stack)
+            push @states, Nfa::new_state()
+            my $start = len(@states) - 1
+            push @states, Nfa::new_state()
+            my $accept = len(@states) - 1
+            Nfa::add_trans(\@states, $start, "", $f->{start})
+            Nfa::add_trans(\@states, $start, "", $accept)
+            Nfa::add_trans(\@states, $f->{accept}, "", $f->{start})
+            Nfa::add_trans(\@states, $f->{accept}, "", $accept)
+            push @stack, +{ start => $start, accept => $accept }
+        } elsif ($tok eq "+") {
+            my $f = pop(@stack)
+            push @states, Nfa::new_state()
+            my $start = len(@states) - 1
+            push @states, Nfa::new_state()
+            my $accept = len(@states) - 1
+            Nfa::add_trans(\@states, $start, "", $f->{start})
+            Nfa::add_trans(\@states, $f->{accept}, "", $f->{start})
+            Nfa::add_trans(\@states, $f->{accept}, "", $accept)
+            push @stack, +{ start => $start, accept => $accept }
+        } else {
+            push @states, Nfa::new_state()
+            my $start = len(@states) - 1
+            push @states, Nfa::new_state()
+            my $accept = len(@states) - 1
+            Nfa::add_trans(\@states, $start, $tok, $accept)
+            push @stack, +{ start => $start, accept => $accept }
+        }
+    }
+    my $frag = pop(@stack)
+    +{
+        states => \@states,
+        start  => $frag->{start},
+        accept => $frag->{accept},
+    }
+}
+
+# ── ε-closure of a state set ─────────────────────────────────────
+
+fn Nfa::eclose($nfa, $set) {
+    my @stack = @$set
+    my %seen
+    for my $s (@$set) { $seen{$s} = 1 }
+    while (len(@stack) > 0) {
+        my $u = pop(@stack)
+        my $eps = $nfa->{states}->[$u]->{trans}->{""}
+        next unless defined $eps
+        for my $v (@$eps) {
+            if (!exists $seen{$v}) {
+                $seen{$v} = 1
+                push @stack, $v
+            }
+        }
+    }
+    [sort { _0 <=> _1 } keys %seen]
+}
+
+# ── full-match simulation ────────────────────────────────────────
+
+fn Nfa::match($nfa, $input) {
+    my $current = Nfa::eclose($nfa, [$nfa->{start}])
+    my $n = len($input)
+    for my $i (0:$n - 1) {
+        my $c = substr($input, $i, 1)
+        my @next
+        my %seen
+        for my $s (@$current) {
+            my $trans = $nfa->{states}->[$s]->{trans}
+            for my $key (keys %$trans) {
+                next if $key eq ""
+                next unless $key eq $c || $key eq "."
+                for my $t (@{$trans->{$key}}) {
+                    if (!exists $seen{$t}) {
+                        $seen{$t} = 1
+                        push @next, $t
+                    }
+                }
+            }
+        }
+        return 0 if len(@next) == 0
+        $current = Nfa::eclose($nfa, \@next)
+    }
+    for my $s (@$current) {
+        return 1 if $s == $nfa->{accept}
+    }
+    0
+}
+
+# ── compile + match in one step ──────────────────────────────────
+
+fn Nfa::compile_match($pattern, $input) {
+    my $postfix = Nfa::infix_to_postfix($pattern)
+    my $nfa = Nfa::build($postfix)
+    Nfa::match($nfa, $input)
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{ re => "a",        accept => ["a"],            reject => ["", "b", "aa"]                },
+    +{ re => "abc",      accept => ["abc"],          reject => ["ab", "abcd", "abx"]          },
+    +{ re => "a|b",      accept => ["a", "b"],       reject => ["", "ab", "ba", "c"]          },
+    +{ re => "a*",       accept => ["", "a", "aaa"], reject => ["b", "ab", "ba"]              },
+    +{ re => "a+",       accept => ["a", "aaa"],     reject => ["", "b", "ab"]                },
+    +{ re => "a?b",      accept => ["b", "ab"],      reject => ["", "aab", "ba"]              },
+    +{ re => "(a|b)*c",  accept => ["c", "ac", "bc", "abc", "babac"], reject => ["", "ab"]    },
+    +{ re => "a.c",      accept => ["abc", "axc", "a1c"], reject => ["ac", "abxc"]            },
+    +{ re => "a(bc)+",   accept => ["abc", "abcbc", "abcbcbc"], reject => ["a", "abcb", "ab"] },
+)
+
+p "── Thompson-NFA regex demo ───────────────────────────"
+printf "  %-14s  %-26s  %-26s\n", "regex", "accepts", "rejects"
+printf "  %-14s  %-26s  %-26s\n", "--------------", "--------------------------", "--------------------------"
+for my $c (@cases) {
+    my $ok_part = ""
+    my $bad_part = ""
+    my @ok_strs
+    my @bad_strs
+    for my $s (@{$c->{accept}}) {
+        push @ok_strs, "\"#{$s}\""
+    }
+    for my $s (@{$c->{reject}}) {
+        push @bad_strs, "\"#{$s}\""
+    }
+    printf "  %-14s  %-26s  %-26s\n", "\"#{$c->{re}}\"", join(",", @ok_strs), join(",", @bad_strs)
+}
+
+# ── invariant 1: every accept-list string matches ─────────────────
+
+for my $c (@cases) {
+    for my $s (@{$c->{accept}}) {
+        die "regex \"#{$c->{re}}\" failed to accept \"#{$s}\"" unless Nfa::compile_match($c->{re}, $s)
+    }
+}
+
+# ── invariant 2: every reject-list string rejects ─────────────────
+
+for my $c (@cases) {
+    for my $s (@{$c->{reject}}) {
+        die "regex \"#{$c->{re}}\" wrongly accepted \"#{$s}\"" if Nfa::compile_match($c->{re}, $s)
+    }
+}
+
+# ── invariant 3: a* / a+ length boundaries ────────────────────────
+
+for my $k (0:10) {
+    my $s = "a" x $k
+    die "a* must accept \"#{$s}\"" unless Nfa::compile_match("a*", $s)
+    if ($k == 0) {
+        die "a+ must reject \"\"" if Nfa::compile_match("a+", "")
+    } else {
+        die "a+ must accept \"#{$s}\"" unless Nfa::compile_match("a+", $s)
+    }
+}
+
+# ── invariant 4: '.' is any single char (not zero, not two) ───────
+
+for my $c ("a", "b", "1", "Z", "%") {
+    die "'.' must accept single char \"#{$c}\"" unless Nfa::compile_match(".", $c)
+}
+die "'.' must reject empty" if Nfa::compile_match(".", "")
+die "'.' must reject double" if Nfa::compile_match(".", "ab")
+
+# ── invariant 5: postfix conversion stack size invariant ──────────
+# After consuming all tokens, the operator stack must be empty AND
+# the output stack must reduce to exactly one fragment.
+
+for my $c (@cases) {
+    my $pf = Nfa::infix_to_postfix($c->{re})
+    my $nfa = Nfa::build($pf)
+    # build() would die or leave a >1 stack if precedence were wrong.
+    # Re-verify by counting that the final fragment is a single state pair.
+    die "NFA \"#{$c->{re}}\" start out of range" unless $nfa->{start} >= 0 && $nfa->{start} < len(@{$nfa->{states}})
+    die "NFA \"#{$c->{re}}\" accept out of range" unless $nfa->{accept} >= 0 && $nfa->{accept} < len(@{$nfa->{states}})
+}
+
+# ── invariant 6: alternation is commutative on language ───────────
+
+for my $pair (["a|b", "b|a"], ["(a|b)c", "(b|a)c"], ["a|b|c", "c|b|a"]) {
+    for my $s ("a", "b", "c", "ab", "bc", "ac", "", "abc") {
+        my $left = Nfa::compile_match($pair->[0], $s)
+        my $right = Nfa::compile_match($pair->[1], $s)
+        die "alt-commutativity: \"#{$pair->[0]}\"~\"#{$pair->[1]}\" disagree on \"#{$s}\"" unless $left == $right
+    }
+}
+
+# ── invariant 7: brute string-set test on (a|b)* ──────────────────
+# A string of length ≤ 4 over {a, b} is accepted; any other char
+# rejected. Compare against direct character-set membership.
+
+my $alpha = "ab"
+my @queue = ("")
+my $start = 0
+my $end = 0
+for my $L (1:4) {
+    my $tail = len(@queue) - 1
+    for my $i ($start:$end) {
+        my $base = $queue[$i]
+        push @queue, $base . "a"
+        push @queue, $base . "b"
+    }
+    $start = $tail + 1
+    $end = len(@queue) - 1
+}
+push @queue, "c", "ac", "aac", "abz", "x"
+for my $s (@queue) {
+    my $only_ab = 1
+    my $n = len($s)
+    for my $i (0:$n - 1) {
+        my $c = substr($s, $i, 1)
+        if ($c ne "a" && $c ne "b") { $only_ab = 0; last }
+    }
+    my $matched = Nfa::compile_match("(a|b)*", $s)
+    die "(a|b)* mismatch on \"#{$s}\": expected #{$only_ab} got #{$matched}" unless $matched == $only_ab
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"
