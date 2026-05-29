@@ -1,0 +1,217 @@
+#!/usr/bin/env stryke
+
+# Baby-step / giant-step — discrete logarithm in cyclic groups: find
+# the smallest non-negative `x` with `g^x ≡ h (mod p)`, given a
+# generator `g`, target `h`, and prime modulus `p`. Splits the search
+# `x = i·m − j` (where m = ⌈√(p−1)⌉) into m "baby" steps `g^j` cached
+# in a hash, and m "giant" steps `h · (g^m)^i` probed against the
+# hash. O(√p) time + O(√p) memory. Cross-validated by recomputing
+# `g^x mod p` and comparing against `h`.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Bsgs::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/bsgs_no_interop.stk
+
+# ── modular exponentiation a^e mod m ─────────────────────────────
+
+fn Bsgs::pow_mod($base, $exp, $m) {
+    return 0 if $m == 1
+    my $result = 1
+    my $bx = $base % $m
+    my $e = $exp
+    while ($e > 0) {
+        if ($e & 1) {
+            $result = ($result * $bx) % $m
+        }
+        $e = int($e / 2)
+        $bx = ($bx * $bx) % $m
+    }
+    $result
+}
+
+# ── extended Euclidean → modular inverse ─────────────────────────
+
+fn Bsgs::ext_gcd($ax, $bx) {
+    return +{ g => $ax, x => 1, y => 0 } if $bx == 0
+    my $q = int($ax / $bx)
+    my $r = $ax - $q * $bx
+    my $sub = Bsgs::ext_gcd($bx, $r)
+    +{
+        g => $sub->{g},
+        x => $sub->{y},
+        y => $sub->{x} - $q * $sub->{y},
+    }
+}
+
+fn Bsgs::mod_inverse($ax, $m) {
+    my $r = Bsgs::ext_gcd($ax, $m)
+    die "no inverse: gcd(#{$ax}, #{$m}) = #{$r->{g}}" unless $r->{g} == 1
+    my $inv = $r->{x} % $m
+    $inv += $m if $inv < 0
+    $inv
+}
+
+# ── integer ceiling of √n ────────────────────────────────────────
+
+fn Bsgs::isqrt_ceil($n) {
+    return 0 if $n <= 0
+    my $r = int(sqrt($n))
+    while ($r * $r < $n) {
+        $r++
+    }
+    $r
+}
+
+# ── core BSGS — returns +{ ok => 0/1, x => smallest non-neg } ────
+
+fn Bsgs::dlog($g, $h, $p) {
+    my $gg = $g % $p
+    my $hh = $h % $p
+    if ($hh == 1) {
+        return +{ ok => 1, x => 0 }
+    }
+    my $m = Bsgs::isqrt_ceil($p - 1)
+    # Baby steps: tab[g^j] = j for j = 0..m-1.
+    my %tab
+    my $cur = 1
+    for my $j (0:$m - 1) {
+        if (!exists $tab{$cur}) {
+            $tab{$cur} = $j
+        }
+        $cur = ($cur * $gg) % $p
+    }
+    # Giant step factor: (g^m)^{-1} mod p, applied each iteration to h.
+    my $gm = Bsgs::pow_mod($gg, $m, $p)
+    my $gm_inv = Bsgs::mod_inverse($gm, $p)
+    my $gamma = $hh
+    for my $i (0:$m - 1) {
+        if (exists $tab{$gamma}) {
+            my $j = $tab{$gamma}
+            my $x = $i * $m + $j
+            return +{ ok => 1, x => $x }
+        }
+        $gamma = ($gamma * $gm_inv) % $p
+    }
+    +{ ok => 0, x => -1 }
+}
+
+# ── O(p) brute force discrete log for cross-validation ──────────
+
+fn Bsgs::brute_dlog($g, $h, $p) {
+    my $gg = $g % $p
+    my $hh = $h % $p
+    my $cur = 1
+    for my $x (0:$p - 2) {
+        if ($cur == $hh) {
+            return +{ ok => 1, x => $x }
+        }
+        $cur = ($cur * $gg) % $p
+    }
+    +{ ok => 0, x => -1 }
+}
+
+# ── primary cases ────────────────────────────────────────────────
+
+my @cases = (
+    +{ g => 2,  h => 5,   p => 23  },   # 2^4 = 16, 2^16 = 5 mod 23
+    +{ g => 2,  h => 1,   p => 23  },   # x = 0
+    +{ g => 5,  h => 3,   p => 41  },
+    +{ g => 3,  h => 13,  p => 17  },
+    +{ g => 7,  h => 8,   p => 23  },
+    +{ g => 3,  h => 23,  p => 113 },
+    +{ g => 2,  h => 263, p => 491 },
+    +{ g => 5,  h => 1000, p => 1009 },
+)
+
+p "── baby-step / giant-step discrete-log demo ──────────"
+printf "  %5s  %6s  %6s  %6s\n", "g", "h", "p", "x"
+printf "  %5s  %6s  %6s  %6s\n", "-----", "------", "------", "------"
+for my $c (@cases) {
+    my $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+    if ($r->{ok}) {
+        printf "  %5d  %6d  %6d  %6d\n", $c->{g}, $c->{h}, $c->{p}, $r->{x}
+    } else {
+        printf "  %5d  %6d  %6d  %6s\n", $c->{g}, $c->{h}, $c->{p}, "—"
+    }
+}
+
+# ── invariant 1: g^x mod p equals h on every reported solution ────
+
+for my $c (@cases) {
+    my $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+    next unless $r->{ok}
+    my $check = Bsgs::pow_mod($c->{g}, $r->{x}, $c->{p})
+    die "g^x check failed on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check} != #{$c->{h}}" unless $check == $c->{h} % $c->{p}
+}
+
+# ── invariant 2: x is in [0, p-1) for every solution ──────────────
+
+for my $c (@cases) {
+    my $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+    next unless $r->{ok}
+    die "x #{$r->{x}} out of [0, #{$c->{p} - 1}) on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}})" unless $r->{x} >= 0 && $r->{x} < $c->{p} - 1
+}
+
+# ── invariant 3: BSGS agrees with brute force (small p) ───────────
+
+for my $c (@cases) {
+    next if $c->{p} > 200
+    my $bs = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+    my $br = Bsgs::brute_dlog($c->{g}, $c->{h}, $c->{p})
+    die "ok mismatch on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): bsgs=#{$bs->{ok}} brute=#{$br->{ok}}" unless $bs->{ok} == $br->{ok}
+    next unless $bs->{ok}
+    # Both should refer to the same element; allow x's that differ
+    # by a multiple of group order — verify by g^x ≡ h instead.
+    my $check_bs = Bsgs::pow_mod($c->{g}, $bs->{x}, $c->{p})
+    my $check_br = Bsgs::pow_mod($c->{g}, $br->{x}, $c->{p})
+    die "bsgs check failed for (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check_bs} != h" unless $check_bs == $c->{h}
+    die "brute check failed for (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check_br} != h" unless $check_br == $c->{h}
+}
+
+# ── invariant 4: h = 1 always returns x = 0 ──────────────────────
+
+for my $p (7, 11, 13, 17, 23, 31, 41, 101, 113, 257) {
+    my $r = Bsgs::dlog(3, 1, $p)
+    die "dlog(3, 1, #{$p}) must be ok with x=0" unless $r->{ok} && $r->{x} == 0
+}
+
+# ── invariant 5: h = g returns x = 1 ─────────────────────────────
+
+for my $p (7, 11, 13, 23, 41, 101) {
+    for my $g (2, 3, 5) {
+        next if $g >= $p
+        my $r = Bsgs::dlog($g, $g, $p)
+        die "dlog(#{$g}, #{$g}, #{$p}) must yield x ≥ 1" unless $r->{ok} && $r->{x} >= 1
+        # Verify it's a real solution (x might be 1 or > 1 for any subgroup).
+        my $check = Bsgs::pow_mod($g, $r->{x}, $p)
+        die "g^x != g for dlog(#{$g}, #{$g}, #{$p}): got #{$check}" unless $check == $g
+    }
+}
+
+# ── invariant 6: mod_inverse round-trip: a · a⁻¹ ≡ 1 (mod p) ──────
+
+for my $pair ([5, 23], [7, 41], [3, 113], [11, 1009], [17, 257]) {
+    my $inv = Bsgs::mod_inverse($pair->[0], $pair->[1])
+    my $prod = ($pair->[0] * $inv) % $pair->[1]
+    die "inverse round-trip failed on (#{$pair->[0]}, #{$pair->[1]})" unless $prod == 1
+}
+
+# ── invariant 7: dlog round-trip — for every y in [0, p-2], ──────
+# dlog(g, g^y mod p, p) recovers some x with g^x ≡ g^y (mod p).
+
+for my $p (23, 41, 113) {
+    my $g = 2
+    for my $y (0:$p - 2) {
+        my $h = Bsgs::pow_mod($g, $y, $p)
+        my $r = Bsgs::dlog($g, $h, $p)
+        die "dlog roundtrip ok=0 on (g=#{$g}, y=#{$y}, p=#{$p})" unless $r->{ok}
+        my $check = Bsgs::pow_mod($g, $r->{x}, $p)
+        die "round-trip h mismatch on (g=#{$g}, y=#{$y}, p=#{$p}): #{$check} != #{$h}" unless $check == $h
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

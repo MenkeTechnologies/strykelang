@@ -247,3 +247,8 @@ demo_runs_no_interop!(demo_lcp_kasai, "examples/lcp_kasai_no_interop.stk");
 demo_runs_no_interop!(demo_min_cost_max_flow, "examples/min_cost_max_flow_no_interop.stk");
 demo_runs_no_interop!(demo_regex_thompson_nfa, "examples/regex_thompson_nfa_no_interop.stk");
 demo_runs_no_interop!(demo_karger_min_cut, "examples/karger_min_cut_no_interop.stk");
+demo_runs_no_interop!(demo_strassen, "examples/strassen_no_interop.stk");
+demo_runs_no_interop!(demo_rotating_calipers, "examples/rotating_calipers_no_interop.stk");
+demo_runs_no_interop!(demo_boyer_moore_majority, "examples/boyer_moore_majority_no_interop.stk");
+demo_runs_no_interop!(demo_lazy_segment_tree, "examples/lazy_segment_tree_no_interop.stk");
+demo_runs_no_interop!(demo_bsgs, "examples/bsgs_no_interop.stk");
