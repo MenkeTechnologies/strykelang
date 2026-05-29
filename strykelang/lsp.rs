@@ -28,16 +28,16 @@ use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::request::SignatureHelpRequest;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
-    CompletionTextEdit,
-    DeclarationCapability, Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams,
-    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentHighlight,
-    DocumentHighlightKind, DocumentHighlightParams, DocumentSymbolParams, DocumentSymbolResponse,
-    Documentation, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, Location, LocationLink, OneOf, Position, PrepareRenameResponse,
-    PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions, RenameParams,
-    ServerCapabilities, SymbolInformation, SymbolKind, TextDocumentContentChangeEvent,
-    TextDocumentPositionParams, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TextEdit, Uri, WorkDoneProgressOptions, WorkspaceEdit,
+    CompletionTextEdit, DeclarationCapability, Diagnostic, DiagnosticSeverity,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, DocumentSymbolParams,
+    DocumentSymbolResponse, Documentation, GotoDefinitionParams, GotoDefinitionResponse, Hover,
+    HoverContents, HoverParams, HoverProviderCapability, Location, LocationLink, OneOf, Position,
+    PrepareRenameResponse, PublishDiagnosticsParams, Range, ReferenceParams, RenameOptions,
+    RenameParams, ServerCapabilities, SymbolInformation, SymbolKind,
+    TextDocumentContentChangeEvent, TextDocumentPositionParams, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextEdit, Uri, WorkDoneProgressOptions,
+    WorkspaceEdit,
 };
 use lsp_types::{InsertTextFormat, MarkupContent, MarkupKind};
 use percent_encoding::percent_decode_str;
@@ -10511,7 +10511,10 @@ fn qualified_sub_completions(
             continue;
         }
         // Skip sigil-prefixed entries — they belong to sigil_completions.
-        if matches!(w.chars().next(), Some('$') | Some('@') | Some('%') | Some('&')) {
+        if matches!(
+            w.chars().next(),
+            Some('$') | Some('@') | Some('%') | Some('&')
+        ) {
             continue;
         }
         if !seen.insert(w.clone()) {
@@ -10583,7 +10586,11 @@ fn sigil_completions(
                 range: edit_range,
                 new_text,
             })),
-            documentation: if builtin { doc_for_label(&display) } else { None },
+            documentation: if builtin {
+                doc_for_label(&display)
+            } else {
+                None
+            },
             ..Default::default()
         }
     };
@@ -12090,18 +12097,20 @@ mod rename_hover_tests {
     #[test]
     fn doc_comments_above_collects_contiguous_block() {
         let text = "## First line.\n## Second line.\nfn foo() {}\n";
-        let doc = super::doc_comments_above(text, 2)
-            .expect("expected to extract doc block above line 2");
+        let doc =
+            super::doc_comments_above(text, 2).expect("expected to extract doc block above line 2");
         assert!(doc.contains("First line."), "missing first line in {doc:?}");
-        assert!(doc.contains("Second line."), "missing second line in {doc:?}");
+        assert!(
+            doc.contains("Second line."),
+            "missing second line in {doc:?}"
+        );
     }
 
     #[test]
     fn doc_comments_above_stops_at_first_non_doc_line() {
         // Plain `# comment` (single `#`) is code, not docs — must stop.
         let text = "# regular comment\n## doc line\nfn foo() {}\n";
-        let doc = super::doc_comments_above(text, 2)
-            .expect("doc block should still be picked up");
+        let doc = super::doc_comments_above(text, 2).expect("doc block should still be picked up");
         assert!(doc.contains("doc line"));
         assert!(
             !doc.contains("regular comment"),
@@ -12121,9 +12130,18 @@ mod rename_hover_tests {
         let text = "## Short description.\n## Second paragraph.\nfn greeter() { p \"hi\" }\n";
         let h = hover_markdown_for_word("greeter", text, "a.stk")
             .expect("hover should resolve `greeter` to a sub");
-        assert!(h.contains("Short description."), "hover missing first line: {h}");
-        assert!(h.contains("Second paragraph."), "hover missing second line: {h}");
-        assert!(h.contains("Subroutine `greeter`"), "hover missing header: {h}");
+        assert!(
+            h.contains("Short description."),
+            "hover missing first line: {h}"
+        );
+        assert!(
+            h.contains("Second paragraph."),
+            "hover missing second line: {h}"
+        );
+        assert!(
+            h.contains("Subroutine `greeter`"),
+            "hover missing header: {h}"
+        );
     }
 
     #[test]
@@ -12131,9 +12149,15 @@ mod rename_hover_tests {
         let text = "## Foo wraps the bar API.\n## Multi-line OK.\npackage Foo;\n";
         let h = hover_markdown_for_word("Foo", text, "a.stk")
             .expect("hover should resolve `Foo` to a package");
-        assert!(h.contains("Foo wraps the bar API."), "hover missing doc: {h}");
+        assert!(
+            h.contains("Foo wraps the bar API."),
+            "hover missing doc: {h}"
+        );
         assert!(h.contains("Multi-line OK."), "hover missing 2nd line: {h}");
-        assert!(h.contains("Package `Foo`"), "hover missing package header: {h}");
+        assert!(
+            h.contains("Package `Foo`"),
+            "hover missing package header: {h}"
+        );
     }
 
     #[test]

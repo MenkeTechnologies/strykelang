@@ -160,10 +160,10 @@ fn fork_teleport_fan_out_to_three_children() {
                 let got = eval_string(code);
                 let _ = std::fs::write(&path, got);
                 // `_exit` over `std::process::exit` in fork children — Rust
-            // runtime cleanup is NOT async-signal-safe, and pre-fork
-            // global state (rayon, channels) hangs forever in
-            // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
-            unsafe { libc::_exit(0) }
+                // runtime cleanup is NOT async-signal-safe, and pre-fork
+                // global state (rayon, channels) hangs forever in
+                // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
+                unsafe { libc::_exit(0) }
             }
             ForkResult::Parent { child } => {
                 children.push(child);
@@ -230,10 +230,10 @@ fn fork_teleport_arrayref_pids_with_opts_hash() {
                 "#;
                 let _ = std::fs::write(&p, eval_string(code));
                 // `_exit` over `std::process::exit` in fork children — Rust
-            // runtime cleanup is NOT async-signal-safe, and pre-fork
-            // global state (rayon, channels) hangs forever in
-            // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
-            unsafe { libc::_exit(0) }
+                // runtime cleanup is NOT async-signal-safe, and pre-fork
+                // global state (rayon, channels) hangs forever in
+                // `std::rt::cleanup` on shutdown. See scriptable_controller_pin.
+                unsafe { libc::_exit(0) }
             }
             ForkResult::Parent { child } => {
                 children.push(child);

@@ -11,7 +11,6 @@ use crate::util::Result;
 use std::path::Path;
 use std::process::Command;
 /// `run` — see implementation.
-
 pub fn run(port: u16) -> Result<()> {
     if !Path::new("bin/server").exists() {
         return Err(
@@ -30,7 +29,6 @@ pub fn run(port: u16) -> Result<()> {
     Ok(())
 }
 /// `console` — see implementation.
-
 pub fn console() -> Result<()> {
     if !Path::new("config/application.stk").exists() {
         return Err(

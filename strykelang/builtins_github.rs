@@ -253,29 +253,24 @@ pub fn gh_get(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 // ── user / org ─────────────────────────────────────────────────────────
 /// `gh_user` — see implementation.
-
 pub fn gh_user(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single(&format!("/users/{}", arg_str(args, 0)))
 }
 /// `gh_org` — see implementation.
-
 pub fn gh_org(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single(&format!("/orgs/{}", arg_str(args, 0)))
 }
 /// `gh_followers` — see implementation.
-
 pub fn gh_followers(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/users/{}/followers", arg_str(args, 0)))
 }
 /// `gh_following` — see implementation.
-
 pub fn gh_following(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/users/{}/following", arg_str(args, 0)))
 }
 
 // ── repos ──────────────────────────────────────────────────────────────
 /// `gh_repo` — see implementation.
-
 pub fn gh_repo(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let s = arg_str(args, 0);
     // Accept either `gh_repo("owner/repo")` or `gh_repo("owner", "repo")`
@@ -287,29 +282,24 @@ pub fn gh_repo(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single(&path)
 }
 /// `gh_repos` — see implementation.
-
 pub fn gh_repos(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/users/{}/repos", arg_str(args, 0)))
 }
 /// `gh_org_repos` — see implementation.
-
 pub fn gh_org_repos(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/orgs/{}/repos", arg_str(args, 0)))
 }
 /// `gh_starred` — see implementation.
-
 pub fn gh_starred(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/users/{}/starred", arg_str(args, 0)))
 }
 
 // ── gists ──────────────────────────────────────────────────────────────
 /// `gh_gists` — see implementation.
-
 pub fn gh_gists(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     paginated(&format!("/users/{}/gists", arg_str(args, 0)))
 }
 /// `gh_gist` — see implementation.
-
 pub fn gh_gist(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single(&format!("/gists/{}", arg_str(args, 0)))
 }
@@ -325,61 +315,51 @@ fn split_owner_repo(args: &[StrykeValue]) -> (String, String) {
     }
 }
 /// `gh_issues` — see implementation.
-
 pub fn gh_issues(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/issues", o, r))
 }
 /// `gh_prs` — see implementation.
-
 pub fn gh_prs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/pulls", o, r))
 }
 /// `gh_commits` — see implementation.
-
 pub fn gh_commits(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/commits", o, r))
 }
 /// `gh_branches` — see implementation.
-
 pub fn gh_branches(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/branches", o, r))
 }
 /// `gh_tags` — see implementation.
-
 pub fn gh_tags(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/tags", o, r))
 }
 /// `gh_releases` — see implementation.
-
 pub fn gh_releases(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/releases", o, r))
 }
 /// `gh_contributors` — see implementation.
-
 pub fn gh_contributors(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/contributors", o, r))
 }
 /// `gh_forks` — see implementation.
-
 pub fn gh_forks(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/forks", o, r))
 }
 /// `gh_stargazers` — see implementation.
-
 pub fn gh_stargazers(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     paginated(&format!("/repos/{}/{}/stargazers", o, r))
 }
 /// `gh_workflows` — see implementation.
-
 pub fn gh_workflows(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     match single(&format!("/repos/{}/{}/actions/workflows", o, r))? {
@@ -394,7 +374,6 @@ pub fn gh_workflows(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     }
 }
 /// `gh_runs` — see implementation.
-
 pub fn gh_runs(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let (o, r) = split_owner_repo(args);
     match single(&format!("/repos/{}/{}/actions/runs", o, r))? {
@@ -466,25 +445,21 @@ pub fn gh_readme(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 // ── search ─────────────────────────────────────────────────────────────
 /// `gh_search_repos` — see implementation.
-
 pub fn gh_search_repos(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = url_encode(&arg_str(args, 0));
     paginated(&format!("/search/repositories?q={}", q))
 }
 /// `gh_search_users` — see implementation.
-
 pub fn gh_search_users(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = url_encode(&arg_str(args, 0));
     paginated(&format!("/search/users?q={}", q))
 }
 /// `gh_search_code` — see implementation.
-
 pub fn gh_search_code(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = url_encode(&arg_str(args, 0));
     paginated(&format!("/search/code?q={}", q))
 }
 /// `gh_search_issues` — see implementation.
-
 pub fn gh_search_issues(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let q = url_encode(&arg_str(args, 0));
     paginated(&format!("/search/issues?q={}", q))
@@ -492,17 +467,14 @@ pub fn gh_search_issues(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 
 // ── meta ───────────────────────────────────────────────────────────────
 /// `gh_rate_limit` — see implementation.
-
 pub fn gh_rate_limit(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single("/rate_limit")
 }
 /// `gh_meta` — see implementation.
-
 pub fn gh_meta(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single("/meta")
 }
 /// `gh_emojis` — see implementation.
-
 pub fn gh_emojis(_args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     single("/emojis")
 }

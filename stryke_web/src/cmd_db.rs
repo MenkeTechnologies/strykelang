@@ -32,28 +32,24 @@ web_db_connect("sqlite://$db_path");
 for my $f (glob "db/migrate/**/*.stk") { require $f; }
 "#;
 /// `migrate` — see implementation.
-
 pub fn migrate() -> Result<()> {
     ensure_app_root()?;
     let snippet = format!("{}\nweb_migrate();\n", BOOT);
     stryke_eval(&snippet)
 }
 /// `rollback` — see implementation.
-
 pub fn rollback() -> Result<()> {
     ensure_app_root()?;
     let snippet = format!("{}\nweb_rollback();\n", BOOT);
     stryke_eval(&snippet)
 }
 /// `seed` — see implementation.
-
 pub fn seed() -> Result<()> {
     ensure_app_root()?;
     let snippet = format!("{}\nrequire \"./db/seeds.stk\";\n", BOOT);
     stryke_eval(&snippet)
 }
 /// `reset` — see implementation.
-
 pub fn reset() -> Result<()> {
     ensure_app_root()?;
     // Drop the file, recreate via migrate, then re-seed.

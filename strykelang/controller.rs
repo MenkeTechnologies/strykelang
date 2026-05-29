@@ -1071,12 +1071,10 @@ pub fn register_chant(controller_id: u64, local_chant_id: u64) -> u64 {
     id
 }
 /// `get_chant` — see implementation.
-
 pub fn get_chant(chant_id: u64) -> Option<(u64, u64)> {
     chant_registry().lock().unwrap().get(&chant_id).copied()
 }
 /// `unregister_chant` — see implementation.
-
 pub fn unregister_chant(chant_id: u64) -> Option<(u64, u64)> {
     chant_registry().lock().unwrap().remove(&chant_id)
 }

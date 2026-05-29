@@ -45,7 +45,6 @@ pub const AOT_VERSION_V2: u32 = 2;
 /// Fixed trailer length in bytes: `8 (cl) + 8 (ul) + 4 (ver) + 4 (rsv) + 8 (magic)`.
 pub const TRAILER_LEN: u64 = 32;
 /// `EmbeddedScript` — see fields for layout.
-
 #[derive(Debug, Clone)]
 pub struct EmbeddedScript {
     /// `__FILE__` / error-reporting name (e.g. `hello.pl`).

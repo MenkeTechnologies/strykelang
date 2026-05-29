@@ -493,7 +493,6 @@ pub fn stat_path(path: &str, symlink: bool) -> StrykeValue {
     }
 }
 /// `perl_stat_from_metadata` — see implementation.
-
 pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<StrykeValue> {
     #[cfg(unix)]
     {
@@ -535,7 +534,6 @@ pub fn perl_stat_from_metadata(meta: &std::fs::Metadata) -> Vec<StrykeValue> {
     }
 }
 /// `link_hard` — see implementation.
-
 pub fn link_hard(old: &str, new: &str) -> StrykeValue {
     StrykeValue::integer(if std::fs::hard_link(old, new).is_ok() {
         1
@@ -544,7 +542,6 @@ pub fn link_hard(old: &str, new: &str) -> StrykeValue {
     })
 }
 /// `link_sym` — see implementation.
-
 pub fn link_sym(old: &str, new: &str) -> StrykeValue {
     #[cfg(unix)]
     {
@@ -558,7 +555,6 @@ pub fn link_sym(old: &str, new: &str) -> StrykeValue {
     }
 }
 /// `read_link` — see implementation.
-
 pub fn read_link(path: &str) -> StrykeValue {
     match std::fs::read_link(path) {
         Ok(p) => StrykeValue::string(p.to_string_lossy().into_owned()),
@@ -896,7 +892,6 @@ pub fn list_char_devices(dir: &str) -> StrykeValue {
     StrykeValue::array(names.into_iter().map(StrykeValue::string).collect())
 }
 /// `glob_patterns` — see implementation.
-
 pub fn glob_patterns(patterns: &[String]) -> StrykeValue {
     let mut paths: Vec<String> = Vec::new();
     for pat in patterns {

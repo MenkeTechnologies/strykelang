@@ -1878,7 +1878,10 @@ mod tests {
         // Two prints separated; the empty `;` shouldn't insert garbage.
         assert!(out.contains("print 1"));
         assert!(out.contains("print 2"));
-        assert!(!out.contains(";;"), "empty stmt leaked literal `;;`: {out:?}");
+        assert!(
+            !out.contains(";;"),
+            "empty stmt leaked literal `;;`: {out:?}"
+        );
     }
 
     // ─── extract_pipe_source — threading chains ─────────────────────────────

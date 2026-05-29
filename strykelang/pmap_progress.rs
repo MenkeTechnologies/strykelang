@@ -219,7 +219,6 @@ impl PmapProgress {
         }
     }
     /// `tick` — see implementation.
-
     #[inline]
     pub fn tick(&self) {
         if !self.enabled {
@@ -242,7 +241,6 @@ impl PmapProgress {
         }
     }
     /// `finish` — see implementation.
-
     pub fn finish(&self) {
         if !self.enabled {
             return;

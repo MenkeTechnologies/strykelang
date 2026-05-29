@@ -38,11 +38,10 @@ const NAMES_FIXTURE: &str = include_str!("../fixtures/wolfram_builtins.txt");
 /// `name()` fails at PARSE time (not runtime) and isn't a builtin
 /// bug. Skip them in the smoke walk.
 const STRYKE_RESERVED: &[&str] = &[
-    "if", "elsif", "else", "unless", "while", "until", "for", "foreach",
-    "do", "last", "next", "redo", "return", "sub", "my", "our", "local",
-    "state", "use", "no", "package", "require", "eval", "die", "warn",
-    "print", "printf", "say", "and", "or", "not", "xor", "cmp", "eq",
-    "ne", "lt", "gt", "le", "ge", "qw", "qr", "q", "qq",
+    "if", "elsif", "else", "unless", "while", "until", "for", "foreach", "do", "last", "next",
+    "redo", "return", "sub", "my", "our", "local", "state", "use", "no", "package", "require",
+    "eval", "die", "warn", "print", "printf", "say", "and", "or", "not", "xor", "cmp", "eq", "ne",
+    "lt", "gt", "le", "ge", "qw", "qr", "q", "qq",
 ];
 
 /// Known-offender allowlist: builtins that PANIC on empty args.
@@ -60,12 +59,7 @@ const PANIC_ALLOWLIST: &[&str] = &[
 /// on empty args. Carlson elliptic integrals (`rd`/`rf`/`rj`) iterate
 /// to numeric convergence; `qs_relation` runs the quadratic-sieve
 /// inner loop. Each one needs an early-return guard for empty input.
-const HANG_ALLOWLIST: &[&str] = &[
-    "carlson_rd",
-    "carlson_rf",
-    "carlson_rj",
-    "qs_relation",
-];
+const HANG_ALLOWLIST: &[&str] = &["carlson_rd", "carlson_rf", "carlson_rj", "qs_relation"];
 
 /// Per-call wall-clock budget. Some Wolfram builtins (Monte Carlo
 /// pricers, sparse solvers, plan generators) iterate to convergence

@@ -191,10 +191,7 @@ mod tests {
         let unique: HashSet<u64> = ids.iter().copied().collect();
         assert_eq!(unique.len(), 100, "all 100 socket ids must be unique");
         for id in &ids {
-            assert!(
-                get(*id).is_some(),
-                "socket {id} must be in pool after open",
-            );
+            assert!(get(*id).is_some(), "socket {id} must be in pool after open",);
         }
         let mut closed = 0;
         for id in &ids {
@@ -204,10 +201,7 @@ mod tests {
         }
         assert_eq!(closed, 100, "all 100 closes must report success");
         for id in &ids {
-            assert!(
-                get(*id).is_none(),
-                "socket {id} must be gone after close",
-            );
+            assert!(get(*id).is_none(), "socket {id} must be gone after close",);
         }
     }
 }

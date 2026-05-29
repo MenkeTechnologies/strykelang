@@ -62,7 +62,6 @@ fn matrix_to_sv(m: &[Vec<f64>]) -> StrykeValue {
 // Matrix operations
 // ══════════════════════════════════════════════════════════════════════
 /// `matrix_new` — see implementation.
-
 pub fn matrix_new(args: &[StrykeValue]) -> StrykeValue {
     let rows = arg_i64(args, 0).unwrap_or(1).max(0) as usize;
     let cols = arg_i64(args, 1).unwrap_or(rows as i64).max(0) as usize;
@@ -70,19 +69,16 @@ pub fn matrix_new(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&vec![vec![fill; cols]; rows])
 }
 /// `matrix_rows` — see implementation.
-
 pub fn matrix_rows(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     StrykeValue::integer(m.len() as i64)
 }
 /// `matrix_cols` — see implementation.
-
 pub fn matrix_cols(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     StrykeValue::integer(m.first().map_or(0, |r| r.len()) as i64)
 }
 /// `matrix_get` — see implementation.
-
 pub fn matrix_get(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let r = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -93,7 +89,6 @@ pub fn matrix_get(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `matrix_set` — see implementation.
-
 pub fn matrix_set(args: &[StrykeValue]) -> StrykeValue {
     let mut m = args.first().map(as_matrix).unwrap_or_default();
     let r = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -105,7 +100,6 @@ pub fn matrix_set(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&m)
 }
 /// `matrix_from_cols` — see implementation.
-
 pub fn matrix_from_cols(args: &[StrykeValue]) -> StrykeValue {
     let cols: Vec<Vec<f64>> = args.iter().map(as_vec_f64).collect();
     if cols.is_empty() {
@@ -121,7 +115,6 @@ pub fn matrix_from_cols(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&m)
 }
 /// `matrix_minor` — see implementation.
-
 pub fn matrix_minor(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let skip_r = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -176,13 +169,11 @@ fn determinant(m: &[Vec<f64>]) -> f64 {
     det
 }
 /// `matrix_determinant` — see implementation.
-
 pub fn matrix_determinant(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     StrykeValue::float(determinant(&m))
 }
 /// `matrix_cofactor` — see implementation.
-
 pub fn matrix_cofactor(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -211,7 +202,6 @@ pub fn matrix_cofactor(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_adjugate` — see implementation.
-
 pub fn matrix_adjugate(args: &[StrykeValue]) -> StrykeValue {
     let c = as_matrix(&matrix_cofactor(args));
     let n = c.len();
@@ -227,14 +217,12 @@ pub fn matrix_adjugate(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&t)
 }
 /// `matrix_norm_frobenius` — see implementation.
-
 pub fn matrix_norm_frobenius(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let sum: f64 = m.iter().flat_map(|r| r.iter()).map(|v| v * v).sum();
     StrykeValue::float(sum.sqrt())
 }
 /// `matrix_norm_l1` — see implementation.
-
 pub fn matrix_norm_l1(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     if m.is_empty() {
@@ -251,7 +239,6 @@ pub fn matrix_norm_l1(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(max_col)
 }
 /// `matrix_norm_linf` — see implementation.
-
 pub fn matrix_norm_linf(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let max: f64 = m
@@ -261,7 +248,6 @@ pub fn matrix_norm_linf(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(max)
 }
 /// `matrix_kronecker` — see implementation.
-
 pub fn matrix_kronecker(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_matrix).unwrap_or_default();
     let b = args.get(1).map(as_matrix).unwrap_or_default();
@@ -285,7 +271,6 @@ pub fn matrix_kronecker(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_vec_mul` — see implementation.
-
 pub fn matrix_vec_mul(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let v = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -296,7 +281,6 @@ pub fn matrix_vec_mul(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `matrix_outer_product` — see implementation.
-
 pub fn matrix_outer_product(args: &[StrykeValue]) -> StrykeValue {
     let u = args.first().map(as_vec_f64).unwrap_or_default();
     let v = args.get(1).map(as_vec_f64).unwrap_or_default();
@@ -307,7 +291,6 @@ pub fn matrix_outer_product(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_concat_h` — see implementation.
-
 pub fn matrix_concat_h(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_matrix).unwrap_or_default();
     let b = args.get(1).map(as_matrix).unwrap_or_default();
@@ -321,7 +304,6 @@ pub fn matrix_concat_h(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_concat_v` — see implementation.
-
 pub fn matrix_concat_v(args: &[StrykeValue]) -> StrykeValue {
     let a = args.first().map(as_matrix).unwrap_or_default();
     let b = args.get(1).map(as_matrix).unwrap_or_default();
@@ -330,7 +312,6 @@ pub fn matrix_concat_v(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_reshape` — see implementation.
-
 pub fn matrix_reshape(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let flat: Vec<f64> = m.into_iter().flatten().collect();
@@ -346,7 +327,6 @@ pub fn matrix_reshape(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_submatrix` — see implementation.
-
 pub fn matrix_submatrix(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let r0 = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -362,7 +342,6 @@ pub fn matrix_submatrix(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&out)
 }
 /// `matrix_swap_rows` — see implementation.
-
 pub fn matrix_swap_rows(args: &[StrykeValue]) -> StrykeValue {
     let mut m = args.first().map(as_matrix).unwrap_or_default();
     let i = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -373,7 +352,6 @@ pub fn matrix_swap_rows(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&m)
 }
 /// `matrix_swap_cols` — see implementation.
-
 pub fn matrix_swap_cols(args: &[StrykeValue]) -> StrykeValue {
     let mut m = args.first().map(as_matrix).unwrap_or_default();
     let i = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -386,7 +364,6 @@ pub fn matrix_swap_cols(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&m)
 }
 /// `matrix_to_string` — see implementation.
-
 pub fn matrix_to_string(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let rendered: Vec<String> = m
@@ -401,7 +378,6 @@ pub fn matrix_to_string(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(rendered.join("\n"))
 }
 /// `matrix_lu_decompose` — see implementation.
-
 pub fn matrix_lu_decompose(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -427,7 +403,6 @@ pub fn matrix_lu_decompose(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(vec![matrix_to_sv(&l), matrix_to_sv(&u)])
 }
 /// `matrix_qr_decompose` — see implementation.
-
 pub fn matrix_qr_decompose(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -459,7 +434,6 @@ pub fn matrix_qr_decompose(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(vec![matrix_to_sv(&q), matrix_to_sv(&r)])
 }
 /// `matrix_cholesky_decompose` — see implementation.
-
 pub fn matrix_cholesky_decompose(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -540,7 +514,6 @@ fn adj_unweighted(v: &StrykeValue) -> Vec<Vec<usize>> {
         .collect()
 }
 /// `graph_from_edges` — see implementation.
-
 pub fn graph_from_edges(args: &[StrykeValue]) -> StrykeValue {
     let edges = args.first().map(as_vec_sv).unwrap_or_default();
     let directed = arg_i64(args, 1).unwrap_or(0) != 0;
@@ -576,7 +549,6 @@ pub fn graph_from_edges(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(adj.into_iter().map(arr_sv).collect())
 }
 /// `graph_to_adj_matrix` — see implementation.
-
 pub fn graph_to_adj_matrix(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let n = g.len();
@@ -591,7 +563,6 @@ pub fn graph_to_adj_matrix(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&m)
 }
 /// `graph_to_adj_list` — see implementation.
-
 pub fn graph_to_adj_list(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -609,7 +580,6 @@ pub fn graph_to_adj_list(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(adj.into_iter().map(arr_sv).collect())
 }
 /// `graph_bfs` — see implementation.
-
 pub fn graph_bfs(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -638,7 +608,6 @@ pub fn graph_bfs(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `graph_dfs` — see implementation.
-
 pub fn graph_dfs(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -686,7 +655,6 @@ impl PartialOrd for DjkNode {
     }
 }
 /// `graph_dijkstra` — see implementation.
-
 pub fn graph_dijkstra(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -714,7 +682,6 @@ pub fn graph_dijkstra(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(dist)
 }
 /// `graph_bellman_ford` — see implementation.
-
 pub fn graph_bellman_ford(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let start = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -740,7 +707,6 @@ pub fn graph_bellman_ford(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(dist)
 }
 /// `graph_floyd_warshall` — see implementation.
-
 pub fn graph_floyd_warshall(args: &[StrykeValue]) -> StrykeValue {
     let m = args.first().map(as_matrix).unwrap_or_default();
     let n = m.len();
@@ -766,7 +732,6 @@ pub fn graph_floyd_warshall(args: &[StrykeValue]) -> StrykeValue {
     matrix_to_sv(&d)
 }
 /// `graph_kruskal_mst` — see implementation.
-
 pub fn graph_kruskal_mst(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let n = g.len();
@@ -803,7 +768,6 @@ pub fn graph_kruskal_mst(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(mst)
 }
 /// `graph_prim_mst` — see implementation.
-
 pub fn graph_prim_mst(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let n = g.len();
@@ -837,7 +801,6 @@ pub fn graph_prim_mst(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(mst)
 }
 /// `graph_topological_sort` — see implementation.
-
 pub fn graph_topological_sort(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -878,7 +841,6 @@ pub fn graph_topological_sort(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `graph_connected_components` — see implementation.
-
 pub fn graph_connected_components(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -908,7 +870,6 @@ pub fn graph_connected_components(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `graph_strongly_connected_components` — see implementation.
-
 pub fn graph_strongly_connected_components(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -959,7 +920,6 @@ pub fn graph_strongly_connected_components(args: &[StrykeValue]) -> StrykeValue 
     )
 }
 /// `graph_cycle_detect` — see implementation.
-
 pub fn graph_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -987,7 +947,6 @@ pub fn graph_cycle_detect(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
 }
 /// `graph_has_path` — see implementation.
-
 pub fn graph_has_path(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let s = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1014,7 +973,6 @@ pub fn graph_has_path(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(0)
 }
 /// `graph_shortest_path` — see implementation.
-
 pub fn graph_shortest_path(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let s = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1060,7 +1018,6 @@ pub fn graph_shortest_path(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `graph_eccentricity` — see implementation.
-
 pub fn graph_eccentricity(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_from_arg).unwrap_or_default();
     let v = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1094,7 +1051,6 @@ pub fn graph_eccentricity(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(ecc)
 }
 /// `graph_clustering_coefficient` — see implementation.
-
 pub fn graph_clustering_coefficient(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let v = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1120,14 +1076,12 @@ pub fn graph_clustering_coefficient(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(edges as f64 / (k * (k - 1)) as f64)
 }
 /// `graph_degree` — see implementation.
-
 pub fn graph_degree(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let v = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
     StrykeValue::integer(g.get(v).map_or(0, |n| n.len()) as i64)
 }
 /// `graph_in_degree` — see implementation.
-
 pub fn graph_in_degree(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let v = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1140,12 +1094,10 @@ pub fn graph_in_degree(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(count)
 }
 /// `graph_out_degree` — see implementation.
-
 pub fn graph_out_degree(args: &[StrykeValue]) -> StrykeValue {
     graph_degree(args)
 }
 /// `graph_pagerank` — see implementation.
-
 pub fn graph_pagerank(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let damp = arg_f64(args, 1).unwrap_or(0.85);
@@ -1176,7 +1128,6 @@ pub fn graph_pagerank(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(pr)
 }
 /// `graph_betweenness` — see implementation.
-
 pub fn graph_betweenness(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1220,7 +1171,6 @@ pub fn graph_betweenness(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(bc)
 }
 /// `graph_closeness` — see implementation.
-
 pub fn graph_closeness(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let v = arg_i64(args, 1).unwrap_or(0).max(0) as usize;
@@ -1247,7 +1197,6 @@ pub fn graph_closeness(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((n as f64 - 1.0) / sum as f64)
 }
 /// `graph_eigenvector_centrality` — see implementation.
-
 pub fn graph_eigenvector_centrality(args: &[StrykeValue]) -> StrykeValue {
     // Power iteration on the (possibly weighted) adjacency matrix: x ← A·x / ‖A·x‖.
     let g = args.first().map(adj_from_arg).unwrap_or_default();
@@ -1282,12 +1231,10 @@ pub fn graph_eigenvector_centrality(args: &[StrykeValue]) -> StrykeValue {
     arr_f64(x)
 }
 /// `graph_kosaraju` — see implementation.
-
 pub fn graph_kosaraju(args: &[StrykeValue]) -> StrykeValue {
     graph_strongly_connected_components(args)
 }
 /// `graph_tarjan` — see implementation.
-
 pub fn graph_tarjan(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1359,7 +1306,6 @@ pub fn graph_tarjan(args: &[StrykeValue]) -> StrykeValue {
     )
 }
 /// `graph_articulation_points` — see implementation.
-
 pub fn graph_articulation_points(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1428,7 +1374,6 @@ pub fn graph_articulation_points(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(pts)
 }
 /// `graph_bridges` — see implementation.
-
 pub fn graph_bridges(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1493,7 +1438,6 @@ pub fn graph_bridges(args: &[StrykeValue]) -> StrykeValue {
     arr_sv(result)
 }
 /// `graph_is_connected` — see implementation.
-
 pub fn graph_is_connected(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1517,7 +1461,6 @@ pub fn graph_is_connected(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(if count == n { 1 } else { 0 })
 }
 /// `graph_is_bipartite` — see implementation.
-
 pub fn graph_is_bipartite(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1546,7 +1489,6 @@ pub fn graph_is_bipartite(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::integer(1)
 }
 /// `graph_color_greedy` — see implementation.
-
 pub fn graph_color_greedy(args: &[StrykeValue]) -> StrykeValue {
     let g = args.first().map(adj_unweighted).unwrap_or_default();
     let n = g.len();
@@ -1596,84 +1538,72 @@ fn parse_date_arg(args: &[StrykeValue], idx: usize) -> Option<DateTime<Utc>> {
     parse_date_unix(args, idx)
 }
 /// `date_year` — see implementation.
-
 pub fn date_year(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.year() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_month` — see implementation.
-
 pub fn date_month(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.month() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_day` — see implementation.
-
 pub fn date_day(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.day() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_hour` — see implementation.
-
 pub fn date_hour(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.hour() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_minute` — see implementation.
-
 pub fn date_minute(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.minute() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_second` — see implementation.
-
 pub fn date_second(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.second() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_dayofweek` — see implementation.
-
 pub fn date_dayofweek(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.weekday().num_days_from_sunday() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_dayofyear` — see implementation.
-
 pub fn date_dayofyear(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.ordinal() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_weekofyear` — see implementation.
-
 pub fn date_weekofyear(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer(d.iso_week().week() as i64))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_quarter` — see implementation.
-
 pub fn date_quarter(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::integer((d.month() as i64 - 1) / 3 + 1))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_is_leap` — see implementation.
-
 pub fn date_is_leap(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_i64(args, 0).unwrap_or(0);
     let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
     StrykeValue::integer(if leap { 1 } else { 0 })
 }
 /// `date_days_in_month` — see implementation.
-
 pub fn date_days_in_month(args: &[StrykeValue]) -> StrykeValue {
     let y = arg_i64(args, 0).unwrap_or(2000) as i32;
     let m = arg_i64(args, 1).unwrap_or(1) as u32;
@@ -1687,7 +1617,6 @@ pub fn date_days_in_month(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_business_days_between` — see implementation.
-
 pub fn date_business_days_between(args: &[StrykeValue]) -> StrykeValue {
     let a = parse_date_arg(args, 0);
     let b = parse_date_arg(args, 1);
@@ -1710,7 +1639,6 @@ pub fn date_business_days_between(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_add_days` — see implementation.
-
 pub fn date_add_days(args: &[StrykeValue]) -> StrykeValue {
     let d = parse_date_arg(args, 0);
     let n = arg_i64(args, 1).unwrap_or(0);
@@ -1731,7 +1659,6 @@ fn last_day_of_month(year: i32, month: u32) -> u32 {
         .unwrap_or(28)
 }
 /// `date_add_months` — see implementation.
-
 pub fn date_add_months(args: &[StrykeValue]) -> StrykeValue {
     let d = parse_date_arg(args, 0);
     let n = arg_i64(args, 1).unwrap_or(0);
@@ -1748,7 +1675,6 @@ pub fn date_add_months(args: &[StrykeValue]) -> StrykeValue {
     .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_add_years` — see implementation.
-
 pub fn date_add_years(args: &[StrykeValue]) -> StrykeValue {
     let d = parse_date_arg(args, 0);
     let n = arg_i64(args, 1).unwrap_or(0) as i32;
@@ -1763,7 +1689,6 @@ pub fn date_add_years(args: &[StrykeValue]) -> StrykeValue {
     .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_diff_days` — see implementation.
-
 pub fn date_diff_days(args: &[StrykeValue]) -> StrykeValue {
     match (parse_date_arg(args, 0), parse_date_arg(args, 1)) {
         (Some(a), Some(b)) => StrykeValue::integer((b - a).num_days()),
@@ -1771,7 +1696,6 @@ pub fn date_diff_days(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_diff_hours` — see implementation.
-
 pub fn date_diff_hours(args: &[StrykeValue]) -> StrykeValue {
     match (parse_date_arg(args, 0), parse_date_arg(args, 1)) {
         (Some(a), Some(b)) => StrykeValue::integer((b - a).num_hours()),
@@ -1779,7 +1703,6 @@ pub fn date_diff_hours(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_diff_minutes` — see implementation.
-
 pub fn date_diff_minutes(args: &[StrykeValue]) -> StrykeValue {
     match (parse_date_arg(args, 0), parse_date_arg(args, 1)) {
         (Some(a), Some(b)) => StrykeValue::integer((b - a).num_minutes()),
@@ -1787,7 +1710,6 @@ pub fn date_diff_minutes(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_diff_seconds` — see implementation.
-
 pub fn date_diff_seconds(args: &[StrykeValue]) -> StrykeValue {
     match (parse_date_arg(args, 0), parse_date_arg(args, 1)) {
         (Some(a), Some(b)) => StrykeValue::integer((b - a).num_seconds()),
@@ -1795,7 +1717,6 @@ pub fn date_diff_seconds(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `date_easter` — see implementation.
-
 pub fn date_easter(args: &[StrykeValue]) -> StrykeValue {
     let year = arg_i64(args, 0).unwrap_or(2025) as i32;
     let a = year % 19;
@@ -1815,7 +1736,6 @@ pub fn date_easter(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::string(format!("{year:04}-{month:02}-{day:02}"))
 }
 /// `date_is_weekend` — see implementation.
-
 pub fn date_is_weekend(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| {
@@ -1829,7 +1749,6 @@ pub fn date_is_weekend(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_first_of_month` — see implementation.
-
 pub fn date_first_of_month(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .and_then(|d| {
@@ -1841,7 +1760,6 @@ pub fn date_first_of_month(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_last_of_month` — see implementation.
-
 pub fn date_last_of_month(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .and_then(|d| {
@@ -1857,7 +1775,6 @@ pub fn date_last_of_month(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_iso_week` — see implementation.
-
 pub fn date_iso_week(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| {
@@ -1867,14 +1784,12 @@ pub fn date_iso_week(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_iso_format` — see implementation.
-
 pub fn date_iso_format(args: &[StrykeValue]) -> StrykeValue {
     parse_date_arg(args, 0)
         .map(|d| StrykeValue::string(d.to_rfc3339()))
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_unix_to_str` — see implementation.
-
 pub fn date_unix_to_str(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(0);
     let fmt = arg_str(args, 1).unwrap_or_else(|| "%Y-%m-%d %H:%M:%S".to_string());
@@ -1884,7 +1799,6 @@ pub fn date_unix_to_str(args: &[StrykeValue]) -> StrykeValue {
         .unwrap_or(StrykeValue::UNDEF)
 }
 /// `date_str_to_unix` — see implementation.
-
 pub fn date_str_to_unix(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_str(args, 0).unwrap_or_default();
     let fmt = arg_str(args, 1).unwrap_or_else(|| "%Y-%m-%d %H:%M:%S".to_string());
@@ -1969,7 +1883,6 @@ pub fn sun_set_unix(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::UNDEF
 }
 /// `zodiac_sign` — see implementation.
-
 pub fn zodiac_sign(args: &[StrykeValue]) -> StrykeValue {
     let m = arg_i64(args, 0).unwrap_or(1);
     let d = arg_i64(args, 1).unwrap_or(1);
@@ -2003,14 +1916,12 @@ fn gamma(x: f64) -> f64 {
     libm::tgamma(x)
 }
 /// `beta_function` — see implementation.
-
 pub fn beta_function(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(1.0);
     let b = arg_f64(args, 1).unwrap_or(1.0);
     StrykeValue::float(gamma(a) * gamma(b) / gamma(a + b))
 }
 /// `beta_incomplete` — see implementation.
-
 pub fn beta_incomplete(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.5).clamp(0.0, 1.0);
     let a = arg_f64(args, 1).unwrap_or(1.0);
@@ -2075,7 +1986,6 @@ pub fn beta_incomplete(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `gamma_regularized_p` — see implementation.
-
 pub fn gamma_regularized_p(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(1.0);
     let x = arg_f64(args, 1).unwrap_or(0.0).max(0.0);
@@ -2124,13 +2034,11 @@ pub fn gamma_regularized_p(args: &[StrykeValue]) -> StrykeValue {
     }
 }
 /// `gamma_regularized_q` — see implementation.
-
 pub fn gamma_regularized_q(args: &[StrykeValue]) -> StrykeValue {
     let p = gamma_regularized_p(args).to_number();
     StrykeValue::float(1.0 - p)
 }
 /// `ei` — see implementation.
-
 pub fn ei(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(1.0);
     if x == 0.0 {
@@ -2163,7 +2071,6 @@ pub fn ei(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(euler + x.abs().ln() + sum)
 }
 /// `expint` — see implementation.
-
 pub fn expint(args: &[StrykeValue]) -> StrykeValue {
     let n = arg_i64(args, 0).unwrap_or(1).max(0) as u32;
     let x = arg_f64(args, 1).unwrap_or(1.0).max(0.0);
@@ -2226,7 +2133,6 @@ pub fn expint(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float((-x).exp() * h)
 }
 /// `si` — see implementation.
-
 pub fn si(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(0.0);
     // Series expansion: Si(x) = sum_{k=0}^inf (-1)^k * x^(2k+1) / ((2k+1)*(2k+1)!)
@@ -2244,7 +2150,6 @@ pub fn si(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 /// `li` — see implementation.
-
 pub fn li(args: &[StrykeValue]) -> StrykeValue {
     let x = arg_f64(args, 0).unwrap_or(2.0);
     if x <= 0.0 || x == 1.0 {
@@ -2255,7 +2160,6 @@ pub fn li(args: &[StrykeValue]) -> StrykeValue {
     ei(&new_args)
 }
 /// `zeta_riemann` — see implementation.
-
 pub fn zeta_riemann(args: &[StrykeValue]) -> StrykeValue {
     let s = arg_f64(args, 0).unwrap_or(2.0);
     if s == 1.0 {
@@ -2268,7 +2172,6 @@ pub fn zeta_riemann(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 /// `hypergeom_2f1` — see implementation.
-
 pub fn hypergeom_2f1(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(1.0);
     let b = arg_f64(args, 1).unwrap_or(1.0);
@@ -2289,7 +2192,6 @@ pub fn hypergeom_2f1(args: &[StrykeValue]) -> StrykeValue {
     StrykeValue::float(sum)
 }
 /// `hypergeom_1f1` — see implementation.
-
 pub fn hypergeom_1f1(args: &[StrykeValue]) -> StrykeValue {
     let a = arg_f64(args, 0).unwrap_or(1.0);
     let c = arg_f64(args, 1).unwrap_or(1.0);

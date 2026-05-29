@@ -6,7 +6,6 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(clippy::needless_range_loop)]
 /// `agent` submodule.
-
 pub mod agent;
 /// `ai` submodule.
 pub mod ai;
@@ -358,7 +357,6 @@ pub fn deconvert_to_perl_with_options(
     deconvert::deconvert_program_with_options(p, opts)
 }
 /// `parse` — see implementation.
-
 pub fn parse(code: &str) -> StrykeResult<ast::Program> {
     parse_with_file(code, "-e")
 }

@@ -28,7 +28,6 @@ const PWA_SW: &str = include_str!("../templates/devops/sw.js");
 
 // ── Theme ──────────────────────────────────────────────────────────────
 /// `apply_theme` — see implementation.
-
 pub fn apply_theme(theme: &str, api: bool) -> Result<()> {
     if api {
         return Ok(());
@@ -77,7 +76,6 @@ const AUTH_USERS_CONTROLLER: &str =
 const AUTH_SIGNUP_VIEW: &str = include_str!("../templates/auth/signup.html.erb");
 const AUTH_LOGIN_VIEW: &str = include_str!("../templates/auth/login.html.erb");
 /// `auth` — see implementation.
-
 pub fn auth() -> Result<()> {
     ensure_app_root()?;
 
@@ -155,7 +153,6 @@ const ADMIN_INDEX: &str = include_str!("../templates/admin/index.html.erb");
 const ADMIN_TABLE: &str = include_str!("../templates/admin/table.html.erb");
 const ADMIN_CSS: &str = include_str!("../templates/admin/admin.css");
 /// `admin` — see implementation.
-
 pub fn admin() -> Result<()> {
     ensure_app_root()?;
 
@@ -193,7 +190,6 @@ pub fn admin() -> Result<()> {
 
 const API_CONTROLLER: &str = include_str!("../templates/api/controller.stk");
 /// `api` — see implementation.
-
 pub fn api(name: &str) -> Result<()> {
     ensure_app_root()?;
     let model_cn = name.to_pascal_case();
@@ -252,7 +248,6 @@ const MAILER_TMPL: &str = include_str!("../templates/extras/mailer.stk");
 const JOB_TMPL: &str = include_str!("../templates/extras/job.stk");
 const CHANNEL_TMPL: &str = include_str!("../templates/extras/channel.stk");
 /// `mailer` — see implementation.
-
 pub fn mailer(name: &str, actions: &[String]) -> Result<()> {
     ensure_app_root()?;
     let cn = format!("{}Mailer", name.to_pascal_case());
@@ -281,7 +276,6 @@ pub fn mailer(name: &str, actions: &[String]) -> Result<()> {
     Ok(())
 }
 /// `job` — see implementation.
-
 pub fn job(name: &str) -> Result<()> {
     ensure_app_root()?;
     let cn = format!("{}Job", name.to_pascal_case());
@@ -294,7 +288,6 @@ pub fn job(name: &str) -> Result<()> {
     Ok(())
 }
 /// `channel` — see implementation.
-
 pub fn channel(name: &str) -> Result<()> {
     ensure_app_root()?;
     let cn = format!("{}Channel", name.to_pascal_case());
@@ -312,7 +305,6 @@ pub fn channel(name: &str) -> Result<()> {
 
 // ── DevOps generators (Dockerfile / GitHub Actions / PWA) ─────────────
 /// `docker` — see implementation.
-
 pub fn docker(app_name: &str) -> Result<()> {
     ensure_app_root()?;
     let dockerfile = DOCKERFILE.replace("{{app_name}}", app_name);
@@ -322,7 +314,6 @@ pub fn docker(app_name: &str) -> Result<()> {
     Ok(())
 }
 /// `ci` — see implementation.
-
 pub fn ci() -> Result<()> {
     ensure_app_root()?;
     write_file(&PathBuf::from(".github/workflows/ci.yml"), CI_YAML)?;
@@ -330,7 +321,6 @@ pub fn ci() -> Result<()> {
     Ok(())
 }
 /// `pwa` — see implementation.
-
 pub fn pwa(app_name: &str) -> Result<()> {
     ensure_app_root()?;
     let manifest = PWA_MANIFEST.replace("{{app_name}}", app_name);
@@ -347,7 +337,6 @@ pub fn pwa(app_name: &str) -> Result<()> {
 
 // ── API mode conversion ────────────────────────────────────────────────
 /// `convert_to_api` — see implementation.
-
 pub fn convert_to_api() -> Result<()> {
     // Drop the layout — API responses don't need HTML chrome.
     let layout = PathBuf::from("app/views/layouts/application.html.erb");
