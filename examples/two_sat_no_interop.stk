@@ -1,0 +1,273 @@
+#!/usr/bin/env stryke
+
+# 2-SAT solver — finds a satisfying truth assignment for any 2-CNF
+# formula in O(n + m) via Tarjan SCC on the implication graph.
+# Each variable x_i has two graph nodes (x_i = 2*i, ¬x_i = 2*i + 1).
+# Every clause (a ∨ b) becomes two implications: ¬a → b and ¬b → a.
+# Formula is satisfiable iff no SCC contains both x_i and ¬x_i; the
+# topological assignment "later component is true" then satisfies
+# every clause.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Sat::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/two_sat_no_interop.stk
+
+# ── lit-encoding helpers: positive lit -> 2*v, negative -> 2*v+1 ───
+
+fn Sat::lit($v, $neg) {
+    $neg ? 2 * $v + 1 : 2 * $v
+}
+
+fn Sat::neg($lit) {
+    $lit ^ 1
+}
+
+# ── build the implication graph from a list of 2-clauses ──────────
+# Each clause is +{ a => [var, neg?], b => [var, neg?] }.
+
+fn Sat::build_graph($n_vars, $clauses) {
+    my $V = 2 * $n_vars
+    my @g
+    my @gr
+    for my $i (0:$V - 1) {
+        push @g,  []
+        push @gr, []
+    }
+    for my $c (@$clauses) {
+        my $ax = Sat::lit($c->{a}->[0], $c->{a}->[1])
+        my $bx = Sat::lit($c->{b}->[0], $c->{b}->[1])
+        push @{$g[Sat::neg($ax)]}, $bx
+        push @{$g[Sat::neg($bx)]}, $ax
+        push @{$gr[$bx]}, Sat::neg($ax)
+        push @{$gr[$ax]}, Sat::neg($bx)
+    }
+    +{ g => \@g, gr => \@gr, V => $V }
+}
+
+# ── Kosaraju SCC: returns +{ comp => [...], n_comp => k } ─────────
+# Components are numbered in reverse-finish order so a later
+# component number means "later in topological order" — that's
+# exactly what 2-SAT needs.
+
+fn Sat::scc($graph) {
+    my $V = $graph->{V}
+    my $g = $graph->{g}
+    my $gr = $graph->{gr}
+    my @visited = (0) x $V
+    my @order
+    my @stack
+    for my $start (0:$V - 1) {
+        next if $visited[$start]
+        push @stack, [$start, 0]
+        $visited[$start] = 1
+        while (len(@stack) > 0) {
+            my $top = $stack[-1]
+            my $v = $top->[0]
+            my $idx = $top->[1]
+            if ($idx < len(@{$g->[$v]})) {
+                $top->[1]++
+                my $u = $g->[$v]->[$idx]
+                if (!$visited[$u]) {
+                    $visited[$u] = 1
+                    push @stack, [$u, 0]
+                }
+            } else {
+                push @order, $v
+                pop(@stack)
+            }
+        }
+    }
+    my @comp = (-1) x $V
+    my $k = 0
+    for my $i (0:$V - 1) {
+        my $v = $order[$V - 1 - $i]
+        next if $comp[$v] >= 0
+        $comp[$v] = $k
+        my @work = ($v)
+        while (len(@work) > 0) {
+            my $u = pop(@work)
+            for my $w (@{$gr->[$u]}) {
+                if ($comp[$w] < 0) {
+                    $comp[$w] = $k
+                    push @work, $w
+                }
+            }
+        }
+        $k++
+    }
+    +{ comp => \@comp, n_comp => $k }
+}
+
+# ── solve 2-SAT ───────────────────────────────────────────────────
+# Returns +{ ok => 0/1, assign => [bool, bool, …] }.
+
+fn Sat::solve($n_vars, $clauses) {
+    my $graph = Sat::build_graph($n_vars, $clauses)
+    my $sccs = Sat::scc($graph)
+    my $comp = $sccs->{comp}
+    for my $v (0:$n_vars - 1) {
+        if ($comp->[2 * $v] == $comp->[2 * $v + 1]) {
+            return +{ ok => 0, assign => [] }
+        }
+    }
+    my @assign
+    for my $v (0:$n_vars - 1) {
+        push @assign, $comp->[2 * $v] > $comp->[2 * $v + 1] ? 1 : 0
+    }
+    +{ ok => 1, assign => \@assign }
+}
+
+# ── verify a candidate assignment satisfies every clause ──────────
+
+fn Sat::check($n_vars, $clauses, $assign) {
+    for my $c (@$clauses) {
+        my $av = $assign->[$c->{a}->[0]]
+        my $bv = $assign->[$c->{b}->[0]]
+        if ($c->{a}->[1]) { $av = !$av }
+        if ($c->{b}->[1]) { $bv = !$bv }
+        return 0 unless $av || $bv
+    }
+    1
+}
+
+# ── primary test cases ────────────────────────────────────────────
+# Each clause is encoded as (var, negated?). Variables index from 0.
+
+my @cases = (
+    +{
+        name    => "trivial sat: (x0 ∨ x1)",
+        n       => 2,
+        clauses => [
+            +{ a => [0, 0], b => [1, 0] },
+        ],
+        sat     => 1,
+    },
+    +{
+        name    => "trivial unsat: (x0) ∧ (¬x0)",
+        n       => 1,
+        clauses => [
+            +{ a => [0, 0], b => [0, 0] },
+            +{ a => [0, 1], b => [0, 1] },
+        ],
+        sat     => 0,
+    },
+    +{
+        name    => "implication chain — sat",
+        n       => 3,
+        clauses => [
+            +{ a => [0, 1], b => [1, 0] },   # ¬x0 ∨ x1   (x0 → x1)
+            +{ a => [1, 1], b => [2, 0] },   # ¬x1 ∨ x2   (x1 → x2)
+            +{ a => [0, 0], b => [2, 0] },   # x0  ∨ x2
+        ],
+        sat     => 1,
+    },
+    +{
+        name    => "cycle unsat",
+        n       => 2,
+        clauses => [
+            +{ a => [0, 1], b => [1, 0] },   # x0 → x1
+            +{ a => [1, 1], b => [0, 0] },   # x1 → x0
+            +{ a => [0, 0], b => [0, 0] },   # x0
+            +{ a => [1, 1], b => [1, 1] },   # ¬x1
+        ],
+        sat     => 0,
+    },
+    +{
+        name    => "4-var puzzle — sat",
+        n       => 4,
+        clauses => [
+            +{ a => [0, 0], b => [1, 0] },   # x0 ∨ x1
+            +{ a => [2, 1], b => [3, 0] },   # ¬x2 ∨ x3
+            +{ a => [1, 1], b => [3, 1] },   # ¬x1 ∨ ¬x3
+            +{ a => [0, 1], b => [2, 0] },   # ¬x0 ∨ x2
+        ],
+        sat     => 1,
+    },
+    +{
+        name    => "implication that's its own negation",
+        n       => 1,
+        clauses => [
+            +{ a => [0, 0], b => [0, 0] },   # x0
+        ],
+        sat     => 1,
+    },
+)
+
+p "── 2-SAT solver demo ────────────────────────────────"
+printf "  %-40s  %3s  %s\n", "case", "sat", "assignment"
+printf "  %-40s  %3s  %s\n", "----------------------------------------", "---", "----------"
+for my $c (@cases) {
+    my $r = Sat::solve($c->{n}, $c->{clauses})
+    my $shown = $r->{ok} ? "[" . join(", ", @{$r->{assign}}) . "]" : "—"
+    printf "  %-40s  %3s  %s\n", $c->{name}, $r->{ok} ? "yes" : "no", $shown
+}
+
+# ── invariant 1: solver sat-status matches expectation ────────────
+
+for my $c (@cases) {
+    my $r = Sat::solve($c->{n}, $c->{clauses})
+    die "sat mismatch on \"#{$c->{name}}\": got #{$r->{ok}} want #{$c->{sat}}" unless $r->{ok} == $c->{sat}
+}
+
+# ── invariant 2: every reported sat-assignment satisfies all clauses ─
+
+for my $c (@cases) {
+    my $r = Sat::solve($c->{n}, $c->{clauses})
+    next unless $r->{ok}
+    die "model failed verifier on \"#{$c->{name}}\"" unless Sat::check($c->{n}, $c->{clauses}, $r->{assign})
+}
+
+# ── invariant 3: assignment length matches n_vars on sat cases ────
+
+for my $c (@cases) {
+    my $r = Sat::solve($c->{n}, $c->{clauses})
+    next unless $r->{ok}
+    die "assignment length mismatch on \"#{$c->{name}}\"" unless len(@{$r->{assign}}) == $c->{n}
+}
+
+# ── invariant 4: brute-force cross-check on small cases ───────────
+
+for my $c (@cases) {
+    next unless $c->{n} <= 4
+    my $solver = Sat::solve($c->{n}, $c->{clauses})
+    my $brute = 0
+    my $total = 1 << $c->{n}
+    for my $m (0:$total - 1) {
+        my @assign
+        for my $v (0:$c->{n} - 1) {
+            push @assign, ($m >> $v) & 1
+        }
+        if (Sat::check($c->{n}, $c->{clauses}, \@assign)) {
+            $brute = 1
+            last
+        }
+    }
+    die "brute disagrees with solver on \"#{$c->{name}}\": solver=#{$solver->{ok}} brute=#{$brute}" unless $solver->{ok} == $brute
+}
+
+# ── invariant 5: adding (x_i ∨ x_i) forces x_i = 1 in the model ───
+# This is the "unit clause" reduction baked into the 2-CNF form.
+
+my $forced = Sat::solve(
+    2,
+    [
+        +{ a => [0, 0], b => [0, 0] },   # x0
+        +{ a => [1, 1], b => [1, 1] },   # ¬x1
+        +{ a => [0, 0], b => [1, 0] },   # x0 ∨ x1
+    ],
+)
+die "forced case must be sat" unless $forced->{ok}
+die "x0 must be forced true"  unless $forced->{assign}->[0] == 1
+die "x1 must be forced false" unless $forced->{assign}->[1] == 0
+
+# ── invariant 6: an empty clause list with n_vars > 0 is sat ──────
+
+my $empty = Sat::solve(3, [])
+die "empty 2-SAT must be sat" unless $empty->{ok}
+die "empty assignment length must be 3" unless len(@{$empty->{assign}}) == 3
+
+p ""
+p "── all six invariants satisfied ──────────────────────"

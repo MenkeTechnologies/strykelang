@@ -1,0 +1,240 @@
+#!/usr/bin/env stryke
+
+# Karatsuba multiplication — O(n^log₂3) ≈ O(n^1.585) bignum multiply
+# on digit-string operands. Splits each n-digit operand at m = n/2:
+#   x = x1 · 10^m + x0,  y = y1 · 10^m + y0
+#   xy = (x1·y1)·10^(2m) + ((x1+x0)(y1+y0) − x1·y1 − x0·y0)·10^m + x0·y0
+# Only THREE recursive multiplications instead of four. Below the
+# threshold we fall back to grade-school multiplication.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Kar::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/karatsuba_no_interop.stk
+
+# ── strip a leading-zero string to canonical form (no leading 0s) ─
+
+fn Kar::strip($s) {
+    return "0" if $s eq "" || $s eq "0"
+    my $i = 0
+    my $n = len($s)
+    while ($i < $n - 1 && substr($s, $i, 1) eq "0") {
+        $i++
+    }
+    substr($s, $i)
+}
+
+# ── pad-left a string with zeros up to length n ───────────────────
+
+fn Kar::pad_left($s, $n) {
+    my $k = $n - len($s)
+    return $s if $k <= 0
+    ("0" x $k) . $s
+}
+
+# ── add two non-negative digit strings ────────────────────────────
+
+fn Kar::add($x, $y) {
+    my $n = len($x) > len($y) ? len($x) : len($y)
+    my $ax = Kar::pad_left($x, $n)
+    my $bx = Kar::pad_left($y, $n)
+    my $carry = 0
+    my $out = ""
+    for my $i (0:$n - 1) {
+        my $pos = $n - 1 - $i
+        my $sum = int(substr($ax, $pos, 1)) + int(substr($bx, $pos, 1)) + $carry
+        $carry = int($sum / 10)
+        $out = ($sum % 10) . $out
+    }
+    if ($carry > 0) {
+        $out = $carry . $out
+    }
+    Kar::strip($out)
+}
+
+# ── subtract y from x assuming x >= y >= 0 ────────────────────────
+
+fn Kar::sub($x, $y) {
+    my $n = len($x)
+    my $ax = $x
+    my $bx = Kar::pad_left($y, $n)
+    my $borrow = 0
+    my $out = ""
+    for my $i (0:$n - 1) {
+        my $pos = $n - 1 - $i
+        my $d = int(substr($ax, $pos, 1)) - int(substr($bx, $pos, 1)) - $borrow
+        if ($d < 0) {
+            $d += 10
+            $borrow = 1
+        } else {
+            $borrow = 0
+        }
+        $out = $d . $out
+    }
+    Kar::strip($out)
+}
+
+# ── shift left = append n zeros (multiply by 10^n) ────────────────
+
+fn Kar::shift_left($x, $n) {
+    return "0" if $x eq "0"
+    $x . ("0" x $n)
+}
+
+# ── grade-school O(n²) multiplication for the base case ───────────
+# Uses an arrayref (not a my @res) to hold the partial-product
+# accumulator; in stryke (current), `my @res; $res[$i] = …` inside
+# a function whose result is then passed positionally to another
+# function can leak the array into the outer arglist. Arrayrefs
+# don't trigger that.
+
+fn Kar::grade_school($x, $y) {
+    return "0" if $x eq "0" || $y eq "0"
+    my $nx = len($x)
+    my $ny = len($y)
+    my $res = [(0) x ($nx + $ny)]
+    for my $i (0:$nx - 1) {
+        my $ax = int(substr($x, $nx - 1 - $i, 1))
+        for my $j (0:$ny - 1) {
+            my $bx = int(substr($y, $ny - 1 - $j, 1))
+            $res->[$i + $j] = $res->[$i + $j] + $ax * $bx
+        }
+    }
+    my $carry = 0
+    for my $k (0:len(@$res) - 1) {
+        my $v = $res->[$k] + $carry
+        $res->[$k] = $v % 10
+        $carry = int($v / 10)
+    }
+    my $out = ""
+    for my $k (0:len(@$res) - 1) {
+        $out = $res->[$k] . $out
+    }
+    Kar::strip($out)
+}
+
+# ── recursive Karatsuba ───────────────────────────────────────────
+
+fn Kar::mul($x, $y) {
+    my $x_s = Kar::strip($x)
+    my $y_s = Kar::strip($y)
+    my $nx = len($x_s)
+    my $ny = len($y_s)
+    if ($nx <= 16 || $ny <= 16) {
+        return Kar::grade_school($x_s, $y_s)
+    }
+    my $n = $nx > $ny ? $nx : $ny
+    my $m = int($n / 2)
+    my $x_pad = Kar::pad_left($x_s, $n)
+    my $y_pad = Kar::pad_left($y_s, $n)
+    my $hi_x = substr($x_pad, 0, $n - $m)
+    my $lo_x = substr($x_pad, $n - $m, $m)
+    my $hi_y = substr($y_pad, 0, $n - $m)
+    my $lo_y = substr($y_pad, $n - $m, $m)
+    my $z2 = Kar::mul($hi_x, $hi_y)
+    my $z0 = Kar::mul($lo_x, $lo_y)
+    my $sx = Kar::add($hi_x, $lo_x)
+    my $sy = Kar::add($hi_y, $lo_y)
+    my $z1 = Kar::sub(Kar::sub(Kar::mul($sx, $sy), $z2), $z0)
+    my $term2 = Kar::shift_left($z2, 2 * $m)
+    my $term1 = Kar::shift_left($z1, $m)
+    Kar::add(Kar::add($term2, $term1), $z0)
+}
+
+# ── primary test cases ────────────────────────────────────────────
+
+my @cases = (
+    +{ x => "0",                y => "12345678901234567890" },
+    +{ x => "1",                y => "99999999999999999999" },
+    +{ x => "42",               y => "777" },
+    +{ x => "123456789",        y => "987654321" },
+    +{ x => "1234567890123456", y => "9876543210987654" },
+    +{ x => "11111111111111111111111111", y => "11111111111111111111111111" },
+    +{ x => "9" x 30,           y => "1" },
+    +{ x => "9" x 40,           y => "9" x 40 },
+    +{ x => "1" . ("0" x 50),   y => "1" . ("0" x 50) },
+)
+
+# ── compute a known-correct reference via grade-school multiply ───
+
+p "── Karatsuba multiplication demo ─────────────────────"
+printf "  %-30s × %-30s = (product)\n", "x (head)", "y (head)"
+printf "  %-30s   %-30s\n", "------------------------------", "------------------------------"
+for my $c (@cases) {
+    my $kar = Kar::mul($c->{x}, $c->{y})
+    my $ref = Kar::grade_school(Kar::strip($c->{x}), Kar::strip($c->{y}))
+    my $x_show = len($c->{x}) > 28 ? substr($c->{x}, 0, 26) . ".." : $c->{x}
+    my $y_show = len($c->{y}) > 28 ? substr($c->{y}, 0, 26) . ".." : $c->{y}
+    printf "  %-30s × %-30s = %s\n", $x_show, $y_show, len($kar) > 40 ? substr($kar, 0, 38) . ".." : $kar
+    die "Karatsuba disagrees with grade-school: kar=#{$kar} ref=#{$ref}" unless $kar eq $ref
+}
+
+# ── invariant 1: 0 · anything == 0 ────────────────────────────────
+
+for my $rhs ("0", "1", "999999999999999999999999") {
+    die "0 · #{$rhs} != 0" unless Kar::mul("0", $rhs) eq "0"
+    die "#{$rhs} · 0 != 0" unless Kar::mul($rhs, "0") eq "0"
+}
+
+# ── invariant 2: 1 · n == n ───────────────────────────────────────
+
+for my $n ("1", "42", "12345678901234567890", "9" x 100) {
+    die "1 · #{$n} != #{$n}" unless Kar::mul("1", $n) eq Kar::strip($n)
+    die "#{$n} · 1 != #{$n}" unless Kar::mul($n, "1") eq Kar::strip($n)
+}
+
+# ── invariant 3: commutativity x · y == y · x ─────────────────────
+
+for my $c (@cases) {
+    my $xy = Kar::mul($c->{x}, $c->{y})
+    my $yx = Kar::mul($c->{y}, $c->{x})
+    die "commutativity violated on #{$c->{x}}, #{$c->{y}}" unless $xy eq $yx
+}
+
+# ── invariant 4: a · (b + c) == a · b + a · c (distributivity) ────
+
+my @triples = (
+    ["7", "11", "13"],
+    ["123", "456", "789"],
+    ["123456789", "987654321", "111111111"],
+    ["1" . ("0" x 25), "5" x 25, "9" x 25],
+)
+for my $t (@triples) {
+    my $sum = Kar::add($t->[1], $t->[2])
+    my $left = Kar::mul($t->[0], $sum)
+    my $right = Kar::add(Kar::mul($t->[0], $t->[1]), Kar::mul($t->[0], $t->[2]))
+    die "distributivity violated on (#{$t->[0]}, #{$t->[1]}, #{$t->[2]}): #{$left} != #{$right}" unless $left eq $right
+}
+
+# ── invariant 5: 10^n · 10^n == 10^(2n) (canonical form, no junk) ─
+
+for my $n (1, 5, 10, 25, 50) {
+    my $ax = "1" . ("0" x $n)
+    my $prod = Kar::mul($ax, $ax)
+    my $want = "1" . ("0" x (2 * $n))
+    die "10^#{$n} squared mismatch: got #{$prod} want #{$want}" unless $prod eq $want
+}
+
+# ── invariant 6: product length is exactly len(x) + len(y) or 1 less ─
+
+for my $c (@cases) {
+    my $kar = Kar::mul($c->{x}, $c->{y})
+    next if $kar eq "0"
+    my $nx = len(Kar::strip($c->{x}))
+    my $ny = len(Kar::strip($c->{y}))
+    my $lp = len($kar)
+    die "product length out of bounds on #{$c->{x}}, #{$c->{y}}: got #{$lp} expected #{$nx + $ny - 1} or #{$nx + $ny}" unless $lp == $nx + $ny - 1 || $lp == $nx + $ny
+}
+
+# ── invariant 7: no leading zeros in canonical result (except "0") ─
+
+for my $c (@cases) {
+    my $kar = Kar::mul($c->{x}, $c->{y})
+    next if $kar eq "0"
+    die "leading zero in result on #{$c->{x}}, #{$c->{y}}: #{$kar}" if substr($kar, 0, 1) eq "0"
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

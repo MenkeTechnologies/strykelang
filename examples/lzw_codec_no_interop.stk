@@ -1,0 +1,181 @@
+#!/usr/bin/env stryke
+
+# LZW codec — Lempel-Ziv-Welch encoder + decoder with a dynamically
+# growing dictionary. The encoder seeds the dict with every 1-byte
+# string (codes 0..255), then walks the input greedily emitting the
+# longest already-known prefix's code; on each emission a new entry
+# `prefix + lookahead` is added.  Decoder reconstructs the dict from
+# the code stream — including the classic `k = next_code` edge case
+# where a brand-new code is consumed before its definition arrives.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`LZW::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#   * `_0`/`_1` in sort comparators (§11)
+#
+# Run: stryke --no-interop examples/lzw_codec_no_interop.stk
+
+# ── encoder ────────────────────────────────────────────────────────
+
+fn LZW::encode($input) {
+    my %dict
+    for my $i (0:255) {
+        $dict{chr($i)} = $i
+    }
+    my $next = 256
+    my @out
+    my $w = ""
+    my $n = len($input)
+    return \@out if $n == 0
+    for my $i (0:$n - 1) {
+        my $c = substr($input, $i, 1)
+        my $wc = $w . $c
+        if (exists $dict{$wc}) {
+            $w = $wc
+        } else {
+            push @out, $dict{$w}
+            $dict{$wc} = $next
+            $next++
+            $w = $c
+        }
+    }
+    push @out, $dict{$w} if len($w) > 0
+    \@out
+}
+
+# ── decoder ────────────────────────────────────────────────────────
+
+fn LZW::decode($codes) {
+    my @dict
+    for my $i (0:255) {
+        push @dict, chr($i)
+    }
+    my $n = len(@$codes)
+    return "" if $n == 0
+    my $first = $codes->[0]
+    die "first LZW code out of dict range: #{$first}" unless $first < 256
+    my $w = $dict[$first]
+    my $out = $w
+    for my $i (1:$n - 1) {
+        my $k = $codes->[$i]
+        my $entry
+        if ($k < len(@dict)) {
+            $entry = $dict[$k]
+        } elsif ($k == len(@dict)) {
+            # The k == next_code case: the entry is `w + w[0]`.
+            $entry = $w . substr($w, 0, 1)
+        } else {
+            die "LZW decode: out-of-band code #{$k} > dict #{len(@dict)}"
+        }
+        $out .= $entry
+        push @dict, $w . substr($entry, 0, 1)
+        $w = $entry
+    }
+    $out
+}
+
+# ── corpus ────────────────────────────────────────────────────────
+
+my @corpus = (
+    "TOBEORNOTTOBEORTOBEORNOT",
+    "ABABABABABABAB",
+    "abracadabra abracadabra abracadabra",
+    "the quick brown fox jumps over the lazy dog",
+    "stryke language compiles bytecode runs parallel",
+    "AAAAAAAAAAAAAAAAAA",
+    "Mississippi-Mississippi-Mississippi",
+    "",
+    "x",
+    "the rain in spain falls mainly on the plain",
+)
+
+p "── LZW round-trip demo ──────────────────────────────"
+printf "  %-44s  %5s  %5s  %5s\n", "input", "in", "out", "ratio"
+printf "  %-44s  %5s  %5s  %5s\n",
+    "------------------------------------",
+    "-----", "-----", "-----"
+
+my $fail = 0
+my $total_in = 0
+my $total_codes = 0
+for my $msg (@corpus) {
+    my $codes = LZW::encode($msg)
+    my $back  = LZW::decode($codes)
+    my $in_n  = len($msg)
+    my $out_n = len(@$codes)
+    my $ratio = $in_n == 0 ? 0 : $out_n / $in_n
+    my $ok    = $back eq $msg
+    $fail++ unless $ok
+    $total_in    += $in_n
+    $total_codes += $out_n
+    my $shown = len($msg) > 42 ? substr($msg, 0, 42) . ".." : $msg
+    printf "  %-44s  %5d  %5d  %5.2f  %s\n",
+        "\"" . $shown . "\"", $in_n, $out_n, $ratio,
+        $ok ? "" : "FAIL"
+}
+
+die "#{$fail} / #{len(@corpus)} round-trips failed" if $fail > 0
+printf "\n  total in : %d bytes\n", $total_in
+printf "  total out: %d codes\n", $total_codes
+
+# ── invariant 1: each input round-trips exactly ────────────────────
+
+for my $msg (@corpus) {
+    my $codes = LZW::encode($msg)
+    my $back  = LZW::decode($codes)
+    die "round-trip mismatch on \"#{$msg}\"" unless $back eq $msg
+}
+
+# ── invariant 2: encoded code count is ≤ input length + 1 ──────────
+# (LZW can at worst emit one code per byte for purely random data.)
+
+for my $msg (@corpus) {
+    my $codes = LZW::encode($msg)
+    die "code count exceeds input length+1 for \"#{$msg}\"" unless len(@$codes) <= len($msg) + 1
+}
+
+# ── invariant 3: every emitted code is < 256 + new-entries-added ───
+# i.e. no code can reference a dictionary entry that hasn't been
+# defined yet on the encoder side (each emission grows the dict by 1).
+
+for my $msg (@corpus) {
+    my $codes = LZW::encode($msg)
+    my $allowed = 256
+    for my $c (@$codes) {
+        die "code #{$c} >= dict size #{$allowed} at emit time" unless $c < $allowed
+        $allowed++   # encoder adds one entry per emission
+    }
+}
+
+# ── invariant 4: highly-repetitive input compresses (ratio < 1) ────
+
+my $abab = "ABABABABABABABABABABABABABABAB"
+my $abab_codes = LZW::encode($abab)
+die "ABAB-pattern must compress to < 1 ratio, got #{len(@$abab_codes) / len($abab)}" unless len(@$abab_codes) / len($abab) < 0.6
+
+# ── invariant 5: the classic kRk edge case ─────────────────────────
+# Input "TOBEORNOTTOBEORTOBEORNOT#"  triggers the k==next_code case
+# (the second occurrence of "TOBEOR" extends through a code emitted
+# during its own definition). The decoder MUST reconstruct correctly.
+
+my $tobe = "TOBEORNOTTOBEORTOBEORNOT#"
+my $tobe_codes = LZW::encode($tobe)
+my $tobe_back  = LZW::decode($tobe_codes)
+die "TOBE round-trip failed: \"#{$tobe_back}\"" unless $tobe_back eq $tobe
+
+# ── invariant 6: empty input → empty codes → empty output ──────────
+
+my $empty_codes = LZW::encode("")
+die "empty input must yield empty code list" unless len(@$empty_codes) == 0
+my $empty_back = LZW::decode($empty_codes)
+die "empty codes must yield empty string" unless $empty_back eq ""
+
+# ── invariant 7: single-character input → exactly 1 code ──────────
+
+my $one_codes = LZW::encode("X")
+die "1-char input must yield exactly 1 code, got #{len(@$one_codes)}" unless len(@$one_codes) == 1
+die "1-char code must equal ord('X')" unless $one_codes->[0] == ord("X")
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

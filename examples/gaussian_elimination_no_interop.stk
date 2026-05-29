@@ -1,0 +1,314 @@
+#!/usr/bin/env stryke
+
+# Gaussian elimination — solve Ax = b for square A via partial-pivot
+# row reduction in O(n³). Also computes |det A| by tracking pivot
+# signs and the product of pivots. Matrix inversion follows by
+# augmenting `[A | I]` and reducing to `[I | A⁻¹]`.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Gauss::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * `_0`/`_1` would go here in sort blocks (§11)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/gaussian_elimination_no_interop.stk
+
+# ── deep-copy a 2D matrix (matrices are arrayref-of-arrayref) ─────
+
+fn Gauss::clone($A) {
+    my @out
+    for my $row (@$A) {
+        my @r = @$row
+        push @out, \@r
+    }
+    \@out
+}
+
+# ── solve A x = b via partial-pivot Gaussian elimination ──────────
+# Returns +{ ok => 0/1, x => [...], det => scalar }.
+
+fn Gauss::solve($A_in, $b_in) {
+    my $n = len(@$A_in)
+    my $A = Gauss::clone($A_in)
+    my @bv = @$b_in
+    my $det = 1.0
+    for my $k (0:$n - 1) {
+        my $pivot = $k
+        my $max = abs($A->[$k]->[$k])
+        for my $i ($k + 1:$n - 1) {
+            my $v = abs($A->[$i]->[$k])
+            if ($v > $max) {
+                $max = $v
+                $pivot = $i
+            }
+        }
+        if ($max == 0) {
+            return +{ ok => 0, x => [], det => 0 }
+        }
+        if ($pivot != $k) {
+            my $tmp = $A->[$k]
+            $A->[$k] = $A->[$pivot]
+            $A->[$pivot] = $tmp
+            my $tb = $bv[$k]
+            $bv[$k] = $bv[$pivot]
+            $bv[$pivot] = $tb
+            $det = -$det
+        }
+        my $pv = $A->[$k]->[$k]
+        $det = $det * $pv
+        for my $i ($k + 1:$n - 1) {
+            my $factor = $A->[$i]->[$k] / $pv
+            for my $j ($k:$n - 1) {
+                $A->[$i]->[$j] = $A->[$i]->[$j] - $factor * $A->[$k]->[$j]
+            }
+            $bv[$i] = $bv[$i] - $factor * $bv[$k]
+        }
+    }
+    my @x = (0) x $n
+    for my $i (0:$n - 1) {
+        my $row = $n - 1 - $i
+        my $s = $bv[$row]
+        for my $j ($row + 1:$n - 1) {
+            $s = $s - $A->[$row]->[$j] * $x[$j]
+        }
+        $x[$row] = $s / $A->[$row]->[$row]
+    }
+    +{ ok => 1, x => \@x, det => $det }
+}
+
+# ── invert an n×n matrix by reducing [A | I] to [I | A⁻¹] ─────────
+
+fn Gauss::invert($A_in) {
+    my $n = len(@$A_in)
+    my @aug
+    for my $i (0:$n - 1) {
+        my @row
+        for my $j (0:$n - 1) {
+            push @row, $A_in->[$i]->[$j]
+        }
+        for my $j (0:$n - 1) {
+            push @row, $i == $j ? 1.0 : 0.0
+        }
+        push @aug, \@row
+    }
+    for my $k (0:$n - 1) {
+        my $pivot = $k
+        my $max = abs($aug[$k]->[$k])
+        for my $i ($k + 1:$n - 1) {
+            my $v = abs($aug[$i]->[$k])
+            if ($v > $max) {
+                $max = $v
+                $pivot = $i
+            }
+        }
+        return +{ ok => 0, inv => [] } if $max == 0
+        if ($pivot != $k) {
+            my $tmp = $aug[$k]
+            $aug[$k] = $aug[$pivot]
+            $aug[$pivot] = $tmp
+        }
+        my $pv = $aug[$k]->[$k]
+        for my $j (0:2 * $n - 1) {
+            $aug[$k]->[$j] = $aug[$k]->[$j] / $pv
+        }
+        for my $i (0:$n - 1) {
+            next if $i == $k
+            my $factor = $aug[$i]->[$k]
+            for my $j (0:2 * $n - 1) {
+                $aug[$i]->[$j] = $aug[$i]->[$j] - $factor * $aug[$k]->[$j]
+            }
+        }
+    }
+    my @inv
+    for my $i (0:$n - 1) {
+        my @row
+        for my $j (0:$n - 1) {
+            push @row, $aug[$i]->[$n + $j]
+        }
+        push @inv, \@row
+    }
+    +{ ok => 1, inv => \@inv }
+}
+
+# ── matrix-vector product ─────────────────────────────────────────
+
+fn Gauss::matvec($A, $x) {
+    my $n = len(@$A)
+    my @out
+    for my $i (0:$n - 1) {
+        my $s = 0
+        my $m = len(@{$A->[$i]})
+        for my $j (0:$m - 1) {
+            $s = $s + $A->[$i]->[$j] * $x->[$j]
+        }
+        push @out, $s
+    }
+    \@out
+}
+
+# ── matrix × matrix ───────────────────────────────────────────────
+
+fn Gauss::matmul($A, $B) {
+    my $n = len(@$A)
+    my $m = len(@{$B->[0]})
+    my $k = len(@{$A->[0]})
+    my @out
+    for my $i (0:$n - 1) {
+        my @row = (0) x $m
+        for my $j (0:$m - 1) {
+            my $s = 0
+            for my $kk (0:$k - 1) {
+                $s = $s + $A->[$i]->[$kk] * $B->[$kk]->[$j]
+            }
+            $row[$j] = $s
+        }
+        push @out, \@row
+    }
+    \@out
+}
+
+# ── primary cases with known solutions ────────────────────────────
+
+my @cases = (
+    +{
+        name => "2x2 trivial",
+        A    => [[2, 1], [1, 3]],
+        b    => [4, 5],
+        x    => [1.4, 1.2],
+        det  => 5,
+    },
+    +{
+        name => "3x3 textbook",
+        A    => [
+            [ 2,  1, -1],
+            [-3, -1,  2],
+            [-2,  1,  2],
+        ],
+        b    => [8, -11, -3],
+        x    => [2, 3, -1],
+        det  => -1,
+    },
+    +{
+        name => "3x3 needs-pivot",   # zero diagonal at start
+        A    => [
+            [0, 2, 1],
+            [1, 0, 3],
+            [4, 5, 6],
+        ],
+        b    => [3, 4, 15],
+        x    => [1, 1, 1],
+        det  => 17,
+    },
+    +{
+        name => "4x4 identity-ish",
+        A    => [
+            [1, 0, 0, 0],
+            [0, 2, 0, 0],
+            [0, 0, 3, 0],
+            [0, 0, 0, 4],
+        ],
+        b    => [1, 4, 9, 16],
+        x    => [1, 2, 3, 4],
+        det  => 24,
+    },
+)
+
+# ── approximate float equality ────────────────────────────────────
+
+fn Gauss::approx($got, $want, $eps) {
+    my $d = $got - $want
+    $d = -$d if $d < 0
+    $d < $eps
+}
+
+p "── Gaussian elimination demo ────────────────────────"
+printf "  %-22s  %5s  %s\n", "case", "det", "solution"
+printf "  %-22s  %5s  %s\n", "----------------------", "-----", "--------"
+for my $c (@cases) {
+    my $r = Gauss::solve($c->{A}, $c->{b})
+    die "no solution on \"#{$c->{name}}\"" unless $r->{ok}
+    my @rounded
+    for my $v (@{$r->{x}}) {
+        push @rounded, sprintf("%.4f", $v)
+    }
+    printf "  %-22s  %5.2f  [%s]\n", $c->{name}, $r->{det}, join(", ", @rounded)
+}
+
+# ── invariant 1: solution matches expected within 1e-6 ────────────
+
+for my $c (@cases) {
+    my $r = Gauss::solve($c->{A}, $c->{b})
+    my $n = len(@{$c->{x}})
+    for my $i (0:$n - 1) {
+        die "x[#{$i}] mismatch on \"#{$c->{name}}\": got #{$r->{x}->[$i]} want #{$c->{x}->[$i]}" unless Gauss::approx($r->{x}->[$i], $c->{x}->[$i], 1e-6)
+    }
+}
+
+# ── invariant 2: det matches expected within 1e-6 ─────────────────
+
+for my $c (@cases) {
+    my $r = Gauss::solve($c->{A}, $c->{b})
+    die "det mismatch on \"#{$c->{name}}\": got #{$r->{det}} want #{$c->{det}}" unless Gauss::approx($r->{det}, $c->{det}, 1e-6)
+}
+
+# ── invariant 3: A · x = b (residual check) ───────────────────────
+
+for my $c (@cases) {
+    my $r = Gauss::solve($c->{A}, $c->{b})
+    my $bv = Gauss::matvec($c->{A}, $r->{x})
+    my $n = len(@$bv)
+    for my $i (0:$n - 1) {
+        die "residual on \"#{$c->{name}}\" row #{$i}: A·x = #{$bv->[$i]} != b = #{$c->{b}->[$i]}" unless Gauss::approx($bv->[$i], $c->{b}->[$i], 1e-6)
+    }
+}
+
+# ── invariant 4: singular matrices report ok=0 ────────────────────
+
+my $sing = Gauss::solve(
+    [
+        [1, 2, 3],
+        [2, 4, 6],
+        [1, 1, 1],
+    ],
+    [6, 12, 3],
+)
+die "singular matrix must return ok=0" unless $sing->{ok} == 0
+
+# ── invariant 5: inversion produces a true inverse (A · A⁻¹ = I) ──
+
+p ""
+p "── matrix inversion demo ────────────────────────────"
+for my $c (@cases) {
+    my $iv = Gauss::invert($c->{A})
+    die "inversion failed on \"#{$c->{name}}\"" unless $iv->{ok}
+    my $prod = Gauss::matmul($c->{A}, $iv->{inv})
+    my $n = len(@$prod)
+    for my $i (0:$n - 1) {
+        for my $j (0:$n - 1) {
+            my $want = $i == $j ? 1.0 : 0.0
+            die "A · A⁻¹ off identity at (#{$i}, #{$j}) on \"#{$c->{name}}\": got #{$prod->[$i]->[$j]}" unless Gauss::approx($prod->[$i]->[$j], $want, 1e-6)
+        }
+    }
+    printf "  %-22s  inv·A = I (within 1e-6)\n", $c->{name}
+}
+
+# ── invariant 6: 1×1 inverse is the reciprocal ────────────────────
+
+my $solo = Gauss::invert([[7.0]])
+die "1x1 inverse must succeed" unless $solo->{ok}
+die "1x1 inverse must be 1/7" unless Gauss::approx($solo->{inv}->[0]->[0], 1.0 / 7.0, 1e-9)
+
+# ── invariant 7: 2×2 inverse formula sanity ───────────────────────
+# For [[a,b],[c,d]], inv = 1/(ad-bc) * [[d,-b],[-c,a]].
+
+my $two = Gauss::invert([[4.0, 7.0], [2.0, 6.0]])
+my $det2 = 4.0 * 6.0 - 7.0 * 2.0   # = 10
+my @want2 = ([6.0 / $det2, -7.0 / $det2], [-2.0 / $det2, 4.0 / $det2])
+for my $i (0:1) {
+    for my $j (0:1) {
+        die "2x2 inv[#{$i}][#{$j}] mismatch" unless Gauss::approx($two->{inv}->[$i]->[$j], $want2[$i][$j], 1e-9)
+    }
+}
+
+p ""
+p "── all seven invariants satisfied ────────────────────"

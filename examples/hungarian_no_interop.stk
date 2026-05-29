@@ -1,0 +1,244 @@
+#!/usr/bin/env stryke
+
+# Hungarian algorithm — O(n³) minimum-cost assignment over a square
+# cost matrix. Uses the Kuhn-Munkres / Jonker-Volgenant potentials
+# variant: dual potentials `u`, `v` keep `cost[i][j] - u[i] - v[j]`
+# non-negative; for each new row, the shortest-augmenting-path scan
+# adjusts potentials by `delta = min uncovered slack` until a free
+# column is reached, then walks `way[]` back to flip the matching.
+# Cross-validated against an O(n!) brute force on small inputs.
+#
+# Style-guide conformance (docs/STYLE_GUIDE.md):
+#   * named-package fns (`Hun::`) under --no-interop (§18)
+#   * `:` ranges, `len` for sizes, `#{ }` interpolation (§4, §5, §1a)
+#   * implicit return on tail, no trailing `;` (§3, §12b)
+#
+# Run: stryke --no-interop examples/hungarian_no_interop.stk
+
+# ── O(n³) Hungarian / Jonker-Volgenant ─────────────────────────────
+
+fn Hun::solve($cost) {
+    my $n = len(@$cost)
+    my $INF = 1_000_000_000
+    my @u = (0) x ($n + 1)
+    my @v = (0) x ($n + 1)
+    my @p = (0) x ($n + 1)         # p[j] = row matched to column j
+    my @way = (0) x ($n + 1)
+    for my $i (1:$n) {
+        $p[0] = $i
+        my $j0 = 0
+        my @minv = ($INF) x ($n + 1)
+        my @used = (0) x ($n + 1)
+        my $done = 0
+        while ($done == 0) {
+            $used[$j0] = 1
+            my $i0 = $p[$j0]
+            my $delta = $INF
+            my $j1 = 0
+            for my $j (1:$n) {
+                next if $used[$j]
+                my $cur = $cost->[$i0 - 1]->[$j - 1] - $u[$i0] - $v[$j]
+                if ($cur < $minv[$j]) {
+                    $minv[$j] = $cur
+                    $way[$j]  = $j0
+                }
+                if ($minv[$j] < $delta) {
+                    $delta = $minv[$j]
+                    $j1    = $j
+                }
+            }
+            for my $j (0:$n) {
+                if ($used[$j]) {
+                    $u[$p[$j]] += $delta
+                    $v[$j]     -= $delta
+                } else {
+                    $minv[$j]  -= $delta
+                }
+            }
+            $j0 = $j1
+            $done = 1 if $p[$j0] == 0
+        }
+        # Augment by walking way[] back to j == 0.
+        while ($j0 != 0) {
+            my $j1 = $way[$j0]
+            $p[$j0] = $p[$j1]
+            $j0 = $j1
+        }
+    }
+    my @ans = (0) x $n
+    for my $j (1:$n) {
+        $ans[$p[$j] - 1] = $j - 1 if $p[$j] != 0
+    }
+    my $total = 0
+    for my $i (0:$n - 1) {
+        $total += $cost->[$i]->[$ans[$i]]
+    }
+    +{ assignment => \@ans, cost => $total }
+}
+
+# ── brute force: enumerate every permutation, pick min cost ────────
+
+fn Hun::brute_min($cost) {
+    my $n = len(@$cost)
+    my @perm = (0:$n - 1)
+    my $best = 1_000_000_000
+    my @best_perm
+    Hun::permute(\@perm, 0, $cost, \$best, \@best_perm)
+    +{ assignment => \@best_perm, cost => $best }
+}
+
+fn Hun::permute($arr, $k, $cost, $best_ref, $best_perm_ref) {
+    my $n = len(@$arr)
+    if ($k == $n - 1) {
+        my $sum = 0
+        for my $i (0:$n - 1) {
+            $sum += $cost->[$i]->[$arr->[$i]]
+        }
+        if ($sum < $$best_ref) {
+            $$best_ref = $sum
+            @$best_perm_ref = @$arr
+        }
+        return
+    }
+    for my $i ($k:$n - 1) {
+        ($arr->[$k], $arr->[$i]) = ($arr->[$i], $arr->[$k])
+        Hun::permute($arr, $k + 1, $cost, $best_ref, $best_perm_ref)
+        ($arr->[$k], $arr->[$i]) = ($arr->[$i], $arr->[$k])
+    }
+}
+
+# ── test matrices with known optima ────────────────────────────────
+
+my @cases = (
+    +{
+        name => "3x3 simple",
+        cost => [
+            [ 250, 400, 350 ],
+            [ 400, 600, 350 ],
+            [ 200, 400, 250 ],
+        ],
+        opt  => 950,
+    },
+    +{
+        name => "4x4 textbook",
+        cost => [
+            [ 82, 83, 69, 92 ],
+            [ 77, 37, 49, 92 ],
+            [ 11, 69,  5, 86 ],
+            [  8,  9, 98, 23 ],
+        ],
+        opt  => 140,
+    },
+    +{
+        name => "4x4 identity-like",
+        cost => [
+            [ 1, 9, 9, 9 ],
+            [ 9, 1, 9, 9 ],
+            [ 9, 9, 1, 9 ],
+            [ 9, 9, 9, 1 ],
+        ],
+        opt  => 4,
+    },
+    +{
+        name => "5x5 random",
+        cost => [
+            [  9,  2,  7,  8,  3 ],
+            [  6,  4,  3,  7,  5 ],
+            [  5,  8,  1,  8,  9 ],
+            [  7,  6,  9,  4,  6 ],
+            [  3,  7,  5,  6,  8 ],
+        ],
+        opt  => 15,
+    },
+    +{
+        name => "2x2 trivial",
+        cost => [
+            [ 5, 2 ],
+            [ 3, 4 ],
+        ],
+        opt  => 5,
+    },
+)
+
+p "── Hungarian assignment demo ────────────────────────"
+printf "  %-20s  %5s  %5s  %s\n", "matrix", "opt", "brute", "assignment"
+printf "  %-20s  %5s  %5s  %s\n", "--------------------", "-----", "-----", "----------"
+
+for my $c (@cases) {
+    my $r = Hun::solve($c->{cost})
+    my $br = Hun::brute_min($c->{cost})
+    my $assign = join(", ", @{$r->{assignment}})
+    printf "  %-20s  %5d  %5d  [%s]  %s\n",
+        $c->{name}, $r->{cost}, $br->{cost}, $assign,
+        $r->{cost} == $c->{opt} ? "" : "FAIL want=#{$c->{opt}}"
+}
+
+# ── invariant 1: solver matches the known optimum on every case ───
+
+for my $c (@cases) {
+    my $r = Hun::solve($c->{cost})
+    die "Hungarian cost #{$r->{cost}} != known optimum #{$c->{opt}} on \"#{$c->{name}}\"" unless $r->{cost} == $c->{opt}
+}
+
+# ── invariant 2: assignment is a permutation (each col used once) ─
+
+for my $c (@cases) {
+    my $r = Hun::solve($c->{cost})
+    my $n = len(@{$r->{assignment}})
+    my %seen
+    for my $col (@{$r->{assignment}}) {
+        die "col #{$col} used twice in assignment for \"#{$c->{name}}\"" if exists $seen{$col}
+        $seen{$col} = 1
+    }
+    die "assignment doesn't cover #{$n} cols on \"#{$c->{name}}\"" unless len(keys %seen) == $n
+}
+
+# ── invariant 3: assignment cost equals reported cost (sum check) ─
+
+for my $c (@cases) {
+    my $r = Hun::solve($c->{cost})
+    my $sum = 0
+    my $n = len(@{$r->{assignment}})
+    for my $i (0:$n - 1) {
+        $sum += $c->{cost}->[$i]->[$r->{assignment}->[$i]]
+    }
+    die "reported cost #{$r->{cost}} != recomputed #{$sum} on \"#{$c->{name}}\"" unless $sum == $r->{cost}
+}
+
+# ── invariant 4: Hungarian = brute force on every case ────────────
+
+for my $c (@cases) {
+    my $r = Hun::solve($c->{cost})
+    my $br = Hun::brute_min($c->{cost})
+    die "Hungarian #{$r->{cost}} != brute #{$br->{cost}} on \"#{$c->{name}}\"" unless $r->{cost} == $br->{cost}
+}
+
+# ── invariant 5: shifting every row by a constant doesn't change ──
+# the optimal assignment (only shifts total cost by n*shift).
+
+my $shift_cost = [
+    [ 100, 102, 104 ],
+    [ 200, 198, 196 ],
+    [ 300, 301, 299 ],
+]
+my $r_orig = Hun::solve($shift_cost)
+
+my @shifted
+for my $i (0:2) {
+    my @row
+    for my $j (0:2) {
+        push @row, $shift_cost->[$i]->[$j] + 1000
+    }
+    push @shifted, \@row
+}
+my $r_shifted = Hun::solve(\@shifted)
+die "row shift broke assignment: #{join(',', @{$r_orig->{assignment}})} vs #{join(',', @{$r_shifted->{assignment}})}" unless join(",", @{$r_orig->{assignment}}) eq join(",", @{$r_shifted->{assignment}})
+die "shifted total mismatch: #{$r_shifted->{cost}} != #{$r_orig->{cost} + 3000}" unless $r_shifted->{cost} == $r_orig->{cost} + 3000
+
+# ── invariant 6: 1×1 matrix is trivially that single cell ─────────
+
+my $solo = Hun::solve([[42]])
+die "1x1 assignment wrong" unless $solo->{cost} == 42 && $solo->{assignment}->[0] == 0
+
+p ""
+p "── all six invariants satisfied ──────────────────────"
