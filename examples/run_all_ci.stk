@@ -92,10 +92,16 @@ fn Ci::parse_file($f) = system("$st --no-interop -c \"$f\" >/dev/null 2>&1") == 
 # rather than blocking forever on collect.
 my $RUN_TIMEOUT = $ENV{RUN_ALL_CI_FILE_TIMEOUT} // 60
 
+# Embedded suites (ruby, scheme) are single monolithic files that walk
+# a from-scratch interpreter over hundreds of asserts — they need a
+# bigger budget than per-example files. Scheme in particular consistently
+# blew past 60s and killed CI at the scheme phase.
+my $SUITE_TIMEOUT = $ENV{RUN_ALL_CI_SUITE_TIMEOUT} // 300
+
 fn Ci::run_file($f) = system("timeout $RUN_TIMEOUT $st --no-interop \"$f\" </dev/null >/dev/null 2>&1") == 0
 
 fn Ci::run_suite($path) {
-    my $cmd = "timeout $RUN_TIMEOUT $st \"$path\" </dev/null"
+    my $cmd = "timeout $SUITE_TIMEOUT $st \"$path\" </dev/null"
     return system("$cmd >/dev/null 2>&1") == 0 if $summary
     system($cmd) == 0
 }
