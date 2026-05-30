@@ -3019,7 +3019,15 @@ impl Lexer {
                 // Perl: `x` is the string-repetition infix operator only after a complete term.
                 // After `sub`, `package`, `(`, etc. a term is expected — bare `x` must be an
                 // identifier (`sub x {`, `x::Foo`, leading `x` in `(x)`).
-                let tok = if ident == "x" && !self.last_was_term {
+                //
+                // After `::` (package separator) or `->` (method arrow), the
+                // identifier is a path leaf or method name — never an infix
+                // operator. Without these gates, `keyword_or_ident("eq")` returns
+                // `Token::StrEq` so `Mat::eq` fails to parse and `$obj->eq(...)`
+                // silently degrades to `$obj eq …`.
+                let tok = if after_package_sep || self.prev_arrow {
+                    Token::Ident(ident.clone())
+                } else if ident == "x" && !self.last_was_term {
                     Token::Ident("x".to_string())
                 } else {
                     keyword_or_ident(&ident)

@@ -272,6 +272,7 @@ mod ord_chr_hex_oct_pin;
 mod our_array_hash_across_packages_pin;
 mod outer_topic_chain;
 mod pack_unpack_runtime;
+mod package_qualified_op_keyword_leaf_pin;
 mod par_chunk_macros;
 mod par_top_level_forms;
 mod parallel;
