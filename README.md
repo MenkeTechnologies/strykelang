@@ -50,9 +50,9 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x0C\] Development & CI](#0x0c-development--ci)
 - [\[0x0C-test\] Test Runner — Worker Pool Architecture](#0x0c-test-test-runner--worker-pool-architecture)
 - [\[0x0D\] Standalone Binaries (`stryke build`)](#0x0d-standalone-binaries-stryke-build)
-- [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust-----)
+- [\[0x0E\] Inline Rust FFI (`rust { ... }`)](#0x0e-inline-rust-ffi-rust---)
 - [\[0x0F\] Bytecode Cache (rkyv)](#0x0f-bytecode-cache-rkyv)
-- [\[0x10\] Distributed `pmap_on` / `~d>` over SSH (`cluster`)](#0x10-distributed-pmap_on-over-ssh-cluster)
+- [\[0x10\] Distributed `pmap_on` / `~d>` over SSH (`cluster`)](#0x10-distributed-pmap_on--d-over-ssh-cluster)
 - [\[0x10a\] Infrastructure Load Testing](#0x10a-infrastructure-load-testing)
 - [\[0x10b\] Agent/Controller Architecture](#0x10b-agentcontroller-architecture)
 - [\[0x10c\] Scriptable Distributed Compute — `congregation` / `pray` / `annex`](#0x10c-scriptable-distributed-compute--congregation--pray--annex)
@@ -961,13 +961,13 @@ stryke-specific long flags:
 | `--record` | Record one row per stryke run (wall-clock, exit code, argv) to `~/.stryke/perf.sqlite`. Inherits to child processes via `STRYKE_RECORD=1` env, so `s --record t TESTS...` records one row per test file. Query via the `perfview` builtin. |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
-| `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a-no-interop-mode) |
+| `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a---no-interop-mode) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server-stryke-lsp)) |
 | `--dap [HOST:PORT]` | Debug Adapter Protocol server. With no arg → stdio; with `HOST:PORT` → connects to a TCP socket the spawner is listening on. Used by the JetBrains plugin under [`editors/intellij/`](editors/intellij/) |
 | `-d` | TTY debugger (`perl -d` style REPL on stdin/stderr). Use with `--`: `stryke -d -- script.stk` |
 | `-j N` / `--threads N` | Set number of parallel threads (rayon) |
-| `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)) |
+| `--remote-worker` | Persistent cluster worker over stdio ([\[0x10\]](#0x10-distributed-pmap_on--d-over-ssh-cluster)) |
 | `--remote-worker-v1` | Legacy one-shot cluster worker over stdio |
 | `build SCRIPT [-o OUT]` | AOT compile script to standalone binary ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)) |
 | `doc [TOPIC]` | Interactive reference book with vim-style navigation (`stryke doc`, `stryke doc pmap`, `stryke doc --toc`) |
@@ -1195,9 +1195,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - HTTP (`fetch`/`fetch_json`/`fetch_async`/`par_fetch`), JSON (`json_encode`/`json_decode`).
 - Crypto, compression, time, TOML, YAML helpers (see [\[0x05\]](#0x05-native-data-scripting)).
 - All parallel primitives in [\[0x03\]](#0x03-parallel-primitives) (`pmap`, `fan`, `pipeline`, `par_pipeline_stream`, `pchannel`, `pselect`, `barrier`, `ppool`, `glob_par`, `par_walk`, `par_lines`, `par_sed`, `par_find_files`, `par_line_count`, `pwatch`, `watch`).
-- **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
+- **Distributed compute** ([\[0x10\]](#0x10-distributed-pmap_on--d-over-ssh-cluster)): `cluster([...])` builds an SSH worker pool; `pmap_on $cluster { } @list` and `pflat_map_on $cluster { } @list` fan a map across persistent remote workers with fault tolerance and per-job retries.
 - **Standalone binaries** ([\[0x0D\]](#0x0d-standalone-binaries-stryke-build)): `stryke build SCRIPT -o OUT` bakes a script into a self-contained executable.
-- **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust-----)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
+- **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust---)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-rkyv)): single rkyv shard at `~/.stryke/scripts.rkyv` — `mmap` + zero-copy `ArchivedHashMap` lookup skips lex/parse/compile on warm starts. Disable with `STRYKE_CACHE=0`.
 - **Language server** ([\[0x11\]](#0x11-language-server-stryke-lsp)): `stryke lsp` runs an LSP server over stdio with diagnostics, hover, completion.
 - `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
@@ -3316,7 +3316,7 @@ spec:
 - **Diagnostics** on every keystroke. Strict-vars is **on by default** in the IDE (CLI `stryke check` stays lenient — gated on explicit `use strict;`), so undefined `$scalar` / `@array` / `%hash` typos surface inline without per-file opt-in. Skipped: bare sigil-vars inside double-quoted string interpolations (`"got $fh ..."` is template/description text — no false positives on test descriptions), Perl `$^X`/`$^O`/`$^V`/`$^W` family and bare `$$` (process id), AOP advice-body context vars (`$INTERCEPT_NAME`, `@INTERCEPT_ARGS`, `$INTERCEPT_RESULT`, `$INTERCEPT_MS`, `$INTERCEPT_US`), the full block-param grammar (`_`, `_N`, `_<`, `_<N`, `_<<<<<`, `_N<<<<<`, `_N<M`), `$#arr` last-index-of-array references resolved via `@arr`, `open(my $fh, …)` lexical filehandle declarations, `exists(&Pkg::sub)` introspection, and parser-internal `_thread_par_run` desugaring targets emitted by `~p>` / `~s>` thread macros.
 - **OOP-aware checks**. Constructor calls (`Class(field => v, …)` and `Class->new(...)`) validate keys against declared fields, walking parent classes via `extends` and implemented traits via `impl` for inherited fields. Positional constructor calls (`Task(1, "title", Priority::High)`) are auto-detected and pass through unchanged. `$self->method` / `$obj->method` checks walk the same `extends + impl` chain, plus a universal-method whitelist (`isa`, `can`, `DOES`, `does`, `VERSION`, `new`, `BUILD`, `DESTROY`, `clone`, `with`, `to_hash`, `to_hash_rec`, `to_hash_deep`, `fields`, `methods`, `superclass`). Match-arm enum-variant typos (`Sig::Term2 =>` when `Sig` has no `Term2`) flag with the available-variant list.
 - **Cross-file require resolution**. `require "./lib/Foo/Bar.stk"` walks up from the source file looking for the project root (any ancestor with a sibling `lib/` directory) — the classic Perl/CPAN layout. Subs, classes, traits, enums, constants declared in required files all join the active completion + diagnostics index.
-- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%o`/`%p`/`%pc`/`%v`, `%parameters`, `%limits`, `%term`). Hash-returning builtins like `pool_info()` ship full key tables in their hover doc. Hover is suppressed inside string literals (`"length"` doesn't pop the `length` builtin) but still fires inside `#{ EXPR }` interpolations.
+- **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on--d-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%o`/`%p`/`%pc`/`%v`, `%parameters`, `%limits`, `%term`). Hash-returning builtins like `pool_info()` ship full key tables in their hover doc. Hover is suppressed inside string literals (`"length"` doesn't pop the `length` builtin) but still fires inside `#{ EXPR }` interpolations.
 - **Completion** covering every identifier category the editor expects to see:
   - Sigil variables (`$scalar`, `@array`, `%hash`) — declared via `my` / `our` / `state` / `local` / `mysync` / `oursync`, `foreach my $x`, sub signature params, `open(my $fh, …)` filehandle decls
   - Subs — bare and qualified, with **suffix-only `insertText`** for qualified completions (typing `Demo::│` produces `Demo::handle`, not `Demo::Demo::handle`)
