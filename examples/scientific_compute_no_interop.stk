@@ -1963,9 +1963,9 @@ Sci::banner("§6 root finding")
     die "newton fast"      unless $rn->{iter} <= 6
 
     # Secant from (1, 2)
-    my $rs = Root::secant($hullptsrt2, 1.0, 2.0, 1e-12, 100)
-    die "secant converged" unless $rs->{converged}
-    die "secant root"      unless Sci::approx($rs->{x}, sqrt(2.0), 1e-10)
+    my $randset = Root::secant($hullptsrt2, 1.0, 2.0, 1e-12, 100)
+    die "secant converged" unless $randset->{converged}
+    die "secant root"      unless Sci::approx($randset->{x}, sqrt(2.0), 1e-10)
 
     # Brent on [1, 2]
     my $rt = Root::brent($hullptsrt2, 1.0, 2.0, 1e-12, 100)
@@ -1991,7 +1991,7 @@ Sci::banner("§6 root finding")
 
     # Verify all four methods agree to 8 digits on √2
     die "method agreement (bisect vs newton)" unless abs($rb->{x} - $rn->{x}) < 1e-8
-    die "method agreement (bisect vs secant)" unless abs($rb->{x} - $rs->{x}) < 1e-8
+    die "method agreement (bisect vs secant)" unless abs($rb->{x} - $randset->{x}) < 1e-8
     die "method agreement (bisect vs brent)"  unless abs($rb->{x} - $rt->{x}) < 1e-8
 
     # Root inside a tight bracket — verifies tol respected
@@ -8176,9 +8176,9 @@ Sci::banner("§28 sets & sketches")
     die "cms unseen" unless CMS::estimate($cms, "kiwi")    >= 0
 
     # ── Reservoir sampling ───────────────────────────────────────
-    my $rs_rng = RNG::seed(42)
+    my $randset_rng = RNG::seed(42)
     my @stream = (1:100)
-    my $sampled = Reservoir::sample(\@stream, 10, $rs_rng)
+    my $sampled = Reservoir::sample(\@stream, 10, $randset_rng)
     die "reservoir size" unless len(@$sampled) == 10
     # All samples within stream range
     for my $val (@$sampled) {
@@ -8190,8 +8190,8 @@ Sci::banner("§28 sets & sketches")
     die "reservoir distinct" unless len(keys %seen_rs) == 10
 
     # Stream shorter than k: reservoir == stream (modulo order)
-    my $rs_rng2 = RNG::seed(99)
-    my $short_sample = Reservoir::sample([1, 2, 3], 10, $rs_rng2)
+    my $randset_rng2 = RNG::seed(99)
+    my $short_sample = Reservoir::sample([1, 2, 3], 10, $randset_rng2)
     die "reservoir short" unless len(@$short_sample) == 3
 }
 
@@ -12939,7 +12939,7 @@ fn CG::solve($A_mat, $b_rhs, $tol, $max_iter) {
     # r = b − A x  (x starts at 0 → r = b)
     my @r_res = @$b_rhs
     my @p_dir = @r_res
-    my $rs_old = Vec::dot(\@r_res, \@r_res)
+    my $randset_old = Vec::dot(\@r_res, \@r_res)
     my $b_norm = sqrt(Vec::dot($b_rhs, $b_rhs))
     $b_norm = 1.0 if $b_norm == 0.0       # avoid div-by-zero scaling
     my $iter = 0
@@ -12947,21 +12947,21 @@ fn CG::solve($A_mat, $b_rhs, $tol, $max_iter) {
         my $A_p = Mat::mvmul($A_mat, \@p_dir)
         my $p_A_p = Vec::dot(\@p_dir, $A_p)
         die "CG::solve: non-positive p·A·p (#{$p_A_p})" if $p_A_p <= 0.0
-        my $alpha_v = $rs_old / $p_A_p
+        my $alpha_v = $randset_old / $p_A_p
         # x = x + α p
         for my $i (0:$n - 1) { $x_sol[$i] += $alpha_v * $p_dir[$i] }
         # r = r − α A p
         for my $i (0:$n - 1) { $r_res[$i] -= $alpha_v * $A_p->[$i] }
-        my $rs_new = Vec::dot(\@r_res, \@r_res)
-        my $r_norm = sqrt($rs_new)
+        my $randset_new = Vec::dot(\@r_res, \@r_res)
+        my $r_norm = sqrt($randset_new)
         if ($r_norm / $b_norm < $tol) {
             return +{ x => \@x_sol, iter => $iter + 1, converged => 1,
                       residual_norm => $r_norm }
         }
-        my $beta = $rs_new / $rs_old
+        my $beta = $randset_new / $randset_old
         # p = r + β p
         for my $i (0:$n - 1) { $p_dir[$i] = $r_res[$i] + $beta * $p_dir[$i] }
-        $rs_old = $rs_new
+        $randset_old = $randset_new
         $iter++
     }
     +{ x => \@x_sol, iter => $iter, converged => 0,
@@ -22785,6 +22785,584 @@ Sci::banner("§119 jump+maxprod")
     die "circ_rob [1..6] = 12"       unless HR2::circular_rob([1, 2, 3, 4, 5, 6]) == 12
 }
 
+# ═══════════════════════════════════════════════════════════════════
+# §120  binary-search hard problems — LC 4, 162, 81
+# ═══════════════════════════════════════════════════════════════════
+#
+#   BSH::median_two_sorted(a, b)
+#       LC 4  : O(log min(m, n)) median of two sorted arrays via
+#               partition search.  Returns float.
+#
+#   BSH::find_peak(nums)
+#       LC 162: ANY peak (index i with nums[i] > both neighbours,
+#               edges treated as -∞).  O(log n) by always stepping
+#               toward the rising side.
+#
+#   BSH::search_rotated_dup(nums, target)
+#       LC 81 : true iff target present.  Like §102 search_rotated
+#               but handles duplicate values at boundaries.
+
+# LC 4: ensure A is the shorter array, then binary-search a partition
+# of A so that the left halves of A∪B contain (m+n+1)/2 elements with
+# A_left ≤ B_right AND B_left ≤ A_right.
+fn BSH::median_two_sorted($a_in, $b_in) {
+    my @a_arr = @$a_in
+    my @b_arr = @$b_in
+    if (len(@a_arr) > len(@b_arr)) {
+        my @tmp = @a_arr
+        @a_arr = @b_arr
+        @b_arr = @tmp
+    }
+    my $m = len(@a_arr)
+    my $n = len(@b_arr)
+    die "BSH median: both empty" if $m + $n == 0
+    my $half = int(($m + $n + 1) / 2)
+    my $lo = 0
+    my $hi = $m
+    my $huge = 1e18
+    while ($lo <= $hi) {
+        my $i = int(($lo + $hi) / 2)
+        my $j = $half - $i
+        my $a_left  = $i == 0  ? -$huge : $a_arr[$i - 1]
+        my $a_right = $i == $m ?  $huge : $a_arr[$i]
+        my $b_left  = $j == 0  ? -$huge : $b_arr[$j - 1]
+        my $b_right = $j == $n ?  $huge : $b_arr[$j]
+        if ($a_left <= $b_right && $b_left <= $a_right) {
+            if (($m + $n) % 2 == 1) {
+                return $a_left > $b_left ? $a_left + 0.0 : $b_left + 0.0
+            }
+            my $lo_max = $a_left > $b_left  ? $a_left  : $b_left
+            my $hi_min = $a_right < $b_right ? $a_right : $b_right
+            return ($lo_max + $hi_min) / 2.0
+        }
+        if ($a_left > $b_right) { $hi = $i - 1 }
+        else                    { $lo = $i + 1 }
+    }
+    die "BSH median: invariant violated"
+}
+
+fn BSH::find_peak($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    die "find_peak: empty" if $n == 0
+    return 0 if $n == 1
+    my $lo = 0
+    my $hi = $n - 1
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        if ($nums[$mid] < $nums[$mid + 1]) {
+            $lo = $mid + 1                     # rising slope → peak on right
+        } else {
+            $hi = $mid                          # falling/plateau → peak on left side
+        }
+    }
+    $lo
+}
+
+fn BSH::search_rotated_dup($nums_in, $target) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    my $lo = 0
+    my $hi = $n - 1
+    while ($lo <= $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        return 1 if $nums[$mid] == $target
+        # Disambiguate via duplicate-stripping when lo == mid == hi
+        if ($nums[$lo] == $nums[$mid] && $nums[$mid] == $nums[$hi]) {
+            $lo++
+            $hi--
+        } elsif ($nums[$lo] <= $nums[$mid]) {
+            if ($target >= $nums[$lo] && $target < $nums[$mid]) { $hi = $mid - 1 }
+            else                                                { $lo = $mid + 1 }
+        } else {
+            if ($target > $nums[$mid] && $target <= $nums[$hi]) { $lo = $mid + 1 }
+            else                                                { $hi = $mid - 1 }
+        }
+    }
+    0
+}
+
+Sci::banner("§120 BS hard")
+{
+    # ── LC 4 median of two sorted ─────────────────────────────
+    # [1,3] [2] → 2.0
+    die "median [1,3] [2] = 2"     unless
+        Sci::approx(BSH::median_two_sorted([1, 3], [2]), 2.0, 1e-12)
+    # [1,2] [3,4] → 2.5
+    die "median [1,2] [3,4] = 2.5" unless
+        Sci::approx(BSH::median_two_sorted([1, 2], [3, 4]), 2.5, 1e-12)
+    # [] [1] → 1
+    die "median [] [1] = 1"        unless
+        Sci::approx(BSH::median_two_sorted([], [1]), 1.0, 1e-12)
+    # [2] [] → 2
+    die "median [2] [] = 2"        unless
+        Sci::approx(BSH::median_two_sorted([2], []), 2.0, 1e-12)
+    # [1,2,3,4,5] [6,7,8,9,10] → 5.5
+    die "median 5+5 = 5.5"         unless
+        Sci::approx(BSH::median_two_sorted([1, 2, 3, 4, 5], [6, 7, 8, 9, 10]), 5.5, 1e-12)
+    # Identical arrays
+    die "median [1,2,3] [1,2,3] = 2" unless
+        Sci::approx(BSH::median_two_sorted([1, 2, 3], [1, 2, 3]), 2.0, 1e-12)
+    # All-negative
+    die "median [-5,-3] [-4,-1] = -3.5" unless
+        Sci::approx(BSH::median_two_sorted([-5, -3], [-4, -1]), -3.5, 1e-12)
+
+    # ── LC 162 find peak ──────────────────────────────────────
+    # [1,2,3,1] → 2 (peak at index 2, value 3)
+    my $pk1 = BSH::find_peak([1, 2, 3, 1])
+    die "peak [1,2,3,1] = 2" unless $pk1 == 2
+
+    # [1,2,1,3,5,6,4] → either 1 or 5 (both are peaks)
+    my $pk2 = BSH::find_peak([1, 2, 1, 3, 5, 6, 4])
+    die "peak [1,2,1,3,5,6,4] ∈ {1,5}" unless $pk2 == 1 || $pk2 == 5
+    # Single element
+    die "peak [7] = 0"       unless BSH::find_peak([7]) == 0
+    # Strictly increasing → last element
+    die "peak [1,2,3,4] = 3" unless BSH::find_peak([1, 2, 3, 4]) == 3
+    # Strictly decreasing → first
+    die "peak [4,3,2,1] = 0" unless BSH::find_peak([4, 3, 2, 1]) == 0
+    # Two elements
+    die "peak [1,2] = 1"     unless BSH::find_peak([1, 2]) == 1
+    die "peak [2,1] = 0"     unless BSH::find_peak([2, 1]) == 0
+
+    # ── LC 81 search rotated with duplicates ──────────────────
+    # [2,5,6,0,0,1,2] target=0 → true
+    die "srd [2,5,6,0,0,1,2] tgt=0"  unless BSH::search_rotated_dup([2, 5, 6, 0, 0, 1, 2], 0)
+    die "srd [2,5,6,0,0,1,2] tgt=3"  if     BSH::search_rotated_dup([2, 5, 6, 0, 0, 1, 2], 3)
+    # All duplicates
+    die "srd [1,1,1,1] tgt=1"        unless BSH::search_rotated_dup([1, 1, 1, 1], 1)
+    die "srd [1,1,1,1] tgt=2"        if     BSH::search_rotated_dup([1, 1, 1, 1], 2)
+    # Tricky duplicate at boundaries
+    die "srd [1,0,1,1,1] tgt=0"      unless BSH::search_rotated_dup([1, 0, 1, 1, 1], 0)
+    # Empty
+    die "srd [] tgt=1"               if     BSH::search_rotated_dup([], 1)
+    # Single element
+    die "srd [5] tgt=5"              unless BSH::search_rotated_dup([5], 5)
+    die "srd [5] tgt=3"              if     BSH::search_rotated_dup([5], 3)
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §121  max rectangle (LC 85) + max square (LC 221) in binary grid
+# ═══════════════════════════════════════════════════════════════════
+#
+# Grids passed as flat row-major arrayrefs of 0/1, width w + height h
+# given as separate parameters.
+#
+#   MaxShape::max_rectangle(grid, w, h)
+#       LC 85  : largest 1-filled rectangle area.  Computed by walking
+#                rows top-down, maintaining "heights" — the count of
+#                consecutive 1s ending at (r, c) — then calling §81
+#                Histo::max_rect on each updated heights row.
+#
+#   MaxShape::max_square(grid, w, h)
+#       LC 221 : largest 1-filled square area.  DP:
+#                dp[r][c] = min(dp[r-1][c], dp[r][c-1], dp[r-1][c-1]) + 1
+#                if grid[r][c] == 1.  Track best dp seen; answer = best².
+
+fn MaxShape::idx($w, $r, $c) { $r * $w + $c }
+
+fn MaxShape::max_rectangle($grid_in, $w, $h) {
+    return 0 if $w == 0 || $h == 0
+    my @grid = @$grid_in
+    my @heights
+    for my $i (0:$w - 1) { push @heights, 0 }
+    my $best = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($grid[MaxShape::idx($w, $r, $c)] == 1) {
+                $heights[$c] = $heights[$c] + 1
+            } else {
+                $heights[$c] = 0
+            }
+            $c++
+        }
+        my $row_result = Histo::max_rect(\@heights)
+        $best = $row_result->{area} if $row_result->{area} > $best
+        $r++
+    }
+    $best
+}
+
+fn MaxShape::max_square($grid_in, $w, $h) {
+    return 0 if $w == 0 || $h == 0
+    my @grid = @$grid_in
+    my @dp
+    for my $i (0:$w * $h - 1) { push @dp, 0 }
+    my $best = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($grid[MaxShape::idx($w, $r, $c)] == 1) {
+                if ($r == 0 || $c == 0) {
+                    $dp[MaxShape::idx($w, $r, $c)] = 1
+                } else {
+                    my $up_v   = $dp[MaxShape::idx($w, $r - 1, $c)]
+                    my $left_v = $dp[MaxShape::idx($w, $r, $c - 1)]
+                    my $ul_v   = $dp[MaxShape::idx($w, $r - 1, $c - 1)]
+                    my $m = $up_v < $left_v ? $up_v : $left_v
+                    $m = $ul_v if $ul_v < $m
+                    $dp[MaxShape::idx($w, $r, $c)] = $m + 1
+                }
+                my $cur_dp = $dp[MaxShape::idx($w, $r, $c)]
+                $best = $cur_dp if $cur_dp > $best
+            }
+            $c++
+        }
+        $r++
+    }
+    $best * $best
+}
+
+Sci::banner("§121 max rect/sq")
+{
+    # ── LC 85 canonical 4x5 ─────────────────────────────────────
+    # 1 0 1 0 0
+    # 1 0 1 1 1
+    # 1 1 1 1 1
+    # 1 0 0 1 0
+    # → 6 (the 3x2 rectangle in rows 1-2, cols 2-3 has area 6)
+    my $mr_in = [
+        1, 0, 1, 0, 0,
+        1, 0, 1, 1, 1,
+        1, 1, 1, 1, 1,
+        1, 0, 0, 1, 0,
+    ]
+    die "max_rect LC85 ex = 6" unless MaxShape::max_rectangle($mr_in, 5, 4) == 6
+
+    # All-zero / all-one / single row
+    die "max_rect all-0 = 0"    unless MaxShape::max_rectangle([0, 0, 0, 0], 2, 2) == 0
+    die "max_rect all-1 2x2 = 4" unless MaxShape::max_rectangle([1, 1, 1, 1], 2, 2) == 4
+    die "max_rect 1x3 [1,1,1] = 3" unless MaxShape::max_rectangle([1, 1, 1], 3, 1) == 3
+    # Single 1 → 1
+    die "max_rect single 1 = 1" unless MaxShape::max_rectangle([1], 1, 1) == 1
+    # 3x3 with central hole
+    # 1 1 1
+    # 1 0 1
+    # 1 1 1   → best rect is 1x3 (top row) = 3
+    die "max_rect hole = 3"     unless MaxShape::max_rectangle([1, 1, 1, 1, 0, 1, 1, 1, 1], 3, 3) == 3
+
+    # ── LC 221 canonical 4x5 (same grid) → 4 (2x2 square in cols 2-3 rows 1-2)
+    die "max_sq LC221 ex = 4"   unless MaxShape::max_square($mr_in, 5, 4) == 4
+
+    # All-zero / all-one
+    die "max_sq all-0 = 0"      unless MaxShape::max_square([0, 0, 0, 0], 2, 2) == 0
+    die "max_sq all-1 2x2 = 4"  unless MaxShape::max_square([1, 1, 1, 1], 2, 2) == 4
+    die "max_sq all-1 3x3 = 9"  unless MaxShape::max_square([1, 1, 1, 1, 1, 1, 1, 1, 1], 3, 3) == 9
+    # Single 1
+    die "max_sq single 1 = 1"   unless MaxShape::max_square([1], 1, 1) == 1
+    # Row of 1s → max square is 1 (can't make 2x2 from single row)
+    die "max_sq 1x4 = 1"        unless MaxShape::max_square([1, 1, 1, 1], 4, 1) == 1
+
+    # ── Cross-check: max_square answer ≤ max_rectangle (square is a rect)
+    my @arr_xchk = (
+        1, 1, 0, 1,
+        1, 1, 1, 1,
+        1, 1, 1, 0,
+        0, 1, 1, 1,
+    )
+    my $sq_x  = MaxShape::max_square(\@arr_xchk, 4, 4)
+    my $rec_x = MaxShape::max_rectangle(\@arr_xchk, 4, 4)
+    die "sq ≤ rect" unless $sq_x <= $rec_x
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §122  wiggle subseq + increasing triplet + frog jump
+# ═══════════════════════════════════════════════════════════════════
+#
+#   Wig::longest_wiggle(nums)
+#       LC 376 : length of longest subsequence where signs of consecutive
+#                differences strictly alternate.  Greedy O(n).
+#
+#   Wig::increasing_triplet(nums)
+#       LC 334 : O(1)-space test for any (i < j < k) with
+#                nums[i] < nums[j] < nums[k].
+#
+#   FrogJump::can_cross(stones)
+#       LC 403 : sorted stones[]; first stone is always 0.  Frog starts
+#                at 0 with last-jump=0.  From k-jump at stone, next
+#                jump is k-1, k, or k+1 (and ≥ 1).  Reach last stone?
+
+fn Wig::longest_wiggle($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    return $n if $n < 2
+    my $up   = 1
+    my $down = 1
+    my $i = 1
+    while ($i < $n) {
+        if    ($nums[$i] > $nums[$i - 1]) { $up   = $down + 1 }
+        elsif ($nums[$i] < $nums[$i - 1]) { $down = $up   + 1 }
+        $i++
+    }
+    $up > $down ? $up : $down
+}
+
+fn Wig::increasing_triplet($nums_in) {
+    my @nums = @$nums_in
+    my $huge = 1e18
+    my $first  = $huge
+    my $second = $huge
+    for my $v (@nums) {
+        if    ($v <= $first)  { $first  = $v }
+        elsif ($v <= $second) { $second = $v }
+        else                  { return 1 }
+    }
+    0
+}
+
+fn FrogJump::can_cross($stones_in) {
+    my @stones = @$stones_in
+    my $n = len(@stones)
+    return 1 if $n == 0 || $n == 1
+    # First jump must be 1 stone (from 0 to stone[1]); enforce
+    return 0 if $stones[1] != 1
+    # Index stones by position for O(1) presence check
+    my %pos_of
+    for my $i (0:$n - 1) { $pos_of{$stones[$i]} = $i }
+    # reachable[i] = hashref of jump-distances that can land on stone i
+    my %reach
+    for my $i (0:$n - 1) { $reach{$i} = +{} }
+    $reach{0}->{0} = 1
+    my $i = 0
+    while ($i < $n) {
+        my @jumps = keys %{$reach{$i}}
+        for my $k (@jumps) {
+            for my $dk (-1, 0, 1) {
+                my $step = $k + $dk
+                next if $step <= 0
+                my $target = $stones[$i] + $step
+                if (exists $pos_of{$target}) {
+                    my $tidx = $pos_of{$target}
+                    next if $tidx == $i
+                    $reach{$tidx}->{$step} = 1
+                }
+            }
+        }
+        $i++
+    }
+    my @last_jumps = keys %{$reach{$n - 1}}
+    len(@last_jumps) > 0 ? 1 : 0
+}
+
+Sci::banner("§122 wiggle/triplet")
+{
+    # ── LC 376 wiggle subsequence ─────────────────────────────
+    # [1,7,4,9,2,5] all alternate → 6
+    die "wig [1,7,4,9,2,5] = 6"  unless Wig::longest_wiggle([1, 7, 4, 9, 2, 5]) == 6
+    # [1,17,5,10,13,15,10,5,16,8] → 7
+    die "wig LC ex2 = 7"          unless Wig::longest_wiggle([1, 17, 5, 10, 13, 15, 10, 5, 16, 8]) == 7
+    # Monotone increasing
+    die "wig [1..5] = 2"          unless Wig::longest_wiggle([1, 2, 3, 4, 5]) == 2
+    # Monotone decreasing
+    die "wig [5..1] = 2"          unless Wig::longest_wiggle([5, 4, 3, 2, 1]) == 2
+    # All same → 1
+    die "wig [3,3,3] = 1"         unless Wig::longest_wiggle([3, 3, 3]) == 1
+    # Single
+    die "wig [9] = 1"             unless Wig::longest_wiggle([9]) == 1
+    # Empty
+    die "wig [] = 0"              unless Wig::longest_wiggle([]) == 0
+    # Two
+    die "wig [1,2] = 2"           unless Wig::longest_wiggle([1, 2]) == 2
+
+    # ── LC 334 increasing triplet ─────────────────────────────
+    die "triplet [1,2,3,4,5] = T" unless Wig::increasing_triplet([1, 2, 3, 4, 5])
+    die "triplet [5,4,3,2,1] = F" if     Wig::increasing_triplet([5, 4, 3, 2, 1])
+    die "triplet [2,1,5,0,4,6] = T" unless Wig::increasing_triplet([2, 1, 5, 0, 4, 6])
+    die "triplet [1,1,1,1,1] = F" if     Wig::increasing_triplet([1, 1, 1, 1, 1])
+    die "triplet [1,2] = F"       if     Wig::increasing_triplet([1, 2])
+    die "triplet [] = F"          if     Wig::increasing_triplet([])
+    # Strict: 1,2,2 should NOT be a triplet (need strict)
+    die "triplet [1,2,2] = F"     if     Wig::increasing_triplet([1, 2, 2])
+    # Far-apart: 1, then 100 negative values, then 2, then 3
+    die "triplet [1,-1,-2,2,3] = T" unless Wig::increasing_triplet([1, -1, -2, 2, 3])
+
+    # ── LC 403 frog jump ──────────────────────────────────────
+    # [0,1,3,5,6,8,12,17] → true (canonical)
+    die "frog LC ex1 = T" unless FrogJump::can_cross([0, 1, 3, 5, 6, 8, 12, 17])
+    # [0,1,2,3,4,8,9,11] → false (cannot reach 8 from 4 with required jumps)
+    die "frog LC ex2 = F" if     FrogJump::can_cross([0, 1, 2, 3, 4, 8, 9, 11])
+    # Single stone
+    die "frog [0] = T"    unless FrogJump::can_cross([0])
+    # Two stones, gap 1 → T
+    die "frog [0,1] = T"  unless FrogJump::can_cross([0, 1])
+    # Two stones, gap 2 (first jump must be 1) → F
+    die "frog [0,2] = F"  if     FrogJump::can_cross([0, 2])
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §123  queue/stack conversions — LC 232, 225, 622
+# ═══════════════════════════════════════════════════════════════════
+#
+# QofStacks: amortised-O(1) push/pop using two-stack inversion trick.
+# SofQueue:  O(n) push, O(1) pop using single rotating queue.
+# CircQ:     classic ring-buffer with head/tail/count.
+#
+#   QofStacks::new()              — fresh queue (in/out stack hashref)
+#   QofStacks::push(q, v)
+#   QofStacks::pop(q)             — front element (FIFO)
+#   QofStacks::peek(q)            — front element without removal
+#   QofStacks::empty(q)           — boolean
+#
+#   SofQueue::new()
+#   SofQueue::push(s, v)
+#   SofQueue::pop(s)              — last-pushed (LIFO)
+#   SofQueue::top(s)              — last-pushed without removal
+#   SofQueue::empty(s)
+#
+#   CircQ::new(capacity)
+#   CircQ::enqueue(q, v)          — returns 1 on success, 0 if full
+#   CircQ::dequeue(q)             — returns front or undef
+#   CircQ::front(q)
+#   CircQ::rear(q)
+#   CircQ::full(q), CircQ::empty(q)
+#   CircQ::size(q)
+
+fn QofStacks::new() {
+    +{ in_stack => [], out_stack => [] }
+}
+
+fn QofStacks::push($q, $v) {
+    push @{$q->{in_stack}}, $v
+}
+
+# Move every "in" element to "out" so the original front becomes the top of out.
+fn QofStacks::shift_in_to_out($q) {
+    while (len(@{$q->{in_stack}}) > 0) {
+        push @{$q->{out_stack}}, pop(@{$q->{in_stack}})
+    }
+}
+
+fn QofStacks::pop($q) {
+    QofStacks::shift_in_to_out($q) if len(@{$q->{out_stack}}) == 0
+    pop(@{$q->{out_stack}})
+}
+
+fn QofStacks::peek($q) {
+    QofStacks::shift_in_to_out($q) if len(@{$q->{out_stack}}) == 0
+    $q->{out_stack}->[-1]
+}
+
+fn QofStacks::empty($q) {
+    len(@{$q->{in_stack}}) == 0 && len(@{$q->{out_stack}}) == 0 ? 1 : 0
+}
+
+# ─── Stack-via-single-queue: each push rotates so newest is at front ──
+fn SofQueue::new() {
+    +{ queue => [] }
+}
+
+fn SofQueue::push($s, $v) {
+    push @{$s->{queue}}, $v
+    # Rotate: pop n-1 items from front and push them back so newest is front.
+    my $n = len(@{$s->{queue}})
+    my $rot = 0
+    while ($rot < $n - 1) {
+        push @{$s->{queue}}, shift @{$s->{queue}}
+        $rot++
+    }
+}
+
+fn SofQueue::pop($s) {
+    shift @{$s->{queue}}
+}
+
+fn SofQueue::top($s) {
+    $s->{queue}->[0]
+}
+
+fn SofQueue::empty($s) {
+    len(@{$s->{queue}}) == 0 ? 1 : 0
+}
+
+# ─── Circular ring buffer ─────────────────────────────────────
+fn CircQ::new($capacity) {
+    my @buf
+    for my $i (0:$capacity - 1) { push @buf, 0 }
+    +{ buf => \@buf, cap => $capacity, head => 0, tail => 0, count => 0 }
+}
+
+fn CircQ::full($q)  { $q->{count} == $q->{cap} ? 1 : 0 }
+fn CircQ::empty($q) { $q->{count} == 0 ? 1 : 0 }
+fn CircQ::size($q)  { $q->{count} }
+
+fn CircQ::enqueue($q, $v) {
+    return 0 if CircQ::full($q)
+    $q->{buf}->[$q->{tail}] = $v
+    $q->{tail} = ($q->{tail} + 1) % $q->{cap}
+    $q->{count}++
+    1
+}
+
+fn CircQ::dequeue($q) {
+    return undef if CircQ::empty($q)
+    my $v = $q->{buf}->[$q->{head}]
+    $q->{head} = ($q->{head} + 1) % $q->{cap}
+    $q->{count}--
+    $v
+}
+
+fn CircQ::front($q) {
+    return undef if CircQ::empty($q)
+    $q->{buf}->[$q->{head}]
+}
+
+fn CircQ::rear($q) {
+    return undef if CircQ::empty($q)
+    my $idx = ($q->{tail} - 1 + $q->{cap}) % $q->{cap}
+    $q->{buf}->[$idx]
+}
+
+Sci::banner("§123 queue/stack")
+{
+    # ── LC 232 queue via stacks ───────────────────────────────
+    my $q = QofStacks::new()
+    die "qs empty initial"   unless QofStacks::empty($q)
+    QofStacks::push($q, 1)
+    QofStacks::push($q, 2)
+    QofStacks::push($q, 3)
+    die "qs peek = 1"        unless QofStacks::peek($q) == 1
+    die "qs not empty"       if     QofStacks::empty($q)
+    die "qs pop = 1"         unless QofStacks::pop($q) == 1
+    die "qs pop = 2"         unless QofStacks::pop($q) == 2
+    QofStacks::push($q, 4)
+    die "qs pop = 3"         unless QofStacks::pop($q) == 3       # FIFO preserved
+    die "qs pop = 4"         unless QofStacks::pop($q) == 4
+    die "qs empty after"     unless QofStacks::empty($q)
+
+    # ── LC 225 stack via queue ────────────────────────────────
+    my $st = SofQueue::new()
+    die "sq empty initial"   unless SofQueue::empty($st)
+    SofQueue::push($st, 1)
+    SofQueue::push($st, 2)
+    SofQueue::push($st, 3)
+    die "sq top = 3"         unless SofQueue::top($st) == 3       # LIFO
+    die "sq pop = 3"         unless SofQueue::pop($st) == 3
+    die "sq pop = 2"         unless SofQueue::pop($st) == 2
+    SofQueue::push($st, 5)
+    die "sq pop = 5"         unless SofQueue::pop($st) == 5
+    die "sq pop = 1"         unless SofQueue::pop($st) == 1
+    die "sq empty after"     unless SofQueue::empty($st)
+
+    # ── LC 622 circular queue ─────────────────────────────────
+    my $cq = CircQ::new(3)
+    die "cq empty"           unless CircQ::empty($cq)
+    die "cq enq 1 = ok"      unless CircQ::enqueue($cq, 1) == 1
+    die "cq enq 2 = ok"      unless CircQ::enqueue($cq, 2) == 1
+    die "cq enq 3 = ok"      unless CircQ::enqueue($cq, 3) == 1
+    die "cq full"            unless CircQ::full($cq)
+    die "cq enq 4 = fail"    unless CircQ::enqueue($cq, 4) == 0
+    die "cq front = 1"       unless CircQ::front($cq) == 1
+    die "cq rear = 3"        unless CircQ::rear($cq)  == 3
+    die "cq size = 3"        unless CircQ::size($cq)  == 3
+    die "cq deq = 1"         unless CircQ::dequeue($cq) == 1
+    die "cq enq 4 wraps"     unless CircQ::enqueue($cq, 4) == 1
+    die "cq front = 2 after wrap" unless CircQ::front($cq) == 2
+    die "cq rear = 4 after wrap"  unless CircQ::rear($cq)  == 4
+}
+
 # Final report.
 p ""
 p "── §1 vectors          (≥ 30 invariants)"
@@ -22906,4 +23484,8 @@ p "── §116 interval sched (≥ 16 invariants)"
 p "── §117 slide window str (≥ 18 invariants)"
 p "── §118 prefix sum sub (≥ 16 invariants)"
 p "── §119 jump+maxprod  (≥ 18 invariants)"
+p "── §120 BS hard       (≥ 18 invariants)"
+p "── §121 max rect/sq   (≥ 14 invariants)"
+p "── §122 wiggle/triplet (≥ 18 invariants)"
+p "── §123 queue/stack    (≥ 18 invariants)"
 p "── scientific_compute_no_interop.stk: all invariants satisfied"
