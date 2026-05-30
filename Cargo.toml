@@ -8,6 +8,8 @@ authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/strykelang"
 homepage = "https://menketechnologies.github.io/strykelang/"
 documentation = "https://docs.rs/strykelang"
+keywords = ["perl", "interpreter", "scripting", "vm", "parallel"]
+categories = ["compilers", "command-line-utilities"]
 exclude = ["/parity/", "/.github/", "/examples/", "/bench/", "/benches/", "/docs/", "/scripts/", "/vendor/", "/tools/", "/fuzz/", "/tests/", "/.github/"]
 autobins = false
 
