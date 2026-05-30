@@ -109,8 +109,14 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 ## [0x01] INSTALL
 
 ```sh
+# Via Homebrew tap (auto-bumped by each release; formula is `stryke`)
+brew tap MenkeTechnologies/menketech
+brew install stryke
+
+# Or via crates.io
 cargo install strykelang
-# or from source
+
+# Or from source
 git clone https://github.com/MenkeTechnologies/strykelang && cd strykelang && cargo build --release
 ```
 
