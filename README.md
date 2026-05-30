@@ -2049,7 +2049,7 @@ stryke examples/gradient_descent_linreg.stk     # mini-batch SGD, pmap_reduce gr
 stryke examples/kalman_filter_tracking.stk      # 1D Kalman filter, hand-rolled 2×2 matrix algebra
 stryke examples/markov_chain_analysis.stk       # transition matrix + stationary distribution
 
-# Scientific computing — single-file toolkit (95 sections, 18,820 lines, 2,120 hand-crafted die invariants)
+# Scientific computing — single-file toolkit (123 sections, 23,491 lines, 2,718 hand-crafted die invariants)
 stryke --no-interop examples/scientific_compute_no_interop.stk   # vectors, matrices, LU/QR, eigenvalues, root-finding,
                                                                  # quadrature, ODE/PDE, FFT, optimization, statistics,
                                                                  # RNG, graph algos (BFS/DFS/Dijkstra/Tarjan/Kuhn),
