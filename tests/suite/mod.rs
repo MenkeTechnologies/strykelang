@@ -338,6 +338,7 @@ mod splice_pin;
 mod split_pin;
 mod sprintf_edge_pin;
 mod sprintf_format_pin;
+mod sprintf_v_directive_deep_pin;
 mod sprintf_width_precision_combo_pin;
 mod state_var_pin;
 mod statement_modifier_pin;

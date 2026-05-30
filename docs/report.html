@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~463k Rust lines (production + tests + tooling) + ~184k .stk lines, 13,184 tests, 10,431 builtins (11,159 keys in %all), 341 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
+  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~463k Rust lines (production + tests + tooling) + ~184k .stk lines, 13,198 tests, 10,431 builtins (11,159 keys in %all), 341 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
   <title>strykelang &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -98,7 +98,7 @@
         <div class="stat-card"><div class="stat-val">470,227</div><div class="stat-label">Rust Lines</div></div>
         <div class="stat-card"><div class="stat-val">204,004</div><div class="stat-label">Stryke Lines (.stk)</div></div>
         <div class="stat-card"><div class="stat-val accent">10,431</div><div class="stat-label">Builtins (Primary)</div></div>
-        <div class="stat-card"><div class="stat-val green">13,184</div><div class="stat-label">Test Functions</div></div>
+        <div class="stat-card"><div class="stat-val green">13,198</div><div class="stat-label">Test Functions</div></div>
         <div class="stat-card"><div class="stat-val">347</div><div class="stat-label">VM Opcodes</div></div>
         <div class="stat-card"><div class="stat-val">343</div><div class="stat-label">AST Variants</div></div>
         <div class="stat-card"><div class="stat-val">20,056</div><div class="stat-label">Parity Cases</div></div>
@@ -210,7 +210,7 @@
         </div>
         <div class="feature-card">
           <h4>By Test Surface</h4>
-          <p><code>13,184</code> <code>#[test]</code> functions + <code>20,056</code> Perl-parity cases + <code>12,955</code> <code>assert_eq</code> / <code>assert_ok</code> checks in <code>examples/rosetta</code> + <code>examples/project</code>. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
+          <p><code>13,198</code> <code>#[test]</code> functions + <code>20,056</code> Perl-parity cases + <code>12,955</code> <code>assert_eq</code> / <code>assert_ok</code> checks in <code>examples/rosetta</code> + <code>examples/project</code>. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
         </div>
         <div class="feature-card">
           <h4>By Built-in Capability</h4>
@@ -283,7 +283,7 @@
           <tr><td style="color:var(--accent);">Tooling</td><td><code>profiler, perf_recorder, stryke_log</code></td><td class="num">1,425</td><td class="num">0.3%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.3%"></div></div></td><td>Sampling profiler, perf event recorder, structured logger. (Static analyzer counts under the LSP row; the step debugger lives under the DAP Debugger row above so the TTY <code>-d</code> front-end and the DAP server count together.)</td></tr>
           <tr><td style="color:var(--accent);">FFI / AOT</td><td><code>rust_ffi, rust_sugar, aot, data_section, aop</code></td><td class="num">1,823</td><td class="num">0.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.4%"></div></div></td><td>Embed-Rust closure FFI, AOT bytecode caching, data-section relocations, AOP intercepts</td></tr>
           <tr><td style="color:var(--accent);">Crypto / Pack</td><td><code>crypt_util, jwt, pack, secrets</code></td><td class="num">1,834</td><td class="num">0.4%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:0.4%"></div></div></td><td>Symmetric / asymmetric encryption, password hashing, JWT encode/decode, <code>pack</code>/<code>unpack</code> templates, secret-store helpers</td></tr>
-          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">109,133</td><td class="num">23.4%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:23.4%"></div></div></td><td>13,184 <code>#[test]</code> functions across 378 Rust modules (20 inline + 358 integration): parser, lexer, builtins, parallel, sync (21 mutex / semaphore tests in <code>builtins_sync_tests.rs</code>), regex, values, OO, semantics, CLI, LSP, DAP, runtime, fix-regression suite, and 142 behavioral pin suites (incl. <code>reduce_pin</code>, <code>split_pin</code>, <code>zip_pad_pin</code>)</td></tr>
+          <tr><td style="color:var(--green);">Tests</td><td><code>tests/suite/*, *_tests.rs</code></td><td class="num">109,133</td><td class="num">23.4%</td><td><div class="bar-wrap"><div class="bar-fill green" style="width:23.4%"></div></div></td><td>13,198 <code>#[test]</code> functions across 378 Rust modules (20 inline + 358 integration): parser, lexer, builtins, parallel, sync (21 mutex / semaphore tests in <code>builtins_sync_tests.rs</code>), regex, values, OO, semantics, CLI, LSP, DAP, runtime, fix-regression suite, and 142 behavioral pin suites (incl. <code>reduce_pin</code>, <code>split_pin</code>, <code>zip_pad_pin</code>)</td></tr>
           <tr><td style="color:var(--text-muted);">Build / Bench</td><td><code>build.rs, benches/, fuzz/</code></td><td class="num">5,464</td><td class="num">1.2%</td><td><div class="bar-wrap"><div class="bar-fill yellow" style="width:1.2%"></div></div></td><td>Build-time reflection generator (<code>BUILTIN_ARMS</code>, <code>CATEGORY_MAP</code>, <code>DESCRIPTIONS</code>), JIT vs interpreter micro-bench, libfuzzer harnesses</td></tr>
         </tbody>
         <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">TOTAL</td><td class="num">470,227</td><td class="num">100%</td><td></td><td></td></tr></tfoot>
@@ -540,7 +540,7 @@
       <p class="tutorial-subtitle">Two complementary suites. Unit + integration tests are <code>#[test]</code> functions in Rust; parity tests are <code>.pl</code> scripts that must produce byte-identical output between system perl and stryke. CI runs both on every push.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
-        <div class="stat-card"><div class="stat-val green">13,184</div><div class="stat-label">#[test] Functions</div></div>
+        <div class="stat-card"><div class="stat-val green">13,198</div><div class="stat-label">#[test] Functions</div></div>
         <div class="stat-card"><div class="stat-val">2,453</div><div class="stat-label">Unit Tests</div></div>
         <div class="stat-card"><div class="stat-val">8,611</div><div class="stat-label">Integration Tests</div></div>
         <div class="stat-card"><div class="stat-val accent">20,056</div><div class="stat-label">Parity Cases</div></div>
@@ -802,7 +802,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 470,227 RUST LINES &middot; 204,004 STRYKE LINES &middot; 13,184 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 470,227 RUST LINES &middot; 204,004 STRYKE LINES &middot; 13,198 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
