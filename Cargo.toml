@@ -6,6 +6,7 @@ description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
 authors = ["MenkeTechnologies"]
 repository = "https://github.com/MenkeTechnologies/strykelang"
+homepage = "https://menketechnologies.github.io/strykelang/"
 documentation = "https://docs.rs/strykelang"
 exclude = ["/parity/", "/.github/", "/examples/", "/bench/", "/benches/", "/docs/", "/scripts/", "/vendor/", "/tools/", "/fuzz/", "/tests/", "/.github/"]
 autobins = false
