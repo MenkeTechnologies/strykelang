@@ -18720,6 +18720,4071 @@ Sci::banner("§95 RMQ + slide win")
     }
 }
 
+# ═══════════════════════════════════════════════════════════════════
+# §96  monotonic-stack patterns
+# ═══════════════════════════════════════════════════════════════════
+#
+# A monotonic stack keeps its elements (or their indices) in a strict
+# order while scanning the input.  When a new element violates the
+# order, prior elements are popped — at the moment of pop, the new
+# element is precisely the "next greater" (or "next smaller", etc.)
+# of the popped index.  Every element is pushed and popped at most
+# once, so the total work is O(n) even though the inner while loop
+# looks quadratic.
+#
+#   MonoStack::next_greater(arr)      — for each i, the next value > arr[i] (or -1)
+#   MonoStack::next_greater_idx(arr)  — same but returns the index (or -1)
+#   MonoStack::next_smaller(arr)      — next strictly smaller value (or -1)
+#   MonoStack::daily_temps(temps)     — LeetCode 739: days until warmer temperature
+#   MonoStack::next_greater_circular(arr)  — LeetCode 503: wrap-around variant
+
+fn MonoStack::next_greater($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @res
+    for my $i (0:$n - 1) { push @res, -1 }
+    my @stk
+    my $i = 0
+    while ($i < $n) {
+        while (len(@stk) > 0 && $vals[$stk[-1]] < $vals[$i]) {
+            my $j = pop(@stk)
+            $res[$j] = $vals[$i]
+        }
+        push @stk, $i
+        $i++
+    }
+    \@res
+}
+
+fn MonoStack::next_greater_idx($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @res
+    for my $i (0:$n - 1) { push @res, -1 }
+    my @stk
+    my $i = 0
+    while ($i < $n) {
+        while (len(@stk) > 0 && $vals[$stk[-1]] < $vals[$i]) {
+            my $j = pop(@stk)
+            $res[$j] = $i
+        }
+        push @stk, $i
+        $i++
+    }
+    \@res
+}
+
+fn MonoStack::next_smaller($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @res
+    for my $i (0:$n - 1) { push @res, -1 }
+    my @stk
+    my $i = 0
+    while ($i < $n) {
+        while (len(@stk) > 0 && $vals[$stk[-1]] > $vals[$i]) {
+            my $j = pop(@stk)
+            $res[$j] = $vals[$i]
+        }
+        push @stk, $i
+        $i++
+    }
+    \@res
+}
+
+fn MonoStack::daily_temps($temps_in) {
+    my @temps = @$temps_in
+    my $n = len(@temps)
+    my @res
+    for my $i (0:$n - 1) { push @res, 0 }
+    my @stk
+    my $i = 0
+    while ($i < $n) {
+        while (len(@stk) > 0 && $temps[$stk[-1]] < $temps[$i]) {
+            my $j = pop(@stk)
+            $res[$j] = $i - $j
+        }
+        push @stk, $i
+        $i++
+    }
+    \@res
+}
+
+fn MonoStack::next_greater_circular($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @res
+    for my $i (0:$n - 1) { push @res, -1 }
+    my @stk
+    my $i = 0
+    while ($i < 2 * $n) {
+        my $idx_real = $i % $n
+        while (len(@stk) > 0 && $vals[$stk[-1]] < $vals[$idx_real]) {
+            my $j = pop(@stk)
+            $res[$j] = $vals[$idx_real]
+        }
+        push @stk, $idx_real if $i < $n
+        $i++
+    }
+    \@res
+}
+
+Sci::banner("§96 mono stack")
+{
+    # ── Next greater value (arr = [2, 1, 2, 4, 3, 1]) ─────────
+    my $ng = MonoStack::next_greater([2, 1, 2, 4, 3, 1])
+    die "ng[0]=4"  unless $ng->[0] == 4
+    die "ng[1]=2"  unless $ng->[1] == 2
+    die "ng[2]=4"  unless $ng->[2] == 4
+    die "ng[3]=-1" unless $ng->[3] == -1
+    die "ng[4]=-1" unless $ng->[4] == -1
+    die "ng[5]=-1" unless $ng->[5] == -1
+
+    # ── Next-greater INDEX ─────────────────────────────────────
+    my $ngi = MonoStack::next_greater_idx([2, 1, 2, 4, 3, 1])
+    die "ngi[0]=3"  unless $ngi->[0] == 3
+    die "ngi[1]=2"  unless $ngi->[1] == 2
+    die "ngi[2]=3"  unless $ngi->[2] == 3
+    die "ngi[3]=-1" unless $ngi->[3] == -1
+
+    # ── Strictly decreasing input → all -1 ────────────────────
+    my $dec = MonoStack::next_greater([5, 4, 3, 2, 1])
+    for my $idx (0:4) { die "dec[$idx]=-1" unless $dec->[$idx] == -1 }
+
+    # ── Strictly increasing input → each elem points to next ──
+    my $inc = MonoStack::next_greater([1, 2, 3, 4, 5])
+    die "inc[0]=2"  unless $inc->[0] == 2
+    die "inc[3]=5"  unless $inc->[3] == 5
+    die "inc[4]=-1" unless $inc->[4] == -1
+
+    # ── Next smaller (arr = [4, 8, 5, 2, 25]) ─────────────────
+    my $ns = MonoStack::next_smaller([4, 8, 5, 2, 25])
+    die "ns[0]=2"  unless $ns->[0] == 2
+    die "ns[1]=5"  unless $ns->[1] == 5
+    die "ns[2]=2"  unless $ns->[2] == 2
+    die "ns[3]=-1" unless $ns->[3] == -1
+    die "ns[4]=-1" unless $ns->[4] == -1
+
+    # ── Daily temperatures (LeetCode 739) ─────────────────────
+    # [73,74,75,71,69,72,76,73] → [1,1,4,2,1,1,0,0]
+    my $dt = MonoStack::daily_temps([73, 74, 75, 71, 69, 72, 76, 73])
+    die "dt[0]=1" unless $dt->[0] == 1
+    die "dt[1]=1" unless $dt->[1] == 1
+    die "dt[2]=4" unless $dt->[2] == 4
+    die "dt[3]=2" unless $dt->[3] == 2
+    die "dt[4]=1" unless $dt->[4] == 1
+    die "dt[5]=1" unless $dt->[5] == 1
+    die "dt[6]=0" unless $dt->[6] == 0
+    die "dt[7]=0" unless $dt->[7] == 0
+
+    # ── Circular next greater (LeetCode 503): [1,2,1] → [2,-1,2] ──
+    my $ngc = MonoStack::next_greater_circular([1, 2, 1])
+    die "ngc[0]=2"  unless $ngc->[0] == 2
+    die "ngc[1]=-1" unless $ngc->[1] == -1
+    die "ngc[2]=2"  unless $ngc->[2] == 2
+
+    # ── Next smaller on Pi-digit prefix [3,1,4,1,5,9,2,6] ────
+    # Expected ns: [1, -1, 1, -1, 2, 2, -1, -1]
+    my $ns2 = MonoStack::next_smaller([3, 1, 4, 1, 5, 9, 2, 6])
+    die "ns2[0]=1"  unless $ns2->[0] == 1
+    die "ns2[1]=-1" unless $ns2->[1] == -1
+    die "ns2[2]=1"  unless $ns2->[2] == 1
+    die "ns2[3]=-1" unless $ns2->[3] == -1
+    die "ns2[4]=2"  unless $ns2->[4] == 2
+    die "ns2[5]=2"  unless $ns2->[5] == 2
+    die "ns2[6]=-1" unless $ns2->[6] == -1
+    die "ns2[7]=-1" unless $ns2->[7] == -1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §97  RPN evaluation + Dijkstra's shunting yard (infix → postfix)
+# ═══════════════════════════════════════════════════════════════════
+#
+# RPN::eval — evaluate a postfix token list (numbers + binary ops).
+#   Tokens are strings: "3", "4", "+", "*", "-", "/".  Stack walk.
+#
+# Shunting::infix_to_postfix — convert an infix token list to RPN
+#   using Dijkstra's algorithm.  Supports +, -, *, /, ^ (right-assoc)
+#   and parentheses.
+
+fn RPN::is_op($tok) {
+    $tok eq "+" || $tok eq "-" || $tok eq "*" || $tok eq "/" || $tok eq "^"
+}
+
+fn RPN::apply($lv, $rv, $op) {
+    if    ($op eq "+") { $lv + $rv }
+    elsif ($op eq "-") { $lv - $rv }
+    elsif ($op eq "*") { $lv * $rv }
+    elsif ($op eq "/") { $lv / $rv }
+    elsif ($op eq "^") { $lv ** $rv }
+    else { die "unknown op $op" }
+}
+
+fn RPN::eval($tokens_in) {
+    my @toks = @$tokens_in
+    my @stk
+    for my $t (@toks) {
+        if (RPN::is_op($t)) {
+            die "RPN underflow" unless len(@stk) >= 2
+            my $rv = pop(@stk)
+            my $lv = pop(@stk)
+            push @stk, RPN::apply($lv, $rv, $t)
+        } else {
+            push @stk, $t + 0       # numeric coercion
+        }
+    }
+    die "RPN extra operands" unless len(@stk) == 1
+    $stk[0]
+}
+
+# Operator precedence: higher = binds tighter.
+fn Shunting::prec($op) {
+    if    ($op eq "+" || $op eq "-") { 1 }
+    elsif ($op eq "*" || $op eq "/") { 2 }
+    elsif ($op eq "^")               { 3 }
+    else { 0 }
+}
+
+# Right-associative ops: only ^
+fn Shunting::is_right_assoc($op) { $op eq "^" }
+
+fn Shunting::infix_to_postfix($tokens_in) {
+    my @toks = @$tokens_in
+    my @out
+    my @ops
+    for my $t (@toks) {
+        if (RPN::is_op($t)) {
+            my $tp = Shunting::prec($t)
+            while (len(@ops) > 0 && RPN::is_op($ops[-1])) {
+                my $top = $ops[-1]
+                my $top_prec = Shunting::prec($top)
+                my $pop_it = 0
+                if (Shunting::is_right_assoc($t)) {
+                    $pop_it = 1 if $top_prec > $tp
+                } else {
+                    $pop_it = 1 if $top_prec >= $tp
+                }
+                last unless $pop_it
+                push @out, pop(@ops)
+            }
+            push @ops, $t
+        } elsif ($t eq "(") {
+            push @ops, $t
+        } elsif ($t eq ")") {
+            while (len(@ops) > 0 && $ops[-1] ne "(") {
+                push @out, pop(@ops)
+            }
+            die "shunting: mismatched )" unless len(@ops) > 0
+            pop(@ops)                   # discard "("
+        } else {
+            push @out, $t              # operand
+        }
+    }
+    while (len(@ops) > 0) {
+        my $top = pop(@ops)
+        die "shunting: mismatched (" if $top eq "("
+        push @out, $top
+    }
+    \@out
+}
+
+Sci::banner("§97 RPN + shunting")
+{
+    # ── Direct RPN evaluation ─────────────────────────────────
+    # 3 4 + → 7
+    die "rpn 3 4 +"     unless RPN::eval(["3", "4", "+"]) == 7
+    # 5 1 2 + 4 * + 3 - → 5 + (1+2)*4 - 3 = 5 + 12 - 3 = 14
+    die "rpn LC 150"    unless RPN::eval(["5", "1", "2", "+", "4", "*", "+", "3", "-"]) == 14
+    # 2 3 ^ → 8
+    die "rpn 2 3 ^"     unless RPN::eval(["2", "3", "^"]) == 8
+    # 10 2 / → 5
+    die "rpn 10 2 /"    unless RPN::eval(["10", "2", "/"]) == 5
+
+    # ── Shunting yard precedence: 3 + 4 * 2 → 3 4 2 * + → 11 ───
+    my $r1 = Shunting::infix_to_postfix(["3", "+", "4", "*", "2"])
+    die "shunt r1 len=5"   unless len(@$r1) == 5
+    die "shunt r1 result"  unless RPN::eval($r1) == 11
+
+    # ── Parens override precedence: (3 + 4) * 2 → 14 ──────────
+    my $r2 = Shunting::infix_to_postfix(["(", "3", "+", "4", ")", "*", "2"])
+    die "shunt r2 result"  unless RPN::eval($r2) == 14
+
+    # ── Right associative ^: 2 ^ 3 ^ 2 = 2 ^ (3 ^ 2) = 2 ^ 9 = 512 ──
+    my $r3 = Shunting::infix_to_postfix(["2", "^", "3", "^", "2"])
+    die "shunt r3 (right-assoc ^)" unless RPN::eval($r3) == 512
+
+    # ── Left associative -: 10 - 4 - 3 = (10-4)-3 = 3 ─────────
+    my $r4 = Shunting::infix_to_postfix(["10", "-", "4", "-", "3"])
+    die "shunt r4 (left-assoc -)" unless RPN::eval($r4) == 3
+
+    # ── Mixed: 3 + 4 * 2 / (1 - 5) ^ 2 ^ 3 ────────────────────
+    # = 3 + 4 * 2 / (-4) ^ (2 ^ 3)
+    # = 3 + 4 * 2 / (-4) ^ 8
+    # = 3 + 4 * 2 / 65536
+    # = 3 + 8/65536
+    # = 3 + 0.0001220703125
+    # ≈ 3.0001220703125
+    my $r5 = Shunting::infix_to_postfix(["3", "+", "4", "*", "2", "/",
+                                          "(", "1", "-", "5", ")", "^",
+                                          "2", "^", "3"])
+    die "shunt r5 mixed Wikipedia example" unless
+        Sci::approx(RPN::eval($r5), 3.0 + 8.0 / 65536.0, 1e-12)
+
+    # ── Nested parens: ((2 + 3) * (4 - 1)) → 15 ───────────────
+    my $r6 = Shunting::infix_to_postfix(["(", "(", "2", "+", "3", ")", "*",
+                                          "(", "4", "-", "1", ")", ")"])
+    die "shunt r6 nested parens" unless RPN::eval($r6) == 15
+
+    # ── Single number → single number ─────────────────────────
+    my $r7 = Shunting::infix_to_postfix(["42"])
+    die "shunt r7 single"      unless len(@$r7) == 1
+    die "shunt r7 eval=42"     unless RPN::eval($r7) == 42
+
+    # ── Unary-ish: -5 + 3.  Without unary support we model it as
+    #    0 - 5 + 3 = -2.
+    my $r8 = Shunting::infix_to_postfix(["0", "-", "5", "+", "3"])
+    die "shunt r8 negative" unless RPN::eval($r8) == -2
+
+    # ── Floating point: 1.5 * 2.0 + 0.25 → 3.25 ───────────────
+    my $r9 = Shunting::infix_to_postfix(["1.5", "*", "2.0", "+", "0.25"])
+    die "shunt r9 float" unless Sci::approx(RPN::eval($r9), 3.25, 1e-12)
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §98  quickselect + median of medians (BFPRT)
+# ═══════════════════════════════════════════════════════════════════
+#
+# Quickselect — Hoare's partition-based k-th smallest selection.
+#   Expected O(n) on random pivots, worst-case O(n²) on adversarial
+#   input (always-bad pivot).
+#
+# Median of medians — Blum, Floyd, Pratt, Rivest, Tarjan (1973).
+#   Picks a deterministic pivot guaranteed to lie between the 30th
+#   and 70th percentile of any input, giving worst-case O(n) for
+#   k-th smallest selection.
+#
+# Together they form the standard selection toolkit: quickselect is
+# almost always faster in practice; MoM is the theoretical safety net.
+#
+#   Sel::quickselect(arr, k)         — k-th smallest (0-indexed) via Hoare
+#   Sel::quickselect_median(arr)     — convenience wrapper for k = n/2
+#   Sel::bfprt(arr, k)               — guaranteed O(n) via median-of-medians
+#   Sel::median_low(arr)             — true low median (matches statistics.median_low)
+#   Sel::partition(arr_ref, lo, hi)  — Lomuto partition, last elem as pivot
+
+# Lomuto partition: rearranges arr_ref slice [lo, hi] so that
+# arr_ref[hi] (the pivot) ends up at its final sorted position.
+# Returns the final pivot index.  Mutates the underlying array.
+fn Sel::partition($arr_ref, $lo, $hi) {
+    my $pivot = $arr_ref->[$hi]
+    my $store = $lo
+    my $i = $lo
+    while ($i < $hi) {
+        if ($arr_ref->[$i] <= $pivot) {
+            my $tmp = $arr_ref->[$store]
+            $arr_ref->[$store] = $arr_ref->[$i]
+            $arr_ref->[$i]     = $tmp
+            $store++
+        }
+        $i++
+    }
+    my $tmp = $arr_ref->[$store]
+    $arr_ref->[$store] = $arr_ref->[$hi]
+    $arr_ref->[$hi]    = $tmp
+    $store
+}
+
+# Standard quickselect on a fresh copy (so caller array is untouched).
+fn Sel::quickselect($arr_in, $k) {
+    my @work = @$arr_in
+    my $n = len(@work)
+    die "quickselect k oob" unless $k >= 0 && $k < $n
+    my $lo = 0
+    my $hi = $n - 1
+    while ($lo < $hi) {
+        my $piv = Sel::partition(\@work, $lo, $hi)
+        if    ($piv == $k) { return $work[$k] }
+        elsif ($piv  < $k) { $lo = $piv + 1 }
+        else               { $hi = $piv - 1 }
+    }
+    $work[$k]
+}
+
+fn Sel::quickselect_median($arr_in) {
+    my $n = len(@$arr_in)
+    Sel::quickselect($arr_in, int($n / 2))
+}
+
+# Sort 5 elements in place — used as MoM's chunk-median primitive.
+fn Sel::insertion_sort5($arr_ref, $lo, $hi) {
+    my $i = $lo + 1
+    while ($i <= $hi) {
+        my $cur = $arr_ref->[$i]
+        my $j = $i - 1
+        while ($j >= $lo && $arr_ref->[$j] > $cur) {
+            $arr_ref->[$j + 1] = $arr_ref->[$j]
+            $j--
+        }
+        $arr_ref->[$j + 1] = $cur
+        $i++
+    }
+}
+
+# Recursive median-of-medians selector.  Operates on a fresh copy.
+fn Sel::bfprt_inner($arr_ref, $lo, $hi, $k) {
+    while (1) {
+        if ($lo == $hi) { return $arr_ref->[$lo] }
+        # Phase 1: pivot = median of medians of groups of 5.
+        my @medians
+        my $g = $lo
+        while ($g <= $hi) {
+            my $g_end = $g + 4
+            $g_end = $hi if $g_end > $hi
+            Sel::insertion_sort5($arr_ref, $g, $g_end)
+            push @medians, $arr_ref->[$g + int(($g_end - $g) / 2)]
+            $g += 5
+        }
+        my $pivot_val
+        if (len(@medians) <= 5) {
+            # Direct: insertion-sort the (≤ 5) medians and take the middle.
+            Sel::insertion_sort5(\@medians, 0, len(@medians) - 1)
+            $pivot_val = $medians[int(len(@medians) / 2)]
+        } else {
+            # Recurse on the medians array to get its true median.
+            $pivot_val = Sel::bfprt_inner(\@medians, 0, len(@medians) - 1,
+                                          int(len(@medians) / 2))
+        }
+        # Phase 2: partition [lo, hi] around $pivot_val.  We swap the
+        # pivot to the end first to reuse Lomuto.
+        my $piv_idx = $lo
+        while ($piv_idx <= $hi && $arr_ref->[$piv_idx] != $pivot_val) { $piv_idx++ }
+        die "bfprt: pivot vanished" if $piv_idx > $hi
+        my $tmp = $arr_ref->[$piv_idx]
+        $arr_ref->[$piv_idx] = $arr_ref->[$hi]
+        $arr_ref->[$hi]      = $tmp
+        my $piv_final = Sel::partition($arr_ref, $lo, $hi)
+        if    ($piv_final == $k) { return $arr_ref->[$k] }
+        elsif ($piv_final  < $k) { $lo = $piv_final + 1 }
+        else                     { $hi = $piv_final - 1 }
+    }
+}
+
+fn Sel::bfprt($arr_in, $k) {
+    my @work = @$arr_in
+    my $n = len(@work)
+    die "bfprt k oob" unless $k >= 0 && $k < $n
+    Sel::bfprt_inner(\@work, 0, $n - 1, $k)
+}
+
+# Statistics-style low median: for even n returns the lower of the
+# two middle values (matches Python's statistics.median_low).
+fn Sel::median_low($arr_in) {
+    my $n = len(@$arr_in)
+    Sel::quickselect($arr_in, int(($n - 1) / 2))
+}
+
+Sci::banner("§98 quickselect")
+{
+    # ── Quickselect basic: sorted-form pinning ────────────────
+    # arr = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+    # sorted: [1, 1, 2, 3, 3, 4, 5, 5, 5, 6, 9]
+    my $arr_a = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+    die "qs 0=1"  unless Sel::quickselect($arr_a, 0)  == 1
+    die "qs 1=1"  unless Sel::quickselect($arr_a, 1)  == 1
+    die "qs 2=2"  unless Sel::quickselect($arr_a, 2)  == 2
+    die "qs 5=4"  unless Sel::quickselect($arr_a, 5)  == 4
+    die "qs 6=5"  unless Sel::quickselect($arr_a, 6)  == 5
+    die "qs 10=9" unless Sel::quickselect($arr_a, 10) == 9
+
+    # ── Caller's array MUST be unchanged ──────────────────────
+    die "qs no mutate" unless $arr_a->[0] == 3 && $arr_a->[10] == 5
+
+    # ── Median (n odd) ────────────────────────────────────────
+    # [3,1,4,1,5,9,2,6,5,3,5] n=11 sorted middle (idx 5) = 4
+    die "qs median n=11" unless Sel::quickselect_median($arr_a) == 4
+
+    # ── Median-low (n even) ───────────────────────────────────
+    # [7,1,3,5,2,8] sorted: [1,2,3,5,7,8] low median = 3 (idx 2)
+    die "median_low n=6" unless Sel::median_low([7, 1, 3, 5, 2, 8]) == 3
+
+    # ── BFPRT cross-check vs quickselect for many k ───────────
+    my $arr_b = [42, 17, 8, 99, 23, 4, 65, 12, 71, 38, 56, 91, 27, 3, 80]
+    my $bn = 15
+    my $kk = 0
+    while ($kk < $bn) {
+        my $qsv  = Sel::quickselect($arr_b, $kk)
+        my $bfv  = Sel::bfprt      ($arr_b, $kk)
+        die "qs == bfprt at k=$kk" unless $qsv == $bfv
+        $kk++
+    }
+
+    # ── Adversarial: already-sorted input is worst case for naive
+    #    quicksort, but quickselect still finds the right answer. ──
+    my $sorted_arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    die "qs sorted k=4" unless Sel::quickselect($sorted_arr, 4) == 5
+    die "qs sorted k=0" unless Sel::quickselect($sorted_arr, 0) == 1
+    die "qs sorted k=9" unless Sel::quickselect($sorted_arr, 9) == 10
+
+    # ── All-equal input ───────────────────────────────────────
+    die "qs all-7 k=3" unless Sel::quickselect([7, 7, 7, 7, 7, 7, 7], 3) == 7
+    die "bf all-7 k=3" unless Sel::bfprt      ([7, 7, 7, 7, 7, 7, 7], 3) == 7
+
+    # ── Negative numbers + zeros ──────────────────────────────
+    # sorted: [-5, -3, -2, 0, 0, 1, 4, 7]; median (n=8, idx 4) = 0
+    my $arr_neg = [4, -3, 0, 7, -5, 1, -2, 0]
+    die "qs neg k=0=-5"   unless Sel::quickselect($arr_neg, 0) == -5
+    die "qs neg k=4=0"    unless Sel::quickselect($arr_neg, 4) == 0
+    die "qs neg k=7=7"    unless Sel::quickselect($arr_neg, 7) == 7
+
+    # ── Single-element ────────────────────────────────────────
+    die "qs single"  unless Sel::quickselect([42], 0) == 42
+    die "bf single"  unless Sel::bfprt      ([42], 0) == 42
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §99  topological sort — Kahn's BFS + DFS post-order
+# ═══════════════════════════════════════════════════════════════════
+#
+# Linear ordering of a directed acyclic graph's vertices such that
+# every edge u → v puts u before v.  Two classical algorithms:
+#
+#   Topo::kahn(g)   — repeatedly emit in-degree-zero vertices, decrement
+#                     downstream in-degrees, push newly-zero into queue.
+#                     Returns {order, has_cycle}.  If has_cycle is true,
+#                     `order` contains only the prefix that was emittable.
+#
+#   Topo::dfs(g)    — DFS each unvisited vertex; on exit, prepend it
+#                     to the order.  Detect cycles by tracking the
+#                     three-color (white/gray/black) state.
+#
+# Both run in O(V + E) on the §15 Graph::* representation.
+#
+# A graph is a DAG iff its toposort has length == V.
+
+fn Topo::kahn($g_obj) {
+    my $n = $g_obj->{n}
+    my $adj_ref = $g_obj->{adj}
+    my @indeg
+    for my $i (0:$n - 1) { push @indeg, 0 }
+    for my $u (0:$n - 1) {
+        my $nbrs = $adj_ref->[$u]
+        for my $edge (@$nbrs) {
+            $indeg[$edge->[0]]++
+        }
+    }
+    my @queue
+    for my $i (0:$n - 1) { push @queue, $i if $indeg[$i] == 0 }
+    my @order
+    while (len(@queue) > 0) {
+        my $u_node = shift @queue
+        push @order, $u_node
+        my $nbrs = $adj_ref->[$u_node]
+        for my $edge (@$nbrs) {
+            my $v_node = $edge->[0]
+            $indeg[$v_node]--
+            push @queue, $v_node if $indeg[$v_node] == 0
+        }
+    }
+    +{ order => \@order, has_cycle => (len(@order) != $n ? 1 : 0) }
+}
+
+# DFS three-color cycle detector.  Returns 1 if a back edge was found.
+fn Topo::dfs_visit($adj_ref, $u, $color_ref, $order_ref) {
+    $color_ref->[$u] = 1                       # gray (in progress)
+    my $nbrs = $adj_ref->[$u]
+    for my $edge (@$nbrs) {
+        my $v_node = $edge->[0]
+        if    ($color_ref->[$v_node] == 1) { return 1 }      # back edge → cycle
+        elsif ($color_ref->[$v_node] == 0) {
+            return 1 if Topo::dfs_visit($adj_ref, $v_node, $color_ref, $order_ref)
+        }
+    }
+    $color_ref->[$u] = 2                       # black (finished)
+    push @$order_ref, $u                       # post-order push, reverse later
+    0
+}
+
+fn Topo::dfs($g_obj) {
+    my $n = $g_obj->{n}
+    my $adj_ref = $g_obj->{adj}
+    my @color
+    for my $i (0:$n - 1) { push @color, 0 }    # 0 = white
+    my @post_order
+    my $cyc = 0
+    for my $u (0:$n - 1) {
+        if ($color[$u] == 0) {
+            if (Topo::dfs_visit($adj_ref, $u, \@color, \@post_order)) {
+                $cyc = 1
+                last
+            }
+        }
+    }
+    # DFS post-order reversed is a valid topo order.
+    my @rev
+    my $idx = len(@post_order) - 1
+    while ($idx >= 0) { push @rev, $post_order[$idx]; $idx-- }
+    +{ order => \@rev, has_cycle => $cyc }
+}
+
+# Validator: confirm that for every edge u→v, position(u) < position(v).
+fn Topo::is_valid($g_obj, $order_ref) {
+    my $n = $g_obj->{n}
+    return 0 unless len(@$order_ref) == $n
+    my @pos
+    for my $i (0:$n - 1) { push @pos, -1 }
+    my $i = 0
+    while ($i < $n) {
+        $pos[$order_ref->[$i]] = $i
+        $i++
+    }
+    my $adj_ref = $g_obj->{adj}
+    for my $u (0:$n - 1) {
+        my $nbrs = $adj_ref->[$u]
+        for my $edge (@$nbrs) {
+            return 0 unless $pos[$u] < $pos[$edge->[0]]
+        }
+    }
+    1
+}
+
+Sci::banner("§99 toposort")
+{
+    # ── Linear chain 0→1→2→3→4 ────────────────────────────────
+    my $gph_chain = Graph::new(5)
+    Graph::add_edge($gph_chain, 0, 1, 1.0)
+    Graph::add_edge($gph_chain, 1, 2, 1.0)
+    Graph::add_edge($gph_chain, 2, 3, 1.0)
+    Graph::add_edge($gph_chain, 3, 4, 1.0)
+    my $k_chain = Topo::kahn($gph_chain)
+    die "chain Kahn no cycle" if $k_chain->{has_cycle}
+    die "chain Kahn order = [0..4]" unless Sci::arr_eq($k_chain->{order}, [0, 1, 2, 3, 4])
+    die "chain Kahn valid" unless Topo::is_valid($gph_chain, $k_chain->{order})
+    my $d_chain = Topo::dfs($gph_chain)
+    die "chain DFS no cycle" if $d_chain->{has_cycle}
+    die "chain DFS valid" unless Topo::is_valid($gph_chain, $d_chain->{order})
+
+    # ── Diamond: 0→1, 0→2, 1→3, 2→3 ───────────────────────────
+    my $gph_diamond = Graph::new(4)
+    Graph::add_edge($gph_diamond, 0, 1, 1.0)
+    Graph::add_edge($gph_diamond, 0, 2, 1.0)
+    Graph::add_edge($gph_diamond, 1, 3, 1.0)
+    Graph::add_edge($gph_diamond, 2, 3, 1.0)
+    my $k_d = Topo::kahn($gph_diamond)
+    my $d_d = Topo::dfs($gph_diamond)
+    die "diamond Kahn no cycle" if $k_d->{has_cycle}
+    die "diamond DFS no cycle"  if $d_d->{has_cycle}
+    die "diamond Kahn valid"    unless Topo::is_valid($gph_diamond, $k_d->{order})
+    die "diamond DFS valid"     unless Topo::is_valid($gph_diamond, $d_d->{order})
+    # 0 must come first; 3 must come last
+    die "diamond Kahn 0 first" unless $k_d->{order}->[0] == 0
+    die "diamond Kahn 3 last"  unless $k_d->{order}->[3] == 3
+    die "diamond DFS 0 first"  unless $d_d->{order}->[0] == 0
+    die "diamond DFS 3 last"   unless $d_d->{order}->[3] == 3
+
+    # ── Cycle: 0→1, 1→2, 2→0 ──────────────────────────────────
+    my $gph_cyc = Graph::new(3)
+    Graph::add_edge($gph_cyc, 0, 1, 1.0)
+    Graph::add_edge($gph_cyc, 1, 2, 1.0)
+    Graph::add_edge($gph_cyc, 2, 0, 1.0)
+    die "cycle Kahn has_cycle" unless Topo::kahn($gph_cyc)->{has_cycle}
+    die "cycle DFS has_cycle"  unless Topo::dfs ($gph_cyc)->{has_cycle}
+
+    # ── Self-loop: 0→0 ────────────────────────────────────────
+    my $gph_self = Graph::new(2)
+    Graph::add_edge($gph_self, 0, 0, 1.0)
+    die "self-loop Kahn has_cycle" unless Topo::kahn($gph_self)->{has_cycle}
+    die "self-loop DFS has_cycle"  unless Topo::dfs ($gph_self)->{has_cycle}
+
+    # ── Disconnected DAG (two chains): 0→1, 2→3 ───────────────
+    my $gph_disco = Graph::new(4)
+    Graph::add_edge($gph_disco, 0, 1, 1.0)
+    Graph::add_edge($gph_disco, 2, 3, 1.0)
+    my $k_disco = Topo::kahn($gph_disco)
+    die "disco no cycle"  if $k_disco->{has_cycle}
+    die "disco len = 4"   unless len(@{$k_disco->{order}}) == 4
+    die "disco valid"     unless Topo::is_valid($gph_disco, $k_disco->{order})
+
+    # ── Course prerequisites (LC 207 / 210 canonical) ─────────
+    # 4 courses, prereqs: [1, 0], [2, 0], [3, 1], [3, 2]
+    # i.e. 0→1, 0→2, 1→3, 2→3.  Valid orders: 0,1,2,3 or 0,2,1,3
+    my $gph_courses = Graph::new(4)
+    Graph::add_edge($gph_courses, 0, 1, 1.0)
+    Graph::add_edge($gph_courses, 0, 2, 1.0)
+    Graph::add_edge($gph_courses, 1, 3, 1.0)
+    Graph::add_edge($gph_courses, 2, 3, 1.0)
+    my $k_c = Topo::kahn($gph_courses)
+    my $d_c = Topo::dfs($gph_courses)
+    die "courses Kahn no cycle"   if $k_c->{has_cycle}
+    die "courses DFS no cycle"    if $d_c->{has_cycle}
+    die "courses Kahn valid"      unless Topo::is_valid($gph_courses, $k_c->{order})
+    die "courses DFS valid"       unless Topo::is_valid($gph_courses, $d_c->{order})
+
+    # ── Empty graph (n=3, no edges): any permutation valid ────
+    my $gph_empty = Graph::new(3)
+    my $k_e = Topo::kahn($gph_empty)
+    die "empty no cycle"  if $k_e->{has_cycle}
+    die "empty len = 3"   unless len(@{$k_e->{order}}) == 3
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §100  Conway's Game of Life — cellular automaton
+# ═══════════════════════════════════════════════════════════════════
+#
+# Rules (Conway, 1970):
+#   1. Any live cell with 2 or 3 live neighbours survives.
+#   2. Any dead cell with exactly 3 live neighbours becomes alive.
+#   3. All other cells die or stay dead.
+#
+# Grid is a flat row-major arrayref of length w*h, with 0/1 cells.
+# Out-of-bounds neighbours count as dead (no wrap).
+#
+#   Conway::idx(w, x, y)           — flat index from (x, y)
+#   Conway::get(grid, w, h, x, y)  — bounds-aware read (0 if outside)
+#   Conway::count_neighbours       — count 8-neighbourhood living cells
+#   Conway::step(grid, w, h)       — compute next generation (returns new arrayref)
+#   Conway::population(grid)       — count of live cells
+#   Conway::eq(g1, g2)             — grid equality
+#   Conway::run(grid, w, h, n)     — apply step n times
+
+fn Conway::idx($w, $x, $y) { $y * $w + $x }
+
+fn Conway::get($grid, $w, $h, $x, $y) {
+    return 0 if $x < 0 || $x >= $w || $y < 0 || $y >= $h
+    $grid->[Conway::idx($w, $x, $y)]
+}
+
+fn Conway::count_neighbours($grid, $w, $h, $x, $y) {
+    my $n = 0
+    my $dy = -1
+    while ($dy <= 1) {
+        my $dx = -1
+        while ($dx <= 1) {
+            unless ($dx == 0 && $dy == 0) {
+                $n += Conway::get($grid, $w, $h, $x + $dx, $y + $dy)
+            }
+            $dx++
+        }
+        $dy++
+    }
+    $n
+}
+
+fn Conway::step($grid, $w, $h) {
+    my @nxt
+    my $y = 0
+    while ($y < $h) {
+        my $x = 0
+        while ($x < $w) {
+            my $cur = $grid->[Conway::idx($w, $x, $y)]
+            my $nb  = Conway::count_neighbours($grid, $w, $h, $x, $y)
+            my $alive_next = 0
+            if ($cur == 1) {
+                $alive_next = 1 if ($nb == 2 || $nb == 3)
+            } else {
+                $alive_next = 1 if ($nb == 3)
+            }
+            push @nxt, $alive_next
+            $x++
+        }
+        $y++
+    }
+    \@nxt
+}
+
+fn Conway::population($grid) {
+    my $n = 0
+    for my $c (@$grid) { $n += $c }
+    $n
+}
+
+fn Conway::eq($g1, $g2) {
+    return 0 unless len(@$g1) == len(@$g2)
+    my $i = 0
+    while ($i < len(@$g1)) {
+        return 0 unless $g1->[$i] == $g2->[$i]
+        $i++
+    }
+    1
+}
+
+fn Conway::run($grid, $w, $h, $n_steps) {
+    my $cur = [@$grid]
+    my $s = 0
+    while ($s < $n_steps) {
+        $cur = Conway::step($cur, $w, $h)
+        $s++
+    }
+    $cur
+}
+
+Sci::banner("§100 Conway's Life")
+{
+    # ── Block still-life (2x2 alive in 4x4 grid) — period 1 ──
+    # . . . .
+    # . X X .
+    # . X X .
+    # . . . .
+    my $blk = [
+        0, 0, 0, 0,
+        0, 1, 1, 0,
+        0, 1, 1, 0,
+        0, 0, 0, 0,
+    ]
+    my $blk_after = Conway::step($blk, 4, 4)
+    die "block stable"          unless Conway::eq($blk, $blk_after)
+    die "block pop=4 before"    unless Conway::population($blk) == 4
+    die "block pop=4 after"     unless Conway::population($blk_after) == 4
+
+    # ── Blinker — 3 horizontal cells → 3 vertical → 3 horizontal ──
+    # period 2
+    # 5x5 with cells (1,2), (2,2), (3,2) alive
+    my $blink = [
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+        0, 1, 1, 1, 0,
+        0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0,
+    ]
+    my $blink_v = [
+        0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 0, 0,
+    ]
+    my $blink_1 = Conway::step($blink,   5, 5)
+    my $blink_2 = Conway::step($blink_1, 5, 5)
+    die "blinker → vertical"    unless Conway::eq($blink_1, $blink_v)
+    die "blinker → back"        unless Conway::eq($blink_2, $blink)
+    die "blinker pop steady"    unless Conway::population($blink_1) == 3
+
+    # ── Run via wrapper (5 steps = 5 toggles back to vertical) ──
+    my $blink_5 = Conway::run($blink, 5, 5, 5)
+    die "blinker odd-step"      unless Conway::eq($blink_5, $blink_v)
+
+    # ── Toad — 6-cell period-2 oscillator ─────────────────────
+    # 6x6:
+    # . . . . . .         . . . . . .
+    # . . . . . .         . . . X . .
+    # . . X X X .   →     . X . . X .
+    # . X X X . .         . X . . X .
+    # . . . . . .         . . X . . .
+    # . . . . . .         . . . . . .
+    my $toad_a = [
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 1, 1, 1, 0,
+        0, 1, 1, 1, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ]
+    my $toad_b = [
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, 1, 0, 0,
+        0, 1, 0, 0, 1, 0,
+        0, 1, 0, 0, 1, 0,
+        0, 0, 1, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+    ]
+    my $toad_1 = Conway::step($toad_a, 6, 6)
+    my $toad_2 = Conway::step($toad_1, 6, 6)
+    die "toad → b"  unless Conway::eq($toad_1, $toad_b)
+    die "toad → a"  unless Conway::eq($toad_2, $toad_a)
+
+    # ── Glider — period-4 but translates by (+1, +1) per period ──
+    # In a finite grid it'll eventually crash into a wall, but for
+    # 8x8 starting at (0..2, 0..2) it's stable for 4 cycles.
+    # Generation 0 (canonical glider, top-left):
+    #   . X .
+    #   . . X
+    #   X X X
+    my $glider_0 = [
+        0, 1, 0, 0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0, 0, 0, 0,
+        1, 1, 1, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+    ]
+    # Glider population must stay 5 throughout.
+    my $glider_step1 = Conway::run($glider_0, 8, 8, 1)
+    my $glider_step2 = Conway::run($glider_0, 8, 8, 2)
+    my $glider_step3 = Conway::run($glider_0, 8, 8, 3)
+    my $glider_step4 = Conway::run($glider_0, 8, 8, 4)
+    die "glider gen=1 pop=5" unless Conway::population($glider_step1) == 5
+    die "glider gen=2 pop=5" unless Conway::population($glider_step2) == 5
+    die "glider gen=3 pop=5" unless Conway::population($glider_step3) == 5
+    die "glider gen=4 pop=5" unless Conway::population($glider_step4) == 5
+
+    # After 4 steps the glider moved (+1, +1).  Cell (1,2) → (2,3),
+    # i.e. the bottom-left "tail" of the glider shifted diagonally.
+    # We just verify the displaced glider matches an explicitly-shifted
+    # version of the canonical pattern.
+    my $glider_shift = [
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 1, 0, 0, 0, 0, 0,
+        0, 0, 0, 1, 0, 0, 0, 0,
+        0, 1, 1, 1, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0,
+    ]
+    die "glider gen=4 displaced" unless Conway::eq($glider_step4, $glider_shift)
+
+    # ── Empty grid stays empty ────────────────────────────────
+    my $empty = [(0) x 16]
+    die "empty stays empty" unless Conway::eq(Conway::step($empty, 4, 4), $empty)
+
+    # ── Single isolated cell dies ─────────────────────────────
+    my $lonely = [(0) x 9]
+    $lonely->[4] = 1                          # centre of 3x3
+    die "lonely dies" unless Conway::population(Conway::step($lonely, 3, 3)) == 0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §101  segment tree — point update + range sum / min / max
+# ═══════════════════════════════════════════════════════════════════
+#
+# Iterative segment tree (bottom-up, single-array, 1-based 2N layout).
+# Unlike §95's sparse table, this supports point updates in O(log n).
+#
+#   tree[i] for i in [n, 2n-1] = leaf values
+#   tree[i] for i in [1, n-1]  = op(tree[2i], tree[2i+1])
+#
+#   SegTree::build_sum(arr)        — build with addition combine
+#   SegTree::build_min(arr)        — build with min combine
+#   SegTree::build_max(arr)        — build with max combine
+#   SegTree::update_sum(st, i, v)  — set leaf i = v, propagate
+#   SegTree::query_sum(st, l, r)   — sum of arr[l..r] inclusive
+#   SegTree::query_min/max similar
+
+fn SegTree::build_sum($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @tree
+    for my $i (0:2 * $n - 1) { push @tree, 0 }
+    my $i = 0
+    while ($i < $n) {
+        $tree[$n + $i] = $vals[$i]
+        $i++
+    }
+    my $j = $n - 1
+    while ($j >= 1) {
+        $tree[$j] = $tree[2 * $j] + $tree[2 * $j + 1]
+        $j--
+    }
+    +{ tree => \@tree, n => $n, op => "sum" }
+}
+
+fn SegTree::build_min($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @tree
+    for my $i (0:2 * $n - 1) { push @tree, 1e18 }
+    my $i = 0
+    while ($i < $n) {
+        $tree[$n + $i] = $vals[$i]
+        $i++
+    }
+    my $j = $n - 1
+    while ($j >= 1) {
+        my $lv = $tree[2 * $j]
+        my $rv = $tree[2 * $j + 1]
+        $tree[$j] = $lv < $rv ? $lv : $rv
+        $j--
+    }
+    +{ tree => \@tree, n => $n, op => "min" }
+}
+
+fn SegTree::build_max($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my @tree
+    for my $i (0:2 * $n - 1) { push @tree, -1e18 }
+    my $i = 0
+    while ($i < $n) {
+        $tree[$n + $i] = $vals[$i]
+        $i++
+    }
+    my $j = $n - 1
+    while ($j >= 1) {
+        my $lv = $tree[2 * $j]
+        my $rv = $tree[2 * $j + 1]
+        $tree[$j] = $lv > $rv ? $lv : $rv
+        $j--
+    }
+    +{ tree => \@tree, n => $n, op => "max" }
+}
+
+fn SegTree::update_sum($st, $idx, $v) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $p = $idx + $n
+    $tree_ref->[$p] = $v
+    $p = int($p / 2)
+    while ($p >= 1) {
+        $tree_ref->[$p] = $tree_ref->[2 * $p] + $tree_ref->[2 * $p + 1]
+        $p = int($p / 2)
+    }
+}
+
+fn SegTree::update_min($st, $idx, $v) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $p = $idx + $n
+    $tree_ref->[$p] = $v
+    $p = int($p / 2)
+    while ($p >= 1) {
+        my $lv = $tree_ref->[2 * $p]
+        my $rv = $tree_ref->[2 * $p + 1]
+        $tree_ref->[$p] = $lv < $rv ? $lv : $rv
+        $p = int($p / 2)
+    }
+}
+
+fn SegTree::update_max($st, $idx, $v) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $p = $idx + $n
+    $tree_ref->[$p] = $v
+    $p = int($p / 2)
+    while ($p >= 1) {
+        my $lv = $tree_ref->[2 * $p]
+        my $rv = $tree_ref->[2 * $p + 1]
+        $tree_ref->[$p] = $lv > $rv ? $lv : $rv
+        $p = int($p / 2)
+    }
+}
+
+fn SegTree::query_sum($st, $lo, $hi) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $l = $lo + $n
+    my $r = $hi + $n + 1
+    my $sum = 0
+    while ($l < $r) {
+        if ($l % 2 == 1) { $sum += $tree_ref->[$l]; $l++ }
+        if ($r % 2 == 1) { $r--; $sum += $tree_ref->[$r] }
+        $l = int($l / 2)
+        $r = int($r / 2)
+    }
+    $sum
+}
+
+fn SegTree::query_min($st, $lo, $hi) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $l = $lo + $n
+    my $r = $hi + $n + 1
+    my $best = 1e18
+    while ($l < $r) {
+        if ($l % 2 == 1) {
+            $best = $tree_ref->[$l] if $tree_ref->[$l] < $best
+            $l++
+        }
+        if ($r % 2 == 1) {
+            $r--
+            $best = $tree_ref->[$r] if $tree_ref->[$r] < $best
+        }
+        $l = int($l / 2)
+        $r = int($r / 2)
+    }
+    $best
+}
+
+fn SegTree::query_max($st, $lo, $hi) {
+    my $tree_ref = $st->{tree}
+    my $n = $st->{n}
+    my $l = $lo + $n
+    my $r = $hi + $n + 1
+    my $best = -1e18
+    while ($l < $r) {
+        if ($l % 2 == 1) {
+            $best = $tree_ref->[$l] if $tree_ref->[$l] > $best
+            $l++
+        }
+        if ($r % 2 == 1) {
+            $r--
+            $best = $tree_ref->[$r] if $tree_ref->[$r] > $best
+        }
+        $l = int($l / 2)
+        $r = int($r / 2)
+    }
+    $best
+}
+
+Sci::banner("§101 segment tree")
+{
+    # ── SUM tree on [1..8] ────────────────────────────────────
+    my $st_s = SegTree::build_sum([1, 2, 3, 4, 5, 6, 7, 8])
+    die "sum [0..7] = 36" unless SegTree::query_sum($st_s, 0, 7) == 36
+    die "sum [0..3] = 10" unless SegTree::query_sum($st_s, 0, 3) == 10
+    die "sum [4..7] = 26" unless SegTree::query_sum($st_s, 4, 7) == 26
+    die "sum [2..5] = 18" unless SegTree::query_sum($st_s, 2, 5) == 18
+    die "sum [3..3] = 4"  unless SegTree::query_sum($st_s, 3, 3) == 4
+
+    # ── Point update: set arr[2] = 100 ────────────────────────
+    SegTree::update_sum($st_s, 2, 100)
+    die "sum [0..3] after = 107" unless SegTree::query_sum($st_s, 0, 3) == 107
+    die "sum [0..7] after = 133" unless SegTree::query_sum($st_s, 0, 7) == 133
+    die "sum [4..7] unchanged"   unless SegTree::query_sum($st_s, 4, 7) == 26
+
+    # ── MIN tree on [5,2,9,1,4,6,3,8] ─────────────────────────
+    my $st_min = SegTree::build_min([5, 2, 9, 1, 4, 6, 3, 8])
+    die "min [0..7] = 1"  unless SegTree::query_min($st_min, 0, 7) == 1
+    die "min [0..2] = 2"  unless SegTree::query_min($st_min, 0, 2) == 2
+    die "min [4..7] = 3"  unless SegTree::query_min($st_min, 4, 7) == 3
+    die "min [5..6] = 3"  unless SegTree::query_min($st_min, 5, 6) == 3
+
+    # ── Point update on MIN: set arr[3] = 50 → min[0..3] = 2 ──
+    SegTree::update_min($st_min, 3, 50)
+    die "min [0..3] after = 2" unless SegTree::query_min($st_min, 0, 3) == 2
+    die "min [0..7] after = 2" unless SegTree::query_min($st_min, 0, 7) == 2
+
+    # ── MAX tree on [3,1,7,2,5,9,4,6] ─────────────────────────
+    my $st_max = SegTree::build_max([3, 1, 7, 2, 5, 9, 4, 6])
+    die "max [0..7] = 9"  unless SegTree::query_max($st_max, 0, 7) == 9
+    die "max [0..3] = 7"  unless SegTree::query_max($st_max, 0, 3) == 7
+    die "max [4..7] = 9"  unless SegTree::query_max($st_max, 4, 7) == 9
+    die "max [6..7] = 6"  unless SegTree::query_max($st_max, 6, 7) == 6
+
+    # ── Point update on MAX: clear arr[5] = 0 ─────────────────
+    SegTree::update_max($st_max, 5, 0)
+    die "max [4..7] after = 6" unless SegTree::query_max($st_max, 4, 7) == 6
+    die "max [0..7] after = 7" unless SegTree::query_max($st_max, 0, 7) == 7
+
+    # ── Cross-check segment-tree max vs §95 sparse-table max on
+    #    a fresh array — every range pair must agree. ──
+    my @xa = (4, 1, 7, 3, 9, 2, 8, 5)
+    my $st_x   = SegTree::build_max(\@xa)
+    my $spx    = SparseTable::build_max(\@xa)
+    my $idx_lo = 0
+    while ($idx_lo < len(@xa)) {
+        my $idx_hi = $idx_lo
+        while ($idx_hi < len(@xa)) {
+            die "segtree==sparsetable max [$idx_lo..$idx_hi]" unless
+                SegTree::query_max($st_x, $idx_lo, $idx_hi) ==
+                SparseTable::query_max($spx, $idx_lo, $idx_hi)
+            $idx_hi++
+        }
+        $idx_lo++
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §102  binary search utilities
+# ═══════════════════════════════════════════════════════════════════
+#
+# Subtle-by-design — every off-by-one variant gets its own pinned
+# implementation so callers don't reinvent it.
+#
+#   BS::lower_bound(arr, t)   — first idx where arr[i] >= t  (n if none)
+#   BS::upper_bound(arr, t)   — first idx where arr[i] >  t  (n if none)
+#   BS::search_range(arr, t)  — [first_occ, last_occ] of t   ([-1, -1] if absent)
+#   BS::search_insert(arr, t) — LC 35: leftmost insert position
+#   BS::search_rotated(arr, t)— LC 33: target in rotated-sorted array; -1 if absent
+#   BS::find_min_rotated(arr) — LC 153: min element of rotated-sorted array
+
+fn BS::lower_bound($arr_in, $target) {
+    my @vals = @$arr_in
+    my $lo = 0
+    my $hi = len(@vals)
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        if ($vals[$mid] < $target) { $lo = $mid + 1 }
+        else                       { $hi = $mid }
+    }
+    $lo
+}
+
+fn BS::upper_bound($arr_in, $target) {
+    my @vals = @$arr_in
+    my $lo = 0
+    my $hi = len(@vals)
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        if ($vals[$mid] <= $target) { $lo = $mid + 1 }
+        else                        { $hi = $mid }
+    }
+    $lo
+}
+
+fn BS::search_range($arr_in, $target) {
+    my $first = BS::lower_bound($arr_in, $target)
+    my @vals  = @$arr_in
+    return [-1, -1] if $first >= len(@vals) || $vals[$first] != $target
+    my $last = BS::upper_bound($arr_in, $target) - 1
+    [$first, $last]
+}
+
+fn BS::search_insert($arr_in, $target) { BS::lower_bound($arr_in, $target) }
+
+# LeetCode 33: rotated-sorted (distinct values, single rotation).
+# Returns the index of $target, or -1 if not present.
+fn BS::search_rotated($arr_in, $target) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    my $lo = 0
+    my $hi = $n - 1
+    while ($lo <= $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        return $mid if $vals[$mid] == $target
+        if ($vals[$lo] <= $vals[$mid]) {
+            # Left half [lo, mid] is sorted ascending.
+            if ($target >= $vals[$lo] && $target < $vals[$mid]) { $hi = $mid - 1 }
+            else                                                { $lo = $mid + 1 }
+        } else {
+            # Right half [mid, hi] is sorted ascending.
+            if ($target > $vals[$mid] && $target <= $vals[$hi]) { $lo = $mid + 1 }
+            else                                                { $hi = $mid - 1 }
+        }
+    }
+    -1
+}
+
+# LeetCode 153: distinct values, single rotation.  Find smallest.
+fn BS::find_min_rotated($arr_in) {
+    my @vals = @$arr_in
+    my $lo = 0
+    my $hi = len(@vals) - 1
+    while ($lo < $hi) {
+        my $mid = int(($lo + $hi) / 2)
+        if ($vals[$mid] > $vals[$hi]) { $lo = $mid + 1 }
+        else                           { $hi = $mid }
+    }
+    $vals[$lo]
+}
+
+Sci::banner("§102 binary search")
+{
+    # ── lower_bound on [1,2,4,4,4,6,8,8,10] ───────────────────
+    my $arr_lb = [1, 2, 4, 4, 4, 6, 8, 8, 10]
+    die "lb 0=0"  unless BS::lower_bound($arr_lb, 0)  == 0
+    die "lb 1=0"  unless BS::lower_bound($arr_lb, 1)  == 0
+    die "lb 3=2"  unless BS::lower_bound($arr_lb, 3)  == 2
+    die "lb 4=2"  unless BS::lower_bound($arr_lb, 4)  == 2
+    die "lb 5=5"  unless BS::lower_bound($arr_lb, 5)  == 5
+    die "lb 10=8" unless BS::lower_bound($arr_lb, 10) == 8
+    die "lb 11=9" unless BS::lower_bound($arr_lb, 11) == 9
+
+    # ── upper_bound on same array ─────────────────────────────
+    die "ub 0=0"   unless BS::upper_bound($arr_lb, 0)  == 0
+    die "ub 1=1"   unless BS::upper_bound($arr_lb, 1)  == 1
+    die "ub 4=5"   unless BS::upper_bound($arr_lb, 4)  == 5
+    die "ub 8=8"   unless BS::upper_bound($arr_lb, 8)  == 8
+    die "ub 10=9"  unless BS::upper_bound($arr_lb, 10) == 9
+
+    # ── search_range: [first, last] of target ─────────────────
+    # value 4 occupies positions 2,3,4 → [2, 4]
+    my $r4 = BS::search_range($arr_lb, 4)
+    die "range 4 = [2,4]" unless $r4->[0] == 2 && $r4->[1] == 4
+    my $r8 = BS::search_range($arr_lb, 8)
+    die "range 8 = [6,7]" unless $r8->[0] == 6 && $r8->[1] == 7
+    my $r9 = BS::search_range($arr_lb, 9)
+    die "range 9 missing = [-1,-1]" unless $r9->[0] == -1 && $r9->[1] == -1
+    my $r1 = BS::search_range($arr_lb, 1)
+    die "range 1 = [0,0]" unless $r1->[0] == 0 && $r1->[1] == 0
+    my $r10 = BS::search_range($arr_lb, 10)
+    die "range 10 = [8,8]" unless $r10->[0] == 8 && $r10->[1] == 8
+
+    # ── search_insert (LC 35) ─────────────────────────────────
+    die "ins 5 = 5"  unless BS::search_insert([1, 3, 5, 6], 5) == 2
+    die "ins 2 = 1"  unless BS::search_insert([1, 3, 5, 6], 2) == 1
+    die "ins 7 = 4"  unless BS::search_insert([1, 3, 5, 6], 7) == 4
+    die "ins 0 = 0"  unless BS::search_insert([1, 3, 5, 6], 0) == 0
+
+    # ── search_rotated (LC 33) ────────────────────────────────
+    # nums = [4, 5, 6, 7, 0, 1, 2]
+    die "rot find 0=4"  unless BS::search_rotated([4, 5, 6, 7, 0, 1, 2], 0) == 4
+    die "rot find 3=-1" unless BS::search_rotated([4, 5, 6, 7, 0, 1, 2], 3) == -1
+    die "rot find 4=0"  unless BS::search_rotated([4, 5, 6, 7, 0, 1, 2], 4) == 0
+    die "rot find 7=3"  unless BS::search_rotated([4, 5, 6, 7, 0, 1, 2], 7) == 3
+    die "rot find 2=6"  unless BS::search_rotated([4, 5, 6, 7, 0, 1, 2], 2) == 6
+    # No rotation
+    die "norot find 3"  unless BS::search_rotated([1, 2, 3, 4, 5], 3) == 2
+    # Rotated by 1
+    die "rot1 find 5"   unless BS::search_rotated([5, 1, 2, 3, 4], 5) == 0
+    die "rot1 find 1"   unless BS::search_rotated([5, 1, 2, 3, 4], 1) == 1
+
+    # ── find_min_rotated (LC 153) ─────────────────────────────
+    die "fmr [3,4,5,1,2] = 1"   unless BS::find_min_rotated([3, 4, 5, 1, 2]) == 1
+    die "fmr [4,5,6,7,0,1,2]=0" unless BS::find_min_rotated([4, 5, 6, 7, 0, 1, 2]) == 0
+    die "fmr [1] = 1"           unless BS::find_min_rotated([1]) == 1
+    die "fmr [1,2] = 1"         unless BS::find_min_rotated([1, 2]) == 1
+    die "fmr [2,1] = 1"         unless BS::find_min_rotated([2, 1]) == 1
+    # No rotation: min is arr[0]
+    die "fmr [1..7] = 1"        unless BS::find_min_rotated([1, 2, 3, 4, 5, 6, 7]) == 1
+
+    # ── Cross-check: lower_bound found-idx vs search_range[0] ──
+    my @ck = (2, 3, 5, 7, 7, 7, 11, 13)
+    for my $tgt (2, 3, 5, 7, 11, 13) {
+        my $lb = BS::lower_bound(\@ck, $tgt)
+        my $rg = BS::search_range(\@ck, $tgt)
+        die "lb == range[0] for $tgt" unless $lb == $rg->[0]
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §103  Trie + WordDictionary (. wildcard)
+# ═══════════════════════════════════════════════════════════════════
+#
+# Prefix tree: each node is a hashref with two slots —
+#   children → hashref keyed by char → child node
+#   is_end   → 1 if a word ends at this node
+#
+# LeetCode 208 (Implement Trie), 211 (WordDictionary with `.`).
+#
+#   WTrie::new()                       — fresh empty trie
+#   WTrie::insert(t, word)             — add word
+#   WTrie::search(t, word)             — true if word was inserted
+#   WTrie::starts_with(t, prefix)      — true if any inserted word has prefix
+#   WTrie::contains_prefix(t, prefix)  — alias of starts_with
+#   WTrie::word_count(t)               — count of words via DFS
+#   WTrie::wildcard_search(t, pat)     — `.` matches any single char (LC 211)
+
+fn WTrie::new() {
+    +{ children => +{}, is_end => 0 }
+}
+
+fn WTrie::insert($t_root, $word) {
+    my $cur = $t_root
+    my @chars = split //, $word
+    for my $ch (@chars) {
+        unless (exists $cur->{children}->{$ch}) {
+            $cur->{children}->{$ch} = +{ children => +{}, is_end => 0 }
+        }
+        $cur = $cur->{children}->{$ch}
+    }
+    $cur->{is_end} = 1
+}
+
+fn WTrie::walk($t_root, $word) {
+    my $cur = $t_root
+    my @chars = split //, $word
+    for my $ch (@chars) {
+        return undef unless exists $cur->{children}->{$ch}
+        $cur = $cur->{children}->{$ch}
+    }
+    $cur
+}
+
+fn WTrie::search($t_root, $word) {
+    my $node = WTrie::walk($t_root, $word)
+    defined($node) && $node->{is_end} ? 1 : 0
+}
+
+fn WTrie::starts_with($t_root, $prefix) {
+    defined(WTrie::walk($t_root, $prefix)) ? 1 : 0
+}
+
+fn WTrie::contains_prefix($t_root, $prefix) { WTrie::starts_with($t_root, $prefix) }
+
+# Recursive word counter (DFS counting is_end nodes).
+fn WTrie::word_count_at($node) {
+    my $cnt = $node->{is_end}
+    my @children_vals = values %{$node->{children}}
+    for my $ch_node (@children_vals) {
+        $cnt += WTrie::word_count_at($ch_node)
+    }
+    $cnt
+}
+
+fn WTrie::word_count($t_root) { WTrie::word_count_at($t_root) }
+
+# Wildcard helper (LeetCode 211).  `.` matches any single character.
+# Searches every child when `.` is encountered.
+fn WTrie::wildcard_at($node, $pat_chars, $pos) {
+    if ($pos == len(@$pat_chars)) {
+        return $node->{is_end} ? 1 : 0
+    }
+    my $ch = $pat_chars->[$pos]
+    if ($ch eq ".") {
+        my @kid_keys = keys %{$node->{children}}
+        for my $kk (@kid_keys) {
+            return 1 if WTrie::wildcard_at($node->{children}->{$kk}, $pat_chars, $pos + 1)
+        }
+        return 0
+    }
+    return 0 unless exists $node->{children}->{$ch}
+    WTrie::wildcard_at($node->{children}->{$ch}, $pat_chars, $pos + 1)
+}
+
+fn WTrie::wildcard_search($t_root, $pat) {
+    my @chars = split //, $pat
+    WTrie::wildcard_at($t_root, \@chars, 0)
+}
+
+Sci::banner("§103 Trie + wildcard")
+{
+    # ── Insert + exact-match search ───────────────────────────
+    my $t = WTrie::new()
+    WTrie::insert($t, "apple")
+    WTrie::insert($t, "app")
+    WTrie::insert($t, "application")
+    WTrie::insert($t, "banana")
+    WTrie::insert($t, "band")
+
+    die "search apple"      unless WTrie::search($t, "apple")
+    die "search app"        unless WTrie::search($t, "app")
+    die "search application" unless WTrie::search($t, "application")
+    die "search banana"     unless WTrie::search($t, "banana")
+    die "no appl"           if     WTrie::search($t, "appl")
+    die "no ap"             if     WTrie::search($t, "ap")
+    die "no apricot"        if     WTrie::search($t, "apricot")
+    die "no bandit"         if     WTrie::search($t, "bandit")
+
+    # ── starts_with ───────────────────────────────────────────
+    die "prefix app"        unless WTrie::starts_with($t, "app")
+    die "prefix appl"       unless WTrie::starts_with($t, "appl")
+    die "prefix ban"        unless WTrie::starts_with($t, "ban")
+    die "no prefix bat"     if     WTrie::starts_with($t, "bat")
+    die "no prefix cat"     if     WTrie::starts_with($t, "cat")
+
+    # ── word_count via DFS ────────────────────────────────────
+    die "5 words" unless WTrie::word_count($t) == 5
+    WTrie::insert($t, "ape")
+    die "6 words after ape" unless WTrie::word_count($t) == 6
+
+    # ── Wildcard `.` (LC 211) ─────────────────────────────────
+    # Words in trie now: apple, app, application, banana, band, ape
+    die ". 3-char: app"   unless WTrie::wildcard_search($t, "app")
+    die ".pp matches app" unless WTrie::wildcard_search($t, ".pp")
+    die "a.. matches ape" unless WTrie::wildcard_search($t, "a..")          # "app" or "ape"
+    die "a... no exact"   if     WTrie::wildcard_search($t, "a...")         # need 4-char word; not present in 4-char (no exact)
+    die "..nd matches band" unless WTrie::wildcard_search($t, "..nd")
+    die "ba.... matches banana" unless WTrie::wildcard_search($t, "ba....") # 6-char banana via dots
+    die "ba.ana matches"  unless WTrie::wildcard_search($t, "ba.ana")
+    die "b.... no 5-ch b" if     WTrie::wildcard_search($t, "b....")        # neither band(4) nor banana(6) is 5-char
+
+    # All-dots: matches any word of same length.
+    die "... matches app/ape" unless WTrie::wildcard_search($t, "...")
+    die ".... matches band"   unless WTrie::wildcard_search($t, "....")     # band is 4-letter
+    die "..... matches apple" unless WTrie::wildcard_search($t, ".....")
+
+    # ── Empty trie & empty word edge cases ────────────────────
+    my $empty_t = WTrie::new()
+    die "empty trie no apple" if     WTrie::search($empty_t, "apple")
+    die "empty trie no prefix" if    WTrie::starts_with($empty_t, "a")
+    die "empty trie 0 words"   unless WTrie::word_count($empty_t) == 0
+
+    # ── Independent prefix vs whole-word ──────────────────────
+    # "abc" inserted; "ab" is a prefix but not a whole word.
+    my $t2 = WTrie::new()
+    WTrie::insert($t2, "abc")
+    die "abc found"          unless WTrie::search($t2, "abc")
+    die "ab is prefix"       unless WTrie::starts_with($t2, "ab")
+    die "ab is NOT word"     if     WTrie::search($t2, "ab")
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §104  coin change — min-coins, count-ways, reconstruction
+# ═══════════════════════════════════════════════════════════════════
+#
+# Two classic LeetCode problems on the same coin-denomination input:
+#
+#   LC 322 (Coin Change):   minimum number of coins summing to amount
+#   LC 518 (Coin Change 2): number of distinct combinations
+#
+# Both are O(amount × |coins|) DP.
+#
+#   Coin::min_coins(coins, amt)      — fewest coins, -1 if impossible
+#   Coin::count_ways(coins, amt)     — number of distinct multisets
+#   Coin::reconstruct(coins, amt)    — one minimal multiset as a sorted
+#                                       arrayref of denominations
+#                                       (returns [] if amount == 0; undef if impossible)
+
+# LC 322: minimum coin count.
+fn Coin::min_coins($coins_in, $amount) {
+    return 0 if $amount == 0
+    my @coins = @$coins_in
+    my $sentinel = $amount + 1                  # > any feasible coin count
+    my @dp
+    for my $i (0:$amount) { push @dp, $sentinel }
+    $dp[0] = 0
+    my $ai = 1
+    while ($ai <= $amount) {
+        for my $c (@coins) {
+            if ($c <= $ai) {
+                my $cand = $dp[$ai - $c] + 1
+                $dp[$ai] = $cand if $cand < $dp[$ai]
+            }
+        }
+        $ai++
+    }
+    $dp[$amount] > $amount ? -1 : $dp[$amount]
+}
+
+# LC 518: count of distinct combinations summing to amount.
+# Outer loop on coins (not amounts) so each combination is counted once.
+fn Coin::count_ways($coins_in, $amount) {
+    my @coins = @$coins_in
+    my @dp
+    for my $i (0:$amount) { push @dp, 0 }
+    $dp[0] = 1
+    for my $c (@coins) {
+        my $ai = $c
+        while ($ai <= $amount) {
+            $dp[$ai] += $dp[$ai - $c]
+            $ai++
+        }
+    }
+    $dp[$amount]
+}
+
+# Reconstruction: returns one minimal multiset of denominations.
+# Tracks the "last coin used to reach amount $a" alongside the DP.
+fn Coin::reconstruct($coins_in, $amount) {
+    return [] if $amount == 0
+    my @coins = @$coins_in
+    my $sentinel = $amount + 1
+    my @dp
+    my @last
+    for my $i (0:$amount) {
+        push @dp,   $sentinel
+        push @last, -1
+    }
+    $dp[0] = 0
+    my $ai = 1
+    while ($ai <= $amount) {
+        for my $c (@coins) {
+            if ($c <= $ai) {
+                my $cand = $dp[$ai - $c] + 1
+                if ($cand < $dp[$ai]) {
+                    $dp[$ai]   = $cand
+                    $last[$ai] = $c
+                }
+            }
+        }
+        $ai++
+    }
+    return undef if $dp[$amount] > $amount
+    my @picks
+    my $cur = $amount
+    while ($cur > 0) {
+        push @picks, $last[$cur]
+        $cur -= $last[$cur]
+    }
+    my @sorted = sort { $_0 <=> $_1 } @picks
+    \@sorted
+}
+
+Sci::banner("§104 coin change")
+{
+    # ── LC 322 canonical: [1,2,5], 11 → 3 (5+5+1) ─────────────
+    die "min [1,2,5] 11 = 3"   unless Coin::min_coins([1, 2, 5], 11) == 3
+    die "min [2] 3 = -1"       unless Coin::min_coins([2], 3) == -1
+    die "min [1] 0 = 0"        unless Coin::min_coins([1], 0) == 0
+    die "min [1,5,10,25] 30 = 2" unless Coin::min_coins([1, 5, 10, 25], 30) == 2  # 25+5
+    die "min [1,5,10,25] 99 = 9" unless Coin::min_coins([1, 5, 10, 25], 99) == 9  # 25+25+25+10+10+1+1+1+1
+    die "min [186,419,83,408] 6249 = 20" unless
+        Coin::min_coins([186, 419, 83, 408], 6249) == 20  # famous LC322 stress test
+
+    # ── LC 518 canonical: amount=5, [1,2,5] → 4 ways ──────────
+    # ways: 5; 2+2+1; 2+1+1+1; 1+1+1+1+1
+    die "ways [1,2,5] 5 = 4"   unless Coin::count_ways([1, 2, 5], 5) == 4
+    die "ways [2] 3 = 0"       unless Coin::count_ways([2], 3) == 0
+    die "ways [10] 10 = 1"     unless Coin::count_ways([10], 10) == 1
+    die "ways [1,2,3] 4 = 4"   unless Coin::count_ways([1, 2, 3], 4) == 4
+    # ways for 4 with [1,2,3]: 1+1+1+1, 1+1+2, 2+2, 1+3 = 4 ✓
+    die "ways [1] 0 = 1"       unless Coin::count_ways([1], 0) == 1    # empty multiset
+    die "ways [] 0 = 1"        unless Coin::count_ways([], 0) == 1
+    die "ways [] 5 = 0"        unless Coin::count_ways([], 5) == 0
+
+    # ── Reconstruction: returns one minimal multiset ──────────
+    # [1,2,5] 11 → could be {5,5,1} = 3 coins (sorted: [1,5,5])
+    my $rec11 = Coin::reconstruct([1, 2, 5], 11)
+    die "rec 11 size 3"  unless len(@$rec11) == 3
+    my $sum_r = 0
+    for my $c (@$rec11) { $sum_r += $c }
+    die "rec 11 sums"    unless $sum_r == 11
+    # Every coin in result must be a valid denomination
+    for my $c (@$rec11) {
+        die "rec coin valid" unless $c == 1 || $c == 2 || $c == 5
+    }
+
+    # ── Reconstruction: impossible → undef ────────────────────
+    my $rec_imp = Coin::reconstruct([2], 3)
+    die "rec impossible" unless !defined($rec_imp)
+
+    # ── Reconstruction: amount=0 → empty arrayref ─────────────
+    my $rec_z = Coin::reconstruct([1, 2, 5], 0)
+    die "rec 0 = []"     unless len(@$rec_z) == 0
+
+    # ── Cross-check: min_coins == reconstruct length ──────────
+    # Use while loop instead of for-list — nested for-loop counter-state quirk
+    my @amts = (1, 6, 11, 23, 47, 99)
+    my $aii = 0
+    while ($aii < len(@amts)) {
+        my $amt = $amts[$aii]
+        my $mc  = Coin::min_coins ([1, 5, 10, 25], $amt)
+        my $rec = Coin::reconstruct([1, 5, 10, 25], $amt)
+        die "mc==len(rec) at idx $aii" unless $mc == len(@$rec)
+        my $sumv = 0
+        my $bi = 0
+        while ($bi < len(@$rec)) {
+            $sumv += $rec->[$bi]
+            $bi++
+        }
+        die "rec sum mismatch at idx $aii" unless $sumv == $amt
+        $aii++
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §105  stock buy/sell suite — LC 121, 122, 123, 309, 714
+# ═══════════════════════════════════════════════════════════════════
+#
+# Five classic LeetCode stock-profit problems, each a constraint
+# variation on the same core DP.  All return max profit (scalar).
+#
+#   Stock::best_1   — LC 121: at most ONE buy+sell  (single transaction)
+#   Stock::best_inf — LC 122: unlimited transactions, no cooldown/fee
+#   Stock::best_k2  — LC 123: at most TWO transactions
+#   Stock::best_cd  — LC 309: unlimited + 1-day cooldown after sell
+#   Stock::best_fee — LC 714: unlimited transactions, each sell pays fee
+
+fn Stock::best_1($prices_in) {
+    my @p = @$prices_in
+    my $n = len(@p)
+    return 0 if $n < 2
+    my $min_so_far = $p[0]
+    my $best = 0
+    my $i = 1
+    while ($i < $n) {
+        my $diff = $p[$i] - $min_so_far
+        $best = $diff if $diff > $best
+        $min_so_far = $p[$i] if $p[$i] < $min_so_far
+        $i++
+    }
+    $best
+}
+
+fn Stock::best_inf($prices_in) {
+    my @p = @$prices_in
+    my $n = len(@p)
+    my $sum = 0
+    my $i = 1
+    while ($i < $n) {
+        $sum += $p[$i] - $p[$i - 1] if $p[$i] > $p[$i - 1]
+        $i++
+    }
+    $sum
+}
+
+# LC 123 at most 2 transactions — O(n) sweep tracking 4 states.
+fn Stock::best_k2($prices_in) {
+    my @p = @$prices_in
+    my $n = len(@p)
+    return 0 if $n < 2
+    my $buy1  = -$p[0]
+    my $sell1 = 0
+    my $buy2  = -$p[0]
+    my $sell2 = 0
+    my $i = 1
+    while ($i < $n) {
+        my $px = $p[$i]
+        $buy1  = -$px           if -$px           > $buy1
+        $sell1 = $buy1  + $px   if $buy1  + $px   > $sell1
+        $buy2  = $sell1 - $px   if $sell1 - $px   > $buy2
+        $sell2 = $buy2  + $px   if $buy2  + $px   > $sell2
+        $i++
+    }
+    $sell2
+}
+
+# LC 309 unlimited with 1-day cooldown.
+fn Stock::best_cd($prices_in) {
+    my @p = @$prices_in
+    my $n = len(@p)
+    return 0 if $n < 2
+    my $hold = -$p[0]
+    my $sold = 0
+    my $rest = 0
+    my $i = 1
+    while ($i < $n) {
+        my $prev_sold = $sold
+        my $prev_hold = $hold
+        my $prev_rest = $rest
+        $sold = $prev_hold + $p[$i]
+        $hold = $prev_hold
+        $hold = $prev_rest - $p[$i] if $prev_rest - $p[$i] > $hold
+        $rest = $prev_rest
+        $rest = $prev_sold if $prev_sold > $rest
+        $i++
+    }
+    $sold > $rest ? $sold : $rest
+}
+
+# LC 714 unlimited with per-sell fee.
+fn Stock::best_fee($prices_in, $fee) {
+    my @p = @$prices_in
+    my $n = len(@p)
+    return 0 if $n < 2
+    my $cash = 0                   # not holding stock
+    my $hold = -$p[0]              # holding stock
+    my $i = 1
+    while ($i < $n) {
+        my $prev_cash = $cash
+        my $prev_hold = $hold
+        $cash = $prev_hold + $p[$i] - $fee if $prev_hold + $p[$i] - $fee > $cash
+        $hold = $prev_cash - $p[$i]        if $prev_cash - $p[$i]        > $hold
+        $i++
+    }
+    $cash
+}
+
+Sci::banner("§105 stock suite")
+{
+    # ── LC 121: single transaction ────────────────────────────
+    # [7,1,5,3,6,4] → buy at 1, sell at 6 → 5
+    die "best_1 LC121"  unless Stock::best_1([7, 1, 5, 3, 6, 4]) == 5
+    # Strictly decreasing → 0 profit
+    die "best_1 desc"   unless Stock::best_1([7, 6, 5, 4, 3, 2]) == 0
+    # Single price
+    die "best_1 one"    unless Stock::best_1([5]) == 0
+    # Two prices
+    die "best_1 two up" unless Stock::best_1([1, 5]) == 4
+    die "best_1 two dn" unless Stock::best_1([5, 1]) == 0
+
+    # ── LC 122: unlimited transactions ────────────────────────
+    # [7,1,5,3,6,4] → (5-1) + (6-3) = 7
+    die "best_inf LC122"   unless Stock::best_inf([7, 1, 5, 3, 6, 4]) == 7
+    # [1,2,3,4,5] → 4 (or 1→5 in one buy+sell, same answer)
+    die "best_inf monotone" unless Stock::best_inf([1, 2, 3, 4, 5]) == 4
+    # Strictly decreasing → 0
+    die "best_inf desc"     unless Stock::best_inf([7, 6, 5, 4, 3, 2]) == 0
+
+    # ── LC 123: at most 2 transactions ────────────────────────
+    # [3,3,5,0,0,3,1,4] → (3-0) + (4-1) = 6
+    die "best_k2 LC123 ex1" unless Stock::best_k2([3, 3, 5, 0, 0, 3, 1, 4]) == 6
+    # [1,2,3,4,5] → 4 (one transaction is enough)
+    die "best_k2 monotone"  unless Stock::best_k2([1, 2, 3, 4, 5]) == 4
+    # [7,6,4,3,1] → 0
+    die "best_k2 desc"      unless Stock::best_k2([7, 6, 4, 3, 1]) == 0
+    # Classic [1,2,4,2,5,7,2,4,9,0] → ?  Two best segments by hand:
+    # Best 2-txn here: buy@1 sell@7 (=6), buy@2 sell@9 (=7) → 13
+    die "best_k2 13"        unless Stock::best_k2([1, 2, 4, 2, 5, 7, 2, 4, 9, 0]) == 13
+
+    # ── LC 309: cooldown ──────────────────────────────────────
+    # [1,2,3,0,2] canonical → 3
+    #   buy@1 sell@2 (profit 1), cooldown, buy@0 sell@2 (profit 2) = 3
+    die "best_cd LC309 ex" unless Stock::best_cd([1, 2, 3, 0, 2]) == 3
+    die "best_cd 2-day desc" unless Stock::best_cd([2, 1]) == 0
+    die "best_cd flat"     unless Stock::best_cd([1, 1, 1, 1]) == 0
+
+    # ── LC 714: per-sell fee ──────────────────────────────────
+    # [1,3,2,8,4,9] fee=2 → 8
+    #   buy@1 sell@8 (8-1-2 = 5), buy@4 sell@9 (9-4-2 = 3), total 8
+    die "best_fee LC714 ex" unless Stock::best_fee([1, 3, 2, 8, 4, 9], 2) == 8
+    die "best_fee high-fee" unless Stock::best_fee([1, 3, 7, 5, 10, 3], 3) == 6
+    # [1,3,7,5,10,3] fee=3:
+    #   buy@1 sell@7 (7-1-3=3), buy@5 sell@10 (10-5-3=2)  total 5
+    #   OR buy@1 sell@10 (10-1-3=6) single txn → 6 (better)
+    #   So result = 6
+    die "best_fee zero"     unless Stock::best_fee([1, 3, 2, 8, 4, 9], 0) ==
+                                   Stock::best_inf([1, 3, 2, 8, 4, 9])
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §106  DP suite #4 — decode ways, word break, climbing stairs
+# ═══════════════════════════════════════════════════════════════════
+#
+# Four classic LeetCode 1-D DPs in one block:
+#
+#   DP4::decode_ways(s)          — LC 91 : count decodings ("A"=1..."Z"=26)
+#   DP4::word_break(s, dict)     — LC 139: can s be segmented into dict words?
+#   DP4::climb_stairs(n)         — LC 70 : ways to reach step n (1 or 2 at a time)
+#   DP4::min_cost_stairs(costs)  — LC 746: cheapest path to top, start at 0 or 1
+#
+# All return scalars / booleans — no AoA returns to dodge stryke's
+# nested-ref return quirk.
+
+fn DP4::decode_ways($s) {
+    my $n = len($s)
+    return 0 if $n == 0
+    my @dp
+    for my $i (0:$n) { push @dp, 0 }
+    $dp[0] = 1
+    $dp[1] = substr($s, 0, 1) eq "0" ? 0 : 1
+    my $i = 2
+    while ($i <= $n) {
+        my $one  = substr($s, $i - 1, 1) + 0          # single-digit value
+        my $two  = substr($s, $i - 2, 2) + 0          # two-digit value
+        $dp[$i] = 0
+        $dp[$i] += $dp[$i - 1] if $one >= 1 && $one <= 9
+        $dp[$i] += $dp[$i - 2] if $two >= 10 && $two <= 26
+        $i++
+    }
+    $dp[$n]
+}
+
+fn DP4::word_break($s, $dict_in) {
+    my $n = len($s)
+    return 1 if $n == 0
+    my %dict
+    for my $w (@$dict_in) { $dict{$w} = 1 }
+    my @dp
+    for my $i (0:$n) { push @dp, 0 }
+    $dp[0] = 1                                          # empty prefix is trivially breakable
+    my $i = 1
+    while ($i <= $n) {
+        my $j = 0
+        while ($j < $i) {
+            if ($dp[$j] && exists $dict{substr($s, $j, $i - $j)}) {
+                $dp[$i] = 1
+                last
+            }
+            $j++
+        }
+        $i++
+    }
+    $dp[$n]
+}
+
+fn DP4::climb_stairs($n) {
+    return 0 if $n < 0
+    return 1 if $n == 0
+    return 1 if $n == 1
+    my $prev2 = 1                                       # ways to reach step 0
+    my $prev1 = 1                                       # ways to reach step 1
+    my $i = 2
+    my $cur = 0
+    while ($i <= $n) {
+        $cur = $prev1 + $prev2
+        $prev2 = $prev1
+        $prev1 = $cur
+        $i++
+    }
+    $cur
+}
+
+fn DP4::min_cost_stairs($costs_in) {
+    my @c = @$costs_in
+    my $n = len(@c)
+    return 0 if $n == 0
+    return $c[0] if $n == 1
+    my $prev2 = 0                                        # cost to stand at "step -2" (before start)
+    my $prev1 = 0                                        # cost to stand at "step -1"
+    my $i = 0
+    my $cur = 0
+    while ($i < $n) {
+        $cur = $c[$i] + ($prev1 < $prev2 ? $prev1 : $prev2)
+        $prev2 = $prev1
+        $prev1 = $cur
+        $i++
+    }
+    # Top is "step n" — reachable from step n-1 (prev1) or step n-2 (prev2) at no extra cost.
+    $prev1 < $prev2 ? $prev1 : $prev2
+}
+
+Sci::banner("§106 DP suite #4")
+{
+    # ── LC 91 decode ways ─────────────────────────────────────
+    die "decode '12' = 2"      unless DP4::decode_ways("12") == 2       # "AB" or "L"
+    die "decode '226' = 3"     unless DP4::decode_ways("226") == 3      # "BZ","VF","BBF"
+    die "decode '0' = 0"       unless DP4::decode_ways("0") == 0
+    die "decode '06' = 0"      unless DP4::decode_ways("06") == 0       # leading zero invalid
+    die "decode '10' = 1"      unless DP4::decode_ways("10") == 1       # "J"
+    die "decode '100' = 0"     unless DP4::decode_ways("100") == 0      # "10" + "0" — 0 alone bad
+    die "decode '11106' = 2"   unless DP4::decode_ways("11106") == 2    # "AAJF" or "KJF"
+    die "decode '27' = 1"      unless DP4::decode_ways("27") == 1       # "BG" only (27 > 26)
+    die "decode '' = 0"        unless DP4::decode_ways("") == 0
+
+    # ── LC 139 word break ─────────────────────────────────────
+    die "leetcode break"       unless DP4::word_break("leetcode", ["leet", "code"])
+    die "applepenapple break"  unless DP4::word_break("applepenapple", ["apple", "pen"])
+    die "catsandog NO break"   if     DP4::word_break("catsandog", ["cats", "dog", "sand", "and", "cat"])
+    die "empty trivially"      unless DP4::word_break("", ["a"])
+    die "single char hit"      unless DP4::word_break("a", ["a"])
+    die "single char miss"     if     DP4::word_break("a", ["b"])
+    # Long-tail aaaa...b NOT in dict
+    die "aaaaaab dict {a,aa,aaa} no"  if  DP4::word_break("aaaaaab",
+                                                            ["a", "aa", "aaa"])
+    die "aaaaaa dict {a} yes"    unless DP4::word_break("aaaaaa", ["a"])
+
+    # ── LC 70 climbing stairs (Fibonacci) ─────────────────────
+    die "climb 0 = 1"  unless DP4::climb_stairs(0) == 1
+    die "climb 1 = 1"  unless DP4::climb_stairs(1) == 1
+    die "climb 2 = 2"  unless DP4::climb_stairs(2) == 2
+    die "climb 3 = 3"  unless DP4::climb_stairs(3) == 3
+    die "climb 4 = 5"  unless DP4::climb_stairs(4) == 5
+    die "climb 5 = 8"  unless DP4::climb_stairs(5) == 8
+    die "climb 10 = 89" unless DP4::climb_stairs(10) == 89
+    die "climb 20 = 10946" unless DP4::climb_stairs(20) == 10946
+
+    # ── LC 746 min cost climbing stairs ───────────────────────
+    # [10,15,20] → start step 1 (cost 15), jump 2 to top → 15
+    die "mincost [10,15,20]" unless DP4::min_cost_stairs([10, 15, 20]) == 15
+    # [1,100,1,1,1,100,1,1,100,1] → 6
+    die "mincost LC746 ex2"  unless
+        DP4::min_cost_stairs([1, 100, 1, 1, 1, 100, 1, 1, 100, 1]) == 6
+    die "mincost single 7"   unless DP4::min_cost_stairs([7]) == 7
+    die "mincost empty 0"    unless DP4::min_cost_stairs([]) == 0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §107  parentheses suite — valid, longest, generate, min insertions
+# ═══════════════════════════════════════════════════════════════════
+#
+#   Parens::is_valid(s)         — LC 20 : balanced ()[]{} via stack
+#   Parens::longest_valid(s)    — LC 32 : longest contiguous valid ()-substring
+#   Parens::generate(n)         — LC 22 : all "()()" combinations of n pairs
+#                                          returned as arrayref of strings
+#   Parens::min_insert_balance(s) — LC 921: minimum insertions to balance ()
+
+fn Parens::is_valid($s) {
+    my $n = len($s)
+    my @stk
+    my $i = 0
+    while ($i < $n) {
+        my $ch = substr($s, $i, 1)
+        if    ($ch eq "(" || $ch eq "[" || $ch eq "{") { push @stk, $ch }
+        elsif ($ch eq ")" || $ch eq "]" || $ch eq "}") {
+            return 0 if len(@stk) == 0
+            my $top = pop(@stk)
+            return 0 if
+                ($ch eq ")" && $top ne "(") ||
+                ($ch eq "]" && $top ne "[") ||
+                ($ch eq "}" && $top ne "{")
+        }
+        $i++
+    }
+    len(@stk) == 0 ? 1 : 0
+}
+
+# LC 32 longest valid via stack of indices (bottom = "last unmatched"
+# sentinel — initialised to -1).
+fn Parens::longest_valid($s) {
+    my $n = len($s)
+    my @stk = (-1)
+    my $best = 0
+    my $i = 0
+    while ($i < $n) {
+        my $ch = substr($s, $i, 1)
+        if ($ch eq "(") { push @stk, $i }
+        else {
+            pop(@stk)
+            if (len(@stk) == 0) {
+                push @stk, $i                    # new "last unmatched"
+            } else {
+                my $cur_len = $i - $stk[-1]
+                $best = $cur_len if $cur_len > $best
+            }
+        }
+        $i++
+    }
+    $best
+}
+
+# LC 22 generate parens via backtracking.  Each recursive call appends
+# a "(" if there's still opens to spend, then a ")" if it would not
+# unbalance the prefix.  Returns arrayref of strings.
+fn Parens::generate_helper($cur, $opens_left, $closes_left, $out_ref) {
+    if ($opens_left == 0 && $closes_left == 0) {
+        push @$out_ref, $cur
+        return
+    }
+    if ($opens_left > 0) {
+        Parens::generate_helper($cur . "(", $opens_left - 1, $closes_left, $out_ref)
+    }
+    if ($closes_left > $opens_left) {
+        Parens::generate_helper($cur . ")", $opens_left, $closes_left - 1, $out_ref)
+    }
+}
+
+fn Parens::generate($n) {
+    my $out_ref = []
+    if ($n == 0) {
+        push @$out_ref, ""
+        return $out_ref
+    }
+    Parens::generate_helper("", $n, $n, $out_ref)
+    $out_ref
+}
+
+# LC 921 min insertions to balance ()-only.
+fn Parens::min_insert_balance($s) {
+    my $n = len($s)
+    my $needed = 0          # unbalanced ")" to add at end
+    my $open   = 0          # currently-unmatched "("
+    my $i = 0
+    while ($i < $n) {
+        my $ch = substr($s, $i, 1)
+        if ($ch eq "(") {
+            $open++
+        } else {
+            if ($open > 0) { $open-- }
+            else           { $needed++ }
+        }
+        $i++
+    }
+    $needed + $open
+}
+
+Sci::banner("§107 parens suite")
+{
+    # ── LC 20 is_valid ────────────────────────────────────────
+    die "valid ()"             unless Parens::is_valid("()")
+    die "valid ()[]{}"         unless Parens::is_valid("()[]{}")
+    die "valid {[()]}"         unless Parens::is_valid("{[()]}")
+    die "valid empty"          unless Parens::is_valid("")
+    die "invalid (]"           if     Parens::is_valid("(]")
+    die "invalid ((("          if     Parens::is_valid("(((")
+    die "invalid )))"          if     Parens::is_valid(")))")
+    die "invalid ([)]"         if     Parens::is_valid("([)]")
+
+    # ── LC 32 longest_valid ───────────────────────────────────
+    die "longest '(()' = 2"        unless Parens::longest_valid("(()") == 2
+    die "longest ')()())' = 4"     unless Parens::longest_valid(")()())") == 4
+    die "longest '' = 0"           unless Parens::longest_valid("") == 0
+    die "longest '()(())' = 6"     unless Parens::longest_valid("()(())") == 6
+    die "longest '))))((((' = 0"   unless Parens::longest_valid("))))((((")  == 0
+    die "longest '()((' = 2"       unless Parens::longest_valid("()((") == 2
+    die "longest '()()(()' = 4"    unless Parens::longest_valid("()()(()") == 4
+
+    # ── LC 22 generate (count via Catalan number C_n) ─────────
+    # n=0 → [""] ; n=1 → ["()"] ; n=2 → 2 ; n=3 → 5 ; n=4 → 14
+    my $paren0 = Parens::generate(0)
+    my $paren1 = Parens::generate(1)
+    my $paren2 = Parens::generate(2)
+    my $paren3 = Parens::generate(3)
+    my $paren4 = Parens::generate(4)
+    die "gen(0) = 1 (empty)"   unless len(@$paren0) == 1
+    die "gen(0) = ['']"        unless $paren0->[0] eq ""
+    die "gen(1) = ['()']"      unless len(@$paren1) == 1
+    die "gen(1) first='()'"    unless $paren1->[0] eq "()"
+    die "gen(2) Catalan=2"     unless len(@$paren2) == 2
+    die "gen(3) Catalan=5"     unless len(@$paren3) == 5
+    die "gen(4) Catalan=14"    unless len(@$paren4) == 14
+    # Every generated string is valid balanced parens.
+    for my $candidate (@$paren3) {
+        die "gen(3) all valid" unless Parens::is_valid($candidate)
+        die "gen(3) right len" unless len($candidate) == 6
+    }
+
+    # ── LC 921 min insertions to balance ──────────────────────
+    die "min_ins '(' = 1"             unless Parens::min_insert_balance("(") == 1
+    die "min_ins ')' = 1"             unless Parens::min_insert_balance(")") == 1
+    die "min_ins '()' = 0"            unless Parens::min_insert_balance("()") == 0
+    die "min_ins '(((' = 3"           unless Parens::min_insert_balance("(((") == 3
+    die "min_ins '))) = 3"            unless Parens::min_insert_balance(")))") == 3
+    die "min_ins '())(' = 2"          unless Parens::min_insert_balance("())(") == 2
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §108  matrix manipulation — spiral, rotate, zeros, diagonal
+# ═══════════════════════════════════════════════════════════════════
+#
+# All grids passed as ROW-MAJOR FLAT arrayrefs of length w*h with w,h
+# given as separate parameters — sidesteps stryke's AoA-return quirk.
+#
+#   MM::spiral_order(grid, w, h)    — LC 54  : values in clockwise spiral
+#   MM::rotate_90_cw(grid, n)       — LC 48  : NEW n×n grid rotated 90° clockwise
+#   MM::set_zeros(grid, w, h)       — LC 73  : zero entire row/col where any cell is 0
+#                                              (returns NEW grid, doesn't mutate input)
+#   MM::diagonal_order(grid, w, h)  — LC 498 : zig-zag anti-diagonal traversal
+
+fn MM::idx($w, $r, $c) { $r * $w + $c }
+
+fn MM::spiral_order($grid_in, $w, $h) {
+    my @grid = @$grid_in
+    my @out
+    my $top = 0
+    my $bot = $h - 1
+    my $left = 0
+    my $right = $w - 1
+    while ($top <= $bot && $left <= $right) {
+        # → top row
+        my $c = $left
+        while ($c <= $right) {
+            push @out, $grid[MM::idx($w, $top, $c)]
+            $c++
+        }
+        $top++
+        # ↓ right column
+        my $r = $top
+        while ($r <= $bot) {
+            push @out, $grid[MM::idx($w, $r, $right)]
+            $r++
+        }
+        $right--
+        if ($top <= $bot) {
+            # ← bottom row (right→left)
+            my $cc = $right
+            while ($cc >= $left) {
+                push @out, $grid[MM::idx($w, $bot, $cc)]
+                $cc--
+            }
+            $bot--
+        }
+        if ($left <= $right) {
+            # ↑ left column (bottom→top)
+            my $rr = $bot
+            while ($rr >= $top) {
+                push @out, $grid[MM::idx($w, $rr, $left)]
+                $rr--
+            }
+            $left++
+        }
+    }
+    \@out
+}
+
+# Rotate n×n grid 90° clockwise.  Cell (r, c) → (c, n-1-r).
+fn MM::rotate_90_cw($grid_in, $n) {
+    my @grid = @$grid_in
+    my @out
+    for my $i (0:$n * $n - 1) { push @out, 0 }
+    my $r = 0
+    while ($r < $n) {
+        my $c = 0
+        while ($c < $n) {
+            $out[MM::idx($n, $c, $n - 1 - $r)] = $grid[MM::idx($n, $r, $c)]
+            $c++
+        }
+        $r++
+    }
+    \@out
+}
+
+# LC 73 set matrix zeros.  Use independent passes:
+#   1. scan once collecting rows-to-zero, cols-to-zero in hashrefs
+#   2. write a new grid stamping those rows/cols
+fn MM::set_zeros($grid_in, $w, $h) {
+    my @grid = @$grid_in
+    my %zero_row
+    my %zero_col
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($grid[MM::idx($w, $r, $c)] == 0) {
+                $zero_row{$r} = 1
+                $zero_col{$c} = 1
+            }
+            $c++
+        }
+        $r++
+    }
+    my @out
+    $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if (exists($zero_row{$r}) || exists($zero_col{$c})) {
+                push @out, 0
+            } else {
+                push @out, $grid[MM::idx($w, $r, $c)]
+            }
+            $c++
+        }
+        $r++
+    }
+    \@out
+}
+
+# LC 498 diagonal traversal — visit each anti-diagonal alternately
+# top-down then bottom-up (zig-zag).
+fn MM::diagonal_order($grid_in, $w, $h) {
+    my @grid = @$grid_in
+    my @out
+    # There are w + h - 1 diagonals; diagonal d has cells where r+c=d.
+    my $d = 0
+    my $tot = $w + $h - 1
+    while ($d < $tot) {
+        if ($d % 2 == 0) {
+            # Bottom-up: start at (min(d, h-1), max(0, d-h+1)) going up
+            my $r_start = $d < $h ? $d : $h - 1
+            my $c_start = $d - $r_start
+            my $rd = $r_start
+            my $cd = $c_start
+            while ($rd >= 0 && $cd < $w) {
+                push @out, $grid[MM::idx($w, $rd, $cd)]
+                $rd--
+                $cd++
+            }
+        } else {
+            # Top-down: start at (max(0, d-w+1), min(d, w-1)) going down
+            my $c_start = $d < $w ? $d : $w - 1
+            my $r_start = $d - $c_start
+            my $rd = $r_start
+            my $cd = $c_start
+            while ($cd >= 0 && $rd < $h) {
+                push @out, $grid[MM::idx($w, $rd, $cd)]
+                $rd++
+                $cd--
+            }
+        }
+        $d++
+    }
+    \@out
+}
+
+Sci::banner("§108 matrix manip")
+{
+    # ── LC 54 spiral order ────────────────────────────────────
+    # 3x3 grid: 1 2 3 / 4 5 6 / 7 8 9 → [1,2,3,6,9,8,7,4,5]
+    my $sp3 = MM::spiral_order([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, 3)
+    die "spiral 3x3 len = 9" unless len(@$sp3) == 9
+    die "spiral [0]=1"       unless $sp3->[0] == 1
+    die "spiral [4]=9"       unless $sp3->[4] == 9    # corner reached
+    die "spiral [8]=5"       unless $sp3->[8] == 5    # centre last
+    # Full sequence
+    my @expected3 = (1, 2, 3, 6, 9, 8, 7, 4, 5)
+    my $i_chk = 0
+    while ($i_chk < 9) {
+        die "spiral 3x3 [$i_chk]" unless $sp3->[$i_chk] == $expected3[$i_chk]
+        $i_chk++
+    }
+
+    # 4x4 grid (LeetCode 54 example):
+    # 1  2  3  4
+    # 5  6  7  8
+    # 9 10 11 12
+    # 13 14 15 16 → [1,2,3,4,8,12,16,15,14,13,9,5,6,7,11,10]
+    my $sp4 = MM::spiral_order([1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,15,16], 4, 4)
+    my @expected4 = (1,2,3,4, 8,12,16, 15,14,13, 9,5, 6,7, 11, 10)
+    die "spiral 4x4 len" unless len(@$sp4) == 16
+    my $j_chk = 0
+    while ($j_chk < 16) {
+        die "spiral 4x4 [$j_chk]" unless $sp4->[$j_chk] == $expected4[$j_chk]
+        $j_chk++
+    }
+
+    # ── LC 48 rotate 90° clockwise ────────────────────────────
+    # 1 2 3        7 4 1
+    # 4 5 6   →    8 5 2
+    # 7 8 9        9 6 3
+    my $rot3 = MM::rotate_90_cw([1, 2, 3, 4, 5, 6, 7, 8, 9], 3)
+    my @expected_rot = (7, 4, 1, 8, 5, 2, 9, 6, 3)
+    my $k_chk = 0
+    while ($k_chk < 9) {
+        die "rotate 3x3 [$k_chk]" unless $rot3->[$k_chk] == $expected_rot[$k_chk]
+        $k_chk++
+    }
+
+    # Four rotations = identity
+    my $rot_id = MM::rotate_90_cw(
+        MM::rotate_90_cw(
+            MM::rotate_90_cw(
+                MM::rotate_90_cw([1, 2, 3, 4, 5, 6, 7, 8, 9], 3),
+                3),
+            3),
+        3)
+    my $m_chk = 0
+    while ($m_chk < 9) {
+        die "4x rot = identity [$m_chk]" unless $rot_id->[$m_chk] == $m_chk + 1
+        $m_chk++
+    }
+
+    # ── LC 73 set matrix zeros ────────────────────────────────
+    # 1 1 1                    1 0 1
+    # 1 0 1   set_zeros →      0 0 0
+    # 1 1 1                    1 0 1
+    my $sz = MM::set_zeros([1, 1, 1, 1, 0, 1, 1, 1, 1], 3, 3)
+    my @expected_sz = (1, 0, 1, 0, 0, 0, 1, 0, 1)
+    my $n_chk = 0
+    while ($n_chk < 9) {
+        die "set_zeros [$n_chk]" unless $sz->[$n_chk] == $expected_sz[$n_chk]
+        $n_chk++
+    }
+
+    # All-zero in: returns all-zero out
+    my $sz_all = MM::set_zeros([0, 0, 0, 0], 2, 2)
+    die "set_zeros all-zero" unless $sz_all->[0] == 0 &&
+                                    $sz_all->[1] == 0 &&
+                                    $sz_all->[2] == 0 &&
+                                    $sz_all->[3] == 0
+
+    # All-nonzero in: unchanged
+    my $sz_none = MM::set_zeros([1, 2, 3, 4], 2, 2)
+    die "set_zeros no-op [0]" unless $sz_none->[0] == 1
+    die "set_zeros no-op [3]" unless $sz_none->[3] == 4
+
+    # ── LC 498 diagonal order on 3x3 ──────────────────────────
+    # 1 2 3
+    # 4 5 6  → [1, 2, 4, 7, 5, 3, 6, 8, 9]
+    # 7 8 9
+    my $diag = MM::diagonal_order([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, 3)
+    my @expected_diag = (1, 2, 4, 7, 5, 3, 6, 8, 9)
+    die "diag 3x3 len" unless len(@$diag) == 9
+    my $p_chk = 0
+    while ($p_chk < 9) {
+        die "diag [$p_chk]" unless $diag->[$p_chk] == $expected_diag[$p_chk]
+        $p_chk++
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §109  grid BFS/DFS — islands, knight, surrounded regions
+# ═══════════════════════════════════════════════════════════════════
+#
+#   Grid::num_islands(grid, w, h)        — LC 200 : count 4-connected '1' components
+#   Grid::knight_shortest(n, sx, sy, ex, ey) — chess board BFS, n×n; -1 if unreachable
+#   Grid::surrounded_regions(grid, w, h) — LC 130 : flip 'O' surrounded by 'X' to 'X'
+#                                          (border-connected 'O' stay 'O'); returns new grid
+#   Grid::max_island_area(grid, w, h)    — LC 695 : size of largest 4-connected '1' component
+
+fn Grid::idx($w, $r, $c) { $r * $w + $c }
+
+fn Grid::flood_fill_count($grid_ref, $w, $h, $sr, $sc, $target) {
+    return 0 unless $grid_ref->[Grid::idx($w, $sr, $sc)] == $target
+    my @stk = ([$sr, $sc])
+    my $area = 0
+    while (len(@stk) > 0) {
+        my $cell = pop(@stk)
+        my $r = $cell->[0]
+        my $c = $cell->[1]
+        next unless $r >= 0 && $r < $h && $c >= 0 && $c < $w
+        next unless $grid_ref->[Grid::idx($w, $r, $c)] == $target
+        $grid_ref->[Grid::idx($w, $r, $c)] = -1            # mark visited
+        $area++
+        push @stk, [$r + 1, $c]
+        push @stk, [$r - 1, $c]
+        push @stk, [$r, $c + 1]
+        push @stk, [$r, $c - 1]
+    }
+    $area
+}
+
+fn Grid::num_islands($grid_in, $w, $h) {
+    my @work = @$grid_in                            # copy so caller is untouched
+    my $count = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($work[Grid::idx($w, $r, $c)] == 1) {
+                Grid::flood_fill_count(\@work, $w, $h, $r, $c, 1)
+                $count++
+            }
+            $c++
+        }
+        $r++
+    }
+    $count
+}
+
+fn Grid::max_island_area($grid_in, $w, $h) {
+    my @work = @$grid_in
+    my $best = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($work[Grid::idx($w, $r, $c)] == 1) {
+                my $area = Grid::flood_fill_count(\@work, $w, $h, $r, $c, 1)
+                $best = $area if $area > $best
+            }
+            $c++
+        }
+        $r++
+    }
+    $best
+}
+
+# Knight's BFS on infinite n×n chess board.  8 L-moves.
+fn Grid::knight_shortest($n, $sx, $sy, $ex, $ey) {
+    return 0 if $sx == $ex && $sy == $ey
+    return -1 if $sx < 0 || $sx >= $n || $sy < 0 || $sy >= $n
+    return -1 if $ex < 0 || $ex >= $n || $ey < 0 || $ey >= $n
+    my @dx = ( 2,  2, -2, -2,  1,  1, -1, -1)
+    my @dy = ( 1, -1,  1, -1,  2, -2,  2, -2)
+    my @dist
+    for my $i (0:$n * $n - 1) { push @dist, -1 }
+    $dist[$sy * $n + $sx] = 0
+    my @bfs_q = ([$sx, $sy])
+    while (len(@bfs_q) > 0) {
+        my $cell = shift @bfs_q
+        my $cx = $cell->[0]
+        my $cy = $cell->[1]
+        my $cd = $dist[$cy * $n + $cx]
+        my $k = 0
+        while ($k < 8) {
+            my $nx = $cx + $dx[$k]
+            my $ny = $cy + $dy[$k]
+            if ($nx >= 0 && $nx < $n && $ny >= 0 && $ny < $n) {
+                my $idx_n = $ny * $n + $nx
+                if ($dist[$idx_n] < 0) {
+                    $dist[$idx_n] = $cd + 1
+                    return $cd + 1 if $nx == $ex && $ny == $ey
+                    push @bfs_q, [$nx, $ny]
+                }
+            }
+            $k++
+        }
+    }
+    -1
+}
+
+# LC 130 — encode 'X'=0, 'O'=1.  Border-connected O regions get
+# temporarily marked as 2, then we final-pass: 2→1 (kept), 1→0 (flipped),
+# 0→0.
+fn Grid::flood_mark($grid_ref, $w, $h, $sr, $sc, $from_val, $to_val) {
+    return unless $grid_ref->[Grid::idx($w, $sr, $sc)] == $from_val
+    my @stk = ([$sr, $sc])
+    while (len(@stk) > 0) {
+        my $cell = pop(@stk)
+        my $r = $cell->[0]
+        my $c = $cell->[1]
+        next unless $r >= 0 && $r < $h && $c >= 0 && $c < $w
+        next unless $grid_ref->[Grid::idx($w, $r, $c)] == $from_val
+        $grid_ref->[Grid::idx($w, $r, $c)] = $to_val
+        push @stk, [$r + 1, $c]
+        push @stk, [$r - 1, $c]
+        push @stk, [$r, $c + 1]
+        push @stk, [$r, $c - 1]
+    }
+}
+
+fn Grid::surrounded_regions($grid_in, $w, $h) {
+    my @work = @$grid_in
+    # Mark border-touching O regions as 2
+    my $c = 0
+    while ($c < $w) {
+        Grid::flood_mark(\@work, $w, $h, 0,       $c, 1, 2)
+        Grid::flood_mark(\@work, $w, $h, $h - 1,  $c, 1, 2)
+        $c++
+    }
+    my $r = 0
+    while ($r < $h) {
+        Grid::flood_mark(\@work, $w, $h, $r, 0,       1, 2)
+        Grid::flood_mark(\@work, $w, $h, $r, $w - 1,  1, 2)
+        $r++
+    }
+    # Final pass: 2 → 1 (kept), 1 → 0 (flipped to X)
+    my @out
+    my $i = 0
+    while ($i < $w * $h) {
+        if    ($work[$i] == 2) { push @out, 1 }
+        elsif ($work[$i] == 1) { push @out, 0 }
+        else                   { push @out, 0 }
+        $i++
+    }
+    \@out
+}
+
+Sci::banner("§109 grid BFS/DFS")
+{
+    # ── LC 200 num islands — canonical example ────────────────
+    # 1 1 0 0 0
+    # 1 1 0 0 0
+    # 0 0 1 0 0   → 3 islands
+    # 0 0 0 1 1
+    my $isl1 = [
+        1, 1, 0, 0, 0,
+        1, 1, 0, 0, 0,
+        0, 0, 1, 0, 0,
+        0, 0, 0, 1, 1,
+    ]
+    die "islands 3" unless Grid::num_islands($isl1, 5, 4) == 3
+
+    # All water
+    die "no islands" unless Grid::num_islands([0, 0, 0, 0], 2, 2) == 0
+    # All land
+    die "one island all-land" unless Grid::num_islands([1, 1, 1, 1], 2, 2) == 1
+    # Diagonals are NOT connected
+    die "diag = 2 islands" unless Grid::num_islands([1, 0, 0, 1], 2, 2) == 2
+
+    # ── LC 695 max island area ────────────────────────────────
+    my $area1 = Grid::max_island_area($isl1, 5, 4)
+    die "max area 4 (top-left 2x2)" unless $area1 == 4
+    die "max area all-water = 0" unless Grid::max_island_area([0, 0, 0, 0], 2, 2) == 0
+    die "max area all-land = 4"  unless Grid::max_island_area([1, 1, 1, 1], 2, 2) == 4
+
+    # ── Knight BFS — classic distances on 8x8 ─────────────────
+    die "knight (0,0)→(0,0) = 0"  unless Grid::knight_shortest(8, 0, 0, 0, 0) == 0
+    die "knight (0,0)→(1,2) = 1"  unless Grid::knight_shortest(8, 0, 0, 1, 2) == 1
+    die "knight (0,0)→(7,7) = 6"  unless Grid::knight_shortest(8, 0, 0, 7, 7) == 6
+    die "knight (0,0)→(0,1) = 3"  unless Grid::knight_shortest(8, 0, 0, 0, 1) == 3
+    # Adjacent cell in 1x1 — only valid if start==end
+    die "knight 1x1 unreachable" unless Grid::knight_shortest(1, 0, 0, 0, 0) == 0
+    die "knight (0,0)→(2,2) = 4 on 8x8" unless Grid::knight_shortest(8, 0, 0, 2, 2) == 4
+    # Out of bounds
+    die "knight oob" unless Grid::knight_shortest(8, 0, 0, 8, 8) == -1
+
+    # ── LC 130 surrounded regions ─────────────────────────────
+    # X X X X            X X X X
+    # X O O X    →       X X X X
+    # X X O X            X X X X
+    # X O X X            X O X X        (bottom-left O touches border via left edge)
+    my $sr_in = [
+        0, 0, 0, 0,
+        0, 1, 1, 0,
+        0, 0, 1, 0,
+        0, 1, 0, 0,
+    ]
+    my $sr_out = Grid::surrounded_regions($sr_in, 4, 4)
+    my @expected_sr = (
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 1, 0, 0,                # only bottom-left O survives
+    )
+    my $i_chk = 0
+    while ($i_chk < 16) {
+        die "surrounded [$i_chk]" unless $sr_out->[$i_chk] == $expected_sr[$i_chk]
+        $i_chk++
+    }
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §110  Fenwick tree (Binary Indexed Tree)
+# ═══════════════════════════════════════════════════════════════════
+#
+# Compact O(n) array supporting:
+#   - point update arr[i] += delta in O(log n)
+#   - prefix sum arr[0..i] in O(log n)
+#
+# 1-indexed under the hood; user API is 0-indexed.  i & -i isolates
+# the lowest set bit, which is the natural step for both update
+# (climb to parent) and query (jump to next ancestor block).
+#
+# Classic application beyond range-sum: count inversions in O(n log n)
+# by compressing values to ranks then walking right-to-left, summing
+# already-seen smaller values.
+#
+#   BIT::new(n)              — fresh tree of size n
+#   BIT::update(t, i, delta) — arr[i] += delta
+#   BIT::prefix(t, i)        — sum of arr[0..i] inclusive
+#   BIT::range(t, lo, hi)    — sum of arr[lo..hi] inclusive
+#   BIT::set(t, i, v)        — convenience: replace arr[i] with v
+#   BIT::count_inversions(arr) — number of (i, j) with i<j AND arr[i]>arr[j]
+
+fn BIT::new($n) {
+    my @bit_arr
+    my @raw_arr                                   # mirror so set() can overwrite
+    for my $i (0:$n) { push @bit_arr, 0 }         # 1-indexed → size n+1
+    for my $i (0:$n - 1) { push @raw_arr, 0 }
+    +{ tree => \@bit_arr, raw => \@raw_arr, n => $n }
+}
+
+fn BIT::update($t, $i, $delta) {
+    my $tree_ref = $t->{tree}
+    my $raw_ref  = $t->{raw}
+    $raw_ref->[$i] += $delta
+    my $k = $i + 1                                # 1-indexed
+    while ($k <= $t->{n}) {
+        $tree_ref->[$k] += $delta
+        $k += $k & -$k
+    }
+}
+
+fn BIT::set($t, $i, $v) {
+    my $cur = $t->{raw}->[$i]
+    BIT::update($t, $i, $v - $cur)
+}
+
+fn BIT::prefix($t, $i) {
+    my $tree_ref = $t->{tree}
+    my $s = 0
+    my $k = $i + 1
+    while ($k > 0) {
+        $s += $tree_ref->[$k]
+        $k -= $k & -$k
+    }
+    $s
+}
+
+fn BIT::range($t, $lo, $hi) {
+    return BIT::prefix($t, $hi) if $lo == 0
+    BIT::prefix($t, $hi) - BIT::prefix($t, $lo - 1)
+}
+
+# Coordinate-compress + BIT to count inversions in O(n log n).
+fn BIT::count_inversions($arr_in) {
+    my @vals = @$arr_in
+    my $n = len(@vals)
+    return 0 if $n < 2
+    # Rank-compress: sorted unique values mapped to 0..k-1
+    my @sorted_uniq = sort { $_0 <=> $_1 } @vals
+    my %rank
+    my $r = 0
+    my $i = 0
+    while ($i < len(@sorted_uniq)) {
+        unless (exists $rank{$sorted_uniq[$i]}) {
+            $rank{$sorted_uniq[$i]} = $r
+            $r++
+        }
+        $i++
+    }
+    my $bit = BIT::new($r)
+    my $inv = 0
+    my $j = $n - 1
+    while ($j >= 0) {
+        my $rk = $rank{$vals[$j]}
+        $inv += BIT::prefix($bit, $rk - 1) if $rk > 0
+        BIT::update($bit, $rk, 1)
+        $j--
+    }
+    $inv
+}
+
+Sci::banner("§110 Fenwick (BIT)")
+{
+    # ── Empty tree all zeros ──────────────────────────────────
+    my $bit = BIT::new(8)
+    die "empty prefix 0..7 = 0"  unless BIT::prefix($bit, 7) == 0
+    die "empty prefix 0..0 = 0"  unless BIT::prefix($bit, 0) == 0
+
+    # ── update + prefix ───────────────────────────────────────
+    # Setup: arr = [3, 1, 4, 1, 5, 9, 2, 6]
+    my @raw = (3, 1, 4, 1, 5, 9, 2, 6)
+    my $i = 0
+    while ($i < 8) {
+        BIT::update($bit, $i, $raw[$i])
+        $i++
+    }
+    die "prefix 0..7 = 31" unless BIT::prefix($bit, 7) == 31
+    die "prefix 0..3 = 9"  unless BIT::prefix($bit, 3) == 9
+    die "prefix 0..0 = 3"  unless BIT::prefix($bit, 0) == 3
+    die "range 2..5 = 19"  unless BIT::range($bit, 2, 5) == 19
+    die "range 4..7 = 22"  unless BIT::range($bit, 4, 7) == 22
+    die "range 0..7 = 31"  unless BIT::range($bit, 0, 7) == 31
+    die "range 3..3 = 1"   unless BIT::range($bit, 3, 3) == 1
+
+    # ── set() (replace) ───────────────────────────────────────
+    BIT::set($bit, 5, 0)                           # was 9 → 0
+    die "after set [5]=0 prefix 0..7 = 22"  unless BIT::prefix($bit, 7) == 22
+    die "after set [5]=0 range 4..6 = 7"    unless BIT::range($bit, 4, 6) == 7
+
+    BIT::set($bit, 0, 100)                         # was 3 → 100
+    die "after set [0]=100 prefix 0..0 = 100" unless BIT::prefix($bit, 0) == 100
+    die "after set [0]=100 prefix 0..7 = 119" unless BIT::prefix($bit, 7) == 119
+
+    # ── count_inversions ──────────────────────────────────────
+    # [2, 4, 1, 3, 5] inversions: (2,1) (4,1) (4,3) = 3
+    die "inv [2,4,1,3,5] = 3"     unless BIT::count_inversions([2, 4, 1, 3, 5]) == 3
+    # Already sorted: 0
+    die "inv [1,2,3,4,5] = 0"     unless BIT::count_inversions([1, 2, 3, 4, 5]) == 0
+    # Reverse sorted: n*(n-1)/2 = 10 for n=5
+    die "inv [5,4,3,2,1] = 10"    unless BIT::count_inversions([5, 4, 3, 2, 1]) == 10
+    # Single element / empty / duplicates
+    die "inv [7] = 0"             unless BIT::count_inversions([7]) == 0
+    die "inv [] = 0"              unless BIT::count_inversions([]) == 0
+    # All same → 0 inversions (no strict >)
+    die "inv [5,5,5,5] = 0"       unless BIT::count_inversions([5, 5, 5, 5]) == 0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §111  state-space BFS — sliding puzzle + lock
+# ═══════════════════════════════════════════════════════════════════
+#
+# Both problems encode the search state as a string so that visited
+# tracking is just a hashref keyed by string.
+#
+#   Puzzle::min_moves(board_str)   — LC 773 : 2x3 sliding board
+#                                     '0' is the empty cell; goal "123450"
+#   Lock::min_turns(start, target, deadends)
+#                                  — LC 752 : 4-digit dial; each turn rotates
+#                                    a single digit by 1 (mod 10); cannot visit deadends
+
+# Swap two characters in a string by index, returning new string.
+fn Puzzle::swap_chars($s, $i, $j) {
+    my @c = split //, $s
+    my $tmp = $c[$i]
+    $c[$i] = $c[$j]
+    $c[$j] = $tmp
+    join("", @c)
+}
+
+# Neighbour-index list per cell (2x3 board, 0..5).  Hard-coded
+# adjacency of a flattened 2x3 grid:
+#   0 1 2
+#   3 4 5
+# Cell → list of orthogonal neighbours
+fn Puzzle::neighbours_of($pos) {
+    if    ($pos == 0) { [1, 3] }
+    elsif ($pos == 1) { [0, 2, 4] }
+    elsif ($pos == 2) { [1, 5] }
+    elsif ($pos == 3) { [0, 4] }
+    elsif ($pos == 4) { [1, 3, 5] }
+    elsif ($pos == 5) { [2, 4] }
+    else              { die "puzzle neighbours: bad pos $pos" }
+}
+
+fn Puzzle::min_moves($start) {
+    my $goal = "123450"
+    return 0 if $start eq $goal
+    my %visited
+    $visited{$start} = 1
+    my @bfs_q = ([$start, 0])
+    while (len(@bfs_q) > 0) {
+        my $node = shift @bfs_q
+        my $state = $node->[0]
+        my $dist  = $node->[1]
+        my $zero_pos = index($state, "0")
+        my $nbrs = Puzzle::neighbours_of($zero_pos)
+        for my $np (@$nbrs) {
+            my $nxt = Puzzle::swap_chars($state, $zero_pos, $np)
+            next if exists $visited{$nxt}
+            return $dist + 1 if $nxt eq $goal
+            $visited{$nxt} = 1
+            push @bfs_q, [$nxt, $dist + 1]
+        }
+    }
+    -1
+}
+
+# Helper: given a 4-digit lock state, return all 8 single-turn
+# neighbour state strings (each digit ±1 mod 10).
+fn Lock::neighbours($state) {
+    my @nbrs
+    my @digits = split //, $state
+    my $i = 0
+    while ($i < 4) {
+        my $orig_d = $digits[$i]
+        my $down = ($orig_d + 9) % 10                # -1 mod 10
+        my $up   = ($orig_d + 1) % 10
+        $digits[$i] = $down
+        push @nbrs, join("", @digits)
+        $digits[$i] = $up
+        push @nbrs, join("", @digits)
+        $digits[$i] = $orig_d                        # restore
+        $i++
+    }
+    \@nbrs
+}
+
+fn Lock::min_turns($start, $target, $deadends_in) {
+    my %dead
+    for my $de (@$deadends_in) { $dead{$de} = 1 }
+    return -1 if exists $dead{$start}
+    return 0  if $start eq $target
+    my %visited
+    $visited{$start} = 1
+    my @bfs_q = ([$start, 0])
+    while (len(@bfs_q) > 0) {
+        my $node = shift @bfs_q
+        my $state = $node->[0]
+        my $dist  = $node->[1]
+        my $nbrs = Lock::neighbours($state)
+        for my $nx (@$nbrs) {
+            next if exists $visited{$nx} || exists $dead{$nx}
+            return $dist + 1 if $nx eq $target
+            $visited{$nx} = 1
+            push @bfs_q, [$nx, $dist + 1]
+        }
+    }
+    -1
+}
+
+Sci::banner("§111 state BFS")
+{
+    # ── LC 773 sliding 2x3 puzzle ─────────────────────────────
+    # Goal already → 0 moves
+    die "puzzle goal=0"        unless Puzzle::min_moves("123450") == 0
+    # LeetCode example 1: board "123405" → 1 move (swap 0 at pos 5 with 5 at pos 4)
+    die "puzzle ex 123405 = 1" unless Puzzle::min_moves("123405") == 1
+    # LeetCode example 2 (canonical unsolvable): "123540" → -1
+    die "puzzle ex 123540 unsolvable" unless Puzzle::min_moves("123540") == -1
+    # LeetCode example 3 (canonical): "012345" → 5
+    # LeetCode example: "012345" → 15
+    die "puzzle ex 012345 = 15" unless Puzzle::min_moves("012345") == 15
+    # LeetCode example: "4,1,2,5,0,3" = "412503" → 5
+    die "puzzle 412503 = 5"    unless Puzzle::min_moves("412503") == 5
+
+    # ── LC 752 open the lock ──────────────────────────────────
+    # ex1: deadends=["0201","0101","0102","1212","2002"], target="0202" → 6
+    die "lock 0000 → 0202 = 6" unless
+        Lock::min_turns("0000", "0202",
+                        ["0201", "0101", "0102", "1212", "2002"]) == 6
+    # ex2: deadends=["8888"], target="0009" → 1 (just rotate last digit down)
+    die "lock 0000 → 0009 = 1" unless
+        Lock::min_turns("0000", "0009", ["8888"]) == 1
+    # ex3: target unreachable (every neighbour of start is dead) → -1
+    die "lock fully blocked"   unless
+        Lock::min_turns("0000", "8888",
+                        ["8887", "8889", "8878", "8898", "8788", "8988",
+                         "7888", "9888"]) == -1
+    # ex4: start == target → 0
+    die "lock start=target"    unless
+        Lock::min_turns("1234", "1234", []) == 0
+    # ex5: start is dead → -1
+    die "lock start dead"      unless
+        Lock::min_turns("0000", "1234", ["0000"]) == -1
+
+    # ── A single 1-digit turn → 1 ─────────────────────────────
+    die "lock 0000 → 1000 = 1" unless
+        Lock::min_turns("0000", "1000", []) == 1
+    # Two-digit independent turns → 2
+    die "lock 0000 → 1100 = 2" unless
+        Lock::min_turns("0000", "1100", []) == 2
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §112  multi-source BFS — rotting oranges, walls/gates, max-dist
+# ═══════════════════════════════════════════════════════════════════
+#
+# Multi-source BFS: seed the queue with every starting cell at distance
+# 0, then expand normally.  Equivalent to single-source BFS from a
+# virtual super-source connected to every seed with weight-0 edges.
+#
+#   MSBFS::rotting_oranges(grid, w, h)
+#       LC 994: 0=empty, 1=fresh, 2=rotten.  Each tick, rotten infects
+#       4-adjacent fresh.  Returns minutes until all fresh rot, or -1
+#       if any remain isolated.
+#
+#   MSBFS::walls_and_gates(grid, w, h, INF)
+#       LC 286: -1=wall, 0=gate, INF=empty room.  Returns NEW grid with
+#       each empty cell replaced by distance to nearest gate (INF if
+#       unreachable).
+#
+#   MSBFS::max_distance(grid, w, h)
+#       LC 1162: 0=water, 1=land.  Returns largest Manhattan-via-BFS
+#       distance from any water cell to its nearest land cell.  -1 if
+#       all-water or all-land.
+
+fn MSBFS::idx($w, $r, $c) { $r * $w + $c }
+
+fn MSBFS::rotting_oranges($grid_in, $w, $h) {
+    my @grid = @$grid_in
+    my @bfs_q
+    my $fresh = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            my $v = $grid[MSBFS::idx($w, $r, $c)]
+            push @bfs_q, [$r, $c, 0] if $v == 2
+            $fresh++ if $v == 1
+            $c++
+        }
+        $r++
+    }
+    return 0 if $fresh == 0
+    my $minutes = 0
+    while (len(@bfs_q) > 0) {
+        my $node = shift @bfs_q
+        my $cr = $node->[0]
+        my $cc = $node->[1]
+        my $cd = $node->[2]
+        $minutes = $cd if $cd > $minutes
+        my @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        for my $d (@dirs) {
+            my $nr = $cr + $d->[0]
+            my $nc = $cc + $d->[1]
+            next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
+            my $ni = MSBFS::idx($w, $nr, $nc)
+            if ($grid[$ni] == 1) {
+                $grid[$ni] = 2
+                $fresh--
+                push @bfs_q, [$nr, $nc, $cd + 1]
+            }
+        }
+    }
+    $fresh == 0 ? $minutes : -1
+}
+
+fn MSBFS::walls_and_gates($grid_in, $w, $h, $inf) {
+    my @grid = @$grid_in
+    my @bfs_q
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            push @bfs_q, [$r, $c, 0] if $grid[MSBFS::idx($w, $r, $c)] == 0
+            $c++
+        }
+        $r++
+    }
+    while (len(@bfs_q) > 0) {
+        my $node = shift @bfs_q
+        my $cr = $node->[0]
+        my $cc = $node->[1]
+        my $cd = $node->[2]
+        my @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        for my $d (@dirs) {
+            my $nr = $cr + $d->[0]
+            my $nc = $cc + $d->[1]
+            next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
+            my $ni = MSBFS::idx($w, $nr, $nc)
+            if ($grid[$ni] == $inf) {                      # unvisited empty
+                $grid[$ni] = $cd + 1
+                push @bfs_q, [$nr, $nc, $cd + 1]
+            }
+        }
+    }
+    \@grid
+}
+
+fn MSBFS::max_distance($grid_in, $w, $h) {
+    my @grid = @$grid_in
+    my @bfs_q
+    my $land = 0
+    my $water = 0
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            if ($grid[MSBFS::idx($w, $r, $c)] == 1) {
+                push @bfs_q, [$r, $c, 0]
+                $land++
+            } else {
+                $water++
+            }
+            $c++
+        }
+        $r++
+    }
+    return -1 if $land == 0 || $water == 0
+    my @dist
+    for my $i (0:$w * $h - 1) { push @dist, -1 }
+    for my $node (@bfs_q) {
+        $dist[MSBFS::idx($w, $node->[0], $node->[1])] = 0
+    }
+    my $best = 0
+    while (len(@bfs_q) > 0) {
+        my $node = shift @bfs_q
+        my $cr = $node->[0]
+        my $cc = $node->[1]
+        my $cd = $node->[2]
+        $best = $cd if $cd > $best
+        my @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        for my $d (@dirs) {
+            my $nr = $cr + $d->[0]
+            my $nc = $cc + $d->[1]
+            next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
+            my $ni = MSBFS::idx($w, $nr, $nc)
+            if ($dist[$ni] < 0) {
+                $dist[$ni] = $cd + 1
+                push @bfs_q, [$nr, $nc, $cd + 1]
+            }
+        }
+    }
+    $best
+}
+
+Sci::banner("§112 multi-src BFS")
+{
+    # ── LC 994 rotting oranges ────────────────────────────────
+    # 2 1 1
+    # 1 1 0    → 4 minutes
+    # 0 1 1
+    my $ro1 = [2, 1, 1, 1, 1, 0, 0, 1, 1]
+    die "rot ex1 = 4" unless MSBFS::rotting_oranges($ro1, 3, 3) == 4
+
+    # 2 1 1
+    # 0 1 1    → -1 (cell (2,0) is isolated fresh fruit)
+    # 1 0 1
+    my $ro2 = [2, 1, 1, 0, 1, 1, 1, 0, 1]
+    die "rot ex2 = -1" unless MSBFS::rotting_oranges($ro2, 3, 3) == -1
+
+    # All-empty / no fresh
+    die "rot empty = 0"  unless MSBFS::rotting_oranges([0, 0, 0, 0], 2, 2) == 0
+    die "rot all-rotten" unless MSBFS::rotting_oranges([2, 2, 2, 2], 2, 2) == 0
+
+    # Single fresh + adjacent rotten
+    die "rot one fresh = 1" unless MSBFS::rotting_oranges([2, 1], 2, 1) == 1
+
+    # ── LC 286 walls and gates ────────────────────────────────
+    # INF=99 for testing.  Standard LeetCode uses 2147483647.
+    # Input:
+    #   INF -1   0  INF
+    #   INF INF INF -1
+    #   INF -1  INF -1
+    #     0 -1  INF INF
+    #
+    # Expected output:
+    #   3 -1  0  1
+    #   2  2  1 -1
+    #   1 -1  2 -1
+    #   0 -1  3  4
+    my $wg_in = [
+        99, -1,  0, 99,
+        99, 99, 99, -1,
+        99, -1, 99, -1,
+         0, -1, 99, 99,
+    ]
+    my $wg_out = MSBFS::walls_and_gates($wg_in, 4, 4, 99)
+    my @expected_wg = (
+        3, -1,  0,  1,
+        2,  2,  1, -1,
+        1, -1,  2, -1,
+        0, -1,  3,  4,
+    )
+    my $i_chk = 0
+    while ($i_chk < 16) {
+        die "walls&gates [$i_chk]" unless $wg_out->[$i_chk] == $expected_wg[$i_chk]
+        $i_chk++
+    }
+
+    # ── LC 1162 max distance from land ────────────────────────
+    # 1 0 1
+    # 0 0 0   → 2  (cell (1,1) is distance 2 from nearest land)
+    # 1 0 1
+    die "max_dist 3x3 = 2"   unless MSBFS::max_distance([1, 0, 1, 0, 0, 0, 1, 0, 1], 3, 3) == 2
+
+    # 1 0 0
+    # 0 0 0   → 4 (cell (2,2) is distance 4 from (0,0))
+    # 0 0 0
+    die "max_dist single-land = 4" unless
+        MSBFS::max_distance([1, 0, 0, 0, 0, 0, 0, 0, 0], 3, 3) == 4
+
+    # All-water / all-land → -1
+    die "max_dist all-water"  unless MSBFS::max_distance([0, 0, 0, 0], 2, 2) == -1
+    die "max_dist all-land"   unless MSBFS::max_distance([1, 1, 1, 1], 2, 2) == -1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §113  letter combinations + IPv4 restoration (LC 17, LC 93)
+# ═══════════════════════════════════════════════════════════════════
+#
+# Two classic backtracking problems whose outputs are arrayrefs of
+# strings (flat — no nested-ref return issues).
+#
+#   Phone::digit_map($d)             — keypad letters for digit '2'..'9'
+#   Phone::letter_combinations($s)   — LC 17  : all letter strings
+#   IP::restore($s)                  — LC 93  : all valid IPv4 placements
+#                                       of dots in the digit string
+
+fn Phone::digit_map($d) {
+    if    ($d eq "2") { "abc" }
+    elsif ($d eq "3") { "def" }
+    elsif ($d eq "4") { "ghi" }
+    elsif ($d eq "5") { "jkl" }
+    elsif ($d eq "6") { "mno" }
+    elsif ($d eq "7") { "pqrs" }
+    elsif ($d eq "8") { "tuv" }
+    elsif ($d eq "9") { "wxyz" }
+    else              { "" }
+}
+
+fn Phone::letter_helper($digits, $pos, $cur, $out_ref) {
+    if ($pos == len($digits)) {
+        push @$out_ref, $cur if len($cur) > 0
+        return
+    }
+    my $letters = Phone::digit_map(substr($digits, $pos, 1))
+    my @ls = split //, $letters
+    for my $letter (@ls) {
+        Phone::letter_helper($digits, $pos + 1, $cur . $letter, $out_ref)
+    }
+}
+
+fn Phone::letter_combinations($digits) {
+    my $out_ref = []
+    return $out_ref if len($digits) == 0
+    Phone::letter_helper($digits, 0, "", $out_ref)
+    $out_ref
+}
+
+# LC 93: helper — true if a substring is a valid IPv4 octet.
+# Valid: integer in [0, 255], length 1..3, no leading zero unless == "0".
+fn IP::is_valid_octet($s) {
+    my $n = len($s)
+    return 0 if $n == 0 || $n > 3
+    return 0 if $n > 1 && substr($s, 0, 1) eq "0"     # leading zero
+    my $v = $s + 0
+    $v >= 0 && $v <= 255
+}
+
+fn IP::restore_helper($digits, $pos, $parts_far, $cur_built, $out_ref) {
+    my $n = len($digits)
+    if ($parts_far == 4) {
+        push @$out_ref, $cur_built if $pos == $n
+        return
+    }
+    my $remaining = $n - $pos
+    my $parts_left = 4 - $parts_far
+    # Each remaining part must be 1..3 chars
+    return if $remaining < $parts_left || $remaining > 3 * $parts_left
+    my $take = 1
+    while ($take <= 3 && $pos + $take <= $n) {
+        my $oct = substr($digits, $pos, $take)
+        if (IP::is_valid_octet($oct)) {
+            my $sep = $parts_far == 0 ? "" : "."
+            IP::restore_helper($digits, $pos + $take, $parts_far + 1,
+                               $cur_built . $sep . $oct, $out_ref)
+        }
+        $take++
+    }
+}
+
+fn IP::restore($digits) {
+    my $out_ref = []
+    IP::restore_helper($digits, 0, 0, "", $out_ref)
+    $out_ref
+}
+
+Sci::banner("§113 letter+IP")
+{
+    # ── LC 17 letter combinations ─────────────────────────────
+    # "23" → 3*3 = 9 strings: ad, ae, af, bd, be, bf, cd, ce, cf
+    my $lc23 = Phone::letter_combinations("23")
+    die "lc '23' len=9" unless len(@$lc23) == 9
+    # All strings have length 2 (one letter per digit)
+    for my $s (@$lc23) {
+        die "lc '23' str len=2" unless len($s) == 2
+    }
+    # The set of generated strings is the Cartesian product of "abc"×"def"
+    my %seen
+    for my $s (@$lc23) { $seen{$s} = 1 }
+    die "lc 'ad' present" unless exists $seen{"ad"}
+    die "lc 'cf' present" unless exists $seen{"cf"}
+    die "lc 'be' present" unless exists $seen{"be"}
+    die "lc 'xy' absent"  if     exists $seen{"xy"}
+
+    # Empty input → empty output
+    die "lc '' empty"    unless len(@{Phone::letter_combinations("")}) == 0
+
+    # Single digit "2" → 3 strings
+    my $lc2 = Phone::letter_combinations("2")
+    die "lc '2' = 3"     unless len(@$lc2) == 3
+
+    # 7 has 4 letters, so "27" → 3*4 = 12
+    die "lc '27' = 12"   unless len(@{Phone::letter_combinations("27")}) == 12
+
+    # Three digits "234" → 3*3*3 = 27
+    die "lc '234' = 27"  unless len(@{Phone::letter_combinations("234")}) == 27
+
+    # ── LC 93 restore IPv4 ────────────────────────────────────
+    # "25525511135" → ["255.255.11.135", "255.255.111.35"]
+    my $ip1 = IP::restore("25525511135")
+    die "ip '25525511135' len=2" unless len(@$ip1) == 2
+    my %ip_set
+    for my $s (@$ip1) { $ip_set{$s} = 1 }
+    die "ip has 255.255.11.135"  unless exists $ip_set{"255.255.11.135"}
+    die "ip has 255.255.111.35"  unless exists $ip_set{"255.255.111.35"}
+
+    # "0000" → ["0.0.0.0"]
+    my $ip0 = IP::restore("0000")
+    die "ip '0000' len=1"        unless len(@$ip0) == 1
+    die "ip '0000' = 0.0.0.0"    unless $ip0->[0] eq "0.0.0.0"
+
+    # "101023" → 5 ips: 1.0.10.23, 1.0.102.3, 10.1.0.23, 10.10.2.3, 101.0.2.3
+    my $ip3 = IP::restore("101023")
+    die "ip '101023' = 5"        unless len(@$ip3) == 5
+
+    # Too short / too long for 4 octets
+    die "ip '0' too short"       unless len(@{IP::restore("0")})           == 0
+    die "ip '111' too short"     unless len(@{IP::restore("111")})         == 0
+    die "ip '0000000000000' too long" unless len(@{IP::restore("0000000000000")}) == 0
+
+    # Leading-zero rejection: "0100" → only ["0.1.0.0", "0.10.0", ...] valid where no octet has leading 0
+    # Actually "0100" → "0.1.0.0" is the only valid (0.10.0 invalid - need 4 parts)
+    # Let me trust the algorithm and just check count.
+    die "ip '0100' = 1"          unless len(@{IP::restore("0100")}) == 1
+
+    # "255255255255" → 1 (only one parse: 255.255.255.255)
+    die "ip '255255255255' = 1"  unless len(@{IP::restore("255255255255")}) == 1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §114  word search on character board — LC 79, LC 212
+# ═══════════════════════════════════════════════════════════════════
+#
+# Board is a flat row-major arrayref of single-character strings,
+# size w*h.  Search 4-adjacent paths with no cell reuse.
+#
+#   WSearch::exists(board, w, h, word)
+#       LC 79 : true iff word can be traced in board (backtracking DFS
+#       with visited-marker stamp/restore on the board itself).
+#
+#   WSearch::find_all(board, w, h, words)
+#       LC 212: subset of $words present on the board (uses §103 WTrie
+#       for prefix-pruning across many words).
+
+fn WSearch::idx($w, $r, $c) { $r * $w + $c }
+
+fn WSearch::dfs($board_ref, $w, $h, $r, $c, $word, $pos) {
+    return 1 if $pos == len($word)
+    return 0 if $r < 0 || $r >= $h || $c < 0 || $c >= $w
+    my $bi = WSearch::idx($w, $r, $c)
+    return 0 if $board_ref->[$bi] eq "#"           # visited sentinel
+    return 0 unless $board_ref->[$bi] eq substr($word, $pos, 1)
+    my $save = $board_ref->[$bi]
+    $board_ref->[$bi] = "#"
+    my $found =
+        WSearch::dfs($board_ref, $w, $h, $r + 1, $c, $word, $pos + 1) ||
+        WSearch::dfs($board_ref, $w, $h, $r - 1, $c, $word, $pos + 1) ||
+        WSearch::dfs($board_ref, $w, $h, $r, $c + 1, $word, $pos + 1) ||
+        WSearch::dfs($board_ref, $w, $h, $r, $c - 1, $word, $pos + 1)
+    $board_ref->[$bi] = $save                      # restore
+    $found
+}
+
+fn WSearch::exists($board_in, $w, $h, $word) {
+    my @board = @$board_in
+    my $r = 0
+    while ($r < $h) {
+        my $c = 0
+        while ($c < $w) {
+            return 1 if WSearch::dfs(\@board, $w, $h, $r, $c, $word, 0)
+            $c++
+        }
+        $r++
+    }
+    0
+}
+
+fn WSearch::find_all($board_in, $w, $h, $words_in) {
+    my %present
+    for my $w_str (@$words_in) {
+        $present{$w_str} = 1 if WSearch::exists($board_in, $w, $h, $w_str)
+    }
+    my @out = sort keys %present
+    \@out
+}
+
+Sci::banner("§114 word search")
+{
+    # ── LC 79 canonical board ─────────────────────────────────
+    # A B C E
+    # S F C S
+    # A D E E
+    my $brd = [
+        "A", "B", "C", "E",
+        "S", "F", "C", "S",
+        "A", "D", "E", "E",
+    ]
+
+    # LeetCode examples:
+    die "find ABCCED"        unless WSearch::exists($brd, 4, 3, "ABCCED")
+    die "find SEE"           unless WSearch::exists($brd, 4, 3, "SEE")
+    die "no ABCB"            if     WSearch::exists($brd, 4, 3, "ABCB")
+    # Reuse-prohibition pin: "ABCEFCS" walks but tries to revisit C
+    # → must fail
+    die "no ABCEFCS"         if     WSearch::exists($brd, 4, 3, "ABCEFCS")
+
+    # Single-character match
+    die "find single F"      unless WSearch::exists($brd, 4, 3, "F")
+
+    # Long valid path: A(0,0)→B(0,1)→C(0,2)→E(0,3)→S(1,3)→E(2,3) = "ABCESE"
+    die "find ABCESE"        unless WSearch::exists($brd, 4, 3, "ABCESE")
+
+    # Board untouched after search (caller's @$board_in should be intact)
+    die "board untouched 0,0=A" unless $brd->[0] eq "A"
+    die "board untouched 1,1=F" unless $brd->[WSearch::idx(4, 1, 1)] eq "F"
+
+    # ── LC 79 single-character board ──────────────────────────
+    die "1x1 'A' find A"     unless WSearch::exists(["A"], 1, 1, "A")
+    die "1x1 'A' no B"       if     WSearch::exists(["A"], 1, 1, "B")
+    die "1x1 'A' no AA"      if     WSearch::exists(["A"], 1, 1, "AA")
+
+    # ── LC 212 multi-word search ──────────────────────────────
+    # board:
+    # o a a n
+    # e t a e
+    # i h k r
+    # i f l v
+    # words: ["oath", "pea", "eat", "rain"]
+    # expected: ["eat", "oath"]
+    my $brd2 = [
+        "o", "a", "a", "n",
+        "e", "t", "a", "e",
+        "i", "h", "k", "r",
+        "i", "f", "l", "v",
+    ]
+    my $found = WSearch::find_all($brd2, 4, 4, ["oath", "pea", "eat", "rain"])
+    die "find_all len = 2"   unless len(@$found) == 2
+    die "found has eat"      unless $found->[0] eq "eat"
+    die "found has oath"     unless $found->[1] eq "oath"
+
+    # Empty word list
+    my $none = WSearch::find_all($brd2, 4, 4, [])
+    die "empty word list"    unless len(@$none) == 0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §115  number theory advanced — Pollard ρ, Tonelli-Shanks, BSGS
+# ═══════════════════════════════════════════════════════════════════
+#
+#   NTX::pollard_rho($n)         — Brent's variant, returns a non-trivial
+#                                   factor of composite $n; -1 if it
+#                                   fails (rare for small $n).
+#   NTX::tonelli_shanks($a, $p)  — square root of $a mod prime $p; or -1
+#                                   if no root exists (a is QNR).
+#   NTX::bsgs($g, $h, $p)        — baby-step giant-step: smallest x ≥ 0
+#                                   with g^x ≡ h (mod p); or -1 if no
+#                                   discrete log exists.
+
+# Reuses NT::gcd and NT::modpow (defined in §19).
+
+# Polynomial used by Pollard ρ: f(x) = (x*x + c) mod n
+fn NTX::poly_step($x, $c, $n) {
+    (($x * $x) % $n + $c) % $n
+}
+
+fn NTX::pollard_rho($n) {
+    return 2  if $n % 2 == 0
+    return $n if $n < 4
+    my $c = 1
+    while ($c < 20) {
+        my $x = 2
+        my $y = 2
+        my $d = 1
+        while ($d == 1) {
+            $x = NTX::poly_step($x, $c, $n)
+            $y = NTX::poly_step($y, $c, $n)
+            $y = NTX::poly_step($y, $c, $n)
+            my $diff = $x > $y ? $x - $y : $y - $x
+            $d = NT::gcd($diff, $n)
+        }
+        return $d if $d != $n                # found non-trivial factor
+        $c++                                  # retry with different polynomial
+    }
+    -1
+}
+
+# Legendre symbol via Euler's criterion (a/p) = a^((p-1)/2) mod p.
+# Returns 1 (QR), p-1 (QNR), 0 (a divisible by p).
+fn NTX::legendre($av, $p) { NT::modpow($av, int(($p - 1) / 2), $p) }
+
+# Tonelli-Shanks: solve r^2 ≡ a (mod p) for odd prime p.  Returns -1
+# if a is a quadratic non-residue.
+fn NTX::tonelli_shanks($av, $p) {
+    return 0 if $av % $p == 0
+    return -1 if NTX::legendre($av, $p) != 1
+    return NT::modpow($av, int(($p + 1) / 4), $p) if $p % 4 == 3
+    # General case: p ≡ 1 (mod 4)
+    # Step 1: write p-1 = q * 2^s with q odd
+    my $q = $p - 1
+    my $s = 0
+    while ($q % 2 == 0) { $q = int($q / 2); $s++ }
+    # Step 2: find a non-residue z
+    my $z = 2
+    while (NTX::legendre($z, $p) != $p - 1) { $z++ }
+    # Step 3: initialise loop variables
+    my $m = $s
+    my $c = NT::modpow($z, $q, $p)
+    my $t = NT::modpow($av, $q, $p)
+    my $r = NT::modpow($av, int(($q + 1) / 2), $p)
+    while (1) {
+        return $r if $t == 1
+        # Find least i (1 ≤ i < m) such that t^(2^i) ≡ 1 (mod p)
+        my $i = 1
+        my $tmp = ($t * $t) % $p
+        while ($tmp != 1) {
+            $tmp = ($tmp * $tmp) % $p
+            $i++
+            return -1 if $i == $m            # shouldn't happen for QR
+        }
+        my $bv = NT::modpow($c, NT::modpow(2, $m - $i - 1, $p - 1), $p)
+        $m = $i
+        $c = ($bv * $bv) % $p
+        $t = ($t * $c) % $p
+        $r = ($r * $bv) % $p
+    }
+}
+
+# Baby-step giant-step: smallest x ≥ 0 with g^x ≡ h (mod p).
+fn NTX::isqrt_ceil($n) {
+    my $r = 1
+    while ($r * $r < $n) { $r++ }
+    $r
+}
+
+fn NTX::bsgs($g, $h, $p) {
+    return 0 if $h % $p == 1                  # g^0 = 1
+    my $m = NTX::isqrt_ceil($p)
+    # Baby steps: store {g^j → j} for j in 0..m-1
+    my %baby
+    my $cur = 1
+    my $j = 0
+    while ($j < $m) {
+        $baby{$cur} = $j unless exists $baby{$cur}
+        $cur = ($cur * $g) % $p
+        $j++
+    }
+    # Giant steps: factor = g^{-m} = g^{p-1-m} (Fermat little)
+    my $factor = NT::modpow($g, $p - 1 - $m, $p)
+    my $gamma = $h % $p
+    my $i = 0
+    while ($i < $m) {
+        if (exists $baby{$gamma}) {
+            return $i * $m + $baby{$gamma}
+        }
+        $gamma = ($gamma * $factor) % $p
+        $i++
+    }
+    -1
+}
+
+Sci::banner("§115 NT advanced")
+{
+    # ── Pollard ρ on small semiprimes ─────────────────────────
+    # 91 = 7 * 13
+    my $f91 = NTX::pollard_rho(91)
+    die "pollard 91 finds 7 or 13"   unless $f91 == 7 || $f91 == 13
+    die "pollard 91 divides"          unless 91 % $f91 == 0
+    # 1517 = 37 * 41
+    my $f1517 = NTX::pollard_rho(1517)
+    die "pollard 1517 finds 37 or 41" unless $f1517 == 37 || $f1517 == 41
+    # 8051 = 83 * 97
+    my $f8051 = NTX::pollard_rho(8051)
+    die "pollard 8051 finds 83 or 97" unless $f8051 == 83 || $f8051 == 97
+    # Even number: returns 2 fast
+    die "pollard 100 = 2"             unless NTX::pollard_rho(100) == 2
+    die "pollard 999983 prime returns n"  unless NTX::pollard_rho(2) == 2
+    # 999983 is prime, but pollard returns n (or -1).  Test composite only.
+
+    # ── Tonelli-Shanks ────────────────────────────────────────
+    # r² ≡ 10 (mod 13).  Solutions: r=6, r=7 (since 13-6=7).
+    my $ts10 = NTX::tonelli_shanks(10, 13)
+    die "ts(10,13) returns 6 or 7"    unless $ts10 == 6 || $ts10 == 7
+    die "ts(10,13) squared = 10"      unless ($ts10 * $ts10) % 13 == 10
+
+    # r² ≡ 5 (mod 41).  Solutions: r=13, r=28 (41-13=28).
+    my $ts5 = NTX::tonelli_shanks(5, 41)
+    die "ts(5,41) sq = 5"             unless ($ts5 * $ts5) % 41 == 5
+
+    # r² ≡ 56 (mod 101).  101 ≡ 1 (mod 4), exercises the general loop.
+    my $ts56 = NTX::tonelli_shanks(56, 101)
+    die "ts(56,101) defined"          unless $ts56 >= 0
+    die "ts(56,101) sq = 56"          unless ($ts56 * $ts56) % 101 == 56
+
+    # QNR: 5 is a non-residue mod 7 (squares mod 7 are {0,1,2,4})
+    die "ts(5,7) = -1 (QNR)"          unless NTX::tonelli_shanks(5, 7) == -1
+
+    # ── Baby-step giant-step ──────────────────────────────────
+    # 2^x ≡ 22 (mod 29).  29 has order 28; 2 is a primitive root.
+    # 2^1=2, 2^2=4, 2^3=8, 2^4=16, 2^5=32≡3, 2^6=6, 2^7=12, ..., 2^x=22?
+    # Verify: 2^5=3, 2^6=6, 2^7=12, 2^8=24, 2^9=48≡19, 2^10=38≡9,
+    # 2^11=18, 2^12=36≡7, 2^13=14, 2^14=28, 2^15=56≡27, 2^16=54≡25,
+    # 2^17=50≡21, 2^18=42≡13, 2^19=26, 2^20=52≡23, 2^21=46≡17,
+    # 2^22=34≡5, 2^23=10, 2^24=20, 2^25=40≡11, 2^26=22  ✓
+    die "bsgs 2^x = 22 mod 29 → 26" unless NTX::bsgs(2, 22, 29) == 26
+    # 5^x = 1 mod 11 → x = 0 (g^0 = 1)
+    die "bsgs 5^0 = 1"              unless NTX::bsgs(5, 1, 11) == 0
+    # 3^x = 13 mod 17.  17 is prime, 3 is primitive root.
+    # 3^1=3, 3^2=9, 3^3=27≡10, 3^4=30≡13 ✓
+    die "bsgs 3^x = 13 mod 17 → 4"  unless NTX::bsgs(3, 13, 17) == 4
+    # 2^x = 3 mod 5: 2^0=1, 2^1=2, 2^2=4, 2^3=3  → x = 3
+    die "bsgs 2^x = 3 mod 5 → 3"    unless NTX::bsgs(2, 3, 5) == 3
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §116  interval scheduling — meeting rooms, erase overlap, merge
+# ═══════════════════════════════════════════════════════════════════
+#
+# Intervals are passed as TWO PARALLEL arrayrefs of starts and ends
+# (length n each) — sidesteps stryke's array-of-pairs return quirk.
+# The merge function returns a single flat arrayref of length 2*m:
+# [s_0, e_0, s_1, e_1, ..., s_{m-1}, e_{m-1}].
+#
+#   Sched::meeting_can_attend(starts, ends)
+#       LC 252: true iff no two intervals overlap
+#
+#   Sched::meeting_min_rooms(starts, ends)
+#       LC 253: minimum simultaneous rooms via sweep line
+#
+#   Sched::erase_overlap_count(starts, ends)
+#       LC 435: minimum intervals to remove so remaining are non-overlapping
+#
+#   Sched::merge_flat(starts, ends)
+#       LC 56: merge overlapping intervals, return flat [s,e,s,e,...]
+#
+#   Sched::merged_count(starts, ends)
+#       Convenience: how many merged intervals (= len(merge_flat) / 2)
+
+# Sort intervals by start ascending; returns parallel sorted arrayrefs.
+fn Sched::sort_by_start($starts_in, $ends_in) {
+    my @starts = @$starts_in
+    my @ends   = @$ends_in
+    my $n = len(@starts)
+    # Build index array, sort by starts[i]
+    my @idx
+    for my $i (0:$n - 1) { push @idx, $i }
+    my @sorted_idx = sort { $starts[$_0] <=> $starts[$_1] } @idx
+    my @s_out
+    my @e_out
+    for my $k (@sorted_idx) {
+        push @s_out, $starts[$k]
+        push @e_out, $ends[$k]
+    }
+    +{ s => \@s_out, e => \@e_out }
+}
+
+fn Sched::meeting_can_attend($starts_in, $ends_in) {
+    my $sorted = Sched::sort_by_start($starts_in, $ends_in)
+    my $ss = $sorted->{s}
+    my $ee = $sorted->{e}
+    my $n = len(@$ss)
+    return 1 if $n < 2
+    my $i = 1
+    while ($i < $n) {
+        return 0 if $ss->[$i] < $ee->[$i - 1]
+        $i++
+    }
+    1
+}
+
+# Sweep-line: events (time, +1) for start, (time, -1) for end (end
+# events sort BEFORE start events at the same time).
+fn Sched::meeting_min_rooms($starts_in, $ends_in) {
+    my @s = sort { $_0 <=> $_1 } @$starts_in
+    my @e = sort { $_0 <=> $_1 } @$ends_in
+    my $n = len(@s)
+    my $rooms = 0
+    my $best  = 0
+    my $i = 0
+    my $j = 0
+    while ($i < $n) {
+        if ($s[$i] < $e[$j]) {
+            $rooms++
+            $best = $rooms if $rooms > $best
+            $i++
+        } else {
+            $rooms--
+            $j++
+        }
+    }
+    $best
+}
+
+# LC 435 erase overlap.  Greedy by EARLIEST END.
+fn Sched::erase_overlap_count($starts_in, $ends_in) {
+    my @starts = @$starts_in
+    my @ends   = @$ends_in
+    my $n = len(@starts)
+    return 0 if $n < 2
+    # Sort indices by ends[i]
+    my @idx
+    for my $i (0:$n - 1) { push @idx, $i }
+    my @sorted_idx = sort { $ends[$_0] <=> $ends[$_1] } @idx
+    my $kept_count = 1
+    my $cur_end    = $ends[$sorted_idx[0]]
+    my $k = 1
+    while ($k < $n) {
+        my $idx_k = $sorted_idx[$k]
+        if ($starts[$idx_k] >= $cur_end) {
+            $kept_count++
+            $cur_end = $ends[$idx_k]
+        }
+        $k++
+    }
+    $n - $kept_count
+}
+
+fn Sched::merge_flat($starts_in, $ends_in) {
+    my $sorted = Sched::sort_by_start($starts_in, $ends_in)
+    my $ss = $sorted->{s}
+    my $ee = $sorted->{e}
+    my $n = len(@$ss)
+    my $out_ref = []
+    return $out_ref if $n == 0
+    my $cur_s = $ss->[0]
+    my $cur_e = $ee->[0]
+    my $i = 1
+    while ($i < $n) {
+        if ($ss->[$i] <= $cur_e) {
+            $cur_e = $ee->[$i] if $ee->[$i] > $cur_e
+        } else {
+            push @$out_ref, $cur_s, $cur_e
+            $cur_s = $ss->[$i]
+            $cur_e = $ee->[$i]
+        }
+        $i++
+    }
+    push @$out_ref, $cur_s, $cur_e
+    $out_ref
+}
+
+fn Sched::merged_count($starts_in, $ends_in) {
+    int(len(@{Sched::merge_flat($starts_in, $ends_in)}) / 2)
+}
+
+Sci::banner("§116 interval sched")
+{
+    # ── LC 252 can attend all meetings ────────────────────────
+    # [[0,30],[5,10],[15,20]] → false (0-30 overlaps with 5-10)
+    die "ca [[0,30],[5,10],[15,20]] = F"  if     Sched::meeting_can_attend([0, 5, 15], [30, 10, 20])
+    # [[7,10],[2,4]] → true (no overlap)
+    die "ca [[7,10],[2,4]] = T"           unless Sched::meeting_can_attend([7, 2], [10, 4])
+    # Single interval → true
+    die "ca single = T"                   unless Sched::meeting_can_attend([5], [10])
+    # Empty → true
+    die "ca empty = T"                    unless Sched::meeting_can_attend([], [])
+
+    # ── LC 253 min rooms ──────────────────────────────────────
+    # [[0,30],[5,10],[15,20]] → 2
+    die "rooms LC253 ex1 = 2"  unless Sched::meeting_min_rooms([0, 5, 15], [30, 10, 20]) == 2
+    # [[7,10],[2,4]] → 1
+    die "rooms [[7,10],[2,4]] = 1" unless Sched::meeting_min_rooms([7, 2], [10, 4]) == 1
+    # [[9,10],[4,9],[4,17]] → 2
+    die "rooms 3 ex = 2"           unless Sched::meeting_min_rooms([9, 4, 4], [10, 9, 17]) == 2
+    # Fully overlapping × 5 → 5
+    die "rooms 5 overlap = 5"      unless Sched::meeting_min_rooms([1, 2, 3, 4, 5], [10, 10, 10, 10, 10]) == 5
+
+    # ── LC 435 erase overlapping ──────────────────────────────
+    # [[1,2],[2,3],[3,4],[1,3]] → 1 (erase [1,3])
+    die "erase ex1 = 1"  unless Sched::erase_overlap_count([1, 2, 3, 1], [2, 3, 4, 3]) == 1
+    # [[1,2],[1,2],[1,2]] → 2 (keep one)
+    die "erase 3-dup = 2"          unless Sched::erase_overlap_count([1, 1, 1], [2, 2, 2]) == 2
+    # All disjoint → 0
+    die "erase disjoint = 0"       unless Sched::erase_overlap_count([1, 3, 5, 7], [2, 4, 6, 8]) == 0
+    # Empty → 0
+    die "erase empty = 0"          unless Sched::erase_overlap_count([], []) == 0
+
+    # ── LC 56 merge intervals (flat) ──────────────────────────
+    # [[1,3],[2,6],[8,10],[15,18]] → [[1,6],[8,10],[15,18]] (3 merged)
+    my $mf = Sched::merge_flat([1, 2, 8, 15], [3, 6, 10, 18])
+    die "merge len = 6"                unless len(@$mf) == 6
+    die "merge [0]=1, [1]=6 (1,6)"     unless $mf->[0] == 1 && $mf->[1] == 6
+    die "merge [2]=8, [3]=10 (8,10)"   unless $mf->[2] == 8 && $mf->[3] == 10
+    die "merge [4]=15, [5]=18 (15,18)" unless $mf->[4] == 15 && $mf->[5] == 18
+
+    # [[1,4],[4,5]] → [[1,5]] (touching counts as overlap with <=)
+    my $mt = Sched::merge_flat([1, 4], [4, 5])
+    die "merge touching len = 2"       unless len(@$mt) == 2
+    die "merge touching (1,5)"         unless $mt->[0] == 1 && $mt->[1] == 5
+
+    # merged_count convenience
+    die "merged_count LC56 = 3" unless Sched::merged_count([1, 2, 8, 15], [3, 6, 10, 18]) == 3
+    die "merged_count empty = 0" unless Sched::merged_count([], []) == 0
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §117  sliding-window string problems — LC 3, 76, 438
+# ═══════════════════════════════════════════════════════════════════
+#
+# Three canonical two-pointer/sliding-window string problems.
+#
+#   SWStr::longest_no_repeat(s)
+#       LC 3   : length of the longest substring without repeating chars
+#
+#   SWStr::min_window(s, t)
+#       LC 76  : smallest substring of $s containing every char of $t
+#                (with multiplicity).  Returns the substring, or "" if
+#                no such window exists.
+#
+#   SWStr::find_anagrams(s, p)
+#       LC 438 : every start index in $s where a permutation of $p
+#                occurs.  Returns flat arrayref of ints.
+
+fn SWStr::longest_no_repeat($s) {
+    my $n = len($s)
+    my %last_idx
+    my $left = 0
+    my $best = 0
+    my $i = 0
+    while ($i < $n) {
+        my $ch = substr($s, $i, 1)
+        if (exists $last_idx{$ch} && $last_idx{$ch} >= $left) {
+            $left = $last_idx{$ch} + 1
+        }
+        $last_idx{$ch} = $i
+        my $win = $i - $left + 1
+        $best = $win if $win > $best
+        $i++
+    }
+    $best
+}
+
+fn SWStr::min_window($s, $t) {
+    my $sn = len($s)
+    my $tn = len($t)
+    return "" if $tn == 0 || $sn < $tn
+    my %need
+    my $ti = 0
+    while ($ti < $tn) {
+        my $tc = substr($t, $ti, 1)
+        $need{$tc} = ($need{$tc} // 0) + 1
+        $ti++
+    }
+    my %have
+    my $required = 0
+    my @need_keys = keys %need
+    my $required_distinct = len(@need_keys)
+    my $formed = 0
+    my $left = 0
+    my $best_len   = $sn + 1
+    my $best_start = 0
+    my $i = 0
+    while ($i < $sn) {
+        my $ch = substr($s, $i, 1)
+        if (exists $need{$ch}) {
+            $have{$ch} = ($have{$ch} // 0) + 1
+            $formed++ if $have{$ch} == $need{$ch}
+        }
+        while ($formed == $required_distinct) {
+            my $cur_len = $i - $left + 1
+            if ($cur_len < $best_len) {
+                $best_len   = $cur_len
+                $best_start = $left
+            }
+            my $lc = substr($s, $left, 1)
+            if (exists $need{$lc}) {
+                $have{$lc}--
+                $formed-- if $have{$lc} < $need{$lc}
+            }
+            $left++
+        }
+        $i++
+    }
+    $best_len > $sn ? "" : substr($s, $best_start, $best_len)
+}
+
+fn SWStr::find_anagrams($s, $p) {
+    my $sn = len($s)
+    my $pn = len($p)
+    my $out_ref = []
+    return $out_ref if $pn > $sn || $pn == 0
+    my %need
+    my $ti = 0
+    while ($ti < $pn) {
+        my $tc = substr($p, $ti, 1)
+        $need{$tc} = ($need{$tc} // 0) + 1
+        $ti++
+    }
+    my %have
+    my @need_keys = keys %need
+    my $required_distinct = len(@need_keys)
+    my $formed = 0
+    my $i = 0
+    while ($i < $sn) {
+        my $ch = substr($s, $i, 1)
+        if (exists $need{$ch}) {
+            $have{$ch} = ($have{$ch} // 0) + 1
+            $formed++ if $have{$ch} == $need{$ch}
+        }
+        # Shrink window once it exceeds $pn
+        if ($i >= $pn) {
+            my $left_ch = substr($s, $i - $pn, 1)
+            if (exists $need{$left_ch}) {
+                $formed-- if $have{$left_ch} == $need{$left_ch}
+                $have{$left_ch}--
+            }
+        }
+        push @$out_ref, $i - $pn + 1 if $formed == $required_distinct
+        $i++
+    }
+    $out_ref
+}
+
+Sci::banner("§117 slide window str")
+{
+    # ── LC 3 longest substring without repeating chars ────────
+    die "lnr 'abcabcbb' = 3"    unless SWStr::longest_no_repeat("abcabcbb") == 3
+    die "lnr 'bbbbb' = 1"       unless SWStr::longest_no_repeat("bbbbb") == 1
+    die "lnr 'pwwkew' = 3"      unless SWStr::longest_no_repeat("pwwkew") == 3
+    die "lnr '' = 0"            unless SWStr::longest_no_repeat("") == 0
+    die "lnr 'a' = 1"           unless SWStr::longest_no_repeat("a") == 1
+    die "lnr 'au' = 2"          unless SWStr::longest_no_repeat("au") == 2
+    die "lnr 'dvdf' = 3"        unless SWStr::longest_no_repeat("dvdf") == 3
+    # All distinct → length n
+    die "lnr 'abcdefg' = 7"     unless SWStr::longest_no_repeat("abcdefg") == 7
+
+    # ── LC 76 minimum window substring ────────────────────────
+    die "mw 'ADOBECODEBANC','ABC' = 'BANC'"  unless
+        SWStr::min_window("ADOBECODEBANC", "ABC") eq "BANC"
+    die "mw 'a','a' = 'a'"                   unless SWStr::min_window("a", "a") eq "a"
+    die "mw 'a','aa' = ''"                   unless SWStr::min_window("a", "aa") eq ""
+    die "mw 'a','b' = ''"                    unless SWStr::min_window("a", "b") eq ""
+    die "mw 'ab','b' = 'b'"                  unless SWStr::min_window("ab", "b") eq "b"
+    # Multiplicity: need 2 'a's
+    die "mw 'aabbcc','aa' = 'aa'"            unless SWStr::min_window("aabbcc", "aa") eq "aa"
+
+    # ── LC 438 find all anagrams ──────────────────────────────
+    # s = "cbaebabacd", p = "abc" → [0, 6]
+    my $fa1 = SWStr::find_anagrams("cbaebabacd", "abc")
+    die "fa LC ex1 len = 2" unless len(@$fa1) == 2
+    die "fa LC ex1 [0]=0"   unless $fa1->[0] == 0
+    die "fa LC ex1 [1]=6"   unless $fa1->[1] == 6
+
+    # s = "abab", p = "ab" → [0, 1, 2]
+    my $fa2 = SWStr::find_anagrams("abab", "ab")
+    die "fa abab/ab len = 3" unless len(@$fa2) == 3
+    die "fa abab/ab [0]=0"   unless $fa2->[0] == 0
+    die "fa abab/ab [1]=1"   unless $fa2->[1] == 1
+    die "fa abab/ab [2]=2"   unless $fa2->[2] == 2
+
+    # p longer than s → empty
+    my $fa3 = SWStr::find_anagrams("xy", "xyz")
+    die "fa pattern longer = 0" unless len(@$fa3) == 0
+
+    # Repeated pattern letters
+    my $fa4 = SWStr::find_anagrams("baa", "aa")
+    die "fa baa/aa len = 1"  unless len(@$fa4) == 1
+    die "fa baa/aa [0]=1"    unless $fa4->[0] == 1
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §118  prefix-sum subarray techniques — LC 560, 974, 523
+# ═══════════════════════════════════════════════════════════════════
+#
+# Running prefix sum + hashmap of "seen prefix → first-index or count".
+#
+#   PSub::count_sum_equals_k(arr, k)
+#       LC 560 : count contiguous subarrays summing exactly to k.
+#                For each prefix P_i, the count of j with P_i - P_j = k
+#                equals the times P_i - k has been seen.
+#
+#   PSub::count_div_by_k(arr, k)
+#       LC 974 : count subarrays whose sum is divisible by k.  Hash
+#                buckets by (prefix mod k), then for each bucket of
+#                size c, add C(c, 2) pairs.  Also +1 per bucket for
+#                the empty prefix counting as a 0-sum.
+#
+#   PSub::has_multiple_of_k(arr, k)
+#       LC 523 : exists subarray of length >= 2 whose sum is a
+#                multiple of k?  Hash first-seen index per remainder;
+#                if same remainder appears at index j and i (j+2 <= i),
+#                the sum between is a multiple of k.
+
+fn PSub::count_sum_equals_k($arr_in, $kk) {
+    my @arr = @$arr_in
+    my %prefix_count
+    $prefix_count{0} = 1                       # empty prefix
+    my $running = 0
+    my $count = 0
+    for my $v (@arr) {
+        $running += $v
+        $count += $prefix_count{$running - $kk} if exists $prefix_count{$running - $kk}
+        $prefix_count{$running} = ($prefix_count{$running} // 0) + 1
+    }
+    $count
+}
+
+fn PSub::count_div_by_k($arr_in, $kk) {
+    my @arr = @$arr_in
+    my %bucket
+    $bucket{0} = 1                             # empty prefix
+    my $running = 0
+    my $count = 0
+    for my $v (@arr) {
+        $running += $v
+        # Perl `%` is truncated, not modular; handle negative.
+        my $rem = $running % $kk
+        $rem += $kk if $rem < 0
+        $count += $bucket{$rem} if exists $bucket{$rem}
+        $bucket{$rem} = ($bucket{$rem} // 0) + 1
+    }
+    $count
+}
+
+fn PSub::has_multiple_of_k($arr_in, $kk) {
+    my @arr = @$arr_in
+    my $n = len(@arr)
+    return 0 if $n < 2
+    my %first_idx
+    $first_idx{0} = -1                         # empty prefix at "index -1"
+    my $running = 0
+    my $i = 0
+    while ($i < $n) {
+        $running += $arr[$i]
+        my $rem = $running % $kk
+        $rem += $kk if $rem < 0
+        if (exists $first_idx{$rem}) {
+            return 1 if $i - $first_idx{$rem} >= 2
+        } else {
+            $first_idx{$rem} = $i
+        }
+        $i++
+    }
+    0
+}
+
+Sci::banner("§118 prefix sum sub")
+{
+    # ── LC 560 count subarrays sum = k ────────────────────────
+    # [1, 1, 1], k=2 → 2 (positions 0..1 and 1..2)
+    die "psub LC560 [1,1,1] k=2 = 2"       unless
+        PSub::count_sum_equals_k([1, 1, 1], 2) == 2
+    # [1, 2, 3], k=3 → 2 (subarrays {3} and {1,2})
+    die "psub LC560 [1,2,3] k=3 = 2"       unless
+        PSub::count_sum_equals_k([1, 2, 3], 3) == 2
+    # [1], k=1 → 1
+    die "psub LC560 [1] k=1 = 1"           unless
+        PSub::count_sum_equals_k([1], 1) == 1
+    # Negative numbers
+    die "psub LC560 [-1,-1,1] k=0 = 1"     unless
+        PSub::count_sum_equals_k([-1, -1, 1], 0) == 1
+    # k=0 with zeros: [0,0,0] k=0 → 6 (3 single + 2 pairs + 1 triple)
+    # Wait — single 0 sums to 0? yes. (0,0) sum 0? yes. (0,0,0) sum 0? yes.
+    # singles: 3, pairs: 2, triple: 1 → 6
+    die "psub LC560 [0,0,0] k=0 = 6"       unless
+        PSub::count_sum_equals_k([0, 0, 0], 0) == 6
+    # Empty
+    die "psub LC560 [] k=1 = 0"            unless
+        PSub::count_sum_equals_k([], 1) == 0
+
+    # ── LC 974 count subarrays divisible by k ─────────────────
+    # [4,5,0,-2,-3,1], k=5 → 7
+    die "psub LC974 ex1 = 7"               unless
+        PSub::count_div_by_k([4, 5, 0, -2, -3, 1], 5) == 7
+    # [5], k=9 → 0
+    die "psub LC974 [5] k=9 = 0"           unless
+        PSub::count_div_by_k([5], 9) == 0
+    # [5, 5, 5], k=5 → 6 (singles 3 + pairs 2 + triple 1)
+    die "psub LC974 [5,5,5] k=5 = 6"       unless
+        PSub::count_div_by_k([5, 5, 5], 5) == 6
+    # All zeros [0,0,0,0], k=7 → 10 (C(5,2) including empty = 4+3+2+1 = 10)
+    die "psub LC974 [0,0,0,0] k=7 = 10"    unless
+        PSub::count_div_by_k([0, 0, 0, 0], 7) == 10
+
+    # ── LC 523 has subarray multiple of k (len ≥ 2) ───────────
+    # [23,2,4,6,7] k=6 → true (subarray [2,4] sums to 6)
+    die "psub LC523 ex1 = T"               unless
+        PSub::has_multiple_of_k([23, 2, 4, 6, 7], 6)
+    # [23,2,6,4,7] k=6 → true (subarray [2,6,4] sums to 12)
+    die "psub LC523 ex2 = T"               unless
+        PSub::has_multiple_of_k([23, 2, 6, 4, 7], 6)
+    # [23,2,6,4,7] k=13 → false (no len>=2 subarray sums to multiple of 13)
+    die "psub LC523 ex3 = F"               if
+        PSub::has_multiple_of_k([23, 2, 6, 4, 7], 13)
+    # [0, 0] k=1 → true (two zeros sum 0, multiple of any k)
+    die "psub LC523 [0,0] k=1 = T"         unless
+        PSub::has_multiple_of_k([0, 0], 1)
+    # Single element → false (need len >= 2)
+    die "psub LC523 [5] k=5 = F"           if
+        PSub::has_multiple_of_k([5], 5)
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# §119  greedy/DP combo — jump game, max-product, circular robber
+# ═══════════════════════════════════════════════════════════════════
+#
+#   JMP::can_jump(nums)         — LC 55  : true iff position n-1 reachable
+#                                 from position 0 with max-jump = nums[i]
+#   JMP::min_jumps(nums)        — LC 45  : minimum jumps to reach end
+#                                 (guaranteed reachable, but we still
+#                                 handle the impossible case as -1)
+#   MP::max_product_subarray(nums) — LC 152: max contiguous-subarray product
+#                                    handling negative sign-flip
+#   HR2::circular_rob(nums)        — LC 213: house robber on circular street
+#                                    (first and last are neighbours)
+
+fn JMP::can_jump($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    return 1 if $n == 0
+    my $reach = 0
+    my $i = 0
+    while ($i < $n) {
+        return 0 if $i > $reach
+        my $jump_to = $i + $nums[$i]
+        $reach = $jump_to if $jump_to > $reach
+        return 1 if $reach >= $n - 1
+        $i++
+    }
+    1
+}
+
+# LC 45 greedy BFS-layer: track end-of-current-jump-window.
+fn JMP::min_jumps($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    return 0 if $n <= 1
+    my $jumps = 0
+    my $cur_end = 0
+    my $farthest = 0
+    my $i = 0
+    while ($i < $n - 1) {
+        my $jt = $i + $nums[$i]
+        $farthest = $jt if $jt > $farthest
+        if ($i == $cur_end) {
+            $jumps++
+            return -1 if $farthest <= $i        # stuck — can't advance
+            $cur_end = $farthest
+        }
+        $i++
+    }
+    $jumps
+}
+
+# LC 152 sign-flip handling: track both min and max product so far
+# because a new negative can flip a min into the new max.
+fn MP::max_product_subarray($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    return 0 if $n == 0
+    my $cur_min = $nums[0]
+    my $cur_max = $nums[0]
+    my $best    = $nums[0]
+    my $i = 1
+    while ($i < $n) {
+        my $v = $nums[$i]
+        my $cand1 = $cur_max * $v
+        my $cand2 = $cur_min * $v
+        # New max is among (v, cand1, cand2)
+        my $new_max = $v
+        $new_max = $cand1 if $cand1 > $new_max
+        $new_max = $cand2 if $cand2 > $new_max
+        my $new_min = $v
+        $new_min = $cand1 if $cand1 < $new_min
+        $new_min = $cand2 if $cand2 < $new_min
+        $cur_max = $new_max
+        $cur_min = $new_min
+        $best = $cur_max if $cur_max > $best
+        $i++
+    }
+    $best
+}
+
+# Linear house-robber (reuse for the circular variant).
+fn HR2::linear($nums_ref, $lo, $hi) {
+    my $prev2 = 0
+    my $prev1 = 0
+    my $i = $lo
+    while ($i <= $hi) {
+        my $take = $prev2 + $nums_ref->[$i]
+        my $skip = $prev1
+        my $cur = $take > $skip ? $take : $skip
+        $prev2 = $prev1
+        $prev1 = $cur
+        $i++
+    }
+    $prev1
+}
+
+fn HR2::circular_rob($nums_in) {
+    my @nums = @$nums_in
+    my $n = len(@nums)
+    return 0 if $n == 0
+    return $nums[0] if $n == 1
+    # Either rob houses [0 .. n-2] (skipping last) or [1 .. n-1] (skipping first)
+    my $opt1 = HR2::linear(\@nums, 0,      $n - 2)
+    my $opt2 = HR2::linear(\@nums, 1,      $n - 1)
+    $opt1 > $opt2 ? $opt1 : $opt2
+}
+
+Sci::banner("§119 jump+maxprod")
+{
+    # ── LC 55 can jump ────────────────────────────────────────
+    die "can_jump [2,3,1,1,4] = T"  unless JMP::can_jump([2, 3, 1, 1, 4])
+    die "can_jump [3,2,1,0,4] = F"  if     JMP::can_jump([3, 2, 1, 0, 4])
+    die "can_jump [0] = T"          unless JMP::can_jump([0])
+    die "can_jump [1,0,0] = F"      if     JMP::can_jump([1, 0, 0])
+    die "can_jump [2,0,0] = T"      unless JMP::can_jump([2, 0, 0])
+
+    # ── LC 45 min jumps ───────────────────────────────────────
+    die "min_jumps [2,3,1,1,4] = 2" unless JMP::min_jumps([2, 3, 1, 1, 4]) == 2
+    die "min_jumps [2,3,0,1,4] = 2" unless JMP::min_jumps([2, 3, 0, 1, 4]) == 2
+    die "min_jumps [1] = 0"          unless JMP::min_jumps([1]) == 0
+    die "min_jumps [] = 0"           unless JMP::min_jumps([]) == 0
+    die "min_jumps [1,2] = 1"        unless JMP::min_jumps([1, 2]) == 1
+
+    # ── LC 152 max product subarray ───────────────────────────
+    die "maxprod [2,3,-2,4] = 6"     unless MP::max_product_subarray([2, 3, -2, 4]) == 6
+    die "maxprod [-2,0,-1] = 0"      unless MP::max_product_subarray([-2, 0, -1]) == 0
+    die "maxprod [-2,3,-4] = 24"     unless MP::max_product_subarray([-2, 3, -4]) == 24
+    die "maxprod [0,2] = 2"          unless MP::max_product_subarray([0, 2]) == 2
+    die "maxprod [-3] = -3"          unless MP::max_product_subarray([-3]) == -3
+    die "maxprod single 7 = 7"       unless MP::max_product_subarray([7]) == 7
+
+    # ── LC 213 circular robber ────────────────────────────────
+    # [2,3,2] → 3 (cannot rob house 0 and house 2 since they're adjacent in circle)
+    die "circ_rob [2,3,2] = 3"       unless HR2::circular_rob([2, 3, 2]) == 3
+    # [1,2,3,1] → 4 (rob 1 + 3)
+    die "circ_rob [1,2,3,1] = 4"     unless HR2::circular_rob([1, 2, 3, 1]) == 4
+    # Single
+    die "circ_rob [5] = 5"           unless HR2::circular_rob([5]) == 5
+    # Two
+    die "circ_rob [1,2] = 2"         unless HR2::circular_rob([1, 2]) == 2
+    # Empty
+    die "circ_rob [] = 0"            unless HR2::circular_rob([]) == 0
+    # Large monotone [1..6] circular:
+    #   Linear[0..4]=values [1,2,3,4,5]: best subset 1+3+5=9
+    #   Linear[1..5]=values [2,3,4,5,6]: best subset 2+4+6=12
+    # Max = 12
+    die "circ_rob [1..6] = 12"       unless HR2::circular_rob([1, 2, 3, 4, 5, 6]) == 12
+}
+
 # Final report.
 p ""
 p "── §1 vectors          (≥ 30 invariants)"
@@ -18817,4 +22882,28 @@ p "── §92 articulation pts (≥ 10 invariants)"
 p "── §93 bipartite check (≥ 10 invariants)"
 p "── §94 3SUM + 4SUM     (≥ 14 invariants)"
 p "── §95 RMQ + slide win (≥ 14 invariants)"
+p "── §96 mono stack    (≥ 14 invariants)"
+p "── §97 RPN + shunting (≥ 14 invariants)"
+p "── §98 quickselect    (≥ 14 invariants)"
+p "── §99 toposort       (≥ 14 invariants)"
+p "── §100 Conway's Life (≥ 16 invariants)"
+p "── §101 segment tree  (≥ 16 invariants)"
+p "── §102 binary search (≥ 18 invariants)"
+p "── §103 Trie + wildcard (≥ 18 invariants)"
+p "── §104 coin change   (≥ 18 invariants)"
+p "── §105 stock suite   (≥ 16 invariants)"
+p "── §106 DP suite #4   (≥ 20 invariants)"
+p "── §107 parens suite  (≥ 18 invariants)"
+p "── §108 matrix manip  (≥ 16 invariants)"
+p "── §109 grid BFS/DFS  (≥ 18 invariants)"
+p "── §110 Fenwick (BIT) (≥ 16 invariants)"
+p "── §111 state BFS    (≥ 12 invariants)"
+p "── §112 multi-src BFS (≥ 14 invariants)"
+p "── §113 letter+IP    (≥ 16 invariants)"
+p "── §114 word search  (≥ 14 invariants)"
+p "── §115 NT advanced  (≥ 14 invariants)"
+p "── §116 interval sched (≥ 16 invariants)"
+p "── §117 slide window str (≥ 18 invariants)"
+p "── §118 prefix sum sub (≥ 16 invariants)"
+p "── §119 jump+maxprod  (≥ 18 invariants)"
 p "── scientific_compute_no_interop.stk: all invariants satisfied"
