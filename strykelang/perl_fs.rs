@@ -276,54 +276,46 @@ pub fn read_line_perl_compat_with_sep(
     Ok(n)
 }
 
-/// One record from `reader` using the legacy newline-only delimiter. Kept for callers that don't
-/// thread an explicit input record separator. New callers should use
-/// [`read_logical_line_perl_compat_with_sep`] so `-0` / `-0NN` / explicit `$/` settings flow
-/// through to the reader.
+/// One line from `reader` (delimiter `\n`), content **without** trailing `\n` / `\r\n` / `\r`,
+/// same as [`BufRead::lines`] but UTF-8 or Latin-1 per line.
+///
+/// Legacy newline-stripping reader kept for out-of-tree callers. New callers in line-mode
+/// processing should use [`read_logical_line_perl_compat_with_sep`] (which preserves the
+/// separator in the record per perl `<>` semantics) plus the caller's own chomp logic.
 pub fn read_logical_line_perl_compat(reader: &mut impl BufRead) -> io::Result<Option<String>> {
-    read_logical_line_perl_compat_with_sep(reader, Some(b'\n'))
+    let mut buf = Vec::new();
+    let n = reader.read_until(b'\n', &mut buf)?;
+    if n == 0 {
+        return Ok(None);
+    }
+    if buf.ends_with(b"\n") {
+        buf.pop();
+        if buf.ends_with(b"\r") {
+            buf.pop();
+        }
+    }
+    Ok(Some(decode_utf8_or_latin1_line(&buf)))
 }
 
-/// One record from `reader` honoring an explicit input record separator byte:
+/// One record from `reader` honoring an explicit input record separator byte. Matches perl's
+/// `<>` which leaves the IRS *in* `$_` — chomp / `-l` strip the IRS in the autoprint pipeline,
+/// not at the reader.
 ///
-/// - `Some(b'\n')` — default line mode. Strips trailing `\n` / `\r\n` / `\r` (matches stock perl).
-/// - `Some(other)` — perl `-0NN` mode (e.g. `-0` → `Some(0u8)` for NUL delimiter). Strips one
-///   trailing separator byte if present; no `\r` collapsing.
-/// - `None` — slurp mode (perl `-0777`): reads to EOF as one record, no trailing-byte strip.
+/// - `Some(byte)` — read until `byte`; trailing `byte` (and `\r` adjacent for `\n`) is kept in the
+///   returned record so the caller can emit it verbatim (perl `-p` behavior) or chomp it
+///   (perl `-l` / explicit chomp).
+/// - `None` — slurp mode (perl `-0777`): reads to EOF as one record.
 pub fn read_logical_line_perl_compat_with_sep(
     reader: &mut impl BufRead,
     sep: Option<u8>,
 ) -> io::Result<Option<String>> {
     let mut buf = Vec::new();
-    match sep {
-        None => {
-            // Slurp: read everything in one record.
-            let n = reader.read_to_end(&mut buf)?;
-            if n == 0 {
-                return Ok(None);
-            }
-        }
-        Some(b'\n') => {
-            let n = reader.read_until(b'\n', &mut buf)?;
-            if n == 0 {
-                return Ok(None);
-            }
-            if buf.ends_with(b"\n") {
-                buf.pop();
-                if buf.ends_with(b"\r") {
-                    buf.pop();
-                }
-            }
-        }
-        Some(byte) => {
-            let n = reader.read_until(byte, &mut buf)?;
-            if n == 0 {
-                return Ok(None);
-            }
-            if buf.last() == Some(&byte) {
-                buf.pop();
-            }
-        }
+    let n = match sep {
+        None => reader.read_to_end(&mut buf)?,
+        Some(byte) => reader.read_until(byte, &mut buf)?,
+    };
+    if n == 0 {
+        return Ok(None);
     }
     Ok(Some(decode_utf8_or_latin1_line(&buf)))
 }
@@ -1647,6 +1639,10 @@ mod tests {
     /// input reads the whole 5-byte buffer in one shot. Reported via the
     /// powerliners `togg` shell function whose add-path regex needs to match
     /// across newlines.
+    ///
+    /// Returns the record with the trailing input (no NUL exists in the file →
+    /// trailing `\n` from EOF is preserved) — perl `<>` leaves the IRS / trailing
+    /// bytes in `$_`; chomp / `-l` strip them in the autoprint pipeline.
     #[test]
     fn read_logical_line_with_sep_nul_reads_whole_no_nul_file_as_one_record() {
         use std::io::Cursor;
@@ -1661,18 +1657,19 @@ mod tests {
         );
     }
 
-    /// `-0NN` octal separator (e.g. `-040` = space) splits on that byte.
+    /// `-0NN` octal separator (e.g. `-040` = space) splits on that byte. Returns each record
+    /// with the trailing separator included (perl `$_` semantics).
     #[test]
     fn read_logical_line_with_sep_splits_on_arbitrary_byte() {
         use std::io::Cursor;
         let mut r = Cursor::new(b"a b c");
         assert_eq!(
             read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
-            Some("a".to_string()),
+            Some("a ".to_string()),
         );
         assert_eq!(
             read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
-            Some("b".to_string()),
+            Some("b ".to_string()),
         );
         assert_eq!(
             read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
@@ -1695,6 +1692,26 @@ mod tests {
         );
         assert_eq!(
             read_logical_line_perl_compat_with_sep(&mut r, None).unwrap(),
+            None,
+        );
+    }
+
+    /// Default line mode (`Some(b'\n')`) returns each line *with* trailing `\n`. Distinct from
+    /// `read_logical_line_perl_compat` which strips per its legacy contract.
+    #[test]
+    fn read_logical_line_with_sep_line_mode_preserves_trailing_newline() {
+        use std::io::Cursor;
+        let mut r = Cursor::new(b"foo\nbar\n");
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b'\n')).unwrap(),
+            Some("foo\n".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b'\n')).unwrap(),
+            Some("bar\n".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b'\n')).unwrap(),
             None,
         );
     }
