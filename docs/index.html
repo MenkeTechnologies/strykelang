@@ -1669,7 +1669,7 @@ s --script basename         <span class="comment"># run ./basename script, not b
         <h3>LSP — <code>stryke --lsp</code></h3>
         <ul>
           <li><strong>Hover</strong> over any builtin → category + signature + description from <code>%stryke::descriptions</code> / <code>%stryke::categories</code> (4,255 documented names)</li>
-          <li><strong>Completion</strong> with full builtin set (every spelling in <code>%all</code> — 11,093 keys including 643 aliases)</li>
+          <li><strong>Completion</strong> with full builtin set (every spelling in <code>%all</code> — 11,159 keys including 643 aliases)</li>
           <li><strong>Semantic tokens</strong> — keywords, builtins, sigils, types, regex flags get distinct token categories so themes can paint them independently</li>
           <li><strong>Signature help</strong> on function-call cursor</li>
           <li><strong>Code actions</strong> — server-side fix suggestions for common diagnostics</li>
@@ -1958,7 +1958,7 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>10,365 builtins in %b / 11,093 keys in %all in 40&nbsp;MB single static binary, zero-import</td>
+              <td>10,431 builtins in %b / 11,159 keys in %all in 40&nbsp;MB single static binary, zero-import</td>
               <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~3.6&nbsp;KB amortized per builtin, ~200&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>

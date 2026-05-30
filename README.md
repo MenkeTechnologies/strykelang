@@ -2029,7 +2029,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **458 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **173 Exercism solutions** — 2.6k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **778 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **347 Exercism solutions** — 2.7k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
@@ -2048,6 +2048,13 @@ stryke examples/tfidf_search_engine.stk         # TF-IDF inverted index + cosine
 stryke examples/gradient_descent_linreg.stk     # mini-batch SGD, pmap_reduce gradient sum
 stryke examples/kalman_filter_tracking.stk      # 1D Kalman filter, hand-rolled 2×2 matrix algebra
 stryke examples/markov_chain_analysis.stk       # transition matrix + stationary distribution
+
+# Scientific computing — single-file toolkit (95 sections, 18,820 lines, 2,120 hand-crafted die invariants)
+stryke --no-interop examples/scientific_compute_no_interop.stk   # vectors, matrices, LU/QR, eigenvalues, root-finding,
+                                                                 # quadrature, ODE/PDE, FFT, optimization, statistics,
+                                                                 # RNG, graph algos (BFS/DFS/Dijkstra/Tarjan/Kuhn),
+                                                                 # string algos (KMP/Z/BM/Aho-Corasick/SA/LCP/Manacher),
+                                                                 # DP suites, geometry, number theory, simulation
 
 # Parsers + interpreters
 stryke examples/mini_sql_executor.stk           # SELECT/WHERE/ORDER BY/LIMIT recursive-descent
