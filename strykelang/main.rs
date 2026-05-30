@@ -646,24 +646,38 @@ fn commit_in_place_edit(path: &Path, inplace_edit: &str, new_content: &str) -> s
     Ok(())
 }
 
-/// `BufRead::lines()` strips the terminator; Perl’s `<>` leaves it in `$_` unless **`-l`** is set,
-/// in which case Perl **chomps** each record. Match that so `print` + `$\` does not double newlines.
-fn line_mode_input_record(cli: &Cli, l: String) -> String {
-    if cli.line_ending.is_some() {
-        l
-    } else {
-        format!("{}\n", l)
+/// Perl `<>` leaves the IRS in `$_`. `-l` chomps each record on the way in (and then re-appends
+/// `$\` on every `print` so output matches input separator-for-separator). Implement that here:
+/// reader gives us the raw record (with IRS preserved); without `-l` we pass it through;
+/// with `-l` we strip one trailing separator byte (and `\r` adjacent for `\n`).
+fn line_mode_input_record(cli: &Cli, l: String, sep_byte: Option<u8>) -> String {
+    if cli.line_ending.is_none() {
+        return l;
     }
-}
-
-/// Content of one `read_line` result, without the trailing `\n` / `\r\n` / `\r` (same string `lines()`
-/// would have yielded for that physical line).
-fn line_content_from_stdin_read_line(buf: &str) -> String {
-    buf.strip_suffix("\r\n")
-        .or_else(|| buf.strip_suffix('\n'))
-        .or_else(|| buf.strip_suffix('\r'))
-        .unwrap_or(buf)
-        .to_string()
+    // `-l` chomp: strip one trailing IRS byte.
+    let mut bytes = l.into_bytes();
+    match sep_byte {
+        Some(b'\n') => {
+            if bytes.last() == Some(&b'\n') {
+                bytes.pop();
+                if bytes.last() == Some(&b'\r') {
+                    bytes.pop();
+                }
+            }
+        }
+        Some(byte) => {
+            if bytes.last() == Some(&byte) {
+                bytes.pop();
+            }
+        }
+        // Slurp (IRS = undef): perl `-l` with no IRS strips `\n`.
+        None => {
+            if bytes.last() == Some(&b'\n') {
+                bytes.pop();
+            }
+        }
+    }
+    String::from_utf8(bytes).unwrap_or_default()
 }
 
 /// `-n` / `-p` input loop: `@ARGV` files when non-empty, else stdin; `-i` rewrites named files.
@@ -816,7 +830,7 @@ fn run_line_mode_loop(
                             false
                         }
                     };
-                    let input = line_mode_input_record(cli, l);
+                    let input = line_mode_input_record(cli, l, sep_byte);
                     if let Some(output) = local.process_line(&input, program, is_last)? {
                         accumulated.push_str(&output);
                     }
@@ -870,7 +884,7 @@ fn run_line_mode_loop(
                             false
                         }
                     };
-                    let input = line_mode_input_record(cli, l);
+                    let input = line_mode_input_record(cli, l, sep_byte);
                     if let Some(output) = interp.process_line(&input, program, is_last)? {
                         if print_to_stdout {
                             print!("{}", output);
@@ -924,8 +938,10 @@ fn run_line_mode_loop(
             if let Some(pl) = peek_line {
                 interp.line_mode_stdin_pending.push_back(pl);
             }
-            let l = line_content_from_stdin_read_line(&current);
-            let input = line_mode_input_record(cli, l);
+            // perl `<>` leaves the IRS in `$_`; the reader already preserves the trailing
+            // bytes — pass the raw record to `line_mode_input_record` which applies `-l` chomp
+            // when configured.
+            let input = line_mode_input_record(cli, current, sep_byte);
             match interp.process_line(&input, program, is_last) {
                 Ok(Some(output)) => {
                     if print_to_stdout {
