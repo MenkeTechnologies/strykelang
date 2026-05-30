@@ -11,8 +11,8 @@ use rayon::prelude::*;
 use stryke::ast::Program;
 use stryke::error::{ErrorKind, StrykeError};
 use stryke::perl_fs::{
-    decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat,
-    read_logical_line_perl_compat,
+    decode_utf8_or_latin1, read_file_text_perl_compat, read_line_perl_compat_with_sep,
+    read_logical_line_perl_compat_with_sep,
 };
 use stryke::vm_helper::VMHelper;
 
@@ -667,12 +667,29 @@ fn line_content_from_stdin_read_line(buf: &str) -> String {
 }
 
 /// `-n` / `-p` input loop: `@ARGV` files when non-empty, else stdin; `-i` rewrites named files.
+/// Translate the interpreter's configured input record separator (`$/`) into a single byte
+/// for `read_logical_line_perl_compat_with_sep`. Mirrors perl's documented `-0` / `-0NN`
+/// semantics — the IRS is the byte that ends each record.
+///
+/// - `None` (slurp mode set independently of this path) → caller treats as `None` and
+///   reads the full file; this fn keeps `Some(b'\n')` as a safe fallback so the
+///   line-mode loop never silently changes behavior.
+/// - One-char string → that byte
+/// - Multi-char string → first byte (perl falls back the same way when given more)
+fn irs_separator_byte(irs: &Option<String>) -> Option<u8> {
+    match irs {
+        None => Some(b'\n'),
+        Some(s) => s.as_bytes().first().copied().or(Some(b'\n')),
+    }
+}
+
 fn run_line_mode_loop(
     cli: &Cli,
     interp: &mut VMHelper,
     program: &Program,
     slurp: bool,
 ) -> Result<(), StrykeError> {
+    let sep_byte = irs_separator_byte(&interp.irs);
     let inplace = cli.inplace.is_some();
     let use_argv_files = !interp.argv.is_empty();
     let suppressed_stdout_for_inplace = inplace && use_argv_files;
@@ -773,7 +790,7 @@ fn run_line_mode_loop(
                     let l = if let Some(s) = pending.take() {
                         s
                     } else {
-                        match read_logical_line_perl_compat(&mut reader).map_err(|e| {
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
                             StrykeError::new(
                                 ErrorKind::IO,
                                 format!("Error reading {}: {}", path, e),
@@ -785,7 +802,7 @@ fn run_line_mode_loop(
                             Some(s) => s,
                         }
                     };
-                    let is_last = match read_logical_line_perl_compat(&mut reader).map_err(|e| {
+                    let is_last = match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
                         StrykeError::new(
                             ErrorKind::IO,
                             format!("Error reading {}: {}", path, e),
@@ -827,7 +844,7 @@ fn run_line_mode_loop(
                     let l = if let Some(s) = pending.take() {
                         s
                     } else {
-                        match read_logical_line_perl_compat(&mut reader).map_err(|e| {
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
                             StrykeError::new(
                                 ErrorKind::IO,
                                 format!("Error reading {}: {}", path, e),
@@ -839,7 +856,7 @@ fn run_line_mode_loop(
                             Some(s) => s,
                         }
                     };
-                    let is_last = match read_logical_line_perl_compat(&mut reader).map_err(|e| {
+                    let is_last = match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
                         StrykeError::new(
                             ErrorKind::IO,
                             format!("Error reading {}: {}", path, e),
@@ -885,7 +902,7 @@ fn run_line_mode_loop(
                 current.len()
             } else {
                 let mut lock = io::stdin().lock();
-                read_line_perl_compat(&mut lock, &mut current).map_err(|e| {
+                read_line_perl_compat_with_sep(&mut lock, &mut current, sep_byte).map_err(|e| {
                     StrykeError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
                 })?
             };
@@ -895,7 +912,7 @@ fn run_line_mode_loop(
             let (is_last, peek_line) = {
                 let mut lock = io::stdin().lock();
                 let mut peek = String::new();
-                let n = read_line_perl_compat(&mut lock, &mut peek).map_err(|e| {
+                let n = read_line_perl_compat_with_sep(&mut lock, &mut peek, sep_byte).map_err(|e| {
                     StrykeError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
                 })?;
                 if n == 0 {

@@ -251,9 +251,24 @@ fn pattern_is_glob(path: &str) -> bool {
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
 pub fn read_line_perl_compat(reader: &mut impl BufRead, buf: &mut String) -> io::Result<usize> {
+    read_line_perl_compat_with_sep(reader, buf, Some(b'\n'))
+}
+
+/// Like [`read_line_perl_compat`] but honors an explicit input record separator byte. Mirrors
+/// perl `$/`:
+/// - `Some(byte)` — read until `byte`; trailing `byte` is included in the buffer.
+/// - `None`       — slurp: read to EOF.
+pub fn read_line_perl_compat_with_sep(
+    reader: &mut impl BufRead,
+    buf: &mut String,
+    sep: Option<u8>,
+) -> io::Result<usize> {
     buf.clear();
     let mut raw = Vec::new();
-    let n = reader.read_until(b'\n', &mut raw)?;
+    let n = match sep {
+        None => reader.read_to_end(&mut raw)?,
+        Some(byte) => reader.read_until(byte, &mut raw)?,
+    };
     if n == 0 {
         return Ok(0);
     }
@@ -261,18 +276,53 @@ pub fn read_line_perl_compat(reader: &mut impl BufRead, buf: &mut String) -> io:
     Ok(n)
 }
 
-/// One line from `reader` (delimiter `\n`), content **without** trailing `\n` / `\r\n` / `\r`,
-/// same as [`BufRead::lines`] but UTF-8 or Latin-1 per line.
+/// One record from `reader` using the legacy newline-only delimiter. Kept for callers that don't
+/// thread an explicit input record separator. New callers should use
+/// [`read_logical_line_perl_compat_with_sep`] so `-0` / `-0NN` / explicit `$/` settings flow
+/// through to the reader.
 pub fn read_logical_line_perl_compat(reader: &mut impl BufRead) -> io::Result<Option<String>> {
+    read_logical_line_perl_compat_with_sep(reader, Some(b'\n'))
+}
+
+/// One record from `reader` honoring an explicit input record separator byte:
+///
+/// - `Some(b'\n')` — default line mode. Strips trailing `\n` / `\r\n` / `\r` (matches stock perl).
+/// - `Some(other)` — perl `-0NN` mode (e.g. `-0` → `Some(0u8)` for NUL delimiter). Strips one
+///   trailing separator byte if present; no `\r` collapsing.
+/// - `None` — slurp mode (perl `-0777`): reads to EOF as one record, no trailing-byte strip.
+pub fn read_logical_line_perl_compat_with_sep(
+    reader: &mut impl BufRead,
+    sep: Option<u8>,
+) -> io::Result<Option<String>> {
     let mut buf = Vec::new();
-    let n = reader.read_until(b'\n', &mut buf)?;
-    if n == 0 {
-        return Ok(None);
-    }
-    if buf.ends_with(b"\n") {
-        buf.pop();
-        if buf.ends_with(b"\r") {
-            buf.pop();
+    match sep {
+        None => {
+            // Slurp: read everything in one record.
+            let n = reader.read_to_end(&mut buf)?;
+            if n == 0 {
+                return Ok(None);
+            }
+        }
+        Some(b'\n') => {
+            let n = reader.read_until(b'\n', &mut buf)?;
+            if n == 0 {
+                return Ok(None);
+            }
+            if buf.ends_with(b"\n") {
+                buf.pop();
+                if buf.ends_with(b"\r") {
+                    buf.pop();
+                }
+            }
+        }
+        Some(byte) => {
+            let n = reader.read_until(byte, &mut buf)?;
+            if n == 0 {
+                return Ok(None);
+            }
+            if buf.last() == Some(&byte) {
+                buf.pop();
+            }
         }
     }
     Ok(Some(decode_utf8_or_latin1_line(&buf)))
@@ -1589,5 +1639,63 @@ mod tests {
             Some("b".to_string())
         );
         assert_eq!(read_logical_line_perl_compat(&mut r).unwrap(), None);
+    }
+
+    /// Regression for the `-0` (NUL-separator) bug: stryke v0.16.4 ignored the
+    /// configured input record separator and hardcoded `\n`, so a NUL-free file
+    /// got split per line instead of read as one record. perl `-0` on the same
+    /// input reads the whole 5-byte buffer in one shot. Reported via the
+    /// powerliners `togg` shell function whose add-path regex needs to match
+    /// across newlines.
+    #[test]
+    fn read_logical_line_with_sep_nul_reads_whole_no_nul_file_as_one_record() {
+        use std::io::Cursor;
+        let mut r = Cursor::new(b"{\n\n}\n");
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(0u8)).unwrap(),
+            Some("{\n\n}\n".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(0u8)).unwrap(),
+            None,
+        );
+    }
+
+    /// `-0NN` octal separator (e.g. `-040` = space) splits on that byte.
+    #[test]
+    fn read_logical_line_with_sep_splits_on_arbitrary_byte() {
+        use std::io::Cursor;
+        let mut r = Cursor::new(b"a b c");
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
+            Some("a".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
+            Some("b".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
+            Some("c".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, Some(b' ')).unwrap(),
+            None,
+        );
+    }
+
+    /// `-0777` slurp mode reads everything as one record.
+    #[test]
+    fn read_logical_line_with_sep_none_slurps_to_eof() {
+        use std::io::Cursor;
+        let mut r = Cursor::new(b"line1\nline2\nline3");
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, None).unwrap(),
+            Some("line1\nline2\nline3".to_string()),
+        );
+        assert_eq!(
+            read_logical_line_perl_compat_with_sep(&mut r, None).unwrap(),
+            None,
+        );
     }
 }
