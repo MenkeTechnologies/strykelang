@@ -41,17 +41,17 @@ jobs:
             # musl: glibc-only fortified symbols (__snprintf_chk etc.) in
             # libcrypt.a — pre-existing blocker, not a regression.
             allow_failure: true
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             archive: tar.gz
-            # Native arm64 runner (free for public repos since Aug 2025).
-            # Replaces ubuntu-latest + cross+qemu which took hours and was
-            # silently killed by GitHub's runner monitor.
-            # The runner OOM-kills mid-build (~63min) on 463k-LOC trees;
-            # mark allow_failure so the publish + tap update still ship
-            # from the 4 working targets. Re-evaluate when GitHub bumps
-            # arm runner RAM.
-            allow_failure: true
+            # Cross-compile from ubuntu-latest x86_64 via cross-rs
+            # Docker container. Native ubuntu-24.04-arm runners OOM-
+            # killed mid-build (~63min) on 463k-LOC trees. cross-rs
+            # uses host RAM (16GB) instead of arm-runner RAM (~7GB),
+            # which is enough for strykelang's link step.
+            # No allow_failure: this target must succeed so the
+            # Homebrew formula's on_linux/on_arm block emits.
+            use_cross: true
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
@@ -66,19 +66,26 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install musl tools
-        if: contains(matrix.target, 'musl')
+        if: contains(matrix.target, 'musl') && !matrix.use_cross
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Install cross
-        if: matrix.cross
-        run: cargo install cross --locked
+        if: matrix.use_cross
+        run: |
+          # Prefer the prebuilt binary release over `cargo install`
+          # to save ~5 min of compile time per cross-build runner.
+          CROSS_VER="v0.2.5"
+          curl -sSL -o /tmp/cross.tar.gz \
+            "https://github.com/cross-rs/cross/releases/download/${CROSS_VER}/cross-x86_64-unknown-linux-gnu.tar.gz"
+          tar -C /tmp -xzf /tmp/cross.tar.gz
+          sudo install -m 755 /tmp/cross /usr/local/bin/cross
 
       - name: Build (native)
-        if: '!matrix.cross'
+        if: '!matrix.use_cross'
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Build (cross)
-        if: matrix.cross
+        if: matrix.use_cross
         run: cross build --release --locked --target ${{ matrix.target }}
 
       - name: Package
