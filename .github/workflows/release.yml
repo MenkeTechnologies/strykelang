@@ -41,17 +41,15 @@ jobs:
             # musl: glibc-only fortified symbols (__snprintf_chk etc.) in
             # libcrypt.a — pre-existing blocker, not a regression.
             allow_failure: true
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             archive: tar.gz
-            # Cross-compile from ubuntu-latest x86_64 via cross-rs
-            # Docker container. Native ubuntu-24.04-arm runners OOM-
-            # killed mid-build (~63min) on 463k-LOC trees. cross-rs
-            # uses host RAM (16GB) instead of arm-runner RAM (~7GB),
-            # which is enough for strykelang's link step.
-            # No allow_failure: this target must succeed so the
-            # Homebrew formula's on_linux/on_arm block emits.
-            use_cross: true
+            # Native aarch64 GHA runner — switched off cross-rs after
+            # repeated build-infra failures (Docker image fetch / glibc
+            # version mismatches). Native arm runner gets modern gcc +
+            # apt without the cross-rs container layer. Homebrew
+            # formula's on_linux/on_arm block depends on this target
+            # producing an artifact.
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
@@ -68,6 +66,12 @@ jobs:
       - name: Install musl tools
         if: contains(matrix.target, 'musl') && !matrix.use_cross
         run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install native deps for aarch64-linux-gnu (build toolchain)
+        if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config
 
       - name: Install cross
         if: matrix.use_cross
