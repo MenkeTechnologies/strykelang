@@ -57,8 +57,7 @@ fn every_op_keyword_works_as_package_leaf() {
     //   + 80000000 + 900000000 + 10000000000 + 110000000000
     assert_eq!(
         v,
-        1
-            + 20
+        1 + 20
             + 300
             + 4_000
             + 50_000
@@ -157,8 +156,7 @@ fn every_op_keyword_works_as_method_name() {
     );
     assert_eq!(
         v,
-        1
-            + 20
+        1 + 20
             + 300
             + 4_000
             + 50_000

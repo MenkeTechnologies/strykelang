@@ -227,47 +227,119 @@ demo_runs_no_interop!(demo_lzw_codec, "examples/lzw_codec_no_interop.stk");
 demo_runs_no_interop!(demo_manacher_pal, "examples/manacher_pal_no_interop.stk");
 demo_runs_no_interop!(demo_hungarian, "examples/hungarian_no_interop.stk");
 demo_runs_no_interop!(demo_hyperloglog, "examples/hyperloglog_no_interop.stk");
-demo_runs_no_interop!(demo_gaussian_elimination, "examples/gaussian_elimination_no_interop.stk");
-demo_runs_no_interop!(demo_eulerian_circuit, "examples/eulerian_circuit_no_interop.stk");
+demo_runs_no_interop!(
+    demo_gaussian_elimination,
+    "examples/gaussian_elimination_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_eulerian_circuit,
+    "examples/eulerian_circuit_no_interop.stk"
+);
 demo_runs_no_interop!(demo_two_sat, "examples/two_sat_no_interop.stk");
 demo_runs_no_interop!(demo_karatsuba, "examples/karatsuba_no_interop.stk");
 demo_runs_no_interop!(demo_wavelet_tree, "examples/wavelet_tree_no_interop.stk");
 demo_runs_no_interop!(demo_edmonds_karp, "examples/edmonds_karp_no_interop.stk");
-demo_runs_no_interop!(demo_chinese_remainder, "examples/chinese_remainder_no_interop.stk");
-demo_runs_no_interop!(demo_patience_sort_lis, "examples/patience_sort_lis_no_interop.stk");
-demo_runs_no_interop!(demo_smith_waterman, "examples/smith_waterman_no_interop.stk");
+demo_runs_no_interop!(
+    demo_chinese_remainder,
+    "examples/chinese_remainder_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_patience_sort_lis,
+    "examples/patience_sort_lis_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_smith_waterman,
+    "examples/smith_waterman_no_interop.stk"
+);
 demo_runs_no_interop!(demo_stoer_wagner, "examples/stoer_wagner_no_interop.stk");
 demo_runs_no_interop!(demo_closest_pair, "examples/closest_pair_no_interop.stk");
-demo_runs_no_interop!(demo_suffix_automaton, "examples/suffix_automaton_no_interop.stk");
+demo_runs_no_interop!(
+    demo_suffix_automaton,
+    "examples/suffix_automaton_no_interop.stk"
+);
 demo_runs_no_interop!(demo_hopcroft_dfa, "examples/hopcroft_dfa_no_interop.stk");
 demo_runs_no_interop!(demo_mo_algorithm, "examples/mo_algorithm_no_interop.stk");
 demo_runs_no_interop!(demo_splay_tree, "examples/splay_tree_no_interop.stk");
-demo_runs_no_interop!(demo_tonelli_shanks, "examples/tonelli_shanks_no_interop.stk");
+demo_runs_no_interop!(
+    demo_tonelli_shanks,
+    "examples/tonelli_shanks_no_interop.stk"
+);
 demo_runs_no_interop!(demo_lcp_kasai, "examples/lcp_kasai_no_interop.stk");
-demo_runs_no_interop!(demo_min_cost_max_flow, "examples/min_cost_max_flow_no_interop.stk");
-demo_runs_no_interop!(demo_regex_thompson_nfa, "examples/regex_thompson_nfa_no_interop.stk");
-demo_runs_no_interop!(demo_karger_min_cut, "examples/karger_min_cut_no_interop.stk");
+demo_runs_no_interop!(
+    demo_min_cost_max_flow,
+    "examples/min_cost_max_flow_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_regex_thompson_nfa,
+    "examples/regex_thompson_nfa_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_karger_min_cut,
+    "examples/karger_min_cut_no_interop.stk"
+);
 demo_runs_no_interop!(demo_strassen, "examples/strassen_no_interop.stk");
-demo_runs_no_interop!(demo_rotating_calipers, "examples/rotating_calipers_no_interop.stk");
-demo_runs_no_interop!(demo_boyer_moore_majority, "examples/boyer_moore_majority_no_interop.stk");
-demo_runs_no_interop!(demo_lazy_segment_tree, "examples/lazy_segment_tree_no_interop.stk");
+demo_runs_no_interop!(
+    demo_rotating_calipers,
+    "examples/rotating_calipers_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_boyer_moore_majority,
+    "examples/boyer_moore_majority_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_lazy_segment_tree,
+    "examples/lazy_segment_tree_no_interop.stk"
+);
 demo_runs_no_interop!(demo_bsgs, "examples/bsgs_no_interop.stk");
 demo_runs_no_interop!(demo_xor_basis, "examples/xor_basis_no_interop.stk");
 demo_runs_no_interop!(demo_ntt, "examples/ntt_no_interop.stk");
-demo_runs_no_interop!(demo_edmonds_blossom, "examples/edmonds_blossom_no_interop.stk");
-demo_runs_no_interop!(demo_adam_optimizer, "examples/adam_optimizer_no_interop.stk");
-demo_runs_no_interop!(demo_chinese_postman, "examples/chinese_postman_no_interop.stk");
-demo_runs_no_interop!(demo_chu_liu_edmonds, "examples/chu_liu_edmonds_no_interop.stk");
+demo_runs_no_interop!(
+    demo_edmonds_blossom,
+    "examples/edmonds_blossom_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_adam_optimizer,
+    "examples/adam_optimizer_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_chinese_postman,
+    "examples/chinese_postman_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_chu_liu_edmonds,
+    "examples/chu_liu_edmonds_no_interop.stk"
+);
 demo_runs_no_interop!(demo_runge_kutta_4, "examples/runge_kutta_4_no_interop.stk");
-demo_runs_no_interop!(demo_tarjan_articulation, "examples/tarjan_articulation_no_interop.stk");
-demo_runs_no_interop!(demo_brent_root_finding, "examples/brent_root_finding_no_interop.stk");
-demo_runs_no_interop!(demo_adaptive_simpson, "examples/adaptive_simpson_no_interop.stk");
+demo_runs_no_interop!(
+    demo_tarjan_articulation,
+    "examples/tarjan_articulation_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_brent_root_finding,
+    "examples/brent_root_finding_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_adaptive_simpson,
+    "examples/adaptive_simpson_no_interop.stk"
+);
 demo_runs_no_interop!(demo_boruvka_mst, "examples/boruvka_mst_no_interop.stk");
-demo_runs_no_interop!(demo_walsh_hadamard, "examples/walsh_hadamard_no_interop.stk");
+demo_runs_no_interop!(
+    demo_walsh_hadamard,
+    "examples/walsh_hadamard_no_interop.stk"
+);
 demo_runs_no_interop!(demo_li_chao_tree, "examples/li_chao_tree_no_interop.stk");
-demo_runs_no_interop!(demo_berlekamp_massey, "examples/berlekamp_massey_no_interop.stk");
-demo_runs_no_interop!(demo_ukkonen_suffix_tree, "examples/ukkonen_suffix_tree_no_interop.stk");
+demo_runs_no_interop!(
+    demo_berlekamp_massey,
+    "examples/berlekamp_massey_no_interop.stk"
+);
+demo_runs_no_interop!(
+    demo_ukkonen_suffix_tree,
+    "examples/ukkonen_suffix_tree_no_interop.stk"
+);
 demo_runs_no_interop!(demo_prolog_engine, "examples/prolog_engine_no_interop.stk");
 demo_runs_no_interop!(demo_chess_engine, "examples/chess_engine_no_interop.stk");
-demo_runs_no_interop!(demo_hindley_milner, "examples/hindley_milner_no_interop.stk");
+demo_runs_no_interop!(
+    demo_hindley_milner,
+    "examples/hindley_milner_no_interop.stk"
+);
 demo_runs_no_interop!(demo_sql_engine, "examples/sql_engine_no_interop.stk");

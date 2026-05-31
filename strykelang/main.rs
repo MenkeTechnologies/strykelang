@@ -804,32 +804,35 @@ fn run_line_mode_loop(
                     let l = if let Some(s) = pending.take() {
                         s
                     } else {
-                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
-                            StrykeError::new(
-                                ErrorKind::IO,
-                                format!("Error reading {}: {}", path, e),
-                                0,
-                                "-e",
-                            )
-                        })? {
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte)
+                            .map_err(|e| {
+                                StrykeError::new(
+                                    ErrorKind::IO,
+                                    format!("Error reading {}: {}", path, e),
+                                    0,
+                                    "-e",
+                                )
+                            })? {
                             None => break,
                             Some(s) => s,
                         }
                     };
-                    let is_last = match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
-                        StrykeError::new(
-                            ErrorKind::IO,
-                            format!("Error reading {}: {}", path, e),
-                            0,
-                            "-e",
-                        )
-                    })? {
-                        None => true,
-                        Some(next) => {
-                            pending = Some(next);
-                            false
-                        }
-                    };
+                    let is_last =
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte)
+                            .map_err(|e| {
+                                StrykeError::new(
+                                    ErrorKind::IO,
+                                    format!("Error reading {}: {}", path, e),
+                                    0,
+                                    "-e",
+                                )
+                            })? {
+                            None => true,
+                            Some(next) => {
+                                pending = Some(next);
+                                false
+                            }
+                        };
                     let input = line_mode_input_record(cli, l, sep_byte);
                     if let Some(output) = local.process_line(&input, program, is_last)? {
                         accumulated.push_str(&output);
@@ -858,32 +861,35 @@ fn run_line_mode_loop(
                     let l = if let Some(s) = pending.take() {
                         s
                     } else {
-                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
-                            StrykeError::new(
-                                ErrorKind::IO,
-                                format!("Error reading {}: {}", path, e),
-                                0,
-                                "-e",
-                            )
-                        })? {
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte)
+                            .map_err(|e| {
+                                StrykeError::new(
+                                    ErrorKind::IO,
+                                    format!("Error reading {}: {}", path, e),
+                                    0,
+                                    "-e",
+                                )
+                            })? {
                             None => break,
                             Some(s) => s,
                         }
                     };
-                    let is_last = match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte).map_err(|e| {
-                        StrykeError::new(
-                            ErrorKind::IO,
-                            format!("Error reading {}: {}", path, e),
-                            0,
-                            "-e",
-                        )
-                    })? {
-                        None => true,
-                        Some(next) => {
-                            pending = Some(next);
-                            false
-                        }
-                    };
+                    let is_last =
+                        match read_logical_line_perl_compat_with_sep(&mut reader, sep_byte)
+                            .map_err(|e| {
+                                StrykeError::new(
+                                    ErrorKind::IO,
+                                    format!("Error reading {}: {}", path, e),
+                                    0,
+                                    "-e",
+                                )
+                            })? {
+                            None => true,
+                            Some(next) => {
+                                pending = Some(next);
+                                false
+                            }
+                        };
                     let input = line_mode_input_record(cli, l, sep_byte);
                     if let Some(output) = interp.process_line(&input, program, is_last)? {
                         if print_to_stdout {
@@ -926,9 +932,16 @@ fn run_line_mode_loop(
             let (is_last, peek_line) = {
                 let mut lock = io::stdin().lock();
                 let mut peek = String::new();
-                let n = read_line_perl_compat_with_sep(&mut lock, &mut peek, sep_byte).map_err(|e| {
-                    StrykeError::new(ErrorKind::IO, format!("Error reading stdin: {e}"), 0, "-e")
-                })?;
+                let n = read_line_perl_compat_with_sep(&mut lock, &mut peek, sep_byte).map_err(
+                    |e| {
+                        StrykeError::new(
+                            ErrorKind::IO,
+                            format!("Error reading stdin: {e}"),
+                            0,
+                            "-e",
+                        )
+                    },
+                )?;
                 if n == 0 {
                     (true, None)
                 } else {
