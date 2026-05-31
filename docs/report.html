@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~471k Rust lines (production + tests + tooling) + ~223k .stk lines, 13,804 tests, 10,431 builtins (11,159 keys in %all), 347 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
+  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~471k Rust lines (production + tests + tooling) + ~227k .stk lines, 13,804 tests, 10,431 builtins (11,159 keys in %all), 347 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
   <title>strykelang &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,11 +92,11 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 347-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>354k production Rust lines + 223k .stk lines + 10,431 builtins (11,159 keys in %all) + 1,648 Rosetta tasks + 347 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 347-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>354k production Rust lines + 227k .stk lines + 10,431 builtins (11,159 keys in %all) + 1,648 Rosetta tasks + 347 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val">470,557</div><div class="stat-label">Rust Lines</div></div>
-        <div class="stat-card"><div class="stat-val">222,223</div><div class="stat-label">Stryke Lines (.stk)</div></div>
+        <div class="stat-card"><div class="stat-val">226,894</div><div class="stat-label">Stryke Lines (.stk)</div></div>
         <div class="stat-card"><div class="stat-val accent">10,431</div><div class="stat-label">Builtins (Primary)</div></div>
         <div class="stat-card"><div class="stat-val green">13,804</div><div class="stat-label">Test Functions</div></div>
         <div class="stat-card"><div class="stat-val">347</div><div class="stat-label">VM Opcodes</div></div>
@@ -141,7 +141,7 @@
             <td style="color:var(--green);"><strong>stryke</strong></td>
             <td>2026</td>
             <td class="num">0.09</td>
-            <td class="num">353,597 Rust + 222,223 stk</td>
+            <td class="num">353,597 Rust + 226,894 stk</td>
             <td class="num">10,431</td>
             <td>Cranelift</td>
             <td><strong>1,349 / 1,349 (100%)</strong></td>
@@ -711,11 +711,11 @@
       <!-- SECTION 10b: EXAMPLES &amp; SOLVED PROBLEMS  -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">.</span>EXAMPLES &amp; SOLVED PROBLEMS</h2>
-      <p class="tutorial-subtitle">Stryke ships with the largest curated corpus of cross-language exemplars in any single-author Perl 5 work-alike: 2,957 <code>.stk</code> programs under <code>examples/</code> totaling 222,223 LOC. <strong>All 1,349 Rosetta Code tasks in <code>list.txt</code> are solved (100%)</strong> &mdash; every test compiles and runs against the current build, so any builtin regression surfaces as a failing test before it reaches the parity suite.</p>
+      <p class="tutorial-subtitle">Stryke ships with the largest curated corpus of cross-language exemplars in any single-author Perl 5 work-alike: 2,957 <code>.stk</code> programs under <code>examples/</code> totaling 226,894 LOC. <strong>All 1,349 Rosetta Code tasks in <code>list.txt</code> are solved (100%)</strong> &mdash; every test compiles and runs against the current build, so any builtin regression surfaces as a failing test before it reaches the parity suite.</p>
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
         <div class="stat-card"><div class="stat-val accent">2,957</div><div class="stat-label">.stk Programs</div></div>
-        <div class="stat-card"><div class="stat-val">222,223</div><div class="stat-label">examples/ LOC</div></div>
+        <div class="stat-card"><div class="stat-val">226,894</div><div class="stat-label">examples/ LOC</div></div>
         <div class="stat-card"><div class="stat-val green">1,349</div><div class="stat-label">Rosetta Solved</div></div>
         <div class="stat-card"><div class="stat-val accent">100%</div><div class="stat-label">Rosetta Complete</div></div>
         <div class="stat-card"><div class="stat-val">173</div><div class="stat-label">Exercism Solutions</div></div>
@@ -732,7 +732,7 @@
           <tr><td style="color:var(--accent);">Top-level</td><td><code>examples/*.stk</code></td><td class="num">458</td><td class="num">46,439</td><td>Quick-start demos + worked end-to-end programs (TF-IDF search, mini-SQL executor, Kalman filter, Raft simulator, HTTP router with middleware, pub/sub bus, CSV ETL, …).</td></tr>
           <tr><td style="color:var(--accent);">Polyglot ports</td><td><code>examples/ruby/</code>, <code>examples/scheme/</code></td><td class="num">2</td><td class="num">9,077</td><td>Reference ports (not counted in Rosetta / Exercism rows).</td></tr>
         </tbody>
-        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">EXAMPLES TOTAL</td><td class="num">2,957</td><td class="num">222,223</td><td>5 groups under <code>examples/</code> &middot; ~75 LOC/file avg</td></tr></tfoot>
+        <tfoot><tr class="total-row"><td colspan="2" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1px;">EXAMPLES TOTAL</td><td class="num">2,957</td><td class="num">226,894</td><td>5 groups under <code>examples/</code> &middot; ~77 LOC/file avg</td></tr></tfoot>
       </table>
 
       <p style="font-size:11px;color:var(--text-muted);margin-top:0.8rem;">The Rosetta corpus is a complete cross-language reference port at 1,349/1,349 (100%). The full test runner (<code>s test examples/project/t examples/rosetta/t</code>) executes 1,751 <code>.stk</code> test files and 12,211 <code>assert_eq</code> / <code>assert_ok</code> checks across those trees; any builtin drift surfaces as a failing test before it reaches the parity suite. New Rosetta tasks land as fast as the canonical site adds them.</p>
@@ -802,7 +802,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 470,557 RUST LINES &middot; 222,223 STRYKE LINES &middot; 13,804 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 470,557 RUST LINES &middot; 226,894 STRYKE LINES &middot; 13,804 TESTS &middot; 10,431 BUILTINS / 11,159 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
