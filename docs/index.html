@@ -1583,7 +1583,7 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
         <p>Extract Variable / Constant / Parameter / Function (Cmd-Opt-V / -C / -P / -M), Wrap-in-<code>p</code>, toggle line comment. Extract works on caret-only (no manual selection needed) and inside double-quoted strings / backticks.</p>
 
         <h3>JetBrains plugin (<code>editors/intellij/</code>)</h3>
-        <p>First-class plugin for RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua. <code>.stk</code> file association, <strong>44-slot color scheme</strong>, hand-rolled lexer with finer-grained token categories (declaration vs control keywords, sigil variants, topic / block-param / special-var splits, pipe / arrow / range / regex-bind operators). The lexer correctly handles:</p>
+        <p>First-class plugin for RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua. <code>.stk</code> file association, <strong>48-slot color scheme</strong>, hand-rolled lexer with finer-grained token categories (declaration vs control keywords, sigil variants, topic / block-param / special-var splits, pipe / arrow / range / regex-bind operators). The lexer correctly handles:</p>
         <ul>
           <li>Every Perl regex-operator form as one atomic REGEX token — <code>s/PATTERN/REPL/FLAGS</code>, <code>tr/.../.../</code>, <code>y/.../.../</code>, <code>m/.../</code>, <code>qr/.../</code> — including embedded quote chars (<code>s/"/""/g</code>), paired-bracket delimiters (<code>s{foo}{bar}</code>), and mixed delimiters.</li>
           <li>Keyword spellings used as method names (<code>fn state</code>, <code>fn transition</code>) tokenize as <code>FUNCTION_DECL</code>, not the matching control/decl keyword.</li>
@@ -1689,14 +1689,305 @@ s --script basename         <span class="comment"># run ./basename script, not b
           <li><strong>Console output</strong> — <code>p</code> / <code>print</code> / <code>say</code> stream into the IDE Console in real-time (forced <code>$| = 1</code> autoflush in DAP mode)</li>
         </ul>
 
-        <h3>JetBrains plugin — <code>editors/intellij/</code></h3>
-        <p>First-class JVM plugin for the entire JetBrains paid lineup: <strong>RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua</strong>. Built on the IntelliJ Platform Gradle Plugin 2.16.0, Kotlin 2.0.21, JDK 17. Community editions are not supported — LSP API is paid-only on the JetBrains side.</p>
+        <h3 id="jetbrains-plugin">JetBrains plugin — <code>editors/intellij/</code></h3>
+        <p>First-class JVM plugin for the entire JetBrains paid lineup: <strong>RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua</strong>. Built on the IntelliJ Platform Gradle Plugin 2.16.0, Kotlin 2.0.21, JDK 17, SDK 2024.2.4 against builds <code>242..261.*</code>. Community editions don't have the LSP API and won't load the plugin. Talks to the in-tree <code>strykelang/lsp_extras.rs</code> + <code>strykelang/dap.rs</code> over JSON-RPC; no upstream <code>lsp-server</code> / <code>dap-types</code> crates anywhere on the Rust side. JetBrains' own <code>LspServerSupportProvider</code> is the only LSP4J consumer. Compiled <code>build/distributions/stryke-intellij-&lt;v&gt;.zip</code> is self-contained: only Kotlin stdlib + IntelliJ Platform classes at runtime. Full source-of-truth feature list lives in <a href="https://github.com/MenkeTechnologies/strykelang/blob/main/editors/intellij/README.md"><code>editors/intellij/README.md</code></a>.</p>
+
+        <h4>Install</h4>
+<pre><span class="comment"># Settings → Plugins → ⚙ → Install Plugin from Disk…</span>
+editors/intellij/build/distributions/stryke-intellij-&lt;version&gt;.zip</pre>
+        <p>After install: restart the IDE → open any <code>.stk</code> file → the LSP starts automatically → the debugger activates the first time you click Debug. The <code>stryke</code> (or <code>st</code>) binary must be on <code>$PATH</code>, or configured under <em>Settings → Tools → Stryke → Stryke executable</em>. The plugin tries <code>st</code> first, then <code>stryke</code>.</p>
+
+        <h4>Editor surfaces</h4>
+        <table class="reflection-table">
+          <thead><tr><th>Surface</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>File association</td><td><code>.stk</code> (configurable; add <code>pl</code> / <code>pm</code> / etc. under Settings → Tools → Stryke → File extensions)</td></tr>
+            <tr><td>Lexer</td><td>Hand-rolled in <code>StrykeLexer.kt</code> — instant first-paint highlighting before the LSP semantic-tokens response lands</td></tr>
+            <tr><td>Color slots</td><td><strong>48</strong> stable <code>STRYKE_*</code> <code>TextAttributesKey</code>s under <em>Settings → Editor → Color Scheme → Stryke</em>, grouped Comments / Strings / Numbers / Regex / Keywords / Names / Variables / Operators / Punctuation / Errors</td></tr>
+            <tr><td>Brace matching</td><td><code>{}</code> <code>()</code> <code>[]</code> via <code>StrykeBraceMatcher.kt</code></td></tr>
+            <tr><td>Comments</td><td>Cmd/Ctrl-<code>/</code> for <code>#</code> line comments via <code>StrykeCommenter.kt</code>. POD <code>=pod ... =cut</code> requires column-0 markers, so the platform block-comment binding routes to multi-line <code>#</code> instead</td></tr>
+            <tr><td>Quote handler</td><td><code>"</code>, <code>'</code>, <code>`</code>, regex <code>/…/</code> and <code>m{…}</code> / <code>qr//</code> auto-pair</td></tr>
+            <tr><td>Smart-Enter</td><td>Indent + auto-close for <code>fn</code> / <code>sub</code> / <code>class</code> / <code>struct</code> / <code>if</code> / <code>while</code> / <code>foreach</code> / <code>match</code> / <code>try</code> blocks</td></tr>
+            <tr><td>Goto declaration</td><td>Cmd-click / Cmd-B routed through <code>StrykeGotoDeclarationHandler.kt</code> over LSP</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Lexer token coverage</h4>
+        <table class="reflection-table">
+          <thead><tr><th>Category</th><th>Examples</th></tr></thead>
+          <tbody>
+            <tr><td>Comments</td><td><code>#</code> line, <code>##</code> doc, POD <code>=pod … =cut</code></td></tr>
+            <tr><td>Strings</td><td><code>"…"</code>, <code>'…'</code>, <code>qw(…)</code>, <code>qq(…)</code>, <code>qr/…/</code>, heredocs (<code>&lt;&lt;EOT</code>, <code>&lt;&lt;~EOT</code>, <code>&lt;&lt;'EOT'</code>)</td></tr>
+            <tr><td>Numbers</td><td><code>42</code>, <code>3.14</code>, <code>0xFF</code>, <code>0b1010</code>, <code>0o755</code>, <code>1_000_000</code>, <code>1e10</code></td></tr>
+            <tr><td>Regex (atomic REGEX tokens)</td><td><code>/…/flags</code>, <code>m{…}flags</code>, <code>s/…/…/flags</code>, <code>tr/…/…/flags</code>, <code>y/…/…/</code>, <code>qr/…/</code> — handles embedded quote chars (<code>s/"/""/g</code>), paired-bracket delimiters (<code>s{foo}{bar}</code>), mixed delimiters</td></tr>
+            <tr><td>Declarations</td><td><code>my</code> / <code>our</code> / <code>state</code> / <code>use</code> / <code>package</code> / <code>frozen</code></td></tr>
+            <tr><td>Function/type</td><td><code>fn</code> / <code>sub</code> / <code>class</code> / <code>struct</code> / <code>trait</code> / <code>enum</code></td></tr>
+            <tr><td>Control flow</td><td><code>if</code> / <code>unless</code> / <code>elsif</code> / <code>else</code> / <code>while</code> / <code>until</code> / <code>for</code> / <code>foreach</code> / <code>do</code> / <code>match</code> / <code>try</code> / <code>given</code> / <code>when</code></td></tr>
+            <tr><td>Phase blocks</td><td><code>BEGIN</code> / <code>END</code> / <code>INIT</code> / <code>CHECK</code> / <code>UNITCHECK</code></td></tr>
+            <tr><td>Word operators</td><td><code>and</code> / <code>or</code> / <code>not</code> / <code>xor</code> / <code>eq</code> / <code>ne</code> / <code>lt</code> / <code>gt</code> / <code>cmp</code> / <code>x</code></td></tr>
+            <tr><td>Booleans</td><td><code>true</code> / <code>false</code> / <code>undef</code></td></tr>
+            <tr><td>Builtins</td><td>full canonical set from <code>%stryke::builtins</code></td></tr>
+            <tr><td>Parallel builtins</td><td><code>pmap</code> / <code>pgrep</code> / <code>pfor</code> / <code>preduce</code> / <code>pforks</code> / …</td></tr>
+            <tr><td>Sigil vars</td><td><code>$x</code> scalar, <code>@x</code> array, <code>%x</code> hash, <code>$!</code> / <code>$@</code> special, <code>$_</code> / <code>@_</code> topic, <code>$_0</code> / <code>$_1</code> block params</td></tr>
+            <tr><td>Block-param grammar</td><td><code>_</code>, <code>_&lt;</code>, <code>_&lt;2</code>, <code>_&lt;&lt;&lt;&lt;&lt;</code>, <code>$_&lt;3</code>, <code>$_2&lt;&lt;&lt;</code> all lex as single <code>BLOCK_PARAM</code> tokens</td></tr>
+            <tr><td>Package paths</td><td><code>Foo::Bar</code>, <code>Foo::Bar::baz()</code></td></tr>
+            <tr><td>Operators</td><td><code>=&gt;</code>, <code>-&gt;</code>, <code>~&gt;</code>, <code>|&gt;</code>, <code>=~</code>, <code>!~</code>, <code>..</code>, <code>...</code>, <code>&lt;=&gt;</code></td></tr>
+            <tr><td>Punctuation</td><td>parens / braces / brackets / commas / semicolons split into independent color categories</td></tr>
+            <tr><td>Edge cases</td><td>Keyword spellings used as method names (<code>fn state</code>) tokenize as <code>FUNCTION_DECL</code>, not the matching control keyword. Keyword spellings used as hash keys (<code>$h-&gt;{state}</code>, <code>state =&gt; 1</code>) tokenize as <code>IDENTIFIER</code>. Perl-style <code>@{[ EXPR ]}</code> interpolations inside double-quoted strings tokenize the interior as code. <code>&lt;&lt;TAG</code> heredocs after a closing <code>}</code> correctly tokenize as <code>HereDoc</code>, not <code>ShiftLeft</code>; numeric/sigil RHS still hits <code>ShiftLeft</code> (so <code>1 &lt;&lt; 4</code> and <code>$x &lt;&lt; $shift</code> still work).</td></tr>
+          </tbody>
+        </table>
+
+        <h4>LSP capabilities</h4>
+        <p>The LSP server is in-process inside the <code>stryke</code> binary — <code>stryke --lsp</code> (or <code>st --lsp</code>) spawns it over stdio with Content-Length-framed JSON-RPC. Hand-rolled framer on top of <code>serde_json</code> — no <code>lsp-server</code> / <code>lsp-types</code> crates. Plugin side starts it via <code>StrykeLspServerSupportProvider.kt</code>; descriptor in <code>StrykeLspServerDescriptor.kt</code>. Optional <code>STRYKE_LSP_LOG=&lt;path&gt;</code> env var dumps every request/response for debugging.</p>
+        <table class="reflection-table">
+          <thead><tr><th>Capability</th><th>Trigger / scope</th></tr></thead>
+          <tbody>
+            <tr><td><code>completion</code></td><td>trigger chars <code>$</code> <code>@</code> <code>%</code> <code>:</code> <code>_</code> plus all letters; <code>resolveProvider</code>; <strong>60 snippet templates</strong> keyed by prefix</td></tr>
+            <tr><td><code>hover</code></td><td>full markdown cards from <code>lsp_docs_domains.rs</code>; category-stub fallback for any <code>%stryke::builtins</code> entry without a hand card; ≈25k hover-card-backed identifiers spanning every builtin / keyword / operator / Perl5-compat / extension / parallel primitive / sketch / phase block</td></tr>
+            <tr><td><code>definition</code> / <code>declaration</code> / <code>references</code> / <code>documentHighlight</code></td><td>cross-file via the server's <code>SymbolTable</code></td></tr>
+            <tr><td><code>documentSymbol</code></td><td>every <code>sub</code> / <code>fn</code> / <code>class</code> / <code>struct</code> / <code>enum</code> / <code>trait</code> / <code>package</code> decl, plus top-level <code>my</code> / <code>our</code></td></tr>
+            <tr><td><code>foldingRange</code></td><td>every <code>{ … }</code> block, POD <code>=pod … =cut</code>, 3+ consecutive <code>#</code> comment runs</td></tr>
+            <tr><td><code>rename</code> (with <code>prepareRename</code>)</td><td>scalars / arrays / hashes / subs / functions / types / packages; cross-file for package-scoped symbols</td></tr>
+            <tr><td><code>semanticTokens/full</code></td><td>token classes mirroring the lexer; LSP overlay refines what the hand lexer approximates</td></tr>
+            <tr><td><code>signatureHelp</code></td><td>parameter hints with active-arg tracking</td></tr>
+            <tr><td><code>codeAction</code></td><td>line-local quickfixes (<em>Wrap line in <code>p</code></em>, <em>Comment / Uncomment line</em>) plus Extract refactorings — see Code Actions below</td></tr>
+            <tr><td><code>formatting</code></td><td>Cmd/Ctrl-Opt-<code>L</code> pipes the document through stryke's built-in formatter (<code>fmt::format_program</code>): 4-space indent, normalized operator spacing, single-line rewrites for short blocks</td></tr>
+            <tr><td><code>publishDiagnostics</code></td><td>parse + compile errors with line/col</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Completion snippets (60 templates)</h4>
+        <p>Tab walks the <code>${1:...}</code> placeholders to the final <code>${0}</code> cursor:</p>
+        <table class="reflection-table">
+          <thead><tr><th>Family</th><th>Prefixes</th></tr></thead>
+          <tbody>
+            <tr><td>Control flow</td><td><code>if</code> / <code>ifelse</code> / <code>ifelsif</code> / <code>elsif</code> / <code>else</code> / <code>while</code> / <code>until</code> / <code>for</code> / <code>forrange</code> / <code>foreach</code> / <code>do</code> / <code>match</code> / <code>try</code> / <code>given</code></td></tr>
+            <tr><td>Declarations</td><td><code>my</code> / <code>fn</code> / <code>sub</code> / <code>class</code> / <code>struct</code> / <code>enum</code> / <code>trait</code></td></tr>
+            <tr><td>Parallel primitives</td><td><code>pmap</code> / <code>pmaps</code> / <code>pgrep</code> / <code>pfor</code> / <code>preduce</code> / <code>pforks</code> / <code>pwhile</code></td></tr>
+            <tr><td>Phase blocks</td><td><code>BEGIN</code> / <code>END</code> / <code>INIT</code> / <code>CHECK</code></td></tr>
+            <tr><td>Module setup</td><td><code>use</code> / <code>strict</code> / <code>shebang</code> / <code>main</code></td></tr>
+            <tr><td>Scaffolds</td><td><code>web</code> / <code>svg</code> / <code>system</code> / <code>git</code> / <code>test</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>Code actions</h4>
+        <p>Surfaced under <strong>Alt-Enter</strong> (intentions popup). The IntelliJ Refactor menu (Ctrl-T) is reserved for native PSI-based refactorings; LSP-driven extract / inline / rewrite kinds show up in the intentions popup, not under that menu. All three Extract actions use <code>kind: "refactor.extract"</code> (parent kind), so they match <code>refactor.extract.method</code> / <code>.variable</code> / <code>.constant</code> queries via prefix.</p>
+        <table class="reflection-table">
+          <thead><tr><th>Action</th><th>Selection shape</th><th>Edit shape</th></tr></thead>
+          <tbody>
+            <tr><td>Extract to variable (Cmd-Opt-V)</td><td>single-line, full-line OR sub-expression</td><td>inserts <code>my $name = &lt;rhs&gt;</code> above, replaces selection with <code>$name</code></td></tr>
+            <tr><td>Extract to constant (Cmd-Opt-C)</td><td>single-line, full-line OR sub-expression</td><td>inserts <code>my frozen $NAME = &lt;rhs&gt;</code> above (uppercase placeholder), replaces selection with <code>$NAME</code></td></tr>
+            <tr><td>Extract to function (Cmd-Opt-M)</td><td>multi-line</td><td>wraps the selection in <code>fn extracted_fn { … }</code> above the block, replaces the original range with a call. v1 does no free-variable analysis.</td></tr>
+            <tr><td>Wrap line in <code>p</code></td><td>caret on line</td><td>wraps the current statement in <code>p(…)</code> for quick print debugging</td></tr>
+            <tr><td>Comment / Uncomment line</td><td>caret on line</td><td>toggles a <code>#</code> prefix on the current line</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Reflection tool window (9 tabs)</h4>
+        <p><em>View → Tool Windows → Stryke</em> (right edge). Fed live from <code>stryke -e 'p tj({%stryke::*})'</code> on first open (≈25k entries):</p>
+        <table class="reflection-table">
+          <thead><tr><th>Tab</th><th>Source hash</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>All <code>%all</code></td><td>merged union</td><td>one tree spanning every category</td></tr>
+            <tr><td>Builtins <code>%b</code></td><td><code>%stryke::builtins</code></td><td>every builtin grouped by category (math, IO, string, regex, …)</td></tr>
+            <tr><td>Keywords <code>%k</code></td><td><code>%stryke::keywords</code></td><td>reserved words + control-flow keywords</td></tr>
+            <tr><td>Operators <code>%o</code></td><td><code>%stryke::operators</code></td><td>arithmetic / logical / regex-bind / arrow / range / list</td></tr>
+            <tr><td>Special vars <code>%v</code></td><td><code>%stryke::special_vars</code></td><td><code>$_</code>, <code>$@</code>, <code>$!</code>, <code>@ARGV</code>, <code>%ENV</code>, <code>@INC</code>, <code>$0</code>, <code>$$</code>, <code>$0..$9</code> regex captures</td></tr>
+            <tr><td>Perl5 <code>%pc</code></td><td><code>%stryke::perl_compats</code></td><td>every name stryke supports for Perl5 compatibility</td></tr>
+            <tr><td>Extensions <code>%e</code></td><td><code>%stryke::extensions</code></td><td>stryke-only additions (parallel primitives, sketches, async / trace / timer / aop, rust FFI)</td></tr>
+            <tr><td>Aliases <code>%a</code></td><td><code>%stryke::aliases</code></td><td>alias → canonical name</td></tr>
+            <tr><td>Descriptions <code>%d</code></td><td><code>%stryke::descriptions</code></td><td>name → one-line summary</td></tr>
+          </tbody>
+        </table>
+        <p>Each tab is a tree grouped by category, with a per-tab search field filtering across name + category.</p>
+        <table class="reflection-table">
+          <thead><tr><th>Interaction</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td>Left-click on leaf</td><td>Anchored docs popup. Renders <code>stryke docs NAME</code> with ANSI colors decoded via IntelliJ's <code>AnsiEscapeDecoder</code> + <code>ConsoleView</code> — same body as a terminal <code>stryke docs &lt;name&gt;</code> lookup.</td></tr>
+            <tr><td>Right-click on leaf</td><td>Context menu: <em>Show Docs</em> + <em>Copy Name</em></td></tr>
+            <tr><td>Toolbar → Refresh</td><td>Re-runs <code>stryke -e 'p tj({%stryke::*})'</code> and reloads every tab</td></tr>
+            <tr><td>Toolbar → Settings</td><td>Opens <em>Settings → Tools → Stryke</em></td></tr>
+          </tbody>
+        </table>
+
+        <h4>Run configurations</h4>
+        <table class="reflection-table">
+          <thead><tr><th>Surface</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Run config (<code>StrykeRunConfigurationType</code>)</td><td>toggles for <code>--no-interop</code> / <code>--disasm</code> / <code>--profile</code> / <code>--flame</code> / <code>-d</code> / <code>-D</code>; working directory + script args + interpreter args</td></tr>
+            <tr><td>Context menu</td><td><em>Run with stryke</em> on any <code>.stk</code> file in the editor or project view; auto-creates a config</td></tr>
+            <tr><td>Producer</td><td><code>StrykeRunConfigurationProducer</code> materializes a run config from the active file</td></tr>
+            <tr><td>Output</td><td>Standard <code>ConsoleView</code> — <code>p</code> / <code>print</code> / <code>printf</code> / <code>say</code> stream in real time</td></tr>
+            <tr><td>File → New → Stryke File</td><td>Standard New-File dialog; pick <em>Script</em> (shebanged, <code>fn main</code> stub), <em>Library / module</em>, or <em>Empty</em>. Same entry surfaces in the Project-view right-click <em>New</em> submenu.</td></tr>
+          </tbody>
+        </table>
+
+        <h4>DAP debugger</h4>
+        <p>DAP-backed, over a loopback TCP socket. Plugin spawns <code>st --dap 127.0.0.1:&lt;port&gt;</code>; stryke connects back. TCP transport keeps <code>OSProcessHandler</code> stdout/stderr free for the program's own <code>p</code>/<code>print</code> output.</p>
+        <table class="reflection-table">
+          <thead><tr><th>Feature</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Line breakpoints</td><td>Gutter toggle / enable / disable; persistent across sessions</td></tr>
+            <tr><td>Function breakpoints</td><td>Run → View Breakpoints → +</td></tr>
+            <tr><td>Stepping</td><td>Continue / Step Over / Step Into / Step Out / Pause / Run to Cursor — standard XDebugger actions</td></tr>
+            <tr><td>Frames</td><td><code>file:line</code> per frame, click to navigate source</td></tr>
+            <tr><td>Variables panel</td><td>Three-tier sort — user <code>my</code> vars on top, magic block params (<code>$_</code>, <code>$_0</code>, <code>$_1</code>, …, <code>$a</code>, <code>$b</code>) middle, stryke built-ins (<code>$stryke::VERSION</code>, <code>%ENV</code>, <code>%term</code>, <code>@INC</code>, …) bottom. <code>__synthetic__</code> compiler internals hidden.</td></tr>
+            <tr><td>Recursive expansion</td><td><code>[N] (key =&gt; val, …)</code> summary with disclosure triangles, drill in to <code>key = value</code> rows; depth-capped at 12, count-capped at 2000</td></tr>
+            <tr><td>Rich drill-down</td><td><code>StructInstance</code> / <code>ClassInstance</code> (one row per field, <code>+</code>/<code>#</code>/<code>-</code> visibility markers, <code>__class</code> + <code>__isa</code> metadata); <code>EnumInstance</code> (variant + carried data); <code>Set</code> (<code>Set(N) {a, b, c}</code>); every sketch type (<code>TDigestSketch</code> → count/min/max/mean/sum/p50-p99/compression; <code>BloomFilter</code> → inserted/bit_count/k/fpr; <code>HllSketch</code> / <code>CmsSketch</code> / <code>TopKSketch</code>)</td></tr>
+            <tr><td>Evaluate dialog</td><td>Pure expressions (<code>55 + 3</code>, <code>sqrt(2)</code>, <code>len(@INC)</code>) plus expressions using the current frame's scalars (<code>$a * $b</code>) via prelude injection into a <code>st -e</code> subprocess</td></tr>
+            <tr><td>Console</td><td>Program <code>p</code> / <code>print</code> / <code>printf</code> / <code>say</code> output in real time (autoflush + flush-on-pause)</td></tr>
+            <tr><td>Two debuggers</td><td><code>st -d file.stk</code> (TTY REPL, <code>perl -d</code> style) and <code>st --dap HOST:PORT</code> (consumed by this plugin) share one <code>Debugger</code> state machine</td></tr>
+          </tbody>
+        </table>
+
+        <h4>DAP protocol — plugin and server flow</h4>
+        <p>Plugin side (<code>com.menketechnologies.stryke.dap</code>):</p>
+        <ol>
+          <li><code>StrykeDebugRunner.doExecute</code> opens a <code>ServerSocket(0)</code> on <code>127.0.0.1</code>, captures the port.</li>
+          <li>Spawns <code>st --dap 127.0.0.1:&lt;port&gt;</code> via <code>KillableColoredProcessHandler</code> — <code>OSProcessHandler</code> keeps the process's stdio for Console output, exclusively.</li>
+          <li>Waits up to 10 s for stryke to connect back, then runs DAP over that socket.</li>
+          <li>Creates an <code>XDebugSession</code> via <code>XDebuggerManager.startSession</code> and returns the descriptor via <code>getMockRunContentDescriptorIfInitialized</code> reflection — bypasses the platform's split-debugger <code>Logger.error("[Split debugger] …")</code> toast that the deprecated <code>runContentDescriptor</code> getter fires.</li>
+          <li><code>StrykeDebugProcess.createConsole</code> builds a <code>ConsoleView</code> and <code>attachToProcess(processHandler)</code> so program stdout streams in real time.</li>
+          <li><code>StrykeDapClient</code> reads Content-Length-framed JSON-RPC from the socket — <strong>byte-based, not char-based</strong> — so multi-byte UTF-8 in variable reprs doesn't desync framing.</li>
+          <li>On <code>stopped</code> event, <code>onStopped</code> synchronously fetches <code>stackTrace</code> + <code>scopes</code> + <code>variables</code>, builds <code>StrykeStackFrame</code> objects with pre-populated children, calls <code>session.positionReached</code>. No async expansion on the UI thread — IntelliJ 2026.1's split-debugger drops those.</li>
+          <li><code>StrykeEvaluator</code> sends <code>evaluate</code> requests for the Evaluate dialog; stryke does scalar-prelude injection so <code>$a * $b</code> returns the right value from the paused frame.</li>
+        </ol>
+        <p>Stryke side (<code>strykelang/dap.rs</code> + <code>strykelang/debugger.rs</code>):</p>
         <ul>
-          <li><strong><code>.stk</code> file association</strong> with 44-slot color scheme — keywords, sigils, builtins, types, regex bodies/flags, heredocs, sub names, class fields, all paint independently</li>
-          <li><strong>LSP client</strong> consuming <code>stryke --lsp</code> — semantic tokens, completion, hover, signature help, code actions</li>
-          <li><strong>DAP debugger</strong> consuming <code>stryke --dap HOST:PORT</code> (TCP transport keeps <code>OSProcessHandler</code> stdout/stderr free for the program's own <code>p</code>/<code>print</code> output)</li>
-          <li><strong>Reflection tool window</strong> — 9 tabs on the live <code>%stryke::*</code> hashes (≈11k builtin names, 643 aliases, 85 keywords, 309 categories, 4,291 descriptions, 8,851 primaries, 10,179 extensions, 186 perl_compats). Left single-click opens the docs popup; right-click inserts at cursor</li>
-          <li><strong>Run configurations + gutter run icons</strong> — execute, debug, or profile any <code>.stk</code> file with one click</li>
+          <li><code>Debugger</code> state machine (breakpoints, step modes, call depth) shared between TTY and DAP front-ends. Step-over depends on <code>enter_sub</code> / <code>leave_sub</code> being called at every VM call dispatch site so <code>call_depth</code> matches the program's logical call stack — without these hooks step-over drops into UDFs instead of skipping them.</li>
+          <li>Same-line guard tracks both <code>last_stop_line</code> and <code>last_stop_depth</code>. Without the depth half, step-in fires on the same source line as the call site (first opcode of the call setup has the same line as <code>my $r = foo()</code>), requiring two clicks to actually enter <code>foo</code>.</li>
+          <li><code>set_topic</code> for implicit <code>for (@arr) { … }</code> loops so <code>$_</code> / <code>$_0</code> / <code>_</code> / <code>_0</code> all alias.</li>
+          <li>Snapshot capture (<code>capture_locals_with_map</code>) walks the scope, builds per-variable refs for hashes / arrays / structs / classes / enums / sets / sketches, recursively expanding their children into a <code>var_ref_map</code> (depth 12, count 2000) so the DAP <code>variables</code> request resolves any ref to its rows.</li>
+          <li>stdout/stderr autoflush + flush on every pause so output lands in the Console before the suspend UI takes over.</li>
+        </ul>
+
+        <h4>Refactor / Rename</h4>
+        <p><strong>Shift-F6</strong> on any of these identifiers renames it across the workspace via <code>textDocument/rename</code>:</p>
+        <ul>
+          <li>Scalar / array / hash variables (<code>$x</code>, <code>@xs</code>, <code>%h</code>) — the sigil is included in the identifier extraction, so <code>$pass</code> and the <code>pass</code> builtin no longer collide.</li>
+          <li><code>my</code> / <code>state</code> / <code>our</code> declarations (and the <code>frozen my</code> constant form).</li>
+          <li>Subroutine / function declarations (<code>fn</code>, <code>sub</code>).</li>
+          <li>Struct / class / enum / trait names and their constructor / method call sites (<code>Point-&gt;new</code>, <code>Color::Red</code>).</li>
+          <li>Package names declared via <code>package Foo::Bar;</code>.</li>
+        </ul>
+        <p>Cross-file rename fires when the symbol is package-scoped (sub, type, <code>our</code>, package). The server scans every other open document, finds exact-name matches in its <code>SymbolTable</code>, and falls back to a textual qualified-name scan for files that reference the symbol without re-declaring it. Locally-scoped <code>my</code> / <code>state</code> decls and sub parameters are file-scoped and never cross files. Rename of struct/class/enum/trait fields and methods is AST-based with no textual fallback, so <code>my %h = (width =&gt; 1)</code> is never mistaken for a field reference when renaming <code>width</code>. The server defensively strips a <code>::</code> qualifier from <code>newName</code> so clients that send the full prefilled identifier still produce the correct bare replacement. Hovering on the <code>format</code> key in <code>$opts{format}</code> or the <code>exec</code> selector in <code>$db-&gt;exec</code> does NOT show the <code>format</code> / <code>exec</code> builtin card — those are hash keys / method selectors, not builtin references. Implementation: <code>StrykeRenameHandler.kt</code> + <code>strykelang/lsp_extras.rs::rename</code>.</p>
+
+        <h4>Configuration — <em>Settings → Tools → Stryke</em></h4>
+        <table class="reflection-table">
+          <thead><tr><th>Section</th><th>Setting</th><th>Default</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Interpreter</td><td>Stryke executable</td><td>first <code>st</code> then <code>stryke</code> on <code>$PATH</code></td><td>absolute path or blank</td></tr>
+            <tr><td>LSP</td><td>Enable LSP</td><td>on</td><td>master toggle</td></tr>
+            <tr><td>LSP</td><td>Extra LSP args</td><td>empty</td><td>passed after <code>--lsp</code></td></tr>
+            <tr><td>LSP</td><td>LSP environment</td><td>empty</td><td><code>KEY=VAL</code> pairs (e.g. <code>STRYKE_LOG_LEVEL=debug</code>)</td></tr>
+            <tr><td>LSP</td><td>Auto-restart LSP on settings change</td><td>on</td><td>restart picks up new env</td></tr>
+            <tr><td>LSP</td><td>Show builtin hovers</td><td>on</td><td>server-provided cards</td></tr>
+            <tr><td>LSP</td><td>Log LSP traffic to file</td><td>off</td><td>sets <code>STRYKE_LSP_LOG=&lt;path&gt;</code></td></tr>
+            <tr><td>Editor</td><td>Disable lexer highlighting</td><td>off</td><td>rely only on LSP semantic tokens</td></tr>
+            <tr><td>Editor</td><td>File extensions</td><td><code>stk</code></td><td>comma-separated; add <code>pl</code> / <code>pm</code> to enable for Perl files</td></tr>
+            <tr><td>Run configs</td><td>Default <code>--no-interop</code></td><td>off</td><td>strict stryke parser by default</td></tr>
+          </tbody>
+        </table>
+
+        <h4>Logs</h4>
+        <p>Two append-only logs, both under <code>~/.stryke/</code> (or <code>$STRYKE_HOME/</code> when set):</p>
+        <table class="reflection-table">
+          <thead><tr><th>File</th><th>Source</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td><code>~/.stryke/stryke-plugin.log</code></td><td>Kotlin (plugin)</td><td>LSP command line built, DAP <code>send</code> / receive (seq + command + bytes), rename / semantic-token routing, breakpoint handler steps</td></tr>
+            <tr><td><code>~/.stryke/stryke.log</code></td><td>Rust (<code>stryke --lsp</code> / <code>--dap</code>)</td><td>Levelled events (<code>TRACE</code> / <code>DEBUG</code> / <code>INFO</code> / <code>WARN</code> / <code>ERROR</code>) — startup, initialize, every request method (TRACE), didOpen / Change / Close + diagnostics (DEBUG), rename / hover outcomes, DAP launch / breakpoints / step / pause / disconnect, milestone events (<code>stopped</code> / <code>terminated</code> / <code>exited</code>)</td></tr>
+          </tbody>
+        </table>
+        <p>Tail both with <code>tail -f ~/.stryke/stryke.log ~/.stryke/stryke-plugin.log</code>. Server-side level controlled by <code>$STRYKE_LOG_LEVEL</code> (<code>trace</code> / <code>debug</code> / <code>info</code> default / <code>warn</code> / <code>error</code>, case-insensitive). Rotation: <code>STRYKE_LOG_MAX_BYTES</code> (default <code>5242880</code> = 5 MiB; <code>0</code> disables) + <code>STRYKE_LOG_MAX_FILES</code> (default <code>5</code>). When the active log hits the cap, <code>stryke.log.N-1</code> shifts to <code>stryke.log.N</code> (eldest overwritten), then active moves to <code>stryke.log.1</code>. Default bounds the log dir at ≈<code>(N+1) × MAX_BYTES</code> = ~30 MiB. <code>$STRYKE_LOG_FILE=/abs/path/to.log</code> overrides the resolved path entirely (used by tests + sandbox runs). Per-IDE chatter still goes to <code>idea.log</code> via <code>Logger.getInstance(...)</code>.</p>
+
+        <h4>Building</h4>
+<pre>cd editors/intellij
+./gradlew buildPlugin             <span class="comment"># → build/distributions/stryke-intellij-&lt;v&gt;.zip</span>
+./gradlew runIde                  <span class="comment"># launches a sandbox IDE with the plugin installed</span>
+./gradlew verifyPlugin            <span class="comment"># plugin verifier against recommended IDE matrix</span>
+./gradlew test                    <span class="comment"># StrykeLexerTest + StrykeColorSettingsPageTest + StrykeSmartEnterProcessorTest</span></pre>
+        <p>First build downloads the IntelliJ Platform SDK (~1 GB), takes a few minutes, and is cached under <code>editors/intellij/.intellijPlatform/</code> (gitignored).</p>
+
+        <h4>Plugin architecture</h4>
+<pre>editors/intellij/
+├── build.gradle.kts                   <span class="comment"># IntelliJ Platform Gradle Plugin 2.16</span>
+├── gradle.properties                  <span class="comment"># platform version, plugin version, JVM</span>
+├── settings.gradle.kts
+└── src/main/
+    ├── kotlin/com/menketechnologies/stryke/
+    │   ├── StrykeLanguage.kt          <span class="comment"># Language singleton</span>
+    │   ├── StrykeFileType.kt          <span class="comment"># .stk → Stryke</span>
+    │   ├── StrykeIcons.kt             <span class="comment"># icon loader</span>
+    │   ├── StrykeColors.kt            <span class="comment"># 48 STRYKE_* TextAttributesKey constants</span>
+    │   ├── StrykeTokenTypes.kt        <span class="comment"># token type enum</span>
+    │   ├── StrykeLexer.kt             <span class="comment"># hand-rolled lexer</span>
+    │   ├── StrykeSyntaxHighlighter.kt <span class="comment"># token → color mapping</span>
+    │   ├── StrykeColorSettingsPage.kt <span class="comment"># IDE color-scheme entries</span>
+    │   ├── StrykeBraceMatcher.kt      <span class="comment"># {} () []</span>
+    │   ├── StrykeCommenter.kt         <span class="comment"># `#` line comments</span>
+    │   ├── StrykeQuoteHandler.kt      <span class="comment"># " ' ` / m{} qr// auto-pair</span>
+    │   ├── StrykeSmartEnterProcessor.kt <span class="comment"># indent + auto-close blocks</span>
+    │   ├── StrykeParserDefinition.kt
+    │   ├── StrykeSettings.kt          <span class="comment"># persistent settings</span>
+    │   ├── StrykeSettingsConfigurable.kt
+    │   ├── StrykeDebugLog.kt          <span class="comment"># plugin-side log writer</span>
+    │   ├── lsp/
+    │   │   ├── StrykeLspServerSupportProvider.kt
+    │   │   └── StrykeLspServerDescriptor.kt
+    │   ├── refactor/
+    │   │   ├── StrykeRefactoringSupportProvider.kt   <span class="comment"># Extract Method/Var/Const routing</span>
+    │   │   └── StrykeRenameHandler.kt
+    │   ├── navigate/
+    │   │   └── StrykeGotoDeclarationHandler.kt       <span class="comment"># Cmd-click + Cmd-B</span>
+    │   ├── actions/
+    │   │   ├── RunStrykeFileAction.kt
+    │   │   └── CreateStrykeFileAction.kt              <span class="comment"># File → New → Stryke File</span>
+    │   ├── run/
+    │   │   ├── StrykeRunConfigurationType.kt
+    │   │   ├── StrykeRunConfigurationOptions.kt
+    │   │   ├── StrykeRunConfiguration.kt
+    │   │   ├── StrykeRunConfigurationEditor.kt
+    │   │   ├── StrykeRunConfigurationProducer.kt
+    │   │   ├── StrykeProgramRunner.kt    <span class="comment"># Run executor</span>
+    │   │   └── StrykeDebugRunner.kt      <span class="comment"># Debug executor (DAP)</span>
+    │   ├── dap/
+    │   │   ├── StrykeDapClient.kt        <span class="comment"># byte-based DAP protocol client</span>
+    │   │   ├── StrykeDebugProcess.kt     <span class="comment"># XDebugProcess</span>
+    │   │   ├── StrykeDebuggerEditorsProvider.kt
+    │   │   ├── StrykeBreakpointType.kt   <span class="comment"># xdebugger.breakpointType</span>
+    │   │   ├── StrykeBreakpointHandler.kt
+    │   │   ├── StrykeStackFrame.kt
+    │   │   ├── StrykeSuspendContext.kt
+    │   │   ├── StrykeValue.kt            <span class="comment"># XValue with recursive children</span>
+    │   │   └── StrykeEvaluator.kt        <span class="comment"># Evaluate dialog backend</span>
+    │   └── toolwindow/
+    │       └── StrykeReflectionToolWindow.kt
+    └── resources/
+        ├── META-INF/plugin.xml
+        └── icons/stryke.svg</pre>
+        <p>Rust-side counterparts:</p>
+        <table class="reflection-table">
+          <thead><tr><th>Module</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>strykelang/lsp_extras.rs</code></td><td>LSP server (<code>stryke --lsp</code>) — hover, completion, codeAction, rename, semanticTokens, foldingRange, signatureHelp, diagnostics, formatting</td></tr>
+            <tr><td><code>strykelang/dap.rs</code> + <code>strykelang/debugger.rs</code></td><td>DAP server (<code>stryke --dap HOST:PORT</code>) — breakpoints, stepping, scopes, variables (recursive), evaluate</td></tr>
+            <tr><td><code>strykelang/lsp_docs_domains.rs</code></td><td>Hover-card bodies grouped by domain (math, IO, string, regex, parallel, sketches, …)</td></tr>
+            <tr><td><code>strykelang/fmt.rs</code></td><td>Formatter (<code>stryke --fmt</code>) — same engine <code>textDocument/formatting</code> invokes</td></tr>
+            <tr><td><code>strykelang/reflection.rs</code></td><td>Builds the <code>%stryke::*</code> hashes that the reflection tool window serializes via <code>st -e 'p tj({%stryke::*})'</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>Version compatibility</h4>
+        <p>Plugin version tracks the strykelang Cargo version. <code>gradle.properties</code> controls the supported IDE range via <code>pluginSinceBuild</code> / <code>pluginUntilBuild</code>. Currently targets <code>2024.2.4</code> SDK against builds <code>242..261.*</code> — every paid JetBrains IDE on <strong>2024.2 +</strong> loads it (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua). Community editions don't have the LSP API and won't load the plugin.</p>
+
+        <h4>Limitations</h4>
+        <ul>
+          <li><strong>No PSI tree or structural navigation</strong> — relies entirely on the LSP for symbol navigation. Disabling the LSP under Settings disables them all.</li>
+          <li><strong>Debugger v1</strong>: no conditional or hit-count breakpoints, no exception breakpoints, no watch expressions, no Set Value, single-thread only. Step-into across <code>use</code>d modules works only if the called sub has line mapping in the same compilation unit.</li>
+          <li><strong>Evaluator</strong> injects only scalars from the current frame. Expressions referencing user-defined <code>@arr</code> / <code>%hash</code> see them as empty in the subprocess. Builtins / globals (<code>@INC</code>, <code>%ENV</code>, etc.) work.</li>
+          <li><strong>Lexer</strong> is a regex-class scanner; complex constructs (heredocs, <code>qw()</code>, nested string interpolation) are not fully tokenized — they fall back to "string". Server-side semantic tokens fill in where the lexer is approximate.</li>
+          <li><strong><code>[Split debugger]</code> toast on Debug start</strong> — the IDE's deprecated <code>XDebugSession.runContentDescriptor</code> accessor fires <code>Logger.error</code> even when bypassed via reflection if any third-party code touches it during session bring-up. JetBrains' own debug runners suffer the same noise in 2024.3+. Cosmetic only; the debugger works.</li>
+          <li><strong>Reflection hashes (<code>%stryke::*</code>)</strong> populate lazily on first user access in DAP mode (eager <code>ensure_reflection_hashes</code> triggers a VM stack overflow that's still TBD). The standalone Stryke tool window fetches them via <code>st -e</code> and is unaffected.</li>
         </ul>
 
         <h3>Other editors</h3>
