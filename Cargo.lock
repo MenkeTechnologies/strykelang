@@ -5137,6 +5137,7 @@ dependencies = [
  "errno",
  "fancy-regex",
  "flate2",
+ "fusevm",
  "git2",
  "glob",
  "hex",

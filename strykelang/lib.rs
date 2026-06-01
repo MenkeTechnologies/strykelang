@@ -63,6 +63,9 @@ pub mod builtins_validate;
 pub mod builtins_vision_ir_algorithms;
 /// `bytecode` submodule.
 pub mod bytecode;
+/// `fusevm_bridge` submodule: translates strykelang bytecode to the shared
+/// [`fusevm`] runtime, making strykelang a fusevm frontend (opt-in JIT tier).
+pub mod fusevm_bridge;
 /// `capture` submodule.
 pub mod capture;
 /// `cli_runners` submodule.
