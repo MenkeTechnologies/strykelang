@@ -1060,6 +1060,74 @@ impl<'a> VM<'a> {
             .unwrap_or(0)
     }
 
+    /// Tier-0 JIT: run a `ReturnValue`-terminated subroutine body on the shared
+    /// [`fusevm`] runtime when its ops are in the strict universal-integer slot
+    /// subset (see [`crate::fusevm_bridge::segment_is_fusevm_eligible`]).
+    ///
+    /// Reuses the same segment analysis and `i64` slot marshaling as
+    /// [`Self::try_jit_subroutine_linear`], so it only accepts bodies that path
+    /// would also accept. Returns `Ok(true)` when fusevm executed the sub and the
+    /// VM should continue at `return_ip`; `Ok(false)` falls through to
+    /// strykelang's own JIT/interpreter with no observable effect.
+    fn try_fusevm_subroutine(&mut self) -> Result<bool, StrykeError> {
+        let ip = self.ip;
+        debug_assert!(self.sub_entry_at_ip.get(ip).copied().unwrap_or(false));
+        let ops: &Vec<Op> = &self.ops;
+        let ops = ops as *const Vec<Op>;
+        let ops = unsafe { &*ops };
+        let Some((seg, term)) = crate::jit::sub_entry_segment(ops, ip) else {
+            return Ok(false);
+        };
+        if !matches!(term, crate::jit::SubTerminator::Value) {
+            return Ok(false);
+        }
+        if !crate::fusevm_bridge::segment_is_fusevm_eligible(seg, ip) {
+            return Ok(false);
+        }
+
+        // Marshal the integer slots the body reads, mirroring the linear sub-JIT.
+        let mut slot_n = 0usize;
+        if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
+            let n = max as usize + 1;
+            self.jit_buf_slot.resize(n, 0);
+            for i in 0..=max {
+                let pv = self.interp.scope.get_scalar_slot(i);
+                self.jit_buf_slot[i as usize] = match pv.as_integer() {
+                    Some(v) => v,
+                    None if pv.is_undef() && crate::jit::slot_undef_prefill_ok_seq(seg, i) => 0,
+                    None => return Ok(false),
+                };
+            }
+            slot_n = n;
+        }
+
+        let Some(v) =
+            crate::fusevm_bridge::run_linear_segment(seg, ip, &mut self.jit_buf_slot[..slot_n], term)
+        else {
+            return Ok(false);
+        };
+
+        if slot_n > 0 {
+            for idx in crate::jit::linear_slot_ops_written_indices_seq(seg) {
+                self.interp
+                    .scope
+                    .set_scalar_slot(idx, StrykeValue::integer(self.jit_buf_slot[idx as usize]));
+            }
+        }
+        if let Some(frame) = self.call_stack.pop() {
+            self.interp.wantarray_kind = frame.saved_wantarray;
+            self.stack.truncate(frame.stack_base);
+            self.interp.pop_scope_to_depth(frame.scope_depth);
+            if frame.jit_trampoline_return {
+                self.jit_trampoline_out = Some(v);
+            } else {
+                self.push(v);
+                self.ip = frame.return_ip;
+            }
+        }
+        Ok(true)
+    }
+
     /// Cranelift linear JIT for a subroutine body when `ip` is a compiled sub entry (see `Chunk::sub_entries`).
     /// Returns `Ok(true)` when the sub was executed natively and the VM should continue at `return_ip`.
     fn try_jit_subroutine_linear(&mut self) -> Result<bool, StrykeError> {
@@ -2816,6 +2884,12 @@ impl<'a> VM<'a> {
                     && (!self.sub_jit_skip_linear_test(sub_ip)
                         || !self.sub_jit_skip_block_test(sub_ip));
                 if should_try_jit {
+                    // Tier 0: shared fusevm runtime. Falls through to strykelang's
+                    // own JIT below when the segment isn't in the universal-integer
+                    // subset fusevm handles.
+                    if self.try_fusevm_subroutine()? {
+                        continue;
+                    }
                     if !self.sub_jit_skip_linear_test(sub_ip) && self.try_jit_subroutine_linear()? {
                         continue;
                     }
