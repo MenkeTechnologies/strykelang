@@ -405,6 +405,9 @@ pub(crate) fn segment_is_fusevm_eligible(seg: &[Op], seg_start: usize) -> bool {
                     return false;
                 }
             }
+            // Always-float unary built-ins (e.g. `sqrt`) lowered to a native
+            // fusevm float op; eligible like any other arithmetic op.
+            _ if is_float_unary_builtin(op) => continue,
             _ => return false,
         }
     }
@@ -531,6 +534,14 @@ fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
         | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => {
             stack.push(NumTy::Int)
         }
+        // Always-float unary built-ins (e.g. `sqrt`): consume one operand of any
+        // kind and produce a float, lowered to a native fusevm float op.
+        _ if is_float_unary_builtin(op) => {
+            if stack.pop().is_none() {
+                return false;
+            }
+            stack.push(NumTy::Float);
+        }
         // Everything else — `Mod`, bit/shift ops, `Inc`/`Dec`, fused-loop
         // ops, string ops, plain-slot reads — is not float-safe here.
         _ => return false,
@@ -584,10 +595,14 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
     use Op::*;
     // The float-operand path applies to a segment that either carries an explicit
     // float literal (`LoadFloat`), performs strykelang's always-float division
-    // (`Div`, lowered to fusevm `Op::AwkDivJit`), or always-float exponentiation
-    // (`Pow`, lowered to fusevm `Op::PowFloat`). A segment with none of these is
+    // (`Div`, lowered to fusevm `Op::AwkDivJit`), always-float exponentiation
+    // (`Pow`, lowered to fusevm `Op::PowFloat`), or an always-float unary built-in
+    // (`sqrt`, lowered to fusevm `Op::SqrtFloat`). A segment with none of these is
     // pure integer and is already covered by `segment_is_fusevm_eligible`.
-    if !seg.iter().any(|o| matches!(o, LoadFloat(_) | Div | Pow)) {
+    if !seg
+        .iter()
+        .any(|o| matches!(o, LoadFloat(_) | Div | Pow) || is_float_unary_builtin(o))
+    {
         return None;
     }
     let n = seg.len();
@@ -916,6 +931,9 @@ fn translate_op_into(
             fixups.push((body.len(), *t - seg_start));
             body.push(F::JumpIfFalse(0));
         }
+        // Always-float unary built-in `sqrt($x)` -> native fusevm `Op::SqrtFloat`
+        // (Cranelift `fsqrt`), which JITs and persists to the on-disk cache.
+        _ if is_float_unary_builtin(op) => body.push(F::SqrtFloat),
         _ => return false,
     }
     true
@@ -1013,7 +1031,19 @@ fn build_chunk(
 /// preserves the float through [`value_from_fusevm`].
 #[inline]
 fn segment_result_is_integer(seg: &[Op]) -> bool {
-    !seg.iter().any(|o| matches!(o, Op::Div | Op::Pow))
+    !seg.iter()
+        .any(|o| matches!(o, Op::Div | Op::Pow) || is_float_unary_builtin(o))
+}
+
+/// Whether `op` is a strykelang built-in call that the bridge lowers to an
+/// always-float fusevm op (currently `sqrt` -> [`fusevm::Op::SqrtFloat`]). Such a
+/// segment yields a float regardless of its operand kinds, so — like `Div`/`Pow`
+/// — it routes through the float block-JIT path (see
+/// [`segment_fusevm_float_result_kind`]) rather than the integer one, and its
+/// result is reconstructed as a float.
+#[inline]
+fn is_float_unary_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Sqrt as u16)
 }
 
 /// Configure fusevm's per-thread block-JIT warmup so the first invocation of a
@@ -1423,6 +1453,40 @@ mod tests {
             let out = run_linear_segment(&float_pow_cmp, 0, &mut slots, SubTerminator::Value)
                 .expect("float-exponentiation compare must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "($x={x} ** 2.0) < 5.0");
+        }
+
+        // `Op::CallBuiltin(Sqrt, 1)` lowers to fusevm's native `Op::SqrtFloat`
+        // (Cranelift `fsqrt`), an always-float unary built-in: `sqrt($x)` yields
+        // an exact float (sqrt(9) == 3.0) and is eligible even without an explicit
+        // `LoadFloat`.
+        let float_sqrt = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(crate::bytecode::BuiltinId::Sqrt as u16, 1),
+        ];
+        assert!(segment_is_fusevm_float_eligible(&float_sqrt, 0));
+        assert_eq!(
+            segment_fusevm_float_result_kind(&float_sqrt, 0),
+            Some(NumTy::Float)
+        );
+        let mut sslots = [9_i64];
+        let out = run_linear_segment(&float_sqrt, 0, &mut sslots, SubTerminator::Value)
+            .expect("bare float sqrt must run on fusevm");
+        assert_eq!(out.as_float(), Some(3.0), "sqrt(9) == 3.0");
+
+        // `sqrt($x) < 2.0` yields a bool: true for x=2 (1.41 < 2.0), false for
+        // x=9 (3.0 < 2.0).
+        let float_sqrt_cmp = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(crate::bytecode::BuiltinId::Sqrt as u16, 1),
+            Op::LoadFloat(2.0),
+            Op::NumLt,
+        ];
+        assert!(segment_is_fusevm_float_eligible(&float_sqrt_cmp, 0));
+        for (x, want) in [(2_i64, 1_i64), (9, 0)] {
+            let mut slots = [x];
+            let out = run_linear_segment(&float_sqrt_cmp, 0, &mut slots, SubTerminator::Value)
+                .expect("float-sqrt compare must run on fusevm");
+            assert_eq!(out.as_integer(), Some(want), "sqrt($x={x}) < 2.0");
         }
 
         // A segment with no float operand is not a float segment (the integer path
