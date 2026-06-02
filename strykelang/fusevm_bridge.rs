@@ -92,6 +92,19 @@ pub mod ext_ops {
     /// String `oct` — parse as octal/hex/binary (Perl `oct`). Unary `(i64) -> i64`.
     pub const STK_STR_OCT: u16 = 0x0012;
 
+    /// String `uc` — upper-case. Unary, but unlike length/ord/hex/oct it *allocates*
+    /// a new owned string and returns its raw NaN-boxed bits as an `i64` handle (the
+    /// helper `mem::forget`s the result, transferring `Arc` ownership; the bridge
+    /// reconstructs one owning `StrykeValue` via `from_raw_bits`, exactly like
+    /// `STK_STR_CONCAT`). Routed only when the operand is a plain string.
+    pub const STK_STR_UC: u16 = 0x0013;
+    /// String `lc` — lower-case. Unary string→string handle (see `STK_STR_UC`).
+    pub const STK_STR_LC: u16 = 0x0014;
+    /// String `ucfirst` — upper-case first char. Unary string→string handle.
+    pub const STK_STR_UCFIRST: u16 = 0x0015;
+    /// String `lcfirst` — lower-case first char. Unary string→string handle.
+    pub const STK_STR_LCFIRST: u16 = 0x0016;
+
     /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
 }
@@ -287,10 +300,13 @@ const STRYKE_STR_UNARY_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
     (ext_ops::STK_STR_OCT, "stryke_str_oct", stryke_h_str_oct),
 ];
 
-/// True for any unary string Extended id (`length`/`ord`/`hex`/`oct`).
+/// True for any unary string Extended id (`length`/`ord`/`hex`/`oct` →int, or
+/// `uc`/`lc`/`ucfirst`/`lcfirst` →string handle). Both share the `(i64) -> i64`
+/// host-helper ABI and the single-operand emit/dispatch path.
 #[inline]
 fn is_stryke_str_unary_ext(ext_id: u16) -> bool {
     STRYKE_STR_UNARY_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+        || is_stryke_str_unary_str_ext(ext_id)
 }
 
 /// The registered JIT helper id for a unary string Extended op, if any.
@@ -298,6 +314,7 @@ fn is_stryke_str_unary_ext(ext_id: u16) -> bool {
 fn stryke_str_unary_helper_id(ext_id: u16) -> Option<u32> {
     STRYKE_STR_UNARY_HELPERS
         .iter()
+        .chain(STRYKE_STR_UNARY_STR_HELPERS.iter())
         .find(|(id, _, _)| *id == ext_id)
         .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
 }
@@ -311,6 +328,89 @@ fn stryke_str_unary_op(ext_id: u16, a_bits: i64) -> i64 {
         ext_ops::STK_STR_ORD => stryke_str_ord_op(a_bits),
         ext_ops::STK_STR_HEX => stryke_str_hex_op(a_bits),
         ext_ops::STK_STR_OCT => stryke_str_oct_op(a_bits),
+        _ => stryke_str_unary_str_op(ext_id, a_bits),
+    }
+}
+
+/// Build a freshly-allocated, *owned* `StrykeValue::string` from `s` and return its
+/// raw NaN-boxed bits, transferring `Arc` ownership into the handle via `mem::forget`
+/// (identical contract to [`stryke_str_concat_op`]): the caller reconstitutes exactly
+/// one owning `StrykeValue` via `from_raw_bits`, so there is no leak/double-free.
+#[inline]
+fn forget_string_bits(s: String) -> i64 {
+    let new = StrykeValue::string(s);
+    let bits = new.raw_bits() as i64;
+    std::mem::forget(new);
+    bits
+}
+
+/// `uc($s)`: borrow the operand and return an owned upper-cased string handle, using
+/// the same [`StrykeValue::uc_value`] the interpreter uses. Eligibility guarantees a
+/// plain-string operand.
+#[inline]
+fn stryke_str_uc_op(a_bits: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.uc_value())
+}
+extern "C" fn stryke_h_str_uc(a: i64) -> i64 {
+    stryke_str_uc_op(a)
+}
+
+/// `lc($s)`: owned lower-cased string handle (see [`StrykeValue::lc_value`]).
+#[inline]
+fn stryke_str_lc_op(a_bits: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.lc_value())
+}
+extern "C" fn stryke_h_str_lc(a: i64) -> i64 {
+    stryke_str_lc_op(a)
+}
+
+/// `ucfirst($s)`: owned handle, first char upper-cased (see [`StrykeValue::ucfirst_value`]).
+#[inline]
+fn stryke_str_ucfirst_op(a_bits: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.ucfirst_value())
+}
+extern "C" fn stryke_h_str_ucfirst(a: i64) -> i64 {
+    stryke_str_ucfirst_op(a)
+}
+
+/// `lcfirst($s)`: owned handle, first char lower-cased (see [`StrykeValue::lcfirst_value`]).
+#[inline]
+fn stryke_str_lcfirst_op(a_bits: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.lcfirst_value())
+}
+extern "C" fn stryke_h_str_lcfirst(a: i64) -> i64 {
+    stryke_str_lcfirst_op(a)
+}
+
+/// Table of the unary string→**string** ops (`(i64 handle) -> i64 handle`):
+/// `uc`/`lc`/`ucfirst`/`lcfirst`. Same `(i64) -> i64` ABI as the unary string→int
+/// table, but the returned `i64` is the raw bits of a freshly allocated *owned*
+/// `StrykeValue::string` (reconstructed via `from_raw_bits`, like `STK_STR_CONCAT`),
+/// not a plain integer. Kept in its own table so [`run_linear_segment`] knows to
+/// reconstruct an owning handle rather than box an integer.
+const STRYKE_STR_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
+    (ext_ops::STK_STR_UC, "stryke_str_uc", stryke_h_str_uc),
+    (ext_ops::STK_STR_LC, "stryke_str_lc", stryke_h_str_lc),
+    (ext_ops::STK_STR_UCFIRST, "stryke_str_ucfirst", stryke_h_str_ucfirst),
+    (ext_ops::STK_STR_LCFIRST, "stryke_str_lcfirst", stryke_h_str_lcfirst),
+];
+
+/// True for a unary string→string Extended id (`uc`/`lc`/`ucfirst`/`lcfirst`), whose
+/// result is an owned string handle rather than an integer.
+#[inline]
+fn is_stryke_str_unary_str_ext(ext_id: u16) -> bool {
+    STRYKE_STR_UNARY_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+}
+
+/// Interpreter-side computation for a unary string→string Extended op; returns the
+/// raw bits of an owned string handle (mirrors the JIT host helpers).
+#[inline]
+fn stryke_str_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
+    match ext_id {
+        ext_ops::STK_STR_UC => stryke_str_uc_op(a_bits),
+        ext_ops::STK_STR_LC => stryke_str_lc_op(a_bits),
+        ext_ops::STK_STR_UCFIRST => stryke_str_ucfirst_op(a_bits),
+        ext_ops::STK_STR_LCFIRST => stryke_str_lcfirst_op(a_bits),
         _ => 0,
     }
 }
@@ -357,7 +457,9 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             || is_stryke_str_ext(ext_id)
     }
     fn op_count(&self) -> usize {
-        1 + STRYKE_STR_HELPERS.len() + STRYKE_STR_UNARY_HELPERS.len()
+        1 + STRYKE_STR_HELPERS.len()
+            + STRYKE_STR_UNARY_HELPERS.len()
+            + STRYKE_STR_UNARY_STR_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
@@ -439,8 +541,12 @@ pub(crate) fn register_stryke_jit_ext() {
         }
     }
     // SAFETY: each unary helper is `extern "C" fn(i64) -> i64`, matching the
-    // 1-arg / integer-return signature declared here.
-    for (_, name, ptr) in STRYKE_STR_UNARY_HELPERS {
+    // 1-arg / integer-return signature declared here. The string→string helpers
+    // return an `i64` handle (raw bits of an owned string) under the same ABI.
+    for (_, name, ptr) in STRYKE_STR_UNARY_HELPERS
+        .iter()
+        .chain(STRYKE_STR_UNARY_STR_HELPERS.iter())
+    {
         unsafe {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 1, false);
         }
@@ -1012,10 +1118,41 @@ fn unary_str_int_ext_op(op: &Op) -> Option<u16> {
     }
 }
 
-/// True when `op` is one of the unary string→int builtins (`length`/`ord`/`hex`/`oct`).
+/// Maps a unary string→**string** builtin call to its `STK_STR_*` Extended id, if
+/// any: `uc`/`lc`/`ucfirst`/`lcfirst`. Same single-operand segment shape and raw-bits
+/// marshaling as the string→int family, but the result is an owned string handle
+/// (reconstructed via `from_raw_bits`, like concatenation) rather than an integer.
+#[inline]
+fn unary_str_str_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    let Op::CallBuiltin(id, 1) = op else {
+        return None;
+    };
+    let id = *id;
+    if id == BuiltinId::Uc as u16 {
+        Some(ext_ops::STK_STR_UC)
+    } else if id == BuiltinId::Lc as u16 {
+        Some(ext_ops::STK_STR_LC)
+    } else if id == BuiltinId::Ucfirst as u16 {
+        Some(ext_ops::STK_STR_UCFIRST)
+    } else if id == BuiltinId::Lcfirst as u16 {
+        Some(ext_ops::STK_STR_LCFIRST)
+    } else {
+        None
+    }
+}
+
+/// Maps any unary string builtin call (`length`/`ord`/`hex`/`oct` →int, or
+/// `uc`/`lc`/`ucfirst`/`lcfirst` →string handle) to its `STK_STR_*` Extended id.
+#[inline]
+fn unary_str_ext_op(op: &Op) -> Option<u16> {
+    unary_str_int_ext_op(op).or_else(|| unary_str_str_ext_op(op))
+}
+
+/// True when `op` is any unary string builtin lowered to a `STK_STR_*` unary ext op.
 #[inline]
 fn is_unary_str_int_builtin(op: &Op) -> bool {
-    unary_str_int_ext_op(op).is_some()
+    unary_str_ext_op(op).is_some()
 }
 
 /// True when `seg` is exactly a single unary string→int builtin of one slot operand:
@@ -1025,6 +1162,14 @@ fn is_unary_str_int_builtin(op: &Op) -> bool {
 /// result is a plain `i64`, so the chunk stays on the integer block JIT + disk cache.
 pub(crate) fn segment_is_string_unary_eligible(seg: &[Op], _seg_start: usize) -> bool {
     matches!(seg, [Op::GetScalarSlot(_), u] if is_unary_str_int_builtin(u))
+}
+
+/// True when `seg` is a unary string→**string** builtin segment
+/// (`[GetScalarSlot, CallBuiltin(uc|lc|ucfirst|lcfirst, 1)]`), whose JIT result is
+/// the raw bits of an owned string handle (reconstructed via `from_raw_bits`) rather
+/// than a plain integer. A strict subset of [`segment_is_string_unary_eligible`].
+pub(crate) fn segment_is_string_unary_str_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(seg, [Op::GetScalarSlot(_), u] if unary_str_str_ext_op(u).is_some())
 }
 
 /// Translate a single eligible strykelang op, appending the equivalent
@@ -1137,11 +1282,12 @@ fn translate_op_into(
         }
         // strykelang `int(x)` -> fusevm's integer-producing `Op::TruncInt`.
         _ if is_trunc_int_builtin(op) => body.push(F::TruncInt),
-        // `length`/`ord`/`hex`/`oct` ($s) -> unary host-helper-backed Extended op;
-        // the operand is a raw StrykeValue bit-handle (see
+        // `length`/`ord`/`hex`/`oct` (→int) and `uc`/`lc`/`ucfirst`/`lcfirst`
+        // (→owned string handle) ($s) -> unary host-helper-backed Extended op; the
+        // operand is a raw StrykeValue bit-handle (see
         // `segment_is_string_unary_eligible`).
-        _ if unary_str_int_ext_op(op).is_some() => {
-            body.push(F::Extended(unary_str_int_ext_op(op).unwrap(), 0))
+        _ if unary_str_ext_op(op).is_some() => {
+            body.push(F::Extended(unary_str_ext_op(op).unwrap(), 0))
         }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
@@ -1390,6 +1536,9 @@ pub(crate) fn run_linear_segment(
         && !concat_ok
         && !str_ok
         && segment_is_string_unary_eligible(seg, seg_start);
+    // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
+    // reconstructed like concatenation rather than boxed as an integer.
+    let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
     if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok {
         return None;
     }
@@ -1411,7 +1560,7 @@ pub(crate) fn run_linear_segment(
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
-            if concat_ok {
+            if concat_ok || unary_str_ok {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
                 StrykeValue::integer(ret)
@@ -2067,6 +2216,55 @@ mod tests {
                     .as_integer();
             }
             assert_eq!(last, Some(want), "{builtin:?}({s:?})");
+            assert_eq!(v.as_str().as_deref(), Some(*s));
+        }
+    }
+
+    // `uc`/`lc`/`ucfirst`/`lcfirst` ($s) lowered to fusevm (unary string→string host
+    // helpers) must equal the interpreter's `StrykeValue::{uc,lc,ucfirst,lcfirst}_value`.
+    // The result is a freshly allocated owned string handle (reconstructed via
+    // `from_raw_bits`), and the borrowed operand must survive repeated runs intact.
+    #[test]
+    fn fusevm_runs_string_uc_lc() {
+        use crate::bytecode::BuiltinId;
+        let cases: &[(BuiltinId, &str, fn(&StrykeValue) -> String)] = &[
+            (BuiltinId::Uc, "hello", |v| v.uc_value()),
+            (BuiltinId::Uc, "MiXeD", |v| v.uc_value()),
+            (BuiltinId::Uc, "", |v| v.uc_value()),
+            (BuiltinId::Uc, "café", |v| v.uc_value()),
+            (BuiltinId::Lc, "HELLO", |v| v.lc_value()),
+            (BuiltinId::Lc, "MiXeD", |v| v.lc_value()),
+            (BuiltinId::Lc, "ÉCOLE", |v| v.lc_value()),
+            (BuiltinId::Ucfirst, "hello world", |v| v.ucfirst_value()),
+            (BuiltinId::Ucfirst, "", |v| v.ucfirst_value()),
+            (BuiltinId::Ucfirst, "éa", |v| v.ucfirst_value()),
+            (BuiltinId::Lcfirst, "Hello World", |v| v.lcfirst_value()),
+            (BuiltinId::Lcfirst, "ABC", |v| v.lcfirst_value()),
+        ];
+        for (builtin, s, want_fn) in cases {
+            let seg = vec![
+                Op::GetScalarSlot(0),
+                Op::CallBuiltin(*builtin as u16, 1),
+            ];
+            assert!(
+                segment_is_string_unary_eligible(&seg, 0),
+                "segment must be unary-string eligible for {builtin:?}"
+            );
+            assert!(
+                segment_is_string_unary_str_eligible(&seg, 0),
+                "segment must be unary-string→string eligible for {builtin:?}"
+            );
+            let v = StrykeValue::string((*s).to_string());
+            let want = want_fn(&v);
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [v.raw_bits() as i64];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("unary-string→string segment must run on fusevm")
+                    .as_str();
+            }
+            assert_eq!(last.as_deref(), Some(want.as_str()), "{builtin:?}({s:?})");
+            // The operand is borrowed, never dropped — it stays intact.
             assert_eq!(v.as_str().as_deref(), Some(*s));
         }
     }

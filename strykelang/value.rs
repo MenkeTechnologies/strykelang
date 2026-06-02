@@ -1542,6 +1542,40 @@ impl StrykeValue {
             i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
         }
     }
+
+    /// `uc` builtin: the stringified value upper-cased. Shared by the interpreter
+    /// (`BuiltinId::Uc`) and the fusevm JIT host helper so both agree exactly.
+    pub fn uc_value(&self) -> String {
+        self.to_string().to_uppercase()
+    }
+
+    /// `lc` builtin: the stringified value lower-cased. Shared by the interpreter
+    /// (`BuiltinId::Lc`) and the fusevm JIT host helper.
+    pub fn lc_value(&self) -> String {
+        self.to_string().to_lowercase()
+    }
+
+    /// `ucfirst` builtin: the stringified value with only its first character
+    /// upper-cased. Shared by the interpreter and the fusevm JIT helper.
+    pub fn ucfirst_value(&self) -> String {
+        let s = self.to_string();
+        let mut chars = s.chars();
+        match chars.next() {
+            Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+            None => String::new(),
+        }
+    }
+
+    /// `lcfirst` builtin: the stringified value with only its first character
+    /// lower-cased. Shared by the interpreter and the fusevm JIT helper.
+    pub fn lcfirst_value(&self) -> String {
+        let s = self.to_string();
+        let mut chars = s.chars();
+        match chars.next() {
+            Some(c) => c.to_lowercase().to_string() + chars.as_str(),
+            None => String::new(),
+        }
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
