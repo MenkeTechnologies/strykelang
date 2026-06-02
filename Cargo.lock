@@ -1851,9 +1851,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "fusevm"
-version = "0.12.2"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bddfc061df37c289725f2942d9e1c2ac60a39cd892bbc45b91b55ac16e56c495"
+checksum = "3e595923756e2cafc61c13977f60d678ec1dc6b3724bb5e1ebbd39a0cc3d6f15"
 dependencies = [
  "cranelift-codegen",
  "cranelift-frontend",
@@ -1861,6 +1861,22 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "glob",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "fusevm"
+version = "0.13.3"
+dependencies = [
+ "chrono",
+ "cranelift-codegen",
+ "cranelift-frontend",
+ "cranelift-jit",
+ "cranelift-module",
+ "cranelift-native",
+ "glob",
+ "libc",
  "serde",
  "tracing",
 ]
@@ -5137,7 +5153,7 @@ dependencies = [
  "errno",
  "fancy-regex",
  "flate2",
- "fusevm",
+ "fusevm 0.13.3",
  "git2",
  "glob",
  "hex",
@@ -7068,9 +7084,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.11.20"
+version = "0.11.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40f364b6652a37331b36375634f1cf552e408e36d98d2826cabf759b083e1342"
+checksum = "a14d5fd87530412c18e08f84d8fc5ab49cf88547da8858c80567515b0671bdae"
 dependencies = [
  "atty",
  "bincode",
@@ -7082,7 +7098,7 @@ dependencies = [
  "ctrlc",
  "dirs 5.0.1",
  "filetime",
- "fusevm",
+ "fusevm 0.12.4",
  "glob",
  "hostname",
  "indexmap",
