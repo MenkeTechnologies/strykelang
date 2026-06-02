@@ -85,6 +85,12 @@ pub mod ext_ops {
     /// (chars under the `utf8` pragma, else bytes — see [`super::stryke_utf8_pragma`]).
     /// The result is an `i64`, keeping the chunk on the integer block JIT + disk cache.
     pub const STK_STR_LEN: u16 = 0x000F;
+    /// String `ord` — first char's Unicode codepoint. Unary `(i64) -> i64`.
+    pub const STK_STR_ORD: u16 = 0x0010;
+    /// String `hex` — parse as hexadecimal. Unary `(i64) -> i64`.
+    pub const STK_STR_HEX: u16 = 0x0011;
+    /// String `oct` — parse as octal/hex/binary (Perl `oct`). Unary `(i64) -> i64`.
+    pub const STK_STR_OCT: u16 = 0x0012;
 
     /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
@@ -243,6 +249,72 @@ extern "C" fn stryke_h_str_len(a: i64) -> i64 {
     stryke_str_len_op(a)
 }
 
+/// `ord($s)`: first char's codepoint (see [`StrykeValue::ord_value`]).
+#[inline]
+fn stryke_str_ord_op(a_bits: i64) -> i64 {
+    unsafe { sv_borrow(a_bits) }.ord_value()
+}
+extern "C" fn stryke_h_str_ord(a: i64) -> i64 {
+    stryke_str_ord_op(a)
+}
+
+/// `hex($s)`: parse hexadecimal (see [`StrykeValue::hex_value`]).
+#[inline]
+fn stryke_str_hex_op(a_bits: i64) -> i64 {
+    unsafe { sv_borrow(a_bits) }.hex_value()
+}
+extern "C" fn stryke_h_str_hex(a: i64) -> i64 {
+    stryke_str_hex_op(a)
+}
+
+/// `oct($s)`: parse octal/hex/binary (see [`StrykeValue::oct_value`]).
+#[inline]
+fn stryke_str_oct_op(a_bits: i64) -> i64 {
+    unsafe { sv_borrow(a_bits) }.oct_value()
+}
+extern "C" fn stryke_h_str_oct(a: i64) -> i64 {
+    stryke_str_oct_op(a)
+}
+
+/// Table of the unary string ops (`(i64 handle) -> i64`): `length`/`ord`/`hex`/`oct`.
+/// Each maps its `STK_STR_*` Extended id to the stable host-helper symbol (hashed
+/// into a JIT helper id and registered with arity 1). Distinct from the binary
+/// `STRYKE_STR_HELPERS` table because the ABI differs (one operand, not two).
+const STRYKE_STR_UNARY_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
+    (ext_ops::STK_STR_LEN, STRYKE_STR_LEN_SYM, stryke_h_str_len),
+    (ext_ops::STK_STR_ORD, "stryke_str_ord", stryke_h_str_ord),
+    (ext_ops::STK_STR_HEX, "stryke_str_hex", stryke_h_str_hex),
+    (ext_ops::STK_STR_OCT, "stryke_str_oct", stryke_h_str_oct),
+];
+
+/// True for any unary string Extended id (`length`/`ord`/`hex`/`oct`).
+#[inline]
+fn is_stryke_str_unary_ext(ext_id: u16) -> bool {
+    STRYKE_STR_UNARY_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+}
+
+/// The registered JIT helper id for a unary string Extended op, if any.
+#[inline]
+fn stryke_str_unary_helper_id(ext_id: u16) -> Option<u32> {
+    STRYKE_STR_UNARY_HELPERS
+        .iter()
+        .find(|(id, _, _)| *id == ext_id)
+        .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
+}
+
+/// Interpreter-side computation for a unary string Extended op (mirrors the JIT
+/// host helpers so the cold path agrees with JITted code).
+#[inline]
+fn stryke_str_unary_op(ext_id: u16, a_bits: i64) -> i64 {
+    match ext_id {
+        ext_ops::STK_STR_LEN => stryke_str_len_op(a_bits),
+        ext_ops::STK_STR_ORD => stryke_str_ord_op(a_bits),
+        ext_ops::STK_STR_HEX => stryke_str_hex_op(a_bits),
+        ext_ops::STK_STR_OCT => stryke_str_oct_op(a_bits),
+        _ => 0,
+    }
+}
+
 /// Table mapping each string-compare `Extended` id to the stable host-helper
 /// symbol name and its function pointer. The name is hashed into a JIT helper id
 /// (`fusevm::jit::jit_helper_id`) so cached native code re-resolves the helper at
@@ -281,24 +353,26 @@ pub(crate) struct StrykeJitExt;
 impl fusevm::jit::JitExtension for StrykeJitExt {
     fn can_jit(&self, ext_id: u16) -> bool {
         ext_id == ext_ops::STK_MOD_FLOOR
-            || ext_id == ext_ops::STK_STR_LEN
+            || is_stryke_str_unary_ext(ext_id)
             || is_stryke_str_ext(ext_id)
     }
     fn op_count(&self) -> usize {
-        2 + STRYKE_STR_HELPERS.len()
+        1 + STRYKE_STR_HELPERS.len() + STRYKE_STR_UNARY_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
     }
     fn emit_extended(&self, ext_id: u16, _arg: u8, cx: &mut fusevm::jit::ExtJitCtx) -> bool {
-        if ext_id == ext_ops::STK_STR_LEN {
-            // length($s): pop the single operand handle and call the unary host
-            // helper, which reads the live `utf8` pragma. `call_host` records the
+        if is_stryke_str_unary_ext(ext_id) {
+            // Unary string ops (length/ord/hex/oct): pop the single operand handle
+            // and call the registered unary host helper. `call_host` records the
             // relocation so the chunk stays on-disk cacheable.
+            let Some(helper_id) = stryke_str_unary_helper_id(ext_id) else {
+                return false;
+            };
             let Some(a) = cx.pop_i64() else {
                 return false;
             };
-            let helper_id = fusevm::jit::jit_helper_id(STRYKE_STR_LEN_SYM);
             let Some(result) = cx.call_host(helper_id, &[a]) else {
                 return false;
             };
@@ -364,15 +438,12 @@ pub(crate) fn register_stryke_jit_ext() {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 2, false);
         }
     }
-    // SAFETY: `stryke_h_str_len` is `extern "C" fn(i64) -> i64`, matching the
+    // SAFETY: each unary helper is `extern "C" fn(i64) -> i64`, matching the
     // 1-arg / integer-return signature declared here.
-    unsafe {
-        fusevm::jit::register_jit_helper(
-            STRYKE_STR_LEN_SYM,
-            stryke_h_str_len as *const u8,
-            1,
-            false,
-        );
+    for (_, name, ptr) in STRYKE_STR_UNARY_HELPERS {
+        unsafe {
+            fusevm::jit::register_jit_helper(name, *ptr as *const u8, 1, false);
+        }
     }
 }
 
@@ -384,9 +455,9 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(floored_mod(a, b)));
-    } else if id == ext_ops::STK_STR_LEN {
+    } else if is_stryke_str_unary_ext(id) {
         let a = vm.pop().to_int();
-        vm.push(fusevm::Value::Int(stryke_str_len_op(a)));
+        vm.push(fusevm::Value::Int(stryke_str_unary_op(id, a)));
     } else if is_stryke_str_ext(id) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
@@ -918,19 +989,42 @@ pub(crate) fn segment_is_string_concat_eligible(seg: &[Op], _seg_start: usize) -
     )
 }
 
-/// True when `op` is the `length` builtin call (`CallBuiltin(Length, 1)`).
+/// Maps a unary string→int builtin call to its `STK_STR_*` Extended id, if any:
+/// `length`/`ord`/`hex`/`oct`. All take one operand and yield an `i64`, so they
+/// share the same segment shape, raw-bits marshaling and integer-result handling.
 #[inline]
-fn is_length_builtin(op: &Op) -> bool {
-    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Length as u16)
+fn unary_str_int_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    let Op::CallBuiltin(id, 1) = op else {
+        return None;
+    };
+    let id = *id;
+    if id == BuiltinId::Length as u16 {
+        Some(ext_ops::STK_STR_LEN)
+    } else if id == BuiltinId::Ord as u16 {
+        Some(ext_ops::STK_STR_ORD)
+    } else if id == BuiltinId::Hex as u16 {
+        Some(ext_ops::STK_STR_HEX)
+    } else if id == BuiltinId::Oct as u16 {
+        Some(ext_ops::STK_STR_OCT)
+    } else {
+        None
+    }
 }
 
-/// True when `seg` is exactly a single `length($s)` of one slot operand:
-/// `[GetScalarSlot, CallBuiltin(Length, 1)]`. Like the compare/concat segments the
-/// operand is marshaled as raw NaN-boxed `StrykeValue` bits (and routed only when it
-/// is a plain string — see the caller's `is_string_like` gate), and the result is a
-/// plain `i64`, so the chunk stays on the integer block JIT + on-disk native cache.
-pub(crate) fn segment_is_string_length_eligible(seg: &[Op], _seg_start: usize) -> bool {
-    matches!(seg, [Op::GetScalarSlot(_), len] if is_length_builtin(len))
+/// True when `op` is one of the unary string→int builtins (`length`/`ord`/`hex`/`oct`).
+#[inline]
+fn is_unary_str_int_builtin(op: &Op) -> bool {
+    unary_str_int_ext_op(op).is_some()
+}
+
+/// True when `seg` is exactly a single unary string→int builtin of one slot operand:
+/// `[GetScalarSlot, CallBuiltin(length|ord|hex|oct, 1)]`. Like the compare/concat
+/// segments the operand is marshaled as raw NaN-boxed `StrykeValue` bits (and routed
+/// only when it is a plain string — see the caller's `is_string_like` gate), and the
+/// result is a plain `i64`, so the chunk stays on the integer block JIT + disk cache.
+pub(crate) fn segment_is_string_unary_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(seg, [Op::GetScalarSlot(_), u] if is_unary_str_int_builtin(u))
 }
 
 /// Translate a single eligible strykelang op, appending the equivalent
@@ -1043,9 +1137,12 @@ fn translate_op_into(
         }
         // strykelang `int(x)` -> fusevm's integer-producing `Op::TruncInt`.
         _ if is_trunc_int_builtin(op) => body.push(F::TruncInt),
-        // `length($s)` -> unary host-helper-backed Extended op; the operand is a raw
-        // StrykeValue bit-handle (see `segment_is_string_length_eligible`).
-        _ if is_length_builtin(op) => body.push(F::Extended(ext_ops::STK_STR_LEN, 0)),
+        // `length`/`ord`/`hex`/`oct` ($s) -> unary host-helper-backed Extended op;
+        // the operand is a raw StrykeValue bit-handle (see
+        // `segment_is_string_unary_eligible`).
+        _ if unary_str_int_ext_op(op).is_some() => {
+            body.push(F::Extended(unary_str_int_ext_op(op).unwrap(), 0))
+        }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
         // on-disk cache.
@@ -1288,28 +1385,28 @@ pub(crate) fn run_linear_segment(
         && !float_ok
         && !concat_ok
         && segment_is_string_compare_eligible(seg, seg_start);
-    let len_ok = !int_ok
+    let unary_ok = !int_ok
         && !float_ok
         && !concat_ok
         && !str_ok
-        && segment_is_string_length_eligible(seg, seg_start);
-    if !int_ok && !float_ok && !str_ok && !concat_ok && !len_ok {
+        && segment_is_string_unary_eligible(seg, seg_start);
+    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok {
         return None;
     }
 
-    // String segments (comparison + concatenation): build an *unseeded* chunk
-    // (operand handles flow through the runtime `slots` buffer, never baked into
-    // the chunk) and run it strictly on the block JIT, which is configured to
-    // compile eagerly. There is no fusevm-interpreter fallback here: that path
-    // reads slots from the VM frame, which an unseeded chunk never populates. On
-    // block-JIT decline we return None so strykelang falls back to its own
-    // interpreter.
+    // String segments (comparison + concatenation + unary length/ord/hex/oct): build
+    // an *unseeded* chunk (operand handles flow through the runtime `slots` buffer,
+    // never baked into the chunk) and run it strictly on the block JIT, which is
+    // configured to compile eagerly. There is no fusevm-interpreter fallback here:
+    // that path reads slots from the VM frame, which an unseeded chunk never
+    // populates. On block-JIT decline we return None so strykelang falls back to its
+    // own interpreter.
     //
-    // Comparison results are plain `i64` outcomes (0/1, or -1/0/1 for `cmp`).
+    // Comparison and unary length/ord/hex/oct results are plain `i64` outcomes.
     // Concatenation returns the raw bits of a freshly allocated, *owned* string
     // handle, which we reconstitute into exactly one owning `StrykeValue` via
     // `from_raw_bits` (the helper `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || len_ok {
+    if str_ok || concat_ok || unary_ok {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
@@ -1909,7 +2006,7 @@ mod tests {
             Op::GetScalarSlot(0),
             Op::CallBuiltin(crate::bytecode::BuiltinId::Length as u16, 1),
         ];
-        assert!(segment_is_string_length_eligible(&seg, 0));
+        assert!(segment_is_string_unary_eligible(&seg, 0));
 
         let cases: &[&str] = &["", "foo", "hello world", "café", "naïve façade", "🦀🦀"];
         for utf8 in [false, true] {
@@ -1930,6 +2027,48 @@ mod tests {
             }
         }
         set_utf8_pragma(false);
+    }
+
+    // `ord`/`hex`/`oct` ($s) lowered to fusevm (unary host helpers) must equal the
+    // interpreter's `StrykeValue::{ord,hex,oct}_value`. These are pragma-independent.
+    #[test]
+    fn fusevm_runs_string_ord_hex_oct() {
+        use crate::bytecode::BuiltinId;
+        let cases: &[(BuiltinId, &str, fn(&StrykeValue) -> i64)] = &[
+            (BuiltinId::Ord, "A", |v| v.ord_value()),
+            (BuiltinId::Ord, "abc", |v| v.ord_value()),
+            (BuiltinId::Ord, "", |v| v.ord_value()),
+            (BuiltinId::Ord, "🦀", |v| v.ord_value()),
+            (BuiltinId::Hex, "ff", |v| v.hex_value()),
+            (BuiltinId::Hex, "0x1A", |v| v.hex_value()),
+            (BuiltinId::Hex, "deadbeef", |v| v.hex_value()),
+            (BuiltinId::Hex, "zzz", |v| v.hex_value()),
+            (BuiltinId::Oct, "0755", |v| v.oct_value()),
+            (BuiltinId::Oct, "0x1A", |v| v.oct_value()),
+            (BuiltinId::Oct, "0b1010", |v| v.oct_value()),
+            (BuiltinId::Oct, "777", |v| v.oct_value()),
+        ];
+        for (builtin, s, want_fn) in cases {
+            let seg = vec![
+                Op::GetScalarSlot(0),
+                Op::CallBuiltin(*builtin as u16, 1),
+            ];
+            assert!(
+                segment_is_string_unary_eligible(&seg, 0),
+                "segment must be unary-string eligible for {builtin:?}"
+            );
+            let v = StrykeValue::string((*s).to_string());
+            let want = want_fn(&v);
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [v.raw_bits() as i64];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("unary-string segment must run on fusevm")
+                    .as_integer();
+            }
+            assert_eq!(last, Some(want), "{builtin:?}({s:?})");
+            assert_eq!(v.as_str().as_deref(), Some(*s));
+        }
     }
 
     // The concat chunk, like the compare chunks, must not bake operand pointers
