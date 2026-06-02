@@ -1510,6 +1510,38 @@ impl StrykeValue {
             }
         }
     }
+
+    /// `ord` builtin: Unicode codepoint of the stringified value's first char (0 if
+    /// empty). Shared by the interpreter (`BuiltinId::Ord`) and the fusevm JIT host
+    /// helper so both agree exactly.
+    pub fn ord_value(&self) -> i64 {
+        self.to_string().chars().next().map(|c| c as i64).unwrap_or(0)
+    }
+
+    /// `hex` builtin: parse the stringified value as hexadecimal (optional `0x`/`0X`
+    /// prefix), 0 on failure. Shared by the interpreter and the fusevm JIT helper.
+    pub fn hex_value(&self) -> i64 {
+        let s = self.to_string();
+        let clean = s.trim().trim_start_matches("0x").trim_start_matches("0X");
+        i64::from_str_radix(clean, 16).unwrap_or(0)
+    }
+
+    /// `oct` builtin: parse the stringified value per Perl `oct` (`0x`/`0X` hex,
+    /// `0b`/`0B` binary, `0o`/`0O` or bare-leading-zero octal), 0 on failure. Shared
+    /// by the interpreter and the fusevm JIT helper.
+    pub fn oct_value(&self) -> i64 {
+        let s = self.to_string();
+        let s = s.trim();
+        if s.starts_with("0x") || s.starts_with("0X") {
+            i64::from_str_radix(&s[2..], 16).unwrap_or(0)
+        } else if s.starts_with("0b") || s.starts_with("0B") {
+            i64::from_str_radix(&s[2..], 2).unwrap_or(0)
+        } else if s.starts_with("0o") || s.starts_with("0O") {
+            i64::from_str_radix(&s[2..], 8).unwrap_or(0)
+        } else {
+            i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
+        }
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
