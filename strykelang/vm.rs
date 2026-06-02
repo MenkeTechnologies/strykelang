@@ -1075,45 +1075,166 @@ impl<'a> VM<'a> {
         let ops: &Vec<Op> = &self.ops;
         let ops = ops as *const Vec<Op>;
         let ops = unsafe { &*ops };
-        let Some((seg, term)) = crate::jit::sub_entry_segment(ops, ip) else {
+        let Some((full_seg, term)) = crate::jit::sub_entry_segment(ops, ip) else {
             return Ok(false);
         };
         if !matches!(term, crate::jit::SubTerminator::Value) {
             return Ok(false);
         }
-        if !crate::fusevm_bridge::segment_is_fusevm_eligible(seg, ip) {
+
+        // Most real subs open with the `my (...) = @_` argument-unpacking prologue
+        // (array ops the universal subset can't JIT). Recognize that fixed idiom and
+        // *skip* it: the declared scalar slots are seeded directly from `@_`, and the
+        // remaining body — the part that's actually pure arithmetic/string work — is
+        // what we hand to fusevm. Without this, virtually no real sub is ever
+        // eligible, so the on-disk JIT cache never engages for them.
+        let uscore = self.names.iter().position(|n| n == "_");
+        let (seg, seg_ip, arg_binds): (&[Op], usize, Vec<(u8, usize)>) = match uscore
+            .and_then(|u| crate::jit::recognize_args_unpack_prologue(full_seg, u as u16))
+        {
+            Some((plen, binds)) => (&full_seg[plen..], ip + plen, binds),
+            None => (full_seg, ip, Vec::new()),
+        };
+
+        // Signature subs (`sub f($x,$y){ $x + $y }`) reference their parameters by
+        // name (`GetScalarPlain`), not via the `@_`-unpack prologue, so they were
+        // never JIT-eligible. Remap those *read-only* named reads to synthetic slots
+        // (numbered past every real slot the body already uses) seeded from scope
+        // below. The rewrite is value-independent, so the disk-cache `op_hash` stays
+        // stable across calls. We bail (no remap) if any named scalar is written.
+        let base_slot = crate::jit::linear_slot_ops_max_index_seq(seg)
+            .map(|m| m as usize + 1)
+            .unwrap_or(0);
+        let plain_remap: Option<(Vec<Op>, Vec<(u8, u16)>)> = if base_slot <= u8::MAX as usize {
+            crate::jit::plain_scalar_read_names(seg).and_then(|pnames| {
+                if base_slot + pnames.len() <= u8::MAX as usize + 1 {
+                    Some(crate::jit::remap_plain_reads_to_slots(
+                        seg,
+                        &pnames,
+                        base_slot as u8,
+                    ))
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let (seg, plain_binds): (&[Op], &[(u8, u16)]) = match &plain_remap {
+            Some((normalized, binds)) => (normalized.as_slice(), binds.as_slice()),
+            None => (seg, &[][..]),
+        };
+
+        let int_ok = crate::fusevm_bridge::segment_is_fusevm_eligible(seg, seg_ip);
+        let str_ok = !int_ok
+            && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
+                || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip));
+        // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
+        // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
+        let float_ok = !int_ok
+            && !str_ok
+            && crate::fusevm_bridge::segment_is_fusevm_float_eligible(seg, seg_ip);
+        if !int_ok && !str_ok && !float_ok {
             return Ok(false);
         }
 
-        // Marshal the integer slots the body reads, mirroring the linear sub-JIT.
+        // Map each arg-bound slot to its `@_` index. Slots not in this map are body
+        // locals (seeded 0 when write-before-read) or, for string segments, read
+        // from the current scope.
+        let arg_of_slot = |slot: u8| -> Option<usize> {
+            arg_binds.iter().find(|(s, _)| *s == slot).map(|(_, a)| *a)
+        };
+        // `@_` is already populated at the sub entry (the prologue we skipped would
+        // have read it); fetch it once to seed the bound slots.
+        let argv: Vec<StrykeValue> = if arg_binds.is_empty() {
+            Vec::new()
+        } else {
+            self.interp.scope.get_array("_")
+        };
+
+        // Resolve each remapped signature-parameter slot to its current scope value
+        // (read once by name, up front). These flow into the synthetic slots below
+        // exactly like `@_`-bound args, but sourced from the named scalar instead.
+        let plain_vals: Vec<(u8, StrykeValue)> = plain_binds
+            .iter()
+            .map(|(slot, name_idx)| {
+                let nm = self.names[*name_idx as usize].clone();
+                (*slot, self.interp.scope.get_scalar(&nm))
+            })
+            .collect();
+        let plain_of_slot = |slot: u8| -> Option<&StrykeValue> {
+            plain_vals.iter().find(|(s, _)| *s == slot).map(|(_, v)| v)
+        };
+
+        // Marshal the slots the body reads. Integer segments seed unboxed i64 values
+        // (and seed 0 for write-before-read slots via `slot_undef_prefill_ok_seq`, so
+        // the chunk stays identical across calls). String-comparison/concat segments
+        // instead seed the raw NaN-boxed `StrykeValue` bits as i64 handles, which the
+        // host helper reconstructs; those are routed only when every operand is a
+        // plain string (`is_string_like`), bailing to the interpreter otherwise so
+        // operator-overloading and numeric-coercion semantics are kept. Arg-bound
+        // slots are seeded from `@_` instead of the (skipped) prologue's declarations,
+        // and remapped signature-param slots from their named scope scalar.
         let mut slot_n = 0usize;
         if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
             let n = max as usize + 1;
             self.jit_buf_slot.resize(n, 0);
             for i in 0..=max {
-                let pv = self.interp.scope.get_scalar_slot(i);
-                self.jit_buf_slot[i as usize] = match pv.as_integer() {
-                    Some(v) => v,
-                    None if pv.is_undef() && crate::jit::slot_undef_prefill_ok_seq(seg, i) => 0,
-                    None => return Ok(false),
+                let bound = arg_of_slot(i);
+                self.jit_buf_slot[i as usize] = if let Some(pv) = plain_of_slot(i) {
+                    if str_ok {
+                        if !pv.is_string_like() {
+                            return Ok(false);
+                        }
+                        pv.raw_bits() as i64
+                    } else {
+                        match pv.as_integer() {
+                            Some(v) => v,
+                            None => return Ok(false),
+                        }
+                    }
+                } else if str_ok {
+                    let v = match bound {
+                        Some(a) => argv.get(a).cloned().unwrap_or(StrykeValue::UNDEF),
+                        None => self.interp.scope.get_scalar_slot(i),
+                    };
+                    if !v.is_string_like() {
+                        return Ok(false);
+                    }
+                    v.raw_bits() as i64
+                } else if let Some(a) = bound {
+                    match argv.get(a).and_then(|v| v.as_integer()) {
+                        Some(v) => v,
+                        None => return Ok(false),
+                    }
+                } else if crate::jit::slot_undef_prefill_ok_seq(seg, i) {
+                    0
+                } else {
+                    match self.interp.scope.get_scalar_slot(i).as_integer() {
+                        Some(v) => v,
+                        None => return Ok(false),
+                    }
                 };
             }
             slot_n = n;
         }
 
-        let Some(v) =
-            crate::fusevm_bridge::run_linear_segment(seg, ip, &mut self.jit_buf_slot[..slot_n], term)
-        else {
+        let Some(v) = crate::fusevm_bridge::run_linear_segment(
+            seg,
+            seg_ip,
+            &mut self.jit_buf_slot[..slot_n],
+            term,
+        ) else {
             return Ok(false);
         };
 
-        if slot_n > 0 {
-            for idx in crate::jit::linear_slot_ops_written_indices_seq(seg) {
-                self.interp
-                    .scope
-                    .set_scalar_slot(idx, StrykeValue::integer(self.jit_buf_slot[idx as usize]));
-            }
-        }
+        // The eligible segment is a whole sub body terminated by `ReturnValue`; every
+        // slot it touches is a frame-local declared inside the sub. Those locals are
+        // discarded when the call frame is popped below, so there is nothing to write
+        // back — only the return value `v` propagates. (Writing them back would be
+        // wrong: because the fusevm chunk replaces the body's `DeclareScalarSlot` ops,
+        // this frame never *owns* the slots, so `set_scalar_slot` would walk outward
+        // and clobber the caller's identically-numbered slots.)
         if let Some(frame) = self.call_stack.pop() {
             self.interp.wantarray_kind = frame.saved_wantarray;
             self.stack.truncate(frame.stack_base);

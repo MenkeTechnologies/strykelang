@@ -1749,8 +1749,10 @@ fn linear_needs_plain(seq: &[Op]) -> bool {
 }
 
 fn max_scalar_slot_index(seq: &[Op]) -> Option<u8> {
-    seq.iter()
-        .filter_map(|o| match o {
+    let mut max: Option<u8> = None;
+    let mut bump = |s: u8| max = Some(max.map_or(s, |m| m.max(s)));
+    for o in seq {
+        match o {
             Op::GetScalarSlot(s)
             | Op::SetScalarSlot(s)
             | Op::SetScalarSlotKeep(s)
@@ -1758,10 +1760,25 @@ fn max_scalar_slot_index(seq: &[Op]) -> Option<u8> {
             | Op::PreIncSlot(s)
             | Op::PostIncSlot(s)
             | Op::PreDecSlot(s)
-            | Op::PostDecSlot(s) => Some(*s),
-            _ => None,
-        })
-        .max()
+            | Op::PostDecSlot(s) => bump(*s),
+            Op::AddAssignSlotSlot(d, s)
+            | Op::SubAssignSlotSlot(d, s)
+            | Op::MulAssignSlotSlot(d, s)
+            | Op::AddAssignSlotSlotVoid(d, s) => {
+                bump(*d);
+                bump(*s);
+            }
+            Op::PreIncSlotVoid(s)
+            | Op::SlotLtIntJumpIfFalse(s, _, _)
+            | Op::SlotIncLtIntJumpBack(s, _, _) => bump(*s),
+            Op::AccumSumLoop(sum, i, _) => {
+                bump(*sum);
+                bump(*i);
+            }
+            _ => {}
+        }
+    }
+    max
 }
 
 /// Largest slot index referenced by get/set slot ops in `ops` before [`Op::Halt`], if any (dense
@@ -1782,6 +1799,18 @@ pub(crate) fn slot_undef_prefill_ok_seq(seq: &[Op], slot: u8) -> bool {
             Op::GetScalarSlot(s) if *s == slot && !written => {
                 return false;
             }
+            // Fused `$d op= $s` ops read both `d` and `s` before writing `d`.
+            Op::AddAssignSlotSlot(d, s)
+            | Op::SubAssignSlotSlot(d, s)
+            | Op::MulAssignSlotSlot(d, s)
+            | Op::AddAssignSlotSlotVoid(d, s) => {
+                if (*d == slot || *s == slot) && !written {
+                    return false;
+                }
+                if *d == slot {
+                    written = true;
+                }
+            }
             Op::DeclareScalarSlot(s, _) | Op::SetScalarSlot(s) | Op::SetScalarSlotKeep(s)
                 if *s == slot =>
             {
@@ -1791,6 +1820,28 @@ pub(crate) fn slot_undef_prefill_ok_seq(seq: &[Op], slot: u8) -> bool {
                 if *s == slot =>
             {
                 written = true;
+            }
+            // `++$slot` void: undef reads as 0, same as the seed, so this counts as a write.
+            Op::PreIncSlotVoid(s) if *s == slot => {
+                written = true;
+            }
+            // `$slot += 1; if $slot < limit ...`: reads-then-writes `slot`; undef reads as 0.
+            Op::SlotIncLtIntJumpBack(s, _, _) if *s == slot => {
+                written = true;
+            }
+            // `if $slot < INT`: a pure read of `slot` — must observe a real value if
+            // the slot was not written earlier in the sequence.
+            Op::SlotLtIntJumpIfFalse(s, _, _) if *s == slot && !written => {
+                return false;
+            }
+            // `while $i < limit { $sum += $i; $i += 1 }` reads then writes both slots.
+            Op::AccumSumLoop(sum, i, _) => {
+                if (*sum == slot || *i == slot) && !written {
+                    return false;
+                }
+                if *sum == slot || *i == slot {
+                    written = true;
+                }
             }
             _ => {}
         }
@@ -1814,7 +1865,11 @@ pub(crate) fn linear_slot_ops_written_indices_seq(seq: &[Op]) -> Vec<u8> {
             | Op::PreIncSlot(s)
             | Op::PostIncSlot(s)
             | Op::PreDecSlot(s)
-            | Op::PostDecSlot(s) => Some(*s),
+            | Op::PostDecSlot(s)
+            | Op::AddAssignSlotSlot(s, _)
+            | Op::SubAssignSlotSlot(s, _)
+            | Op::MulAssignSlotSlot(s, _)
+            | Op::AddAssignSlotSlotVoid(s, _) => Some(*s),
             _ => None,
         })
         .collect();
@@ -1998,6 +2053,112 @@ pub(crate) fn sub_entry_segment(ops: &[Op], entry_ip: usize) -> Option<(&[Op], S
         _ => return None,
     };
     Some((&tail[..rel], term))
+}
+
+/// Recognize the standard `my (...) = @_` argument-unpacking prologue at the
+/// start of `seg` and report how to seed each declared scalar slot directly from
+/// `@_`, so the prologue can be *skipped* and the remaining body JITted by fusevm.
+///
+/// The compiler emits this fixed idiom (see `--disasm`):
+/// ```text
+///   GetArray(uscore) DeclareArray(tmp)
+///   [ LoadInt(k) GetArrayElem(tmp) DeclareScalarSlot(slot_k, name_k) ]*
+/// ```
+/// `uscore` is the name-pool index of `_` (the `@_` array). On a match this
+/// returns `(prologue_len, binds)` where `binds[j] = (slot, arg_index)` means the
+/// body reads `@_[arg_index]` from `GetScalarSlot(slot)`. Returns `None` if the
+/// prefix is not exactly this shape (the caller then leaves the sub to the
+/// interpreter / its own JIT).
+pub(crate) fn recognize_args_unpack_prologue(
+    seg: &[Op],
+    uscore: u16,
+) -> Option<(usize, Vec<(u8, usize)>)> {
+    match (seg.first(), seg.get(1)) {
+        (Some(Op::GetArray(a)), Some(Op::DeclareArray(tmp))) if *a == uscore => {
+            let tmp = *tmp;
+            let mut i = 2;
+            let mut binds: Vec<(u8, usize)> = Vec::new();
+            while let (Some(Op::LoadInt(k)), Some(Op::GetArrayElem(t)), Some(Op::DeclareScalarSlot(slot, _))) =
+                (seg.get(i), seg.get(i + 1), seg.get(i + 2))
+            {
+                if *t != tmp || *k < 0 {
+                    break;
+                }
+                binds.push((*slot, *k as usize));
+                i += 3;
+            }
+            if binds.is_empty() {
+                None
+            } else {
+                Some((i, binds))
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Read-only signature-parameter reads (`GetScalarPlain(name)`) in `seg`, in
+/// first-appearance order, when the segment never *writes* a named scalar. These
+/// can be remapped to synthetic slots seeded from scope, so signature subs
+/// (`sub f($x,$y){ $x + $y }`, whose params are referenced by name, not via the
+/// `@_`-unpack prologue) become fusevm-JIT eligible.
+///
+/// Returns `None` if the segment writes any named scalar (`Set*Plain` / `SetScalar`
+/// / `SetScalarKeep`) or reads a named scalar through a form we don't model
+/// (`GetScalar`) — in those cases the value seen by the body could change mid-run
+/// or depends on scope semantics we can't safely cache through — or if there are no
+/// plain reads at all.
+pub(crate) fn plain_scalar_read_names(seg: &[Op]) -> Option<Vec<u16>> {
+    let mut names: Vec<u16> = Vec::new();
+    for op in seg {
+        match op {
+            Op::GetScalarPlain(i) => {
+                if !names.contains(i) {
+                    names.push(*i);
+                }
+            }
+            Op::SetScalarPlain(_)
+            | Op::SetScalarKeepPlain(_)
+            | Op::SetScalar(_)
+            | Op::SetScalarKeep(_)
+            | Op::GetScalar(_) => return None,
+            _ => {}
+        }
+    }
+    if names.is_empty() {
+        None
+    } else {
+        Some(names)
+    }
+}
+
+/// Build a normalized copy of `seg` with each `GetScalarPlain(name)` rewritten to
+/// `GetScalarSlot(synth)`, assigning synthetic slot indices densely from `base`
+/// (which must be past every real slot the body already uses). Returns the rewritten
+/// ops plus `binds[j] = (synth_slot, name_idx)` telling the caller which scope scalar
+/// to seed each synthetic slot from. `names` must be the list returned by
+/// [`plain_scalar_read_names`] for the same `seg`.
+pub(crate) fn remap_plain_reads_to_slots(
+    seg: &[Op],
+    names: &[u16],
+    base: u8,
+) -> (Vec<Op>, Vec<(u8, u16)>) {
+    let binds: Vec<(u8, u16)> = names
+        .iter()
+        .enumerate()
+        .map(|(k, n)| (base + k as u8, *n))
+        .collect();
+    let out = seg
+        .iter()
+        .map(|op| match op {
+            Op::GetScalarPlain(i) => {
+                let slot = binds.iter().find(|(_, n)| n == i).map(|(s, _)| *s).unwrap();
+                Op::GetScalarSlot(slot)
+            }
+            other => other.clone(),
+        })
+        .collect();
+    (out, binds)
 }
 
 /// Subroutine body from `entry_ip` through the first [`Op::Return`] or [`Op::ReturnValue`] (inclusive).
@@ -3890,6 +4051,133 @@ mod tests {
     use super::*;
     use crate::bytecode::Chunk;
     use crate::value::StrykeValue;
+
+    // `my ($a,$b) = @_;` lowers to a fixed prologue:
+    //   GetArray(uscore) DeclareArray(tmp)
+    //   [LoadInt(k) GetArrayElem(tmp) DeclareScalarSlot(slot_k, name_k)]*
+    // `recognize_args_unpack_prologue` must return the prologue length (so the
+    // caller can skip straight to the body) plus the (slot, arg_index) bindings
+    // it needs to seed from `@_`, and must reject anything that isn't this idiom.
+    #[test]
+    fn recognizes_args_unpack_prologue() {
+        let uscore = 7u16;
+        let tmp = 3u16;
+        let seg = vec![
+            Op::GetArray(uscore),
+            Op::DeclareArray(tmp),
+            Op::LoadInt(0),
+            Op::GetArrayElem(tmp),
+            Op::DeclareScalarSlot(0, 11),
+            Op::LoadInt(1),
+            Op::GetArrayElem(tmp),
+            Op::DeclareScalarSlot(1, 12),
+            // body
+            Op::GetScalarSlot(0),
+            Op::GetScalarSlot(1),
+            Op::Add,
+            Op::ReturnValue,
+        ];
+        let (plen, binds) =
+            recognize_args_unpack_prologue(&seg, uscore).expect("idiom must be recognized");
+        assert_eq!(plen, 8, "prologue spans GetArray..last DeclareScalarSlot");
+        assert_eq!(binds, vec![(0u8, 0usize), (1u8, 1usize)]);
+        assert!(matches!(seg[plen], Op::GetScalarSlot(0)));
+    }
+
+    #[test]
+    fn args_unpack_prologue_rejects_non_idiom() {
+        let uscore = 7u16;
+        // Wrong leading op (signature-style param, not `@_` unpack).
+        let sig = vec![
+            Op::GetScalarPlain(11),
+            Op::GetScalarPlain(12),
+            Op::Add,
+            Op::ReturnValue,
+        ];
+        assert!(recognize_args_unpack_prologue(&sig, uscore).is_none());
+
+        // Right shape but reads a DIFFERENT array than @_ — must not match.
+        let other = vec![
+            Op::GetArray(uscore + 1),
+            Op::DeclareArray(3),
+            Op::LoadInt(0),
+            Op::GetArrayElem(3),
+            Op::DeclareScalarSlot(0, 11),
+        ];
+        assert!(recognize_args_unpack_prologue(&other, uscore).is_none());
+
+        // GetArray/DeclareArray but no element bindings — nothing to seed.
+        let empty = vec![Op::GetArray(uscore), Op::DeclareArray(3), Op::ReturnValue];
+        assert!(recognize_args_unpack_prologue(&empty, uscore).is_none());
+    }
+
+    // Signature subs (`sub f($x,$y){ $x + $y }`) reference params by name via
+    // GetScalarPlain. `plain_scalar_read_names` collects the distinct read names in
+    // first-appearance order, and `remap_plain_reads_to_slots` rewrites them to
+    // synthetic slots seeded from scope, making such bodies fusevm-JIT eligible.
+    #[test]
+    fn collects_and_remaps_plain_param_reads() {
+        let seg = vec![
+            Op::GetScalarPlain(2),
+            Op::GetScalarPlain(3),
+            Op::Add,
+            Op::GetScalarPlain(2), // re-read of $x — must reuse the same synth slot
+            Op::Mul,
+        ];
+        let names = plain_scalar_read_names(&seg).expect("plain reads present");
+        assert_eq!(names, vec![2u16, 3u16], "distinct, first-appearance order");
+
+        let (norm, binds) = remap_plain_reads_to_slots(&seg, &names, 0);
+        assert_eq!(binds, vec![(0u8, 2u16), (1u8, 3u16)]);
+        assert_eq!(
+            norm,
+            vec![
+                Op::GetScalarSlot(0),
+                Op::GetScalarSlot(1),
+                Op::Add,
+                Op::GetScalarSlot(0),
+                Op::Mul,
+            ]
+        );
+    }
+
+    #[test]
+    fn plain_reads_remap_respects_base_slot() {
+        // A body with a local slot 0 plus two named params: synth slots start past
+        // the local (base = 1).
+        let seg = vec![
+            Op::GetScalarPlain(5),
+            Op::DeclareScalarSlot(0, 9),
+            Op::GetScalarSlot(0),
+            Op::GetScalarPlain(6),
+            Op::Add,
+        ];
+        let names = plain_scalar_read_names(&seg).unwrap();
+        let base = max_scalar_slot_index(&seg).map(|m| m + 1).unwrap_or(0);
+        assert_eq!(base, 1);
+        let (norm, binds) = remap_plain_reads_to_slots(&seg, &names, base);
+        assert_eq!(binds, vec![(1u8, 5u16), (2u8, 6u16)]);
+        assert_eq!(norm[0], Op::GetScalarSlot(1));
+        assert_eq!(norm[2], Op::GetScalarSlot(0)); // the real local is untouched
+        assert_eq!(norm[3], Op::GetScalarSlot(2));
+    }
+
+    #[test]
+    fn plain_reads_rejected_when_named_scalar_written() {
+        // A write to a named scalar means the value could change mid-body; we can't
+        // safely cache a single seeded snapshot, so the remap must decline.
+        let with_write = vec![
+            Op::GetScalarPlain(2),
+            Op::LoadInt(1),
+            Op::SetScalarPlain(2),
+            Op::GetScalarPlain(2),
+        ];
+        assert!(plain_scalar_read_names(&with_write).is_none());
+
+        // No plain reads at all → nothing to remap.
+        let none = vec![Op::GetScalarSlot(0), Op::LoadInt(1), Op::Add];
+        assert!(plain_scalar_read_names(&none).is_none());
+    }
 
     #[test]
     fn jit_add_mul_chain() {
