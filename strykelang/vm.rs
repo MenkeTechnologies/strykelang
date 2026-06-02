@@ -1128,7 +1128,8 @@ impl<'a> VM<'a> {
         let int_ok = crate::fusevm_bridge::segment_is_fusevm_eligible(seg, seg_ip);
         let str_ok = !int_ok
             && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip));
+                || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
+                || crate::fusevm_bridge::segment_is_string_length_eligible(seg, seg_ip));
         // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
         // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
         let float_ok = !int_ok
@@ -1219,6 +1220,11 @@ impl<'a> VM<'a> {
             slot_n = n;
         }
 
+        // Refresh the `length` helper's view of the runtime `utf8` pragma so a
+        // JIT-computed `length($s)` matches the interpreter under `use utf8` /
+        // `no utf8` (which toggle the pragma at runtime). Cheap and harmless for
+        // non-length segments.
+        crate::fusevm_bridge::set_utf8_pragma(self.interp.utf8_pragma);
         let Some(v) = crate::fusevm_bridge::run_linear_segment(
             seg,
             seg_ip,
@@ -9337,22 +9343,7 @@ impl<'a> VM<'a> {
         match bid {
             Some(BuiltinId::Length) => {
                 let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-                Ok(if let Some(a) = val.as_array_vec() {
-                    StrykeValue::integer(a.len() as i64)
-                } else if let Some(h) = val.as_hash_map() {
-                    StrykeValue::integer(h.len() as i64)
-                } else if let Some(b) = val.as_bytes_arc() {
-                    // Raw byte buffer: always byte count, regardless of utf8 pragma.
-                    StrykeValue::integer(b.len() as i64)
-                } else {
-                    let s = val.to_string();
-                    let n = if self.interp.utf8_pragma {
-                        s.chars().count()
-                    } else {
-                        s.len()
-                    };
-                    StrykeValue::integer(n as i64)
-                })
+                Ok(StrykeValue::integer(val.length_value(self.interp.utf8_pragma)))
             }
             Some(BuiltinId::Defined) => {
                 let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
