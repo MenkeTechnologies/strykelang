@@ -1058,10 +1058,17 @@ pub(crate) fn run_linear_segment(
     // result, because fusevm's block JIT collapses whole-number float literals to
     // integers (e.g. `$x * 2.0` is computed in i64), so its runtime kind would
     // under-report floats. Integer arithmetic over whole-number operands is
-    // bit-identical to the float computation (only Div/Pow/Mod differ, and those
-    // are excluded from float eligibility), so coercing such an integer result to
-    // a float is exact.
-    let float_kind = if int_ok {
+    // bit-identical to the float computation, so coercing such an integer result
+    // to a float is exact.
+    //
+    // A segment can be `int_ok` yet still yield a float when it contains an
+    // always-float op (`Div`/`Pow`, lowered to fusevm `Op::AwkDivJit`/`PowFloat`):
+    // `segment_result_is_integer` reports it as *not* integer-result, so we must
+    // still compute `float_kind` for it — otherwise such a bare segment (e.g.
+    // `$x / $y` or `$x ** $y`) would skip BOTH the integer block JIT (wrong
+    // result kind) and the float block JIT, falling to the interpreter and never
+    // persisting a native blob to the on-disk cache.
+    let float_kind = if int_ok && segment_result_is_integer(seg) {
         None
     } else {
         segment_fusevm_float_result_kind(seg, seg_start)
