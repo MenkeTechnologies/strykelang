@@ -1129,7 +1129,7 @@ impl<'a> VM<'a> {
         let str_ok = !int_ok
             && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_length_eligible(seg, seg_ip));
+                || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip));
         // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
         // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
         let float_ok = !int_ok
@@ -9439,43 +9439,16 @@ impl<'a> VM<'a> {
                 ))
             }
             Some(BuiltinId::Ord) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                Ok(StrykeValue::integer(
-                    s.chars().next().map(|c| c as i64).unwrap_or(0),
-                ))
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.ord_value()))
             }
             Some(BuiltinId::Hex) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                let clean = s.trim().trim_start_matches("0x").trim_start_matches("0X");
-                Ok(StrykeValue::integer(
-                    i64::from_str_radix(clean, 16).unwrap_or(0),
-                ))
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.hex_value()))
             }
             Some(BuiltinId::Oct) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                let s = s.trim();
-                let n = if s.starts_with("0x") || s.starts_with("0X") {
-                    i64::from_str_radix(&s[2..], 16).unwrap_or(0)
-                } else if s.starts_with("0b") || s.starts_with("0B") {
-                    i64::from_str_radix(&s[2..], 2).unwrap_or(0)
-                } else if s.starts_with("0o") || s.starts_with("0O") {
-                    i64::from_str_radix(&s[2..], 8).unwrap_or(0)
-                } else {
-                    i64::from_str_radix(s.trim_start_matches('0'), 8).unwrap_or(0)
-                };
-                Ok(StrykeValue::integer(n))
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.oct_value()))
             }
             Some(BuiltinId::Uc) => {
                 let s = args
