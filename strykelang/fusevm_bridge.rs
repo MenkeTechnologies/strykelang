@@ -408,6 +408,8 @@ pub(crate) fn segment_is_fusevm_eligible(seg: &[Op], seg_start: usize) -> bool {
             // Always-float math built-ins (e.g. `sqrt`/`sin`/`cos`/`exp`/`atan2`)
             // lowered to native fusevm float ops; eligible like any other op.
             _ if is_float_builtin(op) => continue,
+            // strykelang `int(x)` -> integer-producing `Op::TruncInt`.
+            _ if is_trunc_int_builtin(op) => continue,
             _ => return false,
         }
     }
@@ -549,6 +551,16 @@ fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
                 return false;
             }
             stack.push(NumTy::Float);
+        }
+        // `int(x)`: consume one operand of either kind and produce an integer
+        // (fusevm `Op::TruncInt` truncates a float toward zero to an i64). This
+        // is what lets a float-bearing segment (e.g. `int($x / 2)`) yield a
+        // block-JIT-returnable integer.
+        _ if is_trunc_int_builtin(op) => {
+            if stack.pop().is_none() {
+                return false;
+            }
+            stack.push(NumTy::Int);
         }
         // Everything else — `Mod`, bit/shift ops, `Inc`/`Dec`, fused-loop
         // ops, string ops, plain-slot reads — is not float-safe here.
@@ -702,6 +714,8 @@ fn op_stack_delta(op: &Op) -> Option<i32> {
         | JumpIfTrue(_) | JumpIfFalse(_) => -1,
         AddAssignSlotSlot(_, _) | SubAssignSlotSlot(_, _) | MulAssignSlotSlot(_, _)
         | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => 1,
+        // `int(x)` pops one and pushes one (net 0); see `is_trunc_int_builtin`.
+        _ if is_trunc_int_builtin(op) => 0,
         _ => return None,
     })
 }
@@ -939,6 +953,8 @@ fn translate_op_into(
             fixups.push((body.len(), *t - seg_start));
             body.push(F::JumpIfFalse(0));
         }
+        // strykelang `int(x)` -> fusevm's integer-producing `Op::TruncInt`.
+        _ if is_trunc_int_builtin(op) => body.push(F::TruncInt),
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
         // on-disk cache.
@@ -1076,6 +1092,16 @@ fn is_float_binary_builtin(op: &Op) -> bool {
 #[inline]
 fn is_float_builtin(op: &Op) -> bool {
     is_float_unary_builtin(op) || is_float_binary_builtin(op)
+}
+
+/// Whether `op` is strykelang's `int(x)` built-in, which the bridge lowers to
+/// fusevm's integer-producing [`fusevm::Op::TruncInt`] (truncate toward zero).
+/// Unlike the always-float built-ins, `int` yields an *integer*, so a segment
+/// containing it can take the integer block-JIT path; crucially it also turns an
+/// otherwise-unreturnable float (e.g. `int($x / 2)`) into a returnable integer.
+#[inline]
+fn is_trunc_int_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Int as u16)
 }
 
 /// The fusevm always-float op a lowerable math built-in maps to, or `None` if
@@ -1631,6 +1657,37 @@ mod tests {
         let out = run_linear_segment(&float_atan2, 0, &mut a2slots, SubTerminator::Value)
             .expect("bare float atan2 must run on fusevm");
         assert_eq!(out.as_float(), Some(0.0), "atan2(0, 1) == 0.0");
+
+        // `int($x / 2)` with x = slot 0 (= 7): div makes the segment float-bearing,
+        // but `int` truncates to a block-JIT-returnable integer. 7 / 2 == 3.5 ->
+        // int == 3.
+        let int_div = vec![
+            Op::GetScalarSlot(0),
+            Op::LoadInt(2),
+            Op::Div,
+            Op::CallBuiltin(BuiltinId::Int as u16, 1),
+        ];
+        assert!(segment_is_fusevm_float_eligible(&int_div, 0));
+        assert_eq!(
+            segment_fusevm_float_result_kind(&int_div, 0),
+            Some(NumTy::Int),
+            "int(div) yields an integer result"
+        );
+        let mut idslots = [7_i64];
+        let out = run_linear_segment(&int_div, 0, &mut idslots, SubTerminator::Value)
+            .expect("int($x / 2) must run on fusevm");
+        assert_eq!(out.as_integer(), Some(3), "int(7 / 2) == 3");
+
+        // Pure `int($x)` (integer operand) takes the integer block-JIT path.
+        let int_pure = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Int as u16, 1),
+        ];
+        assert!(segment_is_fusevm_eligible(&int_pure, 0));
+        let mut ipslots = [-9_i64];
+        let out = run_linear_segment(&int_pure, 0, &mut ipslots, SubTerminator::Value)
+            .expect("int($x) must run on fusevm");
+        assert_eq!(out.as_integer(), Some(-9), "int(-9) == -9");
 
         // A segment with no float operand is not a float segment (the integer path
         // covers it).
