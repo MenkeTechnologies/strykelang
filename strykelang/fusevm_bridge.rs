@@ -405,9 +405,9 @@ pub(crate) fn segment_is_fusevm_eligible(seg: &[Op], seg_start: usize) -> bool {
                     return false;
                 }
             }
-            // Always-float unary built-ins (e.g. `sqrt`) lowered to a native
-            // fusevm float op; eligible like any other arithmetic op.
-            _ if is_float_unary_builtin(op) => continue,
+            // Always-float math built-ins (e.g. `sqrt`/`sin`/`cos`/`exp`/`atan2`)
+            // lowered to native fusevm float ops; eligible like any other op.
+            _ if is_float_builtin(op) => continue,
             _ => return false,
         }
     }
@@ -534,10 +534,18 @@ fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
         | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => {
             stack.push(NumTy::Int)
         }
-        // Always-float unary built-ins (e.g. `sqrt`): consume one operand of any
-        // kind and produce a float, lowered to a native fusevm float op.
+        // Always-float unary built-ins (`sqrt`/`sin`/`cos`/`exp`): consume one
+        // operand of any kind and produce a float.
         _ if is_float_unary_builtin(op) => {
             if stack.pop().is_none() {
+                return false;
+            }
+            stack.push(NumTy::Float);
+        }
+        // Always-float binary built-ins (`atan2`): consume two operands and
+        // produce a float.
+        _ if is_float_binary_builtin(op) => {
+            if stack.pop().is_none() || stack.pop().is_none() {
                 return false;
             }
             stack.push(NumTy::Float);
@@ -601,7 +609,7 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
     // pure integer and is already covered by `segment_is_fusevm_eligible`.
     if !seg
         .iter()
-        .any(|o| matches!(o, LoadFloat(_) | Div | Pow) || is_float_unary_builtin(o))
+        .any(|o| matches!(o, LoadFloat(_) | Div | Pow) || is_float_builtin(o))
     {
         return None;
     }
@@ -931,9 +939,12 @@ fn translate_op_into(
             fixups.push((body.len(), *t - seg_start));
             body.push(F::JumpIfFalse(0));
         }
-        // Always-float unary built-in `sqrt($x)` -> native fusevm `Op::SqrtFloat`
-        // (Cranelift `fsqrt`), which JITs and persists to the on-disk cache.
-        _ if is_float_unary_builtin(op) => body.push(F::SqrtFloat),
+        // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
+        // corresponding native fusevm float op, which JITs and persists to the
+        // on-disk cache.
+        _ if is_float_builtin(op) => {
+            body.push(float_builtin_fusevm_op(op).expect("is_float_builtin implies a lowering"))
+        }
         _ => return false,
     }
     true
@@ -1032,18 +1043,62 @@ fn build_chunk(
 #[inline]
 fn segment_result_is_integer(seg: &[Op]) -> bool {
     !seg.iter()
-        .any(|o| matches!(o, Op::Div | Op::Pow) || is_float_unary_builtin(o))
+        .any(|o| matches!(o, Op::Div | Op::Pow) || is_float_builtin(o))
 }
 
-/// Whether `op` is a strykelang built-in call that the bridge lowers to an
-/// always-float fusevm op (currently `sqrt` -> [`fusevm::Op::SqrtFloat`]). Such a
-/// segment yields a float regardless of its operand kinds, so — like `Div`/`Pow`
-/// — it routes through the float block-JIT path (see
+/// Whether `op` is a strykelang unary math built-in call (`sqrt`/`sin`/`cos`/
+/// `exp`) that the bridge lowers to an always-float fusevm op. Such a segment
+/// yields a float regardless of its operand kinds, so — like `Div`/`Pow` — it
+/// routes through the float block-JIT path (see
 /// [`segment_fusevm_float_result_kind`]) rather than the integer one, and its
 /// result is reconstructed as a float.
 #[inline]
 fn is_float_unary_builtin(op: &Op) -> bool {
-    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Sqrt as u16)
+    use crate::bytecode::BuiltinId;
+    matches!(op, Op::CallBuiltin(id, 1)
+        if *id == BuiltinId::Sqrt as u16
+            || *id == BuiltinId::Sin as u16
+            || *id == BuiltinId::Cos as u16
+            || *id == BuiltinId::Exp as u16)
+}
+
+/// Whether `op` is a strykelang binary math built-in call (`atan2`) that the
+/// bridge lowers to an always-float fusevm op. See [`is_float_unary_builtin`].
+#[inline]
+fn is_float_binary_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 2) if *id == crate::bytecode::BuiltinId::Atan2 as u16)
+}
+
+/// Whether `op` is any always-float math built-in the bridge lowers (unary or
+/// binary). Segments containing one always produce a float.
+#[inline]
+fn is_float_builtin(op: &Op) -> bool {
+    is_float_unary_builtin(op) || is_float_binary_builtin(op)
+}
+
+/// The fusevm always-float op a lowerable math built-in maps to, or `None` if
+/// `op` is not such a built-in.
+#[inline]
+fn float_builtin_fusevm_op(op: &Op) -> Option<fusevm::Op> {
+    use crate::bytecode::BuiltinId;
+    use fusevm::Op as F;
+    let Op::CallBuiltin(id, _) = op else {
+        return None;
+    };
+    let id = *id;
+    if id == BuiltinId::Sqrt as u16 {
+        Some(F::SqrtFloat)
+    } else if id == BuiltinId::Sin as u16 {
+        Some(F::SinFloat)
+    } else if id == BuiltinId::Cos as u16 {
+        Some(F::CosFloat)
+    } else if id == BuiltinId::Exp as u16 {
+        Some(F::ExpFloat)
+    } else if id == BuiltinId::Atan2 as u16 {
+        Some(F::Atan2Float)
+    } else {
+        None
+    }
 }
 
 /// Configure fusevm's per-thread block-JIT warmup so the first invocation of a
@@ -1488,6 +1543,58 @@ mod tests {
                 .expect("float-sqrt compare must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "sqrt($x={x}) < 2.0");
         }
+
+        // The other always-float math built-ins lower to their native fusevm
+        // ops too: unary `sin`/`cos`/`exp` and binary `atan2`. Each yields a
+        // float and is eligible without an explicit `LoadFloat`.
+        use crate::bytecode::BuiltinId;
+        let float_exp = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Exp as u16, 1),
+        ];
+        assert!(segment_is_fusevm_float_eligible(&float_exp, 0));
+        assert_eq!(
+            segment_fusevm_float_result_kind(&float_exp, 0),
+            Some(NumTy::Float)
+        );
+        let mut eslots = [0_i64];
+        let out = run_linear_segment(&float_exp, 0, &mut eslots, SubTerminator::Value)
+            .expect("bare float exp must run on fusevm");
+        assert_eq!(out.as_float(), Some(1.0), "exp(0) == 1.0");
+
+        let float_cos = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Cos as u16, 1),
+        ];
+        let mut cslots = [0_i64];
+        let out = run_linear_segment(&float_cos, 0, &mut cslots, SubTerminator::Value)
+            .expect("bare float cos must run on fusevm");
+        assert_eq!(out.as_float(), Some(1.0), "cos(0) == 1.0");
+
+        let float_sin = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Sin as u16, 1),
+        ];
+        let mut snslots = [0_i64];
+        let out = run_linear_segment(&float_sin, 0, &mut snslots, SubTerminator::Value)
+            .expect("bare float sin must run on fusevm");
+        assert_eq!(out.as_float(), Some(0.0), "sin(0) == 0.0");
+
+        // `atan2($y, $x)`: the chunk pushes y (slot 0) then x (slot 1); atan2(0, 1) == 0.0.
+        let float_atan2 = vec![
+            Op::GetScalarSlot(0),
+            Op::GetScalarSlot(1),
+            Op::CallBuiltin(BuiltinId::Atan2 as u16, 2),
+        ];
+        assert!(segment_is_fusevm_float_eligible(&float_atan2, 0));
+        assert_eq!(
+            segment_fusevm_float_result_kind(&float_atan2, 0),
+            Some(NumTy::Float)
+        );
+        let mut a2slots = [0_i64, 1_i64];
+        let out = run_linear_segment(&float_atan2, 0, &mut a2slots, SubTerminator::Value)
+            .expect("bare float atan2 must run on fusevm");
+        assert_eq!(out.as_float(), Some(0.0), "atan2(0, 1) == 0.0");
 
         // A segment with no float operand is not a float segment (the integer path
         // covers it).
