@@ -9451,20 +9451,12 @@ impl<'a> VM<'a> {
                 Ok(StrykeValue::integer(val.oct_value()))
             }
             Some(BuiltinId::Uc) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                Ok(StrykeValue::string(s.to_uppercase()))
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.uc_value()))
             }
             Some(BuiltinId::Lc) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                Ok(StrykeValue::string(s.to_lowercase()))
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.lc_value()))
             }
             Some(BuiltinId::Ref) => {
                 let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
@@ -9783,30 +9775,12 @@ impl<'a> VM<'a> {
                 Ok(StrykeValue::integer(result))
             }
             Some(BuiltinId::Ucfirst) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                let mut chars = s.chars();
-                let result = match chars.next() {
-                    Some(c) => c.to_uppercase().to_string() + chars.as_str(),
-                    None => String::new(),
-                };
-                Ok(StrykeValue::string(result))
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.ucfirst_value()))
             }
             Some(BuiltinId::Lcfirst) => {
-                let s = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_string();
-                let mut chars = s.chars();
-                let result = match chars.next() {
-                    Some(c) => c.to_lowercase().to_string() + chars.as_str(),
-                    None => String::new(),
-                };
-                Ok(StrykeValue::string(result))
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.lcfirst_value()))
             }
             Some(BuiltinId::Splice) => self.interp.splice_builtin_execute(&args, line),
             Some(BuiltinId::Unshift) => self.interp.unshift_builtin_execute(&args, line),
