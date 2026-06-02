@@ -1059,7 +1059,8 @@ fn is_float_unary_builtin(op: &Op) -> bool {
         if *id == BuiltinId::Sqrt as u16
             || *id == BuiltinId::Sin as u16
             || *id == BuiltinId::Cos as u16
-            || *id == BuiltinId::Exp as u16)
+            || *id == BuiltinId::Exp as u16
+            || *id == BuiltinId::Log as u16)
 }
 
 /// Whether `op` is a strykelang binary math built-in call (`atan2`) that the
@@ -1094,6 +1095,8 @@ fn float_builtin_fusevm_op(op: &Op) -> Option<fusevm::Op> {
         Some(F::CosFloat)
     } else if id == BuiltinId::Exp as u16 {
         Some(F::ExpFloat)
+    } else if id == BuiltinId::Log as u16 {
+        Some(F::LogFloat)
     } else if id == BuiltinId::Atan2 as u16 {
         Some(F::Atan2Float)
     } else {
@@ -1579,6 +1582,21 @@ mod tests {
         let out = run_linear_segment(&float_sin, 0, &mut snslots, SubTerminator::Value)
             .expect("bare float sin must run on fusevm");
         assert_eq!(out.as_float(), Some(0.0), "sin(0) == 0.0");
+
+        // `log($x)` with x = slot 0 (= 1): log(1.0) == 0.0 exactly.
+        let float_log = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Log as u16, 1),
+        ];
+        assert!(segment_is_fusevm_float_eligible(&float_log, 0));
+        assert_eq!(
+            segment_fusevm_float_result_kind(&float_log, 0),
+            Some(NumTy::Float)
+        );
+        let mut lgslots = [1_i64];
+        let out = run_linear_segment(&float_log, 0, &mut lgslots, SubTerminator::Value)
+            .expect("bare float log must run on fusevm");
+        assert_eq!(out.as_float(), Some(0.0), "log(1) == 0.0");
 
         // `atan2($y, $x)`: the chunk pushes y (slot 0) then x (slot 1); atan2(0, 1) == 0.0.
         let float_atan2 = vec![
