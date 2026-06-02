@@ -79,6 +79,13 @@ pub mod ext_ops {
     /// the interpreter and never triggers `use overload`/stringify side effects.
     pub const STK_STR_CONCAT: u16 = 0x000E;
 
+    /// String `length`. Unary (`(i64 handle) -> i64 count`), unlike every other
+    /// `STK_STR_*` op which is binary. Routed only when the operand is a plain
+    /// string (`is_string_like`), so the handler/helper just stringifies and counts
+    /// (chars under the `utf8` pragma, else bytes — see [`super::stryke_utf8_pragma`]).
+    /// The result is an `i64`, keeping the chunk on the integer block JIT + disk cache.
+    pub const STK_STR_LEN: u16 = 0x000F;
+
     /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
 }
@@ -199,6 +206,43 @@ extern "C" fn stryke_h_str_concat(a: i64, b: i64) -> i64 {
     stryke_str_concat_op(a, b)
 }
 
+thread_local! {
+    /// Mirror of the interpreter's `utf8_pragma`, refreshed at each fusevm block
+    /// dispatch (see [`set_utf8_pragma`]). `length`'s host helper runs on the same
+    /// thread as the interpreter that set it, so it reads the *live* pragma value;
+    /// keeping it out of the chunk leaves the chunk operand/pragma-independent
+    /// (hence disk-cacheable) while still matching the interpreter across `use utf8`
+    /// / `no utf8` toggles, which flip the pragma at runtime.
+    static STRYKE_UTF8_PRAGMA: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Refresh the thread-local `utf8` pragma the `length` helper consults. Called by
+/// the interpreter immediately before dispatching a segment to the fusevm block
+/// JIT, so a JIT-computed `length` matches the interpreter under the current pragma.
+#[inline]
+pub(crate) fn set_utf8_pragma(on: bool) {
+    STRYKE_UTF8_PRAGMA.with(|p| p.set(on));
+}
+
+/// Stable helper-symbol name for `STK_STR_LEN`, hashed into a JIT helper id and
+/// registered with arity 1 (unary) — distinct from the binary string helpers.
+const STRYKE_STR_LEN_SYM: &str = "stryke_str_len";
+
+/// `length($s)`: borrow the operand `StrykeValue` from its NaN-boxed bits and
+/// return its length using the same [`StrykeValue::length_value`] the interpreter
+/// uses, under the live thread-local `utf8` pragma. Eligibility guarantees the
+/// operand is a plain string, so this never drops/allocates.
+#[inline]
+fn stryke_str_len_op(a_bits: i64) -> i64 {
+    let a = unsafe { sv_borrow(a_bits) };
+    a.length_value(STRYKE_UTF8_PRAGMA.with(|p| p.get()))
+}
+
+/// `extern "C"` host helper for `STK_STR_LEN`. ABI: `(i64 handle) -> i64` (unary).
+extern "C" fn stryke_h_str_len(a: i64) -> i64 {
+    stryke_str_len_op(a)
+}
+
 /// Table mapping each string-compare `Extended` id to the stable host-helper
 /// symbol name and its function pointer. The name is hashed into a JIT helper id
 /// (`fusevm::jit::jit_helper_id`) so cached native code re-resolves the helper at
@@ -236,15 +280,31 @@ fn stryke_str_helper_id(ext_id: u16) -> Option<u32> {
 pub(crate) struct StrykeJitExt;
 impl fusevm::jit::JitExtension for StrykeJitExt {
     fn can_jit(&self, ext_id: u16) -> bool {
-        ext_id == ext_ops::STK_MOD_FLOOR || is_stryke_str_ext(ext_id)
+        ext_id == ext_ops::STK_MOD_FLOOR
+            || ext_id == ext_ops::STK_STR_LEN
+            || is_stryke_str_ext(ext_id)
     }
     fn op_count(&self) -> usize {
-        1 + STRYKE_STR_HELPERS.len()
+        2 + STRYKE_STR_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
     }
     fn emit_extended(&self, ext_id: u16, _arg: u8, cx: &mut fusevm::jit::ExtJitCtx) -> bool {
+        if ext_id == ext_ops::STK_STR_LEN {
+            // length($s): pop the single operand handle and call the unary host
+            // helper, which reads the live `utf8` pragma. `call_host` records the
+            // relocation so the chunk stays on-disk cacheable.
+            let Some(a) = cx.pop_i64() else {
+                return false;
+            };
+            let helper_id = fusevm::jit::jit_helper_id(STRYKE_STR_LEN_SYM);
+            let Some(result) = cx.call_host(helper_id, &[a]) else {
+                return false;
+            };
+            cx.push_i64(result);
+            return true;
+        }
         if is_stryke_str_ext(ext_id) {
             // String compares: pop the two operand handles (raw StrykeValue bits)
             // and emit a call to the registered host helper, which defers to
@@ -304,6 +364,16 @@ pub(crate) fn register_stryke_jit_ext() {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 2, false);
         }
     }
+    // SAFETY: `stryke_h_str_len` is `extern "C" fn(i64) -> i64`, matching the
+    // 1-arg / integer-return signature declared here.
+    unsafe {
+        fusevm::jit::register_jit_helper(
+            STRYKE_STR_LEN_SYM,
+            stryke_h_str_len as *const u8,
+            1,
+            false,
+        );
+    }
 }
 
 /// fusevm interpreter handler for strykelang Extended ops, registered on the
@@ -314,6 +384,9 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(floored_mod(a, b)));
+    } else if id == ext_ops::STK_STR_LEN {
+        let a = vm.pop().to_int();
+        vm.push(fusevm::Value::Int(stryke_str_len_op(a)));
     } else if is_stryke_str_ext(id) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
@@ -845,6 +918,21 @@ pub(crate) fn segment_is_string_concat_eligible(seg: &[Op], _seg_start: usize) -
     )
 }
 
+/// True when `op` is the `length` builtin call (`CallBuiltin(Length, 1)`).
+#[inline]
+fn is_length_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Length as u16)
+}
+
+/// True when `seg` is exactly a single `length($s)` of one slot operand:
+/// `[GetScalarSlot, CallBuiltin(Length, 1)]`. Like the compare/concat segments the
+/// operand is marshaled as raw NaN-boxed `StrykeValue` bits (and routed only when it
+/// is a plain string — see the caller's `is_string_like` gate), and the result is a
+/// plain `i64`, so the chunk stays on the integer block JIT + on-disk native cache.
+pub(crate) fn segment_is_string_length_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(seg, [Op::GetScalarSlot(_), len] if is_length_builtin(len))
+}
+
 /// Translate a single eligible strykelang op, appending the equivalent
 /// `fusevm::Op`(s) to `body`. Most ops are 1:1; strykelang's fused slot ops are
 /// decomposed into fusevm's primitive slot/arith ops (fusevm has no slot-slot
@@ -955,6 +1043,9 @@ fn translate_op_into(
         }
         // strykelang `int(x)` -> fusevm's integer-producing `Op::TruncInt`.
         _ if is_trunc_int_builtin(op) => body.push(F::TruncInt),
+        // `length($s)` -> unary host-helper-backed Extended op; the operand is a raw
+        // StrykeValue bit-handle (see `segment_is_string_length_eligible`).
+        _ if is_length_builtin(op) => body.push(F::Extended(ext_ops::STK_STR_LEN, 0)),
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
         // on-disk cache.
@@ -1197,7 +1288,12 @@ pub(crate) fn run_linear_segment(
         && !float_ok
         && !concat_ok
         && segment_is_string_compare_eligible(seg, seg_start);
-    if !int_ok && !float_ok && !str_ok && !concat_ok {
+    let len_ok = !int_ok
+        && !float_ok
+        && !concat_ok
+        && !str_ok
+        && segment_is_string_length_eligible(seg, seg_start);
+    if !int_ok && !float_ok && !str_ok && !concat_ok && !len_ok {
         return None;
     }
 
@@ -1213,7 +1309,7 @@ pub(crate) fn run_linear_segment(
     // Concatenation returns the raw bits of a freshly allocated, *owned* string
     // handle, which we reconstitute into exactly one owning `StrykeValue` via
     // `from_raw_bits` (the helper `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok {
+    if str_ok || concat_ok || len_ok {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
@@ -1801,6 +1897,39 @@ mod tests {
             assert_eq!(a.as_str().as_deref(), Some(*a_s));
             assert_eq!(b.as_str().as_deref(), Some(*b_s));
         }
+    }
+
+    // `length($s)` lowered to fusevm (unary `STK_STR_LEN` host helper) must equal
+    // the interpreter's `StrykeValue::length_value` for ASCII, multibyte UTF-8 and
+    // empty strings, under both the byte (default) and char (`use utf8`) pragmas.
+    // The operand is only borrowed, so it must survive repeated runs intact.
+    #[test]
+    fn fusevm_runs_string_length() {
+        let seg = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(crate::bytecode::BuiltinId::Length as u16, 1),
+        ];
+        assert!(segment_is_string_length_eligible(&seg, 0));
+
+        let cases: &[&str] = &["", "foo", "hello world", "café", "naïve façade", "🦀🦀"];
+        for utf8 in [false, true] {
+            set_utf8_pragma(utf8);
+            for s in cases {
+                let v = StrykeValue::string((*s).to_string());
+                let want = v.length_value(utf8);
+                let mut last = None;
+                for _ in 0..256 {
+                    let mut slots = [v.raw_bits() as i64];
+                    last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                        .expect("string-length segment must run on fusevm")
+                        .as_integer();
+                }
+                assert_eq!(last, Some(want), "length({s:?}) utf8={utf8}");
+                // The operand is borrowed, never dropped — it stays intact.
+                assert_eq!(v.as_str().as_deref(), Some(*s));
+            }
+        }
+        set_utf8_pragma(false);
     }
 
     // The concat chunk, like the compare chunks, must not bake operand pointers

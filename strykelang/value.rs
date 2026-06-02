@@ -1489,6 +1489,27 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// `length` builtin semantics, factored out so the interpreter
+    /// (`BuiltinId::Length`) and the fusevm JIT host helper
+    /// (`fusevm_bridge::stryke_str_len_op`) compute an identical result: array
+    /// element count, hash key count, raw-byte length, otherwise the stringified
+    /// value's character count (when the `utf8` pragma is active) or byte length.
+    pub fn length_value(&self, utf8: bool) -> i64 {
+        if let Some(a) = self.as_array_vec() {
+            a.len() as i64
+        } else if let Some(h) = self.as_hash_map() {
+            h.len() as i64
+        } else if let Some(b) = self.as_bytes_arc() {
+            b.len() as i64
+        } else {
+            let s = self.to_string();
+            if utf8 {
+                s.chars().count() as i64
+            } else {
+                s.len() as i64
+            }
+        }
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
