@@ -105,6 +105,14 @@ pub mod ext_ops {
     /// String `lcfirst` — lower-case first char. Unary string→string handle.
     pub const STK_STR_LCFIRST: u16 = 0x0016;
 
+    /// `chr` — the one-character string for an integer codepoint. Unlike the other
+    /// `STK_STR_*` ops its operand is an **integer** (not a string handle), but like
+    /// `uc`/`concat` its result is the raw bits of a freshly allocated *owned*
+    /// `StrykeValue::string` (reconstructed via `from_raw_bits`). So the operand is
+    /// marshaled as an unboxed `i64` (the integer path), while the result is an owned
+    /// string handle — its own int→string eligibility class.
+    pub const STK_STR_CHR: u16 = 0x0017;
+
     /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
 }
@@ -307,6 +315,7 @@ const STRYKE_STR_UNARY_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
 fn is_stryke_str_unary_ext(ext_id: u16) -> bool {
     STRYKE_STR_UNARY_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
         || is_stryke_str_unary_str_ext(ext_id)
+        || is_stryke_int_str_ext(ext_id)
 }
 
 /// The registered JIT helper id for a unary string Extended op, if any.
@@ -315,6 +324,7 @@ fn stryke_str_unary_helper_id(ext_id: u16) -> Option<u32> {
     STRYKE_STR_UNARY_HELPERS
         .iter()
         .chain(STRYKE_STR_UNARY_STR_HELPERS.iter())
+        .chain(STRYKE_INT_STR_HELPERS.iter())
         .find(|(id, _, _)| *id == ext_id)
         .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
 }
@@ -411,8 +421,36 @@ fn stryke_str_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
         ext_ops::STK_STR_LC => stryke_str_lc_op(a_bits),
         ext_ops::STK_STR_UCFIRST => stryke_str_ucfirst_op(a_bits),
         ext_ops::STK_STR_LCFIRST => stryke_str_lcfirst_op(a_bits),
+        ext_ops::STK_STR_CHR => stryke_str_chr_op(a_bits),
         _ => 0,
     }
+}
+
+/// `chr($n)`: build the one-character owned string for integer codepoint `n` (the
+/// operand is a plain `i64`, *not* a NaN-boxed handle), via the same
+/// [`crate::value::chr_from_codepoint`] the interpreter uses. Returns an owned string
+/// handle (raw bits of a `mem::forget`-ed `StrykeValue::string`).
+#[inline]
+fn stryke_str_chr_op(n: i64) -> i64 {
+    forget_string_bits(crate::value::chr_from_codepoint(n))
+}
+extern "C" fn stryke_h_str_chr(n: i64) -> i64 {
+    stryke_str_chr_op(n)
+}
+
+/// Table of int→string ops (`(i64 codepoint) -> i64 string handle`): currently just
+/// `chr`. The `(i64) -> i64` helper ABI matches the unary tables, so emit/dispatch
+/// reuse the single-operand path; the distinction is the *operand* is an integer (so
+/// it is marshaled unboxed, via the integer path) rather than a string handle.
+const STRYKE_INT_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
+    (ext_ops::STK_STR_CHR, "stryke_str_chr", stryke_h_str_chr),
+];
+
+/// True for an int→string Extended id (`chr`), whose operand is an integer and whose
+/// result is an owned string handle.
+#[inline]
+fn is_stryke_int_str_ext(ext_id: u16) -> bool {
+    STRYKE_INT_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
 }
 
 /// Table mapping each string-compare `Extended` id to the stable host-helper
@@ -460,6 +498,7 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
         1 + STRYKE_STR_HELPERS.len()
             + STRYKE_STR_UNARY_HELPERS.len()
             + STRYKE_STR_UNARY_STR_HELPERS.len()
+            + STRYKE_INT_STR_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
@@ -546,6 +585,7 @@ pub(crate) fn register_stryke_jit_ext() {
     for (_, name, ptr) in STRYKE_STR_UNARY_HELPERS
         .iter()
         .chain(STRYKE_STR_UNARY_STR_HELPERS.iter())
+        .chain(STRYKE_INT_STR_HELPERS.iter())
     {
         unsafe {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 1, false);
@@ -1149,6 +1189,17 @@ fn unary_str_ext_op(op: &Op) -> Option<u16> {
     unary_str_int_ext_op(op).or_else(|| unary_str_str_ext_op(op))
 }
 
+/// Maps the int→string builtin `chr` to its `STK_STR_CHR` Extended id. The operand
+/// is an integer (marshaled unboxed) and the result is an owned string handle.
+#[inline]
+fn int_str_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    match op {
+        Op::CallBuiltin(id, 1) if *id == BuiltinId::Chr as u16 => Some(ext_ops::STK_STR_CHR),
+        _ => None,
+    }
+}
+
 /// True when `op` is any unary string builtin lowered to a `STK_STR_*` unary ext op.
 #[inline]
 fn is_unary_str_int_builtin(op: &Op) -> bool {
@@ -1170,6 +1221,15 @@ pub(crate) fn segment_is_string_unary_eligible(seg: &[Op], _seg_start: usize) ->
 /// than a plain integer. A strict subset of [`segment_is_string_unary_eligible`].
 pub(crate) fn segment_is_string_unary_str_eligible(seg: &[Op], _seg_start: usize) -> bool {
     matches!(seg, [Op::GetScalarSlot(_), u] if unary_str_str_ext_op(u).is_some())
+}
+
+/// True when `seg` is an int→string builtin segment
+/// (`[GetScalarSlot, CallBuiltin(chr, 1)]`): the operand is an **integer** (marshaled
+/// unboxed, like the integer fast path) and the result is an owned string handle
+/// (reconstructed via `from_raw_bits`, like concatenation). Its own eligibility class
+/// because the operand marshaling differs from the string-operand unary family.
+pub(crate) fn segment_is_int_to_string_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(seg, [Op::GetScalarSlot(_), u] if int_str_ext_op(u).is_some())
 }
 
 /// Translate a single eligible strykelang op, appending the equivalent
@@ -1288,6 +1348,11 @@ fn translate_op_into(
         // `segment_is_string_unary_eligible`).
         _ if unary_str_ext_op(op).is_some() => {
             body.push(F::Extended(unary_str_ext_op(op).unwrap(), 0))
+        }
+        // `chr($n)` -> int→string host-helper Extended op; the operand is an unboxed
+        // integer codepoint (see `segment_is_int_to_string_eligible`).
+        _ if int_str_ext_op(op).is_some() => {
+            body.push(F::Extended(int_str_ext_op(op).unwrap(), 0))
         }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
@@ -1539,28 +1604,37 @@ pub(crate) fn run_linear_segment(
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
     let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
-    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok {
+    // `chr($n)`: integer operand (marshaled unboxed by the caller, exactly like the
+    // integer fast path), owned-string-handle result (reconstructed via from_raw_bits).
+    let int_str_ok = !int_ok
+        && !float_ok
+        && !str_ok
+        && !concat_ok
+        && !unary_ok
+        && segment_is_int_to_string_eligible(seg, seg_start);
+    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok && !int_str_ok {
         return None;
     }
 
-    // String segments (comparison + concatenation + unary length/ord/hex/oct): build
-    // an *unseeded* chunk (operand handles flow through the runtime `slots` buffer,
-    // never baked into the chunk) and run it strictly on the block JIT, which is
-    // configured to compile eagerly. There is no fusevm-interpreter fallback here:
-    // that path reads slots from the VM frame, which an unseeded chunk never
-    // populates. On block-JIT decline we return None so strykelang falls back to its
-    // own interpreter.
+    // String segments (comparison + concatenation + unary length/ord/hex/oct + the
+    // int→string `chr`): build an *unseeded* chunk (operand values flow through the
+    // runtime `slots` buffer, never baked into the chunk) and run it strictly on the
+    // block JIT, which is configured to compile eagerly. There is no fusevm-interpreter
+    // fallback here: that path reads slots from the VM frame, which an unseeded chunk
+    // never populates. On block-JIT decline we return None so strykelang falls back to
+    // its own interpreter.
     //
     // Comparison and unary length/ord/hex/oct results are plain `i64` outcomes.
-    // Concatenation returns the raw bits of a freshly allocated, *owned* string
-    // handle, which we reconstitute into exactly one owning `StrykeValue` via
-    // `from_raw_bits` (the helper `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok {
+    // Concatenation and the string-producing ops (uc/lc/ucfirst/lcfirst, chr) return
+    // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
+    // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
+    // `mem::forget`-ed it, transferring ownership).
+    if str_ok || concat_ok || unary_ok || int_str_ok {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
-            if concat_ok || unary_str_ok {
+            if concat_ok || unary_str_ok || int_str_ok {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
                 StrykeValue::integer(ret)
@@ -2266,6 +2340,32 @@ mod tests {
             assert_eq!(last.as_deref(), Some(want.as_str()), "{builtin:?}({s:?})");
             // The operand is borrowed, never dropped — it stays intact.
             assert_eq!(v.as_str().as_deref(), Some(*s));
+        }
+    }
+
+    // `chr($n)` lowered to fusevm (int→string `STK_STR_CHR` host helper) must equal
+    // the interpreter's `StrykeValue::chr_value`. The operand is an *integer* (marshaled
+    // unboxed), and the result is an owned string handle reconstructed via `from_raw_bits`.
+    #[test]
+    fn fusevm_runs_string_chr() {
+        let seg = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(crate::bytecode::BuiltinId::Chr as u16, 1),
+        ];
+        assert!(segment_is_int_to_string_eligible(&seg, 0));
+        assert!(!segment_is_string_unary_eligible(&seg, 0));
+
+        let cases: &[i64] = &[65, 97, 0x1F980, 8364, 0, 233, 0x110000];
+        for n in cases {
+            let want = crate::value::chr_from_codepoint(*n);
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [*n];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("chr segment must run on fusevm")
+                    .as_str();
+            }
+            assert_eq!(last.as_deref(), Some(want.as_str()), "chr({n})");
         }
     }
 

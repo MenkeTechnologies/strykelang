@@ -1576,6 +1576,13 @@ impl StrykeValue {
             None => String::new(),
         }
     }
+
+    /// `chr` builtin: the one-character string for this value's integer codepoint
+    /// (empty string for an invalid codepoint). Shared by the interpreter
+    /// (`BuiltinId::Chr`) and the fusevm JIT host helper via [`chr_from_codepoint`].
+    pub fn chr_value(&self) -> String {
+        chr_from_codepoint(self.to_int())
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
@@ -3134,6 +3141,16 @@ pub fn set_member_key(v: &StrykeValue) -> String {
 ///   `perl_mod_i64(-7,-3) = -1`
 ///   `perl_mod_i64( 7, 3) =  1`
 #[inline]
+/// `chr` builtin core: the one-character string for a Unicode codepoint, or the
+/// empty string if `n` is not a valid `char` (matches the interpreter's
+/// `char::from_u32(n).map(...).unwrap_or_default()`). Factored out so the interpreter
+/// (via [`StrykeValue::chr_value`]) and the fusevm JIT host helper agree exactly.
+pub fn chr_from_codepoint(n: i64) -> String {
+    char::from_u32(n as u32)
+        .map(|c| c.to_string())
+        .unwrap_or_default()
+}
+
 pub fn perl_mod_i64(a: i64, b: i64) -> i64 {
     debug_assert_ne!(b, 0);
     let r = a.wrapping_rem(b);
