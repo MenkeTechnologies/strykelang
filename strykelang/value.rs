@@ -1584,6 +1584,13 @@ impl StrykeValue {
         chr_from_codepoint(self.to_int())
     }
 
+    /// `fc` builtin: the Unicode default case-fold of the stringified value (used for
+    /// caseless comparison). Shared by the interpreter (`BuiltinId::Fc`) and the fusevm
+    /// JIT host helper so both agree exactly.
+    pub fn fc_value(&self) -> String {
+        caseless::default_case_fold_str(&self.to_string())
+    }
+
     /// `index($s, $sub)` builtin (2-arg form, no explicit position): the byte offset
     /// of the first occurrence of `sub` in `self`, or -1 if absent. Shared by the
     /// interpreter and the fusevm JIT host helper so both agree exactly. (The 3-arg
