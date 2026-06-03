@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 
-use caseless::default_case_fold_str;
 
 use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam};
 use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
@@ -9415,7 +9414,7 @@ impl<'a> VM<'a> {
             }
             Some(BuiltinId::Fc) => {
                 let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-                Ok(StrykeValue::string(default_case_fold_str(&s.to_string())))
+                Ok(StrykeValue::string(s.fc_value()))
             }
             Some(BuiltinId::Pos) => {
                 let key = if args.is_empty() {

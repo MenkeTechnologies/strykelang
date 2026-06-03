@@ -104,6 +104,8 @@ pub mod ext_ops {
     pub const STK_STR_UCFIRST: u16 = 0x0015;
     /// String `lcfirst` — lower-case first char. Unary string→string handle.
     pub const STK_STR_LCFIRST: u16 = 0x0016;
+    /// `fc` — Unicode default case-fold. Unary string→string handle (see `STK_STR_UC`).
+    pub const STK_STR_FC: u16 = 0x001A;
 
     /// `chr` — the one-character string for an integer codepoint. Unlike the other
     /// `STK_STR_*` ops its operand is an **integer** (not a string handle), but like
@@ -431,6 +433,15 @@ extern "C" fn stryke_h_str_lcfirst(a: i64) -> i64 {
     stryke_str_lcfirst_op(a)
 }
 
+/// `fc($s)`: owned case-folded string handle (see [`StrykeValue::fc_value`]).
+#[inline]
+fn stryke_str_fc_op(a_bits: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.fc_value())
+}
+extern "C" fn stryke_h_str_fc(a: i64) -> i64 {
+    stryke_str_fc_op(a)
+}
+
 /// Table of the unary string→**string** ops (`(i64 handle) -> i64 handle`):
 /// `uc`/`lc`/`ucfirst`/`lcfirst`. Same `(i64) -> i64` ABI as the unary string→int
 /// table, but the returned `i64` is the raw bits of a freshly allocated *owned*
@@ -442,6 +453,7 @@ const STRYKE_STR_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = 
     (ext_ops::STK_STR_LC, "stryke_str_lc", stryke_h_str_lc),
     (ext_ops::STK_STR_UCFIRST, "stryke_str_ucfirst", stryke_h_str_ucfirst),
     (ext_ops::STK_STR_LCFIRST, "stryke_str_lcfirst", stryke_h_str_lcfirst),
+    (ext_ops::STK_STR_FC, "stryke_str_fc", stryke_h_str_fc),
 ];
 
 /// True for a unary string→string Extended id (`uc`/`lc`/`ucfirst`/`lcfirst`), whose
@@ -460,6 +472,7 @@ fn stryke_str_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
         ext_ops::STK_STR_LC => stryke_str_lc_op(a_bits),
         ext_ops::STK_STR_UCFIRST => stryke_str_ucfirst_op(a_bits),
         ext_ops::STK_STR_LCFIRST => stryke_str_lcfirst_op(a_bits),
+        ext_ops::STK_STR_FC => stryke_str_fc_op(a_bits),
         ext_ops::STK_STR_CHR => stryke_str_chr_op(a_bits),
         _ => 0,
     }
@@ -1254,6 +1267,8 @@ fn unary_str_str_ext_op(op: &Op) -> Option<u16> {
         Some(ext_ops::STK_STR_UCFIRST)
     } else if id == BuiltinId::Lcfirst as u16 {
         Some(ext_ops::STK_STR_LCFIRST)
+    } else if id == BuiltinId::Fc as u16 {
+        Some(ext_ops::STK_STR_FC)
     } else {
         None
     }
@@ -2398,6 +2413,10 @@ mod tests {
             (BuiltinId::Ucfirst, "éa", |v| v.ucfirst_value()),
             (BuiltinId::Lcfirst, "Hello World", |v| v.lcfirst_value()),
             (BuiltinId::Lcfirst, "ABC", |v| v.lcfirst_value()),
+            (BuiltinId::Fc, "HELLO", |v| v.fc_value()),
+            (BuiltinId::Fc, "Straße", |v| v.fc_value()),
+            (BuiltinId::Fc, "MiXeD", |v| v.fc_value()),
+            (BuiltinId::Fc, "", |v| v.fc_value()),
         ];
         for (builtin, s, want_fn) in cases {
             let seg = vec![
