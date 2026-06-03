@@ -1480,6 +1480,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Lcfirst(e) => format!("lcfirst {}", format_expr(e)),
         ExprKind::Ucfirst(e) => format!("ucfirst {}", format_expr(e)),
         ExprKind::Fc(e) => format!("fc {}", format_expr(e)),
+        ExprKind::Quotemeta(e) => format!("quotemeta {}", format_expr(e)),
         ExprKind::Crypt { plaintext, salt } => {
             format!("crypt({}, {})", format_expr(plaintext), format_expr(salt))
         }
