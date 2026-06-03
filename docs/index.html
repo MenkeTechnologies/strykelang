@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~463k-line Rust slice (production + tests + tooling), 10,431 builtins (11,159 keys in %all), 341-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~470k-line Rust slice (production + tests + tooling), 10,431 builtins (11,159 keys in %all), 347-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -752,7 +752,7 @@ wizard
         <h3 style="color:#39ff14;">What stryke REPL Has That zsh / bash Don't</h3>
         <ul>
           <li><strong>Composable pipelines</strong> — every shell-like builtin returns a stryke value, so <code>ls() |&gt; grep { /\.rs$/ } |&gt; sort</code> works without spawning subprocesses</li>
-          <li><strong>10,365 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
+          <li><strong>10,431 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
           <li><strong>Perl 5 syntax</strong> for everything that isn't shell muscle-memory: <code>$_</code>, <code>@ARGV</code>, <code>%ENV</code>, here-docs, regex literals, captures, <code>sub</code>, <code>my</code>, <code>local</code>, <code>our</code> all work</li>
           <li><strong>Reflection at the prompt</strong> — <code>keys %b</code> for the full builtin set, <code>keys %a</code> for aliases, <code>keys %d</code> for documented names, <code>keys %p</code> for primaries, <code>keys %k</code> for keywords, <code>keys %c</code> for category names</li>
           <li><strong>Live doc browser</strong> — <code>docs &lt;name&gt;</code> drops into a TUI hover-doc reader (j/k nav, t for ToC, / search, ]/[ for next/prev chapter)</li>
