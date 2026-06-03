@@ -113,6 +113,14 @@ pub mod ext_ops {
     /// string handle — its own int→string eligibility class.
     pub const STK_STR_CHR: u16 = 0x0017;
 
+    /// `index($s, $sub)` (2-arg) — byte offset of first occurrence, or -1. Binary
+    /// string→int (two NaN-boxed string handle operands, `i64` result), like the
+    /// comparison ops, so it stays on the integer block JIT + on-disk cache.
+    pub const STK_STR_INDEX: u16 = 0x0018;
+    /// `rindex($s, $sub)` (2-arg) — byte offset of *last* occurrence, or -1. Binary
+    /// string→int (see `STK_STR_INDEX`).
+    pub const STK_STR_RINDEX: u16 = 0x0019;
+
     /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
 }
@@ -205,6 +213,37 @@ stryke_str_helper!(stryke_h_str_gt, ext_ops::STK_STR_GT);
 stryke_str_helper!(stryke_h_str_le, ext_ops::STK_STR_LE);
 stryke_str_helper!(stryke_h_str_ge, ext_ops::STK_STR_GE);
 stryke_str_helper!(stryke_h_str_cmp, ext_ops::STK_STR_CMP);
+
+/// Shared computation for the binary string→int search ops `index`/`rindex` (2-arg
+/// form). Reconstructs both operands from their NaN-boxed bits and defers to
+/// strykelang's native [`StrykeValue::index_value`] / [`StrykeValue::rindex_value`]
+/// so stringification and byte-offset semantics match the interpreter exactly.
+#[inline]
+fn stryke_str_index_op(ext_id: u16, a_bits: i64, b_bits: i64) -> i64 {
+    let (a, b) = unsafe { (sv_borrow(a_bits), sv_borrow(b_bits)) };
+    match ext_id {
+        ext_ops::STK_STR_INDEX => a.index_value(&b),
+        ext_ops::STK_STR_RINDEX => a.rindex_value(&b),
+        _ => -1,
+    }
+}
+
+/// `extern "C"` host helper for `STK_STR_INDEX`. ABI matches the compare helpers
+/// (`(i64 a_bits, i64 b_bits) -> i64`) so it shares the binary string machinery.
+extern "C" fn stryke_h_str_index(a: i64, b: i64) -> i64 {
+    stryke_str_index_op(ext_ops::STK_STR_INDEX, a, b)
+}
+/// `extern "C"` host helper for `STK_STR_RINDEX`.
+extern "C" fn stryke_h_str_rindex(a: i64, b: i64) -> i64 {
+    stryke_str_index_op(ext_ops::STK_STR_RINDEX, a, b)
+}
+
+/// True for the binary string→int search ops (`index`/`rindex`), whose operands are
+/// string handles and whose result is an `i64` offset.
+#[inline]
+fn is_stryke_str_index_ext(ext_id: u16) -> bool {
+    matches!(ext_id, ext_ops::STK_STR_INDEX | ext_ops::STK_STR_RINDEX)
+}
 
 /// Concatenate two plain-string operands (`$a . $b`), returning the raw bits of a
 /// **newly allocated, owned** `StrykeValue::string`. The two operands are borrowed
@@ -466,12 +505,16 @@ const STRYKE_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
     (ext_ops::STK_STR_GE, "stryke_str_ge", stryke_h_str_ge),
     (ext_ops::STK_STR_CMP, "stryke_str_cmp", stryke_h_str_cmp),
     (ext_ops::STK_STR_CONCAT, "stryke_str_concat", stryke_h_str_concat),
+    (ext_ops::STK_STR_INDEX, "stryke_str_index", stryke_h_str_index),
+    (ext_ops::STK_STR_RINDEX, "stryke_str_rindex", stryke_h_str_rindex),
 ];
 
-/// True for any `STK_STR_*` extension id (comparisons + concatenation).
+/// True for any binary `STK_STR_*` extension id (comparisons + concatenation +
+/// `index`/`rindex`). Table-driven rather than a contiguous range because these ids
+/// are interleaved with the unary/string-producing ops in the `STK_STR_*` space.
 #[inline]
 fn is_stryke_str_ext(ext_id: u16) -> bool {
-    (ext_ops::STK_STR_EQ..=ext_ops::STK_STR_CONCAT).contains(&ext_id)
+    STRYKE_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
 }
 
 /// The registered JIT helper id for a string-compare extension op, if any.
@@ -609,6 +652,8 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
         let a = vm.pop().to_int();
         let r = if id == ext_ops::STK_STR_CONCAT {
             stryke_str_concat_op(a, b)
+        } else if is_stryke_str_index_ext(id) {
+            stryke_str_index_op(id, a, b)
         } else {
             stryke_str_compare_op(id, a, b)
         };
@@ -1135,6 +1180,38 @@ pub(crate) fn segment_is_string_concat_eligible(seg: &[Op], _seg_start: usize) -
     )
 }
 
+/// Maps a binary string→int builtin call (2-arg `index`/`rindex`) to its `STK_STR_*`
+/// Extended id, if any. Two string-handle operands, `i64` result — same raw-bits
+/// marshaling and integer-result handling as the comparison ops.
+#[inline]
+fn binary_str_int_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    let Op::CallBuiltin(id, 2) = op else {
+        return None;
+    };
+    let id = *id;
+    if id == BuiltinId::Index as u16 {
+        Some(ext_ops::STK_STR_INDEX)
+    } else if id == BuiltinId::Rindex as u16 {
+        Some(ext_ops::STK_STR_RINDEX)
+    } else {
+        None
+    }
+}
+
+/// True when `seg` is exactly a single binary string→int builtin of two slot
+/// operands: `[GetScalarSlot, GetScalarSlot, CallBuiltin(index|rindex, 2)]`. Like the
+/// compare/concat segments the operands are marshaled as raw NaN-boxed `StrykeValue`
+/// bits (routed only when both are plain strings — see the caller's `is_string_like`
+/// gate), and the result is a plain `i64`, so the chunk stays on the integer block
+/// JIT + on-disk cache.
+pub(crate) fn segment_is_string_binary_int_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(_), Op::GetScalarSlot(_), u] if binary_str_int_ext_op(u).is_some()
+    )
+}
+
 /// Maps a unary string→int builtin call to its `STK_STR_*` Extended id, if any:
 /// `length`/`ord`/`hex`/`oct`. All take one operand and yield an `i64`, so they
 /// share the same segment shape, raw-bits marshaling and integer-result handling.
@@ -1353,6 +1430,12 @@ fn translate_op_into(
         // integer codepoint (see `segment_is_int_to_string_eligible`).
         _ if int_str_ext_op(op).is_some() => {
             body.push(F::Extended(int_str_ext_op(op).unwrap(), 0))
+        }
+        // 2-arg `index`/`rindex` -> binary string→int host-helper Extended op; the two
+        // operands are raw StrykeValue bit-handles (see
+        // `segment_is_string_binary_int_eligible`).
+        _ if binary_str_int_ext_op(op).is_some() => {
+            body.push(F::Extended(binary_str_int_ext_op(op).unwrap(), 0))
         }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
@@ -1595,7 +1678,8 @@ pub(crate) fn run_linear_segment(
     let str_ok = !int_ok
         && !float_ok
         && !concat_ok
-        && segment_is_string_compare_eligible(seg, seg_start);
+        && (segment_is_string_compare_eligible(seg, seg_start)
+            || segment_is_string_binary_int_eligible(seg, seg_start));
     let unary_ok = !int_ok
         && !float_ok
         && !concat_ok
@@ -2366,6 +2450,54 @@ mod tests {
                     .as_str();
             }
             assert_eq!(last.as_deref(), Some(want.as_str()), "chr({n})");
+        }
+    }
+
+    // `index`/`rindex` ($s, $sub) (2-arg form) lowered to fusevm (binary string→int
+    // host helpers) must equal the interpreter's `StrykeValue::{index,rindex}_value`.
+    // Two string-handle operands, `i64` result; operands are only borrowed.
+    #[test]
+    fn fusevm_runs_string_index_rindex() {
+        use crate::bytecode::BuiltinId;
+        let cases: &[(BuiltinId, &str, &str)] = &[
+            (BuiltinId::Index, "hello world", "o"),
+            (BuiltinId::Index, "hello world", "world"),
+            (BuiltinId::Index, "hello", "z"),
+            (BuiltinId::Index, "abc", ""),
+            (BuiltinId::Index, "café au lait", "au"),
+            (BuiltinId::Rindex, "hello world", "o"),
+            (BuiltinId::Rindex, "hello world", "l"),
+            (BuiltinId::Rindex, "hello", "z"),
+            (BuiltinId::Rindex, "abcabc", "bc"),
+        ];
+        for (builtin, s, sub) in cases {
+            let seg = vec![
+                Op::GetScalarSlot(0),
+                Op::GetScalarSlot(1),
+                Op::CallBuiltin(*builtin as u16, 2),
+            ];
+            assert!(
+                segment_is_string_binary_int_eligible(&seg, 0),
+                "segment must be binary-string→int eligible for {builtin:?}"
+            );
+            let a = StrykeValue::string((*s).to_string());
+            let b = StrykeValue::string((*sub).to_string());
+            let want = if *builtin == BuiltinId::Index {
+                a.index_value(&b)
+            } else {
+                a.rindex_value(&b)
+            };
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [a.raw_bits() as i64, b.raw_bits() as i64];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("binary-string→int segment must run on fusevm")
+                    .as_integer();
+            }
+            assert_eq!(last, Some(want), "{builtin:?}({s:?}, {sub:?})");
+            // Operands are only borrowed by the helper, so they remain intact.
+            assert_eq!(a.as_str().as_deref(), Some(*s));
+            assert_eq!(b.as_str().as_deref(), Some(*sub));
         }
     }
 
