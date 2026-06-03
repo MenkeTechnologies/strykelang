@@ -1583,6 +1583,25 @@ impl StrykeValue {
     pub fn chr_value(&self) -> String {
         chr_from_codepoint(self.to_int())
     }
+
+    /// `index($s, $sub)` builtin (2-arg form, no explicit position): the byte offset
+    /// of the first occurrence of `sub` in `self`, or -1 if absent. Shared by the
+    /// interpreter and the fusevm JIT host helper so both agree exactly. (The 3-arg
+    /// form with an explicit start position is handled only by the interpreter.)
+    pub fn index_value(&self, sub: &StrykeValue) -> i64 {
+        let s = self.to_string();
+        let sub = sub.to_string();
+        s.find(&sub).map(|i| i as i64).unwrap_or(-1)
+    }
+
+    /// `rindex($s, $sub)` builtin (2-arg form, no explicit position): the byte offset
+    /// of the *last* occurrence of `sub` in `self`, or -1 if absent. Shared by the
+    /// interpreter and the fusevm JIT host helper.
+    pub fn rindex_value(&self, sub: &StrykeValue) -> i64 {
+        let s = self.to_string();
+        let sub = sub.to_string();
+        s.rfind(&sub).map(|i| i as i64).unwrap_or(-1)
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {

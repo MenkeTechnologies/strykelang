@@ -1129,7 +1129,8 @@ impl<'a> VM<'a> {
         let str_ok = !int_ok
             && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip));
+                || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
+                || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip));
         // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
         // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
         let float_ok = !int_ok
@@ -9742,8 +9743,13 @@ impl<'a> VM<'a> {
                 ))
             }
             Some(BuiltinId::Index) => {
-                let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let sub = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+                if args.len() < 3 {
+                    return Ok(StrykeValue::integer(s.index_value(&sub)));
+                }
+                let s = s.to_string();
+                let sub = sub.to_string();
                 // Perl: negative POS clamps to 0; POS past end returns -1
                 // (or, for empty needle, returns POS clamped to len).
                 let pos_raw = args.get(2).map(|v| v.to_int()).unwrap_or(0);
@@ -9757,8 +9763,13 @@ impl<'a> VM<'a> {
                 ))
             }
             Some(BuiltinId::Rindex) => {
-                let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let sub = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                let sv = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let subv = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+                if args.len() < 3 {
+                    return Ok(StrykeValue::integer(sv.rindex_value(&subv)));
+                }
+                let s = sv.to_string();
+                let sub = subv.to_string();
                 // Perl: negative POS means "search must end at or before POS";
                 // any negative value past -1 implies no possible match.
                 let result = match args.get(2) {
