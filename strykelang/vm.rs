@@ -1142,14 +1142,14 @@ impl<'a> VM<'a> {
             && !str_ok
             && !float_ok
             && crate::fusevm_bridge::segment_is_int_to_string_eligible(seg, seg_ip);
-        // `substr($s,$off)` (2-arg) / `$s x $n`: a string operand AND an integer
-        // operand, marshaled with DIFFERENT kinds per slot (see `str_int_kinds`).
-        let str_int_kinds = if !int_ok && !str_ok && !float_ok && !int_str_ok {
-            crate::fusevm_bridge::string_int_slot_kinds(seg, seg_ip)
+        // `substr($s,$off[,$len])` / `$s x $n`: a string operand AND integer operand(s),
+        // marshaled with DIFFERENT kinds per slot (see `string_handle_slot`).
+        let str_handle_slot = if !int_ok && !str_ok && !float_ok && !int_str_ok {
+            crate::fusevm_bridge::string_handle_slot(seg, seg_ip)
         } else {
             None
         };
-        let str_int_ok = str_int_kinds.is_some();
+        let str_int_ok = str_handle_slot.is_some();
         if !int_ok && !str_ok && !float_ok && !int_str_ok && !str_int_ok {
             return Ok(false);
         }
@@ -1199,8 +1199,8 @@ impl<'a> VM<'a> {
             // integer). Uniformly `str_ok` for the all-string families; for the mixed
             // `substr`/`x`-repeat family only the designated string slot wants a handle.
             let wants_string = |i: u8| -> bool {
-                match str_int_kinds {
-                    Some((str_slot, _)) => i == str_slot,
+                match str_handle_slot {
+                    Some(str_slot) => i == str_slot,
                     None => str_ok,
                 }
             };
@@ -9743,25 +9743,10 @@ impl<'a> VM<'a> {
                     let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
                     return Ok(StrykeValue::string(s.substr2_value(off)));
                 }
-                let s = args.first().map(|v| v.to_string()).unwrap_or_default();
-                let slen = s.len() as i64;
+                let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
                 let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
-                let start = if off < 0 { (slen + off).max(0) } else { off }.min(slen) as usize;
-
-                let end = if let Some(l_val) = args.get(2) {
-                    let l = l_val.to_int();
-                    if l < 0 {
-                        (slen + l).max(start as i64)
-                    } else {
-                        (start as i64 + l).min(slen)
-                    }
-                } else {
-                    slen
-                } as usize;
-
-                Ok(StrykeValue::string(
-                    s.get(start..end).unwrap_or("").to_string(),
-                ))
+                let len = args.get(2).map(|v| v.to_int()).unwrap_or(0);
+                Ok(StrykeValue::string(s.substr3_value(off, len)))
             }
             Some(BuiltinId::Index) => {
                 let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
