@@ -9433,6 +9433,14 @@ impl<'a> VM<'a> {
                 let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
                 Ok(StrykeValue::string(s.fc_value()))
             }
+            Some(BuiltinId::Quotemeta) => {
+                let s = args
+                    .into_iter()
+                    .next()
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                Ok(StrykeValue::string(crate::perl_regex::perl_quotemeta(&s)))
+            }
             Some(BuiltinId::Pos) => {
                 let key = if args.is_empty() {
                     "_".to_string()

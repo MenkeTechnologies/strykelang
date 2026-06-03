@@ -1247,12 +1247,17 @@ pub enum BuiltinId {
     CharDevices,
     /// `exe` / `exe DIR` — list executable file names in a directory (default: `.`).
     Executables,
+    /// `quotemeta` / `qm` — backslash-escape every non-word character. Returns a
+    /// string suitable for safe interpolation into a regex (Perl `\Q…\E` form).
+    /// Appended at the end of the enum so the discriminants of all earlier
+    /// variants stay stable across rebuilds (script-cache compatibility).
+    Quotemeta,
 }
 
 impl BuiltinId {
     /// `from_u16` — see implementation.
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Executables as u16 {
+        if v <= Self::Quotemeta as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None

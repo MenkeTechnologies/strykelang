@@ -6732,6 +6732,14 @@ impl Compiler {
                 self.compile_expr(e)?;
                 self.emit_op(Op::CallBuiltin(BuiltinId::Fc as u16, 1), line, Some(root));
             }
+            ExprKind::Quotemeta(e) => {
+                self.compile_expr(e)?;
+                self.emit_op(
+                    Op::CallBuiltin(BuiltinId::Quotemeta as u16, 1),
+                    line,
+                    Some(root),
+                );
+            }
             ExprKind::Crypt { plaintext, salt } => {
                 self.compile_expr(plaintext)?;
                 self.compile_expr(salt)?;

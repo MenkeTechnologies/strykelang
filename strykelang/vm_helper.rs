@@ -13335,6 +13335,9 @@ impl VMHelper {
             ExprKind::Fc(expr) => Ok(StrykeValue::string(default_case_fold_str(
                 &self.eval_expr(expr)?.to_string(),
             ))),
+            ExprKind::Quotemeta(expr) => Ok(StrykeValue::string(crate::perl_regex::perl_quotemeta(
+                &self.eval_expr(expr)?.to_string(),
+            ))),
             ExprKind::Crypt { plaintext, salt } => {
                 let p = self.eval_expr(plaintext)?.to_string();
                 let sl = self.eval_expr(salt)?.to_string();

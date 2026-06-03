@@ -106,6 +106,10 @@ pub mod ext_ops {
     pub const STK_STR_LCFIRST: u16 = 0x0016;
     /// `fc` — Unicode default case-fold. Unary string→string handle (see `STK_STR_UC`).
     pub const STK_STR_FC: u16 = 0x001A;
+    /// `quotemeta` / `qm` — backslash-escape every non-word char (Perl regex
+    /// shield, equivalent of `\Q…\E`). Unary string→string handle (see
+    /// `STK_STR_UC`); reuses the same `(i64) -> i64` ABI and owned-handle return.
+    pub const STK_STR_QUOTEMETA: u16 = 0x001E;
     /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
     /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
@@ -484,6 +488,17 @@ extern "C" fn stryke_h_str_fc(a: i64) -> i64 {
     stryke_str_fc_op(a)
 }
 
+/// `quotemeta($s)`: owned handle wrapping `perl_quotemeta` (Perl `\Q…\E`).
+/// Backslash-escapes every non-word character; pure functional.
+#[inline]
+fn stryke_str_quotemeta_op(a_bits: i64) -> i64 {
+    let v = unsafe { sv_borrow(a_bits) };
+    forget_string_bits(crate::perl_regex::perl_quotemeta(&v.to_string()))
+}
+extern "C" fn stryke_h_str_quotemeta(a: i64) -> i64 {
+    stryke_str_quotemeta_op(a)
+}
+
 /// Table of the unary string→**string** ops (`(i64 handle) -> i64 handle`):
 /// `uc`/`lc`/`ucfirst`/`lcfirst`. Same `(i64) -> i64` ABI as the unary string→int
 /// table, but the returned `i64` is the raw bits of a freshly allocated *owned*
@@ -496,6 +511,7 @@ const STRYKE_STR_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = 
     (ext_ops::STK_STR_UCFIRST, "stryke_str_ucfirst", stryke_h_str_ucfirst),
     (ext_ops::STK_STR_LCFIRST, "stryke_str_lcfirst", stryke_h_str_lcfirst),
     (ext_ops::STK_STR_FC, "stryke_str_fc", stryke_h_str_fc),
+    (ext_ops::STK_STR_QUOTEMETA, "stryke_str_quotemeta", stryke_h_str_quotemeta),
 ];
 
 /// True for a unary string→string Extended id (`uc`/`lc`/`ucfirst`/`lcfirst`), whose
@@ -515,6 +531,7 @@ fn stryke_str_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
         ext_ops::STK_STR_UCFIRST => stryke_str_ucfirst_op(a_bits),
         ext_ops::STK_STR_LCFIRST => stryke_str_lcfirst_op(a_bits),
         ext_ops::STK_STR_FC => stryke_str_fc_op(a_bits),
+        ext_ops::STK_STR_QUOTEMETA => stryke_str_quotemeta_op(a_bits),
         ext_ops::STK_STR_CHR => stryke_str_chr_op(a_bits),
         _ => 0,
     }
@@ -1441,6 +1458,8 @@ fn unary_str_str_ext_op(op: &Op) -> Option<u16> {
         Some(ext_ops::STK_STR_LCFIRST)
     } else if id == BuiltinId::Fc as u16 {
         Some(ext_ops::STK_STR_FC)
+    } else if id == BuiltinId::Quotemeta as u16 {
+        Some(ext_ops::STK_STR_QUOTEMETA)
     } else {
         None
     }

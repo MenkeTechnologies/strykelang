@@ -2953,10 +2953,7 @@ impl Parser {
                 name: "count".to_string(),
                 args: vec![arg],
             },
-            "quotemeta" | "qm" => ExprKind::FuncCall {
-                name: "quotemeta".to_string(),
-                args: vec![arg],
-            },
+            "quotemeta" | "qm" => ExprKind::Quotemeta(Box::new(arg)),
             // Numeric functions
             "abs" => ExprKind::Abs(Box::new(arg)),
             "int" => ExprKind::Int(Box::new(arg)),

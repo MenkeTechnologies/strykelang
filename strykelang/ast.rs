@@ -1445,6 +1445,9 @@ pub enum ExprKind {
 
     /// Unicode case fold (Perl `fc`).
     Fc(Box<Expr>),
+    /// Regex-escape a string (Perl `quotemeta`, aliased `qm`). Lowers to
+    /// `Op::CallBuiltin(BuiltinId::Quotemeta, 1)` for JIT lowering.
+    Quotemeta(Box<Expr>),
     /// DES-style `crypt` (see libc `crypt(3)` on Unix; empty on other targets).
     Crypt {
         plaintext: Box<Expr>,
