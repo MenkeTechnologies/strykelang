@@ -1142,7 +1142,15 @@ impl<'a> VM<'a> {
             && !str_ok
             && !float_ok
             && crate::fusevm_bridge::segment_is_int_to_string_eligible(seg, seg_ip);
-        if !int_ok && !str_ok && !float_ok && !int_str_ok {
+        // `substr($s,$off)` (2-arg) / `$s x $n`: a string operand AND an integer
+        // operand, marshaled with DIFFERENT kinds per slot (see `str_int_kinds`).
+        let str_int_kinds = if !int_ok && !str_ok && !float_ok && !int_str_ok {
+            crate::fusevm_bridge::string_int_slot_kinds(seg, seg_ip)
+        } else {
+            None
+        };
+        let str_int_ok = str_int_kinds.is_some();
+        if !int_ok && !str_ok && !float_ok && !int_str_ok && !str_int_ok {
             return Ok(false);
         }
 
@@ -1187,10 +1195,19 @@ impl<'a> VM<'a> {
         if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
             let n = max as usize + 1;
             self.jit_buf_slot.resize(n, 0);
+            // Whether slot `i` marshals as a NaN-boxed string handle (vs an unboxed
+            // integer). Uniformly `str_ok` for the all-string families; for the mixed
+            // `substr`/`x`-repeat family only the designated string slot wants a handle.
+            let wants_string = |i: u8| -> bool {
+                match str_int_kinds {
+                    Some((str_slot, _)) => i == str_slot,
+                    None => str_ok,
+                }
+            };
             for i in 0..=max {
                 let bound = arg_of_slot(i);
                 self.jit_buf_slot[i as usize] = if let Some(pv) = plain_of_slot(i) {
-                    if str_ok {
+                    if wants_string(i) {
                         if !pv.is_string_like() {
                             return Ok(false);
                         }
@@ -1201,7 +1218,7 @@ impl<'a> VM<'a> {
                             None => return Ok(false),
                         }
                     }
-                } else if str_ok {
+                } else if wants_string(i) {
                     let v = match bound {
                         Some(a) => argv.get(a).cloned().unwrap_or(StrykeValue::UNDEF),
                         None => self.interp.scope.get_scalar_slot(i),
@@ -4172,9 +4189,9 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::StringRepeat => {
-                        let n = self.pop().to_int().max(0) as usize;
+                        let n = self.pop().to_int();
                         let val = self.pop();
-                        self.push(StrykeValue::string(val.to_string().repeat(n)));
+                        self.push(StrykeValue::string(val.repeat_value(n)));
                         Ok(())
                     }
                     Op::ListRepeat => {
@@ -9721,6 +9738,11 @@ impl<'a> VM<'a> {
                     .unwrap_or(StrykeValue::UNDEF))
             }
             Some(BuiltinId::Substr) => {
+                if args.len() < 3 {
+                    let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                    let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+                    return Ok(StrykeValue::string(s.substr2_value(off)));
+                }
                 let s = args.first().map(|v| v.to_string()).unwrap_or_default();
                 let slen = s.len() as i64;
                 let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);

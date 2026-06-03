@@ -106,6 +106,11 @@ pub mod ext_ops {
     pub const STK_STR_LCFIRST: u16 = 0x0016;
     /// `fc` — Unicode default case-fold. Unary string→string handle (see `STK_STR_UC`).
     pub const STK_STR_FC: u16 = 0x001A;
+    /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
+    /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
+    pub const STK_STR_SUBSTR2: u16 = 0x001B;
+    /// `$s x $n` string-repeat. Binary string+INTEGER→string handle (see `STK_STR_SUBSTR2`).
+    pub const STK_STR_REPEAT: u16 = 0x001C;
 
     /// `chr` — the one-character string for an integer codepoint. Unlike the other
     /// `STK_STR_*` ops its operand is an **integer** (not a string handle), but like
@@ -272,6 +277,28 @@ fn stryke_str_concat_op(a_bits: i64, b_bits: i64) -> i64 {
 /// (`(i64, i64) -> i64`) so it shares the same `call_host`/relocation machinery.
 extern "C" fn stryke_h_str_concat(a: i64, b: i64) -> i64 {
     stryke_str_concat_op(a, b)
+}
+
+/// `substr($s, $off)` (2-arg): operand `a_bits` is a borrowed NaN-boxed string handle,
+/// `off` a plain `i64`. Returns the raw bits of a freshly allocated owned string handle
+/// (see [`StrykeValue::substr2_value`]).
+#[inline]
+fn stryke_str_substr2_op(a_bits: i64, off: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.substr2_value(off))
+}
+extern "C" fn stryke_h_str_substr2(a: i64, off: i64) -> i64 {
+    stryke_str_substr2_op(a, off)
+}
+
+/// `$s x $n` string-repeat: operand `a_bits` is a borrowed NaN-boxed string handle, `n`
+/// a plain `i64`. Returns the raw bits of an owned string handle (see
+/// [`StrykeValue::repeat_value`]).
+#[inline]
+fn stryke_str_repeat_op(a_bits: i64, n: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.repeat_value(n))
+}
+extern "C" fn stryke_h_str_repeat(a: i64, n: i64) -> i64 {
+    stryke_str_repeat_op(a, n)
 }
 
 thread_local! {
@@ -505,6 +532,43 @@ fn is_stryke_int_str_ext(ext_id: u16) -> bool {
     STRYKE_INT_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
 }
 
+/// Table of binary string+INTEGER→string ops (`(i64 str_handle, i64 int) -> i64 string
+/// handle`): `substr($s,$off)` (2-arg) and the `$s x $n` repeat operator. Unlike the
+/// other binary string ops, the two operands marshal with DIFFERENT kinds — the first
+/// as a NaN-boxed string handle, the second as a plain unboxed integer — so the caller
+/// (`vm.rs`) marshals these slots per-operand (see `string_int_slot_kinds`). The result
+/// is an owned string handle reconstructed via `from_raw_bits`.
+const STRYKE_STR_INT_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
+    (ext_ops::STK_STR_SUBSTR2, "stryke_str_substr2", stryke_h_str_substr2),
+    (ext_ops::STK_STR_REPEAT, "stryke_str_repeat", stryke_h_str_repeat),
+];
+
+/// True for a binary string+integer→string Extended id (`substr` 2-arg, `x`-repeat).
+#[inline]
+fn is_stryke_str_int_str_ext(ext_id: u16) -> bool {
+    STRYKE_STR_INT_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+}
+
+/// The registered JIT helper id for a binary string+integer→string op, if any.
+#[inline]
+fn stryke_str_int_str_helper_id(ext_id: u16) -> Option<u32> {
+    STRYKE_STR_INT_STR_HELPERS
+        .iter()
+        .find(|(id, _, _)| *id == ext_id)
+        .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
+}
+
+/// Interpreter-side computation for a binary string+integer→string Extended op; returns
+/// the raw bits of an owned string handle (mirrors the JIT host helpers).
+#[inline]
+fn stryke_str_int_str_op(ext_id: u16, a_bits: i64, b: i64) -> i64 {
+    match ext_id {
+        ext_ops::STK_STR_SUBSTR2 => stryke_str_substr2_op(a_bits, b),
+        ext_ops::STK_STR_REPEAT => stryke_str_repeat_op(a_bits, b),
+        _ => 0,
+    }
+}
+
 /// Table mapping each string-compare `Extended` id to the stable host-helper
 /// symbol name and its function pointer. The name is hashed into a JIT helper id
 /// (`fusevm::jit::jit_helper_id`) so cached native code re-resolves the helper at
@@ -549,12 +613,14 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
         ext_id == ext_ops::STK_MOD_FLOOR
             || is_stryke_str_unary_ext(ext_id)
             || is_stryke_str_ext(ext_id)
+            || is_stryke_str_int_str_ext(ext_id)
     }
     fn op_count(&self) -> usize {
         1 + STRYKE_STR_HELPERS.len()
             + STRYKE_STR_UNARY_HELPERS.len()
             + STRYKE_STR_UNARY_STR_HELPERS.len()
             + STRYKE_INT_STR_HELPERS.len()
+            + STRYKE_STR_INT_STR_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
@@ -582,6 +648,23 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             // strykelang's native str_eq/str_cmp. `call_host` records the helper
             // relocation so the chunk stays on-disk cacheable.
             let Some(helper_id) = stryke_str_helper_id(ext_id) else {
+                return false;
+            };
+            let (Some(b), Some(a)) = (cx.pop_i64(), cx.pop_i64()) else {
+                return false;
+            };
+            let Some(result) = cx.call_host(helper_id, &[a, b]) else {
+                return false;
+            };
+            cx.push_i64(result);
+            return true;
+        }
+        if is_stryke_str_int_str_ext(ext_id) {
+            // Binary string+integer→string ops (substr 2-arg, `x`-repeat): operand `a`
+            // is a string handle, `b` a plain integer (marshaled unboxed by the caller).
+            // Same 2-arg `call_host` path as the compares; the result is an owned string
+            // handle the caller reconstructs via `from_raw_bits`.
+            let Some(helper_id) = stryke_str_int_str_helper_id(ext_id) else {
                 return false;
             };
             let (Some(b), Some(a)) = (cx.pop_i64(), cx.pop_i64()) else {
@@ -635,6 +718,13 @@ pub(crate) fn register_stryke_jit_ext() {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 2, false);
         }
     }
+    // SAFETY: each binary string+integer→string helper is `extern "C" fn(i64, i64) ->
+    // i64` (string handle + plain int → owned string handle), the same 2-arg ABI.
+    for (_, name, ptr) in STRYKE_STR_INT_STR_HELPERS {
+        unsafe {
+            fusevm::jit::register_jit_helper(name, *ptr as *const u8, 2, false);
+        }
+    }
     // SAFETY: each unary helper is `extern "C" fn(i64) -> i64`, matching the
     // 1-arg / integer-return signature declared here. The string→string helpers
     // return an `i64` handle (raw bits of an owned string) under the same ABI.
@@ -660,6 +750,10 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
     } else if is_stryke_str_unary_ext(id) {
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(stryke_str_unary_op(id, a)));
+    } else if is_stryke_str_int_str_ext(id) {
+        let b = vm.pop().to_int();
+        let a = vm.pop().to_int();
+        vm.push(fusevm::Value::Int(stryke_str_int_str_op(id, a, b)));
     } else if is_stryke_str_ext(id) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
@@ -1324,6 +1418,47 @@ pub(crate) fn segment_is_int_to_string_eligible(seg: &[Op], _seg_start: usize) -
     matches!(seg, [Op::GetScalarSlot(_), u] if int_str_ext_op(u).is_some())
 }
 
+/// Maps a binary string+INTEGER→string op to its `STK_STR_*` Extended id: the 2-arg
+/// `substr($s,$off)` builtin and the `$s x $n` repeat operator (`Op::StringRepeat`).
+/// The first operand is a string handle, the second a plain integer.
+#[inline]
+fn str_int_str_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    match op {
+        Op::StringRepeat => Some(ext_ops::STK_STR_REPEAT),
+        Op::CallBuiltin(id, 2) if *id == BuiltinId::Substr as u16 => Some(ext_ops::STK_STR_SUBSTR2),
+        _ => None,
+    }
+}
+
+/// True when `seg` is a binary string+integer→string segment
+/// (`[GetScalarSlot(s), GetScalarSlot(n), substr|x-repeat]`) whose two operands marshal
+/// with DIFFERENT kinds: `s` as a NaN-boxed string handle, `n` as a plain integer. The
+/// two slots must be distinct (a shared slot can't be marshaled as both a string and an
+/// integer). The JIT result is an owned string handle (reconstructed via `from_raw_bits`).
+pub(crate) fn segment_is_string_int_to_string_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(s), Op::GetScalarSlot(n), u]
+            if s != n && str_int_str_ext_op(u).is_some()
+    )
+}
+
+/// For an eligible binary string+integer→string segment, the `(string_slot, int_slot)`
+/// pair: the first `GetScalarSlot` supplies the string operand, the second the integer.
+/// Lets the caller (`vm.rs`) marshal each slot with its own kind. Returns `None` for any
+/// non-matching (or shared-slot) segment.
+pub(crate) fn string_int_slot_kinds(seg: &[Op], _seg_start: usize) -> Option<(u8, u8)> {
+    match seg {
+        [Op::GetScalarSlot(s), Op::GetScalarSlot(n), u]
+            if s != n && str_int_str_ext_op(u).is_some() =>
+        {
+            Some((*s, *n))
+        }
+        _ => None,
+    }
+}
+
 /// Translate a single eligible strykelang op, appending the equivalent
 /// `fusevm::Op`(s) to `body`. Most ops are 1:1; strykelang's fused slot ops are
 /// decomposed into fusevm's primitive slot/arith ops (fusevm has no slot-slot
@@ -1451,6 +1586,12 @@ fn translate_op_into(
         // `segment_is_string_binary_int_eligible`).
         _ if binary_str_int_ext_op(op).is_some() => {
             body.push(F::Extended(binary_str_int_ext_op(op).unwrap(), 0))
+        }
+        // `substr($s,$off)` (2-arg) / `$s x $n` -> binary string+integer→string
+        // host-helper Extended op; operand `a` is a string handle, operand `b` an
+        // unboxed integer (see `segment_is_string_int_to_string_eligible`).
+        _ if str_int_str_ext_op(op).is_some() => {
+            body.push(F::Extended(str_int_str_ext_op(op).unwrap(), 0))
         }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
@@ -1711,7 +1852,16 @@ pub(crate) fn run_linear_segment(
         && !concat_ok
         && !unary_ok
         && segment_is_int_to_string_eligible(seg, seg_start);
-    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok && !int_str_ok {
+    // `substr($s,$off)` (2-arg) / `$s x $n`: a string operand + an integer operand
+    // (marshaled per-slot by the caller), owned-string-handle result.
+    let str_int_ok = !int_ok
+        && !float_ok
+        && !str_ok
+        && !concat_ok
+        && !unary_ok
+        && !int_str_ok
+        && segment_is_string_int_to_string_eligible(seg, seg_start);
+    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok && !int_str_ok && !str_int_ok {
         return None;
     }
 
@@ -1728,12 +1878,12 @@ pub(crate) fn run_linear_segment(
     // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok || int_str_ok {
+    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
-            if concat_ok || unary_str_ok || int_str_ok {
+            if concat_ok || unary_str_ok || int_str_ok || str_int_ok {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
                 StrykeValue::integer(ret)
@@ -2517,6 +2667,56 @@ mod tests {
             // Operands are only borrowed by the helper, so they remain intact.
             assert_eq!(a.as_str().as_deref(), Some(*s));
             assert_eq!(b.as_str().as_deref(), Some(*sub));
+        }
+    }
+
+    // `substr($s,$off)` (2-arg) and `$s x $n` lowered to fusevm (binary
+    // string+integer→string host helpers) must equal the interpreter's
+    // `StrykeValue::{substr2,repeat}_value`. Operand 0 is a string handle (raw bits),
+    // operand 1 a plain integer; the result is an owned string handle.
+    #[test]
+    fn fusevm_runs_string_substr_repeat() {
+        enum Kind {
+            Substr,
+            Repeat,
+        }
+        let cases: &[(Kind, u16, &str, i64)] = &[
+            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 0),
+            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 6),
+            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", -3),
+            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 20),
+            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "café", 2),
+            (Kind::Repeat, 0, "ab", 0),
+            (Kind::Repeat, 0, "ab", 1),
+            (Kind::Repeat, 0, "ab", 4),
+            (Kind::Repeat, 0, "xy", -2),
+        ];
+        for (kind, builtin, s, n) in cases {
+            let op = match kind {
+                Kind::Substr => Op::CallBuiltin(*builtin, 2),
+                Kind::Repeat => Op::StringRepeat,
+            };
+            let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), op];
+            assert!(
+                segment_is_string_int_to_string_eligible(&seg, 0),
+                "segment must be binary-string+int→string eligible for {s:?} x/substr {n}"
+            );
+            assert_eq!(string_int_slot_kinds(&seg, 0), Some((0, 1)));
+            let a = StrykeValue::string((*s).to_string());
+            let want = match kind {
+                Kind::Substr => a.substr2_value(*n),
+                Kind::Repeat => a.repeat_value(*n),
+            };
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [a.raw_bits() as i64, *n];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("binary-string+int→string segment must run on fusevm")
+                    .as_str();
+            }
+            assert_eq!(last.as_deref(), Some(want.as_str()), "{s:?} op {n}");
+            // The string operand is only borrowed, so it remains intact.
+            assert_eq!(a.as_str().as_deref(), Some(*s));
         }
     }
 
