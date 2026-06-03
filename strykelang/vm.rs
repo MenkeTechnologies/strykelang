@@ -1135,7 +1135,14 @@ impl<'a> VM<'a> {
         let float_ok = !int_ok
             && !str_ok
             && crate::fusevm_bridge::segment_is_fusevm_float_eligible(seg, seg_ip);
-        if !int_ok && !str_ok && !float_ok {
+        // `chr($n)`: integer operand (marshaled unboxed, like `int_ok`/`float_ok`),
+        // owned-string-handle result. Not `str_ok` — its operand is an integer, not a
+        // string handle — so it takes the integer marshaling branch below.
+        let int_str_ok = !int_ok
+            && !str_ok
+            && !float_ok
+            && crate::fusevm_bridge::segment_is_int_to_string_eligible(seg, seg_ip);
+        if !int_ok && !str_ok && !float_ok && !int_str_ok {
             return Ok(false);
         }
 
@@ -9429,14 +9436,8 @@ impl<'a> VM<'a> {
                 Ok(VMHelper::study_return_value(&s.to_string()))
             }
             Some(BuiltinId::Chr) => {
-                let n = args
-                    .into_iter()
-                    .next()
-                    .unwrap_or(StrykeValue::UNDEF)
-                    .to_int() as u32;
-                Ok(StrykeValue::string(
-                    char::from_u32(n).map(|c| c.to_string()).unwrap_or_default(),
-                ))
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(val.chr_value()))
             }
             Some(BuiltinId::Ord) => {
                 let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
