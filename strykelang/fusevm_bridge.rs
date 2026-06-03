@@ -111,6 +111,10 @@ pub mod ext_ops {
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
     /// `$s x $n` string-repeat. Binary string+INTEGER→string handle (see `STK_STR_SUBSTR2`).
     pub const STK_STR_REPEAT: u16 = 0x001C;
+    /// `substr($s, $off, $len)` (3-arg) — byte-offset substring. string + INTEGER +
+    /// INTEGER → string handle: operand `a` is a NaN-boxed string handle, `b`/`c` plain
+    /// `i64`s (see `STK_STR_SUBSTR2`).
+    pub const STK_STR_SUBSTR3: u16 = 0x001D;
 
     /// `chr` — the one-character string for an integer codepoint. Unlike the other
     /// `STK_STR_*` ops its operand is an **integer** (not a string handle), but like
@@ -299,6 +303,17 @@ fn stryke_str_repeat_op(a_bits: i64, n: i64) -> i64 {
 }
 extern "C" fn stryke_h_str_repeat(a: i64, n: i64) -> i64 {
     stryke_str_repeat_op(a, n)
+}
+
+/// `substr($s, $off, $len)` (3-arg): operand `a_bits` is a borrowed NaN-boxed string
+/// handle, `off`/`len` plain `i64`s. Returns the raw bits of an owned string handle
+/// (see [`StrykeValue::substr3_value`]).
+#[inline]
+fn stryke_str_substr3_op(a_bits: i64, off: i64, len: i64) -> i64 {
+    forget_string_bits(unsafe { sv_borrow(a_bits) }.substr3_value(off, len))
+}
+extern "C" fn stryke_h_str_substr3(a: i64, off: i64, len: i64) -> i64 {
+    stryke_str_substr3_op(a, off, len)
 }
 
 thread_local! {
@@ -569,6 +584,40 @@ fn stryke_str_int_str_op(ext_id: u16, a_bits: i64, b: i64) -> i64 {
     }
 }
 
+/// Table of ternary string+INTEGER+INTEGER→string ops (`(i64 str_handle, i64, i64) ->
+/// i64 string handle`): currently just `substr($s,$off,$len)` (3-arg). Like the binary
+/// mixed family, operand 0 marshals as a string handle and the rest as plain integers
+/// (per-operand marshaling via `string_int_slot_kinds`); the result is an owned string
+/// handle reconstructed via `from_raw_bits`.
+const STRYKE_STR_INT2_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64, i64) -> i64)] = &[
+    (ext_ops::STK_STR_SUBSTR3, "stryke_str_substr3", stryke_h_str_substr3),
+];
+
+/// True for a ternary string+integer+integer→string Extended id (`substr` 3-arg).
+#[inline]
+fn is_stryke_str_int2_str_ext(ext_id: u16) -> bool {
+    STRYKE_STR_INT2_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+}
+
+/// The registered JIT helper id for a ternary string+int+int→string op, if any.
+#[inline]
+fn stryke_str_int2_str_helper_id(ext_id: u16) -> Option<u32> {
+    STRYKE_STR_INT2_STR_HELPERS
+        .iter()
+        .find(|(id, _, _)| *id == ext_id)
+        .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
+}
+
+/// Interpreter-side computation for a ternary string+int+int→string Extended op; returns
+/// the raw bits of an owned string handle (mirrors the JIT host helpers).
+#[inline]
+fn stryke_str_int2_str_op(ext_id: u16, a_bits: i64, b: i64, c: i64) -> i64 {
+    match ext_id {
+        ext_ops::STK_STR_SUBSTR3 => stryke_str_substr3_op(a_bits, b, c),
+        _ => 0,
+    }
+}
+
 /// Table mapping each string-compare `Extended` id to the stable host-helper
 /// symbol name and its function pointer. The name is hashed into a JIT helper id
 /// (`fusevm::jit::jit_helper_id`) so cached native code re-resolves the helper at
@@ -614,6 +663,7 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             || is_stryke_str_unary_ext(ext_id)
             || is_stryke_str_ext(ext_id)
             || is_stryke_str_int_str_ext(ext_id)
+            || is_stryke_str_int2_str_ext(ext_id)
     }
     fn op_count(&self) -> usize {
         1 + STRYKE_STR_HELPERS.len()
@@ -621,6 +671,7 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             + STRYKE_STR_UNARY_STR_HELPERS.len()
             + STRYKE_INT_STR_HELPERS.len()
             + STRYKE_STR_INT_STR_HELPERS.len()
+            + STRYKE_STR_INT2_STR_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
@@ -676,6 +727,21 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             cx.push_i64(result);
             return true;
         }
+        if is_stryke_str_int2_str_ext(ext_id) {
+            // Ternary string+int+int→string ops (substr 3-arg): operand `a` is a string
+            // handle, `b`/`c` plain integers. 3-arg `call_host`; owned-string result.
+            let Some(helper_id) = stryke_str_int2_str_helper_id(ext_id) else {
+                return false;
+            };
+            let (Some(c), Some(b), Some(a)) = (cx.pop_i64(), cx.pop_i64(), cx.pop_i64()) else {
+                return false;
+            };
+            let Some(result) = cx.call_host(helper_id, &[a, b, c]) else {
+                return false;
+            };
+            cx.push_i64(result);
+            return true;
+        }
         if ext_id != ext_ops::STK_MOD_FLOOR {
             return false;
         }
@@ -725,6 +791,13 @@ pub(crate) fn register_stryke_jit_ext() {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 2, false);
         }
     }
+    // SAFETY: each ternary string+int+int→string helper is `extern "C" fn(i64, i64,
+    // i64) -> i64` (string handle + two plain ints → owned string handle), 3-arg ABI.
+    for (_, name, ptr) in STRYKE_STR_INT2_STR_HELPERS {
+        unsafe {
+            fusevm::jit::register_jit_helper(name, *ptr as *const u8, 3, false);
+        }
+    }
     // SAFETY: each unary helper is `extern "C" fn(i64) -> i64`, matching the
     // 1-arg / integer-return signature declared here. The string→string helpers
     // return an `i64` handle (raw bits of an owned string) under the same ABI.
@@ -754,6 +827,11 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(stryke_str_int_str_op(id, a, b)));
+    } else if is_stryke_str_int2_str_ext(id) {
+        let c = vm.pop().to_int();
+        let b = vm.pop().to_int();
+        let a = vm.pop().to_int();
+        vm.push(fusevm::Value::Int(stryke_str_int2_str_op(id, a, b, c)));
     } else if is_stryke_str_ext(id) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
@@ -1444,16 +1522,53 @@ pub(crate) fn segment_is_string_int_to_string_eligible(seg: &[Op], _seg_start: u
     )
 }
 
-/// For an eligible binary string+integer→string segment, the `(string_slot, int_slot)`
-/// pair: the first `GetScalarSlot` supplies the string operand, the second the integer.
-/// Lets the caller (`vm.rs`) marshal each slot with its own kind. Returns `None` for any
-/// non-matching (or shared-slot) segment.
-pub(crate) fn string_int_slot_kinds(seg: &[Op], _seg_start: usize) -> Option<(u8, u8)> {
+/// Maps a ternary string+INTEGER+INTEGER→string op to its `STK_STR_*` Extended id: the
+/// 3-arg `substr($s,$off,$len)` builtin. The first operand is a string handle, the rest
+/// plain integers.
+#[inline]
+fn str_int2_str_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    match op {
+        Op::CallBuiltin(id, 3) if *id == BuiltinId::Substr as u16 => Some(ext_ops::STK_STR_SUBSTR3),
+        _ => None,
+    }
+}
+
+/// True when `seg` is a ternary string+int+int→string segment
+/// (`[GetScalarSlot(s), GetScalarSlot(o), GetScalarSlot(l), substr-3arg]`): `s` marshals
+/// as a string handle, `o`/`l` as plain integers. The string slot must be distinct from
+/// both integer slots (it can't be reinterpreted as an integer). Owned-string result.
+pub(crate) fn segment_is_string_int2_to_string_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(s), Op::GetScalarSlot(o), Op::GetScalarSlot(l), u]
+            if s != o && s != l && str_int2_str_ext_op(u).is_some()
+    )
+}
+
+/// True for any mixed string+integer→string segment (binary `substr`-2/`x`-repeat or
+/// ternary `substr`-3), whose operands marshal per-slot (string handle + plain ints).
+#[inline]
+pub(crate) fn segment_is_string_int_mixed_eligible(seg: &[Op], seg_start: usize) -> bool {
+    segment_is_string_int_to_string_eligible(seg, seg_start)
+        || segment_is_string_int2_to_string_eligible(seg, seg_start)
+}
+
+/// The slot supplying the *string* operand of a mixed string+integer→string segment
+/// (binary or ternary). Every other `GetScalarSlot` in the segment marshals as a plain
+/// integer. Returns `None` for non-mixed (or shared-slot) segments. The caller
+/// (`vm.rs`) consults this to marshal each slot with its own kind.
+pub(crate) fn string_handle_slot(seg: &[Op], _seg_start: usize) -> Option<u8> {
     match seg {
         [Op::GetScalarSlot(s), Op::GetScalarSlot(n), u]
             if s != n && str_int_str_ext_op(u).is_some() =>
         {
-            Some((*s, *n))
+            Some(*s)
+        }
+        [Op::GetScalarSlot(s), Op::GetScalarSlot(o), Op::GetScalarSlot(l), u]
+            if s != o && s != l && str_int2_str_ext_op(u).is_some() =>
+        {
+            Some(*s)
         }
         _ => None,
     }
@@ -1592,6 +1707,11 @@ fn translate_op_into(
         // unboxed integer (see `segment_is_string_int_to_string_eligible`).
         _ if str_int_str_ext_op(op).is_some() => {
             body.push(F::Extended(str_int_str_ext_op(op).unwrap(), 0))
+        }
+        // `substr($s,$off,$len)` (3-arg) -> ternary string+int+int→string host-helper
+        // Extended op (see `segment_is_string_int2_to_string_eligible`).
+        _ if str_int2_str_ext_op(op).is_some() => {
+            body.push(F::Extended(str_int2_str_ext_op(op).unwrap(), 0))
         }
         // Always-float math built-in (`sqrt`/`sin`/`cos`/`exp`/`atan2`) -> the
         // corresponding native fusevm float op, which JITs and persists to the
@@ -1860,7 +1980,7 @@ pub(crate) fn run_linear_segment(
         && !concat_ok
         && !unary_ok
         && !int_str_ok
-        && segment_is_string_int_to_string_eligible(seg, seg_start);
+        && segment_is_string_int_mixed_eligible(seg, seg_start);
     if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok && !int_str_ok && !str_int_ok {
         return None;
     }
@@ -2701,7 +2821,7 @@ mod tests {
                 segment_is_string_int_to_string_eligible(&seg, 0),
                 "segment must be binary-string+int→string eligible for {s:?} x/substr {n}"
             );
-            assert_eq!(string_int_slot_kinds(&seg, 0), Some((0, 1)));
+            assert_eq!(string_handle_slot(&seg, 0), Some(0));
             let a = StrykeValue::string((*s).to_string());
             let want = match kind {
                 Kind::Substr => a.substr2_value(*n),
@@ -2717,6 +2837,49 @@ mod tests {
             assert_eq!(last.as_deref(), Some(want.as_str()), "{s:?} op {n}");
             // The string operand is only borrowed, so it remains intact.
             assert_eq!(a.as_str().as_deref(), Some(*s));
+        }
+    }
+
+    // 3-arg `substr($s,$off,$len)` lowered to fusevm (ternary string+int+int→string
+    // host helper) must equal the interpreter's `StrykeValue::substr3_value`. Operand 0
+    // is a string handle, operands 1/2 plain integers; the result is an owned handle.
+    #[test]
+    fn fusevm_runs_string_substr3() {
+        let s = "hello world";
+        let cases: &[(i64, i64)] = &[
+            (0, 5),
+            (6, 5),
+            (6, 100),
+            (-5, 3),
+            (3, -2),
+            (0, -3),
+            (20, 4),
+            (4, 0),
+        ];
+        for (off, len) in cases {
+            let seg = vec![
+                Op::GetScalarSlot(0),
+                Op::GetScalarSlot(1),
+                Op::GetScalarSlot(2),
+                Op::CallBuiltin(crate::bytecode::BuiltinId::Substr as u16, 3),
+            ];
+            assert!(
+                segment_is_string_int2_to_string_eligible(&seg, 0),
+                "segment must be ternary-string+int+int→string eligible for substr({off},{len})"
+            );
+            assert!(segment_is_string_int_mixed_eligible(&seg, 0));
+            assert_eq!(string_handle_slot(&seg, 0), Some(0));
+            let a = StrykeValue::string(s.to_string());
+            let want = a.substr3_value(*off, *len);
+            let mut last = None;
+            for _ in 0..256 {
+                let mut slots = [a.raw_bits() as i64, *off, *len];
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    .expect("ternary-string+int+int→string segment must run on fusevm")
+                    .as_str();
+            }
+            assert_eq!(last.as_deref(), Some(want.as_str()), "substr({s:?},{off},{len})");
+            assert_eq!(a.as_str().as_deref(), Some(s));
         }
     }
 

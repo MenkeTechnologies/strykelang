@@ -1627,6 +1627,23 @@ impl StrykeValue {
     pub fn repeat_value(&self, n: i64) -> String {
         self.to_string().repeat(n.max(0) as usize)
     }
+
+    /// `substr($s, $off, $len)` builtin (3-arg form): the byte-offset substring of
+    /// `self` starting at `off` (negative counts from the end) for `len` bytes (a
+    /// negative `len` stops that many bytes from the end). Mirrors the interpreter's
+    /// byte-based slicing exactly (a non-char-boundary range yields the empty string).
+    /// Shared by the interpreter and the fusevm JIT host helper.
+    pub fn substr3_value(&self, off: i64, len: i64) -> String {
+        let s = self.to_string();
+        let slen = s.len() as i64;
+        let start = if off < 0 { (slen + off).max(0) } else { off }.min(slen) as usize;
+        let end = if len < 0 {
+            (slen + len).max(start as i64)
+        } else {
+            (start as i64 + len).min(slen)
+        } as usize;
+        s.get(start..end).unwrap_or("").to_string()
+    }
     /// `as_async_task` — see implementation.
     #[inline]
     pub fn as_async_task(&self) -> Option<Arc<StrykeAsyncTask>> {
