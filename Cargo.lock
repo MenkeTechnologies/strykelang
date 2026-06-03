@@ -1867,7 +1867,7 @@ dependencies = [
 
 [[package]]
 name = "fusevm"
-version = "0.13.3"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "cranelift-codegen",
@@ -5153,7 +5153,7 @@ dependencies = [
  "errno",
  "fancy-regex",
  "flate2",
- "fusevm 0.13.3",
+ "fusevm 0.14.0",
  "git2",
  "glob",
  "hex",
