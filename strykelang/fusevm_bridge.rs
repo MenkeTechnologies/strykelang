@@ -1633,7 +1633,11 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
 fn op_stack_delta(op: &Op) -> Option<i32> {
     use Op::*;
     Some(match op {
-        LoadInt(_) | Dup | GetScalarSlot(_) | GetScalarPlain(_) => 1,
+        // `LoadConst(idx)` translates to `[LoadInt(idx), Extended(STK_VAL_LOAD_CONST)]`
+        // in [`translate_op_into`] — net stack delta +1, same as a plain `LoadInt`.
+        // Modeling it here lets compare/index/binary-str detectors accept `LoadConst`
+        // operand positions without bailing on stack-consistency.
+        LoadInt(_) | LoadConst(_) | Dup | GetScalarSlot(_) | GetScalarPlain(_) => 1,
         Dup2 => 2,
         Pop | SetScalarSlot(_) | DeclareScalarSlot(_, _) => -1,
         Swap | SetScalarSlotKeep(_) | Negate | BitNot | LogNot | Inc | Dec
@@ -1743,7 +1747,12 @@ pub(crate) fn segment_is_string_compare_eligible(seg: &[Op], seg_start: usize) -
         match op {
             Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe
             | Op::StrCmp => has_str_op = true,
-            Op::GetScalarSlot(_) | Op::LogNot | Op::Pop | Op::Dup => {}
+            // `LoadConst` is the literal-string case: `$x eq "literal"`,
+            // `"prefix" lt $y`, chained `$a eq "y" || $a eq "n"`, etc. The
+            // [`STK_VAL_LOAD_CONST`] translation pushes a borrowed handle that
+            // the compare helpers consume via `sv_borrow` — identical contract
+            // to seeded-slot operands.
+            Op::GetScalarSlot(_) | Op::LoadConst(_) | Op::LogNot | Op::Pop | Op::Dup => {}
             Op::Jump(t) | Op::JumpIfTrue(t) | Op::JumpIfFalse(t) => {
                 if *t < seg_start || *t > seg_end {
                     return false;
@@ -1825,28 +1834,47 @@ fn binary_str_str_ext_op(op: &Op) -> Option<u16> {
     }
 }
 
-/// True when `seg` is exactly a single binary string→string builtin of two
-/// slot operands: `[GetScalarSlot, GetScalarSlot, CallBuiltin(crypt, 2)]`.
-/// Mirrors `segment_is_string_binary_int_eligible` but the result is an owned
-/// string handle (reconstructed via `from_raw_bits`, like `STK_STR_CONCAT`).
+/// True when `seg` is a single binary string→string builtin (currently 2-arg
+/// `crypt`) of two operand-producing ops: each may be either a `GetScalarSlot`
+/// (`crypt($a, $salt)`) or a `LoadConst` (`crypt($a, "salt")` /
+/// `crypt("seed", $key)`), in any combination. Mirrors
+/// [`segment_is_string_binary_int_eligible`] — same `(handle, handle) -> handle`
+/// ABI; result is an owned string handle reconstructed via `from_raw_bits`,
+/// like [`stryke_str_concat_op`].
 pub(crate) fn segment_is_string_binary_str_eligible(seg: &[Op], _seg_start: usize) -> bool {
     matches!(
         seg,
-        [Op::GetScalarSlot(_), Op::GetScalarSlot(_), u] if binary_str_str_ext_op(u).is_some()
+        [a, b, u]
+            if is_str_operand(a) && is_str_operand(b) && binary_str_str_ext_op(u).is_some()
     )
 }
 
-/// True when `seg` is exactly a single binary string→int builtin of two slot
-/// operands: `[GetScalarSlot, GetScalarSlot, CallBuiltin(index|rindex, 2)]`. Like the
-/// compare/concat segments the operands are marshaled as raw NaN-boxed `StrykeValue`
-/// bits (routed only when both are plain strings — see the caller's `is_string_like`
-/// gate), and the result is a plain `i64`, so the chunk stays on the integer block
-/// JIT + on-disk cache.
+/// True when `seg` is a single binary string→int builtin (`index`/`rindex`,
+/// 2-arg) of two operand-producing ops: each may be either a `GetScalarSlot` or
+/// a `LoadConst` (so `index($s, "needle")` and `index("haystack", $n)` both
+/// lower). Operands marshal as raw NaN-boxed `StrykeValue` bits — for slots,
+/// the caller's `is_string_like` seeder gate enforces plain-string; for
+/// LoadConst, the [`STK_VAL_LOAD_CONST`] runtime resolution borrows the
+/// constants-pool handle (also string-typed in compiled code, since
+/// `index`/`rindex` reach here only with string arguments). Result is a plain
+/// `i64`, so the chunk stays on the integer block JIT + on-disk cache.
 pub(crate) fn segment_is_string_binary_int_eligible(seg: &[Op], _seg_start: usize) -> bool {
     matches!(
         seg,
-        [Op::GetScalarSlot(_), Op::GetScalarSlot(_), u] if binary_str_int_ext_op(u).is_some()
+        [a, b, u]
+            if is_str_operand(a) && is_str_operand(b) && binary_str_int_ext_op(u).is_some()
     )
+}
+
+/// True for an op that produces a single string handle on the stack — either a
+/// `GetScalarSlot` (slot-seeded, gated by `is_string_like`) or a `LoadConst`
+/// (resolved at runtime via [`ext_ops::STK_VAL_LOAD_CONST`] off the
+/// thread-local constants pool). Shared by every detector that accepts
+/// "string-producing operand at this position": compare, concat, index/rindex,
+/// crypt.
+#[inline]
+fn is_str_operand(op: &Op) -> bool {
+    matches!(op, Op::GetScalarSlot(_) | Op::LoadConst(_))
 }
 
 /// Maps a unary string→int builtin call to its `STK_STR_*` Extended id, if any:
@@ -3263,6 +3291,71 @@ mod tests {
             assert_eq!(slot_v.as_str().as_deref(), Some(*slot_s));
             assert_eq!(literal_v.as_str().as_deref(), Some(*literal_s));
             assert_eq!(constants[0].as_str().as_deref(), Some(*literal_s));
+        }
+    }
+
+    // `$x eq "literal"` / `"literal" lt $y` / chained `$a eq "a" || $a eq "b"`
+    // string comparisons now flow through the bridge via STK_VAL_LOAD_CONST.
+    // Same borrow-only contract as concat — the compare helpers `sv_borrow` the
+    // operands; nothing drains the LoadConst-produced bits.
+    #[test]
+    fn fusevm_runs_string_compare_with_load_const() {
+        use Op::*;
+        // `$x eq "yes"` shape: GetScalarSlot, LoadConst, StrEq.
+        let seg_eq = vec![GetScalarSlot(0), LoadConst(0), StrEq];
+        assert!(segment_is_string_compare_eligible(&seg_eq, 0));
+        // `"a" lt $x` shape: LoadConst, GetScalarSlot, StrLt.
+        let seg_lt = vec![LoadConst(0), GetScalarSlot(0), StrLt];
+        assert!(segment_is_string_compare_eligible(&seg_lt, 0));
+
+        let yes = StrykeValue::string("yes".to_string());
+        let no = StrykeValue::string("no".to_string());
+        let key = StrykeValue::string("yes".to_string());
+        let constants = vec![key];
+
+        for _ in 0..16 {
+            let mut slots = [yes.raw_bits() as i64];
+            let out = run_linear_segment(&seg_eq, 0, &mut slots, SubTerminator::Value, &constants)
+                .expect("compare-with-literal must run on fusevm");
+            assert_eq!(out.as_integer(), Some(1), "yes eq yes");
+
+            let mut slots = [no.raw_bits() as i64];
+            let out = run_linear_segment(&seg_eq, 0, &mut slots, SubTerminator::Value, &constants)
+                .expect("compare-with-literal must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0), "no eq yes");
+        }
+
+        // "yes" lt "yes" = 0; "yes" lt "z" = 1 — exercise the LoadConst-on-left form.
+        let z = StrykeValue::string("z".to_string());
+        let constants_lit_left = vec![StrykeValue::string("yes".to_string())];
+        let mut slots = [z.raw_bits() as i64];
+        let out = run_linear_segment(&seg_lt, 0, &mut slots, SubTerminator::Value, &constants_lit_left)
+            .expect("literal-on-left compare must run on fusevm");
+        assert_eq!(out.as_integer(), Some(1), "yes lt z");
+    }
+
+    // `index($s, "needle")` / `index("haystack", $n)` lower to fusevm: same
+    // (handle, handle) -> i64 ABI as the slot-slot form, with LoadConst supplying
+    // one operand via STK_VAL_LOAD_CONST. Disk-cache safe by construction.
+    #[test]
+    fn fusevm_runs_string_index_with_load_const() {
+        use crate::bytecode::BuiltinId;
+        let seg = vec![
+            Op::GetScalarSlot(0),
+            Op::LoadConst(0),
+            Op::CallBuiltin(BuiltinId::Index as u16, 2),
+        ];
+        assert!(segment_is_string_binary_int_eligible(&seg, 0));
+
+        let haystack = StrykeValue::string("foo needle bar".to_string());
+        let needle = StrykeValue::string("needle".to_string());
+        let constants = vec![needle];
+
+        for _ in 0..16 {
+            let mut slots = [haystack.raw_bits() as i64];
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &constants)
+                .expect("index-with-literal must run on fusevm");
+            assert_eq!(out.as_integer(), Some(4), "byte offset of \"needle\" in haystack");
         }
     }
 
