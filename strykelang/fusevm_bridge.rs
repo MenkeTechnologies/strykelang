@@ -2003,6 +2003,19 @@ enum StackKind {
     Int,
 }
 
+/// Abstract stack entry. `Known(k)` is a value whose kind is fixed (built by
+/// LoadInt / LoadConst / builtin output). `SlotVar(s)` is a value just pushed
+/// by `GetScalarSlot(s)` whose kind is determined by the next consumer — when
+/// a consumer pops a `SlotVar(s)` and requires kind `K`, slot `s` is
+/// constrained to `K`. Different slots can have different constrained kinds;
+/// the same slot used with different required kinds means the segment isn't
+/// type-coherent and the analyzer bails.
+#[derive(Clone, Copy)]
+enum AbsValue {
+    Known(StackKind),
+    SlotVar(u8),
+}
+
 /// True when `seg` is composed of ops that take string-handle and/or integer
 /// operands, produce an integer (or boolean) result, and never need
 /// owned-string-handle ownership tracking. Subsumes (and generalizes) the
@@ -2035,8 +2048,25 @@ enum StackKind {
 /// against non-string slot values reaching string-typed helpers.
 pub(crate) fn segment_is_string_bearing_int_result_eligible(
     seg: &[Op],
-    _seg_start: usize,
+    seg_start: usize,
 ) -> bool {
+    string_bearing_int_result_slot_kinds(seg, seg_start).is_some()
+}
+
+/// Same eligibility check as [`segment_is_string_bearing_int_result_eligible`],
+/// but additionally returns a per-slot kind map (`true` = string handle,
+/// `false` = unboxed int) keyed by slot index, indexed 0..=max_slot. `vm.rs`
+/// consults this when seeding to decide each slot's marshaling individually —
+/// so `length($s) >= $min` (with `$s` as a string handle and `$min` as an
+/// unboxed int) lowers correctly.
+///
+/// `None` means the segment isn't eligible: either has no string-typed op,
+/// fails abstract-stack type checking, contains an unmodeled op (e.g. jumps —
+/// not yet supported), or has a slot used with conflicting kinds.
+pub(crate) fn string_bearing_int_result_slot_kinds(
+    seg: &[Op],
+    _seg_start: usize,
+) -> Option<Vec<bool>> {
     use crate::bytecode::BuiltinId;
     // Must contain at least one string-typed op (otherwise it's a plain int
     // segment, which the int detector already covers — and we don't want this
@@ -2050,79 +2080,130 @@ pub(crate) fn segment_is_string_bearing_int_result_eligible(
             || matches!(op, Op::CallBuiltin(id, 2) if *id == BuiltinId::Index as u16 || *id == BuiltinId::Rindex as u16)
     });
     if !has_str_typed_op {
-        return false;
+        return None;
     }
 
-    let mut stk: Vec<StackKind> = Vec::with_capacity(8);
+    // Per-slot kind, `None` = unconstrained / not seen yet.
+    let max_slot = seg.iter().filter_map(|op| match op {
+        Op::GetScalarSlot(s) => Some(*s as usize),
+        _ => None,
+    }).max();
+    let mut slot_kinds: Vec<Option<StackKind>> = match max_slot {
+        Some(m) => vec![None; m + 1],
+        None => Vec::new(),
+    };
+
+    // Constrain a popped abstract value to a required kind. If it's a
+    // `SlotVar(s)`, record (or check) slot `s`'s kind; if it's `Known`, check
+    // it matches the requirement.
+    fn constrain(
+        slot_kinds: &mut [Option<StackKind>],
+        v: AbsValue,
+        required: StackKind,
+    ) -> bool {
+        match v {
+            AbsValue::Known(k) => k == required,
+            AbsValue::SlotVar(s) => match slot_kinds[s as usize] {
+                Some(existing) => existing == required,
+                None => {
+                    slot_kinds[s as usize] = Some(required);
+                    true
+                }
+            },
+        }
+    }
+
+    let mut stk: Vec<AbsValue> = Vec::with_capacity(8);
     for op in seg {
         match op {
-            // Slot reads / LoadConst push a string handle. (Slot seeding is
-            // str_ok = handle bits; LoadConst always resolves to a string
-            // payload in compiled code — numeric literals use LoadInt /
-            // LoadFloat.)
-            Op::GetScalarSlot(_) | Op::LoadConst(_) => stk.push(StackKind::StrHandle),
-            Op::LoadInt(_) => stk.push(StackKind::Int),
+            // Slot read: kind unconstrained until a consumer demands one.
+            Op::GetScalarSlot(s) => stk.push(AbsValue::SlotVar(*s)),
+            // LoadConst always resolves to a string payload in compiled code
+            // (numeric literals use LoadInt / LoadFloat).
+            Op::LoadConst(_) => stk.push(AbsValue::Known(StackKind::StrHandle)),
+            Op::LoadInt(_) => stk.push(AbsValue::Known(StackKind::Int)),
             // Unary str→int: pop StrHandle, push Int.
             _ if is_unary_str_int_builtin(op) => {
-                if stk.pop() != Some(StackKind::StrHandle) {
-                    return false;
+                let a = stk.pop()?;
+                if !constrain(&mut slot_kinds, a, StackKind::StrHandle) {
+                    return None;
                 }
-                stk.push(StackKind::Int);
+                stk.push(AbsValue::Known(StackKind::Int));
             }
             // Binary str+str→int: index / rindex (2-arg) and the str compares.
-            // Pop StrHandle×2, push Int.
             Op::CallBuiltin(id, 2)
                 if *id == BuiltinId::Index as u16 || *id == BuiltinId::Rindex as u16 =>
             {
-                if stk.pop() != Some(StackKind::StrHandle)
-                    || stk.pop() != Some(StackKind::StrHandle)
+                let b = stk.pop()?;
+                let a = stk.pop()?;
+                if !constrain(&mut slot_kinds, a, StackKind::StrHandle)
+                    || !constrain(&mut slot_kinds, b, StackKind::StrHandle)
                 {
-                    return false;
+                    return None;
                 }
-                stk.push(StackKind::Int);
+                stk.push(AbsValue::Known(StackKind::Int));
             }
             Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe | Op::StrCmp => {
-                if stk.pop() != Some(StackKind::StrHandle)
-                    || stk.pop() != Some(StackKind::StrHandle)
+                let b = stk.pop()?;
+                let a = stk.pop()?;
+                if !constrain(&mut slot_kinds, a, StackKind::StrHandle)
+                    || !constrain(&mut slot_kinds, b, StackKind::StrHandle)
                 {
-                    return false;
+                    return None;
                 }
-                stk.push(StackKind::Int);
+                stk.push(AbsValue::Known(StackKind::Int));
             }
             // Int binops: pop Int×2, push Int.
             _ if is_int_binary_op(op) => {
-                if stk.pop() != Some(StackKind::Int) || stk.pop() != Some(StackKind::Int) {
-                    return false;
+                let b = stk.pop()?;
+                let a = stk.pop()?;
+                if !constrain(&mut slot_kinds, a, StackKind::Int)
+                    || !constrain(&mut slot_kinds, b, StackKind::Int)
+                {
+                    return None;
                 }
-                stk.push(StackKind::Int);
+                stk.push(AbsValue::Known(StackKind::Int));
             }
             // Unary int ops: pop Int, push Int.
             Op::LogNot | Op::Negate | Op::BitNot => {
-                if stk.pop() != Some(StackKind::Int) {
-                    return false;
+                let a = stk.pop()?;
+                if !constrain(&mut slot_kinds, a, StackKind::Int) {
+                    return None;
                 }
-                stk.push(StackKind::Int);
+                stk.push(AbsValue::Known(StackKind::Int));
             }
-            // Stack shuffles that only make sense on uniform-kind regions.
-            // `Dup` duplicates the top kind; `Pop` discards regardless.
+            // Stack shuffles. `Dup` duplicates the top entry; `Pop` discards.
+            // A duplicated `SlotVar(s)` propagates the same origin — if either
+            // copy gets consumed with a kind constraint, both pin slot s.
             Op::Dup => {
-                let top = stk.last().copied();
-                let Some(k) = top else { return false };
-                stk.push(k);
+                let top = *stk.last()?;
+                stk.push(top);
             }
             Op::Pop => {
-                if stk.pop().is_none() {
-                    return false;
-                }
+                stk.pop()?;
             }
             // Jumps don't (yet) participate in this abstract model — without
             // tracking per-block stack state we can't safely accept them.
             // Future: integrate with [`segment_block_stack_is_consistent`].
-            _ => return false,
+            _ => return None,
         }
     }
     // Exactly one Int on the stack at the implicit return point.
-    stk.len() == 1 && stk[0] == StackKind::Int
+    if stk.len() != 1 {
+        return None;
+    }
+    if !constrain(&mut slot_kinds, stk[0], StackKind::Int) {
+        return None;
+    }
+    // Every slot that appears in the segment must have its kind determined.
+    // An unconstrained slot would mean the slot was pushed but never consumed
+    // — that's a stack-leak segment, which the final-stack-len check above
+    // already catches, but be explicit so the returned Vec is always reliable.
+    let kinds_bool: Option<Vec<bool>> = slot_kinds
+        .iter()
+        .map(|k| k.map(|x| matches!(x, StackKind::StrHandle)))
+        .collect();
+    kinds_bool
 }
 
 /// True when `seg` is a unary string→**string** builtin segment
@@ -3605,6 +3686,57 @@ mod tests {
             let out = run_linear_segment(&seg_ord, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("ord>=N must run on fusevm");
             assert_eq!(out.as_integer(), Some(0), "ord(\"A\") >= 128");
+        }
+    }
+
+    // Per-slot kind inference: `length($s) >= $min` has $s as a string handle
+    // and $min as a plain int — different kinds on different slots in the
+    // same segment. The analyzer must record both and the seeder must respect
+    // them individually.
+    #[test]
+    fn fusevm_runs_mixed_kind_slots() {
+        use crate::bytecode::BuiltinId;
+        // length($s) >= $min — slot 0 is StrHandle, slot 1 is Int.
+        let seg = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::GetScalarSlot(1),
+            Op::NumGe,
+        ];
+        let kinds = string_bearing_int_result_slot_kinds(&seg, 0)
+            .expect("mixed-kind segment must be eligible");
+        assert_eq!(
+            kinds,
+            vec![true, false],
+            "slot 0 = string handle (length operand), slot 1 = int (compare operand)"
+        );
+
+        // Conflict case: same slot used as BOTH string and int.
+        // length($s) + $s — pops StrHandle for length, then Int for Add.
+        let seg_conflict = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::GetScalarSlot(0),
+            Op::Add,
+        ];
+        assert!(
+            string_bearing_int_result_slot_kinds(&seg_conflict, 0).is_none(),
+            "slot used with conflicting kinds must bail (not silently miscompile)"
+        );
+
+        // Run the OK case end-to-end. length("hello world") >= 5 → 1.
+        let s = StrykeValue::string("hello world".to_string());
+        for _ in 0..8 {
+            // Slot 0: string handle bits. Slot 1: plain int.
+            let mut slots = [s.raw_bits() as i64, 5];
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("mixed-kind length>=min must run on fusevm");
+            assert_eq!(out.as_integer(), Some(1));
+
+            let mut slots = [s.raw_bits() as i64, 99];
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("mixed-kind length>=min must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0));
         }
     }
 

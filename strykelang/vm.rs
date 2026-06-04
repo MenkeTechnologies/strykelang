@@ -1232,17 +1232,33 @@ impl<'a> VM<'a> {
         if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
             let n = max as usize + 1;
             self.jit_buf_slot.resize(n, 0);
+            // Per-slot kind for str-bearing integer-result segments: `length($s)`,
+            // `length($s) >= $min`, `index($s, "x") > 0`, etc. — slots whose
+            // value the segment uses as a *string handle* are seeded as raw bits;
+            // slots used as *plain ints* are seeded unboxed. The general
+            // analyzer infers each slot's kind from how its value gets
+            // consumed; `None` means use the legacy str_ok blanket rule.
+            let str_slot_kinds: Option<Vec<bool>> = if str_ok {
+                crate::fusevm_bridge::string_bearing_int_result_slot_kinds(seg, seg_ip)
+            } else {
+                None
+            };
             // Whether slot `i` marshals as a NaN-boxed string handle (vs an unboxed
-            // integer). Uniformly `str_ok` for the all-string families; for the mixed
-            // `substr`/`x`-repeat family only the designated string slot wants a handle.
-            // True when slot `i` is marshaled as a raw NaN-boxed handle (vs an
-            // unboxed integer). For `val_unary_ok` we additionally bypass the
-            // `is_string_like` gate inside the seeder below (see the `bypass_type
-            // _gate` flag), because `defined` accepts UNDEF and any other type.
+            // integer). For the mixed `substr`/`x`-repeat family only the
+            // designated string slot wants a handle. The general str-bearing
+            // analyzer (if it matched) returns a per-slot kind map. Otherwise
+            // uniform `str_ok || val_unary_ok` for the all-string / any-value
+            // families. For `val_unary_ok` we additionally bypass the
+            // `is_string_like` gate inside the seeder below (see the
+            // `bypass_type_gate` flag), because `defined` accepts UNDEF and
+            // any other type.
             let wants_string = |i: u8| -> bool {
                 match str_handle_slot {
                     Some(str_slot) => i == str_slot,
-                    None => str_ok || val_unary_ok,
+                    None => match &str_slot_kinds {
+                        Some(kinds) => kinds.get(i as usize).copied().unwrap_or(false),
+                        None => str_ok || val_unary_ok,
+                    },
                 }
             };
             // Whether to bypass the `is_string_like` gate when seeding a handle
