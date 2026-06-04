@@ -297,19 +297,27 @@ fn is_stryke_str_index_ext(ext_id: u16) -> bool {
     matches!(ext_id, ext_ops::STK_STR_INDEX | ext_ops::STK_STR_RINDEX)
 }
 
-/// Concatenate two plain-string operands (`$a . $b`), returning the raw bits of a
-/// **newly allocated, owned** `StrykeValue::string`. The two operands are borrowed
-/// (never dropped — they stay owned by the caller's slots); the result's `Arc`
-/// ownership is transferred into the returned handle via `mem::forget`, so the
-/// caller must reconstitute exactly one owning `StrykeValue` from these bits
-/// (`StrykeValue::from_raw_bits`) — which [`run_linear_segment`] does. Eligibility
-/// guarantees both operands are plain strings, matching the interpreter's
-/// byte-level `push_str` without any `use overload`/stringify side effects.
+/// Concatenate two operands (`$a . $b`), returning the raw bits of a **newly
+/// allocated, owned** `StrykeValue::string`. The two operands are borrowed
+/// (never dropped — they stay owned by the caller's slots or constants pool);
+/// the result's `Arc` ownership is transferred into the returned handle via
+/// `mem::forget`, so the caller must reconstitute exactly one owning
+/// `StrykeValue` from these bits (`StrykeValue::from_raw_bits`) — which
+/// [`run_linear_segment`] does.
+///
+/// Uses [`StrykeValue::append_to`] (byte-identical to `push_str` for plain
+/// strings — the seeded-slot fast path — and produces the same Perl-style
+/// stringification the interpreter would for non-string operands like integer
+/// or float constants reached via the `LoadConst → STK_VAL_LOAD_CONST`
+/// translation). Still does NOT trigger `use overload '""'` (slot operands are
+/// gated by `is_string_like`, and LoadConst constants are compile-time
+/// literals that can't be blessed), so semantics remain a pure byte-level join.
 #[inline]
 fn stryke_str_concat_op(a_bits: i64, b_bits: i64) -> i64 {
     let (a, b) = unsafe { (sv_borrow(a_bits), sv_borrow(b_bits)) };
-    let mut s = a.as_str().unwrap_or_default();
-    s.push_str(&b.as_str().unwrap_or_default());
+    let mut s = String::new();
+    a.append_to(&mut s);
+    b.append_to(&mut s);
     let new = StrykeValue::string(s);
     let bits = new.raw_bits() as i64;
     // Transfer the new value's Arc ownership into the returned handle; the caller
@@ -1763,9 +1771,20 @@ pub(crate) fn segment_is_string_compare_eligible(seg: &[Op], seg_start: usize) -
 /// chunk is built unseeded, so its `op_hash` (the disk-cache key) is independent of
 /// the per-run operand pointers.
 pub(crate) fn segment_is_string_concat_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    // `[GetScalarSlot, GetScalarSlot, Concat]` is the original shape: `$a . $b`
+    // with both operands as scope-local scalars. `LoadConst` in either position
+    // is the new `[…, "literal", Concat]` / `[ "literal", …, Concat]` shape, with
+    // the literal resolved at runtime via [`ext_ops::STK_VAL_LOAD_CONST`] off the
+    // thread-local constants pool (see [`LoadConstCtxGuard`]). LoadConst-on-both
+    // is unreachable in compiled code (the compiler constant-folds it), but
+    // matching it costs nothing and avoids a brittle assertion if the folder
+    // ever changes.
     matches!(
         seg,
         [Op::GetScalarSlot(_), Op::GetScalarSlot(_), Op::Concat]
+            | [Op::GetScalarSlot(_), Op::LoadConst(_), Op::Concat]
+            | [Op::LoadConst(_), Op::GetScalarSlot(_), Op::Concat]
+            | [Op::LoadConst(_), Op::LoadConst(_), Op::Concat]
     )
 }
 
@@ -3177,6 +3196,109 @@ mod tests {
             assert_eq!(a.as_str().as_deref(), Some(*a_s));
             assert_eq!(b.as_str().as_deref(), Some(*b_s));
         }
+    }
+
+    // `$a . "literal"` lowered to fusevm: the literal LoadConst gets resolved at
+    // runtime by [`ext_ops::STK_VAL_LOAD_CONST`] off the thread-local constants
+    // pool [`LoadConstCtxGuard`] publishes, so the chunk is disk-cache safe
+    // (hashes the constant *index*, not the per-process heap-pointer bits).
+    // Tests both operand orderings: `slot . literal` and `literal . slot`.
+    #[test]
+    fn fusevm_runs_string_concat_with_load_const() {
+        // `$a . " world"` shape: GetScalarSlot, LoadConst, Concat.
+        let seg_right = vec![Op::GetScalarSlot(0), Op::LoadConst(0), Op::Concat];
+        assert!(segment_is_string_concat_eligible(&seg_right, 0));
+
+        // `"prefix: " . $b` shape: LoadConst, GetScalarSlot, Concat.
+        let seg_left = vec![Op::LoadConst(0), Op::GetScalarSlot(0), Op::Concat];
+        assert!(segment_is_string_concat_eligible(&seg_left, 0));
+
+        let cases: &[(&str, &str)] = &[
+            ("foo", "bar"),
+            ("", "tail"),
+            ("head", ""),
+            ("café", "🦀"),
+        ];
+
+        for (slot_s, literal_s) in cases {
+            let slot_v = StrykeValue::string((*slot_s).to_string());
+            let literal_v = StrykeValue::string((*literal_s).to_string());
+            let constants = vec![literal_v.clone()];
+
+            // slot . literal
+            let mut last_r = None;
+            for _ in 0..32 {
+                let mut slots = [slot_v.raw_bits() as i64];
+                let out = run_linear_segment(
+                    &seg_right,
+                    0,
+                    &mut slots,
+                    SubTerminator::Value,
+                    &constants,
+                )
+                .expect("slot+literal concat must run on fusevm");
+                last_r = out.as_str();
+            }
+            let want_r = format!("{slot_s}{literal_s}");
+            assert_eq!(last_r.as_deref(), Some(want_r.as_str()), "{slot_s:?} . {literal_s:?}");
+
+            // literal . slot
+            let mut last_l = None;
+            for _ in 0..32 {
+                let mut slots = [slot_v.raw_bits() as i64];
+                let out = run_linear_segment(
+                    &seg_left,
+                    0,
+                    &mut slots,
+                    SubTerminator::Value,
+                    &constants,
+                )
+                .expect("literal+slot concat must run on fusevm");
+                last_l = out.as_str();
+            }
+            let want_l = format!("{literal_s}{slot_s}");
+            assert_eq!(last_l.as_deref(), Some(want_l.as_str()), "{literal_s:?} . {slot_s:?}");
+
+            // Operands and constants both survive (borrow-only contract).
+            assert_eq!(slot_v.as_str().as_deref(), Some(*slot_s));
+            assert_eq!(literal_v.as_str().as_deref(), Some(*literal_s));
+            assert_eq!(constants[0].as_str().as_deref(), Some(*literal_s));
+        }
+    }
+
+    // The same chunk shape must produce a STABLE op_hash across runs with
+    // different per-process constant pointers — the whole point of routing
+    // LoadConst through STK_VAL_LOAD_CONST instead of baking the bits. Two
+    // freshly-built `StrykeValue::string` constants have different `raw_bits`
+    // each call (heap-allocated `Arc`), but the chunk hashes only the constant
+    // *index* (0) and the helper id (FNV-1a of "stryke_val_load_const") —
+    // both stable — so `op_hash` must match byte-for-byte.
+    #[test]
+    fn load_const_concat_chunk_op_hash_is_pointer_independent() {
+        let seg = vec![Op::GetScalarSlot(0), Op::LoadConst(0), Op::Concat];
+
+        let slot = StrykeValue::string("slot".to_string());
+        let slots_buf = [slot.raw_bits() as i64];
+
+        let lit1 = StrykeValue::string("first".to_string());
+        let lit2 = StrykeValue::string("second".to_string());
+        // Sanity: two freshly-built strings really do have distinct raw_bits.
+        assert_ne!(
+            lit1.raw_bits(),
+            lit2.raw_bits(),
+            "test assumes distinct per-process pointers"
+        );
+
+        let chunk_a = build_chunk(&seg, 0, &slots_buf, false, &[lit1])
+            .expect("chunk a builds with LoadConst translation");
+        let chunk_b = build_chunk(&seg, 0, &slots_buf, false, &[lit2])
+            .expect("chunk b builds with LoadConst translation");
+
+        assert_eq!(
+            chunk_a.op_hash, chunk_b.op_hash,
+            "LoadConst → STK_VAL_LOAD_CONST keeps op_hash independent of \
+             per-process constant heap-pointer bits"
+        );
     }
 
     // `length($s)` lowered to fusevm (unary `STK_STR_LEN` host helper) must equal
