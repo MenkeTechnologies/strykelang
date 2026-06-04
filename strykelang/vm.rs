@@ -1158,7 +1158,28 @@ impl<'a> VM<'a> {
             None
         };
         let str_int_ok = str_handle_slot.is_some();
-        if !int_ok && !str_ok && !float_ok && !int_str_ok && !str_int_ok && !val_unary_ok {
+        // `substr("abc", $n)` / `"prefix" x $n`: literal-string + slot-int → string.
+        // The string operand comes from `LoadConst` (resolved at runtime by
+        // `STK_VAL_LOAD_CONST` off the constants pool — no slot is involved),
+        // so the single slot here marshals as a plain integer — exactly like
+        // `int_str_ok` for `chr($n)`. Treating `lit_str_int_ok` as "all slots
+        // are ints" in the seeder below keeps wants_string false for every slot.
+        let lit_str_int_ok = !int_ok
+            && !str_ok
+            && !float_ok
+            && !int_str_ok
+            && !str_int_ok
+            && crate::fusevm_bridge::segment_is_literal_string_int_to_string_eligible(
+                seg, seg_ip,
+            );
+        if !int_ok
+            && !str_ok
+            && !float_ok
+            && !int_str_ok
+            && !str_int_ok
+            && !lit_str_int_ok
+            && !val_unary_ok
+        {
             return Ok(false);
         }
 

@@ -2038,6 +2038,24 @@ pub(crate) fn segment_is_string_int_mixed_eligible(seg: &[Op], seg_start: usize)
         || segment_is_string_int2_to_string_eligible(seg, seg_start)
 }
 
+/// True for a literal-string + slot-int → string segment: the universal
+/// `"prefix" x $n` / `substr("abc", $n)` shape. The string operand comes from
+/// [`Op::LoadConst`] (resolved at runtime via [`ext_ops::STK_VAL_LOAD_CONST`]
+/// — disk-cache safe by construction), the integer operand from a slot
+/// (marshaled unboxed). The result is an owned string handle, reconstructed
+/// via `from_raw_bits` by the caller. Distinct from
+/// [`segment_is_string_int_to_string_eligible`] because no slot holds a string
+/// handle here — `vm.rs` seeds the single slot purely as an integer.
+pub(crate) fn segment_is_literal_string_int_to_string_eligible(
+    seg: &[Op],
+    _seg_start: usize,
+) -> bool {
+    matches!(
+        seg,
+        [Op::LoadConst(_), Op::GetScalarSlot(_), u] if str_int_str_ext_op(u).is_some()
+    )
+}
+
 /// The slot supplying the *string* operand of a mixed string+integer→string segment
 /// (binary or ternary). Every other `GetScalarSlot` in the segment marshals as a plain
 /// integer. Returns `None` for non-mixed (or shared-slot) segments. The caller
@@ -2602,6 +2620,19 @@ pub(crate) fn run_linear_segment(
         && !unary_ok
         && !int_str_ok
         && segment_is_string_int_mixed_eligible(seg, seg_start);
+    // `substr("abc", $n)` / `"prefix" x $n`: literal string + slot int → string.
+    // No slot is a string handle (the literal supplies the string via
+    // `STK_VAL_LOAD_CONST`), so the single slot here marshals as a plain integer
+    // — identical seeding to `int_str_ok` for `chr($n)`. Result is an owned
+    // string handle, reconstructed via `from_raw_bits`.
+    let lit_str_int_ok = !int_ok
+        && !float_ok
+        && !str_ok
+        && !concat_ok
+        && !unary_ok
+        && !int_str_ok
+        && !str_int_ok
+        && segment_is_literal_string_int_to_string_eligible(seg, seg_start);
     if !int_ok
         && !float_ok
         && !str_ok
@@ -2609,6 +2640,7 @@ pub(crate) fn run_linear_segment(
         && !unary_ok
         && !int_str_ok
         && !str_int_ok
+        && !lit_str_int_ok
         && !str_str_bin_ok
         && !val_unary_int_ok
         && !val_unary_str_ok
@@ -2629,8 +2661,8 @@ pub(crate) fn run_linear_segment(
     // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || str_str_bin_ok
-        || val_unary_int_ok || val_unary_str_ok
+    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || lit_str_int_ok
+        || str_str_bin_ok || val_unary_int_ok || val_unary_str_ok
     {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
@@ -2639,8 +2671,10 @@ pub(crate) fn run_linear_segment(
             // val_unary_int_ok returns a plain integer (defined: 0 or 1).
             // val_unary_str_ok returns the raw bits of an owned string handle
             // (ref: "ARRAY"/"HASH"/etc), reconstructed via from_raw_bits.
-            if concat_ok || unary_str_ok || int_str_ok || str_int_ok || str_str_bin_ok
-                || val_unary_str_ok
+            // lit_str_int_ok returns an owned string handle (the result of
+            // substr/repeat applied to a literal-string operand).
+            if concat_ok || unary_str_ok || int_str_ok || str_int_ok || lit_str_int_ok
+                || str_str_bin_ok || val_unary_str_ok
             {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
@@ -3332,6 +3366,58 @@ mod tests {
         let out = run_linear_segment(&seg_lt, 0, &mut slots, SubTerminator::Value, &constants_lit_left)
             .expect("literal-on-left compare must run on fusevm");
         assert_eq!(out.as_integer(), Some(1), "yes lt z");
+    }
+
+    // `"prefix" x $n` / `substr("abc", $n)` lower to fusevm: literal-string
+    // operand resolved at runtime via STK_VAL_LOAD_CONST, slot operand
+    // marshaled as a plain int (no slot is a string handle here — the literal
+    // supplies the string). Result is an owned string handle.
+    #[test]
+    fn fusevm_runs_literal_string_repeat_and_substr() {
+        use crate::bytecode::BuiltinId;
+        // `"*" x $n` shape.
+        let seg_rep = vec![Op::LoadConst(0), Op::GetScalarSlot(0), Op::StringRepeat];
+        assert!(segment_is_literal_string_int_to_string_eligible(&seg_rep, 0));
+
+        // `substr("Hello, World", $n)` shape.
+        let seg_sub = vec![
+            Op::LoadConst(0),
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Substr as u16, 2),
+        ];
+        assert!(segment_is_literal_string_int_to_string_eligible(&seg_sub, 0));
+
+        // Repeat: "*" x 5 → "*****".
+        let star = StrykeValue::string("*".to_string());
+        let constants_star = vec![star];
+        for _ in 0..16 {
+            let mut slots = [5_i64];
+            let out = run_linear_segment(
+                &seg_rep,
+                0,
+                &mut slots,
+                SubTerminator::Value,
+                &constants_star,
+            )
+            .expect("literal-x-slot repeat must run on fusevm");
+            assert_eq!(out.as_str().as_deref(), Some("*****"));
+        }
+
+        // Substr: substr("Hello, World", 7) → "World".
+        let hello = StrykeValue::string("Hello, World".to_string());
+        let constants_hello = vec![hello];
+        for _ in 0..16 {
+            let mut slots = [7_i64];
+            let out = run_linear_segment(
+                &seg_sub,
+                0,
+                &mut slots,
+                SubTerminator::Value,
+                &constants_hello,
+            )
+            .expect("literal-substr-slot must run on fusevm");
+            assert_eq!(out.as_str().as_deref(), Some("World"));
+        }
     }
 
     // `index($s, "needle")` / `index("haystack", $n)` lower to fusevm: same
