@@ -120,6 +120,11 @@ pub mod ext_ops {
     /// is lowered here; the list/array form stays on the interpreter (different
     /// result type, allocates a Vec).
     pub const STK_STR_REVERSE: u16 = 0x0020;
+    /// `defined($x)` — 0 if `$x` is UNDEF, else 1. Unary **any-value**→int: the
+    /// operand can be ANY type including UNDEF (unlike string→int ops which gate
+    /// on `is_string_like` and bail for non-string operands). Marshaled as raw
+    /// NaN-boxed `StrykeValue` bits and reconstructed by the helper.
+    pub const STK_VAL_DEFINED: u16 = 0x0021;
     /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
     /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
@@ -536,6 +541,71 @@ extern "C" fn stryke_h_str_reverse(a: i64) -> i64 {
     stryke_str_reverse_op(a)
 }
 
+/// `defined($x)`: returns 1 if `$x` is anything other than UNDEF, else 0. The
+/// operand is a raw NaN-boxed StrykeValue handle of ANY type (string, integer,
+/// float, hash ref, undef, …). Unlike `STK_STR_*` helpers there's no operand
+/// type gate at the call site — the helper accepts every kind.
+#[inline]
+fn stryke_val_defined_op(a_bits: i64) -> i64 {
+    let v = unsafe { sv_borrow(a_bits) };
+    if v.is_undef() { 0 } else { 1 }
+}
+extern "C" fn stryke_h_val_defined(a: i64) -> i64 {
+    stryke_val_defined_op(a)
+}
+
+/// Table of unary any-value→int ext ops. Same `(i64) -> i64` ABI as the unary
+/// string→int helpers, but at the call site the seeder skips the
+/// `is_string_like` gate so the operand can be any type.
+const STRYKE_VAL_UNARY_INT_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
+    (ext_ops::STK_VAL_DEFINED, "stryke_val_defined", stryke_h_val_defined),
+];
+
+/// True for an any-value unary→int ext id (currently just `defined`).
+#[inline]
+fn is_stryke_val_unary_int_ext(ext_id: u16) -> bool {
+    STRYKE_VAL_UNARY_INT_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+}
+
+/// Registered JIT helper id for an any-value unary→int ext op.
+#[inline]
+fn stryke_val_unary_int_helper_id(ext_id: u16) -> Option<u32> {
+    STRYKE_VAL_UNARY_INT_HELPERS
+        .iter()
+        .find(|(id, _, _)| *id == ext_id)
+        .map(|(_, name, _)| fusevm::jit::jit_helper_id(name))
+}
+
+/// Interpreter-side dispatch for an any-value unary→int ext op.
+#[inline]
+fn stryke_val_unary_int_op(ext_id: u16, a_bits: i64) -> i64 {
+    match ext_id {
+        ext_ops::STK_VAL_DEFINED => stryke_val_defined_op(a_bits),
+        _ => 0,
+    }
+}
+
+/// Maps a unary any-value→int builtin call to its `STK_VAL_*` ext id, if any.
+/// Currently just `defined`.
+#[inline]
+fn unary_any_int_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    let Op::CallBuiltin(id, 1) = op else { return None; };
+    if *id == BuiltinId::Defined as u16 {
+        Some(ext_ops::STK_VAL_DEFINED)
+    } else {
+        None
+    }
+}
+
+/// True when `seg` is `[GetScalarSlot, CallBuiltin(defined, 1)]` — a single
+/// any-value unary→int builtin. Same shape as the string unary segments but
+/// the operand can be any type (the caller's seeder MUST NOT gate on
+/// `is_string_like`).
+pub(crate) fn segment_is_any_value_unary_int_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(seg, [Op::GetScalarSlot(_), u] if unary_any_int_ext_op(u).is_some())
+}
+
 /// Table of the unary string→**string** ops (`(i64 handle) -> i64 handle`):
 /// `uc`/`lc`/`ucfirst`/`lcfirst`. Same `(i64) -> i64` ABI as the unary string→int
 /// table, but the returned `i64` is the raw bits of a freshly allocated *owned*
@@ -721,6 +791,7 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             || is_stryke_str_ext(ext_id)
             || is_stryke_str_int_str_ext(ext_id)
             || is_stryke_str_int2_str_ext(ext_id)
+            || is_stryke_val_unary_int_ext(ext_id)
     }
     fn op_count(&self) -> usize {
         1 + STRYKE_STR_HELPERS.len()
@@ -729,6 +800,7 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             + STRYKE_INT_STR_HELPERS.len()
             + STRYKE_STR_INT_STR_HELPERS.len()
             + STRYKE_STR_INT2_STR_HELPERS.len()
+            + STRYKE_VAL_UNARY_INT_HELPERS.len()
     }
     fn name(&self) -> &str {
         "strykelang"
@@ -739,6 +811,22 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             // and call the registered unary host helper. `call_host` records the
             // relocation so the chunk stays on-disk cacheable.
             let Some(helper_id) = stryke_str_unary_helper_id(ext_id) else {
+                return false;
+            };
+            let Some(a) = cx.pop_i64() else {
+                return false;
+            };
+            let Some(result) = cx.call_host(helper_id, &[a]) else {
+                return false;
+            };
+            cx.push_i64(result);
+            return true;
+        }
+        if is_stryke_val_unary_int_ext(ext_id) {
+            // Unary any-value→int ops (`defined`): same shape as unary string ops
+            // above, but the caller's seeder MUST NOT gate on `is_string_like`
+            // because the operand can be UNDEF.
+            let Some(helper_id) = stryke_val_unary_int_helper_id(ext_id) else {
                 return false;
             };
             let Some(a) = cx.pop_i64() else {
@@ -880,6 +968,9 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
     } else if is_stryke_str_unary_ext(id) {
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(stryke_str_unary_op(id, a)));
+    } else if is_stryke_val_unary_int_ext(id) {
+        let a = vm.pop().to_int();
+        vm.push(fusevm::Value::Int(stryke_val_unary_int_op(id, a)));
     } else if is_stryke_str_int_str_ext(id) {
         let b = vm.pop().to_int();
         let a = vm.pop().to_int();
@@ -1799,6 +1890,11 @@ fn translate_op_into(
         _ if unary_str_ext_op(op).is_some() => {
             body.push(F::Extended(unary_str_ext_op(op).unwrap(), 0))
         }
+        // `defined($x)` — unary any-value→int Extended op; the operand is a raw
+        // StrykeValue bit-handle (see `segment_is_any_value_unary_int_eligible`).
+        _ if unary_any_int_ext_op(op).is_some() => {
+            body.push(F::Extended(unary_any_int_ext_op(op).unwrap(), 0))
+        }
         // `chr($n)` -> int→string host-helper Extended op; the operand is an unboxed
         // integer codepoint (see `segment_is_int_to_string_eligible`).
         _ if int_str_ext_op(op).is_some() => {
@@ -2136,6 +2232,16 @@ pub(crate) fn run_linear_segment(
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
     let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
+    // Unary any-value→int (`defined($x)`): same shape as `unary_ok` but the
+    // operand can be ANY type — the seeder (in `vm.rs`) bypasses `is_string_like`.
+    // Result is a plain `i64`.
+    let val_unary_int_ok = !int_ok
+        && !float_ok
+        && !concat_ok
+        && !str_ok
+        && !str_str_bin_ok
+        && !unary_ok
+        && segment_is_any_value_unary_int_eligible(seg, seg_start);
     // `chr($n)`: integer operand (marshaled unboxed by the caller, exactly like the
     // integer fast path), owned-string-handle result (reconstructed via from_raw_bits).
     let int_str_ok = !int_ok
@@ -2161,6 +2267,7 @@ pub(crate) fn run_linear_segment(
         && !int_str_ok
         && !str_int_ok
         && !str_str_bin_ok
+        && !val_unary_int_ok
     {
         return None;
     }
@@ -2178,11 +2285,15 @@ pub(crate) fn run_linear_segment(
     // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || str_str_bin_ok {
+    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || str_str_bin_ok
+        || val_unary_int_ok
+    {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
+            // val_unary_int_ok returns a plain integer (defined: 0 or 1), so it
+            // does NOT go through from_raw_bits.
             if concat_ok || unary_str_ok || int_str_ok || str_int_ok || str_str_bin_ok {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {

@@ -1130,6 +1130,13 @@ impl<'a> VM<'a> {
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip));
+        // Any-value unary→int (`defined($x)`): SAME shape as the unary string→int
+        // segments BUT the operand can be ANY type including UNDEF (that's the
+        // whole point). Marshaled as raw bits, with the `is_string_like` gate
+        // BYPASSED — the helper accepts every kind.
+        let val_unary_ok = !int_ok
+            && !str_ok
+            && crate::fusevm_bridge::segment_is_any_value_unary_int_eligible(seg, seg_ip);
         // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
         // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
         let float_ok = !int_ok
@@ -1150,7 +1157,7 @@ impl<'a> VM<'a> {
             None
         };
         let str_int_ok = str_handle_slot.is_some();
-        if !int_ok && !str_ok && !float_ok && !int_str_ok && !str_int_ok {
+        if !int_ok && !str_ok && !float_ok && !int_str_ok && !str_int_ok && !val_unary_ok {
             return Ok(false);
         }
 
@@ -1198,17 +1205,24 @@ impl<'a> VM<'a> {
             // Whether slot `i` marshals as a NaN-boxed string handle (vs an unboxed
             // integer). Uniformly `str_ok` for the all-string families; for the mixed
             // `substr`/`x`-repeat family only the designated string slot wants a handle.
+            // True when slot `i` is marshaled as a raw NaN-boxed handle (vs an
+            // unboxed integer). For `val_unary_ok` we additionally bypass the
+            // `is_string_like` gate inside the seeder below (see the `bypass_type
+            // _gate` flag), because `defined` accepts UNDEF and any other type.
             let wants_string = |i: u8| -> bool {
                 match str_handle_slot {
                     Some(str_slot) => i == str_slot,
-                    None => str_ok,
+                    None => str_ok || val_unary_ok,
                 }
             };
+            // Whether to bypass the `is_string_like` gate when seeding a handle
+            // slot — only true for any-value segments (currently `defined`).
+            let bypass_type_gate = val_unary_ok;
             for i in 0..=max {
                 let bound = arg_of_slot(i);
                 self.jit_buf_slot[i as usize] = if let Some(pv) = plain_of_slot(i) {
                     if wants_string(i) {
-                        if !pv.is_string_like() {
+                        if !bypass_type_gate && !pv.is_string_like() {
                             return Ok(false);
                         }
                         pv.raw_bits() as i64
@@ -1223,7 +1237,7 @@ impl<'a> VM<'a> {
                         Some(a) => argv.get(a).cloned().unwrap_or(StrykeValue::UNDEF),
                         None => self.interp.scope.get_scalar_slot(i),
                     };
-                    if !v.is_string_like() {
+                    if !bypass_type_gate && !v.is_string_like() {
                         return Ok(false);
                     }
                     v.raw_bits() as i64
