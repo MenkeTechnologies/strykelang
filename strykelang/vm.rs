@@ -9489,6 +9489,12 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Floor) => Ok(StrykeValue::integer(
                 args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().floor() as i64,
             )),
+            // Round: 1-arg form returns Int (ties away from zero); 2-arg form
+            // (round to N places) defers to the named-dispatch path which is
+            // still in `builtins.rs`. CallBuiltin only emits the 1-arg form.
+            Some(BuiltinId::Round) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().round() as i64,
+            )),
             Some(BuiltinId::Pos) => {
                 let key = if args.is_empty() {
                     "_".to_string()

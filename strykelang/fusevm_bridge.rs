@@ -131,6 +131,11 @@ pub mod ext_ops {
     /// any-value gate-bypass with the unary-str-str result reconstruction
     /// (`from_raw_bits` on the owned handle, like `STK_STR_UC` and friends).
     pub const STK_VAL_REF: u16 = 0x0022;
+    /// `round($x)` (1-arg) — round to nearest integer, ties AWAY from zero
+    /// (matches `f64::round() as i64`). Any-value→int (handles UNDEF/string/
+    /// numeric uniformly via `to_number().round()`); same gate-bypass as
+    /// `defined`. The 2-arg precision form stays on the interpreter.
+    pub const STK_VAL_ROUND: u16 = 0x0023;
     /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
     /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
@@ -573,11 +578,24 @@ extern "C" fn stryke_h_val_ref(a: i64) -> i64 {
     stryke_val_ref_op(a)
 }
 
+/// `round($x)` (1-arg): ties AWAY from zero, returns Int. Coerces via
+/// `to_number()` so any input type works (UNDEF→0, string→numeric-parse, etc).
+/// Avoids a fusevm Op::RoundAway by doing the rounding in the host helper.
+#[inline]
+fn stryke_val_round_op(a_bits: i64) -> i64 {
+    let v = unsafe { sv_borrow(a_bits) };
+    v.to_number().round() as i64
+}
+extern "C" fn stryke_h_val_round(a: i64) -> i64 {
+    stryke_val_round_op(a)
+}
+
 /// Table of unary any-value→int ext ops. Same `(i64) -> i64` ABI as the unary
 /// string→int helpers, but at the call site the seeder skips the
 /// `is_string_like` gate so the operand can be any type.
 const STRYKE_VAL_UNARY_INT_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
     (ext_ops::STK_VAL_DEFINED, "stryke_val_defined", stryke_h_val_defined),
+    (ext_ops::STK_VAL_ROUND, "stryke_val_round", stryke_h_val_round),
 ];
 
 /// Table of unary any-value→**string handle** ext ops. Same `(i64) -> i64` ABI as
@@ -651,6 +669,7 @@ fn stryke_val_unary_int_helper_id(ext_id: u16) -> Option<u32> {
 fn stryke_val_unary_int_op(ext_id: u16, a_bits: i64) -> i64 {
     match ext_id {
         ext_ops::STK_VAL_DEFINED => stryke_val_defined_op(a_bits),
+        ext_ops::STK_VAL_ROUND => stryke_val_round_op(a_bits),
         _ => 0,
     }
 }
@@ -663,6 +682,8 @@ fn unary_any_int_ext_op(op: &Op) -> Option<u16> {
     let Op::CallBuiltin(id, 1) = op else { return None; };
     if *id == BuiltinId::Defined as u16 {
         Some(ext_ops::STK_VAL_DEFINED)
+    } else if *id == BuiltinId::Round as u16 {
+        Some(ext_ops::STK_VAL_ROUND)
     } else {
         None
     }
