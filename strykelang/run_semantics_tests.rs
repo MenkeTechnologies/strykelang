@@ -174,6 +174,28 @@ fn rs(s: &str) -> String {
     run(s).expect("run").to_string()
 }
 
+// Regression: fusevm seeder used StrykeValue::clone() (deep clone — new Arc,
+// new String) when seeding `@_`-bound slots, then let the local drop before the
+// JIT helper dereferenced the slot bits. With allocator reuse, the freed slot
+// would show up as an empty HeapObject::Hash ("0/0" via append_to). The new
+// `[GetScalarSlot, LoadConst, Concat]` lowering hits this on every literal-
+// concat sub. Loop enough times to force the bridge through JIT (eager mode is
+// configured on the string family, so a single call is already enough), but
+// 100 iterations gives the allocator plenty of opportunity to reuse the freed
+// slot — making any future regression louder.
+#[test]
+fn fusevm_concat_with_literal_in_sub_no_seeder_use_after_free() {
+    assert_eq!(
+        rs(r#"sub greet { my ($name, $unused) = @_; return $name . "!"; }
+              my $r;
+              for my $i (1..100) {
+                  $r = greet("World", "x");
+              }
+              $r"#),
+        "World!"
+    );
+}
+
 #[test]
 fn sprintf_basic_decimal() {
     assert_eq!(rs(r#"sprintf "%d", 42;"#), "42");
