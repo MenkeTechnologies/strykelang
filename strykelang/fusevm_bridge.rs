@@ -110,6 +110,11 @@ pub mod ext_ops {
     /// shield, equivalent of `\Q…\E`). Unary string→string handle (see
     /// `STK_STR_UC`); reuses the same `(i64) -> i64` ABI and owned-handle return.
     pub const STK_STR_QUOTEMETA: u16 = 0x001E;
+    /// `crypt($plaintext, $salt)` — DES/MD5 password hash. Binary
+    /// string+string→string handle: both operands are NaN-boxed string handles,
+    /// result is an owned string handle (see `STK_STR_CONCAT`). Routes through
+    /// `crate::crypt_util::perl_crypt` (pure Rust, no FFI).
+    pub const STK_STR_CRYPT: u16 = 0x001F;
     /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
     /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
@@ -285,6 +290,21 @@ fn stryke_str_concat_op(a_bits: i64, b_bits: i64) -> i64 {
 /// (`(i64, i64) -> i64`) so it shares the same `call_host`/relocation machinery.
 extern "C" fn stryke_h_str_concat(a: i64, b: i64) -> i64 {
     stryke_str_concat_op(a, b)
+}
+
+/// `crypt($plaintext, $salt)`: pure-Rust `perl_crypt`. Both operands are
+/// borrowed NaN-boxed string handles; the result is an owned string handle
+/// (same `mem::forget` transfer as `STK_STR_CONCAT`).
+#[inline]
+fn stryke_str_crypt_op(a_bits: i64, b_bits: i64) -> i64 {
+    let (a, b) = unsafe { (sv_borrow(a_bits), sv_borrow(b_bits)) };
+    forget_string_bits(crate::crypt_util::perl_crypt(
+        &a.as_str().unwrap_or_default(),
+        &b.as_str().unwrap_or_default(),
+    ))
+}
+extern "C" fn stryke_h_str_crypt(a: i64, b: i64) -> i64 {
+    stryke_str_crypt_op(a, b)
 }
 
 /// `substr($s, $off)` (2-arg): operand `a_bits` is a borrowed NaN-boxed string handle,
@@ -650,6 +670,7 @@ const STRYKE_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
     (ext_ops::STK_STR_CONCAT, "stryke_str_concat", stryke_h_str_concat),
     (ext_ops::STK_STR_INDEX, "stryke_str_index", stryke_h_str_index),
     (ext_ops::STK_STR_RINDEX, "stryke_str_rindex", stryke_h_str_rindex),
+    (ext_ops::STK_STR_CRYPT, "stryke_str_crypt", stryke_h_str_crypt),
 ];
 
 /// True for any binary `STK_STR_*` extension id (comparisons + concatenation +
@@ -854,6 +875,8 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
         let a = vm.pop().to_int();
         let r = if id == ext_ops::STK_STR_CONCAT {
             stryke_str_concat_op(a, b)
+        } else if id == ext_ops::STK_STR_CRYPT {
+            stryke_str_crypt_op(a, b)
         } else if is_stryke_str_index_ext(id) {
             stryke_str_index_op(id, a, b)
         } else {
@@ -1401,6 +1424,35 @@ fn binary_str_int_ext_op(op: &Op) -> Option<u16> {
     }
 }
 
+/// Maps a binary string→**string** builtin call (currently 2-arg `crypt`) to its
+/// `STK_STR_*` Extended id. Two string-handle operands, owned-string-handle
+/// result — same `(i64, i64) -> i64` ABI as `STK_STR_CONCAT`. The pipeline
+/// must reconstruct the result via `from_raw_bits` (not box it as an integer).
+#[inline]
+fn binary_str_str_ext_op(op: &Op) -> Option<u16> {
+    use crate::bytecode::BuiltinId;
+    let Op::CallBuiltin(id, 2) = op else {
+        return None;
+    };
+    let id = *id;
+    if id == BuiltinId::Crypt as u16 {
+        Some(ext_ops::STK_STR_CRYPT)
+    } else {
+        None
+    }
+}
+
+/// True when `seg` is exactly a single binary string→string builtin of two
+/// slot operands: `[GetScalarSlot, GetScalarSlot, CallBuiltin(crypt, 2)]`.
+/// Mirrors `segment_is_string_binary_int_eligible` but the result is an owned
+/// string handle (reconstructed via `from_raw_bits`, like `STK_STR_CONCAT`).
+pub(crate) fn segment_is_string_binary_str_eligible(seg: &[Op], _seg_start: usize) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(_), Op::GetScalarSlot(_), u] if binary_str_str_ext_op(u).is_some()
+    )
+}
+
 /// True when `seg` is exactly a single binary string→int builtin of two slot
 /// operands: `[GetScalarSlot, GetScalarSlot, CallBuiltin(index|rindex, 2)]`. Like the
 /// compare/concat segments the operands are marshaled as raw NaN-boxed `StrykeValue`
@@ -1721,6 +1773,12 @@ fn translate_op_into(
         _ if binary_str_int_ext_op(op).is_some() => {
             body.push(F::Extended(binary_str_int_ext_op(op).unwrap(), 0))
         }
+        // 2-arg `crypt` -> binary string→string host-helper Extended op; both
+        // operands are raw StrykeValue bit-handles, result is an owned string
+        // handle (see `segment_is_string_binary_str_eligible`).
+        _ if binary_str_str_ext_op(op).is_some() => {
+            body.push(F::Extended(binary_str_str_ext_op(op).unwrap(), 0))
+        }
         // `substr($s,$off)` (2-arg) / `$s x $n` -> binary string+integer→string
         // host-helper Extended op; operand `a` is a string handle, operand `b` an
         // unboxed integer (see `segment_is_string_int_to_string_eligible`).
@@ -1975,10 +2033,18 @@ pub(crate) fn run_linear_segment(
         && !concat_ok
         && (segment_is_string_compare_eligible(seg, seg_start)
             || segment_is_string_binary_int_eligible(seg, seg_start));
+    // Binary string→**string** builtins (currently just 2-arg `crypt`). Result is
+    // an owned string handle reconstructed via `from_raw_bits`, like concat.
+    let str_str_bin_ok = !int_ok
+        && !float_ok
+        && !concat_ok
+        && !str_ok
+        && segment_is_string_binary_str_eligible(seg, seg_start);
     let unary_ok = !int_ok
         && !float_ok
         && !concat_ok
         && !str_ok
+        && !str_str_bin_ok
         && segment_is_string_unary_eligible(seg, seg_start);
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
@@ -2000,7 +2066,15 @@ pub(crate) fn run_linear_segment(
         && !unary_ok
         && !int_str_ok
         && segment_is_string_int_mixed_eligible(seg, seg_start);
-    if !int_ok && !float_ok && !str_ok && !concat_ok && !unary_ok && !int_str_ok && !str_int_ok {
+    if !int_ok
+        && !float_ok
+        && !str_ok
+        && !concat_ok
+        && !unary_ok
+        && !int_str_ok
+        && !str_int_ok
+        && !str_str_bin_ok
+    {
         return None;
     }
 
@@ -2017,12 +2091,12 @@ pub(crate) fn run_linear_segment(
     // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok {
+    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || str_str_bin_ok {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
-            if concat_ok || unary_str_ok || int_str_ok || str_int_ok {
+            if concat_ok || unary_str_ok || int_str_ok || str_int_ok || str_str_bin_ok {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
                 StrykeValue::integer(ret)
