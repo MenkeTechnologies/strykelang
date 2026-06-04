@@ -2013,6 +2013,30 @@ pub(crate) fn segment_is_string_unary_int_combined_eligible(
     )
 }
 
+/// True when `seg` is `[GetScalarSlot, unary_str_int, GetScalarSlot, unary_str_int,
+/// int_binop]` — two unary string→int builtins on two (possibly identical)
+/// slots combined via a binary integer op. Covers the universal
+/// `length($a) > length($b)` / `length($a) - length($b)` /
+/// `ord($a) == ord($b)` patterns.
+///
+/// Both slots marshal as NaN-boxed string handles (each consumed immediately
+/// by its own unary str builtin); the result is a plain `i64`. Same str-family
+/// `unary_ok` dispatch as the single-slot + int-literal variant — the seeder
+/// treats every slot in a str_ok segment as a string handle, which is what
+/// both `GetScalarSlot`s need here.
+pub(crate) fn segment_is_string_unary_binop_eligible(
+    seg: &[Op],
+    _seg_start: usize,
+) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(_), u1, Op::GetScalarSlot(_), u2, b]
+            if is_unary_str_int_builtin(u1)
+                && is_unary_str_int_builtin(u2)
+                && is_int_binary_op(b)
+    )
+}
+
 /// True when `seg` is a unary string→**string** builtin segment
 /// (`[GetScalarSlot, CallBuiltin(uc|lc|ucfirst|lcfirst, 1)]`), whose JIT result is
 /// the raw bits of an owned string handle (reconstructed via `from_raw_bits`) rather
@@ -2643,7 +2667,12 @@ pub(crate) fn run_linear_segment(
             // unary-str-int builtin combined with an int literal via a binary
             // int op. Same seeder (slot as string handle) and result (plain i64)
             // as the bare unary case, so it joins the same dispatch branch.
-            || segment_is_string_unary_int_combined_eligible(seg, seg_start));
+            || segment_is_string_unary_int_combined_eligible(seg, seg_start)
+            // `length($a) > length($b)`, `length($a) - length($b)`,
+            // `ord($a) == ord($b)` — two unary-str-int builtins on two slots
+            // combined via a binary int op. Both slots marshal as string
+            // handles (str_ok seeder default) and the result is a plain i64.
+            || segment_is_string_unary_binop_eligible(seg, seg_start));
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
     let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
@@ -3493,6 +3522,53 @@ mod tests {
             let out = run_linear_segment(&seg_ord, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("ord>=N must run on fusevm");
             assert_eq!(out.as_integer(), Some(0), "ord(\"A\") >= 128");
+        }
+    }
+
+    // `length($a) > length($b)` / `length($a) - length($b)` / `ord($a) == ord($b)`:
+    // two unary string→int builtins on two slots combined via an int binop.
+    // Symmetric to the single-slot + int-literal variant: both slots marshal
+    // as string handles (each consumed by its own unary str builtin), result
+    // is a plain i64.
+    #[test]
+    fn fusevm_runs_string_unary_binop() {
+        use crate::bytecode::BuiltinId;
+        // length($a) > length($b)
+        let seg_cmp = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::GetScalarSlot(1),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::NumGt,
+        ];
+        assert!(segment_is_string_unary_binop_eligible(&seg_cmp, 0));
+
+        // length($a) - length($b)
+        let seg_sub = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::GetScalarSlot(1),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::Sub,
+        ];
+        assert!(segment_is_string_unary_binop_eligible(&seg_sub, 0));
+
+        let foo = StrykeValue::string("foo".to_string());
+        let hello = StrykeValue::string("hello".to_string());
+        let hi = StrykeValue::string("hi".to_string());
+
+        for _ in 0..8 {
+            // length("foo") > length("hello") = 3 > 5 = 0
+            let mut slots = [foo.raw_bits() as i64, hello.raw_bits() as i64];
+            let out = run_linear_segment(&seg_cmp, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length-cmp-length must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0), "length(foo) > length(hello)");
+
+            // length("hello") - length("hi") = 5 - 2 = 3
+            let mut slots = [hello.raw_bits() as i64, hi.raw_bits() as i64];
+            let out = run_linear_segment(&seg_sub, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length-sub-length must run on fusevm");
+            assert_eq!(out.as_integer(), Some(3), "length(hello) - length(hi)");
         }
     }
 
