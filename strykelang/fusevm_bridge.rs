@@ -1964,10 +1964,9 @@ pub(crate) fn segment_is_string_unary_eligible(seg: &[Op], _seg_start: usize) ->
 }
 
 /// True for an integer arithmetic / compare op that takes two integer operands
-/// (e.g. the int produced by a `unary_str_int` builtin and a `LoadInt` literal)
 /// and produces an integer result. Used by
-/// [`segment_is_string_unary_int_combined_eligible`] to allow patterns like
-/// `length($s) > 5`, `length($s) == 0`, `length($s) - 1` to lower.
+/// [`segment_is_string_bearing_int_result_eligible`] for length+intliteral,
+/// length+length, index+intliteral, and similar string-bearing → int chains.
 #[inline]
 fn is_int_binary_op(op: &Op) -> bool {
     matches!(
@@ -1992,49 +1991,138 @@ fn is_int_binary_op(op: &Op) -> bool {
     )
 }
 
-/// True when `seg` is `[GetScalarSlot, CallBuiltin(length|ord|hex|oct, 1),
-/// LoadInt(_), int_binop]` — a unary string→int builtin's result combined with
-/// an integer literal via a binary integer op. Covers the universal
-/// `length($s) > N` / `length($s) == 0` / `length($s) - 1` patterns and
-/// `ord($c) >= 0x80` Unicode-range checks.
-///
-/// Slot marshals as a NaN-boxed string handle (the only operand is the
-/// `GetScalarSlot` consumed immediately by the unary str builtin); the
-/// `LoadInt` and result are plain `i64`s. Goes through the same str-family
-/// dispatch as [`segment_is_string_unary_eligible`] in [`run_linear_segment`].
-pub(crate) fn segment_is_string_unary_int_combined_eligible(
-    seg: &[Op],
-    _seg_start: usize,
-) -> bool {
-    matches!(
-        seg,
-        [Op::GetScalarSlot(_), u, Op::LoadInt(_), b]
-            if is_unary_str_int_builtin(u) && is_int_binary_op(b)
-    )
+/// Stack-value kind for [`segment_is_string_bearing_int_result_eligible`]'s
+/// abstract interpretation. `StrHandle` = a NaN-boxed `StrykeValue` (slot
+/// handle bits or LoadConst-resolved constant); `Int` = a plain unboxed `i64`.
+/// Owned-string-result ops (Concat, Uc, etc.) are intentionally NOT modeled
+/// here — those need different result reconstitution and live in their own
+/// detector families.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StackKind {
+    StrHandle,
+    Int,
 }
 
-/// True when `seg` is `[GetScalarSlot, unary_str_int, GetScalarSlot, unary_str_int,
-/// int_binop]` — two unary string→int builtins on two (possibly identical)
-/// slots combined via a binary integer op. Covers the universal
-/// `length($a) > length($b)` / `length($a) - length($b)` /
-/// `ord($a) == ord($b)` patterns.
+/// True when `seg` is composed of ops that take string-handle and/or integer
+/// operands, produce an integer (or boolean) result, and never need
+/// owned-string-handle ownership tracking. Subsumes (and generalizes) the
+/// hand-written narrow detectors:
 ///
-/// Both slots marshal as NaN-boxed string handles (each consumed immediately
-/// by its own unary str builtin); the result is a plain `i64`. Same str-family
-/// `unary_ok` dispatch as the single-slot + int-literal variant — the seeder
-/// treats every slot in a str_ok segment as a string handle, which is what
-/// both `GetScalarSlot`s need here.
-pub(crate) fn segment_is_string_unary_binop_eligible(
+///   - [`segment_is_string_compare_eligible`] (StrEq / StrNe / StrLt / …)
+///   - [`segment_is_string_unary_eligible`] (length / ord / hex / oct)
+///   - [`segment_is_string_binary_int_eligible`] (index / rindex 2-arg)
+///   - `length($s) [op] N` (single-slot + int literal — was its own detector)
+///   - `length($a) [op] length($b)` (two slots — was its own detector)
+///
+/// AND opens up many new shapes for free:
+///
+///   - `index(\$s, "x") > 0` (5 ops: slot, LoadConst, index, LoadInt, NumGt)
+///   - `length(\$a) + length(\$b) > 10` (7 ops, chained arithmetic + compare)
+///   - `\$x eq "foo" && length(\$y) > 5` would only lower with `JumpIfTrueKeep`
+///     support (currently still rejected since fusevm's block JIT doesn't
+///     codegen the Keep variants), but the basic compose-without-short-circuit
+///     style works
+///
+/// Implementation: abstract-interprets the operand stack, tracking
+/// `StackKind` for every value. Returns false on any unmodelable op, type
+/// mismatch (e.g. an int op applied to a string handle), or final-stack shape
+/// other than exactly one `Int` at the implicit return point.
+///
+/// Slot marshaling for these segments is the str_ok default — every slot
+/// flows as a NaN-boxed string handle — so the detector only allows
+/// `GetScalarSlot` in positions where the following op consumes a string
+/// handle. This keeps the seeder's `is_string_like` gate the sole guard
+/// against non-string slot values reaching string-typed helpers.
+pub(crate) fn segment_is_string_bearing_int_result_eligible(
     seg: &[Op],
     _seg_start: usize,
 ) -> bool {
-    matches!(
-        seg,
-        [Op::GetScalarSlot(_), u1, Op::GetScalarSlot(_), u2, b]
-            if is_unary_str_int_builtin(u1)
-                && is_unary_str_int_builtin(u2)
-                && is_int_binary_op(b)
-    )
+    use crate::bytecode::BuiltinId;
+    // Must contain at least one string-typed op (otherwise it's a plain int
+    // segment, which the int detector already covers — and we don't want this
+    // detector to silently subsume those and force string-handle seeding on
+    // int-only segments).
+    let has_str_typed_op = seg.iter().any(|op| {
+        matches!(
+            op,
+            Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe | Op::StrCmp
+        ) || is_unary_str_int_builtin(op)
+            || matches!(op, Op::CallBuiltin(id, 2) if *id == BuiltinId::Index as u16 || *id == BuiltinId::Rindex as u16)
+    });
+    if !has_str_typed_op {
+        return false;
+    }
+
+    let mut stk: Vec<StackKind> = Vec::with_capacity(8);
+    for op in seg {
+        match op {
+            // Slot reads / LoadConst push a string handle. (Slot seeding is
+            // str_ok = handle bits; LoadConst always resolves to a string
+            // payload in compiled code — numeric literals use LoadInt /
+            // LoadFloat.)
+            Op::GetScalarSlot(_) | Op::LoadConst(_) => stk.push(StackKind::StrHandle),
+            Op::LoadInt(_) => stk.push(StackKind::Int),
+            // Unary str→int: pop StrHandle, push Int.
+            _ if is_unary_str_int_builtin(op) => {
+                if stk.pop() != Some(StackKind::StrHandle) {
+                    return false;
+                }
+                stk.push(StackKind::Int);
+            }
+            // Binary str+str→int: index / rindex (2-arg) and the str compares.
+            // Pop StrHandle×2, push Int.
+            Op::CallBuiltin(id, 2)
+                if *id == BuiltinId::Index as u16 || *id == BuiltinId::Rindex as u16 =>
+            {
+                if stk.pop() != Some(StackKind::StrHandle)
+                    || stk.pop() != Some(StackKind::StrHandle)
+                {
+                    return false;
+                }
+                stk.push(StackKind::Int);
+            }
+            Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe | Op::StrCmp => {
+                if stk.pop() != Some(StackKind::StrHandle)
+                    || stk.pop() != Some(StackKind::StrHandle)
+                {
+                    return false;
+                }
+                stk.push(StackKind::Int);
+            }
+            // Int binops: pop Int×2, push Int.
+            _ if is_int_binary_op(op) => {
+                if stk.pop() != Some(StackKind::Int) || stk.pop() != Some(StackKind::Int) {
+                    return false;
+                }
+                stk.push(StackKind::Int);
+            }
+            // Unary int ops: pop Int, push Int.
+            Op::LogNot | Op::Negate | Op::BitNot => {
+                if stk.pop() != Some(StackKind::Int) {
+                    return false;
+                }
+                stk.push(StackKind::Int);
+            }
+            // Stack shuffles that only make sense on uniform-kind regions.
+            // `Dup` duplicates the top kind; `Pop` discards regardless.
+            Op::Dup => {
+                let top = stk.last().copied();
+                let Some(k) = top else { return false };
+                stk.push(k);
+            }
+            Op::Pop => {
+                if stk.pop().is_none() {
+                    return false;
+                }
+            }
+            // Jumps don't (yet) participate in this abstract model — without
+            // tracking per-block stack state we can't safely accept them.
+            // Future: integrate with [`segment_block_stack_is_consistent`].
+            _ => return false,
+        }
+    }
+    // Exactly one Int on the stack at the implicit return point.
+    stk.len() == 1 && stk[0] == StackKind::Int
 }
 
 /// True when `seg` is a unary string→**string** builtin segment
@@ -2663,16 +2751,11 @@ pub(crate) fn run_linear_segment(
         && !str_ok
         && !str_str_bin_ok
         && (segment_is_string_unary_eligible(seg, seg_start)
-            // `length($s) > N`, `length($s) - 1`, `ord($c) >= 0x80` etc. —
-            // unary-str-int builtin combined with an int literal via a binary
-            // int op. Same seeder (slot as string handle) and result (plain i64)
-            // as the bare unary case, so it joins the same dispatch branch.
-            || segment_is_string_unary_int_combined_eligible(seg, seg_start)
-            // `length($a) > length($b)`, `length($a) - length($b)`,
-            // `ord($a) == ord($b)` — two unary-str-int builtins on two slots
-            // combined via a binary int op. Both slots marshal as string
-            // handles (str_ok seeder default) and the result is a plain i64.
-            || segment_is_string_unary_binop_eligible(seg, seg_start));
+            // General string-bearing integer-result detector — covers length+intlit,
+            // length+length, index+intlit, length+length+intlit chains, etc.
+            // via abstract-interpretation over the operand stack. See
+            // [`segment_is_string_bearing_int_result_eligible`].
+            || segment_is_string_bearing_int_result_eligible(seg, seg_start));
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
     let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
@@ -3478,7 +3561,7 @@ mod tests {
             Op::LoadInt(5),
             Op::NumGt,
         ];
-        assert!(segment_is_string_unary_int_combined_eligible(&seg_gt, 0));
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_gt, 0));
 
         // length($s) - 1
         let seg_sub = vec![
@@ -3487,7 +3570,7 @@ mod tests {
             Op::LoadInt(1),
             Op::Sub,
         ];
-        assert!(segment_is_string_unary_int_combined_eligible(&seg_sub, 0));
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_sub, 0));
 
         // ord($c) >= 128
         let seg_ord = vec![
@@ -3496,7 +3579,7 @@ mod tests {
             Op::LoadInt(128),
             Op::NumGe,
         ];
-        assert!(segment_is_string_unary_int_combined_eligible(&seg_ord, 0));
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_ord, 0));
 
         let hello_world = StrykeValue::string("hello world".to_string());
         let empty = StrykeValue::string("".to_string());
@@ -3525,6 +3608,65 @@ mod tests {
         }
     }
 
+    // Shapes the general string-bearing-int-result detector unlocks beyond
+    // the original narrow detectors: `index($s, "needle") > 0` (slot + literal
+    // + builtin + intlit + cmp) and `length($a) + length($b) > N` (two slots,
+    // two unary str→int, arithmetic + compare). Each is rejected by the
+    // old narrow detectors but passes the abstract-stack analysis.
+    #[test]
+    fn fusevm_runs_general_string_int_chains() {
+        use crate::bytecode::BuiltinId;
+        // index($s, "needle") > 0 — 5 ops: GetScalarSlot, LoadConst, Index, LoadInt, NumGt.
+        let seg_idx = vec![
+            Op::GetScalarSlot(0),
+            Op::LoadConst(0),
+            Op::CallBuiltin(BuiltinId::Index as u16, 2),
+            Op::LoadInt(0),
+            Op::NumGt,
+        ];
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_idx, 0));
+
+        // length($a) + length($b) > 10 — 7 ops.
+        let seg_sum = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::GetScalarSlot(1),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::Add,
+            Op::LoadInt(10),
+            Op::NumGt,
+        ];
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_sum, 0));
+
+        // Sanity: a non-string segment is NOT eligible (no str-typed op).
+        let seg_pure_int = vec![Op::GetScalarSlot(0), Op::LoadInt(5), Op::NumGt];
+        assert!(!segment_is_string_bearing_int_result_eligible(&seg_pure_int, 0));
+
+        let haystack = StrykeValue::string("haystack with needle".to_string());
+        let needle = StrykeValue::string("needle".to_string());
+        let abc = StrykeValue::string("abc".to_string());
+        let de = StrykeValue::string("de".to_string());
+
+        for _ in 0..8 {
+            let mut slots = [haystack.raw_bits() as i64];
+            let out = run_linear_segment(
+                &seg_idx,
+                0,
+                &mut slots,
+                SubTerminator::Value,
+                &[needle.clone()],
+            )
+            .expect("index(\"hay\", \"needle\") > 0 must run on fusevm");
+            assert_eq!(out.as_integer(), Some(1), "needle found at offset > 0");
+
+            let mut slots = [abc.raw_bits() as i64, de.raw_bits() as i64];
+            let out =
+                run_linear_segment(&seg_sum, 0, &mut slots, SubTerminator::Value, &[])
+                    .expect("length+length>N must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0), "3 + 2 not > 10");
+        }
+    }
+
     // `length($a) > length($b)` / `length($a) - length($b)` / `ord($a) == ord($b)`:
     // two unary string→int builtins on two slots combined via an int binop.
     // Symmetric to the single-slot + int-literal variant: both slots marshal
@@ -3541,7 +3683,7 @@ mod tests {
             Op::CallBuiltin(BuiltinId::Length as u16, 1),
             Op::NumGt,
         ];
-        assert!(segment_is_string_unary_binop_eligible(&seg_cmp, 0));
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_cmp, 0));
 
         // length($a) - length($b)
         let seg_sub = vec![
@@ -3551,7 +3693,7 @@ mod tests {
             Op::CallBuiltin(BuiltinId::Length as u16, 1),
             Op::Sub,
         ];
-        assert!(segment_is_string_unary_binop_eligible(&seg_sub, 0));
+        assert!(segment_is_string_bearing_int_result_eligible(&seg_sub, 0));
 
         let foo = StrykeValue::string("foo".to_string());
         let hello = StrykeValue::string("hello".to_string());
