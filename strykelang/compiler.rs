@@ -6129,6 +6129,13 @@ impl Compiler {
                         self.compile_expr(&args[0])?;
                         self.emit_op(Op::CallBuiltin(BuiltinId::Floor as u16, 1), line, Some(root));
                     }
+                    // round($x) (1-arg, no precision) — lowers to STK_VAL_ROUND
+                    // via BuiltinId::Round. round($x, $n) (2-arg) keeps the
+                    // generic name-dispatch path (returns float, different shape).
+                    "round" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Round as u16, 1), line, Some(root));
+                    }
                     _ => {
                         // Generic sub call: args are in list context so `f(1..10)`, `f(@a)`,
                         // `f(reverse LIST)` etc. flatten into `@_`. [`Self::pop_call_operands_flattened`]
