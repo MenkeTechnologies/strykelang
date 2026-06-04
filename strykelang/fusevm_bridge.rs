@@ -1886,11 +1886,24 @@ fn translate_op_into(
     seg_start: usize,
     body: &mut Vec<fusevm::Op>,
     fixups: &mut Vec<(usize, usize)>,
+    constants: &[StrykeValue],
 ) -> bool {
     use fusevm::Op as F;
     match op {
         Op::LoadInt(n) => body.push(F::LoadInt(*n)),
         Op::LoadFloat(f) => body.push(F::LoadFloat(*f)),
+        // Strykelang LoadConst is handled via synthetic-slot allocation at the
+        // segment-eligibility layer (see `sprintf_2arg_int_ok` and friends in
+        // run_linear_segment): the caller pre-fills an extra slot with the
+        // constant's raw_bits, and the segment is rewritten so LoadConst →
+        // GetSlot(synthetic). This is disk-cache safe because the chunk's
+        // op_hash hashes the slot index (stable across runs) instead of the
+        // run-specific heap-pointer bits. Bare LoadConst in a segment without
+        // that rewrite reaches here and bails out so we don't emit broken code.
+        Op::LoadConst(_) => {
+            let _ = constants;
+            return false;
+        }
         Op::Pop => body.push(F::Pop),
         Op::Dup => body.push(F::Dup),
         Op::Dup2 => body.push(F::Dup2),
@@ -2074,6 +2087,7 @@ fn build_chunk(
     seg_start: usize,
     slot_buf: &[i64],
     seed_slots: bool,
+    constants: &[StrykeValue],
 ) -> Option<fusevm::Chunk> {
     let preamble = preamble_len(slot_buf.len(), seed_slots);
 
@@ -2084,7 +2098,7 @@ fn build_chunk(
     let mut fixups: Vec<(usize, usize)> = Vec::new();
     for op in seg {
         src_off.push(body.len());
-        if !translate_op_into(op, seg_start, &mut body, &mut fixups) {
+        if !translate_op_into(op, seg_start, &mut body, &mut fixups, constants) {
             return None;
         }
     }
@@ -2300,6 +2314,7 @@ pub(crate) fn run_linear_segment(
     seg_start: usize,
     slot_buf: &mut [i64],
     term: SubTerminator,
+    constants: &[StrykeValue],
 ) -> Option<StrykeValue> {
     if !matches!(term, SubTerminator::Value) {
         return None;
@@ -2419,7 +2434,7 @@ pub(crate) fn run_linear_segment(
         || val_unary_int_ok || val_unary_str_ok
     {
         configure_block_jit_eager();
-        let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
+        let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
         let jit = fusevm::JitCompiler::new();
         return jit.try_run_block(&chunk, slot_buf).map(|ret| {
             // val_unary_int_ok returns a plain integer (defined: 0 or 1).
@@ -2448,7 +2463,7 @@ pub(crate) fn run_linear_segment(
     // combination.
     if float_ok || (int_ok && segment_result_is_integer(seg)) {
         configure_block_jit_eager();
-        let chunk = build_chunk(seg, seg_start, slot_buf, false)?;
+        let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
         let jit = fusevm::JitCompiler::new();
         // A segment containing strykelang `/` lowers to fusevm `Op::AwkDivJit`,
         // which traps (via a thread-local flag) on a zero divisor and returns a
@@ -2496,7 +2511,7 @@ pub(crate) fn run_linear_segment(
     // (not disk-cached as native code, so the per-value `op_hash` churn is moot).
     // The strykelang Extended handler makes `%` (STK_MOD_FLOOR) correct on this
     // cold path too; without it fusevm would treat the unknown op as a no-op.
-    let chunk = build_chunk(seg, seg_start, slot_buf, true)?;
+    let chunk = build_chunk(seg, seg_start, slot_buf, true, constants)?;
     let mut vm = fusevm::VM::new(chunk);
     vm.set_extension_handler(Box::new(stryke_ext_handler));
     let result = vm.run();
@@ -2551,7 +2566,7 @@ mod tests {
             let seg = vec![Op::LoadInt(a), Op::LoadInt(b), Op::Mod];
             assert!(segment_is_fusevm_eligible(&seg, 0));
             let mut slots: [i64; 0] = [];
-            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("modulo segment must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "{a} % {b}");
         }
@@ -2623,7 +2638,7 @@ mod tests {
 
         for (x, want) in [(1_i64, 1_i64), (2, 0), (-3, 1)] {
             let mut slots = [x];
-            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-compare segment must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "{x} < 1.5");
         }
@@ -2642,7 +2657,7 @@ mod tests {
         assert!(segment_is_fusevm_float_eligible(&ternary, 0));
         for (x, want) in [(1_i64, 10_i64), (2, 20)] {
             let mut slots = [x];
-            let out = run_linear_segment(&ternary, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&ternary, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-ternary segment must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "$x={x} ? 10 : 20");
         }
@@ -2658,7 +2673,7 @@ mod tests {
         );
         for x in [2_i64, 4, -3] {
             let mut slots = [x];
-            let out = run_linear_segment(&float_result, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&float_result, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-result segment must run on fusevm");
             assert_eq!(out.as_float(), Some(x as f64 * 1.5), "$x={x} * 1.5");
         }
@@ -2677,7 +2692,7 @@ mod tests {
         assert!(segment_is_fusevm_float_eligible(&float_ternary, 0));
         for (x, want) in [(1_i64, 1.0_f64), (2, 2.0)] {
             let mut slots = [x];
-            let out = run_linear_segment(&float_ternary, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&float_ternary, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-ternary segment must run on fusevm");
             assert_eq!(out.as_float(), Some(want), "$x={x} ? 1.0 : 2.0");
         }
@@ -2696,7 +2711,7 @@ mod tests {
         assert!(segment_is_fusevm_float_eligible(&float_div_cmp, 0));
         for (x, want) in [(1_i64, 1_i64), (3, 0)] {
             let mut slots = [x];
-            let out = run_linear_segment(&float_div_cmp, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&float_div_cmp, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-division compare must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "($x={x} / 2.0) < 1.0");
         }
@@ -2706,7 +2721,7 @@ mod tests {
         let float_div = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::Div];
         assert!(segment_is_fusevm_float_eligible(&float_div, 0));
         let mut slots = [7_i64, 2_i64];
-        let out = run_linear_segment(&float_div, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&float_div, 0, &mut slots, SubTerminator::Value, &[])
             .expect("bare float division must run on fusevm");
         assert_eq!(out.as_float(), Some(3.5), "7 / 2 == 3.5");
 
@@ -2714,7 +2729,7 @@ mod tests {
         // the caller's interpreter can raise strykelang's own "Illegal division by
         // zero", rather than silently returning the AwkDivJit sentinel.
         let mut zslots = [7_i64, 0_i64];
-        let zout = run_linear_segment(&float_div, 0, &mut zslots, SubTerminator::Value);
+        let zout = run_linear_segment(&float_div, 0, &mut zslots, SubTerminator::Value, &[]);
         assert!(zout.is_none(), "division by zero must decline to the interpreter");
 
         // Always-float exponentiation: strykelang `**` lowers to fusevm
@@ -2730,7 +2745,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut pslots = [2_i64, 10_i64];
-        let out = run_linear_segment(&float_pow, 0, &mut pslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_pow, 0, &mut pslots, SubTerminator::Value, &[])
             .expect("bare float exponentiation must run on fusevm");
         assert_eq!(out.as_float(), Some(1024.0), "2 ** 10 == 1024.0");
 
@@ -2746,7 +2761,7 @@ mod tests {
         assert!(segment_is_fusevm_float_eligible(&float_pow_cmp, 0));
         for (x, want) in [(2_i64, 1_i64), (3, 0)] {
             let mut slots = [x];
-            let out = run_linear_segment(&float_pow_cmp, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&float_pow_cmp, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-exponentiation compare must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "($x={x} ** 2.0) < 5.0");
         }
@@ -2765,7 +2780,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut sslots = [9_i64];
-        let out = run_linear_segment(&float_sqrt, 0, &mut sslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_sqrt, 0, &mut sslots, SubTerminator::Value, &[])
             .expect("bare float sqrt must run on fusevm");
         assert_eq!(out.as_float(), Some(3.0), "sqrt(9) == 3.0");
 
@@ -2780,7 +2795,7 @@ mod tests {
         assert!(segment_is_fusevm_float_eligible(&float_sqrt_cmp, 0));
         for (x, want) in [(2_i64, 1_i64), (9, 0)] {
             let mut slots = [x];
-            let out = run_linear_segment(&float_sqrt_cmp, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&float_sqrt_cmp, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("float-sqrt compare must run on fusevm");
             assert_eq!(out.as_integer(), Some(want), "sqrt($x={x}) < 2.0");
         }
@@ -2799,7 +2814,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut eslots = [0_i64];
-        let out = run_linear_segment(&float_exp, 0, &mut eslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_exp, 0, &mut eslots, SubTerminator::Value, &[])
             .expect("bare float exp must run on fusevm");
         assert_eq!(out.as_float(), Some(1.0), "exp(0) == 1.0");
 
@@ -2808,7 +2823,7 @@ mod tests {
             Op::CallBuiltin(BuiltinId::Cos as u16, 1),
         ];
         let mut cslots = [0_i64];
-        let out = run_linear_segment(&float_cos, 0, &mut cslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_cos, 0, &mut cslots, SubTerminator::Value, &[])
             .expect("bare float cos must run on fusevm");
         assert_eq!(out.as_float(), Some(1.0), "cos(0) == 1.0");
 
@@ -2817,7 +2832,7 @@ mod tests {
             Op::CallBuiltin(BuiltinId::Sin as u16, 1),
         ];
         let mut snslots = [0_i64];
-        let out = run_linear_segment(&float_sin, 0, &mut snslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_sin, 0, &mut snslots, SubTerminator::Value, &[])
             .expect("bare float sin must run on fusevm");
         assert_eq!(out.as_float(), Some(0.0), "sin(0) == 0.0");
 
@@ -2832,7 +2847,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut lgslots = [1_i64];
-        let out = run_linear_segment(&float_log, 0, &mut lgslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_log, 0, &mut lgslots, SubTerminator::Value, &[])
             .expect("bare float log must run on fusevm");
         assert_eq!(out.as_float(), Some(0.0), "log(1) == 0.0");
 
@@ -2847,7 +2862,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut absslots = [-5_i64];
-        let out = run_linear_segment(&float_abs, 0, &mut absslots, SubTerminator::Value)
+        let out = run_linear_segment(&float_abs, 0, &mut absslots, SubTerminator::Value, &[])
             .expect("bare float abs must run on fusevm");
         assert_eq!(out.as_float(), Some(5.0), "abs(-5) == 5.0");
 
@@ -2863,7 +2878,7 @@ mod tests {
             Some(NumTy::Float)
         );
         let mut a2slots = [0_i64, 1_i64];
-        let out = run_linear_segment(&float_atan2, 0, &mut a2slots, SubTerminator::Value)
+        let out = run_linear_segment(&float_atan2, 0, &mut a2slots, SubTerminator::Value, &[])
             .expect("bare float atan2 must run on fusevm");
         assert_eq!(out.as_float(), Some(0.0), "atan2(0, 1) == 0.0");
 
@@ -2883,7 +2898,7 @@ mod tests {
             "int(div) yields an integer result"
         );
         let mut idslots = [7_i64];
-        let out = run_linear_segment(&int_div, 0, &mut idslots, SubTerminator::Value)
+        let out = run_linear_segment(&int_div, 0, &mut idslots, SubTerminator::Value, &[])
             .expect("int($x / 2) must run on fusevm");
         assert_eq!(out.as_integer(), Some(3), "int(7 / 2) == 3");
 
@@ -2894,7 +2909,7 @@ mod tests {
         ];
         assert!(segment_is_fusevm_eligible(&int_pure, 0));
         let mut ipslots = [-9_i64];
-        let out = run_linear_segment(&int_pure, 0, &mut ipslots, SubTerminator::Value)
+        let out = run_linear_segment(&int_pure, 0, &mut ipslots, SubTerminator::Value, &[])
             .expect("int($x) must run on fusevm");
         assert_eq!(out.as_integer(), Some(-9), "int(-9) == -9");
 
@@ -2966,7 +2981,7 @@ mod tests {
                 "segment must be string-compare eligible for {op:?}"
             );
             let mut slots = [a.raw_bits() as i64, b.raw_bits() as i64];
-            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+            let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("string-compare segment must run on fusevm");
             assert_eq!(out.as_integer(), Some(*want), "op {op:?}");
         }
@@ -3000,7 +3015,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [a.raw_bits() as i64, b.raw_bits() as i64];
-                let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("string-concat segment must run on fusevm");
                 last = out.as_str();
             }
@@ -3033,7 +3048,7 @@ mod tests {
                 let mut last = None;
                 for _ in 0..256 {
                     let mut slots = [v.raw_bits() as i64];
-                    last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                    last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                         .expect("string-length segment must run on fusevm")
                         .as_integer();
                 }
@@ -3078,7 +3093,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [v.raw_bits() as i64];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("unary-string segment must run on fusevm")
                     .as_integer();
             }
@@ -3130,7 +3145,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [v.raw_bits() as i64];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("unary-string→string segment must run on fusevm")
                     .as_str();
             }
@@ -3158,7 +3173,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [*n];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("chr segment must run on fusevm")
                     .as_str();
             }
@@ -3203,7 +3218,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [a.raw_bits() as i64, b.raw_bits() as i64];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("binary-string→int segment must run on fusevm")
                     .as_integer();
             }
@@ -3254,7 +3269,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [a.raw_bits() as i64, *n];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("binary-string+int→string segment must run on fusevm")
                     .as_str();
             }
@@ -3298,7 +3313,7 @@ mod tests {
             let mut last = None;
             for _ in 0..256 {
                 let mut slots = [a.raw_bits() as i64, *off, *len];
-                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+                last = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                     .expect("ternary-string+int+int→string segment must run on fusevm")
                     .as_str();
             }
@@ -3333,7 +3348,7 @@ mod tests {
             let p1 = StrykeValue::string("p1".to_string());
             let p2 = StrykeValue::string("p2".to_string());
             let slots = [p1.raw_bits() as i64, p2.raw_bits() as i64];
-            let chunk = build_chunk(&seg, 0, &slots, false).expect("probe chunk");
+            let chunk = build_chunk(&seg, 0, &slots, false, &[]).expect("probe chunk");
             format!("{:016x}.", chunk.op_hash)
         };
         let count_blobs = || -> usize {
@@ -3351,14 +3366,14 @@ mod tests {
         let a1 = StrykeValue::string("alpha".to_string());
         let b1 = StrykeValue::string("-one".to_string());
         let mut slots1 = [a1.raw_bits() as i64, b1.raw_bits() as i64];
-        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value);
+        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value, &[]);
         assert_eq!(out1.and_then(|v| v.as_str()).as_deref(), Some("alpha-one"));
         let after_first = count_blobs();
 
         let a2 = StrykeValue::string("gamma-distinct".to_string());
         let b2 = StrykeValue::string("-two-distinct".to_string());
         let mut slots2 = [a2.raw_bits() as i64, b2.raw_bits() as i64];
-        let out2 = run_linear_segment(&seg, 0, &mut slots2, SubTerminator::Value);
+        let out2 = run_linear_segment(&seg, 0, &mut slots2, SubTerminator::Value, &[]);
         assert_eq!(
             out2.and_then(|v| v.as_str()).as_deref(),
             Some("gamma-distinct-two-distinct")
@@ -3403,7 +3418,7 @@ mod tests {
 
         let prefix = {
             let slots = [3_i64, 4_i64];
-            let chunk = build_chunk(&seg, 0, &slots, false).expect("probe chunk");
+            let chunk = build_chunk(&seg, 0, &slots, false, &[]).expect("probe chunk");
             format!("{:016x}.", chunk.op_hash)
         };
         let count_blobs = || -> usize {
@@ -3419,14 +3434,14 @@ mod tests {
         };
 
         let mut slots1 = [100_i64, 23_i64];
-        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value);
+        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value, &[]);
         assert_eq!(out1.and_then(|v| v.as_integer()), Some(123));
         let after_first = count_blobs();
 
         // Thousands of distinct argument pairs must all reuse the same blob.
         for i in 0..2000_i64 {
             let mut slots = [i * 7 + 1, i * 13 + 2];
-            let got = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+            let got = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
                 .and_then(|v| v.as_integer());
             assert_eq!(got, Some((i * 7 + 1) + (i * 13 + 2)));
         }
@@ -3472,7 +3487,7 @@ mod tests {
             let probe = StrykeValue::string("probe-a".to_string());
             let probe2 = StrykeValue::string("probe-b".to_string());
             let slots = [probe.raw_bits() as i64, probe2.raw_bits() as i64];
-            let chunk = build_chunk(&seg, 0, &slots, false).expect("probe chunk");
+            let chunk = build_chunk(&seg, 0, &slots, false, &[]).expect("probe chunk");
             format!("{:016x}.", chunk.op_hash)
         };
         let count_blobs = || -> usize {
@@ -3491,7 +3506,7 @@ mod tests {
         let a1 = StrykeValue::string("apple".to_string());
         let b1 = StrykeValue::string("banana".to_string());
         let mut slots1 = [a1.raw_bits() as i64, b1.raw_bits() as i64];
-        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value);
+        let out1 = run_linear_segment(&seg, 0, &mut slots1, SubTerminator::Value, &[]);
         assert_eq!(out1.and_then(|v| v.as_integer()), Some(1), "apple < banana");
         let after_first = count_blobs();
 
@@ -3499,7 +3514,7 @@ mod tests {
         let a2 = StrykeValue::string("cherry-distinct".to_string());
         let b2 = StrykeValue::string("date-distinct".to_string());
         let mut slots2 = [a2.raw_bits() as i64, b2.raw_bits() as i64];
-        let out2 = run_linear_segment(&seg, 0, &mut slots2, SubTerminator::Value);
+        let out2 = run_linear_segment(&seg, 0, &mut slots2, SubTerminator::Value, &[]);
         assert_eq!(out2.and_then(|v| v.as_integer()), Some(1), "cherry < date");
         let after_second = count_blobs();
 
@@ -3537,8 +3552,8 @@ mod tests {
         let slots2 = [a2.raw_bits() as i64, b2.raw_bits() as i64];
         assert_ne!(slots1, slots2, "operand handles must actually differ");
 
-        let chunk1 = build_chunk(&seg, 0, &slots1, false).expect("chunk 1");
-        let chunk2 = build_chunk(&seg, 0, &slots2, false).expect("chunk 2");
+        let chunk1 = build_chunk(&seg, 0, &slots1, false, &[]).expect("chunk 1");
+        let chunk2 = build_chunk(&seg, 0, &slots2, false, &[]).expect("chunk 2");
         assert_eq!(
             chunk1.op_hash, chunk2.op_hash,
             "unseeded string-compare chunks must hash identically regardless of operand pointers"
@@ -3546,8 +3561,8 @@ mod tests {
 
         // Sanity: the SEEDED build (numeric path) WOULD bake the values and thus
         // differ — this is exactly why string segments must use the unseeded form.
-        let seeded1 = build_chunk(&seg, 0, &slots1, true).expect("seeded 1");
-        let seeded2 = build_chunk(&seg, 0, &slots2, true).expect("seeded 2");
+        let seeded1 = build_chunk(&seg, 0, &slots1, true, &[]).expect("seeded 1");
+        let seeded2 = build_chunk(&seg, 0, &slots2, true, &[]).expect("seeded 2");
         assert_ne!(
             seeded1.op_hash, seeded2.op_hash,
             "seeded chunks bake operand values, so their hashes diverge"
@@ -3594,7 +3609,7 @@ mod tests {
             Op::Sub,
         ];
         let mut slots: [i64; 0] = [];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("segment must be fusevm-eligible and run");
         assert_eq!(out.as_integer(), Some(120));
     }
@@ -3610,7 +3625,7 @@ mod tests {
             Op::GetScalarSlot(0),
         ];
         let mut slots = [7_i64];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("slot segment must run on fusevm");
         assert_eq!(slots[0], 14);
         assert_eq!(out.as_integer(), Some(14));
@@ -3627,7 +3642,7 @@ mod tests {
             Op::LoadInt(5), // abs 103: landing pad
         ];
         let mut slots: [i64; 0] = [];
-        let out = run_linear_segment(&seg, 100, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 100, &mut slots, SubTerminator::Value, &[])
             .expect("jump segment must run on fusevm");
         assert_eq!(out.as_integer(), Some(5));
     }
@@ -3642,7 +3657,7 @@ mod tests {
             Op::Dec,           // 12 -> 11
         ];
         let mut slots = [10_i64];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("preinc/inc/dec segment must run on fusevm");
         assert_eq!(slots[0], 11);
         assert_eq!(out.as_integer(), Some(11));
@@ -3654,7 +3669,7 @@ mod tests {
     fn ineligible_segment_returns_none() {
         let seg = vec![Op::LoadInt(1), Op::Concat];
         let mut slots: [i64; 0] = [];
-        assert!(run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value).is_none());
+        assert!(run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[]).is_none());
     }
 
     // Void terminator is not handled by the universal tier.
@@ -3662,7 +3677,7 @@ mod tests {
     fn void_terminator_returns_none() {
         let seg = vec![Op::LoadInt(1)];
         let mut slots: [i64; 0] = [];
-        assert!(run_linear_segment(&seg, 0, &mut slots, SubTerminator::Void).is_none());
+        assert!(run_linear_segment(&seg, 0, &mut slots, SubTerminator::Void, &[]).is_none());
     }
 
     // strykelang's fused slot-arith-assign ops decompose onto fusevm primitives.
@@ -3684,7 +3699,7 @@ mod tests {
             Op::GetScalarSlot(2), // push $c = 14
         ];
         let mut slots = [0_i64; 3];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("fused slot-assign segment must run on fusevm");
         assert_eq!(slots[2], 14);
         assert_eq!(out.as_integer(), Some(14));
@@ -3701,7 +3716,7 @@ mod tests {
             Op::MulAssignSlotSlot(0, 1),  // $x *= $y -> 42 (pushes 42)
         ];
         let mut slots = [0_i64; 2];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("mul-assign-slot segment must run on fusevm");
         assert_eq!(slots[0], 42);
         assert_eq!(out.as_integer(), Some(42));
@@ -3723,7 +3738,7 @@ mod tests {
             Op::GetScalarSlot(0),               // 7: exit: push $sum
         ];
         let mut slots = [0_i64; 2];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("counted-loop segment must run on fusevm");
         assert_eq!(out.as_integer(), Some(10));
     }
@@ -3740,7 +3755,7 @@ mod tests {
             Op::GetScalarSlot(0),        // push $sum
         ];
         let mut slots = [0_i64; 2];
-        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value)
+        let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
             .expect("accum-sum-loop segment must run on fusevm");
         assert_eq!(out.as_integer(), Some(10));
     }
