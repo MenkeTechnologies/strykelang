@@ -987,8 +987,10 @@ pub(crate) fn segment_is_fusevm_eligible(seg: &[Op], seg_start: usize) -> bool {
             // Always-float math built-ins (e.g. `sqrt`/`sin`/`cos`/`exp`/`atan2`)
             // lowered to native fusevm float ops; eligible like any other op.
             _ if is_float_builtin(op) => continue,
-            // strykelang `int(x)` -> integer-producing `Op::TruncInt`.
-            _ if is_trunc_int_builtin(op) => continue,
+            // strykelang `int(x)`/`ceil(x)`/`floor(x)` -> integer-producing fusevm
+            // ops (Op::TruncInt alone for int; [Op::CeilFloat, Op::TruncInt] for
+            // ceil; [Op::FloorFloat, Op::TruncInt] for floor).
+            _ if is_int_returning_float_builtin(op) => continue,
             _ => return false,
         }
     }
@@ -1131,11 +1133,11 @@ fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
             }
             stack.push(NumTy::Float);
         }
-        // `int(x)`: consume one operand of either kind and produce an integer
-        // (fusevm `Op::TruncInt` truncates a float toward zero to an i64). This
-        // is what lets a float-bearing segment (e.g. `int($x / 2)`) yield a
-        // block-JIT-returnable integer.
-        _ if is_trunc_int_builtin(op) => {
+        // `int(x)`/`ceil(x)`/`floor(x)`: consume one operand of either kind and
+        // produce an integer (fusevm sequence ends in `Op::TruncInt`). This is
+        // what lets a float-bearing segment (e.g. `int($x / 2)`, `ceil($x - 0.5)`)
+        // yield a block-JIT-returnable integer.
+        _ if is_int_returning_float_builtin(op) => {
             if stack.pop().is_none() {
                 return false;
             }
@@ -1293,8 +1295,9 @@ fn op_stack_delta(op: &Op) -> Option<i32> {
         | JumpIfTrue(_) | JumpIfFalse(_) => -1,
         AddAssignSlotSlot(_, _) | SubAssignSlotSlot(_, _) | MulAssignSlotSlot(_, _)
         | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => 1,
-        // `int(x)` pops one and pushes one (net 0); see `is_trunc_int_builtin`.
-        _ if is_trunc_int_builtin(op) => 0,
+        // `int(x)`/`ceil(x)`/`floor(x)` pop one and push one (net 0); see
+        // `is_int_returning_float_builtin`.
+        _ if is_int_returning_float_builtin(op) => 0,
         _ => return None,
     })
 }
@@ -1776,6 +1779,19 @@ fn translate_op_into(
         }
         // strykelang `int(x)` -> fusevm's integer-producing `Op::TruncInt`.
         _ if is_trunc_int_builtin(op) => body.push(F::TruncInt),
+        // strykelang `ceil(x)`/`ceiling(x)` -> [CeilFloat, TruncInt] (float ceil,
+        // then truncate-to-int; ceil of a float lands on an integer value so the
+        // truncation is exact). Returns Int.
+        _ if is_ceil_int_builtin(op) => {
+            body.push(F::CeilFloat);
+            body.push(F::TruncInt);
+        }
+        // strykelang `floor(x)` -> [FloorFloat, TruncInt] (float floor, then
+        // truncate-to-int; same exactness reasoning as ceil). Returns Int.
+        _ if is_floor_int_builtin(op) => {
+            body.push(F::FloorFloat);
+            body.push(F::TruncInt);
+        }
         // `length`/`ord`/`hex`/`oct` (→int) and `uc`/`lc`/`ucfirst`/`lcfirst`
         // (→owned string handle) ($s) -> unary host-helper-backed Extended op; the
         // operand is a raw StrykeValue bit-handle (see
@@ -1967,6 +1983,29 @@ fn is_float_builtin(op: &Op) -> bool {
 #[inline]
 fn is_trunc_int_builtin(op: &Op) -> bool {
     matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Int as u16)
+}
+
+/// Whether `op` is `ceil(x)`/`ceiling(x)` — float operand, INTEGER result. Lowered
+/// to the 2-op fusevm sequence `[CeilFloat, TruncInt]`. Stack effect: pop 1 push 1
+/// (net 0, like `int()`). Lets a float-bearing segment (e.g. `ceil($x / 2)`) yield
+/// a block-JIT-returnable integer.
+#[inline]
+fn is_ceil_int_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Ceil as u16)
+}
+
+/// Whether `op` is `floor(x)` — float operand, INTEGER result. Lowered to
+/// `[FloorFloat, TruncInt]`. See [`is_ceil_int_builtin`].
+#[inline]
+fn is_floor_int_builtin(op: &Op) -> bool {
+    matches!(op, Op::CallBuiltin(id, 1) if *id == crate::bytecode::BuiltinId::Floor as u16)
+}
+
+/// Whether `op` is any int-returning float-operand builtin lowered to fusevm:
+/// `int(x)`, `ceil(x)`, `floor(x)`. Same eligibility/stack/emit story.
+#[inline]
+fn is_int_returning_float_builtin(op: &Op) -> bool {
+    is_trunc_int_builtin(op) || is_ceil_int_builtin(op) || is_floor_int_builtin(op)
 }
 
 /// The fusevm always-float op a lowerable math built-in maps to, or `None` if

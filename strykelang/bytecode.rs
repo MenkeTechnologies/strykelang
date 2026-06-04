@@ -1270,12 +1270,19 @@ pub enum BuiltinId {
     Log2,
     /// `log10($x)` — base-10 logarithm. Lowers to fusevm Op::Log10Float.
     Log10,
+    /// `ceil($x)` / `ceiling($x)` — smallest integer ≥ x. Returns Int (matches
+    /// stryke's `f64::ceil() as i64` semantics). Lowers to the 2-op fusevm
+    /// sequence `[CeilFloat, TruncInt]`, both committed in fusevm 0.14.0.
+    Ceil,
+    /// `floor($x)` — largest integer ≤ x. Returns Int (matches stryke's
+    /// `f64::floor() as i64`). Lowers to `[FloorFloat, TruncInt]`.
+    Floor,
 }
 
 impl BuiltinId {
     /// `from_u16` — see implementation.
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Log10 as u16 {
+        if v <= Self::Floor as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
