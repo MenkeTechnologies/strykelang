@@ -6121,6 +6121,14 @@ impl Compiler {
                         self.compile_expr(&args[0])?;
                         self.emit_op(Op::CallBuiltin(BuiltinId::Log10 as u16, 1), line, Some(root));
                     }
+                    "ceil" | "ceiling" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Ceil as u16, 1), line, Some(root));
+                    }
+                    "floor" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Floor as u16, 1), line, Some(root));
+                    }
                     _ => {
                         // Generic sub call: args are in list context so `f(1..10)`, `f(@a)`,
                         // `f(reverse LIST)` etc. flatten into `@_`. [`Self::pop_call_operands_flattened`]
