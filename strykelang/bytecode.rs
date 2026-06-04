@@ -1252,12 +1252,30 @@ pub enum BuiltinId {
     /// Appended at the end of the enum so the discriminants of all earlier
     /// variants stay stable across rebuilds (script-cache compatibility).
     Quotemeta,
+    /// `tan($x)` — tangent. Pure float-in/float-out; lowers to fusevm Op::TanFloat.
+    Tan,
+    /// `asin($x)` — arcsine. Lowers to fusevm Op::AsinFloat (NaN outside [-1, 1]).
+    Asin,
+    /// `acos($x)` — arccosine. Lowers to fusevm Op::AcosFloat (NaN outside [-1, 1]).
+    Acos,
+    /// `atan($x)` — one-arg arctangent. Lowers to fusevm Op::AtanFloat.
+    Atan,
+    /// `sinh($x)` — hyperbolic sine. Lowers to fusevm Op::SinhFloat.
+    Sinh,
+    /// `cosh($x)` — hyperbolic cosine. Lowers to fusevm Op::CoshFloat.
+    Cosh,
+    /// `tanh($x)` — hyperbolic tangent. Lowers to fusevm Op::TanhFloat.
+    Tanh,
+    /// `log2($x)` — base-2 logarithm. Lowers to fusevm Op::Log2Float.
+    Log2,
+    /// `log10($x)` — base-10 logarithm. Lowers to fusevm Op::Log10Float.
+    Log10,
 }
 
 impl BuiltinId {
     /// `from_u16` — see implementation.
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Quotemeta as u16 {
+        if v <= Self::Log10 as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None

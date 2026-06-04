@@ -6081,6 +6081,46 @@ impl Compiler {
                         };
                         self.emit_op(op, line, Some(root));
                     }
+                    // Math builtins lowered to fusevm Op::*Float for JIT disk-cache
+                    // coverage. Each is a unary float→float fn; the bytecode shape
+                    // (CallBuiltin(N, 1)) is recognized by `is_float_unary_builtin`
+                    // and translated by `float_builtin_fusevm_op` in fusevm_bridge.
+                    "tan" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Tan as u16, 1), line, Some(root));
+                    }
+                    "asin" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Asin as u16, 1), line, Some(root));
+                    }
+                    "acos" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Acos as u16, 1), line, Some(root));
+                    }
+                    "atan" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Atan as u16, 1), line, Some(root));
+                    }
+                    "sinh" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Sinh as u16, 1), line, Some(root));
+                    }
+                    "cosh" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Cosh as u16, 1), line, Some(root));
+                    }
+                    "tanh" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Tanh as u16, 1), line, Some(root));
+                    }
+                    "log2" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Log2 as u16, 1), line, Some(root));
+                    }
+                    "log10" if args.len() == 1 => {
+                        self.compile_expr(&args[0])?;
+                        self.emit_op(Op::CallBuiltin(BuiltinId::Log10 as u16, 1), line, Some(root));
+                    }
                     _ => {
                         // Generic sub call: args are in list context so `f(1..10)`, `f(@a)`,
                         // `f(reverse LIST)` etc. flatten into `@_`. [`Self::pop_call_operands_flattened`]
