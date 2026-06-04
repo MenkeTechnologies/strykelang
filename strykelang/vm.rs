@@ -1269,6 +1269,7 @@ impl<'a> VM<'a> {
             seg_ip,
             &mut self.jit_buf_slot[..slot_n],
             term,
+            &self.constants,
         ) else {
             return Ok(false);
         };
