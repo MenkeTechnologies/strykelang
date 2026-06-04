@@ -1129,13 +1129,15 @@ impl<'a> VM<'a> {
             && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_unary_int_combined_eligible(
+                || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip)
+                // General string-bearing → int detector — covers length+intlit,
+                // length+length, index+intlit, multi-op chains, etc. via
+                // abstract-interpretation. Subsumes the narrower hand-written
+                // patterns; kept alongside them so a regression in one path
+                // doesn't silently lose the wins of others.
+                || crate::fusevm_bridge::segment_is_string_bearing_int_result_eligible(
                     seg, seg_ip,
-                )
-                || crate::fusevm_bridge::segment_is_string_unary_binop_eligible(
-                    seg, seg_ip,
-                )
-                || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip));
+                ));
         // Any-value unary→int (`defined($x)`) OR any-value unary→string (`ref($x)`):
         // SAME shape as the unary string→int segments BUT the operand can be ANY
         // type including UNDEF (that's the whole point). Marshaled as raw bits,
