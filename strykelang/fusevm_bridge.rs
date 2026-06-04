@@ -481,21 +481,6 @@ fn stryke_str_unary_op(ext_id: u16, a_bits: i64) -> i64 {
     }
 }
 
-/// Take an arbitrary `StrykeValue` and return its raw NaN-boxed bits as an *owned*
-/// handle: `mem::forget`-s the local so the destructor doesn't run; the downstream
-/// consumer is responsible for reconstructing exactly one owning value via
-/// `StrykeValue::from_raw_bits` to balance the suppressed drop. For heap-backed
-/// payloads (string/array/hash) the caller should pass `v.shallow_clone()` so the
-/// `Arc` refcount is bumped before ownership is transferred — otherwise the
-/// original handle's drop would over-release. Mirrors [`forget_string_bits`] but
-/// works for any [`StrykeValue`] kind, not just freshly-built `String`s.
-#[inline]
-fn forget_value_bits(v: StrykeValue) -> i64 {
-    let bits = v.raw_bits() as i64;
-    std::mem::forget(v);
-    bits
-}
-
 thread_local! {
     /// Pointer + length of the strykelang chunk-constants slice the
     /// currently-executing `run_linear_segment` call is running against.
@@ -535,28 +520,37 @@ impl Drop for LoadConstCtxGuard {
 
 /// `STK_VAL_LOAD_CONST` interpreter/host-helper body. Resolves a `LoadConst(idx)`
 /// operand by looking the constant up in the thread-local pool published by the
-/// current [`LoadConstCtxGuard`]. Returns the raw bits of a freshly-cloned
-/// *owning* handle (shallow-clone bumps the heap `Arc` refcount; `mem::forget`
-/// transfers ownership to the JIT'd block, which passes it on to a downstream
-/// ext op that consumes it via `from_raw_bits`). Out-of-range indices and an
-/// unset context both yield `UNDEF` rather than panicking — the segment
-/// eligibility detectors only emit `LoadConst` for in-range indices, so either
-/// case indicates a bridge bug that the interpreter fallback can still observe
-/// without crashing the process.
+/// current [`LoadConstCtxGuard`] and returning its raw bits *as a borrowed view*
+/// — no `shallow_clone`, no `mem::forget`. The downstream ext op (concat /
+/// compare / etc.) reads the bits via [`sv_borrow`] (`ManuallyDrop`), which
+/// never decrements the `Arc`; ownership stays with the chunk-constants pool
+/// the [`LoadConstCtxGuard`] is currently publishing.
+///
+/// This matches the seeded-slot operand contract exactly — both kinds of input
+/// to a chunk are *borrowed* views into something the caller owns and keeps
+/// alive across the JIT call. Any future consumer that *does* drain its
+/// operand (e.g. a hypothetical sprintf helper using `from_raw_bits`) must
+/// either go through a different ext op or `shallow_clone` the borrowed bits
+/// before consuming, otherwise it would over-release the constants pool entry.
+///
+/// Out-of-range indices and an unset context both yield bare `UNDEF` bits
+/// (still borrow-only — `UNDEF` is a tagged NaN, not heap-backed) rather than
+/// panicking; either case indicates a bridge bug that the interpreter fallback
+/// can still observe without crashing the process.
 #[inline]
 fn stryke_val_load_const_op(idx_bits: i64) -> i64 {
     LOAD_CONST_CTX.with(|c| {
         let (ptr, len) = c.get();
         let idx = idx_bits as usize;
         if ptr.is_null() || idx >= len {
-            return forget_value_bits(StrykeValue::UNDEF);
+            return StrykeValue::UNDEF.raw_bits() as i64;
         }
         // SAFETY: `LoadConstCtxGuard::new` set `ptr`/`len` from a `&[StrykeValue]`
         // borrow that outlives every helper call dispatched from inside the same
         // `try_run_block`; the guard restores the prior pointer on drop so any
         // nested segment correctly sees its own pool.
         let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
-        forget_value_bits(slice[idx].shallow_clone())
+        slice[idx].raw_bits() as i64
     })
 }
 extern "C" fn stryke_h_val_load_const(idx: i64) -> i64 {
