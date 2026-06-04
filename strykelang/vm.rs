@@ -1129,6 +1129,9 @@ impl<'a> VM<'a> {
             && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
+                || crate::fusevm_bridge::segment_is_string_unary_int_combined_eligible(
+                    seg, seg_ip,
+                )
                 || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip));
         // Any-value unary→int (`defined($x)`) OR any-value unary→string (`ref($x)`):
         // SAME shape as the unary string→int segments BUT the operand can be ANY
