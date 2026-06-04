@@ -2038,21 +2038,31 @@ pub(crate) fn segment_is_string_int_mixed_eligible(seg: &[Op], seg_start: usize)
         || segment_is_string_int2_to_string_eligible(seg, seg_start)
 }
 
-/// True for a literal-string + slot-int → string segment: the universal
-/// `"prefix" x $n` / `substr("abc", $n)` shape. The string operand comes from
-/// [`Op::LoadConst`] (resolved at runtime via [`ext_ops::STK_VAL_LOAD_CONST`]
-/// — disk-cache safe by construction), the integer operand from a slot
-/// (marshaled unboxed). The result is an owned string handle, reconstructed
-/// via `from_raw_bits` by the caller. Distinct from
-/// [`segment_is_string_int_to_string_eligible`] because no slot holds a string
-/// handle here — `vm.rs` seeds the single slot purely as an integer.
+/// True for a literal-string + slot-int(s) → string segment: the universal
+/// `"prefix" x $n` / `substr("abc", $n)` (binary) and `substr("abc", $o, $l)`
+/// (ternary) shapes. The string operand comes from [`Op::LoadConst`]
+/// (resolved at runtime via [`ext_ops::STK_VAL_LOAD_CONST`] — disk-cache safe
+/// by construction), the integer operands from slots (marshaled unboxed).
+/// The result is an owned string handle, reconstructed via `from_raw_bits` by
+/// the caller. Distinct from [`segment_is_string_int_to_string_eligible`] /
+/// [`segment_is_string_int2_to_string_eligible`] because no slot holds a
+/// string handle here — `vm.rs` seeds every slot in the segment purely as an
+/// integer.
 pub(crate) fn segment_is_literal_string_int_to_string_eligible(
     seg: &[Op],
     _seg_start: usize,
 ) -> bool {
     matches!(
         seg,
-        [Op::LoadConst(_), Op::GetScalarSlot(_), u] if str_int_str_ext_op(u).is_some()
+        // 2-arg: substr("abc", $n) / "abc" x $n
+        [Op::LoadConst(_), Op::GetScalarSlot(_), u]
+            if str_int_str_ext_op(u).is_some()
+    ) || matches!(
+        seg,
+        // 3-arg: substr("abc", $off, $len). Slots must be distinct so neither
+        // is reinterpreted as the other's value.
+        [Op::LoadConst(_), Op::GetScalarSlot(o), Op::GetScalarSlot(l), u]
+            if o != l && str_int2_str_ext_op(u).is_some()
     )
 }
 
@@ -3417,6 +3427,46 @@ mod tests {
             )
             .expect("literal-substr-slot must run on fusevm");
             assert_eq!(out.as_str().as_deref(), Some("World"));
+        }
+    }
+
+    // `substr("Hello, World!", $off, $len)` — 3-arg substr with literal
+    // string + two slot ints. Same dispatch family as the 2-arg case (`lit_str_int_ok`),
+    // distinguished only by the additional GetScalarSlot for the length operand.
+    #[test]
+    fn fusevm_runs_literal_string_substr3() {
+        use crate::bytecode::BuiltinId;
+        let seg = vec![
+            Op::LoadConst(0),
+            Op::GetScalarSlot(0),
+            Op::GetScalarSlot(1),
+            Op::CallBuiltin(BuiltinId::Substr as u16, 3),
+        ];
+        assert!(segment_is_literal_string_int_to_string_eligible(&seg, 0));
+
+        let hello = StrykeValue::string("Hello, World!".to_string());
+        let constants = vec![hello];
+
+        // (off, len, expected)
+        let cases: &[(i64, i64, &str)] = &[
+            (0, 5, "Hello"),
+            (7, 5, "World"),
+            (7, 6, "World!"),
+            (0, 13, "Hello, World!"),
+        ];
+        for &(off, len, want) in cases {
+            for _ in 0..8 {
+                let mut slots = [off, len];
+                let out = run_linear_segment(
+                    &seg,
+                    0,
+                    &mut slots,
+                    SubTerminator::Value,
+                    &constants,
+                )
+                .expect("literal-substr-3 must run on fusevm");
+                assert_eq!(out.as_str().as_deref(), Some(want), "substr(\"...\", {off}, {len})");
+            }
         }
     }
 
