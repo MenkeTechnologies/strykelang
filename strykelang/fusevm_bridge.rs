@@ -154,6 +154,17 @@ pub mod ext_ops {
     /// string handle — its own int→string eligibility class.
     pub const STK_STR_CHR: u16 = 0x0017;
 
+    /// `LoadConst(idx)` runtime resolution — read strykelang chunk constant `idx`
+    /// from the thread-local pool set by [`super::run_linear_segment`] (via
+    /// [`super::with_load_const_ctx`]) and return its raw bits as an *owned*
+    /// handle (shallow-cloned, then `mem::forget`-ed). Disk-cache safe: the chunk
+    /// hashes the constant *index* and the helper id (both stable across
+    /// processes), never the per-process heap-pointer bits of the constant
+    /// itself. Operand is the constant index, passed as a plain `i64` via
+    /// [`LoadInt`](fusevm::Op::LoadInt); result is a NaN-boxed [`StrykeValue`]
+    /// handle the downstream ext op consumes via `from_raw_bits`.
+    pub const STK_VAL_LOAD_CONST: u16 = 0x0024;
+
     /// `index($s, $sub)` (2-arg) — byte offset of first occurrence, or -1. Binary
     /// string→int (two NaN-boxed string handle operands, `i64` result), like the
     /// comparison ops, so it stays on the integer block JIT + on-disk cache.
@@ -470,6 +481,88 @@ fn stryke_str_unary_op(ext_id: u16, a_bits: i64) -> i64 {
     }
 }
 
+/// Take an arbitrary `StrykeValue` and return its raw NaN-boxed bits as an *owned*
+/// handle: `mem::forget`-s the local so the destructor doesn't run; the downstream
+/// consumer is responsible for reconstructing exactly one owning value via
+/// `StrykeValue::from_raw_bits` to balance the suppressed drop. For heap-backed
+/// payloads (string/array/hash) the caller should pass `v.shallow_clone()` so the
+/// `Arc` refcount is bumped before ownership is transferred — otherwise the
+/// original handle's drop would over-release. Mirrors [`forget_string_bits`] but
+/// works for any [`StrykeValue`] kind, not just freshly-built `String`s.
+#[inline]
+fn forget_value_bits(v: StrykeValue) -> i64 {
+    let bits = v.raw_bits() as i64;
+    std::mem::forget(v);
+    bits
+}
+
+thread_local! {
+    /// Pointer + length of the strykelang chunk-constants slice the
+    /// currently-executing `run_linear_segment` call is running against.
+    /// `with_load_const_ctx` sets this before invoking `try_run_block` and
+    /// clears it on drop, so [`stryke_h_val_load_const`] can resolve a
+    /// `LoadConst(idx)` operand to the right `StrykeValue` at runtime — without
+    /// baking the per-process heap-pointer bits into the chunk (which would
+    /// break the on-disk cache key by making `op_hash` process-specific).
+    ///
+    /// Null when no segment is executing; a non-null pointer is valid only for
+    /// the duration of the `with_load_const_ctx` scope that set it (the chunk
+    /// runs inside that scope, so the slice borrow outlives every call to the
+    /// helper).
+    static LOAD_CONST_CTX: std::cell::Cell<(*const StrykeValue, usize)> =
+        const { std::cell::Cell::new((std::ptr::null(), 0)) };
+}
+
+/// RAII guard that publishes a `&[StrykeValue]` constants slice to
+/// [`LOAD_CONST_CTX`] for the duration of the guard's lifetime, restoring the
+/// prior value on drop (so nested `run_linear_segment` calls correctly stack).
+struct LoadConstCtxGuard {
+    prev: (*const StrykeValue, usize),
+}
+
+impl LoadConstCtxGuard {
+    fn new(constants: &[StrykeValue]) -> Self {
+        let prev = LOAD_CONST_CTX.with(|c| c.replace((constants.as_ptr(), constants.len())));
+        LoadConstCtxGuard { prev }
+    }
+}
+
+impl Drop for LoadConstCtxGuard {
+    fn drop(&mut self) {
+        LOAD_CONST_CTX.with(|c| c.set(self.prev));
+    }
+}
+
+/// `STK_VAL_LOAD_CONST` interpreter/host-helper body. Resolves a `LoadConst(idx)`
+/// operand by looking the constant up in the thread-local pool published by the
+/// current [`LoadConstCtxGuard`]. Returns the raw bits of a freshly-cloned
+/// *owning* handle (shallow-clone bumps the heap `Arc` refcount; `mem::forget`
+/// transfers ownership to the JIT'd block, which passes it on to a downstream
+/// ext op that consumes it via `from_raw_bits`). Out-of-range indices and an
+/// unset context both yield `UNDEF` rather than panicking — the segment
+/// eligibility detectors only emit `LoadConst` for in-range indices, so either
+/// case indicates a bridge bug that the interpreter fallback can still observe
+/// without crashing the process.
+#[inline]
+fn stryke_val_load_const_op(idx_bits: i64) -> i64 {
+    LOAD_CONST_CTX.with(|c| {
+        let (ptr, len) = c.get();
+        let idx = idx_bits as usize;
+        if ptr.is_null() || idx >= len {
+            return forget_value_bits(StrykeValue::UNDEF);
+        }
+        // SAFETY: `LoadConstCtxGuard::new` set `ptr`/`len` from a `&[StrykeValue]`
+        // borrow that outlives every helper call dispatched from inside the same
+        // `try_run_block`; the guard restores the prior pointer on drop so any
+        // nested segment correctly sees its own pool.
+        let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
+        forget_value_bits(slice[idx].shallow_clone())
+    })
+}
+extern "C" fn stryke_h_val_load_const(idx: i64) -> i64 {
+    stryke_val_load_const_op(idx)
+}
+
 /// Build a freshly-allocated, *owned* `StrykeValue::string` from `s` and return its
 /// raw NaN-boxed bits, transferring `Arc` ownership into the handle via `mem::forget`
 /// (identical contract to [`stryke_str_concat_op`]): the caller reconstitutes exactly
@@ -647,6 +740,26 @@ fn unary_any_str_ext_op(op: &Op) -> Option<u16> {
 /// the result type differs (handle vs. integer).
 pub(crate) fn segment_is_any_value_unary_str_eligible(seg: &[Op], _seg_start: usize) -> bool {
     matches!(seg, [Op::GetScalarSlot(_), u] if unary_any_str_ext_op(u).is_some())
+}
+
+/// Registered helper name + JIT helper id for `STK_VAL_LOAD_CONST`. Kept as a
+/// pair of free functions (rather than slotted into one of the unary tables)
+/// because the operand semantics are different: the input `i64` is a *constant
+/// index* (not a NaN-boxed handle, not an integer-context value), and the
+/// helper resolves it against a thread-local context rather than computing
+/// purely from the operand. The result is an owned `StrykeValue` handle
+/// (any kind: int, float, string, …) that the downstream ext op consumes via
+/// `from_raw_bits`.
+const STRYKE_VAL_LOAD_CONST_NAME: &str = "stryke_val_load_const";
+
+#[inline]
+fn is_stryke_val_load_const_ext(ext_id: u16) -> bool {
+    ext_id == ext_ops::STK_VAL_LOAD_CONST
+}
+
+#[inline]
+fn stryke_val_load_const_helper_id() -> u32 {
+    fusevm::jit::jit_helper_id(STRYKE_VAL_LOAD_CONST_NAME)
 }
 
 /// True for an any-value unary→int ext id (currently just `defined`).
@@ -884,9 +997,11 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             || is_stryke_str_int2_str_ext(ext_id)
             || is_stryke_val_unary_int_ext(ext_id)
             || is_stryke_val_unary_str_ext(ext_id)
+            || is_stryke_val_load_const_ext(ext_id)
     }
     fn op_count(&self) -> usize {
-        1 + STRYKE_STR_HELPERS.len()
+        // +1 for STK_MOD_FLOOR; +1 for STK_VAL_LOAD_CONST.
+        2 + STRYKE_STR_HELPERS.len()
             + STRYKE_STR_UNARY_HELPERS.len()
             + STRYKE_STR_UNARY_STR_HELPERS.len()
             + STRYKE_INT_STR_HELPERS.len()
@@ -906,6 +1021,23 @@ impl fusevm::jit::JitExtension for StrykeJitExt {
             let Some(helper_id) = stryke_str_unary_helper_id(ext_id) else {
                 return false;
             };
+            let Some(a) = cx.pop_i64() else {
+                return false;
+            };
+            let Some(result) = cx.call_host(helper_id, &[a]) else {
+                return false;
+            };
+            cx.push_i64(result);
+            return true;
+        }
+        if is_stryke_val_load_const_ext(ext_id) {
+            // `LoadConst(idx)` runtime resolution: pop the constant index
+            // (previously emitted by [`translate_op_into`] via `LoadInt(idx)`)
+            // and call the registered host helper, which reads the constant
+            // from the thread-local pool set by [`LoadConstCtxGuard`] and
+            // returns the raw bits of an owned handle. Same single-`(i64) -> i64`
+            // shape as the unary string helpers, so the codegen is identical.
+            let helper_id = stryke_val_load_const_helper_id();
             let Some(a) = cx.pop_i64() else {
                 return false;
             };
@@ -1064,6 +1196,16 @@ pub(crate) fn register_stryke_jit_ext() {
             fusevm::jit::register_jit_helper(name, *ptr as *const u8, 1, false);
         }
     }
+    // SAFETY: `stryke_h_val_load_const` is `extern "C" fn(i64) -> i64` (constant
+    // index → owned handle bits), same 1-arg integer-return signature.
+    unsafe {
+        fusevm::jit::register_jit_helper(
+            STRYKE_VAL_LOAD_CONST_NAME,
+            stryke_h_val_load_const as *const u8,
+            1,
+            false,
+        );
+    }
 }
 
 /// fusevm interpreter handler for strykelang Extended ops, registered on the
@@ -1077,6 +1219,9 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
     } else if is_stryke_str_unary_ext(id) {
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(stryke_str_unary_op(id, a)));
+    } else if is_stryke_val_load_const_ext(id) {
+        let a = vm.pop().to_int();
+        vm.push(fusevm::Value::Int(stryke_val_load_const_op(a)));
     } else if is_stryke_val_unary_int_ext(id) {
         let a = vm.pop().to_int();
         vm.push(fusevm::Value::Int(stryke_val_unary_int_op(id, a)));
@@ -1892,17 +2037,22 @@ fn translate_op_into(
     match op {
         Op::LoadInt(n) => body.push(F::LoadInt(*n)),
         Op::LoadFloat(f) => body.push(F::LoadFloat(*f)),
-        // Strykelang LoadConst is handled via synthetic-slot allocation at the
-        // segment-eligibility layer (see `sprintf_2arg_int_ok` and friends in
-        // run_linear_segment): the caller pre-fills an extra slot with the
-        // constant's raw_bits, and the segment is rewritten so LoadConst →
-        // GetSlot(synthetic). This is disk-cache safe because the chunk's
-        // op_hash hashes the slot index (stable across runs) instead of the
-        // run-specific heap-pointer bits. Bare LoadConst in a segment without
-        // that rewrite reaches here and bails out so we don't emit broken code.
-        Op::LoadConst(_) => {
+        // Strykelang LoadConst translates to a runtime constants lookup so the
+        // chunk stays disk-cache safe: we emit `LoadInt(idx)` followed by an
+        // Extended call to [`ext_ops::STK_VAL_LOAD_CONST`], whose helper reads
+        // the constant from the thread-local pool published by
+        // [`LoadConstCtxGuard`] in `run_linear_segment`. `op_hash` hashes the
+        // index (stable across runs) and the extension id (stable via FNV-1a
+        // over the helper name), never the per-process heap-pointer bits of the
+        // resolved constant — so the same cached native blob is reused across
+        // processes even for string constants whose `raw_bits` differ each run.
+        // Eligibility detectors that allow `LoadConst` operands MUST run inside
+        // a [`LoadConstCtxGuard`] scope before `try_run_block`, otherwise the
+        // helper returns `UNDEF` and the segment computes the wrong value.
+        Op::LoadConst(idx) => {
             let _ = constants;
-            return false;
+            body.push(F::LoadInt(*idx as i64));
+            body.push(F::Extended(ext_ops::STK_VAL_LOAD_CONST, 0));
         }
         Op::Pop => body.push(F::Pop),
         Op::Dup => body.push(F::Dup),
@@ -2319,6 +2469,14 @@ pub(crate) fn run_linear_segment(
     if !matches!(term, SubTerminator::Value) {
         return None;
     }
+    // Publish the chunk-constants slice to the thread-local context for the
+    // duration of any `try_run_block` invocation below, so a `LoadConst(idx)`
+    // operand translated to [`STK_VAL_LOAD_CONST`] can resolve to the right
+    // `StrykeValue` at runtime. The guard restores the prior context on drop
+    // (so nested calls correctly stack). Setting this *unconditionally* (vs
+    // per-branch) keeps the future addition of LoadConst-bearing eligibility
+    // families a one-line change.
+    let _load_const_ctx = LoadConstCtxGuard::new(constants);
     let int_ok = segment_is_fusevm_eligible(seg, seg_start);
     // The float-operand path also reports the segment's *static* result kind
     // (`Int` for a comparison/bool, `Float` for arithmetic involving a float). We
