@@ -9441,6 +9441,33 @@ impl<'a> VM<'a> {
                     .unwrap_or_default();
                 Ok(StrykeValue::string(crate::perl_regex::perl_quotemeta(&s)))
             }
+            Some(BuiltinId::Tan) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().tan(),
+            )),
+            Some(BuiltinId::Asin) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().asin(),
+            )),
+            Some(BuiltinId::Acos) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().acos(),
+            )),
+            Some(BuiltinId::Atan) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().atan(),
+            )),
+            Some(BuiltinId::Sinh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().sinh(),
+            )),
+            Some(BuiltinId::Cosh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().cosh(),
+            )),
+            Some(BuiltinId::Tanh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().tanh(),
+            )),
+            Some(BuiltinId::Log2) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().log2(),
+            )),
+            Some(BuiltinId::Log10) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().log10(),
+            )),
             Some(BuiltinId::Pos) => {
                 let key = if args.is_empty() {
                     "_".to_string()

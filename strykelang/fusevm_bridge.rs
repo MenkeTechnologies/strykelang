@@ -1933,7 +1933,16 @@ fn is_float_unary_builtin(op: &Op) -> bool {
             || *id == BuiltinId::Cos as u16
             || *id == BuiltinId::Exp as u16
             || *id == BuiltinId::Log as u16
-            || *id == BuiltinId::Abs as u16)
+            || *id == BuiltinId::Abs as u16
+            || *id == BuiltinId::Tan as u16
+            || *id == BuiltinId::Asin as u16
+            || *id == BuiltinId::Acos as u16
+            || *id == BuiltinId::Atan as u16
+            || *id == BuiltinId::Sinh as u16
+            || *id == BuiltinId::Cosh as u16
+            || *id == BuiltinId::Tanh as u16
+            || *id == BuiltinId::Log2 as u16
+            || *id == BuiltinId::Log10 as u16)
 }
 
 /// Whether `op` is a strykelang binary math built-in call (`atan2`) that the
@@ -1984,6 +1993,24 @@ fn float_builtin_fusevm_op(op: &Op) -> Option<fusevm::Op> {
         Some(F::AbsFloat)
     } else if id == BuiltinId::Atan2 as u16 {
         Some(F::Atan2Float)
+    } else if id == BuiltinId::Tan as u16 {
+        Some(F::TanFloat)
+    } else if id == BuiltinId::Asin as u16 {
+        Some(F::AsinFloat)
+    } else if id == BuiltinId::Acos as u16 {
+        Some(F::AcosFloat)
+    } else if id == BuiltinId::Atan as u16 {
+        Some(F::AtanFloat)
+    } else if id == BuiltinId::Sinh as u16 {
+        Some(F::SinhFloat)
+    } else if id == BuiltinId::Cosh as u16 {
+        Some(F::CoshFloat)
+    } else if id == BuiltinId::Tanh as u16 {
+        Some(F::TanhFloat)
+    } else if id == BuiltinId::Log2 as u16 {
+        Some(F::Log2Float)
+    } else if id == BuiltinId::Log10 as u16 {
+        Some(F::Log10Float)
     } else {
         None
     }
