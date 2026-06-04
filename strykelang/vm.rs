@@ -9468,6 +9468,12 @@ impl<'a> VM<'a> {
             Some(BuiltinId::Log10) => Ok(StrykeValue::float(
                 args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().log10(),
             )),
+            Some(BuiltinId::Ceil) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().ceil() as i64,
+            )),
+            Some(BuiltinId::Floor) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().floor() as i64,
+            )),
             Some(BuiltinId::Pos) => {
                 let key = if args.is_empty() {
                     "_".to_string()
