@@ -115,6 +115,11 @@ pub mod ext_ops {
     /// result is an owned string handle (see `STK_STR_CONCAT`). Routes through
     /// `crate::crypt_util::perl_crypt` (pure Rust, no FFI).
     pub const STK_STR_CRYPT: u16 = 0x001F;
+    /// `reverse($s)` — reverse a scalar string character-by-character. Unary
+    /// string→string handle (see `STK_STR_UC`). Only the scalar (string) form
+    /// is lowered here; the list/array form stays on the interpreter (different
+    /// result type, allocates a Vec).
+    pub const STK_STR_REVERSE: u16 = 0x0020;
     /// `substr($s, $off)` (2-arg) — byte-offset suffix. Binary string+INTEGER→string
     /// handle: operand `a` is a NaN-boxed string handle, operand `b` a plain `i64`.
     pub const STK_STR_SUBSTR2: u16 = 0x001B;
@@ -519,6 +524,18 @@ extern "C" fn stryke_h_str_quotemeta(a: i64) -> i64 {
     stryke_str_quotemeta_op(a)
 }
 
+/// `reverse($s)` (scalar form): owned handle of `$s`'s chars reversed. The
+/// list form (`reverse(@arr)`) returns an array and is NOT routed here — the
+/// detector only emits this op when the operand is a scalar string.
+#[inline]
+fn stryke_str_reverse_op(a_bits: i64) -> i64 {
+    let v = unsafe { sv_borrow(a_bits) };
+    forget_string_bits(v.to_string().chars().rev().collect::<String>())
+}
+extern "C" fn stryke_h_str_reverse(a: i64) -> i64 {
+    stryke_str_reverse_op(a)
+}
+
 /// Table of the unary string→**string** ops (`(i64 handle) -> i64 handle`):
 /// `uc`/`lc`/`ucfirst`/`lcfirst`. Same `(i64) -> i64` ABI as the unary string→int
 /// table, but the returned `i64` is the raw bits of a freshly allocated *owned*
@@ -532,6 +549,7 @@ const STRYKE_STR_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = 
     (ext_ops::STK_STR_LCFIRST, "stryke_str_lcfirst", stryke_h_str_lcfirst),
     (ext_ops::STK_STR_FC, "stryke_str_fc", stryke_h_str_fc),
     (ext_ops::STK_STR_QUOTEMETA, "stryke_str_quotemeta", stryke_h_str_quotemeta),
+    (ext_ops::STK_STR_REVERSE, "stryke_str_reverse", stryke_h_str_reverse),
 ];
 
 /// True for a unary string→string Extended id (`uc`/`lc`/`ucfirst`/`lcfirst`), whose
@@ -552,6 +570,7 @@ fn stryke_str_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
         ext_ops::STK_STR_LCFIRST => stryke_str_lcfirst_op(a_bits),
         ext_ops::STK_STR_FC => stryke_str_fc_op(a_bits),
         ext_ops::STK_STR_QUOTEMETA => stryke_str_quotemeta_op(a_bits),
+        ext_ops::STK_STR_REVERSE => stryke_str_reverse_op(a_bits),
         ext_ops::STK_STR_CHR => stryke_str_chr_op(a_bits),
         _ => 0,
     }
@@ -1512,6 +1531,8 @@ fn unary_str_str_ext_op(op: &Op) -> Option<u16> {
         Some(ext_ops::STK_STR_FC)
     } else if id == BuiltinId::Quotemeta as u16 {
         Some(ext_ops::STK_STR_QUOTEMETA)
+    } else if id == BuiltinId::Reverse as u16 {
+        Some(ext_ops::STK_STR_REVERSE)
     } else {
         None
     }
