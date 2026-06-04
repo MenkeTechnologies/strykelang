@@ -1130,13 +1130,14 @@ impl<'a> VM<'a> {
                 || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
                 || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip));
-        // Any-value unary→int (`defined($x)`): SAME shape as the unary string→int
-        // segments BUT the operand can be ANY type including UNDEF (that's the
-        // whole point). Marshaled as raw bits, with the `is_string_like` gate
-        // BYPASSED — the helper accepts every kind.
+        // Any-value unary→int (`defined($x)`) OR any-value unary→string (`ref($x)`):
+        // SAME shape as the unary string→int segments BUT the operand can be ANY
+        // type including UNDEF (that's the whole point). Marshaled as raw bits,
+        // with the `is_string_like` gate BYPASSED — the helper accepts every kind.
         let val_unary_ok = !int_ok
             && !str_ok
-            && crate::fusevm_bridge::segment_is_any_value_unary_int_eligible(seg, seg_ip);
+            && (crate::fusevm_bridge::segment_is_any_value_unary_int_eligible(seg, seg_ip)
+                || crate::fusevm_bridge::segment_is_any_value_unary_str_eligible(seg, seg_ip));
         // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
         // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
         let float_ok = !int_ok
