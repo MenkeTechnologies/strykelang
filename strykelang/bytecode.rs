@@ -1277,12 +1277,18 @@ pub enum BuiltinId {
     /// `floor($x)` — largest integer ≤ x. Returns Int (matches stryke's
     /// `f64::floor() as i64`). Lowers to `[FloorFloat, TruncInt]`.
     Floor,
+    /// `round($x)` (1-arg form) — round to nearest integer, ties AWAY from zero
+    /// (matches `f64::round() as i64`, e.g. 0.5→1, -0.5→-1). Lowers to the
+    /// any-value→int ext op `STK_VAL_ROUND` since the helper composes
+    /// `to_number().round() as i64` in one call without needing a fusevm op.
+    /// The 2-arg form `round($x, $places)` keeps the interpreter path.
+    Round,
 }
 
 impl BuiltinId {
     /// `from_u16` — see implementation.
     pub fn from_u16(v: u16) -> Option<Self> {
-        if v <= Self::Floor as u16 {
+        if v <= Self::Round as u16 {
             Some(unsafe { std::mem::transmute::<u16, BuiltinId>(v) })
         } else {
             None
