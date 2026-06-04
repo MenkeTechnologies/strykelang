@@ -1234,8 +1234,22 @@ impl<'a> VM<'a> {
                         }
                     }
                 } else if wants_string(i) {
+                    // SAFETY: must use `shallow_clone` (Arc::clone) rather than the
+                    // default `Clone` (which deep-clones the heap payload — new Arc,
+                    // new String). The seeded `i64` is a *handle* to the heap pointer;
+                    // when this local `v` drops at the end of the iteration its Arc
+                    // refcount must NOT take the heap with it, or the chunk's JIT
+                    // helper would dereference freed memory at execution time.
+                    // `shallow_clone` bumps the original Arc held by `argv[a]` (which
+                    // outlives this whole function), so the heap stays alive across
+                    // the JIT call. Same reasoning for `get_scalar_slot`'s return: it
+                    // already gives back a `StrykeValue` whose Arc is held by the
+                    // scope, so a normal value-move keeps the heap alive.
                     let v = match bound {
-                        Some(a) => argv.get(a).cloned().unwrap_or(StrykeValue::UNDEF),
+                        Some(a) => match argv.get(a) {
+                            Some(vr) => vr.shallow_clone(),
+                            None => StrykeValue::UNDEF,
+                        },
                         None => self.interp.scope.get_scalar_slot(i),
                     };
                     if !bypass_type_gate && !v.is_string_like() {
