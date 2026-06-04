@@ -43,6 +43,14 @@ pub fn desugar_rust_blocks(code: &str) -> String {
         // match `rust {` that is really inside `"...rust { ..."` or `# rust { ...`.
         // Note: newlines DO NOT imply a statement boundary in Perl — expressions routinely
         // span lines. Only `;`, `{`, `}` reset `can_start_stmt`.
+        //
+        // CRITICAL: this scanner copies the source byte-by-byte. Every emitted run MUST go
+        // through `out.push_str(&code[a..b])` (a slice of the original `&str`) so multi-byte
+        // UTF-8 sequences round-trip intact. Casting individual bytes via `bytes[i] as char`
+        // would treat each byte as a U+00XX codepoint and re-encode each high byte as a
+        // two-byte UTF-8 sequence (E2→C3 A2, 94→C2 94, 80→C2 80) — silently mangling every
+        // `─`, `→`, `§`, emoji, accented char etc. anywhere in the source as soon as any
+        // occurrence of `rust` (e.g. `# Let me trust ...`) makes the fast path miss.
         match c {
             b'\n' => {
                 out.push('\n');
@@ -56,30 +64,31 @@ pub fn desugar_rust_blocks(code: &str) -> String {
                 continue;
             }
             b'#' => {
-                // Perl line comment to end of line.
+                // Perl line comment to end of line. Copy as a UTF-8-preserving slice.
+                let start = i;
                 while i < bytes.len() && bytes[i] != b'\n' {
-                    out.push(bytes[i] as char);
                     i += 1;
                 }
+                out.push_str(&code[start..i]);
                 continue;
             }
             b'"' | b'\'' | b'`' => {
                 // Double- / single- / backtick-quoted string. Treat `\X` as an escape.
+                // Body bytes are copied as a single UTF-8-preserving slice; the scanner
+                // only inspects ASCII control bytes (the quote itself, `\`, `\n`), so it
+                // never lands inside a multi-byte sequence.
                 let quote = c;
-                out.push(c as char);
+                let start = i;
                 i += 1;
                 while i < bytes.len() {
                     let b = bytes[i];
                     if b == b'\\' && i + 1 < bytes.len() {
-                        out.push(b as char);
-                        out.push(bytes[i + 1] as char);
                         if bytes[i + 1] == b'\n' {
                             line += 1;
                         }
                         i += 2;
                         continue;
                     }
-                    out.push(b as char);
                     i += 1;
                     if b == b'\n' {
                         line += 1;
@@ -88,6 +97,7 @@ pub fn desugar_rust_blocks(code: &str) -> String {
                         break;
                     }
                 }
+                out.push_str(&code[start..i]);
                 can_start_stmt = false;
                 continue;
             }
@@ -100,11 +110,31 @@ pub fn desugar_rust_blocks(code: &str) -> String {
             _ => {}
         }
 
-        // Candidate: identifier start?
+        // Candidate: identifier start? Only single-byte ASCII letters / `_` start an
+        // identifier; any non-ASCII byte is the leading byte of a UTF-8 multi-byte
+        // sequence and must be copied via a slice (NOT cast to `char`) along with its
+        // continuation bytes, otherwise high-bit bytes get double-encoded (see CRITICAL
+        // comment above).
         let is_ident_start = c.is_ascii_alphabetic() || c == b'_';
         if !is_ident_start {
-            out.push(c as char);
-            i += 1;
+            let start = i;
+            // Advance past this whole UTF-8 codepoint: 1 byte for ASCII (c < 0x80),
+            // 2/3/4 bytes for a leading byte 0xC0..=0xF7.
+            let step = if c < 0x80 {
+                1
+            } else if c < 0xC0 {
+                // Stray continuation byte — shouldn't happen in well-formed UTF-8
+                // input. Skip it conservatively as 1 byte.
+                1
+            } else if c < 0xE0 {
+                2
+            } else if c < 0xF0 {
+                3
+            } else {
+                4
+            };
+            i = (i + step).min(bytes.len());
+            out.push_str(&code[start..i]);
             can_start_stmt = false;
             continue;
         }
@@ -318,6 +348,30 @@ mod tests {
     fn rust_keyword_in_comment_is_not_expanded() {
         let src = "# rust { not a block }\nprint 1;\n";
         assert_eq!(desugar_rust_blocks(src), src);
+    }
+
+    // Regression: byte-by-byte `out.push(b as char)` silently mangled every
+    // UTF-8 multi-byte sequence — `─` (E2 94 80) became `── ` (C3 A2 C2 94 C2 80
+    // …) and similar for `§`, `→`, emoji, etc. — as soon as any `rust`
+    // substring (including innocuous `# Let me trust ...` comments) made the
+    // `code.contains("rust")` fast path miss. The fix copies via `push_str`
+    // slices of the original `&str`. This test pins UTF-8 round-trip across
+    // every emit site: leading non-ident byte, comment body, string literal
+    // body, and post-fast-path passthrough.
+    #[test]
+    fn desugar_preserves_utf8_when_fast_path_misses() {
+        let src = "\
+# Section banner — must preserve em dash / arrow / § across the desugar
+my $banner = \"── §1 vectors ──────────\";
+p \"$banner — adjacent →\";
+# Force the desugar to actually scan (any `rust` substring triggers it).
+# trust me — this is what makes the fast path miss.
+";
+        assert_eq!(
+            desugar_rust_blocks(src),
+            src,
+            "non-rust source must round-trip byte-for-byte through the desugarer"
+        );
     }
 
     #[test]
