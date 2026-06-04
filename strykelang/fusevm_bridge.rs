@@ -1963,6 +1963,56 @@ pub(crate) fn segment_is_string_unary_eligible(seg: &[Op], _seg_start: usize) ->
     matches!(seg, [Op::GetScalarSlot(_), u] if is_unary_str_int_builtin(u))
 }
 
+/// True for an integer arithmetic / compare op that takes two integer operands
+/// (e.g. the int produced by a `unary_str_int` builtin and a `LoadInt` literal)
+/// and produces an integer result. Used by
+/// [`segment_is_string_unary_int_combined_eligible`] to allow patterns like
+/// `length($s) > 5`, `length($s) == 0`, `length($s) - 1` to lower.
+#[inline]
+fn is_int_binary_op(op: &Op) -> bool {
+    matches!(
+        op,
+        Op::Add
+            | Op::Sub
+            | Op::Mul
+            | Op::Div
+            | Op::Mod
+            | Op::BitAnd
+            | Op::BitOr
+            | Op::BitXor
+            | Op::Shl
+            | Op::Shr
+            | Op::NumEq
+            | Op::NumNe
+            | Op::NumLt
+            | Op::NumGt
+            | Op::NumLe
+            | Op::NumGe
+            | Op::Spaceship
+    )
+}
+
+/// True when `seg` is `[GetScalarSlot, CallBuiltin(length|ord|hex|oct, 1),
+/// LoadInt(_), int_binop]` — a unary string→int builtin's result combined with
+/// an integer literal via a binary integer op. Covers the universal
+/// `length($s) > N` / `length($s) == 0` / `length($s) - 1` patterns and
+/// `ord($c) >= 0x80` Unicode-range checks.
+///
+/// Slot marshals as a NaN-boxed string handle (the only operand is the
+/// `GetScalarSlot` consumed immediately by the unary str builtin); the
+/// `LoadInt` and result are plain `i64`s. Goes through the same str-family
+/// dispatch as [`segment_is_string_unary_eligible`] in [`run_linear_segment`].
+pub(crate) fn segment_is_string_unary_int_combined_eligible(
+    seg: &[Op],
+    _seg_start: usize,
+) -> bool {
+    matches!(
+        seg,
+        [Op::GetScalarSlot(_), u, Op::LoadInt(_), b]
+            if is_unary_str_int_builtin(u) && is_int_binary_op(b)
+    )
+}
+
 /// True when `seg` is a unary string→**string** builtin segment
 /// (`[GetScalarSlot, CallBuiltin(uc|lc|ucfirst|lcfirst, 1)]`), whose JIT result is
 /// the raw bits of an owned string handle (reconstructed via `from_raw_bits`) rather
@@ -2588,7 +2638,12 @@ pub(crate) fn run_linear_segment(
         && !concat_ok
         && !str_ok
         && !str_str_bin_ok
-        && segment_is_string_unary_eligible(seg, seg_start);
+        && (segment_is_string_unary_eligible(seg, seg_start)
+            // `length($s) > N`, `length($s) - 1`, `ord($c) >= 0x80` etc. —
+            // unary-str-int builtin combined with an int literal via a binary
+            // int op. Same seeder (slot as string handle) and result (plain i64)
+            // as the bare unary case, so it joins the same dispatch branch.
+            || segment_is_string_unary_int_combined_eligible(seg, seg_start));
     // Subset of `unary_ok` whose JIT result is an owned string handle (uc/lc/…),
     // reconstructed like concatenation rather than boxed as an integer.
     let unary_str_ok = unary_ok && segment_is_string_unary_str_eligible(seg, seg_start);
@@ -3376,6 +3431,69 @@ mod tests {
         let out = run_linear_segment(&seg_lt, 0, &mut slots, SubTerminator::Value, &constants_lit_left)
             .expect("literal-on-left compare must run on fusevm");
         assert_eq!(out.as_integer(), Some(1), "yes lt z");
+    }
+
+    // `length($s) > 5` / `length($s) - 1` / `ord($c) >= 128` etc.: a unary
+    // string→int builtin combined with an int literal via an integer binary op
+    // (arithmetic or compare). Slot marshals as a string handle (consumed
+    // immediately by the unary str builtin); the LoadInt + binop produce a
+    // plain i64 result. Goes through the same str-family eager-block-JIT path
+    // as bare `length($s)`.
+    #[test]
+    fn fusevm_runs_string_unary_int_combined() {
+        use crate::bytecode::BuiltinId;
+        // length($s) > 5
+        let seg_gt = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::LoadInt(5),
+            Op::NumGt,
+        ];
+        assert!(segment_is_string_unary_int_combined_eligible(&seg_gt, 0));
+
+        // length($s) - 1
+        let seg_sub = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Length as u16, 1),
+            Op::LoadInt(1),
+            Op::Sub,
+        ];
+        assert!(segment_is_string_unary_int_combined_eligible(&seg_sub, 0));
+
+        // ord($c) >= 128
+        let seg_ord = vec![
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Ord as u16, 1),
+            Op::LoadInt(128),
+            Op::NumGe,
+        ];
+        assert!(segment_is_string_unary_int_combined_eligible(&seg_ord, 0));
+
+        let hello_world = StrykeValue::string("hello world".to_string());
+        let empty = StrykeValue::string("".to_string());
+        let a = StrykeValue::string("A".to_string());
+
+        for _ in 0..8 {
+            let mut slots = [hello_world.raw_bits() as i64];
+            let out = run_linear_segment(&seg_gt, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length>N must run on fusevm");
+            assert_eq!(out.as_integer(), Some(1), "length(\"hello world\") > 5");
+
+            let mut slots = [empty.raw_bits() as i64];
+            let out = run_linear_segment(&seg_gt, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length>N must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0), "length(\"\") > 5");
+
+            let mut slots = [hello_world.raw_bits() as i64];
+            let out = run_linear_segment(&seg_sub, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length-N must run on fusevm");
+            assert_eq!(out.as_integer(), Some(10), "length(\"hello world\") - 1");
+
+            let mut slots = [a.raw_bits() as i64];
+            let out = run_linear_segment(&seg_ord, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("ord>=N must run on fusevm");
+            assert_eq!(out.as_integer(), Some(0), "ord(\"A\") >= 128");
+        }
     }
 
     // `"prefix" x $n` / `substr("abc", $n)` lower to fusevm: literal-string
