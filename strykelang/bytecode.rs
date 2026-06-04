@@ -2637,7 +2637,12 @@ mod tests {
 
     #[test]
     fn builtin_id_from_u16_out_of_range() {
-        assert_eq!(BuiltinId::from_u16(BuiltinId::Executables as u16 + 1), None);
+        // The out-of-range boundary is `Self::Round + 1` — `Round` is the
+        // currently-last variant (see [`BuiltinId::from_u16`]'s `<=` check).
+        // Anchored to `Round` rather than a hard-coded number so adding new
+        // variants at the tail moves the boundary automatically (`from_u16`'s
+        // own max check uses the same variant — the two stay in lock-step).
+        assert_eq!(BuiltinId::from_u16(BuiltinId::Round as u16 + 1), None);
         assert_eq!(BuiltinId::from_u16(u16::MAX), None);
     }
 
