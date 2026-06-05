@@ -165,6 +165,17 @@ pub mod ext_ops {
     /// handle the downstream ext op consumes via `from_raw_bits`.
     pub const STK_VAL_LOAD_CONST: u16 = 0x0024;
 
+    /// `sprintf($fmt, $arg)` (2-arg) with `$fmt` a string handle (typically
+    /// from a `LoadConst` resolved via [`STK_VAL_LOAD_CONST`]) and `$arg` a
+    /// raw NaN-boxed [`StrykeValue`] handle (any kind — int, float, string,
+    /// etc.; sprintf interprets per the format directive). Two-handle in,
+    /// owned-string-handle out — same `(i64, i64) -> i64` ABI as
+    /// [`STK_STR_CRYPT`], but the second operand bypasses the
+    /// `is_string_like` seeder gate (like [`STK_VAL_DEFINED`]) because the
+    /// arg's type is determined at format-parse time by the helper, not at
+    /// chunk-build time by the bridge.
+    pub const STK_VAL_SPRINTF2: u16 = 0x0025;
+
     /// `index($s, $sub)` (2-arg) — byte offset of first occurrence, or -1. Binary
     /// string→int (two NaN-boxed string handle operands, `i64` result), like the
     /// comparison ops, so it stays on the integer block JIT + on-disk cache.
@@ -685,6 +696,42 @@ extern "C" fn stryke_h_val_round(a: i64) -> i64 {
     stryke_val_round_op(a)
 }
 
+/// `sprintf($fmt, $arg)` (2-arg): delegates to the interpreter's full
+/// `perl_sprintf_format_full` so every format directive (%d / %s / %f / %x /
+/// %o / %c / %e / %g / %5d / %.2f / …) works exactly like the interpreter,
+/// not a JIT-side reimplementation. `$fmt` is borrowed via `sv_borrow` and
+/// stringified; `$arg` is reconstructed from its raw bits (any kind — sprintf
+/// itself does the type coercion per directive). Result is the raw bits of a
+/// freshly-allocated owned string handle (caller must `from_raw_bits` exactly
+/// once, like every other owned-string helper).
+///
+/// Single-arg fast path only — multi-arg sprintf would need an array operand
+/// (variadic), which the bridge doesn't model yet. Format strings consuming
+/// more directives than args provided just stringify UNDEF, matching the
+/// interpreter's behavior.
+#[inline]
+fn stryke_val_sprintf2_op(fmt_bits: i64, arg_bits: i64) -> i64 {
+    let fmt_v = unsafe { sv_borrow(fmt_bits) };
+    let fmt = fmt_v.as_str().unwrap_or_default();
+    // Reconstruct the arg by shallow_clone'ing through a borrowed view — this
+    // bumps the Arc refcount so the owned StrykeValue we pass to sprintf
+    // doesn't dispose the seeded slot's heap when it drops.
+    let arg = unsafe { sv_borrow(arg_bits) }.shallow_clone();
+    let args = [arg];
+    let mut stringify = |v: &StrykeValue| -> Result<String, crate::vm_helper::FlowOrError> {
+        let mut s = String::new();
+        v.append_to(&mut s);
+        Ok(s)
+    };
+    match crate::vm_helper::perl_sprintf_format_full(&fmt, &args, &mut stringify) {
+        Ok((result, _pending_n)) => forget_string_bits(result),
+        Err(_) => forget_string_bits(String::new()),
+    }
+}
+extern "C" fn stryke_h_val_sprintf2(fmt: i64, arg: i64) -> i64 {
+    stryke_val_sprintf2_op(fmt, arg)
+}
+
 /// Table of unary any-value→int ext ops. Same `(i64) -> i64` ABI as the unary
 /// string→int helpers, but at the call site the seeder skips the
 /// `is_string_like` gate so the operand can be any type.
@@ -966,6 +1013,7 @@ const STRYKE_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
     (ext_ops::STK_STR_INDEX, "stryke_str_index", stryke_h_str_index),
     (ext_ops::STK_STR_RINDEX, "stryke_str_rindex", stryke_h_str_rindex),
     (ext_ops::STK_STR_CRYPT, "stryke_str_crypt", stryke_h_str_crypt),
+    (ext_ops::STK_VAL_SPRINTF2, "stryke_val_sprintf2", stryke_h_val_sprintf2),
 ];
 
 /// True for any binary `STK_STR_*` extension id (comparisons + concatenation +
@@ -1246,6 +1294,8 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             stryke_str_concat_op(a, b)
         } else if id == ext_ops::STK_STR_CRYPT {
             stryke_str_crypt_op(a, b)
+        } else if id == ext_ops::STK_VAL_SPRINTF2 {
+            stryke_val_sprintf2_op(a, b)
         } else if is_stryke_str_index_ext(id) {
             stryke_str_index_op(id, a, b)
         } else {
@@ -1829,6 +1879,8 @@ fn binary_str_str_ext_op(op: &Op) -> Option<u16> {
     let id = *id;
     if id == BuiltinId::Crypt as u16 {
         Some(ext_ops::STK_STR_CRYPT)
+    } else if id == BuiltinId::Sprintf as u16 {
+        Some(ext_ops::STK_VAL_SPRINTF2)
     } else {
         None
     }
@@ -1846,6 +1898,25 @@ pub(crate) fn segment_is_string_binary_str_eligible(seg: &[Op], _seg_start: usiz
         seg,
         [a, b, u]
             if is_str_operand(a) && is_str_operand(b) && binary_str_str_ext_op(u).is_some()
+    )
+}
+
+/// True when `seg` is `[LoadConst, GetScalarSlot, CallBuiltin(sprintf, 2)]` —
+/// the universal `sprintf("FORMAT", $arg)` idiom. Distinct from
+/// [`segment_is_string_binary_str_eligible`] (crypt-style) because the slot
+/// operand here marshals as a raw NaN-boxed handle WITHOUT the
+/// `is_string_like` gate (sprintf accepts any arg type — int, float, string —
+/// and dispatches per the format directive). Result is an owned string
+/// handle reconstructed via `from_raw_bits`.
+pub(crate) fn segment_is_literal_string_anyval_sprintf_eligible(
+    seg: &[Op],
+    _seg_start: usize,
+) -> bool {
+    use crate::bytecode::BuiltinId;
+    matches!(
+        seg,
+        [Op::LoadConst(_), Op::GetScalarSlot(_), Op::CallBuiltin(id, 2)]
+            if *id == BuiltinId::Sprintf as u16
     )
 }
 
@@ -2891,6 +2962,20 @@ pub(crate) fn run_linear_segment(
         && !int_str_ok
         && !str_int_ok
         && segment_is_literal_string_int_to_string_eligible(seg, seg_start);
+    // `sprintf("%d", $x)`: literal-string format + any-typed slot arg →
+    // owned string. Slot marshals as a raw NaN-boxed handle with the
+    // `is_string_like` gate BYPASSED — sprintf interprets the arg's type
+    // per its format directive (so `sprintf("%d", "5")` and
+    // `sprintf("%s", 5)` both work). Result is an owned string handle.
+    let lit_str_sprintf_ok = !int_ok
+        && !float_ok
+        && !str_ok
+        && !concat_ok
+        && !unary_ok
+        && !int_str_ok
+        && !str_int_ok
+        && !lit_str_int_ok
+        && segment_is_literal_string_anyval_sprintf_eligible(seg, seg_start);
     if !int_ok
         && !float_ok
         && !str_ok
@@ -2899,6 +2984,7 @@ pub(crate) fn run_linear_segment(
         && !int_str_ok
         && !str_int_ok
         && !lit_str_int_ok
+        && !lit_str_sprintf_ok
         && !str_str_bin_ok
         && !val_unary_int_ok
         && !val_unary_str_ok
@@ -2920,7 +3006,7 @@ pub(crate) fn run_linear_segment(
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
     if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || lit_str_int_ok
-        || str_str_bin_ok || val_unary_int_ok || val_unary_str_ok
+        || lit_str_sprintf_ok || str_str_bin_ok || val_unary_int_ok || val_unary_str_ok
     {
         configure_block_jit_eager();
         let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
@@ -2931,8 +3017,9 @@ pub(crate) fn run_linear_segment(
             // (ref: "ARRAY"/"HASH"/etc), reconstructed via from_raw_bits.
             // lit_str_int_ok returns an owned string handle (the result of
             // substr/repeat applied to a literal-string operand).
+            // lit_str_sprintf_ok returns an owned string handle from sprintf.
             if concat_ok || unary_str_ok || int_str_ok || str_int_ok || lit_str_int_ok
-                || str_str_bin_ok || val_unary_str_ok
+                || lit_str_sprintf_ok || str_str_bin_ok || val_unary_str_ok
             {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
@@ -3686,6 +3773,57 @@ mod tests {
             let out = run_linear_segment(&seg_ord, 0, &mut slots, SubTerminator::Value, &[])
                 .expect("ord>=N must run on fusevm");
             assert_eq!(out.as_integer(), Some(0), "ord(\"A\") >= 128");
+        }
+    }
+
+    // `sprintf("FMT", $arg)` lowers via STK_VAL_SPRINTF2: the format LoadConst
+    // resolves at runtime via STK_VAL_LOAD_CONST; the arg is marshaled as raw
+    // NaN-boxed bits with the is_string_like gate BYPASSED, so int/float/
+    // string args all reach the helper which delegates to the interpreter's
+    // perl_sprintf_format_full for full format-directive parity.
+    #[test]
+    fn fusevm_runs_sprintf_with_literal_format() {
+        use crate::bytecode::BuiltinId;
+        let seg = vec![
+            Op::LoadConst(0),
+            Op::GetScalarSlot(0),
+            Op::CallBuiltin(BuiltinId::Sprintf as u16, 2),
+        ];
+        assert!(segment_is_literal_string_anyval_sprintf_eligible(&seg, 0));
+
+        // (format, arg_value_factory, expected) — arg covers int, float, string.
+        let int_42 = StrykeValue::integer(42);
+        let int_255 = StrykeValue::integer(255);
+        let float_pi = StrykeValue::float(3.14159);
+        let str_hi = StrykeValue::string("hi".to_string());
+
+        let cases: &[(&str, &StrykeValue, &str)] = &[
+            ("%d", &int_42, "42"),
+            ("%5d", &int_42, "   42"),
+            ("0x%x", &int_255, "0xff"),
+            ("[%s]", &str_hi, "[hi]"),
+            ("%.2f", &float_pi, "3.14"),
+        ];
+
+        for (fmt_str, arg_v, expected) in cases {
+            let fmt = StrykeValue::string((*fmt_str).to_string());
+            let constants = vec![fmt];
+            for _ in 0..8 {
+                let mut slots = [arg_v.raw_bits() as i64];
+                let out = run_linear_segment(
+                    &seg,
+                    0,
+                    &mut slots,
+                    SubTerminator::Value,
+                    &constants,
+                )
+                .unwrap_or_else(|| panic!("sprintf({fmt_str:?}, …) must run on fusevm"));
+                assert_eq!(
+                    out.as_str().as_deref(),
+                    Some(*expected),
+                    "sprintf({fmt_str:?}, {arg_v:?})"
+                );
+            }
         }
     }
 
