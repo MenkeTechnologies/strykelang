@@ -2846,7 +2846,11 @@ fn configure_block_jit_eager() {
 /// discards the second tuple element. Used by the 60+ in-crate unit tests
 /// that build short-lived `Vec<Op>` segments where chunk caching isn't
 /// meaningful (and pointer-keyed caching would be unsafe — addresses get
-/// recycled between test invocations).
+/// recycled between test invocations). Production callers (`vm.rs`) go
+/// through `run_linear_segment_cached` directly to participate in the
+/// per-sub chunk cache; `#[allow(dead_code)]` because the lib build sees
+/// no callers outside `#[cfg(test)]`.
+#[allow(dead_code)]
 pub(crate) fn run_linear_segment(
     seg: &[Op],
     seg_start: usize,
