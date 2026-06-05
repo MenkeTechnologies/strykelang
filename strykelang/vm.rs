@@ -1180,12 +1180,29 @@ impl<'a> VM<'a> {
             && crate::fusevm_bridge::segment_is_literal_string_int_to_string_eligible(
                 seg, seg_ip,
             );
+        // `sprintf("FMT", $arg)`: literal-string fmt + any-typed slot arg.
+        // Slot marshals as a raw NaN-boxed handle with the `is_string_like`
+        // gate BYPASSED — sprintf interprets per its format directive, so the
+        // arg can be int / float / string / undef and the helper handles
+        // type coercion correctly. Same seeder behavior as `val_unary_ok`
+        // (any-value handle bits, no type gate).
+        let lit_str_sprintf_ok = !int_ok
+            && !str_ok
+            && !float_ok
+            && !int_str_ok
+            && !str_int_ok
+            && !lit_str_int_ok
+            && !val_unary_ok
+            && crate::fusevm_bridge::segment_is_literal_string_anyval_sprintf_eligible(
+                seg, seg_ip,
+            );
         if !int_ok
             && !str_ok
             && !float_ok
             && !int_str_ok
             && !str_int_ok
             && !lit_str_int_ok
+            && !lit_str_sprintf_ok
             && !val_unary_ok
         {
             return Ok(false);
@@ -1257,13 +1274,15 @@ impl<'a> VM<'a> {
                     Some(str_slot) => i == str_slot,
                     None => match &str_slot_kinds {
                         Some(kinds) => kinds.get(i as usize).copied().unwrap_or(false),
-                        None => str_ok || val_unary_ok,
+                        None => str_ok || val_unary_ok || lit_str_sprintf_ok,
                     },
                 }
             };
             // Whether to bypass the `is_string_like` gate when seeding a handle
-            // slot — only true for any-value segments (currently `defined`).
-            let bypass_type_gate = val_unary_ok;
+            // slot — true for any-value segments (`defined`/`ref`) AND for
+            // `sprintf("FMT", $arg)` which dispatches arg-type by format
+            // directive inside the helper, not at seed time.
+            let bypass_type_gate = val_unary_ok || lit_str_sprintf_ok;
             for i in 0..=max {
                 let bound = arg_of_slot(i);
                 self.jit_buf_slot[i as usize] = if let Some(pv) = plain_of_slot(i) {
