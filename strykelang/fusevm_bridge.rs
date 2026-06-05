@@ -2842,6 +2842,11 @@ fn configure_block_jit_eager() {
     });
 }
 
+/// Cache-less entry point — wrapper around [`run_linear_segment_cached`] that
+/// discards the second tuple element. Used by the 60+ in-crate unit tests
+/// that build short-lived `Vec<Op>` segments where chunk caching isn't
+/// meaningful (and pointer-keyed caching would be unsafe — addresses get
+/// recycled between test invocations).
 pub(crate) fn run_linear_segment(
     seg: &[Op],
     seg_start: usize,
@@ -2849,8 +2854,25 @@ pub(crate) fn run_linear_segment(
     term: SubTerminator,
     constants: &[StrykeValue],
 ) -> Option<StrykeValue> {
+    run_linear_segment_cached(seg, seg_start, slot_buf, term, constants, None).0
+}
+
+/// Same as [`run_linear_segment`] but with an optional pre-built `fusevm::Chunk`
+/// reused across calls. Production callers (`vm.rs::try_fusevm_subroutine`)
+/// pass `Some(cached_arc)` on cache hit and consume `Some(fresh_arc)` from
+/// the returned tuple on cache miss to populate their per-sub `OnceCell`.
+/// Skips the per-call `build_chunk` walk + chunk-Vec allocation when the
+/// cache hits.
+pub(crate) fn run_linear_segment_cached(
+    seg: &[Op],
+    seg_start: usize,
+    slot_buf: &mut [i64],
+    term: SubTerminator,
+    constants: &[StrykeValue],
+    cached_chunk: Option<&std::sync::Arc<fusevm::Chunk>>,
+) -> (Option<StrykeValue>, Option<std::sync::Arc<fusevm::Chunk>>) {
     if !matches!(term, SubTerminator::Value) {
-        return None;
+        return (None, None);
     }
     // Publish the chunk-constants slice to the thread-local context for the
     // duration of any `try_run_block` invocation below, so a `LoadConst(idx)`
@@ -2989,8 +3011,26 @@ pub(crate) fn run_linear_segment(
         && !val_unary_int_ok
         && !val_unary_str_ok
     {
-        return None;
+        return (None, None);
     }
+
+    // Closure that obtains the unseeded fusevm chunk: clones the cached Arc
+    // on hit, or calls build_chunk + wraps in Arc on miss. Returns (chunk_to_use,
+    // fresh_arc_for_caller_to_cache) — the fresh_arc is Some only when we
+    // just built it (so the caller can populate its OnceCell). Used by both
+    // JIT branches below.
+    let obtain_unseeded = |seg, seg_start, slot_buf: &[i64], constants| -> Option<(
+        std::sync::Arc<fusevm::Chunk>,
+        Option<std::sync::Arc<fusevm::Chunk>>,
+    )> {
+        if let Some(c) = cached_chunk {
+            Some((std::sync::Arc::clone(c), None))
+        } else {
+            let built = build_chunk(seg, seg_start, slot_buf, false, constants)?;
+            let arc = std::sync::Arc::new(built);
+            Some((arc.clone(), Some(arc)))
+        }
+    };
 
     // String segments (comparison + concatenation + unary length/ord/hex/oct + the
     // int→string `chr`): build an *unseeded* chunk (operand values flow through the
@@ -3009,9 +3049,12 @@ pub(crate) fn run_linear_segment(
         || lit_str_sprintf_ok || str_str_bin_ok || val_unary_int_ok || val_unary_str_ok
     {
         configure_block_jit_eager();
-        let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
+        let (chunk_arc, fresh) = match obtain_unseeded(seg, seg_start, slot_buf, constants) {
+            Some(x) => x,
+            None => return (None, None),
+        };
         let jit = fusevm::JitCompiler::new();
-        return jit.try_run_block(&chunk, slot_buf).map(|ret| {
+        let result = jit.try_run_block(&chunk_arc, slot_buf).map(|ret| {
             // val_unary_int_ok returns a plain integer (defined: 0 or 1).
             // val_unary_str_ok returns the raw bits of an owned string handle
             // (ref: "ARRAY"/"HASH"/etc), reconstructed via from_raw_bits.
@@ -3026,6 +3069,7 @@ pub(crate) fn run_linear_segment(
                 StrykeValue::integer(ret)
             }
         });
+        return (result, fresh);
     }
 
     // Fast path: pure-integer segments — and segments that compute with float
@@ -3041,7 +3085,10 @@ pub(crate) fn run_linear_segment(
     // combination.
     if float_ok || (int_ok && segment_result_is_integer(seg)) {
         configure_block_jit_eager();
-        let chunk = build_chunk(seg, seg_start, slot_buf, false, constants)?;
+        let (chunk_arc, fresh) = match obtain_unseeded(seg, seg_start, slot_buf, constants) {
+            Some(x) => x,
+            None => return (None, None),
+        };
         let jit = fusevm::JitCompiler::new();
         // A segment containing strykelang `/` lowers to fusevm `Op::AwkDivJit`,
         // which traps (via a thread-local flag) on a zero divisor and returns a
@@ -3059,28 +3106,31 @@ pub(crate) fn run_linear_segment(
             // literal collapse); coerce it to a float since the static analysis
             // proved the value is a float.
             Some(NumTy::Float) => {
-                if let Some(num) = jit.try_run_block_typed_kinded(&chunk, slot_buf, &[]) {
+                if let Some(num) = jit.try_run_block_typed_kinded(&chunk_arc, slot_buf, &[]) {
                     if has_div && jit.take_awk_div_trap() {
-                        return None;
+                        return (None, fresh);
                     }
-                    return Some(match num {
+                    return (Some(match num {
                         fusevm::BlockNum::Float(f) => StrykeValue::float(f),
                         fusevm::BlockNum::Int(n) => StrykeValue::float(n as f64),
-                    });
+                    }), fresh);
                 }
             }
             // Integer/bool-result segment (e.g. a float comparison `$x < 0.5`, or a
             // division feeding a comparison `$x / $y < 1`): the result is a genuine
             // integer, so the plain i64 entry point is exact.
             Some(NumTy::Int) | None => {
-                if let Some(ret) = jit.try_run_block(&chunk, slot_buf) {
+                if let Some(ret) = jit.try_run_block(&chunk_arc, slot_buf) {
                     if has_div && jit.take_awk_div_trap() {
-                        return None;
+                        return (None, fresh);
                     }
-                    return Some(StrykeValue::integer(ret));
+                    return (Some(StrykeValue::integer(ret)), fresh);
                 }
             }
         }
+        // Fall-through to interpreter path; the freshly-built chunk above
+        // becomes orphaned (caller doesn't cache None paths). Drop it.
+        let _ = fresh;
     }
 
     // Fallback: fusevm's interpreter. Handles float/bool results and any chunk the
@@ -3089,7 +3139,12 @@ pub(crate) fn run_linear_segment(
     // (not disk-cached as native code, so the per-value `op_hash` churn is moot).
     // The strykelang Extended handler makes `%` (STK_MOD_FLOOR) correct on this
     // cold path too; without it fusevm would treat the unknown op as a no-op.
-    let chunk = build_chunk(seg, seg_start, slot_buf, true, constants)?;
+    // No cache reuse on this path — the seeded preamble is per-call and the
+    // chunk's identity changes with every slot_buf snapshot.
+    let chunk = match build_chunk(seg, seg_start, slot_buf, true, constants) {
+        Some(c) => c,
+        None => return (None, None),
+    };
     let mut vm = fusevm::VM::new(chunk);
     vm.set_extension_handler(Box::new(stryke_ext_handler));
     let result = vm.run();
@@ -3102,10 +3157,11 @@ pub(crate) fn run_linear_segment(
         }
     }
 
-    match result {
+    let v = match result {
         fusevm::VMResult::Ok(val) => Some(value_from_fusevm(&val)),
         _ => None,
-    }
+    };
+    (v, None)
 }
 
 /// Convert a `fusevm::Value` produced by the universal-integer subset back into a

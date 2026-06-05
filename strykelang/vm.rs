@@ -304,7 +304,7 @@ enum FusevmDispatch {
 /// remap still run — those depend on having the actual seg slice in hand;
 /// caching them would require owning a Vec<Op> per sub. The detector results
 /// are the bulk of the recomputed work, and they're tiny to cache.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct FusevmSubElig {
     dispatch: FusevmDispatch,
     /// For StrInt only: which slot is the string handle.
@@ -313,6 +313,14 @@ struct FusevmSubElig {
     /// LitStrSprintf).
     #[allow(dead_code)]
     bypass_type_gate: bool,
+    /// Cached fusevm chunk built by `run_linear_segment_cached` on the first
+    /// call to this sub; reused on every subsequent call. Avoids re-running
+    /// `build_chunk` (segment-op walk + chunk-Vec allocation + jump-fixup
+    /// pass) on the per-record hot path. Stored as `Arc` so vm.rs can hand
+    /// out cheap borrows to the bridge without copying the chunk's Vec<Op>.
+    /// `OnceCell` for interior mutability — the cache is populated once on
+    /// first build then read-only, so `&FusevmSubElig` suffices for hits.
+    cached_chunk: std::cell::OnceCell<std::sync::Arc<fusevm::Chunk>>,
 }
 
 /// Single-pass eligibility check + dispatch resolution: runs each
@@ -329,6 +337,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::Int,
             str_handle_slot: None,
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_string_compare_eligible(seg, seg_ip)
@@ -341,6 +350,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::Str,
             str_handle_slot: None,
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_any_value_unary_int_eligible(seg, seg_ip)
@@ -350,6 +360,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::ValUnary,
             str_handle_slot: None,
             bypass_type_gate: true,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_fusevm_float_eligible(seg, seg_ip) {
@@ -357,6 +368,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::Float,
             str_handle_slot: None,
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_int_to_string_eligible(seg, seg_ip) {
@@ -364,6 +376,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::IntStr,
             str_handle_slot: None,
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if let Some(str_slot) = fb::string_handle_slot(seg, seg_ip) {
@@ -371,6 +384,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::StrInt,
             str_handle_slot: Some(str_slot),
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_literal_string_int_to_string_eligible(seg, seg_ip) {
@@ -378,6 +392,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::LitStrInt,
             str_handle_slot: None,
             bypass_type_gate: false,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     if fb::segment_is_literal_string_anyval_sprintf_eligible(seg, seg_ip) {
@@ -385,6 +400,7 @@ fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
             dispatch: FusevmDispatch::LitStrSprintf,
             str_handle_slot: None,
             bypass_type_gate: true,
+            cached_chunk: std::cell::OnceCell::new(),
         });
     }
     None
@@ -1267,35 +1283,41 @@ impl<'a> VM<'a> {
         // detectors; subsequent calls hit the cache. `None` = not yet
         // analyzed; `Some(None)` = known-not-eligible (skip the bridge);
         // `Some(Some(elig))` = cached dispatch verdict.
-        let elig = {
-            // Use the ORIGINAL sub-entry ip as the cache key (not seg_ip,
-            // which moves around when plain_remap_data fires — the cache
-            // shouldn't be sensitive to which form of the seg we analyzed).
-            let cache_ip = ip;
-            if cache_ip >= self.sub_fusevm_meta.len() {
-                self.sub_fusevm_meta.resize(cache_ip + 1, None);
-            }
-            match self.sub_fusevm_meta[cache_ip] {
-                Some(None) => return Ok(false),
-                Some(Some(cached)) => cached,
-                None => {
-                    let computed = compute_fusevm_elig(seg, seg_ip);
-                    self.sub_fusevm_meta[cache_ip] = Some(computed);
-                    match computed {
-                        Some(e) => e,
-                        None => return Ok(false),
-                    }
+        //
+        // Use the ORIGINAL sub-entry ip as the cache key (not seg_ip, which
+        // moves around when plain_remap_data fires — the cache shouldn't be
+        // sensitive to which form of the seg we analyzed).
+        let cache_ip = ip;
+        if cache_ip >= self.sub_fusevm_meta.len() {
+            self.sub_fusevm_meta.resize(cache_ip + 1, None);
+        }
+        // Ensure the entry is populated (compute on miss). Borrow-checker note:
+        // we can't return a `&FusevmSubElig` from the match while also keeping
+        // `&mut self` available for the seeder below, so we extract the
+        // `Copy` fields up front and re-borrow the entry later via index when
+        // we need the (interior-mut) cached_chunk OnceCell.
+        match &self.sub_fusevm_meta[cache_ip] {
+            Some(None) => return Ok(false),
+            Some(Some(_)) => {}
+            None => {
+                let computed = compute_fusevm_elig(seg, seg_ip);
+                self.sub_fusevm_meta[cache_ip] = Some(computed);
+                if matches!(&self.sub_fusevm_meta[cache_ip], Some(None)) {
+                    return Ok(false);
                 }
             }
+        }
+        // Extract the Copy dispatch fields (released the borrow on next line).
+        let (dispatch, str_handle_slot) = {
+            let e = self.sub_fusevm_meta[cache_ip]
+                .as_ref()
+                .and_then(|x| x.as_ref())
+                .expect("populated above");
+            (e.dispatch, e.str_handle_slot)
         };
-        // Only the downstream-used flags are extracted. The bridge's
-        // run_linear_segment reproduces the per-dispatch routing internally
-        // from the same detectors (which it re-runs once on the cached
-        // chunk's translation — that's separate from this seeder analysis).
-        let str_ok = matches!(elig.dispatch, FusevmDispatch::Str);
-        let str_handle_slot = elig.str_handle_slot;
-        let lit_str_sprintf_ok = matches!(elig.dispatch, FusevmDispatch::LitStrSprintf);
-        let val_unary_ok = matches!(elig.dispatch, FusevmDispatch::ValUnary);
+        let str_ok = matches!(dispatch, FusevmDispatch::Str);
+        let lit_str_sprintf_ok = matches!(dispatch, FusevmDispatch::LitStrSprintf);
+        let val_unary_ok = matches!(dispatch, FusevmDispatch::ValUnary);
 
         // Map each arg-bound slot to its `@_` index. Slots not in this map are body
         // locals (seeded 0 when write-before-read) or, for string segments, read
@@ -1431,13 +1453,35 @@ impl<'a> VM<'a> {
         // `no utf8` (which toggle the pragma at runtime). Cheap and harmless for
         // non-length segments.
         crate::fusevm_bridge::set_utf8_pragma(self.interp.utf8_pragma);
-        let Some(v) = crate::fusevm_bridge::run_linear_segment(
+        // Hand the bridge a borrow of the cached fusevm chunk if we have one;
+        // on cache miss the bridge returns the freshly-built Arc so we can
+        // populate the OnceCell for the next call. The OnceCell ::get/::set
+        // pair are &self methods so we don't need a fresh &mut self here.
+        let cached_chunk_arc: Option<std::sync::Arc<fusevm::Chunk>> = self
+            .sub_fusevm_meta
+            .get(cache_ip)
+            .and_then(|x| x.as_ref())
+            .and_then(|x| x.as_ref())
+            .and_then(|e| e.cached_chunk.get().cloned());
+        let (result_opt, fresh_chunk) = crate::fusevm_bridge::run_linear_segment_cached(
             seg,
             seg_ip,
             &mut self.jit_buf_slot[..slot_n],
             term,
             &self.constants,
-        ) else {
+            cached_chunk_arc.as_ref(),
+        );
+        if let Some(fresh) = fresh_chunk {
+            if let Some(e) = self
+                .sub_fusevm_meta
+                .get(cache_ip)
+                .and_then(|x| x.as_ref())
+                .and_then(|x| x.as_ref())
+            {
+                let _ = e.cached_chunk.set(fresh);
+            }
+        }
+        let Some(v) = result_opt else {
             return Ok(false);
         };
 
