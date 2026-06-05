@@ -690,6 +690,22 @@ impl<'a> VM<'a> {
         end: usize,
         op_count: &mut u64,
     ) -> StrykeResult<StrykeValue> {
+        // Tier-0 JIT fast path: hand the block body to fusevm's bridge if
+        // the per-IP eligibility cache says it's lowerable. Bypasses the
+        // call-frame + scope-frame push and the interpreter dispatch loop
+        // entirely on cache hits — `try_fusevm_block_region` reads the
+        // block's `$_`/outer-scope vars via the same plain-remap mechanism
+        // signature subs use, runs the seg via `run_linear_segment_cached`,
+        // and returns the block's result value. On cache miss / ineligible
+        // body, falls through to the interpreter path below with no
+        // observable effect.
+        if let Some(v) = self.try_fusevm_block_region(start, end)? {
+            // Count the iteration as one op for the global op-count limit
+            // (mirrors what the interpreter would charge for the body run).
+            *op_count = op_count.saturating_add(1);
+            return Ok(v);
+        }
+
         let resume_ip = self.ip;
         let saved_mode = self.block_region_mode;
         let saved_end = self.block_region_end;
@@ -1504,6 +1520,221 @@ impl<'a> VM<'a> {
             }
         }
         Ok(true)
+    }
+
+    /// Tier-0 JIT for block-region bodies (map/grep/sort/foreach inline blocks
+    /// run by [`Self::run_block_region`]). Parallels [`Self::try_fusevm_subroutine`]
+    /// but:
+    /// - Takes the precomputed `(start, end)` region instead of scanning for a
+    ///   `ReturnValue` terminator. The region ends with `Op::BlockReturnValue`;
+    ///   the bridge runs the seg without that terminator and the result becomes
+    ///   the block's return value (the runtime equivalent of what
+    ///   `BlockReturnValue` would have pushed into `block_region_return`).
+    /// - Has no `@_`-unpack prologue — blocks don't have arg lists. Synthetic-
+    ///   slot remapping via [`crate::jit::plain_scalar_read_names`] still
+    ///   applies for `$_` / outer-scope reads, mirroring how signature-sub
+    ///   reads are handled in `try_fusevm_subroutine`.
+    /// - Returns `Ok(Some(value))` on JIT success (caller bypasses the
+    ///   interpreter dispatch loop entirely, no call-frame push needed), or
+    ///   `Ok(None)` to fall through to the existing block-region interpreter
+    ///   path (which pushes a fresh call frame + scope frame and runs the
+    ///   main dispatch loop).
+    ///
+    /// The cache (`sub_fusevm_meta`) is keyed by `start` IP — block-region
+    /// starts don't collide with sub-entry IPs (different positions in the
+    /// bytecode), so reusing the same `Vec<Option<Option<FusevmSubElig>>>`
+    /// is safe and saves a separate per-block-IP cache structure.
+    fn try_fusevm_block_region(
+        &mut self,
+        start: usize,
+        end: usize,
+    ) -> Result<Option<StrykeValue>, StrykeError> {
+        let ops: &Vec<Op> = &self.ops;
+        let ops = ops as *const Vec<Op>;
+        let ops = unsafe { &*ops };
+
+        // Sanity-check the range and require BlockReturnValue as the
+        // terminator. Block regions with mid-flow terminators (early returns,
+        // `last`/`next` from outer loops, etc.) fall through to the
+        // interpreter.
+        if start >= end || end > ops.len() {
+            return Ok(None);
+        }
+        if !matches!(ops.get(end - 1), Some(Op::BlockReturnValue)) {
+            return Ok(None);
+        }
+        let full_seg = &ops[start..end - 1];
+        if full_seg.is_empty() {
+            return Ok(None);
+        }
+
+        // Same plain-scalar-read remap as sig subs: rewrite GetScalarPlain(name)
+        // → GetScalarSlot(synth) so the bridge can seed `$_`/outer-scope reads
+        // through its slot mechanism. Bails on any named-scalar WRITE.
+        let base_slot = crate::jit::linear_slot_ops_max_index_seq(full_seg)
+            .map(|m| m as usize + 1)
+            .unwrap_or(0);
+        let plain_remap: Option<(Vec<Op>, Vec<(u8, u16)>)> = if base_slot <= u8::MAX as usize {
+            crate::jit::plain_scalar_read_names(full_seg).and_then(|pnames| {
+                if base_slot + pnames.len() <= u8::MAX as usize + 1 {
+                    Some(crate::jit::remap_plain_reads_to_slots(
+                        full_seg,
+                        &pnames,
+                        base_slot as u8,
+                    ))
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let (seg, plain_binds): (&[Op], &[(u8, u16)]) = match &plain_remap {
+            Some((normalized, binds)) => (normalized.as_slice(), binds.as_slice()),
+            None => (full_seg, &[][..]),
+        };
+        let seg_ip = start;
+
+        // Eligibility cache (same Vec used by try_fusevm_subroutine — IPs
+        // don't collide between sub-entries and block-region starts).
+        let cache_ip = start;
+        if cache_ip >= self.sub_fusevm_meta.len() {
+            self.sub_fusevm_meta.resize(cache_ip + 1, None);
+        }
+        match &self.sub_fusevm_meta[cache_ip] {
+            Some(None) => return Ok(None),
+            Some(Some(_)) => {}
+            None => {
+                let computed = compute_fusevm_elig(seg, seg_ip);
+                self.sub_fusevm_meta[cache_ip] = Some(computed);
+                if matches!(&self.sub_fusevm_meta[cache_ip], Some(None)) {
+                    return Ok(None);
+                }
+            }
+        }
+        let (dispatch, str_handle_slot) = {
+            let e = self.sub_fusevm_meta[cache_ip]
+                .as_ref()
+                .and_then(|x| x.as_ref())
+                .expect("populated above");
+            (e.dispatch, e.str_handle_slot)
+        };
+        let str_ok = matches!(dispatch, FusevmDispatch::Str);
+        let lit_str_sprintf_ok = matches!(dispatch, FusevmDispatch::LitStrSprintf);
+        let val_unary_ok = matches!(dispatch, FusevmDispatch::ValUnary);
+
+        // Resolve each plain-remapped synthetic slot to its current scope
+        // value. For grep `{ length($_) > 1 }` this reads `$_` (the topic,
+        // set by the caller before each iteration) into one synth slot.
+        let plain_vals: Vec<(u8, StrykeValue)> = plain_binds
+            .iter()
+            .map(|(slot, name_idx)| {
+                let nm = self.names[*name_idx as usize].clone();
+                (*slot, self.interp.scope.get_scalar(&nm))
+            })
+            .collect();
+        let plain_of_slot = |slot: u8| -> Option<&StrykeValue> {
+            plain_vals.iter().find(|(s, _)| *s == slot).map(|(_, v)| v)
+        };
+
+        // Seeder. Same per-slot kind matrix as try_fusevm_subroutine, minus
+        // the @_ arg-bound branch (blocks have no args). Body-local slots
+        // get 0 (write-before-read) or are read from the current scope.
+        let mut slot_n = 0usize;
+        if let Some(max) = crate::jit::linear_slot_ops_max_index_seq(seg) {
+            let n = max as usize + 1;
+            self.jit_buf_slot.resize(n, 0);
+            let str_slot_kinds: Option<Vec<bool>> = if str_ok {
+                crate::fusevm_bridge::string_bearing_int_result_slot_kinds(seg, seg_ip)
+            } else {
+                None
+            };
+            let wants_string = |i: u8| -> bool {
+                match str_handle_slot {
+                    Some(str_slot) => i == str_slot,
+                    None => match &str_slot_kinds {
+                        Some(kinds) => kinds.get(i as usize).copied().unwrap_or(false),
+                        None => str_ok || val_unary_ok || lit_str_sprintf_ok,
+                    },
+                }
+            };
+            // Block regions bypass the `is_string_like` gate unconditionally:
+            // block items (`$_` from grep/map/sort) can be any type — numbers,
+            // strings, refs — and Perl-style stringification is the standard
+            // (`length(42)` == 2, `42 eq "42"`, etc.). The bridge's str
+            // helpers call `as_str()` / `length_value()` / `ord_value()` /
+            // etc. which all stringify internally, matching the interpreter's
+            // semantics for non-overloaded values. The narrow risk is an
+            // operator-overload (`use overload '""'`) producing a different
+            // string than the helpers' naive stringification — for grep/map
+            // bodies the convention is to use unblessed scalars, so this
+            // tradeoff is the right default.
+            //
+            // For ValUnary / LitStrSprintf the gate-bypass was already needed
+            // for sub-call dispatch (`defined`/`ref`/`sprintf` accept any
+            // type); the unconditional `true` here covers both those cases
+            // and the general block-region case.
+            let bypass_type_gate = true;
+            for i in 0..=max {
+                self.jit_buf_slot[i as usize] = if let Some(pv) = plain_of_slot(i) {
+                    if wants_string(i) {
+                        if !bypass_type_gate && !pv.is_string_like() {
+                            return Ok(None);
+                        }
+                        pv.raw_bits() as i64
+                    } else {
+                        match pv.as_integer() {
+                            Some(v) => v,
+                            None => return Ok(None),
+                        }
+                    }
+                } else if wants_string(i) {
+                    let v = self.interp.scope.get_scalar_slot(i);
+                    if !bypass_type_gate && !v.is_string_like() {
+                        return Ok(None);
+                    }
+                    v.raw_bits() as i64
+                } else if crate::jit::slot_undef_prefill_ok_seq(seg, i) {
+                    0
+                } else {
+                    match self.interp.scope.get_scalar_slot(i).as_integer() {
+                        Some(v) => v,
+                        None => return Ok(None),
+                    }
+                };
+            }
+            // Silence unused-variable warnings for the val_*_ok flags now
+            // that bypass_type_gate is unconditionally true.
+            let _ = (val_unary_ok, lit_str_sprintf_ok);
+            slot_n = n;
+        }
+
+        crate::fusevm_bridge::set_utf8_pragma(self.interp.utf8_pragma);
+        let cached_chunk_arc: Option<std::sync::Arc<fusevm::Chunk>> = self
+            .sub_fusevm_meta
+            .get(cache_ip)
+            .and_then(|x| x.as_ref())
+            .and_then(|x| x.as_ref())
+            .and_then(|e| e.cached_chunk.get().cloned());
+        let (result_opt, fresh_chunk) = crate::fusevm_bridge::run_linear_segment_cached(
+            seg,
+            seg_ip,
+            &mut self.jit_buf_slot[..slot_n],
+            crate::jit::SubTerminator::Value,
+            &self.constants,
+            cached_chunk_arc.as_ref(),
+        );
+        if let Some(fresh) = fresh_chunk {
+            if let Some(e) = self
+                .sub_fusevm_meta
+                .get(cache_ip)
+                .and_then(|x| x.as_ref())
+                .and_then(|x| x.as_ref())
+            {
+                let _ = e.cached_chunk.set(fresh);
+            }
+        }
+        Ok(result_opt)
     }
 
     /// Cranelift linear JIT for a subroutine body when `ip` is a compiled sub entry (see `Chunk::sub_entries`).
