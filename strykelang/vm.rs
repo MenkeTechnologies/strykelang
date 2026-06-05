@@ -192,6 +192,8 @@ impl ParallelBlockVmShared {
             jit_enabled: false,
             sub_jit_skip_linear: vec![false; n],
             sub_jit_skip_block: vec![false; n],
+            sub_fusevm_meta: vec![None; n],
+            uscore_name_idx: None,
             sub_entry_at_ip: {
                 let mut v = vec![false; n];
                 for (_, e, _) in &self.sub_entries {
@@ -272,6 +274,122 @@ struct CallFrame {
 }
 
 /// Stack-based bytecode virtual machine.
+/// Which fusevm-bridge dispatch path applies to a sub. Cached in
+/// [`VM::sub_fusevm_meta`] so `try_fusevm_subroutine` skips re-running 6+
+/// `segment_is_*` detectors on every call to a hot sub.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FusevmDispatch {
+    /// Pure-integer segment (slots as unboxed i64s).
+    Int,
+    /// Float-bearing segment, integer-or-float result.
+    Float,
+    /// `chr($n)` — int operand, owned-string result.
+    IntStr,
+    /// `substr($s, $n)` / `$s x $n` — string handle + int per-slot.
+    StrInt,
+    /// `substr("abc", $n)` / `"prefix" x $n` — literal-string + int slot.
+    LitStrInt,
+    /// `sprintf("FMT", $arg)` — literal-string fmt + any-typed slot, owned-string result.
+    LitStrSprintf,
+    /// String-bearing → int (compare/concat/unary/binary-int/general analyzer).
+    Str,
+    /// Any-value unary (defined/ref) — bypass type gate.
+    ValUnary,
+}
+
+/// Cached fusevm-bridge eligibility for a sub at IP. Records only the
+/// detector verdict so `try_fusevm_subroutine` can skip the 13+
+/// `segment_is_*` calls (each walking the segment) on every invocation of a
+/// hot sub. The per-call seg-derivation, slot-kind inference, and arg-bind
+/// remap still run — those depend on having the actual seg slice in hand;
+/// caching them would require owning a Vec<Op> per sub. The detector results
+/// are the bulk of the recomputed work, and they're tiny to cache.
+#[derive(Clone, Copy)]
+struct FusevmSubElig {
+    dispatch: FusevmDispatch,
+    /// For StrInt only: which slot is the string handle.
+    str_handle_slot: Option<u8>,
+    /// Whether to bypass `is_string_like` on slot seeding (ValUnary +
+    /// LitStrSprintf).
+    #[allow(dead_code)]
+    bypass_type_gate: bool,
+}
+
+/// Single-pass eligibility check + dispatch resolution: runs each
+/// `segment_is_*` detector exactly once and resolves which `FusevmDispatch`
+/// (if any) the segment falls into. Returns `None` when no detector matches
+/// — the bridge bails to the interpreter.
+///
+/// Called once per sub-entry IP via [`VM::sub_fusevm_meta`] caching, then
+/// the result is reused across every invocation of that sub.
+fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
+    use crate::fusevm_bridge as fb;
+    if fb::segment_is_fusevm_eligible(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::Int,
+            str_handle_slot: None,
+            bypass_type_gate: false,
+        });
+    }
+    if fb::segment_is_string_compare_eligible(seg, seg_ip)
+        || fb::segment_is_string_concat_eligible(seg, seg_ip)
+        || fb::segment_is_string_unary_eligible(seg, seg_ip)
+        || fb::segment_is_string_binary_int_eligible(seg, seg_ip)
+        || fb::segment_is_string_bearing_int_result_eligible(seg, seg_ip)
+    {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::Str,
+            str_handle_slot: None,
+            bypass_type_gate: false,
+        });
+    }
+    if fb::segment_is_any_value_unary_int_eligible(seg, seg_ip)
+        || fb::segment_is_any_value_unary_str_eligible(seg, seg_ip)
+    {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::ValUnary,
+            str_handle_slot: None,
+            bypass_type_gate: true,
+        });
+    }
+    if fb::segment_is_fusevm_float_eligible(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::Float,
+            str_handle_slot: None,
+            bypass_type_gate: false,
+        });
+    }
+    if fb::segment_is_int_to_string_eligible(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::IntStr,
+            str_handle_slot: None,
+            bypass_type_gate: false,
+        });
+    }
+    if let Some(str_slot) = fb::string_handle_slot(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::StrInt,
+            str_handle_slot: Some(str_slot),
+            bypass_type_gate: false,
+        });
+    }
+    if fb::segment_is_literal_string_int_to_string_eligible(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::LitStrInt,
+            str_handle_slot: None,
+            bypass_type_gate: false,
+        });
+    }
+    if fb::segment_is_literal_string_anyval_sprintf_eligible(seg, seg_ip) {
+        return Some(FusevmSubElig {
+            dispatch: FusevmDispatch::LitStrSprintf,
+            str_handle_slot: None,
+            bypass_type_gate: true,
+        });
+    }
+    None
+}
+
 pub struct VM<'a> {
     /// Shared with parallel workers via [`Self::new_parallel_worker`] (cheap `Arc` clones).
     names: Arc<Vec<String>>,
@@ -374,6 +492,18 @@ pub struct VM<'a> {
     sub_jit_skip_linear: Vec<bool>,
     /// `sub_jit_skip_block[ip]` — true when block sub-JIT cannot apply.
     sub_jit_skip_block: Vec<bool>,
+    /// Per-sub-IP cache for the fusevm bridge's `try_fusevm_subroutine`
+    /// eligibility analysis. First call to a sub computes flags + slot kinds
+    /// once (running 6+ `segment_is_*` detectors + the abstract-stack analyzer
+    /// + prologue recognition + the `_` name lookup); subsequent calls hit
+    /// the cache for O(1) dispatch. `None` = not yet analyzed; `Some(None)` =
+    /// known-not-eligible (skip without re-trying); `Some(Some(meta))` = cached
+    /// dispatch metadata.
+    sub_fusevm_meta: Vec<Option<Option<FusevmSubElig>>>,
+    /// Cached index of the `_` name (for `@_`) — populated lazily by the first
+    /// fusevm-bridge call. Avoids a linear `self.names.iter().position` scan
+    /// on every sub call.
+    uscore_name_idx: Option<Option<u16>>,
     /// `sub_entry_at_ip[ip]` — faster than hashing on every opcode (recursive subs dispatch millions of ops).
     sub_entry_at_ip: Vec<bool>,
     /// Invocations per sub-entry IP (tiered JIT: interpreter until count exceeds threshold).
@@ -484,6 +614,8 @@ impl<'a> VM<'a> {
             jit_enabled: true,
             sub_jit_skip_linear: vec![false; chunk.ops.len().saturating_add(1)],
             sub_jit_skip_block: vec![false; chunk.ops.len().saturating_add(1)],
+            sub_fusevm_meta: vec![None; chunk.ops.len().saturating_add(1)],
+            uscore_name_idx: None,
             sub_entry_at_ip: {
                 let mut v = vec![false; chunk.ops.len().saturating_add(1)];
                 for (_, e, _) in &chunk.sub_entries {
@@ -1087,9 +1219,16 @@ impl<'a> VM<'a> {
         // remaining body — the part that's actually pure arithmetic/string work — is
         // what we hand to fusevm. Without this, virtually no real sub is ever
         // eligible, so the on-disk JIT cache never engages for them.
-        let uscore = self.names.iter().position(|n| n == "_");
+        let uscore = match self.uscore_name_idx {
+            Some(cached) => cached,
+            None => {
+                let v = self.names.iter().position(|n| n == "_").and_then(|p| u16::try_from(p).ok());
+                self.uscore_name_idx = Some(v);
+                v
+            }
+        };
         let (seg, seg_ip, arg_binds): (&[Op], usize, Vec<(u8, usize)>) = match uscore
-            .and_then(|u| crate::jit::recognize_args_unpack_prologue(full_seg, u as u16))
+            .and_then(|u| crate::jit::recognize_args_unpack_prologue(full_seg, u))
         {
             Some((plen, binds)) => (&full_seg[plen..], ip + plen, binds),
             None => (full_seg, ip, Vec::new()),
@@ -1124,89 +1263,39 @@ impl<'a> VM<'a> {
             None => (seg, &[][..]),
         };
 
-        let int_ok = crate::fusevm_bridge::segment_is_fusevm_eligible(seg, seg_ip);
-        let str_ok = !int_ok
-            && (crate::fusevm_bridge::segment_is_string_compare_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_concat_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_unary_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_string_binary_int_eligible(seg, seg_ip)
-                // General string-bearing → int detector — covers length+intlit,
-                // length+length, index+intlit, multi-op chains, etc. via
-                // abstract-interpretation. Subsumes the narrower hand-written
-                // patterns; kept alongside them so a regression in one path
-                // doesn't silently lose the wins of others.
-                || crate::fusevm_bridge::segment_is_string_bearing_int_result_eligible(
-                    seg, seg_ip,
-                ));
-        // Any-value unary→int (`defined($x)`) OR any-value unary→string (`ref($x)`):
-        // SAME shape as the unary string→int segments BUT the operand can be ANY
-        // type including UNDEF (that's the whole point). Marshaled as raw bits,
-        // with the `is_string_like` gate BYPASSED — the helper accepts every kind.
-        let val_unary_ok = !int_ok
-            && !str_ok
-            && (crate::fusevm_bridge::segment_is_any_value_unary_int_eligible(seg, seg_ip)
-                || crate::fusevm_bridge::segment_is_any_value_unary_str_eligible(seg, seg_ip));
-        // Float-operand segments with an integer/bool result (e.g. `$x < 0.5`) are
-        // JIT-eligible too; their slots marshal as integers exactly like `int_ok`.
-        let float_ok = !int_ok
-            && !str_ok
-            && crate::fusevm_bridge::segment_is_fusevm_float_eligible(seg, seg_ip);
-        // `chr($n)`: integer operand (marshaled unboxed, like `int_ok`/`float_ok`),
-        // owned-string-handle result. Not `str_ok` — its operand is an integer, not a
-        // string handle — so it takes the integer marshaling branch below.
-        let int_str_ok = !int_ok
-            && !str_ok
-            && !float_ok
-            && crate::fusevm_bridge::segment_is_int_to_string_eligible(seg, seg_ip);
-        // `substr($s,$off[,$len])` / `$s x $n`: a string operand AND integer operand(s),
-        // marshaled with DIFFERENT kinds per slot (see `string_handle_slot`).
-        let str_handle_slot = if !int_ok && !str_ok && !float_ok && !int_str_ok {
-            crate::fusevm_bridge::string_handle_slot(seg, seg_ip)
-        } else {
-            None
+        // Per-sub-IP eligibility cache: first call to this sub runs all 13+
+        // detectors; subsequent calls hit the cache. `None` = not yet
+        // analyzed; `Some(None)` = known-not-eligible (skip the bridge);
+        // `Some(Some(elig))` = cached dispatch verdict.
+        let elig = {
+            // Use the ORIGINAL sub-entry ip as the cache key (not seg_ip,
+            // which moves around when plain_remap_data fires — the cache
+            // shouldn't be sensitive to which form of the seg we analyzed).
+            let cache_ip = ip;
+            if cache_ip >= self.sub_fusevm_meta.len() {
+                self.sub_fusevm_meta.resize(cache_ip + 1, None);
+            }
+            match self.sub_fusevm_meta[cache_ip] {
+                Some(None) => return Ok(false),
+                Some(Some(cached)) => cached,
+                None => {
+                    let computed = compute_fusevm_elig(seg, seg_ip);
+                    self.sub_fusevm_meta[cache_ip] = Some(computed);
+                    match computed {
+                        Some(e) => e,
+                        None => return Ok(false),
+                    }
+                }
+            }
         };
-        let str_int_ok = str_handle_slot.is_some();
-        // `substr("abc", $n)` / `"prefix" x $n`: literal-string + slot-int → string.
-        // The string operand comes from `LoadConst` (resolved at runtime by
-        // `STK_VAL_LOAD_CONST` off the constants pool — no slot is involved),
-        // so the single slot here marshals as a plain integer — exactly like
-        // `int_str_ok` for `chr($n)`. Treating `lit_str_int_ok` as "all slots
-        // are ints" in the seeder below keeps wants_string false for every slot.
-        let lit_str_int_ok = !int_ok
-            && !str_ok
-            && !float_ok
-            && !int_str_ok
-            && !str_int_ok
-            && crate::fusevm_bridge::segment_is_literal_string_int_to_string_eligible(
-                seg, seg_ip,
-            );
-        // `sprintf("FMT", $arg)`: literal-string fmt + any-typed slot arg.
-        // Slot marshals as a raw NaN-boxed handle with the `is_string_like`
-        // gate BYPASSED — sprintf interprets per its format directive, so the
-        // arg can be int / float / string / undef and the helper handles
-        // type coercion correctly. Same seeder behavior as `val_unary_ok`
-        // (any-value handle bits, no type gate).
-        let lit_str_sprintf_ok = !int_ok
-            && !str_ok
-            && !float_ok
-            && !int_str_ok
-            && !str_int_ok
-            && !lit_str_int_ok
-            && !val_unary_ok
-            && crate::fusevm_bridge::segment_is_literal_string_anyval_sprintf_eligible(
-                seg, seg_ip,
-            );
-        if !int_ok
-            && !str_ok
-            && !float_ok
-            && !int_str_ok
-            && !str_int_ok
-            && !lit_str_int_ok
-            && !lit_str_sprintf_ok
-            && !val_unary_ok
-        {
-            return Ok(false);
-        }
+        // Only the downstream-used flags are extracted. The bridge's
+        // run_linear_segment reproduces the per-dispatch routing internally
+        // from the same detectors (which it re-runs once on the cached
+        // chunk's translation — that's separate from this seeder analysis).
+        let str_ok = matches!(elig.dispatch, FusevmDispatch::Str);
+        let str_handle_slot = elig.str_handle_slot;
+        let lit_str_sprintf_ok = matches!(elig.dispatch, FusevmDispatch::LitStrSprintf);
+        let val_unary_ok = matches!(elig.dispatch, FusevmDispatch::ValUnary);
 
         // Map each arg-bound slot to its `@_` index. Slots not in this map are body
         // locals (seeded 0 when write-before-read) or, for string segments, read
