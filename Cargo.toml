@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.16.10"
+version = "0.16.12"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
@@ -241,6 +241,3 @@ while_let_on_iterator = "allow"
 
 [lints]
 workspace = true
-
-[patch.crates-io]
-fusevm = { path = "../fusevm" }
