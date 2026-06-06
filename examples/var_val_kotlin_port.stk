@@ -1,0 +1,108 @@
+#!/usr/bin/env stryke
+
+# Side-by-side port from Kotlin to stryke using `var` / `val`. The
+# spellings transfer 1:1 — `val Math.PI` becomes `val $PI`, `var
+# counter: Int` becomes `var $counter : Int`. Sigils stay (`$` for
+# scalar, `@` for array, `%` for hash) because stryke is Perl-rooted,
+# but the immutability and shape of each declaration matches the
+# Kotlin original exactly.
+#
+# Each section shows:
+#   1. The Kotlin original (in a comment block)
+#   2. The stryke port using `var` / `val`
+#   3. A short trace so you can see the output line up
+
+p "── Section 1 — basic val + var ───────────────────────"
+# Kotlin:
+#   val name: String = "world"
+#   var greeting: String = "hello, $name"
+#   greeting = "hi, $name"
+#   println(greeting)
+val $name : Str = "world"
+var $greeting = "hello, $name"
+$greeting = "hi, $name"
+p "  $greeting"
+
+p ""
+p "── Section 2 — collections (List → @, Map → %) ───────"
+# Kotlin:
+#   val colors: List<String> = listOf("red", "green", "blue")
+#   var counts: Map<String, Int> = mapOf("red" to 3, "blue" to 5)
+#   for (c in colors) println(c)
+var @colors = ("red", "green", "blue")
+var %counts = (red => 3, blue => 5)
+for my $c (@colors) {
+    p "  color: $c"
+}
+p "  counts: red=$counts{red}, blue=$counts{blue}"
+
+p ""
+p "── Section 3 — derived constants (val from val) ──────"
+# Kotlin:
+#   val width = 80
+#   val height = 24
+#   val area = width * height
+#   println("area = $area")
+val $width = 80
+val $height = 24
+val $area = $width * $height
+p "  area = $area  (expected 1920)"
+
+p ""
+p "── Section 4 — running counter (var, mutating) ───────"
+# Kotlin:
+#   var total = 0
+#   for (n in 1..10) total += n
+#   println("sum 1..10 = \$total")
+var $total = 0
+for my $n (1:10) { $total += $n }
+p "  sum 1..10 = $total  (expected 55)"
+
+p ""
+p "── Section 5 — config object frozen at startup ───────"
+# Kotlin:
+#   data class Config(val host: String, val port: Int)
+#   val cfg = Config(host = "localhost", port = 8080)
+#   val baseUrl = "http://\${cfg.host}:\${cfg.port}"
+#   println(baseUrl)
+val $cfg = { host => "localhost", port => 8080 }
+val $base_url = "http://" . $cfg->{host} . ":" . $cfg->{port}
+p "  base_url = $base_url  (expected http://localhost:8080)"
+
+p ""
+p "── Section 6 — accumulator pattern (var array) ───────"
+# Kotlin:
+#   val src = listOf(1, 2, 3, 4, 5)
+#   var sumOfSquares = 0
+#   for (x in src) sumOfSquares += x * x
+#   println("sum of squares = \$sumOfSquares")
+var @src = (1, 2, 3, 4, 5)
+var $sum_of_squares = 0
+for my $x (@src) { $sum_of_squares += $x * $x }
+p "  sum of squares = $sum_of_squares  (expected 55)"
+
+p ""
+p "── Section 7 — fn with val + var locals ──────────────"
+# Kotlin:
+#   fun fibonacci(n: Int): Int {
+#       val target = n
+#       var a = 0; var b = 1
+#       repeat(target) { val t = a + b; a = b; b = t }
+#       return a
+#   }
+#   println("fib(10) = \${fibonacci(10)}")
+fn Demo::fibonacci($n) {
+    val $target = $n
+    var $a = 0
+    var $b = 1
+    for my $_ (1:$target) {
+        val $t = $a + $b
+        $a = $b
+        $b = $t
+    }
+    $a
+}
+p "  fib(10) = ", Demo::fibonacci(10), "  (expected 55)"
+
+p ""
+p "── done ──────────────────────────────────────────────"

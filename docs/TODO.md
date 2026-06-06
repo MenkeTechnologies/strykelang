@@ -26,10 +26,6 @@
      (`examples/http_router_middleware.stk`) or use string ops like `index`
      (`examples/pubsub_message_bus.stk`).
 
-  4. `pmap_reduce { } { }` silently absorbs the following statement as an
-     optional third block argument unless terminated with `;`. See BUG-301.
-     Three call sites in examples document the workaround in-line.
-
   5. Array slice past the end fills with `undef` instead of clamping
      (`@arr[0:N]` for N >= len gives `len` elements plus `(N+1 - len)`
      undefs). See BUG-302. Clamp the upper bound at the caller.
