@@ -55,7 +55,7 @@ p "── Section 4 — running counter (var, mutating) ───────"
 #   for (n in 1..10) total += n
 #   println("sum 1..10 = \$total")
 var $total = 0
-for my $n (1:10) { $total += $n }
+for var $n (1:10) { $total += $n }
 p "  sum 1..10 = $total  (expected 55)"
 
 p ""
@@ -78,7 +78,7 @@ p "── Section 6 — accumulator pattern (var array) ───────"
 #   println("sum of squares = \$sumOfSquares")
 var @src = (1, 2, 3, 4, 5)
 var $sum_of_squares = 0
-for my $x (@src) { $sum_of_squares += $x * $x }
+for var $x (@src) { $sum_of_squares += $x * $x }
 p "  sum of squares = $sum_of_squares  (expected 55)"
 
 p ""
