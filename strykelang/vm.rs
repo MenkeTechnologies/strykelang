@@ -1631,6 +1631,30 @@ impl<'a> VM<'a> {
                 // infinite loop. Conservatively bail on these compares; the
                 // bridge can still lower numeric grep bodies (`grep { _ > N }`).
                 Op::StrEq | Op::StrNe => return Ok(None),
+                // 2-arg `index` / `rindex` over a captured outer-scope string
+                // have the same i64-seeding hazard as StrEq/StrNe above. The
+                // bridge has a `STK_STR_INDEX` host helper that reconstructs
+                // both operands from raw bits — fine when the slot's raw_bits
+                // is a live `StrykeValue` handle. But the plain-remap path
+                // seeds plain-bound captured scalars as `raw_bits() as i64`,
+                // and for any non-trivial captured string (or a derived value
+                // like `my $lower = lc($s)`) the JIT produced -1 for every
+                // call regardless of whether the substring was present —
+                // making `grep { index($s, _) < 0 }` keep *every* element
+                // (-1 < 0 is true). The pangram rosetta test surfaced this:
+                // `grep { index($lower, _) < 0 } 'a'..'z'` returned all 26
+                // letters for the canonical "the quick brown fox …" string
+                // (pangram ⇒ should return zero), and `Standard pangram`
+                // failed across the rosetta suite. Conservatively bail; the
+                // bridge can still lower grep bodies whose `index` operands
+                // are constants or topic-only (the `index(LITERAL, _) < N`
+                // form continues to JIT because plain-remap isn't engaged).
+                Op::CallBuiltin(id, 2)
+                    if *id == crate::bytecode::BuiltinId::Index as u16
+                        || *id == crate::bytecode::BuiltinId::Rindex as u16 =>
+                {
+                    return Ok(None)
+                }
                 _ => {}
             }
         }
