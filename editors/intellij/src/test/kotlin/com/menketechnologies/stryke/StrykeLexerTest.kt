@@ -207,8 +207,10 @@ class StrykeLexerTest {
 
     @Test
     fun keywords_classified_by_category() {
-        val toks = lex("my fn return if BEGIN true undef")
+        val toks = lex("my var val fn return if BEGIN true undef")
         assertTrue("DECL my: $toks", has(toks, StrykeTokenTypes.DECL_KEYWORD, "my"))
+        assertTrue("DECL var: $toks", has(toks, StrykeTokenTypes.DECL_KEYWORD, "var"))
+        assertTrue("DECL val: $toks", has(toks, StrykeTokenTypes.DECL_KEYWORD, "val"))
         assertTrue("FN fn: $toks", has(toks, StrykeTokenTypes.FN_KEYWORD, "fn"))
         assertTrue(
             "CONTROL return/if: $toks",

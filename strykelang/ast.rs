@@ -977,8 +977,15 @@ pub enum ExprKind {
     /// Evaluation: declare each var in the current scope, evaluate the initializer
     /// (or default to `undef`), then return the assigned value(s).
     /// Distinct from `StmtKind::My` which only appears at statement level.
+    ///
+    /// `var $x = EXPR` and `val $x = EXPR` (Kotlin/Scala-style aliases for
+    /// `my` and `const my`) reach this node via parser-level normalization
+    /// — `parse_primary` rewrites `raw_kw` to `"my"` and threads the
+    /// `mark_frozen` bit through `VarDecl::frozen` on each decl. The
+    /// `keyword` field below therefore only ever holds the post-normalized
+    /// spelling; `"var"`/`"val"` do not appear at the AST layer.
     MyExpr {
-        keyword: String, // "my" / "our" / "state" / "local"
+        keyword: String, // "my" / "our" / "state" / "local" (post-normalization; `var`/`val` collapse into `"my"`)
         decls: Vec<VarDecl>,
     },
 
