@@ -8966,10 +8966,29 @@ impl Parser {
         // assigned value(s); has the side effect of declaring the variable in
         // the current scope.  See `ExprKind::MyExpr`.
         if let Token::Ident(ref kw) = self.peek().clone() {
-            if matches!(
-                kw.as_str(),
-                "my" | "var" | "val" | "our" | "state" | "local"
-            ) {
+            // `var` / `val` are surface aliases for `my` / `const my` but they
+            // are also common user identifiers (struct field names, hash keys,
+            // method names — `struct Node { val => Int }`, `Box(val => undef)`,
+            // `$rec->val`). Only treat them as declarators when the lookahead
+            // is unambiguous: a sigil token (`$x` / `@x` / `%x` / `*x`), an
+            // `(` for list destructuring, or a `typed` modifier. In all other
+            // positions (`val =>` / `val:` / `val,` / `val)` / `val;`) they
+            // are barewords and fall through to the normal expression parser.
+            let is_var_val_decl_start = matches!(kw.as_str(), "var" | "val")
+                && matches!(
+                    self.peek_at(1),
+                    Token::ScalarVar(_)
+                        | Token::ArrayVar(_)
+                        | Token::HashVar(_)
+                        | Token::Star
+                        | Token::LParen
+                ) || matches!(kw.as_str(), "var" | "val")
+                    && matches!(
+                        self.peek_at(1),
+                        Token::Ident(ref kw) if kw == "typed"
+                    );
+            let eager_kw = matches!(kw.as_str(), "my" | "our" | "state" | "local");
+            if eager_kw || is_var_val_decl_start {
                 let raw_kw = kw.clone();
                 // `var` / `val` are surface aliases; normalize to `my` for
                 // the inner parser (same as the statement-form dispatch).
