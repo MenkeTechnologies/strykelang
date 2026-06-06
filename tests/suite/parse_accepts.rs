@@ -272,6 +272,30 @@ fn accepts_foreach_my() {
     p("foreach my $v (1, 2) { $v; }");
 }
 
+// `for var $x (LIST)` / `for val $x (LIST)` / `foreach var $x` /
+// `foreach val $x` — Kotlin/Scala-style loop-variable declarators that
+// parse identically to `for my $x` / `foreach my $x`. Pin so the
+// contextual-keyword gating in `parse_for_or_foreach` and `parse_foreach`
+// stays wired (both arms require a `Token::ScalarVar` lookahead so bare
+// `for var (@xs) {…}` still routes to the no-decl arm with `var` as an
+// identifier).
+#[test]
+fn accepts_for_var() {
+    p("for var $c (1, 2, 3) { p $c }");
+}
+#[test]
+fn accepts_for_val() {
+    p("for val $c (1, 2, 3) { p $c }");
+}
+#[test]
+fn accepts_foreach_var() {
+    p("foreach var $c (1, 2, 3) { p $c }");
+}
+#[test]
+fn accepts_foreach_val() {
+    p("foreach val $c (1, 2, 3) { p $c }");
+}
+
 #[test]
 fn accepts_foreach_implicit_topic() {
     p("foreach (1, 2) { $_; }");
