@@ -44,7 +44,7 @@ p "  after reassign: \$w = $w, \$x = $x"
 p ""
 p "── Type annotations work on val (same as const my) ───"
 val $count : Int = 0
-val $title : Str = "stryke v0.16.15"
+val $title : Str = "stryke v0.16.16"
 p "  val \$count : Int = $count"
 p "  val \$title : Str = '$title'"
 
