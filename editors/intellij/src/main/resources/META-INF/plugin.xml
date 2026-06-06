@@ -58,6 +58,11 @@
     <!-- Platform LSP API (paid IDEs) -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.ultimate</depends>
+    <!-- Required for the `spellchecker.support` EP registration below.
+         Without this depends tag the SpellcheckingStrategy class loads
+         but the EP wiring no-ops and TypoInspection still fires on
+         every STRING / HEREDOC / COMMENT / REGEX token. -->
+    <depends>com.intellij.spellchecker</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- File type -->
@@ -81,6 +86,15 @@
 
         <!-- Color settings page -->
         <colorSettingsPage implementation="com.menketechnologies.stryke.StrykeColorSettingsPage"/>
+
+        <!-- Spell-check strategy: suppress TypoInspection on string /
+             heredoc / comment / regex tokens. Perl-ish scripts are
+             full of identifiers (`paramsubst`, `bracecomplete`), paths
+             (`Src/glob.c`), banner dividers, and regex patterns that
+             the platform dictionary flags as typos by default. -->
+        <spellchecker.support
+            language="Stryke"
+            implementationClass="com.menketechnologies.stryke.StrykeSpellcheckingStrategy"/>
 
         <!-- Commenter (line comment with #) -->
         <lang.commenter language="Stryke" implementationClass="com.menketechnologies.stryke.StrykeCommenter"/>
