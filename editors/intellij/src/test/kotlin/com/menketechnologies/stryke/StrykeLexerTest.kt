@@ -63,14 +63,94 @@ class StrykeLexerTest {
 
     @Test
     fun double_quoted_string_with_hash_subscript_emits_scalar_var() {
-        // `"$h{key}"` — the `$h` part is a sigil-var; `{key}` falls
-        // back to regular tokenization. At minimum, `$h` must be
-        // SCALAR_VAR (the IDE colors the whole subscript as variable
-        // via semantic-tokens layered on top in a real editor).
+        // `"$h{key}"` — `$h{key}` must come through as one SCALAR_VAR
+        // token. Before the extendStringInterpSubscripts fix the lexer
+        // dropped back to STRING mode at `{`, leaving the subscript
+        // uncolored — the bug the user hit on
+        // `"counts: red=$counts{red}, blue=$counts{blue}"`.
         val toks = lex("\"got \$h{key} done\"")
         assertTrue(
-            "expected SCALAR_VAR `\$h` inside the string: $toks",
-            toks.any { it.first == StrykeTokenTypes.SCALAR_VAR && it.second.startsWith("\$h") },
+            "expected SCALAR_VAR `\$h{key}` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$h{key}"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_array_subscript_emits_scalar_var() {
+        // `"$ary[0]"` — same gap as the hash-subscript case, on the
+        // `[N]` path.
+        val toks = lex("\"v=\$ary[0] done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$ary[0]` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$ary[0]"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_chained_hash_subscripts_emits_scalar_var() {
+        // `"$h{k1}{k2}"` — chained subscripts. Both braces must be
+        // absorbed into the SCALAR_VAR token, not just the first.
+        val toks = lex("\"x=\$h{k1}{k2} done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$h{k1}{k2}` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$h{k1}{k2}"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_mixed_subscripts_emits_scalar_var() {
+        // `"$h{k}[0]{m}"` — mixed `{}`/`[]` chain.
+        val toks = lex("\"x=\$h{k}[0]{m} done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$h{k}[0]{m}` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$h{k}[0]{m}"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_arrow_hash_deref_emits_scalar_var() {
+        // `"$ref->{key}"` — Perl-style arrow into hash subscript.
+        val toks = lex("\"v=\$ref->{key} done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$ref->{key}` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$ref->{key}"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_arrow_array_deref_emits_scalar_var() {
+        // `"$ref->[0]"` — Perl-style arrow into array subscript.
+        val toks = lex("\"v=\$ref->[0] done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$ref->[0]` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$ref->[0]"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_with_chained_arrow_deref_emits_scalar_var() {
+        // `"$ref->{k}->[0]->{m}"` — chained arrow derefs over mixed
+        // subscript kinds. The whole chain is one variable token.
+        val toks = lex("\"v=\$ref->{k}->[0]->{m} done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$ref->{k}->[0]->{m}` as one token: $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$ref->{k}->[0]->{m}"),
+        )
+    }
+
+    @Test
+    fun double_quoted_string_arrow_method_call_does_not_extend() {
+        // Perl does NOT interpolate method calls — `"$obj->method"`
+        // emits `$obj` and leaves the rest as STRING. The extender
+        // must stop at `->` when the next char is not `{` or `[`.
+        val toks = lex("\"name=\$obj->method done\"")
+        assertTrue(
+            "expected SCALAR_VAR `\$obj` (NOT extended through `->method`): $toks",
+            has(toks, StrykeTokenTypes.SCALAR_VAR, "\$obj"),
+        )
+        assertTrue(
+            "expected the `->method done\"` tail to come through as STRING: $toks",
+            toks.any { it.first == StrykeTokenTypes.STRING && it.second.contains("->method") },
         )
     }
 
