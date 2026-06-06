@@ -30,21 +30,21 @@ p "  val \%ENDPOINTS.api = '$ENDPOINTS{api}'"
 
 p ""
 p "── Mixing var / val / my / const my freely ───────────"
-my  $a = 10
-var $b = 20
-val $c = 30                                  # immutable
-const my $d = 40                             # immutable, longer spelling
-p "  $a + $b + $c + $d = ", $a + $b + $c + $d
+my  $w = 10
+var $x = 20
+val $y = 30                                  # immutable
+const my $z = 40                             # immutable, longer spelling
+p "  $w + $x + $y + $z = ", $w + $x + $y + $z
 
 # Both var and my can be reassigned; val and const my cannot.
-$a = 100
-$b = 200
-p "  after reassign: \$a = $a, \$b = $b"
+$w = 100
+$x = 200
+p "  after reassign: \$w = $w, \$x = $x"
 
 p ""
 p "── Type annotations work on val (same as const my) ───"
 val $count : Int = 0
-val $title : Str = "stryke v0.16.12"
+val $title : Str = "stryke v0.16.13"
 p "  val \$count : Int = $count"
 p "  val \$title : Str = '$title'"
 
@@ -57,7 +57,7 @@ push @log, "starting"
 push @log, "connected to $base_url"
 push @log, "ready"
 p "  base_url (val):  $base_url"
-p "  log lines (var): ", scalar(@log)
+p "  log lines (var): ", len(@log)
 p "  log: ", join(" | ", @log)
 
 p ""
