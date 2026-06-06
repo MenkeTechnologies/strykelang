@@ -94,9 +94,16 @@ class StrykeLexer : LexerBase() {
         // We're at a `$`/`@`/`%` interpolation marker inside a `"..."`.
         // Emit the sigil-var as one token (SCALAR_VAR / ARRAY_VAR / HASH_VAR)
         // then return to string mode so the suffix is consumed as STRING.
+        // After the bare sigil-var, extend through any trailing hash /
+        // array subscript chains so `$h{key}`, `$ary[0]`, `$h{k1}{k2}`,
+        // `$ref->{k}->[1]` render as ONE sigil-var token. Without this,
+        // the lexer dropped back to STRING mode at `{` / `[`, leaving
+        // the subscript uncolored in interpolated strings — the bug
+        // the user hit on `"counts: red=$counts{red}, blue=$counts{blue}"`.
         if (state == STATE_IN_DQ_SIGIL_VAR) {
             val sigil = buf[pos]
             consumeSigilVar(sigil)
+            extendStringInterpSubscripts()
             state = STATE_IN_DQ_STRING
             return
         }
@@ -743,6 +750,85 @@ class StrykeLexer : LexerBase() {
         }
         tokenEnd = p; pos = p
         tokenType = varKind(sigil)
+    }
+
+    /**
+     * After a sigil-var inside a double-quoted interpolation, extend
+     * the current token through trailing subscript chains:
+     *
+     *   `$h{key}`               — bare hash subscript
+     *   `$ary[0]`               — bare array subscript
+     *   `$h{k1}{k2}`            — chained hash subscripts
+     *   `$ary[0][1]`            — chained array subscripts
+     *   `$h{k}[0]{m}`           — mixed
+     *   `$ref->{k}` / `$ref->[0]` — arrow-deref into a subscript
+     *   `$ref->{k}->[0]`        — arrow chains
+     *
+     * Stops at any char that would cross the enclosing `"` (string
+     * close) or at a non-subscript char. Matches Perl's interpolation
+     * rule and what JetBrains' Perl plugin renders for the same code.
+     *
+     * Operates by advancing `tokenEnd` / `pos` in place — the SCALAR_VAR
+     * / ARRAY_VAR / HASH_VAR token type already set by `consumeSigilVar`
+     * is preserved.
+     */
+    private fun extendStringInterpSubscripts() {
+        while (pos < endOffset) {
+            val c = buf[pos]
+            when {
+                c == '{' -> {
+                    val e = skipStringInterpSubscript(pos, '{', '}') ?: return
+                    tokenEnd = e
+                    pos = e
+                }
+                c == '[' -> {
+                    val e = skipStringInterpSubscript(pos, '[', ']') ?: return
+                    tokenEnd = e
+                    pos = e
+                }
+                // `->` followed by a subscript opener — consume the
+                // arrow and loop so the next iteration eats the
+                // `{...}` or `[...]`. Bare `->method` calls inside
+                // strings are NOT interpolated by Perl, so stop there.
+                c == '-' && pos + 1 < endOffset && buf[pos + 1] == '>'
+                    && pos + 2 < endOffset && (buf[pos + 2] == '{' || buf[pos + 2] == '[') -> {
+                    tokenEnd = pos + 2
+                    pos = pos + 2
+                }
+                else -> return
+            }
+        }
+    }
+
+    /**
+     * Skip a balanced `{...}` / `[...]` subscript starting at `start`
+     * (which must point at `open`). Returns the offset RIGHT AFTER the
+     * matching close, or `null` if the subscript would cross the
+     * enclosing `"` (in which case the caller bails and leaves the
+     * `{` / `[` to be lexed as plain string content).
+     *
+     * Escapes (`\` + next char) skip both chars. Nested same-kind
+     * braces increment depth so `$h{$h2{k}}` walks correctly.
+     */
+    private fun skipStringInterpSubscript(start: Int, open: Char, close: Char): Int? {
+        var p = start + 1
+        var depth = 1
+        while (p < endOffset) {
+            val c = buf[p]
+            if (c == '\\' && p + 1 < endOffset) { p += 2; continue }
+            // A bare `"` inside the subscript would terminate the
+            // enclosing string. Bail; do not extend through the close.
+            if (c == '"') return null
+            if (c == open) depth++
+            else if (c == close) {
+                depth--
+                if (depth == 0) return p + 1
+            }
+            p++
+        }
+        // Reached EOF without closing — caller leaves the `{` / `[`
+        // alone and continues in string mode (best-effort recovery).
+        return null
     }
 
     private fun varKind(sigil: Char): IElementType = when (sigil) {
