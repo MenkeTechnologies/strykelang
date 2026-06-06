@@ -80,13 +80,22 @@ jobs:
         # after ~1h). 8 GB of swap is the standard arm-runner
         # workaround and lets the link complete without falling back
         # to cross-rs.
+        #
+        # The runner ships with a pre-mounted /swapfile (4 GB), so
+        # fallocate on it returns "Text file busy". swapoff + rm
+        # first, then recreate at 8 GB. dd is preferred over
+        # fallocate because some runner filesystems reject fallocate
+        # on swap-flagged inodes even after swapoff.
         if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
         run: |
-          sudo fallocate -l 8G /swapfile
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
           free -h
+          swapon --show
 
       - name: Set aarch64-linux-gnu RUSTFLAGS (link-time memory budget)
         # --no-keep-memory + --reduce-memory-overheads cut the linker's
