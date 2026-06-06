@@ -3064,6 +3064,8 @@ impl Lexer {
                     // Keywords/builtins that always expect arguments — never a term,
                     // so the next `/` is always a regex start.
                     "my"
+                    | "var"
+                    | "val"
                     | "mysync"
                     | "frozen"
                     | "const"

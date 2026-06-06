@@ -1568,6 +1568,73 @@ impl<'a> VM<'a> {
             return Ok(None);
         }
 
+        // Bail on any WRITE to a scalar (named or slot) inside the block.
+        //
+        // Unlike sub bodies (which run in their own scope and discard locals on
+        // return), block bodies share the outer scope. `map { $s += $_ }` /
+        // `e { $n++ }` / `foreach { $sum += $_ }` mutate outer-captured
+        // lexicals, and the bridge has NO writeback path:
+        //   - For NAMED writes (`Op::SetScalarPlain` / `ScalarCompoundAssign` /
+        //     `PreInc(name_idx)` etc.) — the bridge's plain-remap rewrites only
+        //     reads; writes were never plumbed back to scope.
+        //   - For SLOT writes (`Op::SetScalarSlot` / `AddAssignSlotSlot` /
+        //     `PreIncSlot` etc.) — the bridge runs ops against `jit_buf_slot`
+        //     but never copies the slot values back to
+        //     `scope.set_scalar_slot(i, ...)` after the seg runs (see seeder
+        //     loop above; there is no symmetric drain loop after
+        //     `run_linear_segment_cached`).
+        //
+        // Net effect when not bailed: `$s == 0` after a map that should have
+        // summed it to 6 (regression in `map_block_mutates_outer_lexical`,
+        // `e_block_visit_count_matches_input_length`, and 6 sibling tests in
+        // the `ep_each_iteration_pin` suite). Also `pfor { $x = 1 }` is
+        // supposed to raise a Runtime error from the parallel-write guard —
+        // the bridge would let the body succeed silently
+        // (`parallel_block_rejects_captured_lexical_assignment`).
+        //
+        // This bail is conservative: pure-read blocks (`grep { length($_) > 5 }`,
+        // `map { $_ * 2 }`) carry no scalar-write ops and stay bridge-eligible.
+        // Block-local `my $x = …; …; $x` is also bailed for now since the slot
+        // index alone doesn't distinguish block-local from outer; a future
+        // refinement can use `DeclareScalarSlot` as a watermark to allow
+        // slot-writes whose targets were declared inside the seg.
+        for op in full_seg {
+            match op {
+                Op::SetScalar(_)
+                | Op::SetScalarPlain(_)
+                | Op::SetScalarKeep(_)
+                | Op::SetScalarKeepPlain(_)
+                | Op::PreInc(_)
+                | Op::PreDec(_)
+                | Op::PostInc(_)
+                | Op::PostDec(_)
+                | Op::ScalarCompoundAssign { .. }
+                | Op::SetScalarSlot(_)
+                | Op::SetScalarSlotKeep(_)
+                | Op::PreIncSlot(_)
+                | Op::PreIncSlotVoid(_)
+                | Op::PostIncSlot(_)
+                | Op::PreDecSlot(_)
+                | Op::PostDecSlot(_)
+                | Op::AddAssignSlotSlot(_, _)
+                | Op::AddAssignSlotSlotVoid(_, _) => return Ok(None),
+                // String comparisons require operand decode beyond the i64
+                // seeder; e.g. `grep { _ eq $node } @seen` reads `$node` from
+                // an outer-scope slot, but the bridge seeds slot values as
+                // `raw_bits() as i64` and compares with int semantics. For
+                // an integer-typed `$node` this is fine; for a string
+                // (`"SF"`), the int form is a stale handle that compares as
+                // some unrelated i64. The grep returns "no match" for items
+                // that should match, which makes `next if grep { ... }` not
+                // skip when it should — caught by
+                // `demo_graph_bfs` which fell into a BFS-without-seen-check
+                // infinite loop. Conservatively bail on these compares; the
+                // bridge can still lower numeric grep bodies (`grep { _ > N }`).
+                Op::StrEq | Op::StrNe => return Ok(None),
+                _ => {}
+            }
+        }
+
         // Same plain-scalar-read remap as sig subs: rewrite GetScalarPlain(name)
         // → GetScalarSlot(synth) so the bridge can seed `$_`/outer-scope reads
         // through its slot mechanism. Bails on any named-scalar WRITE.

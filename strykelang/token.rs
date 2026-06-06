@@ -315,6 +315,8 @@ pub const KEYWORDS: &[&str] = &[
     "frozen",
     "typed",
     "my",
+    "var",
+    "val",
     "mysync",
     "our",
     "oursync",

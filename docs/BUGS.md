@@ -3313,38 +3313,35 @@ Severity: **bug**. Surfaced while building 9 complex example programs
 non-regex matchers.
 
 
-## BUG-301 — `pmap_reduce { } { }` silently absorbs following statement
+## BUG-301 — `pmap_reduce { } { }` silently absorbs following statement [FIXED]
 
 ```sh
 $ stryke -e '
-my $g = 1:10 |> pmap_reduce { 1 } { _ + _1 };
+my $g = 1:10 |> pmap_reduce { 1 } { _ + _1 }
 p "after pmr"
 p "g = $g"'
+after pmr
 g = 10
-                        # ← "after pmr" was eaten
 ```
 
-`pmap_reduce` accepts two blocks (mapper + reducer). The parser keeps
-looking for an *optional third block* after the second one, and at file
-scope it greedily absorbs the next statement — `p "after pmr"` here —
-silently dropping its execution. Behavior is invisible (no warning,
-correct numeric result), so it usually surfaces only when a follow-up
-print or variable update mysteriously fails to run.
+**Was:** `pmap_reduce` accepted two blocks (mapper + reducer); the parser
+kept looking for an *optional third block* after the second one, and at
+file scope it greedily absorbed the next statement — `p "after pmr"` —
+silently dropping its execution. Behavior was invisible (no warning,
+correct numeric result), so it typically surfaced only when a follow-up
+print or variable update mysteriously failed to run.
 
-**Workaround:** terminate the `pmap_reduce` call with an explicit `;`:
+**Fix:** when `pmap_reduce` is the RHS of a pipe (`|>`), the LIST operand
+is supplied by the pipe placeholder, so the function-call form must NOT
+greedily call `parse_assign_expr` for a list. Added a `pipe_supplies_
+slurped_list_operand()` check after the second block so the parser bails
+out with an empty list in pipe-RHS context. This mirrors how `puniq`,
+`pany`, and the other list-slurping builtins already short-circuit.
+See `strykelang/parser.rs` around the `"pmap_reduce" =>` arm.
 
-```sh
-my $g = 1:10 |> pmap_reduce { 1 } { _ + _1 };   # ← trailing semicolon
-p "after pmr"                                   # ← now runs
-```
-
-Pinned in `examples/parallel_pi_monte_carlo.stk`,
-`examples/gradient_descent_linreg.stk`, and `examples/csv_etl_parallel.stk`
-(each documents the workaround at the call site).
-
-Severity: **bug**. The same trap exists for any builtin that takes a
-variable number of block arguments. Style rule §0 #4 ("no trailing `;`")
-explicitly carves out this parser-mandated exception.
+Trailing `;` is no longer required after `pmap_reduce { } { }` even in
+pipe form. Example files retain the explicit semicolons (harmless) but
+new code can omit them.
 
 
 ## BUG-302 — Array slice past end fills with `undef` instead of clamping

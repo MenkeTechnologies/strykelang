@@ -343,3 +343,5 @@ demo_runs_no_interop!(
     "examples/hindley_milner_no_interop.stk"
 );
 demo_runs_no_interop!(demo_sql_engine, "examples/sql_engine_no_interop.stk");
+demo_runs_no_interop!(demo_var_val, "examples/var_val.stk");
+demo_runs_no_interop!(demo_var_val_kotlin_port, "examples/var_val_kotlin_port.stk");
