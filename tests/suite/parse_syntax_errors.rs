@@ -105,6 +105,22 @@ fn rejects_eof_after_my() {
     assert!(stryke::parse("my").is_err());
 }
 
+// `var` / `val` are *contextual* keywords (Kotlin/Scala-style aliases for
+// `my` / `const my`). When followed by a sigil they dispatch as declarators
+// exactly like `my`; in every other position they parse as plain barewords.
+// So bare `parse("var")` / `parse("val")` succeed (identifier expression),
+// unlike bare `parse("my")` which always errors. The parallel error case is
+// `var $` / `val $` — sigil-but-no-name, identical EOF-mid-decl reject path.
+#[test]
+fn rejects_eof_after_var_sigil() {
+    assert!(stryke::parse("var $").is_err());
+}
+
+#[test]
+fn rejects_eof_after_val_sigil() {
+    assert!(stryke::parse("val $").is_err());
+}
+
 #[test]
 fn rejects_eof_after_comma_in_list() {
     assert!(stryke::parse("(1,").is_err());

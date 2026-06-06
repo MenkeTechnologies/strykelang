@@ -58,7 +58,7 @@ fn percent_a_has_aliases() {
 fn percent_k_contains_known_keywords() {
     let code = r#"
         my $ok = 1;
-        for my $name ("if", "else", "for", "while", "return", "my", "fn") {
+        for my $name ("if", "else", "for", "while", "return", "my", "var", "val", "fn") {
             $ok = 0 unless exists $k{$name};
         }
         $ok ? 1 : 0
