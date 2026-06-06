@@ -807,13 +807,19 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    // `frozen my $x = val;` / `const my $x = val;` — the
-                    // two spellings are interchangeable (`const` is the
-                    // more-familiar name for new users). Expects `my`
-                    // to follow.
+                    // `frozen my $x = val;` / `const my $x = val;` — the two
+                    // spellings are interchangeable (`const` is the
+                    // more-familiar name for new users). Also accept
+                    // `frozen var` / `const var` / `frozen val` / `const
+                    // val` so the Kotlin/Scala-style aliases compose with
+                    // the modifier the same way `my` does. `val` already
+                    // means frozen on its own — pairing it with
+                    // `const`/`frozen` is redundant but idempotent (the
+                    // post-parse loop below sets `decl.frozen = true`,
+                    // which `val`'s own arm would have set too).
                     self.advance(); // consume "frozen"/"const"
                     if let Token::Ident(ref kw) = self.peek().clone() {
-                        if kw == "my" {
+                        if matches!(kw.as_str(), "my" | "var" | "val") {
                             // Accept type annotations the same way `typed
                             // my $x : Int` does — `const`/`frozen` is
                             // orthogonal to typing, and `: Type` after a
@@ -827,13 +833,13 @@ impl Parser {
                             stmt
                         } else {
                             return Err(self.syntax_err(
-                                format!("Expected 'my' after '{leading}'"),
+                                format!("Expected 'my' / 'var' / 'val' after '{leading}'"),
                                 self.peek_line(),
                             ));
                         }
                     } else {
                         return Err(self.syntax_err(
-                            format!("Expected 'my' after '{leading}'"),
+                            format!("Expected 'my' / 'var' / 'val' after '{leading}'"),
                             self.peek_line(),
                         ));
                     }
@@ -847,17 +853,35 @@ impl Parser {
                     }
                     self.advance();
                     if let Token::Ident(ref kw) = self.peek().clone() {
-                        if kw == "my" {
-                            self.parse_my_our_local("my", true)?
+                        // `typed my $x : Int = …` is the canonical form;
+                        // `typed var` / `typed val` accept the same
+                        // alias-keyword set as the `frozen`/`const` arm
+                        // above. For `typed val`, the original `val` arm
+                        // would have set `decl.frozen = true`; preserve
+                        // that here so the modifier composition matches
+                        // (`typed val $x : Int = …` ≡ `const typed my $x : Int = …`).
+                        let raw_kw = kw.clone();
+                        if matches!(raw_kw.as_str(), "my" | "var" | "val") {
+                            let mut stmt = self.parse_my_our_local("my", true)?;
+                            if raw_kw == "val" {
+                                if let StmtKind::My(ref mut decls) = stmt.kind {
+                                    for decl in decls.iter_mut() {
+                                        decl.frozen = true;
+                                    }
+                                }
+                            }
+                            stmt
                         } else {
-                            return Err(
-                                self.syntax_err("Expected 'my' after 'typed'", self.peek_line())
-                            );
+                            return Err(self.syntax_err(
+                                "Expected 'my' / 'var' / 'val' after 'typed'",
+                                self.peek_line(),
+                            ));
                         }
                     } else {
-                        return Err(
-                            self.syntax_err("Expected 'my' after 'typed'", self.peek_line())
-                        );
+                        return Err(self.syntax_err(
+                            "Expected 'my' / 'var' / 'val' after 'typed'",
+                            self.peek_line(),
+                        ));
                     }
                 }
                 "our" => self.parse_my_our_local("our", false)?,

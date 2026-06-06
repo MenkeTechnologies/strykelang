@@ -296,6 +296,39 @@ fn accepts_foreach_val() {
     p("foreach val $c (1, 2, 3) { p $c }");
 }
 
+// `const`/`frozen`/`typed` modifiers compose with `my` / `var` / `val`.
+// `const var` is the practical addition (use when the surrounding code
+// uses `var` for mutable lexicals and you want a frozen exception
+// without introducing the `val` spelling); the others (`frozen var`,
+// `const val`, `frozen val`, `typed var`, `typed val`) compose for
+// symmetry — `val` is already frozen on its own, so pairing it with
+// `const`/`frozen` is idempotent. `typed val $x : Int` keeps val's
+// frozen flag through the typed prefix.
+#[test]
+fn accepts_const_var() {
+    p("const var $x = 1");
+}
+#[test]
+fn accepts_const_val() {
+    p("const val $x = 1");
+}
+#[test]
+fn accepts_frozen_var() {
+    p("frozen var $x = 1");
+}
+#[test]
+fn accepts_frozen_val() {
+    p("frozen val $x = 1");
+}
+#[test]
+fn accepts_typed_var() {
+    p("typed var $x : Int = 1");
+}
+#[test]
+fn accepts_typed_val() {
+    p("typed val $x : Int = 1");
+}
+
 #[test]
 fn accepts_foreach_implicit_topic() {
     p("foreach (1, 2) { $_; }");
