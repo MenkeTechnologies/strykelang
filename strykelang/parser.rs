@@ -724,13 +724,28 @@ impl Parser {
                     self.parse_trait_decl()?
                 }
                 "my" => self.parse_my_our_local("my", false)?,
-                // `var $x = …` — Kotlin/Scala/Java-style synonym for `my`.
-                // Parses identically (same StmtKind::My output, same scoping
-                // rules) so existing tooling, error messages, and bytecode
-                // emission don't fork. Consume the `var` token then dispatch
-                // through `parse_my_our_local("my", false)` which advances
-                // past what it thinks is `my`.
-                "var" => {
+                // `var $x = …` / `val $x = …` — Kotlin/Scala-style aliases for
+                // `my` / `const my`. Both are common user identifiers (struct
+                // field names, hash keys, around-advice targets, user-defined
+                // sub names like `fn val { 1 }`). Match-guard on the lookahead
+                // so they ONLY dispatch as declarators when the next token is
+                // a sigil binding (`$x` / `@x` / `%x` / `*x`), an LParen for
+                // list destructuring (`var ($a, $b) = …`), or a `typed`
+                // modifier. Every other shape (`val()` / `val,` / `val =>` /
+                // `val { … }`) falls through to the default arm so the bare
+                // identifier is parsed as an expression statement.
+                "var" if matches!(
+                    self.peek_at(1),
+                    Token::ScalarVar(_)
+                        | Token::ArrayVar(_)
+                        | Token::HashVar(_)
+                        | Token::Star
+                        | Token::LParen
+                ) || matches!(
+                    self.peek_at(1),
+                    Token::Ident(ref k) if k == "typed"
+                ) =>
+                {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
                             "`var` is a stryke extension (disabled by --compat)",
@@ -739,12 +754,18 @@ impl Parser {
                     }
                     self.parse_my_our_local("my", false)?
                 }
-                // `val $x = …` — Kotlin/Scala-style synonym for `const my`.
-                // Same desugaring as `const my $x = …`: parse as `my`,
-                // then mark every decl as frozen so reassignment is a
-                // compile-time error. Type annotations (`val $x : Int = …`)
-                // permitted on the same grounds as `const my`.
-                "val" => {
+                "val" if matches!(
+                    self.peek_at(1),
+                    Token::ScalarVar(_)
+                        | Token::ArrayVar(_)
+                        | Token::HashVar(_)
+                        | Token::Star
+                        | Token::LParen
+                ) || matches!(
+                    self.peek_at(1),
+                    Token::Ident(ref k) if k == "typed"
+                ) =>
+                {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
                             "`val` is a stryke extension (disabled by --compat)",
@@ -14059,7 +14080,15 @@ impl Parser {
             | "endhostent" | "endnetent" | "endprotoent" | "endservent"
             // ── control flow ────────────────────────────────────────────
             | "return" | "do" | "eval" | "require"
-            | "my" | "var" | "val" | "our" | "local" | "use" | "no"
+            // NB: `var` / `val` are stryke declarator keywords (surface
+            // aliases for `my` / `const my`), NOT Perl 5 core — they're
+            // handled in `RESERVED_FUNCTION_NAMES` for the fn-name rejection
+            // path with the same "reserved word" message as `my`/`our`/`sub`
+            // get. Keeping them out of `is_perl5_core` also keeps them out
+            // of `is_known_bareword`, which is the right call: var/val are
+            // not callable barewords (`map { val }` should not be promoted
+            // to `val($_)`).
+            | "my" | "our" | "local" | "use" | "no"
             | "sub" | "if" | "unless" | "while" | "until"
             | "for" | "foreach" | "last" | "next" | "redo" | "goto"
             | "not" | "and" | "or"
@@ -18327,6 +18356,8 @@ impl Parser {
         "redo",
         "goto",
         "my",
+        "var",
+        "val",
         "our",
         "local",
         "state",
