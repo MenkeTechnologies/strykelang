@@ -93,14 +93,14 @@ p "── Section 7 — fn with val + var locals ──────────�
 #   println("fib(10) = \${fibonacci(10)}")
 fn Demo::fibonacci($n) {
     val $target = $n
-    var $a = 0
-    var $b = 1
+    var $prev = 0
+    var $curr = 1
     for my $_ (1:$target) {
-        val $t = $a + $b
-        $a = $b
-        $b = $t
+        val $next = $prev + $curr
+        $prev = $curr
+        $curr = $next
     }
-    $a
+    $prev
 }
 p "  fib(10) = ", Demo::fibonacci(10), "  (expected 55)"
 
