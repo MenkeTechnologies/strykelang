@@ -73,6 +73,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config
 
+      - name: Add swapfile for aarch64-linux-gnu link step
+        # ubuntu-24.04-arm runners ship ~7 GB RAM, which the final
+        # linker process exceeds on 463k-LOC trees and the runner is
+        # OOM-killed (manifests as "hosted runner lost communication"
+        # after ~1h). 8 GB of swap is the standard arm-runner
+        # workaround and lets the link complete without falling back
+        # to cross-rs.
+        if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Set aarch64-linux-gnu RUSTFLAGS (link-time memory budget)
+        # --no-keep-memory + --reduce-memory-overheads cut the linker's
+        # peak RSS at the cost of ~20% link time. debuginfo=0 drops
+        # debug sections from release binaries (already stripped in
+        # the Package step). codegen-units=1 trades a small wall-clock
+        # hit for a single LLVM module that links cleaner.
+        if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
+        run: |
+          {
+            echo 'CARGO_PROFILE_RELEASE_DEBUG=0'
+            echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1'
+            echo 'RUSTFLAGS=-C link-arg=-Wl,--no-keep-memory -C link-arg=-Wl,--reduce-memory-overheads'
+          } >> "$GITHUB_ENV"
+
       - name: Install cross
         if: matrix.use_cross
         run: |
