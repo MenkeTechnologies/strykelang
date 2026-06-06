@@ -4348,8 +4348,20 @@ impl Parser {
                     })
                 }
             }
-            Token::Ident(ref kw) if kw == "my" => {
-                self.advance(); // 'my'
+            // `for my $x (LIST)` / `for var $x (LIST)` / `for val $x (LIST)`.
+            // `var` / `val` are Kotlin/Scala-style aliases for `my` / `const my`
+            // (see `parse_primary`); gate on the lookahead being a sigil so
+            // `for var(@list)` (`var` as a bareword fn name) still routes to
+            // the no-decl `Token::LParen` arm above instead of dispatching as
+            // a decl. `val` in this position currently parses identically to
+            // `my` (the loop variable's frozenness isn't surfaced in
+            // `StmtKind::Foreach`'s `var` field today), keeping the surface
+            // syntax consistent with the other var/val sites.
+            Token::Ident(ref kw)
+                if (kw == "my" || kw == "var" || kw == "val")
+                    && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
+            {
+                self.advance(); // 'my' / 'var' / 'val'
                 let var = self.parse_scalar_var_name()?;
                 self.expect(&Token::LParen)?;
                 let list = self.parse_expression()?;
@@ -4435,7 +4447,14 @@ impl Parser {
         let line = self.peek_line();
         self.advance(); // 'foreach'
         let var = match self.peek() {
-            Token::Ident(ref kw) if kw == "my" => {
+            // Same gating as `parse_for_or_foreach` above — `var`/`val` only
+            // dispatch as the loop-binding declarator when the next token is
+            // a sigil. Bare `foreach var (@xs) {...}` (no sigil) routes to
+            // the no-decl arm and parses `var` as an expression.
+            Token::Ident(ref kw)
+                if (kw == "my" || kw == "var" || kw == "val")
+                    && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
+            {
                 self.advance();
                 self.parse_scalar_var_name()?
             }

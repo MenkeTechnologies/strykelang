@@ -31,7 +31,7 @@ p "── Section 2 — collections (List → @, Map → %) ──────�
 #   for (c in colors) println(c)
 var @colors = ("red", "green", "blue")
 var %counts = (red => 3, blue => 5)
-for my $c (@colors) {
+for var $c (@colors) {
     p "  color: $c"
 }
 p "  counts: red=$counts{red}, blue=$counts{blue}"
