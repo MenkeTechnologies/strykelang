@@ -2216,7 +2216,7 @@ impl Parser {
                 Token::Ident(ref kw)
                     if matches!(
                         kw.as_str(),
-                        "my" | "our"
+                        "my" | "var" | "val" | "our"
                             | "local"
                             | "state"
                             | "if"
@@ -3542,9 +3542,9 @@ impl Parser {
                         // "tie expects $scalar, @array, or %hash, got Ident(\"my\")".
         let mut implicit_decl: Option<Statement> = None;
         if let Token::Ident(kw) = self.peek().clone() {
-            if matches!(kw.as_str(), "my" | "our") {
+            if matches!(kw.as_str(), "my" | "var" | "val" | "our") {
                 let kw_line = self.peek_line();
-                self.advance(); // my / our
+                self.advance(); // my / var / val / our
                                 // Read the variable being declared (must be Scalar/Array/Hash).
                 let (decl_sigil, decl_name) = match self.peek().clone() {
                     Token::ScalarVar(s) => (Sigil::Scalar, s),
@@ -8966,15 +8966,29 @@ impl Parser {
         // assigned value(s); has the side effect of declaring the variable in
         // the current scope.  See `ExprKind::MyExpr`.
         if let Token::Ident(ref kw) = self.peek().clone() {
-            if matches!(kw.as_str(), "my" | "our" | "state" | "local") {
-                let kw_owned = kw.clone();
+            if matches!(
+                kw.as_str(),
+                "my" | "var" | "val" | "our" | "state" | "local"
+            ) {
+                let raw_kw = kw.clone();
+                // `var` / `val` are surface aliases; normalize to `my` for
+                // the inner parser (same as the statement-form dispatch).
+                // `val` requires marking the resulting decls frozen so the
+                // expression form `if (val $x = …) { … }` matches its
+                // statement-form counterpart `if (const my $x = …) { … }`.
+                let kw_owned: String = match raw_kw.as_str() {
+                    "var" | "val" => "my".to_string(),
+                    _ => raw_kw.clone(),
+                };
+                let allow_type = matches!(raw_kw.as_str(), "val");
+                let mark_frozen = matches!(raw_kw.as_str(), "val");
                 // Parse exactly like the statement form via `parse_my_our_local`,
                 // then unwrap the resulting `StmtKind::*` back into a list of
                 // `VarDecl`s for the expression node.  This re-uses the full
                 // syntax (typed sigs, list destructuring, type annotations).
                 let saved_pos = self.pos;
-                let stmt = self.parse_my_our_local(&kw_owned, false)?;
-                let decls = match stmt.kind {
+                let stmt = self.parse_my_our_local(&kw_owned, allow_type)?;
+                let mut decls = match stmt.kind {
                     StmtKind::My(d)
                     | StmtKind::Our(d)
                     | StmtKind::State(d)
@@ -8991,6 +9005,11 @@ impl Parser {
                         ));
                     }
                 };
+                if mark_frozen {
+                    for d in decls.iter_mut() {
+                        d.frozen = true;
+                    }
+                }
                 return Ok(Expr {
                     kind: ExprKind::MyExpr {
                         keyword: kw_owned,
@@ -14021,7 +14040,7 @@ impl Parser {
             | "endhostent" | "endnetent" | "endprotoent" | "endservent"
             // ── control flow ────────────────────────────────────────────
             | "return" | "do" | "eval" | "require"
-            | "my" | "our" | "local" | "use" | "no"
+            | "my" | "var" | "val" | "our" | "local" | "use" | "no"
             | "sub" | "if" | "unless" | "while" | "until"
             | "for" | "foreach" | "last" | "next" | "redo" | "goto"
             | "not" | "and" | "or"

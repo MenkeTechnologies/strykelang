@@ -27,7 +27,7 @@ class StrykeColorSettingsPage : ColorSettingsPage {
 
         // Keywords
         AttributesDescriptor("Keywords//Keyword (generic)", StrykeColors.KEYWORD),
-        AttributesDescriptor("Keywords//Declaration (my, our, local, state, use)", StrykeColors.DECL_KEYWORD),
+        AttributesDescriptor("Keywords//Declaration (my, var, val, our, local, state, use)", StrykeColors.DECL_KEYWORD),
         AttributesDescriptor("Keywords//Function/class (fn, sub, class, struct, trait)", StrykeColors.FN_KEYWORD),
         AttributesDescriptor("Keywords//Control flow (if, while, for, return)", StrykeColors.CONTROL_KEYWORD),
         AttributesDescriptor("Keywords//Phase (BEGIN, END, INIT, CHECK)", StrykeColors.PHASE_KEYWORD),

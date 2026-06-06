@@ -1104,7 +1104,7 @@ class StrykeLexer : LexerBase() {
         )
 
         private val DECL_KEYWORDS = setOf(
-            "my", "our", "local", "state", "use", "no", "package", "require",
+            "my", "var", "val", "our", "local", "state", "use", "no", "package", "require",
             "has", "pub", "priv", "in", "is", "as",
         )
         private val FN_KEYWORDS = setOf(
