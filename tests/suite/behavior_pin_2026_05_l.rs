@@ -75,11 +75,13 @@ fn multiple_before_and_after_fire_in_order() {
 fn multiple_around_advice_does_not_compose_today() {
     // BUG-069: registering two `around` blocks for the same target doesn't
     // wrap them — only one wins. Perl-style ordering would compose both.
+    // NB: target sub renamed `val` -> `tgt` after `val`/`var` were promoted
+    // to stryke keywords (same fn-name reservation as `my`/`our`).
     let r = eval_int(
-        r#"fn val { 1 }
-           around "val" { proceed() + 10 }
-           around "val" { proceed() * 100 }
-           val()"#,
+        r#"fn tgt { 1 }
+           around "tgt" { proceed() + 10 }
+           around "tgt" { proceed() * 100 }
+           tgt()"#,
     );
     // Pin: stryke applies only the first registered around, returning 11
     // (proceed()=1, +10). The expected composed value would be 110 (1*100
@@ -96,9 +98,9 @@ fn explicit_return_in_around_block_is_rejected_today() {
     // works.
     use stryke::error::ErrorKind;
     let kind = eval_err_kind(
-        r#"fn val { 1 }
-           around "val" { my $r = proceed(); return $r + 10 }
-           val()"#,
+        r#"fn tgt { 1 }
+           around "tgt" { my $r = proceed(); return $r + 10 }
+           tgt()"#,
     );
     assert!(
         matches!(
@@ -114,9 +116,9 @@ fn explicit_return_in_around_block_is_rejected_today() {
 fn implicit_final_value_in_around_is_used_as_return() {
     assert_eq!(
         eval_int(
-            r#"fn val { 1 }
-               around "val" { my $r = proceed(); $r + 10 }
-               val()"#
+            r#"fn tgt { 1 }
+               around "tgt" { my $r = proceed(); $r + 10 }
+               tgt()"#
         ),
         11
     );
