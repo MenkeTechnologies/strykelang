@@ -345,6 +345,8 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("unless", "control"),
     ("until", "control"),
     ("use", "decl"),
+    ("val", "decl"),
+    ("var", "decl"),
     ("when", "control"),
     ("while", "control"),
     ("x", "operator"),
