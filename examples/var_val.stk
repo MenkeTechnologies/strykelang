@@ -1,0 +1,72 @@
+#!/usr/bin/env stryke
+
+# Stryke `var` / `val` — Kotlin/Scala/Java-style synonyms for `my` and
+# `const my`. Parse identically to their canonical forms; same AST, same
+# scoping, same bytecode. Pick whichever spelling reads better at the
+# call site — they coexist with `my` and `const my` in the same file.
+
+p "── var — mutable lexical (== my) ─────────────────────"
+var $name = "world"
+var @nums = 1:5
+var %cfg = (debug => 1, verbose => 0)
+p "  var \$name = '$name'"
+p "  var \@nums = (", join(",", @nums), ")"
+p "  var \%cfg.debug = $cfg{debug}"
+
+# var is mutable — reassignment works.
+$name = "stryke"
+p "  after reassign: \$name = '$name'"
+
+p ""
+p "── val — immutable lexical (== const my) ─────────────"
+val $PI = 3.14159
+val $MAX_RETRIES = 5
+val @COLORS = ("red", "green", "blue")
+val %ENDPOINTS = (api => "https://api.example.com", web => "https://www.example.com")
+p "  val \$PI = $PI"
+p "  val \$MAX_RETRIES = $MAX_RETRIES"
+p "  val \@COLORS = (", join(",", @COLORS), ")"
+p "  val \%ENDPOINTS.api = '$ENDPOINTS{api}'"
+
+p ""
+p "── Mixing var / val / my / const my freely ───────────"
+my  $a = 10
+var $b = 20
+val $c = 30                                  # immutable
+const my $d = 40                             # immutable, longer spelling
+p "  $a + $b + $c + $d = ", $a + $b + $c + $d
+
+# Both var and my can be reassigned; val and const my cannot.
+$a = 100
+$b = 200
+p "  after reassign: \$a = $a, \$b = $b"
+
+p ""
+p "── Type annotations work on val (same as const my) ───"
+val $count : Int = 0
+val $title : Str = "stryke v0.16.12"
+p "  val \$count : Int = $count"
+p "  val \$title : Str = '$title'"
+
+p ""
+p "── Realistic mix — derived values + working state ────"
+val $config = { host => "localhost", port => 8080, timeout_ms => 5000 }
+val $base_url = "http://" . $config->{host} . ":" . $config->{port}
+var @log
+push @log, "starting"
+push @log, "connected to $base_url"
+push @log, "ready"
+p "  base_url (val):  $base_url"
+p "  log lines (var): ", scalar(@log)
+p "  log: ", join(" | ", @log)
+
+p ""
+p "── Compile-time error: reassigning a val (commented) ──"
+p "  val \$PI = 3.14159"
+p "  \$PI = 3.14    # COMPILE ERROR: cannot assign to frozen variable \$PI"
+p "  (uncomment to see the error firsthand)"
+# val $x = 1
+# $x = 2          # cannot assign to frozen variable `$x`
+
+p ""
+p "── done ──────────────────────────────────────────────"

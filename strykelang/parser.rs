@@ -512,7 +512,7 @@ impl Parser {
                 // strict` / `use warnings` followed by `fn foo { ... }`
                 // on the next line swallows `foo` as an import argument.
                 | "fn" | "class" | "abstract" | "final" | "trait"
-                | "state" | "mysync" | "oursync"
+                | "state" | "mysync" | "oursync" | "var" | "val"
             )
         )
     }
@@ -724,6 +724,41 @@ impl Parser {
                     self.parse_trait_decl()?
                 }
                 "my" => self.parse_my_our_local("my", false)?,
+                // `var $x = …` — Kotlin/Scala/Java-style synonym for `my`.
+                // Parses identically (same StmtKind::My output, same scoping
+                // rules) so existing tooling, error messages, and bytecode
+                // emission don't fork. Consume the `var` token then dispatch
+                // through `parse_my_our_local("my", false)` which advances
+                // past what it thinks is `my`.
+                "var" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`var` is a stryke extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_my_our_local("my", false)?
+                }
+                // `val $x = …` — Kotlin/Scala-style synonym for `const my`.
+                // Same desugaring as `const my $x = …`: parse as `my`,
+                // then mark every decl as frozen so reassignment is a
+                // compile-time error. Type annotations (`val $x : Int = …`)
+                // permitted on the same grounds as `const my`.
+                "val" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`val` is a stryke extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    let mut stmt = self.parse_my_our_local("my", true)?;
+                    if let StmtKind::My(ref mut decls) = stmt.kind {
+                        for decl in decls.iter_mut() {
+                            decl.frozen = true;
+                        }
+                    }
+                    stmt
+                }
                 "state" => self.parse_my_our_local("state", false)?,
                 "mysync" => {
                     if crate::compat_mode() {
@@ -11795,10 +11830,19 @@ impl Parser {
                         });
                     }
                 }
-                if matches!(
-                    self.peek(),
-                    Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
-                ) {
+                // BUG-301 fix: in pipe-RHS context (after `LHS |> pmap_reduce { } { }`),
+                // the list operand comes from the pipe placeholder — there is no inline
+                // list. Without this guard, `parse_assign_expr` below would greedily
+                // consume the next statement (e.g. `p "after"` or `my $x = …`) as the
+                // list, silently absorbing it into the pmap_reduce call. Mirror the
+                // terminator check above to also bail when the next token signals "no
+                // list here" in pipe-RHS context.
+                if self.pipe_supplies_slurped_list_operand()
+                    || matches!(
+                        self.peek(),
+                        Token::Semicolon | Token::RBrace | Token::RParen | Token::Eof
+                    )
+                {
                     return Ok(Expr {
                         kind: ExprKind::PMapReduceExpr {
                             map_block,
