@@ -20,7 +20,7 @@
 # the dash-prefixed flags before they reach @ARGV. Bare script args
 # (no leading dash) don't need `--`.
 
-val $VERSION              = "1.0.1"
+val $VERSION              = "1.1.0"
 val $COORD_1              = 199
 val $COORD_2              = 300
 val $OFF_HOURS_SLEEP_TIME = 60
@@ -28,14 +28,14 @@ val $COLOR                = "1;4;34"
 val $ELLIPSIS             = "..."
 
 # ── arg parsing — mirror the original Python flags ──
-my $caffeinate = 0
-my $start_hour = 9
-my $end_hour   = 17
-my $sleep_time = 8
+var $caffeinate = 0
+var $start_hour = 9
+var $end_hour   = 17
+var $sleep_time = 8
 
-my $i = 0
-while ($i < len(@ARGV)) {
-    my $a = $ARGV[$i]
+var $i = 0
+while ($i < len @ARGV ) {
+    var $a = $ARGV[$i]
     if ($a eq "-c" || $a eq "--caffeinate") {
         $caffeinate = 1
     } elsif ($a eq "-s" || $a eq "--start") {
@@ -52,7 +52,7 @@ while ($i < len(@ARGV)) {
 }
 
 fn now_string {
-    my @t = localtime(time())
+    var @t = localtime time()
     sprintf "%04d-%02d-%02d %02d:%02d:%02d",
         $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]
 }
@@ -62,16 +62,16 @@ fn logger($s) {
 }
 
 fn off_hours_pred {
-    my @t = localtime(time())
-    my $h = $t[2]
+    var @t = localtime time()
+    var $h = $t[2]
     return $h >= $end_hour || $h < $start_hour
 }
 
 fn movement_loop {
     sleep $sleep_time
-    mouse_move($COORD_1, $COORD_1)
+    mouse_move $COORD_1, $COORD_1
     sleep $sleep_time
-    mouse_move($COORD_2, $COORD_2)
+    mouse_move $COORD_2, $COORD_2
 }
 
 $SIG{INT} = fn {
@@ -80,27 +80,27 @@ $SIG{INT} = fn {
 }
 
 if ($caffeinate) {
-    logger("Entering the activity maintainer #{$VERSION} caffeinated#{$ELLIPSIS}")
+    logger "Entering the activity maintainer #{$VERSION} caffeinated#{$ELLIPSIS}"
 } else {
-    logger("Entering the activity maintainer #{$VERSION}#{$ELLIPSIS}")
+    logger "Entering the activity maintainer #{$VERSION}#{$ELLIPSIS}"
 }
 
-my $was_in_on_hours = 0
-while (1) {
+var $was_in_on_hours = 0
+loop {
     if (!$caffeinate && off_hours_pred()) {
         logger("Entering off hours sleeping#{$ELLIPSIS}")
         while (off_hours_pred()) {
             if ($was_in_on_hours) {
-                my $n = random_between(5, 250)
-                my $secs = $n * 2 * $sleep_time
-                logger("movement loop #{$n} times, #{int($secs / 60)} minutes, #{$secs % 60} seconds")
+                var $n = random_between 5, 250
+                var $secs = $n * 2 * $sleep_time
+                logger "movement loop #{$n} times, #{int($secs / 60)} minutes, #{$secs % 60} seconds"
                 for (1:$n) { movement_loop() }
-                logger("going into off hours")
+                logger "going into off hours"
             }
             $was_in_on_hours = 0
             sleep $OFF_HOURS_SLEEP_TIME
         }
-        logger("Back to mouse moving#{$ELLIPSIS}")
+        logger "Back to mouse moving#{$ELLIPSIS}"
     }
     $was_in_on_hours = 1
     movement_loop()

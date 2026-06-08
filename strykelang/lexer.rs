@@ -3103,6 +3103,12 @@ impl Lexer {
                     | "unless"
                     | "while"
                     | "until"
+                    // `loop { ... }` — Rust-style infinite loop, desugars to
+                    // `while (1) { ... }`. Listed here so the lexer's
+                    // last_was_term tracking treats `loop` like other
+                    // statement-start keywords (next char is `{`, never a
+                    // continuation of a term).
+                    | "loop"
                     | "for"
                     | "foreach"
                     | "elsif"

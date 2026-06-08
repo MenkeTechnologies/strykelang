@@ -4660,6 +4660,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "unless" => "A negated conditional — executes the block when the condition is *false*. This reads more naturally than `if (!COND)` for guard clauses and early returns. stryke supports both block and postfix forms. Convention: use `unless` for simple negative guards; avoid `unless` with complex compound conditions, as double-negatives hurt readability. There is no `unlessif` — use `if`/`elsif` chains for multi-branch logic.\n\n```perl\nunless ($ENV{QUIET}) { p \"verbose output\" }\np \"missing!\" unless -e $path   # postfix guard\ndie \"no input\" unless @ARGV\nreturn unless defined $val    # early return pattern\n```",
         "foreach" | "for" => "Iterate over a list, binding each element to a loop variable (or `_` by default). `for` and `foreach` are interchangeable keywords. The loop variable is automatically localized and aliases the original element — modifications to `_` inside the loop mutate the list in-place. In stryke, `for` loops work with ranges, arrays, hash slices, and iterator results. For parallel iteration, see `pfor`; for pipeline-style processing, prefer `|> e` or `|> map`. C-style `for (INIT; COND; STEP)` is also supported.\n\n```perl\nfor my $f (glob \"*.txt\") { p $f }\nfor (1:5) { p _ * 2 }            # _ is default\nmy @names = qw(alice bob carol)\nfor (@names) { _ = uc _ }         # mutates in-place\np join \", \", @names                 # ALICE, BOB, CAROL\n```",
         "while" => "Loop that re-evaluates its condition before each iteration and continues as long as it is true. Commonly used for reading input line-by-line, polling, and indefinite iteration. The condition is tested in boolean context. `while` integrates naturally with the diamond operator `<>` for reading filehandles. The loop variable can be declared in the condition with `my`, scoping it to the loop body. Postfix form is also supported: `EXPR while COND;`.\n\n```perl\nwhile (my $line = <STDIN>) {\n    $line |> tm |> p             # trim + print each line\n}\nmy $i = 0\nwhile ($i < 5) { p $i++ }    # counted loop\nwhile (1) { last if done() }     # infinite loop with break\n```",
+        "loop" => "Rust-style infinite loop — exactly equivalent to `while (1) { ... }` and desugared to one at parse time. Use when the only sane exit is `last` / `return` / `die` / a signal: the omitted condition makes the intent obvious to a reader instead of obscuring it behind a `1` literal.\n\nLabels, `last LABEL`, `next LABEL`, and `continue { ... }` all work because the desugar shares the existing `while` runtime — there is no separate `loop` opcode.\n\n```perl\nloop {\n    my $msg = recv_or_undef()\n    last unless defined $msg\n    handle($msg)\n}\n\n# polling pattern\nloop {\n    my $line = readline(STDIN)\n    last if !defined $line\n    next if $line =~ /^\\s*$/\n    process($line)\n}\n\n# labeled loops compose\nOUTER: loop {\n    for my $job (@queue) {\n        last OUTER if $job->{shutdown}\n        run($job)\n    }\n    sleep(1)\n}\n```\n\nSee also: `while`, `until`, `last`, `next`.",
         "until" => "Loop that continues as long as its condition is *false* — the logical inverse of `while`. Useful when the termination condition is more naturally expressed as a positive assertion (\"keep going until X happens\"). Supports both block and postfix forms. Prefer `while` with a negated condition if `until` makes the logic harder to read.\n\n```perl\nmy $n = 1\nuntil ($n > 1000) { $n *= 2 }\np $n   # 1024\n\nmy $tries = 0\nuntil (connected()) {\n    $tries++\n    sleep 1\n}\np \"connected after $tries tries\"\n```",
         "do" => "Execute a block and return its value, or execute a file. As a block, `do { ... }` creates an expression scope — the last expression in the block is the return value, making it useful for complex initializations. As a file operation, `do \"file.pl\"` executes the file in the current scope and returns its last expression. Unlike `require`, `do` does not cache and re-executes on each call. `do { ... } while (COND)` creates a loop that always runs at least once.\n\n```perl\nmy $val = do { my $x = 10\n    $x ** 2 }   # 100\np $val\nmy $cfg = do \"config.pl\"               # load config\n# do-while: body runs at least once\nmy $input\ndo { $input = readline(STDIN) |> tm } while ($input eq \"\")\n```",
         "last" => "Immediately exit the innermost enclosing loop (equivalent to `break` in C/Rust). Execution continues after the loop. `last LABEL` can target a labeled outer loop to break out of nested loops. Works in `for`, `foreach`, `while`, `until`, and `do-while`. Does *not* work inside `map`, `grep`, or `|>` pipeline stages — use `take`, `first`, or `take_while` for early termination in functional contexts.\n\n```perl\nfor (1:1_000_000) {\n    last if _ > 5\n    p _\n}   # prints 1 2 3 4 5\n\nOUTER: for my $i (1:10) {\n    for my $j (1:10) {\n        last OUTER if $i * $j > 50   # break both loops\n    }\n}\n```\n\nFor pipeline early-exit: `1:1000 |> take_while { _ < 50 } |> e p`.",
@@ -5421,6 +5422,71 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "gmtime" => "Convert a Unix epoch timestamp to a nine-element list of broken-down UTC time components, identical in structure to `localtime` but always in the UTC timezone. The fields are `($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst)` where `$isdst` is always 0. When called without arguments, uses the current time.\n\n```perl\nmy @utc = gmtime(time())\nmy $year = $utc[5] + 1900\nmy $mon  = $utc[4] + 1\np sprintf(\"%04d-%02d-%02dT%02d:%02d:%02dZ\",\n    $year, $mon, @utc[3,2,1,0])\n# compare local vs UTC\nmy @loc = localtime(time())\np \"UTC hour=$utc[2] local hour=$loc[2]\"\n```",
         "sleep" => "Pause execution for the specified number of seconds. Accepts both integer and fractional values for sub-second sleeps (e.g. `sleep 0.1` for 100ms). The process yields the CPU during the sleep, so it is safe to use in polling loops without burning cycles. Returns the unslept time (always 0 unless interrupted by a signal).\n\n```perl\np \"waiting...\"\nsleep(2)\np \"done\"\n# polling loop\nwhile (!-e \"done.flag\") {\n    sleep(0.5)\n}\n# rate limiting\nmy @urls = @targets\n@urls |> e { fetch\n    sleep(0.1) }\n```",
         "alarm" => "Schedule a `SIGALRM` signal to be delivered to the process after the specified number of seconds. Calling `alarm(0)` cancels any pending alarm. Only one alarm can be active at a time — setting a new alarm replaces the previous one. Returns the number of seconds remaining on the previous alarm (or 0 if none was set). Combine with `eval` and `$SIG{ALRM}` to implement timeouts around potentially hanging operations.\n\n```perl\neval {\n    local $SIG{ALRM} = fn { die \"timeout\\n\" }\n    alarm(5)           # 5 second deadline\n    my $data = slow_network_call()\n    alarm(0)           # cancel on success\n}\nif ($@ =~ /timeout/) {\n    log_error(\"operation timed out\")\n}\n```",
+
+        // ── GUI automation (pyautogui-equivalent) ──
+        // enigo-backed mouse / keyboard, xcap-backed pixel / screenshot.
+        // Cross-platform: macOS CGEvent + ScreenCaptureKit, X11 XTest +
+        // XGetImage, Wayland libei + portal, Win32 SendInput + GDI. The
+        // first call on macOS prompts for Accessibility (input) or
+        // Screen Recording (capture) — both are one-time grants.
+
+        // ── mouse position / size ──
+        "mouse_pos" => "Return the current cursor position as `[x, y]` in screen-global pixels. Origin is the top-left of the primary display. Works without moving the cursor — useful for recording start positions before a drag, or for checking that an automation step actually changed the pointer.\n\n```perl\nmy @p = mouse_pos()\np \"cursor at: @p\"            # cursor at: 412 297\nmy ($x, $y) = @{ mouse_pos() }\nmouse_move($x + 50, $y)       # nudge right 50px\n```\n\nSee also: `mouse_move`, `screen_size`, `on_screen`.",
+
+        "mouse_size" | "screen_size" => "Return the primary display dimensions as `[width, height]` in pixels. `mouse_size` is the pyautogui spelling; `screen_size` is the more direct name. Multi-monitor setups only report the primary display — secondary monitors aren't surfaced by enigo's `main_display` API.\n\n```perl\nmy @s = screen_size()\np \"display is @s\"             # display is 1920 1080\nmy ($w, $h) = @{ screen_size() }\nmouse_move(int($w / 2), int($h / 2))   # center the cursor\n```\n\nSee also: `mouse_pos`, `on_screen`.",
+
+        "on_screen" => "Return 1 if `(x, y)` lies inside the primary display, 0 otherwise. Useful as a sanity guard before clicking — pyautogui's failsafe behavior was to abort when the cursor was dragged off-screen; this builtin lets you check coords explicitly. Multi-monitor setups: secondary displays aren't checked.\n\n```perl\nif (on_screen($x, $y)) {\n    mouse_click($x, $y)\n} else {\n    die \"refusing to click at ($x, $y) — off-screen\"\n}\n```\n\nSee also: `screen_size`, `mouse_pos`.",
+
+        // ── mouse motion ──
+        "mouse_move" => "Move the cursor to absolute coords `(x, y)`. The optional third arg `duration` (seconds) animates the move at 60 fps via linear interpolation; `0` or omitted = instant warp (pyautogui's default).\n\nmacOS prompts for Accessibility access on first call; X11 needs no permissions; Wayland requires a virtual-pointer portal.\n\n```perl\nmouse_move(400, 300)                 # instant\nmouse_move(800, 600, 0.5)            # half-second tween\n# move-to-center pattern\nmy ($w, $h) = @{ screen_size() }\nmouse_move(int($w / 2), int($h / 2), 0.25)\n```\n\nSee also: `mouse_move_rel`, `mouse_drag`, `mouse_pos`.",
+
+        "mouse_move_rel" => "Move the cursor by `(dx, dy)` relative to its current position. Optional third arg `duration` animates the move at 60 fps. `0` = instant.\n\n```perl\nmouse_move_rel(50, 0)                # nudge right 50px\nmouse_move_rel(0, -200, 0.3)         # slow drift up\n# spiral pattern\nfor my $i (1:36) {\n    mouse_move_rel(10 * cos($i * 0.17), 10 * sin($i * 0.17), 0.02)\n}\n```\n\nSee also: `mouse_move`, `mouse_pos`.",
+
+        "mouse_drag" => "Press the mouse button at the current cursor position, drag to absolute `(x, y)`, then release. `duration` animates the drag at 60 fps; `button` is `\"left\"` / `\"right\"` / `\"middle\"` (default `\"left\"`).\n\nButton state is always released even if the move errors — no stuck-button on partial failure.\n\n```perl\nmouse_drag(800, 600)                            # quick drag\nmouse_drag(800, 600, 1.0, \"left\")              # one-second left drag\n# select a range in a text editor\nmouse_move(100, 100)\nmouse_drag(400, 100, 0.2)\n```\n\nSee also: `mouse_drag_rel`, `mouse_down`, `mouse_up`.",
+
+        "mouse_drag_rel" => "Press the mouse button, drag by `(dx, dy)` relative to the current position, then release. `duration` + `button` as in `mouse_drag`.\n\n```perl\nmouse_drag_rel(200, 0)                          # drag right 200px\nmouse_drag_rel(0, 300, 0.5, \"right\")           # slow right-button drag down\n```\n\nSee also: `mouse_drag`, `mouse_move_rel`.",
+
+        // ── mouse buttons ──
+        "mouse_click" => "Click a mouse button. Full pyautogui shape: `mouse_click(x?, y?, clicks?, interval?, button?)`. Every arg is optional. When `x` and `y` are given, the cursor warps there first; otherwise the click fires at the current position. `clicks` defaults to 1, `interval` (seconds between clicks) defaults to 0, `button` defaults to `\"left\"`.\n\n```perl\nmouse_click()                          # click at current pos\nmouse_click(400, 300)                  # click at (400, 300)\nmouse_click(400, 300, 2, 0.1)          # double-click with 100ms gap\nmouse_click(400, 300, 1, 0, \"right\")   # right-click\n```\n\nSee also: `mouse_right_click`, `mouse_double_click`, `mouse_down`, `mouse_up`.",
+
+        "mouse_right_click" => "Right-click. Equivalent to `mouse_click(x, y, 1, 0, \"right\")`. Optional `(x, y)` warps the cursor first; omit to click at the current position.\n\n```perl\nmouse_right_click()                    # at current pos\nmouse_right_click(800, 200)            # at coords (opens context menu)\n```\n\nSee also: `mouse_click`, `mouse_middle_click`.",
+
+        "mouse_middle_click" => "Middle-click (often paste-on-X11 or wheel-button-press). Equivalent to `mouse_click(x, y, 1, 0, \"middle\")`. Optional `(x, y)` warps the cursor first.\n\n```perl\nmouse_middle_click()\nmouse_middle_click(500, 500)\n```\n\nSee also: `mouse_click`, `mouse_right_click`.",
+
+        "mouse_double_click" => "Double-click. Optional positional args: `(x?, y?, button?)`. Defaults to a left double-click at the current cursor position. The two clicks are dispatched back-to-back — most apps recognize them as a double-click even with no inter-click delay, but if you need a specific gap use `mouse_click(x, y, 2, 0.05)` instead.\n\n```perl\nmouse_double_click()\nmouse_double_click(400, 300)\nmouse_double_click(400, 300, \"right\")   # rare double-right\n```\n\nSee also: `mouse_click`, `mouse_triple_click`.",
+
+        "mouse_triple_click" => "Triple-click. Same arg shape as `mouse_double_click` — `(x?, y?, button?)`. Most text editors interpret a triple-click as \"select whole line\" or \"select paragraph\".\n\n```perl\nmouse_triple_click(400, 300)            # select whole line at coord\n```\n\nSee also: `mouse_click`, `mouse_double_click`.",
+
+        "mouse_down" => "Press a mouse button without releasing it. `button` defaults to `\"left\"`. Use this with `mouse_up` to build custom drag / hold sequences when `mouse_drag` isn't flexible enough. Always pair every `mouse_down` with a matching `mouse_up` — a stuck button state survives the script and the user has to recover manually.\n\n```perl\nmouse_down()                            # press left at current pos\nmouse_move(800, 600, 0.3)\nmouse_up()                              # release\n# right-button hold\nmouse_down(\"right\")\nsleep(2)\nmouse_up(\"right\")\n```\n\nSee also: `mouse_up`, `mouse_drag`.",
+
+        "mouse_up" => "Release a mouse button. `button` defaults to `\"left\"`. See `mouse_down` for the press-and-hold pattern.\n\n```perl\nmouse_up()\nmouse_up(\"middle\")\n```\n\nSee also: `mouse_down`, `mouse_drag`.",
+
+        // ── mouse wheel ──
+        "mouse_scroll" | "mouse_vscroll" => "Vertical scroll. `mouse_scroll(clicks, x?, y?)` — positive `clicks` = scroll up, negative = scroll down. Optional `(x, y)` warps the cursor first so the scroll lands on the intended pane (pyautogui semantics). `mouse_vscroll` is an alias for explicit code.\n\n```perl\nmouse_scroll(3)                         # 3 up\nmouse_scroll(-5)                        # 5 down\nmouse_scroll(10, 400, 300)              # warp + scroll on coord\n```\n\nSee also: `mouse_hscroll`, `mouse_move`.",
+
+        "mouse_hscroll" => "Horizontal scroll. `mouse_hscroll(clicks, x?, y?)` — positive `clicks` = scroll right, negative = scroll left. Many displays / trackpads honor horizontal wheel events; some only respond when Shift is held — combine with `key_down(\"shift\")` / `mouse_scroll` / `key_up(\"shift\")` if `mouse_hscroll` no-ops on your setup.\n\n```perl\nmouse_hscroll(5)                        # scroll right 5\nmouse_hscroll(-3, 400, 300)             # warp + scroll left\n```\n\nSee also: `mouse_scroll`.",
+
+        // ── keyboard ──
+        "key_press" => "Press a key. `key_press(name, presses?, interval?)`. `name` is any spelling in `keyboard_keys()` (plus single-character fall-through for letters / digits / punctuation). `presses` defaults to 1, `interval` (seconds between presses) defaults to 0.\n\nFor the names supported on each platform see the source of `parse_key` in `builtins_gui.rs` — macOS has variants like `function`, `rcommand`, `eject`, `brightnessup`; Windows + Linux have `insert`, `numlock`, `pause`, browser keys, launch keys, etc.\n\n```perl\nkey_press(\"enter\")\nkey_press(\"a\", 5)                       # type 'aaaaa'\nkey_press(\"down\", 10, 0.05)             # smooth scroll-by-down\nkey_press(\"f5\")                         # refresh\n```\n\nSee also: `key_down`, `key_up`, `key_hotkey`, `keyboard_keys`.",
+
+        "key_down" => "Press a key without releasing. Use with `key_up` for modifier-and-hold patterns. Always pair every `key_down` with `key_up` — a stuck modifier state survives the script and the user has to recover manually.\n\n```perl\nkey_down(\"shift\")\nkey_press(\"a\", 3)                       # 'AAA' (uppercase via held shift)\nkey_up(\"shift\")\n# zoom while scrolling\nkey_down(\"ctrl\")\nmouse_scroll(5)\nkey_up(\"ctrl\")\n```\n\nSee also: `key_up`, `key_press`, `key_hotkey`.",
+
+        "key_up" => "Release a key. See `key_down` for the press-and-hold pattern.\n\n```perl\nkey_up(\"shift\")\nkey_up(\"ctrl\")\n```\n\nSee also: `key_down`, `key_press`.",
+
+        "key_type" => "Type a literal UTF-8 string as keystrokes. `key_type(text, interval?)`. `interval` (seconds between characters) defaults to 0; non-zero values produce visible typewriter effect.\n\nUses the OS-keyboard-layout-correct path (`enigo::Keyboard::text`), so non-US layouts type the correct glyphs rather than physical-keysym surrogates.\n\n```perl\nkey_type(\"hello world\")\nkey_type(\"slow type\", 0.1)              # 100ms per char\nkey_type(\"naïve résumé café\")            # diacritics fine\n```\n\nSee also: `key_press`, `key_hotkey`.",
+
+        "key_hotkey" => "Press a chord: `key_hotkey(@keys, interval?)`. Keys are pressed in order, then released in reverse — the standard modifier-then-key idiom (`ctrl-c` is `key_down(\"ctrl\") + key_press(\"c\") + key_up(\"ctrl\")` shorthand). Optional trailing numeric `interval` adds a delay between successive presses.\n\nAccepts either positional args (`key_hotkey(\"ctrl\", \"c\")`) or a single array (`key_hotkey(@chord)`).\n\n```perl\nkey_hotkey(\"ctrl\", \"c\")                 # copy\nkey_hotkey(\"cmd\", \"shift\", \"t\")         # reopen tab (macOS)\nkey_hotkey(\"alt\", \"f4\")                 # close window\nmy @chord = (\"ctrl\", \"shift\", \"p\")\nkey_hotkey(@chord)                       # command palette\n```\n\nSee also: `key_down`, `key_up`, `key_press`.",
+
+        "keyboard_keys" => "Return the full list of valid key names accepted by `key_press` / `key_down` / `key_up` / `key_hotkey`. Returns ~142 names spanning modifiers (with left/right variants where the platform supports them), arrows, F1-F24, numpad, media keys, browser keys, launch keys, CJK input methods, and OS-specific extras (macOS: `function`, `rcommand`, `eject`, `brightnessup`, `illuminationtoggle`, `launchpad`, `missioncontrol`; Linux: `shiftlock`, `scrolllock`, `micmute`, `find`, `redo`, `undo`).\n\nSingle-character names (`\"a\"`, `\"7\"`, `\"!\"`) are always valid and don't need to appear in this list — they fall through to `Key::Unicode(c)`.\n\n```perl\nmy @ks = keyboard_keys()\np scalar @ks                            # 142\np \"@ks[0:7]\"                            # tab enter return space backspace delete del escape\nmy @fns = grep { /^f\\d+$/ } @ks         # function keys\np \"@fns\"\n```\n\nSee also: `key_press`, `key_hotkey`.",
+
+        // ── pixel + screenshot (xcap) ──
+        "pixel" => "Read the RGB color at screen coord `(x, y)`. Returns `[r, g, b]` with each channel 0–255.\n\nCaptures the full primary display on each call (xcap doesn't expose single-pixel reads on most platforms), so this is much slower than a tight loop should sustain — for hot-path pixel polling, capture once with `screenshot()` and walk the buffer in stryke.\n\nmacOS prompts for Screen Recording permission on first call (separate from the Accessibility grant used by mouse/keyboard).\n\n```perl\nmy ($r, $g, $b) = @{ pixel(400, 300) }\np \"#%02X%02X%02X\" |> sprintf($r, $g, $b)\n# poll until a pixel turns red\nwhile (1) {\n    my @p = pixel(400, 300)\n    last if $p[0] > 200 && $p[1] < 50 && $p[2] < 50\n    sleep(0.1)\n}\n```\n\nSee also: `pixel_matches_color`, `screenshot`.",
+
+        "pixel_matches_color" => "Compare a pixel against an expected RGB color. `pixel_matches_color(x, y, [r, g, b], tolerance?)`. Tolerance is per-channel L∞ distance (max abs diff across R/G/B), defaults to 0 (exact match). Returns 1 / 0.\n\n```perl\nif (pixel_matches_color(400, 300, [255, 0, 0])) {\n    p \"red pixel found\"\n}\n# fuzzy match for anti-aliased UI elements\nif (pixel_matches_color(400, 300, [200, 100, 50], 10)) {\n    p \"roughly that brown\"\n}\n```\n\nSee also: `pixel`, `screenshot`.",
+
+        "screenshot" => "Capture the primary display. With no args, returns `[width, height, RGBA-bytes]` (the bytes are a flat array of 4 ints per pixel, row-major). With a path argument, writes a PNG to disk and returns the path.\n\nmacOS prompts for Screen Recording permission on first call.\n\n```perl\n# save to disk\nmy $path = screenshot(\"/tmp/desktop.png\")\np \"saved to $path\"\n# in-memory access\nmy ($w, $h, $bytes) = @{ screenshot() }\np \"$w x $h, \" . scalar(@$bytes) . \" channel-bytes\"\n```\n\nSee also: `screenshot_region`, `pixel`.",
+
+        "screenshot_region" => "Capture a rectangular region of the primary display: `screenshot_region(L, T, W, H, path?)`. `L`/`T` are the top-left coords, `W`/`H` are the dimensions. Path arg behaves identically to `screenshot`.\n\n```perl\n# snip a 400x300 region\nmy $path = screenshot_region(100, 100, 400, 300, \"/tmp/region.png\")\n# in-memory\nmy ($w, $h, $bytes) = @{ screenshot_region(0, 0, 200, 200) }\n```\n\nSee also: `screenshot`, `pixel`.",
 
         // ── File / path utilities ──
         "basename" | "bn" => "Extract the filename component from a path, stripping all leading directory segments. The short alias `bn` keeps one-liner pipelines terse. If an optional suffix argument is provided, that suffix is also stripped from the result, which is handy for removing extensions.\n\n```perl\np basename(\"/usr/local/bin/stryke\")        # stryke\np bn(\"/tmp/data.csv\", \".csv\")           # data\n\"/etc/nginx/nginx.conf\" |> bn |> p      # nginx.conf\n```",
@@ -7723,6 +7789,31 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         ],
     ),
     (
+        "GUI Automation",
+        // pyautogui-equivalent surface — enigo-backed mouse + keyboard,
+        // xcap-backed pixel + screenshot. See `builtins_gui.rs` for the
+        // full doc-comment header (permission notes + per-platform caveats).
+        &[
+            // Position / size
+            "mouse_pos", "mouse_size", "screen_size", "on_screen",
+            // Motion
+            "mouse_move", "mouse_move_rel",
+            "mouse_drag", "mouse_drag_rel",
+            // Buttons
+            "mouse_click", "mouse_right_click", "mouse_middle_click",
+            "mouse_double_click", "mouse_triple_click",
+            "mouse_down", "mouse_up",
+            // Wheel
+            "mouse_scroll", "mouse_vscroll", "mouse_hscroll",
+            // Keyboard
+            "key_press", "key_down", "key_up",
+            "key_type", "key_hotkey", "keyboard_keys",
+            // Pixel + screenshot
+            "pixel", "pixel_matches_color",
+            "screenshot", "screenshot_region",
+        ],
+    ),
+    (
         "Shared State & Concurrency",
         &[
             "mysync", "async", "spawn", "await", "pchannel", "pselect", "barrier", "ppool",
@@ -9380,8 +9471,8 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     (
         "Control Flow",
         &[
-            "if", "elsif", "else", "unless", "for", "foreach", "while", "until", "do", "last",
-            "next", "redo", "continue", "given", "when", "default", "return", "not",
+            "if", "elsif", "else", "unless", "for", "foreach", "while", "until", "loop", "do",
+            "last", "next", "redo", "continue", "given", "when", "default", "return", "not",
         ],
     ),
     (
@@ -10788,6 +10879,11 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "while",
             "while (${1:condition}) {\n\t${0}\n}\n",
             "while loop (snippet)",
+        ),
+        (
+            "loop",
+            "loop {\n\t${0}\n}\n",
+            "infinite loop (snippet) — Rust-style, equivalent to while(1)",
         ),
         (
             "unless",

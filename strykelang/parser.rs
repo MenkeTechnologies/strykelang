@@ -504,7 +504,7 @@ impl Parser {
             self.peek(),
             Token::Ident(ref kw) if matches!(kw.as_str(),
                 "use" | "no" | "my" | "our" | "local" | "sub" | "struct" | "enum"
-                | "if" | "unless" | "while" | "until" | "for" | "foreach"
+                | "if" | "unless" | "while" | "until" | "for" | "foreach" | "loop"
                 | "return" | "last" | "next" | "redo" | "package" | "require"
                 | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
                 // stryke-specific declaration keywords that start a new
@@ -617,6 +617,21 @@ impl Parser {
                 "unless" => self.parse_unless()?,
                 "while" => {
                     let mut s = self.parse_while()?;
+                    if let StmtKind::While {
+                        label: ref mut lbl, ..
+                    } = s.kind
+                    {
+                        *lbl = label.clone();
+                    }
+                    s
+                }
+                // `loop { ... }` — Rust-style infinite loop, exactly
+                // equivalent to `while (1) { ... }`. Desugars to a
+                // `While` stmt with a synthesized `1` condition so
+                // `last` / `next` / labels / continue blocks all
+                // share the existing while-loop runtime.
+                "loop" => {
+                    let mut s = self.parse_loop()?;
                     if let StmtKind::While {
                         label: ref mut lbl, ..
                     } = s.kind
@@ -4168,6 +4183,31 @@ impl Parser {
                 condition: cond,
                 body,
                 else_block,
+            },
+            line,
+        })
+    }
+
+    /// `loop { BLOCK }` — Rust-style infinite loop, desugars to
+    /// `while (1) { BLOCK }`. No parens, no condition. `last` / `next`
+    /// (with optional labels), `redo`, and `continue` blocks all work
+    /// because the resulting StmtKind::While is what the runtime
+    /// already handles.
+    fn parse_loop(&mut self) -> StrykeResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // 'loop'
+        let body = self.parse_block()?;
+        let continue_block = self.parse_optional_continue_block()?;
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::While {
+                condition: Expr {
+                    kind: ExprKind::Integer(1),
+                    line,
+                },
+                body,
+                label: None,
+                continue_block,
             },
             line,
         })
@@ -18337,6 +18377,24 @@ impl Parser {
             | "trix" | "true_range" | "twap" | "ulcer_index"
             | "volatility_annualized" | "volatility_realized" | "vwap" | "williams_r"
             | "wma"
+            // ── GUI automation (pyautogui-equivalent) ──
+            // Mouse + keyboard + screen, dispatched from
+            // builtins_gui.rs via the BUILTIN_ARMS scan. Registered
+            // here so the parser recognizes them as known builtins
+            // (avoids "Undefined subroutine" under `-c` syntax-check
+            // and lets the reflection registry / %b / %all surface
+            // them).
+            | "mouse_move" | "mouse_move_rel"
+            | "mouse_pos" | "mouse_size" | "screen_size" | "on_screen"
+            | "mouse_click" | "mouse_right_click" | "mouse_middle_click"
+            | "mouse_double_click" | "mouse_triple_click"
+            | "mouse_down" | "mouse_up"
+            | "mouse_drag" | "mouse_drag_rel"
+            | "mouse_scroll" | "mouse_vscroll" | "mouse_hscroll"
+            | "key_press" | "key_down" | "key_up"
+            | "key_type" | "key_hotkey" | "keyboard_keys"
+            | "pixel" | "pixel_matches_color"
+            | "screenshot" | "screenshot_region"
             => Some(name),
             _ => None,
         }
@@ -18387,6 +18445,7 @@ impl Parser {
         "until",
         "for",
         "foreach",
+        "loop",
         "given",
         "when",
         "else",

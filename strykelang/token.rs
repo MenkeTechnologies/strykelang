@@ -339,6 +339,8 @@ pub const KEYWORDS: &[&str] = &[
     "unless",
     "while",
     "until",
+    // `loop { ... }` — Rust-style infinite loop, desugars to `while (1)`.
+    "loop",
     "for",
     "foreach",
     "do",
