@@ -77,22 +77,29 @@ jobs:
         if: contains(matrix.target, 'musl') && !matrix.use_cross
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Install Linux GUI deps (wayland + X11 + pipewire for xcap screen capture)
+      - name: Install Linux GUI deps (wayland + X11 + pipewire + EGL for xcap screen capture)
         # The `xcap` crate (backs the screenshot / pixel builtins)
-        # pulls in wayland-sys + x11rb + libspa-sys (PipeWire) on Linux —
-        # all three have build.rs scripts that unconditionally pkg-config-
-        # probe for their dev headers, so every linux-gnu / linux-musl /
-        # aarch64-linux-gnu job needs the matching -dev packages installed
-        # even though the resulting binary is statically linked.
-        # Discovered probes (in order): wayland-client, libxkbcommon,
-        # libpipewire-0.3, libxcb, libxrandr, libdbus.
+        # pulls in wayland-sys + x11rb + libspa-sys (PipeWire) +
+        # khronos-egl on Linux — each crate has a build.rs that
+        # unconditionally pkg-config-probes for its dev headers, so
+        # every linux-gnu / linux-musl / aarch64-linux-gnu job needs
+        # the matching -dev packages installed even though the
+        # resulting binary is statically linked.
+        # Probes discovered iteratively (v0.16.24 → v0.16.27):
+        #   wayland-client, libxkbcommon, libpipewire-0.3, egl,
+        #   libxcb, libxrandr, libdbus.
+        # Installing the full Wayland + Mesa GL/EGL stack up-front
+        # to stop the whack-a-mole bp cycle.
         if: contains(matrix.target, 'linux') && !matrix.use_cross
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libwayland-dev libxkbcommon-dev \
-            libpipewire-0.3-dev \
-            libxcb1-dev libxrandr-dev libdbus-1-dev \
+            libwayland-dev libxkbcommon-dev libwayland-egl1 \
+            libpipewire-0.3-dev libspa-0.2-dev \
+            libegl-dev libgl1-mesa-dev libgles-dev libgbm-dev \
+            libxcb1-dev libxrandr-dev libxcb-randr0-dev \
+            libxinerama-dev libxcursor-dev libxi-dev \
+            libdbus-1-dev libudev-dev \
             pkg-config
 
       - name: Install native deps for aarch64-linux-gnu (build toolchain)
