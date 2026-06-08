@@ -310,6 +310,8 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("last", "control"),
     ("le", "operator"),
     ("local", "decl"),
+    // `loop { ... }` — Rust-style infinite loop, desugars to `while (1)`.
+    ("loop", "control"),
     ("lt", "operator"),
     ("m", "quote"),
     ("match", "control"),

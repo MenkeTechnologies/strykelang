@@ -1,0 +1,51 @@
+#!/usr/bin/env stryke
+
+# GUI demo — `mouse_drag(x, y, duration?, button?)`. Picks up the
+# cursor at one corner of a 400x300 box, drags to the opposite
+# corner over 1.5s, then releases. Useful for testing whether your
+# target application receives press / move / release events as a
+# real drag rather than three independent clicks.
+#
+# Run:  s examples/gui_drag.stk
+#
+# Permission: macOS Accessibility (one-time prompt).
+
+val $WARMUP = 5
+val $BOX_W = 400
+val $BOX_H = 300
+val $DURATION = 1.5
+
+p "── drag demo ────────────────────────────────────────"
+
+var @screen = screen_size()
+val $cx = int($screen[0] / 2)
+val $cy = int($screen[1] / 2)
+val $start_x = $cx - int($BOX_W / 2)
+val $start_y = $cy - int($BOX_H / 2)
+val $end_x   = $cx + int($BOX_W / 2)
+val $end_y   = $cy + int($BOX_H / 2)
+
+p "centered #{$BOX_W}x#{$BOX_H} box around (#{$cx}, #{$cy})"
+p "  press at:  ($start_x, $start_y)"
+p "  drag to:   ($end_x, $end_y)"
+p "  duration:  #{$DURATION}s"
+p ""
+p "click into the target window (text editor, paint app, file"
+p "manager) during the next #{$WARMUP}s. the drag will affect"
+p "whatever's at the press coord — caveat emptor."
+for var $i (1:$WARMUP) {
+    p "  #{$WARMUP - $i + 1}..."
+    sleep 1
+}
+
+# Position the cursor first so the press happens at the right spot
+# without a visible warp during the drag.
+p "moving to start..."
+mouse_move($start_x, $start_y, 0.3)
+sleep 0.5
+
+p "dragging..."
+mouse_drag($end_x, $end_y, $DURATION)
+
+p ""
+p "done — release dispatched. cursor at ($end_x, $end_y)."

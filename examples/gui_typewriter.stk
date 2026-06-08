@@ -1,0 +1,36 @@
+#!/usr/bin/env stryke
+
+# GUI demo — typewriter effect using `key_type(text, interval)`.
+# Types a sentence into whatever window currently has keyboard focus.
+#
+# **Focus matters.** When you launch this, you have 5 seconds to click
+# into the target window (your terminal prompt, a text editor, a chat
+# box). The script then types at 80 ms per character so the effect is
+# visible.
+#
+# Run:  s examples/gui_typewriter.stk
+#
+# Permission: macOS prompts for Accessibility on the first key press.
+
+val $WARMUP = 5     # seconds to give focus to the target window
+val $INTERVAL = 0.08
+val $LINE = "hello from stryke v0.16.24 — typewriter via key_type()"
+
+p "── typewriter demo ──────────────────────────────────"
+p "you have #{$WARMUP} seconds to click into the target window."
+p "the script will then type:"
+p "  '$LINE'"
+p ""
+
+for var $i (1:$WARMUP) {
+    p "  #{$WARMUP - $i + 1}..."
+    sleep 1
+}
+
+p "typing now..."
+key_type($LINE, $INTERVAL)
+# Press Return so the typed line is committed.
+sleep 0.2
+key_press("return")
+
+p "done — line was committed with Return."
