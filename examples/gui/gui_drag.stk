@@ -25,13 +25,13 @@ val $start_y = $cy - int($BOX_H / 2)
 val $end_x   = $cx + int($BOX_W / 2)
 val $end_y   = $cy + int($BOX_H / 2)
 
-p "centered #{$BOX_W}x#{$BOX_H} box around (#{$cx}, #{$cy})"
+p "centered ${BOX_W}x$BOX_H box around ($cx, $cy)"
 p "  press at:  ($start_x, $start_y)"
 p "  drag to:   ($end_x, $end_y)"
-p "  duration:  #{$DURATION}s"
+p "  duration:  ${DURATION}s"
 p ""
 p "click into the target window (text editor, paint app, file"
-p "manager) during the next #{$WARMUP}s. the drag will affect"
+p "manager) during the next ${WARMUP}s. the drag will affect"
 p "whatever's at the press coord — caveat emptor."
 for var $i (1:$WARMUP) {
     p "  #{$WARMUP - $i + 1}..."

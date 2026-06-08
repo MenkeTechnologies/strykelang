@@ -17,7 +17,7 @@ val $INTERVAL = 0.08
 val $LINE = "hello from stryke v0.16.29 — typewriter via key_type()"
 
 p "── typewriter demo ──────────────────────────────────"
-p "you have #{$WARMUP} seconds to click into the target window."
+p "you have $WARMUP seconds to click into the target window."
 p "the script will then type:"
 p "  '$LINE'"
 p ""

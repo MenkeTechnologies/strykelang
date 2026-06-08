@@ -12,7 +12,7 @@
 val $WARMUP = 5
 
 p "── scroll demo ──────────────────────────────────────"
-p "click into a scrollable window in the next #{$WARMUP}s"
+p "click into a scrollable window in the next ${WARMUP}s"
 p "the script will scroll up 10, down 10, then right 5, left 5."
 for var $i (1:$WARMUP) {
     p "  #{$WARMUP - $i + 1}..."

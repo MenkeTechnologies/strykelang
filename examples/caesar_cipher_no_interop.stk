@@ -15,20 +15,18 @@
 #       stryke --no-interop examples/caesar_cipher_no_interop.stk encode "Hello, World!" 7
 #       stryke --no-interop examples/caesar_cipher_no_interop.stk decode "Olssv, Dvysk!" 7
 
-fn Caesar::shift_one($ch, $by) {
-    my $code = ord($ch)
+fn Caesar::shift_one($c, $by) {
+    my $code = ord($c)
     if ($code >= ord("A") && $code <= ord("Z")) {
         return chr(((($code - ord("A")) + $by) % 26 + 26) % 26 + ord("A"))
     }
     if ($code >= ord("a") && $code <= ord("z")) {
         return chr(((($code - ord("a")) + $by) % 26 + 26) % 26 + ord("a"))
     }
-    $ch
+    $c
 }
 
-fn Caesar::cipher($text, $shift = 3) {
-    join("", maps { Caesar::shift_one(_, $shift) } split(//, $text))
-}
+fn Caesar::cipher($s, $shift = 3) = join("", maps { Caesar::shift_one(_, $shift) } split(//, $s))
 
 if (len(@ARGV) >= 2) {
     my $mode  = $ARGV[0]

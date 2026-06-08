@@ -24,7 +24,7 @@ val $start_x = $start[0]
 val $start_y = $start[1]
 
 p "center:    ($cx, $cy)"
-p "radius:    #{$RADIUS}px"
+p "radius:    ${RADIUS}px"
 p "loops:     $REVOLUTIONS revolutions of $STEPS steps each"
 p ""
 p "starting in 2s — Ctrl-C to abort"

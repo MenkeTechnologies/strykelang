@@ -55,9 +55,7 @@ fn now_string {
         $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]
 }
 
-fn logger($s) {
-    p "\x1b[${COLOR}m#{now_string()} - $s\x1b[0m"
-}
+fn logger = p "\x1b[${COLOR}m#{now_string()} - $_\x1b[0m"
 
 fn off_hours_pred {
     var @t = localtime time()
