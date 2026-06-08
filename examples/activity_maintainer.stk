@@ -1,0 +1,107 @@
+#!/usr/bin/env stryke
+
+# Activity maintainer — keeps the system "active" by nudging the
+# mouse on a schedule, throttled by on-hours and off-hours windows.
+#
+# Port of /Users/wizard/PycharmProjects/fromShell/activityMaintainer.py
+# from PyAutoGUI to stryke's `mouse_move` builtin (enigo-backed).
+# One-for-one feature parity with the original: same flags, same
+# coordinates, same random-jitter behavior at the on/off boundary.
+#
+# Flags:
+#   -c, --caffeinate     keep nudging during off-hours too
+#   -s N,  --start N     on-hours start hour (default 9)
+#   -e N,  --end N       on-hours end hour   (default 17)
+#   -t N,  --time N      seconds between mouse nudges (default 8)
+#
+# Run:  s examples/activity_maintainer.stk -- [-c] [-s 9] [-e 17] [-t 8]
+#
+# The `--` separator is required so stryke's CLI doesn't intercept
+# the dash-prefixed flags before they reach @ARGV. Bare script args
+# (no leading dash) don't need `--`.
+
+val $VERSION              = "1.0.1"
+val $COORD_1              = 199
+val $COORD_2              = 300
+val $OFF_HOURS_SLEEP_TIME = 60
+val $COLOR                = "1;4;34"
+val $ELLIPSIS             = "..."
+
+# ── arg parsing — mirror the original Python flags ──
+my $caffeinate = 0
+my $start_hour = 9
+my $end_hour   = 17
+my $sleep_time = 8
+
+my $i = 0
+while ($i < len(@ARGV)) {
+    my $a = $ARGV[$i]
+    if ($a eq "-c" || $a eq "--caffeinate") {
+        $caffeinate = 1
+    } elsif ($a eq "-s" || $a eq "--start") {
+        $i++
+        $start_hour = 0 + $ARGV[$i]
+    } elsif ($a eq "-e" || $a eq "--end") {
+        $i++
+        $end_hour = 0 + $ARGV[$i]
+    } elsif ($a eq "-t" || $a eq "--time") {
+        $i++
+        $sleep_time = 0 + $ARGV[$i]
+    }
+    $i++
+}
+
+fn now_string {
+    my @t = localtime(time())
+    sprintf "%04d-%02d-%02d %02d:%02d:%02d",
+        $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]
+}
+
+fn logger($s) {
+    p "\x1b[#{$COLOR}m#{now_string()} - #{$s}\x1b[0m"
+}
+
+fn off_hours_pred {
+    my @t = localtime(time())
+    my $h = $t[2]
+    return $h >= $end_hour || $h < $start_hour
+}
+
+fn movement_loop {
+    sleep $sleep_time
+    mouse_move($COORD_1, $COORD_1)
+    sleep $sleep_time
+    mouse_move($COORD_2, $COORD_2)
+}
+
+$SIG{INT} = fn {
+    logger("Cya#{$ELLIPSIS}")
+    exit(0)
+}
+
+if ($caffeinate) {
+    logger("Entering the activity maintainer #{$VERSION} caffeinated#{$ELLIPSIS}")
+} else {
+    logger("Entering the activity maintainer #{$VERSION}#{$ELLIPSIS}")
+}
+
+my $was_in_on_hours = 0
+while (1) {
+    if (!$caffeinate && off_hours_pred()) {
+        logger("Entering off hours sleeping#{$ELLIPSIS}")
+        while (off_hours_pred()) {
+            if ($was_in_on_hours) {
+                my $n = random_between(5, 250)
+                my $secs = $n * 2 * $sleep_time
+                logger("movement loop #{$n} times, #{int($secs / 60)} minutes, #{$secs % 60} seconds")
+                for (1:$n) { movement_loop() }
+                logger("going into off hours")
+            }
+            $was_in_on_hours = 0
+            sleep $OFF_HOURS_SLEEP_TIME
+        }
+        logger("Back to mouse moving#{$ELLIPSIS}")
+    }
+    $was_in_on_hours = 1
+    movement_loop()
+}
