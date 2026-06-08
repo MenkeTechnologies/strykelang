@@ -21860,6 +21860,7 @@ variance
 variance_decomposition
 varint_decode
 varint_encode
+varsync
 vary_match
 vasicek_bond
 vat

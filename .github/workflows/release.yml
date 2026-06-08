@@ -77,6 +77,23 @@ jobs:
         if: contains(matrix.target, 'musl') && !matrix.use_cross
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
+      - name: Install Linux GUI deps (wayland + X11 for xcap screen capture)
+        # The `xcap` crate (backs the screenshot / pixel builtins)
+        # pulls in wayland-sys + x11rb on Linux. wayland-sys's build.rs
+        # unconditionally pkg-config-probes for wayland-client + libxkbcommon,
+        # so the linux-gnu / linux-musl / aarch64-linux-gnu jobs need
+        # the matching -dev packages even though the resulting binary
+        # is statically linked. Pre-existing musl/aarch64 jobs already
+        # `apt-get update` separately, so we keep this step idempotent
+        # by re-running update + install with -y --no-install-recommends.
+        if: contains(matrix.target, 'linux') && !matrix.use_cross
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwayland-dev libxkbcommon-dev \
+            libxcb1-dev libxrandr-dev libdbus-1-dev \
+            pkg-config
+
       - name: Install native deps for aarch64-linux-gnu (build toolchain)
         if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
         run: |
