@@ -1197,9 +1197,9 @@ class StrykeLexer : LexerBase() {
             "fn", "sub", "method", "class", "trait", "struct", "enum", "impl", "extends",
         )
         private val CONTROL_KEYWORDS = setOf(
-            "return", "if", "elsif", "else", "unless", "while", "until", "for", "foreach",
-            "do", "last", "next", "redo", "given", "when", "default", "die", "eval",
-            "try", "catch", "finally",
+            "return", "if", "elsif", "else", "unless", "while", "until", "loop",
+            "for", "foreach", "do", "last", "next", "redo", "given", "when", "default",
+            "die", "eval", "try", "catch", "finally",
         )
         private val PHASE_KEYWORDS = setOf(
             "BEGIN", "END", "INIT", "CHECK", "UNITCHECK", "BUILD", "DESTROY",
@@ -1236,6 +1236,19 @@ class StrykeLexer : LexerBase() {
             "snake_case", "sc", "camel_case", "cc", "pascal_case", "kebab_case",
             "spurt", "slurp", "exists_file", "exists_dir", "mkdir_p", "rmdir_r",
             "now_ns", "td_add",
+            // ── GUI automation (pyautogui-equivalent) ──
+            // enigo-backed mouse / keyboard, xcap-backed pixel / screenshot.
+            // Source: strykelang/builtins_gui.rs.
+            "mouse_pos", "mouse_size", "screen_size", "on_screen",
+            "mouse_move", "mouse_move_rel", "mouse_drag", "mouse_drag_rel",
+            "mouse_click", "mouse_right_click", "mouse_middle_click",
+            "mouse_double_click", "mouse_triple_click",
+            "mouse_down", "mouse_up",
+            "mouse_scroll", "mouse_vscroll", "mouse_hscroll",
+            "key_press", "key_down", "key_up",
+            "key_type", "key_hotkey", "keyboard_keys",
+            "pixel", "pixel_matches_color",
+            "screenshot", "screenshot_region",
         )
         private val REGEX_ANCHORS = setOf(',', '(', '=', ';', '{', '|', '&', '~', '!', '?')
         private val SPECIAL_VAR_CHARS = setOf(
