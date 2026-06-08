@@ -178,6 +178,11 @@ tracing = "0.1.44"
 # surface). macOS uses CGEvent, X11 uses XTest, Wayland uses libei
 # (or fails gracefully), Windows uses SendInput. No external binaries.
 enigo = "0.6"
+# Cross-platform screen capture — backs the screenshot / pixel
+# builtins. macOS requires a one-time Screen Recording permission
+# (System Settings → Privacy & Security → Screen Recording); X11
+# always works; Wayland needs portal access. Returns RGBA frames.
+xcap = "0.9"
 
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.3"
