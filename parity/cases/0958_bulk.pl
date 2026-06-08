@@ -1,2 +1,0 @@
-# bulk:958
-printf "%d\n", ord("A") + 3;
