@@ -8,48 +8,46 @@
 # One-for-one feature parity with the original: same flags, same
 # coordinates, same random-jitter behavior at the on/off boundary.
 #
-# Flags:
+# Flags (via stryke's `getopts` — see `s -e 'docs getopts'`):
 #   -c, --caffeinate     keep nudging during off-hours too
-#   -s N,  --start N     on-hours start hour (default 9)
-#   -e N,  --end N       on-hours end hour   (default 17)
-#   -t N,  --time N      seconds between mouse nudges (default 8)
+#   -s N, --start N      on-hours start hour      (default 9)
+#   -e N, --end N        on-hours end hour        (default 17)
+#   -t N, --time N       seconds between nudges   (default 8)
+#   -h, --help           auto-printed usage block + exit
 #
 # Run:  s examples/activity_maintainer.stk -- [-c] [-s 9] [-e 17] [-t 8]
 #
 # The `--` separator is required so stryke's CLI doesn't intercept
 # the dash-prefixed flags before they reach @ARGV. Bare script args
-# (no leading dash) don't need `--`.
+# (no leading dash) don't need `--`. getopts itself recognizes both
+# `-s 9` and `--start=9` / `--start 9` shapes and the bundled form
+# (`-cs9` = `-c -s 9`).
 
-val $VERSION              = "1.1.0"
+val $VERSION              = "1.2.0"
 val $COORD_1              = 199
 val $COORD_2              = 300
 val $OFF_HOURS_SLEEP_TIME = 60
 val $COLOR                = "1;4;34"
 val $ELLIPSIS             = "..."
 
-# ── arg parsing — mirror the original Python flags ──
-var $caffeinate = 0
-var $start_hour = 9
-var $end_hour   = 17
-var $sleep_time = 8
+# ── arg parsing via getopts ──
+# Hash form keeps the spec + help text + defaults in one declaration;
+# getopts auto-intercepts --help / -h, prints a formatted usage block,
+# and exits cleanly. Returns a hashref of canonical-name → value.
+var %opts = %{ getopts({
+    "caffeinate|c"  => { help => "keep nudging during off-hours too",  default => 0 },
+    "start|s=i"     => { help => "on-hours start hour",                 default => 9 },
+    "end|e=i"       => { help => "on-hours end hour",                   default => 17 },
+    "time|t=i"      => { help => "seconds between mouse nudges",        default => 8 },
+}, {
+    prog => "activity_maintainer",
+    desc => "keep system active by nudging the mouse on a schedule",
+}) }
 
-var $i = 0
-while ($i < len @ARGV ) {
-    var $a = $ARGV[$i]
-    if ($a eq "-c" || $a eq "--caffeinate") {
-        $caffeinate = 1
-    } elsif ($a eq "-s" || $a eq "--start") {
-        $i++
-        $start_hour = 0 + $ARGV[$i]
-    } elsif ($a eq "-e" || $a eq "--end") {
-        $i++
-        $end_hour = 0 + $ARGV[$i]
-    } elsif ($a eq "-t" || $a eq "--time") {
-        $i++
-        $sleep_time = 0 + $ARGV[$i]
-    }
-    $i++
-}
+val $caffeinate = $opts{caffeinate}
+val $start_hour = $opts{start}
+val $end_hour   = $opts{end}
+val $sleep_time = $opts{time}
 
 fn now_string {
     var @t = localtime time()
