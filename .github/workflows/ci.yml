@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --all-targets --locked
 
@@ -40,6 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      # No-op on macOS via runner.os guard inside the composite action.
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --locked --no-fail-fast
 
@@ -55,6 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - env:
           RUSTDOCFLAGS: -D warnings
@@ -66,6 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
       - name: Compare stryke output to perl on parity/cases
@@ -94,6 +99,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
       - name: Examples CI (parse, run, demos, project, rosetta, exercism, ruby, scheme)
@@ -167,6 +173,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      # No-op on macOS via runner.os guard in the composite action.
+      - uses: ./.github/actions/install-linux-deps
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
