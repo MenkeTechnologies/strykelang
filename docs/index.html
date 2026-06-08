@@ -233,7 +233,7 @@ s 'p to_yaml read_json "data.json"'</pre>
             <tr><td>Stress testing / heat</td><td style="color:#f55;"><b>100% TDP</b></td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>Distributed agents</td><td style="color:#0f0;">&#10003;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
             <tr><td>JIT compiler</td><td style="color:#0f0;">Cranelift</td><td>&#10007;</td><td>YJIT</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td></tr>
-            <tr><td>Single binary</td><td style="color:#0f0;">40MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
+            <tr><td>Single binary</td><td style="color:#0f0;">44MB</td><td>pkg</td><td>pkg</td><td>pkg</td><td>pkg</td><td>3MB</td></tr>
           </tbody>
         </table>
         <h3 style="margin-top:1em;">Character count — real tasks</h3>
@@ -265,7 +265,7 @@ s 'p to_yaml read_json "data.json"'</pre>
           <li><strong>Regex</strong> — three-tier engine: Rust <code>regex</code> → <code>fancy-regex</code> (backrefs) → <code>pcre2</code> (PCRE-only verbs).</li>
           <li><strong>Parallelism</strong> — every parallel builtin uses rayon work-stealing across all cores. See <code>pmap</code>, <code>pflat_map</code>, <code>pgrep</code>, <code>pfor</code>, <code>psort</code>, <code>preduce</code>, <code>pcache</code>, <code>ppool</code>, <code>fan</code>, <code>pipeline</code>, <code>par_pipeline_stream</code>, <code>pchannel</code>, <code>pselect</code>, <code>par_walk</code>, <code>par_lines</code>, <code>par_sed</code>.</li>
           <li><strong>Stress testing</strong> — <code>heat(60)</code> pins ALL cores to 100% TDP. <code>stryke agent</code> + <code>stryke controller</code> for distributed fleet-wide load testing. The hottest language ever created.</li>
-          <li><strong>Binary size</strong> — ~40 MB stripped with LTO + O3.</li>
+          <li><strong>Binary size</strong> — ~44 MB stripped with LTO + O3.</li>
         </ul>
       </section>
 
@@ -2249,7 +2249,7 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>10,459 builtins in %b / 11,191 keys in %all in 40&nbsp;MB single static binary, zero-import</td>
+              <td>10,459 builtins in %b / 11,191 keys in %all in 44&nbsp;MB single static binary, zero-import</td>
               <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~3.6&nbsp;KB amortized per builtin, ~200&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>

@@ -245,12 +245,12 @@
       <table class="file-table">
         <thead><tr><th>Toolchain</th><th class="num">Builtins</th><th class="num">Install Size</th><th class="num">Bytes / Builtin</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>11,191</strong></td><td class="num"><strong>40 MB</strong></td><td class="num"><strong>~3.0 KB</strong></td></tr>
+          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>11,191</strong></td><td class="num"><strong>44 MB</strong></td><td class="num"><strong>~4.0 KB</strong></td></tr>
           <tr><td>Wolfram Engine v14 (free tier)</td><td class="num">~7,000</td><td class="num">~5&ndash;6 GB</td><td class="num">~750 KB</td></tr>
           <tr><td>MATLAB R2025a + toolboxes</td><td class="num">thousands</td><td class="num">30+ GB</td><td class="num">n/a</td></tr>
         </tbody>
       </table>
-      <p style="margin-top:8px;">~200&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with 11,102 callable spellings (10,459 builtins + 643 aliases) plus 89 keywords reflected in <code>%all</code> (11,191 keys total). Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "11,102 callable names + 40 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
+      <p style="margin-top:8px;">~200&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with 11,102 callable spellings (10,459 builtins + 643 aliases) plus 89 keywords reflected in <code>%all</code> (11,191 keys total). Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "11,102 callable names + 44 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
 
       <hr class="section-rule">
 
