@@ -1,0 +1,55 @@
+#!/usr/bin/env stryke
+
+# GUI demo — chord key combinations via `key_hotkey(@keys)`.
+# Demonstrates three common chords:
+#
+#   Cmd+T   (macOS) / Ctrl+T (Linux/Windows)   open new tab in many apps
+#   Cmd+W   / Ctrl+W                            close current tab
+#   Cmd+K   / Ctrl+L                            clear terminal screen
+#
+# Run:  s examples/gui_hotkey.stk
+#
+# **Click into your terminal during the warmup** — the chords fire
+# against whatever window has focus.
+#
+# Permission: macOS Accessibility (one-time prompt).
+
+# Platform detection — stryke exposes the OS family via $^O (Perl
+# convention). Pick the meta-key spelling that fires on the host.
+val $IS_MAC = $^O eq "darwin"
+val $META   = $IS_MAC ? "cmd"  : "ctrl"
+val $WARMUP = 5
+
+p "── hotkey demo ──────────────────────────────────────"
+p "platform: $^O — using $META as the modifier"
+p ""
+p "this demo will press 3 chords against the focused window:"
+p "  1. $META + T         (open new tab — if the app supports it)"
+p "  2. $META + W         (close that tab)"
+p "  3. $META + K  or  ctrl + L  (clear terminal screen)"
+p ""
+p "click into your terminal during the next #{$WARMUP}s"
+for var $i (1:$WARMUP) {
+    p "  #{$WARMUP - $i + 1}..."
+    sleep 1
+}
+
+p ""
+p "[$META + t] open new tab"
+key_hotkey($META, "t")
+sleep 1.5
+
+p "[$META + w] close that tab"
+key_hotkey($META, "w")
+sleep 1.5
+
+if ($IS_MAC) {
+    p "[cmd + k] clear Terminal.app screen"
+    key_hotkey("cmd", "k")
+} else {
+    p "[ctrl + l] clear terminal screen"
+    key_hotkey("ctrl", "l")
+}
+
+p ""
+p "done."
