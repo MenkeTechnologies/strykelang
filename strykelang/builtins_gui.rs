@@ -346,7 +346,10 @@ fn parse_key_unix(lc: &str) -> Option<Key> {
         "find" => Find,
         "redo" => Redo,
         "undo" => Undo,
-        "final" => Final,
+        // `Final` is Windows-only in enigo despite living next to
+        // Function which is macOS-only — not a Linux variant.
+        // Drop here; Windows path can still hit it via parse_key_platform
+        // if a Windows-specific arm is added later.
         _ => return None,
     })
 }
