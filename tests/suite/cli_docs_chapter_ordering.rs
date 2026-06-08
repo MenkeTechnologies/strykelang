@@ -162,10 +162,10 @@ fn toc_starts_with_doc_categories_in_declared_order() {
     // enough to catch the "interleaved alphabetical" regression.)
     let want = [
         "Parallel Primitives",
+        "GUI Automation",
         "Shared State & Concurrency",
         "Pipeline & Pipe-Forward",
         "Streaming Iterators",
-        "List Operations",
     ];
     let got: Vec<&str> = chapters
         .iter()
