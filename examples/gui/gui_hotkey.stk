@@ -28,7 +28,7 @@ p "  1. $META + T         (open new tab — if the app supports it)"
 p "  2. $META + W         (close that tab)"
 p "  3. $META + K  or  ctrl + L  (clear terminal screen)"
 p ""
-p "click into your terminal during the next #{$WARMUP}s"
+p "click into your terminal during the next ${WARMUP}s"
 for var $i (1:$WARMUP) {
     p "  #{$WARMUP - $i + 1}..."
     sleep 1
