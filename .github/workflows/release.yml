@@ -47,9 +47,19 @@ jobs:
             # Native aarch64 GHA runner — switched off cross-rs after
             # repeated build-infra failures (Docker image fetch / glibc
             # version mismatches). Native arm runner gets modern gcc +
-            # apt without the cross-rs container layer. Homebrew
-            # formula's on_linux/on_arm block depends on this target
-            # producing an artifact.
+            # apt without the cross-rs container layer.
+            # allow_failure: true here because the runner repeatedly
+            # crashes mid-link with "runner lost communication with
+            # server" + a `null` conclusion on the Build (native) step
+            # even after the 8 GB swap + reduce-memory-overheads
+            # linker flags (v0.16.20-.22 all blocked publish on this
+            # one matrix entry). The Homebrew formula's on_linux/on_arm
+            # block currently ships an empty sha256 anyway (no aarch64
+            # Linux binary since at least v0.16.6), so allowing this
+            # to fail matches reality and stops blocking the publish
+            # job on a target the formula doesn't actually deliver.
+            # Revisit once the runner instability is root-caused.
+            allow_failure: true
           - os: macos-latest
             target: x86_64-apple-darwin
             archive: tar.gz
