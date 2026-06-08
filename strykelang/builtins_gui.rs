@@ -288,54 +288,49 @@ fn parse_key_platform(lc: &str) -> Option<Key> {
 fn parse_key_platform(lc: &str) -> Option<Key> {
     use Key::*;
     Some(match lc {
-        // Function keys past F20 are non-macOS only
+        // ── Available on BOTH Windows + Linux (enigo gates them
+        // under cfg(any(windows, all(unix, not(macos))))) ──
         "f21" => F21, "f22" => F22, "f23" => F23, "f24" => F24,
-        // Print-screen family — macOS doesn't have a single keysym
-        // for this; users hit Cmd+Shift+3/4 instead.
         "printscreen" | "prntscrn" | "prtsc" | "prtscr" => PrintScr,
-        // Left/right modifier variants
         "altleft" | "optionleft" => LMenu,
-        "altright" | "optionright" => RMenu,
-        "win" | "winleft" => LWin,
-        "winright" => RWin,
-        // Edit + locks
         "insert" => Insert,
         "numlock" => Numlock,
-        // System
         "pause" => Pause,
         "modechange" => ModeChange,
         "select" => Select,
         "execute" => Execute,
         "cancel" => Cancel,
         "clear" => Clear,
-        "apps" => Apps,
-        "sleep" => Sleep,
-        "accept" => Accept,
-        "convert" => Convert,
-        "nonconvert" => NonConvert,
-        // Media
         "stop" => MediaStop,
-        // Launch
-        "launchmail" => LaunchMail,
-        "launchmediaselect" => LaunchMediaSelect,
-        "launchapp1" => LaunchApp1,
-        "launchapp2" => LaunchApp2,
-        // Browser
-        "browserback" => BrowserBack,
-        "browserforward" => BrowserForward,
-        "browserrefresh" => BrowserRefresh,
-        "browserstop" => BrowserStop,
-        "browsersearch" => BrowserSearch,
-        "browserfavorites" => BrowserFavorites,
-        "browserhome" => BrowserHome,
-        // CJK input method
         "hangul" | "hanguel" => Hangul,
         "hanja" => Hanja,
-        "junja" => Junja,
-        "kana" => Kana,
         "kanji" => Kanji,
-        // Separator (numpad)
-        "separator" => Separator,
+        // ── Windows-only variants ── enigo gates these under
+        // cfg(target_os = "windows"); Linux build doesn't see them.
+        // Per-arm cfg attrs keep one match block instead of
+        // splitting into a separate parse_key_windows fn.
+        #[cfg(target_os = "windows")] "altright" | "optionright" => RMenu,
+        #[cfg(target_os = "windows")] "win" | "winleft" => LWin,
+        #[cfg(target_os = "windows")] "winright" => RWin,
+        #[cfg(target_os = "windows")] "apps" => Apps,
+        #[cfg(target_os = "windows")] "sleep" => Sleep,
+        #[cfg(target_os = "windows")] "accept" => Accept,
+        #[cfg(target_os = "windows")] "convert" => Convert,
+        #[cfg(target_os = "windows")] "nonconvert" => NonConvert,
+        #[cfg(target_os = "windows")] "junja" => Junja,
+        #[cfg(target_os = "windows")] "kana" => Kana,
+        #[cfg(target_os = "windows")] "separator" => Separator,
+        #[cfg(target_os = "windows")] "launchmail" => LaunchMail,
+        #[cfg(target_os = "windows")] "launchmediaselect" => LaunchMediaSelect,
+        #[cfg(target_os = "windows")] "launchapp1" => LaunchApp1,
+        #[cfg(target_os = "windows")] "launchapp2" => LaunchApp2,
+        #[cfg(target_os = "windows")] "browserback" => BrowserBack,
+        #[cfg(target_os = "windows")] "browserforward" => BrowserForward,
+        #[cfg(target_os = "windows")] "browserrefresh" => BrowserRefresh,
+        #[cfg(target_os = "windows")] "browserstop" => BrowserStop,
+        #[cfg(target_os = "windows")] "browsersearch" => BrowserSearch,
+        #[cfg(target_os = "windows")] "browserfavorites" => BrowserFavorites,
+        #[cfg(target_os = "windows")] "browserhome" => BrowserHome,
         _ => parse_key_unix(lc)?,
     })
 }
