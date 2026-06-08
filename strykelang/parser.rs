@@ -512,7 +512,7 @@ impl Parser {
                 // strict` / `use warnings` followed by `fn foo { ... }`
                 // on the next line swallows `foo` as an import argument.
                 | "fn" | "class" | "abstract" | "final" | "trait"
-                | "state" | "mysync" | "oursync" | "var" | "val"
+                | "state" | "mysync" | "varsync" | "oursync" | "var" | "val"
             )
         )
     }
@@ -800,6 +800,19 @@ impl Parser {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
                             "`mysync` is a stryke extension (disabled by --compat)",
+                            self.peek_line(),
+                        ));
+                    }
+                    self.parse_my_our_local("mysync", false)?
+                }
+                // `varsync $x = …` — Kotlin-style alias for `mysync`,
+                // same way `var` aliases `my`. Parses identically to
+                // `mysync` (StmtKind::MySync), so all downstream
+                // bytecode + reflection treats it as the same binding.
+                "varsync" => {
+                    if crate::compat_mode() {
+                        return Err(self.syntax_err(
+                            "`varsync` is a stryke extension (disabled by --compat)",
                             self.peek_line(),
                         ));
                     }

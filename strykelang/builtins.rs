@@ -349,6 +349,9 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("use", "decl"),
     ("val", "decl"),
     ("var", "decl"),
+    // `varsync` aliases `mysync` (Kotlin-style spelling) — same
+    // lockless atomic shared-state binding, parsed as StmtKind::MySync.
+    ("varsync", "concurrency"),
     ("when", "control"),
     ("while", "control"),
     ("x", "operator"),
