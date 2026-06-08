@@ -1,0 +1,52 @@
+#!/usr/bin/env stryke
+
+# GUI demo — full-screen + region capture via `screenshot()` and
+# `screenshot_region()`. Saves PNGs to /tmp and prints the paths so
+# you can `open` them.
+#
+# Run:  s examples/gui_screenshot.stk
+#
+# Permission: macOS prompts for **Screen Recording** access (separate
+# grant from Accessibility — System Settings → Privacy & Security →
+# Screen Recording). Wayland needs the screenshot portal. X11 and
+# Windows have no permission gates.
+
+val $FULL_PATH = "/tmp/stryke_screenshot.png"
+val $REGION_PATH = "/tmp/stryke_region.png"
+val $REGION_W = 600
+val $REGION_H = 400
+
+p "── screenshot demo ──────────────────────────────────"
+
+var @screen = screen_size()
+p "screen:    #{$screen[0]} x #{$screen[1]} pixels"
+p ""
+
+# Full screen.
+p "capturing full screen → $FULL_PATH"
+var $full = screenshot($FULL_PATH)
+p "saved: $full"
+
+# Centered region.
+val $L = int(($screen[0] - $REGION_W) / 2)
+val $T = int(($screen[1] - $REGION_H) / 2)
+p ""
+p "capturing centered #{$REGION_W}x#{$REGION_H} region at ($L, $T) → $REGION_PATH"
+var $rg = screenshot_region($L, $T, $REGION_W, $REGION_H, $REGION_PATH)
+p "saved: $rg"
+
+# In-memory capture — just confirm the shape, don't dump the bytes.
+p ""
+p "in-memory capture (no path) — returns [w, h, bytes]"
+var @cap = screenshot()
+val $w = $cap[0]
+val $h = $cap[1]
+val $bytes = len(@{ $cap[2] })
+p "  width:        $w"
+p "  height:       $h"
+p "  channel-bytes: $bytes   (should be w * h * 4 = #{$w * $h * 4})"
+
+p ""
+p "done — open the PNGs:"
+p "  open $FULL_PATH"
+p "  open $REGION_PATH"
