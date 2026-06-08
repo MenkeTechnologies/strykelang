@@ -56,13 +56,13 @@ fn now_string {
 }
 
 fn logger($s) {
-    p "\x1b[#{$COLOR}m#{now_string()} - #{$s}\x1b[0m"
+    p "\x1b[${COLOR}m#{now_string()} - $s\x1b[0m"
 }
 
 fn off_hours_pred {
     var @t = localtime time()
     var $h = $t[2]
-    return $h >= $end_hour || $h < $start_hour
+    $h >= $end_hour || $h < $start_hour
 }
 
 fn movement_loop {
@@ -73,32 +73,32 @@ fn movement_loop {
 }
 
 $SIG{INT} = fn {
-    logger("Cya#{$ELLIPSIS}")
-    exit(0)
+    logger "Cya$ELLIPSIS"
+    exit 0
 }
 
 if ($caffeinate) {
-    logger "Entering the activity maintainer #{$VERSION} caffeinated#{$ELLIPSIS}"
+    logger "Entering the activity maintainer $VERSION caffeinated$ELLIPSIS"
 } else {
-    logger "Entering the activity maintainer #{$VERSION}#{$ELLIPSIS}"
+    logger "Entering the activity maintainer $VERSION$ELLIPSIS"
 }
 
 var $was_in_on_hours = 0
 loop {
     if (!$caffeinate && off_hours_pred()) {
-        logger("Entering off hours sleeping#{$ELLIPSIS}")
+        logger "Entering off hours sleeping$ELLIPSIS"
         while (off_hours_pred()) {
             if ($was_in_on_hours) {
                 var $n = random_between 5, 250
                 var $secs = $n * 2 * $sleep_time
-                logger "movement loop #{$n} times, #{int($secs / 60)} minutes, #{$secs % 60} seconds"
+                logger "movement loop $n times, #{int($secs / 60)} minutes, #{$secs % 60} seconds"
                 for (1:$n) { movement_loop() }
                 logger "going into off hours"
             }
             $was_in_on_hours = 0
             sleep $OFF_HOURS_SLEEP_TIME
         }
-        logger "Back to mouse moving#{$ELLIPSIS}"
+        logger "Back to mouse moving$ELLIPSIS"
     }
     $was_in_on_hours = 1
     movement_loop()
