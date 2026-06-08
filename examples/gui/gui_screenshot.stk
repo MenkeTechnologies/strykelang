@@ -31,7 +31,7 @@ p "saved: $full"
 val $L = int(($screen[0] - $REGION_W) / 2)
 val $T = int(($screen[1] - $REGION_H) / 2)
 p ""
-p "capturing centered #{$REGION_W}x#{$REGION_H} region at ($L, $T) → $REGION_PATH"
+p "capturing centered ${REGION_W}x${REGION_H} region at ($L, $T) → $REGION_PATH"
 var $rg = screenshot_region($L, $T, $REGION_W, $REGION_H, $REGION_PATH)
 p "saved: $rg"
 

@@ -39,7 +39,7 @@ for var $row (@probes) {
 # color with tol=255 (always 1, since max abs diff is at most 255).
 var @c = pixel($cx, $cy)
 p ""
-p "pixel_matches_color sanity checks at center (#{$cx}, #{$cy}):"
+p "pixel_matches_color sanity checks at center ($cx, $cy):"
 p "  exact match (tol=0):   #{pixel_matches_color($cx, $cy, [$c[0], $c[1], $c[2]], 0)}    (expect 1)"
 p "  black with tol=255:    #{pixel_matches_color($cx, $cy, [0, 0, 0], 255)}    (expect 1)"
 p "  black with tol=0:      #{pixel_matches_color($cx, $cy, [0, 0, 0], 0)}    (expect 0 unless your screen pixel is exactly black)"
