@@ -318,6 +318,10 @@ pub const KEYWORDS: &[&str] = &[
     "var",
     "val",
     "mysync",
+    // `varsync` — Kotlin-style declarator alias for `mysync`, same
+    // way `var` aliases `my`. Both spell the same lockless atomic
+    // shared-state binding at the AST level (StmtKind::MySync).
+    "varsync",
     "our",
     "oursync",
     "local",

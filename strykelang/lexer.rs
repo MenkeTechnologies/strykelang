@@ -3067,6 +3067,7 @@ impl Lexer {
                     | "var"
                     | "val"
                     | "mysync"
+                    | "varsync"
                     | "frozen"
                     | "const"
                     | "typed"
