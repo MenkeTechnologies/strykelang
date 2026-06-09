@@ -1516,6 +1516,42 @@ fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String>
         let header = format!("Package `{word}` — declared at line {}.", decl_0 + 1);
         return Some(format_with_doc_comments(text, decl_0, header));
     }
+    // Cross-file: chase `require "./lib/foo.stk"` / `use Foo::Bar` and
+    // look up the sub in each chased file. Surfaces `##` doc-comments
+    // declared in installed packages (e.g. `GUI::mouse_pos` in
+    // `~/.stryke/store/gui@<ver>/lib/GUI.stk`) — resolve_require_path_from_file
+    // chains through arms 1/2/3 (local → project lockfile → global pin)
+    // to find the target file.
+    let mut cross_file_hit: Option<String> = None;
+    walk_required_files(&program, path, |target_path, src, child| {
+        if cross_file_hit.is_some() {
+            return false;
+        }
+        let child_map = collect_sub_fqn_map(child);
+        if let Some(ln) = resolve_sub_decl_line(&child_map, word) {
+            let decl_0 = ln.saturating_sub(1);
+            let header = format!(
+                "Subroutine `{word}` — declared in `{target_path}` at line {ln}."
+            );
+            cross_file_hit = Some(format_with_doc_comments(src, decl_0, header));
+            return false;
+        }
+        // Also try matching a `package <word>` declaration in the chased
+        // file so `use GUI` followed by hover over bare `GUI` surfaces
+        // the library's package-level `##` block.
+        if let Some(decl_0) = package_decl_line(src, word) {
+            let header = format!(
+                "Package `{word}` — declared in `{target_path}` at line {}.",
+                decl_0 + 1
+            );
+            cross_file_hit = Some(format_with_doc_comments(src, decl_0, header));
+            return false;
+        }
+        true
+    });
+    if let Some(out) = cross_file_hit {
+        return Some(out);
+    }
     if let Some(doc) = doc_for_label(word) {
         return Some(documentation_to_string(&doc));
     }
@@ -2082,8 +2118,15 @@ fn collect_required_files(program: &crate::ast::Program, file: &str) -> Vec<(Str
 fn require_specs_from_program(program: &crate::ast::Program) -> Vec<String> {
     let mut out = Vec::new();
     for stmt in &program.statements {
-        if let StmtKind::Expression(e) = &stmt.kind {
-            collect_require_spec(e, &mut out);
+        match &stmt.kind {
+            StmtKind::Expression(e) => collect_require_spec(e, &mut out),
+            // `use Foo::Bar` is parsed as StmtKind::Use; treat it as a
+            // require for cross-file lookup. Standard pragmas (strict,
+            // warnings, etc.) are filtered by resolve_require_path_from_file
+            // (it returns None when no file resolves), so we don't
+            // re-filter them here.
+            StmtKind::Use { module, .. } => out.push(module.clone()),
+            _ => {}
         }
     }
     out
