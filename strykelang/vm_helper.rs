@@ -3212,18 +3212,23 @@ impl VMHelper {
         }
     }
 
-    /// Lockfile-driven module resolution (RFC §"Module Resolution"). Walks up from
-    /// `cwd` for `stryke.toml`, then asks [`crate::pkg::commands::resolve_module`]
-    /// to find the module either in `lib/` or in the lockfile-pinned store. The
-    /// `relpath` arg is the `@INC`-style path (`Foo/Bar.pm`) used elsewhere in
-    /// `require`; it is converted to a logical name (`Foo::Bar`) for the resolver.
-    /// Both `.pm` and `.stk` variants are tried — stryke source uses `.stk`.
+    /// Lockfile- and pin-driven module resolution (RFC §"Module Resolution").
+    /// Walks up from `cwd` for `stryke.toml`; if found, asks
+    /// [`crate::pkg::commands::resolve_module`] to look in `lib/` then the
+    /// lockfile-pinned store. When no project root is reachable, still
+    /// invokes `resolve_module(&cwd, &logical)` so the global pin arm
+    /// (`~/.stryke/installed.toml` → store) fires for standalone scripts
+    /// run outside any project — the exact path `use GUI` from a one-off
+    /// script takes after `s pkg install -g github.com/.../stryke-gui`.
+    ///
+    /// The `relpath` arg is the `@INC`-style path (`Foo/Bar.pm`) used
+    /// elsewhere in `require`; it is converted to a logical name (`Foo::Bar`)
+    /// for the resolver. Both `.pm` and `.stk` variants are tried — stryke
+    /// source uses `.stk`.
     fn try_resolve_via_lockfile(relpath: &str) -> Option<std::path::PathBuf> {
         let cwd = std::env::current_dir().ok()?;
-        let project_root = crate::pkg::commands::find_project_root(&cwd)?;
+        let project_root = crate::pkg::commands::find_project_root(&cwd);
 
-        // Convert "Foo/Bar.pm" → "Foo::Bar". Drop the trailing extension so
-        // `resolve_module` (which appends `.stk`) builds the right path.
         let stem = relpath
             .strip_suffix(".pm")
             .or_else(|| relpath.strip_suffix(".pl"))
@@ -3231,7 +3236,12 @@ impl VMHelper {
             .unwrap_or(relpath);
         let logical = stem.replace('/', "::");
 
-        crate::pkg::commands::resolve_module(&project_root, &logical).unwrap_or_default()
+        // Anchor at the project root when we have one (so the local `lib/`
+        // arm of resolve_module is checked); otherwise anchor at cwd, which
+        // skips both project-local and lockfile arms and falls straight
+        // through to the global installed.toml arm.
+        let anchor = project_root.unwrap_or(cwd);
+        crate::pkg::commands::resolve_module(&anchor, &logical).unwrap_or_default()
     }
 
     /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully

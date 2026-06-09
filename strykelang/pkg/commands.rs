@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use super::lockfile::Lockfile;
 use super::manifest::{DepSpec, DetailedDep, Manifest, PackageMeta};
 use super::resolver::Resolver;
-use super::store::Store;
+use super::store::{InstalledIndex, Store};
 use super::PkgResult;
 
 /// Filename of the project manifest.
@@ -750,6 +750,8 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
     // 1. Project-local `lib/`.
     let local = root.join("lib").join(segments_to_path(&segments));
     if local.is_file() {
+        // Project may declare [ffi] for its own cdylib in stryke.toml.
+        try_load_ffi_for(root)?;
         return Ok(Some(local));
     }
 
@@ -768,11 +770,88 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
                 store_pkg.join("lib").join(segments_to_path(&segments[1..]))
             };
             if nested_path.is_file() {
+                try_load_ffi_for(&store_pkg)?;
                 return Ok(Some(nested_path));
             }
         }
     }
+
+    // 3. Global pin file. `~/.stryke/installed.toml` records every
+    //    `s pkg install -g`-installed package. When the script runs outside
+    //    a project (no walking up to a stryke.toml) or the project's lock
+    //    doesn't pin this package, look it up here. This is the path that
+    //    makes `s install -g github.com/MenkeTechnologies/stryke-gui` →
+    //    standalone `use GUI` work.
+    if let Ok(idx) = InstalledIndex::load_or_default() {
+        let pkg_name = segments[0].to_lowercase();
+        if let Some(entry) = idx.find(&pkg_name) {
+            let store = Store::user_default()?;
+            let store_pkg = store.package_dir(&entry.name, &entry.version);
+            let nested_path = if segments.len() == 1 {
+                store_pkg.join("lib").join(format!("{}.stk", segments[0]))
+            } else {
+                store_pkg.join("lib").join(segments_to_path(&segments[1..]))
+            };
+            if nested_path.is_file() {
+                try_load_ffi_for(&store_pkg)?;
+                return Ok(Some(nested_path));
+            }
+        }
+    }
+
     Ok(None)
+}
+
+/// Side-load the package's `[ffi]` cdylib (if declared) into the FFI registry.
+/// Idempotent across repeat `use NAMESPACE` calls within one process —
+/// [`crate::rust_ffi::load_cdylib`] short-circuits when the lib was already
+/// loaded. Returns `Ok(())` for packages without an `[ffi]` section.
+fn try_load_ffi_for(pkg_dir: &Path) -> PkgResult<()> {
+    let manifest_path = pkg_dir.join(MANIFEST_FILE);
+    if !manifest_path.is_file() {
+        return Ok(());
+    }
+    let manifest = Manifest::from_path(&manifest_path)?;
+    let Some(ffi) = manifest.ffi else {
+        return Ok(());
+    };
+    if ffi.lib_name.is_empty() || ffi.exports.is_empty() {
+        return Ok(());
+    }
+    let lib_filename = format!(
+        "{}{}{}",
+        std::env::consts::DLL_PREFIX,
+        ffi.lib_name,
+        std::env::consts::DLL_SUFFIX
+    );
+    // Search order:
+    //   1. lib/<lib_filename>    — production layout (release tarball drop).
+    //   2. target/release/...    — dev layout after `cargo build --release`.
+    //   3. target/debug/...      — dev layout after `cargo build`.
+    // Letting `target/` also satisfy the lookup lets contributors iterate on
+    // a stryke-* package without re-running `s pkg install -g .` after every
+    // edit. Production installs always hit (1) because the release tarball
+    // ships the cdylib at lib/.
+    let candidates = [
+        pkg_dir.join("lib").join(&lib_filename),
+        pkg_dir.join("target").join("release").join(&lib_filename),
+        pkg_dir.join("target").join("debug").join(&lib_filename),
+    ];
+    let lib_path = match candidates.iter().find(|p| p.is_file()) {
+        Some(p) => p.clone(),
+        None => {
+            return Err(super::PkgError::Other(format!(
+                "[ffi] cdylib `{}` not found under {}/lib or {}/target/{{release,debug}}/ \
+                 — install with `s pkg install -g github.com/...` to fetch the prebuilt \
+                 artifact, or run `cargo build --release` in the package dir for dev",
+                lib_filename,
+                pkg_dir.display(),
+                pkg_dir.display()
+            )));
+        }
+    };
+    crate::rust_ffi::load_cdylib(&lib_path, &ffi.exports, 0)
+        .map_err(|e| super::PkgError::Other(format!("[ffi] load {}: {}", lib_path.display(), e)))
 }
 
 fn segments_to_path(segments: &[&str]) -> PathBuf {
@@ -1253,29 +1332,31 @@ fn copy_tree(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()
 /// any local package with a manifest declaring binaries.
 pub fn cmd_install_global(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) || args.is_empty() {
-        println!("usage: stryke install -g PATH");
+        println!("usage: stryke install -g SPEC");
         println!();
-        println!("Install a local package's [bin] entries into ~/.stryke/bin/ as launcher");
-        println!("scripts that invoke `stryke <main_stk>`. PATH is the path to a directory");
-        println!("containing a stryke.toml with a [bin] table.");
+        println!("SPEC is one of:");
+        println!("  PATH                                local dir with stryke.toml");
+        println!("  gh:owner/repo[@VERSION]             GitHub release (prebuilt)");
+        println!("  github.com/owner/repo[@VERSION]     GitHub release (prebuilt)");
+        println!("  https://github.com/owner/repo[@VERSION]");
+        println!();
+        println!("Local installs copy the source into ~/.stryke/store/<name>@<version>/.");
+        println!("GitHub installs download the prebuilt release tarball for the host");
+        println!("triple (override with STRYKE_TARGET=...), verify its SHA-256, and");
+        println!("extract into the store. Launchers in ~/.stryke/bin/ point at the");
+        println!("store entry. When the package declares [ffi], its cdylib loads");
+        println!("lazily on first `use <namespace>`.");
         return if args.is_empty() { 1 } else { 0 };
     }
-    let pkg_path = std::path::PathBuf::from(&args[0]);
-    if !pkg_path.is_dir() {
-        eprintln!("s install -g: {} is not a directory", pkg_path.display());
-        return 1;
-    }
-    let manifest = match Manifest::from_path(&pkg_path.join(MANIFEST_FILE)) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("s install -g: {}", e);
+
+    let spec = match InstallSpec::parse(&args[0]) {
+        Ok(s) => s,
+        Err(msg) => {
+            eprintln!("s install -g: {}", msg);
             return 1;
         }
     };
-    if manifest.bin.is_empty() {
-        eprintln!("s install -g: package has no [bin] entries");
-        return 1;
-    }
+
     let store = match Store::user_default() {
         Ok(s) => s,
         Err(e) => {
@@ -1288,16 +1369,31 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
         return 1;
     }
 
-    let abs_pkg = match pkg_path.canonicalize() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("s install -g: canonicalize {}: {}", pkg_path.display(), e);
-            return 1;
-        }
+    let (manifest, store_pkg_dir, source) = match spec {
+        InstallSpec::Path(p) => match install_global_from_path(&store, &p) {
+            Ok(v) => v,
+            Err(msg) => {
+                eprintln!("s install -g: {}", msg);
+                return 1;
+            }
+        },
+        InstallSpec::GitHub {
+            owner,
+            repo,
+            version,
+        } => match install_global_from_github(&store, &owner, &repo, version.as_deref()) {
+            Ok(v) => v,
+            Err(msg) => {
+                eprintln!("s install -g: {}", msg);
+                return 1;
+            }
+        },
     };
 
+    // Launchers from [bin]. FFI-only packages may have empty [bin] — fine,
+    // they're invoked via `use <namespace>` not via a CLI launcher.
     for (bin_name, entry) in &manifest.bin {
-        let target = abs_pkg.join(entry);
+        let target = store_pkg_dir.join(entry);
         if !target.is_file() {
             eprintln!(
                 "s install -g: bin `{}` -> {} does not exist",
@@ -1313,13 +1409,310 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
         }
         eprintln!("  installed {} -> {}", launcher.display(), target.display());
     }
+
+    // Pin the install in ~/.stryke/installed.toml so standalone scripts
+    // (no project dir) can resolve `use <namespace>` to this store entry
+    // — that's the resolution path resolve_module's third arm walks.
+    if let Some(pkg) = manifest.package.as_ref() {
+        let mut idx = match InstalledIndex::load_or_default() {
+            Ok(i) => i,
+            Err(e) => {
+                eprintln!("s install -g: load installed.toml: {}", e);
+                return 1;
+            }
+        };
+        idx.upsert(&pkg.name, &pkg.version, &source);
+        if let Err(e) = idx.save() {
+            eprintln!("s install -g: write installed.toml: {}", e);
+            return 1;
+        }
+    }
+
+    let pkg_label = manifest
+        .package
+        .as_ref()
+        .map(|p| format!("{}@{}", p.name, p.version))
+        .unwrap_or_else(|| "package".to_string());
+    let mode_label = if manifest.ffi.is_some() {
+        " [ffi cdylib]"
+    } else {
+        ""
+    };
     eprintln!(
-        "\x1b[32m✓ installed {} bin{} (add {} to PATH)\x1b[0m",
-        manifest.bin.len(),
-        if manifest.bin.len() == 1 { "" } else { "s" },
-        store.bin_dir().display()
+        "\x1b[32m✓ {} installed{} → {}\x1b[0m",
+        pkg_label,
+        mode_label,
+        store_pkg_dir.display()
     );
+    if !manifest.bin.is_empty() {
+        eprintln!("  (add {} to PATH)", store.bin_dir().display());
+    }
     0
+}
+
+/// Parsed argument to `s install -g SPEC`.
+enum InstallSpec {
+    /// Local directory containing `stryke.toml`. Source-copied into the store.
+    Path(PathBuf),
+    /// GitHub release. Prebuilt tarball downloaded per host triple.
+    GitHub {
+        owner: String,
+        repo: String,
+        /// Tag to install (`v0.2.0`, `0.2.0`, etc.). `None` means latest.
+        version: Option<String>,
+    },
+}
+
+impl InstallSpec {
+    fn parse(arg: &str) -> Result<InstallSpec, String> {
+        let (head, version) = split_version_suffix(arg);
+        if let Some(rest) = head.strip_prefix("gh:") {
+            let (owner, repo) = parse_gh_owner_repo(rest)?;
+            return Ok(InstallSpec::GitHub {
+                owner,
+                repo,
+                version,
+            });
+        }
+        for prefix in ["https://github.com/", "http://github.com/", "github.com/"] {
+            if let Some(rest) = head.strip_prefix(prefix) {
+                let (owner, repo) = parse_gh_owner_repo(rest)?;
+                return Ok(InstallSpec::GitHub {
+                    owner,
+                    repo,
+                    version,
+                });
+            }
+        }
+        let path = PathBuf::from(head);
+        if !path.is_dir() {
+            return Err(format!(
+                "`{}` is not a directory or a recognized GitHub spec",
+                head
+            ));
+        }
+        Ok(InstallSpec::Path(path))
+    }
+}
+
+/// Split `gh:foo/bar@v1.0` into `("gh:foo/bar", Some("v1.0"))`. The `@` only
+/// counts as a version separator when followed by a digit or `v` so paths
+/// containing `@` (e.g. `~/projects/team@2023/pkg`) are not misparsed.
+fn split_version_suffix(arg: &str) -> (&str, Option<String>) {
+    if let Some(at_pos) = arg.rfind('@') {
+        let v = &arg[at_pos + 1..];
+        let looks_like_version = !v.is_empty()
+            && (v.starts_with('v') || v.chars().next().map_or(false, |c| c.is_ascii_digit()));
+        if looks_like_version {
+            return (&arg[..at_pos], Some(v.to_string()));
+        }
+    }
+    (arg, None)
+}
+
+fn parse_gh_owner_repo(s: &str) -> Result<(String, String), String> {
+    let cleaned = s.trim_end_matches('/').trim_end_matches(".git");
+    let mut parts = cleaned.splitn(2, '/');
+    let owner = parts
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or("expected owner/repo")?;
+    let repo = parts
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or("expected owner/repo")?;
+    Ok((owner.to_string(), repo.to_string()))
+}
+
+fn install_global_from_path(
+    store: &Store,
+    src: &Path,
+) -> Result<(Manifest, PathBuf, String), String> {
+    let abs = src
+        .canonicalize()
+        .map_err(|e| format!("canonicalize {}: {}", src.display(), e))?;
+    let manifest = Manifest::from_path(&abs.join(MANIFEST_FILE)).map_err(|e| e.to_string())?;
+    let pkg = manifest
+        .package
+        .as_ref()
+        .ok_or("manifest missing [package]")?;
+    let dst = store
+        .install_path_dep(&pkg.name, &pkg.version, &abs)
+        .map_err(|e| e.to_string())?;
+    let source = format!("path+file://{}", abs.display());
+    Ok((manifest, dst, source))
+}
+
+fn install_global_from_github(
+    store: &Store,
+    owner: &str,
+    repo: &str,
+    requested_version: Option<&str>,
+) -> Result<(Manifest, PathBuf, String), String> {
+    let tag = match requested_version {
+        Some(v) => v.to_string(),
+        None => fetch_latest_release_tag(owner, repo)?,
+    };
+    let triple = host_target_triple()?;
+    let asset_stem = repo.to_lowercase();
+    let asset = format!("{}-{}-{}.tar.gz", asset_stem, tag, triple);
+    let url_tar = format!(
+        "https://github.com/{}/{}/releases/download/{}/{}",
+        owner, repo, tag, asset
+    );
+    let url_sha = format!("{}.sha256", url_tar);
+
+    eprintln!("  fetching {} ...", url_tar);
+
+    let sha_text = ureq::get(&url_sha)
+        .call()
+        .map_err(|e| format!("GET {}: {}", url_sha, e))?
+        .into_string()
+        .map_err(|e| format!("read {}: {}", url_sha, e))?;
+    let expected_sha = sha_text
+        .split_whitespace()
+        .next()
+        .ok_or("empty sha256 file")?
+        .to_string();
+
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    ureq::get(&url_tar)
+        .call()
+        .map_err(|e| format!("GET {}: {}", url_tar, e))?
+        .into_reader()
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("read {}: {}", url_tar, e))?;
+
+    use sha2::Digest as _;
+    let actual = hex::encode(sha2::Sha256::digest(&bytes));
+    if !expected_sha.eq_ignore_ascii_case(&actual) {
+        return Err(format!(
+            "sha256 mismatch on {}: expected {} got {}",
+            asset, expected_sha, actual
+        ));
+    }
+
+    // Stage under cache/ then rename into store/ atomically so a failure
+    // mid-extract doesn't leave a half-populated store entry.
+    let stage_dir = store
+        .cache_dir()
+        .join(format!("install-stage-{}-{}-{}", asset_stem, tag, triple));
+    if stage_dir.exists() {
+        std::fs::remove_dir_all(&stage_dir)
+            .map_err(|e| format!("clear {}: {}", stage_dir.display(), e))?;
+    }
+    std::fs::create_dir_all(&stage_dir)
+        .map_err(|e| format!("mkdir {}: {}", stage_dir.display(), e))?;
+    let decoder = flate2::read::GzDecoder::new(std::io::Cursor::new(&bytes));
+    tar::Archive::new(decoder)
+        .unpack(&stage_dir)
+        .map_err(|e| format!("extract {}: {}", asset, e))?;
+
+    let manifest_dir = locate_manifest_dir(&stage_dir)?;
+    let manifest = Manifest::from_path(&manifest_dir.join(MANIFEST_FILE))
+        .map_err(|e| format!("installed stryke.toml: {}", e))?;
+    let pkg = manifest
+        .package
+        .as_ref()
+        .ok_or("installed manifest missing [package]")?;
+
+    let dst = store.package_dir(&pkg.name, &pkg.version);
+    if dst.exists() {
+        std::fs::remove_dir_all(&dst)
+            .map_err(|e| format!("clear existing store entry {}: {}", dst.display(), e))?;
+    }
+    if let Some(parent) = dst.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    std::fs::rename(&manifest_dir, &dst).map_err(|e| {
+        format!(
+            "rename {} -> {}: {}",
+            manifest_dir.display(),
+            dst.display(),
+            e
+        )
+    })?;
+    let _ = std::fs::remove_dir_all(&stage_dir);
+
+    let source = format!("github:{}/{}@{}", owner, repo, tag);
+    Ok((manifest, dst, source))
+}
+
+/// GET `https://api.github.com/repos/{owner}/{repo}/releases/latest` and pull
+/// the `tag_name` field. Returns the tag verbatim — `v0.2.0`, `0.2.0`, etc.
+fn fetch_latest_release_tag(owner: &str, repo: &str) -> Result<String, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/releases/latest",
+        owner, repo
+    );
+    let resp = ureq::get(&url)
+        .set("User-Agent", "stryke-pkg")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("GET {}: {}", url, e))?;
+    let v: serde_json::Value = resp
+        .into_json()
+        .map_err(|e| format!("parse {}: {}", url, e))?;
+    v.get("tag_name")
+        .and_then(|t| t.as_str())
+        .map(String::from)
+        .ok_or_else(|| format!("no tag_name in {} response", url))
+}
+
+/// Host triple used to pick which release asset to download. Uses
+/// `STRYKE_TARGET` when set (escape hatch for musl, cross builds, exotic
+/// architectures). The default mapping covers the four triples that every
+/// stryke-* package's release CI must publish.
+fn host_target_triple() -> Result<String, String> {
+    if let Ok(t) = std::env::var("STRYKE_TARGET") {
+        if !t.is_empty() {
+            return Ok(t);
+        }
+    }
+    let arch = std::env::consts::ARCH;
+    let os = std::env::consts::OS;
+    let triple = match (arch, os) {
+        ("aarch64", "macos") => "aarch64-apple-darwin",
+        ("x86_64", "macos") => "x86_64-apple-darwin",
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+        ("aarch64", "linux") => "aarch64-unknown-linux-gnu",
+        _ => {
+            return Err(format!(
+                "no prebuilt asset triple for host {}-{}; set STRYKE_TARGET=... to override",
+                arch, os
+            ));
+        }
+    };
+    Ok(triple.to_string())
+}
+
+/// The release tarball convention is `tar czf - <pkgdir>/`, which produces an
+/// archive with one top-level directory. Some packages publish a flat tarball
+/// (manifest at the root) instead; we accept both shapes.
+fn locate_manifest_dir(root: &Path) -> Result<PathBuf, String> {
+    if root.join(MANIFEST_FILE).is_file() {
+        return Ok(root.to_path_buf());
+    }
+    let mut subdirs: Vec<PathBuf> = Vec::new();
+    for entry in std::fs::read_dir(root).map_err(|e| format!("read {}: {}", root.display(), e))? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        if entry.path().is_dir() {
+            subdirs.push(entry.path());
+        }
+    }
+    if subdirs.len() != 1 {
+        return Err(format!(
+            "expected stryke.toml at tarball root or a single top-level dir in {}, found {} dirs",
+            root.display(),
+            subdirs.len()
+        ));
+    }
+    let s = subdirs.remove(0);
+    if !s.join(MANIFEST_FILE).is_file() {
+        return Err(format!("no stryke.toml in {}", s.display()));
+    }
+    Ok(s)
 }
 
 /// Write a `#!/bin/sh` launcher that invokes `stryke <abs_target> "$@"`. We
@@ -1348,12 +1741,19 @@ fn write_launcher(
     Ok(())
 }
 
-/// `s uninstall -g NAME` — remove a launcher from `~/.stryke/bin/`.
+/// `s uninstall -g NAME` — remove a package installed by `s install -g`.
+/// Drops the global pin in `~/.stryke/installed.toml` (so `use NAME` from a
+/// standalone script no longer resolves), removes every launcher in
+/// `~/.stryke/bin/` declared by the package's manifest, and leaves the
+/// store entry in place (re-install hits the same path without re-fetching).
 pub fn cmd_uninstall_global(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) || args.is_empty() {
         println!("usage: stryke uninstall -g NAME");
         println!();
-        println!("Remove the launcher script ~/.stryke/bin/NAME installed by `stryke install -g`.");
+        println!("Remove a package installed by `stryke install -g`. NAME is the");
+        println!("package name (the `[package].name` field of its stryke.toml, or");
+        println!("equivalently a launcher in ~/.stryke/bin/). Drops the entry from");
+        println!("~/.stryke/installed.toml and removes any associated launchers.");
         return if args.is_empty() { 1 } else { 0 };
     }
     let store = match Store::user_default() {
@@ -1363,16 +1763,70 @@ pub fn cmd_uninstall_global(args: &[String]) -> i32 {
             return 1;
         }
     };
-    let target = store.bin_dir().join(&args[0]);
-    if !target.exists() {
-        eprintln!("s uninstall -g: {} not installed", args[0]);
+    let name = &args[0];
+
+    // Pull the pin first so we can find every [bin] launcher to remove.
+    let mut idx = match InstalledIndex::load_or_default() {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("s uninstall -g: load installed.toml: {}", e);
+            return 1;
+        }
+    };
+    let index_entry = idx.find(name).cloned();
+    let mut removed_anything = false;
+
+    if let Some(entry) = index_entry {
+        let store_pkg = store.package_dir(&entry.name, &entry.version);
+        let manifest_path = store_pkg.join(MANIFEST_FILE);
+        if manifest_path.is_file() {
+            if let Ok(m) = Manifest::from_path(&manifest_path) {
+                for bin_name in m.bin.keys() {
+                    let launcher = store.bin_dir().join(bin_name);
+                    if launcher.exists() {
+                        match std::fs::remove_file(&launcher) {
+                            Ok(_) => {
+                                eprintln!("  removed launcher {}", launcher.display());
+                                removed_anything = true;
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "s uninstall -g: remove {}: {}",
+                                    launcher.display(),
+                                    e
+                                );
+                                return 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        idx.remove(name);
+        if let Err(e) = idx.save() {
+            eprintln!("s uninstall -g: write installed.toml: {}", e);
+            return 1;
+        }
+        eprintln!("  unpinned {} (store entry kept at {})", name, store_pkg.display());
+        removed_anything = true;
+    } else {
+        // No pin — fall back to single-launcher removal for packages that
+        // pre-date the installed-index machinery.
+        let target = store.bin_dir().join(name);
+        if target.exists() {
+            if let Err(e) = std::fs::remove_file(&target) {
+                eprintln!("s uninstall -g: remove {}: {}", target.display(), e);
+                return 1;
+            }
+            eprintln!("  removed launcher {}", target.display());
+            removed_anything = true;
+        }
+    }
+
+    if !removed_anything {
+        eprintln!("s uninstall -g: {} not installed", name);
         return 1;
     }
-    if let Err(e) = std::fs::remove_file(&target) {
-        eprintln!("s uninstall -g: remove {}: {}", target.display(), e);
-        return 1;
-    }
-    eprintln!("  removed {}", target.display());
     0
 }
 
@@ -1651,6 +2105,194 @@ mod tests {
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn try_load_ffi_for_noop_without_section() {
+        let d = tempdir("ffi-noop");
+        std::fs::write(
+            d.join(MANIFEST_FILE),
+            "[package]\nname=\"plain\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+        // No [ffi] table — must succeed silently.
+        try_load_ffi_for(&d).unwrap();
+    }
+
+    #[test]
+    fn try_load_ffi_for_missing_manifest_is_ok() {
+        // Bare store entry (e.g. mid-install partial state) — no manifest.
+        // Must not panic; FFI load is a no-op for plain dirs.
+        let d = tempdir("ffi-no-manifest");
+        try_load_ffi_for(&d).unwrap();
+    }
+
+    #[test]
+    fn try_load_ffi_for_errors_when_lib_missing() {
+        let d = tempdir("ffi-missing-lib");
+        std::fs::write(
+            d.join(MANIFEST_FILE),
+            "[package]\nname=\"gui\"\nversion=\"0.1.0\"\n\n\
+             [ffi]\nlib-name=\"stryke_gui\"\nnamespace=\"GUI\"\nexports=[\"gui__mouse_pos\"]\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(d.join("lib")).unwrap();
+        let err = try_load_ffi_for(&d).unwrap_err();
+        // Error must mention the platform-specific filename and point at the
+        // search locations so the user knows what to install / build.
+        let msg = format!("{}", err);
+        let expected_filename = format!(
+            "{}{}{}",
+            std::env::consts::DLL_PREFIX,
+            "stryke_gui",
+            std::env::consts::DLL_SUFFIX
+        );
+        assert!(
+            msg.contains(&expected_filename),
+            "expected {} in: {}",
+            expected_filename,
+            msg
+        );
+        assert!(msg.contains("not found"), "got: {}", msg);
+        assert!(msg.contains("install"), "got: {}", msg);
+    }
+
+    #[test]
+    fn installed_index_round_trip_via_save_load_from() {
+        // Verify the explicit-store API end-to-end at the commands layer
+        // (the version of this test in store.rs covers the load/save path
+        // directly; this one verifies upsert + find as the resolver uses
+        // them). Both avoid STRYKE_HOME so parallel runs don't race.
+        let root = tempdir("installed-index-cmds");
+        let store = Store::at(&root);
+        store.ensure_layout().unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.2.0", "github:MenkeTechnologies/stryke-gui");
+        idx.save_to(&store).unwrap();
+        let reloaded = InstalledIndex::load_from(&store).unwrap();
+        assert_eq!(reloaded.find("gui").unwrap().version, "0.2.0");
+    }
+
+    #[test]
+    fn install_spec_parses_gh_short() {
+        match InstallSpec::parse("gh:MenkeTechnologies/stryke-gui").unwrap() {
+            InstallSpec::GitHub {
+                owner,
+                repo,
+                version,
+            } => {
+                assert_eq!(owner, "MenkeTechnologies");
+                assert_eq!(repo, "stryke-gui");
+                assert!(version.is_none());
+            }
+            _ => panic!("expected GitHub"),
+        }
+    }
+
+    #[test]
+    fn install_spec_parses_https_with_version() {
+        match InstallSpec::parse("https://github.com/foo/bar@v1.2.3").unwrap() {
+            InstallSpec::GitHub {
+                owner,
+                repo,
+                version,
+            } => {
+                assert_eq!(owner, "foo");
+                assert_eq!(repo, "bar");
+                assert_eq!(version.as_deref(), Some("v1.2.3"));
+            }
+            _ => panic!("expected GitHub"),
+        }
+    }
+
+    #[test]
+    fn install_spec_strips_git_suffix() {
+        match InstallSpec::parse("github.com/o/r.git").unwrap() {
+            InstallSpec::GitHub { owner, repo, .. } => {
+                assert_eq!(owner, "o");
+                assert_eq!(repo, "r");
+            }
+            _ => panic!("expected GitHub"),
+        }
+    }
+
+    #[test]
+    fn install_spec_unknown_scheme_is_path_if_dir() {
+        let d = tempdir("install-spec-path");
+        match InstallSpec::parse(d.to_str().unwrap()).unwrap() {
+            InstallSpec::Path(p) => assert_eq!(p, PathBuf::from(d.to_str().unwrap())),
+            _ => panic!("expected Path"),
+        }
+    }
+
+    #[test]
+    fn install_spec_unknown_scheme_errors_if_not_dir() {
+        let r = InstallSpec::parse("/definitely/not/a/dir/here");
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn split_version_suffix_basic() {
+        assert_eq!(
+            split_version_suffix("gh:foo/bar@v1.0"),
+            ("gh:foo/bar", Some("v1.0".into()))
+        );
+        assert_eq!(
+            split_version_suffix("gh:foo/bar@0.2.0"),
+            ("gh:foo/bar", Some("0.2.0".into()))
+        );
+        assert_eq!(split_version_suffix("gh:foo/bar"), ("gh:foo/bar", None));
+    }
+
+    #[test]
+    fn split_version_suffix_keeps_non_version_at() {
+        // `@scope/pkg` style — not a version, do not split.
+        assert_eq!(
+            split_version_suffix("/Users/wizard/projects/team@alpha/pkg"),
+            ("/Users/wizard/projects/team@alpha/pkg", None)
+        );
+    }
+
+    #[test]
+    fn host_target_triple_honors_env() {
+        std::env::set_var("STRYKE_TARGET", "x86_64-unknown-linux-musl");
+        let t = host_target_triple().unwrap();
+        std::env::remove_var("STRYKE_TARGET");
+        assert_eq!(t, "x86_64-unknown-linux-musl");
+    }
+
+    #[test]
+    fn locate_manifest_dir_finds_root_level() {
+        let d = tempdir("locate-root");
+        std::fs::write(
+            d.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+        let r = locate_manifest_dir(&d).unwrap();
+        assert_eq!(r, d);
+    }
+
+    #[test]
+    fn locate_manifest_dir_descends_single_top_dir() {
+        let d = tempdir("locate-nested");
+        let inner = d.join("stryke-gui-v0.2.0-aarch64-apple-darwin");
+        std::fs::create_dir_all(&inner).unwrap();
+        std::fs::write(
+            inner.join(MANIFEST_FILE),
+            "[package]\nname=\"gui\"\nversion=\"0.2.0\"\n",
+        )
+        .unwrap();
+        let r = locate_manifest_dir(&d).unwrap();
+        assert_eq!(r, inner);
+    }
+
+    #[test]
+    fn locate_manifest_dir_rejects_multiple_top_dirs() {
+        let d = tempdir("locate-multi");
+        std::fs::create_dir_all(d.join("a")).unwrap();
+        std::fs::create_dir_all(d.join("b")).unwrap();
+        assert!(locate_manifest_dir(&d).is_err());
     }
 
     #[test]

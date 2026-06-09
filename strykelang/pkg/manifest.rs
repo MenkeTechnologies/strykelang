@@ -51,6 +51,48 @@ pub struct Manifest {
     /// `[workspace]` — workspace root configuration.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<WorkspaceConfig>,
+
+    /// `[ffi]` — opt-in native cdylib package. When present, the package ships
+    /// a `lib/lib<lib_name>.{dylib,so,dll}` whose `extern "C"` exports are
+    /// dlopened and registered as stryke functions on first `use <namespace>`.
+    /// Replaces the per-package helper-binary + JSON-over-pipe pattern that
+    /// every pre-FFI stryke package used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ffi: Option<FfiManifest>,
+}
+
+/// `[ffi]` table — declares a precompiled cdylib shipped alongside the .stk lib.
+///
+/// All exports follow the JSON-string-in / JSON-string-out shape, matching
+/// `rust_ffi.rs`'s existing `FfiSig::StrToStr` arm:
+///
+/// ```ignore
+/// #[no_mangle]
+/// pub extern "C" fn <export>(args_json: *const c_char) -> *const c_char
+/// ```
+///
+/// The cdylib must also export `stryke_free_cstring(*mut c_char)` so the
+/// stryke side can free returned strings without leaking. Loading is wired
+/// in [`crate::pkg::commands::resolve_module`].
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FfiManifest {
+    /// Library file stem — produces `lib<lib_name>.{dylib,so}` (unix) or
+    /// `<lib_name>.dll` (windows). Conventionally `stryke_<package_name>`.
+    #[serde(rename = "lib-name")]
+    pub lib_name: String,
+
+    /// Stryke-side namespace the exports register under. The .stk wrapper
+    /// declares `package <namespace>` and calls the exports as
+    /// `<namespace>::<export_minus_prefix>` (the bare symbol name lives in
+    /// `exports`).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub namespace: String,
+
+    /// Bare `extern "C"` symbol names to resolve from the dlopened cdylib.
+    /// Each becomes a stryke-callable function registered under its full
+    /// symbol name (the .stk wrapper invokes it directly).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exports: Vec<String>,
 }
 
 /// `[package]` table.
@@ -326,6 +368,59 @@ myapp = "main.stk"
     fn requires_package_or_workspace() {
         let m = Manifest::from_str("").unwrap();
         assert!(m.validate().is_err());
+    }
+
+    #[test]
+    fn parses_ffi_section() {
+        let m = Manifest::from_str(
+            r#"
+[package]
+name = "gui"
+version = "0.1.0"
+
+[ffi]
+lib-name = "stryke_gui"
+namespace = "GUI"
+exports = ["gui__mouse_pos", "gui__screen_size"]
+"#,
+        )
+        .unwrap();
+        let ffi = m.ffi.unwrap();
+        assert_eq!(ffi.lib_name, "stryke_gui");
+        assert_eq!(ffi.namespace, "GUI");
+        assert_eq!(ffi.exports, vec!["gui__mouse_pos", "gui__screen_size"]);
+    }
+
+    #[test]
+    fn ffi_section_is_optional() {
+        let m = Manifest::from_str(
+            r#"
+[package]
+name = "plain"
+version = "0.1.0"
+"#,
+        )
+        .unwrap();
+        assert!(m.ffi.is_none());
+    }
+
+    #[test]
+    fn ffi_round_trip_preserves_exports() {
+        let src = r#"[package]
+name = "gui"
+version = "0.1.0"
+
+[ffi]
+lib-name = "stryke_gui"
+namespace = "GUI"
+exports = ["a", "b"]
+"#;
+        let m = Manifest::from_str(src).unwrap();
+        let out = m.to_toml_string().unwrap();
+        let m2 = Manifest::from_str(&out).unwrap();
+        let ffi = m2.ffi.unwrap();
+        assert_eq!(ffi.lib_name, "stryke_gui");
+        assert_eq!(ffi.exports, vec!["a", "b"]);
     }
 
     #[test]

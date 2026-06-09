@@ -66,6 +66,13 @@ use crate::value::StrykeValue;
 struct FfiEntry {
     sig: FfiSig,
     sym: usize, // raw `*const ()` boxed as usize for Send+Sync
+    /// Optional `stryke_free_cstring(*mut c_char)` exported by the same lib.
+    /// Resolved per-lib at load time. When present, [`invoke`] calls it after
+    /// copying a StrToStr return value into a stryke string — without it the
+    /// cdylib's heap allocation leaks. Inline `rust { ... }` blocks may omit
+    /// the export (existing leak-prone behavior preserved); package cdylibs
+    /// declared via `[ffi]` are required to export it.
+    free_sym: Option<usize>,
 }
 
 // SAFETY: The underlying pointer is a function pointer in a shared library that is kept
@@ -117,6 +124,11 @@ struct LoadedLib {
     // registration time and cached in `FfiEntry::sym`.
     #[allow(dead_code)]
     handle: usize,
+    /// `stryke_free_cstring(*mut c_char)` symbol from this lib, if exported.
+    /// Copied into every `FfiEntry::free_sym` registered against this lib at
+    /// load time; retained on `LoadedLib` for future re-registration paths.
+    #[allow(dead_code)]
+    free_sym: Option<usize>,
 }
 
 // SAFETY: dlopen handles are opaque and only closed on process exit here. All access is
@@ -194,12 +206,17 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> StrykeResult<()> {
         ));
     }
 
+    // Optional free-hook: inline blocks may or may not export it. When present,
+    // it plugs the StrToStr leak. When absent, behavior matches v1 (leak).
+    let free_sym = dlsym_optional(handle, "stryke_free_cstring");
+
     let mut reg = registry().lock();
     // Remember the library so its symbols stay valid.
     if !reg.libs.iter().any(|l| l.path == lib_path) {
         reg.libs.push(LoadedLib {
             path: lib_path.clone(),
             handle,
+            free_sym,
         });
     }
     for (name, sig) in decls {
@@ -209,10 +226,95 @@ pub fn compile_and_register(body_b64: &str, line: usize) -> StrykeResult<()> {
             FfiEntry {
                 sig,
                 sym: sym as usize,
+                free_sym,
             },
         );
     }
     Ok(())
+}
+
+/// Load an already-compiled cdylib package and register its exports as stryke
+/// functions. Used by [`crate::pkg::commands::resolve_module`] when the loaded
+/// package's `stryke.toml` declares an `[ffi]` section.
+///
+/// Every export is registered with the [`FfiSig::StrToStr`] signature — the
+/// caller passes a JSON-encoded args string and gets a JSON-encoded result back.
+/// The cdylib MUST export `stryke_free_cstring(*mut c_char)`; without it,
+/// every returned string leaks.
+///
+/// Idempotent — repeated calls with the same `lib_path` are no-ops after the
+/// first dlopen.
+pub fn load_cdylib(lib_path: &Path, exports: &[String], line: usize) -> StrykeResult<()> {
+    if exports.is_empty() {
+        return Err(StrykeError::runtime(
+            format!(
+                "rust FFI: cdylib {} has no [ffi.exports] declared",
+                lib_path.display()
+            ),
+            line,
+        ));
+    }
+
+    // Fast path: lib already loaded by a prior `use X` in this process.
+    {
+        let guard = registry().lock();
+        if guard.libs.iter().any(|l| l.path == lib_path) {
+            return Ok(());
+        }
+    }
+
+    let handle = dlopen_lib(lib_path, line)?;
+    let free_sym = dlsym_optional(handle, "stryke_free_cstring");
+    if free_sym.is_none() {
+        return Err(StrykeError::runtime(
+            format!(
+                "rust FFI: cdylib {} missing required `stryke_free_cstring` export — \
+                 package cdylibs must export it to free StrToStr returns without leaking",
+                lib_path.display()
+            ),
+            line,
+        ));
+    }
+
+    let mut reg = registry().lock();
+    if !reg.libs.iter().any(|l| l.path == lib_path) {
+        reg.libs.push(LoadedLib {
+            path: lib_path.to_path_buf(),
+            handle,
+            free_sym,
+        });
+    }
+    for name in exports {
+        let sym = dlsym_lookup(handle, name, line)?;
+        reg.entries.insert(
+            name.clone(),
+            FfiEntry {
+                sig: FfiSig::StrToStr,
+                sym: sym as usize,
+                free_sym,
+            },
+        );
+    }
+    Ok(())
+}
+
+/// `dlsym` that returns `None` for missing symbols instead of erroring.
+/// Used for the optional `stryke_free_cstring` export.
+#[cfg(unix)]
+fn dlsym_optional(handle: usize, name: &str) -> Option<usize> {
+    let cname = CString::new(name).ok()?;
+    // SAFETY: handle came from a successful dlopen.
+    let sym = unsafe { libc::dlsym(handle as *mut libc::c_void, cname.as_ptr()) };
+    if sym.is_null() {
+        None
+    } else {
+        Some(sym as usize)
+    }
+}
+
+#[cfg(not(unix))]
+fn dlsym_optional(_handle: usize, _name: &str) -> Option<usize> {
+    None
 }
 
 fn ffi_cache_dir() -> Result<PathBuf, String> {
@@ -619,7 +721,15 @@ fn invoke(
                     return Ok(StrykeValue::UNDEF);
                 }
                 let cs = CStr::from_ptr(ret);
-                Ok(StrykeValue::string(cs.to_string_lossy().into_owned()))
+                let out = cs.to_string_lossy().into_owned();
+                // Free the cdylib's heap allocation via the lib's `stryke_free_cstring`
+                // export when available. Without this, every JSON-returning call leaks
+                // the returned buffer.
+                if let Some(free_addr) = entry.free_sym {
+                    let free_fn: extern "C" fn(*mut c_char) = std::mem::transmute(free_addr);
+                    free_fn(ret as *mut c_char);
+                }
+                Ok(StrykeValue::string(out))
             }
         }
     }
