@@ -307,6 +307,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ("gt", "operator"),
     ("if", "control"),
     ("impl", "decl"),
+    ("import", "decl"),
     ("last", "control"),
     ("le", "operator"),
     ("local", "decl"),

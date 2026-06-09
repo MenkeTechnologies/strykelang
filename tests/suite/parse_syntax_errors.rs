@@ -162,6 +162,26 @@ fn use_strict_without_trailing_semicolon_still_parses() {
 }
 
 #[test]
+fn import_keyword_aliases_use() {
+    // `import` is a 1:1 syntactic alias for `use` — same parser path,
+    // same AST. All four shapes must parse identically.
+    stryke::parse("import strict").expect("import bareword");
+    stryke::parse("import strict;").expect("import with semi");
+    stryke::parse("import warnings; import strict;").expect("two imports");
+    stryke::parse("import List::Util qw(sum max);").expect("import qw(...)");
+    stryke::parse("import 5.36;").expect("import VERSION");
+    // Mixing `use` and `import` in one program is legal.
+    stryke::parse("use strict; import warnings;").expect("mixed use+import");
+    // Bare `import` with no module is rejected, same as bare `use`.
+    let err = stryke::parse("import").expect_err("bare import must error");
+    assert!(
+        err.to_string().contains("import"),
+        "error should reference the spelling the user typed (got: {})",
+        err
+    );
+}
+
+#[test]
 fn rejects_open_missing_comma() {
     assert!(stryke::parse("open F").is_err());
 }
