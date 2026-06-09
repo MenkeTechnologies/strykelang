@@ -1357,7 +1357,7 @@ fn main() {
     if args.len() >= 2 && args[1] == "info" {
         process::exit(stryke::pkg::commands::cmd_info(&args[2..]));
     }
-    if args.len() >= 2 && args[1] == "update" {
+    if args.len() >= 2 && matches!(args[1].as_str(), "update" | "up" | "upgrade") {
         process::exit(stryke::pkg::commands::cmd_update(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "outdated" {
@@ -1375,14 +1375,14 @@ fn main() {
     if args.len() >= 2 && args[1] == "search" {
         process::exit(stryke::pkg::commands::cmd_search(&args[2..]));
     }
-    if args.len() >= 2 && args[1] == "publish" {
+    if args.len() >= 2 && matches!(args[1].as_str(), "publish" | "pub") {
         process::exit(stryke::pkg::commands::cmd_publish(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "yank" {
         process::exit(stryke::pkg::commands::cmd_yank(&args[2..]));
     }
     // `stryke uninstall -g NAME` and `stryke list -g` for global CLI tools.
-    if args.len() >= 2 && args[1] == "uninstall" {
+    if args.len() >= 2 && matches!(args[1].as_str(), "uninstall" | "un") {
         let rest = &args[2..];
         if rest.iter().any(|a| a == "-g" || a == "--global") {
             let filtered: Vec<String> = rest
@@ -1396,7 +1396,7 @@ fn main() {
             process::exit(1);
         }
     }
-    if args.len() >= 2 && args[1] == "list" {
+    if args.len() >= 2 && matches!(args[1].as_str(), "list" | "ls") {
         let rest = &args[2..];
         if rest.iter().any(|a| a == "-g" || a == "--global") {
             let filtered: Vec<String> = rest
