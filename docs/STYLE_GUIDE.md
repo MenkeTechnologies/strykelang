@@ -6,7 +6,7 @@ Every example pair is **DO / DON'T** with one-line rationale. The DON'T side is 
 
 ---
 
-## 0. The eight hard rules
+## 0. The nine hard rules
 
 Every other idiom is downstream of these. If a piece of stryke code violates any of them, it is wrong style, full stop.
 
@@ -18,6 +18,7 @@ Every other idiom is downstream of these. If a piece of stryke code violates any
 6. **Expression-bodied `fn` for one-liners.** `fn double = _ * 2` over `fn double($a) { $a * 10 }` over `fn double { _ * 2 }`. No braces, no named param, implicit topic. The block form is for multi-statement bodies only.
 7. **Implicit return — never `return` on the tail expression.** The last expression in any `fn` body, arrow-block, or expression-position block IS the return value. `return` is **only** correct as an early-return guard (`return undef if $err`). Writing `return $x` at the bottom of a body is noise.
 8. **No parens on fn calls unless precedence demands them.** stryke calls take args list-operator-style. `p "hello"`, `len @a`, `uc rev "abc"` — paren-less. Add parens **only** when the call is followed by an operator that would re-bind (`len(@a) > 1`), when nesting needs disambiguation, or when an empty arg list is the intent (`time()`).
+9. **No trailing `1` (or any sentinel truthy value) at the end of a library / module file.** That's Perl 5's `package returns true` ritual — `require` there demanded the last evaluated expression be truthy, so every `.pm` ended in `1;`. stryke `use`/`import` resolution does not consult the file's tail expression, so the `1` is pure noise inherited from CPAN muscle memory. Library files end at the last `fn` (or `class` / `const`) definition. `--no-interop` rejects a bare-integer tail expression in module position.
 
 ```stryke
 # RIGHT — fn, p, pipeline, no semicolons, implicit params, expression-body, implicit return
