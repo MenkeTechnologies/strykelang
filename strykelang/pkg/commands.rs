@@ -3190,6 +3190,136 @@ mod tests {
         }
     }
 
+    /// L6 — end-to-end IDE scenario: hover on the package name `GUI`
+    /// from a user script that does `use GUI`, with the package's
+    /// `lib/GUI.stk` shipping the conventional rustdoc layout (file-level
+    /// `##` block, blank separator, `package GUI`). v0.16.36's walker
+    /// fix made the blank separator survivable; this test pins that the
+    /// cross-file chase + walker combo surfaces the file-header docs to
+    /// the IDE hover card.
+    #[test]
+    fn hover_chases_use_to_show_package_module_docs() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("hover-pkg-module-docs");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+
+        // Hand-craft the package — the default fake_installed_pkg helper
+        // doesn't lay out file-level docs, but the real stryke-gui 0.2.2
+        // ships this exact shape (## header, blank, `package GUI`).
+        let pkg = store.package_dir("gui", "1.0.0");
+        std::fs::create_dir_all(pkg.join("lib")).unwrap();
+        std::fs::write(
+            pkg.join("stryke.toml"),
+            "[package]\nname=\"gui\"\nversion=\"1.0.0\"\n\n\
+             [ffi]\nlib-name=\"x\"\nnamespace=\"GUI\"\nexports=[]\n",
+        )
+        .unwrap();
+        std::fs::write(
+            pkg.join("lib/GUI.stk"),
+            "## lib/GUI.stk — GUI automation for stryke (`use GUI`).\n\
+             ##\n\
+             ## Thin wrapper around the stryke-gui cdylib's exports.\n\
+             \n\
+             package GUI\n\
+             \n\
+             fn GUI::mouse_pos { 1 }\n",
+        )
+        .unwrap();
+
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // User script — outside any project, just `use GUI`. The IDE
+        // would hover over the `GUI` token on this line.
+        let script_dir = tempdir("hover-pkg-script");
+        let script_path = script_dir.join("main.stk");
+        let text = "use GUI\n";
+        std::fs::write(&script_path, text).unwrap();
+
+        let hover =
+            crate::lsp::hover_markdown_for_word("GUI", text, script_path.to_str().unwrap());
+        std::env::remove_var("STRYKE_HOME");
+
+        let md = hover.expect("hover should resolve the GUI package via cross-file chase");
+        assert!(
+            md.contains("GUI automation"),
+            "package hover must surface the file-header `## …` block: {}",
+            md
+        );
+        assert!(
+            md.contains("Thin wrapper around the stryke-gui cdylib"),
+            "multi-line file header must come through intact: {}",
+            md
+        );
+        assert!(
+            md.contains("declared in"),
+            "header line ('declared in <path> at line N') should still be appended: {}",
+            md
+        );
+    }
+
+    /// L7 — end-to-end IDE hover on a library SUB (`GUI::mouse_pos`)
+    /// whose `##` docstring sits a blank line above the `fn` decl —
+    /// the conventional layout the user's stryke-gui 0.2.2 ships with.
+    /// Pre-v0.16.36 this returned the header alone; post-fix it surfaces
+    /// the docstring too.
+    #[test]
+    fn hover_chases_use_to_show_fn_docs_with_blank_separator() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("hover-fn-blank-sep");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+
+        let pkg = store.package_dir("gui", "1.0.0");
+        std::fs::create_dir_all(pkg.join("lib")).unwrap();
+        std::fs::write(
+            pkg.join("stryke.toml"),
+            "[package]\nname=\"gui\"\nversion=\"1.0.0\"\n\n\
+             [ffi]\nlib-name=\"x\"\nnamespace=\"GUI\"\n\
+             exports=[\"gui__mouse_pos\"]\n",
+        )
+        .unwrap();
+        // Conventional layout: blank line between docstring and fn.
+        std::fs::write(
+            pkg.join("lib/GUI.stk"),
+            "package GUI\n\n\
+             ## Current cursor position → ($x, $y).\n\
+             \n\
+             fn GUI::mouse_pos { gui__mouse_pos(\"{}\") }\n",
+        )
+        .unwrap();
+
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let script_dir = tempdir("hover-fn-script");
+        let script_path = script_dir.join("main.stk");
+        let text = "use GUI\nmy ($x, $y) = GUI::mouse_pos()\n";
+        std::fs::write(&script_path, text).unwrap();
+
+        let hover = crate::lsp::hover_markdown_for_word(
+            "GUI::mouse_pos",
+            text,
+            script_path.to_str().unwrap(),
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        let md = hover.expect("hover should resolve `GUI::mouse_pos` cross-file");
+        assert!(
+            md.contains("Current cursor position"),
+            "fn hover must surface the `##` docstring even with a blank \
+             separator above the `fn` decl: {}",
+            md
+        );
+    }
+
     /// L2 — hover_markdown_for_word chases `use GUI` into the store
     /// file and surfaces the `## …` doc block declared above the sub.
     #[test]
