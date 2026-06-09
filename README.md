@@ -101,7 +101,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,459 standard library primaries** in `%b` (11,191 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,159
+- **10,431 standard library primaries** in `%b` (11,163 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,131
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -2031,7 +2031,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **778 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **347 Exercism solutions** — 2.7k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **780 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
@@ -2051,7 +2051,7 @@ stryke examples/gradient_descent_linreg.stk     # mini-batch SGD, pmap_reduce gr
 stryke examples/kalman_filter_tracking.stk      # 1D Kalman filter, hand-rolled 2×2 matrix algebra
 stryke examples/markov_chain_analysis.stk       # transition matrix + stationary distribution
 
-# Scientific computing — single-file toolkit (123 sections, 23,491 lines, 2,718 hand-crafted die invariants)
+# Scientific computing — single-file toolkit (124 sections, 23,491 lines, 2,727 hand-crafted die invariants)
 stryke --no-interop examples/scientific_compute_no_interop.stk   # vectors, matrices, LU/QR, eigenvalues, root-finding,
                                                                  # quadrature, ODE/PDE, FFT, optimization, statistics,
                                                                  # RNG, graph algos (BFS/DFS/Dijkstra/Tarjan/Kuhn),
