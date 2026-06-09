@@ -1421,6 +1421,25 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
                 return 1;
             }
         };
+        // Warn loud when replacing a different pinned version so the user
+        // notices the old store dir is now an orphan. Same-version reinstall
+        // is silent (idempotent re-runs are normal).
+        if let Some(prev) = idx.find(&pkg.name) {
+            if prev.version != pkg.version {
+                let old_dir = if let Ok(s) = Store::user_default() {
+                    s.package_dir(&pkg.name, &prev.version)
+                } else {
+                    std::path::PathBuf::from(format!("{}@{}", pkg.name, prev.version))
+                };
+                eprintln!(
+                    "  \x1b[33mreplacing pinned {} {} → {}\x1b[0m  ({} kept on disk; run `s pkg gc -g` to free)",
+                    pkg.name,
+                    prev.version,
+                    pkg.version,
+                    old_dir.display()
+                );
+            }
+        }
         idx.upsert(&pkg.name, &pkg.version, &source);
         if let Err(e) = idx.save() {
             eprintln!("s install -g: write installed.toml: {}", e);
@@ -1830,12 +1849,216 @@ pub fn cmd_uninstall_global(args: &[String]) -> i32 {
     0
 }
 
+/// `s use -g NAME@VERSION` — switch which version of an already-installed
+/// package the global pin points at, without re-fetching. Errors loud when
+/// the requested store dir doesn't exist — the user must `install -g` first.
+///
+/// Lets users keep multiple side-by-side versions on disk and flip between
+/// them for standalone scripts. Inside a project the lockfile still wins
+/// over the global pin, so this has no effect on project-scoped resolution.
+pub fn cmd_use_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) || args.is_empty() {
+        println!("usage: stryke use -g NAME@VERSION");
+        println!();
+        println!("Switch the global pin in ~/.stryke/installed.toml to a different");
+        println!("version of an already-installed package. The version must already");
+        println!("exist as ~/.stryke/store/<name>@<version>/ — this command does NOT");
+        println!("download anything; use `s pkg install -g <spec>@<version>` to fetch.");
+        println!();
+        println!("Standalone scripts that `use <Namespace>` will resolve to this");
+        println!("version. Inside a project the stryke.lock still wins.");
+        return if args.is_empty() { 1 } else { 0 };
+    }
+    let spec = &args[0];
+    let (name, version) = match spec.split_once('@') {
+        Some((n, v)) if !n.is_empty() && !v.is_empty() => (n.to_string(), v.to_string()),
+        _ => {
+            eprintln!("s use -g: spec must be NAME@VERSION, got `{}`", spec);
+            return 1;
+        }
+    };
+
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s use -g: {}", e);
+            return 1;
+        }
+    };
+    let store_pkg = store.package_dir(&name, &version);
+    if !store_pkg.is_dir() {
+        eprintln!(
+            "s use -g: {}@{} is not installed (no {} directory). \
+             Run `s pkg install -g <spec>@{}` to fetch it first.",
+            name,
+            version,
+            store_pkg.display(),
+            version
+        );
+        return 1;
+    }
+
+    let mut idx = match InstalledIndex::load_from(&store) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("s use -g: load installed.toml: {}", e);
+            return 1;
+        }
+    };
+    let previous = idx.find(&name).map(|p| p.version.clone());
+    let source = idx
+        .find(&name)
+        .map(|p| p.source.clone())
+        .unwrap_or_else(|| format!("local-pin:store/{}@{}", name, version));
+    idx.upsert(&name, &version, &source);
+    if let Err(e) = idx.save_to(&store) {
+        eprintln!("s use -g: write installed.toml: {}", e);
+        return 1;
+    }
+
+    match previous {
+        Some(prev) if prev != version => {
+            eprintln!(
+                "\x1b[32m✓ {} pin {} → {}\x1b[0m  ({} still on disk; run `s pkg gc -g` to free it)",
+                name,
+                prev,
+                version,
+                store.package_dir(&name, &prev).display()
+            );
+        }
+        Some(_) => {
+            eprintln!(
+                "\x1b[32m✓ {} pin already at {}\x1b[0m",
+                name, version
+            );
+        }
+        None => {
+            eprintln!(
+                "\x1b[32m✓ pinned {}@{}\x1b[0m  (was not in installed.toml)",
+                name, version
+            );
+        }
+    }
+    0
+}
+
+/// `s gc -g [--dry-run]` — remove every `~/.stryke/store/<name>@<version>/`
+/// not currently pinned in `installed.toml`. Returns the total bytes freed.
+/// `--dry-run` reports what would be removed without touching disk.
+///
+/// Project lockfiles can pin versions that the global index does not — but
+/// only the active project's lockfile is reachable from here (no way to find
+/// every checkout on disk). Run this from outside any project, or accept
+/// that store entries needed by a project lockfile may be deleted and have
+/// to be re-fetched by `s install` next time.
+pub fn cmd_gc_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke gc -g [--dry-run]");
+        println!();
+        println!("Remove every ~/.stryke/store/<name>@<version>/ directory not pinned");
+        println!("by ~/.stryke/installed.toml. Project lockfiles are not consulted —");
+        println!("a store entry deleted here will be re-fetched on the next `s install`");
+        println!("inside a project that pinned it.");
+        println!();
+        println!("Flags:");
+        println!("  --dry-run   list what would be removed without touching disk");
+        return 0;
+    }
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s gc -g: {}", e);
+            return 1;
+        }
+    };
+    let idx = match InstalledIndex::load_from(&store) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("s gc -g: load installed.toml: {}", e);
+            return 1;
+        }
+    };
+
+    let orphans = scan_orphan_store_dirs(&store, &idx);
+    if orphans.is_empty() {
+        eprintln!("  no orphan store entries");
+        return 0;
+    }
+
+    let mut total_bytes: u64 = 0;
+    let mut total_count: usize = 0;
+    for (name, version, path) in &orphans {
+        let bytes = dir_size_recursive(path);
+        total_bytes += bytes;
+        total_count += 1;
+        if dry_run {
+            eprintln!(
+                "  would remove {}@{}  ({} KB)",
+                name,
+                version,
+                (bytes + 512) / 1024
+            );
+        } else {
+            match std::fs::remove_dir_all(path) {
+                Ok(_) => eprintln!(
+                    "  removed {}@{}  ({} KB)",
+                    name,
+                    version,
+                    (bytes + 512) / 1024
+                ),
+                Err(e) => {
+                    eprintln!("s gc -g: remove {}: {}", path.display(), e);
+                    return 1;
+                }
+            }
+        }
+    }
+    let verb = if dry_run { "would free" } else { "freed" };
+    eprintln!(
+        "\x1b[32m✓ {} {} orphan{} ({} KB total)\x1b[0m",
+        verb,
+        total_count,
+        if total_count == 1 { "" } else { "s" },
+        (total_bytes + 512) / 1024
+    );
+    0
+}
+
+/// Sum every regular file under `path` recursively. Used by `s gc -g` so its
+/// output names how much disk each removal frees. Symlinks are not followed
+/// (matches the install side's `copy_dir` symlink-preserves behavior).
+fn dir_size_recursive(path: &Path) -> u64 {
+    let mut total: u64 = 0;
+    let entries = match std::fs::read_dir(path) {
+        Ok(e) => e,
+        Err(_) => return 0,
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        if meta.is_dir() {
+            total += dir_size_recursive(&entry.path());
+        } else if meta.is_file() {
+            total += meta.len();
+        }
+    }
+    total
+}
+
 /// `s list -g` — list every launcher in `~/.stryke/bin/`.
 pub fn cmd_list_global(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) {
         println!("usage: stryke list -g");
         println!();
-        println!("List launchers installed via `stryke install -g` in ~/.stryke/bin/.");
+        println!("Three sections of global state, all under ~/.stryke/:");
+        println!("  packages  — entries in installed.toml (the pin source-of-truth)");
+        println!("  launchers — files in bin/ (created by install -g on packages with [bin])");
+        println!("  orphans   — store/<name>@<ver>/ dirs not pinned by installed.toml");
+        println!();
+        println!("Run `s pkg gc -g` to remove orphans.");
         return 0;
     }
     let store = match Store::user_default() {
@@ -1845,33 +2068,87 @@ pub fn cmd_list_global(args: &[String]) -> i32 {
             return 1;
         }
     };
-    let bin_dir = store.bin_dir();
-    if !bin_dir.is_dir() {
-        eprintln!("  no global tools installed");
-        return 0;
-    }
-    let mut names: Vec<String> = Vec::new();
-    let entries = match std::fs::read_dir(&bin_dir) {
-        Ok(e) => e,
+    let idx = match InstalledIndex::load_from(&store) {
+        Ok(i) => i,
         Err(e) => {
-            eprintln!("s list -g: read {}: {}", bin_dir.display(), e);
+            eprintln!("s list -g: load installed.toml: {}", e);
             return 1;
         }
     };
-    for entry in entries.flatten() {
-        if let Some(n) = entry.file_name().to_str() {
-            names.push(n.to_string());
+
+    // ── packages: every pinned entry ──
+    println!("packages:");
+    if idx.packages.is_empty() {
+        println!("  (none)");
+    } else {
+        for pkg in &idx.packages {
+            println!("  {}@{}  {}", pkg.name, pkg.version, pkg.source);
         }
     }
-    names.sort();
-    if names.is_empty() {
-        eprintln!("  no global tools installed");
+
+    // ── launchers: files in bin/ (FFI-only packages may have none) ──
+    println!("launchers:");
+    let bin_dir = store.bin_dir();
+    let mut launcher_names: Vec<String> = Vec::new();
+    if bin_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&bin_dir) {
+            for entry in entries.flatten() {
+                if let Some(n) = entry.file_name().to_str() {
+                    launcher_names.push(n.to_string());
+                }
+            }
+        }
+    }
+    launcher_names.sort();
+    if launcher_names.is_empty() {
+        println!("  (none)");
     } else {
-        for n in &names {
-            println!("{}", n);
+        for n in &launcher_names {
+            println!("  {}", n);
+        }
+    }
+
+    // ── orphans: store/<name>@<ver>/ not matching any pin ──
+    println!("orphans:");
+    let orphans = scan_orphan_store_dirs(&store, &idx);
+    if orphans.is_empty() {
+        println!("  (none)");
+    } else {
+        for (name, version, _path) in &orphans {
+            println!("  {}@{}", name, version);
         }
     }
     0
+}
+
+/// Return every `~/.stryke/store/<name>@<version>/` whose `(name, version)` is
+/// not the currently-pinned entry in [`InstalledIndex`]. A store dir whose
+/// name isn't in the index at all is also an orphan. Used by `s pkg list -g`
+/// and `s pkg gc -g`.
+fn scan_orphan_store_dirs(store: &Store, idx: &InstalledIndex) -> Vec<(String, String, PathBuf)> {
+    let mut out = Vec::new();
+    let store_dir = store.store_dir();
+    let entries = match std::fs::read_dir(&store_dir) {
+        Ok(e) => e,
+        Err(_) => return out,
+    };
+    for e in entries.flatten() {
+        let name = match e.file_name().to_str().map(|s| s.to_string()) {
+            Some(n) => n,
+            None => continue,
+        };
+        let (pkg_name, version) = match name.split_once('@') {
+            Some((n, v)) => (n.to_string(), v.to_string()),
+            None => continue, // malformed entry — skip rather than crash
+        };
+        let pinned = idx.find(&pkg_name).map(|p| &p.version);
+        let is_pinned = pinned.map(|v| v == &version).unwrap_or(false);
+        if !is_pinned {
+            out.push((pkg_name, version, e.path()));
+        }
+    }
+    out.sort_by(|a, b| (a.0.as_str(), a.1.as_str()).cmp(&(b.0.as_str(), b.1.as_str())));
+    out
 }
 
 /// `s search NAME` — registry-dependent, not deployed yet. Honest stub so the
@@ -2003,9 +2280,11 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  init [NAME]               scaffold project in cwd");
         println!("  new NAME                  scaffold project at ./NAME/");
         println!("  install [--offline]       resolve deps + write stryke.lock");
-        println!("  install -g PATH           install a local package's [bin] entries globally");
-        println!("  uninstall -g NAME         remove a global launcher");
-        println!("  list -g                   list global launchers");
+        println!("  install -g SPEC           install a package globally (PATH | gh:owner/repo | github.com/...)");
+        println!("  uninstall -g NAME         drop a global pin + its launchers");
+        println!("  use -g NAME@VERSION       switch which installed version a standalone `use` resolves to");
+        println!("  list -g                   list global packages, launchers, and orphans");
+        println!("  gc -g [--dry-run]         delete ~/.stryke/store/ entries no longer pinned");
         println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
         println!("  remove NAME               drop a dep from stryke.toml");
         println!("  update [NAME]             re-resolve and rewrite stryke.lock");
@@ -2073,6 +2352,32 @@ pub fn dispatch(args: &[String]) -> i32 {
                 1
             }
         }
+        "use" => {
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_use_global(&filtered)
+            } else {
+                eprintln!("s use: pass -g to switch a global pin (no per-project `use` yet)");
+                1
+            }
+        }
+        "gc" => {
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_gc_global(&filtered)
+            } else {
+                eprintln!("s gc: pass -g to garbage-collect orphan global store entries");
+                1
+            }
+        }
         "tree" => cmd_tree(&args[1..]),
         "info" => cmd_info(&args[1..]),
         "update" => cmd_update(&args[1..]),
@@ -2094,6 +2399,13 @@ pub fn dispatch(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Tests that mutate `STRYKE_HOME` are serialized through this mutex —
+    /// the env var is process-global, so parallel test execution would race
+    /// (one test's clearing wipes another test's setting mid-run). Grab the
+    /// guard at the top of any STRYKE_HOME-touching test; drop it via scope.
+    static STRYKE_HOME_MUTEX: Mutex<()> = Mutex::new(());
 
     fn tempdir(tag: &str) -> PathBuf {
         let pid = std::process::id();
@@ -2155,6 +2467,143 @@ mod tests {
         );
         assert!(msg.contains("not found"), "got: {}", msg);
         assert!(msg.contains("install"), "got: {}", msg);
+    }
+
+    #[test]
+    fn scan_orphan_store_dirs_flags_unpinned() {
+        let root = tempdir("scan-orphans");
+        let store = Store::at(&root);
+        store.ensure_layout().unwrap();
+        for v in ["0.1.0", "0.2.0", "0.3.0"] {
+            std::fs::create_dir_all(store.package_dir("gui", v)).unwrap();
+        }
+        std::fs::create_dir_all(store.package_dir("aws", "0.1.0")).unwrap();
+        let mut idx = InstalledIndex::new();
+        // Pin gui@0.2.0 and aws@0.1.0. Expect gui@0.1.0 and gui@0.3.0 as orphans.
+        idx.upsert("gui", "0.2.0", "test");
+        idx.upsert("aws", "0.1.0", "test");
+
+        let orphans = scan_orphan_store_dirs(&store, &idx);
+        let names: Vec<(String, String)> = orphans
+            .into_iter()
+            .map(|(n, v, _)| (n, v))
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                ("gui".to_string(), "0.1.0".to_string()),
+                ("gui".to_string(), "0.3.0".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn scan_orphan_store_dirs_flags_unindexed_names() {
+        // A store dir whose name isn't in the index at all counts as an orphan.
+        let root = tempdir("scan-orphans-unindexed");
+        let store = Store::at(&root);
+        store.ensure_layout().unwrap();
+        std::fs::create_dir_all(store.package_dir("stale-pkg", "1.0.0")).unwrap();
+        let idx = InstalledIndex::new();
+        let orphans = scan_orphan_store_dirs(&store, &idx);
+        assert_eq!(orphans.len(), 1);
+        assert_eq!(orphans[0].0, "stale-pkg");
+    }
+
+    #[test]
+    fn cmd_use_global_switches_pin() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let root = tempdir("use-g-switch");
+        std::env::set_var("STRYKE_HOME", &root);
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        std::fs::create_dir_all(store.package_dir("gui", "0.1.0")).unwrap();
+        std::fs::create_dir_all(store.package_dir("gui", "0.2.0")).unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.1.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let rc = cmd_use_global(&["gui@0.2.0".to_string()]);
+        let reloaded = InstalledIndex::load_from(&store).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(rc, 0);
+        assert_eq!(reloaded.find("gui").unwrap().version, "0.2.0");
+    }
+
+    #[test]
+    fn cmd_use_global_errors_when_store_missing() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let root = tempdir("use-g-missing");
+        std::env::set_var("STRYKE_HOME", &root);
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Only 0.1.0 exists. Asking for 0.2.0 must fail without writing.
+        std::fs::create_dir_all(store.package_dir("gui", "0.1.0")).unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.1.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let rc = cmd_use_global(&["gui@0.2.0".to_string()]);
+        let reloaded = InstalledIndex::load_from(&store).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(rc, 1, "must fail when the version isn't in the store");
+        assert_eq!(reloaded.find("gui").unwrap().version, "0.1.0", "pin must be untouched");
+    }
+
+    #[test]
+    fn cmd_use_global_rejects_bad_spec() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let root = tempdir("use-g-bad-spec");
+        std::env::set_var("STRYKE_HOME", &root);
+        let rc = cmd_use_global(&["gui-without-version".to_string()]);
+        std::env::remove_var("STRYKE_HOME");
+        assert_eq!(rc, 1);
+    }
+
+    #[test]
+    fn cmd_gc_global_removes_orphans_only() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let root = tempdir("gc-g-removes");
+        std::env::set_var("STRYKE_HOME", &root);
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        for v in ["0.1.0", "0.2.0"] {
+            std::fs::create_dir_all(store.package_dir("gui", v)).unwrap();
+            std::fs::write(store.package_dir("gui", v).join("marker"), b"x").unwrap();
+        }
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.2.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let rc = cmd_gc_global(&[]);
+        let pinned_exists = store.package_dir("gui", "0.2.0").is_dir();
+        let orphan_gone = !store.package_dir("gui", "0.1.0").exists();
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(rc, 0);
+        assert!(pinned_exists, "pinned version must remain");
+        assert!(orphan_gone, "orphan must be removed");
+    }
+
+    #[test]
+    fn cmd_gc_global_dry_run_keeps_files() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let root = tempdir("gc-g-dry");
+        std::env::set_var("STRYKE_HOME", &root);
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        std::fs::create_dir_all(store.package_dir("gui", "0.1.0")).unwrap();
+        // Empty index → both store dirs are orphans, but --dry-run must not delete.
+        InstalledIndex::new().save_to(&store).unwrap();
+
+        let rc = cmd_gc_global(&["--dry-run".to_string()]);
+        let still_present = store.package_dir("gui", "0.1.0").is_dir();
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(rc, 0);
+        assert!(still_present, "--dry-run must not touch disk");
     }
 
     #[test]
