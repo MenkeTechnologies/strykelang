@@ -4,11 +4,11 @@
 
 fn Rle::encode($s) {
     return "" if $s eq ""
-    my @chars = split //, $s
-    my $out = ""
-    my $prev = $chars[0]
-    my $count = 1
-    for my $ch (@chars[1:$#chars]) {
+    val @chars = split //, $s
+    var $out = ""
+    var $prev = $chars[0]
+    var $count = 1
+    for val $ch (@chars[1:$#chars]) {
         if ($ch eq $prev) {
             $count++
         } else {
@@ -21,7 +21,7 @@ fn Rle::encode($s) {
 }
 
 fn Rle::decode($s) {
-    my $out = ""
+    var $out = ""
     while ($s =~ /(\d+)(.)/g) {
         $out .= $2 x $1
     }
@@ -51,11 +51,11 @@ Rle::roundtrip("WWWWWWWWWWWWBWWWWWWWWWWWWBBB") |> aeq "WWWWWWWWWWWWBWWWWWWWWWWWW
 # Variant: only-runs (skip count=1)
 fn Rle::encode_terse($s) {
     return "" if $s eq ""
-    my @chars = split //, $s
-    my $out = ""
-    my $prev = $chars[0]
-    my $count = 1
-    for my $ch (@chars[1:$#chars]) {
+    val @chars = split //, $s
+    var $out = ""
+    var $prev = $chars[0]
+    var $count = 1
+    for val $ch (@chars[1:$#chars]) {
         if ($ch eq $prev) {
             $count++
         } else {
@@ -84,9 +84,9 @@ Rle::ratio("abcdef") > 1                  |> aok "incompressible grows"
 # Count of distinct chars in encoded form
 fn Rle::run_count($s) {
     return 0 if $s eq ""
-    my $count = 1
-    my @c = split //, $s
-    for my $i (1:$#c) {
+    var $count = 1
+    val @c = split //, $s
+    for val $i (1:$#c) {
         $count++ if $c[$i] ne $c[$i-1]
     }
     $count

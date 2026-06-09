@@ -11,10 +11,10 @@ fn Rosetta::SumMultiples::triangle($a, $b) {
 }
 
 fn Rosetta::SumMultiples::fast($n) {
-    my $m = $n - 1
-    my $a = Rosetta::SumMultiples::triangle(3, int($m / 3))
-    my $b = Rosetta::SumMultiples::triangle(5, int($m / 5))
-    my $c = Rosetta::SumMultiples::triangle(15, int($m / 15))
+    val $m = $n - 1
+    val $a = Rosetta::SumMultiples::triangle(3, int($m / 3))
+    val $b = Rosetta::SumMultiples::triangle(5, int($m / 5))
+    val $c = Rosetta::SumMultiples::triangle(15, int($m / 15))
     $a + $b - $c
 }
 
@@ -26,7 +26,7 @@ assert_eq Rosetta::SumMultiples::fast(1000), 233168, "Project Euler #1 (fast)"
 assert_eq Rosetta::SumMultiples::fast(100000), 2333316668, "below 100000"
 
 # Brute and fast agree across a range of inputs
-for my $n (5, 16, 100, 999, 12345) {
+for val $n (5, 16, 100, 999, 12345) {
     assert_eq Rosetta::SumMultiples::brute($n),
               Rosetta::SumMultiples::fast($n),
               "brute == fast for $n"

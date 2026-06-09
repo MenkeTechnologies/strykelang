@@ -3,10 +3,10 @@
 enum ThreatLevel { HIGH, WARN, OK }
 
 fn Project::Threats::analyze_threats ($sys, $net, $disks, $mem_free) {
-    my @threats
+    var @threats
     $mem_free //= mem_free()
 
-    for my $d (@$disks) {
+    for val $d (@$disks) {
         if ($d->{use_pct} > 95) {
             push @threats, { level => "HIGH", message => "$d->{mount} is $d->{use_pct}% full — critical" }
         } elsif ($d->{use_pct} > 85) {
@@ -28,9 +28,9 @@ fn Project::Threats::analyze_threats ($sys, $net, $disks, $mem_free) {
     }
 
     # Memory check
-    my $mem_total = $sys->{ram_bytes}
+    val $mem_total = $sys->{ram_bytes}
     if ($mem_total > 0) {
-        my $mem_pct = ($mem_total - $mem_free) / $mem_total * 100
+        val $mem_pct = ($mem_total - $mem_free) / $mem_total * 100
         if ($mem_pct > 95) {
             push @threats, { level => "HIGH", message => sprintf("Memory %.0f%% used", $mem_pct) }
         } elsif ($mem_pct > 80) {

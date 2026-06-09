@@ -2,13 +2,13 @@
 
 # ── Project::StringsAdvancedImpl::adv_levenshtein: minimum number of edits to change one string to another ─────
 fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
-    my $len1 = len($s1)
-    my $len2 = len($s2)
+    val $len1 = len($s1)
+    val $len2 = len($s2)
     
     return $len2 if $len1 == 0
     return $len1 if $len2 == 0
     
-    my @d = ()
+    var @d = ()
     ~> 0:$len1 ep {
         $d[_] = []
         $d[_][0] = _
@@ -17,17 +17,17 @@ fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
         $d[0][_] = _
     }
     
-    for my $i (1:$len1) {
-        my $char1 = substr($s1, $i-1, 1)
-        for my $j (1:$len2) {
-            my $char2 = substr($s2, $j-1, 1)
-            my $cost = ($char1 eq $char2) ? 0 : 1
+    for val $i (1:$len1) {
+        val $char1 = substr($s1, $i-1, 1)
+        for val $j (1:$len2) {
+            val $char2 = substr($s2, $j-1, 1)
+            val $cost = ($char1 eq $char2) ? 0 : 1
             
-            my $v1 = $d[$i-1][$j] + 1
-            my $v2 = $d[$i][$j-1] + 1
-            my $v3 = $d[$i-1][$j-1] + $cost
+            val $v1 = $d[$i-1][$j] + 1
+            val $v2 = $d[$i][$j-1] + 1
+            val $v3 = $d[$i-1][$j-1] + $cost
             
-            my $min = $v1
+            var $min = $v1
             $min = $v2 if $v2 < $min
             $min = $v3 if $v3 < $min
             
@@ -40,26 +40,26 @@ fn Project::StringsAdvancedImpl::adv_levenshtein($s1, $s2) {
 
 # ── Project::StringsAdvancedImpl::adv_lcs: longest common subsequence length ─────
 fn Project::StringsAdvancedImpl::adv_lcs($s1, $s2) {
-    my $len1 = len($s1)
-    my $len2 = len($s2)
+    val $len1 = len($s1)
+    val $len2 = len($s2)
     
-    my @dp = ()
-    for my $i (0:$len1) {
+    var @dp = ()
+    for val $i (0:$len1) {
         $dp[$i] = []
         ~> 0:$len2 ep {
             $dp[$i][_] = 0
         }
     }
 
-    for my $i (1:$len1) {
-        my $char1 = substr($s1, $i-1, 1)
-        for my $j (1:$len2) {
-            my $char2 = substr($s2, $j-1, 1)
+    for val $i (1:$len1) {
+        val $char1 = substr($s1, $i-1, 1)
+        for val $j (1:$len2) {
+            val $char2 = substr($s2, $j-1, 1)
             if ($char1 eq $char2) {
                 $dp[$i][$j] = $dp[$i-1][$j-1] + 1
             } else {
-                my $v1 = $dp[$i-1][$j]
-                my $v2 = $dp[$i][$j-1]
+                val $v1 = $dp[$i-1][$j]
+                val $v2 = $dp[$i][$j-1]
                 if ($v1 > $v2) {
                     $dp[$i][$j] = $v1
                 } else {
@@ -73,26 +73,26 @@ fn Project::StringsAdvancedImpl::adv_lcs($s1, $s2) {
 
 # ── Project::StringsAdvancedImpl::adv_is_anagram: checks if two strings are anagrams ─────
 fn Project::StringsAdvancedImpl::adv_is_anagram($s1, $s2) {
-    my $s1_clean = lc($s1)
+    var $s1_clean = lc($s1)
     $s1_clean =~ s/\s+//g
-    my $s2_clean = lc($s2)
+    var $s2_clean = lc($s2)
     $s2_clean =~ s/\s+//g
     
     return 0 if len($s1_clean) != len($s2_clean)
     
-    my @c1 = sort split("", $s1_clean)
-    my @c2 = sort split("", $s2_clean)
+    val @c1 = sort split("", $s1_clean)
+    val @c2 = sort split("", $s2_clean)
     
     join("", @c1) eq join("", @c2) ? 1 : 0
 }
 
 # ── Project::StringsAdvancedImpl::adv_word_frequency: returns hashref of word counts ─────
 fn Project::StringsAdvancedImpl::adv_word_frequency($s) {
-    my $clean = lc($s)
+    var $clean = lc($s)
     $clean =~ s/[^\w\s]//g
-    my @words = split(/\s+/, $clean)
+    val @words = split(/\s+/, $clean)
     
-    my %freq = ()
+    var %freq = ()
     ~> @words ep {
         if (len(_) > 0) {
             $freq{_} = ($freq{_} // 0) + 1

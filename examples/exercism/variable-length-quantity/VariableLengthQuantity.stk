@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 
 fn Exercism::VariableLengthQuantity::encode($ns) {
-    my @bytes
-    for my $n (@{$ns}) {
-        my @parts = ($n & 0x7f)
-        my $m = $n >> 7
+    var @bytes
+    for val $n (@{$ns}) {
+        var @parts = ($n & 0x7f)
+        var $m = $n >> 7
         while ($m > 0) { unshift @parts, ($m & 0x7f) | 0x80; $m >>= 7 }
         push @bytes, @parts
     }
@@ -12,10 +12,10 @@ fn Exercism::VariableLengthQuantity::encode($ns) {
 }
 
 fn Exercism::VariableLengthQuantity::decode($bytes) {
-    my @out
-    my $cur = 0
-    my $in  = 0
-    for my $byte (@{$bytes}) {
+    var @out
+    var $cur = 0
+    var $in  = 0
+    for val $byte (@{$bytes}) {
         $cur = ($cur << 7) | ($byte & 0x7f)
         if ($byte & 0x80) { $in = 1 } else { push @out, $cur; $cur = 0; $in = 0 }
     }

@@ -9,7 +9,7 @@ fn Rosetta::Comments::show() {
     "1. Hash (#) for single line comments" |> p
     "2. Multi-line with multiple # lines" |> p
     
-    my $x = 42  # Inline comment after code
+    val $x = 42  # Inline comment after code
     "Value with inline comment: $x" |> p
 }
 

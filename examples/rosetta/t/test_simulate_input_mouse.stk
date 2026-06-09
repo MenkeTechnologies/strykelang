@@ -2,7 +2,7 @@
 # Rosetta Code: Simulate input/Mouse
 
 fn Rosetta::SimMouse::new() {
-    my @events
+    val @events
     { x => 0, y => 0, down => 0, events => \@events }
 }
 
@@ -22,7 +22,7 @@ fn Rosetta::SimMouse::release($mouse) {
     push @{$mouse->{events}}, "up"
 }
 
-my $mouse = Rosetta::SimMouse::new()
+val $mouse = Rosetta::SimMouse::new()
 Rosetta::SimMouse::move($mouse, 10, 20)
 Rosetta::SimMouse::press($mouse)
 Rosetta::SimMouse::move($mouse, 15, 25)

@@ -89,7 +89,7 @@ die "wc"    unless Stat::word_count("a\nb\nc\n") == 3
 
 # ── closure capture of outer lexical ───────────────────────────────────────
 
-my $tax_rate = 0.08
+val $tax_rate = 0.08
 
 fn Money::with_tax = _ * (1 + $tax_rate)
 fn Money::tip_15   = _ * 0.15
@@ -109,8 +109,8 @@ fn Pipeline::tokenize  = _ |> Pipeline::normalize |> chars |> len
 
 p ""
 p "── compose multiple expr-bodied fns into a pipeline ──"
-my @inputs = ("  Hello, World!  ", "FOO BAR BAZ", "")
-for my $s (@inputs) {
+val @inputs = ("  Hello, World!  ", "FOO BAR BAZ", "")
+for val $s (@inputs) {
     printf("  [%-20s] → norm=[%s] chars=%d\n",
         $s, Pipeline::normalize($s), Pipeline::tokenize($s))
 }

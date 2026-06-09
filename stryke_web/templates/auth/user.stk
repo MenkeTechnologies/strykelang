@@ -19,21 +19,21 @@ class User extends ApplicationRecord {
     fn Self.destroy($id) { web_model_destroy("users", $id) }
 
     fn Self.find_by_email($email) {
-        my $rows = web_model_where("users", +{ email => $email })
+        val $rows = web_model_where("users", +{ email => $email })
         return undef unless ref($rows) eq "ARRAY" && @$rows
         $rows->[0]
     }
 
     fn Self.register($attrs) {
-        my $email = $attrs->{email}
-        my $password = $attrs->{password}
+        val $email = $attrs->{email}
+        val $password = $attrs->{password}
         return +{ ok => 0, error => "email required" } unless defined $email && length $email
         return +{ ok => 0, error => "password required" } unless defined $password && length $password
         if (User::find_by_email($email)) {
             return +{ ok => 0, error => "email already taken" }
         }
-        my $digest = web_password_hash($password)
-        my $u = web_model_create("users", +{
+        val $digest = web_password_hash($password)
+        val $u = web_model_create("users", +{
             name            => $attrs->{name} // $email,
             email           => $email,
             password_digest => $digest,
@@ -42,7 +42,7 @@ class User extends ApplicationRecord {
     }
 
     fn Self.sign_in($email, $password) {
-        my $u = User::find_by_email($email)
+        val $u = User::find_by_email($email)
         return +{ ok => 0, error => "no such user" } unless defined $u
         unless (web_password_verify($password, $u->{password_digest})) {
             return +{ ok => 0, error => "wrong password" }
@@ -57,7 +57,7 @@ class User extends ApplicationRecord {
     }
 
     fn Self.current {
-        my $id = web_session_get("user_id")
+        val $id = web_session_get("user_id")
         return undef unless defined $id && $id
         User::find($id)
     }

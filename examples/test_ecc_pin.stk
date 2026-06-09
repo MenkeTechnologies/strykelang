@@ -1,19 +1,19 @@
 #!/usr/bin/env stryke
 
 fn ECC::mod($n, $p) {
-    my $r = $n % $p
+    val $r = $n % $p
     $r < 0 ? $r + $p : $r
 }
 
 fn ECC::mod_inv($n, $p) {
-    my $t = 0
-    my $newt = 1
-    my $r = $p
-    my $newr = ECC::mod($n, $p)
+    var $t = 0
+    var $newt = 1
+    var $r = $p
+    var $newr = ECC::mod($n, $p)
     while ($newr != 0) {
-        my $q = int($r / $newr)
-        my $tmp_t = $t - $q * $newt; $t = $newt; $newt = $tmp_t
-        my $tmp_r = $r - $q * $newr; $r = $newr; $newr = $tmp_r
+        val $q = int($r / $newr)
+        val $tmp_t = $t - $q * $newt; $t = $newt; $newt = $tmp_t
+        val $tmp_r = $r - $q * $newr; $r = $newr; $newr = $tmp_r
     }
     return undef if $r > 1
     ECC::mod($t, $p)
@@ -23,26 +23,26 @@ fn ECC::add_points($p1, $p2, $ca, $p) {
     return $p2 if $p1->{inf}
     return $p1 if $p2->{inf}
     return +{ inf => 1 } if $p1->{x} == $p2->{x} && $p1->{y} != $p2->{y}
-    my $m
+    var $m
     if ($p1->{x} == $p2->{x}) {
         return +{ inf => 1 } if $p1->{y} == 0
-        my $num = ECC::mod(3 * $p1->{x} * $p1->{x} + $ca, $p)
-        my $den = ECC::mod_inv(2 * $p1->{y}, $p)
+        val $num = ECC::mod(3 * $p1->{x} * $p1->{x} + $ca, $p)
+        val $den = ECC::mod_inv(2 * $p1->{y}, $p)
         $m = ECC::mod($num * $den, $p)
     } else {
-        my $num = ECC::mod($p2->{y} - $p1->{y}, $p)
-        my $den = ECC::mod_inv(ECC::mod($p2->{x} - $p1->{x}, $p), $p)
+        val $num = ECC::mod($p2->{y} - $p1->{y}, $p)
+        val $den = ECC::mod_inv(ECC::mod($p2->{x} - $p1->{x}, $p), $p)
         $m = ECC::mod($num * $den, $p)
     }
-    my $x3 = ECC::mod($m * $m - $p1->{x} - $p2->{x}, $p)
-    my $y3 = ECC::mod($m * ($p1->{x} - $x3) - $p1->{y}, $p)
+    val $x3 = ECC::mod($m * $m - $p1->{x} - $p2->{x}, $p)
+    val $y3 = ECC::mod($m * ($p1->{x} - $x3) - $p1->{y}, $p)
     +{ x => $x3, y => $y3, inf => 0 }
 }
 
 fn ECC::scalar_mult($k, $pt, $ca, $p) {
-    my $res = +{ inf => 1 }
-    my $addend = +{ %$pt }
-    my $n = $k
+    var $res = +{ inf => 1 }
+    var $addend = +{ %$pt }
+    var $n = $k
     while ($n > 0) {
         $res = ECC::add_points($res, $addend, $ca, $p) if $n % 2 == 1
         $addend = ECC::add_points($addend, $addend, $ca, $p)
@@ -51,23 +51,23 @@ fn ECC::scalar_mult($k, $pt, $ca, $p) {
     $res
 }
 
-my $ca = 2
-my $p = 17
-my $G = +{ x => 5, y => 1, inf => 0 }
+val $ca = 2
+val $p = 17
+val $G = +{ x => 5, y => 1, inf => 0 }
 
-my $G2 = ECC::scalar_mult(2, $G, $ca, $p)
+val $G2 = ECC::scalar_mult(2, $G, $ca, $p)
 ~> $G2->{x} aeq(6, "2G x")
 ~> $G2->{y} aeq(3, "2G y")
 
-my $G3 = ECC::add_points($G, $G2, $ca, $p)
+val $G3 = ECC::add_points($G, $G2, $ca, $p)
 ~> $G3->{x} aeq(10, "3G x")
 ~> $G3->{y} aeq(6, "3G y")
 
-my $G3_sm = ECC::scalar_mult(3, $G, $ca, $p)
+val $G3_sm = ECC::scalar_mult(3, $G, $ca, $p)
 ~> $G3_sm->{x} aeq(10, "3G_sm x")
 ~> $G3_sm->{y} aeq(6, "3G_sm y")
 
-my $G19 = ECC::scalar_mult(19, $G, $ca, $p)
+val $G19 = ECC::scalar_mult(19, $G, $ca, $p)
 ~> $G19->{inf} aeq(1, "19G is infinity (order is 19)")
 
 test_run

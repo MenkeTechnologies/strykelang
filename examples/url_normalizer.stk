@@ -13,7 +13,7 @@
 
 # ── tracking parameter blacklist ───────────────────────────────────
 
-my %TRACKING = (
+val %TRACKING = (
     utm_source   => 1, utm_medium    => 1, utm_campaign => 1,
     utm_term     => 1, utm_content   => 1,
     fbclid       => 1, gclid         => 1, mc_cid       => 1,
@@ -24,18 +24,18 @@ my %TRACKING = (
 # ── parser ──────────────────────────────────────────────────────────
 
 fn Demo::URL::parse($url) {
-    my $scheme  = ""
-    my $host    = ""
-    my $port    = ""
-    my $path    = "/"
-    my $query   = ""
-    my $rest = $url
+    var $scheme  = ""
+    var $host    = ""
+    var $port    = ""
+    var $path    = "/"
+    var $query   = ""
+    var $rest = $url
     if ($rest =~ /^([a-zA-Z][a-zA-Z0-9+.\-]*):\/\/(.*)$/) {
         $scheme = lc $1
         $rest = $2
     }
     if ($rest =~ /^([^\/?]+)(.*)$/) {
-        my $authority = $1
+        val $authority = $1
         $rest = $2
         if ($authority =~ /^([^:]+):(\d+)$/) {
             $host = lc $1
@@ -57,13 +57,13 @@ fn Demo::URL::parse($url) {
 # ── parse + normalize query string ─────────────────────────────────
 
 fn Demo::URL::parse_query($qs) {
-    my @parts = split /&/, $qs
+    var @parts = split /&/, $qs
     @parts = grep { len(_) > 0 } @parts
-    my %params
-    for my $p (@parts) {
-        my @kv = split /=/, $p, 2
-        my $k = $kv[0]
-        my $v = $kv[1] // ""
+    var %params
+    for val $p (@parts) {
+        val @kv = split /=/, $p, 2
+        val $k = $kv[0]
+        val $v = $kv[1] // ""
         next if exists $TRACKING{lc($k)}
         $params{$k} = $v
     }
@@ -71,9 +71,9 @@ fn Demo::URL::parse_query($qs) {
 }
 
 fn Demo::URL::serialize_query($params) {
-    my @keys = sort { _ cmp _1 } keys %$params
-    my @parts
-    for my $k (@keys) {
+    val @keys = sort { _ cmp _1 } keys %$params
+    var @parts
+    for var $k (@keys) {
         push @parts, "$k=" . $params->{$k}
     }
     join("&", @parts)
@@ -82,10 +82,10 @@ fn Demo::URL::serialize_query($params) {
 # ── full normalize ──────────────────────────────────────────────────
 
 fn Demo::URL::normalize($url) {
-    my $parsed = Demo::URL::parse($url)
-    my $clean_q = Demo::URL::parse_query($parsed->{query})
-    my $qs = Demo::URL::serialize_query($clean_q)
-    my $out = ""
+    val $parsed = Demo::URL::parse($url)
+    val $clean_q = Demo::URL::parse_query($parsed->{query})
+    val $qs = Demo::URL::serialize_query($clean_q)
+    var $out = ""
     $out .= $parsed->{scheme} . "://" if len $parsed->{scheme}
     $out .= $parsed->{host}
     $out .= ":" . $parsed->{port} if len $parsed->{port}
@@ -96,7 +96,7 @@ fn Demo::URL::normalize($url) {
 
 # ── sample URLs ─────────────────────────────────────────────────────
 
-my @urls = (
+val @urls = (
     "https://example.com/page?id=1&utm_source=twitter",
     "https://example.com/page?id=1",
     "HTTPS://Example.com/page?id=1",                       # case folds
@@ -115,21 +115,21 @@ printf "── input: %d URLs ────────────────�
 
 # ── normalize each ──────────────────────────────────────────────────
 
-my @normalized = map {Demo::URL::normalize} @urls
+val @normalized = map {Demo::URL::normalize} @urls
 
 p ""
 p "── normalized forms ─────────────────────────────────"
-for my $i (0:len(@urls) - 1) {
+for val $i (0:len(@urls) - 1) {
     printf "  %s\n", substr($urls[$i], 0, 65)
     printf "    -> %s\n", $normalized[$i]
 }
 
 # ── distinct via uniq ───────────────────────────────────────────────
 
-my @distinct = sort { _ cmp _1 } uniq(@normalized)
+val @distinct = sort { _ cmp _1 } uniq(@normalized)
 p ""
 printf "── %d distinct normalized URLs ────────────────────────\n", len @distinct
-for my $u (@distinct) {
+for val $u (@distinct) {
     p "  $u"
 }
 
@@ -137,14 +137,14 @@ for my $u (@distinct) {
 
 p ""
 p "── tracking-param removal stats ─────────────────────"
-my $tracked = 0
-my %tracked_kinds
-for my $url (@urls) {
-    my $p = Demo::URL::parse($url)
+var $tracked = 0
+var %tracked_kinds
+for val $url (@urls) {
+    val $p = Demo::URL::parse($url)
     next unless len $p->{query}
-    for my $part (split /&/, $p->{query}) {
-        my @kv = split /=/, $part, 2
-        my $k = lc($kv[0])
+    for val $part (split /&/, $p->{query}) {
+        val @kv = split /=/, $part, 2
+        val $k = lc($kv[0])
         if (exists $TRACKING{$k}) {
             $tracked++
             $tracked_kinds{$k}++
@@ -153,7 +153,7 @@ for my $url (@urls) {
 }
 printf "  tracking params found : %d (across %d URLs)\n",
     $tracked, len @urls
-for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_} } keys %tracked_kinds) {
+for val $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_} } keys %tracked_kinds) {
     printf "  %-15s : %d\n", $k, $tracked_kinds{$k}
 }
 
@@ -161,9 +161,9 @@ for my $k (sort { $tracked_kinds{_1} <=> $tracked_kinds{_} } keys %tracked_kinds
 
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
-my $hll_raw = hll(14)
+val $hll_raw = hll(14)
 hll_add($hll_raw, _) for @urls
-my $hll_norm = hll(14)
+val $hll_norm = hll(14)
 hll_add($hll_norm, _) for @normalized
 printf "  HLL distinct (raw URLs)        : %d\n", hll_count($hll_raw)
 printf "  HLL distinct (normalized URLs) : %d\n", hll_count($hll_norm)
@@ -173,12 +173,12 @@ printf "  exact distinct (normalized)    : %d\n", len @distinct
 
 p ""
 p "── host frequency (TopK) ────────────────────────────"
-my $tk = topk(5)
-for my $url (@urls) {
-    my $p = Demo::URL::parse($url)
+val $tk = topk(5)
+for val $url (@urls) {
+    val $p = Demo::URL::parse($url)
     topk_add($tk, $p->{host})
 }
-my @top = topk_top($tk)
-for my $h (@top) {
+val @top = topk_top($tk)
+for val $h (@top) {
     printf "  %-30s : %d\n", $h->[0], $h->[1]
 }

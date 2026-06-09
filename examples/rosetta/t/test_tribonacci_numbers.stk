@@ -6,11 +6,11 @@ fn Rosetta::Tribonacci::compute($n) {
     elsif ($n == 1) { 0 }
     elsif ($n == 2) { 1 }
     else {
-        my $t0 = 0
-        my $t1 = 0
-        my $t2 = 1
-        for my $i (3:$n) {
-            my $t3 = $t0 + $t1 + $t2
+        var $t0 = 0
+        var $t1 = 0
+        var $t2 = 1
+        for val $i (3:$n) {
+            val $t3 = $t0 + $t1 + $t2
             ($t0, $t1, $t2) = ($t1, $t2, $t3)
         }
         $t2
@@ -29,7 +29,7 @@ assert_eq Rosetta::Tribonacci::compute(4), 2, "T4 (0+1+1)"
 assert_eq Rosetta::Tribonacci::compute(5), 4, "T5 (1+1+2)"
 assert_eq Rosetta::Tribonacci::compute(10), 81, "T10"
 
-my @list = Rosetta::Tribonacci::list(6)
+val @list = Rosetta::Tribonacci::list(6)
 assert_eq join(",", @list), "0,0,1,1,2,4,7", "Tribonacci list"
 
 10 |> Rosetta::Tribonacci::compute |> assert_eq(81, "pipe tribonacci")

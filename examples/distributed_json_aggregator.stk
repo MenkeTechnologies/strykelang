@@ -15,7 +15,7 @@
 p "── distributed JSON aggregator ──"
 
 # Synthetic JSON records.
-my @records = (
+val @records = (
     '{"status":200,"latency_ms":12}',
     '{"status":200,"latency_ms":18}',
     '{"status":404,"latency_ms":5}',
@@ -29,28 +29,28 @@ my @records = (
     '{"status":404,"latency_ms":6}',
     '{"status":200,"latency_ms":19}',
 )
-my $n = len(@records)
+val $n = len(@records)
 printf "records: %d JSON entries\n", $n
 
-my @workers = congregation(4)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(4)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard records, each worker parses + groups by status, returns
 # JSON: { "200": {count, sum}, "404": ..., "500": ... }.
-my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
-my @partials
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+var @partials
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = $n - 1 if $end >= $n
     next if $start >= $n
-    my @shard
-    for my $r ($start:$end) { push @shard, $records[$r] }
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    var @shard
+    for val $r ($start:$end) { push @shard, $records[$r] }
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
-        my %stats;  # status_str → [count, sum]
+        var %stats;  # status_str → [count, sum]
         for my \$rec (\@\$arr) {
             my \$obj = from_json(\$rec);
             my \$st = '' . \$obj->{status};
@@ -64,16 +64,16 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json(\\%stats)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     push @partials, from_json($reply{$w})
 }
 
 # Fleet aggregate.
-my %fleet  # status → [count, sum]
-for my $p (@partials) {
-    for my $st (keys %$p) {
-        my $pair = $p->{$st}
+var %fleet  # status → [count, sum]
+for val $p (@partials) {
+    for val $st (keys %$p) {
+        val $pair = $p->{$st}
         if (exists $fleet{$st}) {
             $fleet{$st}[0] += $pair->[0]
             $fleet{$st}[1] += $pair->[1]
@@ -85,16 +85,16 @@ for my $p (@partials) {
 
 p "── per-status fleet stats ──"
 printf "  %-7s %-6s %-7s %s\n", "status", "count", "sum_ms", "avg_ms"
-for my $st (sort keys %fleet) {
-    my $pair = $fleet{$st}
-    my ($cnt, $sum) = @$pair
-    my $avg = $sum / $cnt
+for val $st (sort keys %fleet) {
+    val $pair = $fleet{$st}
+    val ($cnt, $sum) = @$pair
+    val $avg = $sum / $cnt
     printf "  %-7s %-6d %-7d %.2f\n", $st, $cnt, $sum, $avg
 }
 
 # Sanity: total record count == input count.
-my $total = 0
-for my $st (keys %fleet) { $total += $fleet{$st}[0] }
+var $total = 0
+for val $st (keys %fleet) { $total += $fleet{$st}[0] }
 p $total == $n ? "✓ all $n records aggregated" : "✗ count mismatch"
 
 excommunicate(@workers)

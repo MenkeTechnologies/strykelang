@@ -2,10 +2,10 @@
 # Rosetta Code: Bitmap/Histogram
 
 fn Rosetta::BitmapHistogram::calculate($img) {
-    my %hist = ( r => {}, g => {}, b => {} )
+    var %hist = ( r => {}, g => {}, b => {} )
     
-    for my $row (@$img) {
-        for my $pixel (@$row) {
+    for val $row (@$img) {
+        for val $pixel (@$row) {
             $hist{r}->{$pixel->{r}}++
             $hist{g}->{$pixel->{g}}++
             $hist{b}->{$pixel->{b}}++
@@ -16,16 +16,16 @@ fn Rosetta::BitmapHistogram::calculate($img) {
 
 fn Rosetta::BitmapHistogram::demo() {
     # Simple 2x2 image
-    my $img = [
+    val $img = [
         [ {r=>255, g=>0, b=>0}, {r=>0, g=>255, b=>0} ],
         [ {r=>0, g=>0, b=>255}, {r=>255, g=>255, b=>255} ]
     ]
     
-    my $h = Rosetta::BitmapHistogram::calculate($img)
+    val $h = Rosetta::BitmapHistogram::calculate($img)
     
     "Bitmap Histogram (Color Counts):" |> p
     "Red channel counts:" |> p
-    for my $val (sort { _ <=> _1 } keys %{$h->{r}}) {
+    for val $val (sort { _ <=> _1 } keys %{$h->{r}}) {
         p "  $val: " . $h->{r}->{$val}
     }
     

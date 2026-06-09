@@ -18,7 +18,7 @@ fn Flat::flatten    = @{_} |> flat_maps { ref(_) eq "ARRAY" ? Flat::flatten(_) :
 fn Flat::leaf_count = Flat::flatten(_) |> len
 
 # Demo grid — (input, expected flat).
-my @cases = (
+val @cases = (
     +{ input => [],                        flat => []                },
     +{ input => [1, 2, 3],                 flat => [1, 2, 3]         },
     +{ input => [1, [2, 3], 4],            flat => [1, 2, 3, 4]      },
@@ -30,19 +30,19 @@ my @cases = (
 )
 
 p "── Recursive flatten demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my @got      = Flat::flatten($c->{input})
-    my @want     = @{$c->{flat}}
-    my $ok       = "@got" eq "@want"
+var $fail = 0
+for val $c (@cases) {
+    val @got      = Flat::flatten($c->{input})
+    val @want     = @{$c->{flat}}
+    val $ok       = "@got" eq "@want"
     $fail++ unless $ok
     p "  in=(#{len @{$c->{input}}} items)  out=[@got]  expect=[@want]  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "$fail / #{len @cases} flatten cases failed" if $fail > 0
 
 # Universal invariant: flattened length equals total leaf count.
-for my $c (@cases) {
-    my @f = Flat::flatten($c->{input})
+for val $c (@cases) {
+    val @f = Flat::flatten($c->{input})
     die "leaf count != flat length" unless Flat::leaf_count($c->{input}) == len @f
 }
 

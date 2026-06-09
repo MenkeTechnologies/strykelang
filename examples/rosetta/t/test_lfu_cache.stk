@@ -17,11 +17,11 @@ fn Rosetta::LFU::new($capacity) {
 }
 
 fn Rosetta::LFU::touch($c, $key) {
-    my $entry = $c->{store}{$key}
-    my $old = $entry->{freq}
+    var $entry = $c->{store}{$key}
+    val $old = $entry->{freq}
     # Remove from old list.
-    my $old_list = $c->{freq_lists}{$old}
-    my @new_list
+    val $old_list = $c->{freq_lists}{$old}
+    var @new_list
     ~> @$old_list ep { push @new_list, _ if _ ne $key }
     $c->{freq_lists}{$old} = \@new_list
     if (len(@new_list) == 0) {
@@ -29,7 +29,7 @@ fn Rosetta::LFU::touch($c, $key) {
         if ($c->{min_freq} == $old) { $c->{min_freq}++ }
     }
     # Add to new list.
-    my $new = $old + 1
+    val $new = $old + 1
     $entry->{freq} = $new
     $c->{freq_lists}{$new} //= []
     push @{$c->{freq_lists}{$new}}, $key
@@ -42,8 +42,8 @@ fn Rosetta::LFU::get($c, $key) {
 }
 
 fn Rosetta::LFU::evict($c) {
-    my $list = $c->{freq_lists}{$c->{min_freq}}
-    my $victim = shift @$list
+    val $list = $c->{freq_lists}{$c->{min_freq}}
+    val $victim = shift @$list
     if (len(@$list) == 0) { delete $c->{freq_lists}{$c->{min_freq}} }
     delete $c->{store}{$victim}
     $victim
@@ -68,7 +68,7 @@ fn Rosetta::LFU::put($c, $key, $val) {
 fn Rosetta::LFU::contains($c, $key) { exists $c->{store}{$key} }
 
 # LeetCode 460 reference scenario.
-my $c = Rosetta::LFU::new(2)
+val $c = Rosetta::LFU::new(2)
 Rosetta::LFU::put($c, "1", 1)
 Rosetta::LFU::put($c, "2", 2)
 assert_eq Rosetta::LFU::get($c, "1"), 1, "get 1 → 1"
@@ -81,19 +81,19 @@ assert_eq Rosetta::LFU::get($c, "3"), 3, "3 still present"
 assert_eq Rosetta::LFU::get($c, "4"), 4, "4 present"
 
 # Capacity 0
-my $z = Rosetta::LFU::new(0)
+val $z = Rosetta::LFU::new(0)
 Rosetta::LFU::put($z, "a", 1)
 assert_eq Rosetta::LFU::contains($z, "a"), 0, "cap 0 stores nothing"
 
 # Update existing key shouldn't evict
-my $u = Rosetta::LFU::new(1)
+val $u = Rosetta::LFU::new(1)
 Rosetta::LFU::put($u, "x", 1)
 Rosetta::LFU::put($u, "x", 2)  # update
 assert_eq Rosetta::LFU::get($u, "x"), 2, "updated value"
 assert_eq len(keys %{$u->{store}}), 1, "still 1 key"
 
 # Frequency-driven eviction
-my $f = Rosetta::LFU::new(3)
+val $f = Rosetta::LFU::new(3)
 Rosetta::LFU::put($f, "a", 1)
 Rosetta::LFU::put($f, "b", 2)
 Rosetta::LFU::put($f, "c", 3)
@@ -109,7 +109,7 @@ assert_eq Rosetta::LFU::contains($f, "b"), 1, "b kept"
 assert_eq Rosetta::LFU::contains($f, "d"), 1, "d added"
 
 # Tie broken by LRU within smallest frequency bucket.
-my $t = Rosetta::LFU::new(2)
+val $t = Rosetta::LFU::new(2)
 Rosetta::LFU::put($t, "x", 1)
 Rosetta::LFU::put($t, "y", 2)
 # Both at freq 1. y was inserted later, so x is LRU.

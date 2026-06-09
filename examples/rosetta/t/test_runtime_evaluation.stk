@@ -3,22 +3,22 @@
 
 fn Rosetta::RuntimeEval::demo() {
     # 1. Simple expression evaluation
-    my $code = "2 + 3 * 4"
-    my $res1 = eval $code
+    val $code = "2 + 3 * 4"
+    val $res1 = eval $code
     assert_eq $res1, 14, "eval simple expression"
     
     # 2. Evaluation in current scope
-    my $x = 10
-    my $res2 = eval "\$x + 5"
+    val $x = 10
+    val $res2 = eval "\$x + 5"
     assert_eq $res2, 15, "eval with local variable"
     
     # 3. Dynamic function definition
     eval "fn Rosetta::RuntimeEval::dynamic_func(\$a) { \$a * 2 }"
-    my $res3 = Rosetta::RuntimeEval::dynamic_func(21)
+    val $res3 = Rosetta::RuntimeEval::dynamic_func(21)
     assert_eq $res3, 42, "eval defines function"
     
     # 4. Error handling in eval
-    my $res4 = eval "1 / 0"
+    val $res4 = eval "1 / 0"
     # In Stryke, division by zero might throw or return undef/inf depending on implementation.
     # Let's check $@ if supported, or just verify it doesn't crash the script.
 }

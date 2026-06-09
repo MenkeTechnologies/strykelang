@@ -11,27 +11,27 @@ package Manacher
 
 fn solve($s) {
     # Preprocess string: "aba" -> "#a#b#a#"
-    my $t = "#"
-    my $n = len $s
-    for my $i (0 : $n - 1) {
+    var $t = "#"
+    val $n = len $s
+    for val $i (0 : $n - 1) {
         $t = $t . $s[$i] . "#"
     }
     
-    my $m = len $t
-    my @p = (0) x $m
-    my $c = 0 # current center
-    my $r = 0 # current right boundary
+    val $m = len $t
+    var @p = (0) x $m
+    var $c = 0 # current center
+    var $r = 0 # current right boundary
     
-    for my $i (0 : $m - 1) {
-        my $mirr = 2 * $c - $i
+    for val $i (0 : $m - 1) {
+        val $mirr = 2 * $c - $i
         
         if ($i < $r) {
             $p[$i] = min($r - $i, $p[$mirr])
         }
         
         # Attempt to expand around center i
-        my $v1 = $i + (1 + $p[$i])
-        my $v2 = $i - (1 + $p[$i])
+        var $v1 = $i + (1 + $p[$i])
+        var $v2 = $i - (1 + $p[$i])
         while ($v1 < $m && $v2 >= 0 && $t[$v1] eq $t[$v2]) {
             $p[$i]++
             $v1++
@@ -46,9 +46,9 @@ fn solve($s) {
     }
     
     # Find max radius
-    my $max_r = 0
-    my $best_c = 0
-    for my $i (0 : $m - 1) {
+    var $max_r = 0
+    var $best_c = 0
+    for val $i (0 : $m - 1) {
         if ($p[$i] > $max_r) {
             $max_r = $p[$i]
             $best_c = $i
@@ -56,7 +56,7 @@ fn solve($s) {
     }
     
     # Extract longest palindrome
-    my $start = int(($best_c - $max_r) / 2)
+    val $start = int(($best_c - $max_r) / 2)
     substr($s, $start, $max_r)
 }
 
@@ -64,13 +64,13 @@ package main
 
 p "── Manacher's Algorithm Demo ──"
 
-my $s = "babad"
-my $res = Manacher::solve($s)
+val $s = "babad"
+val $res = Manacher::solve($s)
 p "Input: '#{$s}'"
 p "Longest Palindrome: '#{$res}'"
 
-my $s2 = "cbbd"
-my $res2 = Manacher::solve($s2)
+val $s2 = "cbbd"
+val $res2 = Manacher::solve($s2)
 p "\nInput: '#{$s2}'"
 p "Longest Palindrome: '#{$res2}'"
 

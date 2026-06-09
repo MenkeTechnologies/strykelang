@@ -13,29 +13,29 @@
 
 p "── distributed sliding window (rolling sum) ──"
 
-my $window = 5
-my @series
-for my $i (0:39) { push @series, ($i % 7) + 1 }
-my $n = len(@series)
+val $window = 5
+var @series
+for val $i (0:39) { push @series, ($i % 7) + 1 }
+val $n = len(@series)
 printf "series: %d values  ·  window: %d\n", $n, $window
 
-my @workers = congregation(4)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(4)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard with overlap (window-1) at the right edge so per-worker
 # rolling computations don't lose boundary windows.
-my $base_per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
-my @rollups
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $base_per
-    my $end = ($i + 1) * $base_per - 1 + ($window - 1)
+val $base_per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+var @rollups
+for val $i (0:len(@sorted_workers) - 1) {
+    var $w = $sorted_workers[$i]
+    val $start = $i * $base_per
+    var $end = ($i + 1) * $base_per - 1 + ($window - 1)
     $end = $n - 1 if $end >= $n
     next if $start >= $n
-    my @shard
-    for my $r ($start:$end) { push @shard, $series[$r] }
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    var @shard
+    for val $r ($start:$end) { push @shard, $series[$r] }
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
         my \$w = $window;
         my \@out;
@@ -47,36 +47,36 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json(\\\@out)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     push @rollups, [$start, from_json($reply{$w})]
 }
 
 # Concatenate per-shard rolling sums by base position.
-my @merged
-for my $r (@rollups) {
-    my ($base, $rolls) = @$r
-    for my $j (0:len(@$rolls) - 1) {
+var @merged
+for var $r (@rollups) {
+    val ($base, $rolls) = @$r
+    for val $j (0:len(@$rolls) - 1) {
         $merged[$base + $j] = $rolls->[$j]
     }
 }
 
 # Local rolling sum for verification.
-my @local
-for my $i (0:$n - $window) {
-    my $s = 0
-    for my $j (0:$window - 1) { $s += $series[$i + $j] }
+var @local
+for val $i (0:$n - $window) {
+    var $s = 0
+    for val $j (0:$window - 1) { $s += $series[$i + $j] }
     push @local, $s
 }
 
 p "── distributed rolling sums ──"
-my $expected_len = $n - $window + 1
+val $expected_len = $n - $window + 1
 printf "expected length: %d  ·  got distributed: %d  ·  local: %d\n",
     $expected_len, len(@merged), len(@local)
 
 # Print first 8 values side-by-side.
 p "── first 8 windows (distributed vs local) ──"
-for my $i (0:7) {
+for val $i (0:7) {
     next if $i >= len(@local)
     printf "  win %2d: distributed=%s  local=%d  %s\n",
         $i, ($merged[$i] // "?"), $local[$i],

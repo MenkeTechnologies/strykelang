@@ -2,10 +2,10 @@
 # Rosetta Code: Abbreviation, automatic
 
 fn Rosetta::AbbrevAuto::min_len($word, $list) {
-    for my $l (1..length($word)) {
-        my $sub = substr($word, 0, $l)
-        my $count = 0
-        for my $w (@$list) {
+    for val $l (1..length($word)) {
+        val $sub = substr($word, 0, $l)
+        var $count = 0
+        for val $w (@$list) {
             if (substr($w, 0, $l) eq $sub) {
                 $count = $count + 1
             }
@@ -16,15 +16,15 @@ fn Rosetta::AbbrevAuto::min_len($word, $list) {
 }
 
 fn Rosetta::AbbrevAuto::solve($list) {
-    my @res
-    for my $w (@$list) {
+    var @res
+    for val $w (@$list) {
         push @res, Rosetta::AbbrevAuto::min_len($w, $list)
     }
     \@res
 }
 
-my @input = ("apple", "apply", "ape", "april")
-my $res = Rosetta::AbbrevAuto::solve(\@input)
+val @input = ("apple", "apply", "ape", "april")
+val $res = Rosetta::AbbrevAuto::solve(\@input)
 
 # apple -> appl (4) vs apply (appl)
 # apple -> apple (5)

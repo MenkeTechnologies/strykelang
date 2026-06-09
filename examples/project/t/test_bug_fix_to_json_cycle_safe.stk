@@ -4,18 +4,18 @@
 # via an Arc-pointer visited set and emits `null` for back-edges.
 
 # Direct self-reference.
-my $a = { name => "root" }
+var $a = { name => "root" }
 $a->{self} = $a
-my $j_a = to_json($a)
+val $j_a = to_json($a)
 ($j_a =~ /"name":"root"/)  |> assert_ok("root field preserved")
 ($j_a =~ /"self":null/)    |> assert_ok("back-edge serialized as null")
 
 # Two-node cycle: A -> B -> A.
-my $x = { tag => "A" }
-my $y = { tag => "B" }
+var $x = { tag => "A" }
+var $y = { tag => "B" }
 $x->{next} = $y
 $y->{prev} = $x
-my $j_x = to_json($x)
+val $j_x = to_json($x)
 ($j_x =~ /"tag":"A"/)         |> assert_ok("A node tag")
 ($j_x =~ /"tag":"B"/)         |> assert_ok("B node tag visited once")
 ($j_x =~ /"prev":null/)       |> assert_ok("back-edge from B->A is null")
@@ -23,29 +23,29 @@ my $j_x = to_json($x)
 # Diamond: B references C twice. NOT a cycle — the visited set must
 # track the recursion stack only, not all-time visits, so both edges
 # emit the full subtree.
-my $shared = { kind => "leaf", val => 7 }
-my $diamond = { left => $shared, right => $shared }
-my $j_d = to_json($diamond)
-my $hits = 0
-my $tmp = $j_d
+val $shared = { kind => "leaf", val => 7 }
+val $diamond = { left => $shared, right => $shared }
+val $j_d = to_json($diamond)
+var $hits = 0
+var $tmp = $j_d
 while ($tmp =~ s/"val":7//) { $hits++ }
 $hits |> assert_eq(2, "shared (non-cyclic) subtree emitted twice")
 
 # Arrayref cycle: array contains itself.
-my $arr = []
+val $arr = []
 push @$arr, "first"
 push @$arr, $arr
-my $j_arr = to_json($arr)
+val $j_arr = to_json($arr)
 ($j_arr =~ /^\["first",null\]$/) |> assert_ok("array self-ref → null sentinel")
 
 # Triple-step cycle: A -> B -> C -> A.
-my $A = { id => "A" }
-my $B = { id => "B" }
-my $C = { id => "C" }
+var $A = { id => "A" }
+var $B = { id => "B" }
+var $C = { id => "C" }
 $A->{nx} = $B
 $B->{nx} = $C
 $C->{nx} = $A
-my $j_t = to_json($A)
+val $j_t = to_json($A)
 ($j_t =~ /"id":"A"/) |> assert_ok("A in triple cycle")
 ($j_t =~ /"id":"B"/) |> assert_ok("B in triple cycle")
 ($j_t =~ /"id":"C"/) |> assert_ok("C in triple cycle")

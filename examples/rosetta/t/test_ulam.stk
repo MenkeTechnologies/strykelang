@@ -2,14 +2,14 @@
 # Rosetta Code: Ulam sequence
 
 fn Rosetta::Ulam::generate($n) {
-    my @u = (1, 2)
+    var @u = (1, 2)
     while (len(@u) < $n) {
-        my $next = $u[-1] + 1
-        my $found = 0
+        var $next = $u[-1] + 1
+        var $found = 0
         while (!$found) {
-            my $ways = 0
-            for my $i (0..len(@u)-2) {
-                for my $j ($i+1..len(@u)-1) {
+            var $ways = 0
+            for val $i (0..len(@u)-2) {
+                for val $j ($i+1..len(@u)-1) {
                     if ($u[$i] + $u[$j] == $next) {
                         $ways++
                     }
@@ -26,7 +26,7 @@ fn Rosetta::Ulam::generate($n) {
     \@u
 }
 
-my $res = Rosetta::Ulam::generate(10)
+val $res = Rosetta::Ulam::generate(10)
 assert_eq join(",", @$res), "1,2,3,4,6,8,11,13,16,18", "Ulam first 10"
 
 10 |> Rosetta::Ulam::generate |> { _->[9] } |> assert_eq(18, "pipe Ulam(10)")

@@ -16,7 +16,7 @@
 
 # ── synthetic "internet" — host => { port => banner } ──────────────
 
-my %hosts = (
+val %hosts = (
     "alpha.example"   => { 22 => "OpenSSH_9.6", 80 => "nginx/1.25.3", 443 => "nginx/1.25.3" },
     "beta.example"    => { 22 => "OpenSSH_8.4", 80 => "Apache/2.4.57", 443 => "Apache/2.4.57", 3306 => "MySQL-8.0.36" },
     "gamma.example"   => { 80 => "lighttpd/1.4.71", 443 => "lighttpd/1.4.71", 5432 => "PostgreSQL-16.2" },
@@ -29,20 +29,20 @@ my %hosts = (
 
 # ── ports of interest ─────────────────────────────────────────────
 
-my @port_set = (21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
+val @port_set = (21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
                 1080, 3306, 5432, 6379, 8080, 9092, 11211)
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_lat   = t_digest(200)
-my $cms_svc  = cms(8, 512)
-my $tk_bnr   = topk(16)
-my $hll_host = hll(12)
-my $bf_closed = bloom(128, 0.01)
+val $td_lat   = t_digest(200)
+val $cms_svc  = cms(8, 512)
+val $tk_bnr   = topk(16)
+val $hll_host = hll(12)
+val $bf_closed = bloom(128, 0.01)
 
 # Seed bloom with "well-known closed" ports for our network.
-my @well_known_closed = (135, 137, 139, 445)
-for my $p (@well_known_closed) {
+val @well_known_closed = (135, 137, 139, 445)
+for val $p (@well_known_closed) {
     bloom_add($bf_closed, "p:$p")
 }
 
@@ -50,18 +50,18 @@ for my $p (@well_known_closed) {
 
 fn Demo::PS::probe($host, $port) {
     # Pretend a real syscall happens here; we just look it up.
-    my $t0 = now_ns()
+    val $t0 = now_ns()
 
-    my $latency_us
-    my $status
-    my $banner
+    var $latency_us
+    var $status
+    var $banner
 
     if (bloom_contains($bf_closed, "p:$port")) {
         $latency_us = int(rand 500) + 100
         $status = "filtered"
         $banner = ""
     } elsif (exists $hosts{$host}) {
-        my $ports = $hosts{$host}
+        val $ports = $hosts{$host}
         if (exists $ports->{$port}) {
             $latency_us = int(rand 3000) + 200
             $status = "open"
@@ -90,21 +90,21 @@ fn Demo::PS::probe($host, $port) {
 
 # ── generate scan plan ────────────────────────────────────────────
 
-my @plan
-for my $h (sort keys %hosts) {
-    for my $p (@port_set) {
+var @plan
+for val $h (sort keys %hosts) {
+    for val $p (@port_set) {
         push @plan, [$h, $p]
     }
 }
 # Add a few unreachable hosts to demonstrate "timeout" path.
-for my $h ("ghost.example", "void.example") {
-    for my $p (@port_set) {
+for val $h ("ghost.example", "void.example") {
+    for val $p (@port_set) {
         push @plan, [$h, $p]
     }
 }
 # Add the well-known-closed ports to show the bloom-filter shortcut.
-for my $h (sort keys %hosts) {
-    for my $p (@well_known_closed) {
+for val $h (sort keys %hosts) {
+    for val $p (@well_known_closed) {
         push @plan, [$h, $p]
     }
 }
@@ -114,23 +114,23 @@ p "port scanner sim — ", len(@plan), " (host,port) pairs across ",
 p "─" x 60
 # ── parallel scan ─────────────────────────────────────────────────
 
-my $t_scan = now_ns()
-my @results = pmap {
+val $t_scan = now_ns()
+val @results = pmap {
     Demo::PS::probe(_->[0], _->[1])
 } @plan
-my $elapsed_us = (now_ns() - $t_scan) / 1000.0
+val $elapsed_us = (now_ns() - $t_scan) / 1000.0
 
 printf("scan complete: %d probes in %.0f us total\n",
        len(@results), $elapsed_us)
 
 # ── post-process ──────────────────────────────────────────────────
 
-my $n_open     = 0
-my $n_closed   = 0
-my $n_filtered = 0
-my $n_timeout  = 0
+var $n_open     = 0
+var $n_closed   = 0
+var $n_filtered = 0
+var $n_timeout  = 0
 
-for my $r (@results) {
+for val $r (@results) {
     if ($r->{status} eq "open") {
         $n_open++
         cms_add($cms_svc, $r->{banner}, 1)
@@ -154,17 +154,17 @@ printf("  timeout  = %4d (host unreachable)\n", $n_timeout)
 # ── per-host open-port report ─────────────────────────────────────
 
 p "\nopen-port report:"
-my %by_host
-for my $r (@results) {
+var %by_host
+for val $r (@results) {
     next unless $r->{status} eq "open"
     $by_host{$r->{host}} = [] unless exists $by_host{$r->{host}}
     push @{$by_host{$r->{host}}}, $r
 }
 
-for my $h (sort keys %by_host) {
-    my @sorted_ports = sort { _->{port} <=> _1->{port} } @{$by_host{$h}}
+for val $h (sort keys %by_host) {
+    val @sorted_ports = sort { _->{port} <=> _1->{port} } @{$by_host{$h}}
     printf("  %-18s\n", $h)
-    for my $r (@sorted_ports) {
+    for val $r (@sorted_ports) {
         printf("      %5d  %s  (%d us)\n",
                $r->{port}, $r->{banner}, $r->{latency})
     }
@@ -172,11 +172,11 @@ for my $h (sort keys %by_host) {
 
 if ($n_timeout > 0) {
     p "\nunreachable hosts:"
-    my %seen_timeout
-    for my $r (@results) {
+    var %seen_timeout
+    for val $r (@results) {
         $seen_timeout{$r->{host}} = 1 if $r->{status} eq "timeout"
     }
-    for my $h (sort keys %seen_timeout) {
+    for val $h (sort keys %seen_timeout) {
         printf("  %-18s\n", $h)
     }
 }
@@ -184,15 +184,15 @@ if ($n_timeout > 0) {
 # ── top banners ──────────────────────────────────────────────────
 
 p "\nmost-common banners (TopK):"
-my @bnrs = topk_top($tk_bnr, 6)
-for my $p (@bnrs) {
+val @bnrs = topk_top($tk_bnr, 6)
+for val $p (@bnrs) {
     printf("  %-22s count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct reachable hosts ──────────────────────────────────────
 
-my $hll_n = hll_count($hll_host)
-my $exact_open_hosts = len(keys %by_host)
+val $hll_n = hll_count($hll_host)
+val $exact_open_hosts = len(keys %by_host)
 printf("\ndistinct reachable hosts: HLL=%.1f vs exact=%d\n",
        $hll_n, $exact_open_hosts)
 

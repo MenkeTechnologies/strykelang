@@ -5,8 +5,8 @@ fn Rosetta::ShellOneLiner::demo() {
     # Task: Execute a command from the shell that performs a simple action.
     # Use the current binary's path ($^X) so this works in CI where
     # `stryke` may not be on PATH (only `./target/release/s` exists).
-    my $exe = $^X
-    my $res = `'$exe' -e 'print "Hello from one-liner\n"'` |> trim
+    val $exe = $^X
+    val $res = `'$exe' -e 'print "Hello from one-liner\n"'` |> trim
     $res
 }
 

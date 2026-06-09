@@ -7,17 +7,17 @@ class QueryBuilder {
     query = ""
 
     fn select($fields) {
-        my $new_query = $self->query . "SELECT " . $fields
+        val $new_query = $self->query . "SELECT " . $fields
         QueryBuilder(query => $new_query)
     }
 
     fn from($table) {
-        my $new_query = $self->query . " FROM " . $table  
+        val $new_query = $self->query . " FROM " . $table  
         QueryBuilder(query => $new_query)
     }
 
     fn where($condition) {
-        my $new_query = $self->query . " WHERE " . $condition
+        val $new_query = $self->query . " WHERE " . $condition
         QueryBuilder(query => $new_query)
     }
 
@@ -26,7 +26,7 @@ class QueryBuilder {
     }
 }
 
-my $sql = QueryBuilder()
+val $sql = QueryBuilder()
     ->select("name, age")
     ->from("users")
     ->where("age > 18")
@@ -53,10 +53,10 @@ class Logger {
     }
 }
 
-my $debug_log = Logger::debug()
+val $debug_log = Logger::debug()
 assert_eq $debug_log->log("test"), "[DEBUG] test -> console", "factory debug"
 
-my $file_log = Logger::file("/tmp/app.log")
+val $file_log = Logger::file("/tmp/app.log")
 assert_eq $file_log->log("error"), "[INFO] error -> /tmp/app.log", "factory file"
 
 # ── Class Composition Over Inheritance ─────────────────────────────────
@@ -85,7 +85,7 @@ class Car {
     }
 }
 
-my $car = Car::new("Tesla Model S")
+val $car = Car::new("Tesla Model S")
 assert_eq $car->start(), "Engine started (200hp) in Tesla Model S", "composition start"
 
 # ── Singleton Pattern ──────────────────────────────────────────────
@@ -106,7 +106,7 @@ class Config {
     }
 }
 
-my $config1 = Config::instance()
+val $config1 = Config::instance()
 assert_eq $config1->get("database"), "prod.db", "singleton value"
 
 # ── Method Overloading via Dispatch ────────────────────────────────────
@@ -123,11 +123,11 @@ class MathUtil {
     }
 
     fn Self.add_arrays($arr1, $arr2) {
-        my @result = ()
-        my $max_len = len(@$arr1) > len(@$arr2) ? len(@$arr1) : len(@$arr2)
-        for my $i (0:$max_len - 1) {
-            my $val1 = $i < len(@$arr1) ? $arr1->[$i] : 0
-            my $val2 = $i < len(@$arr2) ? $arr2->[$i] : 0
+        var @result = ()
+        val $max_len = len(@$arr1) > len(@$arr2) ? len(@$arr1) : len(@$arr2)
+        for val $i (0:$max_len - 1) {
+            val $val1 = $i < len(@$arr1) ? $arr1->[$i] : 0
+            val $val2 = $i < len(@$arr2) ? $arr2->[$i] : 0
             push @result, $val1 + $val2
         }
         \@result
@@ -173,14 +173,14 @@ class Circle extends Shape {
     }
 }
 
-my @shapes = (
+val @shapes = (
     Rectangle(width => 5, height => 4),
     Circle(radius => 3),
     Rectangle(width => 10, height => 2)
 )
 
-my $total_area = 0
-for my $shape (@shapes) {
+var $total_area = 0
+for val $shape (@shapes) {
     $total_area += $shape->area()
 }
 

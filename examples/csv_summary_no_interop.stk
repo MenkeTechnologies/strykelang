@@ -16,7 +16,7 @@
 #       cat sales.csv | stryke --no-interop examples/csv_summary_no_interop.stk
 
 # Embedded fallback rows so the demo runs without an input file.
-my $sample = "region,product,qty,price\n"
+val $sample = "region,product,qty,price\n"
            . "north,widget,10,4.50\n"
            . "south,widget,7,4.75\n"
            . "north,gadget,3,12.00\n"
@@ -26,7 +26,7 @@ my $sample = "region,product,qty,price\n"
            . "east,sprocket,4,9.50\n"
            . "south,sprocket,6,9.25\n"
 
-my $text
+var $text
 if (-t STDIN) {
     $text = $sample
 } else {
@@ -34,12 +34,12 @@ if (-t STDIN) {
     $text = $sample if len($text) == 0
 }
 
-my @lines = split(/\n/, $text)
-my $hdr   = shift @lines
-my @rows
-for my $line (@lines) {
+var @lines = split(/\n/, $text)
+val $hdr   = shift @lines
+var @rows
+for val $line (@lines) {
     next if len($line) == 0
-    my @fields = split(/,/, $line)
+    val @fields = split(/,/, $line)
     push @rows, +{
         region  => $fields[0],
         product => $fields[1],
@@ -49,9 +49,9 @@ for my $line (@lines) {
 }
 
 # Group rows by region. Hash-of-array buckets via `||=` lazy init.
-my %by_region
-for my $row (@rows) {
-    my $r = $row->{region}
+var %by_region
+for val $row (@rows) {
+    val $r = $row->{region}
     $by_region{$r} ||= []
     push @{$by_region{$r}}, $row
 }
@@ -60,15 +60,15 @@ p "── Sales summary by region (", len(@rows), " rows total) ──"
 printf "  %-8s %5s %12s %12s\n", "region", "rows", "revenue", "avg price"
 printf "  %-8s %5s %12s %12s\n", "------", "----", "-------", "---------"
 
-for my $region (sort keys %by_region) {
-    my @bucket = @{$by_region{$region}}
-    my $rev    = sum(map { _->{qty} * _->{price} } @bucket)
-    my $avg    = sum(map { _->{price} } @bucket) / len(@bucket)
+for val $region (sort keys %by_region) {
+    val @bucket = @{$by_region{$region}}
+    val $rev    = sum(map { _->{qty} * _->{price} } @bucket)
+    val $avg    = sum(map { _->{price} } @bucket) / len(@bucket)
     printf "  %-8s %5d %12.2f %12.2f\n", $region, len(@bucket), $rev, $avg
 }
 
 # Roll-up: grand total revenue.
-my $total = sum(map { _->{qty} * _->{price} } @rows)
+val $total = sum(map { _->{qty} * _->{price} } @rows)
 p ""
 printf "  grand total revenue: %.2f\n", $total
 

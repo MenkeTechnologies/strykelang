@@ -30,11 +30,11 @@ fn BST::contains($root, $v) {
 }
 
 fn BST::inorder($root) {
-    my @out = ()
+    var @out = ()
     return \@out unless defined $root
-    for my $x (@{BST::inorder($root->{left})})  { push @out, $x }
+    for val $x (@{BST::inorder($root->{left})})  { push @out, $x }
     push @out, $root->{val}
-    for my $x (@{BST::inorder($root->{right})}) { push @out, $x }
+    for val $x (@{BST::inorder($root->{right})}) { push @out, $x }
     \@out
 }
 
@@ -45,21 +45,21 @@ fn BST::size($root) {
 
 fn BST::depth($root) {
     return 0 unless defined $root
-    my $l = BST::depth($root->{left})
-    my $r = BST::depth($root->{right})
+    val $l = BST::depth($root->{left})
+    val $r = BST::depth($root->{right})
     1 + ($l > $r ? $l : $r)
 }
 
 fn BST::min($root) {
     return undef unless defined $root
-    my $n = $root
+    var $n = $root
     while (defined $n->{left}) { $n = $n->{left} }
     $n->{val}
 }
 
 fn BST::max($root) {
     return undef unless defined $root
-    my $n = $root
+    var $n = $root
     while (defined $n->{right}) { $n = $n->{right} }
     $n->{val}
 }
@@ -69,8 +69,8 @@ p " Stryke BST Demo"
 p "═══════════════════════════════════════════════"
 p ""
 
-my $tree = undef
-for my $v (50, 30, 70, 20, 40, 60, 80, 10, 25, 45) {
+var $tree = undef
+for val $v (50, 30, 70, 20, 40, 60, 80, 10, 25, 45) {
     $tree = BST::insert($tree, $v)
 }
 
@@ -86,7 +86,7 @@ p "  max   : #{BST::max($tree)}"
 
 p ""
 p "── Lookups ────────────────────────────────────"
-for my $q (45, 80, 10, 999, 0) {
-    my $found = BST::contains($tree, $q) ? "✓" : "✗"
+for val $q (45, 80, 10, 999, 0) {
+    val $found = BST::contains($tree, $q) ? "✓" : "✗"
     p "  #{$found}  contains($q)"
 }

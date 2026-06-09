@@ -3,44 +3,44 @@
 package PageRank
 
 fn solve($nodes, $edges, $d, $iterations) {
-    my $n = len @$nodes
+    val $n = len @$nodes
     return {} if $n == 0
     
-    my %pr
-    my $initial_pr = 1.0 / $n
-    for my $node (@$nodes) { $pr{$node} = $initial_pr }
+    var %pr
+    val $initial_pr = 1.0 / $n
+    for val $node (@$nodes) { $pr{$node} = $initial_pr }
     
-    my %out_degree
-    for my $node (@$nodes) { $out_degree{$node} = 0 }
+    var %out_degree
+    for val $node (@$nodes) { $out_degree{$node} = 0 }
     
-    my %incoming
-    for my $node (@$nodes) { $incoming{$node} = [] }
+    var %incoming
+    for val $node (@$nodes) { $incoming{$node} = [] }
     
-    for my $edge (@$edges) {
-        my $u = $edge->[0]; my $v = $edge->[1]
+    for val $edge (@$edges) {
+        val $u = $edge->[0]; val $v = $edge->[1]
         $out_degree{$u}++
         push @{$incoming{$v}}, $u
     }
     
-    my @sink_nodes
-    for my $node (@$nodes) {
+    var @sink_nodes
+    for val $node (@$nodes) {
         if ($out_degree{$node} == 0) { push @sink_nodes, $node }
     }
     
-    for (my $iter = 0; $iter < $iterations; $iter++) {
-        my %new_pr
-        my $sink_pr = 0.0
-        for my $sink (@sink_nodes) { $sink_pr += $pr{$sink} }
+    for (var $iter = 0; $iter < $iterations; $iter++) {
+        var %new_pr
+        var $sink_pr = 0.0
+        for val $sink (@sink_nodes) { $sink_pr += $pr{$sink} }
         
-        for my $node (@$nodes) {
-            my $sum = 0.0
-            my $inc = $incoming{$node}
-            for my $in_node (@$inc) { $sum += $pr{$in_node} / $out_degree{$in_node} }
+        for val $node (@$nodes) {
+            var $sum = 0.0
+            val $inc = $incoming{$node}
+            for val $in_node (@$inc) { $sum += $pr{$in_node} / $out_degree{$in_node} }
             $sum += $sink_pr / $n
             $new_pr{$node} = (1.0 - $d) / $n + $d * $sum
         }
         
-        for my $node (@$nodes) { $pr{$node} = $new_pr{$node} }
+        for val $node (@$nodes) { $pr{$node} = $new_pr{$node} }
     }
     
     \%pr
@@ -48,17 +48,17 @@ fn solve($nodes, $edges, $d, $iterations) {
 
 package main
 
-my @nodes = ("A", "B", "C")
-my @edges = ( ["A", "B"], ["B", "C"], ["C", "A"] )
+val @nodes = ("A", "B", "C")
+val @edges = ( ["A", "B"], ["B", "C"], ["C", "A"] )
 
-my $pr = PageRank::solve(\@nodes, \@edges, 0.85, 50)
+val $pr = PageRank::solve(\@nodes, \@edges, 0.85, 50)
 ~> abs($pr->{"A"} - 0.3333) <(1e-3) aeq(1, "A has ~1/3 PR")
 ~> abs($pr->{"B"} - 0.3333) <(1e-3) aeq(1, "B has ~1/3 PR")
 ~> abs($pr->{"C"} - 0.3333) <(1e-3) aeq(1, "C has ~1/3 PR")
 
-my @nodes2 = ("A", "B")
-my @edges2 = ( ["A", "B"] )
-my $pr2 = PageRank::solve(\@nodes2, \@edges2, 0.85, 50)
+val @nodes2 = ("A", "B")
+val @edges2 = ( ["A", "B"] )
+val $pr2 = PageRank::solve(\@nodes2, \@edges2, 0.85, 50)
 ~> $pr2->{"B"} >($pr2->{"A"}) aeq(1, "B has higher PR than A")
 
 test_run

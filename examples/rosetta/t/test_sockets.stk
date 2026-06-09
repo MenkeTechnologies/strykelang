@@ -4,7 +4,7 @@
 fn Rosetta::Sockets::demo() {
     # Task: Create a socket and connect.
     # We'll just demonstrate the system call signature.
-    # my $handle;
+    # val $handle;
     # socket($handle, 2, 1, 6) or die "socket failed";
     
     "Socket calls structured"

@@ -12,7 +12,7 @@
 
 # ── registry: topic_pattern -> arrayref-of-coderef ──────────────────
 
-my %subs
+var %subs
 
 fn Demo::Bus::subscribe($pattern, $handler) {
     $subs{$pattern} = [] unless exists $subs{$pattern}
@@ -38,11 +38,11 @@ mysync $handler_calls = 0
 
 fn Demo::Bus::emit($topic, $payload) {
     $emit_count++
-    my @matched
-    for my $pat (keys %subs) {
+    var @matched
+    for val $pat (keys %subs) {
         if (Demo::Bus::pattern_matches($pat, $topic)) {
             push @matched, $pat
-            for my $handler (@{$subs{$pat}}) {
+            for val $handler (@{$subs{$pat}}) {
                 $handler($topic, $payload)
                 $handler_calls++
             }
@@ -56,8 +56,8 @@ fn Demo::Bus::emit($topic, $payload) {
 mysync $event_latency = t_digest(100)
 
 around "Demo::Bus::emit" {
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
     td_add($event_latency, (now_ns() - $t0) / 1000.0)
     $r
 }
@@ -88,14 +88,14 @@ Demo::Bus::subscribe("*", fn($topic, $p) {
 
 printf "── %d subscriber patterns registered ─────────────────\n",
     len(keys %subs)
-for my $pat (sort { _ cmp _1 } keys %subs) {
+for val $pat (sort { _ cmp _1 } keys %subs) {
     printf "  %-16s -> %d handler(s)\n",
         $pat, len(@{$subs{$pat}})
 }
 
 # ── emit a stream of events ─────────────────────────────────────────
 
-my @events = (
+val @events = (
     ["user.created", +{ id => 1, name => "alice" }],
     ["user.created", +{ id => 2, name => "bob"   }],
     ["user.deleted", +{ id => 1 }],
@@ -107,8 +107,8 @@ my @events = (
 
 p ""
 printf "── emitting %d events ────────────────────────────────\n", len @events
-for my $e (@events) {
-    my $matched = Demo::Bus::emit($e->[0], $e->[1])
+for val $e (@events) {
+    val $matched = Demo::Bus::emit($e->[0], $e->[1])
     printf "  %-18s -> matched %d pattern(s) [%s]\n",
         $e->[0], len(@{$matched}), join(", ", @{$matched})
 }
@@ -117,7 +117,7 @@ for my $e (@events) {
 
 p ""
 p "── per-pattern hit counts ───────────────────────────"
-for my $pat (sort { _ cmp _1 } keys %seen_by_topic) {
+for val $pat (sort { _ cmp _1 } keys %seen_by_topic) {
     printf "  %-16s : %d\n", $pat, $seen_by_topic{$pat}
 }
 
@@ -138,11 +138,11 @@ printf "  p99 : %.1f µs\n", td_quantile($event_latency, 0.99)
 p ""
 p "── topic cardinality (HLL) ──────────────────────────"
 mysync $hll = hll(14)
-for my $e (@events) {
+for val $e (@events) {
     hll_add($hll, $e->[0])
 }
 printf "  HLL distinct estimate : %d\n", hll_count($hll)
-my %distinct
+var %distinct
 $distinct{_->[0]} = 1 for @events
 printf "  exact distinct topics : %d\n", len(keys %distinct)
 
@@ -150,7 +150,7 @@ printf "  exact distinct topics : %d\n", len(keys %distinct)
 
 p ""
 p "── pattern-match smoke test ─────────────────────────"
-my @cases = (
+val @cases = (
     ["user.*",       "user.created",      1],
     ["user.*",       "user.deleted",      1],
     ["user.*",       "order.placed",      0],
@@ -158,9 +158,9 @@ my @cases = (
     ["order.placed", "order.placed",      1],
     ["order.placed", "order.shipped",     0],
 )
-for my $c (@cases) {
-    my $got = Demo::Bus::pattern_matches($c->[0], $c->[1])
-    my $ok = $got == $c->[2] ? "ok" : "FAIL"
+for val $c (@cases) {
+    val $got = Demo::Bus::pattern_matches($c->[0], $c->[1])
+    val $ok = $got == $c->[2] ? "ok" : "FAIL"
     printf "  %-14s vs %-22s : got=%d expect=%d  %s\n",
         $c->[0], $c->[1], $got, $c->[2], $ok
 }

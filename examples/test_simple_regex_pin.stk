@@ -6,7 +6,7 @@ fn SR::_eq($pc, $tc) {
 }
 
 fn SR::_match_star($c, $re, $j, $s, $i) {
-    my $k = $i
+    var $k = $i
     while ($k < (len $s) && SR::_eq($c, substr($s, $k, 1))) {
         $k = $k + 1
     }
@@ -18,7 +18,7 @@ fn SR::_match_star($c, $re, $j, $s, $i) {
 }
 
 fn SR::_match_here($re, $j, $s, $i) {
-    my $rl = len $re
+    val $rl = len $re
     return 1 if $j == $rl
     if ($j + 1 < $rl && substr($re, $j + 1, 1) eq "*") {
         return SR::_match_star(substr($re, $j, 1), $re, $j + 2, $s, $i)
@@ -36,8 +36,8 @@ fn SR::match($re, $s) {
     if ((len $re) > 0 && substr($re, 0, 1) eq "^") {
         return SR::_match_here($re, 1, $s, 0)
     }
-    my $i = 0
-    my $n = len $s
+    var $i = 0
+    val $n = len $s
     while (1) {
         return 1 if SR::_match_here($re, 0, $s, $i)
         last if $i >= $n

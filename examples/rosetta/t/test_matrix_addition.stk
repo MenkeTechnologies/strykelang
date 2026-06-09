@@ -2,26 +2,26 @@
 # Rosetta Code: Matrix Addition
 
 fn Rosetta::MatrixAdd::matrix_add {
-    my $m1 = _
-    my $m2 = _1
-    my $rows = len(@$m1)
-    my $cols = len(@{$m1->[0]})
-    my @res = ~> 0:$rows-1 map {
-        my @row = ~> 0:$cols-1 map { $m1->[_<][_] + $m2->[_<][_] }
+    val $m1 = _
+    val $m2 = _1
+    val $rows = len(@$m1)
+    val $cols = len(@{$m1->[0]})
+    val @res = ~> 0:$rows-1 map {
+        val @row = ~> 0:$cols-1 map { $m1->[_<][_] + $m2->[_<][_] }
         \@row
     }
     \@res
 }
 
 fn Rosetta::MatrixAdd::to_string {
-    my $m = _
-    my @rows = ~> @$m map { join(",", @{_}) }
+    val $m = _
+    val @rows = ~> @$m map { join(",", @{_}) }
     join(";", @rows)
 }
 
-my $a = [[1, 2], [3, 4]]
-my $b = [[5, 6], [7, 8]]
-my $sum = Rosetta::MatrixAdd::matrix_add($a, $b)
+val $a = [[1, 2], [3, 4]]
+val $b = [[5, 6], [7, 8]]
+val $sum = Rosetta::MatrixAdd::matrix_add($a, $b)
 assert_eq Rosetta::MatrixAdd::to_string($sum), "6,8;10,12", "matrix add 2x2"
 
 test_run

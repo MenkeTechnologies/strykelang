@@ -19,18 +19,18 @@ fn Rosetta::GOST::rotl32($x, $bits) {
 }
 
 fn Rosetta::GOST::main_step($left, $right, $key, $sbox) {
-    my $sum = ($left + $key) & 0xFFFFFFFF
-    my $sub = 0
-    for my $i (0:7) {
-        my $nibble = ($sum >> ($i * 4)) & 0xF
+    val $sum = ($left + $key) & 0xFFFFFFFF
+    var $sub = 0
+    for val $i (0:7) {
+        val $nibble = ($sum >> ($i * 4)) & 0xF
         $sub |= $sbox->[$i][$nibble] << ($i * 4)
     }
-    my $mixed = Rosetta::GOST::rotl32($sub, 11) ^ $right
+    val $mixed = Rosetta::GOST::rotl32($sub, 11) ^ $right
     [$mixed & 0xFFFFFFFF, $left & 0xFFFFFFFF]
 }
 
-my $sbox = Rosetta::GOST::sbox()
-my $res = Rosetta::GOST::main_step(0x043B0421, 0x04320430, 0xE2C104F9, $sbox)
+val $sbox = Rosetta::GOST::sbox()
+val $res = Rosetta::GOST::main_step(0x043B0421, 0x04320430, 0xE2C104F9, $sbox)
 
 assert_eq sprintf("%08X", $res->[0]), "07CF881F", "new left matches reference"
 assert_eq sprintf("%08X", $res->[1]), "043B0421", "new right is previous left"

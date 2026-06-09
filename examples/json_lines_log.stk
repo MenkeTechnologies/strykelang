@@ -17,20 +17,20 @@
 
 # ── synthesise a sample JSONL log ────────────────────────────────────
 
-my $tmp = "/tmp/stryke_jsonl_demo.ndjson"
+val $tmp = "/tmp/stryke_jsonl_demo.ndjson"
 unlink $tmp if -e $tmp
 
-my @services = ("api-gateway", "auth", "billing", "search", "notifier")
-my @levels   = ("INFO", "INFO", "INFO", "INFO", "WARN", "WARN", "ERROR")
+val @services = ("api-gateway", "auth", "billing", "search", "notifier")
+val @levels   = ("INFO", "INFO", "INFO", "INFO", "WARN", "WARN", "ERROR")
 
 # Write 100 log lines.
-my @lines
-for my $i (1:100) {
-    my $svc   = $services[$i % len(@services)]
-    my $level = $levels[$i % len(@levels)]
-    my $global_lat   = int(rand 500) + 10            # 10:510 ms
-    my $trace = "trace-" . int(rand 30)       # 30 distinct traces
-    my $rec = +{
+var @lines
+for val $i (1:100) {
+    var $svc   = $services[$i % len(@services)]
+    val $level = $levels[$i % len(@levels)]
+    val $global_lat   = int(rand 500) + 10            # 10:510 ms
+    val $trace = "trace-" . int(rand 30)       # 30 distinct traces
+    val $rec = +{
         ts      => sprintf("2026-05-15T12:%02d:%02d", int($i / 10), $i % 60),
         service => $svc,
         level   => $level,
@@ -46,11 +46,11 @@ printf "── synthesised %d log lines, %d bytes ──────────
 
 # ── read back + parse ───────────────────────────────────────────────
 
-my @records
-my $parse_errs = 0
-for my $line (split /\n/, slurp($tmp)) {
+var @records
+var $parse_errs = 0
+for val $line (split /\n/, slurp($tmp)) {
     next if len($line) == 0
-    my $rec = eval { from_json($line) }
+    val $rec = eval { from_json($line) }
     if (defined($rec) && ref($rec) =~ /HASH/) {
         push @records, $rec
     } else {
@@ -64,9 +64,9 @@ printf "  parsed %d records (%d parse errors)\n",
 
 p ""
 p "── breakdown by level ───────────────────────────────"
-my %by_level
+var %by_level
 $by_level{_->{level}}++ for @records
-for my $lvl (sort { _ cmp _1 } keys %by_level) {
+for val $lvl (sort { _ cmp _1 } keys %by_level) {
     printf "  %-6s : %d\n", $lvl, $by_level{$lvl}
 }
 
@@ -74,9 +74,9 @@ for my $lvl (sort { _ cmp _1 } keys %by_level) {
 
 p ""
 p "── error log (first 5) ──────────────────────────────"
-my @errors = grep { _->{level} eq "ERROR" } @records
-my $shown = 0
-for my $e (@errors) {
+val @errors = grep { _->{level} eq "ERROR" } @records
+var $shown = 0
+for val $e (@errors) {
     last if $shown >= 5
     printf "  %s [%s] %s (%dms)\n",
         $e->{ts}, $e->{service}, $e->{msg}, $e->{latency_ms}
@@ -88,18 +88,18 @@ printf "  ... %d more error records\n", len(@errors) - $shown if len(@errors) > 
 
 p ""
 p "── per-service rollup ───────────────────────────────"
-my %svc_count
-my %svc_lat_sum
-my %svc_lat_count
-for my $r (@records) {
-    my $s = $r->{service}
+var %svc_count
+var %svc_lat_sum
+var %svc_lat_count
+for val $r (@records) {
+    var $s = $r->{service}
     $svc_count{$s}++
     $svc_lat_sum{$s} += $r->{latency_ms}
     $svc_lat_count{$s}++
 }
 printf "  %-14s %5s %10s %10s\n", "service", "n", "avg_ms", "total_ms"
-for my $s (sort { $svc_count{_1} <=> $svc_count{_} } keys %svc_count) {
-    my $avg = $svc_lat_sum{$s} / $svc_lat_count{$s}
+for val $s (sort { $svc_count{_1} <=> $svc_count{_} } keys %svc_count) {
+    val $avg = $svc_lat_sum{$s} / $svc_lat_count{$s}
     printf "  %-14s %5d %10.1f %10d\n", $s, $svc_count{$s}, $avg, $svc_lat_sum{$s}
 }
 
@@ -109,7 +109,7 @@ p ""
 p "── distinct cardinality (HLL) ───────────────────────"
 mysync $hll = hll(14)
 mysync %distinct_traces
-for my $r (@records) {
+for val $r (@records) {
     hll_add($hll, $r->{trace})
     $distinct_traces{$r->{trace}} = 1
 }
@@ -122,8 +122,8 @@ p ""
 p "── TopK noisiest services ───────────────────────────"
 mysync $tk = topk(3)
 topk_add($tk, _->{service}) for @records
-my @top = topk_top($tk)
-for my $h (@top) {
+val @top = topk_top($tk)
+for val $h (@top) {
     printf "  %-14s : %d records\n", $h->[0], $h->[1]
 }
 
@@ -131,8 +131,8 @@ for my $h (@top) {
 
 p ""
 p "── global latency percentiles (t-digest) ────────────"
-my $gtd = t_digest(100)
-for my $r (@records) {
+val $gtd = t_digest(100)
+for val $r (@records) {
     td_add($gtd, $r->{latency_ms})
 }
 printf "  p50  : %d ms\n", ~> td_quantile($gtd, 0.50) int
@@ -143,14 +143,14 @@ printf "  p99  : %d ms\n", ~> td_quantile($gtd, 0.99) int
 
 p ""
 p "── per-service p99 latency ──────────────────────────"
-my %svc_td
-for my $r (@records) {
+var %svc_td
+for val $r (@records) {
     $svc_td{$r->{service}} = t_digest(100) unless exists $svc_td{$r->{service}}
     td_add($svc_td{$r->{service}}, $r->{latency_ms})
 }
-for my $s (sort { _ cmp _1 } keys %svc_td) {
-    my $p99 = ~> td_quantile($svc_td{$s}, 0.99) int
-    my $p50 = ~> td_quantile($svc_td{$s}, 0.50) int
+for val $s (sort { _ cmp _1 } keys %svc_td) {
+    val $p99 = ~> td_quantile($svc_td{$s}, 0.99) int
+    val $p50 = ~> td_quantile($svc_td{$s}, 0.50) int
     printf "  %-14s p50=%4d ms  p99=%4d ms\n", $s, $p50, $p99
 }
 
@@ -158,13 +158,13 @@ for my $s (sort { _ cmp _1 } keys %svc_td) {
 
 p ""
 p "── error-rate by service ────────────────────────────"
-my %svc_err
-for my $r (@records) {
+var %svc_err
+for val $r (@records) {
     $svc_err{$r->{service}}++ if $r->{level} eq "ERROR"
 }
-for my $s (sort { _ cmp _1 } keys %svc_count) {
-    my $err = $svc_err{$s} // 0
-    my $rate = 100.0 * $err / $svc_count{$s}
+for val $s (sort { _ cmp _1 } keys %svc_count) {
+    val $err = $svc_err{$s} // 0
+    val $rate = 100.0 * $err / $svc_count{$s}
     printf "  %-14s : %d / %d  (%.1f%% errors)\n",
         $s, $err, $svc_count{$s}, $rate
 }

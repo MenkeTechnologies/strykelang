@@ -4,9 +4,9 @@
 
 fn Rosetta::StairClimb::ways($n) {
     return 1 if $n <= 1
-    my $a = 1
-    my $b = 1
-    for my $i (2:$n) {
+    var $a = 1
+    var $b = 1
+    for val $i (2:$n) {
         ($a, $b) = ($b, $a + $b)
     }
     $b
@@ -14,11 +14,11 @@ fn Rosetta::StairClimb::ways($n) {
 
 # Generalised: at each step you may take any number of stairs in @steps
 fn Rosetta::StairClimb::ways_with($n, $steps) {
-    my @dp
-    for my $i (0:$n) { $dp[$i] = 0 }
+    var @dp
+    for val $i (0:$n) { $dp[$i] = 0 }
     $dp[0] = 1
-    for my $i (1:$n) {
-        for my $s (@$steps) {
+    for val $i (1:$n) {
+        for val $s (@$steps) {
             $dp[$i] += $dp[$i - $s] if $i - $s >= 0
         }
     }

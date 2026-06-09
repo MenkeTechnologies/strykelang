@@ -7,22 +7,22 @@
 
 fn Rosetta::Wordle::compare($target, $guess) {
     return undef if len($target) != len($guess)
-    my $n = len($target)
-    my @t = split //, $target
-    my @g = split //, $guess
-    my @res = ("-") x $n
-    my @consumed = (0) x $n
+    val $n = len($target)
+    val @t = split //, $target
+    val @g = split //, $guess
+    var @res = ("-") x $n
+    var @consumed = (0) x $n
     # Pass 1: greens
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         if ($g[$i] eq $t[$i]) {
             $res[$i] = "G"
             $consumed[$i] = 1
         }
     }
     # Pass 2: yellows
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         next if $res[$i] eq "G"
-        for my $j (0:$n - 1) {
+        for val $j (0:$n - 1) {
             next if $consumed[$j]
             next if $i == $j
             if ($g[$i] eq $t[$j]) {
@@ -69,7 +69,7 @@ assert_ok !defined(Rosetta::Wordle::compare("CAT", "DOGS")), "length mismatch â†
 "PLANT" |> fn { Rosetta::Wordle::compare(_, "PLANK") } |> assert_eq("GGGG-", "pipe compare")
 
 # Threaded form: every guess against a shared target
-my @rows = ~> ("STARE", "BLOOM", "TRACE") |> map { Rosetta::Wordle::compare("CRANE", _) }
+val @rows = ~> ("STARE", "BLOOM", "TRACE") |> map { Rosetta::Wordle::compare("CRANE", _) }
 assert_eq join("|", @rows), "--GYG|-----|-GGYG", "batch of guesses"
 
 test_run

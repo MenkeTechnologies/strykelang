@@ -30,8 +30,8 @@ fn UF::same = UF::find(_, _1) == UF::find(_, _2)
 # Union-by-rank: attach the shorter tree under the taller. Returns 1
 # if union happened, 0 if already in same component.
 fn UF::union($uf, $x, $y) {
-    my $ra = UF::find($uf, $x)
-    my $rb = UF::find($uf, $y)
+    var $ra = UF::find($uf, $x)
+    var $rb = UF::find($uf, $y)
     return 0 if $ra == $rb
     if ($uf->{rank}[$ra] < $uf->{rank}[$rb]) { ($ra, $rb) = ($rb, $ra) }
     $uf->{parent}[$rb] = $ra
@@ -43,7 +43,7 @@ fn UF::union($uf, $x, $y) {
 p "── Union-Find demo ──"
 
 # Build 8 disjoint singletons, then merge {0,1,2}, {3,4}, {5,6,7}.
-my $uf = UF::new(8)
+val $uf = UF::new(8)
 die "initial count off" unless $uf->{count} == 8
 
 UF::union($uf, 0, 1)
@@ -67,8 +67,8 @@ die "0 and 4 should now be same" unless UF::same($uf, 0, 4)
 p "  bridged across, count=2 (expected 2)  OK"
 
 # Stress: chain N elements then check all-equivalent.
-my $N = 1000
-my $big = UF::new($N)
+val $N = 1000
+val $big = UF::new($N)
 UF::union($big, _, _ + 1) for 0:$N - 2
 die "chain should collapse to 1 component" unless $big->{count} == 1
 die "first and last should be same" unless UF::same($big, 0, $N - 1)

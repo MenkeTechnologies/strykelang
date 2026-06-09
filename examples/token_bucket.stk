@@ -18,10 +18,10 @@ fn new($capacity, $rate_per_sec) {
 }
 
 fn _refill($bk, $now) {
-    my $elapsed = $now - $bk->{last}
+    val $elapsed = $now - $bk->{last}
     if ($elapsed > 0) {
-        my $add = $elapsed * $bk->{rate}
-        my $new = $bk->{tokens} + $add
+        val $add = $elapsed * $bk->{rate}
+        val $new = $bk->{tokens} + $add
         $bk->{tokens} = $new > $bk->{cap} ? $bk->{cap} : $new
         $bk->{last} = $now
     }
@@ -44,7 +44,7 @@ fn available($bk, $now) {
 fn time_until($bk, $now, $n) {
     TB::_refill($bk, $now)
     return 0 if $bk->{tokens} >= $n
-    my $deficit = $n - $bk->{tokens}
+    val $deficit = $n - $bk->{tokens}
     $deficit / $bk->{rate}
 }
 
@@ -52,12 +52,12 @@ package main;
 
 p "=== Token Bucket Demo ==="
 # Bucket: capacity 10, refill rate 2/sec
-my $bk = TB::new(10, 2)
-my $t = 0
+val $bk = TB::new(10, 2)
+var $t = 0
 p "t=" . $t . " avail=" . TB::available($bk, $t)
 
 # Burst-consume 8
-my $ok = TB::try_consume($bk, $t, 8)
+var $ok = TB::try_consume($bk, $t, 8)
 p "t=" . $t . " consume 8 -> " . $ok . " avail=" . TB::available($bk, $t)
 
 # Try 5 more - should fail

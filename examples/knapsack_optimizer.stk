@@ -15,31 +15,31 @@
 # ── one solver ────────────────────────────────────────────────────
 
 fn Demo::KS::solve($items_ref, $capacity) {
-    my $n = len @$items_ref
-    my @dp
-    for my $i (0:$n) {
+    val $n = len @$items_ref
+    var @dp
+    for val $i (0:$n) {
         push @dp, [(0) x ($capacity + 1)]
     }
 
-    for my $i (1:$n) {
-        my $item = $items_ref->[$i - 1]
-        my $w = $item->{w}
-        my $v = $item->{v}
-        for my $cap (0:$capacity) {
+    for val $i (1:$n) {
+        val $item = $items_ref->[$i - 1]
+        val $w = $item->{w}
+        val $v = $item->{v}
+        for val $cap (0:$capacity) {
             if ($w > $cap) {
                 $dp[$i]->[$cap] = $dp[$i - 1]->[$cap]
             } else {
-                my $skip = $dp[$i - 1]->[$cap]
-                my $take = $dp[$i - 1]->[$cap - $w] + $v
+                val $skip = $dp[$i - 1]->[$cap]
+                val $take = $dp[$i - 1]->[$cap - $w] + $v
                 $dp[$i]->[$cap] = $skip > $take ? $skip : $take
             }
         }
     }
 
     # Backtrack
-    my @chosen
-    my $cap = $capacity
-    for my $i (rev 1:$n) {
+    var @chosen
+    var $cap = $capacity
+    for val $i (rev 1:$n) {
         if ($dp[$i]->[$cap] != $dp[$i - 1]->[$cap]) {
             unshift @chosen, $items_ref->[$i - 1]
             $cap -= $items_ref->[$i - 1]->{w}
@@ -55,7 +55,7 @@ fn Demo::KS::solve($items_ref, $capacity) {
 
 # ── problem instances ─────────────────────────────────────────────
 
-my @instances = (
+val @instances = (
     {
         name     => "camping",
         capacity => 15,
@@ -121,33 +121,33 @@ my @instances = (
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_eff   = t_digest(100)
-my $tk_item  = topk(16)
-my $hll_name = hll(12)
+val $td_eff   = t_digest(100)
+val $tk_item  = topk(16)
+val $hll_name = hll(12)
 
 # ── parallel solve ────────────────────────────────────────────────
 
 p "0/1 knapsack solver — ", len(@instances), " instances"
 p "─" x 60
-my $t0 = now_ns()
-my @results = pmap { Demo::KS::solve(_->{items}, _->{capacity}) } @instances
-my $elapsed_us = (now_ns() - $t0) / 1000.0
+val $t0 = now_ns()
+val @results = pmap { Demo::KS::solve(_->{items}, _->{capacity}) } @instances
+val $elapsed_us = (now_ns() - $t0) / 1000.0
 
 # ── report each ───────────────────────────────────────────────────
 
-for my $i (0:len(@instances) - 1) {
-    my $inst = $instances[$i]
-    my $res  = $results[$i]
-    my $cap  = $inst->{capacity}
-    my $val  = $res->{max_value}
-    my $used = $res->{used_w}
-    my $eff  = $used > 0 ? $val / $used : 0
+for val $i (0:len(@instances) - 1) {
+    val $inst = $instances[$i]
+    val $res  = $results[$i]
+    val $cap  = $inst->{capacity}
+    val $val  = $res->{max_value}
+    val $used = $res->{used_w}
+    val $eff  = $used > 0 ? $val / $used : 0
     td_add($td_eff, $eff)
 
     printf("\n[%s] capacity=%d  max_value=%d  weight_used=%d/%d (%.0f%% full)  eff=%.2f v/w\n",
            $inst->{name}, $cap, $val, $used, $cap, 100 * $used / $cap, $eff)
 
-    for my $item (@{$res->{chosen}}) {
+    for val $item (@{$res->{chosen}}) {
         printf("    %-12s w=%2d  v=%4d\n", $item->{name}, $item->{w}, $item->{v})
         topk_add($tk_item, $item->{name})
         hll_add($hll_name, $item->{name})
@@ -168,21 +168,21 @@ printf("  p90 = %.2f\n", td_quantile($td_eff, 0.90))
 # ── most-chosen items overall ────────────────────────────────────
 
 p "\nmost-chosen items overall (TopK):"
-my @top = topk_top($tk_item, 8)
-for my $p (@top) {
+val @top = topk_top($tk_item, 8)
+for val $p (@top) {
     printf("  %-12s count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct items ───────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_name)
-my %seen
-for my $inst (@instances) {
-    for my $it (@{$inst->{items}}) {
+val $hll_n = hll_count($hll_name)
+var %seen
+for val $inst (@instances) {
+    for val $it (@{$inst->{items}}) {
         $seen{$it->{name}} = 1
     }
 }
-my $total_distinct_items = len(keys %seen)
+val $total_distinct_items = len(keys %seen)
 printf("\ndistinct chosen items: HLL=%.1f vs catalog-distinct=%d\n",
        $hll_n, $total_distinct_items)
 

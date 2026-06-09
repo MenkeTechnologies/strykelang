@@ -3,9 +3,9 @@
 
 fn Rosetta::ParallelCalc::factorize_all(@nums) {
     # pmap automatically parallelizes the work across all cores.
-    my @res = ~> @nums pmap {
-        my @factors
-        for (my $i = 1; $i <= sqrt(_); $i++) {
+    val @res = ~> @nums pmap {
+        var @factors
+        for (var $i = 1; $i <= sqrt(_); $i++) {
             if (_ % $i == 0) {
                 push @factors, $i
                 push @factors, _ / $i if $i * $i != _
@@ -16,8 +16,8 @@ fn Rosetta::ParallelCalc::factorize_all(@nums) {
     \@res
 }
 
-my @nums = (12, 18, 20)
-my $res = Rosetta::ParallelCalc::factorize_all(@nums)
+val @nums = (12, 18, 20)
+val $res = Rosetta::ParallelCalc::factorize_all(@nums)
 
 assert_eq join(",", @{$res->[0]}), "1,2,3,4,6,12", "Factors of 12"
 assert_eq join(",", @{$res->[1]}), "1,2,3,6,9,18", "Factors of 18"

@@ -8,23 +8,23 @@
 
 fn Rosetta::Penney::counter($pattern) {
     return undef if length($pattern) != 3
-    my @b = split //, $pattern
-    my $flipped = $b[1] eq "H" ? "T" : "H"
+    val @b = split //, $pattern
+    val $flipped = $b[1] eq "H" ? "T" : "H"
     $flipped . $b[0] . $b[1]
 }
 
 fn Rosetta::Penney::flip_seq($n) {
-    my @flips
-    for my $i (~> 1:$n) {
+    var @flips
+    for val $i (~> 1:$n) {
         push @flips, rand() < 0.5 ? "H" : "T"
     }
     join("", @flips)
 }
 
 fn Rosetta::Penney::wins($p1, $p2, $stream) {
-    my $i = 0
+    var $i = 0
     while ($i + 2 < length($stream)) {
-        my $window = substr($stream, $i, 3)
+        val $window = substr($stream, $i, 3)
         return "P1" if $window eq $p1
         return "P2" if $window eq $p2
         $i++
@@ -33,9 +33,9 @@ fn Rosetta::Penney::wins($p1, $p2, $stream) {
 }
 
 fn Rosetta::Penney::win_rate($p1, $p2, $trials, $stream_len) {
-    my $w1 = 0; my $w2 = 0; my $d = 0
-    for my $i (~> 1:$trials) {
-        my $r = Rosetta::Penney::wins($p1, $p2, Rosetta::Penney::flip_seq($stream_len))
+    var $w1 = 0; var $w2 = 0; var $d = 0
+    for val $i (~> 1:$trials) {
+        val $r = Rosetta::Penney::wins($p1, $p2, Rosetta::Penney::flip_seq($stream_len))
         if    ($r eq "P1") { $w1++ }
         elsif ($r eq "P2") { $w2++ }
         else                { $d++ }
@@ -58,7 +58,7 @@ assert_eq Rosetta::Penney::wins("HHH", "TTH", "TTHHH"), "P2", "TTH at pos 0"
 assert_eq Rosetta::Penney::wins("HHH", "TTH", "HHHTT"), "P1", "HHH at pos 0"
 
 # Penney superiority: counter beats target on Monte Carlo
-my $r = Rosetta::Penney::win_rate("HHH", "THH", 200, 50)
+val $r = Rosetta::Penney::win_rate("HHH", "THH", 200, 50)
 assert_ok $r->[1] > $r->[0], sprintf("THH beats HHH (%d vs %d)", $r->[1], $r->[0])
 
 # Pipe form

@@ -26,19 +26,19 @@ system("sh -c 'exit 4'")
 
 # BUG-014: %ENV writes propagate to subprocesses.
 $ENV{STRYKE_BUG_FIX_DEMO} = "hello from stryke"
-my $seen = `env | grep '^STRYKE_BUG_FIX_DEMO='`
+var $seen = `env | grep '^STRYKE_BUG_FIX_DEMO='`
 chomp $seen
 $seen |> assert_eq("STRYKE_BUG_FIX_DEMO=hello from stryke", "child inherits var")
 
 # Mutation visible to child.
 $ENV{STRYKE_BUG_FIX_DEMO} = "updated"
-my $updated = `echo "\$STRYKE_BUG_FIX_DEMO"`
+var $updated = `echo "\$STRYKE_BUG_FIX_DEMO"`
 chomp $updated
 $updated |> assert_eq("updated", "child sees updated value")
 
 # `delete $ENV{...}` removes from child env too.
 delete $ENV{STRYKE_BUG_FIX_DEMO}
-my $gone = `echo "\${STRYKE_BUG_FIX_DEMO:-unset}"`
+var $gone = `echo "\${STRYKE_BUG_FIX_DEMO:-unset}"`
 chomp $gone
 $gone |> assert_eq("unset", "delete \$ENV unsets in child")
 

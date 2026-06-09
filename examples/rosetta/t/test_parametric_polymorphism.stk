@@ -16,11 +16,11 @@ fn Rosetta::Poly::replace_val($tree, $new_val) {
     $tree
 }
 
-my $t1 = Rosetta::Tree->new(42, undef, undef)
+val $t1 = Rosetta::Tree->new(42, undef, undef)
 Rosetta::Poly::replace_val($t1, 100)
 assert_eq $t1->{value}, 100, "Integer polymorphism"
 
-my $t2 = Rosetta::Tree->new("Hello", undef, undef)
+val $t2 = Rosetta::Tree->new("Hello", undef, undef)
 Rosetta::Poly::replace_val($t2, "World")
 assert_eq $t2->{value}, "World", "String polymorphism"
 

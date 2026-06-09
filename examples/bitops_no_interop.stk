@@ -14,8 +14,8 @@
 #      stryke --no-interop examples/bitops_no_interop.stk Bits::popcount 42
 
 fn Bits::popcount($n) {
-    my $x = $n
-    my $count = 0
+    var $x = $n
+    var $count = 0
     while ($x > 0) {
         $count += $x & 1
         $x = $x >> 1
@@ -33,8 +33,8 @@ fn Bits::bin8($n) {
 }
 
 if (len(@ARGV) >= 2) {
-    my ($op, $lhsrg) = @ARGV
-    my $n = 0 + $lhsrg
+    val ($op, $lhsrg) = @ARGV
+    val $n = 0 + $lhsrg
     if    ($op eq "Bits::popcount")   { p Bits::popcount($n) }
     elsif ($op eq "Bits::is_pow2")    { p Bits::is_pow2($n) ? 1 : 0 }
     elsif ($op eq "binary")     { p Bits::bin8($n) }
@@ -44,8 +44,8 @@ if (len(@ARGV) >= 2) {
 
 # Demo grid — operator table on two values.
 p "── Bitwise ops on 0xAA and 0x55 ──"
-my $lhs = 0xAA   # 10101010
-my $rhs = 0x55   # 01010101
+val $lhs = 0xAA   # 10101010
+val $rhs = 0x55   # 01010101
 printf "  a    = %s = 0x%02x = %d\n", Bits::bin8($lhs), $lhs, $lhs
 printf "  b    = %s = 0x%02x = %d\n", Bits::bin8($rhs), $rhs, $rhs
 printf "  a&b  = %s = 0x%02x\n", Bits::bin8($lhs & $rhs),   $lhs & $rhs
@@ -58,7 +58,7 @@ printf "  a>>2 = %s = 0x%02x\n", Bits::bin8($lhs >> 2),   $lhs >> 2
 # Popcount table.
 p ""
 p "── Popcount (set-bit count) ──"
-my @Bits::popcount_cases = (
+val @Bits::popcount_cases = (
     +{ n => 0,   c => 0 },
     +{ n => 1,   c => 1 },
     +{ n => 7,   c => 3 },
@@ -68,10 +68,10 @@ my @Bits::popcount_cases = (
     +{ n => 256, c => 1 },
     +{ n => 1023,c => 10 },
 )
-my $fail = 0
-for my $c (@Bits::popcount_cases) {
-    my $got = Bits::popcount($c->{n})
-    my $ok  = ($got == $c->{c})
+var $fail = 0
+for val $c (@Bits::popcount_cases) {
+    val $got = Bits::popcount($c->{n})
+    val $ok  = ($got == $c->{c})
     $fail++ unless $ok
     printf "  Bits::popcount(%4d) = %2d  expect %2d  %s\n",
         $c->{n}, $got, $c->{c}, $ok ? "" : "FAIL"
@@ -80,7 +80,7 @@ for my $c (@Bits::popcount_cases) {
 # Power-of-two table.
 p ""
 p "── Bits::is_pow2 ──"
-my @pow2_cases = (
+val @pow2_cases = (
     +{ n => 0,    p => 0 },  # 0 not a power
     +{ n => 1,    p => 1 },
     +{ n => 2,    p => 1 },
@@ -89,9 +89,9 @@ my @pow2_cases = (
     +{ n => 1024, p => 1 },
     +{ n => 1023, p => 0 },
 )
-for my $c (@pow2_cases) {
-    my $got = Bits::is_pow2($c->{n}) ? 1 : 0
-    my $ok  = ($got == $c->{p})
+for val $c (@pow2_cases) {
+    val $got = Bits::is_pow2($c->{n}) ? 1 : 0
+    val $ok  = ($got == $c->{p})
     $fail++ unless $ok
     printf "  Bits::is_pow2(%5d) = %d  expect %d  %s\n",
         $c->{n}, $got, $c->{p}, $ok ? "" : "FAIL"

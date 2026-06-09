@@ -5,7 +5,7 @@ fn Rosetta::Deceptive::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n == 2
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -19,10 +19,10 @@ fn Rosetta::Deceptive::is_deceptive($n) {
     return 0 if $n < 4 || Rosetta::Deceptive::is_prime($n)
     return 0 if $n % 2 == 0 || $n % 5 == 0
     # Compute 10^(n-1) mod 9n via fast exponentiation.
-    my $m = 9 * $n
-    my $base = 10 % $m
-    my $exp = $n - 1
-    my $r = 1 % $m
+    val $m = 9 * $n
+    var $base = 10 % $m
+    var $exp = $n - 1
+    var $r = 1 % $m
     while ($exp > 0) {
         if ($exp % 2 == 1) { $r = ($r * $base) % $m }
         $base = ($base * $base) % $m
@@ -32,8 +32,8 @@ fn Rosetta::Deceptive::is_deceptive($n) {
 }
 
 fn Rosetta::Deceptive::first_n($count) {
-    my @res
-    my $n = 9
+    var @res
+    var $n = 9
     while (len(@res) < $count) {
         push @res, $n if Rosetta::Deceptive::is_deceptive($n)
         $n += 2
@@ -42,7 +42,7 @@ fn Rosetta::Deceptive::first_n($count) {
 }
 
 # OEIS A000864: 91, 259, 451, 481, 703, 1729, 2821, 2981, 3367, 4141, ...
-my @first10 = Rosetta::Deceptive::first_n(10)
+val @first10 = Rosetta::Deceptive::first_n(10)
 assert_eq join(",", @first10),
     "91,259,451,481,703,1729,2821,2981,3367,4141",
     "first 10 deceptive numbers"

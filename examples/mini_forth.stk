@@ -24,39 +24,39 @@
 # ── interpreter core ───────────────────────────────────────────────
 
 fn Forth::run($prog) {
-    my @stack
-    my $output = ""
-    my @tokens = grep { len(_) > 0 } split(/\s+/, $prog)
+    var @stack
+    var $output = ""
+    val @tokens = grep { len(_) > 0 } split(/\s+/, $prog)
 
-    for my $tok (@tokens) {
+    for val $tok (@tokens) {
         if ($tok =~ /^-?\d+$/) {
             push @stack, 0 + $tok
             next
         }
 
-        my $is_binary = ($tok eq "+" || $tok eq "-" || $tok eq "*" || $tok eq "/" || $tok eq "mod" || $tok eq "swap" || $tok eq "nip")
+        val $is_binary = ($tok eq "+" || $tok eq "-" || $tok eq "*" || $tok eq "/" || $tok eq "mod" || $tok eq "swap" || $tok eq "nip")
         die "stack underflow on `$tok` (need 2 operands)" if $is_binary && len(@stack) < 2
 
         if ($tok eq "+") {
-            my $rhs = pop @stack
-            my $lhs = pop @stack
+            val $rhs = pop @stack
+            val $lhs = pop @stack
             push @stack, $lhs + $rhs
         } elsif ($tok eq "-") {
-            my $rhs = pop @stack
-            my $lhs = pop @stack
+            val $rhs = pop @stack
+            val $lhs = pop @stack
             push @stack, $lhs - $rhs
         } elsif ($tok eq "*") {
-            my $rhs = pop @stack
-            my $lhs = pop @stack
+            val $rhs = pop @stack
+            val $lhs = pop @stack
             push @stack, $lhs * $rhs
         } elsif ($tok eq "/") {
-            my $rhs = pop @stack
-            my $lhs = pop @stack
+            val $rhs = pop @stack
+            val $lhs = pop @stack
             die "division by zero" if $rhs == 0
             push @stack, int($lhs / $rhs)
         } elsif ($tok eq "mod") {
-            my $rhs = pop @stack
-            my $lhs = pop @stack
+            val $rhs = pop @stack
+            val $lhs = pop @stack
             die "modulo by zero" if $rhs == 0
             push @stack, $lhs % $rhs
         } elsif ($tok eq "dup") {
@@ -66,8 +66,8 @@ fn Forth::run($prog) {
             die "stack underflow on drop" if len(@stack) < 1
             pop @stack
         } elsif ($tok eq "swap") {
-            my $top = pop @stack
-            my $bot = pop @stack
+            val $top = pop @stack
+            val $bot = pop @stack
             push @stack, $top
             push @stack, $bot
         } elsif ($tok eq "over") {
@@ -76,20 +76,20 @@ fn Forth::run($prog) {
         } elsif ($tok eq "rot") {
             die "stack underflow on rot" if len(@stack) < 3
             # ( a b c -- b c a )
-            my $c = pop @stack
-            my $b_val = pop @stack
-            my $a_val = pop @stack
+            val $c = pop @stack
+            val $b_val = pop @stack
+            val $a_val = pop @stack
             push @stack, $b_val
             push @stack, $c
             push @stack, $a_val
         } elsif ($tok eq "nip") {
             # ( a b -- b )
-            my $top = pop @stack
+            val $top = pop @stack
             pop @stack
             push @stack, $top
         } elsif ($tok eq ".") {
             die "stack underflow on ." if len(@stack) < 1
-            my $top = pop @stack
+            val $top = pop @stack
             $output .= "$top "
         } else {
             die "unknown word: $tok"
@@ -103,7 +103,7 @@ fn Forth::run($prog) {
 
 printf "── Mini-Forth core word demo ──────────────────────────\n\n"
 
-my @cases = (
+val @cases = (
     ["3 4 +",                "7",            "add"],
     ["10 3 -",               "7",            "subtract"],
     ["6 7 *",                "42",           "multiply"],
@@ -119,26 +119,26 @@ my @cases = (
     ["10 dup * 5 5 * +",     "125",          "10*10 + 5*5"],
 )
 
-for my $case (@cases) {
-    my $prog = $case->[0]
-    my $want = $case->[1]
-    my $note = $case->[2]
-    my $r = Forth::run($prog)
-    my $got = join(" ", @{$r->{stack}})
+for val $case (@cases) {
+    val $prog = $case->[0]
+    val $want = $case->[1]
+    val $note = $case->[2]
+    val $r = Forth::run($prog)
+    val $got = join(" ", @{$r->{stack}})
     printf "  %-30s -> [%s]  (%s)\n", $prog, $got, $note
     die "case `$prog`: expected [$want], got [$got]" unless $got eq $want
 }
 
 # ── `.` (dot) output pin ───────────────────────────────────────────
 
-my $r = Forth::run("3 4 + . 5 6 * .")
+val $r = Forth::run("3 4 + . 5 6 * .")
 die "`.` output mismatch: got [$r->{output}]" unless $r->{output} eq "7 30 "
 die "`.` should leave stack empty" unless len(@{$r->{stack}}) == 0
 
 # ── error pins ─────────────────────────────────────────────────────
 
 # Division by zero must die.
-my $caught
+var $caught
 eval { Forth::run("5 0 /") }
 $caught = $@
 die "division by zero not caught" unless $caught =~ /division/

@@ -9,7 +9,7 @@ assert_eq Exercism::QueenAttack::can_attack([2,2],[3,1]),  1, "diagonal SW"
 assert_eq Exercism::QueenAttack::can_attack([2,2],[1,1]),  1, "diagonal NW"
 assert_eq Exercism::QueenAttack::can_attack([1,7],[0,6]),  1, "diagonal close"
 
-my $err = eval { Exercism::QueenAttack::can_attack([2,4],[2,4]); 0 } || $@
+val $err = eval { Exercism::QueenAttack::can_attack([2,4],[2,4]); 0 } || $@
 assert_ok $err =~ /share a position/, "same square"
 
 test_run

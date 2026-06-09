@@ -5,11 +5,11 @@
 
 fn Rosetta::Upc::checksum($digits11) {
     return -1 if length($digits11) != 11
-    my $sum = 0
-    for my $i (0:10) {
-        my $d = ord(substr($digits11, $i, 1)) - ord("0")
+    var $sum = 0
+    for val $i (0:10) {
+        val $d = ord(substr($digits11, $i, 1)) - ord("0")
         return -1 if $d < 0 || $d > 9
-        my $weight = ($i % 2 == 0) ? 3 : 1
+        val $weight = ($i % 2 == 0) ? 3 : 1
         $sum += $d * $weight
     }
     (10 - ($sum % 10)) % 10
@@ -17,30 +17,30 @@ fn Rosetta::Upc::checksum($digits11) {
 
 fn Rosetta::Upc::is_valid($s) {
     return 0 if length($s) != 12
-    my $cd = Rosetta::Upc::checksum(substr($s, 0, 11))
+    val $cd = Rosetta::Upc::checksum(substr($s, 0, 11))
     return 0 if $cd < 0
     substr($s, 11, 1) eq "$cd"
 }
 
 fn Rosetta::Upc::complete($digits11) {
-    my $cd = Rosetta::Upc::checksum($digits11)
+    val $cd = Rosetta::Upc::checksum($digits11)
     return undef if $cd < 0
     "$digits11$cd"
 }
 
 fn Rosetta::Upc::clean($s) {
-    my $out = $s
+    var $out = $s
     $out =~ s/[\s\-]//g
     $out
 }
 
 # Sample valid UPCs
-my @valid = (
+val @valid = (
     "036000291452",   # Coca-Cola
     "012345678905",
     "075678164125",
 )
-for my $u (@valid) {
+for val $u (@valid) {
     assert_eq Rosetta::Upc::is_valid($u), 1, sprintf("%s valid", $u)
 }
 

@@ -3,18 +3,18 @@
 
 fn Rosetta::Sudoku::is_valid($board, $row, $col, $num) {
     # Check row
-    for my $i (0:3) {
+    for val $i (0:3) {
         if ($board->[$row][$i] == $num) { return 0 }
     }
     # Check col
-    for my $i (0:3) {
+    for val $i (0:3) {
         if ($board->[$i][$col] == $num) { return 0 }
     }
     # Check box
-    my $start_row = int($row / 2) * 2
-    my $start_col = int($col / 2) * 2
-    for my $i (0:1) {
-        for my $j (0:1) {
+    val $start_row = int($row / 2) * 2
+    val $start_col = int($col / 2) * 2
+    for val $i (0:1) {
+        for val $j (0:1) {
             if ($board->[$start_row + $i][$start_col + $j] == $num) { return 0 }
         }
     }
@@ -22,10 +22,10 @@ fn Rosetta::Sudoku::is_valid($board, $row, $col, $num) {
 }
 
 fn Rosetta::Sudoku::solve($board) {
-    for my $row (0:3) {
-        for my $col (0:3) {
+    for val $row (0:3) {
+        for val $col (0:3) {
             if ($board->[$row][$col] == 0) {
-                for my $num (1:4) {
+                for val $num (1:4) {
                     if (Rosetta::Sudoku::is_valid($board, $row, $col, $num)) {
                         $board->[$row][$col] = $num
                         if (Rosetta::Sudoku::solve($board)) { return 1 }
@@ -39,7 +39,7 @@ fn Rosetta::Sudoku::solve($board) {
     1
 }
 
-my $board = [
+val $board = [
     [1, 0, 0, 0],
     [0, 0, 2, 0],
     [0, 3, 0, 0],

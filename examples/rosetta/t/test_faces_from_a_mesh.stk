@@ -5,12 +5,12 @@ struct Vertex { x, y, z }
 struct Face { indices }
 
 fn Rosetta::Mesh::get_cube() {
-    my @vertices = (
+    val @vertices = (
         Vertex(0, 0, 0), Vertex(1, 0, 0), Vertex(1, 1, 0), Vertex(0, 1, 0),
         Vertex(0, 0, 1), Vertex(1, 0, 1), Vertex(1, 1, 1), Vertex(0, 1, 1)
     )
     
-    my @faces = (
+    val @faces = (
         Face([0, 1, 2, 3]), # bottom
         Face([4, 5, 6, 7]), # top
         Face([0, 1, 5, 4]), # front
@@ -22,7 +22,7 @@ fn Rosetta::Mesh::get_cube() {
     (\@vertices, \@faces)
 }
 
-my ($v, $f) = Rosetta::Mesh::get_cube()
+val ($v, $f) = Rosetta::Mesh::get_cube()
 assert_eq len(@$v), 8, "Cube has 8 vertices"
 assert_eq len(@$f), 6, "Cube has 6 faces"
 assert_eq len(@{$f->[0]->{indices}}), 4, "First face has 4 vertices"

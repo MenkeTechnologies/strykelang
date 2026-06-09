@@ -3,7 +3,7 @@ require "./GradeSchool.stk"
 
 fn fmt { join("|", map { join(",", @{_}) } @{_}) }
 
-my $s = Exercism::GradeSchool::new()
+val $s = Exercism::GradeSchool::new()
 assert_eq fmt(Exercism::GradeSchool::roster($s)), "", "empty roster"
 
 Exercism::GradeSchool::add($s, "Aimee", 2)

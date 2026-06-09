@@ -2,15 +2,15 @@
 # Rosetta Code: N-bonacci numbers
 
 fn Rosetta::Nbonacci::generate($n, $count) {
-    my @seq
+    var @seq
     # Initial sequence: n-1 zeros and one 1
-    for my $i (1:$n-1) { push @seq, 0 }
+    for val $i (1:$n-1) { push @seq, 0 }
     push @seq, 1
     
     while (len(@seq) < $count) {
-        my $len = len(@seq)
-        my $sum = 0
-        for my $i ($len - $n:$len - 1) {
+        val $len = len(@seq)
+        var $sum = 0
+        for val $i ($len - $n:$len - 1) {
             $sum += $seq[$i]
         }
         push @seq, $sum
@@ -18,10 +18,10 @@ fn Rosetta::Nbonacci::generate($n, $count) {
     \@seq
 }
 
-my $fib = Rosetta::Nbonacci::generate(2, 10)
+val $fib = Rosetta::Nbonacci::generate(2, 10)
 assert_eq join(",", @$fib), "0,1,1,2,3,5,8,13,21,34", "fibonacci (2-bonacci)"
 
-my $tri = Rosetta::Nbonacci::generate(3, 10)
+val $tri = Rosetta::Nbonacci::generate(3, 10)
 assert_eq join(",", @$tri), "0,0,1,1,2,4,7,13,24,44", "tribonacci (3-bonacci)"
 
 # Pipe

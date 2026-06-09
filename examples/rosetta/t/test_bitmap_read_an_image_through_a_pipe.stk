@@ -3,30 +3,30 @@
 
 # We'll reuse the logic from test_bitmap_ppm but reading from /dev/stdin
 fn Rosetta::BitmapPipe::read() {
-    # In a real use case: my $str = slurp("/dev/stdin")
+    # In a real use case: val $str = slurp("/dev/stdin")
     # For testing, we simulate the pipe input
-    my $ppm = "P3\n1 1\n255\n255 0 0\n"
+    val $ppm = "P3\n1 1\n255\n255 0 0\n"
     
-    my @tokens
-    for my $line (split("\n", $ppm)) {
+    var @tokens
+    for val $line (split("\n", $ppm)) {
         next if $line =~ /^#/
-        for my $t (split(/\s+/, $line)) {
+        for val $t (split(/\s+/, $line)) {
             if ($t ne "") { push @tokens, $t }
         }
     }
     
-    my $magic = shift @tokens
-    my $w = int(shift @tokens)
-    my $h = int(shift @tokens)
-    my $max = int(shift @tokens)
+    val $magic = shift @tokens
+    val $w = int(shift @tokens)
+    val $h = int(shift @tokens)
+    val $max = int(shift @tokens)
     
-    my @pixels
-    for my $i (1:$h) {
-        my @row
-        for my $j (1:$w) {
-            my $r = shift @tokens
-            my $g = shift @tokens
-            my $b = shift @tokens
+    var @pixels
+    for val $i (1:$h) {
+        var @row
+        for val $j (1:$w) {
+            val $r = shift @tokens
+            val $g = shift @tokens
+            val $b = shift @tokens
             push @row, { r => int($r), g => int($g), b => int($b) }
         }
         push @pixels, \@row

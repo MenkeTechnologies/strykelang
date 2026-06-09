@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 
-const my @SUFFIX = ("th","st","nd","rd","th","th","th","th","th","th")
+const val @SUFFIX = ("th","st","nd","rd","th","th","th","th","th","th")
 
 fn Exercism::LineUp::format($name, $n) {
-    my $last2 = $n % 100
-    my $suf   = $last2 >= 11 && $last2 <= 13 ? "th" : $SUFFIX[$n % 10]
+    val $last2 = $n % 100
+    val $suf   = $last2 >= 11 && $last2 <= 13 ? "th" : $SUFFIX[$n % 10]
     "Hello, #{$name}! You are the #{$n}#{$suf} in line."
 }

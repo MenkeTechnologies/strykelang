@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Morse code
 
-my %MORSE_MAP = (
+val %MORSE_MAP = (
     A=>".-", B=>"-...", C=>"-.-.", D=>"-..", E=>".", F=>"..-.",
     G=>"--.", H=>"....", I=>"..", J=>".---", K=>"-.-", L=>".-..",
     M=>"--", N=>"-.", O=>"---", P=>".--.", Q=>"--.-", R=>".-.",
@@ -12,8 +12,8 @@ my %MORSE_MAP = (
 )
 
 fn Rosetta::MorseCode::encode($s) {
-    my @parts
-    for my $c (~> $s uc chars) {
+    var @parts
+    for val $c (~> $s uc chars) {
         if (exists $MORSE_MAP{$c}) {
             push @parts, $MORSE_MAP{$c}
         }

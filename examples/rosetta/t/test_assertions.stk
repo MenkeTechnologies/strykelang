@@ -4,7 +4,7 @@
 # Stryke provides built-in assertion subroutines for testing.
 # These are commonly used in .stk test files.
 
-my $x = 42
+val $x = 42
 
 # assert_eq checks for equality
 assert_eq $x, 42, "x should be 42"

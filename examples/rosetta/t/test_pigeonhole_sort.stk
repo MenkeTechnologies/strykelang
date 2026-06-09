@@ -3,12 +3,12 @@
 
 fn Rosetta::Pigeonhole::sort($arr) {
     return [] if len(@$arr) == 0
-    my $min = min(@$arr)
-    my $max = max(@$arr)
-    my @holes = (0) x ($max - $min + 1)
+    val $min = min(@$arr)
+    val $max = max(@$arr)
+    var @holes = (0) x ($max - $min + 1)
     $holes[_ - $min]++ for @$arr
-    my @out
-    for my $i (0..len(@holes) - 1) {
+    var @out
+    for val $i (0..len(@holes) - 1) {
         push @out, $i + $min for 1:$holes[$i]
     }
     \@out

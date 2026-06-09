@@ -15,7 +15,7 @@ fn Rosetta::Doc::add($a, $b) {
 }
 
 # The main part of the script
-my $sum = Rosetta::Doc::add(10, 20)
+val $sum = Rosetta::Doc::add(10, 20)
 assert_eq $sum, 30, "Documentation example addition works"
 
 test_run

@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 
 fn Exercism::RpnCalculatorInspection::start_reliability_check($op, $n) {
-    my @results
-    for my $i (1:$n) { push @results, $op($i) }
+    var @results
+    for val $i (1:$n) { push @results, $op($i) }
     \@results
 }
 
 fn Exercism::RpnCalculatorInspection::await_reliability_check_result($results) {
-    my %tally = (pass => 0, fail => 0)
-    for my $r (@{$results}) {
+    var %tally = (pass => 0, fail => 0)
+    for val $r (@{$results}) {
         if ($r) { $tally{pass}++ } else { $tally{fail}++ }
     }
     \%tally
@@ -16,11 +16,11 @@ fn Exercism::RpnCalculatorInspection::await_reliability_check_result($results) {
 
 fn Exercism::RpnCalculatorInspection::reliability_check($op, $n, $retries) {
     $retries //= 0
-    my @results
-    for my $i (1:$n) {
-        my $r = $op($i)
+    var @results
+    for val $i (1:$n) {
+        var $r = $op($i)
         if (!$r) {
-            for my $t (1..$retries) {
+            for val $t (1..$retries) {
                 $r = $op($i)
                 last if $r
             }

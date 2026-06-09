@@ -3,12 +3,12 @@
 
 fn Rosetta::Superperm::get_permutations(@items) {
     if (len(@items) == 0) { return ([]) }
-    my @res
-    for my $i (0 .. len(@items) - 1) {
-        my @rest = @items
-        my $first = splice(@rest, $i, 1)
-        my @sub_perms = Rosetta::Superperm::get_permutations(@rest)
-        for my $p (@sub_perms) {
+    var @res
+    for val $i (0 .. len(@items) - 1) {
+        var @rest = @items
+        val $first = splice(@rest, $i, 1)
+        val @sub_perms = Rosetta::Superperm::get_permutations(@rest)
+        for val $p (@sub_perms) {
             push @res, [$first, @$p]
         }
     }
@@ -16,11 +16,11 @@ fn Rosetta::Superperm::get_permutations(@items) {
 }
 
 fn Rosetta::Superperm::is_superperm($s, $n) {
-    my @items = 1:$n
-    my @perms = Rosetta::Superperm::get_permutations(@items)
+    val @items = 1:$n
+    val @perms = Rosetta::Superperm::get_permutations(@items)
     
-    for my $p (@perms) {
-        my $p_str = join("", @$p)
+    for val $p (@perms) {
+        val $p_str = join("", @$p)
         if (index($s, $p_str) == -1) {
             return 0
         }
@@ -29,28 +29,28 @@ fn Rosetta::Superperm::is_superperm($s, $n) {
 }
 
 fn Rosetta::Superperm::find_short($n) {
-    my @items = 1:$n
-    my @perms_refs = Rosetta::Superperm::get_permutations(@items)
-    my @perms
-    for my $p_ref (@perms_refs) { push @perms, join("", @$p_ref) }
+    val @items = 1:$n
+    val @perms_refs = Rosetta::Superperm::get_permutations(@items)
+    var @perms
+    for val $p_ref (@perms_refs) { push @perms, join("", @$p_ref) }
     
-    my $res = $perms[0]
-    my %seen
+    var $res = $perms[0]
+    var %seen
     $seen{$perms[0]} = 1
-    my $seen_count = 1
+    var $seen_count = 1
     
     while ($seen_count < len(@perms)) {
-        my $best_overlap = -1
-        my $best_p = ""
+        var $best_overlap = -1
+        var $best_p = ""
         
-        for my $p (@perms) {
+        for val $p (@perms) {
             next if $seen{$p}
             
             # Check overlap from largest to smallest
-            my $current_overlap = 0
-            for (my $o = $n - 1; $o >= 1; $o--) {
-                my $end = substr($res, length($res) - $o)
-                my $start = substr($p, 0, $o)
+            var $current_overlap = 0
+            for (var $o = $n - 1; $o >= 1; $o--) {
+                val $end = substr($res, length($res) - $o)
+                val $start = substr($p, 0, $o)
                 if ($end eq $start) {
                     $current_overlap = $o
                     last
@@ -71,12 +71,12 @@ fn Rosetta::Superperm::find_short($n) {
 }
 
 # Test n=2
-my $s2 = Rosetta::Superperm::find_short(2)
+val $s2 = Rosetta::Superperm::find_short(2)
 assert_eq length($s2), 3, "n=2 minimal length is 3"
 assert_ok Rosetta::Superperm::is_superperm($s2, 2), "is superperm n=2"
 
 # Test n=3
-my $s3 = Rosetta::Superperm::find_short(3)
+val $s3 = Rosetta::Superperm::find_short(3)
 assert_eq length($s3), 9, "n=3 minimal length is 9"
 assert_ok Rosetta::Superperm::is_superperm($s3, 3), "is superperm n=3"
 

@@ -11,18 +11,18 @@
 p "── multi-congregation (primary + secondary pools) ──"
 
 # 1. Primary pool via congregation — becomes the current controller.
-my @primary = congregation(2)
+val @primary = congregation(2)
 printf "primary pool (%d workers): %s\n", len(@primary), join(",", @primary)
 
 # 2. Secondary pool via anoint — does NOT take over as current.
-my @secondary = anoint(2)
+val @secondary = anoint(2)
 printf "secondary pool (%d workers, anointed): %s\n", len(@secondary), join(",", @secondary)
 
 # 3. pray without an explicit congregation routes to PRIMARY (because
 #    anoint preserved the current controller).
-my %p_results = harvest "'from-primary-' . \$\$", @primary
+val %p_results = harvest "'from-primary-' . \$\$", @primary
 p "── primary pool reports (current controller) ──"
-for my $sid (sort { _ <=> _1 } keys %p_results) {
+for val $sid (sort { _ <=> _1 } keys %p_results) {
     printf "  worker %d: %s\n", $sid, $p_results{$sid}
 }
 

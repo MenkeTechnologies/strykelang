@@ -2,14 +2,14 @@
 # Rosetta Code: Dudeney numbers
 
 fn Rosetta::Dudeney::sum_digits($n) {
-    my $sum = 0
-    my @digits = ~> "$n" chars map {int}
+    var $sum = 0
+    val @digits = ~> "$n" chars map {int}
     ~> @digits ep { $sum += _ }
     $sum
 }
 
 fn Rosetta::Dudeney::check($n) {
-    my $root = int($n**(1/3) + 0.5)
+    val $root = int($n**(1/3) + 0.5)
     if ($root**3 == $n) {
         Rosetta::Dudeney::sum_digits($n) == $root
     } else {

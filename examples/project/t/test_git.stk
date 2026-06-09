@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # t/test_git.stk — git builtin tests
 
-my $root = undef
+var $root = undef
 eval {
     $root = git_root()
 }
@@ -16,16 +16,16 @@ if (!defined $root) {
 assert_ok defined($root), "git_root is defined"
 assert_ok -d $root, "git_root is a directory"
 
-my @branches = git_branches()
+val @branches = git_branches()
 assert_gt len(@branches), 0, "has branches"
 
-my @head_branch = grep { _->{is_head} } @branches
+val @head_branch = grep { _->{is_head} } @branches
 assert_eq len(@head_branch), 1, "has exactly one HEAD branch"
 assert_ok defined($head_branch[0]->{name}), "head branch has a name"
 
 # ── Git Log and History ───────────────────────────────────────────
 
-my @log = git_log(10)
+val @log = git_log(10)
 assert_gt len(@log), 0, "has commit log"
 if (len(@log) > 0) {
     assert_ok defined($log[0]->{sha}), "first commit has sha"
@@ -35,12 +35,12 @@ if (len(@log) > 0) {
 
 # ── Git Files ─────────────────────────────────────────────────────
 
-my @files = git_files()
+val @files = git_files()
 assert_gt len(@files), 0, "has tracked files"
 
 # ── Git Authors ───────────────────────────────────────────────────
 
-my @authors = git_authors()
+val @authors = git_authors()
 assert_gt len(@authors), 0, "has authors"
 if (len(@authors) > 0) {
     assert_ok defined($authors[0]->{name}), "first author has name"

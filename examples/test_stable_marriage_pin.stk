@@ -3,23 +3,23 @@
 package StableMarriage
 
 fn solve($men_prefs, $women_prefs) {
-    my %men_matches; my %women_matches
-    my @free_men = keys %$men_prefs |> sort
-    my %women_ranks
-    for my $w (keys %$women_prefs) {
-        my $p = $women_prefs->{$w}
+    var %men_matches; var %women_matches
+    var @free_men = keys %$men_prefs |> sort
+    var %women_ranks
+    for val $w (keys %$women_prefs) {
+        val $p = $women_prefs->{$w}
         $women_ranks{$w} = {}
-        for my $i (0 : (len @$p) - 1) { $women_ranks{$w}->{$p->[$i]} = $i }
+        for val $i (0 : (len @$p) - 1) { $women_ranks{$w}->{$p->[$i]} = $i }
     }
-    my %next_proposal
-    for my $m (@free_men) { $next_proposal{$m} = 0 }
+    var %next_proposal
+    for val $m (@free_men) { $next_proposal{$m} = 0 }
     while (@free_men) {
-        my $m = shift @free_men
-        my $w = $men_prefs->{$m}->[$next_proposal{$m}++]
+        val $m = shift @free_men
+        val $w = $men_prefs->{$m}->[$next_proposal{$m}++]
         if (!defined $women_matches{$w}) {
             $women_matches{$w} = $m; $men_matches{$m} = $w
         } else {
-            my $m_current = $women_matches{$w}
+            val $m_current = $women_matches{$w}
             if ($women_ranks{$w}->{$m} < $women_ranks{$w}->{$m_current}) {
                 $women_matches{$w} = $m; $men_matches{$m} = $w
                 push @free_men, $m_current; delete $men_matches{$m_current}
@@ -30,16 +30,16 @@ fn solve($men_prefs, $women_prefs) {
 }
 
 fn verify($matches, $men_prefs, $women_prefs) {
-    my %women_matches = rev %$matches
-    for my $m (keys %$matches) {
-        my $m_match = $matches->{$m}
-        my $m_pref_list = $men_prefs->{$m}
-        for my $w (@$m_pref_list) {
+    val %women_matches = rev %$matches
+    for val $m (keys %$matches) {
+        val $m_match = $matches->{$m}
+        val $m_pref_list = $men_prefs->{$m}
+        for val $w (@$m_pref_list) {
             last if $w eq $m_match
-            my $w_match = $women_matches{$w}
-            my $w_pref_list = $women_prefs->{$w}
-            my $rank_m = -1; my $rank_match = -1
-            for my $i (0 : (len @$w_pref_list) - 1) {
+            val $w_match = $women_matches{$w}
+            val $w_pref_list = $women_prefs->{$w}
+            var $rank_m = -1; var $rank_match = -1
+            for val $i (0 : (len @$w_pref_list) - 1) {
                 if ($w_pref_list->[$i] eq $m) { $rank_m = $i }
                 if ($w_pref_list->[$i] eq $w_match) { $rank_match = $i }
             }
@@ -52,32 +52,32 @@ fn verify($matches, $men_prefs, $women_prefs) {
 package main
 
 # --- End-to-end Test ---
-my %m1 = ( a => ["x", "y"], b => ["y", "x"] )
-my %w1 = ( x => ["b", "a"], y => ["a", "b"] )
-my $res1 = StableMarriage::solve \%m1, \%w1
+val %m1 = ( a => ["x", "y"], b => ["y", "x"] )
+val %w1 = ( x => ["b", "a"], y => ["a", "b"] )
+val $res1 = StableMarriage::solve \%m1, \%w1
 $res1->{a} |> aeq "x", "matching a-x"
 $res1->{b} |> aeq "y", "matching b-y"
 StableMarriage::verify($res1, \%m1, \%w1) |> aeq 1, "basic stable"
 
 # --- Another Case ---
-my %m2 = (
+val %m2 = (
     abe  => ["abi", "eve"],
     bob  => ["eve", "abi"],
 )
-my %w2 = (
+val %w2 = (
     abi  => ["abe", "bob"],
     eve  => ["bob", "abe"],
 )
 # abe proposes to abi -> engaged
 # bob proposes to eve -> engaged
 # matches: abe-abi, bob-eve
-my $res2 = StableMarriage::solve \%m2, \%w2
+val $res2 = StableMarriage::solve \%m2, \%w2
 $res2->{abe} |> aeq "abi", "abe-abi"
 $res2->{bob} |> aeq "eve", "bob-eve"
 StableMarriage::verify($res2, \%m2, \%w2) |> aeq 1, "simple stable"
 
 # --- Mismatch Case (instability check) ---
-my %bad_matches = ( abe => "eve", bob => "abi" )
+val %bad_matches = ( abe => "eve", bob => "abi" )
 StableMarriage::verify(\%bad_matches, \%m2, \%w2) |> aeq 0, "bad matches unstable"
 
 test_run

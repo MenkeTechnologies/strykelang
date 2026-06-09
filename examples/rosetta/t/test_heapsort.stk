@@ -2,10 +2,10 @@
 # Rosetta Code: Heapsort
 
 fn Rosetta::Heapsort::sift_down($arr, $start, $end) {
-    my $root = $start
+    var $root = $start
     while ($root * 2 + 1 <= $end) {
-        my $child = $root * 2 + 1
-        my $swap = $root
+        val $child = $root * 2 + 1
+        var $swap = $root
         
         if ($arr->[$swap] < $arr->[$child]) {
             $swap = $child
@@ -24,7 +24,7 @@ fn Rosetta::Heapsort::sift_down($arr, $start, $end) {
 }
 
 fn Rosetta::Heapsort::heapify($arr, $count) {
-    my $start = ($count - 2) / 2 | 0
+    var $start = ($count - 2) / 2 | 0
     while ($start >= 0) {
         Rosetta::Heapsort::sift_down($arr, $start, $count - 1)
         $start--
@@ -32,10 +32,10 @@ fn Rosetta::Heapsort::heapify($arr, $count) {
 }
 
 fn Rosetta::Heapsort::sort($arr) {
-    my $count = len(@$arr)
+    val $count = len(@$arr)
     Rosetta::Heapsort::heapify($arr, $count)
     
-    my $end = $count - 1
+    var $end = $count - 1
     while ($end > 0) {
         ($arr->[0], $arr->[$end]) = ($arr->[$end], $arr->[0])
         $end--
@@ -44,8 +44,8 @@ fn Rosetta::Heapsort::sort($arr) {
     $arr
 }
 
-my $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
-my $sorted = Rosetta::Heapsort::sort($data)
+val $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
+val $sorted = Rosetta::Heapsort::sort($data)
 assert_eq join(",", @$sorted), "-31,0,1,2,2,4,65,83,99,782", "heapsort works"
 
 test_run

@@ -5,9 +5,9 @@
 # Run: stryke --no-interop examples/segment_tree.stk
 
 fn Seg::build($values) {
-    my $n = len @$values
-    my @tree = ()
-    for my $i (0:4*$n) { push @tree, 0 }
+    val $n = len @$values
+    var @tree = ()
+    for val $i (0:4*$n) { push @tree, 0 }
     if ($n > 0) {
         Seg::_build(\@tree, $values, 1, 0, $n - 1)
     }
@@ -19,7 +19,7 @@ fn Seg::_build($tree, $values, $node, $l, $r) {
         $tree->[$node] = $values->[$l]
         return
     }
-    my $m = ($l + $r) / 2
+    var $m = ($l + $r) / 2
     $m = int($m)
     Seg::_build($tree, $values, 2*$node,   $l,   $m)
     Seg::_build($tree, $values, 2*$node+1, $m+1, $r)
@@ -34,7 +34,7 @@ fn Seg::sum($seg, $ql, $qr) {
 fn Seg::_sum($tree, $node, $l, $r, $ql, $qr) {
     return 0 if $qr < $l || $r < $ql
     return $tree->[$node] if $ql <= $l && $r <= $qr
-    my $m = int(($l + $r) / 2)
+    val $m = int(($l + $r) / 2)
     Seg::_sum($tree, 2*$node,   $l,   $m, $ql, $qr) +
     Seg::_sum($tree, 2*$node+1, $m+1, $r, $ql, $qr)
 }
@@ -48,7 +48,7 @@ fn Seg::_update($tree, $node, $l, $r, $idx, $val) {
         $tree->[$node] = $val
         return
     }
-    my $m = int(($l + $r) / 2)
+    val $m = int(($l + $r) / 2)
     if ($idx <= $m) {
         Seg::_update($tree, 2*$node,   $l,   $m, $idx, $val)
     } else {
@@ -58,8 +58,8 @@ fn Seg::_update($tree, $node, $l, $r, $idx, $val) {
 }
 
 p "=== Segment Tree (range sum) ==="
-my @vals = (1, 3, 5, 7, 9, 11)
-my $seg = Seg::build(\@vals)
+val @vals = (1, 3, 5, 7, 9, 11)
+val $seg = Seg::build(\@vals)
 p "values: " . join(",", @vals)
 p "sum[0..5] = " . Seg::sum($seg, 0, 5)
 p "sum[1..3] = " . Seg::sum($seg, 1, 3)

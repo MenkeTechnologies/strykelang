@@ -3,17 +3,17 @@
 # ── Set operations ───────────────────────────────────────────────────
 
 fn Project::Collections::union_sets ($a, $b) {
-    my @combined
+    var @combined
     ~> @$a ep { push @combined, _ }
     ~> @$b ep { push @combined, _ }
-    my @result = uniq(@combined)
+    val @result = uniq(@combined)
     @result
 }
 
 fn Project::Collections::intersect_sets ($a, $b) {
-    my $in_b = {}
+    var $in_b = {}
     ~> @$b ep { $in_b->{_} = 1 }
-    my @result
+    var @result
     ~> @$a ep {
         push @result, _ if exists $in_b->{_}
     }
@@ -21,9 +21,9 @@ fn Project::Collections::intersect_sets ($a, $b) {
 }
 
 fn Project::Collections::diff_sets ($a, $b) {
-    my $in_b = {}
+    var $in_b = {}
     ~> @$b ep { $in_b->{_} = 1 }
-    my @result
+    var @result
     ~> @$a ep {
         push @result, _ unless exists $in_b->{_}
     }
@@ -34,7 +34,7 @@ fn Project::Collections::diff_sets ($a, $b) {
 
 # Invert a hash (swap keys and values), returns hashref
 fn Project::Collections::flip_hash (%h) {
-    my $inv = {}
+    var $inv = {}
     ~> keys %h ep {
         $inv->{$h{_}} = _
     }
@@ -43,11 +43,11 @@ fn Project::Collections::flip_hash (%h) {
 
 # Select only certain keys from a hash
 fn Project::Collections::extract_keys ($href) {
-    my @keys
+    var @keys
     ~> 1..len(@_) - 1 ep {
         push @keys, $_[_]
     }
-    my $result = {}
+    var $result = {}
     ~> @keys ep {
         $result->{_} = $href->{_} if exists $href->{_}
     }
@@ -56,7 +56,7 @@ fn Project::Collections::extract_keys ($href) {
 
 # Map over hash values, keeping keys
 fn Project::Collections::apply_to_values ($href, $fn) {
-    my $result = {}
+    var $result = {}
     ~> keys %$href ep {
         $result->{_} = $fn($href->{_})
     }
@@ -80,13 +80,13 @@ fn Project::Collections::apply_pipeline ($val, @fns) {
 
 # Count occurrences — returns arrayref of [value, count] pairs
 fn Project::Collections::count_occurrences (@items) {
-    my $freq = {}
+    var $freq = {}
     ~> @items ep {
         $freq->{_} = ($freq->{_} // 0) + 1
     }
-    my @pairs
-    for my $k (keys %$freq) {
-        my $pair = [$k, $freq->{$k}]
+    var @pairs
+    for val $k (keys %$freq) {
+        val $pair = [$k, $freq->{$k}]
         push @pairs, $pair
     }
     [@pairs]
@@ -94,10 +94,10 @@ fn Project::Collections::count_occurrences (@items) {
 
 # Split an array into groups of N
 fn Project::Collections::split_chunks ($n, @items) {
-    my @chunks
+    var @chunks
     while (scalar @items) {
-        my @group
-        for my $i (1:$n) {
+        var @group
+        for val $i (1:$n) {
             last unless scalar @items
             push @group, shift @items
         }

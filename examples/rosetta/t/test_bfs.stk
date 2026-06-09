@@ -2,14 +2,14 @@
 # Rosetta Code: Breadth-first search
 
 fn Rosetta::BFS::solve($graph, $start) {
-    my @queue = ($start)
-    my %visited = ($start => 1)
-    my @order = ()
+    var @queue = ($start)
+    var %visited = ($start => 1)
+    var @order = ()
     
     while (len(@queue) > 0) {
-        my $u = shift @queue
+        val $u = shift @queue
         push @order, $u
-        for my $v (@{$graph->{$u}}) {
+        for val $v (@{$graph->{$u}}) {
             if (!exists $visited{$v}) {
                 $visited{$v} = 1
                 push @queue, $v
@@ -19,7 +19,7 @@ fn Rosetta::BFS::solve($graph, $start) {
     \@order
 }
 
-my $graph = {
+val $graph = {
     "A" => ["B", "C"],
     "B" => ["D", "E"],
     "C" => ["F"],
@@ -28,7 +28,7 @@ my $graph = {
     "F" => []
 }
 
-my $res = Rosetta::BFS::solve($graph, "A")
+val $res = Rosetta::BFS::solve($graph, "A")
 assert_eq join(",", @$res), "A,B,C,D,E,F", "BFS order from A"
 
 test_run

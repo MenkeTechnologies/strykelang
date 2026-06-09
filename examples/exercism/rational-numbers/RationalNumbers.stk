@@ -7,8 +7,8 @@ fn Exercism::RationalNumbers::_gcd($x, $y) {
 }
 
 fn Exercism::RationalNumbers::reduce($r) {
-    my ($n, $d) = @{$r}
-    my $g = Exercism::RationalNumbers::_gcd($n, $d) || 1
+    var ($n, $d) = @{$r}
+    val $g = Exercism::RationalNumbers::_gcd($n, $d) || 1
     $d < 0 and ($n, $d) = (-$n, -$d)
     [int($n / $g), int($d / $g)]
 }
@@ -21,7 +21,7 @@ fn Exercism::RationalNumbers::div($r, $s) = Exercism::RationalNumbers::reduce([$
 fn Exercism::RationalNumbers::abs($r)     = Exercism::RationalNumbers::reduce([abs($r->[0]), abs($r->[1])])
 
 fn Exercism::RationalNumbers::pow_rational($r, $e) {
-    my ($n, $d) = @{$r}
+    val ($n, $d) = @{$r}
     $e >= 0 ? Exercism::RationalNumbers::reduce([$n ** $e, $d ** $e])
             : Exercism::RationalNumbers::reduce([$d ** -$e, $n ** -$e])
 }

@@ -3,8 +3,8 @@
 
 fn Rosetta::DigitalRoot::compute($n) {
     if ($n < 10) { return $n }
-    my $sum = 0
-    my $curr = $n
+    var $sum = 0
+    var $curr = $n
     while ($curr > 0) {
         $sum += $curr % 10
         $curr = int($curr / 10)
@@ -13,10 +13,10 @@ fn Rosetta::DigitalRoot::compute($n) {
 }
 
 fn Rosetta::DigitalRoot::persistence($n) {
-    my $curr = $n
-    my $count = 0
+    var $curr = $n
+    var $count = 0
     while ($curr >= 10) {
-        my $sum = 0
+        var $sum = 0
         while ($curr > 0) {
             $sum += $curr % 10
             $curr = int($curr / 10)
@@ -30,7 +30,7 @@ fn Rosetta::DigitalRoot::persistence($n) {
 assert_eq Rosetta::DigitalRoot::compute(627615), 9, "dr(627615)"
 assert_eq Rosetta::DigitalRoot::compute(39390), 6, "dr(39390)"
 
-my $res = Rosetta::DigitalRoot::persistence(627615)
+val $res = Rosetta::DigitalRoot::persistence(627615)
 assert_eq $res->[0], 9, "root"
 assert_eq $res->[1], 2, "persistence"
 

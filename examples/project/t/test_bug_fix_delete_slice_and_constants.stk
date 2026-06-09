@@ -6,28 +6,28 @@
 #    shadow Perl's `open E, ...` literal-filehandle idiom.
 
 # BUG-042: delete array slice.
-my @a = (10, 20, 30, 40, 50)
-my @gone = delete @a[1, 3]
+val @a = (10, 20, 30, 40, 50)
+val @gone = delete @a[1, 3]
 join(",", @gone) |> assert_eq("20,40", "delete @a[1,3] returns removed")
 # slots 1 and 3 are undef now; others intact.
 join(",", map { defined($_) ? $_ : "U" } @a)
     |> assert_eq("10,U,30,U,50", "delete leaves undef slots")
 
 # Range form.
-my @b = (1..6)
+val @b = (1..6)
 delete @b[1..3]
 join(",", map { defined($_) ? $_ : "U" } @b)
     |> assert_eq("1,U,U,U,5,6", "delete @b[1..3] range")
 
 # BUG-043: delete hash slice with literal keys.
-my %h = (a => 1, b => 2, c => 3, d => 4)
-my @removed = delete @h{qw(a c)}
+val %h = (a => 1, b => 2, c => 3, d => 4)
+val @removed = delete @h{qw(a c)}
 join(",", sort @removed) |> assert_eq("1,3", "delete @h{qw(a c)} returns values")
 join(",", sort keys %h) |> assert_eq("b,d", "remaining keys")
 
 # Delete with array-var keys (interop with BUG-028).
-my %h2 = (alice => 1, bob => 2, carol => 3, dave => 4)
-my @drop = ("alice", "carol")
+val %h2 = (alice => 1, bob => 2, carol => 3, dave => 4)
+val @drop = ("alice", "carol")
 delete @h2{@drop}
 join(",", sort keys %h2) |> assert_eq("bob,dave", "delete @h{@arr} drops keys")
 
@@ -44,22 +44,22 @@ join(",", sort keys %h2) |> assert_eq("bob,dave", "delete @h{@arr} drops keys")
 
 # Open-FH parser carve-out: `open E, ...` uses the literal handle name,
 # NOT the Euler constant.
-my $tmp = "/tmp/stryke_bug_fix_open_E_demo.txt"
+val $tmp = "/tmp/stryke_bug_fix_open_E_demo.txt"
 open E, ">", $tmp; print E "data\n"; close E
-my $body = `cat $tmp`
+var $body = `cat $tmp`
 chomp $body
 $body |> assert_eq("data", "open E ... writes via handle, not constant 2.718...")
 unlink $tmp
 
 # Same protection for PI / TAU as filehandle names.
-my $tmp2 = "/tmp/stryke_bug_fix_open_PI_demo.txt"
+val $tmp2 = "/tmp/stryke_bug_fix_open_PI_demo.txt"
 open PI, ">", $tmp2; print PI "via PI handle\n"; close PI
-chomp(my $body2 = `cat $tmp2`)
+chomp(val $body2 = `cat $tmp2`)
 $body2 |> assert_eq("via PI handle", "open PI ... also fine")
 unlink $tmp2
 
 # In expression position, the constants still resolve.
-my $area = PI * 5 ** 2
+val $area = PI * 5 ** 2
 sprintf("%.4f", $area) |> assert_eq("78.5398", "PI usable in math after open carve-out")
 
 test_run

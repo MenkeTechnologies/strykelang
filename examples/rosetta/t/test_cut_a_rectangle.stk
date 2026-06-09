@@ -8,8 +8,8 @@
 fn Rosetta::CutRectangle::solve($w, $h) {
     # The cut must pass through the center (w/2, h/2).
     # We can perform a walk from the center to the boundary.
-    my %visited
-    my $count = 0
+    var %visited
+    val $count = 0
     
     # Grid coordinates are 0..w, 0..h
     # Center is ($w/2, $h/2)
@@ -30,14 +30,14 @@ fn Rosetta::CutRectangle::walk($x, $y, $w, $h, $visited, $count_ref) {
     
     $visited->{"$x,$y"} = 1
     # Symmetric point
-    my $sx = $w - $x
-    my $sy = $h - $y
+    val $sx = $w - $x
+    val $sy = $h - $y
     $visited->{"$sx,$sy"} = 1
     
-    my @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
-    for my $d (@dirs) {
-        my $nx = $x + $d->[0]
-        my $ny = $y + $d->[1]
+    val @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+    for val $d (@dirs) {
+        val $nx = $x + $d->[0]
+        val $ny = $y + $d->[1]
         
         if (!exists $visited->{"$nx,$ny"}) {
             Rosetta::CutRectangle::walk($nx, $ny, $w, $h, $visited, $count_ref)
@@ -51,7 +51,7 @@ fn Rosetta::CutRectangle::walk($x, $y, $w, $h, $visited, $count_ref) {
 # For a 2x2 grid, there are 2 ways.
 # My simplified walk might need adjustment for the exact RC logic.
 # Let's just verify for 2x2.
-my $res22 = Rosetta::CutRectangle::solve(2, 2)
+val $res22 = Rosetta::CutRectangle::solve(2, 2)
 assert_eq $res22, 2, "2x2 grid has 2 ways to cut"
 
 test_run

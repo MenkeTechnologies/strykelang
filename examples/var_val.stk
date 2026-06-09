@@ -8,7 +8,7 @@
 p "── var — mutable lexical (== my) ─────────────────────"
 var $name = "world"
 var @nums = 1:5
-var %cfg = (debug => 1, verbose => 0)
+val %cfg = (debug => 1, verbose => 0)
 p "  var \$name = '$name'"
 p "  var \@nums = (", join(",", @nums), ")"
 p "  var \%cfg.debug = $cfg{debug}"
@@ -30,10 +30,10 @@ p "  val \%ENDPOINTS.api = '$ENDPOINTS{api}'"
 
 p ""
 p "── Mixing var / val / my / const my freely ───────────"
-my  $w = 10
+var  $w = 10
 var $x = 20
 val $y = 30                                  # immutable
-const my $z = 40                             # immutable, longer spelling
+const var $z = 40                             # immutable, longer spelling
 p "  $w + $x + $y + $z = ", $w + $x + $y + $z
 
 # Both var and my can be reassigned; val and const my cannot.

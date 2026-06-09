@@ -2,36 +2,36 @@
 # Rosetta Code: Mind boggling card trick
 
 fn Rosetta::CardTrick::deal($cards) {
-    my @a
-    my @b
-    my @c
-    for my $i (0 .. len(@$cards) - 1) {
-        my $pile = $i % 3
+    var @a
+    var @b
+    var @c
+    for val $i (0 .. len(@$cards) - 1) {
+        val $pile = $i % 3
         push @a, $cards->[$i] if $pile == 0
         push @b, $cards->[$i] if $pile == 1
         push @c, $cards->[$i] if $pile == 2
     }
-    my @piles = (\@a, \@b, \@c)
+    val @piles = (\@a, \@b, \@c)
     \@piles
 }
 
 fn Rosetta::CardTrick::place_selected_middle($piles, $selected) {
-    my @order = ((($selected + 1) % 3), $selected, (($selected + 2) % 3))
-    my @out
-    for my $idx (@order) { push @out, @{$piles->[$idx]} }
+    val @order = ((($selected + 1) % 3), $selected, (($selected + 2) % 3))
+    var @out
+    for val $idx (@order) { push @out, @{$piles->[$idx]} }
     \@out
 }
 
 fn Rosetta::CardTrick::locate($cards, $choice_sequence) {
-    my $cur = $cards
-    for my $choice (@$choice_sequence) {
-        my $piles = Rosetta::CardTrick::deal($cur)
+    var $cur = $cards
+    for val $choice (@$choice_sequence) {
+        val $piles = Rosetta::CardTrick::deal($cur)
         $cur = Rosetta::CardTrick::place_selected_middle($piles, $choice)
     }
     $cur->[10]
 }
 
-my @cards = (1:21)
+val @cards = (1:21)
 
 assert_eq join(",", @{Rosetta::CardTrick::deal(\@cards)->[0]}), "1,4,7,10,13,16,19", "first pile dealt cyclically"
 assert_eq Rosetta::CardTrick::locate(\@cards, [1, 1, 1]), 11, "three middle gathers reveal center card"

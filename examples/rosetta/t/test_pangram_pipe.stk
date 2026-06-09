@@ -2,7 +2,7 @@
 # Rosetta Code: Pangram (using pipes)
 
 fn Rosetta::Pangram::is_pangram($text) {
-    my $len = $text |> lc() |> chars() |> grep { _ =~ /[a-z]/ } |> uniq() |> len()
+    val $len = $text |> lc() |> chars() |> grep { _ =~ /[a-z]/ } |> uniq() |> len()
     $len == 26
 }
 

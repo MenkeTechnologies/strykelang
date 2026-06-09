@@ -45,7 +45,7 @@ tool fn web_search($query: string) "Search the web for real-time information" {
 p ""
 p "── running agentic RAG query ──────────────────────────"
 
-my $question = "Who created Stryke and what is the weather in Tokyo?"
+val $question = "Who created Stryke and what is the weather in Tokyo?"
 p "Question: $question"
 
 # The `ai` builtin will:
@@ -55,7 +55,7 @@ p "Question: $question"
 # 4. Call `web_search`.
 # 5. Synthesize the final answer.
 
-my $answer = ai($question,
+val $answer = ai($question,
     system => "You are a helpful research assistant. Use the provided tools to find accurate information.",
     max_turns => 5
 )

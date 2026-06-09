@@ -2,18 +2,18 @@
 # Rosetta Code: Commatizing numbers
 
 fn Rosetta::Commatize::insert($n) {
-    my $s = "$n"
-    my $sign = ""
+    var $s = "$n"
+    var $sign = ""
     if (substr($s, 0, 1) eq "-") {
         $sign = "-"
         $s = substr($s, 1)
     }
-    my $dot = index($s, ".")
-    my $int_part = $dot < 0 ? $s : substr($s, 0, $dot)
-    my $rest = $dot < 0 ? "" : substr($s, $dot)
-    my @rev = rev split("", $int_part)
-    my @grouped
-    for my $i (0..len(@rev)-1) {
+    val $dot = index($s, ".")
+    val $int_part = $dot < 0 ? $s : substr($s, 0, $dot)
+    val $rest = $dot < 0 ? "" : substr($s, $dot)
+    val @rev = rev split("", $int_part)
+    var @grouped
+    for val $i (0..len(@rev)-1) {
         push @grouped, "," if $i > 0 && $i % 3 == 0
         push @grouped, $rev[$i]
     }
@@ -28,7 +28,7 @@ assert_eq Rosetta::Commatize::insert(-1234567),  "-1,234,567","negative"
 assert_eq Rosetta::Commatize::insert(1234.567),  "1,234.567", "decimal"
 
 # pipeline of formatting
-my @fmts = (1234, 56, 9876543, 100) |> map {Rosetta::Commatize::insert}
+val @fmts = (1234, 56, 9876543, 100) |> map {Rosetta::Commatize::insert}
 assert_eq join(";", @fmts), "1,234;56;9,876,543;100", "map commatize"
 
 test_run

@@ -19,12 +19,12 @@
 
 # ── constants ──────────────────────────────────────────────────────
 
-my $PI = 3.141592653589793
-my $PHI = (1 + sqrt(5)) / 2
-my $GA = 2 * $PI * (1 - 1 / $PHI)
-my $N = 200
-my $WIDTH = 41
-my $HEIGHT = 21
+val $PI = 3.141592653589793
+val $PHI = (1 + sqrt(5)) / 2
+val $GA = 2 * $PI * (1 - 1 / $PHI)
+val $N = 200
+val $WIDTH = 41
+val $HEIGHT = 21
 
 # ── Vogel's spiral coordinates ─────────────────────────────────────
 
@@ -36,10 +36,10 @@ fn Spiral::y($i) = Spiral::radius($i) * sin(Spiral::theta($i))
 # ── render onto an ASCII grid ──────────────────────────────────────
 
 fn Spiral::make_grid($w, $h) {
-    my @grid
-    for my $r (0:$h - 1) {
-        my @row
-        for my $c (0:$w - 1) { push @row, " " }
+    var @grid
+    for val $r (0:$h - 1) {
+        var @row
+        for val $c (0:$w - 1) { push @row, " " }
         push @grid, \@row
     }
     \@grid
@@ -49,9 +49,9 @@ fn Spiral::plot($grid, $w, $h, $x, $y, $mark) {
     # World coords have origin (0, 0) at the centre; the seed at
     # i = N - 1 sits at radius √N. Scale so the largest radius hits
     # the grid edge minus 1 unit.
-    my $scale = ($w < $h * 2 ? $w : $h * 2) / 2 / sqrt($N) * 0.95
-    my $col = int(($w / 2) + $x * $scale)
-    my $row = int(($h / 2) + $y * $scale / 2)
+    val $scale = ($w < $h * 2 ? $w : $h * 2) / 2 / sqrt($N) * 0.95
+    val $col = int(($w / 2) + $x * $scale)
+    val $row = int(($h / 2) + $y * $scale / 2)
     return if $col < 0 || $col >= $w
     return if $row < 0 || $row >= $h
     $grid->[$row]->[$col] = $mark
@@ -59,36 +59,36 @@ fn Spiral::plot($grid, $w, $h, $x, $y, $mark) {
 
 # ── compute coordinates ───────────────────────────────────────────
 
-my @coords
-for my $i (0:$N - 1) {
+var @coords
+for val $i (0:$N - 1) {
     push @coords, [Spiral::x($i), Spiral::y($i)]
 }
 
 # ── render ─────────────────────────────────────────────────────────
 
-my $grid = Spiral::make_grid($WIDTH, $HEIGHT)
-my $idx = 0
-for my $p (@coords) {
+val $grid = Spiral::make_grid($WIDTH, $HEIGHT)
+var $idx = 0
+for val $p (@coords) {
     # Use a few characters by index so the spiral arms read as
     # different generations.
-    my $mark = ("·", "+", "*", "o", "@")[$idx % 5]
+    val $mark = ("·", "+", "*", "o", "@")[$idx % 5]
     Spiral::plot($grid, $WIDTH, $HEIGHT, $p->[0], $p->[1], $mark)
     $idx++
 }
 
 printf "── Vogel phyllotaxis: N=#{$N} seeds, golden angle ≈ #{int($GA / $PI * 18000) / 100}° ──\n\n"
-for my $row (@$grid) {
+for val $row (@$grid) {
     p join("", @$row)
 }
 
 # ── invariant 1: golden angle is in (137.5°, 137.51°) ─────────────
 
-my $deg = $GA / $PI * 180
+val $deg = $GA / $PI * 180
 die "golden angle out of range: $deg" unless $deg > 137.5 && $deg < 137.51
 
 # ── invariant 2: radius monotonically nondecreasing in i ──────────
 
-for my $i (1:$N - 1) {
+for val $i (1:$N - 1) {
     die "radius not monotone at i=$i" unless Spiral::radius($i) >= Spiral::radius($i - 1)
 }
 
@@ -97,11 +97,11 @@ for my $i (1:$N - 1) {
 # (cos and sin agree under the same period, so we test that the
 # angular difference between any two consecutive seeds reduces mod
 # 2π to a constant near GA mod 2π.)
-my $two_pi = 2 * $PI
-my $expected = $GA - $two_pi * int($GA / $two_pi)
+val $two_pi = 2 * $PI
+var $expected = $GA - $two_pi * int($GA / $two_pi)
 $expected += $two_pi if $expected < 0
-for my $i (1:10) {
-    my $diff = Spiral::theta($i) - Spiral::theta($i - 1)
+for val $i (1:10) {
+    var $diff = Spiral::theta($i) - Spiral::theta($i - 1)
     $diff -= $two_pi * int($diff / $two_pi)
     $diff += $two_pi if $diff < 0
     die "angular increment $diff != $expected at i=$i" unless abs($diff - $expected) < 1e-9
@@ -111,10 +111,10 @@ for my $i (1:10) {
 #                (no two seeds land at exactly the same θ for any
 #                 finite N — would require GA / 2π rational).
 
-my %seen
-my $unique = 0
-for my $i (0:$N - 1) {
-    my $key = sprintf "%.6f", Spiral::theta($i) - $two_pi * int(Spiral::theta($i) / $two_pi)
+var %seen
+var $unique = 0
+for val $i (0:$N - 1) {
+    val $key = sprintf "%.6f", Spiral::theta($i) - $two_pi * int(Spiral::theta($i) / $two_pi)
     $seen{$key}++
     $unique++ if $seen{$key} == 1
 }
@@ -122,8 +122,8 @@ die "expected #{$N} distinct angles, got #{$unique}" unless $unique == $N
 
 # ── invariant 5: the final radius equals sqrt(N - 1) ──────────────
 
-my $final = Spiral::radius($N - 1)
-my $want = sqrt($N - 1)
+val $final = Spiral::radius($N - 1)
+val $want = sqrt($N - 1)
 die "final radius mismatch" unless abs($final - $want) < 1e-9
 
 p ""

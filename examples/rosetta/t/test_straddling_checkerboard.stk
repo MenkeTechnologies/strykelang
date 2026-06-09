@@ -2,12 +2,12 @@
 # Rosetta Code: Straddling checkerboard
 
 fn Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2) {
-    my %map
-    my @alpha_chars = split("", $alphabet)
+    var %map
+    val @alpha_chars = split("", $alphabet)
     
     # 1. Fill map
-    my $char_idx = 0
-    for my $i (0:9) {
+    var $char_idx = 0
+    for val $i (0:9) {
         if ($i == $sp1 || $i == $sp2) {
             next
         }
@@ -16,20 +16,20 @@ fn Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2) {
     }
     
     # 2. Fill rows for $sp1 and $sp2
-    for my $i (0:9) {
+    for val $i (0:9) {
         $map{$alpha_chars[$char_idx]} = "$sp1$i"
         $char_idx++
         if ($char_idx >= len(@alpha_chars)) { last }
     }
-    for my $i (0:9) {
+    for val $i (0:9) {
         if ($char_idx >= len(@alpha_chars)) { last }
         $map{$alpha_chars[$char_idx]} = "$sp2$i"
         $char_idx++
     }
     
     # 3. Encode
-    my $encoded = ""
-    for my $c (split("", uc($msg))) {
+    var $encoded = ""
+    for val $c (split("", uc($msg))) {
         if (exists $map{$c}) {
             $encoded .= $map{$c}
         }
@@ -38,12 +38,12 @@ fn Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2) {
 }
 
 # Values from Wikipedia / Rosetta Code example
-my $alphabet = "ET ONRISHDLFCUMGPYBWVKXJQZ./"
-my $sp1 = 2
-my $sp2 = 6
+val $alphabet = "ET ONRISHDLFCUMGPYBWVKXJQZ./"
+val $sp1 = 2
+val $sp2 = 6
 
-my $msg = "CHECK"
-my $enc = Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2)
+val $msg = "CHECK"
+val $enc = Rosetta::Checkerboard::encode($msg, $alphabet, $sp1, $sp2)
 # p "Encoded: $enc"
 
 # E (0), T (1), SPACE (3), O (4), N (5), R (7), I (8), S (9)

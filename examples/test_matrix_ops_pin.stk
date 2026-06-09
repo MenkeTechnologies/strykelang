@@ -3,72 +3,72 @@
 package Matrix
 
 fn new($rows, $cols) {
-    my @m
-    for my $i (0 : $rows - 1) {
-        my @row = (0.0) x $cols
+    var @m
+    for val $i (0 : $rows - 1) {
+        val @row = (0.0) x $cols
         push @m, \@row
     }
     \@m
 }
 fn identity($n) {
-    my $m = new $n, $n
-    for my $i (0 : $n - 1) { $m->[$i]->[$i] = 1.0 }
+    var $m = new $n, $n
+    for val $i (0 : $n - 1) { $m->[$i]->[$i] = 1.0 }
     $m
 }
 fn transpose($m) {
-    my $r = len @$m
-    my $c = len @{$m->[0]}
-    my $res = new $c, $r
-    for my $i (0 : $r - 1) {
-        for my $j (0 : $c - 1) { $res->[$j]->[$i] = $m->[$i]->[$j] }
+    val $r = len @$m
+    val $c = len @{$m->[0]}
+    val $res = new $c, $r
+    for val $i (0 : $r - 1) {
+        for val $j (0 : $c - 1) { $res->[$j]->[$i] = $m->[$i]->[$j] }
     }
     $res
 }
 fn multiply($m1, $m2) {
-    my $r1 = len @$m1; my $c1 = len @{$m1->[0]}
-    my $r2 = len @$m2; my $c2 = len @{$m2->[0]}
+    val $r1 = len @$m1; val $c1 = len @{$m1->[0]}
+    val $r2 = len @$m2; val $c2 = len @{$m2->[0]}
     return undef if $c1 != $r2
-    my $res = new $r1, $c2
-    for my $i (0 : $r1 - 1) {
-        for my $j (0 : $c2 - 1) {
-            my $sum = 0.0
-            for my $k (0 : $c1 - 1) { $sum = $sum + $m1->[$i]->[$k] * $m2->[$k]->[$j] }
+    val $res = new $r1, $c2
+    for val $i (0 : $r1 - 1) {
+        for val $j (0 : $c2 - 1) {
+            var $sum = 0.0
+            for val $k (0 : $c1 - 1) { $sum = $sum + $m1->[$i]->[$k] * $m2->[$k]->[$j] }
             $res->[$i]->[$j] = $sum
         }
     }
     $res
 }
 fn solve($a_orig, $b_orig) {
-    my $n = len @$a_orig
-    my $mat_a = new $n, $n
-    my $mat_b = new $n, len(@{$b_orig->[0]})
-    for my $i (0 : $n - 1) {
-        for my $j (0 : $n - 1) { $mat_a->[$i]->[$j] = $a_orig->[$i]->[$j] }
-        for my $j (0 : (len @{$b_orig->[0]}) - 1) { $mat_b->[$i]->[$j] = $b_orig->[$i]->[$j] }
+    val $n = len @$a_orig
+    var $mat_a = new $n, $n
+    var $mat_b = new $n, len(@{$b_orig->[0]})
+    for val $i (0 : $n - 1) {
+        for val $j (0 : $n - 1) { $mat_a->[$i]->[$j] = $a_orig->[$i]->[$j] }
+        for val $j (0 : (len @{$b_orig->[0]}) - 1) { $mat_b->[$i]->[$j] = $b_orig->[$i]->[$j] }
     }
-    for my $i (0 : $n - 1) {
-        my $max = abs($mat_a->[$i]->[$i]); my $max_row = $i
-        for my $k ($i + 1 : $n - 1) {
+    for var $i (0 : $n - 1) {
+        var $max = abs($mat_a->[$i]->[$i]); var $max_row = $i
+        for val $k ($i + 1 : $n - 1) {
             if (abs($mat_a->[$k]->[$i]) > $max) { $max = abs($mat_a->[$k]->[$i]); $max_row = $k }
         }
         ($mat_a->[$i], $mat_a->[$max_row]) = ($mat_a->[$max_row], $mat_a->[$i])
         ($mat_b->[$i], $mat_b->[$max_row]) = ($mat_b->[$max_row], $mat_b->[$i])
-        my $pivot = $mat_a->[$i]->[$i]
+        val $pivot = $mat_a->[$i]->[$i]
         return undef if abs($pivot) < 1e-12
-        for my $k ($i + 1 : $n - 1) {
-            my $c = -$mat_a->[$k]->[$i] / $pivot
-            for my $j ($i : $n - 1) {
+        for val $k ($i + 1 : $n - 1) {
+            val $c = -$mat_a->[$k]->[$i] / $pivot
+            for val $j ($i : $n - 1) {
                 if ($i == $j) { $mat_a->[$k]->[$j] = 0.0 }
                 else { $mat_a->[$k]->[$j] = $mat_a->[$k]->[$j] + $c * $mat_a->[$i]->[$j] }
             }
-            for my $j (0 : (len @{$mat_b->[0]}) - 1) { $mat_b->[$k]->[$j] = $mat_b->[$k]->[$j] + $c * $mat_b->[$i]->[$j] }
+            for val $j (0 : (len @{$mat_b->[0]}) - 1) { $mat_b->[$k]->[$j] = $mat_b->[$k]->[$j] + $c * $mat_b->[$i]->[$j] }
         }
     }
-    my $x = new $n, len(@{$mat_b->[0]})
-    for my $i (rev 0 : $n - 1) {
-        for my $j (0 : (len @{$mat_b->[0]}) - 1) {
-            my $sum = $mat_b->[$i]->[$j]
-            for my $k ($i + 1 : $n - 1) { $sum = $sum - $mat_a->[$i]->[$k] * $x->[$k]->[$j] }
+    val $x = new $n, len(@{$mat_b->[0]})
+    for val $i (rev 0 : $n - 1) {
+        for val $j (0 : (len @{$mat_b->[0]}) - 1) {
+            var $sum = $mat_b->[$i]->[$j]
+            for val $k ($i + 1 : $n - 1) { $sum = $sum - $mat_a->[$i]->[$k] * $x->[$k]->[$j] }
             $x->[$i]->[$j] = $sum / $mat_a->[$i]->[$i]
         }
     }
@@ -78,25 +78,25 @@ fn solve($a_orig, $b_orig) {
 package main
 
 # Multiply
-my $m1 = [[1, 2], [3, 4]]
-my $m2 = [[5, 6], [7, 8]]
-my $m3 = Matrix::multiply $m1, $m2
+val $m1 = [[1, 2], [3, 4]]
+val $m2 = [[5, 6], [7, 8]]
+val $m3 = Matrix::multiply $m1, $m2
 $m3->[0]->[0] |> aeq 19, "multiply 0,0"
 $m3->[1]->[1] |> aeq 50, "multiply 1,1"
 
 # Transpose
-my $mt1 = Matrix::transpose [[1, 2, 3], [4, 5, 6]]
+val $mt1 = Matrix::transpose [[1, 2, 3], [4, 5, 6]]
 len(@$mt1) |> aeq 3, "transpose rows"
 
 # Solve
-my $ma = [[1, 1], [1, -1]]
-my $mb = [[2], [0]]
-my $sol = Matrix::solve $ma, $mb
+val $ma = [[1, 1], [1, -1]]
+val $mb = [[2], [0]]
+val $sol = Matrix::solve $ma, $mb
 $sol->[0]->[0] |> aeq 1, "solve x"
 $sol->[1]->[0] |> aeq 1, "solve y"
 
 # Identity
-my $mid = Matrix::identity 3
+val $mid = Matrix::identity 3
 $mid->[2]->[2] |> aeq 1, "id 2,2"
 
 test_run

@@ -9,8 +9,8 @@ fn Rosetta::CollatzPipe::sequence($n) {
     # We can't easily do a while loop in a pure pipeline without a specialized operator
     # but we can use ~> with a generator-like logic if we had one.
     # For now, show piping the results.
-    my @seq = ($n)
-    my $curr = $n
+    var @seq = ($n)
+    var $curr = $n
     while ($curr != 1) {
         $curr = $curr |> Rosetta::CollatzPipe::step
         push @seq, $curr

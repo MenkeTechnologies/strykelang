@@ -8,22 +8,22 @@
 # clouds, run a convex-hull pass first; we use Andrew's monotone chain.
 
 fn Rosetta::Calipers::convex_hull($pts) {
-    my @sorted = sort {
+    val @sorted = sort {
         _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
     } @$pts
-    my $n = len(@sorted)
+    val $n = len(@sorted)
     return \@sorted if $n < 3
-    my @lower
-    for my $p (@sorted) {
+    var @lower
+    for val $p (@sorted) {
         while (len(@lower) >= 2
                && Rosetta::Calipers::cross($lower[-2], $lower[-1], $p) <= 0) {
             pop @lower
         }
         push @lower, $p
     }
-    my @upper
-    for (my $i = $n - 1; $i >= 0; $i--) {
-        my $p = $sorted[$i]
+    var @upper
+    for (var $i = $n - 1; $i >= 0; $i--) {
+        val $p = $sorted[$i]
         while (len(@upper) >= 2
                && Rosetta::Calipers::cross($upper[-2], $upper[-1], $p) <= 0) {
             pop @upper
@@ -41,29 +41,29 @@ fn Rosetta::Calipers::cross($o, $u, $v) {
 }
 
 fn Rosetta::Calipers::dist2($p, $q) {
-    my $dx = $p->[0] - $q->[0]
-    my $dy = $p->[1] - $q->[1]
+    val $dx = $p->[0] - $q->[0]
+    val $dy = $p->[1] - $q->[1]
     $dx * $dx + $dy * $dy
 }
 
 fn Rosetta::Calipers::diameter($hull) {
-    my $n = len(@$hull)
+    val $n = len(@$hull)
     return 0 if $n < 2
     return Rosetta::Calipers::dist2($hull->[0], $hull->[1]) if $n == 2
-    my $best = 0
-    my $j = 1
-    for my $i (~> 0:$n - 1) {
-        my $ni = ($i + 1) % $n
+    var $best = 0
+    var $j = 1
+    for val $i (~> 0:$n - 1) {
+        val $ni = ($i + 1) % $n
         # Advance j while the triangle area grows.
         while (1) {
-            my $nj = ($j + 1) % $n
-            my $area_j  = abs(Rosetta::Calipers::cross($hull->[$i], $hull->[$ni], $hull->[$j]))
-            my $area_nj = abs(Rosetta::Calipers::cross($hull->[$i], $hull->[$ni], $hull->[$nj]))
+            val $nj = ($j + 1) % $n
+            val $area_j  = abs(Rosetta::Calipers::cross($hull->[$i], $hull->[$ni], $hull->[$j]))
+            val $area_nj = abs(Rosetta::Calipers::cross($hull->[$i], $hull->[$ni], $hull->[$nj]))
             last if $area_nj <= $area_j
             $j = $nj
         }
-        my $d1 = Rosetta::Calipers::dist2($hull->[$i],  $hull->[$j])
-        my $d2 = Rosetta::Calipers::dist2($hull->[$ni], $hull->[$j])
+        val $d1 = Rosetta::Calipers::dist2($hull->[$i],  $hull->[$j])
+        val $d2 = Rosetta::Calipers::dist2($hull->[$ni], $hull->[$j])
         $best = $d1 if $d1 > $best
         $best = $d2 if $d2 > $best
     }
@@ -73,11 +73,11 @@ fn Rosetta::Calipers::diameter($hull) {
 fn Rosetta::Calipers::approx($x, $y, $eps) { abs($x - $y) < $eps }
 
 fn Rosetta::Calipers::naive_diameter($pts) {
-    my $n = len(@$pts)
-    my $best = 0
-    for my $i (~> 0:$n - 1) {
-        for my $j ($i + 1:$n - 1) {
-            my $d = Rosetta::Calipers::dist2($pts->[$i], $pts->[$j])
+    val $n = len(@$pts)
+    var $best = 0
+    for val $i (~> 0:$n - 1) {
+        for val $j ($i + 1:$n - 1) {
+            val $d = Rosetta::Calipers::dist2($pts->[$i], $pts->[$j])
             $best = $d if $d > $best
         }
     }
@@ -85,48 +85,48 @@ fn Rosetta::Calipers::naive_diameter($pts) {
 }
 
 # Square — diameter² = 2 (unit square).
-my $sq = [[0, 0], [1, 0], [1, 1], [0, 1]]
-my $hull_sq = Rosetta::Calipers::convex_hull($sq)
+val $sq = [[0, 0], [1, 0], [1, 1], [0, 1]]
+val $hull_sq = Rosetta::Calipers::convex_hull($sq)
 assert_ok Rosetta::Calipers::approx(Rosetta::Calipers::diameter($hull_sq), 2, 1e-9),
     "unit square diameter² = 2"
 
 # Triangle 3-4-5 — diameter² = 25
-my $tri = [[0, 0], [4, 0], [0, 3]]
-my $hull_t = Rosetta::Calipers::convex_hull($tri)
+val $tri = [[0, 0], [4, 0], [0, 3]]
+val $hull_t = Rosetta::Calipers::convex_hull($tri)
 assert_eq Rosetta::Calipers::diameter($hull_t), 25, "3-4-5 diameter² = 25"
 
 # Regular polygon: diameter² ≈ (2R)² for opposite vertices on circumscribed
 # circle of radius R. Use a hexagon at R=5; opposite vertices are 10 apart.
-my $r = 5
-my $pi = atan2(0, -1)
-my @hex
-for my $i (~> 0:5) {
-    my $ang = $i * $pi / 3
+val $r = 5
+val $pi = atan2(0, -1)
+var @hex
+for val $i (~> 0:5) {
+    val $ang = $i * $pi / 3
     push @hex, [$r * cos($ang), $r * sin($ang)]
 }
-my $hull_h = Rosetta::Calipers::convex_hull(\@hex)
+val $hull_h = Rosetta::Calipers::convex_hull(\@hex)
 assert_ok Rosetta::Calipers::approx(Rosetta::Calipers::diameter($hull_h), 100, 1e-6),
     "hex diameter² = 100"
 
 # Random points cross-checked vs naive O(n²).
 srand(33)
-my @rand
+var @rand
 for (~> 1:25) {
     push @rand, [int(rand() * 100), int(rand() * 100)]
 }
-my $hull_r = Rosetta::Calipers::convex_hull(\@rand)
-my $cal = Rosetta::Calipers::diameter($hull_r)
-my $nv  = Rosetta::Calipers::naive_diameter(\@rand)
+val $hull_r = Rosetta::Calipers::convex_hull(\@rand)
+val $cal = Rosetta::Calipers::diameter($hull_r)
+val $nv  = Rosetta::Calipers::naive_diameter(\@rand)
 assert_eq $cal, $nv, "calipers = naive on 25 random points"
 
 # Two-point cloud
-my $two = [[0, 0], [10, 0]]
-my $hull_two = Rosetta::Calipers::convex_hull($two)
+val $two = [[0, 0], [10, 0]]
+val $hull_two = Rosetta::Calipers::convex_hull($two)
 assert_eq Rosetta::Calipers::diameter($hull_two), 100, "two points: 10²"
 
 # Convex hull sanity
-my $hull = Rosetta::Calipers::convex_hull([[0, 0], [4, 0], [4, 4], [0, 4], [2, 2]])
-my @hull_set = sort {
+val $hull = Rosetta::Calipers::convex_hull([[0, 0], [4, 0], [4, 4], [0, 4], [2, 2]])
+val @hull_set = sort {
     _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
 } @$hull
 assert_eq len(@hull_set), 4, "interior point excluded from hull"

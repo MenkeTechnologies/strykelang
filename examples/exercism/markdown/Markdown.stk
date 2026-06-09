@@ -3,14 +3,14 @@
 # Parse a small Markdown subset: `#`..`######` headers, `*` bullet list,
 # `__bold__`, `_italic_`, otherwise a `<p>...</p>` paragraph.
 fn Exercism::Markdown::parse {
-    my $html = join "", map { Exercism::Markdown::_process(_) } split /\n/, _
+    var $html = join "", map { Exercism::Markdown::_process(_) } split /\n/, _
     # Wrap consecutive `<li>` runs in `<ul>...</ul>`.
     $html =~ s|((?:<li>.*?</li>)+)|<ul>$1</ul>|gr
 }
 
 fn Exercism::Markdown::_process {
     if (_ =~ /^(#{1,6})\s+(.*)$/) {
-        my $n = len($1)
+        val $n = len($1)
         "<h$n>" . Exercism::Markdown::_inline($2) . "</h$n>"
     } elsif (_ =~ /^\*\s+(.*)$/) {
         "<li>" . Exercism::Markdown::_inline($1) . "</li>"

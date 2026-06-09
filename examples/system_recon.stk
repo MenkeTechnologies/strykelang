@@ -6,9 +6,9 @@
 print cyber_banner("STRYKE MINIRECON")
 p ""
 
-my $info = pool_info()
-my $ram_total = mem_total()
-my $uptime = sys_uptime()
+val $info = pool_info()
+val $ram_total = mem_total()
+val $uptime = sys_uptime()
 
 p "--- SYSTEM INTEL ---"
 printf "  HOST:     %s\n", gethostname()
@@ -23,8 +23,8 @@ printf "  MAC:      %s\n", net_mac() // "N/A"
 printf "  DNS:      %s\n", join(", ", net_dns_servers())
 
 p "\n--- DISK INTEL ---"
-my @disks = mounts()
-for my $m (@disks) {
+val @disks = mounts()
+for val $m (@disks) {
     next unless $m->{total} > 0
     printf "  %-10s %5.1f%% used (%s free)\n", 
         $m->{mount}, 

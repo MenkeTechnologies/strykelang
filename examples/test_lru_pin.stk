@@ -8,8 +8,8 @@ fn LRU::new($cap) {
 }
 
 fn LRU::touch($cache, $key) {
-    my @new_order = ()
-    for my $k (@{$cache->{order}}) {
+    var @new_order = ()
+    for val $k (@{$cache->{order}}) {
         push @new_order, $k if $k ne $key
     }
     push @new_order, $key
@@ -31,7 +31,7 @@ fn LRU::put($cache, $key, $val) {
     $cache->{store}->{$key} = $val
     push @{$cache->{order}}, $key
     while (len(@{$cache->{order}}) > $cache->{cap}) {
-        my $evict = shift @{$cache->{order}}
+        val $evict = shift @{$cache->{order}}
         delete $cache->{store}->{$evict}
     }
 }
@@ -40,13 +40,13 @@ fn LRU::size($cache) { len @{$cache->{order}} }
 
 # ── Empty cache ───────────────────────────────────────────────────────────
 
-my $c0 = LRU::new(3)
+val $c0 = LRU::new(3)
 LRU::size($c0)         |> aeq 0, "empty size = 0"
 (defined LRU::get($c0, "x") ? 1 : 0) |> aeq 0, "missing key returns undef"
 
 # ── Basic put/get ─────────────────────────────────────────────────────────
 
-my $c1 = LRU::new(3)
+val $c1 = LRU::new(3)
 LRU::put($c1, "a", 1)
 LRU::put($c1, "b", 2)
 LRU::put($c1, "c", 3)
@@ -57,7 +57,7 @@ LRU::get($c1, "c")     |> aeq 3, "get c=3"
 
 # ── Eviction at capacity ──────────────────────────────────────────────────
 
-my $c2 = LRU::new(3)
+val $c2 = LRU::new(3)
 LRU::put($c2, "a", 1)
 LRU::put($c2, "b", 2)
 LRU::put($c2, "c", 3)
@@ -68,7 +68,7 @@ LRU::get($c2, "d")     |> aeq 4, "d present"
 
 # ── Touch moves to MRU end ────────────────────────────────────────────────
 
-my $c3 = LRU::new(3)
+val $c3 = LRU::new(3)
 LRU::put($c3, "a", 1)
 LRU::put($c3, "b", 2)
 LRU::put($c3, "c", 3)
@@ -81,7 +81,7 @@ LRU::get($c3, "d")             |> aeq 4, "d present"
 
 # ── Update existing key ───────────────────────────────────────────────────
 
-my $c4 = LRU::new(3)
+val $c4 = LRU::new(3)
 LRU::put($c4, "a", 1)
 LRU::put($c4, "a", 99)
 LRU::size($c4)         |> aeq 1, "size still 1 after update"
@@ -89,7 +89,7 @@ LRU::get($c4, "a")     |> aeq 99, "a updated to 99"
 
 # ── Capacity 1 ────────────────────────────────────────────────────────────
 
-my $c5 = LRU::new(1)
+val $c5 = LRU::new(1)
 LRU::put($c5, "x", 10)
 LRU::put($c5, "y", 20)
 LRU::size($c5)         |> aeq 1, "cap-1 size = 1"
@@ -98,16 +98,16 @@ LRU::get($c5, "y")     |> aeq 20, "y present"
 
 # ── Capacity larger than items ────────────────────────────────────────────
 
-my $c6 = LRU::new(10)
-for my $i (1:5) { LRU::put($c6, "k$i", $i * 10) }
+val $c6 = LRU::new(10)
+for val $i (1:5) { LRU::put($c6, "k$i", $i * 10) }
 LRU::size($c6)         |> aeq 5, "size below cap"
 LRU::get($c6, "k1")    |> aeq 10, "k1=10"
 LRU::get($c6, "k5")    |> aeq 50, "k5=50"
 
 # ── Many evictions ────────────────────────────────────────────────────────
 
-my $c7 = LRU::new(2)
-for my $i (1:10) { LRU::put($c7, "k$i", $i) }
+val $c7 = LRU::new(2)
+for val $i (1:10) { LRU::put($c7, "k$i", $i) }
 LRU::size($c7)         |> aeq 2, "cap-2 holds 2"
 LRU::get($c7, "k10")   |> aeq 10, "newest k10"
 LRU::get($c7, "k9")    |> aeq 9,  "second-newest k9"

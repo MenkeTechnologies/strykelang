@@ -16,19 +16,19 @@
 
 p "── chant + amen lifecycle ──"
 
-my @workers = congregation(2)
+val @workers = congregation(2)
 printf "spawned %d workers\n", len(@workers)
 
 # 1. Start a chant — sets a config hash that workers retain across EVALs.
-my $chant_id = chant("%main::config = (mode => 'render', quality => 'high')", @workers)
+val $chant_id = chant("%main::config = (mode => 'render', quality => 'high')", @workers)
 printf "chant id: %d (registered as active rescatter)\n", $chant_id
 
 # 2. amen — stop the chant.
-my $stopped = amen $chant_id
+val $stopped = amen $chant_id
 printf "amen returned %d (1 = chant was active)\n", $stopped
 
 # 3. amen again — idempotent, returns 0.
-my $stopped_again = amen $chant_id
+var $stopped_again = amen $chant_id
 printf "amen second call returned %d (0 = already removed)\n", $stopped_again
 
 excommunicate(@workers)

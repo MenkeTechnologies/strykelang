@@ -11,7 +11,7 @@
 
 # ── tiny corpus ───────────────────────────────────────────────────────
 
-my @docs = (
+val @docs = (
     "Rust is a systems programming language focused on safety and speed",
     "Perl is famous for its expressive text processing and regex support",
     "Stryke is a Rust language that supersets Perl and adds parallel JIT",
@@ -27,25 +27,25 @@ printf "── %d documents in corpus ──────────────
 # ── tokenise + lowercase ─────────────────────────────────────────────
 
 fn Demo::IR::tokenize($s) {
-    my @tokens = split /\W+/, lc $s
+    var @tokens = split /\W+/, lc $s
     @tokens = grep { len(_) > 0 } @tokens
     \@tokens
 }
 
 # ── document length + avg ────────────────────────────────────────────
 
-my @tokens_per_doc = map {Demo::IR::tokenize} @docs
-my @doc_lengths    = map { len(@{_}) } @tokens_per_doc
-my $avgdl          = sum(@doc_lengths) / len @doc_lengths
+val @tokens_per_doc = map {Demo::IR::tokenize} @docs
+val @doc_lengths    = map { len(@{_}) } @tokens_per_doc
+val $avgdl          = sum(@doc_lengths) / len @doc_lengths
 printf "  total terms: %d, avg doc length: %.1f\n",
     sum(@doc_lengths), $avgdl
 
 # ── build inverted index: term -> hashref{ doc_id => count } ─────────
 
-my %index
-for my $doc_id (0:len(@docs)-1) {
-    my $toks = $tokens_per_doc[$doc_id]
-    for my $tok (@{$toks}) {
+var %index
+for val $doc_id (0:len(@docs)-1) {
+    val $toks = $tokens_per_doc[$doc_id]
+    for val $tok (@{$toks}) {
         $index{$tok} //= +{}
         $index{$tok}->{$doc_id} = ($index{$tok}->{$doc_id} // 0) + 1
     }
@@ -56,7 +56,7 @@ printf "  distinct terms in index: %d\n", len(keys %index)
 
 fn Demo::IR::idf($term, $idx_ref, $N) {
     return 0 unless exists $idx_ref->{$term}
-    my $df = len(keys %{$idx_ref->{$term}})
+    val $df = len(keys %{$idx_ref->{$term}})
     return 0 if $df == 0
     # BM25 idf: log((N - df + 0.5) / (df + 0.5) + 1)
     log(($N - $df + 0.5) / ($df + 0.5) + 1.0)
@@ -65,17 +65,17 @@ fn Demo::IR::idf($term, $idx_ref, $N) {
 # ── BM25 score per (query, doc) ──────────────────────────────────────
 
 fn Demo::IR::bm25_score($query_terms, $doc_id, $idx_ref, $lengths_ref, $avgdl, $N) {
-    my $k1 = 1.5
-    my $bm = 0.75
-    my $dl = $lengths_ref->[$doc_id]
-    my $score = 0.0
-    for my $term (@{$query_terms}) {
+    val $k1 = 1.5
+    val $bm = 0.75
+    val $dl = $lengths_ref->[$doc_id]
+    var $score = 0.0
+    for val $term (@{$query_terms}) {
         next unless exists $idx_ref->{$term}
-        my $tf = $idx_ref->{$term}->{$doc_id} // 0
+        val $tf = $idx_ref->{$term}->{$doc_id} // 0
         next if $tf == 0
-        my $idf = Demo::IR::idf($term, $idx_ref, $N)
-        my $num = $tf * ($k1 + 1)
-        my $den = $tf + $k1 * (1 - $bm + $bm * ($dl / $avgdl))
+        val $idf = Demo::IR::idf($term, $idx_ref, $N)
+        val $num = $tf * ($k1 + 1)
+        val $den = $tf + $k1 * (1 - $bm + $bm * ($dl / $avgdl))
         $score += $idf * ($num / $den)
     }
     $score
@@ -84,10 +84,10 @@ fn Demo::IR::bm25_score($query_terms, $doc_id, $idx_ref, $lengths_ref, $avgdl, $
 # ── search: rank all docs for a query and return TopK ────────────────
 
 fn Demo::IR::search($query, $k, $idx_ref, $lengths_ref, $avgdl, $N) {
-    my $qtoks = Demo::IR::tokenize($query)
-    my @scored
-    for my $doc_id (0:$N-1) {
-        my $s = Demo::IR::bm25_score($qtoks, $doc_id, $idx_ref, $lengths_ref, $avgdl, $N)
+    val $qtoks = Demo::IR::tokenize($query)
+    var @scored
+    for val $doc_id (0:$N-1) {
+        val $s = Demo::IR::bm25_score($qtoks, $doc_id, $idx_ref, $lengths_ref, $avgdl, $N)
         push @scored, [$doc_id, $s] if $s > 0
     }
     @scored = sort { _1->[1] <=> _->[1] } @scored
@@ -97,12 +97,12 @@ fn Demo::IR::search($query, $k, $idx_ref, $lengths_ref, $avgdl, $N) {
 
 # ── run a few queries ────────────────────────────────────────────────
 
-my $lengths_ref = \@doc_lengths
-my $N = len @docs
+val $lengths_ref = \@doc_lengths
+val $N = len @docs
 
 mysync $query_log = topk(3)
 
-my @queries = (
+val @queries = (
     "rust language",
     "regex parallel",
     "bytecode vm",
@@ -110,16 +110,16 @@ my @queries = (
     "compiler",
 )
 
-for my $q (@queries) {
+for val $q (@queries) {
     topk_add($query_log, $q)
     printf "\n── query: \"%s\" ─────────────────────────────────\n", $q
-    my $hits = Demo::IR::search($q, 3, \%index, $lengths_ref, $avgdl, $N)
+    val $hits = Demo::IR::search($q, 3, \%index, $lengths_ref, $avgdl, $N)
     if (len(@{$hits}) == 0) {
         p "  (no results)"
     } else {
-        for my $hit (@{$hits}) {
-            my $doc_id = $hit->[0]
-            my $score  = $hit->[1]
+        for val $hit (@{$hits}) {
+            val $doc_id = $hit->[0]
+            val $score  = $hit->[1]
             printf "  doc %d  score=%.3f  : %s\n",
                 $doc_id, $score, substr($docs[$doc_id], 0, 60)
         }
@@ -130,8 +130,8 @@ for my $q (@queries) {
 
 p ""
 p "── top queries (TopK telemetry) ─────────────────────"
-my @top = topk_top($query_log)
-for my $h (@top) {
+val @top = topk_top($query_log)
+for val $h (@top) {
     printf "  %s : %d\n", $h->[0], $h->[1]
 }
 
@@ -140,7 +140,7 @@ for my $h (@top) {
 p ""
 p "── distinct term cardinality (HLL) ──────────────────"
 mysync $hll = hll(14)
-for my $toks (@tokens_per_doc) {
+for val $toks (@tokens_per_doc) {
     hll_add($hll, _) for @{$toks}
 }
 printf "  HLL distinct estimate : %d\n", hll_count($hll)

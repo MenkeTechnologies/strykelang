@@ -6,8 +6,8 @@ fn Rosetta::HappyNumbers::sum_sq_digits($n) {
 }
 
 fn Rosetta::HappyNumbers::is_happy($n) {
-    my %seen
-    my $curr = $n
+    var %seen
+    var $curr = $n
     while ($curr != 1 && !$seen{$curr}) {
         $seen{$curr} = 1
         $curr = Rosetta::HappyNumbers::sum_sq_digits($curr)
@@ -16,8 +16,8 @@ fn Rosetta::HappyNumbers::is_happy($n) {
 }
 
 fn Rosetta::HappyNumbers::solve($count) {
-    my @happy
-    my $n = 1
+    var @happy
+    var $n = 1
     while (len(@happy) < $count) {
         if (Rosetta::HappyNumbers::is_happy($n)) {
             push @happy, $n
@@ -32,7 +32,7 @@ assert_ok Rosetta::HappyNumbers::is_happy(7), "7 is happy"
 assert_ok Rosetta::HappyNumbers::is_happy(19), "19 is happy"
 assert_ok !Rosetta::HappyNumbers::is_happy(4), "4 is not happy"
 
-my @first8 = Rosetta::HappyNumbers::solve(8)
+val @first8 = Rosetta::HappyNumbers::solve(8)
 assert_eq join(",", @first8), "1,7,10,13,19,23,28,31", "first 8 happy numbers"
 
 test_run

@@ -11,11 +11,11 @@ fn Rosetta::ErdosNicolas::divisors($n) {
 
 fn Rosetta::ErdosNicolas::is($n) {
     return 0 if $n < 2
-    my @d = Rosetta::ErdosNicolas::divisors($n)
+    var @d = Rosetta::ErdosNicolas::divisors($n)
     # Drop n itself — Erdős–Nicolas considers proper-divisor prefixes.
     pop @d
-    my $s = 0
-    for my $i (0..len(@d) - 1) {
+    var $s = 0
+    for val $i (0..len(@d) - 1) {
         $s += $d[$i]
         # Need k > 1 (i.e. at least two divisors) and not all of them
         # (that would make n perfect).
@@ -25,8 +25,8 @@ fn Rosetta::ErdosNicolas::is($n) {
 }
 
 fn Rosetta::ErdosNicolas::first($k) {
-    my @found
-    my $n = 1
+    var @found
+    var $n = 1
     while (len(@found) < $k) {
         $n++
         push @found, $n if Rosetta::ErdosNicolas::is($n)
@@ -35,7 +35,7 @@ fn Rosetta::ErdosNicolas::first($k) {
 }
 
 # Sanity on divisor list
-my @d24 = Rosetta::ErdosNicolas::divisors(24)
+val @d24 = Rosetta::ErdosNicolas::divisors(24)
 assert_eq join(",", @d24), "1,2,3,4,6,8,12,24", "divisors of 24"
 
 # 24 is the first Erdős–Nicolas number
@@ -52,14 +52,14 @@ assert_eq Rosetta::ErdosNicolas::is(20), 0, "20 is not E-N"
 assert_eq Rosetta::ErdosNicolas::is(30), 0, "30 is not E-N"
 
 # First 1 Erdős–Nicolas number
-my @first = Rosetta::ErdosNicolas::first(1)
+val @first = Rosetta::ErdosNicolas::first(1)
 assert_eq $first[0], 24, "first E-N number is 24"
 
 # Pipe form
 24 |> Rosetta::ErdosNicolas::is |> assert_eq(1, "pipe is(24)")
 
 # Threaded: scan a small window
-my @hits = ~> 1:100 |> grep {Rosetta::ErdosNicolas::is}
+val @hits = ~> 1:100 |> grep {Rosetta::ErdosNicolas::is}
 assert_eq join(",", @hits), "24", "only 24 in 1:100"
 
 test_run

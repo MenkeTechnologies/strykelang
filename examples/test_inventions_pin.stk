@@ -21,12 +21,12 @@ join(",", sort(@stream_results)) |> aeq "10,20,30,40,50", "streaming macro conte
 # Number -> sum
 ~> (1:100) par_reduce { sum } |> aeq 5050, "par_reduce numeric sum"
 # Hash<num> -> key-wise add
-my $merged_h = ~> "aaabbc" par_reduce { letters |> freq }
+val $merged_h = ~> "aaabbc" par_reduce { letters |> freq }
 $merged_h->{a} |> aeq 3, "par_reduce hash merge"
 
 # ── 3. Indexed Outer Topics (_<N) ──────────────────────────────────────────
 
-my $invention_depth = 0
+var $invention_depth = 0
 range(1, 1) |> e {
     range(2, 2) |> e {
         range(3, 3) |> e {
@@ -43,7 +43,7 @@ $invention_depth |> aeq 6, "indexed depth topics _<N"
 
 # ── 5. Multi-line Comma Regex (s,,) ───────────────────────────────────────
 
-my $re_val = "foo,bar"
+var $re_val = "foo,bar"
 $re_val =~ s,foo,baz,
 $re_val |> aeq "baz,bar", "s,,, comma delimiter"
 

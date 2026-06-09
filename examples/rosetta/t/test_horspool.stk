@@ -2,29 +2,29 @@
 # Rosetta Code: Boyer-Moore-Horspool string search
 
 fn Rosetta::Horspool::shift_table($pat) {
-    my $m = length($pat)
-    my %tbl
-    for my $i (0:$m-2) {
+    val $m = length($pat)
+    var %tbl
+    for val $i (0:$m-2) {
         $tbl{substr($pat, $i, 1)} = $m - 1 - $i
     }
     \%tbl
 }
 
 fn Rosetta::Horspool::find($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
+    val $n = length($text)
+    val $m = length($pat)
     return 0 if $m == 0
     return -1 if $n < $m
-    my $tbl = Rosetta::Horspool::shift_table($pat)
-    my $i = $m - 1
+    val $tbl = Rosetta::Horspool::shift_table($pat)
+    var $i = $m - 1
     while ($i < $n) {
-        my $k = 0
+        var $k = 0
         while ($k < $m && substr($pat, $m - 1 - $k, 1) eq substr($text, $i - $k, 1)) {
             $k++
         }
         if ($k == $m) { return $i - $m + 1 }
-        my $c = substr($text, $i, 1)
-        my $shift = exists $tbl->{$c} ? $tbl->{$c} : $m
+        val $c = substr($text, $i, 1)
+        val $shift = exists $tbl->{$c} ? $tbl->{$c} : $m
         $i += $shift
     }
     -1

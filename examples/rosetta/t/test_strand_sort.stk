@@ -2,13 +2,13 @@
 # Rosetta Code: Strand Sort
 
 fn Rosetta::StrandSort::sort($list) {
-    my @arr = @$list
-    my @result = ()
+    var @arr = @$list
+    var @result = ()
     
     while (len(@arr) > 0) {
-        my @sublist = (shift @arr)
-        my @remaining = ()
-        for my $val (@arr) {
+        var @sublist = (shift @arr)
+        var @remaining = ()
+        for val $val (@arr) {
             if (len(@sublist) > 0 && $val > $sublist[-1]) {
                 push @sublist, $val
             } else {
@@ -18,7 +18,7 @@ fn Rosetta::StrandSort::sort($list) {
         @arr = @remaining
         
         # Merge sublist into result
-        my @merged = ()
+        var @merged = ()
         while (len(@result) > 0 && len(@sublist) > 0) {
             if ($result[0] < $sublist[0]) {
                 push @merged, (shift @result)
@@ -33,8 +33,8 @@ fn Rosetta::StrandSort::sort($list) {
     \@result
 }
 
-my $data = [1, 6, 3, 2, 1, 7, 5, 22, 58, 0, 9, 3, 4]
-my $sorted = Rosetta::StrandSort::sort($data)
+val $data = [1, 6, 3, 2, 1, 7, 5, 22, 58, 0, 9, 3, 4]
+val $sorted = Rosetta::StrandSort::sort($data)
 assert_eq join(",", @$sorted), "0,1,1,2,3,3,4,5,6,7,9,22,58", "strand sort"
 
 test_run

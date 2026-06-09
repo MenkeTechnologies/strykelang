@@ -5,29 +5,29 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::nested_array_access {
-    my $arr = [[1, 2], [3, 4], [5, 6]]
+    val $arr = [[1, 2], [3, 4], [5, 6]]
     $arr->[1][0]
 }
 
 fn Project::DataStructures::nested_array_depth3 {
-    my $arr = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
+    val $arr = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]
     $arr->[1][0][1]
 }
 
 fn Project::DataStructures::nested_array_modify {
-    my $arr = [[1, 2], [3, 4]]
+    val $arr = [[1, 2], [3, 4]]
     $arr->[0][1] = 99
     $arr->[0][1]
 }
 
 fn Project::DataStructures::nested_array_push {
-    my $arr = [[1], [2]]
+    val $arr = [[1], [2]]
     push @{$arr->[0]}, 10
     len(@{$arr->[0]})
 }
 
 fn Project::DataStructures::nested_array_count {
-    my $arr = [[1, 2, 3], [4, 5], [6]]
+    val $arr = [[1, 2, 3], [4, 5], [6]]
     len(@{$arr->[0]})
 }
 
@@ -36,29 +36,29 @@ fn Project::DataStructures::nested_array_count {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::nested_hash_access {
-    my $h = {a => {x => 1, y => 2}, b => {x => 3, y => 4}}
+    val $h = {a => {x => 1, y => 2}, b => {x => 3, y => 4}}
     $h->{a}{y}
 }
 
 fn Project::DataStructures::nested_hash_depth3 {
-    my $h = {a => {b => {c => "deep"}}}
+    val $h = {a => {b => {c => "deep"}}}
     $h->{a}{b}{c}
 }
 
 fn Project::DataStructures::nested_hash_modify {
-    my $h = {a => {x => 1}}
+    val $h = {a => {x => 1}}
     $h->{a}{x} = 99
     $h->{a}{x}
 }
 
 fn Project::DataStructures::nested_hash_add_key {
-    my $h = {a => {}}
+    val $h = {a => {}}
     $h->{a}{new} = "value"
     $h->{a}{new}
 }
 
 fn Project::DataStructures::nested_hash_keys {
-    my $h = {a => {x => 1, y => 2, z => 3}}
+    val $h = {a => {x => 1, y => 2, z => 3}}
     len(keys %{$h->{a}})
 }
 
@@ -67,32 +67,32 @@ fn Project::DataStructures::nested_hash_keys {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::aoh_access {
-    my @arr = ({name => "Alice", age => 30}, {name => "Bob", age => 25})
+    val @arr = ({name => "Alice", age => 30}, {name => "Bob", age => 25})
     $arr[0]{name}
 }
 
 fn Project::DataStructures::aoh_modify {
-    my @arr = ({x => 1}, {x => 2})
+    val @arr = ({x => 1}, {x => 2})
     $arr[1]{x} = 99
     $arr[1]{x}
 }
 
 fn Project::DataStructures::aoh_iterate {
-    my @arr = ({v => 1}, {v => 2}, {v => 3})
-    my $sum = 0
-    for my $h (@arr) {
+    val @arr = ({v => 1}, {v => 2}, {v => 3})
+    var $sum = 0
+    for val $h (@arr) {
         $sum += $h->{v}
     }
     $sum
 }
 
 fn Project::DataStructures::aoh_map {
-    my @arr = ({n => 1}, {n => 2}, {n => 3})
+    val @arr = ({n => 1}, {n => 2}, {n => 3})
     join(",", map { _->{n} * 2 } @arr)
 }
 
 fn Project::DataStructures::aoh_grep {
-    my @arr = ({v => 1}, {v => 5}, {v => 3})
+    val @arr = ({v => 1}, {v => 5}, {v => 3})
     len(grep { _->{v} > 2 } @arr)
 }
 
@@ -101,29 +101,29 @@ fn Project::DataStructures::aoh_grep {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::hoa_access {
-    my %h = (nums => [1, 2, 3], letters => ["a", "b", "c"])
+    val %h = (nums => [1, 2, 3], letters => ["a", "b", "c"])
     $h{nums}[1]
 }
 
 fn Project::DataStructures::hoa_modify {
-    my %h = (arr => [1, 2, 3])
+    val %h = (arr => [1, 2, 3])
     $h{arr}[0] = 99
     $h{arr}[0]
 }
 
 fn Project::DataStructures::hoa_push {
-    my %h = (arr => [1, 2])
+    val %h = (arr => [1, 2])
     push @{$h{arr}}, 3
     len(@{$h{arr}})
 }
 
 fn Project::DataStructures::hoa_join {
-    my %h = (arr => ["a", "b", "c"])
+    val %h = (arr => ["a", "b", "c"])
     join("-", @{$h{arr}})
 }
 
 fn Project::DataStructures::hoa_keys {
-    my %h = (a => [1], b => [2], c => [3])
+    val %h = (a => [1], b => [2], c => [3])
     len(keys %h)
 }
 
@@ -132,7 +132,7 @@ fn Project::DataStructures::hoa_keys {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::hoh_access {
-    my %h = (
+    val %h = (
         user1 => {name => "Alice", role => "admin"},
         user2 => {name => "Bob", role => "user"}
     )
@@ -140,21 +140,21 @@ fn Project::DataStructures::hoh_access {
 }
 
 fn Project::DataStructures::hoh_modify {
-    my %h = (a => {x => 1})
+    val %h = (a => {x => 1})
     $h{a}{x} = 99
     $h{a}{x}
 }
 
 fn Project::DataStructures::hoh_add_inner {
-    my %h = (outer => {})
+    val %h = (outer => {})
     $h{outer}{inner} = "value"
     $h{outer}{inner}
 }
 
 fn Project::DataStructures::hoh_iterate {
-    my %h = (a => {v => 1}, b => {v => 2})
-    my $sum = 0
-    for my $k (keys %h) {
+    val %h = (a => {v => 1}, b => {v => 2})
+    var $sum = 0
+    for val $k (keys %h) {
         $sum += $h{$k}{v}
     }
     $sum
@@ -165,7 +165,7 @@ fn Project::DataStructures::hoh_iterate {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::complex_tree {
-    my $tree = {
+    val $tree = {
         value => 1,
         left => {value => 2, left => undef, right => undef},
         right => {value => 3, left => undef, right => undef}
@@ -174,7 +174,7 @@ fn Project::DataStructures::complex_tree {
 }
 
 fn Project::DataStructures::complex_graph {
-    my %graph = (
+    val %graph = (
         a => ["b", "c"],
         b => ["d"],
         c => ["d"],
@@ -184,7 +184,7 @@ fn Project::DataStructures::complex_graph {
 }
 
 fn Project::DataStructures::complex_config {
-    my $config = {
+    val $config = {
         server => {host => "localhost", port => 8080},
         database => {name => "test", user => "admin"},
         features => ["logging", "caching"]
@@ -193,7 +193,7 @@ fn Project::DataStructures::complex_config {
 }
 
 fn Project::DataStructures::complex_records {
-    my @records = (
+    val @records = (
         {id => 1, data => {name => "A", values => [1, 2, 3]}},
         {id => 2, data => {name => "B", values => [4, 5, 6]}}
     )
@@ -205,25 +205,25 @@ fn Project::DataStructures::complex_records {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::ref_to_nested {
-    my $h = {a => {b => 1}}
-    my $inner = $h->{a}
+    val $h = {a => {b => 1}}
+    val $inner = $h->{a}
     ref $inner}
 
 fn Project::DataStructures::ref_copy_vs_alias {
-    my $h = {x => 1}
-    my $ref = $h
+    val $h = {x => 1}
+    var $ref = $h
     $ref->{x} = 99
     $h->{x}
 }
 
 fn Project::DataStructures::ref_deref_array {
-    my $arr = [1, 2, 3]
-    my @copy = @$arr
+    val $arr = [1, 2, 3]
+    val @copy = @$arr
     scalar @copy}
 
 fn Project::DataStructures::ref_deref_hash {
-    my $h = {a => 1, b => 2}
-    my %copy = %$h
+    val $h = {a => 1, b => 2}
+    val %copy = %$h
     $copy{a}
 }
 
@@ -232,10 +232,10 @@ fn Project::DataStructures::ref_deref_hash {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::traverse_array_sum {
-    my $arr = [[1, 2], [3, 4], [5, 6]]
-    my $sum = 0
-    for my $inner (@$arr) {
-        for my $val (@$inner) {
+    val $arr = [[1, 2], [3, 4], [5, 6]]
+    var $sum = 0
+    for val $inner (@$arr) {
+        for val $val (@$inner) {
             $sum += $val
         }
     }
@@ -243,20 +243,20 @@ fn Project::DataStructures::traverse_array_sum {
 }
 
 fn Project::DataStructures::traverse_hash_values {
-    my $h = {a => {v => 1}, b => {v => 2}, c => {v => 3}}
-    my $sum = 0
-    for my $k (keys %$h) {
+    val $h = {a => {v => 1}, b => {v => 2}, c => {v => 3}}
+    var $sum = 0
+    for val $k (keys %$h) {
         $sum += $h->{$k}{v}
     }
     $sum
 }
 
 fn Project::DataStructures::traverse_mixed {
-    my $data = {
+    val $data = {
         items => [{n => 1}, {n => 2}, {n => 3}]
     }
-    my $sum = 0
-    for my $item (@{$data->{items}}) {
+    var $sum = 0
+    for val $item (@{$data->{items}}) {
         $sum += $item->{n}
     }
     $sum
@@ -267,14 +267,14 @@ fn Project::DataStructures::traverse_mixed {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::build_array_of_arrays {
-    my @result = ()
+    var @result = ()
     ~> 1:3 ep {
         push @result, [_, _ * 2, _ * 3]
     }
     scalar @result}
 
 fn Project::DataStructures::build_hash_of_arrays {
-    my %h = ()
+    var %h = ()
     $h{even} = []
     $h{odd} = []
     ~> 1:6 ep {
@@ -288,7 +288,7 @@ fn Project::DataStructures::build_hash_of_arrays {
 }
 
 fn Project::DataStructures::build_records {
-    my @records = ()
+    var @records = ()
     ~> 1:3 ep {
         push @records, {id => _, name => "item$i"}
     }
@@ -300,30 +300,30 @@ fn Project::DataStructures::build_records {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::filter_by_field {
-    my @arr = ({x => 1}, {x => 5}, {x => 3}, {x => 8})
-    my @filtered = grep { _->{x} > 3 } @arr
+    val @arr = ({x => 1}, {x => 5}, {x => 3}, {x => 8})
+    val @filtered = grep { _->{x} > 3 } @arr
     scalar @filtered}
 
 fn Project::DataStructures::transform_records {
-    my @arr = ({v => 1}, {v => 2}, {v => 3})
-    my @vals = map { _->{v} * 2 } @arr
+    val @arr = ({v => 1}, {v => 2}, {v => 3})
+    val @vals = map { _->{v} * 2 } @arr
     $vals[1]
 }
 
 fn Project::DataStructures::sort_by_field {
-    my @arr = ({n => 3}, {n => 1}, {n => 2})
-    my @sorted = sort { $a->{n} <=> $b->{n} } @arr
+    val @arr = ({n => 3}, {n => 1}, {n => 2})
+    val @sorted = sort { $a->{n} <=> $b->{n} } @arr
     $sorted[0]{n}
 }
 
 fn Project::DataStructures::group_by_key {
-    my @items = (
+    val @items = (
         {type => "a", v => 1},
         {type => "b", v => 2},
         {type => "a", v => 3}
     )
-    my %groups = (a => [], b => [])
-    for my $item (@items) {
+    val %groups = (a => [], b => [])
+    for val $item (@items) {
         push @{$groups{$item->{type}}}, $item
     }
     len(@{$groups{a}})
@@ -334,22 +334,22 @@ fn Project::DataStructures::group_by_key {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DataStructures::empty_nested_array {
-    my $arr = [[], [], []]
+    val $arr = [[], [], []]
     len(@{$arr->[0]})
 }
 
 fn Project::DataStructures::empty_nested_hash {
-    my $h = {a => {}, b => {}}
+    val $h = {a => {}, b => {}}
     len(keys %{$h->{a}})
 }
 
 fn Project::DataStructures::undef_in_structure {
-    my $arr = [1, undef, 3]
+    val $arr = [1, undef, 3]
     defined($arr->[1]) ? 1 : 0
 }
 
 fn Project::DataStructures::mixed_types {
-    my $data = {
+    val $data = {
         num => 42,
         str => "hello",
         arr => [1, 2, 3],

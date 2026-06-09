@@ -11,9 +11,9 @@
 package BF
 
 fn hash($s, $seed) {
-    my $h = 2166136261 + $seed * 16777619
-    my $n = len $s
-    for my $i (0 : $n - 1) {
+    var $h = 2166136261 + $seed * 16777619
+    val $n = len $s
+    for val $i (0 : $n - 1) {
         $h = ($h ^ ord(substr $s, $i, 1)) * 16777619
         $h = $h % 4294967296
     }
@@ -21,20 +21,20 @@ fn hash($s, $seed) {
 }
 
 fn new($size, $k) {
-    my @bits = (0) x $size
+    val @bits = (0) x $size
     { size => $size, k => $k, bits => \@bits }
 }
 
 fn add($bf, $item) {
-    for my $i (0 : $bf->{k} - 1) {
-        my $h = hash($item, $i) % $bf->{size}
+    for val $i (0 : $bf->{k} - 1) {
+        val $h = hash($item, $i) % $bf->{size}
         $bf->{bits}->[$h] = 1
     }
 }
 
 fn contains($bf, $item) {
-    for my $i (0 : $bf->{k} - 1) {
-        my $h = hash($item, $i) % $bf->{size}
+    for val $i (0 : $bf->{k} - 1) {
+        val $h = hash($item, $i) % $bf->{size}
         return 0 if $bf->{bits}->[$h] == 0
     }
     1
@@ -44,15 +44,15 @@ package main
 
 p "── Bloom Filter Demo ──"
 
-my $bf = BF::new 1000, 5
-my @words = ("apple", "banana", "cherry", "date")
+val $bf = BF::new 1000, 5
+val @words = ("apple", "banana", "cherry", "date")
 
-for my $w (@words) {
+for val $w (@words) {
     BF::add $bf, $w
 }
 
-for my $test ("apple", "cherry", "elderberry", "fig") {
-    my $res = BF::contains($bf, $test) ? "Yes" : "No"
+for val $test ("apple", "cherry", "elderberry", "fig") {
+    val $res = BF::contains($bf, $test) ? "Yes" : "No"
     p "Contains '#{$test}'? #{$res}"
 }
 

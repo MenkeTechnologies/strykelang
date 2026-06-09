@@ -10,33 +10,33 @@
 p "── distributed dependency resolver (in-degree compute) ──"
 
 # 8-node DAG. Each edge: [src, dst]. src must complete before dst.
-my @edges = (
+var @edges = (
     [0, 1], [0, 2],
     [1, 3], [2, 3],
     [2, 4], [3, 5],
     [4, 5], [5, 6],
     [5, 7], [6, 7],
 )
-my $n = 8
+val $n = 8
 printf "graph: %d nodes  ·  %d edges\n", $n, len(@edges)
 
-my @workers = congregation(4)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(4)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard nodes across workers; each computes in-degree for its
 # assigned nodes given the full edge list.
-my $edges_json = to_json(\@edges)
-my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
-my %indegrees
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $edges_json = to_json(\@edges)
+val $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+var %indegrees
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = $n - 1 if $end >= $n
     next if $start >= $n
-    my $code = "
+    val $code = "
         my \$edges = from_json(q{$edges_json});
-        my %deg;
+        var %deg;
         for my \$v ($start:$end) { \$deg{\$v} = 0 }
         for my \$e (\@\$edges) {
             my (\$src, \$dst) = \@\$e;
@@ -46,19 +46,19 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json(\\%deg)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
-    my $h = from_json($reply{$w})
-    for my $k (keys %$h) {
+    val $div = pray $code, $w
+    val %reply = annex $div
+    val $h = from_json($reply{$w})
+    for val $k (keys %$h) {
         $indegrees{0 + $k} = $h->{$k}
     }
 }
 
 p "── in-degrees per node ──"
-my @roots
-my @leaves
-for my $v (0:$n - 1) {
-    my $d = $indegrees{$v} // 0
+var @roots
+var @leaves
+for val $v (0:$n - 1) {
+    val $d = $indegrees{$v} // 0
     printf "  node %d: in-degree %d\n", $v, $d
     push @roots, $v if $d == 0
     push @leaves, $v if $d > 0 && !grep { $_->[0] == $v } @edges
@@ -68,8 +68,8 @@ printf "── roots (in-degree 0): %s ──\n", join(",", @roots)
 
 # Sanity: total in-degree == number of edges (handshaking lemma for
 # directed graphs counted from the dst side).
-my $total_deg = 0
-for my $v (0:$n - 1) { $total_deg += ($indegrees{$v} // 0) }
+var $total_deg = 0
+for val $v (0:$n - 1) { $total_deg += ($indegrees{$v} // 0) }
 printf "sum of in-degrees: %d (must equal %d edges) %s\n",
     $total_deg, len(@edges),
     $total_deg == len(@edges) ? "✓" : "✗"

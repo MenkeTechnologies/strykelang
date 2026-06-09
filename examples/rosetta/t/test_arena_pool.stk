@@ -12,11 +12,11 @@ class Arena {
 
     fn alloc {
         if (len(@{$self->free_ref}) > 0) {
-            my $obj = pop @{$self->free_ref}
+            var $obj = pop @{$self->free_ref}
             $self->inuse($self->inuse + 1)
             return $obj
         }
-        my $h = { value => 0, generation => $self->inuse + 1 }
+        val $h = { value => 0, generation => $self->inuse + 1 }
         $self->inuse($self->inuse + 1)
         $h
     }
@@ -35,12 +35,12 @@ class Arena {
     }
 }
 
-my $arena = Arena()
+val $arena = Arena()
 assert_eq $arena->inuse, 0, "starts empty"
 
-my $a = $arena->alloc()
-my $b = $arena->alloc()
-my $c = $arena->alloc()
+val $a = $arena->alloc()
+val $b = $arena->alloc()
+val $c = $arena->alloc()
 assert_eq $arena->inuse, 3, "3 in use"
 
 $arena->release($a)
@@ -49,7 +49,7 @@ assert_eq $arena->inuse, 1,                "1 still in use"
 assert_eq $arena->free_count, 2,         "2 free"
 
 # Reuse: next alloc returns one of the freed objects (no fresh allocation).
-my $d = $arena->alloc()
+val $d = $arena->alloc()
 assert_eq $arena->inuse, 2,                "2 in use after reuse"
 assert_eq $arena->free_count, 1,         "1 still free"
 

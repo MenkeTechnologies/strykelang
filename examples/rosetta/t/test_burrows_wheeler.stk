@@ -2,14 +2,14 @@
 # Rosetta Code: Burrows-Wheeler transform
 
 fn Rosetta::BWT::compute($s) {
-    my $n = length($s)
-    my @rotations = ()
-    for my $i (0:$n-1) {
+    val $n = length($s)
+    var @rotations = ()
+    for val $i (0:$n-1) {
         push @rotations, substr($s, $i) . substr($s, 0, $i)
     }
-    my @sorted = sort(@rotations)
-    my $res = ""
-    for my $r (@sorted) {
+    val @sorted = sort(@rotations)
+    var $res = ""
+    for val $r (@sorted) {
         $res = $res . substr($r, -1)
     }
     $res

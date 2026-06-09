@@ -5,8 +5,8 @@ fn Rosetta::Statistics::mean(@nums) {
     if (len(@nums) == 0) {
         0
     } else {
-        my $sum = 0
-        for my $x (@nums) { $sum += $x }
+        var $sum = 0
+        for val $x (@nums) { $sum += $x }
         $sum / len(@nums)
     }
 }
@@ -15,10 +15,10 @@ fn Rosetta::Statistics::variance(@nums) {
     if (len(@nums) < 1) {
         0
     } else {
-        my $m = Rosetta::Statistics::mean(@nums)
-        my $sum_sq_diff = 0
-        for my $x (@nums) { 
-            my $diff = $x - $m
+        val $m = Rosetta::Statistics::mean(@nums)
+        var $sum_sq_diff = 0
+        for val $x (@nums) { 
+            val $diff = $x - $m
             $sum_sq_diff += $diff * $diff
         }
         $sum_sq_diff / len(@nums)
@@ -29,7 +29,7 @@ fn Rosetta::Statistics::std_dev(@nums) {
     sqrt(Rosetta::Statistics::variance(@nums))
 }
 
-my @data = (15, 12, 8, 8, 7, 7, 7, 6, 5, 3)
+val @data = (15, 12, 8, 8, 7, 7, 7, 6, 5, 3)
 assert_near Rosetta::Statistics::mean(@data), 7.8, 0.0001, "mean is 7.8"
 assert_near Rosetta::Statistics::variance(@data), 10.56, 0.0001, "variance is 10.56"
 assert_near Rosetta::Statistics::std_dev(@data), 3.2496, 0.001, "std dev is 3.2496"

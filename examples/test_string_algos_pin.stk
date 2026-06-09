@@ -7,30 +7,30 @@ fn Algos::Str::reverse_words($s) {
 }
 
 fn Algos::Str::is_anagram($x, $y) {
-    my $u = lc($x); $u =~ s/[^a-z]//g
-    my $v = lc($y); $v =~ s/[^a-z]//g
+    var $u = lc($x); $u =~ s/[^a-z]//g
+    var $v = lc($y); $v =~ s/[^a-z]//g
     join("", sort split(//, $u)) eq join("", sort split(//, $v))
 }
 
 fn Algos::Str::char_freq($s) {
-    my %f
+    var %f
     $f{_}++ for split(//, $s)
     \%f
 }
 
 fn Algos::Str::most_common_char($s) {
-    my $f = Algos::Str::char_freq($s)
-    my @keys = sort { $f->{_1} <=> $f->{_} } keys %$f
+    val $f = Algos::Str::char_freq($s)
+    val @keys = sort { $f->{_1} <=> $f->{_} } keys %$f
     $keys[0]
 }
 
 fn Algos::Str::run_length($s) {
-    my @out
-    my @chars = split(//, $s)
-    my $i = 0
+    var @out
+    val @chars = split(//, $s)
+    var $i = 0
     while ($i < len(@chars)) {
-        my $c = $chars[$i]
-        my $k = 0
+        val $c = $chars[$i]
+        var $k = 0
         while ($i < len(@chars) && $chars[$i] eq $c) {
             $k++
             $i++
@@ -41,7 +41,7 @@ fn Algos::Str::run_length($s) {
 }
 
 fn Algos::Str::longest_word($s) {
-    my @words = sort { len(_1) <=> len(_) } split(/\s+/, $s)
+    val @words = sort { len(_1) <=> len(_) } split(/\s+/, $s)
     $words[0]
 }
 

@@ -3,17 +3,17 @@
 
 # Stabilization function
 fn Rosetta::Sandpile::stabilize($grid, $size) {
-    my $toppled = 1
+    var $toppled = 1
     while ($toppled) {
         $toppled = 0
-        for my $y (0:($size - 1)) {
-            for my $x (0:($size - 1)) {
+        for val $y (0:($size - 1)) {
+            for val $x (0:($size - 1)) {
                 if ($grid->[$y]->[$x] >= 4) {
-                    my $count = int($grid->[$y]->[$x] / 4)
+                    val $count = int($grid->[$y]->[$x] / 4)
                     $grid->[$y]->[$x] %= 4
-                    for my $d ([-1, 0], [1, 0], [0, -1], [0, 1]) {
-                        my $ny = $y + $d->[0]
-                        my $nx = $x + $d->[1]
+                    for val $d ([-1, 0], [1, 0], [0, -1], [0, 1]) {
+                        val $ny = $y + $d->[0]
+                        val $nx = $x + $d->[1]
                         if ($ny >= 0 && $ny < $size && $nx >= 0 && $nx < $size) {
                             $grid->[$ny]->[$nx] += $count
                         }
@@ -27,18 +27,18 @@ fn Rosetta::Sandpile::stabilize($grid, $size) {
 
 fn Rosetta::Sandpile::identity($size) {
     # 1. Start with 6 grains everywhere
-    my @z = 1:$size |> map { my @r = 1:$size |> map { 6 }; \@r }
+    val @z = 1:$size |> map { val @r = 1:$size |> map { 6 }; \@r }
     
     # 2. Stabilize z to get s(z)
     # We need a copy because stabilize modifies in place
-    my @sz = 1:$size |> map { my @r = 1:$size |> map { 6 }; \@r }
+    val @sz = 1:$size |> map { val @r = 1:$size |> map { 6 }; \@r }
     Rosetta::Sandpile::stabilize(\@sz, $size)
     
     # 3. id = z - s(z) stabilized
-    my @id = 1:$size |> map {
-        my $y = _ - 1
-        my @r = 1:$size |> map {
-            my $x = _ - 1
+    val @id = 1:$size |> map {
+        val $y = _ - 1
+        val @r = 1:$size |> map {
+            val $x = _ - 1
             6 - $sz[$y]->[$x]
         }
         \@r
@@ -48,15 +48,15 @@ fn Rosetta::Sandpile::identity($size) {
 }
 
 fn Rosetta::Sandpile::display($grid) {
-    for my $row (@$grid) {
+    for val $row (@$grid) {
         @$row |> join(" ") |> p
     }
 }
 
 fn Rosetta::Sandpile::demo_identity() {
-    my $size = 5
+    val $size = 5
     ("Abelian Sandpile Identity (" . $size . "x" . $size . "):") |> p
-    my $id = Rosetta::Sandpile::identity($size)
+    val $id = Rosetta::Sandpile::identity($size)
     Rosetta::Sandpile::display($id)
     
     # Test assertions

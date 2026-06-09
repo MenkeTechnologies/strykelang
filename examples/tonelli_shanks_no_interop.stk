@@ -20,9 +20,9 @@
 
 fn Ts::pow_mod($base, $exp, $m) {
     return 0 if $m == 1
-    my $result = 1
-    my $bx = $base % $m
-    my $e = $exp
+    var $result = 1
+    var $bx = $base % $m
+    var $e = $exp
     while ($e > 0) {
         if ($e & 1) {
             $result = ($result * $bx) % $m
@@ -45,18 +45,18 @@ fn Ts::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n == 2 || $n == 3
     return 0 if $n % 2 == 0
-    my $d = $n - 1
-    my $r = 0
+    var $d = $n - 1
+    var $r = 0
     while ($d % 2 == 0) {
         $d = int($d / 2)
         $r++
     }
-    for my $ax (2, 3, 5, 7) {
+    for val $ax (2, 3, 5, 7) {
         next if $ax >= $n
-        my $x = Ts::pow_mod($ax, $d, $n)
+        var $x = Ts::pow_mod($ax, $d, $n)
         next if $x == 1 || $x == $n - 1
-        my $composite = 1
-        for my $i (0:$r - 2) {
+        var $composite = 1
+        for val $i (0:$r - 2) {
             $x = ($x * $x) % $n
             if ($x == $n - 1) {
                 $composite = 0
@@ -73,42 +73,42 @@ fn Ts::is_prime($n) {
 
 fn Ts::sqrt_mod($n, $p) {
     die "Tonelli-Shanks: p must be prime" unless Ts::is_prime($p)
-    my $nn = $n % $p
+    val $nn = $n % $p
     return +{ ok => 1, root => 0 } if $nn == 0
     return +{ ok => 1, root => 1 } if $p == 2
     return +{ ok => 0, root => 0 } unless Ts::is_residue($nn, $p)
     # Fast path: p ≡ 3 (mod 4).
     if ($p % 4 == 3) {
-        my $r = Ts::pow_mod($nn, int(($p + 1) / 4), $p)
+        val $r = Ts::pow_mod($nn, int(($p + 1) / 4), $p)
         return +{ ok => 1, root => $r }
     }
     # Factor p − 1 = Q · 2^S with Q odd.
-    my $Q = $p - 1
-    my $S = 0
+    var $Q = $p - 1
+    var $S = 0
     while ($Q % 2 == 0) {
         $Q = int($Q / 2)
         $S++
     }
     # Find a quadratic non-residue z.
-    my $z = 2
+    var $z = 2
     while (Ts::is_residue($z, $p)) {
         $z++
     }
-    my $M = $S
-    my $c = Ts::pow_mod($z, $Q, $p)
-    my $t = Ts::pow_mod($nn, $Q, $p)
-    my $R = Ts::pow_mod($nn, int(($Q + 1) / 2), $p)
+    var $M = $S
+    var $c = Ts::pow_mod($z, $Q, $p)
+    var $t = Ts::pow_mod($nn, $Q, $p)
+    var $R = Ts::pow_mod($nn, int(($Q + 1) / 2), $p)
     while (1) {
         return +{ ok => 1, root => $R } if $t == 1
         # Find least i with t^(2^i) ≡ 1 (mod p), 0 < i < M.
-        my $i = 0
-        my $temp = $t
+        var $i = 0
+        var $temp = $t
         while ($temp != 1) {
             $temp = ($temp * $temp) % $p
             $i++
             die "Tonelli-Shanks: ran out of i" if $i >= $M
         }
-        my $bx = Ts::pow_mod($c, 1 << ($M - $i - 1), $p)
+        val $bx = Ts::pow_mod($c, 1 << ($M - $i - 1), $p)
         $M = $i
         $c = ($bx * $bx) % $p
         $t = ($t * $c) % $p
@@ -118,7 +118,7 @@ fn Ts::sqrt_mod($n, $p) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{ n => 0,    p => 13,    has_root => 1 },
     +{ n => 1,    p => 13,    has_root => 1 },
     +{ n => 5,    p => 41,    has_root => 1 },
@@ -135,8 +135,8 @@ my @cases = (
 
 # Correct the has_root flags via Euler's criterion (some I guessed
 # at design time; the canonical answer is fixed below before tests).
-for my $c (@cases) {
-    my $nn = $c->{n} % $c->{p}
+for var $c (@cases) {
+    val $nn = $c->{n} % $c->{p}
     if ($nn == 0 || $c->{p} == 2) {
         $c->{has_root} = 1
     } else {
@@ -147,8 +147,8 @@ for my $c (@cases) {
 p "── Tonelli-Shanks modular sqrt demo ──────────────────"
 printf "  %8s  %8s  %4s  %10s  %s\n", "n", "p", "QR?", "root", ""
 printf "  %8s  %8s  %4s  %10s\n", "--------", "--------", "----", "----------"
-for my $c (@cases) {
-    my $r = Ts::sqrt_mod($c->{n}, $c->{p})
+for val $c (@cases) {
+    val $r = Ts::sqrt_mod($c->{n}, $c->{p})
     if ($r->{ok}) {
         printf "  %8d  %8d  %4s  %10d\n", $c->{n}, $c->{p}, "yes", $r->{root}
     } else {
@@ -158,25 +158,25 @@ for my $c (@cases) {
 
 # ── invariant 1: ok flag matches Euler's criterion ────────────────
 
-for my $c (@cases) {
-    my $r = Ts::sqrt_mod($c->{n}, $c->{p})
+for val $c (@cases) {
+    val $r = Ts::sqrt_mod($c->{n}, $c->{p})
     die "ok mismatch on n=#{$c->{n}} p=#{$c->{p}}: got #{$r->{ok}} want #{$c->{has_root}}" unless $r->{ok} == $c->{has_root}
 }
 
 # ── invariant 2: every reported root squared returns n (mod p) ────
 
-for my $c (@cases) {
-    my $r = Ts::sqrt_mod($c->{n}, $c->{p})
+for val $c (@cases) {
+    val $r = Ts::sqrt_mod($c->{n}, $c->{p})
     next unless $r->{ok}
-    my $check = ($r->{root} * $r->{root}) % $c->{p}
-    my $expected = $c->{n} % $c->{p}
+    val $check = ($r->{root} * $r->{root}) % $c->{p}
+    val $expected = $c->{n} % $c->{p}
     die "root² mismatch on n=#{$c->{n}} p=#{$c->{p}}: #{$r->{root}}² = #{$check} ≠ #{$expected}" unless $check == $expected
 }
 
 # ── invariant 3: 0 ≤ root < p (canonical representative) ──────────
 
-for my $c (@cases) {
-    my $r = Ts::sqrt_mod($c->{n}, $c->{p})
+for val $c (@cases) {
+    val $r = Ts::sqrt_mod($c->{n}, $c->{p})
     next unless $r->{ok}
     die "root #{$r->{root}} out of [0, #{$c->{p}}) on n=#{$c->{n}}" unless $r->{root} >= 0 && $r->{root} < $c->{p}
 }
@@ -187,7 +187,7 @@ fn Ts::trial_prime($n) {
     return 0 if $n < 2
     return 1 if $n == 2
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -195,50 +195,50 @@ fn Ts::trial_prime($n) {
     1
 }
 
-for my $p (2, 3, 5, 7, 11, 13, 17, 41, 113, 7919, 65537) {
-    my $mr = Ts::is_prime($p)
-    my $td = Ts::trial_prime($p)
+for val $p (2, 3, 5, 7, 11, 13, 17, 41, 113, 7919, 65537) {
+    val $mr = Ts::is_prime($p)
+    val $td = Ts::trial_prime($p)
     die "primality disagreement on #{$p}: MR=#{$mr} TD=#{$td}" unless $mr == $td
 }
-for my $n (4, 9, 15, 21, 25, 27, 35, 49, 91, 121, 169, 1001) {
+for val $n (4, 9, 15, 21, 25, 27, 35, 49, 91, 121, 169, 1001) {
     die "Miller-Rabin falsely calls #{$n} prime" if Ts::is_prime($n)
 }
 
 # ── invariant 5: pow_mod agrees with the naive O(e) reference ─────
 
 fn Ts::naive_pow_mod($bx, $e, $m) {
-    my $r = 1
-    for my $i (1:$e) {
+    var $r = 1
+    for val $i (1:$e) {
         $r = ($r * $bx) % $m
     }
     $r
 }
 
-for my $t ([2, 10, 13], [3, 20, 101], [5, 100, 257], [7, 50, 1009]) {
-    my $fast = Ts::pow_mod($t->[0], $t->[1], $t->[2])
-    my $slow = Ts::naive_pow_mod($t->[0], $t->[1], $t->[2])
+for val $t ([2, 10, 13], [3, 20, 101], [5, 100, 257], [7, 50, 1009]) {
+    val $fast = Ts::pow_mod($t->[0], $t->[1], $t->[2])
+    val $slow = Ts::naive_pow_mod($t->[0], $t->[1], $t->[2])
     die "pow_mod disagreement on (#{$t->[0]}, #{$t->[1]}, #{$t->[2]}): fast=#{$fast} slow=#{$slow}" unless $fast == $slow
 }
 
 # ── invariant 6: for p ≡ 3 mod 4, the closed form root matches ────
 
-for my $p (7, 11, 19, 23, 31, 43, 47, 59) {
-    for my $n (1, 2, 3, 4, 5, 10) {
-        my $nn = $n % $p
+for val $p (7, 11, 19, 23, 31, 43, 47, 59) {
+    for val $n (1, 2, 3, 4, 5, 10) {
+        val $nn = $n % $p
         next if $nn == 0 || !Ts::is_residue($nn, $p)
-        my $closed = Ts::pow_mod($nn, int(($p + 1) / 4), $p)
-        my $ts = Ts::sqrt_mod($n, $p)
+        val $closed = Ts::pow_mod($nn, int(($p + 1) / 4), $p)
+        val $ts = Ts::sqrt_mod($n, $p)
         die "p≡3-mod-4 closed form vs TS disagrees on n=#{$n} p=#{$p}: closed=#{$closed} TS=#{$ts->{root}}" unless ($closed * $closed) % $p == ($ts->{root} * $ts->{root}) % $p
     }
 }
 
 # ── invariant 7: every QR mod a small prime has a root ────────────
 
-for my $p (5, 7, 11, 13, 17, 19, 23) {
-    my $hits = 0
-    for my $n (0:$p - 1) {
+for val $p (5, 7, 11, 13, 17, 19, 23) {
+    var $hits = 0
+    for val $n (0:$p - 1) {
         if (Ts::is_residue($n, $p) || $n == 0) {
-            my $r = Ts::sqrt_mod($n, $p)
+            val $r = Ts::sqrt_mod($n, $p)
             die "QR #{$n} mod #{$p} has no root" unless $r->{ok}
             die "QR root²!=n on (#{$n}, #{$p})" unless ($r->{root} * $r->{root}) % $p == $n
             $hits++

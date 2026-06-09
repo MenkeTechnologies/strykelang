@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./RelativeDistance.stk"
 
-my $tree = {
+val $tree = {
     Anna   => ["Bob", "Carla"],
     Bob    => ["Dan"],
     Carla  => ["Eve"],

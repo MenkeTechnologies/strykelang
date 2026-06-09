@@ -2,20 +2,20 @@
 # Rosetta Code: Execute Computer/Zero
 
 fn Rosetta::ComputerZero::execute($program_ref) {
-    my @mem = @$program_ref
+    var @mem = @$program_ref
     # Pad memory to 32 bytes
     while (len(@mem) < 32) { push @mem, 0 }
     
-    my $pc = 0
-    my $ac = 0
-    my $running = 1
-    my $cycles = 0
+    var $pc = 0
+    var $ac = 0
+    var $running = 1
+    var $cycles = 0
     
     while ($running && $cycles < 1000) {
         $cycles++
-        my $instr = $mem[$pc]
-        my $opcode = ($instr >> 5) & 0x07
-        my $addr = $instr & 0x1F
+        val $instr = $mem[$pc]
+        val $opcode = ($instr >> 5) & 0x07
+        val $addr = $instr & 0x1F
         
         $pc = ($pc + 1) % 32
         
@@ -33,7 +33,7 @@ fn Rosetta::ComputerZero::execute($program_ref) {
             $pc = $addr
         } elsif ($opcode == 6) { # JGE
             # Check if $ac is >= 0 in 8-bit signed
-            my $signed_ac = $ac > 127 ? $ac - 256 : $ac
+            val $signed_ac = $ac > 127 ? $ac - 256 : $ac
             if ($signed_ac >= 0) { $pc = $addr }
         } elsif ($opcode == 7) { # JNE
             if ($ac != 0) { $pc = $addr }
@@ -48,7 +48,7 @@ fn Rosetta::ComputerZero::execute($program_ref) {
 # ADD 31 (3 << 5 | 31 = 96 + 31 = 127)
 # STA 29 (2 << 5 | 29 = 64 + 29 = 93)
 # STP    (0 << 5 | 0  = 0)
-my @prog = (0) x 32
+var @prog = (0) x 32
 $prog[0] = 1 << 5 | 30
 $prog[1] = 3 << 5 | 31
 $prog[2] = 2 << 5 | 29
@@ -56,7 +56,7 @@ $prog[3] = 0
 $prog[30] = 10
 $prog[31] = 20
 
-my $res = Rosetta::ComputerZero::execute(\@prog)
+val $res = Rosetta::ComputerZero::execute(\@prog)
 assert_eq $res->{ac}, 30, "Accumulator has 10+20=30"
 assert_eq $res->{mem}[29], 30, "Memory[29] has 10+20=30"
 
@@ -75,7 +75,7 @@ $prog[4] = 0
 $prog[30] = 1
 $prog[31] = 5
 
-my $res2 = Rosetta::ComputerZero::execute(\@prog)
+val $res2 = Rosetta::ComputerZero::execute(\@prog)
 assert_eq $res2->{ac}, 0, "Countdown finished at 0"
 
 test_run

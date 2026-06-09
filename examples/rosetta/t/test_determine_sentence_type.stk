@@ -8,9 +8,9 @@
 # Whitespace at the end is stripped before inspection.
 
 fn Rosetta::SentType::classify($s) {
-    my $t = $s
+    var $t = $s
     $t =~ s/\s+$//
-    my $last = substr($t, -1)
+    val $last = substr($t, -1)
     if    ($last eq "?") { "question"   }
     elsif ($last eq "!") { "exclamation" }
     elsif ($last eq ".") { "declarative" }
@@ -19,9 +19,9 @@ fn Rosetta::SentType::classify($s) {
 
 fn Rosetta::SentType::classify_all($paragraph) {
     # Split on terminator boundaries, keep the terminators.
-    my @parts
-    my $buf = ""
-    for my $ch (split //, $paragraph) {
+    var @parts
+    var $buf = ""
+    for val $ch (split //, $paragraph) {
         $buf .= $ch
         if ($ch eq "?" || $ch eq "!" || $ch eq ".") {
             push @parts, $buf
@@ -29,9 +29,9 @@ fn Rosetta::SentType::classify_all($paragraph) {
         }
     }
     push @parts, $buf if $buf =~ /\S/
-    my @out
-    for my $p (@parts) {
-        my $trim = $p
+    var @out
+    for val $p (@parts) {
+        var $trim = $p
         $trim =~ s/^\s+//
         push @out, Rosetta::SentType::classify($trim) if length($trim) > 0
     }
@@ -48,12 +48,12 @@ assert_eq Rosetta::SentType::classify("no terminator"),"unknown",     "no termin
 assert_eq Rosetta::SentType::classify("Why!  "),       "exclamation", "trailing space ignored"
 
 # Paragraph parsing
-my @cls = Rosetta::SentType::classify_all("Hello world. Are you there? Yes!")
+val @cls = Rosetta::SentType::classify_all("Hello world. Are you there? Yes!")
 assert_eq join(",", @cls), "declarative,question,exclamation",
     "three sentences classified"
 
 # Mixed paragraph with no terminator at end
-my @cls2 = Rosetta::SentType::classify_all("One. Two? Three! Trailing")
+val @cls2 = Rosetta::SentType::classify_all("One. Two? Three! Trailing")
 assert_eq join(",", @cls2),
     "declarative,question,exclamation,unknown",
     "trailing fragment marked unknown"

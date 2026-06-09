@@ -10,17 +10,17 @@ fn Rosetta::FixedLength::write_record($id, $name, $score) {
 
 fn Rosetta::FixedLength::read_record($data) {
     # unpack the record
-    my ($id, $name, $score) = unpack("iA10i", $data)
+    val ($id, $name, $score) = unpack("iA10i", $data)
     # Trim the name (A format might leave spaces)
     $name |> trim
     
     { id => $id, name => $name, score => $score }
 }
 
-my $record = Rosetta::FixedLength::write_record(1, "Alice", 100)
+val $record = Rosetta::FixedLength::write_record(1, "Alice", 100)
 assert_eq len($record), 18, "Record length is 18 bytes (4 + 10 + 4)"
 
-my $parsed = Rosetta::FixedLength::read_record($record)
+val $parsed = Rosetta::FixedLength::read_record($record)
 assert_eq $parsed->{id}, 1, "ID matches"
 assert_eq $parsed->{name}, "Alice", "Name matches"
 assert_eq $parsed->{score}, 100, "Score matches"

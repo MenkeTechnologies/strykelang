@@ -23,8 +23,8 @@ class Cons impl List {
     
     fn to_str {
         # Iterative to_str to avoid stack overflow
-        my $s = "[" . $self->val;
-        my $curr = $self->next;
+        var $s = "[" . $self->val;
+        var $curr = $self->next;
         while (!$curr->is_empty()) {
             $s .= ", " . $curr->head();
             $curr = $curr->tail();
@@ -34,16 +34,16 @@ class Cons impl List {
 }
 
 fn Project::LinkedList::list_new(@vals) {
-    my $curr = Nil();
-    for my $v (rev @vals) {
+    var $curr = Nil();
+    for val $v (rev @vals) {
         $curr = Cons(val => $v, next => $curr);
     }
     $curr;
 }
 
 fn Project::LinkedList::list_length($l) {
-    my $len = 0;
-    my $curr = $l;
+    var $len = 0;
+    var $curr = $l;
     while (!$curr->is_empty()) {
         $len++;
         $curr = $curr->tail();
@@ -52,8 +52,8 @@ fn Project::LinkedList::list_length($l) {
 }
 
 fn Project::LinkedList::list_map($f, $l) {
-    my @arr;
-    my $curr = $l;
+    var @arr;
+    var $curr = $l;
     while (!$curr->is_empty()) {
         push @arr, $f($curr->head());
         $curr = $curr->tail();
@@ -62,8 +62,8 @@ fn Project::LinkedList::list_map($f, $l) {
 }
 
 fn Project::LinkedList::list_to_array($l) {
-    my @res;
-    my $curr = $l;
+    var @res;
+    var $curr = $l;
     while (!$curr->is_empty()) {
         push @res, $curr->head();
         $curr = $curr->tail();

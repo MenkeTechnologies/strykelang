@@ -2,7 +2,7 @@
 # Rosetta Code: Mergesort
 
 fn Rosetta::Mergesort::merge($left, $right) {
-    my @res
+    var @res
     while (len(@$left) > 0 && len(@$right) > 0) {
         if ($left->[0] <= $right->[0]) {
             push @res, shift @$left
@@ -16,32 +16,32 @@ fn Rosetta::Mergesort::merge($left, $right) {
 }
 
 fn Rosetta::Mergesort::sort($arr) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return $arr if $n <= 1
     
-    my $mid = $n / 2 | 0
-    my @left = @$arr[0 : $mid - 1]
-    my @right = @$arr[$mid : $n - 1]
+    val $mid = $n / 2 | 0
+    val @left = @$arr[0 : $mid - 1]
+    val @right = @$arr[$mid : $n - 1]
     
-    my $left_sorted = Rosetta::Mergesort::sort(\@left)
-    my $right_sorted = Rosetta::Mergesort::sort(\@right)
+    val $left_sorted = Rosetta::Mergesort::sort(\@left)
+    val $right_sorted = Rosetta::Mergesort::sort(\@right)
     
     Rosetta::Mergesort::merge($left_sorted, $right_sorted)
 }
 
-my $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
-my $sorted = Rosetta::Mergesort::sort($data)
+val $data = [4, 65, 2, -31, 0, 99, 2, 83, 782, 1]
+val $sorted = Rosetta::Mergesort::sort($data)
 assert_eq join(",", @$sorted), "-31,0,1,2,2,4,65,83,99,782", "mergesort works"
 
 # Parallel sort test (manual partition)
-my $mid = len(@$data) / 2 | 0
-my @l = @$data[0 : $mid - 1]
-my @r = @$data[$mid : len(@$data)-1]
+val $mid = len(@$data) / 2 | 0
+val @l = @$data[0 : $mid - 1]
+val @r = @$data[$mid : len(@$data)-1]
 
 # Use ~> to sort halves in parallel
-my @parts = (\@l, \@r)
-my @sorted_parts = ~> @parts map {Rosetta::Mergesort::sort}
-my $final = Rosetta::Mergesort::merge($sorted_parts[0], $sorted_parts[1])
+val @parts = (\@l, \@r)
+val @sorted_parts = ~> @parts map {Rosetta::Mergesort::sort}
+val $final = Rosetta::Mergesort::merge($sorted_parts[0], $sorted_parts[1])
 assert_eq join(",", @$final), "-31,0,1,2,2,4,65,83,99,782", "parallel mergesort works"
 
 test_run

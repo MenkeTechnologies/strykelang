@@ -23,14 +23,14 @@ class Rosetta::Tree::Node {
     }
 
     fn count {
-        my $c = 1
+        var $c = 1
         $c += $self->left->count() if defined $self->left
         $c += $self->right->count() if defined $self->right
         $c
     }
 
     fn to_list {
-        my @res
+        var @res
         push @res, @{$self->left->to_list()} if defined $self->left
         push @res, $self->value
         push @res, @{$self->right->to_list()} if defined $self->right
@@ -39,14 +39,14 @@ class Rosetta::Tree::Node {
 }
 
 # Test the tree
-my $root = Rosetta::Tree::Node(value => 10)
+val $root = Rosetta::Tree::Node(value => 10)
 $root->insert(5)
 $root->insert(15)
 $root->insert(2)
 $root->insert(7)
 
 assert_eq $root->count(), 5, "Tree has 5 nodes"
-my $list = $root->to_list()
+val $list = $root->to_list()
 assert_eq join(",", @$list), "2,5,7,10,15", "In-order traversal produces sorted list"
 
 test_run

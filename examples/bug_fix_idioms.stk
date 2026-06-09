@@ -29,12 +29,12 @@ p "\n--- BUG-203: dijkstra_relax honors negative weights ---"
 p "dijkstra(3, -5, 10) = ", dijkstra_relax(3, -5, 10)  # -2 (matches bellman_ford)
 
 p "\n--- BUG-105: to_json detects cycles ---"
-my $a = { name => "root" }
+var $a = { name => "root" }
 $a->{self} = $a
 p "self-ref:    ", to_json($a)                          # back-edge -> null
 
-my $b = { tag => "A" }
-my $c = { tag => "B" }
+var $b = { tag => "A" }
+var $c = { tag => "B" }
 $b->{next} = $c
 $c->{prev} = $b
 p "two-node:    ", to_json($b)
@@ -45,26 +45,26 @@ p "strict ^A-Za-z0-9: ", uri_escape("hello-world.tar~gz", "^A-Za-z0-9")
 p "decode round-trip: ", uri_unescape(uri_escape("http://x/y z?q=1#f"))
 
 p "\n--- BUG-099 / 026: reverse() and \$s x= N ---"
-my @empty = reverse()
+val @empty = reverse()
 p "reverse() len:    ", len @empty                  # 0
 
-my $s = "ab"
+var $s = "ab"
 $s x= 4
 p "ab x= 4:          ", $s                              # abababab
 
 p "\n--- BUG-260 / 261: digit labels + redo if ---"
-my @hits
-OUT1: for my $i (1:3) {
-    for my $j (1:3) {
+var @hits
+OUT1: for val $i (1:3) {
+    for val $j (1:3) {
         next OUT1 if $j == 2
         push @hits, "$i.$j"
     }
 }
 p "labels with digits work: [", join(",", @hits), "]"   # 1.1, 2.1, 3.1
 
-my $i = 0
-my @log
-for my $x (1:2) {
+var $i = 0
+var @log
+for val $x (1:2) {
     $i++
     push @log, $i
     redo if $i < 4
@@ -84,55 +84,55 @@ system("sh", "-c", "exit 9")
 p "list-form 'exit 9': \$? >> 8 = ", $? >> 8           # 9
 
 p "\n--- BUG-013: backticks list context = one element per line ---"
-my @lines = `printf "a\nb\nc\n"`
+val @lines = `printf "a\nb\nc\n"`
 p "lines len:        ", len @lines                  # 3
 p "lines join '|':   ", join("|", @lines)              # a\n|b\n|c\n
 
 p "\n--- BUG-014: %ENV propagates to subprocesses ---"
 $ENV{STRYKE_DEMO} = "hi from stryke"
-my $seen = `env | grep '^STRYKE_DEMO='`
+var $seen = `env | grep '^STRYKE_DEMO='`
 chomp $seen
 p "child saw:        ", $seen
 delete $ENV{STRYKE_DEMO}
 
 p "\n--- BUG-085 + open-FH bareword: printf \$fh + literal FH names ---"
-my $tmp = "/tmp/stryke_bug_demo_printf.txt"
+val $tmp = "/tmp/stryke_bug_demo_printf.txt"
 open E, ">", $tmp or die
 printf E "n=%d\n", 7
 printf E "k=%s\n", "v"
 close E
-my $body = `cat $tmp`
+val $body = `cat $tmp`
 unlink $tmp
 p "file contents:\n$body"
 p "(constant E still works elsewhere): E = ", E
 
 p "\n--- BUG-098: eof reflects actual buffered-reader state ---"
-my $efile = "/tmp/stryke_bug_demo_eof.txt"
-open(my $wfh, ">", $efile) or die
+val $efile = "/tmp/stryke_bug_demo_eof.txt"
+open(val $wfh, ">", $efile) or die
 print $wfh "line1\nline2\n"
 close $wfh
-open(my $rfh, "<", $efile) or die
+open(val $rfh, "<", $efile) or die
 p "before any read: eof = ", eof($rfh) ? 1 : 0         # 0
-my $first  = <$rfh>
-my $second = <$rfh>
+val $first  = <$rfh>
+val $second = <$rfh>
 p "after draining:  eof = ", eof($rfh) ? 1 : 0         # 1
 close $rfh
 unlink $efile
 
 p "\n--- BUG-253: splice list-context replacement ---"
-my @target = (1, 2, 5, 6)
-my @inject = (3, 4)
+var @target = (1, 2, 5, 6)
+val @inject = (3, 4)
 splice(@target, 2, 0, @inject)
 p "splice insert:    ", join(",", @target)              # 1,2,3,4,5,6
 
 p "\n--- BUG-251/252: tr///c complement + tr///s squeeze ---"
-my $count = "abcde123"
-my $non_d = ($count =~ tr/0-9//c)
+var $count = "abcde123"
+val $non_d = ($count =~ tr/0-9//c)
 p "non-digits in '$count': ", $non_d
-my $msg = "aaabbbccc"
+var $msg = "aaabbbccc"
 $msg =~ tr/abc//s
 p "squeezed:               ", $msg                       # abc
-my $msg2 = "aabbccdd"
+var $msg2 = "aabbccdd"
 $msg2 =~ tr/a-d/x/s
 p "translate + squeeze:    ", $msg2                      # x
 
@@ -144,17 +144,17 @@ p "exists \&Stryke::Demo::greet:   ", exists(&Stryke::Demo::greet) ? "Y" : "N"
 p "exists \&Stryke::Demo::missing: ", exists(&Stryke::Demo::missing) ? "Y" : "N"
 
 p "\n--- BUG-016/258: m// and m//g list contexts ---"
-my @caps = ("a1 b2 c3" =~ /(\w)(\d)/g)
+val @caps = ("a1 b2 c3" =~ /(\w)(\d)/g)
 p "m//g captures:     ", join(",", @caps)               # a,1,b,2,c,3
 
-my ($scheme, $rest) = ("https://example" =~ m{^([a-z]+)://(.*)})
+val ($scheme, $rest) = ("https://example" =~ m{^([a-z]+)://(.*)})
 p "destructure:       scheme=$scheme rest=$rest"
 
 p "\n--- BUG-256 / BUG-005: __PACKAGE__ + caller fn name ---"
 package Demo::Tag
 fn label = __PACKAGE__
 fn origin {
-    my @c = caller(0)
+    val @c = caller(0)
     $c[3]
 }
 package main
@@ -162,19 +162,19 @@ p "Demo::Tag::label():   ", Demo::Tag::label()
 p "Demo::Tag::origin():  ", Demo::Tag::origin()
 
 p "\n--- BUG-028 / 091 / 217: hash slice via array var + arrayref deref ---"
-my %h = (a => 1, b => 2, c => 3, d => 4)
-my @ks = ("b", "d", "a")
+val %h = (a => 1, b => 2, c => 3, d => 4)
+val @ks = ("b", "d", "a")
 p "\@h{\@ks}:           ", join(",", @h{@ks})           # 2,4,1
-my $r = \%h
+val $r = \%h
 p "\@{\$r}{qw(c b)}:    ", join(",", @{$r}{qw(c b)})    # 3,2
-my $ar = [10, 20, 30, 40]
+val $ar = [10, 20, 30, 40]
 p "\@{\$ar}[1, 3]:      ", join(",", @{$ar}[1, 3])      # 20,40
 
 p "\n--- BUG-076: \\N numbered backref + terminator escape \\/ ---"
-my $rev = "ab"
+var $rev = "ab"
 $rev =~ s/(a)(b)/\2\1/
 p "swap captures:    ", $rev                            # ba
-my $path = "abc"
+var $path = "abc"
 $path =~ s/b/\//
 p "literal slash:    ", $path                           # a/c
 
@@ -184,9 +184,9 @@ p "TAU = ", TAU
 p "E = ", E
 
 p "\n--- BUG-042 / 043: delete \@arr[...] / delete \@h{...} ---"
-my @arr = (10, 20, 30, 40, 50)
-my @gone = delete @arr[1, 3]
+val @arr = (10, 20, 30, 40, 50)
+val @gone = delete @arr[1, 3]
 p "delete \@arr[1,3]: removed=[", join(",", @gone), "]"
-my %hh = (a => 1, b => 2, c => 3)
+val %hh = (a => 1, b => 2, c => 3)
 delete @hh{qw(a c)}
 p "remaining keys:   ", join(",", sort keys %hh)

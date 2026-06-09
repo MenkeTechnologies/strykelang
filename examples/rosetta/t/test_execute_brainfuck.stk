@@ -2,32 +2,32 @@
 # Rosetta Code: Execute Brainfuck
 
 fn Rosetta::Brainfuck::execute($code) {
-    my @chars = split "", $code
-    my %jumps
-    my @stack
+    val @chars = split "", $code
+    var %jumps
+    var @stack
 
     # Precompute jumps
-    for (my $i = 0; $i < len(@chars); $i++) {
+    for (var $i = 0; $i < len(@chars); $i++) {
         if ($chars[$i] eq "[") {
             push @stack, $i
         } elsif ($chars[$i] eq "]") {
-            my $start = pop @stack
+            val $start = pop @stack
             $jumps{$start} = $i
             $jumps{$i} = $start
         }
     }
 
-    my @tape
-    for (my $i = 0; $i < 30000; $i++) {
+    var @tape
+    for (var $i = 0; $i < 30000; $i++) {
         push @tape, 0
     }
 
-    my $ptr = 0
-    my $pc = 0
-    my $output = ""
+    var $ptr = 0
+    var $pc = 0
+    var $output = ""
 
     while ($pc < len(@chars)) {
-        my $c = $chars[$pc]
+        val $c = $chars[$pc]
 
         if ($c eq ">") {
             $ptr++
@@ -59,7 +59,7 @@ fn Rosetta::Brainfuck::execute($code) {
 }
 
 # Test 1: Simple Hello World
-my $hw_code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
+val $hw_code = "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++."
 assert_eq Rosetta::Brainfuck::execute($hw_code), "Hello World!\n", "Brainfuck: Hello World"
 
 # Test 2: Simple arithmetic and output

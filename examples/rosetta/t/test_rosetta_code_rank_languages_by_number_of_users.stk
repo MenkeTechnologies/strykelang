@@ -2,17 +2,17 @@
 # Rosetta Code: Rosetta Code/Rank languages by number of users
 
 fn Rosetta::RankUsers::rank($rows) {
-    my @sorted = sort { _1->{users} <=> _->{users} || _->{language} cmp _1->{language} } @$rows
+    val @sorted = sort { _1->{users} <=> _->{users} || _->{language} cmp _1->{language} } @$rows
     \@sorted
 }
 
-my @rows = (
+val @rows = (
     { language => "Python", users => 1200 },
     { language => "Go", users => 480 },
     { language => "Rust", users => 620 },
 )
 
-my $ranked = Rosetta::RankUsers::rank(\@rows)
+val $ranked = Rosetta::RankUsers::rank(\@rows)
 
 assert_eq $ranked->[0]{language}, "Python", "highest user count ranks first"
 assert_eq $ranked->[1]{language}, "Rust", "second highest user count ranks second"

@@ -2,9 +2,9 @@
 # Rosetta Code: Longest increasing subsequence — O(n log n) patience sort
 
 fn Rosetta::LisFast::lower_bound($tails, $x) {
-    my ($lo, $hi) = (0, len(@$tails))
+    var ($lo, $hi) = (0, len(@$tails))
     while ($lo < $hi) {
-        my $mid = int(($lo + $hi) / 2)
+        val $mid = int(($lo + $hi) / 2)
         if ($tails->[$mid] < $x) {
             $lo = $mid + 1
         } else {
@@ -15,9 +15,9 @@ fn Rosetta::LisFast::lower_bound($tails, $x) {
 }
 
 fn Rosetta::LisFast::length_only($arr) {
-    my @tails
-    for my $x (@$arr) {
-        my $i = Rosetta::LisFast::lower_bound(\@tails, $x)
+    var @tails
+    for val $x (@$arr) {
+        val $i = Rosetta::LisFast::lower_bound(\@tails, $x)
         if ($i == len(@tails)) {
             push @tails, $x
         } else {
@@ -28,14 +28,14 @@ fn Rosetta::LisFast::length_only($arr) {
 }
 
 fn Rosetta::LisFast::sequence($arr) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return [] if $n == 0
-    my @tails
-    my @tail_idx
-    my @prev = (-1) x $n
-    for my $i (0:$n - 1) {
-        my $x = $arr->[$i]
-        my $pos = Rosetta::LisFast::lower_bound(\@tails, $x)
+    var @tails
+    var @tail_idx
+    var @prev = (-1) x $n
+    for val $i (0:$n - 1) {
+        val $x = $arr->[$i]
+        val $pos = Rosetta::LisFast::lower_bound(\@tails, $x)
         if ($pos == len(@tails)) {
             push @tails, $x
             push @tail_idx, $i
@@ -45,8 +45,8 @@ fn Rosetta::LisFast::sequence($arr) {
         }
         $prev[$i] = $pos > 0 ? $tail_idx[$pos - 1] : -1
     }
-    my @seq
-    my $cur = $tail_idx[-1]
+    var @seq
+    var $cur = $tail_idx[-1]
     while ($cur != -1) {
         unshift @seq, $arr->[$cur]
         $cur = $prev[$cur]
@@ -73,10 +73,10 @@ assert_eq Rosetta::LisFast::length_only([1, 1, 1, 1]), 1, "all equal strict -> 1
 assert_eq Rosetta::LisFast::length_only([1, 2, 2, 3]), 3, "with dup -> 3"
 
 # Reconstruct one valid sequence
-my $seq = Rosetta::LisFast::sequence([10, 22, 9, 33, 21, 50, 41, 60])
+val $seq = Rosetta::LisFast::sequence([10, 22, 9, 33, 21, 50, 41, 60])
 assert_eq len(@$seq), 5, "reconstructed LIS length = 5"
 # Validate it is strictly increasing
-for my $i (1..len(@$seq) - 1) {
+for val $i (1..len(@$seq) - 1) {
     assert_ok($seq->[$i] > $seq->[$i - 1], "seq[$i] > seq[" . ($i - 1) . "]")
 }
 

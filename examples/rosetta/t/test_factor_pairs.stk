@@ -3,8 +3,8 @@
 
 fn Rosetta::FactorPairs::all($n) {
     return [] if $n < 1
-    my @pairs
-    my $i = 1
+    var @pairs
+    var $i = 1
     while ($i * $i <= $n) {
         if ($n % $i == 0) {
             push @pairs, [$i, int($n / $i)]
@@ -30,12 +30,12 @@ assert_eq len(@{Rosetta::FactorPairs::all(0)}), 0, "0 has no factor pairs"
 assert_eq len(@{Rosetta::FactorPairs::all(-5)}), 0, "negative has none"
 
 # Number of factor pairs = ceil(num_divisors / 2)
-my $r = Rosetta::FactorPairs::all(48)   # 48 has divisors: 1,2,3,4,6,8,12,16,24,48 (10 divisors)
+val $r = Rosetta::FactorPairs::all(48)   # 48 has divisors: 1,2,3,4,6,8,12,16,24,48 (10 divisors)
 assert_eq len(@$r), 5, "48 -> 5 pairs (10/2)"
 
 # Perfect squares have an "odd" divisor count, last pair is (sqrt, sqrt)
-my $sq = Rosetta::FactorPairs::all(16)
-my $last = $sq->[-1]
+val $sq = Rosetta::FactorPairs::all(16)
+val $last = $sq->[-1]
 assert_eq $last->[0], $last->[1], "perfect square last pair has equal halves"
 assert_eq $last->[0], 4, "16 -> last pair is (4, 4)"
 

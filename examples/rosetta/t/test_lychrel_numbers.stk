@@ -2,14 +2,14 @@
 # Rosetta Code: Lychrel numbers
 
 fn Rosetta::Lychrel::check_palindrome($s) {
-    my $rev = ~> $s chars rev |> join ""
+    val $rev = ~> $s chars rev |> join ""
     $s eq $rev
 }
 
 fn Rosetta::Lychrel::check($n, $max_iter) {
-    my $curr = $n
-    for my $i (1:$max_iter) {
-        my $rev = ~> "$curr" chars rev |> join ""
+    var $curr = $n
+    for val $i (1:$max_iter) {
+        val $rev = ~> "$curr" chars rev |> join ""
         $curr = $curr + $rev
         if (Rosetta::Lychrel::check_palindrome("$curr")) {
             return 0

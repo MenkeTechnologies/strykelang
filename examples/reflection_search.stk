@@ -19,41 +19,41 @@
 # all of these run instantly even on a cold cache.
 
 p "── 1. Categories matching 'crypto' ─────────────────────"
-my @crypto_cats = sort grep { /crypto/i } keys %c
+val @crypto_cats = sort grep { /crypto/i } keys %c
 printf "  %s\n", $_ for @crypto_cats
 
 p ""
 p "── 2. Builtins inside 'sketch' categories ─────────────"
-for my $cat (sort grep { /sketch/i } keys %c) {
-    my @members = sort @{$c{$cat}}
+for val $cat (sort grep { /sketch/i } keys %c) {
+    val @members = sort @{$c{$cat}}
     printf "  %-22s : %s\n", $cat, join(", ", @members[0:3])
     printf "  %22s   (… and %d more)\n", "", len(@members) - 4 if len(@members) > 4
 }
 
 p ""
 p "── 3. One-line docs for a few well-known builtins ─────"
-for my $name (qw(sha256 base64_encode jwt_encode hide reveal god burp swallow)) {
-    my $doc = $d{$name}
-    my $snip = defined $doc ? substr($doc, 0, 70) : "(no doc)"
+for val $name (qw(sha256 base64_encode jwt_encode hide reveal god burp swallow)) {
+    val $doc = $d{$name}
+    var $snip = defined $doc ? substr($doc, 0, 70) : "(no doc)"
     $snip .= "…" if defined $doc && len($doc) > 70
     printf "  %-14s : %s\n", $name, $snip
 }
 
 p ""
 p "── 4. Free-text grep — every builtin mentioning 'bloom' ─"
-my @bloom_hits = sort grep { defined $d{$_} && $d{$_} =~ /bloom/i } keys %b
+val @bloom_hits = sort grep { defined $d{$_} && $d{$_} =~ /bloom/i } keys %b
 printf "  %d match%s\n", len(@bloom_hits), len(@bloom_hits) == 1 ? "" : "es"
 printf "    %s\n", $_ for @bloom_hits
 
 p ""
 p "── 5. The 'how do I do X?' query — first 5 hits for 'channel' ─"
-my @channel_hits = sort grep { defined $d{$_} && $d{$_} =~ /channel/i } keys %b
-my @first_few = @channel_hits[0:4]
+val @channel_hits = sort grep { defined $d{$_} && $d{$_} =~ /channel/i } keys %b
+val @first_few = @channel_hits[0:4]
 printf "  %s\n", $_ for @first_few
 
 p ""
 p "── 6. Reverse lookup — does an alias exist for 'shuffle'? ─"
-my $alias_for_shuffle = $a{shuffle}
+val $alias_for_shuffle = $a{shuffle}
 defined $alias_for_shuffle
     ? p "  'shuffle' is an alias for '$alias_for_shuffle'"
     : p "  'shuffle' is itself a primary (no alias indirection)"

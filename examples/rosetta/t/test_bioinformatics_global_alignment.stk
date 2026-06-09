@@ -2,34 +2,34 @@
 # Rosetta Code: Bioinformatics/Global alignment
 
 fn Bio::needleman_wunsch($s1, $s2, $match, $mismatch, $gap) {
-    my $n = len($s1)
-    my $m = len($s2)
+    val $n = len($s1)
+    val $m = len($s2)
     
     # Initialize DP matrix
-    my @score = 0:$n |> map { my @r = 0:$m |> map { 0 }; \@r }
+    val @score = 0:$n |> map { val @r = 0:$m |> map { 0 }; \@r }
     
-    for my $i (0:$n) { $score[$i]->[0] = $i * $gap }
-    for my $j (0:$m) { $score[0]->[$j] = $j * $gap }
+    for val $i (0:$n) { $score[$i]->[0] = $i * $gap }
+    for val $j (0:$m) { $score[0]->[$j] = $j * $gap }
     
-    my @chars1 = split("", $s1)
-    my @chars2 = split("", $s2)
+    val @chars1 = split("", $s1)
+    val @chars2 = split("", $s2)
     
-    for my $i (1:$n) {
-        for my $j (1:$m) {
-            my $s = ($chars1[$i-1] eq $chars2[$j-1] ? $match : $mismatch)
-            my $diag = $score[$i-1]->[$j-1] + $s
-            my $up = $score[$i-1]->[$j] + $gap
-            my $left = $score[$i]->[$j-1] + $gap
+    for val $i (1:$n) {
+        for val $j (1:$m) {
+            val $s = ($chars1[$i-1] eq $chars2[$j-1] ? $match : $mismatch)
+            val $diag = $score[$i-1]->[$j-1] + $s
+            val $up = $score[$i-1]->[$j] + $gap
+            val $left = $score[$i]->[$j-1] + $gap
             
             $score[$i]->[$j] = max($diag, $up, $left)
         }
     }
     
     # Traceback
-    my $align1 = ""
-    my $align2 = ""
-    my $i = $n
-    my $j = $m
+    var $align1 = ""
+    var $align2 = ""
+    var $i = $n
+    var $j = $m
     while ($i > 0 || $j > 0) {
         if ($i > 0 && $j > 0 && $score[$i]->[$j] == $score[$i-1]->[$j-1] + ($chars1[$i-1] eq $chars2[$j-1] ? $match : $mismatch)) {
             $align1 = $chars1[$i-1] . $align1
@@ -50,14 +50,14 @@ fn Bio::needleman_wunsch($s1, $s2, $match, $mismatch, $gap) {
 }
 
 fn Rosetta::GlobalAlignment::demo() {
-    my $seq1 = "GAATTCAGTTA"
-    my $seq2 = "GGATCGA"
+    val $seq1 = "GAATTCAGTTA"
+    val $seq2 = "GGATCGA"
     
     "Global Alignment (Needleman-Wunsch):" |> p
     "Seq 1: $seq1" |> p
     "Seq 2: $seq2" |> p
     
-    my $res = Bio::needleman_wunsch($seq1, $seq2, 1, -1, -1)
+    val $res = Bio::needleman_wunsch($seq1, $seq2, 1, -1, -1)
     
     "Resulting Alignment:" |> p
     $res->[0] |> p

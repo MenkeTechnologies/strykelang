@@ -5,10 +5,10 @@ require "./lib/huffman.stk"
 
 # ── Huffman Roundtrip ─────
 fn test_huffman($input) {
-    my $res = Project::Huffman::adv_huffman_encode($input)
-    my $binary = $res->[0]
-    my $root = $res->[1]
-    my $decoded = Project::Huffman::adv_huffman_decode($binary, $root)
+    val $res = Project::Huffman::adv_huffman_encode($input)
+    val $binary = $res->[0]
+    val $root = $res->[1]
+    val $decoded = Project::Huffman::adv_huffman_decode($binary, $root)
     return $decoded
 }
 
@@ -19,9 +19,9 @@ assert_eq test_huffman("a"), "a", "huffman single"
 assert_eq test_huffman(""), "", "huffman empty"
 
 # ── Verify compression ─────
-my $input = "this is a test of huffman coding"
-my $res = Project::Huffman::adv_huffman_encode($input)
-my $binary = $res->[0]
+val $input = "this is a test of huffman coding"
+val $res = Project::Huffman::adv_huffman_encode($input)
+val $binary = $res->[0]
 # Original: 32 chars * 8 bits = 256 bits
 # Huffman should be significantly less
 assert_ok len($binary) < 256, "huffman binary length < original"

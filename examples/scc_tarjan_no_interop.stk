@@ -18,13 +18,13 @@
 # Returns arrayref of SCCs, each SCC an arrayref of vertex ids.
 # adj is hashref: vertex → arrayref of neighbors.
 fn SCC::find($n, $edges) {
-    my %adj
-    for my $i (0:$n - 1) { $adj{$i} //= [] }
-    for my $e (@$edges) {
-        my ($u, $w) = @$e
+    var %adj
+    for val $i (0:$n - 1) { $adj{$i} //= [] }
+    for val $e (@$edges) {
+        val ($u, $w) = @$e
         push @{$adj{$u}}, $w
     }
-    my $state = +{
+    val $state = +{
         adj      => \%adj,
         index    => 0,
         idx_of   => +{},
@@ -33,7 +33,7 @@ fn SCC::find($n, $edges) {
         stack    => [],
         sccs     => [],
     }
-    for my $v (0:$n - 1) {
+    for val $v (0:$n - 1) {
         SCC::strong_connect($state, $v) unless exists $state->{idx_of}{$v}
     }
     $state->{sccs}
@@ -46,7 +46,7 @@ fn SCC::strong_connect($s, $v) {
     push @{$s->{stack}}, $v
     $s->{on_stack}{$v} = 1
 
-    for my $w (@{$s->{adj}{$v}}) {
+    for val $w (@{$s->{adj}{$v}}) {
         if (!exists $s->{idx_of}{$w}) {
             SCC::strong_connect($s, $w)
             $s->{low_of}{$v} = $s->{low_of}{$w} if $s->{low_of}{$w} < $s->{low_of}{$v}
@@ -57,8 +57,8 @@ fn SCC::strong_connect($s, $v) {
 
     # Root: pop the current SCC off the stack.
     if ($s->{low_of}{$v} == $s->{idx_of}{$v}) {
-        my @scc
-        my $popped = -1
+        var @scc
+        var $popped = -1
         while ($popped != $v) {
             $popped = pop @{$s->{stack}}
             delete $s->{on_stack}{$popped}
@@ -71,8 +71,8 @@ fn SCC::strong_connect($s, $v) {
 # Sort each SCC then sort the list — gives a canonical representation
 # for cross-implementation comparison.
 fn SCC::canonical($sccs) {
-    my @rows
-    for my $s (@$sccs) {
+    var @rows
+    for val $s (@$sccs) {
         push @rows, [sort { _ <=> _1 } @$s]
     }
     sort {
@@ -88,17 +88,17 @@ p "── Tarjan SCC demo ──"
 # 4 → 1, 4 → 5         (cross-edges)
 # 5 → 6 → 5            (2-cycle)
 # 6 → 7 → 7            (self-loop)
-my @edges = (
+val @edges = (
     [0, 1], [1, 2], [2, 3], [3, 0],
     [4, 1], [4, 5],
     [5, 6], [6, 5],
     [6, 7], [7, 7],
 )
-my $sccs = SCC::find(8, \@edges)
+val $sccs = SCC::find(8, \@edges)
 die "expected 4 SCCs, got #{len @$sccs}" unless len(@$sccs) == 4
 
-my @canon = SCC::canonical($sccs)
-my $rendered = join(" | ", map { "{" . join(",", @{_}) . "}" } @canon)
+val @canon = SCC::canonical($sccs)
+val $rendered = join(" | ", map { "{" . join(",", @{_}) . "}" } @canon)
 p "  CLRS 8-vertex graph: SCCs = $rendered"
 die "SCC {0,1,2,3} expected" unless grep { join(",", @{_}) eq "0,1,2,3" } @canon
 die "SCC {4} expected"       unless grep { join(",", @{_}) eq "4" } @canon
@@ -107,31 +107,31 @@ die "SCC {7} expected"       unless grep { join(",", @{_}) eq "7" } @canon
 p "  4 SCCs match expected {0,1,2,3}/{4}/{5,6}/{7}  OK"
 
 # DAG (no cycles) — every vertex its own SCC.
-my @dag = ([0, 1], [1, 2], [2, 3])
-my $dag_sccs = SCC::find(4, \@dag)
+val @dag = ([0, 1], [1, 2], [2, 3])
+val $dag_sccs = SCC::find(4, \@dag)
 die "DAG → 4 singletons" unless len(@$dag_sccs) == 4
-for my $s (@$dag_sccs) {
+for val $s (@$dag_sccs) {
     die "DAG SCC singleton" unless len(@$s) == 1
 }
 p "  DAG 0→1→2→3: each vertex is its own SCC  OK"
 
 # Disconnected: two independent cycles.
-my @two_cyc = ([0, 1], [1, 0], [2, 3], [3, 2])
-my $tc_sccs = SCC::find(4, \@two_cyc)
+val @two_cyc = ([0, 1], [1, 0], [2, 3], [3, 2])
+val $tc_sccs = SCC::find(4, \@two_cyc)
 die "two-cycle: 2 SCCs" unless len(@$tc_sccs) == 2
 p "  two independent 2-cycles: 2 SCCs  OK"
 
 # Single vertex, no edges.
-my $solo_sccs = SCC::find(1, [])
+val $solo_sccs = SCC::find(1, [])
 die "solo: 1 SCC of size 1" unless len(@$solo_sccs) == 1 && len(@{$solo_sccs->[0]}) == 1
 
 # Universal invariants:
 #   * Total vertex count across SCCs = N
 #   * SCCs partition the vertex set (no overlap)
-my $total = 0
-my %seen
-for my $s (@$sccs) {
-    for my $v (@$s) {
+var $total = 0
+var %seen
+for val $s (@$sccs) {
+    for val $v (@$s) {
         die "vertex $v in two SCCs" if exists $seen{$v}
         $seen{$v} = 1
         $total++

@@ -16,8 +16,8 @@
 # ── Hashing for Bloom Filter ────────────────────────────────────────────────
 
 fn LSM::Hash::fnv1a($data) {
-    my $hash = 2166136261
-    for my $char (split "", $data) {
+    var $hash = 2166136261
+    for val $char (split "", $data) {
         $hash ^= ord($char)
         $hash *= 16777619
         $hash &= 0xFFFFFFFF
@@ -27,8 +27,8 @@ fn LSM::Hash::fnv1a($data) {
 
 fn LSM::Hash::murmur3($data) {
     # Simple XOR-shift fallback for a second hash
-    my $hash = 3323198485
-    for my $char (split "", $data) {
+    var $hash = 3323198485
+    for val $char (split "", $data) {
         $hash ^= ord($char)
         $hash ^= ($hash >> 16)
         $hash *= 0x85ebca6b
@@ -47,15 +47,15 @@ fn LSM::BloomFilter::new($size=1024) {
 }
 
 fn LSM::BloomFilter::add($bf, $key) {
-    my $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
-    my $h2 = LSM::Hash::murmur3($key) % $bf->{size}
+    val $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
+    val $h2 = LSM::Hash::murmur3($key) % $bf->{size}
     $bf->{bits}->[$h1] = 1
     $bf->{bits}->[$h2] = 1
 }
 
 fn LSM::BloomFilter::check($bf, $key) {
-    my $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
-    my $h2 = LSM::Hash::murmur3($key) % $bf->{size}
+    val $h1 = LSM::Hash::fnv1a($key) % $bf->{size}
+    val $h2 = LSM::Hash::murmur3($key) % $bf->{size}
     $bf->{bits}->[$h1] && $bf->{bits}->[$h2]
 }
 
@@ -65,10 +65,10 @@ fn LSM::Memtable::new = []
 
 fn LSM::Memtable::set($mem, $key, $val) {
     # Find insertion point via binary search
-    my $low = 0
-    my $high = len(@$mem) - 1
+    var $low = 0
+    var $high = len(@$mem) - 1
     while ($low <= $high) {
-        my $mid = int(($low + $high) / 2)
+        val $mid = int(($low + $high) / 2)
         if ($mem->[$mid]->[0] eq $key) {
             $mem->[$mid]->[1] = $val
             return
@@ -79,10 +79,10 @@ fn LSM::Memtable::set($mem, $key, $val) {
 }
 
 fn LSM::Memtable::get($mem, $key) {
-    my $low = 0
-    my $high = len(@$mem) - 1
+    var $low = 0
+    var $high = len(@$mem) - 1
     while ($low <= $high) {
-        my $mid = int(($low + $high) / 2)
+        val $mid = int(($low + $high) / 2)
         return $mem->[$mid]->[1] if $mem->[$mid]->[0] eq $key
         $mem->[$mid]->[0] lt $key ? ($low = $mid + 1) : ($high = $mid - 1)
     }
@@ -92,8 +92,8 @@ fn LSM::Memtable::get($mem, $key) {
 # ── SSTable (Immutable) ──────────────────────────────────────────────────────
 
 fn LSM::SSTable::new($id, $data) {
-    my $bf = LSM::BloomFilter::new(len(@$data) * 10)
-    for my $entry (@$data) {
+    val $bf = LSM::BloomFilter::new(len(@$data) * 10)
+    for val $entry (@$data) {
         LSM::BloomFilter::add $bf, $entry->[0]
     }
     +{
@@ -113,11 +113,11 @@ fn LSM::SSTable::get($ss, $key) {
     return undef if $key lt $ss->{min} || $key gt $ss->{max}
     
     # 3. Binary Search in data
-    my $low = 0
-    my $high = len(@{$ss->{data}}) - 1
+    var $low = 0
+    var $high = len(@{$ss->{data}}) - 1
     while ($low <= $high) {
-        my $mid = int(($low + $high) / 2)
-        my $cur = $ss->{data}->[$mid]
+        val $mid = int(($low + $high) / 2)
+        val $cur = $ss->{data}->[$mid]
         return $cur->[1] if $cur->[0] eq $key
         $cur->[0] lt $key ? ($low = $mid + 1) : ($high = $mid - 1)
     }
@@ -153,7 +153,7 @@ fn LSM::Engine::flush($eng) {
     return if len(@{$eng->{memtable}}) == 0
     
     p "Flushing memtable to SSTable #{$eng->{next_id}}..."
-    my $ss = LSM::SSTable::new($eng->{next_id}++, [ @{$eng->{memtable}} ])
+    val $ss = LSM::SSTable::new($eng->{next_id}++, [ @{$eng->{memtable}} ])
     unshift @{$eng->{sstables}}, $ss
     
     # Clear memtable and WAL
@@ -168,13 +168,13 @@ fn LSM::Engine::flush($eng) {
 
 fn LSM::Engine::get($eng, $key) {
     # 1. Check Memtable
-    my $val = LSM::Memtable::get $eng->{memtable}, $key
+    var $val = LSM::Memtable::get $eng->{memtable}, $key
     if (defined $val) {
         return $val eq "__TOMBSTONE__" ? undef : $val
     }
     
     # 2. Check SSTables (Level 0 - linear search newest to oldest)
-    for my $ss (@{$eng->{sstables}}) {
+    for val $ss (@{$eng->{sstables}}) {
         $val = LSM::SSTable::get $ss, $key
         if (defined $val) {
             return $val eq "__TOMBSTONE__" ? undef : $val
@@ -193,22 +193,22 @@ fn LSM::Engine::compact($eng) {
     p "Compacting #{len(@{$eng->{sstables}})} SSTables..."
     
     # Merge all SSTables into one using K-way merge (simplified here)
-    my %merged
+    var %merged
     # We iterate newest to oldest so we keep the latest version
-    for my $ss (rev @{$eng->{sstables}}) {
-        for my $entry (@{$ss->{data}}) {
+    for val $ss (rev @{$eng->{sstables}}) {
+        for val $entry (@{$ss->{data}}) {
             $merged{$entry->[0]} = $entry->[1]
         }
     }
     
     # Sort merged keys
-    my @sorted_keys = sort { _0 cmp _1 } keys %merged
-    my @merged_data = @sorted_keys |> maps { [_, $merged{_}] } |> collect
+    val @sorted_keys = sort { _0 cmp _1 } keys %merged
+    var @merged_data = @sorted_keys |> maps { [_, $merged{_}] } |> collect
     
     # Filter tombstones at final level (simplified)
     @merged_data = @merged_data |> greps { _->[1] ne "__TOMBSTONE__" } |> collect
     
-    my $new_ss = LSM::SSTable::new($eng->{next_id}++, \@merged_data)
+    val $new_ss = LSM::SSTable::new($eng->{next_id}++, \@merged_data)
     $eng->{sstables} = [$new_ss]
     
     p "Compaction complete. New SSTable ID: #{$new_ss->{id}}, Size: #{len @merged_data}"
@@ -217,7 +217,7 @@ fn LSM::Engine::compact($eng) {
 # ── Internal Tests ───────────────────────────────────────────────────────────
 
 fn test_lsm_engine {
-    my $eng = LSM::Engine::new 3
+    val $eng = LSM::Engine::new 3
     
     LSM::Engine::set $eng, "apple",  "10"
     LSM::Engine::set $eng, "banana", "20"
@@ -254,11 +254,11 @@ test_lsm_engine()
 
 p ""
 p "── Interactive LSM Demo ──"
-my $db = LSM::Engine::new 10
+val $db = LSM::Engine::new 10
 
 # Bulk insert
 p "Inserting 100 items..."
-for my $i (1 : 100) {
+for val $i (1 : 100) {
     LSM::Engine::set $db, sprintf("user_%03d", $i), "data_#{rand()}"
 }
 
@@ -266,10 +266,10 @@ for my $i (1 : 100) {
 LSM::Engine::set $db, "user_050", "UPDATED_VALUE"
 
 # Read back
-my $u50 = LSM::Engine::get $db, "user_050"
+val $u50 = LSM::Engine::get $db, "user_050"
 p "user_050: $u50"
 
-my $u99 = LSM::Engine::get $db, "user_099"
+val $u99 = LSM::Engine::get $db, "user_099"
 p "user_099: $u99"
 
 p "Current SSTable count: #{len @{$db->{sstables}}}"

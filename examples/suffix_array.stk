@@ -12,29 +12,29 @@
 package SA;
 
 fn build($s) {
-    my $n = len($s)
-    my @idx = ()
-    for my $i (0:$n-1) {
+    val $n = len($s)
+    var @idx = ()
+    for val $i (0:$n-1) {
         push @idx, $i
     }
-    my @sorted = sort { substr($s, _) cmp substr($s, _1) } @idx
+    val @sorted = sort { substr($s, _) cmp substr($s, _1) } @idx
     \@sorted
 }
 
 # Kasai's algorithm for LCP given $s and its suffix array.
 fn lcp($s, $sa) {
-    my $n = len($s)
-    my @rank = ()
-    for my $i (0:$n-1) { push @rank, 0 }
-    for my $i (0:$n-1) {
+    val $n = len($s)
+    var @rank = ()
+    for val $i (0:$n-1) { push @rank, 0 }
+    for val $i (0:$n-1) {
         $rank[$sa->[$i]] = $i
     }
-    my @lcp = ()
-    for my $i (0:$n-1) { push @lcp, 0 }
-    my $h = 0
-    for my $i (0:$n-1) {
+    var @lcp = ()
+    for val $i (0:$n-1) { push @lcp, 0 }
+    var $h = 0
+    for val $i (0:$n-1) {
         if ($rank[$i] > 0) {
-            my $j = $sa->[$rank[$i] - 1]
+            val $j = $sa->[$rank[$i] - 1]
             while ($i + $h < $n && $j + $h < $n
                    && substr($s, $i + $h, 1) eq substr($s, $j + $h, 1)) {
                 $h = $h + 1
@@ -50,12 +50,12 @@ fn lcp($s, $sa) {
 
 # Lower-bound binary search: smallest sa-index whose suffix is >= $pat.
 fn lb_suffix($s, $sa, $pat) {
-    my $lo = 0
-    my $hi = len(@$sa)
-    my $m = len($pat)
+    var $lo = 0
+    var $hi = len(@$sa)
+    val $m = len($pat)
     while ($lo < $hi) {
-        my $mid = int(($lo + $hi) / 2)
-        my $suf = substr($s, $sa->[$mid], $m)
+        val $mid = int(($lo + $hi) / 2)
+        val $suf = substr($s, $sa->[$mid], $m)
         if ($suf lt $pat) {
             $lo = $mid + 1
         } else {
@@ -67,35 +67,35 @@ fn lb_suffix($s, $sa, $pat) {
 
 # All starting positions (sorted) where $pat occurs in $s.
 fn find_all($s, $sa, $pat) {
-    my $m = len($pat)
-    my $n = len(@$sa)
+    val $m = len($pat)
+    val $n = len(@$sa)
     return [] if $m == 0
-    my $lo = lb_suffix($s, $sa, $pat)
-    my @hits = ()
-    my $i = $lo
+    val $lo = lb_suffix($s, $sa, $pat)
+    var @hits = ()
+    var $i = $lo
     while ($i < $n) {
-        my $suf = substr($s, $sa->[$i], $m)
+        val $suf = substr($s, $sa->[$i], $m)
         last if $suf ne $pat
         push @hits, $sa->[$i]
         $i = $i + 1
     }
     # Hits emerge from a contiguous suffix-array range; sort numerically.
-    my @sorted = sort { _ <=> _1 } @hits
+    val @sorted = sort { _ <=> _1 } @hits
     \@sorted
 }
 
 fn contains($s, $sa, $pat) {
-    my $hits = SA::find_all($s, $sa, $pat)
+    val $hits = SA::find_all($s, $sa, $pat)
     len(@$hits) > 0
 }
 
 # Longest repeated substring via max LCP entry.
 fn longest_repeated($s) {
-    my $sa = SA::build($s)
-    my $lc = SA::lcp($s, $sa)
-    my $best_i = 0
-    my $best_h = 0
-    for my $i (1:(len(@$lc))-1) {
+    val $sa = SA::build($s)
+    val $lc = SA::lcp($s, $sa)
+    var $best_i = 0
+    var $best_h = 0
+    for val $i (1:(len(@$lc))-1) {
         if ($lc->[$i] > $best_h) {
             $best_h = $lc->[$i]
             $best_i = $i
@@ -106,12 +106,12 @@ fn longest_repeated($s) {
 
 package main;
 
-my $s = "banana"
-my $sa = SA::build($s)
+val $s = "banana"
+val $sa = SA::build($s)
 p "string: $s"
 p "suffix array: @$sa"
-my $l = SA::lcp($s, $sa)
+val $l = SA::lcp($s, $sa)
 p "lcp: @$l"
-my $hits = SA::find_all($s, $sa, "ana")
+val $hits = SA::find_all($s, $sa, "ana")
 p "occurrences of 'ana': @$hits"
 p "longest repeated substring: " . SA::longest_repeated("mississippi")

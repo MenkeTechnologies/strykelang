@@ -9,40 +9,40 @@ fn Rosetta::Republican::check_leap($y) {
 }
 
 fn Rosetta::Republican::from_gregorian($y, $m, $d) {
-    my $abs_now = Rosetta::Republican::greg_to_abs($y, $m, $d)
-    my $abs_epoch = Rosetta::Republican::greg_to_abs(1792, 9, 22)
-    my $days = $abs_now - $abs_epoch
+    val $abs_now = Rosetta::Republican::greg_to_abs($y, $m, $d)
+    val $abs_epoch = Rosetta::Republican::greg_to_abs(1792, 9, 22)
+    var $days = $abs_now - $abs_epoch
     
     if ($days < 0) { return "Before Republic" }
     
     # 2. Convert days to Republican (Year, Month, Day)
-    my $ry = 1
+    var $ry = 1
     while (1) {
         # Republican year Y contains the February of Gregorian year 1792 + Y
-        my $d_in_y = Rosetta::Republican::check_leap($ry + 1792) ? 366 : 365
+        val $d_in_y = Rosetta::Republican::check_leap($ry + 1792) ? 366 : 365
         if ($days < $d_in_y) { last }
         $days -= $d_in_y
         $ry++
     }
     
-    my @months = qw{Vendémiaire Brumaire Frimaire Nivôse Pluviôse Ventôse Germinal Floréal Prairial Messidor Thermidor Fructidor}
+    val @months = qw{Vendémiaire Brumaire Frimaire Nivôse Pluviôse Ventôse Germinal Floréal Prairial Messidor Thermidor Fructidor}
     
     if ($days < 360) {
-        my $rm_idx = int($days / 30)
-        my $rd = ($days % 30) + 1
+        val $rm_idx = int($days / 30)
+        val $rd = ($days % 30) + 1
         return "$rd $months[$rm_idx] Year $ry"
     } else {
-        my $rd = ($days - 360) + 1
+        val $rd = ($days - 360) + 1
         return "Sans-culottide $rd Year $ry"
     }
 }
 
 fn Rosetta::Republican::greg_to_abs($y, $m, $d) {
     # Calculate absolute days since 0001-01-01
-    my $prev_y = $y - 1
-    my $days = $prev_y * 365 + int($prev_y / 4) - int($prev_y / 100) + int($prev_y / 400)
+    val $prev_y = $y - 1
+    var $days = $prev_y * 365 + int($prev_y / 4) - int($prev_y / 100) + int($prev_y / 400)
     
-    my @m_days = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    var @m_days = (0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
     if (Rosetta::Republican::check_leap($y)) { $m_days[2] = 29 }
     
     for (1:$m - 1) {

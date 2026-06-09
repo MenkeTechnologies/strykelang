@@ -11,51 +11,51 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $kth = $ARGV[0] // 7
-my $n_workers = $ARGV[1] // 4
+val $kth = $ARGV[0] // 7
+val $n_workers = $ARGV[1] // 4
 
 p "── distributed quickselect (Kth smallest) ──"
 
 # Synthetic dataset.
-my @data
-for my $i (0:49) { push @data, (($i * 37 + 11) % 100) }
+var @data
+for val $i (0:49) { push @data, (($i * 37 + 11) % 100) }
 printf "data: %d values  ·  workers: %d  ·  K: %d (1-indexed)\n",
     len(@data), $n_workers, $kth
 
-my @workers = congregation($n_workers)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n_workers)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard data, each worker sorts its shard, returns the sorted list.
-my $per = int((len(@data) + $n_workers - 1) / $n_workers)
-my @shards
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int((len(@data) + $n_workers - 1) / $n_workers)
+var @shards
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@data) - 1 if $end >= len(@data)
     next if $start >= len(@data)
-    my @shard
-    for my $r ($start:$end) { push @shard, $data[$r] }
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    var @shard
+    for val $r ($start:$end) { push @shard, $data[$r] }
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
         my \@sorted = sort { _ <=> _1 } \@\$arr;
         to_json(\\\@sorted)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     push @shards, from_json($reply{$w})
 }
 
 # Merge the per-shard sorted lists and pick the K-th.
-my @merged
-for my $s (@shards) {
+var @merged
+for val $s (@shards) {
     push @merged, @$s
 }
 @merged = sort { _ <=> _1 } @merged
 
-my $kth_value = $merged[$kth - 1]   # 1-indexed
-my $local_kth = (sort { _ <=> _1 } @data)[$kth - 1]
+val $kth_value = $merged[$kth - 1]   # 1-indexed
+val $local_kth = (sort { _ <=> _1 } @data)[$kth - 1]
 
 printf "── distributed Kth smallest ──\n"
 printf "  distributed result: %d\n", $kth_value

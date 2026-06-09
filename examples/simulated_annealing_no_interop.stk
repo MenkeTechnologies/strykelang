@@ -10,50 +10,50 @@
 package SimulatedAnnealing
 
 fn distance($city1, $city2) {
-    my $dx = $city1->{x} - $city2->{x}
-    my $dy = $city1->{y} - $city2->{y}
+    val $dx = $city1->{x} - $city2->{x}
+    val $dy = $city1->{y} - $city2->{y}
     sqrt($dx * $dx + $dy * $dy)
 }
 
 fn tour_distance($tour, $cities) {
-    my $dist = 0.0
-    my $n = len @$tour
-    for (my $i = 0; $i < $n; $i++) {
-        my $c1 = $cities->[$tour->[$i]]
-        my $next_idx = ($i + 1) % $n
-        my $c2 = $cities->[$tour->[$next_idx]]
+    var $dist = 0.0
+    val $n = len @$tour
+    for (var $i = 0; $i < $n; $i++) {
+        val $c1 = $cities->[$tour->[$i]]
+        val $next_idx = ($i + 1) % $n
+        val $c2 = $cities->[$tour->[$next_idx]]
         $dist += SimulatedAnnealing::distance($c1, $c2)
     }
     $dist
 }
 
 fn solve($cities, $init_temp, $cooling_rate, $iterations) {
-    my $n = len @$cities
+    val $n = len @$cities
     return [] if $n == 0
     
-    my @current_tour
-    for my $i (0 : $n - 1) { push @current_tour, $i }
-    my $current_dist = SimulatedAnnealing::tour_distance(\@current_tour, $cities)
+    var @current_tour
+    for val $i (0 : $n - 1) { push @current_tour, $i }
+    var $current_dist = SimulatedAnnealing::tour_distance(\@current_tour, $cities)
     
-    my @best_tour = @current_tour
-    my $best_dist = $current_dist
+    var @best_tour = @current_tour
+    var $best_dist = $current_dist
     
-    my $temp = $init_temp
+    var $temp = $init_temp
     
-    for (my $iter = 0; $iter < $iterations; $iter++) {
+    for (var $iter = 0; $iter < $iterations; $iter++) {
         # Propose a new tour by swapping two random cities
-        my $idx1 = int(rand($n))
-        my $idx2 = int(rand($n))
+        val $idx1 = int(rand($n))
+        var $idx2 = int(rand($n))
         while ($idx1 == $idx2) {
             $idx2 = int(rand($n))
         }
         
-        my @new_tour = @current_tour
-        my $tmp = $new_tour[$idx1]
+        var @new_tour = @current_tour
+        val $tmp = $new_tour[$idx1]
         $new_tour[$idx1] = $new_tour[$idx2]
         $new_tour[$idx2] = $tmp
         
-        my $new_dist = SimulatedAnnealing::tour_distance(\@new_tour, $cities)
+        val $new_dist = SimulatedAnnealing::tour_distance(\@new_tour, $cities)
         
         # Decide whether to accept the new tour
         if ($new_dist < $current_dist) {
@@ -64,7 +64,7 @@ fn solve($cities, $init_temp, $cooling_rate, $iterations) {
                 $best_dist = $new_dist
             }
         } else {
-            my $acceptance_prob = exp(-($new_dist - $current_dist) / $temp)
+            val $acceptance_prob = exp(-($new_dist - $current_dist) / $temp)
             if (rand(1.0) < $acceptance_prob) {
                 @current_tour = @new_tour
                 $current_dist = $new_dist
@@ -82,7 +82,7 @@ package main
 p "── Simulated Annealing (TSP) Demo ──"
 srand(42)
 
-my @cities = (
+val @cities = (
     { x => 0.0,  y => 0.0 },
     { x => 10.0, y => 0.0 },
     { x => 10.0, y => 10.0 },
@@ -91,11 +91,11 @@ my @cities = (
 )
 
 p "Cities:"
-for my $i (0 : (len @cities) - 1) {
+for val $i (0 : (len @cities) - 1) {
     p "  #{$i}: (#{$cities[$i]->{x}}, #{$cities[$i]->{y}})"
 }
 
-my $res = SimulatedAnnealing::solve(\@cities, 1000.0, 0.99, 10000)
+val $res = SimulatedAnnealing::solve(\@cities, 1000.0, 0.99, 10000)
 
 p "\nBest Tour Found: #{join ' -> ', @{$res->{tour}}}"
 p "Total Distance:  #{sprintf '%.2f', $res->{distance}}"

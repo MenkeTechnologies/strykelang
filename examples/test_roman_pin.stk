@@ -3,13 +3,13 @@
 # Pinning test for roman.stk demo.
 # Compliance: docs/STYLE_GUIDE.md
 
-my @vals    = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
-my @symbols = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+val @vals    = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+val @symbols = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
 
 fn Roman::encode($n) {
-    my $out = ""
-    my $r = $n
-    for my $i (0:12) {
+    var $out = ""
+    var $r = $n
+    for val $i (0:12) {
         while ($r >= $vals[$i]) {
             $out = $out . $symbols[$i]
             $r = $r - $vals[$i]
@@ -19,13 +19,13 @@ fn Roman::encode($n) {
 }
 
 fn Roman::decode($s) {
-    my %val = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
-    my $total = 0
-    my $n = len $s
-    for my $i (0:$n-1) {
-        my $c    = $s[$i]
-        my $cur  = $val{$c}
-        my $next = $i + 1 < $n ? $val{$s[$i+1]} : 0
+    val %val = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
+    var $total = 0
+    val $n = len $s
+    for val $i (0:$n-1) {
+        val $c    = $s[$i]
+        val $cur  = $val{$c}
+        val $next = $i + 1 < $n ? $val{$s[$i+1]} : 0
         if ($cur < $next) {
             $total = $total - $cur
         } else {
@@ -74,17 +74,17 @@ Roman::decode("MMMCMXCIX") |> aeq 3999, "decode MMMCMXCIX"
 
 # ── Round-trip ────────────────────────────────────────────────────────────
 
-my $all_match = 1
-for my $n (1:100) {
-    my $r = Roman::encode($n)
-    my $d = Roman::decode($r)
+var $all_match = 1
+for val $n (1:100) {
+    val $r = Roman::encode($n)
+    val $d = Roman::decode($r)
     $all_match = 0 if $d != $n
 }
 $all_match |> aeq 1, "round-trip 1..100 all match"
 
-my $hi_match = 1
-for my $n (500:520) {
-    my $d = Roman::decode(Roman::encode($n))
+var $hi_match = 1
+for val $n (500:520) {
+    val $d = Roman::decode(Roman::encode($n))
     $hi_match = 0 if $d != $n
 }
 $hi_match |> aeq 1, "round-trip 500..520 all match"

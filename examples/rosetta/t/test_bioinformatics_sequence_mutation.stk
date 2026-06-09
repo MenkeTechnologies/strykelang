@@ -2,18 +2,18 @@
 # Rosetta Code: Bioinformatics/Sequence mutation
 
 fn Bio::mutate($seq, $rate) {
-    my @chars = split("", $seq)
-    my @res
-    my @nucleotides = ("A", "C", "G", "T")
+    val @chars = split("", $seq)
+    var @res
+    val @nucleotides = ("A", "C", "G", "T")
     
-    for my $c (@chars) {
-        my $r = rand()
+    for val $c (@chars) {
+        val $r = rand()
         if ($r < $rate) {
             # Mutate
-            my $r2 = rand()
+            val $r2 = rand()
             if ($r2 < 0.33) {
                 # Substitution
-                my $new_c = $nucleotides[int(rand() * 4)]
+                val $new_c = $nucleotides[int(rand() * 4)]
                 push @res, $new_c
             } elsif ($r2 < 0.66) {
                 # Insertion
@@ -31,11 +31,11 @@ fn Bio::mutate($seq, $rate) {
 }
 
 fn Rosetta::SequenceMutation::demo() {
-    my $seq = "GAATTCAGTTA"
+    val $seq = "GAATTCAGTTA"
     "Sequence Mutation Simulation:" |> p
     "Original:  $seq" |> p
     
-    my $mutated = Bio::mutate($seq, 0.2)
+    val $mutated = Bio::mutate($seq, 0.2)
     "Mutated:   $mutated" |> p
     
     assert_ok len($mutated) >= 0, "Mutated sequence has valid length"

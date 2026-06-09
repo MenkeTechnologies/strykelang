@@ -2,10 +2,10 @@
 # Rosetta Code: Pascal matrix generation
 
 fn Rosetta::PascalMatrix::pascal_matrix($n) {
-    my @matrix = ()
-    for my $i (0:$n-1) {
+    var @matrix = ()
+    for val $i (0:$n-1) {
         $matrix[$i] = []
-        for my $j (0:$n-1) {
+        for val $j (0:$n-1) {
             if ($i == 0 || $j == 0) {
                 $matrix[$i][$j] = 1
             } else {
@@ -16,7 +16,7 @@ fn Rosetta::PascalMatrix::pascal_matrix($n) {
     \@matrix
 }
 
-my $res = Rosetta::PascalMatrix::pascal_matrix(5)
+val $res = Rosetta::PascalMatrix::pascal_matrix(5)
 assert_eq $res->[0][0], 1, "m[0][0]"
 assert_eq $res->[1][1], 2, "m[1][1]"
 assert_eq $res->[2][2], 6, "m[2][2]"

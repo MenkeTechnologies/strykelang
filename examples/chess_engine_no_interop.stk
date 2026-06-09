@@ -48,37 +48,37 @@
 # Piece codes (chosen so that `piece > 6` ⇒ black, and `((piece - 1) % 6)`
 # extracts piece-type-without-color: 0=P, 1=N, 2=B, 3=R, 4=Q, 5=K).
 
-my $EMPTY = 0
-my $WP = 1
-my $WN = 2
-my $WB = 3
-my $WR = 4
-my $WQ = 5
-my $WK = 6
-my $BP = 7
-my $BN = 8
-my $BB = 9
-my $BR = 10
-my $BQ = 11
-my $BK = 12
+val $EMPTY = 0
+val $WP = 1
+val $WN = 2
+val $WB = 3
+val $WR = 4
+val $WQ = 5
+val $WK = 6
+val $BP = 7
+val $BN = 8
+val $BB = 9
+val $BR = 10
+val $BQ = 11
+val $BK = 12
 
-my $WHITE = 0
-my $BLACK = 1
+val $WHITE = 0
+val $BLACK = 1
 
 # Castling rights bitmask: bit 0 = WK, 1 = WQ, 2 = BK, 3 = BQ.
 
-my $CR_WK = 1
-my $CR_WQ = 2
-my $CR_BK = 4
-my $CR_BQ = 8
+val $CR_WK = 1
+val $CR_WQ = 2
+val $CR_BK = 4
+val $CR_BQ = 8
 
 # Move flags.
 
-my $FLAG_NORMAL = 0
-my $FLAG_CASTLE = 1
-my $FLAG_EP     = 2
-my $FLAG_PROMO  = 3
-my $FLAG_DPUSH  = 4
+val $FLAG_NORMAL = 0
+val $FLAG_CASTLE = 1
+val $FLAG_EP     = 2
+val $FLAG_PROMO  = 3
+val $FLAG_DPUSH  = 4
 
 # Decompose a square index into file (0..7) and rank (0..7).
 
@@ -127,7 +127,7 @@ fn Ch::piece_char($p) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Ch::new_position() {
-    my @board = (0) x 64
+    var @board = (0) x 64
     # White back rank (rank 0, a1-h1).
     $board[0] = $WR
     $board[1] = $WN
@@ -138,11 +138,11 @@ fn Ch::new_position() {
     $board[6] = $WN
     $board[7] = $WR
     # White pawns (rank 1).
-    for my $f (0:7) {
+    for val $f (0:7) {
         $board[8 + $f] = $WP
     }
     # Black pawns (rank 6).
-    for my $f (0:7) {
+    for val $f (0:7) {
         $board[48 + $f] = $BP
     }
     # Black back rank (rank 7).
@@ -167,18 +167,18 @@ fn Ch::new_position() {
 # Pretty-print a position with rank/file labels.
 
 fn Ch::render($pos) {
-    my $out = ""
-    for my $r (rev 0:7) {
+    var $out = ""
+    for val $r (rev 0:7) {
         $out .= ($r + 1) . " "
-        for my $f (0:7) {
+        for val $f (0:7) {
             $out .= Ch::piece_char($pos->{board}->[Ch::sq_of($f, $r)]) . " "
         }
         $out .= "\n"
     }
     $out .= "  a b c d e f g h\n"
-    my $side = $pos->{side} == $WHITE ? "white" : "black"
+    val $side = $pos->{side} == $WHITE ? "white" : "black"
     $out .= "  side: $side\n"
-    my @cr
+    var @cr
     push @cr, "K" if $pos->{castle} & $CR_WK
     push @cr, "Q" if $pos->{castle} & $CR_WQ
     push @cr, "k" if $pos->{castle} & $CR_BK
@@ -191,7 +191,7 @@ fn Ch::render($pos) {
 # Deep-clone a position so make/unmake doesn't share state.
 
 fn Ch::clone_position($pos) {
-    my @new_board = @{$pos->{board}}
+    val @new_board = @{$pos->{board}}
     +{
         board  => \@new_board,
         side   => $pos->{side},
@@ -207,26 +207,26 @@ fn Ch::clone_position($pos) {
 # ═══════════════════════════════════════════════════════════════════
 
 # Knight offsets — (file, rank) deltas.
-my @KNIGHT_DELTAS = (
+val @KNIGHT_DELTAS = (
     [-2, -1], [-2, 1], [-1, -2], [-1, 2],
     [ 1, -2], [ 1, 2], [ 2, -1], [ 2, 1],
 )
 
 # King offsets.
-my @KING_DELTAS = (
+val @KING_DELTAS = (
     [-1, -1], [-1, 0], [-1, 1],
     [ 0, -1],          [ 0, 1],
     [ 1, -1], [ 1, 0], [ 1, 1],
 )
 
 # Bishop directions.
-my @BISHOP_DIRS = ([-1, -1], [-1, 1], [1, -1], [1, 1])
+val @BISHOP_DIRS = ([-1, -1], [-1, 1], [1, -1], [1, 1])
 
 # Rook directions.
-my @ROOK_DIRS = ([-1, 0], [1, 0], [0, -1], [0, 1])
+val @ROOK_DIRS = ([-1, 0], [1, 0], [0, -1], [0, 1])
 
 # Queen = bishop + rook directions.
-my @QUEEN_DIRS = (
+val @QUEEN_DIRS = (
     [-1, -1], [-1, 1], [1, -1], [1, 1],
     [-1, 0], [1, 0], [0, -1], [0, 1],
 )
@@ -263,57 +263,57 @@ fn Ch::push_move($moves, $from, $to, $captured, $pos) {
 # Used both for check detection and for "is this castle path safe?".
 
 fn Ch::is_square_attacked($pos, $sq, $attacker) {
-    my $board = $pos->{board}
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
+    val $board = $pos->{board}
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
     # Pawn attacks.
     if ($attacker == $WHITE) {
         if ($r > 0) {
             if ($f > 0) {
-                my $p = $board->[Ch::sq_of($f - 1, $r - 1)]
+                val $p = $board->[Ch::sq_of($f - 1, $r - 1)]
                 return 1 if $p == $WP
             }
             if ($f < 7) {
-                my $p = $board->[Ch::sq_of($f + 1, $r - 1)]
+                val $p = $board->[Ch::sq_of($f + 1, $r - 1)]
                 return 1 if $p == $WP
             }
         }
     } else {
         if ($r < 7) {
             if ($f > 0) {
-                my $p = $board->[Ch::sq_of($f - 1, $r + 1)]
+                val $p = $board->[Ch::sq_of($f - 1, $r + 1)]
                 return 1 if $p == $BP
             }
             if ($f < 7) {
-                my $p = $board->[Ch::sq_of($f + 1, $r + 1)]
+                val $p = $board->[Ch::sq_of($f + 1, $r + 1)]
                 return 1 if $p == $BP
             }
         }
     }
     # Knight attacks.
-    for my $d (@KNIGHT_DELTAS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    for val $d (@KNIGHT_DELTAS) {
+        val $nf = $f + $d->[0]
+        val $nr = $r + $d->[1]
         next unless $nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8
-        my $p = $board->[Ch::sq_of($nf, $nr)]
+        val $p = $board->[Ch::sq_of($nf, $nr)]
         if ($attacker == $WHITE && $p == $WN) { return 1 }
         if ($attacker == $BLACK && $p == $BN) { return 1 }
     }
     # King attacks (for adjacent-king detection during legality).
-    for my $d (@KING_DELTAS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    for val $d (@KING_DELTAS) {
+        val $nf = $f + $d->[0]
+        val $nr = $r + $d->[1]
         next unless $nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8
-        my $p = $board->[Ch::sq_of($nf, $nr)]
+        val $p = $board->[Ch::sq_of($nf, $nr)]
         if ($attacker == $WHITE && $p == $WK) { return 1 }
         if ($attacker == $BLACK && $p == $BK) { return 1 }
     }
     # Bishop / queen diagonal sliders.
-    for my $d (@BISHOP_DIRS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    for val $d (@BISHOP_DIRS) {
+        var $nf = $f + $d->[0]
+        var $nr = $r + $d->[1]
         while ($nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8) {
-            my $p = $board->[Ch::sq_of($nf, $nr)]
+            val $p = $board->[Ch::sq_of($nf, $nr)]
             if ($p != $EMPTY) {
                 if ($attacker == $WHITE && ($p == $WB || $p == $WQ)) { return 1 }
                 if ($attacker == $BLACK && ($p == $BB || $p == $BQ)) { return 1 }
@@ -324,11 +324,11 @@ fn Ch::is_square_attacked($pos, $sq, $attacker) {
         }
     }
     # Rook / queen orthogonal sliders.
-    for my $d (@ROOK_DIRS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    for val $d (@ROOK_DIRS) {
+        var $nf = $f + $d->[0]
+        var $nr = $r + $d->[1]
         while ($nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8) {
-            my $p = $board->[Ch::sq_of($nf, $nr)]
+            val $p = $board->[Ch::sq_of($nf, $nr)]
             if ($p != $EMPTY) {
                 if ($attacker == $WHITE && ($p == $WR || $p == $WQ)) { return 1 }
                 if ($attacker == $BLACK && ($p == $BR || $p == $BQ)) { return 1 }
@@ -344,8 +344,8 @@ fn Ch::is_square_attacked($pos, $sq, $attacker) {
 # Find the king square of `side` on the board.
 
 fn Ch::king_square($pos, $side) {
-    my $target = $side == $WHITE ? $WK : $BK
-    for my $sq (0:63) {
+    val $target = $side == $WHITE ? $WK : $BK
+    for val $sq (0:63) {
         return $sq if $pos->{board}->[$sq] == $target
     }
     -1
@@ -354,7 +354,7 @@ fn Ch::king_square($pos, $side) {
 # Is `side`'s king currently in check?
 
 fn Ch::in_check($pos, $side) {
-    my $king_sq = Ch::king_square($pos, $side)
+    val $king_sq = Ch::king_square($pos, $side)
     return 0 if $king_sq == -1
     Ch::is_square_attacked($pos, $king_sq, 1 - $side)
 }
@@ -364,29 +364,29 @@ fn Ch::in_check($pos, $side) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Ch::gen_pawn_moves($pos, $sq, $moves) {
-    my $board = $pos->{board}
-    my $piece = $board->[$sq]
-    my $is_w = $piece == $WP
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
-    my $dir       = $is_w ? 1 : -1
-    my $start_rank = $is_w ? 1 : 6
-    my $promo_rank = $is_w ? 6 : 1
+    val $board = $pos->{board}
+    val $piece = $board->[$sq]
+    val $is_w = $piece == $WP
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
+    val $dir       = $is_w ? 1 : -1
+    val $start_rank = $is_w ? 1 : 6
+    val $promo_rank = $is_w ? 6 : 1
     # Single push.
-    my $nr = $r + $dir
+    val $nr = $r + $dir
     if ($nr >= 0 && $nr <= 7) {
-        my $to = Ch::sq_of($f, $nr)
+        val $to = Ch::sq_of($f, $nr)
         if ($board->[$to] == $EMPTY) {
             if ($r == $promo_rank) {
                 # Promotion to N, B, R, Q.
-                for my $promo ($is_w ? ($WN, $WB, $WR, $WQ) : ($BN, $BB, $BR, $BQ)) {
+                for val $promo ($is_w ? ($WN, $WB, $WR, $WQ) : ($BN, $BB, $BR, $BQ)) {
                     push @$moves, Ch::make_move($sq, $to, $FLAG_PROMO, $promo, 0, $pos)
                 }
             } else {
                 Ch::push_move($moves, $sq, $to, 0, $pos)
                 # Double push from starting rank.
                 if ($r == $start_rank) {
-                    my $to2 = Ch::sq_of($f, $r + 2 * $dir)
+                    val $to2 = Ch::sq_of($f, $r + 2 * $dir)
                     if ($board->[$to2] == $EMPTY) {
                         push @$moves, Ch::make_move($sq, $to2, $FLAG_DPUSH, 0, 0, $pos)
                     }
@@ -395,15 +395,15 @@ fn Ch::gen_pawn_moves($pos, $sq, $moves) {
         }
     }
     # Captures (including en-passant).
-    for my $df (-1, 1) {
-        my $cf = $f + $df
-        my $cr = $r + $dir
+    for val $df (-1, 1) {
+        val $cf = $f + $df
+        val $cr = $r + $dir
         next unless $cf >= 0 && $cf < 8 && $cr >= 0 && $cr < 8
-        my $to = Ch::sq_of($cf, $cr)
-        my $target = $board->[$to]
+        val $to = Ch::sq_of($cf, $cr)
+        val $target = $board->[$to]
         if ($target != $EMPTY && Ch::piece_color($target) != Ch::piece_color($piece)) {
             if ($r == $promo_rank) {
-                for my $promo ($is_w ? ($WN, $WB, $WR, $WQ) : ($BN, $BB, $BR, $BQ)) {
+                for var $promo ($is_w ? ($WN, $WB, $WR, $WQ) : ($BN, $BB, $BR, $BQ)) {
                     push @$moves, Ch::make_move($sq, $to, $FLAG_PROMO, $promo, $target, $pos)
                 }
             } else {
@@ -418,16 +418,16 @@ fn Ch::gen_pawn_moves($pos, $sq, $moves) {
 }
 
 fn Ch::gen_knight_moves($pos, $sq, $moves) {
-    my $piece = $pos->{board}->[$sq]
-    my $mycolor = Ch::piece_color($piece)
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
-    for my $d (@KNIGHT_DELTAS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    val $piece = $pos->{board}->[$sq]
+    val $mycolor = Ch::piece_color($piece)
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
+    for val $d (@KNIGHT_DELTAS) {
+        val $nf = $f + $d->[0]
+        val $nr = $r + $d->[1]
         next unless $nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8
-        my $to = Ch::sq_of($nf, $nr)
-        my $target = $pos->{board}->[$to]
+        val $to = Ch::sq_of($nf, $nr)
+        val $target = $pos->{board}->[$to]
         if ($target == $EMPTY) {
             Ch::push_move($moves, $sq, $to, 0, $pos)
         } elsif (Ch::piece_color($target) != $mycolor) {
@@ -437,16 +437,16 @@ fn Ch::gen_knight_moves($pos, $sq, $moves) {
 }
 
 fn Ch::gen_sliding_moves($pos, $sq, $dirs, $moves) {
-    my $piece = $pos->{board}->[$sq]
-    my $mycolor = Ch::piece_color($piece)
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
-    for my $d (@$dirs) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    val $piece = $pos->{board}->[$sq]
+    val $mycolor = Ch::piece_color($piece)
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
+    for val $d (@$dirs) {
+        var $nf = $f + $d->[0]
+        var $nr = $r + $d->[1]
         while ($nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8) {
-            my $to = Ch::sq_of($nf, $nr)
-            my $target = $pos->{board}->[$to]
+            val $to = Ch::sq_of($nf, $nr)
+            val $target = $pos->{board}->[$to]
             if ($target == $EMPTY) {
                 Ch::push_move($moves, $sq, $to, 0, $pos)
             } else {
@@ -462,17 +462,17 @@ fn Ch::gen_sliding_moves($pos, $sq, $dirs, $moves) {
 }
 
 fn Ch::gen_king_moves($pos, $sq, $moves) {
-    my $piece = $pos->{board}->[$sq]
-    my $mycolor = Ch::piece_color($piece)
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
+    val $piece = $pos->{board}->[$sq]
+    val $mycolor = Ch::piece_color($piece)
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
     # One-square moves.
-    for my $d (@KING_DELTAS) {
-        my $nf = $f + $d->[0]
-        my $nr = $r + $d->[1]
+    for val $d (@KING_DELTAS) {
+        val $nf = $f + $d->[0]
+        val $nr = $r + $d->[1]
         next unless $nf >= 0 && $nf < 8 && $nr >= 0 && $nr < 8
-        my $to = Ch::sq_of($nf, $nr)
-        my $target = $pos->{board}->[$to]
+        val $to = Ch::sq_of($nf, $nr)
+        val $target = $pos->{board}->[$to]
         if ($target == $EMPTY) {
             Ch::push_move($moves, $sq, $to, 0, $pos)
         } elsif (Ch::piece_color($target) != $mycolor) {
@@ -484,13 +484,13 @@ fn Ch::gen_king_moves($pos, $sq, $moves) {
 }
 
 fn Ch::gen_castling($pos, $sq, $moves) {
-    my $piece = $pos->{board}->[$sq]
-    my $is_w = $piece == $WK
-    my $home = $is_w ? 4 : 60
+    val $piece = $pos->{board}->[$sq]
+    val $is_w = $piece == $WK
+    val $home = $is_w ? 4 : 60
     return unless $sq == $home
-    my $opp = 1 - ($is_w ? $WHITE : $BLACK)
+    val $opp = 1 - ($is_w ? $WHITE : $BLACK)
     # King-side.
-    my $cr_k = $is_w ? $CR_WK : $CR_BK
+    val $cr_k = $is_w ? $CR_WK : $CR_BK
     if ($pos->{castle} & $cr_k) {
         if ($pos->{board}->[$home + 1] == $EMPTY && $pos->{board}->[$home + 2] == $EMPTY) {
             # King must not be in check, must not move through check.
@@ -502,7 +502,7 @@ fn Ch::gen_castling($pos, $sq, $moves) {
         }
     }
     # Queen-side.
-    my $cr_q = $is_w ? $CR_WQ : $CR_BQ
+    val $cr_q = $is_w ? $CR_WQ : $CR_BQ
     if ($pos->{castle} & $cr_q) {
         if ($pos->{board}->[$home - 1] == $EMPTY && $pos->{board}->[$home - 2] == $EMPTY && $pos->{board}->[$home - 3] == $EMPTY) {
             if (!Ch::is_square_attacked($pos, $home, $opp) &&
@@ -519,10 +519,10 @@ fn Ch::gen_castling($pos, $sq, $moves) {
 # downstream by make-move + king-not-in-check.
 
 fn Ch::generate_pseudo_legal($pos) {
-    my @moves
-    my $side = $pos->{side}
-    for my $sq (0:63) {
-        my $p = $pos->{board}->[$sq]
+    val @moves
+    val $side = $pos->{side}
+    for val $sq (0:63) {
+        val $p = $pos->{board}->[$sq]
         next if $p == $EMPTY
         next if Ch::piece_color($p) != $side
         if (Ch::is_pawn($p)) {
@@ -547,11 +547,11 @@ fn Ch::generate_pseudo_legal($pos) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Ch::make_move_on($pos, $mv) {
-    my $board = $pos->{board}
-    my $from = $mv->{from}
-    my $to   = $mv->{to}
-    my $piece = $board->[$from]
-    my $flag = $mv->{flag}
+    var $board = $pos->{board}
+    val $from = $mv->{from}
+    val $to   = $mv->{to}
+    val $piece = $board->[$from]
+    val $flag = $mv->{flag}
     # Move the piece.
     $board->[$from] = $EMPTY
     $board->[$to]   = $piece
@@ -573,7 +573,7 @@ fn Ch::make_move_on($pos, $mv) {
     if ($flag == $FLAG_EP) {
         # Captured pawn is BEHIND the destination (one rank back from
         # the mover's perspective).
-        my $ep_capture_sq = Ch::piece_color($piece) == $WHITE ? $to - 8 : $to + 8
+        val $ep_capture_sq = Ch::piece_color($piece) == $WHITE ? $to - 8 : $to + 8
         $board->[$ep_capture_sq] = $EMPTY
     }
     # Update castle rights.
@@ -610,10 +610,10 @@ fn Ch::make_move_on($pos, $mv) {
 }
 
 fn Ch::unmake_move_on($pos, $mv) {
-    my $board = $pos->{board}
-    my $from = $mv->{from}
-    my $to   = $mv->{to}
-    my $flag = $mv->{flag}
+    var $board = $pos->{board}
+    val $from = $mv->{from}
+    val $to   = $mv->{to}
+    val $flag = $mv->{flag}
     # Flip side back BEFORE we work — saves figuring out who moved.
     $pos->{side} = 1 - $pos->{side}
     # Restore castle, ep, half.
@@ -621,7 +621,7 @@ fn Ch::unmake_move_on($pos, $mv) {
     $pos->{ep}     = $mv->{prev_ep}
     $pos->{half}   = $mv->{prev_half}
     # Move the piece back.
-    my $moved = $board->[$to]
+    var $moved = $board->[$to]
     if ($flag == $FLAG_PROMO) {
         # Promotion: the moved piece on `$to` is the promoted piece;
         # the piece we move back to `$from` must be a pawn of the
@@ -644,7 +644,7 @@ fn Ch::unmake_move_on($pos, $mv) {
     }
     if ($flag == $FLAG_EP) {
         # En passant: restore the captured pawn one rank behind.
-        my $ep_capture_sq = $pos->{side} == $WHITE ? $to - 8 : $to + 8
+        val $ep_capture_sq = $pos->{side} == $WHITE ? $to - 8 : $to + 8
         $board->[$ep_capture_sq] = $mv->{captured}
         # And clear the destination square — the ep "to" was empty.
         $board->[$to] = $EMPTY
@@ -655,10 +655,10 @@ fn Ch::unmake_move_on($pos, $mv) {
 # that leave own king in check.
 
 fn Ch::generate_legal($pos) {
-    my $pseudo = Ch::generate_pseudo_legal($pos)
-    my @legal
-    for my $mv (@$pseudo) {
-        my $mover = $pos->{side}
+    val $pseudo = Ch::generate_pseudo_legal($pos)
+    var @legal
+    for val $mv (@$pseudo) {
+        val $mover = $pos->{side}
         Ch::make_move_on($pos, $mv)
         if (!Ch::in_check($pos, $mover)) {
             push @legal, $mv
@@ -674,10 +674,10 @@ fn Ch::generate_legal($pos) {
 
 fn Ch::perft($pos, $depth) {
     return 1 if $depth == 0
-    my $moves = Ch::generate_legal($pos)
+    val $moves = Ch::generate_legal($pos)
     return len(@$moves) if $depth == 1
-    my $total = 0
-    for my $mv (@$moves) {
+    var $total = 0
+    for val $mv (@$moves) {
         Ch::make_move_on($pos, $mv)
         $total += Ch::perft($pos, $depth - 1)
         Ch::unmake_move_on($pos, $mv)
@@ -691,16 +691,16 @@ fn Ch::perft($pos, $depth) {
 
 fn Ch::sq_str($sq) {
     return "??" if $sq < 0 || $sq > 63
-    my $f = Ch::file_of($sq)
-    my $r = Ch::rank_of($sq)
-    my @files = ("a", "b", "c", "d", "e", "f", "g", "h")
+    val $f = Ch::file_of($sq)
+    val $r = Ch::rank_of($sq)
+    val @files = ("a", "b", "c", "d", "e", "f", "g", "h")
     $files[$f] . ($r + 1)
 }
 
 fn Ch::move_str($mv) {
-    my $s = Ch::sq_str($mv->{from}) . Ch::sq_str($mv->{to})
+    var $s = Ch::sq_str($mv->{from}) . Ch::sq_str($mv->{to})
     if ($mv->{flag} == $FLAG_PROMO) {
-        my $c = Ch::piece_char($mv->{promo})
+        val $c = Ch::piece_char($mv->{promo})
         $s .= "=" . uc($c)
     }
     $s
@@ -711,13 +711,13 @@ fn Ch::move_str($mv) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Ch::is_checkmate($pos) {
-    my $legal = Ch::generate_legal($pos)
+    val $legal = Ch::generate_legal($pos)
     return 0 if len(@$legal) > 0
     Ch::in_check($pos, $pos->{side})
 }
 
 fn Ch::is_stalemate($pos) {
-    my $legal = Ch::generate_legal($pos)
+    val $legal = Ch::generate_legal($pos)
     return 0 if len(@$legal) > 0
     !Ch::in_check($pos, $pos->{side})
 }
@@ -725,10 +725,10 @@ fn Ch::is_stalemate($pos) {
 # Find a single mate-in-1 move (returns the first one found).
 
 fn Ch::find_mate_in_one($pos) {
-    my $legal = Ch::generate_legal($pos)
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($pos)
+    for val $mv (@$legal) {
         Ch::make_move_on($pos, $mv)
-        my $mate = Ch::is_checkmate($pos)
+        val $mate = Ch::is_checkmate($pos)
         Ch::unmake_move_on($pos, $mv)
         return $mv if $mate
     }
@@ -743,10 +743,10 @@ fn Ch::find_mate_in_one($pos) {
 # (square_string => piece_code) plus side/castle/ep.
 
 fn Ch::position_from_pieces($pieces, $side, $castle, $ep) {
-    my @board = (0) x 64
-    for my $sq_str (keys %$pieces) {
-        my $f = ord(substr($sq_str, 0, 1)) - ord("a")
-        my $r = int(substr($sq_str, 1, 1)) - 1
+    var @board = (0) x 64
+    for val $sq_str (keys %$pieces) {
+        val $f = ord(substr($sq_str, 0, 1)) - ord("a")
+        val $r = int(substr($sq_str, 1, 1)) - 1
         $board[Ch::sq_of($f, $r)] = $pieces->{$sq_str}
     }
     +{
@@ -764,7 +764,7 @@ fn Ch::position_from_pieces($pieces, $side, $castle, $ep) {
 # ═══════════════════════════════════════════════════════════════════
 
 p "── Chess engine — starting position ────────────────────"
-my $start = Ch::new_position()
+val $start = Ch::new_position()
 print Ch::render($start)
 
 p ""
@@ -774,11 +774,11 @@ p "── Perft (legal-move tree leaf counts from start) ─────"
 #   depth 1 = 20, depth 2 = 400, depth 3 = 8902, depth 4 = 197,281.
 # We cap at depth 3 to keep the demo runtime reasonable.
 
-my @perft_expected = (1, 20, 400, 8902)
+val @perft_expected = (1, 20, 400, 8902)
 
-for my $depth (0:3) {
-    my $count = Ch::perft($start, $depth)
-    my $want  = $perft_expected[$depth]
+for val $depth (0:3) {
+    val $count = Ch::perft($start, $depth)
+    val $want  = $perft_expected[$depth]
     printf "  depth %d: %7d   (expected %7d)  %s\n",
         $depth, $count, $want,
         $count == $want ? "" : "FAIL"
@@ -791,7 +791,7 @@ for my $depth (0:3) {
 # Position: White: Ke6, Qd7.  Black: Ke8.  White to move.
 # Qd7-e7# — queen guarded by Ke6, black king on e8 has no escape.
 
-my $mate1 = Ch::position_from_pieces(
+val $mate1 = Ch::position_from_pieces(
     +{
         "e6" => $WK,
         "d7" => $WQ,
@@ -805,7 +805,7 @@ my $mate1 = Ch::position_from_pieces(
 p ""
 p "── Tactical: mate-in-one (Ke6, Qd7 vs Ke8) ───────────"
 print Ch::render($mate1)
-my $mate_mv = Ch::find_mate_in_one($mate1)
+val $mate_mv = Ch::find_mate_in_one($mate1)
 if (defined $mate_mv) {
     p "  mate-in-1 move: " . Ch::move_str($mate_mv)
 } else {
@@ -818,8 +818,8 @@ if (defined $mate_mv) {
 
 # ── invariant 1: starting position has exactly 32 pieces ──────────
 {
-    my $count = 0
-    for my $sq (0:63) {
+    var $count = 0
+    for val $sq (0:63) {
         $count++ if $start->{board}->[$sq] != $EMPTY
     }
     die "starting piece count is #{$count}, expected 32" unless $count == 32
@@ -827,9 +827,9 @@ if (defined $mate_mv) {
 
 # ── invariant 2: starting position has the right material balance ─
 {
-    my %tally
-    for my $sq (0:63) {
-        my $p = $start->{board}->[$sq]
+    var %tally
+    for val $sq (0:63) {
+        var $p = $start->{board}->[$sq]
         next if $p == $EMPTY
         $tally{$p} = 0 unless exists $tally{$p}
         $tally{$p}++
@@ -861,14 +861,14 @@ die "perft(3) != 8902" unless Ch::perft($start, 3) == 8902
 # Every legal move from the starting position, when made then
 # unmade, must leave the board in its original state.
 {
-    my @orig_board = @{$start->{board}}
-    my $orig_side  = $start->{side}
-    my $orig_castle = $start->{castle}
-    my $legal = Ch::generate_legal($start)
-    for my $mv (@$legal) {
+    val @orig_board = @{$start->{board}}
+    val $orig_side  = $start->{side}
+    val $orig_castle = $start->{castle}
+    val $legal = Ch::generate_legal($start)
+    for val $mv (@$legal) {
         Ch::make_move_on($start, $mv)
         Ch::unmake_move_on($start, $mv)
-        for my $sq (0:63) {
+        for val $sq (0:63) {
             die "make+unmake corrupted square #{$sq} (move " . Ch::move_str($mv) . ")" unless $start->{board}->[$sq] == $orig_board[$sq]
         }
         die "side flipped" unless $start->{side} == $orig_side
@@ -880,22 +880,22 @@ die "perft(3) != 8902" unless Ch::perft($start, 3) == 8902
 # (Starting position has no pins or checks that make pseudo-legal
 # moves illegal, so the two counts must match.)
 {
-    my $legal  = Ch::generate_legal($start)
-    my $pseudo = Ch::generate_pseudo_legal($start)
+    val $legal  = Ch::generate_legal($start)
+    val $pseudo = Ch::generate_pseudo_legal($start)
     die "legal != pseudo at start" unless len(@$legal) == len(@$pseudo)
 }
 
 # ── invariant 8: each pawn has exactly 2 moves available at start ─
 # (1-square push + 2-square push = 2 each, knights and rooks aside.)
 {
-    my $legal = Ch::generate_legal($start)
-    my %from_count
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($start)
+    var %from_count
+    for val $mv (@$legal) {
         $from_count{$mv->{from}} = 0 unless exists $from_count{$mv->{from}}
         $from_count{$mv->{from}}++
     }
     # White pawns are on squares 8..15.
-    for my $sq (8:15) {
+    for val $sq (8:15) {
         die "pawn on #{$sq} has #{$from_count{$sq}} moves, expected 2" unless ($from_count{$sq} // 0) == 2
     }
     # White knights on b1 (1) and g1 (6) have 2 moves each.
@@ -917,7 +917,7 @@ die "black king sq" unless Ch::king_square($start, $BLACK) == 60
 
 # ── invariant 12: square attacks — d4 is attacked by no piece ──────
 {
-    my $pos = Ch::new_position()
+    val $pos = Ch::new_position()
     die "d4 attacked by W" if Ch::is_square_attacked($pos, Ch::sq_of(3, 3), $WHITE)
     die "d4 attacked by B" if Ch::is_square_attacked($pos, Ch::sq_of(3, 3), $BLACK)
 }
@@ -926,7 +926,7 @@ die "black king sq" unless Ch::king_square($start, $BLACK) == 60
 # but actually e2 attacks d3+f3, and rank-1 pieces attack rank-2 only.
 # A correct invariant: c3 is attacked by White pawn b2.
 {
-    my $pos = Ch::new_position()
+    val $pos = Ch::new_position()
     # White pawn on b2 attacks a3 and c3.
     die "c3 not attacked by W (pawn b2)" unless Ch::is_square_attacked($pos, Ch::sq_of(2, 2), $WHITE)
     die "a3 not attacked by W (pawn b2)" unless Ch::is_square_attacked($pos, Ch::sq_of(0, 2), $WHITE)
@@ -934,7 +934,7 @@ die "black king sq" unless Ch::king_square($start, $BLACK) == 60
 
 # ── invariant 14: mate-in-1 search finds the queen move ──────────
 {
-    my $mv = Ch::find_mate_in_one($mate1)
+    val $mv = Ch::find_mate_in_one($mate1)
     die "no mate-in-1 found"   unless defined $mv
     # The found move must be by the queen (only piece besides the
     # king can deliver mate here) and must produce checkmate.
@@ -946,9 +946,9 @@ die "black king sq" unless Ch::king_square($start, $BLACK) == 60
 
 # ── invariant 15: piece moves can't land on own pieces ────────────
 {
-    my $legal = Ch::generate_legal($start)
-    for my $mv (@$legal) {
-        my $target = $start->{board}->[$mv->{to}]
+    val $legal = Ch::generate_legal($start)
+    for val $mv (@$legal) {
+        val $target = $start->{board}->[$mv->{to}]
         next if $mv->{flag} == $FLAG_CASTLE   # castle's 'to' is empty by construction
         die "move " . Ch::move_str($mv) . " lands on own piece" unless $target == $EMPTY || Ch::piece_color($target) != $start->{side}
     }
@@ -956,10 +956,10 @@ die "black king sq" unless Ch::king_square($start, $BLACK) == 60
 
 # ── invariant 16: captured-piece field is consistent ──────────────
 {
-    my $legal = Ch::generate_legal($start)
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($start)
+    for val $mv (@$legal) {
         next if $mv->{flag} == $FLAG_CASTLE || $mv->{flag} == $FLAG_EP
-        my $target = $start->{board}->[$mv->{to}]
+        val $target = $start->{board}->[$mv->{to}]
         die "captured mismatch: target=#{$target} mv.captured=#{$mv->{captured}}" unless $target == $mv->{captured}
     }
 }
@@ -976,9 +976,9 @@ die "start side" unless $start->{side} == $WHITE
 # ── invariant 20: perft(2) from start matches the sum of perft(1) ─
 # over each first-move child (the recursive identity).
 {
-    my $legal = Ch::generate_legal($start)
-    my $sum = 0
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($start)
+    var $sum = 0
+    for val $mv (@$legal) {
         Ch::make_move_on($start, $mv)
         $sum += Ch::perft($start, 1)
         Ch::unmake_move_on($start, $mv)
@@ -993,7 +993,7 @@ die "start side" unless $start->{side} == $WHITE
 # After 1. e4 e5  2. Bc4 Nc6  3. Qh5 Nf6??  White plays Qxf7#.
 # Build that position directly.
 
-my $scholars_mate_pos = Ch::position_from_pieces(
+val $scholars_mate_pos = Ch::position_from_pieces(
     +{
         # White pieces.
         "a1" => $WR, "b1" => $WN, "c1" => $WB, "d1" => $WQ,
@@ -1013,7 +1013,7 @@ my $scholars_mate_pos = Ch::position_from_pieces(
 
 # ── invariant 21: constructed start matches the canonical start ──
 {
-    for my $sq (0:63) {
+    for val $sq (0:63) {
         die "rebuilt position differs at #{$sq}" unless $start->{board}->[$sq] == $scholars_mate_pos->{board}->[$sq]
     }
 }
@@ -1026,7 +1026,7 @@ my $scholars_mate_pos = Ch::position_from_pieces(
 # Black king isn't attacked (Qc7→Ka8 isn't a queen line), but every
 # escape (a7, b7, b8) IS attacked by Qc7 → stalemate, not check.
 
-my $stale = Ch::position_from_pieces(
+val $stale = Ch::position_from_pieces(
     +{
         "e6" => $WK,
         "c7" => $WQ,
@@ -1053,7 +1053,7 @@ my $stale = Ch::position_from_pieces(
 # played a7-a5).  White: Pb5, Ka1.  Black: Pa5, Kh8.
 # bxa6 ep is the only pawn move that captures via en-passant.
 
-my $ep_pos = Ch::position_from_pieces(
+val $ep_pos = Ch::position_from_pieces(
     +{
         "a1" => $WK,
         "b5" => $WP,
@@ -1067,9 +1067,9 @@ my $ep_pos = Ch::position_from_pieces(
 
 # ── invariant 23: en-passant move is generated ──────────────────
 {
-    my $legal = Ch::generate_legal($ep_pos)
-    my $found_ep = 0
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($ep_pos)
+    var $found_ep = 0
+    for val $mv (@$legal) {
         $found_ep = 1 if $mv->{flag} == $FLAG_EP
     }
     die "en-passant move not generated" unless $found_ep
@@ -1077,9 +1077,9 @@ my $ep_pos = Ch::position_from_pieces(
 
 # ── invariant 24: after bxa6 ep the captured pawn vanishes ──────
 {
-    my $legal = Ch::generate_legal($ep_pos)
-    my $ep_mv
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($ep_pos)
+    var $ep_mv
+    for val $mv (@$legal) {
         $ep_mv = $mv if $mv->{flag} == $FLAG_EP
     }
     Ch::make_move_on($ep_pos, $ep_mv)
@@ -1102,7 +1102,7 @@ my $ep_pos = Ch::position_from_pieces(
 # White: Ra1, Ke1, Rh1.  Black: Ke8.
 # Both castles should be legal.
 
-my $castle_ready = Ch::position_from_pieces(
+val $castle_ready = Ch::position_from_pieces(
     +{
         "a1" => $WR,
         "e1" => $WK,
@@ -1116,10 +1116,10 @@ my $castle_ready = Ch::position_from_pieces(
 
 # ── invariant 25: both castling moves are generated ─────────────
 {
-    my $legal = Ch::generate_legal($castle_ready)
-    my $found_ks = 0
-    my $found_qs = 0
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($castle_ready)
+    var $found_ks = 0
+    var $found_qs = 0
+    for val $mv (@$legal) {
         if ($mv->{flag} == $FLAG_CASTLE) {
             $found_ks = 1 if $mv->{to} == Ch::sq_of(6, 0)   # g1
             $found_qs = 1 if $mv->{to} == Ch::sq_of(2, 0)   # c1
@@ -1131,9 +1131,9 @@ my $castle_ready = Ch::position_from_pieces(
 
 # ── invariant 26: after king-side castle, K=g1, R=f1 ────────────
 {
-    my $legal = Ch::generate_legal($castle_ready)
-    my $ks_mv
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($castle_ready)
+    var $ks_mv
+    for val $mv (@$legal) {
         $ks_mv = $mv if $mv->{flag} == $FLAG_CASTLE && $mv->{to} == Ch::sq_of(6, 0)
     }
     Ch::make_move_on($castle_ready, $ks_mv)
@@ -1154,7 +1154,7 @@ my $castle_ready = Ch::position_from_pieces(
 # Position: White pawn on a7 ready to promote.
 # White: Ka1, Pa7.  Black: Kh8.
 
-my $promo_pos = Ch::position_from_pieces(
+val $promo_pos = Ch::position_from_pieces(
     +{
         "a1" => $WK,
         "a7" => $WP,
@@ -1167,10 +1167,10 @@ my $promo_pos = Ch::position_from_pieces(
 
 # ── invariant 27: promotion generates 4 moves (=N, =B, =R, =Q) ──
 {
-    my $legal = Ch::generate_legal($promo_pos)
-    my $promo_count = 0
-    my %promo_pieces
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($promo_pos)
+    var $promo_count = 0
+    var %promo_pieces
+    for val $mv (@$legal) {
         if ($mv->{flag} == $FLAG_PROMO) {
             $promo_count++
             $promo_pieces{$mv->{promo}} = 1
@@ -1185,9 +1185,9 @@ my $promo_pos = Ch::position_from_pieces(
 
 # ── invariant 28: after pawn promotes to queen, board reflects it ─
 {
-    my $legal = Ch::generate_legal($promo_pos)
-    my $promo_q
-    for my $mv (@$legal) {
+    val $legal = Ch::generate_legal($promo_pos)
+    var $promo_q
+    for val $mv (@$legal) {
         $promo_q = $mv if $mv->{flag} == $FLAG_PROMO && $mv->{promo} == $WQ
     }
     Ch::make_move_on($promo_pos, $promo_q)

@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my %MIME = (
+const val %MIME = (
     exe => "application/octet-stream",
     bmp => "image/bmp",
     png => "image/png",
@@ -19,7 +19,7 @@ fn Exercism::FileSniffer::type_from_binary($bin) =
                                        undef
 
 fn Exercism::FileSniffer::verify($binary, $ext) {
-    my $t = Exercism::FileSniffer::type_from_binary($binary)
+    val $t = Exercism::FileSniffer::type_from_binary($binary)
     defined($t) && $t eq Exercism::FileSniffer::type_from_extension($ext)
         ? ["ok", $t]
         : ["error", "Warning, file format and file extension do not match."]

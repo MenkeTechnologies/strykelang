@@ -11,7 +11,7 @@
 # Run: stryke --no-interop examples/rna_codon_translator.stk
 
 # Standard genetic code mapping
-my %CODONS = (
+val %CODONS = (
     AUG => "Methionine (Start)",
     UUU => "Phenylalanine", UUC => "Phenylalanine",
     UUA => "Leucine", UUG => "Leucine",
@@ -43,15 +43,15 @@ fn Bio::translate_codon($codon) = $CODONS{uc $codon} // "Unknown"
 
 # Translates a full RNA sequence
 fn Bio::translate_sequence($seq) {
-    my @amino_acids
-    my $s = uc $seq
+    var @amino_acids
+    val $s = uc $seq
     
     # 1. Split into 3-char chunks via range
     # 2. Translate and collect
     # 3. Stop on STOP codon
-    for my $i (0:len($s)-3:3) {
-        my $codon = $s[$i:$i+2]
-        my $aa = Bio::translate_codon($codon)
+    for val $i (0:len($s)-3:3) {
+        val $codon = $s[$i:$i+2]
+        val $aa = Bio::translate_codon($codon)
         last if $aa eq "STOP"
         push @amino_acids, $aa
     }
@@ -61,14 +61,14 @@ fn Bio::translate_sequence($seq) {
 
 p "── RNA Codon Translator ────────────────────────────────"
 
-my $sample_rna = "AUGUUUCUCUAA"
+val $sample_rna = "AUGUUUCUCUAA"
 p "Input RNA:  $sample_rna"
 
 # Using pipeline to process and display
-my $translated = $sample_rna |> Bio::translate_sequence 
+val $translated = $sample_rna |> Bio::translate_sequence 
 
 p "Translated amino acids:"
-for my $aa (@$translated) { p "  - $aa" }
+for val $aa (@$translated) { p "  - $aa" }
 
 # Assertions
 die "Translation count mismatch: #{len @$translated}" unless len(@$translated) == 3
@@ -80,12 +80,12 @@ p ""
 p "── Using thread-first macro for more complex chain ──"
 
 # A longer sequence with a STOP codon in the middle
-my $long_rna = "AUGUUUCUCUCUAGUCAUACGUAA"
+val $long_rna = "AUGUUUCUCUCUAGUCAUACGUAA"
 
-my $long_translated = ~> $long_rna Bio::translate_sequence
+val $long_translated = ~> $long_rna Bio::translate_sequence
 
 p "Long sequence amino acids:"
-for my $aa (@$long_translated) { p "  - $aa" }
+for val $aa (@$long_translated) { p "  - $aa" }
 
 # Assertions for long sequence
 # Count should be 7: Methionine, Phenylalanine, Leucine, Serine, Serine, Histidine, Threonine

@@ -24,29 +24,29 @@
 #   3. annex($div) blocks for each worker's EVAL_RESULT, returns a hash
 #      keyed by session-id (stringified) with the eval output per worker.
 
-my $n = $ARGV[0] // 2
-my $code = $ARGV[1] // "2 + 3"
+val $n = $ARGV[0] // 2
+val $code = $ARGV[1] // "2 + 3"
 
 printf "── distributed_congregation: N=%d code=%s ──\n", $n, $code
 
 # 1. Spawn N workers locally. Returns an array of session-id handles.
-my @workers = congregation($n)
+val @workers = congregation($n)
 printf "spawned %d workers: %s\n", len(@workers), join(",", @workers)
 
 # 2. Scatter the prayer (one EVAL frame per worker, all in parallel).
-my $div = pray $code, @workers
+val $div = pray $code, @workers
 printf "divination id: %d\n", $div
 
 # 3. Gather results. Hash keys are session-ids (as strings); values are
 #    each worker's eval output string.
-my %answers = annex $div
-for my $sid (sort keys %answers) {
+val %answers = annex $div
+for val $sid (sort keys %answers) {
     printf "  worker %s → %s\n", $sid, $answers{$sid}
 }
 
 # Sanity — every worker should have produced the same answer for a pure
 # expression. Different expressions / per-worker state would diverge.
-my @unique = uniq values %answers
+val @unique = uniq values %answers
 if (len(@unique) == 1) {
     printf "✓ all %d workers returned: %s\n", $n, $unique[0]
 } else {

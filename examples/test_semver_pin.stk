@@ -3,22 +3,22 @@
 package SV;
 
 fn parse($s) {
-    my $rest = $s
-    my $plus = index($rest, "+")
-    my $build = ""
+    var $rest = $s
+    val $plus = index($rest, "+")
+    var $build = ""
     if ($plus >= 0) {
         $build = substr($rest, $plus + 1)
         $rest = substr($rest, 0, $plus)
     }
-    my $dash = index($rest, "-")
-    my $pre = ""
+    val $dash = index($rest, "-")
+    var $pre = ""
     if ($dash >= 0) {
         $pre = substr($rest, $dash + 1)
         $rest = substr($rest, 0, $dash)
     }
-    my @nums = split(/\./, $rest)
+    val @nums = split(/\./, $rest)
     return undef if len(@nums) != 3
-    for my $nn (@nums) {
+    for val $nn (@nums) {
         return undef if $nn !~ /^\d+$/
     }
     {
@@ -31,18 +31,18 @@ fn parse($s) {
 }
 
 fn format($v) {
-    my $s = $v->{major} . "." . $v->{minor} . "." . $v->{patch}
+    var $s = $v->{major} . "." . $v->{minor} . "." . $v->{patch}
     $s = $s . "-" . $v->{pre} if (len $v->{pre}) > 0
     $s = $s . "+" . $v->{build} if (len $v->{build}) > 0
     $s
 }
 
 fn _cmp_pre_id($x, $y) {
-    my $xn = $x =~ /^\d+$/
-    my $yn = $y =~ /^\d+$/
+    val $xn = $x =~ /^\d+$/
+    val $yn = $y =~ /^\d+$/
     if ($xn && $yn) {
-        my $av = $x + 0
-        my $bv = $y + 0
+        val $av = $x + 0
+        val $bv = $y + 0
         return -1 if $av < $bv
         return 1 if $av > $bv
         return 0
@@ -61,16 +61,16 @@ fn compare($av, $bv) {
     return 1 if $av->{minor} > $bv->{minor}
     return -1 if $av->{patch} < $bv->{patch}
     return 1 if $av->{patch} > $bv->{patch}
-    my $ap = len $av->{pre}
-    my $bp = len $bv->{pre}
+    val $ap = len $av->{pre}
+    val $bp = len $bv->{pre}
     return 1 if $ap == 0 && $bp > 0
     return -1 if $ap > 0 && $bp == 0
     return 0 if $ap == 0 && $bp == 0
-    my @ai = split(/\./, $av->{pre})
-    my @bi = split(/\./, $bv->{pre})
-    my $n = len(@ai) < len(@bi) ? len(@ai) : len(@bi)
-    for my $i (0:$n-1) {
-        my $c = SV::_cmp_pre_id($ai[$i], $bi[$i])
+    val @ai = split(/\./, $av->{pre})
+    val @bi = split(/\./, $bv->{pre})
+    val $n = len(@ai) < len(@bi) ? len(@ai) : len(@bi)
+    for val $i (0:$n-1) {
+        val $c = SV::_cmp_pre_id($ai[$i], $bi[$i])
         return $c if $c != 0
     }
     return -1 if len(@ai) < len(@bi)
@@ -93,35 +93,35 @@ fn satisfies_caret($v, $base) {
 package main;
 
 # --- parse simple ---
-my $v1 = SV::parse("1.2.3")
+val $v1 = SV::parse("1.2.3")
 $v1->{major} |> aeq 1, "parse major"
 $v1->{minor} |> aeq 2, "parse minor"
 $v1->{patch} |> aeq 3, "parse patch"
 $v1->{pre}   |> aeq "", "parse no pre"
 $v1->{build} |> aeq "", "parse no build"
 
-my $v2 = SV::parse("0.0.0")
+val $v2 = SV::parse("0.0.0")
 $v2->{major} |> aeq 0, "parse zero major"
 $v2->{minor} |> aeq 0, "parse zero minor"
 $v2->{patch} |> aeq 0, "parse zero patch"
 
-my $v3 = SV::parse("10.20.30")
+val $v3 = SV::parse("10.20.30")
 $v3->{major} |> aeq 10, "parse 10"
 $v3->{minor} |> aeq 20, "parse 20"
 $v3->{patch} |> aeq 30, "parse 30"
 
 # --- parse pre-release / build ---
-my $vp = SV::parse("1.0.0-alpha")
+val $vp = SV::parse("1.0.0-alpha")
 $vp->{pre} |> aeq "alpha", "parse pre alpha"
 
-my $vp2 = SV::parse("1.0.0-rc.1")
+val $vp2 = SV::parse("1.0.0-rc.1")
 $vp2->{pre} |> aeq "rc.1", "parse pre rc.1"
 
-my $vb = SV::parse("2.0.0+build.42")
+val $vb = SV::parse("2.0.0+build.42")
 $vb->{build} |> aeq "build.42", "parse build"
 $vb->{pre}   |> aeq "", "no pre when only build"
 
-my $vpb = SV::parse("1.0.0-beta+exp.sha.5114f85")
+val $vpb = SV::parse("1.0.0-beta+exp.sha.5114f85")
 $vpb->{pre}   |> aeq "beta", "pre with build"
 $vpb->{build} |> aeq "exp.sha.5114f85", "build with pre"
 
@@ -138,31 +138,31 @@ SV::format($vp) |> aeq "1.0.0-alpha", "format pre"
 SV::format($vb) |> aeq "2.0.0+build.42", "format build"
 SV::format($vpb) |> aeq "1.0.0-beta+exp.sha.5114f85", "format pre+build"
 
-for my $s ("0.0.0", "1.2.3", "10.20.30", "1.0.0-alpha", "1.0.0-rc.1",
+for val $s ("0.0.0", "1.2.3", "10.20.30", "1.0.0-alpha", "1.0.0-rc.1",
            "2.0.0+build.42", "1.0.0-beta+meta") {
-    my $parsed = SV::parse($s)
+    val $parsed = SV::parse($s)
     SV::format($parsed) |> aeq $s, "round-trip: " . $s
 }
 
 # --- compare: major/minor/patch ---
-my $va = SV::parse("1.0.0")
-my $vb = SV::parse("2.0.0")
+val $va = SV::parse("1.0.0")
+val $vb = SV::parse("2.0.0")
 SV::compare($va, $vb) |> aeq -1, "1.0.0 < 2.0.0"
 SV::compare($vb, $va) |> aeq 1, "2.0.0 > 1.0.0"
 SV::compare($va, $va) |> aeq 0, "1.0.0 == 1.0.0"
 
-my $c = SV::parse("1.2.0")
-my $d = SV::parse("1.3.0")
+val $c = SV::parse("1.2.0")
+val $d = SV::parse("1.3.0")
 SV::compare($c, $d) |> aeq -1, "minor less"
 
-my $e = SV::parse("1.2.3")
-my $f = SV::parse("1.2.4")
+val $e = SV::parse("1.2.3")
+val $f = SV::parse("1.2.4")
 SV::compare($e, $f) |> aeq -1, "patch less"
 
 # --- compare: pre-release rules ---
 # pre-release < release
-my $r = SV::parse("1.0.0")
-my $rp = SV::parse("1.0.0-alpha")
+val $r = SV::parse("1.0.0")
+val $rp = SV::parse("1.0.0-alpha")
 SV::compare($rp, $r) |> aeq -1, "1.0.0-alpha < 1.0.0"
 SV::compare($r, $rp) |> aeq 1, "1.0.0 > 1.0.0-alpha"
 
@@ -184,7 +184,7 @@ SV::compare(SV::parse("1.0.0+a"), SV::parse("1.0.0+b")) |> aeq 0, "build ignored
 SV::compare(SV::parse("1.0.0"), SV::parse("1.0.0+xyz")) |> aeq 0, "build vs none ignored"
 
 # --- satisfies_caret ---
-my $base = SV::parse("1.2.3")
+val $base = SV::parse("1.2.3")
 SV::satisfies_caret(SV::parse("1.2.3"), $base) |> aeq 1, "^1.2.3 = 1.2.3"
 SV::satisfies_caret(SV::parse("1.2.4"), $base) |> aeq 1, "^1.2.3 = 1.2.4"
 SV::satisfies_caret(SV::parse("1.9.0"), $base) |> aeq 1, "^1.2.3 = 1.9.0"
@@ -193,14 +193,14 @@ SV::satisfies_caret(SV::parse("2.0.0"), $base) |> aeq 0, "^1.2.3 not 2.0.0"
 SV::satisfies_caret(SV::parse("0.9.0"), $base) |> aeq 0, "^1.2.3 not 0.9.0"
 
 # Caret with 0.x.y: same minor required
-my $bo = SV::parse("0.2.3")
+val $bo = SV::parse("0.2.3")
 SV::satisfies_caret(SV::parse("0.2.4"), $bo) |> aeq 1, "^0.2.3 = 0.2.4"
 SV::satisfies_caret(SV::parse("0.2.3"), $bo) |> aeq 1, "^0.2.3 = 0.2.3"
 SV::satisfies_caret(SV::parse("0.3.0"), $bo) |> aeq 0, "^0.2.3 not 0.3.0"
 SV::satisfies_caret(SV::parse("0.2.2"), $bo) |> aeq 0, "^0.2.3 not 0.2.2"
 
 # Caret with 0.0.z: exact only
-my $bz = SV::parse("0.0.5")
+val $bz = SV::parse("0.0.5")
 SV::satisfies_caret(SV::parse("0.0.5"), $bz) |> aeq 1, "^0.0.5 = 0.0.5"
 SV::satisfies_caret(SV::parse("0.0.6"), $bz) |> aeq 0, "^0.0.5 not 0.0.6"
 SV::satisfies_caret(SV::parse("0.0.4"), $bz) |> aeq 0, "^0.0.5 not 0.0.4"

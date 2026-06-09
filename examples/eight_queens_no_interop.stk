@@ -19,8 +19,8 @@
 # Predicate: can a queen at (col=$c, row=$r) coexist with the queens
 # already placed in @cols (where cols[i] is the col of the queen in row i)?
 fn Queens::safe($cols, $c, $r) {
-    for my $i (0:len(@$cols) - 1) {
-        my $prev_c = $cols->[$i]
+    for val $i (0:len(@$cols) - 1) {
+        val $prev_c = $cols->[$i]
         return 0 if $prev_c == $c                # same column
         return 0 if abs($prev_c - $c) == $r - $i # diagonal
     }
@@ -29,19 +29,19 @@ fn Queens::safe($cols, $c, $r) {
 
 # Count solutions for an N×N board via backtracking.
 fn Queens::count($n) {
-    my $count = 0
-    my @cols
+    val $count = 0
+    val @cols
     Queens::recur($n, \@cols, \$count)
     $count
 }
 
 fn Queens::recur($n, $cols, $count_ref) {
-    my $r = len(@$cols)
+    val $r = len(@$cols)
     if ($r == $n) {
         $$count_ref++
         return
     }
-    for my $c (0:$n - 1) {
+    for val $c (0:$n - 1) {
         next unless Queens::safe($cols, $c, $r)
         push @$cols, $c
         Queens::recur($n, $cols, $count_ref)
@@ -52,20 +52,20 @@ fn Queens::recur($n, $cols, $count_ref) {
 # Collect all solutions (not just the count). Each solution is an
 # arrayref of N column indices (one per row).
 fn Queens::all($n) {
-    my @sols
-    my @cols
+    val @sols
+    val @cols
     Queens::collect($n, \@cols, \@sols)
     \@sols
 }
 
 fn Queens::collect($n, $cols, $sols) {
-    my $r = len(@$cols)
+    val $r = len(@$cols)
     if ($r == $n) {
-        my @snapshot = @$cols
+        val @snapshot = @$cols
         push @$sols, \@snapshot
         return
     }
-    for my $c (0:$n - 1) {
+    for val $c (0:$n - 1) {
         next unless Queens::safe($cols, $c, $r)
         push @$cols, $c
         Queens::collect($n, $cols, $sols)
@@ -76,11 +76,11 @@ fn Queens::collect($n, $cols, $sols) {
 p "── Eight Queens demo ──"
 
 # Known solution counts for N = 1..11 (OEIS A000170).
-my @expected = (1, 0, 0, 2, 10, 4, 40, 92, 352, 724, 2680)
-for my $i (0:len(@expected) - 1) {
-    my $n   = $i + 1
-    my $got = Queens::count($n)
-    my $exp = $expected[$i]
+val @expected = (1, 0, 0, 2, 10, 4, 40, 92, 352, 724, 2680)
+for val $i (0:len(@expected) - 1) {
+    val $n   = $i + 1
+    val $got = Queens::count($n)
+    val $exp = $expected[$i]
     die "N=$n: expected $exp solutions, got $got" unless $got == $exp
 }
 p "  N=1..11: solution counts match OEIS A000170  OK"
@@ -89,15 +89,15 @@ p "  N=1..11: solution counts match OEIS A000170  OK"
 #   - have exactly 8 columns
 #   - use each column exactly once (a permutation of 0:7)
 #   - satisfy the diagonal constraint (no two queens on same diag)
-my $sols = Queens::all(8)
+val $sols = Queens::all(8)
 die "N=8 solution count" unless len(@$sols) == 92
-for my $s (@$sols) {
+for val $s (@$sols) {
     die "wrong length" unless len(@$s) == 8
-    my %seen
+    var %seen
     $seen{_} = 1 for @$s
     die "not a permutation of 0:7" unless len(keys %seen) == 8
-    for my $i (0:6) {
-        for my $j ($i + 1:7) {
+    for val $i (0:6) {
+        for val $j ($i + 1:7) {
             die "diagonal violation" if abs($s->[$i] - $s->[$j]) == $j - $i
         }
     }

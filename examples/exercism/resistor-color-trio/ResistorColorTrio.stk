@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 
-const my %COLORS = (
+const val %COLORS = (
     black  => 0, brown => 1, red   => 2, orange => 3, yellow => 4,
     green  => 5, blue  => 6, violet=> 7, grey   => 8, white  => 9,
 )
 
-const my @UNITS = ("ohms", "kiloohms", "megaohms", "gigaohms")
+const val @UNITS = ("ohms", "kiloohms", "megaohms", "gigaohms")
 
 fn Exercism::ResistorColorTrio::label {
-    my @c = @{_}
-    my $base = ($COLORS{$c[0]} * 10 + $COLORS{$c[1]}) * 10 ** $COLORS{$c[2]}
-    my $i = 0
+    val @c = @{_}
+    var $base = ($COLORS{$c[0]} * 10 + $COLORS{$c[1]}) * 10 ** $COLORS{$c[2]}
+    var $i = 0
     while ($base >= 1000 && $i < $#UNITS) {
         $base /= 1000
         $i++

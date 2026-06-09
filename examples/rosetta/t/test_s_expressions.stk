@@ -4,11 +4,11 @@
 # parentheses, integers, floats, quoted strings, and bare symbols.
 
 fn Rosetta::SExpr::tokenize($s) {
-    my @tokens
-    my $i = 0
-    my $n = length($s)
+    var @tokens
+    var $i = 0
+    val $n = length($s)
     while ($i < $n) {
-        my $c = substr($s, $i, 1)
+        val $c = substr($s, $i, 1)
         if ($c =~ /\s/) { $i++; next }
         if ($c eq "(" || $c eq ")") {
             push @tokens, $c
@@ -16,16 +16,16 @@ fn Rosetta::SExpr::tokenize($s) {
             next
         }
         if ($c eq '"') {
-            my $j = $i + 1
+            var $j = $i + 1
             while ($j < $n && substr($s, $j, 1) ne '"') { $j++ }
             push @tokens, substr($s, $i, $j - $i + 1)
             $i = $j + 1
             next
         }
         # Atom
-        my $j = $i
+        var $j = $i
         while ($j < $n) {
-            my $cc = substr($s, $j, 1)
+            val $cc = substr($s, $j, 1)
             last if $cc =~ /\s/ || $cc eq "(" || $cc eq ")"
             $j++
         }
@@ -37,12 +37,12 @@ fn Rosetta::SExpr::tokenize($s) {
 
 fn Rosetta::SExpr::parse_tokens($tokens, $pos) {
     return [undef, $pos] if $pos >= len(@$tokens)
-    my $t = $tokens->[$pos]
+    val $t = $tokens->[$pos]
     if ($t eq "(") {
-        my @items
+        var @items
         $pos++
         while ($pos < len(@$tokens) && $tokens->[$pos] ne ")") {
-            my $r = Rosetta::SExpr::parse_tokens($tokens, $pos)
+            val $r = Rosetta::SExpr::parse_tokens($tokens, $pos)
             push @items, $r->[0]
             $pos = $r->[1]
         }
@@ -60,7 +60,7 @@ fn Rosetta::SExpr::coerce($t) {
 }
 
 fn Rosetta::SExpr::parse($s) {
-    my $tokens = Rosetta::SExpr::tokenize($s)
+    val $tokens = Rosetta::SExpr::tokenize($s)
     Rosetta::SExpr::parse_tokens($tokens, 0)->[0]
 }
 
@@ -75,17 +75,17 @@ fn Rosetta::SExpr::render($node) {
 }
 
 # Tokeniser
-my $tk = Rosetta::SExpr::tokenize("(foo 1 2 3)")
+val $tk = Rosetta::SExpr::tokenize("(foo 1 2 3)")
 assert_eq join("|", @$tk), "(|foo|1|2|3|)", "tokenise basic"
 
-my $tk2 = Rosetta::SExpr::tokenize("(a (b c) d)")
+val $tk2 = Rosetta::SExpr::tokenize("(a (b c) d)")
 assert_eq join("|", @$tk2), "(|a|(|b|c|)|d|)", "tokenise nested"
 
-my $tk3 = Rosetta::SExpr::tokenize('(say "hello world")')
+val $tk3 = Rosetta::SExpr::tokenize('(say "hello world")')
 assert_eq join("|", @$tk3), '(|say|"hello world"|)', "tokenise string"
 
 # Parse + structure
-my $p = Rosetta::SExpr::parse("(add 1 2)")
+val $p = Rosetta::SExpr::parse("(add 1 2)")
 assert_eq ref($p), "ARRAY", "list parsed"
 assert_eq len(@$p), 3, "3 items"
 assert_eq $p->[0]{type},  "symbol", "first is symbol"
@@ -94,17 +94,17 @@ assert_eq $p->[1]{type},  "int",    "1 is int"
 assert_eq $p->[1]{value}, 1,        "1 = 1"
 
 # Nested
-my $p2 = Rosetta::SExpr::parse("(if (= x 0) 1 (* x 2))")
+val $p2 = Rosetta::SExpr::parse("(if (= x 0) 1 (* x 2))")
 assert_eq ref($p2->[1]), "ARRAY", "nested call"
 assert_eq $p2->[1][0]{value}, "=",  "operator ="
 
 # Float
-my $p3 = Rosetta::SExpr::parse("(value 3.14)")
+val $p3 = Rosetta::SExpr::parse("(value 3.14)")
 assert_eq $p3->[1]{type},  "float", "3.14 is float"
 assert_near $p3->[1]{value}, 3.14, 1e-9, "float value"
 
 # Round-trip
-my $rt = Rosetta::SExpr::render(Rosetta::SExpr::parse("(a (b c) d)"))
+val $rt = Rosetta::SExpr::render(Rosetta::SExpr::parse("(a (b c) d)"))
 assert_eq $rt, "(a (b c) d)", "round-trip"
 
 # Pipe form

@@ -3,7 +3,7 @@
 
 fn Rosetta::FifteenPuzzle::create() {
     # Create solved puzzle
-    my @grid = (
+    val @grid = (
         [1, 2, 3, 4],
         [5, 6, 7, 8],
         [9, 10, 11, 12],
@@ -13,15 +13,15 @@ fn Rosetta::FifteenPuzzle::create() {
 }
 
 fn Rosetta::FifteenPuzzle::move($state, $num) {
-    my $grid = $state->{grid}
-    my $er = $state->{empty_r}
-    my $ec = $state->{empty_c}
+    val $grid = $state->{grid}
+    val $er = $state->{empty_r}
+    val $ec = $state->{empty_c}
     
     # Find num
-    my $nr = -1
-    my $nc = -1
-    for my $r (0:3) {
-        for my $c (0:3) {
+    var $nr = -1
+    var $nc = -1
+    for val $r (0:3) {
+        for val $c (0:3) {
             if ($grid->[$r]->[$c] == $num) {
                 $nr = $r
                 $nc = $c
@@ -44,10 +44,10 @@ fn Rosetta::FifteenPuzzle::move($state, $num) {
 }
 
 fn Rosetta::FifteenPuzzle::is_solved($state) {
-    my $expected = 1
-    my $grid = $state->{grid}
-    for my $r (0:3) {
-        for my $c (0:3) {
+    var $expected = 1
+    val $grid = $state->{grid}
+    for val $r (0:3) {
+        for val $c (0:3) {
             if ($r == 3 && $c == 3) {
                 return $grid->[$r]->[$c] == 0 ? 1 : 0
             }
@@ -61,13 +61,13 @@ fn Rosetta::FifteenPuzzle::is_solved($state) {
 }
 
 fn Rosetta::FifteenPuzzle::demo() {
-    my $state = Rosetta::FifteenPuzzle::create()
+    val $state = Rosetta::FifteenPuzzle::create()
     
     "15 Puzzle Game Demo:" |> p
     assert_eq Rosetta::FifteenPuzzle::is_solved($state), 1, "Initial state is solved"
     
     # Move 15 down (to empty space)
-    my $moved = Rosetta::FifteenPuzzle::move($state, 15)
+    var $moved = Rosetta::FifteenPuzzle::move($state, 15)
     assert_eq $moved, 1, "Move 15 valid"
     assert_eq $state->{grid}->[3]->[3], 15, "15 moved to 3,3"
     assert_eq $state->{empty_r}, 3, "Empty row is 3"

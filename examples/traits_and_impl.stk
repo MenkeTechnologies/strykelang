@@ -22,7 +22,7 @@ class Square impl Drawable, Sized {
     }
 }
 
-my $sq = Square->new(side => 5.0)
+val $sq = Square->new(side => 5.0)
 p "  ", $sq->draw()
 p "  area = ", $sq->area()
 
@@ -39,7 +39,7 @@ class Circle impl Drawable, Sized {
     }
 }
 
-my $c = Circle->new(radius => 2.5)
+val $c = Circle->new(radius => 2.5)
 p "  ", $c->draw()
 p "  area = ", $c->area()
 

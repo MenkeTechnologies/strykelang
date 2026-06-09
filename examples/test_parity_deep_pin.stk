@@ -5,7 +5,7 @@
 
 # ── Vec Lvalue ─────────────────────────────────────────────────────────────
 
-my $s_v = ""
+var $s_v = ""
 vec($s_v, 0, 8) = 65
 $s_v |> aeq "A", "vec 8-bit lvalue"
 
@@ -22,17 +22,17 @@ use overload
     '+'  => "add"
 
 package main
-my $bx1 = bless({ val => 10 }, "Box")
-my $bx2 = bless({ val => 20 }, "Box")
+val $bx1 = bless({ val => 10 }, "Box")
+val $bx2 = bless({ val => 20 }, "Box")
 "$bx1" |> aeq "Box(10)", "overload stringify"
-my $bx3 = $bx1 + $bx2
+val $bx3 = $bx1 + $bx2
 "$bx3" |> aeq "Box(30)", "overload +"
 
 # Verify anonymous fn in overload behavior
 package BoxAnon
 use overload '""' => fn { "Anon(" . _->{val} . ")" }
 package main
-my $ba = bless({ val => 99 }, "BoxAnon")
+val $ba = bless({ val => 99 }, "BoxAnon")
 "$ba" |> aeq "Anon(99)", "overload anonymous fn"
 
 # ── Caller ─────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ Pin::ParityDeep::call_outer() |> aeq "Pin::ParityDeep::call_inner", "caller(0)[3
 
 # ── Bless Arrayref Tag ─────────────────────────────────────────────────────
 
-my $o_bless = bless [1,2], "MyClass"
+val $o_bless = bless [1,2], "MyClass"
 "$o_bless" =~ /MyClass=HASH/ |> aok "bless arrayref HASH (pinned bug)"
 
 # ── Pipe Auto-deref ────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ my $o_bless = bless [1,2], "MyClass"
 
 # ── Chomp Array ────────────────────────────────────────────────────────────
 
-my @lines_chomp = ("a\n", "b\n")
+var @lines_chomp = ("a\n", "b\n")
 chomp(@lines_chomp) |> aeq 2, 'chomp @array returns element count'
 join("|", @lines_chomp) |> aeq "a|b", 'chomp @array mutates elements'
 

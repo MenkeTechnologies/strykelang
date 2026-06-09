@@ -19,9 +19,9 @@
 # ── trial-division factorization → arrayref of primes (with mult.) ─
 
 fn Factor::primes_of($n) {
-    my @out
-    my $m = $n
-    my $p = 2
+    var @out
+    var $m = $n
+    var $p = 2
     while ($p * $p <= $m) {
         while ($m % $p == 0) {
             push @out, $p
@@ -37,12 +37,12 @@ fn Factor::primes_of($n) {
 
 fn Factor::signature($n) {
     return "1" if $n == 1
-    my $pf = Factor::primes_of($n)
-    my %exp
-    for my $p (@$pf) { $exp{$p}++ }
-    my @parts
-    for my $p (sort { _0 <=> _1 } keys %exp) {
-        my $e = $exp{$p}
+    val $pf = Factor::primes_of($n)
+    var %exp
+    for val $p (@$pf) { $exp{$p}++ }
+    var @parts
+    for val $p (sort { _0 <=> _1 } keys %exp) {
+        val $e = $exp{$p}
         push @parts, $e == 1 ? "$p" : "#{$p}^#{$e}"
     }
     join " * ", @parts
@@ -53,16 +53,16 @@ fn Factor::signature($n) {
 # For n = ∏ pᵢ^eᵢ ,  σ(n) = ∏ (p^(e+1) - 1) / (p - 1).
 fn Factor::sigma($n) {
     return 1 if $n == 1
-    my $pf = Factor::primes_of($n)
-    my %exp
-    for my $p (@$pf) { $exp{$p}++ }
-    my $s = 1
-    for my $p (keys %exp) {
-        my $e = $exp{$p}
+    val $pf = Factor::primes_of($n)
+    var %exp
+    for val $p (@$pf) { $exp{$p}++ }
+    var $s = 1
+    for val $p (keys %exp) {
+        val $e = $exp{$p}
         # σ contribution at prime power p^e:  1 + p + p² + … + p^e.
-        my $pp = 1
-        my $num = 0
-        for my $k (0:$e) {
+        var $pp = 1
+        var $num = 0
+        for val $k (0:$e) {
             $num += $pp
             $pp *= $p
         }
@@ -75,11 +75,11 @@ fn Factor::sigma($n) {
 
 fn Factor::totient($n) {
     return 1 if $n == 1
-    my $pf = Factor::primes_of($n)
-    my %distinct
-    for my $p (@$pf) { $distinct{$p} = 1 }
-    my $result = $n
-    for my $p (keys %distinct) {
+    val $pf = Factor::primes_of($n)
+    var %distinct
+    for val $p (@$pf) { $distinct{$p} = 1 }
+    var $result = $n
+    for val $p (keys %distinct) {
         # φ contribution: multiply by (p-1)/p without losing
         # integrality — divide first, then multiply.
         $result = int($result / $p) * ($p - 1)
@@ -91,7 +91,7 @@ fn Factor::totient($n) {
 
 fn Factor::gcd($x, $y) {
     while ($y) {
-        my $t = $y
+        val $t = $y
         $y = $x % $y
         $x = $t
     }
@@ -100,8 +100,8 @@ fn Factor::gcd($x, $y) {
 
 fn Factor::totient_brute($n) {
     return 1 if $n == 1
-    my $c = 0
-    for my $k (1:$n - 1) {
+    var $c = 0
+    for val $k (1:$n - 1) {
         $c++ if Factor::gcd($k, $n) == 1
     }
     $c
@@ -113,33 +113,33 @@ printf "── prime factorization, σ, φ for n = 1..20 ───────�
 printf "  %3s   %-18s   %5s   %5s\n", "n", "factorization", "σ(n)", "φ(n)"
 printf "  %3s   %-18s   %5s   %5s\n", "---", "------------------", "-----", "-----"
 
-for my $n (1:20) {
+for val $n (1:20) {
     printf "  %3d   %-18s   %5d   %5d\n",
         $n, Factor::signature($n), Factor::sigma($n), Factor::totient($n)
 }
 
 # ── invariant 1: every n's factorization multiplies back to n ─────
 
-for my $n (1:200) {
-    my $product = 1
-    for my $p (@{Factor::primes_of($n)}) { $product *= $p }
+for val $n (1:200) {
+    var $product = 1
+    for val $p (@{Factor::primes_of($n)}) { $product *= $p }
     $product = 1 if $n == 1 && len(@{Factor::primes_of($n)}) == 0
     die "factorization product mismatch at n=#{$n} (got #{$product})" unless $product == $n
 }
 
 # ── invariant 2: σ and φ match brute-force reference ──────────────
 
-for my $n (1:60) {
-    my $tot_fast  = Factor::totient($n)
-    my $tot_brute = Factor::totient_brute($n)
+for val $n (1:60) {
+    val $tot_fast  = Factor::totient($n)
+    val $tot_brute = Factor::totient_brute($n)
     die "totient mismatch at n=#{$n}: fast=#{$tot_fast} brute=#{$tot_brute}" unless $tot_fast == $tot_brute
 }
 
 # ── invariant 3: classical Euler identity Σφ(d) = n where d|n ─────
 
 fn Factor::divisors($n) {
-    my @d
-    my $i = 1
+    var @d
+    var $i = 1
     while ($i * $i <= $n) {
         if ($n % $i == 0) {
             push @d, $i
@@ -150,15 +150,15 @@ fn Factor::divisors($n) {
     \@d
 }
 
-for my $n (1, 6, 12, 30, 60, 100) {
-    my $sum_phi = 0
-    for my $d (@{Factor::divisors($n)}) { $sum_phi += Factor::totient($d) }
+for var $n (1, 6, 12, 30, 60, 100) {
+    var $sum_phi = 0
+    for val $d (@{Factor::divisors($n)}) { $sum_phi += Factor::totient($d) }
     die "Σφ(d|#{$n}) = #{$sum_phi} but should be #{$n}" unless $sum_phi == $n
 }
 
 # ── invariant 4: σ(p) = p + 1 for every prime, φ(p) = p − 1 ───────
 
-for my $p (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43) {
+for val $p (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43) {
     die "σ($p) wrong" unless Factor::sigma($p) == $p + 1
     die "φ($p) wrong" unless Factor::totient($p) == $p - 1
 }

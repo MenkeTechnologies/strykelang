@@ -18,12 +18,12 @@
 #      stryke --no-interop examples/luhn_no_interop.stk 4532015112830367
 
 fn Luhn::check($num) {
-    my @digits = grep { _ =~ /\d/ } split(//, "$num")
+    val @digits = grep { _ =~ /\d/ } split(//, "$num")
     return 0 if len(@digits) == 0
-    my $sum = 0
-    my $double = 0
-    for my $d (rev @digits) {
-        my $n = 0 + $d
+    var $sum = 0
+    var $double = 0
+    for val $d (rev @digits) {
+        var $n = 0 + $d
         $n = $n * 2 if $double
         $n -= 9 if $n > 9
         $sum += $n
@@ -33,7 +33,7 @@ fn Luhn::check($num) {
 }
 
 if (len(@ARGV) >= 1) {
-    my $num = $ARGV[0]
+    val $num = $ARGV[0]
     if (Luhn::check($num)) {
         p "$num: VALID"
         exit 0
@@ -44,7 +44,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — known valid + invalid card numbers from public test sets.
-my @cases = (
+val @cases = (
     # Visa test numbers (all valid).
     +{ num => "4111111111111111", ok => 1, label => "Visa test #1" },
     +{ num => "4532015112830366", ok => 1, label => "Visa test #2" },
@@ -65,10 +65,10 @@ my @cases = (
 )
 
 p "── Luhn checksum demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Luhn::check($c->{num}) ? 1 : 0
-    my $ok  = ($got == $c->{ok})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Luhn::check($c->{num}) ? 1 : 0
+    val $ok  = ($got == $c->{ok})
     $fail++ unless $ok
     printf "  %-18s %-13s expect=%-7s got=%-7s %s\n",
         $c->{num}, $c->{label},

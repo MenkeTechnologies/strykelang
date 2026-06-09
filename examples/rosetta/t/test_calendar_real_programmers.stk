@@ -19,7 +19,7 @@ fn Rosetta::RealCalendar::days_in_month($year, $month) {
 
 # 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 fn Rosetta::RealCalendar::day_of_week($year, $month, $day) {
-    my @t = (0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
+    val @t = (0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
     $year -= 1 if $month < 3
     ($year + int($year / 4) - int($year / 100) + int($year / 400) + $t[$month - 1] + $day) % 7
 }
@@ -34,21 +34,21 @@ fn Rosetta::RealCalendar::rtrim($text) {
 }
 
 fn Rosetta::RealCalendar::pad_right($text, $width) {
-    my $pad = $width - len($text)
+    val $pad = $width - len($text)
     return $text if $pad <= 0
     $text . (" " x $pad)
 }
 
 fn Rosetta::RealCalendar::center($text, $width) {
-    my $pad = $width - len($text)
+    val $pad = $width - len($text)
     return $text if $pad <= 0
-    my $left = int($pad / 2)
-    my $right = $pad - $left
+    val $left = int($pad / 2)
+    val $right = $pad - $left
     (" " x $left) . $text . (" " x $right)
 }
 
 fn Rosetta::RealCalendar::month_name($month) {
-    my @months = qw(
+    val @months = qw(
         JANUARY FEBRUARY MARCH APRIL MAY JUNE
         JULY AUGUST SEPTEMBER OCTOBER NOVEMBER DECEMBER
     )
@@ -56,26 +56,26 @@ fn Rosetta::RealCalendar::month_name($month) {
 }
 
 fn Rosetta::RealCalendar::month_block($year, $month) {
-    my @cells
-    for my $i (0:41) {
+    var @cells
+    for val $i (0:41) {
         push @cells, "  "
     }
 
-    my $first = Rosetta::RealCalendar::monday_column($year, $month, 1)
-    my $days = Rosetta::RealCalendar::days_in_month($year, $month)
+    val $first = Rosetta::RealCalendar::monday_column($year, $month, 1)
+    val $days = Rosetta::RealCalendar::days_in_month($year, $month)
 
-    for my $day (1:$days) {
+    for val $day (1:$days) {
         $cells[$first + $day - 1] = sprintf("%2d", $day)
     }
 
-    my @lines = (
+    var @lines = (
         Rosetta::RealCalendar::month_name($month) |> Rosetta::RealCalendar::center(21),
         "MO TU WE TH FR SA SU" |> Rosetta::RealCalendar::pad_right(21),
     )
 
-    for my $week (0:5) {
-        my $line = ""
-        for my $col (0:6) {
+    for val $week (0:5) {
+        var $line = ""
+        for val $col (0:6) {
             $line .= $cells[$week * 7 + $col]
             $line .= " " if $col < 6
         }
@@ -86,28 +86,28 @@ fn Rosetta::RealCalendar::month_block($year, $month) {
 }
 
 fn Rosetta::RealCalendar::render_half($year, $start_month) {
-    my @blocks
-    for my $month ($start_month:$start_month + 5) {
+    var @blocks
+    for val $month ($start_month:$start_month + 5) {
         push @blocks, Rosetta::RealCalendar::month_block($year, $month)
     }
 
-    my @lines
-    for my $row (0:7) {
-        my @parts = ~> @blocks map { $_->[$row] }
+    var @lines
+    for val $row (0:7) {
+        val @parts = ~> @blocks map { $_->[$row] }
         push @lines, " " . (@parts |> join(" "))
     }
     \@lines
 }
 
 fn Rosetta::RealCalendar::render_year($year) {
-    my @lines = (
+    var @lines = (
         "INSERT SNOOPY HERE" |> Rosetta::RealCalendar::center(132),
         "CALENDAR FOR $year" |> Rosetta::RealCalendar::center(132),
         "",
     )
 
-    my $first_half = Rosetta::RealCalendar::render_half($year, 1)
-    my $second_half = Rosetta::RealCalendar::render_half($year, 7)
+    val $first_half = Rosetta::RealCalendar::render_half($year, 1)
+    val $second_half = Rosetta::RealCalendar::render_half($year, 7)
 
     push @lines, @$first_half
     push @lines, ""
@@ -115,14 +115,14 @@ fn Rosetta::RealCalendar::render_year($year) {
     \@lines
 }
 
-my $january_1969 = Rosetta::RealCalendar::month_block(1969, 1)
+val $january_1969 = Rosetta::RealCalendar::month_block(1969, 1)
 assert_eq $january_1969->[0], "       JANUARY       ", "center JANUARY in 21 columns"
 assert_ok $january_1969->[2] =~ /^\s+1  2  3  4  5\s*$/, "January 1969 opens on Wednesday"
 
-my $february_2024 = Rosetta::RealCalendar::month_block(2024, 2)
+val $february_2024 = Rosetta::RealCalendar::month_block(2024, 2)
 assert_ok join("\n", @$february_2024) =~ /26 27 28 29/, "Leap-year February includes the 29th"
 
-my $page_1969 = Rosetta::RealCalendar::render_year(1969)
+val $page_1969 = Rosetta::RealCalendar::render_year(1969)
 assert_eq len($page_1969->[0]), 132, "Snoopy placeholder line is 132 columns"
 assert_eq len($page_1969->[1]), 132, "Title line is 132 columns"
 assert_eq len($page_1969->[3]), 132, "First month row is 132 columns"
@@ -130,7 +130,7 @@ assert_eq $page_1969->[1] =~ /CALENDAR FOR 1969/, 1, "Title mentions the target 
 assert_eq $page_1969->[3] =~ /JANUARY.*FEBRUARY.*MARCH.*APRIL.*MAY.*JUNE/, 1, "Top half lists first six months"
 assert_eq $page_1969->[12] =~ /JULY.*AUGUST.*SEPTEMBER.*OCTOBER.*NOVEMBER.*DECEMBER/, 1, "Bottom half lists last six months"
 
-my $rendered = join("\n", @$page_1969)
+val $rendered = join("\n", @$page_1969)
 assert_eq $rendered, uc($rendered), "Rendered calendar is uppercase"
 
 test_run

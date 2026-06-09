@@ -7,8 +7,8 @@ class UsersController extends ApplicationController {
     }
 
     fn create {
-        my $p = web_permit(web_params(), "name", "email", "password")
-        my $r = User::register($p)
+        val $p = web_permit(web_params(), "name", "email", "password")
+        val $r = User::register($p)
         if ($r->{ok}) {
             web_session_set("user_id", $r->{user}->{id})
             web_session_set("user_email", $r->{user}->{email})

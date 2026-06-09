@@ -14,17 +14,17 @@
 
 p "── distributed vote arbiter ──"
 
-my @workers = congregation(5)
+val @workers = congregation(5)
 printf "spawned %d workers (5-way quorum)\n", len(@workers)
 
 # The input each worker classifies. Pretend it's a temperature reading;
 # workers vote on (cold/warm/hot) using slightly different thresholds
 # to simulate independent classifiers.
-my $reading = 72
+var $reading = 72
 
 # Each worker has its own thresholds (encoded via session_id parity
 # below). The vote is the worker's classification.
-my $code = "
+val $code = "
 my \$reading = $reading;
 my \$cold_thr = 60 + (\$\$ % 5);
 my \$hot_thr  = 80 + (\$\$ % 5);
@@ -33,30 +33,30 @@ elsif (\$reading > \$hot_thr)  { 'hot'  }
 else                           { 'warm' }
 "
 
-my %votes = harvest $code, @workers, 5_000
+val %votes = harvest $code, @workers, 5_000
 
 p "── per-worker votes ──"
-my %tally
-for my $sid (sort { _ <=> _1 } keys %votes) {
-    my $vote = $votes{$sid}
+var %tally
+for val $sid (sort { _ <=> _1 } keys %votes) {
+    val $vote = $votes{$sid}
     printf "  worker %d: %s\n", $sid, $vote
     $tally{$vote} = ($tally{$vote} // 0) + 1
 }
 
 p "── tally ──"
-for my $class (sort keys %tally) {
+for val $class (sort keys %tally) {
     printf "  %-5s  %d vote(s)\n", $class, $tally{$class}
 }
 
 # Pick the plurality winner.
-my @ranked = sort { $tally{_1} <=> $tally{_} || _ cmp _1 } keys %tally
-my $winner = $ranked[0]
+val @ranked = sort { $tally{_1} <=> $tally{_} || _ cmp _1 } keys %tally
+val $winner = $ranked[0]
 printf "── consensus (plurality): %s ──\n", $winner
 
 # Check for a clear majority (>50%) — quorum standard.
-my $n = len(keys %votes)
-my $winning_count = $tally{$winner}
-my $majority = $winning_count * 2 > $n
+val $n = len(keys %votes)
+val $winning_count = $tally{$winner}
+val $majority = $winning_count * 2 > $n
 printf "winning count: %d / %d  (majority: %s)\n",
     $winning_count, $n, $majority ? "YES" : "no — only plurality"
 

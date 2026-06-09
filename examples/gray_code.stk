@@ -22,7 +22,7 @@ fn Gray::encode($n) {
 }
 
 fn Gray::decode($g) {
-    my $n = $g
+    var $n = $g
     while (($n >> 1) > 0) {
         $g = $g ^ ($n >> 1)
         $n = $n >> 1
@@ -32,7 +32,7 @@ fn Gray::decode($g) {
 
 # Count set bits — popcount via Kernighan's drop-lowest-set-bit loop.
 fn Gray::popcount($x) {
-    my $c = 0
+    var $c = 0
     while ($x) {
         $x = $x & ($x - 1)
         $c++
@@ -46,17 +46,17 @@ fn Gray::hamming($u, $v) {
 
 # ── render the k-bit code in order ─────────────────────────────────
 
-my $k = 4
-my $n = 1 << $k
+val $k = 4
+val $n = 1 << $k
 
 printf "── %d-bit reflected Gray code (%d values) ─────────────\n",
     $k, $n
 printf "  %3s  %6s  %6s\n", "i", "bin(i)", "gray"
 printf "  %3s  %6s  %6s\n", "---", "------", "------"
 
-my @gray
-for my $i (0:$n - 1) {
-    my $g = Gray::encode($i)
+var @gray
+for val $i (0:$n - 1) {
+    val $g = Gray::encode($i)
     push @gray, $g
     printf "  %3d  %s  %s\n",
         $i,
@@ -66,30 +66,30 @@ for my $i (0:$n - 1) {
 
 # ── invariant 1: adjacent values differ in exactly one bit ─────────
 
-for my $i (1:$n - 1) {
-    my $d = Gray::hamming($gray[$i - 1], $gray[$i])
+for val $i (1:$n - 1) {
+    val $d = Gray::hamming($gray[$i - 1], $gray[$i])
     die "Hamming distance != 1 at i=$i (saw $d)" unless $d == 1
 }
 
 # ── invariant 2: encode/decode is a bijection ──────────────────────
 
-for my $i (0:$n - 1) {
-    my $roundtrip = Gray::decode(Gray::encode($i))
+for val $i (0:$n - 1) {
+    val $roundtrip = Gray::decode(Gray::encode($i))
     die "round-trip broken at i=$i (saw $roundtrip)" unless $roundtrip == $i
 }
 
 # ── invariant 3: every code appears exactly once ───────────────────
 
-my %seen
-for my $g (@gray) { $seen{$g}++ }
-for my $g (@gray) {
+var %seen
+for val $g (@gray) { $seen{$g}++ }
+for val $g (@gray) {
     die "value $g appears $seen{$g} times" unless $seen{$g} == 1
 }
 die "wrong number of distinct codes" unless len(keys(%seen)) == $n
 
 # ── invariant 4: wrap-around — last and first also differ by 1 bit ─
 
-my $wrap_d = Gray::hamming($gray[$n - 1], $gray[0])
+val $wrap_d = Gray::hamming($gray[$n - 1], $gray[0])
 die "wrap-around Hamming distance != 1 (saw $wrap_d)" unless $wrap_d == 1
 
 p ""

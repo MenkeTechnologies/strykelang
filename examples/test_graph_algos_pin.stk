@@ -14,14 +14,14 @@ fn Graph::adj() {
 }
 
 fn Graph::bfs($g, $start) {
-    my @order
-    my %seen
-    my @queue = ($start)
+    var @order
+    var %seen
+    var @queue = ($start)
     $seen{$start} = 1
     while (len(@queue) > 0) {
-        my $node = shift @queue
+        val $node = shift @queue
         push @order, $node
-        for my $nb (@{$g->{$node}}) {
+        for val $nb (@{$g->{$node}}) {
             unless ($seen{$nb}) {
                 $seen{$nb} = 1
                 push @queue, $nb
@@ -32,16 +32,16 @@ fn Graph::bfs($g, $start) {
 }
 
 fn Graph::dfs($g, $start) {
-    my @order
-    my %seen
-    my @stack = ($start)
+    var @order
+    var %seen
+    var @stack = ($start)
     while (len(@stack) > 0) {
-        my $node = pop @stack
+        val $node = pop @stack
         next if $seen{$node}
         $seen{$node} = 1
         push @order, $node
-        my @nbs = @{$g->{$node}}
-        for my $nb (sort { _1 cmp _ } @nbs) {
+        val @nbs = @{$g->{$node}}
+        for val $nb (sort { _1 cmp _ } @nbs) {
             push @stack, $nb unless $seen{$nb}
         }
     }
@@ -49,20 +49,20 @@ fn Graph::dfs($g, $start) {
 }
 
 fn Graph::shortest_path($g, $src, $dst) {
-    my %parent = ($src => undef)
-    my @queue = ($src)
+    var %parent = ($src => undef)
+    var @queue = ($src)
     while (len(@queue) > 0) {
-        my $node = shift @queue
+        val $node = shift @queue
         if ($node eq $dst) {
-            my @path
-            my $c = $dst
+            var @path
+            var $c = $dst
             while (defined $c) {
                 unshift @path, $c
                 $c = $parent{$c}
             }
             return \@path
         }
-        for my $nb (@{$g->{$node}}) {
+        for val $nb (@{$g->{$node}}) {
             unless (exists $parent{$nb}) {
                 $parent{$nb} = $node
                 push @queue, $nb
@@ -73,17 +73,17 @@ fn Graph::shortest_path($g, $src, $dst) {
 }
 
 fn Graph::connected_components($g) {
-    my %seen
-    my @comps
-    for my $node (sort keys %$g) {
+    var %seen
+    var @comps
+    for val $node (sort keys %$g) {
         next if $seen{$node}
-        my @comp
-        my @queue = ($node)
+        var @comp
+        var @queue = ($node)
         $seen{$node} = 1
         while (len(@queue) > 0) {
-            my $c = shift @queue
+            val $c = shift @queue
             push @comp, $c
-            for my $nb (@{$g->{$c}}) {
+            for val $nb (@{$g->{$c}}) {
                 unless ($seen{$nb}) {
                     $seen{$nb} = 1
                     push @queue, $nb
@@ -95,7 +95,7 @@ fn Graph::connected_components($g) {
     \@comps
 }
 
-my $g = Graph::adj()
+val $g = Graph::adj()
 
 # BFS from A
 join(",", @{Graph::bfs($g, "A")}) |> aeq "A,B,C,D,E,F", "bfs A"
@@ -109,19 +109,19 @@ join("->", @{Graph::shortest_path($g, "D", "F")}) |> aeq "D->B->E->F", "sp D->F"
 join("->", @{Graph::shortest_path($g, "A", "A")}) |> aeq "A",        "sp self"
 
 # Disconnected: A-B, C-D, isolated E
-my $g2 = +{
+val $g2 = +{
     A => ["B"], B => ["A"],
     C => ["D"], D => ["C"],
     E => [],
 }
-my $comps = Graph::connected_components($g2)
+val $comps = Graph::connected_components($g2)
 len(@$comps) |> aeq 3, "3 components"
 join(",", @{$comps->[0]}) |> aeq "A,B", "comp AB"
 join(",", @{$comps->[1]}) |> aeq "C,D", "comp CD"
 join(",", @{$comps->[2]}) |> aeq "E",    "comp E"
 
 # Graph with cycles still terminates
-my $cyc = +{
+val $cyc = +{
     A => ["B"],
     B => ["C"],
     C => ["A"],

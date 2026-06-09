@@ -12,7 +12,7 @@ fn Rosetta::Temp::f_to_k($f) { ($f + 459.67) * 5 / 9 }
 fn Rosetta::Temp::f_to_c($f) { ($f - 32) * 5 / 9 }
 
 fn Rosetta::Temp::approx_eq($a, $b) {
-    my $d = $a - $b
+    var $d = $a - $b
     $d = -$d if $d < 0
     $d < 0.001
 }

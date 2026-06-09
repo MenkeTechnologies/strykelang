@@ -21,7 +21,7 @@
 fn G2::MV::new($s=0, $e1=0, $e2=0, $e12=0) = [$s, $e1, $e2, $e12]
 
 fn G2::MV::str($m) {
-    my @parts
+    var @parts
     push @parts, sprintf("%.2f", $m->[0])     if abs($m->[0]) > 0.001
     push @parts, sprintf("%.2fe1", $m->[1])   if abs($m->[1]) > 0.001
     push @parts, sprintf("%.2fe2", $m->[2])   if abs($m->[2]) > 0.001
@@ -57,7 +57,7 @@ fn G2::MV::rev($mv) = [$mv->[0], $mv->[1], $mv->[2], -$mv->[3]]
 # Sandwich Product: R * v * rev(R)
 fn G2::MV::rotate($v, $r) {
     # Rotate vector v by rotor r
-    my $tmp = G2::MV::mul $r, $v
+    val $tmp = G2::MV::mul $r, $v
     G2::MV::mul $tmp, G2::MV::rev($r)
 }
 
@@ -65,7 +65,7 @@ fn G2::MV::rotate($v, $r) {
 
 fn G2::MV::rotor($angle_rad) {
     # R = cos(theta/2) + sin(theta/2)e12
-    my $half = $angle_rad / 2
+    val $half = $angle_rad / 2
     G2::MV::new cos($half), 0, 0, sin($half)
 }
 
@@ -74,14 +74,14 @@ fn G2::MV::rotor($angle_rad) {
 p "── 2D Geometric Algebra Demo ──────────────────────────"
 
 # Define some vectors
-my $v1 = G2::MV::new 0, 1, 0, 0  # e1
-my $v2 = G2::MV::new 0, 0, 1, 0  # e2
+val $v1 = G2::MV::new 0, 1, 0, 0  # e1
+val $v2 = G2::MV::new 0, 0, 1, 0  # e2
 
 p "v1: #{G2::MV::str $v1}"
 p "v2: #{G2::MV::str $v2}"
 
 # Geometric product: v1 * v2 = e1 * e2 = e12
-my $v12 = G2::MV::mul $v1, $v2
+val $v12 = G2::MV::mul $v1, $v2
 p "v1 * v2 = #{G2::MV::str $v12}"
 
 # Squared vectors
@@ -89,43 +89,43 @@ p "v1 * v1 = #{G2::MV::str(G2::MV::mul $v1, $v1)}"
 p "v12 * v12 = #{G2::MV::str(G2::MV::mul $v12, $v12)} (Imaginary unit behavior)"
 
 # Rotation
-my $angle = 3.14159 / 2  # 90 degrees
-my $r = G2::MV::rotor $angle
+val $angle = 3.14159 / 2  # 90 degrees
+val $r = G2::MV::rotor $angle
 p "Rotor (90deg): #{G2::MV::str $r}"
 
-my $v1_rot = G2::MV::rotate $v1, $r
+val $v1_rot = G2::MV::rotate $v1, $r
 p "v1 rotated 90deg: #{G2::MV::str $v1_rot}"
 
 # Parallel transformation of a cloud of points
 p ""
 p "── Parallel Transform (1000 points) ───────────────────"
-my @points = 1:1000 |> maps { G2::MV::new 0, rand(10), rand(10), 0 } |> collect
+val @points = 1:1000 |> maps { G2::MV::new 0, rand(10), rand(10), 0 } |> collect
 
-my $start = time()
-my @results = pmaps { G2::MV::rotate _, $r } @points
-my $dur = time() - $start
+val $start = time()
+val @results = pmaps { G2::MV::rotate _, $r } @points
+val $dur = time() - $start
 
 printf "Processed %d points in %.3fs\n", len(@results), $dur
 
 # ── Internal Validation ──────────────────────────────────────────────────────
 
 fn test_ga {
-    my $e1 = G2::MV::new 0, 1, 0, 0
-    my $e2 = G2::MV::new 0, 0, 1, 0
+    val $e1 = G2::MV::new 0, 1, 0, 0
+    val $e2 = G2::MV::new 0, 0, 1, 0
     
     # e1 * e1 = 1
-    my $res1 = G2::MV::mul $e1, $e1
+    val $res1 = G2::MV::mul $e1, $e1
     die "e1*e1 != 1" unless abs($res1->[0] - 1.0) < 0.001
     
     # e1 * e2 = -e2 * e1
-    my $e12 = G2::MV::mul $e1, $e2
-    my $e21 = G2::MV::mul $e2, $e1
+    val $e12 = G2::MV::mul $e1, $e2
+    val $e21 = G2::MV::mul $e2, $e1
     die "e1*e2 != -e2*e1" unless abs($e12->[3] + $e21->[3]) < 0.001
     
     # Rotation 180deg
-    my $r180 = G2::MV::rotor 3.14159
-    my $v = G2::MV::new 0, 1, 0, 0 # e1
-    my $v_rot = G2::MV::rotate $v, $r180
+    val $r180 = G2::MV::rotor 3.14159
+    val $v = G2::MV::new 0, 1, 0, 0 # e1
+    val $v_rot = G2::MV::rotate $v, $r180
     die "180deg rotate failed" unless abs($v_rot->[1] + 1.0) < 0.001 # should be -e1
     
     p "✓ GA tests passed."

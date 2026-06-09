@@ -4,10 +4,10 @@
 fn Rosetta::Munchausen::is_munchausen($n) {
     if ($n == 0) { 0 }
     else {
-        my $sum = 0
-        my @digits = ~> "$n" chars
-        for my $d (@digits) {
-            my $val = int($d)
+        var $sum = 0
+        val @digits = ~> "$n" chars
+        for val $d (@digits) {
+            val $val = int($d)
             if ($val == 0) {
                 # 0^0 is usually 0 in Munchausen number context, or ignored
                 # but standard definition for Rosetta task says 0^0 = 0

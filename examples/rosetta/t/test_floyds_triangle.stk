@@ -2,11 +2,11 @@
 # Rosetta Code: Floyd's triangle
 
 fn Rosetta::FloydTriangle::generate($n) {
-    my @rows = ()
-    my $curr = 1
-    for my $i (1:$n) {
-        my @row = ()
-        for my $j (1:$i) {
+    var @rows = ()
+    var $curr = 1
+    for val $i (1:$n) {
+        var @row = ()
+        for val $j (1:$i) {
             push @row, $curr
             $curr = $curr + 1
         }
@@ -15,7 +15,7 @@ fn Rosetta::FloydTriangle::generate($n) {
     \@rows
 }
 
-my $res = Rosetta::FloydTriangle::generate(5)
+val $res = Rosetta::FloydTriangle::generate(5)
 assert_eq len(@$res), 5, "5 rows"
 assert_eq join(",", @{$res->[0]}), "1", "row 1"
 assert_eq join(",", @{$res->[1]}), "2,3", "row 2"

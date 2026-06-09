@@ -4,16 +4,16 @@
 # guessing at _/_ semantics.
 
 fn Rosetta::Cata::foldr($f, $z, @xs) {
-    my $acc = $z
-    for my $i (rev 0..len(@xs)-1) {
+    var $acc = $z
+    for val $i (rev 0..len(@xs)-1) {
         $acc = $f($xs[$i], $acc)
     }
     $acc
 }
 
 fn Rosetta::Cata::foldl($f, $z, @xs) {
-    my $acc = $z
-    for my $x (@xs) { $acc = $f($acc, $x) }
+    var $acc = $z
+    for val $x (@xs) { $acc = $f($acc, $x) }
     $acc
 }
 
@@ -26,7 +26,7 @@ fn Rosetta::Cata::max_(@xs)     {
 }
 fn Rosetta::Cata::reverse_(@xs) {
     # foldl with prepend gives reverse: ((((nil, x1), x2), x3), ...)
-    Rosetta::Cata::foldl(fn ($acc, $x) { my @r = ($x, @$acc); \@r }, [], @xs)
+    Rosetta::Cata::foldl(fn ($acc, $x) { val @r = ($x, @$acc); \@r }, [], @xs)
 }
 
 assert_eq Rosetta::Cata::sum(1,2,3,4,5),     15,  "sum"
@@ -35,12 +35,12 @@ assert_eq Rosetta::Cata::length_(1,2,3,4,5), 5,   "length via fold"
 assert_eq Rosetta::Cata::max_(3,1,4,1,5,9,2,6), 9, "max"
 
 # foldl reverse builds the list backwards
-my $rev = Rosetta::Cata::reverse_(1,2,3,4,5)
+val $rev = Rosetta::Cata::reverse_(1,2,3,4,5)
 assert_eq join(",", @$rev), "5,4,3,2,1", "reverse via foldl"
 
 # Identity: foldr (cons) [] xs == xs
-my $copy = Rosetta::Cata::foldr(
-    fn ($x, $acc) { my @r = ($x, @$acc); \@r },
+val $copy = Rosetta::Cata::foldr(
+    fn ($x, $acc) { val @r = ($x, @$acc); \@r },
     [],
     10, 20, 30,
 )

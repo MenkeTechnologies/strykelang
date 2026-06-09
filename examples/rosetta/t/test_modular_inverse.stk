@@ -2,12 +2,12 @@
 # Rosetta Code: Modular inverse
 
 fn Rosetta::ModularInverse::extended_gcd($a, $b) {
-    my ($old_r, $r) = ($a, $b)
-    my ($old_s, $s) = (1, 0)
-    my ($old_t, $t) = (0, 1)
+    var ($old_r, $r) = ($a, $b)
+    var ($old_s, $s) = (1, 0)
+    var ($old_t, $t) = (0, 1)
     
     while ($r != 0) {
-        my $quotient = int($old_r / $r)
+        val $quotient = int($old_r / $r)
         ($old_r, $r) = ($r, $old_r - $quotient * $r)
         ($old_s, $s) = ($s, $old_s - $quotient * $s)
         ($old_t, $t) = ($t, $old_t - $quotient * $t)
@@ -17,8 +17,8 @@ fn Rosetta::ModularInverse::extended_gcd($a, $b) {
 }
 
 fn Rosetta::ModularInverse::compute($a, $n) {
-    my $res = Rosetta::ModularInverse::extended_gcd($a, $n)
-    my $s = $res->[0]; my $t = $res->[1]; my $g = $res->[2]
+    val $res = Rosetta::ModularInverse::extended_gcd($a, $n)
+    val $s = $res->[0]; val $t = $res->[1]; val $g = $res->[2]
     if ($g != 1) {
         0
     } else {

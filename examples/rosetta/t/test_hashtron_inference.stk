@@ -2,21 +2,21 @@
 # Rosetta Code: Hashtron inference
 
 fn Rosetta::Hashtron::hash_feature($name) {
-    my $sum = 0
-    for my $ch (split //, $name) { $sum += ord($ch) }
+    var $sum = 0
+    for val $ch (split //, $name) { $sum += ord($ch) }
     $sum % 8
 }
 
 fn Rosetta::Hashtron::infer($weights, $features) {
-    my $score = 0
-    for my $feature (@$features) {
-        my $bucket = Rosetta::Hashtron::hash_feature($feature)
+    var $score = 0
+    for val $feature (@$features) {
+        val $bucket = Rosetta::Hashtron::hash_feature($feature)
         $score += $weights->[$bucket]
     }
     $score > 0 ? 1 : 0
 }
 
-my @weights = (1, 1, -1, 0, -2, 1, 0, 1)
+val @weights = (1, 1, -1, 0, -2, 1, 0, 1)
 
 assert_eq Rosetta::Hashtron::hash_feature("cat"), 0, "feature hash bucket is stable"
 assert_eq Rosetta::Hashtron::infer(\@weights, ["cat", "bird"]), 1, "positive aggregate score classifies as true"

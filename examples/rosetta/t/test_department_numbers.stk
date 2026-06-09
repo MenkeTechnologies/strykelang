@@ -4,11 +4,11 @@
 # sanitation even, sum = 12.
 
 fn Rosetta::DeptNum::solutions() {
-    my @sols
-    for my $p (1:7) {
-        for my $s (1:7) {
+    var @sols
+    for val $p (1:7) {
+        for val $s (1:7) {
             next if $s == $p || $s % 2 != 0
-            for my $f (1:7) {
+            for val $f (1:7) {
                 next if $f == $p || $f == $s
                 next unless $p + $s + $f == 12
                 push @sols, [$p, $s, $f]
@@ -18,22 +18,22 @@ fn Rosetta::DeptNum::solutions() {
     @sols
 }
 
-my @sols = Rosetta::DeptNum::solutions()
+val @sols = Rosetta::DeptNum::solutions()
 # Reference count: 14 solutions
 assert_eq len(@sols), 14, "14 valid (P,S,F) triples"
 
 # Each solution satisfies all constraints
-for my $s (@sols) {
-    my $p = $s->[0]; my $sa = $s->[1]; my $f = $s->[2]
+for val $s (@sols) {
+    val $p = $s->[0]; val $sa = $s->[1]; val $f = $s->[2]
     assert_ok $p != $sa && $sa != $f && $p != $f, "all distinct"
     assert_ok $sa % 2 == 0, "sanitation even"
     assert_eq $p + $sa + $f, 12, "sum 12"
-    for my $v ($p, $sa, $f) { assert_ok $v >= 1 && $v <= 7, "in range" }
+    for val $v ($p, $sa, $f) { assert_ok $v >= 1 && $v <= 7, "in range" }
 }
 
 # Pipeline form: format each solution
-my @fmt = ~> @sols map {
-    my $s = _
+val @fmt = ~> @sols map {
+    val $s = _
     "P=" . $s->[0] . ",S=" . $s->[1] . ",F=" . $s->[2]
 }
 assert_eq len(@fmt), 14, "14 formatted"

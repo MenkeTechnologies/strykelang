@@ -8,7 +8,7 @@ fn Rosetta::Sisyphus::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n < 4
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -18,25 +18,25 @@ fn Rosetta::Sisyphus::is_prime($n) {
 
 fn Rosetta::Sisyphus::sequence($k) {
     return [] if $k < 1
-    my @s = (1)
-    for my $n (2:$k) {
-        my $prev = $s[-1]
+    var @s = (1)
+    for val $n (2:$k) {
+        val $prev = $s[-1]
         push @s, Rosetta::Sisyphus::is_prime($n) ? $prev - $n : $prev + $n
     }
     \@s
 }
 
 # First 30 terms of A350877
-my $s = Rosetta::Sisyphus::sequence(30)
+val $s = Rosetta::Sisyphus::sequence(30)
 assert_eq join(",", @$s),
     "1,-1,-4,0,-5,1,-6,2,11,21,10,22,9,23,38,54,37,55,36,56,77,99,76,100,125,151,178,206,177,207",
     "first 30 Sisyphus terms"
 
 # Sanity: every prime index strictly decreases, every composite ≥ 4 increases
-my $every_drop = 1
-my $every_rise = 1
-for my $i (1:29) {
-    my $delta = $s->[$i] - $s->[$i - 1]
+var $every_drop = 1
+var $every_rise = 1
+for val $i (1:29) {
+    val $delta = $s->[$i] - $s->[$i - 1]
     if (Rosetta::Sisyphus::is_prime($i + 1)) {
         $every_drop = 0 if $delta != -($i + 1)
     } else {

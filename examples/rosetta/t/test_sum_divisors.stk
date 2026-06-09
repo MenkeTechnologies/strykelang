@@ -2,14 +2,14 @@
 # Rosetta Code: Sum of divisors
 
 fn Rosetta::SumDivisors::get($n) {
-    my @res = 1:$n |> grep { $n % _ == 0 }
+    val @res = 1:$n |> grep { $n % _ == 0 }
     @res
 }
 
 fn Rosetta::SumDivisors::sum($n) {
-    my @d = Rosetta::SumDivisors::get($n)
-    my $sum = 0
-    for my $v (@d) { $sum = $sum + $v }
+    val @d = Rosetta::SumDivisors::get($n)
+    var $sum = 0
+    for val $v (@d) { $sum = $sum + $v }
     $sum
 }
 

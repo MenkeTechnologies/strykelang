@@ -4,16 +4,16 @@
 # top and bottom; each row is the same total width (2N+1) where N is
 # the letter's 0-based offset from 'A'.
 fn Exercism::Diamond::build_shape {
-    my $n      = ord(_0) - ord('A')
-    my @rows
-    for my $i (0:$n) {
-        my $c   = chr(ord('A') + $i)
-        my $pad = " " x ($n - $i)
-        my $row = $i == 0
+    val $n      = ord(_0) - ord('A')
+    var @rows
+    for val $i (0:$n) {
+        val $c   = chr(ord('A') + $i)
+        val $pad = " " x ($n - $i)
+        val $row = $i == 0
                 ? "${pad}A${pad}"
                 : "${pad}${c}" . (" " x (2 * $i - 1)) . "${c}${pad}"
         push @rows, $row
     }
-    my @bottom = rev @rows[0:$n-1]
+    val @bottom = rev @rows[0:$n-1]
     join("\n", @rows, @bottom) . "\n"
 }

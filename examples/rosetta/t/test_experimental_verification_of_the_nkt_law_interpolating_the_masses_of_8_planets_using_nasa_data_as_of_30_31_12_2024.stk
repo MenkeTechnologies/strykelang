@@ -5,8 +5,8 @@ fn Rosetta::NKTMass::interpolate($left, $right) {
     ($left + $right) / 2
 }
 
-my @masses = (0.055, 0.815, 1.0, 0.107, 317.8, 95.2, 14.5, 17.1)
-my $inner_avg = Rosetta::NKTMass::interpolate($masses[1], $masses[3])
+val @masses = (0.055, 0.815, 1.0, 0.107, 317.8, 95.2, 14.5, 17.1)
+val $inner_avg = Rosetta::NKTMass::interpolate($masses[1], $masses[3])
 
 assert_eq int($inner_avg * 1000), 460, "interpolation between Venus and Mars is stable"
 assert_eq len(@masses), 8, "eight planetary masses embedded"

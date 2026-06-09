@@ -14,7 +14,7 @@ assert_eq Exercism::ComplexNumbers::abs([3, 4]),            5, "abs"
 assert_eq j(Exercism::ComplexNumbers::conjugate([3, 4])),  "3,-4", "conjugate"
 
 # e^(i*pi) ≈ -1
-my $r = Exercism::ComplexNumbers::exp([0, 3.141592653589793])
+val $r = Exercism::ComplexNumbers::exp([0, 3.141592653589793])
 assert_ok abs($r->[0] - -1) < 1e-9 && abs($r->[1]) < 1e-9, "e^(iπ) ≈ -1"
 
 test_run

@@ -21,8 +21,8 @@
 # ── undirected graph builder ─────────────────────────────────────
 
 fn Art::new($n) {
-    my @adj
-    for my $i (0:$n - 1) { push @adj, [] }
+    var @adj
+    for val $i (0:$n - 1) { push @adj, [] }
     +{ n => $n, adj => \@adj }
 }
 
@@ -34,28 +34,28 @@ fn Art::add_edge($g, $u, $v) {
 # ── Tarjan DFS — returns +{ art_points => [...], bridges => [[u,v]] }
 
 fn Art::find($g) {
-    my $n = $g->{n}
-    my @disc   = (-1) x $n
-    my @low    = (0)  x $n
-    my @parent = (-1) x $n
-    my %art_set
-    my @bridges
-    my $timer = 0
+    val $n = $g->{n}
+    var @disc   = (-1) x $n
+    var @low    = (0)  x $n
+    var @parent = (-1) x $n
+    var %art_set
+    var @bridges
+    var $timer = 0
     # Iterative DFS to avoid deep recursion issues.
-    for my $start (0:$n - 1) {
+    for val $start (0:$n - 1) {
         next if $disc[$start] != -1
-        my @stack = ([$start, 0])
+        var @stack = ([$start, 0])
         $disc[$start] = $timer
         $low[$start]  = $timer
         $timer++
-        my $root_children = 0
+        var $root_children = 0
         while (len(@stack) > 0) {
-            my $top = $stack[-1]
-            my $u = $top->[0]
-            my $idx = $top->[1]
+            val $top = $stack[-1]
+            val $u = $top->[0]
+            val $idx = $top->[1]
             if ($idx < len(@{$g->{adj}->[$u]})) {
                 $top->[1]++
-                my $v = $g->{adj}->[$u]->[$idx]
+                val $v = $g->{adj}->[$u]->[$idx]
                 if ($disc[$v] == -1) {
                     $parent[$v] = $u
                     $disc[$v]   = $timer
@@ -71,7 +71,7 @@ fn Art::find($g) {
             } else {
                 pop(@stack)
                 if (len(@stack) > 0) {
-                    my $pu = $stack[-1]->[0]
+                    val $pu = $stack[-1]->[0]
                     $low[$pu] = $low[$u] if $low[$u] < $low[$pu]
                     # Articulation check (non-root parent).
                     if ($pu != $start && $low[$u] >= $disc[$pu]) {
@@ -79,8 +79,8 @@ fn Art::find($g) {
                     }
                     # Bridge check.
                     if ($low[$u] > $disc[$pu]) {
-                        my $a_idx = $pu < $u ? $pu : $u
-                        my $b_idx = $pu < $u ? $u  : $pu
+                        val $a_idx = $pu < $u ? $pu : $u
+                        val $b_idx = $pu < $u ? $u  : $pu
                         push @bridges, [$a_idx, $b_idx]
                     }
                 }
@@ -90,23 +90,23 @@ fn Art::find($g) {
             $art_set{$start} = 1
         }
     }
-    my @arts = sort { _0 <=> _1 } keys %art_set
+    val @arts = sort { _0 <=> _1 } keys %art_set
     +{ art_points => \@arts, bridges => \@bridges }
 }
 
 # ── brute force articulation: remove each v, count components ─────
 
 fn Art::components_excluding($g, $excluded) {
-    my $n = $g->{n}
-    my @comp = (-1) x $n
-    my $cid = 0
-    for my $start (0:$n - 1) {
+    val $n = $g->{n}
+    var @comp = (-1) x $n
+    var $cid = 0
+    for val $start (0:$n - 1) {
         next if $comp[$start] != -1 || $start == $excluded
         $comp[$start] = $cid
-        my @queue = ($start)
+        var @queue = ($start)
         while (len(@queue) > 0) {
-            my $u = shift @queue
-            for my $v (@{$g->{adj}->[$u]}) {
+            val $u = shift @queue
+            for val $v (@{$g->{adj}->[$u]}) {
                 next if $v == $excluded || $comp[$v] != -1
                 $comp[$v] = $cid
                 push @queue, $v
@@ -118,10 +118,10 @@ fn Art::components_excluding($g, $excluded) {
 }
 
 fn Art::brute_articulation($g) {
-    my $n = $g->{n}
-    my $base = Art::components_excluding($g, -1)
-    my @out
-    for my $v (0:$n - 1) {
+    val $n = $g->{n}
+    val $base = Art::components_excluding($g, -1)
+    var @out
+    for val $v (0:$n - 1) {
         push @out, $v if Art::components_excluding($g, $v) > $base
     }
     \@out
@@ -130,24 +130,24 @@ fn Art::brute_articulation($g) {
 # ── brute bridges: remove each edge, check connectivity ──────────
 
 fn Art::brute_bridges($g) {
-    my $n = $g->{n}
+    val $n = $g->{n}
     # Collect canonical edges.
-    my @edges
-    my %seen
-    for my $u (0:$n - 1) {
-        for my $v (@{$g->{adj}->[$u]}) {
+    var @edges
+    var %seen
+    for val $u (0:$n - 1) {
+        for val $v (@{$g->{adj}->[$u]}) {
             next if $u >= $v
-            my $key = "#{$u},#{$v}"
+            val $key = "#{$u},#{$v}"
             next if exists $seen{$key}
             $seen{$key} = 1
             push @edges, [$u, $v]
         }
     }
-    my @bridges
-    for my $e (@edges) {
-        my $g2 = Art::new($n)
-        for my $u (0:$n - 1) {
-            for my $v (@{$g->{adj}->[$u]}) {
+    var @bridges
+    for val $e (@edges) {
+        val $g2 = Art::new($n)
+        for val $u (0:$n - 1) {
+            for val $v (@{$g->{adj}->[$u]}) {
                 next if $u >= $v
                 next if $u == $e->[0] && $v == $e->[1]
                 Art::add_edge($g2, $u, $v)
@@ -162,7 +162,7 @@ fn Art::brute_bridges($g) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "single edge",
         n     => 2,
@@ -225,28 +225,28 @@ my @cases = (
 p "── Tarjan articulation + bridges demo ────────────────"
 printf "  %-36s  %-14s  %s\n", "case", "art-pts", "bridges"
 printf "  %-36s  %-14s  %s\n", "------------------------------------", "--------------", "-------"
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    my @br_s
-    for my $br (@{$r->{bridges}}) {
+    val $r = Art::find($g)
+    var @br_s
+    for val $br (@{$r->{bridges}}) {
         push @br_s, "(#{$br->[0]},#{$br->[1]})"
     }
-    my $ap = "[" . join(",", @{$r->{art_points}}) . "]"
-    my $br_str = "[" . join(",", sort @br_s) . "]"
+    val $ap = "[" . join(",", @{$r->{art_points}}) . "]"
+    val $br_str = "[" . join(",", sort @br_s) . "]"
     printf "  %-36s  %-14s  %s\n", $c->{name}, $ap, $br_str
 }
 
 # ── canonicalize bridge list for comparison ──────────────────────
 
 fn Art::canon_bridges($bridges) {
-    my @lst
-    for my $br (@$bridges) {
-        my $u = $br->[0] < $br->[1] ? $br->[0] : $br->[1]
-        my $v = $br->[0] < $br->[1] ? $br->[1] : $br->[0]
+    var @lst
+    for val $br (@$bridges) {
+        val $u = $br->[0] < $br->[1] ? $br->[0] : $br->[1]
+        val $v = $br->[0] < $br->[1] ? $br->[1] : $br->[0]
         push @lst, "#{$u},#{$v}"
     }
     [sort @lst]
@@ -254,95 +254,95 @@ fn Art::canon_bridges($bridges) {
 
 # ── invariant 1: articulation list matches expected ───────────────
 
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    my @got = sort { _0 <=> _1 } @{$r->{art_points}}
-    my @want = sort { _0 <=> _1 } @{$c->{arts}}
+    val $r = Art::find($g)
+    val @got = sort { _0 <=> _1 } @{$r->{art_points}}
+    val @want = sort { _0 <=> _1 } @{$c->{arts}}
     die "art count mismatch on \"#{$c->{name}}\": #{len(@got)} vs #{len(@want)}" unless len(@got) == len(@want)
-    for my $i (0:len(@want) - 1) {
+    for val $i (0:len(@want) - 1) {
         die "art[#{$i}] got=#{$got[$i]} want=#{$want[$i]} on \"#{$c->{name}}\"" unless $got[$i] == $want[$i]
     }
 }
 
 # ── invariant 2: bridge list matches expected ─────────────────────
 
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    my $got = Art::canon_bridges($r->{bridges})
-    my $want = Art::canon_bridges($c->{bridges})
+    val $r = Art::find($g)
+    val $got = Art::canon_bridges($r->{bridges})
+    val $want = Art::canon_bridges($c->{bridges})
     die "bridge count mismatch on \"#{$c->{name}}\": #{len(@$got)} vs #{len(@$want)}" unless len(@$got) == len(@$want)
-    for my $i (0:len(@$want) - 1) {
+    for val $i (0:len(@$want) - 1) {
         die "bridge[#{$i}] got=#{$got->[$i]} want=#{$want->[$i]} on \"#{$c->{name}}\"" unless $got->[$i] eq $want->[$i]
     }
 }
 
 # ── invariant 3: Tarjan agrees with brute on art points (small) ───
 
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    my $br_a = Art::brute_articulation($g)
-    my @t_sorted = sort { _0 <=> _1 } @{$r->{art_points}}
-    my @b_sorted = sort { _0 <=> _1 } @$br_a
+    val $r = Art::find($g)
+    val $br_a = Art::brute_articulation($g)
+    val @t_sorted = sort { _0 <=> _1 } @{$r->{art_points}}
+    val @b_sorted = sort { _0 <=> _1 } @$br_a
     die "tarjan vs brute art on \"#{$c->{name}}\"" unless join(",", @t_sorted) eq join(",", @b_sorted)
 }
 
 # ── invariant 4: Tarjan agrees with brute on bridges (small) ──────
 
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    my $br_b = Art::brute_bridges($g)
-    my $tarjan_canon = Art::canon_bridges($r->{bridges})
-    my $brute_canon = Art::canon_bridges($br_b)
+    val $r = Art::find($g)
+    val $br_b = Art::brute_bridges($g)
+    val $tarjan_canon = Art::canon_bridges($r->{bridges})
+    val $brute_canon = Art::canon_bridges($br_b)
     die "tarjan vs brute bridges on \"#{$c->{name}}\": #{join(',', @$tarjan_canon)} vs #{join(',', @$brute_canon)}" unless join(",", @$tarjan_canon) eq join(",", @$brute_canon)
 }
 
 # ── invariant 5: every bridge's endpoints are graph vertices ──────
 
-for my $c (@cases) {
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Art::add_edge($g, $e->[0], $e->[1])
     }
-    my $r = Art::find($g)
-    for my $br (@{$r->{bridges}}) {
+    val $r = Art::find($g)
+    for val $br (@{$r->{bridges}}) {
         die "bridge endpoint out of range on \"#{$c->{name}}\"" unless $br->[0] >= 0 && $br->[0] < $c->{n} && $br->[1] >= 0 && $br->[1] < $c->{n}
     }
 }
 
 # ── invariant 6: bicycle (2-edge-connected) graph has no bridges ──
 
-for my $c (@cases) {
+for val $c (@cases) {
     next unless $c->{name} eq "triangle (no cuts)" || $c->{name} eq "cycle C5"
-    my $g = Art::new($c->{n})
-    for my $e (@{$c->{edges}}) { Art::add_edge($g, $e->[0], $e->[1]) }
-    my $r = Art::find($g)
+    val $g = Art::new($c->{n})
+    for val $e (@{$c->{edges}}) { Art::add_edge($g, $e->[0], $e->[1]) }
+    val $r = Art::find($g)
     die "2-edge-connected has bridges on \"#{$c->{name}}\"" unless len(@{$r->{bridges}}) == 0
 }
 
 # ── invariant 7: star K1,n has exactly the center as articulation ──
 
-for my $n (3, 4, 5, 6) {
-    my $g = Art::new($n)
-    for my $i (1:$n - 1) {
+for val $n (3, 4, 5, 6) {
+    val $g = Art::new($n)
+    for val $i (1:$n - 1) {
         Art::add_edge($g, 0, $i)
     }
-    my $r = Art::find($g)
+    val $r = Art::find($g)
     die "K1,#{$n - 1} should have art = [0]" unless len(@{$r->{art_points}}) == 1 && $r->{art_points}->[0] == 0
     die "K1,#{$n - 1} should have #{$n - 1} bridges" unless len(@{$r->{bridges}}) == $n - 1
 }

@@ -4,14 +4,14 @@
 
 fn Rosetta::Entropy::shannon($s) {
     return 0.0 if len($s) == 0
-    my %count
-    for my $c ($s |> chars) {
+    var %count
+    for val $c ($s |> chars) {
         $count{$c} = ($count{$c} // 0) + 1
     }
-    my $n = len($s)
-    my $h = 0.0
-    for my $c (keys %count) {
-        my $p = $count{$c} / $n
+    val $n = len($s)
+    var $h = 0.0
+    for val $c (keys %count) {
+        val $p = $count{$c} / $n
         $h -= $p * log($p) / log(2)
     }
     $h
@@ -26,7 +26,7 @@ assert_eq Rosetta::Entropy::shannon("aaaaaaaa"), 0, "constant → 0"
 assert_eq Rosetta::Entropy::shannon(""),         0, "empty → 0"
 
 # Canonical example: 1223334444 → ~1.846439 bits.
-my $h = Rosetta::Entropy::shannon("1223334444")
+val $h = Rosetta::Entropy::shannon("1223334444")
 assert_ok abs($h - 1.8464393446710154) < 1e-9, "1223334444"
 
 test_run

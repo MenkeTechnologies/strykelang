@@ -6,9 +6,9 @@ fn Rosetta::IsPrime::is_prime($n) {
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
-        my $limit = sqrt($n)
-        my $res = 1
-        for my $i (3..int($limit)) {
+        val $limit = sqrt($n)
+        var $res = 1
+        for var $i (3..int($limit)) {
             if ($n % $i == 0) {
                 $res = 0
                 $i = $n
@@ -19,8 +19,8 @@ fn Rosetta::IsPrime::is_prime($n) {
 }
 
 fn Rosetta::NthPrime::nth_prime($n) {
-    my $count = 0
-    my $candidate = 1
+    var $count = 0
+    var $candidate = 1
     while ($count < $n) {
         $candidate++
         if (Rosetta::IsPrime::is_prime($candidate)) { $count++ }
@@ -34,8 +34,8 @@ fn Rosetta::SuperPrime::is_super_prime($n) {
         0
     } else {
         # Find which prime n is
-        my $count = 0
-        my $p = 1
+        var $count = 0
+        var $p = 1
         while ($p < $n) {
             $p++
             if (Rosetta::IsPrime::is_prime($p)) { $count++ }

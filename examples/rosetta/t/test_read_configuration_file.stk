@@ -5,7 +5,7 @@
 # and numbers are auto-coerced.
 
 fn Rosetta::ConfigRead::trim($s) {
-    my $t = $s
+    var $t = $s
     $t =~ s/^\s+//
     $t =~ s/\s+$//
     $t
@@ -20,26 +20,26 @@ fn Rosetta::ConfigRead::coerce($v) {
 }
 
 fn Rosetta::ConfigRead::parse($contents) {
-    my %cfg
-    for my $line (split /\n/, $contents) {
-        my $t = Rosetta::ConfigRead::trim($line)
+    var %cfg
+    for val $line (split /\n/, $contents) {
+        val $t = Rosetta::ConfigRead::trim($line)
         next if length($t) == 0
         next if substr($t, 0, 1) eq "#" || substr($t, 0, 1) eq ";"
-        my $eq = index($t, "=")
+        val $eq = index($t, "=")
         if ($eq < 0) {
             # Bare key with no value: treat as "true"
             $cfg{Rosetta::ConfigRead::trim($t)} = 1
             next
         }
-        my $key = Rosetta::ConfigRead::trim(substr($t, 0, $eq))
-        my $val = Rosetta::ConfigRead::trim(substr($t, $eq + 1))
+        val $key = Rosetta::ConfigRead::trim(substr($t, 0, $eq))
+        val $val = Rosetta::ConfigRead::trim(substr($t, $eq + 1))
         $cfg{$key} = Rosetta::ConfigRead::coerce($val)
     }
     \%cfg
 }
 
 # Direct
-my $cfg = Rosetta::ConfigRead::parse(
+val $cfg = Rosetta::ConfigRead::parse(
     "# This is a comment\n"
   . "fullname = Foo Barber\n"
   . "favouritefruit = banana\n"
@@ -69,7 +69,7 @@ assert_eq Rosetta::ConfigRead::coerce("42"),    42,   "42 → 42"
 assert_eq Rosetta::ConfigRead::coerce("hello"), "hello", "string passes through"
 
 # Empty / whitespace-only contents
-my $empty = Rosetta::ConfigRead::parse("")
+val $empty = Rosetta::ConfigRead::parse("")
 assert_eq len(keys %$empty), 0, "empty input → empty config"
 
 # Pipe form

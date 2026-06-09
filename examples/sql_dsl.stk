@@ -13,7 +13,7 @@
 
 # ── dataset: a synthetic "orders" table ──────────────────────────────
 
-my @orders = (
+val @orders = (
     +{ id => 1,  customer => "alice", region => "us-west", amount =>  120.50, items => 3 },
     +{ id => 2,  customer => "bob",   region => "us-east", amount =>   75.00, items => 1 },
     +{ id => 3,  customer => "carol", region => "eu",      amount =>  250.00, items => 5 },
@@ -32,10 +32,10 @@ printf "── dataset: %d orders ───────────────�
 
 p ""
 p "── SELECT id,customer,amount WHERE amount > 100 ─────"
-my @big = @orders
+val @big = @orders
     |> grep { _->{amount} > 100 }
     |> sort { _1->{amount} <=> _->{amount} }   # DESC
-for my $row (@big) {
+for val $row (@big) {
     printf "  id=%-2d  %-7s  \$%-7.2f\n",
         $row->{id}, $row->{customer}, $row->{amount}
 }
@@ -44,11 +44,11 @@ for my $row (@big) {
 
 p ""
 p "── SELECT customer, SUM(amount) GROUP BY customer ───"
-my %by_customer
-for my $row (@orders) {
+var %by_customer
+for val $row (@orders) {
     $by_customer{$row->{customer}} += $row->{amount}
 }
-for my $name (sort { $by_customer{_1} <=> $by_customer{_} } keys %by_customer) {
+for val $name (sort { $by_customer{_1} <=> $by_customer{_} } keys %by_customer) {
     printf "  %-7s  \$%.2f\n", $name, $by_customer{$name}
 }
 
@@ -56,17 +56,17 @@ for my $name (sort { $by_customer{_1} <=> $by_customer{_} } keys %by_customer) {
 
 p ""
 p "── per-region rollup ────────────────────────────────"
-my %by_region
-for my $row (@orders) {
-    my $r = $row->{region}
+var %by_region
+for val $row (@orders) {
+    val $r = $row->{region}
     $by_region{$r} //= +{ count => 0, total => 0.0, items => 0 }
     $by_region{$r}->{count}++
     $by_region{$r}->{total} += $row->{amount}
     $by_region{$r}->{items} += $row->{items}
 }
 printf "  %-8s %5s %10s %10s %10s\n", "region", "n", "total", "avg", "items"
-for my $r (sort { _ cmp _1 } keys %by_region) {
-    my $g = $by_region{$r}
+for val $r (sort { _ cmp _1 } keys %by_region) {
+    val $g = $by_region{$r}
     printf "  %-8s %5d %10.2f %10.2f %10d\n",
         $r, $g->{count}, $g->{total},
         $g->{total} / $g->{count}, $g->{items}
@@ -76,7 +76,7 @@ for my $r (sort { _ cmp _1 } keys %by_region) {
 
 p ""
 p "── APPROX_PERCENTILE via t-digest ───────────────────"
-my $td = t_digest(100)
+val $td = t_digest(100)
 td_add($td, _->{amount}) for @orders
 printf "  p50  : \$%.2f\n", td_quantile($td, 0.50)
 printf "  p90  : \$%.2f\n", td_quantile($td, 0.90)
@@ -87,10 +87,10 @@ printf "  p99  : \$%.2f\n", td_quantile($td, 0.99)
 
 p ""
 p "── TOP 3 customers by order count (TopK sketch) ─────"
-my $tk = topk(3)
+val $tk = topk(3)
 topk_add($tk, _->{customer}) for @orders
-my @top = topk_top($tk)
-for my $hit (@top) {
+val @top = topk_top($tk)
+for val $hit (@top) {
     printf "  %-7s : %d orders\n", $hit->[0], $hit->[1]
 }
 
@@ -98,8 +98,8 @@ for my $hit (@top) {
 
 p ""
 p "── SELECT DISTINCT customer ─────────────────────────"
-my @customers = map { _->{customer} } @orders
-my @distinct = sort { _ cmp _1 } uniq(@customers)
+val @customers = map { _->{customer} } @orders
+val @distinct = sort { _ cmp _1 } uniq(@customers)
 printf "  distinct customers (%d): %s\n",
     len(@distinct), join(", ", @distinct)
 
@@ -107,8 +107,8 @@ printf "  distinct customers (%d): %s\n",
 
 p ""
 p "── HAVING SUM(amount) > 200 ─────────────────────────"
-my @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
-for my $c (sort { $by_customer{_1} <=> $by_customer{_} } @big_customers) {
+val @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
+for val $c (sort { $by_customer{_1} <=> $by_customer{_} } @big_customers) {
     printf "  %-7s  \$%.2f\n", $c, $by_customer{$c}
 }
 
@@ -116,8 +116,8 @@ for my $c (sort { $by_customer{_1} <=> $by_customer{_} } @big_customers) {
 
 p ""
 p "── window: cumulative total over id-asc ─────────────"
-my $running = 0
-for my $row (sort { _->{id} <=> _1->{id} } @orders) {
+var $running = 0
+for val $row (sort { _->{id} <=> _1->{id} } @orders) {
     $running += $row->{amount}
     printf "  id=%-2d  %-7s  \$%-7.2f  running=\$%.2f\n",
         $row->{id}, $row->{customer}, $row->{amount}, $running
@@ -127,19 +127,19 @@ for my $row (sort { _->{id} <=> _1->{id} } @orders) {
 
 p ""
 p "── sharded rollup + sketch merge (sketch algebra) ───"
-my $h_west = hll(14)
-my $h_east = hll(14)
-my $h_eu   = hll(14)
-my $h_ap   = hll(14)
-for my $row (@orders) {
-    my $key = $row->{customer}
+val $h_west = hll(14)
+val $h_east = hll(14)
+val $h_eu   = hll(14)
+val $h_ap   = hll(14)
+for val $row (@orders) {
+    val $key = $row->{customer}
     if    ($row->{region} eq "us-west") { hll_add($h_west, $key) }
     elsif ($row->{region} eq "us-east") { hll_add($h_east, $key) }
     elsif ($row->{region} eq "eu")      { hll_add($h_eu,   $key) }
     elsif ($row->{region} eq "ap")      { hll_add($h_ap,   $key) }
 }
 # Sketch algebra: union all four region sketches via `+`.
-my $h_all = $h_west + $h_east + $h_eu + $h_ap
+val $h_all = $h_west + $h_east + $h_eu + $h_ap
 printf "  per-shard distinct customers:\n"
 printf "    us-west : %d\n", hll_count($h_west)
 printf "    us-east : %d\n", hll_count($h_east)

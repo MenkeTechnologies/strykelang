@@ -26,12 +26,12 @@
 p "── provenance audit-log demo ──────────────────────────"
 
 # ── 1. Origin: load a config hash from "userspace" and mark it ─────────
-my $raw_config = mark({
+val $raw_config = mark({
     user_id  => 42,
     api_url  => "https://api.example.com/v2",
     features => ["beta", "metrics"],
 })
-my $origin_p = provenance($raw_config)
+val $origin_p = provenance($raw_config)
 printf "  origin       : %s\n",      $origin_p->{origin}
 printf "  origin_line  : %d\n",      $origin_p->{origin_line}
 printf "  ops at origin: %d (none yet — fresh mark)\n",
@@ -42,21 +42,21 @@ printf "  ops at origin: %d (none yet — fresh mark)\n",
 # strings lose Arc identity through the VM's scalar-return path; the
 # main demo provenance_basics.stk documents this). Wrap in a container
 # to preserve trackability.
-my $envelope = mark({
+val $envelope = mark({
     payload => to_json($raw_config),
 })
 printf "\n  after wrap   : provenance lineage now %d ops\n",
     len(@{provenance($envelope)->{ops}})
 
 # ── 3. Audit boundary: serialize the lineage alongside the payload ────
-my $audit_entry = {
+val $audit_entry = {
     timestamp_unix => time(),
     event          => "config_persisted",
     payload_sha256 => sha256($envelope->{payload}),
     payload_size   => length($envelope->{payload}),
     provenance     => provenance($envelope),
 }
-my $audit_path = "/tmp/stryke_provenance_audit_demo.jsonl"
+val $audit_path = "/tmp/stryke_provenance_audit_demo.jsonl"
 spurt($audit_path, to_json($audit_entry) . "\n")
 printf "\n  wrote audit  : %s (%d bytes)\n",
     $audit_path, -s $audit_path
@@ -64,7 +64,7 @@ printf "\n  wrote audit  : %s (%d bytes)\n",
 # ── 4. Read it back to show on-disk shape ─────────────────────────────
 p ""
 p "── on-disk audit entry (pretty-printed) ───────────────"
-my $read_back = from_json(slurp($audit_path))
+var $read_back = from_json(slurp($audit_path))
 printf "  timestamp_unix : %d\n",      $read_back->{timestamp_unix}
 printf "  event          : %s\n",      $read_back->{event}
 printf "  payload_sha256 : %s…\n",     substr($read_back->{payload_sha256}, 0, 16)

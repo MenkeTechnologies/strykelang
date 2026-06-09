@@ -10,22 +10,22 @@ mem_total() |> maps { _ > 0 } |> aok "mem_total is positive"
 
 # ── 2. High-precision Time ────────────────────────────────────────────────
 
-my $t1 = now_ns()
+val $t1 = now_ns()
 sleep 0.01
-my $t2 = now_ns()
+val $t2 = now_ns()
 ($t2 > $t1) |> aok "now_ns is monotonic"
 
 # ── 3. Temp Assets ────────────────────────────────────────────────────────
 
-my $tmp_dir = tempdir()
+val $tmp_dir = tempdir()
 $tmp_dir |> maps { -d _ } |> aok "tempdir creates directory"
 
-my $tmp_file = tempfile()
+val $tmp_file = tempfile()
 $tmp_file |> maps { -f _ } |> aok "tempfile creates file"
 
 # ── 4. Slurp & Spurt ───────────────────────────────────────────────────────
 
-my $data = "stryke pinning test"
+val $data = "stryke pinning test"
 spurt $tmp_file, $data
 slurp($tmp_file) |> aeq $data, "spurt/slurp roundtrip"
 

@@ -4,27 +4,27 @@
 fn Rosetta::Knapsack::solve($w, $weights, $values, $n) {
     if ($n == 0 || $w == 0) { return 0 }
     
-    my $weight_n = $weights->[$n-1]
-    my $value_n = $values->[$n-1]
+    val $weight_n = $weights->[$n-1]
+    val $value_n = $values->[$n-1]
 
     if ($weight_n > $w) {
         return Rosetta::Knapsack::solve($w, $weights, $values, $n-1)
     }
     
-    my $v_incl_rest = Rosetta::Knapsack::solve($w - $weight_n, $weights, $values, $n-1)
-    my $incl = $value_n + $v_incl_rest
+    val $v_incl_rest = Rosetta::Knapsack::solve($w - $weight_n, $weights, $values, $n-1)
+    val $incl = $value_n + $v_incl_rest
     
-    my $excl = Rosetta::Knapsack::solve($w, $weights, $values, $n-1)
+    val $excl = Rosetta::Knapsack::solve($w, $weights, $values, $n-1)
     
     $incl > $excl ? $incl : $excl
 }
 
-my $weights = [1, 2, 3]
-my $values = [6, 10, 12]
+val $weights = [1, 2, 3]
+val $values = [6, 10, 12]
 assert_eq Rosetta::Knapsack::solve(5, $weights, $values, 3), 22, "knapsack capacity 5"
 
-my $w2 = [1, 2, 5, 6, 7]
-my $v2 = [1, 6, 18, 22, 28]
+val $w2 = [1, 2, 5, 6, 7]
+val $v2 = [1, 6, 18, 22, 28]
 assert_eq Rosetta::Knapsack::solve(11, $w2, $v2, 5), 40, "knapsack capacity 11"
 
 test_run

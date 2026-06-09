@@ -10,13 +10,13 @@
 # Run: stryke --no-interop examples/csv.stk
 
 fn CSV::parse_line($line) {
-    my @fields = ()
-    my $field  = ""
-    my $in_q   = 0
-    my $n      = len $line
-    my $i      = 0
+    var @fields = ()
+    var $field  = ""
+    var $in_q   = 0
+    val $n      = len $line
+    var $i      = 0
     while ($i < $n) {
-        my $c = $line[$i]
+        val $c = $line[$i]
         if ($in_q) {
             if ($c eq "\"") {
                 if ($i + 1 < $n && $line[$i+1] eq "\"") {
@@ -47,8 +47,8 @@ fn CSV::parse_line($line) {
 }
 
 fn CSV::parse($text) {
-    my @rows = ()
-    for my $line (split /\n/, $text) {
+    var @rows = ()
+    for val $line (split /\n/, $text) {
         next if len($line) == 0
         push @rows, CSV::parse_line($line)
     }
@@ -56,12 +56,12 @@ fn CSV::parse($text) {
 }
 
 fn CSV::quote($field) {
-    my $needs = ($field =~ /[,"\n]/) ? 1 : 0
+    val $needs = ($field =~ /[,"\n]/) ? 1 : 0
     if ($needs) {
-        my $esc = ""
-        my $n = len $field
-        for my $i (0:$n-1) {
-            my $c = $field[$i]
+        var $esc = ""
+        val $n = len $field
+        for val $i (0:$n-1) {
+            val $c = $field[$i]
             if ($c eq "\"") { $esc = $esc . "\"\"" } else { $esc = $esc . $c }
         }
         "\"" . $esc . "\""
@@ -71,10 +71,10 @@ fn CSV::quote($field) {
 }
 
 fn CSV::serialize($rows) {
-    my @lines = ()
-    for my $row (@$rows) {
-        my @quoted = ()
-        for my $f (@$row) { push @quoted, CSV::quote($f) }
+    var @lines = ()
+    for val $row (@$rows) {
+        var @quoted = ()
+        for val $f (@$row) { push @quoted, CSV::quote($f) }
         push @lines, join(",", @quoted)
     }
     join("\n", @lines)
@@ -85,15 +85,15 @@ p " Stryke CSV Demo"
 p "═══════════════════════════════════════════════"
 p ""
 
-my $sample = "name,age,city\nAlice,30,New York\nBob,25,\"San Francisco, CA\"\n\"O\"\"Brien\",40,Boston"
+val $sample = "name,age,city\nAlice,30,New York\nBob,25,\"San Francisco, CA\"\n\"O\"\"Brien\",40,Boston"
 
 p "── Input ──────────────────────────────────────"
 p $sample
 p ""
 
-my $rows = CSV::parse($sample)
+val $rows = CSV::parse($sample)
 p "── Parsed (#{len @$rows} rows) ────────────────"
-for my $r (@$rows) {
+for val $r (@$rows) {
     p "  [" . join(" | ", @$r) . "]"
 }
 

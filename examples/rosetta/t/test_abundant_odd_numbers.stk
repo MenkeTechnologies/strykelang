@@ -2,8 +2,8 @@
 # Rosetta Code: Abundant odd numbers
 
 fn Rosetta::AbundantOdd::proper_divisor_sum($n) {
-    my $s = 1
-    my $i = 3
+    var $s = 1
+    var $i = 3
     while ($i * $i <= $n) {
         if ($n % $i == 0) {
             $s += $i
@@ -19,8 +19,8 @@ fn Rosetta::AbundantOdd::is_abundant($n) {
 }
 
 fn Rosetta::AbundantOdd::first_n($count) {
-    my @res
-    my $n = 1
+    var @res
+    var $n = 1
     while (len(@res) < $count) {
         push @res, $n if Rosetta::AbundantOdd::is_abundant($n)
         $n += 2
@@ -29,7 +29,7 @@ fn Rosetta::AbundantOdd::first_n($count) {
 }
 
 # First 5 odd abundants from OEIS A005231: 945, 1575, 2205, 2835, 3465
-my @first5 = Rosetta::AbundantOdd::first_n(5)
+val @first5 = Rosetta::AbundantOdd::first_n(5)
 assert_eq join(",", @first5), "945,1575,2205,2835,3465", "first 5 odd abundants"
 
 # Spot checks

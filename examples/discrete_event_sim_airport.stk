@@ -19,7 +19,7 @@
 fn Sim::PQ::new() = []
 
 fn Sim::PQ::push($pq, $prio, $item) {
-    my $i = 0
+    var $i = 0
     $i++ while $i < len(@$pq) && $pq->[$i]->[0] <= $prio
     splice(@$pq, $i, 0, [$prio, $item])
 }
@@ -50,18 +50,18 @@ fn Sim::Airport::init {
 }
 
 fn Sim::Airport::schedule($sim, $time, $type, $data) {
-    my %item = (%$data, type => $type)
+    val %item = (%$data, type => $type)
     Sim::PQ::push($sim->{events}, $time, \%item)
 }
 
 # ── Event Handlers ───────────────────────────────────────────────────────────
 
 fn Sim::Airport::handle_arrival($sim, $event) {
-    my $fno = $event->{plane_no}
+    val $fno = $event->{plane_no}
     p "[#{sprintf('%.2f', $sim->{time})}] Flight #{$fno} arrived."
     
     # Schedule next arrival
-    my $next_arrival = $sim->{time} + (10 + rand(20))
+    val $next_arrival = $sim->{time} + (10 + rand(20))
     Sim::Airport::schedule $sim, $next_arrival, "arrival", +{ plane_no => $fno + 1 } if $fno < 5
 
     # Request runway
@@ -71,11 +71,11 @@ fn Sim::Airport::handle_arrival($sim, $event) {
 fn Sim::Airport::request_runway($sim, $event) {
     if ($sim->{busy_runways} < $sim->{runways}) {
         $sim->{busy_runways}++
-        my $land_time = $sim->{time} + (2 + rand 3)
+        val $land_time = $sim->{time} + (2 + rand 3)
         Sim::Airport::schedule $sim, $land_time, "landed", $event
         p "  Flight #{$event->{plane_no}} cleared for landing."
     } else {
-        my %queued = (%$event, enter_q => $sim->{time})
+        val %queued = (%$event, enter_q => $sim->{time})
         push @{$sim->{runway_queue}}, \%queued
         p "  Flight #{$event->{plane_no}} entered runway queue."
     }
@@ -87,10 +87,10 @@ fn Sim::Airport::handle_landed($sim, $event) {
     
     # Process runway queue
     if (@{$sim->{runway_queue}}) {
-        my $next = shift @{$sim->{runway_queue}}
+        val $next = shift @{$sim->{runway_queue}}
         $sim->{stats}->{wait_runway} += ($sim->{time} - $next->{enter_q})
         $sim->{busy_runways}++
-        my $land_time = $sim->{time} + (2 + rand 3)
+        val $land_time = $sim->{time} + (2 + rand 3)
         Sim::Airport::schedule $sim, $land_time, "landed", $next
     }
     
@@ -101,11 +101,11 @@ fn Sim::Airport::handle_landed($sim, $event) {
 fn Sim::Airport::request_gate($sim, $event) {
     if ($sim->{busy_gates} < $sim->{gates}) {
         $sim->{busy_gates}++
-        my $stay_time = $sim->{time} + (15 + rand 30)
+        val $stay_time = $sim->{time} + (15 + rand 30)
         Sim::Airport::schedule $sim, $stay_time, "departed", $event
         p "  Flight #{$event->{plane_no}} docked at gate."
     } else {
-        my %queued = (%$event, enter_q => $sim->{time})
+        val %queued = (%$event, enter_q => $sim->{time})
         push @{$sim->{gate_queue}}, \%queued
         p "  Flight #{$event->{plane_no}} entered gate queue."
     }
@@ -118,10 +118,10 @@ fn Sim::Airport::handle_departed($sim, $event) {
     
     # Process gate queue
     if (@{$sim->{gate_queue}}) {
-        my $next = shift @{$sim->{gate_queue}}
+        val $next = shift @{$sim->{gate_queue}}
         $sim->{stats}->{wait_gate} += ($sim->{time} - $next->{enter_q})
         $sim->{busy_gates}++
-        my $stay_time = $sim->{time} + (15 + rand 30)
+        val $stay_time = $sim->{time} + (15 + rand 30)
         Sim::Airport::schedule $sim, $stay_time, "departed", $next
     }
 }
@@ -131,10 +131,10 @@ fn Sim::Airport::handle_departed($sim, $event) {
 fn Sim::Airport::run($sim) {
     Sim::Airport::schedule $sim, 0.0, "arrival", +{ plane_no => 1 }
     
-    my $prev_time = 0.0
+    var $prev_time = 0.0
     p "Starting simulation loop with #{len(@{$sim->{events}})} events..."
-    while (my $event_pair = Sim::PQ::pop $sim->{events}) {
-        my ($t, $event) = @$event_pair
+    while (val $event_pair = Sim::PQ::pop $sim->{events}) {
+        val ($t, $event) = @$event_pair
         p "Processing event #{$event->{type}} at t=#{$t}"
         
         # Accumulate utilization
@@ -144,7 +144,7 @@ fn Sim::Airport::run($sim) {
         $sim->{time} = $t
         $prev_time = $t
         
-        my $type = $event->{type}
+        val $type = $event->{type}
         if ($type eq "arrival")  { Sim::Airport::handle_arrival $sim, $event }
         elsif ($type eq "landed")   { Sim::Airport::handle_landed $sim, $event }
         elsif ($type eq "departed") { Sim::Airport::handle_departed $sim, $event }
@@ -153,8 +153,8 @@ fn Sim::Airport::run($sim) {
     # Final stats report
     p ""
     p "── Simulation Results ────────────────────────────────"
-    my $s = $sim->{stats}
-    my $total_t = $sim->{time}
+    val $s = $sim->{stats}
+    val $total_t = $sim->{time}
     
     ~> (
         "Flights completed:    #{$s->{completed}}",
@@ -168,7 +168,7 @@ fn Sim::Airport::run($sim) {
 # ── Internal Tests ───────────────────────────────────────────────────────────
 
 fn test_pq {
-    my $pq = Sim::PQ::new()
+    val $pq = Sim::PQ::new()
     Sim::PQ::push($pq, 10, "ten")
     Sim::PQ::push($pq, 5,  "five")
     Sim::PQ::push($pq, 15, "fifteen")
@@ -185,7 +185,7 @@ fn test_pq {
 
 test_pq()
 
-my $sim = Sim::Airport::init()
+val $sim = Sim::Airport::init()
 Sim::Airport::run($sim)
 
 p "Done."

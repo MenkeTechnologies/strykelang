@@ -9,17 +9,17 @@ class PriorityQueue {
     }
 
     fn push($val) {
-        my $h = $self->heap()
+        val $h = $self->heap()
         push @$h, $val
         $self->_bubble_up(len(@$h) - 1)
     }
 
     fn pop() {
-        my $h = $self->heap()
+        var $h = $self->heap()
         return undef if len(@$h) == 0
         
-        my $top = $h->[0]
-        my $last = pop @$h
+        val $top = $h->[0]
+        val $last = pop @$h
         
         if (len(@$h) > 0) {
             $h->[0] = $last
@@ -30,7 +30,7 @@ class PriorityQueue {
     }
 
     fn peek() {
-        my $h = $self->heap()
+        val $h = $self->heap()
         return len(@$h) > 0 ? $h->[0] : undef
     }
 
@@ -58,11 +58,11 @@ class PriorityQueue {
     }
 
     fn _bubble_up($idx) {
-        my $h = $self->heap()
+        var $h = $self->heap()
         while ($idx > 0) {
-            my $parent = int(($idx - 1) / 2)
+            val $parent = int(($idx - 1) / 2)
             if ($self->_greater($h->[$idx], $h->[$parent])) {
-                my $tmp = $h->[$idx]
+                val $tmp = $h->[$idx]
                 $h->[$idx] = $h->[$parent]
                 $h->[$parent] = $tmp
                 $idx = $parent
@@ -73,12 +73,12 @@ class PriorityQueue {
     }
 
     fn _bubble_down($idx) {
-        my $h = $self->heap()
-        my $len = len(@$h)
+        var $h = $self->heap()
+        val $len = len(@$h)
         while (1) {
-            my $left = 2 * $idx + 1
-            my $right = 2 * $idx + 2
-            my $largest = $idx
+            val $left = 2 * $idx + 1
+            val $right = 2 * $idx + 2
+            var $largest = $idx
             
             if ($left < $len && $self->_greater($h->[$left], $h->[$largest])) {
                 $largest = $left
@@ -88,7 +88,7 @@ class PriorityQueue {
             }
             
             if ($largest != $idx) {
-                my $tmp = $h->[$idx]
+                val $tmp = $h->[$idx]
                 $h->[$idx] = $h->[$largest]
                 $h->[$largest] = $tmp
                 $idx = $largest
@@ -105,11 +105,11 @@ fn Project::PriorityQueue::pq_new() {
 
 class MinPriorityQueue extends PriorityQueue {
     fn _bubble_up($idx) {
-        my $h = $self->heap()
+        var $h = $self->heap()
         while ($idx > 0) {
-            my $parent = int(($idx - 1) / 2)
+            val $parent = int(($idx - 1) / 2)
             if ($self->_less($h->[$idx], $h->[$parent])) {
-                my $tmp = $h->[$idx]
+                val $tmp = $h->[$idx]
                 $h->[$idx] = $h->[$parent]
                 $h->[$parent] = $tmp
                 $idx = $parent
@@ -120,12 +120,12 @@ class MinPriorityQueue extends PriorityQueue {
     }
 
     fn _bubble_down($idx) {
-        my $h = $self->heap()
-        my $len = len(@$h)
+        var $h = $self->heap()
+        val $len = len(@$h)
         while (1) {
-            my $left = 2 * $idx + 1
-            my $right = 2 * $idx + 2
-            my $smallest = $idx
+            val $left = 2 * $idx + 1
+            val $right = 2 * $idx + 2
+            var $smallest = $idx
             
             if ($left < $len && $self->_less($h->[$left], $h->[$smallest])) {
                 $smallest = $left
@@ -135,7 +135,7 @@ class MinPriorityQueue extends PriorityQueue {
             }
             
             if ($smallest != $idx) {
-                my $tmp = $h->[$idx]
+                val $tmp = $h->[$idx]
                 $h->[$idx] = $h->[$smallest]
                 $h->[$smallest] = $tmp
                 $idx = $smallest

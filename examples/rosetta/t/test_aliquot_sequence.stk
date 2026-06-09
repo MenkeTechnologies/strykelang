@@ -5,12 +5,12 @@ fn Rosetta::AliquotSequence::sum_divisors($n) {
     if ($n < 2) {
         0
     } else {
-        my $sum = 1
-        my $limit = int(sqrt($n))
-        for my $i (2:$limit) {
+        var $sum = 1
+        val $limit = int(sqrt($n))
+        for val $i (2:$limit) {
             if ($n % $i == 0) {
                 $sum += $i
-                my $j = $n / $i
+                val $j = $n / $i
                 if ($j != $i) {
                     $sum += $j
                 }
@@ -21,13 +21,13 @@ fn Rosetta::AliquotSequence::sum_divisors($n) {
 }
 
 fn Rosetta::AliquotSequence::generate($start, $max_len) {
-    my @res = ($start)
-    my $curr = $start
-    for my $i (1:$max_len-1) {
+    var @res = ($start)
+    var $curr = $start
+    for val $i (1:$max_len-1) {
         if ($curr > 0) {
-            my $next = Rosetta::AliquotSequence::sum_divisors($curr)
-            my $already_seen = 0
-            for my $j (0..len(@res)-1) {
+            var $next = Rosetta::AliquotSequence::sum_divisors($curr)
+            var $already_seen = 0
+            for val $j (0..len(@res)-1) {
                 if ($res[$j] == $next) { $already_seen = 1 }
             }
             push @res, $next
@@ -38,13 +38,13 @@ fn Rosetta::AliquotSequence::generate($start, $max_len) {
     \@res
 }
 
-my $res10 = Rosetta::AliquotSequence::generate(10, 10)
+val $res10 = Rosetta::AliquotSequence::generate(10, 10)
 assert_eq join(",", @$res10), "10,8,7,1,0", "aliquot 10"
 
-my $res11 = Rosetta::AliquotSequence::generate(11, 10)
+val $res11 = Rosetta::AliquotSequence::generate(11, 10)
 assert_eq join(",", @$res11), "11,1,0", "aliquot 11"
 
-my $res6 = Rosetta::AliquotSequence::generate(6, 10)
+val $res6 = Rosetta::AliquotSequence::generate(6, 10)
 assert_eq join(",", @$res6), "6,6", "aliquot 6 (perfect)"
 
 10 |> Rosetta::AliquotSequence::generate(5) |> map { join(",", @{_}) } |> assert_eq("10,8,7,1,0", "pipe aliquot")

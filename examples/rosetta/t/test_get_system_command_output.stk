@@ -3,20 +3,20 @@
 
 fn Rosetta::SysOut::get_uptime() {
     # Using qx{} to capture output
-    my $out = qx{uptime}
+    val $out = qx{uptime}
     $out |> trim
 }
 
 fn Rosetta::SysOut::get_echo($msg) {
     # Using pipe syntax with qx
-    my $out = qx{echo "$msg"}
+    val $out = qx{echo "$msg"}
     $out |> trim
 }
 
-my $u = Rosetta::SysOut::get_uptime()
+val $u = Rosetta::SysOut::get_uptime()
 assert_ok len($u) > 0, "Uptime output is not empty"
 
-my $e = Rosetta::SysOut::get_echo("hello world")
+val $e = Rosetta::SysOut::get_echo("hello world")
 assert_eq $e, "hello world", "Echo output matches"
 
 test_run

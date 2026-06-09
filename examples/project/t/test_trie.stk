@@ -3,7 +3,7 @@
 
 require "./lib/trie.stk"
 
-my $trie = Trie::create()
+val $trie = Trie::create()
 $trie->insert("apple")
 $trie->insert("app")
 

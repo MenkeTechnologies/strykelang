@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 fn JP::escape($s) {
-    my $out = $s
+    var $out = $s
     $out =~ s/\\/\\\\/g
     $out =~ s/"/\\"/g
     $out =~ s/\n/\\n/g
@@ -16,25 +16,25 @@ fn JP::is_num($n) {
 }
 
 fn JP::dump($v, $indent) {
-    my $pad   = "  " x $indent
-    my $inner = "  " x ($indent + 1)
+    val $pad   = "  " x $indent
+    val $inner = "  " x ($indent + 1)
     if (!defined $v) {
         return "null"
     }
-    my $r = ref($v)
+    val $r = ref($v)
     if ($r eq "ARRAY") {
         return "[]" if len(@$v) == 0
-        my @parts = ()
-        for my $x (@$v) {
+        var @parts = ()
+        for val $x (@$v) {
             push @parts, $inner . JP::dump($x, $indent + 1)
         }
         return "[\n" . join(",\n", @parts) . "\n" . $pad . "]"
     }
     if ($r eq "HASH") {
-        my @ks = sort keys %$v
+        val @ks = sort keys %$v
         return "{}" if len(@ks) == 0
-        my @parts = ()
-        for my $k (@ks) {
+        var @parts = ()
+        for val $k (@ks) {
             push @parts, $inner . '"' . JP::escape($k) . '": ' . JP::dump($v->{$k}, $indent + 1)
         }
         return "{\n" . join(",\n", @parts) . "\n" . $pad . "}"
@@ -71,19 +71,19 @@ JP::pretty(+{ a => 1, b => 2 }) |> aeq "{\n  \"a\": 1,\n  \"b\": 2\n}", "flat ha
 JP::pretty(+{ k => "v" }) |> aeq "{\n  \"k\": \"v\"\n}", "string value"
 
 # Mixed nested
-my $nested = +{ name => "Bob", nums => [10, 20] }
+val $nested = +{ name => "Bob", nums => [10, 20] }
 JP::pretty($nested)
     |> aeq "{\n  \"name\": \"Bob\",\n  \"nums\": [\n    10,\n    20\n  ]\n}",
        "nested mixed"
 
 # Deep nest
-my $deep = +{ a => +{ b => +{ c => "x" } } }
+val $deep = +{ a => +{ b => +{ c => "x" } } }
 JP::pretty($deep)
     |> aeq "{\n  \"a\": {\n    \"b\": {\n      \"c\": \"x\"\n    }\n  }\n}",
        "deeply nested hashes"
 
 # Array of hashes
-my $aoh = [+{ id => 1 }, +{ id => 2 }]
+val $aoh = [+{ id => 1 }, +{ id => 2 }]
 JP::pretty($aoh)
     |> aeq "[\n  {\n    \"id\": 1\n  },\n  {\n    \"id\": 2\n  }\n]",
        "array of hashes"

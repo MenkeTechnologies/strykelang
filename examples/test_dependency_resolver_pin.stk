@@ -9,8 +9,8 @@ fn DR::_visit($graph, $node, $order, $seen, $active) {
         die "cycle through " . $node
     }
     $active->{$node} = 1
-    my $deps = $graph->{$node} // []
-    for my $d (@$deps) {
+    val $deps = $graph->{$node} // []
+    for val $d (@$deps) {
         DR::_visit($graph, $d, $order, $seen, $active)
     }
     $active->{$node} = 0
@@ -19,49 +19,49 @@ fn DR::_visit($graph, $node, $order, $seen, $active) {
 }
 
 fn DR::resolve($graph, $pkg) {
-    my @order  = ()
-    my %seen   = ()
-    my %active = ()
+    val @order  = ()
+    val %seen   = ()
+    val %active = ()
     DR::_visit($graph, $pkg, \@order, \%seen, \%active)
     \@order
 }
 
 fn DR::resolve_all($graph, $roots) {
-    my @order  = ()
-    my %seen   = ()
-    my %active = ()
-    for my $r (@$roots) {
+    val @order  = ()
+    val %seen   = ()
+    val %active = ()
+    for val $r (@$roots) {
         DR::_visit($graph, $r, \@order, \%seen, \%active)
     }
     \@order
 }
 
 fn DR::transitive($graph, $pkg) {
-    my $order = DR::resolve($graph, $pkg)
-    my @out = ()
-    for my $n (@$order) {
+    val $order = DR::resolve($graph, $pkg)
+    var @out = ()
+    for val $n (@$order) {
         push @out, $n unless $n eq $pkg
     }
     \@out
 }
 
 # Single package, no deps
-my $g0 = +{ a => [] }
-my $r0 = DR::resolve($g0, "a")
+val $g0 = +{ a => [] }
+val $r0 = DR::resolve($g0, "a")
 join(",", @$r0) |> aeq "a", "single pkg"
 
 # Linear chain a -> b -> c
-my $g1 = +{ a => ["b"], b => ["c"], c => [] }
+val $g1 = +{ a => ["b"], b => ["c"], c => [] }
 join(",", @{DR::resolve($g1, "a")}) |> aeq "c,b,a", "linear chain"
 
 # Diamond
-my $g2 = +{
+val $g2 = +{
     app    => ["web", "db"],
     web    => ["common"],
     db     => ["common"],
     common => [],
 }
-my $r2 = DR::resolve($g2, "app")
+val $r2 = DR::resolve($g2, "app")
 len(@$r2) |> aeq 4, "diamond 4 nodes"
 $r2->[len(@$r2)-1] |> aeq "app", "app last"
 $r2->[0] |> aeq "common", "common first"
@@ -70,7 +70,7 @@ $r2->[0] |> aeq "common", "common first"
 join(",", @{DR::transitive($g2, "app")}) |> aeq "common,web,db", "transitive"
 
 # Realistic graph - install order respects deps
-my $g3 = +{
+val $g3 = +{
     app    => ["web", "db", "logger"],
     web    => ["http", "logger"],
     db     => ["pool", "logger"],
@@ -79,11 +79,11 @@ my $g3 = +{
     socket => [],
     logger => [],
 }
-my $r3 = DR::resolve($g3, "app")
+val $r3 = DR::resolve($g3, "app")
 len(@$r3) |> aeq 7, "7 distinct"
-my %pos = ()
-my $idx = 0
-for my $n (@$r3) { $pos{$n} = $idx; $idx = $idx + 1 }
+var %pos = ()
+var $idx = 0
+for val $n (@$r3) { $pos{$n} = $idx; $idx = $idx + 1 }
 ($pos{"socket"} < $pos{"http"} ? 1 : 0) |> aeq 1, "socket before http"
 ($pos{"socket"} < $pos{"pool"} ? 1 : 0) |> aeq 1, "socket before pool"
 ($pos{"http"}   < $pos{"web"}  ? 1 : 0) |> aeq 1, "http before web"
@@ -94,8 +94,8 @@ for my $n (@$r3) { $pos{$n} = $idx; $idx = $idx + 1 }
 ($pos{"db"}     < $pos{"app"}  ? 1 : 0) |> aeq 1, "db before app"
 
 # Cycle detection
-my $cyc = +{ a => ["b"], b => ["c"], c => ["a"] }
-my $caught = 0
+val $cyc = +{ a => ["b"], b => ["c"], c => ["a"] }
+var $caught = 0
 try {
     DR::resolve($cyc, "a")
 } catch ($e) {
@@ -104,28 +104,28 @@ try {
 $caught |> aeq 1, "cycle detected"
 
 # Self-loop cycle
-my $self_loop = +{ x => ["x"] }
-my $caught2 = 0
+val $self_loop = +{ x => ["x"] }
+var $caught2 = 0
 try { DR::resolve($self_loop, "x") } catch ($e) { $caught2 = 1 }
 $caught2 |> aeq 1, "self-loop detected"
 
 # resolve_all with multiple roots, common deps not duplicated
-my $g4 = +{
+val $g4 = +{
     "tool-a" => ["lib"],
     "tool-b" => ["lib"],
     lib      => [],
 }
-my $ra = DR::resolve_all($g4, ["tool-a", "tool-b"])
+val $ra = DR::resolve_all($g4, ["tool-a", "tool-b"])
 len(@$ra) |> aeq 3, "no dup lib"
 $ra->[0] |> aeq "lib", "lib first"
 
 # Missing dep (not in graph) is treated as leaf
-my $g5 = +{ a => ["b"] }
-my $r5 = DR::resolve($g5, "a")
+val $g5 = +{ a => ["b"] }
+val $r5 = DR::resolve($g5, "a")
 join(",", @$r5) |> aeq "b,a", "missing dep as leaf"
 
 # Empty roots gives empty order
-my $rempty = DR::resolve_all(+{}, [])
+val $rempty = DR::resolve_all(+{}, [])
 len(@$rempty) |> aeq 0, "empty roots"
 
 test_run

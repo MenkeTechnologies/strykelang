@@ -3,18 +3,18 @@
 # Skip multiples of 2, 3, 5 by stepping through residues coprime to 30.
 
 fn Rosetta::Wheel::factor($n) {
-    my @factors
+    var @factors
     return \@factors if $n < 2
-    my @small = (2, 3, 5)
-    for my $p (@small) {
+    val @small = (2, 3, 5)
+    for val $p (@small) {
         while ($n % $p == 0) {
             push @factors, $p
             $n = int($n / $p)
         }
     }
-    my @increments = (4, 2, 4, 2, 4, 6, 2, 6)
-    my $k = 7
-    my $idx = 0
+    val @increments = (4, 2, 4, 2, 4, 6, 2, 6)
+    var $k = 7
+    var $idx = 0
     while ($k * $k <= $n) {
         while ($n % $k == 0) {
             push @factors, $k
@@ -44,18 +44,18 @@ assert_eq len(@{Rosetta::Wheel::factor(0)}), 0, "0 -> empty"
 assert_eq len(@{Rosetta::Wheel::factor(1)}), 0, "1 -> empty"
 
 # Recompose check
-for my $n (12, 100, 999, 12345, 65536, 1000000) {
-    my $factors = Rosetta::Wheel::factor($n)
-    my $prod = 1
-    for my $f (@$factors) { $prod *= $f }
+for val $n (12, 100, 999, 12345, 65536, 1000000) {
+    val $factors = Rosetta::Wheel::factor($n)
+    var $prod = 1
+    for val $f (@$factors) { $prod *= $f }
     assert_eq $prod, $n, "factor product = $n"
 }
 
 # All factors are prime
-my $f = Rosetta::Wheel::factor(123456)
-for my $p (@$f) {
-    my $is_prime = 1
-    for my $d (2..int(sqrt($p))) {
+val $f = Rosetta::Wheel::factor(123456)
+for val $p (@$f) {
+    var $is_prime = 1
+    for val $d (2..int(sqrt($p))) {
         if ($p % $d == 0) { $is_prime = 0; last }
     }
     assert_ok $is_prime, "factor $p of 123456 is prime"

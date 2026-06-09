@@ -28,36 +28,36 @@ fn Sim::simpson($f, $left, $right, $fl, $fm, $fr) {
 # ── recursive adaptive Simpson with depth limit ──────────────────
 
 fn Sim::recurse($f, $left, $right, $eps, $S, $fl, $fm, $fr, $depth, $max_depth) {
-    my $mid = ($left + $right) / 2.0
-    my $fa = $f->(($left + $mid) / 2.0)
-    my $fb = $f->(($mid + $right) / 2.0)
-    my $S_left  = Sim::simpson($f, $left, $mid, $fl, $fa, $fm)
-    my $S_right = Sim::simpson($f, $mid, $right, $fm, $fb, $fr)
-    my $delta   = $S_left + $S_right - $S
+    val $mid = ($left + $right) / 2.0
+    val $fa = $f->(($left + $mid) / 2.0)
+    val $fb = $f->(($mid + $right) / 2.0)
+    val $S_left  = Sim::simpson($f, $left, $mid, $fl, $fa, $fm)
+    val $S_right = Sim::simpson($f, $mid, $right, $fm, $fb, $fr)
+    val $delta   = $S_left + $S_right - $S
     if ($depth >= $max_depth || Sim::fabs($delta) <= 15.0 * $eps) {
         return $S_left + $S_right + $delta / 15.0
     }
-    my $left_int  = Sim::recurse($f, $left, $mid, $eps / 2.0, $S_left, $fl, $fa, $fm, $depth + 1, $max_depth)
-    my $right_int = Sim::recurse($f, $mid, $right, $eps / 2.0, $S_right, $fm, $fb, $fr, $depth + 1, $max_depth)
+    val $left_int  = Sim::recurse($f, $left, $mid, $eps / 2.0, $S_left, $fl, $fa, $fm, $depth + 1, $max_depth)
+    val $right_int = Sim::recurse($f, $mid, $right, $eps / 2.0, $S_right, $fm, $fb, $fr, $depth + 1, $max_depth)
     $left_int + $right_int
 }
 
 # ── entry point ─────────────────────────────────────────────────
 
 fn Sim::integrate($f, $left, $right, $eps, $max_depth) {
-    my $fl = $f->($left)
-    my $fr = $f->($right)
-    my $fm = $f->(($left + $right) / 2.0)
-    my $S = Sim::simpson($f, $left, $right, $fl, $fm, $fr)
+    val $fl = $f->($left)
+    val $fr = $f->($right)
+    val $fm = $f->(($left + $right) / 2.0)
+    val $S = Sim::simpson($f, $left, $right, $fl, $fm, $fr)
     Sim::recurse($f, $left, $right, $eps, $S, $fl, $fm, $fr, 0, $max_depth)
 }
 
 # ── trapezoidal rule (reference for accuracy comparison) ─────────
 
 fn Sim::trapezoid($f, $left, $right, $n) {
-    my $h = ($right - $left) / $n
-    my $sum = 0.5 * ($f->($left) + $f->($right))
-    for my $i (1:$n - 1) {
+    val $h = ($right - $left) / $n
+    var $sum = 0.5 * ($f->($left) + $f->($right))
+    for val $i (1:$n - 1) {
         $sum += $f->($left + $i * $h)
     }
     $sum * $h
@@ -73,7 +73,7 @@ fn Sim::f_recip($x)   { 1.0 / $x }                                          # �
 fn Sim::f_quarter($x) { 4.0 / (1.0 + $x * $x) }                            # ∫₀^1 = π
 fn Sim::f_sharp($x)   { 1.0 / (0.01 + ($x - 0.5) * ($x - 0.5)) }           # peaked at 0.5
 
-my @cases = (
+val @cases = (
     +{
         name  => "cubic polynomial",
         f     => \&Sim::f_poly,
@@ -93,70 +93,70 @@ my @cases = (
 p "── adaptive-Simpson integration demo ─────────────────"
 printf "  %-28s  %14s  %14s  %s\n", "case", "Simpson", "exact", "err"
 printf "  %-28s  %14s  %14s  %s\n", "----------------------------", "--------------", "--------------", "---"
-for my $c (@cases) {
-    my $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
-    my $err = Sim::fabs($est - $c->{exact})
+for val $c (@cases) {
+    val $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
+    val $err = Sim::fabs($est - $c->{exact})
     printf "  %-28s  %14.10f  %14.10f  %10.2e\n", $c->{name}, $est, $c->{exact}, $err
 }
 
 # ── invariant 1: every estimate is within 1e-8 of the closed form ──
 
-for my $c (@cases) {
-    my $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
-    my $err = Sim::fabs($est - $c->{exact})
+for val $c (@cases) {
+    val $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
+    val $err = Sim::fabs($est - $c->{exact})
     die "Simpson err #{$err} > 1e-8 on \"#{$c->{name}}\"" unless $err < 1e-8
 }
 
 # ── invariant 2: Simpson is strictly more accurate than trapezoid ──
 
-for my $c (@cases) {
-    my $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
-    my $tr  = Sim::trapezoid($c->{f}, $c->{left}, $c->{right}, 16)
-    my $s_err = Sim::fabs($est - $c->{exact})
-    my $t_err = Sim::fabs($tr  - $c->{exact})
+for val $c (@cases) {
+    val $est = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
+    val $tr  = Sim::trapezoid($c->{f}, $c->{left}, $c->{right}, 16)
+    val $s_err = Sim::fabs($est - $c->{exact})
+    val $t_err = Sim::fabs($tr  - $c->{exact})
     die "Simpson #{$s_err} ≥ trapezoid #{$t_err} on \"#{$c->{name}}\"" unless $s_err <= $t_err
 }
 
 # ── invariant 3: identity ∫ₐᵇ f = ∫ₐᶜ f + ∫꜀ᵇ f for c ∈ (a, b) ────
 
-for my $c (@cases) {
-    my $whole = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
-    my $mid = ($c->{left} + $c->{right}) / 2.0
-    my $left_part  = Sim::integrate($c->{f}, $c->{left}, $mid,   1e-12, 30)
-    my $right_part = Sim::integrate($c->{f}, $mid, $c->{right}, 1e-12, 30)
-    my $err = Sim::fabs($whole - ($left_part + $right_part))
+for val $c (@cases) {
+    val $whole = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
+    val $mid = ($c->{left} + $c->{right}) / 2.0
+    val $left_part  = Sim::integrate($c->{f}, $c->{left}, $mid,   1e-12, 30)
+    val $right_part = Sim::integrate($c->{f}, $mid, $c->{right}, 1e-12, 30)
+    val $err = Sim::fabs($whole - ($left_part + $right_part))
     die "additivity broken on \"#{$c->{name}}\": diff #{$err}" unless $err < 1e-8
 }
 
 # ── invariant 4: ∫ₐᵃ f = 0 ─────────────────────────────────────────
 
-for my $c (@cases) {
-    my $val = Sim::integrate($c->{f}, $c->{left}, $c->{left}, 1e-12, 30)
+for val $c (@cases) {
+    val $val = Sim::integrate($c->{f}, $c->{left}, $c->{left}, 1e-12, 30)
     die "∫ over zero-width interval = #{$val} on \"#{$c->{name}}\"" unless Sim::fabs($val) < 1e-12
 }
 
 # ── invariant 5: ∫ₐᵇ f = −∫ᵇₐ f ────────────────────────────────────
 
-for my $c (@cases) {
-    my $fwd = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
-    my $rev = Sim::integrate($c->{f}, $c->{right}, $c->{left}, 1e-12, 30)
+for val $c (@cases) {
+    val $fwd = Sim::integrate($c->{f}, $c->{left}, $c->{right}, 1e-12, 30)
+    val $rev = Sim::integrate($c->{f}, $c->{right}, $c->{left}, 1e-12, 30)
     die "∫ a→b ≠ −∫ b→a on \"#{$c->{name}}\"" unless Sim::fabs($fwd + $rev) < 1e-8
 }
 
 # ── invariant 6: ∫(c · f) = c · ∫ f (scalar linearity) ─────────────
 
 fn Sim::scaled_sin($x) { 7.5 * sin($x) }
-my $scaled = Sim::integrate(\&Sim::scaled_sin, 0.0, 3.14159265358979, 1e-12, 30)
+val $scaled = Sim::integrate(\&Sim::scaled_sin, 0.0, 3.14159265358979, 1e-12, 30)
 die "scalar linearity broken: #{$scaled} vs #{7.5 * 2.0}" unless Sim::fabs($scaled - 7.5 * 2.0) < 1e-8
 
 # ── invariant 7: a peaked function still converges (adaptive ─────
 # splits the high-curvature region).
 
-my $sharp = Sim::integrate(\&Sim::f_sharp, 0.0, 1.0, 1e-10, 50)
+val $sharp = Sim::integrate(\&Sim::f_sharp, 0.0, 1.0, 1e-10, 50)
 # True value: arctan((1 - 0.5)/0.1) − arctan((0 - 0.5)/0.1) ≈ 2.940
 # scaled by 1/0.1 ÷ 1 ... actually the function is 1/(0.01 + (x-0.5)²),
 # its antiderivative is (1/0.1) · arctan((x − 0.5) / 0.1).
-my $sharp_exact = (1.0 / 0.1) * (atan2(0.5 / 0.1, 1.0) - atan2(-0.5 / 0.1, 1.0))
+val $sharp_exact = (1.0 / 0.1) * (atan2(0.5 / 0.1, 1.0) - atan2(-0.5 / 0.1, 1.0))
 die "peaked-fn err #{Sim::fabs($sharp - $sharp_exact)} > 1e-4" unless Sim::fabs($sharp - $sharp_exact) < 1e-4
 
 p ""

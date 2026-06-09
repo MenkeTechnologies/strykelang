@@ -6,11 +6,11 @@
 p "--- Math ---"
 
 # 1. Infinite Lazy Sequence — iterate → greps → head → collect
-my @res = ~> iterate({ _ * 2 }, 1) greps { _ =~ /6$/ } head(5) collect
+val @res = ~> iterate({ _ * 2 }, 1) greps { _ =~ /6$/ } head(5) collect
 p "Powers of 2 ending in 6: @res"
 
 # 2. Parallel probabilistic search
-my @p = ~> (1e6 : 1e6+1000) pgreps { is_prime _ } collect
+val @p = ~> (1e6 : 1e6+1000) pgreps { is_prime _ } collect
 p "Found #{len @p} primes."
 
 # 3. Tests

@@ -19,18 +19,18 @@
 # ── encoder ────────────────────────────────────────────────────────
 
 fn LZW::encode($input) {
-    my %dict
-    for my $i (0:255) {
+    var %dict
+    for val $i (0:255) {
         $dict{chr($i)} = $i
     }
-    my $next = 256
-    my @out
-    my $w = ""
-    my $n = len($input)
+    var $next = 256
+    var @out
+    var $w = ""
+    val $n = len($input)
     return \@out if $n == 0
-    for my $i (0:$n - 1) {
-        my $c = substr($input, $i, 1)
-        my $wc = $w . $c
+    for val $i (0:$n - 1) {
+        val $c = substr($input, $i, 1)
+        val $wc = $w . $c
         if (exists $dict{$wc}) {
             $w = $wc
         } else {
@@ -47,19 +47,19 @@ fn LZW::encode($input) {
 # ── decoder ────────────────────────────────────────────────────────
 
 fn LZW::decode($codes) {
-    my @dict
-    for my $i (0:255) {
+    var @dict
+    for val $i (0:255) {
         push @dict, chr($i)
     }
-    my $n = len(@$codes)
+    val $n = len(@$codes)
     return "" if $n == 0
-    my $first = $codes->[0]
+    val $first = $codes->[0]
     die "first LZW code out of dict range: #{$first}" unless $first < 256
-    my $w = $dict[$first]
-    my $out = $w
-    for my $i (1:$n - 1) {
-        my $k = $codes->[$i]
-        my $entry
+    var $w = $dict[$first]
+    var $out = $w
+    for val $i (1:$n - 1) {
+        val $k = $codes->[$i]
+        var $entry
         if ($k < len(@dict)) {
             $entry = $dict[$k]
         } elsif ($k == len(@dict)) {
@@ -77,7 +77,7 @@ fn LZW::decode($codes) {
 
 # ── corpus ────────────────────────────────────────────────────────
 
-my @corpus = (
+val @corpus = (
     "TOBEORNOTTOBEORTOBEORNOT",
     "ABABABABABABAB",
     "abracadabra abracadabra abracadabra",
@@ -96,20 +96,20 @@ printf "  %-44s  %5s  %5s  %5s\n",
     "------------------------------------",
     "-----", "-----", "-----"
 
-my $fail = 0
-my $total_in = 0
-my $total_codes = 0
-for my $msg (@corpus) {
-    my $codes = LZW::encode($msg)
-    my $back  = LZW::decode($codes)
-    my $in_n  = len($msg)
-    my $out_n = len(@$codes)
-    my $ratio = $in_n == 0 ? 0 : $out_n / $in_n
-    my $ok    = $back eq $msg
+var $fail = 0
+var $total_in = 0
+var $total_codes = 0
+for val $msg (@corpus) {
+    val $codes = LZW::encode($msg)
+    val $back  = LZW::decode($codes)
+    val $in_n  = len($msg)
+    val $out_n = len(@$codes)
+    val $ratio = $in_n == 0 ? 0 : $out_n / $in_n
+    val $ok    = $back eq $msg
     $fail++ unless $ok
     $total_in    += $in_n
     $total_codes += $out_n
-    my $shown = len($msg) > 42 ? substr($msg, 0, 42) . ".." : $msg
+    val $shown = len($msg) > 42 ? substr($msg, 0, 42) . ".." : $msg
     printf "  %-44s  %5d  %5d  %5.2f  %s\n",
         "\"" . $shown . "\"", $in_n, $out_n, $ratio,
         $ok ? "" : "FAIL"
@@ -121,17 +121,17 @@ printf "  total out: %d codes\n", $total_codes
 
 # ── invariant 1: each input round-trips exactly ────────────────────
 
-for my $msg (@corpus) {
-    my $codes = LZW::encode($msg)
-    my $back  = LZW::decode($codes)
+for val $msg (@corpus) {
+    val $codes = LZW::encode($msg)
+    val $back  = LZW::decode($codes)
     die "round-trip mismatch on \"#{$msg}\"" unless $back eq $msg
 }
 
 # ── invariant 2: encoded code count is ≤ input length + 1 ──────────
 # (LZW can at worst emit one code per byte for purely random data.)
 
-for my $msg (@corpus) {
-    my $codes = LZW::encode($msg)
+for val $msg (@corpus) {
+    val $codes = LZW::encode($msg)
     die "code count exceeds input length+1 for \"#{$msg}\"" unless len(@$codes) <= len($msg) + 1
 }
 
@@ -139,10 +139,10 @@ for my $msg (@corpus) {
 # i.e. no code can reference a dictionary entry that hasn't been
 # defined yet on the encoder side (each emission grows the dict by 1).
 
-for my $msg (@corpus) {
-    my $codes = LZW::encode($msg)
-    my $allowed = 256
-    for my $c (@$codes) {
+for val $msg (@corpus) {
+    val $codes = LZW::encode($msg)
+    var $allowed = 256
+    for val $c (@$codes) {
         die "code #{$c} >= dict size #{$allowed} at emit time" unless $c < $allowed
         $allowed++   # encoder adds one entry per emission
     }
@@ -150,8 +150,8 @@ for my $msg (@corpus) {
 
 # ── invariant 4: highly-repetitive input compresses (ratio < 1) ────
 
-my $abab = "ABABABABABABABABABABABABABABAB"
-my $abab_codes = LZW::encode($abab)
+val $abab = "ABABABABABABABABABABABABABABAB"
+val $abab_codes = LZW::encode($abab)
 die "ABAB-pattern must compress to < 1 ratio, got #{len(@$abab_codes) / len($abab)}" unless len(@$abab_codes) / len($abab) < 0.6
 
 # ── invariant 5: the classic kRk edge case ─────────────────────────
@@ -159,21 +159,21 @@ die "ABAB-pattern must compress to < 1 ratio, got #{len(@$abab_codes) / len($aba
 # (the second occurrence of "TOBEOR" extends through a code emitted
 # during its own definition). The decoder MUST reconstruct correctly.
 
-my $tobe = "TOBEORNOTTOBEORTOBEORNOT#"
-my $tobe_codes = LZW::encode($tobe)
-my $tobe_back  = LZW::decode($tobe_codes)
+val $tobe = "TOBEORNOTTOBEORTOBEORNOT#"
+val $tobe_codes = LZW::encode($tobe)
+val $tobe_back  = LZW::decode($tobe_codes)
 die "TOBE round-trip failed: \"#{$tobe_back}\"" unless $tobe_back eq $tobe
 
 # ── invariant 6: empty input → empty codes → empty output ──────────
 
-my $empty_codes = LZW::encode("")
+val $empty_codes = LZW::encode("")
 die "empty input must yield empty code list" unless len(@$empty_codes) == 0
-my $empty_back = LZW::decode($empty_codes)
+val $empty_back = LZW::decode($empty_codes)
 die "empty codes must yield empty string" unless $empty_back eq ""
 
 # ── invariant 7: single-character input → exactly 1 code ──────────
 
-my $one_codes = LZW::encode("X")
+val $one_codes = LZW::encode("X")
 die "1-char input must yield exactly 1 code, got #{len(@$one_codes)}" unless len(@$one_codes) == 1
 die "1-char code must equal ord('X')" unless $one_codes->[0] == ord("X")
 

@@ -12,7 +12,7 @@
 
 # ── schema ──────────────────────────────────────────────────────────
 
-my @schema = (
+val @schema = (
     +{ name => "id",       type => "int",    required => 1, range => [1, 999999] },
     +{ name => "email",    type => "regex",  required => 1, pattern => "^[^@]+\\\@[^@]+\\.[a-z]+\$" },
     +{ name => "age",      type => "int",    required => 1, range => [0, 150] },
@@ -22,8 +22,8 @@ my @schema = (
 
 printf "── schema: %d columns ─────────────────────────────────\n",
     len @schema
-for my $col (@schema) {
-    my $extra = ""
+for val $col (@schema) {
+    var $extra = ""
     if (exists $col->{range}) {
         $extra = sprintf(" range=[%s..%s]", $col->{range}->[0], $col->{range}->[1])
     } elsif (exists $col->{pattern}) {
@@ -37,7 +37,7 @@ for my $col (@schema) {
 
 # ── sample CSV data (raw text) ─────────────────────────────────────
 
-my $csv_text = q{id,email,age,score,status
+val $csv_text = q{id,email,age,score,status
 1,alice\@example.com,30,85.5,active
 2,bob\@corp.io,28,,pending
 3,invalid-email,25,75,active
@@ -53,7 +53,7 @@ my $csv_text = q{id,email,age,score,status
 # ── validation logic ───────────────────────────────────────────────
 
 mysync @errors
-my $td_lat = t_digest(100)
+val $td_lat = t_digest(100)
 
 fn Demo::CV::is_int($s) {
     return 0 unless defined $s
@@ -66,8 +66,8 @@ fn Demo::CV::is_float($s) {
 }
 
 fn Demo::CV::validate_field($value, $col, $row_idx) {
-    my $name = $col->{name}
-    my $type = $col->{type}
+    val $name = $col->{name}
+    val $type = $col->{type}
     # Required check.
     if ($col->{required} && (!defined($value) || len($value) == 0)) {
         push @errors, +{
@@ -87,7 +87,7 @@ fn Demo::CV::validate_field($value, $col, $row_idx) {
             return 0
         }
         if (exists $col->{range}) {
-            my $n = $value + 0
+            val $n = $value + 0
             if ($n < $col->{range}->[0] || $n > $col->{range}->[1]) {
                 push @errors, +{
                     row => $row_idx, field => $name, kind => "out_of_range",
@@ -105,7 +105,7 @@ fn Demo::CV::validate_field($value, $col, $row_idx) {
             return 0
         }
         if (exists $col->{range}) {
-            my $n = $value + 0.0
+            val $n = $value + 0.0
             if ($n < $col->{range}->[0] || $n > $col->{range}->[1]) {
                 push @errors, +{
                     row => $row_idx, field => $name, kind => "out_of_range",
@@ -127,8 +127,8 @@ fn Demo::CV::validate_field($value, $col, $row_idx) {
             }
         }
     } elsif ($type eq "enum") {
-        my $found = 0
-        for my $allowed (@{$col->{allowed}}) {
+        var $found = 0
+        for val $allowed (@{$col->{allowed}}) {
             $found = 1 if $value eq $allowed
         }
         if (!$found) {
@@ -143,12 +143,12 @@ fn Demo::CV::validate_field($value, $col, $row_idx) {
 }
 
 fn Demo::CV::validate_row($fields, $row_idx) {
-    my $t0 = now_ns()
-    my $all_ok = 1
-    for my $col_idx (0:len(@schema) - 1) {
-        my $col = $schema[$col_idx]
-        my $value = $fields->[$col_idx]
-        my $ok = Demo::CV::validate_field($value, $col, $row_idx)
+    val $t0 = now_ns()
+    var $all_ok = 1
+    for val $col_idx (0:len(@schema) - 1) {
+        val $col = $schema[$col_idx]
+        val $value = $fields->[$col_idx]
+        val $ok = Demo::CV::validate_field($value, $col, $row_idx)
         $all_ok = 0 if !$ok
     }
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
@@ -157,18 +157,18 @@ fn Demo::CV::validate_row($fields, $row_idx) {
 
 # ── parse + validate ───────────────────────────────────────────────
 
-my @lines = split /\n/, $csv_text
+var @lines = split /\n/, $csv_text
 @lines = grep { len(_) > 0 } @lines
-my $header = shift @lines
+val $header = shift @lines
 
 printf "\n── validating %d data rows ─────────────────────────────\n",
     len @lines
 
-my $valid = 0
-my $invalid = 0
-for my $i (0:len(@lines) - 1) {
-    my @fields = split /,/, $lines[$i]
-    my $ok = Demo::CV::validate_row(\@fields, $i + 2)   # +2 since header is row 1
+var $valid = 0
+var $invalid = 0
+for val $i (0:len(@lines) - 1) {
+    val @fields = split /,/, $lines[$i]
+    val $ok = Demo::CV::validate_row(\@fields, $i + 2)   # +2 since header is row 1
     if ($ok) {
         $valid++
     } else {
@@ -180,7 +180,7 @@ for my $i (0:len(@lines) - 1) {
 
 p ""
 p "── error report ─────────────────────────────────────"
-for my $e (@errors) {
+for val $e (@errors) {
     printf "  row=%2d  field=%-8s  kind=%-18s  value=%s\n",
         $e->{row}, $e->{field}, $e->{kind}, $e->{value}
 }
@@ -193,9 +193,9 @@ printf "── summary: %d valid, %d invalid (%d total errors) ──\n",
 
 p ""
 p "── error-kind rollup ────────────────────────────────"
-my %kinds
+var %kinds
 $kinds{_->{kind}}++ for @errors
-for my $k (sort { $kinds{_1} <=> $kinds{_} } keys %kinds) {
+for val $k (sort { $kinds{_1} <=> $kinds{_} } keys %kinds) {
     printf "  %-20s : %d\n", $k, $kinds{$k}
 }
 
@@ -203,12 +203,12 @@ for my $k (sort { $kinds{_1} <=> $kinds{_} } keys %kinds) {
 
 p ""
 p "── rows with most errors (TopK) ─────────────────────"
-my $tk = topk(3)
-for my $e (@errors) {
+val $tk = topk(3)
+for val $e (@errors) {
     topk_add($tk, "row_" . $e->{row})
 }
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-10s : %d errors\n", $h->[0], $h->[1]
 }
 
@@ -216,10 +216,10 @@ for my $h (@hits) {
 
 p ""
 p "── per-field error counts ───────────────────────────"
-my %by_field
+var %by_field
 $by_field{_->{field}}++ for @errors
-for my $col (@schema) {
-    my $n = $by_field{$col->{name}} // 0
+for val $col (@schema) {
+    val $n = $by_field{$col->{name}} // 0
     printf "  %-12s : %d\n", $col->{name}, $n
 }
 
@@ -227,7 +227,7 @@ for my $col (@schema) {
 
 p ""
 p "── HLL distinct error kinds ─────────────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _->{kind}) for @errors
 printf "  HLL distinct kinds : %d\n", hll_count($hll)
 printf "  exact distinct     : %d\n", len(keys %kinds)

@@ -5,27 +5,27 @@
 # from solar noon):  tan(H_t) = sin(φ) · tan(15° · t)
 
 fn Rosetta::Sundial::hour_angle($lat_deg, $hour_offset) {
-    my $pi = 4 * atan2(1, 1)
-    my $lat = $lat_deg * $pi / 180
-    my $t   = 15 * $hour_offset * $pi / 180
-    my $h   = atan2(sin($lat) * sin($t), cos($t))
+    val $pi = 4 * atan2(1, 1)
+    val $lat = $lat_deg * $pi / 180
+    val $t   = 15 * $hour_offset * $pi / 180
+    val $h   = atan2(sin($lat) * sin($t), cos($t))
     $h * 180 / $pi
 }
 
 fn Rosetta::Sundial::hour_lines($lat_deg) {
-    my @lines
-    for my $h (-6:6) {
+    var @lines
+    for val $h (-6:6) {
         push @lines, [$h, Rosetta::Sundial::hour_angle($lat_deg, $h)]
     }
     \@lines
 }
 
 # At equator (φ = 0): every hour line collapses onto noon (sin(0) = 0).
-my $eq = Rosetta::Sundial::hour_angle(0, 3)
+val $eq = Rosetta::Sundial::hour_angle(0, 3)
 assert_near $eq, 0, 1e-9, "equator: hour angle = 0"
 
 # At noon (t = 0): hour angle is always 0 regardless of latitude.
-for my $lat (0, 30, 45, 60, 80) {
+for val $lat (0, 30, 45, 60, 80) {
     assert_near Rosetta::Sundial::hour_angle($lat, 0), 0, 1e-9,
         sprintf("noon at lat %d°", $lat)
 }
@@ -36,10 +36,10 @@ assert_near Rosetta::Sundial::hour_angle(90, 3),  45, 1e-9, "pole 3h = 45°"
 assert_near Rosetta::Sundial::hour_angle(90, -2), -30, 1e-9, "pole -2h = -30°"
 
 # Symmetry: H(-t) = -H(t)
-for my $lat (10, 30, 60) {
-    for my $t (1, 2, 3, 4) {
-        my $a = Rosetta::Sundial::hour_angle($lat, $t)
-        my $b = Rosetta::Sundial::hour_angle($lat, -$t)
+for val $lat (10, 30, 60) {
+    for val $t (1, 2, 3, 4) {
+        val $a = Rosetta::Sundial::hour_angle($lat, $t)
+        val $b = Rosetta::Sundial::hour_angle($lat, -$t)
         assert_near $a, -$b, 1e-9,
             sprintf("symmetry lat=%d°, t=%d", $lat, $t)
     }
@@ -51,7 +51,7 @@ assert_near Rosetta::Sundial::hour_angle(51.4778, 3), 38.04, 0.05,
     "Greenwich 3PM ≈ 38°"
 
 # 13 hour lines from -6h..+6h
-my $lines = Rosetta::Sundial::hour_lines(45)
+val $lines = Rosetta::Sundial::hour_lines(45)
 assert_eq len(@$lines), 13, "13 hour lines"
 
 # Pipe form

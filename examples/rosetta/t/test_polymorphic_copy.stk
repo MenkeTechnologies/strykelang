@@ -41,14 +41,14 @@ class Rosetta::PolyCopy::Cat extends Rosetta::PolyCopy::Animal {
 
 fn Rosetta::PolyCopy::demo() {
     # Array of polymorphic objects
-    my @animals = (
+    val @animals = (
         Rosetta::PolyCopy::Dog->new("Rex"),
         Rosetta::PolyCopy::Cat->new("Whiskers")
     )
     
     # Polymorphic copy
-    my @copies
-    for my $animal (@animals) {
+    var @copies
+    for val $animal (@animals) {
         push @copies, $animal->clone()
     }
     

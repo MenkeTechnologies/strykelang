@@ -2,19 +2,19 @@
 # Rosetta Code: Cyclops numbers
 
 fn Rosetta::Cyclops::check($n) {
-    my $s = sprintf("%d", $n)
-    my @c = chars($s)
-    my $len = len(@c)
+    val $s = sprintf("%d", $n)
+    val @c = chars($s)
+    val $len = len(@c)
     if ($len % 2 == 0) {
         return 0
     }
     
-    my $mid = int($len / 2)
+    val $mid = int($len / 2)
     if ($c[$mid] ne "0") {
         return 0
     }
     
-    for my $i (0:$len-1) {
+    for val $i (0:$len-1) {
         if ($i != $mid && $c[$i] eq "0") {
             return 0
         }

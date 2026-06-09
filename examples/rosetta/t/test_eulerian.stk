@@ -5,9 +5,9 @@ fn Rosetta::Eulerian::binomial($n, $k) {
     if ($k < 0 || $k > $n) { 0 }
     elsif ($k == 0 || $k == $n) { 1 }
     else {
-        my $r = 1
-        my $kk = $k < $n - $k ? $k : $n - $k
-        for my $i (1:$kk) {
+        var $r = 1
+        val $kk = $k < $n - $k ? $k : $n - $k
+        for val $i (1:$kk) {
             $r = $r * ($n - $i + 1) / $i
         }
         int($r + 0.5)
@@ -19,9 +19,9 @@ fn Rosetta::Eulerian::compute($n, $k) {
         if ($n == 0 && $k == 0) { 1 }
         else { 0 }
     } else {
-        my $res = 0
-        for my $j (0:$k) {
-            my $term = Rosetta::Eulerian::binomial($n + 1, $j) * (($k - $j + 1)**$n)
+        var $res = 0
+        for val $j (0:$k) {
+            val $term = Rosetta::Eulerian::binomial($n + 1, $j) * (($k - $j + 1)**$n)
             if ($j % 2 == 1) {
                 $res -= $term
             } else {

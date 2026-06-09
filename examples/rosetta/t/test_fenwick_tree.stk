@@ -2,7 +2,7 @@
 # Rosetta Code: Fenwick tree
 
 fn Rosetta::Fenwick::update($tree, $idx, $val) {
-    my $n = len(@$tree) - 1
+    val $n = len(@$tree) - 1
     $idx++ # 1-based internal
     while ($idx <= $n) {
         $tree->[$idx] += $val
@@ -12,7 +12,7 @@ fn Rosetta::Fenwick::update($tree, $idx, $val) {
 
 fn Rosetta::Fenwick::query($tree, $idx) {
     $idx++
-    my $s = 0
+    var $s = 0
     while ($idx > 0) {
         $s += $tree->[$idx]
         $idx -= $idx & -$idx
@@ -24,8 +24,8 @@ fn Rosetta::Fenwick::range_query($tree, $l, $r) {
     Rosetta::Fenwick::query($tree, $r) - Rosetta::Fenwick::query($tree, $l - 1)
 }
 
-my $n = 10
-my @tree = map { 0 } 0:$n
+val $n = 10
+val @tree = map { 0 } 0:$n
 Rosetta::Fenwick::update(\@tree, 0, 1)
 Rosetta::Fenwick::update(\@tree, 1, 2)
 Rosetta::Fenwick::update(\@tree, 2, 3)

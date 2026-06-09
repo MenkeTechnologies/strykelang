@@ -8,7 +8,7 @@ fn Rosetta::SimpleDb::new($key_field) {
 }
 
 fn Rosetta::SimpleDb::insert($db, $record) {
-    my $k = $record->{$db->{key_field}}
+    val $k = $record->{$db->{key_field}}
     return 0 if !defined $k
     return 0 if exists $db->{rows}{$k}
     $db->{rows}{$k} = $record
@@ -22,7 +22,7 @@ fn Rosetta::SimpleDb::find($db, $key) {
 
 fn Rosetta::SimpleDb::update($db, $key, $patch) {
     return 0 unless exists $db->{rows}{$key}
-    for my $k (keys %$patch) {
+    for val $k (keys %$patch) {
         next if $k eq $db->{key_field}    # primary key locked
         $db->{rows}{$key}{$k} = $patch->{$k}
     }
@@ -40,16 +40,16 @@ fn Rosetta::SimpleDb::count($db) {
 }
 
 fn Rosetta::SimpleDb::find_where($db, $field, $value) {
-    my @out
-    for my $k (keys %{$db->{rows}}) {
-        my $r = $db->{rows}{$k}
+    var @out
+    for val $k (keys %{$db->{rows}}) {
+        val $r = $db->{rows}{$k}
         push @out, $r if exists $r->{$field} && $r->{$field} eq $value
     }
     \@out
 }
 
 # Create
-my $db = Rosetta::SimpleDb::new("id")
+val $db = Rosetta::SimpleDb::new("id")
 assert_eq Rosetta::SimpleDb::count($db), 0, "empty"
 
 # Insert
@@ -65,7 +65,7 @@ assert_eq Rosetta::SimpleDb::insert($db, { id => 1, name => "X" }), 0, "duplicat
 assert_eq Rosetta::SimpleDb::insert($db, { name => "no-id" }), 0, "missing key rejected"
 
 # Find
-my $alice = Rosetta::SimpleDb::find($db, 1)
+val $alice = Rosetta::SimpleDb::find($db, 1)
 assert_eq $alice->{name}, "Alice", "find Alice"
 assert_eq $alice->{age},  30,      "Alice age"
 
@@ -81,7 +81,7 @@ assert_ok defined(Rosetta::SimpleDb::find($db, 1)), "id 1 still exists"
 assert_eq Rosetta::SimpleDb::find($db, 1)->{name}, "renamed", "name updated"
 
 # Find by attribute
-my $thirties = Rosetta::SimpleDb::find_where($db, "age", 30)
+val $thirties = Rosetta::SimpleDb::find_where($db, "age", 30)
 assert_eq len(@$thirties), 1, "1 row aged 30 (Alice was bumped to 31)"
 assert_eq $thirties->[0]{name}, "Carol", "Carol still 30"
 
@@ -94,7 +94,7 @@ assert_eq Rosetta::SimpleDb::count($db), 2, "2 rows after delete"
 assert_eq Rosetta::SimpleDb::delete_row($db, 999), 0, "delete missing"
 
 # Pipe form
-my $db2 = Rosetta::SimpleDb::new("id")
+val $db2 = Rosetta::SimpleDb::new("id")
 $db2 |> fn { Rosetta::SimpleDb::insert(_, { id => "A", v => 1 }) } |> assert_eq(1, "pipe insert")
 
 test_run

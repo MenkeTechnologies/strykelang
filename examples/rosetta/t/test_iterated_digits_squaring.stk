@@ -2,10 +2,10 @@
 # Rosetta Code: Iterated digits squaring
 
 fn Rosetta::IteratedDigitsSquaring::compute($n) {
-    my $curr = $n
+    var $curr = $n
     while ($curr != 1 && $curr != 89) {
-        my $sum = 0
-        my @digits = ~> "$curr" chars
+        var $sum = 0
+        val @digits = ~> "$curr" chars
         ~> @digits ep {
             $sum += int(_) * int(_)
         }

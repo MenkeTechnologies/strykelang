@@ -14,35 +14,35 @@ assert_false Project::Types::ret_bool_false(), "implicit return false"
 
 # ── Array returns ────────────────────────────────────────────────────
 
-my @list = Project::Types::ret_list()
+val @list = Project::Types::ret_list()
 assert_eq len(@list), 5, "implicit return list length"
 assert_eq $list[0], 1, "implicit return list first"
 assert_eq $list[4], 5, "implicit return list last"
 
-my @empty = Project::Types::ret_empty_list()
+val @empty = Project::Types::ret_empty_list()
 assert_eq len(@empty), 0, "implicit return empty list"
 
 # ── Hash returns ─────────────────────────────────────────────────────
 
-my %h = Project::Types::ret_hash_as_list()
+val %h = Project::Types::ret_hash_as_list()
 assert_eq $h{a}, 1, "implicit return hash a"
 assert_eq $h{b}, 2, "implicit return hash b"
 assert_eq $h{c}, 3, "implicit return hash c"
 
 # ── Array refs ───────────────────────────────────────────────────────
 
-my $ar = Project::Types::ret_aref()
+val $ar = Project::Types::ret_aref()
 assert_eq ref($ar), "ARRAY", "implicit return aref type"
 assert_eq len(@$ar), 3, "implicit return aref length"
 assert_eq $ar->[0], 10, "implicit return aref first"
 assert_eq $ar->[2], 30, "implicit return aref last"
 
-my $nested_ar = Project::Types::ret_nested_aref()
+val $nested_ar = Project::Types::ret_nested_aref()
 assert_eq $nested_ar->[0][0], 1, "nested aref [0][0]"
 assert_eq $nested_ar->[1][1], 4, "nested aref [1][1]"
 assert_eq $nested_ar->[2][0], 5, "nested aref [2][0]"
 
-my $mixed = Project::Types::ret_mixed_aref()
+val $mixed = Project::Types::ret_mixed_aref()
 assert_eq $mixed->[0], "str", "mixed aref string"
 assert_eq $mixed->[1], 42, "mixed aref int"
 assert_eq $mixed->[2][1], 2, "mixed aref nested array"
@@ -50,21 +50,21 @@ assert_eq $mixed->[3]{x}, 9, "mixed aref nested hash"
 
 # ── Hash refs ────────────────────────────────────────────────────────
 
-my $hr = Project::Types::ret_href()
+val $hr = Project::Types::ret_href()
 assert_eq ref($hr), "HASH", "implicit return href type"
 assert_eq $hr->{name}, "test", "implicit return href name"
 assert_eq $hr->{value}, 100, "implicit return href value"
 
-my $nested_hr = Project::Types::ret_nested_href()
+val $nested_hr = Project::Types::ret_nested_href()
 assert_eq $nested_hr->{outer}{inner}{deep}, 42, "nested href deep access"
 
-my $complex_hr = Project::Types::ret_href_with_aref()
+val $complex_hr = Project::Types::ret_href_with_aref()
 assert_eq $complex_hr->{items}[0], 1, "href with aref first item"
 assert_eq $complex_hr->{meta}{count}, 3, "href nested meta"
 
 # ── Hash refs with reserved bareword keys ────────────────────────────
 
-my $reserved = Project::Types::ret_href_reserved_keys()
+val $reserved = Project::Types::ret_href_reserved_keys()
 assert_eq $reserved->{q}, "quote", "reserved key q"
 assert_eq $reserved->{qq}, "double quote", "reserved key qq"
 assert_eq $reserved->{qw}, "quote words", "reserved key qw"
@@ -77,98 +77,98 @@ assert_eq $reserved->{m}, "match", "reserved key m"
 
 # ── Structs ──────────────────────────────────────────────────────────
 
-my $v = Project::Types::ret_struct()
+val $v = Project::Types::ret_struct()
 assert_eq $v->x, 1, "struct x"
 assert_eq $v->y, 2, "struct y"
 assert_eq $v->z, 3, "struct z"
 
-my $person = Project::Types::ret_struct_named()
+val $person = Project::Types::ret_struct_named()
 assert_eq $person->name, "Alice", "struct person name"
 assert_eq $person->age, 30, "struct person age"
 assert_eq $person->email, "alice@example.com", "struct person email"
 
-my $cfg = Project::Types::ret_struct_typed()
+val $cfg = Project::Types::ret_struct_typed()
 assert_eq $cfg->host, "localhost", "struct config host"
 assert_eq $cfg->port, 8080, "struct config port"
 
-my $pt = Project::Types::make_point(10, 20, 30)
+val $pt = Project::Types::make_point(10, 20, 30)
 assert_eq $pt->x, 10, "Project::Types::make_point x"
 assert_eq $pt->z, 30, "Project::Types::make_point z"
 
-my $p = Project::Types::make_person("Bob", 25)
+val $p = Project::Types::make_person("Bob", 25)
 assert_eq $p->name, "Bob", "Project::Types::make_person name"
 assert_eq $p->age, 25, "Project::Types::make_person age"
 
 # ── Enums ────────────────────────────────────────────────────────────
 
-my $ok = Project::Types::ret_enum_ok()
-my $err = Project::Types::ret_enum_err()
+val $ok = Project::Types::ret_enum_ok()
+val $err = Project::Types::ret_enum_err()
 assert_eq "$ok", "Result::Ok", "enum Ok stringifies"
 assert_eq "$err", "Result::Err", "enum Err stringifies"
 
-my $green = TrafficLight::Green
-my $next = Project::Types::traffic_next($green)
+val $green = TrafficLight::Green
+val $next = Project::Types::traffic_next($green)
 assert_eq "$next", "TrafficLight::Yellow", "traffic light next from green"
 
-my $red = TrafficLight::Red
-my $next2 = Project::Types::traffic_next($red)
+val $red = TrafficLight::Red
+val $next2 = Project::Types::traffic_next($red)
 assert_eq "$next2", "TrafficLight::Green", "traffic light next from red"
 
 # ── Sets ─────────────────────────────────────────────────────────────
 
-my $s = Project::Types::ret_set()
+val $s = Project::Types::ret_set()
 assert_ok $s->has(3), "set has 3"
 assert_false $s->has(99), "set does not have 99"
 assert_eq $s->len(), 5, "set length"
 
-my $str_set = Project::Types::ret_string_set()
+val $str_set = Project::Types::ret_string_set()
 assert_ok $str_set->has("banana"), "string set has banana"
 assert_false $str_set->has("orange"), "string set no orange"
 
-my $test_set = set(1, 2, 3)
+val $test_set = set(1, 2, 3)
 assert_ok Project::Types::set_contains($test_set, 2), "Project::Types::set_contains wrapper"
-my $size_set = set(1, 2, 3, 4, 5)
+val $size_set = set(1, 2, 3, 4, 5)
 assert_eq Project::Types::set_size($size_set), 5, "Project::Types::set_size wrapper"
 
 # ── Code refs ────────────────────────────────────────────────────────
 
-my $cr = Project::Types::ret_coderef()
+val $cr = Project::Types::ret_coderef()
 assert_eq ref($cr), "CODE", "coderef type"
 assert_eq $cr(), 99, "coderef call"
 
-my $cr_arg = Project::Types::ret_coderef_with_arg()
+val $cr_arg = Project::Types::ret_coderef_with_arg()
 assert_eq $cr_arg(5), 10, "coderef with arg"
 
-my $closure = Project::Types::ret_closure()
+val $closure = Project::Types::ret_closure()
 assert_eq $closure(), 100, "closure captures outer var"
 
-my $add5 = Project::Types::make_adder(5)
+val $add5 = Project::Types::make_adder(5)
 assert_eq $add5(10), 15, "curried adder"
 assert_eq $add5(0), 5, "curried adder zero"
 
-my $times3 = Project::Types::make_multiplier(3)
+val $times3 = Project::Types::make_multiplier(3)
 assert_eq $times3(7), 21, "curried multiplier"
 
 # ── Blessed refs ─────────────────────────────────────────────────────
 
-my $blessed = Project::Types::ret_blessed()
+val $blessed = Project::Types::ret_blessed()
 assert_eq ref($blessed), "MyClass", "blessed ref class"
 assert_eq $blessed->{val}, 42, "blessed ref value"
 
-my $blessed_ar = Project::Types::ret_blessed_aref()
+val $blessed_ar = Project::Types::ret_blessed_aref()
 assert_eq ref($blessed_ar), "MyArray", "blessed aref class"
 assert_eq $blessed_ar->[1], 2, "blessed aref access"
 
 # ── Complex nested structures ────────────────────────────────────────
 
-my $complex = Project::Types::ret_complex()
+val $complex = Project::Types::ret_complex()
 assert_eq $complex->{scalars}{int}, 42, "complex scalars.int"
 assert_eq $complex->{scalars}{str}, "hello", "complex scalars.str"
 assert_eq $complex->{arrays}[0][0], 1, "complex arrays[0][0]"
 assert_eq $complex->{struct}->x, 7, "complex struct.x"
-my $cset = $complex->{set}
+val $cset = $complex->{set}
 assert_ok $cset->has(11), "complex set has 11"
-my $cfn = $complex->{code}
+val $cfn = $complex->{code}
 assert_eq $cfn(), "lambda", "complex code call"
 
 # ── Conditional implicit returns ─────────────────────────────────────
@@ -205,8 +205,8 @@ assert_eq fib(10), 55, "fib 10"
 
 # ── Method chaining returns ──────────────────────────────────────────
 
-my $builder = Project::Types::new_builder()
-my $result = $builder->add("a")->add("b")->add("c")->build()
+val $builder = Project::Types::new_builder()
+val $result = $builder->add("a")->add("b")->add("c")->build()
 assert_eq $result, "a-b-c", "builder chain"
 
 # ── Ternary implicit returns ─────────────────────────────────────────

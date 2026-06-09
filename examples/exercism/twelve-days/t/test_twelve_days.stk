@@ -18,7 +18,7 @@ assert_eq Exercism::TwelveDays::verse(12),
     "twelfth day"
 
 # verses range
-my $v = Exercism::TwelveDays::verses(1, 2)
+val $v = Exercism::TwelveDays::verses(1, 2)
 assert_ok $v =~ /^On the first day/m, "verses includes first"
 assert_ok $v =~ /^On the second day/m, "verses includes second"
 

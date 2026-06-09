@@ -6,7 +6,7 @@ fn Rosetta::Fortunate::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n == 2
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -15,8 +15,8 @@ fn Rosetta::Fortunate::is_prime($n) {
 }
 
 fn Rosetta::Fortunate::nth_prime($n) {
-    my @ps
-    my $k = 2
+    var @ps
+    var $k = 2
     while (len(@ps) < $n) {
         push @ps, $k if Rosetta::Fortunate::is_prime($k)
         $k += 1
@@ -25,9 +25,9 @@ fn Rosetta::Fortunate::nth_prime($n) {
 }
 
 fn Rosetta::Fortunate::primorial($n) {
-    my $p = 1
-    my $k = 2
-    my $count = 0
+    var $p = 1
+    var $k = 2
+    var $count = 0
     while ($count < $n) {
         if (Rosetta::Fortunate::is_prime($k)) {
             $p *= $k
@@ -39,8 +39,8 @@ fn Rosetta::Fortunate::primorial($n) {
 }
 
 fn Rosetta::Fortunate::fortunate($n) {
-    my $pr = Rosetta::Fortunate::primorial($n)
-    my $m = 2
+    val $pr = Rosetta::Fortunate::primorial($n)
+    var $m = 2
     while (1) {
         return $m if Rosetta::Fortunate::is_prime($pr + $m)
         $m += 1
@@ -48,7 +48,7 @@ fn Rosetta::Fortunate::fortunate($n) {
 }
 
 # OEIS A005235: 3, 5, 7, 13, 23, 17, 19, 23, 37, 61, ...
-my @first8 = ~> 1:8 map {Rosetta::Fortunate::fortunate}
+val @first8 = ~> 1:8 map {Rosetta::Fortunate::fortunate}
 assert_eq join(",", @first8), "3,5,7,13,23,17,19,23", "first 8 fortunate"
 
 assert_eq Rosetta::Fortunate::primorial(1), 2,    "primorial(1)=2"

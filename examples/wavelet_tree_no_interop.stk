@@ -20,11 +20,11 @@ fn Wt::build($seq, $lo, $hi) {
     if ($lo == $hi || len(@$seq) == 0) {
         return +{ leaf => 1, lo => $lo, hi => $hi, n => len(@$seq) }
     }
-    my $mid = int(($lo + $hi) / 2)
-    my @bits
-    my @left
-    my @right
-    for my $v (@$seq) {
+    val $mid = int(($lo + $hi) / 2)
+    var @bits
+    var @left
+    var @right
+    for val $v (@$seq) {
         if ($v <= $mid) {
             push @bits, 0
             push @left, $v
@@ -52,9 +52,9 @@ fn Wt::rank($node, $v, $i) {
     if ($node->{leaf}) {
         return $v == $node->{lo} ? $i : 0
     }
-    my $count0 = 0
-    my $count1 = 0
-    for my $k (0:$i - 1) {
+    var $count0 = 0
+    var $count1 = 0
+    for val $k (0:$i - 1) {
         if ($node->{bits}->[$k] == 0) {
             $count0++
         } else {
@@ -74,8 +74,8 @@ fn Wt::select($node, $v, $k) {
     if ($node->{leaf}) {
         return $v == $node->{lo} ? $k - 1 : -1
     }
-    my $child
-    my $target_bit
+    var $child
+    var $target_bit
     if ($v <= $node->{mid}) {
         $child = $node->{left}
         $target_bit = 0
@@ -83,13 +83,13 @@ fn Wt::select($node, $v, $k) {
         $child = $node->{right}
         $target_bit = 1
     }
-    my $child_pos = Wt::select($child, $v, $k)
+    val $child_pos = Wt::select($child, $v, $k)
     return -1 if $child_pos < 0
     # Map child_pos back to parent index: find the (child_pos + 1)-th
     # occurrence of $target_bit in the parent's bitmap.
-    my $seen = 0
-    my $n = len(@{$node->{bits}})
-    for my $i (0:$n - 1) {
+    var $seen = 0
+    val $n = len(@{$node->{bits}})
+    for val $i (0:$n - 1) {
         if ($node->{bits}->[$i] == $target_bit) {
             if ($seen == $child_pos) {
                 return $i
@@ -106,9 +106,9 @@ fn Wt::access($node, $i) {
     if ($node->{leaf}) {
         return $node->{lo}
     }
-    my $bit = $node->{bits}->[$i]
-    my $count = 0
-    for my $k (0:$i - 1) {
+    val $bit = $node->{bits}->[$i]
+    var $count = 0
+    for val $k (0:$i - 1) {
         $count++ if $node->{bits}->[$k] == $bit
     }
     if ($bit == 0) {
@@ -122,16 +122,16 @@ fn Wt::access($node, $i) {
 
 fn Wt::quantile($node, $l, $r, $k) {
     return $node->{lo} if $node->{leaf}
-    my $zeros_l = 0
-    my $zeros_r = 0
-    for my $i (0:$l - 1) { $zeros_l++ if $node->{bits}->[$i] == 0 }
-    for my $i (0:$r)     { $zeros_r++ if $node->{bits}->[$i] == 0 }
-    my $left_count = $zeros_r - $zeros_l
+    var $zeros_l = 0
+    var $zeros_r = 0
+    for val $i (0:$l - 1) { $zeros_l++ if $node->{bits}->[$i] == 0 }
+    for val $i (0:$r)     { $zeros_r++ if $node->{bits}->[$i] == 0 }
+    val $left_count = $zeros_r - $zeros_l
     if ($k <= $left_count) {
         Wt::quantile($node->{left}, $zeros_l, $zeros_r - 1, $k)
     } else {
-        my $ones_l = $l - $zeros_l
-        my $ones_r = ($r + 1) - $zeros_r
+        val $ones_l = $l - $zeros_l
+        val $ones_r = ($r + 1) - $zeros_r
         Wt::quantile($node->{right}, $ones_l, $ones_r - 1, $k - $left_count)
     }
 }
@@ -139,17 +139,17 @@ fn Wt::quantile($node, $l, $r, $k) {
 # ── brute-force references for cross-checking ────────────────────
 
 fn Wt::brute_rank($seq, $v, $i) {
-    my $c = 0
-    for my $k (0:$i - 1) {
+    var $c = 0
+    for val $k (0:$i - 1) {
         $c++ if $seq->[$k] == $v
     }
     $c
 }
 
 fn Wt::brute_select($seq, $v, $k) {
-    my $seen = 0
-    my $n = len(@$seq)
-    for my $i (0:$n - 1) {
+    var $seen = 0
+    val $n = len(@$seq)
+    for val $i (0:$n - 1) {
         if ($seq->[$i] == $v) {
             $seen++
             return $i if $seen == $k
@@ -159,8 +159,8 @@ fn Wt::brute_select($seq, $v, $k) {
 }
 
 fn Wt::brute_quantile($seq, $l, $r, $k) {
-    my @sub
-    for my $i ($l:$r) {
+    var @sub
+    for val $i ($l:$r) {
         push @sub, $seq->[$i]
     }
     @sub = sort { _0 <=> _1 } @sub
@@ -169,8 +169,8 @@ fn Wt::brute_quantile($seq, $l, $r, $k) {
 
 # ── primary sequence ──────────────────────────────────────────────
 
-my @seq = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4)
-my $tree = Wt::build(\@seq, 1, 9)
+val @seq = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8, 4)
+val $tree = Wt::build(\@seq, 1, 9)
 
 p "── wavelet tree over digits of π (first 20) ───────────"
 printf "  seq: %s\n", join(", ", @seq)
@@ -180,9 +180,9 @@ printf "  n  : %d, alphabet [1..9]\n", len(@seq)
 
 p ""
 p "── access[i] (should match seq) ──────────────────────"
-my $ok = 1
-for my $i (0:len(@seq) - 1) {
-    my $got = Wt::access($tree, $i)
+var $ok = 1
+for val $i (0:len(@seq) - 1) {
+    val $got = Wt::access($tree, $i)
     if ($got != $seq[$i]) {
         $ok = 0
         printf "  access[%d] = %d, want %d  FAIL\n", $i, $got, $seq[$i]
@@ -218,27 +218,27 @@ printf "  max of seq[0..19] = %d\n", Wt::quantile($tree, 0, 19, 20)
 
 # ── invariant 1: access matches the source sequence ───────────────
 
-for my $i (0:len(@seq) - 1) {
+for val $i (0:len(@seq) - 1) {
     die "access[#{$i}] = #{Wt::access($tree, $i)}, want #{$seq[$i]}" unless Wt::access($tree, $i) == $seq[$i]
 }
 
 # ── invariant 2: rank agrees with brute force for every (v, i) ───
 
-for my $v (1:9) {
-    for my $i (0:len(@seq)) {
-        my $wt = Wt::rank($tree, $v, $i)
-        my $bt = Wt::brute_rank(\@seq, $v, $i)
+for val $v (1:9) {
+    for val $i (0:len(@seq)) {
+        val $wt = Wt::rank($tree, $v, $i)
+        val $bt = Wt::brute_rank(\@seq, $v, $i)
         die "rank(#{$v}, #{$i}) wt=#{$wt} brute=#{$bt}" unless $wt == $bt
     }
 }
 
 # ── invariant 3: select inverts rank where the value exists ───────
 
-for my $v (1:9) {
-    my $total = Wt::brute_rank(\@seq, $v, len(@seq))
+for var $v (1:9) {
+    val $total = Wt::brute_rank(\@seq, $v, len(@seq))
     next if $total == 0
-    for my $k (1:$total) {
-        my $pos = Wt::select($tree, $v, $k)
+    for var $k (1:$total) {
+        var $pos = Wt::select($tree, $v, $k)
         die "select(#{$v}, #{$k}) = #{$pos} not in range" unless $pos >= 0 && $pos < len(@seq)
         die "select(#{$v}, #{$k}) points to #{$seq[$pos]}, want #{$v}" unless $seq[$pos] == $v
         die "rank(#{$v}, #{$pos + 1}) = #{Wt::rank($tree, $v, $pos + 1)}, want #{$k}" unless Wt::rank($tree, $v, $pos + 1) == $k
@@ -247,19 +247,19 @@ for my $v (1:9) {
 
 # ── invariant 4: select returns -1 for k > occurrence-count ───────
 
-for my $v (1:9) {
-    my $total = Wt::brute_rank(\@seq, $v, len(@seq))
+for val $v (1:9) {
+    val $total = Wt::brute_rank(\@seq, $v, len(@seq))
     die "select(#{$v}, #{$total + 1}) must be -1" unless Wt::select($tree, $v, $total + 1) == -1
 }
 
 # ── invariant 5: quantile agrees with brute on every (l, r, k) ────
 
-for my $l (0:len(@seq) - 1) {
-    for my $r ($l:len(@seq) - 1) {
-        my $width = $r - $l + 1
-        for my $k (1:$width) {
-            my $wt = Wt::quantile($tree, $l, $r, $k)
-            my $bt = Wt::brute_quantile(\@seq, $l, $r, $k)
+for val $l (0:len(@seq) - 1) {
+    for val $r ($l:len(@seq) - 1) {
+        val $width = $r - $l + 1
+        for val $k (1:$width) {
+            val $wt = Wt::quantile($tree, $l, $r, $k)
+            val $bt = Wt::brute_quantile(\@seq, $l, $r, $k)
             die "quantile(#{$l}, #{$r}, #{$k}) wt=#{$wt} brute=#{$bt}" unless $wt == $bt
         }
     }
@@ -267,17 +267,17 @@ for my $l (0:len(@seq) - 1) {
 
 # ── invariant 6: rank(v, n) sums to n across the alphabet ─────────
 
-my $sum_ranks = 0
-for my $v (1:9) {
+var $sum_ranks = 0
+for val $v (1:9) {
     $sum_ranks += Wt::rank($tree, $v, len(@seq))
 }
 die "Σ rank(v, n) = #{$sum_ranks} != #{len(@seq)}" unless $sum_ranks == len(@seq)
 
 # ── invariant 7: a single-symbol alphabet works (degenerate tree) ──
 
-my @mono = (5, 5, 5, 5)
-my $mtree = Wt::build(\@mono, 5, 5)
-for my $i (0:3) {
+val @mono = (5, 5, 5, 5)
+val $mtree = Wt::build(\@mono, 5, 5)
+for val $i (0:3) {
     die "mono access[#{$i}] != 5" unless Wt::access($mtree, $i) == 5
 }
 die "mono rank(5, 4) != 4" unless Wt::rank($mtree, 5, 4) == 4

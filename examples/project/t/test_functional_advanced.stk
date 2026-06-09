@@ -9,8 +9,8 @@ fn Fn::compose($f, $g) {
 
 fn Fn::pipe(@funcs) {
     fn ($x) {
-        my $result = $x
-        for my $func (@funcs) {
+        var $result = $x
+        for val $func (@funcs) {
             $result = $func($result)
         }
         $result
@@ -18,14 +18,14 @@ fn Fn::pipe(@funcs) {
 }
 
 # Test composition
-my $add5 = fn ($x) { $x + 5 }
-my $mul2 = fn ($x) { $x * 2 }
-my $composed = Fn::compose($add5, $mul2)
+val $add5 = fn ($x) { $x + 5 }
+val $mul2 = fn ($x) { $x * 2 }
+val $composed = Fn::compose($add5, $mul2)
 
 assert_eq $composed(3), 11, "Fn::compose: add5(mul2(3))"
 
 # Test pipe
-my $pipeline = Fn::pipe($mul2, $add5, fn ($x) { $x ** 2 })
+val $pipeline = Fn::pipe($mul2, $add5, fn ($x) { $x ** 2 })
 assert_eq $pipeline(3), 121, "pipe: ((3*2)+5)^2"
 
 # ── Maybe Monad for Error Handling ─────────────────────────────────────
@@ -75,13 +75,13 @@ fn Math::safe_divide($a, $b) {
     $b == 0 ? Maybe::none() : Maybe::some($a / $b)
 }
 
-my $result = Maybe::some(10)
+val $result = Maybe::some(10)
     ->flat_map(fn ($x) { Math::safe_divide($x, 2) })
     ->map(fn ($x) { $x + 1 })
 
 assert_eq $result->unwrap_or(0), 6, "maybe chain success"
 
-my $fail_result = Maybe::some(10)
+val $fail_result = Maybe::some(10)
     ->flat_map(fn ($x) { Math::safe_divide($x, 0) })
     ->map(fn ($x) { $x + 1 })
 
@@ -101,19 +101,19 @@ fn Fn::flip($func) {
     }
 }
 
-my $subtract = fn ($a, $b) { $a - $b }
-my $subtract_from_10 = Fn::partial($subtract, 10)
+val $subtract = fn ($a, $b) { $a - $b }
+val $subtract_from_10 = Fn::partial($subtract, 10)
 assert_eq $subtract_from_10(3), 7, "partial application"
 
-my $flipped_subtract = Fn::flip($subtract)
+val $flipped_subtract = Fn::flip($subtract)
 assert_eq $flipped_subtract(3, 10), 7, "flipped function"
 
 # ── Memoization ────────────────────────────────────────────────────────
 
 fn Fn::memoize($func) {
-    my %cache = ()
+    var %cache = ()
     fn (@args) {
-        my $key = join(",", @args)
+        val $key = join(",", @args)
         if (exists $cache{$key}) {
             $cache{$key}
         } else {
@@ -123,16 +123,16 @@ fn Fn::memoize($func) {
 }
 
 fn Test::expensive_computation($n) {
-    my $result = $n
+    var $result = $n
     for (1:10) {  # simplified
         $result = $result * 1.001
     }
     int($result)
 }
 
-my $memoized = Fn::memoize(\&Test::expensive_computation)
-my $result1 = $memoized(10)
-my $result2 = $memoized(10)
+val $memoized = Fn::memoize(\&Test::expensive_computation)
+val $result1 = $memoized(10)
+val $result2 = $memoized(10)
 
 assert_eq $result1, $result2, "memoized results equal"
 

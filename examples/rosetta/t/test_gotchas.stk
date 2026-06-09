@@ -5,16 +5,16 @@ fn Rosetta::Gotchas::demo() {
     # A common gotcha in Perl-like languages is the difference between
     # numeric equality (==) and string equality (eq).
     
-    my $a = "10.0"
-    my $b = "10"
+    val $a = "10.0"
+    val $b = "10"
     
-    my $numeric_eq = ($a == $b)
-    my $string_eq = ($a eq $b)
+    val $numeric_eq = ($a == $b)
+    val $string_eq = ($a eq $b)
     
     ($numeric_eq, $string_eq)
 }
 
-my ($num_eq, $str_eq) = Rosetta::Gotchas::demo()
+val ($num_eq, $str_eq) = Rosetta::Gotchas::demo()
 assert_ok $num_eq, "10.0 == 10 is true (numeric)"
 assert_ok !$str_eq, "10.0 eq 10 is false (string)"
 

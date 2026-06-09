@@ -4,14 +4,14 @@
 # themselves; 6↔9; 2,3,4,5,7 are invalid. OEIS A000787.
 
 fn Rosetta::UpsideDown::is($n) {
-    my %map = (
+    val %map = (
         "0" => "0", "1" => "1", "8" => "8",
         "6" => "9", "9" => "6",
     )
-    my $s = "$n"
-    my @chars = split //, $s
-    my @rev
-    for my $c (rev @chars) {
+    val $s = "$n"
+    val @chars = split //, $s
+    var @rev
+    for val $c (rev @chars) {
         return 0 unless exists $map{$c}
         push @rev, $map{$c}
     }
@@ -46,7 +46,7 @@ assert_eq Rosetta::UpsideDown::is(689), 1, "689 ↔ 689"
 assert_eq Rosetta::UpsideDown::is(123), 0, "123 invalid digits"
 
 # First 30 below 10000
-my @small = Rosetta::UpsideDown::list_below(10000)
+val @small = Rosetta::UpsideDown::list_below(10000)
 assert_eq len(@small), 39, "39 strobogrammatic numbers ≤ 10000"
 assert_eq join(",", @small[0:7]), "0,1,8,11,69,88,96,101", "first 8"
 

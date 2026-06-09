@@ -5,7 +5,7 @@ fn Rosetta::SumOfSeries::sum_series {
     ~> (1:_) map { 1 / (_ * _) } reduce { _0 + _1 }
 }
 
-my $res = Rosetta::SumOfSeries::sum_series(1000)
+val $res = Rosetta::SumOfSeries::sum_series(1000)
 # Should be close to pi^2 / 6 = 1.64493
 assert_ok abs($res - 1.6439) < 0.001, "Sum of 1/n^2 up to 1000"
 

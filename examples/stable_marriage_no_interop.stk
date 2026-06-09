@@ -15,9 +15,9 @@ package StableMarriage
 fn prefers($prefs, $p1, $p2) {
     # Check if a woman prefers man p1 over man p2
     # Returns true (1) if rank of p1 < rank of p2
-    my $rank1 = 0
-    my $rank2 = 0
-    for my $i (0 : (len @$prefs) - 1) {
+    var $rank1 = 0
+    var $rank2 = 0
+    for val $i (0 : (len @$prefs) - 1) {
         if ($prefs->[$i] eq $p1) { $rank1 = $i }
         if ($prefs->[$i] eq $p2) { $rank2 = $i }
     }
@@ -25,28 +25,28 @@ fn prefers($prefs, $p1, $p2) {
 }
 
 fn solve($men_prefs, $women_prefs) {
-    my %men_matches
-    my %women_matches
-    my @free_men = keys %$men_prefs |> sort
+    var %men_matches
+    var %women_matches
+    var @free_men = keys %$men_prefs |> sort
     
     # Pre-calculate woman rankings for O(1) preference check
     # maps man -> rank in her list
-    my %women_ranks
-    for my $w (keys %$women_prefs) {
-        my $p = $women_prefs->{$w}
+    var %women_ranks
+    for val $w (keys %$women_prefs) {
+        val $p = $women_prefs->{$w}
         $women_ranks{$w} = {}
-        for my $i (0 : (len @$p) - 1) {
+        for val $i (0 : (len @$p) - 1) {
             $women_ranks{$w}->{$p->[$i]} = $i
         }
     }
     
     # Track which woman each man has already proposed to
-    my %next_proposal
-    for my $m (@free_men) { $next_proposal{$m} = 0 }
+    var %next_proposal
+    for val $m (@free_men) { $next_proposal{$m} = 0 }
     
     while (@free_men) {
-        my $m = shift @free_men
-        my $w = $men_prefs->{$m}->[$next_proposal{$m}++]
+        val $m = shift @free_men
+        val $w = $men_prefs->{$m}->[$next_proposal{$m}++]
         
         if (!defined $women_matches{$w}) {
             # Woman is free, they get engaged
@@ -54,7 +54,7 @@ fn solve($men_prefs, $women_prefs) {
             $men_matches{$m} = $w
         } else {
             # Woman is already engaged, check if she prefers $m
-            my $m_current = $women_matches{$w}
+            val $m_current = $women_matches{$w}
             if ($women_ranks{$w}->{$m} < $women_ranks{$w}->{$m_current}) {
                 # She prefers new guy, dump the old one
                 $women_matches{$w} = $m
@@ -73,23 +73,23 @@ fn solve($men_prefs, $women_prefs) {
 fn verify($matches, $men_prefs, $women_prefs) {
     # Verify no unstable pairs exist
     # maps woman -> man
-    my %women_matches = rev %$matches
+    val %women_matches = rev %$matches
     
-    for my $m (keys %$matches) {
-        my $m_match = $matches->{$m}
-        my $m_pref_list = $men_prefs->{$m}
+    for val $m (keys %$matches) {
+        val $m_match = $matches->{$m}
+        val $m_pref_list = $men_prefs->{$m}
         
         # Check all women $m prefers over his current match
-        for my $w (@$m_pref_list) {
+        for val $w (@$m_pref_list) {
             last if $w eq $m_match
             
-            my $w_match = $women_matches{$w}
-            my $w_pref_list = $women_prefs->{$w}
+            val $w_match = $women_matches{$w}
+            val $w_pref_list = $women_prefs->{$w}
             
             # If $w also prefers $m over her current match, it's unstable
-            my $rank_m = 0
-            my $rank_match = 0
-            for my $i (0 : (len @$w_pref_list) - 1) {
+            var $rank_m = 0
+            var $rank_match = 0
+            for val $i (0 : (len @$w_pref_list) - 1) {
                 if ($w_pref_list->[$i] eq $m) { $rank_m = $i }
                 if ($w_pref_list->[$i] eq $w_match) { $rank_match = $i }
             }
@@ -109,28 +109,28 @@ package main
 
 p "── Stable Marriage Demo (Gale-Shapley) ──"
 
-my %men_prefs = (
+val %men_prefs = (
     abe  => ["abi", "eve", "cath", "ivy"],
     bob  => ["cath", "abi", "eve", "ivy"],
     col  => ["abi", "eve", "cath", "ivy"],
     dan  => ["eve", "abi", "ivy", "cath"],
 )
 
-my %women_prefs = (
+val %women_prefs = (
     abi   => ["bob", "abe", "col", "dan"],
     eve   => ["abe", "dan", "bob", "col"],
     cath  => ["dan", "abe", "col", "bob"],
     ivy   => ["abe", "dan", "bob", "col"],
 )
 
-my $matches = StableMarriage::solve \%men_prefs, \%women_prefs
+val $matches = StableMarriage::solve \%men_prefs, \%women_prefs
 
 p "Final Matches:"
-for my $m (keys %$matches |> sort) {
+for val $m (keys %$matches |> sort) {
     p "  #{$m} ↔ #{$matches->{$m}}"
 }
 
-my $is_stable = StableMarriage::verify $matches, \%men_prefs, \%women_prefs
+val $is_stable = StableMarriage::verify $matches, \%men_prefs, \%women_prefs
 p "Verification: #{$is_stable ? 'STABLE' : 'UNSTABLE'}"
 
 p "Done."

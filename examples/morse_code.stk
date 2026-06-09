@@ -14,7 +14,7 @@
 
 # ── character → Morse table ─────────────────────────────────────────
 
-my %enc = (
+val %enc = (
     a => ".-",    b => "-...",  c => "-.-.",  d => "-..",
     e => ".",     f => "..-.",  g => "--.",   h => "....",
     i => "..",    j => ".---",  k => "-.-",   l => ".-..",
@@ -30,28 +30,28 @@ my %enc = (
 
 # ── invert: Morse → char ────────────────────────────────────────────
 
-my %dec
-for my $k (keys %enc) {
+var %dec
+for val $k (keys %enc) {
     $dec{$enc{$k}} = $k
 }
 
 # ── sketches & metrics ──────────────────────────────────────────────
 
-my $td_enc = t_digest(100)
-my $tk_sym = topk(8)
-my $hll_ch = hll(12)
+val $td_enc = t_digest(100)
+val $tk_sym = topk(8)
+val $hll_ch = hll(12)
 
 # ── encode helper: split sentence into Morse groups separated by `   ` ─
 
 fn Demo::Morse::encode($text) {
-    my $low = lc $text
-    my @words = split / +/, $low
-    my @encoded_words
-    for my $w (@words) {
-        my @chars = split //, $w
+    val $low = lc $text
+    val @words = split / +/, $low
+    var @encoded_words
+    for val $w (@words) {
+        var @chars = split //, $w
         @chars = grep { exists $enc{_} } @chars
-        my @symbols = map { $enc{_} } @chars
-        for my $s (@symbols) {
+        val @symbols = map { $enc{_} } @chars
+        for val $s (@symbols) {
             topk_add($tk_sym, $s)
         }
         push @encoded_words, join(" ", @symbols)
@@ -62,11 +62,11 @@ fn Demo::Morse::encode($text) {
 # ── decode helper: triple-space splits words, single-space splits chars
 
 fn Demo::Morse::decode($code) {
-    my @words = split / {3,}/, $code
-    my @out_words
-    for my $w (@words) {
-        my @syms = split / +/, $w
-        my @chars = map { exists $dec{_} ? $dec{_} : "?" } @syms
+    val @words = split / {3,}/, $code
+    var @out_words
+    for val $w (@words) {
+        val @syms = split / +/, $w
+        val @chars = map { exists $dec{_} ? $dec{_} : "?" } @syms
         push @out_words, join("", @chars)
     }
     join(" ", @out_words)
@@ -74,7 +74,7 @@ fn Demo::Morse::decode($code) {
 
 # ── corpus: classic Morse demo phrases ──────────────────────────────
 
-my @messages = (
+val @messages = (
     "SOS",
     "Hello World",
     "The quick brown fox",
@@ -89,25 +89,25 @@ my @messages = (
 
 p "morse demo — encode/decode round-trip"
 p "─" x 60
-my $rt_ok = 0
-my $rt_fail = 0
+var $rt_ok = 0
+var $rt_fail = 0
 
-for my $msg (@messages) {
-    my $t0 = now_ns()
-    my $code = Demo::Morse::encode($msg)
+for val $msg (@messages) {
+    val $t0 = now_ns()
+    val $code = Demo::Morse::encode($msg)
     td_add($td_enc, (now_ns() - $t0) / 1000.0)
 
-    my $back = Demo::Morse::decode($code)
-    my $expect = lc $msg
+    val $back = Demo::Morse::decode($code)
+    var $expect = lc $msg
     $expect =~ s/[^a-z0-9 ]//g
     $expect =~ s/ +/ /g
     $expect =~ s/^ +//
     $expect =~ s/ +$//
 
-    my $ok = $back eq $expect ? 1 : 0
+    val $ok = $back eq $expect ? 1 : 0
     if ($ok) { $rt_ok++ } else { $rt_fail++ }
 
-    for my $ch (split //, lc($msg)) {
+    for val $ch (split //, lc($msg)) {
         hll_add($hll_ch, $ch) if $ch =~ /[a-z0-9]/
     }
 
@@ -121,8 +121,8 @@ p "\nround-trip: $rt_ok ok / $rt_fail mismatch (of ", len(@messages), " messages
 # ── top symbols ─────────────────────────────────────────────────────
 
 p "\ntop morse symbols (SpaceSaving k=8):"
-my @top = topk_top($tk_sym, 5)
-for my $p (@top) {
+val @top = topk_top($tk_sym, 5)
+for val $p (@top) {
     printf("  %-7s  count=%d\n", $p->[0], $p->[1])
 }
 

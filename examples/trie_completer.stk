@@ -17,9 +17,9 @@ fn Demo::Trie::make_node() {
 }
 
 fn Demo::Trie::insert($root, $word, $weight) {
-    my $node = $root
-    for my $i (0:len($word) - 1) {
-        my $ch = substr($word, $i, 1)
+    var $node = $root
+    for val $i (0:len($word) - 1) {
+        val $ch = substr($word, $i, 1)
         if (!exists $node->{children}->{$ch}) {
             $node->{children}->{$ch} = Demo::Trie::make_node()
         }
@@ -31,9 +31,9 @@ fn Demo::Trie::insert($root, $word, $weight) {
 
 # Walk to the node at the end of a prefix, or return undef if not present.
 fn Demo::Trie::walk_to($root, $prefix) {
-    my $node = $root
-    for my $i (0:len($prefix) - 1) {
-        my $ch = substr($prefix, $i, 1)
+    var $node = $root
+    for val $i (0:len($prefix) - 1) {
+        val $ch = substr($prefix, $i, 1)
         return undef unless exists $node->{children}->{$ch}
         $node = $node->{children}->{$ch}
     }
@@ -45,16 +45,16 @@ fn Demo::Trie::dfs($node, $prefix, $acc) {
     if ($node->{word_end}) {
         push @$acc, [$prefix, $node->{count}]
     }
-    for my $ch (sort { _ cmp _1 } keys %{$node->{children}}) {
+    for val $ch (sort { _ cmp _1 } keys %{$node->{children}}) {
         Demo::Trie::dfs($node->{children}->{$ch}, $prefix . $ch, $acc)
     }
 }
 
 # Top-K completions for a prefix, sorted by count desc.
 fn Demo::Trie::complete($root, $prefix, $k) {
-    my $node = Demo::Trie::walk_to($root, $prefix)
+    val $node = Demo::Trie::walk_to($root, $prefix)
     return [] unless defined $node
-    my @results
+    var @results
     Demo::Trie::dfs($node, $prefix, \@results)
     @results = sort {
         (_1->[1] <=> _->[1]) || (_->[0] cmp _1->[0])
@@ -65,7 +65,7 @@ fn Demo::Trie::complete($root, $prefix, $k) {
 
 # ── build trie from corpus ──────────────────────────────────────────
 
-my @corpus = (
+val @corpus = (
     # word, frequency weight.
     ["apple",     50], ["application", 25], ["apply",      35],
     ["approach",  20], ["approximate", 10], ["april",       8],
@@ -80,8 +80,8 @@ my @corpus = (
 mysync $td_query = t_digest(100)
 mysync $tk_queries = topk(3)
 
-my $root = Demo::Trie::make_node()
-for my $entry (@corpus) {
+val $root = Demo::Trie::make_node()
+for val $entry (@corpus) {
     Demo::Trie::insert($root, $entry->[0], $entry->[1])
 }
 printf "── trie built: %d words inserted ─────────────────────\n",
@@ -89,11 +89,11 @@ printf "── trie built: %d words inserted ───────────�
 
 # ── query suggestions for various prefixes ─────────────────────────
 
-my @prefixes = ("ap", "ba", "ca", "da", "z", "")
+val @prefixes = ("ap", "ba", "ca", "da", "z", "")
 
-for my $p (@prefixes) {
-    my $t0 = now_ns()
-    my $results = Demo::Trie::complete($root, $p, 5)
+for val $p (@prefixes) {
+    val $t0 = now_ns()
+    val $results = Demo::Trie::complete($root, $p, 5)
     td_add($td_query, (now_ns() - $t0) / 1000.0)
     topk_add($tk_queries, $p)
     printf "\n── prefix '%s' (%d suggestions) ─────────────\n",
@@ -101,7 +101,7 @@ for my $p (@prefixes) {
     if (len(@$results) == 0) {
         p "  (no matches)"
     } else {
-        for my $r (@$results) {
+        for val $r (@$results) {
             printf "  %-15s : freq %d\n", $r->[0], $r->[1]
         }
     }
@@ -109,12 +109,12 @@ for my $p (@prefixes) {
 
 # ── full DFS to count words in trie ────────────────────────────────
 
-my @all
+val @all
 Demo::Trie::dfs($root, "", \@all)
 p ""
 printf "── trie statistics ──────────────────────────────────\n"
 printf "  total words : %d (expected %d)\n", len(@all), len @corpus
-my $total_count = 0
+var $total_count = 0
 $total_count += _->[1] for @all
 printf "  total frequency sum : %d\n", $total_count
 
@@ -122,11 +122,11 @@ printf "  total frequency sum : %d\n", $total_count
 
 p ""
 p "── HLL distinct first-letter starters ───────────────"
-my $hll = hll(14)
-for my $entry (@corpus) {
+val $hll = hll(14)
+for val $entry (@corpus) {
     hll_add($hll, substr($entry->[0], 0, 1))
 }
-my %distinct_letters
+var %distinct_letters
 $distinct_letters{substr(_->[0], 0, 1)} = 1 for @corpus
 printf "  HLL distinct first letters : %d\n", hll_count($hll)
 printf "  exact                       : %d\n", len(keys %distinct_letters)
@@ -135,8 +135,8 @@ printf "  exact                       : %d\n", len(keys %distinct_letters)
 
 p ""
 p "── most-queried prefixes (TopK) ─────────────────────"
-my @hits = topk_top($tk_queries)
-for my $h (@hits) {
+val @hits = topk_top($tk_queries)
+for val $h (@hits) {
     printf "  '%s' : %d queries\n", $h->[0], $h->[1]
 }
 

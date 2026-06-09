@@ -5,14 +5,14 @@
 
 fn Rosetta::Munchausen::digit_self_power($d) {
     return 0 if $d == 0
-    my $r = 1
+    var $r = 1
     for (1:$d) { $r *= $d }
     $r
 }
 
 fn Rosetta::Munchausen::is($n) {
-    my @digits = "$n" |> chars
-    my $sum = ~> @digits map { Rosetta::Munchausen::digit_self_power(_ + 0) } reduce { _0 + _1 }
+    val @digits = "$n" |> chars
+    val $sum = ~> @digits map { Rosetta::Munchausen::digit_self_power(_ + 0) } reduce { _0 + _1 }
     $sum == $n
 }
 
@@ -24,7 +24,7 @@ assert_ok !Rosetta::Munchausen::is(100),      "100 is not"
 assert_ok !Rosetta::Munchausen::is(3434),     "3434 is not"
 
 # Find first 3 Munchausen numbers under 10000 — should be 0, 1, 3435.
-my @found = ~> 0:9999 grep {Rosetta::Munchausen::is}
+val @found = ~> 0:9999 grep {Rosetta::Munchausen::is}
 assert_eq join(",", @found), "0,1,3435", "first three under 10k"
 
 test_run

@@ -26,11 +26,11 @@ class Rectangle {
     }
 }
 
-my $r = Rectangle(width => 4, height => 5)
+val $r = Rectangle(width => 4, height => 5)
 p "rectangle area = " . $r->area    # 20
 
 # A bad input fires the die from BUILD before the object escapes.
-my $bad = eval { Rectangle(width => -1, height => 5) }
+val $bad = eval { Rectangle(width => -1, height => 5) }
 p "rejected bad rect: $@" if $@
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ class Dog extends Animal {
     fn BUILD { $self->trail($self->trail . "Dog:" . $self->breed . ";") }
 }
 
-my $d = Dog(name => "Rex", breed => "Lab")
+val $d = Dog(name => "Rex", breed => "Lab")
 p "build trail = " . $d->trail      # Animal:Rex;Dog:Lab
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ class FileResource extends Resource {
 
 # Scoped block forces DESTROY to fire when the lexical goes away.
 {
-    my $f = FileResource(label => "logger", path => "/tmp/app.log")
+    val $f = FileResource(label => "logger", path => "/tmp/app.log")
     p "live: " . $f->label . " → " . $f->path
 }
 

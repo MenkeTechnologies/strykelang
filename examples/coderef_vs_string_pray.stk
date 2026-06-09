@@ -13,14 +13,14 @@
 
 p "── coderef pray vs string pray ──"
 
-my @workers = congregation(2)
+val @workers = congregation(2)
 printf "spawned %d workers\n", len(@workers)
 
 # Form 1: string prayer — the basic form.
 p "── form 1: string prayer ──"
-my $div1 = pray "2 * 21", @workers
-my %r1 = annex $div1
-for my $sid (sort { _ <=> _1 } keys %r1) {
+val $div1 = pray "2 * 21", @workers
+val %r1 = annex $div1
+for val $sid (sort { _ <=> _1 } keys %r1) {
     printf "  worker %d: %s\n", $sid, $r1{$sid}
 }
 
@@ -29,19 +29,19 @@ for my $sid (sort { _ <=> _1 } keys %r1) {
 # ships as the EVAL source. (Style-guide rule 1: `fn` not `sub` —
 # `sub` is rejected by --no-interop.)
 p "── form 2: coderef prayer ──"
-my $code = fn { 6 * 7 }
-my $div2 = pray $code, @workers
-my %r2 = annex $div2
-for my $sid (sort { _ <=> _1 } keys %r2) {
+val $code = fn { 6 * 7 }
+val $div2 = pray $code, @workers
+val %r2 = annex $div2
+for val $sid (sort { _ <=> _1 } keys %r2) {
     printf "  worker %d: %s\n", $sid, $r2{$sid}
 }
 
 # Verify both forms returned the same answer (42).
-my $all_42 = 1
-for my $sid (keys %r1) {
+var $all_42 = 1
+for val $sid (keys %r1) {
     $all_42 = 0 unless $r1{$sid} eq "42"
 }
-for my $sid (keys %r2) {
+for val $sid (keys %r2) {
     $all_42 = 0 unless $r2{$sid} eq "42"
 }
 p $all_42 ? "✓ both forms returned 42 (= 2*21 = 6*7)" : "✗ forms diverged"
@@ -50,8 +50,8 @@ p $all_42 ? "✓ both forms returned 42 (= 2*21 = 6*7)" : "✗ forms diverged"
 # Variables from the master's scope are NOT shipped to the worker —
 # only the deparsed body source is.
 p "── form 3 caveat: closure captures not shipped ──"
-my $multiplier = 100   # this won't be visible to workers
-my $bad_capture = fn { 6 * $multiplier }   # would fail on worker
+val $multiplier = 100   # this won't be visible to workers
+val $bad_capture = fn { 6 * $multiplier }   # would fail on worker
 # We don't run the prayer because the worker would error on undefined
 # $multiplier. Just print the caveat.
 p "  (closure capturing master-scope vars would fail on worker)"

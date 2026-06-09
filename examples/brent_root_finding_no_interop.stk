@@ -27,25 +27,25 @@ fn Br::fabs($v) {
 # ── Brent's method on f over the bracket [lo, hi] with tolerance ε ─
 
 fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
-    my $fa = $f->($lo)
-    my $fb = $f->($hi)
+    var $fa = $f->($lo)
+    var $fb = $f->($hi)
     die "Brent: f(lo) and f(hi) must straddle zero (f(#{$lo})=#{$fa}, f(#{$hi})=#{$fb})" unless $fa * $fb < 0
     # Ensure |f(b)| ≤ |f(a)| so b is the "best" estimate.
     if (Br::fabs($fa) < Br::fabs($fb)) {
-        my $tmp = $lo
+        val $tmp = $lo
         $lo = $hi
         $hi = $tmp
-        my $ft = $fa
+        val $ft = $fa
         $fa = $fb
         $fb = $ft
     }
-    my $c = $lo
-    my $fc = $fa
-    my $mflag = 1
-    my $d = 0
-    my $iter = 0
+    var $c = $lo
+    var $fc = $fa
+    var $mflag = 1
+    var $d = 0
+    var $iter = 0
     while ($iter < $max_iter && Br::fabs($fb) > $tol && Br::fabs($hi - $lo) > $tol) {
-        my $s
+        var $s
         if ($fa != $fc && $fb != $fc) {
             # Inverse quadratic interpolation.
             $s = $lo * $fb * $fc / (($fa - $fb) * ($fa - $fc))
@@ -55,14 +55,14 @@ fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
             # Secant.
             $s = $hi - $fb * ($hi - $lo) / ($fb - $fa)
         }
-        my $cond_a = 0
+        var $cond_a = 0
         if ($lo < $hi) {
             $cond_a = ($s < (3 * $lo + $hi) / 4) || ($s > $hi)
         } elsif ($lo > $hi) {
             $cond_a = ($s > (3 * $lo + $hi) / 4) || ($s < $hi)
         }
-        my $delta = Br::fabs($s - $hi)
-        my $use_bisect = $cond_a
+        val $delta = Br::fabs($s - $hi)
+        val $use_bisect = $cond_a
                       || ($mflag && $delta >= Br::fabs($hi - $c) / 2)
                       || (!$mflag && $delta >= Br::fabs($c - $d) / 2)
                       || ($mflag && Br::fabs($hi - $c) < $tol)
@@ -73,7 +73,7 @@ fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
         } else {
             $mflag = 0
         }
-        my $fs = $f->($s)
+        val $fs = $f->($s)
         $d = $c
         $c = $hi
         $fc = $fb
@@ -85,10 +85,10 @@ fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
             $fa = $fs
         }
         if (Br::fabs($fa) < Br::fabs($fb)) {
-            my $tmp = $lo
+            val $tmp = $lo
             $lo = $hi
             $hi = $tmp
-            my $ft = $fa
+            val $ft = $fa
             $fa = $fb
             $fb = $ft
         }
@@ -100,13 +100,13 @@ fn Br::find_root($f, $lo, $hi, $tol, $max_iter) {
 # ── bisection (reference for comparison) ─────────────────────────
 
 fn Br::bisect($f, $lo, $hi, $tol, $max_iter) {
-    my $fa = $f->($lo)
-    my $fb = $f->($hi)
+    var $fa = $f->($lo)
+    var $fb = $f->($hi)
     die "bisect: f(lo) and f(hi) must straddle zero" unless $fa * $fb < 0
-    my $iter = 0
+    var $iter = 0
     while ($iter < $max_iter && Br::fabs($hi - $lo) > $tol) {
-        my $mid = ($lo + $hi) / 2
-        my $fm = $f->($mid)
+        val $mid = ($lo + $hi) / 2
+        val $fm = $f->($mid)
         if ($fa * $fm < 0) {
             $hi = $mid
             $fb = $fm
@@ -129,7 +129,7 @@ fn Br::f_exp($x)   { exp($x) - 10 }                           # root: ln(10) ≈
 fn Br::f_tough($x) { ($x - 1) * ($x - 1) * ($x - 1) - 1 }    # root: 2
 fn Br::f_cos($x)   { cos($x) - $x }                           # root: ≈ 0.7390851
 
-my @cases = (
+val @cases = (
     +{ name => "linear 2x − 7",         f => \&Br::f_lin,   lo => 0.0,  hi => 10.0, root => 3.5 },
     +{ name => "√2 (x² − 2)",           f => \&Br::f_quad,  lo => 0.0,  hi => 2.0,  root => 1.41421356237310 },
     +{ name => "cubic x³ − x − 2",      f => \&Br::f_cubic, lo => 0.0,  hi => 3.0,  root => 1.52137970680457 },
@@ -142,9 +142,9 @@ my @cases = (
 p "── Brent's method root-finding demo ──────────────────"
 printf "  %-22s  %14s  %14s  %6s\n", "case", "Brent root", "true root", "iters"
 printf "  %-22s  %14s  %14s  %6s\n", "----------------------", "--------------", "--------------", "------"
-for my $c (@cases) {
-    my $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
-    my $err = Br::fabs($r->{root} - $c->{root})
+for val $c (@cases) {
+    val $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
+    val $err = Br::fabs($r->{root} - $c->{root})
     printf "  %-22s  %14.10f  %14.10f  %6d  %s\n",
         $c->{name}, $r->{root}, $c->{root}, $r->{iters},
         $err < 1e-8 ? "" : "FAIL err=#{$err}"
@@ -152,63 +152,63 @@ for my $c (@cases) {
 
 # ── invariant 1: Brent root matches expected within 1e-8 ──────────
 
-for my $c (@cases) {
-    my $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
-    my $err = Br::fabs($r->{root} - $c->{root})
+for val $c (@cases) {
+    val $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
+    val $err = Br::fabs($r->{root} - $c->{root})
     die "root err #{$err} > 1e-8 on \"#{$c->{name}}\"" unless $err < 1e-8
 }
 
 # ── invariant 2: f(returned root) is within tolerance of zero ──────
 
-for my $c (@cases) {
-    my $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
-    my $fv = $c->{f}->($r->{root})
+for val $c (@cases) {
+    val $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
+    val $fv = $c->{f}->($r->{root})
     die "f(root) #{$fv} not near 0 on \"#{$c->{name}}\"" unless Br::fabs($fv) < 1e-8
 }
 
 # ── invariant 3: Brent finishes within max_iter on every case ─────
 
-for my $c (@cases) {
-    my $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
+for val $c (@cases) {
+    val $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-12, 100)
     die "Brent didn't converge in 100 iters on \"#{$c->{name}}\"" unless $r->{iters} < 100
 }
 
 # ── invariant 4: Brent agrees with bisection ──────────────────────
 
-for my $c (@cases) {
-    my $brent_r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
-    my $bi_r    = Br::bisect($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
-    my $diff = Br::fabs($brent_r->{root} - $bi_r->{root})
+for val $c (@cases) {
+    val $brent_r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
+    val $bi_r    = Br::bisect($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
+    val $diff = Br::fabs($brent_r->{root} - $bi_r->{root})
     die "Brent vs bisection disagree by #{$diff} on \"#{$c->{name}}\"" unless $diff < 1e-7
 }
 
 # ── invariant 5: Brent uses fewer iterations than bisection ───────
 
-for my $c (@cases) {
-    my $brent_r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
-    my $bi_r    = Br::bisect($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
+for val $c (@cases) {
+    val $brent_r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
+    val $bi_r    = Br::bisect($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 200)
     die "Brent took #{$brent_r->{iters}} iters > bisection #{$bi_r->{iters}} on \"#{$c->{name}}\"" unless $brent_r->{iters} <= $bi_r->{iters}
 }
 
 # ── invariant 6: shrinking the bracket doesn't change the root ─────
 # (For functions with a unique root in [lo, hi].)
 
-for my $c (@cases) {
-    my $r_wide = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 100)
-    my $tight_lo = $r_wide->{root} - 0.01
-    my $tight_hi = $r_wide->{root} + 0.01
+for val $c (@cases) {
+    val $r_wide = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-10, 100)
+    val $tight_lo = $r_wide->{root} - 0.01
+    val $tight_hi = $r_wide->{root} + 0.01
     if ($c->{f}->($tight_lo) * $c->{f}->($tight_hi) < 0) {
-        my $r_tight = Br::find_root($c->{f}, $tight_lo, $tight_hi, 1e-10, 100)
-        my $diff = Br::fabs($r_wide->{root} - $r_tight->{root})
+        val $r_tight = Br::find_root($c->{f}, $tight_lo, $tight_hi, 1e-10, 100)
+        val $diff = Br::fabs($r_wide->{root} - $r_tight->{root})
         die "bracket shrinking shifted root by #{$diff} on \"#{$c->{name}}\"" unless $diff < 1e-7
     }
 }
 
 # ── invariant 7: |f(root)| ≤ tolerance even with relaxed eps ──────
 
-for my $c (@cases) {
-    my $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-6, 100)
-    my $fv = $c->{f}->($r->{root})
+for val $c (@cases) {
+    val $r = Br::find_root($c->{f}, $c->{lo}, $c->{hi}, 1e-6, 100)
+    val $fv = $c->{f}->($r->{root})
     die "|f(root)| #{Br::fabs($fv)} > tol on \"#{$c->{name}}\"" unless Br::fabs($fv) < 1e-3
 }
 

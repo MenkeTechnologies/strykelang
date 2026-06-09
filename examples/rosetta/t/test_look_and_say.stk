@@ -4,12 +4,12 @@
 fn Rosetta::LookAndSay::next_step($s) {
     if (len($s) == 0) { "" }
     else {
-        my @chars = ~> $s chars
-        my $res = ""
-        my $curr = $chars[0]
-        my $count = 1
+        val @chars = ~> $s chars
+        var $res = ""
+        var $curr = $chars[0]
+        var $count = 1
         
-        for my $i (1:$#chars) {
+        for val $i (1:$#chars) {
             if ($chars[$i] eq $curr) {
                 $count = $count + 1
             } else {
@@ -23,10 +23,10 @@ fn Rosetta::LookAndSay::next_step($s) {
 }
 
 fn Rosetta::LookAndSay::generate($start, $n) {
-    my @seq = ($start)
-    for my $i (1:$n-1) {
-        my $prev = $seq[-1]
-        my $next = Rosetta::LookAndSay::next_step($prev)
+    var @seq = ($start)
+    for val $i (1:$n-1) {
+        val $prev = $seq[-1]
+        val $next = Rosetta::LookAndSay::next_step($prev)
         push @seq, $next
     }
     \@seq
@@ -37,7 +37,7 @@ assert_eq Rosetta::LookAndSay::next_step("11"), "21", "11 -> 21"
 assert_eq Rosetta::LookAndSay::next_step("21"), "1211", "21 -> 1211"
 assert_eq Rosetta::LookAndSay::next_step("1211"), "111221", "1211 -> 111221"
 
-my $s = Rosetta::LookAndSay::generate("1", 5)
+val $s = Rosetta::LookAndSay::generate("1", 5)
 assert_eq join(",", @$s), "1,11,21,1211,111221", "first 5 terms"
 
 test_run

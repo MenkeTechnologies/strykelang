@@ -29,30 +29,30 @@ assert_eq base64_encode("hello"), "aGVsbG8=", "base64 encode"
 assert_eq base64_decode("aGVsbG8="), "hello", "base64 decode"
 
 # Pipeline
-my $result = sum(map { _ * 2 } 1:5)
+val $result = sum(map { _ * 2 } 1:5)
 assert_eq $result, 30, "pipeline map+sum"
 
 # Pipe forward with builtins
-my $piped = 1:10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
+val $piped = 1:10 |> grep { _ % 2 == 0 } |> map { _ * _ } |> sum
 assert_eq $piped, 220, "pipe grep map sum"
 
 # Thread macro with builtins
-my $threaded = (~> (1:10) grep { _ > 5 } sum)
+val $threaded = (~> (1:10) grep { _ > 5 } sum)
 assert_eq $threaded, 40, "thread macro grep sum"
 
 # Streaming maps
-my @s = range(1, 5) |> maps { _ * 3 }
+val @s = range(1, 5) |> maps { _ * 3 }
 assert_eq len(@s), 5, "maps count"
 
 # JSON roundtrip
-my $decoded = json_decode(to_json({a => 1}))
+val $decoded = json_decode(to_json({a => 1}))
 assert_eq $decoded->{a}, 1, "json roundtrip"
 
 # Regex
 assert_match '\d+', "abc123", "regex match"
 
 # File ops
-my $tmp = tempfile()
+val $tmp = tempfile()
 spurt($tmp, "test content")
 assert_eq slurp($tmp), "test content", "spurt + slurp"
 unlink $tmp
@@ -62,7 +62,7 @@ assert_gt num_cpus(), 0, "has cpus"
 assert_ok defined(cwd()), "cwd defined"
 
 # String transforms via thread macro
-my $transformed = (~> " hello world " trim uc)
+val $transformed = (~> " hello world " trim uc)
 assert_eq $transformed, "HELLO WORLD", "thread trim uc"
 
 # Case conversion

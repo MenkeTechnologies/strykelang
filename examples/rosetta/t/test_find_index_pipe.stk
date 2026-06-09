@@ -9,8 +9,8 @@ fn Rosetta::FindIndex::last($haystack, $needle) {
     last_index_of($needle, $haystack)
 }
 
-my @arr = qw(apple banana cherry banana date)
-my $ref = \@arr
+val @arr = qw(apple banana cherry banana date)
+val $ref = \@arr
 
 $ref |> Rosetta::FindIndex::first("banana") |> assert_eq(1, "first banana")
 $ref |> Rosetta::FindIndex::last("banana") |> assert_eq(3, "last banana")

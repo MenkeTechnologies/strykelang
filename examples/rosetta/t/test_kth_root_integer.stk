@@ -2,15 +2,15 @@
 # Rosetta Code: Integer k-th root — floor(n^(1/k)) via Newton's method on integers.
 
 fn Rosetta::IntRoot::ipow($base, $exp) {
-    my $r = 1
-    for my $i (1:$exp) { $r *= $base }
+    var $r = 1
+    for val $i (1:$exp) { $r *= $base }
     $r
 }
 
 fn Rosetta::IntRoot::kth($n, $k) {
     return 0 if $n == 0
     return $n if $k == 1
-    my $x = 1
+    var $x = 1
     while (Rosetta::IntRoot::ipow($x + 1, $k) <= $n) {
         $x++
         # Double if jumping fast (early exponential phase)

@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-my @_PARTS = (
+val @_PARTS = (
     ["house",                            "Jack built"],
     ["malt",                             "lay in"],
     ["rat",                              "ate"],

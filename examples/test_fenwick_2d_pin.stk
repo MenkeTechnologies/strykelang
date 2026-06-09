@@ -3,9 +3,9 @@
 package Fenwick2D
 
 fn new($rows, $cols) {
-    my $tree = []
+    val $tree = []
     for (0 : $rows) {
-        my $row = []
+        val $row = []
         for (0 : $cols) { push @$row, 0 }
         push @$tree, $row
     }
@@ -13,24 +13,24 @@ fn new($rows, $cols) {
 }
 
 fn update($bit, $r, $c, $val) {
-    my $tree = $bit->{tree}; my $rows = $bit->{rows}; my $cols = $bit->{cols}
-    for (my $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
-        my $row = $tree->[$i]
-        for (my $j = $c + 1; $j <= $cols; $j += ($j & -$j)) { $row->[$j] += $val }
+    val $tree = $bit->{tree}; val $rows = $bit->{rows}; val $cols = $bit->{cols}
+    for (var $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
+        var $row = $tree->[$i]
+        for (var $j = $c + 1; $j <= $cols; $j += ($j & -$j)) { $row->[$j] += $val }
     }
 }
 
 fn query($bit, $r, $c) {
-    my $tree = $bit->{tree}; my $sum = 0
-    for (my $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
-        my $row = $tree->[$i]
-        for (my $j = $c + 1; $j > 0; $j -= ($j & -$j)) { $sum += $row->[$j] }
+    val $tree = $bit->{tree}; var $sum = 0
+    for (var $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
+        val $row = $tree->[$i]
+        for (var $j = $c + 1; $j > 0; $j -= ($j & -$j)) { $sum += $row->[$j] }
     }
     $sum
 }
 
 fn query_range($bit, $r1, $c1, $r2, $c2) {
-    my $res = query($bit, $r2, $c2)
+    var $res = query($bit, $r2, $c2)
     $res -= query($bit, $r1 - 1, $c2) if $r1 > 0
     $res -= query($bit, $r2, $c1 - 1) if $c1 > 0
     $res += query($bit, $r1 - 1, $c1 - 1) if $r1 > 0 && $c1 > 0
@@ -40,7 +40,7 @@ fn query_range($bit, $r1, $c1, $r2, $c2) {
 package main
 
 # --- Basic E2E ---
-my $bit = Fenwick2D::new(10, 10)
+val $bit = Fenwick2D::new(10, 10)
 Fenwick2D::update($bit, 2, 2, 5)
 Fenwick2D::update($bit, 5, 5, 10)
 Fenwick2D::query_range($bit, 0, 0, 9, 9) |> aeq 15, "full range sum"

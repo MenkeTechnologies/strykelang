@@ -11,28 +11,28 @@ fn Demo::Concurrency::slow_operation($n, $delay) {
 p "Starting async tasks..."
 
 # async returns a handle
-my $task1 = async { Demo::Concurrency::slow_operation(10, 0.5) }
-my $task2 = spawn { Demo::Concurrency::slow_operation(20, 1.0) } # spawn is an alias for async
+val $task1 = async { Demo::Concurrency::slow_operation(10, 0.5) }
+val $task2 = spawn { Demo::Concurrency::slow_operation(20, 1.0) } # spawn is an alias for async
 
 p "Tasks are running in the background. Doing other work..."
-my $sum = 0
+var $sum = 0
 $sum += _ for 1:100000
 p "Other work done. Sum = $sum"
 
 p "Awaiting tasks..."
-my $res1 = await $task1
-my $res2 = await $task2
+val $res1 = await $task1
+val $res2 = await $task2
 
 p "Task 1 result: $res1"
 p "Task 2 result: $res2"
 
 # You can also await a list of tasks
 p "\nRunning multiple parallel tasks..."
-my @task_list = map {
+val @task_list = map {
     async { Demo::Concurrency::slow_operation(_, 0.2) }
 } (1:5)
 
-my @results = map { await _ } @task_list
+val @results = map { await _ } @task_list
 p "Results: ", join(", ", @results)
 
 p "\nAll concurrency tests passed."

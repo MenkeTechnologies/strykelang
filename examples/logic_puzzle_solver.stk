@@ -35,11 +35,11 @@ fn Solver::solve($variables, $constraints) {
 fn Solver::backtrack($assignment, $variables, $constraints) {
     return $assignment if len(keys %$assignment) == len @$variables
 
-    my $var = Solver::select_unassigned_variable $assignment, $variables
-    for my $val (1:5) {
+    val $var = Solver::select_unassigned_variable $assignment, $variables
+    for val $val (1:5) {
         if (Solver::is_consistent $var, $val, $assignment, $constraints) {
             $assignment->{$var} = $val
-            my $result = Solver::backtrack $assignment, $variables, $constraints
+            val $result = Solver::backtrack $assignment, $variables, $constraints
             return $result if defined $result
             delete $assignment->{$var}
         }
@@ -48,33 +48,33 @@ fn Solver::backtrack($assignment, $variables, $constraints) {
 }
 
 fn Solver::select_unassigned_variable($assignment, $variables) {
-    for my $v (@$variables) {
+    for val $v (@$variables) {
         return $v unless exists $assignment->{$v}
     }
 }
 
 fn Solver::is_consistent($var, $val, $assignment, $constraints) {
     # 1. Unique value constraint for variables in the same category
-    my @parts = split "_", $var
-    my $category = $parts[0]
-    my $prefix = $category . "_"
-    for my $v (keys %$assignment) {
+    val @parts = split "_", $var
+    val $category = $parts[0]
+    val $prefix = $category . "_"
+    for var $v (keys %$assignment) {
         if (index($v, $prefix) == 0) {
             return 0 if $assignment->{$v} == $val
         }
     }
 
     # 2. Custom puzzle constraints
-    for my $c (@$constraints) {
-        my ($v1_name, $v2_name, $type) = @$c
+    for val $c (@$constraints) {
+        val ($v1_name, $v2_name, $type) = @$c
         
         # We can only check the constraint if both variables are assigned (or one is current)
-        my $v1 = $v1_name eq $var ? $val : $assignment->{$v1_name}
-        my $v2 = $v2_name eq $var ? $val : $assignment->{$v2_name}
+        val $v1 = $v1_name eq $var ? $val : $assignment->{$v1_name}
+        val $v2 = $v2_name eq $var ? $val : $assignment->{$v2_name}
         
         next unless defined $v1 && defined $v2
         
-        my $ok = match ($type) {
+        val $ok = match ($type) {
             "eq"    => $v1 == $v2,
             "next"  => abs($v1 - $v2) == 1,
             "right" => $v1 == $v2 + 1,
@@ -87,7 +87,7 @@ fn Solver::is_consistent($var, $val, $assignment, $constraints) {
 
 # ── Zebra Puzzle Definition ──────────────────────────────────────────────────
 
-my @vars = (
+val @vars = (
     "nat_english", "nat_spaniard", "nat_ukrainian", "nat_norwegian", "nat_japanese",
     "color_red", "color_green", "color_ivory", "color_yellow", "color_blue",
     "pet_dog", "pet_snails", "pet_fox", "pet_horse", "pet_zebra",
@@ -96,7 +96,7 @@ my @vars = (
 )
 
 # Constraints: [Var1, Var2, Type]
-my @constraints = (
+val @constraints = (
     ["nat_english",   "color_red",      "eq"],    # 2
     ["nat_spaniard",  "pet_dog",        "eq"],    # 3
     ["drink_coffee",  "color_green",    "eq"],    # 4
@@ -114,26 +114,26 @@ my @constraints = (
 # ── Main Execution ───────────────────────────────────────────────────────────
 
 p "Solving Zebra Puzzle..."
-my $start_time = time()
+val $start_time = time()
 
 # Static assignments from rules
-my %fixed = (
+val %fixed = (
     "drink_milk"    => 3,  # 9: middle house
     "nat_norwegian" => 1,  # 10: first house
 )
 
 # Seed the assignment
-my $result = Solver::backtrack \%fixed, \@vars, \@constraints
+val $result = Solver::backtrack \%fixed, \@vars, \@constraints
 
 if ($result) {
-    my $elapsed = time() - $start_time
+    val $elapsed = time() - $start_time
     p "Solution found in #{sprintf('%.3f', $elapsed)}s:"
     p ""
 
     # Pivot results for display
-    my %houses
+    var %houses
     for (1:5) { $houses{_} = +{} }
-    for my $k (keys %$result) {
+    for val $k (keys %$result) {
         if ($k =~ /^(\w+)_(\w+)$/) {
             $houses{$result->{$k}}->{$1} = $2
         }
@@ -141,16 +141,16 @@ if ($result) {
 
     p "House | Nationality | Color  | Pet    | Drink  | Smoke"
     p "------|-------------|--------|--------|--------|------------"
-    for my $i (1:5) {
-        my $h = $houses{$i}
+    for val $i (1:5) {
+        val $h = $houses{$i}
         printf "%-5d | %-11s | %-6s | %-6s | %-6s | %s\n",
             $i, $h->{nat}, $h->{color}, $h->{pet}, $h->{drink}, $h->{smoke}
     }
 
     p ""
     # Find the answers
-    my $water_drinker = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{drink_water} }
-    my $zebra_owner   = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{pet_zebra} }
+    var $water_drinker = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{drink_water} }
+    var $zebra_owner   = ~> keys(%$result) greps { /^nat_/ } first { $result->{_} == $result->{pet_zebra} }
     
     $water_drinker =~ s/^nat_//
     $zebra_owner   =~ s/^nat_//

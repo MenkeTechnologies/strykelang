@@ -2,12 +2,12 @@
 # Rosetta Code: Horse racing
 
 fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
-    my @horses
+    var @horses
     for (0:$num_horses - 1) {
         push @horses, { id => _, pos => 0 }
     }
     
-    my $winner = -1
+    var $winner = -1
     while ($winner == -1) {
         # Parallel update of positions? 
         # Using ~> map to simulate movement in parallel turns
@@ -17,7 +17,7 @@ fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
         }
         
         # Check for winners
-        for my $h (@horses) {
+        for val $h (@horses) {
             if ($h->{pos} >= $track_length) {
                 $winner = $h->{id}
                 last
@@ -27,7 +27,7 @@ fn Rosetta::HorseRacing::simulate($num_horses, $track_length) {
     $winner
 }
 
-my $win = Rosetta::HorseRacing::simulate(5, 50)
+val $win = Rosetta::HorseRacing::simulate(5, 50)
 assert_ok $win >= 0 && $win < 5, "Winner is one of the horses"
 
 test_run

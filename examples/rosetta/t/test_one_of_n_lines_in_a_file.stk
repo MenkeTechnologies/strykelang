@@ -2,9 +2,9 @@
 # Rosetta Code: One of n lines in a file
 
 fn Rosetta::OneOfN::pick(@lines) {
-    my $choice = undef
-    my $count = 0
-    for my $line (@lines) {
+    var $choice = undef
+    var $count = 0
+    for val $line (@lines) {
         $count++
         # rand() returns [0, 1)
         # We want to swap with probability 1/$count
@@ -15,10 +15,10 @@ fn Rosetta::OneOfN::pick(@lines) {
     $choice
 }
 
-my @lines = ("A", "B", "C", "D", "E")
-my %counts
-for (my $i = 0; $i < 1000; $i++) {
-    my $p = Rosetta::OneOfN::pick(@lines)
+val @lines = ("A", "B", "C", "D", "E")
+var %counts
+for (var $i = 0; $i < 1000; $i++) {
+    val $p = Rosetta::OneOfN::pick(@lines)
     $counts{$p}++
 }
 

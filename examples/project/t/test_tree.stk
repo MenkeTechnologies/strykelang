@@ -6,12 +6,12 @@ class MyNode extends DocumentNode {
 }
 
 fn build($d) {
-    my $n = MyNode(id => $d)
+    val $n = MyNode(id => $d)
     if ($d > 0) {
         $n->add_child(build($d - 1))
     }
     $n
 }
 
-my $tree = build(2)
+val $tree = build(2)
 p "Done: " . $tree->id . ""

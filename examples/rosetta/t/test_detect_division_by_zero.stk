@@ -12,7 +12,7 @@ fn Rosetta::Division::detect($numerator, $denominator) {
 # In Stryke, dividing by zero throws an exception.
 # We can use an eval block to catch it idiomatically.
 fn Rosetta::Division::idiomatic_detect($numerator, $denominator) {
-    my $res = eval { $numerator / $denominator }
+    val $res = eval { $numerator / $denominator }
     if ($@) {
         if ($@ =~ /Illegal division by zero/) {
             return "Exception caught"

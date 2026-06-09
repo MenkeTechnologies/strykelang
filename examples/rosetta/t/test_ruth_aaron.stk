@@ -7,9 +7,9 @@
 # (5 because n=5: spf=5; n+1=6: spf=2+3=5.)
 
 fn Rosetta::RuthAaron::distinct_pfsum($n) {
-    my $s = 0
-    my $x = $n
-    my $p = 2
+    var $s = 0
+    var $x = $n
+    var $p = 2
     while ($p * $p <= $x) {
         if ($x % $p == 0) {
             $s += $p
@@ -43,7 +43,7 @@ assert_eq Rosetta::RuthAaron::is(6),  0, "(6, 7) not RA"
 assert_eq Rosetta::RuthAaron::is(10), 0, "(10, 11) not RA"
 
 # First 8 Ruth-Aaron numbers
-my @r = ~> 2:500 |> grep {Rosetta::RuthAaron::is}
+val @r = ~> 2:500 |> grep {Rosetta::RuthAaron::is}
 assert_eq join(",", @r[0:7]),
     "5,24,49,77,104,153,369,492",
     "first 8 RA numbers"

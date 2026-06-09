@@ -14,7 +14,7 @@ assert_eq Rosetta::Cullen::compute(2), 9, "C2 (2*4+1)"
 assert_eq Rosetta::Cullen::compute(3), 25, "C3 (3*8+1)"
 assert_eq Rosetta::Cullen::compute(4), 65, "C4"
 
-my @list = Rosetta::Cullen::list(5)
+val @list = Rosetta::Cullen::list(5)
 assert_eq join(",", @list), "3,9,25,65,161", "Cullen list"
 
 5 |> Rosetta::Cullen::compute |> assert_eq(161, "pipe cullen 5")

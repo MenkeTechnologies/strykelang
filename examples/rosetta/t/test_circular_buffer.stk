@@ -25,14 +25,14 @@ fn Rosetta::Buffer::put($b, $val) {
 fn Rosetta::Buffer::get($b) {
     return undef if !$b->{full} && $b->{head} == $b->{tail}
     
-    my $val = $b->{data}->[$b->{tail}]
+    val $val = $b->{data}->[$b->{tail}]
     $b->{data}->[$b->{tail}] = undef
     $b->{tail} = ($b->{tail} + 1) % $b->{size}
     $b->{full} = 0
     $val
 }
 
-my $buf = Rosetta::Buffer::new(3)
+val $buf = Rosetta::Buffer::new(3)
 
 Rosetta::Buffer::put($buf, 1)
 Rosetta::Buffer::put($buf, 2)

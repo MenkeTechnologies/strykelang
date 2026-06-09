@@ -5,7 +5,7 @@ fn Rosetta::PronicNumbers::is_pronic($n) {
     if ($n < 0) {
         0
     } else {
-        my $root = int(sqrt($n))
+        val $root = int(sqrt($n))
         $root * ($root + 1) == $n
     }
 }
@@ -20,7 +20,7 @@ assert_ok Rosetta::PronicNumbers::is_pronic(6), "6 is pronic (2*3)"
 assert_ok Rosetta::PronicNumbers::is_pronic(12), "12 is pronic (3*4)"
 assert_ok !Rosetta::PronicNumbers::is_pronic(5), "5 is not pronic"
 
-my @list = Rosetta::PronicNumbers::pronic_list(30)
+val @list = Rosetta::PronicNumbers::pronic_list(30)
 assert_eq join(",", @list), "0,2,6,12,20,30", "pronic up to 30"
 
 42 |> Rosetta::PronicNumbers::is_pronic |> assert_ok("42 is pronic (6*7)")

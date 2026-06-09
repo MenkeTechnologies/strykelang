@@ -25,7 +25,7 @@ fn Rosetta::Substring::from_pos($str, $pos, $len) {
     substr($str, $pos, $len)
 }
 
-my $s = "Hello, World!"
+val $s = "Hello, World!"
 
 assert_eq Rosetta::Substring::first_n($s, 5), "Hello", "first 5"
 assert_eq Rosetta::Substring::last_n($s, 6), "World!", "last 6"

@@ -5,8 +5,8 @@ fn Rosetta::BinaryDigits::encode($n) {
     if ($n == 0) {
         "0"
     } else {
-        my @bits
-        my $num = $n
+        var @bits
+        var $num = $n
         while ($num > 0) {
             unshift @bits, $num % 2
             $num = int($num / 2)
@@ -16,9 +16,9 @@ fn Rosetta::BinaryDigits::encode($n) {
 }
 
 fn Rosetta::BinaryDigits::decode($s) {
-    my $result = 0
-    my @bits = split //, $s
-    for my $bit (@bits) {
+    var $result = 0
+    val @bits = split //, $s
+    for val $bit (@bits) {
         if ($bit =~ /[01]/) {
             $result = $result * 2 + int($bit)
         }
@@ -27,8 +27,8 @@ fn Rosetta::BinaryDigits::decode($s) {
 }
 
 fn Rosetta::BinaryDigits::count_ones($n) {
-    my $bin = Rosetta::BinaryDigits::encode($n)
-    my @ones = grep { _ eq "1" } chars($bin)
+    val $bin = Rosetta::BinaryDigits::encode($n)
+    val @ones = grep { _ eq "1" } chars($bin)
     len(@ones)
 }
 

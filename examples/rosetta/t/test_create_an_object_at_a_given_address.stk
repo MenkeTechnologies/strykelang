@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Create an object at a given address
 
-my %OBJECT_MEMORY
+var %OBJECT_MEMORY
 
 fn Rosetta::ObjectAtAddress::create_origin($value) {
-    my $seed = $value
-    my $addr = "" . \$seed
+    val $seed = $value
+    val $addr = "" . \$seed
     $OBJECT_MEMORY{$addr} = $value
     { address => $addr }
 }
@@ -23,8 +23,8 @@ fn Rosetta::ObjectAtAddress::write($obj, $value) {
     $obj
 }
 
-my $origin = Rosetta::ObjectAtAddress::create_origin(1234)
-my $alias = Rosetta::ObjectAtAddress::object_at($origin->{address})
+val $origin = Rosetta::ObjectAtAddress::create_origin(1234)
+val $alias = Rosetta::ObjectAtAddress::object_at($origin->{address})
 
 assert_eq $alias->{address}, $origin->{address}, "alias points at same address"
 assert_eq Rosetta::ObjectAtAddress::read($alias), 1234, "aliased object sees original value"

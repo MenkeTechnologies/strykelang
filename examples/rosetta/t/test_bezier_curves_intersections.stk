@@ -12,9 +12,9 @@ fn Rosetta::Bezier::intersect_unit_diagonals() {
     [0.5, 0.5]
 }
 
-my $a = Rosetta::Bezier::line_point([0, 0], [1, 1], 0.5)
-my $b = Rosetta::Bezier::line_point([0, 1], [1, 0], 0.5)
-my $i = Rosetta::Bezier::intersect_unit_diagonals()
+val $a = Rosetta::Bezier::line_point([0, 0], [1, 1], 0.5)
+val $b = Rosetta::Bezier::line_point([0, 1], [1, 0], 0.5)
+val $i = Rosetta::Bezier::intersect_unit_diagonals()
 
 assert_eq join(",", @$a), "0.5,0.5", "first linear Bézier midpoint computed"
 assert_eq join(",", @$b), "0.5,0.5", "second linear Bézier midpoint computed"

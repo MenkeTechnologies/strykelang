@@ -2,16 +2,16 @@
 # Rosetta Code: Longest increasing subsequence
 
 fn Rosetta::LIS::solve($arr_ref) {
-    my @arr = @$arr_ref
-    my $n = len(@arr)
+    val @arr = @$arr_ref
+    val $n = len(@arr)
     if ($n == 0) { return 0 }
-    my @tails = (0) x $n
-    my $size = 0
-    for my $x (@arr) {
-        my $i = 0
-        my $j = $size
+    var @tails = (0) x $n
+    var $size = 0
+    for val $x (@arr) {
+        var $i = 0
+        var $j = $size
         while ($i != $j) {
-            my $m = int(($i + $j) / 2)
+            val $m = int(($i + $j) / 2)
             if ($tails[$m] < $x) {
                 $i = $m + 1
             } else {

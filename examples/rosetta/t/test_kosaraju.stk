@@ -4,7 +4,7 @@
 fn Rosetta::Kosaraju::dfs($graph, $node, $visited, $stack) {
     $visited->{$node} = 1
     if (exists $graph->{$node}) {
-        for my $neighbor (@{$graph->{$node}}) {
+        for val $neighbor (@{$graph->{$node}}) {
             if (!exists $visited->{$neighbor}) {
                 Rosetta::Kosaraju::dfs($graph, $neighbor, $visited, $stack)
             }
@@ -17,7 +17,7 @@ fn Rosetta::Kosaraju::dfs_collect($graph, $node, $visited, $component) {
     $visited->{$node} = 1
     push @$component, $node
     if (exists $graph->{$node}) {
-        for my $neighbor (@{$graph->{$node}}) {
+        for val $neighbor (@{$graph->{$node}}) {
             if (!exists $visited->{$neighbor}) {
                 Rosetta::Kosaraju::dfs_collect($graph, $neighbor, $visited, $component)
             }
@@ -27,11 +27,11 @@ fn Rosetta::Kosaraju::dfs_collect($graph, $node, $visited, $component) {
 
 fn Rosetta::Kosaraju::solve($graph) {
     # 1. Reverse graph
-    my $rev_graph = {}
-    my $all_nodes = {}
-    for my $u (keys %$graph) {
+    var $rev_graph = {}
+    var $all_nodes = {}
+    for val $u (keys %$graph) {
         $all_nodes->{$u} = 1
-        for my $v (@{$graph->{$u}}) {
+        for val $v (@{$graph->{$u}}) {
             $all_nodes->{$v} = 1
             $rev_graph->{$v} = [] if !exists $rev_graph->{$v}
             push @{$rev_graph->{$v}}, $u
@@ -39,34 +39,34 @@ fn Rosetta::Kosaraju::solve($graph) {
     }
     
     # 2. First DFS
-    my $stack = []
-    my $visited = {}
-    for my $node (keys %$all_nodes) {
+    val $stack = []
+    val $visited = {}
+    for val $node (keys %$all_nodes) {
         if (!exists $visited->{$node}) {
             Rosetta::Kosaraju::dfs($graph, $node, $visited, $stack)
         }
     }
     
     # 3. Second DFS
-    my $visited2 = {}
-    my @sccs
+    val $visited2 = {}
+    var @sccs
     while (len(@$stack) > 0) {
-        my $node = pop @$stack
+        val $node = pop @$stack
         if (!exists $visited2->{$node}) {
-            my $component = []
+            val $component = []
             Rosetta::Kosaraju::dfs_collect($rev_graph, $node, $visited2, $component)
             # Sort component for deterministic testing
-            my @sorted_comp = sort(@$component)
+            val @sorted_comp = sort(@$component)
             push @sccs, \@sorted_comp
         }
     }
     
     # Sort SCCs for deterministic testing
-    my @sorted_sccs = sort { join(",", @_0) cmp join(",", @{_1}) } @sccs
+    val @sorted_sccs = sort { join(",", @_0) cmp join(",", @{_1}) } @sccs
     \@sorted_sccs
 }
 
-my $graph = {
+val $graph = {
     "A" => ["B"],
     "B" => ["C"],
     "C" => ["A"],
@@ -75,8 +75,8 @@ my $graph = {
     "F" => ["E"]
 }
 
-my $sccs = Rosetta::Kosaraju::solve($graph)
-my @scc_strs = ~> @$sccs map { join(",", @{_}) }
+val $sccs = Rosetta::Kosaraju::solve($graph)
+val @scc_strs = ~> @$sccs map { join(",", @{_}) }
 
 assert_eq len(@scc_strs), 2, "Found 2 SCCs"
 assert_eq $scc_strs[0], "A,B,C", "SCC 1 is A,B,C"

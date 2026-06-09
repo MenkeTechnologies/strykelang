@@ -1,15 +1,15 @@
 # lib/memoization.stk — memoization patterns and caching utilities
 
 fn Project::Memoization::make_memoized($fn) {
-    my %cache
+    var %cache
     fn {
-        my $key = join("\x00", @_)
+        val $key = join("\x00", @_)
         return $cache{$key} if exists $cache{$key}
         $cache{$key} = $fn(@_)
     }
 }
 
-my %_fib_cache
+var %_fib_cache
 fn Project::Memoization::fib_memo($n) {
     return $n if $n <= 1
     return $_fib_cache{$n} if exists $_fib_cache{$n}
@@ -22,11 +22,11 @@ fn Project::Memoization::fib_no_memo($n) {
 }
 
 fn Project::Memoization::make_cached_adder {
-    my %cache
+    var %cache
     mysync $calls = 0
 
-    my $add = fn($a, $b) {
-        my $key = "$a,$b"
+    val $add = fn($a, $b) {
+        val $key = "$a,$b"
         unless (exists $cache{$key}) {
             $calls++
             $cache{$key} = $a + $b
@@ -34,55 +34,55 @@ fn Project::Memoization::make_cached_adder {
         $cache{$key}
     }
 
-    my $get_calls = fn { $calls }
-    my $clear = fn { %cache = (); $calls = 0 }
+    val $get_calls = fn { $calls }
+    val $clear = fn { %cache = (); $calls = 0 }
 
     { add => $add, calls => $get_calls, clear => $clear }
 }
 
-my %_fact_cache = (0 => 1, 1 => 1)
+var %_fact_cache = (0 => 1, 1 => 1)
 fn Project::Memoization::factorial_memo($n) {
     return $_fact_cache{$n} if exists $_fact_cache{$n}
     $_fact_cache{$n} = $n * Project::Memoization::factorial_memo($n - 1)
 }
 
 fn Project::Memoization::make_lru_cache($max_size) {
-    my @keys_order
-    my %cache
+    var @keys_order
+    var %cache
 
-    my $get = fn($key) {
+    val $get = fn($key) {
         return undef unless exists $cache{$key}
         @keys_order = grep { _ ne $key } @keys_order
         push @keys_order, $key
         $cache{$key}
     }
 
-    my $set = fn($key, $val) {
+    val $set = fn($key, $val) {
         if (exists $cache{$key}) {
             @keys_order = grep { _ ne $key } @keys_order
         } elsif (len(@keys_order) >= $max_size) {
-            my $oldest = shift @keys_order
+            val $oldest = shift @keys_order
             delete $cache{$oldest}
         }
         $cache{$key} = $val
         push @keys_order, $key
     }
 
-    my $size = fn { len(keys %cache) }
-    my $keys = fn { [@keys_order] }
+    val $size = fn { len(keys %cache) }
+    val $keys = fn { [@keys_order] }
 
     { get => $get, set => $set, size => $size, keys => $keys }
 }
 
 fn Project::Memoization::make_ttl_cache($ttl_seconds) {
-    my %cache
-    my %timestamps
+    var %cache
+    var %timestamps
 
-    my $now = fn { time() }
+    val $now = fn { time() }
 
-    my $get = fn($key) {
+    val $get = fn($key) {
         return undef unless exists $cache{$key}
-        my $age = $now() - $timestamps{$key}
+        val $age = $now() - $timestamps{$key}
         if ($age > $ttl_seconds) {
             delete $cache{$key}
             delete $timestamps{$key}
@@ -91,23 +91,23 @@ fn Project::Memoization::make_ttl_cache($ttl_seconds) {
         $cache{$key}
     }
 
-    my $set = fn($key, $val) {
+    val $set = fn($key, $val) {
         $cache{$key} = $val
         $timestamps{$key} = $now()
     }
 
-    my $size = fn { len(keys %cache) }
+    val $size = fn { len(keys %cache) }
 
     { get => $get, set => $set, size => $size }
 }
 
-my %_prime_cache
+var %_prime_cache
 fn Project::Memoization::is_prime_memo($n) {
     return 0 if $n < 2
     return $_prime_cache{$n} if exists $_prime_cache{$n}
 
-    my $sqrt = int(sqrt($n))
-    for my $i (2:$sqrt) {
+    val $sqrt = int(sqrt($n))
+    for val $i (2:$sqrt) {
         if ($n % $i == 0) {
             $_prime_cache{$n} = 0
             return 0
@@ -120,13 +120,13 @@ fn Project::Memoization::is_prime_memo($n) {
 fn Project::Memoization::make_call_counter($fn) {
     mysync $count = 0
 
-    my $wrapped = fn {
+    val $wrapped = fn {
         $count++
         $fn(@_)
     }
 
-    my $get_count = fn { $count }
-    my $reset = fn { $count = 0 }
+    val $get_count = fn { $count }
+    val $reset = fn { $count = 0 }
 
     { call => $wrapped, count => $get_count, reset => $reset }
 }
@@ -144,12 +144,12 @@ fn Project::Memoization::make_once($fn) {
     }
 }
 
-my %_collatz_cache
+var %_collatz_cache
 fn Project::Memoization::collatz_memo($n) {
     return 0 if $n == 1
     return $_collatz_cache{$n} if exists $_collatz_cache{$n}
 
-    my $next = $n % 2 == 0 ? $n / 2 : 3 * $n + 1
+    val $next = $n % 2 == 0 ? $n / 2 : 3 * $n + 1
     $_collatz_cache{$n} = 1 + Project::Memoization::collatz_memo($next)
 }
 
@@ -158,15 +158,15 @@ fn Project::Memoization::nth_fibonacci_memo($n) {
 }
 
 fn Project::Memoization::sum_fibs_memo($n) {
-    my $sum = 0
-    for my $i (1:$n) {
+    var $sum = 0
+    for val $i (1:$n) {
         $sum += Project::Memoization::fib_memo($i)
     }
     $sum
 }
 
 fn Project::Memoization::count_primes_memo($max) {
-    my $count = 0
+    var $count = 0
     ~> 2:$max ep {
         $count++ if Project::Memoization::is_prime_memo(_)
     }
@@ -177,7 +177,7 @@ fn Project::Memoization::make_debounced($delay_ms, $fn) {
     mysync $last_call = 0
 
     fn {
-        my $now = time() * 1000
+        val $now = time() * 1000
         if ($now - $last_call >= $delay_ms) {
             $last_call = $now
             $fn(@_)

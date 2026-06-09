@@ -20,7 +20,7 @@ assert_ok Project::StringsAdvancedImpl::adv_is_anagram("Dormitory", "Dirty Room"
 assert_false Project::StringsAdvancedImpl::adv_is_anagram("Hello", "World"), "Hello/World is not anagram"
 
 # ── Project::StringsAdvancedImpl::adv_word_frequency ─────
-my $f = Project::StringsAdvancedImpl::adv_word_frequency("Hello world, hello!")
+val $f = Project::StringsAdvancedImpl::adv_word_frequency("Hello world, hello!")
 assert_eq $f->{hello}, 2, "freq(hello)"
 assert_eq $f->{world}, 1, "freq(world)"
 assert_false defined($f->{missing}), "freq(missing)"

@@ -16,8 +16,8 @@ p "--- Binary Search ---"
 fn Search::binary($list, $target, $low, $high) {
     return -1 if $low > $high
 
-    my $mid = ($low + $high) / 2 |> int
-    my $cmp = $target <=> $list->[$mid]
+    val $mid = ($low + $high) / 2 |> int
+    val $cmp = $target <=> $list->[$mid]
 
     $cmp == 0  ? $mid
   : $cmp == -1 ? Search::binary $list, $target, $low,      $mid - 1
@@ -26,11 +26,11 @@ fn Search::binary($list, $target, $low, $high) {
 
 # ── 2. Run Example ────────────────────────────────────────────────
 
-my @data   = (10, 20, 30, 40, 50, 60, 70, 80, 90)
-my $target = 70
+val @data   = (10, 20, 30, 40, 50, 60, 70, 80, 90)
+val $target = 70
 
 p "Searching for $target in: @data"
-my $idx = Search::binary \@data, $target, 0, len(@data) - 1
+val $idx = Search::binary \@data, $target, 0, len(@data) - 1
 
 p $idx != -1 ? "Found at index: $idx" : "Not found."
 

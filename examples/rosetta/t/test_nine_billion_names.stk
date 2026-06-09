@@ -7,11 +7,11 @@ fn Rosetta::Partitions::solve($n) {
     # But for small n, we can use simpler DP:
     # ways[i] = ways to sum to i
     
-    my @ways = (1)
+    var @ways = (1)
     push @ways, 0 for 1:$n
     
-    for (my $i = 1; $i <= $n; $i++) {
-        for (my $j = $i; $j <= $n; $j++) {
+    for (var $i = 1; $i <= $n; $i++) {
+        for (var $j = $i; $j <= $n; $j++) {
             $ways[$j] += $ways[$j - $i]
         }
     }

@@ -2,26 +2,26 @@
 # Rosetta Code: Vogel's approximation method
 
 fn Rosetta::Vogel::solve($costs, $supply, $demand) {
-    my $num_rows = len(@$supply)
-    my $num_cols = len(@$demand)
+    val $num_rows = len(@$supply)
+    val $num_cols = len(@$demand)
     
-    my @s = @$supply
-    my @d = @$demand
-    my @res
-    for my $i (0:$num_rows-1) {
+    var @s = @$supply
+    var @d = @$demand
+    var @res
+    for val $i (0:$num_rows-1) {
         $res[$i] = []
-        for my $j (0:$num_cols-1) { $res[$i]->[$j] = 0 }
+        for val $j (0:$num_cols-1) { $res[$i]->[$j] = 0 }
     }
     
-    my %row_active; $row_active{_} = 1 for 0:$num_rows-1
-    my %col_active; $col_active{_} = 1 for 0:$num_cols-1
+    var %row_active; $row_active{_} = 1 for 0:$num_rows-1
+    var %col_active; $col_active{_} = 1 for 0:$num_cols-1
     
     while (cnt(keys %row_active) > 0 && cnt(keys %col_active) > 0) {
-        my %row_penalties
-        for my $r (keys %row_active) {
-            my @c
-            for my $c (keys %col_active) { push @c, $costs->[$r]->[$c] }
-            my @sorted = sort { _0 <=> _1 } @c
+        var %row_penalties
+        for val $r (keys %row_active) {
+            val @c
+            for var $c (keys %col_active) { push @c, $costs->[$r]->[$c] }
+            val @sorted = sort { _0 <=> _1 } @c
             if (len(@sorted) > 1) {
                 $row_penalties{$r} = $sorted[1] - $sorted[0]
             } else {
@@ -29,11 +29,11 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
             }
         }
         
-        my %col_penalties
-        for my $c (keys %col_active) {
-            my @r_costs
-            for my $r (keys %row_active) { push @r_costs, $costs->[$r]->[$c] }
-            my @sorted = sort { _0 <=> _1 } @r_costs
+        var %col_penalties
+        for val $c (keys %col_active) {
+            var @r_costs
+            for val $r (keys %row_active) { push @r_costs, $costs->[$r]->[$c] }
+            val @sorted = sort { _0 <=> _1 } @r_costs
             if (len(@sorted) > 1) {
                 $col_penalties{$c} = $sorted[1] - $sorted[0]
             } else {
@@ -42,29 +42,29 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
         }
         
         # Find max penalty
-        my $max_p = -1
-        my $is_row = 1
-        my $idx = -1
+        var $max_p = -1
+        var $is_row = 1
+        var $idx = -1
         
-        for my $r (keys %row_penalties) {
+        for val $r (keys %row_penalties) {
             if ($row_penalties{$r} > $max_p) {
                 $max_p = $row_penalties{$r}; $idx = $r; $is_row = 1
             }
         }
-        for my $c (keys %col_penalties) {
+        for val $c (keys %col_penalties) {
             if ($col_penalties{$c} > $max_p) {
                 $max_p = $col_penalties{$c}; $idx = $c; $is_row = 0
             }
         }
         
-        my $best_r = -1
-        my $best_c = -1
+        var $best_r = -1
+        var $best_c = -1
         
         if ($is_row) {
             $best_r = $idx
-            my $min_c = -1
-            my $min_v = 1e18
-            for my $c (keys %col_active) {
+            var $min_c = -1
+            var $min_v = 1e18
+            for val $c (keys %col_active) {
                 if ($costs->[$best_r]->[$c] < $min_v) {
                     $min_v = $costs->[$best_r]->[$c]; $min_c = $c
                 }
@@ -72,9 +72,9 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
             $best_c = $min_c
         } else {
             $best_c = $idx
-            my $min_r = -1
-            my $min_v = 1e18
-            for my $r (keys %row_active) {
+            var $min_r = -1
+            var $min_v = 1e18
+            for val $r (keys %row_active) {
                 if ($costs->[$r]->[$best_c] < $min_v) {
                     $min_v = $costs->[$r]->[$best_c]; $min_r = $r
                 }
@@ -82,7 +82,7 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
             $best_r = $min_r
         }
         
-        my $quantity = ($s[$best_r] < $d[$best_c] ? $s[$best_r] : $d[$best_c])
+        val $quantity = ($s[$best_r] < $d[$best_c] ? $s[$best_r] : $d[$best_c])
         $res[$best_r]->[$best_c] = $quantity
         $s[$best_r] -= $quantity
         $d[$best_c] -= $quantity
@@ -95,20 +95,20 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
 }
 
 # Example from a textbook
-my @costs = (
+val @costs = (
     [2, 3, 11, 7],
     [1, 0, 6, 1],
     [5, 8, 15, 9]
 )
-my @supply = (6, 1, 10)
-my @demand = (7, 5, 3, 2)
+val @supply = (6, 1, 10)
+val @demand = (7, 5, 3, 2)
 
-my $result = Rosetta::Vogel::solve(\@costs, \@supply, \@demand)
+val $result = Rosetta::Vogel::solve(\@costs, \@supply, \@demand)
 
 # Total cost should be minimized (initial feasible solution)
-my $total_cost = 0
-for my $i (0:2) {
-    for my $j (0:3) {
+var $total_cost = 0
+for val $i (0:2) {
+    for val $j (0:3) {
         $total_cost += $result->[$i]->[$j] * $costs[$i]->[$j]
     }
 }

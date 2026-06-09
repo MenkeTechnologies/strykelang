@@ -1,20 +1,20 @@
 #!/usr/bin/env stryke
 require "./GoCounting.stk"
 
-my $board = ["_BW_", "_BW_", "_BW_", "_BW_"]
+val $board = ["_BW_", "_BW_", "_BW_", "_BW_"]
 
-my $r = Exercism::GoCounting::territory($board, 0, 0)
+val $r = Exercism::GoCounting::territory($board, 0, 0)
 assert_eq $r->[0],         "ok",    "ok"
 assert_eq $r->[1]{owner},  "black", "B-bordered = black"
 assert_eq len(@{$r->[1]{stones}}), 4, "4 empty cells"
 
-my $r2 = Exercism::GoCounting::territory($board, 3, 0)
+val $r2 = Exercism::GoCounting::territory($board, 3, 0)
 assert_eq $r2->[1]{owner}, "white", "W-bordered = white"
 
-my $r3 = Exercism::GoCounting::territory($board, 1, 0)
+val $r3 = Exercism::GoCounting::territory($board, 1, 0)
 assert_eq $r3->[0], "error", "not empty"
 
-my $r4 = Exercism::GoCounting::territory($board, -1, 0)
+val $r4 = Exercism::GoCounting::territory($board, -1, 0)
 assert_eq $r4->[0], "error", "OOB"
 
 test_run

@@ -12,7 +12,7 @@
 
 # ── route registry ──────────────────────────────────────────────────
 
-my @routes  # each entry: [method, pattern, handler, segments_with_param_marker]
+var @routes  # each entry: [method, pattern, handler, segments_with_param_marker]
 
 # Decompose `/users/:id/posts/:slug` into a list of segments where
 # `:name` segments are tagged as {kind=>"param", name=>"id"}. This
@@ -21,11 +21,11 @@ my @routes  # each entry: [method, pattern, handler, segments_with_param_marker]
 # across multiple routes in a loop.
 
 fn Demo::Router::register($method, $pattern, $handler) {
-    my @raw_segs = split /\//, $pattern
+    var @raw_segs = split /\//, $pattern
     # First element is empty (leading "/"); drop it.
     @raw_segs = grep { len(_) > 0 } @raw_segs
-    my @parsed
-    for my $seg (@raw_segs) {
+    var @parsed
+    for val $seg (@raw_segs) {
         if (substr($seg, 0, 1) eq ":") {
             push @parsed, +{ kind => "param", name => substr($seg, 1) }
         } else {
@@ -38,21 +38,21 @@ fn Demo::Router::register($method, $pattern, $handler) {
 # ── match incoming request ──────────────────────────────────────────
 
 fn Demo::Router::dispatch($method, $path) {
-    my @path_segs = split /\//, $path
+    var @path_segs = split /\//, $path
     @path_segs = grep { len(_) > 0 } @path_segs
 
-    for my $route (@routes) {
+    for val $route (@routes) {
         next unless $route->[0] eq $method
-        my $segs    = $route->[2]
-        my $handler = $route->[3]
+        val $segs    = $route->[2]
+        val $handler = $route->[3]
 
         next unless len(@$segs) == len @path_segs
 
-        my %params
-        my $ok = 1
-        for my $i (0:len(@$segs) - 1) {
-            my $rseg = $segs->[$i]
-            my $pseg = $path_segs[$i]
+        var %params
+        var $ok = 1
+        for val $i (0:len(@$segs) - 1) {
+            val $rseg = $segs->[$i]
+            val $pseg = $path_segs[$i]
             if ($rseg->{kind} eq "lit") {
                 if ($rseg->{name} ne $pseg) {
                     $ok = 0
@@ -95,7 +95,7 @@ Demo::Router::register("GET",  "/users/:id/posts/:slug",    \&Demo::Handlers::us
 Demo::Router::register("POST", "/users",                    \&Demo::Handlers::create_user)
 
 printf "── %d routes registered ──────────────────────────────\n", len @routes
-for my $r (@routes) {
+for val $r (@routes) {
     printf "  %-5s %s\n", $r->[0], $r->[1]
 }
 
@@ -107,12 +107,12 @@ mysync $lat = t_digest(100)
 mysync $hits = topk(3)
 
 around "Demo::Router::dispatch" {
-    my $method = $INTERCEPT_ARGS[0]
-    my $path   = $INTERCEPT_ARGS[1]
+    val $method = $INTERCEPT_ARGS[0]
+    val $path   = $INTERCEPT_ARGS[1]
     $req_count++
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
-    my $us = (now_ns() - $t0) / 1000.0
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
+    val $us = (now_ns() - $t0) / 1000.0
     td_add($lat, $us)
     if ($r->{ok}) {
         $matched++
@@ -123,7 +123,7 @@ around "Demo::Router::dispatch" {
 
 # ── simulate a request stream ───────────────────────────────────────
 
-my @requests = (
+val @requests = (
     ["GET",  "/users"],
     ["GET",  "/users/42"],
     ["GET",  "/users/100"],
@@ -138,10 +138,10 @@ my @requests = (
 
 p ""
 printf "── dispatching %d requests ────────────────────────────\n", len @requests
-for my $req (@requests) {
-    my $result = Demo::Router::dispatch($req->[0], $req->[1])
+for val $req (@requests) {
+    val $result = Demo::Router::dispatch($req->[0], $req->[1])
     if ($result->{ok}) {
-        my $response = $result->{handler}($result->{params})
+        val $response = $result->{handler}($result->{params})
         printf "  %-6s %-30s -> %s\n", $req->[0], $req->[1], $response
     } else {
         printf "  %-6s %-30s -> 404 Not Found\n", $req->[0], $req->[1]
@@ -169,8 +169,8 @@ printf "  p99  : %.1f µs\n", td_quantile($lat, 0.99)
 
 p ""
 p "── top routes (TopK) ────────────────────────────────"
-my @top = topk_top($hits)
-for my $h (@top) {
+val @top = topk_top($hits)
+for val $h (@top) {
     printf "  %-32s : %d hit(s)\n", $h->[0], $h->[1]
 }
 

@@ -2,7 +2,7 @@
 # Rosetta Code: Parameterized SQL statement
 
 fn Rosetta::ParamSQL::prepare_demo() {
-    my $db = sqlite(":memory:")
+    val $db = sqlite(":memory:")
     $db->exec("CREATE TABLE players (name TEXT, score INTEGER, active INTEGER, jerseyNum INTEGER PRIMARY KEY)")
     $db->exec("INSERT INTO players VALUES (?, ?, ?, ?)", "Jones, Bob", 0, 0, 99)
     $db->exec("INSERT INTO players VALUES (?, ?, ?, ?)", "Jesten, Jim", 0, 0, 100)
@@ -10,14 +10,14 @@ fn Rosetta::ParamSQL::prepare_demo() {
 }
 
 fn Rosetta::ParamSQL::execute_update($db) {
-    my $sql = "UPDATE players SET name = ?, score = ?, active = ? WHERE jerseyNum = ?"
+    val $sql = "UPDATE players SET name = ?, score = ?, active = ? WHERE jerseyNum = ?"
     $db->exec($sql, "Smith, Steve", 42, 1, 99)
     ($sql, $db->query("SELECT * FROM players WHERE jerseyNum = ?", 99)->[0])
 }
 
-my $db = Rosetta::ParamSQL::prepare_demo()
-my ($sql, $row) = Rosetta::ParamSQL::execute_update($db)
-my $other = $db->query("SELECT * FROM players WHERE jerseyNum = ?", 100)->[0]
+val $db = Rosetta::ParamSQL::prepare_demo()
+val ($sql, $row) = Rosetta::ParamSQL::execute_update($db)
+val $other = $db->query("SELECT * FROM players WHERE jerseyNum = ?", 100)->[0]
 
 assert_eq $sql =~ /\?/, 1, "statement uses placeholders"
 assert_eq $row->{name}, "Smith, Steve", "name updated through parameters"

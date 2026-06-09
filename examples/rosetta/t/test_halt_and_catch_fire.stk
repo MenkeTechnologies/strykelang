@@ -8,7 +8,7 @@ fn Rosetta::HCF::run() {
     "HCF Simulation"
 }
 
-my $res = Rosetta::HCF::run()
+val $res = Rosetta::HCF::run()
 assert_eq $res, "HCF Simulation", "HCF simulation"
 
 test_run

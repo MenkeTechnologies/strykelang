@@ -2,8 +2,8 @@
 # Rosetta Code: Man or boy test
 
 fn Rosetta::ManOrBoy::a($k_val, $x1, $x2, $x3, $x4, $x5) {
-    my $k = [$k_val]
-    my $b
+    var $k = [$k_val]
+    var $b
     $b = fn {
         $k->[0] -= 1
         Rosetta::ManOrBoy::a($k->[0], $b, $x1, $x2, $x3, $x4)
@@ -13,9 +13,9 @@ fn Rosetta::ManOrBoy::a($k_val, $x1, $x2, $x3, $x4, $x5) {
 }
 
 # Values for x1..x5
-my $f1  = fn { 1 }
-my $f0  = fn { 0 }
-my $fn1 = fn { -1 }
+val $f1  = fn { 1 }
+val $f0  = fn { 0 }
+val $fn1 = fn { -1 }
 
 # Standard test values
 assert_eq Rosetta::ManOrBoy::a(0, $f1, $fn1, $fn1, $f1, $f0), 1,  "Man or boy A(0)"

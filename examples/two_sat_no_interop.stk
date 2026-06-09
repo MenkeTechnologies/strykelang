@@ -29,16 +29,16 @@ fn Sat::neg($lit) {
 # Each clause is +{ a => [var, neg?], b => [var, neg?] }.
 
 fn Sat::build_graph($n_vars, $clauses) {
-    my $V = 2 * $n_vars
-    my @g
-    my @gr
-    for my $i (0:$V - 1) {
+    val $V = 2 * $n_vars
+    var @g
+    var @gr
+    for val $i (0:$V - 1) {
         push @g,  []
         push @gr, []
     }
-    for my $c (@$clauses) {
-        my $ax = Sat::lit($c->{a}->[0], $c->{a}->[1])
-        my $bx = Sat::lit($c->{b}->[0], $c->{b}->[1])
+    for val $c (@$clauses) {
+        val $ax = Sat::lit($c->{a}->[0], $c->{a}->[1])
+        val $bx = Sat::lit($c->{b}->[0], $c->{b}->[1])
         push @{$g[Sat::neg($ax)]}, $bx
         push @{$g[Sat::neg($bx)]}, $ax
         push @{$gr[$bx]}, Sat::neg($ax)
@@ -53,23 +53,23 @@ fn Sat::build_graph($n_vars, $clauses) {
 # exactly what 2-SAT needs.
 
 fn Sat::scc($graph) {
-    my $V = $graph->{V}
-    my $g = $graph->{g}
-    my $gr = $graph->{gr}
-    my @visited = (0) x $V
-    my @order
-    my @stack
-    for my $start (0:$V - 1) {
+    val $V = $graph->{V}
+    val $g = $graph->{g}
+    val $gr = $graph->{gr}
+    var @visited = (0) x $V
+    var @order
+    var @stack
+    for val $start (0:$V - 1) {
         next if $visited[$start]
         push @stack, [$start, 0]
         $visited[$start] = 1
         while (len(@stack) > 0) {
-            my $top = $stack[-1]
-            my $v = $top->[0]
-            my $idx = $top->[1]
+            val $top = $stack[-1]
+            val $v = $top->[0]
+            val $idx = $top->[1]
             if ($idx < len(@{$g->[$v]})) {
                 $top->[1]++
-                my $u = $g->[$v]->[$idx]
+                val $u = $g->[$v]->[$idx]
                 if (!$visited[$u]) {
                     $visited[$u] = 1
                     push @stack, [$u, 0]
@@ -80,16 +80,16 @@ fn Sat::scc($graph) {
             }
         }
     }
-    my @comp = (-1) x $V
-    my $k = 0
-    for my $i (0:$V - 1) {
-        my $v = $order[$V - 1 - $i]
+    var @comp = (-1) x $V
+    var $k = 0
+    for val $i (0:$V - 1) {
+        val $v = $order[$V - 1 - $i]
         next if $comp[$v] >= 0
         $comp[$v] = $k
-        my @work = ($v)
+        var @work = ($v)
         while (len(@work) > 0) {
-            my $u = pop(@work)
-            for my $w (@{$gr->[$u]}) {
+            val $u = pop(@work)
+            for val $w (@{$gr->[$u]}) {
                 if ($comp[$w] < 0) {
                     $comp[$w] = $k
                     push @work, $w
@@ -105,16 +105,16 @@ fn Sat::scc($graph) {
 # Returns +{ ok => 0/1, assign => [bool, bool, …] }.
 
 fn Sat::solve($n_vars, $clauses) {
-    my $graph = Sat::build_graph($n_vars, $clauses)
-    my $sccs = Sat::scc($graph)
-    my $comp = $sccs->{comp}
-    for my $v (0:$n_vars - 1) {
+    val $graph = Sat::build_graph($n_vars, $clauses)
+    val $sccs = Sat::scc($graph)
+    val $comp = $sccs->{comp}
+    for val $v (0:$n_vars - 1) {
         if ($comp->[2 * $v] == $comp->[2 * $v + 1]) {
             return +{ ok => 0, assign => [] }
         }
     }
-    my @assign
-    for my $v (0:$n_vars - 1) {
+    var @assign
+    for val $v (0:$n_vars - 1) {
         push @assign, $comp->[2 * $v] > $comp->[2 * $v + 1] ? 1 : 0
     }
     +{ ok => 1, assign => \@assign }
@@ -123,9 +123,9 @@ fn Sat::solve($n_vars, $clauses) {
 # ── verify a candidate assignment satisfies every clause ──────────
 
 fn Sat::check($n_vars, $clauses, $assign) {
-    for my $c (@$clauses) {
-        my $av = $assign->[$c->{a}->[0]]
-        my $bv = $assign->[$c->{b}->[0]]
+    for val $c (@$clauses) {
+        var $av = $assign->[$c->{a}->[0]]
+        var $bv = $assign->[$c->{b}->[0]]
         if ($c->{a}->[1]) { $av = !$av }
         if ($c->{b}->[1]) { $bv = !$bv }
         return 0 unless $av || $bv
@@ -136,7 +136,7 @@ fn Sat::check($n_vars, $clauses, $assign) {
 # ── primary test cases ────────────────────────────────────────────
 # Each clause is encoded as (var, negated?). Variables index from 0.
 
-my @cases = (
+val @cases = (
     +{
         name    => "trivial sat: (x0 ∨ x1)",
         n       => 2,
@@ -199,45 +199,45 @@ my @cases = (
 p "── 2-SAT solver demo ────────────────────────────────"
 printf "  %-40s  %3s  %s\n", "case", "sat", "assignment"
 printf "  %-40s  %3s  %s\n", "----------------------------------------", "---", "----------"
-for my $c (@cases) {
-    my $r = Sat::solve($c->{n}, $c->{clauses})
-    my $shown = $r->{ok} ? "[" . join(", ", @{$r->{assign}}) . "]" : "—"
+for val $c (@cases) {
+    val $r = Sat::solve($c->{n}, $c->{clauses})
+    val $shown = $r->{ok} ? "[" . join(", ", @{$r->{assign}}) . "]" : "—"
     printf "  %-40s  %3s  %s\n", $c->{name}, $r->{ok} ? "yes" : "no", $shown
 }
 
 # ── invariant 1: solver sat-status matches expectation ────────────
 
-for my $c (@cases) {
-    my $r = Sat::solve($c->{n}, $c->{clauses})
+for val $c (@cases) {
+    val $r = Sat::solve($c->{n}, $c->{clauses})
     die "sat mismatch on \"#{$c->{name}}\": got #{$r->{ok}} want #{$c->{sat}}" unless $r->{ok} == $c->{sat}
 }
 
 # ── invariant 2: every reported sat-assignment satisfies all clauses ─
 
-for my $c (@cases) {
-    my $r = Sat::solve($c->{n}, $c->{clauses})
+for val $c (@cases) {
+    val $r = Sat::solve($c->{n}, $c->{clauses})
     next unless $r->{ok}
     die "model failed verifier on \"#{$c->{name}}\"" unless Sat::check($c->{n}, $c->{clauses}, $r->{assign})
 }
 
 # ── invariant 3: assignment length matches n_vars on sat cases ────
 
-for my $c (@cases) {
-    my $r = Sat::solve($c->{n}, $c->{clauses})
+for val $c (@cases) {
+    val $r = Sat::solve($c->{n}, $c->{clauses})
     next unless $r->{ok}
     die "assignment length mismatch on \"#{$c->{name}}\"" unless len(@{$r->{assign}}) == $c->{n}
 }
 
 # ── invariant 4: brute-force cross-check on small cases ───────────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next unless $c->{n} <= 4
-    my $solver = Sat::solve($c->{n}, $c->{clauses})
-    my $brute = 0
-    my $total = 1 << $c->{n}
-    for my $m (0:$total - 1) {
-        my @assign
-        for my $v (0:$c->{n} - 1) {
+    val $solver = Sat::solve($c->{n}, $c->{clauses})
+    var $brute = 0
+    val $total = 1 << $c->{n}
+    for val $m (0:$total - 1) {
+        var @assign
+        for val $v (0:$c->{n} - 1) {
             push @assign, ($m >> $v) & 1
         }
         if (Sat::check($c->{n}, $c->{clauses}, \@assign)) {
@@ -251,7 +251,7 @@ for my $c (@cases) {
 # ── invariant 5: adding (x_i ∨ x_i) forces x_i = 1 in the model ───
 # This is the "unit clause" reduction baked into the 2-CNF form.
 
-my $forced = Sat::solve(
+val $forced = Sat::solve(
     2,
     [
         +{ a => [0, 0], b => [0, 0] },   # x0
@@ -265,7 +265,7 @@ die "x1 must be forced false" unless $forced->{assign}->[1] == 0
 
 # ── invariant 6: an empty clause list with n_vars > 0 is sat ──────
 
-my $empty = Sat::solve(3, [])
+val $empty = Sat::solve(3, [])
 die "empty 2-SAT must be sat" unless $empty->{ok}
 die "empty assignment length must be 3" unless len(@{$empty->{assign}}) == 3
 

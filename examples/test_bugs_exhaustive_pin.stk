@@ -7,7 +7,7 @@
 
 # ── 1. Array/Range sources in Parallel Macros (BUG FIXED) ───────────────────
 
-my @a1 = (10, 20, 30)
+val @a1 = (10, 20, 30)
 (~> @a1 par_reduce { sum @_ }) |> aeq 60, "par_reduce array source elements"
 
 (~p> @a1 sum) |> aeq 60, "p-arrow array source elements"
@@ -32,24 +32,24 @@ pin_at_use_strict_fn() |> aeq 42, "use strict followed by fn on next line"
 # ── 4. typed my / const my with user types (BUG FIXED) ───────────────────────
 
 struct NS { x => Int }
-typed my $s_obj : NS = NS->new(x => 42)
+typed val $s_obj : NS = NS->new(x => 42)
 $s_obj->{x} |> aeq 42, "typed my with struct"
 
 class Box { fn area { 7 } }
-typed my $b_obj : Box = Box->new
+typed val $b_obj : Box = Box->new
 $b_obj->area() |> aeq 7, "typed my with class"
 
 enum Color { Red, Green, Blue }
-typed my $c_obj : Color = Color::Red
+typed val $c_obj : Color = Color::Red
 "$c_obj" |> aeq "Color::Red", "typed my with enum"
 
-const my $cx : Int = 5
+const val $cx : Int = 5
 $cx |> aeq 5, "const my with type"
 
 # ── 5. Class Instance Reflection (BUG FIXED) ────────────────────────────────
 
 class Person { name: Str = ""; age: Int = 0 }
-my $p_obj = Person->new(name => "Bob", age => 25)
+val $p_obj = Person->new(name => "Bob", age => 25)
 ref($p_obj) |> aeq "Person", "ref(class instance)"
 # Explicitly sort keys for stable comparison
 join(",", sort { _ cmp _1 } keys %$p_obj) |> aeq "age,name", "keys percent_deref class_inst"
@@ -58,24 +58,24 @@ join(",", sort { _ cmp _1 } keys %$p_obj) |> aeq "age,name", "keys percent_deref
 
 class Inner { v: Int = 0 }
 class Outer { name: Str = ""; inner: Any = 0 }
-my $i_obj = Inner->new(v => 7)
-my $o_obj = Outer->new(name => "x", inner => $i_obj)
+val $i_obj = Inner->new(v => 7)
+val $o_obj = Outer->new(name => "x", inner => $i_obj)
 to_json($o_obj) |> aeq '{"name":"x","inner":{"v":7}}', "to_json recursive class"
 
 # ── 7. psort implicit params (BUG FIXED) ────────────────────────────────────
 
-my @sorted = psort { _ <=> _1 } (3, 1, 4, 1, 5)
+val @sorted = psort { _ <=> _1 } (3, 1, 4, 1, 5)
 join(",", @sorted) |> aeq "1,1,3,4,5", "psort _ <=> _1"
 
 # ── 8. Hash Slices (BUG FIXED) ──────────────────────────────────────────────
 
-my %h_map = (a => 1, b => 2, c => 3)
-my @h_slice = @h_map{a, c}
+val %h_map = (a => 1, b => 2, c => 3)
+val @h_slice = @h_map{a, c}
 join(",", @h_slice) |> aeq "1,3", "hash slice @h{a, c}"
 
 # ── 9. exists on missing intermediate (BUG FIXED) ───────────────────────────
 
-my %deep_map = (a => { b => 1 })
+val %deep_map = (a => { b => 1 })
 exists $deep_map{a}{b} |> aok "exists present"
 exists $deep_map{a}{c} |> { _ == 0 } |> aok "exists missing tail"
 exists $deep_map{x}{y} |> { _ == 0 } |> aok "exists missing intermediate"
@@ -98,7 +98,7 @@ running_reduce({ _ + _1 }, [1, 2, 3, 4, 5]) |> join(",") |> aeq "1,3,6,10,15", "
 derangements(4) |> aeq 9, "derangements(4) fixed"
 
 # BUG-202 FIXED: prim_mst disconnected
-my $disconnected = [[0, 0], [0, 0]]
+val $disconnected = [[0, 0], [0, 0]]
 prim_mst($disconnected) |> { _ == "inf" || _ == "Infinity" } |> aok "prim_mst disconnected fixed"
 
 # ── 11. String/UTF-8 length (PARITY FIXED) ──────────────────────────────────
@@ -109,7 +109,7 @@ length("日本語") |> aeq 3, "length nihongo with utf8"
 
 # ── 12. Magic String Increment (PARITY FIXED) ───────────────────────────────
 
-my $s_magic = "Az"
+var $s_magic = "Az"
 $s_magic++
 $s_magic |> aeq "Ba", "magic string increment Az++"
 

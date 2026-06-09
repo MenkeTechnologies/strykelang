@@ -26,19 +26,19 @@
 # ── one rewrite step using regex run-detection ────────────────────
 
 fn LAS::next($s) {
-    my $out = ""
+    var $out = ""
     while ($s =~ /((\d)\2*)/g) {
-        my $run = $1
-        my $d = $run[0:0]
+        val $run = $1
+        val $d = $run[0:0]
         $out .= len($run) . $d
     }
     $out
 }
 
 fn LAS::iterate($seed, $n) {
-    my @hist = ($seed)
-    my $cur = $seed
-    for my $i (1:$n) {
+    var @hist = ($seed)
+    var $cur = $seed
+    for val $i (1:$n) {
         $cur = LAS::next($cur)
         push @hist, $cur
     }
@@ -47,18 +47,18 @@ fn LAS::iterate($seed, $n) {
 
 # ── run ────────────────────────────────────────────────────────────
 
-my $N = 14
-my $hist = LAS::iterate("1", $N)
+val $N = 14
+val $hist = LAS::iterate("1", $N)
 
 printf "── Conway look-and-say, %d iterations from \"1\" ───────\n\n", $N
 printf "  %3s   %8s   %s\n", "i", "len", "term"
 printf "  %3s   %8s   %s\n", "---", "--------", "----"
 
-for my $i (0:$N) {
-    my $term = $hist->[$i]
-    my $shown
+for val $i (0:$N) {
+    val $term = $hist->[$i]
+    var $shown
     if (len($term) > 40) {
-        my $head = $term[0:39]
+        val $head = $term[0:39]
         $shown = $head . "…"
     } else {
         $shown = $term
@@ -70,13 +70,13 @@ for my $i (0:$N) {
 # (Conway's "cosmological" theorem: from the seed "1", no other
 # digit ever appears, regardless of iteration count.)
 
-for my $term (@$hist) {
+for val $term (@$hist) {
     die "term contains digit other than 1/2/3: $term" if $term =~ /[04-9]/
 }
 
 # ── invariant 2: term length is non-decreasing ────────────────────
 
-for my $i (1:$N) {
+for val $i (1:$N) {
     die "length shrank at i=#{$i}" unless len($hist->[$i]) >= len($hist->[$i - 1])
 }
 
@@ -84,16 +84,16 @@ for my $i (1:$N) {
 # i.e., reading off pairs (count, digit) from term n+1 and emitting
 # `digit` × `count` chars reconstructs term n.
 
-for my $i (0:$N - 1) {
-    my $next_term = $hist->[$i + 1]
-    my @pairs = split //, $next_term
+for val $i (0:$N - 1) {
+    val $next_term = $hist->[$i + 1]
+    val @pairs = split //, $next_term
     die "odd-length successor at i=#{$i}: $next_term" unless len(@pairs) % 2 == 0
-    my $rebuilt = ""
-    my $j = 0
+    var $rebuilt = ""
+    var $j = 0
     while ($j < len(@pairs)) {
-        my $cnt = 0 + $pairs[$j]
-        my $d = $pairs[$j + 1]
-        for my $k (1:$cnt) { $rebuilt .= $d }
+        val $cnt = 0 + $pairs[$j]
+        var $d = $pairs[$j + 1]
+        for val $k (1:$cnt) { $rebuilt .= $d }
         $j += 2
     }
     die "reverse-rebuild mismatch at i=#{$i}: got [$rebuilt] vs [$hist->[$i]]" unless $rebuilt eq $hist->[$i]
@@ -102,8 +102,8 @@ for my $i (0:$N - 1) {
 # ── invariant 4: known prefix — terms 0..6 must match the OEIS
 #                 A005150 sequence exactly. ────────────────────────
 
-my @canonical = ("1", "11", "21", "1211", "111221", "312211", "13112221")
-for my $i (0:6) {
+val @canonical = ("1", "11", "21", "1211", "111221", "312211", "13112221")
+for val $i (0:6) {
     die "term $i mismatch: got [$hist->[$i]] want [$canonical[$i]]" unless $hist->[$i] eq $canonical[$i]
 }
 
@@ -111,13 +111,13 @@ for my $i (0:6) {
 #                 run of length L produces at most 2 chars in the
 #                 successor when L < 10, so successor length ≤ 2·n).
 
-for my $i (1:$N) {
+for val $i (1:$N) {
     die "growth rate exceeds 2× at i=#{$i}" unless len($hist->[$i]) <= 2 * len($hist->[$i - 1])
 }
 
 p ""
 printf "── Conway's λ approximation from this run ──────────────\n"
-my $ratio = len($hist->[$N]) / len($hist->[$N - 1])
+val $ratio = len($hist->[$N]) / len($hist->[$N - 1])
 printf "  len(L_%d) / len(L_%d) = %d / %d = %.5f\n",
     $N, $N - 1, len($hist->[$N]), len($hist->[$N - 1]), $ratio
 printf "  (Conway's constant λ ≈ 1.30358)\n"

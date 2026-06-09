@@ -18,11 +18,11 @@
 # except possibly at the root. Push the root down to its correct spot
 # within the slice arr[0..$end-1] (exclusive upper bound).
 fn Heap::sift_down($arr, $root, $end) {
-    my $i = $root
+    var $i = $root
     while (1) {
-        my $left  = 2 * $i + 1
-        my $right = 2 * $i + 2
-        my $max   = $i
+        val $left  = 2 * $i + 1
+        val $right = 2 * $i + 2
+        var $max   = $i
         $max = $left  if $left  < $end && $arr->[$left]  > $arr->[$max]
         $max = $right if $right < $end && $arr->[$right] > $arr->[$max]
         last if $max == $i
@@ -33,18 +33,18 @@ fn Heap::sift_down($arr, $root, $end) {
 
 # Heapify: rebuild heap property bottom-up over the entire array.
 fn Heap::build_max_heap($arr) {
-    my $n = len @$arr
+    val $n = len @$arr
     return if $n <= 1
-    for (my $i = int($n / 2) - 1; $i >= 0; $i--) {
+    for (var $i = int($n / 2) - 1; $i >= 0; $i--) {
         Heap::sift_down($arr, $i, $n)
     }
 }
 
 # Sort in-place. Returns the same arrayref so callers can chain.
 fn Heap::sort($arr) {
-    my $n = len @$arr
+    val $n = len @$arr
     Heap::build_max_heap($arr)
-    for (my $end = $n - 1; $end > 0; $end--) {
+    for (var $end = $n - 1; $end > 0; $end--) {
         ($arr->[0], $arr->[$end]) = ($arr->[$end], $arr->[0])
         Heap::sift_down($arr, 0, $end)
     }
@@ -53,14 +53,14 @@ fn Heap::sort($arr) {
 
 # Non-mutating variant for caller convenience.
 fn Heap::sorted($arr) {
-    my @copy = @$arr
+    val @copy = @$arr
     Heap::sort(\@copy)
     \@copy
 }
 
 p "── Heap sort demo ──"
 
-my @cases = (
+val @cases = (
     +{ input => [],                          sorted => []                 },
     +{ input => [42],                        sorted => [42]               },
     +{ input => [5, 4, 3, 2, 1],             sorted => [1, 2, 3, 4, 5]    },  # reverse
@@ -71,12 +71,12 @@ my @cases = (
     +{ input => [10, -1, 10, -1, 10, -1],    sorted => [-1, -1, -1, 10, 10, 10] },  # dupes
 )
 
-my $fail = 0
-for my $c (@cases) {
-    my $got    = Heap::sorted($c->{input})
-    my $got_s  = join(",", @$got)
-    my $want_s = join(",", @{$c->{sorted}})
-    my $ok     = $got_s eq $want_s
+var $fail = 0
+for val $c (@cases) {
+    val $got    = Heap::sorted($c->{input})
+    val $got_s  = join(",", @$got)
+    val $want_s = join(",", @{$c->{sorted}})
+    val $ok     = $got_s eq $want_s
     $fail++ unless $ok
     p "  [@{$c->{input}}] → [@$got]  #{$ok ? \"\" : \"FAIL (want [$want_s])\"}"
 }
@@ -86,25 +86,25 @@ die "#{$fail} / #{len @cases} heap-sort cases failed" if $fail > 0
 #   * output non-decreasing
 #   * length preserved
 #   * multiset preserved (sorted forms equal)
-for my $c (@cases) {
-    my $r = Heap::sorted($c->{input})
+for val $c (@cases) {
+    val $r = Heap::sorted($c->{input})
     die "length changed" unless len(@$r) == len(@{$c->{input}})
     next if len(@$r) < 2
-    for my $i (1:len(@$r) - 1) {
+    for val $i (1:len(@$r) - 1) {
         die "non-decreasing violated at $i" unless $r->[$i] >= $r->[$i - 1]
     }
 }
 
 # Stress: shuffle 0:199 and re-sort.
 srand(42)
-my @big = 0:199
-my @shuffled
+var @big = 0:199
+var @shuffled
 while (len(@big) > 0) {
-    my $i = int(rand @big)
+    val $i = int(rand @big)
     push @shuffled, $big[$i]
     splice @big, $i, 1
 }
-my $sorted = Heap::sorted(\@shuffled)
+val $sorted = Heap::sorted(\@shuffled)
 die "200-shuffle should round-trip" unless join(",", @$sorted) eq join(",", 0:199)
 p "  200-element shuffle round-trips through heap sort  OK"
 

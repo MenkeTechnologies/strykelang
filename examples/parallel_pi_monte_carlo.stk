@@ -15,25 +15,25 @@
 
 p "--- Parallel Pi Estimation ---"
 
-my $chunks = 8
-my $per    = 12500
-my $total_samples = $chunks * $per
+val $chunks = 8
+val $per    = 12500
+val $total_samples = $chunks * $per
 
 p "Estimating Pi using $total_samples samples ($chunks chunks of $per)..."
 
 # 1. Each chunk runs many samples in one thread, then we sum the chunk counts.
-my $inside_count = 1:$chunks |> pmaps {
-    my $c = 0
+val $inside_count = 1:$chunks |> pmaps {
+    var $c = 0
     for (1:$per) {
-        my $x = rand()
-        my $y = rand()
+        val $x = rand()
+        val $y = rand()
         $c++ if $x*$x + $y*$y <= 1.0
     }
     $c
 } |> sum
 
 # 2. Calculate Pi (Area = 4 * count / total)
-my $pi_est = 4.0 * $inside_count / $total_samples
+val $pi_est = 4.0 * $inside_count / $total_samples
 p "Estimated Pi: #{ sprintf '%.5f', $pi_est }"
 
 # ── 3. Tests ───────────────────────────────────────────────────────

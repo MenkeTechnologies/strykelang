@@ -7,12 +7,12 @@ fn Rosetta::ParallelBruteForce::find_md5_prefix($prefix, $max_attempts) {
     mysync $found = undef
     
     # Check in chunks to reduce overhead
-    my $chunk_size = 1000
-    for (my $start = 0; $start < $max_attempts; $start += $chunk_size) {
-        my $end = $start + $chunk_size - 1
+    val $chunk_size = 1000
+    for (var $start = 0; $start < $max_attempts; $start += $chunk_size) {
+        val $end = $start + $chunk_size - 1
         $start:$end |> pmap {
             return if defined $found
-            my $hash = md5(_)
+            val $hash = md5(_)
             if ($hash =~ /^$prefix/) {
                 $found = _
             }
@@ -23,9 +23,9 @@ fn Rosetta::ParallelBruteForce::find_md5_prefix($prefix, $max_attempts) {
 }
 
 # Find a number whose MD5 starts with '00'
-my $res = Rosetta::ParallelBruteForce::find_md5_prefix("00", 100000)
+val $res = Rosetta::ParallelBruteForce::find_md5_prefix("00", 100000)
 assert_ok defined($res), "Found a matching number"
-my $hash = md5($res)
+val $hash = md5($res)
 assert_eq substr($hash, 0, 2), "00", "MD5 prefix matches"
 
 test_run

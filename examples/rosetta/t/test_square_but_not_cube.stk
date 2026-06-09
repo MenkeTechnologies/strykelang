@@ -3,16 +3,16 @@
 
 fn Rosetta::SqNotCube::is_cube($n) {
     return 1 if $n == 0
-    my $r = int($n ** (1.0/3.0) + 0.5)
+    val $r = int($n ** (1.0/3.0) + 0.5)
     $r * $r * $r == $n
 }
 
 fn Rosetta::SqNotCube::list($count) {
-    my @sq_only
-    my @both
-    my $i = 1
+    var @sq_only
+    var @both
+    var $i = 1
     while (len(@sq_only) + len(@both) < $count) {
-        my $s = $i * $i
+        val $s = $i * $i
         if (Rosetta::SqNotCube::is_cube($s)) {
             push @both, $s
         } else {
@@ -24,10 +24,10 @@ fn Rosetta::SqNotCube::list($count) {
 }
 
 # First few squares-not-cubes: 4, 9, 16, 25, 36, 49, 81, 100, 121, ... (skip 1, 64, 729...)
-my $r = Rosetta::SqNotCube::list(30)
-my $sq_only = $r->[0]
-my $both    = $r->[1]
-my @first10 = @{$sq_only}[0:9]
+val $r = Rosetta::SqNotCube::list(30)
+val $sq_only = $r->[0]
+val $both    = $r->[1]
+val @first10 = @{$sq_only}[0:9]
 assert_eq join(",", @first10), "4,9,16,25,36,49,81,100,121,144", "first 10 squares-not-cubes"
 
 # Squares that are also cubes (= 6th powers): 1, 64, 729, 4096, 15625, 46656, ...

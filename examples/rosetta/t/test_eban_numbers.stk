@@ -4,14 +4,14 @@
 
 fn Rosetta::Eban::spell($n) {
     return "zero" if $n == 0
-    my @units = ("", "one", "two", "three", "four", "five",
+    val @units = ("", "one", "two", "three", "four", "five",
                  "six", "seven", "eight", "nine",
                  "ten", "eleven", "twelve", "thirteen", "fourteen",
                  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
-    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty",
+    val @tens  = ("", "", "twenty", "thirty", "forty", "fifty",
                  "sixty", "seventy", "eighty", "ninety")
-    my $name = ""
-    my $x = $n
+    var $name = ""
+    var $x = $n
     if ($x >= 1000) {
         $name .= $units[int($x / 1000)] . "thousand"
         $x %= 1000
@@ -38,12 +38,12 @@ fn Rosetta::Eban::list($lo, $hi) {
     $lo:$hi |> grep {Rosetta::Eban::is_eban}
 }
 
-my @under_100 = Rosetta::Eban::list(1, 99)
+val @under_100 = Rosetta::Eban::list(1, 99)
 assert_eq join(",", @under_100),
     "2,4,6,30,32,34,36,40,42,44,46,50,52,54,56,60,62,64,66",
     "eban numbers under 100"
 
-my @under_1000 = Rosetta::Eban::list(1, 999)
+val @under_1000 = Rosetta::Eban::list(1, 999)
 # Same set as under 100 — there are NO eban numbers in [100..999] because every
 # hundreds-name contains "hundred", which contains 'e'.
 assert_eq len(@under_1000), 19, "still 19 eban numbers under 1000"

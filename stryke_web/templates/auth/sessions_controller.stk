@@ -7,8 +7,8 @@ class SessionsController extends ApplicationController {
     }
 
     fn create {
-        my $p = web_params()
-        my $r = User::sign_in($p->{email} // "", $p->{password} // "")
+        val $p = web_params()
+        val $r = User::sign_in($p->{email} // "", $p->{password} // "")
         if ($r->{ok}) {
             web_flash_set("notice", "Welcome back!")
             web_redirect("/")

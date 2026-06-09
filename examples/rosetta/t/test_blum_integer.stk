@@ -3,7 +3,7 @@
 
 fn Rosetta::Blum::is_prime($n) {
     return 0 if $n < 2
-    my $d = 2
+    var $d = 2
     while ($d * $d <= $n) {
         if ($n % $d == 0) { return 0 }
         $d = $d + 1
@@ -12,9 +12,9 @@ fn Rosetta::Blum::is_prime($n) {
 }
 
 fn Rosetta::Blum::check($n) {
-    my @factors
-    my $temp = $n
-    my $d = 2
+    var @factors
+    var $temp = $n
+    var $d = 2
     while ($d * $d <= $temp) {
         while ($temp % $d == 0) {
             push @factors, $d
@@ -25,13 +25,13 @@ fn Rosetta::Blum::check($n) {
     if ($temp > 1) { push @factors, $temp }
     
     return 0 if len(@factors) != 2
-    my ($p, $q) = @factors
+    val ($p, $q) = @factors
     if ($p == $q) { return 0 }
     $p % 4 == 3 && $q % 4 == 3
 }
 
-my @blum
-for my $i (1:100) {
+var @blum
+for val $i (1:100) {
     if (Rosetta::Blum::check($i)) {
         push @blum, $i
     }

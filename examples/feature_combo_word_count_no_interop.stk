@@ -18,7 +18,7 @@
 
 # ── corpus: stop-word-laden English, multiple paragraphs ────────────────────
 
-my $corpus = q{
+val $corpus = q{
 The cat sat on the mat. The cat looked at the dog. The dog looked back.
 The mat was old. The cat was new. The dog was indifferent.
 A new cat returned. The old dog returned. The mat remained on the floor.
@@ -35,9 +35,9 @@ fn Norm::qr($text) { ~> $text Norm::s Norm::tr Norm::q }   # full normalize
 # ── sequential baseline ─────────────────────────────────────────────────────
 
 fn WC::seq($text) {
-    my $clean = Norm::qr($text)
-    my $h = +{}
-    for my $w (split /\s+/, $clean) {
+    val $clean = Norm::qr($text)
+    var $h = +{}
+    for val $w (split /\s+/, $clean) {
         next if $w eq ""
         $h->{$w} //= 0
         $h->{$w} += 1
@@ -51,27 +51,27 @@ fn WC::seq($text) {
 # and aggregate outside.)
 
 fn WC::par_char_classes($text) {
-    my @per_chunk = par {
-        my $alpha = 0
-        my $digit = 0
-        my $space = 0
-        for my $c (split //, _) {
+    val @per_chunk = par {
+        var $alpha = 0
+        var $digit = 0
+        var $space = 0
+        for val $c (split //, _) {
             $alpha++ if $c =~ /[a-zA-Z]/
             $digit++ if $c =~ /\d/
             $space++ if $c =~ /\s/
         }
         [$alpha, $digit, $space]
     } $text
-    my $total_alpha = sum map { _->[0] } @per_chunk
-    my $total_digit = sum map { _->[1] } @per_chunk
-    my $total_space = sum map { _->[2] } @per_chunk
+    val $total_alpha = sum map { _->[0] } @per_chunk
+    val $total_digit = sum map { _->[1] } @per_chunk
+    val $total_space = sum map { _->[2] } @per_chunk
     +{ alpha => $total_alpha, digit => $total_digit, space => $total_space }
 }
 
 # ── run both ────────────────────────────────────────────────────────────────
 
-my $seq_h     = WC::seq($corpus)
-my $par_chars = WC::par_char_classes($corpus)
+val $seq_h     = WC::seq($corpus)
+val $par_chars = WC::par_char_classes($corpus)
 
 p "── sequential word-count + parallel char-class ──"
 p "  total distinct words: " . len(keys %$seq_h)
@@ -87,8 +87,8 @@ die "expected alpha count > 200" unless $par_chars->{alpha} > 200
 
 p ""
 p "── top-10 words ──"
-my @top = (sort { $seq_h->{_1} <=> $seq_h->{_} } keys %$seq_h)[0:9]
-for my $w (@top) {
+val @top = (sort { $seq_h->{_1} <=> $seq_h->{_} } keys %$seq_h)[0:9]
+for val $w (@top) {
     printf("  %-10s %3d\n", $w, $seq_h->{$w})
 }
 
@@ -96,7 +96,7 @@ for my $w (@top) {
 
 p ""
 p "── compound-assign + keyword key demo ──"
-my $stats = +{}
+var $stats = +{}
 $stats->{return} //= 0
 $stats->{return} += $seq_h->{return} // 0
 $stats->{last}   //= 0

@@ -10,11 +10,11 @@
 #   5. `mysync` for cross-closure shared state
 
 mysync $attempts = 0
-my $lat = t_digest(100)
-my $outcomes = cms(2048, 5)
+val $lat = t_digest(100)
+val $outcomes = cms(2048, 5)
 
 # Token-bucket: at most 5 retries/sec to avoid hammering a downstream.
-my $rl = token_bucket(5, 5)
+val $rl = token_bucket(5, 5)
 
 # Simulated flaky downstream. Fails ~60% of the time.
 fn Backend::call($payload) {
@@ -27,19 +27,19 @@ fn Backend::call($payload) {
 # `around` advice — wraps every Backend::* call with retry logic.
 # Up to 4 attempts with exponential backoff (1ms, 2ms, 4ms, 8ms).
 around "Backend::*" {
-    my $max_attempts = 4
-    my $delay_ms = 1
-    my $result
-    my $ok = 0
-    for my $attempt (1:$max_attempts) {
+    val $max_attempts = 4
+    var $delay_ms = 1
+    var $result
+    var $ok = 0
+    for val $attempt (1:$max_attempts) {
         $attempts++
         # Rate-limit retries — drop the call if we've burned through the
         # token bucket. (In production this'd return an error to the
         # caller; here we just continue and let the retry budget run out.)
         next unless rl_try_take($rl, 1)
-        my $t1 = now_ns()
-        my $ret = eval { proceed() }
-        my $dt_us = (now_ns() - $t1) / 1000.0
+        val $t1 = now_ns()
+        val $ret = eval { proceed() }
+        val $dt_us = (now_ns() - $t1) / 1000.0
         td_add($lat, $dt_us)
         if ($@) {
             cms_add($outcomes, "failure")
@@ -58,10 +58,10 @@ around "Backend::*" {
 # ── run a batch of calls ──────────────────────────────────────────────
 
 p "── running 20 calls through Backend::call ─────────────"
-my $ok_count = 0
-my $fail_count = 0
-for my $i (1:20) {
-    my $r = Backend::call("payload-$i")
+var $ok_count = 0
+var $fail_count = 0
+for val $i (1:20) {
+    val $r = Backend::call("payload-$i")
     if ($r =~ /^ok:/) {
         $ok_count++
     } else {
@@ -75,8 +75,8 @@ printf "  underlying:    %d total attempts (incl. retries)\n", $attempts
 
 p ""
 p "── per-attempt outcomes via CMS ───────────────────────"
-my $succ = cms_count($outcomes, "success")
-my $fail = cms_count($outcomes, "failure")
+val $succ = cms_count($outcomes, "success")
+val $fail = cms_count($outcomes, "failure")
 printf "  successes : %d\n", $succ
 printf "  failures  : %d\n", $fail
 printf "  recovery rate: %.1f%% (of failures eventually succeeded)\n",

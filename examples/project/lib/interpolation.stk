@@ -17,7 +17,7 @@ fn Project::Interpolation::adjacent_scalars($x, $y) {
 }
 
 fn Project::Interpolation::scalar_with_method($s) {
-    my $len = length $s
+    val $len = length $s
     "String '$s' has $len characters"
 }
 
@@ -26,8 +26,8 @@ fn Project::Interpolation::array_element_interp(@arr) {
 }
 
 fn Project::Interpolation::hash_value_interp(%h) {
-    my $name = $h{name}
-    my $age = $h{age}
+    val $name = $h{name}
+    val $age = $h{age}
     "Name: $name, Age: $age"
 }
 
@@ -40,12 +40,12 @@ fn Project::Interpolation::array_ref_elem_interp($aref) {
 }
 
 fn Project::Interpolation::expression_in_string($x) {
-    my $y = $x * 2
+    val $y = $x * 2
     "Double of $x is $y"
 }
 
 fn Project::Interpolation::conditional_building($cond) {
-    my $msg = $cond ? "yes" : "no"
+    val $msg = $cond ? "yes" : "no"
     "Result: $msg"
 }
 
@@ -90,7 +90,7 @@ fn Project::Interpolation::qq_operator_interp($name) {
 }
 
 fn Project::Interpolation::heredoc_style {
-    my $text = "line1
+    val $text = "line1
 line2
 line3"
     $text
@@ -109,13 +109,13 @@ fn Project::Interpolation::var_at_start($x) {
 }
 
 fn Project::Interpolation::empty_string_interp {
-    my $e = ""
+    val $e = ""
     "empty: '$e'"
 }
 
 fn Project::Interpolation::undef_string_interp {
-    my $u = undef
-    my $s = defined($u) ? $u : ""
+    val $u = undef
+    val $s = defined($u) ? $u : ""
     "undef: '$s'"
 }
 
@@ -132,13 +132,13 @@ fn Project::Interpolation::negative_interp($n) {
 }
 
 fn Project::Interpolation::zero_interp {
-    my $z = 0
+    val $z = 0
     "zero: $z"
 }
 
 fn Project::Interpolation::concat_vs_interp($a, $b) {
-    my $interp = "$a$b"
-    my $concat = $a . $b
+    val $interp = "$a$b"
+    val $concat = $a . $b
     $interp eq $concat ? 1 : 0
 }
 
@@ -147,7 +147,7 @@ fn Project::Interpolation::template_basic($name, $age, $city) {
 }
 
 fn Project::Interpolation::template_with_loop(@items) {
-    my $list = join(", ", @items)
+    val $list = join(", ", @items)
     "Items: $list"
 }
 

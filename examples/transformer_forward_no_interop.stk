@@ -10,19 +10,19 @@
 package Transformer
 
 fn mat_mul($m1, $m2) {
-    my $m1_rows = len @$m1
-    my $m1_cols = len @{$m1->[0]}
-    my $m2_rows = len @$m2
-    my $m2_cols = len @{$m2->[0]}
+    val $m1_rows = len @$m1
+    val $m1_cols = len @{$m1->[0]}
+    val $m2_rows = len @$m2
+    val $m2_cols = len @{$m2->[0]}
     
     die "Invalid dimensions for matrix multiplication" if $m1_cols != $m2_rows
     
-    my $res = []
-    for my $i (0 : $m1_rows - 1) {
-        my $row = []
-        for my $j (0 : $m2_cols - 1) {
-            my $sum = 0.0
-            for my $k (0 : $m1_cols - 1) {
+    val $res = []
+    for val $i (0 : $m1_rows - 1) {
+        val $row = []
+        for val $j (0 : $m2_cols - 1) {
+            var $sum = 0.0
+            for val $k (0 : $m1_cols - 1) {
                 $sum += $m1->[$i]->[$k] * $m2->[$k]->[$j]
             }
             push @$row, $sum
@@ -33,13 +33,13 @@ fn mat_mul($m1, $m2) {
 }
 
 fn mat_transpose($m) {
-    my $rows = len @$m
-    my $cols = len @{$m->[0]}
-    my $res = []
+    val $rows = len @$m
+    val $cols = len @{$m->[0]}
+    val $res = []
     
-    for my $i (0 : $cols - 1) {
-        my $row = []
-        for my $j (0 : $rows - 1) {
+    for val $i (0 : $cols - 1) {
+        val $row = []
+        for val $j (0 : $rows - 1) {
             push @$row, $m->[$j]->[$i]
         }
         push @$res, $row
@@ -48,10 +48,10 @@ fn mat_transpose($m) {
 }
 
 fn mat_scale($m, $scalar) {
-    my $res = []
-    for my $row (@$m) {
-        my $new_row = []
-        for my $val (@$row) {
+    val $res = []
+    for val $row (@$m) {
+        val $new_row = []
+        for val $val (@$row) {
             push @$new_row, $val * $scalar
         }
         push @$res, $new_row
@@ -60,22 +60,22 @@ fn mat_scale($m, $scalar) {
 }
 
 fn softmax($m) {
-    my $res = []
-    for my $row (@$m) {
-        my $max_val = -1000000000.0
-        for my $val (@$row) {
+    val $res = []
+    for val $row (@$m) {
+        var $max_val = -1000000000.0
+        for val $val (@$row) {
             if ($val > $max_val) { $max_val = $val }
         }
         
-        my $new_row = []
-        my $sum_exp = 0.0
-        for my $val (@$row) {
-            my $e = exp($val - $max_val)
+        var $new_row = []
+        var $sum_exp = 0.0
+        for val $val (@$row) {
+            val $e = exp($val - $max_val)
             push @$new_row, $e
             $sum_exp += $e
         }
         
-        for my $i (0 : (len @$new_row) - 1) {
+        for val $i (0 : (len @$new_row) - 1) {
             $new_row->[$i] /= $sum_exp
         }
         
@@ -85,22 +85,22 @@ fn softmax($m) {
 }
 
 fn self_attention($q, $k, $v) {
-    my $d_k = len @{$q->[0]}
+    val $d_k = len @{$q->[0]}
     
     # K^T
-    my $k_t = Transformer::mat_transpose($k)
+    val $k_t = Transformer::mat_transpose($k)
     
     # Q * K^T
-    my $scores = Transformer::mat_mul($q, $k_t)
+    val $scores = Transformer::mat_mul($q, $k_t)
     
     # / sqrt(d_k)
-    my $scaled_scores = Transformer::mat_scale($scores, 1.0 / sqrt($d_k))
+    val $scaled_scores = Transformer::mat_scale($scores, 1.0 / sqrt($d_k))
     
     # softmax
-    my $attention_weights = Transformer::softmax($scaled_scores)
+    val $attention_weights = Transformer::softmax($scaled_scores)
     
     # Attention * V
-    my $output = Transformer::mat_mul($attention_weights, $v)
+    val $output = Transformer::mat_mul($attention_weights, $v)
     
     { output => $output, weights => $attention_weights }
 }
@@ -110,37 +110,37 @@ package main
 p "── Transformer Self-Attention Demo ──"
 
 # Sequence length = 3, hidden dimension = 4
-my $Q = [
+val $Q = [
     [1.0, 0.0, 1.0, 0.0],
     [0.0, 1.0, 0.0, 1.0],
     [1.0, 1.0, 1.0, 1.0]
 ]
 
-my $K = [
+val $K = [
     [1.0, 0.0, 1.0, 0.0],
     [0.0, 1.0, 0.0, 1.0],
     [1.0, 1.0, 1.0, 1.0]
 ]
 
-my $V = [
+val $V = [
     [2.0, 0.0, 0.0, 0.0],
     [0.0, 2.0, 0.0, 0.0],
     [0.0, 0.0, 2.0, 0.0]
 ]
 
-my $res = Transformer::self_attention($Q, $K, $V)
+val $res = Transformer::self_attention($Q, $K, $V)
 
 p "Attention Weights:"
-for my $row (@{$res->{weights}}) {
-    my $s = ""
-    for my $val (@$row) { $s = $s . sprintf("%.3f ", $val) }
+for val $row (@{$res->{weights}}) {
+    var $s = ""
+    for val $val (@$row) { $s = $s . sprintf("%.3f ", $val) }
     p "  [ #{$s}]"
 }
 
 p "\nOutput:"
-for my $row (@{$res->{output}}) {
-    my $s = ""
-    for my $val (@$row) { $s = $s . sprintf("%.3f ", $val) }
+for val $row (@{$res->{output}}) {
+    var $s = ""
+    for val $val (@$row) { $s = $s . sprintf("%.3f ", $val) }
     p "  [ #{$s}]"
 }
 

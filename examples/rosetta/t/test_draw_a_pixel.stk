@@ -2,10 +2,10 @@
 # Rosetta Code: Draw a pixel
 
 fn Rosetta::Bitmap::create($w, $h) {
-    my @grid
-    for (my $i = 0; $i < $h; $i++) {
-        my @row
-        for (my $j = 0; $j < $w; $j++) {
+    var @grid
+    for (var $i = 0; $i < $h; $i++) {
+        var @row
+        for (var $j = 0; $j < $w; $j++) {
             push @row, { r => 0, g => 0, b => 0 }
         }
         push @grid, \@row
@@ -17,7 +17,7 @@ fn Rosetta::Bitmap::set_pixel($img, $x, $y, $color) {
     $img->[$y]->[$x] = $color
 }
 
-my $img = Rosetta::Bitmap::create(10, 10)
+val $img = Rosetta::Bitmap::create(10, 10)
 Rosetta::Bitmap::set_pixel($img, 5, 5, { r => 255, g => 255, b => 255 })
 
 assert_eq $img->[5]->[5]->{r}, 255, "Red set"

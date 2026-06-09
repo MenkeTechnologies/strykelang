@@ -14,14 +14,14 @@ fn Rosetta::UrlDecode::hex_to_int($c) {
 }
 
 fn Rosetta::UrlDecode::decode($s) {
-    my $out = ""
-    my $i = 0
-    my $n = length($s)
+    var $out = ""
+    var $i = 0
+    val $n = length($s)
     while ($i < $n) {
-        my $c = substr($s, $i, 1)
+        val $c = substr($s, $i, 1)
         if ($c eq "%" && $i + 2 < $n) {
-            my $h1 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 1, 1))
-            my $h2 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 2, 1))
+            val $h1 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 1, 1))
+            val $h2 = Rosetta::UrlDecode::hex_to_int(substr($s, $i + 2, 1))
             if ($h1 >= 0 && $h2 >= 0) {
                 $out .= chr($h1 * 16 + $h2)
                 $i += 3
@@ -35,7 +35,7 @@ fn Rosetta::UrlDecode::decode($s) {
 }
 
 fn Rosetta::UrlDecode::decode_form($s) {
-    my $tmp = $s
+    var $tmp = $s
     $tmp =~ s/\+/ /g
     Rosetta::UrlDecode::decode($tmp)
 }

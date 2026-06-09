@@ -2,26 +2,26 @@
 # Rosetta Code: Phrase reversals — three flavors of reversal applied to a string
 
 fn Rosetta::PhraseRev::reverse_string($s) {
-    my @cs = ~> $s chars
+    val @cs = ~> $s chars
     join("", rev @cs)
 }
 
 fn Rosetta::PhraseRev::reverse_words($s) {
-    my @ws = split /\s+/, $s
+    val @ws = split /\s+/, $s
     join(" ", rev @ws)
 }
 
 fn Rosetta::PhraseRev::reverse_each_word($s) {
-    my @ws = split /\s+/, $s
-    my @reved
-    for my $w (@ws) {
+    val @ws = split /\s+/, $s
+    var @reved
+    for val $w (@ws) {
         push @reved, Rosetta::PhraseRev::reverse_string($w)
     }
     join(" ", @reved)
 }
 
 # Standard sample
-my $s = "rosetta code phrase reversal"
+val $s = "rosetta code phrase reversal"
 
 assert_eq Rosetta::PhraseRev::reverse_string($s),
     "lasrever esarhp edoc attesor",
@@ -43,7 +43,7 @@ assert_eq Rosetta::PhraseRev::reverse_string("hello"),   "olleh",  "single word 
 assert_eq Rosetta::PhraseRev::reverse_string("level"),   "level",  "palindrome stays the same"
 
 # Mixed-case + punctuation preserved
-my $s2 = "Hello, World!"
+val $s2 = "Hello, World!"
 assert_eq Rosetta::PhraseRev::reverse_string($s2), "!dlroW ,olleH", "case and punctuation"
 
 # Numbers and symbols

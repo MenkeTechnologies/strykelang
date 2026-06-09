@@ -21,7 +21,7 @@
 
 # ── letter → 6-dot bitmap ──────────────────────────────────────────
 
-my %dots = (
+val %dots = (
     a => 0x01, b => 0x03, c => 0x09, d => 0x19, e => 0x11,
     f => 0x0B, g => 0x1B, h => 0x13, i => 0x0A, j => 0x1A,
     k => 0x05, l => 0x07, m => 0x0D, n => 0x1D, o => 0x15,
@@ -30,15 +30,15 @@ my %dots = (
 )
 
 # Inverse table built once at load time.
-my %from_braille
-for my $letter (keys %dots) {
+var %from_braille
+for val $letter (keys %dots) {
     $from_braille{chr(0x2800 + $dots{$letter})} = $letter
 }
 
 # ── single-char codec ──────────────────────────────────────────────
 
 fn Bx::to_cell($c) {
-    my $lc = lc $c
+    val $lc = lc $c
     return $c unless exists $dots{$lc}
     chr(0x2800 + $dots{$lc})
 }
@@ -48,26 +48,26 @@ fn Bx::from_cell($c) = exists $from_braille{$c} ? $from_braille{$c} : $c
 # ── string codec ───────────────────────────────────────────────────
 
 fn Bx::encode($s) {
-    my $out = ""
-    for my $c (split //, $s) { $out .= Bx::to_cell($c) }
+    var $out = ""
+    for val $c (split //, $s) { $out .= Bx::to_cell($c) }
     $out
 }
 
 fn Bx::decode($s) {
-    my $out = ""
-    for my $c (split //, $s) { $out .= Bx::from_cell($c) }
+    var $out = ""
+    for val $c (split //, $s) { $out .= Bx::from_cell($c) }
     $out
 }
 
 # ── ASCII dot-grid rendering for one cell (for human inspection) ──
 
 fn Bx::render_cell($bits) {
-    my $d1 =  $bits        & 1
-    my $d2 = ($bits >> 1)  & 1
-    my $d3 = ($bits >> 2)  & 1
-    my $d4 = ($bits >> 3)  & 1
-    my $d5 = ($bits >> 4)  & 1
-    my $d6 = ($bits >> 5)  & 1
+    val $d1 =  $bits        & 1
+    val $d2 = ($bits >> 1)  & 1
+    val $d3 = ($bits >> 2)  & 1
+    val $d4 = ($bits >> 3)  & 1
+    val $d5 = ($bits >> 4)  & 1
+    val $d6 = ($bits >> 5)  & 1
     sprintf "%s %s\n%s %s\n%s %s",
         $d1 ? "●" : "·", $d4 ? "●" : "·",
         $d2 ? "●" : "·", $d5 ? "●" : "·",
@@ -76,13 +76,13 @@ fn Bx::render_cell($bits) {
 
 # ── demo ───────────────────────────────────────────────────────────
 
-my @samples = ("hello", "stryke rules", "the quick brown fox", "abcdefghij")
+val @samples = ("hello", "stryke rules", "the quick brown fox", "abcdefghij")
 
 printf "── ASCII ↔ Unicode-Braille transcoder ─────────────────\n\n"
 
-for my $s (@samples) {
-    my $enc = Bx::encode($s)
-    my $dec = Bx::decode($enc)
+for val $s (@samples) {
+    val $enc = Bx::encode($s)
+    val $dec = Bx::decode($enc)
     printf "  in : [%s]\n", $s
     printf "  bra: [%s]\n", $enc
     printf "  out: [%s]   %s\n\n", $dec, $dec eq $s ? "(round-trip ok)" : "(MISMATCH)"
@@ -91,8 +91,8 @@ for my $s (@samples) {
 # ── grid view: dot patterns for a–j (the "first decade") ──────────
 
 printf "── dot patterns for letters a..j ──────────────────────\n\n"
-for my $letter (qw(a b c d e f g h i j)) {
-    my $bits = $dots{$letter}
+for val $letter (qw(a b c d e f g h i j)) {
+    val $bits = $dots{$letter}
     p ""
     printf "  %s  (cell U+%04X)\n", $letter, 0x2800 + $bits
     p Bx::render_cell($bits)
@@ -100,24 +100,24 @@ for my $letter (qw(a b c d e f g h i j)) {
 
 # ── invariant 1: every letter round-trips through encode/decode ───
 
-for my $letter (keys %dots) {
-    my $rt = Bx::decode(Bx::encode($letter))
+for val $letter (keys %dots) {
+    val $rt = Bx::decode(Bx::encode($letter))
     die "letter $letter failed round-trip (got $rt)" unless $rt eq $letter
 }
 
 # ── invariant 2: every Braille codepoint is in U+2800..U+283F ─────
 
-for my $letter (keys %dots) {
-    my $cp = 0x2800 + $dots{$letter}
+for val $letter (keys %dots) {
+    val $cp = 0x2800 + $dots{$letter}
     die "letter $letter cell U+$cp out of Braille block" unless $cp >= 0x2800 && $cp <= 0x283F
 }
 
 # ── invariant 3: the mapping is injective (no two letters share a
 #                 dot pattern). ────────────────────────────────────
 
-my %seen
-for my $letter (keys %dots) {
-    my $cell = chr(0x2800 + $dots{$letter})
+var %seen
+for val $letter (keys %dots) {
+    val $cell = chr(0x2800 + $dots{$letter})
     die "duplicate cell for $letter (already $seen{$cell})" if exists $seen{$cell}
     $seen{$cell} = $letter
 }
@@ -129,13 +129,13 @@ die "inverse table missing entries" unless len(%from_braille) == 26
 
 # ── invariant 5: case-insensitive — uppercase decodes the same ────
 
-my $lower = Bx::encode("hello")
-my $upper = Bx::encode("HELLO")
+val $lower = Bx::encode("hello")
+val $upper = Bx::encode("HELLO")
 die "uppercase encoding diverges from lowercase" unless $lower eq $upper
 
 # ── invariant 6: non-letters pass through untouched ───────────────
 
-my $mixed = Bx::encode("hi 42!")
+val $mixed = Bx::encode("hi 42!")
 die "non-letter passthrough broken: $mixed" unless $mixed[2] eq " " && $mixed[3] eq "4" && $mixed[5] eq "!"
 
 p ""

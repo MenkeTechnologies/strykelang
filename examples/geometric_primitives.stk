@@ -2,9 +2,9 @@
 # Run: stryke --no-interop examples/geometric_primitives.stk
 
 p "--- Geom ---"
-my @poly = ([0,0], [10,0], [10,10], [0,10])
+val @poly = ([0,0], [10,0], [10,10], [0,10])
 polygon_contains_point(\@poly, [5,5]) |> aok "in"
 
-my $h = [[1,1], [5,1], [1,5], [5,5]] |> polygon_convex_hull_2d
+val $h = [[1,1], [5,1], [1,5], [5,5]] |> polygon_convex_hull_2d
 len $h |> aeq 4, "hull"
 test_run

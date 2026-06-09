@@ -18,8 +18,8 @@ fn make($val, $left, $right) {
 fn merge_h($ha, $hb) {
     return $hb if !defined $ha
     return $ha if !defined $hb
-    my $lo
-    my $hi
+    var $lo
+    var $hi
     if ($ha->{val} <= $hb->{val}) {
         $lo = $ha
         $hi = $hb
@@ -28,7 +28,7 @@ fn merge_h($ha, $hb) {
         $hi = $ha
     }
     # Skew step: recurse into RIGHT spine and unconditionally swap
-    my $merged_right = merge_h($lo->{right}, $hi)
+    val $merged_right = merge_h($lo->{right}, $hi)
     make($lo->{val}, $merged_right, $lo->{left})
 }
 
@@ -50,16 +50,16 @@ fn heap_size($h) {
 }
 
 fn from_array($arr) {
-    my $h = undef
-    for my $v (@$arr) {
+    var $h = undef
+    for val $v (@$arr) {
         $h = insert($h, $v)
     }
     $h
 }
 
 fn drain($h) {
-    my @out = ()
-    my $cur = $h
+    var @out = ()
+    var $cur = $h
     while (defined $cur) {
         push @out, find_min($cur)
         $cur = delete_min($cur)
@@ -69,12 +69,12 @@ fn drain($h) {
 
 package main;
 
-my $h = SH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
+val $h = SH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
 p "size: " . SH::heap_size($h)
 p "min: " . SH::find_min($h)
 p "drain: @{SH::drain($h)}"
 
-my $ha = SH::from_array([10, 30, 50])
-my $hb = SH::from_array([20, 40, 60])
-my $hm = SH::merge_h($ha, $hb)
+val $ha = SH::from_array([10, 30, 50])
+val $hb = SH::from_array([20, 40, 60])
+val $hm = SH::merge_h($ha, $hb)
 p "merged drain: @{SH::drain($hm)}"

@@ -7,7 +7,7 @@ fn Val::is_float_str($s) { $s =~ /^-?\d+(?:\.\d+)?$/ ? 1 : 0 }
 fn Val::is_hex($s) { $s =~ /^(?:0[xX])?[0-9a-fA-F]+$/ ? 1 : 0 }
 
 fn Val::strip_ws($s) {
-    my $t = $s
+    var $t = $s
     $t =~ s/^\s+|\s+$//g
     $t
 }
@@ -15,15 +15,15 @@ fn Val::strip_ws($s) {
 fn Val::is_blank($s) { Val::strip_ws($s) eq "" ? 1 : 0 }
 
 fn Val::normalize_phone($s) {
-    my $t = $s
+    var $t = $s
     $t =~ s/[^\d]//g
     $t
 }
 
 fn Val::parse_kv($s) {
-    my %out
-    for my $pair (split(/&/, $s)) {
-        my ($k, $v) = split(/=/, $pair, 2)
+    var %out
+    for val $pair (split(/&/, $s)) {
+        val ($k, $v) = split(/=/, $pair, 2)
         $out{$k} = $v if defined $k && $k ne ""
     }
     \%out
@@ -66,7 +66,7 @@ Val::normalize_phone("(415) 555-1234") |> aeq "4155551234", "phone normalized"
 Val::normalize_phone("+1-800-FOO-BAR") |> aeq "1800",       "phone strips letters"
 
 # Query string
-my $kv = Val::parse_kv("a=1&b=2&c=hello")
+val $kv = Val::parse_kv("a=1&b=2&c=hello")
 $kv->{a} |> aeq "1",     "kv a"
 $kv->{b} |> aeq "2",     "kv b"
 $kv->{c} |> aeq "hello", "kv c"

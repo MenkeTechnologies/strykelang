@@ -10,18 +10,18 @@ fn Rosetta::EquilibriumIndex::sum_list(@list) {
 }
 
 fn Rosetta::EquilibriumIndex::solve(@arr) {
-    my @res
-    my $n = len(@arr)
-    for my $i (0:$n-1) {
-        my $ls = 0
+    var @res
+    val $n = len(@arr)
+    for val $i (0:$n-1) {
+        var $ls = 0
         if ($i > 0) {
-            my @left = @arr[0:$i-1]
+            val @left = @arr[0:$i-1]
             $ls = Rosetta::EquilibriumIndex::sum_list(@left)
         }
         
-        my $rs = 0
+        var $rs = 0
         if ($i < $n - 1) {
-            my @right = @arr[$i+1:$n-1]
+            val @right = @arr[$i+1:$n-1]
             $rs = Rosetta::EquilibriumIndex::sum_list(@right)
         }
         
@@ -32,8 +32,8 @@ fn Rosetta::EquilibriumIndex::solve(@arr) {
     \@res
 }
 
-my @data = (-7, 1, 5, 2, -4, 3, 0)
-my $res = Rosetta::EquilibriumIndex::solve(@data)
+val @data = (-7, 1, 5, 2, -4, 3, 0)
+val $res = Rosetta::EquilibriumIndex::solve(@data)
 assert_eq join(",", @$res), "3,6", "equilibrium indices of -7,1,5,2,-4,3,0"
 
 # Pipe example

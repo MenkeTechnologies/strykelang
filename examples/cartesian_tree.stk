@@ -12,19 +12,19 @@
 package CT;
 
 fn build($arr) {
-    my $n = len(@$arr)
-    my @nodes = ()
-    for my $i (0:$n-1) {
+    val $n = len(@$arr)
+    var @nodes = ()
+    for val $i (0:$n-1) {
         push @nodes, {
             val => $arr->[$i], idx => $i,
             parent => -1, left => -1, right => -1
         }
     }
     return { nodes => \@nodes, root => -1 } if $n == 0
-    my @stack = (0)
-    my $root_i = 0
-    for my $i (1:$n-1) {
-        my $last_popped = -1
+    var @stack = (0)
+    var $root_i = 0
+    for val $i (1:$n-1) {
+        var $last_popped = -1
         while (len(@stack) > 0 && $nodes[$stack[(len(@stack)) - 1]]->{val} > $arr->[$i]) {
             $last_popped = pop @stack
         }
@@ -33,8 +33,8 @@ fn build($arr) {
             $nodes[$last_popped]->{parent} = $i if $last_popped >= 0
             $root_i = $i
         } else {
-            my $top = $stack[(len(@stack)) - 1]
-            my $old_right = $nodes[$top]->{right}
+            val $top = $stack[(len(@stack)) - 1]
+            val $old_right = $nodes[$top]->{right}
             $nodes[$top]->{right} = $i
             $nodes[$i]->{parent} = $top
             if ($old_right >= 0) {
@@ -51,16 +51,16 @@ fn build($arr) {
 # Returns the (value, index) of the minimum in arr[l..r] inclusive.
 fn rmq($t, $l, $r) {
     return undef if $l > $r
-    my $nodes = $t->{nodes}
+    val $nodes = $t->{nodes}
     # Collect ancestors of l up to root
-    my %anc_of_l = ()
-    my $cur = $l
+    var %anc_of_l = ()
+    var $cur = $l
     while ($cur >= 0) {
         $anc_of_l{$cur} = 1
         $cur = $nodes->[$cur]->{parent}
     }
     # Walk up from r until we hit a common ancestor
-    my $u = $r
+    var $u = $r
     while (!exists $anc_of_l{$u}) {
         $u = $nodes->[$u]->{parent}
     }
@@ -68,11 +68,11 @@ fn rmq($t, $l, $r) {
 }
 
 fn inorder($t) {
-    my @out = ()
+    var @out = ()
     return \@out if $t->{root} < 0
-    my @stack = ()
-    my $cur = $t->{root}
-    my $nodes = $t->{nodes}
+    var @stack = ()
+    var $cur = $t->{root}
+    val $nodes = $t->{nodes}
     while ($cur >= 0 || len(@stack) > 0) {
         while ($cur >= 0) {
             push @stack, $cur
@@ -87,12 +87,12 @@ fn inorder($t) {
 
 package main;
 
-my $arr = [3, 1, 4, 1, 5, 9, 2, 6]
-my $t = CT::build($arr)
+val $arr = [3, 1, 4, 1, 5, 9, 2, 6]
+val $t = CT::build($arr)
 p "array: @$arr"
-my $io = CT::inorder($t)
+val $io = CT::inorder($t)
 p "in-order: @$io"
-my $q = CT::rmq($t, 2, 6)
+val $q = CT::rmq($t, 2, 6)
 p "rmq[2..6] = val=" . $q->{val} . " idx=" . $q->{idx}
-my $q2 = CT::rmq($t, 0, 7)
+val $q2 = CT::rmq($t, 0, 7)
 p "rmq[0..7] = val=" . $q2->{val} . " idx=" . $q2->{idx}

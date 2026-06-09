@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 
 fn CB::new($cap) {
-    my @buf = ()
-    for my $i (0:$cap-1) { push @buf, undef }
+    var @buf = ()
+    for val $i (0:$cap-1) { push @buf, undef }
     +{ cap => $cap, buf => \@buf, head => 0, tail => 0, n => 0 }
 }
 
@@ -18,7 +18,7 @@ fn CB::push($cb, $x) {
 
 fn CB::shift($cb) {
     return undef if $cb->{n} == 0
-    my $v = $cb->{buf}->[$cb->{head}]
+    val $v = $cb->{buf}->[$cb->{head}]
     $cb->{head} = ($cb->{head} + 1) % $cb->{cap}
     $cb->{n} = $cb->{n} - 1
     $v
@@ -34,9 +34,9 @@ fn CB::is_full($cb)  { $cb->{n} == $cb->{cap} ? 1 : 0 }
 fn CB::is_empty($cb) { $cb->{n} == 0 ? 1 : 0 }
 
 fn CB::to_array($cb) {
-    my @out = ()
-    my $i = $cb->{head}
-    for my $k (0:$cb->{n}-1) {
+    var @out = ()
+    var $i = $cb->{head}
+    for val $k (0:$cb->{n}-1) {
         push @out, $cb->{buf}->[$i]
         $i = ($i + 1) % $cb->{cap}
     }
@@ -44,7 +44,7 @@ fn CB::to_array($cb) {
 }
 
 # Empty buffer
-my $e = CB::new(3)
+val $e = CB::new(3)
 CB::size($e)       |> aeq 0, "empty size"
 CB::is_empty($e)   |> aeq 1, "is_empty true"
 CB::is_full($e)    |> aeq 0, "is_full false"
@@ -52,7 +52,7 @@ CB::is_full($e)    |> aeq 0, "is_full false"
 (defined CB::shift($e) ? 1 : 0)  |> aeq 0, "shift empty undef"
 
 # Push within capacity
-my $c = CB::new(3)
+val $c = CB::new(3)
 CB::push($c, 1)
 CB::push($c, 2)
 CB::size($c)       |> aeq 2, "size 2"
@@ -78,7 +78,7 @@ CB::is_empty($c)   |> aeq 1, "empty again"
 (defined CB::shift($c) ? 1 : 0) |> aeq 0, "shift past empty"
 
 # Mixed push/shift wrap-around
-my $w = CB::new(4)
+val $w = CB::new(4)
 CB::push($w, "a")
 CB::push($w, "b")
 CB::shift($w) |> aeq "a", "shift a"
@@ -93,7 +93,7 @@ CB::push($w, "g")
 join(",", @{CB::to_array($w)}) |> aeq "d,e,f,g", "after more pushes"
 
 # Capacity 1
-my $u = CB::new(1)
+val $u = CB::new(1)
 CB::push($u, "x")
 CB::peek($u) |> aeq "x", "cap1 x"
 CB::push($u, "y")

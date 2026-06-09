@@ -6,9 +6,9 @@
 fn Rosetta::ISIN::is_valid($isin) {
     return 0 if len($isin) != 12
     return 0 if $isin !~ /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/
-    my $digits = ""
-    my @cs = ~> $isin chars
-    for my $c (@cs) {
+    var $digits = ""
+    val @cs = ~> $isin chars
+    for val $c (@cs) {
         if ($c =~ /[A-Z]/) {
             $digits .= ord($c) - ord("A") + 10
         } else {
@@ -16,11 +16,11 @@ fn Rosetta::ISIN::is_valid($isin) {
         }
     }
     # Luhn check on digit string (right-to-left, every 2nd digit doubled)
-    my @ds = ~> $digits chars
-    my $sum = 0
-    my $n = len(@ds)
-    for my $i (0:$n-1) {
-        my $d = int($ds[$n - 1 - $i])
+    val @ds = ~> $digits chars
+    var $sum = 0
+    val $n = len(@ds)
+    for val $i (0:$n-1) {
+        var $d = int($ds[$n - 1 - $i])
         if ($i % 2 == 1) {
             $d *= 2
             $d -= 9 if $d > 9

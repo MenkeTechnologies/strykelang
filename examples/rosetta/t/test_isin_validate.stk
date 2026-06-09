@@ -12,9 +12,9 @@ fn Rosetta::Isin::char_value($c) {
 }
 
 fn Rosetta::Isin::expand($s) {
-    my $out = ""
-    for my $ch (split //, $s) {
-        my $v = Rosetta::Isin::char_value($ch)
+    var $out = ""
+    for val $ch (split //, $s) {
+        val $v = Rosetta::Isin::char_value($ch)
         return undef if $v < 0
         $out .= "$v"
     }
@@ -22,11 +22,11 @@ fn Rosetta::Isin::expand($s) {
 }
 
 fn Rosetta::Isin::luhn_check($digits) {
-    my @d = split //, $digits
-    my $n = len(@d)
-    my $sum = 0
-    for my $i (0:$n - 1) {
-        my $v = $d[$n - 1 - $i] + 0
+    val @d = split //, $digits
+    val $n = len(@d)
+    var $sum = 0
+    for val $i (0:$n - 1) {
+        var $v = $d[$n - 1 - $i] + 0
         $v *= 2 if $i % 2 == 1
         $v = ($v % 10) + int($v / 10) if $v > 9
         $sum += $v
@@ -39,7 +39,7 @@ fn Rosetta::Isin::is_valid($s) {
     return 0 unless substr($s, 0, 2)  =~ /^[A-Z]{2}$/
     return 0 unless substr($s, 2, 9)  =~ /^[A-Z0-9]{9}$/
     return 0 unless substr($s, 11, 1) =~ /^[0-9]$/
-    my $expanded = Rosetta::Isin::expand($s)
+    val $expanded = Rosetta::Isin::expand($s)
     return 0 unless defined $expanded
     Rosetta::Isin::luhn_check($expanded)
 }
@@ -54,25 +54,25 @@ assert_eq Rosetta::Isin::char_value("Z"), 35, "Z → 35"
 assert_eq Rosetta::Isin::expand("US0378331005"), "30280378331005", "expand US0378331005"
 
 # Sample valid ISINs (from rosetta task)
-my @valid = (
+val @valid = (
     "US0378331005",   # Apple
     "AU0000XVGZA3",
     "GB0002634946",
     "FR0000133308",
 )
-for my $i (@valid) {
+for val $i (@valid) {
     assert_eq Rosetta::Isin::is_valid($i), 1, sprintf("%s valid", $i)
 }
 
 # Sample invalid ISINs
-my @invalid = (
+val @invalid = (
     "US0378331004",   # wrong check digit
     "us0378331005",   # lowercase country code
     "AU0000xVGZA3",   # lowercase in NSIN
     "AU000XVGZA3",    # wrong length
     "AU0000XVGZAD",   # alpha check digit
 )
-for my $i (@invalid) {
+for val $i (@invalid) {
     assert_eq Rosetta::Isin::is_valid($i), 0, sprintf("%s invalid", $i)
 }
 

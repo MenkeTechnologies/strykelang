@@ -26,12 +26,12 @@
 # rotate frequently; the most reliable route is running your own coturn
 # (https://github.com/coturn/coturn) or paying a service.
 
-my $mode = $ARGV[0] // "classify"
+val $mode = $ARGV[0] // "classify"
 
 if ($mode eq "classify") {
-    my $sock = udp_open()
+    val $sock = udp_open()
     if ($sock == 0) { p "bind failed"; exit 1 }
-    my $nat = stun_classify($sock)
+    val $nat = stun_classify($sock)
     udp_close($sock)
     printf "NAT type: %s (succeeded %d of %d STUN queries)\n",
         $nat->{nat_type}, $nat->{succeeded}, $nat->{queried}
@@ -48,10 +48,10 @@ if ($mode eq "classify") {
 }
 
 # Common setup for listen/send modes.
-my $turn_host = $ARGV[1]
-my $turn_port = $ARGV[2]
-my $user      = $ARGV[3]
-my $pass      = $ARGV[4]
+val $turn_host = $ARGV[1]
+val $turn_port = $ARGV[2]
+val $user      = $ARGV[3]
+val $pass      = $ARGV[4]
 if (!defined $turn_host || !defined $turn_port || !defined $user || !defined $pass) {
     p "usage:"
     p "  classify mode: stryke examples/turn_relay_chat.stk classify"
@@ -63,11 +63,11 @@ if (!defined $turn_host || !defined $turn_port || !defined $user || !defined $pa
     exit 1
 }
 
-my $sock = udp_open()
+val $sock = udp_open()
 if ($sock == 0) { p "bind failed"; exit 1 }
 
 printf "Allocating TURN relay at %s:%s …\n", $turn_host, $turn_port
-my $alloc = turn_allocate($sock, $turn_host, $turn_port, $user, $pass, 5000)
+val $alloc = turn_allocate($sock, $turn_host, $turn_port, $user, $pass, 5000)
 if (!defined $alloc) {
     p "TURN allocation failed — check credentials and that $turn_host:$turn_port is reachable."
     udp_close($sock)
@@ -85,8 +85,8 @@ if ($mode eq "listen") {
     p "Waiting for messages (60s timeout per recv) …"
 
     # Loop and reply. Each round receives one DATA-INDICATION and replies.
-    for my $i (1:5) {
-        my $msg = turn_recv($sock, 60_000)
+    for val $i (1:5) {
+        val $msg = turn_recv($sock, 60_000)
         if (!defined $msg) {
             p "  $i/5 — no message received in 60s, giving up."
             last
@@ -105,9 +105,9 @@ if ($mode eq "listen") {
     udp_close($sock)
 }
 elsif ($mode eq "send") {
-    my $peer_ip   = $ARGV[5]
-    my $peer_port = $ARGV[6]
-    my $message   = $ARGV[7] // "hello via TURN"
+    val $peer_ip   = $ARGV[5]
+    val $peer_port = $ARGV[6]
+    val $message   = $ARGV[7] // "hello via TURN"
     if (!defined $peer_ip || !defined $peer_port) {
         p "send mode needs PEER_RELAY_IP PEER_RELAY_PORT MESSAGE"
         udp_close($sock)
@@ -121,11 +121,11 @@ elsif ($mode eq "send") {
     }
     printf "Sending '%s' to %s:%s via TURN relay …\n",
         $message, $peer_ip, $peer_port
-    my $sent = turn_send($sock, $peer_ip, $peer_port, $message)
+    val $sent = turn_send($sock, $peer_ip, $peer_port, $message)
     printf "  %d bytes sent to TURN server\n", $sent
 
     p "Waiting up to 30s for peer reply …"
-    my $reply = turn_recv($sock, 30_000)
+    val $reply = turn_recv($sock, 30_000)
     if (defined $reply) {
         printf "  peer replied (%s:%d): %s\n",
             $reply->{peer_ip}, $reply->{peer_port}, $reply->{payload}

@@ -5,14 +5,14 @@ fn Rosetta::Callback::apply($cb, @arr) {
     @arr |> map $cb
 }
 
-my @vals = (1, 2, 3)
-my $square = fn ($x) { $x * $x }
+val @vals = (1, 2, 3)
+val $square = fn ($x) { $x * $x }
 
-my @res = Rosetta::Callback::apply($square, @vals)
+val @res = Rosetta::Callback::apply($square, @vals)
 assert_eq join(",", @res), "1,4,9", "callback applied"
 
 # Using builtin map directly
-my @res2 = (10, 20) |> map { _ + 5 }
+val @res2 = (10, 20) |> map { _ + 5 }
 assert_eq join(",", @res2), "15,25", "piped map"
 
 # Piped version

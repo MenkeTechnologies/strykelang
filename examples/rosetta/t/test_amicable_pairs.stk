@@ -5,9 +5,9 @@ fn Rosetta::AmicablePairs::sum_divisors($n) {
     if ($n < 2) {
         0
     }
-    my $sum = 0
-    my $limit = int($n / 2)
-    for my $i (1:$limit) {
+    var $sum = 0
+    val $limit = int($n / 2)
+    for val $i (1:$limit) {
         if ($n % $i == 0) {
             $sum = $sum + $i
         }
@@ -19,8 +19,8 @@ fn Rosetta::AmicablePairs::check($val1, $val2) {
     if ($val1 == $val2) {
         0
     }
-    my $sa = Rosetta::AmicablePairs::sum_divisors($val1)
-    my $sb = Rosetta::AmicablePairs::sum_divisors($val2)
+    val $sa = Rosetta::AmicablePairs::sum_divisors($val1)
+    val $sb = Rosetta::AmicablePairs::sum_divisors($val2)
     ($sa == $val2 && $sb == $val1) ? 1 : 0
 }
 

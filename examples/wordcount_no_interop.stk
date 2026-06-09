@@ -11,22 +11,22 @@
 # Run: echo "the quick brown fox jumps over the lazy dog the fox" \
 #        | stryke --no-interop examples/wordcount_no_interop.stk
 
-my $text = join("\n", <STDIN>)
+var $text = join("\n", <STDIN>)
 # Fall back to the canonical pangram so the CI / docs run cleanly even
 # when stdin is closed.
-my $pangram = "the quick brown fox jumps over the lazy dog the fox"
+val $pangram = "the quick brown fox jumps over the lazy dog the fox"
 $text = $pangram if len($text) == 0
 
-my @words = split(/\W+/, lc($text)) |> pgrep { len(_) > 0 } _
+val @words = split(/\W+/, lc($text)) |> pgrep { len(_) > 0 } _
 
-my %freq
+var %freq
 $freq{_}++ for @words
 
 p "total words : ", len(@words)
 p "unique words: ", len(keys %freq)
 p ""
 p "frequencies (alphabetical):"
-for my $w (sort keys %freq) {
+for val $w (sort keys %freq) {
     printf "  %5d  %s\n", $freq{$w}, $w
 }
 

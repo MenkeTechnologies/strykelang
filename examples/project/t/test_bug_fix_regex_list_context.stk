@@ -3,24 +3,24 @@
 # `m//g` in list context now return the capture groups across all
 # matches, and the destructure idiom works:
 #
-#   my ($k, $v) = $str =~ /^(\w+)=(\d+)/;
+#   var ($k, $v) = $str =~ /^(\w+)=(\d+)/;
 #
 # Plus the BUG-258 "all-captures-undef → integer(1)" fallback so
 # boolean-test idioms keep working when the regex matched but the only
 # group was optional.
 
 # m//g with two groups: 3 matches × 2 groups = 6 elements.
-my @parts = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g)
+val @parts = ("foo=1 bar=2 baz=3" =~ /(\w+)=(\d+)/g)
 len(@parts)       |> assert_eq(6, "m//g flat captures count")
 join("|", @parts) |> assert_eq("foo|1|bar|2|baz|3", "m//g flat captures order")
 
 # m// (no /g) — list-context returns the capture list once.
-my ($k, $v) = ("alice=30" =~ /^(\w+)=(\d+)/)
+val ($k, $v) = ("alice=30" =~ /^(\w+)=(\d+)/)
 $k |> assert_eq("alice", "destructure scheme")
 $v |> assert_eq(30, "destructure value")
 
 # m//g with no capture groups falls back to full-match strings.
-my @overall = ("alice bob carol" =~ /\w+/g)
+val @overall = ("alice bob carol" =~ /\w+/g)
 join(",", @overall) |> assert_eq("alice,bob,carol", "no-group m//g returns matches")
 
 # BUG-258 truthy fallback: optional group that didn't fire stays truthy
@@ -35,11 +35,11 @@ Demo::IsNumeric::check("-3.14")  |> assert_ok("-3.14 is numeric (group matched)"
 (!Demo::IsNumeric::check(""))    |> assert_ok("empty not numeric")
 
 # Named-capture interop: list context still returns positional captures.
-my ($yr, $mo, $dy) = ("2026-05-21" =~ /^(?<year>\d{4})-(?<mo>\d{2})-(?<dy>\d{2})$/)
+val ($yr, $mo, $dy) = ("2026-05-21" =~ /^(?<year>\d{4})-(?<mo>\d{2})-(?<dy>\d{2})$/)
 "$yr/$mo/$dy" |> assert_eq("2026/05/21", "named groups preserve positional list")
 
 # Mixed text with multiple captures per match.
-my @tags = ("[a:1] [b:2] [c:3]" =~ /\[(\w):(\d)\]/g)
+val @tags = ("[a:1] [b:2] [c:3]" =~ /\[(\w):(\d)\]/g)
 join(",", @tags) |> assert_eq("a,1,b,2,c,3", "/g across structured matches")
 
 test_run

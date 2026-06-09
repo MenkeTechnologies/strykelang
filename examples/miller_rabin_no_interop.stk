@@ -18,9 +18,9 @@
 # Modular exponentiation by squaring: (base^exp) mod m, in O(log exp).
 fn MR::mod_pow($base, $exp, $m) {
     return 0 if $m == 1
-    my $result = 1
-    my $bs = $base % $m
-    my $e = $exp
+    var $result = 1
+    var $bs = $base % $m
+    var $e = $exp
     while ($e > 0) {
         $result = ($result * $bs) % $m if $e % 2 == 1
         $e = int($e / 2)
@@ -34,13 +34,13 @@ fn MR::mod_pow($base, $exp, $m) {
 fn MR::witness($n, $witness) {
     return 1 if $n == $witness       # n = witness is trivially prime
     # Decompose n - 1 = d * 2^r with d odd.
-    my $d = $n - 1
-    my $r = 0
+    var $d = $n - 1
+    var $r = 0
     while ($d % 2 == 0) {
         $d = int($d / 2)
         $r++
     }
-    my $x = MR::mod_pow($witness, $d, $n)
+    var $x = MR::mod_pow($witness, $d, $n)
     return 1 if $x == 1 || $x == $n - 1
     for (1:$r - 1) {
         $x = ($x * $x) % $n
@@ -54,7 +54,7 @@ fn MR::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n == 2 || $n == 3
     return 0 if $n % 2 == 0
-    for my $w (2, 3, 5, 7, 11, 13) {
+    for val $w (2, 3, 5, 7, 11, 13) {
         return 1 if $n == $w
         return 0 unless MR::witness($n, $w)
     }
@@ -66,7 +66,7 @@ fn MR::is_prime_brute($n) {
     return 0 if $n < 2
     return 1 if $n == 2
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -77,22 +77,22 @@ fn MR::is_prime_brute($n) {
 p "── Miller-Rabin primality demo ──"
 
 # Known primes and composites.
-my @known_primes = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 97, 541, 7919, 65537, 104729, 1000003)
-my @known_composites = (1, 4, 6, 8, 9, 15, 21, 25, 27, 49, 100, 561, 1105, 1729, 2465)  # includes Carmichaels
+val @known_primes = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 97, 541, 7919, 65537, 104729, 1000003)
+val @known_composites = (1, 4, 6, 8, 9, 15, 21, 25, 27, 49, 100, 561, 1105, 1729, 2465)  # includes Carmichaels
 
-for my $n (@known_primes) {
+for val $n (@known_primes) {
     die "$n should be prime" unless MR::is_prime($n)
 }
 p "  #{len @known_primes} known primes all detected  OK"
 
-for my $n (@known_composites) {
+for val $n (@known_composites) {
     die "$n should be composite" if MR::is_prime($n)
 }
 p "  #{len @known_composites} composites (incl. Carmichaels 561, 1105, 1729, 2465) all rejected  OK"
 
 # Cross-check against brute trial division for every n in 0:1000.
-my $disagree = 0
-for my $n (0:1000) {
+var $disagree = 0
+for val $n (0:1000) {
     if (MR::is_prime($n) != MR::is_prime_brute($n)) {
         $disagree++
     }
@@ -106,10 +106,10 @@ p "  0..1000: MR agrees with trial-division on all 1001 values  OK"
 #   * is_prime(2k) = 0 for k > 1
 die "0 not prime" if MR::is_prime(0)
 die "1 not prime" if MR::is_prime(1)
-for my $p (2, 3, 5, 7, 11, 13) {
+for val $p (2, 3, 5, 7, 11, 13) {
     die "$p is prime" unless MR::is_prime($p)
 }
-for my $k (2:50) {
+for val $k (2:50) {
     die "even #{2*$k} composite" if MR::is_prime(2 * $k)
 }
 

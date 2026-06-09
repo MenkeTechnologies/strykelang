@@ -17,7 +17,7 @@
 p "── provenance chain walkthrough ──────────────────────"
 
 fn dump_stage($val, $label) {
-    my $p = provenance($val)
+    val $p = provenance($val)
     if (!defined $p) {
         printf "  [%-18s]  (no lineage)\n", $label
         return
@@ -27,7 +27,7 @@ fn dump_stage($val, $label) {
 }
 
 # ── stage 1: origin ────────────────────────────────────────────────
-my $config = mark({
+val $config = mark({
     user    => "jamenk",
     project => "strykelang",
     started => time(),
@@ -35,11 +35,11 @@ my $config = mark({
 dump_stage($config, "1. origin")
 
 # ── stage 2: extract a value, wrap to keep trackable ──────────────
-my $extracted = mark({ user => $config->{user} })
+val $extracted = mark({ user => $config->{user} })
 dump_stage($extracted, "2. extracted")
 
 # ── stage 3: enrich with a derived field ──────────────────────────
-my $enriched = mark({
+val $enriched = mark({
     %$extracted,
     user_upper => uc($extracted->{user}),
 })
@@ -48,11 +48,11 @@ dump_stage($enriched, "3. enriched")
 # ── stage 4: serialize, then wrap the JSON in a container ─────────
 # (Bare-string returns from to_json lose Arc identity — v1 limit. Wrap
 # in a hash so the container's stable Arc carries the lineage forward.)
-my $packed = mark({ payload => to_json($enriched) })
+val $packed = mark({ payload => to_json($enriched) })
 dump_stage($packed, "4. serialized")
 
 # ── stage 5: hash + attach metadata ───────────────────────────────
-my $sealed = mark({
+val $sealed = mark({
     payload      => $packed->{payload},
     sha256       => sha256($packed->{payload}),
     sealed_at    => time(),
@@ -60,7 +60,7 @@ my $sealed = mark({
 dump_stage($sealed, "5. sealed")
 
 # ── stage 6: prepare for transport — what an outbound system sees ─
-my $envelope = mark({
+val $envelope = mark({
     body    => $sealed,
     # Escape @ so stryke doesn't try to interpolate `@v0` as an array.
     sender  => "stryke\@v0.14.30",

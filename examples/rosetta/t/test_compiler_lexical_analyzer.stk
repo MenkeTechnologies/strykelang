@@ -2,8 +2,8 @@
 # Rosetta Code: Compiler/lexical analyzer
 
 fn Rosetta::Lexer::tokenize($src) {
-    my @tokens
-    my $work = $src
+    var @tokens
+    var $work = $src
     while (len($work) > 0) {
         if ($work =~ s/^\s*(\d+)//) {
             push @tokens, ["Integer", $1]
@@ -21,8 +21,8 @@ fn Rosetta::Lexer::tokenize($src) {
     \@tokens
 }
 
-my $src = "x = 10 + 20;"
-my $tokens = Rosetta::Lexer::tokenize($src)
+val $src = "x = 10 + 20;"
+val $tokens = Rosetta::Lexer::tokenize($src)
 
 assert_eq len(@$tokens), 6, "Number of tokens matches"
 assert_eq $tokens->[0]->[0], "Identifier", "Token 0 type"

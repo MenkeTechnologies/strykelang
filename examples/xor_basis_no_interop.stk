@@ -17,20 +17,20 @@
 
 # ── 64-bit width is enough for any case in this demo ─────────────
 
-my $BITS = 60
+val $BITS = 60
 
 # ── factory: empty basis ─────────────────────────────────────────
 
 fn Xb::new() {
-    my @b = (0) x $BITS
+    val @b = (0) x $BITS
     +{ basis => \@b, count => 0 }
 }
 
 # ── insert v; returns 1 iff v expands the basis ──────────────────
 
 fn Xb::insert($xb, $v) {
-    my $cur = $v
-    for my $i (rev 0:$BITS - 1) {
+    var $cur = $v
+    for val $i (rev 0:$BITS - 1) {
         next if ($cur >> $i & 1) == 0
         if ($xb->{basis}->[$i] == 0) {
             $xb->{basis}->[$i] = $cur
@@ -45,9 +45,9 @@ fn Xb::insert($xb, $v) {
 # ── max-XOR over the subspace spanned by the inserted values ─────
 
 fn Xb::max_xor($xb) {
-    my $best = 0
-    for my $i (rev 0:$BITS - 1) {
-        my $bv = $xb->{basis}->[$i]
+    var $best = 0
+    for val $i (rev 0:$BITS - 1) {
+        val $bv = $xb->{basis}->[$i]
         next if $bv == 0
         if (($best ^ $bv) > $best) {
             $best = $best ^ $bv
@@ -59,10 +59,10 @@ fn Xb::max_xor($xb) {
 # ── reduce to row-echelon (each basis bit only set in its own row) ─
 
 fn Xb::reduced($xb) {
-    my @r = @{$xb->{basis}}
-    for my $i (0:$BITS - 1) {
+    var @r = @{$xb->{basis}}
+    for val $i (0:$BITS - 1) {
         next if $r[$i] == 0
-        for my $j ($i + 1:$BITS - 1) {
+        for val $j ($i + 1:$BITS - 1) {
             next if $r[$j] == 0
             if (($r[$j] >> $i & 1) == 1) {
                 $r[$j] = $r[$j] ^ $r[$i]
@@ -75,8 +75,8 @@ fn Xb::reduced($xb) {
 # ── is v representable as XOR of basis elements? ─────────────────
 
 fn Xb::contains($xb, $v) {
-    my $cur = $v
-    for my $i (rev 0:$BITS - 1) {
+    var $cur = $v
+    for val $i (rev 0:$BITS - 1) {
         next if ($cur >> $i & 1) == 0
         return 0 if $xb->{basis}->[$i] == 0
         $cur = $cur ^ $xb->{basis}->[$i]
@@ -87,31 +87,31 @@ fn Xb::contains($xb, $v) {
 # ── brute force: enumerate every subset XOR ──────────────────────
 
 fn Xb::brute_set($vals) {
-    my %seen = (0 => 1)
-    my $n = len(@$vals)
+    var %seen = (0 => 1)
+    val $n = len(@$vals)
     return [keys %seen] if $n == 0
-    my $total = 1 << $n
-    for my $mask (1:$total - 1) {
-        my $x = 0
-        for my $i (0:$n - 1) {
+    val $total = 1 << $n
+    for val $mask (1:$total - 1) {
+        var $x = 0
+        for val $i (0:$n - 1) {
             $x = $x ^ $vals->[$i] if ($mask >> $i) & 1
         }
         $seen{$x} = 1
     }
-    my @out = sort { _0 <=> _1 } keys %seen
+    val @out = sort { _0 <=> _1 } keys %seen
     \@out
 }
 
 fn Xb::brute_max($vals) {
-    my $set = Xb::brute_set($vals)
-    my $best = 0
-    for my $v (@$set) { $best = $v if $v > $best }
+    val $set = Xb::brute_set($vals)
+    var $best = 0
+    for val $v (@$set) { $best = $v if $v > $best }
     $best
 }
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{ name => "trivial",          xs => [1, 2, 3],                              max => 3,  dim => 2 },
     +{ name => "duplicates only",  xs => [5, 5, 5, 5],                           max => 5,  dim => 1 },
     +{ name => "powers of 2",      xs => [1, 2, 4, 8, 16],                       max => 31, dim => 5 },
@@ -124,12 +124,12 @@ my @cases = (
 p "── XOR linear basis demo ─────────────────────────────"
 printf "  %-22s  %3s  %5s  %5s\n", "case", "n", "dim", "maxXOR"
 printf "  %-22s  %3s  %5s  %5s\n", "----------------------", "---", "-----", "------"
-for my $c (@cases) {
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) {
+for val $c (@cases) {
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) {
         Xb::insert($xb, $v)
     }
-    my $mx = Xb::max_xor($xb)
+    val $mx = Xb::max_xor($xb)
     printf "  %-22s  %3d  %5d  %5d  %s\n",
         $c->{name}, len(@{$c->{xs}}), $xb->{count}, $mx,
         ($xb->{count} == $c->{dim} && $mx == $c->{max}) ? "" : "FAIL"
@@ -137,9 +137,9 @@ for my $c (@cases) {
 
 # ── invariant 1: basis size matches expected subspace dimension ───
 
-for my $c (@cases) {
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) {
+for val $c (@cases) {
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) {
         Xb::insert($xb, $v)
     }
     die "dim mismatch on \"#{$c->{name}}\": got #{$xb->{count}} want #{$c->{dim}}" unless $xb->{count} == $c->{dim}
@@ -147,67 +147,67 @@ for my $c (@cases) {
 
 # ── invariant 2: max-XOR matches expected ─────────────────────────
 
-for my $c (@cases) {
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) {
+for val $c (@cases) {
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) {
         Xb::insert($xb, $v)
     }
-    my $mx = Xb::max_xor($xb)
+    val $mx = Xb::max_xor($xb)
     die "max-XOR mismatch on \"#{$c->{name}}\": got #{$mx} want #{$c->{max}}" unless $mx == $c->{max}
 }
 
 # ── invariant 3: max-XOR matches brute subset enumeration ─────────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next if len(@{$c->{xs}}) > 12
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
-    my $brute_mx = Xb::brute_max($c->{xs})
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    val $brute_mx = Xb::brute_max($c->{xs})
     die "max-XOR vs brute on \"#{$c->{name}}\": basis=#{Xb::max_xor($xb)} brute=#{$brute_mx}" unless Xb::max_xor($xb) == $brute_mx
 }
 
 # ── invariant 4: every input is contained in the basis subspace ───
 
-for my $c (@cases) {
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
-    for my $v (@{$c->{xs}}) {
+for val $c (@cases) {
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    for val $v (@{$c->{xs}}) {
         die "#{$v} not in basis subspace on \"#{$c->{name}}\"" unless Xb::contains($xb, $v)
     }
 }
 
 # ── invariant 5: subspace size = 2^dim ────────────────────────────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next if len(@{$c->{xs}}) > 8
-    my $xb = Xb::new()
-    for my $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
-    my $brute_set = Xb::brute_set($c->{xs})
-    my $expected = 1 << $xb->{count}
+    val $xb = Xb::new()
+    for val $v (@{$c->{xs}}) { Xb::insert($xb, $v) }
+    val $brute_set = Xb::brute_set($c->{xs})
+    val $expected = 1 << $xb->{count}
     die "subspace size #{len(@$brute_set)} != 2^dim #{$expected} on \"#{$c->{name}}\"" unless len(@$brute_set) == $expected
 }
 
 # ── invariant 6: insertion order doesn't affect dim or max-XOR ─────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next if len(@{$c->{xs}}) < 2
-    my $xb1 = Xb::new()
-    for my $v (@{$c->{xs}}) { Xb::insert($xb1, $v) }
-    my $xb2 = Xb::new()
-    my @rev = rev @{$c->{xs}}
-    for my $v (@rev) { Xb::insert($xb2, $v) }
+    val $xb1 = Xb::new()
+    for val $v (@{$c->{xs}}) { Xb::insert($xb1, $v) }
+    val $xb2 = Xb::new()
+    val @rev = rev @{$c->{xs}}
+    for val $v (@rev) { Xb::insert($xb2, $v) }
     die "dim differs by order on \"#{$c->{name}}\"" unless $xb1->{count} == $xb2->{count}
     die "max differs by order on \"#{$c->{name}}\"" unless Xb::max_xor($xb1) == Xb::max_xor($xb2)
 }
 
 # ── invariant 7: inserting a 0 never expands the basis ─────────────
 
-for my $rep (1:10) {
-    my $xb = Xb::new()
+for val $rep (1:10) {
+    val $xb = Xb::new()
     Xb::insert($xb, 5)
     Xb::insert($xb, 3)
-    my $before = $xb->{count}
-    my $added = Xb::insert($xb, 0)
+    val $before = $xb->{count}
+    val $added = Xb::insert($xb, 0)
     die "zero falsely expanded the basis" if $added
     die "zero changed basis count" unless $xb->{count} == $before
 }

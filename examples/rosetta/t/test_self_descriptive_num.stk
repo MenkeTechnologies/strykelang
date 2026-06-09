@@ -2,17 +2,17 @@
 # Rosetta Code: Self-descriptive numbers
 
 fn Rosetta::SelfDescriptive::check($n) {
-    my @digits = ~> "$n" chars
-    my $len = len(@digits)
-    my @counts = (0) x $len
-    for my $d (@digits) {
+    val @digits = ~> "$n" chars
+    val $len = len(@digits)
+    var @counts = (0) x $len
+    for val $d (@digits) {
         if ($d < $len) {
             $counts[$d]++
         } else {
             return 0
         }
     }
-    for my $i (0:$len-1) {
+    for val $i (0:$len-1) {
         if ($counts[$i] != $digits[$i]) { return 0 }
     }
     1

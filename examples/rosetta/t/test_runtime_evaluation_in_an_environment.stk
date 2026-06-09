@@ -8,8 +8,8 @@ fn Rosetta::EvalEnv::op($op, $a, $b) { { kind => "op", op => $op, a => $a, b => 
 fn Rosetta::EvalEnv::eval($expr, $env) {
     return $expr->{value} if $expr->{kind} eq "lit"
     return $env->{$expr->{name}} if $expr->{kind} eq "var"
-    my $a = Rosetta::EvalEnv::eval($expr->{a}, $env)
-    my $b = Rosetta::EvalEnv::eval($expr->{b}, $env)
+    val $a = Rosetta::EvalEnv::eval($expr->{a}, $env)
+    val $b = Rosetta::EvalEnv::eval($expr->{b}, $env)
     return $a + $b if $expr->{op} eq "+"
     return $a - $b if $expr->{op} eq "-"
     return $a * $b if $expr->{op} eq "*"
@@ -18,12 +18,12 @@ fn Rosetta::EvalEnv::eval($expr, $env) {
 }
 
 fn Rosetta::EvalEnv::delta($expr, $x1, $x2) {
-    my $r1 = Rosetta::EvalEnv::eval($expr, { x => $x1 })
-    my $r2 = Rosetta::EvalEnv::eval($expr, { x => $x2 })
+    val $r1 = Rosetta::EvalEnv::eval($expr, { x => $x1 })
+    val $r2 = Rosetta::EvalEnv::eval($expr, { x => $x2 })
     $r2 - $r1
 }
 
-my $expr = Rosetta::EvalEnv::op(
+val $expr = Rosetta::EvalEnv::op(
     "+",
     Rosetta::EvalEnv::op("*", Rosetta::EvalEnv::var("x"), Rosetta::EvalEnv::lit(2)),
     Rosetta::EvalEnv::lit(3)

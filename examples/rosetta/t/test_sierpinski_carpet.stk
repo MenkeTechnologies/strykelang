@@ -13,8 +13,8 @@ fn Rosetta::SierpinskiCarpet::in_carpet($x, $y) {
 }
 
 fn Rosetta::SierpinskiCarpet::carpet_row($y, $size) {
-    my $res = ""
-    for my $x (0:$size-1) {
+    var $res = ""
+    for val $x (0:$size-1) {
         if (Rosetta::SierpinskiCarpet::in_carpet($x, $y)) {
             $res = $res . "#"
         } else {

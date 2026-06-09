@@ -8,28 +8,28 @@ ai_mock_install('(?si).*Stryke.*', 'Stryke: terse, fast, built-in AI.')
 
 # 2. Parallel Hash Pipeline
 p "--- Hashing ---"
-my %h = ~> glob("examples/*.stk") \
+val %h = ~> glob("examples/*.stk") \
     head(5) \
     pmaps { [ _ => c"#{_}" |> sha256 ] } \
     flat_maps { @{_} } \
     collect
 
-for my $k (keys %h) {
-    my $v = $h{$k}
+for val $k (keys %h) {
+    val $v = $h{$k}
     p "  $k: #{ $v[0:7] }..."
 }
 
 # 3. Sketch Algebra
 p "\n--- Sketches ---"
-my $sk = hll_new(14)
+val $sk = hll_new(14)
 1:500 |> e { hll_add($sk, _) }
 1:1000 |> e { hll_add($sk, _) }
 p "  Unique (approx): #{ hll_count($sk) }"
 
 # 4. AI (Implicit topic, Expression body)
 fn App::sum = ai "summarize: #{_}"
-my @s_res = 'Stryke' |> App::sum |> collect
-my $sum = shift @s_res
+var @s_res = 'Stryke' |> App::sum |> collect
+val $sum = shift @s_res
 p "Summary: $sum"
 
 # 5. Tests

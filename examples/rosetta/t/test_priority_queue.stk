@@ -12,7 +12,7 @@ fn Rosetta::PriorityQueue::push($pq, $item, $priority) {
 }
 
 fn Rosetta::PriorityQueue::pop($pq) {
-    my $val = shift @{$pq->{items}}
+    val $val = shift @{$pq->{items}}
     $val->{item}
 }
 
@@ -20,7 +20,7 @@ fn Rosetta::PriorityQueue::size($pq) {
     len(@{$pq->{items}})
 }
 
-my $pq = Rosetta::PriorityQueue::new()
+val $pq = Rosetta::PriorityQueue::new()
 Rosetta::PriorityQueue::push($pq, "Clear drains", 3)
 Rosetta::PriorityQueue::push($pq, "Feed cat", 4)
 Rosetta::PriorityQueue::push($pq, "Make tea", 5)

@@ -5,12 +5,12 @@
 # Run: stryke --no-interop examples/ipv4_cidr.stk
 
 fn IP::parse($s) {
-    my @parts = split(/\./, $s)
+    val @parts = split(/\./, $s)
     return undef if len(@parts) != 4
-    my $val = 0
-    for my $p (@parts) {
+    var $val = 0
+    for val $p (@parts) {
         return undef if $p !~ /^\d+$/
-        my $n = $p + 0
+        val $n = $p + 0
         return undef if $n < 0 || $n > 255
         $val = $val * 256 + $n
     }
@@ -18,34 +18,34 @@ fn IP::parse($s) {
 }
 
 fn IP::format($n) {
-    my $oa = int($n / 16777216) % 256
-    my $ob = int($n / 65536) % 256
-    my $oc = int($n / 256) % 256
-    my $od = $n % 256
+    val $oa = int($n / 16777216) % 256
+    val $ob = int($n / 65536) % 256
+    val $oc = int($n / 256) % 256
+    val $od = $n % 256
     $oa . "." . $ob . "." . $oc . "." . $od
 }
 
 fn IP::cidr_parse($s) {
-    my @parts = split(/\//, $s)
+    val @parts = split(/\//, $s)
     return undef if len(@parts) != 2
-    my $addr = IP::parse($parts[0])
+    val $addr = IP::parse($parts[0])
     return undef if !defined $addr
-    my $bits = $parts[1] + 0
+    val $bits = $parts[1] + 0
     return undef if $bits < 0 || $bits > 32
-    my $mask = $bits == 0 ? 0 : 4294967295 - (2 ** (32 - $bits)) + 1
-    my $net = $addr - ($addr % (2 ** (32 - $bits)))
+    val $mask = $bits == 0 ? 0 : 4294967295 - (2 ** (32 - $bits)) + 1
+    var $net = $addr - ($addr % (2 ** (32 - $bits)))
     $net = 0 if $bits == 0
     { net => $net, bits => $bits, mask => $mask }
 }
 
 fn IP::in_cidr($addr, $cidr) {
-    my $shift = 2 ** (32 - $cidr->{bits})
+    val $shift = 2 ** (32 - $cidr->{bits})
     return 1 if $cidr->{bits} == 0
     int($addr / $shift) == int($cidr->{net} / $shift)
 }
 
 fn IP::broadcast($cidr) {
-    my $size = 2 ** (32 - $cidr->{bits})
+    val $size = 2 ** (32 - $cidr->{bits})
     $cidr->{net} + $size - 1
 }
 
@@ -54,15 +54,15 @@ fn IP::num_hosts($cidr) {
 }
 
 p "=== IPv4 / CIDR Demo ==="
-my $addr = IP::parse("192.168.1.42")
+val $addr = IP::parse("192.168.1.42")
 p "addr     = " . $addr . " (" . IP::format($addr) . ")"
 
-my $oc = IP::cidr_parse("192.168.1.0/24")
+val $oc = IP::cidr_parse("192.168.1.0/24")
 p "cidr net = " . IP::format($oc->{net}) . "/" . $oc->{bits}
 p "cidr brd = " . IP::format(IP::broadcast($oc))
 p "hosts    = " . IP::num_hosts($oc)
 p "in net?  = " . IP::in_cidr($addr, $oc)
 
-my $c2 = IP::cidr_parse("10.0.0.0/8")
+val $c2 = IP::cidr_parse("10.0.0.0/8")
 p "10/8 contains 10.1.2.3? " . IP::in_cidr(IP::parse("10.1.2.3"), $c2)
 p "10/8 contains 11.0.0.1? " . IP::in_cidr(IP::parse("11.0.0.1"), $c2)

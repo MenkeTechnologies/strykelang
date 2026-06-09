@@ -25,8 +25,8 @@ fn Demo::Queue::make_job($id, $work_us, $fail_rate) {
 #    does not fire when target is called from inside `eval { ... }`).
 
 fn Demo::Queue::execute($job) {
-    my $end = now_ns() + $job->{work_us} * 1000
-    my $spin = 0
+    val $end = now_ns() + $job->{work_us} * 1000
+    var $spin = 0
     while (now_ns() < $end) { $spin++ }
     if (rand() < $job->{fail_rate}) {
         return +{ ok => 0, error => "transient_fail:" . $job->{id} }
@@ -37,16 +37,16 @@ fn Demo::Queue::execute($job) {
 # ── retry-with-linear-backoff wrapper ────────────────────────────────
 
 fn Demo::Queue::run_with_retry($job, $max_attempts) {
-    my $attempt = 0
+    var $attempt = 0
     while ($attempt < $max_attempts) {
         $attempt++
-        my $r = Demo::Queue::execute($job)
+        val $r = Demo::Queue::execute($job)
         if ($r->{ok}) {
             return +{ ok => 1, result => $r->{result}, attempts => $attempt }
         }
         # Linear backoff: 100 µs * attempt.
-        my $delay_us = 100 * $attempt
-        my $end = now_ns() + $delay_us * 1000
+        val $delay_us = 100 * $attempt
+        val $end = now_ns() + $delay_us * 1000
         while (now_ns() < $end) { }
     }
     +{ ok => 0, error => "retries_exhausted", attempts => $attempt }
@@ -59,12 +59,12 @@ mysync $slowest = topk(3)
 mysync $exec_count = 0
 
 around "Demo::Queue::execute" {
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
-    my $elapsed_us = (now_ns() - $t0) / 1000.0
+    val $t0 = now_ns()
+    var $r = proceed(@INTERCEPT_ARGS)
+    val $elapsed_us = (now_ns() - $t0) / 1000.0
     td_add($latency, $elapsed_us)
     # @INTERCEPT_ARGS[0] is the job hashref.
-    my $job = $INTERCEPT_ARGS[0]
+    val $job = $INTERCEPT_ARGS[0]
     topk_add($slowest, sprintf("job-%02d", $job->{id}), int($elapsed_us))
     $exec_count++
     $r
@@ -72,10 +72,10 @@ around "Demo::Queue::execute" {
 
 # ── submit a batch of jobs ───────────────────────────────────────────
 
-my @jobs
-for my $i (1:20) {
-    my $work = 100 + ($i % 5) * 50          # 100:300 µs
-    my $fail = ($i % 4 == 0) ? 0.3 : 0.05   # every 4th job is 30% flaky
+var @jobs
+for val $i (1:20) {
+    val $work = 100 + ($i % 5) * 50          # 100:300 µs
+    val $fail = ($i % 4 == 0) ? 0.3 : 0.05   # every 4th job is 30% flaky
     push @jobs, Demo::Queue::make_job($i, $work, $fail)
 }
 
@@ -86,14 +86,14 @@ printf "── submitted %d jobs ───────────────�
 # children). For a true parallel queue, use `pfor` with a channel; for
 # this demo we stay sequential so latency/topk roll up correctly.
 
-my @results = map { Demo::Queue::run_with_retry(_, 5) } @jobs
+val @results = map { Demo::Queue::run_with_retry(_, 5) } @jobs
 
 # ── per-job summary ──────────────────────────────────────────────────
 
 p ""
 p "── per-job results ──────────────────────────────────"
-for my $i (0:len(@results)-1) {
-    my $r = $results[$i]
+for val $i (0:len(@results)-1) {
+    val $r = $results[$i]
     if ($r->{ok}) {
         printf "  job-%02d  ✓ ok       (attempts=%d)\n",
             $i + 1, $r->{attempts}
@@ -105,10 +105,10 @@ for my $i (0:len(@results)-1) {
 
 # ── rollup stats ─────────────────────────────────────────────────────
 
-my $ok_count = grep { _->{ok} } @results
-my $fail_count = len(@results) - $ok_count
-my $total_attempts = sum(map { _->{attempts} } @results)
-my $retries = $total_attempts - len @results
+val $ok_count = grep { _->{ok} } @results
+val $fail_count = len(@results) - $ok_count
+val $total_attempts = sum(map { _->{attempts} } @results)
+val $retries = $total_attempts - len @results
 
 p ""
 p "── batch rollup ─────────────────────────────────────"
@@ -130,8 +130,8 @@ printf "  p99  : %.1f µs\n", td_quantile($latency, 0.99)
 
 p ""
 p "── slowest 3 jobs (TopK) ────────────────────────────"
-my @hits = topk_top($slowest)
-for my $h (@hits) {
+val @hits = topk_top($slowest)
+for val $h (@hits) {
     printf "  %-10s : %d (approx)\n", $h->[0], $h->[1]
 }
 

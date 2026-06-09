@@ -34,13 +34,13 @@ fn Light::duration_sec($s) {
     else                   { die "unknown light: $s" }
 }
 
-my $cycles = $ARGV[0] // 6
-my $state  = "red"
-my $elapsed = 0
+val $cycles = $ARGV[0] // 6
+var $state  = "red"
+var $elapsed = 0
 
 p "── Traffic-light cycle ($cycles transitions) ──"
 for (1:$cycles) {
-    my $dt = Light::duration_sec($state)
+    val $dt = Light::duration_sec($state)
     printf "  t=%-4ds %s   (hold %ds)\n", $elapsed, Light::label($state), $dt
     $elapsed += $dt
     $state = Light::next($state)
@@ -49,7 +49,7 @@ p ""
 p "total cycle length so far: ${elapsed}s"
 
 # Built-in self-test: one full red→green→yellow→red cycle is 60s.
-my $one_cycle = Light::duration_sec("red") + Light::duration_sec("green") + Light::duration_sec("yellow")
+val $one_cycle = Light::duration_sec("red") + Light::duration_sec("green") + Light::duration_sec("yellow")
 die "one cycle should be 60s, got ${one_cycle}s" unless $one_cycle == 60
 die "next(red)->green failed"    unless Light::next("red")    eq "green"
 die "next(green)->yellow failed" unless Light::next("green")  eq "yellow"

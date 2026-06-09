@@ -5,11 +5,11 @@
 # OEIS A046043: 1210, 2020, 21200, 3211000, 42101000.
 
 fn Rosetta::SelfDescribing::is($n) {
-    my @digits = "$n" |> chars
-    my $len = len(@digits)
-    for my $i (0:$len - 1) {
-        my $expected = $digits[$i] + 0
-        my $actual = len(grep { _ + 0 == $i } @digits)
+    val @digits = "$n" |> chars
+    val $len = len(@digits)
+    for val $i (0:$len - 1) {
+        val $expected = $digits[$i] + 0
+        val $actual = len(grep { _ + 0 == $i } @digits)
         return 0 unless $actual == $expected
     }
     1
@@ -25,7 +25,7 @@ assert_ok Rosetta::SelfDescribing::is(21200),    "21200 is self-describing"
 assert_ok !Rosetta::SelfDescribing::is(1211),    "1211 is not"
 assert_ok !Rosetta::SelfDescribing::is(1234),    "1234 is not"
 
-my @below_3000 = Rosetta::SelfDescribing::find_below(3000)
+val @below_3000 = Rosetta::SelfDescribing::find_below(3000)
 assert_eq join(",", @below_3000), "1210,2020", "below 3000"
 
 test_run

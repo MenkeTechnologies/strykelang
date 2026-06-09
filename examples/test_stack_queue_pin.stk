@@ -8,7 +8,7 @@ fn Stk::peek  = _->[-1]
 fn Stk::size  = len(@{_})
 fn Stk::empty = len(@{_}) == 0
 
-my $s = []
+val $s = []
 Stk::push($s, 1)
 Stk::push($s, 2)
 Stk::push($s, 3)
@@ -27,7 +27,7 @@ fn Q::deq   = shift @{_}
 fn Q::front = _->[0]
 fn Q::size  = len(@{_})
 
-my $q = []
+val $q = []
 Q::enq($q, "a")
 Q::enq($q, "b")
 Q::enq($q, "c")
@@ -42,7 +42,7 @@ fn Dq::push_back  = push @{_}, _1
 fn Dq::pop_front  = shift @{_}
 fn Dq::pop_back   = pop @{_}
 
-my $d = []
+val $d = []
 Dq::push_back($d, 2)
 Dq::push_front($d, 1)
 Dq::push_back($d, 3)
@@ -54,9 +54,9 @@ Dq::pop_back($d)  |> aeq 3, "deque pop back"
 
 # Balanced brackets
 fn balanced($s) {
-    my @stk = ()
-    my %close = (')' => '(', ']' => '[', '}' => '{')
-    for my $ch (split //, $s) {
+    var @stk = ()
+    val %close = (')' => '(', ']' => '[', '}' => '{')
+    for val $ch (split //, $s) {
         if ($ch eq '(' || $ch eq '[' || $ch eq '{') {
             push @stk, $ch
         } elsif (exists $close{$ch}) {
@@ -87,7 +87,7 @@ fn TwoStkQ::deq($tq) {
     pop @{$tq->{out}}
 }
 
-my $tq = TwoStkQ::new()
+val $tq = TwoStkQ::new()
 TwoStkQ::enq($tq, 1)
 TwoStkQ::enq($tq, 2)
 TwoStkQ::enq($tq, 3)
@@ -101,13 +101,13 @@ TwoStkQ::deq($tq) |> aeq 4, "two-stack deq 4"
 fn MinStk::new() { +{ s => [], m => [] } }
 fn MinStk::push($ms, $v) {
     push @{$ms->{s}}, $v
-    my $cur = len(@{$ms->{m}}) == 0 ? $v : $ms->{m}[-1]
+    val $cur = len(@{$ms->{m}}) == 0 ? $v : $ms->{m}[-1]
     push @{$ms->{m}}, ($v < $cur ? $v : $cur)
 }
 fn MinStk::pop = (pop @{_->{m}}, pop @{_->{s}})[1]
 fn MinStk::min = _->{m}[-1]
 
-my $ms = MinStk::new()
+val $ms = MinStk::new()
 MinStk::push($ms, 3)
 MinStk::push($ms, 5)
 MinStk::push($ms, 2)
@@ -119,8 +119,8 @@ MinStk::pop($ms)
 MinStk::min($ms) |> aeq 3, "min stack min 3"
 
 # Reverse a queue using a stack
-my @rq = (1, 2, 3, 4, 5)
-my @stk = ()
+var @rq = (1, 2, 3, 4, 5)
+var @stk = ()
 while (len(@rq) > 0) { push @stk, shift @rq }
 while (len(@stk) > 0) { push @rq, pop @stk }
 "@rq" |> aeq "5 4 3 2 1", "reverse queue via stack"

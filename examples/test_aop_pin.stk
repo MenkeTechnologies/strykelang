@@ -15,7 +15,7 @@ after "AOP_test::target" { $after_fired++; $after_result = $INTERCEPT_RESULT }
 oursync $around_fired = 0
 around "AOP_test::target" {
     $around_fired++
-    my $res = proceed()
+    val $res = proceed()
     $res + 100
 }
 

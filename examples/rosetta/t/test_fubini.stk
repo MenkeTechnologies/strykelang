@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Fubini numbers
 
-my %FUBINI_MEMO
+var %FUBINI_MEMO
 
 fn Rosetta::Fubini::binomial($n, $k) {
     if ($k < 0 || $k > $n) { 0 }
     elsif ($k == 0 || $k == $n) { 1 }
     else {
-        my $res = 1
-        my $kk = $k < $n - $k ? $k : $n - $k
-        for my $i (1:$kk) {
+        var $res = 1
+        val $kk = $k < $n - $k ? $k : $n - $k
+        for val $i (1:$kk) {
             $res = $res * ($n - $i + 1) / $i
         }
         int($res + 0.5)
@@ -20,10 +20,10 @@ fn Rosetta::Fubini::compute($n) {
     if ($n == 0) { 1 }
     elsif (exists $FUBINI_MEMO{$n}) { $FUBINI_MEMO{$n} }
     else {
-        my $sum = 0
-        for my $k (1:$n) {
-            my $b = Rosetta::Fubini::binomial($n, $k)
-            my $f = Rosetta::Fubini::compute($n - $k)
+        var $sum = 0
+        for val $k (1:$n) {
+            val $b = Rosetta::Fubini::binomial($n, $k)
+            val $f = Rosetta::Fubini::compute($n - $k)
             $sum += $b * $f
         }
         $FUBINI_MEMO{$n} = $sum

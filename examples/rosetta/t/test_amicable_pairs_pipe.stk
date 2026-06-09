@@ -3,15 +3,15 @@
 
 fn Rosetta::AmicablePairs::sum_proper_divisors($n) {
     if ($n < 2) { return 0 }
-    my $limit = int($n / 2)
-    my @divs = ~> 1:$limit grep { $n % _ == 0 }
+    val $limit = int($n / 2)
+    val @divs = ~> 1:$limit grep { $n % _ == 0 }
     sum(@divs)
 }
 
 fn Rosetta::AmicablePairs::are_amicable($a, $b) {
     if ($a == $b) { return 0 }
-    my $sa = Rosetta::AmicablePairs::sum_proper_divisors($a)
-    my $sb = Rosetta::AmicablePairs::sum_proper_divisors($b)
+    val $sa = Rosetta::AmicablePairs::sum_proper_divisors($a)
+    val $sb = Rosetta::AmicablePairs::sum_proper_divisors($b)
     $sa == $b && $sb == $a
 }
 

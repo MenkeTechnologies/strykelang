@@ -61,7 +61,7 @@ assert_eq path_stem("/foo/bar.txt"), "bar", "path_stem"
 assert_eq path_parent("/foo/bar/baz.txt"), "/foo/bar", "path_parent"
 assert_eq path_join("/foo", "bar", "baz.txt"), "/foo/bar/baz.txt", "path_join"
 
-my $parts = path_split("/foo/bar/baz")
+val $parts = path_split("/foo/bar/baz")
 assert_eq len(@$parts), 4, "path_split count"
 
 # Validation

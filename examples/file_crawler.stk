@@ -19,7 +19,7 @@ p "Found ", len(@stk_files), " Stryke scripts."
 
 p "\nCounting total lines across all scripts in parallel..."
 mysync $total_lines = 0
-for my $file (@stk_files) {
+for val $file (@stk_files) {
     # par_lines uses mmap for fast line scanning
     mysync $file_lines = 0
     par_lines $file, { $file_lines++ }
@@ -31,7 +31,7 @@ p "\nTOTAL CODE LINES: $total_lines"
 
 p "\nSearching for 'cyber_banner' usage in parallel..."
 mysync @matches
-for my $file (@stk_files) {
+for val $file (@stk_files) {
     par_lines $file, {
         if (_ =~ /cyber_banner/) {
             push @matches, "$file: $_"

@@ -5,7 +5,7 @@
 # 'ph', 'ch', 'ps', 'ks' are recognised first.
 
 fn Rosetta::Greek::translit($s) {
-    my %single = (
+    val %single = (
         a => "α", b => "β", c => "χ", d => "δ", e => "ε",
         f => "φ", g => "γ", h => "η", i => "ι", j => "ξ",
         k => "κ", l => "λ", m => "μ", n => "ν", o => "ο",
@@ -19,8 +19,8 @@ fn Rosetta::Greek::translit($s) {
         U => "Υ", V => "Β", W => "Ω", X => "Ξ", Y => "Ψ",
         Z => "Ζ",
     )
-    my $out = ""
-    for my $c (split //, $s) {
+    var $out = ""
+    for val $c (split //, $s) {
         $out .= exists $single{$c} ? $single{$c} : $c
     }
     $out

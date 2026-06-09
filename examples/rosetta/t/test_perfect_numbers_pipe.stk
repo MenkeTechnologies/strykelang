@@ -3,7 +3,7 @@
 
 fn Rosetta::PerfectNumbers::sum_proper_divisors($n) {
     if ($n < 2) { return 0 }
-    my $limit = int($n / 2)
+    val $limit = int($n / 2)
     ~> 1:$limit grep { $n % _ == 0 } |> reduce { _0 + _1 }
 }
 
@@ -20,7 +20,7 @@ assert_ok Rosetta::PerfectNumbers::is_perfect(28), "28 is perfect"
 assert_ok Rosetta::PerfectNumbers::is_perfect(496), "496 is perfect"
 assert_ok !Rosetta::PerfectNumbers::is_perfect(12), "12 is not perfect"
 
-my @perfects = Rosetta::PerfectNumbers::find_up_to(500)
+val @perfects = Rosetta::PerfectNumbers::find_up_to(500)
 assert_eq join(",", @perfects), "6,28,496", "perfect numbers up to 500"
 
 test_run

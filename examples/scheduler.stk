@@ -12,7 +12,7 @@
 
 # ── task registry ──────────────────────────────────────────────────
 
-my @tasks   # each: { name, cadence, next_run, callback, fires, td }
+var @tasks   # each: { name, cadence, next_run, callback, fires, td }
 
 fn Demo::Sched::register($name, $cadence, $callback) {
     push @tasks, +{
@@ -32,13 +32,13 @@ mysync $now_virtual = 0
 
 fn Demo::Sched::tick($delta) {
     $now_virtual = $now_virtual + $delta
-    my $fired = 0
+    var $fired = 0
     # Find all tasks ready now.
-    my @ready = grep { _->{next_run} <= $now_virtual } @tasks
+    var @ready = grep { _->{next_run} <= $now_virtual } @tasks
     # Sort by next_run for stable order.
     @ready = sort { _->{next_run} <=> _1->{next_run} } @ready
-    for my $task (@ready) {
-        my $t0 = now_ns()
+    for var $task (@ready) {
+        val $t0 = now_ns()
         $task->{callback}($task, $now_virtual)
         td_add($task->{td}, (now_ns() - $t0) / 1000.0)
         $task->{fires}    = $task->{fires} + 1
@@ -71,7 +71,7 @@ Demo::Sched::register("metrics", 5, fn($task, $now) {
 
 printf "── %d scheduled tasks ─────────────────────────────────\n",
     len @tasks
-for my $t (@tasks) {
+for val $t (@tasks) {
     printf "  %-12s cadence=%ds\n", $t->{name}, $t->{cadence}
 }
 
@@ -79,8 +79,8 @@ for my $t (@tasks) {
 
 p ""
 p "── simulating 60s of clock ticks ────────────────────"
-my $simulated_seconds = 60
-for my $sec (1:$simulated_seconds) {
+val $simulated_seconds = 60
+for val $sec (1:$simulated_seconds) {
     Demo::Sched::tick(1)
 }
 
@@ -89,13 +89,13 @@ for my $sec (1:$simulated_seconds) {
 p ""
 printf "── %d events fired during simulation ─────────────────\n",
     len @log
-for my $entry (@log) { p "  $entry" }
+for val $entry (@log) { p "  $entry" }
 
 # ── per-task rollup ────────────────────────────────────────────────
 
 p ""
 p "── per-task rollup ──────────────────────────────────"
-for my $t (sort { _1->{fires} <=> _->{fires} } @tasks) {
+for val $t (sort { _1->{fires} <=> _->{fires} } @tasks) {
     printf "  %-12s fires=%2d  next_run=%ds\n",
         $t->{name}, $t->{fires}, $t->{next_run}
 }
@@ -105,10 +105,10 @@ printf "  total fires : %d\n", $total_fires
 
 p ""
 p "── expected vs actual fire counts ───────────────────"
-for my $t (sort { _->{name} cmp _1->{name} } @tasks) {
+for val $t (sort { _->{name} cmp _1->{name} } @tasks) {
     # 60s / cadence + 1 for t=0 firing.
-    my $expected = int($simulated_seconds / $t->{cadence}) + 1
-    my $match = $t->{fires} == $expected ? "ok" : "diff"
+    val $expected = int($simulated_seconds / $t->{cadence}) + 1
+    val $match = $t->{fires} == $expected ? "ok" : "diff"
     printf "  %-12s : expected=%d actual=%d  %s\n",
         $t->{name}, $expected, $t->{fires}, $match
 }
@@ -117,9 +117,9 @@ for my $t (sort { _->{name} cmp _1->{name} } @tasks) {
 
 p ""
 p "── per-task callback latency (t-digest) ─────────────"
-for my $t (sort { _->{name} cmp _1->{name} } @tasks) {
-    my $p50 = td_quantile($t->{td}, 0.5)
-    my $p99 = td_quantile($t->{td}, 0.99)
+for val $t (sort { _->{name} cmp _1->{name} } @tasks) {
+    val $p50 = td_quantile($t->{td}, 0.5)
+    val $p99 = td_quantile($t->{td}, 0.99)
     printf "  %-12s p50=%.1f µs p99=%.1f µs\n", $t->{name}, $p50, $p99
 }
 
@@ -127,8 +127,8 @@ for my $t (sort { _->{name} cmp _1->{name} } @tasks) {
 
 p ""
 p "── HLL distinct tasks fired ─────────────────────────"
-my $hll = hll(14)
-for my $entry (@log) {
+val $hll = hll(14)
+for val $entry (@log) {
     if ($entry =~ /\] (\w+)/) {
         hll_add($hll, $1)
     }

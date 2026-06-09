@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-my %memo
+var %memo
 
 fn Demo::Fibonacci::fib_n($n) {
     return $n if $n <= 1

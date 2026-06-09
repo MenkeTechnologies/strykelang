@@ -13,25 +13,25 @@
 # ── LCS table construction ──────────────────────────────────────────
 
 fn Demo::Diff::lcs_table($old_ref, $new_ref) {
-    my @ol = @$old_ref
-    my @nw = @$new_ref
-    my $m = len @ol
-    my $n = len @nw
-    my @table
+    val @ol = @$old_ref
+    val @nw = @$new_ref
+    val $m = len @ol
+    val $n = len @nw
+    var @table
     # Initialize (m+1) x (n+1) table of zeros.
-    for my $i (0:$m) {
+    for val $i (0:$m) {
         $table[$i] = []
-        for my $j (0:$n) {
+        for val $j (0:$n) {
             $table[$i]->[$j] = 0
         }
     }
-    for my $i (1:$m) {
-        for my $j (1:$n) {
+    for val $i (1:$m) {
+        for val $j (1:$n) {
             if ($ol[$i - 1] eq $nw[$j - 1]) {
                 $table[$i]->[$j] = $table[$i - 1]->[$j - 1] + 1
             } else {
-                my $up   = $table[$i - 1]->[$j]
-                my $left = $table[$i]->[$j - 1]
+                val $up   = $table[$i - 1]->[$j]
+                val $left = $table[$i]->[$j - 1]
                 $table[$i]->[$j] = $up > $left ? $up : $left
             }
         }
@@ -42,12 +42,12 @@ fn Demo::Diff::lcs_table($old_ref, $new_ref) {
 # ── Diff emission via back-pointer walk ────────────────────────────
 
 fn Demo::Diff::emit($old_ref, $new_ref) {
-    my @ol = @$old_ref
-    my @nw = @$new_ref
-    my $tbl = Demo::Diff::lcs_table($old_ref, $new_ref)
-    my @ops
-    my $i = len @ol
-    my $j = len @nw
+    val @ol = @$old_ref
+    val @nw = @$new_ref
+    val $tbl = Demo::Diff::lcs_table($old_ref, $new_ref)
+    var @ops
+    var $i = len @ol
+    var $j = len @nw
     while ($i > 0 || $j > 0) {
         if ($i > 0 && $j > 0 && $ol[$i - 1] eq $nw[$j - 1]) {
             unshift @ops, +{ op => "=", line => $ol[$i - 1] }
@@ -67,11 +67,11 @@ fn Demo::Diff::emit($old_ref, $new_ref) {
 # ── Unified-diff format ─────────────────────────────────────────────
 
 fn Demo::Diff::render($ops_ref, $a_name, $b_name) {
-    my @out
+    var @out
     push @out, "--- $a_name"
     push @out, "+++ $b_name"
-    for my $op (@$ops_ref) {
-        my $sigil = $op->{op}
+    for val $op (@$ops_ref) {
+        val $sigil = $op->{op}
         if    ($sigil eq "=") { push @out, " " . $op->{line} }
         elsif ($sigil eq "+") { push @out, "+" . $op->{line} }
         elsif ($sigil eq "-") { push @out, "-" . $op->{line} }
@@ -82,11 +82,11 @@ fn Demo::Diff::render($ops_ref, $a_name, $b_name) {
 # ── Apply patch: rebuild target from source + ops ──────────────────
 
 fn Demo::Diff::apply($source_ref, $ops_ref) {
-    my @out
-    my @src = @$source_ref
-    my $i = 0
-    for my $op (@$ops_ref) {
-        my $sigil = $op->{op}
+    var @out
+    val @src = @$source_ref
+    var $i = 0
+    for val $op (@$ops_ref) {
+        val $sigil = $op->{op}
         if ($sigil eq "=") {
             push @out, $src[$i]
             $i++
@@ -101,13 +101,13 @@ fn Demo::Diff::apply($source_ref, $ops_ref) {
 
 # ── Sample texts ────────────────────────────────────────────────────
 
-my @old = (
+val @old = (
     "the quick brown fox",
     "jumps over",
     "the lazy dog",
     "in the morning",
 )
-my @new = (
+val @new = (
     "the quick brown fox",
     "leaps over",
     "the sleeping dog",
@@ -116,29 +116,29 @@ my @new = (
 )
 
 p "── old version ─────────────────────────────────────"
-for my $line (@old) { p "  $line" }
+for val $line (@old) { p "  $line" }
 
 p ""
 p "── new version ─────────────────────────────────────"
-for my $line (@new) { p "  $line" }
+for val $line (@new) { p "  $line" }
 
 # ── Compute diff ────────────────────────────────────────────────────
 
-my $ops = Demo::Diff::emit(\@old, \@new)
-my $diff_text = Demo::Diff::render($ops, "old.txt", "new.txt")
+val $ops = Demo::Diff::emit(\@old, \@new)
+val $diff_text = Demo::Diff::render($ops, "old.txt", "new.txt")
 
 p ""
 p "── unified diff ────────────────────────────────────"
-for my $line (split /\n/, $diff_text) { p "  $line" }
+for val $line (split /\n/, $diff_text) { p "  $line" }
 
 # ── Apply patch to reconstruct ──────────────────────────────────────
 
-my $reconstructed = Demo::Diff::apply(\@old, $ops)
-my $match = 1
+val $reconstructed = Demo::Diff::apply(\@old, $ops)
+var $match = 1
 if (len(@$reconstructed) != len(@new)) {
     $match = 0
 } else {
-    for my $i (0:len(@new) - 1) {
+    for val $i (0:len(@new) - 1) {
         $match = 0 if $reconstructed->[$i] ne $new[$i]
     }
 }
@@ -151,7 +151,7 @@ printf "  matches new version : %s\n", $match ? "YES" : "NO"
 
 # ── Op counts ───────────────────────────────────────────────────────
 
-my %counts
+var %counts
 $counts{_->{op}}++ for @$ops
 p ""
 p "── op-count rollup ─────────────────────────────────"
@@ -161,13 +161,13 @@ printf "  -  (removed) : %d\n", $counts{"-"} // 0
 
 # ── Reverse-direction patch (compute new -> old, apply to new) ─────
 
-my $rev_ops = Demo::Diff::emit(\@new, \@old)
-my $rev_app = Demo::Diff::apply(\@new, $rev_ops)
-my $rev_match = 1
+val $rev_ops = Demo::Diff::emit(\@new, \@old)
+val $rev_app = Demo::Diff::apply(\@new, $rev_ops)
+var $rev_match = 1
 if (len(@$rev_app) != len(@old)) {
     $rev_match = 0
 } else {
-    for my $i (0:len(@old) - 1) {
+    for val $i (0:len(@old) - 1) {
         $rev_match = 0 if $rev_app->[$i] ne $old[$i]
     }
 }
@@ -179,7 +179,7 @@ printf "  matches old version : %s\n", $rev_match ? "YES" : "NO"
 
 p ""
 p "── LCS len(shared lines) ───────────────────────"
-my $tbl = Demo::Diff::lcs_table(\@old, \@new)
-my $lcs_len = $tbl->[len(@old)]->[len(@new)]
+val $tbl = Demo::Diff::lcs_table(\@old, \@new)
+val $lcs_len = $tbl->[len(@old)]->[len(@new)]
 printf "  LCS length = %d (out of max %d)\n",
     $lcs_len, len(@old) > len(@new) ? len(@new) : len @old

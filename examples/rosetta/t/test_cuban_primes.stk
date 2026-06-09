@@ -6,10 +6,10 @@ fn Rosetta::CubanPrimes::formula($y) {
 }
 
 fn Rosetta::CubanPrimes::generate($count) {
-    my @res
-    my $y = 1
+    var @res
+    var $y = 1
     while (len(@res) < $count) {
-        my $p = Rosetta::CubanPrimes::formula($y)
+        val $p = Rosetta::CubanPrimes::formula($y)
         if (is_prime($p)) {
             push @res, $p
         }

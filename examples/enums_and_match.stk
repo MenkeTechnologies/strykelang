@@ -7,7 +7,7 @@
 p "── enum decl + qualified variant access ──────────────────"
 enum TrafficLight { Red, Yellow, Green }
 
-my $sig = TrafficLight::Red
+val $sig = TrafficLight::Red
 p "  current = ", $sig
 
 p ""
@@ -20,7 +20,7 @@ fn TrafficLight::action($c) {
     }
 }
 
-for my $v (TrafficLight::Red, TrafficLight::Yellow, TrafficLight::Green) {
+for val $v (TrafficLight::Red, TrafficLight::Yellow, TrafficLight::Green) {
     p "  ", $v, " → ", TrafficLight::action($v)
 }
 

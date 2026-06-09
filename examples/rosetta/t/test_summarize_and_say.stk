@@ -7,13 +7,13 @@
 
 fn Rosetta::Summarize::next($n) {
     # Look-and-say: count consecutive runs left-to-right.
-    my @chars = split //, "$n"
+    val @chars = split //, "$n"
     return 10 if len(@chars) == 0
-    my $out = ""
-    my $i = 0
+    var $out = ""
+    var $i = 0
     while ($i < len(@chars)) {
-        my $cur = $chars[$i]
-        my $run = 1
+        val $cur = $chars[$i]
+        var $run = 1
         while ($i + $run < len(@chars) && $chars[$i + $run] eq $cur) { $run++ }
         $out .= $run
         $out .= $cur
@@ -23,10 +23,10 @@ fn Rosetta::Summarize::next($n) {
 }
 
 fn Rosetta::Summarize::orbit($start, $max_steps) {
-    my @seq = ($start)
-    my %seen = ($start => 0)
-    for my $i (~> 1:$max_steps) {
-        my $nxt = Rosetta::Summarize::next($seq[-1])
+    var @seq = ($start)
+    var %seen = ($start => 0)
+    for val $i (~> 1:$max_steps) {
+        val $nxt = Rosetta::Summarize::next($seq[-1])
         if (exists $seen{$nxt}) {
             return [\@seq, $seen{$nxt}]
         }
@@ -47,12 +47,12 @@ assert_eq Rosetta::Summarize::next(132110),1113122110, "132110 → '1113122110'"
 assert_eq Rosetta::Summarize::next(22), 22, "22 is a fixed point"
 
 # Orbit from 0 cycles to a fixed point at depth >= 1
-my $r = Rosetta::Summarize::orbit(0, 50)
+val $r = Rosetta::Summarize::orbit(0, 50)
 assert_ok len(@{$r->[0]}) > 1, "orbit advances"
 assert_ok $r->[1] >= 0, "orbit forms a cycle"
 
 # Orbit starting at 22 cycles immediately (period 1)
-my $r22 = Rosetta::Summarize::orbit(22, 5)
+val $r22 = Rosetta::Summarize::orbit(22, 5)
 assert_eq $r22->[0][0], 22, "starts at 22"
 assert_eq $r22->[1], 0, "cycle index = 0 (immediate)"
 
@@ -60,8 +60,8 @@ assert_eq $r22->[1], 0, "cycle index = 0 (immediate)"
 0 |> Rosetta::Summarize::next |> assert_eq(10, "pipe next(0)")
 
 # Iterating six times from 0
-my @six = (0)
-for my $i (~> 1:6) { push @six, Rosetta::Summarize::next($six[-1]) }
+var @six = (0)
+for val $i (~> 1:6) { push @six, Rosetta::Summarize::next($six[-1]) }
 assert_eq join(",", @six),
     "0,10,1110,3110,132110,1113122110,311311222110",
     "first six steps from 0"

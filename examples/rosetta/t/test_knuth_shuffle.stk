@@ -2,23 +2,23 @@
 # Rosetta Code: Knuth Shuffle
 
 fn Rosetta::KnuthShuffle::shuffle($list) {
-    my @arr = @$list
-    my $n = len(@arr)
-    for my $i (~> (1:$n-1) rev) {
-        my $j = int(rand($i + 1))
+    var @arr = @$list
+    val $n = len(@arr)
+    for var $i (~> (1:$n-1) rev) {
+        var $j = int(rand($i + 1))
         ($arr[$i], $arr[$j]) = ($arr[$j], $arr[$i])
     }
     \@arr
 }
 
-my $data = [1, 2, 3, 4, 5]
-my $shuffled = Rosetta::KnuthShuffle::shuffle($data)
+val $data = [1, 2, 3, 4, 5]
+val $shuffled = Rosetta::KnuthShuffle::shuffle($data)
 # We can't easily test randomness, but we can test length and content
 assert_eq len(@$shuffled), 5, "shuffled length"
 
-my %counts
-for my $x (@$shuffled) { $counts{$x}++ }
-for my $i (1:5) {
+var %counts
+for val $x (@$shuffled) { $counts{$x}++ }
+for val $i (1:5) {
     assert_eq $counts{$i}, 1, "contains $i"
 }
 

@@ -2,8 +2,8 @@
 # Rosetta Code: Chinese remainder theorem
 
 fn Rosetta::CRT::solve_2($n1, $n2, $a1, $a2) {
-    my $prod = $n1 * $n2
-    my $x = 0
+    val $prod = $n1 * $n2
+    var $x = 0
     while ($x < $prod) {
         if ($x % $n1 == $a1 && $x % $n2 == $a2) {
             return $x
@@ -14,8 +14,8 @@ fn Rosetta::CRT::solve_2($n1, $n2, $a1, $a2) {
 }
 
 fn Rosetta::CRT::solve_3($n1, $n2, $n3, $a1, $a2, $a3) {
-    my $prod = $n1 * $n2 * $n3
-    my $x = 0
+    val $prod = $n1 * $n2 * $n3
+    var $x = 0
     while ($x < $prod) {
         if ($x % $n1 == $a1 && $x % $n2 == $a2 && $x % $n3 == $a3) {
             return $x

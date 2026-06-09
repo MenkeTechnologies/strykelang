@@ -3,33 +3,33 @@
 
 fn Rosetta::EightPuzzle::solve($start) {
     # Simple BFS for the test to avoid complexity of A* priority queue
-    my @q = ({ state => $start, path => [] })
-    my %seen
+    var @q = ({ state => $start, path => [] })
+    var %seen
     $seen{join(",", @$start)} = 1
     
     while (len(@q) > 0) {
-        my $curr = shift @q
-        my $s = $curr->{state}
+        val $curr = shift @q
+        val $s = $curr->{state}
         
         if (join(",", @$s) eq "1,2,3,4,5,6,7,8,0") { return $curr->{path} }
         
         # Find empty
-        my $zi = 0
-        for my $i (0:8) { if ($s->[$i] == 0) { $zi = $i; last } }
+        var $zi = 0
+        for val $i (0:8) { if ($s->[$i] == 0) { $zi = $i; last } }
         
-        my $zr = int($zi / 3)
-        my $zc = $zi % 3
+        val $zr = int($zi / 3)
+        val $zc = $zi % 3
         
-        my @moves
+        var @moves
         if ($zr > 0) { push @moves, $zi - 3 }
         if ($zr < 2) { push @moves, $zi + 3 }
         if ($zc > 0) { push @moves, $zi - 1 }
         if ($zc < 2) { push @moves, $zi + 1 }
         
-        for my $m (@moves) {
-            my @next = @$s
+        for var $m (@moves) {
+            var @next = @$s
             ($next[$zi], $next[$m]) = ($next[$m], $next[$zi])
-            my $key = join(",", @next)
+            val $key = join(",", @next)
             if (!$seen{$key}) {
                 $seen{$key} = 1
                 push @q, { state => \@next, path => [@{$curr->{path}}, $m] }
@@ -40,8 +40,8 @@ fn Rosetta::EightPuzzle::solve($start) {
 }
 
 # A simple 8-puzzle: 1 step away
-my $start = [1, 2, 3, 4, 5, 6, 7, 0, 8]
-my $path = Rosetta::EightPuzzle::solve($start)
+val $start = [1, 2, 3, 4, 5, 6, 7, 0, 8]
+val $path = Rosetta::EightPuzzle::solve($start)
 assert_ok defined($path), "8-puzzle solved"
 assert_eq len(@$path), 1, "solved in 1 step"
 

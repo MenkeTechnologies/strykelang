@@ -3,12 +3,12 @@
 
 fn Rosetta::Derangements::perms(@list) {
     if (len(@list) <= 1) { return [\@list] }
-    my @res
-    for my $i (0..len(@list)-1) {
-        my @rest = @list
-        my $item = splice(@rest, $i, 1)
-        my $sub_ref = Rosetta::Derangements::perms(@rest)
-        for my $s (@$sub_ref) {
+    var @res
+    for val $i (0..len(@list)-1) {
+        var @rest = @list
+        val $item = splice(@rest, $i, 1)
+        val $sub_ref = Rosetta::Derangements::perms(@rest)
+        for val $s (@$sub_ref) {
             push @res, [$item, @$s]
         }
     }
@@ -16,12 +16,12 @@ fn Rosetta::Derangements::perms(@list) {
 }
 
 fn Rosetta::Derangements::solve($n) {
-    my @items = (0:$n-1)
-    my $all = Rosetta::Derangements::perms(@items)
-    my @res
-    for my $p (@$all) {
-        my $ok = 1
-        for my $i (0:$n-1) {
+    val @items = (0:$n-1)
+    val $all = Rosetta::Derangements::perms(@items)
+    var @res
+    for val $p (@$all) {
+        var $ok = 1
+        for val $i (0:$n-1) {
             if ($p->[$i] == $i) { $ok = 0; last }
         }
         if ($ok) { push @res, $p }
@@ -29,10 +29,10 @@ fn Rosetta::Derangements::solve($n) {
     \@res
 }
 
-my $d3 = Rosetta::Derangements::solve(3)
+val $d3 = Rosetta::Derangements::solve(3)
 assert_eq len(@$d3), 2, "derangements(3) count"
 
-my $d4 = Rosetta::Derangements::solve(4)
+val $d4 = Rosetta::Derangements::solve(4)
 assert_eq len(@$d4), 9, "derangements(4) count"
 
 test_run

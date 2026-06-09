@@ -2,7 +2,7 @@
 # Rosetta Code: Greatest Common Divisor (using pipes)
 
 fn Rosetta::GCD::compute($a, $b) {
-    my $aa = $a; my $bb = $b
+    var $aa = $a; var $bb = $b
     while ($bb != 0) {
         ($aa, $bb) = ($bb, $aa % $bb)
     }

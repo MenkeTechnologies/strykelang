@@ -2,17 +2,17 @@
 # Rosetta Code: Huffman coding
 
 fn Rosetta::HuffmanCoding::build_tree($freqs) {
-    my @nodes = ()
-    for my $char (keys %$freqs) {
+    var @nodes = ()
+    for val $char (keys %$freqs) {
         push @nodes, { char => $char, freq => $freqs->{$char} }
     }
     
     while (len(@nodes) > 1) {
         # Sort by freq
         @nodes = sort { _->{freq} <=> $b->{freq} } @nodes
-        my $left = shift @nodes
-        my $right = shift @nodes
-        my $parent = {
+        val $left = shift @nodes
+        val $right = shift @nodes
+        val $parent = {
             left => $left,
             right => $right,
             freq => $left->{freq} + $right->{freq}
@@ -31,9 +31,9 @@ fn Rosetta::HuffmanCoding::get_codes($node, $prefix, $codes) {
     }
 }
 
-my $freqs = { "a" => 5, "b" => 9, "c" => 12, "d" => 13, "e" => 16, "f" => 45 }
-my $tree = Rosetta::HuffmanCoding::build_tree($freqs)
-my $codes = {}
+val $freqs = { "a" => 5, "b" => 9, "c" => 12, "d" => 13, "e" => 16, "f" => 45 }
+val $tree = Rosetta::HuffmanCoding::build_tree($freqs)
+val $codes = {}
 Rosetta::HuffmanCoding::get_codes($tree, "", $codes)
 
 assert_eq len($codes->{f}), 1, "f should have shortest code"

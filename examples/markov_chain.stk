@@ -7,7 +7,7 @@
 
 # ── corpus ────────────────────────────────────────────────────────────
 
-my @corpus = (
+val @corpus = (
     "the quick brown fox jumps over the lazy dog",
     "the lazy dog sleeps under the warm sun",
     "the brown fox runs fast through the forest",
@@ -23,13 +23,13 @@ my @corpus = (
 # ── build bigram → next-word distribution ─────────────────────────────
 
 p "── building bigram model ──────────────────────────────"
-my %next   # word → arrayref of follow-up words (with repeats = freq)
+var %next   # word → arrayref of follow-up words (with repeats = freq)
 
-for my $sentence (@corpus) {
-    my @words = split /\s+/, $sentence
-    for my $i (0:len(@words)-2) {
-        my $w  = $words[$i]
-        my $nx = $words[$i + 1]
+for val $sentence (@corpus) {
+    val @words = split /\s+/, $sentence
+    for val $i (0:len(@words)-2) {
+        val $w  = $words[$i]
+        val $nx = $words[$i + 1]
         $next{$w} = [] unless exists $next{$w}
         push @{$next{$w}}, $nx
     }
@@ -42,25 +42,25 @@ printf "  trained on %d sentences, %d distinct words\n",
 
 p ""
 p "── sample transitions for 'the' ───────────────────────"
-my @after_the = @{$next{"the"}}
+val @after_the = @{$next{"the"}}
 printf "  after 'the': %d follow-ups\n", len @after_the
-my %freq
-for my $w (@after_the) { $freq{$w}++ }
-my @top = sort { $freq{_1} <=> $freq{_} } keys %freq
-for my $w (@top[0:4]) {
+var %freq
+for val $w (@after_the) { $freq{$w}++ }
+val @top = sort { $freq{_1} <=> $freq{_} } keys %freq
+for val $w (@top[0:4]) {
     printf "    %-12s × %d\n", $w, $freq{$w}
 }
 
 # ── generate sentences ────────────────────────────────────────────────
 
 fn pick_random($arr) {
-    my @items = @$arr
+    val @items = @$arr
     $items[rand @items]
 }
 
 fn generate_sentence($start, $max_len) {
-    my @out = ($start)
-    my $cur = $start
+    var @out = ($start)
+    var $cur = $start
     for (1:$max_len) {
         if (exists $next{$cur} && len(@{$next{$cur}}) > 0) {
             $cur = pick_random($next{$cur})
@@ -75,7 +75,7 @@ fn generate_sentence($start, $max_len) {
 p ""
 p "── generated sentences (5 samples starting with 'the') ─"
 srand(42)   # deterministic for the demo
-for my $i (1:5) {
+for val $i (1:5) {
     printf "  %d. %s\n", $i, generate_sentence("the", 12)
 }
 
@@ -83,7 +83,7 @@ for my $i (1:5) {
 
 p ""
 p "── distinct generated sentences over 1000 samples ─────"
-my $h = hll(14)
+val $h = hll(14)
 srand(42)
 for (1:1000) {
     hll_add($h, generate_sentence("the", 12))
@@ -95,13 +95,13 @@ printf "  HLL estimate : %d unique sentences from 1000 samples\n",
 
 p ""
 p "── starter-word distribution via CMS ──────────────────"
-my $c = cms(2048, 5)
+val $c = cms(2048, 5)
 srand(42)
 for (1:1000) {
-    my $sent = generate_sentence("the", 12)
-    my @ws = split /\s+/, $sent
+    val $sent = generate_sentence("the", 12)
+    val @ws = split /\s+/, $sent
     cms_add($c, $ws[1]) if len(@ws) >= 2
 }
-for my $w ("quick", "lazy", "brown", "warm", "green", "dog", "cat") {
+for val $w ("quick", "lazy", "brown", "warm", "green", "dog", "cat") {
     printf "  word-after-the=%-8s × %d\n", $w, cms_count($c, $w)
 }

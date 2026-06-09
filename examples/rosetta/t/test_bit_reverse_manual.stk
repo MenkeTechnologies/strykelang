@@ -2,9 +2,9 @@
 # Rosetta Code: Reverse bits (Manual)
 
 fn Rosetta::BitReverse::solve($n, $bits) {
-    my $res = 0
-    my $curr = $n
-    for my $i (1:$bits) {
+    var $res = 0
+    var $curr = $n
+    for val $i (1:$bits) {
         $res = ($res << 1) | ($curr & 1)
         $curr = $curr >> 1
     }

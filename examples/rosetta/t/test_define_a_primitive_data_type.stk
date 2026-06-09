@@ -7,11 +7,11 @@
 struct MyPrimitivePoint { x, y }
 
 fn Rosetta::Primitive::demo() {
-    my $p = MyPrimitivePoint(10, 20)
+    val $p = MyPrimitivePoint(10, 20)
     $p
 }
 
-my $p = Rosetta::Primitive::demo()
+val $p = Rosetta::Primitive::demo()
 assert_eq $p->{x}, 10, "Struct field x accessibility"
 assert_eq $p->{y}, 20, "Struct field y accessibility"
 

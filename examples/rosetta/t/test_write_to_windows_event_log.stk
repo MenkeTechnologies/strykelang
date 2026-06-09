@@ -2,7 +2,7 @@
 # Rosetta Code: Write to Windows event log
 
 fn Rosetta::EventLog::new() {
-    my @entries
+    val @entries
     { entries => \@entries }
 }
 
@@ -11,7 +11,7 @@ fn Rosetta::EventLog::write($log, $source, $level, $message) {
     len(@{$log->{entries}})
 }
 
-my $log = Rosetta::EventLog::new()
+val $log = Rosetta::EventLog::new()
 Rosetta::EventLog::write($log, "Rosetta", "INFO", "started")
 Rosetta::EventLog::write($log, "Rosetta", "WARN", "low disk")
 

@@ -4,7 +4,7 @@
 fn Rosetta::GraphCycles::backtrack($curr, $path, $visited, $adj, $cycles) {
     push @$path, $curr
     $visited->{$curr} = 1
-    for my $next (@{$adj->{$curr}}) {
+    for val $next (@{$adj->{$curr}}) {
         if (len(@$path) >= 3 && $next eq $path->[0]) {
             push @$cycles, [@$path]
         } elsif (!$visited->{$next}) {
@@ -14,14 +14,14 @@ fn Rosetta::GraphCycles::backtrack($curr, $path, $visited, $adj, $cycles) {
 }
 
 fn Rosetta::GraphCycles::solve($adj) {
-    my @cycles
+    val @cycles
     ~> keys %$adj ep {
         Rosetta::GraphCycles::backtrack(_, [], {}, $adj, \@cycles)
     }
     \@cycles
 }
 
-my $g = { A => ["B"], B => ["C"], C => ["A"] }
-my $c = Rosetta::GraphCycles::solve($g)
+val $g = { A => ["B"], B => ["C"], C => ["A"] }
+val $c = Rosetta::GraphCycles::solve($g)
 assert_ok len(@$c) > 0, "found cycle in triangle"
 test_run

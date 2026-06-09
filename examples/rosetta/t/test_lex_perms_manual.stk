@@ -2,31 +2,31 @@
 # Rosetta Code: Permutations - Lexicographic (Manual)
 
 fn Rosetta::LexPerms::next_step($p) {
-    my $len = len(@$p)
-    my $i = $len - 2
+    val $len = len(@$p)
+    var $i = $len - 2
     while ($i >= 0 && $p->[$i] >= $p->[$i+1]) { $i = $i - 1 }
     if ($i < 0) { return undef }
     
-    my $j = $len - 1
+    var $j = $len - 1
     while ($p->[$j] <= $p->[$i]) { $j = $j - 1 }
     
-    my @res = @$p
+    var @res = @$p
     ($res[$i], $res[$j]) = ($res[$j], $res[$i])
     
-    my @tail = splice(@res, $i + 1)
+    var @tail = splice(@res, $i + 1)
     @tail = rev(@tail)
     push @res, @tail
     \@res
 }
 
-my $p = [1, 2, 3]
-my $p2 = Rosetta::LexPerms::next_step($p)
+val $p = [1, 2, 3]
+val $p2 = Rosetta::LexPerms::next_step($p)
 assert_eq join(",", @$p2), "1,3,2", "next perm 1,2,3 -> 1,3,2"
 
-my $p3 = Rosetta::LexPerms::next_step($p2)
+val $p3 = Rosetta::LexPerms::next_step($p2)
 assert_eq join(",", @$p3), "2,1,3", "next perm 1,3,2 -> 2,1,3"
 
-my $plast = [3, 2, 1]
+val $plast = [3, 2, 1]
 assert_ok !defined(Rosetta::LexPerms::next_step($plast)), "no next perm for 3,2,1"
 
 test_run

@@ -3,8 +3,8 @@
 
 fn Rosetta::MinHash::hash($s, $seed) {
     # Simple hash function variant
-    my $hash = $seed
-    for my $c ($s |> chars() |> map {ord}) {
+    var $hash = $seed
+    for val $c ($s |> chars() |> map {ord}) {
         $hash = (($hash * 31) + $c) % 4294967296
     }
     $hash
@@ -12,47 +12,47 @@ fn Rosetta::MinHash::hash($s, $seed) {
 
 fn Rosetta::MinHash::solve($str1, $str2, $num_hashes) {
     # Generate shingles (e.g. k=3)
-    my @s1 = $str1 |> chars()
-    my @s2 = $str2 |> chars()
+    val @s1 = $str1 |> chars()
+    val @s2 = $str2 |> chars()
     
-    my %shingles1
-    for (my $i = 0; $i < len(@s1) - 2; $i++) {
+    var %shingles1
+    for (var $i = 0; $i < len(@s1) - 2; $i++) {
         $shingles1{$s1[$i] . $s1[$i+1] . $s1[$i+2]} = 1
     }
     
-    my %shingles2
-    for (my $i = 0; $i < len(@s2) - 2; $i++) {
+    var %shingles2
+    for (var $i = 0; $i < len(@s2) - 2; $i++) {
         $shingles2{$s2[$i] . $s2[$i+1] . $s2[$i+2]} = 1
     }
     
-    my @k1 = keys %shingles1
-    my @k2 = keys %shingles2
+    val @k1 = keys %shingles1
+    val @k2 = keys %shingles2
     
     # Compute minhash signatures
-    my @sig1
-    my @sig2
+    var @sig1
+    var @sig2
     
-    for (my $i = 0; $i < $num_hashes; $i++) {
-        my $seed = $i * 12345 + 67890
+    for (var $i = 0; $i < $num_hashes; $i++) {
+        val $seed = $i * 12345 + 67890
         
-        my $min1 = 1e18
-        for my $sh (@k1) {
-            my $h = Rosetta::MinHash::hash($sh, $seed)
+        var $min1 = 1e18
+        for val $sh (@k1) {
+            val $h = Rosetta::MinHash::hash($sh, $seed)
             if ($h < $min1) { $min1 = $h }
         }
         push @sig1, $min1
         
-        my $min2 = 1e18
-        for my $sh (@k2) {
-            my $h = Rosetta::MinHash::hash($sh, $seed)
+        var $min2 = 1e18
+        for val $sh (@k2) {
+            val $h = Rosetta::MinHash::hash($sh, $seed)
             if ($h < $min2) { $min2 = $h }
         }
         push @sig2, $min2
     }
     
     # Estimate Jaccard similarity
-    my $matches = 0
-    for (my $i = 0; $i < $num_hashes; $i++) {
+    var $matches = 0
+    for (var $i = 0; $i < $num_hashes; $i++) {
         if ($sig1[$i] == $sig2[$i]) {
             $matches++
         }
@@ -61,15 +61,15 @@ fn Rosetta::MinHash::solve($str1, $str2, $num_hashes) {
     $matches / $num_hashes
 }
 
-my $s1 = "the quick brown fox jumps over the lazy dog"
-my $s2 = "the quick brown dog jumps over the lazy fox"
+val $s1 = "the quick brown fox jumps over the lazy dog"
+val $s2 = "the quick brown dog jumps over the lazy fox"
 
-my $sim = Rosetta::MinHash::solve($s1, $s2, 100)
+val $sim = Rosetta::MinHash::solve($s1, $s2, 100)
 # Should have a relatively high similarity since they share many shingles
 assert_ok $sim > 0.5, "Minhash similarity > 0.5"
 
-my $s3 = "a completely different sentence"
-my $sim2 = Rosetta::MinHash::solve($s1, $s3, 100)
+val $s3 = "a completely different sentence"
+val $sim2 = Rosetta::MinHash::solve($s1, $s3, 100)
 assert_ok $sim2 < 0.2, "Minhash similarity < 0.2"
 
 test_run

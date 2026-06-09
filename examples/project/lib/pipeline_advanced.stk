@@ -50,10 +50,10 @@ fn Project::PipelineAdvanced::compose_all(@fns) {
     return \&identity unless len(@fns)
     return $fns[0] if len(@fns) == 1
 
-    my $result = $fns[-1]
-    for my $i (rev(0..len(@fns)-2)) {
-        my $f = $fns[$i]
-        my $g = $result
+    var $result = $fns[-1]
+    for val $i (rev(0..len(@fns)-2)) {
+        val $f = $fns[$i]
+        val $g = $result
         $result = fn { $f($g(@_)) }
     }
     $result
@@ -63,18 +63,18 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
     return \&identity unless len(@fns)
     return $fns[0] if len(@fns) == 1
 
-    my $result = $fns[0]
-    for my $i (1..len(@fns)-1) {
-        my $f = $result
-        my $g = $fns[$i]
+    var $result = $fns[0]
+    for val $i (1..len(@fns)-1) {
+        val $f = $result
+        val $g = $fns[$i]
         $result = fn { $g($f(@_)) }
     }
     $result
 }
 
 # fn filter_map($filter, $mapper, @items) {
-#     my @result
-#     for my $item (@items) {
+#     var @result
+#     for val $item (@items) {
 #         if ($filter($item)) {
 #             push @result, $mapper($item)
 #         }
@@ -83,17 +83,17 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
 # }
 
 # fn reduce_right($fn, $init, @items) {
-#     my $acc = $init
-#     for my $item (rev @items) {
+#     var $acc = $init
+#     for val $item (rev @items) {
 #         $acc = $fn($item, $acc)
 #     }
 #     $acc
 # }
 
 # fn scan($fn, $init, @items) {
-#     my @results = ($init)
-#     my $acc = $init
-#     for my $item (@items) {
+#     var @results = ($init)
+#     var $acc = $init
+#     for val $item (@items) {
 #         $acc = $fn($acc, $item)
 #         push @results, $acc
 #     }
@@ -101,8 +101,8 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
 # }
 
 # fn take_while($pred, @items) {
-#     my @result
-#     for my $item (@items) {
+#     var @result
+#     for val $item (@items) {
 #         last unless $pred($item)
 #         push @result, $item
 #     }
@@ -110,9 +110,9 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
 # }
 
 # fn drop_while($pred, @items) {
-#     my @result
-#     my $dropping = 1
-#     for my $item (@items) {
+#     var @result
+#     var $dropping = 1
+#     for val $item (@items) {
 #         if ($dropping && $pred($item)) {
 #             next
 #         }
@@ -123,9 +123,9 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
 # }
 
 # fn partition_by($pred, @items) {
-#     my @true_items
-#     my @false_items
-#     for my $item (@items) {
+#     var @true_items
+#     var @false_items
+#     for val $item (@items) {
 #         if ($pred($item)) {
 #             push @true_items, $item
 #         } else {
@@ -136,42 +136,42 @@ fn Project::PipelineAdvanced::pipe_all(@fns) {
 # }
 
 # fn group_by_fn($key_fn, @items) {
-#     my $groups = {}
-#     for my $item (@items) {
-#         my $key = $key_fn($item)
+#     var $groups = {}
+#     for val $item (@items) {
+#         val $key = $key_fn($item)
 #         unless (exists $groups->{$key}) {
 #             $groups->{$key} = []
 #         }
-#         my $arr = $groups->{$key}
+#         val $arr = $groups->{$key}
 #         push @$arr, $item
 #     }
 #     $groups
 # }
 
 # fn find_first($pred, @items) {
-#     for my $item (@items) {
+#     for val $item (@items) {
 #         return $item if $pred($item)
 #     }
 #     undef
 # }
 
 # fn find_last($pred, @items) {
-#     my $found
-#     for my $item (@items) {
+#     var $found
+#     for val $item (@items) {
 #         $found = $item if $pred($item)
 #     }
 #     $found
 # }
 
 # fn find_index($pred, @items) {
-#     for my $i (0..$#items) {
+#     for val $i (0..$#items) {
 #         return $i if $pred($items[$i])
 #     }
 #     -1
 # }
 
 fn Project::PipelineAdvanced::count_if($pred, @items) {
-    my $count = 0
+    var $count = 0
     ~> @items ep {
         $count++ if $pred(_)
     }
@@ -179,38 +179,38 @@ fn Project::PipelineAdvanced::count_if($pred, @items) {
 }
 
 # fn all_match($pred, @items) {
-#     for my $item (@items) {
+#     for val $item (@items) {
 #         return 0 unless $pred($item)
 #     }
 #     1
 # }
 
 # fn any_match($pred, @items) {
-#     for my $item (@items) {
+#     for val $item (@items) {
 #         return 1 if $pred($item)
 #     }
 #     0
 # }
 
 # fn none_match($pred, @items) {
-#     for my $item (@items) {
+#     for val $item (@items) {
 #         return 0 if $pred($item)
 #     }
 #     1
 # }
 
 # fn adjacent_pairs(@items) {
-#     my @pairs
-#     for my $i (0..$#items-1) {
+#     var @pairs
+#     for val $i (0..$#items-1) {
 #         push @pairs, [$items[$i], $items[$i+1]]
 #     }
 #     @pairs
 # }
 
 # fn chunk($n, @items) {
-#     my @chunks
-#     my @current
-#     for my $item (@items) {
+#     var @chunks
+#     var @current
+#     for val $item (@items) {
 #         push @current, $item
 #         if (len(@current) == $n) {
 #             push @chunks, [@current]
@@ -222,9 +222,9 @@ fn Project::PipelineAdvanced::count_if($pred, @items) {
 # }
 
 # fn interleave($a, $b) {
-#     my @result
-#     my $len = len(@$a) > len(@$b) ? len(@$a) : len(@$b)
-#     for my $i (0..$len-1) {
+#     var @result
+#     val $len = len(@$a) > len(@$b) ? len(@$a) : len(@$b)
+#     for val $i (0..$len-1) {
 #         push @result, $a->[$i] if $i < len(@$a)
 #         push @result, $b->[$i] if $i < len(@$b)
 #     }
@@ -232,10 +232,10 @@ fn Project::PipelineAdvanced::count_if($pred, @items) {
 # }
 
 # fn window($size, @items) {
-#     my @windows
-#     for my $i (0..len(@items)-$size) {
-#         my @w
-#         for my $j (0..$size-1) {
+#     var @windows
+#     for val $i (0..len(@items)-$size) {
+#         var @w
+#         for val $j (0..$size-1) {
 #             push @w, $items[$i + $j]
 #         }
 #         push @windows, [@w]
@@ -244,18 +244,18 @@ fn Project::PipelineAdvanced::count_if($pred, @items) {
 # }
 
 # fn frequencies(@items) {
-#     my %freq
-#     for my $item (@items) {
+#     var %freq
+#     for val $item (@items) {
 #         $freq{$item}++
 #     }
 #     \%freq
 # }
 
 # fn most_common(@items) {
-#     my $freq = frequencies(@items)
-#     my $max_count = 0
-#     my $most
-#     for my $k (keys %$freq) {
+#     val $freq = frequencies(@items)
+#     var $max_count = 0
+#     var $most
+#     for val $k (keys %$freq) {
 #         if ($freq->{$k} > $max_count) {
 #             $max_count = $freq->{$k}
 #             $most = $k

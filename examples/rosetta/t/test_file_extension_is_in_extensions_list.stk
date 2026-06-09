@@ -4,8 +4,8 @@
 fn Rosetta::FileExt::check($filename, $extensions) {
     # Extract extension using regex
     if ($filename =~ /\.([^.]+)$/) {
-        my $ext = $1
-        for my $e (@$extensions) {
+        val $ext = $1
+        for val $e (@$extensions) {
             if ($ext eq $e) { return 1 }
         }
     }
@@ -13,10 +13,10 @@ fn Rosetta::FileExt::check($filename, $extensions) {
 }
 
 fn Rosetta::FileExt::demo() {
-    my $file = "test.txt"
-    my @exts = ("txt", "doc", "pdf")
+    val $file = "test.txt"
+    val @exts = ("txt", "doc", "pdf")
     
-    my $res = Rosetta::FileExt::check($file, \@exts)
+    val $res = Rosetta::FileExt::check($file, \@exts)
     "Is extension of '$file' in [" . join(", ", @exts) . "]? " . ($res ? "Yes" : "No") |> p
     
     # Assertions

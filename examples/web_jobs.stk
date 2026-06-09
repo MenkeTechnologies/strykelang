@@ -17,7 +17,7 @@ web_jobs_init()
 # ── enqueue a wave of jobs with varied payloads ───────────────────────
 
 p "── enqueue 10 jobs ────────────────────────────────────"
-for my $i (1:10) {
+for val $i (1:10) {
     web_job_enqueue("process_invoice", +{
         invoice_id => $i,
         amount     => 100 + $i * 13,
@@ -30,16 +30,16 @@ printf "  enqueued, stats: %s\n", web_jobs_stats() |> to_json
 
 p ""
 p "── consume + record latency in t-digest ───────────────"
-my $latency = t_digest(100)
-my $by_priority = cms(2048, 5)
+val $latency = t_digest(100)
+val $by_priority = cms(2048, 5)
 
-my $done = 0
-while (my $job = web_job_dequeue()) {
-    my $t1 = now_ns()
+var $done = 0
+while (val $job = web_job_dequeue()) {
+    val $t1 = now_ns()
     # Simulated work: priority-high jobs are slower (more validation).
-    my $extra = $job->{args}->{priority} eq "high" ? 0.01 : 0.002
+    val $extra = $job->{args}->{priority} eq "high" ? 0.01 : 0.002
     sleep $extra
-    my $dt_us = (now_ns() - $t1) / 1000.0
+    val $dt_us = (now_ns() - $t1) / 1000.0
     td_add($latency, $dt_us)
     cms_add($by_priority, $job->{args}->{priority})
     web_job_complete($job->{id})
@@ -62,7 +62,7 @@ printf "  mean : %.1f\n", td_mean($latency)
 
 p ""
 p "── job count by priority ──────────────────────────────"
-for my $p ("high", "normal", "low") {
+for val $p ("high", "normal", "low") {
     printf "  %-7s × %d\n", $p, cms_count($by_priority, $p)
 }
 
@@ -70,7 +70,7 @@ for my $p ("high", "normal", "low") {
 
 p ""
 p "── final job-queue stats ──────────────────────────────"
-my $stats = web_jobs_stats()
+val $stats = web_jobs_stats()
 printf "  done    : %d\n", $stats->{done}
 printf "  pending : %d\n", $stats->{pending}
 printf "  failed  : %d\n", $stats->{failed} // 0
@@ -80,8 +80,8 @@ printf "  failed  : %d\n", $stats->{failed} // 0
 p ""
 p "── failure path ───────────────────────────────────────"
 web_job_enqueue("buggy_job", +{ retry => 0 })
-my $bad = web_job_dequeue()
+val $bad = web_job_dequeue()
 web_job_fail($bad->{id}, "simulated runtime error")
-my $stats2 = web_jobs_stats()
+val $stats2 = web_jobs_stats()
 printf "  done    : %d\n", $stats2->{done}
 printf "  failed  : %d\n", $stats2->{failed} // 0

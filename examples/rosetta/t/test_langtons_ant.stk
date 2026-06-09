@@ -2,12 +2,12 @@
 # Rosetta Code: Langton's Ant
 
 fn Rosetta::LangtonsAnt::simulate($steps) {
-    my %grid # 0 is white, 1 is black
-    my $x = 0; my $y = 0; my $dir = 0 # 0:N, 1:E, 2:S, 3:W
+    var %grid # 0 is white, 1 is black
+    var $x = 0; var $y = 0; var $dir = 0 # 0:N, 1:E, 2:S, 3:W
     
-    for my $i (1:$steps) {
-        my $k = "$x,$y"
-        my $color = $grid{$k} || 0
+    for val $i (1:$steps) {
+        val $k = "$x,$y"
+        val $color = $grid{$k} || 0
         
         if ($color == 0) {
             $dir = ($dir + 1) % 4
@@ -26,11 +26,11 @@ fn Rosetta::LangtonsAnt::simulate($steps) {
 }
 
 # After 1 step: (0,0) is black, ant is at (1,0) facing East
-my $g1 = Rosetta::LangtonsAnt::simulate(1)
+val $g1 = Rosetta::LangtonsAnt::simulate(1)
 assert_eq $g1->{"0,0"}, 1, "0,0 is black after 1 step"
 
 # After 2 steps: (0,0) is black, (1,0) is black, ant is at (1,-1) facing South
-my $g2 = Rosetta::LangtonsAnt::simulate(2)
+val $g2 = Rosetta::LangtonsAnt::simulate(2)
 assert_eq $g2->{"1,0"}, 1, "1,0 is black after 2 steps"
 
 test_run

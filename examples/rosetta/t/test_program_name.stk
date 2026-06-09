@@ -6,7 +6,7 @@ fn Rosetta::ProgramName::get() {
     $0
 }
 
-my $name = Rosetta::ProgramName::get()
+val $name = Rosetta::ProgramName::get()
 assert_ok defined($name), "Program name is defined"
 # When running via stryke test, $0 might be "-e" or a temp file path or the actual file path.
 # We just check that it's a string.

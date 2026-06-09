@@ -2,15 +2,15 @@
 # Rosetta Code: Matrix exponentiation
 
 fn Rosetta::MatrixPow::mul($a, $b) {
-    my $m = len(@$a)
-    my $n = len(@{$a->[0]})
-    my $p = len(@{$b->[0]})
-    my @res = ()
-    for my $i (0:$m-1) {
+    val $m = len(@$a)
+    val $n = len(@{$a->[0]})
+    val $p = len(@{$b->[0]})
+    var @res = ()
+    for val $i (0:$m-1) {
         $res[$i] = []
-        for my $j (0:$p-1) {
-            my $sum = 0
-            for my $k (0:$n-1) {
+        for val $j (0:$p-1) {
+            var $sum = 0
+            for val $k (0:$n-1) {
                 $sum += $a->[$i][$k] * $b->[$k][$j]
             }
             $res[$i][$j] = $sum
@@ -20,30 +20,30 @@ fn Rosetta::MatrixPow::mul($a, $b) {
 }
 
 fn Rosetta::MatrixPow::compute($a, $n) {
-    my $size = len(@$a)
-    my @res = ()
-    for my $i (0:$size-1) {
+    val $size = len(@$a)
+    var @res = ()
+    for val $i (0:$size-1) {
         $res[$i] = []
-        for my $j (0:$size-1) {
+        for val $j (0:$size-1) {
             $res[$i][$j] = ($i == $j ? 1 : 0)
         }
     }
-    my $base = $a
-    my $curr_n = $n
+    var $base = $a
+    var $curr_n = $n
     while ($curr_n > 0) {
         if ($curr_n % 2 == 1) {
-            my $tmp = Rosetta::MatrixPow::mul([@res], $base)
+            val $tmp = Rosetta::MatrixPow::mul([@res], $base)
             @res = @$tmp
         }
-        my $tmp2 = Rosetta::MatrixPow::mul($base, $base)
+        val $tmp2 = Rosetta::MatrixPow::mul($base, $base)
         $base = $tmp2
         $curr_n = int($curr_n / 2)
     }
     \@res
 }
 
-my $m = [[1, 1], [1, 0]]
-my $res = Rosetta::MatrixPow::compute($m, 5)
+val $m = [[1, 1], [1, 0]]
+val $res = Rosetta::MatrixPow::compute($m, 5)
 # Fibonacci matrix power 5 should be [[8, 5], [5, 3]]
 assert_eq $res->[0][0], 8, "Fib(6)"
 assert_eq $res->[0][1], 5, "Fib(5)"

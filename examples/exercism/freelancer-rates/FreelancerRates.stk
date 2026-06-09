@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my $BILLABLE_DAYS = 22
+const val $BILLABLE_DAYS = 22
 
 fn Exercism::FreelancerRates::daily_rate($hourly)                          = $hourly * 8.0
 fn Exercism::FreelancerRates::apply_discount($before, $disc)               = $before * (100 - $disc) / 100

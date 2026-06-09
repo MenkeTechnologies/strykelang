@@ -14,8 +14,8 @@ fn LRU::new($cap) {
 }
 
 fn LRU::touch($cache, $key) {
-    my @new_order = ()
-    for my $k (@{$cache->{order}}) {
+    var @new_order = ()
+    for val $k (@{$cache->{order}}) {
         push @new_order, $k if $k ne $key
     }
     push @new_order, $key
@@ -37,7 +37,7 @@ fn LRU::put($cache, $key, $val) {
     $cache->{store}->{$key} = $val
     push @{$cache->{order}}, $key
     while (len(@{$cache->{order}}) > $cache->{cap}) {
-        my $evict = shift @{$cache->{order}}
+        val $evict = shift @{$cache->{order}}
         delete $cache->{store}->{$evict}
     }
 }
@@ -50,7 +50,7 @@ p " Stryke LRU Cache Demo (capacity = 3)"
 p "==============================================="
 p ""
 
-my $c = LRU::new(3)
+val $c = LRU::new(3)
 
 LRU::put($c, "a", 1)
 LRU::put($c, "b", 2)
@@ -58,7 +58,7 @@ LRU::put($c, "c", 3)
 p "After put a,b,c:"
 p "  keys: " . join(",", @{LRU::keys($c)})
 
-my $v = LRU::get($c, "a")
+val $v = LRU::get($c, "a")
 p ""
 p "After get(a) = $v:"
 p "  keys: " . join(",", @{LRU::keys($c)})
@@ -72,7 +72,7 @@ p "  b still present? " . (defined LRU::get($c, "b") ? "yes" : "no - evicted")
 LRU::put($c, "a", 99)
 p ""
 p "After put a=99 (update):"
-my $sz = LRU::size($c)
+val $sz = LRU::size($c)
 p "  size: $sz"
-my $av = LRU::get($c, "a")
+val $av = LRU::get($c, "a")
 p "  a = $av"

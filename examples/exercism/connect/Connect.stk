@@ -1,31 +1,31 @@
 #!/usr/bin/env stryke
 
 fn Exercism::Connect::result_for($board) {
-    my @rows = @{$board}
-    my $h    = @rows
+    val @rows = @{$board}
+    val $h    = @rows
     return "none" if $h == 0
-    my @grid = map { [split /\s+/, _ =~ s/^\s+//r] } @rows
-    my $w = @{$grid[0]}
+    val @grid = map { [split /\s+/, _ =~ s/^\s+//r] } @rows
+    val $w = @{$grid[0]}
 
-    for my $r (0..$h - 1) {
+    for val $r (0..$h - 1) {
         return "X" if $grid[$r][0] eq "X" && Exercism::Connect::_flood(\@grid, $r, 0, $h, $w, "X", "X-right")
     }
-    for my $c (0..$w - 1) {
+    for val $c (0..$w - 1) {
         return "O" if $grid[0][$c] eq "O" && Exercism::Connect::_flood(\@grid, 0, $c, $h, $w, "O", "O-bottom")
     }
     "none"
 }
 
 fn Exercism::Connect::_flood($grid, $sr, $sc, $h, $w, $color, $goal) {
-    my %seen
-    my @stack = ([$sr, $sc])
+    var %seen
+    var @stack = ([$sr, $sc])
     while (@stack) {
-        my ($r, $c) = @{pop @stack}
+        val ($r, $c) = @{pop @stack}
         next if $seen{"$r,$c"}++
         return 1 if $goal eq "X-right"  && $c == $w - 1
         return 1 if $goal eq "O-bottom" && $r == $h - 1
-        for my $d ([-1,0],[1,0],[0,-1],[0,1],[-1,1],[1,-1]) {
-            my ($nr, $nc) = ($r + $d->[0], $c + $d->[1])
+        for val $d ([-1,0],[1,0],[0,-1],[0,1],[-1,1],[1,-1]) {
+            val ($nr, $nc) = ($r + $d->[0], $c + $d->[1])
             next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
             next unless $grid->[$nr][$nc] eq $color
             push @stack, [$nr, $nc]

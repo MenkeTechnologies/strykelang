@@ -9,8 +9,8 @@ package BH;
 fn new() { { data => [] } }
 
 fn _swap($self, $i, $j) {
-    my $arr = $self->{data}
-    my $t = $arr->[$i]
+    var $arr = $self->{data}
+    val $t = $arr->[$i]
     $arr->[$i] = $arr->[$j]
     $arr->[$j] = $t
 }
@@ -25,11 +25,11 @@ fn peek($self) {
 }
 
 fn push($self, $v) {
-    my $arr = $self->{data}
+    val $arr = $self->{data}
     push @$arr, $v
-    my $i = len(@$arr) - 1
+    var $i = len(@$arr) - 1
     while ($i > 0) {
-        my $parent = int(($i - 1) / 2)
+        val $parent = int(($i - 1) / 2)
         if ($arr->[$i] < $arr->[$parent]) {
             BH::_swap($self, $i, $parent)
             $i = $parent
@@ -40,21 +40,21 @@ fn push($self, $v) {
 }
 
 fn pop($self) {
-    my $arr = $self->{data}
-    my $n = len(@$arr)
+    var $arr = $self->{data}
+    val $n = len(@$arr)
     return undef if $n == 0
-    my $top = $arr->[0]
+    val $top = $arr->[0]
     if ($n == 1) {
         pop @$arr
         return $top
     }
     $arr->[0] = pop @$arr
-    my $i = 0
-    my $sz = len(@$arr)
+    var $i = 0
+    val $sz = len(@$arr)
     while (1) {
-        my $l = 2 * $i + 1
-        my $r = 2 * $i + 2
-        my $smallest = $i
+        val $l = 2 * $i + 1
+        val $r = 2 * $i + 2
+        var $smallest = $i
         $smallest = $l if $l < $sz && $arr->[$l] < $arr->[$smallest]
         $smallest = $r if $r < $sz && $arr->[$r] < $arr->[$smallest]
         last if $smallest == $i
@@ -65,9 +65,9 @@ fn pop($self) {
 }
 
 fn heapsort($arr) {
-    my $h = BH::new()
-    for my $x (@$arr) { BH::push($h, $x) }
-    my @out = ()
+    val $h = BH::new()
+    for val $x (@$arr) { BH::push($h, $x) }
+    var @out = ()
     while (!BH::is_empty($h)) { push @out, BH::pop($h) }
     \@out
 }
@@ -75,13 +75,13 @@ fn heapsort($arr) {
 package main;
 
 p "=== Binary Heap Demo ==="
-my $h = BH::new()
-for my $v (5, 3, 8, 1, 9, 2, 7) { BH::push($h, $v) }
+val $h = BH::new()
+for val $v (5, 3, 8, 1, 9, 2, 7) { BH::push($h, $v) }
 p "size: " . BH::size($h)
 p "peek: " . BH::peek($h)
-my @out = ()
+var @out = ()
 while (!BH::is_empty($h)) { push @out, BH::pop($h) }
 p "sorted: " . join(",", @out)
 
-my $s = BH::heapsort([42, 1, 33, 7, 19, 4, 18, 100, 0])
+val $s = BH::heapsort([42, 1, 33, 7, 19, 4, 18, 100, 0])
 p "heapsort: " . join(",", @$s)

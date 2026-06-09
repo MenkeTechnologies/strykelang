@@ -7,36 +7,36 @@ fn Rosetta::KMeans::distance($p1, $p2) {
 
 fn Rosetta::KMeans::solve($points, $k, $max_iters) {
     # Initialize centroids (pick distant points for stability in this small example)
-    my @centroids = ([@{$points->[0]}], [@{$points->[3]}])
-    my $n = len(@$points)
-    my @assignments = ~> 0:$n-1 map { -1 }
+    var @centroids = ([@{$points->[0]}], [@{$points->[3]}])
+    val $n = len(@$points)
+    var @assignments = ~> 0:$n-1 map { -1 }
     
     for (1:$max_iters) {
         # Assignment step: each point picks the nearest centroid by index.
-        my @new_assignments = map {
-            my $p_idx = _
+        val @new_assignments = map {
+            val $p_idx = _
             min_by { Rosetta::KMeans::distance($points->[$p_idx], $centroids[_]) } 0:$k-1
         } 0:$n-1
-        my $changed = ~> 0:$n-1 any { $new_assignments[_] != $assignments[_] }
+        val $changed = ~> 0:$n-1 any { $new_assignments[_] != $assignments[_] }
         @assignments = @new_assignments
         last if !$changed
         
         # Update step
-        my @counts = map { 0 } 0:$k-1
-        my @sums = map { [ map { 0 } 0..len(@{$points->[0]})-1 ] } 0:$k-1
+        var @counts = map { 0 } 0:$k-1
+        val @sums = map { [ map { 0 } 0..len(@{$points->[0]})-1 ] } 0:$k-1
         
-        for (my $i = 0; $i < $n; $i++) {
-            my $c_idx = $assignments[$i]
+        for (var $i = 0; $i < $n; $i++) {
+            val $c_idx = $assignments[$i]
             $counts[$c_idx]++
-            for (my $d = 0; $d < len(@{$points->[0]}); $d++) {
+            for (var $d = 0; $d < len(@{$points->[0]}); $d++) {
                 $sums[$c_idx]->[$d] += $points->[$i]->[$d]
             }
         }
         
-        for (my $c_idx = 0; $c_idx < $k; $c_idx++) {
+        for (var $c_idx = 0; $c_idx < $k; $c_idx++) {
             if ($counts[$c_idx] > 0) {
-                my @new_c
-                for (my $d = 0; $d < len(@{$points->[0]}); $d++) {
+                var @new_c
+                for (var $d = 0; $d < len(@{$points->[0]}); $d++) {
                     push @new_c, $sums[$c_idx]->[$d] / $counts[$c_idx]
                 }
                 $centroids[$c_idx] = \@new_c
@@ -47,12 +47,12 @@ fn Rosetta::KMeans::solve($points, $k, $max_iters) {
     { centroids => \@centroids, assignments => \@assignments }
 }
 
-my @points = (
+val @points = (
     [1.0, 1.0], [1.5, 2.0], [3.0, 4.0], [5.0, 7.0], [3.5, 5.0], [4.5, 5.0], [3.5, 4.5]
 )
 
-my $res = Rosetta::KMeans::solve(\@points, 2, 10)
-my $assignments = $res->{assignments}
+val $res = Rosetta::KMeans::solve(\@points, 2, 10)
+val $assignments = $res->{assignments}
 
 # Check if points are grouped reasonably
 # [1.0, 1.0], [1.5, 2.0] should be in one cluster

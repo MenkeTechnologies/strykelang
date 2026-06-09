@@ -3,15 +3,15 @@
 # Pinning test for base_converter.stk demo.
 # Compliance: docs/STYLE_GUIDE.md
 
-my $DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+val $DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 fn Base::to($n, $base) {
     return "0" if $n == 0
-    my $neg = $n < 0 ? 1 : 0
-    my $v   = $neg ? 0 - $n : $n
-    my $out = ""
+    val $neg = $n < 0 ? 1 : 0
+    var $v   = $neg ? 0 - $n : $n
+    var $out = ""
     while ($v > 0) {
-        my $d = $v % $base
+        val $d = $v % $base
         $out = $DIGITS[$d] . $out
         $v = int($v / $base)
     }
@@ -19,25 +19,25 @@ fn Base::to($n, $base) {
 }
 
 fn Base::digit_val($ch) {
-    my $c = uc($ch)
-    my $n = len $DIGITS
-    for my $i (0:$n-1) {
+    val $c = uc($ch)
+    val $n = len $DIGITS
+    for val $i (0:$n-1) {
         return $i if $DIGITS[$i] eq $c
     }
     -1
 }
 
 fn Base::from($s, $base) {
-    my $idx = 0
-    my $neg = 0
+    var $idx = 0
+    var $neg = 0
     if ($s[0] eq "-") {
         $neg = 1
         $idx = 1
     }
-    my $total = 0
-    my $n = len $s
-    for my $i ($idx:$n-1) {
-        my $d = Base::digit_val($s[$i])
+    var $total = 0
+    val $n = len $s
+    for val $i ($idx:$n-1) {
+        val $d = Base::digit_val($s[$i])
         $total = $total * $base + $d
     }
     $neg ? 0 - $total : $total
@@ -90,11 +90,11 @@ Base::from("-10", 2)  |> aeq -2,   "parse -10 bin = -2"
 
 # ── Round-trip 0..200 in various bases ────────────────────────────────────
 
-for my $bs (2, 3, 7, 16, 36) {
-    my $all = 1
-    for my $n (0:200) {
-        my $s = Base::to($n, $bs)
-        my $d = Base::from($s, $bs)
+for val $bs (2, 3, 7, 16, 36) {
+    var $all = 1
+    for val $n (0:200) {
+        val $s = Base::to($n, $bs)
+        val $d = Base::from($s, $bs)
         $all = 0 if $d != $n
     }
     $all |> aeq 1, "round-trip 0..200 base $bs"
@@ -102,8 +102,8 @@ for my $bs (2, 3, 7, 16, 36) {
 
 # ── Round-trip negatives ──────────────────────────────────────────────────
 
-for my $n (-100, -50, -7, -1) {
-    my $s = Base::to($n, 16)
+for val $n (-100, -50, -7, -1) {
+    val $s = Base::to($n, 16)
     Base::from($s, 16) |> aeq $n, "round-trip $n base 16"
 }
 

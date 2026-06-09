@@ -5,15 +5,15 @@
 
 # ── 1. JWT (HS256) ─────────────────────────────────────────────────────────
 
-my $jwt_payload = +{ user_id => 42, role => "admin" }
-my $token = web_jwt_encode($jwt_payload)
-my $decoded = web_jwt_decode($token)
+val $jwt_payload = +{ user_id => 42, role => "admin" }
+val $token = web_jwt_encode($jwt_payload)
+val $decoded = web_jwt_decode($token)
 $decoded->{user_id} |> aeq 42, "JWT encode/decode roundtrip"
 
 # ── 2. TOTP (RFC 6238) ─────────────────────────────────────────────────────
 
-my $secret = web_otp_secret()
-my $code = web_otp_generate($secret)
+val $secret = web_otp_secret()
+val $code = web_otp_generate($secret)
 web_otp_verify($secret, $code) |> aok "TOTP verify success"
 
 # ── 3. Faker ───────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ web_faker_email() |> maps { _ =~ /@/ } |> aok "Faker email format"
 
 # ── 5. CSV Export ──────────────────────────────────────────────────────────
 
-my @rows = (+{ id => 1, name => "Alice" }, +{ id => 2, name => "Bob" })
+val @rows = (+{ id => 1, name => "Alice" }, +{ id => 2, name => "Bob" })
 web_csv(\@rows) |> maps { _ =~ /id,name/ && _ =~ /1,Alice/ } |> aok "CSV export arrayref"
 web_csv(@rows) |> maps { _ =~ /id,name/ && _ =~ /2,Bob/ } |> aok "CSV export flat list"
 
@@ -43,8 +43,8 @@ web_button_to("Del", "/p", method => "delete") |> maps { _ =~ /_method" value="d
 
 # ── 8. JSON:API ────────────────────────────────────────────────────────────
 
-my $row = +{ id => 10, title => "Stryke" }
-my $japi = web_jsonapi_resource("post", $row)
+val $row = +{ id => 10, title => "Stryke" }
+val $japi = web_jsonapi_resource("post", $row)
 $japi->{data}{type} |> aeq "post", "JSON:API resource type"
 $japi->{data}{attributes}{title} |> aeq "Stryke", "JSON:API resource attrs"
 

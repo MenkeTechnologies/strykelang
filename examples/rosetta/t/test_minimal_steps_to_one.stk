@@ -9,11 +9,11 @@
 
 fn Rosetta::MinSteps::compute($n) {
     return [0, [1]] if $n == 1
-    my @best = (0, 0)        # best[k] = (steps, parent)
-    my @parent = (0, 0)
-    for my $k (2:$n) {
-        my $b = $best[$k - 1] + 1
-        my $p = $k - 1
+    var @best = (0, 0)        # best[k] = (steps, parent)
+    var @parent = (0, 0)
+    for val $k (2:$n) {
+        var $b = $best[$k - 1] + 1
+        var $p = $k - 1
         if ($k % 2 == 0 && $best[int($k / 2)] + 1 < $b) {
             $b = $best[int($k / 2)] + 1; $p = int($k / 2)
         }
@@ -24,8 +24,8 @@ fn Rosetta::MinSteps::compute($n) {
         push @parent, $p
     }
     # Reconstruct path
-    my @path
-    my $cur = $n
+    var @path
+    var $cur = $n
     while ($cur > 1) { push @path, $cur; $cur = $parent[$cur] }
     push @path, 1
     [$best[$n], \@path]
@@ -38,13 +38,13 @@ assert_eq Rosetta::MinSteps::compute(100)->[0], 7, "f(100) = 7"
 assert_eq Rosetta::MinSteps::compute(1000)->[0], 9, "f(1000) = 9"
 
 # Path validity: every step is one of the three legal moves
-my $r = Rosetta::MinSteps::compute(100)
-my $path = $r->[1]
-my $valid = 1
-for my $i (0..len(@$path) - 2) {
-    my $a = $path->[$i]
-    my $b = $path->[$i + 1]
-    my $ok = ($b == $a - 1)
+val $r = Rosetta::MinSteps::compute(100)
+val $path = $r->[1]
+var $valid = 1
+for val $i (0..len(@$path) - 2) {
+    val $a = $path->[$i]
+    val $b = $path->[$i + 1]
+    val $ok = ($b == $a - 1)
         || ($a % 2 == 0 && $b == int($a / 2))
         || ($a % 3 == 0 && $b == int($a / 3))
     $valid = 0 if !$ok

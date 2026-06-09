@@ -2,7 +2,7 @@
 # Run: stryke --no-interop examples/parallel_prime_finder.stk
 
 p "--- Primes pgreps ---"
-my @res = ~> (1:100) pgreps { is_prime _ } collect sort { _ <=> _1 }
+val @res = ~> (1:100) pgreps { is_prime _ } collect sort { _ <=> _1 }
 
 p "Found #{len @res} primes: #{ join ', ', @res }"
 

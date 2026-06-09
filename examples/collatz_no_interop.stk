@@ -17,8 +17,8 @@ fn Collatz::steps($n) {
     die "n must be positive: $n" unless $n > 0
     state %cache
     return $cache{$n} if exists $cache{$n}
-    my $x = $n
-    my $steps = 0
+    var $x = $n
+    var $steps = 0
     while ($x > 1) {
         $x = ($x % 2 == 0) ? int($x / 2) : 3 * $x + 1
         $steps++
@@ -28,8 +28,8 @@ fn Collatz::steps($n) {
 }
 
 fn Collatz::path($n) {
-    my @path = ($n)
-    my $x = $n
+    var @path = ($n)
+    var $x = $n
     while ($x > 1) {
         $x = ($x % 2 == 0) ? int($x / 2) : 3 * $x + 1
         push @path, $x
@@ -38,14 +38,14 @@ fn Collatz::path($n) {
 }
 
 if (len(@ARGV) >= 1) {
-    my $n = 0 + $ARGV[0]
+    val $n = 0 + $ARGV[0]
     p "trajectory of $n: ", join(" -> ", Collatz::path($n))
     p "steps: ", Collatz::steps($n)
     exit 0
 }
 
 # Reference table — known step counts from OEIS A006577.
-my @cases = (
+val @cases = (
     +{ n => 1,    s => 0 },
     +{ n => 2,    s => 1 },
     +{ n => 3,    s => 7 },
@@ -60,10 +60,10 @@ my @cases = (
 )
 
 p "── Collatz step counts (OEIS A006577) ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Collatz::steps($c->{n})
-    my $ok  = ($got == $c->{s})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Collatz::steps($c->{n})
+    val $ok  = ($got == $c->{s})
     $fail++ unless $ok
     printf "  Collatz::steps(%6d) = %4d   expect %4d  %s\n",
         $c->{n}, $got, $c->{s}, $ok ? "" : "FAIL"
@@ -71,10 +71,10 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " collatz cases failed" if $fail > 0
 
 # Find the longest trajectory under 100.
-my $best_n     = 1
-my $best_steps = 0
-for my $n (1:100) {
-    my $s = Collatz::steps($n)
+var $best_n     = 1
+var $best_steps = 0
+for val $n (1:100) {
+    val $s = Collatz::steps($n)
     if ($s > $best_steps) {
         $best_steps = $s
         $best_n     = $n

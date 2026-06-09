@@ -13,11 +13,11 @@ fn Rosetta::KeyMacros::press($sys, $key, $state) {
     $sys->{bindings}{$key}($state)
 }
 
-my $sys = Rosetta::KeyMacros::new()
+val $sys = Rosetta::KeyMacros::new()
 Rosetta::KeyMacros::bind($sys, "F1", fn ($s) { $s->{count} += 1; "help" })
 Rosetta::KeyMacros::bind($sys, "Alt-P", fn ($s) { $s->{paused} = 1; "pause" })
 
-my $state = { count => 0, paused => 0 }
+val $state = { count => 0, paused => 0 }
 
 assert_eq Rosetta::KeyMacros::press($sys, "F1", $state), "help", "function key triggers method"
 assert_eq $state->{count}, 1, "macro mutated application state"

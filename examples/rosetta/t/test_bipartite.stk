@@ -2,15 +2,15 @@
 # Rosetta Code: Bipartite Graph Check
 
 fn Rosetta::Bipartite::check($adj) {
-    my %color
-    for my $start (keys %$adj) {
+    var %color
+    for val $start (keys %$adj) {
         next if exists $color{$start}
-        my @q = ([$start, 0])
+        var @q = ([$start, 0])
         $color{$start} = 0
         while (len(@q)) {
-            my $curr = shift @q
-            my ($u, $c) = @$curr
-            for my $v (@{$adj->{$u}}) {
+            val $curr = shift @q
+            val ($u, $c) = @$curr
+            for val $v (@{$adj->{$u}}) {
                 if (!exists $color{$v}) {
                     $color{$v} = 1 - $c
                     push @q, [$v, 1 - $c]
@@ -21,8 +21,8 @@ fn Rosetta::Bipartite::check($adj) {
     1
 }
 
-my $g1 = { A => ["B"], B => ["A", "C"], C => ["B"] }
+val $g1 = { A => ["B"], B => ["A", "C"], C => ["B"] }
 assert_ok Rosetta::Bipartite::check($g1), "path is bipartite"
-my $g2 = { A => ["B", "C"], B => ["A", "C"], C => ["A", "B"] }
+val $g2 = { A => ["B", "C"], B => ["A", "C"], C => ["A", "B"] }
 assert_ok !Rosetta::Bipartite::check($g2), "triangle not bipartite"
 test_run

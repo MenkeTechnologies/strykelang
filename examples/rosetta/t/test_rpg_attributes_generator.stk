@@ -4,24 +4,24 @@
 # Re-roll the whole set unless: total ≥ 75 AND at least two values ≥ 15.
 
 fn Rosetta::RpgAttr::roll_4d6_drop_low() {
-    my @rolls = (
+    val @rolls = (
         1 + int(rand(6)),
         1 + int(rand(6)),
         1 + int(rand(6)),
         1 + int(rand(6)),
     )
-    my @sorted = sort { _ <=> _1 } @rolls
+    val @sorted = sort { _ <=> _1 } @rolls
     $sorted[1] + $sorted[2] + $sorted[3]
 }
 
 fn Rosetta::RpgAttr::generate_set() {
-    my @attrs
+    var @attrs
     while (1) {
         @attrs = ()
-        my $sum = 0
-        my $high = 0
-        for my $i (~> 1:6) {
-            my $v = Rosetta::RpgAttr::roll_4d6_drop_low()
+        var $sum = 0
+        var $high = 0
+        for val $i (~> 1:6) {
+            val $v = Rosetta::RpgAttr::roll_4d6_drop_low()
             push @attrs, $v
             $sum += $v
             $high++ if $v >= 15
@@ -32,26 +32,26 @@ fn Rosetta::RpgAttr::generate_set() {
 }
 
 # 4d6-drop-low yields values in [3, 18]
-for my $i (~> 1:200) {
-    my $v = Rosetta::RpgAttr::roll_4d6_drop_low()
+for val $i (~> 1:200) {
+    val $v = Rosetta::RpgAttr::roll_4d6_drop_low()
     assert_ok $v >= 3 && $v <= 18, "value in [3, 18]"
 }
 
 # Single attribute distribution: mean ≈ 12.24
-my @samples
-for my $i (~> 1:5000) { push @samples, Rosetta::RpgAttr::roll_4d6_drop_low() }
-my $sum = 0
-for my $v (@samples) { $sum += $v }
-my $mean = $sum / 5000
+var @samples
+for val $i (~> 1:5000) { push @samples, Rosetta::RpgAttr::roll_4d6_drop_low() }
+var $sum = 0
+for val $v (@samples) { $sum += $v }
+val $mean = $sum / 5000
 assert_ok abs($mean - 12.24) < 0.3, sprintf("mean ≈ 12.24 (got %.2f)", $mean)
 
 # A complete set always satisfies the campaign rules
-for my $i (~> 1:50) {
-    my @set = Rosetta::RpgAttr::generate_set()
+for val $i (~> 1:50) {
+    val @set = Rosetta::RpgAttr::generate_set()
     assert_eq len(@set), 6, "6 attributes"
-    my $set_sum = 0
-    my $high_count = 0
-    for my $v (@set) {
+    var $set_sum = 0
+    var $high_count = 0
+    for val $v (@set) {
         assert_ok $v >= 3 && $v <= 18, "in range"
         $set_sum += $v
         $high_count++ if $v >= 15
@@ -61,6 +61,6 @@ for my $i (~> 1:50) {
 }
 
 # Pipe form
-() |> fn { my @s = Rosetta::RpgAttr::generate_set(); len(@s) } |> assert_eq(6, "pipe count")
+() |> fn { val @s = Rosetta::RpgAttr::generate_set(); len(@s) } |> assert_eq(6, "pipe count")
 
 test_run

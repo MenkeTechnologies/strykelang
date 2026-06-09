@@ -19,7 +19,7 @@ fn Rosetta::WindowMgmt::maximize($win) {
     $win->{minimized} = 0
 }
 
-my $win = Rosetta::WindowMgmt::new()
+val $win = Rosetta::WindowMgmt::new()
 Rosetta::WindowMgmt::focus($win)
 Rosetta::WindowMgmt::maximize($win)
 Rosetta::WindowMgmt::minimize($win)

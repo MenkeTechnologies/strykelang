@@ -22,18 +22,18 @@ aeq style_test::add(10, 20), 30, "expression-bodied fn"
 (1:3) |> map _ * _ |> join(",") |> aeq "1,4,9", "map with expression body"
 
 # Nested loops following Rule 6b (No nested calls)
-my @sums = (1:2) |> map { my $o = _; my @inner = (1:2) |> map { $o + _ }; \@inner }
+val @sums = (1:2) |> map { val $o = _; val @inner = (1:2) |> map { $o + _ }; \@inner }
 tj(\@sums) |> aeq "[[2,3],[3,4]]", "nested loops"
 
 # Sigil-free implicit outer _<
-my @sums_sf = (1:1) |> map { my @l2 = (2:2) |> map { my @l3 = (3:3) |> map { _ + _< + _<< }; \@l3 }; \@l2 }
+val @sums_sf = (1:1) |> map { val @l2 = (2:2) |> map { val @l3 = (3:3) |> map { _ + _< + _<< }; \@l3 }; \@l2 }
 tj(\@sums_sf) |> aeq "[[[6]]]", "triple nested implicit _ variants"
 
 # ── Rule 6: len always ─────────────────────────────────────────────────────
 
 "abc" |> len |> aeq 3, "len(string)"
 (1:10) |> len |> aeq 10, "len(range)"
-my %hash = (a => 1, b => 2)
+val %hash = (a => 1, b => 2)
 # `len(%hash)` returns the key count (consistent with `keys` count).
 # Earlier assertion of 4 (k+v flattened) was a Perl-ism — `scalar(%h)`
 # in Perl returns "used/buckets" like "2/3", never a flat-pair count.
@@ -42,22 +42,22 @@ keys(%hash) |> len |> aeq 2, "len(keys hash) key count"
 
 # ── Rule 6a: Bracket slicing [N:M] ──────────────────────────────────────────
 
-my $str = "strykelang"
+val $str = "strykelang"
 $str[0:4] |> aeq "stryk", "string slice [0:4] inclusive"
 $str[-4:-1] |> aeq "lang", "negative string slice inclusive"
 
-my @arr = (10, 20, 30, 40, 50)
+val @arr = (10, 20, 30, 40, 50)
 @arr[1:2] |> tj |> aeq "[20,30]", "array slice [1:2] inclusive"
 
 # ── Rule 9: File I/O c"..." ────────────────────────────────────────────────
 
-my $tmp = tempdir()
+val $tmp = tempdir()
 spurt "$tmp/style.txt", "idiomatic"
 c"$tmp/style.txt" |> aeq "idiomatic", "c\"path\" slurp"
 
 # ── Iteration Shorthand ────────────────────────────────────────────────────
 
-my @input = (1, 2, 3)
+val @input = (1, 2, 3)
 oursync $count = 0
 @input |> e { $count += _ }
 $count |> aeq 6, "each-call shorthand |> e"

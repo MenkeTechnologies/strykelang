@@ -17,15 +17,15 @@
 #
 # Run: stryke --no-interop examples/ntt_no_interop.stk
 
-my $P = 998244353       # 119 · 2^23 + 1
-my $G = 3               # primitive root of unity mod P
+val $P = 998244353       # 119 · 2^23 + 1
+val $G = 3               # primitive root of unity mod P
 
 # ── modular exponentiation a^e mod m ─────────────────────────────
 
 fn Ntt::pow_mod($base, $exp, $m) {
-    my $result = 1
-    my $bx = $base % $m
-    my $e = $exp
+    var $result = 1
+    var $bx = $base % $m
+    var $e = $exp
     while ($e > 0) {
         if ($e & 1) {
             $result = ($result * $bx) % $m
@@ -43,38 +43,38 @@ fn Ntt::mod_inv($v) {
 # ── iterative in-place NTT; `invert` is 1 for forward, -1 for inverse ─
 
 fn Ntt::transform($ar, $invert) {
-    my $n = len(@$ar)
+    val $n = len(@$ar)
     # Bit-reversal permutation.
-    my $j = 0
-    for my $i (1:$n - 1) {
-        my $bit = int($n / 2)
+    var $j = 0
+    for val $i (1:$n - 1) {
+        var $bit = int($n / 2)
         while ($j & $bit) {
             $j = $j ^ $bit
             $bit = int($bit / 2)
         }
         $j = $j ^ $bit
         if ($i < $j) {
-            my $tmp = $ar->[$i]
+            val $tmp = $ar->[$i]
             $ar->[$i] = $ar->[$j]
             $ar->[$j] = $tmp
         }
     }
     # Butterfly with primitive roots.
-    my $len = 2
+    var $len = 2
     while ($len <= $n) {
-        my $w
+        var $w
         if ($invert == -1) {
             $w = Ntt::pow_mod(Ntt::mod_inv($G), int(($P - 1) / $len), $P)
         } else {
             $w = Ntt::pow_mod($G, int(($P - 1) / $len), $P)
         }
-        my $i = 0
+        var $i = 0
         while ($i < $n) {
-            my $wn = 1
-            my $half = int($len / 2)
-            for my $k (0:$half - 1) {
-                my $u = $ar->[$i + $k]
-                my $v = ($ar->[$i + $k + $half] * $wn) % $P
+            var $wn = 1
+            val $half = int($len / 2)
+            for val $k (0:$half - 1) {
+                val $u = $ar->[$i + $k]
+                val $v = ($ar->[$i + $k + $half] * $wn) % $P
                 $ar->[$i + $k]         = ($u + $v) % $P
                 $ar->[$i + $k + $half] = ($u - $v + $P) % $P
                 $wn = ($wn * $w) % $P
@@ -84,8 +84,8 @@ fn Ntt::transform($ar, $invert) {
         $len = $len * 2
     }
     if ($invert == -1) {
-        my $n_inv = Ntt::mod_inv($n)
-        for my $i (0:$n - 1) {
+        val $n_inv = Ntt::mod_inv($n)
+        for val $i (0:$n - 1) {
             $ar->[$i] = ($ar->[$i] * $n_inv) % $P
         }
     }
@@ -94,24 +94,24 @@ fn Ntt::transform($ar, $invert) {
 # ── convolve two integer-coefficient polynomials via NTT ─────────
 
 fn Ntt::convolve($A, $B) {
-    my $result_len = len(@$A) + len(@$B) - 1
-    my $n = 1
+    val $result_len = len(@$A) + len(@$B) - 1
+    var $n = 1
     while ($n < $result_len) {
         $n = $n * 2
     }
-    my @fa = (0) x $n
-    my @fb = (0) x $n
-    for my $i (0:len(@$A) - 1) { $fa[$i] = $A->[$i] % $P }
-    for my $i (0:len(@$B) - 1) { $fb[$i] = $B->[$i] % $P }
+    var @fa = (0) x $n
+    var @fb = (0) x $n
+    for val $i (0:len(@$A) - 1) { $fa[$i] = $A->[$i] % $P }
+    for val $i (0:len(@$B) - 1) { $fb[$i] = $B->[$i] % $P }
     Ntt::transform(\@fa, 1)
     Ntt::transform(\@fb, 1)
-    my @fc = (0) x $n
-    for my $i (0:$n - 1) {
+    var @fc = (0) x $n
+    for val $i (0:$n - 1) {
         $fc[$i] = ($fa[$i] * $fb[$i]) % $P
     }
     Ntt::transform(\@fc, -1)
-    my @out
-    for my $i (0:$result_len - 1) {
+    var @out
+    for val $i (0:$result_len - 1) {
         push @out, $fc[$i]
     }
     \@out
@@ -120,11 +120,11 @@ fn Ntt::convolve($A, $B) {
 # ── O(n²) reference convolution ──────────────────────────────────
 
 fn Ntt::brute_convolve($A, $B) {
-    my $na = len(@$A)
-    my $nb = len(@$B)
-    my @out = (0) x ($na + $nb - 1)
-    for my $i (0:$na - 1) {
-        for my $j (0:$nb - 1) {
+    val $na = len(@$A)
+    val $nb = len(@$B)
+    var @out = (0) x ($na + $nb - 1)
+    for val $i (0:$na - 1) {
+        for val $j (0:$nb - 1) {
             $out[$i + $j] = ($out[$i + $j] + $A->[$i] * $B->[$j]) % $P
         }
     }
@@ -133,7 +133,7 @@ fn Ntt::brute_convolve($A, $B) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{ name => "(1+x)(1+x)",            a => [1, 1],          b => [1, 1]          },
     +{ name => "(1+2x)(3+4x)",          a => [1, 2],          b => [3, 4]          },
     +{ name => "(1+2x+3x²)(4+5x+6x²)",  a => [1, 2, 3],       b => [4, 5, 6]       },
@@ -146,10 +146,10 @@ my @cases = (
 p "── NTT polynomial-convolution demo ───────────────────"
 printf "  %-32s  %s\n", "case", "A * B coefficients"
 printf "  %-32s  %s\n", "--------------------------------", "------------------"
-for my $c (@cases) {
-    my $r = Ntt::convolve($c->{a}, $c->{b})
-    my @shown
-    for my $v (@$r) {
+for val $c (@cases) {
+    val $r = Ntt::convolve($c->{a}, $c->{b})
+    var @shown
+    for val $v (@$r) {
         push @shown, $v > 1_000_000 ? "≈" . substr("$v", 0, 8) : $v
     }
     printf "  %-32s  [%s]\n", $c->{name}, join(",", @shown)
@@ -157,82 +157,82 @@ for my $c (@cases) {
 
 # ── invariant 1: NTT convolution agrees with O(n²) brute ──────────
 
-for my $c (@cases) {
-    my $ntt_r = Ntt::convolve($c->{a}, $c->{b})
-    my $br_r  = Ntt::brute_convolve($c->{a}, $c->{b})
+for val $c (@cases) {
+    val $ntt_r = Ntt::convolve($c->{a}, $c->{b})
+    val $br_r  = Ntt::brute_convolve($c->{a}, $c->{b})
     die "length mismatch on \"#{$c->{name}}\"" unless len(@$ntt_r) == len(@$br_r)
-    for my $i (0:len(@$ntt_r) - 1) {
+    for val $i (0:len(@$ntt_r) - 1) {
         die "coef[#{$i}] NTT=#{$ntt_r->[$i]} brute=#{$br_r->[$i]} on \"#{$c->{name}}\"" unless $ntt_r->[$i] == $br_r->[$i]
     }
 }
 
 # ── invariant 2: result length is |A| + |B| − 1 ────────────────────
 
-for my $c (@cases) {
-    my $r = Ntt::convolve($c->{a}, $c->{b})
-    my $expected_len = len(@{$c->{a}}) + len(@{$c->{b}}) - 1
+for val $c (@cases) {
+    val $r = Ntt::convolve($c->{a}, $c->{b})
+    val $expected_len = len(@{$c->{a}}) + len(@{$c->{b}}) - 1
     die "result length #{len(@$r)} != #{$expected_len} on \"#{$c->{name}}\"" unless len(@$r) == $expected_len
 }
 
 # ── invariant 3: NTT identity — transform then inverse ≡ identity ──
 
-for my $c (@cases) {
-    my $n = 1
+for val $c (@cases) {
+    var $n = 1
     while ($n < len(@{$c->{a}}) + len(@{$c->{a}}) - 1) { $n = $n * 2 }
-    my @fa = (0) x $n
-    for my $i (0:len(@{$c->{a}}) - 1) { $fa[$i] = $c->{a}->[$i] % $P }
-    my @orig = @fa
+    var @fa = (0) x $n
+    for val $i (0:len(@{$c->{a}}) - 1) { $fa[$i] = $c->{a}->[$i] % $P }
+    val @orig = @fa
     Ntt::transform(\@fa, 1)
     Ntt::transform(\@fa, -1)
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         die "NTT round-trip[#{$i}] = #{$fa[$i]} != #{$orig[$i]} on \"#{$c->{name}}\"" unless $fa[$i] == $orig[$i]
     }
 }
 
 # ── invariant 4: convolution is commutative ──────────────────────
 
-for my $c (@cases) {
-    my $ab = Ntt::convolve($c->{a}, $c->{b})
-    my $ba = Ntt::convolve($c->{b}, $c->{a})
-    for my $i (0:len(@$ab) - 1) {
+for val $c (@cases) {
+    val $ab = Ntt::convolve($c->{a}, $c->{b})
+    val $ba = Ntt::convolve($c->{b}, $c->{a})
+    for val $i (0:len(@$ab) - 1) {
         die "commutativity broken at #{$i} on \"#{$c->{name}}\"" unless $ab->[$i] == $ba->[$i]
     }
 }
 
 # ── invariant 5: convolution with the (1) polynomial is identity ──
 
-for my $c (@cases) {
-    my $r = Ntt::convolve($c->{a}, [1])
-    for my $i (0:len(@{$c->{a}}) - 1) {
+for val $c (@cases) {
+    val $r = Ntt::convolve($c->{a}, [1])
+    for val $i (0:len(@{$c->{a}}) - 1) {
         die "convolve with [1] at #{$i} on \"#{$c->{name}}\"" unless $r->[$i] == $c->{a}->[$i] % $P
     }
 }
 
 # ── invariant 6: (1+x)^n produces the binomial coefficients ───────
 
-for my $n (2, 3, 4, 5, 6, 7, 8) {
-    my $poly = [1, 1]
-    my $power = [1]
-    for my $k (1:$n) {
+for var $n (2, 3, 4, 5, 6, 7, 8) {
+    val $poly = [1, 1]
+    var $power = [1]
+    for val $k (1:$n) {
         $power = Ntt::convolve($power, $poly)
     }
     # The k-th coefficient should be C(n, k).
-    my @binom = (1)
-    for my $k (1:$n) {
+    var @binom = (1)
+    for val $k (1:$n) {
         push @binom, int($binom[$k - 1] * ($n - $k + 1) / $k)
     }
     die "binomial expansion length on n=#{$n}" unless len(@$power) == $n + 1
-    for my $k (0:$n) {
+    for var $k (0:$n) {
         die "(1+x)^#{$n}[#{$k}] = #{$power->[$k]} != C(#{$n}, #{$k}) = #{$binom[$k]}" unless $power->[$k] == $binom[$k]
     }
 }
 
 # ── invariant 7: convolution by zero polynomial is zero ───────────
 
-for my $c (@cases) {
-    my @zero = (0) x len(@{$c->{a}})
-    my $r = Ntt::convolve(\@zero, $c->{b})
-    for my $v (@$r) {
+for val $c (@cases) {
+    val @zero = (0) x len(@{$c->{a}})
+    val $r = Ntt::convolve(\@zero, $c->{b})
+    for val $v (@$r) {
         die "zero · b[#{$v}] != 0 on \"#{$c->{name}}\"" unless $v == 0
     }
 }

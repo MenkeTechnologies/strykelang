@@ -2,12 +2,12 @@
 # Rosetta Code: Nonoblock
 
 fn Rosetta::Nonoblock::gen($lengths, $cells) {
-    my $sum_len = 0
-    for my $l (@$lengths) { $sum_len += $l }
-    my $num_blocks = len(@$lengths)
+    var $sum_len = 0
+    for val $l (@$lengths) { $sum_len += $l }
+    val $num_blocks = len(@$lengths)
     
     # Minimum space needed: blocks + (num_blocks - 1) gaps
-    my $min_space = $sum_len + $num_blocks - 1
+    val $min_space = $sum_len + $num_blocks - 1
     return ([]) if $min_space > $cells
     
     Rosetta::Nonoblock::recurse($lengths, $cells, 0)
@@ -18,26 +18,26 @@ fn Rosetta::Nonoblock::recurse($lengths, $cells, $idx) {
         return ("0" x $cells)
     }
     
-    my $l = $lengths->[$idx]
-    my @res
+    val $l = $lengths->[$idx]
+    var @res
     
     # Try all starting positions for current block
-    my $rem_sum = 0
-    for (my $j = $idx + 1; $j < len(@$lengths); $j++) {
+    var $rem_sum = 0
+    for (var $j = $idx + 1; $j < len(@$lengths); $j++) {
         $rem_sum += $lengths->[$j] + 1
     }
     
-    for (my $start = 0; $start <= $cells - $l - $rem_sum; $start++) {
-        my $prefix = ("0" x $start) . ("1" x $l)
+    for (var $start = 0; $start <= $cells - $l - $rem_sum; $start++) {
+        var $prefix = ("0" x $start) . ("1" x $l)
         
-        my $next_cells = $cells - len($prefix)
+        var $next_cells = $cells - len($prefix)
         if ($idx < len(@$lengths) - 1) {
             $prefix .= "0"
             $next_cells--
         }
         
-        my @suffixes = Rosetta::Nonoblock::recurse($lengths, $next_cells, $idx + 1)
-        for my $s (@suffixes) {
+        val @suffixes = Rosetta::Nonoblock::recurse($lengths, $next_cells, $idx + 1)
+        for val $s (@suffixes) {
             push @res, $prefix . $s
         }
     }
@@ -45,7 +45,7 @@ fn Rosetta::Nonoblock::recurse($lengths, $cells, $idx) {
 }
 
 # Example: lengths [2, 1], cells 5
-my @res = Rosetta::Nonoblock::gen([2, 1], 5)
+val @res = Rosetta::Nonoblock::gen([2, 1], 5)
 
 assert_eq len(@res), 3, "Lengths [2, 1] in 5 cells has 3 possibilities"
 assert_ok len(grep { _ eq "11010" } @res) > 0, "Contains 11010"

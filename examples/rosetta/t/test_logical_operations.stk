@@ -14,9 +14,9 @@ fn Rosetta::Logic::implies($a, $b) { Rosetta::Logic::or_g(Rosetta::Logic::not_g(
 fn Rosetta::Logic::equiv($a, $b)   { Rosetta::Logic::not_g(Rosetta::Logic::xor_g($a, $b)) }
 
 fn Rosetta::Logic::truth_table($f) {
-    my @rows
-    for my $a (0, 1) {
-        for my $b (0, 1) {
+    var @rows
+    for val $a (0, 1) {
+        for val $b (0, 1) {
             push @rows, sprintf("%d %d → %d", $a, $b, $f($a, $b))
         }
     }
@@ -55,15 +55,15 @@ assert_eq Rosetta::Logic::equiv(1, 1),   1, "1 ↔ 1 = 1"
 assert_eq Rosetta::Logic::equiv(1, 0),   0, "1 ↔ 0 = 0"
 
 # Truth tables match
-my $tt_and = Rosetta::Logic::truth_table(\&Rosetta::Logic::and_g)
+val $tt_and = Rosetta::Logic::truth_table(\&Rosetta::Logic::and_g)
 assert_eq $tt_and, "0 0 → 0\n0 1 → 0\n1 0 → 0\n1 1 → 1", "AND truth table"
 
 # De Morgan: ¬(a ∧ b) = ¬a ∨ ¬b for all a, b
-my $de_morgan = 1
-for my $a (0, 1) {
-    for my $b (0, 1) {
-        my $lhs = Rosetta::Logic::not_g(Rosetta::Logic::and_g($a, $b))
-        my $rhs = Rosetta::Logic::or_g(Rosetta::Logic::not_g($a), Rosetta::Logic::not_g($b))
+var $de_morgan = 1
+for val $a (0, 1) {
+    for val $b (0, 1) {
+        val $lhs = Rosetta::Logic::not_g(Rosetta::Logic::and_g($a, $b))
+        val $rhs = Rosetta::Logic::or_g(Rosetta::Logic::not_g($a), Rosetta::Logic::not_g($b))
         $de_morgan = 0 if $lhs != $rhs
     }
 }

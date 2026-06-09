@@ -6,7 +6,7 @@ fn Rosetta::EggDropping::binomial($n, $k) {
     return 1 if $k == 0 || $k == $n
     $k = $n - $k if $k > $n / 2
     
-    my $res = 1
+    var $res = 1
     ~> 1:$k ep {
         $res = $res * ($n - _ + 1) / _
     }

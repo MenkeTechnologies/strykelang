@@ -8,13 +8,13 @@
 
 # Normal-Normal update: posterior of mean with known variance
 # normal_normal_update MU0, VAR0, N, YBAR, VAR_DATA
-my @nn = normal_normal_update(0, 10, 5, 2, 1)
+val @nn = normal_normal_update(0, 10, 5, 2, 1)
 abs($nn[0] - 1.96078431) < 1e-6 |> aok "normal_normal_update mu_post"
 abs($nn[1] - 0.19607843) < 1e-6 |> aok "normal_normal_update var_post"
 
 # Beta-Binomial update: posterior of probability
 # beta_binomial_update ALPHA, BETA, N, K
-my @bb = beta_binomial_update(1, 1, 10, 6)
+val @bb = beta_binomial_update(1, 1, 10, 6)
 @bb |> join(",") |> aeq "7,5", "beta_binomial_update [alpha, beta]"
 
 # Binomial coefficient
@@ -27,7 +27,7 @@ base_convert('255', 10, 16) |> aeq "ff", "base_convert(255, 10, 16)"
 
 # Descriptive stats
 # Note: describe() returns a list of pairs in list context.
-my %stats = describe(1:10)
+val %stats = describe(1:10)
 $stats{mean} |> aeq 5.5, "describe mean"
 $stats{median} |> aeq 6, "describe median"
 
@@ -40,26 +40,26 @@ jaccard_similarity([1, 2], [1, 3]) |> { abs(_ - 0.33333333) < 1e-6 } |> aok "jac
 # ── 3. Graph Theory Primitives ──────────────────────────────────────────────
 
 # Path graph 0-1-2
-my $path = [[1], [0, 2], [1]]
+val $path = [[1], [0, 2], [1]]
 graph_count_edges($path) |> aeq 2, "graph_count_edges"
 graph_diameter($path)    |> aeq 2, "graph_diameter"
 graph_radius($path)      |> aeq 1, "graph_radius"
 graph_is_tree($path)     |> aok "graph_is_tree (path)"
 
 # Cycle graph 0-1-2-0
-my $cycle = [[1, 2], [0, 2], [0, 1]]
+val $cycle = [[1, 2], [0, 2], [0, 1]]
 graph_is_tree($cycle) |> { !_ } |> aok "graph_is_tree (cycle is false)"
 
 # ── 4. Grouping and Moving Windows ──────────────────────────────────────────
 
 # chunk_n (Grouping)
 # chunk_n(N, LIST) -> [[chunk1], [chunk2]]
-my @chunks = chunk_n(2, 1, 2, 3, 4)
+val @chunks = chunk_n(2, 1, 2, 3, 4)
 to_json(\@chunks) |> aeq "[[1,2],[3,4]]", "chunk_n"
 
 # moving_average
 # moving_average(WINDOW, DATA)
-my @ma = moving_average(2, 1, 3, 5)
+val @ma = moving_average(2, 1, 3, 5)
 @ma |> join(",") |> aeq "2,4", "moving_average"
 
 # trimmed_mean
@@ -69,7 +69,7 @@ trimmed_mean(20, 1, 2, 3, 4, 100) |> aeq 3, "trimmed_mean"
 # ── 5. Advanced Parallelism ────────────────────────────────────────────────
 
 # pcache (Parallel Memoized Map)
-my @pc = pcache { _ * 2 } (1, 2, 1, 2)
+val @pc = pcache { _ * 2 } (1, 2, 1, 2)
 @pc |> join(",") |> aeq "2,4,2,4", "pcache"
 
 # pany (Parallel Any)
@@ -81,7 +81,7 @@ pfirst { _ % 10 == 0 && _ > 20 } (1:100) |> aeq 30, "pfirst (first found)"
 
 # ── 6. DataFrames (Basic Smoke) ────────────────────────────────────────────
 
-my $df = df [{a => 1, b => 10}, {a => 2, b => 20}]
+val $df = df [{a => 1, b => 10}, {a => 2, b => 20}]
 ref($df) |> aeq "DataFrame", "df ref"
 
 test_run

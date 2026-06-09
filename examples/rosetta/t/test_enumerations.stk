@@ -5,8 +5,8 @@ enum Color { Red, Green, Blue, Yellow }
 enum Day   { Mon, Tue, Wed, Thu, Fri, Sat, Sun }
 
 # Variants are constructable directly.
-my $c = Color::Red
-my $d = Day::Wed
+val $c = Color::Red
+val $d = Day::Wed
 
 assert_ok defined($c), "color defined"
 assert_ok defined($d), "day defined"

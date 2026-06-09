@@ -2,8 +2,8 @@
 # Rosetta Code: Average loop cost
 
 fn Rosetta::LoopCost::compute($n) {
-    my $sum = 0
-    my $i = 0
+    var $sum = 0
+    var $i = 0
     while ($i < $n) {
         $sum += $i
         $i++

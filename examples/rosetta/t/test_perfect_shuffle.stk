@@ -2,14 +2,14 @@
 # Rosetta Code: Perfect shuffle
 
 fn Rosetta::PerfectShuffle::shuffle($deck) {
-    my $len = len(@$deck)
-    my $mid = int($len / 2)
+    val $len = len(@$deck)
+    val $mid = int($len / 2)
     
-    my @left = @{$deck}[0:$mid-1]
-    my @right = @{$deck}[$mid:$len-1]
-    my @shuffled
+    val @left = @{$deck}[0:$mid-1]
+    val @right = @{$deck}[$mid:$len-1]
+    var @shuffled
     
-    for my $i (0:$mid-1) {
+    for val $i (0:$mid-1) {
         push @shuffled, $left[$i]
         push @shuffled, $right[$i]
     }
@@ -17,12 +17,12 @@ fn Rosetta::PerfectShuffle::shuffle($deck) {
     \@shuffled
 }
 
-my $deck = [1:8]
-my $shuffled = Rosetta::PerfectShuffle::shuffle($deck)
+val $deck = [1:8]
+val $shuffled = Rosetta::PerfectShuffle::shuffle($deck)
 assert_eq join(",", @$shuffled), "1,5,2,6,3,7,4,8", "perfect shuffle of 1:8"
 
-my $deck2 = ["A", "B", "C", "D"]
-my $shuffled2 = Rosetta::PerfectShuffle::shuffle($deck2)
+val $deck2 = ["A", "B", "C", "D"]
+val $shuffled2 = Rosetta::PerfectShuffle::shuffle($deck2)
 assert_eq join(",", @$shuffled2), "A,C,B,D", "perfect shuffle of ABCD"
 
 test_run

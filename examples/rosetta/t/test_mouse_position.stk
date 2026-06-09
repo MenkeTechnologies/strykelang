@@ -22,7 +22,7 @@ fn Rosetta::Mouse::snapshot($mouse) {
     "($mouse->{x},$mouse->{y}) left=$mouse->{left} right=$mouse->{right}"
 }
 
-my $mouse = Rosetta::Mouse::new()
+val $mouse = Rosetta::Mouse::new()
 Rosetta::Mouse::move($mouse, 320, 200)
 Rosetta::Mouse::press($mouse, "left")
 

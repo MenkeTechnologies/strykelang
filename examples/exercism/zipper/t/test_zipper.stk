@@ -1,20 +1,20 @@
 #!/usr/bin/env stryke
 require "./Zipper.stk"
 
-my $tree = { value => 1, left => { value => 2, left => undef, right => undef }, right => { value => 3, left => undef, right => undef } }
+val $tree = { value => 1, left => { value => 2, left => undef, right => undef }, right => { value => 3, left => undef, right => undef } }
 
-my $z = Exercism::Zipper::from_tree($tree)
+val $z = Exercism::Zipper::from_tree($tree)
 assert_eq Exercism::Zipper::value($z), 1, "root value"
 
-my $zl = Exercism::Zipper::left($z)
+val $zl = Exercism::Zipper::left($z)
 assert_eq Exercism::Zipper::value($zl), 2, "left child"
 
-my $up = Exercism::Zipper::up($zl)
+val $up = Exercism::Zipper::up($zl)
 assert_eq Exercism::Zipper::value($up), 1, "back to root"
 
-my $z2 = Exercism::Zipper::set_value($z, 10)
+val $z2 = Exercism::Zipper::set_value($z, 10)
 assert_eq Exercism::Zipper::value($z2), 10, "set root"
-my $orig = Exercism::Zipper::to_tree($z)
+val $orig = Exercism::Zipper::to_tree($z)
 assert_eq $orig->{value}, 1, "original unchanged"
 
 test_run

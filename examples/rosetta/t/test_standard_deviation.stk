@@ -2,22 +2,22 @@
 # Rosetta Code: Standard Deviation
 
 fn Rosetta::StandardDeviation::mean(@nums) {
-    my $sum = @nums |> reduce { _0 + _1 }
+    val $sum = @nums |> reduce { _0 + _1 }
     $sum / len(@nums)
 }
 
 fn Rosetta::StandardDeviation::compute(@nums) {
-    my $m = Rosetta::StandardDeviation::mean(@nums)
-    my $sum_sq_diff = @nums |> map { (_ - $m) ** 2 } |> reduce { _0 + _1 }
+    val $m = Rosetta::StandardDeviation::mean(@nums)
+    val $sum_sq_diff = @nums |> map { (_ - $m) ** 2 } |> reduce { _0 + _1 }
     ($sum_sq_diff / len(@nums)) ** 0.5
 }
 
-my @data = (2, 4, 4, 4, 5, 5, 7, 9)
+val @data = (2, 4, 4, 4, 5, 5, 7, 9)
 assert_eq Rosetta::StandardDeviation::mean(@data), 5, "mean of data"
 assert_eq Rosetta::StandardDeviation::compute(@data), 2, "stddev of data"
 
-my @data2 = (1, 2, 3)
-my $sd2 = Rosetta::StandardDeviation::compute(@data2)
+val @data2 = (1, 2, 3)
+val $sd2 = Rosetta::StandardDeviation::compute(@data2)
 assert_near $sd2, 0.81649, 0.0001, "stddev of 1,2,3"
 
 test_run

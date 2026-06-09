@@ -2,8 +2,8 @@
 # Rosetta Code: Memory allocation
 
 fn Rosetta::MemoryAlloc::alloc_array($n, $fill) {
-    my @out
-    for my $i (1:$n) { push @out, $fill }
+    var @out
+    for val $i (1:$n) { push @out, $fill }
     \@out
 }
 
@@ -15,12 +15,12 @@ fn Rosetta::MemoryAlloc::free_array($ref) {
 }
 
 fn Rosetta::MemoryAlloc::stack_demo() {
-    my $stack_value = 7
+    val $stack_value = 7
     $stack_value
 }
 
-my $heap = Rosetta::MemoryAlloc::alloc_array(5, 9)
-my $scalar_ref = Rosetta::MemoryAlloc::alloc_scalar(42)
+var $heap = Rosetta::MemoryAlloc::alloc_array(5, 9)
+val $scalar_ref = Rosetta::MemoryAlloc::alloc_scalar(42)
 
 assert_eq len(@$heap), 5, "allocated heap-like array"
 assert_eq $heap->[0], 9, "array initialized"

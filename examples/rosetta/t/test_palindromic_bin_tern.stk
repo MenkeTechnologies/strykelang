@@ -7,7 +7,7 @@
 
 fn Rosetta::PalBinTer::base($n, $b) {
     return "0" if $n == 0
-    my $s = ""
+    var $s = ""
     while ($n > 0) {
         $s = ($n % $b) . $s
         $n = int($n / $b)
@@ -45,12 +45,12 @@ assert_eq Rosetta::PalBinTer::is(6643), 1, "6643 is palindromic in both"
 6643 |> Rosetta::PalBinTer::is |> assert_eq(1, "pipe is(6643)")
 
 # Threaded scan: nothing between 2 and 6642 qualifies
-my @hits = ~> 2:6642 |> grep {Rosetta::PalBinTer::is}
+val @hits = ~> 2:6642 |> grep {Rosetta::PalBinTer::is}
 assert_eq len(@hits), 0, "no dual-pal between 2 and 6642"
 
 # First 3 dual palindromes
-my @found = (0, 1)
-for my $n (2:7000) {
+var @found = (0, 1)
+for val $n (2:7000) {
     push @found, $n if Rosetta::PalBinTer::is($n)
     last if len(@found) >= 3
 }

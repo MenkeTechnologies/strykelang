@@ -12,7 +12,7 @@ Pin::BugsParity::my_inc("") |> aeq "1", "magic inc empty -> 1"
 
 # ── Vec Lvalue ─────────────────────────────────────────────────────────────
 
-my $bits = ""
+var $bits = ""
 vec($bits, 0, 8) = 65
 $bits |> aeq "A", "vec lvalue assignment"
 
@@ -23,13 +23,13 @@ sqrt(-1) |> tj |> aeq "NaN", "NaN stringification"
 
 # ── For In-place Mutation ─────────────────────────────────────────────────
 
-my @list = (1, 2, 3)
+val @list = (1, 2, 3)
 for (@list) { _ *= 10 }
 join(",", @list) |> aeq "10,20,30", "for loop in-place mutation"
 
 # ── Tail Binding ──────────────────────────────────────────────────────────
 
-my ($head, @tail) = (10, 20, 30, 40)
+val ($head, @tail) = (10, 20, 30, 40)
 $head |> aeq 10, "head binding"
 join(",", @tail) |> aeq "20,30,40", "tail binding"
 
@@ -39,7 +39,7 @@ join(",", @tail) |> aeq "20,30,40", "tail binding"
 
 # ── Dijkstra Deterministic Order ─────────────────────────────────────────
 
-my $graph = +{
+val $graph = +{
     A => [["B", 1], ["C", 4]],
     B => [["C", 2]],
     C => []

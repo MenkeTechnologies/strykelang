@@ -17,20 +17,20 @@ fn Rosetta::IBAN::country_lengths() {
 }
 
 fn Rosetta::IBAN::is_valid($iban) {
-    my $s = $iban
+    var $s = $iban
     $s =~ s/\s+//g
     return 0 if $s !~ /^[A-Z0-9]+$/
     return 0 if length($s) < 4
-    my $country = substr($s, 0, 2)
-    my $lens = Rosetta::IBAN::country_lengths()
+    val $country = substr($s, 0, 2)
+    val $lens = Rosetta::IBAN::country_lengths()
     return 0 if !exists $lens->{$country}
     return 0 if length($s) != $lens->{$country}
 
     # Move first 4 chars to end, then convert letters → digits
-    my $rearr = substr($s, 4) . substr($s, 0, 4)
-    my $digits = ""
-    my @cs = ~> $rearr chars
-    for my $c (@cs) {
+    val $rearr = substr($s, 4) . substr($s, 0, 4)
+    var $digits = ""
+    val @cs = ~> $rearr chars
+    for val $c (@cs) {
         if ($c =~ /[A-Z]/) {
             $digits .= ord($c) - ord("A") + 10
         } else {
@@ -38,8 +38,8 @@ fn Rosetta::IBAN::is_valid($iban) {
         }
     }
     # Compute digits mod 97 in chunks (numeric overflow-safe)
-    my $rem = 0
-    my @ds = ~> $digits chars
+    var $rem = 0
+    val @ds = ~> $digits chars
     ~> @ds ep {
         $rem = ($rem * 10 + int(_)) % 97
     }

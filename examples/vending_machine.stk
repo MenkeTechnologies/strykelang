@@ -13,7 +13,7 @@
 
 # ── inventory (slot -> [name, price_cents, stock]) ─────────────────
 
-my %inv = (
+val %inv = (
     "A1" => ["Cola",        150, 5],
     "A2" => ["Lemon-Lime",  150, 4],
     "A3" => ["Sparkling",   175, 6],
@@ -27,39 +27,39 @@ my %inv = (
 
 # ── coin denominations (cents, descending — greedy works) ───────────
 
-my @denoms = (100, 25, 10, 5, 1)
-my %coin_name = (100 => "dollar", 25 => "quarter", 10 => "dime", 5 => "nickel", 1 => "penny")
+val @denoms = (100, 25, 10, 5, 1)
+val %coin_name = (100 => "dollar", 25 => "quarter", 10 => "dime", 5 => "nickel", 1 => "penny")
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $bf_slots = bloom(64, 0.01)
-for my $code (keys %inv) { bloom_add($bf_slots, $code) }
+val $bf_slots = bloom(64, 0.01)
+for val $code (keys %inv) { bloom_add($bf_slots, $code) }
 
-my $cms_pop = cms(8, 256)
-my $td_lat  = t_digest(100)
-my $hll_cust = hll(12)
+val $cms_pop = cms(8, 256)
+val $td_lat  = t_digest(100)
+val $hll_cust = hll(12)
 
 # ── FSM states ─────────────────────────────────────────────────────
 
-my $S_IDLE       = "IDLE"
-my $S_INSERTING  = "INSERTING"
-my $S_SELECTING  = "SELECTING"
-my $S_DISPENSE   = "DISPENSE"
-my $S_REFUND     = "REFUND"
+val $S_IDLE       = "IDLE"
+val $S_INSERTING  = "INSERTING"
+val $S_SELECTING  = "SELECTING"
+val $S_DISPENSE   = "DISPENSE"
+val $S_REFUND     = "REFUND"
 
 # ── transaction runner ────────────────────────────────────────────
 
 fn Demo::VM::transact($payment, $slot, $cust_id) {
-    my $t0 = now_ns()
-    my $state = $S_IDLE
-    my @log
+    val $t0 = now_ns()
+    var $state = $S_IDLE
+    var @log
 
     # IDLE -> INSERTING
     push @log, "[$state] cust=$cust_id paid=" . sprintf("%.2f", $payment / 100)
     $state = $S_INSERTING
 
     # bloom check first (probabilistic; followed by exact)
-    my $slot_in_bloom = bloom_contains($bf_slots, $slot)
+    val $slot_in_bloom = bloom_contains($bf_slots, $slot)
     unless ($slot_in_bloom && exists $inv{$slot}) {
         push @log, "[$state] slot $slot not recognized -> REFUND"
         $state = $S_REFUND
@@ -71,10 +71,10 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
     push @log, "[$state] coin accepted, slot=$slot"
     $state = $S_SELECTING
 
-    my $item  = $inv{$slot}
-    my $name  = $item->[0]
-    my $price = $item->[1]
-    my $stock = $item->[2]
+    val $item  = $inv{$slot}
+    val $name  = $item->[0]
+    val $price = $item->[1]
+    val $stock = $item->[2]
 
     if ($stock <= 0) {
         push @log, "[$state] $name out of stock -> REFUND"
@@ -98,20 +98,20 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
     cms_add($cms_pop, $slot, 1)
     hll_add($hll_cust, $cust_id)
 
-    my $change = $payment - $price
-    my @coins_out
+    val $change = $payment - $price
+    var @coins_out
 
     # CHANGE: greedy
     if ($change > 0) {
-        my $remaining = $change
-        for my $d (@denoms) {
-            my $n = int($remaining / $d)
+        var $remaining = $change
+        for val $d (@denoms) {
+            val $n = int($remaining / $d)
             if ($n > 0) {
                 push @coins_out, [$d, $n]
                 $remaining -= $n * $d
             }
         }
-        my @coin_strs = map {
+        val @coin_strs = map {
             _->[1] . " x " . $coin_name{_->[0]}
         } @coins_out
         push @log, "[$state] change \$" . sprintf("%.2f", $change / 100)
@@ -126,7 +126,7 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
 
 # ── transaction script ────────────────────────────────────────────
 
-my @txs = (
+val @txs = (
     [200, "A1", "C001"],   # cola
     [200, "A2", "C002"],   # lemon-lime
     [500, "B1", "C003"],   # chips, big change
@@ -143,12 +143,12 @@ my @txs = (
 
 p "vending machine — FSM transcript"
 p "─" x 60
-my $success = 0
-my $refunded = 0
+var $success = 0
+var $refunded = 0
 
-for my $tx (@txs) {
-    my $r = Demo::VM::transact($tx->[0], $tx->[1], $tx->[2])
-    for my $line (@{$r->{log}}) {
+for val $tx (@txs) {
+    val $r = Demo::VM::transact($tx->[0], $tx->[1], $tx->[2])
+    for val $line (@{$r->{log}}) {
         p "  $line"
     }
     p "  -> final state: $r->{state}\n"
@@ -160,8 +160,8 @@ p "transactions: $success dispensed / $refunded refunded"
 # ── final inventory ────────────────────────────────────────────────
 
 p "\nremaining inventory:"
-for my $slot (sort keys %inv) {
-    my $row = $inv{$slot}
+for val $slot (sort keys %inv) {
+    val $row = $inv{$slot}
     printf("  %-3s %-14s \$%.2f  stock=%d\n",
            $slot, $row->[0], $row->[1] / 100, $row->[2])
 }
@@ -169,17 +169,17 @@ for my $slot (sort keys %inv) {
 # ── slot popularity (CMS) ──────────────────────────────────────────
 
 p "\nslot demand (CMS estimated):"
-my @ranked = sort { cms_count($cms_pop, _1) <=> cms_count($cms_pop, _) } keys %inv
-for my $slot (@ranked[0:4]) {
-    my $est = cms_count($cms_pop, $slot)
+val @ranked = sort { cms_count($cms_pop, _1) <=> cms_count($cms_pop, _) } keys %inv
+for val $slot (@ranked[0:4]) {
+    val $est = cms_count($cms_pop, $slot)
     printf("  %-3s  est_purchases=%d\n", $slot, $est)
 }
 
 # ── distinct customers ────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_cust)
-my %seen_cust
-for my $tx (@txs) {
+val $hll_n = hll_count($hll_cust)
+var %seen_cust
+for val $tx (@txs) {
     if (exists $inv{$tx->[1]} && $tx->[0] >= ($inv{$tx->[1]}->[1] // 9999)) {
         $seen_cust{$tx->[2]} = 1
     }

@@ -7,12 +7,12 @@ fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 assert_eq j(Exercism::GameOfLife::tick([[0,0],[0,0]])), "0,0|0,0", "all dead stays"
 
 # Block (still life).
-my $block = [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]]
+val $block = [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]]
 assert_eq j(Exercism::GameOfLife::tick($block)), j($block), "block is stable"
 
 # Blinker (oscillator) — vertical → horizontal.
-my $bv = [[0,1,0],[0,1,0],[0,1,0]]
-my $bh = [[0,0,0],[1,1,1],[0,0,0]]
+val $bv = [[0,1,0],[0,1,0],[0,1,0]]
+val $bh = [[0,0,0],[1,1,1],[0,0,0]]
 assert_eq j(Exercism::GameOfLife::tick($bv)), j($bh), "blinker v → h"
 assert_eq j(Exercism::GameOfLife::tick($bh)), j($bv), "blinker h → v"
 

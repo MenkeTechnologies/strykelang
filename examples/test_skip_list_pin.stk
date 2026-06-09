@@ -2,56 +2,56 @@
 
 package SkipList
 
-my $MAX_LEVEL = 16
-my $P = 0.5
+val $MAX_LEVEL = 16
+val $P = 0.5
 fn new_node($val, $level) {
-    my @next = (undef) x ($level + 1)
+    val @next = (undef) x ($level + 1)
     { val => $val, next => \@next }
 }
 fn new() { { head => new_node(undef, $MAX_LEVEL), level => 0 } }
 fn random_level() {
-    my $lvl = 0
+    var $lvl = 0
     while (rand() < $P && $lvl < $MAX_LEVEL) { $lvl++ }
     $lvl
 }
 fn insert($list, $val) {
-    my @update = (undef) x ($MAX_LEVEL + 1)
-    my $curr = $list->{head}
-    for my $i (rev 0 : $list->{level}) {
+    var @update = (undef) x ($MAX_LEVEL + 1)
+    var $curr = $list->{head}
+    for val $i (rev 0 : $list->{level}) {
         while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
         $update[$i] = $curr
     }
     $curr = $curr->{next}->[0]
     if (!defined $curr || $curr->{val} != $val) {
-        my $lvl = random_level()
+        val $lvl = random_level()
         if ($lvl > $list->{level}) {
-            for my $i ($list->{level} + 1 : $lvl) { $update[$i] = $list->{head} }
+            for val $i ($list->{level} + 1 : $lvl) { $update[$i] = $list->{head} }
             $list->{level} = $lvl
         }
-        my $new = new_node($val, $lvl)
-        for my $i (0 : $lvl) {
+        val $new = new_node($val, $lvl)
+        for val $i (0 : $lvl) {
             $new->{next}->[$i] = $update[$i]->{next}->[$i]; $update[$i]->{next}->[$i] = $new
         }
     }
 }
 fn find($list, $val) {
-    my $curr = $list->{head}
-    for my $i (rev 0 : $list->{level}) {
+    var $curr = $list->{head}
+    for val $i (rev 0 : $list->{level}) {
         while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
     }
     $curr = $curr->{next}->[0]
     return (defined $curr && $curr->{val} == $val)
 }
 fn delete_v($list, $val) {
-    my @update = (undef) x ($MAX_LEVEL + 1)
-    my $curr = $list->{head}
-    for my $i (rev 0 : $list->{level}) {
+    var @update = (undef) x ($MAX_LEVEL + 1)
+    var $curr = $list->{head}
+    for val $i (rev 0 : $list->{level}) {
         while (defined $curr->{next}->[$i] && $curr->{next}->[$i]->{val} < $val) { $curr = $curr->{next}->[$i] }
         $update[$i] = $curr
     }
     $curr = $curr->{next}->[0]
     if (defined $curr && $curr->{val} == $val) {
-        for my $i (0 : $list->{level}) {
+        for val $i (0 : $list->{level}) {
             last if $update[$i]->{next}->[$i] != $curr
             $update[$i]->{next}->[$i] = $curr->{next}->[$i]
         }
@@ -59,7 +59,7 @@ fn delete_v($list, $val) {
     }
 }
 fn to_array($list) {
-    my @out; my $curr = $list->{head}->{next}->[0]
+    var @out; var $curr = $list->{head}->{next}->[0]
     while (defined $curr) { push @out, $curr->{val}; $curr = $curr->{next}->[0] }
     \@out
 }
@@ -67,8 +67,8 @@ fn to_array($list) {
 package main
 
 # --- Basic ---
-my $sl = SkipList::new()
-for my $v (10, 5, 20, 15) { SkipList::insert $sl, $v }
+val $sl = SkipList::new()
+for val $v (10, 5, 20, 15) { SkipList::insert $sl, $v }
 join(",", @{SkipList::to_array $sl}) |> aeq "5,10,15,20", "skip list sorted"
 SkipList::find($sl, 10) |> aeq 1, "find 10"
 SkipList::find($sl, 99) |> aeq 0, "no find 99"
@@ -78,15 +78,15 @@ SkipList::find($sl, 10) |> aeq 0, "10 deleted"
 join(",", @{SkipList::to_array $sl}) |> aeq "5,15,20", "after delete"
 
 # --- Stress ---
-my $sls = SkipList::new()
-my $seed = 42
+val $sls = SkipList::new()
+var $seed = 42
 for (1:100) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     SkipList::insert $sls, ($seed % 1000)
 }
-my $arr = SkipList::to_array $sls
-my $ok = 1
-for my $i (0 : (len @$arr) - 2) { $ok = 0 if $arr->[$i] > $arr->[$i+1] }
+val $arr = SkipList::to_array $sls
+var $ok = 1
+for val $i (0 : (len @$arr) - 2) { $ok = 0 if $arr->[$i] > $arr->[$i+1] }
 $ok |> aeq 1, "stress sorted"
 
 test_run

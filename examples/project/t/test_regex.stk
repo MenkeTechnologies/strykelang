@@ -17,7 +17,7 @@ assert_false starts_with("hello world", "world"), "starts with no"
 assert_ok ends_with("hello world", "world"), "ends with yes"
 assert_false ends_with("hello world", "hello"), "ends with no"
 
-my $email = q{test@example.com}
+val $email = q{test@example.com}
 assert_ok Project::Regex::is_email_like($email), "email valid"
 assert_false Project::Regex::is_email_like("not-an-email"), "email invalid"
 
@@ -26,7 +26,7 @@ assert_false Project::Regex::is_phone_like("5551234567"), "phone invalid"
 
 # ── Capture groups ─────────────────────────────────────────────────
 
-my @nums = Project::Regex::extract_numbers("abc123def456")
+val @nums = Project::Regex::extract_numbers("abc123def456")
 assert_eq len(@nums), 2, "extract numbers count"
 assert_eq $nums[0], "123", "extract numbers first"
 assert_eq $nums[1], "456", "extract numbers second"
@@ -34,7 +34,7 @@ assert_eq $nums[1], "456", "extract numbers second"
 assert_eq Project::Regex::extract_first_word("hello world"), "hello", "first word"
 assert_eq Project::Regex::extract_first_word("  spaced"), "", "first word spaces"
 
-my ($key, $val) = Project::Regex::parse_key_value("name = John Doe")
+val ($key, $val) = Project::Regex::parse_key_value("name = John Doe")
 assert_eq $key, "name", "parse kv key"
 assert_eq $val, "John Doe", "parse kv value"
 
@@ -51,15 +51,15 @@ assert_eq snake_to_camel("snake_case_string"), "snakeCaseString", "snake to came
 
 # ── Split with regex ───────────────────────────────────────────────
 
-my @words = Project::Regex::split_on_whitespace("one  two   three")
+val @words = Project::Regex::split_on_whitespace("one  two   three")
 assert_eq len(@words), 3, "split whitespace count"
 assert_eq $words[0], "one", "split whitespace first"
 
-my @items = Project::Regex::split_on_commas("a, b,  c")
+val @items = Project::Regex::split_on_commas("a, b,  c")
 assert_eq len(@items), 3, "split commas count"
 assert_eq $items[2], "c", "split commas last"
 
-my @sentences = Project::Regex::split_sentences("Hello! How are you? Fine")
+val @sentences = Project::Regex::split_sentences("Hello! How are you? Fine")
 assert_eq len(@sentences), 3, "split sentences count"
 
 # ── Pattern flags ──────────────────────────────────────────────────
@@ -86,32 +86,32 @@ assert_eq count_words("one two three"), 3, "count words spaces"
 
 assert_eq Project::Regex::first_line("first\nsecond\nthird"), "first", "first line"
 
-my @lines = Project::Regex::extract_lines("a\nb\nc")
+val @lines = Project::Regex::extract_lines("a\nb\nc")
 assert_eq len(@lines), 3, "extract lines count"
 assert_eq $lines[1], "b", "extract lines middle"
 
 # ── Lookahead simulation ───────────────────────────────────────────
 
-my @nums_letter = Project::Regex::numbers_followed_by_letter("1a 2b 3 4c")
+val @nums_letter = Project::Regex::numbers_followed_by_letter("1a 2b 3 4c")
 assert_eq len(@nums_letter), 3, "nums before letter count"
 
-my @before_colon = Project::Regex::words_before_colon("key1: val key2: val")
+val @before_colon = Project::Regex::words_before_colon("key1: val key2: val")
 assert_eq len(@before_colon), 2, "words before colon count"
 assert_eq $before_colon[0], "key1", "words before colon first"
 
 # ── Complex patterns ───────────────────────────────────────────────
 
-my ($year, $month, $day) = Project::Regex::parse_date("2024-03-15")
+val ($year, $month, $day) = Project::Regex::parse_date("2024-03-15")
 assert_eq $year, "2024", "parse date year"
 assert_eq $month, "03", "parse date month"
 assert_eq $day, "15", "parse date day"
 
-my ($h, $m, $s) = Project::Regex::parse_time("14:30:45")
+val ($h, $m, $s) = Project::Regex::parse_time("14:30:45")
 assert_eq $h, "14", "parse time hour"
 assert_eq $m, "30", "parse time minute"
 assert_eq $s, "45", "parse time second"
 
-my @urls = Project::Regex::extract_urls("Visit https://example.com or http://test.org")
+val @urls = Project::Regex::extract_urls("Visit https://example.com or http://test.org")
 assert_eq len(@urls), 2, "extract urls count"
 
 assert_eq Project::Regex::mask_digits("phone: 555-1234"), "phone: XXX-XXXX", "mask digits"

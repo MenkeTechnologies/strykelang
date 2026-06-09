@@ -9,7 +9,7 @@ fn Rosetta::Repl::demo() {
     "stryke -i"
 }
 
-my $cmd = Rosetta::Repl::demo()
+val $cmd = Rosetta::Repl::demo()
 assert_eq $cmd, "stryke -i", "REPL command documented"
 
 test_run

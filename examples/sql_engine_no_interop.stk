@@ -56,7 +56,7 @@ fn Sql::is_null($v) {
 #   op    — operator (+, -, *, /, =, !=, <>, <, >, <=, >=)
 #   lparen, rparen, comma, dot, star, semi, eof
 
-my @SQL_KEYWORDS = (
+val @SQL_KEYWORDS = (
     "SELECT", "FROM", "WHERE", "ORDER", "BY", "ASC", "DESC", "LIMIT",
     "CREATE", "TABLE", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
     "DELETE", "INNER", "JOIN", "ON", "GROUP", "AND", "OR", "NOT",
@@ -65,19 +65,19 @@ my @SQL_KEYWORDS = (
 )
 
 fn Sql::is_keyword($word) {
-    my $upper = uc($word)
-    for my $kw (@SQL_KEYWORDS) {
+    val $upper = uc($word)
+    for val $kw (@SQL_KEYWORDS) {
         return 1 if $upper eq $kw
     }
     0
 }
 
 fn Sql::tokenize($src) {
-    my @tokens
-    my $n = len($src)
-    my $i = 0
+    var @tokens
+    val $n = len($src)
+    var $i = 0
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
         # Whitespace.
         if ($c eq " " || $c eq "\t" || $c eq "\n" || $c eq "\r") {
             $i++
@@ -117,19 +117,19 @@ fn Sql::tokenize($src) {
         # String literal (single-quoted, no escapes).
         if ($c eq "'") {
             $i++
-            my $start = $i
+            val $start = $i
             while ($i < $n && substr($src, $i, 1) ne "'") { $i++ }
             die "unterminated string literal" if $i >= $n
-            my $val = substr($src, $start, $i - $start)
+            val $val = substr($src, $start, $i - $start)
             push @tokens, +{ kind => "str", val => $val }
             $i++   # consume the closing quote
             next
         }
         # Integer.
         if ($c ge "0" && $c le "9") {
-            my $start = $i
+            val $start = $i
             while ($i < $n) {
-                my $d = substr($src, $i, 1)
+                val $d = substr($src, $i, 1)
                 last unless $d ge "0" && $d le "9"
                 $i++
             }
@@ -138,16 +138,16 @@ fn Sql::tokenize($src) {
         }
         # Identifier / keyword.
         if (($c ge "a" && $c le "z") || ($c ge "A" && $c le "Z") || $c eq "_") {
-            my $start = $i
+            val $start = $i
             while ($i < $n) {
-                my $d = substr($src, $i, 1)
+                val $d = substr($src, $i, 1)
                 if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_" || $d eq ".") {
                     $i++
                 } else {
                     last
                 }
             }
-            my $word = substr($src, $start, $i - $start)
+            val $word = substr($src, $start, $i - $start)
             if (Sql::is_keyword($word)) {
                 push @tokens, +{ kind => "kw", val => uc($word) }
             } else {
@@ -172,18 +172,18 @@ fn Sql::parser_new($tokens) {
 fn Sql::p_peek($p) { $p->{tokens}->[$p->{pos}] }
 
 fn Sql::p_advance($p) {
-    my $t = $p->{tokens}->[$p->{pos}]
+    var $t = $p->{tokens}->[$p->{pos}]
     $p->{pos}++
     $t
 }
 
 fn Sql::p_check_kw($p, $kw) {
-    my $t = Sql::p_peek($p)
+    val $t = Sql::p_peek($p)
     $t->{kind} eq "kw" && $t->{val} eq $kw
 }
 
 fn Sql::p_check_op($p, $op) {
-    my $t = Sql::p_peek($p)
+    val $t = Sql::p_peek($p)
     $t->{kind} eq "op" && $t->{val} eq $op
 }
 
@@ -201,7 +201,7 @@ fn Sql::p_expect_kw($p, $kw) {
 }
 
 fn Sql::p_expect($p, $kind) {
-    my $t = Sql::p_peek($p)
+    val $t = Sql::p_peek($p)
     die "expected #{$kind}, got " . Sql::p_describe($t) unless $t->{kind} eq $kind
     Sql::p_advance($p)
 }
@@ -243,20 +243,20 @@ fn Sql::parse_expr($p) {
 }
 
 fn Sql::parse_or($p) {
-    my $left = Sql::parse_and($p)
+    var $left = Sql::parse_and($p)
     while (Sql::p_check_kw($p, "OR")) {
         Sql::p_advance($p)
-        my $right = Sql::parse_and($p)
+        val $right = Sql::parse_and($p)
         $left = +{ kind => "binop", op => "OR", lhs => $left, rhs => $right }
     }
     $left
 }
 
 fn Sql::parse_and($p) {
-    my $left = Sql::parse_not($p)
+    var $left = Sql::parse_not($p)
     while (Sql::p_check_kw($p, "AND")) {
         Sql::p_advance($p)
-        my $right = Sql::parse_not($p)
+        val $right = Sql::parse_not($p)
         $left = +{ kind => "binop", op => "AND", lhs => $left, rhs => $right }
     }
     $left
@@ -265,18 +265,18 @@ fn Sql::parse_and($p) {
 fn Sql::parse_not($p) {
     if (Sql::p_check_kw($p, "NOT")) {
         Sql::p_advance($p)
-        my $inner = Sql::parse_not($p)
+        val $inner = Sql::parse_not($p)
         return +{ kind => "not", expr => $inner }
     }
     Sql::parse_comparison($p)
 }
 
 fn Sql::parse_comparison($p) {
-    my $left = Sql::parse_additive($p)
+    var $left = Sql::parse_additive($p)
     # IS [NOT] NULL.
     if (Sql::p_check_kw($p, "IS")) {
         Sql::p_advance($p)
-        my $negate = 0
+        var $negate = 0
         if (Sql::p_check_kw($p, "NOT")) {
             Sql::p_advance($p)
             $negate = 1
@@ -286,38 +286,38 @@ fn Sql::parse_comparison($p) {
     }
     # Comparison ops.
     while (1) {
-        my $t = Sql::p_peek($p)
+        val $t = Sql::p_peek($p)
         last unless $t->{kind} eq "op" && ($t->{val} eq "=" || $t->{val} eq "!=" || $t->{val} eq "<" || $t->{val} eq ">" || $t->{val} eq "<=" || $t->{val} eq ">=")
         Sql::p_advance($p)
-        my $right = Sql::parse_additive($p)
+        val $right = Sql::parse_additive($p)
         $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
     }
     $left
 }
 
 fn Sql::parse_additive($p) {
-    my $left = Sql::parse_mult($p)
+    var $left = Sql::parse_mult($p)
     while (1) {
-        my $t = Sql::p_peek($p)
+        val $t = Sql::p_peek($p)
         last unless $t->{kind} eq "op" && ($t->{val} eq "+" || $t->{val} eq "-")
         Sql::p_advance($p)
-        my $right = Sql::parse_mult($p)
+        val $right = Sql::parse_mult($p)
         $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
     }
     $left
 }
 
 fn Sql::parse_mult($p) {
-    my $left = Sql::parse_primary($p)
+    var $left = Sql::parse_primary($p)
     while (1) {
-        my $t = Sql::p_peek($p)
+        val $t = Sql::p_peek($p)
         if ($t->{kind} eq "op" && ($t->{val} eq "*" || $t->{val} eq "/")) {
             Sql::p_advance($p)
-            my $right = Sql::parse_primary($p)
+            val $right = Sql::parse_primary($p)
             $left = +{ kind => "binop", op => $t->{val}, lhs => $left, rhs => $right }
         } elsif ($t->{kind} eq "star") {
             Sql::p_advance($p)
-            my $right = Sql::parse_primary($p)
+            val $right = Sql::parse_primary($p)
             $left = +{ kind => "binop", op => "*", lhs => $left, rhs => $right }
         } else {
             last
@@ -327,7 +327,7 @@ fn Sql::parse_mult($p) {
 }
 
 fn Sql::parse_primary($p) {
-    my $t = Sql::p_peek($p)
+    val $t = Sql::p_peek($p)
     if ($t->{kind} eq "num") {
         Sql::p_advance($p)
         return +{ kind => "num", val => $t->{val} }
@@ -346,13 +346,13 @@ fn Sql::parse_primary($p) {
     }
     if ($t->{kind} eq "lparen") {
         Sql::p_advance($p)
-        my $inner = Sql::parse_expr($p)
+        val $inner = Sql::parse_expr($p)
         Sql::p_expect($p, "rparen")
         return $inner
     }
     # Aggregate functions.
     if ($t->{kind} eq "kw" && ($t->{val} eq "COUNT" || $t->{val} eq "SUM" || $t->{val} eq "AVG" || $t->{val} eq "MIN" || $t->{val} eq "MAX")) {
-        my $agg = Sql::p_advance($p)
+        val $agg = Sql::p_advance($p)
         Sql::p_expect($p, "lparen")
         # COUNT(*) is the special case.
         if (Sql::p_peek($p)->{kind} eq "star") {
@@ -360,7 +360,7 @@ fn Sql::parse_primary($p) {
             Sql::p_expect($p, "rparen")
             return +{ kind => "agg", op => $agg->{val}, arg => "*" }
         }
-        my $arg = Sql::parse_expr($p)
+        val $arg = Sql::parse_expr($p)
         Sql::p_expect($p, "rparen")
         return +{ kind => "agg", op => $agg->{val}, arg => $arg }
     }
@@ -376,9 +376,9 @@ fn Sql::parse_primary($p) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Sql::parse_program($src) {
-    my $tokens = Sql::tokenize($src)
-    my $p = Sql::parser_new($tokens)
-    my @stmts
+    val $tokens = Sql::tokenize($src)
+    val $p = Sql::parser_new($tokens)
+    var @stmts
     while (Sql::p_peek($p)->{kind} ne "eof") {
         push @stmts, Sql::parse_statement($p)
         # Optional semicolon between statements.
@@ -390,7 +390,7 @@ fn Sql::parse_program($src) {
 }
 
 fn Sql::parse_statement($p) {
-    my $t = Sql::p_peek($p)
+    val $t = Sql::p_peek($p)
     if ($t->{kind} eq "kw") {
         return Sql::parse_create($p) if $t->{val} eq "CREATE"
         return Sql::parse_insert($p) if $t->{val} eq "INSERT"
@@ -404,12 +404,12 @@ fn Sql::parse_statement($p) {
 fn Sql::parse_create($p) {
     Sql::p_expect_kw($p, "CREATE")
     Sql::p_expect_kw($p, "TABLE")
-    my $name_tok = Sql::p_expect($p, "ident")
+    val $name_tok = Sql::p_expect($p, "ident")
     Sql::p_expect($p, "lparen")
-    my @cols
+    var @cols
     while (1) {
-        my $col_name = Sql::p_expect($p, "ident")
-        my $type_tok = Sql::p_peek($p)
+        val $col_name = Sql::p_expect($p, "ident")
+        val $type_tok = Sql::p_peek($p)
         die "expected column type, got " . Sql::p_describe($type_tok) unless $type_tok->{kind} eq "kw" && ($type_tok->{val} eq "INT" || $type_tok->{val} eq "TEXT")
         Sql::p_advance($p)
         push @cols, +{ name => $col_name->{val}, type => $type_tok->{val} }
@@ -423,13 +423,13 @@ fn Sql::parse_create($p) {
 fn Sql::parse_insert($p) {
     Sql::p_expect_kw($p, "INSERT")
     Sql::p_expect_kw($p, "INTO")
-    my $name_tok = Sql::p_expect($p, "ident")
-    my $cols   # optional column list
+    val $name_tok = Sql::p_expect($p, "ident")
+    var $cols   # optional column list
     if (Sql::p_peek($p)->{kind} eq "lparen") {
         Sql::p_advance($p)
         $cols = []
         while (1) {
-            my $col_tok = Sql::p_expect($p, "ident")
+            val $col_tok = Sql::p_expect($p, "ident")
             push @$cols, $col_tok->{val}
             last unless Sql::p_peek($p)->{kind} eq "comma"
             Sql::p_advance($p)
@@ -437,10 +437,10 @@ fn Sql::parse_insert($p) {
         Sql::p_expect($p, "rparen")
     }
     Sql::p_expect_kw($p, "VALUES")
-    my @rows
+    var @rows
     while (1) {
         Sql::p_expect($p, "lparen")
-        my @vals
+        var @vals
         while (1) {
             push @vals, Sql::parse_expr($p)
             last unless Sql::p_peek($p)->{kind} eq "comma"
@@ -456,18 +456,18 @@ fn Sql::parse_insert($p) {
 
 fn Sql::parse_select($p) {
     Sql::p_expect_kw($p, "SELECT")
-    my $items = []
+    var $items = []
     if (Sql::p_peek($p)->{kind} eq "star") {
         Sql::p_advance($p)
         $items = "*"
     } else {
         $items = []
         while (1) {
-            my $expr = Sql::parse_expr($p)
-            my $alias
+            val $expr = Sql::parse_expr($p)
+            var $alias
             if (Sql::p_check_kw($p, "AS")) {
                 Sql::p_advance($p)
-                my $a_tok = Sql::p_expect($p, "ident")
+                val $a_tok = Sql::p_expect($p, "ident")
                 $alias = $a_tok->{val}
             }
             push @$items, +{ expr => $expr, alias => $alias }
@@ -476,36 +476,36 @@ fn Sql::parse_select($p) {
         }
     }
     Sql::p_expect_kw($p, "FROM")
-    my $from_tok = Sql::p_expect($p, "ident")
-    my $from = $from_tok->{val}
+    val $from_tok = Sql::p_expect($p, "ident")
+    val $from = $from_tok->{val}
     # Optional INNER JOIN ... ON ...
-    my $join
+    var $join
     if (Sql::p_check_kw($p, "INNER") || Sql::p_check_kw($p, "JOIN")) {
         Sql::p_match_kw($p, "INNER")
         Sql::p_expect_kw($p, "JOIN")
-        my $rt = Sql::p_expect($p, "ident")
+        val $rt = Sql::p_expect($p, "ident")
         Sql::p_expect_kw($p, "ON")
-        my $cond = Sql::parse_expr($p)
+        val $cond = Sql::parse_expr($p)
         $join = +{ table => $rt->{val}, on => $cond }
     }
-    my $where
+    var $where
     if (Sql::p_check_kw($p, "WHERE")) {
         Sql::p_advance($p)
         $where = Sql::parse_expr($p)
     }
-    my $group_by
+    var $group_by
     if (Sql::p_check_kw($p, "GROUP")) {
         Sql::p_advance($p)
         Sql::p_expect_kw($p, "BY")
-        my $tok = Sql::p_expect($p, "ident")
+        val $tok = Sql::p_expect($p, "ident")
         $group_by = $tok->{val}
     }
-    my $order_by
+    var $order_by
     if (Sql::p_check_kw($p, "ORDER")) {
         Sql::p_advance($p)
         Sql::p_expect_kw($p, "BY")
-        my $tok = Sql::p_expect($p, "ident")
-        my $dir = "ASC"
+        val $tok = Sql::p_expect($p, "ident")
+        var $dir = "ASC"
         if (Sql::p_check_kw($p, "DESC")) {
             Sql::p_advance($p)
             $dir = "DESC"
@@ -514,10 +514,10 @@ fn Sql::parse_select($p) {
         }
         $order_by = +{ col => $tok->{val}, dir => $dir }
     }
-    my $limit
+    var $limit
     if (Sql::p_check_kw($p, "LIMIT")) {
         Sql::p_advance($p)
-        my $tok = Sql::p_expect($p, "num")
+        val $tok = Sql::p_expect($p, "num")
         $limit = $tok->{val}
     }
     +{
@@ -534,21 +534,21 @@ fn Sql::parse_select($p) {
 
 fn Sql::parse_update($p) {
     Sql::p_expect_kw($p, "UPDATE")
-    my $name_tok = Sql::p_expect($p, "ident")
+    val $name_tok = Sql::p_expect($p, "ident")
     Sql::p_expect_kw($p, "SET")
-    my @sets
+    var @sets
     while (1) {
-        my $col = Sql::p_expect($p, "ident")
+        val $col = Sql::p_expect($p, "ident")
         # Need "=" — represented as op token.
-        my $eq = Sql::p_peek($p)
+        val $eq = Sql::p_peek($p)
         die "expected = in SET, got " . Sql::p_describe($eq) unless $eq->{kind} eq "op" && $eq->{val} eq "="
         Sql::p_advance($p)
-        my $rhs = Sql::parse_expr($p)
+        val $rhs = Sql::parse_expr($p)
         push @sets, +{ col => $col->{val}, expr => $rhs }
         last unless Sql::p_peek($p)->{kind} eq "comma"
         Sql::p_advance($p)
     }
-    my $where
+    var $where
     if (Sql::p_check_kw($p, "WHERE")) {
         Sql::p_advance($p)
         $where = Sql::parse_expr($p)
@@ -559,8 +559,8 @@ fn Sql::parse_update($p) {
 fn Sql::parse_delete($p) {
     Sql::p_expect_kw($p, "DELETE")
     Sql::p_expect_kw($p, "FROM")
-    my $name_tok = Sql::p_expect($p, "ident")
-    my $where
+    val $name_tok = Sql::p_expect($p, "ident")
+    var $where
     if (Sql::p_check_kw($p, "WHERE")) {
         Sql::p_advance($p)
         $where = Sql::parse_expr($p)
@@ -580,7 +580,7 @@ fn Sql::db_new() {
 # col is +{ name, type } and each row is parallel to cols.
 
 fn Sql::table_col_index($tbl, $col_name) {
-    for my $i (0:len(@{$tbl->{cols}}) - 1) {
+    for val $i (0:len(@{$tbl->{cols}}) - 1) {
         return $i if $tbl->{cols}->[$i]->{name} eq $col_name
     }
     -1
@@ -595,7 +595,7 @@ fn Sql::table_col_index($tbl, $col_name) {
 # handled separately in the GROUP/aggregate executor.
 
 fn Sql::eval_expr($expr, $row_ctx) {
-    my $k = $expr->{kind}
+    val $k = $expr->{kind}
     if ($k eq "num") {
         return $expr->{val}
     }
@@ -606,41 +606,41 @@ fn Sql::eval_expr($expr, $row_ctx) {
         return Sql::null()
     }
     if ($k eq "col") {
-        my $name = $expr->{name}
+        val $name = $expr->{name}
         return $row_ctx->{$name} if exists $row_ctx->{$name}
         # Try unqualified vs qualified mismatch.
-        for my $key (keys %$row_ctx) {
+        for val $key (keys %$row_ctx) {
             return $row_ctx->{$key} if Sql::col_matches($key, $name)
         }
         die "unknown column: #{$name}"
     }
     if ($k eq "not") {
-        my $v = Sql::eval_expr($expr->{expr}, $row_ctx)
+        val $v = Sql::eval_expr($expr->{expr}, $row_ctx)
         return Sql::null() if Sql::is_null($v)
         return $v ? 0 : 1
     }
     if ($k eq "is_null") {
-        my $v = Sql::eval_expr($expr->{expr}, $row_ctx)
-        my $is = Sql::is_null($v) ? 1 : 0
+        val $v = Sql::eval_expr($expr->{expr}, $row_ctx)
+        val $is = Sql::is_null($v) ? 1 : 0
         return $expr->{negate} ? !$is : $is
     }
     if ($k eq "binop") {
-        my $op = $expr->{op}
+        val $op = $expr->{op}
         # AND / OR — short-circuit with three-value-logic-lite (NULL → false here).
         if ($op eq "AND") {
-            my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+            val $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
             return 0 if Sql::is_null($l) || !$l
-            my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+            val $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
             return Sql::is_null($r) ? 0 : ($r ? 1 : 0)
         }
         if ($op eq "OR") {
-            my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+            val $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
             return 1 if !Sql::is_null($l) && $l
-            my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+            val $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
             return Sql::is_null($r) ? 0 : ($r ? 1 : 0)
         }
-        my $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
-        my $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
+        val $l = Sql::eval_expr($expr->{lhs}, $row_ctx)
+        val $r = Sql::eval_expr($expr->{rhs}, $row_ctx)
         # NULL propagation for arithmetic/comparison: any NULL operand → NULL.
         if (Sql::is_null($l) || Sql::is_null($r)) {
             return Sql::null()
@@ -664,7 +664,7 @@ fn Sql::eval_expr($expr, $row_ctx) {
 
 fn Sql::col_matches($key, $needle) {
     return 1 if $key eq $needle
-    my $dot = index($key, ".")
+    val $dot = index($key, ".")
     if ($dot >= 0) {
         return 1 if substr($key, $dot + 1) eq $needle
     }
@@ -713,26 +713,26 @@ fn Sql::exec_create($db, $stmt) {
 }
 
 fn Sql::exec_insert($db, $stmt) {
-    my $tbl = $db->{tables}->{$stmt->{table}}
+    val $tbl = $db->{tables}->{$stmt->{table}}
     die "no such table: #{$stmt->{table}}" unless $tbl
-    my $col_order
+    var $col_order
     if (defined $stmt->{cols}) {
         $col_order = $stmt->{cols}
     } else {
         $col_order = []
-        for my $c (@{$tbl->{cols}}) {
+        for val $c (@{$tbl->{cols}}) {
             push @$col_order, $c->{name}
         }
     }
-    my $count = 0
-    for my $value_row (@{$stmt->{rows}}) {
+    var $count = 0
+    for val $value_row (@{$stmt->{rows}}) {
         die "column count mismatch on INSERT into #{$stmt->{table}}" unless len(@$value_row) == len(@$col_order)
         # Build row by positional order based on $col_order.
-        my @row = (Sql::null()) x len(@{$tbl->{cols}})
-        for my $i (0:len(@$col_order) - 1) {
-            my $idx = Sql::table_col_index($tbl, $col_order->[$i])
+        var @row = (Sql::null()) x len(@{$tbl->{cols}})
+        for val $i (0:len(@$col_order) - 1) {
+            val $idx = Sql::table_col_index($tbl, $col_order->[$i])
             die "no such column: #{$col_order->[$i]}" if $idx < 0
-            my $v = Sql::eval_expr($value_row->[$i], +{})
+            val $v = Sql::eval_expr($value_row->[$i], +{})
             $row[$idx] = $v
         }
         push @{$tbl->{rows}}, \@row
@@ -742,17 +742,17 @@ fn Sql::exec_insert($db, $stmt) {
 }
 
 fn Sql::exec_update($db, $stmt) {
-    my $tbl = $db->{tables}->{$stmt->{table}}
+    val $tbl = $db->{tables}->{$stmt->{table}}
     die "no such table: #{$stmt->{table}}" unless $tbl
-    my $count = 0
-    for my $row (@{$tbl->{rows}}) {
-        my $ctx = Sql::row_ctx($tbl, $row, undef)
+    var $count = 0
+    for var $row (@{$tbl->{rows}}) {
+        val $ctx = Sql::row_ctx($tbl, $row, undef)
         if (defined $stmt->{where}) {
-            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            val $v = Sql::eval_expr($stmt->{where}, $ctx)
             next if Sql::is_null($v) || !$v
         }
-        for my $set (@{$stmt->{sets}}) {
-            my $idx = Sql::table_col_index($tbl, $set->{col})
+        for val $set (@{$stmt->{sets}}) {
+            val $idx = Sql::table_col_index($tbl, $set->{col})
             die "no such column: #{$set->{col}}" if $idx < 0
             $row->[$idx] = Sql::eval_expr($set->{expr}, $ctx)
         }
@@ -762,14 +762,14 @@ fn Sql::exec_update($db, $stmt) {
 }
 
 fn Sql::exec_delete($db, $stmt) {
-    my $tbl = $db->{tables}->{$stmt->{table}}
+    var $tbl = $db->{tables}->{$stmt->{table}}
     die "no such table: #{$stmt->{table}}" unless $tbl
-    my @keep
-    my $count = 0
-    for my $row (@{$tbl->{rows}}) {
-        my $ctx = Sql::row_ctx($tbl, $row, undef)
+    var @keep
+    var $count = 0
+    for val $row (@{$tbl->{rows}}) {
+        val $ctx = Sql::row_ctx($tbl, $row, undef)
         if (defined $stmt->{where}) {
-            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            val $v = Sql::eval_expr($stmt->{where}, $ctx)
             if (Sql::is_null($v) || !$v) {
                 push @keep, $row
                 next
@@ -786,9 +786,9 @@ fn Sql::exec_delete($db, $stmt) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Sql::row_ctx($tbl, $row, $alias) {
-    my %ctx
-    for my $i (0:len(@{$tbl->{cols}}) - 1) {
-        my $name = $tbl->{cols}->[$i]->{name}
+    var %ctx
+    for val $i (0:len(@{$tbl->{cols}}) - 1) {
+        val $name = $tbl->{cols}->[$i]->{name}
         $ctx{$name} = $row->[$i]
         if (defined $alias) {
             $ctx{$alias . "." . $name} = $row->[$i]
@@ -798,14 +798,14 @@ fn Sql::row_ctx($tbl, $row, $alias) {
 }
 
 fn Sql::join_ctx($t1_name, $t1, $r1, $t2_name, $t2, $r2) {
-    my %ctx
-    for my $i (0:len(@{$t1->{cols}}) - 1) {
-        my $name = $t1->{cols}->[$i]->{name}
+    var %ctx
+    for val $i (0:len(@{$t1->{cols}}) - 1) {
+        val $name = $t1->{cols}->[$i]->{name}
         $ctx{$name} = $r1->[$i]
         $ctx{$t1_name . "." . $name} = $r1->[$i]
     }
-    for my $i (0:len(@{$t2->{cols}}) - 1) {
-        my $name = $t2->{cols}->[$i]->{name}
+    for val $i (0:len(@{$t2->{cols}}) - 1) {
+        val $name = $t2->{cols}->[$i]->{name}
         # Don't shadow t1's unqualified columns by default.
         $ctx{$t2_name . "." . $name} = $r2->[$i]
         $ctx{$name} = $r2->[$i] unless exists $ctx{$name}
@@ -818,85 +818,85 @@ fn Sql::join_ctx($t1_name, $t1, $r1, $t2_name, $t2, $r2) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Sql::exec_select($db, $stmt) {
-    my $tbl = $db->{tables}->{$stmt->{from}}
+    val $tbl = $db->{tables}->{$stmt->{from}}
     die "no such table: #{$stmt->{from}}" unless $tbl
     # Build the input row stream: either a single-table scan or a
     # nested-loop join.
-    my @input_ctxs
+    var @input_ctxs
     if (defined $stmt->{join}) {
-        my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+        val $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
         die "no such table: #{$stmt->{join}->{table}}" unless $tbl2
-        for my $r1 (@{$tbl->{rows}}) {
-            for my $r2 (@{$tbl2->{rows}}) {
-                my $ctx = Sql::join_ctx($stmt->{from}, $tbl, $r1, $stmt->{join}->{table}, $tbl2, $r2)
-                my $on_ok = Sql::eval_expr($stmt->{join}->{on}, $ctx)
+        for val $r1 (@{$tbl->{rows}}) {
+            for val $r2 (@{$tbl2->{rows}}) {
+                val $ctx = Sql::join_ctx($stmt->{from}, $tbl, $r1, $stmt->{join}->{table}, $tbl2, $r2)
+                val $on_ok = Sql::eval_expr($stmt->{join}->{on}, $ctx)
                 next if Sql::is_null($on_ok) || !$on_ok
                 push @input_ctxs, $ctx
             }
         }
     } else {
-        for my $r (@{$tbl->{rows}}) {
+        for val $r (@{$tbl->{rows}}) {
             push @input_ctxs, Sql::row_ctx($tbl, $r, $stmt->{from})
         }
     }
     # WHERE filter.
-    my @filtered
-    for my $ctx (@input_ctxs) {
+    var @filtered
+    for val $ctx (@input_ctxs) {
         if (defined $stmt->{where}) {
-            my $v = Sql::eval_expr($stmt->{where}, $ctx)
+            val $v = Sql::eval_expr($stmt->{where}, $ctx)
             next if Sql::is_null($v) || !$v
         }
         push @filtered, $ctx
     }
     # If aggregates appear in SELECT items, switch to aggregate mode.
-    my $has_agg = 0
+    var $has_agg = 0
     if ($stmt->{items} ne "*") {
-        for my $it (@{$stmt->{items}}) {
+        for val $it (@{$stmt->{items}}) {
             $has_agg = 1 if Sql::expr_has_agg($it->{expr})
         }
     }
-    my $rows_out
-    my $cols_out
+    var $rows_out
+    var $cols_out
     if ($has_agg || defined $stmt->{group_by}) {
-        my $r = Sql::eval_aggregate_select($stmt, \@filtered)
+        val $r = Sql::eval_aggregate_select($stmt, \@filtered)
         $rows_out = $r->{rows}
         $cols_out = $r->{cols}
     } else {
         # Plain projection.
         $cols_out = []
         if ($stmt->{items} eq "*") {
-            for my $c (@{$tbl->{cols}}) {
+            for val $c (@{$tbl->{cols}}) {
                 push @$cols_out, $c->{name}
             }
             if (defined $stmt->{join}) {
-                my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
-                for my $c (@{$tbl2->{cols}}) {
+                val $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+                for val $c (@{$tbl2->{cols}}) {
                     push @$cols_out, $stmt->{join}->{table} . "." . $c->{name}
                 }
             }
         } else {
-            for my $it (@{$stmt->{items}}) {
-                my $name = defined $it->{alias}
+            for val $it (@{$stmt->{items}}) {
+                val $name = defined $it->{alias}
                     ? $it->{alias}
                     : ($it->{expr}->{kind} eq "col" ? $it->{expr}->{name} : "expr")
                 push @$cols_out, $name
             }
         }
         $rows_out = []
-        for my $ctx (@filtered) {
-            my @row
+        for val $ctx (@filtered) {
+            var @row
             if ($stmt->{items} eq "*") {
-                for my $c (@{$tbl->{cols}}) {
+                for val $c (@{$tbl->{cols}}) {
                     push @row, $ctx->{$c->{name}}
                 }
                 if (defined $stmt->{join}) {
-                    my $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
-                    for my $c (@{$tbl2->{cols}}) {
+                    val $tbl2 = $db->{tables}->{$stmt->{join}->{table}}
+                    for val $c (@{$tbl2->{cols}}) {
                         push @row, $ctx->{$stmt->{join}->{table} . "." . $c->{name}}
                     }
                 }
             } else {
-                for my $it (@{$stmt->{items}}) {
+                for val $it (@{$stmt->{items}}) {
                     push @row, Sql::eval_expr($it->{expr}, $ctx)
                 }
             }
@@ -909,9 +909,9 @@ fn Sql::exec_select($db, $stmt) {
     }
     # LIMIT.
     if (defined $stmt->{limit}) {
-        my $lim = $stmt->{limit}
-        my @sliced
-        for my $i (0:$lim - 1) {
+        val $lim = $stmt->{limit}
+        var @sliced
+        for val $i (0:$lim - 1) {
             last if $i >= len(@$rows_out)
             push @sliced, $rows_out->[$i]
         }
@@ -944,10 +944,10 @@ fn Sql::expr_has_agg($expr) {
 
 fn Sql::eval_aggregate_select($stmt, $ctxs) {
     # Group rows by group_by column (or single global group).
-    my %groups
-    my @group_order
-    for my $ctx (@$ctxs) {
-        my $key
+    var %groups
+    var @group_order
+    for val $ctx (@$ctxs) {
+        var $key
         if (defined $stmt->{group_by}) {
             $key = "" . $ctx->{$stmt->{group_by}}
         } else {
@@ -966,25 +966,25 @@ fn Sql::eval_aggregate_select($stmt, $ctxs) {
         $groups{""} = []
         push @group_order, ""
     }
-    my @cols_out
-    for my $it (@{$stmt->{items}}) {
+    var @cols_out
+    for val $it (@{$stmt->{items}}) {
         if (defined $it->{alias}) {
             push @cols_out, $it->{alias}
         } elsif ($it->{expr}->{kind} eq "col") {
             push @cols_out, $it->{expr}->{name}
         } elsif ($it->{expr}->{kind} eq "agg") {
-            my $agg = $it->{expr}
-            my $arg_name = $agg->{arg} eq "*" ? "*" : ($agg->{arg}->{kind} eq "col" ? $agg->{arg}->{name} : "expr")
+            val $agg = $it->{expr}
+            val $arg_name = $agg->{arg} eq "*" ? "*" : ($agg->{arg}->{kind} eq "col" ? $agg->{arg}->{name} : "expr")
             push @cols_out, $agg->{op} . "(" . $arg_name . ")"
         } else {
             push @cols_out, "expr"
         }
     }
-    my @rows_out
-    for my $key (@group_order) {
-        my $group_ctxs = $groups{$key}
-        my @row
-        for my $it (@{$stmt->{items}}) {
+    var @rows_out
+    for val $key (@group_order) {
+        val $group_ctxs = $groups{$key}
+        var @row
+        for val $it (@{$stmt->{items}}) {
             if ($it->{expr}->{kind} eq "agg") {
                 push @row, Sql::eval_agg($it->{expr}, $group_ctxs)
             } else {
@@ -998,44 +998,44 @@ fn Sql::eval_aggregate_select($stmt, $ctxs) {
 }
 
 fn Sql::eval_agg($expr, $ctxs) {
-    my $op = $expr->{op}
-    my $arg = $expr->{arg}
+    val $op = $expr->{op}
+    val $arg = $expr->{arg}
     if ($op eq "COUNT") {
         if ($arg eq "*") {
             return len(@$ctxs)
         }
-        my $c = 0
-        for my $ctx (@$ctxs) {
-            my $v = Sql::eval_expr($arg, $ctx)
+        var $c = 0
+        for val $ctx (@$ctxs) {
+            val $v = Sql::eval_expr($arg, $ctx)
             $c++ unless Sql::is_null($v)
         }
         return $c
     }
     # For SUM/AVG/MIN/MAX we operate on non-null cell values.
-    my @vals
-    for my $ctx (@$ctxs) {
-        my $v = Sql::eval_expr($arg, $ctx)
+    var @vals
+    for val $ctx (@$ctxs) {
+        val $v = Sql::eval_expr($arg, $ctx)
         push @vals, $v unless Sql::is_null($v)
     }
     return Sql::null() if len(@vals) == 0
     if ($op eq "SUM") {
-        my $s = 0
-        for my $v (@vals) { $s += $v }
+        var $s = 0
+        for val $v (@vals) { $s += $v }
         return $s
     }
     if ($op eq "AVG") {
-        my $s = 0
-        for my $v (@vals) { $s += $v }
+        var $s = 0
+        for val $v (@vals) { $s += $v }
         return int($s / len(@vals))
     }
     if ($op eq "MIN") {
-        my $m = $vals[0]
-        for my $v (@vals) { $m = $v if Sql::sql_lt($v, $m) }
+        var $m = $vals[0]
+        for val $v (@vals) { $m = $v if Sql::sql_lt($v, $m) }
         return $m
     }
     if ($op eq "MAX") {
-        my $m = $vals[0]
-        for my $v (@vals) { $m = $v if Sql::sql_lt($m, $v) }
+        var $m = $vals[0]
+        for val $v (@vals) { $m = $v if Sql::sql_lt($m, $v) }
         return $m
     }
     die "unknown aggregate: #{$op}"
@@ -1046,19 +1046,19 @@ fn Sql::eval_agg($expr, $ctxs) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Sql::apply_order_by($rows, $cols, $ob) {
-    my $col_idx = -1
-    for my $i (0:len(@$cols) - 1) {
+    var $col_idx = -1
+    for val $i (0:len(@$cols) - 1) {
         if ($cols->[$i] eq $ob->{col}) {
             $col_idx = $i
             last
         }
     }
     die "ORDER BY: unknown column #{$ob->{col}}" if $col_idx < 0
-    my $dir = $ob->{dir}
-    my @sorted = sort {
-        my $av = _0->[$col_idx]
-        my $bv = _1->[$col_idx]
-        my $cmp
+    val $dir = $ob->{dir}
+    val @sorted = sort {
+        val $av = _0->[$col_idx]
+        val $bv = _1->[$col_idx]
+        var $cmp
         if (Sql::looks_int($av) && Sql::looks_int($bv)) {
             $cmp = $av <=> $bv
         } else {
@@ -1076,12 +1076,12 @@ fn Sql::apply_order_by($rows, $cols, $ob) {
 fn Sql::render_result($result) {
     return "" unless ref($result) eq "HASH"
     return "msg: " . $result->{msg} . "\n" if exists $result->{msg}
-    my $out = ""
+    var $out = ""
     $out .= "| " . join(" | ", @{$result->{cols}}) . " |\n"
     $out .= "| " . join(" | ", map { "-" x len($_) } @{$result->{cols}}) . " |\n"
-    for my $row (@{$result->{rows}}) {
-        my @cells
-        for my $v (@$row) {
+    for val $row (@{$result->{rows}}) {
+        var @cells
+        for val $v (@$row) {
             push @cells, Sql::is_null($v) ? "NULL" : ("" . $v)
         }
         $out .= "| " . join(" | ", @cells) . " |\n"
@@ -1095,9 +1095,9 @@ fn Sql::render_result($result) {
 # ═══════════════════════════════════════════════════════════════════
 
 fn Sql::exec_sql($db, $src) {
-    my $stmts = Sql::parse_program($src)
-    my $last
-    for my $stmt (@$stmts) {
+    val $stmts = Sql::parse_program($src)
+    var $last
+    for val $stmt (@$stmts) {
         $last = Sql::exec_stmt($db, $stmt)
     }
     $last
@@ -1107,7 +1107,7 @@ fn Sql::exec_sql($db, $src) {
 # Section 15: Demo workload — build a small e-commerce schema
 # ═══════════════════════════════════════════════════════════════════
 
-my $DB = Sql::db_new()
+val $DB = Sql::db_new()
 
 # Create tables and seed data.
 Sql::exec_sql($DB, q{
@@ -1143,7 +1143,7 @@ p "  orders:    " . len(@{$DB->{tables}->{orders}->{rows}}) . " rows"
 #   * expected_rows is the row count for SELECTs (or undef for DDL).
 #   * expected_cells (optional) checks first-row first-column value.
 
-my @cases = (
+val @cases = (
     # ── basic SELECT * ──
     +{ sql => "SELECT * FROM customers",                                  rows => 5 },
     +{ sql => "SELECT id, name FROM customers",                           rows => 5 },
@@ -1188,23 +1188,23 @@ my @cases = (
 
 p ""
 p "── test suite ────────────────────────────────────────"
-my $passed = 0
-my $failed = 0
-for my $c (@cases) {
-    my $r = Sql::exec_sql($DB, $c->{sql})
-    my $ok = 1
-    my $actual_rows = exists $r->{rows} ? len(@{$r->{rows}}) : -1
+var $passed = 0
+var $failed = 0
+for val $c (@cases) {
+    val $r = Sql::exec_sql($DB, $c->{sql})
+    var $ok = 1
+    val $actual_rows = exists $r->{rows} ? len(@{$r->{rows}}) : -1
     if (defined $c->{rows}) {
         $ok = 0 if $actual_rows != $c->{rows}
     }
     if (defined $c->{cell} && exists $r->{rows} && len(@{$r->{rows}}) > 0) {
-        my $got_cell = $r->{rows}->[0]->[0]
+        val $got_cell = $r->{rows}->[0]->[0]
         $ok = 0 if "$got_cell" ne "" . $c->{cell}
     } elsif (defined $c->{cell}) {
         $ok = 0
     }
     if ($ok) { $passed++ } else { $failed++ }
-    my $sql_show = $c->{sql}
+    var $sql_show = $c->{sql}
     $sql_show =~ s/\s+/ /g
     $sql_show = substr($sql_show, 0, 70) . ".." if len($sql_show) > 72
     printf "  %-72s  %s\n",
@@ -1224,12 +1224,12 @@ die "#{$failed} SQL test cases failed" if $failed > 0
 # Helper: get count from a "SELECT COUNT(*) ..." query.
 
 fn Sql::query_count($db, $sql) {
-    my $r = Sql::exec_sql($db, $sql)
+    val $r = Sql::exec_sql($db, $sql)
     $r->{rows}->[0]->[0]
 }
 
 fn Sql::query_first($db, $sql) {
-    my $r = Sql::exec_sql($db, $sql)
+    val $r = Sql::exec_sql($db, $sql)
     return undef unless len(@{$r->{rows}}) > 0
     $r->{rows}->[0]->[0]
 }
@@ -1237,7 +1237,7 @@ fn Sql::query_first($db, $sql) {
 # Rebuild a fresh DB so invariants see a known state.
 
 fn Sql::seed_db() {
-    my $db = Sql::db_new()
+    val $db = Sql::db_new()
     Sql::exec_sql($db, q{
         CREATE TABLE customers (id INT, name TEXT, city TEXT);
         INSERT INTO customers VALUES
@@ -1262,14 +1262,14 @@ fn Sql::seed_db() {
 
 # ── invariant 1: row count of fresh customers/orders ──────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     die "customer count" unless Sql::query_count($db, "SELECT COUNT(*) FROM customers") == 5
     die "order count"    unless Sql::query_count($db, "SELECT COUNT(*) FROM orders")    == 8
 }
 
 # ── invariant 2: SUM equals brute total ───────────────────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     die "sum total"  unless Sql::query_count($db, "SELECT SUM(total) FROM orders") == 250 + 100 + 350 + 50 + 700 + 120 + 800 + 200
     die "min total"  unless Sql::query_first($db, "SELECT MIN(total) FROM orders") == 50
     die "max total"  unless Sql::query_first($db, "SELECT MAX(total) FROM orders") == 800
@@ -1277,7 +1277,7 @@ fn Sql::seed_db() {
 
 # ── invariant 3: WHERE clauses agree with hand-counted rows ──────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     die "Boston customers" unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Boston'") == 2
     die "Seattle"          unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Seattle'") == 2
     die "Austin"           unless Sql::query_count($db, "SELECT COUNT(*) FROM customers WHERE city = 'Austin'") == 1
@@ -1289,7 +1289,7 @@ fn Sql::seed_db() {
 
 # ── invariant 4: AND/OR/NOT combinations ──────────────────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     die "AND clause" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total > 200 AND status = 'shipped'") == 4
     die "OR clause"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total < 100 OR total > 500") == 3
     die "NOT clause" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE NOT (status = 'shipped')") == 3
@@ -1297,41 +1297,41 @@ fn Sql::seed_db() {
 
 # ── invariant 5: GROUP BY tallies match per-group totals ─────────
 {
-    my $db = Sql::seed_db()
-    my $r = Sql::exec_sql($db, "SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id ORDER BY customer_id")
+    val $db = Sql::seed_db()
+    val $r = Sql::exec_sql($db, "SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id ORDER BY customer_id")
     die "5 customer groups" unless len(@{$r->{rows}}) == 5
     # Customer 1 has 2 orders, customer 2 has 2, customer 3 has 1, 4 has 1, 5 has 2.
-    my %expected = (1 => 2, 2 => 2, 3 => 1, 4 => 1, 5 => 2)
-    for my $row (@{$r->{rows}}) {
-        my $cid = $row->[0]
-        my $cnt = $row->[1]
+    val %expected = (1 => 2, 2 => 2, 3 => 1, 4 => 1, 5 => 2)
+    for val $row (@{$r->{rows}}) {
+        val $cid = $row->[0]
+        val $cnt = $row->[1]
         die "group #{$cid} has #{$cnt}, want #{$expected{$cid}}" unless $cnt == $expected{$cid}
     }
 }
 
 # ── invariant 6: GROUP BY + SUM ──────────────────────────────────
 {
-    my $db = Sql::seed_db()
-    my $r = Sql::exec_sql($db, "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY customer_id")
-    my %expected = (1 => 350, 2 => 400, 3 => 700, 4 => 120, 5 => 1000)
-    for my $row (@{$r->{rows}}) {
+    val $db = Sql::seed_db()
+    val $r = Sql::exec_sql($db, "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY customer_id")
+    val %expected = (1 => 350, 2 => 400, 3 => 700, 4 => 120, 5 => 1000)
+    for val $row (@{$r->{rows}}) {
         die "cid #{$row->[0]} sum #{$row->[1]} != #{$expected{$row->[0]}}" unless $row->[1] == $expected{$row->[0]}
     }
 }
 
 # ── invariant 7: INNER JOIN multiplicity ─────────────────────────
 {
-    my $db = Sql::seed_db()
-    my $cnt = Sql::query_count($db, "SELECT COUNT(*) FROM customers INNER JOIN orders ON customers.id = orders.customer_id")
+    val $db = Sql::seed_db()
+    val $cnt = Sql::query_count($db, "SELECT COUNT(*) FROM customers INNER JOIN orders ON customers.id = orders.customer_id")
     die "join cardinality" unless $cnt == 8   # every order has exactly one matching customer
 }
 
 # ── invariant 8: ORDER BY ASC produces non-decreasing column ──────
 {
-    my $db = Sql::seed_db()
-    my $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total ASC")
-    my $prev = -1
-    for my $row (@{$r->{rows}}) {
+    val $db = Sql::seed_db()
+    val $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total ASC")
+    var $prev = -1
+    for val $row (@{$r->{rows}}) {
         die "ORDER BY ASC violation: prev=#{$prev} curr=#{$row->[0]}" if $row->[0] < $prev
         $prev = $row->[0]
     }
@@ -1339,10 +1339,10 @@ fn Sql::seed_db() {
 
 # ── invariant 9: ORDER BY DESC produces non-increasing column ─────
 {
-    my $db = Sql::seed_db()
-    my $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total DESC")
-    my $prev = 100_000
-    for my $row (@{$r->{rows}}) {
+    val $db = Sql::seed_db()
+    val $r = Sql::exec_sql($db, "SELECT total FROM orders ORDER BY total DESC")
+    var $prev = 100_000
+    for val $row (@{$r->{rows}}) {
         die "ORDER BY DESC violation: prev=#{$prev} curr=#{$row->[0]}" if $row->[0] > $prev
         $prev = $row->[0]
     }
@@ -1350,17 +1350,17 @@ fn Sql::seed_db() {
 
 # ── invariant 10: LIMIT truncates result ─────────────────────────
 {
-    my $db = Sql::seed_db()
-    for my $n (1, 2, 3, 5, 8) {
-        my $r = Sql::exec_sql($db, "SELECT id FROM orders ORDER BY id ASC LIMIT #{$n}")
-        my $expected_n = $n < 8 ? $n : 8
+    val $db = Sql::seed_db()
+    for val $n (1, 2, 3, 5, 8) {
+        val $r = Sql::exec_sql($db, "SELECT id FROM orders ORDER BY id ASC LIMIT #{$n}")
+        val $expected_n = $n < 8 ? $n : 8
         die "LIMIT #{$n} returned #{len(@{$r->{rows}})} rows" unless len(@{$r->{rows}}) == $expected_n
     }
 }
 
 # ── invariant 11: UPDATE changes the right rows ──────────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     Sql::exec_sql($db, "UPDATE orders SET total = 0 WHERE status = 'pending'")
     die "after-update pending total" unless Sql::query_first($db, "SELECT SUM(total) FROM orders WHERE status = 'pending'") == 0
     # Shipped orders untouched.
@@ -1369,7 +1369,7 @@ fn Sql::seed_db() {
 
 # ── invariant 12: DELETE removes only matching rows ──────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     Sql::exec_sql($db, "DELETE FROM orders WHERE status = 'cancelled'")
     die "after-delete count" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders") == 7
     die "no cancelled left"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE status = 'cancelled'") == 0
@@ -1377,27 +1377,27 @@ fn Sql::seed_db() {
 
 # ── invariant 13: tokenizer recognises every keyword variant ─────
 {
-    my $tokens = Sql::tokenize("select * from t WHERE x = 5 AND y < 10 ORDER BY z DESC LIMIT 3")
-    my @kinds
-    for my $t (@$tokens) { push @kinds, $t->{kind} }
+    val $tokens = Sql::tokenize("select * from t WHERE x = 5 AND y < 10 ORDER BY z DESC LIMIT 3")
+    var @kinds
+    for val $t (@$tokens) { push @kinds, $t->{kind} }
     die "tokenizer kinds" unless len(@kinds) == 19   # SELECT * FROM t WHERE x = 5 AND y < 10 ORDER BY z DESC LIMIT 3 + EOF
 }
 
 # ── invariant 14: CREATE TABLE then SELECT * is empty ────────────
 {
-    my $db = Sql::db_new()
+    val $db = Sql::db_new()
     Sql::exec_sql($db, "CREATE TABLE empty_t (k INT, v TEXT)")
     die "empty table count" unless Sql::query_count($db, "SELECT COUNT(*) FROM empty_t") == 0
 }
 
 # ── invariant 15: INSERT with explicit column list reorders ──────
 {
-    my $db = Sql::db_new()
+    val $db = Sql::db_new()
     Sql::exec_sql($db, q{
         CREATE TABLE t (a INT, b INT, c INT);
         INSERT INTO t (c, a, b) VALUES (30, 10, 20);
     })
-    my $r = Sql::exec_sql($db, "SELECT a, b, c FROM t")
+    val $r = Sql::exec_sql($db, "SELECT a, b, c FROM t")
     die "row a" unless $r->{rows}->[0]->[0] == 10
     die "row b" unless $r->{rows}->[0]->[1] == 20
     die "row c" unless $r->{rows}->[0]->[2] == 30
@@ -1405,9 +1405,9 @@ fn Sql::seed_db() {
 
 # ── invariant 16: arithmetic in WHERE expressions ────────────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     # Orders with total > customer_id * 100.
-    my $n = Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total > customer_id * 100")
+    val $n = Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE total > customer_id * 100")
     # Manually: 101 (1, 250 > 100) ✓, 103 (2, 350 > 200) ✓, 105 (3, 700 > 300) ✓, 107 (5, 800 > 500) ✓.
     # And 102 (1, 100 > 100): not, equality fails. 104 (2, 50 > 200): no. 106 (4, 120 > 400): no.
     # 108 (5, 200 > 500): no.
@@ -1416,15 +1416,15 @@ fn Sql::seed_db() {
 
 # ── invariant 17: arithmetic in SELECT projections ───────────────
 {
-    my $db = Sql::seed_db()
-    my $r = Sql::exec_sql($db, "SELECT id, total + 10 FROM orders WHERE id = 101")
+    val $db = Sql::seed_db()
+    val $r = Sql::exec_sql($db, "SELECT id, total + 10 FROM orders WHERE id = 101")
     die "expr id"    unless $r->{rows}->[0]->[0] == 101
     die "expr total+10" unless $r->{rows}->[0]->[1] == 260
 }
 
 # ── invariant 18: NULL handling — IS NULL vs IS NOT NULL ─────────
 {
-    my $db = Sql::db_new()
+    val $db = Sql::db_new()
     Sql::exec_sql($db, q{
         CREATE TABLE n (a INT, b TEXT);
         INSERT INTO n VALUES (1, 'x'), (2, NULL), (3, 'y'), (NULL, 'z');
@@ -1436,14 +1436,14 @@ fn Sql::seed_db() {
 
 # ── invariant 19: empty WHERE clause never matches when contradictory ─
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     die "false WHERE" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE 1 = 2") == 0
     die "true WHERE"  unless Sql::query_count($db, "SELECT COUNT(*) FROM orders WHERE 1 = 1") == 8
 }
 
 # ── invariant 20: complete delete-all + repopulate cycle ─────────
 {
-    my $db = Sql::seed_db()
+    val $db = Sql::seed_db()
     Sql::exec_sql($db, "DELETE FROM orders")
     die "after delete-all" unless Sql::query_count($db, "SELECT COUNT(*) FROM orders") == 0
     Sql::exec_sql($db, "INSERT INTO orders VALUES (200, 1, 50, 'new')")

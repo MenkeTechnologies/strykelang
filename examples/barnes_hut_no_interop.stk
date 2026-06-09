@@ -28,7 +28,7 @@ fn insert($node, $body) {
     }
 
     # Update center of mass
-    my $new_mass = $node->{mass} + $body->{mass}
+    val $new_mass = $node->{mass} + $body->{mass}
     $node->{center_x} = ($node->{center_x} * $node->{mass} + $body->{x} * $body->{mass}) / $new_mass
     $node->{center_y} = ($node->{center_y} * $node->{mass} + $body->{y} * $body->{mass}) / $new_mass
     $node->{mass} = $new_mass
@@ -40,7 +40,7 @@ fn insert($node, $body) {
     }
 
     # If it's a leaf node with a body, we need to split it
-    my $existing_body = $node->{body}
+    val $existing_body = $node->{body}
     $node->{body} = undef
 
     BarnesHut::insert_into_quadrant($node, $existing_body)
@@ -48,9 +48,9 @@ fn insert($node, $body) {
 }
 
 fn insert_into_quadrant($node, $body) {
-    my $half = $node->{size} / 2.0
-    my $left = $body->{x} < $node->{x}
-    my $top  = $body->{y} < $node->{y}
+    val $half = $node->{size} / 2.0
+    val $left = $body->{x} < $node->{x}
+    val $top  = $body->{y} < $node->{y}
 
     if ($left) {
         if ($top) {
@@ -74,26 +74,26 @@ fn insert_into_quadrant($node, $body) {
 fn calculate_force($node, $body, $theta, $g) {
     return [0.0, 0.0] if $node->{mass} == 0.0
     
-    my $dx = $node->{center_x} - $body->{x}
-    my $dy = $node->{center_y} - $body->{y}
-    my $dist_sq = $dx * $dx + $dy * $dy + 1e-9 # softening
-    my $dist = sqrt($dist_sq)
+    val $dx = $node->{center_x} - $body->{x}
+    val $dy = $node->{center_y} - $body->{y}
+    val $dist_sq = $dx * $dx + $dy * $dy + 1e-9 # softening
+    val $dist = sqrt($dist_sq)
     
     if (defined $node->{body}) {
         return [0.0, 0.0] if $node->{body}->{id} == $body->{id}
-        my $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
+        val $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
         return [ $f * $dx / $dist, $f * $dy / $dist ]
     }
     
     if ($node->{size} / $dist < $theta) {
-        my $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
+        val $f = ($g * $node->{mass} * $body->{mass}) / $dist_sq
         return [ $f * $dx / $dist, $f * $dy / $dist ]
     }
     
-    my @total_f = (0.0, 0.0)
-    for my $child ($node->{nw}, $node->{ne}, $node->{sw}, $node->{se}) {
+    var @total_f = (0.0, 0.0)
+    for val $child ($node->{nw}, $node->{ne}, $node->{sw}, $node->{se}) {
         if (defined $child) {
-            my $f = BarnesHut::calculate_force($child, $body, $theta, $g)
+            val $f = BarnesHut::calculate_force($child, $body, $theta, $g)
             $total_f[0] += $f->[0]
             $total_f[1] += $f->[1]
         }
@@ -102,18 +102,18 @@ fn calculate_force($node, $body, $theta, $g) {
 }
 
 fn step($bodies, $size, $theta, $dt) {
-    my $root = new_node(0.0, 0.0, $size)
-    for my $body (@$bodies) { BarnesHut::insert($root, $body) }
+    val $root = new_node(0.0, 0.0, $size)
+    for val $body (@$bodies) { BarnesHut::insert($root, $body) }
     
-    my $g = 6.674e-11
-    for my $body (@$bodies) {
-        my $f = BarnesHut::calculate_force($root, $body, $theta, $g)
-        my $ax = $f->[0] / $body->{mass}
-        my $ay = $f->[1] / $body->{mass}
+    val $g = 6.674e-11
+    for var $body (@$bodies) {
+        val $f = BarnesHut::calculate_force($root, $body, $theta, $g)
+        val $ax = $f->[0] / $body->{mass}
+        val $ay = $f->[1] / $body->{mass}
         $body->{vx} += $ax * $dt
         $body->{vy} += $ay * $dt
     }
-    for my $body (@$bodies) {
+    for var $body (@$bodies) {
         $body->{x} += $body->{vx} * $dt
         $body->{y} += $body->{vy} * $dt
     }
@@ -122,21 +122,21 @@ fn step($bodies, $size, $theta, $dt) {
 package main
 
 p "── Barnes-Hut N-Body Demo ──"
-my @body_list = (
+val @body_list = (
     { id => 1, mass => 1e12, x => -100.0, y => -100.0, vx => 0.0, vy => 0.0 },
     { id => 2, mass => 1e12, x => 100.0,  y => 100.0,  vx => 0.0, vy => 0.0 },
     { id => 3, mass => 1e12, x => -100.0, y => 100.0,  vx => 0.0, vy => 0.0 }
 )
 
 p "Initial states:"
-for my $body (@body_list) {
+for val $body (@body_list) {
     p "  Body #{$body->{id}}: (#{$body->{x}}, #{$body->{y}})"
 }
 
 p "\nSimulating 10 steps..."
 for (1:10) { BarnesHut::step(\@body_list, 1000.0, 0.5, 0.1) }
 
-for my $body (@body_list) {
+for val $body (@body_list) {
     p "  Body #{$body->{id}}: (#{sprintf '%.2f', $body->{x}}, #{sprintf '%.2f', $body->{y}})"
 }
 p "Done."

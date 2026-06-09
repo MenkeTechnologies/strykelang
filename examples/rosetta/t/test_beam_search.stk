@@ -8,18 +8,18 @@
 # Goal fn: state → bool. Returns the best path it finds within max_depth.
 
 fn Rosetta::Beam::search($start, $goal_fn, $successors_fn, $cost_fn, $beam_width, $max_depth) {
-    my @beam = ([0, $start, [$start]])  # [cost_so_far, state, path]
+    var @beam = ([0, $start, [$start]])  # [cost_so_far, state, path]
     if ($goal_fn($start)) {
         return { path => [$start], cost => 0 }
     }
-    for my $depth (~> 1:$max_depth) {
-        my @candidates
-        for my $entry (@beam) {
-            my ($cost, $state, $path) = @$entry
-            for my $succ (@{$successors_fn($state)}) {
-                my ($ns, $c) = @$succ
-                my $new_cost = $cost + $c
-                my @new_path = @$path
+    for val $depth (~> 1:$max_depth) {
+        var @candidates
+        for val $entry (@beam) {
+            val ($cost, $state, $path) = @$entry
+            for val $succ (@{$successors_fn($state)}) {
+                val ($ns, $c) = @$succ
+                val $new_cost = $cost + $c
+                var @new_path = @$path
                 push @new_path, $ns
                 if ($goal_fn($ns)) {
                     return { path => \@new_path, cost => $new_cost }
@@ -30,7 +30,7 @@ fn Rosetta::Beam::search($start, $goal_fn, $successors_fn, $cost_fn, $beam_width
         last if len(@candidates) == 0
         @candidates = sort { _0->[0] <=> _1->[0] } @candidates
         @beam = ()
-        for my $i (~> 0:$beam_width - 1) {
+        for val $i (~> 0:$beam_width - 1) {
             last if $i >= len(@candidates)
             push @beam, $candidates[$i]
         }
@@ -39,7 +39,7 @@ fn Rosetta::Beam::search($start, $goal_fn, $successors_fn, $cost_fn, $beam_width
 }
 
 # Toy: find a path in a tiny weighted graph.
-my %graph = (
+val %graph = (
     "A" => [["B", 1], ["C", 4]],
     "B" => [["D", 2], ["E", 5]],
     "C" => [["F", 1]],
@@ -49,7 +49,7 @@ my %graph = (
     "G" => []
 )
 
-my $r1 = Rosetta::Beam::search(
+val $r1 = Rosetta::Beam::search(
     "A",
     fn ($s) { $s eq "G" },
     fn ($s) { $graph{$s} // [] },
@@ -61,7 +61,7 @@ assert_eq $r1->{path}[-1], "G", "ends at G"
 assert_eq $r1->{cost}, 4, "optimal A → B → D → G cost = 4"
 
 # Beam width 1 = greedy: still finds something but may not be optimal.
-my $r2 = Rosetta::Beam::search(
+val $r2 = Rosetta::Beam::search(
     "A",
     fn ($s) { $s eq "G" },
     fn ($s) { $graph{$s} // [] },
@@ -70,8 +70,8 @@ my $r2 = Rosetta::Beam::search(
 assert_ok defined $r2->{path}, "greedy finds something"
 
 # Goal not reachable
-my %trap = ("A" => [["B", 1]], "B" => [["A", 1]])
-my $r3 = Rosetta::Beam::search(
+val %trap = ("A" => [["B", 1]], "B" => [["A", 1]])
+val $r3 = Rosetta::Beam::search(
     "A",
     fn ($s) { $s eq "Z" },
     fn ($s) { $trap{$s} // [] },
@@ -80,7 +80,7 @@ my $r3 = Rosetta::Beam::search(
 assert_ok !defined $r3->{path}, "unreachable returns undef path"
 
 # Start = goal
-my $r4 = Rosetta::Beam::search(
+val $r4 = Rosetta::Beam::search(
     "G",
     fn ($s) { $s eq "G" },
     fn ($s) { [] },
@@ -91,7 +91,7 @@ assert_eq join(",", @{$r4->{path}}), "G", "single-state path"
 
 # Larger problem: weighted lattice. Best path A→I has cost 4
 # (A,1)→(B,1)→(D,1)→(I,1) = 4 with appropriate weights.
-my %lattice = (
+val %lattice = (
     "A" => [["B", 1], ["C", 5]],
     "B" => [["D", 1], ["E", 3]],
     "C" => [["F", 1]],
@@ -102,7 +102,7 @@ my %lattice = (
     "H" => [["I", 1]],
     "I" => []
 )
-my $r5 = Rosetta::Beam::search(
+val $r5 = Rosetta::Beam::search(
     "A",
     fn ($s) { $s eq "I" },
     fn ($s) { $lattice{$s} // [] },
@@ -117,13 +117,13 @@ assert_ok $r5->{cost} <= 8, "lattice cost finite"
 
 # Sequence-style: digits 0..9, find sequence of length 4 minimizing sum.
 # Each step appends a digit 0..3, terminal at length 4. Min sum = 0.
-my $r6 = Rosetta::Beam::search(
+val $r6 = Rosetta::Beam::search(
     [],
     fn ($s) { len(@$s) == 4 },
     fn ($s) {
-        my @succs
-        for my $d (0, 1, 2, 3) {
-            my @ns = @$s
+        var @succs
+        for val $d (0, 1, 2, 3) {
+            var @ns = @$s
             push @ns, $d
             push @succs, [\@ns, $d]
         }

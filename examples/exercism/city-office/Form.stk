@@ -5,6 +5,6 @@ fn Exercism::CityOffice::letters($w)             = [split //, uc($w)]
 fn Exercism::CityOffice::check_length($w, $max)  = len($w) - $max <= 0 ? "ok" : ["error", len($w) - $max]
 
 fn Exercism::CityOffice::format_address($addr) {
-    my ($s, $p, $c) = ref($addr) eq 'HASH' ? ($addr->{street}, $addr->{postal_code}, $addr->{city}) : @{$addr}
+    val ($s, $p, $c) = ref($addr) eq 'HASH' ? ($addr->{street}, $addr->{postal_code}, $addr->{city}) : @{$addr}
     "#{uc($s)}\n#{uc($p)} #{uc($c)}\n"
 }

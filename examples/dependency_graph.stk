@@ -11,7 +11,7 @@
 # ── declare the dependency graph ────────────────────────────────────
 # Real-world-ish stryke / Rust crate dependency layout.
 
-my %deps = (
+val %deps = (
     "stryke-core"    => ["bytecode", "value", "lexer", "parser"],
     "stryke-runtime" => ["stryke-core", "scheduler", "kvstore"],
     "stryke-cli"     => ["stryke-runtime", "config", "term"],
@@ -28,8 +28,8 @@ my %deps = (
 
 printf "── dependency graph: %d packages ───────────────────────\n",
     len(keys %deps)
-for my $pkg (sort { _ cmp _1 } keys %deps) {
-    my @d = @{$deps{$pkg}}
+for val $pkg (sort { _ cmp _1 } keys %deps) {
+    val @d = @{$deps{$pkg}}
     if (len(@d) == 0) {
         printf "  %-18s (no deps)\n", $pkg
     } else {
@@ -44,7 +44,7 @@ mysync @order
 mysync $cycle_found = 0
 
 fn Demo::Topo::visit($node) {
-    my $c = $color{$node} // 0
+    val $c = $color{$node} // 0
     return if $c == 2     # already finished
     if ($c == 1) {
         # Found a cycle.
@@ -52,7 +52,7 @@ fn Demo::Topo::visit($node) {
         return
     }
     $color{$node} = 1
-    for my $child (@{$deps{$node} // []}) {
+    for val $child (@{$deps{$node} // []}) {
         Demo::Topo::visit($child)
     }
     $color{$node} = 2
@@ -64,14 +64,14 @@ fn Demo::Topo::visit($node) {
 @order = ()
 $cycle_found = 0
 
-for my $pkg (sort { _ cmp _1 } keys %deps) {
+for val $pkg (sort { _ cmp _1 } keys %deps) {
     Demo::Topo::visit($pkg)
 }
 
 p ""
 p "── topological order (deps-first) ───────────────────"
-my $i = 0
-for my $pkg (@order) {
+var $i = 0
+for val $pkg (@order) {
     printf "  %2d. %s\n", ++$i, $pkg
 }
 printf "  cycle detected: %s\n", $cycle_found ? "YES" : "no"
@@ -80,27 +80,27 @@ printf "  cycle detected: %s\n", $cycle_found ? "YES" : "no"
 
 p ""
 p "── parallel build layers (BFS) ──────────────────────"
-my %indeg
-for my $pkg (keys %deps) {
+var %indeg
+for val $pkg (keys %deps) {
     $indeg{$pkg} = 0
 }
 # in-degree counts how many packages depend on this one — invert: how
 # many deps each pkg has.
-for my $pkg (keys %deps) {
+for val $pkg (keys %deps) {
     $indeg{$pkg} = len(@{$deps{$pkg}})
 }
 
-my @layers
-my %remaining
+var @layers
+var %remaining
 $remaining{_} = 1 for keys %deps
-my $layer_idx = 0
+var $layer_idx = 0
 
 while (len(keys %remaining) > 0) {
-    my @layer_pkgs
-    for my $pkg (sort { _ cmp _1 } keys %remaining) {
+    var @layer_pkgs
+    for var $pkg (sort { _ cmp _1 } keys %remaining) {
         # Pkg is ready if all its deps are NOT in remaining.
-        my $ready = 1
-        for my $d (@{$deps{$pkg}}) {
+        var $ready = 1
+        for val $d (@{$deps{$pkg}}) {
             if (exists $remaining{$d}) {
                 $ready = 0
                 last
@@ -117,16 +117,16 @@ while (len(keys %remaining) > 0) {
     $layer_idx++
 }
 
-for my $li (0:len(@layers) - 1) {
-    my $layer = $layers[$li]
+for val $li (0:len(@layers) - 1) {
+    val $layer = $layers[$li]
     printf "  layer %d (%d parallel): %s\n",
         $li + 1, len(@$layer), join(", ", @$layer)
 }
 printf "  total layers: %d (would allow up to %d-way parallel build)\n",
     len(@layers),
     do {
-        my $max = 0
-        for my $l (@layers) { $max = len(@$l) if len(@$l) > $max }
+        var $max = 0
+        for val $l (@layers) { $max = len(@$l) if len(@$l) > $max }
         $max
     }
 
@@ -134,21 +134,21 @@ printf "  total layers: %d (would allow up to %d-way parallel build)\n",
 
 p ""
 p "── reverse dependencies (who depends on each pkg?) ──"
-my %dependents
+var %dependents
 $dependents{_} = [] for keys %deps
-for my $pkg (keys %deps) {
-    for my $d (@{$deps{$pkg}}) {
+for val $pkg (keys %deps) {
+    for val $d (@{$deps{$pkg}}) {
         $dependents{$d} = [] unless exists $dependents{$d}
         push @{$dependents{$d}}, $pkg
     }
 }
 
 # Sort by dependent count, descending.
-my @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_}}) } keys %dependents
-for my $pkg (@by_pop) {
-    my $count = len(@{$dependents{$pkg}})
+val @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_}}) } keys %dependents
+for val $pkg (@by_pop) {
+    val $count = len(@{$dependents{$pkg}})
     next if $count == 0
-    my @sorted_deps = sort { _ cmp _1 } @{$dependents{$pkg}}
+    val @sorted_deps = sort { _ cmp _1 } @{$dependents{$pkg}}
     printf "  %-18s used by %d: %s\n", $pkg, $count, join(", ", @sorted_deps)
 }
 
@@ -156,14 +156,14 @@ for my $pkg (@by_pop) {
 
 p ""
 p "── TopK most-depended-on (sketch) ───────────────────"
-my $tk = topk(3)
-for my $pkg (keys %deps) {
-    for my $d (@{$deps{$pkg}}) {
+val $tk = topk(3)
+for val $pkg (keys %deps) {
+    for val $d (@{$deps{$pkg}}) {
         topk_add($tk, $d)
     }
 }
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-18s : %d dependents\n", $h->[0], $h->[1]
 }
 
@@ -171,7 +171,7 @@ for my $h (@hits) {
 
 p ""
 p "── cycle-detection test (inject A -> B -> A) ────────"
-my %cyclic_deps = (
+val %cyclic_deps = (
     "A" => ["B"],
     "B" => ["A"],
 )
@@ -181,18 +181,18 @@ $cycle_found = 0
 
 # Use a local visit fn over %cyclic_deps.
 fn Demo::Cyc::visit($node, $g) {
-    my $c = $color{$node} // 0
+    val $c = $color{$node} // 0
     return if $c == 2
     if ($c == 1) { $cycle_found = 1; return }
     $color{$node} = 1
-    for my $child (@{$g->{$node} // []}) {
+    for val $child (@{$g->{$node} // []}) {
         Demo::Cyc::visit($child, $g)
     }
     $color{$node} = 2
     push @order, $node
 }
 
-for my $node (keys %cyclic_deps) {
+for val $node (keys %cyclic_deps) {
     Demo::Cyc::visit($node, \%cyclic_deps)
 }
 printf "  cycle detected: %s (expected: YES)\n", $cycle_found ? "YES" : "no"

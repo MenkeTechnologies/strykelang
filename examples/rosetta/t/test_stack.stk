@@ -22,7 +22,7 @@ fn Rosetta::Stack::empty($stack) {
     len(@$stack) == 0
 }
 
-my $s = Rosetta::Stack::new()
+val $s = Rosetta::Stack::new()
 $s |> Rosetta::Stack::push(10) |> Rosetta::Stack::push(20)
 
 assert_eq Rosetta::Stack::peek($s), 20, "peek stack"

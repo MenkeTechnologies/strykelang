@@ -5,13 +5,13 @@ fn Rosetta::PascalsTriangleRow::solve($n) {
     if ($n == 0) {
         return (1)
     }
-    my @prev = Rosetta::PascalsTriangleRow::solve($n - 1)
+    val @prev = Rosetta::PascalsTriangleRow::solve($n - 1)
     
     # Pipeline to construct the row: zip shifted arrays, sum pairs, prepend 1, append 1
-    my @left = @prev
+    var @left = @prev
     push @left, 0
-    my @right = (0)
-    for my $v (@prev) { push @right, $v }
+    var @right = (0)
+    for val $v (@prev) { push @right, $v }
 
     ~> zip(\@left, \@right) map { _->[0] + _->[1] }
 }

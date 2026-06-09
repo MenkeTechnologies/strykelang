@@ -4,9 +4,9 @@
 # The Writer monad 'bind' applies a function to a value and accumulates a log.
 
 fn Rosetta::WriterMonad::bind($pair, $func) {
-    my ($val, $log) = @$pair
-    my $res_pair = $func($val)
-    my ($new_val, $new_log) = @$res_pair
+    val ($val, $log) = @$pair
+    val $res_pair = $func($val)
+    val ($new_val, $new_log) = @$res_pair
     [$new_val, $log . $new_log]
 }
 
@@ -20,15 +20,15 @@ fn Rosetta::WriterMonad::half($x) {
 }
 
 # Initial pair: [val, initial_log]
-my $p1 = [10, "Start with 10. "]
+val $p1 = [10, "Start with 10. "]
 
-my $p2 = Rosetta::WriterMonad::bind($p1, fn {Rosetta::WriterMonad::sq})
+val $p2 = Rosetta::WriterMonad::bind($p1, fn {Rosetta::WriterMonad::sq})
 # Expected: [100, "Start with 10. Squared 10. "]
 
 assert_eq $p2->[0], 100, "10^2 = 100"
 assert_eq $p2->[1], "Start with 10. Squared 10. ", "Log matches after sq"
 
-my $p3 = Rosetta::WriterMonad::bind($p2, fn {Rosetta::WriterMonad::half})
+val $p3 = Rosetta::WriterMonad::bind($p2, fn {Rosetta::WriterMonad::half})
 # Expected: [50, "Start with 10. Squared 10. Halved 100. "]
 
 assert_eq $p3->[0], 50, "100/2 = 50"

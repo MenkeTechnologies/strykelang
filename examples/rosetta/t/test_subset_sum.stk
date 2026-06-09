@@ -3,12 +3,12 @@
 
 fn Rosetta::SubsetSum::solve($numbers, $target) {
     # Using an iterative approach for stability in Stryke
-    my %possible = ( 0 => [] )
+    var %possible = ( 0 => [] )
     
-    for my $n (@$numbers) {
-        my %new_possible = %possible
-        for my $sum (keys %possible) {
-            my $new_sum = $sum + $n
+    for val $n (@$numbers) {
+        var %new_possible = %possible
+        for val $sum (keys %possible) {
+            val $new_sum = $sum + $n
             if (!exists $new_possible{$new_sum} && $new_sum <= $target) {
                 $new_possible{$new_sum} = [ @{$possible{$sum}}, $n ]
             }
@@ -19,16 +19,16 @@ fn Rosetta::SubsetSum::solve($numbers, $target) {
     exists $possible{$target} ? $possible{$target} : undef
 }
 
-my @set = (3, 34, 4, 12, 5, 2)
-my $res = Rosetta::SubsetSum::solve(\@set, 9)
+val @set = (3, 34, 4, 12, 5, 2)
+val $res = Rosetta::SubsetSum::solve(\@set, 9)
 assert_ok defined($res), "subset sum 9 exists"
 assert_eq join(",", sort(@$res)), "4,5", "subset sum 9 is 4,5"
 
-my $res2 = Rosetta::SubsetSum::solve(\@set, 15)
+val $res2 = Rosetta::SubsetSum::solve(\@set, 15)
 assert_ok defined($res2), "subset sum 15 exists"
 assert_eq join(",", sort(@$res2)), "12,3", "subset sum 15 is 3,12"
 
-my $res3 = Rosetta::SubsetSum::solve(\@set, 30)
+val $res3 = Rosetta::SubsetSum::solve(\@set, 30)
 assert_ok !defined($res3), "subset sum 30 does not exist"
 
 test_run

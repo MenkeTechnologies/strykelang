@@ -9,33 +9,33 @@
 
 p "── bestow + lick round-trip ──"
 
-my @workers = congregation(3)
+val @workers = congregation(3)
 printf "spawned %d workers\n", len(@workers)
 
 # 1. Bestow a config hash to all workers' %gift.
-my %config = (
+val %config = (
     db_host => "prod.example.com",
     db_port => "5432",
     max_retries => "3",
     timeout_ms => "1000",
 )
-my $bestowed = bestow(\%config, @workers)
+val $bestowed = bestow(\%config, @workers)
 printf "bestow → %d workers accepted the %%gift hash\n", $bestowed
 
 # 2. Each worker reads %gift and stores it into %main::soul.
-my $copy_div = pray "our %gift; %main::soul = %gift; 'copied'", @workers
-my %copy_acks = annex $copy_div
+val $copy_div = pray "our %gift; %main::soul = %gift; 'copied'", @workers
+val %copy_acks = annex $copy_div
 printf "copy → %d workers acknowledged\n", len(keys %copy_acks)
 
 # 3. Lick %soul from every worker — non-destructive snapshot.
-my %souls = lick(@workers)
+val %souls = lick(@workers)
 
 p "── per-worker %soul snapshots ──"
-for my $sid (sort { _ <=> _1 } keys %souls) {
-    my $h = $souls{$sid}
+for val $sid (sort { _ <=> _1 } keys %souls) {
+    val $h = $souls{$sid}
     printf "  worker %d:\n", $sid
     if (ref($h) eq 'HASH') {
-        for my $k (sort keys %$h) {
+        for val $k (sort keys %$h) {
             printf "    %-12s %s\n", $k, $h->{$k}
         }
     } else {
@@ -44,11 +44,11 @@ for my $sid (sort { _ <=> _1 } keys %souls) {
 }
 
 # 4. Verify all 3 workers see the same config (since bestow shipped to all).
-my $first_sid = (sort { _ <=> _1 } keys %souls)[0]
-my $first_keys = ref($souls{$first_sid}) eq 'HASH' ? join(",", sort keys %{$souls{$first_sid}}) : ""
-my $all_same = 1
-for my $sid (keys %souls) {
-    my $k = ref($souls{$sid}) eq 'HASH' ? join(",", sort keys %{$souls{$sid}}) : ""
+val $first_sid = (sort { _ <=> _1 } keys %souls)[0]
+val $first_keys = ref($souls{$first_sid}) eq 'HASH' ? join(",", sort keys %{$souls{$first_sid}}) : ""
+var $all_same = 1
+for val $sid (keys %souls) {
+    val $k = ref($souls{$sid}) eq 'HASH' ? join(",", sort keys %{$souls{$sid}}) : ""
     $all_same = 0 unless $k eq $first_keys
 }
 p $all_same ? "✓ all workers see identical config keys" : "✗ workers diverged"

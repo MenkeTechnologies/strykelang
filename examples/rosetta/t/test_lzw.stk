@@ -2,16 +2,16 @@
 # Rosetta Code: LZW Compression
 
 fn Rosetta::LZW::encode($text) {
-    my %dict
-    for my $i (0:255) { $dict{chr($i)} = $i }
+    var %dict
+    for val $i (0:255) { $dict{chr($i)} = $i }
     
-    my @chars = $text |> chars
-    my @result
-    my $w = ""
-    my $dict_size = 256
+    val @chars = $text |> chars
+    var @result
+    var $w = ""
+    var $dict_size = 256
     
-    for my $c (@chars) {
-        my $wc = $w . $c
+    for val $c (@chars) {
+        val $wc = $w . $c
         if (exists $dict{$wc}) {
             $w = $wc
         } else {
@@ -26,16 +26,16 @@ fn Rosetta::LZW::encode($text) {
 }
 
 fn Rosetta::LZW::decode($codes_ref) {
-    my @codes = @$codes_ref
-    my %dict
-    for my $i (0:255) { $dict{$i} = chr($i) }
+    var @codes = @$codes_ref
+    var %dict
+    for val $i (0:255) { $dict{$i} = chr($i) }
     
-    my $dict_size = 256
-    my $w = $dict{shift @codes}
-    my $result = $w
+    var $dict_size = 256
+    var $w = $dict{shift @codes}
+    var $result = $w
     
-    for my $k (@codes) {
-        my $entry = ""
+    for val $k (@codes) {
+        var $entry = ""
         if (exists $dict{$k}) {
             $entry = $dict{$k}
         } elsif ($k == $dict_size) {
@@ -50,11 +50,11 @@ fn Rosetta::LZW::decode($codes_ref) {
     $result
 }
 
-my $input = "TOBEORNOTTOBEORTOBEORNOT"
-my $encoded = Rosetta::LZW::encode($input)
+val $input = "TOBEORNOTTOBEORTOBEORNOT"
+val $encoded = Rosetta::LZW::encode($input)
 assert_eq join(",", @$encoded), "84,79,66,69,79,82,78,79,84,256,258,260,265,259,261,263", "LZW encode"
 
-my $decoded = Rosetta::LZW::decode($encoded)
+val $decoded = Rosetta::LZW::decode($encoded)
 assert_eq $decoded, $input, "LZW decode"
 
 test_run

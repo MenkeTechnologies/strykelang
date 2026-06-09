@@ -9,11 +9,11 @@ fn Rosetta::RSA::gcd($a, $b) {
 }
 
 fn Rosetta::RSA::mod_inverse($a, $m) {
-    my ($m0, $x0, $x1) = ($m, 0, 1)
+    var ($m0, $x0, $x1) = ($m, 0, 1)
     return 0 if $m == 1
     while ($a > 1) {
-        my $q = $a / $m | 0
-        my $t = $m
+        val $q = $a / $m | 0
+        var $t = $m
         $m = $a % $m
         $a = $t
         $t = $x0
@@ -24,7 +24,7 @@ fn Rosetta::RSA::mod_inverse($a, $m) {
 }
 
 fn Rosetta::RSA::mod_pow($base, $exp, $mod) {
-    my $res = 1
+    var $res = 1
     $base %= $mod
     while ($exp > 0) {
         if ($exp % 2 == 1) {
@@ -37,15 +37,15 @@ fn Rosetta::RSA::mod_pow($base, $exp, $mod) {
 }
 
 fn Rosetta::RSA::generate_keys($p, $q) {
-    my $n = $p * $q
-    my $phi = ($p - 1) * ($q - 1)
+    val $n = $p * $q
+    val $phi = ($p - 1) * ($q - 1)
     
-    my $e = 3
+    var $e = 3
     while (Rosetta::RSA::gcd($e, $phi) != 1) {
         $e += 2
     }
     
-    my $d = Rosetta::RSA::mod_inverse($e, $phi)
+    val $d = Rosetta::RSA::mod_inverse($e, $phi)
     # pub: (e, n), priv: (d, n)
     ([$e, $n], [$d, $n])
 }
@@ -61,22 +61,22 @@ fn Rosetta::RSA::decrypt($c, $priv) {
 # Use small primes for demo (must not overflow during $base * $base)
 # sqrt(2^63 - 1) is about 3e9. So $base can be up to 3e9.
 # $n should be less than 3e9 if we want simple mod_pow without overflow handling.
-my $p = 61
-my $q = 53
-my ($pub, $priv) = Rosetta::RSA::generate_keys($p, $q)
+var $p = 61
+val $q = 53
+val ($pub, $priv) = Rosetta::RSA::generate_keys($p, $q)
 
-my $message = 42
-my $cipher = Rosetta::RSA::encrypt($message, $pub)
-my $plain = Rosetta::RSA::decrypt($cipher, $priv)
+val $message = 42
+val $cipher = Rosetta::RSA::encrypt($message, $pub)
+val $plain = Rosetta::RSA::decrypt($cipher, $priv)
 
 assert_eq $plain, $message, "RSA round trip for message 42"
 
 # Test with a string (char by char for simplicity)
-my $text = "Stryke"
-my @ciphers = ~> $text chars map { 
+val $text = "Stryke"
+val @ciphers = ~> $text chars map { 
     Rosetta::RSA::encrypt(ord(_), $pub) 
 }
-my $decoded = ~> @ciphers map { 
+val $decoded = ~> @ciphers map { 
     chr(Rosetta::RSA::decrypt(_, $priv)) 
 } |> join("")
 

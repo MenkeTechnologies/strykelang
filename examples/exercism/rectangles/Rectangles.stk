@@ -4,26 +4,26 @@
 # edges are unbroken `|` (or `+`) and both horizontal edges are
 # unbroken `-` (or `+`) defines one rectangle.
 fn Exercism::Rectangles::count {
-    my @rows  = split /\n/, _
-    my $count = 0
-    for my $y1 (0..$#rows) {
-        for my $y2 ($y1 + 2..$#rows) {
-            my @c1 = split //, $rows[$y1]
-            my @c2 = split //, $rows[$y2]
-            my $max_x = (len($rows[$y1]) < len($rows[$y2]) ? len($rows[$y1]) : len($rows[$y2])) - 1
-            for my $x1 (0..$max_x) {
+    val @rows  = split /\n/, _
+    var $count = 0
+    for val $y1 (0..$#rows) {
+        for val $y2 ($y1 + 2..$#rows) {
+            val @c1 = split //, $rows[$y1]
+            val @c2 = split //, $rows[$y2]
+            val $max_x = (len($rows[$y1]) < len($rows[$y2]) ? len($rows[$y1]) : len($rows[$y2])) - 1
+            for val $x1 (0..$max_x) {
                 next unless ($c1[$x1] // "") eq "+" && ($c2[$x1] // "") eq "+"
-                for my $x2 ($x1 + 2..$max_x) {
+                for val $x2 ($x1 + 2..$max_x) {
                     next unless ($c1[$x2] // "") eq "+" && ($c2[$x2] // "") eq "+"
-                    my $ok = 1
-                    for my $x ($x1 + 1..$x2 - 1) {
-                        my ($top, $bot) = ($c1[$x] // "", $c2[$x] // "")
+                    var $ok = 1
+                    for val $x ($x1 + 1..$x2 - 1) {
+                        val ($top, $bot) = ($c1[$x] // "", $c2[$x] // "")
                         $top =~ /^[-+]$/ && $bot =~ /^[-+]$/ or do { $ok = 0; last }
                     }
                     next unless $ok
-                    for my $y ($y1 + 1..$y2 - 1) {
-                        my @r = split //, $rows[$y]
-                        my ($l, $rr) = ($r[$x1] // "", $r[$x2] // "")
+                    for val $y ($y1 + 1..$y2 - 1) {
+                        var @r = split //, $rows[$y]
+                        val ($l, $rr) = ($r[$x1] // "", $r[$x2] // "")
                         $l =~ /^[|+]$/ && $rr =~ /^[|+]$/ or do { $ok = 0; last }
                     }
                     $count++ if $ok

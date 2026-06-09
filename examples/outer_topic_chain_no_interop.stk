@@ -18,13 +18,13 @@
 # ── 1. multiplication table (classic nested-map outer access) ──────────────
 
 p "── 5 × 5 multiplication table via nested map + _< ──"
-my @table = map { join(" ", map { sprintf("%4d", _ * _<) } 1:5) } 1:5
-for my $row (@table) {
+val @table = map { join(" ", map { sprintf("%4d", _ * _<) } 1:5) } 1:5
+for val $row (@table) {
     p "  $row"
 }
 
 # Sanity-check the diagonal: cell[i][i] should be i*i.
-my $diag = ~> map { (_ - 1) * 5 + (_ - 1) } 1:5 sum
+val $diag = ~> map { (_ - 1) * 5 + (_ - 1) } 1:5 sum
 p ""
 p "  diagonal-position sum check: $diag (expect 60 = 0+6+12+18+24)"
 die "expected 60" unless $diag == 60
@@ -33,7 +33,7 @@ die "expected 60" unless $diag == 60
 
 p ""
 p "── 3-level nested map: (outer-bonus + inner-row + inner-col) ──"
-my @scores = map {                                    # _ = bonus ∈ {100, 200}
+val @scores = map {                                    # _ = bonus ∈ {100, 200}
     map {                                             # _ = row ∈ {10, 20}, _< = bonus
         map {                                         # _ = col ∈ {1, 2}, _< = row, _<< = bonus
             _ + _< + _<<
@@ -57,13 +57,13 @@ die "last cell wrong"  unless $scores[-1] == 222
 
 p ""
 p "── grep inside outer map: threshold drawn from _< ──"
-my @thresholds = (10, 50, 100)
-my @data = (5, 15, 60, 99, 200, 300)
-my @hits = map {
+val @thresholds = (10, 50, 100)
+val @data = (5, 15, 60, 99, 200, 300)
+val @hits = map {
     [_, [grep { _ > _< } @data]]
 } @thresholds
 
-for my $pair (@hits) {
+for val $pair (@hits) {
     printf("  threshold=%3d  keep: @{$pair->[1]}\n", $pair->[0])
 }
 
@@ -75,7 +75,7 @@ die "threshold 100 should keep 2 items" unless len(@{$hits[2][1]}) == 2
 
 p ""
 p "── 5-deep nested map: _<<<< reaches the outermost ──"
-my @deep = map {                                # L5: _ = 10000
+val @deep = map {                                # L5: _ = 10000
     map {                                       # L4: _ = 1000, _< = 10000
         map {                                   # L3: _ = 100,  _<< = 10000
             map {                               # L2: _ = 10,   _<<< = 10000
@@ -93,15 +93,15 @@ die "expected 11111" unless $deep[0] == 11111
 
 p ""
 p "── outer product of two vectors (4×3 matrix) ──"
-my @rows = ([10, 20, 30], [40, 50, 60, 70])
-my @outer_prod = map { my @v = @{_}; map { _ * _< } @v } map { _ } (3, 7)
+val @rows = ([10, 20, 30], [40, 50, 60, 70])
+val @outer_prod = map { val @v = @{_}; map { _ * _< } @v } map { _ } (3, 7)
 # Above is contrived; do the simpler outer-product form instead.
-my @v1 = (1, 2, 3, 4)
-my @v2 = (10, 100, 1000)
-my @prod = map {                  # _ = a, outer
+val @v1 = (1, 2, 3, 4)
+val @v2 = (10, 100, 1000)
+val @prod = map {                  # _ = a, outer
     [ map { _ * _< } @v2 ]        # _ = b, _< = a
 } @v1
-for my $row (@prod) {
+for val $row (@prod) {
     printf("  [%s]\n", join(" ", @$row))
 }
 die "expected 4 rows"  unless len(@prod) == 4

@@ -38,7 +38,7 @@ fn Project::Refs::array_ref_pop($aref) {
 }
 
 fn Project::Refs::array_ref_slice($aref, $start, $end) {
-    my @result = @{$aref}[$start:$end]
+    val @result = @{$aref}[$start:$end]
     \@result
 }
 
@@ -58,12 +58,12 @@ fn Project::Refs::hash_ref_set($href, $key, $val) {
 }
 
 fn Project::Refs::hash_ref_keys($href) {
-    my @k = keys %$href
+    val @k = keys %$href
     @k
 }
 
 fn Project::Refs::hash_ref_values($href) {
-    my @v = values %$href
+    val @v = values %$href
     @v
 }
 
@@ -145,14 +145,14 @@ fn Project::Refs::is_scalar_ref($ref) {
 # ── Autovivification ───────────────────────────────────────────────
 
 fn Project::Refs::autoviv_array {
-    my $data = { items => [] }
+    val $data = { items => [] }
     $data->{items}->[0] = "first"
     $data->{items}->[1] = "second"
     $data
 }
 
 fn Project::Refs::autoviv_hash {
-    my $data = { nested => { deep => {} } }
+    val $data = { nested => { deep => {} } }
     $data->{nested}->{deep}->{value} = 42
     $data
 }
@@ -160,16 +160,16 @@ fn Project::Refs::autoviv_hash {
 # ── Reference counting / aliasing ──────────────────────────────────
 
 fn Project::Refs::alias_test {
-    my @arr = (1, 2, 3)
-    my $ref1 = \@arr
-    my $ref2 = $ref1
+    val @arr = (1, 2, 3)
+    val $ref1 = \@arr
+    val $ref2 = $ref1
     push @$ref2, 4
     scalar @arr
 }
 
 fn Project::Refs::modify_alias {
-    my %hash = (a => 1)
-    my $ref = \%hash
+    val %hash = (a => 1)
+    var $ref = \%hash
     $ref->{b} = 2
     $hash{a} + $hash{b}
 }
@@ -182,12 +182,12 @@ fn Project::Refs::make_tree_node($val, $left, $right) {
 
 fn Project::Refs::tree_sum($node) {
     if (!defined $node) { return 0 }
-    my $v = $node->{value} // 0
-    my $l = 0
+    val $v = $node->{value} // 0
+    var $l = 0
     if (exists $node->{left} && defined $node->{left}) {
         $l = Project::Refs::tree_sum($node->{left})
     }
-    my $r = 0
+    var $r = 0
     if (exists $node->{right} && defined $node->{right}) {
         $r = Project::Refs::tree_sum($node->{right})
     }
@@ -195,16 +195,16 @@ fn Project::Refs::tree_sum($node) {
 }
 
 fn Project::Refs::make_linked_list(@vals) {
-    my $head = undef
-    for my $v (rev @vals) {
+    var $head = undef
+    for val $v (rev @vals) {
         $head = { value => $v, next => $head }
     }
     $head
 }
 
 fn Project::Refs::list_length($head) {
-    my $count = 0
-    my $curr = $head
+    var $count = 0
+    var $curr = $head
     while (defined $curr) {
         $count++
         $curr = $curr->{next}
@@ -213,8 +213,8 @@ fn Project::Refs::list_length($head) {
 }
 
 fn Project::Refs::list_to_array($head) {
-    my @result
-    my $curr = $head
+    var @result
+    var $curr = $head
     while (defined $curr) {
         push @result, $curr->{value}
         $curr = $curr->{next}
@@ -225,8 +225,8 @@ fn Project::Refs::list_to_array($head) {
 # ── WeakRef-like patterns ──────────────────────────────────────────
 
 fn Project::Refs::circular_safe {
-    my $a = { name => "A" }
-    my $b = { name => "B" }
+    var $a = { name => "A" }
+    val $b = { name => "B" }
     $a->{ref} = $b
     $a->{name} . "-" . $b->{name}
 }

@@ -2,12 +2,12 @@
 # Rosetta Code: Bacon's cipher
 
 fn Rosetta::Bacon::encode($text) {
-    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
-    my @chars = $t |> chars()
+    val $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    val @chars = $t |> chars()
     
-    my @res = ~> @chars map {
-        my $v = ord(_) - ord("A")
-        my $bin = sprintf("%05b", $v)
+    val @res = ~> @chars map {
+        val $v = ord(_) - ord("A")
+        var $bin = sprintf("%05b", $v)
         $bin =~ tr/01/ab/r
     }
     
@@ -15,20 +15,20 @@ fn Rosetta::Bacon::encode($text) {
 }
 
 fn Rosetta::Bacon::decode($text) {
-    my $t = $text |> lc() |> { _ =~ s/[^ab]//gr }
+    val $t = $text |> lc() |> { _ =~ s/[^ab]//gr }
     
-    my @res
-    for (my $i = 0; $i < length($t); $i += 5) {
-        my $chunk = substr($t, $i, 5)
-        my $bin = $chunk =~ tr/ab/01/r
+    var @res
+    for (var $i = 0; $i < length($t); $i += 5) {
+        var $chunk = substr($t, $i, 5)
+        val $bin = $chunk =~ tr/ab/01/r
         push @res, chr(oct("0b$bin") + ord("A"))
     }
     
     join("", @res)
 }
 
-my $t = "HELLOWORLD"
-my $enc = Rosetta::Bacon::encode($t)
+val $t = "HELLOWORLD"
+val $enc = Rosetta::Bacon::encode($t)
 assert_eq $enc, "aabbb aabaa ababb ababb abbba babba abbba baaab ababb aaabb", "encode HELLO WORLD with Bacon's cipher"
 assert_eq Rosetta::Bacon::decode($enc), "HELLOWORLD", "decode Bacon's cipher"
 

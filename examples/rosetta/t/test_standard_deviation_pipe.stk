@@ -2,16 +2,16 @@
 # Rosetta Code: Standard deviation (using pipes)
 
 fn Rosetta::Stats::standard_deviation(@data) {
-    my $n = len(@data)
+    val $n = len(@data)
     if ($n == 0) { return 0 }
     
-    my $mean = sum(@data) / $n
+    val $mean = sum(@data) / $n
     
-    my $variance = @data |> map { (_ - $mean) ** 2 } |> sum() |> { _ / $n }
+    val $variance = @data |> map { (_ - $mean) ** 2 } |> sum() |> { _ / $n }
     return sqrt($variance)
 }
 
-my @data = (2, 4, 4, 4, 5, 5, 7, 9)
+val @data = (2, 4, 4, 4, 5, 5, 7, 9)
 # Mean: 40 / 8 = 5
 # Squares: (2-5)^2=9, (4-5)^2=1, 1, 1, (5-5)^2=0, 0, (7-5)^2=4, (9-5)^2=16
 # Sum: 9+1+1+1+0+0+4+16 = 32

@@ -3,11 +3,11 @@
 # with j strictly less than i, so no element stays in its original position).
 
 fn Rosetta::Sattolo::shuffle($arr) {
-    my @a = @$arr
-    my $n = len(@a)
-    for (my $i = $n - 1; $i > 0; $i -= 1) {
-        my $j = int(rand($i))      # 0 <= j < i  (strict, never j == i)
-        my $tmp = $a[$i]
+    var @a = @$arr
+    val $n = len(@a)
+    for (var $i = $n - 1; $i > 0; $i -= 1) {
+        val $j = int(rand($i))      # 0 <= j < i  (strict, never j == i)
+        val $tmp = $a[$i]
         $a[$i] = $a[$j]
         $a[$j] = $tmp
     }
@@ -15,18 +15,18 @@ fn Rosetta::Sattolo::shuffle($arr) {
 }
 
 # Length is preserved
-my @input = (1:10)
-my $out = Rosetta::Sattolo::shuffle(\@input)
+val @input = (1:10)
+val $out = Rosetta::Sattolo::shuffle(\@input)
 assert_eq len(@$out), 10, "length preserved"
 
 # Same multiset
-my @sorted_in  = sort { _0 <=> _1 } @input
-my @sorted_out = sort { _0 <=> _1 } @$out
+val @sorted_in  = sort { _0 <=> _1 } @input
+val @sorted_out = sort { _0 <=> _1 } @$out
 assert_eq join(",", @sorted_out), join(",", @sorted_in), "same elements (multiset)"
 
 # Sattolo property: NO element ends in its original position (a single n-cycle)
-my $any_fixed = 0
-for my $i (0:9) {
+var $any_fixed = 0
+for val $i (0:9) {
     $any_fixed = 1 if $out->[$i] == $input[$i]
 }
 assert_eq $any_fixed, 0, "Sattolo: no fixed points"
@@ -34,14 +34,14 @@ assert_eq $any_fixed, 0, "Sattolo: no fixed points"
 # A single full cycle: starting at index 0 and following the permutation,
 # we should visit all n positions before returning to 0.
 fn Rosetta::Sattolo::cycle_length($perm, $orig) {
-    my %pos
-    for my $i (0..len(@$orig)-1) { $pos{$orig->[$i]} = $i }
-    my $start = $perm->[0]
-    my $count = 1
-    my $cur   = $start
+    var %pos
+    for val $i (0..len(@$orig)-1) { $pos{$orig->[$i]} = $i }
+    val $start = $perm->[0]
+    var $count = 1
+    var $cur   = $start
     while (1) {
-        my $next_idx = $pos{$cur}
-        my $next_val = $perm->[$next_idx]
+        val $next_idx = $pos{$cur}
+        val $next_val = $perm->[$next_idx]
         last if $next_val == $perm->[0]
         $cur = $next_val
         $count += 1
@@ -51,22 +51,22 @@ fn Rosetta::Sattolo::cycle_length($perm, $orig) {
 }
 
 # Run multiple shuffles and confirm each produces a single cycle of length n
-for my $trial (1:20) {
-    my @arr = (1:8)
-    my $shuf = Rosetta::Sattolo::shuffle(\@arr)
-    my $clen = Rosetta::Sattolo::cycle_length($shuf, \@arr)
+for val $trial (1:20) {
+    val @arr = (1:8)
+    val $shuf = Rosetta::Sattolo::shuffle(\@arr)
+    val $clen = Rosetta::Sattolo::cycle_length($shuf, \@arr)
     assert_eq $clen, 8, "trial $trial: full single cycle of length 8"
 }
 
 # Edge case: 2-element array always swaps
-for my $trial (1:10) {
-    my $r = Rosetta::Sattolo::shuffle([1, 2])
+for val $trial (1:10) {
+    val $r = Rosetta::Sattolo::shuffle([1, 2])
     assert_eq $r->[0], 2, "2-elem trial $trial: first is 2"
     assert_eq $r->[1], 1, "2-elem trial $trial: second is 1"
 }
 
 # Single-element identity (n=1: no work)
-my $r1 = Rosetta::Sattolo::shuffle([7])
+val $r1 = Rosetta::Sattolo::shuffle([7])
 assert_eq $r1->[0], 7, "single element unchanged"
 
 test_run

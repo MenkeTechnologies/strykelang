@@ -6,15 +6,15 @@ fn Rosetta::Coverage::node($name, $weight, $coverage, $children) {
 }
 
 fn Rosetta::Coverage::score($node) {
-    my $children = $node->{children}
+    val $children = $node->{children}
     if (len(@$children) == 0) {
         return defined($node->{coverage}) ? $node->{coverage} : 0.0
     }
 
-    my $num = 0.0
-    my $den = 0.0
-    for my $child (@$children) {
-        my $w = defined($child->{weight}) ? $child->{weight} : 1.0
+    var $num = 0.0
+    var $den = 0.0
+    for val $child (@$children) {
+        val $w = defined($child->{weight}) ? $child->{weight} : 1.0
         $num += $w * Rosetta::Coverage::score($child)
         $den += $w
     }
@@ -76,10 +76,10 @@ fn Rosetta::Coverage::sample_tree() {
     ])
 }
 
-my $tree = Rosetta::Coverage::sample_tree()
-my $house1 = Rosetta::Coverage::score($tree->{children}[0])
-my $house2 = Rosetta::Coverage::score($tree->{children}[1])
-my $total  = Rosetta::Coverage::score($tree)
+val $tree = Rosetta::Coverage::sample_tree()
+val $house1 = Rosetta::Coverage::score($tree->{children}[0])
+val $house2 = Rosetta::Coverage::score($tree->{children}[1])
+val $total  = Rosetta::Coverage::score($tree)
 
 assert_ok abs($house1 - 0.33125) < 1e-12, "house1 weighted score"
 assert_ok abs($house2 - 0.3777777778) < 1e-9, "house2 weighted score"

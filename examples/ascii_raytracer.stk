@@ -24,24 +24,24 @@ struct Vec3 {
 
 # ── Scene constants ───────────────────────────────────────────────
 
-my $W = 60
-my $H = 30
-my $RAMP = " .:-=+*#%@"
+val $W = 60
+val $H = 30
+val $RAMP = " .:-=+*#%@"
 
-my $LIGHT_DIR = Vec3(x => 1.0, y => -1.0, z => -1.0)->unit()
+val $LIGHT_DIR = Vec3(x => 1.0, y => -1.0, z => -1.0)->unit()
 
 # Sphere at (0, 0, 5) with radius 1.5
-my $SPHERE_CENTER = Vec3(x => 0.0, y => 0.0, z => 5.0)
-my $SPHERE_RADIUS = 1.5
+val $SPHERE_CENTER = Vec3(x => 0.0, y => 0.0, z => 5.0)
+val $SPHERE_RADIUS = 1.5
 
 # ── Ray-Sphere intersection ───────────────────────────────────────
 
 fn RT::hit_sphere($origin, $dir) {
-    my $oc = $origin->sub($SPHERE_CENTER)
-    my $qa = $dir->dot($dir)
-    my $qb = 2.0 * $oc->dot($dir)
-    my $qc = $oc->dot($oc) - $SPHERE_RADIUS * $SPHERE_RADIUS
-    my $discriminant = $qb * $qb - 4.0 * $qa * $qc
+    val $oc = $origin->sub($SPHERE_CENTER)
+    val $qa = $dir->dot($dir)
+    val $qb = 2.0 * $oc->dot($dir)
+    val $qc = $oc->dot($oc) - $SPHERE_RADIUS * $SPHERE_RADIUS
+    val $discriminant = $qb * $qb - 4.0 * $qa * $qc
     
     if ($discriminant < 0) {
         return -1.0
@@ -55,31 +55,31 @@ fn RT::hit_sphere($origin, $dir) {
 p "── ASCII Ray Tracer ────────────────────────────────────"
 
 # Camera at origin
-my $cam_origin = Vec3(x => 0.0, y => 0.0, z => 0.0)
+val $cam_origin = Vec3(x => 0.0, y => 0.0, z => 0.0)
 
-for my $y (0:$H - 1) {
-    my @row
-    for my $x (0:$W - 1) {
+for val $y (0:$H - 1) {
+    var @row
+    for val $x (0:$W - 1) {
         # Map pixel to screen coords (-1.5 to 1.5)
         # Adjust for non-square terminal characters
-        my $u = ($x / ($W - 1) - 0.5) * 3.0 * ($W / $H * 0.5)
-        my $v = ($y / ($H - 1) - 0.5) * 3.0
+        val $u = ($x / ($W - 1) - 0.5) * 3.0 * ($W / $H * 0.5)
+        val $v = ($y / ($H - 1) - 0.5) * 3.0
         
-        my $dir = Vec3(x => $u, y => $v, z => 1.0)->unit()
+        val $dir = Vec3(x => $u, y => $v, z => 1.0)->unit()
         
-        my $t = RT::hit_sphere($cam_origin, $dir)
+        val $t = RT::hit_sphere($cam_origin, $dir)
         
         if ($t > 0) {
             # Intersection point
-            my $hit_pt = $cam_origin->add($dir->mul($t))
+            val $hit_pt = $cam_origin->add($dir->mul($t))
             # Normal at hit point
-            my $normal = $hit_pt->sub($SPHERE_CENTER)->unit()
+            val $normal = $hit_pt->sub($SPHERE_CENTER)->unit()
             
             # Lambertian shading (diffuse)
-            my $shading = $normal->dot($LIGHT_DIR)
+            var $shading = $normal->dot($LIGHT_DIR)
             $shading = 0.0 if $shading < 0
             
-            my $idx = int($shading * (len($RAMP) - 1))
+            val $idx = int($shading * (len($RAMP) - 1))
             push @row, $RAMP[$idx]
         } else {
             push @row, " "
@@ -91,8 +91,8 @@ for my $y (0:$H - 1) {
 p "── Render Complete ─────────────────────────────────────"
 
 # ── Self-test ─────────────────────────────────────────────────────
-my $test_dir = Vec3(x => 0.0, y => 0.0, z => 1.0)
-my $test_t = RT::hit_sphere($cam_origin, $test_dir)
+val $test_dir = Vec3(x => 0.0, y => 0.0, z => 1.0)
+val $test_t = RT::hit_sphere($cam_origin, $test_dir)
 die "Ray should hit sphere" unless $test_t > 0
 die "Ray hit distance mismatch: #{$test_t}" unless abs($test_t - 3.5) < 1e-4
 

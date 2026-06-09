@@ -6,11 +6,11 @@
 # Run: stryke --no-interop examples/interval_scheduler.stk
 
 fn IS::schedule($intervals) {
-    my @sorted = sort { _->[1] <=> _1->[1] } @$intervals
-    my @chosen = ()
-    my $last_end = -9999999999
-    for my $iv (@sorted) {
-        my ($s, $e) = @$iv
+    val @sorted = sort { _->[1] <=> _1->[1] } @$intervals
+    var @chosen = ()
+    var $last_end = -9999999999
+    for val $iv (@sorted) {
+        val ($s, $e) = @$iv
         if ($s >= $last_end) {
             push @chosen, $iv
             $last_end = $e
@@ -20,12 +20,12 @@ fn IS::schedule($intervals) {
 }
 
 fn IS::overlaps($intervals) {
-    my $count = 0
-    my $n = len @$intervals
-    for my $i (0:$n-1) {
-        for my $j ($i+1:$n-1) {
-            my ($a1, $a2) = @{$intervals->[$i]}
-            my ($b1, $b2) = @{$intervals->[$j]}
+    var $count = 0
+    val $n = len @$intervals
+    for val $i (0:$n-1) {
+        for val $j ($i+1:$n-1) {
+            val ($a1, $a2) = @{$intervals->[$i]}
+            val ($b1, $b2) = @{$intervals->[$j]}
             $count = $count + 1 if $a1 < $b2 && $b1 < $a2
         }
     }
@@ -35,11 +35,11 @@ fn IS::overlaps($intervals) {
 fn IS::fmt($iv) { "[" . $iv->[0] . "," . $iv->[1] . ")" }
 
 p "=== Interval Scheduler Demo ==="
-my @ivs = (
+val @ivs = (
     [1,4], [3,5], [0,6], [5,7], [3,9], [5,9], [6,10], [8,11], [8,12], [2,14], [12,16]
 )
 p "input: " . join(" ", map { IS::fmt(_) } @ivs)
-my $best = IS::schedule(\@ivs)
+val $best = IS::schedule(\@ivs)
 p "chosen (" . len(@$best) . "): " . join(" ", map { IS::fmt(_) } @$best)
 p "overlap pairs in input: " . IS::overlaps(\@ivs)
 p "overlap pairs in chosen: " . IS::overlaps($best)

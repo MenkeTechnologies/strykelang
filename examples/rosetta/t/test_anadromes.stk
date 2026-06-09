@@ -2,12 +2,12 @@
 # Rosetta Code: Anadromes
 
 fn Rosetta::Anadromes::find(@words) {
-    my %dict
-    for my $w (@words) { $dict{$w} = 1 }
+    var %dict
+    for val $w (@words) { $dict{$w} = 1 }
     
-    my @anadromes
-    for my $w (@words) {
-        my $rev = rev($w)
+    var @anadromes
+    for val $w (@words) {
+        val $rev = rev($w)
         if ($rev ne $w && exists $dict{$rev}) {
             push @anadromes, "$w-$rev"
             delete $dict{$w}
@@ -17,8 +17,8 @@ fn Rosetta::Anadromes::find(@words) {
     @anadromes
 }
 
-my @list = ("stop", "pots", "stressed", "desserts", "hello", "world", "raw", "war")
-my @res = Rosetta::Anadromes::find(@list)
+val @list = ("stop", "pots", "stressed", "desserts", "hello", "world", "raw", "war")
+val @res = Rosetta::Anadromes::find(@list)
 
 assert_eq len(@res), 3, "found 3 pairs"
 assert_eq join(",", sort @res), "raw-war,stop-pots,stressed-desserts", "anadromes pairs"

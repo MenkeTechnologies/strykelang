@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 
 fn Exercism::FlattenArray::flatten {
-    my @out
-    for my $x (@{_}) {
+    var @out
+    for val $x (@{_}) {
         ref($x) eq 'ARRAY' ? push(@out, @{Exercism::FlattenArray::flatten($x)})
                            : defined($x) && push(@out, $x)
     }

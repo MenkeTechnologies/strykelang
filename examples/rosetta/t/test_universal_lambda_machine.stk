@@ -24,7 +24,7 @@ fn Rosetta::ULM::subst1($term, $arg) {
 
 fn Rosetta::ULM::eval($term) {
     if ($term->{type} eq "app") {
-        my $left = Rosetta::ULM::eval($term->{left})
+        val $left = Rosetta::ULM::eval($term->{left})
         return Rosetta::ULM::eval(Rosetta::ULM::subst1($left->{body}, $term->{right})) if $left->{type} eq "lam"
     }
     $term
@@ -36,9 +36,9 @@ fn Rosetta::ULM::show($term) {
     "(app " . Rosetta::ULM::show($term->{left}) . " " . Rosetta::ULM::show($term->{right}) . ")"
 }
 
-my $id = Rosetta::ULM::parse("0010")
-my $app = Rosetta::ULM::parse("0100100010")
-my $reduced = Rosetta::ULM::eval($app)
+val $id = Rosetta::ULM::parse("0010")
+val $app = Rosetta::ULM::parse("0100100010")
+val $reduced = Rosetta::ULM::eval($app)
 
 assert_eq Rosetta::ULM::show($id), "(lam v1)", "identity term parses from BLC bits"
 assert_eq Rosetta::ULM::show($app), "(app (lam v1) (lam v1))", "application parses from BLC bits"

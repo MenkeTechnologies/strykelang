@@ -3,16 +3,16 @@
 # Pinning batch Fixed-Bugs (2026-05-10): Regression guards for recently fixed bugs
 # Compliance: docs/STYLE_GUIDE.md
 
-# BUG-090: my ($x_90, @y_90) = (1, 2, 3) binds @y to tail
-my ($x_90, @y_90) = (1, 2, 3)
+# BUG-090: val ($x_90, @y_90) = (1, 2, 3) binds @y to tail
+val ($x_90, @y_90) = (1, 2, 3)
 $x_90 |> aeq 1, "BUG-090: head binds correctly"
 @y_90 |> len |> aeq 2, "BUG-090: tail binds correctly"
 
-# BUG-101 (FIXED): my ($x) = @arr now binds the first element correctly
+# BUG-101 (FIXED): val ($x) = @arr now binds the first element correctly
 # (was returning scalar count).
-my @arr_101 = (10, 20, 30)
-my ($first_101) = @arr_101
-$first_101 |> aeq 10, 'BUG-101 (FIXED): my ($x) = @arr binds first element'
+val @arr_101 = (10, 20, 30)
+val ($first_101) = @arr_101
+$first_101 |> aeq 10, 'BUG-101 (FIXED): val ($x) = @arr binds first element'
 
 # BUG-110: use strict followed by fn on next line
 use strict
@@ -26,7 +26,7 @@ class BUG_114_C {
     fn get_val { return $self->val }
 }
 # BUG-114 fix allowed Class->new or Class()
-my $obj_114 = BUG_114_C()
+val $obj_114 = BUG_114_C()
 $obj_114->set_val(42)
 $obj_114->get_val() |> aeq 42, "BUG-114: class method works"
 ref($obj_114) |> aeq "BUG_114_C", "BUG-114: ref() returns class name"
@@ -40,13 +40,13 @@ fn BUG_115_test {
 BUG_115_test(5, 7) |> aeq 12, 'BUG-115: strict vars exempts _, _1'
 
 # BUG-117: psort terminates at newline
-my @s_117 = (3, 1, 2) |> psort { _ <=> _1 }
-my $n_117 = len(@s_117)
+val @s_117 = (3, 1, 2) |> psort { _ <=> _1 }
+val $n_117 = len(@s_117)
 $n_117 |> aeq 3, "BUG-117: psort block terminates at newline"
 @s_117[0] |> aeq 1, "BUG-117: psort actually sorts"
 
 # BUG-027: $#a = N resizes array
-my @a_027 = (1, 2, 3, 4, 5)
+val @a_027 = (1, 2, 3, 4, 5)
 $#a_027 = 2
 @a_027 |> len |> aeq 3, 'BUG-027: $#a = N truncates array'
 $#a_027 = 4
@@ -54,7 +54,7 @@ $#a_027 = 4
 @a_027[4] |> aeq undef, 'BUG-027: $#a = N pads with undef'
 
 # BUG-019: for (@arr) { _ *= 10 } aliases array element
-my @a_019 = (1, 2, 3)
+val @a_019 = (1, 2, 3)
 for (@a_019) { _ *= 10 }
 @a_019[0] |> aeq 10, "BUG-019: for loop aliases elements (0)"
 @a_019[2] |> aeq 30, "BUG-019: for loop aliases elements (2)"

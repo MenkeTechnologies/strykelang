@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 require "./Grep.stk"
 
-my $f1 = { name => "a.txt", content => "Hello world\nLine two\nGoodbye world\n" }
-my $f2 = { name => "b.txt", content => "another\nworld here\n" }
+val $f1 = { name => "a.txt", content => "Hello world\nLine two\nGoodbye world\n" }
+val $f2 = { name => "b.txt", content => "another\nworld here\n" }
 
 assert_eq Exercism::Grep::grep("world", "",  [$f1]),         "Hello world\nGoodbye world\n",                       "single file"
 assert_eq Exercism::Grep::grep("world", "n", [$f1]),         "1:Hello world\n3:Goodbye world\n",                    "-n"

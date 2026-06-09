@@ -5,10 +5,10 @@ fn Rosetta::DeleteFile::delete($path) {
     unlink $path
 }
 
-my $tmp_file = "/tmp/stryke_test_delete_file.txt"
+val $tmp_file = "/tmp/stryke_test_delete_file.txt"
 
 # Setup
-open my $fh, '>', $tmp_file or die "Could not setup file"
+open val $fh, '>', $tmp_file or die "Could not setup file"
 print $fh "temp"
 close $fh
 

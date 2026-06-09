@@ -2,11 +2,11 @@
 # Rosetta Code: File modification time
 
 fn Rosetta::FileMTime::demo() {
-    my $file = "/tmp/rosetta_mtime.txt"
+    val $file = "/tmp/rosetta_mtime.txt"
     write_file($file, "test")
     
     # Get modification time
-    my $mtime = file_mtime($file)
+    val $mtime = file_mtime($file)
     
     "File modification time of '$file': $mtime" |> p
     

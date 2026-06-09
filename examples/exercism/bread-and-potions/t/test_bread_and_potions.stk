@@ -1,17 +1,17 @@
 #!/usr/bin/env stryke
 require "./RPG.stk"
 
-my $char = { health => 50, mana => 20 }
+var $char = { health => 50, mana => 20 }
 
-my $b = Exercism::RPG::eat({ kind => "LoafOfBread" }, $char)
+val $b = Exercism::RPG::eat({ kind => "LoafOfBread" }, $char)
 assert_eq $b->[0], undef, "bread leaves nothing"
 assert_eq $b->[1]{health}, 55, "bread +5 health"
 
-my $p = Exercism::RPG::eat({ kind => "ManaPotion", strength => 15 }, $char)
+val $p = Exercism::RPG::eat({ kind => "ManaPotion", strength => 15 }, $char)
 assert_eq $p->[0]{kind}, "EmptyBottle", "potion returns empty bottle"
 assert_eq $p->[1]{mana}, 35,            "potion +15 mana"
 
-my $poison = Exercism::RPG::eat({ kind => "Poison" }, $char)
+val $poison = Exercism::RPG::eat({ kind => "Poison" }, $char)
 assert_eq $poison->[1]{health}, 0, "poison kills"
 
 test_run

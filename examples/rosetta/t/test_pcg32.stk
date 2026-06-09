@@ -2,7 +2,7 @@
 # Rosetta Code: Pseudo-random numbers/PCG32
 
 fn Rosetta::PCG32::new($seed, $seq) {
-    my $h = +{
+    var $h = +{
         state => 0,
         inc => ($seq << 1) | 1
     }
@@ -13,20 +13,20 @@ fn Rosetta::PCG32::new($seed, $seq) {
 }
 
 fn Rosetta::PCG32::next($h) {
-    my $oldstate = $h->{state}
+    val $oldstate = $h->{state}
     $h->{state} = ($oldstate * 6364136223846793005 + $h->{inc}) & ~0
     
-    my $xorshifted = ((($oldstate >> 18) ^ $oldstate) >> 27) & 0xFFFFFFFF
-    my $rot = ($oldstate >> 59) & 31
+    val $xorshifted = ((($oldstate >> 18) ^ $oldstate) >> 27) & 0xFFFFFFFF
+    val $rot = ($oldstate >> 59) & 31
     
-    my $res = (($xorshifted >> $rot) | ($xorshifted << ((-$rot) & 31))) & 0xFFFFFFFF
+    val $res = (($xorshifted >> $rot) | ($xorshifted << ((-$rot) & 31))) & 0xFFFFFFFF
     $res
 }
 
 # Test with a specific seed
-my $rng = Rosetta::PCG32::new(42, 54)
-my @nums
-for my $i (1:5) {
+val $rng = Rosetta::PCG32::new(42, 54)
+var @nums
+for val $i (1:5) {
     push @nums, Rosetta::PCG32::next($rng)
 }
 

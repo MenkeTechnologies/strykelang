@@ -16,8 +16,8 @@ fn find($parent, $i) {
 }
 
 fn union_sets($parent, $rank, $i, $j) {
-    my $root_i = TarjanLCA::find($parent, $i)
-    my $root_j = TarjanLCA::find($parent, $j)
+    val $root_i = TarjanLCA::find($parent, $i)
+    val $root_j = TarjanLCA::find($parent, $j)
     if ($root_i != $root_j) {
         if ($rank->[$root_i] < $rank->[$root_j]) {
             $parent->[$root_i] = $root_j
@@ -35,42 +35,42 @@ fn dfs($u, $adj, $queries, $parent, $rank, $ancestor, $visited, $res) {
     $ancestor->[$u] = $u
     $visited->[$u] = 1
     
-    my $neighbors = $adj->[$u] // []
-    for my $v (@$neighbors) {
+    val $neighbors = $adj->[$u] // []
+    for val $v (@$neighbors) {
         if (!$visited->[$v]) {
             TarjanLCA::dfs($v, $adj, $queries, $parent, $rank, $ancestor, $visited, $res)
             TarjanLCA::union_sets($parent, $rank, $u, $v)
-            my $root_u = TarjanLCA::find($parent, $u)
+            val $root_u = TarjanLCA::find($parent, $u)
             $ancestor->[$root_u] = $u
         }
     }
     
-    my $qs = $queries->[$u] // []
-    for my $q (@$qs) {
-        my $v = $q->{node}
-        my $idx = $q->{idx}
+    val $qs = $queries->[$u] // []
+    for val $q (@$qs) {
+        val $v = $q->{node}
+        val $idx = $q->{idx}
         if ($visited->[$v]) {
-            my $root_v = TarjanLCA::find($parent, $v)
+            val $root_v = TarjanLCA::find($parent, $v)
             $res->[$idx] = $ancestor->[$root_v]
         }
     }
 }
 
 fn solve($n, $root, $adj, $query_pairs) {
-    my @parent = (0) x $n
-    my @rank = (0) x $n
-    my @ancestor = (0) x $n
-    my @visited = (0) x $n
-    my @res = (-1) x (len @$query_pairs)
+    val @parent = (0) x $n
+    val @rank = (0) x $n
+    val @ancestor = (0) x $n
+    val @visited = (0) x $n
+    val @res = (-1) x (len @$query_pairs)
     
-    my $queries = []
+    val $queries = []
     for (0 : $n - 1) { push @$queries, [] }
     
-    my $q_len = len @$query_pairs
-    for my $i (0 : $q_len - 1) {
-        my $pair = $query_pairs->[$i]
-        my $u = $pair->[0]
-        my $v = $pair->[1]
+    val $q_len = len @$query_pairs
+    for val $i (0 : $q_len - 1) {
+        val $pair = $query_pairs->[$i]
+        val $u = $pair->[0]
+        val $v = $pair->[1]
         push @{$queries->[$u]}, { node => $v, idx => $i }
         push @{$queries->[$v]}, { node => $u, idx => $i }
     }
@@ -82,7 +82,7 @@ fn solve($n, $root, $adj, $query_pairs) {
 package main
 
 p "── Tarjan's Offline LCA Demo ──"
-my $adj = [
+val $adj = [
     [1, 2],
     [3, 4],
     [5, 6],
@@ -92,18 +92,18 @@ my $adj = [
     []
 ]
 
-my $queries = [
+val $queries = [
     [3, 4],
     [4, 6],
     [2, 5]
 ]
 
-my $res = TarjanLCA::solve(7, 0, $adj, $queries)
-my $q_len = len @$queries
-for my $i (0 : $q_len - 1) {
-    my $u = $queries->[$i]->[0]
-    my $v = $queries->[$i]->[1]
-    my $lca = $res->[$i]
+val $res = TarjanLCA::solve(7, 0, $adj, $queries)
+val $q_len = len @$queries
+for val $i (0 : $q_len - 1) {
+    val $u = $queries->[$i]->[0]
+    val $v = $queries->[$i]->[1]
+    val $lca = $res->[$i]
     p "LCA of #{$u} and #{$v} is #{$lca}"
 }
 p "Done."

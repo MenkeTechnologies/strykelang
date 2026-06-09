@@ -8,26 +8,26 @@
 # ── 1. Sketch Algebra (+ | & ^ -) ───────────────────────────────────────────
 
 # Bloom union via +
-my $b1 = bloom_filter(100, 0.01)
-my $b2 = bloom_filter(100, 0.01)
+val $b1 = bloom_filter(100, 0.01)
+val $b2 = bloom_filter(100, 0.01)
 bloom_add($b1, "a")
 bloom_add($b2, "b")
-my $b3 = $b1 + $b2
+val $b3 = $b1 + $b2
 bloom_contains($b3, "a") |> aok "Bloom union contains 'a'"
 bloom_contains($b3, "b") |> aok "Bloom union contains 'b'"
 bloom_contains($b1, "b") |> { _ == 0 } |> aok "Original bloom unchanged"
 
 # HLL union via +
-my $h1 = hll(10)
-my $h2 = hll(10)
+val $h1 = hll(10)
+val $h2 = hll(10)
 hll_add($h1, "x")
 hll_add($h2, "y")
-my $h3 = $h1 + $h2
+val $h3 = $h1 + $h2
 hll_count($h3) |> { _ >= 2 } |> aok "HLL union count >= 2"
 
 # Roaring set algebra
-my $r1 = roaring()
-my $r2 = roaring()
+val $r1 = roaring()
+val $r2 = roaring()
 rb_add($r1, 1)
 rb_add($r1, 2)
 rb_add($r2, 2)
@@ -39,26 +39,26 @@ rb_len($r1 ^ $r2) |> aeq 2, "Roaring sym.diff ^"
 rb_len($r1 - $r2) |> aeq 1, "Roaring difference -"
 
 # t-digest centroid merge via +
-my $td1 = t_digest(10)
-my $td2 = t_digest(10)
+val $td1 = t_digest(10)
+val $td2 = t_digest(10)
 td_add($td1, 10)
 td_add($td2, 20)
-my $td3 = $td1 + $td2
+val $td3 = $td1 + $td2
 td_quantile($td3, 0.5) |> { 10 <= _ <= 20 } |> aok "t-digest merge p50 in range"
 
 # TopK merge via +
-my $tk1 = topk(5)
-my $tk2 = topk(5)
+val $tk1 = topk(5)
+val $tk2 = topk(5)
 topk_add($tk1, "apple")
 topk_add($tk2, "banana")
-my $tk3 = $tk1 + $tk2
+val $tk3 = $tk1 + $tk2
 topk_heavies($tk3) |> len |> aeq 2, "TopK merge count"
 
 # ── 2. rkyv KV Store ────────────────────────────────────────────────────────
 
-my $kv_path = "/tmp/test_kv.rkyv"
+val $kv_path = "/tmp/test_kv.rkyv"
 unlink($kv_path)
-my $db = kv_open($kv_path)
+val $db = kv_open($kv_path)
 kv_put($db, "k1", "v1")
 kv_put($db, "k2", +{ a => 1 })
 kv_get($db, "k1") |> aeq "v1", "KV get string"
@@ -72,7 +72,7 @@ kv_len($db) |> aeq 1, "KV len after del"
 kv_commit($db)
 kv_close($db)
 
-my $db2 = kv_open($kv_path)
+val $db2 = kv_open($kv_path)
 kv_len($db2) |> aeq 1, "KV reopen len"
 kv_get($db2, "k2")->{a} |> aeq 1, "KV reopen get"
 kv_close($db2)
@@ -97,11 +97,11 @@ class FormalPerson impl Greetable {
     fn greeting { "Good day" }
 }
 
-my $p1 = Person(n => "Alice")
+val $p1 = Person(n => "Alice")
 $p1->greeting() |> aeq "Hello", "Trait default method"
 $p1->does("Greetable") |> aok "does(Trait) works"
 
-my $p2 = FormalPerson(n => "Bob")
+val $p2 = FormalPerson(n => "Bob")
 $p2->greeting() |> aeq "Good day", "Trait method override"
 
 # Abstract classes
@@ -114,7 +114,7 @@ class Circle extends Shape {
     fn area { 3.14159 * $self->radius * $self->radius }
 }
 
-my $c = Circle(radius => 10)
+val $c = Circle(radius => 10)
 $c->area() |> { 314.1 <= _ <= 314.2 } |> aok "Circle area from abstract Shape"
 
 # Operator Overloading
@@ -126,24 +126,24 @@ class Vec2 {
     fn stringify { "(" . $self->x . "," . $self->y . ")" }
 }
 
-my $v1 = Vec2(x => 1, y => 2)
-my $v2 = Vec2(x => 10, y => 20)
-my $v3 = $v1 + $v2
+val $v1 = Vec2(x => 1, y => 2)
+val $v2 = Vec2(x => 10, y => 20)
+val $v3 = $v1 + $v2
 $v3->stringify() |> aeq "(11,22)", "Operator overloading op_add"
 
 # ── 4. Deep Utilities ───────────────────────────────────────────────────────
 
-my $orig = { a => [1, 2], b => { c => 3 } }
-my $cloned = deep_clone($orig)
+val $orig = { a => [1, 2], b => { c => 3 } }
+val $cloned = deep_clone($orig)
 $cloned->{a}[0] = 99
 $orig->{a}[0] |> aeq 1, "deep_clone is deep"
 
 deep_equal($orig, { a => [1, 2], b => { c => 3 } }) |> aok "deep_equal true"
 deep_equal($orig, $cloned) |> { _ == 0 } |> aok "deep_equal false"
 
-my $m1 = { a => 1, b => { x => 10 } }
-my $m2 = { c => 2, b => { y => 20 } }
-my $merged = deep_merge($m1, $m2)
+val $m1 = { a => 1, b => { x => 10 } }
+val $m2 = { c => 2, b => { y => 20 } }
+val $merged = deep_merge($m1, $m2)
 $merged->{b}{x} |> aeq 10, "deep_merge b.x"
 $merged->{b}{y} |> aeq 20, "deep_merge b.y"
 $merged->{c} |> aeq 2, "deep_merge c"
@@ -152,7 +152,7 @@ $merged->{c} |> aeq 2, "deep_merge c"
 
 zip_with { _ + _1 } [1, 2, 3], [10, 20, 30] |> join(",") |> aeq "11,22,33", "zip_with"
 
-my ($even, $odd) = partition { _ % 2 == 0 } 1:10
+val ($even, $odd) = partition { _ % 2 == 0 } 1:10
 $even |> len |> aeq 5, "partition even count"
 $odd  |> len |> aeq 5, "partition odd count"
 
@@ -170,7 +170,7 @@ interleave [1, 2, 3], ["a", "b", "c"] |> join(",") |> aeq "1,a,2,b,3,c", "interl
 
 # ── 7. Glob ─────────────────────────────────────────────────────────────────
 
-my $tdir = tempdir()
+val $tdir = tempdir()
 spurt($tdir . "/f1.txt", "hi")
 mkdir($tdir . "/subdir")
 spurt($tdir . "/subdir/f2.log", "bye")

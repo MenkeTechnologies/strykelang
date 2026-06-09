@@ -98,7 +98,7 @@ assert_eq Project::StringsExtended::str_rtrim("  hello  "), "  hello", "rtrim"
 assert_eq Project::StringsExtended::str_chomp("hello\n"), "hello", "chomp newline"
 assert_eq Project::StringsExtended::str_chomp("hello"), "hello", "chomp no newline"
 
-my @chop_res = Project::StringsExtended::str_chop("hello")
+val @chop_res = Project::StringsExtended::str_chop("hello")
 assert_eq $chop_res[0], "hell", "chop result"
 assert_eq $chop_res[1], "o", "chop char"
 
@@ -114,7 +114,7 @@ assert_eq Project::StringsExtended::str_ord("A"), 65, "ord A"
 assert_eq Project::StringsExtended::str_ord("a"), 97, "ord a"
 assert_eq Project::StringsExtended::str_ord("0"), 48, "ord 0"
 
-my @chars = Project::StringsExtended::str_to_chars("abc")
+val @chars = Project::StringsExtended::str_to_chars("abc")
 assert_eq len(@chars), 3, "to chars count"
 assert_eq $chars[0], "a", "to chars first"
 
@@ -155,7 +155,7 @@ assert_eq Project::StringsExtended::str_sprintf_multi("Alice", 30, 95.5), "Alice
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::StringsExtended::str_pack_a("hello"), "hello     ", "pack A10"
-my @unpack_multi = Project::StringsExtended::str_unpack_multi("abcde12345")
+val @unpack_multi = Project::StringsExtended::str_unpack_multi("abcde12345")
 assert_eq $unpack_multi[0], "abcde", "unpack first"
 assert_eq $unpack_multi[1], "12345", "unpack second"
 
@@ -185,7 +185,7 @@ assert_eq Project::StringsExtended::str_quotemeta("a.b*c"), "a\\.b\\*c", "quotem
 assert_eq Project::StringsExtended::str_q(), "hello world", "q{}"
 assert_eq Project::StringsExtended::str_qq(), "hello world", "qq{}"
 
-my @qw_res = Project::StringsExtended::str_qw()
+val @qw_res = Project::StringsExtended::str_qw()
 assert_eq len(@qw_res), 3, "qw count"
 assert_eq $qw_res[0], "one", "qw first"
 
@@ -203,17 +203,17 @@ assert_eq Project::StringsExtended::str_no_interp(), q{$x stays literal}, "no in
 # SPLIT AND JOIN
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @chars_split = Project::StringsExtended::str_split_char("abc")
+val @chars_split = Project::StringsExtended::str_split_char("abc")
 assert_eq len(@chars_split), 3, "split char count"
 assert_eq $chars_split[1], "b", "split char mid"
 
-my @delim_split = Project::StringsExtended::str_split_delim("a,b,c", ",")
+val @delim_split = Project::StringsExtended::str_split_delim("a,b,c", ",")
 assert_eq len(@delim_split), 3, "split delim count"
 
-my @ws_split = Project::StringsExtended::str_split_ws("one  two   three")
+val @ws_split = Project::StringsExtended::str_split_ws("one  two   three")
 assert_eq len(@ws_split), 3, "split ws count"
 
-my @limit_split = Project::StringsExtended::str_split_limit("a,b,c,d", ",", 2)
+val @limit_split = Project::StringsExtended::str_split_limit("a,b,c,d", ",", 2)
 assert_eq len(@limit_split), 2, "split limit count"
 assert_eq $limit_split[1], "b,c,d", "split limit rest"
 
@@ -260,7 +260,7 @@ assert_eq Project::StringsExtended::str_count_char("hello", "x"), 0, "count char
 assert_eq Project::StringsExtended::str_word_count("one two three"), 3, "word count"
 assert_eq Project::StringsExtended::str_word_count("  one   two  "), 2, "word count ws"
 
-my @lines = Project::StringsExtended::str_lines("one\ntwo\nthree")
+val @lines = Project::StringsExtended::str_lines("one\ntwo\nthree")
 assert_eq len(@lines), 3, "lines count"
 assert_eq $lines[1], "two", "lines mid"
 

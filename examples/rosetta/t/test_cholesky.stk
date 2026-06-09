@@ -2,18 +2,18 @@
 # Rosetta Code: Cholesky Decomposition
 
 fn Rosetta::Cholesky::decompose($A) {
-    my $n = len(@$A)
-    my @L
-    for my $i (0:$n-1) {
-        my @row
-        for my $j (0:$n-1) { push @row, 0.0 }
+    val $n = len(@$A)
+    var @L
+    for val $i (0:$n-1) {
+        var @row
+        for val $j (0:$n-1) { push @row, 0.0 }
         push @L, \@row
     }
     
-    for my $i (0:$n-1) {
-        for my $j (0:$i) {
-            my $sum = 0.0
-            for my $k (0:$j-1) {
+    for val $i (0:$n-1) {
+        for val $j (0:$i) {
+            var $sum = 0.0
+            for val $k (0:$j-1) {
                 $sum = $sum + $L[$i]->[$k] * $L[$j]->[$k]
             }
             if ($i == $j) {
@@ -26,8 +26,8 @@ fn Rosetta::Cholesky::decompose($A) {
     \@L
 }
 
-my $A = [[25, 15, -5], [15, 18, 0], [-5, 0, 11]]
-my $L = Rosetta::Cholesky::decompose($A)
+val $A = [[25, 15, -5], [15, 18, 0], [-5, 0, 11]]
+val $L = Rosetta::Cholesky::decompose($A)
 
 # Expected: [[5, 0, 0], [3, 3, 0], [-1, 1, 3]]
 assert_eq $L->[0]->[0], 5, "L[0][0]"

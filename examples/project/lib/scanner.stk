@@ -1,11 +1,11 @@
 # lib/scanner.stk — system reconnaissance functions
 
 fn Project::Scanner::scan_system {
-    my $info = pool_info()
-    my $ram_bytes = mem_total()
-    my $ram = human_bytes $ram_bytes
-    my $up_secs = sys_uptime()
-    my $uptime = human_duration $up_secs
+    val $info = pool_info()
+    val $ram_bytes = mem_total()
+    val $ram = human_bytes $ram_bytes
+    val $up_secs = sys_uptime()
+    val $uptime = human_duration $up_secs
     {
         hostname   => gethostname(),
         os         => os_name(),
@@ -21,13 +21,13 @@ fn Project::Scanner::scan_system {
 }
 
 fn Project::Scanner::scan_disks {
-    my @raw = mounts()
-    my @result
-    for my $m (@raw) {
+    val @raw = mounts()
+    var @result
+    for val $m (@raw) {
         next unless $m->{total} > 0
         next if $m->{mount} =~ /^\/dev$/
         next if $m->{fs_type} =~ /^(devfs|autofs|tmpfs)$/
-        my $entry = {
+        val $entry = {
             mount   => $m->{mount},
             device  => $m->{device},
             fs_type => $m->{fs_type},
@@ -54,17 +54,17 @@ fn Project::Scanner::scan_network {
 }
 
 fn Project::Scanner::scan_interfaces {
-    my @raw = net_interfaces()
+    val @raw = net_interfaces()
     @raw
 }
 
 fn Project::Scanner::scan_top_processes ($n) {
     $n = 10 unless defined($n)
-    my @procs = process_list()
+    val @procs = process_list()
     return () unless @procs
-    my @result
-    my $count = 0
-    for my $p (rev @procs) {
+    var @result
+    var $count = 0
+    for val $p (rev @procs) {
         last if $count >= $n
         push @result, $p
         $count++
@@ -73,27 +73,27 @@ fn Project::Scanner::scan_top_processes ($n) {
 }
 
 fn Project::Scanner::scan_git {
-    my $result = { is_repo => 0 }
+    var $result = { is_repo => 0 }
     eval {
-        my $root = git_root()
+        val $root = git_root()
         $result->{is_repo} = 1
         $result->{root} = $root
 
-        my @branches = git_branches()
-        my @head = grep { _->{is_head} } @branches
+        val @branches = git_branches()
+        val @head = grep { _->{is_head} } @branches
         $result->{branch} = @head ? $head[0]->{name} : "detached"
 
-        my @log = git_log(5)
+        val @log = git_log(5)
         $result->{recent} = \@log
 
-        my @all_log = git_log(10000)
+        val @all_log = git_log(10000)
         $result->{total_commits} = len(@all_log)
 
-        my @files = git_files()
+        val @files = git_files()
         $result->{total_files} = len(@files)
 
-        my @authors = git_authors()
-        my @top3 = take(@authors, 3)
+        val @authors = git_authors()
+        val @top3 = take(@authors, 3)
         $result->{top_authors} = \@top3
     }
     $result
@@ -101,9 +101,9 @@ fn Project::Scanner::scan_git {
 
 fn Project::Scanner::usage_bar ($pct, $width) {
     $width //= 20
-    my $filled = int($pct / 100 * $width)
-    my $empty = $width - $filled
-    my $color = $pct > 90 ? "\x1b[31m" : $pct > 70 ? "\x1b[33m" : "\x1b[32m"
-    my $bar = $color . ("█" x $filled) . ("\x1b[90m" . ("░" x $empty)) . "\x1b[0m"
+    val $filled = int($pct / 100 * $width)
+    val $empty = $width - $filled
+    val $color = $pct > 90 ? "\x1b[31m" : $pct > 70 ? "\x1b[33m" : "\x1b[32m"
+    val $bar = $color . ("█" x $filled) . ("\x1b[90m" . ("░" x $empty)) . "\x1b[0m"
     $bar
 }

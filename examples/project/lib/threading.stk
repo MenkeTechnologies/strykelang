@@ -69,7 +69,7 @@ fn Project::Threading::arrow_thread_chain {
 }
 
 fn Project::Threading::arrow_thread_to_array {
-    my @result = ~> (1:10) grep { _ > 5 } map { _ * 2 }
+    val @result = ~> (1:10) grep { _ > 5 } map { _ * 2 }
     scalar @result
 }
 
@@ -78,12 +78,12 @@ fn Project::Threading::arrow_thread_string_join {
 }
 
 fn Project::Threading::arrow_thread_sort {
-    my @sorted = (~> (5, 2, 8, 1, 9) sort)
+    val @sorted = (~> (5, 2, 8, 1, 9) sort)
     $sorted[0]
 }
 
 fn Project::Threading::arrow_thread_reverse {
-    my @rev = (~> (1, 2, 3) rev)
+    val @rev = (~> (1, 2, 3) rev)
     $rev[0]
 }
 
@@ -131,21 +131,21 @@ fn Project::Threading::pipeline_multi_step {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Threading::threading_comparison {
-    my $a = ~> (1:5) sum
-    my $b = ~> (1:5) sum
-    my $c = (1:5) |> sum
+    val $a = ~> (1:5) sum
+    val $b = ~> (1:5) sum
+    val $c = (1:5) |> sum
     $a == $b && $b == $c ? 1 : 0
 }
 
 fn Project::Threading::threading_vs_traditional {
-    my $traditional = sum(grep { _ % 2 == 0 } (1:10))
-    my $threaded = ~> (1:10) grep { _ % 2 == 0 } sum
-    my $piped = (1:10) |> grep { _ % 2 == 0 } |> sum
+    val $traditional = sum(grep { _ % 2 == 0 } (1:10))
+    val $threaded = ~> (1:10) grep { _ % 2 == 0 } sum
+    val $piped = (1:10) |> grep { _ % 2 == 0 } |> sum
     $traditional == $threaded && $threaded == $piped ? 1 : 0
 }
 
 fn Project::Threading::nested_threading {
-    my $inner = ~> 5 double
-    my $outer = ~> $inner triple
+    val $inner = ~> 5 double
+    val $outer = ~> $inner triple
     $outer
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Inverted syntax
 
 fn Rosetta::InvertedSyntax::demo($val) {
-    my $res = ""
+    var $res = ""
     $res = "positive" if $val > 0
     $res = "negative" if $val < 0
     $res = "zero" if $val == 0

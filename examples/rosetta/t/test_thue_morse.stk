@@ -5,9 +5,9 @@ fn Rosetta::ThueMorse::generate($n) {
     if ($n == 0) {
         "0"
     } else {
-        my $s = "0"
-        for my $i (1:$n) {
-            my $complement = $s
+        var $s = "0"
+        for val $i (1:$n) {
+            var $complement = $s
             $complement =~ tr/01/10/
             $s = $s . $complement
         }

@@ -2,27 +2,27 @@
 # Rosetta Code: Pancake Sort
 
 fn Rosetta::PancakeSort::flip {
-    my @arr = @$_
-    my @sub = @arr[0:_1]
-    my @flipped = ~> @sub rev
-    for my $i (0:_1) {
+    var @arr = @$_
+    val @sub = @arr[0:_1]
+    val @flipped = ~> @sub rev
+    for val $i (0:_1) {
         $arr[$i] = $flipped[$i]
     }
     \@arr
 }
 
 fn Rosetta::PancakeSort::pancake_sort {
-    my @arr = @$_
-    my $n = len(@arr)
+    var @arr = @$_
+    val $n = len(@arr)
     
     if ($n < 2) {
         return \@arr
     }
     
-    for my $curr (~> (1:$n) rev) {
+    for val $curr (~> (1:$n) rev) {
         # find index of max in 0..$curr-1
-        my $max_idx = 0
-        for my $i (1:$curr-1) {
+        var $max_idx = 0
+        for val $i (1:$curr-1) {
             if ($arr[$i] > $arr[$max_idx]) {
                 $max_idx = $i
             }
@@ -30,22 +30,22 @@ fn Rosetta::PancakeSort::pancake_sort {
         
         if ($max_idx != $curr - 1) {
             if ($max_idx != 0) {
-                my $res = Rosetta::PancakeSort::flip([@arr], $max_idx)
+                val $res = Rosetta::PancakeSort::flip([@arr], $max_idx)
                 @arr = @$res
             }
-            my $res2 = Rosetta::PancakeSort::flip([@arr], $curr - 1)
+            val $res2 = Rosetta::PancakeSort::flip([@arr], $curr - 1)
             @arr = @$res2
         }
     }
     \@arr
 }
 
-my $data = [6, 7, 2, 1, 8, 9, 5, 3, 4]
-my $sorted = Rosetta::PancakeSort::pancake_sort($data)
+val $data = [6, 7, 2, 1, 8, 9, 5, 3, 4]
+val $sorted = Rosetta::PancakeSort::pancake_sort($data)
 assert_eq join(",", @$sorted), "1,2,3,4,5,6,7,8,9", "pancake sort"
 
-my $small = [3, 1, 2]
-my $sorted_small = Rosetta::PancakeSort::pancake_sort($small)
+val $small = [3, 1, 2]
+val $sorted_small = Rosetta::PancakeSort::pancake_sort($small)
 assert_eq join(",", @$sorted_small), "1,2,3", "pancake sort small"
 
 test_run

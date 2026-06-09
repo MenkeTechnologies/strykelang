@@ -2,14 +2,14 @@
 # Rosetta Code: 100 prisoners
 
 fn Rosetta::Prisoners::play($optimal) {
-    my @boxes = 0:99
+    var @boxes = 0:99
     @boxes = shuffle(@boxes)
     
-    for (my $p = 0; $p < 100; $p++) {
-        my $found = 0
+    for (var $p = 0; $p < 100; $p++) {
+        var $found = 0
         if ($optimal) {
-            my $curr = $p
-            for (my $i = 0; $i < 50; $i++) {
+            var $curr = $p
+            for (var $i = 0; $i < 50; $i++) {
                 if ($boxes[$curr] == $p) {
                     $found = 1
                     last
@@ -17,9 +17,9 @@ fn Rosetta::Prisoners::play($optimal) {
                 $curr = $boxes[$curr]
             }
         } else {
-            my @choices = 0:99
+            var @choices = 0:99
             @choices = shuffle(@choices)
-            for (my $i = 0; $i < 50; $i++) {
+            for (var $i = 0; $i < 50; $i++) {
                 if ($boxes[$choices[$i]] == $p) {
                     $found = 1
                     last
@@ -32,14 +32,14 @@ fn Rosetta::Prisoners::play($optimal) {
 }
 
 # Statistics
-my $num_trials = 1000
+val $num_trials = 1000
 
 # Random strategy: extremely low probability (2^-100)
-my $random_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(0) } |> reduce { _0 + _1 }
+val $random_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(0) } |> reduce { _0 + _1 }
 assert_eq $random_wins, 0, "Random strategy wins 0 times"
 
 # Optimal strategy: ~31%
-my $optimal_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(1) } |> reduce { _0 + _1 }
+val $optimal_wins = ~> 1:$num_trials map { Rosetta::Prisoners::play(1) } |> reduce { _0 + _1 }
 assert_ok $optimal_wins > 250 && $optimal_wins < 380, "Optimal strategy wins around 31%"
 
 test_run

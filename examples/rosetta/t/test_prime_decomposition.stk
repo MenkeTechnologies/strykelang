@@ -2,8 +2,8 @@
 # Rosetta Code: Prime Decomposition (Factorization)
 
 fn Rosetta::PrimeFactors::prime_factors($n) {
-    my @factors
-    my $d = 2
+    var @factors
+    var $d = 2
     while ($d * $d <= $n) {
         while ($n % $d == 0) {
             push @factors, $d
@@ -19,24 +19,24 @@ fn Rosetta::PrimeDecomposition::is_prime_via_factors($n) {
     if ($n < 2) {
         0
     } else {
-        my @f = Rosetta::PrimeFactors::prime_factors($n)
+        val @f = Rosetta::PrimeFactors::prime_factors($n)
         len(@f) == 1 && $f[0] == $n
     }
 }
 
-my @f12 = Rosetta::PrimeFactors::prime_factors(12)
+val @f12 = Rosetta::PrimeFactors::prime_factors(12)
 assert_eq join("*", @f12), "2*2*3", "12 = 2*2*3"
 
-my @f100 = Rosetta::PrimeFactors::prime_factors(100)
+val @f100 = Rosetta::PrimeFactors::prime_factors(100)
 assert_eq join("*", @f100), "2*2*5*5", "100 = 2*2*5*5"
 
-my @f17 = Rosetta::PrimeFactors::prime_factors(17)
+val @f17 = Rosetta::PrimeFactors::prime_factors(17)
 assert_eq join("*", @f17), "17", "17 is prime"
 
-my @f1 = Rosetta::PrimeFactors::prime_factors(1)
+val @f1 = Rosetta::PrimeFactors::prime_factors(1)
 assert_eq len(@f1), 0, "1 has no prime factors"
 
-my @f84 = Rosetta::PrimeFactors::prime_factors(84)
+val @f84 = Rosetta::PrimeFactors::prime_factors(84)
 assert_eq join("*", @f84), "2*2*3*7", "84 = 2*2*3*7"
 
 assert_ok Rosetta::PrimeDecomposition::is_prime_via_factors(17), "17 is prime"

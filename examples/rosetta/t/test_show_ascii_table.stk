@@ -9,21 +9,21 @@ fn Rosetta::Ascii::name($code) {
 }
 
 fn Rosetta::Ascii::row($start, $count) {
-    my @cells
-    for my $i (0:$count-1) {
-        my $code = $start + $i
+    var @cells
+    for val $i (0:$count-1) {
+        val $code = $start + $i
         push @cells, sprintf("%3d: %s", $code, Rosetta::Ascii::name($code))
     }
     join(" | ", @cells)
 }
 
 fn Rosetta::Ascii::table() {
-    my @rows
+    var @rows
     # Standard layout: 6 columns x 16 rows (codes 32..127)
-    for my $r (0:15) {
-        my @cells
-        for my $c (0:5) {
-            my $code = 32 + $r + $c * 16
+    for val $r (0:15) {
+        var @cells
+        for val $c (0:5) {
+            val $code = 32 + $r + $c * 16
             next if $code > 127
             push @cells, sprintf("%3d: %s", $code, Rosetta::Ascii::name($code))
         }
@@ -42,18 +42,18 @@ assert_eq Rosetta::Ascii::name(126), "~",   "126 -> ~"
 assert_eq Rosetta::Ascii::name(127), "DEL", "127 -> DEL"
 
 # Row rendering
-my $row = Rosetta::Ascii::row(32, 4)
+val $row = Rosetta::Ascii::row(32, 4)
 assert_eq $row, " 32: SPC |  33: ! |  34: \" |  35: #", "row 32:35"
 
 # Table contains all 96 printable cells (32..127)
-my $tbl = Rosetta::Ascii::table()
-my @lines = split /\n/, $tbl
+val $tbl = Rosetta::Ascii::table()
+val @lines = split /\n/, $tbl
 assert_eq len(@lines), 16, "16 rows"
 
 # Every code 32..127 appears exactly once in the table
-for my $code (32:127) {
-    my $pat = sprintf("%3d:", $code)
-    my $count = 0
+for val $code (32:127) {
+    val $pat = sprintf("%3d:", $code)
+    var $count = 0
     while ($tbl =~ /\Q$pat\E/g) { $count += 1 }
     assert_eq $count, 1, "code $code appears once"
 }

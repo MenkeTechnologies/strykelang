@@ -13,20 +13,20 @@ fn Rosetta::RpnToInfix::prec($op) {
 fn Rosetta::RpnToInfix::is_op($t) { $t =~ /^[+\-*\/^]$/ }
 
 fn Rosetta::RpnToInfix::convert($expr) {
-    my @stack
-    for my $t (split /\s+/, $expr) {
+    var @stack
+    for val $t (split /\s+/, $expr) {
         next if length($t) == 0
         if (!Rosetta::RpnToInfix::is_op($t)) {
             push @stack, [$t, 99]
             next
         }
         return undef if len(@stack) < 2
-        my $b = pop @stack
-        my $a = pop @stack
-        my $p  = Rosetta::RpnToInfix::prec($t)
-        my $ls = $a->[1] < $p  ? "(" . $a->[0] . ")" : $a->[0]
-        my $right_strict = ($t eq "^") ? $b->[1] < $p : $b->[1] <= $p
-        my $rs = $right_strict && Rosetta::RpnToInfix::is_op(substr($b->[0], 0, 1))
+        val $b = pop @stack
+        val $a = pop @stack
+        val $p  = Rosetta::RpnToInfix::prec($t)
+        val $ls = $a->[1] < $p  ? "(" . $a->[0] . ")" : $a->[0]
+        val $right_strict = ($t eq "^") ? $b->[1] < $p : $b->[1] <= $p
+        var $rs = $right_strict && Rosetta::RpnToInfix::is_op(substr($b->[0], 0, 1))
             ? "(" . $b->[0] . ")" : $b->[0]
         # Simpler: parenthesise right when its precedence ≤ current.
         $rs = $b->[1] <  $p ? "(" . $b->[0] . ")" : $b->[0]
@@ -38,16 +38,16 @@ fn Rosetta::RpnToInfix::convert($expr) {
 }
 
 fn Rosetta::RpnToInfix::convert_full_paren($expr) {
-    my @stack
-    for my $t (split /\s+/, $expr) {
+    var @stack
+    for val $t (split /\s+/, $expr) {
         next if length($t) == 0
         if (!Rosetta::RpnToInfix::is_op($t)) {
             push @stack, $t
             next
         }
         return undef if len(@stack) < 2
-        my $b = pop @stack
-        my $a = pop @stack
+        val $b = pop @stack
+        val $a = pop @stack
         push @stack, "($a $t $b)"
     }
     return undef if len(@stack) != 1

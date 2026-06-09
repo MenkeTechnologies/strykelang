@@ -7,20 +7,20 @@ fn Rosetta::Duffinian::gcd($a, $b) {
 }
 
 fn Rosetta::Duffinian::sum_divisors($n) {
-    my $sum = 0
-    for my $i (1:$n) {
+    var $sum = 0
+    for val $i (1:$n) {
         if ($n % $i == 0) { $sum += $i }
     }
     $sum
 }
 
 fn Rosetta::Duffinian::check($n) {
-    my $sigma = Rosetta::Duffinian::sum_divisors($n)
-    my $rel_prime = Rosetta::Duffinian::gcd($n, $sigma) == 1
+    val $sigma = Rosetta::Duffinian::sum_divisors($n)
+    val $rel_prime = Rosetta::Duffinian::gcd($n, $sigma) == 1
     # Duffinian numbers must be composite
-    my $is_comp = 0
+    var $is_comp = 0
     if ($n > 1) {
-        for my $i (2..int(sqrt($n))) {
+        for val $i (2..int(sqrt($n))) {
             if ($n % $i == 0) {
                 $is_comp = 1
                 return $rel_prime && $is_comp

@@ -2,7 +2,7 @@
 # Rosetta Code: Latin Squares in reduced form/Randomizing using Jacobson and Matthews' technique
 
 fn Rosetta::Latin::base() {
-    my @rows = (
+    val @rows = (
         [1, 2, 3],
         [2, 3, 1],
         [3, 1, 2],
@@ -11,7 +11,7 @@ fn Rosetta::Latin::base() {
 }
 
 fn Rosetta::Latin::randomize($square) {
-    my @rows = (
+    val @rows = (
         [$square->[0][0], $square->[0][2], $square->[0][1]],
         [$square->[2][0], $square->[2][2], $square->[2][1]],
         [$square->[1][0], $square->[1][2], $square->[1][1]],
@@ -19,7 +19,7 @@ fn Rosetta::Latin::randomize($square) {
     \@rows
 }
 
-my $square = Rosetta::Latin::randomize(Rosetta::Latin::base())
+val $square = Rosetta::Latin::randomize(Rosetta::Latin::base())
 
 assert_eq join(",", @{$square->[0]}), "1,3,2", "first row stays reduced while columns are permuted"
 assert_eq join(",", @{$square->[1]}), "3,2,1", "row permutation applied"

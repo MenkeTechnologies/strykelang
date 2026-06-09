@@ -2,14 +2,14 @@
 # Rosetta Code: Word frequency
 
 fn Rosetta::WordFrequencies::word_frequency {
-    my $counts = {}
-    my @words = split(/[^a-z]+/, lc(_))
+    var $counts = {}
+    val @words = split(/[^a-z]+/, lc(_))
     ~> @words grep { _ ne "" } map { $counts->{_} = $counts->{_} + 1 }
     $counts
 }
 
-my $text = "The quick brown fox jumps over the lazy dog. The dog was not amused."
-my $f = Rosetta::WordFrequencies::word_frequency($text)
+val $text = "The quick brown fox jumps over the lazy dog. The dog was not amused."
+val $f = Rosetta::WordFrequencies::word_frequency($text)
 assert_eq $f->{the}, 3, "frequency of 'the'"
 assert_eq $f->{dog}, 2, "frequency of 'dog'"
 assert_eq $f->{fox}, 1, "frequency of 'fox'"

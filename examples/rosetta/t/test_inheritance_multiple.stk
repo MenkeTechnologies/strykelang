@@ -23,9 +23,9 @@ class Sparrow impl Walks, Flies {
     fn fly  { $self->name . " soars" }
 }
 
-my $duck   = Duck(name => "Donald")
-my $nemo   = Fish(name => "Nemo")
-my $birdie = Sparrow(name => "Tweety")
+val $duck   = Duck(name => "Donald")
+val $nemo   = Fish(name => "Nemo")
+val $birdie = Sparrow(name => "Tweety")
 
 assert_eq $duck->walk(),   "Donald waddles", "Duck walks"
 assert_eq $duck->swim(),   "Donald paddles", "Duck swims"
@@ -35,7 +35,7 @@ assert_eq $birdie->walk(), "Tweety hops",    "Sparrow walks"
 assert_eq $birdie->fly(),  "Tweety soars",   "Sparrow flies"
 
 # Polymorphism: every type that implements Swims responds to swim()
-my @swims = ($duck->swim(), $nemo->swim())
+val @swims = ($duck->swim(), $nemo->swim())
 assert_eq join("|", @swims), "Donald paddles|Nemo swims", "Swims trait dispatch"
 
 test_run

@@ -1,27 +1,27 @@
 #!/usr/bin/env stryke
 
 fn Topo::sort($edges, $nodes) {
-    my %indeg = ()
-    my %adj   = ()
-    for my $n (@$nodes) {
+    var %indeg = ()
+    var %adj   = ()
+    for val $n (@$nodes) {
         $indeg{$n} = 0
         $adj{$n}   = []
     }
-    for my $e (@$edges) {
-        my ($u, $v) = @$e
+    for val $e (@$edges) {
+        val ($u, $v) = @$e
         push @{$adj{$u}}, $v
         $indeg{$v} = $indeg{$v} + 1
     }
-    my @queue = ()
-    for my $n (sort @$nodes) {
+    var @queue = ()
+    for val $n (sort @$nodes) {
         push @queue, $n if $indeg{$n} == 0
     }
-    my @order = ()
+    var @order = ()
     while (len(@queue) > 0) {
-        my $n = shift @queue
+        val $n = shift @queue
         push @order, $n
-        my @nexts = sort @{$adj{$n}}
-        for my $m (@nexts) {
+        val @nexts = sort @{$adj{$n}}
+        for val $m (@nexts) {
             $indeg{$m} = $indeg{$m} - 1
             push @queue, $m if $indeg{$m} == 0
         }
@@ -32,17 +32,17 @@ fn Topo::sort($edges, $nodes) {
     return undef
 }
 
-my @nodes = ("a","b","c","d")
-my @edges = (["a","b"], ["a","c"], ["b","d"], ["c","d"])
-my $order = Topo::sort(\@edges, \@nodes)
+val @nodes = ("a","b","c","d")
+val @edges = (["a","b"], ["a","c"], ["b","d"], ["c","d"])
+val $order = Topo::sort(\@edges, \@nodes)
 
 len(@$order)   |> aeq 4, "4 nodes ordered"
 $order->[0]    |> aeq "a", "a first"
 $order->[3]    |> aeq "d", "d last"
 
-my %pos = ()
-my $i = 0
-for my $n (@$order) {
+var %pos = ()
+var $i = 0
+for val $n (@$order) {
     $pos{$n} = $i
     $i = $i + 1
 }
@@ -52,34 +52,34 @@ for my $n (@$order) {
 (($pos{"b"} < $pos{"d"}) ? 1 : 0) |> aeq 1, "b before d"
 (($pos{"c"} < $pos{"d"}) ? 1 : 0) |> aeq 1, "c before d"
 
-my @cn = ("x","y","z")
-my @ce = (["x","y"], ["y","z"], ["z","x"])
-my $r = Topo::sort(\@ce, \@cn)
+val @cn = ("x","y","z")
+val @ce = (["x","y"], ["y","z"], ["z","x"])
+val $r = Topo::sort(\@ce, \@cn)
 
 (defined($r) ? 1 : 0) |> aeq 0, "cycle returns undef"
 
-my @s = ("only")
-my @se = ()
-my $sr = Topo::sort(\@se, \@s)
+val @s = ("only")
+val @se = ()
+val $sr = Topo::sort(\@se, \@s)
 
 len(@$sr)   |> aeq 1, "single node"
 $sr->[0]    |> aeq "only", "only node"
 
-my @dn = ("a","b","c","d")
-my @de = (["a","b"], ["c","d"])
-my $dr = Topo::sort(\@de, \@dn)
+val @dn = ("a","b","c","d")
+val @de = (["a","b"], ["c","d"])
+val $dr = Topo::sort(\@de, \@dn)
 
 len(@$dr)   |> aeq 4, "disconnected 4 nodes"
 
-my @ln = ("1","2","3","4","5")
-my @le = (["1","2"], ["2","3"], ["3","4"], ["4","5"])
-my $lr = Topo::sort(\@le, \@ln)
+val @ln = ("1","2","3","4","5")
+val @le = (["1","2"], ["2","3"], ["3","4"], ["4","5"])
+val $lr = Topo::sort(\@le, \@ln)
 
 join(",", @$lr) |> aeq "1,2,3,4,5", "linear chain order"
 
-my @en = ()
-my @ee = ()
-my $er = Topo::sort(\@ee, \@en)
+val @en = ()
+val @ee = ()
+val $er = Topo::sort(\@ee, \@en)
 
 len(@$er)   |> aeq 0, "empty"
 

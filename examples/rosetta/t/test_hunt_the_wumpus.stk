@@ -28,8 +28,8 @@ fn Rosetta::Wumpus::get_adj() {
 }
 
 fn Rosetta::Wumpus::sense($player, $wumpus, $pits, $bats, $adj) {
-    my @warnings
-    for my $neighbor (@{$adj->[$player]}) {
+    var @warnings
+    for val $neighbor (@{$adj->[$player]}) {
         if ($neighbor == $wumpus) { push @warnings, "I smell a Wumpus!" }
         if (grep { _ == $neighbor } @$pits) { push @warnings, "I feel a draft!" }
         if (grep { _ == $neighbor } @$bats) { push @warnings, "Bats nearby!" }
@@ -38,23 +38,23 @@ fn Rosetta::Wumpus::sense($player, $wumpus, $pits, $bats, $adj) {
 }
 
 # Setup a fixed game state for testing
-my $adj = Rosetta::Wumpus::get_adj()
-my $wumpus = 19
-my @pits = (3, 12)
-my @bats = (5)
+val $adj = Rosetta::Wumpus::get_adj()
+val $wumpus = 19
+val @pits = (3, 12)
+val @bats = (5)
 
 # Test sensing
-my $warn1 = Rosetta::Wumpus::sense(18, $wumpus, \@pits, \@bats, $adj)
+val $warn1 = Rosetta::Wumpus::sense(18, $wumpus, \@pits, \@bats, $adj)
 # 18 is adjacent to 10, 17, 19 (Wumpus)
-my $c1 = @$warn1 |> grep { _ =~ /Wumpus/ } |> len()
+val $c1 = @$warn1 |> grep { _ =~ /Wumpus/ } |> len()
 assert_ok $c1 > 0, "Sensed Wumpus near 18"
 
-my $warn2 = Rosetta::Wumpus::sense(4, $wumpus, \@pits, \@bats, $adj)
+val $warn2 = Rosetta::Wumpus::sense(4, $wumpus, \@pits, \@bats, $adj)
 # 4 is adjacent to 0, 3 (Pit), 5 (Bat)
-my $c2 = @$warn2 |> grep { _ =~ /draft/ } |> len()
+val $c2 = @$warn2 |> grep { _ =~ /draft/ } |> len()
 assert_ok $c2 > 0, "Sensed Pit near 4"
 
-my $c3 = @$warn2 |> grep { _ =~ /Bats/ } |> len()
+val $c3 = @$warn2 |> grep { _ =~ /Bats/ } |> len()
 assert_ok $c3 > 0, "Sensed Bats near 4"
 
 test_run

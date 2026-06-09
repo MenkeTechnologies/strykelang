@@ -5,23 +5,23 @@
 
 fn Rosetta::FileIO::demonstrate($filename, $content) {
     # Write to file
-    open my $out_fh, '>', $filename or die "Could not open $filename for writing"
+    open val $out_fh, '>', $filename or die "Could not open $filename for writing"
     print $out_fh $content
     close $out_fh
     
     # Read from file
-    open my $in_fh, '<', $filename or die "Could not open $filename for reading"
+    open val $in_fh, '<', $filename or die "Could not open $filename for reading"
     # Slurp the whole file
-    my $read_content = slurp($filename)
+    val $read_content = slurp($filename)
     close $in_fh
     
     $read_content
 }
 
-my $tmp_file = "/tmp/stryke_rosetta_file_io_test.txt"
-my $test_data = "Hello, Rosetta Code!\nThis is a test of File I/O in Stryke."
+val $tmp_file = "/tmp/stryke_rosetta_file_io_test.txt"
+val $test_data = "Hello, Rosetta Code!\nThis is a test of File I/O in Stryke."
 
-my $result = Rosetta::FileIO::demonstrate($tmp_file, $test_data)
+val $result = Rosetta::FileIO::demonstrate($tmp_file, $test_data)
 
 assert_eq $result, $test_data, "file read matches written data"
 

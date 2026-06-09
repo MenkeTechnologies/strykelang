@@ -25,9 +25,9 @@ fn Demo::LB::make_backends() {
 # ── strategy: round-robin ──────────────────────────────────────────
 
 fn Demo::LB::strategy_round_robin($backends, $rr_state) {
-    my $healthy = [ grep { _->{healthy} } @$backends ]
+    val $healthy = [ grep { _->{healthy} } @$backends ]
     return undef if len(@$healthy) == 0
-    my $idx = $rr_state->{counter} % len @$healthy
+    val $idx = $rr_state->{counter} % len @$healthy
     $rr_state->{counter} = $rr_state->{counter} + 1
     $healthy->[$idx]
 }
@@ -35,13 +35,13 @@ fn Demo::LB::strategy_round_robin($backends, $rr_state) {
 # ── strategy: weighted ─────────────────────────────────────────────
 
 fn Demo::LB::strategy_weighted($backends, $_state) {
-    my $healthy = [ grep { _->{healthy} } @$backends ]
+    val $healthy = [ grep { _->{healthy} } @$backends ]
     return undef if len(@$healthy) == 0
-    my $total = 0
+    var $total = 0
     $total += _->{weight} for @$healthy
-    my $r = rand() * $total
-    my $cum = 0
-    for my $backend (@$healthy) {
+    val $r = rand() * $total
+    var $cum = 0
+    for val $backend (@$healthy) {
         $cum += $backend->{weight}
         return $backend if $r < $cum
     }
@@ -51,10 +51,10 @@ fn Demo::LB::strategy_weighted($backends, $_state) {
 # ── strategy: least-connections ────────────────────────────────────
 
 fn Demo::LB::strategy_least_conn($backends, $_state) {
-    my $healthy = [ grep { _->{healthy} } @$backends ]
+    val $healthy = [ grep { _->{healthy} } @$backends ]
     return undef if len(@$healthy) == 0
-    my $best = $healthy->[0]
-    for my $backend (@$healthy) {
+    var $best = $healthy->[0]
+    for val $backend (@$healthy) {
         if ($backend->{conns} < $best->{conns}) {
             $best = $backend
         }
@@ -65,16 +65,16 @@ fn Demo::LB::strategy_least_conn($backends, $_state) {
 # ── simulate workload ──────────────────────────────────────────────
 
 fn Demo::LB::simulate($name, $strategy_fn) {
-    my $backends = Demo::LB::make_backends()
-    my $state = +{ counter => 0 }
-    my $td_lat = t_digest(100)
-    my $tk_hot = topk(3)
-    for my $i (1:1000) {
-        my $picked = $strategy_fn($backends, $state)
+    val $backends = Demo::LB::make_backends()
+    val $state = +{ counter => 0 }
+    val $td_lat = t_digest(100)
+    val $tk_hot = topk(3)
+    for val $i (1:1000) {
+        var $picked = $strategy_fn($backends, $state)
         last unless defined $picked
         $picked->{conns} = $picked->{conns} + 1
         # Simulate request latency proportional to current load.
-        my $latency_ms = 10 + $picked->{conns} / 10.0
+        val $latency_ms = 10 + $picked->{conns} / 10.0
         td_add($td_lat, $latency_ms)
         topk_add($tk_hot, $picked->{name})
         # Some requests "finish" - decrement conns.
@@ -96,11 +96,11 @@ fn Demo::LB::report($result) {
     printf "── strategy: %s ────────────────────────────────────\n",
         $result->{name}
     # Final load = total requests handled. Need to recompute from TopK.
-    my @hits = topk_top($result->{tk_hot})
+    val @hits = topk_top($result->{tk_hot})
     printf "  %-7s %8s %8s\n", "backend", "load", "%"
-    my $total_load = 0
+    var $total_load = 0
     $total_load += _->[1] for @hits
-    for my $h (@hits) {
+    for val $h (@hits) {
         printf "  %-7s %8d %7.1f%%\n",
             $h->[0], $h->[1], 100.0 * $h->[1] / $total_load
     }
@@ -113,24 +113,24 @@ fn Demo::LB::report($result) {
 p "── running 1000 requests under 3 strategies ─────────"
 p ""
 
-my $rr_result = Demo::LB::simulate("round-robin", \&Demo::LB::strategy_round_robin)
+val $rr_result = Demo::LB::simulate("round-robin", \&Demo::LB::strategy_round_robin)
 Demo::LB::report($rr_result)
 
 p ""
-my $w_result = Demo::LB::simulate("weighted", \&Demo::LB::strategy_weighted)
+val $w_result = Demo::LB::simulate("weighted", \&Demo::LB::strategy_weighted)
 Demo::LB::report($w_result)
 
 p ""
-my $lc_result = Demo::LB::simulate("least-connections", \&Demo::LB::strategy_least_conn)
+val $lc_result = Demo::LB::simulate("least-connections", \&Demo::LB::strategy_least_conn)
 Demo::LB::report($lc_result)
 
 # ── HLL distinct backends used ─────────────────────────────────────
 
 p ""
 p "── HLL distinct backends used per strategy ──────────"
-for my $r ($rr_result, $w_result, $lc_result) {
-    my $hll = hll(14)
-    my @hits = topk_top($r->{tk_hot})
+for val $r ($rr_result, $w_result, $lc_result) {
+    val $hll = hll(14)
+    val @hits = topk_top($r->{tk_hot})
     hll_add($hll, _->[0]) for @hits
     printf "  %-20s : HLL %d distinct\n", $r->{name}, hll_count($hll)
 }

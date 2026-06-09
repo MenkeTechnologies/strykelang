@@ -3,7 +3,7 @@
 
 fn Rosetta::LargestIntConcat::solve(@nums) {
     # Sort strings by $b.$a cmp $a.$b
-    my @sorted = sort { (_1 . _0) cmp (_0 . _1) } @nums
+    val @sorted = sort { (_1 . _0) cmp (_0 . _1) } @nums
     join("", @sorted)
 }
 

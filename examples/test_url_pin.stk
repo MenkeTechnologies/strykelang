@@ -3,14 +3,14 @@
 # URL parsing, percent encode/decode, query strings, URL join.
 
 fn Url::parse($u) {
-    my %out = (scheme => "", host => "", path => "/", query => "", fragment => "")
-    my @c = ($u =~ m{^([a-z]+)://([^/?#]+)(/[^?#]*)?(\?[^#]*)?(\#.*)?$})
+    var %out = (scheme => "", host => "", path => "/", query => "", fragment => "")
+    val @c = ($u =~ m{^([a-z]+)://([^/?#]+)(/[^?#]*)?(\?[^#]*)?(\#.*)?$})
     if (len(@c) > 0) {
         $out{scheme}   = $c[0]
         $out{host}     = $c[1]
         $out{path}     = defined $c[2] && $c[2] ne "" ? $c[2] : "/"
-        my $qr = defined $c[3] ? $c[3] : ""
-        my $fr = defined $c[4] ? $c[4] : ""
+        var $qr = defined $c[3] ? $c[3] : ""
+        var $fr = defined $c[4] ? $c[4] : ""
         $qr =~ s/^\?//
         $fr =~ s/^\#//
         $out{query}    = $qr
@@ -19,14 +19,14 @@ fn Url::parse($u) {
     \%out
 }
 
-my $u = Url::parse("https://example.com/path/to/page?x=1&y=two#section")
+val $u = Url::parse("https://example.com/path/to/page?x=1&y=two#section")
 $u->{scheme}   |> aeq "https",         "scheme"
 $u->{host}     |> aeq "example.com",   "host"
 $u->{path}     |> aeq "/path/to/page", "path"
 $u->{query}    |> aeq "x=1&y=two",     "query"
 $u->{fragment} |> aeq "section",       "fragment"
 
-my $u2 = Url::parse("http://localhost")
+val $u2 = Url::parse("http://localhost")
 $u2->{scheme} |> aeq "http",      "scheme http"
 $u2->{host}   |> aeq "localhost", "host localhost"
 $u2->{path}   |> aeq "/",         "default path"
@@ -34,16 +34,16 @@ $u2->{query}  |> aeq "",          "empty query"
 
 # Query string parse
 fn Qs::parse($q) {
-    my %out = ()
+    var %out = ()
     return \%out if $q eq ""
-    for my $pair (split /&/, $q) {
-        my ($k, $v) = split /=/, $pair, 2
+    for val $pair (split /&/, $q) {
+        val ($k, $v) = split /=/, $pair, 2
         $out{$k} = defined $v ? $v : ""
     }
     \%out
 }
 
-my $qs = Qs::parse("foo=1&bar=two&baz=")
+val $qs = Qs::parse("foo=1&bar=two&baz=")
 $qs->{foo} |> aeq "1",   "qs foo"
 $qs->{bar} |> aeq "two", "qs bar"
 $qs->{baz} |> aeq "",    "qs baz empty"
@@ -57,8 +57,8 @@ Qs::build({ a => 1, b => 2, c => 3 }) |> aeq "a=1&b=2&c=3", "qs build"
 
 # Percent-encode
 fn Url::pct_encode($s) {
-    my $out = ""
-    for my $ch (split //, $s) {
+    var $out = ""
+    for val $ch (split //, $s) {
         $out .= $ch =~ /[A-Za-z0-9\-_.~]/
             ? $ch
             : sprintf("%%%02X", ord $ch)
@@ -73,7 +73,7 @@ Url::pct_encode("a/b/c")          |> aeq "a%2Fb%2Fc",     "encode slashes"
 
 # Percent-decode
 fn Url::pct_decode($s) {
-    my $t = $s
+    var $t = $s
     $t =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge
     $t
 }
@@ -90,11 +90,11 @@ Url::pct_decode(Url::pct_encode("Hello, World!"))
 fn Url::join($base, $path) {
     return $path if $path =~ m{^[a-z]+://}
     if ($path =~ m{^/}) {
-        my @c = ($base =~ m{^([a-z]+://[^/]+)})
+        val @c = ($base =~ m{^([a-z]+://[^/]+)})
         return "#{$c[0]}#{$path}" if len(@c) > 0
     }
     return "#{$base}#{$path}" if $base =~ m{/$}
-    my $rest = $base
+    var $rest = $base
     $rest =~ s{[^/]*$}{}
     "#{$rest}#{$path}"
 }
@@ -106,7 +106,7 @@ Url::join("http://example.com/foo", "https://y.com/z") |> aeq "https://y.com/z",
 
 # Registrable suffix (toy: last two labels)
 fn Url::registrable($host) {
-    my @parts = split /\./, $host
+    val @parts = split /\./, $host
     return $host if len(@parts) < 2
     join(".", @parts[-2:-1])
 }

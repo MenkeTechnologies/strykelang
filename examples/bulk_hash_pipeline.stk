@@ -10,7 +10,7 @@
 p "── bulk hash pipeline ──"
 
 # 6 (input, algorithm) pairs, 6 workers, one task each.
-my @tasks = (
+val @tasks = (
     ["hello",         "sha256"],
     ["world",         "sha256"],
     ["stryke",        "sha1"],
@@ -18,33 +18,33 @@ my @tasks = (
     ["pray",          "md5"],
     ["annex",         "md5"],
 )
-my $n = len(@tasks)
+val $n = len(@tasks)
 printf "tasks: %d (input × hash algo pairs)\n", $n
 
-my @workers = congregation($n)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
-my %results
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my ($input, $algo) = @{$tasks[$i]}
-    my $code = "${algo}(q{$input})"
-    my $div = pray $code, $w
-    my %reply = annex $div
+var %results
+for var $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    var ($input, $algo) = @{$tasks[$i]}
+    val $code = "${algo}(q{$input})"
+    val $div = pray $code, $w
+    val %reply = annex $div
     $results{$w} = [$input, $algo, $reply{$w}]
 }
 
 p "── results ──"
 printf "  %-14s  %-7s  %s\n", "input", "algo", "hash"
-for my $w (@sorted_workers) {
-    my ($input, $algo, $hash) = @{$results{$w}}
-    my $short = len($hash) > 32 ? substr($hash, 0, 16) . "..." . substr($hash, -8) : $hash
+for val $w (@sorted_workers) {
+    val ($input, $algo, $hash) = @{$results{$w}}
+    val $short = len($hash) > 32 ? substr($hash, 0, 16) . "..." . substr($hash, -8) : $hash
     printf "  %-14s  %-7s  %s\n", $input, $algo, $short
 }
 
 # Verify: re-hash one input locally and compare.
-my $expected = sha256("hello")
-my $w0 = $sorted_workers[0]
+val $expected = sha256("hello")
+val $w0 = $sorted_workers[0]
 p $results{$w0}[2] eq $expected ? "✓ worker 0 sha256('hello') matches local" : "✗ hash diverged"
 
 excommunicate(@workers)

@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 fn Exercism::Clock::new($h, $m) {
-    my $total = $h * 60 + $m
+    var $total = $h * 60 + $m
     $total = $total % 1440
     $total += 1440 if $total < 0
     { hour => int($total / 60), minute => $total % 60 }

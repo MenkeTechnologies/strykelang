@@ -4,8 +4,8 @@
 fn Rosetta::ConditionalStructures::demo() {
     "Conditional Structure Examples:" |> p
     
-    my $x = 42
-    my $y = 7
+    val $x = 42
+    val $y = 7
     
     # Basic if statement
     "1. Basic if:" |> p
@@ -35,7 +35,7 @@ fn Rosetta::ConditionalStructures::demo() {
     
     # Ternary operator
     "4. Ternary operator:" |> p
-    my $result = $x > $y ? "x is larger" : "y is larger or equal"
+    val $result = $x > $y ? "x is larger" : "y is larger or equal"
     "   $result" |> p
     
     # Logical operators
@@ -56,7 +56,7 @@ fn Rosetta::ConditionalStructures::demo() {
     
     # Switch-like structure using given/when (if supported)
     "7. Switch-like with if-elsif:" |> p
-    my $grade = "B"
+    val $grade = "B"
     if ($grade eq "A") {
         "   Excellent!" |> p
     } elsif ($grade eq "B") {

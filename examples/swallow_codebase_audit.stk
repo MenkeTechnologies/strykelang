@@ -17,7 +17,7 @@
 p "── codebase audit (swallow) ───────────────────────────"
 
 # Seed a synthetic project so the demo is deterministic across machines.
-my $root = "/tmp/stryke_audit_demo"
+val $root = "/tmp/stryke_audit_demo"
 system "rm", "-rf", $root
 mkdir $root
 mkdir "$root/src"
@@ -29,22 +29,22 @@ spurt "$root/tests/basic.rs",     "#[test]\nfn t() { assert_eq!(2 + 2, 4); }\n"
 spurt "$root/README.md",          "# demo\n"
 
 # One read — every .rs file under the tree, raw bytes, abs paths as keys.
-my %src = swallow "$root/**/*.rs"
+val %src = swallow "$root/**/*.rs"
 p "loaded #{len keys %src} .rs files into memory"
 
 # ── Aggregations over the in-memory hash ──────────────────────────
 
-my $total_bytes  = 0
-my $total_lines  = 0
-my $total_fns    = 0
-my $biggest_path = ""
-my $biggest_size = 0
+var $total_bytes  = 0
+var $total_lines  = 0
+var $total_fns    = 0
+var $biggest_path = ""
+var $biggest_size = 0
 
-for my $path (keys %src) {
-    my $bytes = $src{$path}
-    my $sz    = length $bytes
-    my $lines = ($bytes =~ tr/\n//)         # count newlines
-    my @fns   = ($bytes =~ /\bfn\s+\w+/g)   # rust-style fn defs
+for val $path (keys %src) {
+    var $bytes = $src{$path}
+    val $sz    = length $bytes
+    val $lines = ($bytes =~ tr/\n//)         # count newlines
+    val @fns   = ($bytes =~ /\bfn\s+\w+/g)   # rust-style fn defs
 
     $total_bytes += $sz
     $total_lines += $lines
@@ -66,7 +66,7 @@ p "biggest     : $biggest_path  ($biggest_size bytes)"
 # ── Filter via qualifier at the glob stage (not after) ────────────
 # `(L+50)` selects files larger than 50 bytes — qualifier work happens
 # in zsh::glob before any bytes are read.
-my %big = swallow "$root/**/*.rs(L+50)"
+val %big = swallow "$root/**/*.rs(L+50)"
 p "\n>50-byte files (qualifier-filtered at glob stage): ", len keys %big
 
 # Cleanup

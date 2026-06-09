@@ -2,8 +2,8 @@
 # Rosetta Code: Juggler sequence
 
 fn Rosetta::Juggler::sequence($n) {
-    my @seq = ($n)
-    my $curr = $n
+    var @seq = ($n)
+    var $curr = $n
     while ($curr != 1) {
         if ($curr % 2 == 0) {
             $curr = int(sqrt($curr))
@@ -15,10 +15,10 @@ fn Rosetta::Juggler::sequence($n) {
     \@seq
 }
 
-my $j3 = Rosetta::Juggler::sequence(3)
+val $j3 = Rosetta::Juggler::sequence(3)
 assert_eq join(",", @$j3), "3,5,11,36,6,2,1", "Juggler seq 3"
 
-my $j4 = Rosetta::Juggler::sequence(4)
+val $j4 = Rosetta::Juggler::sequence(4)
 assert_eq join(",", @$j4), "4,2,1", "Juggler seq 4"
 
 test_run

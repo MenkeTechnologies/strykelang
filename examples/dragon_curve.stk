@@ -24,8 +24,8 @@
 # ── L-system rewrite step ──────────────────────────────────────────
 
 fn Dragon::rewrite($s) {
-    my $out = ""
-    for my $c (split //, $s) {
+    var $out = ""
+    for val $c (split //, $s) {
         if    ($c eq "X") { $out .= "X+YF+" }
         elsif ($c eq "Y") { $out .= "-FX-Y" }
         else              { $out .= $c }
@@ -34,23 +34,23 @@ fn Dragon::rewrite($s) {
 }
 
 fn Dragon::iterate($axiom, $n) {
-    my $s = $axiom
-    for my $i (1:$n) { $s = Dragon::rewrite($s) }
+    var $s = $axiom
+    for val $i (1:$n) { $s = Dragon::rewrite($s) }
     $s
 }
 
 # ── walk the turtle, return ([min_x, min_y, max_x, max_y], \@cells) ─
 
 fn Dragon::walk($prog) {
-    my @DX = (1, 0, -1, 0)
-    my @DY = (0, 1, 0, -1)
-    my $dir = 0
-    my $x = 0
-    my $y = 0
-    my %cells
+    val @DX = (1, 0, -1, 0)
+    val @DY = (0, 1, 0, -1)
+    var $dir = 0
+    var $x = 0
+    var $y = 0
+    var %cells
     $cells{"0,0"} = 1
-    my ($minx, $miny, $maxx, $maxy) = (0, 0, 0, 0)
-    for my $c (split //, $prog) {
+    var ($minx, $miny, $maxx, $maxy) = (0, 0, 0, 0)
+    for val $c (split //, $prog) {
         if    ($c eq "+") { $dir = ($dir + 1) % 4 }
         elsif ($c eq "-") { $dir = ($dir + 3) % 4 }
         elsif ($c eq "F") {
@@ -70,15 +70,15 @@ fn Dragon::walk($prog) {
 # ── render bounded grid ───────────────────────────────────────────
 
 fn Dragon::render($walk) {
-    my $box = $walk->{bbox}
-    my $cells = $walk->{cells}
-    my $minx = $box->[0]
-    my $miny = $box->[1]
-    my $maxx = $box->[2]
-    my $maxy = $box->[3]
-    my $out = ""
-    for my $y ($miny:$maxy) {
-        for my $x ($minx:$maxx) {
+    val $box = $walk->{bbox}
+    val $cells = $walk->{cells}
+    val $minx = $box->[0]
+    val $miny = $box->[1]
+    val $maxx = $box->[2]
+    val $maxy = $box->[3]
+    var $out = ""
+    for val $y ($miny:$maxy) {
+        for val $x ($minx:$maxx) {
             $out .= exists $cells->{"$x,$y"} ? "#" : " "
         }
         $out .= "\n"
@@ -88,14 +88,14 @@ fn Dragon::render($walk) {
 
 # ── run for several iteration counts ──────────────────────────────
 
-my $axiom = "FX"
+val $axiom = "FX"
 
 printf "── L-system iteration lengths ────────────────────────\n\n"
 printf "  %3s   %8s\n", "n", "len(s)"
 printf "  %3s   %8s\n", "---", "--------"
-my @lengths
-for my $n (0:8) {
-    my $s = Dragon::iterate($axiom, $n)
+var @lengths
+for val $n (0:8) {
+    val $s = Dragon::iterate($axiom, $n)
     push @lengths, len($s)
     printf "  %3d   %8d\n", $n, len($s)
 }
@@ -105,7 +105,7 @@ for my $n (0:8) {
 #  L_0 = 2, L_{n+1} = 5·(count of X+Y in s_n)/?? — too painful in
 #  closed form. Instead pin: each step strictly grows the string.
 
-for my $i (1:len(@lengths) - 1) {
+for val $i (1:len(@lengths) - 1) {
     die "string length must be non-decreasing at n=#{$i}" unless $lengths[$i] > $lengths[$i - 1]
 }
 
@@ -116,24 +116,24 @@ for my $i (1:len(@lengths) - 1) {
 # doubles. Net effect: F count exactly doubles per iteration.
 
 fn Dragon::count_letter($s, $ch) {
-    my $c = 0
-    for my $k (split //, $s) { $c++ if $k eq $ch }
+    var $c = 0
+    for val $k (split //, $s) { $c++ if $k eq $ch }
     $c
 }
 
-my $prev_f = Dragon::count_letter($axiom, "F")
-for my $n (1:8) {
-    my $s = Dragon::iterate($axiom, $n)
-    my $cur_f = Dragon::count_letter($s, "F")
+var $prev_f = Dragon::count_letter($axiom, "F")
+for val $n (1:8) {
+    val $s = Dragon::iterate($axiom, $n)
+    val $cur_f = Dragon::count_letter($s, "F")
     die "F-count didn't double at n=#{$n}: prev=#{$prev_f} cur=#{$cur_f}" unless $cur_f == 2 * $prev_f
     $prev_f = $cur_f
 }
 
 # ── render n = 6 ──────────────────────────────────────────────────
 
-my $iter = 8
-my $s = Dragon::iterate($axiom, $iter)
-my $walk = Dragon::walk($s)
+val $iter = 8
+val $s = Dragon::iterate($axiom, $iter)
+val $walk = Dragon::walk($s)
 p ""
 printf "── dragon curve, n=#{$iter}, F-count=%d ───────────────\n\n",
     Dragon::count_letter($s, "F")
@@ -145,15 +145,15 @@ print Dragon::render($walk)
 #                  turtle visits ≥ 1 cell per F command (cells may
 #                  revisit, so |cells| ≤ |F|+1).
 
-my $f_count = Dragon::count_letter($s, "F")
-my $cell_count = len(%{$walk->{cells}})
+val $f_count = Dragon::count_letter($s, "F")
+val $cell_count = len(%{$walk->{cells}})
 die "cell count exceeds F+1" unless $cell_count <= $f_count + 1
 die "must visit at least origin" unless $cell_count >= 1
 
 # ── invariant 4: bbox sides are finite and bounded ────────────────
 
-my $bx = $walk->{bbox}->[2] - $walk->{bbox}->[0] + 1
-my $by = $walk->{bbox}->[3] - $walk->{bbox}->[1] + 1
+val $bx = $walk->{bbox}->[2] - $walk->{bbox}->[0] + 1
+val $by = $walk->{bbox}->[3] - $walk->{bbox}->[1] + 1
 die "bbox width must be positive" unless $bx > 0
 die "bbox height must be positive" unless $by > 0
 # Heuristic: width and height are each ≤ F_count (path can't extend

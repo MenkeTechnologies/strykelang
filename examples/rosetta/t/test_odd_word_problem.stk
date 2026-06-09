@@ -6,10 +6,10 @@ fn Rosetta::OddWordProblem::reverse($s) {
 }
 
 fn Rosetta::OddWordProblem::process($s) {
-    my $clean = $s =~ s/\.$//r
-    my @words = split /\s+/, $clean
-    my @res
-    for my $i (0..len(@words)-1) {
+    val $clean = $s =~ s/\.$//r
+    val @words = split /\s+/, $clean
+    var @res
+    for val $i (0..len(@words)-1) {
         if ($i % 2 == 1) {
             push @res, Rosetta::OddWordProblem::reverse($words[$i])
         } else {

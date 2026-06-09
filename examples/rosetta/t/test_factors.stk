@@ -2,23 +2,23 @@
 # Rosetta Code: Factors of an integer
 
 fn Rosetta::Factors::factors($n) {
-    my @f
-    for my $i (1:$n) {
+    var @f
+    for val $i (1:$n) {
         if ($n % $i == 0) { push @f, $i }
     }
     \@f
 }
 
-my $f6 = Rosetta::Factors::factors(6)
+val $f6 = Rosetta::Factors::factors(6)
 assert_eq join(",", @$f6), "1,2,3,6", "factors 6"
 
-my $f12 = Rosetta::Factors::factors(12)
+val $f12 = Rosetta::Factors::factors(12)
 assert_eq join(",", @$f12), "1,2,3,4,6,12", "factors 12"
 
-my $f13 = Rosetta::Factors::factors(13)
+val $f13 = Rosetta::Factors::factors(13)
 assert_eq join(",", @$f13), "1,13", "factors 13 (prime)"
 
-my $f1 = Rosetta::Factors::factors(1)
+val $f1 = Rosetta::Factors::factors(1)
 assert_eq join(",", @$f1), "1", "factors 1"
 
 test_run

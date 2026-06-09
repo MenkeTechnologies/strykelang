@@ -8,9 +8,9 @@ fn Rosetta::NinetyNineBottles::bottles($n) {
 }
 
 fn Rosetta::NinetyNineBottles::verse($n) {
-    my $b = Rosetta::NinetyNineBottles::bottles($n)
-    my $b1 = Rosetta::NinetyNineBottles::bottles($n - 1)
-    my $take = $n == 1 ? "it" : "one"
+    val $b = Rosetta::NinetyNineBottles::bottles($n)
+    val $b1 = Rosetta::NinetyNineBottles::bottles($n - 1)
+    val $take = $n == 1 ? "it" : "one"
     "$b of beer on the wall, $b of beer.\n" .
     "Take $take down and pass it around, $b1 of beer on the wall."
 }
@@ -23,11 +23,11 @@ assert_eq Rosetta::NinetyNineBottles::bottles(99), "99 bottles", "bottles(99)"
 assert_eq Rosetta::NinetyNineBottles::bottles(1), "1 bottle", "bottles(1)"
 assert_eq Rosetta::NinetyNineBottles::bottles(0), "no more bottles", "bottles(0)"
 
-my $v99 = Rosetta::NinetyNineBottles::verse(99)
+val $v99 = Rosetta::NinetyNineBottles::verse(99)
 assert_ok $v99 =~ /99 bottles/, "verse 99 contains 99 bottles"
 assert_ok $v99 =~ /98 bottles/, "verse 99 mentions 98"
 
-my $v1 = Rosetta::NinetyNineBottles::verse(1)
+val $v1 = Rosetta::NinetyNineBottles::verse(1)
 assert_ok $v1 =~ /1 bottle of beer/, "verse 1 is singular"
 assert_ok $v1 =~ /Take it down/, "verse 1 uses 'it'"
 

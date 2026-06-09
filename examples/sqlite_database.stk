@@ -13,7 +13,7 @@
 p "── SQLite Database Demo ────────────────────────────────"
 
 # 1. Open an in-memory database
-my $db = sqlite(":memory:")
+val $db = sqlite(":memory:")
 
 # 2. Create a table
 $db->exec("
@@ -27,34 +27,34 @@ $db->exec("
 
 # 3. Insert some data with parameters
 p "Inserting sample users..."
-my @users = (
+val @users = (
     ["Alice", "alice\@example.com", 30],
     ["Bob",   "bob\@example.com",   25],
     ["Charlie", "charlie\@example.com", 35],
     ["Dave",  "dave\@example.com",  40]
 )
 
-for my $u (@users) {
+for val $u (@users) {
     # Explicitly pass positional args
     $db->exec("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", 
         $u->[0], $u->[1], $u->[2])
 }
 
-my $last_id = $db->last_insert_rowid()
+val $last_id = $db->last_insert_rowid()
 p "Last inserted ID: $last_id"
 
 # 4. Query data
 p ""
 p "Users over 30:"
-my @results = $db->query("SELECT * FROM users WHERE age > ?", 30)
+val @results = $db->query("SELECT * FROM users WHERE age > ?", 30)
 
-for my $row (@results) {
+for val $row (@results) {
     p "  - #{$row->{name}} (#{$row->{age}}) <#{$row->{email}}>"
 }
 
 # 5. Aggregation with SQL
-my @stats = $db->query("SELECT AVG(age) as avg_age, COUNT(*) as count FROM users")
-my $stats_row = $stats[0]
+val @stats = $db->query("SELECT AVG(age) as avg_age, COUNT(*) as count FROM users")
+val $stats_row = $stats[0]
 printf "\nAverage age: %.1f (Total: %d)\n", $stats_row->{avg_age}, $stats_row->{count}
 
 # 6. Self-test / Assertions

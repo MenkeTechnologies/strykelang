@@ -4,42 +4,42 @@
 # O(n·m) worst case, O(n/m) average — matches the stronger BM in practice.
 
 fn Rosetta::Horspool::build_shift($pat) {
-    my $m = length($pat)
-    my %shift
-    for my $i (~> 0:$m - 2) {
+    val $m = length($pat)
+    var %shift
+    for val $i (~> 0:$m - 2) {
         $shift{substr($pat, $i, 1)} = $m - 1 - $i
     }
     \%shift
 }
 
 fn Rosetta::Horspool::search($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
+    val $n = length($text)
+    val $m = length($pat)
     return 0  if $m == 0
     return -1 if $m > $n
-    my $shift = Rosetta::Horspool::build_shift($pat)
-    my $i = 0
+    val $shift = Rosetta::Horspool::build_shift($pat)
+    var $i = 0
     while ($i <= $n - $m) {
-        my $j = $m - 1
+        var $j = $m - 1
         while ($j >= 0 && substr($text, $i + $j, 1) eq substr($pat, $j, 1)) {
             $j--
         }
         return $i if $j < 0
-        my $c = substr($text, $i + $m - 1, 1)
+        val $c = substr($text, $i + $m - 1, 1)
         $i += $shift->{$c} // $m
     }
     -1
 }
 
 fn Rosetta::Horspool::search_all($text, $pat) {
-    my $n = length($text)
-    my $m = length($pat)
-    my @hits
+    val $n = length($text)
+    val $m = length($pat)
+    var @hits
     return \@hits  if $m == 0 || $m > $n
-    my $shift = Rosetta::Horspool::build_shift($pat)
-    my $i = 0
+    val $shift = Rosetta::Horspool::build_shift($pat)
+    var $i = 0
     while ($i <= $n - $m) {
-        my $j = $m - 1
+        var $j = $m - 1
         while ($j >= 0 && substr($text, $i + $j, 1) eq substr($pat, $j, 1)) {
             $j--
         }
@@ -47,7 +47,7 @@ fn Rosetta::Horspool::search_all($text, $pat) {
             push @hits, $i
             $i += 1
         } else {
-            my $c = substr($text, $i + $m - 1, 1)
+            val $c = substr($text, $i + $m - 1, 1)
             $i += $shift->{$c} // $m
         }
     }
@@ -68,26 +68,26 @@ assert_eq Rosetta::Horspool::search("anything", ""), 0, "empty pattern at 0"
 assert_eq Rosetta::Horspool::search("hi", "hello"), -1, "pattern > text"
 
 # Overlapping matches via search_all
-my $a = Rosetta::Horspool::search_all("aaaa", "aa")
+val $a = Rosetta::Horspool::search_all("aaaa", "aa")
 assert_eq join(",", @$a), "0,1,2", "overlapping aa in aaaa"
 
-my $b = Rosetta::Horspool::search_all("ababcabab", "ab")
+val $b = Rosetta::Horspool::search_all("ababcabab", "ab")
 assert_eq join(",", @$b), "0,2,5,7", "non-overlap ab"
 
-my $c = Rosetta::Horspool::search_all("AABCAABXAAZAABA", "AABA")
+val $c = Rosetta::Horspool::search_all("AABCAABXAAZAABA", "AABA")
 assert_eq join(",", @$c), "11", "AABA at index 11"
 
 # Cross-validate against the substring-as-builtin (hides the shift table behind
 # a single linear scan; same answer either way).
-for my $pat ("a", "the", "fox", "lazy", "zzz") {
-    my $text = "the quick brown fox jumps over the lazy dog"
-    my $hp = Rosetta::Horspool::search($text, $pat)
-    my $idx = index($text, $pat)
+for val $pat ("a", "the", "fox", "lazy", "zzz") {
+    val $text = "the quick brown fox jumps over the lazy dog"
+    val $hp = Rosetta::Horspool::search($text, $pat)
+    val $idx = index($text, $pat)
     assert_eq $hp, $idx, "horspool '$pat' matches builtin index"
 }
 
 # Shift table sanity: pattern with distinct chars
-my $shift = Rosetta::Horspool::build_shift("abcd")
+val $shift = Rosetta::Horspool::build_shift("abcd")
 assert_eq $shift->{"a"}, 3, "shift a in abcd"
 assert_eq $shift->{"b"}, 2, "shift b in abcd"
 assert_eq $shift->{"c"}, 1, "shift c in abcd"

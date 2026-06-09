@@ -3,7 +3,7 @@
 # Returns 1 (ccw / left turn), -1 (cw / right turn), 0 (collinear)
 
 fn Rosetta::Orient::orient($a, $b, $c) {
-    my $cx = ($b->[0] - $a->[0]) * ($c->[1] - $a->[1]) - ($b->[1] - $a->[1]) * ($c->[0] - $a->[0])
+    val $cx = ($b->[0] - $a->[0]) * ($c->[1] - $a->[1]) - ($b->[1] - $a->[1]) * ($c->[0] - $a->[0])
     return 0 if $cx == 0
     $cx > 0 ? 1 : -1
 }
@@ -27,15 +27,15 @@ assert_eq Rosetta::Orient::orient([-2, 0], [0, 0], [0, 2]), 1, "L-shape CCW"
 assert_eq Rosetta::Orient::orient([-2, 0], [0, 0], [0, -2]), -1, "mirrored CW"
 
 # Reversing the order flips sign
-my $a = [1, 1]
-my $b = [4, 5]
-my $c = [7, 2]
-my $abc = Rosetta::Orient::orient($a, $b, $c)
-my $cba = Rosetta::Orient::orient($c, $b, $a)
+val $a = [1, 1]
+val $b = [4, 5]
+val $c = [7, 2]
+val $abc = Rosetta::Orient::orient($a, $b, $c)
+val $cba = Rosetta::Orient::orient($c, $b, $a)
 assert_eq $abc + $cba, 0, "swapping a/c flips sign"
 
 # Cyclic permutation preserves sign (for non-collinear)
-my $bca = Rosetta::Orient::orient($b, $c, $a)
+val $bca = Rosetta::Orient::orient($b, $c, $a)
 assert_eq $abc, $bca, "cyclic permutation preserves orientation"
 
 test_run

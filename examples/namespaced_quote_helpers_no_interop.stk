@@ -31,7 +31,7 @@ fn QuoteOps::tr2($n, $k) { $n - $k }
 fn A::B::C::s($n) { $n + 1000 }
 
 p "── single-arg quote-name UDFs ──"
-my @results = (
+val @results = (
     ["s",  QuoteOps::s(1)],
     ["m",  QuoteOps::m(1)],
     ["q",  QuoteOps::q(1)],
@@ -41,20 +41,20 @@ my @results = (
     ["tr", QuoteOps::tr(1)],
     ["y",  QuoteOps::y(1)],
 )
-for my $r (@results) {
+for val $r (@results) {
     printf("  QuoteOps::%-2s(1) = %d\n", $r->[0], $r->[1])
 }
 
 # Total must be 11+13+17+19+23+29+31+37 = 180.
-my $sum = sum map { _->[1] } @results
+val $sum = sum map { _->[1] } @results
 p "  sum = $sum"
 die "expected 180, got $sum" unless $sum == 180
 
 p ""
 p "── multi-arg variants (lexer must not eat `$k` as quote body) ──"
-my $s2 = QuoteOps::s2(7, 5)
-my $m2 = QuoteOps::m2(7, 5)
-my $tr2 = QuoteOps::tr2(7, 5)
+val $s2 = QuoteOps::s2(7, 5)
+val $m2 = QuoteOps::m2(7, 5)
+val $tr2 = QuoteOps::tr2(7, 5)
 p "  QuoteOps::s2(7, 5)  = $s2"
 p "  QuoteOps::m2(7, 5)  = $m2"
 p "  QuoteOps::tr2(7, 5) = $tr2"
@@ -64,7 +64,7 @@ die "expected 2"   unless $tr2 == 2
 
 p ""
 p "── deep namespace ──"
-my $deep = A::B::C::s(5)
+val $deep = A::B::C::s(5)
 p "  A::B::C::s(5) = $deep"
 die "expected 1005" unless $deep == 1005
 

@@ -2,9 +2,9 @@
 # Rosetta Code: Sphenic numbers
 
 fn Rosetta::PrimeFactors::prime_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
+    var @factors
+    var $d = 2
+    var $temp = $n
     while ($temp > 1) {
         while ($temp % $d == 0) {
             push @factors, $d
@@ -16,13 +16,13 @@ fn Rosetta::PrimeFactors::prime_factors($n) {
 }
 
 fn Rosetta::Sphenic::check($n) {
-    my $factors_ref = Rosetta::PrimeFactors::prime_factors($n)
-    my @factors = @$factors_ref
+    val $factors_ref = Rosetta::PrimeFactors::prime_factors($n)
+    val @factors = @$factors_ref
     if (len(@factors) != 3) {
         0
     } else {
-        my %counts
-        for my $f (@factors) { $counts{$f}++ }
+        var %counts
+        for val $f (@factors) { $counts{$f}++ }
         len(keys %counts) == 3
     }
 }

@@ -2,27 +2,27 @@
 # Rosetta Code: Generate Chess960 starting position
 
 fn Rosetta::Chess960::generate() {
-    my @backline
+    var @backline
     for (0:7) { push @backline, undef }
     
     # 1. Bishops on opposite colors
-    my $b1 = int(rand(4)) * 2
-    my $b2 = int(rand(4)) * 2 + 1
+    val $b1 = int(rand(4)) * 2
+    val $b2 = int(rand(4)) * 2 + 1
     $backline[$b1] = "B"
     $backline[$b2] = "B"
     
     # 2. Queen on a random empty square
-    my @empty
+    var @empty
     for (0:7) { push @empty, _ if !defined $backline[_] }
-    my $q_idx = int(rand(len(@empty)))
-    my $q = $empty[$q_idx]
+    val $q_idx = int(rand(len(@empty)))
+    val $q = $empty[$q_idx]
     $backline[$q] = "Q"
     splice @empty, $q_idx, 1
     
     # 3. Knights on random empty squares
     for (1:2) {
-        my $k_idx = int(rand(len(@empty)))
-        my $k = $empty[$k_idx]
+        val $k_idx = int(rand(len(@empty)))
+        val $k = $empty[$k_idx]
         $backline[$k] = "N"
         splice @empty, $k_idx, 1
     }
@@ -37,7 +37,7 @@ fn Rosetta::Chess960::generate() {
     join("", @backline)
 }
 
-my $pos = Rosetta::Chess960::generate()
+val $pos = Rosetta::Chess960::generate()
 assert_eq len($pos), 8, "Position length is 8"
 assert_ok $pos =~ /B.*B/ || $pos =~ /B.*B/, "Has two bishops" # actually need to check colors
 assert_ok $pos =~ /R.*K.*R/, "King is between rooks"

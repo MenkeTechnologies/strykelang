@@ -3,8 +3,8 @@
 package ST;
 
 fn ilog2($n) {
-    my $k = 0
-    my $v = $n
+    var $k = 0
+    var $v = $n
     while ($v > 1) {
         $v = $v >> 1
         $k = $k + 1
@@ -13,23 +13,23 @@ fn ilog2($n) {
 }
 
 fn build_min($arr) {
-    my $n = len(@$arr)
-    my $logn = ilog2($n) + 1
-    my @table = ()
-    my @row0 = ()
-    for my $i (0:$n-1) { push @row0, $arr->[$i] }
+    val $n = len(@$arr)
+    val $logn = ilog2($n) + 1
+    var @table = ()
+    var @row0 = ()
+    for val $i (0:$n-1) { push @row0, $arr->[$i] }
     push @table, \@row0
-    for my $k (1:$logn-1) {
-        my $half = 1 << ($k - 1)
-        my $span = 1 << $k
-        my @row = ()
-        my $last = $n - $span
+    for val $k (1:$logn-1) {
+        val $half = 1 << ($k - 1)
+        val $span = 1 << $k
+        var @row = ()
+        val $last = $n - $span
         if ($last < 0) {
-            for my $i (0:$n-1) { push @row, $table[$k-1]->[$i] }
+            for val $i (0:$n-1) { push @row, $table[$k-1]->[$i] }
         } else {
-            for my $i (0:$last) {
-                my $va = $table[$k-1]->[$i]
-                my $vb = $table[$k-1]->[$i + $half]
+            for val $i (0:$last) {
+                val $va = $table[$k-1]->[$i]
+                val $vb = $table[$k-1]->[$i + $half]
                 push @row, ($va <= $vb ? $va : $vb)
             }
         }
@@ -39,23 +39,23 @@ fn build_min($arr) {
 }
 
 fn build_max($arr) {
-    my $n = len(@$arr)
-    my $logn = ilog2($n) + 1
-    my @table = ()
-    my @row0 = ()
-    for my $i (0:$n-1) { push @row0, $arr->[$i] }
+    val $n = len(@$arr)
+    val $logn = ilog2($n) + 1
+    var @table = ()
+    var @row0 = ()
+    for val $i (0:$n-1) { push @row0, $arr->[$i] }
     push @table, \@row0
-    for my $k (1:$logn-1) {
-        my $half = 1 << ($k - 1)
-        my $span = 1 << $k
-        my @row = ()
-        my $last = $n - $span
+    for val $k (1:$logn-1) {
+        val $half = 1 << ($k - 1)
+        val $span = 1 << $k
+        var @row = ()
+        val $last = $n - $span
         if ($last < 0) {
-            for my $i (0:$n-1) { push @row, $table[$k-1]->[$i] }
+            for val $i (0:$n-1) { push @row, $table[$k-1]->[$i] }
         } else {
-            for my $i (0:$last) {
-                my $va = $table[$k-1]->[$i]
-                my $vb = $table[$k-1]->[$i + $half]
+            for val $i (0:$last) {
+                val $va = $table[$k-1]->[$i]
+                val $vb = $table[$k-1]->[$i + $half]
                 push @row, ($va >= $vb ? $va : $vb)
             }
         }
@@ -66,33 +66,33 @@ fn build_max($arr) {
 
 fn query_min($s, $l, $r) {
     return undef if $l > $r || $l < 0 || $r >= $s->{n}
-    my $k = ilog2($r - $l + 1)
-    my $span = 1 << $k
-    my $va = $s->{table}->[$k]->[$l]
-    my $vb = $s->{table}->[$k]->[$r - $span + 1]
+    val $k = ilog2($r - $l + 1)
+    val $span = 1 << $k
+    val $va = $s->{table}->[$k]->[$l]
+    val $vb = $s->{table}->[$k]->[$r - $span + 1]
     $va <= $vb ? $va : $vb
 }
 
 fn query_max($s, $l, $r) {
     return undef if $l > $r || $l < 0 || $r >= $s->{n}
-    my $k = ilog2($r - $l + 1)
-    my $span = 1 << $k
-    my $va = $s->{table}->[$k]->[$l]
-    my $vb = $s->{table}->[$k]->[$r - $span + 1]
+    val $k = ilog2($r - $l + 1)
+    val $span = 1 << $k
+    val $va = $s->{table}->[$k]->[$l]
+    val $vb = $s->{table}->[$k]->[$r - $span + 1]
     $va >= $vb ? $va : $vb
 }
 
 fn brute_min($arr, $l, $r) {
-    my $m = $arr->[$l]
-    for my $i ($l:$r) {
+    var $m = $arr->[$l]
+    for val $i ($l:$r) {
         $m = $arr->[$i] if $arr->[$i] < $m
     }
     $m
 }
 
 fn brute_max($arr, $l, $r) {
-    my $m = $arr->[$l]
-    for my $i ($l:$r) {
+    var $m = $arr->[$l]
+    for val $i ($l:$r) {
         $m = $arr->[$i] if $arr->[$i] > $m
     }
     $m
@@ -111,21 +111,21 @@ ST::ilog2(31) |> aeq 4, "ilog2(31)"
 ST::ilog2(32) |> aeq 5, "ilog2(32)"
 
 # --- Single element ---
-my $s1 = ST::build_min([42])
+val $s1 = ST::build_min([42])
 ST::query_min($s1, 0, 0) |> aeq 42, "single min"
-my $s1x = ST::build_max([42])
+val $s1x = ST::build_max([42])
 ST::query_max($s1x, 0, 0) |> aeq 42, "single max"
 
 # --- Two elements ---
-my $s2 = ST::build_min([5, 3])
+val $s2 = ST::build_min([5, 3])
 ST::query_min($s2, 0, 0) |> aeq 5, "two min[0..0]"
 ST::query_min($s2, 1, 1) |> aeq 3, "two min[1..1]"
 ST::query_min($s2, 0, 1) |> aeq 3, "two min[0..1]"
 
 # --- Canonical ---
-my $arr = [7, 2, 3, 0, 5, 10, 3, 12, 18, 6]
-my $smin = ST::build_min($arr)
-my $smax = ST::build_max($arr)
+val $arr = [7, 2, 3, 0, 5, 10, 3, 12, 18, 6]
+val $smin = ST::build_min($arr)
+val $smax = ST::build_max($arr)
 ST::query_min($smin, 0, 9) |> aeq 0, "canon full min"
 ST::query_max($smax, 0, 9) |> aeq 18, "canon full max"
 ST::query_min($smin, 4, 9) |> aeq 3, "canon min[4..9]"
@@ -140,28 +140,28 @@ ST::query_min($smin, 5, 5) |> aeq 10, "canon min[5..5]"
 (defined ST::query_min($smin, 5, 4)) |> aeq 0, "oob l>r"
 
 # --- Constant array ---
-my $sc = ST::build_min([9, 9, 9, 9, 9, 9])
-for my $l (0:5) {
-    for my $r ($l:5) {
+val $sc = ST::build_min([9, 9, 9, 9, 9, 9])
+for val $l (0:5) {
+    for val $r ($l:5) {
         ST::query_min($sc, $l, $r) |> aeq 9, "const min[$l..$r]"
     }
 }
 
 # --- Negative values ---
-my $sn = ST::build_min([-3, -1, -5, 0, -2, -4])
+val $sn = ST::build_min([-3, -1, -5, 0, -2, -4])
 ST::query_min($sn, 0, 5) |> aeq -5, "neg min full"
 ST::query_min($sn, 3, 5) |> aeq -4, "neg min[3..5]"
-my $snx = ST::build_max([-3, -1, -5, 0, -2, -4])
+val $snx = ST::build_max([-3, -1, -5, 0, -2, -4])
 ST::query_max($snx, 0, 5) |> aeq 0, "neg max full"
 
 # --- Power-of-two-sized array exercises every row ---
-my @p16 = ()
-for my $i (1:16) { push @p16, ($i * 7) % 50 }
-my $sp = ST::build_min(\@p16)
-my $spm = ST::build_max(\@p16)
-my $ok16 = 1
-for my $l (0:15) {
-    for my $r ($l:15) {
+var @p16 = ()
+for val $i (1:16) { push @p16, ($i * 7) % 50 }
+val $sp = ST::build_min(\@p16)
+val $spm = ST::build_max(\@p16)
+var $ok16 = 1
+for val $l (0:15) {
+    for val $r ($l:15) {
         $ok16 = 0 if ST::query_min($sp, $l, $r) != ST::brute_min(\@p16, $l, $r)
         $ok16 = 0 if ST::query_max($spm, $l, $r) != ST::brute_max(\@p16, $l, $r)
     }
@@ -169,17 +169,17 @@ for my $l (0:15) {
 $ok16 |> aeq 1, "p16 all ranges match brute"
 
 # --- Stress: random array, all O(n^2) ranges vs brute ---
-my $seed = 13371337
-my @rand = ()
-for my $i (1:50) {
+var $seed = 13371337
+var @rand = ()
+for val $i (1:50) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     push @rand, ($seed % 2000) - 1000
 }
-my $sr_min = ST::build_min(\@rand)
-my $sr_max = ST::build_max(\@rand)
-my $all = 1
-for my $l (0:49) {
-    for my $r ($l:49) {
+val $sr_min = ST::build_min(\@rand)
+val $sr_max = ST::build_max(\@rand)
+var $all = 1
+for val $l (0:49) {
+    for val $r ($l:49) {
         $all = 0 if ST::query_min($sr_min, $l, $r) != ST::brute_min(\@rand, $l, $r)
         $all = 0 if ST::query_max($sr_max, $l, $r) != ST::brute_max(\@rand, $l, $r)
     }
@@ -187,8 +187,8 @@ for my $l (0:49) {
 $all |> aeq 1, "stress: all min/max ranges match brute"
 
 # --- Idempotent: querying a single index returns arr[i] ---
-my $self_ok = 1
-for my $i (0:49) {
+var $self_ok = 1
+for val $i (0:49) {
     $self_ok = 0 if ST::query_min($sr_min, $i, $i) != $rand[$i]
     $self_ok = 0 if ST::query_max($sr_max, $i, $i) != $rand[$i]
 }

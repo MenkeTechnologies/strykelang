@@ -5,11 +5,11 @@ assert_eq Exercism::BafflingBirthdays::shared_birthday([]),                     
 assert_eq Exercism::BafflingBirthdays::shared_birthday(["01-01"]),                       0, "single"
 assert_eq Exercism::BafflingBirthdays::shared_birthday(["01-01", "02-02", "01-01"]),     1, "dup"
 
-my $bs = Exercism::BafflingBirthdays::random_birthdates(50)
+val $bs = Exercism::BafflingBirthdays::random_birthdates(50)
 assert_eq len(@{$bs}), 50, "50 birthdays generated"
 
 # Monte-Carlo: with 50 people the shared-birthday prob is ~97%.
-my $p = Exercism::BafflingBirthdays::estimated_probability_of_shared_birthday(50, 200)
+val $p = Exercism::BafflingBirthdays::estimated_probability_of_shared_birthday(50, 200)
 assert_ok $p > 0.85, "MC 50p prob > 0.85"
 
 test_run

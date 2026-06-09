@@ -1,7 +1,7 @@
 # lib/reporter.stk — generate HTML/PDF recon reports
 
 fn Project::Reporter::generate_report ($sys, $net, $disks, $git, $threats) {
-    my @lines
+    var @lines
     push @lines, "STRYKE RECON REPORT"
     push @lines, "═══════════════════"
     push @lines, ""
@@ -19,7 +19,7 @@ fn Project::Reporter::generate_report ($sys, $net, $disks, $git, $threats) {
     push @lines, "  DNS:     $net->{dns}"
     push @lines, ""
     push @lines, "DISKS"
-    for my $d (@$disks) {
+    for val $d (@$disks) {
         push @lines, sprintf("  %-12s %5.1f%%  %s", $d->{mount}, $d->{use_pct}, $d->{free_h})
     }
     push @lines, ""
@@ -31,12 +31,12 @@ fn Project::Reporter::generate_report ($sys, $net, $disks, $git, $threats) {
         push @lines, ""
     }
     push @lines, "THREATS"
-    for my $t (@$threats) {
+    for val $t (@$threats) {
         push @lines, "  [$t->{level}] $t->{message}"
     }
 
-    my $text = join("\n", @lines)
-    my $path = tempfile() . ".pdf"
+    val $text = join("\n", @lines)
+    val $path = tempfile() . ".pdf"
     to_pdf($text, $path)
     $path
 }

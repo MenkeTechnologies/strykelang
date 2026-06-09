@@ -6,6 +6,6 @@ fn Exercism::BirdCount::total                 = (~> @{_} sum) // 0
 fn Exercism::BirdCount::busy_days             = ~> @{_} greps { _ >= 5 } len
 
 fn Exercism::BirdCount::increment_day_count {
-    my @xs = @{_}
+    val @xs = @{_}
     @xs ? [$xs[0] + 1, @xs[1..$#xs]] : [1]
 }

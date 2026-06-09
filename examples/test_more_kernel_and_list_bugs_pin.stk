@@ -9,13 +9,13 @@
 # original assertion used `len` on a 2D arrayref expecting the flat
 # element count (49) instead of the outer row count (7). To pin the
 # flat 49-element contract, flatten explicitly with a nested-map sum.
-my $kernel = box_blur_kernel(3);
+val $kernel = box_blur_kernel(3);
 aeq(len($kernel), 7, "BUG-137: box_blur_kernel(3) returns 7 rows");
 # Iterate via arrow-index instead of `@$kernel` — `box_blur_kernel`
 # returns an Array value (not an ArrayRef), so element access works
 # via `$k->[i]` but full-deref `@$k` doesn't.
-my $flat_count = 0;
-for my $i (0:6) { $flat_count += len($kernel->[$i]) }
+var $flat_count = 0;
+for val $i (0:6) { $flat_count += len($kernel->[$i]) }
 aeq($flat_count, 49, "BUG-137: box_blur_kernel(3) flattens to 49 weights");
 # Uniform-norm verification: every weight is 1/49.
 aok(abs($kernel->[0]->[0] - 1/49) < 1e-12, "BUG-137: each weight is 1/49");
@@ -24,15 +24,15 @@ aok(abs($kernel->[0]->[0] - 1/49) < 1e-12, "BUG-137: each weight is 1/49");
 # BUG-138 (FIXED): clamp now normalizes its min/max bounds so callers can
 # pass them in either order. `clamp(11, 0, 10)` is interpreted as bounds
 # (0, 10) with value 10 → clamps to 10.
-my $clamped = clamp(11, 0, 10);
+val $clamped = clamp(11, 0, 10);
 aeq($clamped, 10, "BUG-138 (FIXED): clamp(11, 0, 10) normalizes bounds → 10");
 
 
 # Pinning test for BUG-139: normalize always 0..1
 # normalize(OUT_MIN, OUT_MAX, LIST) is the documented form, but it's not implemented.
 # The implementation flattens all arguments and normalizes to 0..1.
-my @data = (100, 200, 300, 400, 500);
-my @normalized = normalize(0, 10, @data);
+val @data = (100, 200, 300, 400, 500);
+val @normalized = normalize(0, 10, @data);
 # The min (0) and max (10) are treated as data points.
 # The data becomes (0, 10, 100, 200, 300, 400, 500).
 # The max value 500 should be normalized to 1.

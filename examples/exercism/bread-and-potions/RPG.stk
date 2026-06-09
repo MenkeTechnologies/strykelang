@@ -3,7 +3,7 @@
 # Polymorphic `eat(item, character)` dispatch over item kind. Items are
 # hashes with a `kind` discriminator; characters are `{ health, mana }`.
 fn Exercism::RPG::eat($item, $char) {
-    my $kind = $item->{kind}
+    val $kind = $item->{kind}
     return [undef,                     +{ %{$char}, health => $char->{health} + 5 }]              if $kind eq "LoafOfBread"
     return [{ kind => "EmptyBottle" }, +{ %{$char}, mana   => $char->{mana} + ($item->{strength} // 10) }] if $kind eq "ManaPotion"
     return [{ kind => "EmptyBottle" }, +{ %{$char}, health => 0 }]                                if $kind eq "Poison"

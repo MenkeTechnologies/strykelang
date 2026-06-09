@@ -9,8 +9,8 @@ fn Rosetta::PrimeCheck::check($n) {
     } elsif ($n % 2 == 0) {
         0
     } else {
-        my $i = 3
-        my $is_p = 1
+        var $i = 3
+        var $is_p = 1
         while ($i * $i <= $n && $is_p) {
             if ($n % $i == 0) {
                 $is_p = 0
@@ -32,7 +32,7 @@ assert_ok !Rosetta::PrimeCheck::check(1), "1 is not prime"
 assert_ok !Rosetta::PrimeCheck::check(4), "4 is not prime"
 assert_ok !Rosetta::PrimeCheck::check(15), "15 is not prime"
 
-my @primes = Rosetta::PrimeCheck::list(20)
+val @primes = Rosetta::PrimeCheck::list(20)
 assert_eq join(",", @primes), "2,3,5,7,11,13,17,19", "primes up to 20"
 
 test_run

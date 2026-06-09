@@ -18,16 +18,16 @@
 # Compute Z-array using the maintained-window trick (l, r are the
 # current [left, right] of the rightmost Z-block).
 fn Z::array($s) {
-    my @c = split //, $s
-    my $n = len @c
-    my @z = (0) x $n
+    val @c = split //, $s
+    val $n = len @c
+    var @z = (0) x $n
     return \@z if $n == 0
     $z[0] = $n
-    my $l = 0
-    my $r = 0
-    for my $i (1:$n - 1) {
+    var $l = 0
+    var $r = 0
+    for val $i (1:$n - 1) {
         if ($i < $r) {
-            my $inside = $r - $i < $z[$i - $l] ? $r - $i : $z[$i - $l]
+            val $inside = $r - $i < $z[$i - $l] ? $r - $i : $z[$i - $l]
             $z[$i] = $inside
         }
         while ($i + $z[$i] < $n && $c[$z[$i]] eq $c[$i + $z[$i]]) {
@@ -44,14 +44,14 @@ fn Z::array($s) {
 # Find all occurrences of $pat in $text using the Z-array on
 # `pat + separator + text`. Returns 0-indexed positions in $text.
 fn Z::find_all($text, $pat) {
-    my $m = len $pat
+    val $m = len $pat
     return [] if $m == 0 || $m > len($text)
     # Separator must be a character that never appears in either.
     # `\x{1}` (SOH control) is a safe assumption for our test corpus.
-    my $combined = $pat . "\x{1}" . $text
-    my $z = Z::array($combined)
-    my @hits
-    for my $i ($m + 1:len(@$z) - 1) {
+    val $combined = $pat . "\x{1}" . $text
+    val $z = Z::array($combined)
+    var @hits
+    for val $i ($m + 1:len(@$z) - 1) {
         push @hits, $i - $m - 1 if $z->[$i] >= $m
     }
     \@hits
@@ -59,11 +59,11 @@ fn Z::find_all($text, $pat) {
 
 # Brute reference for cross-checking.
 fn Z::find_brute($text, $pat) {
-    my $m = len $pat
-    my $n = len $text
+    val $m = len $pat
+    val $n = len $text
     return [] if $m == 0 || $m > $n
-    my @hits
-    for my $i (0:$n - $m) {
+    var @hits
+    for val $i (0:$n - $m) {
         push @hits, $i if $text[$i:$i + $m - 1] eq $pat
     }
     \@hits
@@ -74,15 +74,15 @@ p "── Z-algorithm demo ──"
 # Z-array invariants on a known string.
 # s = "aabcaabxaaaz"
 # Z   =  [12, 1, 0, 0, 3, 1, 0, 0, 2, 2, 1, 0]
-my $z = Z::array("aabcaabxaaaz")
-my @want_z = (12, 1, 0, 0, 3, 1, 0, 0, 2, 2, 1, 0)
-for my $i (0:11) {
+val $z = Z::array("aabcaabxaaaz")
+val @want_z = (12, 1, 0, 0, 3, 1, 0, 0, 2, 2, 1, 0)
+for val $i (0:11) {
     die "z[$i] should be $want_z[$i], got $z->[$i]" unless $z->[$i] == $want_z[$i]
 }
 p "  Z-array for 'aabcaabxaaaz' matches reference  OK"
 
 # Substring search test grid.
-my @cases = (
+val @cases = (
     +{ text => "abracadabra",   pat => "abra", hits => [0, 7]    },
     +{ text => "abracadabra",   pat => "cad",  hits => [4]       },
     +{ text => "abracadabra",   pat => "z",    hits => []        },
@@ -94,14 +94,14 @@ my @cases = (
     +{ text => "mississippi",   pat => "issi", hits => [1, 4]    },
 )
 
-my $fail = 0
-for my $c (@cases) {
-    my $z_hits    = Z::find_all($c->{text}, $c->{pat})
-    my $brute     = Z::find_brute($c->{text}, $c->{pat})
-    my $z_s       = join(",", @$z_hits)
-    my $brute_s   = join(",", @$brute)
-    my $want      = join(",", @{$c->{hits}})
-    my $ok        = $z_s eq $want && $brute_s eq $want
+var $fail = 0
+for var $c (@cases) {
+    val $z_hits    = Z::find_all($c->{text}, $c->{pat})
+    val $brute     = Z::find_brute($c->{text}, $c->{pat})
+    val $z_s       = join(",", @$z_hits)
+    val $brute_s   = join(",", @$brute)
+    val $want      = join(",", @{$c->{hits}})
+    val $ok        = $z_s eq $want && $brute_s eq $want
     $fail++ unless $ok
     p "  Z(\"$c->{text}\", \"$c->{pat}\") = [$z_s]  expect [$want]  #{$ok ? \"\" : \"FAIL\"}"
 }
@@ -111,17 +111,17 @@ die "#{$fail} / #{len @cases} Z-find cases failed" if $fail > 0
 #   * z[0] always equals len(s)
 #   * 0 <= z[i] <= n - i
 #   * every Z-find hit really has the pattern there
-for my $c (@cases) {
+for val $c (@cases) {
     next if $c->{text} eq ""
-    my $arr = Z::array($c->{text})
+    val $arr = Z::array($c->{text})
     die "z[0] != len" unless $arr->[0] == len($c->{text})
-    for my $i (0:len(@$arr) - 1) {
+    for val $i (0:len(@$arr) - 1) {
         die "z[$i] out of range" if $arr->[$i] < 0 || $arr->[$i] > len($c->{text}) - $i
     }
-    my $hits = Z::find_all($c->{text}, $c->{pat})
-    my $m = len $c->{pat}
-    my $tx = $c->{text}
-    for my $i (@$hits) {
+    val $hits = Z::find_all($c->{text}, $c->{pat})
+    val $m = len $c->{pat}
+    val $tx = $c->{text}
+    for val $i (@$hits) {
         die "false hit at $i" unless $tx[$i:$i + $m - 1] eq $c->{pat}
     }
 }

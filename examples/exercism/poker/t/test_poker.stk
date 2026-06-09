@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 require "./Poker.stk"
 
-my $r = Exercism::Poker::best_hands(["4S 5H 6S 8D 3C"])
+val $r = Exercism::Poker::best_hands(["4S 5H 6S 8D 3C"])
 assert_eq join(",", @{$r}), "4S 5H 6S 8D 3C", "single hand"
 
-my $sc = Exercism::Poker::_score("AH KS QH JS 10C")
+val $sc = Exercism::Poker::_score("AH KS QH JS 10C")
 assert_ok ref($sc) eq 'ARRAY', "score is array"
 
 test_run

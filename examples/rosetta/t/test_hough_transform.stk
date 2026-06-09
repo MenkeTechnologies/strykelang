@@ -2,22 +2,22 @@
 # Rosetta Code: Hough transform
 
 fn Rosetta::Hough::transform($img) {
-    my $rows = len(@$img)
-    my $cols = len(@{$img->[0]})
+    val $rows = len(@$img)
+    val $cols = len(@{$img->[0]})
     
     # Distance from origin: rho = x*cos(theta) + y*sin(theta)
     # theta: 0..180 degrees
-    my %accumulator
+    var %accumulator
     
     # We'll use 1 degree increments
-    my $PI = 3.14159265
+    val $PI = 3.14159265
     
-    for my $y (0:$rows - 1) {
-        for my $x (0:$cols - 1) {
+    for val $y (0:$rows - 1) {
+        for val $x (0:$cols - 1) {
             if ($img->[$y][$x]) {
-                for (my $theta = 0; $theta < 180; $theta += 5) { # Use 5 deg steps for speed
-                    my $rad = $theta * $PI / 180.0
-                    my $rho = int($x * cos($rad) + $y * sin($rad))
+                for (var $theta = 0; $theta < 180; $theta += 5) { # Use 5 deg steps for speed
+                    val $rad = $theta * $PI / 180.0
+                    val $rho = int($x * cos($rad) + $y * sin($rad))
                     $accumulator{"$rho,$theta"}++
                 }
             }
@@ -27,32 +27,32 @@ fn Rosetta::Hough::transform($img) {
 }
 
 # 10x10 image with a horizontal line at y=5
-my $img = []
-for my $y (0:9) {
-    my @row
-    for my $x (0:9) {
+val $img = []
+for val $y (0:9) {
+    var @row
+    for val $x (0:9) {
         push @row, ($y == 5 ? 1 : 0)
     }
     push @$img, \@row
 }
 
-my $acc = Rosetta::Hough::transform($img)
+val $acc = Rosetta::Hough::transform($img)
 
 # A horizontal line should have theta near 90 degrees and rho near 5
 # At theta=90, rho = x*cos(90) + y*sin(90) = x*0 + 5*1 = 5
 assert_ok $acc->{"5,90"} >= 10, "Horizontal line detected at theta=90, rho=5"
 
 # Another test: Vertical line at x=3
-my $img2 = []
-for my $y (0:9) {
-    my @row
-    for my $x (0:9) {
+val $img2 = []
+for val $y (0:9) {
+    var @row
+    for val $x (0:9) {
         push @row, ($x == 3 ? 1 : 0)
     }
     push @$img2, \@row
 }
 
-my $acc2 = Rosetta::Hough::transform($img2)
+val $acc2 = Rosetta::Hough::transform($img2)
 # At theta=0, rho = 3*cos(0) + y*sin(0) = 3*1 + y*0 = 3
 assert_ok $acc2->{"3,0"} >= 10, "Vertical line detected at theta=0, rho=3"
 

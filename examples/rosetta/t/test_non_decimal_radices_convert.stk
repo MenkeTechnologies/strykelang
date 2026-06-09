@@ -16,9 +16,9 @@ fn Rosetta::Radix::char_to_digit($c) {
 fn Rosetta::Radix::to_base($n, $base) {
     return undef if $base < 2 || $base > 36
     return "0" if $n == 0
-    my $sign = $n < 0 ? "-" : ""
-    my $x = abs($n)
-    my $s = ""
+    val $sign = $n < 0 ? "-" : ""
+    var $x = abs($n)
+    var $s = ""
     while ($x > 0) {
         $s = Rosetta::Radix::digit_to_char($x % $base) . $s
         $x = int($x / $base)
@@ -28,13 +28,13 @@ fn Rosetta::Radix::to_base($n, $base) {
 
 fn Rosetta::Radix::from_base($s, $base) {
     return undef if $base < 2 || $base > 36
-    my $sign = 1
-    my $i = 0
+    var $sign = 1
+    var $i = 0
     if (substr($s, 0, 1) eq "-") { $sign = -1; $i = 1 }
     if (substr($s, 0, 1) eq "+") { $i = 1 }
-    my $v = 0
+    var $v = 0
     while ($i < length($s)) {
-        my $d = Rosetta::Radix::char_to_digit(substr($s, $i, 1))
+        val $d = Rosetta::Radix::char_to_digit(substr($s, $i, 1))
         return undef if $d < 0 || $d >= $base
         $v = $v * $base + $d
         $i++
@@ -66,10 +66,10 @@ assert_eq Rosetta::Radix::from_base("100", 16),    256,  "100 hex"
 assert_eq Rosetta::Radix::from_base("-FF", 16),    -255, "negative hex"
 
 # Round-trip across bases
-my $rt = 1
-for my $n (-1000, -1, 0, 1, 42, 65535, 1000000) {
-    for my $b (2, 8, 10, 16, 36) {
-        my $back = Rosetta::Radix::from_base(Rosetta::Radix::to_base($n, $b), $b)
+var $rt = 1
+for val $n (-1000, -1, 0, 1, 42, 65535, 1000000) {
+    for val $b (2, 8, 10, 16, 36) {
+        val $back = Rosetta::Radix::from_base(Rosetta::Radix::to_base($n, $b), $b)
         $rt = 0 if $back != $n
     }
 }

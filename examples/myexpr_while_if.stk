@@ -2,24 +2,24 @@
 #
 # `my $x = …` in EXPRESSION position — the canonical patterns:
 #
-#   while (my $line = readline(STDIN)) { … }   # consume until EOF
-#   if    (my $row  = fetch_or_undef()) { … }  # branch on defined result
-#   until (my $done = check())          { … }  # loop until truthy
+#   while (var $line = readline(STDIN)) { … }   # consume until EOF
+#   if    (var $row  = fetch_or_undef()) { … }  # branch on defined result
+#   until (val $done = check())          { … }  # loop until truthy
 #
 # The declaration belongs to the loop / branch body, which means `$line`,
 # `$row`, `$done` are LEXICAL — they don't leak past the block. This is
 # the right shape when you need both "did I get a value?" and "use the
 # value I got" in a single check.
 #
-# Equivalent to Perl's `while (defined(my $x = <STDIN>)) { … }` but the
+# Equivalent to Perl's `while (defined(var $x = <STDIN>)) { … }` but the
 # `defined` wrapper is unnecessary in stryke because the loop condition
 # already short-circuits on undef from `readline`.
 
 p "── while (my \$line = …) ───────────────────────────────"
 
 # A small in-memory job queue to demonstrate consumption.
-my @queue = ("alpha", "beta", "gamma", "delta")
-while (my $job = shift @queue) {
+var @queue = ("alpha", "beta", "gamma", "delta")
+while (val $job = shift @queue) {
     p "  processing: $job"
 }
 p "  drained — queue is now empty"
@@ -29,9 +29,9 @@ p "── if (my \$row = fetch()) ───────────────�
 
 # A "lookup or default" pattern — the conditional declaration keeps the
 # scope tight and avoids polluting the outer block with the temporary.
-my %db = (alice => 30, bob => 25)
-for my $name (sort qw(alice bob carol)) {
-    if (my $age = $db{$name}) {
+val %db = (alice => 30, bob => 25)
+for val $name (sort qw(alice bob carol)) {
+    if (val $age = $db{$name}) {
         p "  $name → age $age"
     } else {
         p "  $name → not in db"
@@ -43,8 +43,8 @@ p "── until (my \$attempt = …) ──────────────�
 
 # Retry-with-bounded-attempts: the loop variable is scoped to the body
 # so the counter never leaks back to the caller.
-my $tries = 0
-until ((my $hit = ++$tries) >= 3) {
+var $tries = 0
+until ((val $hit = ++$tries) >= 3) {
     p "  attempt #$hit — still trying"
 }
 p "  bailed after $tries attempts (counter intentionally NOT visible as \$hit here)"
@@ -55,13 +55,13 @@ p "── Single scalar only in expression position ─────────�
 # Today the compiler accepts `my $x = …` in expression position but rejects
 # multi-decl or non-scalar forms (compiler.rs:8367 — `Unsupported: my/our/
 # state/local in expression context with multiple or non-scalar decls`).
-# So `if (my @rows = …)` parses but won't compile yet. The scalar form is
+# So `if (val @rows = …)` parses but won't compile yet. The scalar form is
 # the supported subset and covers ~95% of the idiomatic use cases.
-my @rows = (1, 2, 3, 4, 5)
-if (my $n = len @rows) {
+val @rows = (1, 2, 3, 4, 5)
+if (val $n = len @rows) {
     p "  got $n rows: ", join(",", @rows)
 }
-my %prefs = (theme => "dark", font => "iosevka")
-if (my $k = len keys %prefs) {
+val %prefs = (theme => "dark", font => "iosevka")
+if (val $k = len keys %prefs) {
     p "  got $k prefs: ", join(",", sort keys %prefs)
 }

@@ -2,18 +2,18 @@
 # Rosetta Code: Stern-Brocot sequence
 
 fn Rosetta::SternBrocot::stern_brocot($n) {
-    my @sb = (1, 1)
-    my $i = 0
+    var @sb = (1, 1)
+    var $i = 0
     while (len(@sb) < $n) {
-        my $a = $sb[$i]
-        my $b = $sb[$i+1]
+        val $a = $sb[$i]
+        val $b = $sb[$i+1]
         push @sb, $a + $b, $b
         $i++
     }
     \@sb[0:$n-1]
 }
 
-my $res = Rosetta::SternBrocot::stern_brocot(15)
+val $res = Rosetta::SternBrocot::stern_brocot(15)
 # SB: 1, 1, 2, 1, 3, 2, 3, 1, 4, 3, 5, 2, 5, 3, 4
 assert_eq join(",", @$res), "1,1,2,1,3,2,3,1,4,3,5,2,5,3,4", "Stern-Brocot up to 15"
 

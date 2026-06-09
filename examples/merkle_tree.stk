@@ -8,10 +8,10 @@
 # Run: stryke --no-interop examples/merkle_tree.stk
 
 fn MT::hash($s) {
-    my $h = 0
-    my $n = len $s
-    for my $i (0:$n-1) {
-        my $c = ord(substr($s, $i, 1))
+    var $h = 0
+    val $n = len $s
+    for val $i (0:$n-1) {
+        val $c = ord(substr($s, $i, 1))
         $h = (($h * 31) + $c) % 1000000007
     }
     sprintf("%08x", $h)
@@ -22,23 +22,23 @@ fn MT::combine($aa, $bb) {
 }
 
 fn MT::build($leaves) {
-    my @first = ()
-    for my $x (@$leaves) { push @first, MT::hash($x) }
-    my @levels = ()
-    my @copy0 = @first
+    var @first = ()
+    for val $x (@$leaves) { push @first, MT::hash($x) }
+    var @levels = ()
+    val @copy0 = @first
     push @levels, \@copy0
-    my @level = @first
+    var @level = @first
     while (len(@level) > 1) {
-        my @next = ()
-        my $i = 0
-        my $n = len(@level)
+        var @next = ()
+        var $i = 0
+        val $n = len(@level)
         while ($i < $n) {
-            my $left  = $level[$i]
-            my $right = ($i + 1 < $n) ? $level[$i + 1] : $left
+            val $left  = $level[$i]
+            val $right = ($i + 1 < $n) ? $level[$i + 1] : $left
             push @next, MT::combine($left, $right)
             $i = $i + 2
         }
-        my @copy = @next
+        val @copy = @next
         push @levels, \@copy
         @level = @next
     }
@@ -46,14 +46,14 @@ fn MT::build($leaves) {
 }
 
 fn MT::proof($tree, $idx) {
-    my @proof = ()
-    my $levels = $tree->{levels}
-    my $depth = len(@$levels) - 1
-    for my $d (0:$depth-1) {
-        my $level = $levels->[$d]
-        my $sib   = ($idx % 2 == 0) ? $idx + 1 : $idx - 1
+    var @proof = ()
+    val $levels = $tree->{levels}
+    val $depth = len(@$levels) - 1
+    for val $d (0:$depth-1) {
+        val $level = $levels->[$d]
+        var $sib   = ($idx % 2 == 0) ? $idx + 1 : $idx - 1
         if ($sib >= len(@$level)) { $sib = $idx }   # odd-leaf duplication
-        my $side  = ($idx % 2 == 0) ? "right" : "left"
+        val $side  = ($idx % 2 == 0) ? "right" : "left"
         push @proof, +{ hash => $level->[$sib], side => $side }
         $idx = int($idx / 2)
     }
@@ -61,8 +61,8 @@ fn MT::proof($tree, $idx) {
 }
 
 fn MT::verify($leaf, $proof, $root) {
-    my $h = MT::hash($leaf)
-    for my $step (@$proof) {
+    var $h = MT::hash($leaf)
+    for val $step (@$proof) {
         if ($step->{side} eq "right") {
             $h = MT::combine($h, $step->{hash})
         } else {
@@ -73,16 +73,16 @@ fn MT::verify($leaf, $proof, $root) {
 }
 
 p "=== Merkle Tree Demo ==="
-my @leaves = ("alice", "bob", "carol", "dave")
-my $t = MT::build(\@leaves)
+val @leaves = ("alice", "bob", "carol", "dave")
+val $t = MT::build(\@leaves)
 p "root: " . $t->{root}
-for my $i (0:3) {
-    my $proof = MT::proof($t, $i)
-    my $ok = MT::verify($leaves[$i], $proof, $t->{root})
+for val $i (0:3) {
+    val $proof = MT::proof($t, $i)
+    val $ok = MT::verify($leaves[$i], $proof, $t->{root})
     p "leaf " . $i . " (" . $leaves[$i] . "): proof len=" . len(@$proof) . " verify=" . $ok
 }
 
 # Tamper detection
-my $proof0 = MT::proof($t, 0)
-my $bad = MT::verify("eve", $proof0, $t->{root})
+val $proof0 = MT::proof($t, 0)
+val $bad = MT::verify("eve", $proof0, $t->{root})
 p "tampered leaf 'eve' verifies? " . $bad

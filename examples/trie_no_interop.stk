@@ -18,8 +18,8 @@
 fn Trie::new = +{ children => +{}, end => 0 }
 
 fn Trie::insert($t, $word) {
-    my $cur = $t
-    for my $c (split //, $word) {
+    var $cur = $t
+    for val $c (split //, $word) {
         $cur->{children}{$c} //= Trie::new()
         $cur = $cur->{children}{$c}
     }
@@ -27,8 +27,8 @@ fn Trie::insert($t, $word) {
 }
 
 fn Trie::contains($t, $word) {
-    my $cur = $t
-    for my $c (split //, $word) {
+    var $cur = $t
+    for val $c (split //, $word) {
         return 0 unless exists $cur->{children}{$c}
         $cur = $cur->{children}{$c}
     }
@@ -36,8 +36,8 @@ fn Trie::contains($t, $word) {
 }
 
 fn Trie::has_prefix($t, $prefix) {
-    my $cur = $t
-    for my $c (split //, $prefix) {
+    var $cur = $t
+    for val $c (split //, $prefix) {
         return 0 unless exists $cur->{children}{$c}
         $cur = $cur->{children}{$c}
     }
@@ -46,24 +46,24 @@ fn Trie::has_prefix($t, $prefix) {
 
 # Build a populated trie from a word list.
 fn Trie::from_words($words) {
-    my $t = Trie::new()
+    val $t = Trie::new()
     Trie::insert($t, _) for @$words
     $t
 }
 
 p "── Trie demo ──"
 
-my @dict = ("apple", "app", "apricot", "banana", "band", "bandana", "cat", "car", "card", "care", "careful")
-my $t = Trie::from_words(\@dict)
+val @dict = ("apple", "app", "apricot", "banana", "band", "bandana", "cat", "car", "card", "care", "careful")
+val $t = Trie::from_words(\@dict)
 
 # Membership round-trip — every inserted word should be contained.
-for my $w (@dict) {
+for val $w (@dict) {
     die "missing #{$w}" unless Trie::contains($t, $w)
 }
 p "  all #{len @dict} dict words found  OK"
 
 # Non-members: similar prefixes that aren't full words.
-for my $miss ("ap", "appl", "ba", "bana", "ca", "carda") {
+for val $miss ("ap", "appl", "ba", "bana", "ca", "carda") {
     die "false positive on #{$miss}" if Trie::contains($t, $miss)
 }
 p "  6 non-words rejected  OK"
@@ -78,16 +78,16 @@ p "  prefix queries hit/miss correctly  OK"
 
 # Count how many dict words start with each query prefix.
 fn Trie::count_with_prefix($words, $prefix) {
-    my @hits
-    for my $w (@$words) {
+    var @hits
+    for val $w (@$words) {
         push @hits, $w if len($w) >= len($prefix) && $w[0:len($prefix) - 1] eq $prefix
     }
     len @hits
 }
 
-my @queries = ("app", "ban", "car", "z")
-my @counts
-for my $pre (@queries) {
+val @queries = ("app", "ban", "car", "z")
+var @counts
+for val $pre (@queries) {
     push @counts, Trie::count_with_prefix(\@dict, $pre)
 }
 die "app prefix count" unless $counts[0] == 2          # apple, app

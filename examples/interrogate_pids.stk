@@ -9,11 +9,11 @@
 p "── interrogate(PID) demo ──"
 
 # 1. Self-interrogation — dump our own process state.
-my $self_pid = $$
+val $self_pid = $$
 printf "── interrogating self (pid=%d) ──\n", $self_pid
-my $h = interrogate($self_pid)
-for my $k (sort keys %$h) {
-    my $v = $h->{$k}
+val $h = interrogate($self_pid)
+for val $k (sort keys %$h) {
+    val $v = $h->{$k}
     if (ref($v) eq 'ARRAY') {
         printf "  %-22s [%s]\n", $k, join(", ", @$v)
     } else {
@@ -24,7 +24,7 @@ for my $k (sort keys %$h) {
 # 2. Interrogate PID 1 (init/launchd) — always exists, partial under
 #    macOS perms for unprivileged readers.
 p "── interrogating PID 1 (init/launchd) ──"
-my $init = interrogate(1)
+val $init = interrogate(1)
 if (defined $init) {
     printf "  name:   %s\n", $init->{name}
     printf "  status: %s\n", $init->{status}
@@ -37,20 +37,20 @@ if (defined $init) {
 
 # 3. Bogus PID — returns undef cleanly.
 p "── interrogating bogus PID 99999999 ──"
-my $bogus = interrogate(99999999)
+val $bogus = interrogate(99999999)
 printf "  result: %s\n", (defined $bogus ? "defined" : "undef (as expected)")
 
 # 4. Agent-handle path — spawn a worker and interrogate its VM state.
 p "── interrogating an agent (different code path) ──"
-my @workers = congregation(1)
-my %agent_state = %{interrogate(@workers)}
-for my $sid (sort { _ <=> _1 } keys %agent_state) {
-    my $h = $agent_state{$sid}
+val @workers = congregation(1)
+val %agent_state = %{interrogate(@workers)}
+for val $sid (sort { _ <=> _1 } keys %agent_state) {
+    val $h = $agent_state{$sid}
     if (ref($h) eq 'HASH') {
         printf "  agent %d:\n", $sid
-        for my $k (sort keys %$h) {
-            my $v = $h->{$k}
-            my $vs = ref($v) ? "(nested)" : $v
+        for val $k (sort keys %$h) {
+            val $v = $h->{$k}
+            val $vs = ref($v) ? "(nested)" : $v
             printf "    %-8s %s\n", $k, $vs
         }
     }

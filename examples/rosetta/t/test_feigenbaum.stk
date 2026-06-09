@@ -13,7 +13,7 @@ fn Rosetta::Feig::iterate_logistic($r, $x, $iters) {
 fn Rosetta::Feig::compute() {
     # Pre-computed bifurcation parameters a_n for n=1..6 (well-known values).
     # Approximations to ~9 digits — enough for δ to stabilize to 4.669201609.
-    my @a = (
+    val @a = (
         3.0,            # a_1: stable 1->2
         3.449490,       # a_2: stable 2->4
         3.544090,       # a_3
@@ -21,24 +21,24 @@ fn Rosetta::Feig::compute() {
         3.568759,       # a_5
         3.569692,       # a_6
     )
-    my @deltas
-    for my $i (2..len(@a)-1) {
-        my $d = ($a[$i-1] - $a[$i-2]) / ($a[$i] - $a[$i-1])
+    var @deltas
+    for val $i (2..len(@a)-1) {
+        val $d = ($a[$i-1] - $a[$i-2]) / ($a[$i] - $a[$i-1])
         push @deltas, $d
     }
     @deltas
 }
 
-my @ds = Rosetta::Feig::compute()
-my $best = $ds[len(@ds) - 1]
+val @ds = Rosetta::Feig::compute()
+val $best = $ds[len(@ds) - 1]
 assert_ok abs($best - 4.669) < 0.01, "Feigenbaum δ converges to 4.669..."
 # Successive deltas should be increasing toward δ.
-for my $i (1..len(@ds)-1) {
+for val $i (1..len(@ds)-1) {
     assert_ok $ds[$i] >= $ds[$i-1] - 0.5, "delta sequence behaves"
 }
 
 # Sanity: iterating logistic with r past 4 explodes; just below 1 stays bounded.
-my $x = Rosetta::Feig::iterate_logistic(0.9, 0.5, 100)
+val $x = Rosetta::Feig::iterate_logistic(0.9, 0.5, 100)
 assert_ok $x >= 0 && $x <= 1, "logistic stays in [0,1]"
 
 test_run

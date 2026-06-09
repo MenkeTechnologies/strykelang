@@ -69,8 +69,8 @@ fn Mat::sub_vec2($ma, $mb) { [ $ma->[0]-$mb->[0], $ma->[1]-$mb->[1] ] }
 # ── 2. Box-Muller Gaussian noise generator ─────────────────────────
 
 fn Noise::gauss($sigma) {
-    my $u1 = rand()
-    my $u2 = rand()
+    var $u1 = rand()
+    val $u2 = rand()
     # Avoid log(0); clamp.
     $u1 = 1e-10 if $u1 < 1e-10
     sqrt(-2.0 * log($u1)) * cos(2.0 * 3.14159265358979 * $u2) * $sigma
@@ -78,15 +78,15 @@ fn Noise::gauss($sigma) {
 
 # ── 3. Simulate ground truth + noisy measurements ─────────────────
 
-my $dt        = 1.0
-my $true_x0   = 0.0
-my $true_v    = 2.0       # constant velocity, position units per step
-my $meas_sigma = 3.0      # measurement noise stdev
-my $n_steps   = 60
+val $dt        = 1.0
+val $true_x0   = 0.0
+val $true_v    = 2.0       # constant velocity, position units per step
+val $meas_sigma = 3.0      # measurement noise stdev
+val $n_steps   = 60
 
-my @truth
-my @measured
-my $pos = $true_x0
+var @truth
+var @measured
+var $pos = $true_x0
 for (1:$n_steps) {
     $pos += $true_v * $dt
     push @truth,    $pos
@@ -96,55 +96,55 @@ for (1:$n_steps) {
 # ── 4. Kalman setup ────────────────────────────────────────────────
 
 # State transition (constant velocity model)
-my $F = [
+val $F = [
     [1, $dt],
     [0, 1  ],
 ]
 
 # Observation matrix — we only observe position
-my $H = [ [1, 0] ]   # treated as 1×2
+val $H = [ [1, 0] ]   # treated as 1×2
 
 # Process noise (uncertainty in the dynamics)
-my $q = 0.05
-my $Q = [
+val $q = 0.05
+val $Q = [
     [ $q,   0   ],
     [ 0,    $q  ],
 ]
 
 # Measurement noise covariance
-my $R = $meas_sigma * $meas_sigma
+val $R = $meas_sigma * $meas_sigma
 
 # Initial state — assume position 0, velocity 0; high covariance to start
-my $x = [0, 0]
-my $P = [
+var $x = [0, 0]
+var $P = [
     [100, 0  ],
     [0,   100],
 ]
 
 # ── 5. Run the filter ──────────────────────────────────────────────
 
-my @filtered
-for my $k (0:$n_steps - 1) {
-    my $z = $measured[$k]
+var @filtered
+for val $k (0:$n_steps - 1) {
+    val $z = $measured[$k]
 
     # Predict
     $x = Mat::mul_vec2 $F, $x
     $P = Mat::add2 Mat::mul2($F, Mat::mul2($P, Mat::transpose2($F))), $Q
 
     # Update — H is 1×2 so H·x is scalar, H·P·Hᵀ is scalar, K is 2×1.
-    my $hx     = $H->[0][0]*$x->[0] + $H->[0][1]*$x->[1]
-    my $y      = $z - $hx
+    val $hx     = $H->[0][0]*$x->[0] + $H->[0][1]*$x->[1]
+    val $y      = $z - $hx
     # P·Hᵀ is 2×1 (only first column of P since H = [1,0]).
-    my $PHt    = [ $P->[0][0], $P->[1][0] ]
-    my $S      = $PHt->[0] + $R
-    my $K      = [ $PHt->[0] / $S, $PHt->[1] / $S ]
+    val $PHt    = [ $P->[0][0], $P->[1][0] ]
+    val $S      = $PHt->[0] + $R
+    val $K      = [ $PHt->[0] / $S, $PHt->[1] / $S ]
     $x = [ $x->[0] + $K->[0]*$y, $x->[1] + $K->[1]*$y ]
     # P = (I - K·H)·P. K·H is 2×2; K = [k0,k1]ᵀ, H = [1,0] → K·H = [[k0,0],[k1,0]].
-    my $KH = [
+    val $KH = [
         [ $K->[0], 0 ],
         [ $K->[1], 0 ],
     ]
-    my $I = [[1,0],[0,1]]
+    val $I = [[1,0],[0,1]]
     $P = Mat::mul2 Mat::sub2($I, $KH), $P
 
     push @filtered, $x->[0]
@@ -153,16 +153,16 @@ for my $k (0:$n_steps - 1) {
 # ── 6. Report and assert ───────────────────────────────────────────
 
 fn Kalman::rmse {
-    my $ma = _
-    my $mb = _1
-    my $n = len @$ma
-    my $s = 0
+    val $ma = _
+    val $mb = _1
+    val $n = len @$ma
+    var $s = 0
     $s += ($ma->[_] - $mb->[_]) ** 2 for 0:$n - 1
     sqrt($s / $n)
 }
 
-my $rmse_raw      = Kalman::rmse \@measured, \@truth
-my $rmse_filtered = Kalman::rmse \@filtered, \@truth
+val $rmse_raw      = Kalman::rmse \@measured, \@truth
+val $rmse_filtered = Kalman::rmse \@filtered, \@truth
 
 printf "Steps:              %d\n",   $n_steps
 printf "Measurement σ:      %.2f\n", $meas_sigma
@@ -174,7 +174,7 @@ printf "Final est. velocity: %.4f  (truth %.4f)\n", $x->[1], $true_v
 # Sample console plot — first 10 steps
 p ""
 p "step  measurement  filtered   truth"
-for my $i (0:9) {
+for val $i (0:9) {
     printf "  %2d  %10.2f  %8.2f  %6.2f\n", $i + 1, $measured[$i], $filtered[$i], $truth[$i]
 }
 

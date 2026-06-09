@@ -12,7 +12,7 @@
 # A small undirected graph of US-ish city neighbors. Edges are symmetric
 # we build both directions by hand for clarity.
 
-my %g = (
+val %g = (
     SF      => ["Oakland", "San Jose", "Berkeley"],
     Oakland => ["SF", "Berkeley", "San Jose"],
     Berkeley => ["SF", "Oakland"],
@@ -25,7 +25,7 @@ my %g = (
 )
 
 p "── graph adjacency ──────────────────────────────────"
-for my $node (sort { _ cmp _1 } keys %g) {
+for val $node (sort { _ cmp _1 } keys %g) {
     printf "  %-12s -> %s\n", $node, join(", ", @{$g{$node}})
 }
 
@@ -33,16 +33,16 @@ for my $node (sort { _ cmp _1 } keys %g) {
 
 fn Demo::BFS::shortest_path($graph, $start, $goal) {
     return [$start] if $start eq $goal
-    my @queue = ([$start, [$start]])
-    my %seen = ($start => 1)
+    var @queue = ([$start, [$start]])
+    var %seen = ($start => 1)
     while (@queue) {
-        my $pair = shift @queue
-        my $node = $pair->[0]
-        my $path = $pair->[1]
-        for my $nbr (@{$graph->{$node}}) {
+        val $pair = shift @queue
+        val $node = $pair->[0]
+        val $path = $pair->[1]
+        for val $nbr (@{$graph->{$node}}) {
             next if $seen{$nbr}
             $seen{$nbr} = 1
-            my @new_path = (@$path, $nbr)
+            val @new_path = (@$path, $nbr)
             return \@new_path if $nbr eq $goal
             push @queue, [$nbr, \@new_path]
         }
@@ -52,14 +52,14 @@ fn Demo::BFS::shortest_path($graph, $start, $goal) {
 
 p ""
 p "── BFS shortest paths ───────────────────────────────"
-my @queries = (
+val @queries = (
     ["SF",       "Santa Cruz"],
     ["Berkeley", "San Jose"],
     ["LA",       "Fresno"],
     ["SF",       "LA"],          # disconnected components
 )
-for my $q (@queries) {
-    my $path = Demo::BFS::shortest_path(\%g, $q->[0], $q->[1])
+for val $q (@queries) {
+    val $path = Demo::BFS::shortest_path(\%g, $q->[0], $q->[1])
     if (defined $path) {
         printf "  %-10s -> %-12s (%d hops): %s\n",
             $q->[0], $q->[1], len(@$path) - 1, join(" -> ", @$path)
@@ -71,18 +71,18 @@ for my $q (@queries) {
 # ── Connected components via BFS ─────────────────────────────────────
 
 fn Demo::BFS::components($graph) {
-    my %seen
-    my @components
-    for my $start (sort { _ cmp _1 } keys %$graph) {
+    var %seen
+    var @components
+    for var $start (sort { _ cmp _1 } keys %$graph) {
         next if $seen{$start}
-        my @queue = ($start)
-        my @comp
+        var @queue = ($start)
+        var @comp
         while (@queue) {
-            my $node = shift @queue
+            val $node = shift @queue
             next if $seen{$node}
             $seen{$node} = 1
             push @comp, $node
-            for my $nbr (@{$graph->{$node}}) {
+            for val $nbr (@{$graph->{$node}}) {
                 push @queue, $nbr unless $seen{$nbr}
             }
         }
@@ -93,9 +93,9 @@ fn Demo::BFS::components($graph) {
 
 p ""
 p "── connected components ─────────────────────────────"
-my $comps = Demo::BFS::components(\%g)
-for my $i (0:len(@$comps)-1) {
-    my $c = $comps->[$i]
+val $comps = Demo::BFS::components(\%g)
+for val $i (0:len(@$comps)-1) {
+    val $c = $comps->[$i]
     printf "  component %d (%d nodes): %s\n",
         $i + 1, len(@$c), join(", ", @$c)
 }
@@ -104,10 +104,10 @@ for my $i (0:len(@$comps)-1) {
 
 p ""
 p "── degree distribution ──────────────────────────────"
-my @degs = map { len(@{$g{_}}) } keys %g
-my $max = reduce { _ > _1 ? _ : _1 } 0, @degs
-my $min = reduce { _ < _1 ? _ : _1 } 999, @degs
-my $avg = sum(@degs) / len @degs
+val @degs = map { len(@{$g{_}}) } keys %g
+val $max = reduce { _ > _1 ? _ : _1 } 0, @degs
+val $min = reduce { _ < _1 ? _ : _1 } 999, @degs
+val $avg = sum(@degs) / len @degs
 printf "  min degree : %d\n", $min
 printf "  max degree : %d\n", $max
 printf "  avg degree : %.2f\n", $avg
@@ -118,10 +118,10 @@ p ""
 p "── instrumented BFS (AOP around-advice) ─────────────"
 
 around "Demo::BFS::shortest_path" {
-    my $args_str = join(" -> ", @INTERCEPT_ARGS[1, 2])
-    my $start_t = now_ns()
-    my $result = proceed(@INTERCEPT_ARGS)
-    my $elapsed_us = (now_ns() - $start_t) / 1000.0
+    val $args_str = join(" -> ", @INTERCEPT_ARGS[1, 2])
+    val $start_t = now_ns()
+    val $result = proceed(@INTERCEPT_ARGS)
+    val $elapsed_us = (now_ns() - $start_t) / 1000.0
     printf "  [AOP] %s : %.1f µs\n", $args_str, $elapsed_us
     $result   # last-expression return; explicit `return` breaks AOP lowering
 }
@@ -137,10 +137,10 @@ intercept_clear("Demo::BFS::shortest_path")
 p ""
 p "── reachability set from SF (via uniq + thread macro) ──"
 fn Demo::BFS::reachable($graph, $start) {
-    my @queue = ($start)
-    my @seen
+    var @queue = ($start)
+    var @seen
     while (@queue) {
-        my $node = shift @queue
+        val $node = shift @queue
         next if grep { _ eq $node } @seen
         push @seen, $node
         push @queue, @{$graph->{$node}}
@@ -148,7 +148,7 @@ fn Demo::BFS::reachable($graph, $start) {
     \@seen
 }
 
-my $reach = Demo::BFS::reachable(\%g, "SF")
-my @sorted = sort { _ cmp _1 } @$reach
+val $reach = Demo::BFS::reachable(\%g, "SF")
+val @sorted = sort { _ cmp _1 } @$reach
 printf "  reachable from SF: %s\n", join(", ", @sorted)
 printf "  reach count       : %d\n", len @sorted

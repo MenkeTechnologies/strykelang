@@ -2,21 +2,21 @@
 # Rosetta Code: Bitap algorithm
 
 fn Rosetta::Bitap::solve($text, $pattern) {
-    my $m = len($pattern)
+    val $m = len($pattern)
     return 0 if $m == 0
     
-    my @p_chars = $pattern |> chars()
-    my @mask = map { ~0 } 0:255
+    val @p_chars = $pattern |> chars()
+    var @mask = map { ~0 } 0:255
     
-    for (my $i = 0; $i < $m; $i++) {
-        my $char_code = ord($p_chars[$i])
+    for (var $i = 0; $i < $m; $i++) {
+        val $char_code = ord($p_chars[$i])
         $mask[$char_code] &= ~(1 << $i)
     }
     
-    my $r = ~1
-    my @t_chars = $text |> chars()
-    for (my $i = 0; $i < len(@t_chars); $i++) {
-        my $char_code = ord($t_chars[$i])
+    var $r = ~1
+    val @t_chars = $text |> chars()
+    for (var $i = 0; $i < len(@t_chars); $i++) {
+        val $char_code = ord($t_chars[$i])
         $r |= $mask[$char_code]
         $r <<= 1
         

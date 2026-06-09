@@ -25,7 +25,7 @@ assert_eq 3 ** 4,  81,      "3^4"
 assert_near 2 ** 0.5, sqrt(2), 1e-12, "2^0.5 = √2"
 
 # Trigonometry: sin/cos at quarter turns
-my $pi = Rosetta::RealCF::pi()
+val $pi = Rosetta::RealCF::pi()
 assert_near sin(0),       0,  1e-12, "sin(0)"
 assert_near sin($pi / 2), 1,  1e-12, "sin(π/2)"
 assert_near sin($pi),     0,  1e-12, "sin(π)"

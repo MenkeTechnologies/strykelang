@@ -33,7 +33,7 @@ fn Project::StringsExtended::str_substr_to_end($s, $start) { substr($s, $start) 
 fn Project::StringsExtended::str_substr_negative($s, $offset) { substr($s, $offset) }
 
 fn Project::StringsExtended::str_replace_substr($s, $start, $len, $repl) {
-    my $result = $s
+    val $result = $s
     substr($result, $start, $len, $repl)
     $result
 }
@@ -58,20 +58,20 @@ fn Project::StringsExtended::str_ends_with($s, $suffix) { rindex($s, $suffix) ==
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_trim($s) {
-    my $result = $s
+    var $result = $s
     $result =~ s/^\s+//
     $result =~ s/\s+$//
     $result
 }
 
 fn Project::StringsExtended::str_ltrim($s) {
-    my $result = $s
+    var $result = $s
     $result =~ s/^\s+//
     $result
 }
 
 fn Project::StringsExtended::str_rtrim($s) {
-    my $result = $s
+    var $result = $s
     $result =~ s/\s+$//
     $result
 }
@@ -81,13 +81,13 @@ fn Project::StringsExtended::str_rtrim($s) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_chomp($s) {
-    my $result = $s
+    var $result = $s
     chomp $result    $result
 }
 
 fn Project::StringsExtended::str_chop($s) {
-    my $result = $s
-    my $char = chop $result
+    var $result = $s
+    val $char = chop $result
     ($result, $char)
 }
 
@@ -99,7 +99,7 @@ fn Project::StringsExtended::str_chr($n) { chr($n) }
 fn Project::StringsExtended::str_ord($s) { ord($s) }
 
 fn Project::StringsExtended::str_to_chars($s) {
-    my @chars = ()
+    var @chars = ()
     ~> 0 .. length($s) - 1 ep {
         push @chars, substr($s, _, 1)
     }
@@ -115,22 +115,22 @@ fn Project::StringsExtended::str_char_at($s, $i) { substr($s, $i, 1) }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_pad_left($s, $width, $char) {
-    my $pad = $width - length($s)
+    val $pad = $width - length($s)
     $pad > 0 ? ($char x $pad) . $s : $s
 }
 
 fn Project::StringsExtended::str_pad_right($s, $width, $char) {
-    my $pad = $width - length($s)
+    val $pad = $width - length($s)
     $pad > 0 ? $s . ($char x $pad) : $s
 }
 
 fn Project::StringsExtended::str_center($s, $width, $char) {
-    my $pad = $width - length($s)
+    val $pad = $width - length($s)
     if ($pad <= 0) {
         return $s
     }
-    my $left = int($pad / 2)
-    my $right = $pad - $left
+    val $left = int($pad / 2)
+    val $right = $pad - $left
     ($char x $left) . $s . ($char x $right)
 }
 
@@ -168,7 +168,7 @@ fn Project::StringsExtended::str_unpack_n($packed) { unpack("n", $packed) }
 
 fn Project::StringsExtended::str_pack_multi($s1, $s2) { pack("A5 A5", $s1, $s2) }
 fn Project::StringsExtended::str_unpack_multi($packed) {
-    my @parts = unpack("A5 A5", $packed)
+    val @parts = unpack("A5 A5", $packed)
     @parts
 }
 
@@ -190,25 +190,25 @@ fn Project::StringsExtended::num_to_str($n) { "" . $n }
 fn Project::StringsExtended::str_quotemeta($s) { quotemeta($s) }
 
 fn Project::StringsExtended::str_q { q{hello world} }
-fn Project::StringsExtended::str_qq { my $x = "world"; qq{hello $x} }
-fn Project::StringsExtended::str_qw { my @w = qw(one two three); @w }
+fn Project::StringsExtended::str_qq { val $x = "world"; qq{hello $x} }
+fn Project::StringsExtended::str_qw { val @w = qw(one two three); @w }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # INTERPOLATION
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_interp_scalar {
-    my $name = "Alice"
+    val $name = "Alice"
     "Hello, $name!"
 }
 
 fn Project::StringsExtended::str_interp_array_elem {
-    my @arr = qw(a b c)
+    val @arr = qw(a b c)
     "Second: $arr[1]"
 }
 
 fn Project::StringsExtended::str_interp_hash_elem {
-    my %h = (key => "value")
+    val %h = (key => "value")
     "Key: $h{key}"
 }
 
@@ -217,12 +217,12 @@ fn Project::StringsExtended::str_interp_escape {
 }
 
 fn Project::StringsExtended::str_interp_braces {
-    my $word = "test"
+    val $word = "test"
     "${word}ing"
 }
 
 fn Project::StringsExtended::str_no_interp {
-    my $x = "not interpolated"
+    val $x = "not interpolated"
     q{$x stays literal}
 }
 
@@ -231,7 +231,7 @@ fn Project::StringsExtended::str_no_interp {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_split_char($s) {
-    my @chars = ()
+    var @chars = ()
     ~> 0 .. length($s) - 1 ep {
         push @chars, substr($s, _, 1)
     }
@@ -249,24 +249,24 @@ fn Project::StringsExtended::str_join_empty(@parts) { join("", @parts) }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_tr_basic($s) {
-    my $result = $s
+    var $result = $s
     $result =~ tr/a-z/A-Z/
     $result
 }
 
 fn Project::StringsExtended::str_tr_delete($s) {
-    my $result = $s
+    var $result = $s
     $result =~ tr/aeiou//d
     $result
 }
 
 fn Project::StringsExtended::str_tr_count($s) {
-    my $count = ($s =~ tr/aeiou//)
+    val $count = ($s =~ tr/aeiou//)
     $count
 }
 
 fn Project::StringsExtended::str_tr_squeeze($s) {
-    my $result = $s
+    var $result = $s
     $result =~ tr/a-z//s
     $result
 }
@@ -291,7 +291,7 @@ fn Project::StringsExtended::str_is_empty($s) { length($s) == 0 ? 1 : 0 }
 fn Project::StringsExtended::str_is_blank($s) { $s =~ /^\s*$/ ? 1 : 0 }
 
 fn Project::StringsExtended::str_count_char($s, $char) {
-    my $count = 0
+    var $count = 0
     ~> split(//, $s) ep {
         $count++ if _ eq $char
     }
@@ -299,12 +299,12 @@ fn Project::StringsExtended::str_count_char($s, $char) {
 }
 
 fn Project::StringsExtended::str_word_count($s) {
-    my @words = split(/\s+/, $s)
+    var @words = split(/\s+/, $s)
     @words = grep { length(_) > 0 } @words
     scalar @words}
 
 fn Project::StringsExtended::str_lines($s) {
-    my @lines = split(/\n/, $s)
+    val @lines = split(/\n/, $s)
     @lines
 }
 

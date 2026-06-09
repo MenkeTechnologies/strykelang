@@ -3,10 +3,10 @@
 
 fn Rosetta::Brazilian::check($n) {
     if ($n < 7) { return 0 }
-    for my $b (2:$n-2) {
-        my $temp = $n
-        my $digit = $temp % $b
-        my $all_same = 1
+    for val $b (2:$n-2) {
+        var $temp = $n
+        val $digit = $temp % $b
+        var $all_same = 1
         while ($temp > 0) {
             if ($temp % $b != $digit) {
                 $all_same = 0
@@ -19,8 +19,8 @@ fn Rosetta::Brazilian::check($n) {
     0
 }
 
-my @brazilian
-my $i = 1
+var @brazilian
+var $i = 1
 while (len(@brazilian) < 20) {
     if (Rosetta::Brazilian::check($i)) {
         push @brazilian, $i

@@ -12,29 +12,29 @@
 p "── cloistered ACL lifecycle ──"
 
 # 1. Open congregation (default).
-my $open_cong = ordain "open_pool"
+val $open_cong = ordain "open_pool"
 p "ordained 'open_pool' (open mode — no AUTH required)"
 
 # 2. Cloistered congregation with a specific token.
-my $secured_cong = ordain "audit_pool"
+val $secured_cong = ordain "audit_pool"
 cloister "secret-token-xyz789"
 p "ordained 'audit_pool' (cloistered — STRYKE_AGENT_TOKEN=secret-token-xyz789 required)"
 
 # 3. Show registered congregations.
-my @names = cathedral()
+var @names = cathedral()
 p "── cathedral registry ──"
-for my $name (sort @names) {
+for val $name (sort @names) {
     printf "  %s\n", $name
 }
 
 # 4. Apostatize one of them (unregister from cathedral, doesn't kill agents).
-my $forgotten = apostatize "open_pool"
+val $forgotten = apostatize "open_pool"
 printf "apostatize 'open_pool' → %d (1=was registered)\n", $forgotten
 
 # 5. Verify it's gone from cathedral.
 @names = cathedral()
 p "── after apostatize ──"
-for my $name (sort @names) {
+for val $name (sort @names) {
     printf "  %s\n", $name
 }
 

@@ -1,6 +1,6 @@
 # lib/math.stk — math utilities: memoization, closures, higher-order functions
 
-my %_fib_memo
+var %_fib_memo
 
 fn Project::Math::fib_n ($n) {
     return $n if $n <= 1
@@ -9,19 +9,19 @@ fn Project::Math::fib_n ($n) {
 }
 
 fn Project::Math::factorial_n ($n) {
-    my $r = 1
+    var $r = 1
     $r *= _ for 1:$n
     $r
 }
 
 fn Project::Math::primes_under ($max) {
-    my @result = grep {is_prime} 2:$max
+    val @result = grep {is_prime} 2:$max
     @result
 }
 
 fn Project::Math::gcd_of ($a, $b) {
     while ($b) {
-        my $tmp = $b
+        val $tmp = $b
         $b = $a % $b
         $a = $tmp
     }
@@ -46,7 +46,7 @@ fn Project::Math::apply_n ($f, $n, $val) {
 # Newton's method square root via closure + iterate
 fn Project::Math::sqrt_newton ($x) {
     return 0 if $x == 0
-    my $guess = $x / 2.0
-    my $refine = fn ($g) { ($g + $x / $g) / 2.0 }
+    val $guess = $x / 2.0
+    val $refine = fn ($g) { ($g + $x / $g) / 2.0 }
     Project::Math::apply_n($refine, 20, $guess)
 }

@@ -5,25 +5,25 @@ fn Rosetta::Combinations::generate($n, $k) {
     if ($k == 0) { return [[]] }
     if ($n < $k) { return [] }
     
-    my $with_first = Rosetta::Combinations::generate($n - 1, $k - 1)
-    my @res
-    for my $c (@$with_first) {
+    val $with_first = Rosetta::Combinations::generate($n - 1, $k - 1)
+    var @res
+    for val $c (@$with_first) {
         push @res, [ $n - 1, @$c ]
     }
     
-    my $without_first = Rosetta::Combinations::generate($n - 1, $k)
-    for my $c (@$without_first) {
+    val $without_first = Rosetta::Combinations::generate($n - 1, $k)
+    for val $c (@$without_first) {
         push @res, $c
     }
     
     \@res
 }
 
-my $c52 = Rosetta::Combinations::generate(5, 2)
+val $c52 = Rosetta::Combinations::generate(5, 2)
 assert_eq len(@$c52), 10, "5 choose 2 = 10"
 
 # Combinations of 3 from 5
-my $c53 = Rosetta::Combinations::generate(5, 3)
+val $c53 = Rosetta::Combinations::generate(5, 3)
 assert_eq len(@$c53), 10, "5 choose 3 = 10"
 
 test_run

@@ -17,9 +17,9 @@ fn Dashboard::render {
     # Move cursor to top-left
     p "\x1b[H"
     
-    my $info = pool_info()
-    my $ram_total = mem_total()
-    my $uptime = sys_uptime()
+    val $info = pool_info()
+    val $ram_total = mem_total()
+    val $uptime = sys_uptime()
     
     p "── SYSTEM DASHBOARD ────────────────────────────────────"
     printf "  TIME:     %s\n", datetime_from_epoch(time())
@@ -41,8 +41,8 @@ fn Dashboard::render {
     
     p "────────────────────────────────────────────────────────"
     p "  MOUNTED DISKS:"
-    my @disks = mounts()
-    for my $m (@disks) {
+    val @disks = mounts()
+    for val $m (@disks) {
         next unless $m->{total} > 0
         printf "    %-15s %5.1f%% used (%s free)\n", 
             $m->{mount}, 
@@ -61,7 +61,7 @@ $SIG{INT} = fn {
 }
 
 # Run for 1 iteration if non-interactive (to allow batch verification), else 10
-my $iterations = has_stdout_tty() ? 10 : 1
+val $iterations = has_stdout_tty() ? 10 : 1
 
 for (1:$iterations) {
     Dashboard::render()

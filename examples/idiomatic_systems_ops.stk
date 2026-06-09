@@ -14,9 +14,9 @@ p "--- Systems ---"
 "localhost" |> App::Sys::ping
 
 # 3. Slurp/Spurt
-my $f = "#{ temp_dir() }audit.log"
+val $f = "#{ temp_dir() }audit.log"
 spurt $f, to_json \@log
-my $bytes = len c"$f"
+val $bytes = len c"$f"
 p "Log written: $bytes bytes"
 
 # 4. Tests

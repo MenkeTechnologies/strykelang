@@ -16,8 +16,8 @@ fn Rosetta::NullObject::do_work($logger) {
     "done"
 }
 
-my $real_logger = Logger()
-my $null_logger = NullLogger()
+val $real_logger = Logger()
+val $null_logger = NullLogger()
 
 assert_eq Rosetta::NullObject::do_work($real_logger), "done", "Works with real logger"
 assert_eq Rosetta::NullObject::do_work($null_logger), "done", "Works with null logger"

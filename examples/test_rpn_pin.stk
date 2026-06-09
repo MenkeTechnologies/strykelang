@@ -4,34 +4,34 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 fn RPN::eval($expr) {
-    my @stack = ()
-    for my $tok (split / +/, $expr) {
+    var @stack = ()
+    for val $tok (split / +/, $expr) {
         next if len($tok) == 0
         if ($tok eq "+") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x + $y
         } elsif ($tok eq "-") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x - $y
         } elsif ($tok eq "*") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x * $y
         } elsif ($tok eq "/") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x / $y
         } elsif ($tok eq "neg") {
-            my $x = pop @stack
+            val $x = pop @stack
             push @stack, 0 - $x
         } elsif ($tok eq "dup") {
-            my $x = $stack[-1]
+            val $x = $stack[-1]
             push @stack, $x
         } elsif ($tok eq "swap") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $y
             push @stack, $x
         } else {

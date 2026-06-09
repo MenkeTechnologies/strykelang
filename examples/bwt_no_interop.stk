@@ -19,63 +19,63 @@
 # Run: stryke --no-interop examples/bwt_no_interop.stk
 
 fn BWT::transform($s) {
-    my $n = len $s
+    val $n = len $s
     return +{ bwt => "", idx => 0 } if $n == 0
 
-    my @rotations
-    for my $i (0 : $n - 1) {
-        my $rot = $i == 0 ? $s : $s[$i : $n - 1] . $s[0 : $i - 1]
+    var @rotations
+    for val $i (0 : $n - 1) {
+        val $rot = $i == 0 ? $s : $s[$i : $n - 1] . $s[0 : $i - 1]
         push @rotations, $rot
     }
-    my @sorted = ~> @rotations sort { _0 cmp _1 }
+    val @sorted = ~> @rotations sort { _0 cmp _1 }
 
-    my $last_col = ""
-    for my $r (@sorted) { $last_col = $last_col . $r[-1] }
+    var $last_col = ""
+    for val $r (@sorted) { $last_col = $last_col . $r[-1] }
 
-    my $idx = 0
-    for my $i (0 : $n - 1) {
+    var $idx = 0
+    for val $i (0 : $n - 1) {
         if ($sorted[$i] eq $s) { $idx = $i; last }
     }
     +{ bwt => $last_col, idx => $idx }
 }
 
 fn BWT::inverse($bwt, $idx) {
-    my $n = len $bwt
+    val $n = len $bwt
     return "" if $n == 0
 
-    my @bwt_arr
-    for my $i (0 : $n - 1) { push @bwt_arr, $bwt[$i] }
-    my @first_col = ~> @bwt_arr sort { _0 cmp _1 }
+    var @bwt_arr
+    for val $i (0 : $n - 1) { push @bwt_arr, $bwt[$i] }
+    val @first_col = ~> @bwt_arr sort { _0 cmp _1 }
 
     # occ_bwt[i] / occ_first[j] = how many times that char has been
     # seen in column up to and including row i / j. LF mapping is
     # (char, occ) → row-in-first-column.
-    my %counts_bwt
-    my @occ_bwt
-    for my $c (@bwt_arr) {
+    var %counts_bwt
+    var @occ_bwt
+    for val $c (@bwt_arr) {
         $counts_bwt{$c} = ($counts_bwt{$c} // 0) + 1
         push @occ_bwt, $counts_bwt{$c}
     }
-    my %counts_first
-    my @occ_first
-    for my $c (@first_col) {
+    var %counts_first
+    var @occ_first
+    for val $c (@first_col) {
         $counts_first{$c} = ($counts_first{$c} // 0) + 1
         push @occ_first, $counts_first{$c}
     }
 
-    my %first_occ_idx
-    for my $j (0 : $n - 1) {
-        my $key = "#{$first_col[$j]}_#{$occ_first[$j]}"
+    var %first_occ_idx
+    for val $j (0 : $n - 1) {
+        val $key = "#{$first_col[$j]}_#{$occ_first[$j]}"
         $first_occ_idx{$key} = $j
     }
 
-    my @lf = (0) x $n
-    for my $i (0 : $n - 1) {
+    var @lf = (0) x $n
+    for val $i (0 : $n - 1) {
         $lf[$i] = $first_occ_idx{"#{$bwt_arr[$i]}_#{$occ_bwt[$i]}"}
     }
 
-    my $res = ""
-    my $cur = $idx
+    var $res = ""
+    var $cur = $idx
     for (0 : $n - 1) {
         $res = $bwt_arr[$cur] . $res
         $cur = $lf[$cur]
@@ -84,13 +84,13 @@ fn BWT::inverse($bwt, $idx) {
 }
 
 p "── Burrows-Wheeler Transform demo ──"
-my $msg = "banana"
+val $msg = "banana"
 p "Original: '#{$msg}'"
 
-my $t = BWT::transform($msg)
+val $t = BWT::transform($msg)
 p "BWT:      '#{$t->{bwt}}' (idx: #{$t->{idx}})"
 
-my $inv = BWT::inverse($t->{bwt}, $t->{idx})
+val $inv = BWT::inverse($t->{bwt}, $t->{idx})
 p "Inverse:  '#{$inv}'"
 p "Match:    #{$msg eq $inv ? 'YES' : 'NO'}"
 p "Done."

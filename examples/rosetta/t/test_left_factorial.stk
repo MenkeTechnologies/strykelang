@@ -10,8 +10,8 @@ fn Rosetta::LeftFactorial::compute($n) {
     if ($n == 0) {
         0
     } else {
-        my $sum = 0
-        for my $i (0:$n-1) {
+        var $sum = 0
+        for val $i (0:$n-1) {
             $sum += Rosetta::LeftFactorial::factorial($i)
         }
         $sum

@@ -2,15 +2,15 @@
 # Rosetta Code: URL encoding and decoding
 
 fn Rosetta::URL::test($str) {
-    my $enc = url_encode($str)
-    my $dec = url_decode($enc)
+    val $enc = url_encode($str)
+    val $dec = url_decode($enc)
     $dec
 }
 
-my $str = "http://rosettacode.org/wiki/URL_encoding"
+val $str = "http://rosettacode.org/wiki/URL_encoding"
 assert_eq Rosetta::URL::test($str), $str, "codec roundtrip 1"
 
-my $special = "a b c / @ # $ % ^ & * ( )"
+val $special = "a b c / @ # $ % ^ & * ( )"
 assert_eq Rosetta::URL::test($special), $special, "codec roundtrip special"
 
 # Manual verification of encoding

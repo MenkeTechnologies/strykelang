@@ -11,12 +11,12 @@ fn Rosetta::Game24::eval_op($a, $b, $op) {
 
 fn Rosetta::Game24::perms(@list) {
     if (len(@list) <= 1) { return [\@list] }
-    my @res
-    for my $i (0..len(@list)-1) {
-        my @rest = @list
-        my $item = splice(@rest, $i, 1)
-        my $sub_ref = Rosetta::Game24::perms(@rest)
-        for my $s (@$sub_ref) {
+    var @res
+    for val $i (0..len(@list)-1) {
+        var @rest = @list
+        val $item = splice(@rest, $i, 1)
+        val $sub_ref = Rosetta::Game24::perms(@rest)
+        for val $s (@$sub_ref) {
             push @res, [$item, @$s]
         }
     }
@@ -24,18 +24,18 @@ fn Rosetta::Game24::perms(@list) {
 }
 
 fn Rosetta::Game24::solve($d) {
-    my @ops = ("+", "-", "*", "/")
-    my $perms = Rosetta::Game24::perms(@$d)
+    val @ops = ("+", "-", "*", "/")
+    val $perms = Rosetta::Game24::perms(@$d)
     
-    for my $p (@$perms) {
-        for my $o1 (@ops) {
-            for my $o2 (@ops) {
-                for my $o3 (@ops) {
-                    my $v1 = Rosetta::Game24::eval_op($p->[0], $p->[1], $o1)
+    for val $p (@$perms) {
+        for val $o1 (@ops) {
+            for val $o2 (@ops) {
+                for val $o3 (@ops) {
+                    val $v1 = Rosetta::Game24::eval_op($p->[0], $p->[1], $o1)
                     if (defined $v1) {
-                        my $v2 = Rosetta::Game24::eval_op($v1, $p->[2], $o2)
+                        val $v2 = Rosetta::Game24::eval_op($v1, $p->[2], $o2)
                         if (defined $v2) {
-                            my $v3 = Rosetta::Game24::eval_op($v2, $p->[3], $o3)
+                            val $v3 = Rosetta::Game24::eval_op($v2, $p->[3], $o3)
                             if (defined $v3 && abs($v3 - 24) < 0.0001) {
                                 return "(($p->[0] $o1 $p->[1]) $o2 $p->[2]) $o3 $p->[3]"
                             }
@@ -48,10 +48,10 @@ fn Rosetta::Game24::solve($d) {
     undef
 }
 
-my $res = Rosetta::Game24::solve([4, 6, 8, 2])
+val $res = Rosetta::Game24::solve([4, 6, 8, 2])
 assert_ok defined($res), "24 game solution found for 4,6,8,2"
 
-my $res2 = Rosetta::Game24::solve([1, 2, 3, 4])
+val $res2 = Rosetta::Game24::solve([1, 2, 3, 4])
 assert_ok defined($res2), "24 game solution found for 1,2,3,4"
 
 test_run

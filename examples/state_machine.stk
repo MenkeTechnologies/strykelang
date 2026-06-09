@@ -12,7 +12,7 @@
 # ── states + valid transitions ────────────────────────────────────────
 # transitions{from}{event} = { to => $next_state, guard => $coderef }
 
-my %transitions
+var %transitions
 
 # Define transitions programmatically (BUG-216 — no autoviv).
 fn Demo::FSM::add($from, $event, $to, $guard) {
@@ -21,7 +21,7 @@ fn Demo::FSM::add($from, $event, $to, $guard) {
 }
 
 # An always-true guard helper.
-my $allow = fn($ctx) { 1 }
+val $allow = fn($ctx) { 1 }
 
 Demo::FSM::add("created", "submit",   "pending",   $allow)
 Demo::FSM::add("pending", "approve",  "approved",  fn($ctx) { $ctx->{amount} >= 0 })
@@ -40,7 +40,7 @@ mysync %transition_latency_us # event -> running sum of µs
 fn Demo::FSM::transition($from, $event, $ctx) {
     return undef unless exists $transitions{$from}
     return undef unless exists $transitions{$from}->{$event}
-    my $rule = $transitions{$from}->{$event}
+    val $rule = $transitions{$from}->{$event}
     return undef unless $rule->{guard}($ctx)
     $rule->{to}
 }
@@ -51,14 +51,14 @@ mysync $audit_log = []
 mysync $tlat = t_digest(100)
 
 around "Demo::FSM::transition" {
-    my $from  = $INTERCEPT_ARGS[0]
-    my $event = $INTERCEPT_ARGS[1]
-    my $t0 = now_ns()
-    my $to = proceed(@INTERCEPT_ARGS)
-    my $elapsed = (now_ns() - $t0) / 1000.0
+    val $from  = $INTERCEPT_ARGS[0]
+    val $event = $INTERCEPT_ARGS[1]
+    val $t0 = now_ns()
+    val $to = proceed(@INTERCEPT_ARGS)
+    val $elapsed = (now_ns() - $t0) / 1000.0
     td_add($tlat, $elapsed)
-    my $status_str = defined($to) ? "ok" : "rejected"
-    my $entry = +{ from => $from, event => $event, to => $to, status => $status_str, us => $elapsed }
+    val $status_str = defined($to) ? "ok" : "rejected"
+    val $entry = +{ from => $from, event => $event, to => $to, status => $status_str, us => $elapsed }
     push @$audit_log, $entry
     if (defined $to) { $state_visits{$to} = ($state_visits{$to} // 0) + 1 }
     $to
@@ -67,12 +67,12 @@ around "Demo::FSM::transition" {
 # ── simulated order lifecycle ────────────────────────────────────────
 
 fn Demo::FSM::run_order($order_id, $script) {
-    my $state = "created"
+    var $state = "created"
     printf "── order %d ──────────────────────────────────────────\n", $order_id
-    for my $step (@{$script}) {
-        my $event = $step->[0]
-        my $ctx   = $step->[1]
-        my $next  = Demo::FSM::transition($state, $event, $ctx)
+    for val $step (@{$script}) {
+        val $event = $step->[0]
+        val $ctx   = $step->[1]
+        val $next  = Demo::FSM::transition($state, $event, $ctx)
         if (defined $next) {
             printf "  %-10s --%-8s--> %s\n", $state, $event, $next
             $state = $next
@@ -84,10 +84,10 @@ fn Demo::FSM::run_order($order_id, $script) {
     $state
 }
 
-my $now = time()
+val $now = time()
 
 # Three orders with different lifecycles.
-my @order1 = (
+val @order1 = (
     ["submit",   +{}],
     ["approve",  +{ amount => 100 }],
     ["pay",      +{ paid_at => $now }],
@@ -95,13 +95,13 @@ my @order1 = (
     ["deliver",  +{}],
 )
 
-my @order2 = (
+val @order2 = (
     ["submit",   +{}],
     ["cancel",   +{}],
     ["pay",      +{ paid_at => $now }],   # illegal from cancelled
 )
 
-my @order3 = (
+val @order3 = (
     ["submit",   +{}],
     ["approve",  +{ amount => 200 }],
     ["pay",      +{ paid_at => 0 }],      # guard fails (paid_at == 0)
@@ -118,9 +118,9 @@ Demo::FSM::run_order(3, \@order3)
 
 p ""
 p "── audit log summary ────────────────────────────────"
-my $total      = len @$audit_log
-my $ok         = grep { _->{status} eq "ok" } @$audit_log
-my $rejected   = $total - $ok
+val $total      = len @$audit_log
+val $ok         = grep { _->{status} eq "ok" } @$audit_log
+val $rejected   = $total - $ok
 printf "  total transitions  : %d\n", $total
 printf "  successful         : %d\n", $ok
 printf "  rejected           : %d\n", $rejected
@@ -130,7 +130,7 @@ printf "  rejection rate     : %.1f%%\n", 100.0 * $rejected / $total
 
 p ""
 p "── per-state visit counts ───────────────────────────"
-for my $s (sort { _ cmp _1 } keys %state_visits) {
+for val $s (sort { _ cmp _1 } keys %state_visits) {
     printf "  %-12s : %d\n", $s, $state_visits{$s}
 }
 
@@ -146,8 +146,8 @@ printf "  p99  : %.1f µs\n", td_quantile($tlat, 0.99)
 
 p ""
 p "── illegal transitions (audit log) ──────────────────"
-my @rejects = grep { _->{status} eq "rejected" } @$audit_log
-for my $r (@rejects) {
+val @rejects = grep { _->{status} eq "rejected" } @$audit_log
+for val $r (@rejects) {
     printf "  REJECTED: %-10s --%-8s-->\n", $r->{from}, $r->{event}
 }
 

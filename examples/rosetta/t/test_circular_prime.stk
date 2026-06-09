@@ -6,10 +6,10 @@ fn Rosetta::CircularPrimes::is_prime_custom($n) {
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
-        my $limit = sqrt($n)
-        my $res = 1
-        for my $i (1..int($limit)) {
-            my $v = $i * 2 + 1
+        val $limit = sqrt($n)
+        var $res = 1
+        for val $i (1..int($limit)) {
+            val $v = $i * 2 + 1
             if ($v > $limit) { next }
             if ($n % $v == 0) {
                 $res = 0
@@ -21,16 +21,16 @@ fn Rosetta::CircularPrimes::is_prime_custom($n) {
 }
 
 fn Rosetta::CircularPrimes::rotate($s) {
-    my $first = substr($s, 0, 1)
-    my $rest = substr($s, 1)
+    val $first = substr($s, 0, 1)
+    val $rest = substr($s, 1)
     $rest . $first
 }
 
 fn Rosetta::CircularPrimes::check($n) {
-    my $s = "$n"
-    my $len = length($s)
-    my $all_prime = 1
-    for my $i (1:$len) {
+    var $s = "$n"
+    val $len = length($s)
+    var $all_prime = 1
+    for val $i (1:$len) {
         # Using the builtin is_prime for speed, or the custom one if requested
         if (!is_prime(int($s))) {
             $all_prime = 0

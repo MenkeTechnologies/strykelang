@@ -2,7 +2,7 @@
 
 # Binary tree zipper. Node = { value, left, right }. Zipper = [tree, crumbs].
 fn Exercism::Zipper::from_tree = [_, []]
-fn Exercism::Zipper::to_tree   { my $z2 = _; while (@{$z2->[1]}) { $z2 = Exercism::Zipper::up($z2) }; $z2->[0] }
+fn Exercism::Zipper::to_tree   { var $z2 = _; while (@{$z2->[1]}) { $z2 = Exercism::Zipper::up($z2) }; $z2->[0] }
 
 fn Exercism::Zipper::value     = _->[0]{value}
 fn Exercism::Zipper::left      { return undef unless _->[0]{left}; [_->[0]{left},  [@{_->[1]}, ["left",  _->[0]]]] }
@@ -10,10 +10,10 @@ fn Exercism::Zipper::right     { return undef unless _->[0]{right}; [_->[0]{righ
 
 fn Exercism::Zipper::up {
     return undef unless @{_->[1]}
-    my @crumbs = @{_->[1]}
-    my $top    = pop @crumbs
-    my ($dir, $parent) = @{$top}
-    my $rebuilt = +{ %{$parent}, $dir => _->[0] }
+    var @crumbs = @{_->[1]}
+    val $top    = pop @crumbs
+    val ($dir, $parent) = @{$top}
+    val $rebuilt = +{ %{$parent}, $dir => _->[0] }
     [$rebuilt, \@crumbs]
 }
 

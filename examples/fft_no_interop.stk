@@ -20,8 +20,8 @@ fn c_sub($u, $v) {
 }
 
 fn c_mul($u, $v) {
-    my $r = $u->[0] * $v->[0] - $u->[1] * $v->[1]
-    my $i = $u->[0] * $v->[1] + $u->[1] * $v->[0]
+    val $r = $u->[0] * $v->[0] - $u->[1] * $v->[1]
+    val $i = $u->[0] * $v->[1] + $u->[1] * $v->[0]
     [ $r, $i ]
 }
 
@@ -32,28 +32,28 @@ fn c_exp($theta) {
 # --- Cooley-Tukey FFT ---
 
 fn transform($x) {
-    my $n = len @$x
+    val $n = len @$x
     return $x if $n <= 1
     
-    my @even; my @odd
-    for (my $i = 0; $i < $n; $i += 2) {
+    var @even; var @odd
+    for (var $i = 0; $i < $n; $i += 2) {
         push @even, $x->[$i]
         push @odd,  $x->[$i + 1]
     }
     
-    my $even_fft = FFT::transform(\@even)
-    my $odd_fft  = FFT::transform(\@odd)
+    val $even_fft = FFT::transform(\@even)
+    val $odd_fft  = FFT::transform(\@odd)
     
-    my @res
-    for (my $i = 0; $i < $n; $i++) { push @res, [0.0, 0.0] }
+    var @res
+    for (var $i = 0; $i < $n; $i++) { push @res, [0.0, 0.0] }
     
-    my $half = int($n / 2)
-    my $pi = 3.14159265358979323846
+    val $half = int($n / 2)
+    val $pi = 3.14159265358979323846
     
-    for (my $k = 0; $k < $half; $k++) {
-        my $theta = -2.0 * $pi * $k / $n
-        my $t = FFT::c_exp($theta)
-        my $term = FFT::c_mul($t, $odd_fft->[$k])
+    for (var $k = 0; $k < $half; $k++) {
+        val $theta = -2.0 * $pi * $k / $n
+        val $t = FFT::c_exp($theta)
+        val $term = FFT::c_mul($t, $odd_fft->[$k])
         
         $res[$k] = FFT::c_add($even_fft->[$k], $term)
         $res[$k + $half] = FFT::c_sub($even_fft->[$k], $term)
@@ -63,15 +63,15 @@ fn transform($x) {
 }
 
 fn inverse_transform($x) {
-    my $n = len @$x
-    my @conj
-    for my $c (@$x) {
+    val $n = len @$x
+    var @conj
+    for val $c (@$x) {
         push @conj, [ $c->[0], -$c->[1] ]
     }
     
-    my $t_res = FFT::transform(\@conj)
-    my @res
-    for my $c (@$t_res) {
+    val $t_res = FFT::transform(\@conj)
+    var @res
+    for val $c (@$t_res) {
         push @res, [ $c->[0] / $n, -$c->[1] / $n ]
     }
     \@res
@@ -82,7 +82,7 @@ package main
 p "── FFT Demo ──"
 
 # Polynomial [1, 2, 3, 4] represented as complex numbers
-my @poly = (
+val @poly = (
     [1.0, 0.0],
     [2.0, 0.0],
     [3.0, 0.0],
@@ -90,19 +90,19 @@ my @poly = (
 )
 
 p "Original:"
-for my $c (@poly) {
+for val $c (@poly) {
     p "  #{sprintf '%.2f', $c->[0]} + #{sprintf '%.2f', $c->[1]}i"
 }
 
-my $fft_res = FFT::transform(\@poly)
+val $fft_res = FFT::transform(\@poly)
 p "\nFFT:"
-for my $c (@$fft_res) {
+for val $c (@$fft_res) {
     p "  #{sprintf '%.2f', $c->[0]} + #{sprintf '%.2f', $c->[1]}i"
 }
 
-my $ifft_res = FFT::inverse_transform($fft_res)
+val $ifft_res = FFT::inverse_transform($fft_res)
 p "\nInverse FFT:"
-for my $c (@$ifft_res) {
+for val $c (@$ifft_res) {
     p "  #{sprintf '%.2f', $c->[0]} + #{sprintf '%.2f', $c->[1]}i"
 }
 

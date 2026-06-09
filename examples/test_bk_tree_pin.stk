@@ -3,20 +3,20 @@
 package BK;
 
 fn lev($s1, $s2) {
-    my $n = len $s1
-    my $m = len $s2
+    val $n = len $s1
+    val $m = len $s2
     return $m if $n == 0
     return $n if $m == 0
-    my @prev = ()
-    for my $j (0:$m) { push @prev, $j }
-    for my $i (1:$n) {
-        my @cur = ($i)
-        for my $j (1:$m) {
-            my $cost = substr($s1, $i - 1, 1) eq substr($s2, $j - 1, 1) ? 0 : 1
-            my $del = $prev[$j] + 1
-            my $ins = $cur[$j - 1] + 1
-            my $sub = $prev[$j - 1] + $cost
-            my $mn = $del
+    var @prev = ()
+    for val $j (0:$m) { push @prev, $j }
+    for val $i (1:$n) {
+        var @cur = ($i)
+        for val $j (1:$m) {
+            val $cost = substr($s1, $i - 1, 1) eq substr($s2, $j - 1, 1) ? 0 : 1
+            val $del = $prev[$j] + 1
+            val $ins = $cur[$j - 1] + 1
+            val $sub = $prev[$j - 1] + $cost
+            var $mn = $del
             $mn = $ins if $ins < $mn
             $mn = $sub if $sub < $mn
             push @cur, $mn
@@ -35,9 +35,9 @@ fn add($t, $w) {
         $t->{root} = BK::_node($w)
         return
     }
-    my $node = $t->{root}
+    var $node = $t->{root}
     while (1) {
-        my $d = BK::lev($w, $node->{word})
+        val $d = BK::lev($w, $node->{word})
         return if $d == 0
         if (exists $node->{ch}->{$d}) {
             $node = $node->{ch}->{$d}
@@ -50,12 +50,12 @@ fn add($t, $w) {
 
 fn _search($node, $w, $k, $out) {
     return if !defined $node
-    my $d = BK::lev($w, $node->{word})
+    val $d = BK::lev($w, $node->{word})
     push @$out, $node->{word} if $d <= $k
-    my $lo = $d - $k
-    my $hi = $d + $k
-    my @keys = sort keys %{$node->{ch}}
-    for my $dk (@keys) {
+    val $lo = $d - $k
+    val $hi = $d + $k
+    val @keys = sort keys %{$node->{ch}}
+    for val $dk (@keys) {
         if ($dk >= $lo && $dk <= $hi) {
             BK::_search($node->{ch}->{$dk}, $w, $k, $out)
         }
@@ -63,7 +63,7 @@ fn _search($node, $w, $k, $out) {
 }
 
 fn search($t, $w, $k) {
-    my @out = ()
+    var @out = ()
     BK::_search($t->{root}, $w, $k, \@out)
     @out = sort @out
     \@out
@@ -89,12 +89,12 @@ BK::lev("foo", "bar") |> aeq BK::lev("bar", "foo"), "lev symmetric"
 BK::lev("kitten", "sitting") |> aeq BK::lev("sitting", "kitten"), "lev symmetric 2"
 
 # --- Empty tree ---
-my $te = BK::new()
+val $te = BK::new()
 len(@{BK::search($te, "any", 5)}) |> aeq 0, "empty search no matches"
 (defined $te->{root}) |> aeq 0, "empty root undef"
 
 # --- Single word ---
-my $t1 = BK::new()
+val $t1 = BK::new()
 BK::add($t1, "hello")
 join(",", @{BK::search($t1, "hello", 0)}) |> aeq "hello", "single exact"
 join(",", @{BK::search($t1, "helxo", 1)}) |> aeq "hello", "single within 1"
@@ -103,7 +103,7 @@ len(@{BK::search($t1, "world", 4)}) |> aeq 1, "single within 4"
 join(",", @{BK::search($t1, "world", 4)}) |> aeq "hello", "single via dist 4"
 
 # --- Duplicate add is no-op ---
-my $td = BK::new()
+val $td = BK::new()
 BK::add($td, "foo")
 BK::add($td, "foo")
 BK::add($td, "foo")
@@ -111,8 +111,8 @@ join(",", @{BK::search($td, "foo", 0)}) |> aeq "foo", "dup add: only one"
 len(@{BK::search($td, "fox", 1)}) |> aeq 1, "dup add still one"
 
 # --- Multiple words ---
-my $t = BK::new()
-for my $w ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart") {
+val $t = BK::new()
+for val $w ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart") {
     BK::add($t, $w)
 }
 
@@ -132,38 +132,38 @@ join(",", @{BK::search($t, "boook", 2)}) |> aeq "boo,book,books,boon,cook", "k=2
 len(@{BK::search($t, "zebra", 0)}) |> aeq 0, "no zebra"
 
 # Big k returns everything
-my $all = BK::search($t, "x", 20)
+val $all = BK::search($t, "x", 20)
 len(@$all) |> aeq 8, "k=20 returns all 8"
 
 # Search returns sorted output
-my $sr = BK::search($t, "book", 2)
-my $sorted = 1
-for my $i (0:len(@$sr)-2) {
+val $sr = BK::search($t, "book", 2)
+var $sorted = 1
+for val $i (0:len(@$sr)-2) {
     $sorted = 0 if $sr->[$i] gt $sr->[$i + 1]
 }
 $sorted |> aeq 1, "results sorted"
 
 # --- Equivalence with brute force on a small dictionary ---
-my $tb = BK::new()
-my @words = ("apple", "apply", "ample", "amplep", "snake", "snare", "stare", "spare", "spark")
-for my $w (@words) { BK::add($tb, $w) }
+val $tb = BK::new()
+val @words = ("apple", "apply", "ample", "amplep", "snake", "snare", "stare", "spare", "spark")
+for val $w (@words) { BK::add($tb, $w) }
 
 # Brute force: for each query / k, compute true matches
-for my $q ("apple", "snake", "spare", "amplx") {
-    for my $k (0, 1, 2) {
-        my @expected = ()
-        for my $w (@words) {
+for val $q ("apple", "snake", "spare", "amplx") {
+    for val $k (0, 1, 2) {
+        var @expected = ()
+        for val $w (@words) {
             push @expected, $w if BK::lev($q, $w) <= $k
         }
         @expected = sort @expected
-        my $got = BK::search($tb, $q, $k)
+        val $got = BK::search($tb, $q, $k)
         join(",", @$got) |> aeq join(",", @expected), "match brute: " . $q . " k=" . $k
     }
 }
 
 # --- Numeric/short strings ---
-my $tn = BK::new()
-for my $w ("1", "12", "123", "1234", "21") { BK::add($tn, $w) }
+val $tn = BK::new()
+for val $w ("1", "12", "123", "1234", "21") { BK::add($tn, $w) }
 join(",", @{BK::search($tn, "12", 1)}) |> aeq "1,12,123", "numeric strings k=1"
 
 test_run

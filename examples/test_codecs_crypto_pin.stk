@@ -9,12 +9,12 @@
 
 # ── JSON round-trip ───────────────────────────────────────────────────────
 
-my $obj = { name => "stryke", version => "0.14.18", tags => ["fast", "rust"] }
-my $json = to_json($obj)
+val $obj = { name => "stryke", version => "0.14.18", tags => ["fast", "rust"] }
+val $json = to_json($obj)
 ($json =~ /"name"\s*:\s*"stryke"/) |> aok "to_json contains name field"
 ($json =~ /"version"\s*:\s*"0\.14\.18"/) |> aok "to_json contains version field"
 
-my $back = from_json($json)
+val $back = from_json($json)
 $back->{name}    |> aeq "stryke",   "JSON round-trip preserves name"
 $back->{version} |> aeq "0.14.18", "JSON round-trip preserves version"
 $back->{tags}[0] |> aeq "fast",  "JSON round-trip preserves array element"
@@ -22,38 +22,38 @@ len(@{$back->{tags}}) |> aeq 2,  "JSON round-trip preserves array length"
 
 # ── YAML round-trip ───────────────────────────────────────────────────────
 
-my $yaml = to_yaml($obj)
+val $yaml = to_yaml($obj)
 ($yaml =~ /name:\s*stryke/) |> aok "YAML contains name field"
 
-my $y_back = from_yaml($yaml)
+val $y_back = from_yaml($yaml)
 $y_back->{name}    |> aeq "stryke",   "YAML round-trip preserves name"
 $y_back->{version} |> aeq "0.14.18", "YAML round-trip preserves version"
 len(@{$y_back->{tags}}) |> aeq 2,    "YAML round-trip preserves array"
 
 # ── TOML round-trip ───────────────────────────────────────────────────────
 
-my $cfg = { server => { host => "localhost", port => 8080 }, debug => 1 }
-my $toml = to_toml($cfg)
+val $cfg = { server => { host => "localhost", port => 8080 }, debug => 1 }
+val $toml = to_toml($cfg)
 ($toml =~ /\[server\]/) |> aok "TOML emits [server] table header"
 ($toml =~ /host\s*=\s*"localhost"/) |> aok "TOML emits host = \"localhost\""
 ($toml =~ /port\s*=\s*8080/)        |> aok "TOML emits port = 8080"
 
-my $t_back = from_toml($toml)
+val $t_back = from_toml($toml)
 $t_back->{server}{host} |> aeq "localhost", "TOML round-trip preserves nested host"
 $t_back->{server}{port} |> aeq 8080,        "TOML round-trip preserves port"
 $t_back->{debug}        |> aeq 1,           "TOML round-trip preserves debug flag"
 
 # ── CSV round-trip — header-aware (returns array-of-hashref) ──────────────
 
-my @rows = (
+val @rows = (
     { name => "alice", age => 30 },
     { name => "bob",   age => 25 },
 )
-my $csv = to_csv(\@rows)
+val $csv = to_csv(\@rows)
 ($csv =~ /name,age/)  |> aok "to_csv emits header row"
 ($csv =~ /alice,30/)  |> aok "to_csv emits alice row"
 
-my $c_back = from_csv($csv)
+val $c_back = from_csv($csv)
 len(@$c_back)        |> aeq 2,       "from_csv returns 2 data rows"
 $c_back->[0]{name}   |> aeq "alice", "from_csv parses first row as hash"
 $c_back->[0]{age}    |> aeq 30,      "from_csv preserves age"
@@ -62,20 +62,20 @@ $c_back->[1]{name}   |> aeq "bob",   "from_csv parses second row"
 # ── pack / unpack — binary templates ──────────────────────────────────────
 
 # N = unsigned 32-bit big-endian (network order).
-my $packed = pack("N", 0xDEADBEEF)
+val $packed = pack("N", 0xDEADBEEF)
 len($packed) |> aeq 4, "pack N produces 4 bytes"
-my @round = unpack("N", $packed)
+val @round = unpack("N", $packed)
 $round[0] |> aeq 0xDEADBEEF, "unpack N round-trips uint32"
 
 # A4 = 4 ASCII chars; N = uint32; pair template.
-my $rec = pack("A4N", "STRK", 42)
+val $rec = pack("A4N", "STRK", 42)
 len($rec) |> aeq 8, "pack A4N produces 4+4 = 8 bytes"
-my @decoded = unpack("A4N", $rec)
+val @decoded = unpack("A4N", $rec)
 $decoded[0] |> aeq "STRK", "unpack A4 preserves ASCII tag"
 $decoded[1] |> aeq 42,     "unpack N preserves uint32 payload"
 
 # C* = expand bytes (Perl-style template).
-my @bytes = unpack("C*", "ABC")
+val @bytes = unpack("C*", "ABC")
 $bytes[0] |> aeq 65, "byte 0 of 'ABC' = 65 = 'A'"
 $bytes[1] |> aeq 66, "byte 1 of 'ABC' = 66 = 'B'"
 $bytes[2] |> aeq 67, "byte 2 of 'ABC' = 67 = 'C'"
@@ -118,7 +118,7 @@ url_decode("hello%20world") |> aeq "hello world", "url_decode round-trip"
 (1:10) |> mean |> aeq 5.5, "mean 1:10"
 
 # Sample standard deviation of (2,4,4,4,5,5,7,9) is exactly 2.
-my @xs = (2, 4, 4, 4, 5, 5, 7, 9)
+val @xs = (2, 4, 4, 4, 5, 5, 7, 9)
 stddev(@xs) |> aeq 2, "stddev sample of (2,4,4,4,5,5,7,9) = 2"
 
 squared(4) |> aeq 16, "squared(4) = 16"
@@ -127,19 +127,19 @@ cube(3)    |> aeq 27, "cube(3) = 27 (alias)"
 
 # ── Datetime — strftime + epoch ────────────────────────────────────────────
 
-my $now = time()
+val $now = time()
 ($now > 1700000000 && $now < 3000000000) |> aok "time() in plausible 2024+ range"
 
-my $iso = strftime("%Y-%m-%dT%H:%M:%SZ", $now)
+val $iso = strftime("%Y-%m-%dT%H:%M:%SZ", $now)
 ($iso =~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
     |> aok "strftime produces RFC3339-shaped ISO-8601"
 
 # epoch() is an alias for time().
-my $e = epoch()
+val $e = epoch()
 ($e == $now || $e == $now + 1) |> aok "epoch() ≈ time() (allow 1s drift)"
 
 # Sub-second resolution.
-my $ms = now_ms()
+val $ms = now_ms()
 ($ms > $now * 1000 - 1000) |> aok "now_ms() consistent with time() * 1000"
 
 test_run

@@ -2,8 +2,8 @@
 # Rosetta Code: Find first duplicate element in an array
 
 fn Rosetta::FindFirstDuplicate::solve($list) {
-    my %seen
-    for my $x (@$list) {
+    var %seen
+    for val $x (@$list) {
         if (exists $seen{$x}) {
             return $x
         }

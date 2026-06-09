@@ -19,7 +19,7 @@ fn Temp::convert($value, $from = "C", $to = "C") {
     # Pair-key dispatch via if/elsif — `match` over string literals
     # does not currently fall through to string equality on plain
     # scalars, so the explicit chain is the portable form.
-    my $key = $from . $to
+    val $key = $from . $to
     if    ($key eq "CC") { $value }
     elsif ($key eq "CF") { $value * 9.0 / 5.0 + 32 }
     elsif ($key eq "CK") { $value + 273.15 }
@@ -33,15 +33,15 @@ fn Temp::convert($value, $from = "C", $to = "C") {
 }
 
 if (len(@ARGV) >= 3) {
-    my ($value, $from, $to) = @ARGV
-    my $out = Temp::convert(0 + $value, uc($from), uc($to))
+    val ($value, $from, $to) = @ARGV
+    val $out = Temp::convert(0 + $value, uc($from), uc($to))
     printf "%g %s = %g %s\n", $value, $from, $out, $to
     exit 0
 }
 
 # No args -> demo grid for boiling / freezing / absolute zero.
 p "── Stryke temperature converter ──"
-for my $celsius (0, 100, -40, -273.15) {
+for val $celsius (0, 100, -40, -273.15) {
     printf "%7.2f C  ->  %7.2f F  /  %7.2f K\n",
         $celsius,
         Temp::convert($celsius, "C", "F"),

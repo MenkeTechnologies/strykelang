@@ -2,7 +2,7 @@
 # Rosetta Code: Collatz — find the n <= N producing the longest hailstone sequence
 
 fn Rosetta::CollatzMax::len($n) {
-    my $count = 1
+    var $count = 1
     while ($n > 1) {
         if ($n % 2 == 0) {
             $n = int($n / 2)
@@ -15,7 +15,7 @@ fn Rosetta::CollatzMax::len($n) {
 }
 
 fn Rosetta::CollatzMax::peak($n) {
-    my $max = $n
+    var $max = $n
     while ($n > 1) {
         if ($n % 2 == 0) {
             $n = int($n / 2)
@@ -28,10 +28,10 @@ fn Rosetta::CollatzMax::peak($n) {
 }
 
 fn Rosetta::CollatzMax::longest_under($limit) {
-    my $best_n = 1
-    my $best_len = 1
-    for my $i (1:$limit) {
-        my $l = Rosetta::CollatzMax::len($i)
+    var $best_n = 1
+    var $best_len = 1
+    for val $i (1:$limit) {
+        val $l = Rosetta::CollatzMax::len($i)
         if ($l > $best_len) {
             $best_len = $l
             $best_n = $i
@@ -47,12 +47,12 @@ assert_eq Rosetta::CollatzMax::len(3), 8, "len(3) = 8"
 assert_eq Rosetta::CollatzMax::len(27), 112, "len(27) = 112"
 
 # Longest under 100 -> n=97 (length 119)
-my $r1 = Rosetta::CollatzMax::longest_under(100)
+val $r1 = Rosetta::CollatzMax::longest_under(100)
 assert_eq $r1->[0], 97, "longest under 100: n=97"
 assert_eq $r1->[1], 119, "longest under 100: len=119"
 
 # Longest under 1000 -> n=871 (length 179)
-my $r2 = Rosetta::CollatzMax::longest_under(1000)
+val $r2 = Rosetta::CollatzMax::longest_under(1000)
 assert_eq $r2->[0], 871, "longest under 1000: n=871"
 assert_eq $r2->[1], 179, "longest under 1000: len=179"
 

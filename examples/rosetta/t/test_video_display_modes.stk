@@ -2,7 +2,7 @@
 # Rosetta Code: Video display modes
 
 fn Rosetta::VideoModes::modes() {
-    my @modes = (
+    val @modes = (
         { width => 800, height => 600, refresh => 60 },
         { width => 1280, height => 720, refresh => 60 },
         { width => 1920, height => 1080, refresh => 144 },
@@ -11,12 +11,12 @@ fn Rosetta::VideoModes::modes() {
 }
 
 fn Rosetta::VideoModes::best($modes) {
-    my @sorted = sort { (_1->{width} * _1->{height}) <=> (_->{width} * _->{height}) || _1->{refresh} <=> _->{refresh} } @$modes
+    val @sorted = sort { (_1->{width} * _1->{height}) <=> (_->{width} * _->{height}) || _1->{refresh} <=> _->{refresh} } @$modes
     $sorted[0]
 }
 
-my $modes = Rosetta::VideoModes::modes()
-my $best = Rosetta::VideoModes::best($modes)
+val $modes = Rosetta::VideoModes::modes()
+val $best = Rosetta::VideoModes::best($modes)
 
 assert_eq len(@$modes), 3, "three video modes enumerated"
 assert_eq "$best->{width}x$best->{height}\@$best->{refresh}", "1920x1080@144", "best mode chosen by resolution then refresh"

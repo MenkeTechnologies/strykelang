@@ -4,42 +4,42 @@
 
 fn Rosetta::MaxConsPrime::primes_below($n) {
     return [] if $n < 2
-    my @sieve
-    for my $i (0:$n-1) { $sieve[$i] = 1 }
+    var @sieve
+    for val $i (0:$n-1) { $sieve[$i] = 1 }
     $sieve[0] = 0; $sieve[1] = 0
-    my $i = 2
+    var $i = 2
     while ($i * $i < $n) {
         if ($sieve[$i]) {
-            my $j = $i * $i
+            var $j = $i * $i
             while ($j < $n) { $sieve[$j] = 0; $j += $i }
         }
         $i += 1
     }
-    my @ps
-    for my $k (2:$n-1) { push @ps, $k if $sieve[$k] }
+    var @ps
+    for val $k (2:$n-1) { push @ps, $k if $sieve[$k] }
     \@ps
 }
 
 fn Rosetta::MaxConsPrime::run($limit) {
-    my $primes = Rosetta::MaxConsPrime::primes_below($limit)
-    my %prime_set
-    for my $p (@$primes) { $prime_set{$p} = 1 }
+    val $primes = Rosetta::MaxConsPrime::primes_below($limit)
+    var %prime_set
+    for val $p (@$primes) { $prime_set{$p} = 1 }
 
     # Prefix sums
-    my @ps
+    var @ps
     $ps[0] = 0
-    for my $i (0..len(@$primes)-1) {
+    for val $i (0..len(@$primes)-1) {
         $ps[$i + 1] = $ps[$i] + $primes->[$i]
     }
 
-    my $best_sum = 0
-    my $best_len = 0
-    my $n = len(@$primes)
-    for my $i (0:$n-1) {
-        for my $j ($i + 1:$n) {
-            my $sum = $ps[$j] - $ps[$i]
+    var $best_sum = 0
+    var $best_len = 0
+    val $n = len(@$primes)
+    for val $i (0:$n-1) {
+        for val $j ($i + 1:$n) {
+            val $sum = $ps[$j] - $ps[$i]
             last if $sum >= $limit
-            my $len = $j - $i
+            val $len = $j - $i
             if ($len > $best_len && $prime_set{$sum}) {
                 $best_len = $len
                 $best_sum = $sum
@@ -50,17 +50,17 @@ fn Rosetta::MaxConsPrime::run($limit) {
 }
 
 # Below 100: 41 = 2+3+5+7+11+13 (6 primes)
-my $r100 = Rosetta::MaxConsPrime::run(100)
+val $r100 = Rosetta::MaxConsPrime::run(100)
 assert_eq $r100->[0], 41, "below 100: sum 41"
 assert_eq $r100->[1], 6,  "below 100: length 6"
 
 # Below 1000: 953 = ... (21 primes)
-my $r1000 = Rosetta::MaxConsPrime::run(1000)
+val $r1000 = Rosetta::MaxConsPrime::run(1000)
 assert_eq $r1000->[0], 953, "below 1000: sum 953"
 assert_eq $r1000->[1], 21,  "below 1000: length 21"
 
 # Below 10000: 9521 (65 primes)
-my $r10k = Rosetta::MaxConsPrime::run(10000)
+val $r10k = Rosetta::MaxConsPrime::run(10000)
 assert_eq $r10k->[0], 9521, "below 10000: sum 9521"
 assert_eq $r10k->[1], 65,   "below 10000: length 65"
 

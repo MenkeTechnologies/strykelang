@@ -2,7 +2,7 @@
 # Rosetta Code: Simulate input/Keyboard
 
 fn Rosetta::SimKey::new() {
-    my @queue
+    val @queue
     { queue => \@queue }
 }
 
@@ -11,15 +11,15 @@ fn Rosetta::SimKey::send($kbd, $text) {
 }
 
 fn Rosetta::SimKey::read($kbd, $n) {
-    my @out
-    for my $i (1:$n) {
+    var @out
+    for val $i (1:$n) {
         last if !len(@{$kbd->{queue}})
         push @out, shift @{$kbd->{queue}}
     }
     join("", @out)
 }
 
-my $kbd = Rosetta::SimKey::new()
+val $kbd = Rosetta::SimKey::new()
 Rosetta::SimKey::send($kbd, "abc")
 Rosetta::SimKey::send($kbd, "12")
 

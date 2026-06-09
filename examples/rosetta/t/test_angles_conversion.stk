@@ -2,12 +2,12 @@
 # Rosetta Code: Angles (geometric), normalization and conversion
 
 fn Rosetta::Angles::norm360($a) {
-    my $res = $a % 360
+    val $res = $a % 360
     $res < 0 ? $res + 360 : $res
 }
 
 fn Rosetta::Angles::norm180($a) {
-    my $res = ($a + 180) % 360
+    var $res = ($a + 180) % 360
     if ($res < 0) { $res += 360 }
     $res - 180
 }

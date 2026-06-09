@@ -2,15 +2,15 @@
 # Rosetta Code: Julia set
 
 fn Rosetta::JuliaSet::iterations($z_re, $z_im, $c_re, $c_im, $max_iter) {
-    my $re = $z_re; my $im = $z_im
-    my $iter = 0
+    var $re = $z_re; var $im = $z_im
+    var $iter = 0
     while ($iter < $max_iter) {
-        my $re2 = $re * $re
-        my $im2 = $im * $im
+        val $re2 = $re * $re
+        val $im2 = $im * $im
         if ($re2 + $im2 > 4.0) { return $iter }
         
-        my $next_re = $re2 - $im2 + $c_re
-        my $next_im = 2.0 * $re * $im + $c_im
+        val $next_re = $re2 - $im2 + $c_re
+        val $next_im = 2.0 * $re * $im + $c_im
         
         $re = $next_re
         $im = $next_im
@@ -20,10 +20,10 @@ fn Rosetta::JuliaSet::iterations($z_re, $z_im, $c_re, $c_im, $max_iter) {
 }
 
 # Use assertions that are less sensitive to precision
-my $it1 = Rosetta::JuliaSet::iterations(0, 0, -0.7, 0.27015, 100)
+val $it1 = Rosetta::JuliaSet::iterations(0, 0, -0.7, 0.27015, 100)
 assert_ok $it1 > 90, "point in set stays long"
 
-my $it2 = Rosetta::JuliaSet::iterations(1.5, 1.5, -0.7, 0.27015, 100)
+val $it2 = Rosetta::JuliaSet::iterations(1.5, 1.5, -0.7, 0.27015, 100)
 assert_ok $it2 < 5, "point outside set escapes fast"
 
 test_run

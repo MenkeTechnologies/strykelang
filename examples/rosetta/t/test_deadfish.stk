@@ -2,10 +2,10 @@
 # Rosetta Code: Deadfish
 
 fn Rosetta::Deadfish::execute($cmd) {
-    my $v = 0
-    my @res
-    my @chars = chars($cmd)
-    for my $c (@chars) {
+    var $v = 0
+    var @res
+    val @chars = chars($cmd)
+    for val $c (@chars) {
         if ($c eq "i") { $v++ }
         elsif ($c eq "d") { $v-- }
         elsif ($c eq "s") { $v *= $v }

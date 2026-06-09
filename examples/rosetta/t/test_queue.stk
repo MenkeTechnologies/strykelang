@@ -18,7 +18,7 @@ fn Rosetta::Queue::is_empty($q) {
     len(@$q) == 0
 }
 
-my $q = Rosetta::Queue::new()
+val $q = Rosetta::Queue::new()
 $q |> Rosetta::Queue::enqueue("a") |> Rosetta::Queue::enqueue("b")
 
 assert_eq Rosetta::Queue::dequeue($q), "a", "dequeue a"
@@ -26,7 +26,7 @@ assert_eq Rosetta::Queue::dequeue($q), "b", "dequeue b"
 assert_ok Rosetta::Queue::is_empty($q), "queue empty"
 
 # Pipe-forward queue
-my $q2 = Rosetta::Queue::new() |> Rosetta::Queue::enqueue(1) |> Rosetta::Queue::enqueue(2)
+val $q2 = Rosetta::Queue::new() |> Rosetta::Queue::enqueue(1) |> Rosetta::Queue::enqueue(2)
 assert_eq Rosetta::Queue::dequeue($q2), 1, "pipe-forward dequeue"
 
 test_run

@@ -3,7 +3,7 @@
 # Bitwise / numeric encoding utilities.
 
 fn Bits::popcount($n) {
-    my $c = 0
+    var $c = 0
     while ($n > 0) {
         $c += $n & 1
         $n = $n >> 1
@@ -13,7 +13,7 @@ fn Bits::popcount($n) {
 
 fn Bits::to_binary($n) {
     return "0" if $n == 0
-    my $s = ""
+    var $s = ""
     while ($n > 0) {
         $s = ($n & 1) . $s
         $n = $n >> 1
@@ -22,8 +22,8 @@ fn Bits::to_binary($n) {
 }
 
 fn Bits::from_binary($s) {
-    my $n = 0
-    for my $c (split(//, $s)) {
+    var $n = 0
+    for val $c (split(//, $s)) {
         $n = ($n << 1) | ($c eq "1" ? 1 : 0)
     }
     $n
@@ -35,8 +35,8 @@ fn Bits::flip_bit($n, $i)  { $n ^ (1 << $i) }
 fn Bits::test_bit($n, $i)  { ($n & (1 << $i)) != 0 ? 1 : 0 }
 
 fn Bits::reverse_bits($n, $width) {
-    my $out = 0
-    for my $i (0:$width - 1) {
+    var $out = 0
+    for val $i (0:$width - 1) {
         $out = ($out << 1) | (($n >> $i) & 1)
     }
     $out
@@ -62,7 +62,7 @@ Bits::from_binary("101")       |> aeq 5,   "from_binary 5"
 Bits::from_binary("11111111")  |> aeq 255, "from_binary 255"
 
 # Roundtrip
-for my $n (0, 1, 7, 42, 255, 1000, 65535) {
+for val $n (0, 1, 7, 42, 255, 1000, 65535) {
     Bits::from_binary(Bits::to_binary($n)) |> aeq $n, "roundtrip $n"
 }
 
@@ -88,10 +88,10 @@ Bits::is_power_of_two(1024) |> aok "pow2 1024"
 
 # Build a bitmask of letters seen in a word
 fn letter_mask($word) {
-    my $m = 0
-    for my $c (split(//, lc($word))) {
+    var $m = 0
+    for val $c (split(//, lc($word))) {
         if ($c =~ /[a-z]/) {
-            my $i = ord($c) - ord("a")
+            val $i = ord($c) - ord("a")
             $m = Bits::set_bit($m, $i)
         }
     }

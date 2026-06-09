@@ -2,18 +2,18 @@
 # Rosetta Code: Keith numbers
 
 fn Rosetta::Keith::check($n) {
-    my $s = "$n"
-    my @digits = ~> $s chars map {int}
-    my $len = len(@digits)
+    val $s = "$n"
+    val @digits = ~> $s chars map {int}
+    val $len = len(@digits)
     if ($len < 2) {
         0
     } else {
-        my @seq = @digits
-        my $last = $seq[-1]
+        var @seq = @digits
+        var $last = $seq[-1]
         while ($last < $n) {
-            my $sum = 0
-            my $curr_len = len(@seq)
-            for my $i ($curr_len - $len:$curr_len - 1) {
+            var $sum = 0
+            val $curr_len = len(@seq)
+            for val $i ($curr_len - $len:$curr_len - 1) {
                 $sum += $seq[$i]
             }
             push @seq, $sum

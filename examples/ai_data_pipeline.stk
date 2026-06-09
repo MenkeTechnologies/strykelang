@@ -12,7 +12,7 @@
 p "── AI Data Pipeline ───────────────────────────────────"
 
 # 1. Setup sample data
-my @data = (
+val @data = (
     "The product is amazing and I love it!",
     "Worst experience ever, totally broken.",
     "It's okay, nothing special.",
@@ -22,22 +22,22 @@ my @data = (
 # 2. Batch classify sentiment
 # In mock mode, we provide the expected array response.
 ai_mock_install('(?si)Classify each item below.*labels: positive, negative, neutral', '["positive", "negative", "neutral", "positive"]')
-my $sentiments = ai_classify(\@data, "sentiment", into => ["positive", "negative", "neutral"])
+val $sentiments = ai_classify(\@data, "sentiment", into => ["positive", "negative", "neutral"])
 
 p "Sentiments:"
-for my $i (0:len(@data)-1) {
+for val $i (0:len(@data)-1) {
     p "  [ #{ $sentiments->[$i] } ] #{ @data[$i] }"
 }
 
 # 3. Semantic Filter
 ai_mock_install('(?si)Decide whether each item below.*positive sentiment', '[true, false, false, true]')
-my $positives = ai_filter(\@data, "positive sentiment")
+val $positives = ai_filter(\@data, "positive sentiment")
 
 p "\nFound #{ len $positives } positive items."
 
 # 4. Batch Map (Extract keywords)
 ai_mock_install('(?si)Apply this instruction to each item: extract 2 main keywords', '["amazing, love", "broken", "nothing", "value, money"]')
-my $keywords = ai_map(\@data, "extract 2 main keywords")
+val $keywords = ai_map(\@data, "extract 2 main keywords")
 
 p "Keywords extracted: #{ join(' | ', @$keywords) }"
 

@@ -6,7 +6,7 @@ fn Rosetta::Immutability::create_constant($val) {
     fn { $val }
 }
 
-my $const_42 = Rosetta::Immutability::create_constant(42)
+val $const_42 = Rosetta::Immutability::create_constant(42)
 
 assert_eq $const_42(), 42, "Constant value is 42"
 

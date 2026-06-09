@@ -9,7 +9,7 @@ fn Rosetta::Sokoban::step($state, $move) {
     $state
 }
 
-my $state = { player => [1, 1], box => [2, 1], target => [3, 1] }
+val $state = { player => [1, 1], box => [2, 1], target => [3, 1] }
 Rosetta::Sokoban::step($state, "R")
 
 assert_eq join(",", @{$state->{player}}), "2,1", "player moves right"

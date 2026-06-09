@@ -11,7 +11,7 @@
 # Run: stryke --no-interop examples/pipe_chain_no_interop.stk
 
 # Squares of 1..20, keep even ones, then halve them.
-my @r = 1:20
+val @r = 1:20
     |> maps  { _ * _   }
     |> grep  { _ % 2 == 0 }
     |> maps  { _ / 2 }
@@ -19,33 +19,33 @@ p "first 5: ", join(",", @r[0:4]), " (expect 2,8,18,32,50)"
 die "first 5 mismatch" unless join(",", @r[0:4]) eq "2,8,18,32,50"
 
 # Total count of even squares 1..1000 — same chain, reduced.
-my $count = 1:1000 |> grep { _ * _ % 2 == 0 } |> len
+val $count = 1:1000 |> grep { _ * _ % 2 == 0 } |> len
 p "even-squared count up to 1000: $count (expect 500)"
 die "count off" unless $count == 500
 
 # Word stats on a sentence — pipe a list of words through several
 # stages. Topic `_` rebinds at every step.
-my @words = split(/\s+/, "the quick brown fox jumps over the lazy dog")
-my $total_letters = @words |> maps {len} |> reduce { _ + _1 }
+val @words = split(/\s+/, "the quick brown fox jumps over the lazy dog")
+val $total_letters = @words |> maps {len} |> reduce { _ + _1 }
 p "total letters in the pangram: $total_letters (expect 35)"
 die "letters off" unless $total_letters == 35
 
 # Longest word — pick-max fold via reduce.
-my $longest = @words |> reduce { len(_) > len(_1) ? _ : _1 }
+val $longest = @words |> reduce { len(_) > len(_1) ? _ : _1 }
 p "longest: $longest (expect \"quick\", \"brown\", or \"jumps\" — all 5 chars)"
 die "longest length off" unless len($longest) == 5
 
 # Most-frequent word — hash count + sort by count desc.
-my %freq
+var %freq
 $freq{_}++ for @words
-my $top = (keys %freq) |> reduce { $freq{_} > $freq{_1} ? _ : _1 }
+val $top = (keys %freq) |> reduce { $freq{_} > $freq{_1} ? _ : _1 }
 p "most common: \"$top\" (expect \"the\" with 2 occurrences)"
 die "top frequency word off" unless $top eq "the"
 
 # Parallel variant on a heavier workload — squared/even/half but
 # across cores via pmap + pgrep. Result must match the sequential
 # version above.
-my @par = 1:20
+val @par = 1:20
     |> pmap  { _ * _ }
     |> pgrep { _ % 2 == 0 }
     |> pmap  { _ / 2 }

@@ -6,7 +6,7 @@ fn Rosetta::RepeatString::repeat_string($s, $n) {
 }
 
 fn Rosetta::StringRepeat::repeat_array($n, @arr) {
-    my @result
+    var @result
     push @result, @arr for 1:$n
     @result
 }
@@ -19,10 +19,10 @@ assert_eq Rosetta::RepeatString::repeat_string("test", 0), "", "repeat 0x"
 assert_eq "=" x 10, "==========", "x operator"
 assert_eq "-" x 20, "--------------------", "line of dashes"
 
-my @rep = Rosetta::StringRepeat::repeat_array(3, 1, 2)
+val @rep = Rosetta::StringRepeat::repeat_array(3, 1, 2)
 assert_eq join(",", @rep), "1,2,1,2,1,2", "repeat array"
 
-my @single = Rosetta::StringRepeat::repeat_array(4, 0)
+val @single = Rosetta::StringRepeat::repeat_array(4, 0)
 assert_eq join(",", @single), "0,0,0,0", "repeat single"
 
 test_run

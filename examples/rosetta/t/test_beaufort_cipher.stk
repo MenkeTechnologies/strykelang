@@ -2,19 +2,19 @@
 # Rosetta Code: Beaufort cipher
 
 fn Rosetta::Beaufort::codec($text, $key) {
-    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
-    my $k = $key |> uc() |> { _ =~ s/[^A-Z]//gr }
+    val $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    val $k = $key |> uc() |> { _ =~ s/[^A-Z]//gr }
     return "" if len($k) == 0
     
-    my @t_chars = $t |> chars()
-    my @k_chars = $k |> chars()
-    my $k_len = len(@k_chars)
+    val @t_chars = $t |> chars()
+    val @k_chars = $k |> chars()
+    val $k_len = len(@k_chars)
     
-    my @res = ~> 0:(len(@t_chars)-1) map {
-        my $p_val = ord($t_chars[_]) - ord("A")
-        my $k_val = ord($k_chars[_ % $k_len]) - ord("A")
+    val @res = ~> 0:(len(@t_chars)-1) map {
+        val $p_val = ord($t_chars[_]) - ord("A")
+        val $k_val = ord($k_chars[_ % $k_len]) - ord("A")
 
-        my $c_val = ($k_val - $p_val) % 26
+        var $c_val = ($k_val - $p_val) % 26
         if ($c_val < 0) { $c_val += 26 }
         chr($c_val + ord("A"))
     }
@@ -22,9 +22,9 @@ fn Rosetta::Beaufort::codec($text, $key) {
     join("", @res)
 }
 
-my $t = "DEFENDTHEEASTWALLOFTHECASTLE"
-my $key = "FORTIFICATION"
-my $enc = Rosetta::Beaufort::codec($t, $key)
+val $t = "DEFENDTHEEASTWALLOFTHECASTLE"
+val $key = "FORTIFICATION"
+val $enc = Rosetta::Beaufort::codec($t, $key)
 
 # We will just verify it's reciprocal
 assert_eq Rosetta::Beaufort::codec($enc, $key), $t, "decode with Beaufort is reciprocal"

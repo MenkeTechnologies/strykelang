@@ -2,25 +2,25 @@
 # Rosetta Code: Find the largest left-truncatable prime in a given base.
 
 fn Rosetta::LargestLeftTrunc::is_prime_in_base($digits, $base) {
-    my $n = 0
-    for my $d (@$digits) { $n = $n * $base + $d }
+    var $n = 0
+    for val $d (@$digits) { $n = $n * $base + $d }
     is_prime($n)
 }
 
 fn Rosetta::LargestLeftTrunc::find($base) {
-    my @prev
-    for my $d (1:$base-1) {
+    var @prev
+    for val $d (1:$base-1) {
         push @prev, [$d] if is_prime($d)
     }
-    my $best = 0
+    var $best = 0
     while (len(@prev) > 0) {
-        my @next
-        for my $cand (@prev) {
-            my $val = 0
-            for my $d (@$cand) { $val = $val * $base + $d }
+        var @next
+        for val $cand (@prev) {
+            var $val = 0
+            for val $d (@$cand) { $val = $val * $base + $d }
             $best = $val if $val > $best
-            for my $d (1:$base-1) {
-                my @new = ($d, @$cand)
+            for val $d (1:$base-1) {
+                val @new = ($d, @$cand)
                 if (Rosetta::LargestLeftTrunc::is_prime_in_base(\@new, $base)) {
                     push @next, \@new
                 }

@@ -22,39 +22,39 @@ fn Rosetta::TwelveDays::gifts() {
 }
 
 fn Rosetta::TwelveDays::verse($day) {
-    my @ords = Rosetta::TwelveDays::ordinals()
-    my @gifts = Rosetta::TwelveDays::gifts()
-    my $ord = $ords[$day - 1]
-    my @lines
+    val @ords = Rosetta::TwelveDays::ordinals()
+    val @gifts = Rosetta::TwelveDays::gifts()
+    val $ord = $ords[$day - 1]
+    var @lines
     push @lines, "On the $ord day of Christmas my true love gave to me:"
-    for (my $i = $day - 1; $i >= 0; $i -= 1) {
+    for (var $i = $day - 1; $i >= 0; $i -= 1) {
         push @lines, $gifts[$i]
     }
     join("\n", @lines)
 }
 
 fn Rosetta::TwelveDays::all() {
-    my @verses
-    for my $day (1:12) {
+    var @verses
+    for val $day (1:12) {
         push @verses, Rosetta::TwelveDays::verse($day)
     }
     join("\n\n", @verses)
 }
 
-my $v1 = Rosetta::TwelveDays::verse(1)
+val $v1 = Rosetta::TwelveDays::verse(1)
 assert_eq $v1, "On the first day of Christmas my true love gave to me:\nA partridge in a pear tree.", "verse 1"
 
-my $v2 = Rosetta::TwelveDays::verse(2)
-my $v2_want = "On the second day of Christmas my true love gave to me:\nTwo turtle doves, and\nA partridge in a pear tree."
+val $v2 = Rosetta::TwelveDays::verse(2)
+val $v2_want = "On the second day of Christmas my true love gave to me:\nTwo turtle doves, and\nA partridge in a pear tree."
 assert_eq $v2, $v2_want, "verse 2"
 
-my $v12 = Rosetta::TwelveDays::verse(12)
+val $v12 = Rosetta::TwelveDays::verse(12)
 assert_ok $v12 =~ /^On the twelfth day/, "verse 12 starts correctly"
 assert_ok $v12 =~ /A partridge in a pear tree\.$/, "verse 12 ends with partridge"
 assert_ok $v12 =~ /Twelve drummers drumming/, "verse 12 has drummers"
 
-my $all = Rosetta::TwelveDays::all()
-my @lines = split /\n/, $all
+val $all = Rosetta::TwelveDays::all()
+val @lines = split /\n/, $all
 # 12 verses, each verse has (1 + day_count) lines, plus 11 blank separator lines
 # total content lines = sum(1+i, i=1..12) = 12 + 78 = 90, plus 11 blanks = 101
 assert_eq len(@lines), 101, "complete song line count"

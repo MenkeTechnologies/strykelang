@@ -17,7 +17,7 @@ fn Rosetta::Singleton::reset() {
 }
 
 fn Rosetta::Singleton::tick($label) {
-    my $i = Rosetta::Singleton::instance()
+    val $i = Rosetta::Singleton::instance()
     $i->{count}++
     push @{$i->{log}}, $label
     $i->{count}
@@ -27,12 +27,12 @@ fn Rosetta::Singleton::tick($label) {
 Rosetta::Singleton::reset()
 
 # First call constructs
-my $a = Rosetta::Singleton::instance()
+var $a = Rosetta::Singleton::instance()
 assert_ok defined($a), "first call returns a value"
 assert_eq $a->{count}, 0, "fresh count = 0"
 
 # Second call returns the *same* object
-my $b = Rosetta::Singleton::instance()
+val $b = Rosetta::Singleton::instance()
 $a->{count} = 7
 assert_eq $b->{count}, 7, "mutation visible through second handle"
 
@@ -42,13 +42,13 @@ assert_eq Rosetta::Singleton::tick("hello"), 1, "first tick"
 assert_eq Rosetta::Singleton::tick("world"), 2, "second tick"
 assert_eq Rosetta::Singleton::tick("foo"),   3, "third tick"
 
-my $i = Rosetta::Singleton::instance()
+val $i = Rosetta::Singleton::instance()
 assert_eq $i->{count}, 3, "count visible"
 assert_eq join(",", @{$i->{log}}), "hello,world,foo", "log preserved"
 
 # Reset destroys state
 Rosetta::Singleton::reset()
-my $fresh = Rosetta::Singleton::instance()
+val $fresh = Rosetta::Singleton::instance()
 assert_eq $fresh->{count}, 0, "after reset: count 0"
 assert_eq len(@{$fresh->{log}}), 0, "after reset: empty log"
 

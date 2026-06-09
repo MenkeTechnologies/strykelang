@@ -7,16 +7,16 @@ fn Rosetta::CheckpointSync::step($worker, $step) {
 }
 
 fn Rosetta::CheckpointSync::demo() {
-    my $workers = 5
-    my $steps = 3
+    val $workers = 5
+    val $steps = 3
     
     "Checkpoint Synchronization using pmap (Scatter/Gather):" |> p
     
-    my @all_results
-    for my $s (1:$steps) {
+    var @all_results
+    for val $s (1:$steps) {
         "Starting Step $s..." |> p
         # pmap acts as a barrier: all workers must finish before moving to next step
-        my @results = ~> 1:$workers map { Rosetta::CheckpointSync::step(_, $s) }
+        val @results = ~> 1:$workers map { Rosetta::CheckpointSync::step(_, $s) }
         "Step $s completed by all workers." |> p
         push @all_results, [@results]
     }

@@ -2,7 +2,7 @@
 # Rosetta Code: Play recorded sounds
 
 fn Rosetta::Playback::player() {
-    my @history
+    val @history
     { history => \@history }
 }
 
@@ -11,8 +11,8 @@ fn Rosetta::Playback::play($player, $clip) {
     len(@{$player->{history}})
 }
 
-my $player = Rosetta::Playback::player()
-my $clip = { name => "beep.wav", samples => [1, 0, -1, 0] }
+val $player = Rosetta::Playback::player()
+val $clip = { name => "beep.wav", samples => [1, 0, -1, 0] }
 
 assert_eq Rosetta::Playback::play($player, $clip), 1, "clip playback recorded"
 assert_eq join(",", @{$player->{history}}), "beep.wav", "played clip name stored"

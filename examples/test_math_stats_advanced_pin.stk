@@ -14,10 +14,10 @@ cosine_distance([0], [0]) |> aeq 1, "BUG-120: cosine_distance zero-norm returns 
 median_absolute_deviation(1, 2, 100, 101) |> aeq 49.5, "BUG-121 (FIXED): MAD uses proper even-n median"
 
 # BUG-122: js_divergence (nats) vs jensen_shannon_div (bits)
-my $p = [0.1, 0.9]
-my $q = [0.2, 0.8]
-my $js_bits = jensen_shannon_div($p, $q)
-my $js_nats = js_div($p, $q)
+val $p = [0.1, 0.9]
+val $q = [0.2, 0.8]
+val $js_bits = jensen_shannon_div($p, $q)
+val $js_nats = js_div($p, $q)
 # js_nats should be js_bits * ln(2)
 ($js_nats / $js_bits) |> sprintf("%.10f") |> aeq sprintf("%.10f", log(2)), "BUG-122: js_div (nats) vs jensen_shannon_div (bits)"
 
@@ -70,7 +70,7 @@ hhi(0.3, 0.3, 0.4) |> aeq 0.34, "BUG-169 (FIXED): hhi variadic sums squares of a
 
 # BUG-170 (FIXED): moving_average now accepts either (WINDOW, LIST) or
 # (LIST, WINDOW). When WINDOW > len, returns an empty list.
-my @ma_170 = moving_average([1,2,3], 5)
+val @ma_170 = moving_average([1,2,3], 5)
 len(@ma_170) |> aeq 0, "BUG-170 (FIXED): moving_average(LIST, WINDOW); WINDOW > len → empty"
 
 # BUG-176: base_convert(255, 16) parses "255" as base-16 -> 597

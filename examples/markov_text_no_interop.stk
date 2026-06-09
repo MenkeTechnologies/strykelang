@@ -17,10 +17,10 @@
 
 # Build the bigram table: prev_word → { next_word => count }.
 fn Markov::train($words) {
-    my %table
-    for my $i (0:len(@$words) - 2) {
-        my $prev = $words->[$i]
-        my $next = $words->[$i + 1]
+    var %table
+    for val $i (0:len(@$words) - 2) {
+        val $prev = $words->[$i]
+        val $next = $words->[$i + 1]
         $table{$prev} //= +{}
         $table{$prev}{$next}++
     }
@@ -29,11 +29,11 @@ fn Markov::train($words) {
 
 # Weighted pick: given { word => count } hashref, choose proportionally.
 fn Markov::pick($dist) {
-    my $total = 0
+    var $total = 0
     $total += _ for values %$dist
-    my $r = rand $total
-    my $acc = 0
-    for my $k (keys %$dist) {
+    val $r = rand $total
+    var $acc = 0
+    for val $k (keys %$dist) {
         $acc += $dist->{$k}
         return $k if $r < $acc
     }
@@ -42,12 +42,12 @@ fn Markov::pick($dist) {
 
 # Generate $n words starting with $seed.
 fn Markov::generate($table, $seed, $n) {
-    my @out = ($seed)
-    my $cur = $seed
+    var @out = ($seed)
+    var $cur = $seed
     for (1:$n - 1) {
-        my $dist = $table->{$cur}
+        val $dist = $table->{$cur}
         last unless defined $dist
-        my $next = Markov::pick($dist)
+        val $next = Markov::pick($dist)
         push @out, $next
         $cur = $next
     }
@@ -56,8 +56,8 @@ fn Markov::generate($table, $seed, $n) {
 
 # All next-word probabilities sum to 1 (within rounding).
 fn Markov::sums_to_one($table) {
-    for my $prev (keys %$table) {
-        my $sum = 0
+    for val $prev (keys %$table) {
+        var $sum = 0
         $sum += _ for values %{$table->{$prev}}
         return 0 if $sum == 0
     }
@@ -68,17 +68,17 @@ p "── Markov text-gen demo ──"
 
 # Training corpus — short pangram-ish sentence with repeated word
 # pairs so the bigram table has interesting transitions.
-my $text = "the quick brown fox jumps over the lazy dog the quick brown fox sleeps the lazy cat watches the fox"
-my @words = split /\s+/, $text
+val $text = "the quick brown fox jumps over the lazy dog the quick brown fox sleeps the lazy cat watches the fox"
+val @words = split /\s+/, $text
 
-my $table = Markov::train(\@words)
+val $table = Markov::train(\@words)
 die "table should have transitions" unless len(keys %$table) > 0
 die "sums-to-one invariant"         unless Markov::sums_to_one($table)
 p "  trained on #{len @words} words, #{len(keys %$table)} distinct previous-words  OK"
 
 # "the" appears 5 times in the corpus; next words include quick, lazy,
 # fox. Verify all observed transitions are in the table.
-my $the_dist = $table->{"the"}
+val $the_dist = $table->{"the"}
 die "the→quick observed"  unless exists $the_dist->{quick}
 die "the→lazy observed"   unless exists $the_dist->{lazy}
 die "the→fox observed"    unless exists $the_dist->{fox}
@@ -87,18 +87,18 @@ p "  transitions from 'the': quick=#{$the_dist->{quick}}, lazy=#{$the_dist->{laz
 
 # Generate a fixed-seed sample and verify it stays inside the vocabulary.
 srand(42)
-my $vocab = +{}
+var $vocab = +{}
 $vocab->{_} = 1 for @words
-my $gen = Markov::generate($table, "the", 20)
+val $gen = Markov::generate($table, "the", 20)
 die "generated text must start with seed" unless $gen->[0] eq "the"
-for my $w (@$gen) {
+for val $w (@$gen) {
     die "generated '$w' not in training vocabulary" unless exists $vocab->{$w}
 }
 p "  generated 20-word sample stays inside training vocabulary  OK"
 p "  sample: " . join(" ", @$gen[0:9]) . " ..."
 
 # Sample from a dist with only one option must return that option.
-my $singleton = +{ "always" => 100 }
+val $singleton = +{ "always" => 100 }
 for (1:50) {
     die "singleton pick must always pick" unless Markov::pick($singleton) eq "always"
 }

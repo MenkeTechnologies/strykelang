@@ -2,12 +2,12 @@
 # Rosetta Code: Conway's Game of Life (1 iteration)
 
 fn Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols) {
-    my $count = 0
-    for my $dr (-1:1) {
-        for my $dc (-1:1) {
+    var $count = 0
+    for val $dr (-1:1) {
+        for val $dc (-1:1) {
             if ($dr == 0 && $dc == 0) { next }
-            my $nr = $r + $dr
-            my $nc = $c + $dc
+            val $nr = $r + $dr
+            val $nc = $c + $dc
             if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
                 if ($grid->[$nr][$nc]) { $count++ }
             }
@@ -17,13 +17,13 @@ fn Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols) {
 }
 
 fn Rosetta::GameOfLife::step($grid) {
-    my $rows = len(@$grid)
-    my $cols = len(@{$grid->[0]})
-    my @next = ()
-    for my $r (0:$rows-1) {
+    val $rows = len(@$grid)
+    val $cols = len(@{$grid->[0]})
+    var @next = ()
+    for val $r (0:$rows-1) {
         $next[$r] = []
-        for my $c (0:$cols-1) {
-            my $n = Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols)
+        for val $c (0:$cols-1) {
+            val $n = Rosetta::GameOfLife::count_neighbors($grid, $r, $c, $rows, $cols)
             if ($grid->[$r][$c]) {
                 $next[$r][$c] = ($n == 2 || $n == 3 ? 1 : 0)
             } else {
@@ -38,8 +38,8 @@ fn Rosetta::GameOfLife::step($grid) {
 # 0 0 0    0 1 0
 # 1 1 1 -> 0 1 0
 # 0 0 0    0 1 0
-my $blinker = [[0, 0, 0], [1, 1, 1], [0, 0, 0]]
-my $next = Rosetta::GameOfLife::step($blinker)
+val $blinker = [[0, 0, 0], [1, 1, 1], [0, 0, 0]]
+val $next = Rosetta::GameOfLife::step($blinker)
 
 assert_eq $next->[0][1], 1, "blinker step [0][1]"
 assert_eq $next->[1][1], 1, "blinker step [1][1]"

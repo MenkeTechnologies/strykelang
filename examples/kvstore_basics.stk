@@ -10,11 +10,11 @@
 #   bob deleted, still here: 0
 #   reopened from disk, found 2 users
 
-my $path = "/tmp/kvstore_basics.rkyv"
+val $path = "/tmp/kvstore_basics.rkyv"
 unlink($path);                                   # fresh demo each run
 
 # ─── open or create ──────────────────────────────────────────────────
-my $db = kv_open($path)
+val $db = kv_open($path)
 p "opened: ", $path
 
 # ─── put ─────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ kv_put($db, "carol", { age => 41, role => "user"  })
 p "stored ", kv_len($db), " users"
 
 # ─── get (compound values come back as hashrefs) ─────────────────────
-my $alice = kv_get($db, "alice")
+val $alice = kv_get($db, "alice")
 p "alice -> ", to_json($alice)
 
 # ─── delete ──────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ p "remaining keys: ", join(", ", kv_keys($db))
 
 # ─── commit + reopen for durability proof ────────────────────────────
 kv_commit($db)
-my $db2 = kv_open($path)
+val $db2 = kv_open($path)
 p "reopened from disk, found ", kv_len($db2), " users"
 
 unlink($path)

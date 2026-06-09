@@ -10,14 +10,14 @@ class BSTNode {
             if (defined($self->left)) {
                 $self->left->insert($new_val)
             } else {
-                my $node = BSTNode(val => $new_val)
+                val $node = BSTNode(val => $new_val)
                 $self->left($node)
             }
         } elsif ($new_val > $self->val) {
             if (defined($self->right)) {
                 $self->right->insert($new_val)
             } else {
-                my $node = BSTNode(val => $new_val)
+                val $node = BSTNode(val => $new_val)
                 $self->right($node)
             }
         }
@@ -41,14 +41,14 @@ class BSTNode {
     }
     
     fn in_order() {
-        my @res = ()
+        var @res = ()
         if (defined($self->left)) {
-            my $l_ref = $self->left->in_order()
+            val $l_ref = $self->left->in_order()
             push @res, @$l_ref
         }
         push @res, $self->val
         if (defined($self->right)) {
-            my $r_ref = $self->right->in_order()
+            val $r_ref = $self->right->in_order()
             push @res, @$r_ref
         }
         return [@res]

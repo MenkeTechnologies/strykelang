@@ -2,12 +2,12 @@
 # Rosetta Code: Forward difference
 
 fn Rosetta::ForwardDifference::solve(@arr) {
-    my $len = len(@arr)
+    val $len = len(@arr)
     if ($len < 2) {
         return []
     } else {
-        my @res
-        for my $i (1:$len-1) {
+        var @res
+        for val $i (1:$len-1) {
             push @res, $arr[$i] - $arr[$i-1]
         }
         \@res
@@ -15,18 +15,18 @@ fn Rosetta::ForwardDifference::solve(@arr) {
 }
 
 fn Rosetta::ForwardDifference::nth($n, @arr) {
-    my $res = [@arr]
-    for my $i (1:$n) {
+    var $res = [@arr]
+    for val $i (1:$n) {
         $res = Rosetta::ForwardDifference::solve(@$res)
     }
     $res
 }
 
-my @data = (90, 47, 58, 29, 22, 32, 55, 5, 55, 73)
-my $d1 = Rosetta::ForwardDifference::solve(@data)
+val @data = (90, 47, 58, 29, 22, 32, 55, 5, 55, 73)
+val $d1 = Rosetta::ForwardDifference::solve(@data)
 assert_eq join(",", @$d1), "-43,11,-29,-7,10,23,-50,50,18", "1st forward diff"
 
-my $d2 = Rosetta::ForwardDifference::nth(2, @data)
+val $d2 = Rosetta::ForwardDifference::nth(2, @data)
 assert_eq join(",", @$d2), "54,-40,22,17,13,-73,100,-32", "2nd forward diff"
 
 @data |> Rosetta::ForwardDifference::solve |> map { join(",", @{_}) } |> assert_eq("-43,11,-29,-7,10,23,-50,50,18", "pipe forward diff")

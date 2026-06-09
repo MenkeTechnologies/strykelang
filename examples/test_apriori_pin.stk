@@ -1,35 +1,35 @@
 #!/usr/bin/env stryke
 
 fn Apriori::l1($transactions, $min_support) {
-    my %counts
-    for my $t (@$transactions) {
-        for my $item (@$t) { $counts{$item} = ($counts{$item} // 0) + 1 }
+    var %counts
+    for val $t (@$transactions) {
+        for val $item (@$t) { $counts{$item} = ($counts{$item} // 0) + 1 }
     }
-    my @l1
-    for my $item (keys %counts) {
+    var @l1
+    for val $item (keys %counts) {
         push @l1, [$item] if $counts{$item} >= $min_support
     }
-    my @sorted = ~> @l1 sort { _0->[0] cmp _1->[0] }
+    val @sorted = ~> @l1 sort { _0->[0] cmp _1->[0] }
     \@sorted
 }
 
 fn Apriori::join($lk, $k) {
-    my @candidates
-    my %seen
-    my $n = len @$lk
-    for my $i (0:$n - 1) {
-        for my $j ($i + 1 : $n - 1) {
-            my $s1 = $lk->[$i]
-            my $s2 = $lk->[$j]
-            my $match = 1
-            for my $idx (0 : $k - 3) {
+    var @candidates
+    var %seen
+    val $n = len @$lk
+    for val $i (0:$n - 1) {
+        for val $j ($i + 1 : $n - 1) {
+            val $s1 = $lk->[$i]
+            val $s2 = $lk->[$j]
+            var $match = 1
+            for val $idx (0 : $k - 3) {
                 if ($s1->[$idx] ne $s2->[$idx]) { $match = 0; last }
             }
             next unless $match
-            my @new_set = @$s1
+            var @new_set = @$s1
             push @new_set, $s2->[-1]
-            my @sorted_set = ~> @new_set sort { _0 cmp _1 }
-            my $key = join(",", @sorted_set)
+            val @sorted_set = ~> @new_set sort { _0 cmp _1 }
+            val $key = join(",", @sorted_set)
             if (!$seen{$key}) {
                 $seen{$key} = 1
                 push @candidates, \@sorted_set
@@ -40,14 +40,14 @@ fn Apriori::join($lk, $k) {
 }
 
 fn Apriori::support($candidates, $transactions) {
-    my %support
-    for my $t (@$transactions) {
-        my %in_t
-        for my $item (@$t) { $in_t{$item} = 1 }
-        for my $i (0 : len(@$candidates) - 1) {
-            my $c = $candidates->[$i]
-            my $all = 1
-            for my $item (@$c) {
+    var %support
+    for val $t (@$transactions) {
+        var %in_t
+        for val $item (@$t) { $in_t{$item} = 1 }
+        for val $i (0 : len(@$candidates) - 1) {
+            val $c = $candidates->[$i]
+            var $all = 1
+            for val $item (@$c) {
                 if (!$in_t{$item}) { $all = 0; last }
             }
             $support{$i} = ($support{$i} // 0) + 1 if $all
@@ -57,16 +57,16 @@ fn Apriori::support($candidates, $transactions) {
 }
 
 fn Apriori::solve($transactions, $min_support) {
-    my @result
-    my $lk = Apriori::l1($transactions, $min_support)
+    var @result
+    var $lk = Apriori::l1($transactions, $min_support)
     push @result, $lk
-    my $k = 2
+    var $k = 2
     while (len(@$lk) > 0) {
-        my $candidates = Apriori::join($lk, $k)
-        my $counts = Apriori::support($candidates, $transactions)
-        my @next
-        for my $i (0 : len(@$candidates) - 1) {
-            my $cnt = $counts->{$i} // 0
+        val $candidates = Apriori::join($lk, $k)
+        val $counts = Apriori::support($candidates, $transactions)
+        var @next
+        for val $i (0 : len(@$candidates) - 1) {
+            val $cnt = $counts->{$i} // 0
             push @next, $candidates->[$i] if $cnt >= $min_support
         }
         last if len(@next) == 0
@@ -77,7 +77,7 @@ fn Apriori::solve($transactions, $min_support) {
     \@result
 }
 
-my @transactions = (
+val @transactions = (
     ["apple", "beer", "rice", "chicken"],
     ["apple", "beer", "rice"],
     ["apple", "beer"],
@@ -88,7 +88,7 @@ my @transactions = (
     ["milk", "mango"],
 )
 
-my $res = Apriori::solve(\@transactions, 3)
+val $res = Apriori::solve(\@transactions, 3)
 
 # L1: apple (4), beer (6), rice (4), milk (4) — 4 singletons
 ~> len(@{$res->[0]}) aeq(4, "L1 has 4 frequent items")

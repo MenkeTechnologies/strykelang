@@ -3,7 +3,7 @@
 
 fn Rosetta::Anaprimes::is_prime($n) {
     return 0 if $n < 2
-    my $d = 2
+    var $d = 2
     while ($d * $d <= $n) {
         return 0 if $n % $d == 0
         $d++
@@ -12,16 +12,16 @@ fn Rosetta::Anaprimes::is_prime($n) {
 }
 
 fn Rosetta::Anaprimes::get_perms($s) {
-    my @chars = $s |> chars
+    val @chars = $s |> chars
     if (len(@chars) <= 1) { return ($s) }
     
-    my %perms
-    for my $i (0..len(@chars)-1) {
-        my $c = $chars[$i]
-        my @rest = @chars
+    var %perms
+    for val $i (0..len(@chars)-1) {
+        val $c = $chars[$i]
+        var @rest = @chars
         splice(@rest, $i, 1)
-        my @sub = Rosetta::Anaprimes::get_perms(join("", @rest))
-        for my $p (@sub) {
+        val @sub = Rosetta::Anaprimes::get_perms(join("", @rest))
+        for val $p (@sub) {
             $perms{$c . $p} = 1
         }
     }
@@ -30,9 +30,9 @@ fn Rosetta::Anaprimes::get_perms($s) {
 
 fn Rosetta::Anaprimes::is_anaprime($n) {
     return 0 if !Rosetta::Anaprimes::is_prime($n)
-    my @perms = Rosetta::Anaprimes::get_perms($n . "")
-    for my $p (@perms) {
-        my $val = int($p)
+    val @perms = Rosetta::Anaprimes::get_perms($n . "")
+    for val $p (@perms) {
+        val $val = int($p)
         if ($val != $n && Rosetta::Anaprimes::is_prime($val)) {
             return 1
         }
@@ -40,8 +40,8 @@ fn Rosetta::Anaprimes::is_anaprime($n) {
     0
 }
 
-my @anaprimes
-for my $i (1:100) {
+var @anaprimes
+for val $i (1:100) {
     if (Rosetta::Anaprimes::is_anaprime($i)) {
         push @anaprimes, $i
     }

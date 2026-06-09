@@ -5,43 +5,43 @@
 # Run: stryke --no-interop examples/template_engine.stk
 
 fn Tpl::render($tpl, $ctx) {
-    my $out = ""
-    my $i = 0
-    my $n = len $tpl
+    var $out = ""
+    var $i = 0
+    val $n = len $tpl
     while ($i < $n) {
-        my $c1 = substr($tpl, $i, 2)
+        val $c1 = substr($tpl, $i, 2)
         if ($c1 eq "{{") {
-            my $end = index($tpl, "}}", $i + 2)
+            val $end = index($tpl, "}}", $i + 2)
             if ($end < 0) {
                 $out = $out . substr($tpl, $i, 1)
                 $i = $i + 1
                 next
             }
-            my $tag = substr($tpl, $i + 2, $end - $i - 2)
+            var $tag = substr($tpl, $i + 2, $end - $i - 2)
             $tag =~ s/^\s+//
             $tag =~ s/\s+$//
             if (substr($tag, 0, 5) eq "#each") {
-                my $name = substr($tag, 5)
+                var $name = substr($tag, 5)
                 $name =~ s/^\s+//
-                my $close = "{{/each}}"
-                my $bodyStart = $end + 2
-                my $bodyEnd = index($tpl, $close, $bodyStart)
-                my $body = substr($tpl, $bodyStart, $bodyEnd - $bodyStart)
-                my $items = $ctx->{$name}
+                val $close = "{{/each}}"
+                val $bodyStart = $end + 2
+                val $bodyEnd = index($tpl, $close, $bodyStart)
+                val $body = substr($tpl, $bodyStart, $bodyEnd - $bodyStart)
+                val $items = $ctx->{$name}
                 if (defined $items) {
-                    for my $item (@$items) {
-                        my $sub = +{}
-                        for my $k (keys %$ctx) { $sub->{$k} = $ctx->{$k} }
+                    for val $item (@$items) {
+                        var $sub = +{}
+                        for val $k (keys %$ctx) { $sub->{$k} = $ctx->{$k} }
                         $sub->{"."} = $item
                         if (ref($item) eq "HASH") {
-                            for my $k (keys %$item) { $sub->{$k} = $item->{$k} }
+                            for val $k (keys %$item) { $sub->{$k} = $item->{$k} }
                         }
                         $out = $out . Tpl::render($body, $sub)
                     }
                 }
                 $i = $bodyEnd + len($close)
             } else {
-                my $val = $ctx->{$tag}
+                var $val = $ctx->{$tag}
                 $val = "" unless defined $val
                 $out = $out . $val
                 $i = $end + 2
@@ -55,14 +55,14 @@ fn Tpl::render($tpl, $ctx) {
 }
 
 p "=== Template Engine ==="
-my $t1 = "Hello, {{name}}! You have {{count}} messages."
+val $t1 = "Hello, {{name}}! You have {{count}} messages."
 p Tpl::render($t1, +{ name => "World", count => 5 })
 
-my $t2 = "Fruits: {{#each fruits}}[{{.}}]{{/each}}"
+val $t2 = "Fruits: {{#each fruits}}[{{.}}]{{/each}}"
 p Tpl::render($t2, +{ fruits => ["apple", "banana", "cherry"] })
 
-my $t3 = "Users:\n{{#each users}}- {{name}} ({{age}})\n{{/each}}"
-my @users = (
+val $t3 = "Users:\n{{#each users}}- {{name}} ({{age}})\n{{/each}}"
+val @users = (
     +{ name => "Alice", age => 30 },
     +{ name => "Bob",   age => 25 },
 )

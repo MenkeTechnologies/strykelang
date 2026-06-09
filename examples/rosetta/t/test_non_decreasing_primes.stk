@@ -6,9 +6,9 @@ fn Rosetta::IsPrime::is_prime($n) {
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
+        val $limit = sqrt($n)
+        var $res = 1
+        var $i = 3
         while ($i <= $limit) {
             if ($n % $i == 0) {
                 $res = 0
@@ -21,9 +21,9 @@ fn Rosetta::IsPrime::is_prime($n) {
 }
 
 fn Rosetta::NonDecreasingPrimes::is_non_decreasing_digits($n) {
-    my @digits = ~> "$n" chars map {int}
-    my $valid = 1
-    my $i = 1
+    val @digits = ~> "$n" chars map {int}
+    var $valid = 1
+    var $i = 1
     while ($i < len(@digits)) {
         if ($digits[$i] < $digits[$i-1]) {
             $valid = 0

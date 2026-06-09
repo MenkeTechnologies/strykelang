@@ -112,24 +112,24 @@ fn Project::Numeric::mod_one { 17 % 1 }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::rand_bounded {
-    my $r = rand()
+    val $r = rand()
     $r >= 0 && $r < 1 ? 1 : 0
 }
 
 fn Project::Numeric::rand_multiple_diff {
-    my $r1 = rand()
-    my $r2 = rand()
-    my $r3 = rand()
+    val $r1 = rand()
+    val $r2 = rand()
+    val $r3 = rand()
     ($r1 != $r2 || $r2 != $r3) ? 1 : 0
 }
 
 fn Project::Numeric::rand_with_max {
-    my $r = rand(100)
+    val $r = rand(100)
     $r >= 0 && $r < 100 ? 1 : 0
 }
 
 fn Project::Numeric::rand_int_range {
-    my $r = int(rand(10))
+    val $r = int(rand(10))
     $r >= 0 && $r <= 9 ? 1 : 0
 }
 
@@ -210,38 +210,38 @@ fn Project::Numeric::div_negative { (-10) / 2 }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::inc_post {
-    my $x = 5
-    my $y = $x++
+    var $x = 5
+    var $y = $x++
     $y
 }
 
 fn Project::Numeric::inc_post_after {
-    my $x = 5
+    var $x = 5
     $x++
     $x
 }
 
 fn Project::Numeric::inc_pre {
-    my $x = 5
-    my $y = ++$x
+    var $x = 5
+    val $y = ++$x
     $y
 }
 
 fn Project::Numeric::dec_post {
-    my $x = 5
-    my $y = $x--
+    var $x = 5
+    var $y = $x--
     $y
 }
 
 fn Project::Numeric::dec_post_after {
-    my $x = 5
+    var $x = 5
     $x--
     $x
 }
 
 fn Project::Numeric::dec_pre {
-    my $x = 5
-    my $y = --$x
+    var $x = 5
+    val $y = --$x
     $y
 }
 
@@ -250,37 +250,37 @@ fn Project::Numeric::dec_pre {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::assign_add {
-    my $x = 5
+    var $x = 5
     $x += 3
     $x
 }
 
 fn Project::Numeric::assign_sub {
-    my $x = 10
+    var $x = 10
     $x -= 3
     $x
 }
 
 fn Project::Numeric::assign_mul {
-    my $x = 4
+    var $x = 4
     $x *= 3
     $x
 }
 
 fn Project::Numeric::assign_div {
-    my $x = 12
+    var $x = 12
     $x /= 3
     $x
 }
 
 fn Project::Numeric::assign_mod {
-    my $x = 10
+    var $x = 10
     $x %= 3
     $x
 }
 
 fn Project::Numeric::assign_pow {
-    my $x = 2
+    var $x = 2
     $x **= 3
     $x
 }
@@ -297,13 +297,13 @@ fn Project::Numeric::bit_lshift { 1 << 4 }
 fn Project::Numeric::bit_rshift { 16 >> 2 }
 
 fn Project::Numeric::bit_assign_and {
-    my $x = 12
+    var $x = 12
     $x &= 10
     $x
 }
 
 fn Project::Numeric::bit_assign_or {
-    my $x = 12
+    var $x = 12
     $x |= 3
     $x
 }
@@ -329,7 +329,7 @@ fn Project::Numeric::sprintf_bin { sprintf("%b", 10) }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::zero_div_protected {
-    my $result = eval { 1 / 0 }
+    val $result = eval { 1 / 0 }
     $@ ? 1 : 0
 }
 
@@ -337,14 +337,14 @@ fn Project::Numeric::large_number { 1000000 * 1000000 > 0 ? 1 : 0 }
 fn Project::Numeric::small_fraction { 0.0001 > 0 ? 1 : 0 }
 
 fn Project::Numeric::infinity_check {
-    my $big = 1e308 * 10
+    val $big = 1e308 * 10
     $big > 1e308 ? 1 : 0
 }
 
 fn Project::Numeric::negative_zero { -0 == 0 ? 1 : 0 }
 
 fn Project::Numeric::precision_test {
-    my $a = 0.1 + 0.2
+    val $a = 0.1 + 0.2
     $a > 0.29 && $a < 0.31 ? 1 : 0
 }
 
@@ -353,22 +353,22 @@ fn Project::Numeric::precision_test {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::sum_array {
-    my @a = (1, 2, 3, 4, 5)
-    my $sum = 0
+    val @a = (1, 2, 3, 4, 5)
+    var $sum = 0
     $sum += _ for @a
     $sum
 }
 
 fn Project::Numeric::product_array {
-    my @a = (1, 2, 3, 4, 5)
-    my $prod = 1
+    val @a = (1, 2, 3, 4, 5)
+    var $prod = 1
     $prod *= _ for @a
     $prod
 }
 
 fn Project::Numeric::average_array {
-    my @a = (2, 4, 6, 8, 10)
-    my $sum = 0
+    val @a = (2, 4, 6, 8, 10)
+    var $sum = 0
     $sum += _ for @a
     $sum / len(@a)
 }

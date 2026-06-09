@@ -10,7 +10,7 @@
 
 # ── corpus ───────────────────────────────────────────────────────────
 
-my $text = q{
+val $text = q{
 The quick brown fox jumps over the lazy dog. This is a short paragraph
 demonstrating simple text-statistics computation.
 
@@ -23,19 +23,19 @@ Finally, the third paragraph is short. Very short!
 
 # ── tokenize ────────────────────────────────────────────────────────
 
-my @paragraphs = split /\n\n+/, $text
+var @paragraphs = split /\n\n+/, $text
 @paragraphs = grep { len(_) > 0 } @paragraphs
 
-my @sentences
-for my $para (@paragraphs) {
-    my @s = split /[.!?]+/, $para
+var @sentences
+for val $para (@paragraphs) {
+    var @s = split /[.!?]+/, $para
     @s = grep { len(_) > 0 && _ =~ /\w/ } @s
     push @sentences, @s
 }
 
-my @words
-for my $sent (@sentences) {
-    my @w = split /\W+/, lc $sent
+var @words
+for val $sent (@sentences) {
+    var @w = split /\W+/, lc $sent
     @w = grep { len(_) > 0 } @w
     push @words, @w
 }
@@ -49,9 +49,9 @@ printf "  chars      : %d (codepoints)\n", len $text
 
 # ── per-sentence stats ─────────────────────────────────────────────
 
-my $td_words_per_sent = t_digest(100)
-for my $sent (@sentences) {
-    my @w = split /\W+/, lc $sent
+val $td_words_per_sent = t_digest(100)
+for val $sent (@sentences) {
+    var @w = split /\W+/, lc $sent
     @w = grep { len(_) > 0 } @w
     td_add($td_words_per_sent, len(@w))
 }
@@ -64,26 +64,26 @@ printf "  p90  : %d\n", ~> td_quantile($td_words_per_sent, 0.90) int
 
 # ── word-length distribution ───────────────────────────────────────
 
-my %by_len
-for my $w (@words) {
+var %by_len
+for val $w (@words) {
     $by_len{len($w)} = ($by_len{len($w)} // 0) + 1
 }
 
 p ""
 p "── word-length distribution ─────────────────────────"
-for my $l (sort { _ <=> _1 } keys %by_len) {
-    my $bar = "#" x $by_len{$l}
+for val $l (sort { _ <=> _1 } keys %by_len) {
+    val $bar = "#" x $by_len{$l}
     printf "  %2d-char (%2d): %s\n", $l, $by_len{$l}, $bar
 }
 
 # ── vowel/consonant ratio ──────────────────────────────────────────
 
-my %is_vowel = (a => 1, e => 1, i => 1, o => 1, u => 1)
-my $vowels = 0
-my $consonants = 0
-for my $w (@words) {
-    for my $i (0:len($w) - 1) {
-        my $ch = substr($w, $i, 1)
+val %is_vowel = (a => 1, e => 1, i => 1, o => 1, u => 1)
+var $vowels = 0
+var $consonants = 0
+for val $w (@words) {
+    for val $i (0:len($w) - 1) {
+        val $ch = substr($w, $i, 1)
         if (exists $is_vowel{$ch}) {
             $vowels = $vowels + 1
         } else {
@@ -99,9 +99,9 @@ printf "  consonants : %d (%.1f%%)\n", $consonants, 100.0 * $consonants / ($vowe
 
 # ── readability score (Flesch-Kincaid Grade Level approximation) ──
 
-my $words_per_sent  = len(@words) / len @sentences
-my $syllables_per_word = ($vowels + $consonants) / len(@words) / 3.0   # crude
-my $fkgl = 0.39 * $words_per_sent + 11.8 * $syllables_per_word - 15.59
+var $words_per_sent  = len(@words) / len @sentences
+val $syllables_per_word = ($vowels + $consonants) / len(@words) / 3.0   # crude
+val $fkgl = 0.39 * $words_per_sent + 11.8 * $syllables_per_word - 15.59
 
 p ""
 p "── readability score (Flesch-Kincaid approx) ────────"
@@ -113,10 +113,10 @@ printf "  FK grade level    : %.2f\n", $fkgl
 
 p ""
 p "── most-common words (TopK) ─────────────────────────"
-my $tk = topk(8)
+val $tk = topk(8)
 topk_add($tk, _) for @words
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-12s : %d\n", $h->[0], $h->[1]
 }
 
@@ -124,9 +124,9 @@ for my $h (@hits) {
 
 p ""
 p "── distinct-word cardinality (HLL) ──────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _) for @words
-my %distinct
+var %distinct
 $distinct{_} = 1 for @words
 printf "  HLL distinct : %d\n", hll_count($hll)
 printf "  exact        : %d\n", len(keys %distinct)
@@ -137,10 +137,10 @@ printf "  type-token ratio (vocab diversity) : %.2f\n",
 
 p ""
 p "── longest words (top 5) ────────────────────────────"
-my @uniq_words = keys %distinct
-my @longest = sort { len(_1) <=> len(_) } @uniq_words
-for my $i (0:4) {
+val @uniq_words = keys %distinct
+val @longest = sort { len(_1) <=> len(_) } @uniq_words
+for val $i (0:4) {
     last if $i >= len @longest
-    my $w = $longest[$i]
+    val $w = $longest[$i]
     printf "  %-20s (%d chars)\n", $w, len $w
 }

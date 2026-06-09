@@ -2,10 +2,10 @@
 # Rosetta Code: Unique elements
 
 fn Rosetta::UniqueElements::get($arr_ref) {
-    my @arr = @$arr_ref
-    my %seen
-    my @unique = ()
-    for my $x (@arr) {
+    val @arr = @$arr_ref
+    var %seen
+    var @unique = ()
+    for val $x (@arr) {
         if (!exists $seen{$x}) {
             push @unique, $x
             $seen{$x} = 1
@@ -14,12 +14,12 @@ fn Rosetta::UniqueElements::get($arr_ref) {
     \@unique
 }
 
-my $data = [1, 2, 3, 2, 1, 4, 5, 4]
-my $res = Rosetta::UniqueElements::get($data)
+val $data = [1, 2, 3, 2, 1, 4, 5, 4]
+val $res = Rosetta::UniqueElements::get($data)
 assert_eq join(",", @$res), "1,2,3,4,5", "unique elements"
 
-my $data2 = ["a", "b", "a", "c"]
-my $res2 = Rosetta::UniqueElements::get($data2)
+val $data2 = ["a", "b", "a", "c"]
+val $res2 = Rosetta::UniqueElements::get($data2)
 assert_eq join(",", @$res2), "a,b,c", "unique strings"
 
 test_run

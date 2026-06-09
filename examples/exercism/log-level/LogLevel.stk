@@ -10,7 +10,7 @@ fn Exercism::LogLevel::to_label($level, $legacy) =
                               "unknown"
 
 fn Exercism::LogLevel::alert_recipient($level, $legacy) {
-    my $lbl = Exercism::LogLevel::to_label($level, $legacy)
+    val $lbl = Exercism::LogLevel::to_label($level, $legacy)
     $lbl eq "error" || $lbl eq "fatal" ? "ops" :
     $lbl eq "unknown" && $legacy       ? "dev1" :
     $lbl eq "unknown"                  ? "dev2" :

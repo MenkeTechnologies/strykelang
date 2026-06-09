@@ -4,8 +4,8 @@
 # Known: 30, 858, 1722, 66198, ...
 
 fn Rosetta::Giuga::primes_of($n) {
-    my @ps
-    my $p = 2
+    var @ps
+    var $p = 2
     while ($p * $p <= $n) {
         if ($n % $p == 0) {
             push @ps, $p
@@ -19,15 +19,15 @@ fn Rosetta::Giuga::primes_of($n) {
 
 fn Rosetta::Giuga::is_giuga($n) {
     return 0 if $n < 4
-    my $primes = Rosetta::Giuga::primes_of($n)
+    val $primes = Rosetta::Giuga::primes_of($n)
     return 0 if len(@$primes) < 2
     # Composite check: at least 2 distinct primes OR repeated prime power
     # For Giuga we also need n squarefree (no repeated prime factor).
-    my $prod = 1
+    var $prod = 1
     ~> @$primes ep { $prod *= _ }
     return 0 if $prod != $n
-    for my $p (@$primes) {
-        my $q = int($n / $p) - 1
+    for val $p (@$primes) {
+        val $q = int($n / $p) - 1
         return 0 if $q % $p != 0
     }
     1
@@ -46,12 +46,12 @@ assert_ok !Rosetta::Giuga::is_giuga(60), "60 not Giuga"
 assert_ok !Rosetta::Giuga::is_giuga(100), "100 not Giuga"
 
 # All squares are NOT Giuga (not squarefree)
-for my $n (4, 9, 25, 49, 121) {
+for val $n (4, 9, 25, 49, 121) {
     assert_ok !Rosetta::Giuga::is_giuga($n), "$n^2 not Giuga"
 }
 
 # 30 = 2 * 3 * 5, all distinct primes; check the divisibility property
-my $primes_30 = Rosetta::Giuga::primes_of(30)
+val $primes_30 = Rosetta::Giuga::primes_of(30)
 assert_eq join(",", @$primes_30), "2,3,5", "primes(30) = 2,3,5"
 
 # 30/2 - 1 = 14, divisible by 2
@@ -62,8 +62,8 @@ assert_ok((30 / 3 - 1) % 3 == 0, "(30/3-1) % 3 == 0")
 assert_ok((30 / 5 - 1) % 5 == 0, "(30/5-1) % 5 == 0")
 
 # Search up to 900: should find 30 and 858
-my @found
-for my $i (4:900) {
+var @found
+for val $i (4:900) {
     push @found, $i if Rosetta::Giuga::is_giuga($i)
 }
 assert_eq join(",", @found), "30,858", "Giuga numbers up to 900"

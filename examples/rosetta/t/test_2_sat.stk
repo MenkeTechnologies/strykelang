@@ -9,27 +9,27 @@
 # Encoded as node 2*(x-1) for x and 2*(x-1)+1 for ¬x.
 
 fn Rosetta::TwoSat::lit_node($lit) {
-    my $v = $lit < 0 ? -$lit : $lit
-    my $base = 2 * ($v - 1)
+    val $v = $lit < 0 ? -$lit : $lit
+    val $base = 2 * ($v - 1)
     $lit > 0 ? $base : $base + 1
 }
 
 fn Rosetta::TwoSat::neg($node) { $node ^ 1 }
 
 fn Rosetta::TwoSat::build_graph($n_vars, $clauses) {
-    my $n = 2 * $n_vars
-    my @adj
-    my @rev
-    for my $i (~> 1:$n) {
+    val $n = 2 * $n_vars
+    var @adj
+    var @rev
+    for var $i (~> 1:$n) {
         push @adj, []
         push @rev, []
     }
-    for my $c (@$clauses) {
-        my ($a, $b) = @$c
-        my $na = Rosetta::TwoSat::lit_node($a)
-        my $nb = Rosetta::TwoSat::lit_node($b)
-        my $not_a = Rosetta::TwoSat::neg($na)
-        my $not_b = Rosetta::TwoSat::neg($nb)
+    for val $c (@$clauses) {
+        var ($a, $b) = @$c
+        val $na = Rosetta::TwoSat::lit_node($a)
+        val $nb = Rosetta::TwoSat::lit_node($b)
+        val $not_a = Rosetta::TwoSat::neg($na)
+        val $not_b = Rosetta::TwoSat::neg($nb)
         # ¬a → b and ¬b → a
         push @{$adj[$not_a]}, $nb
         push @{$rev[$nb]}, $not_a
@@ -40,15 +40,15 @@ fn Rosetta::TwoSat::build_graph($n_vars, $clauses) {
 }
 
 fn Rosetta::TwoSat::dfs1($adj, $u, $visited, $order) {
-    my @stack = ([$u, 0])
+    var @stack = ([$u, 0])
     while (len(@stack) > 0) {
-        my $top = $stack[-1]
-        my ($v, $idx) = @$top
+        val $top = $stack[-1]
+        val ($v, $idx) = @$top
         if (!$visited->[$v]) { $visited->[$v] = 1 }
-        my $children = $adj->[$v]
+        val $children = $adj->[$v]
         if ($idx < len(@$children)) {
             $top->[1]++
-            my $w = $children->[$idx]
+            val $w = $children->[$idx]
             push @stack, [$w, 0] if !$visited->[$w]
         } else {
             push @$order, $v
@@ -58,28 +58,28 @@ fn Rosetta::TwoSat::dfs1($adj, $u, $visited, $order) {
 }
 
 fn Rosetta::TwoSat::dfs2($rev, $u, $comp, $cid) {
-    my @stack = ($u)
+    var @stack = ($u)
     while (len(@stack) > 0) {
-        my $v = pop @stack
+        val $v = pop @stack
         next if defined $comp->[$v]
         $comp->[$v] = $cid
-        for my $w (@{$rev->[$v]}) {
+        for val $w (@{$rev->[$v]}) {
             push @stack, $w if !defined $comp->[$w]
         }
     }
 }
 
 fn Rosetta::TwoSat::scc($g) {
-    my $n = $g->{n}
-    my @visited = ~> 1:$n |> map { 0 }
-    my @order
-    for my $u (~> 0:$n - 1) {
+    val $n = $g->{n}
+    val @visited = ~> 1:$n |> map { 0 }
+    val @order
+    for val $u (~> 0:$n - 1) {
         Rosetta::TwoSat::dfs1($g->{adj}, $u, \@visited, \@order) if !$visited[$u]
     }
-    my @comp = ~> 1:$n |> map { undef }
-    my $cid = 0
-    for (my $i = $n - 1; $i >= 0; $i--) {
-        my $u = $order[$i]
+    val @comp = ~> 1:$n |> map { undef }
+    var $cid = 0
+    for (var $i = $n - 1; $i >= 0; $i--) {
+        val $u = $order[$i]
         if (!defined $comp[$u]) {
             Rosetta::TwoSat::dfs2($g->{rev}, $u, \@comp, $cid)
             $cid++
@@ -89,12 +89,12 @@ fn Rosetta::TwoSat::scc($g) {
 }
 
 fn Rosetta::TwoSat::solve($n_vars, $clauses) {
-    my $g = Rosetta::TwoSat::build_graph($n_vars, $clauses)
-    my $comp = Rosetta::TwoSat::scc($g)
-    my @assign
-    for my $v (~> 1:$n_vars) {
-        my $pos = 2 * ($v - 1)
-        my $neg = $pos + 1
+    val $g = Rosetta::TwoSat::build_graph($n_vars, $clauses)
+    val $comp = Rosetta::TwoSat::scc($g)
+    var @assign
+    for val $v (~> 1:$n_vars) {
+        val $pos = 2 * ($v - 1)
+        val $neg = $pos + 1
         return undef if $comp->[$pos] == $comp->[$neg]
         # Variable is true iff its positive node has a later (higher
         # number) component in the reverse topological order.
@@ -104,40 +104,40 @@ fn Rosetta::TwoSat::solve($n_vars, $clauses) {
 }
 
 fn Rosetta::TwoSat::satisfies($assignment, $clauses) {
-    for my $c (@$clauses) {
-        my ($a, $b) = @$c
-        my $va = $a > 0 ? $assignment->[$a - 1] : !$assignment->[-$a - 1]
-        my $vb = $b > 0 ? $assignment->[$b - 1] : !$assignment->[-$b - 1]
+    for val $c (@$clauses) {
+        val ($a, $b) = @$c
+        val $va = $a > 0 ? $assignment->[$a - 1] : !$assignment->[-$a - 1]
+        val $vb = $b > 0 ? $assignment->[$b - 1] : !$assignment->[-$b - 1]
         return 0 if !$va && !$vb
     }
     1
 }
 
 # Satisfiable: (x1 ∨ x2) ∧ (¬x1 ∨ x2)
-my $cl1 = [[1, 2], [-1, 2]]
-my $r1 = Rosetta::TwoSat::solve(2, $cl1)
+val $cl1 = [[1, 2], [-1, 2]]
+val $r1 = Rosetta::TwoSat::solve(2, $cl1)
 assert_ok defined $r1, "satisfiable case yields assignment"
 assert_eq Rosetta::TwoSat::satisfies($r1, $cl1), 1, "x1∨x2 ∧ ¬x1∨x2 satisfied"
 
 # Unsatisfiable: (x1 ∨ x1) ∧ (¬x1 ∨ ¬x1) — forces x1 ∧ ¬x1
-my $cl2 = [[1, 1], [-1, -1]]
-my $r2 = Rosetta::TwoSat::solve(1, $cl2)
+val $cl2 = [[1, 1], [-1, -1]]
+val $r2 = Rosetta::TwoSat::solve(1, $cl2)
 assert_ok !defined $r2, "x ∧ ¬x is unsatisfiable"
 
 # Larger satisfiable case
-my $cl3 = [[1, 2], [-1, 3], [2, -3], [-2, 3], [3, 1]]
-my $r3 = Rosetta::TwoSat::solve(3, $cl3)
+val $cl3 = [[1, 2], [-1, 3], [2, -3], [-2, 3], [3, 1]]
+val $r3 = Rosetta::TwoSat::solve(3, $cl3)
 assert_ok defined $r3, "5-clause/3-var case satisfiable"
 assert_eq Rosetta::TwoSat::satisfies($r3, $cl3), 1, "5-clause assignment satisfies all"
 
 # Forced assignment: (x1 ∨ x1) forces x1=true
-my $cl4 = [[1, 1]]
-my $r4 = Rosetta::TwoSat::solve(1, $cl4)
+val $cl4 = [[1, 1]]
+val $r4 = Rosetta::TwoSat::solve(1, $cl4)
 assert_eq $r4->[0], 1, "forced x1 = true"
 
 # Equivalence chain: x1↔x2↔x3 all true via implications
-my $cl5 = [[1, 1], [-1, 2], [-2, 3]]
-my $r5 = Rosetta::TwoSat::solve(3, $cl5)
+val $cl5 = [[1, 1], [-1, 2], [-2, 3]]
+val $r5 = Rosetta::TwoSat::solve(3, $cl5)
 assert_eq $r5->[0], 1, "chain x1 = true"
 assert_eq $r5->[1], 1, "chain x2 = true"
 assert_eq $r5->[2], 1, "chain x3 = true"

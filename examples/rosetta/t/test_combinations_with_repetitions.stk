@@ -6,7 +6,7 @@ fn Rosetta::CombinationsWithRep::backtrack($n, $k, $start, $curr_ref, $res_ref) 
         push @$res_ref, [@$curr_ref]
         return
     }
-    for my $i ($start:$n-1) {
+    for val $i ($start:$n-1) {
         push @$curr_ref, $i
         Rosetta::CombinationsWithRep::backtrack($n, $k, $i, $curr_ref, $res_ref)
         pop @$curr_ref
@@ -14,13 +14,13 @@ fn Rosetta::CombinationsWithRep::backtrack($n, $k, $start, $curr_ref, $res_ref) 
 }
 
 fn Rosetta::CombinationsWithRep::generate($n, $k) {
-    my $res = []
+    val $res = []
     Rosetta::CombinationsWithRep::backtrack($n, $k, 0, [], $res)
     $res
 }
 
 # 3 items, choose 2 with rep: 00, 01, 02, 11, 12, 22 (6 total)
-my $c = Rosetta::CombinationsWithRep::generate(3, 2)
+val $c = Rosetta::CombinationsWithRep::generate(3, 2)
 assert_eq len(@$c), 6, "3 choose 2 with rep is 6"
 
 test_run

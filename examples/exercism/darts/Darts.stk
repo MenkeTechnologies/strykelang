@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
 fn Exercism::Darts::score_dart {
-    my $d = sqrt(_ * _ + _1 * _1)
+    val $d = sqrt(_ * _ + _1 * _1)
     $d > 10 ? 0 : $d > 5 ? 1 : $d > 1 ? 5 : 10
 }

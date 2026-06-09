@@ -17,8 +17,8 @@
 
 # Count symbol frequencies in a string.
 fn Huff::freq($s) {
-    my %f
-    for my $i (0:len($s) - 1) {
+    var %f
+    for val $i (0:len($s) - 1) {
         $f{$s[$i]}++
     }
     \%f
@@ -28,8 +28,8 @@ fn Huff::freq($s) {
 # leaf:     +{ sym => "a", freq => 5 }
 # internal: +{ freq => 12, left => <node>, right => <node> }
 fn Huff::build_tree($freq) {
-    my @nodes
-    for my $sym (sort keys %$freq) {
+    var @nodes
+    for val $sym (sort keys %$freq) {
         push @nodes, +{ sym => $sym, freq => $freq->{$sym} }
     }
     # Edge case: single distinct symbol — wrap in a trivial parent so
@@ -40,8 +40,8 @@ fn Huff::build_tree($freq) {
     while (len(@nodes) > 1) {
         # Pull two lowest-freq nodes. Linear scan is fine for demo size.
         @nodes = sort { _->{freq} <=> _1->{freq} } @nodes
-        my $l = shift @nodes
-        my $r = shift @nodes
+        val $l = shift @nodes
+        val $r = shift @nodes
         push @nodes, +{ freq => $l->{freq} + $r->{freq}, left => $l, right => $r }
     }
     $nodes[0]
@@ -49,7 +49,7 @@ fn Huff::build_tree($freq) {
 
 # Walk the tree to build sym → code-string table.
 fn Huff::build_codes($root) {
-    my %codes
+    var %codes
     Huff::walk($root, "", \%codes)
     \%codes
 }
@@ -67,8 +67,8 @@ fn Huff::walk($node, $prefix, $codes) {
 
 # Encode: concat per-symbol codes.
 fn Huff::encode($s, $codes) {
-    my $out = ""
-    for my $i (0:len($s) - 1) {
+    var $out = ""
+    for val $i (0:len($s) - 1) {
         $out .= $codes->{$s[$i]}
     }
     $out
@@ -76,10 +76,10 @@ fn Huff::encode($s, $codes) {
 
 # Decode: walk the tree bit-by-bit, emit symbol on each leaf hit.
 fn Huff::decode($bits, $root) {
-    my $out = ""
-    my $node = $root
-    for my $i (0:len($bits) - 1) {
-        my $bit = $bits[$i]
+    var $out = ""
+    var $node = $root
+    for val $i (0:len($bits) - 1) {
+        val $bit = $bits[$i]
         $node = $bit eq "0" ? $node->{left} : $node->{right}
         if (exists $node->{sym}) {
             $out .= $node->{sym}
@@ -91,7 +91,7 @@ fn Huff::decode($bits, $root) {
 
 p "── Huffman coding demo ──"
 
-my @messages = (
+val @messages = (
     "aaaabbc",
     "abcdef",
     "hello world",
@@ -101,21 +101,21 @@ my @messages = (
     "The quick brown fox jumps over the lazy dog.",
 )
 
-for my $msg (@messages) {
-    my $f     = Huff::freq($msg)
-    my $tree  = Huff::build_tree($f)
-    my $codes = Huff::build_codes($tree)
-    my $enc   = Huff::encode($msg, $codes)
-    my $dec   = Huff::decode($enc, $tree)
+for val $msg (@messages) {
+    val $f     = Huff::freq($msg)
+    val $tree  = Huff::build_tree($f)
+    val $codes = Huff::build_codes($tree)
+    val $enc   = Huff::encode($msg, $codes)
+    val $dec   = Huff::decode($enc, $tree)
     die "round-trip failed on '$msg': decoded='$dec'" unless $dec eq $msg
 
     # Prefix-free invariant: no code is a prefix of another.
-    my @code_list = values %$codes
-    for my $i (0:len(@code_list) - 1) {
-        for my $j (0:len(@code_list) - 1) {
+    val @code_list = values %$codes
+    for val $i (0:len(@code_list) - 1) {
+        for val $j (0:len(@code_list) - 1) {
             next if $i == $j
-            my $ca = $code_list[$i]
-            my $cb = $code_list[$j]
+            val $ca = $code_list[$i]
+            val $cb = $code_list[$j]
             die "prefix collision: $ca is a prefix of $cb" if len($ca) < len($cb) && $cb[0:len($ca) - 1] eq $ca
         }
     }
@@ -124,21 +124,21 @@ p "  #{len @messages} messages round-trip + prefix-free invariant  OK"
 
 # Compression ratio sanity: a heavily-repetitive string should compress
 # better than a uniform string of the same length.
-my $skewed = "a" x 90 . "b" x 8 . "c" x 2
-my $f_skew = Huff::freq($skewed)
-my $t_skew = Huff::build_tree($f_skew)
-my $c_skew = Huff::build_codes($t_skew)
-my $enc_skew = Huff::encode($skewed, $c_skew)
-my $bits_per_char = len($enc_skew) / len($skewed)
+val $skewed = "a" x 90 . "b" x 8 . "c" x 2
+val $f_skew = Huff::freq($skewed)
+val $t_skew = Huff::build_tree($f_skew)
+val $c_skew = Huff::build_codes($t_skew)
+val $enc_skew = Huff::encode($skewed, $c_skew)
+val $bits_per_char = len($enc_skew) / len($skewed)
 die "skewed string should compress below 8 bits/char" unless $bits_per_char < 2
 p "  skewed 90/8/2 → #{int($bits_per_char * 100) / 100} bits/char (well below 8)  OK"
 
 # Build code for a single symbol — Huff::walk's special case.
-my $f_one = Huff::freq("aaaa")
-my $t_one = Huff::build_tree($f_one)
-my $c_one = Huff::build_codes($t_one)
+val $f_one = Huff::freq("aaaa")
+val $t_one = Huff::build_tree($f_one)
+val $c_one = Huff::build_codes($t_one)
 die "single-symbol code length"  unless len(keys %$c_one) == 1
-my $a_code = $c_one->{a}
+val $a_code = $c_one->{a}
 die "single-symbol must have non-empty code" unless len($a_code) > 0
 die "round-trip on single-symbol fails" unless Huff::decode(Huff::encode("aaaa", $c_one), $t_one) eq "aaaa"
 

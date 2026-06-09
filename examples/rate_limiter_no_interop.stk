@@ -25,9 +25,9 @@ fn Rate::new = +{
 
 # Refill based on elapsed time since last_t, clamped to capacity.
 fn Rate::refill($bk, $now) {
-    my $elapsed = $now - $bk->{last_t}
+    val $elapsed = $now - $bk->{last_t}
     return if $elapsed <= 0
-    my $add = $elapsed * $bk->{refill_rate}
+    val $add = $elapsed * $bk->{refill_rate}
     $bk->{tokens} = $bk->{tokens} + $add > $bk->{capacity}
                  ? $bk->{capacity}
                  : $bk->{tokens} + $add
@@ -57,12 +57,12 @@ fn Rate::take_n($bk, $n, $now) {
 p "── Token-bucket rate limiter demo ──"
 
 # Bucket of capacity 5, refill 1 token/second. Start at t=0.
-my $bk = Rate::new(5, 1)
+val $bk = Rate::new(5, 1)
 
 # Burst of 5 at t=0: all allowed.
-my $allowed = 0
+var $allowed = 0
 for (1:5) {
-    my $r = Rate::take($bk, 0)
+    val $r = Rate::take($bk, 0)
     $allowed += $r
 }
 die "burst of 5 should fit (capacity = 5)" unless $allowed == 5
@@ -80,16 +80,16 @@ Rate::refill($bk, 11)
 die "after 10s, bucket should be full"    unless $bk->{tokens} == 5
 
 # Burst-after-wait should fit 5 again.
-my $burst_after = 0
+var $burst_after = 0
 for (1:5) {
-    my $r = Rate::take($bk, 11)
+    val $r = Rate::take($bk, 11)
     $burst_after += $r
 }
 die "burst-after-wait should fit 5" unless $burst_after == 5
 p "  10s wait re-fills to cap (no overflow); 5-burst allowed again  OK"
 
 # Bulk take: take_n. Reset bucket, ask for 3 → ok, then 3 → denied.
-my $b2 = Rate::new(5, 1)
+val $b2 = Rate::new(5, 1)
 die "bulk take(3) at t=0 should succeed" unless Rate::take_n($b2, 3, 0)
 die "bulk take(3) right after should fail (only 2 left)" if Rate::take_n($b2, 3, 0)
 die "bulk take(2) right after should succeed" unless Rate::take_n($b2, 2, 0)
@@ -97,10 +97,10 @@ p "  bulk take_n: atomic all-or-nothing semantics  OK"
 
 # Steady-state: 1 req/sec for 20 seconds at exactly the refill rate.
 # All should succeed because we never out-pace the bucket.
-my $b3 = Rate::new(5, 1)
-my $passes = 0
-for my $t (0:19) {
-    my $r = Rate::take($b3, $t)
+val $b3 = Rate::new(5, 1)
+var $passes = 0
+for val $t (0:19) {
+    val $r = Rate::take($b3, $t)
     $passes += $r
 }
 die "steady-state 20 requests at refill rate" unless $passes == 20
@@ -108,12 +108,12 @@ p "  steady state at refill rate: 20/20 allowed  OK"
 
 # Overage: 2 req/sec for 20 seconds. Only capacity + 20 * refill_rate = 5 + 20 = 25
 # tokens worth of requests can succeed. With 40 attempts, ~25 pass.
-my $b4 = Rate::new(5, 1)
-my $passes4 = 0
-my $tries4 = 40
-for my $i (0:$tries4 - 1) {
-    my $t = $i * 0.5    # 2 req/sec
-    my $r = Rate::take($b4, $t)
+val $b4 = Rate::new(5, 1)
+var $passes4 = 0
+val $tries4 = 40
+for val $i (0:$tries4 - 1) {
+    val $t = $i * 0.5    # 2 req/sec
+    val $r = Rate::take($b4, $t)
     $passes4 += $r
 }
 # Allow ±1 for rounding.

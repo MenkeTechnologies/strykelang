@@ -7,16 +7,16 @@ fn Exercism::ComplexNumbers::add($z, $w)     = [$z->[0] + $w->[0], $z->[1] + $w-
 fn Exercism::ComplexNumbers::sub($z, $w)     = [$z->[0] - $w->[0], $z->[1] - $w->[1]]
 
 fn Exercism::ComplexNumbers::mul($z, $w) {
-    my ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    var ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
     [$ar * $br - $ai * $bi, $ai * $br + $ar * $bi]
 }
 
 fn Exercism::ComplexNumbers::div($z, $w) {
-    my ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
-    my $denom = $br * $br + $bi * $bi
+    val ($ar, $ai, $br, $bi) = ($z->[0], $z->[1], $w->[0], $w->[1])
+    val $denom = $br * $br + $bi * $bi
     [($ar * $br + $ai * $bi) / $denom, ($ai * $br - $ar * $bi) / $denom]
 }
 
 fn Exercism::ComplexNumbers::abs($z)         = sqrt($z->[0] ** 2 + $z->[1] ** 2)
 fn Exercism::ComplexNumbers::conjugate($z)   = [$z->[0], -$z->[1]]
-fn Exercism::ComplexNumbers::exp($z)         { my $r = exp($z->[0]); [$r * cos($z->[1]), $r * sin($z->[1])] }
+fn Exercism::ComplexNumbers::exp($z)         { val $r = exp($z->[0]); [$r * cos($z->[1]), $r * sin($z->[1])] }

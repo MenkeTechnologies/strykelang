@@ -17,11 +17,11 @@
 
 # Minimum coins to make exact amount. Returns -1 if impossible.
 fn CC::min_coins($coins, $amount) {
-    my $INF = 1e18
-    my @dp = ($INF) x ($amount + 1)
+    val $INF = 1e18
+    var @dp = ($INF) x ($amount + 1)
     $dp[0] = 0
-    for my $amt (1:$amount) {
-        for my $c (@$coins) {
+    for val $amt (1:$amount) {
+        for val $c (@$coins) {
             next if $c > $amt
             $dp[$amt] = $dp[$amt - $c] + 1 if $dp[$amt - $c] + 1 < $dp[$amt]
         }
@@ -33,10 +33,10 @@ fn CC::min_coins($coins, $amount) {
 # (so {1,2,1} == {2,1,1} == {1,1,2}). Coins-outer loop is the trick:
 # fixing coin-order eliminates duplicate orderings.
 fn CC::count_ways($coins, $amount) {
-    my @dp = (0) x ($amount + 1)
+    var @dp = (0) x ($amount + 1)
     $dp[0] = 1
-    for my $c (@$coins) {
-        for my $amt ($c:$amount) {
+    for val $c (@$coins) {
+        for val $amt ($c:$amount) {
             $dp[$amt] += $dp[$amt - $c]
         }
     }
@@ -46,7 +46,7 @@ fn CC::count_ways($coins, $amount) {
 p "── Coin change demo ──"
 
 # Test grid — (coins, amount, min_coins, count_ways).
-my @cases = (
+val @cases = (
     +{ coins => [1, 2, 5],     amount => 11, min =>  3, ways =>  11 },  # 5+5+1
     +{ coins => [1, 2, 5],     amount =>  0, min =>  0, ways =>   1 },  # empty = 1 way
     +{ coins => [2],           amount =>  3, min => -1, ways =>   0 },  # impossible
@@ -58,11 +58,11 @@ my @cases = (
     +{ coins => [2, 5, 3, 6],  amount => 10, min =>  2, ways =>   5 },
 )
 
-my $fail = 0
-for my $c (@cases) {
-    my $min  = CC::min_coins($c->{coins}, $c->{amount})
-    my $ways = CC::count_ways($c->{coins}, $c->{amount})
-    my $ok   = $min == $c->{min} && $ways == $c->{ways}
+var $fail = 0
+for val $c (@cases) {
+    val $min  = CC::min_coins($c->{coins}, $c->{amount})
+    val $ways = CC::count_ways($c->{coins}, $c->{amount})
+    val $ok   = $min == $c->{min} && $ways == $c->{ways}
     $fail++ unless $ok
     p "  coins=[@{$c->{coins}}] amount=#{$c->{amount}}  min=#{$min} ways=#{$ways}  expect min=#{$c->{min}} ways=#{$c->{ways}}  #{$ok ? \"\" : \"FAIL\"}"
 }
@@ -73,16 +73,16 @@ die "$fail / #{len @cases} coin-change cases failed" if $fail > 0
 #   * count_ways(0) = 1
 #   * min_coins == -1 IFF amount is unreachable from coin set
 #     (cross-checked with brute-force on small inputs)
-for my $c (@cases) {
+for val $c (@cases) {
     die "min(0) != 0"   unless CC::min_coins($c->{coins}, 0) == 0
     die "ways(0) != 1"  unless CC::count_ways($c->{coins}, 0) == 1
 }
 
 # Stress: US-coin set, all amounts 0:99. min_coins should be reachable
 # for every amount (gcd of {1,5,10,25} = 1, so any non-negative int OK).
-my @us = (1, 5, 10, 25)
-for my $amount (0:99) {
-    my $m = CC::min_coins(\@us, $amount)
+val @us = (1, 5, 10, 25)
+for val $amount (0:99) {
+    val $m = CC::min_coins(\@us, $amount)
     die "US coins should reach amount $amount" if $m < 0
     die "min_coins $m for amount $amount sanity" if $m > $amount  # can't be more than amount worth of 1's
 }

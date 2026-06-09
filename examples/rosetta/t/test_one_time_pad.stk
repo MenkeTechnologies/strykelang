@@ -3,12 +3,12 @@
 
 fn Rosetta::OTP::generate_pad($len) {
     # Parallel map to generate random bytes
-    my @res = ~> 1:$len map { int(rand(256)) }
+    val @res = ~> 1:$len map { int(rand(256)) }
     \@res
 }
 
 fn Rosetta::OTP::encrypt($text, $pad) {
-    my @chars = $text |> chars |> map {ord}
+    val @chars = $text |> chars |> map {ord}
     [~> 0:len(@chars)-1 map { $chars[_] ^ $pad->[_] }]
 }
 
@@ -16,10 +16,10 @@ fn Rosetta::OTP::decrypt($cipher, $pad) {
     0:len(@$cipher)-1 |> map { chr($cipher->[_] ^ $pad->[_]) } |> join("")
 }
 
-my $t = "Rosetta Code"
-my $pad = Rosetta::OTP::generate_pad(len($t))
-my $cipher = Rosetta::OTP::encrypt($t, $pad)
-my $back = Rosetta::OTP::decrypt($cipher, $pad)
+val $t = "Rosetta Code"
+val $pad = Rosetta::OTP::generate_pad(len($t))
+val $cipher = Rosetta::OTP::encrypt($t, $pad)
+val $back = Rosetta::OTP::decrypt($cipher, $pad)
 
 assert_eq $back, $t, "OTP round trip"
 assert_eq len(@$cipher), len($t), "cipher length matches"

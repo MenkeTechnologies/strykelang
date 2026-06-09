@@ -7,9 +7,9 @@ fn Rosetta::SmoothNumbers::check($n, $p) {
     } elsif ($n == 1) {
         1
     } else {
-        my @f = prime_factors($n)
-        my $max_f = 0
-        for my $x (@f) {
+        val @f = prime_factors($n)
+        var $max_f = 0
+        for val $x (@f) {
             $max_f = $x if $x > $max_f
         }
         $max_f <= $p

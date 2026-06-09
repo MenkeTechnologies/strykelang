@@ -3,12 +3,12 @@
 
 fn Rosetta::ImageNoise::generate($width, $height) {
     # Generate a grayscale noise image
-    my @image
-    for (my $y = 0; $y < $height; $y++) {
-        my @row
-        for (my $x = 0; $x < $width; $x++) {
+    var @image
+    for (var $y = 0; $y < $height; $y++) {
+        var @row
+        for (var $x = 0; $x < $width; $x++) {
             # Random value between 0 and 255
-            my $pixel = int(rand(256))
+            val $pixel = int(rand(256))
             push @row, $pixel
         }
         push @image, \@row
@@ -16,17 +16,17 @@ fn Rosetta::ImageNoise::generate($width, $height) {
     \@image
 }
 
-my $width = 10
-my $height = 10
-my $noise = Rosetta::ImageNoise::generate($width, $height)
+val $width = 10
+val $height = 10
+val $noise = Rosetta::ImageNoise::generate($width, $height)
 
 assert_eq len(@$noise), $height, "Image height correct"
 assert_eq len(@{$noise->[0]}), $width, "Image width correct"
 
 # Check if values are within bounds
-my $valid = 1
-for my $row (@$noise) {
-    for my $pixel (@$row) {
+var $valid = 1
+for val $row (@$noise) {
+    for val $pixel (@$row) {
         $valid = 0 if $pixel < 0 || $pixel > 255
     }
 }

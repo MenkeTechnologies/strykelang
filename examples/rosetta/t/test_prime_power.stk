@@ -5,13 +5,13 @@ fn Rosetta::PrimePower::check($n) {
     if ($n < 2) {
         0
     } else {
-        my @f = prime_factors($n)
+        val @f = prime_factors($n)
         if (len(@f) == 0) {
             0
         } else {
-            my $p = $f[0]
-            my $all_same = 1
-            for my $x (@f) {
+            val $p = $f[0]
+            var $all_same = 1
+            for val $x (@f) {
                 if ($x != $p) { $all_same = 0 }
             }
             $all_same

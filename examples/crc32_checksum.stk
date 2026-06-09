@@ -18,10 +18,10 @@
 # ── precomputed table ────────────────────────────────────────────
 
 fn Demo::CRC::build_table() {
-    my @table
-    for my $n (0:255) {
-        my $c = $n
-        for my $k (1:8) {
+    var @table
+    for val $n (0:255) {
+        var $c = $n
+        for val $k (1:8) {
             if ($c & 1) {
                 $c = ($c >> 1) ^ 0xEDB88320
             } else {
@@ -33,14 +33,14 @@ fn Demo::CRC::build_table() {
     \@table
 }
 
-my $TABLE = Demo::CRC::build_table()
+val $TABLE = Demo::CRC::build_table()
 
 # ── CRC-32 calculation for a string ───────────────────────────────
 
 fn Demo::CRC::crc32($s) {
-    my $crc = 0xFFFFFFFF
-    for my $byte (split //, $s) {
-        my $bv = ord $byte
+    var $crc = 0xFFFFFFFF
+    for val $byte (split //, $s) {
+        val $bv = ord $byte
         $crc = ($TABLE->[($crc ^ $bv) & 0xFF]) ^ (($crc >> 8) & 0x00FFFFFF)
     }
     ($crc ^ 0xFFFFFFFF) & 0xFFFFFFFF
@@ -48,13 +48,13 @@ fn Demo::CRC::crc32($s) {
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_thr  = t_digest(200)
-my $tk_thr  = topk(8)
-my $hll_crc = hll(12)
+val $td_thr  = t_digest(200)
+val $tk_thr  = topk(8)
+val $hll_crc = hll(12)
 
 # ── known checksums (per IEEE 802.3 / zlib) ───────────────────────
 
-my @known = (
+val @known = (
     ["",                              0x00000000],
     ["a",                             0xE8B7BE43],
     ["abc",                           0x352441C2],
@@ -66,17 +66,17 @@ my @known = (
 
 p "CRC-32 checksum demo"
 p "─" x 60
-my $passes = 0
-my $fails  = 0
+var $passes = 0
+var $fails  = 0
 
-for my $pair (@known) {
-    my $input = $pair->[0]
-    my $expected = $pair->[1]
-    my $got = Demo::CRC::crc32($input)
-    my $ok = ($got == $expected) ? 1 : 0
+for val $pair (@known) {
+    val $input = $pair->[0]
+    val $expected = $pair->[1]
+    val $got = Demo::CRC::crc32($input)
+    val $ok = ($got == $expected) ? 1 : 0
     if ($ok) { $passes++ } else { $fails++ }
 
-    my $show = len($input) <= 40 ? $input : substr($input, 0, 37) . "..."
+    val $show = len($input) <= 40 ? $input : substr($input, 0, 37) . "..."
     printf("  %-45s expect=%08x got=%08x  %s\n",
            "\"$show\"",
            $expected,
@@ -90,30 +90,30 @@ p "\nknown-value check: $passes pass / $fails fail (of ", len(@known), ")"
 
 # ── round-trip & length distribution ──────────────────────────────
 
-my @workload
-my @lengths = (10, 50, 100, 500, 1000, 5000, 10000)
-for my $L (@lengths) {
-    for my $i (1:3) {
-        my $s = ("x") x int($L / 4) . "$i" . ("y") x int($L / 4)
+var @workload
+val @lengths = (10, 50, 100, 500, 1000, 5000, 10000)
+for val $L (@lengths) {
+    for val $i (1:3) {
+        val $s = ("x") x int($L / 4) . "$i" . ("y") x int($L / 4)
         push @workload, $s
     }
 }
 
 printf("\nthroughput test on %d strings (len 10:10000)\n", len(@workload))
 
-my @crcs = pmap {
-    my $t0 = now_ns()
-    my $c = Demo::CRC::crc32(_)
-    my $elapsed_us = (now_ns() - $t0) / 1000.0
-    my $bytes_per_us = $elapsed_us > 0 ? len(_) / $elapsed_us : 0
+val @crcs = pmap {
+    val $t0 = now_ns()
+    val $c = Demo::CRC::crc32(_)
+    val $elapsed_us = (now_ns() - $t0) / 1000.0
+    val $bytes_per_us = $elapsed_us > 0 ? len(_) / $elapsed_us : 0
     [len(_), $c, $bytes_per_us]
 } @workload
 
-for my $row (@crcs) {
+for val $row (@crcs) {
     td_add($td_thr, $row->[2])
     hll_add($hll_crc, sprintf("%08x", $row->[1]))
 
-    my $tier
+    var $tier
     if ($row->[0] < 100) {
         $tier = "tiny"
     } elsif ($row->[0] < 1000) {
@@ -136,28 +136,28 @@ printf("  p90 = %.2f\n", td_quantile($td_thr, 0.90))
 # ── distribution by tier ─────────────────────────────────────────
 
 p "\nworkload by size tier:"
-my @tiers = topk_top($tk_thr, 4)
-for my $p (@tiers) {
+val @tiers = topk_top($tk_thr, 4)
+for val $p (@tiers) {
     printf("  %-7s count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct CRCs ─────────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_crc)
-my $total_inputs = len(@known) + len @workload
+val $hll_n = hll_count($hll_crc)
+val $total_inputs = len(@known) + len @workload
 printf("\ndistinct CRC values: HLL=%.1f vs total=%d (low collision rate expected)\n",
        $hll_n, $total_inputs)
 
 # ── flip-bit demo: small input change => large CRC change ─────────
 
 p "\navalanche demo (one-bit flip near end):"
-my $base = "the quick brown fox"
-my $alt  = "the quick brown box";   # changed 'f' -> 'b'
-my $c1 = Demo::CRC::crc32($base)
-my $c2 = Demo::CRC::crc32($alt)
-my $diff_bits = 0
-my $xor = $c1 ^ $c2
-for my $bit_idx (0:31) {
+val $base = "the quick brown fox"
+val $alt  = "the quick brown box";   # changed 'f' -> 'b'
+val $c1 = Demo::CRC::crc32($base)
+val $c2 = Demo::CRC::crc32($alt)
+var $diff_bits = 0
+val $xor = $c1 ^ $c2
+for val $bit_idx (0:31) {
     $diff_bits++ if ($xor >> $bit_idx) & 1
 }
 printf("  '%s' -> %08x\n", $base, $c1)

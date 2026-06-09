@@ -79,7 +79,7 @@ class TaggedEntity extends NamedEntity {
     }
     
     fn has_tag($tag) {
-        for my $t (@{$self->tags}) {
+        for val $t (@{$self->tags}) {
             return 1 if $t eq $tag
         }
         0
@@ -109,9 +109,9 @@ class Coordinate impl Cloneable {
     }
     
     fn distance_to($other) {
-        my $dx = $other->x - $self->x
-        my $dy = $other->y - $self->y
-        my $dz = $other->z - $self->z
+        val $dx = $other->x - $self->x
+        val $dy = $other->y - $self->y
+        val $dz = $other->z - $self->z
         sqrt($dx * $dx + $dy * $dy + $dz * $dz)
     }
     
@@ -251,10 +251,10 @@ class Circle2D extends Shape2D {
     }
     
     fn contains_point($x, $y) {
-        my $dx = $x - $self->position->x
-        my $dy = $y - $self->position->y
-        my $dist_sq = $dx * $dx + $dy * $dy
-        my $rad_sq = $self->radius * $self->radius
+        val $dx = $x - $self->position->x
+        val $dy = $y - $self->position->y
+        val $dist_sq = $dx * $dx + $dy * $dy
+        val $rad_sq = $self->radius * $self->radius
         $dist_sq <= $rad_sq ? 1 : 0
     }
 }
@@ -276,11 +276,11 @@ class Polygon2D extends Shape2D {
 
 class Triangle2D extends Polygon2D {
     fn area {
-        my @v = @{$self->vertices}
+        val @v = @{$self->vertices}
         return 0 if len(@v) < 3
-        my $x1 = $v[0]->x; my $y1 = $v[0]->y
-        my $x2 = $v[1]->x; my $y2 = $v[1]->y
-        my $x3 = $v[2]->x; my $y3 = $v[2]->y
+        val $x1 = $v[0]->x; val $y1 = $v[0]->y
+        val $x2 = $v[1]->x; val $y2 = $v[1]->y
+        val $x3 = $v[2]->x; val $y3 = $v[2]->y
         abs(($x1 * ($y2 - $y3) + $x2 * ($y3 - $y1) + $x3 * ($y1 - $y2)) / 2)
     }
     
@@ -305,7 +305,7 @@ class Cube3D extends Shape3D {
     }
     
     fn bounds {
-        my $half = $self->side / 2
+        val $half = $self->side / 2
         BoundingBox(
             min => Coordinate(
                 x => $self->position->x - $half,
@@ -373,7 +373,7 @@ class ContactInfo {
     fn has_address { defined($self->address) ? 1 : 0 }
     
     fn to_str {
-        my $s = "Email: " . $self->email . ", Phone: " . $self->phone
+        var $s = "Email: " . $self->email . ", Phone: " . $self->phone
         if ($self->has_address()) {
             $s .= ", Address: " . $self->address->to_str()
         }
@@ -411,8 +411,8 @@ class Employee extends Person {
     fn report_count { len(@{$self->direct_reports}) }
     
     fn total_reports {
-        my $count = $self->report_count()
-        for my $r (@{$self->direct_reports}) {
+        var $count = $self->report_count()
+        for val $r (@{$self->direct_reports}) {
             $count += $r->total_reports()
         }
         $count
@@ -421,8 +421,8 @@ class Employee extends Person {
     fn is_manager { $self->report_count() > 0 ? 1 : 0 }
     
     fn chain_of_command {
-        my @chain
-        my $current = $self
+        var @chain
+        var $current = $self
         while (defined($current)) {
             push @chain, $current
             $current = $current->manager
@@ -439,8 +439,8 @@ class Manager extends Employee {
     budget: Float = 0.0
     
     fn team_salary {
-        my $total = 0
-        for my $r (@{$self->direct_reports}) {
+        var $total = 0
+        for val $r (@{$self->direct_reports}) {
             $total += $r->salary
         }
         $total
@@ -489,28 +489,28 @@ class Department extends NamedEntity {
     }
     
     fn total_employees {
-        my $count = $self->employee_count()
-        for my $sub (@{$self->sub_departments}) {
+        var $count = $self->employee_count()
+        for val $sub (@{$self->sub_departments}) {
             $count += $sub->total_employees()
         }
         $count
     }
     
     fn total_salary {
-        my $sum = 0
-        for my $e (@{$self->employees}) {
+        var $sum = 0
+        for val $e (@{$self->employees}) {
             $sum += $e->salary
         }
-        for my $sub (@{$self->sub_departments}) {
+        for val $sub (@{$self->sub_departments}) {
             $sum += $sub->total_salary()
         }
         $sum
     }
     
     fn depth {
-        my $max_depth = 0
-        for my $sub (@{$self->sub_departments}) {
-            my $d = $sub->depth()
+        var $max_depth = 0
+        for val $sub (@{$self->sub_departments}) {
+            val $d = $sub->depth()
             $max_depth = $d if $d > $max_depth
         }
         1 + $max_depth
@@ -531,16 +531,16 @@ class Company extends TaggedEntity {
     fn department_count { len(@{$self->departments}) }
     
     fn total_employees {
-        my $count = 0
-        for my $d (@{$self->departments}) {
+        var $count = 0
+        for val $d (@{$self->departments}) {
             $count += $d->total_employees()
         }
         $count + (defined($self->ceo) ? 1 : 0)
     }
     
     fn total_payroll {
-        my $sum = 0
-        for my $d (@{$self->departments}) {
+        var $sum = 0
+        for val $d (@{$self->departments}) {
             $sum += $d->total_salary()
         }
         $sum += $self->ceo->total_compensation() if defined($self->ceo)
@@ -548,8 +548,8 @@ class Company extends TaggedEntity {
     }
     
     fn find_employee($emp_id) {
-        for my $d (@{$self->departments}) {
-            for my $e (@{$d->employees}) {
+        for val $d (@{$self->departments}) {
+            for val $e (@{$d->employees}) {
                 return $e if $e->employee_id eq $emp_id
             }
         }
@@ -576,8 +576,8 @@ class DocumentNode impl Visitor {
     fn is_root { !defined($self->parent) ? 1 : 0 }
     
     fn depth {
-        my $d = 0
-        my $current = $self
+        var $d = 0
+        var $current = $self
         while (defined($current->parent)) {
             $d += 1
             $current = $current->parent
@@ -595,8 +595,8 @@ class DocumentNode impl Visitor {
     }
     
     fn node_count {
-        my $count = 1
-        for my $child (@{$self->children}) {
+        var $count = 1
+        for val $child (@{$self->children}) {
             $count += $child->node_count()
         }
         $count
@@ -626,12 +626,12 @@ class ElementNode extends DocumentNode {
     }
     
     fn render {
-        my $attrs = ""
-        for my $k (keys %{$self->attributes}) {
+        var $attrs = ""
+        for val $k (keys %{$self->attributes}) {
             $attrs .= " " . $k . '="' . $self->attributes->{$k} . '"'
         }
-        my $content = ""
-        for my $child (@{$self->children}) {
+        var $content = ""
+        for val $child (@{$self->children}) {
             $content .= $child->render()
         }
         "<" . $self->tag . $attrs . ">" . $content . "</" . $self->tag . ">"
@@ -785,7 +785,7 @@ class LuxurySportsCar extends SportsCar impl Luxury, Performance {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ClassHierarchy::build_org_chart {
-    my $ceo = Executive(
+    val $ceo = Executive(
         id => 1,
         name => "Alice Johnson",
         employee_id => "CEO001",
@@ -797,7 +797,7 @@ fn Project::ClassHierarchy::build_org_chart {
         budget => 1000000.0
     )
     
-    my $cto = Executive(
+    val $cto = Executive(
         id => 2,
         name => "Bob Smith",
         employee_id => "CTO001",
@@ -809,7 +809,7 @@ fn Project::ClassHierarchy::build_org_chart {
         budget => 500000.0
     )
     
-    my $eng_mgr = Manager(
+    val $eng_mgr = Manager(
         id => 3,
         name => "Carol Williams",
         employee_id => "MGR001",
@@ -819,7 +819,7 @@ fn Project::ClassHierarchy::build_org_chart {
         budget => 200000.0
     )
     
-    my $dev1 = Employee(
+    val $dev1 = Employee(
         id => 4,
         name => "Dave Brown",
         employee_id => "ENG001",
@@ -828,7 +828,7 @@ fn Project::ClassHierarchy::build_org_chart {
         hire_date => "2018-02-15"
     )
     
-    my $dev2 = Employee(
+    val $dev2 = Employee(
         id => 5,
         name => "Eve Davis",
         employee_id => "ENG002",
@@ -842,14 +842,14 @@ fn Project::ClassHierarchy::build_org_chart {
     $eng_mgr->add_report($dev1)
     $eng_mgr->add_report($dev2)
     
-    my $company = Company(
+    val $company = Company(
         id => 100,
         name => "TechCorp",
         founded_year => 2005,
         ceo => $ceo
     )
     
-    my $eng_dept = Department(
+    val $eng_dept = Department(
         id => 200,
         name => "Engineering",
         head => $eng_mgr,
@@ -865,7 +865,7 @@ fn Project::ClassHierarchy::build_org_chart {
 }
 
 fn Project::ClassHierarchy::build_shape_scene {
-    my @shapes
+    var @shapes
     
     push @shapes, Rectangle2D(
         position => Coordinate(x => 0, y => 0, z => 0),
@@ -896,9 +896,9 @@ fn Project::ClassHierarchy::build_shape_scene {
 }
 
 fn Project::ClassHierarchy::build_vehicle_fleet {
-    my @vehicles
+    var @vehicles
     
-    my $sports = LuxurySportsCar(
+    val $sports = LuxurySportsCar(
         id => 1,
         name => "Speed Demon",
         vin => "VIN001",
@@ -917,7 +917,7 @@ fn Project::ClassHierarchy::build_vehicle_fleet {
     )
     push @vehicles, $sports
     
-    my $electric = ElectricCar(
+    val $electric = ElectricCar(
         id => 2,
         name => "Eco Runner",
         vin => "VIN002",
@@ -935,7 +935,7 @@ fn Project::ClassHierarchy::build_vehicle_fleet {
     )
     push @vehicles, $electric
     
-    my $truck = Truck(
+    val $truck = Truck(
         id => 3,
         name => "Work Horse",
         vin => "VIN003",
@@ -957,21 +957,21 @@ fn Project::ClassHierarchy::build_vehicle_fleet {
 }
 
 fn Project::ClassHierarchy::build_html_document {
-    my $html = ElementNode(tag => "html")
+    val $html = ElementNode(tag => "html")
     
-    my $head = ElementNode(tag => "head")
-    my $title = ElementNode(tag => "title")
+    val $head = ElementNode(tag => "head")
+    val $title = ElementNode(tag => "title")
     $title->add_child(TextNode(text => "Test Page"))
     $head->add_child($title)
     
-    my $body = ElementNode(tag => "body")
+    val $body = ElementNode(tag => "body")
     
-    my $header = ContainerNode(tag => "header", layout => "block")
-    my $h1 = ElementNode(tag => "h1")
+    val $header = ContainerNode(tag => "header", layout => "block")
+    val $h1 = ElementNode(tag => "h1")
     $h1->add_child(TextNode(text => "Welcome"))
     $header->add_child($h1)
     
-    my $form = FormNode(tag => "form", action => "/submit")
+    val $form = FormNode(tag => "form", action => "/submit")
     $form->add_input(InputNode(input_type => "text", input_name => "username", required => 1))
     $form->add_input(InputNode(input_type => "password", input_name => "password", required => 1))
     $form->add_input(InputNode(input_type => "submit", input_name => "submit", value => "Login"))
@@ -986,17 +986,17 @@ fn Project::ClassHierarchy::build_html_document {
 }
 
 fn Project::ClassHierarchy::total_shape_area($shapes) {
-    my $total = 0
-    for my $s (@$shapes) {
+    var $total = 0
+    for val $s (@$shapes) {
         $total += $s->area()
     }
     $total
 }
 
 fn Project::ClassHierarchy::shapes_in_bounds($shapes, $bbox) {
-    my @result
-    for my $s (@$shapes) {
-        my $shape_bounds = $s->bounds()
+    var @result
+    for val $s (@$shapes) {
+        val $shape_bounds = $s->bounds()
         if ($bbox->intersects($shape_bounds)) {
             push @result, $s
         }

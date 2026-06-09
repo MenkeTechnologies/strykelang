@@ -15,7 +15,7 @@
 
 # ── Mutex: introspection ───────────────────────────────────────────────────
 
-my $m = mutex()
+val $m = mutex()
 $m |> mutex_is_locked |> aeq 0, "fresh mutex is unlocked"
 
 mutex_lock($m)
@@ -34,19 +34,19 @@ mutex_unlock($m)
 
 # ── Mutex: protect a compound read-modify-write across parallel workers ────
 
-my $g = mutex()
+val $g = mutex()
 mysync $counter = 0
 fan 10000 {
     mutex_lock($g)
     defer { mutex_unlock($g) }
-    my $old = $counter
+    val $old = $counter
     $counter = $old + 1
 }
 $counter |> aeq 10000, "mutex serializes RMW across 10k fan workers"
 
 # ── Semaphore: introspection ───────────────────────────────────────────────
 
-my $s = semaphore(3)
+val $s = semaphore(3)
 $s |> sem_permits |> aeq 3, "fresh semaphore has N permits"
 $s |> sem_limit   |> aeq 3, "limit reflects initial N"
 
@@ -57,7 +57,7 @@ $s |> sem_permits |> aeq 3, "release restores permit"
 
 # ── Semaphore: try_acquire drains to zero, then refuses ────────────────────
 
-my $s2 = semaphore(2)
+val $s2 = semaphore(2)
 sem_try_acquire($s2) |> aeq 1, "try_acquire #1 ok"
 sem_try_acquire($s2) |> aeq 1, "try_acquire #2 ok"
 sem_try_acquire($s2) |> aeq 0, "try_acquire #3 refused (0 permits left)"
@@ -65,7 +65,7 @@ $s2 |> sem_permits |> aeq 0, "two acquires drain to zero"
 
 # ── Semaphore: bound concurrent workers ────────────────────────────────────
 
-my $gate = semaphore(4)
+val $gate = semaphore(4)
 mysync $in_flight = 0
 mysync $peak_in_flight = 0
 fan 40 {
@@ -83,15 +83,15 @@ fan 40 {
 # LOCK_UN=8. The lock auto-releases when the fd closes — process
 # crashes don't leak it.
 
-my $lockfile = tempfile()
-open(my $fh, ">", $lockfile) or die "open $lockfile: $!"
+val $lockfile = tempfile()
+open(val $fh, ">", $lockfile) or die "open $lockfile: $!"
 flock($fh, 2) |> aeq 1, "flock LOCK_EX returns 1 on success"
 flock($fh, 8) |> aeq 1, "flock LOCK_UN returns 1 on success"
 close $fh
 
 # ── flock: non-blocking probe (LOCK_NB | LOCK_EX = 4) ──────────────────────
 
-open(my $fh2, ">", $lockfile) or die
+open(val $fh2, ">", $lockfile) or die
 flock($fh2, 4) |> aeq 1, "non-blocking exclusive on free file = 1"
 flock($fh2, 8)
 close $fh2

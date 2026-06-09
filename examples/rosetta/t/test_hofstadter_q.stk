@@ -2,11 +2,11 @@
 # Rosetta Code: Hofstadter Q sequence
 
 fn Rosetta::HofstadterQ::compute($n) {
-    my @q = (0, 1, 1)
-    for my $i (3:$n) {
-        my $prev1 = $q[$i - 1]
-        my $prev2 = $q[$i - 2]
-        my $val = $q[$i - $prev1] + $q[$i - $prev2]
+    var @q = (0, 1, 1)
+    for val $i (3:$n) {
+        val $prev1 = $q[$i - 1]
+        val $prev2 = $q[$i - 2]
+        val $val = $q[$i - $prev1] + $q[$i - $prev2]
         push @q, $val
     }
     @q[$n]

@@ -18,8 +18,8 @@
 # ── factory: fresh optimizer for a parameter vector of length n ──
 
 fn Adam::new($n, $lr, $beta1, $beta2, $eps) {
-    my @m = (0.0) x $n
-    my @v = (0.0) x $n
+    val @m = (0.0) x $n
+    val @v = (0.0) x $n
     +{
         n     => $n,
         lr    => $lr,
@@ -36,12 +36,12 @@ fn Adam::new($n, $lr, $beta1, $beta2, $eps) {
 
 fn Adam::step($opt, $params, $grads) {
     $opt->{t}++
-    my $n = $opt->{n}
-    for my $i (0:$n - 1) {
+    val $n = $opt->{n}
+    for val $i (0:$n - 1) {
         $opt->{m}->[$i] = $opt->{beta1} * $opt->{m}->[$i] + (1.0 - $opt->{beta1}) * $grads->[$i]
         $opt->{v}->[$i] = $opt->{beta2} * $opt->{v}->[$i] + (1.0 - $opt->{beta2}) * $grads->[$i] * $grads->[$i]
-        my $m_hat = $opt->{m}->[$i] / (1.0 - $opt->{beta1} ** $opt->{t})
-        my $v_hat = $opt->{v}->[$i] / (1.0 - $opt->{beta2} ** $opt->{t})
+        val $m_hat = $opt->{m}->[$i] / (1.0 - $opt->{beta1} ** $opt->{t})
+        val $v_hat = $opt->{v}->[$i] / (1.0 - $opt->{beta2} ** $opt->{t})
         $params->[$i] = $params->[$i] - $opt->{lr} * $m_hat / (sqrt($v_hat) + $opt->{eps})
     }
 }
@@ -55,10 +55,10 @@ fn Adam::fabs($v) {
 # ── 1-D quadratic: f(x) = (x − a)², gradient 2(x − a). Minimum: x = a ─
 
 fn Adam::run_quadratic($target_a, $x0, $steps, $lr) {
-    my $opt = Adam::new(1, $lr, 0.9, 0.999, 1e-8)
-    my @params = ($x0)
-    for my $i (1:$steps) {
-        my @grads = (2.0 * ($params[0] - $target_a))
+    val $opt = Adam::new(1, $lr, 0.9, 0.999, 1e-8)
+    val @params = ($x0)
+    for val $i (1:$steps) {
+        val @grads = (2.0 * ($params[0] - $target_a))
         Adam::step($opt, \@params, \@grads)
     }
     $params[0]
@@ -69,16 +69,16 @@ fn Adam::run_quadratic($target_a, $x0, $steps, $lr) {
 # Global minimum at (1, 1).
 
 fn Adam::rosen_grad($x, $y) {
-    my $g0 = 2.0 * ($x - 1.0) - 16.0 * $x * ($y - $x * $x)
-    my $g1 = 8.0 * ($y - $x * $x)
+    val $g0 = 2.0 * ($x - 1.0) - 16.0 * $x * ($y - $x * $x)
+    val $g1 = 8.0 * ($y - $x * $x)
     [$g0, $g1]
 }
 
 fn Adam::run_rosen($x0, $y0, $steps, $lr) {
-    my $opt = Adam::new(2, $lr, 0.9, 0.999, 1e-8)
-    my @params = ($x0, $y0)
-    for my $i (1:$steps) {
-        my $g = Adam::rosen_grad($params[0], $params[1])
+    val $opt = Adam::new(2, $lr, 0.9, 0.999, 1e-8)
+    val @params = ($x0, $y0)
+    for val $i (1:$steps) {
+        val $g = Adam::rosen_grad($params[0], $params[1])
         Adam::step($opt, \@params, $g)
     }
     [$params[0], $params[1]]
@@ -88,12 +88,12 @@ fn Adam::run_rosen($x0, $y0, $steps, $lr) {
 # Each component is independent; min at target_i for every i.
 
 fn Adam::run_md_quadratic($targets, $x0_arr, $steps, $lr) {
-    my $n = len(@$targets)
-    my $opt = Adam::new($n, $lr, 0.9, 0.999, 1e-8)
-    my @params = @$x0_arr
-    for my $i (1:$steps) {
-        my @grads
-        for my $j (0:$n - 1) {
+    val $n = len(@$targets)
+    val $opt = Adam::new($n, $lr, 0.9, 0.999, 1e-8)
+    val @params = @$x0_arr
+    for val $i (1:$steps) {
+        var @grads
+        for val $j (0:$n - 1) {
             push @grads, 2.0 * ($params[$j] - $targets->[$j])
         }
         Adam::step($opt, \@params, \@grads)
@@ -103,7 +103,7 @@ fn Adam::run_md_quadratic($targets, $x0_arr, $steps, $lr) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{ name => "1-D quadratic, a=3, x₀=0",      target => 3.0,  start => 0.0,   steps => 500, lr => 0.1 },
     +{ name => "1-D quadratic, a=−7, x₀=5",     target => -7.0, start => 5.0,   steps => 500, lr => 0.1 },
     +{ name => "1-D quadratic, a=π̃, x₀=10",   target => 3.14, start => 10.0,  steps => 1000, lr => 0.05 },
@@ -113,44 +113,44 @@ my @cases = (
 p "── Adam optimizer demo ───────────────────────────────"
 printf "  %-32s  %8s  %10s\n", "case", "target", "final"
 printf "  %-32s  %8s  %10s\n", "--------------------------------", "--------", "----------"
-for my $c (@cases) {
-    my $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
+for val $c (@cases) {
+    val $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
     printf "  %-32s  %8.4f  %10.4f\n", $c->{name}, $c->{target}, $final
 }
 
 # ── invariant 1: 1-D quadratic converges to within 1e-3 of target ──
 
-for my $c (@cases) {
-    my $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
-    my $err = Adam::fabs($final - $c->{target})
+for val $c (@cases) {
+    val $final = Adam::run_quadratic($c->{target}, $c->{start}, $c->{steps}, $c->{lr})
+    val $err = Adam::fabs($final - $c->{target})
     die "1-D quadratic err #{$err} > 1e-3 on \"#{$c->{name}}\"" unless $err < 1e-3
 }
 
 # ── invariant 2: 2-D Rosenbrock-like cousin reaches (1, 1) ─────────
 # (Adam handles the curved valley well with enough steps.)
 
-my $r = Adam::run_rosen(-1.0, 1.0, 5000, 0.01)
-my $err_x = Adam::fabs($r->[0] - 1.0)
-my $err_y = Adam::fabs($r->[1] - 1.0)
+val $r = Adam::run_rosen(-1.0, 1.0, 5000, 0.01)
+val $err_x = Adam::fabs($r->[0] - 1.0)
+val $err_y = Adam::fabs($r->[1] - 1.0)
 printf "\n  rosen-like (5000 steps, lr=0.01): (%.4f, %.4f)\n", $r->[0], $r->[1]
 die "Rosen-like x err #{$err_x} > 0.1" unless $err_x < 0.1
 die "Rosen-like y err #{$err_y} > 0.1" unless $err_y < 0.1
 
 # ── invariant 3: 5-D quadratic converges to every target component ─
 
-my @targets = (1.0, -2.0, 3.5, -0.7, 4.2)
-my @start_x = (0.0, 0.0, 0.0, 0.0, 0.0)
-my $md_final = Adam::run_md_quadratic(\@targets, \@start_x, 1000, 0.1)
-for my $i (0:4) {
-    my $err = Adam::fabs($md_final->[$i] - $targets[$i])
+val @targets = (1.0, -2.0, 3.5, -0.7, 4.2)
+val @start_x = (0.0, 0.0, 0.0, 0.0, 0.0)
+val $md_final = Adam::run_md_quadratic(\@targets, \@start_x, 1000, 0.1)
+for val $i (0:4) {
+    val $err = Adam::fabs($md_final->[$i] - $targets[$i])
     die "5-D quadratic[#{$i}] err #{$err} > 1e-3 on target #{$targets[$i]}" unless $err < 1e-3
 }
 
 # ── invariant 4: starting AT the minimum stays at the minimum ─────
 
-for my $c (@cases) {
-    my $final = Adam::run_quadratic($c->{target}, $c->{target}, 100, $c->{lr})
-    my $err = Adam::fabs($final - $c->{target})
+for val $c (@cases) {
+    val $final = Adam::run_quadratic($c->{target}, $c->{target}, 100, $c->{lr})
+    val $err = Adam::fabs($final - $c->{target})
     die "started-at-min drifted by #{$err} on \"#{$c->{name}}\"" unless $err < 1e-3
 }
 
@@ -159,17 +159,17 @@ for my $c (@cases) {
 # and dividing by (1 − β₁) recovers grad). So the first-step Δx ≈
 # −lr · sign(grad). Verify on a known case.
 
-my $bc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
-my @bc_params = (5.0)
+val $bc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
+val @bc_params = (5.0)
 Adam::step($bc_opt, \@bc_params, [4.0])   # grad > 0 → param decreases
 die "bias-correction first-step direction wrong" unless $bc_params[0] < 5.0
 die "bias-correction first-step magnitude wrong" unless Adam::fabs(5.0 - $bc_params[0]) < 0.2
 
 # ── invariant 6: zero gradient produces zero update ───────────────
 
-my $z_opt = Adam::new(3, 0.5, 0.9, 0.999, 1e-8)
-my @z_params = (1.0, 2.0, 3.0)
-for my $i (1:50) {
+val $z_opt = Adam::new(3, 0.5, 0.9, 0.999, 1e-8)
+val @z_params = (1.0, 2.0, 3.0)
+for val $i (1:50) {
     Adam::step($z_opt, \@z_params, [0.0, 0.0, 0.0])
 }
 die "zero-gradient drifted parameters" unless $z_params[0] == 1.0 && $z_params[1] == 2.0 && $z_params[2] == 3.0
@@ -177,14 +177,14 @@ die "zero-gradient drifted parameters" unless $z_params[0] == 1.0 && $z_params[1
 # ── invariant 7: monotone convergence — loss should be non-increasing ─
 # on a 1-D quadratic with the right lr.
 
-my $mc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
-my @mc_params = (10.0)
-my $last_loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
-my $bad = 0
-for my $i (1:500) {
-    my @grads = (2.0 * $mc_params[0])
+val $mc_opt = Adam::new(1, 0.1, 0.9, 0.999, 1e-8)
+val @mc_params = (10.0)
+var $last_loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
+var $bad = 0
+for val $i (1:500) {
+    val @grads = (2.0 * $mc_params[0])
     Adam::step($mc_opt, \@mc_params, \@grads)
-    my $loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
+    val $loss = ($mc_params[0] - 0.0) * ($mc_params[0] - 0.0)
     # Allow micro-oscillation up to 1e-6 of last loss.
     $bad++ if $loss > $last_loss + 1e-6
     $last_loss = $loss

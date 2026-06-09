@@ -5,19 +5,19 @@ fn Rosetta::PermutationsWithRep::perms_with_rep($list, $k) {
     if ($k == 0) {
         return [[]]
     }
-    my @res
-    my $sub = Rosetta::PermutationsWithRep::perms_with_rep($list, $k - 1)
-    for my $item (@$list) {
-        for my $s (@$sub) {
-            my @c = ($item, @$s)
+    var @res
+    val $sub = Rosetta::PermutationsWithRep::perms_with_rep($list, $k - 1)
+    for val $item (@$list) {
+        for val $s (@$sub) {
+            val @c = ($item, @$s)
             push @res, \@c
         }
     }
     \@res
 }
 
-my @input = (1, 2)
-my $res = Rosetta::PermutationsWithRep::perms_with_rep(\@input, 2)
+val @input = (1, 2)
+val $res = Rosetta::PermutationsWithRep::perms_with_rep(\@input, 2)
 
 # Expected: (1,1), (1,2), (2,1), (2,2)
 assert_eq len(@$res), 4, "perms with rep count"

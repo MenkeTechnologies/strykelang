@@ -22,10 +22,10 @@ ai_mock_install("embed:probe", "")
 ai_mock_install("(?i)\\bhi\\b", "Hello! How can I help?")
 ai_mock_install("(?i)what is your name", "My name is StrykeAgent.")
 
-my $sess_obj = ai_session_new(system => "You are a helpful assistant")
+val $sess_obj = ai_session_new(system => "You are a helpful assistant")
 ai_session_send($sess_obj, "hi") |> aeq "Hello! How can I help?", "Session turn 1"
 ai_session_send($sess_obj, "what is your name?") |> aeq "My name is StrykeAgent.", "Session turn 2"
-my @sess_hist = ai_session_history($sess_obj)
+val @sess_hist = ai_session_history($sess_obj)
 @sess_hist |> len |> { _ >= 4 } |> aok "Session history length (system + 2 turns)"
 $sess_hist[1]->{content} |> aeq "hi", "Session history first user message"
 ai_session_reset($sess_obj)
@@ -39,8 +39,8 @@ ai_session_close($sess_obj)
 # tried to pass it as a second positional which got eaten as an opt
 # key by `parse_opts`.
 ai_mock_install("(?i)extract user", '{"name":"Alice","age":30}')
-my $u_schema = +{ name => "string", age => "int" }
-my $u_obj = ai_extract("Alice is 30 years old. Task: extract user", schema => $u_schema)
+val $u_schema = +{ name => "string", age => "int" }
+val $u_obj = ai_extract("Alice is 30 years old. Task: extract user", schema => $u_schema)
 $u_obj->{name} |> aeq "Alice", "ai_extract name"
 $u_obj->{age}  |> aeq 30, "ai_extract age"
 
@@ -53,7 +53,7 @@ tool fn get_temp($city: string) "Get current temperature" {
 ai_mock_install("(?i)weather.*SF", '{"tool_calls":[{"name":"get_temp","args":{"city":"San Francisco"}}]}')
 ai_mock_install("(?i)65 degrees", "The weather in San Francisco is 65 degrees.")
 
-my $r_loop = ai "What is the weather in SF?"
+val $r_loop = ai "What is the weather in SF?"
 $r_loop |> { /65/ } |> aok "Agent used get_temp via mock"
 
 # ── 4. AI Vector Memory (Mock Mode) ─────────────────────────────────────────
@@ -66,11 +66,11 @@ ai_memory_count() |> aeq 2, "ai_memory_count after save"
 # Mock embeddings (SHA256-based, see `mock_embedding` in ai.rs) have no
 # semantic ordering — they're hash-deterministic noise. Pull top_k=2 and
 # assert both expected ids are present rather than asserting on rank.
-my @m_results = ai_memory_recall("Stryke", top_k => 2)
+val @m_results = ai_memory_recall("Stryke", top_k => 2)
 @m_results |> len |> aeq 2, "ai_memory_recall count"
-my @ids = sort map { $_->{id} } @m_results
+val @ids = sort map { $_->{id} } @m_results
 ($ids[0] eq "doc1" && $ids[1] eq "doc2") |> aok "ai_memory_recall returns both docs"
-my ($doc1_row) = grep { $_->{id} eq "doc1" } @m_results
+val ($doc1_row) = grep { $_->{id} eq "doc1" } @m_results
 $doc1_row->{metadata}->{category} |> aeq "tech", "ai_memory_recall metadata"
 ai_memory_forget("doc1")
 ai_memory_count() |> aeq 1, "ai_memory_count after forget"

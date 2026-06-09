@@ -3,15 +3,15 @@
 # Roman numeral encode/decode.
 
 fn Roman::encode($n) {
-    my @table = (
+    val @table = (
         [1000, "M"],  [900, "CM"], [500, "D"], [400, "CD"],
         [100,  "C"],  [90,  "XC"], [50,  "L"], [40,  "XL"],
         [10,   "X"],  [9,   "IX"], [5,   "V"], [4,   "IV"],
         [1,    "I"],
     )
-    my $out = ""
-    for my $row (@table) {
-        my ($v, $sym) = @$row
+    var $out = ""
+    for val $row (@table) {
+        val ($v, $sym) = @$row
         while ($n >= $v) {
             $out .= $sym
             $n -= $v
@@ -21,13 +21,13 @@ fn Roman::encode($n) {
 }
 
 fn Roman::decode($s) {
-    my %v = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
-    my @chars = split(//, $s)
-    my $n = len(@chars)
-    my $total = 0
-    for my $i (0:$n - 1) {
-        my $cur = $v{$chars[$i]}
-        my $nxt = $i + 1 < $n ? $v{$chars[$i + 1]} : 0
+    val %v = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
+    val @chars = split(//, $s)
+    val $n = len(@chars)
+    var $total = 0
+    for val $i (0:$n - 1) {
+        val $cur = $v{$chars[$i]}
+        val $nxt = $i + 1 < $n ? $v{$chars[$i + 1]} : 0
         if ($cur < $nxt) {
             $total -= $cur
         } else {
@@ -65,17 +65,17 @@ Roman::decode("CDXLIV")     |> aeq 444,  "decode CDXLIV"
 Roman::decode("MMMCMXCIX")  |> aeq 3999, "decode MMMCMXCIX"
 
 # Roundtrips
-for my $n (1, 3, 7, 14, 49, 88, 100, 247, 555, 999, 1000, 1492, 1888, 2024, 3500) {
+for val $n (1, 3, 7, 14, 49, 88, 100, 247, 555, 999, 1000, 1492, 1888, 2024, 3500) {
     Roman::decode(Roman::encode($n)) |> aeq $n, "roundtrip $n"
 }
 
 # Length monotonicity sanity
-my @lens = map { len(Roman::encode(_)) } 1, 10, 100, 1000
+val @lens = map { len(Roman::encode(_)) } 1, 10, 100, 1000
 $lens[3] >= $lens[2] |> aok "len 1000 >= len 100"
 $lens[2] >= $lens[1] |> aok "len 100 >= len 10"
 
 # Sum the digits of decoded representations as a pipeline
-my @vals = map { Roman::decode(_) } qw(I II III IV V VI VII VIII IX X)
+val @vals = map { Roman::decode(_) } qw(I II III IV V VI VII VIII IX X)
 sum(@vals) |> aeq 55, "sum I..X = 55"
 
 test_run

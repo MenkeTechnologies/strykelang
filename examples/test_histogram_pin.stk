@@ -4,18 +4,18 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 fn Hist::buckets($xs, $n_bins) {
-    my $lo = $xs->[0]
-    my $hi = $xs->[0]
-    for my $x (@$xs) {
+    var $lo = $xs->[0]
+    var $hi = $xs->[0]
+    for val $x (@$xs) {
         $lo = $x if $x < $lo
         $hi = $x if $x > $hi
     }
-    my $span = ($hi - $lo) + 0.0001
-    my $w    = $span / $n_bins
-    my @counts = ()
+    val $span = ($hi - $lo) + 0.0001
+    val $w    = $span / $n_bins
+    var @counts = ()
     for (1:$n_bins) { push @counts, 0 }
-    for my $x (@$xs) {
-        my $idx = int(($x - $lo) / $w)
+    for val $x (@$xs) {
+        var $idx = int(($x - $lo) / $w)
         $idx = $n_bins - 1 if $idx >= $n_bins
         $counts[$idx] = $counts[$idx] + 1
     }
@@ -23,29 +23,29 @@ fn Hist::buckets($xs, $n_bins) {
 }
 
 fn Stats::mean($xs) {
-    my $sum = 0
-    for my $x (@$xs) { $sum = $sum + $x }
+    var $sum = 0
+    for val $x (@$xs) { $sum = $sum + $x }
     $sum / len(@$xs)
 }
 
 fn Stats::median($xs) {
-    my @s = sort { _ <=> _1 } @$xs
-    my $n = len @s
+    val @s = sort { _ <=> _1 } @$xs
+    val $n = len @s
     $n % 2 == 1 ? $s[int($n/2)] : ($s[$n/2 - 1] + $s[$n/2]) / 2
 }
 
 fn Stats::mode($xs) {
-    my %freq = ()
-    for my $x (@$xs) { $freq{$x} = ($freq{$x} // 0) + 1 }
-    my @keys = keys %freq
-    my @sorted = sort { $freq{_1} <=> $freq{_} } @keys
+    var %freq = ()
+    for val $x (@$xs) { $freq{$x} = ($freq{$x} // 0) + 1 }
+    val @keys = keys %freq
+    val @sorted = sort { $freq{_1} <=> $freq{_} } @keys
     $sorted[0] + 0
 }
 
 fn Stats::range($xs) {
-    my $lo = $xs->[0]
-    my $hi = $xs->[0]
-    for my $x (@$xs) {
+    var $lo = $xs->[0]
+    var $hi = $xs->[0]
+    for val $x (@$xs) {
         $lo = $x if $x < $lo
         $hi = $x if $x > $hi
     }
@@ -80,34 +80,34 @@ Stats::range([-5, 5])             |> aeq 10, "range negative"
 
 # ── Histogram: total counts preserved ─────────────────────────────────────
 
-my $h1 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
-my $sum1 = 0
-for my $c (@{$h1->{counts}}) { $sum1 = $sum1 + $c }
+val $h1 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 5)
+var $sum1 = 0
+for val $c (@{$h1->{counts}}) { $sum1 = $sum1 + $c }
 $sum1 |> aeq 10, "buckets: count preservation"
 len(@{$h1->{counts}}) |> aeq 5, "buckets: 5 bins"
 
-my $h2 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 10)
+val $h2 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 10)
 len(@{$h2->{counts}}) |> aeq 10, "buckets: 10 bins"
 
 # ── Histogram: lo/hi ──────────────────────────────────────────────────────
 
-my $h3 = Hist::buckets([5, 10, 15, 20, 25], 5)
+val $h3 = Hist::buckets([5, 10, 15, 20, 25], 5)
 $h3->{lo} |> aeq 5,  "buckets lo"
 $h3->{hi} |> aeq 25, "buckets hi"
 
 # ── Histogram on uniform data ─────────────────────────────────────────────
 
-my $h4 = Hist::buckets([10, 10, 10, 10], 4)
-my $sum4 = 0
-for my $c (@{$h4->{counts}}) { $sum4 = $sum4 + $c }
+val $h4 = Hist::buckets([10, 10, 10, 10], 4)
+var $sum4 = 0
+for val $c (@{$h4->{counts}}) { $sum4 = $sum4 + $c }
 $sum4 |> aeq 4, "uniform data: total preserved"
 $h4->{lo} |> aeq 10, "uniform lo == hi"
 $h4->{hi} |> aeq 10, "uniform hi == lo"
 
 # ── Histogram: monotonic data ─────────────────────────────────────────────
 
-my $h5 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8], 4)
-my $cnts = $h5->{counts}
+val $h5 = Hist::buckets([1, 2, 3, 4, 5, 6, 7, 8], 4)
+val $cnts = $h5->{counts}
 $cnts->[0] |> aeq 2, "bin 0: 2 items (1,2)"
 $cnts->[1] |> aeq 2, "bin 1: 2 items"
 $cnts->[2] |> aeq 2, "bin 2: 2 items"

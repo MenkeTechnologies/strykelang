@@ -6,20 +6,20 @@ fn Rosetta::Vampire::sort_digits($n) {
 }
 
 fn Rosetta::Vampire::check($n) {
-    my $s = sprintf("%d", $n)
-    my $len = len($s)
+    val $s = sprintf("%d", $n)
+    val $len = len($s)
     if ($len % 2 != 0) {
         0
     } else {
-        my $target = Rosetta::Vampire::sort_digits($n)
-        my $found = 0
-        my $half = $len / 2
-        my $start = 10**($half - 1)
-        my $end = 10**$half - 1
+        val $target = Rosetta::Vampire::sort_digits($n)
+        var $found = 0
+        val $half = $len / 2
+        val $start = 10**($half - 1)
+        val $end = 10**$half - 1
         
-        for my $a ($start:$end) {
+        for val $a ($start:$end) {
             if ($n % $a == 0) {
-                my $b = $n / $a
+                val $b = $n / $a
                 if ($b >= $start && $b <= $end) {
                     if (!($a % 10 == 0 && $b % 10 == 0)) {
                         if (Rosetta::Vampire::sort_digits($a . $b) eq $target) {

@@ -13,7 +13,7 @@ fn Cipher::shift_char($c, $n) {
 }
 
 fn Cipher::caesar($s, $n) {
-    my $shift = (($n % 26) + 26) % 26
+    val $shift = (($n % 26) + 26) % 26
     join "", maps { Cipher::shift_char(_, $shift) } split //, $s
 }
 
@@ -42,13 +42,13 @@ Cipher::atbash(Cipher::atbash("stryke")) |> aeq "stryke",   "atbash roundtrip"
 
 # Vigenère
 fn Cipher::vigenere($s, $key, $sign) {
-    my @kchars = grep /[A-Za-z]/, split //, lc $key
+    val @kchars = grep /[A-Za-z]/, split //, lc $key
     return $s if len(@kchars) == 0
-    my $ki = 0
-    my $out = ""
-    for my $ch (split //, $s) {
+    var $ki = 0
+    var $out = ""
+    for val $ch (split //, $s) {
         if ($ch =~ /[A-Za-z]/) {
-            my $shift = ord($kchars[$ki % len(@kchars)]) - ord('a')
+            val $shift = ord($kchars[$ki % len(@kchars)]) - ord('a')
             $out .= Cipher::shift_char($ch, $sign * $shift)
             $ki++
         } else {
@@ -71,14 +71,14 @@ Cipher::vig_encode("plaintext", "") |> aeq "plaintext", "vigenere empty key"
 
 # Letter frequency
 fn Letters::freq($s) {
-    my %f = ()
-    for my $ch (split //, lc $s) {
+    var %f = ()
+    for val $ch (split //, lc $s) {
         $f{$ch}++ if $ch =~ /[a-z]/
     }
     \%f
 }
 
-my $f = Letters::freq("Mississippi")
+val $f = Letters::freq("Mississippi")
 $f->{s} |> aeq 4, "freq s in Mississippi"
 $f->{i} |> aeq 4, "freq i in Mississippi"
 $f->{p} |> aeq 2, "freq p in Mississippi"
@@ -86,7 +86,7 @@ $f->{m} |> aeq 1, "freq m in Mississippi"
 
 # Most common letter
 fn Letters::most_common($s) {
-    my $f = Letters::freq($s)
+    val $f = Letters::freq($s)
     return undef if len(keys %$f) == 0
     (sort { $f->{_1} <=> $f->{_} } keys %$f)[0]
 }

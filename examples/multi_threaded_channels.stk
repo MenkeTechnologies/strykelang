@@ -12,7 +12,7 @@
 p "--- Multi-threaded Channels ---"
 
 # 1. Create a bounded channel (capacity 2)
-my ($tx, $rx) = pchannel(2)
+val ($tx, $rx) = pchannel(2)
 
 # 2. Spawn Producer
 p "Spawning Producer..."
@@ -26,9 +26,9 @@ spawn {
 
 # 3. Consume in Main Thread
 p "Consumer starting..."
-my @results = ()
+var @results = ()
 for (1:5) {
-    my $val = $rx->recv()
+    var $val = $rx->recv()
     p "  [Consumer] Received: $val"
     push @results, $val
 }

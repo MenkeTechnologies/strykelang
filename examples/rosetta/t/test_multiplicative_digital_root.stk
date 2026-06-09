@@ -2,19 +2,19 @@
 # Rosetta Code: Multiplicative digital root and persistence
 
 fn Rosetta::MultiplicativeDigitalRoot::multiplicative_digital_root_and_persistence($n) {
-    my $persistence = 0
-    my $curr = $n
+    var $persistence = 0
+    var $curr = $n
     while (len("$curr") > 1) {
-        my @digits = ~> "$curr" chars map {int}
-        my $prod = 1
-        for my $d (@digits) { $prod *= $d }
+        val @digits = ~> "$curr" chars map {int}
+        var $prod = 1
+        for val $d (@digits) { $prod *= $d }
         $curr = $prod
         $persistence++
     }
     ($curr, $persistence)
 }
 
-my ($root, $pers) = Rosetta::MultiplicativeDigitalRoot::multiplicative_digital_root_and_persistence(327)
+var ($root, $pers) = Rosetta::MultiplicativeDigitalRoot::multiplicative_digital_root_and_persistence(327)
 assert_eq $root, 8, "MDR(327) is 8"
 assert_eq $pers, 2, "MP(327) is 2"
 

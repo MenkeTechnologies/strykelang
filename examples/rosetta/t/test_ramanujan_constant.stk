@@ -4,7 +4,7 @@
 # 262 537 412 640 768 744. Demonstrate the near-equality numerically.
 
 fn Rosetta::Ramanujan::constant() {
-    my $pi = 4 * atan2(1, 1)
+    val $pi = 4 * atan2(1, 1)
     exp($pi * sqrt(163))
 }
 
@@ -17,16 +17,16 @@ fn Rosetta::Ramanujan::deficit() {
 }
 
 # Numerical magnitude is enormous
-my $r = Rosetta::Ramanujan::constant()
+val $r = Rosetta::Ramanujan::constant()
 assert_ok $r > 1e17, "Ramanujan's constant > 10^17"
 assert_ok $r < 1e18, "Ramanujan's constant < 10^18"
 
 # Within double-precision noise of the integer
-my $expect = Rosetta::Ramanujan::expected_integer()
+val $expect = Rosetta::Ramanujan::expected_integer()
 assert_near $r, $expect, 10000, "within ~1e-12 relative of 262537412640768744"
 
 # Deficit small relative to magnitude (~1e-13 of integer)
-my $d = Rosetta::Ramanujan::deficit()
+val $d = Rosetta::Ramanujan::deficit()
 assert_ok abs($d) < 10000, "absolute deficit < 10000"
 assert_ok abs($d) / $expect < 1e-10, "relative deficit tiny"
 

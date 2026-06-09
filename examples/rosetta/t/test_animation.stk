@@ -2,14 +2,14 @@
 # Rosetta Code: Animation
 
 fn Rosetta::Animation::marquee($text, $width, $frames) {
-    my $pad = " " x $width
-    my $full = $pad . $text . $pad
-    my $len = length($full)
-    my @rendered
+    val $pad = " " x $width
+    val $full = $pad . $text . $pad
+    val $len = length($full)
+    var @rendered
     
-    for my $i (0:($frames - 1)) {
-        my $pos = $i % ($len - $width + 1)
-        my $frame = substr($full, $pos, $width)
+    for val $i (0:($frames - 1)) {
+        val $pos = $i % ($len - $width + 1)
+        val $frame = substr($full, $pos, $width)
         print "\r[$frame]"
         sleep 0.05
         push @rendered, $frame
@@ -20,7 +20,7 @@ fn Rosetta::Animation::marquee($text, $width, $frames) {
 
 fn Rosetta::Animation::demo() {
     "Basic Marquee Animation (10 frames):" |> p
-    my $out = Rosetta::Animation::marquee("Hello Rosetta", 15, 10)
+    val $out = Rosetta::Animation::marquee("Hello Rosetta", 15, 10)
     
     # Assertions
     assert_eq len(@$out), 10, "10 frames rendered"

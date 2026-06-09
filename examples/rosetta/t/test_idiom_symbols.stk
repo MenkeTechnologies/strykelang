@@ -7,7 +7,7 @@ fn Rosetta::IdiomSymbols::get_symbols() {
     # The task asks for all characters that can be used.
     
     ~> 0:127 grep { 
-        my $c = chr(_); 
+        val $c = chr(_); 
         $c =~ /[a-zA-Z0-9_]/ 
     } map {chr} |> join ""
 }
@@ -16,7 +16,7 @@ fn Rosetta::IdiomSymbols::is_symbol_char($c) {
     $c =~ /^[a-zA-Z0-9_]$/
 }
 
-my $syms = Rosetta::IdiomSymbols::get_symbols()
+val $syms = Rosetta::IdiomSymbols::get_symbols()
 # p "Symbols: $syms"
 
 assert_ok index($syms, "a") != -1, "a is symbol char"

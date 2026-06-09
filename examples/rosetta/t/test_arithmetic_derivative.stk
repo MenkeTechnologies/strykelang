@@ -3,9 +3,9 @@
 
 fn Rosetta::AD::compute($n) {
     if ($n < 2) { return 0 }
-    my $temp = $n
-    my $res = 0
-    my $d = 2
+    var $temp = $n
+    var $res = 0
+    var $d = 2
     while ($d * $d <= $temp) {
         while ($temp % $d == 0) {
             $res = $res + int($n / $d)
@@ -19,8 +19,8 @@ fn Rosetta::AD::compute($n) {
     $res
 }
 
-my @vals
-for my $i (0:10) {
+var @vals
+for val $i (0:10) {
     push @vals, Rosetta::AD::compute($i)
 }
 # D(0)=0, D(1)=0, D(2)=1, D(3)=1, D(4)=4, D(5)=1, D(6)=5, D(7)=1, D(8)=12, D(9)=6, D(10)=7

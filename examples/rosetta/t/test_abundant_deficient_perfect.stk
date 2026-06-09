@@ -5,9 +5,9 @@ fn Rosetta::ADPNumbers::sum_divisors($n) {
     if ($n < 2) {
         0
     } else {
-        my $sum = 0
-        my $limit = int($n / 2)
-        for my $i (1:$limit) {
+        var $sum = 0
+        val $limit = int($n / 2)
+        for val $i (1:$limit) {
             if ($n % $i == 0) { $sum = $sum + $i }
         }
         $sum
@@ -15,7 +15,7 @@ fn Rosetta::ADPNumbers::sum_divisors($n) {
 }
 
 fn Rosetta::ADPNumbers::classify($n) {
-    my $sum = Rosetta::ADPNumbers::sum_divisors($n)
+    val $sum = Rosetta::ADPNumbers::sum_divisors($n)
     if ($sum == $n) {
         "perfect"
     } elsif ($sum > $n) {

@@ -3,7 +3,7 @@
 
 fn Rosetta::Angles::diff($b1, $b2) {
     # Shortest signed distance from b1 to b2 in degrees [-180, 180)
-    my $d = ($b2 - $b1 + 180) % 360
+    var $d = ($b2 - $b1 + 180) % 360
     # Handle the fact that % can be negative in some languages, 
     # but in Stryke we checked -3 % 3 == 0. 
     # Let's check a case like -190 % 360.

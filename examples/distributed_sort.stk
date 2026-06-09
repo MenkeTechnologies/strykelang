@@ -7,52 +7,52 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $n = $ARGV[0] // 4
+val $n = $ARGV[0] // 4
 
 p "── distributed sort ──"
 
-my @workers = congregation($n)
+val @workers = congregation($n)
 printf "spawned %d workers\n", len(@workers)
 
 # Generate a random-ish unsorted input (deterministic per run for repro).
-my @input
-for my $i (0:39) {
+var @input
+for val $i (0:39) {
     push @input, (($i * 37 + 11) % 100)
 }
 printf "input (%d items): %s\n", len(@input), join(",", @input)
 
 # Shard the input across workers. Each worker gets a chunk.
-my $per = int((len(@input) + $n - 1) / $n)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val $per = int((len(@input) + $n - 1) / $n)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Each worker sorts its own shard and returns the JSON-encoded sorted array.
-my %sorted_shards
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+var %sorted_shards
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@input) - 1 if $end >= len(@input)
     next if $start >= len(@input)
-    my @shard = @input[$start:$end]
-    my $shard_json = to_json(\@shard)
-    my $code = "my \$arr = from_json(q{$shard_json}); my \@sorted = sort { _ <=> _1 } \@\$arr; to_json(\\\@sorted)"
-    my $div = pray $code, $w
-    my %reply = annex $div
-    my $sorted_json = $reply{$w}
-    my $sorted_arr = from_json($sorted_json)
+    val @shard = @input[$start:$end]
+    val $shard_json = to_json(\@shard)
+    val $code = "my \$arr = from_json(q{$shard_json}); my \@sorted = sort { _ <=> _1 } \@\$arr; to_json(\\\@sorted)"
+    val $div = pray $code, $w
+    val %reply = annex $div
+    val $sorted_json = $reply{$w}
+    val $sorted_arr = from_json($sorted_json)
     $sorted_shards{$w} = $sorted_arr
 }
 
 p "── per-worker sorted shards ──"
-for my $sid (sort { _ <=> _1 } keys %sorted_shards) {
+for val $sid (sort { _ <=> _1 } keys %sorted_shards) {
     printf "  worker %d: %s\n", $sid, join(",", @{$sorted_shards{$sid}})
 }
 
 # Master-side merge: N-way merge of the per-worker sorted lists.
 # Simple impl: collect all elements, sort. Real impl would use a
 # k-way merge with a min-heap — left as exercise.
-my @merged
-for my $sid (keys %sorted_shards) {
+var @merged
+for val $sid (keys %sorted_shards) {
     push @merged, @{$sorted_shards{$sid}}
 }
 @merged = sort { _ <=> _1 } @merged
@@ -60,9 +60,9 @@ for my $sid (keys %sorted_shards) {
 printf "merged (%d items): %s\n", len(@merged), join(",", @merged)
 
 # Verify: the merged output is a sorted permutation of the input.
-my @expected = sort { _ <=> _1 } @input
-my $matches = 1
-for my $i (0:len(@expected) - 1) {
+val @expected = sort { _ <=> _1 } @input
+var $matches = 1
+for val $i (0:len(@expected) - 1) {
     $matches = 0 unless $merged[$i] == $expected[$i]
 }
 p $matches ? "✓ distributed sort matches local sort" : "✗ distributed sort diverged"

@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my %RANK = (
+const val %RANK = (
     "2" => 2, "3" => 3, "4" => 4, "5" => 5, "6" => 6, "7" => 7, "8" => 8,
     "9" => 9, "10" => 10, "J" => 11, "Q" => 12, "K" => 13, "A" => 14,
 )
@@ -8,31 +8,31 @@ const my %RANK = (
 # Given list of hand strings ("AS 2H 3D 4C 5S" etc.), return the
 # arrayref of the highest-ranked hands.
 fn Exercism::Poker::best_hands($hands) {
-    my @scored = map { [Exercism::Poker::_score($_), $_] } @{$hands}
+    var @scored = map { [Exercism::Poker::_score($_), $_] } @{$hands}
     @scored = sort { Exercism::Poker::_cmp(_1->[0], _->[0]) } @scored
-    my $best = $scored[0][0]
+    val $best = $scored[0][0]
     [map { $_->[1] } grep { Exercism::Poker::_cmp($_->[0], $best) == 0 } @scored]
 }
 
 fn Exercism::Poker::_cmp($x, $y) {
-    for my $i (0..$#{$x}) {
+    for val $i (0..$#{$x}) {
         return $x->[$i] <=> $y->[$i] if $x->[$i] != $y->[$i]
     }
     0
 }
 
 fn Exercism::Poker::_score($hand) {
-    my @cards = split /\s+/, $hand
-    my @ranks = sort { _1 <=> _ } map { my $r = $_; $r =~ s/[SHDC]$//; $RANK{$r} } @cards
-    my @suits = map { substr($_, -1) } @cards
-    my %count
+    val @cards = split /\s+/, $hand
+    val @ranks = sort { _1 <=> _ } map { var $r = $_; $r =~ s/[SHDC]$//; $RANK{$r} } @cards
+    val @suits = map { substr($_, -1) } @cards
+    var %count
     $count{$_}++ for @ranks
-    my @groups = sort { $count{_1} <=> $count{_} || _1 <=> _ } keys %count
-    my $is_flush    = (len(@{Exercism::Poker::_uniq(\@suits)}) == 1) ? 1 : 0
-    my $is_straight = Exercism::Poker::_is_straight(\@ranks)
+    val @groups = sort { $count{_1} <=> $count{_} || _1 <=> _ } keys %count
+    val $is_flush    = (len(@{Exercism::Poker::_uniq(\@suits)}) == 1) ? 1 : 0
+    val $is_straight = Exercism::Poker::_is_straight(\@ranks)
     # Cat: 8=straight flush, 7=four-of-a-kind, 6=full house, 5=flush, 4=straight, 3=three, 2=two-pair, 1=pair, 0=high
-    my @ordered
-    my $cat
+    var @ordered
+    var $cat
     if ($is_flush && $is_straight) { $cat = 8; @ordered = @ranks }
     elsif ($count{$groups[0]} == 4)                                { $cat = 7; @ordered = ($groups[0], $groups[1]) }
     elsif ($count{$groups[0]} == 3 && $count{$groups[1]} == 2)     { $cat = 6; @ordered = ($groups[0], $groups[1]) }
@@ -46,14 +46,14 @@ fn Exercism::Poker::_score($hand) {
 }
 
 fn Exercism::Poker::_is_straight($ranks) {
-    my @r = @{$ranks}
-    for my $i (0..$#r - 1) {
+    val @r = @{$ranks}
+    for val $i (0..$#r - 1) {
         return 0 if $r[$i] - $r[$i + 1] != 1
     }
     1
 }
 
 fn Exercism::Poker::_uniq($arr) {
-    my %seen
+    var %seen
     [grep { !$seen{$_}++ } @{$arr}]
 }

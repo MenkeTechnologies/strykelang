@@ -12,8 +12,8 @@ fn Point::new($x, $y) {
 }
 
 fn Point::distance($p1, $p2) {
-    my $dx = $p2->x - $p1->x
-    my $dy = $p2->y - $p1->y
+    val $dx = $p2->x - $p1->x
+    val $dy = $p2->y - $p1->y
     sqrt($dx * $dx + $dy * $dy)
 }
 
@@ -50,7 +50,7 @@ fn Rect::is_square($r) {
 struct Circle { center, radius }
 
 fn Circle::new($cx, $cy, $r) {
-    my $center = Point($cx, $cy)
+    val $center = Point($cx, $cy)
     Circle($center, $r)
 }
 
@@ -59,9 +59,9 @@ fn Circle::area($c) {
 }
 
 fn Circle::contains($c, $p) {
-    my $dx = $p->x - $c->center->x
-    my $dy = $p->y - $c->center->y
-    my $dist = sqrt($dx * $dx + $dy * $dy)
+    val $dx = $p->x - $c->center->x
+    val $dy = $p->y - $c->center->y
+    val $dist = sqrt($dx * $dx + $dy * $dy)
     $dist <= $c->radius ? 1 : 0
 }
 
@@ -182,7 +182,7 @@ fn Vec3::len($v) {
 }
 
 fn Vec3::normalize($v) {
-    my $len = Vec3::len($v)
+    val $len = Vec3::len($v)
     if ($len > 0) {
         Vector3($v->x / $len, $v->y / $len, $v->z / $len)
     } else {

@@ -12,16 +12,16 @@ fn Rosetta::FlowControl::test_if($n) {
 }
 
 fn Rosetta::FlowControl::test_for($n) {
-    my @res
-    for (my $i = 0; $i < $n; $i++) { 
+    var @res
+    for (var $i = 0; $i < $n; $i++) { 
         push @res, $i 
     }
     join(",", @res)
 }
 
 fn Rosetta::FlowControl::test_while($n) {
-    my $i = 0
-    my @res
+    var $i = 0
+    var @res
     while ($i < $n) { 
         push @res, $i
         $i++ 

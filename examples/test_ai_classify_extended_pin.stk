@@ -7,10 +7,10 @@
 
 ai_mock_install("(?s)Classify each item below into exactly one of these labels: vehicle, animal, food", '["food", "animal", "vehicle", "food"]');
 
-my @items = ("apple", "dog", "car", "banana");
-my @labels = ("vehicle", "animal", "food");
+val @items = ("apple", "dog", "car", "banana");
+val @labels = ("vehicle", "animal", "food");
 
-my $classified = ai_classify(\@items, "Classify these items", into => \@labels);
+val $classified = ai_classify(\@items, "Classify these items", into => \@labels);
 
 join(",", @{$classified}) |> aeq "food,animal,vehicle,food", "ai_classify basic test";
 
@@ -18,16 +18,16 @@ join(",", @{$classified}) |> aeq "food,animal,vehicle,food", "ai_classify basic 
 
 ai_mock_install("(?s)Classify each item below into exactly one of these labels: info, warning, error", '["error", "info", "error", "warning", "info"]');
 
-my @logs = (
+val @logs = (
     "2026-05-10T10:00:00Z - NullPointerException",
     "2026-05-10T10:01:00Z - User logged in",
     "2026-05-10T10:02:00Z - Database connection failed",
     "2026-05-10T10:03:00Z - Disk space is running low",
     "2026-05-10T10:04:00Z - Request processed successfully"
 );
-my @log_levels = ("info", "warning", "error");
+val @log_levels = ("info", "warning", "error");
 
-my $classified_logs = ai_classify(\@logs, "Categorize these logs", into => \@log_levels);
+val $classified_logs = ai_classify(\@logs, "Categorize these logs", into => \@log_levels);
 
 join(",", @{$classified_logs}) |> aeq "error,info,error,warning,info", "ai_classify log categorization";
 
@@ -35,10 +35,10 @@ join(",", @{$classified_logs}) |> aeq "error,info,error,warning,info", "ai_class
 
 ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, vegetable, meat, dairy, grain, dessert", '["fruit", "vegetable", "meat", "dairy", "grain", "dessert", "fruit"]');
 
-my @many_items = ("apple", "broccoli", "chicken", "milk", "bread", "cake", "orange");
-my @many_labels = ("fruit", "vegetable", "meat", "dairy", "grain", "dessert");
+val @many_items = ("apple", "broccoli", "chicken", "milk", "bread", "cake", "orange");
+val @many_labels = ("fruit", "vegetable", "meat", "dairy", "grain", "dessert");
 
-my $classified_many = ai_classify(\@many_items, "Classify these food items", into => \@many_labels);
+val $classified_many = ai_classify(\@many_items, "Classify these food items", into => \@many_labels);
 
 join(",", @{$classified_many}) |> aeq "fruit,vegetable,meat,dairy,grain,dessert,fruit", "ai_classify many labels and items";
 
@@ -46,10 +46,10 @@ join(",", @{$classified_many}) |> aeq "fruit,vegetable,meat,dairy,grain,dessert,
 
 ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, vegetable", '["fruit", "vegetable", null]');
 
-my @unclassifiable_items = ("apple", "carrot", "rock");
-my @unclassifiable_labels = ("fruit", "vegetable");
+val @unclassifiable_items = ("apple", "carrot", "rock");
+val @unclassifiable_labels = ("fruit", "vegetable");
 
-my $classified_unclassifiable = ai_classify(\@unclassifiable_items, "Classify these items", into => \@unclassifiable_labels);
+val $classified_unclassifiable = ai_classify(\@unclassifiable_items, "Classify these items", into => \@unclassifiable_labels);
 
 join(",", map { _ // "null" } @{$classified_unclassifiable}) |> aeq "fruit,vegetable,null", "ai_classify unclassifiable items";
 

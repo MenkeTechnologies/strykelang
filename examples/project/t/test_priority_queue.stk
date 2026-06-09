@@ -3,7 +3,7 @@
 
 require "./lib/priority_queue.stk"
 
-my $pq = Project::PriorityQueue::pq_new()
+val $pq = Project::PriorityQueue::pq_new()
 assert_ok $pq->is_empty(), "pq is empty initially"
 
 $pq->push(10)
@@ -23,8 +23,8 @@ assert_ok $pq->is_empty(), "pq is empty after pops"
 
 # ── Project::Algorithms::heap_sort test (via algorithms.stk) ─────
 require "./lib/algorithms.stk"
-my @unsorted = (15, 5, 25, 10, 20)
-my @sorted = Project::Algorithms::heap_sort(@unsorted)
+val @unsorted = (15, 5, 25, 10, 20)
+val @sorted = Project::Algorithms::heap_sort(@unsorted)
 assert_eq join(",", @sorted), "5,10,15,20,25", "Project::Algorithms::heap_sort basic"
 
 test_run

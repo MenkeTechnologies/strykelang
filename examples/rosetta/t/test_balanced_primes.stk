@@ -2,7 +2,7 @@
 # Rosetta Code: Balanced primes
 
 fn Rosetta::BalancedPrimes::prev_prime($n) {
-    my $p = $n - 1
+    var $p = $n - 1
     while ($p > 1) {
         if (is_prime($p)) { return $p }
         $p--
@@ -11,7 +11,7 @@ fn Rosetta::BalancedPrimes::prev_prime($n) {
 }
 
 fn Rosetta::BalancedPrimes::next_prime($n) {
-    my $p = $n + 1
+    var $p = $n + 1
     while (1) {
         if (is_prime($p)) { return $p }
         $p++
@@ -22,11 +22,11 @@ fn Rosetta::BalancedPrimes::check($n) {
     if (!is_prime($n)) {
         0
     } else {
-        my $prev = Rosetta::BalancedPrimes::prev_prime($n)
+        val $prev = Rosetta::BalancedPrimes::prev_prime($n)
         if ($prev == 0) {
             0
         } else {
-            my $next = Rosetta::BalancedPrimes::next_prime($n)
+            val $next = Rosetta::BalancedPrimes::next_prime($n)
             $n * 2 == $prev + $next
         }
     }

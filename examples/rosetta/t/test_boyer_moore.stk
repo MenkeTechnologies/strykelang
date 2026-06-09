@@ -2,20 +2,20 @@
 # Rosetta Code: Boyer-Moore string search (Simplified)
 
 fn Rosetta::BoyerMoore::find($text, $pattern) {
-    my $n = length($text)
-    my $m = length($pattern)
+    val $n = length($text)
+    val $m = length($pattern)
     if ($m == 0) { return 0 }
     
     # Precompute bad character shift
-    my %bad_char
-    my @p_chars = ~> $pattern chars
-    for my $i (0:$m-1) {
+    var %bad_char
+    val @p_chars = ~> $pattern chars
+    for val $i (0:$m-1) {
         $bad_char{$p_chars[$i]} = $i
     }
     
-    my $s = 0
+    var $s = 0
     while ($s <= ($n - $m)) {
-        my $j = $m - 1
+        var $j = $m - 1
         while ($j >= 0 && $p_chars[$j] eq substr($text, $s + $j, 1)) {
             $j--
         }
@@ -23,9 +23,9 @@ fn Rosetta::BoyerMoore::find($text, $pattern) {
         if ($j < 0) {
             return $s
         } else {
-            my $char = substr($text, $s + $j, 1)
-            my $bc_idx = exists $bad_char{$char} ? $bad_char{$char} : -1
-            my $shift = $j - $bc_idx
+            val $char = substr($text, $s + $j, 1)
+            val $bc_idx = exists $bad_char{$char} ? $bad_char{$char} : -1
+            val $shift = $j - $bc_idx
             $s += ($shift > 1 ? $shift : 1)
         }
     }

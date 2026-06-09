@@ -3,8 +3,8 @@
 
 fn Rosetta::CompareStrings::all_equal($list) {
     if (len(@$list) <= 1) { return 1 }
-    my $first = $list->[0]
-    for my $s (@$list) {
+    val $first = $list->[0]
+    for val $s (@$list) {
         if ($s ne $first) { return 0 }
     }
     1
@@ -12,22 +12,22 @@ fn Rosetta::CompareStrings::all_equal($list) {
 
 fn Rosetta::CompareStrings::all_increasing($list) {
     if (len(@$list) <= 1) { return 1 }
-    for my $i (0..len(@$list)-2) {
+    for val $i (0..len(@$list)-2) {
         if ($list->[$i] ge $list->[$i+1]) { return 0 }
     }
     1
 }
 
-my @eq = ("abc", "abc", "abc")
+val @eq = ("abc", "abc", "abc")
 assert_ok Rosetta::CompareStrings::all_equal(\@eq), "all strings equal"
 
-my @neq = ("abc", "abd", "abc")
+val @neq = ("abc", "abd", "abc")
 assert_ok !Rosetta::CompareStrings::all_equal(\@neq), "not all equal"
 
-my @inc = ("abc", "abd", "abe")
+val @inc = ("abc", "abd", "abe")
 assert_ok Rosetta::CompareStrings::all_increasing(\@inc), "strings increasing"
 
-my @ninc = ("abc", "abe", "abd")
+val @ninc = ("abc", "abe", "abd")
 assert_ok !Rosetta::CompareStrings::all_increasing(\@ninc), "not increasing"
 
 test_run

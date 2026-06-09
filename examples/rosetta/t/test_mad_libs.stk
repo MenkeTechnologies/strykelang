@@ -4,10 +4,10 @@
 # substitutions; produce the filled-in story.
 
 fn Rosetta::MadLibs::placeholders($template) {
-    my @ph
-    my %seen
+    var @ph
+    var %seen
     while ($template =~ /<([A-Za-z0-9_-]+)>/g) {
-        my $name = $1
+        val $name = $1
         next if exists $seen{$name}
         $seen{$name} = 1
         push @ph, $name
@@ -16,11 +16,11 @@ fn Rosetta::MadLibs::placeholders($template) {
 }
 
 fn Rosetta::MadLibs::fill($template, $values) {
-    my $out = $template
-    for my $key (keys %$values) {
-        my $tag = "<$key>"
-        my $val = $values->{$key}
-        my $idx
+    var $out = $template
+    for val $key (keys %$values) {
+        val $tag = "<$key>"
+        val $val = $values->{$key}
+        var $idx
         while (($idx = index($out, $tag)) >= 0) {
             $out = substr($out, 0, $idx) . $val . substr($out, $idx + length($tag))
         }
@@ -29,21 +29,21 @@ fn Rosetta::MadLibs::fill($template, $values) {
 }
 
 fn Rosetta::MadLibs::missing($template, $values) {
-    my @ph = Rosetta::MadLibs::placeholders($template)
-    my @missing
-    for my $p (@ph) {
+    val @ph = Rosetta::MadLibs::placeholders($template)
+    var @missing
+    for val $p (@ph) {
         push @missing, $p if !exists $values->{$p}
     }
     @missing
 }
 
 # Find placeholders
-my $tpl = "<NAME> the <ANIMAL> sat on a <OBJECT>."
-my @ph = Rosetta::MadLibs::placeholders($tpl)
+val $tpl = "<NAME> the <ANIMAL> sat on a <OBJECT>."
+val @ph = Rosetta::MadLibs::placeholders($tpl)
 assert_eq join(",", @ph), "NAME,ANIMAL,OBJECT", "three placeholders"
 
 # Fill all
-my $story = Rosetta::MadLibs::fill($tpl, {
+val $story = Rosetta::MadLibs::fill($tpl, {
     NAME   => "Alice",
     ANIMAL => "fox",
     OBJECT => "log",
@@ -51,22 +51,22 @@ my $story = Rosetta::MadLibs::fill($tpl, {
 assert_eq $story, "Alice the fox sat on a log.", "all placeholders filled"
 
 # Missing placeholders surface
-my @miss = Rosetta::MadLibs::missing($tpl, { NAME => "X" })
+val @miss = Rosetta::MadLibs::missing($tpl, { NAME => "X" })
 assert_eq len(@miss), 2, "two missing"
-my %miss_set = map { _ => 1 } @miss
+val %miss_set = map { _ => 1 } @miss
 assert_eq exists($miss_set{ANIMAL}), 1, "ANIMAL missing"
 assert_eq exists($miss_set{OBJECT}), 1, "OBJECT missing"
 
 # Repeated placeholder gets repeated value
-my $repeat = Rosetta::MadLibs::fill("<X> + <X>", { X => "7" })
+val $repeat = Rosetta::MadLibs::fill("<X> + <X>", { X => "7" })
 assert_eq $repeat, "7 + 7", "repeated placeholder"
 
 # Template without any placeholders passes through
 assert_eq Rosetta::MadLibs::fill("plain text", {}), "plain text", "no placeholders"
 
 # Order-independence: order of values hash should not matter
-my $s1 = Rosetta::MadLibs::fill($tpl, { ANIMAL => "cat", NAME => "Bob", OBJECT => "mat" })
-my $s2 = Rosetta::MadLibs::fill($tpl, { OBJECT => "mat", NAME => "Bob", ANIMAL => "cat" })
+val $s1 = Rosetta::MadLibs::fill($tpl, { ANIMAL => "cat", NAME => "Bob", OBJECT => "mat" })
+val $s2 = Rosetta::MadLibs::fill($tpl, { OBJECT => "mat", NAME => "Bob", ANIMAL => "cat" })
 assert_eq $s1, $s2, "value-hash order doesn't matter"
 
 # Pipe form

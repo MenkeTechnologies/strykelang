@@ -4,31 +4,31 @@
 # and the chain loops (first.left == last.right). Returns ["ok", chain]
 # or ["error", msg].
 fn Exercism::Dominoes::chain {
-    my @ds = @{_}
+    val @ds = @{_}
     return ["ok", []] unless @ds
-    for my $orient (0, 1) {
-        my @start = $orient ? [$ds[0][1], $ds[0][0]] : @{[$ds[0]]}
-        my @rest  = @ds[1..$#ds]
-        my $r = Exercism::Dominoes::_search(\@start, \@rest)
+    for val $orient (0, 1) {
+        val @start = $orient ? [$ds[0][1], $ds[0][0]] : @{[$ds[0]]}
+        val @rest  = @ds[1..$#ds]
+        var $r = Exercism::Dominoes::_search(\@start, \@rest)
         return ["ok", $r] if $r
     }
     ["error", "no chain"]
 }
 
 fn Exercism::Dominoes::_search {
-    my ($chain, $rest) = (_, _1)
+    val ($chain, $rest) = (_, _1)
     if (!@{$rest}) {
         return $chain->[0][0] == $chain->[-1][1] ? $chain : undef
     }
-    my $tail = $chain->[-1][1]
-    for my $i (0..$#{$rest}) {
-        my $d = $rest->[$i]
-        for my $orient (0, 1) {
-            my @piece = $orient ? ($d->[1], $d->[0]) : @{$d}
+    val $tail = $chain->[-1][1]
+    for val $i (0..$#{$rest}) {
+        val $d = $rest->[$i]
+        for val $orient (0, 1) {
+            val @piece = $orient ? ($d->[1], $d->[0]) : @{$d}
             next unless $piece[0] == $tail
-            my @new_chain = (@{$chain}, [@piece])
-            my @new_rest  = (@{$rest}[0..$i - 1], @{$rest}[$i + 1..$#{$rest}])
-            my $r = Exercism::Dominoes::_search(\@new_chain, \@new_rest)
+            val @new_chain = (@{$chain}, [@piece])
+            val @new_rest  = (@{$rest}[0..$i - 1], @{$rest}[$i + 1..$#{$rest}])
+            val $r = Exercism::Dominoes::_search(\@new_chain, \@new_rest)
             return $r if $r
         }
     }

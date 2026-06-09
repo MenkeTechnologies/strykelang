@@ -3,18 +3,18 @@
 package Lisp
 
 fn tokenize($code) {
-    my $c = $code
+    var $c = $code
     $c =~ s/\(/ ( /g; $c =~ s/\)/ ) /g
-    my @tokens = split /\s+/, $c
-    my @clean = grep { len(_) > 0 } @tokens
+    val @tokens = split /\s+/, $c
+    val @clean = grep { len(_) > 0 } @tokens
     \@clean
 }
 
 fn parse($tokens) {
     return undef if !@$tokens
-    my $token = shift @$tokens
+    val $token = shift @$tokens
     if ($token eq "(") {
-        my @list
+        var @list
         while (@$tokens && $tokens->[0] ne ")") { push @list, parse($tokens) }
         shift @$tokens if @$tokens && $tokens->[0] eq ")"
         \@list
@@ -34,38 +34,38 @@ fn env_find($env, $var) {
 fn eval_v($x, $env) {
     if (ref($x) eq "") {
         if ($x =~ /^-?\d+$/) { return $x }
-        my $found = env_find $env, $x
+        val $found = env_find $env, $x
         return undef if !defined $found
         return $found->{vars}->{$x}
     }
     return $x if ref($x) ne "ARRAY"
-    my @list = @$x
+    val @list = @$x
     return [] if !@list
-    my $op = $list[0]
+    val $op = $list[0]
     if ($op eq "define") {
-        my $val = eval_v($list[2], $env)
+        val $val = eval_v($list[2], $env)
         $env->{vars}->{$list[1]} = $val
         return $val
     }
     if ($op eq "if") {
-        my $cond = eval_v $list[1], $env
+        val $cond = eval_v $list[1], $env
         return eval_v(($cond ? $list[2] : $list[3]), $env)
     }
     if ($op eq "fn") { return { params => $list[1], body => $list[2], env => $env } }
-    my $proc = eval_v $op, $env
-    my @args; for my $i (1 : (len @list) - 1) { push @args, eval_v($list[$i], $env) }
+    val $proc = eval_v $op, $env
+    var @args; for val $i (1 : (len @list) - 1) { push @args, eval_v($list[$i], $env) }
     if (ref($proc) eq "HASH") {
-        my $new_e = new_env $proc->{env}
-        my @p = @{$proc->{params}}
-        for my $i (0 : (len @p) - 1) { $new_e->{vars}->{$p[$i]} = $args[$i] }
+        val $new_e = new_env $proc->{env}
+        val @p = @{$proc->{params}}
+        for val $i (0 : (len @p) - 1) { $new_e->{vars}->{$p[$i]} = $args[$i] }
         return eval_v $proc->{body}, $new_e
     } else { return $proc(@args) }
 }
 
 fn setup_env($env) {
-    $env->{vars}->{"+"} = fn { my $s = 0; for (@_) { $s = $s + _ } $s }
+    $env->{vars}->{"+"} = fn { var $s = 0; for (@_) { $s = $s + _ } $s }
     $env->{vars}->{"-"} = fn { _ - _1 }
-    $env->{vars}->{"*"} = fn { my $p = 1; for (@_) { $p = $p * _ } $p }
+    $env->{vars}->{"*"} = fn { var $p = 1; for (@_) { $p = $p * _ } $p }
     $env->{vars}->{"="} = fn { _ == _1 ? 1 : 0 }
     $env->{vars}->{">"} = fn { _ > _1 ? 1 : 0 }
 }
@@ -73,12 +73,12 @@ fn setup_env($env) {
 package main
 
 # --- Basic E2E ---
-my $env = Lisp::new_env undef
+val $env = Lisp::new_env undef
 Lisp::setup_env $env
 
 fn lisp_run_test($code, $e) {
-    my $tokens = Lisp::tokenize $code
-    my $ast = Lisp::parse $tokens
+    val $tokens = Lisp::tokenize $code
+    val $ast = Lisp::parse $tokens
     Lisp::eval_v $ast, $e
 }
 

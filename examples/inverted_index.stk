@@ -11,7 +11,7 @@
 
 # ── document corpus ─────────────────────────────────────────────────
 
-my @docs = (
+val @docs = (
     +{ id => 1,
        title => "Rust systems programming",
        text  => "Rust is a fast, safe systems programming language with zero-cost abstractions" },
@@ -40,18 +40,18 @@ my @docs = (
 
 # ── build inverted index ────────────────────────────────────────────
 
-my %index    # term -> hashref { doc_id -> term_freq }
+var %index    # term -> hashref { doc_id -> term_freq }
 
 fn Demo::II::tokenize($s) {
-    my @toks = split /\W+/, lc $s
+    var @toks = split /\W+/, lc $s
     @toks = grep { len(_) > 0 } @toks
     \@toks
 }
 
-for my $doc (@docs) {
-    my $combined = $doc->{title} . " " . $doc->{text}
-    my $toks = Demo::II::tokenize($combined)
-    for my $t (@$toks) {
+for val $doc (@docs) {
+    val $combined = $doc->{title} . " " . $doc->{text}
+    val $toks = Demo::II::tokenize($combined)
+    for val $t (@$toks) {
         $index{$t} = +{} unless exists $index{$t}
         $index{$t}->{$doc->{id}} = ($index{$t}->{$doc->{id}} // 0) + 1
     }
@@ -62,17 +62,17 @@ printf "── index built: %d docs, %d distinct terms ────────�
 
 # ── query ops ──────────────────────────────────────────────────────
 
-my $td_query = t_digest(100)
+val $td_query = t_digest(100)
 
 fn Demo::II::posting($term) {
     $index{$term} // +{}
 }
 
 fn Demo::II::query_or($terms) {
-    my %scores
-    for my $t (@$terms) {
-        my $post = Demo::II::posting($t)
-        for my $doc_id (keys %$post) {
+    var %scores
+    for val $t (@$terms) {
+        val $post = Demo::II::posting($t)
+        for val $doc_id (keys %$post) {
             $scores{$doc_id} = ($scores{$doc_id} // 0) + $post->{$doc_id}
         }
     }
@@ -81,16 +81,16 @@ fn Demo::II::query_or($terms) {
 
 fn Demo::II::query_and($terms) {
     return +{} if len(@$terms) == 0
-    my $first_post = Demo::II::posting($terms->[0])
-    my %scores
-    for my $doc_id (keys %$first_post) {
+    val $first_post = Demo::II::posting($terms->[0])
+    var %scores
+    for val $doc_id (keys %$first_post) {
         $scores{$doc_id} = $first_post->{$doc_id}
     }
     # Intersect with remaining terms.
-    for my $i (1:len(@$terms) - 1) {
-        my $post = Demo::II::posting($terms->[$i])
-        my %new
-        for my $doc_id (keys %scores) {
+    for val $i (1:len(@$terms) - 1) {
+        val $post = Demo::II::posting($terms->[$i])
+        var %new
+        for val $doc_id (keys %scores) {
             if (exists $post->{$doc_id}) {
                 $new{$doc_id} = $scores{$doc_id} + $post->{$doc_id}
             }
@@ -101,16 +101,16 @@ fn Demo::II::query_and($terms) {
 }
 
 fn Demo::II::search($query, $mode) {
-    my $t0 = now_ns()
-    my $toks = Demo::II::tokenize($query)
-    my $scores = $mode eq "and" ? Demo::II::query_and($toks)
+    val $t0 = now_ns()
+    val $toks = Demo::II::tokenize($query)
+    val $scores = $mode eq "and" ? Demo::II::query_and($toks)
                                 : Demo::II::query_or($toks)
     td_add($td_query, (now_ns() - $t0) / 1000.0)
     $scores
 }
 
 fn Demo::II::doc_by_id($id) {
-    for my $d (@docs) {
+    for val $d (@docs) {
         return $d if $d->{id} == $id
     }
     undef
@@ -118,7 +118,7 @@ fn Demo::II::doc_by_id($id) {
 
 # ── run sample queries ─────────────────────────────────────────────
 
-my @queries = (
+val @queries = (
     [["rust"],              "or",  "rust"],
     [["parallel"],          "or",  "parallel"],
     [["rust", "parallel"],  "or",  "rust OR parallel"],
@@ -127,16 +127,16 @@ my @queries = (
     [["stryke", "language"], "and", "stryke AND language"],
 )
 
-for my $q (@queries) {
+for val $q (@queries) {
     p ""
     printf "── query: %s ────────────────────────────────\n", $q->[2]
-    my $scores = Demo::II::search(@{$q->[0]} |> join(" "), $q->[1])
+    val $scores = Demo::II::search(@{$q->[0]} |> join(" "), $q->[1])
     if (len(keys %$scores) == 0) {
         p "  (no results)"
     } else {
-        my @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
-        for my $id (@ranked) {
-            my $doc = Demo::II::doc_by_id($id + 0)
+        val @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
+        for val $id (@ranked) {
+            val $doc = Demo::II::doc_by_id($id + 0)
             printf "  doc %s  score=%d  %s\n",
                 $id, $scores->{$id}, substr($doc->{title}, 0, 50)
         }
@@ -147,9 +147,9 @@ for my $q (@queries) {
 
 p ""
 p "── index statistics ─────────────────────────────────"
-my @term_postings_sizes = map { len(keys %{$index{_}}) } keys %index
-my $max_p = max @term_postings_sizes
-my $min_p = min @term_postings_sizes
+val @term_postings_sizes = map { len(keys %{$index{_}}) } keys %index
+val $max_p = max @term_postings_sizes
+val $min_p = min @term_postings_sizes
 printf "  most-shared term : %d docs\n", $max_p
 printf "  rarest term      : %d docs (singletons)\n", $min_p
 
@@ -157,18 +157,18 @@ printf "  rarest term      : %d docs (singletons)\n", $min_p
 
 p ""
 p "── most-common terms across corpus (TopK) ───────────"
-my $tk = topk(5)
-for my $t (keys %index) {
-    my $total_freq = 0
-    for my $doc_id (keys %{$index{$t}}) {
+val $tk = topk(5)
+for val $t (keys %index) {
+    var $total_freq = 0
+    for val $doc_id (keys %{$index{$t}}) {
         $total_freq += $index{$t}->{$doc_id}
     }
-    for my $i (1:$total_freq) {
+    for val $i (1:$total_freq) {
         topk_add($tk, $t)
     }
 }
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
 }
 
@@ -176,7 +176,7 @@ for my $h (@hits) {
 
 p ""
 p "── HLL distinct terms ───────────────────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _) for keys %index
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %index)

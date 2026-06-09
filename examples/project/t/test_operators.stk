@@ -209,19 +209,19 @@ assert_eq Project::Operators::compound_bit_or(), 0xFF, "|="
 # INCREMENT/DECREMENT OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @pre_inc = Project::Operators::pre_increment()
+val @pre_inc = Project::Operators::pre_increment()
 assert_eq $pre_inc[0], 6, "pre inc x"
 assert_eq $pre_inc[1], 6, "pre inc y"
 
-my @post_inc = Project::Operators::post_increment()
+val @post_inc = Project::Operators::post_increment()
 assert_eq $post_inc[0], 6, "post inc x"
 assert_eq $post_inc[1], 5, "post inc y"
 
-my @pre_dec = Project::Operators::pre_decrement()
+val @pre_dec = Project::Operators::pre_decrement()
 assert_eq $pre_dec[0], 4, "pre dec x"
 assert_eq $pre_dec[1], 4, "pre dec y"
 
-my @post_dec = Project::Operators::post_decrement()
+val @post_dec = Project::Operators::post_decrement()
 assert_eq $post_dec[0], 4, "post dec x"
 assert_eq $post_dec[1], 5, "post dec y"
 
@@ -250,7 +250,7 @@ assert_eq Project::Operators::ternary_with_ops(3, 10), 7, "ternary ops 3<10"
 # RANGE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @r1 = range_inclusive(1, 5)
+val @r1 = range_inclusive(1, 5)
 assert_eq len(@r1), 5, "range 1:5 count"
 assert_eq $r1[0], 1, "range first"
 assert_eq $r1[4], 5, "range last"
@@ -260,7 +260,7 @@ assert_eq Project::Operators::range_sum(1, 100), 5050, "range sum 1:100"
 
 assert_eq Project::Operators::range_char(), "abcde", "char range"
 
-my @rev = Project::Operators::range_reverse(1, 5)
+val @rev = Project::Operators::range_reverse(1, 5)
 assert_eq $rev[0], 5, "reverse range first"
 assert_eq $rev[4], 1, "reverse range last"
 
@@ -270,7 +270,7 @@ assert_eq $rev[4], 1, "reverse range last"
 
 assert_eq Project::Operators::list_assign(), 6, "list assign"
 
-my @swapped = Project::Operators::list_swap()
+val @swapped = Project::Operators::list_swap()
 assert_eq $swapped[0], 2, "swap a"
 assert_eq $swapped[1], 1, "swap b"
 

@@ -43,8 +43,8 @@ fn Project::DefaultParams::array_default_empty($x, @rest = ()) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::DefaultParams::hash_default($name, %opts = (debug => 0, verbose => 1)) {
-    my $d = $opts{debug} // 0
-    my $v = $opts{verbose} // 0
+    val $d = $opts{debug} // 0
+    val $v = $opts{verbose} // 0
     "$name: debug=$d verbose=$v"
 }
 

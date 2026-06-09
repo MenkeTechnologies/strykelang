@@ -6,7 +6,7 @@
 
 fn Rosetta::Epoch::stamp() {
     # gmtime(0) yields the broken-down UTC time at the epoch.
-    my @t = gmtime(0)
+    val @t = gmtime(0)
     sprintf("%04d-%02d-%02dT%02d:%02d:%02dZ",
         $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0])
 }
@@ -19,13 +19,13 @@ fn Rosetta::Epoch::seconds_since() {
 assert_eq Rosetta::Epoch::stamp(), "1970-01-01T00:00:00Z", "POSIX epoch"
 
 # time() advances monotonically
-my $t0 = Rosetta::Epoch::seconds_since()
-my $t1 = Rosetta::Epoch::seconds_since()
+val $t0 = Rosetta::Epoch::seconds_since()
+val $t1 = Rosetta::Epoch::seconds_since()
 assert_ok $t1 >= $t0, "time() does not run backwards"
 assert_ok $t0 > 1_700_000_000, "time() past 2023"
 
 # gmtime(0) round-trip
-my @t = gmtime(0)
+val @t = gmtime(0)
 assert_eq $t[0], 0,   "second = 0"
 assert_eq $t[1], 0,   "minute = 0"
 assert_eq $t[2], 0,   "hour = 0"

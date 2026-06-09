@@ -15,18 +15,18 @@
 # Run: stryke --no-interop examples/shunting_yard_no_interop.stk
 #      stryke --no-interop examples/shunting_yard_no_interop.stk "3 + 4 * 2"
 
-my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
-my %RIGHT_ASSOC = ("**" => 1)
+val %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
+val %RIGHT_ASSOC = ("**" => 1)
 
 fn Shunt::is_op($tok) {
     exists $PREC{$tok}
 }
 
 fn Shunt::to_rpn($expr) {
-    my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
-    my @out
-    my @ops
-    for my $tok (@toks) {
+    val @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    var @out
+    var @ops
+    for val $tok (@toks) {
         if (Shunt::is_op($tok)) {
             while (len(@ops) > 0 &&
                    $ops[-1] ne "(" &&
@@ -62,7 +62,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — classic examples.
-my @cases = (
+val @cases = (
     +{ infix => "3 + 4",                 postfix => "3 4 +"                  },
     +{ infix => "3 + 4 * 2",             postfix => "3 4 2 * +"              },
     +{ infix => "( 3 + 4 ) * 2",         postfix => "3 4 + 2 *"              },
@@ -74,10 +74,10 @@ my @cases = (
 )
 
 p "── Shunting-yard demo (infix → postfix) ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Shunt::to_rpn($c->{infix})
-    my $ok  = ($got eq $c->{postfix})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Shunt::to_rpn($c->{infix})
+    val $ok  = ($got eq $c->{postfix})
     $fail++ unless $ok
     printf "  %-28s -> %-22s expect %-22s %s\n",
         "\"" . $c->{infix} . "\"",

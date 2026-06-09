@@ -9,12 +9,12 @@ fn Exercism::SimpleCipher::new($key) {
 }
 
 fn Exercism::SimpleCipher::_process($self, $in, $decode) {
-    my @c = chars(lc($in =~ s/[^a-zA-Z]//gr))
-    my @k = chars($self->{key})
-    my $kn = len(@k)
+    var @c = chars(lc($in =~ s/[^a-zA-Z]//gr))
+    val @k = chars($self->{key})
+    val $kn = len(@k)
     ~> 0:len(@c)-1 map {
-        my $tr = ord($c[_]) - 97
-        my $kk = ord($k[_ % $kn]) - 97
+        val $tr = ord($c[_]) - 97
+        val $kk = ord($k[_ % $kn]) - 97
         chr(97 + (($tr + ($decode ? -$kk : $kk)) % 26 + 26) % 26)
     } join("")
 }

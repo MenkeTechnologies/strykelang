@@ -6,26 +6,26 @@ fn Rosetta::GenericSwap::pair($a, $b) {
 }
 
 # Tuple destructuring works for any types
-my ($x, $y) = (1, "hello")
+var ($x, $y) = (1, "hello")
 ($x, $y) = Rosetta::GenericSwap::pair($x, $y)
 assert_eq $x, "hello", "x got the string"
 assert_eq $y, 1, "y got the number"
 
 # In-place tuple swap (most idiomatic)
-my $a = 10; my $b = 20
+var $a = 10; var $b = 20
 ($a, $b) = ($b, $a)
 assert_eq $a, 20, "a is 20"
 assert_eq $b, 10, "b is 10"
 
 # Mixed types swap
-my $foo = [1, 2, 3]
-my $bar = { name => "stryke" }
+var $foo = [1, 2, 3]
+var $bar = { name => "stryke" }
 ($foo, $bar) = ($bar, $foo)
 assert_eq $foo->{name}, "stryke", "foo is now the hash"
 assert_eq join(",", @$bar), "1,2,3", "bar is now the array"
 
 # Three-way rotation via tuple
-my ($p, $q, $r) = ("first", "second", "third")
+var ($p, $q, $r) = ("first", "second", "third")
 ($p, $q, $r) = ($r, $p, $q)
 assert_eq "$p|$q|$r", "third|first|second", "three-way rotation"
 

@@ -6,14 +6,14 @@
 # This is the standard "next permutation" algorithm in lex order.
 
 fn Rosetta::NextHigh::compute($n) {
-    my @d = split //, "$n"
-    my $i = len(@d) - 2
+    var @d = split //, "$n"
+    var $i = len(@d) - 2
     while ($i >= 0 && $d[$i] >= $d[$i + 1]) { $i-- }
     return -1 if $i < 0
-    my $j = len(@d) - 1
+    var $j = len(@d) - 1
     while ($d[$j] <= $d[$i]) { $j-- }
     ($d[$i], $d[$j]) = ($d[$j], $d[$i])
-    my @suffix = @d[$i + 1..len(@d) - 1]
+    var @suffix = @d[$i + 1..len(@d) - 1]
     @suffix = sort @suffix
     @d = (@d[0:$i], @suffix)
     join("", @d) + 0
@@ -31,11 +31,11 @@ assert_eq Rosetta::NextHigh::compute(414),      441,     "414 → 441"
 assert_eq Rosetta::NextHigh::compute(123456789),123456798, "123456789 → 123456798"
 
 # Property: result has same digit multiset as input
-for my $n (123, 4567, 13579, 24680, 9870654321) {
-    my $next = Rosetta::NextHigh::compute($n)
+for val $n (123, 4567, 13579, 24680, 9870654321) {
+    val $next = Rosetta::NextHigh::compute($n)
     next if $next == -1
-    my @d_in   = sort split //, "$n"
-    my @d_out  = sort split //, "$next"
+    val @d_in   = sort split //, "$n"
+    val @d_out  = sort split //, "$next"
     assert_eq join("", @d_in), join("", @d_out), sprintf("%d preserves digit multiset", $n)
     assert_ok $next > $n, sprintf("%d → %d strictly greater", $n, $next)
 }

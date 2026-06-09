@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-my $text = "The quick brown fox jumps over the lazy dog"
+val $text = "The quick brown fox jumps over the lazy dog"
 p "upper: ",       $text |> uc
 p "lower: ",       $text |> lc
 p "ucfirst: ",     $text |> ucfirst
@@ -9,11 +9,11 @@ p "substr(0,9): ", substr($text, 0, 9)
 p "index(fox): ",  index($text, "fox")
 p "reverse: ",     (~> $text split("") rev join(""))
 
-my @words = split " ", $text
+val @words = split " ", $text
 p "word count: ", len @words
 p "words: ",      (@words |> join " | ")
 
-my $copy = $text
+var $copy = $text
 $copy =~ s/fox/cat/
 p "substituted: $copy"
 
@@ -21,8 +21,8 @@ if ($text =~ /(\w+)\s+(\w+)$/) {
     p "last two words: $1 $2"
 }
 
-my @long_words = @words |> grep { len(_) > 3 }
+val @long_words = @words |> grep { len(_) > 3 }
 p "long words: ", (@long_words |> join ", ")
 
-my @lengths = @words |> map {len}
+val @lengths = @words |> map {len}
 p "word lengths: ", (@lengths |> join ", ")

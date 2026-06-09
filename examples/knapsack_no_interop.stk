@@ -16,24 +16,24 @@
 
 fn Knapsack::solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a builtin
 
-    my @weights = @$weights_ref
-    my @values  = @$values_ref
-    my $n = len(@weights)
+    val @weights = @$weights_ref
+    val @values  = @$values_ref
+    val $n = len(@weights)
     return +{ value => 0, picks => [] } if $n == 0
 
     # dp[i][w] = best value using first i items, capacity w.
-    my @dp
+    var @dp
     for (0:$n) { push @dp, [(0) x ($capacity + 1)] }
 
     # Base row: nothing picked.
-    for my $w (0:$capacity) {
+    for val $w (0:$capacity) {
         $dp[0][$w] = ($weights[0] <= $w) ? $values[0] : 0
     }
 
-    for my $i (1:$n - 1) {
-        for my $w (0:$capacity) {
-            my $skip = $dp[$i - 1][$w]
-            my $take = ($weights[$i] <= $w)
+    for val $i (1:$n - 1) {
+        for val $w (0:$capacity) {
+            val $skip = $dp[$i - 1][$w]
+            val $take = ($weights[$i] <= $w)
                 ? $dp[$i - 1][$w - $weights[$i]] + $values[$i]
                 : 0
             $dp[$i][$w] = max($skip, $take)
@@ -41,9 +41,9 @@ fn Knapsack::solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a bu
     }
 
     # Back-track to recover the chosen items.
-    my @picks
-    my $w = $capacity
-    for my $i (rev 0:$n - 1) {
+    var @picks
+    var $w = $capacity
+    for val $i (rev 0:$n - 1) {
         if ($i == 0) {
             push @picks, 0 if $weights[0] <= $w
             last
@@ -57,7 +57,7 @@ fn Knapsack::solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a bu
 }
 
 # Demo grid — (capacity, weights, values, expected best value).
-my @cases = (
+val @cases = (
     +{ cap => 10, w => [],            v => [],            best =>  0 },  # empty
     +{ cap =>  0, w => [1, 2],        v => [10, 20],      best =>  0 },  # zero cap
     +{ cap => 10, w => [10],          v => [5],           best =>  5 },  # exact fit
@@ -69,11 +69,11 @@ my @cases = (
 )
 
 p "── 0/1 Knapsack demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
-    my $got = $r->{value}
-    my $ok  = ($got == $c->{best})
+var $fail = 0
+for val $c (@cases) {
+    val $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
+    val $got = $r->{value}
+    val $ok  = ($got == $c->{best})
     $fail++ unless $ok
     printf "  cap=%3d  n=%d  best=%4d  expect=%4d  picks=[%s]  %s\n",
         $c->{cap}, len(@{$c->{w}}), $got, $c->{best},
@@ -83,17 +83,17 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " knapsack cases failed" if $fail > 0
 
 # Invariant: total value reported equals sum of picked-item values.
-my $c = $cases[4]   # the (50, [10,20,30], [60,100,120]) case
-my $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
-my $sum_picked_value  = 0
-my $sum_picked_weight = 0
-for my $i (@{$r->{picks}}) {
+val $c = $cases[4]   # the (50, [10,20,30], [60,100,120]) case
+val $r = Knapsack::solve($c->{cap}, $c->{w}, $c->{v})
+var $sum_picked_value  = 0
+var $sum_picked_weight = 0
+for val $i (@{$r->{picks}}) {
     $sum_picked_value  += $c->{v}[$i]
     $sum_picked_weight += $c->{w}[$i]
 }
 die "picks value sum != reported best" unless $sum_picked_value == $r->{value}
 die "picks weight sum exceeds capacity" unless $sum_picked_weight <= $c->{cap}
-my $cap_val = $c->{cap}
+val $cap_val = $c->{cap}
 p "  picks invariant OK: chosen items sum to ${sum_picked_value}, weight ${sum_picked_weight} <= ${cap_val}"
 
 p ""

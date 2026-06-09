@@ -6,11 +6,11 @@ fn Rosetta::ThabitNumbers::compute($n) {
 }
 
 fn Rosetta::ThabitNumbers::check($n) {
-    my $m = $n + 1
+    val $m = $n + 1
     if ($m % 3 != 0) {
         0
     } else {
-        my $p = $m / 3
+        val $p = $m / 3
         # Check if p is power of 2
         ($p > 0) && (($p & ($p - 1)) == 0)
     }

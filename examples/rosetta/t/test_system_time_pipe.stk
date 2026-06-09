@@ -9,7 +9,7 @@ fn Rosetta::Time::strftime($ts, $fmt) {
     datetime_strftime($ts, $fmt)
 }
 
-my $now = Rosetta::Time::now()
+val $now = Rosetta::Time::now()
 $now |> assert_ok("Time is a positive integer")
 
 $now |> Rosetta::Time::strftime("%Y") |> assert_eq("2026", "Year is 2026")

@@ -3,7 +3,7 @@
 
 fn Rosetta::ROT13::solve($text) {
     ~> $text chars map {
-        my $o = ord(_)
+        val $o = ord(_)
         if ($o >= 65 && $o <= 90) {
             chr((($o - 65 + 13) % 26) + 65)
         } elsif ($o >= 97 && $o <= 122) {
@@ -14,15 +14,15 @@ fn Rosetta::ROT13::solve($text) {
     } |> join("")
 }
 
-my $t1 = "Hello World!"
-my $e1 = Rosetta::ROT13::solve($t1)
-my $d1 = Rosetta::ROT13::solve($e1)
+val $t1 = "Hello World!"
+val $e1 = Rosetta::ROT13::solve($t1)
+val $d1 = Rosetta::ROT13::solve($e1)
 
 assert_eq $e1, "Uryyb Jbeyq!", "encrypt Hello World!"
 assert_eq $d1, "Hello World!", "decrypt Uryyb Jbeyq!"
 
-my $t2 = "abcdefghijklmnopqrstuvwxyz"
-my $e2 = Rosetta::ROT13::solve($t2)
+val $t2 = "abcdefghijklmnopqrstuvwxyz"
+val $e2 = Rosetta::ROT13::solve($t2)
 assert_eq $e2, "nopqrstuvwxyzabcdefghijklm", "encrypt alphabet"
 
 test_run

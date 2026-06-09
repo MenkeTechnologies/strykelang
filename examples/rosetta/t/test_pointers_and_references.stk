@@ -2,10 +2,10 @@
 # Rosetta Code: Pointers and references
 
 fn Rosetta::Pointers::demo() {
-    my $val = 42
+    val $val = 42
     
     # Create a reference to $val
-    my $ref = \$val
+    var $ref = \$val
     
     # Modify $val through the reference
     $$ref = 100
@@ -14,8 +14,8 @@ fn Rosetta::Pointers::demo() {
     assert_eq $val, 100, "Value modified through reference"
     
     # References to complex types
-    my @arr = (1, 2, 3)
-    my $arr_ref = \@arr
+    val @arr = (1, 2, 3)
+    var $arr_ref = \@arr
     
     $arr_ref->[0] = 99
     assert_eq $arr[0], 99, "Array modified through reference"

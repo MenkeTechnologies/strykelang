@@ -5,9 +5,9 @@ package Huffman
 fn pq_new = []
 fn pq_push($q, $node) {
     push @$q, $node
-    my $idx = (len @$q) - 1
+    var $idx = (len @$q) - 1
     while ($idx > 0) {
-        my $p = int(($idx - 1) / 2)
+        var $p = int(($idx - 1) / 2)
         last if $q->[$p]->{freq} <= $q->[$idx]->{freq}
         ($q->[$p], $q->[$idx]) = ($q->[$idx], $q->[$p])
         $idx = $p
@@ -15,16 +15,16 @@ fn pq_push($q, $node) {
 }
 fn pq_pop($q) {
     return undef if !@$q
-    my $res = $q->[0]
-    my $last = pop @$q
+    val $res = $q->[0]
+    val $last = pop @$q
     if (@$q) {
         $q->[0] = $last
-        my $idx = 0
-        my $n = len @$q
+        var $idx = 0
+        val $n = len @$q
         while (1) {
-            my $l = 2 * $idx + 1
-            my $r = 2 * $idx + 2
-            my $smallest = $idx
+            val $l = 2 * $idx + 1
+            val $r = 2 * $idx + 2
+            var $smallest = $idx
             $smallest = $l if $l < $n && $q->[$l]->{freq} < $q->[$smallest]->{freq}
             $smallest = $r if $r < $n && $q->[$r]->{freq} < $q->[$smallest]->{freq}
             last if $smallest == $idx
@@ -36,18 +36,18 @@ fn pq_pop($q) {
 }
 
 fn build_tree($text) {
-    my %freq
-    for my $i (0 : (len $text) - 1) {
-        my $c = substr $text, $i, 1
+    var %freq
+    for val $i (0 : (len $text) - 1) {
+        val $c = substr $text, $i, 1
         $freq{$c}++
     }
-    my $pq = pq_new()
-    for my $char (keys %freq) {
+    val $pq = pq_new()
+    for val $char (keys %freq) {
         pq_push $pq, { char => $char, freq => $freq{$char}, left => undef, right => undef }
     }
     while ((len @$pq) > 1) {
-        my $left = pq_pop $pq
-        my $right = pq_pop $pq
+        val $left = pq_pop $pq
+        val $right = pq_pop $pq
         pq_push $pq, {
             char => undef,
             freq => $left->{freq} + $right->{freq},
@@ -68,7 +68,7 @@ fn _build_map($node, $code, $map) {
 }
 
 fn get_codes($tree) {
-    my %map
+    var %map
     return \%map if !defined $tree
     if (defined $tree->{char} && !defined $tree->{left} && !defined $tree->{right}) {
         $map{$tree->{char}} = "0"
@@ -79,23 +79,23 @@ fn get_codes($tree) {
 }
 
 fn encode($text, $codes) {
-    my $out = ""
-    for my $i (0 : (len $text) - 1) {
+    var $out = ""
+    for val $i (0 : (len $text) - 1) {
         $out = $out . $codes->{substr($text, $i, 1)}
     }
     $out
 }
 
 fn decode($bits, $tree) {
-    my $out = ""
-    my $cur = $tree
+    var $out = ""
+    var $cur = $tree
     return "" if !defined $tree
     if (defined $tree->{char} && !defined $tree->{left} && !defined $tree->{right}) {
         for (1 : len $bits) { $out = $out . $tree->{char} }
         return $out
     }
-    for my $i (0 : (len $bits) - 1) {
-        my $bit = substr $bits, $i, 1
+    for val $i (0 : (len $bits) - 1) {
+        val $bit = substr $bits, $i, 1
         $cur = ($bit eq "0" ? $cur->{left} : $cur->{right})
         if (defined $cur->{char}) {
             $out = $out . $cur->{char}
@@ -108,33 +108,33 @@ fn decode($bits, $tree) {
 package main
 
 # --- Basic E2E ---
-my $s1 = "hello world"
-my $t1 = Huffman::build_tree $s1
-my $c1 = Huffman::get_codes $t1
-my $e1 = Huffman::encode $s1, $c1
+val $s1 = "hello world"
+val $t1 = Huffman::build_tree $s1
+val $c1 = Huffman::get_codes $t1
+val $e1 = Huffman::encode $s1, $c1
 Huffman::decode($e1, $t1) |> aeq $s1, "hello world roundtrip"
 
 # --- Edge Cases ---
 Huffman::build_tree("") |> aeq undef, "empty tree"
 Huffman::decode("", undef) |> aeq "", "empty decode"
 
-my $s2 = "aaaaa"
-my $t2 = Huffman::build_tree $s2
-my $c2 = Huffman::get_codes $t2
-my $e2 = Huffman::encode $s2, $c2
+val $s2 = "aaaaa"
+val $t2 = Huffman::build_tree $s2
+val $c2 = Huffman::get_codes $t2
+val $e2 = Huffman::encode $s2, $c2
 len($e2) |> aeq 5, "single char 5 bits"
 Huffman::decode($e2, $t2) |> aeq $s2, "single char roundtrip"
 
 # --- Stress: 1000 chars ---
-my $ss = ""
-my $seed = 123
+var $ss = ""
+var $seed = 123
 for (1:1000) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     $ss = $ss . chr(97 + ($seed % 26))
 }
-my $ts = Huffman::build_tree $ss
-my $cs = Huffman::get_codes $ts
-my $es = Huffman::encode $ss, $cs
+val $ts = Huffman::build_tree $ss
+val $cs = Huffman::get_codes $ts
+val $es = Huffman::encode $ss, $cs
 Huffman::decode($es, $ts) |> aeq $ss, "1000 char random roundtrip"
 
 test_run

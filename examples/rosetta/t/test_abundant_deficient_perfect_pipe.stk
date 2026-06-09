@@ -3,13 +3,13 @@
 
 fn Rosetta::ADPNumbers::sum_proper_divisors($n) {
     if ($n < 2) { return 0 }
-    my $limit = int($n / 2)
-    my @divs = ~> 1:$limit grep { $n % _ == 0 }
+    val $limit = int($n / 2)
+    val @divs = ~> 1:$limit grep { $n % _ == 0 }
     sum(@divs)
 }
 
 fn Rosetta::ADPNumbers::classify($n) {
-    my $sum = Rosetta::ADPNumbers::sum_proper_divisors($n)
+    val $sum = Rosetta::ADPNumbers::sum_proper_divisors($n)
     $sum == $n ? "perfect" : ($sum > $n ? "abundant" : "deficient")
 }
 

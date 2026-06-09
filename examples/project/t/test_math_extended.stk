@@ -62,7 +62,7 @@ assert_eq sum(1, 2, 3, 4, 5), 15, "sum"
 # Clamp - skip, tested in test_builtins_extended.stk
 
 # Normalize
-my @normalized = normalize(0, 50, 100)
+val @normalized = normalize(0, 50, 100)
 assert_near $normalized[0], 0, 0.001, "normalize min"
 assert_near $normalized[1], 0.5, 0.001, "normalize mid"
 assert_near $normalized[2], 1, 0.001, "normalize max"

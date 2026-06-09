@@ -13,37 +13,37 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $n = $ARGV[0] // 2
-my $text = $ARGV[1] // "the quick brown fox jumped over the lazy dog the dog slept"
+val $n = $ARGV[0] // 2
+val $text = $ARGV[1] // "the quick brown fox jumped over the lazy dog the dog slept"
 
 printf "── distributed_wordcount: N=%d text=%s ──\n", $n, $text
 
-my @workers = congregation($n)
+val @workers = congregation($n)
 printf "spawned %d workers\n", len(@workers)
 
 # Each worker counts words in the text (passed inline in the prayer).
-my $text_escaped = $text
-my $code = "my \$t = q{$text_escaped}; my %counts; for my \$w (split /\\s+/, \$t) { \$counts{\$w}++ } to_json(\\%counts)"
-my $div = pray $code, @workers
-my %replies = annex $div
+val $text_escaped = $text
+val $code = "my \$t = q{$text_escaped}; var %counts; for my \$w (split /\\s+/, \$t) { \$counts{\$w}++ } to_json(\\%counts)"
+val $div = pray $code, @workers
+val %replies = annex $div
 
 # Each worker computed the SAME counts (they all saw the same text),
 # so take any one worker's hash as the answer. Rank by count desc,
 # ties alphabetical.
-my $first_sid = (sort { _ <=> _1 } keys %replies)[0]
-my $h = from_json($replies{$first_sid})
+val $first_sid = (sort { _ <=> _1 } keys %replies)[0]
+val $h = from_json($replies{$first_sid})
 
 p "── word counts (each worker independently computed) ──"
-my @keys = sort { $h->{_1} <=> $h->{_} || _ cmp _1 } keys %$h
-for my $k (@keys) {
+val @keys = sort { $h->{_1} <=> $h->{_} || _ cmp _1 } keys %$h
+for val $k (@keys) {
     printf "  %-12s %d\n", $k, $h->{$k}
 }
 
 # Verify all workers agree.
-my $all_agree = 1
-for my $sid (keys %replies) {
-    my $other = from_json($replies{$sid})
-    for my $k (keys %$h) {
+var $all_agree = 1
+for val $sid (keys %replies) {
+    val $other = from_json($replies{$sid})
+    for val $k (keys %$h) {
         $all_agree = 0 unless ($other->{$k} // -1) == $h->{$k}
     }
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Diffie-Hellman key exchange
 
 fn Rosetta::DH::mod_pow($base, $exp, $mod) {
-    my $res = 1
+    var $res = 1
     $base %= $mod
     while ($exp > 0) {
         if ($exp % 2 == 1) {
@@ -15,20 +15,20 @@ fn Rosetta::DH::mod_pow($base, $exp, $mod) {
 }
 
 # Parameters (RFC 3526 group 5, but smaller for demo)
-my $p = 24251 # a prime
-my $g = 2     # a generator
+val $p = 24251 # a prime
+val $g = 2     # a generator
 
 # Alice's secret
-my $a = 123
-my $A = Rosetta::DH::mod_pow($g, $a, $p)
+val $a = 123
+val $A = Rosetta::DH::mod_pow($g, $a, $p)
 
 # Bob's secret
-my $b = 456
-my $B = Rosetta::DH::mod_pow($g, $b, $p)
+val $b = 456
+val $B = Rosetta::DH::mod_pow($g, $b, $p)
 
 # Shared secret computation
-my $s_alice = Rosetta::DH::mod_pow($B, $a, $p)
-my $s_bob = Rosetta::DH::mod_pow($A, $b, $p)
+val $s_alice = Rosetta::DH::mod_pow($B, $a, $p)
+val $s_bob = Rosetta::DH::mod_pow($A, $b, $p)
 
 assert_eq $s_alice, $s_bob, "Shared secrets match"
 p "Shared secret: $s_alice"

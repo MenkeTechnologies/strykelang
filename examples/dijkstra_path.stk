@@ -6,7 +6,7 @@
 
 # ── graph: small road network (miles between cities) ───────────────
 
-my %graph = (
+val %graph = (
     "A" => +{ "B" => 4,  "C" => 2 },
     "B" => +{ "A" => 4,  "C" => 5,  "D" => 10 },
     "C" => +{ "A" => 2,  "B" => 5,  "D" => 3,  "E" => 12 },
@@ -16,9 +16,9 @@ my %graph = (
 )
 
 p "── graph (weighted, undirected) ─────────────────────"
-for my $u (sort { _ cmp _1 } keys %graph) {
-    my @parts
-    for my $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
+for val $u (sort { _ cmp _1 } keys %graph) {
+    var @parts
+    for val $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
         push @parts, sprintf("%s(%d)", $v, $graph{$u}->{$v})
     }
     printf "  %s : %s\n", $u, join(", ", @parts)
@@ -28,8 +28,8 @@ for my $u (sort { _ cmp _1 } keys %graph) {
 
 fn Demo::PQ::new() = []
 fn Demo::PQ::push($pq, $prio, $item) {
-    my $n = len @$pq
-    my $i = 0
+    val $n = len @$pq
+    var $i = 0
     while ($i < $n && $pq->[$i]->[0] <= $prio) { $i++ }
     splice(@$pq, $i, 0, [$prio, $item])
 }
@@ -41,20 +41,20 @@ fn Demo::PQ::pop($pq) {
 # ── Dijkstra ───────────────────────────────────────────────────────
 
 fn Demo::Path::dijkstra($g, $source) {
-    my %dist
-    my %prev
+    var %dist
+    var %prev
     $dist{$source} = 0
-    my $pq = Demo::PQ::new()
+    val $pq = Demo::PQ::new()
     Demo::PQ::push($pq, 0, $source)
     while (len(@$pq) > 0) {
-        my $top = Demo::PQ::pop($pq)
-        my $d = $top->[0]
-        my $u = $top->[1]
+        val $top = Demo::PQ::pop($pq)
+        val $d = $top->[0]
+        val $u = $top->[1]
         next if defined($dist{$u}) && $d > $dist{$u}
-        my $edges = $g->{$u} // +{}
-        for my $v (keys %$edges) {
-            my $w = $edges->{$v}
-            my $alt = $d + $w
+        val $edges = $g->{$u} // +{}
+        for val $v (keys %$edges) {
+            val $w = $edges->{$v}
+            val $alt = $d + $w
             if (!exists($dist{$v}) || $alt < $dist{$v}) {
                 $dist{$v} = $alt
                 $prev{$v} = $u
@@ -68,8 +68,8 @@ fn Demo::Path::dijkstra($g, $source) {
 fn Demo::Path::reconstruct($prev, $source, $target) {
     return [$source] if $source eq $target
     return undef unless exists $prev->{$target}
-    my @path = ($target)
-    my $cur = $target
+    var @path = ($target)
+    var $cur = $target
     while ($cur ne $source && exists $prev->{$cur}) {
         $cur = $prev->{$cur}
         unshift @path, $cur
@@ -79,11 +79,11 @@ fn Demo::Path::reconstruct($prev, $source, $target) {
 
 # ── run Dijkstra from A ────────────────────────────────────────────
 
-my $result = Demo::Path::dijkstra(\%graph, "A")
+val $result = Demo::Path::dijkstra(\%graph, "A")
 
 p ""
 p "── shortest distances from A ────────────────────────"
-for my $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
+for val $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
     printf "  %s : %d\n", $city, $result->{dist}->{$city}
 }
 
@@ -91,9 +91,9 @@ for my $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
 
 p ""
 p "── reconstructed shortest paths ─────────────────────"
-for my $target (sort { _ cmp _1 } keys %{$result->{dist}}) {
+for val $target (sort { _ cmp _1 } keys %{$result->{dist}}) {
     next if $target eq "A"
-    my $path = Demo::Path::reconstruct($result->{prev}, "A", $target)
+    val $path = Demo::Path::reconstruct($result->{prev}, "A", $target)
     if (defined $path) {
         printf "  A -> %s (%d): %s\n",
             $target, $result->{dist}->{$target}, join(" -> ", @$path)
@@ -106,35 +106,35 @@ for my $target (sort { _ cmp _1 } keys %{$result->{dist}}) {
 
 p ""
 p "── shortest-path tree (parent -> child) ─────────────"
-my %children
+var %children
 $children{_} = [] for keys %graph
-for my $city (keys %{$result->{prev}}) {
-    my $parent = $result->{prev}->{$city}
+for val $city (keys %{$result->{prev}}) {
+    val $parent = $result->{prev}->{$city}
     push @{$children{$parent}}, $city
 }
 
 fn Demo::Path::render_tree($node, $children_ref, $indent, $is_last) {
-    my @lines
-    my $prefix = $indent . ($is_last ? "└─ " : "├─ ")
+    var @lines
+    val $prefix = $indent . ($is_last ? "└─ " : "├─ ")
     push @lines, "$prefix$node"
-    my @kids = sort { _ cmp _1 } @{$children_ref->{$node} // []}
-    for my $i (0:len(@kids) - 1) {
-        my $kid = $kids[$i]
-        my $kid_is_last = ($i == len(@kids) - 1)
-        my $child_indent = $indent . ($is_last ? "   " : "│  ")
-        my $sub_lines = Demo::Path::render_tree($kid, $children_ref, $child_indent, $kid_is_last)
+    val @kids = sort { _ cmp _1 } @{$children_ref->{$node} // []}
+    for val $i (0:len(@kids) - 1) {
+        val $kid = $kids[$i]
+        val $kid_is_last = ($i == len(@kids) - 1)
+        val $child_indent = $indent . ($is_last ? "   " : "│  ")
+        val $sub_lines = Demo::Path::render_tree($kid, $children_ref, $child_indent, $kid_is_last)
         push @lines, @$sub_lines
     }
     \@lines
 }
 
-my $tree_lines = Demo::Path::render_tree("A", \%children, "", 1)
-for my $line (@$tree_lines) { p "  $line" }
+val $tree_lines = Demo::Path::render_tree("A", \%children, "", 1)
+for val $line (@$tree_lines) { p "  $line" }
 
 # ── total edges in shortest-path tree ───────────────────────────────
 
 p ""
-my $tree_edges = 0
+var $tree_edges = 0
 $tree_edges += len(@{$children{_}}) for keys %children
 printf "── shortest-path tree has %d edges (V-1 = %d expected) ──\n",
     $tree_edges, len(keys %graph) - 1

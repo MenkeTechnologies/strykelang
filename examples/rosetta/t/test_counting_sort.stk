@@ -2,16 +2,16 @@
 # Rosetta Code: Counting Sort
 
 fn Rosetta::CountingSort::sort($list, $min, $max) {
-    my @arr = @$list
-    my @count = ()
+    val @arr = @$list
+    var @count = ()
     
-    for my $x (@arr) {
+    for val $x (@arr) {
         $count[$x - $min]++
     }
     
-    my @res = ()
-    for my $i (0..len(@count)-1) {
-        my $c = $count[$i]
+    var @res = ()
+    for val $i (0..len(@count)-1) {
+        var $c = $count[$i]
         while ($c > 0) {
             push @res, $i + $min
             $c--
@@ -20,8 +20,8 @@ fn Rosetta::CountingSort::sort($list, $min, $max) {
     \@res
 }
 
-my $data = [4, 2, 2, 8, 3, 3, 1]
-my $sorted = Rosetta::CountingSort::sort($data, 1, 8)
+val $data = [4, 2, 2, 8, 3, 3, 1]
+val $sorted = Rosetta::CountingSort::sort($data, 1, 8)
 assert_eq join(",", @$sorted), "1,2,2,3,3,4,8", "counting sort"
 
 test_run

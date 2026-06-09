@@ -3,21 +3,21 @@
 
 fn Rosetta::Pendulum::calc_x($i) {
     # Simple harmonic motion approximation
-    my $angle = sin($i * 0.3) * 0.8
+    val $angle = sin($i * 0.3) * 0.8
     return 20 + int(sin($angle) * 15)
 }
 
 fn Rosetta::Pendulum::animate($frames) {
     "Pendulum Animation (Terminal):" |> p
-    for my $i (0:$frames) {
-        my $x = Rosetta::Pendulum::calc_x($i)
+    for val $i (0:$frames) {
+        val $x = Rosetta::Pendulum::calc_x($i)
         
         # Build the line
-        my @chars = 0:40 |> map { " " }
+        var @chars = 0:40 |> map { " " }
         $chars[$x] = "O"
         $chars[20] = "|" if $x != 20 # pivot point
         
-        my $line = join("", @chars)
+        val $line = join("", @chars)
         print "\r$line";
         sleep 0.05
     }
@@ -25,7 +25,7 @@ fn Rosetta::Pendulum::animate($frames) {
     
     # Assertions to make it a "real" test
     assert_eq Rosetta::Pendulum::calc_x(0), 20, "At i=0, x should be center (20)"
-    my $x1 = Rosetta::Pendulum::calc_x(1)
+    val $x1 = Rosetta::Pendulum::calc_x(1)
     assert_ok $x1 > 20, "At i=1, x should move right ($x1)"
 }
 

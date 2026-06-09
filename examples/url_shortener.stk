@@ -12,9 +12,9 @@
 # ── hash helper ────────────────────────────────────────────────────
 
 fn Demo::Short::fnv($s) {
-    my $h = 2166136261
-    for my $i (0:len($s) - 1) {
-        my $c = ord $s[$i]
+    var $h = 2166136261
+    for val $i (0:len($s) - 1) {
+        val $c = ord $s[$i]
         $h = ($h ^ $c) * 16777619
         $h = $h % 4294967296
     }
@@ -23,10 +23,10 @@ fn Demo::Short::fnv($s) {
 
 # Convert an integer to base36 (0-9 + a-z).
 fn Demo::Short::to_base36($n) {
-    my $alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-    my $s = ""
+    val $alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
+    var $s = ""
     while ($n > 0) {
-        my $d = $n % 36
+        val $d = $n % 36
         $s = substr($alphabet, $d, 1) . $s
         $n = int($n / 36)
     }
@@ -35,34 +35,34 @@ fn Demo::Short::to_base36($n) {
 
 # ── shortener state ─────────────────────────────────────────────────
 
-my $kv_path = "/tmp/stryke_shortener.rkyv"
+val $kv_path = "/tmp/stryke_shortener.rkyv"
 unlink $kv_path if -e $kv_path
-my $kv = kv_open($kv_path)
+val $kv = kv_open($kv_path)
 mysync %short_to_long   # short_id -> long_url
 mysync %click_count
 
-my $td_shorten = t_digest(100)
-my $tk_clicks = topk(3)
+val $td_shorten = t_digest(100)
+val $tk_clicks = topk(3)
 mysync $collisions = 0
 
 fn Demo::Short::shorten($long_url) {
-    my $t0 = now_ns()
-    my $hash = Demo::Short::fnv($long_url)
+    val $t0 = now_ns()
+    val $hash = Demo::Short::fnv($long_url)
     # Truncate to 6 base36 chars (~2 billion space).
-    my $base = $hash % (36 ** 6)
-    my $short = Demo::Short::to_base36($base)
+    val $base = $hash % (36 ** 6)
+    var $short = Demo::Short::to_base36($base)
     # Pad to 6 chars with leading zeros.
     while (len($short) < 6) {
         $short = "0" . $short
     }
     # Collision handling: if short already maps to a different URL,
     # rehash by appending a counter.
-    my $attempt = 0
+    var $attempt = 0
     while (exists $short_to_long{$short} && $short_to_long{$short} ne $long_url) {
         $collisions = $collisions + 1
         $attempt = $attempt + 1
-        my $rehash = Demo::Short::fnv($long_url . "#$attempt")
-        my $base2 = $rehash % (36 ** 6)
+        val $rehash = Demo::Short::fnv($long_url . "#$attempt")
+        val $base2 = $rehash % (36 ** 6)
         $short = Demo::Short::to_base36($base2)
         while (len($short) < 6) {
             $short = "0" . $short
@@ -76,7 +76,7 @@ fn Demo::Short::shorten($long_url) {
 }
 
 fn Demo::Short::expand($short) {
-    my $r = $short_to_long{$short}
+    val $r = $short_to_long{$short}
     if (defined $r) {
         $click_count{$short} = $click_count{$short} + 1
         topk_add($tk_clicks, $short)
@@ -87,7 +87,7 @@ fn Demo::Short::expand($short) {
 
 # ── workload ───────────────────────────────────────────────────────
 
-my @urls = (
+val @urls = (
     "https://example.com/article/about-us",
     "https://example.com/article/products",
     "https://docs.example.com/getting-started",
@@ -102,9 +102,9 @@ my @urls = (
 
 printf "── shortening %d URLs ────────────────────────────────\n",
     len @urls
-my %short_ids
-for my $url (@urls) {
-    my $s = Demo::Short::shorten($url)
+var %short_ids
+for val $url (@urls) {
+    val $s = Demo::Short::shorten($url)
     $short_ids{$url} = $s
     printf "  %s\n    -> short/%s\n", substr($url, 0, 50), $s
 }
@@ -113,10 +113,10 @@ for my $url (@urls) {
 
 p ""
 p "── simulating 100 clicks (weighted toward first URLs) ──"
-for my $i (1:100) {
+for val $i (1:100) {
     # Weighted: earlier URLs more popular.
-    my $idx = int(rand() * rand @urls)
-    my $short = $short_ids{$urls[$idx]}
+    val $idx = int(rand() * rand @urls)
+    val $short = $short_ids{$urls[$idx]}
     Demo::Short::expand($short)
 }
 
@@ -124,10 +124,10 @@ for my $i (1:100) {
 
 p ""
 p "── click counts (sorted) ────────────────────────────"
-my @sorted = sort { $click_count{_1} <=> $click_count{_} } keys %click_count
-for my $s (@sorted) {
+val @sorted = sort { $click_count{_1} <=> $click_count{_} } keys %click_count
+for val $s (@sorted) {
     next if $click_count{$s} == 0
-    my $url = $short_to_long{$s}
+    val $url = $short_to_long{$s}
     printf "  short/%s : %d clicks  ->  %s\n",
         $s, $click_count{$s}, substr($url, 0, 40)
 }
@@ -136,8 +136,8 @@ for my $s (@sorted) {
 
 p ""
 p "── TopK most-clicked (sketch) ────────────────────────"
-my @hits = topk_top($tk_clicks)
-for my $h (@hits) {
+val @hits = topk_top($tk_clicks)
+for val $h (@hits) {
     printf "  short/%s : %d clicks\n", $h->[0], $h->[1]
 }
 
@@ -146,10 +146,10 @@ for my $h (@hits) {
 p ""
 p "── KV persistence ───────────────────────────────────"
 kv_close($kv)
-my $kv2 = kv_open($kv_path)
-my $kv_count = kv_len($kv2)
-my $first_short = $short_ids{$urls[0]}
-my $back = kv_get($kv2, $first_short)
+val $kv2 = kv_open($kv_path)
+val $kv_count = kv_len($kv2)
+val $first_short = $short_ids{$urls[0]}
+val $back = kv_get($kv2, $first_short)
 printf "  KV stored shorts : %d\n", $kv_count
 printf "  reload first url : %s\n", substr($back // "(missing)", 0, 50)
 kv_close($kv2)

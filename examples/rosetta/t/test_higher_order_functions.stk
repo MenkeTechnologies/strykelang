@@ -9,13 +9,13 @@ fn Rosetta::HOF::compose($f, $g) {
     fn ($x) { $f($g($x)) }
 }
 
-my $double = fn ($x) { $x * 2 }
-my $plus_one = fn ($x) { $x + 1 }
+val $double = fn ($x) { $x * 2 }
+val $plus_one = fn ($x) { $x + 1 }
 
-my $val = Rosetta::HOF::apply($double, 5)
+val $val = Rosetta::HOF::apply($double, 5)
 assert_eq $val, 10, "apply double 5"
 
-my $h = Rosetta::HOF::compose($double, $plus_one)
+val $h = Rosetta::HOF::compose($double, $plus_one)
 assert_eq $h(5), 12, "double(plus_one(5)) = 2*(5+1) = 12"
 
 # Piped HOF

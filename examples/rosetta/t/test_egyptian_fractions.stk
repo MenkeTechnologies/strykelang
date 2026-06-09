@@ -2,9 +2,9 @@
 # Rosetta Code: Egyptian Fractions
 
 fn Rosetta::EgyptianFractions::decompose($n, $d) {
-    my @res = ()
+    var @res = ()
     while ($n != 0) {
-        my $x = int(($d + $n - 1) / $n)
+        val $x = int(($d + $n - 1) / $n)
         push @res, $x
         $n = $x * $n - $d
         $d = $d * $x
@@ -13,12 +13,12 @@ fn Rosetta::EgyptianFractions::decompose($n, $d) {
 }
 
 # 43/48 = 1/2 + 1/3 + 1/16
-my $f1 = Rosetta::EgyptianFractions::decompose(43, 48)
+val $f1 = Rosetta::EgyptianFractions::decompose(43, 48)
 assert_eq join(",", @$f1), "2,3,16", "43/48"
 
 # 5/121 = 1/25 + 1/757 + 1/763309 + ...
 # Greedy algorithm results
-my $f2 = Rosetta::EgyptianFractions::decompose(5, 121)
+val $f2 = Rosetta::EgyptianFractions::decompose(5, 121)
 assert_eq $f2->[0], 25, "5/121 first term"
 
 test_run

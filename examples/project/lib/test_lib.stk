@@ -3,8 +3,8 @@ class TestCache {
     fn get_cache { $self->cache }
 }
 fn Project::Lib::test_cache_ref() {
-    my $o = TestCache()
-    my $c = $o->get_cache()
+    val $o = TestCache()
+    val $c = $o->get_cache()
     p "C TYPE:" . ref($c)
     p "C KEYS:" . join(",", keys %$c)
 }

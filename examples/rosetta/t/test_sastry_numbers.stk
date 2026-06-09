@@ -2,10 +2,10 @@
 # Rosetta Code: Sastry numbers
 
 fn Rosetta::SastryNumbers::is_sastry($n) {
-    my $m = $n + 1
-    my $s = "$n" . "$m"
-    my $val = int($s)
-    my $root = int(sqrt($val))
+    val $m = $n + 1
+    val $s = "$n" . "$m"
+    val $val = int($s)
+    val $root = int(sqrt($val))
     $root * $root == $val
 }
 

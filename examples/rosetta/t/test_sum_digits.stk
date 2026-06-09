@@ -2,15 +2,15 @@
 # Rosetta Code: Sum Digits of an Integer
 
 fn Rosetta::SumDigits::compute($n) {
-    my $sum = 0
-    my @digits = ~> $n abs >{ sprintf("%d", _) } chars
-    for my $d (@digits) { $sum = $sum + int($d) }
+    var $sum = 0
+    val @digits = ~> $n abs >{ sprintf("%d", _) } chars
+    for val $d (@digits) { $sum = $sum + int($d) }
     $sum
 }
 
 fn Rosetta::SumDigits::compute_base($n, $base) {
-    my $sum = 0
-    my $curr = abs($n)
+    var $sum = 0
+    var $curr = abs($n)
     while ($curr > 0) {
         $sum = $sum + ($curr % $base)
         $curr = int($curr / $base)

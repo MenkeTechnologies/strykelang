@@ -24,7 +24,7 @@ ai_mock_install('(?i)Apply this instruction.*summarize',
 
 # ── 2. Input Data ───────────────────────────────────────────────────
 
-my @reviews = (
+val @reviews = (
     "I love Stryke, it makes parallel programming so easy!",
     "This is garbage, nothing works.",
     "The syntax is confusing and the documentation is sparse.",
@@ -36,7 +36,7 @@ p "Processing #{len @reviews} reviews..."
 
 # ── 3. Processing Pipeline ──────────────────────────────────────────
 
-my $ref = \@reviews
+val $ref = \@reviews
 
 # Using pipe-forward for clarity with multi-arg calls
 $ref |> ai_classify("sentiment", into => ["Positive", "Negative"])
@@ -52,7 +52,7 @@ $ref |> ai_map("summarize in 3 words")
 
 p ""
 ai_mock_install('(?i)Decide whether.*criterion: positive sentiment', '[true, false, false, true]')
-my $positives = ai_filter($ref, "positive sentiment")
+val $positives = ai_filter($ref, "positive sentiment")
 
 die "Filtering failed" unless len(@$positives) == 2
 die "First positive mismatch" unless $positives->[0] =~ /love Stryke/

@@ -3,10 +3,10 @@
 # Each input line: "Home;Away;outcome" where outcome ∈ win|loss|draw.
 # Output a fixed-width leaderboard sorted by points (desc), name (asc).
 fn Exercism::Tournament::tally {
-    my %t
-    for my $line (split /\n/, _) {
+    var %t
+    for val $line (split /\n/, _) {
         next unless $line =~ /^([^;]+);([^;]+);(win|loss|draw)$/
-        my ($home, $away, $result) = ($1, $2, $3)
+        val ($home, $away, $result) = ($1, $2, $3)
         $t{$home} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$home}
         $t{$away} = { mp=>0, w=>0, d=>0, l=>0, p=>0 } unless exists $t{$away}
         $t{$home}{mp}++; $t{$away}{mp}++
@@ -14,10 +14,10 @@ fn Exercism::Tournament::tally {
         elsif ($r eq "loss") { $t{$away}{w}++; $t{$home}{l}++; $t{$away}{p} += 3 }
         else                  { $t{$home}{d}++; $t{$away}{d}++; $t{$home}{p}++; $t{$away}{p}++ }
     }
-    my @teams = sort { $t{_1}{p} <=> $t{_}{p} || _ cmp _1 } keys %t
-    my $hdr = sprintf("%-31s| MP |  W |  D |  L |  P", "Team")
-    my @lines = ($hdr)
-    for my $name (@teams) {
+    val @teams = sort { $t{_1}{p} <=> $t{_}{p} || _ cmp _1 } keys %t
+    val $hdr = sprintf("%-31s| MP |  W |  D |  L |  P", "Team")
+    var @lines = ($hdr)
+    for val $name (@teams) {
         push @lines, sprintf("%-31s| %2d | %2d | %2d | %2d | %2d",
             $name, $t{$name}{mp}, $t{$name}{w}, $t{$name}{d}, $t{$name}{l}, $t{$name}{p})
     }

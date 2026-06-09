@@ -13,7 +13,7 @@ fn Rosetta::Complex::mul($a, $b) {
 }
 
 fn Rosetta::Complex::inv($a) {
-    my $d = $a->{re} * $a->{re} + $a->{im} * $a->{im}
+    val $d = $a->{re} * $a->{re} + $a->{im} * $a->{im}
     { re => $a->{re} / $d, im => 0 - $a->{im} / $d }
 }
 
@@ -21,18 +21,18 @@ fn Rosetta::Complex::check_eq($a, $b) {
     abs($a->{re} - $b->{re}) < 0.0001 && abs($a->{im} - $b->{im}) < 0.0001
 }
 
-my $a = { re => 1, im => 1 }
-my $b = { re => 3, im => 1 }
+val $a = { re => 1, im => 1 }
+val $b = { re => 3, im => 1 }
 
-my $sum = Rosetta::Complex::add($a, $b)
+val $sum = Rosetta::Complex::add($a, $b)
 assert_eq $sum->{re}, 4, "complex add re"
 assert_eq $sum->{im}, 2, "complex add im"
 
-my $prod = Rosetta::Complex::mul($a, $b)
+val $prod = Rosetta::Complex::mul($a, $b)
 assert_eq $prod->{re}, 2, "complex mul re"
 assert_eq $prod->{im}, 4, "complex mul im"
 
-my $inv = Rosetta::Complex::inv($a)
+val $inv = Rosetta::Complex::inv($a)
 assert_eq $inv->{re}, 0.5, "complex inv re"
 assert_eq $inv->{im}, -0.5, "complex inv im"
 

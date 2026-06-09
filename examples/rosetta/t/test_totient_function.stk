@@ -9,8 +9,8 @@ fn Rosetta::Totient::gcd($a, $b) {
 fn Rosetta::Totient::phi($n) {
     if ($n == 1) { 1 }
     else {
-        my $count = 0
-        for my $i (1:$n) {
+        var $count = 0
+        for val $i (1:$n) {
             if (Rosetta::Totient::gcd($i, $n) == 1) { $count++ }
         }
         $count

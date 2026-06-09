@@ -4,7 +4,7 @@
 fn Rosetta::Narcissist::check($input) {
     # In a real RC Narcissist, the program source is compared.
     # For this test, we'll mock the source.
-    my $source = slurp($0)
+    val $source = slurp($0)
     
     if ($input eq $source) {
         return "Accept"
@@ -14,11 +14,11 @@ fn Rosetta::Narcissist::check($input) {
 }
 
 # Setup: this file IS the source.
-my $src = slurp($0)
-my $res1 = Rosetta::Narcissist::check($src)
+val $src = slurp($0)
+val $res1 = Rosetta::Narcissist::check($src)
 assert_eq $res1, "Accept", "Input matching source is accepted"
 
-my $res2 = Rosetta::Narcissist::check("not the source")
+val $res2 = Rosetta::Narcissist::check("not the source")
 assert_eq $res2, "Reject", "Different input is rejected"
 
 test_run

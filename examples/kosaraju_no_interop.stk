@@ -8,8 +8,8 @@ package Kosaraju
 
 fn dfs1($u, $g, $visited, $stack) {
     $visited->{$u} = 1
-    my $neighbors = $g->{$u} // []
-    for my $v (@$neighbors) {
+    val $neighbors = $g->{$u} // []
+    for val $v (@$neighbors) {
         if (!$visited->{$v}) { Kosaraju::dfs1($v, $g, $visited, $stack) }
     }
     push @$stack, $u
@@ -18,31 +18,31 @@ fn dfs1($u, $g, $visited, $stack) {
 fn dfs2($u, $rg, $visited, $comp) {
     $visited->{$u} = 1
     push @$comp, $u
-    my $neighbors = $rg->{$u} // []
-    for my $v (@$neighbors) {
+    val $neighbors = $rg->{$u} // []
+    for val $v (@$neighbors) {
         if (!$visited->{$v}) { Kosaraju::dfs2($v, $rg, $visited, $comp) }
     }
 }
 
 fn solve($names, $g) {
-    my %visited1
-    my @stack
-    for my $u (@$names) {
+    val %visited1
+    var @stack
+    for val $u (@$names) {
         if (!$visited1{$u}) { Kosaraju::dfs1($u, $g, \%visited1, \@stack) }
     }
     
-    my %rg
-    for my $u (@$names) {
-        my $neighbors = $g->{$u} // []
-        for my $v (@$neighbors) { push @{$rg{$v}}, $u }
+    val %rg
+    for val $u (@$names) {
+        val $neighbors = $g->{$u} // []
+        for val $v (@$neighbors) { push @{$rg{$v}}, $u }
     }
     
-    my %visited2
-    my @sccs
+    val %visited2
+    var @sccs
     while ((len @stack) > 0) {
-        my $u = pop @stack
+        val $u = pop @stack
         if (!$visited2{$u}) {
-            my @comp
+            val @comp
             Kosaraju::dfs2($u, \%rg, \%visited2, \@comp)
             push @sccs, \@comp
         }
@@ -53,8 +53,8 @@ fn solve($names, $g) {
 package main
 
 p "── Kosaraju's SCC Demo ──"
-my @nodes = ("0", "1", "2", "3", "4")
-my %graph = ("0"=>["2", "3"], "1"=>["0"], "2"=>["1"], "3"=>["4"], "4"=>[])
-my $sccs = Kosaraju::solve(\@nodes, \%graph)
+val @nodes = ("0", "1", "2", "3", "4")
+val %graph = ("0"=>["2", "3"], "1"=>["0"], "2"=>["1"], "3"=>["4"], "4"=>[])
+val $sccs = Kosaraju::solve(\@nodes, \%graph)
 p "SCC Count: #{len @$sccs}"
 p "Done."

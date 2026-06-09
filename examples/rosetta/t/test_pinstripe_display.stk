@@ -2,9 +2,9 @@
 # Rosetta Code: Pinstripe/Display
 
 fn Rosetta::PinDisplay::row($width, $stripe_w) {
-    my $line = ""
-    my @chars = (".", "#")
-    my $i = 0
+    var $line = ""
+    val @chars = (".", "#")
+    var $i = 0
     while (len($line) < $width) {
         $line .= $chars[$i % 2] x $stripe_w
         $i++
@@ -21,7 +21,7 @@ fn Rosetta::PinDisplay::render($width) {
     ]
 }
 
-my $rows = Rosetta::PinDisplay::render(24)
+val $rows = Rosetta::PinDisplay::render(24)
 assert_eq substr($rows->[0], 0, 8), ".#.#.#.#", "first quarter 1-pixel stripes"
 assert_eq substr($rows->[1], 0, 8), "..##..##", "second quarter 2-pixel stripes"
 assert_eq substr($rows->[2], 0, 12), "...###...###", "third quarter 3-pixel stripes"

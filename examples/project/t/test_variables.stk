@@ -22,7 +22,7 @@ assert_eq Project::Variables::scalar_interpolate_expr(), "x is 5 and x+1 is 6", 
 # ARRAY VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @lit = Project::Variables::array_literal()
+val @lit = Project::Variables::array_literal()
 assert_eq len(@lit), 3, "array literal count"
 assert_eq $lit[0], 1, "array literal first"
 assert_eq $lit[2], 3, "array literal last"
@@ -94,13 +94,13 @@ assert_eq Project::Variables::code_ref_closure(), 15, "code ref closure"
 assert_eq Project::Variables::lexical_scope(), "outer", "lexical scope"
 assert_eq Project::Variables::nested_scope(), 6, "nested scope"
 
-my @shadow = Project::Variables::scope_shadow()
+val @shadow = Project::Variables::scope_shadow()
 assert_eq $shadow[0], 10, "scope shadow outer"
 assert_eq $shadow[1], 20, "scope shadow inner"
 
 assert_eq Project::Variables::our_variable(), 42, "our variable"
 
-my @local_res = Project::Variables::local_scope()
+val @local_res = Project::Variables::local_scope()
 assert_eq $local_res[0], "outer", "local restored"
 assert_eq $local_res[1], "inner", "local inner"
 
@@ -151,9 +151,9 @@ assert_eq Project::Variables::ref_check(), "SCALAR,ARRAY,HASH,ARRAY,HASH", "ref 
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Empty string vs undef
-my $empty = ""
-my $zero = 0
-my $Project::Variables::undef_var
+val $empty = ""
+val $zero = 0
+val $Project::Variables::undef_var
 assert_eq defined($empty) ? 1 : 0, 1, "empty string defined"
 assert_eq defined($zero) ? 1 : 0, 1, "zero defined"
 assert_eq defined($Project::Variables::undef_var) ? 1 : 0, 0, "undef undefined"
@@ -167,10 +167,10 @@ assert_eq 1 ? 1 : 0, 1, "one true"
 assert_eq "hello" ? 1 : 0, 1, "non-empty true"
 
 # Array/hash in boolean
-my @empty_arr = ()
-my @nonempty_arr = (1)
-my %empty_hash = ()
-my %nonempty_hash = (a => 1)
+val @empty_arr = ()
+val @nonempty_arr = (1)
+val %empty_hash = ()
+val %nonempty_hash = (a => 1)
 
 assert_eq @empty_arr ? 1 : 0, 0, "empty array false"
 assert_eq @nonempty_arr ? 1 : 0, 1, "nonempty array true"
@@ -187,13 +187,13 @@ assert_eq 42 . "", "42", "int to string"
 assert_eq 3.14 . "", "3.14", "float to string"
 
 # Multiple array assignment
-my @a1 = (1, 2, 3)
-my @a2 = (4, 5, 6)
+val @a1 = (1, 2, 3)
+val @a2 = (4, 5, 6)
 assert_eq len(@a1), 3, "multi array a1"
 assert_eq len(@a2), 3, "multi array a2"
 
 # Hash key types
-my %mixed_keys = (
+val %mixed_keys = (
     "string" => 1,
     42 => 2,
     3.14 => 3

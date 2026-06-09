@@ -6,7 +6,7 @@ fn Rosetta::FixCodeTags::fix($text) {
     $text =~ s/<code\s+lang="([^"]+)">([\s\S]*?)<\/code>/<lang $1>$2<\/lang>/gr
 }
 
-my $sample = qq{
+val $sample = qq{
 Here is some code:
 <code lang="perl">
 print "hello";
@@ -15,15 +15,15 @@ And another one:
 <code lang="python">print "world"</code>
 };
 
-my $fixed = Rosetta::FixCodeTags::fix($sample)
+val $fixed = Rosetta::FixCodeTags::fix($sample)
 
 assert_ok $fixed =~ /<lang perl>/, "Replaced perl code tag"
 assert_ok $fixed =~ /<lang python>/, "Replaced python code tag"
 assert_ok $fixed !~ /<code/, "No more code tags"
 
 # Test multi-line
-my $sample2 = '<code lang="stk">line1\nline2</code>'
-my $fixed2 = Rosetta::FixCodeTags::fix($sample2)
+val $sample2 = '<code lang="stk">line1\nline2</code>'
+val $fixed2 = Rosetta::FixCodeTags::fix($sample2)
 assert_eq $fixed2, '<lang stk>line1\nline2</lang>', "Fixed multi-line code tag"
 
 test_run

@@ -4,8 +4,8 @@
 fn Rosetta::ISqrt::compute($n) {
     return 0 if $n == 0
     return 1 if $n < 4
-    my $x = int($n / 2)
-    my $y = int(($x + int($n / $x)) / 2)
+    var $x = int($n / 2)
+    var $y = int(($x + int($n / $x)) / 2)
     while ($y < $x) {
         $x = $y
         $y = int(($x + int($n / $x)) / 2)
@@ -14,13 +14,13 @@ fn Rosetta::ISqrt::compute($n) {
 }
 
 # Perfect squares
-for my $i (0:50) {
-    my $sq = $i * $i
+for val $i (0:50) {
+    var $sq = $i * $i
     assert_eq Rosetta::ISqrt::compute($sq), $i, "isqrt($sq) = $i"
 }
 
 # Non-perfect squares: must be floor(sqrt(n))
-my @cases = (
+val @cases = (
     [2, 1],     [3, 1],
     [5, 2],     [10, 3],
     [99, 9],    [100, 10],   [101, 10],
@@ -28,13 +28,13 @@ my @cases = (
     [123456789, 11111],
     [999999999, 31622]
 )
-for my $c (@cases) {
+for val $c (@cases) {
     assert_eq Rosetta::ISqrt::compute($c->[0]), $c->[1], "isqrt($c->[0])"
 }
 
 # Property: isqrt(n)^2 <= n < (isqrt(n)+1)^2
-for my $n (1, 7, 50, 200, 1000, 99999) {
-    my $r = Rosetta::ISqrt::compute($n)
+for val $n (1, 7, 50, 200, 1000, 99999) {
+    val $r = Rosetta::ISqrt::compute($n)
     assert_ok $r * $r <= $n,         "$r^2 <= $n"
     assert_ok ($r + 1) * ($r + 1) > $n, "($r+1)^2 > $n"
 }

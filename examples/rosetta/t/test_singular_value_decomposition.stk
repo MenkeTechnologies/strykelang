@@ -5,7 +5,7 @@ fn Rosetta::SVD::decompose_diagonal($a11, $a22) {
     { u => [[1, 0], [0, 1]], s => [$a11, $a22], v => [[1, 0], [0, 1]] }
 }
 
-my $svd = Rosetta::SVD::decompose_diagonal(3, 2)
+val $svd = Rosetta::SVD::decompose_diagonal(3, 2)
 
 assert_eq join(",", @{$svd->{s}}), "3,2", "singular values of diagonal matrix are diagonal entries"
 assert_eq join(",", @{$svd->{u}->[0]}), "1,0", "left singular vectors are identity for diagonal case"

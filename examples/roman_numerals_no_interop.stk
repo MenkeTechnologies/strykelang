@@ -16,11 +16,11 @@
 
 fn Roman::to($n) {
     die "out of range (1..3999): $n" if $n < 1 || $n > 3999
-    my @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
-    my @glyph = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
-    my $out = ""
-    my $rem = $n
-    for my $i (0:len(@vals) - 1) {
+    val @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+    val @glyph = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
+    var $out = ""
+    var $rem = $n
+    for val $i (0:len(@vals) - 1) {
         while ($rem >= $vals[$i]) {
             $out .= $glyph[$i]
             $rem -= $vals[$i]
@@ -31,19 +31,19 @@ fn Roman::to($n) {
 
 fn Roman::from($s) {
     die "not a Roman numeral: $s" unless $s =~ /^[MDCLXVI]+$/i
-    my %val = (M => 1000, D => 500, C => 100, L => 50, X => 10, V => 5, I => 1)
-    my @chars = split(//, uc($s))
-    my $total = 0
-    for my $i (0:len(@chars) - 1) {
-        my $here = $val{$chars[$i]}
-        my $next = $i + 1 < len(@chars) ? $val{$chars[$i + 1]} : 0
+    val %val = (M => 1000, D => 500, C => 100, L => 50, X => 10, V => 5, I => 1)
+    val @chars = split(//, uc($s))
+    var $total = 0
+    for val $i (0:len(@chars) - 1) {
+        val $here = $val{$chars[$i]}
+        val $next = $i + 1 < len(@chars) ? $val{$chars[$i + 1]} : 0
         $total += $here < $next ? -$here : $here
     }
     $total
 }
 
 if (len(@ARGV) >= 1) {
-    my $arg = $ARGV[0]
+    val $arg = $ARGV[0]
     if ($arg =~ /^\d+$/) {
         p Roman::to(0 + $arg)
     } else {
@@ -54,20 +54,20 @@ if (len(@ARGV) >= 1) {
 
 # Demo grid.
 p "── Integer → Roman ──"
-for my $n (1, 4, 9, 14, 40, 90, 400, 944, 1994, 2026, 3999) {
+for val $n (1, 4, 9, 14, 40, 90, 400, 944, 1994, 2026, 3999) {
     printf "  %4d  ->  %s\n", $n, Roman::to($n)
 }
 
 p ""
 p "── Roman → Integer ──"
-for my $s ("I", "IV", "IX", "XIV", "XL", "XC", "CD", "CMXLIV", "MCMXCIV", "MMXXVI", "MMMCMXCIX") {
+for val $s ("I", "IV", "IX", "XIV", "XL", "XC", "CD", "CMXLIV", "MCMXCIV", "MMXXVI", "MMMCMXCIX") {
     printf "  %-10s -> %d\n", $s, Roman::from($s)
 }
 
 p ""
 p "── Round-trip check 1..2026 ──"
-my $bad = 0
-for my $n (1:2026) {
+var $bad = 0
+for val $n (1:2026) {
     $bad++ if Roman::from(Roman::to($n)) != $n
 }
 p "  failures: $bad / 2026"

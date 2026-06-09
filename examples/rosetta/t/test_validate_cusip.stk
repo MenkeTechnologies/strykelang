@@ -13,14 +13,14 @@ fn Rosetta::CUSIP::char_value($c) {
 fn Rosetta::CUSIP::is_valid($cusip) {
     return 0 if len($cusip) != 9
     return 0 if $cusip !~ /^[0-9A-Z*@#]+$/
-    my @cs = ~> $cusip chars
-    my $sum = 0
-    for my $i (0:7) {
-        my $v = Rosetta::CUSIP::char_value($cs[$i])
+    val @cs = ~> $cusip chars
+    var $sum = 0
+    for val $i (0:7) {
+        var $v = Rosetta::CUSIP::char_value($cs[$i])
         $v *= 2 if $i % 2 == 1
         $sum += int($v / 10) + ($v % 10)
     }
-    my $check = (10 - ($sum % 10)) % 10
+    val $check = (10 - ($sum % 10)) % 10
     $check == int($cs[8])
 }
 

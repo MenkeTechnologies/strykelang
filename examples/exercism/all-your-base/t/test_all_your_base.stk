@@ -12,7 +12,7 @@ assert_eq j([0,0,0], 10, 2),             "0",            "leading zeros"
 assert_eq j([2,1,0,1,2], 3, 16),         "12,2",         "trinary to hex (digit list)"
 assert_eq j([1,12,9], 16, 10),           "4,5,7",        "hex-style to decimal"
 
-my $err = eval { Exercism::AllYourBase::rebase([2], 1, 10); 0 } || $@
+var $err = eval { Exercism::AllYourBase::rebase([2], 1, 10); 0 } || $@
 assert_ok $err =~ /input base/, "input base must be >= 2"
 $err = eval { Exercism::AllYourBase::rebase([2], 10, 1); 0 } || $@
 assert_ok $err =~ /output base/, "output base must be >= 2"

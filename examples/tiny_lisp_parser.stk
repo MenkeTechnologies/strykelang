@@ -20,11 +20,11 @@ fn Lisp::tokenize($str) {
 }
 
 fn Lisp::parse_tokens($tokens) {
-    my $token = shift @$tokens
+    val $token = shift @$tokens
     return undef if !defined $token
 
     if ($token eq "(") {
-        my @list = ()
+        var @list = ()
         while ($tokens->[0] ne ")") {
             push @list, Lisp::parse_tokens $tokens
         }
@@ -38,11 +38,11 @@ fn Lisp::parse_tokens($tokens) {
 
 # ── 2. Run Example ────────────────────────────────────────────────
 
-my $code = "(add 10 (mul 2 3) 5)"
+val $code = "(add 10 (mul 2 3) 5)"
 p "Lisp Code: $code"
 
-my @tokens = Lisp::tokenize $code
-my $ast = Lisp::parse_tokens \@tokens
+val @tokens = Lisp::tokenize $code
+val $ast = Lisp::parse_tokens \@tokens
 
 p "Parsed AST: #{ ddump $ast }"
 

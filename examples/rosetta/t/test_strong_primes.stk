@@ -6,9 +6,9 @@ fn Rosetta::IsPrime::is_prime($n) {
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
+        val $limit = sqrt($n)
+        var $res = 1
+        var $i = 3
         while ($i <= $limit) {
             if ($n % $i == 0) {
                 $res = 0
@@ -21,7 +21,7 @@ fn Rosetta::IsPrime::is_prime($n) {
 }
 
 fn Rosetta::PrevPrime::prev_prime($n) {
-    my $p = $n - 1
+    var $p = $n - 1
     while ($p > 1) {
         if (Rosetta::IsPrime::is_prime($p)) { return $p }
         $p--
@@ -30,7 +30,7 @@ fn Rosetta::PrevPrime::prev_prime($n) {
 }
 
 fn Rosetta::NextPrime::next_prime($n) {
-    my $p = $n + 1
+    var $p = $n + 1
     while (1) {
         if (Rosetta::IsPrime::is_prime($p)) { return $p }
         $p++
@@ -41,11 +41,11 @@ fn Rosetta::StrongPrimes::is_strong_prime($n) {
     if (!Rosetta::IsPrime::is_prime($n)) {
         0
     } else {
-        my $prev = Rosetta::PrevPrime::prev_prime($n)
+        val $prev = Rosetta::PrevPrime::prev_prime($n)
         if ($prev == 0) {
             0
         } else {
-            my $next = Rosetta::NextPrime::next_prime($n)
+            val $next = Rosetta::NextPrime::next_prime($n)
             $n * 2 > $prev + $next
         }
     }

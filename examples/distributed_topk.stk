@@ -10,66 +10,66 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $k = $ARGV[0] // 5
-my $n_workers = $ARGV[1] // 4
+val $k = $ARGV[0] // 5
+val $n_workers = $ARGV[1] // 4
 
 printf "── distributed top-%d ──\n", $k
 
 # Generate a synthetic dataset (deterministic for repro).
-my @data
-for my $i (0:199) {
+var @data
+for val $i (0:199) {
     push @data, (($i * 37 + 11) % 1000)
 }
 printf "input: %d values (synthetic)\n", len(@data)
 
-my @workers = congregation($n_workers)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n_workers)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard input across workers. Each worker gets a chunk, finds its
 # local top-K, returns the K values as JSON.
-my $per = int((len(@data) + $n_workers - 1) / $n_workers)
-my %top_per_worker
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int((len(@data) + $n_workers - 1) / $n_workers)
+var %top_per_worker
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@data) - 1 if $end >= len(@data)
     next if $start >= len(@data)
-    my @shard = @data[$start:$end]
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    val @shard = @data[$start:$end]
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
         my \@sorted = sort { _1 <=> _ } \@\$arr;
         my \@top = \@sorted[0:$k - 1];
         to_json(\\\@top)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
-    my $top = from_json($reply{$w})
+    val $div = pray $code, $w
+    val %reply = annex $div
+    val $top = from_json($reply{$w})
     $top_per_worker{$w} = $top
 }
 
 p "── per-worker top-K ──"
-for my $sid (sort { _ <=> _1 } keys %top_per_worker) {
+for val $sid (sort { _ <=> _1 } keys %top_per_worker) {
     printf "  worker %d: %s\n", $sid, join(",", @{$top_per_worker{$sid}})
 }
 
 # Merge: collect all per-worker top-Ks, sort descending, take global top-K.
-my @merged
-for my $sid (keys %top_per_worker) {
+var @merged
+for val $sid (keys %top_per_worker) {
     push @merged, @{$top_per_worker{$sid}}
 }
 @merged = sort { _1 <=> _ } @merged
-my @global_top = @merged[0:$k - 1]
+val @global_top = @merged[0:$k - 1]
 printf "── global top-%d: %s ──\n", $k, join(",", @global_top)
 
 # Verify against a local top-K on the full input.
-my @local_sorted = sort { _1 <=> _ } @data
-my @local_top = @local_sorted[0:$k - 1]
+val @local_sorted = sort { _1 <=> _ } @data
+val @local_top = @local_sorted[0:$k - 1]
 printf "verify: local top-%d = %s\n", $k, join(",", @local_top)
 
-my $matches = 1
-for my $i (0:$k - 1) {
+var $matches = 1
+for val $i (0:$k - 1) {
     $matches = 0 unless $global_top[$i] == $local_top[$i]
 }
 p $matches ? "✓ distributed top-K matches local top-K" : "✗ top-K diverged"

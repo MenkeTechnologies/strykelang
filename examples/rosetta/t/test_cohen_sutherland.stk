@@ -5,7 +5,7 @@
 
 # Outcode bits: 1=left, 2=right, 4=bottom, 8=top.
 fn Rosetta::CohenSutherland::outcode($x, $y, $xmin, $ymin, $xmax, $ymax) {
-    my $code = 0
+    var $code = 0
     $code |= 1 if $x < $xmin
     $code |= 2 if $x > $xmax
     $code |= 4 if $y < $ymin
@@ -14,14 +14,14 @@ fn Rosetta::CohenSutherland::outcode($x, $y, $xmin, $ymin, $xmax, $ymax) {
 }
 
 fn Rosetta::CohenSutherland::clip($x0, $y0, $x1, $y1, $xmin, $ymin, $xmax, $ymax) {
-    my $a = $x0; my $b = $y0; my $c = $x1; my $d = $y1
-    my $oa = Rosetta::CohenSutherland::outcode($a, $b, $xmin, $ymin, $xmax, $ymax)
-    my $ob = Rosetta::CohenSutherland::outcode($c, $d, $xmin, $ymin, $xmax, $ymax)
+    var $a = $x0; var $b = $y0; var $c = $x1; var $d = $y1
+    var $oa = Rosetta::CohenSutherland::outcode($a, $b, $xmin, $ymin, $xmax, $ymax)
+    var $ob = Rosetta::CohenSutherland::outcode($c, $d, $xmin, $ymin, $xmax, $ymax)
     while (1) {
         return [$a, $b, $c, $d] if ($oa | $ob) == 0
         return undef if ($oa & $ob) != 0
-        my $out = $oa != 0 ? $oa : $ob
-        my ($x, $y)
+        val $out = $oa != 0 ? $oa : $ob
+        var ($x, $y)
         if ($out & 8) {
             $x = $a + ($c - $a) * ($ymax - $b) / ($d - $b)
             $y = $ymax
@@ -48,32 +48,32 @@ fn Rosetta::CohenSutherland::clip($x0, $y0, $x1, $y1, $xmin, $ymin, $xmax, $ymax
 fn Rosetta::CohenSutherland::fmt($r) {
     return "rejected" if !defined $r
     # Show ints without trailing decimals, fractions with default precision.
-    join(",", map { my $v = _0; $v == int($v) ? int($v) : $v } @$r)
+    join(",", map { val $v = _0; $v == int($v) ? int($v) : $v } @$r)
 }
 
 # Window 0,0,10,10
 # Fully inside
-my $r1 = Rosetta::CohenSutherland::clip(2, 2, 8, 8, 0, 0, 10, 10)
+val $r1 = Rosetta::CohenSutherland::clip(2, 2, 8, 8, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r1), "2,2,8,8", "fully inside"
 
 # Fully outside (left of window)
-my $r2 = Rosetta::CohenSutherland::clip(-5, 2, -1, 8, 0, 0, 10, 10)
+val $r2 = Rosetta::CohenSutherland::clip(-5, 2, -1, 8, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r2), "rejected", "fully outside left"
 
 # Crosses left edge from outside
-my $r3 = Rosetta::CohenSutherland::clip(-5, 5, 5, 5, 0, 0, 10, 10)
+val $r3 = Rosetta::CohenSutherland::clip(-5, 5, 5, 5, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r3), "0,5,5,5", "crosses left edge"
 
 # Crosses two edges (bottom-left to upper-right beyond window)
-my $r4 = Rosetta::CohenSutherland::clip(-2, -2, 12, 12, 0, 0, 10, 10)
+val $r4 = Rosetta::CohenSutherland::clip(-2, -2, 12, 12, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r4), "0,0,10,10", "diagonal across full window"
 
 # Crosses top edge
-my $r5 = Rosetta::CohenSutherland::clip(5, 5, 5, 15, 0, 0, 10, 10)
+val $r5 = Rosetta::CohenSutherland::clip(5, 5, 5, 15, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r5), "5,5,5,10", "crosses top edge"
 
 # Both endpoints outside but line passes through
-my $r6 = Rosetta::CohenSutherland::clip(-5, 5, 15, 5, 0, 0, 10, 10)
+val $r6 = Rosetta::CohenSutherland::clip(-5, 5, 15, 5, 0, 0, 10, 10)
 assert_eq Rosetta::CohenSutherland::fmt($r6), "0,5,10,5", "horizontal sweep through"
 
 # Outcode sanity

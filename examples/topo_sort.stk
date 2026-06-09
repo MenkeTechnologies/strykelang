@@ -5,27 +5,27 @@
 # Run: stryke --no-interop examples/topo_sort.stk
 
 fn Topo::sort($edges, $nodes) {
-    my %indeg = ()
-    my %adj   = ()
-    for my $n (@$nodes) {
+    var %indeg = ()
+    var %adj   = ()
+    for val $n (@$nodes) {
         $indeg{$n} = 0
         $adj{$n}   = []
     }
-    for my $e (@$edges) {
-        my ($u, $v) = @$e
+    for val $e (@$edges) {
+        val ($u, $v) = @$e
         push @{$adj{$u}}, $v
         $indeg{$v} = $indeg{$v} + 1
     }
-    my @queue = ()
-    for my $n (sort @$nodes) {
+    var @queue = ()
+    for val $n (sort @$nodes) {
         push @queue, $n if $indeg{$n} == 0
     }
-    my @order = ()
+    var @order = ()
     while (len(@queue) > 0) {
-        my $n = shift @queue
+        val $n = shift @queue
         push @order, $n
-        my @nexts = sort @{$adj{$n}}
-        for my $m (@nexts) {
+        val @nexts = sort @{$adj{$n}}
+        for val $m (@nexts) {
             $indeg{$m} = $indeg{$m} - 1
             push @queue, $m if $indeg{$m} == 0
         }
@@ -37,8 +37,8 @@ fn Topo::sort($edges, $nodes) {
 }
 
 p "=== Topological Sort Demo ==="
-my @nodes = ("wake", "shower", "dress", "breakfast", "commute", "work")
-my @edges = (
+val @nodes = ("wake", "shower", "dress", "breakfast", "commute", "work")
+val @edges = (
     ["wake", "shower"],
     ["shower", "dress"],
     ["dress", "breakfast"],
@@ -46,11 +46,11 @@ my @edges = (
     ["commute", "work"],
     ["wake", "breakfast"],
 )
-my $order = Topo::sort(\@edges, \@nodes)
+val $order = Topo::sort(\@edges, \@nodes)
 p "order: " . join(" -> ", @$order)
 
 p "--- cycle detection ---"
-my @cycle = (["a","b"], ["b","c"], ["c","a"])
-my @cn    = ("a","b","c")
-my $r = Topo::sort(\@cycle, \@cn)
+val @cycle = (["a","b"], ["b","c"], ["c","a"])
+val @cn    = ("a","b","c")
+val $r = Topo::sort(\@cycle, \@cn)
 p "cycle result: " . (defined $r ? "ok" : "cycle detected")

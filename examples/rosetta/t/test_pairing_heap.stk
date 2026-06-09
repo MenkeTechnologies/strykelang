@@ -22,7 +22,7 @@ fn Rosetta::Pairing::merge_nodes($a, $b) {
 }
 
 fn Rosetta::Pairing::insert($h, $key) {
-    my $node = { key => $key, children => [] }
+    val $node = { key => $key, children => [] }
     $h->{root} = Rosetta::Pairing::merge_nodes($h->{root}, $node)
     $h->{count}++
 }
@@ -34,19 +34,19 @@ fn Rosetta::Pairing::min($h) {
 
 fn Rosetta::Pairing::extract_min($h) {
     return undef if !defined $h->{root}
-    my $m = $h->{root}{key}
-    my $children = $h->{root}{children}
+    var $m = $h->{root}{key}
+    val $children = $h->{root}{children}
     # Two-pass merge: pair from left; then merge resulting pairs from right.
-    my @paired
-    for (my $i = 0; $i < len(@$children); $i += 2) {
+    var @paired
+    for (var $i = 0; $i < len(@$children); $i += 2) {
         if ($i + 1 < len(@$children)) {
             push @paired, Rosetta::Pairing::merge_nodes($children->[$i], $children->[$i + 1])
         } else {
             push @paired, $children->[$i]
         }
     }
-    my $new_root
-    for (my $i = len(@paired) - 1; $i >= 0; $i--) {
+    var $new_root
+    for (var $i = len(@paired) - 1; $i >= 0; $i--) {
         $new_root = Rosetta::Pairing::merge_nodes($new_root, $paired[$i])
     }
     $h->{root} = $new_root
@@ -62,7 +62,7 @@ fn Rosetta::Pairing::union($a, $b) {
 }
 
 # Insert and min
-my $h = Rosetta::Pairing::new()
+val $h = Rosetta::Pairing::new()
 Rosetta::Pairing::insert($h, 5)
 Rosetta::Pairing::insert($h, 2)
 Rosetta::Pairing::insert($h, 8)
@@ -81,38 +81,38 @@ assert_ok !defined Rosetta::Pairing::extract_min($h), "extract empty undef"
 assert_eq $h->{count}, 0, "empty count = 0"
 
 # Heap-sort
-my @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
-my $hb = Rosetta::Pairing::new()
-for my $v (@input) { Rosetta::Pairing::insert($hb, $v) }
-my @sorted_via_heap
+val @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+val $hb = Rosetta::Pairing::new()
+for val $v (@input) { Rosetta::Pairing::insert($hb, $v) }
+var @sorted_via_heap
 while ($hb->{count} > 0) { push @sorted_via_heap, Rosetta::Pairing::extract_min($hb) }
-my @native = sort { _0 <=> _1 } @input
+val @native = sort { _0 <=> _1 } @input
 assert_eq join(",", @sorted_via_heap), join(",", @native), "pairing heap-sort = native"
 
 # Union
-my $h1 = Rosetta::Pairing::new()
-my $h2 = Rosetta::Pairing::new()
+val $h1 = Rosetta::Pairing::new()
+val $h2 = Rosetta::Pairing::new()
 Rosetta::Pairing::insert($h1, 10)
 Rosetta::Pairing::insert($h1, 4)
 Rosetta::Pairing::insert($h2, 7)
 Rosetta::Pairing::insert($h2, 2)
-my $u = Rosetta::Pairing::union($h1, $h2)
+val $u = Rosetta::Pairing::union($h1, $h2)
 assert_eq Rosetta::Pairing::min($u), 2, "union min = 2"
 assert_eq $u->{count}, 4, "union count = 4"
-my @ord
+var @ord
 while ($u->{count} > 0) { push @ord, Rosetta::Pairing::extract_min($u) }
 assert_eq join(",", @ord), "2,4,7,10", "union extracts sorted"
 
 # Single-element
-my $one = Rosetta::Pairing::new()
+val $one = Rosetta::Pairing::new()
 Rosetta::Pairing::insert($one, 42)
 assert_eq Rosetta::Pairing::extract_min($one), 42, "single extract"
 assert_eq $one->{count}, 0, "after extract count = 0"
 
 # Duplicates
-my $dup = Rosetta::Pairing::new()
-for my $v (5, 5, 3, 3, 1, 1) { Rosetta::Pairing::insert($dup, $v) }
-my @ds
+val $dup = Rosetta::Pairing::new()
+for val $v (5, 5, 3, 3, 1, 1) { Rosetta::Pairing::insert($dup, $v) }
+var @ds
 while ($dup->{count} > 0) { push @ds, Rosetta::Pairing::extract_min($dup) }
 assert_eq join(",", @ds), "1,1,3,3,5,5", "duplicates extracted in order"
 

@@ -5,8 +5,8 @@
 
 fn Bc::to_bin($n) {
     return "0" if $n == 0
-    my $s = ""
-    my $x = $n
+    var $s = ""
+    var $x = $n
     while ($x > 0) {
         $s = ($x % 2) . $s
         $x = int($x / 2)
@@ -16,8 +16,8 @@ fn Bc::to_bin($n) {
 
 fn Bc::to_oct($n) {
     return "0" if $n == 0
-    my $s = ""
-    my $x = $n
+    var $s = ""
+    var $x = $n
     while ($x > 0) {
         $s = ($x % 8) . $s
         $x = int($x / 8)
@@ -27,9 +27,9 @@ fn Bc::to_oct($n) {
 
 fn Bc::to_hex($n) {
     return "0" if $n == 0
-    my @digits = ("0".."9", "a".."f")
-    my $s = ""
-    my $x = $n
+    val @digits = ("0".."9", "a".."f")
+    var $s = ""
+    var $x = $n
     while ($x > 0) {
         $s = $digits[$x % 16] . $s
         $x = int($x / 16)
@@ -39,9 +39,9 @@ fn Bc::to_hex($n) {
 
 fn Bc::to_base($n, $base) {
     return "0" if $n == 0
-    my @digits = ("0".."9", "a".."z")
-    my $s = ""
-    my $x = $n
+    val @digits = ("0".."9", "a".."z")
+    var $s = ""
+    var $x = $n
     while ($x > 0) {
         $s = $digits[$x % $base] . $s
         $x = int($x / $base)
@@ -50,19 +50,19 @@ fn Bc::to_base($n, $base) {
 }
 
 fn Bc::from_bin($s) {
-    my $acc = 0
-    for my $c (split(//, $s)) {
+    var $acc = 0
+    for val $c (split(//, $s)) {
         $acc = $acc * 2 + $c
     }
     $acc
 }
 
 fn Bc::from_base($s, $base) {
-    my %val = ()
-    my @digs = ("0".."9", "a".."z")
+    var %val = ()
+    val @digs = ("0".."9", "a".."z")
     $val{$digs[$_]} = $_ for 0:35
-    my $acc = 0
-    for my $c (split(//, lc $s)) {
+    var $acc = 0
+    for val $c (split(//, lc $s)) {
         $acc = $acc * $base + $val{$c}
     }
     $acc
@@ -98,26 +98,26 @@ Bc::from_base("zz", 36) |> aeq 1295, "zz base36"
 Bc::from_base("10201", 3) |> aeq 100, "10201 base3"
 
 # Round-trip property
-for my $n (0, 1, 7, 100, 1024, 65535, 999999) {
+for val $n (0, 1, 7, 100, 1024, 65535, 999999) {
     Bc::from_bin(Bc::to_bin($n)) |> aeq $n, "bin round #{$n}"
 }
 
-for my $n (0, 1, 100, 1000, 99999) {
-    for my $base (2, 3, 8, 10, 16, 36) {
+for var $n (0, 1, 100, 1000, 99999) {
+    for val $base (2, 3, 8, 10, 16, 36) {
         Bc::from_base(Bc::to_base($n, $base), $base) |> aeq $n, "round #{$n} base #{$base}"
     }
 }
 
 # Roman numerals via lookup (small set)
 fn Bc::roman($n) {
-    my @pairs = (
+    val @pairs = (
         [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
         [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
         [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
     )
-    my $s = ""
-    my $x = $n
-    for my $p (@pairs) {
+    var $s = ""
+    var $x = $n
+    for val $p (@pairs) {
         while ($x >= $p->[0]) {
             $s .= $p->[1]
             $x -= $p->[0]
@@ -136,8 +136,8 @@ Bc::roman(3999) |> aeq "MMMCMXCIX", "3999"
 # Gray code: n ^ (n>>1)
 fn Bc::gray($n) = $n ^ ($n >> 1)
 fn Bc::ungray($g) {
-    my $n = $g
-    my $s = $g >> 1
+    var $n = $g
+    var $s = $g >> 1
     while ($s != 0) {
         $n ^= $s
         $s >>= 1
@@ -152,7 +152,7 @@ Bc::gray(3) |> aeq 2, "gray 3"
 Bc::gray(4) |> aeq 6, "gray 4"
 Bc::gray(7) |> aeq 4, "gray 7"
 
-for my $n (0..15) {
+for val $n (0..15) {
     Bc::ungray(Bc::gray($n)) |> aeq $n, "gray round #{$n}"
 }
 

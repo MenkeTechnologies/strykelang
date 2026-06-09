@@ -2,29 +2,29 @@
 # Rosetta Code: Kernighans large earthquake problem
 
 fn Rosetta::Quakes::large($events, $threshold) {
-    my @out
-    for my $event (@$events) {
+    var @out
+    for val $event (@$events) {
         if ($event->{magnitude} >= $threshold) { push @out, $event }
     }
     \@out
 }
 
 fn Rosetta::Quakes::summary($events) {
-    my $largest = $events->[0]
-    for my $event (@$events) {
+    var $largest = $events->[0]
+    for val $event (@$events) {
         if ($event->{magnitude} > $largest->{magnitude}) { $largest = $event }
     }
     "$largest->{place}:$largest->{magnitude}"
 }
 
-my @events = (
+val @events = (
     { place => "Chile", magnitude => 9.5 },
     { place => "Alaska", magnitude => 9.2 },
     { place => "Japan", magnitude => 9.1 },
     { place => "California", magnitude => 7.1 },
 )
 
-my $large = Rosetta::Quakes::large(\@events, 9.0)
+val $large = Rosetta::Quakes::large(\@events, 9.0)
 
 assert_eq len(@$large), 3, "three large earthquakes selected"
 assert_eq Rosetta::Quakes::summary($large), "Chile:9.5", "largest quake identified"

@@ -7,8 +7,8 @@
 
 ai_mock_install("Decide whether each item below matches this criterion: starts with 'a'", '[true, false, true]');
 
-my @items_string = ("apple", "banana", "avocado");
-my $filtered_string = ai_filter(\@items_string, "starts with 'a'");
+val @items_string = ("apple", "banana", "avocado");
+val $filtered_string = ai_filter(\@items_string, "starts with 'a'");
 
 join(",", @{$filtered_string}) |> aeq "apple,avocado", "ai_filter strings";
 
@@ -16,8 +16,8 @@ join(",", @{$filtered_string}) |> aeq "apple,avocado", "ai_filter strings";
 
 ai_mock_install("Decide whether each item below matches this criterion: is even", '[false, true, false, true]');
 
-my @items_numeric = (1, 2, 3, 4);
-my $filtered_numeric = ai_filter(\@items_numeric, "is even");
+val @items_numeric = (1, 2, 3, 4);
+val $filtered_numeric = ai_filter(\@items_numeric, "is even");
 
 join(",", @{$filtered_numeric}) |> aeq "2,4", "ai_filter numbers";
 
@@ -25,14 +25,14 @@ join(",", @{$filtered_numeric}) |> aeq "2,4", "ai_filter numbers";
 
 ai_mock_install("Decide whether each item below matches this criterion: is older than 30", '[false, false, true]');
 
-my @items_hash = (
+val @items_hash = (
     +{ name => "Alice", age => 30 },
     +{ name => "Bob", age => 25 },
     +{ name => "Charlie", age => 35 }
 );
-my $filtered_hash = ai_filter(\@items_hash, "is older than 30");
+val $filtered_hash = ai_filter(\@items_hash, "is older than 30");
 
-my @filtered_names = map { $_->{name} } @{$filtered_hash};
+val @filtered_names = map { $_->{name} } @{$filtered_hash};
 join(",", @filtered_names) |> aeq "Charlie", "ai_filter by hash key";
 
 

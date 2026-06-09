@@ -2,8 +2,8 @@
 # Rosetta Code: Casting out nines
 
 fn Rosetta::CastingNines::digit_sum($n) {
-    my $s = 0
-    my $x = abs($n)
+    var $s = 0
+    var $x = abs($n)
     while ($x > 0) {
         $s += $x % 10
         $x = int($x / 10)
@@ -12,7 +12,7 @@ fn Rosetta::CastingNines::digit_sum($n) {
 }
 
 fn Rosetta::CastingNines::digital_root($n) {
-    my $x = $n
+    var $x = $n
     while ($x >= 10) {
         $x = Rosetta::CastingNines::digit_sum($x)
     }

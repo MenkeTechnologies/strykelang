@@ -2,8 +2,8 @@
 # Rosetta Code: Nth prime
 
 fn Rosetta::NthPrime::solve($n) {
-    my $count = 0
-    my $candidate = 1
+    var $count = 0
+    var $candidate = 1
     while ($count < $n) {
         $candidate++
         if (is_prime($candidate)) {

@@ -29,7 +29,7 @@ fn Rosetta::RecursionLimit::find() {
     $Rosetta::RecursionLimit::depth
 }
 
-my $limit = Rosetta::RecursionLimit::find()
+val $limit = Rosetta::RecursionLimit::find()
 
 # We assert that we reached at least our artificial limit or whatever limit Stryke threw at
 assert_ok $limit > 0, "Recursion achieved depth of $limit"

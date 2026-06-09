@@ -19,14 +19,14 @@
 
 # Can `$d` be legally placed at row $r, col $c on $board?
 fn Sudoku::safe($board, $r, $c, $d) {
-    for my $i (0:8) {
+    for val $i (0:8) {
         return 0 if $board->[$r * 9 + $i] == $d   # row conflict
         return 0 if $board->[$i * 9 + $c] == $d   # column conflict
     }
-    my $br = int($r / 3) * 3
-    my $bc = int($c / 3) * 3
-    for my $i (0:2) {
-        for my $j (0:2) {
+    val $br = int($r / 3) * 3
+    val $bc = int($c / 3) * 3
+    for val $i (0:2) {
+        for val $j (0:2) {
             return 0 if $board->[($br + $i) * 9 + ($bc + $j)] == $d
         }
     }
@@ -35,7 +35,7 @@ fn Sudoku::safe($board, $r, $c, $d) {
 
 # Find the next empty cell (left-to-right, top-to-bottom), or undef.
 fn Sudoku::next_empty($board) {
-    for my $i (0:80) {
+    for val $i (0:80) {
         return $i if $board->[$i] == 0
     }
     undef
@@ -43,11 +43,11 @@ fn Sudoku::next_empty($board) {
 
 # In-place solve; returns 1 on success, 0 on no solution. Mutates board.
 fn Sudoku::solve($board) {
-    my $idx = Sudoku::next_empty($board)
+    val $idx = Sudoku::next_empty($board)
     return 1 unless defined $idx
-    my $r = int($idx / 9)
-    my $c = $idx % 9
-    for my $d (1:9) {
+    val $r = int($idx / 9)
+    val $c = $idx % 9
+    for val $d (1:9) {
         if (Sudoku::safe($board, $r, $c, $d)) {
             $board->[$idx] = $d
             return 1 if Sudoku::solve($board)
@@ -59,21 +59,21 @@ fn Sudoku::solve($board) {
 
 # Verify a SOLVED board: every row, column, and 3×3 box contains 1:9.
 fn Sudoku::is_valid_solution($board) {
-    for my $i (0:8) {
-        my %row
-        my %col
-        for my $j (0:8) {
+    for val $i (0:8) {
+        var %row
+        var %col
+        for val $j (0:8) {
             $row{$board->[$i * 9 + $j]} = 1
             $col{$board->[$j * 9 + $i]} = 1
         }
         return 0 unless len(keys %row) == 9
         return 0 unless len(keys %col) == 9
     }
-    for my $br (0:2) {
-        for my $bc (0:2) {
-            my %box
-            for my $i (0:2) {
-                for my $j (0:2) {
+    for val $br (0:2) {
+        for val $bc (0:2) {
+            var %box
+            for val $i (0:2) {
+                for val $j (0:2) {
                     $box{$board->[($br * 3 + $i) * 9 + ($bc * 3 + $j)]} = 1
                 }
             }
@@ -86,7 +86,7 @@ fn Sudoku::is_valid_solution($board) {
 p "── Sudoku solver demo ──"
 
 # Classic textbook puzzle (medium difficulty).
-my @puzzle = (
+val @puzzle = (
     5, 3, 0,  0, 7, 0,  0, 0, 0,
     6, 0, 0,  1, 9, 5,  0, 0, 0,
     0, 9, 8,  0, 0, 0,  0, 6, 0,
@@ -97,7 +97,7 @@ my @puzzle = (
     0, 0, 0,  4, 1, 9,  0, 0, 5,
     0, 0, 0,  0, 8, 0,  0, 7, 9,
 )
-my $clues = grep { _ != 0 } @puzzle
+val $clues = grep { _ != 0 } @puzzle
 die "initial clues count" unless $clues == 30
 
 die "solver should succeed" unless Sudoku::solve(\@puzzle)
@@ -105,7 +105,7 @@ die "solution must be valid" unless Sudoku::is_valid_solution(\@puzzle)
 p "  classic puzzle solved (#{$clues} clues → 81 cells filled, all constraints OK)  OK"
 
 # Verify the solution preserves the original clues (none overwritten).
-my @orig = (
+val @orig = (
     5, 3, 0,  0, 7, 0,  0, 0, 0,
     6, 0, 0,  1, 9, 5,  0, 0, 0,
     0, 9, 8,  0, 0, 0,  0, 6, 0,
@@ -116,7 +116,7 @@ my @orig = (
     0, 0, 0,  4, 1, 9,  0, 0, 5,
     0, 0, 0,  0, 8, 0,  0, 7, 9,
 )
-for my $i (0:80) {
+for val $i (0:80) {
     next if $orig[$i] == 0
     die "clue at $i overwritten" unless $puzzle[$i] == $orig[$i]
 }
@@ -125,15 +125,15 @@ p "  all original clues preserved in solution  OK"
 # Almost-full puzzle with a forced impossible last cell: column 0
 # has 1..8 set so the last (0, *) cell must be 9, but row 0 also has
 # 9 already → no valid digit exists. Solver returns 0.
-my @impossible = (0) x 81
+var @impossible = (0) x 81
 $impossible[0 * 9 + 8] = 9    # row 0 col 8 has a 9
-for my $r (1:8) { $impossible[$r * 9 + 0] = $r }   # column 0 = 1..8
+for val $r (1:8) { $impossible[$r * 9 + 0] = $r }   # column 0 = 1..8
 # Cell (0, 0) must be 9 to complete column 0, but row 0 forbids 9.
 die "impossible constraint should be unsolvable" if Sudoku::solve(\@impossible)
 p "  unsolvable puzzle (col-row clash on (0,0)) correctly rejected  OK"
 
 # Already-solved input solves trivially.
-my @done = (
+val @done = (
     5, 3, 4,  6, 7, 8,  9, 1, 2,
     6, 7, 2,  1, 9, 5,  3, 4, 8,
     1, 9, 8,  3, 4, 2,  5, 6, 7,

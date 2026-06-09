@@ -7,8 +7,8 @@
 # Run: stryke --no-interop examples/skip_list.stk
 
 fn SL::new($max_level, $seed) {
-    my @next = ()
-    for my $i (1:$max_level) { push @next, undef }
+    var @next = ()
+    for val $i (1:$max_level) { push @next, undef }
     +{
         head      => +{ val => undef, next => \@next, level => $max_level },
         max_level => $max_level,
@@ -19,7 +19,7 @@ fn SL::new($max_level, $seed) {
 }
 
 fn SL::_rand_level($sl) {
-    my $lvl = 1
+    var $lvl = 1
     while ($lvl < $sl->{max_level}) {
         $sl->{rng}->{state} = ($sl->{rng}->{state} * 1103515245 + 12345) % 2147483648
         last if ($sl->{rng}->{state} % 2) == 1
@@ -29,8 +29,8 @@ fn SL::_rand_level($sl) {
 }
 
 fn SL::contains($sl, $val) {
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
+    var $x = $sl->{head}
+    var $i = $sl->{level} - 1
     while ($i >= 0) {
         while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
             $x = $x->{next}->[$i]
@@ -43,10 +43,10 @@ fn SL::contains($sl, $val) {
 
 fn SL::insert($sl, $val) {
     return 0 if SL::contains($sl, $val)
-    my @update = ()
-    for my $i (1:$sl->{max_level}) { push @update, $sl->{head} }
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
+    var @update = ()
+    for val $i (1:$sl->{max_level}) { push @update, $sl->{head} }
+    var $x = $sl->{head}
+    var $i = $sl->{level} - 1
     while ($i >= 0) {
         while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
             $x = $x->{next}->[$i]
@@ -54,15 +54,15 @@ fn SL::insert($sl, $val) {
         $update[$i] = $x
         $i = $i - 1
     }
-    my $lvl = SL::_rand_level($sl)
+    val $lvl = SL::_rand_level($sl)
     if ($lvl > $sl->{level}) {
-        for my $j ($sl->{level}:$lvl-1) { $update[$j] = $sl->{head} }
+        for val $j ($sl->{level}:$lvl-1) { $update[$j] = $sl->{head} }
         $sl->{level} = $lvl
     }
-    my @next = ()
-    for my $j (1:$lvl) { push @next, undef }
-    my $node = +{ val => $val, next => \@next, level => $lvl }
-    for my $j (0:$lvl-1) {
+    var @next = ()
+    for val $j (1:$lvl) { push @next, undef }
+    val $node = +{ val => $val, next => \@next, level => $lvl }
+    for val $j (0:$lvl-1) {
         $node->{next}->[$j]    = $update[$j]->{next}->[$j]
         $update[$j]->{next}->[$j] = $node
     }
@@ -71,10 +71,10 @@ fn SL::insert($sl, $val) {
 }
 
 fn SL::remove($sl, $val) {
-    my @update = ()
-    for my $i (1:$sl->{max_level}) { push @update, $sl->{head} }
-    my $x = $sl->{head}
-    my $i = $sl->{level} - 1
+    var @update = ()
+    for val $i (1:$sl->{max_level}) { push @update, $sl->{head} }
+    var $x = $sl->{head}
+    var $i = $sl->{level} - 1
     while ($i >= 0) {
         while (defined $x->{next}->[$i] && $x->{next}->[$i]->{val} < $val) {
             $x = $x->{next}->[$i]
@@ -82,9 +82,9 @@ fn SL::remove($sl, $val) {
         $update[$i] = $x
         $i = $i - 1
     }
-    my $node = $x->{next}->[0]
+    val $node = $x->{next}->[0]
     return 0 unless defined $node && $node->{val} == $val
-    for my $j (0:$node->{level}-1) {
+    for val $j (0:$node->{level}-1) {
         if (defined $update[$j]->{next}->[$j] && $update[$j]->{next}->[$j] == $node) {
             $update[$j]->{next}->[$j] = $node->{next}->[$j]
         }
@@ -97,8 +97,8 @@ fn SL::remove($sl, $val) {
 }
 
 fn SL::to_array($sl) {
-    my @out = ()
-    my $x = $sl->{head}->{next}->[0]
+    var @out = ()
+    var $x = $sl->{head}->{next}->[0]
     while (defined $x) {
         push @out, $x->{val}
         $x = $x->{next}->[0]
@@ -109,8 +109,8 @@ fn SL::to_array($sl) {
 fn SL::size($sl) { $sl->{size} }
 
 p "=== Skip List Demo ==="
-my $sl = SL::new(8, 42)
-for my $v (5, 3, 8, 1, 9, 4, 7, 2, 6) { SL::insert($sl, $v) }
+val $sl = SL::new(8, 42)
+for val $v (5, 3, 8, 1, 9, 4, 7, 2, 6) { SL::insert($sl, $v) }
 p "size: " . SL::size($sl)
 p "sorted: " . join(",", @{SL::to_array($sl)})
 p "contains 4? " . SL::contains($sl, 4)

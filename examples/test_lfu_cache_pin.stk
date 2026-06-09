@@ -13,12 +13,12 @@ fn LFU::get($c, $k) {
 }
 
 fn LFU::_evict($c) {
-    my @ks = keys %{$c->{store}}
+    val @ks = keys %{$c->{store}}
     return if len(@ks) == 0
-    my $best = $ks[0]
-    for my $k (@ks) {
-        my $fb = $c->{freq}->{$best}
-        my $fk = $c->{freq}->{$k}
+    var $best = $ks[0]
+    for val $k (@ks) {
+        val $fb = $c->{freq}->{$best}
+        val $fk = $c->{freq}->{$k}
         if ($fk < $fb || ($fk == $fb && $c->{tick}->{$k} < $c->{tick}->{$best})) {
             $best = $k
         }
@@ -48,12 +48,12 @@ fn LFU::size($c) { len(keys %{$c->{store}}) }
 fn LFU::has($c, $k) { exists $c->{store}->{$k} ? 1 : 0 }
 
 # Empty
-my $e = LFU::new(2)
+val $e = LFU::new(2)
 LFU::size($e) |> aeq 0, "empty"
 (defined LFU::get($e, "x") ? 1 : 0) |> aeq 0, "miss"
 
 # Basic put/get
-my $c = LFU::new(3)
+val $c = LFU::new(3)
 LFU::put($c, "a", 1)
 LFU::put($c, "b", 2)
 LFU::put($c, "c", 3)
@@ -68,7 +68,7 @@ LFU::get($c, "a") |> aeq 10, "updated value"
 LFU::size($c) |> aeq 3, "size unchanged"
 
 # LFU eviction: lowest-freq evicted
-my $c2 = LFU::new(3)
+val $c2 = LFU::new(3)
 LFU::put($c2, "a", 1)
 LFU::put($c2, "b", 2)
 LFU::put($c2, "c", 3)
@@ -83,7 +83,7 @@ LFU::has($c2, "b") |> aeq 1, "b kept"
 LFU::has($c2, "d") |> aeq 1, "d added"
 
 # Tie-break by LRU (older tick evicted)
-my $c3 = LFU::new(3)
+val $c3 = LFU::new(3)
 LFU::put($c3, "x", 1)
 LFU::put($c3, "y", 2)
 LFU::put($c3, "z", 3)
@@ -95,7 +95,7 @@ LFU::has($c3, "z") |> aeq 1, "z kept"
 LFU::has($c3, "w") |> aeq 1, "w added"
 
 # Capacity 1
-my $c4 = LFU::new(1)
+val $c4 = LFU::new(1)
 LFU::put($c4, "a", 1)
 LFU::get($c4, "a") |> aeq 1, "cap1 a"
 LFU::put($c4, "b", 2)

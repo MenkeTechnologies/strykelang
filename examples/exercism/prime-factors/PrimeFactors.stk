@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 fn Exercism::PrimeFactors::factors {
-    my @f
-    my $d = 2
+    var @f
+    var $d = 2
     while (_ > 1) {
         while (_ % $d == 0) { push @f, $d; _ /= $d }
         $d++

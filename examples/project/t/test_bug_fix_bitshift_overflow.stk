@@ -19,23 +19,23 @@
 (1 >> -1)         |> assert_eq(0, "1 >> -1 = 0")
 
 # Compound assign forms route through the same helper.
-my $x = 1
+var $x = 1
 $x <<= 64
 $x |> assert_eq(0, "x <<= 64 = 0")
 
-my $y = -8
+var $y = -8
 $y >>= 100
 $y |> assert_eq(-1, "negative y >>= width = -1")
 
 # Loop-pattern: bit walk without clamping the shift amount manually.
 fn Demo::BitWalk::dump($n) {
-    my @bits
-    for my $i (0:65) {
+    var @bits
+    for val $i (0:65) {
         push @bits, (($n >> $i) & 1) ? "1" : "0"
     }
     join("", @bits)
 }
-my $bits = Demo::BitWalk::dump(5)
+val $bits = Demo::BitWalk::dump(5)
 # bit 0 = 1, bit 2 = 1, the rest zeros up to position 65 (inclusive).
 $bits |> assert_eq("1" . "0" . "1" . ("0" x 63), "no panic walking past width")
 

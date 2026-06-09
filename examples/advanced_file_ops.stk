@@ -12,14 +12,14 @@
 
 p "── Advanced File Operations ────────────────────────────"
 
-my $tmp = "/tmp/stryke_adv_io.txt"
+val $tmp = "/tmp/stryke_adv_io.txt"
 
 # 1. Spurt: write data to file in one call.
 spurt $tmp, "line 1: hello\nline 2: world\nline 3: stryke\n"
 p "Wrote data to $tmp"
 
 # 2. Slurp prefix: `c"..."` is the shortest path to file contents.
-my $content = c"$tmp"
+val $content = c"$tmp"
 p "Slurped content (length: #{len $content})"
 
 # 3. Lazy line iteration with filtering.
@@ -29,8 +29,8 @@ c"$tmp" |> lines |> greps { /stryke/ } |> e p
 # 4. Zsh-style globbing with qualifiers.
 # `(.)` means files only (no directories).
 p "\nRecent .stk files in examples/ (files only):"
-my @files = glob("examples/*.stk(.)")
-for my $f (@files[0:2]) { # Slice: first 3
+val @files = glob("examples/*.stk(.)")
+for val $f (@files[0:2]) { # Slice: first 3
     p "  - $f"
 }
 

@@ -5,23 +5,23 @@
 # two power-of-two windows is harmless.
 
 fn Rosetta::SparseTable::log2_floor($n) {
-    my $r = 0
-    my $x = $n
+    var $r = 0
+    var $x = $n
     while ($x > 1) { $x = $x >> 1; $r++ }
     $r
 }
 
 fn Rosetta::SparseTable::build($arr, $op) {
-    my $n = len(@$arr)
-    my $logN = Rosetta::SparseTable::log2_floor($n) + 1
-    my @table
+    val $n = len(@$arr)
+    val $logN = Rosetta::SparseTable::log2_floor($n) + 1
+    var @table
     push @table, [@$arr]
-    for my $j (~> 1:$logN - 1) {
-        my @row
-        my $width = 1 << $j
-        for my $i (~> 0:$n - $width) {
-            my $left = $table[$j - 1][$i]
-            my $right = $table[$j - 1][$i + (1 << ($j - 1))]
+    for val $j (~> 1:$logN - 1) {
+        var @row
+        val $width = 1 << $j
+        for val $i (~> 0:$n - $width) {
+            val $left = $table[$j - 1][$i]
+            val $right = $table[$j - 1][$i + (1 << ($j - 1))]
             push @row, $op($left, $right)
         }
         push @table, \@row
@@ -30,23 +30,23 @@ fn Rosetta::SparseTable::build($arr, $op) {
 }
 
 fn Rosetta::SparseTable::query($st, $lo, $hi) {
-    my $len = $hi - $lo + 1
-    my $j = Rosetta::SparseTable::log2_floor($len)
-    my $left = $st->{table}[$j][$lo]
-    my $right = $st->{table}[$j][$hi - (1 << $j) + 1]
+    val $len = $hi - $lo + 1
+    val $j = Rosetta::SparseTable::log2_floor($len)
+    val $left = $st->{table}[$j][$lo]
+    val $right = $st->{table}[$j][$hi - (1 << $j) + 1]
     $st->{op}($left, $right)
 }
 
 fn Rosetta::SparseTable::query_naive($arr, $op, $lo, $hi) {
-    my $r = $arr->[$lo]
-    for my $i ($lo + 1:$hi) { $r = $op($r, $arr->[$i]) }
+    var $r = $arr->[$lo]
+    for val $i ($lo + 1:$hi) { $r = $op($r, $arr->[$i]) }
     $r
 }
 
 # Min queries
-my $min = fn ($a, $b) { $a < $b ? $a : $b }
-my @data = (5, 2, 8, 1, 9, 3, 7, 4, 6, 0, 11, 4)
-my $st_min = Rosetta::SparseTable::build(\@data, $min)
+val $min = fn ($a, $b) { $a < $b ? $a : $b }
+val @data = (5, 2, 8, 1, 9, 3, 7, 4, 6, 0, 11, 4)
+val $st_min = Rosetta::SparseTable::build(\@data, $min)
 
 assert_eq Rosetta::SparseTable::query($st_min, 0, 11), 0,  "min over full"
 assert_eq Rosetta::SparseTable::query($st_min, 0, 4),  1,  "min [0:4] = 1"
@@ -55,29 +55,29 @@ assert_eq Rosetta::SparseTable::query($st_min, 6, 8),  4,  "min [6:8] = 4"
 assert_eq Rosetta::SparseTable::query($st_min, 3, 3),  1,  "single-element [3:3]"
 
 # Max queries
-my $max = fn ($a, $b) { $a > $b ? $a : $b }
-my $st_max = Rosetta::SparseTable::build(\@data, $max)
+val $max = fn ($a, $b) { $a > $b ? $a : $b }
+val $st_max = Rosetta::SparseTable::build(\@data, $max)
 assert_eq Rosetta::SparseTable::query($st_max, 0, 11), 11, "max over full"
 assert_eq Rosetta::SparseTable::query($st_max, 0, 5),  9,  "max [0:5] = 9"
 assert_eq Rosetta::SparseTable::query($st_max, 7, 11), 11, "max [7:11] = 11"
 
 # GCD queries — also idempotent in the sense needed for sparse tables.
 fn Rosetta::SparseTable::gcd($a, $b) {
-    my $x = $a; my $y = $b
+    var $x = $a; var $y = $b
     while ($y != 0) { ($x, $y) = ($y, $x % $y) }
     $x
 }
-my @nums = (12, 18, 24, 30, 6, 36, 60)
-my $st_gcd = Rosetta::SparseTable::build(\@nums, fn ($a, $b) { Rosetta::SparseTable::gcd($a, $b) })
+val @nums = (12, 18, 24, 30, 6, 36, 60)
+val $st_gcd = Rosetta::SparseTable::build(\@nums, fn ($a, $b) { Rosetta::SparseTable::gcd($a, $b) })
 assert_eq Rosetta::SparseTable::query($st_gcd, 0, 1), 6,  "gcd(12, 18) = 6"
 assert_eq Rosetta::SparseTable::query($st_gcd, 0, 6), 6,  "gcd full = 6"
 assert_eq Rosetta::SparseTable::query($st_gcd, 4, 6), 6,  "gcd [4:6] = 6"
 
 # Cross-check against naive for many queries
-for my $lo (~> 0:11) {
-    for my $hi ($lo:11) {
-        my $st_v = Rosetta::SparseTable::query($st_min, $lo, $hi)
-        my $naive_v = Rosetta::SparseTable::query_naive(\@data, $min, $lo, $hi)
+for val $lo (~> 0:11) {
+    for val $hi ($lo:11) {
+        val $st_v = Rosetta::SparseTable::query($st_min, $lo, $hi)
+        val $naive_v = Rosetta::SparseTable::query_naive(\@data, $min, $lo, $hi)
         assert_eq $st_v, $naive_v, "min match [$lo:$hi]"
     }
 }

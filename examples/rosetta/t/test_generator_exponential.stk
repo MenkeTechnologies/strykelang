@@ -5,7 +5,7 @@
 fn Rosetta::GenExp::power_gen($m) {
     mysync $n = 0
     fn {
-        my $res = $m ** $n
+        var $res = $m ** $n
         $n++
         $res
     }
@@ -18,7 +18,7 @@ fn Rosetta::GenExp::power_gen($m) {
 fn Rosetta::GenExp::seq_gen($func) {
     mysync $n = 0
     fn {
-        my $res = $func($n)
+        var $res = $func($n)
         $n++
         $res
     }
@@ -31,10 +31,10 @@ fn Rosetta::GenExp::seq_gen($func) {
 # Filter squares to remove those that are also cubes.
 
 fn Rosetta::GenExp::filter_gen($gen_squares, $gen_cubes) {
-    my $curr_cube = $gen_cubes()
+    var $curr_cube = $gen_cubes()
     fn {
         while (1) {
-            my $s = $gen_squares()
+            val $s = $gen_squares()
             while ($curr_cube < $s) {
                 $curr_cube = $gen_cubes()
             }
@@ -45,17 +45,17 @@ fn Rosetta::GenExp::filter_gen($gen_squares, $gen_cubes) {
     }
 }
 
-my $squares = Rosetta::GenExp::seq_gen(fn { _ ** 2 })
-my $cubes   = Rosetta::GenExp::seq_gen(fn { _ ** 3 })
+val $squares = Rosetta::GenExp::seq_gen(fn { _ ** 2 })
+val $cubes   = Rosetta::GenExp::seq_gen(fn { _ ** 3 })
 
-my $filtered = Rosetta::GenExp::filter_gen($squares, $cubes)
+val $filtered = Rosetta::GenExp::filter_gen($squares, $cubes)
 
 # Filter out 6th powers (0, 1, 64...)
 # Squares: 0, 1, 4, 9, 16, 25, 36, 49, 64, 81...
 # Cubes: 0, 1, 8, 27, 64, 125...
 # Filtered should be: 4, 9, 16, 25, 36, 49, 81... (0, 1, 64 removed)
 
-my @res
+var @res
 for (1:7) {
     push @res, $filtered()
 }

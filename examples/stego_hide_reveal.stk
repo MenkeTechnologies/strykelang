@@ -15,40 +15,40 @@
 p "── hide / reveal demo ─────────────────────────────────"
 
 # ── 1. Text carrier ───────────────────────────────────────────────
-my $carrier = "The quick brown fox jumps over the lazy dog. " x 6
-my $secret  = "meet at midnight"
+val $carrier = "The quick brown fox jumps over the lazy dog. " x 6
+val $secret  = "meet at midnight"
 
-my $stego = hide($carrier, $secret)
+val $stego = hide($carrier, $secret)
 p "carrier visible length: ", length $carrier
 p "stego visible length:   ", length $stego, " (extra bytes are zero-width chars)"
 p "recovered: ", reveal($stego)
 
 # ── 2. Key-XOR mode ───────────────────────────────────────────────
-my $keyed = hide($carrier, "classified", "shared-passphrase")
+val $keyed = hide($carrier, "classified", "shared-passphrase")
 p "\nwith right key:  ", reveal($keyed, "shared-passphrase")
-my $bad = reveal($keyed, "wrong-key")
+val $bad = reveal($keyed, "wrong-key")
 p "with wrong key:  recovered ", length($bad), " bytes of garbage (not the plaintext)"
 
 # ── 3. PNG carrier ────────────────────────────────────────────────
 # Generate a small PNG fixture via stryke's QR code builtin (returns base64),
 # decode to raw bytes, then hide a binary payload inside it.
-my $png = base64_decode(qr_png("stryke demo carrier", 6))
-my $sz  = length $png
+val $png = base64_decode(qr_png("stryke demo carrier", 6))
+val $sz  = length $png
 p "\nPNG carrier:    $sz bytes"
 p "PNG capacity:   ", hide_capacity($png), " bytes for the secret payload"
 
-my $stego_png = hide($png, pack("C*", 0xde, 0xad, 0xbe, 0xef))
+val $stego_png = hide($png, pack("C*", 0xde, 0xad, 0xbe, 0xef))
 spurt "/tmp/stryke_stego_demo.png", $stego_png
 
-my $back = reveal(slurp "/tmp/stryke_stego_demo.png")
+val $back = reveal(slurp "/tmp/stryke_stego_demo.png")
 p "PNG round-trip: ", length($back), " bytes recovered (hex: ", hex_encode($back), ")"
 
 # Cleanup
 unlink "/tmp/stryke_stego_demo.png"
 
 # ── 4. Tampering is caught ────────────────────────────────────────
-my $tampered = "\x{200B}" . hide($carrier, "x" x 4)   # prepend an extra ZW bit
-my $err
+val $tampered = "\x{200B}" . hide($carrier, "x" x 4)   # prepend an extra ZW bit
+var $err
 try {
     reveal($tampered)
 } catch ($e) {

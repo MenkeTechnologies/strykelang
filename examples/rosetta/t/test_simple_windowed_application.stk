@@ -10,7 +10,7 @@ fn Rosetta::SimpleApp::click($app) {
     $app->{label} = "Clicked $app->{clicks}"
 }
 
-my $app = Rosetta::SimpleApp::new()
+val $app = Rosetta::SimpleApp::new()
 Rosetta::SimpleApp::click($app)
 Rosetta::SimpleApp::click($app)
 

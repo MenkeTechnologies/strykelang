@@ -12,33 +12,33 @@
 
 fn Rosetta::SubUnit::digit_count($n) {
     return 1 if $n == 0
-    my $c = 0
-    my $x = abs($n)
+    var $c = 0
+    var $x = abs($n)
     while ($x > 0) { $c++; $x = int($x / 10) }
     $c
 }
 
 fn Rosetta::SubUnit::split_subtract($n) {
     return undef if $n < 0
-    my $sq = $n * $n
-    my $d = Rosetta::SubUnit::digit_count($sq)
+    val $sq = $n * $n
+    val $d = Rosetta::SubUnit::digit_count($sq)
     return undef if $d < 2
-    my $half = int($d / 2)
+    val $half = int($d / 2)
     # Try every split offset from 1..d-1 (left side has `i` digits).
-    my @hits
-    for my $i (1:$d - 1) {
-        my $right_digits = $d - $i
-        my $factor = 1
-        for my $k (~> 1:$right_digits) { $factor *= 10 }
-        my $left  = int($sq / $factor)
-        my $right = $sq % $factor
+    var @hits
+    for val $i (1:$d - 1) {
+        val $right_digits = $d - $i
+        var $factor = 1
+        for val $k (~> 1:$right_digits) { $factor *= 10 }
+        val $left  = int($sq / $factor)
+        val $right = $sq % $factor
         push @hits, $i if $left - $right == $n
     }
     @hits
 }
 
 fn Rosetta::SubUnit::is($n) {
-    my @hits = Rosetta::SubUnit::split_subtract($n)
+    val @hits = Rosetta::SubUnit::split_subtract($n)
     len(@hits) > 0
 }
 
@@ -52,11 +52,11 @@ assert_eq Rosetta::SubUnit::digit_count(0),    1, "0 has 1 digit"
 assert_eq Rosetta::SubUnit::digit_count(10),   2, "10 has 2 digits"
 
 # n = 1: 1² = 1 (1 digit) — too short; should return no split
-my @r1 = Rosetta::SubUnit::split_subtract(1)
+val @r1 = Rosetta::SubUnit::split_subtract(1)
 assert_eq len(@r1), 0, "1² too short to split"
 
 # n = 0
-my @r0 = Rosetta::SubUnit::split_subtract(0)
+val @r0 = Rosetta::SubUnit::split_subtract(0)
 assert_eq len(@r0), 0, "0² is a single zero, no split"
 
 # Known sub-unit (a - b = n) families:
@@ -68,7 +68,7 @@ assert_eq Rosetta::SubUnit::is(100), 1, "100 satisfies (a - b = n)"
 assert_eq Rosetta::SubUnit::is(297), 0, "297 fails the a-b = n rule"
 
 # Find all sub-unit squares with n ≤ 1000
-my @all = Rosetta::SubUnit::find_below(1000)
+val @all = Rosetta::SubUnit::find_below(1000)
 assert_ok len(@all) >= 1, "found some sub-unit squares ≤ 1000"
 
 # Pipe form

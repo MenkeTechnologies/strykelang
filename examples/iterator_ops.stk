@@ -3,50 +3,50 @@
 # Stryke array slicing + iterator helpers — ergonomic list manipulation.
 
 p "── enumerate — pairs of (index, value) ────────────────"
-my @colors = ("red", "green", "blue", "yellow")
-for my $row (enumerate(@colors)) {
-    my ($i, $v) = @$row
+val @colors = ("red", "green", "blue", "yellow")
+for val $row (enumerate(@colors)) {
+    val ($i, $v) = @$row
     printf "  [%d] %s\n", $i, $v
 }
 
 p ""
 p "── dedup — adjacent-duplicate collapse ────────────────"
-my @noisy = (1, 1, 2, 2, 2, 3, 1, 1, 4)
-my @clean = dedup(@noisy)
+val @noisy = (1, 1, 2, 2, 2, 3, 1, 1, 4)
+val @clean = dedup(@noisy)
 p "  noisy: [", join(",", @noisy), "]"
 p "  dedup: [", join(",", @clean), "]"
 
 p ""
 p "── Array slice — Perl-style take/drop ─────────────────"
-my @nums = (1:10)
+val @nums = (1:10)
 p "  arr[0:2]      take(3) : [", join(",", @nums[0:2]),     "]"
 p "  arr[3..\$#arr]  drop(3) : [", join(",", @nums[3:$#nums]), "]"
 p "  arr[-3..-1]    last 3  : [", join(",", @nums[-3..-1]),   "]"
 
 p ""
 p "── nth — 0-indexed element pick ───────────────────────"
-my @days = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+val @days = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 p "  nth(0): ", nth(0, @days)
 p "  nth(3): ", nth(3, @days)
 p "  nth(6): ", nth(6, @days)
 
 p ""
 p "── range — inclusive lazy integer sequence ────────────"
-my @r1 = range(0, 4);            # 0:4 inclusive
-my @r2 = range(2, 8);            # 2:8 inclusive
+val @r1 = range(0, 4);            # 0:4 inclusive
+val @r2 = range(2, 8);            # 2:8 inclusive
 p "  range(0, 4)   : [", join(",", @r1), "]"
 p "  range(2, 8)   : [", join(",", @r2), "]"
 
 p ""
 p "── Stryke colon-range 1:N — first-class operator ──────"
-my @r3 = 0:9;                    # idiomatic stryke form
-my @r4 = 1:5
+val @r3 = 0:9;                    # idiomatic stryke form
+val @r4 = 1:5
 p "  0:9           : [", join(",", @r3), "]"
 p "  1:5           : [", join(",", @r4), "]"
 
 p ""
 p "── Compose with pipe-forward ──────────────────────────"
-my $sum_cubes_odd = (1:20)
+val $sum_cubes_odd = (1:20)
     |> grep { _ % 2 == 1 }
     |> map  { _ ** 3 }
     |> sum
@@ -54,7 +54,7 @@ p "  sum of cubes of odd 1:20 : $sum_cubes_odd"
 
 p ""
 p "── min / max / sum on arrays ──────────────────────────"
-my @data = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
+val @data = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
 p "  min : ", min @data
 p "  max : ", max @data
 p "  sum : ", sum @data
@@ -62,15 +62,15 @@ p "  avg : ", sum(@data) / len @data
 
 p ""
 p "── flatten — nested arrayrefs to flat list ────────────"
-my @nested = ([1,2], [3,4], [5,6,7])
-my @flat = flatten(@nested)
+val @nested = ([1,2], [3,4], [5,6,7])
+val @flat = flatten(@nested)
 p "  nested : ", to_json(\@nested)
 p "  flat   : [", join(",", @flat), "]"
 
 p ""
 p "── zip — pair-up two arrays ───────────────────────────"
-my @letters = ("a", "b", "c", "d")
-my @ids     = (10, 20, 30, 40)
-for my $pair (zip(\@letters, \@ids)) {
+val @letters = ("a", "b", "c", "d")
+val @ids     = (10, 20, 30, 40)
+for val $pair (zip(\@letters, \@ids)) {
     printf "    %s -> %d\n", $pair->[0], $pair->[1]
 }

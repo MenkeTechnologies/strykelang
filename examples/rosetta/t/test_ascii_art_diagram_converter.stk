@@ -6,20 +6,20 @@ fn Rosetta::AsciiArt::convert($diagram) {
     # or just return it with some modifications.
     # Task is often to convert from one style to another.
     
-    my $work = $diagram
+    var $work = $diagram
     $work =~ s/\+/*/g
     $work =~ s/-/=/g
     $work =~ s/\|/I/g
     $work
 }
 
-my $diagram = qq{
+val $diagram = qq{
 +---+
 |   |
 +---+
 }
 
-my $res = Rosetta::AsciiArt::convert($diagram)
+val $res = Rosetta::AsciiArt::convert($diagram)
 p "RES: $res"
 assert_ok index($res, "*===*") != -1, "Horizontal edges converted"
 assert_ok index($res, "I   I") != -1, "Vertical edges converted"

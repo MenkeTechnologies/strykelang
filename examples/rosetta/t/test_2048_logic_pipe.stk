@@ -2,11 +2,11 @@
 # Rosetta Code: 2048 Game Logic (piped version)
 
 fn Rosetta::Game2048Pipe::slide_row($row) {
-    my @non_zero = ~> @$row grep { _ != 0 }
+    val @non_zero = ~> @$row grep { _ != 0 }
     
-    my @res
-    my $i = 0
-    my $len = len(@non_zero)
+    var @res
+    var $i = 0
+    val $len = len(@non_zero)
     while ($i < $len) {
         if ($i + 1 < $len && $non_zero[$i] == $non_zero[$i+1]) {
             push @res, $non_zero[$i] * 2
@@ -25,8 +25,8 @@ fn Rosetta::Game2048Pipe::move_left($grid) {
     ~> @$grid map { [ Rosetta::Game2048Pipe::slide_row(_) ] }
 }
 
-my $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
-my @res = Rosetta::Game2048Pipe::move_left($g1)
+val $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
+val @res = Rosetta::Game2048Pipe::move_left($g1)
 
 assert_eq join(",", @{$res[0]}), "4,0,0,0", "row 2,2,0,0 -> 4,0,0,0"
 assert_eq join(",", @{$res[1]}), "4,0,0,0", "row 2,0,2,0 -> 4,0,0,0"

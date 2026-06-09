@@ -4,8 +4,8 @@
 # peak concurrent license usage along with each timestamp it occurred.
 
 fn Rosetta::License::parse($lines) {
-    my @events
-    for my $line (@$lines) {
+    var @events
+    for val $line (@$lines) {
         next if $line =~ /^\s*$/
         if ($line =~ /^License\s+(IN|OUT)\s+\@\s*(.+)$/) {
             push @events, [$1, $2]
@@ -15,10 +15,10 @@ fn Rosetta::License::parse($lines) {
 }
 
 fn Rosetta::License::max_in_use($events) {
-    my $cur = 0
-    my $max = 0
-    my @peak_times
-    for my $e (@$events) {
+    var $cur = 0
+    var $max = 0
+    var @peak_times
+    for val $e (@$events) {
         if ($e->[0] eq "OUT") {
             $cur++
             if ($cur > $max) { $max = $cur; @peak_times = ($e->[1]) }
@@ -31,7 +31,7 @@ fn Rosetta::License::max_in_use($events) {
 }
 
 # Sample log
-my @lines = (
+val @lines = (
     'License OUT @ 2008/10/03_23:51:05 for job 4001',
     'License OUT @ 2008/10/03_23:57:09 for job 4002',
     'License IN  @ 2008/10/04_00:00:34 for job 4001',
@@ -41,26 +41,26 @@ my @lines = (
     'License IN  @ 2008/10/04_00:06:15 for job 4002',
 )
 
-my $events = Rosetta::License::parse(\@lines)
+val $events = Rosetta::License::parse(\@lines)
 assert_eq len(@$events), 7, "7 events parsed"
 
 # Each event has direction and timestamp
-for my $e (@$events) {
+for val $e (@$events) {
     assert_ok $e->[0] eq "IN" || $e->[0] eq "OUT", "direction valid"
     assert_ok len($e->[1]) > 0, "timestamp non-empty"
 }
 
 # Peak: 4 licenses at job 4005's OUT
-my $r = Rosetta::License::max_in_use($events)
+val $r = Rosetta::License::max_in_use($events)
 assert_eq $r->[0], 4, "peak = 4 licenses"
 assert_ok len(@{$r->[1]}) >= 1, "at least one peak time"
 
 # Empty log
-my $empty = Rosetta::License::max_in_use([])
+val $empty = Rosetta::License::max_in_use([])
 assert_eq $empty->[0], 0, "empty log peak = 0"
 
 # Single OUT
-my $one = Rosetta::License::max_in_use([["OUT", "now"]])
+val $one = Rosetta::License::max_in_use([["OUT", "now"]])
 assert_eq $one->[0], 1, "single OUT peak = 1"
 
 # Pipe form

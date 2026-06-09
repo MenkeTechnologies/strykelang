@@ -10,34 +10,34 @@
 # Run: stryke --no-interop examples/rpn.stk
 
 fn RPN::eval($expr) {
-    my @stack = ()
-    for my $tok (split / +/, $expr) {
+    var @stack = ()
+    for val $tok (split / +/, $expr) {
         next if len($tok) == 0
         if ($tok eq "+") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x + $y
         } elsif ($tok eq "-") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x - $y
         } elsif ($tok eq "*") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x * $y
         } elsif ($tok eq "/") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $x / $y
         } elsif ($tok eq "neg") {
-            my $x = pop @stack
+            val $x = pop @stack
             push @stack, 0 - $x
         } elsif ($tok eq "dup") {
-            my $x = $stack[-1]
+            val $x = $stack[-1]
             push @stack, $x
         } elsif ($tok eq "swap") {
-            my $y = pop @stack
-            my $x = pop @stack
+            val $y = pop @stack
+            val $x = pop @stack
             push @stack, $y
             push @stack, $x
         } else {
@@ -52,7 +52,7 @@ p " Stryke RPN Calculator Demo"
 p "═══════════════════════════════════════════════"
 p ""
 
-my @progs = (
+val @progs = (
     "3 4 +",
     "10 2 -",
     "6 7 *",
@@ -65,7 +65,7 @@ my @progs = (
 )
 
 p "── Program → Result ──────────────────────────"
-for my $p (@progs) {
+for val $p (@progs) {
     p "  #{$p}  =  #{RPN::eval($p)}"
 }
 
@@ -75,5 +75,5 @@ p "  3 5 * 2 + 4 * 7 -  =  #{RPN::eval('3 5 * 2 + 4 * 7 -')}"
 
 p ""
 p "── Distance via Pythagoras: √(3² + 4²) ──────"
-my $d2 = RPN::eval("3 dup * 4 dup * +")
+val $d2 = RPN::eval("3 dup * 4 dup * +")
 p "  3² + 4² = $d2  →  distance = 5"

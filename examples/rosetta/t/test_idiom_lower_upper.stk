@@ -2,11 +2,11 @@
 # Rosetta Code: Idiomatically determine all the lowercase and uppercase letters
 
 fn Rosetta::IdiomCase::lowers() {
-    ~> 0:127 grep { my $c = chr(_); $c =~ /[a-z]/ } map {chr} |> join ""
+    ~> 0:127 grep { val $c = chr(_); $c =~ /[a-z]/ } map {chr} |> join ""
 }
 
 fn Rosetta::IdiomCase::uppers() {
-    ~> 0:127 grep { my $c = chr(_); $c =~ /[A-Z]/ } map {chr} |> join ""
+    ~> 0:127 grep { val $c = chr(_); $c =~ /[A-Z]/ } map {chr} |> join ""
 }
 
 fn Rosetta::IdiomCase::is_letter($c) {

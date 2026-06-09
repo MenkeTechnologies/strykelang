@@ -2,7 +2,7 @@
 # Rosetta Code: Count in factors
 
 fn Rosetta::CountInFactors::solve($n) {
-    my @f = prime_factors($n)
+    val @f = prime_factors($n)
     if (len(@f) == 0) { return "$n" }
     join(" * ", @f)
 }

@@ -9,14 +9,14 @@ fn Rosetta::Delegates::execute($delegate, $value) {
 }
 
 # Define a delegate (fn reference)
-my $double = fn { _ * 2 }
+val $double = fn { _ * 2 }
 
-my $res = Rosetta::Delegates::execute($double, 21)
+val $res = Rosetta::Delegates::execute($double, 21)
 assert_eq $res, 42, "Delegate (fn reference) executed correctly"
 
 # Closure as a delegate
-my $factor = 10
-my $multiply = fn { _ * $factor }
+val $factor = 10
+val $multiply = fn { _ * $factor }
 assert_eq Rosetta::Delegates::execute($multiply, 5), 50, "Closure delegate executed correctly"
 
 test_run

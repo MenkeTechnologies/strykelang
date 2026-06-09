@@ -14,7 +14,7 @@ p "── Interactive PTY Demo (Automating bc) ───────────
 
 # 1. Spawn a command that expects interaction
 # Using `bc` (basic calculator) as a target
-my $h = pty_spawn("bc -q")
+val $h = pty_spawn("bc -q")
 
 # 2. Wait for it to be ready (bc -q starts with no prompt but waits for input)
 # We send a dummy command to see it's alive

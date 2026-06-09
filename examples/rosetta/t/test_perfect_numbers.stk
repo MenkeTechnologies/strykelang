@@ -2,12 +2,12 @@
 # Rosetta Code: Perfect numbers
 
 fn Rosetta::PerfectNumbers::divisors($n) {
-    my @divs = (1) # Proper divisors start with 1
-    my $limit = int(sqrt($n))
-    for my $i (2:$limit) {
+    var @divs = (1) # Proper divisors start with 1
+    val $limit = int(sqrt($n))
+    for val $i (2:$limit) {
         if ($n % $i == 0) {
             push @divs, $i
-            my $j = $n / $i
+            val $j = $n / $i
             if ($j != $i) {
                 push @divs, $j
             }
@@ -21,16 +21,16 @@ fn Rosetta::PerfectNumbers::is_perfect($n) {
     if ($n < 2) {
         return 0 # Not perfect
     } else {
-        my @divs = @{ Rosetta::PerfectNumbers::divisors($n) } # Gets the list of proper divisors
-        my $sum = 0
-        for my $d (@divs) { $sum += $d } # Sums the list
+        val @divs = @{ Rosetta::PerfectNumbers::divisors($n) } # Gets the list of proper divisors
+        var $sum = 0
+        for val $d (@divs) { $sum += $d } # Sums the list
         return $sum == $n ? 1 : 0; # Explicitly return 1 for true, 0 for false
     }
 }
 
 fn Rosetta::PerfectNumbers::perfect_numbers($max) {
-    my @perfects
-    for my $n (2:$max) {
+    var @perfects
+    for val $n (2:$max) {
         if (Rosetta::PerfectNumbers::is_perfect($n)) {
             push @perfects, $n
         }
@@ -49,7 +49,7 @@ assert_ok !Rosetta::PerfectNumbers::is_perfect(1), "1 is not perfect"
 assert_ok !Rosetta::PerfectNumbers::is_perfect(12), "12 is not perfect"
 assert_ok !Rosetta::PerfectNumbers::is_perfect(100), "100 is not perfect"
 
-my @perfects = @{ Rosetta::PerfectNumbers::perfect_numbers(500) }
+val @perfects = @{ Rosetta::PerfectNumbers::perfect_numbers(500) }
 assert_eq join(",", @perfects), "6,28,496", "perfect numbers up to 500"
 
 test_run

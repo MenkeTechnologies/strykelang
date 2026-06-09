@@ -18,9 +18,9 @@
 
 fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 
-    my @stack
-    my @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
-    for my $tok (@tokens) {
+    var @stack
+    val @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
+    for val $tok (@tokens) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
             push @stack, 0 + $tok
             next
@@ -28,8 +28,8 @@ fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
         die "stack underflow at `$tok` (need 2 operands)" if len(@stack) < 2
         # `$a` / `$b` are reserved for sort/reduce blocks — strict mode
         # rejects them as plain var names. Use `$lhs` / `$rhs`.
-        my $rhs = pop @stack
-        my $lhs = pop @stack
+        val $rhs = pop @stack
+        val $lhs = pop @stack
         if    ($tok eq "+")   { push @stack, $lhs + $rhs }
         elsif ($tok eq "-")   { push @stack, $lhs - $rhs }
         elsif ($tok eq "*")   { push @stack, $lhs * $rhs }
@@ -45,8 +45,8 @@ fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 }
 
 if (len(@ARGV) > 0) {
-    my $expr = join(" ", @ARGV)
-    my $result = eval { RPN::eval($expr) }
+    val $expr = join(" ", @ARGV)
+    val $result = eval { RPN::eval($expr) }
     if ($@) {
         p "error: $@"
         exit 1
@@ -58,7 +58,7 @@ if (len(@ARGV) > 0) {
 # Demo grid — classic RPN examples paired with expected results so the
 # CI runner has a built-in self-test.
 p "── RPN calculator demo ──"
-my @cases = (
+val @cases = (
     +{ expr => "3 4 +",             want =>   7 },
     +{ expr => "5 1 2 + 4 * + 3 -", want =>  14 },
     +{ expr => "10 5 / 2 *",        want =>   4 },
@@ -66,14 +66,14 @@ my @cases = (
     +{ expr => "5 3 min 10 max",    want =>  10 },  # min(5,3)=3, max(3,10)=10
     +{ expr => "20 7 %",            want =>   6 },
 )
-my $fail = 0
-for my $c (@cases) {
-    my $r = eval { RPN::eval($c->{expr}) }
+var $fail = 0
+for val $c (@cases) {
+    val $r = eval { RPN::eval($c->{expr}) }
     if ($@) {
         printf "  %-30s -> error: %s\n", $c->{expr}, $@
         $fail++
     } else {
-        my $ok = ($r == $c->{want})
+        val $ok = ($r == $c->{want})
         $fail++ unless $ok
         printf "  %-30s -> %s   %s\n", $c->{expr}, $r, $ok ? "" : "FAIL"
     }

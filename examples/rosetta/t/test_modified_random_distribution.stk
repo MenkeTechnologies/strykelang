@@ -11,29 +11,29 @@ fn Rosetta::ModRand::modifier($x) {
 }
 
 fn Rosetta::ModRand::generate($n, $seed) {
-    my @out
+    var @out
     while (len(@out) < $n) {
-        my $r1 = Rosetta::ModRand::lcg(\$seed)
-        my $r2 = Rosetta::ModRand::lcg(\$seed)
+        val $r1 = Rosetta::ModRand::lcg(\$seed)
+        val $r2 = Rosetta::ModRand::lcg(\$seed)
         push @out, $r1 if $r2 < Rosetta::ModRand::modifier($r1)
     }
     \@out
 }
 
 fn Rosetta::ModRand::histogram($data, $bins) {
-    my @counts = (0) x $bins
-    for my $x (@$data) {
-        my $idx = int($x * $bins)
+    var @counts = (0) x $bins
+    for val $x (@$data) {
+        var $idx = int($x * $bins)
         $idx = $bins - 1 if $idx >= $bins
         $counts[$idx]++
     }
     \@counts
 }
 
-my $data = Rosetta::ModRand::generate(10000, 123456789)
-my $hist = Rosetta::ModRand::histogram($data, 15)
-my $total = 0
-for my $c (@$hist) { $total += $c }
+val $data = Rosetta::ModRand::generate(10000, 123456789)
+val $hist = Rosetta::ModRand::histogram($data, 15)
+var $total = 0
+for val $c (@$hist) { $total += $c }
 
 assert_eq $total, 10000, "histogram counts all generated values"
 assert_eq $hist->[0] > $hist->[7], 1, "left edge exceeds center"

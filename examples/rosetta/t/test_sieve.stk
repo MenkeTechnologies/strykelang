@@ -3,29 +3,29 @@
 
 fn Rosetta::Sieve::compute($limit) {
     if ($limit < 2) { return [] }
-    my @is_prime = map { 1 } 0:$limit
+    var @is_prime = map { 1 } 0:$limit
     $is_prime[0] = 0
     $is_prime[1] = 0
     
-    for (my $p = 2; $p * $p <= $limit; $p++) {
+    for (var $p = 2; $p * $p <= $limit; $p++) {
         if ($is_prime[$p]) {
-            for (my $i = $p * $p; $i <= $limit; $i += $p) {
+            for (var $i = $p * $p; $i <= $limit; $i += $p) {
                 $is_prime[$i] = 0
             }
         }
     }
     
-    my @primes
-    for (my $p = 2; $p <= $limit; $p++) {
+    var @primes
+    for (var $p = 2; $p <= $limit; $p++) {
         push @primes, $p if $is_prime[$p]
     }
     \@primes
 }
 
-my $primes30 = Rosetta::Sieve::compute(30)
+val $primes30 = Rosetta::Sieve::compute(30)
 assert_eq join(",", @$primes30), "2,3,5,7,11,13,17,19,23,29", "sieve 30"
 
-my $primes100 = Rosetta::Sieve::compute(100)
+val $primes100 = Rosetta::Sieve::compute(100)
 assert_eq len(@$primes100), 25, "sieve 100 count"
 
 test_run

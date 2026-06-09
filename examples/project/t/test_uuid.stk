@@ -2,11 +2,11 @@
 # t/test_uuid.stk — UUID and ID generation
 
 # UUID v4
-my $id1 = uuid()
+val $id1 = uuid()
 assert_eq len($id1), 36, "uuid length"
 assert_ok $id1 =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, "uuid format"
 
-my $id2 = uuid()
+val $id2 = uuid()
 assert_ok $id1 ne $id2, "uuids are unique"
 
 # UUID validation
@@ -17,32 +17,32 @@ assert_false is_uuid("550e8400-e29b-41d4-a716"), "truncated uuid invalid"
 assert_false is_uuid(""), "empty string not uuid"
 
 # Nanoid
-my $nano1 = nanoid()
+val $nano1 = nanoid()
 assert_gt len($nano1), 0, "nanoid has length"
-my $nano2 = nanoid()
+val $nano2 = nanoid()
 assert_ok $nano1 ne $nano2, "nanoids are unique"
 
-my $nano_custom = nanoid(10)
+val $nano_custom = nanoid(10)
 assert_eq len($nano_custom), 10, "nanoid custom length"
 
 # Short ID
-my $short1 = short_id()
+val $short1 = short_id()
 assert_gt len($short1), 0, "short_id has length"
-my $short2 = short_id()
+val $short2 = short_id()
 assert_ok $short1 ne $short2, "short_ids are unique"
 
 # Token
-my $tok = token 32
+val $tok = token 32
 assert_eq len($tok), 32, "token length"
 assert_ok $tok =~ /^[a-zA-Z0-9]+$/, "token is alphanumeric"
 
-my $tok2 = token 32
+val $tok2 = token 32
 assert_ok $tok ne $tok2, "tokens are unique"
 
 # Different token lengths
-my $tok8 = token 8
+val $tok8 = token 8
 assert_eq len($tok8), 8, "token(8) length"
-my $tok64 = token 64
+val $tok64 = token 64
 assert_eq len($tok64), 64, "token(64) length"
 
 test_run

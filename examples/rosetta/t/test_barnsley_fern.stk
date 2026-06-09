@@ -2,12 +2,12 @@
 # Rosetta Code: Barnsley fern
 
 fn Rosetta::BarnsleyFern::solve($iters) {
-    my ($x, $y) = (0.0, 0.0)
-    my @points
+    var ($x, $y) = (0.0, 0.0)
+    var @points
     
     for (1:$iters) {
-        my $r = rand()
-        my ($nx, $ny)
+        val $r = rand()
+        var ($nx, $ny)
         
         if ($r < 0.01) {
             $nx = 0.0
@@ -29,12 +29,12 @@ fn Rosetta::BarnsleyFern::solve($iters) {
     \@points
 }
 
-my $res = Rosetta::BarnsleyFern::solve(1000)
+val $res = Rosetta::BarnsleyFern::solve(1000)
 assert_eq len(@$res), 1000, "1000 points generated"
 
 # Check if points are within reasonable bounds
 # x is roughly [-2.18, 2.65], y is [0, 9.99]
-for my $p (@$res) {
+for val $p (@$res) {
     assert_ok ($p->[0] >= -3.0 && $p->[0] <= 3.0), "x in bounds"
     assert_ok ($p->[1] >= 0.0 && $p->[1] <= 11.0), "y in bounds"
 }

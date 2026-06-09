@@ -5,18 +5,18 @@
 # Run: stryke --no-interop examples/ini_parser.stk
 
 fn Ini::parse($text) {
-    my @lines = split /\n/, $text
-    my $section = ""
-    my %out = ( "" => +{} )
-    for my $raw (@lines) {
-        my $line = $raw
+    val @lines = split /\n/, $text
+    var $section = ""
+    var %out = ( "" => +{} )
+    for val $raw (@lines) {
+        var $line = $raw
         $line =~ s/^\s+//
         $line =~ s/\s+$//
         next if $line eq ""
         next if substr($line, 0, 1) eq "#"
         next if substr($line, 0, 1) eq ";"
         if (substr($line, 0, 1) eq "[") {
-            my $rb = index($line, "]")
+            val $rb = index($line, "]")
             if ($rb > 0) {
                 $section = substr($line, 1, $rb - 1)
                 $section =~ s/^\s+//
@@ -25,10 +25,10 @@ fn Ini::parse($text) {
             }
             next
         }
-        my $eq = index($line, "=")
+        val $eq = index($line, "=")
         next if $eq < 0
-        my $key = substr($line, 0, $eq)
-        my $val = substr($line, $eq + 1)
+        var $key = substr($line, 0, $eq)
+        var $val = substr($line, $eq + 1)
         $key =~ s/^\s+//
         $key =~ s/\s+$//
         $val =~ s/^\s+//
@@ -48,12 +48,12 @@ fn Ini::get($cfg, $section, $key) {
 }
 
 fn Ini::sections($cfg) {
-    my @s = sort keys %$cfg
+    val @s = sort keys %$cfg
     \@s
 }
 
 p "=== INI Parser Demo ==="
-my $sample = "
+val $sample = "
 # Sample config
 host = localhost
 port = 8080
@@ -67,7 +67,7 @@ password = \"s3cr et\"
 level = info
 file  = /var/log/app.log
 "
-my $cfg = Ini::parse($sample)
+val $cfg = Ini::parse($sample)
 p "sections: " . join(",", @{Ini::sections($cfg)})
 p "host = " . Ini::get($cfg, "", "host")
 p "db.url = " . Ini::get($cfg, "database", "url")

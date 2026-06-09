@@ -2,13 +2,13 @@
 # Rosetta Code: Handle a signal
 
 fn Rosetta::HandleSignal::new() {
-    my @log
+    val @log
     { handlers => {}, counts => {}, stopped => 0, log => \@log }
 }
 
 fn Rosetta::HandleSignal::register($bus, $signal, $name) {
     if (!exists $bus->{handlers}{$signal}) {
-        my @handlers
+        val @handlers
         $bus->{handlers}{$signal} = \@handlers
     }
     push @{$bus->{handlers}{$signal}}, $name
@@ -16,16 +16,16 @@ fn Rosetta::HandleSignal::register($bus, $signal, $name) {
 
 fn Rosetta::HandleSignal::dispatch($bus, $signal) {
     return 0 if !exists $bus->{handlers}{$signal}
-    for my $name (@{$bus->{handlers}{$signal}}) {
+    for val $name (@{$bus->{handlers}{$signal}}) {
         push @{$bus->{log}}, $name
-        my $count = exists $bus->{counts}{$name} ? $bus->{counts}{$name} : 0
+        val $count = exists $bus->{counts}{$name} ? $bus->{counts}{$name} : 0
         $bus->{counts}{$name} = $count + 1
         if ($name eq "shutdown") { $bus->{stopped} = 1 }
     }
     len(@{$bus->{handlers}{$signal}})
 }
 
-my $bus = Rosetta::HandleSignal::new()
+val $bus = Rosetta::HandleSignal::new()
 Rosetta::HandleSignal::register($bus, "TERM", "flush")
 Rosetta::HandleSignal::register($bus, "TERM", "shutdown")
 

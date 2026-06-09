@@ -5,13 +5,13 @@ fn Rosetta::Kaprekar::check($n) {
     if ($n == 1) {
         1
     } else {
-        my $sq = $n * $n
-        my $s = "$sq"
-        my $len = length($s)
-        my $found = 0
-        for my $i (1:$len-1) {
-            my $left = substr($s, 0, $i)
-            my $right = substr($s, $i)
+        val $sq = $n * $n
+        val $s = "$sq"
+        val $len = length($s)
+        var $found = 0
+        for val $i (1:$len-1) {
+            val $left = substr($s, 0, $i)
+            val $right = substr($s, $i)
             if ($right !~ /^0+$/) {
                 if (int($left) + int($right) == $n) {
                     $found = 1
@@ -36,7 +36,7 @@ assert_ok Rosetta::Kaprekar::check(297), "297 is kaprekar (88209 = 88+209)"
 assert_ok !Rosetta::Kaprekar::check(2), "2 is not kaprekar"
 assert_ok !Rosetta::Kaprekar::check(10), "10 is not kaprekar"
 
-my @kap = Rosetta::Kaprekar::generate(100)
+val @kap = Rosetta::Kaprekar::generate(100)
 assert_eq join(",", @kap), "1,9,45,55,99", "kaprekar up to 100"
 
 test_run

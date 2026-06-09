@@ -9,8 +9,8 @@
 package HopcroftKarp
 
 fn bfs($u_size, $adj, $pair_u, $pair_v, $dist) {
-    my @queue
-    for (my $u = 1; $u <= $u_size; $u++) {
+    var @queue
+    for (var $u = 1; $u <= $u_size; $u++) {
         if ($pair_u->[$u] == 0) {
             $dist->[$u] = 0
             push @queue, $u
@@ -21,13 +21,13 @@ fn bfs($u_size, $adj, $pair_u, $pair_v, $dist) {
     
     $dist->[0] = 1000000000
     
-    my $head = 0
+    var $head = 0
     while ($head < len @queue) {
-        my $u = $queue[$head++]
+        val $u = $queue[$head++]
         if ($dist->[$u] < $dist->[0]) {
-            my $u_adj = $adj->[$u] // []
-            for my $v (@$u_adj) {
-                my $u_next = $pair_v->[$v]
+            val $u_adj = $adj->[$u] // []
+            for val $v (@$u_adj) {
+                val $u_next = $pair_v->[$v]
                 if ($dist->[$u_next] == 1000000000) {
                     $dist->[$u_next] = $dist->[$u] + 1
                     push @queue, $u_next
@@ -41,9 +41,9 @@ fn bfs($u_size, $adj, $pair_u, $pair_v, $dist) {
 
 fn dfs($u, $adj, $pair_u, $pair_v, $dist) {
     if ($u != 0) {
-        my $u_adj = $adj->[$u] // []
-        for my $v (@$u_adj) {
-            my $u_next = $pair_v->[$v]
+        val $u_adj = $adj->[$u] // []
+        for val $v (@$u_adj) {
+            val $u_next = $pair_v->[$v]
             if ($dist->[$u_next] == $dist->[$u] + 1) {
                 if (HopcroftKarp::dfs($u_next, $adj, $pair_u, $pair_v, $dist)) {
                     $pair_v->[$v] = $u
@@ -60,14 +60,14 @@ fn dfs($u, $adj, $pair_u, $pair_v, $dist) {
 
 fn solve($u_size, $v_size, $adj) {
     # 1-based indexing for vertices. 0 represents NIL (unmatched).
-    my @pair_u = (0) x ($u_size + 1)
-    my @pair_v = (0) x ($v_size + 1)
-    my @dist   = (0) x ($u_size + 1)
+    val @pair_u = (0) x ($u_size + 1)
+    val @pair_v = (0) x ($v_size + 1)
+    val @dist   = (0) x ($u_size + 1)
     
-    my $matching = 0
+    var $matching = 0
     
     while (HopcroftKarp::bfs($u_size, $adj, \@pair_u, \@pair_v, \@dist)) {
-        for (my $u = 1; $u <= $u_size; $u++) {
+        for (var $u = 1; $u <= $u_size; $u++) {
             if ($pair_u[$u] == 0) {
                 if (HopcroftKarp::dfs($u, $adj, \@pair_u, \@pair_v, \@dist)) {
                     $matching++
@@ -85,7 +85,7 @@ p "── Hopcroft-Karp Demo ──"
 
 # U = {1, 2, 3, 4}, V = {1, 2, 3, 4}
 # Edges: (1, 2), (1, 3), (2, 1), (3, 2), (4, 2), (4, 4)
-my $adj = [
+val $adj = [
     [],        # 0 (NIL)
     [2, 3],    # U1 connects to V2, V3
     [1],       # U2 connects to V1
@@ -93,14 +93,14 @@ my $adj = [
     [2, 4]     # U4 connects to V2, V4
 ]
 
-my $u_size = 4
-my $v_size = 4
+val $u_size = 4
+val $v_size = 4
 
-my $res = HopcroftKarp::solve($u_size, $v_size, $adj)
+val $res = HopcroftKarp::solve($u_size, $v_size, $adj)
 
 p "Maximum Bipartite Matching: #{$res->{count}}"
-for (my $u = 1; $u <= $u_size; $u++) {
-    my $v = $res->{pair_u}->[$u]
+for (var $u = 1; $u <= $u_size; $u++) {
+    val $v = $res->{pair_u}->[$u]
     if ($v != 0) {
         p "  U#{$u} -> V#{$v}"
     }

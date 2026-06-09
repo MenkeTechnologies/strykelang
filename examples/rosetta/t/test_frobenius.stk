@@ -8,21 +8,21 @@ fn Rosetta::Frobenius::two($a, $b) {
 }
 
 fn Rosetta::Frobenius::dp(@coins) {
-    my @sorted = sort { _0 <=> _1 } @coins
+    val @sorted = sort { _0 <=> _1 } @coins
     return -1 if $sorted[0] == 1
-    my $bound = 1
+    var $bound = 1
     ~> @coins ep { $bound *= _ }
-    my @reach
-    for my $i (0:$bound) { $reach[$i] = 0 }
+    var @reach
+    for val $i (0:$bound) { $reach[$i] = 0 }
     $reach[0] = 1
-    for my $i (0:$bound) {
+    for val $i (0:$bound) {
         next if !$reach[$i]
-        for my $c (@coins) {
+        for val $c (@coins) {
             if ($i + $c <= $bound) { $reach[$i + $c] = 1 }
         }
     }
-    my $last = -1
-    for my $i (0:$bound) {
+    var $last = -1
+    for val $i (0:$bound) {
         if (!$reach[$i]) { $last = $i }
     }
     $last

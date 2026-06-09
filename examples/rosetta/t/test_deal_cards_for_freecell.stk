@@ -7,21 +7,21 @@ fn Rosetta::FreeCell::ms_rand($seed_ref) {
 }
 
 fn Rosetta::FreeCell::deal($game_num) {
-    my @ranks = ("A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K")
-    my @suits = ("C", "D", "H", "S")
+    val @ranks = ("A", 2, 3, 4, 5, 6, 7, 8, 9, 10, "J", "Q", "K")
+    val @suits = ("C", "D", "H", "S")
     
-    my @deck
-    for (my $r = 0; $r < 13; $r++) {
-        for (my $s = 0; $s < 4; $s++) {
+    var @deck
+    for (var $r = 0; $r < 13; $r++) {
+        for (var $s = 0; $s < 4; $s++) {
             push @deck, "$ranks[$r]$suits[$s]"
         }
     }
     
-    my $seed = $game_num
-    for (my $i = 51; $i > 0; $i--) {
-        my $j = Rosetta::FreeCell::ms_rand(\$seed) % ($i + 1)
+    val $seed = $game_num
+    for (var $i = 51; $i > 0; $i--) {
+        val $j = Rosetta::FreeCell::ms_rand(\$seed) % ($i + 1)
         # Swap $deck[$i] and $deck[$j]
-        my $tmp = $deck[$i]
+        val $tmp = $deck[$i]
         $deck[$i] = $deck[$j]
         $deck[$j] = $tmp
     }
@@ -32,7 +32,7 @@ fn Rosetta::FreeCell::deal($game_num) {
     \@deck
 }
 
-my $game1 = Rosetta::FreeCell::deal(1)
+val $game1 = Rosetta::FreeCell::deal(1)
 # Game 1 first few cards: JD, 2D, 9H, JC, 5D, 7H, 7C, 5S
 # Wait, MS FreeCell cards are JD, 2D...
 assert_eq $game1->[51], "JD", "Game 1 last card (JD)"

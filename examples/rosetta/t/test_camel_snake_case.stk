@@ -2,10 +2,10 @@
 # Rosetta Code: Camel case and snake case
 
 fn Case::to_camel($s) {
-    my @parts = ~> $s trim |> s/([a-z0-9])([A-Z])/$1_$2/g |> split(/[\s._-]+/)
+    var @parts = ~> $s trim |> s/([a-z0-9])([A-Z])/$1_$2/g |> split(/[\s._-]+/)
     return "" if !@parts
-    my $res = lc(shift @parts)
-    for my $p (@parts) {
+    var $res = lc(shift @parts)
+    for val $p (@parts) {
         $res .= ucfirst(lc($p))
     }
     $res
@@ -21,7 +21,7 @@ fn Case::to_snake($s) {
        |> lc
 }
 
-my @test_cases = (
+val @test_cases = (
     "snakeCase",
     "snake_case",
     "variable_10_case",
@@ -32,9 +32,9 @@ my @test_cases = (
     "  spaces  "
 )
 
-for my $t (@test_cases) {
-    my $camel = Case::to_camel($t);
-    my $snake = Case::to_snake($t);
+for val $t (@test_cases) {
+    val $camel = Case::to_camel($t);
+    val $snake = Case::to_snake($t);
     p "Input: '$t'";
     p "  Camel: '$camel'";
     p "  Snake: '$snake'";

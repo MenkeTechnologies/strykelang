@@ -9,34 +9,34 @@
 #     start => "S" }
 
 fn Rosetta::CYK::parse($grammar, $tokens) {
-    my $n = len(@$tokens)
+    val $n = len(@$tokens)
     return 0 if $n == 0
     # dp[$i][$j] = hashref of NTs deriving tokens[$i..$j].
-    my @dp
-    for my $i (~> 0:$n - 1) {
-        my @row
-        for my $j (~> 0:$n - 1) { push @row, {} }
+    var @dp
+    for val $i (~> 0:$n - 1) {
+        var @row
+        for val $j (~> 0:$n - 1) { push @row, {} }
         push @dp, \@row
     }
     # Length-1: terminal productions.
-    for my $i (~> 0:$n - 1) {
-        my $term = $tokens->[$i]
+    for val $i (~> 0:$n - 1) {
+        val $term = $tokens->[$i]
         if (exists $grammar->{unary}{$term}) {
-            for my $nt (@{$grammar->{unary}{$term}}) {
+            for val $nt (@{$grammar->{unary}{$term}}) {
                 $dp[$i][$i]{$nt} = 1
             }
         }
     }
     # Length L = 2..n.
-    for my $L (2:$n) {
-        for my $i (0:$n - $L) {
-            my $j = $i + $L - 1
-            for my $k ($i:$j - 1) {
-                for my $left (keys %{$dp[$i][$k]}) {
-                    for my $right (keys %{$dp[$k + 1][$j]}) {
-                        my $key = "$left $right"
+    for val $L (2:$n) {
+        for val $i (0:$n - $L) {
+            val $j = $i + $L - 1
+            for val $k ($i:$j - 1) {
+                for val $left (keys %{$dp[$i][$k]}) {
+                    for val $right (keys %{$dp[$k + 1][$j]}) {
+                        val $key = "$left $right"
                         if (exists $grammar->{binary}{$key}) {
-                            for my $nt (@{$grammar->{binary}{$key}}) {
+                            for val $nt (@{$grammar->{binary}{$key}}) {
                                 $dp[$i][$j]{$nt} = 1
                             }
                         }
@@ -65,7 +65,7 @@ fn Rosetta::CYK::parse($grammar, $tokens) {
 #     C → S B
 #     A → a
 #     B → b
-my $g1 = {
+val $g1 = {
     start => "S",
     unary => {
         "a" => ["A"],
@@ -91,7 +91,7 @@ assert_eq Rosetta::CYK::parse($g1, ["a", "a", "b"]), 0, "aab unbalanced rejected
 #   U → S B
 #   A → a
 #   B → b
-my $g2 = {
+val $g2 = {
     start => "S",
     unary => {
         "a" => ["A", "S"],

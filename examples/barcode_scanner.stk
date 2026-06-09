@@ -14,7 +14,7 @@
 
 # ── product catalog (UPC-A 12-digit codes) ──────────────────────────
 
-my %catalog = (
+val %catalog = (
     "036000291452" => "Coca-Cola 12oz",
     "012000028533" => "Pepsi 12oz",
     "041800000111" => "Milk Gallon",
@@ -31,33 +31,33 @@ my %catalog = (
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $bf_known = bloom(128, 0.01)
-for my $code (keys %catalog) { bloom_add($bf_known, $code) }
+val $bf_known = bloom(128, 0.01)
+for val $code (keys %catalog) { bloom_add($bf_known, $code) }
 
-my $cms_scans = cms(8, 512)
-my $tk_top    = topk(8)
-my $hll_uniq  = hll(12)
-my $td_lat    = t_digest(100)
+val $cms_scans = cms(8, 512)
+val $tk_top    = topk(8)
+val $hll_uniq  = hll(12)
+val $td_lat    = t_digest(100)
 
 # ── UPC-A check-digit verification ────────────────────────────────
 # digit[12] must equal (10 - ((sum_odd*3 + sum_even) mod 10)) mod 10
 
 fn Demo::BC::upca_check($code) {
     return 0 unless len($code) == 12
-    my @d = split //, $code
+    val @d = split //, $code
     return 0 if grep { !/^[0-9]$/ } @d
 
-    my $odd_sum  = 0
-    my $even_sum = 0
-    for my $i (0:10) {
+    var $odd_sum  = 0
+    var $even_sum = 0
+    for val $i (0:10) {
         if ($i % 2 == 0) {
             $odd_sum += $d[$i]
         } else {
             $even_sum += $d[$i]
         }
     }
-    my $total = $odd_sum * 3 + $even_sum
-    my $check = (10 - ($total % 10)) % 10
+    val $total = $odd_sum * 3 + $even_sum
+    val $check = (10 - ($total % 10)) % 10
     $check == $d[11] ? 1 : 0
 }
 
@@ -65,35 +65,35 @@ fn Demo::BC::upca_check($code) {
 
 fn Demo::BC::ean13_check($code) {
     return 0 unless len($code) == 13
-    my @d = split //, $code
+    val @d = split //, $code
     return 0 if grep { !/^[0-9]$/ } @d
 
-    my $sum = 0
-    for my $i (0:11) {
+    var $sum = 0
+    for val $i (0:11) {
         if ($i % 2 == 0) {
             $sum += $d[$i]
         } else {
             $sum += $d[$i] * 3
         }
     }
-    my $check = (10 - ($sum % 10)) % 10
+    val $check = (10 - ($sum % 10)) % 10
     $check == $d[12] ? 1 : 0
 }
 
 # ── compute UPC-A check digit (for generation) ──────────────────────
 
 fn Demo::BC::upca_calc_check($code11) {
-    my @d = split //, $code11
-    my $odd_sum  = 0
-    my $even_sum = 0
-    for my $i (0:10) {
+    val @d = split //, $code11
+    var $odd_sum  = 0
+    var $even_sum = 0
+    for val $i (0:10) {
         if ($i % 2 == 0) {
             $odd_sum += $d[$i]
         } else {
             $even_sum += $d[$i]
         }
     }
-    my $total = $odd_sum * 3 + $even_sum
+    val $total = $odd_sum * 3 + $even_sum
     (10 - ($total % 10)) % 10
 }
 
@@ -101,10 +101,10 @@ fn Demo::BC::upca_calc_check($code11) {
 
 p "barcode scanner — UPC-A check-digit verification"
 p "─" x 60
-my $cat_ok = 0
-my $cat_bad = 0
-for my $code (sort keys %catalog) {
-    my $ok = Demo::BC::upca_check($code)
+var $cat_ok = 0
+var $cat_bad = 0
+for val $code (sort keys %catalog) {
+    val $ok = Demo::BC::upca_check($code)
     if ($ok) { $cat_ok++ } else { $cat_bad++ }
     printf("  %s  %-18s  %s\n",
            $code, $catalog{$code}, $ok ? "ok" : "INVALID CHECK")
@@ -114,19 +114,19 @@ p "\ncatalog: $cat_ok valid / $cat_bad invalid (of ", len(keys %catalog), ")"
 # ── verify computed check matches expected ────────────────────────
 
 p "\nverify Demo::BC::upca_calc_check matches stored:"
-my $calc_ok = 0
-my $calc_bad = 0
-for my $code (sort keys %catalog) {
-    my $first_11 = substr($code, 0, 11)
-    my $expect = substr($code, 11, 1) + 0
-    my $got = Demo::BC::upca_calc_check($first_11)
+var $calc_ok = 0
+var $calc_bad = 0
+for val $code (sort keys %catalog) {
+    val $first_11 = substr($code, 0, 11)
+    val $expect = substr($code, 11, 1) + 0
+    val $got = Demo::BC::upca_calc_check($first_11)
     if ($got == $expect) { $calc_ok++ } else { $calc_bad++ }
 }
 printf("  calc matches stored: %d ok / %d bad\n", $calc_ok, $calc_bad)
 
 # ── EAN-13 sample verification ────────────────────────────────────
 
-my @ean_samples = (
+val @ean_samples = (
     "5901234123457",
     "4006381333931",
     "9783161484100",
@@ -134,8 +134,8 @@ my @ean_samples = (
 )
 
 p "\nEAN-13 sample verification:"
-for my $code (@ean_samples) {
-    my $ok = Demo::BC::ean13_check($code)
+for val $code (@ean_samples) {
+    val $ok = Demo::BC::ean13_check($code)
     printf("  %s  %s\n", $code, $ok ? "valid" : "invalid")
 }
 
@@ -143,27 +143,27 @@ for my $code (@ean_samples) {
 
 p "\nsimulated scan stream (200 scans):"
 srand(42)
-my @cat_codes = sort keys %catalog
+val @cat_codes = sort keys %catalog
 
-my $valid = 0
-my $unknown = 0
-my $bad_check = 0
+var $valid = 0
+var $unknown = 0
+var $bad_check = 0
 
-for my $i (1:200) {
-    my $code
+for val $i (1:200) {
+    var $code
     if (rand() < 0.85) {
         $code = $cat_codes[~> @cat_codes len rand int]
     } else {
         # Garbage scan: random 12-digit string (likely fails check).
-        my @digits
-        for my $k (1:12) { push @digits, int(rand 10) }
+        var @digits
+        for val $k (1:12) { push @digits, int(rand 10) }
         $code = join("", @digits)
     }
 
-    my $t0 = now_ns()
+    val $t0 = now_ns()
 
-    my $bloom_hit = bloom_contains($bf_known, $code)
-    my $check_ok  = Demo::BC::upca_check($code)
+    val $bloom_hit = bloom_contains($bf_known, $code)
+    val $check_ok  = Demo::BC::upca_check($code)
 
     if ($bloom_hit && exists $catalog{$code} && $check_ok) {
         $valid++
@@ -185,14 +185,14 @@ printf("\nscan results: %d valid / %d unknown / %d bad-check (total 200)\n",
 # ── top sellers (TopK) ──────────────────────────────────────────
 
 p "\ntop sellers (SpaceSaving k=8):"
-my @top = topk_top($tk_top, 5)
-for my $p (@top) {
+val @top = topk_top($tk_top, 5)
+for val $p (@top) {
     printf("  %-20s scans=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct unique products (HLL) ────────────────────────────────
 
-my $hll_n = hll_count($hll_uniq)
+val $hll_n = hll_count($hll_uniq)
 printf("\ndistinct products seen: HLL=%.1f vs catalog=%d\n",
        $hll_n, len(keys %catalog))
 

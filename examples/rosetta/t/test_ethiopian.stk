@@ -6,9 +6,9 @@ fn Rosetta::Ethiopian::double($n) { $n * 2 }
 fn Rosetta::Ethiopian::is_odd($n) { $n % 2 != 0 }
 
 fn Rosetta::Ethiopian::multiply($a, $b) {
-    my $curr_a = $a
-    my $curr_b = $b
-    my $result = 0
+    var $curr_a = $a
+    var $curr_b = $b
+    var $result = 0
     while ($curr_a >= 1) {
         if (Rosetta::Ethiopian::is_odd($curr_a)) {
             $result = $result + $curr_b

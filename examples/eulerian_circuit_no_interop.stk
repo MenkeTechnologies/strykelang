@@ -20,17 +20,17 @@
 # Returns +{ ok => 0/1, circuit => [v0, v1, …, v0] } on success.
 
 fn Euler::hierholzer($adj, $start) {
-    my %work
-    for my $v (keys %$adj) {
-        my @copy = @{$adj->{$v}}
+    var %work
+    for val $v (keys %$adj) {
+        val @copy = @{$adj->{$v}}
         $work{$v} = \@copy
     }
-    my @stack = ($start)
-    my @circuit
+    var @stack = ($start)
+    var @circuit
     while (len(@stack) > 0) {
-        my $v = $stack[-1]
+        val $v = $stack[-1]
         if (exists $work{$v} && len(@{$work{$v}}) > 0) {
-            my $u = shift @{$work{$v}}
+            val $u = shift @{$work{$v}}
             push @stack, $u
         } else {
             push @circuit, pop(@stack)
@@ -38,8 +38,8 @@ fn Euler::hierholzer($adj, $start) {
     }
     @circuit = rev @circuit
     # Confirm every edge was consumed.
-    my $unused = 0
-    for my $v (keys %work) {
+    var $unused = 0
+    for val $v (keys %work) {
         $unused += len(@{$work{$v}})
     }
     if ($unused > 0) {
@@ -51,12 +51,12 @@ fn Euler::hierholzer($adj, $start) {
 # ── degree balance / total edge count ─────────────────────────────
 
 fn Euler::degrees($adj) {
-    my %indeg
-    my %outdeg
-    for my $v (keys %$adj) {
+    var %indeg
+    var %outdeg
+    for val $v (keys %$adj) {
         $outdeg{$v} = len(@{$adj->{$v}})
         $indeg{$v}  = 0 unless exists $indeg{$v}
-        for my $u (@{$adj->{$v}}) {
+        for val $u (@{$adj->{$v}}) {
             $indeg{$u} = 0 unless exists $indeg{$u}
             $indeg{$u}++
             $outdeg{$u} = 0 unless exists $outdeg{$u}
@@ -68,8 +68,8 @@ fn Euler::degrees($adj) {
 # ── total edges in the multigraph ─────────────────────────────────
 
 fn Euler::edge_count($adj) {
-    my $n = 0
-    for my $v (keys %$adj) {
+    var $n = 0
+    for val $v (keys %$adj) {
         $n += len(@{$adj->{$v}})
     }
     $n
@@ -77,7 +77,7 @@ fn Euler::edge_count($adj) {
 
 # ── primary cases ─────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "triangle",
         adj   => +{ A => ["B"], B => ["C"], C => ["A"] },
@@ -133,76 +133,76 @@ my @cases = (
 p "── Eulerian-circuit (Hierholzer) demo ────────────────"
 printf "  %-32s  %4s  %s\n", "case", "ok?", "circuit"
 printf "  %-32s  %4s  %s\n", "--------------------------------", "----", "-------"
-for my $c (@cases) {
-    my $deg = Euler::degrees($c->{adj})
-    my $balanced = 1
-    for my $v (keys %{$deg->{indeg}}) {
+for val $c (@cases) {
+    val $deg = Euler::degrees($c->{adj})
+    var $balanced = 1
+    for val $v (keys %{$deg->{indeg}}) {
         if (($deg->{indeg}->{$v} // 0) != ($deg->{outdeg}->{$v} // 0)) {
             $balanced = 0
             last
         }
     }
-    my $r
+    var $r
     if (!$balanced) {
         $r = +{ ok => 0, circuit => [] }
     } else {
         $r = Euler::hierholzer($c->{adj}, $c->{start})
     }
-    my $shown = $r->{ok} ? join(" → ", @{$r->{circuit}}) : "—"
+    val $shown = $r->{ok} ? join(" → ", @{$r->{circuit}}) : "—"
     printf "  %-32s  %4s  %s\n", $c->{name}, $r->{ok} ? "yes" : "no", $shown
 }
 
 # ── invariant 1: ok-cases produce circuits whose length is |E| + 1 ─
 
-for my $c (@cases) {
+for val $c (@cases) {
     next unless $c->{ok}
-    my $r = Euler::hierholzer($c->{adj}, $c->{start})
+    val $r = Euler::hierholzer($c->{adj}, $c->{start})
     die "expected ok on \"#{$c->{name}}\"" unless $r->{ok}
-    my $edges = Euler::edge_count($c->{adj})
+    val $edges = Euler::edge_count($c->{adj})
     die "circuit length #{len(@{$r->{circuit}})} != edges+1 #{$edges + 1} on \"#{$c->{name}}\"" unless len(@{$r->{circuit}}) == $edges + 1
 }
 
 # ── invariant 2: circuit closes — first == last ───────────────────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next unless $c->{ok}
-    my $r = Euler::hierholzer($c->{adj}, $c->{start})
-    my $cir = $r->{circuit}
+    val $r = Euler::hierholzer($c->{adj}, $c->{start})
+    val $cir = $r->{circuit}
     die "circuit does not close on \"#{$c->{name}}\": #{$cir->[0]} != #{$cir->[-1]}" unless $cir->[0] eq $cir->[-1]
 }
 
 # ── invariant 3: every consecutive pair is a real edge ────────────
 
-for my $c (@cases) {
+for val $c (@cases) {
     next unless $c->{ok}
-    my $r = Euler::hierholzer($c->{adj}, $c->{start})
-    my $cir = $r->{circuit}
-    my %multi
-    for my $v (keys %{$c->{adj}}) {
-        for my $u (@{$c->{adj}->{$v}}) {
-            my $key = "#{$v}->#{$u}"
+    val $r = Euler::hierholzer($c->{adj}, $c->{start})
+    val $cir = $r->{circuit}
+    var %multi
+    for val $v (keys %{$c->{adj}}) {
+        for val $u (@{$c->{adj}->{$v}}) {
+            val $key = "#{$v}->#{$u}"
             $multi{$key} = 0 unless exists $multi{$key}
             $multi{$key}++
         }
     }
-    for my $i (0:len(@$cir) - 2) {
-        my $v = $cir->[$i]
-        my $u = $cir->[$i + 1]
-        my $key = "#{$v}->#{$u}"
+    for val $i (0:len(@$cir) - 2) {
+        val $v = $cir->[$i]
+        val $u = $cir->[$i + 1]
+        val $key = "#{$v}->#{$u}"
         die "edge #{$key} not in graph on \"#{$c->{name}}\"" unless exists $multi{$key} && $multi{$key} > 0
         $multi{$key}--
     }
-    for my $k (keys %multi) {
+    for val $k (keys %multi) {
         die "edge #{$k} left unused on \"#{$c->{name}}\"" if $multi{$k} > 0
     }
 }
 
 # ── invariant 4: balanced check correctly rejects imbalanced graph ─
 
-my $bad = $cases[4]   # the imbalanced one
-my $deg_bad = Euler::degrees($bad->{adj})
-my $bal_bad = 1
-for my $v (keys %{$deg_bad->{indeg}}) {
+val $bad = $cases[4]   # the imbalanced one
+val $deg_bad = Euler::degrees($bad->{adj})
+var $bal_bad = 1
+for val $v (keys %{$deg_bad->{indeg}}) {
     if (($deg_bad->{indeg}->{$v} // 0) != ($deg_bad->{outdeg}->{$v} // 0)) {
         $bal_bad = 0
         last
@@ -212,14 +212,14 @@ die "imbalanced graph must NOT pass balance test" if $bal_bad
 
 # ── invariant 5: disconnected graph fails (returns ok=0) ──────────
 
-my $disc = $cases[3]
-my $r_disc = Euler::hierholzer($disc->{adj}, $disc->{start})
+val $disc = $cases[3]
+val $r_disc = Euler::hierholzer($disc->{adj}, $disc->{start})
 die "disconnected graph must yield ok=0" if $r_disc->{ok}
 
 # ── invariant 6: single self-loop has trivial circuit ─────────────
 
-my $self_loop = +{ A => ["A"] }
-my $r_self = Euler::hierholzer($self_loop, "A")
+val $self_loop = +{ A => ["A"] }
+val $r_self = Euler::hierholzer($self_loop, "A")
 die "self-loop must succeed" unless $r_self->{ok}
 die "self-loop circuit must be [A, A]" unless len(@{$r_self->{circuit}}) == 2 && $r_self->{circuit}->[0] eq "A" && $r_self->{circuit}->[1] eq "A"
 

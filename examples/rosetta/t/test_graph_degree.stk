@@ -6,7 +6,7 @@ fn Rosetta::GraphDegree::get($adj, $node) {
     len(@{$adj->{$node}})
 }
 
-my $graph = {
+val $graph = {
     A => ["B", "C"],
     B => ["A", "C", "D"],
     C => ["A", "B"],

@@ -6,24 +6,24 @@ fn Rosetta::LogisticFit::curve($k, $r, $t0, $t) {
 }
 
 fn Rosetta::LogisticFit::sse($points, $k, $r, $t0) {
-    my $sum = 0
-    for my $point (@$points) {
-        my $pred = Rosetta::LogisticFit::curve($k, $r, $t0, $point->[0])
-        my $err = $pred - $point->[1]
+    var $sum = 0
+    for val $point (@$points) {
+        val $pred = Rosetta::LogisticFit::curve($k, $r, $t0, $point->[0])
+        val $err = $pred - $point->[1]
         $sum += $err * $err
     }
     $sum
 }
 
 fn Rosetta::LogisticFit::fit($points) {
-    my @ks = (90, 100, 110)
-    my @rs = (0.5, 0.8, 1.1)
-    my @t0s = (2, 3, 4)
-    my $best = { k => 0, r => 0, t0 => 0, sse => 1e30 }
-    for my $k (@ks) {
-        for my $r (@rs) {
-            for my $t0 (@t0s) {
-                my $sse = Rosetta::LogisticFit::sse($points, $k, $r, $t0)
+    val @ks = (90, 100, 110)
+    val @rs = (0.5, 0.8, 1.1)
+    val @t0s = (2, 3, 4)
+    var $best = { k => 0, r => 0, t0 => 0, sse => 1e30 }
+    for val $k (@ks) {
+        for val $r (@rs) {
+            for val $t0 (@t0s) {
+                val $sse = Rosetta::LogisticFit::sse($points, $k, $r, $t0)
                 if ($sse < $best->{sse}) {
                     $best = { k => $k, r => $r, t0 => $t0, sse => $sse }
                 }
@@ -33,11 +33,11 @@ fn Rosetta::LogisticFit::fit($points) {
     $best
 }
 
-my @points = (
+val @points = (
     [0, 8.3], [1, 16.8], [2, 31.0], [3, 50.0], [4, 69.0], [5, 83.2], [6, 91.7]
 )
 
-my $fit = Rosetta::LogisticFit::fit(\@points)
+val $fit = Rosetta::LogisticFit::fit(\@points)
 
 assert_eq "$fit->{k},$fit->{r},$fit->{t0}", "100,0.8,3", "grid search recovers source parameters"
 assert_eq Rosetta::LogisticFit::curve(100, 0.8, 3, 3) == 50 ? 1 : 0, 1, "curve midpoint equals half carrying capacity"

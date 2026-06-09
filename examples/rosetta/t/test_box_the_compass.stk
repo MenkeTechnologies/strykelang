@@ -2,7 +2,7 @@
 # Rosetta Code: Box the compass
 
 fn Rosetta::BoxCompass::point($index) {
-    my @names = (
+    val @names = (
         "North","North by east","North-northeast","Northeast by north",
         "Northeast","Northeast by east","East-northeast","East by north",
         "East","East by south","East-southeast","Southeast by east",
@@ -32,7 +32,7 @@ assert_eq Rosetta::BoxCompass::deg_to_index(270),   24, "270deg -> idx 24"
 assert_eq Rosetta::BoxCompass::deg_to_index(354.38),0,  "354.38 wraps to N"
 
 # pipeline: degrees -> name
-my $name = 67.5 |> Rosetta::BoxCompass::deg_to_index |> Rosetta::BoxCompass::point
+val $name = 67.5 |> Rosetta::BoxCompass::deg_to_index |> Rosetta::BoxCompass::point
 assert_eq $name, "East-northeast", "67.5deg -> ENE"
 
 test_run

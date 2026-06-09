@@ -6,19 +6,19 @@
 
 p "── User / system identity ─────────────────────────────"
 p "  whoami: ", whoami()
-my @g = groups()
+val @g = groups()
 p "  groups (first 5): ", join(", ", @g[0..($#g < 4 ? $#g : 4)])
 
 p ""
 p "── Terminal size (TTY only — 0x0 when piped) ──────────"
-my @sz = term_size()
+val @sz = term_size()
 printf "  rows x cols: %d x %d\n", $sz[0], $sz[1]
 printf "  width       : %d\n", term_width()
 printf "  height      : %d\n", term_height()
 
 p ""
 p "── Directory stack — pushd / popd ─────────────────────"
-my $start = cwd()
+val $start = cwd()
 pushd("/tmp")
 p "  after pushd /tmp:   ", cwd()
 pushd($ENV{HOME} // "/")
@@ -31,14 +31,14 @@ p "  back at start:      ", cwd()
 
 p ""
 p "── strftime — calendar formatting ─────────────────────"
-my $t = time()
+val $t = time()
 p "  now ISO 8601 :    ", strftime("%Y-%m-%dT%H:%M:%S%z", $t)
 p "  RFC 2822 date:    ", strftime("%a, %d %b %Y %H:%M:%S %z", $t)
 p "  day of year  :    ", strftime("%j", $t)
 
 p ""
 p "── tac / rev_lines — reverse line streams ─────────────"
-my @poem = ("roses are red", "violets are blue", "stryke is hot", "PHP is too")
+val @poem = ("roses are red", "violets are blue", "stryke is hot", "PHP is too")
 p "  original:"
 p "    $_" for @poem
 p "  reversed via tac:"
@@ -46,9 +46,9 @@ p "    $_" for tac(@poem)
 
 p ""
 p "── Filesystem niceties ────────────────────────────────"
-my $td = mktempdir("/tmp/stryke_demo_XXXXXX")
+val $td = mktempdir("/tmp/stryke_demo_XXXXXX")
 p "  mktempdir made: $td"
-my $tf = mktemp("/tmp/stryke_demo_XXXXXX.txt")
+val $tf = mktemp("/tmp/stryke_demo_XXXXXX.txt")
 p "  mktemp made:   $tf"
 
 # fill the tempdir with files and tree it
@@ -57,7 +57,7 @@ spurt("$td/beta.txt",   "hello beta")
 mkdir("$td/sub")
 spurt("$td/sub/gamma.txt", "hello gamma")
 p "  tree of \$td:"
-for my $line (split /\n/, tree($td)) {
+for val $line (split /\n/, tree($td)) {
     p "    $line"
 }
 

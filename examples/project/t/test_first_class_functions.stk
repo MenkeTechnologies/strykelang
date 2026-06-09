@@ -12,16 +12,16 @@
 # FUNCTIONS AS VALUES — assign to scalars
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $double = fn($x) { $x * 2 }
-my $square = fn($x) { $x * $x }
-my $add = fn($a, $b) { $a + $b }
+val $double = fn($x) { $x * 2 }
+val $square = fn($x) { $x * $x }
+val $add = fn($a, $b) { $a + $b }
 
 assert_eq $double(5), 10, "fn in scalar: double"
 assert_eq $square(4), 16, "fn in scalar: square"
 assert_eq $add(3, 7), 10, "fn in scalar: add"
 
 # Reassign function to different variable
-my $f = $double
+var $f = $double
 assert_eq $f(6), 12, "fn reassigned to new var"
 
 # Overwrite variable with different function
@@ -32,7 +32,7 @@ assert_eq $f(5), 25, "fn var overwritten"
 # FUNCTIONS IN ARRAYS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @fn_array = (
+var @fn_array = (
     fn($x) { $x + 1 },
     fn($x) { $x * 2 },
     fn($x) { $x * $x },
@@ -45,8 +45,8 @@ assert_eq $fn_array[2](10), 100, "fn in array[2]: square"
 assert_eq $fn_array[3](10), 9, "fn in array[3]: -1"
 
 # Iterate and apply all functions
-my @results = ()
-for my $fn (@fn_array) {
+var @results = ()
+for val $fn (@fn_array) {
     push @results, $fn(5)
 }
 assert_eq join(",", @results), "6,10,25,4", "iterate fn array"
@@ -59,7 +59,7 @@ assert_eq $fn_array[4](10), 5, "pushed fn to array"
 # FUNCTIONS IN HASHES
 # ══════════════════════════════════════════════════════════════════════════════
 
-my %fn_hash = (
+var %fn_hash = (
     inc    => fn($x) { $x + 1 },
     dec    => fn($x) { $x - 1 },
     double => fn($x) { $x * 2 },
@@ -74,7 +74,7 @@ assert_eq $fn_hash{negate}(5), -5, "fn in hash: negate"
 assert_eq $fn_hash{abs}(-7), 7, "fn in hash: abs"
 
 # Dynamic dispatch by name
-my $op = "double"
+val $op = "double"
 assert_eq $fn_hash{$op}(8), 16, "dynamic fn dispatch"
 
 # Add function to hash
@@ -85,7 +85,7 @@ assert_eq $fn_hash{triple}(4), 12, "added fn to hash"
 # FUNCTIONS IN NESTED STRUCTURES
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $nested = {
+val $nested = {
     math => {
         basic => {
             add => fn($a, $b) { $a + $b },
@@ -93,7 +93,7 @@ my $nested = {
         },
         advanced => {
             pow => fn($base, $exp) {
-                my $result = 1
+                var $result = 1
                 for (1:$exp) { $result *= $base }
                 $result
             },
@@ -123,7 +123,7 @@ fn apply_fn($fn, $x) { $fn($x) }
 fn apply_fn2($fn, $a, $b) { $fn($a, $b) }
 fn apply_fn_twice($fn, $x) { $fn($fn($x)) }
 fn apply_fn_n_times($fn, $x, $n) {
-    my $result = $x
+    var $result = $x
     for (1:$n) { $result = $fn($result) }
     $result
 }
@@ -134,38 +134,38 @@ assert_eq apply_fn_twice(fn($x) { $x + 1 }, 5), 7, "fn as arg: Project::Closures
 assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: Project::Closures::apply_n_times"
 
 # map with custom function
-my @nums = (1, 2, 3, 4, 5)
-my @squared = map { _ * _ } @nums
+val @nums = (1, 2, 3, 4, 5)
+val @squared = map { _ * _ } @nums
 assert_eq join(",", @squared), "1,4,9,16,25", "map with block"
 
 fn List::transform($fn, @list) {
-    my @out = ()
-    for my $x (@list) { push @out, $fn($x) }
+    var @out = ()
+    for val $x (@list) { push @out, $fn($x) }
     @out
 }
-my @tripled = List::transform(fn($x) { $x * 3 }, 1, 2, 3)
+val @tripled = List::transform(fn($x) { $x * 3 }, 1, 2, 3)
 assert_eq join(",", @tripled), "3,6,9", "custom map with fn arg"
 
 # filter with custom function
 fn List::filter($pred, @list) {
-    my @out = ()
-    for my $x (@list) { 
+    var @out = ()
+    for val $x (@list) { 
         push @out, $x if $pred($x)
     }
     @out
 }
-my @evens = List::filter(fn($x) { $x % 2 == 0 }, 1, 2, 3, 4, 5, 6)
+val @evens = List::filter(fn($x) { $x % 2 == 0 }, 1, 2, 3, 4, 5, 6)
 assert_eq join(",", @evens), "2,4,6", "custom filter with fn arg"
 
 # reduce with custom function
 fn List::fold($fn, $init, @list) {
-    my $acc = $init
-    for my $x (@list) { $acc = $fn($acc, $x) }
+    var $acc = $init
+    for val $x (@list) { $acc = $fn($acc, $x) }
     $acc
 }
-my $sum = List::fold(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
+val $sum = List::fold(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
 assert_eq $sum, 15, "custom reduce: sum"
-my $product = List::fold(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
+val $product = List::fold(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
 assert_eq $product, 120, "custom reduce: product"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -182,24 +182,24 @@ fn Project::Closures::make_multiplier($n) {
 
 fn make_power($exp) {
     fn($base) {
-        my $result = 1
+        var $result = 1
         for (1:$exp) { $result *= $base }
         $result
     }
 }
 
-my $add10 = Project::Closures::make_adder(10)
-my $add100 = Project::Closures::make_adder(100)
+val $add10 = Project::Closures::make_adder(10)
+val $add100 = Project::Closures::make_adder(100)
 assert_eq $add10(5), 15, "fn returns fn: add10"
 assert_eq $add100(5), 105, "fn returns fn: add100"
 
-my $times5 = Project::Closures::make_multiplier(5)
-my $times7 = Project::Closures::make_multiplier(7)
+val $times5 = Project::Closures::make_multiplier(5)
+val $times7 = Project::Closures::make_multiplier(7)
 assert_eq $times5(3), 15, "fn returns fn: times5"
 assert_eq $times7(3), 21, "fn returns fn: times7"
 
-my $cube = make_power(3)
-my $fourth = make_power(4)
+val $cube = make_power(3)
+val $fourth = make_power(4)
 assert_eq $cube(2), 8, "fn returns fn: cube"
 assert_eq $fourth(2), 16, "fn returns fn: fourth power"
 
@@ -215,29 +215,29 @@ fn pipe_fns($g, $f) {
     fn($x) { $f($g($x)) }
 }
 
-my $inc = fn($x) { $x + 1 }
-my $Project::Types::dbl = fn($x) { $x * 2 }
+val $inc = fn($x) { $x + 1 }
+val $Project::Types::dbl = fn($x) { $x * 2 }
 
-my $inc_then_dbl = pipe_fns($inc, $Project::Types::dbl)
-my $dbl_then_inc = pipe_fns($Project::Types::dbl, $inc)
+val $inc_then_dbl = pipe_fns($inc, $Project::Types::dbl)
+val $dbl_then_inc = pipe_fns($Project::Types::dbl, $inc)
 
 assert_eq $inc_then_dbl(5), 12, "pipe: inc then Project::Types::dbl: (5+1)*2=12"
 assert_eq $dbl_then_inc(5), 11, "pipe: Project::Types::dbl then inc: (5*2)+1=11"
 
-my $composed = Project::Closures::compose_fns($Project::Types::dbl, $inc)
+val $composed = Project::Closures::compose_fns($Project::Types::dbl, $inc)
 assert_eq $composed(5), 12, "compose: Project::Types::dbl(inc(5))=12"
 
 # Chain multiple compositions
 fn compose_all_fns(@fns) {
-    my $result = fn($x) { $x }
-    for my $fn (rev @fns) {
-        my $prev = $result
+    var $result = fn($x) { $x }
+    for val $fn (rev @fns) {
+        val $prev = $result
         $result = fn($x) { $fn($prev($x)) }
     }
     $result
 }
 
-my $chain = compose_all_fns(
+val $chain = compose_all_fns(
     fn($x) { $x + 1 },
     fn($x) { $x * 2 },
     fn($x) { $x + 3 },
@@ -253,8 +253,8 @@ fn Project::Closures::make_counter {
     fn { ++$count }
 }
 
-my $counter1 = Project::Closures::make_counter()
-my $counter2 = Project::Closures::make_counter()
+val $counter1 = Project::Closures::make_counter()
+val $counter2 = Project::Closures::make_counter()
 
 assert_eq $counter1(), 1, "closure counter1: 1"
 assert_eq $counter1(), 2, "closure counter1: 2"
@@ -264,20 +264,20 @@ assert_eq $counter1(), 4, "closure counter1: 4"
 
 # Closure with getter/setter - using arrayref for mutable state
 fn make_box($initial) {
-    my $state = [$initial]
-    my $get = fn { $state->[0] }
-    my $set = fn($v) { $state->[0] = $v }
+    var $state = [$initial]
+    val $get = fn { $state->[0] }
+    val $set = fn($v) { $state->[0] = $v }
     { get => $get, set => $set }
 }
 
-my $box = make_box(42)
+val $box = make_box(42)
 assert_eq $box->{get}(), 42, "closure box: initial"
 $box->{set}(100)
 assert_eq $box->{get}(), 100, "closure box: after set"
 
 # Multiple closures sharing state - using arrayref for items
 fn make_stack {
-    my $items = []
+    val $items = []
     {
         push_item => fn($v) { push @$items, $v },
         pop_item  => fn { pop @$items },
@@ -286,7 +286,7 @@ fn make_stack {
     }
 }
 
-my $stack = make_stack()
+val $stack = make_stack()
 $stack->{push_item}(1)
 $stack->{push_item}(2)
 $stack->{push_item}(3)
@@ -307,12 +307,12 @@ fn Project::PipelineAdvanced::curry3($fn) {
     fn($a) { fn($b) { fn($c) { $fn($a, $b, $c) } } }
 }
 
-my $curried_add = Project::PipelineAdvanced::curry2(fn($a, $b) { $a + $b })
-my $add5_curried = $curried_add(5)
+val $curried_add = Project::PipelineAdvanced::curry2(fn($a, $b) { $a + $b })
+val $add5_curried = $curried_add(5)
 assert_eq $add5_curried(3), 8, "curried add: 5+3"
 assert_eq $curried_add(10)(20), 30, "curried add: 10+20"
 
-my $curried_sum3 = Project::PipelineAdvanced::curry3(fn($a, $b, $c) { $a + $b + $c })
+val $curried_sum3 = Project::PipelineAdvanced::curry3(fn($a, $b, $c) { $a + $b + $c })
 assert_eq $curried_sum3(1)(2)(3), 6, "curried sum3: 1+2+3"
 
 # Partial application helper
@@ -320,13 +320,13 @@ fn partial_left($fn, $first) {
     fn { $fn($first, @_) }
 }
 
-my $div = fn($a, $b) { $a / $b }
-my $half = partial_left($div, 1)
+val $div = fn($a, $b) { $a / $b }
+val $half = partial_left($div, 1)
 # Note: partial_left puts first arg first, so half(x) = 1/x... let's fix:
 fn Project::PipelineAdvanced::partial_right($fn, $last) {
     fn($first) { $fn($first, $last) }
 }
-my $halve = Project::PipelineAdvanced::partial_right($div, 2)
+val $halve = Project::PipelineAdvanced::partial_right($div, 2)
 assert_eq $halve(10), 5, "partial right: 10/2"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -338,12 +338,12 @@ class Calculator {
     
     fn set_op($op) { $self->operation($op) }
     fn calc($a, $b) { 
-        my $op = $self->operation()
+        val $op = $self->operation()
         $op($a, $b)
     }
 }
 
-my $calc = Calculator()
+val $calc = Calculator()
 $calc->set_op(fn($a, $b) { $a + $b })
 assert_eq $calc->calc(3, 4), 7, "fn in class field: add"
 
@@ -357,9 +357,9 @@ assert_eq $calc->calc(2, 10), 1024, "fn in class field: pow"
 # FUNCTION IDENTITY AND REFERENCES
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $fn_a = fn { 42 }
-my $fn_b = $fn_a
-my $fn_c = fn { 42 }
+val $fn_a = fn { 42 }
+val $fn_b = $fn_a
+val $fn_c = fn { 42 }
 
 assert_eq ref($fn_a), "CODE", "fn ref type is CODE"
 assert_eq ref($fn_b), "CODE", "copied fn ref type is CODE"
@@ -372,17 +372,17 @@ assert_eq $fn_a(), $fn_b(), "same fn reference: same result"
 # IMMEDIATELY INVOKED FUNCTION EXPRESSIONS (IIFE)
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $iife_result = fn { 42 * 2 }()
+val $iife_result = fn { 42 * 2 }()
 assert_eq $iife_result, 84, "IIFE: immediate call"
 
-my $iife_with_arg = fn($x) { $x * $x }(7)
+val $iife_with_arg = fn($x) { $x * $x }(7)
 assert_eq $iife_with_arg, 49, "IIFE with arg"
 
 # IIFE for scoped computation
-my $computed = fn {
-    my $a = 10
-    my $b = 20
-    my $c = 30
+val $computed = fn {
+    val $a = 10
+    val $b = 20
+    val $c = 30
     $a + $b + $c
 }()
 assert_eq $computed, 60, "IIFE for scoped computation"
@@ -391,9 +391,9 @@ assert_eq $computed, 60, "IIFE for scoped computation"
 # FUNCTIONS WITH VARIADIC ARGUMENTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $sum_all = fn { 
-    my $total = 0
-    for my $x (@_) { $total += $x }
+val $sum_all = fn { 
+    var $total = 0
+    for var $x (@_) { $total += $x }
     $total
 }
 
@@ -401,8 +401,8 @@ assert_eq $sum_all(1), 1, "variadic fn: 1 arg"
 assert_eq $sum_all(1, 2), 3, "variadic fn: 2 args"
 assert_eq $sum_all(1, 2, 3, 4, 5), 15, "variadic fn: 5 args"
 
-my $join_all = fn {
-    my $sep = shift @_
+val $join_all = fn {
+    val $sep = shift @_
     join($sep, @_)
 }
 assert_eq $join_all("-", "a", "b", "c"), "a-b-c", "variadic fn: join"
@@ -412,17 +412,17 @@ assert_eq $join_all("-", "a", "b", "c"), "a-b-c", "variadic fn: join"
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Store functions in registry
-my %registry = ()
+var %registry = ()
 $registry{double} = fn($x) { $x * 2 }
 $registry{triple} = fn($x) { $x * 3 }
 $registry{square} = fn($x) { $x * $x }
 
-my @fn_names = sort keys %registry
+val @fn_names = sort keys %registry
 assert_eq join(",", @fn_names), "double,square,triple", "list fn names from hash"
 
 # Apply all registered functions to a value
-my %results = ()
-for my $name (keys %registry) {
+var %results = ()
+for val $name (keys %registry) {
     $results{$name} = $registry{$name}(4)
 }
 assert_eq $results{double}, 8, "registry apply: double"
@@ -434,14 +434,14 @@ assert_eq $results{square}, 16, "registry apply: square"
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn fn_pipeline($val, @fns) {
-    my $result = $val
-    for my $fn (@fns) {
+    var $result = $val
+    for val $fn (@fns) {
         $result = $fn($result)
     }
     $result
 }
 
-my $pipe_result = fn_pipeline(
+val $pipe_result = fn_pipeline(
     5,
     fn($x) { $x + 1 },      # 6
     fn($x) { $x * 2 },      # 12
@@ -455,7 +455,7 @@ assert_eq $pipe_result, 4, "function pipeline"
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn memoize_fn($fn) {
-    my $cache = {}
+    var $cache = {}
     fn($x) {
         unless (exists $cache->{$x}) {
             $cache->{$x} = $fn($x)
@@ -465,13 +465,13 @@ fn memoize_fn($fn) {
 }
 
 # Use arrayref to track call count (scalar capture limitation)
-my $calls = [0]
-my $expensive = fn($x) {
+val $calls = [0]
+val $expensive = fn($x) {
     $calls->[0]++
     $x * $x
 }
 
-my $memoized = memoize_fn($expensive)
+val $memoized = memoize_fn($expensive)
 assert_eq $memoized(5), 25, "memoized: first call"
 assert_eq $calls->[0], 1, "memoized: one underlying call"
 assert_eq $memoized(5), 25, "memoized: cached call"

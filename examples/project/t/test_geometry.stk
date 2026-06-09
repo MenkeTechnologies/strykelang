@@ -9,11 +9,11 @@ assert_near Project::Geometry::adv_dist_2d(1, 1, 1, 1), 0.0, 0.001, "dist same p
 
 # ── Project::Geometry::adv_area_polygon ─────
 # Square: (0,0), (2,0), (2,2), (0,2) -> Area = 4
-my $square = [[0, 0], [2, 0], [2, 2], [0, 2]]
+val $square = [[0, 0], [2, 0], [2, 2], [0, 2]]
 assert_near Project::Geometry::adv_area_polygon($square), 4.0, 0.001, "square area"
 
 # Triangle: (0,0), (4,0), (0,3) -> Area = (4*3)/2 = 6
-my $triangle = [[0, 0], [4, 0], [0, 3]]
+val $triangle = [[0, 0], [4, 0], [0, 3]]
 assert_near Project::Geometry::adv_area_polygon($triangle), 6.0, 0.001, "triangle area"
 
 # ── Project::Geometry::adv_is_point_in_circle ─────

@@ -2,13 +2,13 @@
 # Rosetta Code: Schieber-Vishkin algorithm
 
 fn Rosetta::SV::lca($parent, $a, $b) {
-    my %anc
-    my $x = $a
+    var %anc
+    var $x = $a
     while (defined $x) {
         $anc{$x} = 1
         $x = exists $parent->{$x} ? $parent->{$x} : undef
     }
-    my $y = $b
+    var $y = $b
     while (defined $y) {
         return $y if $anc{$y}
         $y = exists $parent->{$y} ? $parent->{$y} : undef
@@ -16,7 +16,7 @@ fn Rosetta::SV::lca($parent, $a, $b) {
     undef
 }
 
-my %parent = (
+val %parent = (
     b => "a",
     c => "a",
     d => "b",

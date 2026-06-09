@@ -2,16 +2,16 @@
 
 # ── Project::GraphAlgorithms::adv_bfs: Breadth-First Search, returns list of visited nodes ─────
 fn Project::GraphAlgorithms::adv_bfs($graph, $start_node) {
-    my @visited = ()
-    my %seen = ()
-    my @queue = ($start_node)
+    var @visited = ()
+    var %seen = ()
+    var @queue = ($start_node)
     $seen{$start_node} = 1
     
     while (len(@queue) > 0) {
-        my $curr = shift @queue
+        val $curr = shift @queue
         push @visited, $curr
         
-        my $neighbors = $graph->{$curr} // []
+        val $neighbors = $graph->{$curr} // []
         ~> @$neighbors ep {
             unless (exists $seen{_}) {
                 $seen{_} = 1
@@ -24,20 +24,20 @@ fn Project::GraphAlgorithms::adv_bfs($graph, $start_node) {
 
 # ── Project::GraphAlgorithms::adv_dfs: Depth-First Search, returns list of visited nodes ─────
 fn Project::GraphAlgorithms::adv_dfs($graph, $start_node) {
-    my @visited = ()
-    my %seen = ()
-    my @stack = ($start_node)
+    var @visited = ()
+    var %seen = ()
+    var @stack = ($start_node)
     
     while (len(@stack) > 0) {
-        my $curr = pop @stack
+        val $curr = pop @stack
         unless (exists $seen{$curr}) {
             $seen{$curr} = 1
             push @visited, $curr
             
-            my $neighbors = $graph->{$curr} // []
+            val $neighbors = $graph->{$curr} // []
             # Push in reversed to maintain same order as recursive DFS if desired
-            for my $i (rev 0..len(@$neighbors)-1) {
-                my $neighbor = $neighbors->[$i]
+            for val $i (rev 0..len(@$neighbors)-1) {
+                val $neighbor = $neighbors->[$i]
                 unless (exists $seen{$neighbor}) {
                     push @stack, $neighbor
                 }
@@ -52,26 +52,26 @@ require "./lib/priority_queue.stk"
 # ── Project::GraphAlgorithms::adv_dijkstra: Shortest path in a weighted graph ─────
 # Graph format: { node => [[neighbor, weight], ...] }
 fn Project::GraphAlgorithms::adv_dijkstra($graph, $start) {
-    my %dist = ()
+    var %dist = ()
     ~> keys %$graph ep {
         $dist{_} = 1e18 # Infinity
     }
     $dist{$start} = 0
     
-    my $pq = Project::PriorityQueue::pq_min_new()
+    val $pq = Project::PriorityQueue::pq_min_new()
     $pq->push([0, $start])
     
     while (!$pq->is_empty()) {
-        my $top = $pq->pop()
-        my $d = $top->[0]
-        my $u = $top->[1]
+        val $top = $pq->pop()
+        val $d = $top->[0]
+        val $u = $top->[1]
         
         next if $d > $dist{$u}
         
-        my $neighbors = $graph->{$u} // []
-        for my $edge (@$neighbors) {
-            my $v = $edge->[0]
-            my $weight = $edge->[1]
+        val $neighbors = $graph->{$u} // []
+        for val $edge (@$neighbors) {
+            val $v = $edge->[0]
+            val $weight = $edge->[1]
             
             if ($dist{$u} + $weight < $dist{$v}) {
                 $dist{$v} = $dist{$u} + $weight
@@ -82,31 +82,31 @@ fn Project::GraphAlgorithms::adv_dijkstra($graph, $start) {
     { %dist }
 }
 fn Project::GraphAlgorithms::adv_has_cycle($graph) {
-    my %visited = ()
+    var %visited = ()
     
-    my @nodes = keys %$graph
-    for my $start_node (@nodes) {
+    val @nodes = keys %$graph
+    for val $start_node (@nodes) {
         next if exists $visited{$start_node}
         
-        my %in_stack = ()
-        my @stack = ([$start_node, 0])
+        var %in_stack = ()
+        var @stack = ([$start_node, 0])
         
         while (len(@stack) > 0) {
-            my $top_ref = $stack[-1]
-            my $curr = $top_ref->[0]
-            my $edge_idx = $top_ref->[1]
+            val $top_ref = $stack[-1]
+            val $curr = $top_ref->[0]
+            val $edge_idx = $top_ref->[1]
             
             if ($edge_idx == 0) {
                 $visited{$curr} = 1
                 $in_stack{$curr} = 1
             }
             
-            my $neighbors = $graph->{$curr} // []
+            val $neighbors = $graph->{$curr} // []
             if ($edge_idx < len(@$neighbors)) {
                 # Update current node's edge index for next time we see it
                 $top_ref->[1]++
                 
-                my $neighbor = $neighbors->[$edge_idx]
+                val $neighbor = $neighbors->[$edge_idx]
                 if (exists $in_stack{$neighbor} && $in_stack{$neighbor}) {
                     return 1
                 }

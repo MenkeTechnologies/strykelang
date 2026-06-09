@@ -2,23 +2,23 @@
 # Rosetta Code: Cartesian product
 
 fn Rosetta::CartesianProduct::compute($a_ref, $b_ref) {
-    my @res = ()
-    for my $x (@$a_ref) {
-        for my $y (@$b_ref) {
+    var @res = ()
+    for val $x (@$a_ref) {
+        for val $y (@$b_ref) {
             push @res, [$x, $y]
         }
     }
     \@res
 }
 
-my $p = Rosetta::CartesianProduct::compute([1, 2], ["a", "b"])
+val $p = Rosetta::CartesianProduct::compute([1, 2], ["a", "b"])
 assert_eq len(@$p), 4, "2x2 product has 4 elements"
 assert_eq $p->[0][0], 1, "first element x"
 assert_eq $p->[0][1], "a", "first element y"
 assert_eq $p->[3][1], "b", "last element y"
 
 # Verify all combinations
-my $joined = ~> @$p map { join("-", @{_}) } |> join(",")
+val $joined = ~> @$p map { join("-", @{_}) } |> join(",")
 assert_eq $joined, "1-a,1-b,2-a,2-b", "all combinations"
 
 test_run

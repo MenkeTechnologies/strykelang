@@ -6,7 +6,7 @@ require "./lib/deep_oop.stk"
 # ── 1. Deep Inheritance Chain (7 levels) ───────────────────────────
 # BaseNode -> SpatialNode -> PhysicsBody -> Actor -> Humanoid -> Player -> Hero
 
-my $hero = Hero(
+val $hero = Hero(
     uuid => "h1",
     name => "Arthur",
     posX => 10.0,
@@ -41,7 +41,7 @@ assert_eq $hero->id(), "h1", "Trait method via inheritance"
 
 # ── 3. Multiple Inheritance & Mixins ───────────────────────────────
 
-my $mage = ArchMageHero(
+val $mage = ArchMageHero(
     uuid => "m1",
     name => "Gandalf",
     mana => 200,
@@ -66,9 +66,9 @@ assert_true $mage->isa("CombatFlyer"),  "isa CombatFlyer (Mixin parent)"
 
 # ── 5. Deep Composition & Cross-Object Access ──────────────────────
 
-my $w = Weapon(name => "Excalibur", damage => 99)
-my $cs = CharacterSheet(weapon => $w)
-my $npc = ComplexNPC(
+val $w = Weapon(name => "Excalibur", damage => 99)
+val $cs = CharacterSheet(weapon => $w)
+val $npc = ComplexNPC(
     uuid => "n1", name => "Guardsman", sheet => $cs,
     posX => 0, posY => 0, posZ => 0, mass => 100, velocity => 0,
     health => 200, level => 10, species => "Human", faction => "Guard"

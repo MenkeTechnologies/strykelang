@@ -9,8 +9,8 @@ fn Rosetta::HTTP::get($url) {
 }
 
 # Pick a high port unlikely to collide with developer services.
-my $port = 9871
-my $base = "http://127.0.0.1:$port"
+val $port = 9871
+val $base = "http://127.0.0.1:$port"
 
 # Start a tiny echo server in the background. The handler reflects
 # `path` and `query` back as a JSON blob the test can pattern-match.
@@ -18,8 +18,8 @@ my $base = "http://127.0.0.1:$port"
 # verbatim with the path.
 async {
     serve $port, fn {
-        my $req  = _0
-        my $body = sprintf '{"path":"%s","query":"%s"}',
+        val $req  = _0
+        val $body = sprintf '{"path":"%s","query":"%s"}',
             $req->{path},
             $req->{query} // ""
         return +{ status => 200, body => $body }
@@ -31,18 +31,18 @@ async {
 sleep 0.2
 
 # Single fetch round-trip.
-my $res = Rosetta::HTTP::get("$base/get")
+val $res = Rosetta::HTTP::get("$base/get")
 assert_ok defined($res),                  "fetch returned something"
 assert_ok $res =~ /"path":"\/get"/,       "response contains expected path"
 
 # Parallel fetch — fan out via `fetch_async`, collect via `await`.
-my @urls = (
+val @urls = (
     "$base/get?a=1",
     "$base/get?b=2",
     "$base/get?c=3",
 )
-my @tasks   = map {fetch_async} @urls
-my @results = map { await _ }        @tasks
+val @tasks   = map {fetch_async} @urls
+val @results = map { await _ }        @tasks
 
 assert_eq cnt(@results), 3,             "parallel fetch got 3 results"
 assert_ok $results[0] =~ /"query":"a=1"/, "result 0 has a=1"

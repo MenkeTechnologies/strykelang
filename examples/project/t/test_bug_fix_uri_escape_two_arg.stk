@@ -31,12 +31,12 @@ uri_escape("a1 b2 c3", "^a-c0-9")
     |> assert_eq("a1%20b2%20c3", "complement of [a-c0-9] = space encoded")
 
 # Round-trip: default encode → decode is the identity.
-my $orig = "https://example.com/path?q=hello world&n=1#frag"
-my $enc = uri_escape($orig)
+val $orig = "https://example.com/path?q=hello world&n=1#frag"
+val $enc = uri_escape($orig)
 uri_unescape($enc) |> assert_eq($orig, "round-trip via default form")
 
 # Round-trip via strict form too.
-my $enc2 = uri_escape($orig, "^A-Za-z0-9")
+val $enc2 = uri_escape($orig, "^A-Za-z0-9")
 uri_unescape($enc2) |> assert_eq($orig, "round-trip via strict form")
 
 test_run

@@ -4,24 +4,24 @@
 # Returns hash { word => { start => [row, col], end => [row, col] } } or
 # { word => undef } for not-found.
 fn Exercism::WordSearch::search {
-    my ($grid, $words) = (_, _1)
-    my @rows = map { [split //, $_] } @{$grid}
-    my $h = @rows
-    my $w = @rows ? @{$rows[0]} : 0
-    my @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
-    my %out
-    for my $word (@{$words}) {
-        my $len = len($word)
-        my @found
-        for my $r (0..$h - 1) {
-            for my $c (0..$w - 1) {
+    val ($grid, $words) = (_, _1)
+    val @rows = map { [split //, $_] } @{$grid}
+    val $h = @rows
+    val $w = @rows ? @{$rows[0]} : 0
+    val @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
+    var %out
+    for val $word (@{$words}) {
+        val $len = len($word)
+        var @found
+        for val $r (0..$h - 1) {
+            for val $c (0..$w - 1) {
                 next unless $rows[$r][$c] eq substr($word, 0, 1)
-                for my $d (@dirs) {
-                    my $er = $r + $d->[0] * ($len - 1)
-                    my $ec = $c + $d->[1] * ($len - 1)
+                for val $d (@dirs) {
+                    val $er = $r + $d->[0] * ($len - 1)
+                    val $ec = $c + $d->[1] * ($len - 1)
                     next if $er < 0 || $er >= $h || $ec < 0 || $ec >= $w
-                    my $ok = 1
-                    for my $i (0..$len - 1) {
+                    var $ok = 1
+                    for val $i (0..$len - 1) {
                         if ($rows[$r + $d->[0] * $i][$c + $d->[1] * $i] ne substr($word, $i, 1)) {
                             $ok = 0
                             last

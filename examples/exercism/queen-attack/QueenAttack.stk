@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 
 fn Exercism::QueenAttack::can_attack {
-    my $dx = abs(_->[0] - _1->[0])
-    my $dy = abs(_->[1] - _1->[1])
+    val $dx = abs(_->[0] - _1->[0])
+    val $dy = abs(_->[1] - _1->[1])
 
     die "queens can't share a position" if $dx == 0 && $dy == 0
     $dx == 0 || $dy == 0 || $dx == $dy

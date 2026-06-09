@@ -2,17 +2,17 @@
 # Rosetta Code: Birthday Problem
 
 fn Rosetta::BirthdayProblem::compute($n) {
-    my $p = 1.0
-    for my $i (0:$n-1) {
+    var $p = 1.0
+    for val $i (0:$n-1) {
         $p = $p * (365 - $i) / 365
     }
     1 - $p
 }
 
-my $p23 = Rosetta::BirthdayProblem::compute(23)
+val $p23 = Rosetta::BirthdayProblem::compute(23)
 assert_near $p23, 0.507397, 0.0001, "prob(23) approx 0.507"
 
-my $p50 = Rosetta::BirthdayProblem::compute(50)
+val $p50 = Rosetta::BirthdayProblem::compute(50)
 assert_near $p50, 0.970374, 0.0001, "prob(50) approx 0.970"
 
 test_run

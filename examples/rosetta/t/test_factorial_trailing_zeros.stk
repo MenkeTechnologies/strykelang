@@ -2,8 +2,8 @@
 # Rosetta Code: Factorial/Trailing zeros
 
 fn Rosetta::FactorialTrailingZeros::solve($n) {
-    my $curr_n = $n
-    my $count = 0
+    var $curr_n = $n
+    var $count = 0
     while ($curr_n >= 5) {
         $curr_n = int($curr_n / 5)
         $count = $count + $curr_n

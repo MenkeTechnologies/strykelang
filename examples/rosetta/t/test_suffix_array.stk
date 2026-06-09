@@ -2,18 +2,18 @@
 # Rosetta Code: Suffix array
 
 fn Rosetta::SuffixArray::solve($s) {
-    my $n = length($s)
-    my @indices = (0:$n-1)
+    val $n = length($s)
+    val @indices = (0:$n-1)
     
     # Sort indices based on the suffix starting at that index
-    my @res = sort {
+    val @res = sort {
         substr($s, $a) cmp substr($s, $b)
     } @indices
     
     \@res
 }
 
-my $res = Rosetta::SuffixArray::solve("banana")
+val $res = Rosetta::SuffixArray::solve("banana")
 # banana, anana, nana, ana, na, a
 # Sorted suffixes:
 # a      (5)
@@ -24,7 +24,7 @@ my $res = Rosetta::SuffixArray::solve("banana")
 # nana   (2)
 assert_eq join(",", @$res), "5,3,1,0,4,2", "suffix array for banana"
 
-my $res2 = Rosetta::SuffixArray::solve("camel")
+val $res2 = Rosetta::SuffixArray::solve("camel")
 # camel, amel, mel, el, l
 # Sorted: amel, camel, el, l, mel
 # Indices: 1, 0, 3, 4, 2

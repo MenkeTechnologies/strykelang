@@ -2,17 +2,17 @@
 # Rosetta Code: Mian-Chowla sequence
 
 fn Rosetta::MianChowla::mian_chowla($n) {
-    my @a = (1)
+    var @a = (1)
     while (len(@a) < $n) {
-        my $next = $a[-1] + 1
-        my $found = 0
+        var $next = $a[-1] + 1
+        var $found = 0
         while (!$found) {
-            my %sums
-            my $valid = 1
-            my @temp = (@a, $next)
-            for my $i (0..len(@temp)-1) {
-                for my $j ($i..len(@temp)-1) {
-                    my $s = $temp[$i] + $temp[$j]
+            var %sums
+            var $valid = 1
+            val @temp = (@a, $next)
+            for var $i (0..len(@temp)-1) {
+                for var $j ($i..len(@temp)-1) {
+                    val $s = $temp[$i] + $temp[$j]
                     if (exists $sums{$s}) {
                         $valid = 0
                         $i = len(@temp) # break
@@ -32,7 +32,7 @@ fn Rosetta::MianChowla::mian_chowla($n) {
     \@a
 }
 
-my $res = Rosetta::MianChowla::mian_chowla(5)
+val $res = Rosetta::MianChowla::mian_chowla(5)
 assert_eq join(",", @$res), "1,2,4,8,13", "Mian-Chowla first 5"
 
 5 |> Rosetta::MianChowla::mian_chowla |> map { _->[4] } |> assert_eq(13, "pipe Mian-Chowla")

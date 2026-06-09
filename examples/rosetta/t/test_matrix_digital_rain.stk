@@ -2,13 +2,13 @@
 # Rosetta Code: Matrix digital rain
 
 fn Rosetta::MatrixRain::run($frames) {
-    my $cols = 30
+    val $cols = 30
     # Drop positions
-    my @drops = 1:$cols |> map { -int(rand() * 20) }
+    var @drops = 1:$cols |> map { -int(rand() * 20) }
     
-    for my $f (1:$frames) {
-        my $line = ""
-        for my $i (0:($cols - 1)) {
+    for val $f (1:$frames) {
+        var $line = ""
+        for val $i (0:($cols - 1)) {
             if ($drops[$i] >= 0 && $drops[$i] < 10) {
                 # Visible character
                 $line .= chr(33 + int(rand() * 93))

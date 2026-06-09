@@ -4,28 +4,28 @@
 fn Rosetta::BondPerc::key($r, $c) { "$r,$c" }
 
 fn Rosetta::BondPerc::percolates($n, $edges) {
-    my %adj
-    for my $r (0:$n - 1) {
-        for my $c (0:$n - 1) {
+    var %adj
+    for var $r (0:$n - 1) {
+        for var $c (0:$n - 1) {
             $adj{Rosetta::BondPerc::key($r, $c)} = []
         }
     }
-    for my $e (@$edges) {
-        my ($r1, $c1, $r2, $c2) = @$e
+    for val $e (@$edges) {
+        val ($r1, $c1, $r2, $c2) = @$e
         push @{$adj{Rosetta::BondPerc::key($r1, $c1)}}, [$r2, $c2]
         push @{$adj{Rosetta::BondPerc::key($r2, $c2)}}, [$r1, $c1]
     }
 
-    my @queue = map { [0, _] } (0:$n - 1)
-    my %seen
+    var @queue = map { [0, _] } (0:$n - 1)
+    var %seen
     while (len(@queue) > 0) {
-        my $cur = shift @queue
-        my ($r, $c) = @$cur
-        my $k = Rosetta::BondPerc::key($r, $c)
+        val $cur = shift @queue
+        val ($r, $c) = @$cur
+        val $k = Rosetta::BondPerc::key($r, $c)
         next if $seen{$k}
         $seen{$k} = 1
         return 1 if $r == $n - 1
-        for my $nxt (@{$adj{$k}}) { push @queue, $nxt }
+        for val $nxt (@{$adj{$k}}) { push @queue, $nxt }
     }
     0
 }

@@ -7,7 +7,7 @@
 
 # ── § 6a. String / array slicing — `[N:M]` not substr ──────────────────────
 
-my $s = "hello"
+val $s = "hello"
 $s[1]      |> aeq "e",   "single char index"
 $s[1:3]    |> aeq "ell", "inclusive both ends, 3 chars (1,2,3)"
 $s[-1]     |> aeq "o",   "negative index = last"
@@ -16,7 +16,7 @@ $s[2:-1]   |> aeq "llo", "end-anchored via -1"
 $s[0:2]    |> aeq "hel", "start-anchored via 0"
 $s[1:99]   |> aeq "ello","right-clamp graceful (no Perl warning)"
 
-my @a = (10, 20, 30, 40, 50)
+val @a = (10, 20, 30, 40, 50)
 join(",", @a[2:4]) |> aeq "30,40,50", "array tail via explicit end"
 join(",", @a[0:2]) |> aeq "10,20,30", "array start-anchored"
 join(",", @a[1:3]) |> aeq "20,30,40", "array inclusive range"
@@ -61,7 +61,7 @@ mysync $expected = (1:1000) |> sum
 # `e` = foreach (void), `ep` = foreach with print, `maps` / `greps`
 # = streaming map / grep that compose under |>.
 
-my @squares
+var @squares
 (1:5) |> e { push @squares, _ * _ }
 @squares |> sum |> aeq 55, "e { push }: 1+4+9+16+25 = 55"
 
@@ -74,8 +74,8 @@ my @squares
 # ── § 11. Sort / reduce blocks ─────────────────────────────────────────────
 # `$a` / `$b` are the magic comparison/reduction slots inside the block.
 
-my @words = ("apple", "fig", "banana", "kiwi")
-my @sorted = sort { len(_) <=> len(_1) } @words
+val @words = ("apple", "fig", "banana", "kiwi")
+val @sorted = sort { len(_) <=> len(_1) } @words
 $sorted[0] |> aeq "fig", "shortest sorted first"
 $sorted[-1] |> aeq "banana", "longest sorted last"
 
@@ -93,8 +93,8 @@ add3(1, 2, 3) |> aeq 6, "positional _, _1, _2"
 
 # Outer-chain `_<` inside nested map — current scope's topic refers to
 # the inner block, `_<` reaches one scope outward.
-my @cross
-~> (1:3) e { my $outer = _; ~> (10:12) e { push @cross, $outer * 100 + _ } }
+var @cross
+~> (1:3) e { val $outer = _; ~> (10:12) e { push @cross, $outer * 100 + _ } }
 @cross |> sum |> aeq 1*100*3 + 2*100*3 + 3*100*3 + (10+11+12)*3, "nested e: outer*100 + inner"
 
 # ── Stylistic check: implicit return on tail expression ────────────────────

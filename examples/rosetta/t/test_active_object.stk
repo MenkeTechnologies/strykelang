@@ -5,7 +5,7 @@
 # closing over the same backing record.
 
 fn Rosetta::ActiveObj::new() {
-    my $state = { log => [], count => 0 }
+    var $state = { log => [], count => 0 }
     {
         add => fn {
             push @{$state->{log}}, _
@@ -22,21 +22,21 @@ fn Rosetta::ActiveObj::new() {
     }
 }
 
-my $obj = Rosetta::ActiveObj::new()
+val $obj = Rosetta::ActiveObj::new()
 assert_eq $obj->{add}("hello"),   1, "add returns count"
 assert_eq $obj->{add}("world"),   2, "add returns count"
 assert_eq $obj->{add}("rosetta"), 3, "add returns count"
 assert_eq $obj->{size}(), 3, "3 items"
 
-my $snap = $obj->{snapshot}()
+val $snap = $obj->{snapshot}()
 assert_eq join(",", @$snap), "hello,world,rosetta", "snapshot order"
 
 $obj->{reset}()
 assert_eq $obj->{size}(), 0, "reset clears"
 
 # Two instances are independent — separate $state hashrefs.
-my $a = Rosetta::ActiveObj::new()
-my $b = Rosetta::ActiveObj::new()
+val $a = Rosetta::ActiveObj::new()
+val $b = Rosetta::ActiveObj::new()
 $a->{add}("x")
 assert_eq $a->{size}(), 1, "a has 1"
 assert_eq $b->{size}(), 0, "b unaffected"

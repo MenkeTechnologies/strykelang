@@ -3,7 +3,7 @@ fn Exercism::LinkedList::new   { { head => undef, tail => undef, count => 0 } }
 fn Exercism::LinkedList::count { _->{count} }
 
 fn Exercism::LinkedList::push($d, $v) {
-    my $n = { value => $v, prev => $d->{tail}, next => undef }
+    val $n = { value => $v, prev => $d->{tail}, next => undef }
     $d->{tail} ? ($d->{tail}{next} = $n) : ($d->{head} = $n)
     $d->{tail} = $n
     $d->{count}++
@@ -11,7 +11,7 @@ fn Exercism::LinkedList::push($d, $v) {
 }
 
 fn Exercism::LinkedList::unshift($d, $v) {
-    my $n = { value => $v, prev => undef, next => $d->{head} }
+    val $n = { value => $v, prev => undef, next => $d->{head} }
     $d->{head} ? ($d->{head}{prev} = $n) : ($d->{tail} = $n)
     $d->{head} = $n
     $d->{count}++
@@ -20,7 +20,7 @@ fn Exercism::LinkedList::unshift($d, $v) {
 
 fn Exercism::LinkedList::pop($d) {
     return undef unless $d->{tail}
-    my $v = $d->{tail}{value}
+    var $v = $d->{tail}{value}
     $d->{tail} = $d->{tail}{prev}
     $d->{tail} ? ($d->{tail}{next} = undef) : ($d->{head} = undef)
     $d->{count}--
@@ -29,7 +29,7 @@ fn Exercism::LinkedList::pop($d) {
 
 fn Exercism::LinkedList::shift($d) {
     return undef unless $d->{head}
-    my $v = $d->{head}{value}
+    var $v = $d->{head}{value}
     $d->{head} = $d->{head}{next}
     $d->{head} ? ($d->{head}{prev} = undef) : ($d->{tail} = undef)
     $d->{count}--

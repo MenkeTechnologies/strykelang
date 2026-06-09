@@ -17,7 +17,7 @@ assert_eq Rosetta::Atbash::cipher("Svool"), "Hello", "atbash Svool"
 assert_eq Rosetta::Atbash::cipher("Test 123!"), "Gvhg 123!", "with non-alpha"
 assert_eq Rosetta::Atbash::cipher(""), "", "empty"
 
-my $original = "The quick brown fox"
+val $original = "The quick brown fox"
 assert_eq Rosetta::Atbash::cipher(Rosetta::Atbash::cipher($original)), $original, "atbash is self-inverse"
 
 test_run

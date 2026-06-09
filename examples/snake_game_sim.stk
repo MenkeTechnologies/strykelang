@@ -8,8 +8,8 @@
 #   * autopilot: BFS-style "head toward fruit"
 #   * t-digest for score-per-game
 
-my $H = 20
-my $W = 20
+val $H = 20
+val $W = 20
 
 # ── helpers ─────────────────────────────────────────────────────────
 
@@ -19,9 +19,9 @@ fn Demo::Snake::manhattan($p1, $p2) {
 
 fn Demo::Snake::random_empty_cell($snake_set) {
     while (1) {
-        my $r = int(rand $H)
-        my $c = int(rand $W)
-        my $key = "$r,$c"
+        val $r = int(rand $H)
+        val $c = int(rand $W)
+        val $key = "$r,$c"
         return [$r, $c] unless exists $snake_set->{$key}
     }
 }
@@ -29,36 +29,36 @@ fn Demo::Snake::random_empty_cell($snake_set) {
 # ── single game ─────────────────────────────────────────────────────
 
 fn Demo::Snake::play_one() {
-    my @snake = ([int($H / 2), int($W / 2)])
-    my %snake_set
+    var @snake = ([int($H / 2), int($W / 2)])
+    var %snake_set
     $snake_set{$snake[0]->[0] . "," . $snake[0]->[1]} = 1
-    my $fruit = Demo::Snake::random_empty_cell(\%snake_set)
-    my $score = 0
-    my $steps = 0
-    my $max_steps = 500
+    var $fruit = Demo::Snake::random_empty_cell(\%snake_set)
+    var $score = 0
+    var $steps = 0
+    val $max_steps = 500
     while ($steps < $max_steps) {
         $steps = $steps + 1
-        my $head = $snake[-1]
+        val $head = $snake[-1]
         # Greedy: pick direction that gets closer to fruit + doesn't hit body.
-        my @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
-        my $best_dir = undef
-        my $best_dist = 99999
-        for my $d (@dirs) {
-            my $nr = $head->[0] + $d->[0]
-            my $nc = $head->[1] + $d->[1]
+        val @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+        var $best_dir = undef
+        var $best_dist = 99999
+        for val $d (@dirs) {
+            val $nr = $head->[0] + $d->[0]
+            val $nc = $head->[1] + $d->[1]
             next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
-            my $key = "$nr,$nc"
+            val $key = "$nr,$nc"
             # Body collision (excluding tail which will move).
             next if exists $snake_set{$key} && !($nr == $snake[0]->[0] && $nc == $snake[0]->[1])
-            my $d2 = abs($nr - $fruit->[0]) + abs($nc - $fruit->[1])
+            val $d2 = abs($nr - $fruit->[0]) + abs($nc - $fruit->[1])
             if ($d2 < $best_dist) {
                 $best_dist = $d2
                 $best_dir = $d
             }
         }
         last unless defined $best_dir   # stuck
-        my $nr = $head->[0] + $best_dir->[0]
-        my $nc = $head->[1] + $best_dir->[1]
+        val $nr = $head->[0] + $best_dir->[0]
+        val $nc = $head->[1] + $best_dir->[1]
         push @snake, [$nr, $nc]
         $snake_set{"$nr,$nc"} = 1
         # Did we eat the fruit?
@@ -67,7 +67,7 @@ fn Demo::Snake::play_one() {
             $fruit = Demo::Snake::random_empty_cell(\%snake_set)
         } else {
             # Move tail.
-            my $tail = shift @snake
+            val $tail = shift @snake
             delete $snake_set{$tail->[0] . "," . $tail->[1]}
         }
     }
@@ -77,24 +77,24 @@ fn Demo::Snake::play_one() {
 # ── render snake on grid ───────────────────────────────────────────
 
 fn Demo::Snake::render($snake, $fruit) {
-    my @grid
-    for my $r (0:$H - 1) {
+    var @grid
+    for val $r (0:$H - 1) {
         $grid[$r] = []
-        for my $c (0:$W - 1) {
+        for val $c (0:$W - 1) {
             $grid[$r]->[$c] = "."
         }
     }
     # Body.
-    for my $seg (@$snake) {
+    for val $seg (@$snake) {
         $grid[$seg->[0]]->[$seg->[1]] = "o"
     }
     # Head.
-    my $head = $snake->[-1]
+    val $head = $snake->[-1]
     $grid[$head->[0]]->[$head->[1]] = "O"
     # Fruit.
     $grid[$fruit->[0]]->[$fruit->[1]] = "*"
-    my @lines
-    for my $r (0:$H - 1) {
+    var @lines
+    for val $r (0:$H - 1) {
         push @lines, join("", @{$grid[$r]})
     }
     \@lines
@@ -102,16 +102,16 @@ fn Demo::Snake::render($snake, $fruit) {
 
 # ── run N games ─────────────────────────────────────────────────────
 
-my $N = 50
-my $td_score = t_digest(100)
-my $tk_scores = topk(5)
-my $hll_scores = hll(14)
+val $N = 50
+val $td_score = t_digest(100)
+val $tk_scores = topk(5)
+val $hll_scores = hll(14)
 
 printf "── simulating %d games ─────────────────────────────────\n", $N
-my $total_score = 0
-my $max_score = 0
-for my $i (1:$N) {
-    my $r = Demo::Snake::play_one()
+var $total_score = 0
+var $max_score = 0
+for val $i (1:$N) {
+    val $r = Demo::Snake::play_one()
     $total_score = $total_score + $r->{score}
     $max_score = $r->{score} if $r->{score} > $max_score
     td_add($td_score, $r->{score})
@@ -134,8 +134,8 @@ printf "  mean : %.2f\n", $total_score / $N
 
 p ""
 p "── most-common score buckets (TopK) ─────────────────"
-my @hits = topk_top($tk_scores)
-for my $h (@hits) {
+val @hits = topk_top($tk_scores)
+for val $h (@hits) {
     printf "  %-10s : %d games\n", $h->[0], $h->[1]
 }
 
@@ -149,9 +149,9 @@ printf "  HLL : %d\n", hll_count($hll_scores)
 
 p ""
 p "── sample frame of one game ─────────────────────────"
-my @snake = ([5, 5], [5, 6], [5, 7], [6, 7], [7, 7], [7, 8], [7, 9])
-my $fruit = [10, 10]
-my $frame = Demo::Snake::render(\@snake, $fruit)
-for my $line (@$frame) { p "  $line" }
+val @snake = ([5, 5], [5, 6], [5, 7], [6, 7], [7, 7], [7, 8], [7, 9])
+val $fruit = [10, 10]
+val $frame = Demo::Snake::render(\@snake, $fruit)
+for val $line (@$frame) { p "  $line" }
 p ""
 p "  Legend: O=head, o=body, *=fruit, .=empty"

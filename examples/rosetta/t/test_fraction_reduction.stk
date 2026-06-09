@@ -2,19 +2,19 @@
 # Rosetta Code: Fraction reduction
 
 fn Rosetta::FractionReduction::reduce($num, $den) {
-    my $g = gcd($num, $den)
+    val $g = gcd($num, $den)
     [$num / $g, $den / $g]
 }
 
-my $res = Rosetta::FractionReduction::reduce(4, 8)
+val $res = Rosetta::FractionReduction::reduce(4, 8)
 assert_eq $res->[0], 1, "4/8 -> 1/2 (num)"
 assert_eq $res->[1], 2, "4/8 -> 1/2 (den)"
 
-my $res2 = Rosetta::FractionReduction::reduce(120, 160)
+val $res2 = Rosetta::FractionReduction::reduce(120, 160)
 assert_eq $res2->[0], 3, "120/160 -> 3/4 (num)"
 assert_eq $res2->[1], 4, "120/160 -> 3/4 (den)"
 
-my $res_pipe = Rosetta::FractionReduction::reduce(120, 160)
+val $res_pipe = Rosetta::FractionReduction::reduce(120, 160)
 assert_eq "$res_pipe->[0]/$res_pipe->[1]", "3/4", "pipe reduce fraction"
 
 test_run

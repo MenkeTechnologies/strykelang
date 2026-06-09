@@ -2,12 +2,12 @@
 # Rosetta Code: Chinese zodiac
 
 fn Rosetta::ChineseZodiac::animal($year) {
-    my @animals = ("Rat","Ox","Tiger","Rabbit","Dragon","Snake","Horse","Goat","Monkey","Rooster","Dog","Pig")
+    val @animals = ("Rat","Ox","Tiger","Rabbit","Dragon","Snake","Horse","Goat","Monkey","Rooster","Dog","Pig")
     $animals[($year - 4) % 12]
 }
 
 fn Rosetta::ChineseZodiac::element($year) {
-    my @elements = ("Wood","Fire","Earth","Metal","Water")
+    val @elements = ("Wood","Fire","Earth","Metal","Water")
     $elements[(int(($year - 4) / 2)) % 5]
 }
 

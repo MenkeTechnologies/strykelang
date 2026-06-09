@@ -8,13 +8,13 @@ fn Rosetta::VarSizeSet::resize_array($ary, $size, $fill) {
 }
 
 fn Rosetta::VarSizeSet::resize_string($text, $size, $fill) {
-    my @chars = split //, $text
+    var @chars = split //, $text
     while (len(@chars) < $size) { push @chars, $fill }
     while (len(@chars) > $size) { pop @chars }
     join("", @chars)
 }
 
-my @vals = (1, 2)
+val @vals = (1, 2)
 Rosetta::VarSizeSet::resize_array(\@vals, 5, 9)
 assert_eq join(",", @vals), "1,2,9,9,9", "array grows with fill value"
 Rosetta::VarSizeSet::resize_array(\@vals, 3, 0)

@@ -2,20 +2,20 @@
 # Rosetta Code: Self numbers
 
 fn Rosetta::SelfNumbers::sum_digits($n) {
-    my $sum = 0
-    my @digits = str($n) |> chars
-    for my $d (@digits) {
+    var $sum = 0
+    val @digits = str($n) |> chars
+    for val $d (@digits) {
         $sum = $sum + int($d)
     }
     $sum
 }
 
 fn Rosetta::SelfNumbers::check($n) {
-    my $found = 0
+    var $found = 0
     # A candidate m must be less than n
-    my $start = $n - 100
+    var $start = $n - 100
     if ($start < 1) { $start = 1 }
-    for my $m ($start:$n-1) {
+    for val $m ($start:$n-1) {
         if ($m + Rosetta::SelfNumbers::sum_digits($m) == $n) {
             $found = 1
             return 0

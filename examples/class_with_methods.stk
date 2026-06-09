@@ -32,7 +32,7 @@ class Account {
     }
 }
 
-my $acct = Account->new(holder => "alice", balance => 250.00)
+val $acct = Account->new(holder => "alice", balance => 250.00)
 p "  initial: ", $acct->statement()
 
 $acct->deposit(50.00)
@@ -42,7 +42,7 @@ $acct->withdraw(80.00)
 p "  -80:     ", $acct->statement()
 
 # Try a withdrawal beyond the overdraft limit.
-my $denied = $acct->withdraw(500.00)
+val $denied = $acct->withdraw(500.00)
 p "  denied?  ", defined($denied) ? "no" : "yes"
 p "  final:   ", $acct->statement()
 
@@ -58,6 +58,6 @@ p "── refactoring + linter playground ────────────�
 #   - inside a method, $self->blance       # → no field/method `blance`
 #
 # Try uncommenting:
-# my $typo = Account->new(holdr => "bob", balance => 0.0)
+# val $typo = Account->new(holdr => "bob", balance => 0.0)
 
 p "── done ──────────────────────────────────────────────────"

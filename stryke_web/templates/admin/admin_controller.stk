@@ -13,16 +13,16 @@ class AdminController extends ApplicationController {
     }
 
     fn table {
-        my $name = web_params()->{table}
-        my $allowed = 0
-        for my $t (@{ AdminController::tables() }) { $allowed = 1 if $t eq $name }
+        val $name = web_params()->{table}
+        var $allowed = 0
+        for val $t (@{ AdminController::tables() }) { $allowed = 1 if $t eq $name }
         unless ($allowed) {
             web_flash_set("alert", "unknown table: $name")
             web_redirect("/admin")
             return
         }
-        my $rows = web_db_query("SELECT * FROM $name ORDER BY id DESC LIMIT 50")
-        my $count = (web_db_query("SELECT count(*) AS c FROM $name"))->[0]->{c}
+        val $rows = web_db_query("SELECT * FROM $name ORDER BY id DESC LIMIT 50")
+        val $count = (web_db_query("SELECT count(*) AS c FROM $name"))->[0]->{c}
         web_render(
             template => "admin/table",
             locals => +{

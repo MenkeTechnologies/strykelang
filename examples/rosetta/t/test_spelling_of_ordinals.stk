@@ -2,20 +2,20 @@
 # Rosetta Code: Spelling of ordinal numbers (irregular suffix rules + general "th")
 
 fn Rosetta::Ordinal::cardinal_under_hundred($n) {
-    my @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    val @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                  "ten", "eleven", "twelve", "thirteen", "fourteen",
                  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
-    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    val @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
     return $units[$n] if $n < 20
-    my $t = $tens[int($n / 10)]
-    my $u = $n % 10
+    val $t = $tens[int($n / 10)]
+    val $u = $n % 10
     return $t if $u == 0
     "$t-$units[$u]"
 }
 
 fn Rosetta::Ordinal::say($n) {
     # Irregular ordinals
-    my %irreg = (
+    val %irreg = (
         "one"    => "first",
         "two"    => "second",
         "three"  => "third",
@@ -25,11 +25,11 @@ fn Rosetta::Ordinal::say($n) {
         "twelve" => "twelfth"
     )
     if ($n < 100) {
-        my $card = Rosetta::Ordinal::cardinal_under_hundred($n)
+        val $card = Rosetta::Ordinal::cardinal_under_hundred($n)
         # If trailing word is irregular, replace it
         if ($card =~ /-/) {
-            my @parts = split /-/, $card
-            my $last = $parts[-1]
+            var @parts = split /-/, $card
+            val $last = $parts[-1]
             if (exists $irreg{$last}) {
                 $parts[-1] = $irreg{$last}
             } else {
@@ -45,11 +45,11 @@ fn Rosetta::Ordinal::say($n) {
     if ($n == 1000)    { return "one thousandth" }
     if ($n == 1000000) { return "one millionth" }
     # Compound: take cardinal "X hundred Y" -> spell ordinal of Y or hundredth
-    my $h = int($n / 100)
-    my $rest = $n % 100
+    val $h = int($n / 100)
+    val $rest = $n % 100
     if ($n < 1000) {
-        my $head = "" . $h . "00"  # placeholder
-        my $head_card = Rosetta::Ordinal::cardinal_under_hundred($h)
+        val $head = "" . $h . "00"  # placeholder
+        val $head_card = Rosetta::Ordinal::cardinal_under_hundred($h)
         if ($rest == 0) {
             return "$head_card hundredth"
         }
@@ -60,7 +60,7 @@ fn Rosetta::Ordinal::say($n) {
 
 fn Rosetta::Ordinal::th_form($word) {
     if ($word =~ /y$/) {
-        my $stem = $word
+        var $stem = $word
         $stem =~ s/y$/ie/
         return $stem . "th"
     }

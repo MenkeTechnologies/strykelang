@@ -5,29 +5,29 @@ package FFT
 fn c_add($u, $v) { [ $u->[0] + $v->[0], $u->[1] + $v->[1] ] }
 fn c_sub($u, $v) { [ $u->[0] - $v->[0], $u->[1] - $v->[1] ] }
 fn c_mul($u, $v) {
-    my $r = $u->[0] * $v->[0] - $u->[1] * $v->[1]
-    my $i = $u->[0] * $v->[1] + $u->[1] * $v->[0]
+    val $r = $u->[0] * $v->[0] - $u->[1] * $v->[1]
+    val $i = $u->[0] * $v->[1] + $u->[1] * $v->[0]
     [ $r, $i ]
 }
 fn c_exp($theta) { [ cos($theta), sin($theta) ] }
 
 fn transform($x) {
-    my $n = len @$x
+    val $n = len @$x
     return $x if $n <= 1
-    my @even; my @odd
-    for (my $i = 0; $i < $n; $i += 2) {
+    var @even; var @odd
+    for (var $i = 0; $i < $n; $i += 2) {
         push @even, $x->[$i]; push @odd, $x->[$i + 1]
     }
-    my $even_fft = FFT::transform(\@even)
-    my $odd_fft  = FFT::transform(\@odd)
-    my @res
-    for (my $i = 0; $i < $n; $i++) { push @res, [0.0, 0.0] }
-    my $half = int($n / 2)
-    my $pi = 3.14159265358979323846
-    for (my $k = 0; $k < $half; $k++) {
-        my $theta = -2.0 * $pi * $k / $n
-        my $t = FFT::c_exp($theta)
-        my $term = FFT::c_mul($t, $odd_fft->[$k])
+    val $even_fft = FFT::transform(\@even)
+    val $odd_fft  = FFT::transform(\@odd)
+    var @res
+    for (var $i = 0; $i < $n; $i++) { push @res, [0.0, 0.0] }
+    val $half = int($n / 2)
+    val $pi = 3.14159265358979323846
+    for (var $k = 0; $k < $half; $k++) {
+        val $theta = -2.0 * $pi * $k / $n
+        val $t = FFT::c_exp($theta)
+        val $term = FFT::c_mul($t, $odd_fft->[$k])
         $res[$k] = FFT::c_add($even_fft->[$k], $term)
         $res[$k + $half] = FFT::c_sub($even_fft->[$k], $term)
     }
@@ -35,25 +35,25 @@ fn transform($x) {
 }
 
 fn inverse_transform($x) {
-    my $n = len @$x; my @conj
-    for my $c (@$x) { push @conj, [ $c->[0], -$c->[1] ] }
-    my $t_res = FFT::transform(\@conj); my @res
-    for my $c (@$t_res) { push @res, [ $c->[0] / $n, -$c->[1] / $n ] }
+    val $n = len @$x; var @conj
+    for val $c (@$x) { push @conj, [ $c->[0], -$c->[1] ] }
+    val $t_res = FFT::transform(\@conj); var @res
+    for val $c (@$t_res) { push @res, [ $c->[0] / $n, -$c->[1] / $n ] }
     \@res
 }
 
 package main
 
 # --- Basic E2E ---
-my @poly = ( [1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0] )
-my $fft_res = FFT::transform(\@poly)
-my $ifft_res = FFT::inverse_transform($fft_res)
+val @poly = ( [1.0, 0.0], [2.0, 0.0], [3.0, 0.0], [4.0, 0.0] )
+val $fft_res = FFT::transform(\@poly)
+val $ifft_res = FFT::inverse_transform($fft_res)
 
 # Validate roundtrip
-my $ok = 1
-for my $i (0 : 3) {
-    my $orig = $poly[$i]->[0]
-    my $inv = $ifft_res->[$i]->[0]
+var $ok = 1
+for val $i (0 : 3) {
+    val $orig = $poly[$i]->[0]
+    val $inv = $ifft_res->[$i]->[0]
     if (abs($orig - $inv) > 1e-6) { $ok = 0 }
 }
 $ok |> aeq 1, "FFT roundtrip matches original"

@@ -2,7 +2,7 @@
 # Rosetta Code: Greatest Common Divisor
 
 fn Rosetta::GCD::compute($a, $b) {
-    my $aa = $a; my $bb = $b
+    var $aa = $a; var $bb = $b
     while ($bb != 0) {
         ($aa, $bb) = ($bb, $aa % $bb)
     }
@@ -12,7 +12,7 @@ fn Rosetta::GCD::compute($a, $b) {
 # gcd of multiple numbers
 fn Rosetta::GCD::multi(@nums) {
     if (len(@nums) == 0) { return 0 }
-    my $res = shift @nums
+    var $res = shift @nums
     ~> @nums ep {
         $res = Rosetta::GCD::compute($res, _)
     }
@@ -26,8 +26,8 @@ assert_eq Rosetta::GCD::multi(12, 18, 24), 6, "gcd_multi(12, 18, 24)"
 
 # Use pipe and threading
 12 |> Rosetta::GCD::compute(18) |> assert_eq(6, "pipe gcd")
-my $args = [12, 18, 24]
-my $res = Rosetta::GCD::multi(@$args)
+val $args = [12, 18, 24]
+val $res = Rosetta::GCD::multi(@$args)
 assert_eq $res, 6, "manual check"
 
 test_run

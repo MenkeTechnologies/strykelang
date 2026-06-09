@@ -3,7 +3,7 @@
 # Given a partial puzzle hash, fill in derivable fields.
 # Inputs may include: pieces, rows, columns, format, aspect_ratio, border, inside.
 fn Exercism::JigsawPuzzle::fill {
-    my %pz = %{_}
+    var %pz = %{_}
     # pieces = rows * columns (or vice versa).
     if (defined $pz{rows} && defined $pz{columns} && !defined $pz{pieces}) {
         $pz{pieces} = $pz{rows} * $pz{columns}

@@ -17,21 +17,21 @@
 #      stryke --no-interop examples/levenshtein_no_interop.stk kitten sitting
 
 fn Lev::dist($s1, $s2) {
-    my @ac = split(//, $s1)
-    my @bc = split(//, $s2)
-    my $m  = len(@ac)
-    my $n  = len(@bc)
+    val @ac = split(//, $s1)
+    val @bc = split(//, $s2)
+    val $m  = len(@ac)
+    val $n  = len(@bc)
     return $n if $m == 0
     return $m if $n == 0
 
     # @prev = previous row (D[i-1][*]); @curr = current row (D[i][*]).
-    my @prev = (0:$n)        # D[0][j] = j (j inserts to get from "" to b[0..j-1])
-    my @curr = (0) x ($n + 1)
+    var @prev = (0:$n)        # D[0][j] = j (j inserts to get from "" to b[0..j-1])
+    var @curr = (0) x ($n + 1)
 
-    for my $i (1:$m) {
+    for val $i (1:$m) {
         $curr[0] = $i        # D[i][0] = i (i deletes)
-        for my $j (1:$n) {
-            my $cost = $ac[$i - 1] eq $bc[$j - 1] ? 0 : 1
+        for val $j (1:$n) {
+            val $cost = $ac[$i - 1] eq $bc[$j - 1] ? 0 : 1
             $curr[$j] = min(
                 $prev[$j]     + 1,        # deletion
                 $curr[$j - 1] + 1,        # insertion
@@ -49,7 +49,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo table — known distances from the literature.
-my @cases = (
+val @cases = (
     +{ a => "",        b => "",        d => 0 },
     +{ a => "abc",     b => "abc",     d => 0 },
     +{ a => "kitten",  b => "sitting", d => 3 },  # classic example
@@ -63,10 +63,10 @@ my @cases = (
 )
 
 p "── Levenshtein edit-distance demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Lev::dist($c->{a}, $c->{b})
-    my $ok  = ($got == $c->{d})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Lev::dist($c->{a}, $c->{b})
+    val $ok  = ($got == $c->{d})
     $fail++ unless $ok
     printf "  d(%-10s , %-10s) = %d  expect %d  %s\n",
         "\"" . $c->{a} . "\"", "\"" . $c->{b} . "\"",

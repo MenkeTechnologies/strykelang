@@ -8,12 +8,12 @@
 
 fn Rosetta::WordWheel::valid($word, $wheel, $centre, $min_len) {
     return 0 if length($word) < $min_len
-    my $w = lc($word)
+    val $w = lc($word)
     return 0 if index($w, lc($centre)) < 0
-    my %avail
-    for my $c (split //, lc($wheel)) { $avail{$c}++ }
-    my %used
-    for my $c (split //, $w) {
+    var %avail
+    for val $c (split //, lc($wheel)) { $avail{$c}++ }
+    var %used
+    for val $c (split //, $w) {
         $used{$c}++
         return 0 if !exists $avail{$c}
         return 0 if $used{$c} > $avail{$c}
@@ -22,25 +22,25 @@ fn Rosetta::WordWheel::valid($word, $wheel, $centre, $min_len) {
 }
 
 fn Rosetta::WordWheel::solve($wheel, $centre, $min_len, $words) {
-    my @hits
-    for my $w (@$words) {
+    var @hits
+    for val $w (@$words) {
         push @hits, $w if Rosetta::WordWheel::valid($w, $wheel, $centre, $min_len)
     }
     @hits
 }
 
 # Rosetta sample wheel: ADGEYNNII with centre N (3+ letters)
-my @dict = ("aided", "annoy", "danny", "deign", "denied", "denying", "engine",
+val @dict = ("aided", "annoy", "danny", "deign", "denied", "denying", "engine",
             "ennui", "deny", "agni", "aging", "danny",
             "say", "and", "die", "dying", "eden", "edged",
             "indy", "needing", "nanny", "needy",
             "eye", "any")
 
-my @hits = Rosetta::WordWheel::solve("ADGEYNNII", "N", 3, \@dict)
-my %h = map { _ => 1 } @hits
+val @hits = Rosetta::WordWheel::solve("ADGEYNNII", "N", 3, \@dict)
+val %h = map { _ => 1 } @hits
 
 # These should be present (use only available letters and contain N):
-for my $w ("annoy", "denying", "denied", "ennui", "engine", "indy", "nanny", "needy") {
+for val $w ("annoy", "denying", "denied", "ennui", "engine", "indy", "nanny", "needy") {
     next if !exists $h{$w}
     assert_ok 1, sprintf("%s included", $w)
 }

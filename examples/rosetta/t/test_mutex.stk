@@ -13,7 +13,7 @@ fn Rosetta::Mutex::demo() {
     $counter
 }
 
-my $count = Rosetta::Mutex::demo()
+val $count = Rosetta::Mutex::demo()
 p "COUNT: $count"
 assert_eq $count, 5, "Mutex (mysync) shared counter works correctly"
 

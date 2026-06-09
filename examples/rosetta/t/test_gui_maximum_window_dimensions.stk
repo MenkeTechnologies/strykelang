@@ -2,14 +2,14 @@
 # Rosetta Code: GUI/Maximum window dimensions
 
 fn Rosetta::GUIMax::clamp($screen, $request) {
-    my $w = $request->{width} > $screen->{width} ? $screen->{width} : $request->{width}
-    my $h = $request->{height} > $screen->{height} ? $screen->{height} : $request->{height}
+    val $w = $request->{width} > $screen->{width} ? $screen->{width} : $request->{width}
+    val $h = $request->{height} > $screen->{height} ? $screen->{height} : $request->{height}
     { width => $w, height => $h }
 }
 
-my $screen = { width => 1920, height => 1080 }
-my $full = Rosetta::GUIMax::clamp($screen, { width => 2400, height => 1400 })
-my $small = Rosetta::GUIMax::clamp($screen, { width => 800, height => 600 })
+val $screen = { width => 1920, height => 1080 }
+val $full = Rosetta::GUIMax::clamp($screen, { width => 2400, height => 1400 })
+val $small = Rosetta::GUIMax::clamp($screen, { width => 800, height => 600 })
 
 assert_eq "$full->{width}x$full->{height}", "1920x1080", "oversized window is clamped to screen"
 assert_eq "$small->{width}x$small->{height}", "800x600", "smaller window remains unchanged"

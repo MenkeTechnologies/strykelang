@@ -16,7 +16,7 @@ class Qubit impl Cloneable {
     beta: Float = 0.0
     
     fn collapse {
-        my $prob_zero = $self->alpha ** 2
+        val $prob_zero = $self->alpha ** 2
         return rand() < $prob_zero ? 0 : 1
     }
     
@@ -33,8 +33,8 @@ class QuantumNode extends DocumentNode {
     }
     
     fn resonance {
-        my $sum = 0
-        for my $q (@{$self->qubits}) { $sum += $q->alpha }
+        var $sum = 0
+        for val $q (@{$self->qubits}) { $sum += $q->alpha }
         $sum / (len(@{$self->qubits}) || 1)
     }
 }
@@ -49,8 +49,8 @@ class NeuralQuantumLink extends QuantumNode {
     }
     
     fn total_connectivity {
-        my $total = 0
-        for my $val (values %{$self->synapses}) { $total += $val }
+        var $total = 0
+        for val $val (values %{$self->synapses}) { $total += $val }
         $total * $self->resonance()
     }
 }
@@ -60,7 +60,7 @@ class NeuralQuantumLink extends QuantumNode {
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Create a curried validator for "cyber-threats"
-my $threat_validator = fn($threshold) {
+val $threat_validator = fn($threshold) {
     fn($threat_level) {
         fn($node_type) {
             $threat_level > $threshold && $node_type eq "QuantumNode"
@@ -68,15 +68,15 @@ my $threat_validator = fn($threshold) {
     }
 }
 
-my $high_threat_quantum = $threat_validator(0.8)
-my $is_critical_quantum = $high_threat_quantum(0.95)
+val $high_threat_quantum = $threat_validator(0.8)
+val $is_critical_quantum = $high_threat_quantum(0.95)
 
 # Pipeline of transformations
-my $sanitize = fn($s) { $s =~ s/[^a-zA-Z0-9]//gr }
-my $wrap = fn($s) { "[RECON] $s" }
-my $colorize = fn($s) { "\x1b[32m$s\x1b[0m" }
+val $sanitize = fn($s) { $s =~ s/[^a-zA-Z0-9]//gr }
+val $wrap = fn($s) { "[RECON] $s" }
+val $colorize = fn($s) { "\x1b[32m$s\x1b[0m" }
 
-my $recon_logger = Project::PipelineAdvanced::pipe_all($sanitize, $wrap, $colorize)
+val $recon_logger = Project::PipelineAdvanced::pipe_all($sanitize, $wrap, $colorize)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. MASSIVE DATA GENERATION & PARALLEL PROCESSING
@@ -84,9 +84,9 @@ my $recon_logger = Project::PipelineAdvanced::pipe_all($sanitize, $wrap, $colori
 
 p "Initializing Quantum Neural Grid..."
 
-my @input_range = (1:100);
-my @grid_nodes = @input_range |> pmap {
-    my $node = NeuralQuantumLink(id => _)
+val @input_range = (1:100);
+val @grid_nodes = @input_range |> pmap {
+    val $node = NeuralQuantumLink(id => _)
     for (1:5) {
         $node->add_qubit(Qubit(alpha => rand(), beta => rand()))
     }
@@ -101,7 +101,7 @@ p "Grid initialized with ", len(@grid_nodes), " nodes."
 
 # Parallel analysis of connectivity and resonance
 p "Running parallel resonance calibration..."
-my @resonance_scores = @grid_nodes |> pmap {
+val @resonance_scores = @grid_nodes |> pmap {
     { id => _->id, score => _->total_connectivity() }
 } |> psort { $b->{score} <=> $a->{score} };
 
@@ -110,7 +110,7 @@ my @resonance_scores = @grid_nodes |> pmap {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::QuantumCyberRecon::build_quantum_tree($depth, $branching) {
-    my $root = QuantumNode(id => int(rand(100000)))
+    val $root = QuantumNode(id => int(rand(100000)))
     if ($depth > 0) {
         for (1:$branching) {
             $root->add_child(Project::QuantumCyberRecon::build_quantum_tree($depth - 1, $branching))
@@ -120,10 +120,10 @@ fn Project::QuantumCyberRecon::build_quantum_tree($depth, $branching) {
 }
 
 p "Constructing deep quantum recursive tree (depth 4)..."
-my $qtree = Project::QuantumCyberRecon::build_quantum_tree(4, 3);
+val $qtree = Project::QuantumCyberRecon::build_quantum_tree(4, 3);
 p "Tree depth: ", $qtree->depth(), ", Total nodes: ", $qtree->node_count()
 # Recursive visitor to find high-resonance sectors
-my $sectors = []
+val $sectors = []
 $qtree->traverse(fn($node) {
     # Check if it has the resonance method
     if ($node->can("resonance") && $node->resonance() > 0.7) {
@@ -139,13 +139,13 @@ p "High resonance sectors found: " . len(@$sectors) . ""
 
 p "Executing Final Recon Pipeline..."
 
-my $final_report = (1:500)
+val $final_report = (1:500)
     |> pmap { _ * rand() }                       # Random noise
     |> pgrep { _ > 250 }                         # Filter peaks
     |> chunk(10)                                  # Group them
     |> pmap {                                     # Aggregate chunks
-        my $sum = 0
-        for my $x (@{_}) { $sum += $x }
+        var $sum = 0
+        for val $x (@{_}) { $sum += $x }
         $sum / (len(@{_}) || 1)
     }
     |> psort { $b <=> $a }                        # Sort descending
@@ -155,7 +155,7 @@ my $final_report = (1:500)
 p "Intensity Signature: $final_report"
 
 # Integration test with builtins
-my $sys = Project::Scanner::scan_system()
+val $sys = Project::Scanner::scan_system()
 p $recon_logger("SYSTEM RECON COMPLETE: " . ($sys->{hostname} // "localhost") . " (" . ($sys->{os} // "unknown") . ")") . ""
 
 # Closure with state
@@ -164,7 +164,7 @@ fn Project::QuantumCyberRecon::make_counter {
     fn { ++$c }
 }
 
-my $tick = Project::QuantumCyberRecon::make_counter()
+val $tick = Project::QuantumCyberRecon::make_counter()
 p "T-Minus: " . $tick() . "... " . $tick() . "... " . $tick() . " LAUNCH."
 
 # Final complex verification

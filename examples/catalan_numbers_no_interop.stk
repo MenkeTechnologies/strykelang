@@ -17,10 +17,10 @@
 
 # DP using the convolution recurrence.
 fn Cat::dp($n) {
-    my @c = (1)
-    for my $i (1:$n) {
-        my $sum = 0
-        for my $j (0:$i - 1) { $sum += $c[$j] * $c[$i - 1 - $j] }
+    var @c = (1)
+    for val $i (1:$n) {
+        var $sum = 0
+        for val $j (0:$i - 1) { $sum += $c[$j] * $c[$i - 1 - $j] }
         push @c, $sum
     }
     $c[$n]
@@ -29,8 +29,8 @@ fn Cat::dp($n) {
 # Closed form via ratio recurrence: C(n+1) = C(n) * 2(2n+1)/(n+2).
 # Avoids computing huge factorials.
 fn Cat::ratio($n) {
-    my $c = 1
-    for my $i (0:$n - 1) {
+    var $c = 1
+    for val $i (0:$n - 1) {
         $c = int($c * 2 * (2 * $i + 1) / ($i + 2))
     }
     $c
@@ -44,7 +44,7 @@ fn Cat::count_balanced($n) {
 
 fn Cat::balanced_inner($s, $open, $close, $n) {
     return 1 if len($s) == 2 * $n
-    my $count = 0
+    var $count = 0
     if ($open < $n) {
         $count += Cat::balanced_inner($s . "(", $open + 1, $close, $n)
     }
@@ -57,20 +57,20 @@ fn Cat::balanced_inner($s, $open, $close, $n) {
 p "── Catalan numbers demo ──"
 
 # OEIS A000108: 1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012
-my @expected = (1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012)
-my $fail = 0
-for my $n (0:len(@expected) - 1) {
-    my $dp  = Cat::dp($n)
-    my $rat = Cat::ratio($n)
-    my $ok  = $dp == $expected[$n] && $rat == $expected[$n]
+val @expected = (1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012)
+var $fail = 0
+for var $n (0:len(@expected) - 1) {
+    val $dp  = Cat::dp($n)
+    val $rat = Cat::ratio($n)
+    val $ok  = $dp == $expected[$n] && $rat == $expected[$n]
     $fail++ unless $ok
     p "  C(#{$n}) = #{$dp} (dp) / #{$rat} (ratio)  expect #{$expected[$n]}  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "$fail / #{len @expected} Catalan cases failed" if $fail > 0
 
 # Cross-check via brute balanced-paren enumeration for small n.
-for my $n (0:6) {
-    my $brute = Cat::count_balanced($n)
+for val $n (0:6) {
+    val $brute = Cat::count_balanced($n)
     die "balanced-paren count != C($n)" unless $brute == $expected[$n]
 }
 p "  balanced-paren enumeration matches Catalan for n = 0..6  OK"
@@ -79,7 +79,7 @@ p "  balanced-paren enumeration matches Catalan for n = 0..6  OK"
 #   * C(n) > 0 for all n >= 0
 #   * Monotonic: C(n+1) >= C(n) for n >= 1
 #   * Ratio formula equals DP for all tested n
-for my $n (0:len(@expected) - 2) {
+for val $n (0:len(@expected) - 2) {
     next if $n == 0   # C(0) = C(1) = 1
     die "non-monotone at n=$n" if Cat::dp($n + 1) < Cat::dp($n)
 }

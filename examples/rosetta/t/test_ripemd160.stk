@@ -5,8 +5,8 @@ fn Rosetta::RIPEMD160::hash($text) {
     ripemd160($text)
 }
 
-my $input = "Rosetta Code"
-my $hash = Rosetta::RIPEMD160::hash($input)
+val $input = "Rosetta Code"
+val $hash = Rosetta::RIPEMD160::hash($input)
 
 # Known RIPEMD-160 for "Rosetta Code":
 # b3be159860842cebaa7174c8fff0aa9e50a5199f

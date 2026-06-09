@@ -2,11 +2,11 @@
 # Rosetta Code: Strobogrammatic numbers
 
 fn Rosetta::Strobogrammatic::is_strobogrammatic($n) {
-    my $s = "$n"
-    my @chars = chars($s)
-    my $res_s = ""
-    my $valid = 1
-    for my $c (@chars) {
+    val $s = "$n"
+    val @chars = chars($s)
+    var $res_s = ""
+    var $valid = 1
+    for val $c (@chars) {
         if ($c eq "0") { $res_s = "0" . $res_s }
         elsif ($c eq "1") { $res_s = "1" . $res_s }
         elsif ($c eq "6") { $res_s = "9" . $res_s }
@@ -14,7 +14,7 @@ fn Rosetta::Strobogrammatic::is_strobogrammatic($n) {
         elsif ($c eq "9") { $res_s = "6" . $res_s }
         else { $valid = 0 }
     }
-    my $final = 0
+    var $final = 0
     if ($valid) {
         if ($res_s eq $s) {
             $final = 1

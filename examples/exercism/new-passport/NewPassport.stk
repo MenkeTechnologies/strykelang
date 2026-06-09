@@ -6,7 +6,7 @@
 fn Exercism::NewPassport::get_new_passport($now, $birthday, $form) {
     return ["error", "no name"]               unless defined($form) && len($form) > 0
     return ["error", "birthday in the future"] if $birthday >= $now
-    my $age_years = int(($now - $birthday) / (365 * 86400))
+    val $age_years = int(($now - $birthday) / (365 * 86400))
     return ["error", "underage"]              if $age_years < 18
     ["ok", "PASS-#{$form}-#{$age_years}"]
 }

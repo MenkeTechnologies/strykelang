@@ -2,15 +2,15 @@
 # Rosetta Code: Spinning rod animation/Text
 
 fn Rosetta::Rod::frames($count) {
-    my @cycle = ("|", "/", "-", "\\")
-    my @out
-    for my $i (0:$count - 1) {
+    val @cycle = ("|", "/", "-", "\\")
+    var @out
+    for val $i (0:$count - 1) {
         push @out, $cycle[$i % 4]
     }
     \@out
 }
 
-my $frames = Rosetta::Rod::frames(8)
+val $frames = Rosetta::Rod::frames(8)
 
 assert_eq join("", @$frames), "|/-\\|/-\\", "rod cycles through four orientations"
 assert_eq $frames->[0], "|", "first frame is vertical"

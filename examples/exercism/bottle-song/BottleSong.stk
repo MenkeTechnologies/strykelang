@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
-my @_NUM = ("No","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten")
+val @_NUM = ("No","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten")
 
 fn Exercism::BottleSong::_word = $_NUM[_] // "$_"
 
 fn Exercism::BottleSong::recite($args) {
-    my $start  = $args->{start_bottles}
-    my $verses = $args->{take_down} // 1
-    my @out
-    for my $i (0:$verses - 1) {
-        my $n  = $start - $i
-        my $w  = $n == 1 ? "bottle"  : "bottles"
-        my $nn = $n - 1
-        my $wn = $nn == 1 ? "bottle" : "bottles"
-        my $line1 = Exercism::BottleSong::_word($n)  . " green $w hanging on the wall,"
-        my $line3 = "And if one green bottle should accidentally fall,"
-        my $next  = $nn == 0 ? "no green bottles" : Exercism::BottleSong::_word($nn) . " green $wn"
-        my $line4 = "There'll be $next hanging on the wall."
+    val $start  = $args->{start_bottles}
+    val $verses = $args->{take_down} // 1
+    var @out
+    for val $i (0:$verses - 1) {
+        val $n  = $start - $i
+        val $w  = $n == 1 ? "bottle"  : "bottles"
+        val $nn = $n - 1
+        val $wn = $nn == 1 ? "bottle" : "bottles"
+        val $line1 = Exercism::BottleSong::_word($n)  . " green $w hanging on the wall,"
+        val $line3 = "And if one green bottle should accidentally fall,"
+        val $next  = $nn == 0 ? "no green bottles" : Exercism::BottleSong::_word($nn) . " green $wn"
+        val $line4 = "There'll be $next hanging on the wall."
         push @out, "$line1\n$line1\n$line3\n$line4"
     }
     join("\n\n", @out)

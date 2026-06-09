@@ -3,20 +3,20 @@
 
 fn Rosetta::Easter::compute($year) {
     # Meeus/Jones/Butcher algorithm
-    my $a = $year % 19
-    my $b = int($year / 100)
-    my $c = $year % 100
-    my $d = int($b / 4)
-    my $e = $b % 4
-    my $f = int(($b + 8) / 25)
-    my $g = int(($b - $f + 1) / 3)
-    my $h = (19 * $a + $b - $d - $g + 15) % 30
-    my $i = int($c / 4)
-    my $k = $c % 4
-    my $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7
-    my $m = int(($a + 11 * $h + 22 * $l) / 451)
-    my $month = int(($h + $l - 7 * $m + 114) / 31)
-    my $day = (($h + $l - 7 * $m + 114) % 31) + 1
+    val $a = $year % 19
+    val $b = int($year / 100)
+    val $c = $year % 100
+    val $d = int($b / 4)
+    val $e = $b % 4
+    val $f = int(($b + 8) / 25)
+    val $g = int(($b - $f + 1) / 3)
+    val $h = (19 * $a + $b - $d - $g + 15) % 30
+    val $i = int($c / 4)
+    val $k = $c % 4
+    val $l = (32 + 2 * $e + 2 * $i - $h - $k) % 7
+    val $m = int(($a + 11 * $h + 22 * $l) / 451)
+    val $month = int(($h + $l - 7 * $m + 114) / 31)
+    val $day = (($h + $l - 7 * $m + 114) % 31) + 1
     
     # Return as YYYY-MM-DD
     sprintf("%04d-%02d-%02d", $year, $month, $day)

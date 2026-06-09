@@ -3,30 +3,30 @@
 # prefix of length perm[0]; count steps until perm[0] == 1. Find max over perms.
 
 fn Rosetta::Topswops::flip($perm) {
-    my $k = $perm->[0]
+    val $k = $perm->[0]
     return 0 if $k == 1
-    my $count = 0
-    my @p = @$perm
+    var $count = 0
+    var @p = @$perm
     while ($p[0] != 1) {
-        my $first = $p[0]
-        my @rev = rev @p[0:$first-1]
-        for my $i (0:$first-1) { $p[$i] = $rev[$i] }
+        val $first = $p[0]
+        val @rev = rev @p[0:$first-1]
+        for val $i (0:$first-1) { $p[$i] = $rev[$i] }
         $count += 1
     }
     $count
 }
 
 fn Rosetta::Topswops::permutations($arr) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return [[@$arr]] if $n <= 1
-    my @result
-    for my $i (0:$n-1) {
-        my @rest
-        for my $j (0:$n-1) {
+    var @result
+    for val $i (0:$n-1) {
+        var @rest
+        for val $j (0:$n-1) {
             push @rest, $arr->[$j] if $j != $i
         }
-        my $sub = Rosetta::Topswops::permutations(\@rest)
-        for my $p (@$sub) {
+        val $sub = Rosetta::Topswops::permutations(\@rest)
+        for val $p (@$sub) {
             push @result, [$arr->[$i], @$p]
         }
     }
@@ -34,11 +34,11 @@ fn Rosetta::Topswops::permutations($arr) {
 }
 
 fn Rosetta::Topswops::max_swaps($n) {
-    my @initial = (1:$n)
-    my $perms = Rosetta::Topswops::permutations(\@initial)
-    my $max = 0
-    for my $p (@$perms) {
-        my $c = Rosetta::Topswops::flip($p)
+    val @initial = (1:$n)
+    val $perms = Rosetta::Topswops::permutations(\@initial)
+    var $max = 0
+    for val $p (@$perms) {
+        val $c = Rosetta::Topswops::flip($p)
         $max = $c if $c > $max
     }
     $max

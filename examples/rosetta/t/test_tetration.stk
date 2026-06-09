@@ -3,8 +3,8 @@
 
 fn Rosetta::Tetration::tower($base, $height) {
     return 1 if $height == 0
-    my $result = $base
-    for my $i (2:$height) {
+    var $result = $base
+    for val $i (2:$height) {
         $result = $base ** $result
     }
     $result
@@ -14,10 +14,10 @@ fn Rosetta::Tetration::tower($base, $height) {
 fn Rosetta::Tetration::tower_mod($base, $height, $mod) {
     return 1 % $mod if $height == 0
     return $base % $mod if $height == 1
-    my $sub = Rosetta::Tetration::tower_mod($base, $height - 1, $mod)
-    my $result = 1
-    my $b = $base % $mod
-    my $e = $sub
+    val $sub = Rosetta::Tetration::tower_mod($base, $height - 1, $mod)
+    var $result = 1
+    var $b = $base % $mod
+    var $e = $sub
     while ($e > 0) {
         if ($e % 2 == 1) {
             $result = ($result * $b) % $mod

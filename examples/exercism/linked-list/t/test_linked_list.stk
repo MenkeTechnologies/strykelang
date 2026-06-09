@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./LinkedList.stk"
 
-my $d = Exercism::LinkedList::new()
+val $d = Exercism::LinkedList::new()
 assert_eq Exercism::LinkedList::count($d), 0, "empty count"
 
 Exercism::LinkedList::push($d, 1)

@@ -10,9 +10,9 @@
 package Fenwick2D
 
 fn new($rows, $cols) {
-    my $tree = []
+    val $tree = []
     for (0 : $rows) {
-        my $row = []
+        val $row = []
         for (0 : $cols) { push @$row, 0 }
         push @$tree, $row
     }
@@ -20,26 +20,26 @@ fn new($rows, $cols) {
 }
 
 fn update($bit, $r, $c, $val) {
-    my $tree = $bit->{tree}
-    my $rows = $bit->{rows}
-    my $cols = $bit->{cols}
+    val $tree = $bit->{tree}
+    val $rows = $bit->{rows}
+    val $cols = $bit->{cols}
     
     # Fenwick indices are 1-based internally
-    for (my $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
-        my $row = $tree->[$i]
-        for (my $j = $c + 1; $j <= $cols; $j += ($j & -$j)) {
+    for (var $i = $r + 1; $i <= $rows; $i += ($i & -$i)) {
+        var $row = $tree->[$i]
+        for (var $j = $c + 1; $j <= $cols; $j += ($j & -$j)) {
             $row->[$j] += $val
         }
     }
 }
 
 fn query($bit, $r, $c) {
-    my $tree = $bit->{tree}
-    my $sum = 0
+    val $tree = $bit->{tree}
+    var $sum = 0
     
-    for (my $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
-        my $row = $tree->[$i]
-        for (my $j = $c + 1; $j > 0; $j -= ($j & -$j)) {
+    for (var $i = $r + 1; $i > 0; $i -= ($i & -$i)) {
+        val $row = $tree->[$i]
+        for (var $j = $c + 1; $j > 0; $j -= ($j & -$j)) {
             $sum += $row->[$j]
         }
     }
@@ -47,7 +47,7 @@ fn query($bit, $r, $c) {
 }
 
 fn query_range($bit, $r1, $c1, $r2, $c2) {
-    my $res = query($bit, $r2, $c2)
+    var $res = query($bit, $r2, $c2)
     $res -= query($bit, $r1 - 1, $c2) if $r1 > 0
     $res -= query($bit, $r2, $c1 - 1) if $c1 > 0
     $res += query($bit, $r1 - 1, $c1 - 1) if $r1 > 0 && $c1 > 0
@@ -58,17 +58,17 @@ package main
 
 p "── 2D Fenwick Tree Demo ──"
 
-my $bit = Fenwick2D::new(5, 5)
+val $bit = Fenwick2D::new(5, 5)
 
 p "Updating grid: (1,1) += 5, (2,2) += 10, (3,3) += 2"
 Fenwick2D::update($bit, 1, 1, 5)
 Fenwick2D::update($bit, 2, 2, 10)
 Fenwick2D::update($bit, 3, 3, 2)
 
-my $sum = Fenwick2D::query_range($bit, 0, 0, 4, 4)
+val $sum = Fenwick2D::query_range($bit, 0, 0, 4, 4)
 p "Sum of grid [0,0] to [4,4]: #{$sum}"
 
-my $sub_sum = Fenwick2D::query_range($bit, 1, 1, 2, 2)
+val $sub_sum = Fenwick2D::query_range($bit, 1, 1, 2, 2)
 p "Sum of subgrid [1,1] to [2,2]: #{$sub_sum}"
 
 p "Done."

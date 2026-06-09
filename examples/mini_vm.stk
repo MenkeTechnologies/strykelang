@@ -23,44 +23,44 @@
 # Run: stryke --no-interop examples/mini_vm.stk
 
 fn VM::run($prog) {
-    my @stack = ()
-    my %regs  = ()
-    my @output = ()
-    my $ip = 0
-    my $n  = len @$prog
+    var @stack = ()
+    var %regs  = ()
+    var @output = ()
+    var $ip = 0
+    val $n  = len @$prog
     while ($ip < $n) {
-        my $inst = $prog->[$ip]
-        my $op   = $inst->[0]
+        val $inst = $prog->[$ip]
+        val $op   = $inst->[0]
         if ($op eq "PUSH") {
             push @stack, $inst->[1]
             $ip = $ip + 1
         } elsif ($op eq "ADD") {
-            my $bb = pop @stack
-            my $aa = pop @stack
+            val $bb = pop @stack
+            val $aa = pop @stack
             push @stack, $aa + $bb
             $ip = $ip + 1
         } elsif ($op eq "SUB") {
-            my $bb = pop @stack
-            my $aa = pop @stack
+            val $bb = pop @stack
+            val $aa = pop @stack
             push @stack, $aa - $bb
             $ip = $ip + 1
         } elsif ($op eq "MUL") {
-            my $bb = pop @stack
-            my $aa = pop @stack
+            val $bb = pop @stack
+            val $aa = pop @stack
             push @stack, $aa * $bb
             $ip = $ip + 1
         } elsif ($op eq "DIV") {
-            my $bb = pop @stack
-            my $aa = pop @stack
+            val $bb = pop @stack
+            val $aa = pop @stack
             push @stack, int($aa / $bb)
             $ip = $ip + 1
         } elsif ($op eq "DUP") {
-            my $aa = $stack[len(@stack) - 1]
+            val $aa = $stack[len(@stack) - 1]
             push @stack, $aa
             $ip = $ip + 1
         } elsif ($op eq "SWAP") {
-            my $bb = pop @stack
-            my $aa = pop @stack
+            val $bb = pop @stack
+            val $aa = pop @stack
             push @stack, $bb
             push @stack, $aa
             $ip = $ip + 1
@@ -68,13 +68,13 @@ fn VM::run($prog) {
             pop @stack
             $ip = $ip + 1
         } elsif ($op eq "PRINT") {
-            my $aa = pop @stack
+            val $aa = pop @stack
             push @output, "$aa"
             $ip = $ip + 1
         } elsif ($op eq "JMP") {
             $ip = $ip + $inst->[1]
         } elsif ($op eq "JZ") {
-            my $aa = pop @stack
+            val $aa = pop @stack
             if ($aa == 0) { $ip = $ip + $inst->[1] } else { $ip = $ip + 1 }
         } elsif ($op eq "LOAD") {
             push @stack, ($regs{$inst->[1]} // 0)
@@ -92,7 +92,7 @@ fn VM::run($prog) {
 }
 
 p "=== Mini VM Demo ==="
-my $prog = [
+val $prog = [
     ["PUSH", 2],
     ["PUSH", 3],
     ["ADD"],
@@ -101,11 +101,11 @@ my $prog = [
     ["PRINT"],
     ["HALT"],
 ]
-my $r = VM::run($prog)
+val $r = VM::run($prog)
 p "output: " . join(",", @{$r->{output}})
 
 # Loop: countdown 5..1 with a STORE/LOAD register.
-my $loop = [
+val $loop = [
     ["PUSH", 5],
     ["STORE", "i"],
     # loop start (ip = 2)
@@ -120,5 +120,5 @@ my $loop = [
     ["JMP", -8],
     ["HALT"],
 ]
-my $r2 = VM::run($loop)
+val $r2 = VM::run($loop)
 p "loop output: " . join(",", @{$r2->{output}})

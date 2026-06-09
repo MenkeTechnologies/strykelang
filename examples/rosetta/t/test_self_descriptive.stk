@@ -2,15 +2,15 @@
 # Rosetta Code: Self-descriptive numbers
 
 fn Rosetta::SelfDescriptive::check($n) {
-    my $s = str($n)
-    my @chars = split //, $s
-    my $len = len(@chars)
+    val $s = str($n)
+    val @chars = split //, $s
+    val $len = len(@chars)
 
-    for my $i (0:$len-1) {
-        my $digit_at_pos_i = int(substr($s, $i, 1))
-        my $char_to_count = str($i)
-        my $count = 0
-        for my $char (@chars) {
+    for val $i (0:$len-1) {
+        val $digit_at_pos_i = int(substr($s, $i, 1))
+        val $char_to_count = str($i)
+        var $count = 0
+        for val $char (@chars) {
             if ($char eq $char_to_count) {
                 $count = $count + 1
             }

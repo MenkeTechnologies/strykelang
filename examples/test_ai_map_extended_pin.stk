@@ -7,8 +7,8 @@
 
 ai_mock_install("Apply this instruction to each item: uppercase", '["APPLE", "BANANA"]');
 
-my @items_string = ("apple", "banana");
-my $mapped_string = ai_map(\@items_string, "uppercase");
+val @items_string = ("apple", "banana");
+val $mapped_string = ai_map(\@items_string, "uppercase");
 
 join(",", @{$mapped_string}) |> aeq "APPLE,BANANA", "ai_map uppercase strings";
 
@@ -16,8 +16,8 @@ join(",", @{$mapped_string}) |> aeq "APPLE,BANANA", "ai_map uppercase strings";
 
 ai_mock_install("Apply this instruction to each item: square", '[1, 4, 9]');
 
-my @items_numeric = (1, 2, 3);
-my $mapped_numeric = ai_map(\@items_numeric, "square");
+val @items_numeric = (1, 2, 3);
+val $mapped_numeric = ai_map(\@items_numeric, "square");
 
 join(",", @{$mapped_numeric}) |> aeq "1,4,9", "ai_map square numbers";
 
@@ -25,11 +25,11 @@ join(",", @{$mapped_numeric}) |> aeq "1,4,9", "ai_map square numbers";
 
 ai_mock_install("Apply this instruction to each item: extract the name", '["Alice", "Bob"]');
 
-my @items_hash = (
+val @items_hash = (
     +{ name => "Alice", age => 30 },
     +{ name => "Bob", age => 25 }
 );
-my $mapped_hash = ai_map(\@items_hash, "extract the name");
+val $mapped_hash = ai_map(\@items_hash, "extract the name");
 
 join(",", @{$mapped_hash}) |> aeq "Alice,Bob", "ai_map hash to string";
 

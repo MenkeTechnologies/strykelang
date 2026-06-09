@@ -2,33 +2,33 @@
 # Rosetta Code: Intersecting number wheels
 
 fn Rosetta::Wheels::matches_at_shift($a, $b, $shift) {
-    my $n = len(@$a)
-    my $count = 0
-    for my $i (0:$n - 1) {
-        my $j = ($i + $shift) % $n
+    val $n = len(@$a)
+    var $count = 0
+    for val $i (0:$n - 1) {
+        val $j = ($i + $shift) % $n
         if ($a->[$i] == $b->[$j]) { $count++ }
     }
     $count
 }
 
 fn Rosetta::Wheels::best_shift($a, $b) {
-    my $n = len(@$a)
-    my $best_shift = 0
-    my $best_count = -1
-    for my $shift (0:$n - 1) {
-        my $count = Rosetta::Wheels::matches_at_shift($a, $b, $shift)
+    val $n = len(@$a)
+    var $best_shift = 0
+    var $best_count = -1
+    for val $shift (0:$n - 1) {
+        val $count = Rosetta::Wheels::matches_at_shift($a, $b, $shift)
         if ($count > $best_count) {
             $best_shift = $shift
             $best_count = $count
         }
     }
-    my @best = ($best_shift, $best_count)
+    val @best = ($best_shift, $best_count)
     \@best
 }
 
-my @a = (1, 3, 5, 7, 9, 2)
-my @b = (7, 9, 2, 1, 3, 5)
-my $best = Rosetta::Wheels::best_shift(\@a, \@b)
+val @a = (1, 3, 5, 7, 9, 2)
+val @b = (7, 9, 2, 1, 3, 5)
+val $best = Rosetta::Wheels::best_shift(\@a, \@b)
 
 assert_eq Rosetta::Wheels::matches_at_shift(\@a, \@b, 0), 0, "no matches without rotation"
 assert_eq $best->[0], 3, "best shift aligns the wheels"

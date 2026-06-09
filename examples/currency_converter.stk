@@ -13,7 +13,7 @@
 
 # ── USD-anchored rates (units of currency per 1 USD) ─────────────────
 
-my %usd_per = (
+val %usd_per = (
     USD => 1.0,
     EUR => 0.92,
     GBP => 0.79,
@@ -33,7 +33,7 @@ my %usd_per = (
 
 # ── ISO 4217 minor-unit table (digits after the decimal) ─────────────
 
-my %minor_units = (
+val %minor_units = (
     USD => 2, EUR => 2, GBP => 2, CHF => 2, CAD => 2, AUD => 2,
     SGD => 2, SEK => 2, NOK => 2, MXN => 2, BRL => 2, ZAR => 2,
     INR => 2, CNY => 2,
@@ -42,16 +42,16 @@ my %minor_units = (
 
 # ── sketches & metrics ──────────────────────────────────────────────
 
-my $td_conv  = t_digest(100)
-my $tk_dst   = topk(8)
-my $hll_src  = hll(12)
+val $td_conv  = t_digest(100)
+val $tk_dst   = topk(8)
+val $hll_src  = hll(12)
 
 # ── core conversion: USD pivot ──────────────────────────────────────
 
 fn Demo::FX::convert($amount, $from, $to) {
     return undef unless exists $usd_per{$from} && exists $usd_per{$to}
-    my $in_usd = $amount / $usd_per{$from}
-    my $out    = $in_usd * $usd_per{$to}
+    val $in_usd = $amount / $usd_per{$from}
+    val $out    = $in_usd * $usd_per{$to}
     $out
 }
 
@@ -60,13 +60,13 @@ fn Demo::FX::pair_rate($from, $to) {
 }
 
 fn Demo::FX::fmt($amount, $code) {
-    my $digits = $minor_units{$code} // 2
+    val $digits = $minor_units{$code} // 2
     sprintf("%.*f %s", $digits, $amount, $code)
 }
 
 # ── demo: convert a sample basket ───────────────────────────────────
 
-my @basket = (
+val @basket = (
     [100,     "USD", "EUR"],
     [100,     "USD", "JPY"],
     [50,      "GBP", "USD"],
@@ -83,13 +83,13 @@ my @basket = (
 
 p "currency converter — USD-pivoted rate table"
 p "─" x 60
-for my $row (@basket) {
-    my $amt  = $row->[0]
-    my $from = $row->[1]
-    my $to   = $row->[2]
+for val $row (@basket) {
+    val $amt  = $row->[0]
+    val $from = $row->[1]
+    val $to   = $row->[2]
 
-    my $t0 = now_ns()
-    my $r  = Demo::FX::convert($amt, $from, $to)
+    val $t0 = now_ns()
+    val $r  = Demo::FX::convert($amt, $from, $to)
     td_add($td_conv, (now_ns() - $t0) / 1000.0)
 
     topk_add($tk_dst, $to)
@@ -108,26 +108,26 @@ for my $row (@basket) {
 # ── identity check: USD->X->USD round-trip ──────────────────────────
 
 p "\nround-trip stability (USD -> X -> USD on \$1000):"
-my $base = 1000.0
-my @codes = sort grep { _ ne "USD" } keys %usd_per
-my @rt_errors
-for my $code (@codes) {
-    my $there = Demo::FX::convert($base, "USD", $code)
-    my $back  = Demo::FX::convert($there, $code, "USD")
-    my $delta = abs($back - $base)
+val $base = 1000.0
+val @codes = sort grep { _ ne "USD" } keys %usd_per
+var @rt_errors
+for val $code (@codes) {
+    val $there = Demo::FX::convert($base, "USD", $code)
+    val $back  = Demo::FX::convert($there, $code, "USD")
+    val $delta = abs($back - $base)
     push @rt_errors, $delta
     printf("  USD->%s->USD : \$%.6f  (delta %.2e)\n",
            $code, $back, $delta)
 }
 
-my $max_err = 0
-for my $e (@rt_errors) { $max_err = $e if $e > $max_err }
+var $max_err = 0
+for val $e (@rt_errors) { $max_err = $e if $e > $max_err }
 printf("\nmax round-trip delta across %d currencies: %.2e (must be ~0)\n",
        len(@codes), $max_err)
 
 # ── parallel scan: which currencies are weaker than the JPY benchmark? ─
 
-my @weak_vs_jpy = pgrep {
+var @weak_vs_jpy = pgrep {
     Demo::FX::pair_rate("USD", _) > Demo::FX::pair_rate("USD", "JPY") / 10
 } @codes
 @weak_vs_jpy = sort @weak_vs_jpy
@@ -137,17 +137,17 @@ p "\ncurrencies where 1 USD buys > JPY/10 units: ",
 # ── top destinations ────────────────────────────────────────────────
 
 p "\nmost-converted target (SpaceSaving k=8):"
-my @top = topk_top($tk_dst, 5)
-for my $p (@top) {
+val @top = topk_top($tk_dst, 5)
+for val $p (@top) {
     printf("  %s  count=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct sources ────────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_src)
-my %seen_src
-for my $row (@basket) { $seen_src{$row->[1]} = 1 }
-my $exact_src = len(keys %seen_src)
+val $hll_n = hll_count($hll_src)
+var %seen_src
+for val $row (@basket) { $seen_src{$row->[1]} = 1 }
+val $exact_src = len(keys %seen_src)
 printf("\ndistinct origin currencies: HLL=%.1f vs exact=%d\n",
        $hll_n, $exact_src)
 

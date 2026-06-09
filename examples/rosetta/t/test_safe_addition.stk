@@ -15,12 +15,12 @@ fn Rosetta::SafeAdd::sub_v($a, $b) {
 }
 
 fn Rosetta::SafeAdd::mul($a, $b) {
-    my @vals = (
+    val @vals = (
         $a->[0] * $b->[0], $a->[0] * $b->[1],
         $a->[1] * $b->[0], $a->[1] * $b->[1],
     )
-    my $lo = $vals[0]; my $hi = $vals[0]
-    for my $v (@vals[1:3]) {
+    var $lo = $vals[0]; var $hi = $vals[0]
+    for val $v (@vals[1:3]) {
         $lo = $v if $v < $lo
         $hi = $v if $v > $hi
     }
@@ -34,19 +34,19 @@ fn Rosetta::SafeAdd::contains($i, $v) {
 fn Rosetta::SafeAdd::width($i) { $i->[1] - $i->[0] }
 
 # Direct
-my $a = Rosetta::SafeAdd::interval(1, 2)
-my $b = Rosetta::SafeAdd::interval(3, 5)
-my $sum = Rosetta::SafeAdd::add($a, $b)
+val $a = Rosetta::SafeAdd::interval(1, 2)
+val $b = Rosetta::SafeAdd::interval(3, 5)
+val $sum = Rosetta::SafeAdd::add($a, $b)
 assert_eq $sum->[0], 4, "[1,2] + [3,5] lo = 4"
 assert_eq $sum->[1], 7, "[1,2] + [3,5] hi = 7"
 
 # Subtraction widens
-my $diff = Rosetta::SafeAdd::sub_v($a, $b)
+val $diff = Rosetta::SafeAdd::sub_v($a, $b)
 assert_eq $diff->[0], -4, "[1,2] - [3,5] lo = -4"
 assert_eq $diff->[1], -1, "[1,2] - [3,5] hi = -1"
 
 # Multiply across sign change
-my $cd = Rosetta::SafeAdd::mul(
+val $cd = Rosetta::SafeAdd::mul(
     Rosetta::SafeAdd::interval(-2, 3),
     Rosetta::SafeAdd::interval(-1, 4),
 )
@@ -62,9 +62,9 @@ assert_eq Rosetta::SafeAdd::width(Rosetta::SafeAdd::interval(2, 7)), 5, "width =
 
 # Floating-point rounding capture: 0.1 + 0.2 may not equal 0.3 exactly,
 # but a small epsilon-padded interval contains 0.3.
-my $point_a = Rosetta::SafeAdd::interval(0.099999999, 0.100000001)
-my $point_b = Rosetta::SafeAdd::interval(0.199999999, 0.200000001)
-my $r = Rosetta::SafeAdd::add($point_a, $point_b)
+val $point_a = Rosetta::SafeAdd::interval(0.099999999, 0.100000001)
+val $point_b = Rosetta::SafeAdd::interval(0.199999999, 0.200000001)
+val $r = Rosetta::SafeAdd::add($point_a, $point_b)
 assert_eq Rosetta::SafeAdd::contains($r, 0.3), 1, "0.3 in safe-added interval"
 
 # Pipe form

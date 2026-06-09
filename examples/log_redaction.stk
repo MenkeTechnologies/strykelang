@@ -13,7 +13,7 @@
 
 # ── PII patterns (compiled once via qr//) ───────────────────────────
 
-my %patterns = (
+val %patterns = (
     email      => qr/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
     credit_card => qr/\b(?:\d[ -]*?){13,16}\b/,
     ssn        => qr/\b\d{3}-\d{2}-\d{4}\b/,
@@ -21,7 +21,7 @@ my %patterns = (
     ip_v4      => qr/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/,
 )
 
-my %replacements = (
+val %replacements = (
     email       => "<EMAIL_REDACTED>",
     credit_card => "<CC_REDACTED>",
     ssn         => "<SSN_REDACTED>",
@@ -36,49 +36,49 @@ mysync $hll_pii = hll(14)
 mysync $td_lat = t_digest(100)
 mysync $tk_kinds = topk(5)
 
-for my $k (keys %patterns) {
+for val $k (keys %patterns) {
     $redaction_count{$k} = 0
 }
 
 # ── core redaction per line ─────────────────────────────────────────
 
 fn Demo::Redact::scan($line) {
-    my $t0 = now_ns()
-    my $out = $line
+    val $t0 = now_ns()
+    var $out = $line
     # Apply each pattern directly via inline regex literal. Stryke's
     # regex-with-interpolated-variable bug (BUG-218) makes the natural
     # `=~ /$pat/` approach unreliable across calls in a loop. Inline
     # literals are compiled once per call site and always work.
     while ($out =~ /(\d{3}-\d{2}-\d{4})/) {
-        my $hit = $1
+        val $hit = $1
         hll_add($hll_pii, $hit)
         topk_add($tk_kinds, "ssn")
         $redaction_count{ssn} = $redaction_count{ssn} + 1
         $out =~ s/\d{3}-\d{2}-\d{4}/<SSN_REDACTED>/
     }
     while ($out =~ /(\d{3}-\d{3}-\d{4})/) {
-        my $hit = $1
+        val $hit = $1
         hll_add($hll_pii, $hit)
         topk_add($tk_kinds, "phone")
         $redaction_count{phone} = $redaction_count{phone} + 1
         $out =~ s/\d{3}-\d{3}-\d{4}/<PHONE_REDACTED>/
     }
     while ($out =~ /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/) {
-        my $hit = $1
+        val $hit = $1
         hll_add($hll_pii, $hit)
         topk_add($tk_kinds, "ip_v4")
         $redaction_count{ip_v4} = $redaction_count{ip_v4} + 1
         $out =~ s/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/<IP_REDACTED>/
     }
     while ($out =~ /([a-zA-Z0-9._%+-]+\@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/) {
-        my $hit = $1
+        val $hit = $1
         hll_add($hll_pii, $hit)
         topk_add($tk_kinds, "email")
         $redaction_count{email} = $redaction_count{email} + 1
         $out =~ s/[a-zA-Z0-9._%+-]+\@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/<EMAIL_REDACTED>/
     }
     while ($out =~ /(\d{4}-\d{4}-\d{4}-\d{4})/) {
-        my $hit = $1
+        val $hit = $1
         hll_add($hll_pii, $hit)
         topk_add($tk_kinds, "credit_card")
         $redaction_count{credit_card} = $redaction_count{credit_card} + 1
@@ -90,7 +90,7 @@ fn Demo::Redact::scan($line) {
 
 # ── sample log lines (with intentional PII) ────────────────────────
 
-my @log = (
+val @log = (
     "2026-05-15 12:00:01 INFO User alice\@example.com logged in from 192.168.1.42",
     "2026-05-15 12:00:05 WARN failed login: bob\@corp.io retry count 3",
     "2026-05-15 12:00:10 INFO charge cleared: 4111-1111-1111-1111",
@@ -109,8 +109,8 @@ printf "── %d log lines, scanning for PII ───────────�
 
 p ""
 p "── redacted output ──────────────────────────────────"
-for my $line (@log) {
-    my $redacted = Demo::Redact::scan($line)
+for val $line (@log) {
+    val $redacted = Demo::Redact::scan($line)
     p "  $redacted"
 }
 
@@ -118,9 +118,9 @@ for my $line (@log) {
 
 p ""
 p "── redaction counts by kind ─────────────────────────"
-my $total = 0
+var $total = 0
 $total += $redaction_count{_} for keys %redaction_count
-for my $kind (sort { $redaction_count{_1} <=> $redaction_count{_} } keys %redaction_count) {
+for val $kind (sort { $redaction_count{_1} <=> $redaction_count{_} } keys %redaction_count) {
     next if $redaction_count{$kind} == 0
     printf "  %-13s : %d\n", $kind, $redaction_count{$kind}
 }
@@ -136,8 +136,8 @@ printf "  HLL estimate : %d\n", hll_count($hll_pii)
 
 p ""
 p "── most-common PII kinds (TopK) ─────────────────────"
-my @hits = topk_top($tk_kinds)
-for my $h (@hits) {
+val @hits = topk_top($tk_kinds)
+for val $h (@hits) {
     printf "  %-13s : %d\n", $h->[0], $h->[1]
 }
 
@@ -152,10 +152,10 @@ printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)
 
 p ""
 p "── re-scan verification ─────────────────────────────"
-my $verified = 0
-for my $line (@log) {
-    my $redacted = Demo::Redact::scan($line)
-    my $second_pass = Demo::Redact::scan($redacted)
+var $verified = 0
+for val $line (@log) {
+    val $redacted = Demo::Redact::scan($line)
+    val $second_pass = Demo::Redact::scan($redacted)
     $verified++ if $second_pass eq $redacted
 }
 printf "  %d / %d lines clean on re-scan (idempotent)\n", $verified, len @log

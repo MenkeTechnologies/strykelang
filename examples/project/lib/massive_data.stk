@@ -10,10 +10,10 @@ class StarSystem {
 }
 
 fn Project::MassiveData::ss_total_moons($self) {
-    my $count = 0;
-    my $plist = $self->planets;
-    for my $p (@$plist) {
-        my $mlist = $p->moons;
+    var $count = 0;
+    val $plist = $self->planets;
+    for val $p (@$plist) {
+        val $mlist = $p->moons;
         $count += len(@$mlist);
     }
     return $count;
@@ -26,10 +26,10 @@ class Sector {
 }
 
 fn Project::MassiveData::sector_total_planets($self) {
-    my $count = 0;
-    my $smap = $self->systems;
-    for my $s (values %$smap) {
-        my $plist = $s->planets;
+    var $count = 0;
+    val $smap = $self->systems;
+    for val $s (values %$smap) {
+        val $plist = $s->planets;
         $count += len(@$plist);
     }
     return $count;
@@ -41,17 +41,17 @@ class Galaxy {
 }
 
 fn Project::MassiveData::galaxy_stats($self) {
-    my $seclist = $self->sectors;
-    my $s_count = len(@$seclist);
-    my $sys_count = 0;
-    my $p_count = 0;
-    my $m_count = 0;
+    val $seclist = $self->sectors;
+    val $s_count = len(@$seclist);
+    var $sys_count = 0;
+    var $p_count = 0;
+    var $m_count = 0;
     
-    for my $sec (@$seclist) {
-        my $smap = $sec->{systems};
+    for val $sec (@$seclist) {
+        val $smap = $sec->{systems};
         $sys_count += len(keys %$smap);
         $p_count += Project::MassiveData::sector_total_planets($sec);
-        for my $sys (values %$smap) {
+        for val $sys (values %$smap) {
             $m_count += Project::MassiveData::ss_total_moons($sys);
         }
     }
@@ -67,14 +67,14 @@ fn Project::MassiveData::galaxy_stats($self) {
 # ── Factory Functions ──────────────────────────────────────────────
 
 fn Project::MassiveData::generate_massive_galaxy($num_sectors, $sys_per_sector) {
-    my $sectors = [];
-    for (my $i = 1; $i <= $num_sectors; $i++) {
-        my $systems = {};
-        for (my $j = 1; $j <= $sys_per_sector; $j++) {
-            my $planets = [];
-            for (my $k = 1; $k <= 3; $k++) {
-                my $moons = [];
-                for (my $l = 1; $l <= 2; $l++) {
+    val $sectors = [];
+    for (var $i = 1; $i <= $num_sectors; $i++) {
+        var $systems = {};
+        for (var $j = 1; $j <= $sys_per_sector; $j++) {
+            val $planets = [];
+            for (var $k = 1; $k <= 3; $k++) {
+                val $moons = [];
+                for (var $l = 1; $l <= 2; $l++) {
                     push @$moons, Moon(
                         name => "Moon-$i-$j-$k-$l",
                         mass => rand(100),
@@ -87,7 +87,7 @@ fn Project::MassiveData::generate_massive_galaxy($num_sectors, $sys_per_sector) 
                     moons => $moons
                 );
             }
-            my $sys_name = "System-$i-$j";
+            val $sys_name = "System-$i-$j";
             $systems->{$sys_name} = StarSystem(
                 name => $sys_name,
                 star_type => "G-Type",
@@ -113,20 +113,20 @@ class Node {
 }
 
 fn Project::MassiveData::create_linked_mesh($size) {
-    my @nodes;
-    for (my $i = 0; $i < $size; $i++) {
+    var @nodes;
+    for (var $i = 0; $i < $size; $i++) {
         push @nodes, Node(id => $i, value => rand(1000), edges => []);
     }
     
-    for (my $i = 0; $i < $size; $i++) {
-        my $elist = $nodes[$i]->edges;
-        my $next = ($i + 1) % $size;
+    for (var $i = 0; $i < $size; $i++) {
+        val $elist = $nodes[$i]->edges;
+        val $next = ($i + 1) % $size;
         push @$elist, $nodes[$next];
         
-        my $prev = ($i - 1 + $size) % $size;
+        val $prev = ($i - 1 + $size) % $size;
         push @$elist, $nodes[$prev];
         
-        my $jump = ($i + 5) % $size;
+        val $jump = ($i + 5) % $size;
         push @$elist, $nodes[$jump];
     }
     
@@ -135,9 +135,9 @@ fn Project::MassiveData::create_linked_mesh($size) {
 
 fn Project::MassiveData::traverse_mesh($start_node, $depth) {
     return 0 if $depth <= 0;
-    my $sum = $start_node->value;
-    my $elist = $start_node->edges;
-    for my $neighbor (@$elist) {
+    var $sum = $start_node->value;
+    val $elist = $start_node->edges;
+    for val $neighbor (@$elist) {
         $sum += Project::MassiveData::traverse_mesh($neighbor, $depth - 1);
     }
     return $sum;

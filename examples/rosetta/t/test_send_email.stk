@@ -10,8 +10,8 @@ fn Rosetta::Mail::send($outbox, $message) {
     len(@$outbox)
 }
 
-my @outbox
-my $message = Rosetta::Mail::compose('me@example.com', 'you@example.com', "Hi", "Hello there")
+val @outbox
+val $message = Rosetta::Mail::compose('me@example.com', 'you@example.com', "Hi", "Hello there")
 
 assert_eq Rosetta::Mail::send(\@outbox, $message), 1, "message appended to outbox"
 assert_eq substr($outbox[0], 0, 20), 'From: me@example.com', "message contains From header"

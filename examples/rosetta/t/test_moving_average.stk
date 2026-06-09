@@ -5,8 +5,8 @@
 
 fn Rosetta::MovAvg::two(@xs) {
     return () if len(@xs) < 2
-    my @out
-    for my $i (1 .. len(@xs) - 1) {
+    var @out
+    for val $i (1 .. len(@xs) - 1) {
         push @out, ($xs[$i] + $xs[$i - 1]) / 2
     }
     @out
@@ -14,29 +14,29 @@ fn Rosetta::MovAvg::two(@xs) {
 
 fn Rosetta::MovAvg::n($xs_ref, $n) {
     return () if $n < 1 || len(@$xs_ref) < $n
-    my @out
-    for my $i ($n - 1 .. len(@$xs_ref) - 1) {
-        my $sum = 0
-        for my $j (0:$n - 1) { $sum += $xs_ref->[$i - $j] }
+    var @out
+    for val $i ($n - 1 .. len(@$xs_ref) - 1) {
+        var $sum = 0
+        for val $j (0:$n - 1) { $sum += $xs_ref->[$i - $j] }
         push @out, $sum / $n
     }
     @out
 }
 
 # 2-window moving average of (1,2,3,4,5): means of (1,2), (2,3), (3,4), (4,5) = 1.5, 2.5, 3.5, 4.5.
-my @r = Rosetta::MovAvg::two(1, 2, 3, 4, 5)
+val @r = Rosetta::MovAvg::two(1, 2, 3, 4, 5)
 assert_eq join(",", @r), "1.5,2.5,3.5,4.5", "2-window (1:5)"
 
 # 3-window: means of (1,2,3), (2,3,4), (3,4,5) = 2, 3, 4.
-my @r3 = Rosetta::MovAvg::n([1, 2, 3, 4, 5], 3)
+val @r3 = Rosetta::MovAvg::n([1, 2, 3, 4, 5], 3)
 assert_eq join(",", @r3), "2,3,4", "3-window (1:5)"
 
 # Constant series → constant means.
-my @c = Rosetta::MovAvg::two(7, 7, 7, 7)
+val @c = Rosetta::MovAvg::two(7, 7, 7, 7)
 assert_eq join(",", @c), "7,7,7", "constant → constant"
 
 # Single element → empty (no window fits).
-my @s = Rosetta::MovAvg::two(42)
+val @s = Rosetta::MovAvg::two(42)
 assert_eq len(@s), 0, "single element → empty 2-window"
 
 test_run

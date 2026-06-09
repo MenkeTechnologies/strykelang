@@ -29,7 +29,7 @@
 # Usage in your own script:
 #
 #   require "examples/ice_orchestrator.stk"   # or copy the functions
-#   my $conn = ice::connect({
+#   val $conn = ice::connect({
 #       peer_host_addr   => "192.0.2.50:9000",    # try this first (LAN/public)
 #       peer_srflx_addr  => "203.0.113.45:51234", # from peer's STUN
 #       peer_relay_addr  => "198.51.100.99:49000",# from peer's TURN
@@ -64,9 +64,9 @@ fn ice::parse_addr($s) {
 # Send one probe, wait for echo. Returns 1 on success, 0 otherwise.
 fn ice::try_direct($sock, $peer_host, $peer_port, $timeout_ms) {
     return 0 unless defined $peer_host && defined $peer_port
-    my $payload = "ice-probe-direct"
+    val $payload = "ice-probe-direct"
     udp_send_to($sock, $peer_host, $peer_port, $payload)
-    my $reply = udp_recv_from($sock, $timeout_ms)
+    val $reply = udp_recv_from($sock, $timeout_ms)
     return 0 unless defined $reply
     # Accept any reply on this socket as proof of bidirectional path.
     1
@@ -77,7 +77,7 @@ fn ice::try_direct($sock, $peer_host, $peer_port, $timeout_ms) {
 # Delegates to the `punch` builtin which handles bombard + listen.
 fn ice::try_punch($sock, $peer_host, $peer_port, $timeout_ms) {
     return 0 unless defined $peer_host && defined $peer_port
-    my $r = punch($sock, $peer_host, $peer_port, {
+    var $r = punch($sock, $peer_host, $peer_port, {
         timeout_ms  => $timeout_ms,
         interval_ms => 50,
         payload     => "ice-probe-punch",
@@ -94,13 +94,13 @@ fn ice::try_relay($sock, $peer_host, $peer_port, $turn_server,
                   $turn_user, $turn_pass, $timeout_ms) {
     return 0 unless defined $peer_host && defined $peer_port
     return 0 unless defined $turn_server && defined $turn_user && defined $turn_pass
-    my ($th, $tp) = ice::parse_addr($turn_server)
+    var ($th, $tp) = ice::parse_addr($turn_server)
     return 0 unless defined $th
-    my $alloc = turn_allocate($sock, $th, $tp, $turn_user, $turn_pass, $timeout_ms)
+    val $alloc = turn_allocate($sock, $th, $tp, $turn_user, $turn_pass, $timeout_ms)
     return 0 unless defined $alloc
     return 0 unless turn_permission($sock, $peer_host, $timeout_ms)
     turn_send($sock, $peer_host, $peer_port, "ice-probe-relay")
-    my $reply = turn_recv($sock, $timeout_ms)
+    val $reply = turn_recv($sock, $timeout_ms)
     defined $reply ? 1 : 0
 }
 
@@ -120,28 +120,28 @@ fn ice::try_relay($sock, $peer_host, $peer_port, $turn_server,
 #
 # Caller owns the socket and is responsible for udp_close($sock).
 fn ice::connect($opts) {
-    my $timeout = $opts->{timeout_ms} // 3000
+    val $timeout = $opts->{timeout_ms} // 3000
 
     # Bind one socket; reuse across all rungs. NAT mapping is per-socket,
     # so the punch attempt must use the same socket the eventual data
     # path uses. Same constraint for TURN (allocation tied to socket).
-    my $sock = udp_open()
+    val $sock = udp_open()
     return { ok => 0, reason => "udp_open failed" } if $sock == 0
 
     # ── Rung 1: direct host candidate ───────────────────────────────────
-    my ($hh, $hp) = ice::parse_addr($opts->{peer_host_addr})
+    val ($hh, $hp) = ice::parse_addr($opts->{peer_host_addr})
     if (defined $hh && ice::try_direct($sock, $hh, $hp, $timeout)) {
         return { ok => 1, method => "direct", socket => $sock }
     }
 
     # ── Rung 2: server-reflexive (hole-punch) ──────────────────────────
-    my ($sh, $sp) = ice::parse_addr($opts->{peer_srflx_addr})
+    val ($sh, $sp) = ice::parse_addr($opts->{peer_srflx_addr})
     if (defined $sh && ice::try_punch($sock, $sh, $sp, $timeout)) {
         return { ok => 1, method => "punch", socket => $sock }
     }
 
     # ── Rung 3: relayed (TURN) ─────────────────────────────────────────
-    my ($rh, $rp) = ice::parse_addr($opts->{peer_relay_addr})
+    val ($rh, $rp) = ice::parse_addr($opts->{peer_relay_addr})
     if (defined $rh && ice::try_relay($sock, $rh, $rp,
         $opts->{turn_server}, $opts->{turn_user}, $opts->{turn_pass},
         $timeout)) {
@@ -166,25 +166,25 @@ fn ice::connect($opts) {
 #     socket       => $sock_id,              # caller closes when done
 #   }
 fn ice::gather_candidates($opts) {
-    my $sock = udp_open()
+    val $sock = udp_open()
     return { socket => 0 } if $sock == 0
 
     # NAT classification — informs whether srflx is even worth advertising.
-    my $nat = stun_classify($sock)
-    my $srflx = undef
+    val $nat = stun_classify($sock)
+    var $srflx = undef
     if ($nat->{nat_type} eq "cone" && defined $nat->{public_ip}) {
-        my $info = stun($sock)
+        val $info = stun($sock)
         if (defined $info) {
             $srflx = "$info->{public_ip}:$info->{public_port}"
         }
     }
 
-    my $relay = undef
+    var $relay = undef
     if (defined $opts && defined $opts->{turn_server}
         && defined $opts->{turn_user} && defined $opts->{turn_pass}) {
-        my ($th, $tp) = ice::parse_addr($opts->{turn_server})
+        val ($th, $tp) = ice::parse_addr($opts->{turn_server})
         if (defined $th) {
-            my $alloc = turn_allocate($sock, $th, $tp,
+            val $alloc = turn_allocate($sock, $th, $tp,
                 $opts->{turn_user}, $opts->{turn_pass}, 3000)
             if (defined $alloc) {
                 $relay = "$alloc->{relay_ip}:$alloc->{relay_port}"
@@ -220,8 +220,8 @@ p "── ICE-lite loopback smoke ───────────────�
 # stryke's `spawn` doesn't have a clean way to return values from the
 # thread; instead we use a fixed port + retry loop. For the demo we
 # pick a high port and accept the rare collision risk.
-my $peer_port = 39000 + int(rand(2000))
-my $peer_sock = udp_open("127.0.0.1", $peer_port)
+val $peer_port = 39000 + int(rand(2000))
+val $peer_sock = udp_open("127.0.0.1", $peer_port)
 if ($peer_sock == 0) {
     p "  could not bind demo peer (port collision?); skipping smoke"
     exit 0
@@ -231,7 +231,7 @@ printf "  demo peer bound on 127.0.0.1:%d\n", $peer_port
 spawn {
     # Echo any inbound for ~5s then exit.
     for (1:5) {
-        my $msg = udp_recv_from($peer_sock, 1000)
+        val $msg = udp_recv_from($peer_sock, 1000)
         if (defined $msg) {
             udp_send_to($peer_sock, $msg->{src_ip}, $msg->{src_port},
                 "echo: $msg->{payload}")
@@ -242,7 +242,7 @@ spawn {
 
 # Orchestrate against the loopback peer. Direct rung should succeed
 # instantly without needing punch or relay.
-my $conn = ice::connect({
+val $conn = ice::connect({
     peer_host_addr => "127.0.0.1:$peer_port",
     timeout_ms     => 500,
 })
@@ -251,7 +251,7 @@ if ($conn->{ok}) {
     printf "  ✓ connected via %s (socket=%d)\n", $conn->{method}, $conn->{socket}
     # Send a follow-up message and confirm round-trip.
     udp_send_to($conn->{socket}, "127.0.0.1", $peer_port, "ice-followup")
-    my $reply = udp_recv_from($conn->{socket}, 500)
+    val $reply = udp_recv_from($conn->{socket}, 500)
     if (defined $reply) {
         printf "  ✓ round-trip via %s: %s\n", $conn->{method}, $reply->{payload}
     }

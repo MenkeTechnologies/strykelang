@@ -14,15 +14,15 @@ p "── Sketch Algebra Idioms ────────────────
 # ── 1. Bloom Filters ───────────────────────────────────────────────
 p "Bloom Filters (Membership):"
 
-my $bf1 = bloom_new(1000, 0.01)
+val $bf1 = bloom_new(1000, 0.01)
 bloom_add($bf1, "apple")
 bloom_add($bf1, "banana")
 
-my $bf2 = bloom_new(1000, 0.01)
+val $bf2 = bloom_new(1000, 0.01)
 bloom_add($bf2, "cherry")
 
 # Sketch Algebra: Union of two filters via `+`
-my $bf_combined = $bf1 + $bf2
+val $bf_combined = $bf1 + $bf2
 
 p "  'apple' in union?  ", bloom_contains($bf_combined, "apple")  ? "yes" : "no"
 p "  'cherry' in union? ", bloom_contains($bf_combined, "cherry") ? "yes" : "no"
@@ -30,14 +30,14 @@ p "  'cherry' in union? ", bloom_contains($bf_combined, "cherry") ? "yes" : "no"
 # ── 2. HyperLogLog (HLL) ──────────────────────────────────────────
 p "\nHyperLogLog (Cardinality):"
 
-my $hll1 = hll_new(14)
+val $hll1 = hll_new(14)
 hll_add($hll1, $_) for 1:1000
 
-my $hll2 = hll_new(14)
+val $hll2 = hll_new(14)
 hll_add($hll2, $_) for 501:1500
 
 # Sketch Algebra: Union via `+`
-my $hll_combined = $hll1 + $hll2
+val $hll_combined = $hll1 + $hll2
 
 printf "  HLL 1 count:        %d\n", hll_count($hll1)
 printf "  Combined HLL count: %d (approx 1500)\n", hll_count($hll_combined)
@@ -45,7 +45,7 @@ printf "  Combined HLL count: %d (approx 1500)\n", hll_count($hll_combined)
 # ── 3. Count-Min Sketch (CMS) ─────────────────────────────────────
 p "\nCount-Min Sketch (Frequency):"
 
-my $cms = cms_new(0.001, 0.99)
+val $cms = cms_new(0.001, 0.99)
 cms_add($cms, "user_123", 5)
 cms_add($cms, "user_456", 2)
 

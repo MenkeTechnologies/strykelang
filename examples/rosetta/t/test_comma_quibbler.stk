@@ -2,14 +2,14 @@
 # Rosetta Code: Comma quibbler
 
 fn Rosetta::CommaQuibbler::quibble(@list) {
-    my $len = len(@list)
+    val $len = len(@list)
     if ($len == 0) {
         "{}"
     } elsif ($len == 1) {
         "{" . $list[0] . "}"
     } else {
-        my @init = @list[0:$len-2]
-        my $last = $list[-1]
+        val @init = @list[0:$len-2]
+        val $last = $list[-1]
         "{" . join(", ", @init) . " and " . $last . "}"
     }
 }

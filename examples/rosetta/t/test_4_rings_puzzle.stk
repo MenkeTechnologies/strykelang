@@ -6,20 +6,20 @@
 # letter must be distinct. Returns the number of valid assignments.
 
 fn Rosetta::FourRings::count($low, $high, $unique) {
-    my $n = 0
-    for my $a ($low:$high) {
-        for my $b ($low:$high) {
-            my $s = $a + $b
-            for my $c ($low:$high) {
-                my $d = $s - $b - $c
+    var $n = 0
+    for val $a ($low:$high) {
+        for val $b ($low:$high) {
+            var $s = $a + $b
+            for val $c ($low:$high) {
+                val $d = $s - $b - $c
                 next if $d < $low || $d > $high
-                for my $e ($low:$high) {
-                    my $f = $b + $c - $e
+                for val $e ($low:$high) {
+                    val $f = $b + $c - $e
                     next if $f < $low || $f > $high
-                    my $g = $s - $f
+                    val $g = $s - $f
                     next if $g < $low || $g > $high
                     if ($unique) {
-                        my %seen
+                        var %seen
                         $seen{$a}++; $seen{$b}++; $seen{$c}++
                         $seen{$d}++; $seen{$e}++; $seen{$f}++; $seen{$g}++
                         next if len(keys %seen) != 7
@@ -41,7 +41,7 @@ assert_eq Rosetta::FourRings::count(0, 9, 0),  2860, "non-unique 0:9"
 0 |> fn { Rosetta::FourRings::count(_, 9, 0) } |> assert_eq(2860, "pipe non-unique 0:9")
 
 # Threaded computation
-my $u = ~> 1 fn { Rosetta::FourRings::count(_, 7, 1) }
+val $u = ~> 1 fn { Rosetta::FourRings::count(_, 7, 1) }
 assert_eq $u, 8, "threaded unique 1:7"
 
 # Symmetry check: solutions come in pairs (rev the chain)

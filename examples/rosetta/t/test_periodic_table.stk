@@ -17,22 +17,22 @@ fn Rosetta::Periodic::get_table() {
 }
 
 fn Rosetta::Periodic::query($symbol) {
-    my $table = Rosetta::Periodic::get_table()
+    val $table = Rosetta::Periodic::get_table()
     if (exists $table->{$symbol}) {
         return $table->{$symbol}
     }
     undef
 }
 
-my $h = Rosetta::Periodic::query("H")
+val $h = Rosetta::Periodic::query("H")
 assert_eq $h->{name}, "Hydrogen", "H is Hydrogen"
 assert_eq $h->{number}, 1, "H atomic number 1"
 
-my $c = Rosetta::Periodic::query("C")
+val $c = Rosetta::Periodic::query("C")
 assert_eq $c->{name}, "Carbon", "C is Carbon"
 assert_eq $c->{number}, 6, "C atomic number 6"
 
-my $missing = Rosetta::Periodic::query("U")
+val $missing = Rosetta::Periodic::query("U")
 assert_ok !defined($missing), "U is missing in simplified table"
 
 test_run

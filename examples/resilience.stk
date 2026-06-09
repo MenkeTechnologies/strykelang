@@ -5,7 +5,7 @@
 
 # 1. Retry with backoff.
 p "--- Resilience: Retrying unstable operation ---"
-my $tries = 0
+var $tries = 0
 eval {
     retry {
         $tries++
@@ -18,10 +18,10 @@ else    { p "  Succeeded on attempt $tries" }
 
 # 2. Benchmarking.
 p "\n--- Performance: Benchmarking sort algorithms ---"
-my @large_data = map { rand(1000) } 1:5000
+val @large_data = map { rand(1000) } 1:5000
 
-my $report = bench {
-    my @sorted = sort { _ <=> _1 } @large_data
+val $report = bench {
+    val @sorted = sort { _ <=> _1 } @large_data
 } 10
 
 p "Sort Benchmark (10 iterations): $report"
@@ -41,7 +41,7 @@ if ($@ =~ /timeout/) {
 
 # 4. High-resolution timing.
 p "\n--- Instrumentation: Manual timing ---"
-my $start = now_ns()
+val $start = now_ns()
 _ * _ for 1:1_000_000
-my $end = now_ns()
+val $end = now_ns()
 printf "  Million multiplications took %.4f ms\n", ($end - $start) / 1_000_000

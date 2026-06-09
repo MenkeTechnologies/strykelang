@@ -2,17 +2,17 @@
 # Rosetta Code: Matrix rank
 
 fn Rosetta::Matrix::rank($m) {
-    my @mat = map { [ @{_} ] } @$m
-    my $rows = cnt(@mat)
+    val @mat = map { [ @{_} ] } @$m
+    val $rows = cnt(@mat)
     return 0 if $rows == 0
-    my $cols = cnt(@{$mat[0]})
+    val $cols = cnt(@{$mat[0]})
     
-    my $rank = 0
-    my @row_selected = (0) x $rows
+    var $rank = 0
+    var @row_selected = (0) x $rows
     
-    for (my $j = 0; $j < $cols; $j++) {
-        my $piv = -1
-        for (my $i = 0; $i < $rows; $i++) {
+    for (var $j = 0; $j < $cols; $j++) {
+        var $piv = -1
+        for (var $i = 0; $i < $rows; $i++) {
             if (!$row_selected[$i] && abs($mat[$i]->[$j]) > 1e-9) {
                 if ($piv == -1 || abs($mat[$i]->[$j]) > abs($mat[$piv]->[$j])) {
                     $piv = $i
@@ -23,10 +23,10 @@ fn Rosetta::Matrix::rank($m) {
         if ($piv != -1) {
             $rank++
             $row_selected[$piv] = 1
-            for (my $i = 0; $i < $rows; $i++) {
+            for (var $i = 0; $i < $rows; $i++) {
                 if ($i != $piv && abs($mat[$i]->[$j]) > 1e-9) {
-                    my $factor = $mat[$i]->[$j] / $mat[$piv]->[$j]
-                    for (my $k = $j; $k < $cols; $k++) {
+                    val $factor = $mat[$i]->[$j] / $mat[$piv]->[$j]
+                    for (var $k = $j; $k < $cols; $k++) {
                         $mat[$i]->[$k] -= $factor * $mat[$piv]->[$k]
                     }
                 }
@@ -36,7 +36,7 @@ fn Rosetta::Matrix::rank($m) {
     $rank
 }
 
-my $m1 = [
+val $m1 = [
     [1, 2, 1],
     [-2, -3, 1],
     [3, 5, 0]
@@ -44,7 +44,7 @@ my $m1 = [
 # R3 = R1 - R2 -> Row 3 is dependent. Rank 2.
 assert_eq Rosetta::Matrix::rank($m1), 2, "rank of 3x3 singular matrix"
 
-my $m2 = [
+val $m2 = [
     [1, 2, 3],
     [4, 5, 6],
     [7, 8, 9]
@@ -52,7 +52,7 @@ my $m2 = [
 # 7,8,9 = 2*(4,5,6) - (1,2,3). Rank 2.
 assert_eq Rosetta::Matrix::rank($m2), 2, "rank of 3x3 arithmetic progression matrix"
 
-my $m3 = [
+val $m3 = [
     [1, 1, 0],
     [0, 1, 1],
     [1, 0, 1]
@@ -60,7 +60,7 @@ my $m3 = [
 # Independent. Rank 3.
 assert_eq Rosetta::Matrix::rank($m3), 3, "rank of 3x3 identity-like matrix"
 
-my $m4 = [
+val $m4 = [
     [1, 2, 1, 2],
     [2, 4, 2, 4],
     [3, 6, 3, 6]

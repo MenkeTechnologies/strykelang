@@ -4,7 +4,7 @@
 # Verifies dictionary lookup and Levenshtein-based suggestions.
 # Compliance: docs/STYLE_GUIDE.md
 
-my @dict = qw(
+val @dict = qw(
     the quick brown fox jumps over lazy dog
     hello world program code function variable
     stryke language syntax feature builtin range
@@ -16,20 +16,20 @@ my @dict = qw(
 )
 
 fn Spell::known($word) {
-    my %dict_set = ()
-    for my $w (@dict) { $dict_set{$w} = 1 }
+    var %dict_set = ()
+    for val $w (@dict) { $dict_set{$w} = 1 }
     exists $dict_set{lc($word)}
 }
 
 fn Spell::suggest($word, $n) {
-    my $w = lc($word)
-    my @scored = ()
-    for my $entry (@dict) {
+    val $w = lc($word)
+    var @scored = ()
+    for val $entry (@dict) {
         push @scored, [$entry, levenshtein($w, $entry)]
     }
-    my @sorted = sort { _->[1] <=> _1->[1] } @scored
-    my @top = ()
-    for my $pair (@sorted[0:$n-1]) {
+    val @sorted = sort { _->[1] <=> _1->[1] } @scored
+    var @top = ()
+    for val $pair (@sorted[0:$n-1]) {
         push @top, $pair->[0]
     }
     \@top
@@ -54,37 +54,37 @@ Spell::known("xyzqqq") |> aeq 0, "known: xyzqqq is unknown"
 
 # ── Suggestions: closest match is the correct word ────────────────────────
 
-my $s1 = Spell::suggest("helo", 1)
+val $s1 = Spell::suggest("helo", 1)
 $s1->[0] |> aeq "hello", "suggest helo → hello"
 
-my $s2 = Spell::suggest("strke", 1)
+val $s2 = Spell::suggest("strke", 1)
 $s2->[0] |> aeq "stryke", "suggest strke → stryke"
 
-my $s3 = Spell::suggest("progam", 1)
+val $s3 = Spell::suggest("progam", 1)
 $s3->[0] |> aeq "program", "suggest progam → program"
 
-my $s4 = Spell::suggest("fnction", 1)
+val $s4 = Spell::suggest("fnction", 1)
 $s4->[0] |> aeq "function", "suggest fnction → function"
 
-my $s5 = Spell::suggest("algoithm", 1)
+val $s5 = Spell::suggest("algoithm", 1)
 $s5->[0] |> aeq "algorithm", "suggest algoithm → algorithm"
 
-my $s6 = Spell::suggest("vaiable", 1)
+val $s6 = Spell::suggest("vaiable", 1)
 $s6->[0] |> aeq "variable", "suggest vaiable → variable"
 
 # ── Suggestion count ──────────────────────────────────────────────────────
 
-my $s_top3 = Spell::suggest("helo", 3)
+val $s_top3 = Spell::suggest("helo", 3)
 len(@$s_top3) |> aeq 3, "suggest: returns 3 results"
 $s_top3->[0]  |> aeq "hello", "top-3: first is hello"
 
-my $s_top5 = Spell::suggest("strke", 5)
+val $s_top5 = Spell::suggest("strke", 5)
 len(@$s_top5) |> aeq 5, "suggest: returns 5 results"
 $s_top5->[0]  |> aeq "stryke", "top-5: first is stryke"
 
 # ── Case-insensitive suggestion ───────────────────────────────────────────
 
-my $up = Spell::suggest("HELO", 1)
+val $up = Spell::suggest("HELO", 1)
 $up->[0] |> aeq "hello", "suggest: HELO → hello (case-fold)"
 
 test_run

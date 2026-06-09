@@ -2,17 +2,17 @@
 # Rosetta Code: Entropy
 
 fn Rosetta::Entropy::shannon($s) {
-    my $len = len($s)
+    val $len = len($s)
     if ($len == 0) { return 0 }
-    my $counts = {}
-    my @chars = ~> $s chars
-    for my $c (@chars) {
+    var $counts = {}
+    val @chars = ~> $s chars
+    for val $c (@chars) {
         $counts->{$c} = ($counts->{$c} || 0) + 1
     }
     
-    my $entropy = 0
-    for my $char (keys %$counts) {
-        my $p = $counts->{$char} / $len
+    var $entropy = 0
+    for val $char (keys %$counts) {
+        val $p = $counts->{$char} / $len
         $entropy -= $p * (log($p) / log(2))
     }
     $entropy

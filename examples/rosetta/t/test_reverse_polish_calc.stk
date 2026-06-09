@@ -2,15 +2,15 @@
 # Rosetta Code: Reverse Polish notation (RPN) calculator
 
 fn Rosetta::RPN::eval($expr) {
-    my @stack
-    my @tokens = split /\s+/, $expr
-    for my $tok (@tokens) {
+    var @stack
+    val @tokens = split /\s+/, $expr
+    for val $tok (@tokens) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
             push @stack, $tok + 0
         } else {
-            my $b = pop @stack
-            my $a = pop @stack
-            my $r
+            val $b = pop @stack
+            val $a = pop @stack
+            var $r
             if    ($tok eq "+") { $r = $a + $b }
             elsif ($tok eq "-") { $r = $a - $b }
             elsif ($tok eq "*") { $r = $a * $b }

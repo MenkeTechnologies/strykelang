@@ -11,7 +11,7 @@ $^X |> maps { _ =~ /stryke$/ } |> aok "Executable path $^X"
 
 # ── OS Errors ($! and $^E) ────────────────────────────────────────────────
 
-eval { open(my $fh, "<", "/non/existent/path/999") }
+eval { open(val $fh, "<", "/non/existent/path/999") }
 $! |> maps { _ != 0 } |> aok "Errno $! non-zero"
 "$!" |> maps { _ =~ /No such file/i } |> aok "Errno string"
 $^E |> maps { _ =~ /No such file/i } |> aok "Extended error $^E"
@@ -46,9 +46,9 @@ $+[0] |> aeq 6, "match end @+[0]"
 
 # ── Input Line Number ($.) ────────────────────────────────────────────────
 
-my $tmp = tempdir()
+val $tmp = tempdir()
 spurt "$tmp/lines.txt", "a\nb\nc\n"
-open(my $fh, "<", "$tmp/lines.txt")
+open(val $fh, "<", "$tmp/lines.txt")
 <$fh>
 $. |> aeq 1, "$. is 1"
 <$fh>

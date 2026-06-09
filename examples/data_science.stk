@@ -5,7 +5,7 @@
 
 p "--- Stats: Analyzing a large dataset ---"
 # Generate 10k random samples
-my @data = map { rand(100) } (1:10000)
+val @data = map { rand(100) } (1:10000)
 
 printf "  Samples:    %d\n", len @data
 printf "  Mean:       %.4f\n", mean(@data)
@@ -16,11 +16,11 @@ printf "  Sum:        %.4f\n", sum @data
 
 p "\n--- Regression: Simple Linear Fit ---"
 # y = 2x + 5 + noise
-my @x = (1:10)
-my @y = map { 2 * _ + 5 + (rand(2) - 1) } @x
+val @x = (1:10)
+val @y = map { 2 * _ + 5 + (rand(2) - 1) } @x
 
 # linear_regression returns [slope, intercept, r_squared]
-my $fit = linear_regression(\@x, \@y)
+val $fit = linear_regression(\@x, \@y)
 if (ref($fit) eq "ARRAY") {
     printf "  Model:      y = %.2fx + %.2f (R^2 = %.4f)\n", @$fit
 } else {
@@ -29,13 +29,13 @@ if (ref($fit) eq "ARRAY") {
 
 p "\n--- Parallel Data Transformation ---"
 # Use pmap to process large arrays across all cores
-my @squares = (1:100000) |> pmap { _ * _ }
+val @squares = (1:100000) |> pmap { _ * _ }
 
 p "  Calculated ", len(@squares), " squares in parallel."
 printf "  Sample (index 99,999): %d\n", $squares[-1]
 
 # Quantiles (passing data and list of quantiles)
-my @qs = quantiles(\@data, [0.25, 0.5, 0.75])
+val @qs = quantiles(\@data, [0.25, 0.5, 0.75])
 p "\n--- Distribution: Quantiles ---"
 printf "  25%%: %.2f | 50%%: %.2f | 75%%: %.2f\n", @qs
 p "  Spark: ", sparkline(@qs)

@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Factorions
 
-my @FACS = (1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880)
+val @FACS = (1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880)
 
 fn Rosetta::Factorions::check($n) {
-    my $sum = 0
-    my @digits = "$n" |> chars
+    var $sum = 0
+    val @digits = "$n" |> chars
     ~> @digits ep {
         $sum = $sum + $FACS[int(_)]
     }

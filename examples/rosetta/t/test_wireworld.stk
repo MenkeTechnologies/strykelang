@@ -2,26 +2,26 @@
 # Rosetta Code: Wireworld
 
 fn Rosetta::Wireworld::step($grid) {
-    my $h = len(@$grid)
-    my $w = len(@{$grid->[0]})
-    my @new_grid
+    val $h = len(@$grid)
+    val $w = len(@{$grid->[0]})
+    var @new_grid
     
-    for (my $y = 0; $y < $h; $y++) {
-        my @row
-        for (my $x = 0; $x < $w; $x++) {
-            my $cell = $grid->[$y]->[$x]
+    for (var $y = 0; $y < $h; $y++) {
+        var @row
+        for (var $x = 0; $x < $w; $x++) {
+            val $cell = $grid->[$y]->[$x]
             if ($cell == 1) { # Electron head
                 push @row, 2 # -> Electron tail
             } elsif ($cell == 2) { # Electron tail
                 push @row, 3 # -> Conductor
             } elsif ($cell == 3) { # Conductor
                 # Count neighbors that are heads (1)
-                my $heads = 0
-                for (my $dy = -1; $dy <= 1; $dy++) {
-                    for (my $dx = -1; $dx <= 1; $dx++) {
+                var $heads = 0
+                for (var $dy = -1; $dy <= 1; $dy++) {
+                    for (var $dx = -1; $dx <= 1; $dx++) {
                         next if $dx == 0 && $dy == 0
-                        my $nx = $x + $dx
-                        my $ny = $y + $dy
+                        val $nx = $x + $dx
+                        val $ny = $y + $dy
                         if ($nx >= 0 && $nx < $w && $ny >= 0 && $ny < $h) {
                             $heads++ if $grid->[$ny]->[$nx] == 1
                         }
@@ -43,7 +43,7 @@ fn Rosetta::Wireworld::step($grid) {
 
 # Example: a simple wire with a head
 # 0: empty, 1: head, 2: tail, 3: conductor
-my $grid = [
+val $grid = [
     [0, 0, 0, 0, 0],
     [1, 2, 3, 3, 3],
     [0, 0, 0, 0, 0]
@@ -75,13 +75,13 @@ my $grid = [
 # Step 1: C t H C C
 # Step 2: C C t H C
 
-my $g0 = [
+val $g0 = [
     [3, 3, 3, 3, 3],
     [1, 2, 3, 3, 3],
     [3, 3, 3, 3, 3]
 ]
 
-my $g1 = Rosetta::Wireworld::step($g0)
+val $g1 = Rosetta::Wireworld::step($g0)
 # (1,0) was head -> (1,0) is tail (2)
 # (1,1) was tail -> (1,1) is cond (3)
 # (1,2) was cond. Neighbors: (0,1),(0,2),(0,3),(1,1),(1,3),(2,1),(2,2),(2,3)
@@ -101,10 +101,10 @@ my $g1 = Rosetta::Wireworld::step($g0)
 # cond(3) -> head(1) if neighbors has 1 or 2 heads.
 
 # Let's test:
-my $test_g = [
+val $test_g = [
     [0, 1, 2, 3, 0]
 ]
-my $test_g1 = Rosetta::Wireworld::step($test_g)
+val $test_g1 = Rosetta::Wireworld::step($test_g)
 # (0,1) was head(1) -> (0,1) is tail(2)
 # (0,2) was tail(2) -> (0,2) is cond(3)
 # (0,3) was cond(3). Neighbor (0,2) is tail. (0,4) is empty.
@@ -113,10 +113,10 @@ my $test_g1 = Rosetta::Wireworld::step($test_g)
 assert_eq $test_g1->[0]->[1], 2, "head to tail"
 assert_eq $test_g1->[0]->[2], 3, "tail to cond"
 
-my $test_g_head = [
+val $test_g_head = [
     [1, 3, 3, 3]
 ]
-my $test_g_head1 = Rosetta::Wireworld::step($test_g_head)
+val $test_g_head1 = Rosetta::Wireworld::step($test_g_head)
 # (0,0) head -> tail(2)
 # (0,1) cond. Neighbor (0,0) is head. -> head(1)
 # (0,2) cond. Neighbor (0,1) is cond. -> cond(3)

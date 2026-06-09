@@ -2,10 +2,10 @@
 # Rosetta Code: Selection Sort
 
 fn Rosetta::SelectionSort::sort(@arr) {
-    my $n = len(@arr)
-    for my $i (0:$n-2) {
-        my $min_idx = $i
-        for my $j ($i+1:$n-1) {
+    val $n = len(@arr)
+    for var $i (0:$n-2) {
+        var $min_idx = $i
+        for val $j ($i+1:$n-1) {
             $min_idx = $j if $arr[$j] < $arr[$min_idx]
         }
         if ($min_idx != $i) {
@@ -15,19 +15,19 @@ fn Rosetta::SelectionSort::sort(@arr) {
     @arr
 }
 
-my @sorted = Rosetta::SelectionSort::sort(64, 25, 12, 22, 11)
+val @sorted = Rosetta::SelectionSort::sort(64, 25, 12, 22, 11)
 assert_eq join(",", @sorted), "11,12,22,25,64", "selection sort"
 
-my @single = Rosetta::SelectionSort::sort(42)
+val @single = Rosetta::SelectionSort::sort(42)
 assert_eq join(",", @single), "42", "single element"
 
-my @already = Rosetta::SelectionSort::sort(1, 2, 3, 4, 5)
+val @already = Rosetta::SelectionSort::sort(1, 2, 3, 4, 5)
 assert_eq join(",", @already), "1,2,3,4,5", "already sorted"
 
-my @reverse = Rosetta::SelectionSort::sort(5, 4, 3, 2, 1)
+val @reverse = Rosetta::SelectionSort::sort(5, 4, 3, 2, 1)
 assert_eq join(",", @reverse), "1,2,3,4,5", "reverse"
 
-my @dups = Rosetta::SelectionSort::sort(3, 1, 4, 1, 5)
+val @dups = Rosetta::SelectionSort::sort(3, 1, 4, 1, 5)
 assert_eq join(",", @dups), "1,1,3,4,5", "with duplicates"
 
 test_run

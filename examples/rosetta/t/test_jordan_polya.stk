@@ -5,30 +5,30 @@
 # 1, 2, 4, 6, 8, 12, 16, 24, 32, 36, 48, 64, 72, 96, 120, 128, …
 
 fn Rosetta::JordanPolya::factorial($n) {
-    my $r = 1
-    for my $i (~> 2:$n) { $r *= $i }
+    var $r = 1
+    for val $i (~> 2:$n) { $r *= $i }
     $r
 }
 
 fn Rosetta::JordanPolya::sequence_up_to($limit) {
     # Generate factorials ≥ 2 whose values are ≤ $limit, then close
     # the multiplicative semigroup under multiplication staying ≤ limit.
-    my @facs
-    my $k = 2
+    var @facs
+    var $k = 2
     while (1) {
-        my $f = Rosetta::JordanPolya::factorial($k)
+        val $f = Rosetta::JordanPolya::factorial($k)
         last if $f > $limit
         push @facs, $f
         $k++
     }
-    my %set
+    var %set
     $set{1} = 1
-    my @frontier = (1)
+    var @frontier = (1)
     while (len(@frontier) > 0) {
-        my @next
-        for my $v (@frontier) {
-            for my $f (@facs) {
-                my $p = $v * $f
+        var @next
+        for val $v (@frontier) {
+            for val $f (@facs) {
+                val $p = $v * $f
                 next if $p > $limit
                 if (!exists $set{$p}) {
                     $set{$p} = 1
@@ -38,7 +38,7 @@ fn Rosetta::JordanPolya::sequence_up_to($limit) {
         }
         @frontier = @next
     }
-    my @sorted = sort { _ <=> _1 } keys %set
+    val @sorted = sort { _ <=> _1 } keys %set
     @sorted
 }
 
@@ -48,12 +48,12 @@ assert_eq Rosetta::JordanPolya::factorial(5),  120,  "5! = 120"
 assert_eq Rosetta::JordanPolya::factorial(7),  5040, "7! = 5040"
 
 # First chunk of the sequence
-my @s = Rosetta::JordanPolya::sequence_up_to(150)
+val @s = Rosetta::JordanPolya::sequence_up_to(150)
 assert_eq join(",", @s), "1,2,4,6,8,12,16,24,32,36,48,64,72,96,120,128,144", "JP up to 150"
 
 # Membership tests
-my @big = Rosetta::JordanPolya::sequence_up_to(10000)
-my %is_jp = map { _ => 1 } @big
+val @big = Rosetta::JordanPolya::sequence_up_to(10000)
+val %is_jp = map { _ => 1 } @big
 assert_eq exists($is_jp{720}),  1, "720 = 6! is JP"
 assert_eq exists($is_jp{1440}), 1, "1440 = 2!·6! is JP"
 assert_eq exists($is_jp{5040}), 1, "5040 = 7! is JP"

@@ -21,7 +21,7 @@ fn Fib::naive($n) {
 fn Fib::memo($n) {
     state %cache
     return $cache{$n} if exists $cache{$n}
-    my $v = $n < 2 ? $n : Fib::memo($n - 1) + Fib::memo($n - 2)
+    val $v = $n < 2 ? $n : Fib::memo($n - 1) + Fib::memo($n - 2)
     $cache{$n} = $v
     $v
 }
@@ -29,26 +29,26 @@ fn Fib::memo($n) {
 fn Fib::iter($n) {
     return $n if $n < 2
     # `$a` / `$b` are reserved in strict mode — use $prev / $curr.
-    my ($prev, $curr) = (0, 1)
+    var ($prev, $curr) = (0, 1)
     for (2:$n) {
         ($prev, $curr) = ($curr, $prev + $curr)
     }
     $curr
 }
 
-my $n = $ARGV[0] // 25
+val $n = $ARGV[0] // 25
 
 p "── Fibonacci($n) — three implementations ──"
 printf "  %-10s %12s %12s\n", "method", "fib($n)", "time (ms)"
 printf "  %-10s %12s %12s\n", "------", "-------", "---------"
 
-for my $impl ("naive", "memo", "iter") {
-    my $t0 = now_ns()
-    my $r
+for val $impl ("naive", "memo", "iter") {
+    val $t0 = now_ns()
+    var $r
     if    ($impl eq "naive") { $r = Fib::naive($n) }
     elsif ($impl eq "memo")  { $r = Fib::memo($n)  }
     else                     { $r = Fib::iter($n)  }
-    my $ms = (now_ns() - $t0) / 1_000_000
+    val $ms = (now_ns() - $t0) / 1_000_000
     printf "  %-10s %12d %12.3f\n", $impl, $r, $ms
 }
 
@@ -57,8 +57,8 @@ p "(naive blows up exponentially; iter is O(n) and stays sub-millisecond"
 p " well past n=10k)"
 
 # Built-in self-test against a known fib table.
-my %expected = (0 => 0, 1 => 1, 5 => 5, 10 => 55, 20 => 6765, 25 => 75025)
-for my $k (sort { _ <=> _1 } keys %expected) {
+val %expected = (0 => 0, 1 => 1, 5 => 5, 10 => 55, 20 => 6765, 25 => 75025)
+for val $k (sort { _ <=> _1 } keys %expected) {
     die "Fib::iter($k) != $expected{$k}" unless Fib::iter($k) == $expected{$k}
     die "Fib::memo($k) != $expected{$k}" unless Fib::memo($k) == $expected{$k}
     die "Fib::naive($k) != $expected{$k}" unless Fib::naive($k) == $expected{$k}

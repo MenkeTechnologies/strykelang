@@ -4,34 +4,34 @@
 # HASH CREATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::HashesExtended::pairs_to_hash { my %h = (a => 1, b => 2, c => 3); \%h }
-fn Project::HashesExtended::list_to_hash { my %h = qw(a 1 b 2 c 3); \%h }
-fn Project::HashesExtended::hash_empty { my %h = (); \%h }
-fn Project::HashesExtended::hash_single { my %h = (key => "value"); \%h }
+fn Project::HashesExtended::pairs_to_hash { val %h = (a => 1, b => 2, c => 3); \%h }
+fn Project::HashesExtended::list_to_hash { val %h = qw(a 1 b 2 c 3); \%h }
+fn Project::HashesExtended::hash_empty { val %h = (); \%h }
+fn Project::HashesExtended::hash_single { val %h = (key => "value"); \%h }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # KEYS AND VALUES
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_keys {
-    my %h = (a => 1, b => 2, c => 3)
+    val %h = (a => 1, b => 2, c => 3)
     sort keys %h
 }
 
 fn Project::HashesExtended::hash_values {
-    my %h = (a => 1, b => 2, c => 3)
+    val %h = (a => 1, b => 2, c => 3)
     sort { $a <=> $b } values %h
 }
 
 fn Project::HashesExtended::hash_keys_count {
-    my %h = (a => 1, b => 2, c => 3, d => 4)
+    val %h = (a => 1, b => 2, c => 3, d => 4)
     len(keys %h)
 }
 
 fn Project::HashesExtended::hash_values_sum {
-    my %h = (a => 1, b => 2, c => 3)
-    my $sum = 0
-    for my $v (values %h) {
+    val %h = (a => 1, b => 2, c => 3)
+    var $sum = 0
+    for val $v (values %h) {
         $sum += $v
     }
     $sum
@@ -42,32 +42,32 @@ fn Project::HashesExtended::hash_values_sum {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_exists_true {
-    my %h = (a => 1, b => undef)
+    val %h = (a => 1, b => undef)
     exists $h{a} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_exists_undef {
-    my %h = (a => 1, b => undef)
+    val %h = (a => 1, b => undef)
     exists $h{b} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_exists_false {
-    my %h = (a => 1)
+    val %h = (a => 1)
     exists $h{z} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_defined_true {
-    my %h = (a => 1)
+    val %h = (a => 1)
     defined $h{a} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_defined_false {
-    my %h = (a => undef)
+    val %h = (a => undef)
     defined($h{a}) ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_defined_missing {
-    my %h = (a => 1)
+    val %h = (a => 1)
     defined($h{z}) ? 1 : 0
 }
 
@@ -76,25 +76,25 @@ fn Project::HashesExtended::hash_defined_missing {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_delete_returns {
-    my %h = (a => 1, b => 2, c => 3)
-    my $deleted = delete $h{b}
+    var %h = (a => 1, b => 2, c => 3)
+    val $deleted = delete $h{b}
     $deleted
 }
 
 fn Project::HashesExtended::hash_delete_removes {
-    my %h = (a => 1, b => 2, c => 3)
+    var %h = (a => 1, b => 2, c => 3)
     delete $h{b}
     exists $h{b} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_delete_undef {
-    my %h = (a => 1)
-    my $deleted = delete $h{z}
+    var %h = (a => 1)
+    val $deleted = delete $h{z}
     defined($deleted) ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_delete_multiple {
-    my %h = (a => 1, b => 2, c => 3, d => 4)
+    var %h = (a => 1, b => 2, c => 3, d => 4)
     delete $h{a}
     delete $h{c}
     len(keys %h)
@@ -105,20 +105,20 @@ fn Project::HashesExtended::hash_delete_multiple {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_slice_values {
-    my %h = (a => 1, b => 2, c => 3, d => 4)
-    my @vals = @h{qw(a c)}
+    val %h = (a => 1, b => 2, c => 3, d => 4)
+    val @vals = @h{qw(a c)}
     @vals
 }
 
 fn Project::HashesExtended::hash_slice_assign {
-    my %h = (a => 1, b => 2)
+    var %h = (a => 1, b => 2)
     @h{qw(c d)} = (3, 4)
     len(keys %h)
 }
 
 fn Project::HashesExtended::hash_slice_mixed {
-    my %h = (a => 1, b => 2, c => 3)
-    my @vals = @h{qw(a z c)}
+    val %h = (a => 1, b => 2, c => 3)
+    val @vals = @h{qw(a z c)}
     join(",", map { defined(_) ? _ : "U" } @vals)
 }
 
@@ -127,26 +127,26 @@ fn Project::HashesExtended::hash_slice_mixed {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_modify_value {
-    my %h = (x => 10)
+    var %h = (x => 10)
     $h{x} = 20
     $h{x}
 }
 
 fn Project::HashesExtended::hash_add_new_key {
-    my %h = (a => 1)
+    var %h = (a => 1)
     $h{b} = 2
     $h{b}
 }
 
 fn Project::HashesExtended::hash_increment {
-    my %h = (count => 0)
+    var %h = (count => 0)
     $h{count}++
     $h{count}++
     $h{count}
 }
 
 fn Project::HashesExtended::hash_compound_assign {
-    my %h = (x => 10)
+    var %h = (x => 10)
     $h{x} += 5
     $h{x}
 }
@@ -156,27 +156,27 @@ fn Project::HashesExtended::hash_compound_assign {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_iterate_keys {
-    my %h = (a => 1, b => 2, c => 3)
-    my $sum = 0
-    for my $k (keys %h) {
+    val %h = (a => 1, b => 2, c => 3)
+    var $sum = 0
+    for val $k (keys %h) {
         $sum += $h{$k}
     }
     $sum
 }
 
 fn Project::HashesExtended::hash_iterate_values {
-    my %h = (a => 1, b => 2, c => 3)
-    my $sum = 0
-    for my $v (values %h) {
+    val %h = (a => 1, b => 2, c => 3)
+    var $sum = 0
+    for val $v (values %h) {
         $sum += $v
     }
     $sum
 }
 
 fn Project::HashesExtended::hash_iterate_sorted {
-    my %h = (c => 3, a => 1, b => 2)
-    my @result
-    for my $k (sort keys %h) {
+    val %h = (c => 3, a => 1, b => 2)
+    var @result
+    for var $k (sort keys %h) {
         push @result, "$k=$h{$k}"
     }
     join(",", @result)
@@ -187,25 +187,25 @@ fn Project::HashesExtended::hash_iterate_sorted {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_to_array {
-    my %h = (a => 1, b => 2)
-    my @arr = %h
+    val %h = (a => 1, b => 2)
+    val @arr = %h
     scalar @arr}
 
 fn Project::HashesExtended::array_to_hash {
-    my @arr = qw(a 1 b 2 c 3)
-    my %h = @arr
+    val @arr = qw(a 1 b 2 c 3)
+    val %h = @arr
     $h{b}
 }
 
 fn Project::HashesExtended::hash_to_ref {
-    my %h = (x => 10, y => 20)
-    my $ref = \%h
+    val %h = (x => 10, y => 20)
+    val $ref = \%h
     $ref->{x}
 }
 
 fn Project::HashesExtended::ref_to_hash {
-    my $ref = {a => 1, b => 2}
-    my %h = %$ref
+    val $ref = {a => 1, b => 2}
+    val %h = %$ref
     $h{a}
 }
 
@@ -214,20 +214,20 @@ fn Project::HashesExtended::ref_to_hash {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_merge {
-    my %h1 = (a => 1, b => 2)
-    my %h2 = (c => 3, d => 4)
-    my %merged
-    for my $k (keys %h1) { $merged{$k} = $h1{$k} }
-    for my $k (keys %h2) { $merged{$k} = $h2{$k} }
+    val %h1 = (a => 1, b => 2)
+    val %h2 = (c => 3, d => 4)
+    var %merged
+    for val $k (keys %h1) { $merged{$k} = $h1{$k} }
+    for val $k (keys %h2) { $merged{$k} = $h2{$k} }
     len(keys %merged)
 }
 
 fn Project::HashesExtended::hash_merge_override {
-    my %h1 = (a => 1, b => 2)
-    my %h2 = (b => 20, c => 3)
-    my %merged
-    for my $k (keys %h1) { $merged{$k} = $h1{$k} }
-    for my $k (keys %h2) { $merged{$k} = $h2{$k} }
+    val %h1 = (a => 1, b => 2)
+    val %h2 = (b => 20, c => 3)
+    var %merged
+    for val $k (keys %h1) { $merged{$k} = $h1{$k} }
+    for val $k (keys %h2) { $merged{$k} = $h2{$k} }
     $merged{b}
 }
 
@@ -236,17 +236,17 @@ fn Project::HashesExtended::hash_merge_override {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_grep_keys {
-    my %h = (apple => 1, banana => 2, apricot => 3, cherry => 4)
-    my @keys = grep { /^a/ } keys %h
+    val %h = (apple => 1, banana => 2, apricot => 3, cherry => 4)
+    val @keys = grep { /^a/ } keys %h
     scalar @keys}
 
 fn Project::HashesExtended::hash_grep_values {
-    my %h = (a => 1, b => 2, c => 3, d => 4)
-    my @big = grep { $h{_} > 2 } keys %h
+    val %h = (a => 1, b => 2, c => 3, d => 4)
+    val @big = grep { $h{_} > 2 } keys %h
     scalar @big}
 
 fn Project::HashesExtended::hash_vals_map {
-    my %h = (a => 1, b => 2)
+    val %h = (a => 1, b => 2)
     $h{a} * 2
 }
 
@@ -255,8 +255,8 @@ fn Project::HashesExtended::hash_vals_map {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_invert {
-    my %h = (a => 1, b => 2, c => 3)
-    my %inv = rev %h
+    val %h = (a => 1, b => 2, c => 3)
+    val %inv = rev %h
     $inv{2}
 }
 
@@ -265,7 +265,7 @@ fn Project::HashesExtended::hash_invert {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_nested_access {
-    my %h = (
+    val %h = (
         outer => {
             inner => "value"
         }
@@ -274,13 +274,13 @@ fn Project::HashesExtended::hash_nested_access {
 }
 
 fn Project::HashesExtended::hash_nested_modify {
-    my %h = (level1 => {level2 => 10})
+    val %h = (level1 => {level2 => 10})
     $h{level1}{level2} = 20
     $h{level1}{level2}
 }
 
 fn Project::HashesExtended::hash_nested_add {
-    my %h = (a => {})
+    val %h = (a => {})
     $h{a}{b} = {c => "deep"}
     $h{a}{b}{c}
 }
@@ -290,19 +290,19 @@ fn Project::HashesExtended::hash_nested_add {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_numeric_key {
-    my %h = (42 => "answer")
+    val %h = (42 => "answer")
     $h{42}
 }
 
 fn Project::HashesExtended::hash_string_numeric_key {
-    my %h
+    var %h
     $h{42} = "a"
     $h{"42"} = "b"
     $h{42}
 }
 
 fn Project::HashesExtended::hash_complex_key {
-    my %h = ("key with spaces" => 1)
+    val %h = ("key with spaces" => 1)
     $h{"key with spaces"}
 }
 
@@ -311,35 +311,35 @@ fn Project::HashesExtended::hash_complex_key {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::HashesExtended::hash_is_empty {
-    my %h = ()
+    val %h = ()
     len(keys %h) == 0 ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_has_key {
-    my %h = (a => 1, b => 2)
+    val %h = (a => 1, b => 2)
     exists $h{a} ? 1 : 0
 }
 
 fn Project::HashesExtended::hash_get_or_default {
-    my %h = (a => 1)
-    my $val = $h{b} // "default"
+    val %h = (a => 1)
+    val $val = $h{b} // "default"
     $val
 }
 
 fn Project::HashesExtended::hash_count_by {
-    my @items = qw(a b a c a b)
-    my %counts
-    for my $item (@items) {
+    val @items = qw(a b a c a b)
+    var %counts
+    for val $item (@items) {
         $counts{$item}++
     }
     $counts{a}
 }
 
 fn Project::HashesExtended::hash_group_by {
-    my @nums = (1, 2, 3, 4, 5, 6)
-    my %groups = (even => [], odd => [])
-    for my $n (@nums) {
-        my $key = $n % 2 == 0 ? "even" : "odd"
+    val @nums = (1, 2, 3, 4, 5, 6)
+    val %groups = (even => [], odd => [])
+    for val $n (@nums) {
+        val $key = $n % 2 == 0 ? "even" : "odd"
         push @{$groups{$key}}, $n
     }
     len(@{$groups{even}})

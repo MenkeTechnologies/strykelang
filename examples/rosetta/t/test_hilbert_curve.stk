@@ -2,14 +2,14 @@
 # Rosetta Code: Hilbert curve
 
 fn Rosetta::Hilbert::d2xy($n, $d) {
-    my $x = 0
-    my $y = 0
-    my $t = $d
-    my $s = 1
+    var $x = 0
+    var $y = 0
+    var $t = $d
+    var $s = 1
     while ($s < $n) {
-        my $rx = 1 & (int($t / 2))
-        my $ry = 1 & ($t ^ $rx)
-        my $res = Rosetta::Hilbert::rot($s, $x, $y, $rx, $ry)
+        val $rx = 1 & (int($t / 2))
+        val $ry = 1 & ($t ^ $rx)
+        val $res = Rosetta::Hilbert::rot($s, $x, $y, $rx, $ry)
         $x = $res->[0] + $s * $rx
         $y = $res->[1] + $s * $ry
         $t = int($t / 4)
@@ -30,25 +30,25 @@ fn Rosetta::Hilbert::rot($n, $x, $y, $rx, $ry) {
 }
 
 # n=4 (2x2 order) -> 16 points
-my $res0 = Rosetta::Hilbert::d2xy(2, 0)
+val $res0 = Rosetta::Hilbert::d2xy(2, 0)
 assert_eq $res0->[0], 0, "d=0 x"
 assert_eq $res0->[1], 0, "d=0 y"
 
-my $res1 = Rosetta::Hilbert::d2xy(2, 1)
+val $res1 = Rosetta::Hilbert::d2xy(2, 1)
 assert_eq $res1->[0], 0, "d=1 x"
 assert_eq $res1->[1], 1, "d=1 y"
 
-my $res2 = Rosetta::Hilbert::d2xy(2, 2)
+val $res2 = Rosetta::Hilbert::d2xy(2, 2)
 assert_eq $res2->[0], 1, "d=2 x"
 assert_eq $res2->[1], 1, "d=2 y"
 
-my $res3 = Rosetta::Hilbert::d2xy(2, 3)
+val $res3 = Rosetta::Hilbert::d2xy(2, 3)
 assert_eq $res3->[0], 1, "d=3 x"
 assert_eq $res3->[1], 0, "d=3 y"
 
 # Higher order n=4
 # d=15 should be (3,0)
-my $res15 = Rosetta::Hilbert::d2xy(4, 15)
+val $res15 = Rosetta::Hilbert::d2xy(4, 15)
 assert_eq $res15->[0], 3, "n=4 d=15 x"
 assert_eq $res15->[1], 0, "n=4 d=15 y"
 

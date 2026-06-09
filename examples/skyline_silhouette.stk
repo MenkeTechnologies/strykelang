@@ -26,8 +26,8 @@
 # ── compute skyline ───────────────────────────────────────────────
 
 fn Sky::compute($buildings_ref) {
-    my @events
-    for my $bld (@$buildings_ref) {
+    var @events
+    for val $bld (@$buildings_ref) {
         # Start: negative height marker (sorts BEFORE ends at same x).
         push @events, [$bld->[0], -$bld->[2]]
         push @events, [$bld->[1],  $bld->[2]]
@@ -38,22 +38,22 @@ fn Sky::compute($buildings_ref) {
             : _0->[1] <=> _1->[1]
     } @events
 
-    my @active = (0)
-    my $prev_max = 0
-    my @skyline
-    for my $e (@events) {
-        my $x = $e->[0]
-        my $h = $e->[1]
+    var @active = (0)
+    var $prev_max = 0
+    var @skyline
+    for val $e (@events) {
+        val $x = $e->[0]
+        val $h = $e->[1]
         if ($h < 0) {
             push @active, -$h
         } else {
             # Remove the first occurrence of $h from @active.
-            for my $i (0:len(@active) - 1) {
+            for val $i (0:len(@active) - 1) {
                 if ($active[$i] == $h) { splice(@active, $i, 1); last }
             }
         }
-        my $max = 0
-        for my $v (@active) { $max = $v if $v > $max }
+        var $max = 0
+        for val $v (@active) { $max = $v if $v > $max }
         if ($max != $prev_max) {
             push @skyline, [$x, $max]
             $prev_max = $max
@@ -65,20 +65,20 @@ fn Sky::compute($buildings_ref) {
 # ── ASCII renderer ────────────────────────────────────────────────
 
 fn Sky::render($skyline_ref, $width_pad, $height) {
-    my $minx = 999999
-    my $maxx = -999999
-    for my $p (@$skyline_ref) {
+    var $minx = 999999
+    var $maxx = -999999
+    for val $p (@$skyline_ref) {
         $minx = $p->[0] if $p->[0] < $minx
         $maxx = $p->[0] if $p->[0] > $maxx
     }
-    my $W = ($maxx - $minx) + 1 + 2 * $width_pad
+    val $W = ($maxx - $minx) + 1 + 2 * $width_pad
     # Build the height map: at each x, the current height.
-    my @h
-    for my $col (0:$W - 1) { push @h, 0 }
-    my $cur = 0
-    my $idx = 0
-    for my $col (0:$W - 1) {
-        my $x = $col + $minx - $width_pad
+    var @h
+    for val $col (0:$W - 1) { push @h, 0 }
+    var $cur = 0
+    var $idx = 0
+    for val $col (0:$W - 1) {
+        val $x = $col + $minx - $width_pad
         # Update cur if we hit a skyline x.
         while ($idx < len(@$skyline_ref) && $skyline_ref->[$idx]->[0] <= $x) {
             $cur = $skyline_ref->[$idx]->[1]
@@ -86,22 +86,22 @@ fn Sky::render($skyline_ref, $width_pad, $height) {
         }
         $h[$col] = $cur
     }
-    my $out = ""
-    for my $y (rev 1:$height) {
-        for my $col (0:$W - 1) {
+    var $out = ""
+    for val $y (rev 1:$height) {
+        for val $col (0:$W - 1) {
             $out .= $h[$col] >= $y ? "#" : " "
         }
         $out .= "\n"
     }
     # Ground line.
-    for my $col (0:$W - 1) { $out .= "_" }
+    for val $col (0:$W - 1) { $out .= "_" }
     $out .= "\n"
     $out
 }
 
 # ── run ───────────────────────────────────────────────────────────
 
-my @buildings = (
+val @buildings = (
     [2,  9,  10],
     [3,  7,  15],
     [5,  12, 12],
@@ -109,19 +109,19 @@ my @buildings = (
     [19, 24, 8],
 )
 
-my $skyline = Sky::compute(\@buildings)
+val $skyline = Sky::compute(\@buildings)
 
 printf "── skyline for %d buildings ────────────────────────────\n\n", len(@buildings)
 print Sky::render($skyline, 2, 16)
 p ""
 printf "── key-points (x, height) ─────────────────────────────\n"
-for my $p (@$skyline) {
+for val $p (@$skyline) {
     printf "  (%d, %d)\n", $p->[0], $p->[1]
 }
 
 # ── invariant 1: known-good output for the canonical example ─────
 
-my @expected = (
+val @expected = (
     [2,  10],
     [3,  15],
     [7,  12],
@@ -131,21 +131,21 @@ my @expected = (
     [24, 0],
 )
 die "skyline length mismatch: got #{len(@$skyline)} want #{len(@expected)}" unless len(@$skyline) == len(@expected)
-for my $i (0:len(@expected) - 1) {
-    my $got = $skyline->[$i]
-    my $want = $expected[$i]
+for val $i (0:len(@expected) - 1) {
+    val $got = $skyline->[$i]
+    val $want = $expected[$i]
     die "key-point #{$i}: got (#{$got->[0]}, #{$got->[1]}) want (#{$want->[0]}, #{$want->[1]})" unless $got->[0] == $want->[0] && $got->[1] == $want->[1]
 }
 
 # ── invariant 2: x coordinates strictly increase ──────────────────
 
-for my $i (1:len(@$skyline) - 1) {
+for val $i (1:len(@$skyline) - 1) {
     die "x coords not strictly increasing at #{$i}" unless $skyline->[$i]->[0] > $skyline->[$i - 1]->[0]
 }
 
 # ── invariant 3: adjacent heights must differ (no redundant pts) ─
 
-for my $i (1:len(@$skyline) - 1) {
+for val $i (1:len(@$skyline) - 1) {
     die "two consecutive points have same height at #{$i}" unless $skyline->[$i]->[1] != $skyline->[$i - 1]->[1]
 }
 
@@ -155,15 +155,15 @@ die "skyline must end at height 0" unless $skyline->[-1]->[1] == 0
 
 # ── invariant 5: peak height equals the tallest building ──────────
 
-my $peak = 0
-for my $p (@$skyline) { $peak = $p->[1] if $p->[1] > $peak }
-my $tallest = 0
-for my $bld (@buildings) { $tallest = $bld->[2] if $bld->[2] > $tallest }
+var $peak = 0
+for val $p (@$skyline) { $peak = $p->[1] if $p->[1] > $peak }
+var $tallest = 0
+for val $bld (@buildings) { $tallest = $bld->[2] if $bld->[2] > $tallest }
 die "peak #{$peak} != tallest building #{$tallest}" unless $peak == $tallest
 
 # ── invariant 6: a single-building input gives exactly two pts ────
 
-my $single = Sky::compute([[5, 10, 7]])
+val $single = Sky::compute([[5, 10, 7]])
 die "single building must produce 2 key-points" unless len(@$single) == 2
 die "single building first point" unless $single->[0]->[0] == 5 && $single->[0]->[1] == 7
 die "single building last point" unless $single->[1]->[0] == 10 && $single->[1]->[1] == 0

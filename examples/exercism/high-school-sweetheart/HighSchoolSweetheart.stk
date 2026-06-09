@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 fn Exercism::HighSchoolSweetheart::first_letter {
-    my $t = _ =~ s/^\s+|\s+$//rg
+    val $t = _ =~ s/^\s+|\s+$//rg
     $t[0]
 }
 fn Exercism::HighSchoolSweetheart::initial  = uc(Exercism::HighSchoolSweetheart::first_letter(_)) . "."

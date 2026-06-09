@@ -14,40 +14,40 @@
 
 p "── distributed log aggregation ──"
 
-my @workers = congregation(4)
+val @workers = congregation(4)
 printf "spawned %d workers\n", len(@workers)
 
 # Each worker simulates a service emitting events and returns the JSON-
 # encoded per-event-type counts directly.
-my $simulate = "
-my %counts;
+val $simulate = "
+var %counts;
 my \@events = ('http_200', 'http_200', 'http_200', 'http_404', 'http_500', 'http_200');
 for my \$e (\@events) { \$counts{\$e}++ }
 to_json(\\%counts)
 "
-my %replies = harvest $simulate, @workers, 5_000
+val %replies = harvest $simulate, @workers, 5_000
 
 p "── per-worker event counts ──"
-for my $sid (sort { _ <=> _1 } keys %replies) {
-    my $h = from_json($replies{$sid})
+for val $sid (sort { _ <=> _1 } keys %replies) {
+    val $h = from_json($replies{$sid})
     if (ref($h) eq 'HASH') {
-        my @pairs = map { "$_=$h->{$_}" } sort keys %$h
+        val @pairs = map { "$_=$h->{$_}" } sort keys %$h
         printf "  worker %d: %s\n", $sid, join(" ", @pairs)
     }
 }
 
 # Aggregate across the fleet — sum each event type across all workers.
-my %fleet
-for my $sid (keys %replies) {
-    my $h = from_json($replies{$sid})
+var %fleet
+for val $sid (keys %replies) {
+    val $h = from_json($replies{$sid})
     next unless ref($h) eq 'HASH'
-    for my $event (keys %$h) {
+    for val $event (keys %$h) {
         $fleet{$event} = ($fleet{$event} // 0) + $h->{$event}
     }
 }
 
 p "── fleet-wide aggregate ──"
-for my $event (sort keys %fleet) {
+for val $event (sort keys %fleet) {
     printf "  %-10s %d\n", $event, $fleet{$event}
 }
 

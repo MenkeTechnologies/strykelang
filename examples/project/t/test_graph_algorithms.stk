@@ -3,7 +3,7 @@
 
 require "./lib/graph_algorithms.stk"
 
-my $graph = {
+val $graph = {
     A => ["B", "C"],
     B => ["D", "E"],
     C => ["F"],
@@ -13,7 +13,7 @@ my $graph = {
 }
 
 # ── Project::GraphAlgorithms::adv_bfs ─────
-my @bfs = Project::GraphAlgorithms::adv_bfs($graph, "A")
+val @bfs = Project::GraphAlgorithms::adv_bfs($graph, "A")
 # BFS: A -> B, C -> D, E, F
 assert_eq $bfs[0], "A", "bfs 0"
 assert_ok grep { _ eq "B" } @bfs[1,2], "bfs 1 or 2 is B"
@@ -21,7 +21,7 @@ assert_ok grep { _ eq "C" } @bfs[1,2], "bfs 1 or 2 is C"
 assert_eq len(@bfs), 6, "bfs all nodes"
 
 # ── Project::GraphAlgorithms::adv_dfs ─────
-my @dfs = Project::GraphAlgorithms::adv_dfs($graph, "A")
+val @dfs = Project::GraphAlgorithms::adv_dfs($graph, "A")
 assert_eq $dfs[0], "A", "dfs 0"
 assert_eq len(@dfs), 6, "dfs all nodes"
 
@@ -29,26 +29,26 @@ assert_eq len(@dfs), 6, "dfs all nodes"
 assert_false Project::GraphAlgorithms::adv_has_cycle($graph), "graph has no cycle"
 
 # ── Project::GraphAlgorithms::adv_dijkstra ─────
-my $weighted_graph = {
+val $weighted_graph = {
     A => [["B", 1], ["C", 4]],
     B => [["C", 2], ["D", 5]],
     C => [["D", 1]],
     D => []
 }
-my $dists = Project::GraphAlgorithms::adv_dijkstra($weighted_graph, "A")
+val $dists = Project::GraphAlgorithms::adv_dijkstra($weighted_graph, "A")
 assert_eq $dists->{A}, 0, "dist A = 0"
 assert_eq $dists->{B}, 1, "dist B = 1"
 assert_eq $dists->{C}, 3, "dist C = 3 (A->B->C)"
 assert_eq $dists->{D}, 4, "dist D = 4 (A->B->C->D)"
 
-my $cyclic_graph = {
+val $cyclic_graph = {
     A => ["B"],
     B => ["C"],
     C => ["A"]
 }
 assert_ok Project::GraphAlgorithms::adv_has_cycle($cyclic_graph), "cyclic_graph has cycle"
 
-my $complex_cyclic = {
+val $complex_cyclic = {
     1 => [2],
     2 => [3],
     3 => [4],

@@ -2,11 +2,11 @@
 # Rosetta Code: Longest common prefix
 
 fn Rosetta::LongestCommonPrefix::common($s1, $s2) {
-    my @c1 = chars($s1)
-    my @c2 = chars($s2)
-    my $len = len(@c1) < len(@c2) ? len(@c1) : len(@c2)
-    my $res = ""
-    my $i = 0
+    val @c1 = chars($s1)
+    val @c2 = chars($s2)
+    val $len = len(@c1) < len(@c2) ? len(@c1) : len(@c2)
+    var $res = ""
+    var $i = 0
     while ($i < $len) {
         if ($c1[$i] eq $c2[$i]) {
             $res = $res . $c1[$i]

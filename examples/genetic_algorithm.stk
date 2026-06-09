@@ -16,34 +16,34 @@
 
 # ── target ─────────────────────────────────────────────────────────
 
-my $TARGET = "TO_BE_OR_NOT_TO_BE"
-my $TGT_LEN = len $TARGET
+val $TARGET = "TO_BE_OR_NOT_TO_BE"
+val $TGT_LEN = len $TARGET
 
 # ── parameters ─────────────────────────────────────────────────────
 
-my $POP    = 200
-my $GENS   = 60
-my $MUT    = 0.05;     # 5% per-char mutation rate
-my $TOURN  = 5;        # tournament size
-my $ELITE  = 5;        # top-K kept across generations
-my $ALPHA  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+val $POP    = 200
+val $GENS   = 60
+val $MUT    = 0.05;     # 5% per-char mutation rate
+val $TOURN  = 5;        # tournament size
+val $ELITE  = 5;        # top-K kept across generations
+val $ALPHA  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_gen = t_digest(100)
-my $tk_pos = topk(20)
-my $hll_g  = hll(12)
+val $td_gen = t_digest(100)
+val $tk_pos = topk(20)
+val $hll_g  = hll(12)
 
 # ── random helpers ─────────────────────────────────────────────────
 
 fn Demo::GA::rand_char() {
-    my $i = ~> $ALPHA len rand int
+    val $i = ~> $ALPHA len rand int
     substr($ALPHA, $i, 1)
 }
 
 fn Demo::GA::rand_genome() {
-    my @chars
-    for my $i (1:$TGT_LEN) {
+    var @chars
+    for val $i (1:$TGT_LEN) {
         push @chars, Demo::GA::rand_char()
     }
     join("", @chars)
@@ -52,8 +52,8 @@ fn Demo::GA::rand_genome() {
 # ── fitness: number of matching chars (0..TGT_LEN) ────────────────
 
 fn Demo::GA::fitness($g) {
-    my $score = 0
-    for my $i (0:$TGT_LEN - 1) {
+    var $score = 0
+    for val $i (0:$TGT_LEN - 1) {
         $score++ if substr($g, $i, 1) eq substr($TARGET, $i, 1)
     }
     $score
@@ -62,12 +62,12 @@ fn Demo::GA::fitness($g) {
 # ── tournament selection: best of K random ────────────────────────
 
 fn Demo::GA::tournament($pop_ref) {
-    my $best
-    my $best_fit = -1
-    for my $i (1:$TOURN) {
-        my $idx = ~> @$pop_ref len rand int
-        my $g = $pop_ref->[$idx]
-        my $f = Demo::GA::fitness($g)
+    var $best
+    var $best_fit = -1
+    for val $i (1:$TOURN) {
+        val $idx = ~> @$pop_ref len rand int
+        val $g = $pop_ref->[$idx]
+        val $f = Demo::GA::fitness($g)
         if ($f > $best_fit) {
             $best = $g
             $best_fit = $f
@@ -79,15 +79,15 @@ fn Demo::GA::tournament($pop_ref) {
 # ── crossover: one-point ──────────────────────────────────────────
 
 fn Demo::GA::crossover($parent_a, $parent_b) {
-    my $point = int(rand $TGT_LEN)
+    val $point = int(rand $TGT_LEN)
     substr($parent_a, 0, $point) . substr($parent_b, $point)
 }
 
 # ── mutation ──────────────────────────────────────────────────────
 
 fn Demo::GA::mutate($g) {
-    my @chars = split //, $g
-    for my $i (0:len(@chars) - 1) {
+    var @chars = split //, $g
+    for val $i (0:len(@chars) - 1) {
         if (rand() < $MUT) {
             $chars[$i] = Demo::GA::rand_char()
         }
@@ -98,39 +98,39 @@ fn Demo::GA::mutate($g) {
 # ── seed population ───────────────────────────────────────────────
 
 srand(42);   # deterministic run
-my @pop
-for my $i (1:$POP) {
+var @pop
+for val $i (1:$POP) {
     push @pop, Demo::GA::rand_genome()
 }
 
 p "genetic algorithm demo"
 p "target: \"$TARGET\" (len=$TGT_LEN, pop=$POP, gens=$GENS)"
 p "─" x 60
-my $best_ever_fit = -1
-my $best_ever     = ""
-my $best_gen      = 0
+var $best_ever_fit = -1
+var $best_ever     = ""
+var $best_gen      = 0
 
 # ── evolve ────────────────────────────────────────────────────────
 
-for my $gen (1:$GENS) {
-    my $t0 = now_ns()
+for val $gen (1:$GENS) {
+    val $t0 = now_ns()
 
     # Evaluate fitness for the whole pop in parallel.
-    my @fits = pmap {Demo::GA::fitness} @pop
+    val @fits = pmap {Demo::GA::fitness} @pop
 
     # Sort by fitness desc.
-    my @ranked = map { _->[1] }
+    val @ranked = map { _->[1] }
                  sort { _1->[0] <=> _->[0] }
                  map { [$fits[_], $pop[_]] }
                  (0:len(@pop) - 1)
 
-    my $cur_best_fit = Demo::GA::fitness($ranked[0])
-    my $cur_best     = $ranked[0]
+    val $cur_best_fit = Demo::GA::fitness($ranked[0])
+    val $cur_best     = $ranked[0]
 
     td_add($td_gen, $cur_best_fit)
     hll_add($hll_g, $cur_best)
 
-    for my $i (0:$TGT_LEN - 1) {
+    for val $i (0:$TGT_LEN - 1) {
         if (substr($cur_best, $i, 1) eq substr($TARGET, $i, 1)) {
             topk_add($tk_pos, "pos-$i")
         }
@@ -151,14 +151,14 @@ for my $gen (1:$GENS) {
     last if $cur_best_fit == $TGT_LEN
 
     # Build next pop: elitism + breed.
-    my @next_pop
-    for my $i (0:$ELITE - 1) {
+    var @next_pop
+    for val $i (0:$ELITE - 1) {
         push @next_pop, $ranked[$i]
     }
     while (len(@next_pop) < $POP) {
-        my $parent_a = Demo::GA::tournament(\@pop)
-        my $parent_b = Demo::GA::tournament(\@pop)
-        my $child    = Demo::GA::crossover($parent_a, $parent_b)
+        val $parent_a = Demo::GA::tournament(\@pop)
+        val $parent_b = Demo::GA::tournament(\@pop)
+        var $child    = Demo::GA::crossover($parent_a, $parent_b)
         $child = Demo::GA::mutate($child)
         push @next_pop, $child
     }
@@ -168,20 +168,20 @@ for my $gen (1:$GENS) {
 # ── summary ────────────────────────────────────────────────────────
 
 p "\nbest ever: \"$best_ever\" (fitness $best_ever_fit/$TGT_LEN at gen $best_gen)"
-my $hits = $best_ever eq $TARGET ? "PERFECT MATCH" : "partial match"
+val $hits = $best_ever eq $TARGET ? "PERFECT MATCH" : "partial match"
 p "result: $hits"
 
 # ── per-position-hit ranking ──────────────────────────────────────
 
 p "\nmost-frequently-correct positions (TopK):"
-my @top = topk_top($tk_pos, 6)
-for my $p (@top) {
+val @top = topk_top($tk_pos, 6)
+for val $p (@top) {
     printf("  %-7s correct_gens=%d\n", $p->[0], $p->[1])
 }
 
 # ── distinct genomes seen as best ─────────────────────────────────
 
-my $hll_n = hll_count($hll_g)
+val $hll_n = hll_count($hll_g)
 printf("\ndistinct best-of-generation genomes seen: HLL=%.1f\n", $hll_n)
 
 # ── per-gen fitness distribution ──────────────────────────────────

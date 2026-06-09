@@ -12,15 +12,15 @@ fn Rosetta::BinStr::find($haystack, $needle) {
     index($haystack, $needle)
 }
 
-my $a = "hello"
-my $b = "world"
+val $a = "hello"
+val $b = "world"
 
 # Length
 assert_eq length($a), 5, "len a"
 assert_eq length($b), 5, "len b"
 
 # Concat
-my $c = $a . " " . $b
+val $c = $a . " " . $b
 assert_eq $c, "hello world", "concat"
 assert_eq length($c), 11, "len concat"
 
@@ -43,12 +43,12 @@ assert_eq Rosetta::BinStr::find($c, "world"), 6, "find world at 6"
 assert_eq Rosetta::BinStr::find($c, "xyz"),   -1, "not found"
 
 # Construct from raw bytes (round-trip)
-my $bin = Rosetta::BinStr::from_bytes(72, 105, 33)
+val $bin = Rosetta::BinStr::from_bytes(72, 105, 33)
 assert_eq $bin, "Hi!", "from_bytes"
 assert_eq length($bin), 3, "3 bytes"
 
 # Replacement (Perl-style s///)
-my $copy = $c
+var $copy = $c
 $copy =~ s/world/stryke/
 assert_eq $copy, "hello stryke", "s/// replace"
 

@@ -15,10 +15,10 @@
 # Run: stryke --no-interop examples/two_sum_no_interop.stk
 
 fn TwoSum::find($nums_ref, $target) {
-    my %seen
-    my $n = len(@$nums_ref)
-    for my $i (0:$n - 1) {
-        my $need = $target - $nums_ref->[$i]
+    var %seen
+    val $n = len(@$nums_ref)
+    for val $i (0:$n - 1) {
+        val $need = $target - $nums_ref->[$i]
         if (exists $seen{$need}) {
             return [$seen{$need}, $i]
         }
@@ -28,7 +28,7 @@ fn TwoSum::find($nums_ref, $target) {
 }
 
 # Demo grid — paired (nums, target, expected indices or []).
-my @cases = (
+val @cases = (
     +{ nums => [2, 7, 11, 15],     target => 9,   want => [0, 1] },
     +{ nums => [3, 2, 4],          target => 6,   want => [1, 2] },
     +{ nums => [3, 3],             target => 6,   want => [0, 1] },
@@ -41,15 +41,15 @@ my @cases = (
 )
 
 p "── TwoSum demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = TwoSum::find($c->{nums}, $c->{target})
-    my $got_str  = "[" . join(",", @$got) . "]"
-    my $want_str = "[" . join(",", @{$c->{want}}) . "]"
-    my $ok = ($got_str eq $want_str)
+var $fail = 0
+for val $c (@cases) {
+    val $got = TwoSum::find($c->{nums}, $c->{target})
+    val $got_str  = "[" . join(",", @$got) . "]"
+    val $want_str = "[" . join(",", @{$c->{want}}) . "]"
+    var $ok = ($got_str eq $want_str)
     # If indices were returned, verify they really sum to target.
     if ($ok && len(@$got) == 2) {
-        my $sum = $c->{nums}[$got->[0]] + $c->{nums}[$got->[1]]
+        val $sum = $c->{nums}[$got->[0]] + $c->{nums}[$got->[1]]
         $ok = ($sum == $c->{target})
     }
     $fail++ unless $ok
@@ -61,10 +61,10 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " two-sum cases failed" if $fail > 0
 
 # Universal: if the function returns indices, they must really sum.
-for my $c (@cases) {
-    my $r = TwoSum::find($c->{nums}, $c->{target})
+for val $c (@cases) {
+    val $r = TwoSum::find($c->{nums}, $c->{target})
     next if len(@$r) == 0
-    my $sum = $c->{nums}[$r->[0]] + $c->{nums}[$r->[1]]
+    val $sum = $c->{nums}[$r->[0]] + $c->{nums}[$r->[1]]
     die "returned pair doesn't sum to target" unless $sum == $c->{target}
     die "indices not strictly increasing"     unless $r->[0] < $r->[1]
 }

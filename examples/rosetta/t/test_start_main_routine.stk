@@ -8,7 +8,7 @@ fn Rosetta::MainRoutine::main() {
 # The task is about ensuring there's a clear entry point.
 # In many languages, this is literal. In Stryke/Perl, we can just call it.
 
-my $res = Rosetta::MainRoutine::main()
+val $res = Rosetta::MainRoutine::main()
 assert_eq $res, "Program started from main", "Entry point main called"
 
 test_run

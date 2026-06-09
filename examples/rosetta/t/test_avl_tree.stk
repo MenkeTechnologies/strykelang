@@ -11,14 +11,14 @@ fn Rosetta::AVL::balance($node) {
 }
 
 fn Rosetta::AVL::recompute($n) {
-    my $lh = Rosetta::AVL::height($n->{l})
-    my $rh = Rosetta::AVL::height($n->{r})
+    val $lh = Rosetta::AVL::height($n->{l})
+    val $rh = Rosetta::AVL::height($n->{r})
     $n->{h} = 1 + ($lh > $rh ? $lh : $rh)
 }
 
 fn Rosetta::AVL::rotate_right($y) {
-    my $x = $y->{l}
-    my $t2 = $x->{r}
+    var $x = $y->{l}
+    val $t2 = $x->{r}
     $x->{r} = $y
     $y->{l} = $t2
     Rosetta::AVL::recompute($y)
@@ -27,8 +27,8 @@ fn Rosetta::AVL::rotate_right($y) {
 }
 
 fn Rosetta::AVL::rotate_left($x) {
-    my $y = $x->{r}
-    my $t2 = $y->{l}
+    var $y = $x->{r}
+    val $t2 = $y->{l}
     $y->{l} = $x
     $x->{r} = $t2
     Rosetta::AVL::recompute($x)
@@ -45,7 +45,7 @@ fn Rosetta::AVL::insert($node, $key) {
         $node->{r} = Rosetta::AVL::insert($node->{r}, $key)
     }
     Rosetta::AVL::recompute($node)
-    my $bf = Rosetta::AVL::balance($node)
+    val $bf = Rosetta::AVL::balance($node)
     return Rosetta::AVL::rotate_right($node) if $bf > 1 && $key < $node->{l}{k}
     return Rosetta::AVL::rotate_left($node)  if $bf < -1 && $key > $node->{r}{k}
     if ($bf > 1 && $key > $node->{l}{k}) {
@@ -74,14 +74,14 @@ fn Rosetta::AVL::inorder($node, $out) {
 }
 
 fn Rosetta::AVL::sorted($root) {
-    my @out
+    val @out
     Rosetta::AVL::inorder($root, \@out)
     \@out
 }
 
 # Build, in-order traversal returns sorted
-my $root
-for my $v (10, 20, 30, 40, 50, 25) {
+var $root
+for val $v (10, 20, 30, 40, 50, 25) {
     $root = Rosetta::AVL::insert($root, $v)
 }
 assert_eq join(",", @{Rosetta::AVL::sorted($root)}), "10,20,25,30,40,50", "inorder is sorted"
@@ -97,8 +97,8 @@ fn Rosetta::AVL::is_balanced($node) {
 assert_ok Rosetta::AVL::is_balanced($root), "balanced after 6 inserts"
 
 # Insert sequential 1..100 — naive BST would be O(n) deep; AVL stays O(log n)
-my $r2
-for my $v (1:100) {
+var $r2
+for val $v (1:100) {
     $r2 = Rosetta::AVL::insert($r2, $v)
 }
 assert_eq len(@{Rosetta::AVL::sorted($r2)}), 100, "100 keys all inserted"
@@ -106,7 +106,7 @@ assert_ok Rosetta::AVL::is_balanced($r2), "balanced after 100 sequential inserts
 assert_ok Rosetta::AVL::height($r2) <= 8, "height after 100 keys <= 8 (log2(100) ~ 6.6)"
 
 # Duplicate insert is a no-op (same key)
-my $r3 = Rosetta::AVL::insert($r2, 50)
+val $r3 = Rosetta::AVL::insert($r2, 50)
 assert_eq len(@{Rosetta::AVL::sorted($r3)}), 100, "dup insert doesn't add"
 
 test_run

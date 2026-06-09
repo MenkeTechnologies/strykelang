@@ -4,11 +4,11 @@
 
 fn Rosetta::StrictPart::count($n) {
     return 1 if $n == 0
-    my @dp
-    for my $i (0:$n) { $dp[$i] = 0 }
+    var @dp
+    for val $i (0:$n) { $dp[$i] = 0 }
     $dp[0] = 1
-    for my $part (1:$n) {
-        for (my $i = $n; $i >= $part; $i -= 1) {
+    for val $part (1:$n) {
+        for (var $i = $n; $i >= $part; $i -= 1) {
             $dp[$i] += $dp[$i - $part]
         }
     }
@@ -19,39 +19,39 @@ fn Rosetta::StrictPart::count($n) {
 fn Rosetta::StrictPart::enumerate($n, $max_part) {
     return [[]] if $n == 0
     return [] if $max_part == 0
-    my @result
+    var @result
     if ($max_part <= $n) {
-        my $with = Rosetta::StrictPart::enumerate($n - $max_part, $max_part - 1)
-        for my $p (@$with) {
+        val $with = Rosetta::StrictPart::enumerate($n - $max_part, $max_part - 1)
+        for val $p (@$with) {
             push @result, [$max_part, @$p]
         }
     }
-    my $without = Rosetta::StrictPart::enumerate($n, $max_part - 1)
-    for my $p (@$without) {
+    val $without = Rosetta::StrictPart::enumerate($n, $max_part - 1)
+    for val $p (@$without) {
         push @result, $p
     }
     \@result
 }
 
 # OEIS A000009: 1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 22, 27, 32, 38, 46, 54, 64
-my @want = (1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 22, 27, 32, 38, 46, 54, 64)
-for my $n (0:20) {
+val @want = (1, 1, 1, 2, 2, 3, 4, 5, 6, 8, 10, 12, 15, 18, 22, 27, 32, 38, 46, 54, 64)
+for val $n (0:20) {
     assert_eq Rosetta::StrictPart::count($n), $want[$n], "strict_count($n)"
 }
 
 # count agrees with enumeration size for small n
-for my $n (0:10) {
-    my $en = Rosetta::StrictPart::enumerate($n, $n)
-    my $cnt = len(@$en)
-    my $expected = Rosetta::StrictPart::count($n)
+for val $n (0:10) {
+    val $en = Rosetta::StrictPart::enumerate($n, $n)
+    val $cnt = len(@$en)
+    val $expected = Rosetta::StrictPart::count($n)
     assert_eq $cnt, $expected, "enum size matches count for n=$n"
 }
 
 # A few specific strict partitions
-my $p7 = Rosetta::StrictPart::enumerate(7, 7)
+val $p7 = Rosetta::StrictPart::enumerate(7, 7)
 # A000009(7) = 5: {7}, {6,1}, {5,2}, {4,3}, {4,2,1}
-my @joined = map { join("+", @{_}) } @$p7
-my @sorted = sort @joined
+val @joined = map { join("+", @{_}) } @$p7
+val @sorted = sort @joined
 assert_eq len(@sorted), 5, "5 strict partitions of 7"
 
 test_run

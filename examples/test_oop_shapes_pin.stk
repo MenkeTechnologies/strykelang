@@ -40,15 +40,15 @@ class Triangle impl Drawable, Sized, Bounded {
     fn draw      = "△(" . $self->a . "," . $self->b . "," . $self->c . ")"
     fn perimeter = $self->a + $self->b + $self->c
     fn area {
-        my $s = $self->perimeter() / 2
+        val $s = $self->perimeter() / 2
         sqrt($s * ($s - $self->a) * ($s - $self->b) * ($s - $self->c))
     }
 }
 
-my $sq = Square->new(side => 5.0)
-my $rc = Rectangle->new(w => 4.0, h => 3.0)
-my $ci = Circle->new(r => 2.0)
-my $tr = Triangle->new(a => 3.0, b => 4.0, c => 5.0)
+val $sq = Square->new(side => 5.0)
+val $rc = Rectangle->new(w => 4.0, h => 3.0)
+val $ci = Circle->new(r => 2.0)
+val $tr = Triangle->new(a => 3.0, b => 4.0, c => 5.0)
 
 $sq->draw()       |> aeq "□(5)",       "draw sq"
 $rc->draw()       |> aeq "▭(4x3)",     "draw rc"
@@ -66,22 +66,22 @@ abs($ci->perimeter() - 12.566370614359172) < 1e-9 |> aeq 1, "peri ci"
 $tr->perimeter()  |> aeq 12,   "peri tr"
 
 # Polymorphic dispatch via array + pipelines
-my @shapes = ($sq, $rc, $ci, $tr)
+val @shapes = ($sq, $rc, $ci, $tr)
 
-my @drawn = @shapes |> maps { $_->draw() }
+val @drawn = @shapes |> maps { $_->draw() }
 join("|", @drawn) |> aeq "□(5)|▭(4x3)|○(2)|△(3,4,5)", "polymorphic draw"
 
-my @areas = @shapes |> maps { $_->area() }
-my $total = 0
+val @areas = @shapes |> maps { $_->area() }
+var $total = 0
 $total += $_ for @areas
 abs($total - (25 + 12 + 12.566370614359172 + 6)) < 1e-9 |> aeq 1, "Σ areas"
 
 # Filter: big shapes (area > 10)
-my @big_names = @shapes |> greps { $_->area() > 10 } |> maps { $_->name() }
+val @big_names = @shapes |> greps { $_->area() > 10 } |> maps { $_->name() }
 join(",", @big_names) |> aeq "sq,rc,ci", "big names"
 
 # Sort by area (ascending) and pick smallest/biggest
-my @sorted = sort { $_->area() <=> $_1->area() } @shapes
+val @sorted = sort { $_->area() <=> $_1->area() } @shapes
 $sorted[0]->name()  |> aeq "tr", "smallest area is tr (6)"
 $sorted[-1]->name() |> aeq "sq", "largest area is sq (25)"
 
@@ -91,22 +91,22 @@ $sq->isa("Square")    |> aok                "sq isa Square"
 $sq->isa("Rectangle") |> aeq "",             "sq NOT Rectangle"
 
 # All shapes can draw (verify by call, not `can`)
-my @ds = ()
+var @ds = ()
 push @ds, $_->draw() for @shapes
 (len @ds) |> aeq 4, "4 drawables"
 
 # Aggregate stats
-my @ps = @shapes |> maps { $_->perimeter() }
-my $sum_p = 0
+val @ps = @shapes |> maps { $_->perimeter() }
+var $sum_p = 0
 $sum_p += $_ for @ps
 abs($sum_p - (20 + 14 + 12.566370614359172 + 12)) < 1e-9 |> aeq 1, "Σ perimeters"
 
 # Sort by name lex
-my @byname = sort { $_->name() cmp $_1->name() } @shapes
+val @byname = sort { $_->name() cmp $_1->name() } @shapes
 join(",", map { $_->name() } @byname) |> aeq "ci,rc,sq,tr", "sorted names"
 
 # Count distinct classes
-my %distinct = ()
+var %distinct = ()
 $distinct{ref($_)} = 1 for @shapes
 (len keys %distinct) |> aeq 4, "4 distinct shape classes"
 

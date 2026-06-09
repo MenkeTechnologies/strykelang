@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 
 fn Exercism::IsbnVerifier::is_valid {
-    my $s = _ =~ s/-//rg
+    val $s = _ =~ s/-//rg
     return 0 unless $s =~ /^\d{9}[\dX]$/
-    my @ch  = split //, $s
-    my $sum = ~> 0:9 maps { ($ch[_] eq 'X' ? 10 : $ch[_]) * (10 - _) } sum
+    val @ch  = split //, $s
+    val $sum = ~> 0:9 maps { ($ch[_] eq 'X' ? 10 : $ch[_]) * (10 - _) } sum
     $sum % 11 == 0 ? 1 : 0
 }

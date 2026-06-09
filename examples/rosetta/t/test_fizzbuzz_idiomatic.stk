@@ -10,7 +10,7 @@ fn Rosetta::FizzBuzz::idiomatic($n) {
     }
 }
 
-my @res = Rosetta::FizzBuzz::idiomatic(15)
+val @res = Rosetta::FizzBuzz::idiomatic(15)
 
 assert_eq @res[0], 1, "1"
 assert_eq @res[2], "Fizz", "3 is Fizz"

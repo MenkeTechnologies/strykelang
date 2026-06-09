@@ -21,8 +21,8 @@ fn Josephus::survivor = _ == 1 ? 0 : (Josephus::survivor(_ - 1, _1) + _1) % _
 
 # Iterative variant — same answer but O(n) without recursion depth.
 fn Josephus::survivor_iter($n, $k) {
-    my $j = 0
-    for my $i (2:$n) {
+    var $j = 0
+    for val $i (2:$n) {
         $j = ($j + $k) % $i
     }
     $j
@@ -32,8 +32,8 @@ fn Josephus::survivor_iter($n, $k) {
 # and return the last one standing. Slower (O(n*k)) but matches the
 # closed-form for correctness check.
 fn Josephus::simulate($n, $k) {
-    my @circle = 0:$n - 1
-    my $idx = 0
+    var @circle = 0:$n - 1
+    var $idx = 0
     while (len(@circle) > 1) {
         $idx = ($idx + $k - 1) % len(@circle)
         splice @circle, $idx, 1
@@ -50,7 +50,7 @@ die "simulate matches (41, 3)"       unless Josephus::simulate(41, 3) == 30
 p "  N=41, k=3: survivor at index 30 (Roman tradition)  OK"
 
 # A few more known cases (OEIS / classical).
-my @cases = (
+val @cases = (
     +{ n =>  1, k => 2, ans => 0 },
     +{ n =>  2, k => 2, ans => 0 },
     +{ n =>  3, k => 2, ans => 2 },
@@ -60,10 +60,10 @@ my @cases = (
     +{ n => 13, k => 4, ans => 4 },    # tractable cross-impl check
 )
 
-for my $c (@cases) {
-    my $r = Josephus::survivor($c->{n}, $c->{k})
-    my $i = Josephus::survivor_iter($c->{n}, $c->{k})
-    my $s = Josephus::simulate($c->{n}, $c->{k})
+for val $c (@cases) {
+    val $r = Josephus::survivor($c->{n}, $c->{k})
+    val $i = Josephus::survivor_iter($c->{n}, $c->{k})
+    val $s = Josephus::simulate($c->{n}, $c->{k})
     die "N=$c->{n}, k=$c->{k}: rec got $r expected $c->{ans}" unless $r == $c->{ans}
     die "iter disagrees"     unless $i == $c->{ans}
     die "simulate disagrees" unless $s == $c->{ans}
@@ -71,15 +71,15 @@ for my $c (@cases) {
 p "  #{len @cases} additional cases verified across 3 implementations  OK"
 
 # k=1 means "eliminate every neighbor" — survivor is always n-1.
-for my $n (1:20) {
+for val $n (1:20) {
     die "k=1, N=$n: survivor != n-1" unless Josephus::survivor($n, 1) == $n - 1
 }
 p "  k=1 boundary: survivor is always N-1 (last in line)  OK"
 
 # Universal invariant: 0 <= survivor < N (always within bounds).
-for my $n (1:50) {
-    for my $k (1:10) {
-        my $r = Josephus::survivor($n, $k)
+for val $n (1:50) {
+    for val $k (1:10) {
+        val $r = Josephus::survivor($n, $k)
         die "out of bounds: $r not in 0:#{$n - 1}" unless $r >= 0 && $r < $n
     }
 }

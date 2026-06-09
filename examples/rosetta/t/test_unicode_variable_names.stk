@@ -4,8 +4,8 @@
 fn Rosetta::UnicodeVars::demo() {
     # Stryke supports Unicode in identifiers
     my $π = 3.14159
-    my $r = 2
-    my $area = $π * ($r ** 2)
+    val $r = 2
+    val $area = $π * ($r ** 2)
     
     assert_eq $area, 12.56636, "Area calculation using Unicode variable name"
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 
 fn SH::hash32($s) {
-    my $h = 2166136261
-    my $n = len $s
-    for my $i (0:$n-1) {
+    var $h = 2166136261
+    val $n = len $s
+    for val $i (0:$n-1) {
         $h = $h ^ ord(substr($s, $i, 1))
         $h = ($h * 16777619) % 4294967296
     }
@@ -11,23 +11,23 @@ fn SH::hash32($s) {
 }
 
 fn SH::shingles($text, $k) {
-    my $n = len $text
+    val $n = len $text
     return [$text] if $n <= $k
-    my @out = ()
-    for my $i (0:$n-$k) {
+    var @out = ()
+    for val $i (0:$n-$k) {
         push @out, substr($text, $i, $k)
     }
     \@out
 }
 
 fn SH::compute($text, $k) {
-    my @v = ()
-    for my $i (0:31) { push @v, 0 }
-    my $sh = SH::shingles($text, $k)
-    for my $tok (@$sh) {
-        my $h = SH::hash32($tok)
-        for my $bi (0:31) {
-            my $bit = int($h / (2 ** $bi)) % 2
+    var @v = ()
+    for val $i (0:31) { push @v, 0 }
+    val $sh = SH::shingles($text, $k)
+    for val $tok (@$sh) {
+        val $h = SH::hash32($tok)
+        for val $bi (0:31) {
+            val $bit = int($h / (2 ** $bi)) % 2
             if ($bit == 1) {
                 $v[$bi] = $v[$bi] + 1
             } else {
@@ -35,61 +35,61 @@ fn SH::compute($text, $k) {
             }
         }
     }
-    my $sig = 0
-    for my $bi (0:31) {
+    var $sig = 0
+    for val $bi (0:31) {
         if ($v[$bi] >= 0) { $sig = $sig + (2 ** $bi) }
     }
     $sig
 }
 
 fn SH::hamming($x, $y) {
-    my $z = $x ^ $y
-    my $cnt = 0
-    for my $bi (0:31) {
+    val $z = $x ^ $y
+    var $cnt = 0
+    for val $bi (0:31) {
         $cnt = $cnt + 1 if int($z / (2 ** $bi)) % 2 == 1
     }
     $cnt
 }
 
 # --- hash32 ---
-my $hv = SH::hash32("")
+val $hv = SH::hash32("")
 $hv |> aeq 2166136261, "fnv1a empty"
 
-my $h_a = SH::hash32("a")
-my $h_b = SH::hash32("a")
+val $h_a = SH::hash32("a")
+val $h_b = SH::hash32("a")
 $h_a |> aeq $h_b, "fnv1a determinism"
 
 (SH::hash32("a") == SH::hash32("b")) |> aeq 0, "fnv1a different chars distinct"
 (SH::hash32("hello") == SH::hash32("world")) |> aeq 0, "fnv1a different words distinct"
 
 # Range
-my $hh = SH::hash32("foo")
+val $hh = SH::hash32("foo")
 ($hh >= 0) |> aeq 1, "hash non-negative"
 ($hh < 4294967296) |> aeq 1, "hash fits u32"
 
 # --- shingles ---
-my $s1 = SH::shingles("hello", 3)
+val $s1 = SH::shingles("hello", 3)
 len(@$s1) |> aeq 3, "shingles len=3"
 $s1->[0] |> aeq "hel", "shingle 0"
 $s1->[1] |> aeq "ell", "shingle 1"
 $s1->[2] |> aeq "llo", "shingle 2"
 
-my $s2 = SH::shingles("abc", 3)
+val $s2 = SH::shingles("abc", 3)
 len(@$s2) |> aeq 1, "shingles equal len"
 $s2->[0] |> aeq "abc", "shingle eq val"
 
-my $s3 = SH::shingles("ab", 3)
+val $s3 = SH::shingles("ab", 3)
 len(@$s3) |> aeq 1, "shingles shorter"
 $s3->[0] |> aeq "ab", "short shingle val"
 
-my $s4 = SH::shingles("abcdef", 2)
+val $s4 = SH::shingles("abcdef", 2)
 len(@$s4) |> aeq 5, "shingles k=2 len"
 $s4->[0] |> aeq "ab", "k=2 first"
 $s4->[4] |> aeq "ef", "k=2 last"
 
 # --- compute determinism ---
-my $sig_a = SH::compute("hello world", 3)
-my $sig_b = SH::compute("hello world", 3)
+val $sig_a = SH::compute("hello world", 3)
+val $sig_b = SH::compute("hello world", 3)
 $sig_a |> aeq $sig_b, "simhash deterministic"
 
 # --- hamming ---
@@ -101,29 +101,29 @@ SH::hamming(7, 0) |> aeq 3, "hamming three"
 SH::hamming(123, 123) |> aeq 0, "hamming same"
 
 # Symmetry
-my $xa = 0x12345678
-my $xb = 0xDEADBEEF
+val $xa = 0x12345678
+val $xb = 0xDEADBEEF
 SH::hamming($xa, $xb) |> aeq SH::hamming($xb, $xa), "hamming symmetric"
 
 # --- end-to-end: near-duplicate has small hamming ---
-my $doc1 = "the quick brown fox jumps over the lazy dog"
-my $doc2 = "the quick brown fox jumps over a lazy dog"
-my $doc3 = "completely unrelated text about cats and weather"
+val $doc1 = "the quick brown fox jumps over the lazy dog"
+val $doc2 = "the quick brown fox jumps over a lazy dog"
+val $doc3 = "completely unrelated text about cats and weather"
 
-my $sig1 = SH::compute($doc1, 4)
-my $sig2 = SH::compute($doc2, 4)
-my $sig3 = SH::compute($doc3, 4)
+val $sig1 = SH::compute($doc1, 4)
+val $sig2 = SH::compute($doc2, 4)
+val $sig3 = SH::compute($doc3, 4)
 
-my $near = SH::hamming($sig1, $sig2)
-my $far  = SH::hamming($sig1, $sig3)
+val $near = SH::hamming($sig1, $sig2)
+val $far  = SH::hamming($sig1, $sig3)
 
 ($near < 8) |> aeq 1, "near-dup small distance"
 ($far > $near) |> aeq 1, "unrelated farther than near-dup"
 ($far >= 10) |> aeq 1, "unrelated noticeably far"
 
 # Identical docs => distance 0
-my $sx = SH::compute("same text", 3)
-my $sy = SH::compute("same text", 3)
+val $sx = SH::compute("same text", 3)
+val $sy = SH::compute("same text", 3)
 SH::hamming($sx, $sy) |> aeq 0, "identical docs zero"
 
 # Compute non-negative and fits u32

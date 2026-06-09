@@ -11,19 +11,19 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $n_workers = $ARGV[0] // 4
-my $samples_per_worker = $ARGV[1] // 250_000
+val $n_workers = $ARGV[0] // 4
+val $samples_per_worker = $ARGV[1] // 250_000
 
 printf "── distributed Monte Carlo π estimation ──\n"
 printf "  workers: %d  ·  samples/worker: %d  ·  total samples: %d\n",
     $n_workers, $samples_per_worker, $n_workers * $samples_per_worker
 
-my @workers = congregation($n_workers)
+val @workers = congregation($n_workers)
 
 # Each worker generates its samples and returns the in-circle count.
 # Worker seeds with its own session_id + time so workers don't all
 # generate the same sequence (would defeat the parallelism).
-my $code = "
+val $code = "
 my \$N = $samples_per_worker;
 srand(\$\$ + time);
 my \$hits = 0;
@@ -35,19 +35,19 @@ for my \$i (1:\$N) {
 \$hits
 "
 
-my %hits_per_worker = harvest $code, @workers, 60_000
+val %hits_per_worker = harvest $code, @workers, 60_000
 
 # Sum total hits and total samples; compute π estimate.
-my $total_hits = 0
-my $total_samples = $n_workers * $samples_per_worker
-for my $sid (sort { _ <=> _1 } keys %hits_per_worker) {
-    my $h = $hits_per_worker{$sid}
+var $total_hits = 0
+val $total_samples = $n_workers * $samples_per_worker
+for val $sid (sort { _ <=> _1 } keys %hits_per_worker) {
+    val $h = $hits_per_worker{$sid}
     printf "  worker %d: %s hits / %d samples\n", $sid, $h, $samples_per_worker
     $total_hits += $h
 }
 
-my $pi_estimate = 4.0 * $total_hits / $total_samples
-my $error = abs($pi_estimate - 3.14159265358979)
+val $pi_estimate = 4.0 * $total_hits / $total_samples
+val $error = abs($pi_estimate - 3.14159265358979)
 printf "── result ──\n"
 printf "  total hits:    %d / %d\n", $total_hits, $total_samples
 printf "  π estimate:    %.6f\n", $pi_estimate

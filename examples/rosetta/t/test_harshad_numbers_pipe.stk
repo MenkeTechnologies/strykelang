@@ -3,7 +3,7 @@
 
 fn Rosetta::Harshad::is_harshad($n) {
     if ($n == 0) { return 0 }
-    my $sum_digits = "$n" |> split(//) |> sum()
+    val $sum_digits = "$n" |> split(//) |> sum()
     $n % $sum_digits == 0
 }
 

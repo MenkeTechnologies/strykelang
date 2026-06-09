@@ -2,9 +2,9 @@
 # Rosetta Code: Carmichael numbers
 
 fn Rosetta::Carmichael::get_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
+    var @factors
+    var $d = 2
+    var $temp = $n
     while ($temp > 1) {
         while ($temp % $d == 0) {
             push @factors, $d
@@ -16,15 +16,15 @@ fn Rosetta::Carmichael::get_factors($n) {
 }
 
 fn Rosetta::Carmichael::check($n) {
-    my $factors_ref = Rosetta::Carmichael::get_factors($n)
-    my @factors = @$factors_ref
+    val $factors_ref = Rosetta::Carmichael::get_factors($n)
+    val @factors = @$factors_ref
     if (len(@factors) < 2) {
         0
     } else {
         # Check if square-free
-        my %counts
-        my $square_free = 1
-        for my $f (@factors) {
+        var %counts
+        var $square_free = 1
+        for val $f (@factors) {
             $counts{$f}++
             if ($counts{$f} > 1) { $square_free = 0 }
         }
@@ -32,8 +32,8 @@ fn Rosetta::Carmichael::check($n) {
         if (!$square_free || is_prime($n)) {
             0
         } else {
-            my $all_div = 1
-            for my $p (keys %counts) {
+            var $all_div = 1
+            for val $p (keys %counts) {
                 if (($n - 1) % ($p - 1) != 0) {
                     $all_div = 0
                 }

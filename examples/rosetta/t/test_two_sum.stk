@@ -2,10 +2,10 @@
 # Rosetta Code: Two sum — find a pair of indices summing to target
 
 fn Rosetta::TwoSum::find($arr, $target) {
-    my %seen
-    my $n = len(@$arr)
-    for my $i (0:$n-1) {
-        my $need = $target - $arr->[$i]
+    var %seen
+    val $n = len(@$arr)
+    for val $i (0:$n-1) {
+        val $need = $target - $arr->[$i]
         if (exists $seen{$need}) {
             return [$seen{$need}, $i]
         }
@@ -14,13 +14,13 @@ fn Rosetta::TwoSum::find($arr, $target) {
     undef
 }
 
-my $r = Rosetta::TwoSum::find([2, 7, 11, 15], 9)
+val $r = Rosetta::TwoSum::find([2, 7, 11, 15], 9)
 assert_eq join(",", @$r), "0,1", "[2,7,11,15] target 9 -> indices 0,1"
 
-my $r2 = Rosetta::TwoSum::find([3, 2, 4], 6)
+val $r2 = Rosetta::TwoSum::find([3, 2, 4], 6)
 assert_eq join(",", @$r2), "1,2", "[3,2,4] target 6 -> indices 1,2"
 
-my $r3 = Rosetta::TwoSum::find([3, 3], 6)
+val $r3 = Rosetta::TwoSum::find([3, 3], 6)
 assert_eq join(",", @$r3), "0,1", "duplicates [3,3]"
 
 assert_eq Rosetta::TwoSum::find([1, 2, 3], 100), undef, "no two sum"

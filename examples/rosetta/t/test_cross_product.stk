@@ -9,17 +9,17 @@ fn Rosetta::Vector::cross_product($a, $b) {
     ]
 }
 
-my $v1 = [1, 2, 3]
-my $v2 = [4, 5, 6]
-my $res = Rosetta::Vector::cross_product($v1, $v2)
+val $v1 = [1, 2, 3]
+val $v2 = [4, 5, 6]
+val $res = Rosetta::Vector::cross_product($v1, $v2)
 
 assert_eq $res->[0], -3, "cross product x"
 assert_eq $res->[1], 6,  "cross product y"
 assert_eq $res->[2], -3, "cross product z"
 
 # Test with zero vector
-my $zero = [0, 0, 0]
-my $res2 = Rosetta::Vector::cross_product($v1, $zero)
+val $zero = [0, 0, 0]
+val $res2 = Rosetta::Vector::cross_product($v1, $zero)
 assert_eq join(",", @$res2), "0,0,0", "cross product with zero"
 
 test_run

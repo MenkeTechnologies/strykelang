@@ -2,8 +2,8 @@
 # Rosetta Code: Evil and odious numbers
 
 fn Rosetta::EvilOdious::count_bits($n) {
-    my $count = 0
-    my $num = $n
+    var $count = 0
+    var $num = $n
     while ($num > 0) {
         if ($num % 2 == 1) { $count++ }
         $num = int($num / 2)

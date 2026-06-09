@@ -8,36 +8,36 @@ fn Exercism::SwiftScheduling::delivery_date($meeting, $desc) {
 }
 
 fn Exercism::SwiftScheduling::_add_days($iso, $n) {
-    my ($d, $t)       = split /T/, $iso
-    my ($y, $m, $dd)  = split /-/, $d
-    my $epoch = Exercism::SwiftScheduling::_to_epoch($y, $m, $dd) + $n * 86400
+    var ($d, $t)       = split /T/, $iso
+    var ($y, $m, $dd)  = split /-/, $d
+    val $epoch = Exercism::SwiftScheduling::_to_epoch($y, $m, $dd) + $n * 86400
     Exercism::SwiftScheduling::_from_epoch($epoch) . "T$t"
 }
 
 fn Exercism::SwiftScheduling::_add_months($iso, $n) {
-    my ($d, $t)      = split /T/, $iso
-    my ($y, $m, $dd) = split /-/, $d
+    var ($d, $t)      = split /T/, $iso
+    var ($y, $m, $dd) = split /-/, $d
     $m += $n
     while ($m > 12) { $m -= 12; $y++ }
     sprintf("%04d-%02d-%02d", $y, $m, $dd) . "T$t"
 }
 
 fn Exercism::SwiftScheduling::_to_epoch($y, $m, $d) {
-    my @cum = (0,31,59,90,120,151,181,212,243,273,304,334)
-    my $leap = (($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) && $m > 2 ? 1 : 0
+    val @cum = (0,31,59,90,120,151,181,212,243,273,304,334)
+    val $leap = (($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) && $m > 2 ? 1 : 0
     (($y - 1970) * 365 + int(($y - 1969) / 4) + $cum[$m - 1] + $leap + $d - 1) * 86400
 }
 
 fn Exercism::SwiftScheduling::_from_epoch($epoch) {
-    my $days = int($epoch / 86400)
-    my $y = 1970
+    var $days = int($epoch / 86400)
+    var $y = 1970
     while ($days >= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)) {
         $days -= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)
         $y++
     }
-    my @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
+    val @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
                 31,30,31,30,31,31,30,31,30,31)
-    my $m = 1
+    var $m = 1
     while ($days >= $mlen[$m - 1]) { $days -= $mlen[$m - 1]; $m++ }
     sprintf("%04d-%02d-%02d", $y, $m, $days + 1)
 }

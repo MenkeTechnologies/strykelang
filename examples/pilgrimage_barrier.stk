@@ -9,39 +9,39 @@
 
 p "── pilgrimage barrier demo ──"
 
-my @workers = congregation(4)
+val @workers = congregation(4)
 printf "spawned %d workers for 3-stage BSP\n", len(@workers)
 
 # Each worker maintains %main::stage_count tracking how many stages it's
 # completed. Init via chant so all workers (current and future) start at 0.
-my $init = chant("%main::stage_count = 0", @workers)
+val $init = chant("%main::stage_count = 0", @workers)
 # Drain the chant reply.
-my $drain = pray "'drain'", @workers
-my %drained = annex $drain
+val $drain = pray "'drain'", @workers
+val %drained = annex $drain
 amen $init
 
 # Three stages. Each stage's prayer increments stage_count and returns it.
 # pilgrimage scatter+gathers and returns true iff EVERY worker replied.
-my @stage_descriptions = ("warmup", "compute", "finalize")
-for my $i (0:2) {
-    my $desc = $stage_descriptions[$i]
+val @stage_descriptions = ("warmup", "compute", "finalize")
+for val $i (0:2) {
+    val $desc = $stage_descriptions[$i]
     printf "── stage %d (%s): ", $i + 1, $desc
-    my $code = "\$main::stage_count++; 'stage-' . \$main::stage_count"
-    my $ok = pilgrimage($code, @workers, 5_000)
+    val $code = "\$main::stage_count++; 'stage-' . \$main::stage_count"
+    val $ok = pilgrimage($code, @workers, 5_000)
     p $ok ? "all workers rendezvoused ✓" : "BARRIER FAILED ✗"
     last unless $ok
 }
 
 # Verify every worker completed all 3 stages.
-my $verify = pray "\$main::stage_count", @workers
-my %counts = annex $verify
+val $verify = pray "\$main::stage_count", @workers
+val %counts = annex $verify
 p "── final stage counts ──"
-for my $sid (sort { _ <=> _1 } keys %counts) {
+for val $sid (sort { _ <=> _1 } keys %counts) {
     printf "  worker %d: %s\n", $sid, $counts{$sid}
 }
 
-my $all_three = 1
-for my $sid (keys %counts) {
+var $all_three = 1
+for val $sid (keys %counts) {
     $all_three = 0 unless $counts{$sid} eq "3" || $counts{$sid} eq "stage-3"
 }
 p $all_three ? "✓ every worker completed exactly 3 stages" : "✗ stage counts diverged"

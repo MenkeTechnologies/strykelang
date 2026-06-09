@@ -5,51 +5,51 @@
 # occurrence of each distinct value wins.
 
 p "── variadic — flat args ───────────────────────────────"
-my @r1 = uniq(1, 1, 2, 2, 3, 3, 1)
+val @r1 = uniq(1, 1, 2, 2, 3, 3, 1)
 p "  uniq(1,1,2,2,3,3,1) → ", join(",", @r1)
 
 p ""
 p "── arrayref literal — derefs automatically ────────────"
-my @r2 = uniq([1, 1, 2, 2, 3])
+val @r2 = uniq([1, 1, 2, 2, 3])
 p "  uniq([1,1,2,2,3])   → ", join(",", @r2)
 
 p ""
 p "── named array via \\@arr backslash ────────────────────"
-my @data = (5, 5, 4, 4, 3, 3, 2, 2, 1, 1)
-my @r3 = uniq(\@data)
+val @data = (5, 5, 4, 4, 3, 3, 2, 2, 1, 1)
+val @r3 = uniq(\@data)
 p "  uniq(\\\@data)        → ", join(",", @r3)
 
 p ""
 p "── mixed: scalars + arrayref unfolded in place ────────"
-my @r4 = uniq("a", "a", [10, 10, 20, 20], "b", "b", 30)
+val @r4 = uniq("a", "a", [10, 10, 20, 20], "b", "b", 30)
 p "  uniq('a','a',[10,10,20,20],'b','b',30):"
 p "    → ", join(",", @r4)
 
 p ""
 p "── empty arrayref → empty result ──────────────────────"
-my @r5 = uniq([])
+val @r5 = uniq([])
 p "  uniq([])            → (", join(",", @r5), ") len=", len @r5
 
 p ""
 p "── chained with sort (sort + uniq for canonical form) ─"
-my @noisy = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
-my @canonical = uniq(sort { _ <=> _1 } @noisy)
+val @noisy = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5)
+val @canonical = uniq(sort { _ <=> _1 } @noisy)
 p "  sort+uniq noisy     → ", join(",", @canonical)
 
 p ""
 p "── pipe-forward composition: count distinct tokens ────"
-my $text = "the quick brown fox jumps over the lazy dog the fox"
-my $distinct = ~> $text split(/\s+/) uniq len
+val $text = "the quick brown fox jumps over the lazy dog the fox"
+val $distinct = ~> $text split(/\s+/) uniq len
 p "  distinct words in   : '$text'"
 p "  count               : $distinct"
 
 p ""
 p "── word-frequency table via uniq + grep ───────────────"
-my @words = split(/\s+/, "alpha beta alpha gamma beta alpha")
-my @unique_words = uniq(@words)
+val @words = split(/\s+/, "alpha beta alpha gamma beta alpha")
+val @unique_words = uniq(@words)
 p "  unique tokens       : ", join(",", @unique_words)
-for my $w (@unique_words) {
-    my @hits = grep { _ eq $w } @words
+for val $w (@unique_words) {
+    val @hits = grep { _ eq $w } @words
     printf "    %-7s × %d\n", $w, len @hits
 }
 
@@ -60,7 +60,7 @@ p "── nested arrayrefs collapse via ref-stringification ──"
 # so any sequence of arrayrefs uniqs down to a single atom. For
 # value-aware dedup of nested data use:
 #   uniq(map {to_json} @nested)
-my @r6 = uniq([[1, 2], [1, 2], [3, 4]])
+val @r6 = uniq([[1, 2], [1, 2], [3, 4]])
 printf "  uniq([[1,2],[1,2],[3,4]]) → %d atom (all refs stringify to ARRAY(0x...))\n", len @r6
-my @r7 = uniq(map {to_json} [1, 2], [1, 2], [3, 4])
+val @r7 = uniq(map {to_json} [1, 2], [1, 2], [3, 4])
 p "  value-aware via to_json:    ", join("  |  ", @r7)

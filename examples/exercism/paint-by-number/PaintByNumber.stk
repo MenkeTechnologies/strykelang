@@ -2,9 +2,9 @@
 
 # Math.pow workalike: integer exponentiation.
 fn Exercism::PaintByNumber::pow {
-    my ($base, $exp) = (_, _1)
+    var ($base, $exp) = (_, _1)
     die "negative exponent" if $exp < 0
-    my $r = 1
+    var $r = 1
     while ($exp > 0) {
         $r *= $base if $exp & 1
         $base *= $base
@@ -15,16 +15,16 @@ fn Exercism::PaintByNumber::pow {
 
 # How many bits are needed to encode N distinct colors? (ceil(log2(N)).)
 fn Exercism::PaintByNumber::palette_bit_size {
-    my $n  = _
-    my $bits = 0
-    my $cap = 1
+    val $n  = _
+    var $bits = 0
+    var $cap = 1
     while ($cap < $n) { $cap *= 2; $bits++ }
     $bits
 }
 
 # How many pixels does that palette let us encode in `bytes` bytes?
 fn Exercism::PaintByNumber::palette_pixel_count {
-    my ($bytes, $palette_n) = (_, _1)
-    my $bits = Exercism::PaintByNumber::palette_bit_size($palette_n)
+    val ($bytes, $palette_n) = (_, _1)
+    val $bits = Exercism::PaintByNumber::palette_bit_size($palette_n)
     $bits == 0 ? 0 : int($bytes * 8 / $bits)
 }

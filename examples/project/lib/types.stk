@@ -96,7 +96,7 @@ fn Project::Types::set_size($s) { $s->len }
 fn Project::Types::ret_coderef { fn { 99 } }
 fn Project::Types::ret_coderef_with_arg { fn ($x) { $x * 2 } }
 fn Project::Types::ret_closure {
-    my $n = 10
+    val $n = 10
     fn { $n * $n }
 }
 
@@ -111,8 +111,8 @@ fn Project::Types::ret_blessed_aref { bless [1, 2, 3], "MyArray" }
 # ── Complex nested structures ────────────────────────────────────────
 
 fn Project::Types::ret_complex {
-    my $the_set = set(10, 11, 12)
-    my $the_code = fn { "lambda" }
+    val $the_set = set(10, 11, 12)
+    val $the_code = fn { "lambda" }
     {
         scalars => {
             int   => 42,
@@ -147,14 +147,14 @@ fn Project::Types::sign_of($n) {
 # ── Loop-based returns ───────────────────────────────────────────────
 
 fn Project::Types::first_even(@nums) {
-    for my $n (@nums) {
+    for val $n (@nums) {
         return $n if $n % 2 == 0
     }
     undef
 }
 
 fn Project::Types::all_positive(@nums) {
-    for my $n (@nums) {
+    for val $n (@nums) {
         return 0 if $n <= 0
     }
     1

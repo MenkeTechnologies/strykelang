@@ -2,12 +2,12 @@
 # Rosetta Code: Experimental Verification of the NKTg Law Using NASA Mercury Data in 2025
 
 fn Rosetta::NKTgMercury::score($vals) {
-    my $sum = 0
-    for my $v (@$vals) { $sum += sqrt($v) }
+    var $sum = 0
+    for val $v (@$vals) { $sum += sqrt($v) }
     $sum
 }
 
-my @vals = (0.1, 0.3, 0.5, 0.7)
+val @vals = (0.1, 0.3, 0.5, 0.7)
 
 assert_eq int(Rosetta::NKTgMercury::score(\@vals) * 1000), 2407, "mercury score is stable"
 assert_eq $vals[0] < $vals[-1] ? 1 : 0, 1, "dataset is ordered"

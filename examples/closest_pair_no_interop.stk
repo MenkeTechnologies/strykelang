@@ -19,8 +19,8 @@
 # ── squared distance — avoids sqrt in hot loops ───────────────────
 
 fn Cp::dist2($pa, $pb) {
-    my $dx = $pa->[0] - $pb->[0]
-    my $dy = $pa->[1] - $pb->[1]
+    val $dx = $pa->[0] - $pb->[0]
+    val $dy = $pa->[1] - $pb->[1]
     $dx * $dx + $dy * $dy
 }
 
@@ -28,14 +28,14 @@ fn Cp::dist2($pa, $pb) {
 # Returns +{ d2, pa, pb }. d2 is the squared distance.
 
 fn Cp::rec($px, $lo, $hi) {
-    my $n = $hi - $lo + 1
+    val $n = $hi - $lo + 1
     if ($n <= 3) {
-        my $best = 1_000_000_000_000_000
-        my $bp_a
-        my $bp_b
-        for my $i ($lo:$hi) {
-            for my $j ($i + 1:$hi) {
-                my $d = Cp::dist2($px->[$i], $px->[$j])
+        var $best = 1_000_000_000_000_000
+        var $bp_a
+        var $bp_b
+        for val $i ($lo:$hi) {
+            for val $j ($i + 1:$hi) {
+                val $d = Cp::dist2($px->[$i], $px->[$j])
                 if ($d < $best) {
                     $best = $d
                     $bp_a = $px->[$i]
@@ -45,29 +45,29 @@ fn Cp::rec($px, $lo, $hi) {
         }
         return +{ d2 => $best, pa => $bp_a, pb => $bp_b }
     }
-    my $mid = int(($lo + $hi) / 2)
-    my $mid_x = $px->[$mid]->[0]
-    my $left = Cp::rec($px, $lo, $mid)
-    my $right = Cp::rec($px, $mid + 1, $hi)
-    my $best
+    val $mid = int(($lo + $hi) / 2)
+    val $mid_x = $px->[$mid]->[0]
+    val $left = Cp::rec($px, $lo, $mid)
+    val $right = Cp::rec($px, $mid + 1, $hi)
+    var $best
     if ($left->{d2} < $right->{d2}) {
         $best = $left
     } else {
         $best = $right
     }
-    my $d2 = $best->{d2}
+    var $d2 = $best->{d2}
     # Build the strip: points within sqrt(d2) of the divider x.
-    my @strip
-    for my $i ($lo:$hi) {
-        my $dx = $px->[$i]->[0] - $mid_x
+    var @strip
+    for val $i ($lo:$hi) {
+        val $dx = $px->[$i]->[0] - $mid_x
         push @strip, $px->[$i] if $dx * $dx < $d2
     }
     @strip = sort { _0->[1] <=> _1->[1] } @strip
-    my $sn = len(@strip)
-    for my $i (0:$sn - 1) {
-        my $j = $i + 1
+    val $sn = len(@strip)
+    for val $i (0:$sn - 1) {
+        var $j = $i + 1
         while ($j < $sn && ($strip[$j]->[1] - $strip[$i]->[1]) * ($strip[$j]->[1] - $strip[$i]->[1]) < $d2) {
-            my $d = Cp::dist2($strip[$i], $strip[$j])
+            val $d = Cp::dist2($strip[$i], $strip[$j])
             if ($d < $d2) {
                 $d2 = $d
                 $best = +{ d2 => $d, pa => $strip[$i], pb => $strip[$j] }
@@ -81,22 +81,22 @@ fn Cp::rec($px, $lo, $hi) {
 # ── entry point: sort by x, then recurse ─────────────────────────
 
 fn Cp::closest($points) {
-    my $n = len(@$points)
+    val $n = len(@$points)
     die "need ≥ 2 points" if $n < 2
-    my @px = sort { _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1] } @$points
+    val @px = sort { _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1] } @$points
     Cp::rec(\@px, 0, $n - 1)
 }
 
 # ── O(n²) brute force ────────────────────────────────────────────
 
 fn Cp::brute($points) {
-    my $n = len(@$points)
-    my $best = 1_000_000_000_000_000
-    my $bp_a
-    my $bp_b
-    for my $i (0:$n - 1) {
-        for my $j ($i + 1:$n - 1) {
-            my $d = Cp::dist2($points->[$i], $points->[$j])
+    val $n = len(@$points)
+    var $best = 1_000_000_000_000_000
+    var $bp_a
+    var $bp_b
+    for val $i (0:$n - 1) {
+        for val $j ($i + 1:$n - 1) {
+            val $d = Cp::dist2($points->[$i], $points->[$j])
             if ($d < $best) {
                 $best = $d
                 $bp_a = $points->[$i]
@@ -109,7 +109,7 @@ fn Cp::brute($points) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name   => "2-point line",
         points => [[0, 0], [3, 4]],
@@ -165,9 +165,9 @@ my @cases = (
 p "── closest-pair-of-points demo ───────────────────────"
 printf "  %-30s  %3s  %5s  %s\n", "case", "n", "d²", "pair"
 printf "  %-30s  %3s  %5s  %s\n", "------------------------------", "---", "-----", "----"
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
-    my $ok = $r->{d2} == $c->{d2}
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
+    val $ok = $r->{d2} == $c->{d2}
     printf "  %-30s  %3d  %5d  (%d,%d)-(%d,%d)  %s\n",
         $c->{name}, len(@{$c->{points}}), $r->{d2},
         $r->{pa}->[0], $r->{pa}->[1], $r->{pb}->[0], $r->{pb}->[1],
@@ -176,34 +176,34 @@ for my $c (@cases) {
 
 # ── invariant 1: D&C result matches expected d² ───────────────────
 
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
     die "d² #{$r->{d2}} != expected #{$c->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $c->{d2}
 }
 
 # ── invariant 2: D&C result matches brute force on every case ─────
 
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
-    my $br = Cp::brute($c->{points})
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
+    val $br = Cp::brute($c->{points})
     die "D&C d² #{$r->{d2}} != brute d² #{$br->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $br->{d2}
 }
 
 # ── invariant 3: returned pair actually has the reported distance ─
 
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
-    my $d_check = Cp::dist2($r->{pa}, $r->{pb})
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
+    val $d_check = Cp::dist2($r->{pa}, $r->{pb})
     die "pair distance #{$d_check} != reported #{$r->{d2}} on \"#{$c->{name}}\"" unless $d_check == $r->{d2}
 }
 
 # ── invariant 4: both points are present in the input ─────────────
 
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
-    my $found_a = 0
-    my $found_b = 0
-    for my $p (@{$c->{points}}) {
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
+    var $found_a = 0
+    var $found_b = 0
+    for val $p (@{$c->{points}}) {
         $found_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
         $found_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
     }
@@ -213,12 +213,12 @@ for my $c (@cases) {
 
 # ── invariant 5: no pair in input has smaller distance ────────────
 
-for my $c (@cases) {
-    my $r = Cp::closest($c->{points})
-    my $n = len(@{$c->{points}})
-    for my $i (0:$n - 1) {
-        for my $j ($i + 1:$n - 1) {
-            my $d = Cp::dist2($c->{points}->[$i], $c->{points}->[$j])
+for val $c (@cases) {
+    val $r = Cp::closest($c->{points})
+    val $n = len(@{$c->{points}})
+    for val $i (0:$n - 1) {
+        for val $j ($i + 1:$n - 1) {
+            val $d = Cp::dist2($c->{points}->[$i], $c->{points}->[$j])
             die "found closer pair (#{$d} < #{$r->{d2}}) on \"#{$c->{name}}\"" if $d < $r->{d2}
         }
     }
@@ -226,12 +226,12 @@ for my $c (@cases) {
 
 # ── invariant 6: 2-point input returns exactly that pair ──────────
 
-my $two = Cp::closest([[7, 11], [19, 23]])
+val $two = Cp::closest([[7, 11], [19, 23]])
 die "2-point d² mismatch" unless $two->{d2} == (12 * 12 + 12 * 12)
 
 # ── invariant 7: a duplicated point yields d² = 0 ─────────────────
 
-my $dup = Cp::closest([[1, 2], [3, 4], [1, 2], [5, 6]])
+val $dup = Cp::closest([[1, 2], [3, 4], [1, 2], [5, 6]])
 die "duplicate-point d² must be 0" unless $dup->{d2} == 0
 
 p ""

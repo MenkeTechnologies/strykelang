@@ -9,8 +9,8 @@ fn Rosetta::GraphicalInput::choose($dialog, $index) {
     $dialog->{choices}->[$index]
 }
 
-my @choices = ("Red", "Green", "Blue")
-my $dialog = Rosetta::GraphicalInput::dialog("Pick a color", \@choices)
+val @choices = ("Red", "Green", "Blue")
+val $dialog = Rosetta::GraphicalInput::dialog("Pick a color", \@choices)
 
 assert_eq $dialog->{prompt}, "Pick a color", "dialog records prompt"
 assert_eq Rosetta::GraphicalInput::choose($dialog, 1), "Green", "selected item returned"

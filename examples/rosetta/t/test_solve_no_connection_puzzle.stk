@@ -23,10 +23,10 @@ fn Rosetta::NoConn::edges() {
 }
 
 fn Rosetta::NoConn::adj() {
-    my $es = Rosetta::NoConn::edges()
-    my %adj
-    for my $n (1:8) { $adj{$n} = {} }
-    for my $e (@$es) {
+    val $es = Rosetta::NoConn::edges()
+    var %adj
+    for val $n (1:8) { $adj{$n} = {} }
+    for val $e (@$es) {
         $adj{$e->[0]}{$e->[1]} = 1
         $adj{$e->[1]}{$e->[0]} = 1
     }
@@ -35,16 +35,16 @@ fn Rosetta::NoConn::adj() {
 
 fn Rosetta::NoConn::solve_helper($adj, $assign, $used, $idx) {
     return [@$assign] if $idx == 9   # 1:8 placed
-    my $letter = chr(ord("A") + $idx - 1)
-    for my $node (1:8) {
+    val $letter = chr(ord("A") + $idx - 1)
+    for val $node (1:8) {
         next if $used->{$node}
         # Forbid edges between consecutive letters
-        my $prev = $assign->[$idx - 2]
-        my $next = $assign->[$idx]      # not yet placed
+        val $prev = $assign->[$idx - 2]
+        val $next = $assign->[$idx]      # not yet placed
         if (defined $prev && $adj->{$node}{$prev}) { next }
         $assign->[$idx - 1] = $node
         $used->{$node} = 1
-        my $r = Rosetta::NoConn::solve_helper($adj, $assign, $used, $idx + 1)
+        val $r = Rosetta::NoConn::solve_helper($adj, $assign, $used, $idx + 1)
         if (defined $r) { return $r }
         $used->{$node} = 0
     }
@@ -52,48 +52,48 @@ fn Rosetta::NoConn::solve_helper($adj, $assign, $used, $idx) {
 }
 
 fn Rosetta::NoConn::solve() {
-    my $adj = Rosetta::NoConn::adj()
-    my @assign = (undef) x 8
-    my %used
+    val $adj = Rosetta::NoConn::adj()
+    val @assign = (undef) x 8
+    val %used
     Rosetta::NoConn::solve_helper($adj, \@assign, \%used, 1)
 }
 
 fn Rosetta::NoConn::is_valid($assign, $adj) {
-    my $n = len(@$assign)
+    val $n = len(@$assign)
     return 0 if $n != 8
-    my %seen
-    for my $node (@$assign) {
+    var %seen
+    for val $node (@$assign) {
         return 0 if exists $seen{$node}
         return 0 if $node < 1 || $node > 8
         $seen{$node} = 1
     }
-    for my $i (0:$n - 2) {
+    for val $i (0:$n - 2) {
         return 0 if $adj->{$assign->[$i]}{$assign->[$i + 1]}
     }
     1
 }
 
 # A solution exists
-my $sol = Rosetta::NoConn::solve()
+val $sol = Rosetta::NoConn::solve()
 assert_ok defined($sol), "solver returned an assignment"
 assert_eq len(@$sol), 8, "8 letters placed"
 
 # Validate solution
-my $adj = Rosetta::NoConn::adj()
+val $adj = Rosetta::NoConn::adj()
 assert_eq Rosetta::NoConn::is_valid($sol, $adj), 1, "solution passes validity check"
 
 # Every node used exactly once
-my %used
-for my $n (@$sol) { $used{$n}++ }
+var %used
+for val $n (@$sol) { $used{$n}++ }
 assert_eq len(keys %used), 8, "all 8 nodes used"
-for my $n (1:8) {
+for val $n (1:8) {
     assert_eq $used{$n}, 1, sprintf("node %d used once", $n)
 }
 
 # Edge validation
-my $edges = Rosetta::NoConn::edges()
-my $total_adj = 0
-for my $e (@$edges) {
+val $edges = Rosetta::NoConn::edges()
+var $total_adj = 0
+for val $e (@$edges) {
     $total_adj++ if defined $adj->{$e->[0]}{$e->[1]}
     $total_adj++ if defined $adj->{$e->[1]}{$e->[0]}
 }
@@ -101,10 +101,10 @@ assert_eq $total_adj, 28, "14 edges → 28 directed entries"
 
 # Tampering detection: swap A and B's positions; A-B is an edge violation
 # only if the swapped nodes were adjacent in the graph.
-my @bad = @$sol
+var @bad = @$sol
 ($bad[0], $bad[1]) = ($bad[1], $bad[0])
 # This may or may not be a valid solution depending on graph. Just check:
-my $valid_after_swap = Rosetta::NoConn::is_valid(\@bad, $adj)
+val $valid_after_swap = Rosetta::NoConn::is_valid(\@bad, $adj)
 assert_ok $valid_after_swap == 0 || $valid_after_swap == 1, "validity is boolean"
 
 # Pipe form

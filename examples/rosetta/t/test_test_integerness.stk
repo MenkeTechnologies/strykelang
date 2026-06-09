@@ -2,9 +2,9 @@
 # Rosetta Code: Test integerness — does a value represent an integer?
 
 fn Rosetta::Integerness::is_integer($v, $tol) {
-    my $eps = (defined($tol)) ? $tol : 0
-    my $rounded = int($v + ($v >= 0 ? 0.5 : -0.5))
-    my $diff = $v - $rounded
+    val $eps = (defined($tol)) ? $tol : 0
+    val $rounded = int($v + ($v >= 0 ? 0.5 : -0.5))
+    var $diff = $v - $rounded
     $diff = -$diff if $diff < 0
     $diff <= $eps
 }

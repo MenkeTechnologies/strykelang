@@ -3,8 +3,8 @@
 
 fn Rosetta::FactorialZeros::solve($n) {
     # Count factors of 5
-    my $zeros = 0
-    my $power = 5
+    var $zeros = 0
+    var $power = 5
     while ($n >= $power) {
         $zeros += int($n / $power)
         $power *= 5
@@ -15,15 +15,15 @@ fn Rosetta::FactorialZeros::solve($n) {
 # Pipeline approach using a sequence and reduce (more idiomatic stryke)
 fn Rosetta::FactorialZeros::solve_pipe($n) {
     # Generate powers of 5 up to $n
-    my @powers
-    my $p = 5
+    var @powers
+    var $p = 5
     while ($p <= $n) {
         push @powers, $p
         $p *= 5
     }
     
     # Map each power to int($n / power) and sum
-    my $sum = ~> @powers map { int($n / _) } |> sum()
+    val $sum = ~> @powers map { int($n / _) } |> sum()
     $sum || 0
 }
 

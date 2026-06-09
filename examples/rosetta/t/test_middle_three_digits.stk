@@ -2,13 +2,13 @@
 # Rosetta Code: Middle three digits
 
 fn Rosetta::MiddleThreeDigits::middle_three_digits {
-    my $s = ~> _ abs >{ sprintf("%d", _) }
-    my $len = length($s)
+    val $s = ~> _ abs >{ sprintf("%d", _) }
+    val $len = length($s)
     
     if ($len < 3 || $len % 2 == 0) {
         "invalid"
     } else {
-        my $mid = int($len / 2)
+        val $mid = int($len / 2)
         substr($s, $mid - 1, 3)
     }
 }

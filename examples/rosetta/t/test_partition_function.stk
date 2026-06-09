@@ -2,10 +2,10 @@
 # Rosetta Code: Partition function
 
 fn Rosetta::Partition::solve($n) {
-    my @p = ~> 0:$n map { 0 }
+    var @p = ~> 0:$n map { 0 }
     $p[0] = 1
-    for my $i (~> 1 : $n) {
-        for my $j (~> $i : $n) {
+    for val $i (~> 1 : $n) {
+        for val $j (~> $i : $n) {
             $p[$j] += $p[$j - $i]
         }
     }

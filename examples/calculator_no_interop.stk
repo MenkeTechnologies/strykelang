@@ -17,14 +17,14 @@
 #      stryke --no-interop examples/calculator_no_interop.stk "3 + 4 * 2"
 #      stryke --no-interop examples/calculator_no_interop.stk "( 5 + 1 ) * 7"
 
-my %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
-my %RIGHT_ASSOC = ("**" => 1)
+val %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
+val %RIGHT_ASSOC = ("**" => 1)
 
 fn Calc::to_rpn($expr) {
-    my @toks = grep { len(_) > 0 } split(/\s+/, $expr)
-    my @out
-    my @ops
-    for my $tok (@toks) {
+    val @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    var @out
+    var @ops
+    for val $tok (@toks) {
         if (exists $PREC{$tok}) {
             while (len(@ops) > 0 &&
                    $ops[-1] ne "(" &&
@@ -55,15 +55,15 @@ fn Calc::to_rpn($expr) {
 }
 
 fn Calc::eval_rpn(@toks) {
-    my @stack
-    for my $tok (@toks) {
+    var @stack
+    for val $tok (@toks) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
             push @stack, 0 + $tok
             next
         }
         die "stack underflow at $tok" if len(@stack) < 2
-        my $rhs = pop @stack
-        my $lhs = pop @stack
+        val $rhs = pop @stack
+        val $lhs = pop @stack
         if    ($tok eq "+")  { push @stack, $lhs + $rhs }
         elsif ($tok eq "-")  { push @stack, $lhs - $rhs }
         elsif ($tok eq "*")  { push @stack, $lhs * $rhs }
@@ -77,13 +77,13 @@ fn Calc::eval_rpn(@toks) {
 }
 
 fn Calc::run($expr) {
-    my @rpn = Calc::to_rpn($expr)
+    val @rpn = Calc::to_rpn($expr)
     Calc::eval_rpn(@rpn)
 }
 
 if (len(@ARGV) >= 1) {
-    my $expr = join(" ", @ARGV)
-    my $r = eval { Calc::run($expr) }
+    val $expr = join(" ", @ARGV)
+    val $r = eval { Calc::run($expr) }
     if ($@) {
         p "error: $@"
         exit 1
@@ -93,7 +93,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — composes shunting-yard + RPN evaluator.
-my @cases = (
+val @cases = (
     +{ expr => "3 + 4",                       want =>  7    },
     +{ expr => "3 + 4 * 2",                   want => 11    },   # precedence: *, then +
     +{ expr => "( 3 + 4 ) * 2",               want => 14    },   # parens override
@@ -108,15 +108,15 @@ my @cases = (
 )
 
 p "── Full infix calculator demo (shunt + RPN) ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = eval { Calc::run($c->{expr}) }
+var $fail = 0
+for val $c (@cases) {
+    val $got = eval { Calc::run($c->{expr}) }
     if ($@) {
         printf "  %-30s -> ERROR: %s\n", $c->{expr}, $@
         $fail++
         next
     }
-    my $ok = ($got == $c->{want})
+    val $ok = ($got == $c->{want})
     $fail++ unless $ok
     printf "  %-30s -> %-10s expect %-10s %s\n",
         "\"" . $c->{expr} . "\"", $got, $c->{want},

@@ -2,13 +2,13 @@
 # Rosetta Code: Gapful numbers
 
 fn Rosetta::Gapful::check($n) {
-    my $s = "$n"
-    my $len = len($s)
+    val $s = "$n"
+    val $len = len($s)
     if ($len < 3) {
         0
     } else {
-        my @c = chars($s)
-        my $divisor = int($c[0] . $c[$len-1])
+        val @c = chars($s)
+        val $divisor = int($c[0] . $c[$len-1])
         $n % $divisor == 0
     }
 }

@@ -29,9 +29,9 @@ p "── Section 2 — collections (List → @, Map → %) ──────�
 #   val colors: List<String> = listOf("red", "green", "blue")
 #   var counts: Map<String, Int> = mapOf("red" to 3, "blue" to 5)
 #   for (c in colors) println(c)
-var @colors = ("red", "green", "blue")
-var %counts = (red => 3, blue => 5)
-for var $c (@colors) {
+val @colors = ("red", "green", "blue")
+val %counts = (red => 3, blue => 5)
+for val $c (@colors) {
     p "  color: $c"
 }
 p "  counts: red=$counts{red}, blue=$counts{blue}"
@@ -55,7 +55,7 @@ p "── Section 4 — running counter (var, mutating) ───────"
 #   for (n in 1..10) total += n
 #   println("sum 1..10 = \$total")
 var $total = 0
-for var $n (1:10) { $total += $n }
+for val $n (1:10) { $total += $n }
 p "  sum 1..10 = $total  (expected 55)"
 
 p ""
@@ -76,9 +76,9 @@ p "── Section 6 — accumulator pattern (var array) ───────"
 #   var sumOfSquares = 0
 #   for (x in src) sumOfSquares += x * x
 #   println("sum of squares = \$sumOfSquares")
-var @src = (1, 2, 3, 4, 5)
+val @src = (1, 2, 3, 4, 5)
 var $sum_of_squares = 0
-for var $x (@src) { $sum_of_squares += $x * $x }
+for val $x (@src) { $sum_of_squares += $x * $x }
 p "  sum of squares = $sum_of_squares  (expected 55)"
 
 p ""
@@ -95,7 +95,7 @@ fn Demo::fibonacci($n) {
     val $target = $n
     var $prev = 0
     var $curr = 1
-    for my $_ (1:$target) {
+    for val $_ (1:$target) {
         val $next = $prev + $curr
         $prev = $curr
         $curr = $next

@@ -6,7 +6,7 @@ fn Pubsub::new() { +{ subs => {}, next_id => 0 } }
 
 fn Pubsub::subscribe($bus, $topic, $cb) {
     $bus->{subs}{$topic} //= {}
-    my $id = $bus->{next_id}++
+    val $id = $bus->{next_id}++
     $bus->{subs}{$topic}{$id} = $cb
     $id
 }
@@ -17,9 +17,9 @@ fn Pubsub::unsubscribe($bus, $topic, $id) {
 }
 
 fn Pubsub::publish($bus, $topic, $msg) {
-    my $count = 0
+    var $count = 0
     if (exists $bus->{subs}{$topic}) {
-        for my $cb (values %{$bus->{subs}{$topic}}) {
+        for val $cb (values %{$bus->{subs}{$topic}}) {
             $cb($msg)
             $count++
         }
@@ -29,12 +29,12 @@ fn Pubsub::publish($bus, $topic, $msg) {
 
 fn Pubsub::sub_count = exists _->{subs}{_1} ? len(keys %{_->{subs}{_1}}) : 0
 
-my $bus = Pubsub::new()
-my $log = []
+val $bus = Pubsub::new()
+var $log = []
 
-my $id1 = Pubsub::subscribe($bus, "news", fn { push @$log, "A:" . _ })
-my $id2 = Pubsub::subscribe($bus, "news", fn { push @$log, "B:" . _ })
-my $id3 = Pubsub::subscribe($bus, "other", fn { push @$log, "C:" . _ })
+val $id1 = Pubsub::subscribe($bus, "news", fn { push @$log, "A:" . _ })
+val $id2 = Pubsub::subscribe($bus, "news", fn { push @$log, "B:" . _ })
+val $id3 = Pubsub::subscribe($bus, "other", fn { push @$log, "C:" . _ })
 
 Pubsub::sub_count($bus, "news")  |> aeq 2, "news has 2"
 Pubsub::sub_count($bus, "other") |> aeq 1, "other has 1"
@@ -60,7 +60,7 @@ Pubsub::publish($bus, "news", "world")
 "@$log" |> aeq "B:world", "only B got news"
 
 # Multi-topic
-my $cb_all = fn { push @$log, "ALL:" . _ }
+val $cb_all = fn { push @$log, "ALL:" . _ }
 Pubsub::subscribe($bus, "news", $cb_all)
 Pubsub::subscribe($bus, "other", $cb_all)
 @$log = ()
@@ -70,8 +70,8 @@ len(@$log) |> aeq 4, "4 deliveries across two topics"
 
 # Wildcard-like fan-out using publish_all helper
 fn Pubsub::publish_all($bus, $msg) {
-    my $total = 0
-    for my $topic (keys %{$bus->{subs}}) {
+    var $total = 0
+    for val $topic (keys %{$bus->{subs}}) {
         $total += Pubsub::publish($bus, $topic, $msg)
     }
     $total
@@ -85,8 +85,8 @@ fn Pubsub::subscribe_where($bus, $topic, $pred, $cb) {
     Pubsub::subscribe($bus, $topic, fn($m) { $cb($m) if $pred($m) })
 }
 
-my $bus2 = Pubsub::new()
-my $log2 = []
+val $bus2 = Pubsub::new()
+val $log2 = []
 Pubsub::subscribe_where($bus2, "n", fn { _ > 5 }, fn { push @$log2, _ })
 Pubsub::publish($bus2, "n", 3)
 Pubsub::publish($bus2, "n", 7)
@@ -96,7 +96,7 @@ Pubsub::publish($bus2, "n", 2)
 
 # Counter via mysync (closure capturing shared counter)
 mysync $hits = 0
-my $bus3 = Pubsub::new()
+val $bus3 = Pubsub::new()
 Pubsub::subscribe($bus3, "tap", fn { $hits++ })
 Pubsub::publish($bus3, "tap", "x")
 Pubsub::publish($bus3, "tap", "y")

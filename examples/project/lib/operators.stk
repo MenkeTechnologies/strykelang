@@ -80,13 +80,13 @@ fn Project::Operators::low_prec_not($a) { not $a ? 1 : 0 }
 fn Project::Operators::defined_or($a, $b) { $a // $b }
 
 fn Project::Operators::short_circuit_and($a) {
-    my $side_effect = 0
+    var $side_effect = 0
     $a && ($side_effect = 1)
     $side_effect
 }
 
 fn Project::Operators::short_circuit_or($a) {
-    my $side_effect = 0
+    var $side_effect = 0
     $a || ($side_effect = 1)
     $side_effect
 }
@@ -132,79 +132,79 @@ fn Project::Operators::concat_with_space($a, $b) { $a . " " . $b }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::compound_add {
-    my $x = 5
+    var $x = 5
     $x += 3
     $x
 }
 
 fn Project::Operators::compound_sub {
-    my $x = 10
+    var $x = 10
     $x -= 4
     $x
 }
 
 fn Project::Operators::compound_mul {
-    my $x = 3
+    var $x = 3
     $x *= 4
     $x
 }
 
 fn Project::Operators::compound_div {
-    my $x = 20
+    var $x = 20
     $x /= 4
     $x
 }
 
 fn Project::Operators::compound_mod {
-    my $x = 17
+    var $x = 17
     $x %= 5
     $x
 }
 
 fn Project::Operators::compound_pow {
-    my $x = 2
+    var $x = 2
     $x **= 3
     $x
 }
 
 fn Project::Operators::compound_concat {
-    my $s = "hello"
+    var $s = "hello"
     $s .= " world"
     $s
 }
 
 fn Project::Operators::compound_repeat {
-    my $s = "ab"
+    var $s = "ab"
     $s = $s x 3
     $s
 }
 
 fn Project::Operators::compound_or {
-    my $x = 0
+    var $x = 0
     $x ||= 42
     $x
 }
 
 fn Project::Operators::compound_and {
-    my $x = 5
+    val $x = 5
     $x &&= 10
     $x
 }
 
 fn Project::Operators::compound_defined_or {
-    my $x
+    var $x
     $x //= "default"
     $x
 }
 
 fn Project::Operators::compound_bit_and {
-    my $x = 0xFF
+    var $x = 0xFF
     $x &= 0x0F
     $x
 }
 
 fn Project::Operators::compound_bit_or {
-    my $x = 0x0F
+    var $x = 0x0F
     $x |= 0xF0
     $x
 }
@@ -214,32 +214,32 @@ fn Project::Operators::compound_bit_or {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::pre_increment {
-    my $x = 5
-    my $y = ++$x
+    var $x = 5
+    val $y = ++$x
     ($x, $y)
 }
 
 fn Project::Operators::post_increment {
-    my $x = 5
-    my $y = $x++
+    var $x = 5
+    val $y = $x++
     ($x, $y)
 }
 
 fn Project::Operators::pre_decrement {
-    my $x = 5
-    my $y = --$x
+    var $x = 5
+    val $y = --$x
     ($x, $y)
 }
 
 fn Project::Operators::post_decrement {
-    my $x = 5
-    my $y = $x--
+    var $x = 5
+    val $y = $x--
     ($x, $y)
 }
 
 fn Project::Operators::increment_in_expr {
-    my $x = 5
-    my $y = $x++ + ++$x
+    var $x = 5
+    val $y = $x++ + ++$x
     $y
 }
 
@@ -265,25 +265,25 @@ fn Project::Operators::ternary_with_ops($a, $b) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::incl_range($a, $b) {
-    my @r = $a:$b
+    val @r = $a:$b
     @r
 }
 
 fn Project::Operators::range_sum($a, $b) {
-    my $sum = 0
-    for my $i ($a:$b) {
+    var $sum = 0
+    for val $i ($a:$b) {
         $sum += $i
     }
     $sum
 }
 
 fn Project::Operators::range_char {
-    my @chars = "a".."e"
+    val @chars = "a".."e"
     join("", @chars)
 }
 
 fn Project::Operators::range_reverse($a, $b) {
-    my @r = rev($a:$b)
+    val @r = rev($a:$b)
     @r
 }
 
@@ -292,25 +292,25 @@ fn Project::Operators::range_reverse($a, $b) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::list_assign {
-    my ($a, $b, $c) = (1, 2, 3)
+    var ($a, $b, $c) = (1, 2, 3)
     $a + $b + $c
 }
 
 fn Project::Operators::list_swap {
-    my ($a, $b) = (1, 2)
+    var ($a, $b) = (1, 2)
     ($a, $b) = ($b, $a)
     ($a, $b)
 }
 
 fn Project::Operators::comma_operator {
     # In stryke mode, use explicit last-element syntax
-    my @list = (1, 2, 3)
-    my $x = $list[-1]
+    val @list = (1, 2, 3)
+    val $x = $list[-1]
     $x
 }
 
 fn Project::Operators::list_in_scalar {
-    my @arr = (1, 2, 3, 4, 5)
+    val @arr = (1, 2, 3, 4, 5)
     scalar @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -338,7 +338,7 @@ fn Project::Operators::prec_or_and { 0 || 1 && 0 ? 1 : 0 }
 fn Project::Operators::prec_not_and { !0 && 1 ? 1 : 0 }
 
 fn Project::Operators::prec_assign_ternary {
-    my $x = 1 ? "a" : "b"
+    val $x = 1 ? "a" : "b"
     $x
 }
 

@@ -2,7 +2,7 @@
 # Rosetta Code: Teacup rim text
 
 fn Rosetta::Teacup::render($text) {
-    my @rows
+    var @rows
     push @rows, "  " . $text
     push @rows, " /" . ("-" x len(split //, $text)) . "\\"
     push @rows, "| " . (" " x len(split //, $text)) . " |"
@@ -10,7 +10,7 @@ fn Rosetta::Teacup::render($text) {
     \@rows
 }
 
-my $cup = Rosetta::Teacup::render("TEA")
+val $cup = Rosetta::Teacup::render("TEA")
 
 assert_eq $cup->[0], "  TEA", "rim text rendered above cup"
 assert_eq $cup->[1], " /---\\", "cup lip matches text width"

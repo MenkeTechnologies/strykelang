@@ -2,15 +2,15 @@
 # Rosetta Code: Simple turtle graphics
 
 fn Rosetta::Turtle::new($width, $height) {
-    my @rows
-    for my $y (0:$height - 1) {
+    var @rows
+    for val $y (0:$height - 1) {
         push @rows, ("." x $width)
     }
     { x => 1, y => 1, dir => 0, rows => \@rows, width => $width, height => $height }
 }
 
 fn Rosetta::Turtle::plot($turtle) {
-    my @chars = split //, $turtle->{rows}[$turtle->{y}]
+    var @chars = split //, $turtle->{rows}[$turtle->{y}]
     $chars[$turtle->{x}] = "#"
     $turtle->{rows}[$turtle->{y}] = join("", @chars)
 }
@@ -20,7 +20,7 @@ fn Rosetta::Turtle::turn_right($turtle) {
 }
 
 fn Rosetta::Turtle::forward($turtle, $steps) {
-    for my $step (1:$steps) {
+    for val $step (1:$steps) {
         if ($turtle->{dir} == 0) { $turtle->{x}++ }
         elsif ($turtle->{dir} == 1) { $turtle->{y}++ }
         elsif ($turtle->{dir} == 2) { $turtle->{x}-- }
@@ -33,14 +33,14 @@ fn Rosetta::Turtle::render($turtle) {
     join("\n", @{$turtle->{rows}})
 }
 
-my $turtle = Rosetta::Turtle::new(8, 8)
+val $turtle = Rosetta::Turtle::new(8, 8)
 Rosetta::Turtle::plot($turtle)
-for my $i (1:4) {
+for val $i (1:4) {
     Rosetta::Turtle::forward($turtle, 2)
     Rosetta::Turtle::turn_right($turtle)
 }
-my $drawing = Rosetta::Turtle::render($turtle)
-my @rows = split /\n/, $drawing
+val $drawing = Rosetta::Turtle::render($turtle)
+val @rows = split /\n/, $drawing
 
 assert_eq $turtle->{x}, 1, "turtle returns to original x"
 assert_eq $turtle->{y}, 1, "turtle returns to original y"

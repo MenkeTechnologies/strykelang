@@ -2,12 +2,12 @@
 # Rosetta Code: Traveling Salesman Problem (Small)
 
 fn Rosetta::TSP::perms($arr) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return [[@$arr]] if $n <= 1
-    my @result
-    for my $i (0:$n-1) {
-        my @rest = ~> 0:$n-1 grep { _ != $i } map { $arr->[_] }
-        for my $p (@{ Rosetta::TSP::perms(\@rest) }) {
+    var @result
+    for val $i (0:$n-1) {
+        val @rest = ~> 0:$n-1 grep { _ != $i } map { $arr->[_] }
+        for val $p (@{ Rosetta::TSP::perms(\@rest) }) {
             push @result, [$arr->[$i], @$p]
         }
     }
@@ -15,11 +15,11 @@ fn Rosetta::TSP::perms($arr) {
 }
 
 fn Rosetta::TSP::solve($dist_matrix) {
-    my $n = len(@$dist_matrix)
-    my $all_perms = Rosetta::TSP::perms([1:$n-1])
+    val $n = len(@$dist_matrix)
+    val $all_perms = Rosetta::TSP::perms([1:$n-1])
     ~> @$all_perms map {
-        my $p = _
-        my $hops = ~> 0:len(@$p)-2 map { $dist_matrix->[$p->[_]]->[$p->[_+1]] } sum
+        val $p = _
+        val $hops = ~> 0:len(@$p)-2 map { $dist_matrix->[$p->[_]]->[$p->[_+1]] } sum
         $dist_matrix->[0]->[$p->[0]] + $hops + $dist_matrix->[$p->[-1]]->[0]
     } min
 }
@@ -29,7 +29,7 @@ fn Rosetta::TSP::solve($dist_matrix) {
 # 10  0 35 25
 # 15 35  0 30
 # 20 25 30  0
-my $mat = [
+val $mat = [
     [ 0, 10, 15, 20 ],
     [10,  0, 35, 25 ],
     [15, 35,  0, 30 ],
@@ -44,7 +44,7 @@ my $mat = [
 # 0-3-1-2-0: 20 + 25 + 35 + 15 = 95
 # 0-3-2-1-0: 20 + 30 + 35 + 10 = 95
 
-my $res = Rosetta::TSP::solve($mat)
+val $res = Rosetta::TSP::solve($mat)
 assert_eq $res, 80, "TSP min distance for 4 cities is 80"
 
 test_run

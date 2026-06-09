@@ -5,9 +5,9 @@
 
 # BUG-260: digit-containing label routes `next` correctly.
 fn Demo::Labels::next_with_digit_label() {
-    my @hits
-    LOOP1: for my $i (1:3) {
-        for my $j (1:3) {
+    var @hits
+    LOOP1: for val $i (1:3) {
+        for val $j (1:3) {
             next LOOP1 if $j == 2
             push @hits, "$i.$j"
         }
@@ -18,9 +18,9 @@ Demo::Labels::next_with_digit_label() |> assert_eq("1.1,2.1,3.1", "next LOOP1 wi
 
 # BUG-260: `last` with a digit label exits the outer loop.
 fn Demo::Labels::last_with_digit_label() {
-    my @hits
-    A1: for my $i (1:5) {
-        for my $j (1:5) {
+    var @hits
+    A1: for val $i (1:5) {
+        for val $j (1:5) {
             last A1 if $i == 2 && $j == 3
             push @hits, "$i.$j"
         }
@@ -34,9 +34,9 @@ Demo::Labels::last_with_digit_label() |> assert_eq(
 
 # Letter-only labels still work (control).
 fn Demo::Labels::letter_label() {
-    my @hits
-    OUTER: for my $i (1:3) {
-        for my $j (1:3) {
+    var @hits
+    OUTER: for val $i (1:3) {
+        for val $j (1:3) {
             next OUTER if $j == 2
             push @hits, "$i.$j"
         }
@@ -47,9 +47,9 @@ Demo::Labels::letter_label() |> assert_eq("1.1,2.1,3.1", "next OUTER no-digit fo
 
 # BUG-261: `redo if EXPR;` statement-modifier form parses and executes.
 fn Demo::Redo::counted() {
-    my $i = 0
-    my @log
-    for my $x (1:2) {
+    var $i = 0
+    var @log
+    for val $x (1:2) {
         $i++
         push @log, $i
         redo if $i < 4
@@ -60,9 +60,9 @@ Demo::Redo::counted() |> assert_eq("1,2,3,4,5", "redo if EXPR; runs body again")
 
 # `redo unless` postfix form too.
 fn Demo::Redo::counted_unless() {
-    my $i = 0
-    my @log
-    for my $x (1:2) {
+    var $i = 0
+    var @log
+    for val $x (1:2) {
         $i++
         push @log, $i
         redo unless $i >= 4
@@ -73,9 +73,9 @@ Demo::Redo::counted_unless() |> assert_eq("1,2,3,4,5", "redo unless EXPR; works"
 
 # Labelled redo with a digit label.
 fn Demo::Redo::labelled() {
-    my @hits
-    my $n = 0
-    INNER1: for my $i (1:3) {
+    var @hits
+    var $n = 0
+    INNER1: for val $i (1:3) {
         push @hits, $i
         $n++
         redo INNER1 if $n < 5

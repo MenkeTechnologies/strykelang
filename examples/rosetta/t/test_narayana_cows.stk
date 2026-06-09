@@ -5,11 +5,11 @@ fn Rosetta::NarayanaCows::compute($n) {
     if ($n < 3) {
         1
     } else {
-        my $a0 = 1
-        my $a1 = 1
-        my $a2 = 1
-        for my $i (3:$n) {
-            my $a3 = $a2 + $a0
+        var $a0 = 1
+        var $a1 = 1
+        var $a2 = 1
+        for val $i (3:$n) {
+            val $a3 = $a2 + $a0
             ($a0, $a1, $a2) = ($a1, $a2, $a3)
         }
         $a2

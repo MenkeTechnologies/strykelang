@@ -13,9 +13,9 @@
 # Usage:
 #   s scripts/check_doc_examples.stk [--source FILE] [--show OK]
 
-my $ROOT = groot
-my $TMP  = "/tmp/stryke_doc_check"
-my $BIN  = "$ROOT/target/debug/stryke"
+val $ROOT = groot
+val $TMP  = "/tmp/stryke_doc_check"
+val $BIN  = "$ROOT/target/debug/stryke"
 mkdir $TMP unless -d $TMP
 
 # ── code/non-code heuristic ────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ mkdir $TMP unless -d $TMP
 # with a stryke-ish token (`p`, `fn`, `my`, `our`, `~>`, etc.). Output
 # text, shell prompts, and tree diagrams are skipped.
 fn looks_like_stryke_code($code) {
-    for my $l (split /\n/, $code) {
+    for val $l (split /\n/, $code) {
         next if $l =~ /^\s*$/
         next if $l =~ /^\s*#/
         return 0 if $l =~ /^\s*\$\s/                  # `$ stryke ...`
@@ -44,13 +44,13 @@ fn looks_like_stryke_code($code) {
 
 # `README.md` / generic markdown — capture every ```perl … ``` fence.
 fn extract_markdown($path) {
-    my @lines = c($path) |> split /\n/, _
-    my @blocks
-    my $in_block = 0
-    my $start_line = 0
-    my $buf = ""
-    for my $i (0 : $#lines) {
-        my $line = $lines[$i]
+    val @lines = c($path) |> split /\n/, _
+    var @blocks
+    var $in_block = 0
+    var $start_line = 0
+    var $buf = ""
+    for val $i (0 : $#lines) {
+        val $line = $lines[$i]
         if (!$in_block && $line =~ /^```(?:perl|stryke)\s*$/) {
             $in_block = 1
             $start_line = $i + 1
@@ -71,17 +71,17 @@ fn extract_markdown($path) {
 # every double-quoted string spanning to the matching unescaped quote,
 # then look for ```perl … ``` inside the unescaped result.
 fn extract_rust_strings($path) {
-    my $text = c $path
-    my @strs
-    my $i = 0
-    my $n = len $text
+    val $text = c $path
+    var @strs
+    var $i = 0
+    val $n = len $text
     # Codepoint-coordinate scan: `len` / `[i]` / `[a:b]` are all
     # codepoint-based and stay aligned. The Perl 5 byte-coordinate
     # equivalents (`length` / `substr` / `index`) would also work, but
     # mixing the two would silently misalign on any non-ASCII char
     # (lsp.rs has ─, ✓, ✗) — see README [0x08b].
     while ($i < $n) {
-        my $c = $text[$i]
+        val $c = $text[$i]
         # Skip line + block comments.
         if ($c eq '/' && $text[$i + 1] eq '/') {
             while ($i < $n && $text[$i] ne "\n") { $i++ }
@@ -94,10 +94,10 @@ fn extract_rust_strings($path) {
             next
         }
         if ($c ne '"') { $i++; next }
-        my $start = $i + 1
+        val $start = $i + 1
         $i++
         while ($i < $n) {
-            my $cc = $text[$i]
+            val $cc = $text[$i]
             if ($cc eq '\\') { $i += 2; next }
             if ($cc eq '"') { last }
             $i++
@@ -123,13 +123,13 @@ fn unescape_rust($s) {
 }
 
 fn extract_lsp_blocks($path) {
-    my @blocks
-    for my $raw (extract_rust_strings $path) {
+    var @blocks
+    for val $raw (extract_rust_strings $path) {
         next unless index($raw, '```perl') >= 0
-        my @lines = unescape_rust($raw) |> split /\n/, _
-        my $in_block = 0
-        my $buf = ""
-        for my $line (@lines) {
+        val @lines = unescape_rust($raw) |> split /\n/, _
+        var $in_block = 0
+        var $buf = ""
+        for val $line (@lines) {
             if (!$in_block && $line =~ /^```(?:perl|stryke)\s*$/) {
                 $in_block = 1
                 $buf = ""
@@ -148,21 +148,21 @@ fn extract_lsp_blocks($path) {
 # `&gt;` / `&amp;` / `&quot;` and strip `<span ...>...</span>` wrappers
 # (they only carry styling for the comment-coloring trick).
 fn extract_html_blocks($path) {
-    my $text = c $path
-    my @blocks
-    my $i = 0
-    my $n = len $text
+    val $text = c $path
+    var @blocks
+    var $i = 0
+    val $n = len $text
     while ($i < $n) {
-        my $open = cindex $text, '<pre', $i
+        val $open = cindex $text, '<pre', $i
         last if $open < 0
-        my $close_open = cindex $text, '>', $open
+        val $close_open = cindex $text, '>', $open
         last if $close_open < 0
-        my $close = cindex $text, '</pre>', $close_open
+        val $close = cindex $text, '</pre>', $close_open
         last if $close < 0
         # `cindex` + `[a:b]` are both codepoint-based — same coordinate
         # system, no off-by-N on UTF-8 entities like ✓ / ✗. `\`
         # continues the `~>` chain across newlines.
-        my $body = ~> $text[$close_open + 1 : $close - 1] \
+        val $body = ~> $text[$close_open + 1 : $close - 1] \
             s|<span[^>]*>||g \
             s|</span>||g \
             s/&lt;/</g \
@@ -181,12 +181,12 @@ fn extract_html_blocks($path) {
 # ── run -c on each block ───────────────────────────────────────────────────────
 
 fn check_block($block, $idx) {
-    my $tmp = "$TMP/$idx.stk"
+    val $tmp = "$TMP/$idx.stk"
     # Prepend `no strict;` so doc examples don't have to declare every
     # symbol they reference. `-c` (parse-only) is looser than `--check`
     # and is the right level of strictness for docs.
     spew $tmp, "no strict;\nno warnings;\n" . $block->{code}
-    my $out = `$BIN -c $tmp 2>&1`
+    val $out = `$BIN -c $tmp 2>&1`
     +{
         ok   => ($? >> 8) == 0,
         out  => $out,
@@ -199,24 +199,24 @@ fn check_block($block, $idx) {
 
 # ── main ───────────────────────────────────────────────────────────────────────
 
-my $source = "all"
-my $show   = "fail"
-my $top    = 0
-my @argv   = @ARGV
-while (my $arg = shift @argv) {
+var $source = "all"
+var $show   = "fail"
+var $top    = 0
+var @argv   = @ARGV
+while (val $arg = shift @argv) {
     if    ($arg eq "--source") { $source = shift @argv }
     elsif ($arg eq "--show")   { $show   = shift @argv }
     elsif ($arg eq "--top")    { $top    = shift @argv }
 }
 
-my @all
+var @all
 push @all, extract_markdown   "$ROOT/README.md"            if $source eq "all" || $source eq "readme"
 push @all, extract_lsp_blocks "$ROOT/strykelang/lsp.rs"    if $source eq "all" || $source eq "lsp"
 push @all, extract_html_blocks "$ROOT/docs/index.html"     if $source eq "all" || $source eq "html"
 
-my @code_blocks = grep { looks_like_stryke_code _->{code} } @all
-my $total       = len @code_blocks
-my $skipped     = len(@all) - $total
+val @code_blocks = grep { looks_like_stryke_code _->{code} } @all
+val $total       = len @code_blocks
+val $skipped     = len(@all) - $total
 
 p "total blocks: ", len @all
 p "code blocks: $total (skipped $skipped non-code)"
@@ -226,13 +226,13 @@ p "code blocks: $total (skipped $skipped non-code)"
 # order-preserving and an order of magnitude faster than a serial loop
 # on 1000+ blocks. `with_index` yields `[value, idx]` arrayrefs so the
 # block can recover both via destructure.
-my @results = pmap {
-    my ($b, $idx) = @{ _ }
+val @results = pmap {
+    val ($b, $idx) = @{ _ }
     check_block $b, $idx
 } with_index @code_blocks
 
-my @failures = grep { !_->{ok} } @results
-my @oks      = grep {  _->{ok} } @results
+val @failures = grep { !_->{ok} } @results
+val @oks      = grep {  _->{ok} } @results
 
 p "passed:  ", len @oks
 p "failed:  ", len @failures
@@ -241,10 +241,10 @@ p ""
 # Group failures by their first error line so common patterns surface.
 if ($top > 0 && @failures) {
     p "── failure categories (top $top) ────────────────────────────────────"
-    my %bucket
-    for my $f (@failures) {
-        my $first = ""
-        for my $e (split /\n/, $f->{out}) {
+    var %bucket
+    for val $f (@failures) {
+        var $first = ""
+        for val $e (split /\n/, $f->{out}) {
             next if $e =~ /^\s*$/
             $first = $e
             last
@@ -255,9 +255,9 @@ if ($top > 0 && @failures) {
         $bucket{$first} //= 0
         $bucket{$first}++
     }
-    my @keys = sort { $bucket{$_1} <=> $bucket{$_0} } keys %bucket
-    my $n = 0
-    for my $k (@keys) {
+    val @keys = sort { $bucket{$_1} <=> $bucket{$_0} } keys %bucket
+    var $n = 0
+    for val $k (@keys) {
         last if $n >= $top
         $n++
         printf "  %4d  %s\n", $bucket{$k}, $k
@@ -267,7 +267,7 @@ if ($top > 0 && @failures) {
 
 if (@failures && $show ne "none") {
     p "── failures ─────────────────────────────────────────────────────────"
-    for my $f (@failures) {
+    for val $f (@failures) {
         p ""
         p "$f->{file}:$f->{line}  ($f->{tmp})"
         p "  code:"

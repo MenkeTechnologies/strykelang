@@ -2,9 +2,9 @@
 # Rosetta Code: URL Encoding/Decoding (Manual)
 
 fn Rosetta::UrlEncode::url_encode($str) {
-    my @chars = $str |> chars
-    my $res = ""
-    for my $c (@chars) {
+    val @chars = $str |> chars
+    var $res = ""
+    for val $c (@chars) {
         if ($c =~ /[a-zA-Z0-9._~-]/) {
             $res = $res . $c
         } else {
@@ -15,13 +15,13 @@ fn Rosetta::UrlEncode::url_encode($str) {
 }
 
 fn Rosetta::UrlDecode::url_decode($str) {
-    my $res = ""
-    my $i = 0
-    my $len = length($str)
+    var $res = ""
+    var $i = 0
+    val $len = length($str)
     while ($i < $len) {
-        my $c = substr($str, $i, 1)
+        val $c = substr($str, $i, 1)
         if ($c eq "%") {
-            my $h = substr($str, $i + 1, 2)
+            val $h = substr($str, $i + 1, 2)
             $res = $res . chr(hex($h))
             $i = $i + 3
         } else {
@@ -32,11 +32,11 @@ fn Rosetta::UrlDecode::url_decode($str) {
     $res
 }
 
-my $input = "http://rosettacode.org/wiki/URL_encoding"
-my $encoded = Rosetta::UrlEncode::url_encode($input)
+val $input = "http://rosettacode.org/wiki/URL_encoding"
+val $encoded = Rosetta::UrlEncode::url_encode($input)
 assert_eq $encoded, "http%3A%2F%2Frosettacode.org%2Fwiki%2FURL_encoding", "manual url encode"
 
-my $decoded = Rosetta::UrlDecode::url_decode($encoded)
+val $decoded = Rosetta::UrlDecode::url_decode($encoded)
 assert_eq $decoded, $input, "manual url decode"
 
 test_run

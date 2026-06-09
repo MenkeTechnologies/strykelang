@@ -2,24 +2,24 @@
 # Rosetta Code: Floyd-Warshall algorithm
 
 fn Rosetta::FloydWarshall::solve($n, $edges) {
-    my $dist = []
-    for my $i (0:$n-1) {
+    var $dist = []
+    for val $i (0:$n-1) {
         $dist->[$i] = []
-        for my $j (0:$n-1) {
+        for val $j (0:$n-1) {
             $dist->[$i][$j] = ($i == $j ? 0 : 1000000)
         }
     }
     
     ~> @$edges ep {
-        my $u = _->[0]
-        my $v = _->[1]
-        my $w = _->[2]
+        val $u = _->[0]
+        val $v = _->[1]
+        val $w = _->[2]
         $dist->[$u][$v] = $w
     }
     
-    for my $k (0:$n-1) {
-        for my $i (0:$n-1) {
-            for my $j (0:$n-1) {
+    for val $k (0:$n-1) {
+        for val $i (0:$n-1) {
+            for val $j (0:$n-1) {
                 if ($dist->[$i][$k] + $dist->[$k][$j] < $dist->[$i][$j]) {
                     $dist->[$i][$j] = $dist->[$i][$k] + $dist->[$k][$j]
                 }
@@ -29,14 +29,14 @@ fn Rosetta::FloydWarshall::solve($n, $edges) {
     $dist
 }
 
-my $edges = [
+val $edges = [
     [0, 2, -2],
     [1, 0, 4],
     [1, 2, 3],
     [2, 3, 2],
     [3, 1, -1]
 ]
-my $res = Rosetta::FloydWarshall::solve(4, $edges)
+val $res = Rosetta::FloydWarshall::solve(4, $edges)
 
 # Shortest path from 0 to 3: 0->2->3 (weight -2 + 2 = 0)
 assert_eq $res->[0][3], 0, "dist 0 to 3"

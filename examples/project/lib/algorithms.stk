@@ -2,12 +2,12 @@
 
 # ── Algo::binary_search: returns index of target in sorted list, or -1 ─────
 fn Algo::binary_search($target, @list) {
-    my $low = 0
-    my $high = len(@list) - 1
+    var $low = 0
+    var $high = len(@list) - 1
     
     while ($low <= $high) {
-        my $mid = int(($low + $high) / 2)
-        my $guess = $list[$mid]
+        val $mid = int(($low + $high) / 2)
+        val $guess = $list[$mid]
         
         if ($guess == $target) {
             return $mid
@@ -23,11 +23,11 @@ fn Algo::binary_search($target, @list) {
 
 # ── Project::Algorithms::bubble_sort: classic inefficient sort for testing ─────
 fn Project::Algorithms::bubble_sort(@list) {
-    my $len = len(@list)
-    for my $i (0:$len-1) {
-        for my $j (0:$len-$i-2) {
+    val $len = len(@list)
+    for val $i (0:$len-1) {
+        for val $j (0:$len-$i-2) {
             if ($list[$j] > $list[$j+1]) {
-                my $tmp = $list[$j]
+                val $tmp = $list[$j]
                 $list[$j] = $list[$j+1]
                 $list[$j+1] = $tmp
             }
@@ -42,12 +42,12 @@ fn Project::Algorithms::quick_sort(@list) {
         return @list
     }
     
-    my $pivot = $list[0]
-    my @left = ()
-    my @right = ()
+    val $pivot = $list[0]
+    var @left = ()
+    var @right = ()
     
-    for my $i (1..len(@list)-1) {
-        my $val = $list[$i]
+    for val $i (1..len(@list)-1) {
+        val $val = $list[$i]
         if ($val <= $pivot) {
             push @left, $val
         } else {
@@ -55,12 +55,12 @@ fn Project::Algorithms::quick_sort(@list) {
         }
     }
     
-    my @sorted_left = ()
+    var @sorted_left = ()
     if (len(@left) > 0) {
         @sorted_left = Project::Algorithms::quick_sort(@left)
     }
     
-    my @sorted_right = ()
+    var @sorted_right = ()
     if (len(@right) > 0) {
         @sorted_right = Project::Algorithms::quick_sort(@right)
     }
@@ -74,20 +74,20 @@ fn Project::Algorithms::merge_sort(@list) {
         return @list
     }
     
-    my $mid = int(len(@list) / 2)
-    my @left = @list[0:$mid-1]
-    my @right = @list[$mid..len(@list)-1]
+    val $mid = int(len(@list) / 2)
+    val @left = @list[0:$mid-1]
+    val @right = @list[$mid..len(@list)-1]
     
-    my @sorted_left = Project::Algorithms::merge_sort(@left)
-    my @sorted_right = Project::Algorithms::merge_sort(@right)
+    val @sorted_left = Project::Algorithms::merge_sort(@left)
+    val @sorted_right = Project::Algorithms::merge_sort(@right)
     
     _merge(\@sorted_left, \@sorted_right)
 }
 
 fn _merge($left_ref, $right_ref) {
-    my @left = @$left_ref
-    my @right = @$right_ref
-    my @res = ()
+    var @left = @$left_ref
+    var @right = @$right_ref
+    var @res = ()
     while (len(@left) > 0 && len(@right) > 0) {
         if ($left[0] <= $right[0]) {
             push @res, shift @left
@@ -106,12 +106,12 @@ require "./lib/priority_queue.stk"
 fn Project::Algorithms::heap_sort(@list) {
     return @list if len(@list) <= 1
     
-    my $pq = Project::PriorityQueue::pq_new()
+    val $pq = Project::PriorityQueue::pq_new()
     ~> @list ep {
         $pq->push(_)
     }
     
-    my @res = ()
+    var @res = ()
     while (!$pq->is_empty()) {
         unshift @res, $pq->pop()
     }

@@ -2,7 +2,7 @@
 require "./WordCount.stk"
 
 fn sig {
-    my $h = _0
+    val $h = _0
     join(",", map { "$_=$h->{$_}" } sort keys %$h)
 }
 

@@ -12,10 +12,10 @@ fn Rosetta::Cistercian::quadrants($n) {
 }
 
 fn Rosetta::Cistercian::render($n) {
-    my $q = Rosetta::Cistercian::quadrants($n)
+    val $q = Rosetta::Cistercian::quadrants($n)
     return undef unless defined $q
-    my ($u, $t, $h, $th) = @$q
-    my @rows = (
+    val ($u, $t, $h, $th) = @$q
+    val @rows = (
         sprintf("%s|%s", $th == 0 ? " " : $th, $h == 0 ? " " : $h),
         " | ",
         sprintf("%s|%s", $t  == 0 ? " " : $t,  $u == 0 ? " " : $u),
@@ -37,16 +37,16 @@ assert_ok !defined(Rosetta::Cistercian::quadrants(-1)),    "negative rejected"
 assert_ok !defined(Rosetta::Cistercian::quadrants(10000)), "10000 rejected"
 
 # Render basic glyph for 6831 (a common rosetta example)
-my $g = Rosetta::Cistercian::render(6831)
+val $g = Rosetta::Cistercian::render(6831)
 assert_eq $g,
     "6|8\n | \n3|1",
     "render 6831 grid"
 
 # Reconstruction round-trip via quadrants
-my $all_round = 1
-for my $n (0:99) {
-    my $q = Rosetta::Cistercian::quadrants($n)
-    my $back = $q->[0] + 10 * $q->[1] + 100 * $q->[2] + 1000 * $q->[3]
+var $all_round = 1
+for val $n (0:99) {
+    val $q = Rosetta::Cistercian::quadrants($n)
+    val $back = $q->[0] + 10 * $q->[1] + 100 * $q->[2] + 1000 * $q->[3]
     $all_round = 0 if $back != $n
 }
 assert_ok $all_round, "0:99 round-trip exact"

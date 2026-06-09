@@ -2,7 +2,7 @@
 # Rosetta Code: Hero's formula
 
 fn Rosetta::Hero::area($a, $b, $c) {
-    my $s = ($a + $b + $c) / 2.0
+    val $s = ($a + $b + $c) / 2.0
     sqrt($s * ($s - $a) * ($s - $b) * ($s - $c))
 }
 
