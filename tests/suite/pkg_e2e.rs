@@ -158,7 +158,7 @@ fn registry_dep_returns_unimplemented_diagnostic() {
 }
 
 #[test]
-fn git_dep_returns_unimplemented_diagnostic() {
+fn git_dep_with_unreachable_url_fails_clone() {
     let project = tempdir("project");
     let mut manifest = Manifest {
         package: Some(PackageMeta {
@@ -171,7 +171,7 @@ fn git_dep_returns_unimplemented_diagnostic() {
     manifest.deps.insert(
         "lib".to_string(),
         DepSpec::Detailed(stryke::pkg::manifest::DetailedDep {
-            git: Some("https://example.com/lib".into()),
+            git: Some("file:///nonexistent/stryke-git-dep-test/repo.git".into()),
             default_features: true,
             ..Default::default()
         }),
@@ -186,8 +186,8 @@ fn git_dep_returns_unimplemented_diagnostic() {
     };
     let err = r.resolve().unwrap_err();
     let msg = err.to_string();
-    assert!(msg.contains("git dep"), "got: {}", msg);
-    assert!(msg.contains("phase 9"), "got: {}", msg);
+    assert!(msg.contains("git clone"), "got: {}", msg);
+    assert!(msg.contains("lib"), "got: {}", msg);
 }
 
 #[test]
