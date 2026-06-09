@@ -1,12 +1,17 @@
-//! Resolution pipeline. Local-only for Tier 1 (RFC phases 1–6):
+//! Resolution pipeline (RFC phases 1–6 + 9 git):
 //! - Path deps (`{ path = "../lib" }`) are read from the filesystem, hashed,
 //!   copied into the store, and pinned in the lockfile.
 //! - Workspace member deps work the same as path deps.
-//! - Registry (`http = "1.0"`) and git (`{ git = "..." }`) deps return a
-//!   structured "not yet implemented" error so the CLI surface is honest
-//!   about what's wired today.
+//! - Git deps (`{ git = "https://...", tag|branch|rev = ... }`) are cloned
+//!   into `~/.stryke/git/`, the resolved commit is recorded in the lockfile,
+//!   and the working copy is installed through the same `install_dir_dep`
+//!   path as path deps. FFI git deps (cloned tree has `[ffi]`) are rejected
+//!   loud — the cdylib isn't in the source tree, the user wants
+//!   `s pkg install -g github.com/...` for the prebuilt binary instead.
+//! - Registry (`http = "1.0"`) deps return a structured "not yet implemented"
+//!   error so the CLI surface is honest about what's wired today.
 //!
-//! When the registry / PubGrub semver / parallel fetch land (RFC phases 7-9),
+//! When the registry / PubGrub semver / parallel fetch land (RFC phases 7-8),
 //! they slot in at [`Resolver::resolve`] without changing the lockfile shape.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -236,12 +241,7 @@ impl<'a> Resolver<'a> {
                 self.install_path_dep(name, &path, graph, installed, visiting)?;
                 Ok(())
             }
-            DepSource::Git => Err(PkgError::Resolve(format!(
-                "git dep `{}` is not supported in this stryke version yet \
-                 (RFC phase 9 — see docs/PACKAGE_REGISTRY.md). Use `path = \"...\"` \
-                 to depend on a local checkout in the meantime.",
-                name
-            ))),
+            DepSource::Git => self.install_git_dep(name, spec, graph, installed, visiting),
             DepSource::Registry => Err(PkgError::Resolve(format!(
                 "registry dep `{}` is not supported in this stryke version yet \
                  (RFC phases 7–8 — see docs/PACKAGE_REGISTRY.md). Use `path = \"...\"` \
@@ -249,6 +249,117 @@ impl<'a> Resolver<'a> {
                 name
             ))),
         }
+    }
+
+    /// Clone a git dep into `~/.stryke/git/`, error fast on FFI git deps
+    /// (the cdylib is not in the source tree — it's published as a release
+    /// artifact, so source clones can't supply it), and otherwise install
+    /// the working copy through the same path the path-dep arm uses.
+    fn install_git_dep(
+        &self,
+        name: &str,
+        spec: &DepSpec,
+        graph: &mut BTreeMap<String, ResolvedDep>,
+        installed: &mut Vec<(String, String, PathBuf)>,
+        visiting: &mut BTreeSet<String>,
+    ) -> PkgResult<()> {
+        let url = spec
+            .git()
+            .ok_or_else(|| PkgError::Resolve(format!("git dep `{}` missing url", name)))?
+            .to_string();
+        let (branch_or_tag, rev_pin) = git_branch_or_rev(spec);
+        let (clone_path, resolved_commit) =
+            self.clone_git_dep(name, &url, branch_or_tag.as_deref(), rev_pin.as_deref())?;
+
+        // Refuse FFI git deps with a pointer at the binary-distribution path.
+        let manifest_path = clone_path.join("stryke.toml");
+        if manifest_path.is_file() {
+            let m = Manifest::from_path(&manifest_path)?;
+            if m.ffi.is_some() {
+                return Err(PkgError::Resolve(format!(
+                    "git dep `{}` ships a [ffi] cdylib that isn't in the source tree. \
+                     Use `s pkg install -g <github-url>` to fetch the prebuilt binary \
+                     for this host, or remove [ffi] to build from source.",
+                    name
+                )));
+            }
+        }
+
+        let source = format!("git+{}#{}", url, resolved_commit);
+        self.install_dir_dep(name, &clone_path, source, graph, installed, visiting)
+    }
+
+    /// `git clone --depth 1` (or full clone for arbitrary `rev`) into
+    /// `~/.stryke/git/<host>-<owner>-<repo>-<pin>/`. Idempotent — repeated
+    /// installs with the same `(url, pin)` reuse the existing checkout.
+    fn clone_git_dep(
+        &self,
+        name: &str,
+        url: &str,
+        branch_or_tag: Option<&str>,
+        rev: Option<&str>,
+    ) -> PkgResult<(PathBuf, String)> {
+        std::fs::create_dir_all(self.store.git_dir())
+            .map_err(|e| PkgError::Io(format!("create git cache dir: {}", e)))?;
+        let dir_name = git_cache_dir_name(url, branch_or_tag, rev);
+        let target = self.store.git_dir().join(&dir_name);
+
+        if !target.is_dir() {
+            use std::process::Command;
+            let mut cmd = Command::new("git");
+            cmd.arg("clone");
+            // Shallow-clone when a branch/tag/none is pinned. Arbitrary `rev`
+            // requires the full history because GitHub's HTTPS smart-protocol
+            // doesn't accept `fetch <sha>` for shallow clones.
+            if rev.is_none() {
+                cmd.args(["--depth", "1"]);
+                if let Some(bt) = branch_or_tag {
+                    cmd.args(["--branch", bt]);
+                }
+            }
+            cmd.arg(url).arg(&target);
+            let status = cmd
+                .status()
+                .map_err(|e| PkgError::Resolve(format!("git clone `{}`: {}", name, e)))?;
+            if !status.success() {
+                return Err(PkgError::Resolve(format!(
+                    "git clone `{}` exited with status {}",
+                    name, status
+                )));
+            }
+            if let Some(rev) = rev {
+                let s = Command::new("git")
+                    .arg("-C")
+                    .arg(&target)
+                    .args(["checkout", rev])
+                    .status()
+                    .map_err(|e| PkgError::Resolve(format!("git checkout `{}`: {}", rev, e)))?;
+                if !s.success() {
+                    return Err(PkgError::Resolve(format!(
+                        "git checkout `{}` exited with status {}",
+                        rev, s
+                    )));
+                }
+            }
+        }
+
+        let resolved = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&target)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .map_err(|e| PkgError::Resolve(format!("git rev-parse: {}", e)))?;
+        if !resolved.status.success() {
+            return Err(PkgError::Resolve(format!(
+                "git rev-parse HEAD failed for `{}`",
+                target.display()
+            )));
+        }
+        let commit = String::from_utf8(resolved.stdout)
+            .map_err(|e| PkgError::Resolve(format!("non-utf8 rev: {}", e)))?
+            .trim()
+            .to_string();
+        Ok((target, commit))
     }
 
     /// Pull a path-dep manifest, hash the directory, copy into the store, and
@@ -262,9 +373,27 @@ impl<'a> Resolver<'a> {
         installed: &mut Vec<(String, String, PathBuf)>,
         visiting: &mut BTreeSet<String>,
     ) -> PkgResult<()> {
+        let canonical_src = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
+        let source = format!("path+file://{}", canonical_src.display());
+        self.install_dir_dep(name, src, source, graph, installed, visiting)
+    }
+
+    /// Shared installer for any source-tree dep (path or git). Reads the
+    /// nested manifest, hashes the tree, copies to the store, recurses into
+    /// transitive deps, and records the lockfile entry with the caller-
+    /// supplied `source` string (`path+file://...` or `git+<url>#<rev>`).
+    fn install_dir_dep(
+        &self,
+        name: &str,
+        src: &Path,
+        source: String,
+        graph: &mut BTreeMap<String, ResolvedDep>,
+        installed: &mut Vec<(String, String, PathBuf)>,
+        visiting: &mut BTreeSet<String>,
+    ) -> PkgResult<()> {
         if !src.is_dir() {
             return Err(PkgError::Resolve(format!(
-                "path dep `{}` does not exist or is not a directory: {}",
+                "dep `{}` does not exist or is not a directory: {}",
                 name,
                 src.display()
             )));
@@ -313,13 +442,12 @@ impl<'a> Resolver<'a> {
         transitive.sort();
         transitive.dedup();
 
-        let canonical_src = src.canonicalize().unwrap_or_else(|_| src.to_path_buf());
         graph.insert(
             key.clone(),
             ResolvedDep {
                 name: name.to_string(),
                 version,
-                source: format!("path+file://{}", canonical_src.display()),
+                source,
                 integrity,
                 deps: transitive,
                 features: Vec::new(),
@@ -328,6 +456,75 @@ impl<'a> Resolver<'a> {
         visiting.remove(&key);
         Ok(())
     }
+}
+
+/// Extract `branch`/`tag`/`rev` from a detailed git dep spec. Returns
+/// `(branch_or_tag, rev)`. `branch_or_tag` carries either field because they
+/// both feed `git clone --branch <X>` semantics; `rev` is treated separately
+/// since it needs a full clone + post-checkout instead of a shallow clone.
+fn git_branch_or_rev(spec: &DepSpec) -> (Option<String>, Option<String>) {
+    match spec {
+        DepSpec::Detailed(d) => {
+            let bt = d.tag.clone().or_else(|| d.branch.clone());
+            (bt, d.rev.clone())
+        }
+        _ => (None, None),
+    }
+}
+
+/// Stable per-`(url, pin)` directory name for `~/.stryke/git/`. Mirrors the
+/// shape in `PACKAGE_REGISTRY.md` §"Global Store" (`github.com-user-mylib-<hash>`)
+/// — host + owner + repo + a short hash that uniquely identifies the pin so
+/// `{ git = ..., tag = "v1" }` and `{ git = ..., tag = "v2" }` get separate
+/// clones.
+fn git_cache_dir_name(url: &str, branch_or_tag: Option<&str>, rev: Option<&str>) -> String {
+    let (host, owner, repo) = parse_git_url(url);
+    let mut hasher = sha2::Sha256::new();
+    use sha2::Digest as _;
+    hasher.update(url.as_bytes());
+    if let Some(bt) = branch_or_tag {
+        hasher.update(b"\0bt:");
+        hasher.update(bt.as_bytes());
+    }
+    if let Some(rev) = rev {
+        hasher.update(b"\0rev:");
+        hasher.update(rev.as_bytes());
+    }
+    let hash = hex::encode(&hasher.finalize()[..6]);
+    format!("{}-{}-{}-{}", host, owner, repo, hash)
+}
+
+/// Best-effort split of a git URL into `(host, owner, repo)` for the cache
+/// directory name. Handles the common `https://github.com/owner/repo[.git]`
+/// and `git@github.com:owner/repo[.git]` forms. Unrecognized URLs degrade to
+/// `("git", "unknown", "<sanitized-url>")` — they still hash-pin uniquely
+/// via the sha digest, the prefix is just a human-readable hint.
+fn parse_git_url(url: &str) -> (String, String, String) {
+    let trimmed = url.trim_end_matches(".git");
+    if let Some(rest) = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))
+        .or_else(|| trimmed.strip_prefix("git://"))
+    {
+        let mut parts = rest.splitn(3, '/');
+        let host = parts.next().unwrap_or("git").to_string();
+        let owner = parts.next().unwrap_or("unknown").to_string();
+        let repo = parts.next().unwrap_or("repo").to_string();
+        return (host, owner, repo);
+    }
+    if let Some(rest) = trimmed.strip_prefix("git@") {
+        if let Some((host, path)) = rest.split_once(':') {
+            let mut p = path.splitn(2, '/');
+            let owner = p.next().unwrap_or("unknown").to_string();
+            let repo = p.next().unwrap_or("repo").to_string();
+            return (host.to_string(), owner, repo);
+        }
+    }
+    (
+        "git".into(),
+        "unknown".into(),
+        trimmed.replace(['/', ':'], "-"),
+    )
 }
 
 /// Resolve a (possibly relative) dep path against the dep's containing manifest dir.
@@ -387,6 +584,67 @@ mod tests {
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn parse_git_url_https_github() {
+        let (h, o, r) = parse_git_url("https://github.com/MenkeTechnologies/stryke-gui.git");
+        assert_eq!(h, "github.com");
+        assert_eq!(o, "MenkeTechnologies");
+        assert_eq!(r, "stryke-gui");
+    }
+
+    #[test]
+    fn parse_git_url_ssh_form() {
+        let (h, o, r) = parse_git_url("git@github.com:foo/bar.git");
+        assert_eq!(h, "github.com");
+        assert_eq!(o, "foo");
+        assert_eq!(r, "bar");
+    }
+
+    #[test]
+    fn parse_git_url_unknown_scheme_degrades_safely() {
+        let (h, _, _) = parse_git_url("file:///tmp/local.git");
+        // Falls into the unrecognized-bucket — the per-(url,pin) hash still
+        // disambiguates the cache dir, the prefix is just cosmetic.
+        assert_eq!(h, "git");
+    }
+
+    #[test]
+    fn git_cache_dir_name_pins_change_with_tag() {
+        let a = git_cache_dir_name("https://github.com/o/r.git", Some("v1.0"), None);
+        let b = git_cache_dir_name("https://github.com/o/r.git", Some("v2.0"), None);
+        assert_ne!(a, b, "different tags must produce different cache dirs");
+        assert!(a.starts_with("github.com-o-r-"));
+        assert!(b.starts_with("github.com-o-r-"));
+    }
+
+    #[test]
+    fn git_cache_dir_name_pins_change_with_rev() {
+        let a = git_cache_dir_name("https://github.com/o/r.git", None, Some("abc"));
+        let b = git_cache_dir_name("https://github.com/o/r.git", None, Some("def"));
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn git_cache_dir_name_stable_across_calls() {
+        let a = git_cache_dir_name("https://github.com/o/r.git", Some("v1"), None);
+        let b = git_cache_dir_name("https://github.com/o/r.git", Some("v1"), None);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn git_branch_or_rev_picks_tag_over_branch() {
+        use crate::pkg::manifest::DetailedDep;
+        let spec = DepSpec::Detailed(DetailedDep {
+            git: Some("https://x".into()),
+            tag: Some("v1.0".into()),
+            branch: Some("main".into()),
+            ..DetailedDep::default()
+        });
+        let (bt, rev) = git_branch_or_rev(&spec);
+        assert_eq!(bt.as_deref(), Some("v1.0"));
+        assert!(rev.is_none());
     }
 
     fn make_path_dep(name: &str, version: &str) -> PathBuf {

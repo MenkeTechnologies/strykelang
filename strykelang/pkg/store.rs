@@ -3,10 +3,20 @@
 //! Paths are human-readable (`name@version`) per RFC §"Global Store" — we get
 //! Nix-grade reproducibility from the lockfile's content hashes without
 //! Nix-grade opaque path UX.
+//!
+//! Also hosts the global pin file [`InstalledIndex`] at `~/.stryke/installed.toml`,
+//! which records every `s pkg install -g` so that one-off scripts run outside
+//! a project can still resolve `use Foo` to a store entry. The project lockfile
+//! takes precedence for in-project resolution; the installed index is only
+//! consulted when there's no project lockfile entry for the requested package.
 
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use super::{PkgError, PkgResult};
+
+/// Filename of the global installed-package index.
+pub const INSTALLED_FILE: &str = "installed.toml";
 
 /// Resolves and (lazily) creates the standard `~/.stryke/...` layout.
 pub struct Store {
@@ -100,6 +110,128 @@ impl Store {
     }
 }
 
+/// Global pin for every `s pkg install -g`-installed package.
+///
+/// Lives at `~/.stryke/installed.toml`. Unlike per-project lockfiles, this
+/// has no SHA-256 integrity hashes and no transitive-dep records — it's a
+/// flat name→version map that lets one-off scripts run outside any project
+/// still resolve `use Foo` to a global store entry.
+///
+/// Conflict resolution in [`crate::pkg::commands::resolve_module`]:
+/// project lockfile (#2) wins over this global pin (#3). If a project pins
+/// `gui` at `0.1.0` and the global index has `gui@0.2.0`, the project gets
+/// `0.1.0`; standalone scripts get `0.2.0`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InstalledIndex {
+    /// Schema version. Bumped when the layout changes incompatibly.
+    pub version: u32,
+    /// One entry per installed package, sorted by name.
+    #[serde(default, rename = "package")]
+    pub packages: Vec<InstalledPackage>,
+}
+
+/// One entry in the installed-package index.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InstalledPackage {
+    /// Package name (matches `[package].name` in the installed manifest).
+    pub name: String,
+    /// Version that was installed (matches `[package].version`).
+    pub version: String,
+    /// Where the install came from — `github:owner/repo`, `path+file://...`,
+    /// etc. Recorded for `s list -g` display + future upgrade paths.
+    pub source: String,
+}
+
+impl InstalledIndex {
+    /// Empty index stamped with the current schema version.
+    pub fn new() -> InstalledIndex {
+        InstalledIndex {
+            version: 1,
+            packages: Vec::new(),
+        }
+    }
+
+    /// Convenience: load via [`Store::user_default`] (honors `STRYKE_HOME`).
+    /// Production code paths use this; tests prefer [`InstalledIndex::load_from`]
+    /// with an explicit store root so parallel test execution doesn't race on
+    /// the process-global env var.
+    pub fn load_or_default() -> PkgResult<InstalledIndex> {
+        let store = Store::user_default()?;
+        Self::load_from(&store)
+    }
+
+    /// Load the index from a specific [`Store`] root. Returns an empty
+    /// index when the file doesn't exist yet — the index materializes on
+    /// the first `s pkg install -g`.
+    pub fn load_from(store: &Store) -> PkgResult<InstalledIndex> {
+        let path = store.root().join(INSTALLED_FILE);
+        if !path.is_file() {
+            return Ok(InstalledIndex::new());
+        }
+        let s = std::fs::read_to_string(&path)
+            .map_err(|e| PkgError::Io(format!("read {}: {}", path.display(), e)))?;
+        toml::from_str::<InstalledIndex>(&s)
+            .map_err(|e| PkgError::Other(format!("parse {}: {}", path.display(), e.message())))
+    }
+
+    /// Convenience: save via [`Store::user_default`] (honors `STRYKE_HOME`).
+    pub fn save(&self) -> PkgResult<()> {
+        let store = Store::user_default()?;
+        self.save_to(&store)
+    }
+
+    /// Save the index under a specific [`Store`] root. Packages are sorted
+    /// by name first so the file is deterministic across runs and friendly
+    /// to `diff`.
+    pub fn save_to(&self, store: &Store) -> PkgResult<()> {
+        let path = store.root().join(INSTALLED_FILE);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| PkgError::Io(format!("create {}: {}", parent.display(), e)))?;
+        }
+        let mut copy = self.clone();
+        copy.packages.sort_by(|a, b| a.name.cmp(&b.name));
+        let mut header =
+            String::from("# Auto-generated. Updated by `s pkg install -g` / `s uninstall -g`.\n");
+        header.push_str("# Hand-edit this only if you understand the impact on `use X` resolution.\n\n");
+        let body = toml::to_string_pretty(&copy)
+            .map_err(|e| PkgError::Other(format!("serialize {}: {}", path.display(), e)))?;
+        std::fs::write(&path, format!("{}{}", header, body))
+            .map_err(|e| PkgError::Io(format!("write {}: {}", path.display(), e)))?;
+        Ok(())
+    }
+
+    /// Find an installed package by name (case-sensitive). Use the package's
+    /// canonical name from `[package].name`, not a logical `use Foo`-style
+    /// segment — the lookup is verbatim.
+    pub fn find(&self, name: &str) -> Option<&InstalledPackage> {
+        self.packages.iter().find(|p| p.name == name)
+    }
+
+    /// Insert or overwrite the entry for `name`. Multiple installs of the
+    /// same package (e.g. `s pkg install -g <url>` after a previous install)
+    /// collapse to one entry — the latest install always wins.
+    pub fn upsert(&mut self, name: impl Into<String>, version: impl Into<String>, source: impl Into<String>) {
+        let name = name.into();
+        let version = version.into();
+        let source = source.into();
+        if let Some(slot) = self.packages.iter_mut().find(|p| p.name == name) {
+            slot.version = version;
+            slot.source = source;
+        } else {
+            self.packages.push(InstalledPackage { name, version, source });
+        }
+    }
+
+    /// Remove the entry for `name`. Returns `true` if a matching entry was
+    /// removed, `false` if the package wasn't in the index.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.packages.len();
+        self.packages.retain(|p| p.name != name);
+        self.packages.len() != before
+    }
+}
+
 /// Recursive directory copy. Symlinks are copied as symlinks; files preserve
 /// permissions when the OS supports it.
 fn copy_dir(src: &Path, dst: &Path) -> PkgResult<()> {
@@ -165,6 +297,58 @@ mod tests {
             s.package_dir("http", "1.0.0"),
             PathBuf::from("/x/store/http@1.0.0")
         );
+    }
+
+    #[test]
+    fn installed_index_round_trip() {
+        // Use an explicit Store::at() rather than STRYKE_HOME so parallel
+        // test execution doesn't race on the process-global env var. The
+        // load_from/save_to API mirrors Store::at vs Store::user_default.
+        let root = tempdir();
+        let store = Store::at(&root);
+        store.ensure_layout().unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.2.0", "github:MenkeTechnologies/stryke-gui");
+        idx.upsert("aws", "0.1.0", "github:MenkeTechnologies/stryke-aws");
+        idx.save_to(&store).unwrap();
+
+        let reloaded = InstalledIndex::load_from(&store).unwrap();
+        assert_eq!(reloaded.version, 1);
+        assert_eq!(reloaded.packages.len(), 2);
+        // Sorted by name on save.
+        assert_eq!(reloaded.packages[0].name, "aws");
+        assert_eq!(reloaded.packages[1].name, "gui");
+        assert_eq!(
+            reloaded.find("gui").unwrap().source,
+            "github:MenkeTechnologies/stryke-gui"
+        );
+    }
+
+    #[test]
+    fn installed_index_upsert_overwrites() {
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.1.0", "github:a/b");
+        idx.upsert("gui", "0.2.0", "github:a/b");
+        assert_eq!(idx.packages.len(), 1);
+        assert_eq!(idx.packages[0].version, "0.2.0");
+    }
+
+    #[test]
+    fn installed_index_remove_returns_true_when_present() {
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.1.0", "github:a/b");
+        assert!(idx.remove("gui"));
+        assert!(!idx.remove("gui"));
+        assert!(idx.packages.is_empty());
+    }
+
+    #[test]
+    fn installed_index_load_from_returns_empty_when_missing() {
+        let root = tempdir();
+        let store = Store::at(&root);
+        store.ensure_layout().unwrap();
+        let idx = InstalledIndex::load_from(&store).unwrap();
+        assert!(idx.packages.is_empty());
     }
 
     #[test]
