@@ -299,6 +299,15 @@ impl StaticAnalyzer {
             }
             StmtKind::Use { module, imports } => {
                 self.declare_sub(module);
+                // `use Foo::Bar` mirrors `require Foo::Bar` for analyzer
+                // purposes: chase the resolved file and merge its sub
+                // declarations into scope so `Foo::Bar::baz()` calls in
+                // the current file don't fire as "Undefined subroutine".
+                // Without this, `use GUI; GUI::mouse_pos()` always lints
+                // red regardless of whether stryke-gui is installed and
+                // resolve_require_path_from_file's L1 3-arm resolver
+                // would have found it.
+                self.follow_require(module);
                 // `use constant NAME => …`, `use constant { A => 1, B => 2 }`,
                 // and `use constant NAME => (1, 2, 3)` install one sub per
                 // NAME. Recognize those name slots so the linter can resolve
