@@ -4,7 +4,7 @@
 # the same backing storage.
 
 fn Rosetta::FCEnv::make_counter() {
-    my $s = { count => 0 }
+    var $s = { count => 0 }
     {
         inc   => fn { $s->{count} += 1; $s->{count} },
         dec   => fn { $s->{count} -= 1; $s->{count} },
@@ -14,7 +14,7 @@ fn Rosetta::FCEnv::make_counter() {
 }
 
 # Three independent environments, each with private state.
-my @envs = (
+val @envs = (
     Rosetta::FCEnv::make_counter(),
     Rosetta::FCEnv::make_counter(),
     Rosetta::FCEnv::make_counter(),
@@ -32,7 +32,7 @@ assert_eq $envs[1]->{get}(),  1, "env 1 = 1"
 assert_eq $envs[2]->{get}(), -1, "env 2 = -1"
 
 # pipeline: snapshot all
-my @snap = ~> @envs map { _->{get}() }
+val @snap = ~> @envs map { _->{get}() }
 assert_eq join(",", @snap), "3,1,-1", "snapshot"
 
 # Reset env 0, ensure others untouched.
@@ -47,7 +47,7 @@ fn Rosetta::FCEnv::ramp_up($env, $n) {
     $env->{get}()
 }
 
-my $fresh = Rosetta::FCEnv::make_counter()
+val $fresh = Rosetta::FCEnv::make_counter()
 assert_eq Rosetta::FCEnv::ramp_up($fresh, 10), 10, "passing env into a fn works"
 
 test_run

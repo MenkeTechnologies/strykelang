@@ -5,7 +5,7 @@
 
 # ── Const and Frozen with Types ───────────────────────────────────────────
 
-const my $x : Int = 42
+const val $x : Int = 42
 $x |> aeq 42, "const my with type annotation"
 
 # ── Class Instances and Dereferencing ─────────────────────────────────────
@@ -15,10 +15,10 @@ class Point {
     y : Int
 }
 
-my $p = Point->new(x => 10, y => 20)
+val $p = Point->new(x => 10, y => 20)
 ref($p) |> aeq "Point", "ref() on class instance"
 
-my %fields = %$p
+val %fields = %$p
 keys(%fields) |> sort { _ cmp _1 } |> join(",") |> aeq "x,y", "deref class instance keys"
 $fields{x} |> aeq 10, "deref class instance value x"
 
@@ -29,7 +29,7 @@ class Node {
     child : Node
 }
 
-my $root = Node->new(
+val $root = Node->new(
     name => "parent",
     child => Node->new(name => "child")
 )

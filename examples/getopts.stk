@@ -10,7 +10,7 @@
 #
 # The `--` separates stryke's own flags from the script's @ARGV.
 
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "verbose|v"   => { help => "enable verbose output" },
     "file|f=s"    => { help => "output path", default => "out.txt" },
     "count|n=i"   => { help => "number of iterations", default => 1 },
@@ -26,9 +26,9 @@ my %opts = %{ getopts({
     epilog => "All flags are optional. Anything after the last flag is positional.",
 }) }
 
-my @tags    = @{ $opts{tag} }
-my %defines = %{ $opts{define} }
-my $kv      = (sort keys %defines) |> maps { "$_=$defines{$_}" } |> join(", ", _)
+val @tags    = @{ $opts{tag} }
+val %defines = %{ $opts{define} }
+val $kv      = (sort keys %defines) |> maps { "$_=$defines{$_}" } |> join(", ", _)
 
 p "── parsed options ───────────────────────────"
 p "verbose : $opts{verbose}"

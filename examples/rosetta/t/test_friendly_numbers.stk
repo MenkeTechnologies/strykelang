@@ -3,8 +3,8 @@
 # (Same abundancy index.) Solitary numbers have a unique index.
 
 fn Rosetta::Friendly::sigma($n) {
-    my $s = 0
-    for my $d (1:$n) {
+    var $s = 0
+    for val $d (1:$n) {
         $s += $d if $n % $d == 0
     }
     $s
@@ -16,21 +16,21 @@ fn Rosetta::Friendly::gcd($a, $b) {
 }
 
 fn Rosetta::Friendly::abundancy($n) {
-    my $s = Rosetta::Friendly::sigma($n)
-    my $g = Rosetta::Friendly::gcd($s, $n)
+    val $s = Rosetta::Friendly::sigma($n)
+    val $g = Rosetta::Friendly::gcd($s, $n)
     [int($s / $g), int($n / $g)]
 }
 
 # Group 1..n by abundancy index, return groups with size > 1
 fn Rosetta::Friendly::groups($n) {
-    my %by_idx
-    for my $i (1:$n) {
-        my $idx = Rosetta::Friendly::abundancy($i)
-        my $key = "$idx->[0]/$idx->[1]"
+    val %by_idx
+    for val $i (1:$n) {
+        val $idx = Rosetta::Friendly::abundancy($i)
+        val $key = "$idx->[0]/$idx->[1]"
         push @{$by_idx{$key}}, $i
     }
-    my %big
-    for my $k (keys %by_idx) {
+    var %big
+    for val $k (keys %by_idx) {
         $big{$k} = $by_idx{$k} if len(@{$by_idx{$k}}) > 1
     }
     \%big
@@ -49,11 +49,11 @@ assert_eq join("/", @{Rosetta::Friendly::abundancy(140)}), "12/5", "abundancy(14
 # (240, 3110400) share abundancy ... too large for trial division — verify abundancy(80) and (200) instead
 # (80, 200) share abundancy 117/40? Actually check (24, 91963648) — out of range too
 # Just confirm (30, 140) come up in groups search up to 200
-my $groups = Rosetta::Friendly::groups(200)
-my $found = 0
-for my $key (keys %$groups) {
-    my @members = @{$groups->{$key}}
-    my %m = map { _ => 1 } @members
+val $groups = Rosetta::Friendly::groups(200)
+var $found = 0
+for val $key (keys %$groups) {
+    val @members = @{$groups->{$key}}
+    val %m = map { _ => 1 } @members
     if (exists $m{30} && exists $m{140}) {
         $found = 1
     }
@@ -61,7 +61,7 @@ for my $key (keys %$groups) {
 assert_ok $found, "30 and 140 in same group"
 
 # Solitary by virtue of abundancy 1/1: just {1}
-my $abu_1 = Rosetta::Friendly::abundancy(1)
+val $abu_1 = Rosetta::Friendly::abundancy(1)
 assert_eq join("/", @$abu_1), "1/1", "abundancy(1) = 1/1"
 
 test_run

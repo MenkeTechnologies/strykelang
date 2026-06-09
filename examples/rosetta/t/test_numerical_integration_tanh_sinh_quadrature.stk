@@ -4,30 +4,30 @@
 fn Rosetta::TanhSinh::sinh($x) { (exp($x) - exp(-$x)) / 2 }
 fn Rosetta::TanhSinh::cosh($x) { (exp($x) + exp(-$x)) / 2 }
 fn Rosetta::TanhSinh::tanh($x) {
-    my $e2 = exp(2 * $x)
+    val $e2 = exp(2 * $x)
     ($e2 - 1) / ($e2 + 1)
 }
 
 fn Rosetta::TanhSinh::integrate($f, $lower, $upper, $steps, $acc) {
-    my $pi_half = 3.141592653589793 / 2
-    my $h = 0.1
-    my $h0 = ($upper - $lower) / 2
-    my $h1 = ($lower + $upper) / 2
-    my $rr = 0.0
-    my $ro = $rr + 1 + 2 * $acc
+    val $pi_half = 3.141592653589793 / 2
+    val $h = 0.1
+    val $h0 = ($upper - $lower) / 2
+    val $h1 = ($lower + $upper) / 2
+    var $rr = 0.0
+    var $ro = $rr + 1 + 2 * $acc
 
-    for my $k (1:$steps) {
+    for val $k (1:$steps) {
         last if abs($rr - $ro) < $acc
         $ro = $rr
-        my $n = (2 ** $k) - 1
-        my $ss = 0.0
-        for my $i (-$n:$n) {
-            my $t = $i * $h
-            my $sh = Rosetta::TanhSinh::sinh($t)
-            my $ch = Rosetta::TanhSinh::cosh($t)
-            my $th = Rosetta::TanhSinh::tanh($sh * $pi_half)
-            my $dx = ($ch * $pi_half) / (Rosetta::TanhSinh::cosh($sh * $pi_half) ** 2)
-            my $xi = $h1 + $h0 * $th
+        val $n = (2 ** $k) - 1
+        var $ss = 0.0
+        for val $i (-$n:$n) {
+            val $t = $i * $h
+            val $sh = Rosetta::TanhSinh::sinh($t)
+            val $ch = Rosetta::TanhSinh::cosh($t)
+            val $th = Rosetta::TanhSinh::tanh($sh * $pi_half)
+            val $dx = ($ch * $pi_half) / (Rosetta::TanhSinh::cosh($sh * $pi_half) ** 2)
+            val $xi = $h1 + $h0 * $th
             $ss += $f($xi) * $h * $dx
         }
         $rr = $h0 * $ss
@@ -35,8 +35,8 @@ fn Rosetta::TanhSinh::integrate($f, $lower, $upper, $steps, $acc) {
     $rr
 }
 
-my $r1 = Rosetta::TanhSinh::integrate(fn ($x) { sin($x) }, 0, 1, 5, 1e-8)
-my $r2 = Rosetta::TanhSinh::integrate(fn ($x) { exp($x) }, -3, 3, 5, 1e-8)
+val $r1 = Rosetta::TanhSinh::integrate(fn ($x) { sin($x) }, 0, 1, 5, 1e-8)
+val $r2 = Rosetta::TanhSinh::integrate(fn ($x) { exp($x) }, -3, 3, 5, 1e-8)
 
 assert_ok abs($r1 - 0.4596976941) < 1e-6, "sin(x) on [0,1]"
 assert_ok abs($r2 - 20.0357498548) < 1e-5, "exp(x) on [-3,3]"

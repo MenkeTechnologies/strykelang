@@ -4,9 +4,9 @@
 fn Rosetta::EthiopianMult::is_even($n) { $n % 2 == 0 }
 
 fn Rosetta::EthiopianMult::solve($a, $b) {
-    my $curr_a = $a
-    my $curr_b = $b
-    my $sum = 0
+    var $curr_a = $a
+    var $curr_b = $b
+    var $sum = 0
     while ($curr_a >= 1) {
         if (!Rosetta::EthiopianMult::is_even($curr_a)) {
             $sum += $curr_b

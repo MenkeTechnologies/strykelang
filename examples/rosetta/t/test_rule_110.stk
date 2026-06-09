@@ -2,12 +2,12 @@
 # Rosetta Code: Rule 110
 
 fn Rosetta::Rule110::next_gen($state) {
-    my $len = len($state)
-    my $padded = "0" . $state . "0"
-    my @chars = chars($padded)
+    val $len = len($state)
+    val $padded = "0" . $state . "0"
+    val @chars = chars($padded)
     
-    my $next_state = ~> 1:$len map {
-        my $pattern = $chars[_-1] . $chars[_] . $chars[_+1]
+    val $next_state = ~> 1:$len map {
+        val $pattern = $chars[_-1] . $chars[_] . $chars[_+1]
         # Rule 110:
         # 111 -> 0, 110 -> 1, 101 -> 1, 100 -> 0
         # 011 -> 1, 010 -> 1, 001 -> 1, 000 -> 0
@@ -21,9 +21,9 @@ fn Rosetta::Rule110::next_gen($state) {
     $next_state
 }
 
-my $initial = "000000000000001"
-my $gen1 = Rosetta::Rule110::next_gen($initial)
-my $gen2 = Rosetta::Rule110::next_gen($gen1)
+val $initial = "000000000000001"
+val $gen1 = Rosetta::Rule110::next_gen($initial)
+val $gen2 = Rosetta::Rule110::next_gen($gen1)
 
 assert_eq $gen1, "000000000000011", "gen 1"
 assert_eq $gen2, "000000000000111", "gen 2"

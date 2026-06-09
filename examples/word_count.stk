@@ -10,7 +10,7 @@
 
 # ── corpus (paragraph of sample text) ───────────────────────────────
 
-my $corpus = q{
+val $corpus = q{
     The quick brown fox jumps over the lazy dog.
     The lazy dog sleeps under the warm afternoon sun.
     A quick brown fox watches the sleeping dog from afar.
@@ -25,25 +25,25 @@ my $corpus = q{
 
 # ── line-by-line word count (sequential) ───────────────────────────
 
-my %counts
-my $td_tok = t_digest(100)
+var %counts
+val $td_tok = t_digest(100)
 
-for my $line (split /\n/, $corpus) {
+for val $line (split /\n/, $corpus) {
     next if len($line) == 0
-    my $t0 = now_ns()
-    my @words = split /\W+/, lc $line
+    val $t0 = now_ns()
+    var @words = split /\W+/, lc $line
     @words = grep { len(_) > 0 } @words
     td_add($td_tok, (now_ns() - $t0) / 1000.0)
-    for my $w (@words) {
+    for val $w (@words) {
         $counts{$w} = ($counts{$w} // 0) + 1
     }
 }
 
 # ── stats ───────────────────────────────────────────────────────────
 
-my $total_words = 0
+var $total_words = 0
 $total_words += _ for values %counts
-my $distinct = len(keys %counts)
+val $distinct = len(keys %counts)
 
 printf "── corpus: %d total words, %d distinct ───────────────\n",
     $total_words, $distinct
@@ -52,12 +52,12 @@ printf "── corpus: %d total words, %d distinct ─────────�
 
 p ""
 p "── top words by frequency ───────────────────────────"
-my @sorted = sort {
+val @sorted = sort {
     ($counts{_1} <=> $counts{_}) || (_ cmp _1)
 } keys %counts
-for my $i (0:9) {
+for val $i (0:9) {
     last if $i >= len @sorted
-    my $w = $sorted[$i]
+    val $w = $sorted[$i]
     printf "  %2d. %-10s : %d\n", $i + 1, $w, $counts{$w}
 }
 
@@ -65,16 +65,16 @@ for my $i (0:9) {
 
 p ""
 p "── TopK sketch (streaming top-5) ────────────────────"
-my $tk = topk(5)
-for my $line (split /\n/, $corpus) {
+val $tk = topk(5)
+for val $line (split /\n/, $corpus) {
     next if len($line) == 0
-    for my $w (split /\W+/, lc($line)) {
+    for val $w (split /\W+/, lc($line)) {
         next if len($w) == 0
         topk_add($tk, $w)
     }
 }
-my @top = topk_top($tk)
-for my $h (@top) {
+val @top = topk_top($tk)
+for val $h (@top) {
     printf "  %-10s : %d hits\n", $h->[0], $h->[1]
 }
 
@@ -82,9 +82,9 @@ for my $h (@top) {
 
 p ""
 p "── distinct-word cardinality (HLL vs exact) ─────────"
-my $hll = hll(14)
-for my $line (split /\n/, $corpus) {
-    for my $w (split /\W+/, lc($line)) {
+val $hll = hll(14)
+for val $line (split /\n/, $corpus) {
+    for val $w (split /\W+/, lc($line)) {
         next if len($w) == 0
         hll_add($hll, $w)
     }
@@ -96,25 +96,25 @@ printf "  exact distinct: %d\n", $distinct
 
 p ""
 p "── word-length distribution ─────────────────────────"
-my %by_length
-for my $w (keys %counts) {
+var %by_length
+for val $w (keys %counts) {
     $by_length{len($w)} = ($by_length{len($w)} // 0) + $counts{$w}
 }
-for my $l (sort { _ <=> _1 } keys %by_length) {
-    my $bar = "#" x ($by_length{$l})
+for val $l (sort { _ <=> _1 } keys %by_length) {
+    val $bar = "#" x ($by_length{$l})
     printf "  %2d-char (%2d): %s\n", $l, $by_length{$l}, $bar
 }
 
 # ── singletons: words appearing exactly once ───────────────────────
 
 p ""
-my @singletons = grep { $counts{_} == 1 } keys %counts
+var @singletons = grep { $counts{_} == 1 } keys %counts
 @singletons = sort { _ cmp _1 } @singletons
 printf "── singletons (%d total) ──────────────────────────────\n",
     len @singletons
-my $cols = 4
-my @row
-for my $w (@singletons) {
+val $cols = 4
+var @row
+for val $w (@singletons) {
     push @row, sprintf("%-12s", $w)
     if (len(@row) == $cols) {
         p "  ", join(" ", @row)        @row = ()

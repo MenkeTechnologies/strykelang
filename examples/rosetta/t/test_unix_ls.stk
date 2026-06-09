@@ -13,16 +13,16 @@ fn Rosetta::UnixLS::list($dir) {
 # (the prior `glob("t/*")` form was relative to CWD and depended on
 # stryke being invoked from the project root — fragile under
 # `cargo test` vs. running the test file directly).
-my $tmp = tempdir()
-for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
-    open(my $fh, ">", "$tmp/$name") or die "create: $!"
+val $tmp = tempdir()
+for val $name ("alpha.txt", "beta.txt", "gamma.txt") {
+    open(val $fh, ">", "$tmp/$name") or die "create: $!"
     close $fh
 }
 
-my @t_files = Rosetta::UnixLS::list($tmp)
+val @t_files = Rosetta::UnixLS::list($tmp)
 
 # Cleanup before assertions so they fire even on partial cleanup.
-for my $name ("alpha.txt", "beta.txt", "gamma.txt") {
+for val $name ("alpha.txt", "beta.txt", "gamma.txt") {
     unlink "$tmp/$name"
 }
 rmdir($tmp)

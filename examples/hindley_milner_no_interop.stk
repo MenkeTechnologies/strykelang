@@ -84,8 +84,8 @@ fn Hm::scheme($quants, $body) {
 }
 
 # Pre-allocated singletons for common monotypes.
-my $T_INT  = Hm::tcon("int")
-my $T_BOOL = Hm::tcon("bool")
+val $T_INT  = Hm::tcon("int")
+val $T_BOOL = Hm::tcon("bool")
 
 # ── pretty-printer ────────────────────────────────────────────────
 # Renames `tvar(N)` to 'a, 'b, 'c, ... in stable encounter order so
@@ -93,8 +93,8 @@ my $T_BOOL = Hm::tcon("bool")
 # human-readable way.
 
 fn Hm::show_type($t) {
-    my $rename = +{}
-    my $next   = 0
+    var $rename = +{}
+    val $next   = 0
     Hm::show_type_inner($t, $rename, \$next, 0)
 }
 
@@ -110,14 +110,14 @@ fn Hm::show_type_inner($t, $rename, $next_ref, $prec) {
         return $t->{name}
     }
     if ($t->{kind} eq "tarr") {
-        my $left  = Hm::show_type_inner($t->{from}, $rename, $next_ref, 1)
-        my $right = Hm::show_type_inner($t->{to},   $rename, $next_ref, 0)
-        my $s = $left . " -> " . $right
+        val $left  = Hm::show_type_inner($t->{from}, $rename, $next_ref, 1)
+        val $right = Hm::show_type_inner($t->{to},   $rename, $next_ref, 0)
+        val $s = $left . " -> " . $right
         return $prec >= 1 ? "(" . $s . ")" : $s
     }
     if ($t->{kind} eq "ttup") {
-        my @parts
-        for my $p (@{$t->{parts}}) {
+        var @parts
+        for val $p (@{$t->{parts}}) {
             push @parts, Hm::show_type_inner($p, $rename, $next_ref, 0)
         }
         return "(" . join(", ", @parts) . ")"
@@ -129,8 +129,8 @@ fn Hm::show_type_inner($t, $rename, $next_ref, $prec) {
 
 fn Hm::greek($n) {
     return chr(ord("a") + $n) if $n < 26
-    my $first = chr(ord("a") + int($n / 26) - 1)
-    my $second = chr(ord("a") + ($n % 26))
+    val $first = chr(ord("a") + int($n / 26) - 1)
+    val $second = chr(ord("a") + ($n % 26))
     $first . $second
 }
 
@@ -146,11 +146,11 @@ fn Hm::greek($n) {
 # polymorphic equality `eq` instead (no operator overloading).
 
 fn Hm::tokenize($src) {
-    my @tokens
-    my $n = len($src)
-    my $i = 0
+    var @tokens
+    val $n = len($src)
+    var $i = 0
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
         if ($c eq " " || $c eq "\t" || $c eq "\n" || $c eq "\r") {
             $i++
             next
@@ -172,9 +172,9 @@ fn Hm::tokenize($src) {
         }
         # Integers.
         if ($c ge "0" && $c le "9") {
-            my $start = $i
+            val $start = $i
             while ($i < $n) {
-                my $d = substr($src, $i, 1)
+                val $d = substr($src, $i, 1)
                 last unless $d ge "0" && $d le "9"
                 $i++
             }
@@ -183,13 +183,13 @@ fn Hm::tokenize($src) {
         }
         # Identifiers + keywords.
         if (($c ge "a" && $c le "z") || ($c ge "A" && $c le "Z") || $c eq "_") {
-            my $start = $i
+            val $start = $i
             while ($i < $n) {
-                my $d = substr($src, $i, 1)
+                val $d = substr($src, $i, 1)
                 last unless ($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_"
                 $i++
             }
-            my $word = substr($src, $start, $i - $start)
+            val $word = substr($src, $start, $i - $start)
             if ($word eq "fn"   ) { push @tokens, +{ kind => "fn"    } }
             elsif ($word eq "let") { push @tokens, +{ kind => "let"   } }
             elsif ($word eq "in" ) { push @tokens, +{ kind => "in"    } }
@@ -226,12 +226,12 @@ fn Hm::parser_new($tokens) {
 
 fn Hm::p_peek($p) { $p->{tokens}->[$p->{pos}] }
 fn Hm::p_consume($p) {
-    my $t = $p->{tokens}->[$p->{pos}]
+    var $t = $p->{tokens}->[$p->{pos}]
     $p->{pos}++
     $t
 }
 fn Hm::p_expect($p, $kind) {
-    my $t = Hm::p_peek($p)
+    val $t = Hm::p_peek($p)
     die "parser: expected #{$kind}, got #{$t->{kind}} at pos #{$p->{pos}}" unless $t->{kind} eq $kind
     Hm::p_consume($p)
 }
@@ -248,36 +248,36 @@ fn Hm::p_expect($p, $kind) {
 # desugared to applications of named functions.
 
 fn Hm::parse_expr($p) {
-    my $expr = Hm::parse_app($p)
+    var $expr = Hm::parse_app($p)
     # Binary ops (left-associative): `e + e`, `e - e`, `e * e`, `e < e`.
     while (Hm::p_peek($p)->{kind} eq "op") {
-        my $op = Hm::p_consume($p)
-        my $rhs = Hm::parse_app($p)
+        val $op = Hm::p_consume($p)
+        val $rhs = Hm::parse_app($p)
         # `e1 + e2` ↦ `((+) e1) e2`
-        my $fn_var = +{ kind => "var", name => $op->{name} }
-        my $app1 = +{ kind => "app", fn => $fn_var, arg => $expr }
-        my $app2 = +{ kind => "app", fn => $app1,    arg => $rhs }
+        val $fn_var = +{ kind => "var", name => $op->{name} }
+        val $app1 = +{ kind => "app", fn => $fn_var, arg => $expr }
+        val $app2 = +{ kind => "app", fn => $app1,    arg => $rhs }
         $expr = $app2
     }
     $expr
 }
 
 fn Hm::parse_app($p) {
-    my $expr = Hm::parse_primary($p)
+    var $expr = Hm::parse_primary($p)
     while (Hm::is_primary_start(Hm::p_peek($p))) {
-        my $arg = Hm::parse_primary($p)
+        val $arg = Hm::parse_primary($p)
         $expr = +{ kind => "app", fn => $expr, arg => $arg }
     }
     $expr
 }
 
 fn Hm::is_primary_start($tok) {
-    my $k = $tok->{kind}
+    val $k = $tok->{kind}
     $k eq "int" || $k eq "true" || $k eq "false" || $k eq "ident" || $k eq "lparen"
 }
 
 fn Hm::parse_primary($p) {
-    my $t = Hm::p_peek($p)
+    val $t = Hm::p_peek($p)
     if ($t->{kind} eq "int") {
         Hm::p_consume($p)
         return +{ kind => "int", val => $t->{val} }
@@ -296,32 +296,32 @@ fn Hm::parse_primary($p) {
     }
     if ($t->{kind} eq "fn") {
         Hm::p_consume($p)
-        my $param = Hm::p_expect($p, "ident")
+        val $param = Hm::p_expect($p, "ident")
         Hm::p_expect($p, "arrow")
-        my $body = Hm::parse_expr($p)
+        val $body = Hm::parse_expr($p)
         return +{ kind => "lam", param => $param->{name}, body => $body }
     }
     if ($t->{kind} eq "let") {
         Hm::p_consume($p)
-        my $name = Hm::p_expect($p, "ident")
+        val $name = Hm::p_expect($p, "ident")
         Hm::p_expect($p, "assign")
-        my $value = Hm::parse_expr($p)
+        val $value = Hm::parse_expr($p)
         Hm::p_expect($p, "in")
-        my $body = Hm::parse_expr($p)
+        val $body = Hm::parse_expr($p)
         return +{ kind => "let", name => $name->{name}, value => $value, body => $body }
     }
     if ($t->{kind} eq "if") {
         Hm::p_consume($p)
-        my $cond = Hm::parse_expr($p)
+        val $cond = Hm::parse_expr($p)
         Hm::p_expect($p, "then")
-        my $thn = Hm::parse_expr($p)
+        val $thn = Hm::parse_expr($p)
         Hm::p_expect($p, "else")
-        my $els = Hm::parse_expr($p)
+        val $els = Hm::parse_expr($p)
         return +{ kind => "if", cond => $cond, then_b => $thn, else_b => $els }
     }
     if ($t->{kind} eq "lparen") {
         Hm::p_consume($p)
-        my $inner = Hm::parse_expr($p)
+        val $inner = Hm::parse_expr($p)
         Hm::p_expect($p, "rparen")
         return $inner
     }
@@ -329,9 +329,9 @@ fn Hm::parse_primary($p) {
 }
 
 fn Hm::parse($src) {
-    my $tokens = Hm::tokenize($src)
-    my $par = Hm::parser_new($tokens)
-    my $e = Hm::parse_expr($par)
+    val $tokens = Hm::tokenize($src)
+    val $par = Hm::parser_new($tokens)
+    val $e = Hm::parse_expr($par)
     Hm::p_expect($par, "eof")
     $e
 }
@@ -358,8 +358,8 @@ fn Hm::apply($t, $s) {
         return Hm::tarr(Hm::apply($t->{from}, $s), Hm::apply($t->{to}, $s))
     }
     if ($t->{kind} eq "ttup") {
-        my @parts
-        for my $p (@{$t->{parts}}) {
+        var @parts
+        for val $p (@{$t->{parts}}) {
             push @parts, Hm::apply($p, $s)
         }
         return Hm::ttup(\@parts)
@@ -370,11 +370,11 @@ fn Hm::apply($t, $s) {
 # Compose two substitutions: (s2 ∘ s1)(x) = s2(s1(x))
 
 fn Hm::compose($s2, $s1) {
-    my %result
-    for my $k (keys %$s1) {
+    var %result
+    for val $k (keys %$s1) {
         $result{$k} = Hm::apply($s1->{$k}, $s2)
     }
-    for my $k (keys %$s2) {
+    for val $k (keys %$s2) {
         $result{$k} = $s2->{$k} unless exists $result{$k}
     }
     \%result
@@ -390,16 +390,16 @@ fn Hm::ftv_type($t) {
         return +{}
     }
     if ($t->{kind} eq "tarr") {
-        my $av = Hm::ftv_type($t->{from})
-        my $bv = Hm::ftv_type($t->{to})
-        my %merged = (%$av, %$bv)
+        val $av = Hm::ftv_type($t->{from})
+        val $bv = Hm::ftv_type($t->{to})
+        val %merged = (%$av, %$bv)
         return \%merged
     }
     if ($t->{kind} eq "ttup") {
-        my %merged
-        for my $p (@{$t->{parts}}) {
-            my $f = Hm::ftv_type($p)
-            for my $k (keys %$f) { $merged{$k} = 1 }
+        var %merged
+        for val $p (@{$t->{parts}}) {
+            val $f = Hm::ftv_type($p)
+            for val $k (keys %$f) { $merged{$k} = 1 }
         }
         return \%merged
     }
@@ -409,9 +409,9 @@ fn Hm::ftv_type($t) {
 # Free type variables of a scheme = ftv(body) \ quants
 
 fn Hm::ftv_scheme($sch) {
-    my $f = Hm::ftv_type($sch->{body})
-    my %out = %$f
-    for my $q (@{$sch->{quants}}) {
+    val $f = Hm::ftv_type($sch->{body})
+    var %out = %$f
+    for val $q (@{$sch->{quants}}) {
         delete $out{$q}
     }
     \%out
@@ -420,10 +420,10 @@ fn Hm::ftv_scheme($sch) {
 # Free type variables of a type environment.
 
 fn Hm::ftv_env($env) {
-    my %out
-    for my $name (keys %$env) {
-        my $f = Hm::ftv_scheme($env->{$name})
-        for my $k (keys %$f) { $out{$k} = 1 }
+    var %out
+    for val $name (keys %$env) {
+        val $f = Hm::ftv_scheme($env->{$name})
+        for val $k (keys %$f) { $out{$k} = 1 }
     }
     \%out
 }
@@ -432,8 +432,8 @@ fn Hm::ftv_env($env) {
 
 fn Hm::apply_scheme($sch, $s) {
     # Remove quantified vars from substitution.
-    my %s_filt = %$s
-    for my $q (@{$sch->{quants}}) {
+    var %s_filt = %$s
+    for val $q (@{$sch->{quants}}) {
         delete $s_filt{$q}
     }
     Hm::scheme($sch->{quants}, Hm::apply($sch->{body}, \%s_filt))
@@ -442,8 +442,8 @@ fn Hm::apply_scheme($sch, $s) {
 # Apply a substitution to an environment.
 
 fn Hm::apply_env($env, $s) {
-    my %out
-    for my $name (keys %$env) {
+    var %out
+    for val $name (keys %$env) {
         $out{$name} = Hm::apply_scheme($env->{$name}, $s)
     }
     \%out
@@ -469,7 +469,7 @@ fn Hm::occurs_in($id, $t) {
         return 0
     }
     if ($t->{kind} eq "ttup") {
-        for my $p (@{$t->{parts}}) {
+        for val $p (@{$t->{parts}}) {
             return 1 if Hm::occurs_in($id, $p)
         }
         return 0
@@ -497,17 +497,17 @@ fn Hm::unify($t1, $t2) {
         die "type mismatch: cannot unify #{$t1->{name}} with #{$t2->{name}}"
     }
     if ($t1->{kind} eq "tarr" && $t2->{kind} eq "tarr") {
-        my $s1 = Hm::unify($t1->{from}, $t2->{from})
-        my $s2 = Hm::unify(Hm::apply($t1->{to}, $s1), Hm::apply($t2->{to}, $s1))
+        val $s1 = Hm::unify($t1->{from}, $t2->{from})
+        val $s2 = Hm::unify(Hm::apply($t1->{to}, $s1), Hm::apply($t2->{to}, $s1))
         return Hm::compose($s2, $s1)
     }
     if ($t1->{kind} eq "ttup" && $t2->{kind} eq "ttup") {
         die "tuple arity mismatch" unless len(@{$t1->{parts}}) == len(@{$t2->{parts}})
-        my $s = +{}
-        for my $i (0:len(@{$t1->{parts}}) - 1) {
-            my $a_i = Hm::apply($t1->{parts}->[$i], $s)
-            my $b_i = Hm::apply($t2->{parts}->[$i], $s)
-            my $s_new = Hm::unify($a_i, $b_i)
+        var $s = +{}
+        for val $i (0:len(@{$t1->{parts}}) - 1) {
+            val $a_i = Hm::apply($t1->{parts}->[$i], $s)
+            val $b_i = Hm::apply($t2->{parts}->[$i], $s)
+            val $s_new = Hm::unify($a_i, $b_i)
             $s = Hm::compose($s_new, $s)
         }
         return $s
@@ -524,10 +524,10 @@ fn Hm::unify($t1, $t2) {
 # let-bound name's type can be specialized fresh at each use site.
 
 fn Hm::generalize($env, $t) {
-    my $ftv_t = Hm::ftv_type($t)
-    my $ftv_e = Hm::ftv_env($env)
-    my @quants
-    for my $id (keys %$ftv_t) {
+    val $ftv_t = Hm::ftv_type($t)
+    val $ftv_e = Hm::ftv_env($env)
+    var @quants
+    for val $id (keys %$ftv_t) {
         push @quants, $id unless exists $ftv_e->{$id}
     }
     Hm::scheme(\@quants, $t)
@@ -537,8 +537,8 @@ fn Hm::generalize($env, $t) {
 # each quantified var with a brand-new tvar id.
 
 fn Hm::instantiate($sch) {
-    my %map
-    for my $id (@{$sch->{quants}}) {
+    var %map
+    for val $id (@{$sch->{quants}}) {
         $map{$id} = Hm::fresh_tvar()
     }
     Hm::apply($sch->{body}, \%map)
@@ -551,7 +551,7 @@ fn Hm::instantiate($sch) {
 # infer(env, expr) returns +{ subst, type }.
 
 fn Hm::infer($env, $e) {
-    my $k = $e->{kind}
+    val $k = $e->{kind}
     if ($k eq "int") {
         return +{ subst => +{}, type => $T_INT }
     }
@@ -560,60 +560,60 @@ fn Hm::infer($env, $e) {
     }
     if ($k eq "var") {
         die "unbound variable: #{$e->{name}}" unless exists $env->{$e->{name}}
-        my $inst = Hm::instantiate($env->{$e->{name}})
+        val $inst = Hm::instantiate($env->{$e->{name}})
         return +{ subst => +{}, type => $inst }
     }
     if ($k eq "lam") {
-        my $tv = Hm::fresh_tvar()
-        my %new_env = %$env
+        val $tv = Hm::fresh_tvar()
+        var %new_env = %$env
         $new_env{$e->{param}} = Hm::scheme([], $tv)
-        my $body_r = Hm::infer(\%new_env, $e->{body})
-        my $arg_t = Hm::apply($tv, $body_r->{subst})
+        val $body_r = Hm::infer(\%new_env, $e->{body})
+        val $arg_t = Hm::apply($tv, $body_r->{subst})
         return +{
             subst => $body_r->{subst},
             type  => Hm::tarr($arg_t, $body_r->{type}),
         }
     }
     if ($k eq "app") {
-        my $fn_r = Hm::infer($env, $e->{fn})
-        my $env2 = Hm::apply_env($env, $fn_r->{subst})
-        my $arg_r = Hm::infer($env2, $e->{arg})
-        my $tv = Hm::fresh_tvar()
-        my $s_app = Hm::unify(
+        val $fn_r = Hm::infer($env, $e->{fn})
+        val $env2 = Hm::apply_env($env, $fn_r->{subst})
+        val $arg_r = Hm::infer($env2, $e->{arg})
+        val $tv = Hm::fresh_tvar()
+        val $s_app = Hm::unify(
             Hm::apply($fn_r->{type}, $arg_r->{subst}),
             Hm::tarr($arg_r->{type}, $tv),
         )
-        my $s = Hm::compose($s_app, Hm::compose($arg_r->{subst}, $fn_r->{subst}))
+        val $s = Hm::compose($s_app, Hm::compose($arg_r->{subst}, $fn_r->{subst}))
         return +{
             subst => $s,
             type  => Hm::apply($tv, $s_app),
         }
     }
     if ($k eq "let") {
-        my $val_r = Hm::infer($env, $e->{value})
-        my $env_sub = Hm::apply_env($env, $val_r->{subst})
-        my $sch = Hm::generalize($env_sub, $val_r->{type})
-        my %env2 = %$env_sub
+        val $val_r = Hm::infer($env, $e->{value})
+        val $env_sub = Hm::apply_env($env, $val_r->{subst})
+        val $sch = Hm::generalize($env_sub, $val_r->{type})
+        var %env2 = %$env_sub
         $env2{$e->{name}} = $sch
-        my $body_r = Hm::infer(\%env2, $e->{body})
-        my $s = Hm::compose($body_r->{subst}, $val_r->{subst})
+        val $body_r = Hm::infer(\%env2, $e->{body})
+        val $s = Hm::compose($body_r->{subst}, $val_r->{subst})
         return +{ subst => $s, type => $body_r->{type} }
     }
     if ($k eq "if") {
-        my $c_r = Hm::infer($env, $e->{cond})
-        my $s_c = Hm::unify(Hm::apply($c_r->{type}, $c_r->{subst}), $T_BOOL)
-        my $sc  = Hm::compose($s_c, $c_r->{subst})
-        my $env2 = Hm::apply_env($env, $sc)
-        my $t_r = Hm::infer($env2, $e->{then_b})
-        my $st  = Hm::compose($t_r->{subst}, $sc)
-        my $env3 = Hm::apply_env($env, $st)
-        my $e_r = Hm::infer($env3, $e->{else_b})
-        my $se = Hm::compose($e_r->{subst}, $st)
-        my $s_branch = Hm::unify(
+        val $c_r = Hm::infer($env, $e->{cond})
+        val $s_c = Hm::unify(Hm::apply($c_r->{type}, $c_r->{subst}), $T_BOOL)
+        val $sc  = Hm::compose($s_c, $c_r->{subst})
+        val $env2 = Hm::apply_env($env, $sc)
+        val $t_r = Hm::infer($env2, $e->{then_b})
+        val $st  = Hm::compose($t_r->{subst}, $sc)
+        val $env3 = Hm::apply_env($env, $st)
+        val $e_r = Hm::infer($env3, $e->{else_b})
+        val $se = Hm::compose($e_r->{subst}, $st)
+        val $s_branch = Hm::unify(
             Hm::apply($t_r->{type}, $se),
             Hm::apply($e_r->{type}, $se),
         )
-        my $s_final = Hm::compose($s_branch, $se)
+        val $s_final = Hm::compose($s_branch, $se)
         return +{
             subst => $s_final,
             type  => Hm::apply($t_r->{type}, $s_final),
@@ -625,8 +625,8 @@ fn Hm::infer($env, $e) {
 # Top-level: parse, infer, apply substitution, return principal type.
 
 fn Hm::type_of($env, $src) {
-    my $expr = Hm::parse($src)
-    my $r = Hm::infer($env, $expr)
+    val $expr = Hm::parse($src)
+    val $r = Hm::infer($env, $expr)
     Hm::apply($r->{type}, $r->{subst})
 }
 
@@ -649,15 +649,15 @@ fn Hm::scheme_lt() {
 # Polymorphic equality: forall 'a . 'a -> 'a -> bool
 
 fn Hm::scheme_eq() {
-    my $av = Hm::fresh_tvar_id()
+    val $av = Hm::fresh_tvar_id()
     Hm::scheme([$av], Hm::tarr(Hm::tvar($av), Hm::tarr(Hm::tvar($av), $T_BOOL)))
 }
 
 # pair : forall 'a 'b . 'a -> 'b -> ('a, 'b)
 
 fn Hm::scheme_pair() {
-    my $av = Hm::fresh_tvar_id()
-    my $bv = Hm::fresh_tvar_id()
+    val $av = Hm::fresh_tvar_id()
+    val $bv = Hm::fresh_tvar_id()
     Hm::scheme(
         [$av, $bv],
         Hm::tarr(Hm::tvar($av), Hm::tarr(Hm::tvar($bv), Hm::ttup([Hm::tvar($av), Hm::tvar($bv)]))),
@@ -667,8 +667,8 @@ fn Hm::scheme_pair() {
 # fst : forall 'a 'b . ('a, 'b) -> 'a
 
 fn Hm::scheme_fst() {
-    my $av = Hm::fresh_tvar_id()
-    my $bv = Hm::fresh_tvar_id()
+    val $av = Hm::fresh_tvar_id()
+    val $bv = Hm::fresh_tvar_id()
     Hm::scheme(
         [$av, $bv],
         Hm::tarr(Hm::ttup([Hm::tvar($av), Hm::tvar($bv)]), Hm::tvar($av)),
@@ -678,8 +678,8 @@ fn Hm::scheme_fst() {
 # snd : forall 'a 'b . ('a, 'b) -> 'b
 
 fn Hm::scheme_snd() {
-    my $av = Hm::fresh_tvar_id()
-    my $bv = Hm::fresh_tvar_id()
+    val $av = Hm::fresh_tvar_id()
+    val $bv = Hm::fresh_tvar_id()
     Hm::scheme(
         [$av, $bv],
         Hm::tarr(Hm::ttup([Hm::tvar($av), Hm::tvar($bv)]), Hm::tvar($bv)),
@@ -706,7 +706,7 @@ fn Hm::initial_env() {
 # Each case is +{ src, expected_type }. The inferred type is
 # pretty-printed and compared string-wise.
 
-my @cases = (
+val @cases = (
     # Literals.
     +{ src => "42",              type => "int"  },
     +{ src => "true",            type => "bool" },
@@ -801,9 +801,9 @@ p "── Hindley-Milner type inference — test cases ────────"
 printf "  %-58s  %s\n", "expression", "inferred type"
 printf "  %-58s  %s\n", "----------------------------------------------------------", "-------------"
 
-my $passed = 0
-my $failed = 0
-for my $c (@cases) {
+var $passed = 0
+var $failed = 0
+for val $c (@cases) {
     # Fresh ENV per test so the polymorphic-built-in tvars don't leak
     # between tests (initial schemes have quantified vars but the
     # body still carries fresh tvar ids that would only show up if a
@@ -811,11 +811,11 @@ for my $c (@cases) {
     # also if it appeared in the OUTPUT type of a top-level inference.
     # For our pretty-printer that re-alphabetizes from 0, this is
     # cosmetically irrelevant since the rename map is per-print.)
-    my $env = Hm::initial_env()
-    my $got = Hm::show_type(Hm::type_of($env, $c->{src}))
-    my $ok = $got eq $c->{type}
+    val $env = Hm::initial_env()
+    val $got = Hm::show_type(Hm::type_of($env, $c->{src}))
+    val $ok = $got eq $c->{type}
     if ($ok) { $passed++ } else { $failed++ }
-    my $src_show = $c->{src}
+    var $src_show = $c->{src}
     $src_show = substr($src_show, 0, 56) . ".." if len($src_show) > 58
     printf "  %-58s  %s  %s\n", $src_show, $got, $ok ? "" : "FAIL want=#{$c->{type}}"
 }
@@ -850,7 +850,7 @@ die "let-poly id-at-both" unless Hm::infer_str("let id = fn x -> x in pair (id 1
 # unify int with bool. We catch the failure by checking the type
 # inference dies on this input.
 {
-    my $err = 0
+    val $err = 0
     {
         # Stryke doesn't have try; we wrap in a fn and use die.
         # Use a known-bad expression and assert it throws.
@@ -896,16 +896,16 @@ die "nested let" unless Hm::infer_str("fn x -> let y = x + 1 in y * 2") eq "int 
 
 # ── invariant 13: tokenizer handles all keywords ─────────────────
 {
-    my $tokens = Hm::tokenize("fn x -> let y = if x < 10 then true else false in y")
-    my @kinds
-    for my $t (@$tokens) { push @kinds, $t->{kind} }
-    my $expected = "fn ident arrow let ident assign if ident op int then true else false in ident eof"
+    val $tokens = Hm::tokenize("fn x -> let y = if x < 10 then true else false in y")
+    var @kinds
+    for val $t (@$tokens) { push @kinds, $t->{kind} }
+    val $expected = "fn ident arrow let ident assign if ident op int then true else false in ident eof"
     die "tokenizer kinds: " . join(" ", @kinds) unless join(" ", @kinds) eq $expected
 }
 
 # ── invariant 14: parser produces expected lambda nesting ──────────
 {
-    my $e = Hm::parse("fn x -> fn y -> x")
+    val $e = Hm::parse("fn x -> fn y -> x")
     die "outer not lam" unless $e->{kind} eq "lam" && $e->{param} eq "x"
     die "inner not lam" unless $e->{body}->{kind} eq "lam" && $e->{body}->{param} eq "y"
     die "body not var"  unless $e->{body}->{body}->{kind} eq "var" && $e->{body}->{body}->{name} eq "x"
@@ -913,7 +913,7 @@ die "nested let" unless Hm::infer_str("fn x -> let y = x + 1 in y * 2") eq "int 
 
 # ── invariant 15: parser desugars `1 + 2` correctly ────────────────
 {
-    my $e = Hm::parse("1 + 2")
+    val $e = Hm::parse("1 + 2")
     die "top not app"    unless $e->{kind} eq "app"
     die "inner not app"  unless $e->{fn}->{kind} eq "app"
     die "fn-var not '+'" unless $e->{fn}->{fn}->{kind} eq "var" && $e->{fn}->{fn}->{name} eq "+"
@@ -927,7 +927,7 @@ die "nested let" unless Hm::infer_str("fn x -> let y = x + 1 in y * 2") eq "int 
 # ── invariant 17: parsing then printing the AST is structure-preserving ─
 # Tokenize "1 + 2 * 3" → AST → re-stringify by walking and check shape.
 {
-    my $e = Hm::parse("1 + 2 * 3")
+    val $e = Hm::parse("1 + 2 * 3")
     # Should be (1 + (2 * 3)) — wait, our parser is left-associative
     # without precedence climbing, so it's actually ((1 + 2) * 3).
     # Let me just check it's a single AST root of app.
@@ -944,7 +944,7 @@ die "shadow let" unless Hm::infer_str("let x = 5 in let x = true in x") eq "bool
 
 # ── invariant 20: deeply nested let-bound identity ────────────────
 {
-    my $expr = "let id = fn x -> x in let id2 = fn x -> id x in id2 (id 42)"
+    val $expr = "let id = fn x -> x in let id2 = fn x -> id x in id2 (id 42)"
     die "nested id" unless Hm::infer_str($expr) eq "int"
 }
 
@@ -952,8 +952,8 @@ die "shadow let" unless Hm::infer_str("let x = 5 in let x = true in x") eq "bool
 # succ = λn.λf.λx. f (n f x)
 # Type: ((a → b) → c → a) → (a → b) → c → b
 {
-    my $expr = "fn n -> fn f -> fn x -> f (n f x)"
-    my $t = Hm::infer_str($expr)
+    val $expr = "fn n -> fn f -> fn x -> f (n f x)"
+    val $t = Hm::infer_str($expr)
     # Just verify it parses and types (the exact rendering depends on
     # the tvar order; check it's an arrow type with 3 input arrows).
     die "church succ — empty type" unless len($t) > 0
@@ -987,13 +987,13 @@ die "adder" unless Hm::infer_str("fn x -> fn y -> x + y") eq "int -> int -> int"
 
 # ── invariant 27: identity types preserve through deep let chains ─
 {
-    my $e = "let a = fn x -> x in let b = a in let c = b in let d = c in d true"
+    val $e = "let a = fn x -> x in let b = a in let c = b in let d = c in d true"
     die "chained-id" unless Hm::infer_str($e) eq "bool"
 }
 
 # ── invariant 28: tuple destructuring via fst/snd ─────────────────
 {
-    my $e = "let p = pair 1 true in pair (snd p) (fst p)"
+    val $e = "let p = pair 1 true in pair (snd p) (fst p)"
     die "destructure" unless Hm::infer_str($e) eq "(bool, int)"
 }
 
@@ -1003,8 +1003,8 @@ die "pos lt"  unless Hm::infer_str("(fn x -> x < 5) 3") eq "bool"
 
 # ── invariant 30: a complex 3-arg combinator's principal type ─────
 {
-    my $e = "fn f -> fn g -> fn x -> f (g x) (g x)"
-    my $t = Hm::infer_str($e)
+    val $e = "fn f -> fn g -> fn x -> f (g x) (g x)"
+    val $t = Hm::infer_str($e)
     die "3-arg combinator" unless $t eq "('a -> 'a -> 'b) -> ('c -> 'a) -> 'c -> 'b"
 }
 

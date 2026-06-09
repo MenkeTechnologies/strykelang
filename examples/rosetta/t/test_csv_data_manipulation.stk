@@ -2,17 +2,17 @@
 # Rosetta Code: CSV data manipulation
 
 fn Rosetta::CsvData::add_column($csv, $col_name, $val_sub) {
-    my @lines = split "\n", $csv
-    my @new_lines
+    var @lines = split "\n", $csv
+    var @new_lines
     
     # Header
-    my $header = shift @lines
+    val $header = shift @lines
     push @new_lines, "$header,$col_name"
     
     # Data
-    my $i = 0
-    for my $line (@lines) {
-        my $new_val = $val_sub($line, $i)
+    var $i = 0
+    for val $line (@lines) {
+        val $new_val = $val_sub($line, $i)
         push @new_lines, "$line,$new_val"
         $i++
     }
@@ -20,9 +20,9 @@ fn Rosetta::CsvData::add_column($csv, $col_name, $val_sub) {
     join "\n", @new_lines
 }
 
-my $csv = "Name,Age\nAlice,30\nBob,25"
-my $new_csv = Rosetta::CsvData::add_column($csv, "City", fn {
-    my ($line, $idx) = @_
+val $csv = "Name,Age\nAlice,30\nBob,25"
+val $new_csv = Rosetta::CsvData::add_column($csv, "City", fn {
+    val ($line, $idx) = @_
     $idx == 0 ? "New York" : "London"
 })
 

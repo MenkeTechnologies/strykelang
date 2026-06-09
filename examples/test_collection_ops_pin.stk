@@ -3,17 +3,17 @@
 # Collection / array / hash operations.
 
 fn Coll::partition($pred, @xs) {
-    my @t = grep { $pred(_) } @xs
-    my @f = grep { !$pred(_) } @xs
+    val @t = grep { $pred(_) } @xs
+    val @f = grep { !$pred(_) } @xs
     (\@t, \@f)
 }
 
 fn Coll::chunk($n, @xs) {
-    my @out
-    my $i = 0
+    var @out
+    var $i = 0
     while ($i < len(@xs)) {
-        my @slice
-        my $j = $i
+        var @slice
+        var $j = $i
         while ($j < $i + $n && $j < len(@xs)) {
             push @slice, $xs[$j]
             $j++
@@ -25,17 +25,17 @@ fn Coll::chunk($n, @xs) {
 }
 
 fn Coll::zip($r1, $r2) {
-    my @out
-    my $n = len(@$r1) < len(@$r2) ? len(@$r1) : len(@$r2)
-    for my $i (0:$n - 1) {
+    var @out
+    val $n = len(@$r1) < len(@$r2) ? len(@$r1) : len(@$r2)
+    for val $i (0:$n - 1) {
         push @out, [$r1->[$i], $r2->[$i]]
     }
     \@out
 }
 
 fn Coll::flatten($ref) {
-    my @out
-    for my $e (@$ref) {
+    var @out
+    for var $e (@$ref) {
         if (ref($e) eq "ARRAY") {
             push @out, @{Coll::flatten($e)}
         } else {
@@ -46,9 +46,9 @@ fn Coll::flatten($ref) {
 }
 
 fn Coll::group_by($keyfn, @xs) {
-    my %g
-    for my $x (@xs) {
-        my $k = $keyfn($x)
+    var %g
+    for val $x (@xs) {
+        val $k = $keyfn($x)
         $g{$k} ||= []
         push @{$g{$k}}, $x
     }
@@ -56,34 +56,34 @@ fn Coll::group_by($keyfn, @xs) {
 }
 
 fn Coll::count_if($pred, @xs) {
-    my $n = 0
+    var $n = 0
     $pred(_) && $n++ for @xs
     $n
 }
 
 # partition
-my ($evens, $odds) = Coll::partition(fn ($n) { $n % 2 == 0 }, 1, 2, 3, 4, 5, 6)
+val ($evens, $odds) = Coll::partition(fn ($n) { $n % 2 == 0 }, 1, 2, 3, 4, 5, 6)
 join(",", @$evens) |> aeq "2,4,6", "partition evens"
 join(",", @$odds)  |> aeq "1,3,5", "partition odds"
 
 # chunk
-my $chunks = Coll::chunk(3, 1, 2, 3, 4, 5, 6, 7)
+val $chunks = Coll::chunk(3, 1, 2, 3, 4, 5, 6, 7)
 len(@$chunks)              |> aeq 3, "chunk count"
 join(",", @{$chunks->[0]}) |> aeq "1,2,3", "chunk 0"
 join(",", @{$chunks->[2]}) |> aeq "7", "chunk last tail"
 
 # zip
-my $z = Coll::zip([1, 2, 3], ["a", "b", "c"])
+val $z = Coll::zip([1, 2, 3], ["a", "b", "c"])
 $z->[1][0] |> aeq 2, "zip val"
 $z->[2][1] |> aeq "c", "zip key"
 len(@$z)   |> aeq 3, "zip len"
 
 # flatten (nested)
-my $flat = Coll::flatten([1, [2, [3, [4, 5]], 6], 7])
+val $flat = Coll::flatten([1, [2, [3, [4, 5]], 6], 7])
 join(",", @$flat) |> aeq "1,2,3,4,5,6,7", "flatten deep"
 
 # group_by
-my $g = Coll::group_by(fn ($x) { $x % 3 }, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+val $g = Coll::group_by(fn ($x) { $x % 3 }, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 len(@{$g->{0}}) |> aeq 3, "group_by 0"
 len(@{$g->{1}}) |> aeq 3, "group_by 1"
 len(@{$g->{2}}) |> aeq 3, "group_by 2"
@@ -96,8 +96,8 @@ Coll::count_if(fn ($n) { $n > 3 }, 1, 2, 3, 4, 5, 6) |> aeq 3, "count_if"
 ~> (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5) uniq |> sort |> join(",") |> aeq "1,2,3,4,5,6,9", "uniq sort"
 
 # hash inversion
-my %h = (a => 1, b => 2, c => 3)
-my %inv = map { ($h{_}, _) } keys %h
+val %h = (a => 1, b => 2, c => 3)
+val %inv = map { ($h{_}, _) } keys %h
 $inv{2} |> aeq "b", "hash inversion"
 
 test_run

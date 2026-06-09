@@ -3,29 +3,29 @@
 
 fn Rosetta::Quoting::demo() {
     # 1. Single quotes (no interpolation)
-    my $var = "INTERPOLATED"
-    my $q1 = 'Value: $var'
+    val $var = "INTERPOLATED"
+    val $q1 = 'Value: $var'
     assert_eq $q1, 'Value: $var', "Single quotes do not interpolate"
     
     # 2. Double quotes (interpolation)
-    my $q2 = "Value: $var"
+    val $q2 = "Value: $var"
     assert_eq $q2, "Value: INTERPOLATED", "Double quotes interpolate"
     
     # 3. q{} (equivalent to single quotes)
-    my $q3 = q{Value: $var}
+    val $q3 = q{Value: $var}
     assert_eq $q3, 'Value: $var', "q{} does not interpolate"
     
     # 4. qq{} (equivalent to double quotes)
-    my $q4 = qq{Value: $var}
+    val $q4 = qq{Value: $var}
     assert_eq $q4, "Value: INTERPOLATED", "qq{} interpolates"
     
     # 5. qw{} (quote words)
-    my @words = qw{apple banana cherry}
+    val @words = qw{apple banana cherry}
     assert_eq len(@words), 3, "qw{} creates array of words"
     assert_eq $words[1], "banana", "qw{} second word correct"
     
     # 6. qx{} (command execution)
-    my $echo = qx{echo "hello"} |> trim
+    val $echo = qx{echo "hello"} |> trim
     assert_eq $echo, "hello", "qx{} executes command"
 }
 

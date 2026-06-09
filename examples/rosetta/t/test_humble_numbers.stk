@@ -3,15 +3,15 @@
 
 fn Rosetta::Humble::is_humble($n) {
     return 0 if $n < 1
-    for my $p (2, 3, 5, 7) {
+    for val $p (2, 3, 5, 7) {
         while ($n % $p == 0) { $n = int($n / $p) }
     }
     $n == 1
 }
 
 fn Rosetta::Humble::first_n($count) {
-    my @res
-    my $n = 1
+    var @res
+    var $n = 1
     while (len(@res) < $count) {
         push @res, $n if Rosetta::Humble::is_humble($n)
         $n += 1
@@ -20,7 +20,7 @@ fn Rosetta::Humble::first_n($count) {
 }
 
 # OEIS A002473: 1,2,3,4,5,6,7,8,9,10,12,14,15,16,18,20,21,...
-my @first17 = Rosetta::Humble::first_n(17)
+val @first17 = Rosetta::Humble::first_n(17)
 assert_eq join(",", @first17),
     "1,2,3,4,5,6,7,8,9,10,12,14,15,16,18,20,21",
     "first 17 humbles"

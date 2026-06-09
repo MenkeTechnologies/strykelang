@@ -4,9 +4,9 @@
 fn Rosetta::ColourPinDisplay::palette() { qw(K R G B M C Y W) }
 
 fn Rosetta::ColourPinDisplay::row($width, $stripe_w) {
-    my @colors = Rosetta::ColourPinDisplay::palette()
-    my $line = ""
-    my $i = 0
+    val @colors = Rosetta::ColourPinDisplay::palette()
+    var $line = ""
+    var $i = 0
     while (len($line) < $width) {
         $line .= $colors[$i % len(@colors)] x $stripe_w
         $i++
@@ -23,7 +23,7 @@ fn Rosetta::ColourPinDisplay::render($width) {
     ]
 }
 
-my $rows = Rosetta::ColourPinDisplay::render(32)
+val $rows = Rosetta::ColourPinDisplay::render(32)
 
 assert_eq len(@$rows), 4, "top to bottom quarter rows"
 assert_eq substr($rows->[0], 0, 8), "KRGBMCYW", "top quarter uses 1-pixel stripes"

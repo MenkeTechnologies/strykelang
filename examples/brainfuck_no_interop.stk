@@ -24,15 +24,15 @@
 #      stryke --no-interop examples/brainfuck_no_interop.stk '++++++++[>++++++++<-]>+.'
 
 fn BF::build_jumps(@code) {
-    my %fwd
-    my %back
-    my @stack
-    for my $i (0:len(@code) - 1) {
+    var %fwd
+    var %back
+    var @stack
+    for val $i (0:len(@code) - 1) {
         if ($code[$i] eq "[") {
             push @stack, $i
         } elsif ($code[$i] eq "]") {
             die "unmatched ] at $i" unless len(@stack) > 0
-            my $open = pop @stack
+            val $open = pop @stack
             $fwd{$open} = $i
             $back{$i} = $open
         }
@@ -42,16 +42,16 @@ fn BF::build_jumps(@code) {
 }
 
 fn BF::run($src) {
-    my @code = grep { _ =~ /[\+\-<>\[\]\.,]/ } split(//, $src)
-    my ($fwd_ref, $back_ref) = BF::build_jumps(@code)
+    val @code = grep { _ =~ /[\+\-<>\[\]\.,]/ } split(//, $src)
+    val ($fwd_ref, $back_ref) = BF::build_jumps(@code)
 
-    my @tape = (0) x 1024  # 1k tape — enough for demo programs
-    my $dp   = 0           # data pointer
-    my $ip   = 0           # instruction pointer
-    my $out  = ""
+    var @tape = (0) x 1024  # 1k tape — enough for demo programs
+    var $dp   = 0           # data pointer
+    var $ip   = 0           # instruction pointer
+    var $out  = ""
 
     while ($ip < len(@code)) {
-        my $op = $code[$ip]
+        val $op = $code[$ip]
         if    ($op eq ">") { $dp++ }
         elsif ($op eq "<") { $dp-- }
         elsif ($op eq "+") { $tape[$dp] = ($tape[$dp] + 1) % 256 }
@@ -73,18 +73,18 @@ if (len(@ARGV) >= 1) {
 p "── Brainfuck demos ──"
 
 # 1) Emit 'A' (ASCII 65) — 8 * 8 + 1 = 65
-my $prog_a = "++++++++[>++++++++<-]>+."
-my $out_a = BF::run($prog_a)
+val $prog_a = "++++++++[>++++++++<-]>+."
+val $out_a = BF::run($prog_a)
 p "  print 'A': $out_a"
 
 # 2) Emit 'H' (ASCII 72) — 9 * 8 = 72
-my $prog_h = "+++++++++[>++++++++<-]>."
-my $out_h  = BF::run($prog_h)
+val $prog_h = "+++++++++[>++++++++<-]>."
+val $out_h  = BF::run($prog_h)
 p "  print 'H': $out_h"
 
 # 3) Two-letter 'HI' — 'H' from above (72), shift +1 to get 'I' (73).
-my $prog_hi = "+++++++++[>++++++++<-]>.+."
-my $out_hi  = BF::run($prog_hi)
+val $prog_hi = "+++++++++[>++++++++<-]>.+."
+val $out_hi  = BF::run($prog_hi)
 p "  print 'HI': $out_hi"
 
 # Built-in self-test: every program must emit the expected output.

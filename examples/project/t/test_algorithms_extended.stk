@@ -4,7 +4,7 @@
 require "./lib/algorithms.stk"
 
 # ── Algo::binary_search ──────────────────────────────────────────────────
-my @sorted = (1, 3, 5, 7, 9, 11, 13, 15)
+val @sorted = (1, 3, 5, 7, 9, 11, 13, 15)
 assert_eq Algo::binary_search(7, @sorted), 3, "binsearch found 7"
 assert_eq Algo::binary_search(1, @sorted), 0, "binsearch found first"
 assert_eq Algo::binary_search(15, @sorted), 7, "binsearch found last"
@@ -15,22 +15,22 @@ assert_eq Algo::binary_search(5, (5)), 0, "binsearch single element found"
 assert_eq Algo::binary_search(5, ()), -1, "binsearch empty list"
 
 # ── Project::Algorithms::bubble_sort ───────────────────────────────────────────────────
-my @unsorted = (5, 1, 9, 3, 7)
-my @res1 = Project::Algorithms::bubble_sort(@unsorted)
+val @unsorted = (5, 1, 9, 3, 7)
+val @res1 = Project::Algorithms::bubble_sort(@unsorted)
 assert_eq join(",", @res1), "1,3,5,7,9", "Project::Algorithms::bubble_sort basic"
 assert_eq join(",", Project::Algorithms::bubble_sort(10, 5, 1)), "1,5,10", "Project::Algorithms::bubble_sort three"
 assert_eq join(",", Project::Algorithms::bubble_sort(42)), "42", "Project::Algorithms::bubble_sort single"
 
 # ── Project::Algorithms::quick_sort ───────────────────────────────────────────────────
-my @unsorted2 = (10, 2, 8, 4, 6)
-my @res2 = Project::Algorithms::quick_sort(@unsorted2)
+val @unsorted2 = (10, 2, 8, 4, 6)
+val @res2 = Project::Algorithms::quick_sort(@unsorted2)
 assert_eq join(",", @res2), "2,4,6,8,10", "Project::Algorithms::quick_sort basic"
 assert_eq join(",", Project::Algorithms::quick_sort(3, 1, 2)), "1,2,3", "Project::Algorithms::quick_sort three"
 assert_eq join(",", Project::Algorithms::quick_sort(100)), "100", "Project::Algorithms::quick_sort single"
 
 # ── Project::Algorithms::merge_sort ───────────────────────────────────────────────────
-my @unsorted3 = (15, 5, 25, 10, 20)
-my @res3 = Project::Algorithms::merge_sort(@unsorted3)
+val @unsorted3 = (15, 5, 25, 10, 20)
+val @res3 = Project::Algorithms::merge_sort(@unsorted3)
 assert_eq join(",", @res3), "5,10,15,20,25", "Project::Algorithms::merge_sort basic"
 assert_eq join(",", Project::Algorithms::merge_sort(5, 4, 3, 2, 1)), "1,2,3,4,5", "Project::Algorithms::merge_sort reverse"
 assert_eq join(",", Project::Algorithms::merge_sort(7)), "7", "Project::Algorithms::merge_sort single"

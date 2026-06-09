@@ -7,25 +7,25 @@
 fn Rosetta::OneZero::find($n) {
     return "0" if $n == 0
     return "1" if $n == 1
-    my @parent = (undef) x $n
-    my @digit  = (undef) x $n
-    my @prev   = (undef) x $n
-    my $start  = 1 % $n
-    my @queue = ($start)
+    var @parent = (undef) x $n
+    var @digit  = (undef) x $n
+    val @prev   = (undef) x $n
+    val $start  = 1 % $n
+    var @queue = ($start)
     $parent[$start] = -1
     $digit[$start]  = "1"
     while (len(@queue) > 0) {
-        my $r = shift @queue
-        for my $d (0, 1) {
-            my $new_r = (($r * 10) + $d) % $n
+        val $r = shift @queue
+        for val $d (0, 1) {
+            val $new_r = (($r * 10) + $d) % $n
             next if defined $parent[$new_r]
             $parent[$new_r] = $r
             $digit[$new_r]  = "$d"
             push @queue, $new_r
             if ($new_r == 0) {
                 # reconstruct
-                my @path
-                my $cur = 0
+                var @path
+                var $cur = 0
                 while ($cur != -1 && defined $digit[$cur]) {
                     unshift @path, $digit[$cur]
                     $cur = $parent[$cur]
@@ -52,13 +52,13 @@ assert_eq Rosetta::OneZero::find(11), "11",       "n=11"
 assert_eq Rosetta::OneZero::find(12), "11100",    "n=12"
 
 # Property: every result is divisible by n
-for my $n (1:30) {
-    my $s = Rosetta::OneZero::find($n)
-    my $val = $s + 0
+for val $n (1:30) {
+    val $s = Rosetta::OneZero::find($n)
+    val $val = $s + 0
     assert_eq $val % $n, 0, sprintf("result for n=%d is divisible by n", $n)
     # Only 0 / 1 digits
-    my $bad = 0
-    for my $c (split //, $s) { $bad = 1 if $c ne "0" && $c ne "1" }
+    var $bad = 0
+    for val $c (split //, $s) { $bad = 1 if $c ne "0" && $c ne "1" }
     assert_eq $bad, 0, sprintf("result for n=%d is binary-digit only", $n)
 }
 

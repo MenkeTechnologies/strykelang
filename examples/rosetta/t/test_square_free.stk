@@ -5,9 +5,9 @@ fn Rosetta::SquareFree::is_square_free($n) {
     if ($n == 1) {
         1
     } else {
-        my $temp = $n
-        my $i = 2
-        my $free = 1
+        val $temp = $n
+        var $i = 2
+        var $free = 1
         while ($i * $i <= $temp) {
             if ($temp % ($i * $i) == 0) {
                 $free = 0
@@ -28,7 +28,7 @@ assert_ok Rosetta::SquareFree::is_square_free(10), "10 is square-free (2*5)"
 assert_ok !Rosetta::SquareFree::is_square_free(4), "4 is not square-free"
 assert_ok !Rosetta::SquareFree::is_square_free(12), "12 is not square-free"
 
-my @list = Rosetta::SquareFree::square_free_list(20)
+val @list = Rosetta::SquareFree::square_free_list(20)
 assert_eq join(",", @list), "1,2,3,5,6,7,10,11,13,14,15,17,19", "square-free up to 20"
 
 30 |> Rosetta::SquareFree::is_square_free |> assert_ok("30 is square-free")

@@ -2,8 +2,8 @@
 # Rosetta Code: Palindrome detection
 
 fn Rosetta::IsPalindrome::is_palindrome($s) {
-    my $clean = ~> $s lc s/[^a-z0-9]//gr
-    my $rev = ~> $clean >{split //, _} rev |> join ""
+    val $clean = ~> $s lc s/[^a-z0-9]//gr
+    val $rev = ~> $clean >{split //, _} rev |> join ""
     $clean eq $rev
 }
 

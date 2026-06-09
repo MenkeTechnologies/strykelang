@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./TakeANumber.stk"
 
-my $m = Exercism::TakeANumber::start()
+val $m = Exercism::TakeANumber::start()
 assert_eq Exercism::TakeANumber::report_state($m), 0, "fresh = 0"
 
 assert_eq Exercism::TakeANumber::take_a_number($m), 1, "first ticket"

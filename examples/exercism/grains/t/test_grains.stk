@@ -13,7 +13,7 @@ assert_ok abs(Exercism::Grains::grains_on_square(64) - 9.22337203685478e18) / 9.
 assert_ok abs(Exercism::Grains::total_grains() - 1.84467440737096e19) / 1.84467440737096e19 < 1e-10, "total ~= 2^64-1"
 
 # Validation
-my $err = eval { Exercism::Grains::grains_on_square(0); 0 } || $@
+var $err = eval { Exercism::Grains::grains_on_square(0); 0 } || $@
 assert_ok $err =~ /between 1 and 64/, "square 0 is invalid"
 $err = eval { Exercism::Grains::grains_on_square(65); 0 } || $@
 assert_ok $err =~ /between 1 and 64/, "square 65 is invalid"

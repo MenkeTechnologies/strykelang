@@ -2,15 +2,15 @@
 # Rosetta Code: Compound Duration
 
 fn Rosetta::CompoundDuration::fmt($seconds) {
-    my $curr_s = $seconds
-    my $d = int($curr_s / 86400)
+    var $curr_s = $seconds
+    val $d = int($curr_s / 86400)
     $curr_s = $curr_s % 86400
-    my $h = int($curr_s / 3600)
+    val $h = int($curr_s / 3600)
     $curr_s = $curr_s % 3600
-    my $m = int($curr_s / 60)
+    val $m = int($curr_s / 60)
     $curr_s = $curr_s % 60
     
-    my @parts
+    var @parts
     if ($d > 0) { push @parts, "$d d" }
     if ($h > 0) { push @parts, "$h hr" }
     if ($m > 0) { push @parts, "$m min" }

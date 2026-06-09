@@ -2,11 +2,11 @@
 # Rosetta Code: Soundex
 
 fn Rosetta::Soundex::compute($name) {
-    my $s = ~> $name uc
-    my @chars = ~> $s chars
+    val $s = ~> $name uc
+    val @chars = ~> $s chars
     
-    my $first = $chars[0]
-    my %codes = (
+    val $first = $chars[0]
+    val %codes = (
         B=>1, F=>1, P=>1, V=>1,
         C=>2, G=>2, J=>2, K=>2, Q=>2, S=>2, X=>2, Z=>2,
         D=>3, T=>3,
@@ -15,22 +15,22 @@ fn Rosetta::Soundex::compute($name) {
         R=>6
     )
     
-    my $first_code = $codes{$first} ? $codes{$first} : ""
+    val $first_code = $codes{$first} ? $codes{$first} : ""
     
-    my @rest_codes = ~> @chars[1:$#chars] map {
+    val @rest_codes = ~> @chars[1:$#chars] map {
         $codes{_} ? $codes{_} : ""
     } |> grep { _ ne "" }
     
-    my @unique
-    my $prev = $first_code
-    for my $c (@rest_codes) {
+    var @unique
+    var $prev = $first_code
+    for val $c (@rest_codes) {
         if ($c != $prev) {
             push @unique, $c
         }
         $prev = $c
     }
     
-    my $code = $first . join("", @unique)
+    var $code = $first . join("", @unique)
     $code .= "000"
     substr($code, 0, 4)
 }

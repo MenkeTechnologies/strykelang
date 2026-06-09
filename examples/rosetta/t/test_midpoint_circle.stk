@@ -2,10 +2,10 @@
 # Rosetta Code: Midpoint circle algorithm
 
 fn Rosetta::MidpointCircle::solve($xm, $ym, $r) {
-    my $x = -$r
-    my $y = 0
-    my $err = 2 - 2 * $r
-    my %points
+    var $x = -$r
+    var $y = 0
+    var $err = 2 - 2 * $r
+    var %points
     
     while ($x < 0) {
         $points{join(",", $xm - $x, $ym + $y)} = 1
@@ -26,7 +26,7 @@ fn Rosetta::MidpointCircle::solve($xm, $ym, $r) {
     \%points
 }
 
-my $pts = Rosetta::MidpointCircle::solve(0, 0, 3)
+val $pts = Rosetta::MidpointCircle::solve(0, 0, 3)
 
 # For radius 3 at (0,0), we expect points like (3,0), (0,3), (-3,0), (0,-3)
 # and possibly (2,2) etc. depending on implementation

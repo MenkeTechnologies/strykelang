@@ -16,7 +16,7 @@ assert_eq Exercism::AffineCipher::decode("ldagc wpfda zwj", 15, 13), "mindblowin
 assert_eq Exercism::AffineCipher::decode("swxtj npvyk lruol iejdc blaxk swxmh qzglf", 17, 33), "thequickbrownfoxjumpsoverthelazydog", "decode all letters"
 
 # error
-my $err = eval { Exercism::AffineCipher::encode("x", 6, 7); 0 } || $@
+val $err = eval { Exercism::AffineCipher::encode("x", 6, 7); 0 } || $@
 assert_ok $err =~ /coprime/, "non-coprime errors"
 
 test_run

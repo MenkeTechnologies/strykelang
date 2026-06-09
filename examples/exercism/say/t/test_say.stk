@@ -15,7 +15,7 @@ assert_eq Exercism::Say::say_number(1002345), "one million two thousand three hu
 assert_eq Exercism::Say::say_number(1000000000), "one billion",        "billion"
 assert_eq Exercism::Say::say_number(987654321123), "nine hundred eighty-seven billion six hundred fifty-four million three hundred twenty-one thousand one hundred twenty-three", "huge"
 
-my $err = eval { Exercism::Say::say_number(-1); 0 } || $@
+var $err = eval { Exercism::Say::say_number(-1); 0 } || $@
 assert_ok $err =~ /out of range/, "negative"
 $err = eval { Exercism::Say::say_number(1000000000000); 0 } || $@
 assert_ok $err =~ /out of range/, "too big"

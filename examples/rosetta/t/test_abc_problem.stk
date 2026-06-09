@@ -6,13 +6,13 @@ fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
         return 1
     }
     
-    my @chars = @$chars_ref
-    my @blocks = @$blocks_ref
-    my $c = shift @chars
+    var @chars = @$chars_ref
+    val @blocks = @$blocks_ref
+    val $c = shift @chars
     
-    for my $i (0..len(@blocks)-1) {
+    for val $i (0..len(@blocks)-1) {
         if (index($blocks[$i], $c) >= 0) {
-            my @remaining = @blocks
+            var @remaining = @blocks
             splice(@remaining, $i, 1)
             if (Rosetta::ABCProblem::check_recursive(\@chars, \@remaining)) {
                 return 1
@@ -23,12 +23,12 @@ fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
 }
 
 fn Rosetta::ABCProblem::check($word, @blocks) {
-    my @chars = ~> $word lc chars
-    my @b_list = ~> @blocks map { lc }
+    val @chars = ~> $word lc chars
+    val @b_list = ~> @blocks map { lc }
     Rosetta::ABCProblem::check_recursive(\@chars, \@b_list)
 }
 
-my @blocks = ("BO", "XK", "DQ", "CP", "NA", "GT", "RE", "TG", "QD", "FS", "JW", "HU", "VI", "AN", "OB", "ER", "FS", "LY", "PC", "ZM")
+val @blocks = ("BO", "XK", "DQ", "CP", "NA", "GT", "RE", "TG", "QD", "FS", "JW", "HU", "VI", "AN", "OB", "ER", "FS", "LY", "PC", "ZM")
 
 assert_ok Rosetta::ABCProblem::check("A", @blocks), "can make A"
 assert_ok Rosetta::ABCProblem::check("BARK", @blocks), "can make BARK"

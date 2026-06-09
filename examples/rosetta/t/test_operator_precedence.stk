@@ -38,13 +38,13 @@ fn Rosetta::Prec::table() {
 }
 
 fn Rosetta::Prec::tighter_than($a, $b) {
-    my $t = Rosetta::Prec::table()
+    val $t = Rosetta::Prec::table()
     return undef unless exists $t->{$a} && exists $t->{$b}
     $t->{$a}[0] > $t->{$b}[0] ? 1 : 0
 }
 
 fn Rosetta::Prec::assoc($op) {
-    my $t = Rosetta::Prec::table()
+    val $t = Rosetta::Prec::table()
     return undef unless exists $t->{$op}
     $t->{$op}[1]
 }

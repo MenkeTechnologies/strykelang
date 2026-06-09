@@ -24,7 +24,7 @@ p "── CSV ETL Pipeline ─────────────────�
 
 # ── 1. Product catalog ─────────────────────────────────────────────
 
-my %catalog = (
+val %catalog = (
     "P-101" => +{ name => "Widget Pro",   category => "hardware", unit_cost => 12.50 },
     "P-102" => +{ name => "Widget Lite",  category => "hardware", unit_cost =>  6.25 },
     "P-201" => +{ name => "Cable 6ft",    category => "accessories", unit_cost =>  3.10 },
@@ -35,22 +35,22 @@ my %catalog = (
 
 # ── 2. Generate synthetic CSV-like rows (header + 1000 records) ───
 
-my @regions = ("us-east", "us-west", "eu", "apac")
-my @pids    = keys %catalog
+val @regions = ("us-east", "us-west", "eu", "apac")
+val @pids    = keys %catalog
 
 srand 7
 
 fn ETL::rand_choice($arr) { $arr->[ int(rand() * len(@$arr)) ] }
 
-my @raw
+var @raw
 push @raw, "id,region,product_id,units,price"
-for my $i (1:1000) {
-    my $region = ETL::rand_choice \@regions
-    my $pid    = ETL::rand_choice \@pids
-    my $units  = 1 + int(rand() * 20)
-    my $cost   = $catalog{$pid}{unit_cost}
+for var $i (1:1000) {
+    val $region = ETL::rand_choice \@regions
+    val $pid    = ETL::rand_choice \@pids
+    val $units  = 1 + int(rand() * 20)
+    val $cost   = $catalog{$pid}{unit_cost}
     # Markup of 1.5–3.5x.
-    my $price  = sprintf("%.2f", $cost * (1.5 + rand() * 2.0))
+    val $price  = sprintf("%.2f", $cost * (1.5 + rand() * 2.0))
     push @raw, "$i,$region,$pid,$units,$price"
 }
 
@@ -65,12 +65,12 @@ p "Generated #{ len(@raw) - 1 } raw rows (incl. 5 deliberately bad)."
 
 # ── 3. Parse + validate (parallel) ────────────────────────────────
 
-my %region_set = map { _ => 1 } @regions
+val %region_set = map { _ => 1 } @regions
 
 fn ETL::parse_row($line) {
-    my @f = split /,/, $line
+    val @f = split /,/, $line
     return undef if len(@f) != 5
-    my ($id, $region, $pid, $units, $price) = @f
+    val ($id, $region, $pid, $units, $price) = @f
     return undef unless $region_set{$region}
     return undef unless $catalog{$pid}
     return undef unless $units =~ /^\d+$/
@@ -85,16 +85,16 @@ fn ETL::parse_row($line) {
 }
 
 # Skip header (first row) and parse the rest in parallel.
-my @body = @raw[1:len(@raw) - 1]
-my @parsed = ~> @body pmaps { ETL::parse_row(_) } collect grep { defined _ }
+val @body = @raw[1:len(@raw) - 1]
+val @parsed = ~> @body pmaps { ETL::parse_row(_) } collect grep { defined _ }
 
 p "Parsed #{ len @parsed } valid rows; dropped #{ len(@body) - len(@parsed) } malformed."
 
 # ── 4. Enrich each row with category + profit ─────────────────────
 
-my $C = \%catalog
-for my $r (@parsed) {
-    my $c = $C->{ $r->{pid} }
+val $C = \%catalog
+for var $r (@parsed) {
+    var $c = $C->{ $r->{pid} }
     $r->{name}     = $c->{name}
     $r->{category} = $c->{category}
     $r->{revenue}  = $r->{units} * $r->{price}
@@ -109,8 +109,8 @@ for my $r (@parsed) {
 # The reducer merges hashes key-wise.
 
 fn ETL::merge_into($acc, $other) {
-    for my $k (keys %$other) {
-        my $row = $other->{$k}
+    for val $k (keys %$other) {
+        val $row = $other->{$k}
         if (!exists $acc->{$k}) {
             $acc->{$k} = +{ %$row }
         } else {
@@ -125,21 +125,21 @@ fn ETL::merge_into($acc, $other) {
 
 # Pre-chunk into ~CPU-count slices so each pmap_reduce worker reduces a
 # meaningful slab of rows rather than a single row.
-my $chunk_n = 8
-my $per     = int(len(@parsed) / $chunk_n) + 1
-my @chunks
-my $i = 0
+val $chunk_n = 8
+val $per     = int(len(@parsed) / $chunk_n) + 1
+var @chunks
+var $i = 0
 while ($i < len(@parsed)) {
-    my $end = $i + $per - 1
+    var $end = $i + $per - 1
     $end = len(@parsed) - 1 if $end > len(@parsed) - 1
     push @chunks, [ @parsed[$i:$end] ]
     $i += $per
 }
 
-my $agg = @chunks |> pmap_reduce {
-    my %h
-    for my $r (@$_) {
-        my $key = "$r->{region}|$r->{category}"
+val $agg = @chunks |> pmap_reduce {
+    var %h
+    for var $r (@$_) {
+        val $key = "$r->{region}|$r->{category}"
         $h{$key} //= +{ rows => 0, units => 0, revenue => 0, profit => 0 }
         $h{$key}{rows}    += 1
         $h{$key}{units}   += $r->{units}
@@ -153,10 +153,10 @@ my $agg = @chunks |> pmap_reduce {
 
 # ── 6. Region-only roll-up + ranking ─────────────────────────────
 
-my %by_region
-for my $key (keys %$agg) {
-    my ($region, $cat) = split /\|/, $key
-    my $r = $agg->{$key}
+var %by_region
+for val $key (keys %$agg) {
+    var ($region, $cat) = split /\|/, $key
+    var $r = $agg->{$key}
     $by_region{$region} //= +{ rows => 0, units => 0, revenue => 0, profit => 0 }
     $by_region{$region}{rows}    += $r->{rows}
     $by_region{$region}{units}   += $r->{units}
@@ -164,7 +164,7 @@ for my $key (keys %$agg) {
     $by_region{$region}{profit}  += $r->{profit}
 }
 
-my @ranked = sort { $by_region{_1}{profit} <=> $by_region{_}{profit} } keys %by_region
+val @ranked = sort { $by_region{_1}{profit} <=> $by_region{_}{profit} } keys %by_region
 
 # ── 7. Report ─────────────────────────────────────────────────────
 
@@ -173,17 +173,17 @@ p "── Region × Category breakdown ─────────────�
 printf "%-9s %-12s %6s %7s %12s %12s\n", "region", "category", "rows", "units", "revenue", "profit"
 p "  " . ("-" x 65)
 
-for my $key (sort keys %$agg) {
-    my ($region, $cat) = split /\|/, $key
-    my $r = $agg->{$key}
+for val $key (sort keys %$agg) {
+    val ($region, $cat) = split /\|/, $key
+    val $r = $agg->{$key}
     printf "%-9s %-12s %6d %7d %12.2f %12.2f\n",
         $region, $cat, $r->{rows}, $r->{units}, $r->{revenue}, $r->{profit}
 }
 
 p ""
 p "── Region ranking by profit ──────────────────────────"
-for my $i (0:len(@ranked) - 1) {
-    my $r = $by_region{ $ranked[$i] }
+for val $i (0:len(@ranked) - 1) {
+    val $r = $by_region{ $ranked[$i] }
     printf "  %d. %-9s rows=%d profit=%.2f\n", $i + 1, $ranked[$i], $r->{rows}, $r->{profit}
 }
 
@@ -193,7 +193,7 @@ p ""
 
 len(@parsed)               |> aeq 1000, "1000 valid parsed rows"
 
-my $total_rows = 0
+var $total_rows = 0
 $total_rows += $by_region{_}{rows} for keys %by_region
 $total_rows |> aeq 1000, "region rollup row-count matches parsed"
 
@@ -201,15 +201,15 @@ $total_rows |> aeq 1000, "region rollup row-count matches parsed"
 (len(@ranked) == len(@regions))      |> aok "ranking includes every region"
 
 # Profit must equal revenue - cost across the rollup
-my $total_revenue = 0
-my $total_profit  = 0
+var $total_revenue = 0
+var $total_profit  = 0
 $total_revenue += $by_region{_}{revenue} for keys %by_region
 $total_profit  += $by_region{_}{profit}  for keys %by_region
 ($total_revenue > $total_profit)     |> aok "revenue exceeds profit (positive cost)"
 ($total_profit  > 0)                 |> aok "total profit positive"
 
 # Each ranked region should have non-zero rows
-my $all_have_rows = 1
+val $all_have_rows = 1
 $all_have_rows &&= $by_region{_}{rows} > 0 for @ranked
 $all_have_rows |> aeq 1, "every region had at least one row"
 

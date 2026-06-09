@@ -3,7 +3,7 @@
 
 fn Rosetta::Splitmix::reference_sequence($seed) {
     if ($seed == 1234567) {
-        my @vals = (
+        val @vals = (
             "599ed017fb08fc85",
             "2c73f08458540fa5",
             "883ebce5a3f27c77",
@@ -12,7 +12,7 @@ fn Rosetta::Splitmix::reference_sequence($seed) {
         )
         return \@vals
     }
-    my @vals
+    val @vals
     \@vals
 }
 

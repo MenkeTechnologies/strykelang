@@ -19,9 +19,9 @@ Pin::BugsPhase3::target_compose() |> aeq 11, "Multiple around advice do not comp
 
 # ── RefAddr ───────────────────────────────────────────────────────────────
 
-my @arr_ref = (1, 2)
-my $r1 = \@arr_ref
-my $r2 = \@arr_ref
+val @arr_ref = (1, 2)
+val $r1 = \@arr_ref
+val $r2 = \@arr_ref
 refaddr($r1) != refaddr($r2) |> aok "refaddr of repeated backslash-at differs"
 
 # ── BEGIN Mutations ───────────────────────────────────────────────────────
@@ -34,32 +34,32 @@ $log_begin |> aeq "M:", "BEGIN mutations to package vars are lost"
 # ── Destructuring Bugs ────────────────────────────────────────────────────
 
 fn Pin::BugsPhase3::test_slurp {
-    my ($first, @rest) = @_
+    val ($first, @rest) = @_
     len(@rest)
 }
 Pin::BugsPhase3::test_slurp(1, 2, 3) |> aeq 2, 'my ($s, @rest) = @_ correctly takes tail'
 
-my @items = (10, 20, 30)
-my ($x_single) = @items
+val @items = (10, 20, 30)
+val ($x_single) = @items
 $x_single |> aeq 10, "my (\$x) = \@arr binds first element (FIXED, was returning count)"
 
 # ── Filehandle Bugs ───────────────────────────────────────────────────────
 
-my $tmp = tempdir()
-my $out_file = "$tmp/out.txt"
-open(my $fh_out, ">", $out_file)
+val $tmp = tempdir()
+val $out_file = "$tmp/out.txt"
+open(val $fh_out, ">", $out_file)
 printf $fh_out "n=%d", 42
 close($fh_out)
 # printf $fh (FIXED): writes to the file handle instead of STDOUT — was 0-byte file.
 (-s $out_file) |> aeq 4, "printf \$fh (FIXED): writes to filehandle (4 bytes: 'n=42')"
 
-open(my $fh_in, "<", $out_file)
+open(val $fh_in, "<", $out_file)
 eof($fh_in) |> maps { !_ } |> aok "eof on non-empty file is false"
 close($fh_in)
 
 # ── Parallel Source (BUG-108) ──────────────────────────────────────────────
 
-my @source_list = (10, 20, 30)
+val @source_list = (10, 20, 30)
 # BUG-108 is FIXED: ~p> correctly expands the array source
 ~p> @source_list sum |> aeq 60, "~p> @array correctly sums elements (fixed bug)"
 

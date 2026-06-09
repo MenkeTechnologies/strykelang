@@ -5,30 +5,30 @@
 
 fn Rosetta::Karatsuba::digits($n) {
     return 1 if $n == 0
-    my $d = 0
+    var $d = 0
     while ($n > 0) { $d++; $n = int($n / 10) }
     $d
 }
 
 fn Rosetta::Karatsuba::pow10($k) {
-    my $r = 1
+    var $r = 1
     for (1:$k) { $r *= 10 }
     $r
 }
 
 fn Rosetta::Karatsuba::mul($x, $y) {
     return $x * $y if $x < 10 || $y < 10
-    my $n = Rosetta::Karatsuba::digits($x)
-    my $m = Rosetta::Karatsuba::digits($y)
-    my $half = int(($n > $m ? $n : $m) / 2)
-    my $base = Rosetta::Karatsuba::pow10($half)
-    my $high1 = int($x / $base)
-    my $low1 = $x - $high1 * $base
-    my $high2 = int($y / $base)
-    my $low2 = $y - $high2 * $base
-    my $z0 = Rosetta::Karatsuba::mul($low1, $low2)
-    my $z2 = Rosetta::Karatsuba::mul($high1, $high2)
-    my $z1 = Rosetta::Karatsuba::mul($low1 + $high1, $low2 + $high2) - $z2 - $z0
+    val $n = Rosetta::Karatsuba::digits($x)
+    val $m = Rosetta::Karatsuba::digits($y)
+    val $half = int(($n > $m ? $n : $m) / 2)
+    val $base = Rosetta::Karatsuba::pow10($half)
+    val $high1 = int($x / $base)
+    val $low1 = $x - $high1 * $base
+    val $high2 = int($y / $base)
+    val $low2 = $y - $high2 * $base
+    val $z0 = Rosetta::Karatsuba::mul($low1, $low2)
+    val $z2 = Rosetta::Karatsuba::mul($high1, $high2)
+    val $z1 = Rosetta::Karatsuba::mul($low1 + $high1, $low2 + $high2) - $z2 - $z0
     $z2 * Rosetta::Karatsuba::pow10(2 * $half) + $z1 * $base + $z0
 }
 
@@ -41,8 +41,8 @@ assert_eq Rosetta::Karatsuba::mul(99, 99), 9801, "99 * 99"
 assert_eq Rosetta::Karatsuba::mul(100, 100), 10000, "100 * 100"
 
 # Match against native multiplication for a range of values
-for my $a (1, 7, 42, 137, 999, 12345) {
-    for my $b (1, 3, 50, 200, 7777) {
+for val $a (1, 7, 42, 137, 999, 12345) {
+    for val $b (1, 3, 50, 200, 7777) {
         assert_eq Rosetta::Karatsuba::mul($a, $b), $a * $b, "$a * $b matches native"
     }
 }

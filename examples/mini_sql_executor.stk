@@ -19,7 +19,7 @@ p "── Mini SQL Executor ─────────────────�
 
 # ── 1. Schema + data ───────────────────────────────────────────────
 
-my %tables = (
+val %tables = (
     employees => [
         +{ id => 1, name => "Ada",  salary => 95000, dept => "eng",   years => 12 },
         +{ id => 2, name => "Bob",  salary => 72000, dept => "sales", years =>  4 },
@@ -33,16 +33,16 @@ my %tables = (
 # ── 2. Tokenizer ───────────────────────────────────────────────────
 
 fn Sql::tokenize($s) {
-    my @toks
-    my $i = 0
-    my $n = len $s
+    var @toks
+    var $i = 0
+    val $n = len $s
     while ($i < $n) {
-        my $c = $s[$i]
+        val $c = $s[$i]
         if ($c =~ /\s/) { $i++; next }
 
         # Single-quoted string literal
         if ($c eq "'") {
-            my $j = $i + 1
+            var $j = $i + 1
             $j++ while $j < $n && $s[$j] ne "'"
             push @toks, +{ kind => "str", v => $s[$i + 1 : $j - 1] }
             $i = $j + 1
@@ -51,7 +51,7 @@ fn Sql::tokenize($s) {
 
         # Numeric literal
         if ($c =~ /\d/) {
-            my $j = $i
+            var $j = $i
             $j++ while $j < $n && $s[$j] =~ /[\d.]/
             push @toks, +{ kind => "num", v => 0 + $s[$i : $j - 1] }
             $i = $j
@@ -60,7 +60,7 @@ fn Sql::tokenize($s) {
 
         # Multi-char operators
         if ($i + 1 < $n) {
-            my $two = $s[$i : $i + 1]
+            val $two = $s[$i : $i + 1]
             if ($two eq "!=" || $two eq "<=" || $two eq ">=") {
                 push @toks, +{ kind => "op", v => $two }
                 $i += 2
@@ -77,11 +77,11 @@ fn Sql::tokenize($s) {
 
         # Identifier / keyword
         if ($c =~ /[A-Za-z_]/) {
-            my $j = $i
+            var $j = $i
             $j++ while $j < $n && $s[$j] =~ /[A-Za-z0-9_]/
-            my $w = $s[$i : $j - 1]
-            my $low = lc $w
-            my $kind = ($low =~ /^(select|from|where|order|by|asc|desc|limit|and)$/) ? "kw" : "id"
+            val $w = $s[$i : $j - 1]
+            val $low = lc $w
+            val $kind = ($low =~ /^(select|from|where|order|by|asc|desc|limit|and)$/) ? "kw" : "id"
             push @toks, +{ kind => $kind, v => $low, raw => $w }
             $i = $j
             next
@@ -95,20 +95,20 @@ fn Sql::tokenize($s) {
 # ── 3. Parser ──────────────────────────────────────────────────────
 
 fn Sql::expect($toks, $kind, $v) {
-    my $t = shift @$toks
+    val $t = shift @$toks
     die "expected $kind '$v', got " . ($t ? "$t->{kind} '$t->{v}'" : "EOF") \
         unless $t && $t->{kind} eq $kind && $t->{v} eq $v
     $t
 }
 
 fn Sql::parse($query) {
-    my $toks = Sql::tokenize $query
+    val $toks = Sql::tokenize $query
     Sql::expect $toks, "kw", "select"
 
     # column list
-    my @cols
+    var @cols
     while (1) {
-        my $t = shift @$toks
+        val $t = shift @$toks
         die "expected column" unless defined $t
         if ($t->{kind} eq "op" && $t->{v} eq "*") {
             push @cols, "*"
@@ -117,40 +117,40 @@ fn Sql::parse($query) {
         } else {
             die "unexpected token in select-list: $t->{v}"
         }
-        my $peek = $toks->[0]
+        val $peek = $toks->[0]
         last if !$peek || !($peek->{kind} eq "op" && $peek->{v} eq ",")
         shift @$toks
     }
 
     Sql::expect $toks, "kw", "from"
-    my $tname = (shift @$toks)->{v}
+    val $tname = (shift @$toks)->{v}
 
-    my @wheres
+    var @wheres
     if (@$toks && $toks->[0]{kind} eq "kw" && $toks->[0]{v} eq "where") {
         shift @$toks
         while (1) {
-            my $col = (shift @$toks)->{v}
-            my $op  = (shift @$toks)->{v}
-            my $val = shift @$toks
+            val $col = (shift @$toks)->{v}
+            val $op  = (shift @$toks)->{v}
+            val $val = shift @$toks
             push @wheres, +{ col => $col, op => $op, val => $val->{v}, kind => $val->{kind} }
             last unless @$toks && $toks->[0]{kind} eq "kw" && $toks->[0]{v} eq "and"
             shift @$toks
         }
     }
 
-    my $order
+    var $order
     if (@$toks && $toks->[0]{kind} eq "kw" && $toks->[0]{v} eq "order") {
         shift @$toks
         Sql::expect $toks, "kw", "by"
-        my $col = (shift @$toks)->{v}
-        my $dir = "asc"
+        val $col = (shift @$toks)->{v}
+        var $dir = "asc"
         if (@$toks && $toks->[0]{kind} eq "kw" && ($toks->[0]{v} eq "asc" || $toks->[0]{v} eq "desc")) {
             $dir = (shift @$toks)->{v}
         }
         $order = +{ col => $col, dir => $dir }
     }
 
-    my $limit
+    var $limit
     if (@$toks && $toks->[0]{kind} eq "kw" && $toks->[0]{v} eq "limit") {
         shift @$toks
         $limit = (shift @$toks)->{v}
@@ -168,9 +168,9 @@ fn Sql::parse($query) {
 # ── 4. Executor ────────────────────────────────────────────────────
 
 fn Sql::row_matches($row, $w) {
-    my $left  = $row->{ $w->{col} }
-    my $right = $w->{kind} eq "num" ? 0 + $w->{val} : $w->{val}
-    my $op    = $w->{op}
+    val $left  = $row->{ $w->{col} }
+    val $right = $w->{kind} eq "num" ? 0 + $w->{val} : $w->{val}
+    val $op    = $w->{op}
     $op eq "="  ? $left eq $right
   : $op eq "!=" ? $left ne $right
   : $op eq "<"  ? $left <  $right
@@ -181,20 +181,20 @@ fn Sql::row_matches($row, $w) {
 }
 
 fn Sql::execute($plan) {
-    my $tbl = $tables{ $plan->{table} } or die "no such table: $plan->{table}"
+    val $tbl = $tables{ $plan->{table} } or die "no such table: $plan->{table}"
 
     # WHERE
-    my @rows = @$tbl
-    for my $w (@{ $plan->{wheres} }) {
+    var @rows = @$tbl
+    for val $w (@{ $plan->{wheres} }) {
         @rows = grep { Sql::row_matches _, $w } @rows
     }
 
     # ORDER BY
     if ($plan->{order}) {
-        my $col = $plan->{order}{col}
-        my $dir = $plan->{order}{dir}
-        my $first_val = @rows ? $rows[0]{$col} : 0
-        my $numeric = $first_val =~ /^-?\d+(\.\d+)?$/
+        val $col = $plan->{order}{col}
+        val $dir = $plan->{order}{dir}
+        val $first_val = @rows ? $rows[0]{$col} : 0
+        val $numeric = $first_val =~ /^-?\d+(\.\d+)?$/
         if ($numeric) {
             @rows = sort { _->{$col} <=> _1->{$col} } @rows
         } else {
@@ -205,16 +205,16 @@ fn Sql::execute($plan) {
 
     # LIMIT
     if (defined $plan->{limit}) {
-        my $lim = 0 + $plan->{limit}
-        my $end = $lim < len(@rows) ? $lim - 1 : len(@rows) - 1
+        val $lim = 0 + $plan->{limit}
+        val $end = $lim < len(@rows) ? $lim - 1 : len(@rows) - 1
         @rows = $end >= 0 ? @rows[0:$end] : ()
     }
 
     # SELECT cols — `*` returns rows as-is; otherwise project each row.
-    my @cols = @{ $plan->{cols} }
+    val @cols = @{ $plan->{cols} }
     return @rows if len(@cols) == 1 && $cols[0] eq "*"
     map {
-        my $r = _
+        val $r = _
         +{ map { _ => $r->{_} } @cols }
     } @rows
 }
@@ -223,17 +223,17 @@ fn Sql::run = Sql::parse(_) |> Sql::execute
 
 fn Sql::print_table(@rows) {
     if (!len(@rows)) { p "  (empty result)"; return }
-    my @cols = sort keys %{ $rows[0] }
+    val @cols = sort keys %{ $rows[0] }
     p "  " . join(" | ", @cols)
     p "  " . join("-+-", map { "-" x len(_) } @cols)
-    for my $r (@rows) {
+    for val $r (@rows) {
         p "  " . join(" | ", map { $r->{_} // "" } @cols)
     }
 }
 
 # ── 5. Run sample queries ──────────────────────────────────────────
 
-my @queries = (
+val @queries = (
     "SELECT * FROM employees",
     "SELECT name, salary FROM employees WHERE dept = 'eng'",
     "SELECT name, salary FROM employees WHERE salary > 70000 ORDER BY salary DESC",
@@ -241,10 +241,10 @@ my @queries = (
     "SELECT name, dept FROM employees WHERE salary <= 65000 ORDER BY name ASC",
 )
 
-for my $q (@queries) {
+for val $q (@queries) {
     p ""
     p "Query: $q"
-    my @result = Sql::run $q
+    val @result = Sql::run $q
     Sql::print_table @result
 }
 
@@ -252,21 +252,21 @@ for my $q (@queries) {
 
 p ""
 
-my @r1 = Sql::run "SELECT name FROM employees WHERE dept = 'eng'"
+val @r1 = Sql::run "SELECT name FROM employees WHERE dept = 'eng'"
 len(@r1) |> aeq 3, "3 engineers"
 
-my @r2 = Sql::run "SELECT name FROM employees WHERE salary > 70000 ORDER BY salary DESC LIMIT 2"
+val @r2 = Sql::run "SELECT name FROM employees WHERE salary > 70000 ORDER BY salary DESC LIMIT 2"
 len(@r2)         |> aeq 2,     "top-2 limited"
 $r2[0]->{name}   |> aeq "Eve", "highest paid is Eve"
 $r2[1]->{name}   |> aeq "Ada", "next is Ada"
 
-my @r3 = Sql::run "SELECT name FROM employees WHERE dept = 'eng' AND years > 10"
+val @r3 = Sql::run "SELECT name FROM employees WHERE dept = 'eng' AND years > 10"
 len(@r3) |> aeq 2, "two engineers with >10 years"
 
-my @r4 = Sql::run "SELECT name FROM employees WHERE id = 4"
+val @r4 = Sql::run "SELECT name FROM employees WHERE id = 4"
 $r4[0]->{name} |> aeq "Dan", "lookup by id"
 
-my @r5 = Sql::run "SELECT * FROM employees ORDER BY name ASC LIMIT 1"
+val @r5 = Sql::run "SELECT * FROM employees ORDER BY name ASC LIMIT 1"
 $r5[0]->{name} |> aeq "Ada", "alphabetical first is Ada"
 
 test_run

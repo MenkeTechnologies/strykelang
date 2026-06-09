@@ -2,12 +2,12 @@
 # Rosetta Code: Arithmetic evaluation
 
 fn Rosetta::Eval::expr($tokens_ref, $pos_ref) {
-    my $res = Rosetta::Eval::term($tokens_ref, $pos_ref)
+    var $res = Rosetta::Eval::term($tokens_ref, $pos_ref)
     while ($$pos_ref < len(@$tokens_ref)) {
-        my $op = $tokens_ref->[$$pos_ref]
+        val $op = $tokens_ref->[$$pos_ref]
         if ($op eq "+" || $op eq "-") {
             $$pos_ref = $$pos_ref + 1
-            my $rhs = Rosetta::Eval::term($tokens_ref, $pos_ref)
+            val $rhs = Rosetta::Eval::term($tokens_ref, $pos_ref)
             $res = ($op eq "+" ? $res + $rhs : $res - $rhs)
         } else {
             last
@@ -17,12 +17,12 @@ fn Rosetta::Eval::expr($tokens_ref, $pos_ref) {
 }
 
 fn Rosetta::Eval::term($tokens_ref, $pos_ref) {
-    my $res = Rosetta::Eval::factor($tokens_ref, $pos_ref)
+    var $res = Rosetta::Eval::factor($tokens_ref, $pos_ref)
     while ($$pos_ref < len(@$tokens_ref)) {
-        my $op = $tokens_ref->[$$pos_ref]
+        val $op = $tokens_ref->[$$pos_ref]
         if ($op eq "*" || $op eq "/") {
             $$pos_ref = $$pos_ref + 1
-            my $rhs = Rosetta::Eval::factor($tokens_ref, $pos_ref)
+            val $rhs = Rosetta::Eval::factor($tokens_ref, $pos_ref)
             $res = ($op eq "*" ? $res * $rhs : $res / $rhs)
         } else {
             last
@@ -32,10 +32,10 @@ fn Rosetta::Eval::term($tokens_ref, $pos_ref) {
 }
 
 fn Rosetta::Eval::factor($tokens_ref, $pos_ref) {
-    my $tok = $tokens_ref->[$$pos_ref]
+    val $tok = $tokens_ref->[$$pos_ref]
     $$pos_ref = $$pos_ref + 1
     if ($tok eq "(") {
-        my $res = Rosetta::Eval::expr($tokens_ref, $pos_ref)
+        val $res = Rosetta::Eval::expr($tokens_ref, $pos_ref)
         $$pos_ref = $$pos_ref + 1
         return $res
     }
@@ -43,8 +43,8 @@ fn Rosetta::Eval::factor($tokens_ref, $pos_ref) {
 }
 
 fn Rosetta::Eval::solve($s) {
-    my @tokens = ~> $s s/([\(\)\+\-\*\/])/ $1 /g |> trim |> split(/\s+/)
-    my $pos = 0
+    val @tokens = ~> $s s/([\(\)\+\-\*\/])/ $1 /g |> trim |> split(/\s+/)
+    val $pos = 0
     Rosetta::Eval::expr(\@tokens, \$pos)
 }
 

@@ -2,8 +2,8 @@
 # Rosetta Code: Zeckendorf number representation
 
 fn Rosetta::Rev::rev(@arr) {
-    my @reversed
-    my $i = $#arr
+    var @reversed
+    var $i = $#arr
     while ($i >= 0) {
         push @reversed, $arr[$i]
         $i = $i - 1
@@ -12,8 +12,8 @@ fn Rosetta::Rev::rev(@arr) {
 }
 
 fn Rosetta::Zeckendorf::fib_seq_until($max) {
-    my @fibs
-    my ($a, $b) = (1, 2)
+    var @fibs
+    var ($a, $b) = (1, 2)
     while ($a <= $max) {
         push @fibs, $a
         ($a, $b) = ($b, $a + $b)
@@ -25,28 +25,28 @@ fn Rosetta::Zeckendorf::zeckendorf($n) {
     if ($n == 0) {
         return ()
     }
-    my @fibs = Rosetta::Rev::rev(Rosetta::Zeckendorf::fib_seq_until($n))
-    my @result
-    for my $fib (@fibs) {
+    val @fibs = Rosetta::Rev::rev(Rosetta::Zeckendorf::fib_seq_until($n))
+    var @result
+    for val $fib (@fibs) {
         if ($n >= $fib) {
             push @result, $fib
             $n = $n - $fib
         }
     }
-    my @rev_res = Rosetta::Rev::rev(@result)
+    val @rev_res = Rosetta::Rev::rev(@result)
     @rev_res
 }
 
-my @z100 = Rosetta::Zeckendorf::zeckendorf(100)
+val @z100 = Rosetta::Zeckendorf::zeckendorf(100)
 join(",", @z100) |> assert_eq("3,8,89", "Rosetta::Zeckendorf::zeckendorf(100)")
 
-my @z20 = Rosetta::Zeckendorf::zeckendorf(20)
+val @z20 = Rosetta::Zeckendorf::zeckendorf(20)
 join(",", @z20) |> assert_eq("2,5,13", "Rosetta::Zeckendorf::zeckendorf(20)")
 
-my @z0 = Rosetta::Zeckendorf::zeckendorf(0)
+val @z0 = Rosetta::Zeckendorf::zeckendorf(0)
 assert_eq(len(@z0), 0, "Rosetta::Zeckendorf::zeckendorf(0)")
 
-my @z8 = Rosetta::Zeckendorf::zeckendorf(8)
+val @z8 = Rosetta::Zeckendorf::zeckendorf(8)
 join(",", @z8) |> assert_eq("8", "Rosetta::Zeckendorf::zeckendorf(8)")
 
 test_run

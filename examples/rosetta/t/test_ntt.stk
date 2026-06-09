@@ -2,7 +2,7 @@
 # Rosetta Code: Number theoretic transform
 
 fn Rosetta::NTT::mod_pow($base, $exp, $mod) {
-    my $res = 1
+    var $res = 1
     $base %= $mod
     while ($exp > 0) {
         if ($exp % 2 == 1) { $res = ($res * $base) % $mod }
@@ -14,7 +14,7 @@ fn Rosetta::NTT::mod_pow($base, $exp, $mod) {
 
 fn Rosetta::NTT::transform($a, $n, $g, $p) {
     [~> 0:$n-1 map {
-        my $sum = ~> 0:$n-1 map {
+        val $sum = ~> 0:$n-1 map {
             $a->[_] * Rosetta::NTT::mod_pow($g, (_< * _) % ($p - 1), $p)
         } sum
         $sum % $p
@@ -25,12 +25,12 @@ fn Rosetta::NTT::transform($a, $n, $g, $p) {
 # p=7, p-1=6. n=3 divides 6.
 # 2^2 = 4, 2^4 = 16 = 2, 2^6 = 64 = 1.
 # So g=2^2 = 4 is a 3rd root of unity mod 7.
-my $p = 7
-my $n = 3
-my $g = 4 # 4^3 = 64 = 1 mod 7.
+val $p = 7
+val $n = 3
+val $g = 4 # 4^3 = 64 = 1 mod 7.
 
-my @a = (1, 2, 3)
-my $res = Rosetta::NTT::transform(\@a, $n, $g, $p)
+val @a = (1, 2, 3)
+val $res = Rosetta::NTT::transform(\@a, $n, $g, $p)
 # res[0] = 1*4^0 + 2*4^0 + 3*4^0 = 1+2+3 = 6 mod 7
 # res[1] = 1*4^0 + 2*4^1 + 3*4^2 = 1+8+48 = 57 = 1 mod 7
 # res[2] = 1*4^0 + 2*4^2 + 3*4^4 = 1+32+3*256 = 1+4+3*4 = 1+4+12 = 17 = 3 mod 7

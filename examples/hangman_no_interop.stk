@@ -23,10 +23,10 @@ fn Hangman::new = +{
 
 # Returns "hit" / "miss" / "already" so the caller can score.
 fn Hangman::guess($g, $ch) {
-    my $c = lc($ch)
+    val $c = lc($ch)
     return "already" if exists $g->{guessed}{$c}
     $g->{guessed}{$c} = 1
-    my $hits = grep { _ eq $c } split //, $g->{word}
+    val $hits = grep { _ eq $c } split //, $g->{word}
     $g->{wrong}++ if $hits == 0
     $hits > 0 ? "hit" : "miss"
 }
@@ -42,13 +42,13 @@ fn Hangman::lost($g) = $g->{wrong} >= $g->{max_wrong} ? 1 : 0
 p "── Hangman demo ──"
 
 # Winning run: guess every letter of "stryke" + a few wrong ones.
-my $g = Hangman::new("stryke", 5)
+val $g = Hangman::new("stryke", 5)
 die "initial display all _" unless Hangman::display($g) eq "______"
 die "not won at start"      if     Hangman::won($g)
 die "not lost at start"     if     Hangman::lost($g)
 
-for my $ch (split //, "stryke") {
-    my $r = Hangman::guess($g, $ch)
+for val $ch (split //, "stryke") {
+    val $r = Hangman::guess($g, $ch)
     die "expected hit on $ch, got $r" unless $r eq "hit"
 }
 die "must have won after spelling word" unless Hangman::won($g)
@@ -56,9 +56,9 @@ die "no wrongs in winning run"          unless $g->{wrong} == 0
 p "  winning run: display='#{Hangman::display($g)}', wrong=#{$g->{wrong}}  OK"
 
 # Losing run: 5 wrong guesses on "perl".
-my $g2 = Hangman::new("perl", 5)
-for my $bad (split //, "xyzab") {
-    my $r = Hangman::guess($g2, $bad)
+val $g2 = Hangman::new("perl", 5)
+for val $bad (split //, "xyzab") {
+    val $r = Hangman::guess($g2, $bad)
     die "expected miss on $bad, got $r" unless $r eq "miss"
 }
 die "must be lost" unless Hangman::lost($g2)
@@ -66,15 +66,15 @@ die "must not be won" if    Hangman::won($g2)
 p "  losing run: 5 wrongs reached limit, display='#{Hangman::display($g2)}'  OK"
 
 # Duplicate guesses do not count.
-my $g3 = Hangman::new("test", 5)
+val $g3 = Hangman::new("test", 5)
 Hangman::guess($g3, "t")
-my $r = Hangman::guess($g3, "t")
+val $r = Hangman::guess($g3, "t")
 die "duplicate should return 'already'" unless $r eq "already"
 die "duplicate must not increment wrong" unless $g3->{wrong} == 0
 p "  duplicate guess returns 'already', no penalty  OK"
 
 # Case-insensitive: "S" matches "stryke".
-my $g4 = Hangman::new("stryke", 5)
+val $g4 = Hangman::new("stryke", 5)
 die "uppercase S should hit" unless Hangman::guess($g4, "S") eq "hit"
 
 p ""

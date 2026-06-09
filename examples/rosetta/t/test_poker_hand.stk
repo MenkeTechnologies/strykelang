@@ -2,7 +2,7 @@
 # Rosetta Code: Poker hand analyser
 
 fn Rosetta::PokerHand::card_value($c) {
-    my $v = substr($c, 0, length($c)-1)
+    val $v = substr($c, 0, length($c)-1)
     if ($v eq "A") { 14 }
     elsif ($v eq "K") { 13 }
     elsif ($v eq "Q") { 12 }
@@ -16,38 +16,38 @@ fn Rosetta::PokerHand::card_suit($c) {
 }
 
 fn Rosetta::PokerHand::analyze_hand(@cards) {
-    my @raw_vals = ~> @cards map {Rosetta::PokerHand::card_value}
-    my @vals = sort { _0 <=> _1 } @raw_vals
-    my @suits = ~> @cards map {Rosetta::PokerHand::card_suit}
+    val @raw_vals = ~> @cards map {Rosetta::PokerHand::card_value}
+    val @vals = sort { _0 <=> _1 } @raw_vals
+    val @suits = ~> @cards map {Rosetta::PokerHand::card_suit}
     
-    my $is_flush = 0
-    my %suit_counts
-    for my $s (@suits) { $suit_counts{$s}++ }
-    for my $s (keys %suit_counts) {
+    var $is_flush = 0
+    var %suit_counts
+    for val $s (@suits) { $suit_counts{$s}++ }
+    for val $s (keys %suit_counts) {
         if ($suit_counts{$s} == 5) { $is_flush = 1 }
     }
     
-    my $is_straight = 1
-    for my $i (1:4) { 
-        my $v1 = int($vals[$i])
-        my $v0 = int($vals[$i-1])
+    var $is_straight = 1
+    for val $i (1:4) { 
+        val $v1 = int($vals[$i])
+        val $v0 = int($vals[$i-1])
         if ($v1 - $v0 != 1) { $is_straight = 0 }
     }
     if (!$is_straight) {
-        my $v_s = join(",", @vals)
+        val $v_s = join(",", @vals)
         if ($v_s eq "2,3,4,5,14") { $is_straight = 1 }
     }
     
-    my %counts
-    for my $v (@vals) { 
-        my $key = "$v"
+    var %counts
+    for val $v (@vals) { 
+        val $key = "$v"
         $counts{$key}++ 
     }
-    my @c = ~> values %counts sort { _1 <=> _0 }
-    my $max_c = int($c[0])
-    my $second_c = int($c[1])
+    val @c = ~> values %counts sort { _1 <=> _0 }
+    val $max_c = int($c[0])
+    val $second_c = int($c[1])
     
-    my $res = "high card"
+    var $res = "high card"
     if ($is_straight) {
         if ($is_flush) { $res = "straight flush" }
         else { $res = "straight" }

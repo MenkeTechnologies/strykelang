@@ -11,19 +11,19 @@
 # ── 1. Sequential ~> (Clojure / Racket / Elixir compatible) ──────
 p "═══ Sequential threading"
 
-my $upper = ~> "hello world" uc rev
+val $upper = ~> "hello world" uc rev
 p "  ~> uc rev: $upper"
 
-my @squared = ~> 1:5 map { _ * _ } collect
+val @squared = ~> 1:5 map { _ * _ } collect
 p "  squares: @squared"
 
 # ── 2. Pipe-forward |> (Elixir-style) ────────────────────────────
 p "\n═══ Pipe-forward (sequential)"
 
-my $shout = "hello" |> uc |> rev
+val $shout = "hello" |> uc |> rev
 p "  |> chain: $shout"
 
-my $sum = 1:10 |> map { _ * _ } |> sum
+val $sum = 1:10 |> map { _ * _ } |> sum
 p "  sum of squares 1:10: $sum"
 
 # ── 3. ~s> per-item streaming via bounded channels ──────────────
@@ -32,48 +32,48 @@ p "\n═══ ~s> per-item streaming"
 # Each stage runs as an independent worker; items flow through bounded
 # channels with backpressure. Best when stages have differing
 # latencies (faster workers pull ahead while slower ones catch up).
-my $items = ~s> [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 }
+val $items = ~s> [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 }
 p "  basic chain: $items items"
 
 # Streaming with a filter stage.
-my $matched = ~s> [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] grep { _ % 2 == 0 } map { _ * _ }
+val $matched = ~s> [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] grep { _ % 2 == 0 } map { _ * _ }
 p "  even squares: $matched matched"
 
 # Mixed I/O + CPU — this is where streaming wins over chunk-parallel.
 # Each item gets its own worker; faster items don't wait for slower ones.
-my $mixed = ~s> [1, 2, 3, 4, 5] map { sleep 0.05; _ * _ }
+val $mixed = ~s> [1, 2, 3, 4, 5] map { sleep 0.05; _ * _ }
 p "  I/O-mixed: $mixed items"
 
 # Streaming JSON parse + transform.
-my @raw = (q({"id":1,"v":10}), q({"id":2,"v":20}), q({"id":3,"v":30}))
-my $parsed = ~s> [@raw] map {from_json} map { _->{v} * 2 }
+val @raw = (q({"id":1,"v":10}), q({"id":2,"v":20}), q({"id":3,"v":30}))
+val $parsed = ~s> [@raw] map {from_json} map { _->{v} * 2 }
 p "  JSON pipeline: $parsed items"
 
 # Log-line filter: errors only, uppercased.
-my @log = ("INFO ok", "ERROR oops", "WARN slow", "ERROR bad", "INFO done")
-my $errs = ~s> [@log] grep { /ERROR/ } map { uc }
+val @log = ("INFO ok", "ERROR oops", "WARN slow", "ERROR bad", "INFO done")
+val $errs = ~s> [@log] grep { /ERROR/ } map { uc }
 p "  log errors: $errs"
 
 # Streaming with mysync counter for shared state across workers.
 mysync $accum = 0
-my $n = ~s> [10, 20, 30, 40, 50] map { $accum += _; _ }
+val $n = ~s> [10, 20, 30, 40, 50] map { $accum += _; _ }
 p "  shared accumulator: $accum across $n items"
 
 # ── 4. ~p> chunk-parallel — bake parallelism into the arrow ─────
 p "\n═══ ~p> chunk-parallel"
 
 # Letter-frequency histogram, fanned out across CPU cores.
-my $h = ~p> "the quick brown fox jumps over the lazy dog" letters freq
-my @top = (sort { $h->{_1} <=> $h->{_} } keys %$h)[0:2]
+val $h = ~p> "the quick brown fox jumps over the lazy dog" letters freq
+val @top = (sort { $h->{_1} <=> $h->{_} } keys %$h)[0:2]
 p "  top letters: ", join(", ", map { "$_=$h->{$_}" } @top)
 
 # Total alphabetic character count via the ||> mid-chain boundary
 # (parallel extract → sequential merge).
-my $alpha = ~p> "the quick brown fox jumps over the lazy dog" letters freq ||> values |> sum
+val $alpha = ~p> "the quick brown fox jumps over the lazy dog" letters freq ||> values |> sum
 p "  total alphabetic: $alpha"
 
 # Same with the English boundary marker |then|.
-my $alpha2 = ~p> "the quick brown fox jumps over the lazy dog" letters freq |then| values |> sum
+val $alpha2 = ~p> "the quick brown fox jumps over the lazy dog" letters freq |then| values |> sum
 p "  same w/ |then|: $alpha2"
 
 # ── 5. par_reduce — explicit chunk-extract-merge ────────────────
@@ -81,65 +81,65 @@ p "\n═══ par_reduce"
 
 # Single-block form: type-aware auto-merge (hash<num> → key-wise add,
 # numeric → sum, array → concat, string → concat).
-my $tot_len = ~> "abcdefghij" par_reduce {len}
+val $tot_len = ~> "abcdefghij" par_reduce {len}
 p "  auto-sum: $tot_len"
 
 # Two-block form: explicit pairwise reducer with `_` / `_1`.
-my $manual = ~> "abcdefghij" par_reduce {len} { _ + _1 }
+val $manual = ~> "abcdefghij" par_reduce {len} { _ + _1 }
 p "  explicit reducer: $manual"
 
 # Maximum word length via custom reducer.
-my $max_word = ~> "the quick brown fox jumps over the lazy dog" words \
+val $max_word = ~> "the quick brown fox jumps over the lazy dog" words \
     par_reduce {len} { _ > _1 ? _ : _1 }
 p "  max word length: $max_word"
 
 # ── 6. par { BLOCK } — generic parallel-chunk wrapper ───────────
 p "\n═══ par { BLOCK }"
 
-my @per_chunk = ~> "Hello, World 123" par { letters }
+val @per_chunk = ~> "Hello, World 123" par { letters }
 p "  letters per chunk: @per_chunk"
 
 # ── 7. Real-world parallel corpus workloads ─────────────────────
 p "\n═══ Parallel corpus workloads"
 
 # Letter-freq histogram across every .stk file in the project.
-my $corpus = ~p> c("**.stk") letters freq
-my @top5 = (sort { $corpus->{_1} <=> $corpus->{_} } keys %$corpus)[0:4]
+val $corpus = ~p> c("**.stk") letters freq
+val @top5 = (sort { $corpus->{_1} <=> $corpus->{_} } keys %$corpus)[0:4]
 p "  top 5 letters in .stk: ", join(", ", map { "$_=$corpus->{$_}" } @top5)
 
 # Word-count: unique words across the same corpus.
-my $words = ~p> c("**.stk") words freq
+val $words = ~p> c("**.stk") words freq
 p "  unique words across .stk: ", len(keys %$words)
 
 # Total character count across the corpus (per_reduce + auto-merge).
-my $total_chars = ~p> c("**.stk") par_reduce {len}
+val $total_chars = ~p> c("**.stk") par_reduce {len}
 p "  total chars: $total_chars"
 
 # Total line count across the corpus.
-my $total_lines = ~p> c("**.stk") par_reduce { my @l = split(/\n/, _); len(@l) }
+val $total_lines = ~p> c("**.stk") par_reduce { val @l = split(/\n/, _); len(@l) }
 p "  total lines: $total_lines"
 
 # Pattern-match count: how many regex hits across all files.
-my $unsafe = ~p> c("**.rs") par_reduce { my @m = (_ =~ /unsafe/g); len(@m) }
+val $unsafe = ~p> c("**.rs") par_reduce { val @m = (_ =~ /unsafe/g); len(@m) }
 p "  /unsafe/ in .rs: $unsafe occurrences"
 
 # Most common 3-letter word prefix.
-my $prefix = ~p> c("**.stk") words map { lc } map { substr(_, 0, 3) } freq
-my @top_prefix = (sort { $prefix->{_1} <=> $prefix->{_} } keys %$prefix)[0:2]
+val $prefix = ~p> c("**.stk") words map { lc } map { substr(_, 0, 3) } freq
+val @top_prefix = (sort { $prefix->{_1} <=> $prefix->{_} } keys %$prefix)[0:2]
 p "  top 3-letter prefixes: ", join(", ", map { "$_=$prefix->{$_}" } @top_prefix)
 
 # Files containing a pattern (count of files with at least one match).
-my $hits = ~p> c("**.stk") par_reduce { /threading/ ? 1 : 0 }
+val $hits = ~p> c("**.stk") par_reduce { /threading/ ? 1 : 0 }
 p "  files mentioning 'threading': $hits"
 
 # ── 8. Speedup demonstration ────────────────────────────────────
 p "\n═══ Sequential vs parallel timing"
 
-my $start = now_ns()
-my $h_seq = ~> c("**.rs") letters freq
-my $seq_ms = (now_ns() - $start) / 1_000_000
+var $start = now_ns()
+val $h_seq = ~> c("**.rs") letters freq
+val $seq_ms = (now_ns() - $start) / 1_000_000
 $start = now_ns()
-my $h_par = ~p> c("**.rs") letters freq
-my $par_ms = (now_ns() - $start) / 1_000_000
+val $h_par = ~p> c("**.rs") letters freq
+val $par_ms = (now_ns() - $start) / 1_000_000
 printf "  ~>  sequential:  %.0f ms\n", $seq_ms
 printf "  ~p> chunk-par:   %.0f ms (%.2fx speedup)\n", $par_ms, $seq_ms / $par_ms

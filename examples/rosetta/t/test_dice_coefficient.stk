@@ -2,11 +2,11 @@
 # Rosetta Code: Sørensen–Dice coefficient
 
 fn Rosetta::DiceCoefficient::get_bigrams($s) {
-    my @chars = ~> $s chars
-    my $bg = {}
+    val @chars = ~> $s chars
+    var $bg = {}
     if (len(@chars) < 2) { return $bg }
-    for my $i (0..len(@chars)-2) {
-        my $b = $chars[$i] . $chars[$i+1]
+    for val $i (0..len(@chars)-2) {
+        val $b = $chars[$i] . $chars[$i+1]
         $bg->{$b} = ($bg->{$b} || 0) + 1
     }
     $bg
@@ -16,17 +16,17 @@ fn Rosetta::DiceCoefficient::compute($s1, $s2) {
     if ($s1 eq $s2) { return 1.0 }
     if (len($s1) < 2 || len($s2) < 2) { return 0.0 }
     
-    my $b1 = Rosetta::DiceCoefficient::get_bigrams($s1)
-    my $b2 = Rosetta::DiceCoefficient::get_bigrams($s2)
+    val $b1 = Rosetta::DiceCoefficient::get_bigrams($s1)
+    val $b2 = Rosetta::DiceCoefficient::get_bigrams($s2)
     
-    my $intersection = 0
-    for my $k (keys %$b1) {
+    var $intersection = 0
+    for val $k (keys %$b1) {
         if (exists $b2->{$k}) {
             $intersection += ($b1->{$k} < $b2->{$k} ? $b1->{$k} : $b2->{$k})
         }
     }
     
-    my $total = (len($s1) - 1) + (len($s2) - 1)
+    val $total = (len($s1) - 1) + (len($s2) - 1)
     (2.0 * $intersection) / $total
 }
 

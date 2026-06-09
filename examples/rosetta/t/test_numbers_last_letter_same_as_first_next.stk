@@ -8,7 +8,7 @@ fn Rosetta::Cardinal::say($n) {
 }
 
 fn Rosetta::Cardinal::trim($s) {
-    my $r = $s
+    var $r = $s
     $r =~ s/^\s+|\s+$//g
     $r =~ s/\s+/ /g
     $r
@@ -16,9 +16,9 @@ fn Rosetta::Cardinal::trim($s) {
 
 fn Rosetta::Cardinal::big($n) {
     return "" if $n == 0
-    my $billion  = 1000000000
-    my $million  = 1000000
-    my $thousand = 1000
+    val $billion  = 1000000000
+    val $million  = 1000000
+    val $thousand = 1000
     if ($n >= $billion) {
         return Rosetta::Cardinal::big(int($n / $billion)) . " billion " . Rosetta::Cardinal::big($n % $billion)
     }
@@ -32,12 +32,12 @@ fn Rosetta::Cardinal::big($n) {
 }
 
 fn Rosetta::Cardinal::under_thousand($n) {
-    my @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    val @units = ("", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
                  "ten", "eleven", "twelve", "thirteen", "fourteen",
                  "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
-    my @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
-    my $s = ""
-    my $x = $n
+    val @tens  = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+    var $s = ""
+    var $x = $n
     if ($x >= 100) {
         $s .= $units[int($x / 100)] . " hundred"
         $x %= 100
@@ -54,14 +54,14 @@ fn Rosetta::Cardinal::under_thousand($n) {
 }
 
 fn Rosetta::NumbersLastFirst::check($k) {
-    my $name_k = Rosetta::Cardinal::say($k)
-    my $name_kp1 = Rosetta::Cardinal::say($k + 1)
+    var $name_k = Rosetta::Cardinal::say($k)
+    var $name_kp1 = Rosetta::Cardinal::say($k + 1)
     
     $name_k =~ s/[^a-z]//g
     $name_kp1 =~ s/[^a-z]//g
     
-    my $last = substr($name_k, -1)
-    my $first = substr($name_kp1, 0, 1)
+    val $last = substr($name_k, -1)
+    val $first = substr($name_kp1, 0, 1)
     
     $last eq $first
 }
@@ -81,7 +81,7 @@ assert_ok !Rosetta::NumbersLastFirst::check(2), "2 fails: two (o), three (t)"
 assert_ok !Rosetta::NumbersLastFirst::check(3), "3 fails: three (e), four (f)"
 
 # Using pipeline to find matches in 1..200
-my @matches = 1:200 |> grep {Rosetta::NumbersLastFirst::check}
+val @matches = 1:200 |> grep {Rosetta::NumbersLastFirst::check}
 assert_eq len(@matches), 17, "Found 17 matches in 1:200"
 
 test_run

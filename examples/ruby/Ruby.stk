@@ -102,9 +102,9 @@ fn Rb::v_eq($a, $b) {
     return $a->{val} eq $b->{val}     if Rb::is_sym($a)  && Rb::is_sym($b)
     return $a->{val} == $b->{val}     if Rb::is_bool($a) && Rb::is_bool($b)
     if (Rb::is_array($a) && Rb::is_array($b)) {
-        my $ai = $a->{items}; my $bi = $b->{items}
+        val $ai = $a->{items}; val $bi = $b->{items}
         return 0 if len(@$ai) != len(@$bi)
-        for (my $i = 0; $i < len(@$ai); $i++) {
+        for (var $i = 0; $i < len(@$ai); $i++) {
             return 0 unless Rb::v_eq($ai->[$i], $bi->[$i])
         }
         return 1
@@ -114,7 +114,7 @@ fn Rb::v_eq($a, $b) {
 
 fn Rb::v_cmp($a, $b) {
     if (Rb::is_num($a) && Rb::is_num($b)) {
-        my $av = $a->{val}; my $bv = $b->{val}
+        val $av = $a->{val}; val $bv = $b->{val}
         return $av < $bv ? -1 : ($av > $bv ? 1 : 0)
     }
     if (Rb::is_str($a) && Rb::is_str($b)) {
@@ -133,13 +133,13 @@ fn Rb::inspect($v) {
     return ($v->{val} ? "true" : "false") if Rb::is_bool($v)
     return $v->{val} . ""                 if Rb::is_int($v)
     if (Rb::is_float($v)) {
-        my $s = $v->{val} . ""
+        val $s = $v->{val} . ""
         return $s . ".0" unless $s =~ /[.eE]/
         return $s
     }
     if (Rb::is_str($v)) {
-        my $out = "\""
-        for my $c (split //, $v->{val}) {
+        var $out = "\""
+        for val $c (split //, $v->{val}) {
             if    ($c eq "\\") { $out .= "\\\\" }
             elsif ($c eq "\"") { $out .= "\\\"" }
             elsif ($c eq "\n") { $out .= "\\n" }
@@ -153,8 +153,8 @@ fn Rb::inspect($v) {
         return "[" . join(", ", map {Rb::inspect} @{$v->{items}}) . "]"
     }
     if (Rb::is_hash($v)) {
-        my @parts
-        for my $p (@{$v->{pairs}}) {
+        var @parts
+        for val $p (@{$v->{pairs}}) {
             if (Rb::is_sym($p->[0])) {
                 push @parts, $p->[0]{val} . ": " . Rb::inspect($p->[1])
             } else {
@@ -164,23 +164,23 @@ fn Rb::inspect($v) {
         return "{" . join(", ", @parts) . "}"
     }
     if (Rb::is_range($v)) {
-        my $sep = $v->{exclusive} ? "..." : ".."
+        val $sep = $v->{exclusive} ? "..." : ".."
         return Rb::inspect($v->{lo}) . $sep . Rb::inspect($v->{hi})
     }
     return "#<Proc>"  if Rb::is_proc($v)
     return $v->{name} if Rb::is_class($v)
     if (Rb::is_instance($v)) {
-        my @parts
-        for my $k (sort keys %{$v->{ivars}}) {
+        var @parts
+        for val $k (sort keys %{$v->{ivars}}) {
             push @parts, "@" . $k . "=" . Rb::inspect($v->{ivars}{$k})
         }
-        my $body = len(@parts) ? " " . join(", ", @parts) : ""
+        val $body = len(@parts) ? " " . join(", ", @parts) : ""
         return "#<" . $v->{klass}{name} . $body . ">"
     }
     if (Rb::is_exception($v)) {
         # Ruby's `e.inspect` formats as `#<Class: message>`; Stryke tests for
         # bare `e` without `.inspect` so we keep the message-only short form.
-        my $m = $v->{message} // $v->{klass}{name}
+        val $m = $v->{message} // $v->{klass}{name}
         return "\"" . $m . "\""
     }
     "#<unknown>"
@@ -199,13 +199,13 @@ fn Rb::to_s($v) {
 # Newlines are significant (Ruby statement separator).
 
 fn Rb::tokenize($src) {
-    my @toks
-    my $i = 0
-    my $line = 1
-    my $n = length($src)
+    var @toks
+    var $i = 0
+    var $line = 1
+    val $n = length($src)
 
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
 
         if ($c eq " " || $c eq "\t" || $c eq "\r") { $i++; next }
         if ($c eq "\n") {
@@ -224,8 +224,8 @@ fn Rb::tokenize($src) {
 
         # Numbers
         if ($c =~ /[0-9]/) {
-            my $start = $i
-            my $is_float = 0
+            val $start = $i
+            var $is_float = 0
             while ($i < $n && substr($src, $i, 1) =~ /[0-9_]/) { $i++ }
             if ($i < $n && substr($src, $i, 1) eq "."
                 && $i + 1 < $n && substr($src, $i + 1, 1) =~ /[0-9]/) {
@@ -233,7 +233,7 @@ fn Rb::tokenize($src) {
                 $i++
                 while ($i < $n && substr($src, $i, 1) =~ /[0-9_]/) { $i++ }
             }
-            my $text = substr($src, $start, $i - $start)
+            var $text = substr($src, $start, $i - $start)
             $text =~ s/_//g
             if ($is_float) {
                 push @toks, +{ kind => "FLOAT", val => $text + 0, line => $line }
@@ -247,23 +247,23 @@ fn Rb::tokenize($src) {
         # Splits on whitespace, emits LBRACK <STR|SYM> COMMA ... RBRACK so the
         # array-literal parser builds an Array AST node.
         if ($c eq "%" && $i + 1 < $n && substr($src, $i + 1, 1) =~ /[wi]/) {
-            my $kind = substr($src, $i + 1, 1)
-            my $opener = $i + 2 < $n ? substr($src, $i + 2, 1) : ""
-            my %close = ("[" => "]", "(" => ")", "{" => "}", "<" => ">")
+            val $kind = substr($src, $i + 1, 1)
+            val $opener = $i + 2 < $n ? substr($src, $i + 2, 1) : ""
+            val %close = ("[" => "]", "(" => ")", "{" => "}", "<" => ">")
             if (exists $close{$opener}) {
                 $i += 3
-                my $closer = $close{$opener}
+                val $closer = $close{$opener}
                 push @toks, +{ kind => "LBRACK", val => "[", line => $line }
-                my $first = 1
+                var $first = 1
                 while ($i < $n && substr($src, $i, 1) ne $closer) {
                     while ($i < $n && substr($src, $i, 1) =~ /\s/) {
                         $line++ if substr($src, $i, 1) eq "\n"
                         $i++
                     }
                     last if $i >= $n || substr($src, $i, 1) eq $closer
-                    my $start = $i
+                    val $start = $i
                     while ($i < $n && substr($src, $i, 1) ne $closer && substr($src, $i, 1) !~ /\s/) { $i++ }
-                    my $word = substr($src, $start, $i - $start)
+                    val $word = substr($src, $start, $i - $start)
                     push @toks, +{ kind => "COMMA", val => ",", line => $line } unless $first
                     $first = 0
                     if ($kind eq "w") {
@@ -281,10 +281,10 @@ fn Rb::tokenize($src) {
         # Single-quoted string
         if ($c eq "'") {
             $i++
-            my $s = ""
+            var $s = ""
             while ($i < $n && substr($src, $i, 1) ne "'") {
                 if (substr($src, $i, 1) eq "\\" && $i + 1 < $n) {
-                    my $nx = substr($src, $i + 1, 1)
+                    val $nx = substr($src, $i + 1, 1)
                     if ($nx eq "\\") { $s .= "\\"; $i += 2; next }
                     if ($nx eq "'")  { $s .= "'";  $i += 2; next }
                     $s .= "\\"; $i++; next
@@ -303,12 +303,12 @@ fn Rb::tokenize($src) {
         # ["lit", text] / ["expr", text] entries.
         if ($c eq "\"") {
             $i++
-            my @parts = (["lit", ""])
+            var @parts = (["lit", ""])
             while ($i < $n && substr($src, $i, 1) ne "\"") {
-                my $cur = substr($src, $i, 1)
+                val $cur = substr($src, $i, 1)
                 if ($cur eq "\\" && $i + 1 < $n) {
-                    my $nx = substr($src, $i + 1, 1)
-                    my $esc =
+                    val $nx = substr($src, $i + 1, 1)
+                    val $esc =
                         $nx eq "n"  ? "\n" :
                         $nx eq "t"  ? "\t" :
                         $nx eq "r"  ? "\r" :
@@ -323,10 +323,10 @@ fn Rb::tokenize($src) {
                 }
                 if ($cur eq "#" && $i + 1 < $n && substr($src, $i + 1, 1) eq "{") {
                     $i += 2
-                    my $depth = 1
-                    my $expr = ""
+                    var $depth = 1
+                    var $expr = ""
                     while ($i < $n && $depth > 0) {
-                        my $ch = substr($src, $i, 1)
+                        val $ch = substr($src, $i, 1)
                         if    ($ch eq "{") { $depth++ }
                         elsif ($ch eq "}") { $depth--; last if $depth == 0 }
                         $line++ if $ch eq "\n"
@@ -354,16 +354,16 @@ fn Rb::tokenize($src) {
         # Symbol — :name (also :"..." but skipped for MVP)
         if ($c eq ":" && $i + 1 < $n && substr($src, $i + 1, 1) =~ /[a-zA-Z_]/) {
             $i++
-            my $start = $i
+            val $start = $i
             while ($i < $n && substr($src, $i, 1) =~ /[a-zA-Z0-9_]/) { $i++ }
             push @toks, +{ kind => "SYM", val => substr($src, $start, $i - $start), line => $line }
             next
         }
 
-        # Instance var @x
+        # Instance val @x
         if ($c eq "@") {
             $i++
-            my $start = $i
+            val $start = $i
             while ($i < $n && substr($src, $i, 1) =~ /[a-zA-Z0-9_]/) { $i++ }
             push @toks, +{ kind => "IVAR", val => substr($src, $start, $i - $start), line => $line }
             next
@@ -371,11 +371,11 @@ fn Rb::tokenize($src) {
 
         # Identifiers / keywords / constants
         if ($c =~ /[a-zA-Z_]/) {
-            my $start = $i
+            val $start = $i
             while ($i < $n && substr($src, $i, 1) =~ /[a-zA-Z0-9_]/) { $i++ }
             if ($i < $n && substr($src, $i, 1) =~ /[?!]/) { $i++ }
-            my $word = substr($src, $start, $i - $start)
-            my $kind
+            val $word = substr($src, $start, $i - $start)
+            var $kind
             if (Rb::is_keyword($word))  { $kind = "KW" }
             elsif ($word =~ /^[A-Z]/)   { $kind = "CONST" }
             else                        { $kind = "IDENT" }
@@ -385,11 +385,11 @@ fn Rb::tokenize($src) {
 
         # Multi-char operators (longest first). Set `$matched` so the outer
         # loop can `next` past the trailing single-char fallback.
-        my $matched = 0
-        for my $op ("<=>", "===", "...", "..", "**", "==", "!=", "<=", ">=",
+        var $matched = 0
+        for val $op ("<=>", "===", "...", "..", "**", "==", "!=", "<=", ">=",
                     "<<", ">>", "&&", "||", "+=", "-=", "*=", "/=", "%=",
                     "->", "=>", "::") {
-            my $L = length($op)
+            val $L = length($op)
             if ($i + $L <= $n && substr($src, $i, $L) eq $op) {
                 push @toks, +{ kind => "OP", val => $op, line => $line }
                 $i += $L
@@ -423,7 +423,7 @@ fn Rb::tokenize($src) {
 }
 
 fn Rb::is_keyword($w) {
-    my %kw = map { $_ => 1 } qw(
+    val %kw = map { $_ => 1 } qw(
         def end if elsif else unless while until for in do return yield
         nil true false class module self begin rescue raise ensure case when
         then and or not puts print p pp break next lambda proc new super
@@ -440,7 +440,7 @@ fn Rb::is_keyword($w) {
 fn Rb::p_new($toks) { +{ toks => $toks, pos => 0 } }
 fn Rb::p_at($p)     { $p->{toks}->[$p->{pos}] }
 fn Rb::p_at1($p)    { $p->{toks}->[$p->{pos} + 1] }
-fn Rb::p_adv($p)    { my $t = $p->{toks}->[$p->{pos}]; $p->{pos}++; $t }
+fn Rb::p_adv($p)    { val $t = $p->{toks}->[$p->{pos}]; $p->{pos}++; $t }
 fn Rb::p_kind($p, $k)  { Rb::p_at($p)->{kind} eq $k }
 fn Rb::p_op($p, $op)   { Rb::p_at($p)->{kind} eq "OP" && Rb::p_at($p)->{val} eq $op }
 fn Rb::p_kw($p, $w)    { Rb::p_at($p)->{kind} eq "KW" && Rb::p_at($p)->{val} eq $w }
@@ -461,28 +461,28 @@ fn Rb::p_skip_nl($p) {
 }
 fn Rb::p_expect_kind($p, $k) {
     unless (Rb::p_eat_kind($p, $k)) {
-        my $t = Rb::p_at($p)
+        val $t = Rb::p_at($p)
         die "Rb::parse: expected " . $k . ", got " . $t->{kind} . " `" . $t->{val} . "` at line " . $t->{line}
     }
 }
 fn Rb::p_expect_kw($p, $w) {
     unless (Rb::p_eat_kw($p, $w)) {
-        my $t = Rb::p_at($p)
+        val $t = Rb::p_at($p)
         die "Rb::parse: expected `" . $w . "`, got " . $t->{kind} . " `" . $t->{val} . "` at line " . $t->{line}
     }
 }
 fn Rb::p_expect_op($p, $op) {
     unless (Rb::p_eat_op($p, $op)) {
-        my $t = Rb::p_at($p)
+        val $t = Rb::p_at($p)
         die "Rb::parse: expected `" . $op . "`, got " . $t->{kind} . " `" . $t->{val} . "` at line " . $t->{line}
     }
 }
 
 fn Rb::parse($src) {
-    my $toks = Rb::tokenize($src)
-    my $p = Rb::p_new($toks)
+    val $toks = Rb::tokenize($src)
+    val $p = Rb::p_new($toks)
     Rb::p_skip_nl($p)
-    my @stmts
+    var @stmts
     while (!Rb::p_kind($p, "EOF")) {
         push @stmts, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -492,20 +492,20 @@ fn Rb::parse($src) {
 
 # Statement: an expression with optional postfix `if`/`unless`/`while`.
 fn Rb::parse_stmt($p) {
-    my $e = Rb::parse_expr($p)
+    val $e = Rb::parse_expr($p)
     if (Rb::p_kw($p, "if")) {
         Rb::p_adv($p)
-        my $c = Rb::parse_expr($p)
+        val $c = Rb::parse_expr($p)
         return +{ kind => "If", cond => $c, then => [$e], elsifs => [], else => undef, line => $e->{line} }
     }
     if (Rb::p_kw($p, "unless")) {
         Rb::p_adv($p)
-        my $c = Rb::parse_expr($p)
+        val $c = Rb::parse_expr($p)
         return +{ kind => "Unless", cond => $c, then => [$e], else => undef, line => $e->{line} }
     }
     if (Rb::p_kw($p, "while")) {
         Rb::p_adv($p)
-        my $c = Rb::parse_expr($p)
+        val $c = Rb::parse_expr($p)
         return +{ kind => "While", cond => $c, body => [$e], line => $e->{line} }
     }
     $e
@@ -514,17 +514,17 @@ fn Rb::parse_stmt($p) {
 fn Rb::parse_expr($p) { Rb::parse_assign($p) }
 
 fn Rb::parse_assign($p) {
-    my $lhs = Rb::parse_ternary_op($p)
+    val $lhs = Rb::parse_ternary_op($p)
     if (Rb::p_op($p, "=")) {
         Rb::p_adv($p)
-        my $rhs = Rb::parse_assign($p)
+        val $rhs = Rb::parse_assign($p)
         return +{ kind => "Assign", target => $lhs, value => $rhs, line => $lhs->{line} }
     }
-    for my $op ("+=", "-=", "*=", "/=", "%=") {
+    for val $op ("+=", "-=", "*=", "/=", "%=") {
         if (Rb::p_op($p, $op)) {
             Rb::p_adv($p)
-            my $rhs = Rb::parse_assign($p)
-            my $bare = substr($op, 0, length($op) - 1)
+            val $rhs = Rb::parse_assign($p)
+            val $bare = substr($op, 0, length($op) - 1)
             return +{ kind => "OpAssign", target => $lhs, op => $bare, value => $rhs, line => $lhs->{line} }
         }
     }
@@ -532,32 +532,32 @@ fn Rb::parse_assign($p) {
 }
 
 fn Rb::parse_ternary_op($p) {
-    my $cond = Rb::parse_or($p)
+    val $cond = Rb::parse_or($p)
     if (Rb::p_op($p, "?")) {
         Rb::p_adv($p)
-        my $then = Rb::parse_or($p)
+        val $then = Rb::parse_or($p)
         Rb::p_expect_op($p, ":")
-        my $else = Rb::parse_or($p)
+        val $else = Rb::parse_or($p)
         return +{ kind => "Ternary", cond => $cond, then => $then, else => $else, line => $cond->{line} }
     }
     $cond
 }
 
 fn Rb::parse_or($p) {
-    my $left = Rb::parse_and($p)
+    var $left = Rb::parse_and($p)
     while (Rb::p_op($p, "||") || Rb::p_kw($p, "or")) {
         Rb::p_adv($p)
-        my $right = Rb::parse_and($p)
+        val $right = Rb::parse_and($p)
         $left = +{ kind => "Or", left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_and($p) {
-    my $left = Rb::parse_not($p)
+    var $left = Rb::parse_not($p)
     while (Rb::p_op($p, "&&") || Rb::p_kw($p, "and")) {
         Rb::p_adv($p)
-        my $right = Rb::parse_not($p)
+        val $right = Rb::parse_not($p)
         $left = +{ kind => "And", left => $left, right => $right, line => $left->{line} }
     }
     $left
@@ -566,78 +566,78 @@ fn Rb::parse_and($p) {
 fn Rb::parse_not($p) {
     if (Rb::p_kw($p, "not") || Rb::p_op($p, "!")) {
         Rb::p_adv($p)
-        my $operand = Rb::parse_not($p)
+        val $operand = Rb::parse_not($p)
         return +{ kind => "Not", operand => $operand, line => $operand->{line} }
     }
     Rb::parse_range($p)
 }
 
 fn Rb::parse_range($p) {
-    my $left = Rb::parse_eq($p)
+    val $left = Rb::parse_eq($p)
     if (Rb::p_op($p, "..") || Rb::p_op($p, "...")) {
-        my $excl = Rb::p_at($p)->{val} eq "..."
+        val $excl = Rb::p_at($p)->{val} eq "..."
         Rb::p_adv($p)
-        my $right = Rb::parse_eq($p)
+        val $right = Rb::parse_eq($p)
         return +{ kind => "Range", lo => $left, hi => $right, exclusive => $excl, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_eq($p) {
-    my $left = Rb::parse_cmp($p)
+    var $left = Rb::parse_cmp($p)
     while (Rb::p_op($p, "==") || Rb::p_op($p, "!=") || Rb::p_op($p, "<=>") || Rb::p_op($p, "===")) {
-        my $op = Rb::p_adv($p)->{val}
-        my $right = Rb::parse_cmp($p)
+        val $op = Rb::p_adv($p)->{val}
+        val $right = Rb::parse_cmp($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_cmp($p) {
-    my $left = Rb::parse_add($p)
+    var $left = Rb::parse_add($p)
     while (Rb::p_op($p, "<") || Rb::p_op($p, ">") || Rb::p_op($p, "<=") || Rb::p_op($p, ">=")) {
-        my $op = Rb::p_adv($p)->{val}
-        my $right = Rb::parse_add($p)
+        val $op = Rb::p_adv($p)->{val}
+        val $right = Rb::parse_add($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_add($p) {
-    my $left = Rb::parse_shift($p)
+    var $left = Rb::parse_shift($p)
     while (Rb::p_op($p, "+") || Rb::p_op($p, "-")) {
-        my $op = Rb::p_adv($p)->{val}
-        my $right = Rb::parse_shift($p)
+        val $op = Rb::p_adv($p)->{val}
+        val $right = Rb::parse_shift($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_shift($p) {
-    my $left = Rb::parse_mul($p)
+    var $left = Rb::parse_mul($p)
     while (Rb::p_op($p, "<<") || Rb::p_op($p, ">>")) {
-        my $op = Rb::p_adv($p)->{val}
-        my $right = Rb::parse_mul($p)
+        val $op = Rb::p_adv($p)->{val}
+        val $right = Rb::parse_mul($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_mul($p) {
-    my $left = Rb::parse_pow($p)
+    var $left = Rb::parse_pow($p)
     while (Rb::p_op($p, "*") || Rb::p_op($p, "/") || Rb::p_op($p, "%")) {
-        my $op = Rb::p_adv($p)->{val}
-        my $right = Rb::parse_pow($p)
+        val $op = Rb::p_adv($p)->{val}
+        val $right = Rb::parse_pow($p)
         $left = +{ kind => "BinOp", op => $op, left => $left, right => $right, line => $left->{line} }
     }
     $left
 }
 
 fn Rb::parse_pow($p) {
-    my $left = Rb::parse_unary($p)
+    val $left = Rb::parse_unary($p)
     if (Rb::p_op($p, "**")) {
         Rb::p_adv($p)
-        my $right = Rb::parse_pow($p)
+        val $right = Rb::parse_pow($p)
         return +{ kind => "BinOp", op => "**", left => $left, right => $right, line => $left->{line} }
     }
     $left
@@ -646,7 +646,7 @@ fn Rb::parse_pow($p) {
 fn Rb::parse_unary($p) {
     if (Rb::p_op($p, "-")) {
         Rb::p_adv($p)
-        my $operand = Rb::parse_unary($p)
+        val $operand = Rb::parse_unary($p)
         return +{ kind => "Neg", operand => $operand, line => $operand->{line} }
     }
     if (Rb::p_op($p, "+")) {
@@ -658,14 +658,14 @@ fn Rb::parse_unary($p) {
 
 # Postfix chain: `.method(args) [block]` and `[index]`.
 fn Rb::parse_postfix($p) {
-    my $e = Rb::parse_primary($p)
+    var $e = Rb::parse_primary($p)
     while (1) {
         if (Rb::p_op($p, ".")) {
             Rb::p_adv($p)
-            my $t = Rb::p_adv($p)
-            my $name = $t->{val}
-            my @args
-            my $block = undef
+            val $t = Rb::p_adv($p)
+            val $name = $t->{val}
+            var @args
+            var $block = undef
             if (Rb::p_kind($p, "LPAREN")) {
                 Rb::p_adv($p)
                 Rb::p_skip_nl($p)
@@ -682,7 +682,7 @@ fn Rb::parse_postfix($p) {
         }
         if (Rb::p_kind($p, "LBRACK")) {
             Rb::p_adv($p)
-            my @idx
+            var @idx
             while (!Rb::p_kind($p, "RBRACK")) {
                 push @idx, Rb::parse_expr($p)
                 if (!Rb::p_eat_kind($p, "COMMA")) { last }
@@ -690,7 +690,7 @@ fn Rb::parse_postfix($p) {
             Rb::p_expect_kind($p, "RBRACK")
             if (Rb::p_op($p, "=")) {
                 Rb::p_adv($p)
-                my $val = Rb::parse_assign($p)
+                val $val = Rb::parse_assign($p)
                 $e = +{ kind => "IdxAssign", recv => $e, indices => \@idx, value => $val, line => $e->{line} }
             } else {
                 $e = +{ kind => "Index", recv => $e, indices => \@idx, line => $e->{line} }
@@ -710,11 +710,11 @@ fn Rb::try_block($p) {
 }
 
 fn Rb::parse_brace_block($p) {
-    my $line = Rb::p_at($p)->{line}
+    val $line = Rb::p_at($p)->{line}
     Rb::p_adv($p)
-    my $params = Rb::parse_block_params($p)
+    val $params = Rb::parse_block_params($p)
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kind($p, "RBRACE")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -724,11 +724,11 @@ fn Rb::parse_brace_block($p) {
 }
 
 fn Rb::parse_do_block($p) {
-    my $line = Rb::p_at($p)->{line}
+    val $line = Rb::p_at($p)->{line}
     Rb::p_adv($p)
-    my $params = Rb::parse_block_params($p)
+    val $params = Rb::parse_block_params($p)
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -741,9 +741,9 @@ fn Rb::parse_block_params($p) {
     Rb::p_skip_nl($p)
     return [] unless Rb::p_op($p, "|")
     Rb::p_adv($p)
-    my @params
+    var @params
     while (!Rb::p_op($p, "|")) {
-        my $t = Rb::p_adv($p)
+        val $t = Rb::p_adv($p)
         push @params, $t->{val}
         last unless Rb::p_eat_kind($p, "COMMA")
     }
@@ -752,9 +752,9 @@ fn Rb::parse_block_params($p) {
 }
 
 fn Rb::parse_primary($p) {
-    my $t = Rb::p_at($p)
-    my $line = $t->{line}
-    my $k = $t->{kind}
+    val $t = Rb::p_at($p)
+    val $line = $t->{line}
+    val $k = $t->{kind}
 
     if ($k eq "INT")   { Rb::p_adv($p); return +{ kind => "Int",   val => $t->{val}, line => $line } }
     if ($k eq "FLOAT") { Rb::p_adv($p); return +{ kind => "Float", val => $t->{val}, line => $line } }
@@ -762,12 +762,12 @@ fn Rb::parse_primary($p) {
     if ($k eq "SYM")   { Rb::p_adv($p); return +{ kind => "Sym",   val => $t->{val}, line => $line } }
     if ($k eq "STRINTERP") {
         Rb::p_adv($p)
-        my @parts
-        for my $part (@{$t->{val}}) {
+        var @parts
+        for val $part (@{$t->{val}}) {
             if ($part->[0] eq "lit") {
                 push @parts, +{ kind => "Str", val => $part->[1], line => $line }
             } else {
-                my $sub_p = Rb::p_new(Rb::tokenize($part->[1]))
+                val $sub_p = Rb::p_new(Rb::tokenize($part->[1]))
                 Rb::p_skip_nl($sub_p)
                 push @parts, Rb::parse_expr($sub_p)
             }
@@ -779,7 +779,7 @@ fn Rb::parse_primary($p) {
     if ($k eq "LPAREN") {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my $e = Rb::parse_expr($p)
+        val $e = Rb::parse_expr($p)
         Rb::p_skip_nl($p)
         Rb::p_expect_kind($p, "RPAREN")
         return $e
@@ -787,7 +787,7 @@ fn Rb::parse_primary($p) {
     if ($k eq "LBRACK") {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @items
+        var @items
         while (!Rb::p_kind($p, "RBRACK")) {
             push @items, Rb::parse_expr($p)
             if (!Rb::p_eat_kind($p, "COMMA")) { last }
@@ -800,19 +800,19 @@ fn Rb::parse_primary($p) {
         # Hash literal — `{ k => v, sym: v }`.
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @pairs
+        var @pairs
         while (!Rb::p_kind($p, "RBRACE")) {
-            my $key
+            var $key
             # `name:` shorthand for symbol keys.
             if (Rb::p_kind($p, "IDENT") && Rb::p_at1($p)->{kind} eq "OP" && Rb::p_at1($p)->{val} eq ":") {
-                my $tn = Rb::p_adv($p)
+                val $tn = Rb::p_adv($p)
                 Rb::p_adv($p)
                 $key = +{ kind => "Sym", val => $tn->{val}, line => $line }
             } else {
                 $key = Rb::parse_expr($p)
                 Rb::p_expect_op($p, "=>")
             }
-            my $val = Rb::parse_expr($p)
+            val $val = Rb::parse_expr($p)
             push @pairs, [$key, $val]
             if (!Rb::p_eat_kind($p, "COMMA")) { last }
             Rb::p_skip_nl($p)
@@ -821,7 +821,7 @@ fn Rb::parse_primary($p) {
         return +{ kind => "Hash", pairs => \@pairs, line => $line }
     }
     if ($k eq "KW") {
-        my $w = $t->{val}
+        var $w = $t->{val}
         if ($w eq "nil")    { Rb::p_adv($p); return +{ kind => "Nil",   line => $line } }
         if ($w eq "true")   { Rb::p_adv($p); return +{ kind => "True",  line => $line } }
         if ($w eq "false")  { Rb::p_adv($p); return +{ kind => "False", line => $line } }
@@ -849,8 +849,8 @@ fn Rb::parse_primary($p) {
         if ($w eq "proc")   { return Rb::parse_lambda_or_proc($p, 0) }
         if ($w eq "super") {
             Rb::p_adv($p)
-            my @args
-            my $explicit = 0
+            var @args
+            var $explicit = 0
             if (Rb::p_kind($p, "LPAREN")) {
                 Rb::p_adv($p)
                 $explicit = 1
@@ -871,24 +871,24 @@ fn Rb::parse_primary($p) {
     }
     if ($k eq "IDENT") {
         Rb::p_adv($p)
-        my $name = $t->{val}
+        val $name = $t->{val}
         if (Rb::p_kind($p, "LPAREN")) {
             Rb::p_adv($p)
             Rb::p_skip_nl($p)
-            my @args
+            var @args
             while (!Rb::p_kind($p, "RPAREN")) {
                 push @args, Rb::parse_expr($p)
                 if (!Rb::p_eat_kind($p, "COMMA")) { last }
                 Rb::p_skip_nl($p)
             }
             Rb::p_expect_kind($p, "RPAREN")
-            my $block = Rb::try_block($p)
+            val $block = Rb::try_block($p)
             return +{ kind => "Call", recv => undef, name => $name, args => \@args, block => $block, line => $line }
         }
         # Bareword followed by block (`thrice { |x| … }` or `thrice do … end`)
         # is a no-arg call with a block — common for yielding methods.
         if (Rb::p_kind($p, "LBRACE") || Rb::p_kw($p, "do")) {
-            my $block = Rb::try_block($p)
+            val $block = Rb::try_block($p)
             return +{ kind => "Call", recv => undef, name => $name, args => [], block => $block, line => $line }
         }
         return +{ kind => "Ident", name => $name, line => $line }
@@ -897,8 +897,8 @@ fn Rb::parse_primary($p) {
 }
 
 fn Rb::parse_implicit_call($p, $name) {
-    my $line = Rb::p_adv($p)->{line}
-    my @args
+    val $line = Rb::p_adv($p)->{line}
+    var @args
     if (Rb::p_kind($p, "NL") || Rb::p_kind($p, "EOF")) {
         return +{ kind => "Call", recv => undef, name => $name, args => \@args, block => undef, line => $line }
     }
@@ -919,28 +919,28 @@ fn Rb::parse_implicit_call($p, $name) {
 }
 
 fn Rb::parse_lambda_or_proc($p, $is_lambda) {
-    my $line = Rb::p_adv($p)->{line}
-    my $blk = Rb::try_block($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $blk = Rb::try_block($p)
     die "lambda/proc requires a block at line " . $line unless defined $blk
     +{ kind => "Lambda", params => $blk->{params}, body => $blk->{body}, line => $line }
 }
 
 fn Rb::parse_if($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $cond = Rb::parse_expr($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $cond = Rb::parse_expr($p)
     Rb::p_eat_kw($p, "then")
     Rb::p_skip_nl($p)
-    my @then; my @elsifs; my $else_body = undef
+    var @then; var @elsifs; var $else_body = undef
     while (!Rb::p_kw($p, "end") && !Rb::p_kw($p, "elsif") && !Rb::p_kw($p, "else")) {
         push @then, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
     }
     while (Rb::p_kw($p, "elsif")) {
         Rb::p_adv($p)
-        my $ec = Rb::parse_expr($p)
+        val $ec = Rb::parse_expr($p)
         Rb::p_eat_kw($p, "then")
         Rb::p_skip_nl($p)
-        my @eb
+        var @eb
         while (!Rb::p_kw($p, "end") && !Rb::p_kw($p, "elsif") && !Rb::p_kw($p, "else")) {
             push @eb, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
@@ -950,7 +950,7 @@ fn Rb::parse_if($p) {
     if (Rb::p_kw($p, "else")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @e
+        var @e
         while (!Rb::p_kw($p, "end")) {
             push @e, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
@@ -962,11 +962,11 @@ fn Rb::parse_if($p) {
 }
 
 fn Rb::parse_unless($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $cond = Rb::parse_expr($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $cond = Rb::parse_expr($p)
     Rb::p_eat_kw($p, "then")
     Rb::p_skip_nl($p)
-    my @body; my $else_body = undef
+    var @body; var $else_body = undef
     while (!Rb::p_kw($p, "end") && !Rb::p_kw($p, "else")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -974,7 +974,7 @@ fn Rb::parse_unless($p) {
     if (Rb::p_kw($p, "else")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @e
+        var @e
         while (!Rb::p_kw($p, "end")) {
             push @e, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
@@ -986,11 +986,11 @@ fn Rb::parse_unless($p) {
 }
 
 fn Rb::parse_while($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $cond = Rb::parse_expr($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $cond = Rb::parse_expr($p)
     Rb::p_eat_kw($p, "do")
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1000,11 +1000,11 @@ fn Rb::parse_while($p) {
 }
 
 fn Rb::parse_until($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $cond = Rb::parse_expr($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $cond = Rb::parse_expr($p)
     Rb::p_eat_kw($p, "do")
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1014,34 +1014,34 @@ fn Rb::parse_until($p) {
 }
 
 fn Rb::parse_case($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $subject = undef
+    val $line = Rb::p_adv($p)->{line}
+    var $subject = undef
     unless (Rb::p_kw($p, "when") || Rb::p_kind($p, "NL")) {
         $subject = Rb::parse_expr($p)
     }
     Rb::p_skip_nl($p)
-    my @whens
+    var @whens
     while (Rb::p_kw($p, "when")) {
         Rb::p_adv($p)
-        my @pats
+        var @pats
         push @pats, Rb::parse_expr($p)
         while (Rb::p_eat_kind($p, "COMMA")) {
             push @pats, Rb::parse_expr($p)
         }
         Rb::p_eat_kw($p, "then")
         Rb::p_skip_nl($p)
-        my @body
+        var @body
         while (!Rb::p_kw($p, "when") && !Rb::p_kw($p, "else") && !Rb::p_kw($p, "end")) {
             push @body, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
         }
         push @whens, [\@pats, \@body]
     }
-    my $else_body = undef
+    var $else_body = undef
     if (Rb::p_kw($p, "else")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @e
+        var @e
         while (!Rb::p_kw($p, "end")) {
             push @e, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
@@ -1053,13 +1053,13 @@ fn Rb::parse_case($p) {
 }
 
 fn Rb::parse_for($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $var_t = Rb::p_adv($p)
+    val $line = Rb::p_adv($p)->{line}
+    val $var_t = Rb::p_adv($p)
     Rb::p_expect_kw($p, "in")
-    my $iter = Rb::parse_expr($p)
+    val $iter = Rb::parse_expr($p)
     Rb::p_eat_kw($p, "do")
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1069,24 +1069,24 @@ fn Rb::parse_for($p) {
 }
 
 fn Rb::parse_def($p) {
-    my $line = Rb::p_adv($p)->{line}
+    val $line = Rb::p_adv($p)->{line}
     # `def self.foo` → class method (singleton on the class).
-    my $is_self = 0
+    var $is_self = 0
     if (Rb::p_kw($p, "self")) {
         Rb::p_adv($p)
         Rb::p_expect_op($p, ".")
         $is_self = 1
     }
-    my $name_t = Rb::p_adv($p)
-    my $name = $name_t->{val}
+    val $name_t = Rb::p_adv($p)
+    var $name = $name_t->{val}
     # `def foo=` setter — accept the trailing `=`.
     if (Rb::p_op($p, "=")) {
         Rb::p_adv($p)
         $name = $name . "="
     }
-    my @params
-    my $rest = undef                # `*args` slurp
-    my $block_param = undef         # `&block`
+    var @params
+    var $rest = undef                # `*args` slurp
+    var $block_param = undef         # `&block`
     if (Rb::p_kind($p, "LPAREN")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
@@ -1116,7 +1116,7 @@ fn Rb::parse_def($p) {
         }
     }
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1135,15 +1135,15 @@ fn Rb::parse_def($p) {
 }
 
 fn Rb::parse_class($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $name = Rb::p_adv($p)->{val}
-    my $parent = undef
+    val $line = Rb::p_adv($p)->{line}
+    val $name = Rb::p_adv($p)->{val}
+    var $parent = undef
     if (Rb::p_op($p, "<")) {
         Rb::p_adv($p)
         $parent = Rb::p_adv($p)->{val}
     }
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1153,10 +1153,10 @@ fn Rb::parse_class($p) {
 }
 
 fn Rb::parse_module($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $name = Rb::p_adv($p)->{val}
+    val $line = Rb::p_adv($p)->{line}
+    val $name = Rb::p_adv($p)->{val}
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
@@ -1166,18 +1166,18 @@ fn Rb::parse_module($p) {
 }
 
 fn Rb::parse_begin($p) {
-    my $line = Rb::p_adv($p)->{line}
+    val $line = Rb::p_adv($p)->{line}
     Rb::p_skip_nl($p)
-    my @body
+    var @body
     while (!Rb::p_kw($p, "rescue") && !Rb::p_kw($p, "ensure") && !Rb::p_kw($p, "end")) {
         push @body, Rb::parse_stmt($p)
         Rb::p_skip_nl($p)
     }
-    my @rescues
+    var @rescues
     while (Rb::p_kw($p, "rescue")) {
         Rb::p_adv($p)
-        my $klass = undef
-        my $var = undef
+        var $klass = undef
+        var $var = undef
         if (Rb::p_kind($p, "CONST")) { $klass = Rb::p_adv($p)->{val} }
         if (Rb::p_op($p, "=>")) {
             Rb::p_adv($p)
@@ -1185,18 +1185,18 @@ fn Rb::parse_begin($p) {
         }
         Rb::p_eat_kw($p, "then")
         Rb::p_skip_nl($p)
-        my @rb
+        var @rb
         while (!Rb::p_kw($p, "rescue") && !Rb::p_kw($p, "ensure") && !Rb::p_kw($p, "end")) {
             push @rb, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
         }
         push @rescues, +{ klass => $klass, var => $var, body => \@rb }
     }
-    my $ensure = undef
+    var $ensure = undef
     if (Rb::p_kw($p, "ensure")) {
         Rb::p_adv($p)
         Rb::p_skip_nl($p)
-        my @eb
+        var @eb
         while (!Rb::p_kw($p, "end")) {
             push @eb, Rb::parse_stmt($p)
             Rb::p_skip_nl($p)
@@ -1208,8 +1208,8 @@ fn Rb::parse_begin($p) {
 }
 
 fn Rb::parse_return($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my $val = undef
+    val $line = Rb::p_adv($p)->{line}
+    var $val = undef
     unless (Rb::p_kind($p, "NL") || Rb::p_kind($p, "EOF")) {
         $val = Rb::parse_expr($p)
     }
@@ -1217,8 +1217,8 @@ fn Rb::parse_return($p) {
 }
 
 fn Rb::parse_yield($p) {
-    my $line = Rb::p_adv($p)->{line}
-    my @args
+    val $line = Rb::p_adv($p)->{line}
+    var @args
     if (Rb::p_kind($p, "LPAREN")) {
         Rb::p_adv($p)
         while (!Rb::p_kind($p, "RPAREN")) {
@@ -1243,19 +1243,19 @@ fn Rb::parse_yield($p) {
 
 fn Rb::env_new()              { [+{}] }
 fn Rb::env_lookup($env, $name) {
-    for my $frame (rev @$env) {
+    for val $frame (rev @$env) {
         return $frame->{$name} if exists $frame->{$name}
     }
     undef
 }
 fn Rb::env_has($env, $name) {
-    for my $frame (@$env) {
+    for val $frame (@$env) {
         return 1 if exists $frame->{$name}
     }
     0
 }
 fn Rb::env_set($env, $name, $val) {
-    for my $frame (rev @$env) {
+    for var $frame (rev @$env) {
         if (exists $frame->{$name}) { $frame->{$name} = $val; return $val }
     }
     $env->[-1]{$name} = $val
@@ -1279,20 +1279,20 @@ fn Rb::ctx_new() {
 # Invoke a block: bind params, eval body, restore env. Used for `yield`,
 # `.each { ... }`, `lambda { ... }.call`, etc.
 fn Rb::call_block($block, $args, $ctx) {
-    my $saved = $ctx->{env}
-    my @new   = (@{$block->{env}}, +{})
+    val $saved = $ctx->{env}
+    val @new   = (@{$block->{env}}, +{})
     $ctx->{env} = \@new
-    my $params = $block->{params}
-    my $n = len(@$params)
+    val $params = $block->{params}
+    val $n = len(@$params)
     # Auto-splat: `[k, v]` block param against pair argument.
     if ($n > 1 && len(@$args) == 1 && Rb::is_array($args->[0])) {
         $args = $args->[0]{items}
     }
-    for (my $i = 0; $i < $n; $i++) {
+    for (var $i = 0; $i < $n; $i++) {
         Rb::env_define($ctx->{env}, $params->[$i], $args->[$i] // Rb::v_nil())
     }
-    my $r = eval { Rb::eval_body($block->{body}, $ctx) }
-    my $err = $@
+    val $r = eval { Rb::eval_body($block->{body}, $ctx) }
+    val $err = $@
     $ctx->{env} = $saved
     if ($err) {
         if (ref($err) eq "HASH" && $err->{flow} eq "next") {
@@ -1308,8 +1308,8 @@ fn Rb::call_block($block, $args, $ctx) {
 
 # Run a list of statements; return the last value.
 fn Rb::eval_body($body, $ctx) {
-    my $r = Rb::v_nil()
-    for my $s (@$body) {
+    var $r = Rb::v_nil()
+    for val $s (@$body) {
         $r = Rb::eval_node($s, $ctx)
     }
     $r
@@ -1317,13 +1317,13 @@ fn Rb::eval_body($body, $ctx) {
 
 # Top-level eval entry.
 fn Rb::run($src, $ctx) {
-    my $stmts = Rb::parse($src)
+    val $stmts = Rb::parse($src)
     Rb::eval_body($stmts, $ctx)
 }
 
 # Single-AST-node evaluator. ~30 node kinds; each branch ≤ a few lines.
 fn Rb::eval_node($n, $ctx) {
-    my $k = $n->{kind}
+    val $k = $n->{kind}
 
     return Rb::v_int($n->{val})    if $k eq "Int"
     return Rb::v_float($n->{val})  if $k eq "Float"
@@ -1334,8 +1334,8 @@ fn Rb::eval_node($n, $ctx) {
     return Rb::v_bool(0)           if $k eq "False"
 
     if ($k eq "StrInterp") {
-        my $out = ""
-        for my $part (@{$n->{parts}}) {
+        var $out = ""
+        for val $part (@{$n->{parts}}) {
             $out .= Rb::to_s(Rb::eval_node($part, $ctx))
         }
         return Rb::v_str($out)
@@ -1344,8 +1344,8 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::v_array([map { Rb::eval_node($_, $ctx) } @{$n->{elems}}])
     }
     if ($k eq "Hash") {
-        my @pairs
-        for my $p (@{$n->{pairs}}) {
+        var @pairs
+        for val $p (@{$n->{pairs}}) {
             push @pairs, [Rb::eval_node($p->[0], $ctx), Rb::eval_node($p->[1], $ctx)]
         }
         return Rb::v_hash(\@pairs)
@@ -1358,7 +1358,7 @@ fn Rb::eval_node($n, $ctx) {
     if ($k eq "Self")  { return $ctx->{self} }
 
     if ($k eq "Ident") {
-        my $name = $n->{name}
+        val $name = $n->{name}
         if (Rb::env_has($ctx->{env}, $name)) {
             return Rb::env_lookup($ctx->{env}, $name)
         }
@@ -1366,48 +1366,48 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::dispatch($ctx->{self}, $name, [], undef, $ctx, 1)
     }
     if ($k eq "IVar") {
-        my $self = $ctx->{self}
+        val $self = $ctx->{self}
         return Rb::v_nil() unless Rb::is_instance($self)
         return $self->{ivars}{$n->{name}} // Rb::v_nil()
     }
     if ($k eq "Const") {
-        my $name = $n->{name}
+        val $name = $n->{name}
         return $ctx->{classes}{$name} if exists $ctx->{classes}{$name}
         die "Rb::eval: uninitialized constant " . $name
     }
 
     if ($k eq "Assign") {
-        my $val = Rb::eval_node($n->{value}, $ctx)
+        val $val = Rb::eval_node($n->{value}, $ctx)
         Rb::do_assign($n->{target}, $val, $ctx)
         return $val
     }
     if ($k eq "OpAssign") {
-        my $cur = Rb::eval_node($n->{target}, $ctx)
-        my $rhs = Rb::eval_node($n->{value}, $ctx)
-        my $new = Rb::apply_op($n->{op}, $cur, $rhs)
+        val $cur = Rb::eval_node($n->{target}, $ctx)
+        val $rhs = Rb::eval_node($n->{value}, $ctx)
+        val $new = Rb::apply_op($n->{op}, $cur, $rhs)
         Rb::do_assign($n->{target}, $new, $ctx)
         return $new
     }
     if ($k eq "Index") {
-        my $recv = Rb::eval_node($n->{recv}, $ctx)
-        my @idx  = map { Rb::eval_node($_, $ctx) } @{$n->{indices}}
+        val $recv = Rb::eval_node($n->{recv}, $ctx)
+        val @idx  = map { Rb::eval_node($_, $ctx) } @{$n->{indices}}
         return Rb::dispatch($recv, "[]", \@idx, undef, $ctx, 0)
     }
     if ($k eq "IdxAssign") {
-        my $recv = Rb::eval_node($n->{recv}, $ctx)
-        my @idx  = map { Rb::eval_node($_, $ctx) } @{$n->{indices}}
-        my $val = Rb::eval_node($n->{value}, $ctx)
-        my @args = (@idx, $val)
+        val $recv = Rb::eval_node($n->{recv}, $ctx)
+        val @idx  = map { Rb::eval_node($_, $ctx) } @{$n->{indices}}
+        val $val = Rb::eval_node($n->{value}, $ctx)
+        val @args = (@idx, $val)
         return Rb::dispatch($recv, "[]=", \@args, undef, $ctx, 0)
     }
 
     if ($k eq "BinOp") {
-        my $l = Rb::eval_node($n->{left}, $ctx)
-        my $r = Rb::eval_node($n->{right}, $ctx)
+        val $l = Rb::eval_node($n->{left}, $ctx)
+        val $r = Rb::eval_node($n->{right}, $ctx)
         return Rb::apply_op($n->{op}, $l, $r)
     }
     if ($k eq "Neg") {
-        my $v = Rb::eval_node($n->{operand}, $ctx)
+        val $v = Rb::eval_node($n->{operand}, $ctx)
         return Rb::v_int(-$v->{val})   if Rb::is_int($v)
         return Rb::v_float(-$v->{val}) if Rb::is_float($v)
         die "no `-` for " . $v->{type}
@@ -1416,12 +1416,12 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::v_bool(Rb::is_truthy(Rb::eval_node($n->{operand}, $ctx)) ? 0 : 1)
     }
     if ($k eq "And") {
-        my $l = Rb::eval_node($n->{left}, $ctx)
+        val $l = Rb::eval_node($n->{left}, $ctx)
         return $l unless Rb::is_truthy($l)
         return Rb::eval_node($n->{right}, $ctx)
     }
     if ($k eq "Or") {
-        my $l = Rb::eval_node($n->{left}, $ctx)
+        var $l = Rb::eval_node($n->{left}, $ctx)
         return $l if Rb::is_truthy($l)
         return Rb::eval_node($n->{right}, $ctx)
     }
@@ -1433,7 +1433,7 @@ fn Rb::eval_node($n, $ctx) {
         if (Rb::is_truthy(Rb::eval_node($n->{cond}, $ctx))) {
             return Rb::eval_body($n->{then}, $ctx)
         }
-        for my $eif (@{$n->{elsifs}}) {
+        for val $eif (@{$n->{elsifs}}) {
             if (Rb::is_truthy(Rb::eval_node($eif->[0], $ctx))) {
                 return Rb::eval_body($eif->[1], $ctx)
             }
@@ -1449,9 +1449,9 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::v_nil()
     }
     if ($k eq "While") {
-        my $r = Rb::v_nil()
+        var $r = Rb::v_nil()
         while (Rb::is_truthy(Rb::eval_node($n->{cond}, $ctx))) {
-            my $v = eval { Rb::eval_body($n->{body}, $ctx) }
+            val $v = eval { Rb::eval_body($n->{body}, $ctx) }
             if ($@) {
                 if (ref($@) eq "HASH" && $@->{flow} eq "break") { return $@->{value} // Rb::v_nil() }
                 if (ref($@) eq "HASH" && $@->{flow} eq "next")  { next }
@@ -1462,9 +1462,9 @@ fn Rb::eval_node($n, $ctx) {
         return $r
     }
     if ($k eq "Until") {
-        my $r = Rb::v_nil()
+        var $r = Rb::v_nil()
         while (!Rb::is_truthy(Rb::eval_node($n->{cond}, $ctx))) {
-            my $v = eval { Rb::eval_body($n->{body}, $ctx) }
+            val $v = eval { Rb::eval_body($n->{body}, $ctx) }
             if ($@) {
                 if (ref($@) eq "HASH" && $@->{flow} eq "break") { return $@->{value} // Rb::v_nil() }
                 if (ref($@) eq "HASH" && $@->{flow} eq "next")  { next }
@@ -1475,10 +1475,10 @@ fn Rb::eval_node($n, $ctx) {
         return $r
     }
     if ($k eq "For") {
-        my $iter = Rb::eval_node($n->{iter}, $ctx)
-        my $items = Rb::iter_items($iter)
-        my $r = Rb::v_nil()
-        for my $item (@$items) {
+        val $iter = Rb::eval_node($n->{iter}, $ctx)
+        val $items = Rb::iter_items($iter)
+        var $r = Rb::v_nil()
+        for val $item (@$items) {
             Rb::env_set($ctx->{env}, $n->{var}, $item)
             $r = eval { Rb::eval_body($n->{body}, $ctx) }
             if ($@) {
@@ -1490,10 +1490,10 @@ fn Rb::eval_node($n, $ctx) {
         return $r
     }
     if ($k eq "Case") {
-        my $subj = defined $n->{subject} ? Rb::eval_node($n->{subject}, $ctx) : undef
-        for my $w (@{$n->{whens}}) {
-            for my $pat (@{$w->[0]}) {
-                my $pv = Rb::eval_node($pat, $ctx)
+        val $subj = defined $n->{subject} ? Rb::eval_node($n->{subject}, $ctx) : undef
+        for val $w (@{$n->{whens}}) {
+            for val $pat (@{$w->[0]}) {
+                val $pv = Rb::eval_node($pat, $ctx)
                 if (defined $subj) {
                     return Rb::eval_body($w->[1], $ctx) if Rb::case_match($pv, $subj)
                 } else {
@@ -1505,8 +1505,8 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::v_nil()
     }
     if ($k eq "Begin") {
-        my $r = eval { Rb::eval_body($n->{body}, $ctx) }
-        my $err = $@
+        var $r = eval { Rb::eval_body($n->{body}, $ctx) }
+        var $err = $@
         # Skip control-flow unwinds (return/break/next) — they propagate.
         if ($err && ref($err) eq "HASH" && exists($err->{flow})) {
             Rb::eval_body($n->{ensure}, $ctx) if defined $n->{ensure}
@@ -1514,21 +1514,21 @@ fn Rb::eval_node($n, $ctx) {
         }
         if ($err) {
             # Coerce non-exception err (string die from internals, plain hashref) into an exception.
-            my $exc
+            var $exc
             if (Rb::is_exception($err)) {
                 $exc = $err
             } else {
-                my $msg = ref($err) eq "HASH" && exists($err->{message}) ? $err->{message} : "" . $err
+                val $msg = ref($err) eq "HASH" && exists($err->{message}) ? $err->{message} : "" . $err
                 $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, $msg)
             }
-            for my $rs (@{$n->{rescues}}) {
+            for val $rs (@{$n->{rescues}}) {
                 # Class filter: bare rescue matches StandardError + RuntimeError-like errors.
-                my $matches = 1
+                var $matches = 1
                 if (defined $rs->{klass}) {
-                    my $cls = $ctx->{classes}{$rs->{klass}}
+                    val $cls = $ctx->{classes}{$rs->{klass}}
                     $matches = (defined($cls) && Rb::value_is_a($exc, $cls, $ctx)) ? 1 : 0
                 } else {
-                    my $std = $ctx->{classes}{StandardError}
+                    val $std = $ctx->{classes}{StandardError}
                     $matches = (defined($std) && Rb::value_is_a($exc, $std, $ctx)) ? 1 : 0
                 }
                 next unless $matches
@@ -1545,28 +1545,28 @@ fn Rb::eval_node($n, $ctx) {
         return $r
     }
     if ($k eq "Return") {
-        my $v = defined $n->{value} ? Rb::eval_node($n->{value}, $ctx) : Rb::v_nil()
+        val $v = defined $n->{value} ? Rb::eval_node($n->{value}, $ctx) : Rb::v_nil()
         die +{ flow => "return", value => $v }
     }
     if ($k eq "Break")  { die +{ flow => "break",  value => Rb::v_nil() } }
     if ($k eq "Next")   { die +{ flow => "next",   value => Rb::v_nil() } }
     if ($k eq "Yield") {
-        my $blk = $ctx->{block}
+        val $blk = $ctx->{block}
         die "no block given (yield)" unless defined $blk
-        my @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
+        val @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
         return Rb::call_block($blk, \@args, $ctx)
     }
     if ($k eq "Block" || $k eq "Lambda") {
-        my @frames = @{$ctx->{env}}
+        val @frames = @{$ctx->{env}}
         return Rb::v_proc($n->{params}, $n->{body}, \@frames)
     }
     if ($k eq "Def") {
-        my $proc = Rb::v_proc($n->{params}, $n->{body}, [@{$ctx->{env}}])
+        var $proc = Rb::v_proc($n->{params}, $n->{body}, [@{$ctx->{env}}])
         # Carry through optional rest / block-param markers for richer dispatch.
         $proc->{rest}        = $n->{rest}        if defined $n->{rest}
         $proc->{block_param} = $n->{block_param} if defined $n->{block_param}
         $proc->{name}        = $n->{name}
-        my $owner = $ctx->{cur_klass}
+        val $owner = $ctx->{cur_klass}
         if (defined $owner) {
             if ($n->{is_self} && Rb::is_class($owner)) {
                 # `def self.foo` — class-side method.
@@ -1580,57 +1580,57 @@ fn Rb::eval_node($n, $ctx) {
         return Rb::v_sym($n->{name})
     }
     if ($k eq "Class") {
-        my $name = $n->{name}
-        my $klass
+        val $name = $n->{name}
+        var $klass
         if (exists $ctx->{classes}{$name}) {
             $klass = $ctx->{classes}{$name}
         } else {
-            my $parent = defined($n->{parent}) ? $ctx->{classes}{$n->{parent}} : $ctx->{classes}{Object}
+            val $parent = defined($n->{parent}) ? $ctx->{classes}{$n->{parent}} : $ctx->{classes}{Object}
             $klass = Rb::v_class($name, $parent)
             $ctx->{classes}{$name} = $klass
         }
-        my $saved = $ctx->{cur_klass}
+        val $saved = $ctx->{cur_klass}
         $ctx->{cur_klass} = $klass
         eval { Rb::eval_body($n->{body}, $ctx) }
-        my $err = $@
+        val $err = $@
         $ctx->{cur_klass} = $saved
         die $err if $err
         return $klass
     }
     if ($k eq "Module") {
-        my $name = $n->{name}
-        my $mod
+        var $name = $n->{name}
+        var $mod
         if (exists $ctx->{classes}{$name}) {
             $mod = $ctx->{classes}{$name}
         } else {
             $mod = Rb::v_module($name)
             $ctx->{classes}{$name} = $mod
         }
-        my $saved = $ctx->{cur_klass}
+        val $saved = $ctx->{cur_klass}
         $ctx->{cur_klass} = $mod
         eval { Rb::eval_body($n->{body}, $ctx) }
-        my $err = $@
+        val $err = $@
         $ctx->{cur_klass} = $saved
         die $err if $err
         return $mod
     }
     if ($k eq "Super") {
         # `super` calls the same-named method on the parent class.
-        my $klass = Rb::is_instance($ctx->{self}) ? $ctx->{self}{klass} : undef
+        val $klass = Rb::is_instance($ctx->{self}) ? $ctx->{self}{klass} : undef
         die "super outside method" unless defined $klass
-        my $parent = $klass->{parent}
+        val $parent = $klass->{parent}
         die "super: no parent" unless defined $parent
         # Find the current method's name from `__method__` env binding (best-effort).
-        my $mname = Rb::env_lookup($ctx->{env}, "__method__")
-        my $mn = Rb::is_str($mname) ? $mname->{val} : (Rb::is_sym($mname) ? $mname->{val} : "?")
-        my $proc = Rb::class_method($parent, $mn)
+        val $mname = Rb::env_lookup($ctx->{env}, "__method__")
+        val $mn = Rb::is_str($mname) ? $mname->{val} : (Rb::is_sym($mname) ? $mname->{val} : "?")
+        val $proc = Rb::class_method($parent, $mn)
         die "super: method `" . $mn . "` not in parent" unless defined $proc
-        my @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
+        var @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
         # `super` (no parens) forwards the current method's args.
         unless ($n->{explicit}) {
             @args = ()
-            for my $p (@{$ctx->{cur_method_params} // []}) {
-                my $v = Rb::env_lookup($ctx->{env}, $p)
+            for val $p (@{$ctx->{cur_method_params} // []}) {
+                val $v = Rb::env_lookup($ctx->{env}, $p)
                 push @args, defined($v) ? $v : Rb::v_nil()
             }
         }
@@ -1638,14 +1638,14 @@ fn Rb::eval_node($n, $ctx) {
     }
 
     if ($k eq "Call") {
-        my @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
-        my $blk = undef
+        var @args = map { Rb::eval_node($_, $ctx) } @{$n->{args}}
+        var $blk = undef
         if (defined $n->{block}) {
-            my @frames = @{$ctx->{env}}
+            val @frames = @{$ctx->{env}}
             $blk = Rb::v_proc($n->{block}{params}, $n->{block}{body}, \@frames)
         }
         if (defined $n->{recv}) {
-            my $recv = Rb::eval_node($n->{recv}, $ctx)
+            val $recv = Rb::eval_node($n->{recv}, $ctx)
             return Rb::dispatch($recv, $n->{name}, \@args, $blk, $ctx, 0)
         }
         return Rb::dispatch_implicit($n->{name}, \@args, $blk, $ctx)
@@ -1655,10 +1655,10 @@ fn Rb::eval_node($n, $ctx) {
 }
 
 fn Rb::do_assign($target, $val, $ctx) {
-    my $k = $target->{kind}
+    val $k = $target->{kind}
     if ($k eq "Ident") { Rb::env_set($ctx->{env}, $target->{name}, $val); return $val }
     if ($k eq "IVar") {
-        my $self = $ctx->{self}
+        val $self = $ctx->{self}
         $self->{ivars}{$target->{name}} = $val if Rb::is_instance($self)
         return $val
     }
@@ -1668,7 +1668,7 @@ fn Rb::do_assign($target, $val, $ctx) {
     }
     # `obj.foo = val` desugars to `obj.foo=(val)` setter dispatch.
     if ($k eq "Call" && defined($target->{recv}) && !len(@{$target->{args}})) {
-        my $recv = Rb::eval_node($target->{recv}, $ctx)
+        var $recv = Rb::eval_node($target->{recv}, $ctx)
         return Rb::dispatch($recv, $target->{name} . "=", [$val], undef, $ctx, 0)
     }
     die "cannot assign to " . $k
@@ -1701,7 +1701,7 @@ fn Rb::apply_op($op, $l, $r) {
     }
     if ($op eq "/") {
         if (Rb::is_int($l) && Rb::is_int($r)) {
-            my $q = int($l->{val} / $r->{val})
+            var $q = int($l->{val} / $r->{val})
             $q-- if (($l->{val} % $r->{val}) != 0) && (($l->{val} < 0) != ($r->{val} < 0))
             return Rb::v_int($q)
         }
@@ -1709,20 +1709,20 @@ fn Rb::apply_op($op, $l, $r) {
     }
     if ($op eq "%") {
         if (Rb::is_int($l) && Rb::is_int($r)) {
-            my $m = $l->{val} % $r->{val}
+            var $m = $l->{val} % $r->{val}
             $m += $r->{val} if $m != 0 && (($m < 0) != ($r->{val} < 0))
             return Rb::v_int($m)
         }
         # `"fmt" % args` — sprintf-style formatting with %d, %s, %f, %x, etc.
         if (Rb::is_str($l)) {
-            my @argv = Rb::is_array($r) ? @{$r->{items}} : ($r)
-            my @raw = map { Rb::is_str($_) || Rb::is_sym($_) ? $_->{val} : Rb::is_num($_) ? $_->{val} : Rb::to_s($_) } @argv
+            val @argv = Rb::is_array($r) ? @{$r->{items}} : ($r)
+            val @raw = map { Rb::is_str($_) || Rb::is_sym($_) ? $_->{val} : Rb::is_num($_) ? $_->{val} : Rb::to_s($_) } @argv
             return Rb::v_str(sprintf($l->{val}, @raw))
         }
     }
     if ($op eq "**") {
         if (Rb::is_int($l) && Rb::is_int($r) && $r->{val} >= 0) {
-            my $a = 1
+            var $a = 1
             for (1 .. $r->{val}) { $a *= $l->{val} }
             return Rb::v_int($a)
         }
@@ -1752,8 +1752,8 @@ fn Rb::apply_op($op, $l, $r) {
 
 fn Rb::case_match($pat, $subj) {
     if (Rb::is_class($pat)) {
-        my $kls = Rb::is_instance($subj) ? $subj->{klass} : undef
-        my $c = $kls
+        val $kls = Rb::is_instance($subj) ? $subj->{klass} : undef
+        var $c = $kls
         while (defined $c) {
             return 1 if $c->{name} eq $pat->{name}
             $c = $c->{parent}
@@ -1761,9 +1761,9 @@ fn Rb::case_match($pat, $subj) {
         return 0
     }
     if (Rb::is_range($pat)) {
-        my $vn = Rb::nv($subj)
-        my $lo = Rb::nv($pat->{lo})
-        my $hi = Rb::nv($pat->{hi})
+        val $vn = Rb::nv($subj)
+        val $lo = Rb::nv($pat->{lo})
+        val $hi = Rb::nv($pat->{hi})
         return 0 if $vn < $lo
         return $pat->{exclusive} ? $vn < $hi : $vn <= $hi
     }
@@ -1773,11 +1773,11 @@ fn Rb::case_match($pat, $subj) {
 fn Rb::iter_items($it) {
     return $it->{items} if Rb::is_array($it)
     if (Rb::is_range($it)) {
-        my @out
-        my $lo = Rb::nv($it->{lo})
-        my $hi = Rb::nv($it->{hi})
-        my $end = $it->{exclusive} ? $hi : $hi + 1
-        for (my $i = $lo; $i < $end; $i++) {
+        var @out
+        val $lo = Rb::nv($it->{lo})
+        val $hi = Rb::nv($it->{hi})
+        val $end = $it->{exclusive} ? $hi : $hi + 1
+        for (var $i = $lo; $i < $end; $i++) {
             push @out, Rb::v_int($i)
         }
         return \@out
@@ -1796,11 +1796,11 @@ fn Rb::iter_items($it) {
 fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
     if ($name eq "puts") {
         if (len(@$args) == 0) { print "\n"; return Rb::v_nil() }
-        for my $a (@$args) {
+        for val $a (@$args) {
             if (Rb::is_array($a)) {
-                for my $e (@{$a->{items}}) { print Rb::to_s($e), "\n" }
+                for val $e (@{$a->{items}}) { print Rb::to_s($e), "\n" }
             } else {
-                my $s = Rb::to_s($a)
+                val $s = Rb::to_s($a)
                 print $s
                 print "\n" unless substr($s, -1) eq "\n"
             }
@@ -1821,13 +1821,13 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         # raise Class                 — instance of Class
         # raise Class, "msg"          — instance of Class with message
         # raise instance              — re-raise instance
-        my $exc
+        var $exc
         if (!len(@$args)) {
             $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, "RuntimeError")
         } elsif (Rb::is_exception($args->[0])) {
             $exc = $args->[0]
         } elsif (Rb::is_class($args->[0])) {
-            my $msg = len(@$args) > 1 ? Rb::to_s($args->[1]) : $args->[0]{name}
+            val $msg = len(@$args) > 1 ? Rb::to_s($args->[1]) : $args->[0]{name}
             $exc = Rb::v_exception($args->[0], $msg)
         } else {
             $exc = Rb::v_exception($ctx->{classes}{RuntimeError}, Rb::to_s($args->[0]))
@@ -1847,18 +1847,18 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         return Rb::v_array([$args->[0]])
     }
     if ($name eq "attr_accessor" || $name eq "attr_reader" || $name eq "attr_writer") {
-        my $klass = $ctx->{cur_klass}
+        val $klass = $ctx->{cur_klass}
         die $name . " outside class" unless defined $klass
-        my $reader = ($name eq "attr_writer") ? 0 : 1
-        my $writer = ($name eq "attr_reader") ? 0 : 1
-        for my $sym (@$args) {
-            my $attr = Rb::is_sym($sym) ? $sym->{val} : Rb::to_s($sym)
+        val $reader = ($name eq "attr_writer") ? 0 : 1
+        val $writer = ($name eq "attr_reader") ? 0 : 1
+        for val $sym (@$args) {
+            val $attr = Rb::is_sym($sym) ? $sym->{val} : Rb::to_s($sym)
             if ($reader) {
-                my $body = [+{ kind => "IVar", name => $attr, line => 0 }]
+                val $body = [+{ kind => "IVar", name => $attr, line => 0 }]
                 $klass->{methods}{$attr} = Rb::v_proc([], $body, [+{}])
             }
             if ($writer) {
-                my $body = [+{
+                val $body = [+{
                     kind   => "Assign",
                     target => +{ kind => "IVar", name => $attr, line => 0 },
                     value  => +{ kind => "Ident", name => "v", line => 0 },
@@ -1870,18 +1870,18 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
         return Rb::v_nil()
     }
     if ($name eq "include") {
-        my $klass = $ctx->{cur_klass}
+        val $klass = $ctx->{cur_klass}
         die "include outside class/module" unless defined $klass
-        for my $mod (@$args) {
+        for val $mod (@$args) {
             push @{$klass->{includes}}, $mod
         }
         return Rb::v_nil()
     }
     if ($name eq "extend") {
-        my $klass = $ctx->{cur_klass}
+        val $klass = $ctx->{cur_klass}
         die "extend outside class/module" unless defined $klass
-        for my $mod (@$args) {
-            for my $mname (keys %{$mod->{methods}}) {
+        for val $mod (@$args) {
+            for val $mname (keys %{$mod->{methods}}) {
                 $klass->{cmethods}{$mname} = $mod->{methods}{$mname}
             }
         }
@@ -1893,7 +1893,7 @@ fn Rb::dispatch_implicit($name, $args, $block, $ctx) {
     }
     # Fallback — `name` as a local variable holding a proc, or method on self.
     if (Rb::env_has($ctx->{env}, $name)) {
-        my $v = Rb::env_lookup($ctx->{env}, $name)
+        val $v = Rb::env_lookup($ctx->{env}, $name)
         if (Rb::is_proc($v)) {
             # Top-level def: install caller's block so `yield` inside the body
             # finds it. Use call_method so `return` flow unwinds correctly.
@@ -1934,8 +1934,8 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
     # Class method `Klass.new` builds an instance and runs `initialize`.
     if (Rb::is_class($recv)) {
         if ($name eq "new") {
-            my $inst = Rb::v_instance($recv)
-            my $init = Rb::class_method($recv, "initialize")
+            val $inst = Rb::v_instance($recv)
+            val $init = Rb::class_method($recv, "initialize")
             if (defined $init) {
                 Rb::call_method($init, $inst, $args, $block, $ctx, "initialize")
             }
@@ -1945,7 +1945,7 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
             return Rb::v_str($recv->{name})
         }
         if ($name eq "ancestors") {
-            my @a; my $c = $recv
+            var @a; var $c = $recv
             while (defined $c) {
                 push @a, $c
                 push @a, $_ for @{$c->{includes} // []}
@@ -1954,7 +1954,7 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
             return Rb::v_array(\@a)
         }
         # `def self.foo` is a class-side method; lookup via cmethods.
-        my $cm = $recv->{cmethods}{$name}
+        val $cm = $recv->{cmethods}{$name}
         if (defined $cm) {
             return Rb::call_method($cm, $recv, $args, $block, $ctx, $name)
         }
@@ -1963,19 +1963,19 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
         if ($name eq "name" || $name eq "to_s" || $name eq "inspect") {
             return Rb::v_str($recv->{name})
         }
-        my $m = $recv->{methods}{$name}
+        val $m = $recv->{methods}{$name}
         if (defined $m) {
             return Rb::call_method($m, $recv, $args, $block, $ctx, $name)
         }
     }
 
     # Type-specific built-ins.
-    my $r = Rb::call_builtin_method($recv, $name, $args, $block, $ctx)
+    val $r = Rb::call_builtin_method($recv, $name, $args, $block, $ctx)
     return $r if defined $r
 
     # User-defined method on instance: walk the class chain.
     if (Rb::is_instance($recv)) {
-        my $m = Rb::class_method($recv->{klass}, $name)
+        val $m = Rb::class_method($recv->{klass}, $name)
         if (defined $m) {
             return Rb::call_method($m, $recv, $args, $block, $ctx, $name)
         }
@@ -1986,13 +1986,13 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
         return Rb::v_bool(Rb::value_is_a($recv, $args->[0], $ctx) ? 1 : 0)
     }
     if ($name eq "instance_of?" && len(@$args) > 0 && Rb::is_class($args->[0])) {
-        my $cls = Rb::value_class($recv, $ctx)
+        val $cls = Rb::value_class($recv, $ctx)
         return Rb::v_bool(defined($cls) && $cls->{name} eq $args->[0]{name} ? 1 : 0)
     }
     if ($name eq "respond_to?" && len(@$args) > 0) {
-        my $sym = Rb::is_sym($args->[0]) ? $args->[0]{val} : Rb::to_s($args->[0])
+        var $sym = Rb::is_sym($args->[0]) ? $args->[0]{val} : Rb::to_s($args->[0])
         # Check built-in dispatch first.
-        my $tries = Rb::call_builtin_method($recv, $sym, [], undef, $ctx)
+        val $tries = Rb::call_builtin_method($recv, $sym, [], undef, $ctx)
         return Rb::v_bool(1) if defined $tries
         if (Rb::is_instance($recv)) {
             return Rb::v_bool(defined(Rb::class_method($recv->{klass}, $sym)) ? 1 : 0)
@@ -2010,8 +2010,8 @@ fn Rb::dispatch($recv, $name, $args, $block, $ctx, $is_implicit) {
     if ($name eq "frozen?") { return Rb::v_bool(1) }   # simplified
     if ($name eq "object_id" || $name eq "__id__") { return Rb::v_int(0) }
     if ($name eq "send" || $name eq "__send__" || $name eq "public_send") {
-        my $msg = shift @$args
-        my $mname = Rb::is_sym($msg) ? $msg->{val} : Rb::to_s($msg)
+        val $msg = shift @$args
+        val $mname = Rb::is_sym($msg) ? $msg->{val} : Rb::to_s($msg)
         return Rb::dispatch($recv, $mname, $args, $block, $ctx, 0)
     }
 
@@ -2039,10 +2039,10 @@ fn Rb::value_class($v, $ctx) {
 
 # Walk class chain (including mixins) checking for a target class.
 fn Rb::value_is_a($v, $target, $ctx) {
-    my $c = Rb::value_class($v, $ctx)
+    var $c = Rb::value_class($v, $ctx)
     while (defined $c) {
         return 1 if $c->{name} eq $target->{name}
-        for my $mod (@{$c->{includes} // []}) {
+        for val $mod (@{$c->{includes} // []}) {
             return 1 if $mod->{name} eq $target->{name}
         }
         $c = $c->{parent}
@@ -2051,11 +2051,11 @@ fn Rb::value_is_a($v, $target, $ctx) {
 }
 
 fn Rb::class_method($klass, $name) {
-    my $c = $klass
+    var $c = $klass
     while (defined $c) {
         return $c->{methods}{$name} if exists $c->{methods}{$name}
         # Mixed-in modules: most-recently-included takes precedence (matches MRI's MRO).
-        for my $mod (rev @{$c->{includes} // []}) {
+        for val $mod (rev @{$c->{includes} // []}) {
             return $mod->{methods}{$name} if exists $mod->{methods}{$name}
         }
         $c = $c->{parent}
@@ -2067,22 +2067,22 @@ fn Rb::class_method($klass, $name) {
 # unwinds on `Return`. The proc's body runs in its captured env + a fresh
 # frame — local vars don't leak out.
 fn Rb::call_method($proc, $recv, $args, $block, $ctx, $mname) {
-    my $saved_env    = $ctx->{env}
-    my $saved_self   = $ctx->{self}
-    my $saved_block  = $ctx->{block}
-    my $saved_params = $ctx->{cur_method_params}
-    my @new_frames = (@{$proc->{env}}, +{})
+    val $saved_env    = $ctx->{env}
+    val $saved_self   = $ctx->{self}
+    val $saved_block  = $ctx->{block}
+    val $saved_params = $ctx->{cur_method_params}
+    val @new_frames = (@{$proc->{env}}, +{})
     $ctx->{env}   = \@new_frames
     $ctx->{self}  = $recv
     $ctx->{block} = $block
-    my $params = $proc->{params}
+    val $params = $proc->{params}
     $ctx->{cur_method_params} = $params
     Rb::env_define($ctx->{env}, "__method__", Rb::v_sym($mname)) if defined $mname
-    for (my $i = 0; $i < len(@$params); $i++) {
+    for (var $i = 0; $i < len(@$params); $i++) {
         Rb::env_define($ctx->{env}, $params->[$i], $args->[$i] // Rb::v_nil())
     }
-    my $r = eval { Rb::eval_body($proc->{body}, $ctx) }
-    my $err = $@
+    val $r = eval { Rb::eval_body($proc->{body}, $ctx) }
+    val $err = $@
     $ctx->{env}              = $saved_env
     $ctx->{self}             = $saved_self
     $ctx->{block}            = $saved_block
@@ -2111,28 +2111,28 @@ fn Rb::call_builtin_method($recv, $name, $args, $block, $ctx) {
 }
 
 fn Rb::array_m($a, $name, $args, $block, $ctx) {
-    my $items = $a->{items}
+    var $items = $a->{items}
     if ($name eq "[]") {
-        my $idx = $args->[0]
+        val $idx = $args->[0]
         if (Rb::is_int($idx)) {
             # [start, length] form: arr[1, 2]
             if (len(@$args) >= 2 && Rb::is_int($args->[1])) {
-                my $s = $idx->{val}
+                var $s = $idx->{val}
                 $s += len(@$items) if $s < 0
-                my $len = $args->[1]{val}
+                val $len = $args->[1]{val}
                 return Rb::v_nil() if $s < 0 || $s > len(@$items) || $len < 0
-                my $e = $s + $len - 1
+                var $e = $s + $len - 1
                 $e = len(@$items) - 1 if $e >= len(@$items)
                 return Rb::v_array([]) if $e < $s
                 return Rb::v_array([@$items[$s..$e]])
             }
-            my $i = $idx->{val}
+            var $i = $idx->{val}
             $i += len(@$items) if $i < 0
             return ($i < 0 || $i >= len(@$items)) ? Rb::v_nil() : $items->[$i]
         }
         if (Rb::is_range($idx)) {
-            my $lo = Rb::nv($idx->{lo})
-            my $hi = Rb::nv($idx->{hi})
+            var $lo = Rb::nv($idx->{lo})
+            var $hi = Rb::nv($idx->{hi})
             $lo += len(@$items) if $lo < 0
             $hi += len(@$items) if $hi < 0
             $hi-- if $idx->{exclusive}
@@ -2144,7 +2144,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_nil()
     }
     if ($name eq "[]=") {
-        my $i = $args->[0]{val}
+        val $i = $args->[0]{val}
         $items->[$i] = $args->[1]
         return $args->[1]
     }
@@ -2157,7 +2157,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "empty?") { return Rb::v_bool(len(@$items) == 0 ? 1 : 0) }
     if ($name eq "first") {
         if (len(@$args) && Rb::is_int($args->[0])) {
-            my $n = $args->[0]{val}
+            var $n = $args->[0]{val}
             $n = len(@$items) if $n > len(@$items)
             return Rb::v_array([]) if $n <= 0
             return Rb::v_array([@$items[0..$n - 1]])
@@ -2166,10 +2166,10 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "last") {
         if (len(@$args) && Rb::is_int($args->[0])) {
-            my $n = $args->[0]{val}
+            var $n = $args->[0]{val}
             $n = len(@$items) if $n > len(@$items)
             return Rb::v_array([]) if $n <= 0
-            my $start = len(@$items) - $n
+            val $start = len(@$items) - $n
             return Rb::v_array([@$items[$start..len(@$items) - 1]])
         }
         return $items->[-1] // Rb::v_nil()
@@ -2180,37 +2180,37 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "unshift") { unshift @$items, @$args; return $a }
     if ($name eq "reverse") { return Rb::v_array([rev @$items]) }
     if ($name eq "include?") {
-        for my $e (@$items) { return Rb::v_bool(1) if Rb::v_eq($e, $args->[0]) }
+        for val $e (@$items) { return Rb::v_bool(1) if Rb::v_eq($e, $args->[0]) }
         return Rb::v_bool(0)
     }
     if ($name eq "join") {
-        my $sep = len(@$args) ? $args->[0]{val} : ""
+        val $sep = len(@$args) ? $args->[0]{val} : ""
         return Rb::v_str(join($sep, map {Rb::to_s} @$items))
     }
     if ($name eq "sort") {
         if (defined $block) {
-            my @s = sort {
-                my $r = Rb::call_block($block, [_, _1], $ctx)
+            val @s = sort {
+                val $r = Rb::call_block($block, [_, _1], $ctx)
                 Rb::is_int($r) ? $r->{val} : 0
             } @$items
             return Rb::v_array(\@s)
         }
-        my @s = sort { Rb::v_cmp(_, _1) } @$items
+        val @s = sort { Rb::v_cmp(_, _1) } @$items
         return Rb::v_array(\@s)
     }
     if ($name eq "uniq") {
-        my @seen
-        my @out
-        for my $e (@$items) {
-            my $dup = 0
-            for my $s (@seen) { if (Rb::v_eq($e, $s)) { $dup = 1; last } }
+        var @seen
+        var @out
+        for val $e (@$items) {
+            var $dup = 0
+            for val $s (@seen) { if (Rb::v_eq($e, $s)) { $dup = 1; last } }
             unless ($dup) { push @seen, $e; push @out, $e }
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "each") {
-        for my $e (@$items) {
-            my $r = eval { Rb::call_block($block, [$e], $ctx) }
+        for val $e (@$items) {
+            val $r = eval { Rb::call_block($block, [$e], $ctx) }
             if ($@) {
                 if (ref($@) eq "HASH" && $@->{flow} eq "break") { return $@->{value} // Rb::v_nil() }
                 die $@ if ref($@) ne "HASH"
@@ -2219,38 +2219,38 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $a
     }
     if ($name eq "each_with_index") {
-        for (my $i = 0; $i < len(@$items); $i++) {
+        for (var $i = 0; $i < len(@$items); $i++) {
             Rb::call_block($block, [$items->[$i], Rb::v_int($i)], $ctx)
         }
         return $a
     }
     if ($name eq "map" || $name eq "collect") {
-        my @out
-        for my $e (@$items) { push @out, Rb::call_block($block, [$e], $ctx) }
+        var @out
+        for val $e (@$items) { push @out, Rb::call_block($block, [$e], $ctx) }
         return Rb::v_array(\@out)
     }
     if ($name eq "select" || $name eq "filter") {
-        my @out
-        for my $e (@$items) {
+        var @out
+        for val $e (@$items) {
             push @out, $e if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "reject") {
-        my @out
-        for my $e (@$items) {
+        var @out
+        for val $e (@$items) {
             push @out, $e unless Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "find" || $name eq "detect") {
-        for my $e (@$items) {
+        for val $e (@$items) {
             return $e if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
         }
         return Rb::v_nil()
     }
     if ($name eq "any?") {
-        for my $e (@$items) {
+        for val $e (@$items) {
             if (defined $block) {
                 return Rb::v_bool(1) if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             } else {
@@ -2260,7 +2260,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_bool(0)
     }
     if ($name eq "all?") {
-        for my $e (@$items) {
+        for val $e (@$items) {
             if (defined $block) {
                 return Rb::v_bool(0) unless Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             } else {
@@ -2270,70 +2270,70 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_bool(1)
     }
     if ($name eq "reduce" || $name eq "inject") {
-        my @rest = @$items
-        my $acc
+        var @rest = @$items
+        var $acc
         if (len(@$args)) { $acc = $args->[0] }
         else                { return Rb::v_nil() unless len(@rest); $acc = shift @rest }
-        for my $e (@rest) {
+        for val $e (@rest) {
             $acc = Rb::call_block($block, [$acc, $e], $ctx)
         }
         return $acc
     }
     if ($name eq "min") {
         return Rb::v_nil() unless len(@$items)
-        my $m = $items->[0]
+        var $m = $items->[0]
         if (defined $block) {
-            for my $e (@$items) {
-                my $r = Rb::call_block($block, [$e, $m], $ctx)
-                my $cmp = Rb::is_int($r) ? $r->{val} : 0
+            for val $e (@$items) {
+                val $r = Rb::call_block($block, [$e, $m], $ctx)
+                val $cmp = Rb::is_int($r) ? $r->{val} : 0
                 $m = $e if $cmp < 0
             }
             return $m
         }
-        for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) < 0 }
+        for val $e (@$items) { $m = $e if Rb::v_cmp($e, $m) < 0 }
         return $m
     }
     if ($name eq "max") {
         return Rb::v_nil() unless len(@$items)
-        my $m = $items->[0]
+        var $m = $items->[0]
         if (defined $block) {
-            for my $e (@$items) {
-                my $r = Rb::call_block($block, [$e, $m], $ctx)
-                my $cmp = Rb::is_int($r) ? $r->{val} : 0
+            for val $e (@$items) {
+                val $r = Rb::call_block($block, [$e, $m], $ctx)
+                val $cmp = Rb::is_int($r) ? $r->{val} : 0
                 $m = $e if $cmp > 0
             }
             return $m
         }
-        for my $e (@$items) { $m = $e if Rb::v_cmp($e, $m) > 0 }
+        for val $e (@$items) { $m = $e if Rb::v_cmp($e, $m) > 0 }
         return $m
     }
     if ($name eq "sum") {
-        my $init = len(@$args) ? Rb::nv($args->[0]) : 0
-        my $s = $init
-        my $is_float = (defined($args->[0]) && Rb::is_float($args->[0])) ? 1 : 0
-        for my $e (@$items) {
-            my $v = defined($block) ? Rb::call_block($block, [$e], $ctx) : $e
+        val $init = len(@$args) ? Rb::nv($args->[0]) : 0
+        var $s = $init
+        var $is_float = (defined($args->[0]) && Rb::is_float($args->[0])) ? 1 : 0
+        for val $e (@$items) {
+            val $v = defined($block) ? Rb::call_block($block, [$e], $ctx) : $e
             $is_float = 1 if Rb::is_float($v)
             $s += Rb::nv($v)
         }
         return $is_float ? Rb::v_float($s) : Rb::v_int($s)
     }
     if ($name eq "filter_map") {
-        my @out
-        for my $e (@$items) {
-            my $r = Rb::call_block($block, [$e], $ctx)
+        var @out
+        for val $e (@$items) {
+            val $r = Rb::call_block($block, [$e], $ctx)
             push @out, $r if Rb::is_truthy($r)
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "find_index") {
         if (defined $block) {
-            for (my $i = 0; $i < len(@$items); $i++) {
+            for (var $i = 0; $i < len(@$items); $i++) {
                 return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
             }
             return Rb::v_nil()
         }
-        for (my $i = 0; $i < len(@$items); $i++) {
+        for (var $i = 0; $i < len(@$items); $i++) {
             return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
         }
         return Rb::v_nil()
@@ -2341,7 +2341,7 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     if ($name eq "to_a")    { return $a }
     if ($name eq "compact") { return Rb::v_array([grep { !Rb::is_nil(_) } @$items]) }
     if ($name eq "none?") {
-        for my $e (@$items) {
+        for val $e (@$items) {
             if (defined $block) {
                 return Rb::v_bool(0) if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             } else {
@@ -2353,61 +2353,61 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     # `count` with a predicate or value argument (no-arg case handled at top).
     if ($name eq "count") {
         if (defined $block) {
-            my $n = 0
-            for my $e (@$items) {
+            var $n = 0
+            for val $e (@$items) {
                 $n++ if Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             }
             return Rb::v_int($n)
         }
-        my $n = 0
-        for my $e (@$items) {
+        var $n = 0
+        for val $e (@$items) {
             $n++ if Rb::v_eq($e, $args->[0])
         }
         return Rb::v_int($n)
     }
     if ($name eq "index") {
         if (defined $block) {
-            for (my $i = 0; $i < len(@$items); $i++) {
+            for (var $i = 0; $i < len(@$items); $i++) {
                 return Rb::v_int($i) if Rb::is_truthy(Rb::call_block($block, [$items->[$i]], $ctx))
             }
             return Rb::v_nil()
         }
-        for (my $i = 0; $i < len(@$items); $i++) {
+        for (var $i = 0; $i < len(@$items); $i++) {
             return Rb::v_int($i) if Rb::v_eq($items->[$i], $args->[0])
         }
         return Rb::v_nil()
     }
     if ($name eq "take") {
-        my $n = $args->[0]{val}
+        var $n = $args->[0]{val}
         $n = len(@$items) if $n > len(@$items)
         return Rb::v_array([@$items[0..$n - 1]]) if $n > 0
         return Rb::v_array([])
     }
     if ($name eq "drop") {
-        my $n = $args->[0]{val}
+        val $n = $args->[0]{val}
         return Rb::v_array([]) if $n >= len(@$items)
         return Rb::v_array([@$items[$n..len(@$items) - 1]])
     }
     if ($name eq "take_while") {
-        my @out
-        for my $e (@$items) {
+        var @out
+        for val $e (@$items) {
             last unless Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             push @out, $e
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "drop_while") {
-        my @out
-        my $dropping = 1
-        for my $e (@$items) {
+        var @out
+        var $dropping = 1
+        for val $e (@$items) {
             $dropping = 0 unless $dropping && Rb::is_truthy(Rb::call_block($block, [$e], $ctx))
             push @out, $e unless $dropping
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "partition") {
-        my @yes; my @no
-        for my $e (@$items) {
+        var @yes; var @no
+        for val $e (@$items) {
             if (Rb::is_truthy(Rb::call_block($block, [$e], $ctx))) {
                 push @yes, $e
             } else {
@@ -2417,11 +2417,11 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array([Rb::v_array(\@yes), Rb::v_array(\@no)])
     }
     if ($name eq "group_by") {
-        my @keys; my @groups
-        for my $e (@$items) {
-            my $k = Rb::call_block($block, [$e], $ctx)
-            my $found = 0
-            for (my $i = 0; $i < len(@keys); $i++) {
+        var @keys; var @groups
+        for val $e (@$items) {
+            val $k = Rb::call_block($block, [$e], $ctx)
+            var $found = 0
+            for (var $i = 0; $i < len(@keys); $i++) {
                 if (Rb::v_eq($keys[$i], $k)) {
                     push @{$groups[$i]}, $e
                     $found = 1
@@ -2433,17 +2433,17 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
                 push @groups, [$e]
             }
         }
-        my @pairs
-        for (my $i = 0; $i < len(@keys); $i++) {
+        var @pairs
+        for (var $i = 0; $i < len(@keys); $i++) {
             push @pairs, [$keys[$i], Rb::v_array($groups[$i])]
         }
         return Rb::v_hash(\@pairs)
     }
     if ($name eq "tally") {
-        my @keys; my @counts
-        for my $e (@$items) {
-            my $found = 0
-            for (my $i = 0; $i < len(@keys); $i++) {
+        var @keys; var @counts
+        for val $e (@$items) {
+            var $found = 0
+            for (var $i = 0; $i < len(@keys); $i++) {
                 if (Rb::v_eq($keys[$i], $e)) {
                     $counts[$i]++
                     $found = 1
@@ -2455,25 +2455,25 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
                 push @counts, 1
             }
         }
-        my @pairs
-        for (my $i = 0; $i < len(@keys); $i++) {
+        var @pairs
+        for (var $i = 0; $i < len(@keys); $i++) {
             push @pairs, [$keys[$i], Rb::v_int($counts[$i])]
         }
         return Rb::v_hash(\@pairs)
     }
     if ($name eq "to_h") {
-        my @pairs
-        for my $e (@$items) {
+        var @pairs
+        for val $e (@$items) {
             die "to_h requires pair" unless Rb::is_array($e) && len(@{$e->{items}}) == 2
             push @pairs, [$e->{items}[0], $e->{items}[1]]
         }
         return Rb::v_hash(\@pairs)
     }
     if ($name eq "zip") {
-        my @result
-        for (my $i = 0; $i < len(@$items); $i++) {
-            my @row = ($items->[$i])
-            for my $other (@$args) {
+        var @result
+        for (var $i = 0; $i < len(@$items); $i++) {
+            var @row = ($items->[$i])
+            for val $other (@$args) {
                 push @row, ($other->{items}[$i] // Rb::v_nil())
             }
             push @result, Rb::v_array(\@row)
@@ -2482,45 +2482,45 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
     }
     if ($name eq "min_by") {
         return Rb::v_nil() unless len(@$items)
-        my $best = $items->[0]
-        my $bk = Rb::call_block($block, [$best], $ctx)
-        for (my $i = 1; $i < len(@$items); $i++) {
-            my $e = $items->[$i]
-            my $k = Rb::call_block($block, [$e], $ctx)
+        var $best = $items->[0]
+        var $bk = Rb::call_block($block, [$best], $ctx)
+        for (var $i = 1; $i < len(@$items); $i++) {
+            val $e = $items->[$i]
+            val $k = Rb::call_block($block, [$e], $ctx)
             if (Rb::v_cmp($k, $bk) < 0) { $best = $e; $bk = $k }
         }
         return $best
     }
     if ($name eq "max_by") {
         return Rb::v_nil() unless len(@$items)
-        my $best = $items->[0]
-        my $bk = Rb::call_block($block, [$best], $ctx)
-        for (my $i = 1; $i < len(@$items); $i++) {
-            my $e = $items->[$i]
-            my $k = Rb::call_block($block, [$e], $ctx)
+        var $best = $items->[0]
+        var $bk = Rb::call_block($block, [$best], $ctx)
+        for (var $i = 1; $i < len(@$items); $i++) {
+            val $e = $items->[$i]
+            val $k = Rb::call_block($block, [$e], $ctx)
             if (Rb::v_cmp($k, $bk) > 0) { $best = $e; $bk = $k }
         }
         return $best
     }
     if ($name eq "sort_by") {
-        my @decorated = map { [Rb::call_block($block, [$_], $ctx), $_] } @$items
-        my @sorted = sort { Rb::v_cmp(_->[0], _1->[0]) } @decorated
+        val @decorated = map { [Rb::call_block($block, [$_], $ctx), $_] } @$items
+        val @sorted = sort { Rb::v_cmp(_->[0], _1->[0]) } @decorated
         return Rb::v_array([map { $_->[1] } @sorted])
     }
     if ($name eq "flat_map" || $name eq "collect_concat") {
-        my @out
-        for my $e (@$items) {
-            my $r = Rb::call_block($block, [$e], $ctx)
+        var @out
+        for val $e (@$items) {
+            val $r = Rb::call_block($block, [$e], $ctx)
             if (Rb::is_array($r)) { push @out, @{$r->{items}} } else { push @out, $r }
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "flatten") {
-        my $depth = len(@$args) ? $args->[0]{val} : -1
+        var $depth = len(@$args) ? $args->[0]{val} : -1
         return Rb::v_array(Rb::array_flatten($items, $depth))
     }
     if ($name eq "concat") {
-        for my $arg (@$args) {
+        for val $arg (@$args) {
             push @$items, @{$arg->{items}} if Rb::is_array($arg)
         }
         return $a
@@ -2529,8 +2529,8 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array([@$items])
     }
     if ($name eq "rotate") {
-        my $by = len(@$args) ? $args->[0]{val} : 1
-        my $n = len(@$items)
+        var $by = len(@$args) ? $args->[0]{val} : 1
+        val $n = len(@$items)
         return $a if $n == 0
         $by = (($by % $n) + $n) % $n
         return Rb::v_array([@$items[$by..$n - 1], @$items[0..$by - 1]])
@@ -2540,34 +2540,34 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return $items->[int(rand(len(@$items)))]
     }
     if ($name eq "shuffle") {
-        my @out = @$items
-        for (my $i = len(@out) - 1; $i > 0; $i--) {
-            my $j = int(rand($i + 1))
+        var @out = @$items
+        for (var $i = len(@out) - 1; $i > 0; $i--) {
+            var $j = int(rand($i + 1))
             ($out[$i], $out[$j]) = ($out[$j], $out[$i])
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "minmax") {
         return Rb::v_array([Rb::v_nil(), Rb::v_nil()]) unless len(@$items)
-        my $min = $items->[0]; my $max = $items->[0]
-        for my $e (@$items) {
+        var $min = $items->[0]; var $max = $items->[0]
+        for val $e (@$items) {
             $min = $e if Rb::v_cmp($e, $min) < 0
             $max = $e if Rb::v_cmp($e, $max) > 0
         }
         return Rb::v_array([$min, $max])
     }
     if ($name eq "each_with_object") {
-        my $memo = $args->[0]
-        for my $e (@$items) {
+        val $memo = $args->[0]
+        for val $e (@$items) {
             Rb::call_block($block, [$e, $memo], $ctx)
         }
         return $memo
     }
     if ($name eq "chunk_while") {
-        my @groups
+        var @groups
         return Rb::v_array(\@groups) unless len(@$items)
-        my @cur = ($items->[0])
-        for (my $i = 1; $i < len(@$items); $i++) {
+        var @cur = ($items->[0])
+        for (var $i = 1; $i < len(@$items); $i++) {
             if (Rb::is_truthy(Rb::call_block($block, [$items->[$i - 1], $items->[$i]], $ctx))) {
                 push @cur, $items->[$i]
             } else {
@@ -2579,27 +2579,27 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
         return Rb::v_array(\@groups)
     }
     if ($name eq "each_slice") {
-        my $n = $args->[0]{val}
-        my @out
-        for (my $i = 0; $i < len(@$items); $i += $n) {
-            my $end = $i + $n - 1
+        val $n = $args->[0]{val}
+        var @out
+        for (var $i = 0; $i < len(@$items); $i += $n) {
+            var $end = $i + $n - 1
             $end = len(@$items) - 1 if $end >= len(@$items)
             push @out, Rb::v_array([@$items[$i..$end]])
         }
         if (defined $block) {
-            for my $g (@out) { Rb::call_block($block, [$g], $ctx) }
+            for val $g (@out) { Rb::call_block($block, [$g], $ctx) }
             return $a
         }
         return Rb::v_array(\@out)
     }
     if ($name eq "each_cons") {
-        my $n = $args->[0]{val}
-        my @out
-        for (my $i = 0; $i + $n <= len(@$items); $i++) {
+        val $n = $args->[0]{val}
+        var @out
+        for (var $i = 0; $i + $n <= len(@$items); $i++) {
             push @out, Rb::v_array([@$items[$i..$i + $n - 1]])
         }
         if (defined $block) {
-            for my $g (@out) { Rb::call_block($block, [$g], $ctx) }
+            for val $g (@out) { Rb::call_block($block, [$g], $ctx) }
             return $a
         }
         return Rb::v_array(\@out)
@@ -2609,8 +2609,8 @@ fn Rb::array_m($a, $name, $args, $block, $ctx) {
 
 # Recursive helper for `flatten` — `$depth = -1` means infinite.
 fn Rb::array_flatten($items, $depth) {
-    my @out
-    for my $e (@$items) {
+    var @out
+    for val $e (@$items) {
         if (Rb::is_array($e) && $depth != 0) {
             push @out, @{Rb::array_flatten($e->{items}, $depth - 1)}
         } else {
@@ -2621,7 +2621,7 @@ fn Rb::array_flatten($items, $depth) {
 }
 
 fn Rb::str_m($s, $name, $args, $block, $ctx) {
-    my $v = $s->{val}
+    val $v = $s->{val}
     if ($name eq "length" || $name eq "size") { return Rb::v_int(length($v)) }
     if ($name eq "empty?")    { return Rb::v_bool(length($v) == 0 ? 1 : 0) }
     if ($name eq "upcase")    { return Rb::v_str(uc($v)) }
@@ -2632,42 +2632,42 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "split") {
         # Bare split / split(" ") — split on runs of whitespace, drop leading empties.
         if (!len(@$args) || (Rb::is_str($args->[0]) && $args->[0]{val} eq " ")) {
-            my $r = $v
+            var $r = $v
             $r =~ s/^\s+//
             return Rb::v_array([map {Rb::v_str} split /\s+/, $r])
         }
-        my $sep = $args->[0]{val}
+        val $sep = $args->[0]{val}
         return Rb::v_array([map {Rb::v_str} split /\Q$sep\E/, $v])
     }
     if ($name eq "index") {
-        my $needle = $args->[0]{val}
-        my $i = index($v, $needle)
+        val $needle = $args->[0]{val}
+        val $i = index($v, $needle)
         return $i < 0 ? Rb::v_nil() : Rb::v_int($i)
     }
     if ($name eq "include?") { return Rb::v_bool(index($v, $args->[0]{val}) >= 0 ? 1 : 0) }
     if ($name eq "start_with?") { return Rb::v_bool(substr($v, 0, length($args->[0]{val})) eq $args->[0]{val} ? 1 : 0) }
-    if ($name eq "end_with?")   { my $L = length($args->[0]{val}); return Rb::v_bool($L <= length($v) && substr($v, -$L) eq $args->[0]{val} ? 1 : 0) }
+    if ($name eq "end_with?")   { val $L = length($args->[0]{val}); return Rb::v_bool($L <= length($v) && substr($v, -$L) eq $args->[0]{val} ? 1 : 0) }
     if ($name eq "to_i")  { return Rb::v_int($v + 0) }
     if ($name eq "to_f")  { return Rb::v_float($v + 0.0) }
     if ($name eq "to_sym"){ return Rb::v_sym($v) }
     if ($name eq "[]") {
-        my $idx = $args->[0]
+        val $idx = $args->[0]
         if (Rb::is_int($idx)) {
             if (len(@$args) >= 2 && Rb::is_int($args->[1])) {
-                my $s = $idx->{val}
+                var $s = $idx->{val}
                 $s += length($v) if $s < 0
-                my $len = $args->[1]{val}
+                val $len = $args->[1]{val}
                 return Rb::v_nil() if $s < 0 || $s > length($v) || $len < 0
                 return Rb::v_str(substr($v, $s, $len))
             }
-            my $i = $idx->{val}
+            var $i = $idx->{val}
             $i += length($v) if $i < 0
             return Rb::v_nil() if $i < 0 || $i >= length($v)
             return Rb::v_str(substr($v, $i, 1))
         }
         if (Rb::is_range($idx)) {
-            my $lo = Rb::nv($idx->{lo})
-            my $hi = Rb::nv($idx->{hi})
+            var $lo = Rb::nv($idx->{lo})
+            var $hi = Rb::nv($idx->{hi})
             $lo += length($v) if $lo < 0
             $hi += length($v) if $hi < 0
             $hi-- if $idx->{exclusive}
@@ -2684,8 +2684,8 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "+")     { return Rb::v_str($v . $args->[0]{val}) }
     if ($name eq "*")     { return Rb::v_str($v x $args->[0]{val}) }
     if ($name eq "swapcase") {
-        my $r = ""
-        for my $c (split //, $v) {
+        var $r = ""
+        for val $c (split //, $v) {
             if ($c =~ /[A-Z]/) { $r .= lc($c) }
             elsif ($c =~ /[a-z]/) { $r .= uc($c) }
             else { $r .= $c }
@@ -2693,45 +2693,45 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
         return Rb::v_str($r)
     }
     if ($name eq "bytes") {
-        my @b
-        for my $c (split //, $v) { push @b, Rb::v_int(ord($c)) }
+        var @b
+        for val $c (split //, $v) { push @b, Rb::v_int(ord($c)) }
         return Rb::v_array(\@b)
     }
     if ($name eq "lines") {
         return Rb::v_array([map {Rb::v_str} split /(?<=\n)/, $v])
     }
     if ($name eq "strip" || $name eq "trim") {
-        my $r = $v
+        var $r = $v
         $r =~ s/^\s+//
         $r =~ s/\s+$//
         return Rb::v_str($r)
     }
     if ($name eq "lstrip") {
-        my $r = $v; $r =~ s/^\s+//
+        var $r = $v; $r =~ s/^\s+//
         return Rb::v_str($r)
     }
     if ($name eq "rstrip") {
-        my $r = $v; $r =~ s/\s+$//
+        var $r = $v; $r =~ s/\s+$//
         return Rb::v_str($r)
     }
     if ($name eq "chomp") {
-        my $r = $v; $r =~ s/\r?\n$//
+        var $r = $v; $r =~ s/\r?\n$//
         return Rb::v_str($r)
     }
     if ($name eq "chop") {
         return Rb::v_str(length($v) > 0 ? substr($v, 0, -1) : "")
     }
     if ($name eq "sub") {
-        my $pat = $args->[0]{val}
-        my $rep = $args->[1]{val}
-        my $r = $v
+        val $pat = $args->[0]{val}
+        val $rep = $args->[1]{val}
+        var $r = $v
         $r =~ s/\Q$pat\E/$rep/
         return Rb::v_str($r)
     }
     if ($name eq "gsub") {
-        my $pat = $args->[0]{val}
-        my $rep = $args->[1]{val}
-        my $r = $v
+        val $pat = $args->[0]{val}
+        val $rep = $args->[1]{val}
+        var $r = $v
         $r =~ s/\Q$pat\E/$rep/g
         return Rb::v_str($r)
     }
@@ -2744,11 +2744,11 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
         return $s
     }
     if ($name eq "tr") {
-        my $from = $args->[0]{val}
-        my $to = $args->[1]{val}
-        my $r = ""
-        for my $c (split //, $v) {
-            my $idx = index($from, $c)
+        val $from = $args->[0]{val}
+        val $to = $args->[1]{val}
+        var $r = ""
+        for val $c (split //, $v) {
+            val $idx = index($from, $c)
             if ($idx >= 0 && $idx < length($to)) {
                 $r .= substr($to, $idx, 1)
             } elsif ($idx >= 0) {
@@ -2761,67 +2761,67 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
         return Rb::v_str($r)
     }
     if ($name eq "delete") {
-        my $del = $args->[0]{val}
-        my $r = ""
-        for my $c (split //, $v) {
+        val $del = $args->[0]{val}
+        var $r = ""
+        for val $c (split //, $v) {
             $r .= $c unless index($del, $c) >= 0
         }
         return Rb::v_str($r)
     }
     if ($name eq "squeeze") {
-        my $r = ""; my $prev = ""
-        for my $c (split //, $v) {
+        var $r = ""; var $prev = ""
+        for val $c (split //, $v) {
             $r .= $c unless $c eq $prev
             $prev = $c
         }
         return Rb::v_str($r)
     }
     if ($name eq "center") {
-        my $w = $args->[0]{val}
-        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
-        my $deficit = $w - length($v)
+        val $w = $args->[0]{val}
+        val $pad = len(@$args) > 1 ? $args->[1]{val} : " "
+        val $deficit = $w - length($v)
         return $s if $deficit <= 0
-        my $left = int($deficit / 2)
-        my $right = $deficit - $left
+        val $left = int($deficit / 2)
+        val $right = $deficit - $left
         return Rb::v_str(($pad x $left) . $v . ($pad x $right))
     }
     if ($name eq "ljust") {
-        my $w = $args->[0]{val}
-        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
+        val $w = $args->[0]{val}
+        val $pad = len(@$args) > 1 ? $args->[1]{val} : " "
         return Rb::v_str(length($v) >= $w ? $v : $v . ($pad x ($w - length($v))))
     }
     if ($name eq "rjust") {
-        my $w = $args->[0]{val}
-        my $pad = len(@$args) > 1 ? $args->[1]{val} : " "
+        val $w = $args->[0]{val}
+        val $pad = len(@$args) > 1 ? $args->[1]{val} : " "
         return Rb::v_str(length($v) >= $w ? $v : ($pad x ($w - length($v))) . $v)
     }
     if ($name eq "match?") {
-        my $pat = $args->[0]{val}
+        val $pat = $args->[0]{val}
         return Rb::v_bool($v =~ /$pat/ ? 1 : 0)
     }
     if ($name eq "match") {
-        my $pat = $args->[0]{val}
+        val $pat = $args->[0]{val}
         return $v =~ /$pat/ ? Rb::v_str($&) : Rb::v_nil()
     }
     if ($name eq "scan") {
-        my $pat = $args->[0]{val}
-        my @hits = ($v =~ /$pat/g)
+        val $pat = $args->[0]{val}
+        val @hits = ($v =~ /$pat/g)
         return Rb::v_array([map {Rb::v_str} @hits])
     }
     if ($name eq "count") {
-        my $n = 0
-        my $needle = $args->[0]{val}
+        var $n = 0
+        val $needle = $args->[0]{val}
         $n++ for $v =~ /\Q$needle\E/g
         return Rb::v_int($n)
     }
     if ($name eq "each_char") {
-        for my $c (split //, $v) {
+        for val $c (split //, $v) {
             Rb::call_block($block, [Rb::v_str($c)], $ctx)
         }
         return $s
     }
     if ($name eq "each_line") {
-        for my $line (split /(?<=\n)/, $v) {
+        for val $line (split /(?<=\n)/, $v) {
             Rb::call_block($block, [Rb::v_str($line)], $ctx)
         }
         return $s
@@ -2834,8 +2834,8 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
     if ($name eq "succ" || $name eq "next") {
         # Just bump last char (simplified).
         return Rb::v_str("") if length($v) == 0
-        my $last = substr($v, -1, 1)
-        my $rest = substr($v, 0, length($v) - 1)
+        val $last = substr($v, -1, 1)
+        val $rest = substr($v, 0, length($v) - 1)
         return Rb::v_str($rest . chr(ord($last) + 1))
     }
     if ($name eq "ord")     { return Rb::v_int(ord(substr($v, 0, 1))) }
@@ -2845,15 +2845,15 @@ fn Rb::str_m($s, $name, $args, $block, $ctx) {
 }
 
 fn Rb::hash_m($h, $name, $args, $block, $ctx) {
-    my $pairs = $h->{pairs}
+    val $pairs = $h->{pairs}
     if ($name eq "[]") {
-        for my $p (@$pairs) {
+        for val $p (@$pairs) {
             return $p->[1] if Rb::v_eq($p->[0], $args->[0])
         }
         return Rb::v_nil()
     }
     if ($name eq "[]=") {
-        for my $p (@$pairs) {
+        for var $p (@$pairs) {
             if (Rb::v_eq($p->[0], $args->[0])) { $p->[1] = $args->[1]; return $args->[1] }
         }
         push @$pairs, [$args->[0], $args->[1]]
@@ -2866,24 +2866,24 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
     if ($name eq "values")   { return Rb::v_array([map { $_->[1] } @$pairs]) }
     if ($name eq "empty?")   { return Rb::v_bool(len(@$pairs) == 0 ? 1 : 0) }
     if ($name eq "has_key?" || $name eq "key?" || $name eq "include?") {
-        for my $p (@$pairs) { return Rb::v_bool(1) if Rb::v_eq($p->[0], $args->[0]) }
+        for val $p (@$pairs) { return Rb::v_bool(1) if Rb::v_eq($p->[0], $args->[0]) }
         return Rb::v_bool(0)
     }
     if ($name eq "each" || $name eq "each_pair") {
-        for my $p (@$pairs) { Rb::call_block($block, [$p->[0], $p->[1]], $ctx) }
+        for val $p (@$pairs) { Rb::call_block($block, [$p->[0], $p->[1]], $ctx) }
         return $h
     }
     if ($name eq "map") {
-        my @out
-        for my $p (@$pairs) { push @out, Rb::call_block($block, [$p->[0], $p->[1]], $ctx) }
+        var @out
+        for val $p (@$pairs) { push @out, Rb::call_block($block, [$p->[0], $p->[1]], $ctx) }
         return Rb::v_array(\@out)
     }
     if ($name eq "merge") {
-        my @m = map { [$_->[0], $_->[1]] } @$pairs
-        for my $other (@$args) {
-            for my $p (@{$other->{pairs}}) {
-                my $found = 0
-                for my $mp (@m) {
+        var @m = map { [$_->[0], $_->[1]] } @$pairs
+        for val $other (@$args) {
+            for val $p (@{$other->{pairs}}) {
+                var $found = 0
+                for var $mp (@m) {
                     if (Rb::v_eq($mp->[0], $p->[0])) { $mp->[1] = $p->[1]; $found = 1; last }
                 }
                 push @m, [$p->[0], $p->[1]] unless $found
@@ -2892,9 +2892,9 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash(\@m)
     }
     if ($name eq "delete") {
-        for (my $i = 0; $i < len(@$pairs); $i++) {
+        for (var $i = 0; $i < len(@$pairs); $i++) {
             if (Rb::v_eq($pairs->[$i][0], $args->[0])) {
-                my $val = $pairs->[$i][1]
+                val $val = $pairs->[$i][1]
                 splice @$pairs, $i, 1
                 return $val
             }
@@ -2902,7 +2902,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_nil()
     }
     if ($name eq "fetch") {
-        for my $p (@$pairs) {
+        for val $p (@$pairs) {
             return $p->[1] if Rb::v_eq($p->[0], $args->[0])
         }
         return $args->[1] if len(@$args) > 1
@@ -2913,7 +2913,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash([map { [$_->[1], $_->[0]] } @$pairs])
     }
     if ($name eq "has_value?" || $name eq "value?") {
-        for my $p (@$pairs) {
+        for val $p (@$pairs) {
             return Rb::v_bool(1) if Rb::v_eq($p->[1], $args->[0])
         }
         return Rb::v_bool(0)
@@ -2925,16 +2925,16 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash([map { [$_->[0], $_->[1]] } @$pairs])
     }
     if ($name eq "each_key") {
-        for my $p (@$pairs) { Rb::call_block($block, [$p->[0]], $ctx) }
+        for val $p (@$pairs) { Rb::call_block($block, [$p->[0]], $ctx) }
         return $h
     }
     if ($name eq "each_value") {
-        for my $p (@$pairs) { Rb::call_block($block, [$p->[1]], $ctx) }
+        for val $p (@$pairs) { Rb::call_block($block, [$p->[1]], $ctx) }
         return $h
     }
     if ($name eq "select" || $name eq "filter") {
-        my @kept
-        for my $p (@$pairs) {
+        var @kept
+        for val $p (@$pairs) {
             if (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
                 push @kept, [$p->[0], $p->[1]]
             }
@@ -2942,8 +2942,8 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash(\@kept)
     }
     if ($name eq "reject") {
-        my @kept
-        for my $p (@$pairs) {
+        var @kept
+        for val $p (@$pairs) {
             unless (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
                 push @kept, [$p->[0], $p->[1]]
             }
@@ -2951,7 +2951,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_hash(\@kept)
     }
     if ($name eq "any?") {
-        for my $p (@$pairs) {
+        for val $p (@$pairs) {
             if (defined $block) {
                 return Rb::v_bool(1)
                     if Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))
@@ -2962,7 +2962,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
         return Rb::v_bool(0)
     }
     if ($name eq "all?") {
-        for my $p (@$pairs) {
+        for val $p (@$pairs) {
             unless (Rb::is_truthy(Rb::call_block($block, [$p->[0], $p->[1]], $ctx))) {
                 return Rb::v_bool(0)
             }
@@ -2971,34 +2971,34 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
     }
     if ($name eq "min_by") {
         return Rb::v_nil() unless len(@$pairs)
-        my $best = $pairs->[0]
-        my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
-        for (my $i = 1; $i < len(@$pairs); $i++) {
-            my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
+        var $best = $pairs->[0]
+        var $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
+        for (var $i = 1; $i < len(@$pairs); $i++) {
+            val $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
             if (Rb::v_cmp($k, $bk) < 0) { $best = $pairs->[$i]; $bk = $k }
         }
         return Rb::v_array([$best->[0], $best->[1]])
     }
     if ($name eq "max_by") {
         return Rb::v_nil() unless len(@$pairs)
-        my $best = $pairs->[0]
-        my $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
-        for (my $i = 1; $i < len(@$pairs); $i++) {
-            my $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
+        var $best = $pairs->[0]
+        var $bk = Rb::call_block($block, [$best->[0], $best->[1]], $ctx)
+        for (var $i = 1; $i < len(@$pairs); $i++) {
+            val $k = Rb::call_block($block, [$pairs->[$i][0], $pairs->[$i][1]], $ctx)
             if (Rb::v_cmp($k, $bk) > 0) { $best = $pairs->[$i]; $bk = $k }
         }
         return Rb::v_array([$best->[0], $best->[1]])
     }
     if ($name eq "transform_values") {
-        my @out
-        for my $p (@$pairs) {
+        var @out
+        for val $p (@$pairs) {
             push @out, [$p->[0], Rb::call_block($block, [$p->[1]], $ctx)]
         }
         return Rb::v_hash(\@out)
     }
     if ($name eq "transform_keys") {
-        my @out
-        for my $p (@$pairs) {
+        var @out
+        for val $p (@$pairs) {
             push @out, [Rb::call_block($block, [$p->[0]], $ctx), $p->[1]]
         }
         return Rb::v_hash(\@out)
@@ -3008,16 +3008,16 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
     }
     if ($name eq "min") {
         return Rb::v_nil() unless len(@$pairs)
-        my $best = $pairs->[0]
-        for my $p (@$pairs) {
+        var $best = $pairs->[0]
+        for val $p (@$pairs) {
             $best = $p if Rb::v_cmp($p->[0], $best->[0]) < 0
         }
         return Rb::v_array([$best->[0], $best->[1]])
     }
     if ($name eq "max") {
         return Rb::v_nil() unless len(@$pairs)
-        my $best = $pairs->[0]
-        for my $p (@$pairs) {
+        var $best = $pairs->[0]
+        for val $p (@$pairs) {
             $best = $p if Rb::v_cmp($p->[0], $best->[0]) > 0
         }
         return Rb::v_array([$best->[0], $best->[1]])
@@ -3031,7 +3031,7 @@ fn Rb::hash_m($h, $name, $args, $block, $ctx) {
 }
 
 fn Rb::int_m($n, $name, $args, $block, $ctx) {
-    my $v = $n->{val}
+    val $v = $n->{val}
     if ($name eq "to_s")  { return Rb::v_str("" . $v) }
     if ($name eq "to_i" || $name eq "to_int") { return $n }
     if ($name eq "to_f")  { return Rb::v_float($v + 0.0) }
@@ -3042,69 +3042,69 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
     if ($name eq "succ" || $name eq "next") { return Rb::v_int($v + 1) }
     if ($name eq "pred")  { return Rb::v_int($v - 1) }
     if ($name eq "times") {
-        for (my $i = 0; $i < $v; $i++) {
+        for (var $i = 0; $i < $v; $i++) {
             Rb::call_block($block, [Rb::v_int($i)], $ctx)
         }
         return $n
     }
     if ($name eq "upto") {
-        my $hi = $args->[0]{val}
-        for (my $i = $v; $i <= $hi; $i++) {
+        val $hi = $args->[0]{val}
+        for (var $i = $v; $i <= $hi; $i++) {
             Rb::call_block($block, [Rb::v_int($i)], $ctx)
         }
         return $n
     }
     if ($name eq "downto") {
-        my $lo = $args->[0]{val}
-        for (my $i = $v; $i >= $lo; $i--) {
+        val $lo = $args->[0]{val}
+        for (var $i = $v; $i >= $lo; $i--) {
             Rb::call_block($block, [Rb::v_int($i)], $ctx)
         }
         return $n
     }
     if ($name eq "step") {
-        my $hi = $args->[0]{val}
-        my $step = len(@$args) > 1 ? $args->[1]{val} : 1
+        val $hi = $args->[0]{val}
+        val $step = len(@$args) > 1 ? $args->[1]{val} : 1
         if ($step > 0) {
-            for (my $i = $v; $i <= $hi; $i += $step) {
+            for (var $i = $v; $i <= $hi; $i += $step) {
                 Rb::call_block($block, [Rb::v_int($i)], $ctx)
             }
         } elsif ($step < 0) {
-            for (my $i = $v; $i >= $hi; $i += $step) {
+            for (var $i = $v; $i >= $hi; $i += $step) {
                 Rb::call_block($block, [Rb::v_int($i)], $ctx)
             }
         }
         return $n
     }
     if ($name eq "gcd") {
-        my $a = abs($v); my $b = abs($args->[0]{val})
+        var $a = abs($v); var $b = abs($args->[0]{val})
         while ($b) { ($a, $b) = ($b, $a % $b) }
         return Rb::v_int($a)
     }
     if ($name eq "lcm") {
-        my $a = abs($v); my $b = abs($args->[0]{val})
+        val $a = abs($v); val $b = abs($args->[0]{val})
         return Rb::v_int(0) if $a == 0 || $b == 0
-        my $x = $a; my $y = $b
+        var $x = $a; var $y = $b
         while ($y) { ($x, $y) = ($y, $x % $y) }
         return Rb::v_int(int($a * $b / $x))
     }
     if ($name eq "divmod") {
-        my $b = $args->[0]{val}
-        my $q = int($v / $b)
+        val $b = $args->[0]{val}
+        var $q = int($v / $b)
         $q-- if ($v % $b != 0) && (($v < 0) != ($b < 0))
-        my $r = $v - $q * $b
+        val $r = $v - $q * $b
         return Rb::v_array([Rb::v_int($q), Rb::v_int($r)])
     }
     if ($name eq "digits") {
-        my $base = len(@$args) ? $args->[0]{val} : 10
-        my @d
-        my $x = abs($v)
+        val $base = len(@$args) ? $args->[0]{val} : 10
+        var @d
+        var $x = abs($v)
         if ($x == 0) { @d = (0) }
         while ($x > 0) { push @d, $x % $base; $x = int($x / $base) }
         return Rb::v_array([map {Rb::v_int} @d])
     }
     if ($name eq "bit_length") {
-        my $x = $v < 0 ? ~$v : $v
-        my $bits = 0
+        var $x = $v < 0 ? ~$v : $v
+        var $bits = 0
         while ($x > 0) { $bits++; $x = $x >> 1 }
         return Rb::v_int($bits)
     }
@@ -3118,13 +3118,13 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
     if ($name eq "**")        { return Rb::v_int($v ** $args->[0]{val}) }
     if ($name eq "coerce")    { return Rb::v_array([$args->[0], $n]) }
     if ($name eq "between?") {
-        my $lo = Rb::nv($args->[0])
-        my $hi = Rb::nv($args->[1])
+        val $lo = Rb::nv($args->[0])
+        val $hi = Rb::nv($args->[1])
         return Rb::v_bool(($v >= $lo && $v <= $hi) ? 1 : 0)
     }
     if ($name eq "clamp") {
-        my $lo = Rb::nv($args->[0])
-        my $hi = Rb::nv($args->[1])
+        val $lo = Rb::nv($args->[0])
+        val $hi = Rb::nv($args->[1])
         return Rb::v_int($lo) if $v < $lo
         return Rb::v_int($hi) if $v > $hi
         return $n
@@ -3133,9 +3133,9 @@ fn Rb::int_m($n, $name, $args, $block, $ctx) {
 }
 
 fn Rb::float_m($f, $name, $args, $block, $ctx) {
-    my $v = $f->{val}
+    val $v = $f->{val}
     if ($name eq "to_s") {
-        my $s = $v . ""
+        val $s = $v . ""
         return Rb::v_str($s . ".0") unless $s =~ /[.eE]/
         return Rb::v_str($s)
     }
@@ -3148,9 +3148,9 @@ fn Rb::float_m($f, $name, $args, $block, $ctx) {
     if ($name eq "positive?") { return Rb::v_bool($v > 0  ? 1 : 0) }
     if ($name eq "negative?") { return Rb::v_bool($v < 0  ? 1 : 0) }
     if ($name eq "round") {
-        my $digits = len(@$args) ? $args->[0]{val} : 0
+        val $digits = len(@$args) ? $args->[0]{val} : 0
         if ($digits > 0) {
-            my $f10 = 10 ** $digits
+            val $f10 = 10 ** $digits
             return Rb::v_float(int($v * $f10 + ($v >= 0 ? 0.5 : -0.5)) / $f10)
         }
         return Rb::v_int(int($v + ($v >= 0 ? 0.5 : -0.5)))
@@ -3171,7 +3171,7 @@ fn Rb::float_m($f, $name, $args, $block, $ctx) {
 }
 
 fn Rb::range_m($r, $name, $args, $block, $ctx) {
-    my $items = Rb::iter_items($r)
+    val $items = Rb::iter_items($r)
     if ($name eq "to_a")    { return Rb::v_array($items) }
     if ($name eq "first")   { return $r->{lo} }
     if ($name eq "last")    { return $r->{hi} }
@@ -3182,16 +3182,16 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
         return Rb::v_bool(Rb::case_match($r, $args->[0]) ? 1 : 0)
     }
     if ($name eq "each") {
-        for my $e (@$items) { Rb::call_block($block, [$e], $ctx) }
+        for val $e (@$items) { Rb::call_block($block, [$e], $ctx) }
         return $r
     }
     if ($name eq "step") {
-        my $stride = len(@$args) ? Rb::nv($args->[0]) : 1
-        my $lo = Rb::nv($r->{lo})
-        my $hi = Rb::nv($r->{hi})
+        val $stride = len(@$args) ? Rb::nv($args->[0]) : 1
+        val $lo = Rb::nv($r->{lo})
+        var $hi = Rb::nv($r->{hi})
         $hi-- if $r->{exclusive}
-        my @out
-        for (my $i = $lo; $i <= $hi; $i += $stride) {
+        var @out
+        for (var $i = $lo; $i <= $hi; $i += $stride) {
             if (defined $block) {
                 Rb::call_block($block, [Rb::v_int($i)], $ctx)
             } else {
@@ -3202,13 +3202,13 @@ fn Rb::range_m($r, $name, $args, $block, $ctx) {
         return Rb::v_array(\@out)
     }
     if ($name eq "map") {
-        my @out
-        for my $e (@$items) { push @out, Rb::call_block($block, [$e], $ctx) }
+        var @out
+        for val $e (@$items) { push @out, Rb::call_block($block, [$e], $ctx) }
         return Rb::v_array(\@out)
     }
     if ($name eq "sum") {
-        my $s = 0
-        for my $e (@$items) { $s += Rb::nv($e) }
+        var $s = 0
+        for val $e (@$items) { $s += Rb::nv($e) }
         return Rb::v_int($s)
     }
     undef
@@ -3226,7 +3226,7 @@ fn Rb::proc_m($p, $name, $args, $block, $ctx) {
 }
 
 fn Rb::sym_m($s, $name, $args, $block, $ctx) {
-    my $v = $s->{val}
+    var $v = $s->{val}
     if ($name eq "to_s")     { return Rb::v_str($v) }
     if ($name eq "to_sym")   { return $s }
     if ($name eq "length" || $name eq "size") { return Rb::v_int(length($v)) }
@@ -3236,7 +3236,7 @@ fn Rb::sym_m($s, $name, $args, $block, $ctx) {
     if ($name eq "empty?")   { return Rb::v_bool(length($v) == 0 ? 1 : 0) }
     if ($name eq "to_proc") {
         # `&:method` — turns a symbol into a one-arg block calling that method.
-        my $body = [+{
+        val $body = [+{
             kind  => "Call",
             recv  => +{ kind => "Ident", name => "x", line => 0 },
             name  => $v,
@@ -3266,7 +3266,7 @@ fn Rb::nil_m($v, $name, $args, $block, $ctx) {
 }
 
 fn Rb::bool_m($v, $name, $args, $block, $ctx) {
-    my $b = $v->{val}
+    val $b = $v->{val}
     if ($name eq "to_s")    { return Rb::v_str($b ? "true" : "false") }
     if ($name eq "inspect") { return Rb::v_str($b ? "true" : "false") }
     if ($name eq "!")       { return Rb::v_bool($b ? 0 : 1) }
@@ -3279,24 +3279,24 @@ fn Rb::bool_m($v, $name, $args, $block, $ctx) {
 # Bootstrap the class registry with the named built-ins. Includes a small
 # exception hierarchy so `rescue`-by-class works.
 fn Rb::bootstrap_classes($ctx) {
-    my $obj = Rb::v_class("Object", undef)
+    val $obj = Rb::v_class("Object", undef)
     $ctx->{classes}{Object} = $obj
-    my $num = Rb::v_class("Numeric", $obj)
+    val $num = Rb::v_class("Numeric", $obj)
     $ctx->{classes}{Numeric} = $num
     $ctx->{classes}{Integer} = Rb::v_class("Integer", $num)
     $ctx->{classes}{Float}   = Rb::v_class("Float",   $num)
-    for my $name (qw(String Symbol Array Hash Range
+    for var $name (qw(String Symbol Array Hash Range
                       TrueClass FalseClass NilClass Proc Class Module
                       Comparable Enumerable)) {
         $ctx->{classes}{$name} = Rb::v_class($name, $obj)
     }
-    my $exc = Rb::v_class("Exception", $obj)
+    val $exc = Rb::v_class("Exception", $obj)
     $ctx->{classes}{Exception} = $exc
-    my $std = Rb::v_class("StandardError", $exc)
+    val $std = Rb::v_class("StandardError", $exc)
     $ctx->{classes}{StandardError} = $std
-    my $rt = Rb::v_class("RuntimeError", $std)
+    val $rt = Rb::v_class("RuntimeError", $std)
     $ctx->{classes}{RuntimeError} = $rt
-    for my $sub (qw(ArgumentError TypeError NameError NoMethodError
+    for val $sub (qw(ArgumentError TypeError NameError NoMethodError
                      ZeroDivisionError IndexError KeyError IOError
                      StopIteration FrozenError NotImplementedError
                      RangeError FloatDomainError)) {
@@ -3310,16 +3310,16 @@ fn Rb::bootstrap_classes($ctx) {
 # as an inspected string (one-shot helper, fresh context per call).
 
 fn Rb::eval_str($src) {
-    my $ctx = Rb::ctx_new()
+    val $ctx = Rb::ctx_new()
     Rb::bootstrap_classes($ctx)
-    my $r = Rb::run($src, $ctx)
+    val $r = Rb::run($src, $ctx)
     Rb::inspect($r)
 }
 
 package main
 
 fn rb_test($desc, $src, $expected) {
-    my $got = eval { Rb::eval_str($src) }
+    val $got = eval { Rb::eval_str($src) }
     if ($@) {
         assert_ok 0, $desc . " — error: " . $@
         return

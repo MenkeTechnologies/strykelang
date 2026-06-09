@@ -2,12 +2,12 @@
 # Rosetta Code: Experimental Verification of the NKTg Law in Earth Orbit Based on NASA’s 2025 Earth Dataset
 
 fn Rosetta::NKTgEarth::score($alts) {
-    my $sum = 0
-    for my $a (@$alts) { $sum += 1 / (1 + $a) }
+    var $sum = 0
+    for val $a (@$alts) { $sum += 1 / (1 + $a) }
     $sum
 }
 
-my @alts = (0.2, 0.4, 0.8, 1.6)
+val @alts = (0.2, 0.4, 0.8, 1.6)
 
 assert_eq int(Rosetta::NKTgEarth::score(\@alts) * 1000), 2487, "earth-orbit score is stable"
 assert_eq len(@alts), 4, "dataset contains four orbit samples"

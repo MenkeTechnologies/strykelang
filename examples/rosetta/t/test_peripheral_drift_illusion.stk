@@ -2,7 +2,7 @@
 # Rosetta Code: Peripheral drift illusion
 
 fn Rosetta::Drift::render() {
-    my @rows = (
+    val @rows = (
         '  oO@Oo  ',
         ' o@..@o ',
         'O..@@..O',
@@ -12,7 +12,7 @@ fn Rosetta::Drift::render() {
     \@rows
 }
 
-my $illusion = Rosetta::Drift::render()
+val $illusion = Rosetta::Drift::render()
 
 assert_eq len(@$illusion), 5, "illusion uses five rows"
 assert_eq $illusion->[2], "O..@@..O", "center band rendered"

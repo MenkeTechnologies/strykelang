@@ -5,16 +5,16 @@
 # longest possible chain.
 
 fn Rosetta::ChainWords::longest($words) {
-    my %used
-    my @best
+    var %used
+    var @best
     Rosetta::ChainWords::dfs($words, \%used, [], \@best)
     @best
 }
 
 fn Rosetta::ChainWords::dfs($words, $used, $cur, $best) {
     if (len(@$cur) > len(@$best)) { @$best = @$cur }
-    my $head = len(@$cur) > 0 ? lc(substr($cur->[-1], -1)) : undef
-    for my $w (@$words) {
+    val $head = len(@$cur) > 0 ? lc(substr($cur->[-1], -1)) : undef
+    for val $w (@$words) {
         next if exists $used->{$w}
         next if defined $head && lc(substr($w, 0, 1)) ne $head
         $used->{$w} = 1
@@ -27,8 +27,8 @@ fn Rosetta::ChainWords::dfs($words, $used, $cur, $best) {
 
 fn Rosetta::ChainWords::is_valid_chain($chain) {
     return 1 if len(@$chain) <= 1
-    my %seen = ($chain->[0] => 1)
-    for my $i (1..len(@$chain) - 1) {
+    var %seen = ($chain->[0] => 1)
+    for val $i (1..len(@$chain) - 1) {
         return 0 if exists $seen{$chain->[$i]}
         $seen{$chain->[$i]} = 1
         return 0 if lc(substr($chain->[$i - 1], -1))
@@ -40,13 +40,13 @@ fn Rosetta::ChainWords::is_valid_chain($chain) {
 # Tiny dictionary: chain "ant", "tea", "ape"... longest = ant→tea→ape but
 # ape ends with 'e' not connecting. Actually a→t→a→ longest is 2.
 # Rosetta sample: cat, tap, pencil, lemon, nice, eel
-my @small = ("cat", "tap", "pencil", "lemon", "nice", "eel")
-my @ch = Rosetta::ChainWords::longest(\@small)
+val @small = ("cat", "tap", "pencil", "lemon", "nice", "eel")
+val @ch = Rosetta::ChainWords::longest(\@small)
 assert_ok len(@ch) >= 2, "found a chain"
 assert_eq Rosetta::ChainWords::is_valid_chain(\@ch), 1, "chain valid"
 
 # Pokémon trio: bulbasaur, raichu, ulysses-style
-my @poke = ("audino", "bagon", "baltoy", "banette", "bidoof", "braviary",
+val @poke = ("audino", "bagon", "baltoy", "banette", "bidoof", "braviary",
             "bronzor", "carracosta", "charmeleon", "cresselia", "croagunk",
             "darmanitan", "deino", "emboar", "emolga", "exeggcute", "gabite",
             "girafarig", "gulpin", "haxorus", "heatmor", "heatran", "ivysaur",
@@ -60,17 +60,17 @@ my @poke = ("audino", "bagon", "baltoy", "banette", "bidoof", "braviary",
             "tirtouga", "trapinch", "treecko", "tyrogue", "vigoroth",
             "vulpix", "wailord", "wartortle", "whismur", "wingull",
             "yamask")
-my @pchain = Rosetta::ChainWords::longest(\@poke[0:14])    # subset for speed
+val @pchain = Rosetta::ChainWords::longest(\@poke[0:14])    # subset for speed
 assert_ok Rosetta::ChainWords::is_valid_chain(\@pchain), "Pokémon subset chain valid"
 
 # Single word forms a trivial chain
-my @one = Rosetta::ChainWords::longest(["alpha"])
+val @one = Rosetta::ChainWords::longest(["alpha"])
 assert_eq len(@one), 1, "single-word chain"
 assert_eq $one[0], "alpha", "single word preserved"
 
 # Disjoint dictionary: nothing chains
-my @disjoint = ("cat", "moon", "frog")
-my @no_chain = Rosetta::ChainWords::longest(\@disjoint)
+val @disjoint = ("cat", "moon", "frog")
+val @no_chain = Rosetta::ChainWords::longest(\@disjoint)
 # Best is any single word
 assert_eq len(@no_chain), 1, "disjoint dict → length 1"
 

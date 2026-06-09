@@ -27,10 +27,10 @@ p "── HTTP Router with Middleware ──────────────
 # dynamic-pattern caching quirks.
 
 fn Router::compile_pattern($pattern) {
-    my @segs = split m{/}, $pattern
+    var @segs = split m{/}, $pattern
     shift @segs if @segs && $segs[0] eq ""        # leading `/` → empty seg
-    my @spec
-    for my $s (@segs) {
+    var @spec
+    for val $s (@segs) {
         if ($s =~ /^:(.+)$/) {
             push @spec, +{ kind => "param", name => $1 }
         } else {
@@ -41,13 +41,13 @@ fn Router::compile_pattern($pattern) {
 }
 
 fn Router::match_pattern($compiled, $path) {
-    my @segs = split m{/}, $path
+    var @segs = split m{/}, $path
     shift @segs if @segs && $segs[0] eq ""
-    my $spec = $compiled->{spec}
+    val $spec = $compiled->{spec}
     return undef if len(@segs) != len(@$spec)
-    my %params
-    for my $i (0:len(@$spec) - 1) {
-        my $s = $spec->[$i]
+    var %params
+    for val $i (0:len(@$spec) - 1) {
+        val $s = $spec->[$i]
         if ($s->{kind} eq "lit") {
             return undef if $segs[$i] ne $s->{value}
         } else {
@@ -59,11 +59,11 @@ fn Router::match_pattern($compiled, $path) {
 
 # ── 2. Router registry ────────────────────────────────────────────
 
-my @routes      # list of { method, pattern, compiled, handler }
+var @routes      # list of { method, pattern, compiled, handler }
 mysync @middlewares = ()
 
 fn Router::register($method, $pattern, $handler) {
-    my $c = Router::compile_pattern $pattern
+    val $c = Router::compile_pattern $pattern
     push @routes, +{ method => $method, pattern => $pattern, compiled => $c, handler => $handler }
 }
 
@@ -72,9 +72,9 @@ fn Router::use($mw) { push @middlewares, $mw }
 # ── 3. Dispatch ───────────────────────────────────────────────────
 
 fn Router::match_route($req) {
-    for my $r (@routes) {
+    for var $r (@routes) {
         next unless $r->{method} eq $req->{method}
-        my $params = Router::match_pattern $r->{compiled}, $req->{path}
+        val $params = Router::match_pattern $r->{compiled}, $req->{path}
         return +{ route => $r, params => $params } if defined $params
     }
     undef
@@ -82,16 +82,16 @@ fn Router::match_route($req) {
 
 # Compose middleware chain — last middleware wraps the handler innermost.
 fn Router::dispatch($req) {
-    my $hit = Router::match_route $req
+    val $hit = Router::match_route $req
     return +{ status => 404, body => "not found: $req->{method} $req->{path}" } unless $hit
     $req->{params} = $hit->{params}
-    my $route      = $hit->{route}
+    val $route      = $hit->{route}
 
-    my $handler = $route->{handler}
+    var $handler = $route->{handler}
     # Wrap from innermost to outermost so the first registered middleware is
     # the outermost (runs first).
-    for my $mw (rev @middlewares) {
-        my $next = $handler
+    for val $mw (rev @middlewares) {
+        val $next = $handler
         $handler = fn { $mw(_, $next) }
     }
     $handler($req)
@@ -102,14 +102,14 @@ fn Router::dispatch($req) {
 mysync @access_log = ()
 
 Router::use fn {
-    my ($req, $next) = (_, _1)
+    var ($req, $next) = (_, _1)
     push @access_log, "$req->{method} $req->{path}"
-    my $res = $next($req)
+    val $res = $next($req)
     $res
 }
 
 Router::use fn {
-    my ($req, $next) = (_, _1)
+    var ($req, $next) = (_, _1)
     return +{ status => 401, body => "missing token" } unless $req->{headers}{authorization}
     return +{ status => 403, body => "bad token"     } unless $req->{headers}{authorization} eq "Bearer secret-xyz"
     $req->{user} = +{ id => 42, name => "alice" }
@@ -118,8 +118,8 @@ Router::use fn {
 
 mysync %rate
 Router::use fn {
-    my ($req, $next) = (_, _1)
-    my $ip = $req->{ip} // "unknown"
+    val ($req, $next) = (_, _1)
+    val $ip = $req->{ip} // "unknown"
     $rate{$ip} //= 0
     $rate{$ip}++
     return +{ status => 429, body => "rate limited" } if $rate{$ip} > 5
@@ -160,7 +160,7 @@ fn Router::make_req($method, $path, %opts) {
     }
 }
 
-my @cases = (
+val @cases = (
     Router::make_req("GET",    "/"),
     Router::make_req("GET",    "/users/7"),
     Router::make_req("GET",    "/orders/A100/items/X1"),
@@ -172,9 +172,9 @@ my @cases = (
 )
 
 p "Dispatching #{ len @cases } requests…"
-my @responses
-for my $req (@cases) {
-    my $res = Router::dispatch $req
+var @responses
+for val $req (@cases) {
+    val $res = Router::dispatch $req
     push @responses, $res
     printf "  %-6s %-30s → %d  %s\n",
         $req->{method}, $req->{path}, $res->{status}, $res->{body}
@@ -183,10 +183,10 @@ for my $req (@cases) {
 # Now hammer the rate-limiter from a different IP
 p ""
 p "── Rate-limit exhaustion (6 requests from 10.0.0.99) ──"
-my @rate_res
-for my $i (1:6) {
-    my $req = Router::make_req("GET", "/users/$i", ip => "10.0.0.99")
-    my $res = Router::dispatch $req
+var @rate_res
+for val $i (1:6) {
+    val $req = Router::make_req("GET", "/users/$i", ip => "10.0.0.99")
+    val $res = Router::dispatch $req
     push @rate_res, $res
     printf "  req #%d → %d  %s\n", $i, $res->{status}, $res->{body}
 }

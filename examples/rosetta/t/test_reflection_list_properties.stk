@@ -13,8 +13,8 @@ fn Rosetta::Reflection::list_properties($obj) {
 }
 
 # Test with a hash
-my $h = +{ name => "Alice", age => 30, city => "New York" }
-my $p1 = Rosetta::Reflection::list_properties($h)
+val $h = +{ name => "Alice", age => 30, city => "New York" }
+val $p1 = Rosetta::Reflection::list_properties($h)
 assert_eq join(",", @$p1), "age,city,name", "Hash properties"
 
 # Test with a class instance
@@ -23,10 +23,10 @@ class Rosetta::Reflection::Person {
     age: Int = 0
 }
 
-my $p = Rosetta::Reflection::Person(name => "Bob", age => 25)
+val $p = Rosetta::Reflection::Person(name => "Bob", age => 25)
 # In Stryke, class instances might be inspectable via keys if they are hash-backed.
 # If not, this might return empty or error.
-my $p2 = Rosetta::Reflection::list_properties($p)
+val $p2 = Rosetta::Reflection::list_properties($p)
 
 # We check if we can at least get something or if it handles it gracefully.
 p "Person properties: " . join(",", @$p2)

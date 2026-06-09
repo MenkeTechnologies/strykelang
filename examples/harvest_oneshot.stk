@@ -5,35 +5,35 @@
 # divination handle in between.
 #
 # Compare:
-#   long form:   my $div = pray $code, @workers; my %r = annex $div
-#   harvest:     my %r = harvest $code, @workers
+#   long form:   val $div = pray $code, @workers; val %r = annex $div
+#   harvest:     val %r = harvest $code, @workers
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
 p "── harvest: one-shot scatter+gather ──"
 
-my @workers = congregation(3)
+val @workers = congregation(3)
 printf "spawned %d workers\n", len(@workers)
 
 # Each worker computes the sum of 1..1000 and returns it. Same compute
 # on every worker so we can verify identical answers.
-my %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 5_000
+val %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 5_000
 
 p "── per-worker results ──"
-for my $sid (sort { _ <=> _1 } keys %results) {
+for val $sid (sort { _ <=> _1 } keys %results) {
     printf "  worker %d: %s\n", $sid, $results{$sid}
 }
 
 # Sanity: sum 1..1000 = 500500.
-my $expected = 500_500
-my $all_match = 1
-for my $sid (keys %results) {
+val $expected = 500_500
+var $all_match = 1
+for val $sid (keys %results) {
     $all_match = 0 unless $results{$sid} eq "$expected"
 }
 p $all_match ? "✓ all 3 workers returned $expected (= 1000*1001/2)" : "✗ workers diverged"
 
 # Custom timeout — harvest's optional last-arg integer >= 100 is a timeout.
-my %fast = harvest "42", @workers, 1_000
+val %fast = harvest "42", @workers, 1_000
 printf "fast harvest with 1s timeout: %d workers replied\n", len(keys %fast)
 
 excommunicate(@workers)

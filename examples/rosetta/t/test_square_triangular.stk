@@ -2,13 +2,13 @@
 # Rosetta Code: Square-triangular numbers
 
 fn Rosetta::SquareTriangular::is_triangular($n) {
-    my $val = 8 * $n + 1
-    my $root = int(sqrt($val))
+    val $val = 8 * $n + 1
+    val $root = int(sqrt($val))
     $root * $root == $val
 }
 
 fn Rosetta::SquareTriangular::is_square($n) {
-    my $root = int(sqrt($n))
+    val $root = int(sqrt($n))
     $root * $root == $n
 }
 

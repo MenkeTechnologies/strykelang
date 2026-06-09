@@ -16,14 +16,14 @@
 
 # 2-list zip — returns list of 2-element arrayrefs.
 fn Zip::pair($xs, $ys) {
-    my $n = min(len(@$xs), len(@$ys))
+    val $n = min(len(@$xs), len(@$ys))
     0:$n - 1 |> maps { [$xs->[_], $ys->[_]] }
 }
 
 # Variadic N-list zip — stops at shortest list.
 fn Zip::n(@lists) {
     return () if len(@lists) == 0
-    my $n = min(map { len(@{_}) } @lists)
+    val $n = min(map { len(@{_}) } @lists)
     0:$n - 1 |> maps {
         [map { _->[_<] } @lists]
     }
@@ -31,13 +31,13 @@ fn Zip::n(@lists) {
 
 # Unzip — inverse of pair. Given a list of pairs, return two lists.
 fn Zip::unpair($pairs) {
-    my @first  = @$pairs |> maps { _->[0] }
-    my @second = @$pairs |> maps { _->[1] }
+    var @first  = @$pairs |> maps { _->[0] }
+    var @second = @$pairs |> maps { _->[1] }
     (\@first, \@second)
 }
 
 # Pair-zip cases.
-my @pair_cases = (
+val @pair_cases = (
     +{ xs => [1, 2, 3],         ys => ["a", "b", "c"],     out => [[1,"a"],[2,"b"],[3,"c"]] },
     +{ xs => [1, 2, 3, 4],      ys => ["a", "b"],          out => [[1,"a"],[2,"b"]] },          # short ys
     +{ xs => [],                ys => [1, 2],              out => [] },                          # empty
@@ -46,18 +46,18 @@ my @pair_cases = (
 )
 
 p "── 2-list zip ──"
-my $fail = 0
-for my $c (@pair_cases) {
-    my @got = Zip::pair $c->{xs}, $c->{ys}
-    my $got_s  = join(" ", map { "[" . join(",", @{_}) . "]" } @got)
-    my $want_s = join(" ", map { "[" . join(",", @{_}) . "]" } @{$c->{out}})
-    my $ok     = $got_s eq $want_s
+var $fail = 0
+for var $c (@pair_cases) {
+    val @got = Zip::pair $c->{xs}, $c->{ys}
+    val $got_s  = join(" ", map { "[" . join(",", @{_}) . "]" } @got)
+    val $want_s = join(" ", map { "[" . join(",", @{_}) . "]" } @{$c->{out}})
+    val $ok     = $got_s eq $want_s
     $fail++ unless $ok
     p "  pair([@{$c->{xs}}], [@{$c->{ys}}]) = $got_s  #{$ok ? \"\" : \"FAIL\"}"
 }
 
 # N-list zip cases.
-my @n_cases = (
+val @n_cases = (
     +{ lists => [[1,2,3], ["a","b","c"], [10,20,30]], out => [[1,"a",10],[2,"b",20],[3,"c",30]] },
     +{ lists => [[1,2,3,4], ["a","b"]],                out => [[1,"a"],[2,"b"]] },
     +{ lists => [[1,2,3]],                              out => [[1],[2],[3]] },                  # 1-list zip = wrap
@@ -66,24 +66,24 @@ my @n_cases = (
 
 p ""
 p "── N-list zip ──"
-for my $c (@n_cases) {
-    my @got = Zip::n(@{$c->{lists}})
-    my $got_s  = join(" ", map { "[" . join(",", @{_}) . "]" } @got)
-    my $want_s = join(" ", map { "[" . join(",", @{_}) . "]" } @{$c->{out}})
-    my $ok     = $got_s eq $want_s
+for var $c (@n_cases) {
+    val @got = Zip::n(@{$c->{lists}})
+    val $got_s  = join(" ", map { "[" . join(",", @{_}) . "]" } @got)
+    val $want_s = join(" ", map { "[" . join(",", @{_}) . "]" } @{$c->{out}})
+    val $ok     = $got_s eq $want_s
     $fail++ unless $ok
     p "  n(#{len @{$c->{lists}}} lists) = $got_s  #{$ok ? \"\" : \"FAIL\"}"
 }
 
 # Unpair round-trip.
-my $pairs = [[1,"a"], [2,"b"], [3,"c"]]
-my ($firsts, $seconds) = Zip::unpair $pairs
+val $pairs = [[1,"a"], [2,"b"], [3,"c"]]
+val ($firsts, $seconds) = Zip::unpair $pairs
 die "unpair firsts wrong"  unless "@$firsts"  eq "1 2 3"
 die "unpair seconds wrong" unless "@$seconds" eq "a b c"
 
 # zip ∘ unpair = identity (when round-tripped via Zip::pair).
-my @round = Zip::pair $firsts, $seconds
-for my $i (0:len(@$pairs) - 1) {
+val @round = Zip::pair $firsts, $seconds
+for val $i (0:len(@$pairs) - 1) {
     die "round-trip mismatch at $i" unless
         $round[$i]->[0] eq $pairs->[$i]->[0] &&
         $round[$i]->[1] eq $pairs->[$i]->[1]

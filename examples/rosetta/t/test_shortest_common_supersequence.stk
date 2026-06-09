@@ -3,34 +3,34 @@
 # Build via LCS DP and trace back.
 
 fn Rosetta::SCS::compute($s1, $s2) {
-    my @c1 = ~> $s1 chars
-    my @c2 = ~> $s2 chars
-    my $n = len(@c1)
-    my $m = len(@c2)
+    val @c1 = ~> $s1 chars
+    val @c2 = ~> $s2 chars
+    val $n = len(@c1)
+    val $m = len(@c2)
 
     # LCS table: lcs[i][j] = length of LCS of s1[0..i-1] and s2[0..j-1]
-    my @lcs
-    for my $i (0:$n) {
+    var @lcs
+    for val $i (0:$n) {
         $lcs[$i] = []
-        for my $j (0:$m) { $lcs[$i][$j] = 0 }
+        for val $j (0:$m) { $lcs[$i][$j] = 0 }
     }
-    for my $i (1:$n) {
-        for my $j (1:$m) {
+    for val $i (1:$n) {
+        for val $j (1:$m) {
             if ($c1[$i-1] eq $c2[$j-1]) {
-                my $prev = $lcs[$i-1][$j-1]
+                val $prev = $lcs[$i-1][$j-1]
                 $lcs[$i][$j] = $prev + 1
             } else {
-                my $a = $lcs[$i-1][$j]
-                my $b = $lcs[$i][$j-1]
+                val $a = $lcs[$i-1][$j]
+                val $b = $lcs[$i][$j-1]
                 $lcs[$i][$j] = $a > $b ? $a : $b
             }
         }
     }
 
     # Walk back to reconstruct
-    my @out
-    my $i = $n
-    my $j = $m
+    var @out
+    var $i = $n
+    var $j = $m
     while ($i > 0 && $j > 0) {
         if ($c1[$i-1] eq $c2[$j-1]) {
             unshift @out, $c1[$i-1]
@@ -50,33 +50,33 @@ fn Rosetta::SCS::compute($s1, $s2) {
 }
 
 fn Rosetta::SCS::is_supersequence($scs, $sub) {
-    my @cs = ~> $sub chars
-    my @ss = ~> $scs chars
-    my $i = 0
-    for my $c (@ss) {
+    val @cs = ~> $sub chars
+    val @ss = ~> $scs chars
+    var $i = 0
+    for val $c (@ss) {
         if ($i < len(@cs) && $c eq $cs[$i]) { $i += 1 }
     }
     $i == len(@cs)
 }
 
 # "abcbdab" + "bdcaba" -> common SCS length 9 (e.g. "abdcabdab")
-my $r = Rosetta::SCS::compute("abcbdab", "bdcaba")
+val $r = Rosetta::SCS::compute("abcbdab", "bdcaba")
 assert_eq len($r), 9, "SCS length is 9"
 assert_ok Rosetta::SCS::is_supersequence($r, "abcbdab"), "SCS contains s1"
 assert_ok Rosetta::SCS::is_supersequence($r, "bdcaba"),  "SCS contains s2"
 
 # Identical strings: SCS == s1
-my $r2 = Rosetta::SCS::compute("abc", "abc")
+val $r2 = Rosetta::SCS::compute("abc", "abc")
 assert_eq $r2, "abc", "SCS of identical strings"
 
 # One empty
-my $r3 = Rosetta::SCS::compute("", "hello")
+val $r3 = Rosetta::SCS::compute("", "hello")
 assert_eq $r3, "hello", "SCS with empty s1"
-my $r4 = Rosetta::SCS::compute("world", "")
+val $r4 = Rosetta::SCS::compute("world", "")
 assert_eq $r4, "world", "SCS with empty s2"
 
 # Disjoint chars: SCS length is sum of lengths
-my $r5 = Rosetta::SCS::compute("abc", "xyz")
+val $r5 = Rosetta::SCS::compute("abc", "xyz")
 assert_eq len($r5), 6, "SCS length for disjoint inputs"
 
 test_run

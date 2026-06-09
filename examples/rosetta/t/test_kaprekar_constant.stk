@@ -6,17 +6,17 @@ fn Rosetta::KaprekarConstant::rev_string($s) {
 }
 
 fn Rosetta::KaprekarConstant::step($n) {
-    my $s = sprintf("%04d", $n)
-    my $asc_s = ~> $s chars sort join("")
-    my $desc_s = Rosetta::KaprekarConstant::rev_string($asc_s)
-    my $asc = int($asc_s)
-    my $desc = int($desc_s)
+    val $s = sprintf("%04d", $n)
+    val $asc_s = ~> $s chars sort join("")
+    val $desc_s = Rosetta::KaprekarConstant::rev_string($asc_s)
+    val $asc = int($asc_s)
+    val $desc = int($desc_s)
     $desc - $asc
 }
 
 fn Rosetta::KaprekarConstant::reaches($n) {
-    my $curr = $n
-    for my $i (1:10) {
+    var $curr = $n
+    for val $i (1:10) {
         if ($curr != 6174) {
             $curr = Rosetta::KaprekarConstant::step($curr)
         }

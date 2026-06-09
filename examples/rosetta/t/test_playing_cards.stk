@@ -12,12 +12,12 @@ class Rosetta::Cards::Card {
 }
 
 fn Rosetta::Cards::create_deck() {
-    my @suits = qw{♣ ♦ ♥ ♠}
-    my @ranks = qw{A 2 3 4 5 6 7 8 9 10 J Q K}
+    val @suits = qw{♣ ♦ ♥ ♠}
+    val @ranks = qw{A 2 3 4 5 6 7 8 9 10 J Q K}
     
-    my @deck
-    for my $s (@suits) {
-        for my $r (@ranks) {
+    var @deck
+    for val $s (@suits) {
+        for val $r (@ranks) {
             push @deck, Rosetta::Cards::Card->new($s, $r)
         }
     }
@@ -26,24 +26,24 @@ fn Rosetta::Cards::create_deck() {
 
 fn Rosetta::Cards::shuffle_deck($deck) {
     # Using parallel shuffle if available, but for a small deck we can just use Fisher-Yates
-    my @d = @$deck
-    for (my $i = len(@d) - 1; $i > 0; $i--) {
-        my $j = int(rand($i + 1))
+    var @d = @$deck
+    for (var $i = len(@d) - 1; $i > 0; $i--) {
+        var $j = int(rand($i + 1))
         ($d[$i], $d[$j]) = ($d[$j], $d[$i])
     }
     \@d
 }
 
-my $deck = Rosetta::Cards::create_deck()
+val $deck = Rosetta::Cards::create_deck()
 assert_eq len(@$deck), 52, "Standard deck has 52 cards"
 assert_eq $deck->[0]->to_string(), "A♣", "First card is Ace of Clubs"
 assert_eq $deck->[51]->to_string(), "K♠", "Last card is King of Spades"
 
-my $shuffled = Rosetta::Cards::shuffle_deck($deck)
+val $shuffled = Rosetta::Cards::shuffle_deck($deck)
 assert_eq len(@$shuffled), 52, "Shuffled deck still has 52 cards"
 
 # Check that it's actually shuffled (very unlikely to be the same)
-my $same = 1
+var $same = 1
 for (0:51) {
     if ($deck->[_]->to_string() ne $shuffled->[_]->to_string()) {
         $same = 0

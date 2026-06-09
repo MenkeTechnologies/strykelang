@@ -3,8 +3,8 @@
 # Only three known: 5, 13, 563 (within reach of the search; p > 5e8 unknown).
 
 fn Rosetta::Wilson::factorial_mod($n, $mod) {
-    my $r = 1
-    for my $i (2:$n) {
+    var $r = 1
+    for val $i (2:$n) {
         $r = ($r * $i) % $mod
     }
     $r
@@ -12,7 +12,7 @@ fn Rosetta::Wilson::factorial_mod($n, $mod) {
 
 fn Rosetta::Wilson::is_wilson($p) {
     return 0 if !is_prime($p)
-    my $mod = $p * $p
+    val $mod = $p * $p
     Rosetta::Wilson::factorial_mod($p - 1, $mod) == $mod - 1
 }
 
@@ -21,7 +21,7 @@ fn Rosetta::Wilson::list($limit) {
 }
 
 # All three known Wilson primes within 1000
-my @found = Rosetta::Wilson::list(1000)
+val @found = Rosetta::Wilson::list(1000)
 assert_eq join(",", @found), "5,13,563", "Wilson primes < 1000"
 
 # Specific membership

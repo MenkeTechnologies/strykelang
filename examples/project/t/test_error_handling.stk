@@ -14,13 +14,13 @@ assert_eq Project::ErrorHandling::get_timeout(), 30, "const timeout"
 assert_eq Project::ErrorHandling::get_app_name(), "StrykeDemo", "const app name"
 assert_eq Project::ErrorHandling::get_version(), "1.0.0", "const version"
 
-my $area = Project::ErrorHandling::circle_area(2)
+val $area = Project::ErrorHandling::circle_area(2)
 assert_eq int($area * 100) / 100, 12.56, "circle area"
 
-my $circ = Project::ErrorHandling::circle_circumference(1)
+val $circ = Project::ErrorHandling::circle_circumference(1)
 assert_eq int($circ * 100) / 100, 6.28, "circle circumference"
 
-my $growth = Project::ErrorHandling::exponential_growth(100, 0.1, 1)
+val $growth = Project::ErrorHandling::exponential_growth(100, 0.1, 1)
 assert_eq int($growth), 110, "exponential growth"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -33,10 +33,10 @@ assert_eq Project::ErrorHandling::try_catch_error_message(), 1, "try catch error
 assert_eq Project::ErrorHandling::try_catch_nested(), "caught-inner;caught-outer", "try catch nested"
 assert_eq Project::ErrorHandling::try_catch_no_error(), 100, "try catch no error"
 
-my $div_result = Project::ErrorHandling::safe_divide_try(10, 2)
+val $div_result = Project::ErrorHandling::safe_divide_try(10, 2)
 assert_eq $div_result, 5, "safe divide try ok"
 
-my $div_zero = Project::ErrorHandling::safe_divide_try(10, 0)
+val $div_zero = Project::ErrorHandling::safe_divide_try(10, 0)
 assert_eq defined($div_zero) ? 1 : 0, 0, "safe divide try zero"
 
 assert_eq Project::ErrorHandling::try_catch_finally_pattern(), "try,catch,after", "try catch finally pattern"
@@ -64,7 +64,7 @@ assert_eq Project::ErrorHandling::die_in_eval(), 1, "die in eval"
 # ERROR HANDLING PATTERNS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $tc = Project::ErrorHandling::try_catch_pattern()
+val $tc = Project::ErrorHandling::try_catch_pattern()
 assert_eq $tc =~ /caught/ ? 1 : 0, 1, "try catch pattern"
 
 assert_eq Project::ErrorHandling::safe_division(10, 2), 5, "safe division ok"
@@ -85,17 +85,17 @@ assert_eq Project::ErrorHandling::rethrow(), 1, "Project::ErrorHandling::rethrow
 
 assert_eq Project::ErrorHandling::validate_positive(5), 5, "validate positive ok"
 
-my $neg_result = eval { Project::ErrorHandling::validate_positive(-5) }
+val $neg_result = eval { Project::ErrorHandling::validate_positive(-5) }
 assert_eq defined($neg_result) ? 1 : 0, 0, "validate positive fail"
 
 assert_eq Project::ErrorHandling::validate_in_range(5, 1, 10), 5, "validate range ok"
 
-my $range_fail = eval { Project::ErrorHandling::validate_in_range(15, 1, 10) }
+val $range_fail = eval { Project::ErrorHandling::validate_in_range(15, 1, 10) }
 assert_eq $@ =~ /out of range/ ? 1 : 0, 1, "validate range fail"
 
 assert_eq Project::ErrorHandling::validate_non_empty("hello"), "hello", "validate non-empty ok"
 
-my $empty_fail = eval { Project::ErrorHandling::validate_non_empty("") }
+val $empty_fail = eval { Project::ErrorHandling::validate_non_empty("") }
 assert_eq $@ =~ /must not be empty/ ? 1 : 0, 1, "validate non-empty fail"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -104,12 +104,12 @@ assert_eq $@ =~ /must not be empty/ ? 1 : 0, 1, "validate non-empty fail"
 
 assert_eq Project::ErrorHandling::return_or_die(0), "returning", "return or die - return"
 
-my $die_result = eval { Project::ErrorHandling::return_or_die(1) }
+val $die_result = eval { Project::ErrorHandling::return_or_die(1) }
 assert_eq $@ =~ /dying/ ? 1 : 0, 1, "return or die - die"
 
 assert_eq Project::ErrorHandling::early_die(0), "reached end", "early die - no die"
 
-my $early_result = eval { Project::ErrorHandling::early_die(1) }
+val $early_result = eval { Project::ErrorHandling::early_die(1) }
 assert_eq $@ =~ /early/ ? 1 : 0, 1, "early die - die"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -117,26 +117,26 @@ assert_eq $@ =~ /early/ ? 1 : 0, 1, "early die - die"
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Eval string (simplified)
-my $eval_val = eval { 2 + 2 }
+val $eval_val = eval { 2 + 2 }
 assert_eq $eval_val, 4, "eval simple expr"
 
 # Multiple sequential errors
-for my $i (1:3) {
+for val $i (1:3) {
     eval { die "error $i" }
     assert_eq $@ =~ /error $i/ ? 1 : 0, 1, "sequential error $i"
 }
 
 # Error in loop
-my @errors
-for my $n (1, 0, 2) {
-    my $r = eval { 10 / $n }
+var @errors
+for val $n (1, 0, 2) {
+    val $r = eval { 10 / $n }
     push @errors, defined($r) ? "ok" : "err"
 }
 assert_eq join(",", @errors), "ok,err,ok", "errors in loop"
 
 # Nested eval
-my $nested = eval {
-    my $inner = eval { 5 + 5 }
+val $nested = eval {
+    val $inner = eval { 5 + 5 }
     $inner * 2
 }
 assert_eq $nested, 20, "nested eval success"
@@ -151,8 +151,8 @@ assert_eq $@ =~ /message at/ ? 1 : 0, 1, "die without newline"
 
 # $@ preservation
 $@ = ""
-my $prev_err = eval { die "test"; 1 }
-my $captured = $@
+val $prev_err = eval { die "test"; 1 }
+val $captured = $@
 assert_eq $captured =~ /test/ ? 1 : 0, 1, "error preserved"
 
 # Successful eval clears $@

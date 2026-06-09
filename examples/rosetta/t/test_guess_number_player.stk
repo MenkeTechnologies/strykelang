@@ -3,10 +3,10 @@
 
 fn Rosetta::GuessNumberPlayer::play($secret) {
     # The computer guesses the number between 1 and 100
-    my $min = 1
-    my $max = 100
-    my $guesses = 0
-    my $guess
+    var $min = 1
+    var $max = 100
+    var $guesses = 0
+    var $guess
     
     while ($min <= $max) {
         $guesses++
@@ -25,13 +25,13 @@ fn Rosetta::GuessNumberPlayer::play($secret) {
 }
 
 # Test with different secrets
-my $g1 = Rosetta::GuessNumberPlayer::play(42)
+val $g1 = Rosetta::GuessNumberPlayer::play(42)
 assert_ok $g1 > 0, "Guessed 42 in $g1 tries"
 
-my $g2 = Rosetta::GuessNumberPlayer::play(100)
+val $g2 = Rosetta::GuessNumberPlayer::play(100)
 assert_ok $g2 > 0, "Guessed 100 in $g2 tries"
 
-my $g3 = Rosetta::GuessNumberPlayer::play(1)
+val $g3 = Rosetta::GuessNumberPlayer::play(1)
 assert_ok $g3 > 0, "Guessed 1 in $g3 tries"
 
 test_run

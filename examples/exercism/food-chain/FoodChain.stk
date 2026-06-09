@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-my @_ANIM = (
+val @_ANIM = (
     { name => "fly",    flavor => "",                                                    reason => "I don't know why she swallowed the fly. Perhaps she'll die." },
     { name => "spider", flavor => "It wriggled and jiggled and tickled inside her.",     reason => "She swallowed the spider to catch the fly." },
     { name => "bird",   flavor => "How absurd to swallow a bird!",                       reason => "She swallowed the bird to catch the spider that wriggled and jiggled and tickled inside her." },
@@ -11,8 +11,8 @@ my @_ANIM = (
 )
 
 fn Exercism::FoodChain::verse($n) {
-    my $cur = $_ANIM[$n - 1]
-    my @lines = ("I know an old lady who swallowed a $cur->{name}.")
+    val $cur = $_ANIM[$n - 1]
+    var @lines = ("I know an old lady who swallowed a $cur->{name}.")
     if ($n == len(@_ANIM)) { return join "\n", @lines, $cur->{flavor} }
     push @lines, $cur->{flavor} if $cur->{flavor}
     ~> rev(1:$n - 1) ep {

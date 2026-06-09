@@ -3,18 +3,18 @@
 
 fn Rosetta::Parser::parse($tokens) {
     # Simple recursive descent parser for expr = term (op term)*
-    my $i = 0
+    val $i = 0
     return Rosetta::Parser::parse_expr($tokens, \$i)
 }
 
 fn Rosetta::Parser::parse_expr($tokens, $i_ref) {
-    my $left = $tokens->[$$i_ref]->[1]
+    val $left = $tokens->[$$i_ref]->[1]
     $$i_ref++
     
     if ($$i_ref < len(@$tokens) && $tokens->[$$i_ref]->[0] eq "Op") {
-        my $op = $tokens->[$$i_ref]->[1]
+        val $op = $tokens->[$$i_ref]->[1]
         $$i_ref++
-        my $right = Rosetta::Parser::parse_expr($tokens, $i_ref)
+        val $right = Rosetta::Parser::parse_expr($tokens, $i_ref)
         return [$op, $left, $right]
     }
     
@@ -22,13 +22,13 @@ fn Rosetta::Parser::parse_expr($tokens, $i_ref) {
 }
 
 # Tokens for: 10 + 20
-my $tokens = [
+val $tokens = [
     ["Integer", 10],
     ["Op", "+"],
     ["Integer", 20]
 ]
 
-my $ast = Rosetta::Parser::parse($tokens)
+val $ast = Rosetta::Parser::parse($tokens)
 assert_eq $ast->[0], "+", "Root op is +"
 assert_eq $ast->[1], 10, "Left child is 10"
 assert_eq $ast->[2], 20, "Right child is 20"

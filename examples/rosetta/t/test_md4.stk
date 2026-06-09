@@ -6,7 +6,7 @@ fn Rosetta::MD4::hash($str) {
     md4($str)
 }
 
-my $h = Rosetta::MD4::hash("The quick brown fox jumps over the lazy dog")
+val $h = Rosetta::MD4::hash("The quick brown fox jumps over the lazy dog")
 assert_eq $h, "1bee69a46ba811185c194762abaeae90", "MD4 hash matches"
 
 test_run

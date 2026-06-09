@@ -26,14 +26,14 @@ fn Crawler::crawl($url, $depth) {
     p "  [Depth $depth] Crawling: $url"
     
     # Fetch content with timeout
-    my $res = eval { http_request($url, +{ timeout => 5 }) }
+    val $res = eval { http_request($url, +{ timeout => 5 }) }
     return if $@ || $res->{status} >= 400
     
     # Extract links (unique, absolute https only)
     # match_all pattern is the FIRST argument
-    my @raw_links = match_all('(?i)href="(https://[^"]+)"', $res->{body})
+    val @raw_links = match_all('(?i)href="(https://[^"]+)"', $res->{body})
     
-    my @links = @raw_links 
+    val @links = @raw_links 
         |> map { _ =~ s/.*href="([^"]+)".*/$1/r } 
         |> grep { !$visited{_} }
         |> head(5) # Limit fan-out for demo
@@ -42,7 +42,7 @@ fn Crawler::crawl($url, $depth) {
     @links |> pmap { Crawler::crawl(_, $depth - 1) }
 }
 
-my $start_url = "https://wikipedia.org"
+val $start_url = "https://wikipedia.org"
 p "Starting crawl from: $start_url"
 
 Crawler::crawl($start_url, 2)

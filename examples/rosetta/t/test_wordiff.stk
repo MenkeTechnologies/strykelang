@@ -12,8 +12,8 @@ fn Rosetta::Wordiff::is_anagram($a, $b) {
 
 fn Rosetta::Wordiff::single_diff($a, $b) {
     return 0 if length($a) != length($b)
-    my $diffs = 0
-    for my $i (0..length($a) - 1) {
+    var $diffs = 0
+    for val $i (0..length($a) - 1) {
         $diffs++ if substr($a, $i, 1) ne substr($b, $i, 1)
     }
     $diffs == 1
@@ -21,8 +21,8 @@ fn Rosetta::Wordiff::single_diff($a, $b) {
 
 fn Rosetta::Wordiff::is_insertion($a, $b) {
     return 0 if length($b) != length($a) + 1
-    for my $i (0..length($b) - 1) {
-        my $candidate = substr($b, 0, $i) . substr($b, $i + 1)
+    for val $i (0..length($b) - 1) {
+        val $candidate = substr($b, 0, $i) . substr($b, $i + 1)
         return 1 if $candidate eq $a
     }
     0

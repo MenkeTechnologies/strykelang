@@ -11,7 +11,7 @@ fn Uf::new($n) {
 }
 
 fn Uf::find($u, $x) {
-    my $p = $u->{parent}
+    var $p = $u->{parent}
     while ($p->[$x] != $x) {
         $p->[$x] = $p->[$p->[$x]]
         $x = $p->[$x]
@@ -20,11 +20,11 @@ fn Uf::find($u, $x) {
 }
 
 fn Uf::union($u, $x, $y) {
-    my $rx = Uf::find($u, $x)
-    my $ry = Uf::find($u, $y)
+    val $rx = Uf::find($u, $x)
+    val $ry = Uf::find($u, $y)
     return 0 if $rx == $ry
-    my $r = $u->{rank}
-    my $p = $u->{parent}
+    val $r = $u->{rank}
+    var $p = $u->{parent}
     if ($r->[$rx] < $r->[$ry]) {
         $p->[$rx] = $ry
     } elsif ($r->[$rx] > $r->[$ry]) {
@@ -43,7 +43,7 @@ fn Uf::connected($u, $x, $y) {
 
 fn Uf::component_count($u) { $u->{count} }
 
-my $u = Uf::new(10)
+val $u = Uf::new(10)
 Uf::component_count($u) |> aeq 10, "init 10 components"
 
 Uf::union($u, 0, 1)
@@ -73,18 +73,18 @@ Uf::union($u, 0, 9)
 Uf::component_count($u) |> aeq 1, "all merged"
 
 # Find returns consistent root
-my $root0 = Uf::find($u, 0)
-for my $i (1:9) {
+val $root0 = Uf::find($u, 0)
+for val $i (1:9) {
     Uf::find($u, $i) |> aeq $root0, "all roots == root0 (i=$i)"
 }
 
 # Kruskal's MST with UF: weighted edge list → spanning weight
-my @edges = (
+val @edges = (
     [1, 0, 1], [4, 0, 2], [2, 1, 2], [6, 1, 3], [3, 2, 3], [5, 2, 4], [7, 3, 4],
 )
-my $uf = Uf::new(5)
-my $mst_weight = 0
-for my $e (sort { _->[0] <=> _1->[0] } @edges) {
+val $uf = Uf::new(5)
+var $mst_weight = 0
+for val $e (sort { _->[0] <=> _1->[0] } @edges) {
     if (Uf::union($uf, $e->[1], $e->[2])) {
         $mst_weight += $e->[0]
     }

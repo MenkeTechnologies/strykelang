@@ -13,7 +13,7 @@ fn Rosetta::Trig::tan($x) {
     tan($x)
 }
 
-my $pi = 3.14159265358979323846
+val $pi = 3.14159265358979323846
 
 0 |> Rosetta::Trig::sin() |> assert_near(0, 1e-9, "sin(0)")
 $pi |> Rosetta::Trig::sin() |> assert_near(0, 1e-9, "sin(pi)")

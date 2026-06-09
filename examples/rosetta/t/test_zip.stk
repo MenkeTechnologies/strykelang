@@ -2,28 +2,28 @@
 # Rosetta Code: Zip
 
 fn Rosetta::Zip::zip($l1, $l2) {
-    my @res
-    my $len = len(@$l1)
-    my $len2 = len(@$l2)
+    var @res
+    var $len = len(@$l1)
+    val $len2 = len(@$l2)
     if ($len2 < $len) { $len = $len2 }
     
-    for my $i (0:$len-1) {
+    for val $i (0:$len-1) {
         push @res, [$l1->[$i], $l2->[$i]]
     }
     \@res
 }
 
-my @a = (1, 2, 3)
-my @b = ("a", "b", "c")
-my $zipped = Rosetta::Zip::zip(\@a, \@b)
+val @a = (1, 2, 3)
+val @b = ("a", "b", "c")
+val $zipped = Rosetta::Zip::zip(\@a, \@b)
 
 assert_eq len(@$zipped), 3, "zipped length"
 assert_eq $zipped->[0]->[0], 1, "zipped[0][0]"
 assert_eq $zipped->[0]->[1], "a", "zipped[0][1]"
 assert_eq $zipped->[2]->[1], "c", "zipped[2][1]"
 
-my @c = (4, 5)
-my $zipped2 = Rosetta::Zip::zip(\@a, \@c)
+val @c = (4, 5)
+val $zipped2 = Rosetta::Zip::zip(\@a, \@c)
 assert_eq len(@$zipped2), 2, "zipped uneven length"
 
 test_run

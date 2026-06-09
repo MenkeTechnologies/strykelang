@@ -4,27 +4,27 @@
 # 1/pi^2 = 32/3 * sum_{n=0}^\infty [ (6n)! / (n!)^6 * (532n^2 + 126n + 9) / 10^{6n+3} ]
 
 fn Rosetta::Almkvist::f($n) {
-    my $res = 1.0
+    var $res = 1.0
     for (2:$n) { $res *= _ }
     $res
 }
 
 fn Rosetta::Almkvist::pi_approx($terms) {
-    my $sum = 0.0
-    for my $n (0:$terms - 1) {
-        my $f6n = Rosetta::Almkvist::f(6 * $n)
-        my $fn  = Rosetta::Almkvist::f($n)
+    var $sum = 0.0
+    for val $n (0:$terms - 1) {
+        val $f6n = Rosetta::Almkvist::f(6 * $n)
+        val $fn  = Rosetta::Almkvist::f($n)
         
-        my $num = $f6n * (532 * ($n ** 2) + 126 * $n + 9)
-        my $den = ($fn ** 6) * (10 ** (6 * $n + 3))
+        val $num = $f6n * (532 * ($n ** 2) + 126 * $n + 9)
+        val $den = ($fn ** 6) * (10 ** (6 * $n + 3))
         
         $sum += $num / $den
     }
-    my $one_over_pi_sq = (32.0 / 3.0) * $sum
+    val $one_over_pi_sq = (32.0 / 3.0) * $sum
     sqrt(1.0 / $one_over_pi_sq)
 }
 
-my $pi_val = Rosetta::Almkvist::pi_approx(20)
+val $pi_val = Rosetta::Almkvist::pi_approx(20)
 p "Almkvist-Giullera pi approx (20 terms): $pi_val"
 
 # It should be close to actual pi

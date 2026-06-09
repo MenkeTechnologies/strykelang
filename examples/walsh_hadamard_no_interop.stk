@@ -23,14 +23,14 @@
 # ── in-place Walsh-Hadamard transform (forward = inverse modulo /N) ─
 
 fn Wht::transform($ar) {
-    my $n = len(@$ar)
-    my $h = 1
+    val $n = len(@$ar)
+    var $h = 1
     while ($h < $n) {
-        my $i = 0
+        var $i = 0
         while ($i < $n) {
-            for my $j ($i:$i + $h - 1) {
-                my $x = $ar->[$j]
-                my $y = $ar->[$j + $h]
+            for val $j ($i:$i + $h - 1) {
+                val $x = $ar->[$j]
+                val $y = $ar->[$j + $h]
                 $ar->[$j]      = $x + $y
                 $ar->[$j + $h] = $x - $y
             }
@@ -43,23 +43,23 @@ fn Wht::transform($ar) {
 # ── XOR convolution via WHT: pointwise multiply transformed arrays ─
 
 fn Wht::xor_convolve($A, $B) {
-    my $n = 1
-    my $max_len = len(@$A) > len(@$B) ? len(@$A) : len(@$B)
+    var $n = 1
+    val $max_len = len(@$A) > len(@$B) ? len(@$A) : len(@$B)
     while ($n < $max_len) {
         $n *= 2
     }
-    my @fa = (0) x $n
-    my @fb = (0) x $n
-    for my $i (0:len(@$A) - 1) { $fa[$i] = $A->[$i] }
-    for my $i (0:len(@$B) - 1) { $fb[$i] = $B->[$i] }
+    var @fa = (0) x $n
+    var @fb = (0) x $n
+    for val $i (0:len(@$A) - 1) { $fa[$i] = $A->[$i] }
+    for val $i (0:len(@$B) - 1) { $fb[$i] = $B->[$i] }
     Wht::transform(\@fa)
     Wht::transform(\@fb)
-    my @fc = (0) x $n
-    for my $i (0:$n - 1) {
+    var @fc = (0) x $n
+    for val $i (0:$n - 1) {
         $fc[$i] = $fa[$i] * $fb[$i]
     }
     Wht::transform(\@fc)
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         $fc[$i] = int($fc[$i] / $n)
     }
     \@fc
@@ -68,14 +68,14 @@ fn Wht::xor_convolve($A, $B) {
 # ── O(n²) brute force XOR convolution ────────────────────────────
 
 fn Wht::brute_xor_convolve($A, $B) {
-    my $n = 1
-    my $max_len = len(@$A) > len(@$B) ? len(@$A) : len(@$B)
+    var $n = 1
+    val $max_len = len(@$A) > len(@$B) ? len(@$A) : len(@$B)
     while ($n < $max_len) {
         $n *= 2
     }
-    my @out = (0) x $n
-    for my $i (0:len(@$A) - 1) {
-        for my $j (0:len(@$B) - 1) {
+    var @out = (0) x $n
+    for val $i (0:len(@$A) - 1) {
+        for val $j (0:len(@$B) - 1) {
             $out[$i ^ $j] += $A->[$i] * $B->[$j]
         }
     }
@@ -84,7 +84,7 @@ fn Wht::brute_xor_convolve($A, $B) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{ name => "size 2 trivial",       a => [1, 2],          b => [3, 4]          },
     +{ name => "size 4 simple",        a => [1, 1, 1, 1],    b => [1, 0, 1, 0]    },
     +{ name => "size 4 mixed",         a => [1, 2, 3, 4],    b => [5, 6, 7, 8]    },
@@ -97,82 +97,82 @@ my @cases = (
 p "── Walsh-Hadamard XOR-convolution demo ───────────────"
 printf "  %-30s  %s\n", "case", "A ⊕* B"
 printf "  %-30s  %s\n", "------------------------------", "----------"
-for my $c (@cases) {
-    my $r = Wht::xor_convolve($c->{a}, $c->{b})
+for val $c (@cases) {
+    val $r = Wht::xor_convolve($c->{a}, $c->{b})
     printf "  %-30s  [%s]\n", $c->{name}, join(",", @$r)
 }
 
 # ── invariant 1: WHT XOR-conv matches brute-force on every case ───
 
-for my $c (@cases) {
-    my $wht_r = Wht::xor_convolve($c->{a}, $c->{b})
-    my $br_r  = Wht::brute_xor_convolve($c->{a}, $c->{b})
+for val $c (@cases) {
+    val $wht_r = Wht::xor_convolve($c->{a}, $c->{b})
+    val $br_r  = Wht::brute_xor_convolve($c->{a}, $c->{b})
     die "length mismatch on \"#{$c->{name}}\"" unless len(@$wht_r) == len(@$br_r)
-    for my $i (0:len(@$wht_r) - 1) {
+    for val $i (0:len(@$wht_r) - 1) {
         die "coef[#{$i}] WHT=#{$wht_r->[$i]} brute=#{$br_r->[$i]} on \"#{$c->{name}}\"" unless $wht_r->[$i] == $br_r->[$i]
     }
 }
 
 # ── invariant 2: WHT is its own inverse modulo 1/N ────────────────
 
-for my $c (@cases) {
-    my @arr = @{$c->{a}}
-    my $n = 1
+for val $c (@cases) {
+    var @arr = @{$c->{a}}
+    var $n = 1
     while ($n < len(@arr)) { $n *= 2 }
     while (len(@arr) < $n) { push @arr, 0 }
-    my @orig = @arr
+    val @orig = @arr
     Wht::transform(\@arr)
     Wht::transform(\@arr)
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         $arr[$i] = int($arr[$i] / $n)
     }
-    for my $i (0:$n - 1) {
+    for val $i (0:$n - 1) {
         die "WHT round-trip [#{$i}]: #{$arr[$i]} != #{$orig[$i]} on \"#{$c->{name}}\"" unless $arr[$i] == $orig[$i]
     }
 }
 
 # ── invariant 3: convolution is commutative ──────────────────────
 
-for my $c (@cases) {
-    my $ab = Wht::xor_convolve($c->{a}, $c->{b})
-    my $ba = Wht::xor_convolve($c->{b}, $c->{a})
-    for my $i (0:len(@$ab) - 1) {
+for val $c (@cases) {
+    val $ab = Wht::xor_convolve($c->{a}, $c->{b})
+    val $ba = Wht::xor_convolve($c->{b}, $c->{a})
+    for val $i (0:len(@$ab) - 1) {
         die "commutativity broken at #{$i} on \"#{$c->{name}}\"" unless $ab->[$i] == $ba->[$i]
     }
 }
 
 # ── invariant 4: delta * b ≡ b (XOR convolution identity) ─────────
 
-for my $c (@cases) {
-    my $n = 1
+for val $c (@cases) {
+    var $n = 1
     while ($n < len(@{$c->{b}})) { $n *= 2 }
-    my @delta = (0) x $n
+    var @delta = (0) x $n
     $delta[0] = 1
-    my $r = Wht::xor_convolve(\@delta, $c->{b})
-    for my $i (0:len(@{$c->{b}}) - 1) {
+    val $r = Wht::xor_convolve(\@delta, $c->{b})
+    for val $i (0:len(@{$c->{b}}) - 1) {
         die "delta · b mismatch on \"#{$c->{name}}\" at #{$i}" unless $r->[$i] == $c->{b}->[$i]
     }
 }
 
 # ── invariant 5: zero polynomial convolves to all zeros ──────────
 
-for my $c (@cases) {
-    my @zero = (0) x len(@{$c->{a}})
-    my $r = Wht::xor_convolve(\@zero, $c->{b})
-    for my $v (@$r) {
+for val $c (@cases) {
+    val @zero = (0) x len(@{$c->{a}})
+    val $r = Wht::xor_convolve(\@zero, $c->{b})
+    for val $v (@$r) {
         die "zero · b not all zero on \"#{$c->{name}}\"" unless $v == 0
     }
 }
 
 # ── invariant 6: WHT(f)[0] = Σ f[i] ──────────────────────────────
 
-for my $c (@cases) {
-    my @arr = @{$c->{a}}
-    my $n = 1
+for val $c (@cases) {
+    var @arr = @{$c->{a}}
+    var $n = 1
     while ($n < len(@arr)) { $n *= 2 }
     while (len(@arr) < $n) { push @arr, 0 }
-    my $sum = 0
-    for my $v (@arr) { $sum += $v }
+    var $sum = 0
+    for val $v (@arr) { $sum += $v }
     Wht::transform(\@arr)
     die "WHT[0] = #{$arr[0]} != Σ f = #{$sum} on \"#{$c->{name}}\"" unless $arr[0] == $sum
 }
@@ -180,16 +180,16 @@ for my $c (@cases) {
 # ── invariant 7: WHT(f)[i] is a ±1 linear combination of f[j] ────
 # Specifically, |WHT(f)[i]| ≤ Σ |f[j]|.
 
-for my $c (@cases) {
-    my @arr = @{$c->{a}}
-    my $n = 1
+for val $c (@cases) {
+    var @arr = @{$c->{a}}
+    var $n = 1
     while ($n < len(@arr)) { $n *= 2 }
     while (len(@arr) < $n) { push @arr, 0 }
-    my $abs_sum = 0
-    for my $v (@arr) { $abs_sum += ($v < 0 ? -$v : $v) }
+    var $abs_sum = 0
+    for val $v (@arr) { $abs_sum += ($v < 0 ? -$v : $v) }
     Wht::transform(\@arr)
-    for my $i (0:$n - 1) {
-        my $av = $arr[$i] < 0 ? -$arr[$i] : $arr[$i]
+    for val $i (0:$n - 1) {
+        val $av = $arr[$i] < 0 ? -$arr[$i] : $arr[$i]
         die "|WHT[#{$i}]| #{$av} > Σ |f| #{$abs_sum} on \"#{$c->{name}}\"" unless $av <= $abs_sum
     }
 }

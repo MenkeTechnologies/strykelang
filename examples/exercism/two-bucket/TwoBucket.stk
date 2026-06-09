@@ -1,25 +1,25 @@
 #!/usr/bin/env stryke
 fn Exercism::TwoBucket::measure($cap1, $cap2, $goal, $start) {
-    my $start_idx = $start eq "one" ? 0 : 1
-    my $forbid    = $start eq "one" ? "0,$cap2" : "$cap1,0"
-    my @init = (0, 0)
+    val $start_idx = $start eq "one" ? 0 : 1
+    val $forbid    = $start eq "one" ? "0,$cap2" : "$cap1,0"
+    var @init = (0, 0)
     $init[$start_idx] = (0, $cap1, $cap2)[$start_idx + 1]
-    my @queue = ([$init[0], $init[1], 1])
-    my %seen
+    var @queue = ([$init[0], $init[1], 1])
+    var %seen
     $seen{"$init[0],$init[1]"} = 1
     while (@queue) {
-        my $st = shift @queue
-        my ($b0, $b1, $moves) = @$st
+        val $st = shift @queue
+        val ($b0, $b1, $moves) = @$st
         if ($b0 == $goal || $b1 == $goal) {
-            my $bucket = $b0 == $goal ? "one" : "two"
-            my $other  = $b0 == $goal ? $b1 : $b0
+            val $bucket = $b0 == $goal ? "one" : "two"
+            val $other  = $b0 == $goal ? $b1 : $b0
             return { moves => $moves, goalBucket => $bucket, otherBucket => $other }
         }
-        my $sp2 = $cap2 - $b1
-        my $xf12 = $b0 < $sp2 ? $b0 : $sp2
-        my $sp1 = $cap1 - $b0
-        my $xf21 = $b1 < $sp1 ? $b1 : $sp1
-        my @nexts = (
+        val $sp2 = $cap2 - $b1
+        val $xf12 = $b0 < $sp2 ? $b0 : $sp2
+        val $sp1 = $cap1 - $b0
+        val $xf21 = $b1 < $sp1 ? $b1 : $sp1
+        val @nexts = (
             [$cap1, $b1],
             [$b0, $cap2],
             [0, $b1],
@@ -27,8 +27,8 @@ fn Exercism::TwoBucket::measure($cap1, $cap2, $goal, $start) {
             [$b0 - $xf12, $b1 + $xf12],
             [$b0 + $xf21, $b1 - $xf21],
         )
-        for my $n (@nexts) {
-            my $key = "$n->[0],$n->[1]"
+        for val $n (@nexts) {
+            val $key = "$n->[0],$n->[1]"
             next if $key eq $forbid
             next if $seen{$key}++
             push @queue, [$n->[0], $n->[1], $moves + 1]

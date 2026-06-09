@@ -23,12 +23,12 @@
 # Stable string identity for a state — drives the "seen" set so we
 # never add the same triple (lhs, rhs, dot, start) twice in chart[i].
 fn Earley::state_hash($s) {
-    my $rhs_str = ~> @{$s->{rhs}} join(" ")
+    val $rhs_str = ~> @{$s->{rhs}} join(" ")
     "#{$s->{lhs}}|#{$rhs_str}|#{$s->{dot}}|#{$s->{start}}"
 }
 
 fn Earley::add_state($chart, $idx, $state) {
-    my $hash = Earley::state_hash($state)
+    val $hash = Earley::state_hash($state)
     return 0 if $chart->[$idx]->{seen}->{$hash}
     $chart->[$idx]->{seen}->{$hash} = 1
     push @{$chart->[$idx]->{states}}, $state
@@ -36,25 +36,25 @@ fn Earley::add_state($chart, $idx, $state) {
 }
 
 fn Earley::parse($words, $grammar, $start) {
-    my $n = len @$words
-    my @chart
+    val $n = len @$words
+    var @chart
     for (0 : $n) { push @chart, +{ states => [], seen => {} } }
 
     # Augmented start rule: gamma -> start_symbol .
     Earley::add_state(\@chart, 0, +{ lhs => "gamma", rhs => [$start], dot => 0, start => 0 })
 
-    for my $i (0 : $n) {
-        my $k = 0
+    for val $i (0 : $n) {
+        var $k = 0
         while ($k < len(@{$chart[$i]->{states}})) {
-            my $state = $chart[$i]->{states}->[$k]
-            my $rhs = $state->{rhs}
-            my $dot = $state->{dot}
+            val $state = $chart[$i]->{states}->[$k]
+            val $rhs = $state->{rhs}
+            val $dot = $state->{dot}
 
             if ($dot < len(@$rhs)) {
-                my $next_sym = $rhs->[$dot]
+                val $next_sym = $rhs->[$dot]
                 if (exists $grammar->{$next_sym}) {
                     # Predictor.
-                    for my $rule_rhs (@{$grammar->{$next_sym}}) {
+                    for val $rule_rhs (@{$grammar->{$next_sym}}) {
                         Earley::add_state(\@chart, $i, +{
                             lhs => $next_sym, rhs => $rule_rhs,
                             dot => 0, start => $i,
@@ -71,10 +71,10 @@ fn Earley::parse($words, $grammar, $start) {
                 }
             } else {
                 # Completer.
-                my $start_idx = $state->{start}
-                for my $prev (@{$chart[$start_idx]->{states}}) {
-                    my $p_rhs = $prev->{rhs}
-                    my $p_dot = $prev->{dot}
+                val $start_idx = $state->{start}
+                for val $prev (@{$chart[$start_idx]->{states}}) {
+                    val $p_rhs = $prev->{rhs}
+                    val $p_dot = $prev->{dot}
                     next if $p_dot >= len(@$p_rhs)
                     next if $p_rhs->[$p_dot] ne $state->{lhs}
                     Earley::add_state(\@chart, $i, +{
@@ -87,7 +87,7 @@ fn Earley::parse($words, $grammar, $start) {
         }
     }
 
-    for my $state (@{$chart[$n]->{states}}) {
+    for val $state (@{$chart[$n]->{states}}) {
         return 1 if $state->{lhs} eq "gamma"
                  && $state->{dot} == 1
                  && $state->{start} == 0
@@ -98,20 +98,20 @@ fn Earley::parse($words, $grammar, $start) {
 p "── Earley parser demo ──"
 
 # Classic ambiguous arithmetic grammar.
-my %grammar = (
+val %grammar = (
     "S" => [ ["S", "+", "M"], ["M"] ],
     "M" => [ ["M", "*", "T"], ["T"] ],
     "T" => [ ["1"], ["2"], ["3"], ["4"] ],
 )
 
-my @s1 = ("2", "+", "3", "*", "4")
+val @s1 = ("2", "+", "3", "*", "4")
 p "Parsing: #{join ' ', @s1}"
-my $ok1 = Earley::parse(\@s1, \%grammar, "S")
+val $ok1 = Earley::parse(\@s1, \%grammar, "S")
 p "Valid? #{$ok1 ? 'YES' : 'NO'}"
 
-my @s2 = ("2", "+", "+", "3")
+val @s2 = ("2", "+", "+", "3")
 p "Parsing: #{join ' ', @s2}"
-my $ok2 = Earley::parse(\@s2, \%grammar, "S")
+val $ok2 = Earley::parse(\@s2, \%grammar, "S")
 p "Valid? #{$ok2 ? 'YES' : 'NO'}"
 
 p "Done."

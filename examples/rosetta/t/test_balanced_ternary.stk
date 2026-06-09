@@ -3,10 +3,10 @@
 
 fn Rosetta::BalancedTernary::encode($n) {
     if ($n == 0) { return "0" }
-    my $res = ""
-    my $curr = $n
+    var $res = ""
+    var $curr = $n
     while ($curr != 0) {
-        my $rem = $curr % 3
+        var $rem = $curr % 3
         if ($rem < 0) { $rem += 3 }
         if ($rem == 0) {
             $res = "0" . $res
@@ -23,10 +23,10 @@ fn Rosetta::BalancedTernary::encode($n) {
 }
 
 fn Rosetta::BalancedTernary::decode($s) {
-    my $res = 0
-    my @chars = ~> $s chars
-    for my $c (@chars) {
-        my $val = ($c eq "Z" ? -1 : int($c))
+    var $res = 0
+    val @chars = ~> $s chars
+    for val $c (@chars) {
+        val $val = ($c eq "Z" ? -1 : int($c))
         $res = $res * 3 + $val
     }
     $res

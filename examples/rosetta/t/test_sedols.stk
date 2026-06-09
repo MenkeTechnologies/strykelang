@@ -13,10 +13,10 @@ fn Rosetta::Sedol::char_value($c) {
 }
 
 fn Rosetta::Sedol::checksum($six) {
-    my @w = (1, 3, 1, 7, 3, 9)
-    my $sum = 0
-    for my $i (0:5) {
-        my $v = Rosetta::Sedol::char_value(substr($six, $i, 1))
+    val @w = (1, 3, 1, 7, 3, 9)
+    var $sum = 0
+    for val $i (0:5) {
+        val $v = Rosetta::Sedol::char_value(substr($six, $i, 1))
         return -1 if $v < 0
         $sum += $v * $w[$i]
     }
@@ -25,13 +25,13 @@ fn Rosetta::Sedol::checksum($six) {
 
 fn Rosetta::Sedol::is_valid($s) {
     return 0 if length($s) != 7
-    my $cd = Rosetta::Sedol::checksum(substr($s, 0, 6))
+    val $cd = Rosetta::Sedol::checksum(substr($s, 0, 6))
     return 0 if $cd < 0
     substr($s, 6, 1) eq "$cd"
 }
 
 fn Rosetta::Sedol::complete($six) {
-    my $cd = Rosetta::Sedol::checksum($six)
+    val $cd = Rosetta::Sedol::checksum($six)
     return undef if $cd < 0
     "$six$cd"
 }
@@ -47,7 +47,7 @@ assert_eq Rosetta::Sedol::char_value("E"), -1, "vowel E rejected"
 assert_eq Rosetta::Sedol::char_value("Z"), 35, "Z → 35"
 
 # Rosetta canonical sample: ten SEDOLs and their check digits
-my @samples = (
+val @samples = (
     ["710889",  "9"],
     ["B0YBKJ",  "7"],
     ["406566",  "3"],
@@ -59,8 +59,8 @@ my @samples = (
     ["585284",  "2"],
     ["B0YBKT",  "7"],
 )
-for my $s (@samples) {
-    my ($six, $cd) = @$s
+for var $s (@samples) {
+    val ($six, $cd) = @$s
     assert_eq Rosetta::Sedol::checksum($six), int($cd),
         sprintf("checksum(%s) = %s", $six, $cd)
     assert_eq Rosetta::Sedol::is_valid("$six$cd"), 1,

@@ -5,7 +5,7 @@
 # Run: stryke --no-interop examples/json_pretty.stk
 
 fn JP::escape($s) {
-    my $out = $s
+    var $out = $s
     $out =~ s/\\/\\\\/g
     $out =~ s/"/\\"/g
     $out =~ s/\n/\\n/g
@@ -26,25 +26,25 @@ fn JP::is_num($n) {
 }
 
 fn JP::dump($v, $indent) {
-    my $pad   = "  " x $indent
-    my $inner = "  " x ($indent + 1)
+    val $pad   = "  " x $indent
+    val $inner = "  " x ($indent + 1)
     if (!defined $v) {
         return "null"
     }
-    my $r = ref($v)
+    val $r = ref($v)
     if ($r eq "ARRAY") {
         return "[]" if len(@$v) == 0
-        my @parts = ()
-        for my $x (@$v) {
+        var @parts = ()
+        for val $x (@$v) {
             push @parts, $inner . JP::dump($x, $indent + 1)
         }
         return "[\n" . join(",\n", @parts) . "\n" . $pad . "]"
     }
     if ($r eq "HASH") {
-        my @ks = sort keys %$v
+        val @ks = sort keys %$v
         return "{}" if len(@ks) == 0
-        my @parts = ()
-        for my $k (@ks) {
+        var @parts = ()
+        for val $k (@ks) {
             push @parts, $inner . '"' . JP::escape($k) . '": ' . JP::dump($v->{$k}, $indent + 1)
         }
         return "{\n" . join(",\n", @parts) . "\n" . $pad . "}"
@@ -60,7 +60,7 @@ fn JP::pretty($v) {
 }
 
 p "=== JSON Pretty Printer ==="
-my $data = +{
+val $data = +{
     name => "Alice",
     age  => 30,
     tags => ["admin", "user"],

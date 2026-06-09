@@ -9,24 +9,24 @@ fn Rosetta::Filter::by_predicate($pred, @nums) {
     @nums |> filter $pred
 }
 
-my @pos = Rosetta::Filter::positive(-2, -1, 0, 1, 2, 3)
+val @pos = Rosetta::Filter::positive(-2, -1, 0, 1, 2, 3)
 assert_eq join(",", @pos), "1,2,3", "filter positive"
 
-my @evens = 1:10 |> filter { _ % 2 == 0 }
+val @evens = 1:10 |> filter { _ % 2 == 0 }
 assert_eq join(",", @evens), "2,4,6,8,10", "filter evens with pipe"
 
-my @gt5 = 1:10 |> filter { _ > 5 }
+val @gt5 = 1:10 |> filter { _ > 5 }
 assert_eq join(",", @gt5), "6,7,8,9,10", "filter > 5"
 
-my @squares = 1:10 |> map { _ * _ } |> filter { _ > 20 }
+val @squares = 1:10 |> map { _ * _ } |> filter { _ > 20 }
 assert_eq join(",", @squares), "25,36,49,64,81,100", "map then filter"
 
-my $is_p = fn ($n) {
+val $is_p = fn ($n) {
     if ($n < 2) {
         0
     } else {
-        my $p = 1
-        for my $i (2..int(sqrt($n))) {
+        var $p = 1
+        for val $i (2..int(sqrt($n))) {
             if ($n % $i == 0) {
                 $p = 0
             }
@@ -34,7 +34,7 @@ my $is_p = fn ($n) {
         $p
     }
 }
-my @primes = Rosetta::Filter::by_predicate($is_p, 1:20)
+val @primes = Rosetta::Filter::by_predicate($is_p, 1:20)
 assert_eq join(",", @primes), "2,3,5,7,11,13,17,19", "filter with predicate fn"
 
 test_run

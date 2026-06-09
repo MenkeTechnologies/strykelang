@@ -15,7 +15,7 @@
 # Run: stryke --no-interop examples/set_ops_no_interop.stk
 
 fn Set::make(@items) {
-    my %s
+    var %s
     # Explicit guard: stryke's `for @items` runs one iteration even when
     # @items is empty (with _ = undef), which would seed a phantom ""
     # key. Skip when there's nothing to iterate.
@@ -26,36 +26,36 @@ fn Set::make(@items) {
 }
 
 fn Set::union($xs, $ys) {
-    my %out = %$xs
+    var %out = %$xs
     $out{_} = 1 for keys %$ys
     \%out
 }
 
 fn Set::intersect($xs, $ys) {
-    my %out
-    for my $k (keys %$xs) {
+    var %out
+    for val $k (keys %$xs) {
         $out{$k} = 1 if exists $ys->{$k}
     }
     \%out
 }
 
 fn Set::diff($xs, $ys) {
-    my %out
-    for my $k (keys %$xs) {
+    var %out
+    for val $k (keys %$xs) {
         $out{$k} = 1 unless exists $ys->{$k}
     }
     \%out
 }
 
 fn Set::sym_diff($xs, $ys) {
-    my %out
-    for my $k (keys %$xs) { $out{$k} = 1 unless exists $ys->{$k} }
-    for my $k (keys %$ys) { $out{$k} = 1 unless exists $xs->{$k} }
+    var %out
+    for val $k (keys %$xs) { $out{$k} = 1 unless exists $ys->{$k} }
+    for val $k (keys %$ys) { $out{$k} = 1 unless exists $xs->{$k} }
     \%out
 }
 
 fn Set::subset_of($xs, $ys) {
-    for my $k (keys %$xs) { return 0 unless exists $ys->{$k} }
+    for val $k (keys %$xs) { return 0 unless exists $ys->{$k} }
     1
 }
 
@@ -64,12 +64,12 @@ fn Set::equals($xs, $ys) {
 }
 
 fn Set::show($label, $s) {
-    my @k = sort keys %$s
+    val @k = sort keys %$s
     printf "  %-12s {%s}\n", $label . ":", join(", ", @k)
 }
 
-my $A = Set::make(1, 2, 3, 4, 5)
-my $B = Set::make(4, 5, 6, 7, 8)
+val $A = Set::make(1, 2, 3, 4, 5)
+val $B = Set::make(4, 5, 6, 7, 8)
 
 p "── Set operations demo ──"
 Set::show("A",        $A)
@@ -81,9 +81,9 @@ Set::show("B − A",    Set::diff($B, $A))
 Set::show("A △ B",    Set::sym_diff($A, $B))
 
 # Built-in self-tests on the algebraic identities.
-my $U  = Set::union($A, $B)
-my $I  = Set::intersect($A, $B)
-my $SD = Set::sym_diff($A, $B)
+val $U  = Set::union($A, $B)
+val $I  = Set::intersect($A, $B)
+val $SD = Set::sym_diff($A, $B)
 
 # |A ∪ B| = |A| + |B| - |A ∩ B| = 5 + 5 - 2 = 8
 die "inclusion-exclusion broken" unless len(keys %$U)  == 8
@@ -96,8 +96,8 @@ die "A equals A"    unless Set::equals($A, $A)
 die "A not equal B" unless !Set::equals($A, $B)
 
 # Disjoint sets: |A ∩ disjoint| = 0.
-my $D = Set::make(10, 11, 12)
-my $disj_intersect = Set::intersect($A, $D)
+val $D = Set::make(10, 11, 12)
+val $disj_intersect = Set::intersect($A, $D)
 die "disjoint intersect == empty" unless len(keys %$disj_intersect) == 0
 
 p ""

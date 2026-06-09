@@ -174,10 +174,10 @@ fn Sch::sch_equal($a, $b) {
             && Sch::sch_equal($a->{cdr}, $b->{cdr}) ? 1 : 0
     }
     if ($a->{type} eq "vec") {
-        my @ai = @{$a->{items}}
-        my @bi = @{$b->{items}}
+        val @ai = @{$a->{items}}
+        val @bi = @{$b->{items}}
         return 0 unless len(@ai) == len(@bi)
-        for my $i (0..$#ai) {
+        for val $i (0..$#ai) {
             return 0 unless Sch::sch_equal($ai[$i], $bi[$i])
         }
         return 1
@@ -197,15 +197,15 @@ fn Sch::sch_equal($a, $b) {
 # counts pairs.
 
 fn Sch::sch_list_from_array($items) {
-    my $list = Sch::make_nil()
-    for my $i (rev 0..(len(@$items) - 1)) {
+    var $list = Sch::make_nil()
+    for val $i (rev 0..(len(@$items) - 1)) {
         $list = Sch::make_pair($items->[$i], $list)
     }
     $list
 }
 
 fn Sch::sch_list_to_array($list) {
-    my @out = ()
+    var @out = ()
     while (Sch::is_pair($list)) {
         push @out, $list->{car}
         $list = $list->{cdr}
@@ -214,7 +214,7 @@ fn Sch::sch_list_to_array($list) {
 }
 
 fn Sch::sch_length($list) {
-    my $n = 0
+    var $n = 0
     while (Sch::is_pair($list)) {
         $n++
         $list = $list->{cdr}
@@ -230,7 +230,7 @@ fn Sch::sch_append2($a, $b) {
 }
 
 fn Sch::sch_reverse($list) {
-    my $out = Sch::make_nil()
+    var $out = Sch::make_nil()
     while (Sch::is_pair($list)) {
         $out  = Sch::make_pair($list->{car}, $out)
         $list = $list->{cdr}
@@ -257,7 +257,7 @@ fn Sch::sch_write($v) {
 
 fn Sch::sch_format($v, $quoted) {
     return "<undef>" unless ref($v) eq "HASH"
-    my $t = $v->{type}
+    var $t = $v->{type}
     if ($t eq "num")  { return Sch::sch_format_num($v->{val}) }
     if ($t eq "str")  {
         return $quoted ? Sch::sch_format_string($v->{val}) : $v->{val}
@@ -285,9 +285,9 @@ fn Sch::sch_format_num($n) {
 }
 
 fn Sch::sch_format_string($s) {
-    my $out = "\""
-    for my $i (0..(length($s) - 1)) {
-        my $c = substr($s, $i, 1)
+    var $out = "\""
+    for val $i (0..(length($s) - 1)) {
+        val $c = substr($s, $i, 1)
         if    ($c eq "\\") { $out .= "\\\\" }
         elsif ($c eq "\"") { $out .= "\\\"" }
         elsif ($c eq "\n") { $out .= "\\n" }
@@ -312,8 +312,8 @@ fn Sch::sch_format_pair($p, $quoted) {
     # Detect quote-family abbreviations: (quote x) → 'x, (quasiquote x) → `x,
     # (unquote x) → ,x, (unquote-splicing x) → ,@x.
     if (Sch::is_pair($p->{cdr}) && Sch::is_nil($p->{cdr}->{cdr}) && Sch::is_sym($p->{car})) {
-        my $name = $p->{car}->{name}
-        my $abbr = +{ "quote"            => "'",
+        val $name = $p->{car}->{name}
+        val $abbr = +{ "quote"            => "'",
                       "quasiquote"       => "`",
                       "unquote"          => ",",
                       "unquote-splicing" => ",@" }
@@ -321,8 +321,8 @@ fn Sch::sch_format_pair($p, $quoted) {
             return $abbr->{$name} . Sch::sch_format($p->{cdr}->{car}, $quoted)
         }
     }
-    my $out = "("
-    my $first = 1
+    var $out = "("
+    var $first = 1
     while (Sch::is_pair($p)) {
         $out .= " " unless $first
         $out .= Sch::sch_format($p->{car}, $quoted)
@@ -337,9 +337,9 @@ fn Sch::sch_format_pair($p, $quoted) {
 }
 
 fn Sch::sch_format_vec($v, $quoted) {
-    my @items = @{$v->{items}}
-    my $out = "#("
-    for my $i (0..$#items) {
+    val @items = @{$v->{items}}
+    var $out = "#("
+    for val $i (0..$#items) {
         $out .= " " if $i > 0
         $out .= Sch::sch_format($items[$i], $quoted)
     }
@@ -361,11 +361,11 @@ fn Sch::sch_format_vec($v, $quoted) {
 # tagged token hashes: { type=>'lparen' }, { type=>'sym', name=>... }, etc.
 
 fn Sch::sch_tokenize($src) {
-    my @tokens = ()
-    my $i = 0
-    my $n = length($src)
+    var @tokens = ()
+    var $i = 0
+    val $n = length($src)
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
         # Skip whitespace
         if ($c =~ /\s/) { $i++; next }
         # Line comment
@@ -376,7 +376,7 @@ fn Sch::sch_tokenize($src) {
         # Block comment #| ... |# (R6RS)
         if ($c eq "#" && $i + 1 < $n && substr($src, $i + 1, 1) eq "|") {
             $i += 2
-            my $depth = 1
+            var $depth = 1
             while ($i < $n && $depth > 0) {
                 if ($i + 1 < $n && substr($src, $i, 2) eq "#|") {
                     $depth++
@@ -419,12 +419,12 @@ fn Sch::sch_tokenize($src) {
         }
         # Booleans: #t #f #true #false
         if ($c eq "#" && $i + 1 < $n) {
-            my $next = substr($src, $i + 1, 1)
+            val $next = substr($src, $i + 1, 1)
             if ($next eq "t" || $next eq "f") {
                 # Possibly #true / #false — consume the whole word
-                my $j = $i + 1
+                var $j = $i + 1
                 while ($j < $n && substr($src, $j, 1) =~ /[a-zA-Z]/) { $j++ }
-                my $word = substr($src, $i + 1, $j - $i - 1)
+                val $word = substr($src, $i + 1, $j - $i - 1)
                 if ($word eq "t" || $word eq "true") {
                     push @tokens, +{ type => "bool", val => 1 }
                     $i = $j
@@ -440,7 +440,7 @@ fn Sch::sch_tokenize($src) {
             if ($next eq "\\") {
                 $i += 2
                 # Consume one char or a named char like 'space', 'newline'
-                my $j = $i
+                var $j = $i
                 while ($j < $n && substr($src, $j, 1) =~ /[a-zA-Z0-9]/) { $j++ }
                 if ($j == $i) {
                     # Single non-alphanumeric char (e.g. #\( #\space-as-char)
@@ -450,11 +450,11 @@ fn Sch::sch_tokenize($src) {
                     }
                     next
                 }
-                my $name = substr($src, $i, $j - $i)
-                my $ch = $name
+                val $name = substr($src, $i, $j - $i)
+                var $ch = $name
                 if (length($name) > 1) {
                     # Named character
-                    my $named = +{ space   => " ",
+                    val $named = +{ space   => " ",
                                    newline => "\n",
                                    tab     => "\t",
                                    return  => "\r",
@@ -477,11 +477,11 @@ fn Sch::sch_tokenize($src) {
         # Strings
         if ($c eq "\"") {
             $i++
-            my $val = ""
+            var $val = ""
             while ($i < $n && substr($src, $i, 1) ne "\"") {
-                my $ch = substr($src, $i, 1)
+                val $ch = substr($src, $i, 1)
                 if ($ch eq "\\" && $i + 1 < $n) {
-                    my $esc = substr($src, $i + 1, 1)
+                    val $esc = substr($src, $i + 1, 1)
                     if    ($esc eq "n") { $val .= "\n" }
                     elsif ($esc eq "t") { $val .= "\t" }
                     elsif ($esc eq "r") { $val .= "\r" }
@@ -502,21 +502,21 @@ fn Sch::sch_tokenize($src) {
         # Numbers (integer or real, optional sign): match here so symbols like
         # `+` and `-` standalone still work — only treat as number if next
         # char is a digit, OR sign followed by digit / decimal point.
-        my $is_num_start = 0
+        var $is_num_start = 0
         if ($c =~ /[0-9]/) { $is_num_start = 1 }
         if (($c eq "+" || $c eq "-") && $i + 1 < $n) {
-            my $next = substr($src, $i + 1, 1)
+            val $next = substr($src, $i + 1, 1)
             if ($next =~ /[0-9.]/) { $is_num_start = 1 }
         }
         if ($c eq "." && $i + 1 < $n) {
-            my $next = substr($src, $i + 1, 1)
+            val $next = substr($src, $i + 1, 1)
             if ($next =~ /[0-9]/) { $is_num_start = 1 }
         }
         if ($is_num_start) {
-            my $j = $i
+            var $j = $i
             $j++ if substr($src, $j, 1) =~ /[+-]/
             while ($j < $n && substr($src, $j, 1) =~ /[0-9]/) { $j++ }
-            my $is_real = 0
+            var $is_real = 0
             if ($j < $n && substr($src, $j, 1) eq ".") {
                 $is_real = 1
                 $j++
@@ -529,19 +529,19 @@ fn Sch::sch_tokenize($src) {
                 $j++ if $j < $n && substr($src, $j, 1) =~ /[+-]/
                 while ($j < $n && substr($src, $j, 1) =~ /[0-9]/) { $j++ }
             }
-            my $tok = substr($src, $i, $j - $i)
+            val $tok = substr($src, $i, $j - $i)
             # Validate: must contain at least one digit
             if ($tok =~ /[0-9]/) {
-                my $val = $is_real ? ($tok + 0.0) : ($tok + 0)
+                val $val = $is_real ? ($tok + 0.0) : ($tok + 0)
                 push @tokens, +{ type => "num", val => $val }
                 $i = $j
                 next
             }
         }
         # Symbol — gobble until whitespace / punctuation
-        my $j = $i
+        var $j = $i
         while ($j < $n) {
-            my $ch = substr($src, $j, 1)
+            val $ch = substr($src, $j, 1)
             last if $ch =~ /\s/
             last if $ch eq "(" || $ch eq ")"
             last if $ch eq "'" || $ch eq "`" || $ch eq ","
@@ -551,7 +551,7 @@ fn Sch::sch_tokenize($src) {
         if ($j == $i) {
             die "tokenize: unrecognized char '" . $c . "' at offset $i"
         }
-        my $name = substr($src, $i, $j - $i)
+        val $name = substr($src, $i, $j - $i)
         push @tokens, +{ type => "sym", name => $name }
         $i = $j
     }
@@ -567,9 +567,9 @@ fn Sch::sch_tokenize($src) {
 # through the helpers.
 
 fn Sch::sch_parse($src) {
-    my $tokens = Sch::sch_tokenize($src)
-    my $state = +{ tokens => $tokens, pos => 0 }
-    my @exprs = ()
+    val $tokens = Sch::sch_tokenize($src)
+    val $state = +{ tokens => $tokens, pos => 0 }
+    var @exprs = ()
     while (Sch::sch_peek_type($state) ne "eof") {
         # Datum comments suppress the next expression entirely
         if (Sch::sch_peek_type($state) eq "datum_comment") {
@@ -587,13 +587,13 @@ fn Sch::sch_peek_type($state) {
 }
 
 fn Sch::sch_advance($state) {
-    my $tok = $state->{tokens}->[$state->{pos}]
+    var $tok = $state->{tokens}->[$state->{pos}]
     $state->{pos}++
     $tok
 }
 
 fn Sch::sch_parse_one($state) {
-    my $type = Sch::sch_peek_type($state)
+    val $type = Sch::sch_peek_type($state)
     if ($type eq "lparen") {
         Sch::sch_advance($state)
         return Sch::sch_parse_list($state)
@@ -610,7 +610,7 @@ fn Sch::sch_parse_one($state) {
         die "parse: unexpected )"
     }
     # Atom
-    my $tok = Sch::sch_advance($state)
+    val $tok = Sch::sch_advance($state)
     if ($tok->{type} eq "num")  { return Sch::make_num($tok->{val}) }
     if ($tok->{type} eq "str")  { return Sch::make_str($tok->{val}) }
     if ($tok->{type} eq "bool") { return Sch::make_bool($tok->{val}) }
@@ -620,11 +620,11 @@ fn Sch::sch_parse_one($state) {
 }
 
 fn Sch::sch_parse_list($state) {
-    my @items = ()
-    my $tail = Sch::make_nil()
-    my $has_dot = 0
+    var @items = ()
+    var $tail = Sch::make_nil()
+    var $has_dot = 0
     while (1) {
-        my $type = Sch::sch_peek_type($state)
+        val $type = Sch::sch_peek_type($state)
         if ($type eq "rparen") {
             Sch::sch_advance($state)
             last
@@ -638,7 +638,7 @@ fn Sch::sch_parse_list($state) {
             $tail = Sch::sch_parse_one($state)
             $has_dot = 1
             # Expect closing rparen next
-            my $next = Sch::sch_peek_type($state)
+            val $next = Sch::sch_peek_type($state)
             if ($next ne "rparen") {
                 die "parse: expected ) after dotted tail, got $next"
             }
@@ -648,17 +648,17 @@ fn Sch::sch_parse_list($state) {
         push @items, Sch::sch_parse_one($state)
     }
     # Build right-folded pair chain
-    my $result = $tail
-    for my $i (rev 0..$#items) {
+    var $result = $tail
+    for val $i (rev 0..$#items) {
         $result = Sch::make_pair($items[$i], $result)
     }
     $result
 }
 
 fn Sch::sch_parse_vector($state) {
-    my @items = ()
+    var @items = ()
     while (1) {
-        my $type = Sch::sch_peek_type($state)
+        val $type = Sch::sch_peek_type($state)
         if ($type eq "rparen") {
             Sch::sch_advance($state)
             last
@@ -673,7 +673,7 @@ fn Sch::sch_parse_vector($state) {
 
 fn Sch::sch_parse_abbr($state, $name) {
     Sch::sch_advance($state)
-    my $inner = Sch::sch_parse_one($state)
+    val $inner = Sch::sch_parse_one($state)
     Sch::make_pair(Sch::make_sym($name),
                    Sch::make_pair($inner, Sch::make_nil()))
 }
@@ -719,20 +719,20 @@ fn Sch::env_set($env, $name, $val) {
 }
 
 fn Sch::env_extend($env, $names, $rest_name, $values) {
-    my $new = Sch::env_new($env)
-    my @vals = @$values
-    my @nms  = @$names
+    val $new = Sch::env_new($env)
+    val @vals = @$values
+    val @nms  = @$names
     if (len(@vals) < len(@nms)) {
         die "apply: too few arguments (" . len(@vals) . " < " . len(@nms) . ")"
     }
     if (!defined($rest_name) && len(@vals) > len(@nms)) {
         die "apply: too many arguments (" . len(@vals) . " > " . len(@nms) . ")"
     }
-    for my $i (0..$#nms) {
+    for val $i (0..$#nms) {
         $new->{bindings}->{$nms[$i]} = $vals[$i]
     }
     if (defined $rest_name) {
-        my @rest_vals = @vals[len(@nms) .. $#vals]
+        val @rest_vals = @vals[len(@nms) .. $#vals]
         $new->{bindings}->{$rest_name} = Sch::sch_list_from_array(\@rest_vals)
     }
     $new
@@ -750,7 +750,7 @@ fn Sch::env_extend($env, $names, $rest_name, $values) {
 
 fn Sch::sch_eval($expr, $env) {
     return $expr unless ref($expr) eq "HASH"
-    my $t = $expr->{type}
+    val $t = $expr->{type}
     # Self-evaluating atoms
     if ($t eq "num"  || $t eq "str"  || $t eq "bool"
         || $t eq "char" || $t eq "vec"  || $t eq "unspec") {
@@ -765,18 +765,18 @@ fn Sch::sch_eval($expr, $env) {
     }
     # Pair — combination
     if ($t eq "pair") {
-        my $head = $expr->{car}
+        val $head = $expr->{car}
         # Special form?
         if (Sch::is_sym($head)) {
-            my $name = $head->{name}
+            val $name = $head->{name}
             if (Sch::is_special_form_name($name)) {
                 return Sch::dispatch_special_form($name, $expr->{cdr}, $env)
             }
         }
         # Procedure application
-        my $proc = Sch::sch_eval($head, $env)
-        my @args = ()
-        my $cur = $expr->{cdr}
+        val $proc = Sch::sch_eval($head, $env)
+        var @args = ()
+        var $cur = $expr->{cdr}
         while (Sch::is_pair($cur)) {
             push @args, Sch::sch_eval($cur->{car}, $env)
             $cur = $cur->{cdr}
@@ -790,7 +790,7 @@ fn Sch::sch_apply($proc, $args) {
     if (Sch::is_builtin($proc)) {
         # Arity check: arity is +N (exact), -N (at-least-N), or undef (any)
         if (defined $proc->{arity}) {
-            my $a = $proc->{arity}
+            val $a = $proc->{arity}
             if ($a >= 0 && len(@$args) != $a) {
                 die "apply: " . $proc->{name} . " expects $a args, got " . len(@$args)
             }
@@ -801,9 +801,9 @@ fn Sch::sch_apply($proc, $args) {
         return $proc->{fn}($args)
     }
     if (Sch::is_lambda($proc)) {
-        my $new_env = Sch::env_extend($proc->{env}, $proc->{params}, $proc->{rest}, $args)
-        my $result = Sch::make_unspec()
-        for my $body_expr (@{$proc->{body}}) {
+        val $new_env = Sch::env_extend($proc->{env}, $proc->{params}, $proc->{rest}, $args)
+        var $result = Sch::make_unspec()
+        for val $body_expr (@{$proc->{body}}) {
             $result = Sch::sch_eval($body_expr, $new_env)
         }
         return $result
@@ -862,11 +862,11 @@ fn Sch::sf_quote($args, $env) {
 }
 
 fn Sch::sf_if($args, $env) {
-    my $arr = Sch::sch_list_to_array($args)
+    val $arr = Sch::sch_list_to_array($args)
     if (len(@$arr) < 2 || len(@$arr) > 3) {
         die "if: expects 2 or 3 forms, got " . len(@$arr)
     }
-    my $test = Sch::sch_eval($arr->[0], $env)
+    val $test = Sch::sch_eval($arr->[0], $env)
     if (Sch::is_true($test)) {
         return Sch::sch_eval($arr->[1], $env)
     }
@@ -878,12 +878,12 @@ fn Sch::sf_if($args, $env) {
 
 fn Sch::sf_define($args, $env) {
     Sch::is_pair($args) or die "define: malformed"
-    my $head = $args->{car}
-    my $rest = $args->{cdr}
+    val $head = $args->{car}
+    var $rest = $args->{cdr}
     if (Sch::is_sym($head)) {
         # (define name expr) — single binding
         Sch::is_pair($rest) or die "define: missing value"
-        my $val = Sch::sch_eval($rest->{car}, $env)
+        var $val = Sch::sch_eval($rest->{car}, $env)
         # Capture the name on lambdas for nicer #<procedure:name> printing
         if (Sch::is_lambda($val) && $val->{name} eq "<anonymous>") {
             $val->{name} = $head->{name}
@@ -892,32 +892,32 @@ fn Sch::sf_define($args, $env) {
     }
     if (Sch::is_pair($head)) {
         # (define (name . params) body...) — sugar for (define name (lambda params body))
-        my $name_sym = $head->{car}
+        val $name_sym = $head->{car}
         Sch::is_sym($name_sym) or die "define: function name must be symbol"
-        my $param_form = $head->{cdr}
-        my $body = $rest
-        my ($params, $rest_param) = Sch::sf_extract_params($param_form)
-        my $body_arr = Sch::sch_list_to_array($body)
-        my $lam = Sch::make_lambda($params, $rest_param, $body_arr, $env, $name_sym->{name})
+        val $param_form = $head->{cdr}
+        val $body = $rest
+        var ($params, $rest_param) = Sch::sf_extract_params($param_form)
+        val $body_arr = Sch::sch_list_to_array($body)
+        val $lam = Sch::make_lambda($params, $rest_param, $body_arr, $env, $name_sym->{name})
         return Sch::env_define($env, $name_sym->{name}, $lam)
     }
     die "define: bad target"
 }
 
 fn Sch::sf_set($args, $env) {
-    my $arr = Sch::sch_list_to_array($args)
+    val $arr = Sch::sch_list_to_array($args)
     len(@$arr) == 2 or die "set!: expects 2 forms"
     Sch::is_sym($arr->[0]) or die "set!: target must be symbol"
-    my $val = Sch::sch_eval($arr->[1], $env)
+    val $val = Sch::sch_eval($arr->[1], $env)
     Sch::env_set($env, $arr->[0]->{name}, $val)
 }
 
 fn Sch::sf_lambda($args, $env) {
     Sch::is_pair($args) or die "lambda: missing params"
-    my $param_form = $args->{car}
-    my $body = $args->{cdr}
-    my ($params, $rest_param) = Sch::sf_extract_params($param_form)
-    my $body_arr = Sch::sch_list_to_array($body)
+    val $param_form = $args->{car}
+    val $body = $args->{cdr}
+    val ($params, $rest_param) = Sch::sf_extract_params($param_form)
+    val $body_arr = Sch::sch_list_to_array($body)
     Sch::make_lambda($params, $rest_param, $body_arr, $env, "<anonymous>")
 }
 
@@ -927,8 +927,8 @@ fn Sch::sf_lambda($args, $env) {
 #   (a b . rest)      — fixed + rest
 #   rest              — single symbol = all-rest
 fn Sch::sf_extract_params($form) {
-    my @names = ()
-    my $rest = undef
+    var @names = ()
+    var $rest = undef
     if (Sch::is_sym($form)) {
         # Whole arg list bound to one symbol
         return (\@names, $form->{name})
@@ -947,7 +947,7 @@ fn Sch::sf_extract_params($form) {
 }
 
 fn Sch::sf_begin($args, $env) {
-    my $result = Sch::make_unspec()
+    var $result = Sch::make_unspec()
     while (Sch::is_pair($args)) {
         $result = Sch::sch_eval($args->{car}, $env)
         $args = $args->{cdr}
@@ -956,7 +956,7 @@ fn Sch::sf_begin($args, $env) {
 }
 
 fn Sch::sf_and($args, $env) {
-    my $result = Sch::make_bool(1)
+    var $result = Sch::make_bool(1)
     while (Sch::is_pair($args)) {
         $result = Sch::sch_eval($args->{car}, $env)
         return $result if Sch::is_false($result)
@@ -966,7 +966,7 @@ fn Sch::sf_and($args, $env) {
 }
 
 fn Sch::sf_or($args, $env) {
-    my $result = Sch::make_bool(0)
+    var $result = Sch::make_bool(0)
     while (Sch::is_pair($args)) {
         $result = Sch::sch_eval($args->{car}, $env)
         return $result if Sch::is_true($result)
@@ -977,7 +977,7 @@ fn Sch::sf_or($args, $env) {
 
 fn Sch::sf_when($args, $env) {
     Sch::is_pair($args) or die "when: missing test"
-    my $test = Sch::sch_eval($args->{car}, $env)
+    val $test = Sch::sch_eval($args->{car}, $env)
     if (Sch::is_true($test)) {
         return Sch::sf_begin($args->{cdr}, $env)
     }
@@ -986,7 +986,7 @@ fn Sch::sf_when($args, $env) {
 
 fn Sch::sf_unless($args, $env) {
     Sch::is_pair($args) or die "unless: missing test"
-    my $test = Sch::sch_eval($args->{car}, $env)
+    val $test = Sch::sch_eval($args->{car}, $env)
     if (Sch::is_false($test)) {
         return Sch::sf_begin($args->{cdr}, $env)
     }
@@ -995,24 +995,24 @@ fn Sch::sf_unless($args, $env) {
 
 fn Sch::sf_cond($args, $env) {
     while (Sch::is_pair($args)) {
-        my $clause = $args->{car}
+        val $clause = $args->{car}
         Sch::is_pair($clause) or die "cond: malformed clause"
-        my $test_form = $clause->{car}
-        my $body = $clause->{cdr}
+        val $test_form = $clause->{car}
+        val $body = $clause->{cdr}
         # else clause
         if (Sch::is_sym($test_form) && $test_form->{name} eq "else") {
             return Sch::sf_begin($body, $env)
         }
-        my $test = Sch::sch_eval($test_form, $env)
+        val $test = Sch::sch_eval($test_form, $env)
         if (Sch::is_true($test)) {
             # (cond (test => proc)) — apply proc to test's value
             if (Sch::is_pair($body)
                 && Sch::is_sym($body->{car})
                 && $body->{car}->{name} eq "=>")
             {
-                my $proc_expr = $body->{cdr}
+                val $proc_expr = $body->{cdr}
                 Sch::is_pair($proc_expr) or die "cond: => requires proc"
-                my $proc = Sch::sch_eval($proc_expr->{car}, $env)
+                val $proc = Sch::sch_eval($proc_expr->{car}, $env)
                 return Sch::sch_apply($proc, [$test])
             }
             return Sch::sf_begin($body, $env) if Sch::is_pair($body)
@@ -1025,19 +1025,19 @@ fn Sch::sf_cond($args, $env) {
 
 fn Sch::sf_case($args, $env) {
     Sch::is_pair($args) or die "case: missing key"
-    my $key = Sch::sch_eval($args->{car}, $env)
-    my $clauses = $args->{cdr}
+    val $key = Sch::sch_eval($args->{car}, $env)
+    var $clauses = $args->{cdr}
     while (Sch::is_pair($clauses)) {
-        my $clause = $clauses->{car}
+        val $clause = $clauses->{car}
         Sch::is_pair($clause) or die "case: malformed clause"
-        my $datums = $clause->{car}
-        my $body = $clause->{cdr}
+        val $datums = $clause->{car}
+        val $body = $clause->{cdr}
         # else clause
         if (Sch::is_sym($datums) && $datums->{name} eq "else") {
             return Sch::sf_begin($body, $env)
         }
         # Match if key eqv? any datum
-        my $cur = $datums
+        var $cur = $datums
         while (Sch::is_pair($cur)) {
             if (Sch::sch_eqv($key, $cur->{car})) {
                 return Sch::sf_begin($body, $env)
@@ -1053,45 +1053,45 @@ fn Sch::sf_case($args, $env) {
 # Named let (let loop ((x 1)) body) — recursive helper bound to `loop`.
 fn Sch::sf_let($args, $env) {
     Sch::is_pair($args) or die "let: missing bindings"
-    my $first = $args->{car}
+    val $first = $args->{car}
     # Named let?
     if (Sch::is_sym($first)) {
-        my $loop_name = $first->{name}
-        my $rest = $args->{cdr}
+        val $loop_name = $first->{name}
+        val $rest = $args->{cdr}
         Sch::is_pair($rest) or die "named let: missing bindings"
-        my $bindings = $rest->{car}
-        my $body = $rest->{cdr}
-        my @names = ()
-        my @inits = ()
-        my $cur = $bindings
+        val $bindings = $rest->{car}
+        val $body = $rest->{cdr}
+        var @names = ()
+        var @inits = ()
+        var $cur = $bindings
         while (Sch::is_pair($cur)) {
-            my $b = $cur->{car}
+            val $b = $cur->{car}
             Sch::is_pair($b) && Sch::is_pair($b->{cdr}) or die "let: bad binding"
             push @names, $b->{car}->{name}
             push @inits, Sch::sch_eval($b->{cdr}->{car}, $env)
             $cur = $cur->{cdr}
         }
-        my $loop_env = Sch::env_new($env)
-        my $body_arr = Sch::sch_list_to_array($body)
-        my $lam = Sch::make_lambda(\@names, undef, $body_arr, $loop_env, $loop_name)
+        val $loop_env = Sch::env_new($env)
+        val $body_arr = Sch::sch_list_to_array($body)
+        val $lam = Sch::make_lambda(\@names, undef, $body_arr, $loop_env, $loop_name)
         Sch::env_define($loop_env, $loop_name, $lam)
         return Sch::sch_apply($lam, \@inits)
     }
     # Plain let
-    my $bindings = $first
-    my $body = $args->{cdr}
-    my @names = ()
-    my @inits = ()
-    my $cur = $bindings
+    val $bindings = $first
+    val $body = $args->{cdr}
+    var @names = ()
+    var @inits = ()
+    var $cur = $bindings
     while (Sch::is_pair($cur)) {
-        my $b = $cur->{car}
+        val $b = $cur->{car}
         Sch::is_pair($b) && Sch::is_pair($b->{cdr}) or die "let: bad binding"
         push @names, $b->{car}->{name}
         push @inits, Sch::sch_eval($b->{cdr}->{car}, $env)
         $cur = $cur->{cdr}
     }
-    my $new_env = Sch::env_new($env)
-    for my $i (0..$#names) {
+    val $new_env = Sch::env_new($env)
+    for val $i (0..$#names) {
         Sch::env_define($new_env, $names[$i], $inits[$i])
     }
     Sch::sf_begin($body, $new_env)
@@ -1099,16 +1099,16 @@ fn Sch::sf_let($args, $env) {
 
 fn Sch::sf_let_star($args, $env) {
     Sch::is_pair($args) or die "let*: missing bindings"
-    my $bindings = $args->{car}
-    my $body = $args->{cdr}
-    my $cur_env = $env
-    my $cur = $bindings
+    val $bindings = $args->{car}
+    val $body = $args->{cdr}
+    var $cur_env = $env
+    var $cur = $bindings
     while (Sch::is_pair($cur)) {
-        my $b = $cur->{car}
+        val $b = $cur->{car}
         Sch::is_pair($b) && Sch::is_pair($b->{cdr}) or die "let*: bad binding"
-        my $name = $b->{car}->{name}
-        my $val  = Sch::sch_eval($b->{cdr}->{car}, $cur_env)
-        my $next_env = Sch::env_new($cur_env)
+        val $name = $b->{car}->{name}
+        val $val  = Sch::sch_eval($b->{cdr}->{car}, $cur_env)
+        val $next_env = Sch::env_new($cur_env)
         Sch::env_define($next_env, $name, $val)
         $cur_env = $next_env
         $cur = $cur->{cdr}
@@ -1118,15 +1118,15 @@ fn Sch::sf_let_star($args, $env) {
 
 fn Sch::sf_letrec($args, $env) {
     Sch::is_pair($args) or die "letrec: missing bindings"
-    my $bindings = $args->{car}
-    my $body = $args->{cdr}
-    my $new_env = Sch::env_new($env)
+    val $bindings = $args->{car}
+    val $body = $args->{cdr}
+    val $new_env = Sch::env_new($env)
     # First pass: define all bindings to unspec so mutual recursion sees them
-    my @names = ()
-    my @init_exprs = ()
-    my $cur = $bindings
+    var @names = ()
+    var @init_exprs = ()
+    var $cur = $bindings
     while (Sch::is_pair($cur)) {
-        my $b = $cur->{car}
+        val $b = $cur->{car}
         Sch::is_pair($b) && Sch::is_pair($b->{cdr}) or die "letrec: bad binding"
         push @names, $b->{car}->{name}
         push @init_exprs, $b->{cdr}->{car}
@@ -1134,8 +1134,8 @@ fn Sch::sf_letrec($args, $env) {
         $cur = $cur->{cdr}
     }
     # Second pass: evaluate inits in new_env (sees all sibling bindings)
-    for my $i (0..$#names) {
-        my $val = Sch::sch_eval($init_exprs[$i], $new_env)
+    for val $i (0..$#names) {
+        val $val = Sch::sch_eval($init_exprs[$i], $new_env)
         Sch::env_define($new_env, $names[$i], $val)
     }
     Sch::sf_begin($body, $new_env)
@@ -1145,25 +1145,25 @@ fn Sch::sf_letrec($args, $env) {
 # Iteration with parallel update, body for side effects, test for exit.
 fn Sch::sf_do($args, $env) {
     Sch::is_pair($args) or die "do: missing bindings"
-    my $bindings = $args->{car}
-    my $rest = $args->{cdr}
+    val $bindings = $args->{car}
+    val $rest = $args->{cdr}
     Sch::is_pair($rest) or die "do: missing test clause"
-    my $test_clause = $rest->{car}
-    my $body = $rest->{cdr}
+    val $test_clause = $rest->{car}
+    val $body = $rest->{cdr}
     Sch::is_pair($test_clause) or die "do: bad test clause"
-    my $test_expr = $test_clause->{car}
-    my $result_exprs = $test_clause->{cdr}
+    val $test_expr = $test_clause->{car}
+    val $result_exprs = $test_clause->{cdr}
     # Collect bindings: (var init step)
-    my @vars  = ()
-    my @inits = ()
-    my @steps = ()
-    my $cur = $bindings
+    var @vars  = ()
+    var @inits = ()
+    var @steps = ()
+    var $cur = $bindings
     while (Sch::is_pair($cur)) {
-        my $b = $cur->{car}
+        val $b = $cur->{car}
         Sch::is_pair($b) && Sch::is_pair($b->{cdr}) or die "do: bad binding"
         push @vars, $b->{car}->{name}
         push @inits, $b->{cdr}->{car}
-        my $step_form = $b->{cdr}->{cdr}
+        val $step_form = $b->{cdr}->{cdr}
         if (Sch::is_pair($step_form)) {
             push @steps, $step_form->{car}
         } else {
@@ -1172,27 +1172,27 @@ fn Sch::sf_do($args, $env) {
         }
         $cur = $cur->{cdr}
     }
-    my $loop_env = Sch::env_new($env)
-    for my $i (0..$#vars) {
+    val $loop_env = Sch::env_new($env)
+    for val $i (0..$#vars) {
         Sch::env_define($loop_env, $vars[$i], Sch::sch_eval($inits[$i], $env))
     }
     while (1) {
-        my $test = Sch::sch_eval($test_expr, $loop_env)
+        val $test = Sch::sch_eval($test_expr, $loop_env)
         if (Sch::is_true($test)) {
             return Sch::sf_begin($result_exprs, $loop_env)
         }
         # Run body for side effects
-        my $b = $body
+        var $b = $body
         while (Sch::is_pair($b)) {
             Sch::sch_eval($b->{car}, $loop_env)
             $b = $b->{cdr}
         }
         # Compute new step values, then assign in parallel
-        my @new_vals = ()
-        for my $i (0..$#vars) {
+        var @new_vals = ()
+        for val $i (0..$#vars) {
             push @new_vals, Sch::sch_eval($steps[$i], $loop_env)
         }
-        for my $i (0..$#vars) {
+        for val $i (0..$#vars) {
             Sch::env_define($loop_env, $vars[$i], $new_vals[$i])
         }
     }
@@ -1220,10 +1220,10 @@ fn Sch::sch_qq($form, $env, $level) {
                               Sch::sch_qq($form->{cdr}, $env, $level + 1))
     }
     # Otherwise — recurse, splicing where needed
-    my @items = ()
-    my $cur = $form
+    var @items = ()
+    var $cur = $form
     while (Sch::is_pair($cur)) {
-        my $elt = $cur->{car}
+        val $elt = $cur->{car}
         # Splicing: ,@expr inside list context
         if (Sch::is_pair($elt)
             && Sch::is_sym($elt->{car})
@@ -1231,7 +1231,7 @@ fn Sch::sch_qq($form, $env, $level) {
             && $level == 1)
         {
             Sch::is_pair($elt->{cdr}) or die "unquote-splicing: missing arg"
-            my $list = Sch::sch_eval($elt->{cdr}->{car}, $env)
+            var $list = Sch::sch_eval($elt->{cdr}->{car}, $env)
             while (Sch::is_pair($list)) {
                 push @items, $list->{car}
                 $list = $list->{cdr}
@@ -1241,9 +1241,9 @@ fn Sch::sch_qq($form, $env, $level) {
         }
         $cur = $cur->{cdr}
     }
-    my $tail = Sch::sch_qq($cur, $env, $level)
-    my $result = $tail
-    for my $i (rev 0..$#items) {
+    val $tail = Sch::sch_qq($cur, $env, $level)
+    var $result = $tail
+    for val $i (rev 0..$#items) {
         $result = Sch::make_pair($items[$i], $result)
     }
     $result
@@ -1255,32 +1255,32 @@ fn Sch::sch_qq($form, $env, $level) {
 # stays terse.
 
 fn Sch::sch_num_arg($args, $idx, $name) {
-    my $v = $args->[$idx]
+    val $v = $args->[$idx]
     Sch::is_num($v) or die "$name: arg " . ($idx + 1) . " must be number, got "
                             . Sch::sch_write($v)
     $v->{val}
 }
 
 fn Sch::sch_int_arg($args, $idx, $name) {
-    my $n = Sch::sch_num_arg($args, $idx, $name)
+    val $n = Sch::sch_num_arg($args, $idx, $name)
     $n == int($n) or die "$name: arg " . ($idx + 1) . " must be integer, got $n"
     int($n)
 }
 
 fn Sch::sch_str_arg($args, $idx, $name) {
-    my $v = $args->[$idx]
+    val $v = $args->[$idx]
     Sch::is_str($v) or die "$name: arg " . ($idx + 1) . " must be string"
     $v->{val}
 }
 
 fn Sch::sch_char_arg($args, $idx, $name) {
-    my $v = $args->[$idx]
+    val $v = $args->[$idx]
     Sch::is_char($v) or die "$name: arg " . ($idx + 1) . " must be char"
     $v->{val}
 }
 
 fn Sch::sch_pair_arg($args, $idx, $name) {
-    my $v = $args->[$idx]
+    val $v = $args->[$idx]
     Sch::is_pair($v) or die "$name: arg " . ($idx + 1) . " must be pair"
     $v
 }
@@ -1298,62 +1298,62 @@ fn Sch::sch_pair_arg($args, $idx, $name) {
 fn Sch::install_builtins($env) {
     # ── Arithmetic ──────────────────────────────────────────────────────
     Sch::env_define($env, "+", Sch::make_builtin("+", undef, fn($args) {
-        my $sum = 0
-        for my $i (0..(len(@$args) - 1)) {
+        var $sum = 0
+        for val $i (0..(len(@$args) - 1)) {
             $sum += Sch::sch_num_arg($args, $i, "+")
         }
         Sch::make_num($sum)
     }))
     Sch::env_define($env, "-", Sch::make_builtin("-", -1, fn($args) {
-        my $first = Sch::sch_num_arg($args, 0, "-")
+        val $first = Sch::sch_num_arg($args, 0, "-")
         if (len(@$args) == 1) {
             return Sch::make_num(-$first)
         }
-        my $r = $first
-        for my $i (1..(len(@$args) - 1)) {
+        var $r = $first
+        for val $i (1..(len(@$args) - 1)) {
             $r -= Sch::sch_num_arg($args, $i, "-")
         }
         Sch::make_num($r)
     }))
     Sch::env_define($env, "*", Sch::make_builtin("*", undef, fn($args) {
-        my $prod = 1
-        for my $i (0..(len(@$args) - 1)) {
+        var $prod = 1
+        for val $i (0..(len(@$args) - 1)) {
             $prod *= Sch::sch_num_arg($args, $i, "*")
         }
         Sch::make_num($prod)
     }))
     Sch::env_define($env, "/", Sch::make_builtin("/", -1, fn($args) {
-        my $first = Sch::sch_num_arg($args, 0, "/")
+        val $first = Sch::sch_num_arg($args, 0, "/")
         if (len(@$args) == 1) {
             $first == 0 and die "/: division by zero"
             return Sch::make_num(1.0 / $first)
         }
-        my $r = $first
-        for my $i (1..(len(@$args) - 1)) {
-            my $d = Sch::sch_num_arg($args, $i, "/")
+        var $r = $first
+        for val $i (1..(len(@$args) - 1)) {
+            val $d = Sch::sch_num_arg($args, $i, "/")
             $d == 0 and die "/: division by zero"
             $r = $r / $d
         }
         Sch::make_num($r)
     }))
     Sch::env_define($env, "quotient", Sch::make_builtin("quotient", 2, fn($args) {
-        my $a = Sch::sch_int_arg($args, 0, "quotient")
-        my $b = Sch::sch_int_arg($args, 1, "quotient")
+        val $a = Sch::sch_int_arg($args, 0, "quotient")
+        val $b = Sch::sch_int_arg($args, 1, "quotient")
         $b == 0 and die "quotient: division by zero"
         Sch::make_num(int($a / $b))
     }))
     Sch::env_define($env, "remainder", Sch::make_builtin("remainder", 2, fn($args) {
-        my $a = Sch::sch_int_arg($args, 0, "remainder")
-        my $b = Sch::sch_int_arg($args, 1, "remainder")
+        val $a = Sch::sch_int_arg($args, 0, "remainder")
+        val $b = Sch::sch_int_arg($args, 1, "remainder")
         $b == 0 and die "remainder: division by zero"
-        my $q = int($a / $b)
+        val $q = int($a / $b)
         Sch::make_num($a - $q * $b)
     }))
     Sch::env_define($env, "modulo", Sch::make_builtin("modulo", 2, fn($args) {
-        my $a = Sch::sch_int_arg($args, 0, "modulo")
-        my $b = Sch::sch_int_arg($args, 1, "modulo")
+        val $a = Sch::sch_int_arg($args, 0, "modulo")
+        val $b = Sch::sch_int_arg($args, 1, "modulo")
         $b == 0 and die "modulo: division by zero"
-        my $m = $a % $b
+        var $m = $a % $b
         # Scheme modulo has the sign of the divisor
         if (($m != 0) && (($m < 0) != ($b < 0))) { $m += $b }
         Sch::make_num($m)
@@ -1362,55 +1362,55 @@ fn Sch::install_builtins($env) {
         Sch::make_num(abs(Sch::sch_num_arg($args, 0, "abs")))
     }))
     Sch::env_define($env, "min", Sch::make_builtin("min", -1, fn($args) {
-        my $m = Sch::sch_num_arg($args, 0, "min")
-        for my $i (1..(len(@$args) - 1)) {
-            my $v = Sch::sch_num_arg($args, $i, "min")
+        var $m = Sch::sch_num_arg($args, 0, "min")
+        for val $i (1..(len(@$args) - 1)) {
+            val $v = Sch::sch_num_arg($args, $i, "min")
             $m = $v if $v < $m
         }
         Sch::make_num($m)
     }))
     Sch::env_define($env, "max", Sch::make_builtin("max", -1, fn($args) {
-        my $m = Sch::sch_num_arg($args, 0, "max")
-        for my $i (1..(len(@$args) - 1)) {
-            my $v = Sch::sch_num_arg($args, $i, "max")
+        var $m = Sch::sch_num_arg($args, 0, "max")
+        for val $i (1..(len(@$args) - 1)) {
+            val $v = Sch::sch_num_arg($args, $i, "max")
             $m = $v if $v > $m
         }
         Sch::make_num($m)
     }))
     Sch::env_define($env, "expt", Sch::make_builtin("expt", 2, fn($args) {
-        my $b = Sch::sch_num_arg($args, 0, "expt")
-        my $e = Sch::sch_num_arg($args, 1, "expt")
+        val $b = Sch::sch_num_arg($args, 0, "expt")
+        val $e = Sch::sch_num_arg($args, 1, "expt")
         Sch::make_num($b ** $e)
     }))
     Sch::env_define($env, "sqrt", Sch::make_builtin("sqrt", 1, fn($args) {
         Sch::make_num(sqrt(Sch::sch_num_arg($args, 0, "sqrt")))
     }))
     Sch::env_define($env, "floor", Sch::make_builtin("floor", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "floor")
+        val $n = Sch::sch_num_arg($args, 0, "floor")
         Sch::make_num(int($n) - (($n < 0 && $n != int($n)) ? 1 : 0))
     }))
     Sch::env_define($env, "ceiling", Sch::make_builtin("ceiling", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "ceiling")
+        val $n = Sch::sch_num_arg($args, 0, "ceiling")
         Sch::make_num(int($n) + (($n > 0 && $n != int($n)) ? 1 : 0))
     }))
     Sch::env_define($env, "round", Sch::make_builtin("round", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "round")
+        val $n = Sch::sch_num_arg($args, 0, "round")
         # Scheme rounds half to even — but most programs don't depend on
         # banker's rounding. Use stryke's `int($n + 0.5)` rule, which is
         # half-up for positives.
         Sch::make_num($n >= 0 ? int($n + 0.5) : -int(-$n + 0.5))
     }))
     Sch::env_define($env, "truncate", Sch::make_builtin("truncate", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "truncate")
+        val $n = Sch::sch_num_arg($args, 0, "truncate")
         Sch::make_num(int($n))
     }))
     Sch::env_define($env, "gcd", Sch::make_builtin("gcd", undef, fn($args) {
         return Sch::make_num(0) if len(@$args) == 0
-        my $g = abs(Sch::sch_int_arg($args, 0, "gcd"))
-        for my $i (1..(len(@$args) - 1)) {
-            my $b = abs(Sch::sch_int_arg($args, $i, "gcd"))
+        var $g = abs(Sch::sch_int_arg($args, 0, "gcd"))
+        for val $i (1..(len(@$args) - 1)) {
+            var $b = abs(Sch::sch_int_arg($args, $i, "gcd"))
             while ($b != 0) {
-                my $t = $b
+                val $t = $b
                 $b = $g % $b
                 $g = $t
             }
@@ -1419,14 +1419,14 @@ fn Sch::install_builtins($env) {
     }))
     Sch::env_define($env, "lcm", Sch::make_builtin("lcm", undef, fn($args) {
         return Sch::make_num(1) if len(@$args) == 0
-        my $l = abs(Sch::sch_int_arg($args, 0, "lcm"))
-        for my $i (1..(len(@$args) - 1)) {
-            my $b = abs(Sch::sch_int_arg($args, $i, "lcm"))
+        var $l = abs(Sch::sch_int_arg($args, 0, "lcm"))
+        for val $i (1..(len(@$args) - 1)) {
+            val $b = abs(Sch::sch_int_arg($args, $i, "lcm"))
             return Sch::make_num(0) if $l == 0 || $b == 0
-            my $g = $l
-            my $tmp = $b
+            var $g = $l
+            var $tmp = $b
             while ($tmp != 0) {
-                my $t = $tmp
+                val $t = $tmp
                 $tmp = $g % $tmp
                 $g = $t
             }
@@ -1435,63 +1435,63 @@ fn Sch::install_builtins($env) {
         Sch::make_num($l)
     }))
     Sch::env_define($env, "even?", Sch::make_builtin("even?", 1, fn($args) {
-        my $n = Sch::sch_int_arg($args, 0, "even?")
+        val $n = Sch::sch_int_arg($args, 0, "even?")
         Sch::make_bool($n % 2 == 0 ? 1 : 0)
     }))
     Sch::env_define($env, "odd?", Sch::make_builtin("odd?", 1, fn($args) {
-        my $n = Sch::sch_int_arg($args, 0, "odd?")
+        val $n = Sch::sch_int_arg($args, 0, "odd?")
         Sch::make_bool($n % 2 != 0 ? 1 : 0)
     }))
     Sch::env_define($env, "zero?", Sch::make_builtin("zero?", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "zero?")
+        val $n = Sch::sch_num_arg($args, 0, "zero?")
         Sch::make_bool($n == 0 ? 1 : 0)
     }))
     Sch::env_define($env, "positive?", Sch::make_builtin("positive?", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "positive?")
+        val $n = Sch::sch_num_arg($args, 0, "positive?")
         Sch::make_bool($n > 0 ? 1 : 0)
     }))
     Sch::env_define($env, "negative?", Sch::make_builtin("negative?", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "negative?")
+        val $n = Sch::sch_num_arg($args, 0, "negative?")
         Sch::make_bool($n < 0 ? 1 : 0)
     }))
 
     # ── Numeric comparison ──────────────────────────────────────────────
     Sch::env_define($env, "=", Sch::make_builtin("=", -2, fn($args) {
-        my $first = Sch::sch_num_arg($args, 0, "=")
-        for my $i (1..(len(@$args) - 1)) {
-            my $v = Sch::sch_num_arg($args, $i, "=")
+        val $first = Sch::sch_num_arg($args, 0, "=")
+        for val $i (1..(len(@$args) - 1)) {
+            val $v = Sch::sch_num_arg($args, $i, "=")
             return Sch::make_bool(0) unless $v == $first
         }
         Sch::make_bool(1)
     }))
     Sch::env_define($env, "<", Sch::make_builtin("<", -2, fn($args) {
-        for my $i (0..((len(@$args) - 1) - 1)) {
-            my $a = Sch::sch_num_arg($args, $i, "<")
-            my $b = Sch::sch_num_arg($args, $i + 1, "<")
+        for val $i (0..((len(@$args) - 1) - 1)) {
+            val $a = Sch::sch_num_arg($args, $i, "<")
+            val $b = Sch::sch_num_arg($args, $i + 1, "<")
             return Sch::make_bool(0) unless $a < $b
         }
         Sch::make_bool(1)
     }))
     Sch::env_define($env, ">", Sch::make_builtin(">", -2, fn($args) {
-        for my $i (0..((len(@$args) - 1) - 1)) {
-            my $a = Sch::sch_num_arg($args, $i, ">")
-            my $b = Sch::sch_num_arg($args, $i + 1, ">")
+        for val $i (0..((len(@$args) - 1) - 1)) {
+            val $a = Sch::sch_num_arg($args, $i, ">")
+            val $b = Sch::sch_num_arg($args, $i + 1, ">")
             return Sch::make_bool(0) unless $a > $b
         }
         Sch::make_bool(1)
     }))
     Sch::env_define($env, "<=", Sch::make_builtin("<=", -2, fn($args) {
-        for my $i (0..((len(@$args) - 1) - 1)) {
-            my $a = Sch::sch_num_arg($args, $i, "<=")
-            my $b = Sch::sch_num_arg($args, $i + 1, "<=")
+        for val $i (0..((len(@$args) - 1) - 1)) {
+            val $a = Sch::sch_num_arg($args, $i, "<=")
+            val $b = Sch::sch_num_arg($args, $i + 1, "<=")
             return Sch::make_bool(0) unless $a <= $b
         }
         Sch::make_bool(1)
     }))
     Sch::env_define($env, ">=", Sch::make_builtin(">=", -2, fn($args) {
-        for my $i (0..((len(@$args) - 1) - 1)) {
-            my $a = Sch::sch_num_arg($args, $i, ">=")
-            my $b = Sch::sch_num_arg($args, $i + 1, ">=")
+        for val $i (0..((len(@$args) - 1) - 1)) {
+            val $a = Sch::sch_num_arg($args, $i, ">=")
+            val $b = Sch::sch_num_arg($args, $i + 1, ">=")
             return Sch::make_bool(0) unless $a >= $b
         }
         Sch::make_bool(1)
@@ -1502,20 +1502,20 @@ fn Sch::install_builtins($env) {
         Sch::make_pair($args->[0], $args->[1])
     }))
     Sch::env_define($env, "car", Sch::make_builtin("car", 1, fn($args) {
-        my $p = Sch::sch_pair_arg($args, 0, "car")
+        val $p = Sch::sch_pair_arg($args, 0, "car")
         $p->{car}
     }))
     Sch::env_define($env, "cdr", Sch::make_builtin("cdr", 1, fn($args) {
-        my $p = Sch::sch_pair_arg($args, 0, "cdr")
+        val $p = Sch::sch_pair_arg($args, 0, "cdr")
         $p->{cdr}
     }))
     Sch::env_define($env, "set-car!", Sch::make_builtin("set-car!", 2, fn($args) {
-        my $p = Sch::sch_pair_arg($args, 0, "set-car!")
+        var $p = Sch::sch_pair_arg($args, 0, "set-car!")
         $p->{car} = $args->[1]
         Sch::make_unspec()
     }))
     Sch::env_define($env, "set-cdr!", Sch::make_builtin("set-cdr!", 2, fn($args) {
-        my $p = Sch::sch_pair_arg($args, 0, "set-cdr!")
+        var $p = Sch::sch_pair_arg($args, 0, "set-cdr!")
         $p->{cdr} = $args->[1]
         Sch::make_unspec()
     }))
@@ -1531,16 +1531,16 @@ fn Sch::install_builtins($env) {
     Sch::env_define($env, "append", Sch::make_builtin("append", undef, fn($args) {
         return Sch::make_nil() if len(@$args) == 0
         return $args->[0] if len(@$args) == 1
-        my $r = $args->[(len(@$args) - 1)]
-        for my $i (rev 0..((len(@$args) - 1) - 1)) {
+        var $r = $args->[(len(@$args) - 1)]
+        for val $i (rev 0..((len(@$args) - 1) - 1)) {
             $r = Sch::sch_append2($args->[$i], $r)
         }
         $r
     }))
     Sch::env_define($env, "list-ref", Sch::make_builtin("list-ref", 2, fn($args) {
-        my $list = $args->[0]
-        my $idx  = Sch::sch_int_arg($args, 1, "list-ref")
-        for (my $i = 0; $i < $idx; $i++) {
+        var $list = $args->[0]
+        val $idx  = Sch::sch_int_arg($args, 1, "list-ref")
+        for (var $i = 0; $i < $idx; $i++) {
             Sch::is_pair($list) or die "list-ref: index out of range"
             $list = $list->{cdr}
         }
@@ -1548,17 +1548,17 @@ fn Sch::install_builtins($env) {
         $list->{car}
     }))
     Sch::env_define($env, "list-tail", Sch::make_builtin("list-tail", 2, fn($args) {
-        my $list = $args->[0]
-        my $idx  = Sch::sch_int_arg($args, 1, "list-tail")
-        for (my $i = 0; $i < $idx; $i++) {
+        var $list = $args->[0]
+        val $idx  = Sch::sch_int_arg($args, 1, "list-tail")
+        for (var $i = 0; $i < $idx; $i++) {
             Sch::is_pair($list) or die "list-tail: index out of range"
             $list = $list->{cdr}
         }
         $list
     }))
     Sch::env_define($env, "memq", Sch::make_builtin("memq", 2, fn($args) {
-        my $obj = $args->[0]
-        my $list = $args->[1]
+        val $obj = $args->[0]
+        var $list = $args->[1]
         while (Sch::is_pair($list)) {
             return $list if Sch::sch_eq($obj, $list->{car})
             $list = $list->{cdr}
@@ -1566,8 +1566,8 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "memv", Sch::make_builtin("memv", 2, fn($args) {
-        my $obj = $args->[0]
-        my $list = $args->[1]
+        val $obj = $args->[0]
+        var $list = $args->[1]
         while (Sch::is_pair($list)) {
             return $list if Sch::sch_eqv($obj, $list->{car})
             $list = $list->{cdr}
@@ -1575,8 +1575,8 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "member", Sch::make_builtin("member", 2, fn($args) {
-        my $obj = $args->[0]
-        my $list = $args->[1]
+        val $obj = $args->[0]
+        var $list = $args->[1]
         while (Sch::is_pair($list)) {
             return $list if Sch::sch_equal($obj, $list->{car})
             $list = $list->{cdr}
@@ -1584,10 +1584,10 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "assq", Sch::make_builtin("assq", 2, fn($args) {
-        my $key = $args->[0]
-        my $alist = $args->[1]
+        val $key = $args->[0]
+        var $alist = $args->[1]
         while (Sch::is_pair($alist)) {
-            my $p = $alist->{car}
+            val $p = $alist->{car}
             if (Sch::is_pair($p) && Sch::sch_eq($key, $p->{car})) {
                 return $p
             }
@@ -1596,10 +1596,10 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "assv", Sch::make_builtin("assv", 2, fn($args) {
-        my $key = $args->[0]
-        my $alist = $args->[1]
+        val $key = $args->[0]
+        var $alist = $args->[1]
         while (Sch::is_pair($alist)) {
-            my $p = $alist->{car}
+            val $p = $alist->{car}
             if (Sch::is_pair($p) && Sch::sch_eqv($key, $p->{car})) {
                 return $p
             }
@@ -1608,10 +1608,10 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "assoc", Sch::make_builtin("assoc", 2, fn($args) {
-        my $key = $args->[0]
-        my $alist = $args->[1]
+        val $key = $args->[0]
+        var $alist = $args->[1]
         while (Sch::is_pair($alist)) {
-            my $p = $alist->{car}
+            var $p = $alist->{car}
             if (Sch::is_pair($p) && Sch::sch_equal($key, $p->{car})) {
                 return $p
             }
@@ -1622,89 +1622,89 @@ fn Sch::install_builtins($env) {
 
     # ── Higher-order on lists ───────────────────────────────────────────
     Sch::env_define($env, "map", Sch::make_builtin("map", -2, fn($args) {
-        my $proc = $args->[0]
+        val $proc = $args->[0]
         Sch::is_proc($proc) or die "map: first arg must be procedure"
         # Map over (possibly multiple) lists in lockstep.
-        my @lists = @$args[1..(len(@$args) - 1)]
-        my @result = ()
+        var @lists = @$args[1..(len(@$args) - 1)]
+        var @result = ()
         while (1) {
-            my @row = ()
-            for my $j (0..$#lists) {
+            var @row = ()
+            for val $j (0..$#lists) {
                 last unless Sch::is_pair($lists[$j])
                 push @row, $lists[$j]->{car}
             }
             last unless len(@row) == len(@lists)
             push @result, Sch::sch_apply($proc, \@row)
-            for my $j (0..$#lists) {
+            for val $j (0..$#lists) {
                 $lists[$j] = $lists[$j]->{cdr}
             }
         }
         Sch::sch_list_from_array(\@result)
     }))
     Sch::env_define($env, "for-each", Sch::make_builtin("for-each", -2, fn($args) {
-        my $proc = $args->[0]
+        val $proc = $args->[0]
         Sch::is_proc($proc) or die "for-each: first arg must be procedure"
-        my @lists = @$args[1..(len(@$args) - 1)]
+        var @lists = @$args[1..(len(@$args) - 1)]
         while (1) {
-            my @row = ()
-            for my $j (0..$#lists) {
+            var @row = ()
+            for val $j (0..$#lists) {
                 last unless Sch::is_pair($lists[$j])
                 push @row, $lists[$j]->{car}
             }
             last unless len(@row) == len(@lists)
             Sch::sch_apply($proc, \@row)
-            for my $j (0..$#lists) {
+            for val $j (0..$#lists) {
                 $lists[$j] = $lists[$j]->{cdr}
             }
         }
         Sch::make_unspec()
     }))
     Sch::env_define($env, "filter", Sch::make_builtin("filter", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "filter: first arg must be procedure"
-        my $list = $args->[1]
-        my @out = ()
+        var $list = $args->[1]
+        var @out = ()
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             push @out, $list->{car} if Sch::is_true($r)
             $list = $list->{cdr}
         }
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "fold-left", Sch::make_builtin("fold-left", -3, fn($args) {
-        my $proc = $args->[0]
+        val $proc = $args->[0]
         Sch::is_proc($proc) or die "fold-left: first arg must be procedure"
-        my $acc = $args->[1]
-        my @lists = @$args[2..(len(@$args) - 1)]
+        var $acc = $args->[1]
+        var @lists = @$args[2..(len(@$args) - 1)]
         while (1) {
-            my @row = ($acc)
-            for my $j (0..$#lists) {
+            var @row = ($acc)
+            for val $j (0..$#lists) {
                 last unless Sch::is_pair($lists[$j])
                 push @row, $lists[$j]->{car}
             }
             last unless len(@row) == 1 + len(@lists)
             $acc = Sch::sch_apply($proc, \@row)
-            for my $j (0..$#lists) {
+            for val $j (0..$#lists) {
                 $lists[$j] = $lists[$j]->{cdr}
             }
         }
         $acc
     }))
     Sch::env_define($env, "fold-right", Sch::make_builtin("fold-right", -3, fn($args) {
-        my $proc = $args->[0]
+        val $proc = $args->[0]
         Sch::is_proc($proc) or die "fold-right: first arg must be procedure"
-        my $init = $args->[1]
-        my @lists = @$args[2..(len(@$args) - 1)]
+        val $init = $args->[1]
+        val @lists = @$args[2..(len(@$args) - 1)]
         # Materialize each list to an array so we can walk in reverse
-        my @arrs = map {Sch::sch_list_to_array} @lists
-        my $min_len = -1
-        for my $a (@arrs) {
+        val @arrs = map {Sch::sch_list_to_array} @lists
+        var $min_len = -1
+        for val $a (@arrs) {
             $min_len = len(@$a) if $min_len < 0 || len(@$a) < $min_len
         }
-        my $acc = $init
-        for (my $i = $min_len - 1; $i >= 0; $i--) {
-            my @row = ()
-            for my $a (@arrs) {
+        var $acc = $init
+        for (var $i = $min_len - 1; $i >= 0; $i--) {
+            var @row = ()
+            for val $a (@arrs) {
                 push @row, $a->[$i]
             }
             push @row, $acc
@@ -1770,41 +1770,41 @@ fn Sch::install_builtins($env) {
 
     # ── String operations ───────────────────────────────────────────────
     Sch::env_define($env, "string-length", Sch::make_builtin("string-length", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-length")
+        val $s = Sch::sch_str_arg($args, 0, "string-length")
         Sch::make_num(length($s))
     }))
     Sch::env_define($env, "string-ref", Sch::make_builtin("string-ref", 2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-ref")
-        my $i = Sch::sch_int_arg($args, 1, "string-ref")
+        val $s = Sch::sch_str_arg($args, 0, "string-ref")
+        val $i = Sch::sch_int_arg($args, 1, "string-ref")
         $i >= 0 && $i < length($s) or die "string-ref: index out of range"
         Sch::make_char(substr($s, $i, 1))
     }))
     Sch::env_define($env, "substring", Sch::make_builtin("substring", 3, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "substring")
-        my $start = Sch::sch_int_arg($args, 1, "substring")
-        my $end   = Sch::sch_int_arg($args, 2, "substring")
+        val $s = Sch::sch_str_arg($args, 0, "substring")
+        val $start = Sch::sch_int_arg($args, 1, "substring")
+        val $end   = Sch::sch_int_arg($args, 2, "substring")
         $start >= 0 && $end >= $start && $end <= length($s)
             or die "substring: index out of range"
         Sch::make_str(substr($s, $start, $end - $start))
     }))
     Sch::env_define($env, "string-append", Sch::make_builtin("string-append", undef, fn($args) {
-        my $r = ""
-        for my $i (0..(len(@$args) - 1)) {
+        var $r = ""
+        for val $i (0..(len(@$args) - 1)) {
             $r .= Sch::sch_str_arg($args, $i, "string-append")
         }
         Sch::make_str($r)
     }))
     Sch::env_define($env, "string->list", Sch::make_builtin("string->list", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string->list")
-        my @chars = ()
-        for my $i (0..(length($s) - 1)) {
+        val $s = Sch::sch_str_arg($args, 0, "string->list")
+        var @chars = ()
+        for val $i (0..(length($s) - 1)) {
             push @chars, Sch::make_char(substr($s, $i, 1))
         }
         Sch::sch_list_from_array(\@chars)
     }))
     Sch::env_define($env, "list->string", Sch::make_builtin("list->string", 1, fn($args) {
-        my $list = $args->[0]
-        my $s = ""
+        var $list = $args->[0]
+        var $s = ""
         while (Sch::is_pair($list)) {
             Sch::is_char($list->{car}) or die "list->string: non-char in list"
             $s .= $list->{car}->{val}
@@ -1813,53 +1813,53 @@ fn Sch::install_builtins($env) {
         Sch::make_str($s)
     }))
     Sch::env_define($env, "string=?", Sch::make_builtin("string=?", 2, fn($args) {
-        my $a = Sch::sch_str_arg($args, 0, "string=?")
-        my $b = Sch::sch_str_arg($args, 1, "string=?")
+        val $a = Sch::sch_str_arg($args, 0, "string=?")
+        val $b = Sch::sch_str_arg($args, 1, "string=?")
         Sch::make_bool($a eq $b ? 1 : 0)
     }))
     Sch::env_define($env, "string<?", Sch::make_builtin("string<?", 2, fn($args) {
-        my $a = Sch::sch_str_arg($args, 0, "string<?")
-        my $b = Sch::sch_str_arg($args, 1, "string<?")
+        val $a = Sch::sch_str_arg($args, 0, "string<?")
+        val $b = Sch::sch_str_arg($args, 1, "string<?")
         Sch::make_bool($a lt $b ? 1 : 0)
     }))
     Sch::env_define($env, "string>?", Sch::make_builtin("string>?", 2, fn($args) {
-        my $a = Sch::sch_str_arg($args, 0, "string>?")
-        my $b = Sch::sch_str_arg($args, 1, "string>?")
+        val $a = Sch::sch_str_arg($args, 0, "string>?")
+        val $b = Sch::sch_str_arg($args, 1, "string>?")
         Sch::make_bool($a gt $b ? 1 : 0)
     }))
     Sch::env_define($env, "string<=?", Sch::make_builtin("string<=?", 2, fn($args) {
-        my $a = Sch::sch_str_arg($args, 0, "string<=?")
-        my $b = Sch::sch_str_arg($args, 1, "string<=?")
+        val $a = Sch::sch_str_arg($args, 0, "string<=?")
+        val $b = Sch::sch_str_arg($args, 1, "string<=?")
         Sch::make_bool($a le $b ? 1 : 0)
     }))
     Sch::env_define($env, "string>=?", Sch::make_builtin("string>=?", 2, fn($args) {
-        my $a = Sch::sch_str_arg($args, 0, "string>=?")
-        my $b = Sch::sch_str_arg($args, 1, "string>=?")
+        val $a = Sch::sch_str_arg($args, 0, "string>=?")
+        val $b = Sch::sch_str_arg($args, 1, "string>=?")
         Sch::make_bool($a ge $b ? 1 : 0)
     }))
     Sch::env_define($env, "string-upcase", Sch::make_builtin("string-upcase", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-upcase")
+        val $s = Sch::sch_str_arg($args, 0, "string-upcase")
         Sch::make_str(uc($s))
     }))
     Sch::env_define($env, "string-downcase", Sch::make_builtin("string-downcase", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-downcase")
+        val $s = Sch::sch_str_arg($args, 0, "string-downcase")
         Sch::make_str(lc($s))
     }))
     Sch::env_define($env, "make-string", Sch::make_builtin("make-string", -1, fn($args) {
-        my $n = Sch::sch_int_arg($args, 0, "make-string")
-        my $c = len(@$args) >= 2 ? Sch::sch_char_arg($args, 1, "make-string") : " "
+        val $n = Sch::sch_int_arg($args, 0, "make-string")
+        val $c = len(@$args) >= 2 ? Sch::sch_char_arg($args, 1, "make-string") : " "
         Sch::make_str($c x $n)
     }))
     Sch::env_define($env, "string", Sch::make_builtin("string", undef, fn($args) {
-        my $s = ""
-        for my $i (0..(len(@$args) - 1)) {
+        var $s = ""
+        for val $i (0..(len(@$args) - 1)) {
             $s .= Sch::sch_char_arg($args, $i, "string")
         }
         Sch::make_str($s)
     }))
     Sch::env_define($env, "number->string", Sch::make_builtin("number->string", -1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "number->string")
-        my $radix = len(@$args) >= 2 ? Sch::sch_int_arg($args, 1, "number->string") : 10
+        val $n = Sch::sch_num_arg($args, 0, "number->string")
+        val $radix = len(@$args) >= 2 ? Sch::sch_int_arg($args, 1, "number->string") : 10
         if ($radix == 10) {
             return Sch::make_str(Sch::sch_format_num($n))
         }
@@ -1868,8 +1868,8 @@ fn Sch::install_builtins($env) {
         Sch::make_str(sprintf($radix == 16 ? "%x" : ($radix == 8 ? "%o" : "%b"), int($n)))
     }))
     Sch::env_define($env, "string->number", Sch::make_builtin("string->number", -1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string->number")
-        my $radix = len(@$args) >= 2 ? Sch::sch_int_arg($args, 1, "string->number") : 10
+        val $s = Sch::sch_str_arg($args, 0, "string->number")
+        val $radix = len(@$args) >= 2 ? Sch::sch_int_arg($args, 1, "string->number") : 10
         if ($radix == 10) {
             if ($s =~ /^[+-]?\d+(\.\d+)?([eE][+-]?\d+)?$/) {
                 return Sch::make_num($s + 0)
@@ -1877,7 +1877,7 @@ fn Sch::install_builtins($env) {
             return Sch::make_bool(0)
         }
         # Other radixes — integer
-        my $n = 0
+        var $n = 0
         eval {
             if ($radix == 16) {
                 $n = hex($s)
@@ -1893,110 +1893,110 @@ fn Sch::install_builtins($env) {
 
     # ── Character operations ────────────────────────────────────────────
     Sch::env_define($env, "char->integer", Sch::make_builtin("char->integer", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char->integer")
+        val $c = Sch::sch_char_arg($args, 0, "char->integer")
         Sch::make_num(ord($c))
     }))
     Sch::env_define($env, "integer->char", Sch::make_builtin("integer->char", 1, fn($args) {
-        my $n = Sch::sch_int_arg($args, 0, "integer->char")
+        val $n = Sch::sch_int_arg($args, 0, "integer->char")
         Sch::make_char(chr($n))
     }))
     Sch::env_define($env, "char-upcase", Sch::make_builtin("char-upcase", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-upcase")
+        val $c = Sch::sch_char_arg($args, 0, "char-upcase")
         Sch::make_char(uc($c))
     }))
     Sch::env_define($env, "char-downcase", Sch::make_builtin("char-downcase", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-downcase")
+        val $c = Sch::sch_char_arg($args, 0, "char-downcase")
         Sch::make_char(lc($c))
     }))
     Sch::env_define($env, "char=?", Sch::make_builtin("char=?", 2, fn($args) {
-        my $a = Sch::sch_char_arg($args, 0, "char=?")
-        my $b = Sch::sch_char_arg($args, 1, "char=?")
+        val $a = Sch::sch_char_arg($args, 0, "char=?")
+        val $b = Sch::sch_char_arg($args, 1, "char=?")
         Sch::make_bool($a eq $b ? 1 : 0)
     }))
     Sch::env_define($env, "char<?", Sch::make_builtin("char<?", 2, fn($args) {
-        my $a = Sch::sch_char_arg($args, 0, "char<?")
-        my $b = Sch::sch_char_arg($args, 1, "char<?")
+        val $a = Sch::sch_char_arg($args, 0, "char<?")
+        val $b = Sch::sch_char_arg($args, 1, "char<?")
         Sch::make_bool($a lt $b ? 1 : 0)
     }))
     Sch::env_define($env, "char>?", Sch::make_builtin("char>?", 2, fn($args) {
-        my $a = Sch::sch_char_arg($args, 0, "char>?")
-        my $b = Sch::sch_char_arg($args, 1, "char>?")
+        val $a = Sch::sch_char_arg($args, 0, "char>?")
+        val $b = Sch::sch_char_arg($args, 1, "char>?")
         Sch::make_bool($a gt $b ? 1 : 0)
     }))
     Sch::env_define($env, "char<=?", Sch::make_builtin("char<=?", 2, fn($args) {
-        my $a = Sch::sch_char_arg($args, 0, "char<=?")
-        my $b = Sch::sch_char_arg($args, 1, "char<=?")
+        val $a = Sch::sch_char_arg($args, 0, "char<=?")
+        val $b = Sch::sch_char_arg($args, 1, "char<=?")
         Sch::make_bool($a le $b ? 1 : 0)
     }))
     Sch::env_define($env, "char>=?", Sch::make_builtin("char>=?", 2, fn($args) {
-        my $a = Sch::sch_char_arg($args, 0, "char>=?")
-        my $b = Sch::sch_char_arg($args, 1, "char>=?")
+        val $a = Sch::sch_char_arg($args, 0, "char>=?")
+        val $b = Sch::sch_char_arg($args, 1, "char>=?")
         Sch::make_bool($a ge $b ? 1 : 0)
     }))
     Sch::env_define($env, "char-alphabetic?", Sch::make_builtin("char-alphabetic?", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-alphabetic?")
+        val $c = Sch::sch_char_arg($args, 0, "char-alphabetic?")
         Sch::make_bool($c =~ /[a-zA-Z]/ ? 1 : 0)
     }))
     Sch::env_define($env, "char-numeric?", Sch::make_builtin("char-numeric?", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-numeric?")
+        val $c = Sch::sch_char_arg($args, 0, "char-numeric?")
         Sch::make_bool($c =~ /[0-9]/ ? 1 : 0)
     }))
     Sch::env_define($env, "char-whitespace?", Sch::make_builtin("char-whitespace?", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-whitespace?")
+        val $c = Sch::sch_char_arg($args, 0, "char-whitespace?")
         Sch::make_bool($c =~ /\s/ ? 1 : 0)
     }))
     Sch::env_define($env, "char-upper-case?", Sch::make_builtin("char-upper-case?", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-upper-case?")
+        val $c = Sch::sch_char_arg($args, 0, "char-upper-case?")
         Sch::make_bool($c =~ /[A-Z]/ ? 1 : 0)
     }))
     Sch::env_define($env, "char-lower-case?", Sch::make_builtin("char-lower-case?", 1, fn($args) {
-        my $c = Sch::sch_char_arg($args, 0, "char-lower-case?")
+        val $c = Sch::sch_char_arg($args, 0, "char-lower-case?")
         Sch::make_bool($c =~ /[a-z]/ ? 1 : 0)
     }))
 
     # ── Symbol / string conversions ─────────────────────────────────────
     Sch::env_define($env, "symbol->string", Sch::make_builtin("symbol->string", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_sym($v) or die "symbol->string: not a symbol"
         Sch::make_str($v->{name})
     }))
     Sch::env_define($env, "string->symbol", Sch::make_builtin("string->symbol", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string->symbol")
+        val $s = Sch::sch_str_arg($args, 0, "string->symbol")
         Sch::make_sym($s)
     }))
 
     # ── Vector operations ───────────────────────────────────────────────
     Sch::env_define($env, "make-vector", Sch::make_builtin("make-vector", -1, fn($args) {
-        my $n = Sch::sch_int_arg($args, 0, "make-vector")
-        my $fill = len(@$args) >= 2 ? $args->[1] : Sch::make_unspec()
-        my @items = ($fill) x $n
+        val $n = Sch::sch_int_arg($args, 0, "make-vector")
+        val $fill = len(@$args) >= 2 ? $args->[1] : Sch::make_unspec()
+        val @items = ($fill) x $n
         Sch::make_vec(\@items)
     }))
     Sch::env_define($env, "vector", Sch::make_builtin("vector", undef, fn($args) {
         Sch::make_vec([@$args])
     }))
     Sch::env_define($env, "vector-length", Sch::make_builtin("vector-length", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_vec($v) or die "vector-length: not a vector"
         Sch::make_num(len(@{$v->{items}}))
     }))
     Sch::env_define($env, "vector-ref", Sch::make_builtin("vector-ref", 2, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_vec($v) or die "vector-ref: not a vector"
-        my $i = Sch::sch_int_arg($args, 1, "vector-ref")
+        val $i = Sch::sch_int_arg($args, 1, "vector-ref")
         $i >= 0 && $i < len(@{$v->{items}}) or die "vector-ref: out of range"
         $v->{items}->[$i]
     }))
     Sch::env_define($env, "vector-set!", Sch::make_builtin("vector-set!", 3, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_vec($v) or die "vector-set!: not a vector"
-        my $i = Sch::sch_int_arg($args, 1, "vector-set!")
+        val $i = Sch::sch_int_arg($args, 1, "vector-set!")
         $i >= 0 && $i < len(@{$v->{items}}) or die "vector-set!: out of range"
         $v->{items}->[$i] = $args->[2]
         Sch::make_unspec()
     }))
     Sch::env_define($env, "vector->list", Sch::make_builtin("vector->list", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_vec($v) or die "vector->list: not a vector"
         Sch::sch_list_from_array($v->{items})
     }))
@@ -2007,13 +2007,13 @@ fn Sch::install_builtins($env) {
     # ── apply / values / error ──────────────────────────────────────────
     Sch::env_define($env, "apply", Sch::make_builtin("apply", -2, fn($args) {
         # (apply proc arg1 ... argN list)
-        my $proc = $args->[0]
+        val $proc = $args->[0]
         Sch::is_proc($proc) or die "apply: first arg must be procedure"
-        my @flat = ()
-        for my $i (1..((len(@$args) - 1) - 1)) {
+        var @flat = ()
+        for val $i (1..((len(@$args) - 1) - 1)) {
             push @flat, $args->[$i]
         }
-        my $list = $args->[(len(@$args) - 1)]
+        var $list = $args->[(len(@$args) - 1)]
         while (Sch::is_pair($list)) {
             push @flat, $list->{car}
             $list = $list->{cdr}
@@ -2021,8 +2021,8 @@ fn Sch::install_builtins($env) {
         Sch::sch_apply($proc, \@flat)
     }))
     Sch::env_define($env, "error", Sch::make_builtin("error", -1, fn($args) {
-        my $msg = ""
-        for my $i (0..(len(@$args) - 1)) {
+        var $msg = ""
+        for val $i (0..(len(@$args) - 1)) {
             $msg .= " " if $i > 0
             $msg .= Sch::sch_display($args->[$i])
         }
@@ -2043,7 +2043,7 @@ fn Sch::install_builtins($env) {
         Sch::make_unspec()
     }))
     Sch::env_define($env, "write-string", Sch::make_builtin("write-string", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "write-string")
+        val $s = Sch::sch_str_arg($args, 0, "write-string")
         print $s
         Sch::make_unspec()
     }))
@@ -2055,17 +2055,17 @@ fn Sch::install_builtins($env) {
     # consumption, no lazy magic).
 
     Sch::env_define($env, "iota", Sch::make_builtin("iota", -1, fn($args) {
-        my $count = Sch::sch_int_arg($args, 0, "iota")
-        my $start = len(@$args) >= 2 ? Sch::sch_num_arg($args, 1, "iota") : 0
-        my $step  = len(@$args) >= 3 ? Sch::sch_num_arg($args, 2, "iota") : 1
-        my @items = ()
-        for my $i (0..($count - 1)) {
+        val $count = Sch::sch_int_arg($args, 0, "iota")
+        val $start = len(@$args) >= 2 ? Sch::sch_num_arg($args, 1, "iota") : 0
+        val $step  = len(@$args) >= 3 ? Sch::sch_num_arg($args, 2, "iota") : 1
+        var @items = ()
+        for val $i (0..($count - 1)) {
             push @items, Sch::make_num($start + $i * $step)
         }
         Sch::sch_list_from_array(\@items)
     }))
     Sch::env_define($env, "last-pair", Sch::make_builtin("last-pair", 1, fn($args) {
-        my $list = $args->[0]
+        var $list = $args->[0]
         Sch::is_pair($list) or die "last-pair: empty list"
         while (Sch::is_pair($list->{cdr})) {
             $list = $list->{cdr}
@@ -2073,7 +2073,7 @@ fn Sch::install_builtins($env) {
         $list
     }))
     Sch::env_define($env, "last", Sch::make_builtin("last", 1, fn($args) {
-        my $list = $args->[0]
+        var $list = $args->[0]
         Sch::is_pair($list) or die "last: empty list"
         while (Sch::is_pair($list->{cdr})) {
             $list = $list->{cdr}
@@ -2085,30 +2085,30 @@ fn Sch::install_builtins($env) {
         $args->[0]->{car}
     }))
     Sch::env_define($env, "second", Sch::make_builtin("second", 1, fn($args) {
-        my $a = Sch::sch_list_to_array($args->[0])
+        val $a = Sch::sch_list_to_array($args->[0])
         len(@$a) >= 2 or die "second: list too short"
         $a->[1]
     }))
     Sch::env_define($env, "third", Sch::make_builtin("third", 1, fn($args) {
-        my $a = Sch::sch_list_to_array($args->[0])
+        val $a = Sch::sch_list_to_array($args->[0])
         len(@$a) >= 3 or die "third: list too short"
         $a->[2]
     }))
     Sch::env_define($env, "fourth", Sch::make_builtin("fourth", 1, fn($args) {
-        my $a = Sch::sch_list_to_array($args->[0])
+        val $a = Sch::sch_list_to_array($args->[0])
         len(@$a) >= 4 or die "fourth: list too short"
         $a->[3]
     }))
     Sch::env_define($env, "fifth", Sch::make_builtin("fifth", 1, fn($args) {
-        my $a = Sch::sch_list_to_array($args->[0])
+        val $a = Sch::sch_list_to_array($args->[0])
         len(@$a) >= 5 or die "fifth: list too short"
         $a->[4]
     }))
     Sch::env_define($env, "take", Sch::make_builtin("take", 2, fn($args) {
-        my $list = $args->[0]
-        my $n = Sch::sch_int_arg($args, 1, "take")
-        my @out = ()
-        for (my $i = 0; $i < $n; $i++) {
+        var $list = $args->[0]
+        val $n = Sch::sch_int_arg($args, 1, "take")
+        var @out = ()
+        for (var $i = 0; $i < $n; $i++) {
             Sch::is_pair($list) or die "take: list too short"
             push @out, $list->{car}
             $list = $list->{cdr}
@@ -2116,64 +2116,64 @@ fn Sch::install_builtins($env) {
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "drop", Sch::make_builtin("drop", 2, fn($args) {
-        my $list = $args->[0]
-        my $n = Sch::sch_int_arg($args, 1, "drop")
-        for (my $i = 0; $i < $n; $i++) {
+        var $list = $args->[0]
+        val $n = Sch::sch_int_arg($args, 1, "drop")
+        for (var $i = 0; $i < $n; $i++) {
             Sch::is_pair($list) or die "drop: list too short"
             $list = $list->{cdr}
         }
         $list
     }))
     Sch::env_define($env, "take-right", Sch::make_builtin("take-right", 2, fn($args) {
-        my $list = $args->[0]
-        my $n = Sch::sch_int_arg($args, 1, "take-right")
-        my $arr = Sch::sch_list_to_array($list)
-        my $start = len(@$arr) - $n
+        val $list = $args->[0]
+        val $n = Sch::sch_int_arg($args, 1, "take-right")
+        val $arr = Sch::sch_list_to_array($list)
+        val $start = len(@$arr) - $n
         $start >= 0 or die "take-right: list too short"
-        my @out = @$arr[$start..(len(@$arr) - 1)]
+        val @out = @$arr[$start..(len(@$arr) - 1)]
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "drop-right", Sch::make_builtin("drop-right", 2, fn($args) {
-        my $list = $args->[0]
-        my $n = Sch::sch_int_arg($args, 1, "drop-right")
-        my $arr = Sch::sch_list_to_array($list)
-        my $end = len(@$arr) - $n
+        val $list = $args->[0]
+        val $n = Sch::sch_int_arg($args, 1, "drop-right")
+        val $arr = Sch::sch_list_to_array($list)
+        val $end = len(@$arr) - $n
         $end >= 0 or die "drop-right: list too short"
-        my @out = @$arr[0..($end - 1)]
+        val @out = @$arr[0..($end - 1)]
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "count", Sch::make_builtin("count", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "count: first arg must be procedure"
-        my $list = $args->[1]
-        my $n = 0
+        var $list = $args->[1]
+        var $n = 0
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             $n++ if Sch::is_true($r)
             $list = $list->{cdr}
         }
         Sch::make_num($n)
     }))
     Sch::env_define($env, "remove", Sch::make_builtin("remove", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "remove: first arg must be procedure"
-        my $list = $args->[1]
-        my @out = ()
+        var $list = $args->[1]
+        var @out = ()
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             push @out, $list->{car} unless Sch::is_true($r)
             $list = $list->{cdr}
         }
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "partition", Sch::make_builtin("partition", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "partition: first arg must be procedure"
-        my $list = $args->[1]
-        my @yes = ()
-        my @no = ()
+        var $list = $args->[1]
+        var @yes = ()
+        var @no = ()
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             if (Sch::is_true($r)) { push @yes, $list->{car} }
             else                   { push @no,  $list->{car} }
             $list = $list->{cdr}
@@ -2184,10 +2184,10 @@ fn Sch::install_builtins($env) {
                        Sch::sch_list_from_array(\@no))
     }))
     Sch::env_define($env, "concatenate", Sch::make_builtin("concatenate", 1, fn($args) {
-        my $lists = $args->[0]
-        my @all = ()
+        var $lists = $args->[0]
+        var @all = ()
         while (Sch::is_pair($lists)) {
-            my $sub = $lists->{car}
+            var $sub = $lists->{car}
             while (Sch::is_pair($sub)) {
                 push @all, $sub->{car}
                 $sub = $sub->{cdr}
@@ -2197,15 +2197,15 @@ fn Sch::install_builtins($env) {
         Sch::sch_list_from_array(\@all)
     }))
     Sch::env_define($env, "delete-duplicates", Sch::make_builtin("delete-duplicates", -1, fn($args) {
-        my $list = $args->[0]
+        var $list = $args->[0]
         # Optional 2nd arg = equality predicate; default `equal?`.
-        my $eq = len(@$args) >= 2 ? $args->[1] : undef
-        my @out = ()
+        val $eq = len(@$args) >= 2 ? $args->[1] : undef
+        var @out = ()
         while (Sch::is_pair($list)) {
-            my $item = $list->{car}
-            my $found = 0
-            for my $x (@out) {
-                my $same = defined($eq)
+            val $item = $list->{car}
+            var $found = 0
+            for val $x (@out) {
+                val $same = defined($eq)
                     ? Sch::is_true(Sch::sch_apply($eq, [$item, $x]))
                     : Sch::sch_equal($item, $x)
                 if ($same) { $found = 1; last }
@@ -2216,63 +2216,63 @@ fn Sch::install_builtins($env) {
         Sch::sch_list_from_array(\@out)
     }))
     Sch::env_define($env, "every", Sch::make_builtin("every", -2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "every: first arg must be procedure"
-        my @lists = @$args[1..(len(@$args) - 1)]
-        my $last = Sch::make_bool(1)
+        var @lists = @$args[1..(len(@$args) - 1)]
+        var $last = Sch::make_bool(1)
         while (1) {
-            my @row = ()
-            for my $j (0..$#lists) {
+            var @row = ()
+            for val $j (0..$#lists) {
                 last unless Sch::is_pair($lists[$j])
                 push @row, $lists[$j]->{car}
             }
             last unless len(@row) == len(@lists)
-            my $r = Sch::sch_apply($pred, \@row)
+            val $r = Sch::sch_apply($pred, \@row)
             return Sch::make_bool(0) if Sch::is_false($r)
             $last = $r
-            for my $j (0..$#lists) { $lists[$j] = $lists[$j]->{cdr} }
+            for val $j (0..$#lists) { $lists[$j] = $lists[$j]->{cdr} }
         }
         $last
     }))
     Sch::env_define($env, "any", Sch::make_builtin("any", -2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "any: first arg must be procedure"
-        my @lists = @$args[1..(len(@$args) - 1)]
+        var @lists = @$args[1..(len(@$args) - 1)]
         while (1) {
-            my @row = ()
-            for my $j (0..$#lists) {
+            var @row = ()
+            for val $j (0..$#lists) {
                 last unless Sch::is_pair($lists[$j])
                 push @row, $lists[$j]->{car}
             }
             last unless len(@row) == len(@lists)
-            my $r = Sch::sch_apply($pred, \@row)
+            val $r = Sch::sch_apply($pred, \@row)
             return $r if Sch::is_true($r)
-            for my $j (0..$#lists) { $lists[$j] = $lists[$j]->{cdr} }
+            for val $j (0..$#lists) { $lists[$j] = $lists[$j]->{cdr} }
         }
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "find", Sch::make_builtin("find", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "find: first arg must be procedure"
-        my $list = $args->[1]
+        var $list = $args->[1]
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             return $list->{car} if Sch::is_true($r)
             $list = $list->{cdr}
         }
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "list-copy", Sch::make_builtin("list-copy", 1, fn($args) {
-        my $arr = Sch::sch_list_to_array($args->[0])
+        val $arr = Sch::sch_list_to_array($args->[0])
         Sch::sch_list_from_array($arr)
     }))
     Sch::env_define($env, "list-index", Sch::make_builtin("list-index", 2, fn($args) {
-        my $pred = $args->[0]
+        val $pred = $args->[0]
         Sch::is_proc($pred) or die "list-index: first arg must be procedure"
-        my $list = $args->[1]
-        my $i = 0
+        var $list = $args->[1]
+        var $i = 0
         while (Sch::is_pair($list)) {
-            my $r = Sch::sch_apply($pred, [$list->{car}])
+            val $r = Sch::sch_apply($pred, [$list->{car}])
             return Sch::make_num($i) if Sch::is_true($r)
             $i++
             $list = $list->{cdr}
@@ -2282,25 +2282,25 @@ fn Sch::install_builtins($env) {
     # `caar`, `cadr`, `cdar`, `cddr`, `caaar`...`cddddr` — the classic
     # 28-member family of compositions. Generate them programmatically by
     # walking the name (right-to-left = inner-to-outer).
-    my @cxr_names = ("caar", "cadr", "cdar", "cddr",
+    val @cxr_names = ("caar", "cadr", "cdar", "cddr",
                      "caaar", "caadr", "cadar", "caddr",
                      "cdaar", "cdadr", "cddar", "cdddr",
                      "caaaar", "caaadr", "caadar", "caaddr",
                      "cadaar", "cadadr", "caddar", "cadddr",
                      "cdaaar", "cdaadr", "cdadar", "cdaddr",
                      "cddaar", "cddadr", "cdddar", "cddddr")
-    for my $n (@cxr_names) {
-        my $name = $n
+    for val $n (@cxr_names) {
+        val $name = $n
         Sch::env_define($env, $name, Sch::make_builtin($name, 1, fn($args) {
-            my $v = $args->[0]
+            var $v = $args->[0]
             # Walk name char-by-char from RIGHT to LEFT, skipping leading 'c'
             # and trailing 'r'. 'a' = car, 'd' = cdr.
-            my @ops = ()
-            my $len = length($name)
-            for (my $i = $len - 2; $i >= 1; $i--) {
+            var @ops = ()
+            val $len = length($name)
+            for (var $i = $len - 2; $i >= 1; $i--) {
                 push @ops, substr($name, $i, 1)
             }
-            for my $op (@ops) {
+            for val $op (@ops) {
                 Sch::is_pair($v) or die "$name: not a pair"
                 $v = ($op eq "a") ? $v->{car} : $v->{cdr}
             }
@@ -2310,22 +2310,22 @@ fn Sch::install_builtins($env) {
 
     # ── EXTENDED STRING OPS ─────────────────────────────────────────────
     Sch::env_define($env, "string-contains", Sch::make_builtin("string-contains", 2, fn($args) {
-        my $hay = Sch::sch_str_arg($args, 0, "string-contains")
-        my $needle = Sch::sch_str_arg($args, 1, "string-contains")
-        my $i = index($hay, $needle)
+        val $hay = Sch::sch_str_arg($args, 0, "string-contains")
+        val $needle = Sch::sch_str_arg($args, 1, "string-contains")
+        val $i = index($hay, $needle)
         $i < 0 ? Sch::make_bool(0) : Sch::make_num($i)
     }))
     Sch::env_define($env, "string-index", Sch::make_builtin("string-index", 2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-index")
-        my $arg2 = $args->[1]
+        val $s = Sch::sch_str_arg($args, 0, "string-index")
+        val $arg2 = $args->[1]
         if (Sch::is_char($arg2)) {
-            my $i = index($s, $arg2->{val})
+            val $i = index($s, $arg2->{val})
             return $i < 0 ? Sch::make_bool(0) : Sch::make_num($i)
         }
         # Predicate variant: scan with the predicate
         if (Sch::is_proc($arg2)) {
-            for my $i (0..(length($s) - 1)) {
-                my $r = Sch::sch_apply($arg2, [Sch::make_char(substr($s, $i, 1))])
+            for val $i (0..(length($s) - 1)) {
+                val $r = Sch::sch_apply($arg2, [Sch::make_char(substr($s, $i, 1))])
                 return Sch::make_num($i) if Sch::is_true($r)
             }
             return Sch::make_bool(0)
@@ -2333,33 +2333,33 @@ fn Sch::install_builtins($env) {
         die "string-index: 2nd arg must be char or procedure"
     }))
     Sch::env_define($env, "string-trim", Sch::make_builtin("string-trim", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-trim")
+        var $s = Sch::sch_str_arg($args, 0, "string-trim")
         $s =~ s/^\s+//
         $s =~ s/\s+$//
         Sch::make_str($s)
     }))
     Sch::env_define($env, "string-trim-left", Sch::make_builtin("string-trim-left", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-trim-left")
+        var $s = Sch::sch_str_arg($args, 0, "string-trim-left")
         $s =~ s/^\s+//
         Sch::make_str($s)
     }))
     Sch::env_define($env, "string-trim-right", Sch::make_builtin("string-trim-right", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-trim-right")
+        var $s = Sch::sch_str_arg($args, 0, "string-trim-right")
         $s =~ s/\s+$//
         Sch::make_str($s)
     }))
     Sch::env_define($env, "string-reverse", Sch::make_builtin("string-reverse", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-reverse")
+        val $s = Sch::sch_str_arg($args, 0, "string-reverse")
         Sch::make_str(rev $s)
     }))
     Sch::env_define($env, "string-copy", Sch::make_builtin("string-copy", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-copy")
+        val $s = Sch::sch_str_arg($args, 0, "string-copy")
         Sch::make_str($s)
     }))
     Sch::env_define($env, "string-join", Sch::make_builtin("string-join", 2, fn($args) {
-        my $list = $args->[0]
-        my $sep = Sch::sch_str_arg($args, 1, "string-join")
-        my @parts = ()
+        var $list = $args->[0]
+        val $sep = Sch::sch_str_arg($args, 1, "string-join")
+        var @parts = ()
         while (Sch::is_pair($list)) {
             Sch::is_str($list->{car}) or die "string-join: list must contain strings"
             push @parts, $list->{car}->{val}
@@ -2368,36 +2368,36 @@ fn Sch::install_builtins($env) {
         Sch::make_str(join($sep, @parts))
     }))
     Sch::env_define($env, "string-split", Sch::make_builtin("string-split", 2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-split")
-        my $sep = Sch::sch_str_arg($args, 1, "string-split")
-        my @parts = $sep eq "" ? split(//, $s) : split(/\Q$sep\E/, $s, -1)
-        my @items = map {Sch::make_str} @parts
+        val $s = Sch::sch_str_arg($args, 0, "string-split")
+        val $sep = Sch::sch_str_arg($args, 1, "string-split")
+        val @parts = $sep eq "" ? split(//, $s) : split(/\Q$sep\E/, $s, -1)
+        val @items = map {Sch::make_str} @parts
         Sch::sch_list_from_array(\@items)
     }))
     Sch::env_define($env, "string-pad-left", Sch::make_builtin("string-pad-left", -2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-pad-left")
-        my $w = Sch::sch_int_arg($args, 1, "string-pad-left")
-        my $c = len(@$args) >= 3 ? Sch::sch_char_arg($args, 2, "string-pad-left") : " "
-        my $cur = length($s)
+        val $s = Sch::sch_str_arg($args, 0, "string-pad-left")
+        val $w = Sch::sch_int_arg($args, 1, "string-pad-left")
+        val $c = len(@$args) >= 3 ? Sch::sch_char_arg($args, 2, "string-pad-left") : " "
+        val $cur = length($s)
         return Sch::make_str($s) if $cur >= $w
         Sch::make_str(($c x ($w - $cur)) . $s)
     }))
     Sch::env_define($env, "string-pad-right", Sch::make_builtin("string-pad-right", -2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-pad-right")
-        my $w = Sch::sch_int_arg($args, 1, "string-pad-right")
-        my $c = len(@$args) >= 3 ? Sch::sch_char_arg($args, 2, "string-pad-right") : " "
-        my $cur = length($s)
+        val $s = Sch::sch_str_arg($args, 0, "string-pad-right")
+        val $w = Sch::sch_int_arg($args, 1, "string-pad-right")
+        val $c = len(@$args) >= 3 ? Sch::sch_char_arg($args, 2, "string-pad-right") : " "
+        val $cur = length($s)
         return Sch::make_str($s) if $cur >= $w
         Sch::make_str($s . ($c x ($w - $cur)))
     }))
     Sch::env_define($env, "string-count", Sch::make_builtin("string-count", 2, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-count")
-        my $pat = Sch::sch_str_arg($args, 1, "string-count")
+        val $s = Sch::sch_str_arg($args, 0, "string-count")
+        val $pat = Sch::sch_str_arg($args, 1, "string-count")
         return Sch::make_num(0) if length($pat) == 0
-        my $n = 0
-        my $pos = 0
+        var $n = 0
+        var $pos = 0
         while (1) {
-            my $i = index($s, $pat, $pos)
+            val $i = index($s, $pat, $pos)
             last if $i < 0
             $n++
             $pos = $i + length($pat)
@@ -2405,14 +2405,14 @@ fn Sch::install_builtins($env) {
         Sch::make_num($n)
     }))
     Sch::env_define($env, "string-replace", Sch::make_builtin("string-replace", 3, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-replace")
-        my $from = Sch::sch_str_arg($args, 1, "string-replace")
-        my $to = Sch::sch_str_arg($args, 2, "string-replace")
+        val $s = Sch::sch_str_arg($args, 0, "string-replace")
+        val $from = Sch::sch_str_arg($args, 1, "string-replace")
+        val $to = Sch::sch_str_arg($args, 2, "string-replace")
         return Sch::make_str($s) if length($from) == 0
-        my $out = ""
-        my $pos = 0
+        var $out = ""
+        var $pos = 0
         while (1) {
-            my $i = index($s, $from, $pos)
+            val $i = index($s, $from, $pos)
             if ($i < 0) {
                 $out .= substr($s, $pos)
                 last
@@ -2424,30 +2424,30 @@ fn Sch::install_builtins($env) {
         Sch::make_str($out)
     }))
     Sch::env_define($env, "string-prefix?", Sch::make_builtin("string-prefix?", 2, fn($args) {
-        my $pre = Sch::sch_str_arg($args, 0, "string-prefix?")
-        my $s = Sch::sch_str_arg($args, 1, "string-prefix?")
-        my $n = length($pre)
+        val $pre = Sch::sch_str_arg($args, 0, "string-prefix?")
+        val $s = Sch::sch_str_arg($args, 1, "string-prefix?")
+        val $n = length($pre)
         return Sch::make_bool(0) if $n > length($s)
         Sch::make_bool(substr($s, 0, $n) eq $pre ? 1 : 0)
     }))
     Sch::env_define($env, "string-suffix?", Sch::make_builtin("string-suffix?", 2, fn($args) {
-        my $suf = Sch::sch_str_arg($args, 0, "string-suffix?")
-        my $s = Sch::sch_str_arg($args, 1, "string-suffix?")
-        my $n = length($suf)
+        val $suf = Sch::sch_str_arg($args, 0, "string-suffix?")
+        val $s = Sch::sch_str_arg($args, 1, "string-suffix?")
+        val $n = length($suf)
         return Sch::make_bool(0) if $n > length($s)
         Sch::make_bool(substr($s, length($s) - $n) eq $suf ? 1 : 0)
     }))
     Sch::env_define($env, "string-null?", Sch::make_builtin("string-null?", 1, fn($args) {
-        my $s = Sch::sch_str_arg($args, 0, "string-null?")
+        val $s = Sch::sch_str_arg($args, 0, "string-null?")
         Sch::make_bool(length($s) == 0 ? 1 : 0)
     }))
 
     # ── EXTENDED MATH ───────────────────────────────────────────────────
     Sch::env_define($env, "log", Sch::make_builtin("log", -1, fn($args) {
-        my $x = Sch::sch_num_arg($args, 0, "log")
+        val $x = Sch::sch_num_arg($args, 0, "log")
         $x > 0 or die "log: argument must be positive"
         if (len(@$args) >= 2) {
-            my $base = Sch::sch_num_arg($args, 1, "log")
+            val $base = Sch::sch_num_arg($args, 1, "log")
             $base > 0 or die "log: base must be positive"
             return Sch::make_num(log($x) / log($base))
         }
@@ -2463,13 +2463,13 @@ fn Sch::install_builtins($env) {
         Sch::make_num(cos(Sch::sch_num_arg($args, 0, "cos")))
     }))
     Sch::env_define($env, "tan", Sch::make_builtin("tan", 1, fn($args) {
-        my $x = Sch::sch_num_arg($args, 0, "tan")
+        val $x = Sch::sch_num_arg($args, 0, "tan")
         Sch::make_num(sin($x) / cos($x))
     }))
     Sch::env_define($env, "atan", Sch::make_builtin("atan", -1, fn($args) {
-        my $y = Sch::sch_num_arg($args, 0, "atan")
+        val $y = Sch::sch_num_arg($args, 0, "atan")
         if (len(@$args) >= 2) {
-            my $x = Sch::sch_num_arg($args, 1, "atan")
+            val $x = Sch::sch_num_arg($args, 1, "atan")
             # 2-arg atan: atan(y/x) with quadrant correction (atan2)
             return Sch::make_num(atan2($y, $x))
         }
@@ -2477,60 +2477,60 @@ fn Sch::install_builtins($env) {
         Sch::make_num(atan2($y, 1))
     }))
     Sch::env_define($env, "exact?", Sch::make_builtin("exact?", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_num($v) or die "exact?: not a number"
         # Treat ints as exact, reals as inexact (no rationals in v1).
         Sch::make_bool($v->{val} == int($v->{val}) ? 1 : 0)
     }))
     Sch::env_define($env, "inexact?", Sch::make_builtin("inexact?", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::is_num($v) or die "inexact?: not a number"
         Sch::make_bool($v->{val} == int($v->{val}) ? 0 : 1)
     }))
     Sch::env_define($env, "exact->inexact", Sch::make_builtin("exact->inexact", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "exact->inexact")
+        val $n = Sch::sch_num_arg($args, 0, "exact->inexact")
         Sch::make_num($n + 0.0)
     }))
     Sch::env_define($env, "inexact->exact", Sch::make_builtin("inexact->exact", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "inexact->exact")
+        val $n = Sch::sch_num_arg($args, 0, "inexact->exact")
         Sch::make_num(int($n))
     }))
     Sch::env_define($env, "exact", Sch::make_builtin("exact", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "exact")
+        val $n = Sch::sch_num_arg($args, 0, "exact")
         Sch::make_num(int($n))
     }))
     Sch::env_define($env, "inexact", Sch::make_builtin("inexact", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "inexact")
+        val $n = Sch::sch_num_arg($args, 0, "inexact")
         Sch::make_num($n + 0.0)
     }))
     Sch::env_define($env, "square", Sch::make_builtin("square", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "square")
+        val $n = Sch::sch_num_arg($args, 0, "square")
         Sch::make_num($n * $n)
     }))
     Sch::env_define($env, "cube", Sch::make_builtin("cube", 1, fn($args) {
-        my $n = Sch::sch_num_arg($args, 0, "cube")
+        val $n = Sch::sch_num_arg($args, 0, "cube")
         Sch::make_num($n * $n * $n)
     }))
 
     # ── EXTENDED CHAR PREDICATES ────────────────────────────────────────
     Sch::env_define($env, "char-ci=?", Sch::make_builtin("char-ci=?", 2, fn($args) {
-        my $a = lc(Sch::sch_char_arg($args, 0, "char-ci=?"))
-        my $b = lc(Sch::sch_char_arg($args, 1, "char-ci=?"))
+        val $a = lc(Sch::sch_char_arg($args, 0, "char-ci=?"))
+        val $b = lc(Sch::sch_char_arg($args, 1, "char-ci=?"))
         Sch::make_bool($a eq $b ? 1 : 0)
     }))
     Sch::env_define($env, "char-ci<?", Sch::make_builtin("char-ci<?", 2, fn($args) {
-        my $a = lc(Sch::sch_char_arg($args, 0, "char-ci<?"))
-        my $b = lc(Sch::sch_char_arg($args, 1, "char-ci<?"))
+        val $a = lc(Sch::sch_char_arg($args, 0, "char-ci<?"))
+        val $b = lc(Sch::sch_char_arg($args, 1, "char-ci<?"))
         Sch::make_bool($a lt $b ? 1 : 0)
     }))
     Sch::env_define($env, "string-ci=?", Sch::make_builtin("string-ci=?", 2, fn($args) {
-        my $a = lc(Sch::sch_str_arg($args, 0, "string-ci=?"))
-        my $b = lc(Sch::sch_str_arg($args, 1, "string-ci=?"))
+        val $a = lc(Sch::sch_str_arg($args, 0, "string-ci=?"))
+        val $b = lc(Sch::sch_str_arg($args, 1, "string-ci=?"))
         Sch::make_bool($a eq $b ? 1 : 0)
     }))
     Sch::env_define($env, "string-ci<?", Sch::make_builtin("string-ci<?", 2, fn($args) {
-        my $a = lc(Sch::sch_str_arg($args, 0, "string-ci<?"))
-        my $b = lc(Sch::sch_str_arg($args, 1, "string-ci<?"))
+        val $a = lc(Sch::sch_str_arg($args, 0, "string-ci<?"))
+        val $b = lc(Sch::sch_str_arg($args, 1, "string-ci<?"))
         Sch::make_bool($a lt $b ? 1 : 0)
     }))
 
@@ -2542,20 +2542,20 @@ fn Sch::install_builtins($env) {
         +{ type => "hash", table => +{} }
     }))
     Sch::env_define($env, "hash?", Sch::make_builtin("hash?", 1, fn($args) {
-        my $v = $args->[0]
+        val $v = $args->[0]
         Sch::make_bool(ref($v) eq "HASH" && $v->{type} eq "hash" ? 1 : 0)
     }))
     Sch::env_define($env, "hash-set!", Sch::make_builtin("hash-set!", 3, fn($args) {
-        my $h = $args->[0]
+        val $h = $args->[0]
         ref($h) eq "HASH" && $h->{type} eq "hash" or die "hash-set!: not a hash"
-        my $key = Sch::sch_display($args->[1])
+        val $key = Sch::sch_display($args->[1])
         $h->{table}->{$key} = $args->[2]
         Sch::make_unspec()
     }))
     Sch::env_define($env, "hash-ref", Sch::make_builtin("hash-ref", -2, fn($args) {
-        my $h = $args->[0]
+        val $h = $args->[0]
         ref($h) eq "HASH" && $h->{type} eq "hash" or die "hash-ref: not a hash"
-        my $key = Sch::sch_display($args->[1])
+        val $key = Sch::sch_display($args->[1])
         if (exists $h->{table}->{$key}) {
             return $h->{table}->{$key}
         }
@@ -2563,20 +2563,20 @@ fn Sch::install_builtins($env) {
         Sch::make_bool(0)
     }))
     Sch::env_define($env, "hash-has-key?", Sch::make_builtin("hash-has-key?", 2, fn($args) {
-        my $h = $args->[0]
+        val $h = $args->[0]
         ref($h) eq "HASH" && $h->{type} eq "hash" or die "hash-has-key?: not a hash"
-        my $key = Sch::sch_display($args->[1])
+        val $key = Sch::sch_display($args->[1])
         Sch::make_bool(exists $h->{table}->{$key} ? 1 : 0)
     }))
     Sch::env_define($env, "hash-remove!", Sch::make_builtin("hash-remove!", 2, fn($args) {
-        my $h = $args->[0]
+        val $h = $args->[0]
         ref($h) eq "HASH" && $h->{type} eq "hash" or die "hash-remove!: not a hash"
-        my $key = Sch::sch_display($args->[1])
+        val $key = Sch::sch_display($args->[1])
         delete $h->{table}->{$key}
         Sch::make_unspec()
     }))
     Sch::env_define($env, "hash-count", Sch::make_builtin("hash-count", 1, fn($args) {
-        my $h = $args->[0]
+        val $h = $args->[0]
         ref($h) eq "HASH" && $h->{type} eq "hash" or die "hash-count: not a hash"
         Sch::make_num(len(keys %{$h->{table}}))
     }))
@@ -2599,22 +2599,22 @@ fn Sch::install_builtins($env) {
 # with all builtins.
 
 fn Sch::sch_make_global_env() {
-    my $env = Sch::env_new(undef)
+    val $env = Sch::env_new(undef)
     Sch::install_builtins($env)
     $env
 }
 
 fn Sch::sch_run($source, $env) {
-    my $exprs = Sch::sch_parse($source)
-    my $result = Sch::make_unspec()
-    for my $expr (@$exprs) {
+    val $exprs = Sch::sch_parse($source)
+    var $result = Sch::make_unspec()
+    for val $expr (@$exprs) {
         $result = Sch::sch_eval($expr, $env)
     }
     $result
 }
 
 fn Sch::sch_run_global($source) {
-    my $env = Sch::sch_make_global_env()
+    val $env = Sch::sch_make_global_env()
     Sch::sch_run($source, $env)
 }
 
@@ -5185,15 +5185,15 @@ assert_eq Sch::run_test('
 
 # Shared env for the REPL — built once, mutated by user `define`s.
 fn Sch::repl() {
-    my $env = Sch::sch_make_global_env()
+    val $env = Sch::sch_make_global_env()
     p "stryke-scheme — Scheme R5RS-subset interpreter (Ctrl-D to quit)"
     p "Tip: try (+ 1 2 3) or (define (f x) (* x x)) (f 7)"
-    my $buf = ""
-    my $depth = 0
+    var $buf = ""
+    var $depth = 0
     while (1) {
-        my $prompt = ($depth == 0 ? "scheme> " : "    ... ")
+        val $prompt = ($depth == 0 ? "scheme> " : "    ... ")
         print $prompt
-        my $line = <STDIN>
+        var $line = <STDIN>
         last unless defined $line
         chomp $line
         next if $line eq "" && $depth == 0
@@ -5209,12 +5209,12 @@ fn Sch::repl() {
             next
         }
         # Balanced: evaluate
-        my $result
+        var $result
         eval {
             $result = Sch::sch_run($buf, $env)
         }
         if ($@) {
-            my $err = $@
+            var $err = $@
             $err =~ s/\s+at .+? line \d+\.?\s*$//
             p "error: $err"
         } else {
@@ -5232,12 +5232,12 @@ fn Sch::repl() {
 # (with `\"` escape) and `;` line comments. Returns the running depth (negative
 # if there are more closes than opens — indicates malformed input).
 fn Sch::repl_paren_balance($src) {
-    my $depth = 0
-    my $i = 0
-    my $n = length($src)
-    my $in_str = 0
+    var $depth = 0
+    var $i = 0
+    val $n = length($src)
+    var $in_str = 0
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
         if ($in_str) {
             if ($c eq "\\" && $i + 1 < $n) {
                 $i += 2

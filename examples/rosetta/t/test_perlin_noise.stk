@@ -14,17 +14,17 @@ fn Rosetta::Perlin::grad($hash, $x) {
 }
 
 fn Rosetta::Perlin::noise1d($x) {
-    my @perm = (151, 160)
-    my $x0 = int($x)
-    my $xf = $x - $x0
-    my $u = Rosetta::Perlin::fade($xf)
-    my $g0 = Rosetta::Perlin::grad($perm[$x0 % 2], $xf)
-    my $g1 = Rosetta::Perlin::grad($perm[($x0 + 1) % 2], $xf - 1)
+    val @perm = (151, 160)
+    val $x0 = int($x)
+    val $xf = $x - $x0
+    val $u = Rosetta::Perlin::fade($xf)
+    val $g0 = Rosetta::Perlin::grad($perm[$x0 % 2], $xf)
+    val $g1 = Rosetta::Perlin::grad($perm[($x0 + 1) % 2], $xf - 1)
     Rosetta::Perlin::lerp($g0, $g1, $u)
 }
 
-my $n0 = Rosetta::Perlin::noise1d(0.25)
-my $n1 = Rosetta::Perlin::noise1d(0.75)
+val $n0 = Rosetta::Perlin::noise1d(0.25)
+val $n1 = Rosetta::Perlin::noise1d(0.75)
 
 assert_eq int($n0 * 1000), -301, "first sample is stable"
 assert_eq int($n1 * 1000), -301, "second sample is stable"

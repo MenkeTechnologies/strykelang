@@ -5,13 +5,13 @@ package NN
 fn sigmoid($x) { 1.0 / (1.0 + exp(-$x)) }
 fn d_sigmoid($y) { $y * (1.0 - $y) }
 fn mat_new($r, $c) {
-    my @m
-    for (1:$r) { my @row = (0.0) x $c; push @m, \@row }
+    var @m
+    for (1:$r) { val @row = (0.0) x $c; push @m, \@row }
     \@m
 }
 fn mat_rand($r, $c) {
-    my $m = mat_new($r, $c)
-    for my $i (0:$r-1) { for my $j (0:$c-1) { $m->[$i]->[$j] = rand(2.0) - 1.0 } }
+    val $m = mat_new($r, $c)
+    for val $i (0:$r-1) { for val $j (0:$c-1) { $m->[$i]->[$j] = rand(2.0) - 1.0 } }
     $m
 }
 fn new($in_n, $hid_n, $out_n) {
@@ -19,38 +19,38 @@ fn new($in_n, $hid_n, $out_n) {
       h_bias => mat_rand($hid_n, 1), o_bias => mat_rand($out_n, 1), lr => 0.3 }
 }
 fn nn_predict($nn, $inputs) {
-    my $ih = $nn->{ih_weights}; my $ho = $nn->{ho_weights}
-    my @h_vals
-    for my $i (0 : (len @$ih) - 1) {
-        my $sum = $nn->{h_bias}->[$i]->[0]
-        for my $j (0 : (len @$inputs) - 1) { $sum = $sum + $ih->[$i]->[$j] * $inputs->[$j] }
+    val $ih = $nn->{ih_weights}; val $ho = $nn->{ho_weights}
+    var @h_vals
+    for val $i (0 : (len @$ih) - 1) {
+        var $sum = $nn->{h_bias}->[$i]->[0]
+        for val $j (0 : (len @$inputs) - 1) { $sum = $sum + $ih->[$i]->[$j] * $inputs->[$j] }
         push @h_vals, sigmoid($sum)
     }
-    my @o_vals
-    for my $i (0 : (len @$ho) - 1) {
-        my $sum = $nn->{o_bias}->[$i]->[0]
-        for my $j (0 : (len @h_vals) - 1) { $sum = $sum + $ho->[$i]->[$j] * $h_vals[$j] }
+    var @o_vals
+    for val $i (0 : (len @$ho) - 1) {
+        var $sum = $nn->{o_bias}->[$i]->[0]
+        for val $j (0 : (len @h_vals) - 1) { $sum = $sum + $ho->[$i]->[$j] * $h_vals[$j] }
         push @o_vals, sigmoid($sum)
     }
     { output => \@o_vals, hidden => \@h_vals }
 }
 fn train($nn, $inputs, $targets) {
-    my $res = nn_predict $nn, $inputs
-    my $h_vals = $res->{hidden}; my $o_vals = $res->{output}
-    my @o_deltas
-    for my $i (0 : (len @$o_vals) - 1) { push @o_deltas, ($targets->[$i] - $o_vals->[$i]) * d_sigmoid($o_vals->[$i]) }
-    my @h_deltas
-    for my $j (0 : (len @$h_vals) - 1) {
-        my $err = 0.0
-        for my $i (0 : (len @o_deltas) - 1) { $err = $err + $o_deltas[$i] * $nn->{ho_weights}->[$i]->[$j] }
+    val $res = nn_predict $nn, $inputs
+    val $h_vals = $res->{hidden}; val $o_vals = $res->{output}
+    var @o_deltas
+    for val $i (0 : (len @$o_vals) - 1) { push @o_deltas, ($targets->[$i] - $o_vals->[$i]) * d_sigmoid($o_vals->[$i]) }
+    var @h_deltas
+    for val $j (0 : (len @$h_vals) - 1) {
+        var $err = 0.0
+        for val $i (0 : (len @o_deltas) - 1) { $err = $err + $o_deltas[$i] * $nn->{ho_weights}->[$i]->[$j] }
         push @h_deltas, $err * d_sigmoid($h_vals->[$j])
     }
-    for my $i (0 : (len @o_deltas) - 1) {
-        for my $j (0 : (len @$h_vals) - 1) { $nn->{ho_weights}->[$i]->[$j] += $nn->{lr} * $o_deltas[$i] * $h_vals->[$j] }
+    for val $i (0 : (len @o_deltas) - 1) {
+        for val $j (0 : (len @$h_vals) - 1) { $nn->{ho_weights}->[$i]->[$j] += $nn->{lr} * $o_deltas[$i] * $h_vals->[$j] }
         $nn->{o_bias}->[$i]->[0] += $nn->{lr} * $o_deltas[$i]
     }
-    for my $i (0 : (len @h_deltas) - 1) {
-        for my $j (0 : (len @$inputs) - 1) { $nn->{ih_weights}->[$i]->[$j] += $nn->{lr} * $h_deltas[$i] * $inputs->[$j] }
+    for val $i (0 : (len @h_deltas) - 1) {
+        for val $j (0 : (len @$inputs) - 1) { $nn->{ih_weights}->[$i]->[$j] += $nn->{lr} * $h_deltas[$i] * $inputs->[$j] }
         $nn->{h_bias}->[$i]->[0] += $nn->{lr} * $h_deltas[$i]
     }
 }
@@ -59,19 +59,19 @@ package main
 
 # --- XOR test ---
 srand(42)
-my $nn = NN::new 2, 4, 1
-my @data = ( {in=>[0,0], out=>[0]}, {in=>[0,1], out=>[1]}, {in=>[1,0], out=>[1]}, {in=>[1,1], out=>[0]} )
+val $nn = NN::new 2, 4, 1
+val @data = ( {in=>[0,0], out=>[0]}, {in=>[0,1], out=>[1]}, {in=>[1,0], out=>[1]}, {in=>[1,1], out=>[0]} )
 
 # Train
 for (1:20000) {
-    my $d = $data[int(rand 4)]
+    val $d = $data[int(rand 4)]
     NN::train $nn, $d->{in}, $d->{out}
 }
 
 # Verify
-my $total_err = 0.0
-for my $d (@data) {
-    my $res = NN::nn_predict $nn, $d->{in}
+var $total_err = 0.0
+for val $d (@data) {
+    val $res = NN::nn_predict $nn, $d->{in}
     $total_err = $total_err + abs($d->{out}->[0] - $res->{output}->[0])
 }
 ($total_err < 0.5) |> aeq 1, "NN learned XOR (total error #{$total_err} < 0.5)"

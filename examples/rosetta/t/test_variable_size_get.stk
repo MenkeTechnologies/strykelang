@@ -8,8 +8,8 @@ fn Rosetta::VarSizeGet::size_of($value) {
     0
 }
 
-my @nums = (3, 1, 4, 1, 5)
-my %map = (a => 1, b => 2, c => 3)
+val @nums = (3, 1, 4, 1, 5)
+val %map = (a => 1, b => 2, c => 3)
 
 assert_eq Rosetta::VarSizeGet::size_of("rosetta"), 7, "string length returned"
 assert_eq Rosetta::VarSizeGet::size_of(\@nums), 5, "array size returned"

@@ -2,18 +2,18 @@
 
 fn Project::StateMachine::make_traffic_light {
     mysync $state = "red"
-    my $transitions = {
+    val $transitions = {
         red    => "green",
         green  => "yellow",
         yellow => "red",
     }
 
-    my $next = fn {
+    val $next = fn {
         $state = $transitions->{$state}
         $state
     }
-    my $current = fn { $state }
-    my $is_stop = fn { $state eq "red" || $state eq "yellow" }
+    val $current = fn { $state }
+    val $is_stop = fn { $state eq "red" || $state eq "yellow" }
 
     { next => $next, current => $current, is_stop => $is_stop }
 }
@@ -22,33 +22,33 @@ fn Project::StateMachine::make_door_fsm {
     mysync $state = "closed"
     mysync $locked = 0
 
-    my $open = fn {
+    val $open = fn {
         return "already open" if $state eq "open"
         return "locked" if $locked
         $state = "open"
         "opened"
     }
 
-    my $close = fn {
+    val $close = fn {
         return "already closed" if $state eq "closed"
         $state = "closed"
         "closed"
     }
 
-    my $lock = fn {
+    val $lock = fn {
         return "must be closed" if $state eq "open"
         return "already locked" if $locked
         $locked = 1
         "locked"
     }
 
-    my $unlock = fn {
+    val $unlock = fn {
         return "not locked" unless $locked
         $locked = 0
         "unlocked"
     }
 
-    my $status = fn { $locked ? "locked" : $state }
+    val $status = fn { $locked ? "locked" : $state }
 
     { open => $open, close => $close, lock => $lock, unlock => $unlock, status => $status }
 }
@@ -56,25 +56,25 @@ fn Project::StateMachine::make_door_fsm {
 fn Project::StateMachine::make_counter_fsm($min, $max) {
     mysync $value = $min
 
-    my $increment = fn {
+    val $increment = fn {
         return 0 if $value >= $max
         $value++
         1
     }
 
-    my $decrement = fn {
+    val $decrement = fn {
         return 0 if $value <= $min
         $value--
         1
     }
 
-    my $reset = fn {
+    val $reset = fn {
         $value = $min
     }
 
-    my $get = fn { $value }
-    my $at_min = fn { $value == $min }
-    my $at_max = fn { $value == $max }
+    val $get = fn { $value }
+    val $at_min = fn { $value == $min }
+    val $at_max = fn { $value == $max }
 
     { inc => $increment, dec => $decrement, reset => $reset, get => $get, at_min => $at_min, at_max => $at_max }
 }
@@ -82,14 +82,14 @@ fn Project::StateMachine::make_counter_fsm($min, $max) {
 fn Project::StateMachine::make_toggle_fsm {
     mysync $on = 0
 
-    my $toggle = fn {
+    val $toggle = fn {
         $on = !$on
         $on ? "on" : "off"
     }
 
-    my $is_on = fn { $on ? 1 : 0 }
-    my $turn_on = fn { $on = 1 }
-    my $turn_off = fn { $on = 0 }
+    val $is_on = fn { $on ? 1 : 0 }
+    val $turn_on = fn { $on = 1 }
+    val $turn_off = fn { $on = 0 }
 
     { toggle => $toggle, is_on => $is_on, on => $turn_on, off => $turn_off }
 }
@@ -98,7 +98,7 @@ fn Project::StateMachine::make_parser_fsm {
     mysync $state = "start"
     mysync $tokens = []
 
-    my $feed = fn($char) {
+    val $feed = fn($char) {
         if ($state eq "start") {
             if ($char =~ /\d/) {
                 $state = "number"
@@ -109,7 +109,7 @@ fn Project::StateMachine::make_parser_fsm {
             }
         } elsif ($state eq "number") {
             if ($char =~ /\d/) {
-                my $last_idx = len(@$tokens) - 1
+                val $last_idx = len(@$tokens) - 1
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"
@@ -117,7 +117,7 @@ fn Project::StateMachine::make_parser_fsm {
             }
         } elsif ($state eq "word") {
             if ($char =~ /[a-zA-Z0-9]/) {
-                my $last_idx = len(@$tokens) - 1
+                val $last_idx = len(@$tokens) - 1
                 $tokens->[$last_idx] .= $char
             } else {
                 $state = "start"
@@ -126,8 +126,8 @@ fn Project::StateMachine::make_parser_fsm {
         }
     }
 
-    my $get_tokens = fn { $tokens }
-    my $reset = fn { $state = "start"; $tokens = [] }
+    val $get_tokens = fn { $tokens }
+    val $reset = fn { $state = "start"; $tokens = [] }
 
     { feed => $feed, tokens => $get_tokens, reset => $reset }
 }
@@ -136,29 +136,29 @@ fn Project::StateMachine::make_vending_machine($price) {
     mysync $balance = 0
     mysync $item_dispensed = 0
 
-    my $insert = fn($amount) {
+    val $insert = fn($amount) {
         return "already paid" if $balance >= $price
         $balance += $amount
         $balance
     }
 
-    my $dispense = fn {
+    val $dispense = fn {
         return "already dispensed" if $item_dispensed
         return "need " . ($price - $balance) . " more" if $balance < $price
         $item_dispensed = 1
-        my $change = $balance - $price
+        val $change = $balance - $price
         $balance = 0
         $change
     }
 
-    my $refund = fn {
-        my $amount = $balance
+    val $refund = fn {
+        val $amount = $balance
         $balance = 0
         $item_dispensed = 0
         $amount
     }
 
-    my $status = fn {
+    val $status = fn {
         { balance => $balance, dispensed => $item_dispensed }
     }
 
@@ -170,7 +170,7 @@ fn Project::StateMachine::make_game_state {
     mysync $score = 0
     mysync $lives = 3
 
-    my $start = fn {
+    val $start = fn {
         return "already playing" if $state eq "playing"
         $state = "playing"
         $score = 0
@@ -178,13 +178,13 @@ fn Project::StateMachine::make_game_state {
         "game started"
     }
 
-    my $add_score = fn($points) {
+    val $add_score = fn($points) {
         return 0 unless $state eq "playing"
         $score += $points
         $score
     }
 
-    my $lose_life = fn {
+    val $lose_life = fn {
         return "not playing" unless $state eq "playing"
         $lives--
         if ($lives <= 0) {
@@ -194,21 +194,21 @@ fn Project::StateMachine::make_game_state {
         $lives
     }
 
-    my $pause = fn {
+    val $pause = fn {
         return "not playing" unless $state eq "playing"
         $state = "paused"
         "paused"
     }
 
-    my $resume = fn {
+    val $resume = fn {
         return "not paused" unless $state eq "paused"
         $state = "playing"
         "resumed"
     }
 
-    my $get_state = fn { $state }
-    my $get_score = fn { $score }
-    my $get_lives = fn { $lives }
+    val $get_state = fn { $state }
+    val $get_score = fn { $score }
+    val $get_lives = fn { $lives }
 
     {
         start => $start, add_score => $add_score, lose_life => $lose_life,
@@ -221,32 +221,32 @@ fn Project::StateMachine::make_connection_fsm {
     mysync $state = "disconnected"
     mysync $retries = 0
 
-    my $connect = fn {
+    val $connect = fn {
         return "already connected" if $state eq "connected"
         $state = "connecting"
         $retries++
         "connecting"
     }
 
-    my $connected = fn {
+    val $connected = fn {
         return "not connecting" unless $state eq "connecting"
         $state = "connected"
         $retries = 0
         "connected"
     }
 
-    my $disconnect = fn {
+    val $disconnect = fn {
         $state = "disconnected"
         "disconnected"
     }
 
-    my $fail = fn {
+    val $fail = fn {
         return "not connecting" unless $state eq "connecting"
         $state = "disconnected"
         "failed (retry $retries)"
     }
 
-    my $status = fn { { state => $state, retries => $retries } }
+    val $status = fn { { state => $state, retries => $retries } }
 
     { connect => $connect, connected => $connected, disconnect => $disconnect, fail => $fail, status => $status }
 }

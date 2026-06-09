@@ -9,16 +9,16 @@
 #   * t-digest for per-generation latency
 #   * HLL for distinct live-cell-count across generations
 
-my $H = 20
-my $W = 20
+val $H = 20
+val $W = 20
 
 # ── grid construction ───────────────────────────────────────────────
 
 fn Demo::Life::empty_grid() {
-    my @g
-    for my $r (0:$H - 1) {
+    var @g
+    for val $r (0:$H - 1) {
         $g[$r] = []
-        for my $c (0:$W - 1) {
+        for val $c (0:$W - 1) {
             $g[$r]->[$c] = 0
         }
     }
@@ -60,12 +60,12 @@ fn Demo::Life::seed_demo($g) {
 # ── neighbor count ─────────────────────────────────────────────────
 
 fn Demo::Life::count_neighbors($g, $r, $c) {
-    my $n = 0
-    for my $dr (-1, 0, 1) {
-        for my $dc (-1, 0, 1) {
+    var $n = 0
+    for val $dr (-1, 0, 1) {
+        for val $dc (-1, 0, 1) {
             next if $dr == 0 && $dc == 0
-            my $nr = $r + $dr
-            my $nc = $c + $dc
+            val $nr = $r + $dr
+            val $nc = $c + $dc
             next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
             $n += $g->[$nr]->[$nc]
         }
@@ -76,11 +76,11 @@ fn Demo::Life::count_neighbors($g, $r, $c) {
 # ── one generation step ────────────────────────────────────────────
 
 fn Demo::Life::step($g) {
-    my $ng = Demo::Life::empty_grid()
-    for my $r (0:$H - 1) {
-        for my $c (0:$W - 1) {
-            my $n = Demo::Life::count_neighbors($g, $r, $c)
-            my $alive = $g->[$r]->[$c]
+    val $ng = Demo::Life::empty_grid()
+    for val $r (0:$H - 1) {
+        for val $c (0:$W - 1) {
+            val $n = Demo::Life::count_neighbors($g, $r, $c)
+            val $alive = $g->[$r]->[$c]
             if ($alive) {
                 $ng->[$r]->[$c] = ($n == 2 || $n == 3) ? 1 : 0
             } else {
@@ -94,10 +94,10 @@ fn Demo::Life::step($g) {
 # ── render ─────────────────────────────────────────────────────────
 
 fn Demo::Life::render($g) {
-    my @lines
-    for my $r (0:$H - 1) {
-        my $line = ""
-        for my $c (0:$W - 1) {
+    var @lines
+    for val $r (0:$H - 1) {
+        var $line = ""
+        for val $c (0:$W - 1) {
             $line = $line . ($g->[$r]->[$c] ? "#" : ".")
         }
         push @lines, $line
@@ -106,9 +106,9 @@ fn Demo::Life::render($g) {
 }
 
 fn Demo::Life::live_count($g) {
-    my $n = 0
-    for my $r (0:$H - 1) {
-        for my $c (0:$W - 1) {
+    var $n = 0
+    for val $r (0:$H - 1) {
+        for val $c (0:$W - 1) {
             $n += $g->[$r]->[$c]
         }
     }
@@ -117,42 +117,42 @@ fn Demo::Life::live_count($g) {
 
 # ── simulate ───────────────────────────────────────────────────────
 
-my $grid = Demo::Life::empty_grid()
+var $grid = Demo::Life::empty_grid()
 Demo::Life::seed_demo($grid)
 
-my $td_step = t_digest(100)
-my $hll_pop = hll(14)
-my $tk_pop = topk(3)
+val $td_step = t_digest(100)
+val $hll_pop = hll(14)
+val $tk_pop = topk(3)
 
-my @population_history
+var @population_history
 
 p "── initial state (generation 0) ─────────────────────"
-my $lines = Demo::Life::render($grid)
-for my $line (@$lines) { p "  $line" }
-my $pop0 = Demo::Life::live_count($grid)
+val $lines = Demo::Life::render($grid)
+for val $line (@$lines) { p "  $line" }
+val $pop0 = Demo::Life::live_count($grid)
 printf "  live cells: %d\n", $pop0
 push @population_history, $pop0
 hll_add($hll_pop, "gen_0_pop_$pop0")
 
-for my $gen (1:5) {
-    my $t0 = now_ns()
+for val $gen (1:5) {
+    val $t0 = now_ns()
     $grid = Demo::Life::step($grid)
     td_add($td_step, (now_ns() - $t0) / 1000.0)
-    my $pop = Demo::Life::live_count($grid)
+    val $pop = Demo::Life::live_count($grid)
     push @population_history, $pop
     hll_add($hll_pop, "gen_${gen}_pop_$pop")
     topk_add($tk_pop, "pop_$pop")
     printf "\n── generation %d (live=%d) ──────────────────────────\n",
         $gen, $pop
-    my $lines = Demo::Life::render($grid)
-    for my $line (@$lines) { p "  $line" }
+    val $lines = Demo::Life::render($grid)
+    for val $line (@$lines) { p "  $line" }
 }
 
 # ── rollup ──────────────────────────────────────────────────────────
 
 p ""
 p "── population history ───────────────────────────────"
-for my $i (0:len(@population_history) - 1) {
+for val $i (0:len(@population_history) - 1) {
     printf "  gen %d : %d live cells\n", $i, $population_history[$i]
 }
 
@@ -163,8 +163,8 @@ printf "  exact (history length) : %d\n", len @population_history
 
 p ""
 p "── most-common gen population (TopK) ────────────────"
-my @hits = topk_top($tk_pop)
-for my $h (@hits) {
+val @hits = topk_top($tk_pop)
+for val $h (@hits) {
     printf "  %-12s : %d gens\n", $h->[0], $h->[1]
 }
 

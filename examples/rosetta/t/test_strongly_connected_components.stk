@@ -8,38 +8,38 @@ fn Rosetta::SCC::strongconnect($u, $adj, $data) {
     push @{$data->{stack}}, $u
     $data->{on_stack}[$u] = 1
     
-    for my $v (@{$adj->[$u]}) {
+    for val $v (@{$adj->[$u]}) {
         if ($data->{indices}[$v] == -1) {
             Rosetta::SCC::strongconnect($v, $adj, $data)
-            my $l1 = $data->{lowlink}[$u]
-            my $l2 = $data->{lowlink}[$v]
+            val $l1 = $data->{lowlink}[$u]
+            val $l2 = $data->{lowlink}[$v]
             $data->{lowlink}[$u] = $l1 < $l2 ? $l1 : $l2
         } elsif ($data->{on_stack}[$v]) {
-            my $l1 = $data->{lowlink}[$u]
-            my $i2 = $data->{indices}[$v]
+            val $l1 = $data->{lowlink}[$u]
+            val $i2 = $data->{indices}[$v]
             $data->{lowlink}[$u] = $l1 < $i2 ? $l1 : $i2
         }
     }
     
     if ($data->{lowlink}[$u] == $data->{indices}[$u]) {
-        my @scc
+        var @scc
         while (1) {
-            my $w = pop @{$data->{stack}}
+            val $w = pop @{$data->{stack}}
             $data->{on_stack}[$w] = 0
             push @scc, $w
             last if ($w == $u)
         }
-        my @sorted_scc = sort { _ <=> _1 } @scc
+        val @sorted_scc = sort { _ <=> _1 } @scc
         push @{$data->{sccs}}, \@sorted_scc
     }
 }
 
 fn Rosetta::SCC::solve($n, $adj) {
-    my @indices = ~> 0:$n-1 map { -1 }
-    my @lowlink = ~> 0:$n-1 map { -1 }
-    my @on_stack = ~> 0:$n-1 map { 0 }
+    val @indices = ~> 0:$n-1 map { -1 }
+    val @lowlink = ~> 0:$n-1 map { -1 }
+    val @on_stack = ~> 0:$n-1 map { 0 }
     
-    my $data = {
+    val $data = {
         index => 0,
         stack => [],
         on_stack => \@on_stack,
@@ -48,19 +48,19 @@ fn Rosetta::SCC::solve($n, $adj) {
         sccs => []
     }
     
-    for my $i (~> 0:$n-1) {
+    for val $i (~> 0:$n-1) {
         if ($data->{indices}[$i] == -1) {
             Rosetta::SCC::strongconnect($i, $adj, $data)
         }
     }
     
-    my @res = sort { _->[0] <=> _1->[0] } @{$data->{sccs}}
+    val @res = sort { _->[0] <=> _1->[0] } @{$data->{sccs}}
     \@res
 }
 
 # Graph: 0 -> 1, 1 -> 2, 2 -> 0, 3 -> 4
-my $adj = [[1], [2], [0], [4], []]
-my $sccs = Rosetta::SCC::solve(5, $adj)
+val $adj = [[1], [2], [0], [4], []]
+val $sccs = Rosetta::SCC::solve(5, $adj)
 
 assert_eq len(@$sccs), 3, "3 SCCs"
 assert_eq join(",", @{$sccs->[0]}), "0,1,2", "SCC 0,1,2"
@@ -68,8 +68,8 @@ assert_eq join(",", @{$sccs->[1]}), "3", "SCC 3"
 assert_eq join(",", @{$sccs->[2]}), "4", "SCC 4"
 
 # Another graph: 0 -> 1, 1 -> 2, 2 -> 3, 3 -> 0
-my $adj2 = [[1], [2], [3], [0]]
-my $sccs2 = Rosetta::SCC::solve(4, $adj2)
+val $adj2 = [[1], [2], [3], [0]]
+val $sccs2 = Rosetta::SCC::solve(4, $adj2)
 assert_eq len(@$sccs2), 1, "1 SCC"
 assert_eq join(",", @{$sccs2->[0]}), "0,1,2,3", "SCC 0,1,2,3"
 

@@ -2,8 +2,8 @@
 # Rosetta Code: Harriss Spiral
 
 fn Rosetta::Harriss::plastic_ratio() {
-    my $x = 1.3
-    for my $i (1:12) {
+    var $x = 1.3
+    for val $i (1:12) {
         $x = $x - (($x ** 3) - $x - 1) / (3 * ($x ** 2) - 1)
     }
     $x
@@ -12,22 +12,22 @@ fn Rosetta::Harriss::plastic_ratio() {
 fn Rosetta::Harriss::deg2rad($deg) { $deg * 3.141592653589793 / 180 }
 
 fn Rosetta::Harriss::add_arc($cx, $cy, $radius, $start_deg, $end_deg, $paths) {
-    my $sr = Rosetta::Harriss::deg2rad($start_deg)
-    my $er = Rosetta::Harriss::deg2rad($end_deg)
-    my $x1 = $cx + $radius * cos($sr)
-    my $y1 = $cy + $radius * sin($sr)
-    my $x2 = $cx + $radius * cos($er)
-    my $y2 = $cy + $radius * sin($er)
+    val $sr = Rosetta::Harriss::deg2rad($start_deg)
+    val $er = Rosetta::Harriss::deg2rad($end_deg)
+    val $x1 = $cx + $radius * cos($sr)
+    val $y1 = $cy + $radius * sin($sr)
+    val $x2 = $cx + $radius * cos($er)
+    val $y2 = $cy + $radius * sin($er)
     push @$paths, sprintf("<path d='M %.2f %.2f A %.2f %.2f 0 0 1 %.2f %.2f'/>", $x1, $y1, $radius, $radius, $x2, $y2)
 }
 
 fn Rosetta::Harriss::section($x, $y, $angle, $len, $iter, $paths) {
     return if $iter <= 0
 
-    my $ratio = Rosetta::Harriss::plastic_ratio()
-    my $rad = Rosetta::Harriss::deg2rad($angle)
-    my $x2 = $x + $len * cos($rad)
-    my $y2 = $y + $len * sin($rad)
+    val $ratio = Rosetta::Harriss::plastic_ratio()
+    val $rad = Rosetta::Harriss::deg2rad($angle)
+    val $x2 = $x + $len * cos($rad)
+    val $y2 = $y + $len * sin($rad)
 
     Rosetta::Harriss::section($x2, $y2, $angle + 90, $len / ($ratio * $ratio), $iter - 2, $paths)
     Rosetta::Harriss::add_arc($x, $y, 1.41421356237 * $len / 2, $angle + 45, $angle + 135, $paths)
@@ -35,13 +35,13 @@ fn Rosetta::Harriss::section($x, $y, $angle, $len, $iter, $paths) {
 }
 
 fn Rosetta::Harriss::svg($iterations) {
-    my @paths
+    val @paths
     Rosetta::Harriss::section(240, 340, -90, 180, $iterations, \@paths)
     "<svg width='500' height='400'>" . join("", @paths) . "</svg>"
 }
 
-my $ratio = Rosetta::Harriss::plastic_ratio()
-my $svg = Rosetta::Harriss::svg(8)
+val $ratio = Rosetta::Harriss::plastic_ratio()
+val $svg = Rosetta::Harriss::svg(8)
 
 assert_ok abs($ratio - 1.3247179572) < 1e-9, "plastic ratio"
 assert_eq $svg =~ /^<svg/, 1, "svg output starts correctly"

@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
 require "./CommunityGarden.stk"
 
-my $g = Exercism::CommunityGarden::start()
+val $g = Exercism::CommunityGarden::start()
 assert_eq len(@{Exercism::CommunityGarden::list_registrations($g)}), 0, "fresh"
 
-my $p = Exercism::CommunityGarden::register($g, "Alice")
+val $p = Exercism::CommunityGarden::register($g, "Alice")
 assert_eq $p->{plot_id}, 1, "first plot id"
 Exercism::CommunityGarden::register($g, "Bob")
 Exercism::CommunityGarden::register($g, "Carol")

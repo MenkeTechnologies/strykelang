@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my %CODON = (
+const val %CODON = (
     UGU => "Cysteine",      UGC => "Cysteine",
     UUA => "Leucine",       UUG => "Leucine",
     UUU => "Phenylalanine", UUC => "Phenylalanine",
@@ -14,9 +14,9 @@ const my %CODON = (
 fn Exercism::ProteinTranslation::of_codon($c) = exists $CODON{$c} ? ["ok", $CODON{$c}] : ["error", "invalid codon"]
 
 fn Exercism::ProteinTranslation::of_rna($rna) {
-    my @out
-    for (my $i = 0; $i < len($rna); $i += 3) {
-        my $codon = $rna[$i:$i+2]
+    var @out
+    for (var $i = 0; $i < len($rna); $i += 3) {
+        val $codon = $rna[$i:$i+2]
         return ["error", "invalid RNA"] unless exists $CODON{$codon}
         last if $CODON{$codon} eq "STOP"
         push @out, $CODON{$codon}

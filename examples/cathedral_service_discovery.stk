@@ -22,21 +22,21 @@ ordain "audit_pool",  "127.0.0.1", 9003
 p "ordained: ingest_pool (9001), render_pool (9002), audit_pool (9003)"
 
 # Enumerate the cathedral.
-my @names = cathedral()
+var @names = cathedral()
 p "── cathedral registry ──"
-for my $n (sort @names) {
+for val $n (sort @names) {
     printf "  %s\n", $n
 }
 
 # Apostatize one congregation (remove from cathedral; doesn't affect
 # any currently-connected agents).
-my $forgotten = apostatize "audit_pool"
+val $forgotten = apostatize "audit_pool"
 printf "apostatize 'audit_pool' → %d (1 = was registered)\n", $forgotten
 
 # Verify the cathedral state after.
 @names = cathedral()
 p "── after apostatize ──"
-for my $n (sort @names) {
+for val $n (sort @names) {
     printf "  %s\n", $n
 }
 
@@ -46,7 +46,7 @@ p "re-ordained 'audit_pool' on a new port (9999)"
 
 @names = cathedral()
 p "── final state ──"
-for my $n (sort @names) {
+for val $n (sort @names) {
     printf "  %s\n", $n
 }
 

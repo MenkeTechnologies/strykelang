@@ -11,9 +11,9 @@
 
 # ── three sorted streams (overlapping ranges) ─────────────────────────
 
-my @s1 = (1, 3, 5, 7, 9, 11, 13, 15)        # odds 1:15
-my @s2 = (2, 4, 6, 8, 10, 12, 14, 16)       # evens 2:16
-my @s3 = (5, 7, 11, 13, 17, 19, 23, 29)     # primes (overlap with s1)
+val @s1 = (1, 3, 5, 7, 9, 11, 13, 15)        # odds 1:15
+val @s2 = (2, 4, 6, 8, 10, 12, 14, 16)       # evens 2:16
+val @s3 = (5, 7, 11, 13, 17, 19, 23, 29)     # primes (overlap with s1)
 
 p "── source streams ─────────────────────────────────────"
 printf "  s1: %s\n", join(" ", @s1)
@@ -22,7 +22,7 @@ printf "  s3: %s\n", join(" ", @s3)
 
 # ── merge via concat + psort + uniq ───────────────────────────────────
 
-my @merged = (@s1, @s2, @s3) |> psort { _ <=> _1 } |> uniq
+val @merged = (@s1, @s2, @s3) |> psort { _ <=> _1 } |> uniq
 printf "\n  merged uniq sorted: %s\n", join(" ", @merged)
 printf "  count: %d (after dedup)\n", len @merged
 
@@ -30,15 +30,15 @@ printf "  count: %d (after dedup)\n", len @merged
 
 p ""
 p "── provenance via per-source CMS ──────────────────────"
-my $by_source = cms(2048, 5)
-for my $x (@s1) { cms_add($by_source, "s1:" . $x) }
-for my $x (@s2) { cms_add($by_source, "s2:" . $x) }
-for my $x (@s3) { cms_add($by_source, "s3:" . $x) }
+val $by_source = cms(2048, 5)
+for val $x (@s1) { cms_add($by_source, "s1:" . $x) }
+for val $x (@s2) { cms_add($by_source, "s2:" . $x) }
+for val $x (@s3) { cms_add($by_source, "s3:" . $x) }
 
 # Which sources contain a given value? Probe a few overlap candidates.
-for my $val (5, 7, 13, 4, 17) {
-    my @sources
-    for my $src ("s1", "s2", "s3") {
+for val $val (5, 7, 13, 4, 17) {
+    var @sources
+    for val $src ("s1", "s2", "s3") {
         push @sources, $src if cms_count($by_source, $src . ":" . $val) > 0
     }
     printf "  value %2d : seen in %s\n", $val, join(", ", @sources)
@@ -48,7 +48,7 @@ for my $val (5, 7, 13, 4, 17) {
 
 p ""
 p "── distinct cardinality via HLL ───────────────────────"
-my $h = hll(14)
+val $h = hll(14)
 hll_add($h, _) for (@s1, @s2, @s3)
 printf "  HLL distinct estimate : %d\n", hll_count($h)
 printf "  exact                  : %d\n", len @merged
@@ -57,19 +57,19 @@ printf "  exact                  : %d\n", len @merged
 
 p ""
 p "── chunked merge with per-chunk latency ───────────────"
-my @big = (1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12, 14, 13, 15, 16)
-my @chunks = ([@big[0:7]], [@big[8:15]])   # split into 2 sorted halves
+val @big = (1, 7, 3, 9, 5, 11, 2, 8, 4, 10, 6, 12, 14, 13, 15, 16)
+val @chunks = ([@big[0:7]], [@big[8:15]])   # split into 2 sorted halves
 # Each chunk is sorted in isolation, then we merge them.
-my $lat = t_digest(100)
-my @sorted_chunks
-for my $i (0:len(@chunks)-1) {
-    my $t1 = now_ns()
-    my @sorted = sort { _ <=> _1 } @{$chunks[$i]}
+val $lat = t_digest(100)
+var @sorted_chunks
+for val $i (0:len(@chunks)-1) {
+    val $t1 = now_ns()
+    val @sorted = sort { _ <=> _1 } @{$chunks[$i]}
     td_add($lat, (now_ns() - $t1) / 1000.0)
     push @sorted_chunks, \@sorted
 }
 printf "  per-chunk sort p50 latency : %.1f µs\n", td_quantile($lat, 0.5)
-my @final = (@{$sorted_chunks[0]}, @{$sorted_chunks[1]}) |> psort { _ <=> _1 }
+val @final = (@{$sorted_chunks[0]}, @{$sorted_chunks[1]}) |> psort { _ <=> _1 }
 printf "  final merged : %s\n", join(" ", @final)
 
 # ── pipe-forward composition chain ────────────────────────────────────
@@ -80,6 +80,6 @@ p "── pipe-forward composition ───────────────
 # explicitly via array slice. (Pipe-forward into `>{ ... }` passes a
 # single value as `_`, not the array — easier to materialise into a
 # scalar first.)
-my @desc_uniq = (@s1, @s2, @s3) |> psort { _1 <=> _ } |> uniq
-my @top5 = @desc_uniq[0:4]
+val @desc_uniq = (@s1, @s2, @s3) |> psort { _1 <=> _ } |> uniq
+val @top5 = @desc_uniq[0:4]
 printf "  top 5 distinct (desc) : %s\n", join(" ", @top5)

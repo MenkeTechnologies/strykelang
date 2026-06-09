@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 fn Exercism::DndCharacter::ability() {
-    my @rolls = ~> 1:4 map { 1 + int(rand 6) } sort { _0 <=> _1 }
+    val @rolls = ~> 1:4 map { 1 + int(rand 6) } sort { _0 <=> _1 }
     sum(@rolls[1:3])
 }
 
 fn Exercism::DndCharacter::modifier = floor((_ - 10) / 2)
 
 fn Exercism::DndCharacter::new() {
-    my %h = (
+    var %h = (
         strength     => Exercism::DndCharacter::ability(),
         dexterity    => Exercism::DndCharacter::ability(),
         constitution => Exercism::DndCharacter::ability(),

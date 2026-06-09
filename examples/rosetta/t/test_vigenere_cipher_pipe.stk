@@ -2,15 +2,15 @@
 # Rosetta Code: Vigenère cipher (using pipes)
 
 fn Rosetta::Vigenere::solve($text, $key, $mode) {
-    my @text_chars = $text |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
-    my @key_chars  = $key |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
-    my $key_len = len(@key_chars)
+    val @text_chars = $text |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
+    val @key_chars  = $key |> uc() |> chars() |> grep { _ =~ /[A-Z]/ }
+    val $key_len = len(@key_chars)
     
     ~> 0:$#text_chars map {
-        my $i = _
-        my $p = ord($text_chars[$i]) - 65
-        my $k = ord($key_chars[$i % $key_len]) - 65
-        my $c
+        val $i = _
+        val $p = ord($text_chars[$i]) - 65
+        val $k = ord($key_chars[$i % $key_len]) - 65
+        var $c
         if ($mode eq "encrypt") {
             $c = ($p + $k) % 26
         } else {
@@ -20,10 +20,10 @@ fn Rosetta::Vigenere::solve($text, $key, $mode) {
     } |> join("")
 }
 
-my $t = "Beware the Jabberwock, my son! The jaws that bite, the claws that catch!"
-my $k = "VIGENERECIPHER"
-my $enc = Rosetta::Vigenere::solve($t, $k, "encrypt")
-my $dec = Rosetta::Vigenere::solve($enc, $k, "decrypt")
+val $t = "Beware the Jabberwock, my son! The jaws that bite, the claws that catch!"
+val $k = "VIGENERECIPHER"
+val $enc = Rosetta::Vigenere::solve($t, $k, "encrypt")
+val $dec = Rosetta::Vigenere::solve($enc, $k, "decrypt")
 
 assert_eq $enc, "WMCEEIKLGRPIFVMEUGXQPWQVIOIAVEYXUEKFKBTALVXTGAFXYEVKPAGY", "encrypt"
 assert_eq $dec, "BEWARETHEJABBERWOCKMYSONTHEJAWSTHATBITETHECLAWSTHATCATCH", "decrypt"

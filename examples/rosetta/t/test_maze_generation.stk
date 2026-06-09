@@ -7,10 +7,10 @@
 # from one cell to a previously-unvisited neighbour.
 
 fn Rosetta::MazeGen::new_grid($w, $h) {
-    my @grid
-    for my $r (~> 1:$h) {
-        my @row
-        for my $c (~> 1:$w) {
+    var @grid
+    for val $r (~> 1:$h) {
+        var @row
+        for val $c (~> 1:$w) {
             push @row, { N => 1, S => 1, E => 1, W => 1, visited => 0 }
         }
         push @grid, \@row
@@ -19,12 +19,12 @@ fn Rosetta::MazeGen::new_grid($w, $h) {
 }
 
 fn Rosetta::MazeGen::carve($grid, $w, $h) {
-    my @stack = ([0, 0])
+    var @stack = ([0, 0])
     $grid->[0][0]{visited} = 1
     while (len(@stack) > 0) {
-        my $top = $stack[-1]
-        my ($r, $c) = @$top
-        my @candidates
+        val $top = $stack[-1]
+        var ($r, $c) = @$top
+        var @candidates
         push @candidates, ["N", -1, 0] if $r > 0      && !$grid->[$r - 1][$c]{visited}
         push @candidates, ["S",  1, 0] if $r < $h - 1 && !$grid->[$r + 1][$c]{visited}
         push @candidates, ["W",  0, -1] if $c > 0      && !$grid->[$r][$c - 1]{visited}
@@ -33,12 +33,12 @@ fn Rosetta::MazeGen::carve($grid, $w, $h) {
             pop @stack
             next
         }
-        my $pick = $candidates[int(rand(len(@candidates)))]
-        my ($dir, $dr, $dc) = @$pick
-        my $nr = $r + $dr
-        my $nc = $c + $dc
+        val $pick = $candidates[int(rand(len(@candidates)))]
+        val ($dir, $dr, $dc) = @$pick
+        val $nr = $r + $dr
+        val $nc = $c + $dc
         $grid->[$r][$c]{$dir} = 0
-        my %opp = (N => "S", S => "N", E => "W", W => "E")
+        val %opp = (N => "S", S => "N", E => "W", W => "E")
         $grid->[$nr][$nc]{$opp{$dir}} = 0
         $grid->[$nr][$nc]{visited} = 1
         push @stack, [$nr, $nc]
@@ -47,25 +47,25 @@ fn Rosetta::MazeGen::carve($grid, $w, $h) {
 }
 
 fn Rosetta::MazeGen::generate($w, $h) {
-    my $g = Rosetta::MazeGen::new_grid($w, $h)
+    val $g = Rosetta::MazeGen::new_grid($w, $h)
     Rosetta::MazeGen::carve($g, $w, $h)
 }
 
 fn Rosetta::MazeGen::reachable($grid, $w, $h) {
     # BFS from (0,0) to count reachable cells
-    my @queue = ([0, 0])
-    my %seen
+    var @queue = ([0, 0])
+    var %seen
     $seen{"0,0"} = 1
     while (len(@queue) > 0) {
-        my $cell = shift @queue
-        my ($r, $c) = @$cell
-        my @neighbours
+        val $cell = shift @queue
+        val ($r, $c) = @$cell
+        var @neighbours
         push @neighbours, [$r - 1, $c] if !$grid->[$r][$c]{N}
         push @neighbours, [$r + 1, $c] if !$grid->[$r][$c]{S}
         push @neighbours, [$r, $c - 1] if !$grid->[$r][$c]{W}
         push @neighbours, [$r, $c + 1] if !$grid->[$r][$c]{E}
-        for my $n (@neighbours) {
-            my $key = "$n->[0],$n->[1]"
+        for val $n (@neighbours) {
+            val $key = "$n->[0],$n->[1]"
             next if exists $seen{$key}
             $seen{$key} = 1
             push @queue, $n
@@ -75,39 +75,39 @@ fn Rosetta::MazeGen::reachable($grid, $w, $h) {
 }
 
 # Generation produces a connected maze
-my $maze = Rosetta::MazeGen::generate(5, 5)
+val $maze = Rosetta::MazeGen::generate(5, 5)
 assert_eq Rosetta::MazeGen::reachable($maze, 5, 5), 25, "5×5 fully connected"
 
 # Larger maze
-my $big = Rosetta::MazeGen::generate(10, 10)
+val $big = Rosetta::MazeGen::generate(10, 10)
 assert_eq Rosetta::MazeGen::reachable($big, 10, 10), 100, "10×10 fully connected"
 
 # Every cell visited
-my $all_visited = 1
-for my $row (@$big) {
-    for my $cell (@$row) {
+var $all_visited = 1
+for val $row (@$big) {
+    for val $cell (@$row) {
         $all_visited = 0 if !$cell->{visited}
     }
 }
 assert_ok $all_visited, "every cell visited during carve"
 
 # Walls reciprocal: if cell A has its E wall down, cell to its right has W wall down
-my $reciprocal_ok = 1
-for my $r (0:9) {
-    for my $c (0:8) {
-        my $a = $maze_cell_e_open = !$big->[$r][$c]{E}
-        my $b = !$big->[$r][$c + 1]{W}
+var $reciprocal_ok = 1
+for val $r (0:9) {
+    for val $c (0:8) {
+        val $a = $maze_cell_e_open = !$big->[$r][$c]{E}
+        val $b = !$big->[$r][$c + 1]{W}
         $reciprocal_ok = 0 if $a != $b
     }
 }
 assert_ok $reciprocal_ok, "wall reciprocity holds"
 
 # 1×1 maze: still works
-my $tiny = Rosetta::MazeGen::generate(1, 1)
+val $tiny = Rosetta::MazeGen::generate(1, 1)
 assert_eq Rosetta::MazeGen::reachable($tiny, 1, 1), 1, "1×1 trivially connected"
 
 # Pipe form
-my $piped = Rosetta::MazeGen::generate(3, 3)
+val $piped = Rosetta::MazeGen::generate(3, 3)
 assert_eq Rosetta::MazeGen::reachable($piped, 3, 3), 9, "pipe 3×3 connected"
 
 test_run

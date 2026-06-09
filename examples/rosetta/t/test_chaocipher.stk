@@ -2,34 +2,34 @@
 # Rosetta Code: Chaocipher
 
 fn Rosetta::Chaocipher::permute_left($alpha, $char) {
-    my @a = split("", $alpha)
+    var @a = split("", $alpha)
     while ($a[0] ne $char) {
         push @a, shift @a
     }
-    my $c = splice(@a, 1, 1)
+    val $c = splice(@a, 1, 1)
     splice(@a, 13, 0, $c)
     join("", @a)
 }
 
 fn Rosetta::Chaocipher::permute_right($alpha, $char) {
-    my @a = split("", $alpha)
+    var @a = split("", $alpha)
     while ($a[0] ne $char) {
         push @a, shift @a
     }
     push @a, shift @a
-    my $c = splice(@a, 2, 1)
+    val $c = splice(@a, 2, 1)
     splice(@a, 13, 0, $c)
     join("", @a)
 }
 
 fn Rosetta::Chaocipher::encrypt($plain, $left, $right) {
-    my $l = $left
-    my $r = $right
-    my $cipher = ""
+    var $l = $left
+    var $r = $right
+    var $cipher = ""
     
-    for my $p (split("", $plain)) {
-        my $idx = index($r, $p)
-        my $c = substr($l, $idx, 1)
+    for val $p (split("", $plain)) {
+        val $idx = index($r, $p)
+        val $c = substr($l, $idx, 1)
         $cipher .= $c
         
         $l = Rosetta::Chaocipher::permute_left($l, $c)
@@ -38,11 +38,11 @@ fn Rosetta::Chaocipher::encrypt($plain, $left, $right) {
     $cipher
 }
 
-my $l_init = "HXUCZVAMDSLKPEFJRIGTWOBNYQ"
-my $r_init = "PTLNBQDEOYSFAVZKGJRIHWXUMC"
-my $plain = "WELLDONEISBETTERTHANWELLSAID"
+val $l_init = "HXUCZVAMDSLKPEFJRIGTWOBNYQ"
+val $r_init = "PTLNBQDEOYSFAVZKGJRIHWXUMC"
+val $plain = "WELLDONEISBETTERTHANWELLSAID"
 
-my $cipher = Rosetta::Chaocipher::encrypt($plain, $l_init, $r_init)
+val $cipher = Rosetta::Chaocipher::encrypt($plain, $l_init, $r_init)
 p "Chaocipher: $cipher"
 
 assert_eq $cipher, "OAHQHCNYNXTSZJRRHJBYHQKSOUJY", "Chaocipher encryption matches RC example"

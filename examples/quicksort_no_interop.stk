@@ -15,14 +15,14 @@
 
 fn QSort::run(@xs) {
     return @xs if len(@xs) <= 1
-    my $pivot = $xs[0]
-    my @rest  = @xs[1:]
-    my @lo    = grep { _ <  $pivot } @rest
-    my @hi    = grep { _ >= $pivot } @rest
+    val $pivot = $xs[0]
+    val @rest  = @xs[1:]
+    val @lo    = grep { _ <  $pivot } @rest
+    val @hi    = grep { _ >= $pivot } @rest
     (QSort::run(@lo), $pivot, QSort::run(@hi))
 }
 
-my @input
+var @input
 if (len(@ARGV) > 0) {
     @input = map { 0 + _ } @ARGV
 } else {
@@ -31,21 +31,21 @@ if (len(@ARGV) > 0) {
 }
 
 p "input : (", join(", ", @input), ")"
-my @sorted = QSort::run(@input)
+val @sorted = QSort::run(@input)
 p "sorted: (", join(", ", @sorted), ")"
 
 # Invariant check — sort block. Under `--no-interop`, `$a` / `$b` are
 # rejected even inside sort/reduce; stryke uses bareword `_` / `_1`
 # instead (the implicit-closure-param spelling).
-my @golden = sort { _ <=> _1 } @input
-my $got    = join(",", @sorted)
-my $want   = join(",", @golden)
+val @golden = sort { _ <=> _1 } @input
+val $got    = join(",", @sorted)
+val $want   = join(",", @golden)
 die "QSort::run drifted! got=$got want=$want" unless $got eq $want
 p "verified against stryke's built-in sort"
 
 # Cross-check on a second hand-picked input.
-my @rev   = (10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
-my @asc   = QSort::run(@rev)
-my $want  = "1,2,3,4,5,6,7,8,9,10"
+val @rev   = (10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
+val @asc   = QSort::run(@rev)
+val $want  = "1,2,3,4,5,6,7,8,9,10"
 die "QSort::run failed on reversed input: " . join(",", @asc) unless join(",", @asc) eq $want
 p "  ALL PASS (reversed-input case also clean)"

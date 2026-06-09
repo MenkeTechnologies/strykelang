@@ -7,11 +7,11 @@ fn Rosetta::Accumulator::make($n) {
     }
 }
 
-my $acc = Rosetta::Accumulator::make(5)
+val $acc = Rosetta::Accumulator::make(5)
 assert_eq $acc(2), 7, "acc(2) -> 7"
 assert_eq $acc(3), 10, "acc(3) -> 10"
 
-my $acc2 = Rosetta::Accumulator::make(100)
+val $acc2 = Rosetta::Accumulator::make(100)
 assert_eq $acc2(50), 150, "acc2(50) -> 150"
 
 # Using pipes with accumulator

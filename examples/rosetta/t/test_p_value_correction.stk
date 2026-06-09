@@ -2,15 +2,15 @@
 # Rosetta Code: P-value correction
 
 fn Rosetta::PValue::bonferroni(@p_values) {
-    my $n = len(@p_values)
+    val $n = len(@p_values)
     ~> @p_values map {
-        my $adj = _ * $n
+        val $adj = _ * $n
         $adj > 1.0 ? 1.0 : $adj
     }
 }
 
-my @p = (0.01, 0.04, 0.05)
-my @res = Rosetta::PValue::bonferroni(@p)
+val @p = (0.01, 0.04, 0.05)
+val @res = Rosetta::PValue::bonferroni(@p)
 
 assert_ok abs($res[0] - 0.03) < 0.0001, "0.01 -> 0.03"
 assert_ok abs($res[1] - 0.12) < 0.0001, "0.04 -> 0.12"

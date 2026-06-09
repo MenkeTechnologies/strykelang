@@ -11,12 +11,12 @@
 p "── adaptive parallelism ──"
 
 # Stage 1: start small. Two workers to feel out the workload.
-my @stage1 = congregation(2)
+val @stage1 = congregation(2)
 printf "stage 1: spawned %d primary workers\n", len(@stage1)
 
 # Initial job: sum 1..50000 on each worker (CPU-bound).
-my $job_code = "my \$s = 0; for my \$i (1:50_000) { \$s += \$i } \$s"
-my %r1 = harvest $job_code, @stage1, 30_000
+val $job_code = "my \$s = 0; for my \$i (1:50_000) { \$s += \$i } \$s"
+val %r1 = harvest $job_code, @stage1, 30_000
 printf "stage 1 result: %d workers returned %d each\n",
     len(keys %r1),
     (values %r1)[0]
@@ -24,7 +24,7 @@ printf "stage 1 result: %d workers returned %d each\n",
 # Stage 2: it's slow / we want more throughput. Anoint a secondary
 # pool of 3 more workers (independent controller, doesn't disrupt
 # stage 1 state).
-my @stage2 = anoint(3)
+val @stage2 = anoint(3)
 printf "stage 2: anointed %d secondary workers (separate controller)\n", len(@stage2)
 
 # Stage 3: re-run the same job on the original primary pool.
@@ -33,7 +33,7 @@ printf "stage 2: anointed %d secondary workers (separate controller)\n", len(@st
 # would expose that explicitly. For this demo we just show the
 # capacity is there — anointed workers are visible via the prior
 # controller-handle the registry returned.)
-my %r3 = harvest $job_code, @stage1, 30_000
+val %r3 = harvest $job_code, @stage1, 30_000
 printf "stage 3: re-ran job on original %d workers — %d hits\n",
     len(@stage1), len(keys %r3)
 

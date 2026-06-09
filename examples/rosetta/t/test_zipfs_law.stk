@@ -2,7 +2,7 @@
 # Rosetta Code: Zipf's law
 
 fn Rosetta::Zipf::solve($text, $n) {
-    my %counts
+    var %counts
     $text |> lc() |> split(/\W+/) |> map {
         if (_ ne "") {
             $counts{_}++
@@ -10,21 +10,21 @@ fn Rosetta::Zipf::solve($text, $n) {
     }
     
     # Sort keys by their frequency in %counts (descending)
-    my @sorted = keys %counts |> sort { $counts{_1} <=> $counts{_0} }
+    val @sorted = keys %counts |> sort { $counts{_1} <=> $counts{_0} }
     
-    my @results
+    var @results
     # Zipf's Law: Frequency * Rank approx constant
-    my $limit = min($n, len(@sorted))
-    for my $rank (1:$limit) {
-        my $word = $sorted[$rank - 1]
-        my $freq = $counts{$word}
+    val $limit = min($n, len(@sorted))
+    for val $rank (1:$limit) {
+        val $word = $sorted[$rank - 1]
+        val $freq = $counts{$word}
         push @results, { word => $word, freq => $freq, rank => $rank, product => $freq * $rank }
     }
     [@results]
 }
 
 # Test with a synthetic string
-my $text = "the " x 100 . "of " x 50 . "and " x 33 . "to " x 25 . "a " x 20
+val $text = "the " x 100 . "of " x 50 . "and " x 33 . "to " x 25 . "a " x 20
 # Top 5:
 # 1. the: 100 * 1 = 100
 # 2. of: 50 * 2 = 100
@@ -32,7 +32,7 @@ my $text = "the " x 100 . "of " x 50 . "and " x 33 . "to " x 25 . "a " x 20
 # 4. to: 25 * 4 = 100
 # 5. a: 20 * 5 = 100
 
-my $res = Rosetta::Zipf::solve($text, 5)
+val $res = Rosetta::Zipf::solve($text, 5)
 
 assert_eq(len(@$res), 5, "top 5 words")
 assert_eq($res->[0]->{word}, "the", "rank 1")

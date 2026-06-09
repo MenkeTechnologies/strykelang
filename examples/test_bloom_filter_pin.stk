@@ -3,27 +3,27 @@
 package BF
 
 fn hash($s, $seed) {
-    my $h = 2166136261 + $seed * 16777619
-    my $n = len $s
-    for my $i (0 : $n - 1) {
+    var $h = 2166136261 + $seed * 16777619
+    val $n = len $s
+    for val $i (0 : $n - 1) {
         $h = ($h ^ ord(substr $s, $i, 1)) * 16777619
         $h = $h % 4294967296
     }
     $h
 }
 fn new($size, $k) {
-    my @bits = (0) x $size
+    val @bits = (0) x $size
     { size => $size, k => $k, bits => \@bits }
 }
 fn add($bf, $item) {
-    for my $i (0 : $bf->{k} - 1) {
-        my $h = hash($item, $i) % $bf->{size}
+    for val $i (0 : $bf->{k} - 1) {
+        val $h = hash($item, $i) % $bf->{size}
         $bf->{bits}->[$h] = 1
     }
 }
 fn contains($bf, $item) {
-    for my $i (0 : $bf->{k} - 1) {
-        my $h = hash($item, $i) % $bf->{size}
+    for val $i (0 : $bf->{k} - 1) {
+        val $h = hash($item, $i) % $bf->{size}
         return 0 if $bf->{bits}->[$h] == 0
     }
     1
@@ -32,16 +32,16 @@ fn contains($bf, $item) {
 package main
 
 # --- Basic ---
-my $b1 = BF::new 1000, 5
+val $b1 = BF::new 1000, 5
 BF::contains($b1, "stryke") |> aeq 0, "empty BF no contains"
 BF::add $b1, "stryke"
 BF::contains($b1, "stryke") |> aeq 1, "contains added item"
 
 # --- False Negatives (Should be 0) ---
-my @items = ("one", "two", "three", "four", "five")
-for my $it (@items) { BF::add $b1, $it }
-my $ok = 1
-for my $it (@items) { $ok = 0 if !BF::contains($b1, $it) }
+val @items = ("one", "two", "three", "four", "five")
+for val $it (@items) { BF::add $b1, $it }
+var $ok = 1
+for val $it (@items) { $ok = 0 if !BF::contains($b1, $it) }
 $ok |> aeq 1, "no false negatives"
 
 test_run

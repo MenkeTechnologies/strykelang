@@ -3,24 +3,24 @@
 
 fn Rosetta::UTM::solve($state, $tape, $pos, $rules, $halt, $blank) {
     $blank = "0" if !defined $blank
-    my %tape_h
-    for (my $i = 0; $i < len(@$tape); $i++) {
+    var %tape_h
+    for (var $i = 0; $i < len(@$tape); $i++) {
         $tape_h{$i} = $tape->[$i]
     }
     
-    my $curr_state = $state
-    my $curr_pos = $pos
+    var $curr_state = $state
+    var $curr_pos = $pos
     
     while ($curr_state ne $halt) {
-        my $read = exists($tape_h{$curr_pos}) ? $tape_h{$curr_pos} : $blank
-        my $rule = $rules->{$curr_state}->{$read}
+        val $read = exists($tape_h{$curr_pos}) ? $tape_h{$curr_pos} : $blank
+        val $rule = $rules->{$curr_state}->{$read}
         
         if (!defined $rule) {
             # Check for default rule or just halt if no rule
             return \%tape_h
         }
         
-        my ($write, $move, $next_state) = @$rule
+        val ($write, $move, $next_state) = @$rule
         $tape_h{$curr_pos} = $write
         
         if ($move eq "R") {
@@ -37,7 +37,7 @@ fn Rosetta::UTM::solve($state, $tape, $pos, $rules, $halt, $blank) {
 
 # Simple incrementer: increments a binary number (e.g., 111 -> 1000)
 # This is a bit complex for a one-off, let's do a simple 3-state busy beaver.
-my %rules = (
+val %rules = (
     a => {
         "0" => ["1", "R", "b"],
         "1" => ["1", "L", "c"]
@@ -52,12 +52,12 @@ my %rules = (
     }
 )
 
-my $tape = ["0", "0", "0"]
-my $res = Rosetta::UTM::solve("a", $tape, 0, \%rules, "HALT")
+val $tape = ["0", "0", "0"]
+val $res = Rosetta::UTM::solve("a", $tape, 0, \%rules, "HALT")
 
 # Busy beaver 3-state 2-symbol should produce 6 ones
-my $count = 0
-for my $v (values %$res) {
+var $count = 0
+for val $v (values %$res) {
     $count++ if $v eq "1"
 }
 

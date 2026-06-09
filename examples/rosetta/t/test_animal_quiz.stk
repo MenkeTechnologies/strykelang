@@ -6,8 +6,8 @@ fn Rosetta::AnimalQuiz::new_node($q, $yes, $no) {
 }
 
 fn Rosetta::AnimalQuiz::solve($root, $answers) {
-    my $curr = $root
-    for my $ans (@$answers) {
+    var $curr = $root
+    for val $ans (@$answers) {
         if (!defined $curr->{yes}) {
             $curr->{q} # Found animal
         }
@@ -20,7 +20,7 @@ fn Rosetta::AnimalQuiz::solve($root, $answers) {
     $curr->{q}
 }
 
-my $tree = Rosetta::AnimalQuiz::new_node(
+val $tree = Rosetta::AnimalQuiz::new_node(
     "Does it bark?",
     Rosetta::AnimalQuiz::new_node("Dog"),
     Rosetta::AnimalQuiz::new_node("Cat")

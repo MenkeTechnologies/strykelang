@@ -7,24 +7,24 @@
 
 # ── § 1a. String interpolation — `#{ EXPR }` over `.` concat ───────────────
 
-my $name = "world"
+val $name = "world"
 "hello, $name!"            |> aeq "hello, world!", "bare-scalar interp"
 
-my $x = 7
+val $x = 7
 "x squared is #{$x * $x}"  |> aeq "x squared is 49", "#{EXPR} arithmetic"
 
-my @nums = (1, 2, 3, 4)
+val @nums = (1, 2, 3, 4)
 "sum: #{sum @nums}"        |> aeq "sum: 10", "#{EXPR} function call"
 
-my $base = "file"
+val $base = "file"
 "${base}_v2.txt"           |> aeq "file_v2.txt", "\${name} disambiguation"
 
 # Array interpolation auto-joins on $" (default space).
 "items: @nums"             |> aeq "items: 1 2 3 4", "@arr interp auto-joins"
 
 # Nested `#{}` — expression inside expression.
-my $n = 5
-my $fact = (1:$n) |> reduce { _ * _1 }
+val $n = 5
+val $fact = (1:$n) |> reduce { _ * _1 }
 "factorial $n! = $fact" |> aeq "factorial 5! = 120", "factorial via reduce + interp"
 
 # ── § 3. Function definition forms ─────────────────────────────────────────
@@ -52,9 +52,9 @@ classify(100) |> aeq "big",      "tail-expression implicit return — big"
 
 # Block form — needs multi-statement body w/ local var.
 fn pair_sum_min(@pairs) {
-    my $best = undef
-    for my $p (@pairs) {
-        my $s = $p->[0] + $p->[1]
+    var $best = undef
+    for val $p (@pairs) {
+        val $s = $p->[0] + $p->[1]
         if (!defined($best) || $s < $best) { $best = $s }
     }
     $best
@@ -68,9 +68,9 @@ pair_sum_min([5, 5], [1, 2])          |> aeq 3, "block fn — min pair-sum (1,2)
 join(",", 1:5) |> aeq "1,2,3,4,5", "1:N inclusive both ends"
 
 # Range as iteration source — same as 1..N but shorter.
-my @evens
-for my $i (1:10) { push @evens, $i if $i % 2 == 0 }
-@evens |> sum |> aeq 30, "for my $i (1:10) — even sum 2+4+6+8+10 = 30"
+var @evens
+for val $i (1:10) { push @evens, $i if $i % 2 == 0 }
+@evens |> sum |> aeq 30, "for val $i (1:10) — even sum 2+4+6+8+10 = 30"
 
 # ── § 5. len — universal length over `scalar` / `length` ───────────────────
 
@@ -88,13 +88,13 @@ join(",", rev (10, 20, 30)) |> aeq "30,20,10", "rev list"
 # ── § 10. Parallelism — `pmap` / `pfor` / `fan` ────────────────────────────
 
 # pmap: parallel work-stealing across rayon threads, order-preserving.
-my @twiced = pmap { _ * 2 } 1:100
+val @twiced = pmap { _ * 2 } 1:100
 @twiced[0]   |> aeq 2,   "pmap order-preserving: first element"
 @twiced[-1]  |> aeq 200, "pmap order-preserving: last element"
 @twiced |> sum |> aeq 10100, "pmap 1:100 * 2 sum = 10100"
 
 # pgrep: parallel filter.
-my @evens_par = pgrep { _ % 2 == 0 } 1:100
+val @evens_par = pgrep { _ % 2 == 0 } 1:100
 @evens_par |> sum |> aeq 2550, "pgrep evens 1:100 = 2+4+..+100 = 2550"
 
 # pfor: void parallel for, side-effects via mysync / atomic.
@@ -105,7 +105,7 @@ $counter |> aeq 5000, "pfor + mysync counter"
 # ── Builtin-name shadowing — namespaced fn ok, bare not ────────────────────
 # `fn helper` is fine because nothing called `helper` exists in %b.
 # Verify by querying %b.
-my %_bcopy = %b
+val %_bcopy = %b
 exists($_bcopy{helper}) |> aeq 0, "no builtin named `helper` to shadow"
 
 fn helper = _ + 100

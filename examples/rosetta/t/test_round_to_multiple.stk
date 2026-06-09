@@ -3,20 +3,20 @@
 
 fn Rosetta::RoundMul::round($n, $m) {
     return $n if $m == 0
-    my $abs_m = $m < 0 ? -$m : $m
-    my $q = $n / $abs_m
-    my $floor_q = int($q)
+    val $abs_m = $m < 0 ? -$m : $m
+    val $q = $n / $abs_m
+    var $floor_q = int($q)
     $floor_q -= 1 if $q < $floor_q
-    my $frac = $q - $floor_q
+    val $frac = $q - $floor_q
     if ($frac < 0.5) {
         return $floor_q * $abs_m
     } elsif ($frac > 0.5) {
         return ($floor_q + 1) * $abs_m
     } else {
         # Halfway: round to even (banker's rounding)
-        my $down = $floor_q * $abs_m
-        my $up   = ($floor_q + 1) * $abs_m
-        my $down_q = int($down / $abs_m)
+        val $down = $floor_q * $abs_m
+        val $up   = ($floor_q + 1) * $abs_m
+        val $down_q = int($down / $abs_m)
         return $down_q % 2 == 0 ? $down : $up
     }
 }

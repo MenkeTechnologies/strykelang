@@ -15,7 +15,7 @@
 #      stryke --no-interop examples/rot13_no_interop.stk "Hello, World!"
 
 fn Rot13::char($ch) {
-    my $c = ord($ch)
+    val $c = ord($ch)
     if ($c >= ord("A") && $c <= ord("Z")) {
         return chr(($c - ord("A") + 13) % 26 + ord("A"))
     }
@@ -33,7 +33,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — each plaintext paired with its expected ROT13 form.
-my @cases = (
+val @cases = (
     +{ plain => "Hello",     cipher => "Uryyb"     },
     +{ plain => "Uryyb",     cipher => "Hello"     },  # self-inverse
     +{ plain => "ROT13",     cipher => "EBG13"     },
@@ -47,10 +47,10 @@ my @cases = (
 )
 
 p "── ROT13 demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Rot13::str($c->{plain})
-    my $ok  = ($got eq $c->{cipher})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Rot13::str($c->{plain})
+    val $ok  = ($got eq $c->{cipher})
     $fail++ unless $ok
     printf "  %-50s -> %s  %s\n",
         "\"" . $c->{plain} . "\"",
@@ -60,8 +60,8 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " ROT13 cases failed" if $fail > 0
 
 # Self-inverse invariant — Rot13::str(Rot13::str(s)) == s for every test input.
-for my $c (@cases) {
-    my $twice = Rot13::str(Rot13::str($c->{plain}))
+for val $c (@cases) {
+    val $twice = Rot13::str(Rot13::str($c->{plain}))
     die "self-inverse failed" unless $twice eq $c->{plain}
 }
 

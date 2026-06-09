@@ -2,32 +2,32 @@
 # Rosetta Code: Vigenere Cipher
 
 fn Rosetta::VigenereCipher::encrypt($text, $key) {
-    my @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
-    my @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
-    my $klen = len(@kc)
+    val @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
+    val @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
+    val $klen = len(@kc)
     
     0..len(@tc)-1 |> map {
-        my $i = _
-        my $shift = ord($kc[$i % $klen]) - 65
+        val $i = _
+        val $shift = ord($kc[$i % $klen]) - 65
         chr((ord($tc[$i]) - 65 + $shift) % 26 + 65)
     } |> join ""
 }
 
 fn Rosetta::VigenereCipher::decrypt($text, $key) {
-    my @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
-    my @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
-    my $klen = len(@kc)
+    val @tc = ~> $text uc chars grep { _ =~ /[A-Z]/ }
+    val @kc = ~> $key uc chars grep { _ =~ /[A-Z]/ }
+    val $klen = len(@kc)
     
     0..len(@tc)-1 |> map {
-        my $i = _
-        my $shift = ord($kc[$i % $klen]) - 65
+        val $i = _
+        val $shift = ord($kc[$i % $klen]) - 65
         chr((ord($tc[$i]) - 65 - $shift + 26) % 26 + 65)
     } |> join ""
 }
 
-my $msg = "ATTACKATDAWN"
-my $key = "LEMON"
-my $enc = Rosetta::VigenereCipher::encrypt($msg, $key)
+val $msg = "ATTACKATDAWN"
+val $key = "LEMON"
+val $enc = Rosetta::VigenereCipher::encrypt($msg, $key)
 assert_eq $enc, "LXFOPVEFRNHR", "encrypt ATTACKATDAWN with LEMON"
 assert_eq Rosetta::VigenereCipher::decrypt($enc, $key), "ATTACKATDAWN", "decrypt roundtrip"
 

@@ -3,24 +3,24 @@
 # Counts the number of distinct palindromic substrings of a string.
 
 fn Rosetta::Eertree::distinct_palindromes($s) {
-    my @chars = split("", $s)
-    my $n = len(@chars)
+    val @chars = split("", $s)
+    val $n = len(@chars)
     return 0 if $n == 0
     # Manacher-flavored: for each center, expand maximally; collect distinct strings.
-    my %seen
+    var %seen
     # odd-length palindromes
-    for my $c (0:$n-1) {
-        my $l = $c
-        my $r = $c
+    for val $c (0:$n-1) {
+        var $l = $c
+        var $r = $c
         while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
             $seen{ join("", @chars[$l:$r]) } = 1
             $l -= 1; $r += 1
         }
     }
     # even-length palindromes
-    for my $c (0:$n-2) {
-        my $l = $c
-        my $r = $c + 1
+    for val $c (0:$n-2) {
+        var $l = $c
+        var $r = $c + 1
         while ($l >= 0 && $r < $n && $chars[$l] eq $chars[$r]) {
             $seen{ join("", @chars[$l:$r]) } = 1
             $l -= 1; $r += 1

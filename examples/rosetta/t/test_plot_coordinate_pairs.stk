@@ -2,25 +2,25 @@
 # Rosetta Code: Plot coordinate pairs
 
 fn Rosetta::Plot::plot(@points) {
-    my $min_x = 999; my $max_x = -999; my $min_y = 999; my $max_y = -999
-    for my $p (@points) {
-        my ($x, $y) = @$p
+    var $min_x = 999; var $max_x = -999; var $min_y = 999; var $max_y = -999
+    for val $p (@points) {
+        var ($x, $y) = @$p
         $min_x = $x if $x < $min_x
         $max_x = $x if $x > $max_x
         $min_y = $y if $y < $min_y
         $max_y = $y if $y > $max_y
     }
     
-    my %grid
-    for my $p (@points) {
-        my ($x, $y) = @$p
+    var %grid
+    for val $p (@points) {
+        var ($x, $y) = @$p
         if (!exists $grid{$x}) { $grid{$x} = {} }
         $grid{$x}{$y} = 1
     }
     
-    my $out = ""
-    for (my $y = $max_y; $y >= $min_y; $y--) {
-        for (my $x = $min_x; $x <= $max_x; $x++) {
+    var $out = ""
+    for (var $y = $max_y; $y >= $min_y; $y--) {
+        for (var $x = $min_x; $x <= $max_x; $x++) {
             $out .= ($grid{$x}{$y} ? "*" : " ")
         }
         $out .= "\n"
@@ -28,8 +28,8 @@ fn Rosetta::Plot::plot(@points) {
     $out
 }
 
-my @p = ([0, 0], [1, 1], [2, 2], [3, 1], [4, 0])
-my $graph = Rosetta::Plot::plot(@p)
+val @p = ([0, 0], [1, 1], [2, 2], [3, 1], [4, 0])
+val $graph = Rosetta::Plot::plot(@p)
 
 # p $graph
 # Expected:

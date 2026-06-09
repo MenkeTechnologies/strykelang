@@ -25,15 +25,15 @@
 #     and arrays come back as refs too — so deeply nested data
 #     navigates the same way it was constructed.
 
-my $n_workers = $ARGV[0] // 4
+val $n_workers = $ARGV[0] // 4
 
 # Spawn N worker children. Each binds its UDS via arrive() and waits.
-my @kids
+var @kids
 for (1:$n_workers) {
-    my $pid = fork()
+    val $pid = fork()
     if ($pid == 0) {
         # CHILD: arrive, do work, exit.
-        my $msg = arrive(5000)
+        val $msg = arrive(5000)
         if (!defined $msg) {
             printf "worker %d: TIMEOUT waiting for payload\n", pid()
             exit 1
@@ -42,12 +42,12 @@ for (1:$n_workers) {
         # index within the worker list. Real pipelines would dispatch
         # by hash, by range, or by tag — this demo just sums the values
         # in the worker's assigned shard.
-        my $shard = $msg->{shards}->{ pid() }
+        val $shard = $msg->{shards}->{ pid() }
         if (!defined $shard) {
             printf "worker %d: no shard assigned\n", pid()
             exit 0
         }
-        my $sum = 0
+        var $sum = 0
         $sum += $_ for @$shard
         printf "worker %d: shard_size=%d sum=%d corpus_tag=%s\n",
             pid(), len(@$shard), $sum, $msg->{tag}
@@ -63,18 +63,18 @@ sleep(1)
 # Real workloads would partition by feature, by user, by region — the
 # shape is "one big payload, indexed per receiver" which is what
 # teleport is for.
-my @items = 1:1000
-my %shards
-for my $i (0..len(@kids) - 1) {
-    my $kid = $kids[$i]
-    my @slice
-    for (my $j = $i; $j < len(@items); $j += len(@kids)) {
+val @items = 1:1000
+var %shards
+for val $i (0..len(@kids) - 1) {
+    val $kid = $kids[$i]
+    var @slice
+    for (var $j = $i; $j < len(@items); $j += len(@kids)) {
         push @slice, $items[$j]
     }
     $shards{ $kid } = [@slice]
 }
 
-my $payload = {
+val $payload = {
     tag    => "broadcast-demo",
     n_workers => len(@kids),
     shards => \%shards,
@@ -83,10 +83,10 @@ my $payload = {
 printf "parent: teleporting %d-item corpus to %d workers\n",
     len(@items), len(@kids)
 
-my $delivered = teleport($payload, @kids, { hold_ms => 800 })
+val $delivered = teleport($payload, @kids, { hold_ms => 800 })
 
 printf "parent: delivered=%d (sent to %d workers)\n", $delivered, len(@kids)
 
 # Reap all children so the demo exits cleanly.
-for my $k (@kids) { waitpid($k, 0) }
+for val $k (@kids) { waitpid($k, 0) }
 printf "parent: all workers done\n"

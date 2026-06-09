@@ -4,15 +4,15 @@
 fn Rosetta::SecureTemp::run {
     # tempfile() in Stryke creates a unique file in the system temp dir
     # with restricted permissions by default (equivalent to mkstemp).
-    my $path = tempfile()
+    val $path = tempfile()
     
     # Write some data
-    my $data = "Secret data"
+    var $data = "Secret data"
     write_file($path, $data)
     
     # Verify it exists and content is correct
     assert_ok(-f $path, "Temp file exists")
-    my $read = slurp($path)
+    val $read = slurp($path)
     assert_eq($read, $data, "Content is correct")
     
     # In a real scenario, we might chmod 0600 if not already done by tempfile()
@@ -25,7 +25,7 @@ fn Rosetta::SecureTemp::run {
     $path
 }
 
-my $p = Rosetta::SecureTemp::run()
+val $p = Rosetta::SecureTemp::run()
 p "Secure temp file task completed using $p"
 
 test_run

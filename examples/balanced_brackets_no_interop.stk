@@ -14,10 +14,10 @@
 #      stryke --no-interop examples/Brackets::balanced_brackets_no_interop.stk "({[]})"
 
 fn Brackets::balanced($s) {
-    my %pair = (")" => "(", "]" => "[", "}" => "{")
-    my %openers = ("(" => 1, "[" => 1, "{" => 1)
-    my @stack
-    for my $ch (split(//, $s)) {
+    val %pair = (")" => "(", "]" => "[", "}" => "{")
+    val %openers = ("(" => 1, "[" => 1, "{" => 1)
+    var @stack
+    for val $ch (split(//, $s)) {
         if (exists $openers{$ch}) {
             push @stack, $ch
         } elsif (exists $pair{$ch}) {
@@ -30,14 +30,14 @@ fn Brackets::balanced($s) {
 }
 
 if (len(@ARGV) >= 1) {
-    my $s = $ARGV[0]
+    val $s = $ARGV[0]
     p Brackets::balanced($s) ? "Brackets::balanced" : "unBrackets::balanced"
     exit Brackets::balanced($s) ? 0 : 1
 }
 
 # Demo table — each row is (input, expected). Lines mix bracket kinds
 # and free text.
-my @cases = (
+val @cases = (
     +{ s => "()",                ok => 1 },
     +{ s => "[]",                ok => 1 },
     +{ s => "{}",                ok => 1 },
@@ -56,10 +56,10 @@ my @cases = (
 )
 
 p "── Balanced-brackets demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Brackets::balanced($c->{s})
-    my $ok  = ($got == $c->{ok})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Brackets::balanced($c->{s})
+    val $ok  = ($got == $c->{ok})
     $fail++ unless $ok
     printf "  %-32s  expect=%-3s got=%-3s  %s\n",
         $c->{s}, $c->{ok} ? "OK" : "NO", $got ? "OK" : "NO",

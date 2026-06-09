@@ -24,20 +24,20 @@ fn Rosetta::MaybeMonad::safe_sqrt($x) {
 
 # Calculation: sqrt(x / y)
 fn Rosetta::MaybeMonad::calc($x, $y) {
-    my $res1 = Rosetta::MaybeMonad::safe_div($x, $y)
+    val $res1 = Rosetta::MaybeMonad::safe_div($x, $y)
     
     # Using bind logic
     Rosetta::MaybeMonad::bind($res1, fn {Rosetta::MaybeMonad::safe_sqrt})
 }
 
 # Test cases
-my $v1 = Rosetta::MaybeMonad::calc(100, 4)
+val $v1 = Rosetta::MaybeMonad::calc(100, 4)
 assert_eq $v1, 5, "sqrt(100/4) = 5"
 
-my $v2 = Rosetta::MaybeMonad::calc(100, 0)
+val $v2 = Rosetta::MaybeMonad::calc(100, 0)
 assert_ok !defined($v2), "sqrt(100/0) is undef"
 
-my $v3 = Rosetta::MaybeMonad::calc(-100, 4)
+val $v3 = Rosetta::MaybeMonad::calc(-100, 4)
 assert_ok !defined($v3), "sqrt(-100/4) is undef"
 
 test_run

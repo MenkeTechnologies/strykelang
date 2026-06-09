@@ -3,9 +3,9 @@
 
 fn Rosetta::CaseSensitivity::demo() {
     # In Stryke, identifiers are case-sensitive.
-    my $foo = "lowercase"
-    my $Foo = "MixedCase"
-    my $FOO = "UPPERCASE"
+    val $foo = "lowercase"
+    val $Foo = "MixedCase"
+    val $FOO = "UPPERCASE"
     
     "Case sensitivity test:" |> p
     "  \$foo: $foo" |> p

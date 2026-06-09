@@ -2,12 +2,12 @@
 # Rosetta Code: Matrix Transpose
 
 fn Rosetta::Transpose::transpose {
-    my $rows = len(@$_)
-    my $cols = len(@{_->[0]})
-    my @res
-    for my $j (0:$cols-1) {
-        my @new_row
-        for my $i (0:$rows-1) {
+    val $rows = len(@$_)
+    val $cols = len(@{_->[0]})
+    var @res
+    for val $j (0:$cols-1) {
+        var @new_row
+        for val $i (0:$rows-1) {
             push @new_row, _->[$i][$j]
         }
         push @res, [@new_row]
@@ -16,19 +16,19 @@ fn Rosetta::Transpose::transpose {
 }
 
 fn Rosetta::Transpose::to_string {
-    my @rows
-    for my $row (@$_) {
+    var @rows
+    for val $row (@$_) {
         push @rows, join(",", @$row)
     }
     join(";", @rows)
 }
 
-my $mtx = [[1, 2, 3], [4, 5, 6]]
-my $t = Rosetta::Transpose::transpose($mtx)
+val $mtx = [[1, 2, 3], [4, 5, 6]]
+val $t = Rosetta::Transpose::transpose($mtx)
 assert_eq Rosetta::Transpose::to_string($t), "1,4;2,5;3,6", "2x3 to 3x2"
 
-my $mtx2 = [[1, 2], [3, 4], [5, 6]]
-my $t2 = Rosetta::Transpose::transpose($mtx2)
+val $mtx2 = [[1, 2], [3, 4], [5, 6]]
+val $t2 = Rosetta::Transpose::transpose($mtx2)
 assert_eq Rosetta::Transpose::to_string($t2), "1,3,5;2,4,6", "3x2 to 2x3"
 
 test_run

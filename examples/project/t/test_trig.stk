@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # t/test_trig.stk — trigonometric and hyperbolic functions
 
-my $pi = 3.14159265358979
+val $pi = 3.14159265358979
 
 # Basic trig
 assert_near sin(0), 0, 0.0001, "sin(0)"

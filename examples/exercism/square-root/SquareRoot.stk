@@ -3,9 +3,9 @@
 # Newton's method for integer square root of a non-negative integer.
 fn Exercism::SquareRoot::sqrt {
     return 0 if _ == 0
-    my $x = _
+    var $x = _
     while (1) {
-        my $nx = int(($x + int(_ / $x)) / 2)
+        val $nx = int(($x + int(_ / $x)) / 2)
         last if $nx >= $x
         $x = $nx
     }

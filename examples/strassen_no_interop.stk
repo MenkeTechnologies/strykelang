@@ -18,18 +18,18 @@
 # ── grade-school multiplication for the base case ────────────────
 
 fn Str::grade_school($A, $B) {
-    my $n = len(@$A)
-    my $m = len(@{$B->[0]})
-    my $k = len(@{$A->[0]})
-    my @C
-    for my $i (0:$n - 1) {
-        my @row = (0) x $m
+    val $n = len(@$A)
+    val $m = len(@{$B->[0]})
+    val $k = len(@{$A->[0]})
+    var @C
+    for val $i (0:$n - 1) {
+        val @row = (0) x $m
         push @C, \@row
     }
-    for my $i (0:$n - 1) {
-        for my $j (0:$m - 1) {
-            my $s = 0
-            for my $kk (0:$k - 1) {
+    for val $i (0:$n - 1) {
+        for val $j (0:$m - 1) {
+            var $s = 0
+            for val $kk (0:$k - 1) {
                 $s += $A->[$i]->[$kk] * $B->[$kk]->[$j]
             }
             $C[$i]->[$j] = $s
@@ -41,14 +41,14 @@ fn Str::grade_school($A, $B) {
 # ── add two n×n matrices ─────────────────────────────────────────
 
 fn Str::add($A, $B) {
-    my $n = len(@$A)
-    my @C
-    for my $i (0:$n - 1) {
-        my @row = (0) x $n
+    val $n = len(@$A)
+    var @C
+    for val $i (0:$n - 1) {
+        val @row = (0) x $n
         push @C, \@row
     }
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             $C[$i]->[$j] = $A->[$i]->[$j] + $B->[$i]->[$j]
         }
     }
@@ -58,14 +58,14 @@ fn Str::add($A, $B) {
 # ── subtract two n×n matrices ────────────────────────────────────
 
 fn Str::sub($A, $B) {
-    my $n = len(@$A)
-    my @C
-    for my $i (0:$n - 1) {
-        my @row = (0) x $n
+    val $n = len(@$A)
+    var @C
+    for val $i (0:$n - 1) {
+        val @row = (0) x $n
         push @C, \@row
     }
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             $C[$i]->[$j] = $A->[$i]->[$j] - $B->[$i]->[$j]
         }
     }
@@ -76,14 +76,14 @@ fn Str::sub($A, $B) {
 # Returns [A11, A12, A21, A22] arrayrefs.
 
 fn Str::split($A) {
-    my $n = len(@$A)
-    my $half = int($n / 2)
-    my @blocks = ([], [], [], [])
-    for my $i (0:$half - 1) {
-        my @top_l = @{$A->[$i]}[0:$half - 1]
-        my @top_r = @{$A->[$i]}[$half:$n - 1]
-        my @bot_l = @{$A->[$i + $half]}[0:$half - 1]
-        my @bot_r = @{$A->[$i + $half]}[$half:$n - 1]
+    val $n = len(@$A)
+    val $half = int($n / 2)
+    val @blocks = ([], [], [], [])
+    for val $i (0:$half - 1) {
+        val @top_l = @{$A->[$i]}[0:$half - 1]
+        val @top_r = @{$A->[$i]}[$half:$n - 1]
+        val @bot_l = @{$A->[$i + $half]}[0:$half - 1]
+        val @bot_r = @{$A->[$i + $half]}[$half:$n - 1]
         push @{$blocks[0]}, \@top_l
         push @{$blocks[1]}, \@top_r
         push @{$blocks[2]}, \@bot_l
@@ -95,14 +95,14 @@ fn Str::split($A) {
 # ── join four (n/2)×(n/2) blocks into one n×n matrix ─────────────
 
 fn Str::join_blocks($C11, $C12, $C21, $C22) {
-    my $half = len(@$C11)
-    my @C
-    for my $i (0:$half - 1) {
-        my @row = (@{$C11->[$i]}, @{$C12->[$i]})
+    val $half = len(@$C11)
+    var @C
+    for val $i (0:$half - 1) {
+        val @row = (@{$C11->[$i]}, @{$C12->[$i]})
         push @C, \@row
     }
-    for my $i (0:$half - 1) {
-        my @row = (@{$C21->[$i]}, @{$C22->[$i]})
+    for val $i (0:$half - 1) {
+        val @row = (@{$C21->[$i]}, @{$C22->[$i]})
         push @C, \@row
     }
     \@C
@@ -124,38 +124,38 @@ fn Str::join_blocks($C11, $C12, $C21, $C22) {
 #   C22 = M1 − M2 + M3 + M6
 
 fn Str::strassen($A, $B) {
-    my $n = len(@$A)
+    val $n = len(@$A)
     if ($n <= 2) {
         return Str::grade_school($A, $B)
     }
-    my $a_split = Str::split($A)
-    my $b_split = Str::split($B)
-    my $A11 = $a_split->[0]
-    my $A12 = $a_split->[1]
-    my $A21 = $a_split->[2]
-    my $A22 = $a_split->[3]
-    my $B11 = $b_split->[0]
-    my $B12 = $b_split->[1]
-    my $B21 = $b_split->[2]
-    my $B22 = $b_split->[3]
-    my $M1 = Str::strassen(Str::add($A11, $A22), Str::add($B11, $B22))
-    my $M2 = Str::strassen(Str::add($A21, $A22), $B11)
-    my $M3 = Str::strassen($A11, Str::sub($B12, $B22))
-    my $M4 = Str::strassen($A22, Str::sub($B21, $B11))
-    my $M5 = Str::strassen(Str::add($A11, $A12), $B22)
-    my $M6 = Str::strassen(Str::sub($A21, $A11), Str::add($B11, $B12))
-    my $M7 = Str::strassen(Str::sub($A12, $A22), Str::add($B21, $B22))
-    my $C11 = Str::add(Str::sub(Str::add($M1, $M4), $M5), $M7)
-    my $C12 = Str::add($M3, $M5)
-    my $C21 = Str::add($M2, $M4)
-    my $C22 = Str::add(Str::sub(Str::add($M1, $M3), $M2), $M6)
+    val $a_split = Str::split($A)
+    val $b_split = Str::split($B)
+    val $A11 = $a_split->[0]
+    val $A12 = $a_split->[1]
+    val $A21 = $a_split->[2]
+    val $A22 = $a_split->[3]
+    val $B11 = $b_split->[0]
+    val $B12 = $b_split->[1]
+    val $B21 = $b_split->[2]
+    val $B22 = $b_split->[3]
+    val $M1 = Str::strassen(Str::add($A11, $A22), Str::add($B11, $B22))
+    val $M2 = Str::strassen(Str::add($A21, $A22), $B11)
+    val $M3 = Str::strassen($A11, Str::sub($B12, $B22))
+    val $M4 = Str::strassen($A22, Str::sub($B21, $B11))
+    val $M5 = Str::strassen(Str::add($A11, $A12), $B22)
+    val $M6 = Str::strassen(Str::sub($A21, $A11), Str::add($B11, $B12))
+    val $M7 = Str::strassen(Str::sub($A12, $A22), Str::add($B21, $B22))
+    val $C11 = Str::add(Str::sub(Str::add($M1, $M4), $M5), $M7)
+    val $C12 = Str::add($M3, $M5)
+    val $C21 = Str::add($M2, $M4)
+    val $C22 = Str::add(Str::sub(Str::add($M1, $M3), $M2), $M6)
     Str::join_blocks($C11, $C12, $C21, $C22)
 }
 
 # ── pad an n×n matrix up to the next power of 2 ──────────────────
 
 fn Str::next_pow2($n) {
-    my $p = 1
+    var $p = 1
     while ($p < $n) {
         $p = $p * 2
     }
@@ -163,14 +163,14 @@ fn Str::next_pow2($n) {
 }
 
 fn Str::pad($A, $size) {
-    my $n = len(@$A)
-    my @padded
-    for my $i (0:$size - 1) {
-        my @row = (0) x $size
+    val $n = len(@$A)
+    var @padded
+    for val $i (0:$size - 1) {
+        val @row = (0) x $size
         push @padded, \@row
     }
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             $padded[$i]->[$j] = $A->[$i]->[$j]
         }
     }
@@ -180,16 +180,16 @@ fn Str::pad($A, $size) {
 # ── multiply two arbitrary-size square matrices via Strassen ──────
 
 fn Str::multiply($A, $B) {
-    my $n = len(@$A)
+    val $n = len(@$A)
     die "Strassen demo: square matrices only" unless len(@{$A->[0]}) == $n && len(@$B) == $n && len(@{$B->[0]}) == $n
-    my $p = Str::next_pow2($n)
-    my $Ap = Str::pad($A, $p)
-    my $Bp = Str::pad($B, $p)
-    my $Cp = Str::strassen($Ap, $Bp)
-    my @C
-    for my $i (0:$n - 1) {
-        my @row
-        for my $j (0:$n - 1) {
+    val $p = Str::next_pow2($n)
+    val $Ap = Str::pad($A, $p)
+    val $Bp = Str::pad($B, $p)
+    val $Cp = Str::strassen($Ap, $Bp)
+    var @C
+    for val $i (0:$n - 1) {
+        var @row
+        for val $j (0:$n - 1) {
             push @row, $Cp->[$i]->[$j]
         }
         push @C, \@row
@@ -200,9 +200,9 @@ fn Str::multiply($A, $B) {
 # ── matrices for testing ─────────────────────────────────────────
 
 fn Str::identity($n) {
-    my @I
-    for my $i (0:$n - 1) {
-        my @row = (0) x $n
+    var @I
+    for val $i (0:$n - 1) {
+        var @row = (0) x $n
         $row[$i] = 1
         push @I, \@row
     }
@@ -211,7 +211,7 @@ fn Str::identity($n) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name => "2x2 trivial",
         A    => [[1, 2], [3, 4]],
@@ -282,20 +282,20 @@ my @cases = (
 p "── Strassen matrix-multiply demo ─────────────────────"
 printf "  %-22s  %3s  %s\n", "case", "n", "first row of A·B"
 printf "  %-22s  %3s  %s\n", "----------------------", "---", "----------------"
-for my $c (@cases) {
-    my $C = Str::multiply($c->{A}, $c->{B})
-    my @vals = @{$C->[0]}
+for val $c (@cases) {
+    val $C = Str::multiply($c->{A}, $c->{B})
+    val @vals = @{$C->[0]}
     printf "  %-22s  %3d  [%s]\n", $c->{name}, len(@{$c->{A}}), join(",", @vals)
 }
 
 # ── invariant 1: Strassen matches grade-school on every product ───
 
-for my $c (@cases) {
-    my $strass = Str::multiply($c->{A}, $c->{B})
-    my $ref = Str::grade_school($c->{A}, $c->{B})
-    my $n = len(@$strass)
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+for val $c (@cases) {
+    val $strass = Str::multiply($c->{A}, $c->{B})
+    val $ref = Str::grade_school($c->{A}, $c->{B})
+    val $n = len(@$strass)
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             die "Strassen[#{$i}][#{$j}] = #{$strass->[$i]->[$j]} != grade-school = #{$ref->[$i]->[$j]} on \"#{$c->{name}}\"" unless $strass->[$i]->[$j] == $ref->[$i]->[$j]
         }
     }
@@ -303,12 +303,12 @@ for my $c (@cases) {
 
 # ── invariant 2: A · I == A for every size ────────────────────────
 
-for my $c (@cases) {
-    my $n = len(@{$c->{A}})
-    my $I = Str::identity($n)
-    my $AI = Str::multiply($c->{A}, $I)
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+for val $c (@cases) {
+    val $n = len(@{$c->{A}})
+    val $I = Str::identity($n)
+    val $AI = Str::multiply($c->{A}, $I)
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             die "A·I != A at (#{$i}, #{$j}) on \"#{$c->{name}}\"" unless $AI->[$i]->[$j] == $c->{A}->[$i]->[$j]
         }
     }
@@ -316,12 +316,12 @@ for my $c (@cases) {
 
 # ── invariant 3: I · B == B for every size ────────────────────────
 
-for my $c (@cases) {
-    my $n = len(@{$c->{A}})
-    my $I = Str::identity($n)
-    my $IB = Str::multiply($I, $c->{B})
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+for val $c (@cases) {
+    val $n = len(@{$c->{A}})
+    val $I = Str::identity($n)
+    val $IB = Str::multiply($I, $c->{B})
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             die "I·B != B at (#{$i}, #{$j}) on \"#{$c->{name}}\"" unless $IB->[$i]->[$j] == $c->{B}->[$i]->[$j]
         }
     }
@@ -329,29 +329,29 @@ for my $c (@cases) {
 
 # ── invariant 4: A · (B + C) == A·B + A·C (distributivity) ────────
 
-for my $size (2, 4, 8) {
-    my @triple
-    for my $which (0:2) {
-        my @M
-        for my $i (0:$size - 1) {
-            my @row
-            for my $j (0:$size - 1) {
+for val $size (2, 4, 8) {
+    var @triple
+    for val $which (0:2) {
+        var @M
+        for val $i (0:$size - 1) {
+            var @row
+            for val $j (0:$size - 1) {
                 push @row, ($i * 13 + $j * 17 + $which * 23) % 19
             }
             push @M, \@row
         }
         push @triple, \@M
     }
-    my $A = $triple[0]
-    my $B = $triple[1]
-    my $C = $triple[2]
-    my $BC = Str::add($B, $C)
-    my $left = Str::multiply($A, $BC)
-    my $AB = Str::multiply($A, $B)
-    my $AC = Str::multiply($A, $C)
-    my $right = Str::add($AB, $AC)
-    for my $i (0:$size - 1) {
-        for my $j (0:$size - 1) {
+    val $A = $triple[0]
+    val $B = $triple[1]
+    val $C = $triple[2]
+    val $BC = Str::add($B, $C)
+    val $left = Str::multiply($A, $BC)
+    val $AB = Str::multiply($A, $B)
+    val $AC = Str::multiply($A, $C)
+    val $right = Str::add($AB, $AC)
+    for val $i (0:$size - 1) {
+        for val $j (0:$size - 1) {
             die "distributivity failed at size #{$size}, (#{$i}, #{$j})" unless $left->[$i]->[$j] == $right->[$i]->[$j]
         }
     }
@@ -359,23 +359,23 @@ for my $size (2, 4, 8) {
 
 # ── invariant 5: associativity (A · B) · C == A · (B · C) ─────────
 
-for my $size (2, 4, 8) {
-    my @triple
-    for my $which (0:2) {
-        my @M
-        for my $i (0:$size - 1) {
-            my @row
-            for my $j (0:$size - 1) {
+for val $size (2, 4, 8) {
+    var @triple
+    for val $which (0:2) {
+        var @M
+        for val $i (0:$size - 1) {
+            var @row
+            for val $j (0:$size - 1) {
                 push @row, ($i * 7 + $j * 11 + $which * 5) % 13
             }
             push @M, \@row
         }
         push @triple, \@M
     }
-    my $left = Str::multiply(Str::multiply($triple[0], $triple[1]), $triple[2])
-    my $right = Str::multiply($triple[0], Str::multiply($triple[1], $triple[2]))
-    for my $i (0:$size - 1) {
-        for my $j (0:$size - 1) {
+    val $left = Str::multiply(Str::multiply($triple[0], $triple[1]), $triple[2])
+    val $right = Str::multiply($triple[0], Str::multiply($triple[1], $triple[2]))
+    for val $i (0:$size - 1) {
+        for val $j (0:$size - 1) {
             die "associativity failed at size #{$size}, (#{$i}, #{$j})" unless $left->[$i]->[$j] == $right->[$i]->[$j]
         }
     }
@@ -383,24 +383,24 @@ for my $size (2, 4, 8) {
 
 # ── invariant 6: zero-matrix multiplication yields zero ───────────
 
-for my $n (2, 3, 4, 5, 8) {
-    my @Z
-    for my $i (0:$n - 1) {
-        my @row = (0) x $n
+for val $n (2, 3, 4, 5, 8) {
+    var @Z
+    for val $i (0:$n - 1) {
+        val @row = (0) x $n
         push @Z, \@row
     }
-    my @rand_M
-    for my $i (0:$n - 1) {
-        my @row
-        for my $j (0:$n - 1) {
+    var @rand_M
+    for val $i (0:$n - 1) {
+        var @row
+        for val $j (0:$n - 1) {
             push @row, ($i + 1) * ($j + 3)
         }
         push @rand_M, \@row
     }
-    my $Z_M = Str::multiply(\@Z, \@rand_M)
-    my $M_Z = Str::multiply(\@rand_M, \@Z)
-    for my $i (0:$n - 1) {
-        for my $j (0:$n - 1) {
+    val $Z_M = Str::multiply(\@Z, \@rand_M)
+    val $M_Z = Str::multiply(\@rand_M, \@Z)
+    for val $i (0:$n - 1) {
+        for val $j (0:$n - 1) {
             die "0·M not zero at size #{$n}" unless $Z_M->[$i]->[$j] == 0
             die "M·0 not zero at size #{$n}" unless $M_Z->[$i]->[$j] == 0
         }
@@ -409,19 +409,19 @@ for my $n (2, 3, 4, 5, 8) {
 
 # ── invariant 7: padding doesn't change the result (size 5 → 8) ──
 
-my $five = [
+val $five = [
     [1, 2, 3, 4, 5],
     [5, 4, 3, 2, 1],
     [2, 3, 5, 7, 11],
     [13, 17, 19, 23, 29],
     [31, 37, 41, 43, 47],
 ]
-my $A_pad = Str::pad($five, 8)
-my $B_pad = Str::pad($five, 8)
-my $C_pad = Str::strassen($A_pad, $B_pad)
-my $C_direct = Str::multiply($five, $five)
-for my $i (0:4) {
-    for my $j (0:4) {
+val $A_pad = Str::pad($five, 8)
+val $B_pad = Str::pad($five, 8)
+val $C_pad = Str::strassen($A_pad, $B_pad)
+val $C_direct = Str::multiply($five, $five)
+for val $i (0:4) {
+    for val $j (0:4) {
         die "pad-vs-direct mismatch at (#{$i}, #{$j})" unless $C_pad->[$i]->[$j] == $C_direct->[$i]->[$j]
     }
 }

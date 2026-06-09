@@ -6,9 +6,9 @@ fn Rosetta::SafePrimes::is_prime($n) {
     elsif ($n == 2) { 1 }
     elsif ($n % 2 == 0) { 0 }
     else {
-        my $limit = sqrt($n)
-        my $res = 1
-        my $i = 3
+        val $limit = sqrt($n)
+        var $res = 1
+        var $i = 3
         while ($i <= $limit) {
             if ($n % $i == 0) {
                 $res = 0
@@ -24,7 +24,7 @@ fn SafePrimes::is_safe_prime($p) {
     if (!Rosetta::SafePrimes::is_prime($p)) {
         0
     } else {
-        my $q = ($p - 1) / 2
+        val $q = ($p - 1) / 2
         Rosetta::SafePrimes::is_prime($q)
     }
 }

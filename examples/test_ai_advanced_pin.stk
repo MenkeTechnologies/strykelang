@@ -7,21 +7,21 @@
 
 # Prompt: Sort these items by: alphabetical. Best/most-relevant first...
 ai_mock_install("(?s)Sort these items by: alphabetical", '[2, 1, 0]')
-my @items = qw(cherry banana apple)
+val @items = qw(cherry banana apple)
 join(",", @{ ai_sort(\@items, "alphabetical") }) |> aeq "apple,banana,cherry", "ai_sort mock"
 
 # ── AI Dedupe ─────────────────────────────────────────────────────────────
 
 # Prompt: Group duplicates among these items (same fruit)...
 ai_mock_install("(?s)Group duplicates among these items \(same fruit\)", "[[0, 2], [1]]")
-my @dupes = qw(apple banana apple)
+val @dupes = qw(apple banana apple)
 join(",", @{ ai_dedupe(\@dupes, "same fruit") }) |> aeq "apple,banana", "ai_dedupe mock"
 
 # ── AI Classify ───────────────────────────────────────────────────────────
 
 # Prompt: Classify each item below into exactly one of these labels: fruit, other...
 ai_mock_install("(?s)Classify each item below into exactly one of these labels: fruit, other", '["fruit", "fruit", "other"]')
-my @to_class = qw(apple orange rock)
+val @to_class = qw(apple orange rock)
 join(",", @{ ai_classify(\@to_class, "food", into => ["fruit", "other"]) }) |> aeq "fruit,fruit,other", "ai_classify mock"
 
 # ── AI Translate ──────────────────────────────────────────────────────────

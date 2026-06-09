@@ -3,21 +3,21 @@
 # Each step from row i to row i+1 must move to an adjacent number.
 
 fn Rosetta::TrianglePath::max_sum($triangle) {
-    my @rows = map { [@{_}] } @$triangle
-    my $n = len(@rows)
-    for (my $i = $n - 2; $i >= 0; $i -= 1) {
-        my $rlen = len(@{$rows[$i]})
-        for my $j (0:$rlen-1) {
-            my $a = $rows[$i+1][$j]
-            my $b = $rows[$i+1][$j+1]
-            my $best = $a > $b ? $a : $b
+    val @rows = map { [@{_}] } @$triangle
+    val $n = len(@rows)
+    for (var $i = $n - 2; $i >= 0; $i -= 1) {
+        val $rlen = len(@{$rows[$i]})
+        for val $j (0:$rlen-1) {
+            val $a = $rows[$i+1][$j]
+            val $b = $rows[$i+1][$j+1]
+            val $best = $a > $b ? $a : $b
             $rows[$i][$j] += $best
         }
     }
     $rows[0][0]
 }
 
-my $small = [
+val $small = [
     [3],
     [7, 4],
     [2, 4, 6],
@@ -26,7 +26,7 @@ my $small = [
 # Best path: 3 -> 7 -> 4 -> 9 = 23
 assert_eq Rosetta::TrianglePath::max_sum($small), 23, "small triangle"
 
-my $rosetta_demo = [
+val $rosetta_demo = [
     [55],
     [94, 48],
     [95, 30, 96],
@@ -35,10 +35,10 @@ my $rosetta_demo = [
 # Best path: 55 -> 94 -> 95 -> 77 = 321
 assert_eq Rosetta::TrianglePath::max_sum($rosetta_demo), 321, "rosetta sample"
 
-my $single = [[42]]
+val $single = [[42]]
 assert_eq Rosetta::TrianglePath::max_sum($single), 42, "single element"
 
-my $two_rows = [[1], [2, 3]]
+val $two_rows = [[1], [2, 3]]
 assert_eq Rosetta::TrianglePath::max_sum($two_rows), 4, "two rows: 1+3"
 
 test_run

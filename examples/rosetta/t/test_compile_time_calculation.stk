@@ -2,12 +2,12 @@
 # Rosetta Code: Compile-time calculation
 
 # In Stryke, BEGIN blocks are executed during the compilation phase.
-my $val
+val $val
 
 BEGIN {
     # This calculation happens at compile time
-    my $res = 1
-    for (my $i = 1; $i <= 10; $i++) {
+    var $res = 1
+    for (var $i = 1; $i <= 10; $i++) {
         $res *= $i
     }
     # We can use a package variable to communicate back if lexicals are tricky

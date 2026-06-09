@@ -5,9 +5,9 @@
 # returns to its original order; report the iteration count.
 
 fn Rosetta::Riffle::out_shuffle($deck) {
-    my $n = len(@$deck) / 2
-    my @result
-    for my $i (0:$n - 1) {
+    val $n = len(@$deck) / 2
+    var @result
+    for val $i (0:$n - 1) {
         push @result, $deck->[$i]
         push @result, $deck->[$i + $n]
     }
@@ -15,14 +15,14 @@ fn Rosetta::Riffle::out_shuffle($deck) {
 }
 
 fn Rosetta::Riffle::iterations_to_restore($size) {
-    my @original = (0:$size - 1)
-    my $cur = [@original]
-    my $count = 0
+    val @original = (0:$size - 1)
+    var $cur = [@original]
+    var $count = 0
     while (1) {
         $cur = Rosetta::Riffle::out_shuffle($cur)
         $count += 1
-        my $same = 1
-        for my $i (0:$size - 1) {
+        var $same = 1
+        for val $i (0:$size - 1) {
             if ($cur->[$i] != $original[$i]) { $same = 0; last }
         }
         return $count if $same
@@ -30,7 +30,7 @@ fn Rosetta::Riffle::iterations_to_restore($size) {
 }
 
 # Out-shuffle on [0,1,2,3,4,5] → [0,3,1,4,2,5].
-my $shuffled = Rosetta::Riffle::out_shuffle([0,1,2,3,4,5])
+val $shuffled = Rosetta::Riffle::out_shuffle([0,1,2,3,4,5])
 assert_eq join(",", @$shuffled), "0,3,1,4,2,5", "size 6"
 
 # OEIS A002326 (multiplicative order of 2 mod (n-1) for even n) — known counts:

@@ -3,13 +3,13 @@
 # CSV parsing & writing (quote-aware) + JSON roundtrip via builtins.
 
 fn Csv::parse_line($line) {
-    my @out
-    my $cur = ""
-    my $in_quote = 0
-    my @chars = split(//, $line)
-    my $i = 0
+    var @out
+    var $cur = ""
+    var $in_quote = 0
+    val @chars = split(//, $line)
+    var $i = 0
     while ($i < len(@chars)) {
-        my $c = $chars[$i]
+        val $c = $chars[$i]
         if ($in_quote) {
             if ($c eq '"') {
                 if ($i + 1 < len(@chars) && $chars[$i + 1] eq '"') {
@@ -44,8 +44,8 @@ fn Csv::parse_line($line) {
 }
 
 fn Csv::parse($text) {
-    my @rows
-    for my $line (split(/\n/, $text)) {
+    var @rows
+    for val $line (split(/\n/, $text)) {
         next if $line eq ""
         push @rows, Csv::parse_line($line)
     }
@@ -54,7 +54,7 @@ fn Csv::parse($text) {
 
 fn Csv::quote($v) {
     if ($v =~ /[",\n]/) {
-        my $q = $v
+        var $q = $v
         $q =~ s/"/""/g
         qq("$q")
     } else {
@@ -71,45 +71,45 @@ fn Csv::write($rows) {
 }
 
 # Simple unquoted parsing
-my $r1 = Csv::parse_line("a,b,c,d")
+val $r1 = Csv::parse_line("a,b,c,d")
 join("|", @$r1) |> aeq "a|b|c|d", "plain 4 cols"
 
 # Quoted fields with comma
-my $r2 = Csv::parse_line('hello,"wo,rld",end')
+val $r2 = Csv::parse_line('hello,"wo,rld",end')
 join("|", @$r2) |> aeq "hello|wo,rld|end", "quoted comma"
 
 # Embedded double-quote
-my $r3 = Csv::parse_line('a,"say ""hi""",b')
+val $r3 = Csv::parse_line('a,"say ""hi""",b')
 join("|", @$r3) |> aeq 'a|say "hi"|b', "embedded quote"
 
 # Empty cells
-my $r4 = Csv::parse_line("a,,c,")
+val $r4 = Csv::parse_line("a,,c,")
 join("|", @$r4) |> aeq "a||c|", "empty cells"
 
 # Multi-line parse
-my $rows = Csv::parse("name,age\nAlice,30\nBob,25\n")
+val $rows = Csv::parse("name,age\nAlice,30\nBob,25\n")
 len(@$rows)         |> aeq 3, "3 rows"
 $rows->[0][0]       |> aeq "name", "header name"
 $rows->[1][1]       |> aeq "30",   "Alice age"
 $rows->[2][0]       |> aeq "Bob",  "Bob name"
 
 # Roundtrip
-my $orig = [
+val $orig = [
     ["name", "city"],
     ["Alice", "NYC"],
     ["Bob", "San Francisco, CA"],
     ['Eve', q(O'Hare, "the airport")],
 ]
-my $serialized = Csv::write($orig)
-my $parsed = Csv::parse($serialized)
+val $serialized = Csv::write($orig)
+val $parsed = Csv::parse($serialized)
 len(@$parsed)        |> aeq 4, "roundtrip rows"
 $parsed->[2][1]      |> aeq "San Francisco, CA", "comma value"
 $parsed->[3][1]      |> aeq q(O'Hare, "the airport"), "quote+comma"
 
 # JSON roundtrip via builtins
-my $tmp = tempdir()
-my $file = "$tmp/data.json"
-my %obj = (
+val $tmp = tempdir()
+val $file = "$tmp/data.json"
+val %obj = (
     users => [
         +{ id => 1, name => "alice" },
         +{ id => 2, name => "bob"   },
@@ -118,7 +118,7 @@ my %obj = (
     nested => +{ a => +{ b => +{ c => 42 } } },
 )
 wj($file, \%obj)
-my $loaded = rj($file)
+val $loaded = rj($file)
 $loaded->{count}              |> aeq 2,       "json count"
 $loaded->{users}[0]{name}     |> aeq "alice", "json deep array"
 $loaded->{nested}{a}{b}{c}    |> aeq 42,      "json deep nested"

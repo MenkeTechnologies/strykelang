@@ -13,9 +13,9 @@
 # the god dump of each inbound datagram. Drop a packet generator in
 # front of it for protocol-level diagnostics.
 
-my $bind_port = 0
-my $self_test = 1
-my $i = 0
+var $bind_port = 0
+var $self_test = 1
+var $i = 0
 while ($i < len(@ARGV)) {
     if ($ARGV[$i] eq "--bind") {
         $bind_port = $ARGV[$i + 1] + 0
@@ -37,9 +37,9 @@ if ($self_test) {
     # Build a binary packet: 4-byte magic + 2-byte length + payload.
     # Concatenate the fixed-width header with the variable payload (stryke's
     # `pack` doesn't support `a*` for variable-length data — concat is cleaner).
-    my $payload = "hello-wire-inspector"
-    my $header  = pack("a4 n", "STRK", length($payload))
-    my $pkt     = $header . $payload
+    val $payload = "hello-wire-inspector"
+    val $header  = pack("a4 n", "STRK", length($payload))
+    val $pkt     = $header . $payload
     printf "  synthetic packet shape: 4B magic + 2B length + %dB payload = %d bytes\n",
         length($payload), length($pkt)
     p ""
@@ -50,14 +50,14 @@ if ($self_test) {
 }
 
 # Real-usage mode: bind + listen + god-dump each inbound packet.
-my $sock = udp_open("127.0.0.1", $bind_port)
+val $sock = udp_open("127.0.0.1", $bind_port)
 if ($sock == 0) {
     printf "wire_inspector: bind to UDP/%d failed\n", $bind_port
     exit 1
 }
 printf "wire_inspector: listening on UDP/%d (ctrl-C to exit)\n", $bind_port
 while (1) {
-    my $msg = udp_recv_from($sock, 0)   # block forever
+    val $msg = udp_recv_from($sock, 0)   # block forever
     if (!defined $msg) { next }
     printf "\n── packet from %s:%d (%d bytes) ────────\n",
         $msg->{src_ip}, $msg->{src_port}, length($msg->{payload})

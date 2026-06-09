@@ -16,15 +16,15 @@ fn evaluate($rule, $data) {
     # If rule is not a hash, it's a literal value
     return $rule if ref($rule) ne "HASH"
     
-    my ($op) = keys %$rule
-    my $args = $rule->{$op}
+    val ($op) = keys %$rule
+    val $args = $rule->{$op}
     
     # Ensure args is an array
-    my @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
+    val @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
     
     # 1. Variable access
     if ($op eq "var") {
-        my $path = $arr_args[0]
+        val $path = $arr_args[0]
         return $data->{$path} // $arr_args[1]
     }
     
@@ -37,14 +37,14 @@ fn evaluate($rule, $data) {
     if ($op eq "<=") { return evaluate($arr_args[0], $data) <= evaluate($arr_args[1], $data) ? 1 : 0 }
     
     if ($op eq "and") {
-        for my $arg (@arr_args) {
+        for val $arg (@arr_args) {
             return 0 if !evaluate($arg, $data)
         }
         return 1
     }
     
     if ($op eq "or") {
-        for my $arg (@arr_args) {
+        for val $arg (@arr_args) {
             return 1 if evaluate($arg, $data)
         }
         return 0
@@ -63,20 +63,20 @@ fn evaluate($rule, $data) {
     
     # 4. Math
     if ($op eq "+") {
-        my $sum = 0
-        for my $arg (@arr_args) { $sum = $sum + evaluate($arg, $data) }
+        var $sum = 0
+        for val $arg (@arr_args) { $sum = $sum + evaluate($arg, $data) }
         return $sum
     }
     if ($op eq "-") {
         return evaluate($arr_args[0], $data) - evaluate($arr_args[1], $data)
     }
     if ($op eq "*") {
-        my $prod = 1
-        for my $arg (@arr_args) { $prod = $prod * evaluate($arg, $data) }
+        var $prod = 1
+        for val $arg (@arr_args) { $prod = $prod * evaluate($arg, $data) }
         return $prod
     }
     if ($op eq "/") {
-        my $v2 = evaluate($arr_args[1], $data)
+        val $v2 = evaluate($arr_args[1], $data)
         return ($v2 == 0 ? 0 : evaluate($arr_args[0], $data) / $v2)
     }
     
@@ -87,13 +87,13 @@ package main
 
 p "── JSON-Logic Engine Demo ──"
 
-my $data = {
+val $data = {
     temp => 25,
     user => "wizard",
     role => "admin"
 }
 
-my @rules = (
+val @rules = (
     { "==" => [{ var => "temp" }, 25] },
     { "and" => [
         { ">" => [{ var => "temp" }, 20] },
@@ -107,8 +107,8 @@ my @rules = (
     { "+" => [1, 2, { var => "temp" }] }
 )
 
-for my $rule (@rules) {
-    my $res = JsonLogic::evaluate $rule, $data
+for val $rule (@rules) {
+    val $res = JsonLogic::evaluate $rule, $data
     p "Rule: #{to_json $rule}"
     p "Result: #{$res // 'null'}"
 }

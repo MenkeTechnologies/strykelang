@@ -2,7 +2,7 @@
 # Rosetta Code: OpenGL
 
 fn Rosetta::OpenGL::new() {
-    my @commands
+    val @commands
     { commands => \@commands, color => "white" }
 }
 
@@ -10,7 +10,7 @@ fn Rosetta::OpenGL::clear($ctx) { push @{$ctx->{commands}}, "clear" }
 fn Rosetta::OpenGL::color($ctx, $name) { $ctx->{color} = $name; push @{$ctx->{commands}}, "color:$name" }
 fn Rosetta::OpenGL::triangle($ctx, @verts) { push @{$ctx->{commands}}, "triangle:$ctx->{color}:" . join(";", @verts) }
 
-my $ctx = Rosetta::OpenGL::new()
+val $ctx = Rosetta::OpenGL::new()
 Rosetta::OpenGL::clear($ctx)
 Rosetta::OpenGL::color($ctx, "green")
 Rosetta::OpenGL::triangle($ctx, "0,0", "1,0", "0,1")

@@ -4,11 +4,11 @@ package JsonLogic
 
 fn evaluate($rule, $data) {
     return $rule if ref($rule) ne "HASH"
-    my ($op) = keys %$rule
-    my $args = $rule->{$op}
-    my @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
+    val ($op) = keys %$rule
+    val $args = $rule->{$op}
+    val @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
     if ($op eq "var") {
-        my $path = $arr_args[0]
+        val $path = $arr_args[0]
         return $data->{$path} // $arr_args[1]
     }
     if ($op eq "==") { return evaluate($arr_args[0], $data) == evaluate($arr_args[1], $data) ? 1 : 0 }
@@ -16,11 +16,11 @@ fn evaluate($rule, $data) {
     if ($op eq ">")  { return evaluate($arr_args[0], $data) >  evaluate($arr_args[1], $data) ? 1 : 0 }
     if ($op eq "<")  { return evaluate($arr_args[0], $data) <  evaluate($arr_args[1], $data) ? 1 : 0 }
     if ($op eq "and") {
-        for my $arg (@arr_args) { return 0 if !evaluate($arg, $data) }
+        for val $arg (@arr_args) { return 0 if !evaluate($arg, $data) }
         return 1
     }
     if ($op eq "or") {
-        for my $arg (@arr_args) { return 1 if evaluate($arg, $data) }
+        for val $arg (@arr_args) { return 1 if evaluate($arg, $data) }
         return 0
     }
     if ($op eq "if") {
@@ -28,8 +28,8 @@ fn evaluate($rule, $data) {
         return evaluate($arr_args[2], $data)
     }
     if ($op eq "+") {
-        my $sum = 0
-        for my $arg (@arr_args) { $sum = $sum + evaluate($arg, $data) }
+        var $sum = 0
+        for val $arg (@arr_args) { $sum = $sum + evaluate($arg, $data) }
         return $sum
     }
     return undef
@@ -38,7 +38,7 @@ fn evaluate($rule, $data) {
 package main
 
 # --- Basic E2E ---
-my $data = { a => 10, b => 20 }
+val $data = { a => 10, b => 20 }
 JsonLogic::evaluate({ "==" => [{ var => "a" }, 10] }, $data) |> aeq 1, "var a == 10"
 JsonLogic::evaluate({ "==" => [{ var => "a" }, 20] }, $data) |> aeq 0, "var a != 20"
 

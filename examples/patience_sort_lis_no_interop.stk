@@ -18,10 +18,10 @@
 # Returns the pile index; len(@tops) if a new pile is needed.
 
 fn Pat::find_pile($tops, $v) {
-    my $lo = 0
-    my $hi = len(@$tops)
+    var $lo = 0
+    var $hi = len(@$tops)
     while ($lo < $hi) {
-        my $mid = int(($lo + $hi) / 2)
+        val $mid = int(($lo + $hi) / 2)
         if ($tops->[$mid] < $v) {
             $lo = $mid + 1
         } else {
@@ -35,16 +35,16 @@ fn Pat::find_pile($tops, $v) {
 # Returns +{ length, seq } — `seq` is one valid LIS realization.
 
 fn Pat::lis($input) {
-    my $n = len(@$input)
+    val $n = len(@$input)
     if ($n == 0) {
         return +{ length => 0, seq => [] }
     }
-    my @tops      # smallest tail value of any LIS of length pile+1
-    my @top_idx   # tops[k] currently sits at input index top_idx[k]
-    my @parent = (-1) x $n
-    for my $i (0:$n - 1) {
-        my $v = $input->[$i]
-        my $k = Pat::find_pile(\@tops, $v)
+    var @tops      # smallest tail value of any LIS of length pile+1
+    var @top_idx   # tops[k] currently sits at input index top_idx[k]
+    var @parent = (-1) x $n
+    for val $i (0:$n - 1) {
+        val $v = $input->[$i]
+        val $k = Pat::find_pile(\@tops, $v)
         if ($k == len(@tops)) {
             push @tops, $v
             push @top_idx, $i
@@ -56,10 +56,10 @@ fn Pat::lis($input) {
             $parent[$i] = $top_idx[$k - 1]
         }
     }
-    my $len = len(@tops)
+    val $len = len(@tops)
     # Reconstruct: walk back from the top of the last pile.
-    my @seq
-    my $cur = $top_idx[$len - 1]
+    var @seq
+    var $cur = $top_idx[$len - 1]
     while ($cur != -1) {
         push @seq, $input->[$cur]
         $cur = $parent[$cur]
@@ -71,24 +71,24 @@ fn Pat::lis($input) {
 # ── O(n²) brute force LIS for cross-validation (length only) ───────
 
 fn Pat::brute_len($input) {
-    my $n = len(@$input)
+    val $n = len(@$input)
     return 0 if $n == 0
-    my @dp = (1) x $n
-    for my $i (1:$n - 1) {
-        for my $j (0:$i - 1) {
+    var @dp = (1) x $n
+    for val $i (1:$n - 1) {
+        for val $j (0:$i - 1) {
             if ($input->[$j] < $input->[$i] && $dp[$j] + 1 > $dp[$i]) {
                 $dp[$i] = $dp[$j] + 1
             }
         }
     }
-    my $best = 0
-    for my $v (@dp) { $best = $v if $v > $best }
+    var $best = 0
+    for val $v (@dp) { $best = $v if $v > $best }
     $best
 }
 
 # ── primary cases with known LIS lengths ──────────────────────────
 
-my @cases = (
+val @cases = (
     +{ name => "ascending",       input => [1, 2, 3, 4, 5, 6, 7],     len => 7 },
     +{ name => "descending",      input => [7, 6, 5, 4, 3, 2, 1],     len => 1 },
     +{ name => "classic textbook",input => [10, 22, 9, 33, 21, 50, 41, 60, 80], len => 6 },
@@ -103,10 +103,10 @@ my @cases = (
 p "── patience-sort LIS demo ────────────────────────────"
 printf "  %-18s  %-26s  %3s  %s\n", "case", "input", "len", "subsequence"
 printf "  %-18s  %-26s  %3s  %s\n", "------------------", "--------------------------", "---", "-----------"
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
-    my $in_s = "[" . join(", ", @{$c->{input}}) . "]"
-    my $seq_s = "[" . join(", ", @{$r->{seq}}) . "]"
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
+    val $in_s = "[" . join(", ", @{$c->{input}}) . "]"
+    val $seq_s = "[" . join(", ", @{$r->{seq}}) . "]"
     printf "  %-18s  %-26s  %3d  %s  %s\n",
         $c->{name}, $in_s, $r->{length}, $seq_s,
         $r->{length} == $c->{len} ? "" : "FAIL want=#{$c->{len}}"
@@ -114,38 +114,38 @@ for my $c (@cases) {
 
 # ── invariant 1: reported length matches known closed-form ────────
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
     die "len #{$r->{length}} != expected #{$c->{len}} on \"#{$c->{name}}\"" unless $r->{length} == $c->{len}
 }
 
 # ── invariant 2: returned subsequence has the reported length ─────
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
     die "seq length #{len(@{$r->{seq}})} != reported #{$r->{length}} on \"#{$c->{name}}\"" unless len(@{$r->{seq}}) == $r->{length}
 }
 
 # ── invariant 3: returned subsequence is strictly increasing ──────
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
-    my $seq = $r->{seq}
-    my $k = len(@$seq)
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
+    val $seq = $r->{seq}
+    val $k = len(@$seq)
     next if $k < 2
-    for my $i (1:$k - 1) {
+    for val $i (1:$k - 1) {
         die "seq not strictly increasing at #{$i} on \"#{$c->{name}}\": #{$seq->[$i - 1]} >= #{$seq->[$i]}" unless $seq->[$i - 1] < $seq->[$i]
     }
 }
 
 # ── invariant 4: returned subsequence appears in the input in order ─
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
-    my $seq = $r->{seq}
-    my $n_in = len(@{$c->{input}})
-    my $idx = 0
-    for my $i (0:$n_in - 1) {
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
+    val $seq = $r->{seq}
+    val $n_in = len(@{$c->{input}})
+    var $idx = 0
+    for val $i (0:$n_in - 1) {
         last if $idx >= len(@$seq)
         if ($c->{input}->[$i] == $seq->[$idx]) {
             $idx++
@@ -156,28 +156,28 @@ for my $c (@cases) {
 
 # ── invariant 5: patience-sort length agrees with O(n²) brute force ─
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
-    my $bt = Pat::brute_len($c->{input})
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
+    val $bt = Pat::brute_len($c->{input})
     die "patience #{$r->{length}} != brute #{$bt} on \"#{$c->{name}}\"" unless $r->{length} == $bt
 }
 
 # ── invariant 6: no longer strictly-increasing subsequence exists ──
 
-for my $c (@cases) {
-    my $r = Pat::lis($c->{input})
-    my $n = len(@{$c->{input}})
+for val $c (@cases) {
+    val $r = Pat::lis($c->{input})
+    val $n = len(@{$c->{input}})
     next if $n > 10                  # skip the n² × 2^n brute on big inputs
     # Enumerate every subset (bitmask) and check increasing-ness + len.
-    my $total = 1 << $n
-    for my $mask (0:$total - 1) {
-        my @sub
-        for my $i (0:$n - 1) {
+    val $total = 1 << $n
+    for val $mask (0:$total - 1) {
+        var @sub
+        for val $i (0:$n - 1) {
             push @sub, $c->{input}->[$i] if ($mask >> $i) & 1
         }
         next if len(@sub) <= $r->{length}
-        my $inc = 1
-        for my $i (1:len(@sub) - 1) {
+        var $inc = 1
+        for val $i (1:len(@sub) - 1) {
             if ($sub[$i - 1] >= $sub[$i]) { $inc = 0; last }
         }
         die "found longer strictly-increasing subsequence (len #{len(@sub)}) on \"#{$c->{name}}\"" if $inc

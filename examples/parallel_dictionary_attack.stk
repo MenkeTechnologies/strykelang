@@ -8,11 +8,11 @@
 # CI-safe: pure loopback fork, synthetic wordlist. Clean under
 # --no-interop.
 
-my $n_workers = $ARGV[0] // 4
+val $n_workers = $ARGV[0] // 4
 
 # Synthetic wordlist (a tiny rockyou-style set). Real attacks use
 # multi-million-line files.
-my @wordlist = (
+val @wordlist = (
     "password", "qwerty", "123456", "admin", "letmein",
     "welcome", "monkey", "dragon", "iloveyou", "trustno1",
     "abc123", "master", "shadow", "ninja", "azerty",
@@ -20,27 +20,27 @@ my @wordlist = (
     "fuckyou", "summer", "winter", "spring", "autumn",
     "secret", "freedom", "thunder", "lightning", "rainbow",
 )
-my $secret_word = "computer"   # the answer
-my $target_hash = sha256("salt::" . $secret_word)
+val $secret_word = "computer"   # the answer
+val $target_hash = sha256("salt::" . $secret_word)
 printf "── parallel dictionary attack ──\n"
 printf "  workers: %d  ·  wordlist: %d entries  ·  target: %s...%s\n",
     $n_workers, len(@wordlist), substr($target_hash, 0, 8), substr($target_hash, -8)
 
-my @workers = congregation($n_workers)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n_workers)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the wordlist by index across workers.
-my $per = int((len(@wordlist) + $n_workers - 1) / $n_workers)
-my %found
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int((len(@wordlist) + $n_workers - 1) / $n_workers)
+var %found
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@wordlist) - 1 if $end >= len(@wordlist)
     next if $start >= len(@wordlist)
-    my @shard = @wordlist[$start:$end]
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    val @shard = @wordlist[$start:$end]
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
         my \$target = '$target_hash';
         my \$ans = 'no';
@@ -49,15 +49,15 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         \$ans
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     $found{$w} = $reply{$w}
 }
 
 p "── per-worker search ──"
-my $winner_word
-for my $w (@sorted_workers) {
-    my $r = $found{$w}
+var $winner_word
+for val $w (@sorted_workers) {
+    val $r = $found{$w}
     if ($r eq 'no') {
         printf "  worker %d: not in shard\n", $w
     } else {

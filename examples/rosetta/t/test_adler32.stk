@@ -2,12 +2,12 @@
 # Rosetta Code: Adler-32
 
 fn Rosetta::Adler32::compute($text) {
-    my $a = 1
-    my $b = 0
-    my $mod = 65521
+    var $a = 1
+    var $b = 0
+    val $mod = 65521
     
     # Calculate checksum
-    for my $c ($text |> chars() |> map {ord}) {
+    for val $c ($text |> chars() |> map {ord}) {
         $a = ($a + $c) % $mod
         $b = ($b + $a) % $mod
     }
@@ -16,13 +16,13 @@ fn Rosetta::Adler32::compute($text) {
     ($b << 16) | $a
 }
 
-my $t1 = "Wikipedia"
-my $h1 = Rosetta::Adler32::compute($t1)
+val $t1 = "Wikipedia"
+val $h1 = Rosetta::Adler32::compute($t1)
 # 300286872 -> 0x11E60398
 assert_eq $h1, 300286872, "Adler-32 Wikipedia"
 
-my $t2 = "Stryke"
-my $h2 = Rosetta::Adler32::compute($t2)
+val $t2 = "Stryke"
+val $h2 = Rosetta::Adler32::compute($t2)
 # S=83, t=116, r=114, y=121, k=107, e=101 => sum = 642, a=643
 # b:
 # 83+1=84

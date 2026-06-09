@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 fn Exercism::SpiralMatrix::spiral_matrix($n) {
     return [] if $n <= 0
-    my @m = map { [(0) x $n] } 1:$n
-    my @dirs = ([0,1], [1,0], [0,-1], [-1,0])
-    my ($r, $c, $d) = (0, 0, 0)
-    for my $v (1:$n * $n) {
+    val @m = map { [(0) x $n] } 1:$n
+    val @dirs = ([0,1], [1,0], [0,-1], [-1,0])
+    var ($r, $c, $d) = (0, 0, 0)
+    for val $v (1:$n * $n) {
         $m[$r][$c] = $v
-        my ($dr, $dc) = @{$dirs[$d]}
-        my $nr = $r + $dr
-        my $nc = $c + $dc
+        var ($dr, $dc) = @{$dirs[$d]}
+        var $nr = $r + $dr
+        var $nc = $c + $dc
         if ($nr < 0 || $nr >= $n || $nc < 0 || $nc >= $n || $m[$nr][$nc] != 0) {
             $d = ($d + 1) % 4
             ($dr, $dc) = @{$dirs[$d]}

@@ -13,17 +13,17 @@
 
 # ── synthesise event stream ──────────────────────────────────────────
 
-my @services = ("api", "auth", "payment", "notify", "search")
-my @levels   = ("ok", "ok", "ok", "ok", "ok", "ok", "ok", "warn", "error", "error")
-my @errors   = ("Timeout", "DBConnError", "RateLimit", "AuthFailed", "NotFound", "ServiceUnavailable")
+val @services = ("api", "auth", "payment", "notify", "search")
+val @levels   = ("ok", "ok", "ok", "ok", "ok", "ok", "ok", "warn", "error", "error")
+val @errors   = ("Timeout", "DBConnError", "RateLimit", "AuthFailed", "NotFound", "ServiceUnavailable")
 
-my @events
-for my $i (1:500) {
-    my $svc   = $services[rand @services]
-    my $level = $levels[rand @levels]
-    my $lat   = int(rand 800) + 20    # 20:820 ms
-    my $user  = "user-" . int(rand 100)   # 100 distinct users
-    my $err   = $level eq "error" ? $errors[rand @errors] : undef
+var @events
+for val $i (1:500) {
+    val $svc   = $services[rand @services]
+    val $level = $levels[rand @levels]
+    val $lat   = int(rand 800) + 20    # 20:820 ms
+    val $user  = "user-" . int(rand 100)   # 100 distinct users
+    val $err   = $level eq "error" ? $errors[rand @errors] : undef
     push @events, +{
         service => $svc,
         level   => $level,
@@ -38,15 +38,15 @@ printf "── stream: %d events across %d services ─────────�
 
 # ── build per-service sketches ──────────────────────────────────────
 
-my %hll       # service -> HLL of distinct users
-my %td        # service -> t-digest of latency
-my %tk_err    # service -> TopK of error names
-my %total     # service -> event count
-my %ok_count  # service -> ok count
-my %warn_count
-my %error_count
+var %hll       # service -> HLL of distinct users
+var %td        # service -> t-digest of latency
+var %tk_err    # service -> TopK of error names
+var %total     # service -> event count
+var %ok_count  # service -> ok count
+var %warn_count
+var %error_count
 
-for my $svc (@services) {
+for val $svc (@services) {
     $hll{$svc}     = hll(14)
     $td{$svc}      = t_digest(100)
     $tk_err{$svc}  = topk(3)
@@ -56,8 +56,8 @@ for my $svc (@services) {
     $error_count{$svc} = 0
 }
 
-for my $e (@events) {
-    my $svc = $e->{service}
+for val $e (@events) {
+    val $svc = $e->{service}
     $total{$svc}++
     hll_add($hll{$svc}, $e->{user})
     td_add($td{$svc}, $e->{latency})
@@ -77,14 +77,14 @@ printf "  %-9s %5s %5s %5s %5s %6s %6s %6s %6s\n",
     "service", "n", "ok", "warn", "err",
     "users", "p50", "p99", "%err"
 p   "  --------- ----- ----- ----- ----- ------ ------ ------ ------"
-for my $svc (@services) {
-    my $n    = $total{$svc}
+for val $svc (@services) {
+    val $n    = $total{$svc}
     next if $n == 0
-    my $u    = hll_count($hll{$svc})
-    my $p50  = ~> td_quantile($td{$svc}, 0.50) int
-    my $p99  = ~> td_quantile($td{$svc}, 0.99) int
-    my $errs = $error_count{$svc}
-    my $pct  = 100.0 * $errs / $n
+    val $u    = hll_count($hll{$svc})
+    val $p50  = ~> td_quantile($td{$svc}, 0.50) int
+    val $p99  = ~> td_quantile($td{$svc}, 0.99) int
+    val $errs = $error_count{$svc}
+    val $pct  = 100.0 * $errs / $n
     printf "  %-9s %5d %5d %5d %5d %6d %6d %6d %5.1f%%\n",
         $svc, $n, $ok_count{$svc}, $warn_count{$svc}, $errs,
         $u, $p50, $p99, $pct
@@ -94,14 +94,14 @@ for my $svc (@services) {
 
 p ""
 p "── global rollup (sketch union via `+`) ─────────────"
-my $global_hll = $hll{api} + $hll{auth} + $hll{payment} + $hll{notify} + $hll{search}
+val $global_hll = $hll{api} + $hll{auth} + $hll{payment} + $hll{notify} + $hll{search}
 printf "  total events           : %d\n", len @events
-my $total_err = 0
+var $total_err = 0
 $total_err += $error_count{_} for @services
 printf "  total errors           : %d (%.1f%%)\n",
     $total_err, 100.0 * $total_err / len @events
 printf "  HLL distinct users      : %d\n", hll_count($global_hll)
-my %seen_users
+var %seen_users
 $seen_users{_->{user}} = 1 for @events
 printf "  exact distinct users    : %d\n", len(keys %seen_users)
 
@@ -109,11 +109,11 @@ printf "  exact distinct users    : %d\n", len(keys %seen_users)
 
 p ""
 p "── top errors per service ───────────────────────────"
-for my $svc (@services) {
+for val $svc (@services) {
     next if $error_count{$svc} == 0
-    my @hits = topk_top($tk_err{$svc})
-    my @parts
-    for my $h (@hits) {
+    val @hits = topk_top($tk_err{$svc})
+    var @parts
+    for val $h (@hits) {
         push @parts, sprintf("%s(%d)", $h->[0], $h->[1])
     }
     printf "  %-9s : %s\n", $svc, join(", ", @parts)
@@ -123,17 +123,17 @@ for my $svc (@services) {
 
 p ""
 p "── alerts (services with > 20% error rate) ──────────"
-my @alerts
-for my $svc (@services) {
-    my $n = $total{$svc}
+var @alerts
+for val $svc (@services) {
+    val $n = $total{$svc}
     next if $n == 0
-    my $rate = 100.0 * $error_count{$svc} / $n
+    val $rate = 100.0 * $error_count{$svc} / $n
     push @alerts, +{ svc => $svc, rate => $rate } if $rate > 20.0
 }
 if (len(@alerts) == 0) {
     p "  (no service exceeds threshold — system healthy)"
 } else {
-    for my $alert (sort { _1->{rate} <=> _->{rate} } @alerts) {
+    for val $alert (sort { _1->{rate} <=> _->{rate} } @alerts) {
         printf "  ALERT %-9s : %.1f%% errors\n", $alert->{svc}, $alert->{rate}
     }
 }
@@ -142,11 +142,11 @@ if (len(@alerts) == 0) {
 
 p ""
 p "── slowest service by p99 latency ───────────────────"
-my @ranked = sort {
+val @ranked = sort {
     (~> td_quantile($td{_1}, 0.99) int) <=> (~> td_quantile($td{_}, 0.99) int)
 } @services
-for my $i (0:2) {
-    my $svc = $ranked[$i]
+for val $i (0:2) {
+    val $svc = $ranked[$i]
     next unless $total{$svc} > 0
     printf "  %d. %-9s p99=%d ms\n", $i + 1, $svc, ~> td_quantile($td{$svc}, 0.99) int
 }

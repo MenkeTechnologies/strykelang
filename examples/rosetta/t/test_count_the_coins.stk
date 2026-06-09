@@ -1,8 +1,8 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Count the coins
 
-my @COINS = (1, 5, 10, 25, 50, 100)
-my %CHANGE_MEMO
+val @COINS = (1, 5, 10, 25, 50, 100)
+var %CHANGE_MEMO
 
 fn Rosetta::CountTheCoins::solve($amount, $coin_idx) {
     if ($amount == 0) {
@@ -10,13 +10,13 @@ fn Rosetta::CountTheCoins::solve($amount, $coin_idx) {
     } elsif ($amount < 0 || $coin_idx < 0) {
         0
     } else {
-        my $key = "$amount,$coin_idx"
+        val $key = "$amount,$coin_idx"
         if (exists $CHANGE_MEMO{$key}) {
             $CHANGE_MEMO{$key}
         } else {
-            my $without = Rosetta::CountTheCoins::solve($amount, $coin_idx - 1)
-            my $with = Rosetta::CountTheCoins::solve($amount - $COINS[$coin_idx], $coin_idx)
-            my $res = $without + $with
+            val $without = Rosetta::CountTheCoins::solve($amount, $coin_idx - 1)
+            val $with = Rosetta::CountTheCoins::solve($amount - $COINS[$coin_idx], $coin_idx)
+            val $res = $without + $with
             $CHANGE_MEMO{$key} = $res
             $res
         }

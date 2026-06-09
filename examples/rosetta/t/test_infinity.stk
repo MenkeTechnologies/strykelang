@@ -12,7 +12,7 @@ fn Rosetta::Infinity::is_inf($x) {
     "$x" eq "Inf"
 }
 
-my $inf = Rosetta::Infinity::get_inf()
+val $inf = Rosetta::Infinity::get_inf()
 assert_eq Rosetta::Infinity::is_inf($inf), 1, "Value is infinity"
 assert_ok $inf > 1e308, "Infinity is greater than a large number"
 

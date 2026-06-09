@@ -2,13 +2,13 @@
 # Rosetta Code: Sierpinski Triangle
 
 fn Rosetta::Sierpinski::generate($n) {
-    my @res
-    for my $i (0:$n-1) {
-        my $row = ""
-        for my $s (0:$n-$i-2) { $row = $row . " " }
+    var @res
+    for val $i (0:$n-1) {
+        var $row = ""
+        for val $s (0:$n-$i-2) { $row = $row . " " }
         
-        my $c = 1
-        for my $j (0:$i) {
+        var $c = 1
+        for val $j (0:$i) {
             if ($c % 2 == 1) {
                 $row = $row . "* "
             } else {
@@ -22,8 +22,8 @@ fn Rosetta::Sierpinski::generate($n) {
 }
 
 p "Sierpinski Triangle (8 rows):"
-my $rows = Rosetta::Sierpinski::generate(8)
-for my $r (@$rows) { print "$r\n" }
+val $rows = Rosetta::Sierpinski::generate(8)
+for val $r (@$rows) { print "$r\n" }
 
 assert_eq len(@$rows), 8, "8 rows generated"
 

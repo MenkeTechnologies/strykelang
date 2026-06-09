@@ -2,7 +2,7 @@
 # Rosetta Code: Active Directory/Search for a user
 
 fn Rosetta::ADSearch::directory() {
-    my @users = (
+    val @users = (
         { uid => "alice", cn => "Alice Adams", mail => "alice@example.com" },
         { uid => "bob", cn => "Bob Brown", mail => "bob@example.com" },
         { uid => "alina", cn => "Alina Aster", mail => "alina@example.com" },
@@ -11,15 +11,15 @@ fn Rosetta::ADSearch::directory() {
 }
 
 fn Rosetta::ADSearch::find_by_prefix($directory, $prefix) {
-    my @matches
-    for my $user (@{$directory->{users}}) {
+    var @matches
+    for val $user (@{$directory->{users}}) {
         if (substr($user->{uid}, 0, len(split //, $prefix)) eq $prefix) { push @matches, $user }
     }
     \@matches
 }
 
-my $directory = Rosetta::ADSearch::directory()
-my $matches = Rosetta::ADSearch::find_by_prefix($directory, "ali")
+val $directory = Rosetta::ADSearch::directory()
+val $matches = Rosetta::ADSearch::find_by_prefix($directory, "ali")
 
 assert_eq len(@$matches), 2, "prefix search finds two users"
 assert_eq join(",", map { $_->{uid} } @$matches), "alice,alina", "matching users preserve directory order"

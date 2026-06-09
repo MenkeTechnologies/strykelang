@@ -16,8 +16,8 @@ fn is_empty($s) { len(@{$s->{data}}) == 0 }
 
 fn push($s, $v) {
     push @{$s->{data}}, $v
-    my $nm = len(@{$s->{mins}})
-    my $nx = len(@{$s->{maxs}})
+    val $nm = len(@{$s->{mins}})
+    val $nx = len(@{$s->{maxs}})
     if ($nm == 0 || $v <= $s->{mins}->[$nm - 1]) {
         push @{$s->{mins}}, $v
     } else {
@@ -38,19 +38,19 @@ fn pop($s) {
 }
 
 fn top($s) {
-    my $n = len(@{$s->{data}})
+    val $n = len(@{$s->{data}})
     return undef if $n == 0
     $s->{data}->[$n - 1]
 }
 
 fn min($s) {
-    my $n = len(@{$s->{mins}})
+    val $n = len(@{$s->{mins}})
     return undef if $n == 0
     $s->{mins}->[$n - 1]
 }
 
 fn max($s) {
-    my $n = len(@{$s->{maxs}})
+    val $n = len(@{$s->{maxs}})
     return undef if $n == 0
     $s->{maxs}->[$n - 1]
 }
@@ -58,15 +58,15 @@ fn max($s) {
 package main;
 
 p "=== Min/Max Stack Demo ==="
-my $s = MS::new()
-for my $v (5, 3, 8, 1, 9, 2, 7) {
+val $s = MS::new()
+for val $v (5, 3, 8, 1, 9, 2, 7) {
     MS::push($s, $v)
     p "push " . $v . " -> top=" . MS::top($s) . " min=" . MS::min($s) . " max=" . MS::max($s)
 }
 while (!MS::is_empty($s)) {
-    my $t = MS::top($s)
-    my $mn = MS::min($s)
-    my $mx = MS::max($s)
+    val $t = MS::top($s)
+    val $mn = MS::min($s)
+    val $mx = MS::max($s)
     MS::pop($s)
     p "pop  " . $t . " (was min=" . $mn . " max=" . $mx . ")"
 }

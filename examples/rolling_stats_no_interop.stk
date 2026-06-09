@@ -17,18 +17,18 @@
 # Run: stryke --no-interop examples/rolling_stats_no_interop.stk
 
 fn Rolling::mean($v, $win) {
-    my @r = 0:len(@$v) - 1 |> maps {
-        my $lo = _ - $win + 1
+    val @r = 0:len(@$v) - 1 |> maps {
+        var $lo = _ - $win + 1
         $lo = 0 if $lo < 0
-        my @s = @$v[$lo:_]
+        val @s = @$v[$lo:_]
         sum(@s) / len(@s)
     }
     \@r
 }
 
 fn Rolling::min($v, $win) {
-    my @r = 0:len(@$v) - 1 |> maps {
-        my $lo = _ - $win + 1
+    val @r = 0:len(@$v) - 1 |> maps {
+        var $lo = _ - $win + 1
         $lo = 0 if $lo < 0
         min(@$v[$lo:_])
     }
@@ -36,8 +36,8 @@ fn Rolling::min($v, $win) {
 }
 
 fn Rolling::max($v, $win) {
-    my @r = 0:len(@$v) - 1 |> maps {
-        my $lo = _ - $win + 1
+    val @r = 0:len(@$v) - 1 |> maps {
+        var $lo = _ - $win + 1
         $lo = 0 if $lo < 0
         max(@$v[$lo:_])
     }
@@ -47,47 +47,47 @@ fn Rolling::max($v, $win) {
 # Variance with Bessel's correction (sample variance, n-1 denom).
 # The deviation-squared sum is itself a pipe-chain.
 fn Rolling::var($v, $win) {
-    my @r = 0:len(@$v) - 1 |> maps {
-        my $lo = _ - $win + 1
+    val @r = 0:len(@$v) - 1 |> maps {
+        var $lo = _ - $win + 1
         $lo = 0 if $lo < 0
-        my @s = @$v[$lo:_]
+        val @s = @$v[$lo:_]
         if (len(@s) < 2) { 0 }
         else {
-            my $mean = sum(@s) / len(@s)
+            val $mean = sum(@s) / len(@s)
             (@s |> maps { (_ - $mean) ** 2 } |> sum) / (len(@s) - 1)
         }
     }
     \@r
 }
 
-my @series = (1, 3, 2, 5, 4, 6, 7, 9, 8, 10)
-my $win    = 3
+val @series = (1, 3, 2, 5, 4, 6, 7, 9, 8, 10)
+val $win    = 3
 
-my $means = Rolling::mean \@series, $win
-my $mins  = Rolling::min  \@series, $win
-my $maxs  = Rolling::max  \@series, $win
-my $vars  = Rolling::var  \@series, $win
+val $means = Rolling::mean \@series, $win
+val $mins  = Rolling::min  \@series, $win
+val $maxs  = Rolling::max  \@series, $win
+val $vars  = Rolling::var  \@series, $win
 
 p "── Rolling stats (window=$win) over (@series) ──"
 printf "  %-4s %-4s %-8s %-4s %-4s %-8s\n",
     "i", "x", "mean", "min", "max", "var"
-for my $i (0:len(@series) - 1) {
+for val $i (0:len(@series) - 1) {
     printf "  %-4d %-4d %-8.3f %-4d %-4d %-8.3f\n",
         $i, $series[$i], $means->[$i], $mins->[$i], $maxs->[$i], $vars->[$i]
 }
 
 # Invariants: min <= mean <= max, var >= 0, win=1 is identity.
-my $n = len @series
-for my $i (0:$n - 1) {
+val $n = len @series
+for val $i (0:$n - 1) {
     die "min > mean at i=$i" unless $mins->[$i]  <= $means->[$i]
     die "mean > max at i=$i" unless $means->[$i] <= $maxs->[$i]
     die "var < 0 at i=$i"    unless $vars->[$i]  >= 0
 }
 
-my $solo_mean = Rolling::mean \@series, 1
-my $solo_min  = Rolling::min  \@series, 1
-my $solo_max  = Rolling::max  \@series, 1
-for my $i (0:$n - 1) {
+val $solo_mean = Rolling::mean \@series, 1
+val $solo_min  = Rolling::min  \@series, 1
+val $solo_max  = Rolling::max  \@series, 1
+for val $i (0:$n - 1) {
     die "win=1 mean != x[$i]" unless $solo_mean->[$i] == $series[$i]
     die "win=1 min  != x[$i]" unless $solo_min->[$i]  == $series[$i]
     die "win=1 max  != x[$i]" unless $solo_max->[$i]  == $series[$i]

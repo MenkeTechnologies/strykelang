@@ -2,12 +2,12 @@
 # Rosetta Code: TOML
 
 fn Rosetta::TOML::test($data) {
-    my $toml = toml_encode($data)
-    my $decoded = toml_decode($toml)
+    val $toml = toml_encode($data)
+    val $decoded = toml_decode($toml)
     $decoded
 }
 
-my $data = {
+val $data = {
     title => "TOML Example",
     owner => {
         name => "Stryke User",
@@ -21,7 +21,7 @@ my $data = {
     }
 }
 
-my $res = Rosetta::TOML::test($data)
+val $res = Rosetta::TOML::test($data)
 
 assert_eq $res->{title}, "TOML Example", "toml title"
 assert_eq $res->{owner}->{name}, "Stryke User", "toml owner name"

@@ -2,7 +2,7 @@
 # Rosetta Code: Fork
 
 fn Rosetta::Fork::demo() {
-    my $pid = fork()
+    val $pid = fork()
     if (!defined $pid) {
         die "Fork failed"
     }
@@ -21,7 +21,7 @@ fn Rosetta::Fork::demo() {
 
 # Since we are in a test environment, let's just assert we can call it.
 # Note: fork might be restricted in some environments, but stryke has it.
-my $res = Rosetta::Fork::demo()
+val $res = Rosetta::Fork::demo()
 assert_eq $res, "Success", "Fork and wait worked"
 
 test_run

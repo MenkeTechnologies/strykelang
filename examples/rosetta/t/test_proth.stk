@@ -5,8 +5,8 @@ fn Rosetta::Proth::is_proth($n) {
     if ($n < 3 || $n % 2 == 0) {
         0
     } else {
-        my $m = $n - 1
-        my $k = 0
+        var $m = $n - 1
+        var $k = 0
         while ($m % 2 == 0) {
             $m = int($m / 2)
             $k++

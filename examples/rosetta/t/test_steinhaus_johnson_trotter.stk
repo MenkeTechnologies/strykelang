@@ -3,12 +3,12 @@
 # Generate all permutations of 1..n by adjacent transpositions.
 
 fn Rosetta::SJT::mobile_index($a, $dir) {
-    my $n = len(@$a)
-    my $best = -1
-    my $best_val = -1
-    for my $i (0:$n-1) {
-        my $d = $dir->[$i]
-        my $j = $i + $d
+    val $n = len(@$a)
+    var $best = -1
+    var $best_val = -1
+    for var $i (0:$n-1) {
+        var $d = $dir->[$i]
+        val $j = $i + $d
         next if $j < 0 || $j >= $n
         if ($a->[$i] > $a->[$j] && $a->[$i] > $best_val) {
             $best = $i
@@ -19,17 +19,17 @@ fn Rosetta::SJT::mobile_index($a, $dir) {
 }
 
 fn Rosetta::SJT::all($n) {
-    my @a = (1:$n)
-    my @dir = (-1) x $n
-    my @perms = ([@a])
+    var @a = (1:$n)
+    var @dir = (-1) x $n
+    var @perms = ([@a])
     while (1) {
-        my $idx = Rosetta::SJT::mobile_index(\@a, \@dir)
+        var $idx = Rosetta::SJT::mobile_index(\@a, \@dir)
         last if $idx < 0
-        my $val = $a[$idx]
-        my $j = $idx + $dir[$idx]
+        val $val = $a[$idx]
+        var $j = $idx + $dir[$idx]
         ($a[$idx], $a[$j]) = ($a[$j], $a[$idx])
         ($dir[$idx], $dir[$j]) = ($dir[$j], $dir[$idx])
-        for my $k (0:$n-1) {
+        for val $k (0:$n-1) {
             $dir[$k] = -$dir[$k] if $a[$k] > $val
         }
         push @perms, [@a]
@@ -44,9 +44,9 @@ fn Rosetta::SJT::all($n) {
 #  3 2 1
 #  2 3 1
 #  2 1 3
-my $p3 = Rosetta::SJT::all(3)
+val $p3 = Rosetta::SJT::all(3)
 assert_eq len(@$p3), 6, "3! = 6"
-my @sigs = map { join("", @{_}) } @$p3
+val @sigs = map { join("", @{_}) } @$p3
 assert_eq $sigs[0], "123", "first perm"
 assert_eq $sigs[1], "132", "swap last 2"
 assert_eq $sigs[2], "312", "3 walks left"
@@ -56,29 +56,29 @@ assert_eq $sigs[5], "213", "final swap"
 
 # Adjacent transposition property: each consecutive pair differs in exactly one swap
 fn Rosetta::SJT::diff_count($x, $y) {
-    my $n = len(@$x)
-    my $d = 0
-    for my $i (0:$n-1) {
+    val $n = len(@$x)
+    var $d = 0
+    for val $i (0:$n-1) {
         $d++ if $x->[$i] != $y->[$i]
     }
     $d
 }
-my $p4 = Rosetta::SJT::all(4)
+val $p4 = Rosetta::SJT::all(4)
 assert_eq len(@$p4), 24, "4! = 24"
-for my $i (1:23) {
-    my $d = Rosetta::SJT::diff_count($p4->[$i-1], $p4->[$i])
+for val $i (1:23) {
+    val $d = Rosetta::SJT::diff_count($p4->[$i-1], $p4->[$i])
     assert_eq $d, 2, "consecutive perms differ in 2 positions (adjacent swap)"
 }
 
 # All distinct
-my %seen
-for my $perm (@$p4) {
+var %seen
+for val $perm (@$p4) {
     $seen{join(",", @$perm)} = 1
 }
 assert_eq len(keys %seen), 24, "all 24 perms distinct"
 
 # n = 1 -> [[1]]
-my $p1 = Rosetta::SJT::all(1)
+val $p1 = Rosetta::SJT::all(1)
 assert_eq len(@$p1), 1, "1! = 1"
 assert_eq $p1->[0][0], 1, "single perm = [1]"
 

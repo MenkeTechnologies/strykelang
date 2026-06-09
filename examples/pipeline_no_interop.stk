@@ -12,7 +12,7 @@ p "── linear pipeline: 1..20, square, even-only, sum ─────"
 
 # Build a list, transform, filter, fold. All without naming the
 # in-flight value. `|> f` inserts the LHS as `f`'s first arg.
-my $total = 1:20
+val $total = 1:20
     |> maps { _ * _ }       # square each
     |> grep { _ % 2 == 0 }  # even-only
     |> sum
@@ -23,7 +23,7 @@ p ""
 p "── parallel pipeline: same shape, pmap across cores ──"
 # `pmap` distributes the block across rayon workers; `pgrep` is the
 # parallel filter. Cube every number 1..1000 and keep multiples of 3.
-my @cubes_div3 = 1:1000
+val @cubes_div3 = 1:1000
     |> pmap { _ ** 3 }
     |> pgrep { _ % 3 == 0 }
 
@@ -32,7 +32,7 @@ p "  (expected ", len(grep { _ % 3 == 0 } 1:1000), " — every 3rd cube)"
 
 p ""
 p "── one-shot product via the standard `product` ───────"
-my $product = 1:5 |> product
+val $product = 1:5 |> product
 p "  1*2*3*4*5 = ", $product, " (expected 120)"
 
 # Built-in self-tests against the printed expectations.

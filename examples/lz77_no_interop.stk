@@ -9,18 +9,18 @@
 package LZ77
 
 fn compress($text, $window_size, $lookahead_size) {
-    my $n = len $text
-    my @compressed
-    my $i = 0
+    val $n = len $text
+    var @compressed
+    var $i = 0
     
     while ($i < $n) {
-        my $match_dist = 0
-        my $match_len = 0
+        var $match_dist = 0
+        var $match_len = 0
         
-        my $start_window = $i > $window_size ? $i - $window_size : 0
+        val $start_window = $i > $window_size ? $i - $window_size : 0
         
-        for (my $j = $start_window; $j < $i; $j++) {
-            my $l = 0
+        for (var $j = $start_window; $j < $i; $j++) {
+            var $l = 0
             while ($l < $lookahead_size && $i + $l < $n && $text[$j + $l] eq $text[$i + $l]) {
                 $l++
             }
@@ -30,7 +30,7 @@ fn compress($text, $window_size, $lookahead_size) {
             }
         }
         
-        my $next_char = ""
+        var $next_char = ""
         if ($i + $match_len < $n) {
             $next_char = $text[$i + $match_len]
         }
@@ -43,15 +43,15 @@ fn compress($text, $window_size, $lookahead_size) {
 }
 
 fn decompress($compressed) {
-    my $text = ""
-    for my $token (@$compressed) {
-        my $dist = $token->[0]
-        my $length = $token->[1]
-        my $next_char = $token->[2]
+    var $text = ""
+    for val $token (@$compressed) {
+        val $dist = $token->[0]
+        val $length = $token->[1]
+        val $next_char = $token->[2]
         
         if ($length > 0) {
-            my $start = (len $text) - $dist
-            for (my $i = 0; $i < $length; $i++) {
+            val $start = (len $text) - $dist
+            for (var $i = 0; $i < $length; $i++) {
                 $text = $text . $text[$start + $i]
             }
         }
@@ -63,16 +63,16 @@ fn decompress($compressed) {
 package main
 
 p "── LZ77 Compression Demo ──"
-my $msg = "ABRACADABRAABRACADABRA"
+val $msg = "ABRACADABRAABRACADABRA"
 p "Original: #{$msg}"
 
-my $comp = LZ77::compress($msg, 12, 10)
+val $comp = LZ77::compress($msg, 12, 10)
 p "\nCompressed Tokens:"
-for my $t (@$comp) {
+for val $t (@$comp) {
     p "  <#{$t->[0]}, #{$t->[1]}, '#{$t->[2]}'>"
 }
 
-my $decomp = LZ77::decompress($comp)
+val $decomp = LZ77::decompress($comp)
 p "\nDecompressed: #{$decomp}"
 p "Matches: #{$msg eq $decomp ? 'YES' : 'NO'}"
 

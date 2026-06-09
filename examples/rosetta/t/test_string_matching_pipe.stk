@@ -13,7 +13,7 @@ fn Rosetta::StringMatching::contains($str, $sub) {
     index($str, $sub) >= 0
 }
 
-my $string = "abcd"
+val $string = "abcd"
 
 $string |> Rosetta::StringMatching::starts("ab") |> assert_ok("Starts with ab")
 $string |> Rosetta::StringMatching::ends("cd") |> assert_ok("Ends with cd")

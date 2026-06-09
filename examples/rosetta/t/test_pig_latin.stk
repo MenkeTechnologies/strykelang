@@ -5,7 +5,7 @@ fn Rosetta::PigLatin::translate($word) {
     if ($word =~ /^[aeiou]/i) {
         $word . "way"
     } else {
-        my $res = $word
+        var $res = $word
         if ($word =~ /^([^aeiou]+)(.*)$/i) {
             $res = $2 . $1 . "ay"
         }

@@ -3,12 +3,12 @@
 
 fn Rosetta::NegativeBase::encode($n, $b) {
     return "0" if $n == 0
-    my @digits
-    my $x = $n
-    my $abs_b = $b < 0 ? -$b : $b
+    var @digits
+    var $x = $n
+    val $abs_b = $b < 0 ? -$b : $b
     while ($x != 0) {
         # Non-negative residue in [0, |b|), regardless of Perl/C modulo flavor.
-        my $r = (($x % $abs_b) + $abs_b) % $abs_b
+        val $r = (($x % $abs_b) + $abs_b) % $abs_b
         # Exact integer quotient: $x - $r is divisible by $b.
         $x = ($x - $r) / $b
         push @digits, $r
@@ -18,10 +18,10 @@ fn Rosetta::NegativeBase::encode($n, $b) {
 }
 
 fn Rosetta::NegativeBase::decode($s, $b) {
-    my @chars = ~> $s chars
-    my $result = 0
-    for my $c (@chars) {
-        my $v
+    val @chars = ~> $s chars
+    var $result = 0
+    for val $c (@chars) {
+        var $v
         if ($c =~ /\d/) {
             $v = int($c)
         } else {
@@ -33,10 +33,10 @@ fn Rosetta::NegativeBase::decode($s, $b) {
 }
 
 # Round-trip on a variety of values
-for my $base (-2, -3, -8, -10) {
-    for my $n (-100, -7, -1, 0, 1, 7, 42, 1000) {
-        my $enc = Rosetta::NegativeBase::encode($n, $base)
-        my $dec = Rosetta::NegativeBase::decode($enc, $base)
+for val $base (-2, -3, -8, -10) {
+    for val $n (-100, -7, -1, 0, 1, 7, 42, 1000) {
+        val $enc = Rosetta::NegativeBase::encode($n, $base)
+        val $dec = Rosetta::NegativeBase::decode($enc, $base)
         assert_eq $dec, $n, "round-trip $n in base $base via $enc"
     }
 }

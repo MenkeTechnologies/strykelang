@@ -2,39 +2,39 @@
 # Rosetta Code: Mode
 
 fn Rosetta::Mode::compute($list) {
-    my $result
+    var $result
     if (len(@$list) == 0) {
         $result = []
     } else {
-        my %counts
-        for my $x (@$list) { $counts{$x}++ }
+        var %counts
+        for val $x (@$list) { $counts{$x}++ }
         
-        my $max = 0
-        for my $k (keys %counts) {
+        var $max = 0
+        for val $k (keys %counts) {
             if ($counts{$k} > $max) {
                 $max = $counts{$k}
             }
         }
         
-        my @res
-        for my $k (keys %counts) {
+        var @res
+        for val $k (keys %counts) {
             if ($counts{$k} == $max) {
                 push @res, $k
             }
         }
-        my @sorted = sort(@res)
+        val @sorted = sort(@res)
         $result = [@sorted]
     }
     $result
 }
 
-my $m1 = Rosetta::Mode::compute([1, 3, 6, 6, 6, 6, 7, 7, 12, 12, 17])
+val $m1 = Rosetta::Mode::compute([1, 3, 6, 6, 6, 6, 7, 7, 12, 12, 17])
 assert_eq join(",", @$m1), "6", "mode is 6"
 
-my $m2 = Rosetta::Mode::compute([1, 1, 2, 4, 4])
+val $m2 = Rosetta::Mode::compute([1, 1, 2, 4, 4])
 assert_eq join(",", @$m2), "1,4", "modes are 1 and 4"
 
-my $m3 = Rosetta::Mode::compute(["apple", "banana", "apple"])
+val $m3 = Rosetta::Mode::compute(["apple", "banana", "apple"])
 assert_eq join(",", @$m3), "apple", "mode with strings"
 
 test_run

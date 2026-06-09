@@ -27,7 +27,7 @@ fn Project::ControlFlow::grade_score($score) {
 }
 
 fn Project::ControlFlow::unless_example($val) {
-    my $result = "default"
+    var $result = "default"
     unless ($val) {
         $result = "was falsy"
     }
@@ -51,25 +51,25 @@ fn Project::ControlFlow::ternary_expr($a, $b) {
 # ── Postfix conditionals ───────────────────────────────────────────
 
 fn Project::ControlFlow::postfix_if_true {
-    my $result = 0
+    var $result = 0
     $result = 42 if 1
     $result
 }
 
 fn Project::ControlFlow::postfix_if_false {
-    my $result = 99
+    var $result = 99
     $result = 42 if 0
     $result
 }
 
 fn Project::ControlFlow::postfix_unless_true {
-    my $result = 0
+    var $result = 0
     $result = 42 unless 1
     $result
 }
 
 fn Project::ControlFlow::postfix_unless_false {
-    my $result = 0
+    var $result = 0
     $result = 42 unless 0
     $result
 }
@@ -77,15 +77,15 @@ fn Project::ControlFlow::postfix_unless_false {
 # ── For loops ──────────────────────────────────────────────────────
 
 fn Project::ControlFlow::sum_range($start, $end) {
-    my $sum = 0
-    for my $i ($start:$end) {
+    var $sum = 0
+    for val $i ($start:$end) {
         $sum += $i
     }
     $sum
 }
 
 fn Project::ControlFlow::count_evens(@nums) {
-    my $count = 0
+    var $count = 0
     ~> @nums ep {
         $count++ if _ % 2 == 0
     }
@@ -93,16 +93,16 @@ fn Project::ControlFlow::count_evens(@nums) {
 }
 
 fn Project::ControlFlow::for_c_style_sum($n) {
-    my $sum = 0
-    for (my $i = 1; $i <= $n; $i++) {
+    var $sum = 0
+    for (var $i = 1; $i <= $n; $i++) {
         $sum += $i
     }
     $sum
 }
 
 fn Project::ControlFlow::for_with_next {
-    my $sum = 0
-    for my $i (1:10) {
+    var $sum = 0
+    for val $i (1:10) {
         next if $i % 2 == 0
         $sum += $i
     }
@@ -110,8 +110,8 @@ fn Project::ControlFlow::for_with_next {
 }
 
 fn Project::ControlFlow::for_with_last {
-    my $sum = 0
-    for my $i (1:100) {
+    var $sum = 0
+    for val $i (1:100) {
         last if $i > 10
         $sum += $i
     }
@@ -121,7 +121,7 @@ fn Project::ControlFlow::for_with_last {
 # ── While loops ────────────────────────────────────────────────────
 
 fn Project::ControlFlow::while_countdown($n) {
-    my @result
+    var @result
     while ($n > 0) {
         push @result, $n
         $n--
@@ -130,8 +130,8 @@ fn Project::ControlFlow::while_countdown($n) {
 }
 
 fn Project::ControlFlow::while_with_last {
-    my $count = 0
-    my $sum = 0
+    var $count = 0
+    var $sum = 0
     while (1) {
         $count++
         $sum += $count
@@ -141,8 +141,8 @@ fn Project::ControlFlow::while_with_last {
 }
 
 fn Project::ControlFlow::while_with_next {
-    my $i = 0
-    my $sum = 0
+    var $i = 0
+    var $sum = 0
     while ($i < 10) {
         $i++
         next if $i % 2 == 0
@@ -152,7 +152,7 @@ fn Project::ControlFlow::while_with_next {
 }
 
 fn Project::ControlFlow::until_example($target) {
-    my $n = 0
+    var $n = 0
     until ($n >= $target) {
         $n += 2
     }
@@ -162,14 +162,14 @@ fn Project::ControlFlow::until_example($target) {
 # ── Postfix loops ──────────────────────────────────────────────────
 
 fn Project::ControlFlow::postfix_for_sum {
-    my $sum = 0
+    var $sum = 0
     $sum += _ for (1, 2, 3, 4, 5)
     $sum
 }
 
 fn Project::ControlFlow::postfix_while_countdown {
-    my @result
-    my $n = 5
+    var @result
+    var $n = 5
     do {
         push @result, $n
         $n--
@@ -217,7 +217,7 @@ fn Project::ControlFlow::classify_char_given($c) {
 }
 
 fn Project::ControlFlow::nested_given($a, $b) {
-    my $result
+    var $result
     given ($a) {
         when (1) {
             given ($b) {
@@ -259,9 +259,9 @@ fn Project::ControlFlow::number_word($n) {
 # ── Nested loops ───────────────────────────────────────────────────
 
 fn Project::ControlFlow::multiplication_table_sum($size) {
-    my $sum = 0
-    for my $i (1:$size) {
-        for my $j (1:$size) {
+    var $sum = 0
+    for val $i (1:$size) {
+        for val $j (1:$size) {
             $sum += $i * $j
         }
     }
@@ -269,9 +269,9 @@ fn Project::ControlFlow::multiplication_table_sum($size) {
 }
 
 fn Project::ControlFlow::find_pair_sum($target, @nums) {
-    my $len = scalar @nums
-    for my $i (0:$len-2) {
-        for my $j ($i+1:$len-1) {
+    val $len = scalar @nums
+    for val $i (0:$len-2) {
+        for val $j ($i+1:$len-1) {
             if ($nums[$i] + $nums[$j] == $target) {
                 return ($nums[$i], $nums[$j])
             }
@@ -290,15 +290,15 @@ fn Project::ControlFlow::early_return($n) {
 }
 
 fn Project::ControlFlow::return_from_loop(@nums) {
-    for my $n (@nums) {
+    for var $n (@nums) {
         return $n if $n > 100
     }
     -1
 }
 
 fn Project::ControlFlow::return_list_from_loop($count) {
-    my @result
-    for my $i (1:$count) {
+    var @result
+    for val $i (1:$count) {
         return @result if $i > 5
         push @result, $i * 2
     }
@@ -308,7 +308,7 @@ fn Project::ControlFlow::return_list_from_loop($count) {
 # ── Complex control flow ───────────────────────────────────────────
 
 fn Project::ControlFlow::fizz_buzz($n) {
-    my @result
+    var @result
     ~> 1:$n ep {
         if (_ % 15 == 0) {
             push @result, "FizzBuzz"
@@ -324,7 +324,7 @@ fn Project::ControlFlow::fizz_buzz($n) {
 }
 
 fn Project::ControlFlow::collatz_steps($n) {
-    my $steps = 0
+    var $steps = 0
     while ($n != 1) {
         if ($n % 2 == 0) {
             $n = $n / 2
@@ -337,9 +337,9 @@ fn Project::ControlFlow::collatz_steps($n) {
 }
 
 fn Project::ControlFlow::find_primes($limit) {
-    my @primes
-    OUTER: for my $n (2:$limit) {
-        for my $p (@primes) {
+    var @primes
+    OUTER: for val $n (2:$limit) {
+        for val $p (@primes) {
             next OUTER if $n % $p == 0
         }
         push @primes, $n

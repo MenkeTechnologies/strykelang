@@ -4,19 +4,19 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 # BUG-021: Scalar-ref to arrayref unwrap
-my $x_21 = [1, 2, 3]
-my $r_21 = \$x_21
-eval { my $val = $$r_21->[0] }
+val $x_21 = [1, 2, 3]
+val $r_21 = \$x_21
+eval { val $val = $$r_21->[0] }
 $@ =~ /Can't use arrow deref/ |> aok "BUG-021: scalar-ref to arrayref unwrap fails"
 
 # BUG-023: Autovivification
-my %h_23
+val %h_23
 eval { $h_23{k}[0] = "first" }
 $@ =~ /Can't assign to arrow array deref/ |> aok "BUG-023: autovivification fails"
 
 # BUG-030 (FIXED): system() now returns the encoded Perl $? word (exit_code << 8),
 # matching stock Perl (`system("false")` → 256). Was returning the raw exit code (1).
-my $r_30 = system("false")
+val $r_30 = system("false")
 $r_30 |> aeq 256, "BUG-030 (FIXED): system('false') returns 256 (Perl-encoded \$?)"
 
 # BUG-031 (FIXED): system(LIST) now sets $? to (exit_code << 8) matching Perl —
@@ -27,8 +27,8 @@ $? |> aeq 1792, "BUG-031 (FIXED): system(LIST) sets \$? to encoded exit code"
 # BUG-037 (FIXED): closure-wrapped coderef call now flattens @_ into the
 # call list (was returning scalar(@_) before the vm_helper fix).
 fn Pin::BugsExtended::my_dbl_37(_) { _ * 2 }
-my $f_37 = \&Pin::BugsExtended::my_dbl_37
-my $h_37 = fn { $f_37(@_) }
+val $f_37 = \&Pin::BugsExtended::my_dbl_37
+val $h_37 = fn { $f_37(@_) }
 $h_37(5) |> aeq 10, "BUG-037 (FIXED): closure passes \@_ flattened, not as count"
 
 # BUG-044: AOP `after` advice sees $? as the *current* shell-status $? (here
@@ -41,20 +41,20 @@ Pin::BugsExtended::payload_44()
 $after_q != 42 |> aok "BUG-044: AOP after \$? is not the sub return value"
 
 # BUG-063: take(N, LIST) returns empty
-my @r_63 = take(3, 1..10)
+val @r_63 = take(3, 1..10)
 len(@r_63) |> aeq 0, "BUG-063: take(N, LIST) returns empty"
 
 # BUG-065: head(N, LIST) returns N
-my @r_65 = head(3, qw(a b c d e))
+val @r_65 = head(3, qw(a b c d e))
 join(",", @r_65) |> aeq "3", "BUG-065: head(N, LIST) returns N"
 
 # BUG-088: (&@) block prototype drops trailing args
-fn Pin::BugsExtended::myff_88(&@) { my $cb = shift; len(@_) }
-my $res_88 = Pin::BugsExtended::myff_88 { 1 } 5, 7
+fn Pin::BugsExtended::myff_88(&@) { val $cb = shift; len(@_) }
+val $res_88 = Pin::BugsExtended::myff_88 { 1 } 5, 7
 $res_88 |> aeq 0, "BUG-088: block prototype drops trailing args"
 
 # BUG-109 (FIXED): sum(\@a) now sums via arrayref operand (was returning 0).
-my @a_109 = (1, 2, 3)
+val @a_109 = (1, 2, 3)
 sum(\@a_109) |> aeq 6, "BUG-109 (FIXED): sum(\\@a) sums arrayref contents"
 
 test_run

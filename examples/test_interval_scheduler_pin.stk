@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 
 fn IS::schedule($intervals) {
-    my @sorted = sort { _->[1] <=> _1->[1] } @$intervals
-    my @chosen = ()
-    my $last_end = -9999999999
-    for my $iv (@sorted) {
-        my ($s, $e) = @$iv
+    val @sorted = sort { _->[1] <=> _1->[1] } @$intervals
+    var @chosen = ()
+    var $last_end = -9999999999
+    for val $iv (@sorted) {
+        val ($s, $e) = @$iv
         if ($s >= $last_end) {
             push @chosen, $iv
             $last_end = $e
@@ -15,12 +15,12 @@ fn IS::schedule($intervals) {
 }
 
 fn IS::overlaps($intervals) {
-    my $count = 0
-    my $n = len @$intervals
-    for my $i (0:$n-1) {
-        for my $j ($i+1:$n-1) {
-            my ($a1, $a2) = @{$intervals->[$i]}
-            my ($b1, $b2) = @{$intervals->[$j]}
+    var $count = 0
+    val $n = len @$intervals
+    for val $i (0:$n-1) {
+        for val $j ($i+1:$n-1) {
+            val ($a1, $a2) = @{$intervals->[$i]}
+            val ($b1, $b2) = @{$intervals->[$j]}
             $count = $count + 1 if $a1 < $b2 && $b1 < $a2
         }
     }
@@ -30,35 +30,35 @@ fn IS::overlaps($intervals) {
 fn IS::fmt($iv) { "[" . $iv->[0] . "," . $iv->[1] . ")" }
 
 # Empty
-my $r0 = IS::schedule([])
+val $r0 = IS::schedule([])
 len(@$r0) |> aeq 0, "empty"
 IS::overlaps([]) |> aeq 0, "no overlaps empty"
 
 # Single
-my $r1 = IS::schedule([[1,5]])
+val $r1 = IS::schedule([[1,5]])
 len(@$r1) |> aeq 1, "single chosen"
 $r1->[0]->[0] |> aeq 1, "single start"
 
 # Two disjoint
-my $r2 = IS::schedule([[1,2],[3,4]])
+val $r2 = IS::schedule([[1,2],[3,4]])
 len(@$r2) |> aeq 2, "two disjoint"
 
 # Two overlapping → pick earliest-finish
-my $r3 = IS::schedule([[1,5],[2,3]])
+val $r3 = IS::schedule([[1,5],[2,3]])
 len(@$r3) |> aeq 1, "two overlap pick one"
 $r3->[0]->[1] |> aeq 3, "picks earliest end"
 
 # Classic case
-my $r4 = IS::schedule([[1,4],[3,5],[0,6],[5,7],[3,9],[5,9],[6,10],[8,11],[8,12],[2,14],[12,16]])
+val $r4 = IS::schedule([[1,4],[3,5],[0,6],[5,7],[3,9],[5,9],[6,10],[8,11],[8,12],[2,14],[12,16]])
 len(@$r4) |> aeq 4, "classic 4"
 IS::overlaps($r4) |> aeq 0, "no overlaps in chosen"
 
 # Touch boundary [1,3) and [3,5) are disjoint (s >= last_end)
-my $r5 = IS::schedule([[1,3],[3,5],[5,7]])
+val $r5 = IS::schedule([[1,3],[3,5],[5,7]])
 len(@$r5) |> aeq 3, "touching boundaries OK"
 
 # Contained interval
-my $r6 = IS::schedule([[0,10],[2,3],[4,5]])
+val $r6 = IS::schedule([[0,10],[2,3],[4,5]])
 len(@$r6) |> aeq 2, "tight inner two beat long outer"
 
 # Overlap count basics
@@ -68,14 +68,14 @@ IS::overlaps([[1,3],[3,5]]) |> aeq 0, "touch != overlap"
 IS::overlaps([[1,10],[2,9],[3,8]]) |> aeq 3, "three pairs"
 
 # Many disjoint
-my @many = ()
-for my $i (0:9) { push @many, [$i*2, $i*2+1] }
-my $rm = IS::schedule(\@many)
+var @many = ()
+for val $i (0:9) { push @many, [$i*2, $i*2+1] }
+val $rm = IS::schedule(\@many)
 len(@$rm) |> aeq 10, "all 10 disjoint chosen"
 IS::overlaps(\@many) |> aeq 0, "10 disjoint zero overlap"
 
 # Unsorted input handled
-my $r7 = IS::schedule([[5,7],[1,4],[3,5]])
+val $r7 = IS::schedule([[5,7],[1,4],[3,5]])
 len(@$r7) |> aeq 2, "unsorted classic 2"
 $r7->[0]->[0] |> aeq 1, "first picked is [1,4)"
 $r7->[1]->[0] |> aeq 5, "second picked is [5,7)"

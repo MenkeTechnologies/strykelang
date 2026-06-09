@@ -48,7 +48,7 @@ assert_eq Exercism::OcrNumbers::convert([
     "   ",
 ]), "1,2", "stacked"
 
-my $err = eval { Exercism::OcrNumbers::convert(["   "]); 0 } || $@
+var $err = eval { Exercism::OcrNumbers::convert(["   "]); 0 } || $@
 assert_ok $err =~ /multiple of four/, "wrong row count"
 $err = eval { Exercism::OcrNumbers::convert(["    ","  ","   ","   "]); 0 } || $@
 assert_ok $err =~ /multiple of three/, "wrong col count"

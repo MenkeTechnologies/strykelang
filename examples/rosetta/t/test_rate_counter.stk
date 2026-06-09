@@ -3,8 +3,8 @@
 
 fn Rosetta::RateCounter::demo() {
     # Task: Count occurrences of events over a period.
-    my $count = 0
-    my $start_time = time()
+    var $count = 0
+    val $start_time = time()
     
     # Simulate events for 1 second
     while (time() - $start_time < 1) {
@@ -15,7 +15,7 @@ fn Rosetta::RateCounter::demo() {
     $count
 }
 
-my $rate = Rosetta::RateCounter::demo()
+val $rate = Rosetta::RateCounter::demo()
 # p "Rate: $rate events/sec"
 assert_ok $rate > 0, "Measured a positive rate"
 

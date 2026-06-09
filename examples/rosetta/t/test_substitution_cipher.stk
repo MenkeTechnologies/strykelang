@@ -5,11 +5,11 @@
 
 fn Rosetta::Subst::build_table($key) {
     return undef if length($key) != 26
-    my %enc
-    my %dec
-    my @upper_in  = ("A".."Z")
-    my @upper_key = split //, uc($key)
-    for my $i (0:25) {
+    var %enc
+    var %dec
+    val @upper_in  = ("A".."Z")
+    val @upper_key = split //, uc($key)
+    for val $i (0:25) {
         $enc{$upper_in[$i]} = $upper_key[$i]
         $dec{$upper_key[$i]} = $upper_in[$i]
     }
@@ -17,9 +17,9 @@ fn Rosetta::Subst::build_table($key) {
 }
 
 fn Rosetta::Subst::translate($s, $table, $direction) {
-    my @out
-    my $map = $direction eq "encode" ? $table->[0] : $table->[1]
-    for my $ch (split //, $s) {
+    var @out
+    val $map = $direction eq "encode" ? $table->[0] : $table->[1]
+    for val $ch (split //, $s) {
         if ($ch =~ /[A-Z]/) {
             push @out, $map->{$ch}
         } elsif ($ch =~ /[a-z]/) {
@@ -32,31 +32,31 @@ fn Rosetta::Subst::translate($s, $table, $direction) {
 }
 
 fn Rosetta::Subst::encode($s, $key) {
-    my $t = Rosetta::Subst::build_table($key)
+    val $t = Rosetta::Subst::build_table($key)
     return undef unless defined $t
     Rosetta::Subst::translate($s, $t, "encode")
 }
 
 fn Rosetta::Subst::decode($s, $key) {
-    my $t = Rosetta::Subst::build_table($key)
+    val $t = Rosetta::Subst::build_table($key)
     return undef unless defined $t
     Rosetta::Subst::translate($s, $t, "decode")
 }
 
 # ROT13 (key = NOPQRSTUVWXYZABCDEFGHIJKLM)
-my $rot13 = "NOPQRSTUVWXYZABCDEFGHIJKLM"
+val $rot13 = "NOPQRSTUVWXYZABCDEFGHIJKLM"
 assert_eq Rosetta::Subst::encode("Hello, World!", $rot13), "Uryyb, Jbeyq!", "ROT13 encode"
 assert_eq Rosetta::Subst::decode("Uryyb, Jbeyq!", $rot13), "Hello, World!", "ROT13 decode (= self)"
 
 # Random-looking key
-my $key = "QWERTYUIOPASDFGHJKLZXCVBNM"
-my $plain = "ATTACK AT DAWN"
-my $enc = Rosetta::Subst::encode($plain, $key)
+val $key = "QWERTYUIOPASDFGHJKLZXCVBNM"
+val $plain = "ATTACK AT DAWN"
+val $enc = Rosetta::Subst::encode($plain, $key)
 assert_eq Rosetta::Subst::decode($enc, $key), $plain, "round-trip preserves plaintext"
 
 # Case preservation
-my $upper_pair = Rosetta::Subst::encode("AB", $key)
-my $expected_mixed = lc(substr($upper_pair, 0, 1)) . substr($upper_pair, 1, 1)
+val $upper_pair = Rosetta::Subst::encode("AB", $key)
+val $expected_mixed = lc(substr($upper_pair, 0, 1)) . substr($upper_pair, 1, 1)
 assert_eq Rosetta::Subst::encode("aB", $key), $expected_mixed, "case preserved"
 
 # Non-alpha passthrough

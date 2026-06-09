@@ -2,8 +2,8 @@
 # Rosetta Code: Pernicious numbers
 
 fn Rosetta::Pernicious::count_bits($n) {
-    my $count = 0
-    my $num = $n
+    var $count = 0
+    var $num = $n
     while ($num > 0) {
         if ($num % 2 == 1) { $count++ }
         $num = int($num / 2)
@@ -12,7 +12,7 @@ fn Rosetta::Pernicious::count_bits($n) {
 }
 
 fn Rosetta::Pernicious::check($n) {
-    my $bits = Rosetta::Pernicious::count_bits($n)
+    val $bits = Rosetta::Pernicious::count_bits($n)
     is_prime($bits)
 }
 

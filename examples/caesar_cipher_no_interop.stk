@@ -16,7 +16,7 @@
 #       stryke --no-interop examples/caesar_cipher_no_interop.stk decode "Olssv, Dvysk!" 7
 
 fn Caesar::shift_one($c, $by) {
-    my $code = ord($c)
+    val $code = ord($c)
     if ($code >= ord("A") && $code <= ord("Z")) {
         return chr(((($code - ord("A")) + $by) % 26 + 26) % 26 + ord("A"))
     }
@@ -29,23 +29,23 @@ fn Caesar::shift_one($c, $by) {
 fn Caesar::cipher($s, $shift = 3) = join("", maps { Caesar::shift_one(_, $shift) } split(//, $s))
 
 if (len(@ARGV) >= 2) {
-    my $mode  = $ARGV[0]
-    my $text  = $ARGV[1]
-    my $shift = $ARGV[2] // 3
-    my $by    = $mode eq "decode" ? -(0 + $shift) : 0 + $shift
+    val $mode  = $ARGV[0]
+    val $text  = $ARGV[1]
+    val $shift = $ARGV[2] // 3
+    val $by    = $mode eq "decode" ? -(0 + $shift) : 0 + $shift
     p Caesar::cipher($text, $by)
     exit 0
 }
 
 # Demo grid: round-trip a phrase through every shift 1..6.
-my $plain = "The quick brown fox jumps over the lazy dog."
+val $plain = "The quick brown fox jumps over the lazy dog."
 p "── Caesar demo (round-trip plain ↔ cipher) ──"
 p "plain : $plain"
-my $any_failed = 0
-for my $s (1:6) {
-    my $enc = Caesar::cipher($plain, $s)
-    my $dec = Caesar::cipher($enc, -$s)
-    my $ok  = ($dec eq $plain)
+var $any_failed = 0
+for val $s (1:6) {
+    val $enc = Caesar::cipher($plain, $s)
+    val $dec = Caesar::cipher($enc, -$s)
+    val $ok  = ($dec eq $plain)
     $any_failed++ unless $ok
     printf "  shift %d: %s   (round-trip %s)\n", $s, $enc, $ok ? "OK" : "FAIL"
 }

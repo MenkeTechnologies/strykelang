@@ -3,9 +3,9 @@
 
 fn Rosetta::AmicableTriples::sum_divisors($n) {
     if ($n < 2) { return 0 }
-    my $sum = 0
-    my $limit = int($n / 2)
-    for my $i (1:$limit) {
+    var $sum = 0
+    val $limit = int($n / 2)
+    for val $i (1:$limit) {
         if ($n % $i == 0) {
             $sum = $sum + $i
         }
@@ -14,17 +14,17 @@ fn Rosetta::AmicableTriples::sum_divisors($n) {
 }
 
 fn Rosetta::AmicableTriples::solve($limit) {
-    my @res
-    for my $a (1:$limit) {
-        my $sa = Rosetta::AmicableTriples::sum_divisors($a)
+    var @res
+    for val $a (1:$limit) {
+        val $sa = Rosetta::AmicableTriples::sum_divisors($a)
         # Amicable triple (a,b,c) means s(a)=b+c, s(b)=a+c, s(c)=a+b
         # So b+c = s(a).
-        for my $b ($a+1:$limit) {
-            my $c = $sa - $b
+        for val $b ($a+1:$limit) {
+            val $c = $sa - $b
             if ($c > $b && $c <= $limit) {
-                my $sb = Rosetta::AmicableTriples::sum_divisors($b)
+                val $sb = Rosetta::AmicableTriples::sum_divisors($b)
                 if ($sb == $a + $c) {
-                    my $sc = Rosetta::AmicableTriples::sum_divisors($c)
+                    val $sc = Rosetta::AmicableTriples::sum_divisors($c)
                     if ($sc == $a + $b) {
                         push @res, [$a, $b, $c]
                     }
@@ -36,7 +36,7 @@ fn Rosetta::AmicableTriples::solve($limit) {
 }
 
 # Known triple: (1980, 2016, 2556)
-my $triples = Rosetta::AmicableTriples::solve(3000)
+val $triples = Rosetta::AmicableTriples::solve(3000)
 assert_eq $triples->[0]->[0], 1980, "first triple a"
 assert_eq $triples->[0]->[1], 2016, "first triple b"
 assert_eq $triples->[0]->[2], 2556, "first triple c"

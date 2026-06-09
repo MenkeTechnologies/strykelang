@@ -10,7 +10,7 @@ class Secret {
 }
 
 fn Rosetta::Privacy::demo() {
-    my $s = Secret()
+    val $s = Secret()
     
     "OO Privacy Test:" |> p
     "  Normal access: " . $s->get_data() |> p

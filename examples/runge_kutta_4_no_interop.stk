@@ -26,29 +26,29 @@
 # ── scalar RK4 step: one update of y given f(t, y) ────────────────
 
 fn Rk::step_scalar($f, $t, $y, $h) {
-    my $k1 = $f->($t,         $y)
-    my $k2 = $f->($t + $h / 2, $y + $h * $k1 / 2)
-    my $k3 = $f->($t + $h / 2, $y + $h * $k2 / 2)
-    my $k4 = $f->($t + $h,     $y + $h * $k3)
+    val $k1 = $f->($t,         $y)
+    val $k2 = $f->($t + $h / 2, $y + $h * $k1 / 2)
+    val $k3 = $f->($t + $h / 2, $y + $h * $k2 / 2)
+    val $k4 = $f->($t + $h,     $y + $h * $k3)
     $y + $h * ($k1 + 2 * $k2 + 2 * $k3 + $k4) / 6
 }
 
 # ── vector RK4 step: y is arrayref, f returns arrayref ────────────
 
 fn Rk::step_vector($f, $t, $y, $h) {
-    my $n = len(@$y)
-    my $k1 = $f->($t, $y)
-    my @y2
-    for my $i (0:$n - 1) { push @y2, $y->[$i] + $h / 2 * $k1->[$i] }
-    my $k2 = $f->($t + $h / 2, \@y2)
-    my @y3
-    for my $i (0:$n - 1) { push @y3, $y->[$i] + $h / 2 * $k2->[$i] }
-    my $k3 = $f->($t + $h / 2, \@y3)
-    my @y4
-    for my $i (0:$n - 1) { push @y4, $y->[$i] + $h * $k3->[$i] }
-    my $k4 = $f->($t + $h, \@y4)
-    my @out
-    for my $i (0:$n - 1) {
+    val $n = len(@$y)
+    val $k1 = $f->($t, $y)
+    var @y2
+    for val $i (0:$n - 1) { push @y2, $y->[$i] + $h / 2 * $k1->[$i] }
+    val $k2 = $f->($t + $h / 2, \@y2)
+    var @y3
+    for val $i (0:$n - 1) { push @y3, $y->[$i] + $h / 2 * $k2->[$i] }
+    val $k3 = $f->($t + $h / 2, \@y3)
+    var @y4
+    for val $i (0:$n - 1) { push @y4, $y->[$i] + $h * $k3->[$i] }
+    val $k4 = $f->($t + $h, \@y4)
+    var @out
+    for val $i (0:$n - 1) {
         push @out, $y->[$i] + $h * ($k1->[$i] + 2 * $k2->[$i] + 2 * $k3->[$i] + $k4->[$i]) / 6
     }
     \@out
@@ -69,10 +69,10 @@ fn Rk::fabs($v) {
 # ── run a scalar ODE from t0 to t1, returning final y ─────────────
 
 fn Rk::integrate_scalar($f, $t0, $y0, $t1, $steps) {
-    my $h = ($t1 - $t0) / $steps
-    my $t = $t0
-    my $y = $y0
-    for my $i (1:$steps) {
+    val $h = ($t1 - $t0) / $steps
+    var $t = $t0
+    var $y = $y0
+    for val $i (1:$steps) {
         $y = Rk::step_scalar($f, $t, $y, $h)
         $t = $t + $h
     }
@@ -82,10 +82,10 @@ fn Rk::integrate_scalar($f, $t0, $y0, $t1, $steps) {
 # ── run a vector ODE ─────────────────────────────────────────────
 
 fn Rk::integrate_vector($f, $t0, $y0, $t1, $steps) {
-    my $h = ($t1 - $t0) / $steps
-    my $t = $t0
-    my $y = $y0
-    for my $i (1:$steps) {
+    val $h = ($t1 - $t0) / $steps
+    var $t = $t0
+    var $y = $y0
+    for val $i (1:$steps) {
         $y = Rk::step_vector($f, $t, $y, $h)
         $t = $t + $h
     }
@@ -117,28 +117,28 @@ printf "  %-26s  %8s  %12s  %12s  %10s\n", "case", "t1", "RK4", "exact", "err"
 printf "  %-26s  %8s  %12s  %12s  %10s\n", "--------------------------", "--------", "------------", "------------", "----------"
 
 # Decay tests at various t.
-for my $t1 (0.5, 1.0, 2.0, 5.0) {
-    my $rk = Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, $t1, 100)
-    my $exact = exp(-$t1)
-    my $err = Rk::fabs($rk - $exact)
+for val $t1 (0.5, 1.0, 2.0, 5.0) {
+    val $rk = Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, $t1, 100)
+    val $exact = exp(-$t1)
+    val $err = Rk::fabs($rk - $exact)
     printf "  %-26s  %8.3f  %12.8f  %12.8f  %10.2e\n",
         "decay y' = -y", $t1, $rk, $exact, $err
     die "decay err #{$err} > 1e-6 at t=#{$t1}" unless $err < 1e-6
 }
 
 # Linear: y(t) = 1 + t²/2.
-my $lin_r = Rk::integrate_scalar(\&Rk::ode_lin, 0.0, 1.0, 4.0, 50)
-my $lin_e = 1.0 + 4.0 * 4.0 / 2.0
+val $lin_r = Rk::integrate_scalar(\&Rk::ode_lin, 0.0, 1.0, 4.0, 50)
+val $lin_e = 1.0 + 4.0 * 4.0 / 2.0
 printf "  %-26s  %8.3f  %12.8f  %12.8f  %10.2e\n",
     "linear y' = t", 4.0, $lin_r, $lin_e, Rk::fabs($lin_r - $lin_e)
 die "linear off" unless Rk::fabs($lin_r - $lin_e) < 1e-9
 
 # Vector SHO: y(t) = (cos t, -sin t) with y0 = (1, 0).
-my $sho_r = Rk::integrate_vector(\&Rk::ode_sho, 0.0, [1.0, 0.0], 3.14159265358979, 1000)
-my $sho_e0 = -1.0   # cos(π)
-my $sho_e1 = 0.0    # -sin(π) ≈ 0
-my $err_s0 = Rk::fabs($sho_r->[0] - $sho_e0)
-my $err_s1 = Rk::fabs($sho_r->[1] - $sho_e1)
+val $sho_r = Rk::integrate_vector(\&Rk::ode_sho, 0.0, [1.0, 0.0], 3.14159265358979, 1000)
+val $sho_e0 = -1.0   # cos(π)
+val $sho_e1 = 0.0    # -sin(π) ≈ 0
+val $err_s0 = Rk::fabs($sho_r->[0] - $sho_e0)
+val $err_s1 = Rk::fabs($sho_r->[1] - $sho_e1)
 printf "  %-26s  %8.3f  (%.4f, %.4f) vs (-1.000, 0.000)\n",
     "SHO at t=π", 3.14159, $sho_r->[0], $sho_r->[1]
 die "SHO y0 err #{$err_s0} > 1e-6" unless $err_s0 < 1e-6
@@ -146,33 +146,33 @@ die "SHO y1 err #{$err_s1} > 1e-6" unless $err_s1 < 1e-6
 
 # ── invariant 1: decay error decreases as O(h⁴) when h halves ─────
 
-my $err_a = Rk::fabs(Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, 1.0, 10) - exp(-1.0))
-my $err_b = Rk::fabs(Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, 1.0, 20) - exp(-1.0))
+val $err_a = Rk::fabs(Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, 1.0, 10) - exp(-1.0))
+val $err_b = Rk::fabs(Rk::integrate_scalar(\&Rk::ode_decay, 0.0, 1.0, 1.0, 20) - exp(-1.0))
 # Halving h should drop error by ~16× (factor 2^4 for global O(h^4)).
 # Allow a generous 8× lower bound to survive constant-factor noise.
 die "RK4 doesn't show ~h^4 convergence: err(N=10)=#{$err_a} err(N=20)=#{$err_b}" unless $err_a / ($err_b == 0 ? 1e-20 : $err_b) > 8.0
 
 # ── invariant 2: RK4 is more accurate than Euler at the same step ──
 
-my $euler_y = 1.0
-my $rk4_y   = 1.0
-my $h = 0.1
-my $t = 0.0
-for my $i (1:10) {
+var $euler_y = 1.0
+var $rk4_y   = 1.0
+val $h = 0.1
+var $t = 0.0
+for val $i (1:10) {
     $euler_y = Rk::euler_scalar(\&Rk::ode_decay, $t, $euler_y, $h)
     $rk4_y   = Rk::step_scalar(\&Rk::ode_decay, $t, $rk4_y, $h)
     $t = $t + $h
 }
-my $exact_1 = exp(-1.0)
+val $exact_1 = exp(-1.0)
 die "Euler beat RK4 at t=1" unless Rk::fabs($rk4_y - $exact_1) < Rk::fabs($euler_y - $exact_1)
 
 # ── invariant 3: exponential growth y' = 2y matches y0·e^(2t) ────
 
-for my $y0 (0.5, 1.0, 2.5) {
-    for my $t1 (0.2, 0.5, 1.0) {
-        my $rk = Rk::integrate_scalar(\&Rk::ode_grow, 0.0, $y0, $t1, 200)
-        my $exact = $y0 * exp(2 * $t1)
-        my $rel = Rk::fabs($rk - $exact) / $exact
+for val $y0 (0.5, 1.0, 2.5) {
+    for val $t1 (0.2, 0.5, 1.0) {
+        val $rk = Rk::integrate_scalar(\&Rk::ode_grow, 0.0, $y0, $t1, 200)
+        val $exact = $y0 * exp(2 * $t1)
+        val $rel = Rk::fabs($rk - $exact) / $exact
         die "growth rel err #{$rel} > 1e-6 at y0=#{$y0}, t=#{$t1}" unless $rel < 1e-6
     }
 }
@@ -180,32 +180,32 @@ for my $y0 (0.5, 1.0, 2.5) {
 # ── invariant 4: quadratic-driver y' = 3t² recovers cubic exactly ─
 # (within floating point — should be effectively exact).
 
-for my $t1 (0.5, 1.0, 2.0, 3.0) {
-    my $rk = Rk::integrate_scalar(\&Rk::ode_t2, 0.0, 0.0, $t1, 50)
-    my $exact = $t1 * $t1 * $t1
-    my $rel = Rk::fabs($rk - $exact) / ($exact == 0 ? 1.0 : $exact)
+for val $t1 (0.5, 1.0, 2.0, 3.0) {
+    val $rk = Rk::integrate_scalar(\&Rk::ode_t2, 0.0, 0.0, $t1, 50)
+    val $exact = $t1 * $t1 * $t1
+    val $rel = Rk::fabs($rk - $exact) / ($exact == 0 ? 1.0 : $exact)
     die "t² driver rel err #{$rel} > 1e-9 at t=#{$t1}" unless $rel < 1e-9
 }
 
 # ── invariant 5: SHO energy ½(y₀² + y₁²) is conserved ─────────────
 
-my $y = [1.0, 0.0]
-my $t_cur = 0.0
-my $h_sh = 0.01
-my $e0 = 0.5 * ($y->[0] ** 2 + $y->[1] ** 2)
-for my $i (1:1000) {
+var $y = [1.0, 0.0]
+var $t_cur = 0.0
+val $h_sh = 0.01
+val $e0 = 0.5 * ($y->[0] ** 2 + $y->[1] ** 2)
+for val $i (1:1000) {
     $y = Rk::step_vector(\&Rk::ode_sho, $t_cur, $y, $h_sh)
     $t_cur += $h_sh
-    my $e_now = 0.5 * ($y->[0] ** 2 + $y->[1] ** 2)
-    my $drift = Rk::fabs($e_now - $e0)
+    val $e_now = 0.5 * ($y->[0] ** 2 + $y->[1] ** 2)
+    val $drift = Rk::fabs($e_now - $e0)
     die "SHO energy drifted #{$drift} > 1e-6 at step #{$i}" unless $drift < 1e-6
 }
 
 # ── invariant 6: a zero-derivative ODE leaves y unchanged ─────────
 
 fn Rk::ode_zero($t, $y) { 0 }
-for my $y0 (-3.0, 0.0, 7.5, 100.0) {
-    my $r = Rk::integrate_scalar(\&Rk::ode_zero, 0.0, $y0, 10.0, 100)
+for val $y0 (-3.0, 0.0, 7.5, 100.0) {
+    val $r = Rk::integrate_scalar(\&Rk::ode_zero, 0.0, $y0, 10.0, 100)
     die "zero-ODE drifted from #{$y0} to #{$r}" unless Rk::fabs($r - $y0) < 1e-12
 }
 
@@ -213,22 +213,22 @@ for my $y0 (-3.0, 0.0, 7.5, 100.0) {
 # doesn't have this property; RK4 doesn't either rigorously but the
 # error is tiny). We use a tolerance check.
 
-my $y0_rev = 2.5
-my $h_rev = 0.05
-my $fwd = $y0_rev
-my $t_rev = 0.0
-for my $i (1:20) {
+val $y0_rev = 2.5
+val $h_rev = 0.05
+var $fwd = $y0_rev
+var $t_rev = 0.0
+for val $i (1:20) {
     $fwd = Rk::step_scalar(\&Rk::ode_decay, $t_rev, $fwd, $h_rev)
     $t_rev += $h_rev
 }
 # Reverse: integrate dy/dt = +y from t = 1 down to 0 using negative h.
-my $back = $fwd
+var $back = $fwd
 $t_rev = 1.0
-for my $i (1:20) {
+for val $i (1:20) {
     $back = Rk::step_scalar(\&Rk::ode_decay, $t_rev, $back, -$h_rev)
     $t_rev -= $h_rev
 }
-my $rev_err = Rk::fabs($back - $y0_rev)
+val $rev_err = Rk::fabs($back - $y0_rev)
 die "fwd+reverse drift #{$rev_err} > 1e-6" unless $rev_err < 1e-6
 
 p ""

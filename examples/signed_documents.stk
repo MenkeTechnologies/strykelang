@@ -5,22 +5,22 @@
 # tampering by mutating content after store. Practical pattern for
 # audit logs / config snapshots / payloads-over-untrusted-channel.
 
-my $secret = "fleet-signing-key-keep-out-of-repo"
-my $path   = "/tmp/signed_docs_demo.rkyv"
+val $secret = "fleet-signing-key-keep-out-of-repo"
+val $path   = "/tmp/signed_docs_demo.rkyv"
 unlink($path)
 
 # ── Build three documents + signatures ────────────────────────────────
 
-my @docs = (
+val @docs = (
     +{ id => "config:prod",    body => '{"db_host":"prod-db.internal","pool":20}' },
     +{ id => "config:staging", body => '{"db_host":"stage-db.internal","pool":5}' },
     +{ id => "audit:2026-05-15", body => "user=alice op=rollout build=0.14.2" },
 )
 
 p "── sign + store ───────────────────────────────────────"
-my $db = kv_open($path)
-for my $doc (@docs) {
-    my $tag = hmac_sha256($secret, $doc->{body})
+val $db = kv_open($path)
+for val $doc (@docs) {
+    val $tag = hmac_sha256($secret, $doc->{body})
     kv_put($db, $doc->{id}, +{
         body       => $doc->{body},
         tag        => $tag,
@@ -36,12 +36,12 @@ printf "  wrote %d signed docs to %s\n", kv_len($db), $path
 
 p ""
 p "── reopen + verify ────────────────────────────────────"
-my $db2 = kv_open($path)
-my $ok = 0
-my $bad = 0
-for my $id ("config:prod", "config:staging", "audit:2026-05-15") {
-    my $row = kv_get($db2, $id)
-    my $recomputed = hmac_sha256($secret, $row->{body})
+val $db2 = kv_open($path)
+var $ok = 0
+var $bad = 0
+for val $id ("config:prod", "config:staging", "audit:2026-05-15") {
+    val $row = kv_get($db2, $id)
+    val $recomputed = hmac_sha256($secret, $row->{body})
     if ($recomputed eq $row->{tag}) {
         printf "  %-22s ✓ (signed_at %s)\n", $id, $row->{signed_at}
         $ok++
@@ -58,15 +58,15 @@ p ""
 p "── tamper detection ───────────────────────────────────"
 # Read, mutate body without re-signing, write back. Mimics an attacker
 # who knows the storage layout but doesn't know the secret.
-my $row = kv_get($db2, "config:prod")
+var $row = kv_get($db2, "config:prod")
 $row->{body} = '{"db_host":"attacker-controlled.evil","pool":20}'
 kv_put($db2, "config:prod", $row)
 kv_commit($db2)
 
 # Reopen the freshly-tampered store
-my $db3 = kv_open($path)
-my $check = kv_get($db3, "config:prod")
-my $tag_now = hmac_sha256($secret, $check->{body})
+val $db3 = kv_open($path)
+val $check = kv_get($db3, "config:prod")
+val $tag_now = hmac_sha256($secret, $check->{body})
 if ($tag_now eq $check->{tag}) {
     p "  config:prod — verifies (BUG: tamper undetected)"
 } else {
@@ -79,9 +79,9 @@ if ($tag_now eq $check->{tag}) {
 
 p ""
 p "── audit aggregates via sketches ──────────────────────"
-my $signers_hll = hll(14)
-my $signer_load = cms(2048, 5)
-my @audit_log = (
+val $signers_hll = hll(14)
+val $signer_load = cms(2048, 5)
+val @audit_log = (
     +{ signer => "deploy-bot",  ts => time() - 3600 },
     +{ signer => "alice",        ts => time() - 1800 },
     +{ signer => "deploy-bot",  ts => time() - 1700 },
@@ -89,12 +89,12 @@ my @audit_log = (
     +{ signer => "alice",        ts => time() - 600 },
     +{ signer => "deploy-bot",  ts => time() - 60 },
 )
-for my $entry (@audit_log) {
+for val $entry (@audit_log) {
     hll_add($signers_hll, $entry->{signer})
     cms_add($signer_load, $entry->{signer})
 }
 printf "  distinct signers (HLL) : %d  (truth: 3)\n", hll_count($signers_hll)
-for my $name ("deploy-bot", "alice", "bob") {
+for val $name ("deploy-bot", "alice", "bob") {
     printf "  %-12s × %d ops\n", $name, cms_count($signer_load, $name)
 }
 

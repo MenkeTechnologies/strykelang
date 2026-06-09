@@ -2,28 +2,28 @@
 # Rosetta Code: Averages/Pythagorean means
 
 fn Rosetta::PythagoreanMeans::arithmetic(@nums) {
-    my $count = len(@nums)
+    val $count = len(@nums)
     if ($count == 0) { return 0 }
     (~> @nums reduce { _0 + _1 }) / $count
 }
 
 fn Rosetta::PythagoreanMeans::geometric(@nums) {
-    my $count = len(@nums)
+    val $count = len(@nums)
     if ($count == 0) { return 0 }
     (~> @nums reduce { _0 * _1 }) ** (1 / $count)
 }
 
 fn Rosetta::PythagoreanMeans::harmonic(@nums) {
-    my $count = len(@nums)
+    val $count = len(@nums)
     if ($count == 0) { return 0 }
-    my $sum_inv = ~> @nums map { 1 / _ } |> reduce { _0 + _1 }
+    val $sum_inv = ~> @nums map { 1 / _ } |> reduce { _0 + _1 }
     $count / $sum_inv
 }
 
-my @data = (1:10)
-my $am = Rosetta::PythagoreanMeans::arithmetic(@data)
-my $gm = Rosetta::PythagoreanMeans::geometric(@data)
-my $hm = Rosetta::PythagoreanMeans::harmonic(@data)
+val @data = (1:10)
+val $am = Rosetta::PythagoreanMeans::arithmetic(@data)
+val $gm = Rosetta::PythagoreanMeans::geometric(@data)
+val $hm = Rosetta::PythagoreanMeans::harmonic(@data)
 
 assert_near $am, 5.5, 0.0001, "Arithmetic mean of 1:10"
 assert_near $gm, 4.5287, 0.0001, "Geometric mean of 1:10"

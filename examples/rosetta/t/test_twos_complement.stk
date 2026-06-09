@@ -4,24 +4,24 @@
 # pattern (string of 0/1), and the inverse.
 
 fn Rosetta::TwosComp::to_bits($n, $bits) {
-    my $mask = (1 << $bits) - 1
-    my $u = $n & $mask
-    my $s = ""
-    for (my $i = $bits - 1; $i >= 0; $i--) {
+    val $mask = (1 << $bits) - 1
+    val $u = $n & $mask
+    var $s = ""
+    for (var $i = $bits - 1; $i >= 0; $i--) {
         $s .= (($u >> $i) & 1)
     }
     $s
 }
 
 fn Rosetta::TwosComp::from_bits($s) {
-    my $bits = length($s)
-    my $u = 0
-    for my $i (0:$bits - 1) {
-        my $c = substr($s, $i, 1)
+    val $bits = length($s)
+    var $u = 0
+    for val $i (0:$bits - 1) {
+        val $c = substr($s, $i, 1)
         $u = $u * 2 + ($c eq "1" ? 1 : 0)
     }
     # If sign bit set, subtract 2^bits
-    my $sign = 1 << ($bits - 1)
+    val $sign = 1 << ($bits - 1)
     $u >= $sign ? $u - (1 << $bits) : $u
 }
 
@@ -43,9 +43,9 @@ assert_eq Rosetta::TwosComp::from_bits("01111111"), 127,  "01111111 → +127"
 assert_eq Rosetta::TwosComp::from_bits("00000000"), 0,    "00000000 → 0"
 
 # Round-trip on every 8-bit signed value
-my $rt_ok = 1
-for my $i (-128:127) {
-    my $back = Rosetta::TwosComp::from_bits(Rosetta::TwosComp::to_bits($i, 8))
+var $rt_ok = 1
+for val $i (-128:127) {
+    val $back = Rosetta::TwosComp::from_bits(Rosetta::TwosComp::to_bits($i, 8))
     $rt_ok = 0 if $back != $i
 }
 assert_ok $rt_ok, "8-bit round-trip preserves all 256 values"

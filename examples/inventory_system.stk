@@ -41,7 +41,7 @@ class Product {
 
 # ── inventory: SKU -> Product ────────────────────────────────────────
 
-my %inventory
+var %inventory
 
 fn Demo::Inv::add_product($sku, $name, $price, $stock, $reorder) {
     $inventory{$sku} = Product(
@@ -53,15 +53,15 @@ fn Demo::Inv::add_product($sku, $name, $price, $stock, $reorder) {
 # ── transaction log for AOP ──────────────────────────────────────────
 
 mysync @txlog
-my $td_lat = t_digest(100)
+val $td_lat = t_digest(100)
 
 fn Demo::Inv::record_sale($sku, $qty) {
     return +{ ok => 0, reason => "unknown_sku" } unless exists $inventory{$sku}
-    my $t0 = now_ns()
-    my $p = $inventory{$sku}
-    my $ok = $p->sell($qty)
+    val $t0 = now_ns()
+    val $p = $inventory{$sku}
+    val $ok = $p->sell($qty)
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
-    my $entry = +{ sku => $sku, qty => $qty, ok => $ok ? 1 : 0, ts => time() }
+    val $entry = +{ sku => $sku, qty => $qty, ok => $ok ? 1 : 0, ts => time() }
     push @txlog, $entry
     +{ ok => $ok, sku => $sku, qty => $qty }
 }
@@ -79,15 +79,15 @@ Demo::Inv::add_product("THINGY-B", "Basic Thingy",        9.99, 200, 40)
 
 p "── initial inventory ────────────────────────────────"
 printf "  %-10s %-18s %10s %5s %5s\n", "sku", "name", "price", "stock", "min"
-for my $sku (sort { _ cmp _1 } keys %inventory) {
-    my $p = $inventory{$sku}
+for val $sku (sort { _ cmp _1 } keys %inventory) {
+    val $p = $inventory{$sku}
     printf "  %-10s %-18s %10.2f %5d %5d\n",
         $p->sku, $p->name, $p->price, $p->stock, $p->reorder
 }
 
 # ── simulate sales workload ─────────────────────────────────────────
 
-my @sales = (
+val @sales = (
     ["WIDGET-A", 3],  ["WIDGET-A", 5],  ["WIDGET-A", 4],
     ["WIDGET-B", 10], ["WIDGET-B", 15], ["WIDGET-B", 8],  ["WIDGET-B", 12],
     ["GADGET-A", 2],  ["GADGET-A", 3],
@@ -102,10 +102,10 @@ my @sales = (
 
 p ""
 printf "── processing %d sales ────────────────────────────\n", len @sales
-my $accepted = 0
-my $rejected = 0
-for my $s (@sales) {
-    my $r = Demo::Inv::record_sale($s->[0], $s->[1])
+var $accepted = 0
+var $rejected = 0
+for val $s (@sales) {
+    val $r = Demo::Inv::record_sale($s->[0], $s->[1])
     if ($r->{ok}) {
         $accepted++
     } else {
@@ -121,17 +121,17 @@ printf "  rejected : %d\n", $rejected
 
 p ""
 p "── revenue ranking (TopK pareto) ────────────────────"
-my @by_rev = sort { _1->revenue <=> _->revenue } values %inventory
-my $total_rev = 0
+val @by_rev = sort { _1->revenue <=> _->revenue } values %inventory
+var $total_rev = 0
 $total_rev += _->revenue for @by_rev
-my $cum = 0
-my $i = 0
-my $eighty_at = 0
+var $cum = 0
+var $i = 0
+var $eighty_at = 0
 printf "  %-10s %-18s %8s %8s %6s\n", "sku", "name", "sold", "revenue", "%cum"
-for my $p (@by_rev) {
+for val $p (@by_rev) {
     $i++
     $cum += $p->revenue
-    my $pct = 100.0 * $cum / $total_rev
+    val $pct = 100.0 * $cum / $total_rev
     printf "  %-10s %-18s %8d %8.2f %5.1f%%\n",
         $p->sku, $p->name, $p->sold, $p->revenue, $pct
     if ($pct >= 80.0 && $eighty_at == 0) {
@@ -145,11 +145,11 @@ printf "  → 80%% of revenue comes from %d / %d products (pareto)\n",
 
 p ""
 p "── reorder candidates ───────────────────────────────"
-my @need_reorder = grep { _->needs_reorder } values %inventory
+val @need_reorder = grep { _->needs_reorder } values %inventory
 if (len(@need_reorder) == 0) {
     p "  (none)"
 } else {
-    for my $p (sort { _->sku cmp _1->sku } @need_reorder) {
+    for val $p (sort { _->sku cmp _1->sku } @need_reorder) {
         printf "  %-10s %-18s stock=%d min=%d\n",
             $p->sku, $p->name, $p->stock, $p->reorder
     }
@@ -159,15 +159,15 @@ if (len(@need_reorder) == 0) {
 
 p ""
 p "── TopK best-selling SKUs (sketch) ──────────────────"
-my $topk = topk(3)
-for my $tx (@txlog) {
+val $topk = topk(3)
+for val $tx (@txlog) {
     next unless $tx->{ok}
-    for my $j (1:$tx->{qty}) {
+    for val $j (1:$tx->{qty}) {
         topk_add($topk, $tx->{sku})
     }
 }
-my @hits = topk_top($topk)
-for my $h (@hits) {
+val @hits = topk_top($topk)
+for val $h (@hits) {
     printf "  %-10s : %d units\n", $h->[0], $h->[1]
 }
 
@@ -175,10 +175,10 @@ for my $h (@hits) {
 
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _->{sku}) for @txlog
 printf "  HLL distinct SKUs in tx log : %d\n", hll_count($hll)
-my %seen
+var %seen
 $seen{_->{sku}} = 1 for @txlog
 printf "  exact distinct                : %d\n", len(keys %seen)
 

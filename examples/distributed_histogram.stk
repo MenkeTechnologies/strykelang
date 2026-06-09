@@ -9,13 +9,13 @@
 
 p "── distributed histogram aggregation ──"
 
-my @workers = congregation(4)
+val @workers = congregation(4)
 printf "spawned %d workers\n", len(@workers)
 
 # Each worker simulates a stream of integers, buckets them by mod 10,
 # and returns the per-bucket counts as JSON.
-my $code = "
-my %hist;
+val $code = "
+var %hist;
 srand(\$\$ + time);
 for my \$i (1:1000) {
     my \$v = int(rand() * 100);
@@ -25,32 +25,32 @@ for my \$i (1:1000) {
 to_json(\\%hist)
 "
 
-my %per_worker_json = harvest $code, @workers, 30_000
+val %per_worker_json = harvest $code, @workers, 30_000
 
 p "── per-worker bucket counts ──"
-for my $sid (sort { _ <=> _1 } keys %per_worker_json) {
-    my $h = from_json($per_worker_json{$sid})
-    my @row
-    for my $bucket (0:9) {
+for val $sid (sort { _ <=> _1 } keys %per_worker_json) {
+    val $h = from_json($per_worker_json{$sid})
+    var @row
+    for val $bucket (0:9) {
         push @row, sprintf("%d:%s", $bucket, ($h->{$bucket} // 0))
     }
     printf "  worker %d: %s\n", $sid, join("  ", @row)
 }
 
 # Aggregate into one fleet-wide histogram.
-my %fleet
-for my $sid (keys %per_worker_json) {
-    my $h = from_json($per_worker_json{$sid})
-    for my $bk (keys %$h) {
+var %fleet
+for val $sid (keys %per_worker_json) {
+    val $h = from_json($per_worker_json{$sid})
+    for val $bk (keys %$h) {
         $fleet{$bk} = ($fleet{$bk} // 0) + $h->{$bk}
     }
 }
 
 p "── fleet-wide histogram (4 workers × 1000 samples = 4000 total) ──"
-my $total = 0
-for my $bucket (0:9) {
-    my $c = $fleet{$bucket} // 0
-    my $bar = "#" x int($c / 50)
+var $total = 0
+for val $bucket (0:9) {
+    val $c = $fleet{$bucket} // 0
+    val $bar = "#" x int($c / 50)
     printf "  bucket %d  %-30s %d\n", $bucket, $bar, $c
     $total += $c
 }

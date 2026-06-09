@@ -4,19 +4,19 @@
 # DEFINED
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::BuiltinsCore::defined_scalar_set { my $x = 1; defined($x) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_scalar_zero { my $x = 0; defined($x) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_scalar_empty { my $x = ""; defined($x) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_scalar_undef { my $x; defined($x) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_after_undef { my $x = 1; $x = undef; defined($x) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_scalar_set { val $x = 1; defined($x) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_scalar_zero { val $x = 0; defined($x) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_scalar_empty { val $x = ""; defined($x) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_scalar_undef { val $x; defined($x) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_after_undef { var $x = 1; $x = undef; defined($x) ? 1 : 0 }
 
-fn Project::BuiltinsCore::defined_array_elem_exists { my @a = (1, 2, 3); defined($a[1]) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_array_elem_missing { my @a = (1, 2, 3); defined($a[10]) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_array_elem_undef { my @a = (1, undef, 3); defined($a[1]) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_array_elem_exists { val @a = (1, 2, 3); defined($a[1]) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_array_elem_missing { val @a = (1, 2, 3); defined($a[10]) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_array_elem_undef { val @a = (1, undef, 3); defined($a[1]) ? 1 : 0 }
 
-fn Project::BuiltinsCore::defined_hash_key_exists { my %h = (a => 1); defined($h{a}) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_hash_key_missing { my %h = (a => 1); defined($h{z}) ? 1 : 0 }
-fn Project::BuiltinsCore::defined_hash_key_undef { my %h = (a => undef); defined($h{a}) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_hash_key_exists { val %h = (a => 1); defined($h{a}) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_hash_key_missing { val %h = (a => 1); defined($h{z}) ? 1 : 0 }
+fn Project::BuiltinsCore::defined_hash_key_undef { val %h = (a => undef); defined($h{a}) ? 1 : 0 }
 
 fn Project::BuiltinsCore::defined_expr_result { defined(1 + 1) ? 1 : 0 }
 fn Project::BuiltinsCore::defined_string_result { defined("hello") ? 1 : 0 }
@@ -26,19 +26,19 @@ fn Project::BuiltinsCore::defined_sub_result { defined(fn { 1 }) ? 1 : 0 }
 # REF
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::BuiltinsCore::ref_scalar { my $x = 1; ref(\$x) }
-fn Project::BuiltinsCore::ref_array { my @a = (1, 2); ref(\@a) }
-fn Project::BuiltinsCore::ref_hash { my %h = (a => 1); ref(\%h) }
-fn Project::BuiltinsCore::ref_code { my $f = fn { 1 }; ref($f) }
+fn Project::BuiltinsCore::ref_scalar { val $x = 1; ref(\$x) }
+fn Project::BuiltinsCore::ref_array { val @a = (1, 2); ref(\@a) }
+fn Project::BuiltinsCore::ref_hash { val %h = (a => 1); ref(\%h) }
+fn Project::BuiltinsCore::ref_code { val $f = fn { 1 }; ref($f) }
 fn Project::BuiltinsCore::ref_anon_array { ref([1, 2, 3]) }
 fn Project::BuiltinsCore::ref_anon_hash { ref({a => 1}) }
 
-fn Project::BuiltinsCore::ref_not_ref { my $x = 1; ref($x) eq "" ? 1 : 0 }
-fn Project::BuiltinsCore::ref_string { my $s = "hello"; ref($s) eq "" ? 1 : 0 }
+fn Project::BuiltinsCore::ref_not_ref { val $x = 1; ref($x) eq "" ? 1 : 0 }
+fn Project::BuiltinsCore::ref_string { val $s = "hello"; ref($s) eq "" ? 1 : 0 }
 fn Project::BuiltinsCore::ref_number { ref(42) eq "" ? 1 : 0 }
 
-fn Project::BuiltinsCore::ref_nested_array { my $r = [[1, 2], [3, 4]]; ref($r->[0]) }
-fn Project::BuiltinsCore::ref_nested_hash { my $r = {a => {b => 1}}; ref($r->{a}) }
+fn Project::BuiltinsCore::ref_nested_array { val $r = [[1, 2], [3, 4]]; ref($r->[0]) }
+fn Project::BuiltinsCore::ref_nested_hash { val $r = {a => {b => 1}}; ref($r->{a}) }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LENGTH
@@ -57,12 +57,12 @@ fn Project::BuiltinsCore::length_float { length(3.14159) }
 fn Project::BuiltinsCore::length_negative { length(-42) }
 
 fn Project::BuiltinsCore::length_var {
-    my $s = "test"
+    val $s = "test"
     length $s}
 
 fn Project::BuiltinsCore::length_concat {
-    my $a = "foo"
-    my $b = "bar"
+    val $a = "foo"
+    val $b = "bar"
     length($a . $b)
 }
 
@@ -70,21 +70,21 @@ fn Project::BuiltinsCore::length_concat {
 # SCALAR
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::BuiltinsCore::scalar_array_count { my @a = (1, 2, 3, 4, 5); scalar(@a) }
-fn Project::BuiltinsCore::scalar_array_empty { my @a = (); scalar(@a) }
-fn Project::BuiltinsCore::scalar_array_one { my @a = (42); scalar(@a) }
+fn Project::BuiltinsCore::scalar_array_count { val @a = (1, 2, 3, 4, 5); scalar(@a) }
+fn Project::BuiltinsCore::scalar_array_empty { val @a = (); scalar(@a) }
+fn Project::BuiltinsCore::scalar_array_one { val @a = (42); scalar(@a) }
 
-fn Project::BuiltinsCore::scalar_hash_info { my %h = (a => 1, b => 2); scalar(keys %h) }
+fn Project::BuiltinsCore::scalar_hash_info { val %h = (a => 1, b => 2); scalar(keys %h) }
 
 fn Project::BuiltinsCore::scalar_string { scalar("hello") }
 fn Project::BuiltinsCore::scalar_number { scalar(42) }
 
 fn Project::BuiltinsCore::scalar_reverse_str { scalar(rev("hello")) }
-fn Project::BuiltinsCore::scalar_reverse_arr { my @a = (1, 2, 3); my @r = rev(@a); scalar(@r) }
+fn Project::BuiltinsCore::scalar_reverse_arr { val @a = (1, 2, 3); val @r = rev(@a); scalar(@r) }
 
 fn Project::BuiltinsCore::scalar_force {
-    my @a = (1, 2, 3)
-    my $count = @a
+    val @a = (1, 2, 3)
+    val $count = @a
     $count
 }
 
@@ -97,18 +97,18 @@ fn Project::BuiltinsCore::returns_context {
 }
 
 fn Project::BuiltinsCore::wantarray_in_scalar {
-    my $x = Project::BuiltinsCore::returns_context()
+    val $x = Project::BuiltinsCore::returns_context()
     $x
 }
 
 fn Project::BuiltinsCore::wantarray_in_list {
-    my @a = Project::BuiltinsCore::returns_context()
+    val @a = Project::BuiltinsCore::returns_context()
     $a[0]
 }
 
 fn Project::BuiltinsCore::wantarray_nested {
-    my $inner = fn { wantarray ? "list" : "scalar" }
-    my $result = $inner()
+    val $inner = fn { wantarray ? "list" : "scalar" }
+    val $result = $inner()
     $result
 }
 
@@ -117,13 +117,13 @@ fn Project::BuiltinsCore::wantarray_nested {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::caller_basic {
-    my @c = caller()
+    val @c = caller()
     defined($c[0]) ? 1 : 0
 }
 
 fn Project::BuiltinsCore::caller_in_sub {
-    my $inner = fn {
-        my @c = caller()
+    val $inner = fn {
+        val @c = caller()
         scalar(@c) > 0 ? 1 : 0
     }
     $inner()
@@ -133,21 +133,21 @@ fn Project::BuiltinsCore::caller_in_sub {
 # EXISTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::BuiltinsCore::exists_hash_true { my %h = (a => 1, b => 2); exists $h{a} ? 1 : 0 }
-fn Project::BuiltinsCore::exists_hash_false { my %h = (a => 1, b => 2); exists $h{z} ? 1 : 0 }
-fn Project::BuiltinsCore::exists_hash_undef_val { my %h = (a => undef); exists $h{a} ? 1 : 0 }
+fn Project::BuiltinsCore::exists_hash_true { val %h = (a => 1, b => 2); exists $h{a} ? 1 : 0 }
+fn Project::BuiltinsCore::exists_hash_false { val %h = (a => 1, b => 2); exists $h{z} ? 1 : 0 }
+fn Project::BuiltinsCore::exists_hash_undef_val { val %h = (a => undef); exists $h{a} ? 1 : 0 }
 
-fn Project::BuiltinsCore::exists_array_true { my @a = (1, 2, 3); exists $a[1] ? 1 : 0 }
-fn Project::BuiltinsCore::exists_array_false { my @a = (1, 2, 3); exists $a[10] ? 1 : 0 }
+fn Project::BuiltinsCore::exists_array_true { val @a = (1, 2, 3); exists $a[1] ? 1 : 0 }
+fn Project::BuiltinsCore::exists_array_false { val @a = (1, 2, 3); exists $a[10] ? 1 : 0 }
 
 fn Project::BuiltinsCore::exists_after_delete {
-    my %h = (a => 1, b => 2)
+    var %h = (a => 1, b => 2)
     delete $h{a}
     exists $h{a} ? 1 : 0
 }
 
 fn Project::BuiltinsCore::exists_nested {
-    my %h = (a => {b => 1})
+    val %h = (a => {b => 1})
     exists $h{a}{b} ? 1 : 0
 }
 
@@ -156,25 +156,25 @@ fn Project::BuiltinsCore::exists_nested {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::delete_hash_returns {
-    my %h = (a => 1, b => 2, c => 3)
+    var %h = (a => 1, b => 2, c => 3)
     delete $h{b}
 }
 
 fn Project::BuiltinsCore::delete_hash_removes {
-    my %h = (a => 1, b => 2, c => 3)
+    var %h = (a => 1, b => 2, c => 3)
     delete $h{b}
     scalar(keys %h)
 }
 
 fn Project::BuiltinsCore::delete_hash_missing {
-    my %h = (a => 1)
-    my $r = delete $h{z}
+    var %h = (a => 1)
+    val $r = delete $h{z}
     defined($r) ? 1 : 0
 }
 
 fn Project::BuiltinsCore::delete_array_elem {
-    my @a = (1, 2, 3, 4, 5)
-    my $r = delete $a[2]
+    var @a = (1, 2, 3, 4, 5)
+    val $r = delete $a[2]
     $r
 }
 
@@ -185,18 +185,18 @@ fn Project::BuiltinsCore::delete_array_elem {
 fn Project::BuiltinsCore::undef_returns { defined(undef) ? 1 : 0 }
 
 fn Project::BuiltinsCore::undef_scalar {
-    my $x = 42
+    var $x = 42
     $x = undef
     defined($x) ? 1 : 0
 }
 
 fn Project::BuiltinsCore::undef_in_list {
-    my @a = (1, undef, 3)
+    val @a = (1, undef, 3)
     defined($a[1]) ? 1 : 0
 }
 
 fn Project::BuiltinsCore::undef_comparison {
-    my $x
+    val $x
     $x eq "" ? 1 : 0
 }
 
@@ -210,10 +210,10 @@ fn Project::BuiltinsCore::bool_empty_str { "" ? 1 : 0 }
 fn Project::BuiltinsCore::bool_zero_str { "0" ? 1 : 0 }
 fn Project::BuiltinsCore::bool_space_str { " " ? 1 : 0 }
 fn Project::BuiltinsCore::bool_text { "hello" ? 1 : 0 }
-fn Project::BuiltinsCore::bool_undef { my $x; $x ? 1 : 0 }
+fn Project::BuiltinsCore::bool_undef { val $x; $x ? 1 : 0 }
 
-fn Project::BuiltinsCore::bool_empty_array { my @a = (); @a ? 1 : 0 }
-fn Project::BuiltinsCore::bool_nonempty_array { my @a = (1); @a ? 1 : 0 }
+fn Project::BuiltinsCore::bool_empty_array { val @a = (); @a ? 1 : 0 }
+fn Project::BuiltinsCore::bool_nonempty_array { val @a = (1); @a ? 1 : 0 }
 
 fn Project::BuiltinsCore::bool_negative { -1 ? 1 : 0 }
 fn Project::BuiltinsCore::bool_float_zero { 0.0 ? 1 : 0 }
@@ -236,12 +236,12 @@ fn Project::BuiltinsCore::ord_zero { ord("0") }
 fn Project::BuiltinsCore::ord_multi { ord("hello") }
 
 fn Project::BuiltinsCore::chr_ord_roundtrip {
-    my $c = "X"
+    val $c = "X"
     chr(ord($c)) eq $c ? 1 : 0
 }
 
 fn Project::BuiltinsCore::ord_chr_roundtrip {
-    my $n = 72
+    val $n = 72
     ord(chr($n)) == $n ? 1 : 0
 }
 
@@ -300,8 +300,8 @@ fn Project::BuiltinsCore::pack_char { pack("A3", "abc") }
 fn Project::BuiltinsCore::pack_int { length(pack("N", 12345)) }
 
 fn Project::BuiltinsCore::unpack_char {
-    my $s = "hello"
-    my @c = unpack("A5", $s)
+    val $s = "hello"
+    val @c = unpack("A5", $s)
     $c[0]
 }
 
@@ -318,31 +318,31 @@ fn Project::BuiltinsCore::quotemeta_star { quotemeta("a*b") =~ /\\\*/ ? 1 : 0 }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::lvalue_substr {
-    my $s = "hello world"
+    val $s = "hello world"
     substr($s, 0, 5, "hi")
     $s
 }
 
 fn Project::BuiltinsCore::lvalue_increment {
-    my $x = 5
+    var $x = 5
     $x++
     $x
 }
 
 fn Project::BuiltinsCore::lvalue_decrement {
-    my $x = 5
+    var $x = 5
     $x--
     $x
 }
 
 fn Project::BuiltinsCore::lvalue_add_assign {
-    my $x = 10
+    var $x = 10
     $x += 5
     $x
 }
 
 fn Project::BuiltinsCore::lvalue_concat_assign {
-    my $s = "hello"
+    var $s = "hello"
     $s .= " world"
     $s
 }
@@ -352,26 +352,26 @@ fn Project::BuiltinsCore::lvalue_concat_assign {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::chop_returns {
-    my $s = "hello"
+    var $s = "hello"
     chop $s}
 
 fn Project::BuiltinsCore::chop_modifies {
-    my $s = "hello"
+    var $s = "hello"
     chop $s    $s
 }
 
 fn Project::BuiltinsCore::chomp_newline {
-    my $s = "hello\n"
+    var $s = "hello\n"
     chomp $s    $s
 }
 
 fn Project::BuiltinsCore::chomp_no_newline {
-    my $s = "hello"
+    var $s = "hello"
     chomp $s    $s
 }
 
 fn Project::BuiltinsCore::chomp_returns {
-    my $s = "hello\n"
+    var $s = "hello\n"
     chomp $s}
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -421,19 +421,19 @@ fn Project::BuiltinsCore::reverse_single { scalar(rev("x")) }
 fn Project::BuiltinsCore::reverse_palindrome { scalar(rev("radar")) }
 
 fn Project::BuiltinsCore::reverse_array_count {
-    my @a = (1, 2, 3, 4, 5)
-    my @r = rev(@a)
+    val @a = (1, 2, 3, 4, 5)
+    val @r = rev(@a)
     scalar @r}
 
 fn Project::BuiltinsCore::reverse_array_first {
-    my @a = (1, 2, 3, 4, 5)
-    my @r = rev(@a)
+    val @a = (1, 2, 3, 4, 5)
+    val @r = rev(@a)
     $r[0]
 }
 
 fn Project::BuiltinsCore::reverse_array_last {
-    my @a = (1, 2, 3, 4, 5)
-    my @r = rev(@a)
+    val @a = (1, 2, 3, 4, 5)
+    val @r = rev(@a)
     $r[-1]
 }
 
@@ -464,7 +464,7 @@ fn Project::BuiltinsCore::substr_negative { substr("hello", -2) }
 fn Project::BuiltinsCore::substr_neg_len { substr("hello", 1, -1) }
 
 fn Project::BuiltinsCore::substr_replace {
-    my $s = "hello"
+    val $s = "hello"
     substr($s, 1, 3, "XYZ")
     $s
 }

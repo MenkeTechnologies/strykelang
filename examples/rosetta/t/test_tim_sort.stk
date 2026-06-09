@@ -5,9 +5,9 @@
 # core idea: fixed minrun + bottom-up merge.
 
 fn Rosetta::Tim::insertion_range($arr, $lo, $hi) {
-    for my $i ($lo + 1:$hi) {
-        my $x = $arr->[$i]
-        my $j = $i - 1
+    for val $i ($lo + 1:$hi) {
+        val $x = $arr->[$i]
+        var $j = $i - 1
         while ($j >= $lo && $arr->[$j] > $x) {
             $arr->[$j + 1] = $arr->[$j]
             $j--
@@ -17,9 +17,9 @@ fn Rosetta::Tim::insertion_range($arr, $lo, $hi) {
 }
 
 fn Rosetta::Tim::merge_range($arr, $lo, $mid, $hi) {
-    my @left = @$arr[$lo:$mid]
-    my @right = @$arr[$mid + 1:$hi]
-    my ($i, $j, $k) = (0, 0, $lo)
+    val @left = @$arr[$lo:$mid]
+    val @right = @$arr[$mid + 1:$hi]
+    var ($i, $j, $k) = (0, 0, $lo)
     while ($i < len(@left) && $j < len(@right)) {
         if ($left[$i] <= $right[$j]) { $arr->[$k++] = $left[$i++] }
         else { $arr->[$k++] = $right[$j++] }
@@ -29,25 +29,25 @@ fn Rosetta::Tim::merge_range($arr, $lo, $mid, $hi) {
 }
 
 fn Rosetta::Tim::sort($list) {
-    my @arr = @$list
-    my $n = len(@arr)
+    val @arr = @$list
+    val $n = len(@arr)
     return \@arr if $n < 2
-    my $minrun = 32
+    val $minrun = 32
 
     # Sort each run with insertion sort.
-    for (my $start = 0; $start < $n; $start += $minrun) {
-        my $end = $start + $minrun - 1
+    for (var $start = 0; $start < $n; $start += $minrun) {
+        var $end = $start + $minrun - 1
         $end = $n - 1 if $end >= $n
         Rosetta::Tim::insertion_range(\@arr, $start, $end)
     }
 
     # Merge runs of size $size, doubling each pass.
-    my $size = $minrun
+    var $size = $minrun
     while ($size < $n) {
-        for (my $lo = 0; $lo < $n; $lo += 2 * $size) {
-            my $mid = $lo + $size - 1
+        for (var $lo = 0; $lo < $n; $lo += 2 * $size) {
+            val $mid = $lo + $size - 1
             next if $mid >= $n - 1
-            my $hi = $lo + 2 * $size - 1
+            var $hi = $lo + 2 * $size - 1
             $hi = $n - 1 if $hi >= $n
             Rosetta::Tim::merge_range(\@arr, $lo, $mid, $hi)
         }
@@ -56,22 +56,22 @@ fn Rosetta::Tim::sort($list) {
     \@arr
 }
 
-my $r1 = Rosetta::Tim::sort([5, 2, 8, 1, 9, 3, 7, 4, 6])
+val $r1 = Rosetta::Tim::sort([5, 2, 8, 1, 9, 3, 7, 4, 6])
 assert_eq join(",", @$r1), "1,2,3,4,5,6,7,8,9", "9 elems"
 
-my $r2 = Rosetta::Tim::sort([])
+val $r2 = Rosetta::Tim::sort([])
 assert_eq join(",", @$r2), "", "empty"
 
-my $r3 = Rosetta::Tim::sort([1])
+val $r3 = Rosetta::Tim::sort([1])
 assert_eq join(",", @$r3), "1", "single"
 
-my $r4 = Rosetta::Tim::sort([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5])
+val $r4 = Rosetta::Tim::sort([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5])
 assert_eq join(",", @$r4), "1,1,2,3,3,4,5,5,5,6,9", "duplicates"
 
 # Larger input crossing the minrun boundary.
-my @big = ~> 0:99 map { (_0 * 7919 + 13) % 1000 }
-my @native = sort { _0 <=> _1 } @big
-my $rb = Rosetta::Tim::sort(\@big)
+val @big = ~> 0:99 map { (_0 * 7919 + 13) % 1000 }
+val @native = sort { _0 <=> _1 } @big
+val $rb = Rosetta::Tim::sort(\@big)
 assert_eq join(",", @$rb), join(",", @native), "100-elem matches native"
 
 test_run

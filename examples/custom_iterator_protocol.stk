@@ -3,10 +3,10 @@
 
 p "--- Iter ---"
 # iterate(fn, init) -> lazy seq
-my @p2 = ~> iterate({ _ * 2 }, 1) head(10) collect
+val @p2 = ~> iterate({ _ * 2 }, 1) head(10) collect
 p "P2: @p2"
 
-my @s6 = ~> iterate({ _ * 2 }, 1) greps { _ % 10 == 6 } head(5) collect
+val @s6 = ~> iterate({ _ * 2 }, 1) greps { _ % 10 == 6 } head(5) collect
 p "Ends in 6: @s6"
 
 @p2[0] |> aeq 1,  "start"

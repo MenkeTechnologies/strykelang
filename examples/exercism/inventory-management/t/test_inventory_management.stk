@@ -2,7 +2,7 @@
 require "./InventoryManagement.stk"
 
 fn sig {
-    my $h = _0
+    val $h = _0
     join(",", map { "$_=$h->{$_}" } sort keys %$h)
 }
 
@@ -12,7 +12,7 @@ assert_eq sig(Exercism::InventoryManagement::create_inventory(["coal"])),       
 assert_eq sig(Exercism::InventoryManagement::create_inventory(["coal","coal","gold","silver","silver","silver"])), "coal=2,gold=1,silver=3", "multiple items"
 
 # add
-my $inv = { coal => 1 }
+var $inv = { coal => 1 }
 Exercism::InventoryManagement::add_items($inv, ["coal","gold"])
 assert_eq sig($inv), "coal=2,gold=1", "add to existing"
 

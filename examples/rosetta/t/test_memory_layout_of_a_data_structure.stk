@@ -2,7 +2,7 @@
 # Rosetta Code: Memory layout of a data structure
 
 fn Rosetta::RS232::pack($pins) {
-    my %bit = (
+    val %bit = (
         carrier_detect => 0,
         received_data => 1,
         transmitted_data => 2,
@@ -14,8 +14,8 @@ fn Rosetta::RS232::pack($pins) {
         ring_indicator => 8,
     )
 
-    my $word = 0
-    for my $name (keys %bit) {
+    var $word = 0
+    for val $name (keys %bit) {
         if ($pins->{$name}) {
             $word |= 1 << $bit{$name}
         }
@@ -37,12 +37,12 @@ fn Rosetta::RS232::unpack($word) {
     }
 }
 
-my $packed = Rosetta::RS232::pack({
+val $packed = Rosetta::RS232::pack({
     transmitted_data => 1,
     clear_to_send => 1,
     ring_indicator => 1,
 })
-my $pins = Rosetta::RS232::unpack($packed)
+val $pins = Rosetta::RS232::unpack($packed)
 
 assert_eq $packed, 388, "bit layout matches TD|CTS|RI"
 assert_eq $pins->{transmitted_data}, 1, "TD unpacked"

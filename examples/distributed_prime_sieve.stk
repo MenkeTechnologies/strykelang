@@ -10,21 +10,21 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $n_workers = $ARGV[0] // 4
-my $upper = $ARGV[1] // 10_000
+val $n_workers = $ARGV[0] // 4
+val $upper = $ARGV[1] // 10_000
 
 printf "── distributed prime sieve: N=%d workers, range 0..%d ──\n", $n_workers, $upper
 
-my @workers = congregation($n_workers)
+val @workers = congregation($n_workers)
 printf "spawned %d workers\n", len(@workers)
 
 # Shard the range across workers. Each worker gets [start, end) chunk.
-my $chunk = int(($upper + $n_workers - 1) / $n_workers)
-my %shards
-my @sorted_workers = sort { _ <=> _1 } @workers
-for my $i (0:len(@sorted_workers) - 1) {
-    my $start = $i * $chunk
-    my $end = $start + $chunk
+val $chunk = int(($upper + $n_workers - 1) / $n_workers)
+var %shards
+val @sorted_workers = sort { _ <=> _1 } @workers
+for val $i (0:len(@sorted_workers) - 1) {
+    val $start = $i * $chunk
+    var $end = $start + $chunk
     $end = $upper if $end > $upper
     $shards{$sorted_workers[$i]} = "${start},${end}"
 }
@@ -32,12 +32,12 @@ for my $i (0:len(@sorted_workers) - 1) {
 # Bestow per-worker shard ranges (we use %gift to receive on slave side).
 # Actually bestow's same-hash-to-all model doesn't fit per-worker shards;
 # use per-worker prays instead.
-my %counts
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my ($start, $end) = split /,/, $shards{$w}
+var %counts
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    var ($start, $end) = split /,/, $shards{$w}
     # Trial-division prime check inside the worker.
-    my $code = "
+    val $code = "
         my \$start = $start;
         my \$end = $end;
         my \$count = 0;
@@ -52,15 +52,15 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         \$count
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     $counts{$w} = $reply{$w}
 }
 
 p "── per-worker prime counts ──"
-my $total = 0
-for my $sid (sort { _ <=> _1 } keys %counts) {
-    my ($start, $end) = split /,/, $shards{$sid}
+var $total = 0
+for val $sid (sort { _ <=> _1 } keys %counts) {
+    val ($start, $end) = split /,/, $shards{$sid}
     printf "  worker %d  [%d..%d)  %s primes\n", $sid, $start, $end, $counts{$sid}
     $total += $counts{$sid}
 }

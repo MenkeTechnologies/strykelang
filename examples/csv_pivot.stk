@@ -11,7 +11,7 @@
 
 # ── sample dataset ───────────────────────────────────────────────────
 
-my @rows = (
+val @rows = (
     +{ region => "us-west", month => "Jan", product => "widget", amount => 100.00 },
     +{ region => "us-west", month => "Jan", product => "gadget", amount =>  50.00 },
     +{ region => "us-west", month => "Feb", product => "widget", amount => 150.00 },
@@ -31,24 +31,24 @@ printf "── %d sales records ────────────────
 
 # ── round-trip through CSV codec (and a temp file) ──────────────────
 
-my $tmp = "/tmp/stryke_csv_pivot_demo.csv"
+val $tmp = "/tmp/stryke_csv_pivot_demo.csv"
 spew($tmp, to_csv(\@rows))
-my $rows_back = ~> $tmp slurp from_csv
+val $rows_back = ~> $tmp slurp from_csv
 printf "  CSV file size : %d bytes\n", -s $tmp
 printf "  rows on read  : %d\n", len(@{$rows_back})
 unlink $tmp
 
 # ── pivot: region × month, sum(amount) ──────────────────────────────
 
-my %pivot
-my %row_total
-my %col_total
-my $grand_total = 0
+var %pivot
+var %row_total
+var %col_total
+var $grand_total = 0
 
-for my $row (@{$rows_back}) {
-    my $rg = $row->{region}
-    my $mo = $row->{month}
-    my $am = $row->{amount} + 0   # numeric coerce from CSV string
+for val $row (@{$rows_back}) {
+    val $rg = $row->{region}
+    val $mo = $row->{month}
+    val $am = $row->{amount} + 0   # numeric coerce from CSV string
 
     $pivot{$rg} = +{} unless exists $pivot{$rg}
     $pivot{$rg}->{$mo} = ($pivot{$rg}->{$mo} // 0) + $am
@@ -59,9 +59,9 @@ for my $row (@{$rows_back}) {
 
 # ── stable axis order ───────────────────────────────────────────────
 
-my @regions = sort { _ cmp _1 } keys %pivot
+val @regions = sort { _ cmp _1 } keys %pivot
 # Months: explicit calendar order, not lexical.
-my @months  = ("Jan", "Feb", "Mar")
+var @months  = ("Jan", "Feb", "Mar")
 @months = grep { exists $col_total{_} } @months
 
 # ── print the pivot ─────────────────────────────────────────────────
@@ -71,24 +71,24 @@ p "── pivot: SUM(amount) by region × month ──────────�
 
 # Header row.
 printf "  %-10s", "region"
-for my $m (@months) {
+for val $m (@months) {
     printf " %10s", $m
 }
 printf " %10s\n", "TOTAL"
 
 # Underline.
-my $dashes = "-" x 10
+val $dashes = "-" x 10
 printf "  %s", $dashes
-for my $m (@months) {
+for val $m (@months) {
     printf " %s", $dashes
 }
 printf " %s\n", $dashes
 
 # Data rows.
-for my $r (@regions) {
+for val $r (@regions) {
     printf "  %-10s", $r
-    for my $m (@months) {
-        my $v = $pivot{$r}->{$m} // 0
+    for val $m (@months) {
+        val $v = $pivot{$r}->{$m} // 0
         if ($v > 0) {
             printf " %10.2f", $v
         } else {
@@ -100,13 +100,13 @@ for my $r (@regions) {
 
 # Column totals.
 printf "  %s", $dashes
-for my $m (@months) {
+for val $m (@months) {
     printf " %s", $dashes
 }
 printf " %s\n", $dashes
 
 printf "  %-10s", "TOTAL"
-for my $m (@months) {
+for val $m (@months) {
     printf " %10.2f", $col_total{$m}
 }
 printf " %10.2f\n", $grand_total
@@ -115,8 +115,8 @@ printf " %10.2f\n", $grand_total
 
 p ""
 p "── share of grand total (%) by region ───────────────"
-for my $r (sort { $row_total{_1} <=> $row_total{_} } keys %row_total) {
-    my $share = 100.0 * $row_total{$r} / $grand_total
+for val $r (sort { $row_total{_1} <=> $row_total{_} } keys %row_total) {
+    val $share = 100.0 * $row_total{$r} / $grand_total
     printf "  %-10s : %5.1f%%\n", $r, $share
 }
 
@@ -124,12 +124,12 @@ for my $r (sort { $row_total{_1} <=> $row_total{_} } keys %row_total) {
 
 p ""
 p "── product breakdown (pipe-forward composition) ─────"
-my %by_product
-for my $row (@{$rows_back}) {
+var %by_product
+for val $row (@{$rows_back}) {
     $by_product{$row->{product}} = ($by_product{$row->{product}} // 0) + ($row->{amount} + 0)
 }
-my @products = sort { $by_product{_1} <=> $by_product{_} } keys %by_product
-for my $p (@products) {
+val @products = sort { $by_product{_1} <=> $by_product{_} } keys %by_product
+for val $p (@products) {
     printf "  %-8s : %8.2f (%5.1f%%)\n",
         $p, $by_product{$p}, 100.0 * $by_product{$p} / $grand_total
 }
@@ -140,8 +140,8 @@ p ""
 p "── TopK regions by sales count (TopK sketch) ────────"
 mysync $tk = topk(3)
 topk_add($tk, _->{region}) for @{$rows_back}
-my @top = topk_top($tk)
-for my $h (@top) {
+val @top = topk_top($tk)
+for val $h (@top) {
     printf "  %-10s : %d records\n", $h->[0], $h->[1]
 }
 

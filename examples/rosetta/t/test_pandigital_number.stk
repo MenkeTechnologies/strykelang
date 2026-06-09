@@ -2,10 +2,10 @@
 # Rosetta Code: Pandigital number
 
 fn Rosetta::Pandigital::check($n) {
-    my $s = "$n"
-    my %digits
-    my @c = chars($s)
-    for my $d (@c) {
+    val $s = "$n"
+    var %digits
+    val @c = chars($s)
+    for val $d (@c) {
         if ($d =~ /[0-9]/) { $digits{$d} = 1 }
     }
     len(keys %digits) == 10

@@ -3,24 +3,24 @@
 # AM >= GM >= HM for any positive list, with equality iff all values equal.
 
 fn Rosetta::PythMean::arithmetic(@xs) {
-    my $sum = ~> @xs reduce { _0 + _1 }
+    val $sum = ~> @xs reduce { _0 + _1 }
     $sum / len(@xs)
 }
 
 fn Rosetta::PythMean::geometric(@xs) {
-    my $prod = ~> @xs reduce { _0 * _1 }
+    val $prod = ~> @xs reduce { _0 * _1 }
     $prod ** (1.0 / len(@xs))
 }
 
 fn Rosetta::PythMean::harmonic(@xs) {
-    my $recip_sum = ~> @xs map { 1.0 / _ } reduce { _0 + _1 }
+    val $recip_sum = ~> @xs map { 1.0 / _ } reduce { _0 + _1 }
     len(@xs) / $recip_sum
 }
 
-my @nums = 1:10
-my $am = Rosetta::PythMean::arithmetic(@nums)
-my $gm = Rosetta::PythMean::geometric(@nums)
-my $hm = Rosetta::PythMean::harmonic(@nums)
+val @nums = 1:10
+val $am = Rosetta::PythMean::arithmetic(@nums)
+val $gm = Rosetta::PythMean::geometric(@nums)
+val $hm = Rosetta::PythMean::harmonic(@nums)
 
 assert_ok abs($am - 5.5) < 1e-12, "AM(1:10) == 5.5"
 assert_ok abs($gm - 4.52872868812) < 1e-7, "GM(1:10) ~ 4.5287..."
@@ -31,7 +31,7 @@ assert_ok $am > $gm, "AM > GM"
 assert_ok $gm > $hm, "GM > HM"
 
 # All-equal case — all three means coincide.
-my @flat = (7, 7, 7, 7)
+val @flat = (7, 7, 7, 7)
 assert_eq Rosetta::PythMean::arithmetic(@flat), 7, "AM(7,7,7,7) = 7"
 assert_ok abs(Rosetta::PythMean::geometric(@flat) - 7) < 1e-12, "GM = 7"
 assert_ok abs(Rosetta::PythMean::harmonic(@flat) - 7) < 1e-12, "HM = 7"

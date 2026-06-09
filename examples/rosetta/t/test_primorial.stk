@@ -9,9 +9,9 @@ fn Rosetta::IsPrime::is_prime($n) {
     } elsif ($n % 2 == 0) {
         0
     } else {
-        my $i = 3
-        my $limit = sqrt($n)
-        my $res = 1
+        var $i = 3
+        val $limit = sqrt($n)
+        var $res = 1
         while ($i <= $limit) {
             if ($n % $i == 0) {
                 $res = 0
@@ -30,8 +30,8 @@ fn Rosetta::Primorial::pn($n) {
     if ($n == 0) {
         1
     } else {
-        my @primes
-        my $p = 2
+        var @primes
+        var $p = 2
         while (len(@primes) < $n) {
             if (Rosetta::IsPrime::is_prime($p)) {
                 push @primes, $p

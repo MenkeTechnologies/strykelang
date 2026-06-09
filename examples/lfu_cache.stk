@@ -17,12 +17,12 @@ fn LFU::get($c, $k) {
 }
 
 fn LFU::_evict($c) {
-    my @ks = keys %{$c->{store}}
+    val @ks = keys %{$c->{store}}
     return if len(@ks) == 0
-    my $best = $ks[0]
-    for my $k (@ks) {
-        my $fb = $c->{freq}->{$best}
-        my $fk = $c->{freq}->{$k}
+    var $best = $ks[0]
+    for val $k (@ks) {
+        val $fb = $c->{freq}->{$best}
+        val $fk = $c->{freq}->{$k}
         if ($fk < $fb || ($fk == $fb && $c->{tick}->{$k} < $c->{tick}->{$best})) {
             $best = $k
         }
@@ -52,7 +52,7 @@ fn LFU::size($c) { len(keys %{$c->{store}}) }
 fn LFU::has($c, $k) { exists $c->{store}->{$k} ? 1 : 0 }
 
 p "=== LFU Cache Demo (cap=3) ==="
-my $c = LFU::new(3)
+val $c = LFU::new(3)
 LFU::put($c, "a", 1)
 LFU::put($c, "b", 2)
 LFU::put($c, "c", 3)

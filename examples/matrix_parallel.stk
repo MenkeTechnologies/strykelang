@@ -15,21 +15,21 @@ fn Math::dot_product($v1, $v2) = sum(0:len($v1)-1 |> map { $v1->[_] * $v2->[_] }
 
 # Parallel matrix multiplication
 fn Math::matrix_mul_parallel($A, $B) {
-    my $rows_A = len($A)
-    my $cols_A = len($A->[0])
-    my $rows_B = len($B)
-    my $cols_B = len($B->[0])
+    val $rows_A = len($A)
+    val $cols_A = len($A->[0])
+    val $rows_B = len($B)
+    val $cols_B = len($B->[0])
     
     die "Incompatible dimensions" if $cols_A != $rows_B
     
     # Transpose B so we can dot product rows of A with "rows" of BT
     # (which are columns of B). This is much faster in Stryke.
-    my $BT = matrix_transpose($B)
+    val $BT = matrix_transpose($B)
     
     p "Computing #{$rows_A}x#{$cols_B} matrix on #{pool_info()->{cpus}} cores..."
     
     # Use pmap to process rows of A in parallel.
-    my $C = [ pmap {
+    val $C = [ pmap {
         # For each column in B (row in BT), compute dot product
         [ (@$BT |> map { Math::dot_product(_<, _) }) ]
     } @$A ]
@@ -40,25 +40,25 @@ fn Math::matrix_mul_parallel($A, $B) {
 p "── Parallel Matrix Multiplication ──────────────────────"
 
 # Create two 100x100 matrices with random values
-my $size = 100
-my $A = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
-my $B = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
+val $size = 100
+val $A = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
+val $B = [ (1:$size |> map { [ (1:$size |> map { rand }) ] }) ]
 
 # Note: $A and $B are arrayrefs of arrayrefs because of `map { [ ... ] }`
 
-my $t0 = now_ns()
-my $C = Math::matrix_mul_parallel($A, $B)
-my $elapsed = (now_ns() - $t0) / 1_000_000
+val $t0 = now_ns()
+val $C = Math::matrix_mul_parallel($A, $B)
+val $elapsed = (now_ns() - $t0) / 1_000_000
 
 printf "Matrix multiplication took %.2f ms\n", $elapsed
 printf "Result dimensions: %dx%d\n", len($C), len($C->[0])
 
 # Verify a random cell
-my $r = int(rand $size)
-my $c = int(rand $size)
-my $BT = matrix_transpose($B)
-my $expected = Math::dot_product($A->[$r], $BT->[$c])
-my $actual = $C->[$r]->[$c]
+val $r = int(rand $size)
+val $c = int(rand $size)
+val $BT = matrix_transpose($B)
+val $expected = Math::dot_product($A->[$r], $BT->[$c])
+val $actual = $C->[$r]->[$c]
 
 printf "Verification at [%d,%d]: expected=%.6f, actual=%.6f\n", $r, $c, $expected, $actual
 die "Verification failed! diff=#{abs($expected - $actual)}" if abs($expected - $actual) > 1e-9

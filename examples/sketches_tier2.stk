@@ -5,34 +5,34 @@
 # builtins, no external crates required.
 
 p "── Token-bucket rate limiter ──────────────────────────"
-my $rl = token_bucket(5, 2);           # 5 tokens cap, refill 2/sec
-my @verdict = map { rl_try_take($rl, 1) } (1:8)
+val $rl = token_bucket(5, 2);           # 5 tokens cap, refill 2/sec
+val @verdict = map { rl_try_take($rl, 1) } (1:8)
 p "  burst of 8: allowed = ", join("", @verdict)
 p "  (first 5 succeed, rest blocked until tokens refill)"
 
 p ""
 p "── Consistent hash ring ───────────────────────────────"
-my $ring = hash_ring(150);             # 150 virtual nodes per real
+val $ring = hash_ring(150);             # 150 virtual nodes per real
 hr_add($ring, _) for ("us-east", "us-west", "eu-central")
-my %hits
-for my $i (1:10_000) { $hits{hr_get($ring, "user:$i")}++ }
-for my $node (sort keys %hits) {
+var %hits
+for val $i (1:10_000) { $hits{hr_get($ring, "user:$i")}++ }
+for val $node (sort keys %hits) {
     printf "  %-12s %d keys (~%.1f%%)\n", $node, $hits{$node}, $hits{$node} / 100.0
 }
 p "  remove eu-central, only ~33% of keys move:"
 hr_remove($ring, "eu-central")
-my $moved = 0
-for my $i (1:10_000) {
-    my $now = hr_get($ring, "user:$i")
+var $moved = 0
+for val $i (1:10_000) {
+    val $now = hr_get($ring, "user:$i")
     $moved++ if $now ne "us-east" && $now ne "us-west"
 }
-my $expected_pct = ($moved == 0) ? "all remap" : "$moved orphaned"
+val $expected_pct = ($moved == 0) ? "all remap" : "$moved orphaned"
 
 p ""
 p "── SimHash (near-duplicate document detection) ────────"
-my $doc1 = simhash()
-my $doc2 = simhash()
-my $doc3 = simhash()
+val $doc1 = simhash()
+val $doc2 = simhash()
+val $doc3 = simhash()
 sh_add($doc1, _) for split /\s+/, "the quick brown fox jumps over the lazy dog"
 sh_add($doc2, _) for split /\s+/, "the quick brown fox jumps over the lazy cat"
 sh_add($doc3, _) for split /\s+/, "completely unrelated text about photosynthesis"
@@ -41,15 +41,15 @@ printf "  doc1 vs doc3 (distant):  similarity %.3f\n", sh_similarity($doc1, $doc
 
 p ""
 p "── MinHash (Jaccard similarity over k-shingles) ───────"
-my $set_a = minhash(128)
-my $set_b = minhash(128)
+val $set_a = minhash(128)
+val $set_b = minhash(128)
 mh_add($set_a, _) for ("apple", "banana", "cherry", "date", "fig")
 mh_add($set_b, _) for ("banana", "cherry", "date", "fig", "grape")
 printf "  Jaccard(A, B) ≈ %.3f  (truth: 4/6 = 0.667)\n", mh_jaccard($set_a, $set_b)
 
 p ""
 p "── Interval tree (range-overlap queries) ──────────────"
-my $it = interval_tree()
+val $it = interval_tree()
 it_insert($it, 0,  10, "morning")
 it_insert($it, 8,  16, "midday")
 it_insert($it, 14, 22, "evening")
@@ -61,7 +61,7 @@ p "  intervals covering t=21:  ",
 
 p ""
 p "── BK-tree (fuzzy / typo-tolerant search) ─────────────"
-my $bk = bk_tree()
+val $bk = bk_tree()
 bk_insert($bk, _) for ("apple", "apply", "ape", "april", "banana", "band")
 p "  within edit-distance 1 of 'aple': ",
     join(", ", map { sprintf("%s(d=%d)", _->[0], _->[1]) } bk_query($bk, "aple", 1))
@@ -70,15 +70,15 @@ p "  within edit-distance 2 of 'bant': ",
 
 p ""
 p "── Rope (fast string edits in long documents) ─────────"
-my $r = rope("Hello, World!")
+val $r = rope("Hello, World!")
 rope_insert($r, 7, "beautiful ")
 p "  after insert: ", rope_to_string($r)
 
 p ""
 p "── Diff algorithms (Myers + Patience) ─────────────────"
-my @v1 = ("alpha", "beta", "gamma", "delta")
-my @v2 = ("alpha", "BETA", "gamma", "epsilon")
+val @v1 = ("alpha", "beta", "gamma", "delta")
+val @v2 = ("alpha", "BETA", "gamma", "epsilon")
 p "  myers_diff:"
-for my $op (myers_diff(\@v1, \@v2)) {
+for val $op (myers_diff(\@v1, \@v2)) {
     printf "    %s %s\n", $op->[0], $op->[1]
 }

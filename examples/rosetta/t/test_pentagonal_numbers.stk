@@ -6,8 +6,8 @@ fn Rosetta::PentagonalNumbers::pentagonal($n) {
 }
 
 fn Rosetta::IsPentagonal::is_pentagonal($n) {
-    my $val = 24 * $n + 1
-    my $root = int(sqrt($val))
+    val $val = 24 * $n + 1
+    val $root = int(sqrt($val))
     if ($root * $root == $val) {
         ($root + 1) % 6 == 0
     } else {

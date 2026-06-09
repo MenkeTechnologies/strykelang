@@ -7,10 +7,10 @@ fn Rosetta::Pell::compute($n) {
     } elsif ($n == 1) {
         1
     } else {
-        my $p0 = 0
-        my $p1 = 1
-        for my $i (2:$n) {
-            my $p2 = 2 * $p1 + $p0
+        var $p0 = 0
+        var $p1 = 1
+        for val $i (2:$n) {
+            val $p2 = 2 * $p1 + $p0
             ($p0, $p1) = ($p1, $p2)
         }
         $p1
@@ -28,7 +28,7 @@ assert_eq Rosetta::Pell::compute(3), 5, "P3"
 assert_eq Rosetta::Pell::compute(4), 12, "P4"
 assert_eq Rosetta::Pell::compute(10), 2378, "P10"
 
-my @list = Rosetta::Pell::list(5)
+val @list = Rosetta::Pell::list(5)
 assert_eq join(",", @list), "0,1,2,5,12,29", "Pell list first 6"
 
 10 |> Rosetta::Pell::compute |> assert_eq(2378, "pipe pell 10")

@@ -2,39 +2,39 @@
 # Rosetta Code: Move-to-front transform
 
 fn Rosetta::MoveToFront::mtf_encode($str) {
-    my @alpha = ("a" .. "z")
-    my @res
-    my @chars = $str |> chars
-    for my $c (@chars) {
-        my $idx = 0
-        for my $i (0..len(@alpha)-1) {
+    var @alpha = ("a" .. "z")
+    var @res
+    val @chars = $str |> chars
+    for val $c (@chars) {
+        var $idx = 0
+        for val $i (0..len(@alpha)-1) {
             if ($alpha[$i] eq $c) { $idx = $i; last }
         }
         push @res, $idx
-        my $val = splice(@alpha, $idx, 1)
+        val $val = splice(@alpha, $idx, 1)
         unshift @alpha, $val
     }
     \@res
 }
 
 fn Rosetta::MoveToFront::mtf_decode($codes_ref) {
-    my @alpha = ("a" .. "z")
-    my @codes = @$codes_ref
-    my $res = ""
-    for my $idx (@codes) {
-        my $c = $alpha[$idx]
+    var @alpha = ("a" .. "z")
+    val @codes = @$codes_ref
+    var $res = ""
+    for val $idx (@codes) {
+        val $c = $alpha[$idx]
         $res = $res . $c
-        my $val = splice(@alpha, $idx, 1)
+        val $val = splice(@alpha, $idx, 1)
         unshift @alpha, $val
     }
     $res
 }
 
-my $input = "brood"
-my $encoded = Rosetta::MoveToFront::mtf_encode($input)
+val $input = "brood"
+val $encoded = Rosetta::MoveToFront::mtf_encode($input)
 assert_eq join(",", @$encoded), "1,17,15,0,5", "mtf_encode 'brood'"
 
-my $decoded = Rosetta::MoveToFront::mtf_decode($encoded)
+val $decoded = Rosetta::MoveToFront::mtf_decode($encoded)
 assert_eq $decoded, $input, "mtf_decode 'brood'"
 
 test_run

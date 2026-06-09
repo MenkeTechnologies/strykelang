@@ -2,24 +2,24 @@
 # Rosetta Code: Max flow (Edmonds-Karp)
 
 fn Rosetta::MaxFlow::solve($capacity, $source, $sink) {
-    my $n = len(@$capacity)
-    my @flow = ~> 0:$n-1 map { [ map { 0 } 1:$n ] }
-    my $max_flow = 0
+    val $n = len(@$capacity)
+    val @flow = ~> 0:$n-1 map { [ map { 0 } 1:$n ] }
+    var $max_flow = 0
     
     while (1) {
-        my @parent = map { -1 } 1:$n
-        my @queue = ($source)
+        var @parent = map { -1 } 1:$n
+        var @queue = ($source)
         $parent[$source] = $source
         
-        my $found_path = 0
+        var $found_path = 0
         while (len(@queue) > 0) {
-            my $u = shift @queue
+            val $u = shift @queue
             if ($u == $sink) {
                 $found_path = 1
                 last
             }
             
-            for (my $v = 0; $v < $n; $v++) {
+            for (var $v = 0; $v < $n; $v++) {
                 if ($parent[$v] == -1 && $capacity->[$u]->[$v] - $flow[$u]->[$v] > 0) {
                     $parent[$v] = $u
                     push @queue, $v
@@ -29,19 +29,19 @@ fn Rosetta::MaxFlow::solve($capacity, $source, $sink) {
         
         last if !$found_path
         
-        my $path_flow = 1e18 # Infinity
-        my $s = $sink
+        var $path_flow = 1e18 # Infinity
+        var $s = $sink
         while ($s != $source) {
-            my $u = $parent[$s]
-            my $residual = $capacity->[$u]->[$s] - $flow[$u]->[$s]
+            val $u = $parent[$s]
+            val $residual = $capacity->[$u]->[$s] - $flow[$u]->[$s]
             $path_flow = min($path_flow, $residual)
             $s = $u
         }
         
         $max_flow += $path_flow
-        my $v = $sink
+        var $v = $sink
         while ($v != $source) {
-            my $u = $parent[$v]
+            val $u = $parent[$v]
             $flow[$u]->[$v] += $path_flow
             $flow[$v]->[$u] -= $path_flow
             $v = $u
@@ -53,7 +53,7 @@ fn Rosetta::MaxFlow::solve($capacity, $source, $sink) {
 
 # Example graph
 # 0: source, 5: sink
-my $cap = [
+val $cap = [
     [0, 16, 13,  0,  0,  0],
     [0,  0, 10, 12,  0,  0],
     [0,  4,  0,  0, 14,  0],
@@ -62,7 +62,7 @@ my $cap = [
     [0,  0,  0,  0,  0,  0]
 ]
 
-my $res = Rosetta::MaxFlow::solve($cap, 0, 5)
+val $res = Rosetta::MaxFlow::solve($cap, 0, 5)
 assert_eq $res, 23, "Max flow is 23"
 
 test_run

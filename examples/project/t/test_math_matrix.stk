@@ -4,31 +4,31 @@
 require "./lib/math_matrix.stk"
 
 # ── Project::MathMatrix::adv_matrix_add ─────
-my $m1 = [[1, 2], [3, 4]]
-my $m2 = [[5, 6], [7, 8]]
-my $m_add = Project::MathMatrix::adv_matrix_add($m1, $m2)
+val $m1 = [[1, 2], [3, 4]]
+val $m2 = [[5, 6], [7, 8]]
+val $m_add = Project::MathMatrix::adv_matrix_add($m1, $m2)
 assert_eq $m_add->[0][0], 6, "add [0][0]"
 assert_eq $m_add->[1][1], 12, "add [1][1]"
 
 # ── Project::MathMatrix::adv_matrix_mul ─────
-my $m3 = [[1, 2], [3, 4]]
-my $m4 = [[2, 0], [1, 2]]
-my $m_mul = Project::MathMatrix::adv_matrix_mul($m3, $m4)
+val $m3 = [[1, 2], [3, 4]]
+val $m4 = [[2, 0], [1, 2]]
+val $m_mul = Project::MathMatrix::adv_matrix_mul($m3, $m4)
 assert_eq $m_mul->[0][0], 4, "mul [0][0]"
 assert_eq $m_mul->[0][1], 4, "mul [0][1]"
 assert_eq $m_mul->[1][0], 10, "mul [1][0]"
 assert_eq $m_mul->[1][1], 8, "mul [1][1]"
 
 # ── Project::MathMatrix::adv_matrix_transpose ─────
-my $m5 = [[1, 2, 3], [4, 5, 6]]
-my $m_t = Project::MathMatrix::adv_matrix_transpose($m5)
+val $m5 = [[1, 2, 3], [4, 5, 6]]
+val $m_t = Project::MathMatrix::adv_matrix_transpose($m5)
 assert_eq len(@$m_t), 3, "transpose rows"
 assert_eq len(@{$m_t->[0]}), 2, "transpose cols"
 assert_eq $m_t->[0][1], 4, "transpose [0][1]"
 assert_eq $m_t->[2][1], 6, "transpose [2][1]"
 
 # ── Project::MathMatrix::adv_matrix_det2x2 ─────
-my $m6 = [[4, 3], [3, 2]]
+val $m6 = [[4, 3], [3, 2]]
 assert_eq Project::MathMatrix::adv_matrix_det2x2($m6), -1, "det2x2"
 
 test_run

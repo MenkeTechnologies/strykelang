@@ -14,7 +14,7 @@
 
 p "── swallow basics ─────────────────────────────────────"
 
-my $dir = "/tmp/stryke_swallow_demo"
+val $dir = "/tmp/stryke_swallow_demo"
 system "rm", "-rf", $dir       # clean any prior run
 mkdir $dir
 mkdir "$dir/nested"
@@ -26,29 +26,29 @@ spurt "$dir/nested/c.txt", "deep\n"
 spurt "$dir/logo.bin",     pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01)   # exactly 5 raw bytes
 
 # 1. Basic glob → hash. Keys are absolute paths.
-my %txt = swallow "$dir/*.txt"
+val %txt = swallow "$dir/*.txt"
 p "swallow '*.txt' → ", len keys %txt, " files"
-for my $path (sort keys %txt) {
+for val $path (sort keys %txt) {
     p "  $path  (#{length $txt{$path}} bytes)"
 }
 
 # 2. `swa` alias.
-my %same = swa "$dir/*.txt"
+val %same = swa "$dir/*.txt"
 p "\nswa alias → ", len keys %same, " files (matches `swallow`)"
 
 # 3. Binary-safe — no decoding, raw bytes preserved.
-my %bin   = swallow "$dir/*.bin"
-my @bkeys = keys %bin
-my $bpath = $bkeys[0]
-my $bbytes = $bin{$bpath}
+val %bin   = swallow "$dir/*.bin"
+val @bkeys = keys %bin
+val $bpath = $bkeys[0]
+val $bbytes = $bin{$bpath}
 p "\nbinary file: $bpath → #{length $bbytes} raw bytes"
 
 # 4. Recursive `**` reaches nested files.
-my %deep = swallow "$dir/**/*.txt"
+val %deep = swallow "$dir/**/*.txt"
 p "\nrecursive '**/*.txt' → ", len keys %deep, " files (top + nested)"
 
 # 5. `(N)` null-glob: empty hash on no match, no error.
-my %empty = swallow "$dir/no_such_*(N)"
+val %empty = swallow "$dir/no_such_*(N)"
 p "\n(N) null-glob on no-match → ", len keys %empty, " files (silent)"
 
 # 6. Compare the three glob-aware primitives.

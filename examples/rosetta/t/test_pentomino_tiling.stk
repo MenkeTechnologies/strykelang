@@ -2,7 +2,7 @@
 # Rosetta Code: Pentomino tiling
 
 fn Rosetta::Pentomino::sample() {
-    my @rows = (
+    val @rows = (
         "ABC",
         "ABC",
         "ABC",
@@ -13,16 +13,16 @@ fn Rosetta::Pentomino::sample() {
 }
 
 fn Rosetta::Pentomino::count_cells($rows, $ch) {
-    my $count = 0
-    for my $row (@$rows) {
-        for my $cell (split //, $row) {
+    var $count = 0
+    for val $row (@$rows) {
+        for val $cell (split //, $row) {
             $count++ if $cell eq $ch
         }
     }
     $count
 }
 
-my $rows = Rosetta::Pentomino::sample()
+val $rows = Rosetta::Pentomino::sample()
 
 assert_eq len(@$rows), 5, "sample tiling has five rows"
 assert_eq Rosetta::Pentomino::count_cells($rows, "A"), 5, "first pentomino covers five cells"

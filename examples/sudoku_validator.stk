@@ -10,8 +10,8 @@
 # Run: stryke --no-interop examples/sudoku_validator.stk
 
 fn Sud::has_dupes($cells) {
-    my %seen = ()
-    for my $v (@$cells) {
+    var %seen = ()
+    for val $v (@$cells) {
         next if $v == 0
         return 1 if exists $seen{$v}
         $seen{$v} = 1
@@ -20,21 +20,21 @@ fn Sud::has_dupes($cells) {
 }
 
 fn Sud::row($board, $r) {
-    my @cells = ()
-    for my $c (0:8) { push @cells, $board->[$r][$c] }
+    var @cells = ()
+    for val $c (0:8) { push @cells, $board->[$r][$c] }
     \@cells
 }
 
 fn Sud::col($board, $c) {
-    my @cells = ()
-    for my $r (0:8) { push @cells, $board->[$r][$c] }
+    var @cells = ()
+    for val $r (0:8) { push @cells, $board->[$r][$c] }
     \@cells
 }
 
 fn Sud::box($board, $br, $bc) {
-    my @cells = ()
-    for my $r (0:2) {
-        for my $c (0:2) {
+    var @cells = ()
+    for val $r (0:2) {
+        for val $c (0:2) {
             push @cells, $board->[$br * 3 + $r][$bc * 3 + $c]
         }
     }
@@ -42,12 +42,12 @@ fn Sud::box($board, $br, $bc) {
 }
 
 fn Sud::valid($board) {
-    for my $i (0:8) {
+    for val $i (0:8) {
         return 0 if Sud::has_dupes(Sud::row($board, $i))
         return 0 if Sud::has_dupes(Sud::col($board, $i))
     }
-    for my $br (0:2) {
-        for my $bc (0:2) {
+    for val $br (0:2) {
+        for val $bc (0:2) {
             return 0 if Sud::has_dupes(Sud::box($board, $br, $bc))
         }
     }
@@ -55,10 +55,10 @@ fn Sud::valid($board) {
 }
 
 fn Sud::print_board($board) {
-    for my $r (0:8) {
-        my @row = ()
-        for my $c (0:8) {
-            my $v = $board->[$r][$c]
+    for val $r (0:8) {
+        var @row = ()
+        for val $c (0:8) {
+            val $v = $board->[$r][$c]
             push @row, $v == 0 ? "." : "$v"
         }
         p "  " . join(" ", @row)
@@ -70,7 +70,7 @@ p " Stryke Sudoku Validator Demo"
 p "==============================================="
 p ""
 
-my $partial = [
+val $partial = [
     [5,3,0, 0,7,0, 0,0,0],
     [6,0,0, 1,9,5, 0,0,0],
     [0,9,8, 0,0,0, 0,6,0],
@@ -84,11 +84,11 @@ my $partial = [
 
 p "── Partial board (valid in-progress) ──────────"
 Sud::print_board($partial)
-my $r1 = Sud::valid($partial) ? "VALID" : "INVALID"
+val $r1 = Sud::valid($partial) ? "VALID" : "INVALID"
 p ""
 p "  result: $r1"
 
-my $bad = [
+val $bad = [
     [5,3,0, 0,7,0, 0,0,0],
     [6,0,0, 1,9,5, 0,0,0],
     [0,9,8, 0,0,0, 0,6,0],
@@ -102,10 +102,10 @@ my $bad = [
 
 p ""
 p "── Bad board (dup 5 in last col) ──────────────"
-my $r2 = Sud::valid($bad) ? "VALID" : "INVALID"
+val $r2 = Sud::valid($bad) ? "VALID" : "INVALID"
 p "  result: $r2"
 
-my $solved = [
+val $solved = [
     [5,3,4, 6,7,8, 9,1,2],
     [6,7,2, 1,9,5, 3,4,8],
     [1,9,8, 3,4,2, 5,6,7],
@@ -119,5 +119,5 @@ my $solved = [
 
 p ""
 p "── Completed valid board ─────────────────────"
-my $r3 = Sud::valid($solved) ? "VALID" : "INVALID"
+val $r3 = Sud::valid($solved) ? "VALID" : "INVALID"
 p "  result: $r3"

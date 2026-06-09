@@ -38,7 +38,7 @@ soundex("Stryke") |> aeq "S362", "soundex"
 
 # ── 4. Statistics ───────────────────────────────────────────────────────────
 
-my @data = (10, 20, 30, 40, 50)
+val @data = (10, 20, 30, 40, 50)
 mean(@data)   |> aeq 30, "mean"
 median(@data) |> aeq 30, "median"
 variance(@data) |> aeq 200, "variance"
@@ -46,13 +46,13 @@ stddev(@data) |> { 14.1 <= _ <= 14.2 } |> aok "stddev"
 
 # ── 5. Matrix Operations ────────────────────────────────────────────────────
 
-my $m2 = [[1, 2], [3, 4]]
+val $m2 = [[1, 2], [3, 4]]
 matrix_det($m2) |> aeq -2, "matrix_det 2x2"
 
-my $m3 = [[1, 2, 3], [0, 1, 4], [5, 6, 0]]
+val $m3 = [[1, 2, 3], [0, 1, 4], [5, 6, 0]]
 matrix_det($m3) |> aeq 1, "matrix_det 3x3"
 
-my $inv = matrix_inverse($m2)
+val $inv = matrix_inverse($m2)
 $inv->[0][0] |> aeq -2, "matrix_inverse [0][0]"
 $inv->[0][1] |> aeq 1, "matrix_inverse [0][1]"
 

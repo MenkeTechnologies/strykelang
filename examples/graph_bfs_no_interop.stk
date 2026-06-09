@@ -14,21 +14,21 @@
 
 fn BFS::shortest($graph_ref, $src, $dst) {
     return [$src] if $src eq $dst
-    my %parent
-    my %seen = ($src => 1)
-    my @q = ($src)
+    var %parent
+    var %seen = ($src => 1)
+    var @q = ($src)
     while (len(@q) > 0) {
-        my $u = shift @q
-        my $neighbours = $graph_ref->{$u}
+        val $u = shift @q
+        val $neighbours = $graph_ref->{$u}
         next unless defined $neighbours
-        for my $v (@$neighbours) {
+        for val $v (@$neighbours) {
             next if exists $seen{$v}
             $seen{$v} = 1
             $parent{$v} = $u
             if ($v eq $dst) {
                 # Walk back to reconstruct.
-                my @path = ($dst)
-                my $cur = $dst
+                var @path = ($dst)
+                var $cur = $dst
                 while (exists $parent{$cur}) {
                     $cur = $parent{$cur}
                     unshift @path, $cur
@@ -43,7 +43,7 @@ fn BFS::shortest($graph_ref, $src, $dst) {
 }
 
 fn BFS::path_len($graph_ref, $src, $dst) {
-    my $path = BFS::shortest($graph_ref, $src, $dst)
+    val $path = BFS::shortest($graph_ref, $src, $dst)
     len(@$path) == 0 ? -1 : len(@$path) - 1
 }
 
@@ -57,7 +57,7 @@ fn BFS::path_len($graph_ref, $src, $dst) {
 #
 # Distances from A: A=0, B=1, C=2, D=3, E=1, F=3, G=2, H=4 (A→E→G,
 # but G also reachable A→B→C→F→H→G; BFS picks the shorter one).
-my $G = +{
+val $G = +{
     A => ["B", "E"],
     B => ["C"],
     C => ["D", "F"],
@@ -69,7 +69,7 @@ my $G = +{
 }
 
 # Reference table — (src, dst, expected BFS::path_len).
-my @cases = (
+val @cases = (
     +{ src => "A", dst => "A", dist => 0 },
     +{ src => "A", dst => "B", dist => 1 },
     +{ src => "A", dst => "C", dist => 2 },
@@ -84,11 +84,11 @@ my @cases = (
 )
 
 p "── Graph BFS shortest-path demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $d = BFS::path_len($G, $c->{src}, $c->{dst})
-    my $p = BFS::shortest($G, $c->{src}, $c->{dst})
-    my $ok = ($d == $c->{dist})
+var $fail = 0
+for val $c (@cases) {
+    val $d = BFS::path_len($G, $c->{src}, $c->{dst})
+    val $p = BFS::shortest($G, $c->{src}, $c->{dst})
+    val $ok = ($d == $c->{dist})
     $fail++ unless $ok
     printf "  %s -> %s  d=%2d  expect=%2d  path=[%s]  %s\n",
         $c->{src}, $c->{dst}, $d, $c->{dist},
@@ -98,9 +98,9 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " BFS cases failed" if $fail > 0
 
 # Triangle inequality (in graph terms): d(A,C) <= d(A,B) + d(B,C).
-my $d_ac = BFS::path_len($G, "A", "C")
-my $d_ab = BFS::path_len($G, "A", "B")
-my $d_bc = BFS::path_len($G, "B", "C")
+val $d_ac = BFS::path_len($G, "A", "C")
+val $d_ab = BFS::path_len($G, "A", "B")
+val $d_bc = BFS::path_len($G, "B", "C")
 die "triangle inequality A-B-C" unless $d_ac <= $d_ab + $d_bc
 
 p ""

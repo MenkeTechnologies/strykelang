@@ -3,7 +3,7 @@
 
 # ── Basic Pattern Matching ─────────────────────────────────────────
 
-my $text = "Hello, World! 123"
+val $text = "Hello, World! 123"
 
 assert_true ($text =~ /Hello/), "basic match"
 assert_false ($text =~ /goodbye/), "basic non-match"
@@ -43,14 +43,14 @@ assert_true ("hello" =~ /^hello$/), "full match"
 
 # ── Groups and Captures ────────────────────────────────────────────
 
-my $email = "user@domain.com"
+val $email = "user@domain.com"
 if ($email =~ /(\w+)@(\w+)\.(\w+)/) {
     assert_eq $1, "user", "capture group 1"
     assert_eq $2, "domain", "capture group 2" 
     assert_eq $3, "com", "capture group 3"
 }
 
-my $phone = "555-123-4567"
+val $phone = "555-123-4567"
 if ($phone =~ /(\d{3})-(\d{3})-(\d{4})/) {
     assert_eq $1, "555", "phone area code"
     assert_eq $2, "123", "phone exchange"
@@ -59,7 +59,7 @@ if ($phone =~ /(\d{3})-(\d{3})-(\d{4})/) {
 
 # ── Non-capturing Groups ───────────────────────────────────────────
 
-my $version = "v1.2.3"
+val $version = "v1.2.3"
 if ($version =~ /v(?:\d+)\.(\d+)\.(\d+)/) {
     assert_eq $1, "2", "non-capturing group $1"
     assert_eq $2, "3", "non-capturing group $2"
@@ -80,33 +80,33 @@ assert_false ("password123" =~ /password(?!\d)/), "negative lookahead fail"
 
 # ── Global Matching ────────────────────────────────────────────────
 
-my $numbers = "There are 5 cats and 3 dogs"
-my @matches = ($numbers =~ /\d+/g)
+val $numbers = "There are 5 cats and 3 dogs"
+val @matches = ($numbers =~ /\d+/g)
 assert_eq len(@matches), 2, "global match count"
 assert_eq $matches[0], "5", "first global match"
 assert_eq $matches[1], "3", "second global match"
 
 # ── Substitution ───────────────────────────────────────────────────
 
-my $str1 = "hello world"
+var $str1 = "hello world"
 $str1 =~ s/world/universe/
 assert_eq $str1, "hello universe", "basic substitution"
 
-my $str2 = "one two three one"
+var $str2 = "one two three one"
 $str2 =~ s/one/ONE/g
 assert_eq $str2, "ONE two three ONE", "global substitution"
 
-my $str3 = "The quick brown fox"
+var $str3 = "The quick brown fox"
 $str3 =~ s/(\w+) (\w+)/$2 $1/g
 assert_eq $str3, "quick The fox brown", "swap substitution"
 
 # ── Case Conversion ────────────────────────────────────────────────
 
-my $mixed = "Hello World"
+var $mixed = "Hello World"
 $mixed =~ s/(\w+)/lc($1)/eg
 assert_eq $mixed, "hello world", "lowercase conversion"
 
-my $lower = "hello world"
+var $lower = "hello world"
 $lower =~ s/(\w+)/uc($1)/eg
 assert_eq $lower, "HELLO WORLD", "uppercase conversion"
 
@@ -130,11 +130,11 @@ assert_true ("xyz" =~ /[^aeiou]/), "consonant set"
 
 # ── Modifiers ──────────────────────────────────────────────────────
 
-my $multiline = "line1\nline2\nline3"
+val $multiline = "line1\nline2\nline3"
 assert_true ($multiline =~ /^line2/m), "multiline mode"
 assert_false ($multiline =~ /^line2/), "single line mode"
 
-my $dotall = "hello\nworld"
+val $dotall = "hello\nworld"
 assert_true ($dotall =~ /hello.world/s), "dotall mode"
 assert_false ($dotall =~ /hello.world/), "normal dot"
 
@@ -143,13 +143,13 @@ assert_false ($dotall =~ /hello.world/), "normal dot"
 assert_true ("hello hello" =~ /(\w+) \1/), "backreference match"
 assert_false ("hello world" =~ /(\w+) \1/), "backreference no match"
 
-my $doubled = "The the quick brown fox fox"
+val $doubled = "The the quick brown fox fox"
 # Backreferences may not work as expected, simplify test
 assert_true ($doubled =~ /(\w+) \1/), "backreference pattern exists"
 
 # ── Named Captures ─────────────────────────────────────────────────
 
-my $log_line = "2023-12-25 14:30:45 ERROR Failed to connect"
+val $log_line = "2023-12-25 14:30:45 ERROR Failed to connect"
 if ($log_line =~ /(?<date>\d{4}-\d{2}-\d{2}) (?<time>\d{2}:\d{2}:\d{2}) (?<level>\w+) (?<message>.*)/) {
     assert_eq $+{date}, "2023-12-25", "named capture date"
     assert_eq $+{level}, "ERROR", "named capture level"
@@ -158,33 +158,33 @@ if ($log_line =~ /(?<date>\d{4}-\d{2}-\d{2}) (?<time>\d{2}:\d{2}:\d{2}) (?<level
 
 # ── Advanced Substitution ──────────────────────────────────────────
 
-my $camelCase = "firstName lastName emailAddress"
+var $camelCase = "firstName lastName emailAddress"
 # Title case conversion - simplified test
 $camelCase =~ s/\b(\w)/uc($1)/eg
 assert_eq $camelCase, "FirstName LastName EmailAddress", "title case"
 
-my $csv = "apple,banana,cherry"
+var $csv = "apple,banana,cherry"
 $csv =~ s/,/ | /g
 assert_eq $csv, "apple | banana | cherry", "delimiter change"
 
 # ── Regex with Variables ───────────────────────────────────────────
 
-my $search_term = "test"
-my $replacement = "exam"
-my $content = "This is a test file for testing"
+val $search_term = "test"
+val $replacement = "exam"
+var $content = "This is a test file for testing"
 $content =~ s/$search_term/$replacement/g
 assert_eq $content, "This is a exam file for examing", "variable substitution"
 
 # ── Complex Pattern Matching ───────────────────────────────────────
 
-my $html = '<div class="content">Hello World</div>'
+val $html = '<div class="content">Hello World</div>'
 if ($html =~ /<(\w+)(?:\s+class="([^"]*)")?>([^<]*)<\/\1>/) {
     assert_eq $1, "div", "HTML tag"
     assert_eq $2, "content", "HTML class"
     assert_eq $3, "Hello World", "HTML content"
 }
 
-my $url = "https://example.com:8080/path/to/resource?param=value"
+val $url = "https://example.com:8080/path/to/resource?param=value"
 if ($url =~ /^(https?):\/\/([^:\/]+)(?::(\d+))?(.*)/) {
     assert_eq $1, "https", "URL protocol"
     assert_eq $2, "example.com", "URL host"
@@ -194,18 +194,18 @@ if ($url =~ /^(https?):\/\/([^:\/]+)(?::(\d+))?(.*)/) {
 
 # ── Pattern Compilation ────────────────────────────────────────────
 
-my $compiled = qr/\d{3}-\d{3}-\d{4}/
+val $compiled = qr/\d{3}-\d{3}-\d{4}/
 assert_true ("555-123-4567" =~ /$compiled/), "compiled regex"
 assert_false ("not-a-phone" =~ /$compiled/), "compiled regex no match"
 
 # ── Split with Regex ───────────────────────────────────────────────
 
-my @words = grep { _ ne "" } split /\s+/, "  hello    world   test  "
+val @words = grep { _ ne "" } split /\s+/, "  hello    world   test  "
 assert_eq len(@words), 3, "split whitespace count"
 assert_eq $words[0], "hello", "split word 1"
 assert_eq $words[2], "test", "split word 3"
 
-my @parts = split /[,;]/, "a,b;c,d"
+val @parts = split /[,;]/, "a,b;c,d"
 assert_eq len(@parts), 4, "split multiple delim count"
 assert_eq join("|", @parts), "a|b|c|d", "split multiple delim"
 

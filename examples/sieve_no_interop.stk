@@ -15,30 +15,30 @@
 
 fn Sieve::run($n) {
     return () if $n < 2
-    my @is_prime = (1) x ($n + 1)
+    var @is_prime = (1) x ($n + 1)
     $is_prime[0] = 0
     $is_prime[1] = 0
-    my $limit = int(sqrt($n))
-    for my $i (2:$limit) {
+    val $limit = int(sqrt($n))
+    for val $i (2:$limit) {
         next unless $is_prime[$i]
-        my $j = $i * $i
+        var $j = $i * $i
         while ($j <= $n) {
             $is_prime[$j] = 0
             $j += $i
         }
     }
-    my @primes
-    for my $i (2:$n) {
+    var @primes
+    for val $i (2:$n) {
         push @primes, $i if $is_prime[$i]
     }
     @primes
 }
 
-my $upper = $ARGV[0] // 100
+val $upper = $ARGV[0] // 100
 
-my $t0 = now_ns()
-my @primes = Sieve::run($upper)
-my $ms = (now_ns() - $t0) / 1_000_000
+val $t0 = now_ns()
+val @primes = Sieve::run($upper)
+val $ms = (now_ns() - $t0) / 1_000_000
 
 p "── Sieve of Eratosthenes (n ≤ $upper) ──"
 p "found ", len(@primes), " primes"
@@ -51,21 +51,21 @@ if (len(@primes) <= 25) {
 printf "took  %.3f ms\n", $ms
 
 # Built-in self-test — counts and select members against the literature.
-my %expected_count = (
+val %expected_count = (
     10    =>   4,
     100   =>  25,
     1000  => 168,
     10000 => 1229,
 )
 if (exists $expected_count{$upper}) {
-    my $want = $expected_count{$upper}
+    val $want = $expected_count{$upper}
     die "prime-count mismatch for n=$upper" unless len(@primes) == $want
     p "  ALL PASS (count matches reference: $want primes ≤ $upper)"
 } else {
     # Spot-check a few well-known primes are present.
-    for my $pr (2, 3, 5, 7, 11, 13) {
+    for val $pr (2, 3, 5, 7, 11, 13) {
         if ($pr <= $upper) {
-            my $found = grep { _ == $pr } @primes
+            val $found = grep { _ == $pr } @primes
             die "$pr missing from sieve output" unless $found
         }
     }

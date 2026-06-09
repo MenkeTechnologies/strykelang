@@ -11,7 +11,7 @@
 package BTree
 
 # Order T
-my $T = 3
+val $T = 3
 
 fn node_new($leaf) {
     {
@@ -22,8 +22,8 @@ fn node_new($leaf) {
 }
 
 fn search($node, $k) {
-    my $v1 = 0
-    my $keys = $node->{keys}
+    var $v1 = 0
+    val $keys = $node->{keys}
     while ($v1 < (len @$keys) && $k > $keys->[$v1]) {
         $v1++
     }
@@ -36,35 +36,35 @@ fn search($node, $k) {
         return undef
     }
     
-    my $child = $node->{children}->[$v1]
+    val $child = $node->{children}->[$v1]
     search($child, $k)
 }
 
 fn split_child($parent, $v1) {
-    my $t = $T
-    my $y = $parent->{children}->[$v1]
-    my $z = node_new($y->{leaf})
+    val $t = $T
+    var $y = $parent->{children}->[$v1]
+    var $z = node_new($y->{leaf})
     
     # Move keys
-    my $y_keys = $y->{keys}
-    my @z_keys = @$y_keys[$t : 2 * $t - 2]
+    val $y_keys = $y->{keys}
+    val @z_keys = @$y_keys[$t : 2 * $t - 2]
     $z->{keys} = [ @z_keys ]
     
     # Move children
     if (!$y->{leaf}) {
-        my $y_children = $y->{children}
-        my @z_children = @$y_children[$t : 2 * $t - 1]
+        val $y_children = $y->{children}
+        val @z_children = @$y_children[$t : 2 * $t - 1]
         $z->{children} = [ @z_children ]
     }
     
     # Truncate y
-    my $mid_key = $y->{keys}->[$t - 1]
-    my @y_keys_new = @$y_keys[0 : $t - 2]
+    val $mid_key = $y->{keys}->[$t - 1]
+    val @y_keys_new = @$y_keys[0 : $t - 2]
     $y->{keys} = [ @y_keys_new ]
     
     if (!$y->{leaf}) {
-        my $y_children = $y->{children}
-        my @y_children_new = @$y_children[0 : $t - 1]
+        val $y_children = $y->{children}
+        val @y_children_new = @$y_children[0 : $t - 1]
         $y->{children} = [ @y_children_new ]
     }
     
@@ -76,8 +76,8 @@ fn split_child($parent, $v1) {
 }
 
 fn insert_non_full($node, $k) {
-    my $node_keys = $node->{keys}
-    my $v1 = (len @$node_keys) - 1
+    val $node_keys = $node->{keys}
+    var $v1 = (len @$node_keys) - 1
     
     if ($node->{leaf}) {
         while ($v1 >= 0 && $k < $node_keys->[$v1]) {
@@ -90,8 +90,8 @@ fn insert_non_full($node, $k) {
         }
         $v1++
         
-        my $child = $node->{children}->[$v1]
-        my $child_keys = $child->{keys}
+        val $child = $node->{children}->[$v1]
+        val $child_keys = $child->{keys}
         if ((len @$child_keys) == 2 * $T - 1) {
             split_child($node, $v1)
             if ($k > $node->{keys}->[$v1]) {
@@ -109,10 +109,10 @@ fn insert($btree, $k) {
         return
     }
     
-    my $root = $btree->{root}
-    my $root_keys = $root->{keys}
+    val $root = $btree->{root}
+    val $root_keys = $root->{keys}
     if ((len @$root_keys) == 2 * $T - 1) {
-        my $s = node_new(0)
+        val $s = node_new(0)
         $btree->{root} = $s
         $s->{children}->[0] = $root
         split_child($s, 0)
@@ -124,9 +124,9 @@ fn insert($btree, $k) {
 
 fn inorder($node, $out) {
     return if !defined $node
-    my $keys = $node->{keys}
-    my $n = len @$keys
-    for (my $v1 = 0; $v1 < $n; $v1++) {
+    val $keys = $node->{keys}
+    val $n = len @$keys
+    for (var $v1 = 0; $v1 < $n; $v1++) {
         if (!$node->{leaf}) {
             inorder($node->{children}->[$v1], $out)
         }
@@ -141,18 +141,18 @@ package main
 
 p "── B-Tree Demo ──"
 
-my $bt = { root => undef }
-for my $v (10, 20, 5, 6, 12, 30, 7, 17) {
+val $bt = { root => undef }
+for val $v (10, 20, 5, 6, 12, 30, 7, 17) {
     p "Inserting #{$v}..."
     BTree::insert($bt, $v)
 }
 
-my @vals
+val @vals
 BTree::inorder($bt->{root}, \@vals)
 p "Inorder: #{join ', ', @vals}"
 
-for my $s (6, 15) {
-    my $res = BTree::search($bt->{root}, $s)
+for val $s (6, 15) {
+    val $res = BTree::search($bt->{root}, $s)
     p "Search #{$s}: #{defined $res ? 'FOUND' : 'NOT FOUND'}"
 }
 

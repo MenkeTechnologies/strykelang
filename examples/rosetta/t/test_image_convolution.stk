@@ -2,28 +2,28 @@
 # Rosetta Code: Image convolution
 
 fn Rosetta::ImageConvolution::convolve($image, $kernel) {
-    my $img_h = len(@$image)
-    my $img_w = len(@{$image->[0]})
-    my $ker_h = len(@$kernel)
-    my $ker_w = len(@{$kernel->[0]})
+    val $img_h = len(@$image)
+    val $img_w = len(@{$image->[0]})
+    val $ker_h = len(@$kernel)
+    val $ker_w = len(@{$kernel->[0]})
     
-    my $kh_half = int($ker_h / 2)
-    my $kw_half = int($ker_w / 2)
+    val $kh_half = int($ker_h / 2)
+    val $kw_half = int($ker_w / 2)
     
-    my @result
+    val @result
     
     # We use map to build the result array
     ~> 0..($img_h - 1) map {
-        my @row
-        for my $c (0..($img_w - 1)) {
-            my $sum = 0.0
-            for my $kr (0..($ker_h - 1)) {
-                for my $kc (0..($ker_w - 1)) {
-                    my $img_r = _ + $kr - $kh_half
-                    my $img_c = $c + $kc - $kw_half
+        var @row
+        for val $c (0..($img_w - 1)) {
+            var $sum = 0.0
+            for val $kr (0..($ker_h - 1)) {
+                for val $kc (0..($ker_w - 1)) {
+                    val $img_r = _ + $kr - $kh_half
+                    val $img_c = $c + $kc - $kw_half
                     
                     # Zero-padding for edges
-                    my $val = 0
+                    var $val = 0
                     if ($img_r >= 0 && $img_r < $img_h && $img_c >= 0 && $img_c < $img_w) {
                         $val = $image->[$img_r][$img_c]
                     }
@@ -37,28 +37,28 @@ fn Rosetta::ImageConvolution::convolve($image, $kernel) {
 }
 
 # Simple 3x3 image
-my $img = [
+val $img = [
     [10, 10, 10],
     [10, 50, 10],
     [10, 10, 10]
 ]
 
 # Blur kernel 3x3
-my $kernel = [
+val $kernel = [
     [0.111, 0.111, 0.111],
     [0.111, 0.111, 0.111],
     [0.111, 0.111, 0.111]
 ]
 
-my @res = Rosetta::ImageConvolution::convolve($img, $kernel)
+val @res = Rosetta::ImageConvolution::convolve($img, $kernel)
 
 # Center pixel should be (50 + 8*10) / 9 = 130 / 9 = 14.444
-my $center = $res[1][1]
+val $center = $res[1][1]
 assert_ok abs($center - 14.444) < 0.1, "Center pixel blurred correctly"
 
 # Corner pixel 0,0: overlaps with 4 pixels of the image
 # (10 + 10 + 10 + 50) / 9 = 80 / 9 = 8.888
-my $corner = $res[0][0]
+val $corner = $res[0][0]
 assert_ok abs($corner - 8.888) < 0.1, "Corner pixel blurred correctly"
 
 test_run

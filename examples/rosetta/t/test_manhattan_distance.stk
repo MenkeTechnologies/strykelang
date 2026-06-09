@@ -2,8 +2,8 @@
 # Rosetta Code: Manhattan distance
 
 fn Rosetta::ManhattanDistance::compute($v1, $v2) {
-    my $dist = 0
-    for my $i (0..len(@$v1)-1) {
+    var $dist = 0
+    for val $i (0..len(@$v1)-1) {
         $dist += abs($v1->[$i] - $v2->[$i])
     }
     $dist

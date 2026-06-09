@@ -19,7 +19,7 @@ fn Rosetta::NestedTemplate::vec($item_type, $items) {
     { kind => "Vec", item_type => $item_type, items => $items }
 }
 
-my $nested = Rosetta::NestedTemplate::box(
+val $nested = Rosetta::NestedTemplate::box(
     "Vec<Pair<Int,Str>>",
     Rosetta::NestedTemplate::vec("Pair<Int,Str>", [
         Rosetta::NestedTemplate::pair("Int", "Str", 1, "one"),

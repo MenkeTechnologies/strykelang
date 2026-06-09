@@ -9,7 +9,7 @@
 
 # ── puzzle (0 = empty) ──────────────────────────────────────────────
 
-my @puzzle = (
+val @puzzle = (
     5, 3, 0,  0, 7, 0,  0, 0, 0,
     6, 0, 0,  1, 9, 5,  0, 0, 0,
     0, 9, 8,  0, 0, 0,  0, 6, 0,
@@ -24,11 +24,11 @@ my @puzzle = (
 )
 
 fn Demo::Sudoku::render($grid) {
-    my @lines
-    for my $r (0:8) {
-        my $line = ""
-        for my $c (0:8) {
-            my $v = $grid->[$r * 9 + $c]
+    var @lines
+    for val $r (0:8) {
+        var $line = ""
+        for val $c (0:8) {
+            val $v = $grid->[$r * 9 + $c]
             $line .= ($v == 0 ? "." : "$v")
             $line .= " "
             $line .= "| " if ($c == 2 || $c == 5)
@@ -44,21 +44,21 @@ fn Demo::Sudoku::render($grid) {
 # ── constraint checks ──────────────────────────────────────────────
 
 fn Demo::Sudoku::is_valid($grid, $idx, $val) {
-    my $row = int($idx / 9)
-    my $col = $idx % 9
+    val $row = int($idx / 9)
+    val $col = $idx % 9
     # Row check.
-    for my $c (0:8) {
+    for val $c (0:8) {
         return 0 if $grid->[$row * 9 + $c] == $val
     }
     # Column check.
-    for my $r (0:8) {
+    for val $r (0:8) {
         return 0 if $grid->[$r * 9 + $col] == $val
     }
     # 3x3 box check.
-    my $br = int($row / 3) * 3
-    my $bc = int($col / 3) * 3
-    for my $r ($br : $br + 2) {
-        for my $c ($bc : $bc + 2) {
+    val $br = int($row / 3) * 3
+    val $bc = int($col / 3) * 3
+    for val $r ($br : $br + 2) {
+        for val $c ($bc : $bc + 2) {
             return 0 if $grid->[$r * 9 + $c] == $val
         }
     }
@@ -68,21 +68,21 @@ fn Demo::Sudoku::is_valid($grid, $idx, $val) {
 # ── backtracking solver ────────────────────────────────────────────
 
 mysync $try_count = 0
-my $td_try = t_digest(100)
+val $td_try = t_digest(100)
 
 fn Demo::Sudoku::solve($grid) {
     # Find next empty.
-    my $idx = -1
-    for my $i (0:80) {
+    var $idx = -1
+    for val $i (0:80) {
         if ($grid->[$i] == 0) {
             $idx = $i
             last
         }
     }
     return 1 if $idx == -1   # solved
-    for my $v (1:9) {
-        my $t0 = now_ns()
-        my $ok = Demo::Sudoku::is_valid($grid, $idx, $v)
+    for val $v (1:9) {
+        val $t0 = now_ns()
+        val $ok = Demo::Sudoku::is_valid($grid, $idx, $v)
         td_add($td_try, (now_ns() - $t0) / 1000.0)
         if ($ok) {
             $try_count = $try_count + 1
@@ -97,19 +97,19 @@ fn Demo::Sudoku::solve($grid) {
 # ── run ─────────────────────────────────────────────────────────────
 
 p "── initial puzzle ───────────────────────────────────"
-my $puz_lines = Demo::Sudoku::render(\@puzzle)
-for my $line (@$puz_lines) { p "  $line" }
+val $puz_lines = Demo::Sudoku::render(\@puzzle)
+for val $line (@$puz_lines) { p "  $line" }
 
-my @solution = @puzzle
-my $start_ns = now_ns()
-my $solved = Demo::Sudoku::solve(\@solution)
-my $elapsed_ms = (now_ns() - $start_ns) / 1_000_000.0
+val @solution = @puzzle
+val $start_ns = now_ns()
+val $solved = Demo::Sudoku::solve(\@solution)
+val $elapsed_ms = (now_ns() - $start_ns) / 1_000_000.0
 
 p ""
 if ($solved) {
     p "── solution ─────────────────────────────────────────"
-    my $sol_lines = Demo::Sudoku::render(\@solution)
-    for my $line (@$sol_lines) { p "  $line" }
+    val $sol_lines = Demo::Sudoku::render(\@solution)
+    for val $line (@$sol_lines) { p "  $line" }
 } else {
     p "── puzzle is unsolvable ─────────────────────────────"
 }
@@ -118,7 +118,7 @@ if ($solved) {
 
 p ""
 p "── solver stats ─────────────────────────────────────"
-my $empty_count = grep { _ == 0 } @puzzle
+val $empty_count = grep { _ == 0 } @puzzle
 printf "  empty cells in input  : %d\n", $empty_count
 printf "  total tries           : %d\n", $try_count
 printf "  total elapsed         : %.2f ms\n", $elapsed_ms
@@ -129,12 +129,12 @@ printf "  per-try p99 latency   : %.1f µs\n", td_quantile($td_try, 0.99)
 
 p ""
 p "── verification ─────────────────────────────────────"
-my $valid = 1
+var $valid = 1
 # Check each row has 1..9.
-for my $r (0:8) {
-    my %seen
-    for my $c (0:8) {
-        my $v = $solution[$r * 9 + $c]
+for val $r (0:8) {
+    var %seen
+    for val $c (0:8) {
+        val $v = $solution[$r * 9 + $c]
         if ($v < 1 || $v > 9 || exists $seen{$v}) { $valid = 0; last }
         $seen{$v} = 1
     }
@@ -143,11 +143,11 @@ for my $r (0:8) {
 printf "  rows valid    : %s\n", $valid ? "YES" : "NO"
 
 # Check each column has 1..9.
-my $cols_valid = 1
-for my $c (0:8) {
-    my %seen
-    for my $r (0:8) {
-        my $v = $solution[$r * 9 + $c]
+var $cols_valid = 1
+for val $c (0:8) {
+    var %seen
+    for val $r (0:8) {
+        val $v = $solution[$r * 9 + $c]
         if ($v < 1 || $v > 9 || exists $seen{$v}) { $cols_valid = 0; last }
         $seen{$v} = 1
     }

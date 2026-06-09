@@ -2,8 +2,8 @@
 # Rosetta Code: Josephus problem
 
 fn Rosetta::Josephus::solve($n, $k) {
-    my $p = 0
-    for my $i (1:$n) {
+    var $p = 0
+    for val $i (1:$n) {
         $p = ($p + $k) % $i
     }
     $p + 1

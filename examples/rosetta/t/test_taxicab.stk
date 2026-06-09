@@ -2,13 +2,13 @@
 # Rosetta Code: Taxicab numbers
 
 fn Rosetta::Taxicab::count_cube_sums($n) {
-    my $count = 0
-    my $limit = int($n**(1/3))
-    for my $a (1:$limit) {
-        my $a3 = $a**3
-        my $rem = $n - $a3
+    var $count = 0
+    val $limit = int($n**(1/3))
+    for val $a (1:$limit) {
+        val $a3 = $a**3
+        val $rem = $n - $a3
         if ($rem > $a3) {
-            my $b = int($rem**(1/3) + 0.5)
+            val $b = int($rem**(1/3) + 0.5)
             if ($b**3 == $rem) {
                 $count++
             }

@@ -5,16 +5,16 @@ fn Rosetta::Mertens::moebius($n) {
     if ($n == 1) {
         1
     } else {
-        my @factors = prime_factors($n)
-        my %counts
-        my $has_square = 0
-        for my $f (@factors) {
+        val @factors = prime_factors($n)
+        var %counts
+        var $has_square = 0
+        for val $f (@factors) {
             $counts{$f}++
             if ($counts{$f} > 1) { $has_square = 1 }
         }
         if ($has_square) { 0 }
         else {
-            my $num_factors = len(@factors)
+            val $num_factors = len(@factors)
             if ($num_factors % 2 == 0) { 1 }
             else { -1 }
         }
@@ -22,8 +22,8 @@ fn Rosetta::Mertens::moebius($n) {
 }
 
 fn Rosetta::Mertens::compute($n) {
-    my $sum = 0
-    for my $k (1:$n) {
+    var $sum = 0
+    for val $k (1:$n) {
         $sum += Rosetta::Mertens::moebius($k)
     }
     $sum

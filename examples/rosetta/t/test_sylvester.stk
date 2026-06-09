@@ -5,8 +5,8 @@ fn Rosetta::Sylvester::nth($n) {
     if ($n == 0) {
         2
     } else {
-        my $s = 2
-        for my $i (1:$n) {
+        var $s = 2
+        for val $i (1:$n) {
             $s = $s * $s - $s + 1
         }
         $s

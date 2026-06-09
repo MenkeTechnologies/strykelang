@@ -1,26 +1,26 @@
 #!/usr/bin/env stryke
 require "./SplitSecondStopwatch.stk"
 
-my $sw = Exercism::SplitSecondStopwatch::new()
+val $sw = Exercism::SplitSecondStopwatch::new()
 assert_eq Exercism::SplitSecondStopwatch::state($sw), "ready", "ready"
 
-my $r1 = Exercism::SplitSecondStopwatch::start($sw)
+val $r1 = Exercism::SplitSecondStopwatch::start($sw)
 assert_eq Exercism::SplitSecondStopwatch::state($r1), "running", "started"
 
-my $r2 = Exercism::SplitSecondStopwatch::lap($r1)
+val $r2 = Exercism::SplitSecondStopwatch::lap($r1)
 assert_eq scalar(@{$r2->{laps}}), 1, "one lap"
 
-my $r3 = Exercism::SplitSecondStopwatch::stop($r2)
+val $r3 = Exercism::SplitSecondStopwatch::stop($r2)
 assert_eq Exercism::SplitSecondStopwatch::state($r3), "stopped", "stopped"
 
-my $r4 = Exercism::SplitSecondStopwatch::reset($r3)
+val $r4 = Exercism::SplitSecondStopwatch::reset($r3)
 assert_eq Exercism::SplitSecondStopwatch::state($r4), "ready", "reset"
 
 # Errors.
-my $e = eval { Exercism::SplitSecondStopwatch::start($r1) }
+val $e = eval { Exercism::SplitSecondStopwatch::start($r1) }
 assert_ok $@ =~ /already running/, "double start errors"
 
-my $e2 = eval { Exercism::SplitSecondStopwatch::stop($sw) }
+val $e2 = eval { Exercism::SplitSecondStopwatch::stop($sw) }
 assert_ok $@ =~ /not running/, "stop unran errors"
 
 test_run

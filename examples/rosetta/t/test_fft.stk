@@ -6,23 +6,23 @@ fn Rosetta::FFT::c_sub($a, $b) { [$a->[0] - $b->[0], $a->[1] - $b->[1]] }
 fn Rosetta::FFT::c_mul($a, $b) { [$a->[0] * $b->[0] - $a->[1] * $b->[1], $a->[0] * $b->[1] + $a->[1] * $b->[0]] }
 
 fn Rosetta::FFT::compute($x) {
-    my $n = len(@$x)
+    val $n = len(@$x)
     if ($n <= 1) { return $x }
     
-    my @even; my @odd
-    for my $i (0..int($n/2)-1) {
+    var @even; var @odd
+    for val $i (0..int($n/2)-1) {
         push @even, $x->[2*$i]
         push @odd, $x->[2*$i+1]
     }
     
-    my $e = Rosetta::FFT::compute(\@even)
-    my $o = Rosetta::FFT::compute(\@odd)
+    val $e = Rosetta::FFT::compute(\@even)
+    val $o = Rosetta::FFT::compute(\@odd)
     
-    my @res
-    for my $k (0..int($n/2)-1) {
-        my $t_angle = -2 * 3.1415926535 * $k / $n
-        my $twiddle = [cos($t_angle), sin($t_angle)]
-        my $t = Rosetta::FFT::c_mul($twiddle, $o->[$k])
+    var @res
+    for val $k (0..int($n/2)-1) {
+        val $t_angle = -2 * 3.1415926535 * $k / $n
+        val $twiddle = [cos($t_angle), sin($t_angle)]
+        val $t = Rosetta::FFT::c_mul($twiddle, $o->[$k])
         $res[$k] = Rosetta::FFT::c_add($e->[$k], $t)
         $res[$k + int($n/2)] = Rosetta::FFT::c_sub($e->[$k], $t)
     }
@@ -30,8 +30,8 @@ fn Rosetta::FFT::compute($x) {
 }
 
 # Unit impulse [1, 0, 0, 0] should result in [1, 1, 1, 1] (all re=1, im=0)
-my $input = [[1,0], [0,0], [0,0], [0,0]]
-my $res = Rosetta::FFT::compute($input)
+val $input = [[1,0], [0,0], [0,0], [0,0]]
+val $res = Rosetta::FFT::compute($input)
 
 assert_near $res->[0]->[0], 1.0, 0.0001, "fft[0] re is 1"
 assert_near $res->[1]->[0], 1.0, 0.0001, "fft[1] re is 1"

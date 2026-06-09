@@ -2,7 +2,7 @@
 # Rosetta Code: Word count (using pipes)
 
 fn Rosetta::WordCount::solve($text) {
-    my %counts
+    var %counts
     $text |> lc() |> split(/\W+/) |> map { 
         if (_ ne "") {
             $counts{_}++
@@ -11,8 +11,8 @@ fn Rosetta::WordCount::solve($text) {
     %counts
 }
 
-my $t = "Hello hello world World! WORLD"
-my %res = Rosetta::WordCount::solve($t)
+val $t = "Hello hello world World! WORLD"
+val %res = Rosetta::WordCount::solve($t)
 
 assert_eq $res{"hello"}, 2, "hello count"
 assert_eq $res{"world"}, 3, "world count"

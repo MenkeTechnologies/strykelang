@@ -3,13 +3,13 @@
 
 fn Rosetta::Sieve::solve($n) {
     return () if $n < 2
-    my @primes = ~> 0:$n map { 1 }
+    var @primes = ~> 0:$n map { 1 }
     $primes[0] = $primes[1] = 0
     
-    for my $i (2:sqrt($n)) {
+    for val $i (2:sqrt($n)) {
         if ($primes[$i]) {
             # Inner marking loop
-            for (my $j = $i * $i; $j <= $n; $j += $i) {
+            for (var $j = $i * $i; $j <= $n; $j += $i) {
                 $primes[$j] = 0
             }
         }
@@ -19,7 +19,7 @@ fn Rosetta::Sieve::solve($n) {
     ~> 0:$n grep { $primes[_] }
 }
 
-my @p = Rosetta::Sieve::solve(30)
+val @p = Rosetta::Sieve::solve(30)
 assert_eq join(",", @p), "2,3,5,7,11,13,17,19,23,29", "primes up to 30"
 
 test_run

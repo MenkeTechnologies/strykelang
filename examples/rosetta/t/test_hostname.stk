@@ -6,7 +6,7 @@ fn Rosetta::Hostname::get() {
     net_hostname()
 }
 
-my $host = Rosetta::Hostname::get()
+val $host = Rosetta::Hostname::get()
 assert_ok len($host) > 0, "Hostname is not empty"
 assert_eq type($host), "string", "Hostname is a string"
 

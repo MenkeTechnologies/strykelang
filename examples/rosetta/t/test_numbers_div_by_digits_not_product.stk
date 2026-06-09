@@ -5,7 +5,7 @@
 # and the product of digits must NOT divide n.
 
 fn Rosetta::DivDigits::digits($n) {
-    my @d
+    var @d
     while ($n > 0) {
         push @d, $n % 10
         $n = int($n / 10)
@@ -15,9 +15,9 @@ fn Rosetta::DivDigits::digits($n) {
 
 fn Rosetta::DivDigits::is($n) {
     return 0 if $n < 10
-    my @d = Rosetta::DivDigits::digits($n)
-    my $prod = 1
-    for my $x (@d) {
+    val @d = Rosetta::DivDigits::digits($n)
+    var $prod = 1
+    for val $x (@d) {
         return 0 if $x == 0
         return 0 if $n % $x != 0
         $prod *= $x
@@ -37,17 +37,17 @@ assert_eq Rosetta::DivDigits::is(24), 0, "24: prod 8 divides"
 assert_eq Rosetta::DivDigits::is(48), 1, "48 qualifies"
 
 # First few in OEIS A007424/A036459 — first 10:
-my @hits = ~> 10:200 |> grep {Rosetta::DivDigits::is}
+val @hits = ~> 10:200 |> grep {Rosetta::DivDigits::is}
 assert_eq join(",", @hits[0:9]),
     "22,33,44,48,55,66,77,88,99,122",
     "first 10 qualifying numbers"
 
 # Properties
-for my $n (@hits[0:9]) {
-    my @d = Rosetta::DivDigits::digits($n)
-    my $prod = 1
-    my $all_div = 1
-    for my $x (@d) {
+for val $n (@hits[0:9]) {
+    val @d = Rosetta::DivDigits::digits($n)
+    var $prod = 1
+    var $all_div = 1
+    for val $x (@d) {
         $all_div = 0 if $n % $x != 0
         $prod *= $x
     }

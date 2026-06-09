@@ -6,14 +6,14 @@ fn Rosetta::Stats::mean(@data) {
     sum(@data) / cnt(@data)
 }
 
-my @data = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+val @data = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 assert_eq Rosetta::Stats::mean(@data), 5.5, "mean of 1:10"
 
 # Using native avg builtin
 assert_eq avg(@data), 5.5, "avg builtin"
 
 # Using pipeline
-my $m = @data |> avg()
+val $m = @data |> avg()
 assert_eq $m, 5.5, "piped avg"
 
 # Empty list

@@ -10,16 +10,16 @@ fn Rosetta::Wolstenholme::gcd($a, $b) {
 }
 
 fn Rosetta::Wolstenholme::add_frac($p1, $q1, $p2, $q2) {
-    my $num = $p1 * $q2 + $p2 * $q1
-    my $den = $q1 * $q2
-    my $g = Rosetta::Wolstenholme::gcd($num, $den)
+    val $num = $p1 * $q2 + $p2 * $q1
+    val $den = $q1 * $q2
+    val $g = Rosetta::Wolstenholme::gcd($num, $den)
     [$num / $g, $den / $g]
 }
 
 fn Rosetta::Wolstenholme::numerator($n) {
-    my $p = 0; my $q = 1
-    for my $k (1:$n) {
-        my $r = Rosetta::Wolstenholme::add_frac($p, $q, 1, $k * $k)
+    var $p = 0; var $q = 1
+    for val $k (1:$n) {
+        val $r = Rosetta::Wolstenholme::add_frac($p, $q, 1, $k * $k)
         ($p, $q) = ($r->[0], $r->[1])
     }
     $p
@@ -41,7 +41,7 @@ assert_eq Rosetta::Wolstenholme::numerator(10), 1968329,  "W(10) = 1968329"
 5 |> Rosetta::Wolstenholme::numerator |> assert_eq(5269, "pipe W(5)")
 
 # Threaded: first ten
-my @first10 = ~> 1:10 |> map {Rosetta::Wolstenholme::numerator}
+val @first10 = ~> 1:10 |> map {Rosetta::Wolstenholme::numerator}
 assert_eq join(",", @first10),
     "1,5,49,205,5269,5369,266681,1077749,9778141,1968329",
     "first ten Wolstenholme numbers"

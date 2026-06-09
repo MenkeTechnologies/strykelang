@@ -15,11 +15,11 @@ fn Geo::triangle_area($x1, $y1, $x2, $y2, $x3, $y3) {
 }
 
 fn Geo::polygon_area($pts) {
-    my $n = len(@$pts)
+    val $n = len(@$pts)
     return 0 if $n < 3
-    my $sum = 0
-    for my $i (0:$n - 1) {
-        my $j = ($i + 1) % $n
+    var $sum = 0
+    for val $i (0:$n - 1) {
+        val $j = ($i + 1) % $n
         $sum += $pts->[$i][0] * $pts->[$j][1]
         $sum -= $pts->[$j][0] * $pts->[$i][1]
     }
@@ -50,7 +50,7 @@ Geo::polygon_area([[0, 0], [1, 0], [1, 1], [0, 1]]) |> aeq 1, "unit square"
 # 5x4 rectangle
 Geo::polygon_area([[0, 0], [5, 0], [5, 4], [0, 4]]) |> aeq 20, "rect 5x4"
 # Pentagon (irregular)
-my $pent = [[1, 1], [4, 1], [5, 3], [2.5, 5], [0, 3]]
+val $pent = [[1, 1], [4, 1], [5, 3], [2.5, 5], [0, 3]]
 Geo::near(Geo::polygon_area($pent), 13) |> aok "pentagon area ~13"
 
 # Point-in-rect
@@ -73,8 +73,8 @@ Geo::near(cos(0),  1) |> aok "cos 0"
 Geo::near(sin(Geo::deg2rad(90)), 1) |> aok "sin 90"
 
 # Pipeline: which of these points lie inside the unit circle?
-my @pts = ([0, 0], [0.5, 0.5], [1, 1], [0.7, 0.7])
-my $inside = grep { Geo::circle_contains(0, 0, 1, _->[0], _->[1]) } @pts
+val @pts = ([0, 0], [0.5, 0.5], [1, 1], [0.7, 0.7])
+val $inside = grep { Geo::circle_contains(0, 0, 1, _->[0], _->[1]) } @pts
 $inside |> aeq 3, "3 points inside unit circle"
 
 test_run

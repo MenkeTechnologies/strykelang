@@ -11,39 +11,39 @@
 #
 # CI-safe: pure loopback fork, no network. Clean under --no-interop.
 
-my $n_workers = $ARGV[0] // 4
+val $n_workers = $ARGV[0] // 4
 
 p "── distributed k-means (1 iteration) ──"
 
 # Synthetic 2D points and initial centroids.
-my @points
-for my $i (0:39) {
-    my $x = ($i * 7 + 3) % 100
-    my $y = ($i * 11 + 5) % 100
+var @points
+for val $i (0:39) {
+    val $x = ($i * 7 + 3) % 100
+    val $y = ($i * 11 + 5) % 100
     push @points, [$x, $y]
 }
-my @centroids = ([20, 20], [80, 80], [20, 80])
+val @centroids = ([20, 20], [80, 80], [20, 80])
 printf "points: %d  ·  centroids: %d  ·  workers: %d\n",
     len(@points), len(@centroids), $n_workers
 
-my @workers = congregation($n_workers)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n_workers)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the points by index. Each worker gets a chunk; returns the
 # per-centroid (count, x_sum, y_sum) as JSON.
-my $per = int((len(@points) + $n_workers - 1) / $n_workers)
-my $centroids_json = to_json(\@centroids)
-my @partials
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int((len(@points) + $n_workers - 1) / $n_workers)
+val $centroids_json = to_json(\@centroids)
+var @partials
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@points) - 1 if $end >= len(@points)
     next if $start >= len(@points)
-    my @shard
-    for my $r ($start:$end) { push @shard, $points[$r] }
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    var @shard
+    for val $r ($start:$end) { push @shard, $points[$r] }
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$pts = from_json(q{$shard_json});
         my \$cs  = from_json(q{$centroids_json});
         my \@cnt = (0) x len(\@\$cs);
@@ -64,18 +64,18 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json([\\\@cnt, \\\@sx, \\\@sy])
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     push @partials, from_json($reply{$w})
 }
 
 # Aggregate partials into fleet totals.
-my @total_cnt = (0) x len(@centroids)
-my @total_sx  = (0) x len(@centroids)
-my @total_sy  = (0) x len(@centroids)
-for my $p (@partials) {
-    my ($c, $sx, $sy) = @$p
-    for my $ci (0:len(@centroids) - 1) {
+var @total_cnt = (0) x len(@centroids)
+var @total_sx  = (0) x len(@centroids)
+var @total_sy  = (0) x len(@centroids)
+for val $p (@partials) {
+    val ($c, $sx, $sy) = @$p
+    for val $ci (0:len(@centroids) - 1) {
         $total_cnt[$ci] += $c->[$ci]
         $total_sx[$ci]  += $sx->[$ci]
         $total_sy[$ci]  += $sy->[$ci]
@@ -83,20 +83,20 @@ for my $p (@partials) {
 }
 
 p "── new centroids (Lloyd update) ──"
-for my $ci (0:len(@centroids) - 1) {
-    my $n = $total_cnt[$ci]
+for val $ci (0:len(@centroids) - 1) {
+    val $n = $total_cnt[$ci]
     if ($n == 0) {
         printf "  centroid %d  (no assigned points)\n", $ci
         next
     }
-    my $nx = $total_sx[$ci] / $n
-    my $ny = $total_sy[$ci] / $n
+    val $nx = $total_sx[$ci] / $n
+    val $ny = $total_sy[$ci] / $n
     printf "  centroid %d  count=%-3d  new=(%.1f, %.1f)\n", $ci, $n, $nx, $ny
 }
 
 # Total assigned points must equal input.
-my $total = 0
-for my $c (@total_cnt) { $total += $c }
+var $total = 0
+for val $c (@total_cnt) { $total += $c }
 printf "total points assigned: %d / %d %s\n",
     $total, len(@points),
     $total == len(@points) ? "✓" : "✗"

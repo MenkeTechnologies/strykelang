@@ -6,14 +6,14 @@
 # ── 1. Weak Refs (BUG-022) ────────────────────────────────────────────────
 
 # weaken and isweak exist but isweak is always false
-my $a_22 = [1]
-my $b_22 = $a_22
+val $a_22 = [1]
+val $b_22 = $a_22
 weaken($b_22)
 isweak($b_22) |> maps { !_ } |> aok "BUG-022: isweak always false today"
 
 # ── 2. Match Position (BUG-038) ───────────────────────────────────────────
 
-my $s_38 = "abc"
+val $s_38 = "abc"
 $s_38 =~ /a/g
 pos($s_38) |> maps {!defined} |> aok "BUG-038: pos() is undef outside while loop"
 
@@ -35,20 +35,20 @@ prototype("push") |> aeq "", "BUG-052: prototype('push') is empty"
 # ── 5. Stress Primitives ──────────────────────────────────────────────────
 
 # stress_cpu(1) runs for 1 second and returns hash count
-my $hashes = stress_cpu(1)
+val $hashes = stress_cpu(1)
 $hashes |> maps { _ > 0 } |> aok "stress_cpu(1) returns positive hash count"
 
 # ── 6. refaddr of repeated references (BUG-102) ───────────────────────────
 
 fn Pin::BugsMarathon::myff_102 { 1 }
-my $r1_102 = \&Pin::BugsMarathon::myff_102
-my $r2_102 = \&Pin::BugsMarathon::myff_102
+val $r1_102 = \&Pin::BugsMarathon::myff_102
+val $r2_102 = \&Pin::BugsMarathon::myff_102
 refaddr($r1_102) != refaddr($r2_102) |> aok "BUG-102: refaddr of repeated \\&fn differs"
 
 # ── 7. Single scalar destructure (BUG-101) ────────────────────────────────
 
-my @arr_101 = (10, 20, 30)
-my ($x_101) = @arr_101
+val @arr_101 = (10, 20, 30)
+val ($x_101) = @arr_101
 $x_101 |> aeq 10, "BUG-101 (FIXED): my (\$x) = \@arr now binds first element (was returning count)"
 
 # ── 8. to_json options (BUG-106) ──────────────────────────────────────────

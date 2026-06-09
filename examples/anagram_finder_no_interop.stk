@@ -21,38 +21,38 @@ fn Anagram::sig($word) {
     join("", sort split(//, lc($word)))
 }
 
-my @sample = (
+val @sample = (
     "rat", "tar", "art", "star", "arts", "cat", "act",
     "dog", "god", "silent", "listen",
     "stop", "tops", "pots", "opts", "spot", "post",
     "stressed", "desserts", "heart", "earth", "hater",
     "throne", "north", "banana", "saved", "vades",
 )
-my @words = @sample
+var @words = @sample
 # If stdin is piped (not a tty), replace the sample with the input
 # word list.
 if (!-t STDIN) {
-    my @stdin = grep { len(_) > 0 } map { _ =~ /(\w+)/g } <STDIN>
+    val @stdin = grep { len(_) > 0 } map { _ =~ /(\w+)/g } <STDIN>
     @words = @stdin if len(@stdin) > 0
 }
 
 # Bucket words by Anagram::sig.
-my %groups
-for my $w (@words) {
-    my $sig = Anagram::sig($w)
+var %groups
+for val $w (@words) {
+    val $sig = Anagram::sig($w)
     $groups{$sig} ||= []
     push @{$groups{$sig}}, $w
 }
 
 # Filter groups of ≥ 2 words and order by size desc, then key asc.
-my @Anagram::sigs = grep { len(@{$groups{_}}) >= 2 } keys %groups
-my @ranked = sort {
+val @Anagram::sigs = grep { len(@{$groups{_}}) >= 2 } keys %groups
+val @ranked = sort {
     len(@{$groups{_1}}) <=> len(@{$groups{_}})
 } @Anagram::sigs
 
 p "── Anagram groups (n=", len(@words), " words, ", len(@ranked), " groups ≥ 2) ──"
-for my $sig (@ranked) {
-    my @group = sort @{$groups{$sig}}
+for val $sig (@ranked) {
+    val @group = sort @{$groups{$sig}}
     printf "  [%s]  %s\n", $sig, join(", ", @group)
 }
 
@@ -61,7 +61,7 @@ if (len(@words) == len(@sample)) {
     # The 27-word sample has 9 anagram groups of size ≥ 2.
     die "expected 9 groups, got " . len(@ranked) unless len(@ranked) == 9
     # The "opst" bucket should contain six tokens.
-    my $sig_opst = Anagram::sig("opts")
+    val $sig_opst = Anagram::sig("opts")
     die "opst bucket should have 6 words" unless len(@{$groups{$sig_opst}}) == 6
     p ""
     p "  ALL PASS (9 groups found, opst bucket has 6 words as expected)"

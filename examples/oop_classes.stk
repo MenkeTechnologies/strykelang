@@ -10,7 +10,7 @@ class User {
     age:  Int
     role: Str = "guest"
 }
-my $u = User(name => "alice", age => 30)
+val $u = User(name => "alice", age => 30)
 p "  name=", $u->name
 p "  age =", $u->age
 p "  role=", $u->role;   # default
@@ -28,7 +28,7 @@ class Rectangle {
         $self->area($self->width * $self->height)
     }
 }
-my $r = Rectangle(width => 4, height => 5)
+val $r = Rectangle(width => 4, height => 5)
 printf "  4x5 rect: area=%.0f\n", $r->area
 
 # Bad input fires the die from BUILD.
@@ -45,7 +45,7 @@ class Dog extends Animal {
     breed: Str
     fn speak = p "  ", $self->name, " (a ", $self->breed, ") barks!"
 }
-my $d = Dog(name => "rex", breed => "shepherd")
+val $d = Dog(name => "rex", breed => "shepherd")
 $d->speak
 
 p ""
@@ -57,7 +57,7 @@ class Counter {
     fn value    = $self->n
     fn reset    = $self->n(0)
 }
-my $c = Counter()
+val $c = Counter()
 $c->inc for 1:5
 $c->dec for 1:2
 printf "  counter after 5 inc, 2 dec : %d\n", $c->value
@@ -75,7 +75,7 @@ class UserCache {
     fn add($name)  = bloom_add($self->bloom, $name)
     fn seen($name) = bloom_contains($self->bloom, $name)
 }
-my $cache = UserCache(capacity => 5000)
+val $cache = UserCache(capacity => 5000)
 $cache->add(_) for ("alice", "bob", "carol")
 p "  cache->seen(alice)  : ", $cache->seen("alice")
 p "  cache->seen(daniel) : ", $cache->seen("daniel")

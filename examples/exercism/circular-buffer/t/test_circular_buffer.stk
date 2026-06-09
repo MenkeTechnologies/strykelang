@@ -2,8 +2,8 @@
 require "./CircularBuffer.stk"
 
 # read empty errors
-my $b = Exercism::CircularBuffer::new(1)
-my $err = eval { Exercism::CircularBuffer::read($b); 0 } || $@
+val $b = Exercism::CircularBuffer::new(1)
+var $err = eval { Exercism::CircularBuffer::read($b); 0 } || $@
 assert_ok $err =~ /empty/, "empty read errors"
 
 # write & read
@@ -21,7 +21,7 @@ $err = eval { Exercism::CircularBuffer::read($b); 0 } || $@
 assert_ok $err =~ /empty/, "clear → empty"
 
 # overwrite when full
-my $b2 = Exercism::CircularBuffer::new(2)
+val $b2 = Exercism::CircularBuffer::new(2)
 Exercism::CircularBuffer::write($b2, 1)
 Exercism::CircularBuffer::write($b2, 2)
 Exercism::CircularBuffer::overwrite($b2, 3)

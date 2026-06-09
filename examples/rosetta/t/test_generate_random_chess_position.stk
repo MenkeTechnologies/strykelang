@@ -2,26 +2,26 @@
 # Rosetta Code: Generate random chess position
 
 fn Rosetta::RandomChess::generate() {
-    my @pieces = ("K", "Q", "R", "R", "B", "B", "N", "N")
-    my @white = map { _ . "w" } @pieces
-    my @black = map { _ . "b" } @pieces
+    val @pieces = ("K", "Q", "R", "R", "B", "B", "N", "N")
+    var @white = map { _ . "w" } @pieces
+    var @black = map { _ . "b" } @pieces
     
     # Add some pawns
     for (1:8) { push @white, "Pw"; push @black, "Pb" }
     
-    my @all = (@white, @black)
+    val @all = (@white, @black)
     shuffle(@all)
     
-    my @board
+    var @board
     for (0:63) { push @board, "." }
     
-    my @squares = 0:63
+    val @squares = 0:63
     shuffle(@squares)
     
     # Place a random number of pieces
-    my $count = int(rand(len(@all))) + 2 # at least 2 kings
-    for (my $i = 0; $i < $count; $i++) {
-        my $sq = $squares[$i]
+    val $count = int(rand(len(@all))) + 2 # at least 2 kings
+    for (var $i = 0; $i < $count; $i++) {
+        val $sq = $squares[$i]
         $board[$sq] = $all[$i]
     }
     
@@ -32,11 +32,11 @@ fn Rosetta::RandomChess::generate() {
     \@board
 }
 
-my $board = Rosetta::RandomChess::generate()
+val $board = Rosetta::RandomChess::generate()
 assert_eq len(@$board), 64, "Board has 64 squares"
-my @kw = ~> @$board grep { /Kw/ }
+val @kw = ~> @$board grep { /Kw/ }
 assert_ok len(@kw) >= 1, "White king present"
-my @kb = ~> @$board grep { /Kb/ }
+val @kb = ~> @$board grep { /Kb/ }
 assert_ok len(@kb) >= 1, "Black king present"
 
 test_run

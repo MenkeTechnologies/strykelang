@@ -3,35 +3,35 @@
 fn Exercism::GottaSnatchEmAll::new_collection = { _ => 1 }
 
 fn Exercism::GottaSnatchEmAll::add_card {
-    my ($card, $col) = (_, _1)
-    my $had = exists $col->{$card} ? 1 : 0
+    val ($card, $col) = (_, _1)
+    val $had = exists $col->{$card} ? 1 : 0
     [$had, { %{$col}, $card => 1 }]
 }
 
 fn Exercism::GottaSnatchEmAll::trade_card {
-    my ($mine, $theirs, $col) = (_, _1, _2)
-    my $valid = !exists($col->{$theirs}) && exists($col->{$mine}) ? 1 : 0
+    var ($mine, $theirs, $col) = (_, _1, _2)
+    val $valid = !exists($col->{$theirs}) && exists($col->{$mine}) ? 1 : 0
     [$valid, $col]
 }
 
 fn Exercism::GottaSnatchEmAll::remove_duplicates = [keys %{+{ map { ($_ => 1) } @{_} }}]
 
 fn Exercism::GottaSnatchEmAll::extra_cards {
-    my ($mine, $theirs) = (_, _1)
+    val ($mine, $theirs) = (_, _1)
     ~> keys %{$mine} greps { !exists $theirs->{_} } len
 }
 
 fn Exercism::GottaSnatchEmAll::boring_cards {
-    my @cols = @{_}
+    val @cols = @{_}
     return [] unless @cols
-    my %counts
-    for my $col (@cols) { $counts{$_}++ for keys %{$col} }
+    var %counts
+    for val $col (@cols) { $counts{$_}++ for keys %{$col} }
     [sort grep { $counts{$_} == @cols } keys %counts]
 }
 
 fn Exercism::GottaSnatchEmAll::total_cards = ~> @{_} maps { len(keys %{$_}) } sum
 
 fn Exercism::GottaSnatchEmAll::split_shiny_cards {
-    my @keys = sort keys %{_}
+    val @keys = sort keys %{_}
     [[grep { /^Shiny/ } @keys], [grep { !/^Shiny/ } @keys]]
 }

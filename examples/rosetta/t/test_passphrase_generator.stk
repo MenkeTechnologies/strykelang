@@ -5,8 +5,8 @@
 
 fn Rosetta::Passphrase::generate($wordlist, $n, $sep) {
     return undef if $n < 1 || len(@$wordlist) == 0
-    my @picked
-    for my $i (~> 1:$n) {
+    var @picked
+    for val $i (~> 1:$n) {
         push @picked, $wordlist->[int(rand(len(@$wordlist)))]
     }
     join($sep, @picked)
@@ -18,25 +18,25 @@ fn Rosetta::Passphrase::entropy_bits($wordlist_size, $n) {
 }
 
 # Generate from a small wordlist
-my @words = ("alpha", "beta", "gamma", "delta", "epsilon",
+val @words = ("alpha", "beta", "gamma", "delta", "epsilon",
              "zeta", "eta", "theta", "iota", "kappa",
              "lambda", "mu", "nu", "xi", "omicron")
-for my $i (~> 1:30) {
-    my $pp = Rosetta::Passphrase::generate(\@words, 4, "-")
-    my @parts = split /-/, $pp
+for val $i (~> 1:30) {
+    val $pp = Rosetta::Passphrase::generate(\@words, 4, "-")
+    val @parts = split /-/, $pp
     assert_eq len(@parts), 4, "4-word passphrase"
-    my %ws = map { _ => 1 } @words
-    for my $p (@parts) {
+    val %ws = map { _ => 1 } @words
+    for val $p (@parts) {
         assert_eq exists($ws{$p}), 1, "word $p in pool"
     }
 }
 
 # Different separators
-my $space = Rosetta::Passphrase::generate(\@words, 3, " ")
+val $space = Rosetta::Passphrase::generate(\@words, 3, " ")
 assert_ok index($space, " ") >= 0, "space separator works"
 
-my $dot = Rosetta::Passphrase::generate(\@words, 5, ".")
-my @parts5 = split /\./, $dot
+val $dot = Rosetta::Passphrase::generate(\@words, 5, ".")
+val @parts5 = split /\./, $dot
 assert_eq len(@parts5), 5, "5-word with dot separator"
 
 # Reject zero count

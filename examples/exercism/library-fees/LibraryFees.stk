@@ -6,48 +6,48 @@ fn Exercism::LibraryFees::datetime_from_string = _
 fn Exercism::LibraryFees::before_noon = (split /T/, _)[1] lt "12:00:00"
 
 fn Exercism::LibraryFees::return_date {
-    my @ymd  = split /-/, _
-    my $days = Exercism::LibraryFees::_days($ymd[0], $ymd[1], $ymd[2]) + 28
+    val @ymd  = split /-/, _
+    val $days = Exercism::LibraryFees::_days($ymd[0], $ymd[1], $ymd[2]) + 28
     Exercism::LibraryFees::_from_days($days)
 }
 
 fn Exercism::LibraryFees::days_late {
-    my ($expected, $actual) = (_, _1)
-    my @e = split /-/, $expected
-    my @av = split /-/, (split /T/, $actual)[0]
-    my $ed = Exercism::LibraryFees::_days($e[0], $e[1], $e[2])
-    my $ad = Exercism::LibraryFees::_days($av[0], $av[1], $av[2])
-    my $d  = $ad - $ed
+    var ($expected, $actual) = (_, _1)
+    val @e = split /-/, $expected
+    val @av = split /-/, (split /T/, $actual)[0]
+    val $ed = Exercism::LibraryFees::_days($e[0], $e[1], $e[2])
+    val $ad = Exercism::LibraryFees::_days($av[0], $av[1], $av[2])
+    val $d  = $ad - $ed
     $d > 0 ? $d : 0
 }
 
 fn Exercism::LibraryFees::monday = (Exercism::LibraryFees::_dow(split /-/, (split /T/, _)[0]) == 1) ? 1 : 0
 
 fn Exercism::LibraryFees::calculate_late_fee {
-    my ($checkout, $actual, $rate) = (_, _1, _2)
-    my $expected = Exercism::LibraryFees::return_date($checkout)
-    my $d = Exercism::LibraryFees::days_late($expected, $actual)
-    my $fee = $d * $rate
+    val ($checkout, $actual, $rate) = (_, _1, _2)
+    val $expected = Exercism::LibraryFees::return_date($checkout)
+    val $d = Exercism::LibraryFees::days_late($expected, $actual)
+    val $fee = $d * $rate
     Exercism::LibraryFees::monday($actual) ? int($fee / 2) : $fee
 }
 
 # Helpers — days since epoch + day-of-week (1=Monday..7=Sunday).
 fn Exercism::LibraryFees::_days {
-    my ($y, $m, $d) = (_, _1, _2)
-    my @cum = (0,31,59,90,120,151,181,212,243,273,304,334)
-    my $leap = (($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) && $m > 2 ? 1 : 0
+    val ($y, $m, $d) = (_, _1, _2)
+    val @cum = (0,31,59,90,120,151,181,212,243,273,304,334)
+    val $leap = (($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) && $m > 2 ? 1 : 0
     ($y - 1970) * 365 + int(($y - 1969) / 4) + $cum[$m - 1] + $leap + $d - 1
 }
 
 fn Exercism::LibraryFees::_from_days {
-    my $y = 1970
+    var $y = 1970
     while (_ >= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)) {
         _ -= ((($y % 4 == 0 && $y % 100 != 0) || $y % 400 == 0) ? 366 : 365)
         $y++
     }
-    my @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
+    val @mlen = (31, ($y % 4 == 0 && $y % 100 != 0 || $y % 400 == 0) ? 29 : 28,
                 31,30,31,30,31,31,30,31,30,31)
-    my $m = 1
+    var $m = 1
     while (_ >= $mlen[$m - 1]) { _ -= $mlen[$m - 1]; $m++ }
     sprintf("%04d-%02d-%02d", $y, $m, _ + 1)
 }

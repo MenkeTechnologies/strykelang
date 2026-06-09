@@ -15,14 +15,14 @@ p "── Threading Macro Deep Dive ──────────────�
 # ── 1. Thread-First (~>) ───────────────────────────────────────────
 # Good for scalar transformations.
 p "Thread-First (~>):"
-my $res1 = ~> "  hello world  " trim uc rev
+val $res1 = ~> "  hello world  " trim uc rev
 p "  Result: $res1"
 
 # ── 2. Thread-Last (~>>) ──────────────────────────────────────────
 # Good for list operations where the collection is the last arg.
 p "\nThread-Last (~>>):"
 # maps and greps are thread-last friendly
-my @res2 = ~>> 1:10 \
+val @res2 = ~>> 1:10 \
     greps { _ % 2 == 0 } \
     maps { _ * 10 } \
     |> collect
@@ -31,7 +31,7 @@ p "  Result: @res2"
 # ── 3. Streaming Workers (~s>) ─────────────────────────────────────
 # Each stage is a separate thread.
 p "\nStreaming Pipeline (~s>):"
-my @stream_results = ~s> 1:5 \
+val @stream_results = ~s> 1:5 \
     >{ sleep 0.01; _ * 2 } \
     >{ sleep 0.01; _ + 1 } \
     |> collect

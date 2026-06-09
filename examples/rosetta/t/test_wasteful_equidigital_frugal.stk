@@ -8,11 +8,11 @@
 
 fn Rosetta::WEF::factor_digit_len($n) {
     return 1 if $n == 1
-    my $len = 0
-    my $x = $n
-    my $p = 2
+    var $len = 0
+    var $x = $n
+    var $p = 2
     while ($p * $p <= $x) {
-        my $e = 0
+        var $e = 0
         while ($x % $p == 0) { $x = int($x / $p); $e++ }
         if ($e > 0) {
             $len += len("$p")
@@ -26,8 +26,8 @@ fn Rosetta::WEF::factor_digit_len($n) {
 
 fn Rosetta::WEF::classify($n) {
     return "n/a" if $n < 2
-    my $nl = len("$n")
-    my $fl = Rosetta::WEF::factor_digit_len($n)
+    val $nl = len("$n")
+    val $fl = Rosetta::WEF::factor_digit_len($n)
     return "wasteful"    if $fl > $nl
     return "equidigital" if $fl == $nl
     "frugal"
@@ -43,15 +43,15 @@ assert_eq Rosetta::WEF::classify(10),   "equidigital", "10 = 2·5 → '25' equid
 assert_eq Rosetta::WEF::classify(1024), "frugal",      "1024 = 2¹⁰ → '210' frugal (3 < 4)"
 
 # First few frugal numbers (OEIS A046759): 125, 128, 243, 256, 343, 512, 625, …
-my @frugals = ~> 2:1000 |> grep { Rosetta::WEF::classify(_) eq "frugal" }
+val @frugals = ~> 2:1000 |> grep { Rosetta::WEF::classify(_) eq "frugal" }
 assert_eq join(",", @frugals[0:6]), "125,128,243,256,343,512,625", "first 7 frugal numbers"
 
 # Equidigital count (A046758) below 100
-my @equi = ~> 2:100 |> grep { Rosetta::WEF::classify(_) eq "equidigital" }
+val @equi = ~> 2:100 |> grep { Rosetta::WEF::classify(_) eq "equidigital" }
 assert_ok len(@equi) > 0, "some equidigital numbers ≤ 100"
 
 # Most numbers are wasteful by far
-my $waste_count = ~> 2:200 |> grep { Rosetta::WEF::classify(_) eq "wasteful" } |> len
+val $waste_count = ~> 2:200 |> grep { Rosetta::WEF::classify(_) eq "wasteful" } |> len
 assert_ok $waste_count > 100, "wasteful dominates ≤ 200"
 
 # Pipe form

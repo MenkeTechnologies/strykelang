@@ -4,21 +4,21 @@
 fn Rosetta::FibSearch::min($x, $y) { $x < $y ? $x : $y }
 
 fn Rosetta::FibSearch::find($arr, $target) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return -1 if $n == 0
 
-    my $fb_2 = 0
-    my $fb_1 = 1
-    my $fb = $fb_1 + $fb_2
+    var $fb_2 = 0
+    var $fb_1 = 1
+    var $fb = $fb_1 + $fb_2
     while ($fb < $n) {
         $fb_2 = $fb_1
         $fb_1 = $fb
         $fb = $fb_1 + $fb_2
     }
 
-    my $offset = -1
+    var $offset = -1
     while ($fb > 1) {
-        my $i = Rosetta::FibSearch::min($offset + $fb_2, $n - 1)
+        val $i = Rosetta::FibSearch::min($offset + $fb_2, $n - 1)
         if ($arr->[$i] < $target) {
             $fb = $fb_1
             $fb_1 = $fb_2
@@ -38,7 +38,7 @@ fn Rosetta::FibSearch::find($arr, $target) {
     -1
 }
 
-my @sorted = (10, 22, 35, 40, 45, 50, 80, 82, 85, 90, 100, 235)
+val @sorted = (10, 22, 35, 40, 45, 50, 80, 82, 85, 90, 100, 235)
 assert_eq Rosetta::FibSearch::find(\@sorted, 85), 8, "find 85 -> idx 8"
 assert_eq Rosetta::FibSearch::find(\@sorted, 10), 0, "first"
 assert_eq Rosetta::FibSearch::find(\@sorted, 235), 11, "last"
@@ -50,7 +50,7 @@ assert_eq Rosetta::FibSearch::find([42], 42), 0, "single match"
 assert_eq Rosetta::FibSearch::find([42], 7), -1, "single miss"
 
 # Power-of-fib aligned size
-my @fib_size = (1:21)
+val @fib_size = (1:21)
 assert_eq Rosetta::FibSearch::find(\@fib_size, 13), 12, "fib-size find 13 -> idx 12"
 assert_eq Rosetta::FibSearch::find(\@fib_size, 1), 0, "fib-size first"
 assert_eq Rosetta::FibSearch::find(\@fib_size, 21), 20, "fib-size last"

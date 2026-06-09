@@ -2,18 +2,18 @@
 # Rosetta Code: Animated Spinners
 
 fn Rosetta::AnimatedSpinners::deciseconds($duration_sec) {
-    my $text = "$duration_sec"
-    my @parts = split /\./, $text
-    my $whole = $parts[0]
-    my $tenths = len(@parts) > 1 ? substr($parts[1] . "0", 0, 1) : 0
+    val $text = "$duration_sec"
+    val @parts = split /\./, $text
+    val $whole = $parts[0]
+    val $tenths = len(@parts) > 1 ? substr($parts[1] . "0", 0, 1) : 0
     ($whole * 10) + $tenths
 }
 
 fn Rosetta::AnimatedSpinners::spin($duration_sec) {
-    my @spinners = ("|", "/", "-", "\\")
-    my $frames = Rosetta::AnimatedSpinners::deciseconds($duration_sec)
-    for my $i (0:$frames - 1) {
-        my $char = $spinners[$i % len(@spinners)]
+    val @spinners = ("|", "/", "-", "\\")
+    val $frames = Rosetta::AnimatedSpinners::deciseconds($duration_sec)
+    for val $i (0:$frames - 1) {
+        val $char = $spinners[$i % len(@spinners)]
         print "\r$char Spinning..."
     }
     p "\rDone!       "
@@ -22,7 +22,7 @@ fn Rosetta::AnimatedSpinners::spin($duration_sec) {
 
 fn Rosetta::AnimatedSpinners::demo() {
     "Testing Animated Spinners (0.5 seconds):" |> p
-    my $frames = Rosetta::AnimatedSpinners::spin(0.5)
+    val $frames = Rosetta::AnimatedSpinners::spin(0.5)
     
     # Assertions
     assert_eq $frames, 5, "Spinner ran for exactly 5 frames"

@@ -17,7 +17,7 @@ stress_mem(1e6) |> aeq 1000000, "stress_mem returns bytes touched"
 
 # ── SQLite Builtin ─────────────────────────────────────────────────────────
 
-my $db = sqlite(":memory:")
+val $db = sqlite(":memory:")
 $db->exec("CREATE TABLE t(x INT)")
 $db->exec("INSERT INTO t VALUES (42)")
 $db->query("SELECT x FROM t")->[0]{x} |> aeq 42, "sqlite query"

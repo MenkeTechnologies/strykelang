@@ -21,7 +21,7 @@ class Account {
     }
 }
 
-my $a = Account(owner => "Alice")
+val $a = Account(owner => "Alice")
 $a->deposit(100)
 $a->deposit(50)
 assert_eq $a->balance, 150, "after 2 deposits"
@@ -34,7 +34,7 @@ assert_eq $a->balance,       120, "balance unchanged"
 assert_eq $a->report(), "Account(Alice): \$120", "report formatted"
 
 # Instances are independent
-my $b = Account(owner => "Bob", balance => 500)
+val $b = Account(owner => "Bob", balance => 500)
 $b->deposit(25)
 assert_eq $b->balance, 525, "Bob unaffected by Alice"
 assert_eq $a->balance, 120, "Alice unaffected by Bob"

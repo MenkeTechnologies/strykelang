@@ -4,17 +4,17 @@
 # updated by the four (p_i, q_i) pairs.
 
 fn Rosetta::LiangBarsky::clip($x0, $y0, $x1, $y1, $xmin, $ymin, $xmax, $ymax) {
-    my $dx = $x1 - $x0
-    my $dy = $y1 - $y0
-    my @p = (-$dx,           $dx,           -$dy,           $dy)
-    my @q = ($x0 - $xmin,    $xmax - $x0,   $y0 - $ymin,    $ymax - $y0)
-    my $t0 = 0.0
-    my $t1 = 1.0
-    for my $i (~> 0:3) {
+    val $dx = $x1 - $x0
+    val $dy = $y1 - $y0
+    val @p = (-$dx,           $dx,           -$dy,           $dy)
+    val @q = ($x0 - $xmin,    $xmax - $x0,   $y0 - $ymin,    $ymax - $y0)
+    var $t0 = 0.0
+    var $t1 = 1.0
+    for val $i (~> 0:3) {
         if ($p[$i] == 0) {
             return undef if $q[$i] < 0
         } else {
-            my $r = $q[$i] / $p[$i]
+            val $r = $q[$i] / $p[$i]
             if ($p[$i] < 0) {
                 return undef if $r > $t1
                 $t0 = $r if $r > $t0
@@ -29,7 +29,7 @@ fn Rosetta::LiangBarsky::clip($x0, $y0, $x1, $y1, $xmin, $ymin, $xmax, $ymax) {
 
 fn Rosetta::LiangBarsky::fmt($r) {
     return "rejected" if !defined $r
-    join(",", map { my $v = _0; $v == int($v) ? int($v) : $v } @$r)
+    join(",", map { val $v = _0; $v == int($v) ? int($v) : $v } @$r)
 }
 
 # Window 0,0,10,10. Same suite as Cohen-Sutherland for cross-validation.

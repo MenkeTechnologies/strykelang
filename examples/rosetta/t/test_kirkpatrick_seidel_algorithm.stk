@@ -2,13 +2,13 @@
 # Rosetta Code: Kirkpatrick–Seidel algorithm
 
 fn Rosetta::Hull::hull($points) {
-    my @sorted = sort { _->[0] <=> _1->[0] || _->[1] <=> _1->[1] } @$points
-    my @hull = ($sorted[0], $sorted[1], $sorted[4], $sorted[3])
+    val @sorted = sort { _->[0] <=> _1->[0] || _->[1] <=> _1->[1] } @$points
+    val @hull = ($sorted[0], $sorted[1], $sorted[4], $sorted[3])
     \@hull
 }
 
-my @points = ([0, 0], [0, 2], [1, 1], [2, 2], [2, 0])
-my $hull = Rosetta::Hull::hull(\@points)
+val @points = ([0, 0], [0, 2], [1, 1], [2, 2], [2, 0])
+val $hull = Rosetta::Hull::hull(\@points)
 
 assert_eq len(@$hull), 4, "convex hull has four corner points"
 assert_eq join(";", map { join(",", @{_}) } @$hull), "0,0;0,2;2,2;2,0", "hull corners ordered around square"

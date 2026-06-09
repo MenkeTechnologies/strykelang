@@ -8,24 +8,24 @@
 package SV;
 
 fn parse($s) {
-    my $rest = $s
+    var $rest = $s
     # Strip optional +build metadata first (ignored for precedence).
-    my $plus = index($rest, "+")
-    my $build = ""
+    val $plus = index($rest, "+")
+    var $build = ""
     if ($plus >= 0) {
         $build = substr($rest, $plus + 1)
         $rest = substr($rest, 0, $plus)
     }
     # Then optional -prerelease.
-    my $dash = index($rest, "-")
-    my $pre = ""
+    val $dash = index($rest, "-")
+    var $pre = ""
     if ($dash >= 0) {
         $pre = substr($rest, $dash + 1)
         $rest = substr($rest, 0, $dash)
     }
-    my @nums = split(/\./, $rest)
+    val @nums = split(/\./, $rest)
     return undef if len(@nums) != 3
-    for my $nn (@nums) {
+    for val $nn (@nums) {
         return undef if $nn !~ /^\d+$/
     }
     {
@@ -38,18 +38,18 @@ fn parse($s) {
 }
 
 fn format($v) {
-    my $s = $v->{major} . "." . $v->{minor} . "." . $v->{patch}
+    var $s = $v->{major} . "." . $v->{minor} . "." . $v->{patch}
     $s = $s . "-" . $v->{pre} if (len $v->{pre}) > 0
     $s = $s . "+" . $v->{build} if (len $v->{build}) > 0
     $s
 }
 
 fn _cmp_pre_id($x, $y) {
-    my $xn = $x =~ /^\d+$/
-    my $yn = $y =~ /^\d+$/
+    val $xn = $x =~ /^\d+$/
+    val $yn = $y =~ /^\d+$/
     if ($xn && $yn) {
-        my $av = $x + 0
-        my $bv = $y + 0
+        val $av = $x + 0
+        val $bv = $y + 0
         return -1 if $av < $bv
         return 1 if $av > $bv
         return 0
@@ -70,16 +70,16 @@ fn compare($av, $bv) {
     return -1 if $av->{patch} < $bv->{patch}
     return 1 if $av->{patch} > $bv->{patch}
     # Pre-release rules: version WITH pre-release is LOWER than without.
-    my $ap = len $av->{pre}
-    my $bp = len $bv->{pre}
+    val $ap = len $av->{pre}
+    val $bp = len $bv->{pre}
     return 1 if $ap == 0 && $bp > 0
     return -1 if $ap > 0 && $bp == 0
     return 0 if $ap == 0 && $bp == 0
-    my @ai = split(/\./, $av->{pre})
-    my @bi = split(/\./, $bv->{pre})
-    my $n = len(@ai) < len(@bi) ? len(@ai) : len(@bi)
-    for my $i (0:$n-1) {
-        my $c = SV::_cmp_pre_id($ai[$i], $bi[$i])
+    val @ai = split(/\./, $av->{pre})
+    val @bi = split(/\./, $bv->{pre})
+    val $n = len(@ai) < len(@bi) ? len(@ai) : len(@bi)
+    for val $i (0:$n-1) {
+        val $c = SV::_cmp_pre_id($ai[$i], $bi[$i])
         return $c if $c != 0
     }
     return -1 if len(@ai) < len(@bi)
@@ -103,26 +103,26 @@ fn satisfies_caret($v, $base) {
 package main;
 
 p "=== SemVer Demo ==="
-for my $s ("1.2.3", "1.0.0-alpha", "1.0.0-rc.1", "1.0.0", "2.0.0+build.42") {
-    my $v = SV::parse($s)
+for val $s ("1.2.3", "1.0.0-alpha", "1.0.0-rc.1", "1.0.0", "2.0.0+build.42") {
+    val $v = SV::parse($s)
     p $s . " -> " . SV::format($v)
 }
 
-my @pairs = (
+val @pairs = (
     ["1.0.0", "2.0.0"],
     ["1.0.0", "1.0.0"],
     ["1.0.0-alpha", "1.0.0"],
     ["1.0.0-alpha", "1.0.0-beta"],
     ["1.0.0-rc.1", "1.0.0-rc.2"],
 )
-for my $pair (@pairs) {
-    my $aa = SV::parse($pair->[0])
-    my $bb = SV::parse($pair->[1])
+for val $pair (@pairs) {
+    val $aa = SV::parse($pair->[0])
+    val $bb = SV::parse($pair->[1])
     p $pair->[0] . " vs " . $pair->[1] . " = " . SV::compare($aa, $bb)
 }
 
-my $base = SV::parse("1.2.3")
-for my $sv ("1.2.4", "1.9.0", "1.2.2", "2.0.0") {
-    my $v = SV::parse($sv)
+val $base = SV::parse("1.2.3")
+for val $sv ("1.2.4", "1.9.0", "1.2.2", "2.0.0") {
+    val $v = SV::parse($sv)
     p "^1.2.3 satisfied by " . $sv . " ? " . SV::satisfies_caret($v, $base)
 }

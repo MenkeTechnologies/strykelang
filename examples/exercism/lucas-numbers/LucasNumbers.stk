@@ -2,8 +2,8 @@
 
 fn Exercism::LucasNumbers::generate {
     !defined(_) || _ !~ /^\d+$/ || _ < 1 and die "count must be specified as an integer >= 1"
-    my @out
-    my ($x, $y) = (2, 1)
+    var @out
+    var ($x, $y) = (2, 1)
     for (1:_) { push @out, $x; ($x, $y) = ($y, $x + $y) }
     \@out
 }

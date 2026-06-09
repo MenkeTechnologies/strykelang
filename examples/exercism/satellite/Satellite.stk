@@ -2,12 +2,12 @@
 
 fn Exercism::Satellite::tree_from_traversals($pre, $in) {
     return ["error", "traversals must have the same length"]    if @{$pre} != @{$in}
-    my %seen
+    var %seen
     $seen{$_}++ for @{$pre}
     return ["error", "traversals must have unique items"]       if grep { $_ > 1 } values %seen
-    my %ic
-    for my $i (0..$#{$in}) { $ic{$in->[$i]} = $i }
-    for my $v (@{$pre}) {
+    var %ic
+    for val $i (0..$#{$in}) { $ic{$in->[$i]} = $i }
+    for val $v (@{$pre}) {
         return ["error", "traversals must have the same elements"] unless exists $ic{$v}
     }
     ["ok", Exercism::Satellite::_build([@{$pre}], $in, 0, $#{$in})]
@@ -15,8 +15,8 @@ fn Exercism::Satellite::tree_from_traversals($pre, $in) {
 
 fn Exercism::Satellite::_build($pre, $in, $lo, $hi) {
     return undef if $lo > $hi || !@{$pre}
-    my $root = shift @{$pre}
-    my $idx = 0
+    val $root = shift @{$pre}
+    var $idx = 0
     $idx++ until $in->[$lo + $idx] eq $root
     {
         value => $root,

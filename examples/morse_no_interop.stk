@@ -19,7 +19,7 @@
 #      stryke --no-interop examples/morse_no_interop.stk encode "Hello World"
 #      stryke --no-interop examples/morse_no_interop.stk decode ".... . .-.. .-.. ---   .-- --- .-. .-.. -.."
 
-my %TABLE = (
+val %TABLE = (
     A => ".-",     B => "-...",  C => "-.-.",  D => "-..",   E => ".",
     F => "..-.",   G => "--.",   H => "....",  I => "..",    J => ".---",
     K => "-.-",    L => ".-..",  M => "--",    N => "-.",    O => "---",
@@ -31,18 +31,18 @@ my %TABLE = (
 )
 
 # Reverse lookup for decoding.
-my %REVERSE
-for my $k (keys %TABLE) {
+var %REVERSE
+for val $k (keys %TABLE) {
     $REVERSE{$TABLE{$k}} = $k
 }
 
 fn Morse::encode($text) {
-    my @words = split(/\s+/, uc($text))
-    my @encoded_words
-    for my $w (@words) {
+    val @words = split(/\s+/, uc($text))
+    var @encoded_words
+    for val $w (@words) {
         next if len($w) == 0
-        my @glyphs
-        for my $ch (split(//, $w)) {
+        var @glyphs
+        for val $ch (split(//, $w)) {
             if (exists $TABLE{$ch}) {
                 push @glyphs, $TABLE{$ch}
             }
@@ -55,12 +55,12 @@ fn Morse::encode($text) {
 
 fn Morse::decode($code) {
     # Three spaces between words, one between letters.
-    my @words = split(/   /, $code)
-    my @decoded_words
-    for my $w (@words) {
-        my @glyphs = split(/ /, $w)
-        my $word = ""
-        for my $g (@glyphs) {
+    val @words = split(/   /, $code)
+    var @decoded_words
+    for val $w (@words) {
+        val @glyphs = split(/ /, $w)
+        var $word = ""
+        for val $g (@glyphs) {
             $word .= $REVERSE{$g} if exists $REVERSE{$g}
         }
         push @decoded_words, $word
@@ -69,8 +69,8 @@ fn Morse::decode($code) {
 }
 
 if (len(@ARGV) >= 2) {
-    my ($mode, @rest) = @ARGV
-    my $arg = join(" ", @rest)
+    val ($mode, @rest) = @ARGV
+    val $arg = join(" ", @rest)
     if    ($mode eq "encode") { p Morse::encode($arg) }
     elsif ($mode eq "decode") { p Morse::decode($arg) }
     else  { die "mode must be 'encode' or 'decode'" }
@@ -78,7 +78,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo grid — each plaintext must round-trip through encode -> decode.
-my @cases = (
+val @cases = (
     +{ text => "SOS",         morse => "... --- ..."                          },
     +{ text => "HELLO",       morse => ".... . .-.. .-.. ---"                 },
     +{ text => "HI",          morse => ".... .."                              },
@@ -89,12 +89,12 @@ my @cases = (
 )
 
 p "── Morse code demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $enc = Morse::encode($c->{text})
-    my $dec = Morse::decode($enc)
-    my $ok_enc = ($enc eq $c->{morse})
-    my $ok_dec = ($dec eq $c->{text})
+var $fail = 0
+for val $c (@cases) {
+    val $enc = Morse::encode($c->{text})
+    val $dec = Morse::decode($enc)
+    val $ok_enc = ($enc eq $c->{morse})
+    val $ok_dec = ($dec eq $c->{text})
     $fail++ unless $ok_enc && $ok_dec
     printf "  %-15s -> %s   (round-trip %s)  %s\n",
         "\"" . $c->{text} . "\"",

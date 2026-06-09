@@ -2,21 +2,21 @@
 # Rosetta Code: Multiplication Table
 
 fn Rosetta::MultiplicationTable::generate($n) {
-    my @indices = (1:$n)
-    my @rows
-    for my $i (@indices) {
-        my @row = @indices |> map { $i * _ }
+    val @indices = (1:$n)
+    var @rows
+    for val $i (@indices) {
+        val @row = @indices |> map { $i * _ }
         push @rows, \@row
     }
     \@rows
 }
 
 fn Rosetta::MultiplicationTable::to_str($m) {
-    my @lines = ~> @$m map { join(",", @{_}) }
+    val @lines = ~> @$m map { join(",", @{_}) }
     join(";", @lines)
 }
 
-my $t3 = Rosetta::MultiplicationTable::generate(3)
+val $t3 = Rosetta::MultiplicationTable::generate(3)
 assert_eq Rosetta::MultiplicationTable::to_str($t3), "1,2,3;2,4,6;3,6,9", "3x3 mult table"
 
 test_run

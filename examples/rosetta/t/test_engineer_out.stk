@@ -7,8 +7,8 @@
 
 fn Rosetta::Engineer::min_steps($delta) {
     $delta = abs($delta)
-    my $k = 0
-    my $sum = 0
+    var $k = 0
+    var $sum = 0
     while ($sum < $delta || ($sum - $delta) % 2 != 0) {
         $k += 1
         $sum += $k

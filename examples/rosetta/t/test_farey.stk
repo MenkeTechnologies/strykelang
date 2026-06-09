@@ -10,8 +10,8 @@ fn Rosetta::Farey::totient($n) {
     if ($n == 1) {
         1
     } else {
-        my $count = 0
-        for my $i (1:$n) {
+        var $count = 0
+        for val $i (1:$n) {
             if (Rosetta::Farey::gcd($i, $n) == 1) { $count++ }
         }
         $count
@@ -19,8 +19,8 @@ fn Rosetta::Farey::totient($n) {
 }
 
 fn Rosetta::Farey::len($n) {
-    my $sum = 0
-    for my $i (1:$n) {
+    var $sum = 0
+    for val $i (1:$n) {
         $sum += Rosetta::Farey::totient($i)
     }
     $sum + 1

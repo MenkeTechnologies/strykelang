@@ -8,7 +8,7 @@
 # A line starting with `|>` or `~>` extends the previous statement
 # without needing `\`.
 
-my $result =
+val $result =
     (1:10)
         |> greps { _ % 2 == 0 }
         |> maps { _ * _ }
@@ -16,10 +16,10 @@ my $result =
 $result |> aeq 220, "pipeline auto-continued across 4 lines: 2²+4²+6²+8²+10² = 220"
 
 # Binary-op-mid-expression needs explicit `\` continuation.
-my $sa = 3
-my $sb = 4
-my $sc = 5
-my $hyp = sqrt( \
+val $sa = 3
+val $sb = 4
+val $sc = 5
+val $hyp = sqrt( \
     $sa * $sa + \
     $sb * $sb + \
     $sc * $sc \
@@ -28,7 +28,7 @@ $hyp |> aeq sqrt(50), "binary-op continuation via \\ — sqrt(9+16+25)"
 
 # ── § 14. Hash declarations — one key=>value per line when ≥4 keys ────────
 
-my %config = (
+val %config = (
     host    => "localhost",
     port    => 8080,
     timeout => 30,
@@ -43,19 +43,19 @@ $config{tls}     |> aeq 1,           "hash key 5"
 len(keys %config) |> aeq 5, "5 keys total"
 
 # Short hash (≤3 keys) stays on one line.
-my %sm = (a => 1, b => 2)
+val %sm = (a => 1, b => 2)
 $sm{a} + $sm{b} |> aeq 3, "short hash 1-line form: a + b = 3"
 
 # Hash merging — stryke prefers literal-spread over manual merge.
-my %defaults = (timeout => 10, retries => 1, tls => 0)
-my %merged = (%defaults, %config)
+val %defaults = (timeout => 10, retries => 1, tls => 0)
+val %merged = (%defaults, %config)
 $merged{timeout} |> aeq 30, "config overrides default (timeout)"
 $merged{tls}     |> aeq 1,  "config overrides default (tls)"
 
 # ── § 15. No defensive code — trust builtin contracts ─────────────────────
 # `sum()` returns 0 on empty list; no need for ternary guards.
 
-my @empty
+val @empty
 sum(@empty) // 0 |> aeq 0, "sum(empty) // 0 — explicit fallback"
 # Note: stryke's `sum` may return undef for empty; `// 0` is the
 # style-compliant defensive form (binds tighter than the ternary).
@@ -65,7 +65,7 @@ min(1, 2, 3) |> aeq 1, "min of (1,2,3) = 1"
 max(1, 2, 3) |> aeq 3, "max of (1,2,3) = 3"
 
 # Hash key access — undef on missing is the contract.
-my %h = (a => 1)
+val %h = (a => 1)
 defined($h{missing}) |> aeq 0, "missing hash key → undef (defined → 0)"
 $h{a} |> aeq 1, "present hash key → value"
 
@@ -80,7 +80,7 @@ class HttpClient {
     base_url: Str = ""
     fn full_url($path) { $self->base_url . $path }
 }
-my $http = HttpClient(base_url => "https://example.com")
+val $http = HttpClient(base_url => "https://example.com")
 $http->full_url("/api") |> aeq "https://example.com/api", "CamelCase class name"
 
 # Constants: SCREAMING_SNAKE via `use constant`.
@@ -94,8 +94,8 @@ fn Util::String::reverse_words = join(" ", rev split(/\s+/, $_[0]))
 Util::String::reverse_words("a b c") |> aeq "c b a", "Module::Sub::name pattern"
 
 # Short single-letter only as loop index / block topic.
-my $accum = 0
-for my $i (1:5) { $accum += $i }
+var $accum = 0
+for val $i (1:5) { $accum += $i }
 $accum |> aeq 15, "single-letter `$i` is fine as loop index"
 
 # ── § 16. Test runner — `test_run` at file end ────────────────────────────

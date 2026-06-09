@@ -9,19 +9,19 @@ fn Rosetta::Heronian::gcd($a, $b) {
 }
 
 fn Rosetta::Heronian::generate($max_p) {
-    my @triangles
+    var @triangles
     
-    for my $c (1:$max_p) {
-        for my $b (1:$c) {
-            for my $a (1:$b) {
+    for val $c (1:$max_p) {
+        for val $b (1:$c) {
+            for val $a (1:$b) {
                 if ($a + $b > $c) {
-                    my $s = ($a + $b + $c) / 2
+                    val $s = ($a + $b + $c) / 2
                     if ($s > $a && $s > $b && $s > $c) {
-                        my $area_sq = $s * ($s - $a) * ($s - $b) * ($s - $c)
+                        val $area_sq = $s * ($s - $a) * ($s - $b) * ($s - $c)
                         if ($area_sq > 0) {
-                            my $area = sqrt($area_sq)
+                            val $area = sqrt($area_sq)
                             if ($area == int($area)) {
-                                my $g = Rosetta::Heronian::gcd($a, Rosetta::Heronian::gcd($b, $c))
+                                val $g = Rosetta::Heronian::gcd($a, Rosetta::Heronian::gcd($b, $c))
                                 if ($g == 1) {
                                     push @triangles, [$a, $b, $c]
                                 }
@@ -37,7 +37,7 @@ fn Rosetta::Heronian::generate($max_p) {
 }
 
 # Just a small check as this is computationally intensive
-my $res = Rosetta::Heronian::generate(25)
+val $res = Rosetta::Heronian::generate(25)
 assert_ok len(@$res) > 0, "found at least one Heronian triangle"
 
 test_run

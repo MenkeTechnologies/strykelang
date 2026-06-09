@@ -6,15 +6,15 @@
 fn Rosetta::Vlq::encode($n) {
     return [0] if $n == 0
     return undef if $n < 0
-    my @rev
-    my $v = $n
+    var @rev
+    var $v = $n
     while ($v > 0) {
         push @rev, $v & 0x7F
         $v = $v >> 7
     }
-    my @out
-    for (my $i = len(@rev) - 1; $i >= 0; $i--) {
-        my $b = $rev[$i]
+    var @out
+    for (var $i = len(@rev) - 1; $i >= 0; $i--) {
+        var $b = $rev[$i]
         $b |= 0x80 if $i > 0
         push @out, $b
     }
@@ -22,9 +22,9 @@ fn Rosetta::Vlq::encode($n) {
 }
 
 fn Rosetta::Vlq::decode($bytes) {
-    my $v = 0
-    for my $i (0..len(@$bytes) - 1) {
-        my $b = $bytes->[$i]
+    var $v = 0
+    for val $i (0..len(@$bytes) - 1) {
+        val $b = $bytes->[$i]
         $v = ($v << 7) | ($b & 0x7F)
         if (($b & 0x80) == 0) {
             return [$v, $i + 1]
@@ -38,7 +38,7 @@ fn Rosetta::Vlq::hex($bytes) {
 }
 
 # Canonical MIDI-spec sample table
-my @table = (
+val @table = (
     [0x00000000, "00"],
     [0x00000040, "40"],
     [0x0000007F, "7F"],
@@ -51,11 +51,11 @@ my @table = (
     [0x08000000, "C0 80 80 00"],
     [0x0FFFFFFF, "FF FF FF 7F"],
 )
-for my $row (@table) {
-    my ($n, $h) = @$row
-    my $bs = Rosetta::Vlq::encode($n)
+for val $row (@table) {
+    val ($n, $h) = @$row
+    val $bs = Rosetta::Vlq::encode($n)
     assert_eq Rosetta::Vlq::hex($bs), $h, sprintf("encode 0x%X", $n)
-    my $r = Rosetta::Vlq::decode($bs)
+    val $r = Rosetta::Vlq::decode($bs)
     assert_eq $r->[0], $n, sprintf("decode 0x%X", $n)
     assert_eq $r->[1], len(@$bs), sprintf("decode 0x%X length", $n)
 }
@@ -64,10 +64,10 @@ for my $row (@table) {
 assert_ok !defined(Rosetta::Vlq::encode(-1)), "negative rejected"
 
 # Round-trip every byte from 0..2000
-my $rt_ok = 1
-for my $n (0:2000) {
-    my $bs = Rosetta::Vlq::encode($n)
-    my $r  = Rosetta::Vlq::decode($bs)
+var $rt_ok = 1
+for val $n (0:2000) {
+    val $bs = Rosetta::Vlq::encode($n)
+    val $r  = Rosetta::Vlq::decode($bs)
     $rt_ok = 0 if $r->[0] != $n
 }
 assert_ok $rt_ok, "0:2000 round-trip"

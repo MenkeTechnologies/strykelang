@@ -13,9 +13,9 @@
 
 # ── parameters ──────────────────────────────────────────────────────
 
-my $capacity = 10000
-my $fpr_target = 0.01
-my $bloom = bloom_filter($capacity, $fpr_target)
+val $capacity = 10000
+val $fpr_target = 0.01
+val $bloom = bloom_filter($capacity, $fpr_target)
 
 mysync %exact            # ground truth set
 mysync $true_positives = 0
@@ -23,16 +23,16 @@ mysync $false_positives = 0
 mysync $true_negatives  = 0
 mysync $duplicates_skipped = 0
 
-my $td_check = t_digest(100)
-my $tk_dups = topk(5)
+val $td_check = t_digest(100)
+val $tk_dups = topk(5)
 
 # ── seen-check ──────────────────────────────────────────────────────
 
 fn Demo::Dedup::is_seen($item) {
-    my $t0 = now_ns()
+    val $t0 = now_ns()
     # Fast path: Bloom check (may have false positives).
-    my $bloom_says = bloom_contains($bloom, $item)
-    my $really_seen = exists $exact{$item}
+    val $bloom_says = bloom_contains($bloom, $item)
+    val $really_seen = exists $exact{$item}
     if ($bloom_says) {
         if ($really_seen) {
             $true_positives = $true_positives + 1
@@ -56,9 +56,9 @@ fn Demo::Dedup::is_seen($item) {
 # ── generate workload: 5000 records, mostly duplicates ──────────────
 # 1000 distinct items, drawn 5000 times with bias toward popular ones.
 
-my @records
-for my $i (1:5000) {
-    my $bucket = int(rand() * rand 1000)
+var @records
+for val $i (1:5000) {
+    val $bucket = int(rand() * rand 1000)
     push @records, "item-$bucket"
     topk_add($tk_dups, "item-$bucket")
 }
@@ -67,7 +67,7 @@ printf "── workload: %d records (target ~1000 distinct) ──────\n
 
 # ── process workload ───────────────────────────────────────────────
 
-for my $rec (@records) {
+for val $rec (@records) {
     Demo::Dedup::is_seen($rec)
 }
 
@@ -86,8 +86,8 @@ printf "  Bloom true-negatives     : %d\n", $true_negatives
 
 p ""
 p "── false-positive rate (measured) ───────────────────"
-my $fpr_denominator = $false_positives + $true_negatives
-my $observed_fpr = $fpr_denominator > 0
+val $fpr_denominator = $false_positives + $true_negatives
+val $observed_fpr = $fpr_denominator > 0
                    ? 100.0 * $false_positives / $fpr_denominator
                    : 0.0
 printf "  observed FPR : %.3f%% (target: %.1f%%)\n",
@@ -97,8 +97,8 @@ printf "  observed FPR : %.3f%% (target: %.1f%%)\n",
 
 p ""
 p "── most-duplicated items (TopK) ─────────────────────"
-my @hits = topk_top($tk_dups)
-for my $h (@hits) {
+val @hits = topk_top($tk_dups)
+for val $h (@hits) {
     printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
 }
 
@@ -106,7 +106,7 @@ for my $h (@hits) {
 
 p ""
 p "── HLL distinct cardinality ─────────────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _) for @records
 printf "  HLL distinct : %d\n", hll_count($hll)
 printf "  exact        : %d\n", len(keys %exact)

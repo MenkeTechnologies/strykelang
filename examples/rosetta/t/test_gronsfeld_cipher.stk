@@ -2,20 +2,20 @@
 # Rosetta Code: Gronsfeld cipher
 
 fn Rosetta::Gronsfeld::encode($text, $key) {
-    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
-    my $k = $key |> { _ =~ s/[^0-9]//gr }
+    val $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    val $k = $key |> { _ =~ s/[^0-9]//gr }
     return "" if len($k) == 0
     
-    my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map {int}
-    my $k_len = len(@k_digits)
+    val @t_chars = $t |> chars()
+    val @k_digits = $k |> chars() |> map {int}
+    val $k_len = len(@k_digits)
     
-    my @res = ~> 0:(len(@t_chars)-1) map {
-        my $i = _
-        my $p_val = ord($t_chars[$i]) - ord("A")
-        my $shift = $k_digits[$i % $k_len]
+    val @res = ~> 0:(len(@t_chars)-1) map {
+        val $i = _
+        val $p_val = ord($t_chars[$i]) - ord("A")
+        val $shift = $k_digits[$i % $k_len]
         
-        my $c_val = ($p_val + $shift) % 26
+        val $c_val = ($p_val + $shift) % 26
         chr($c_val + ord("A"))
     }
     
@@ -23,20 +23,20 @@ fn Rosetta::Gronsfeld::encode($text, $key) {
 }
 
 fn Rosetta::Gronsfeld::decode($text, $key) {
-    my $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
-    my $k = $key |> { _ =~ s/[^0-9]//gr }
+    val $t = $text |> uc() |> { _ =~ s/[^A-Z]//gr }
+    val $k = $key |> { _ =~ s/[^0-9]//gr }
     return "" if len($k) == 0
     
-    my @t_chars = $t |> chars()
-    my @k_digits = $k |> chars() |> map {int}
-    my $k_len = len(@k_digits)
+    val @t_chars = $t |> chars()
+    val @k_digits = $k |> chars() |> map {int}
+    val $k_len = len(@k_digits)
     
-    my @res = ~> 0:(len(@t_chars)-1) map {
-        my $i = _
-        my $c_val = ord($t_chars[$i]) - ord("A")
-        my $shift = $k_digits[$i % $k_len]
+    val @res = ~> 0:(len(@t_chars)-1) map {
+        val $i = _
+        val $c_val = ord($t_chars[$i]) - ord("A")
+        val $shift = $k_digits[$i % $k_len]
         
-        my $p_val = ($c_val - $shift) % 26
+        var $p_val = ($c_val - $shift) % 26
         if ($p_val < 0) { $p_val += 26 }
         chr($p_val + ord("A"))
     }
@@ -44,9 +44,9 @@ fn Rosetta::Gronsfeld::decode($text, $key) {
     join("", @res)
 }
 
-my $t = "GRONSFELD"
-my $k = "0123"
-my $enc = Rosetta::Gronsfeld::encode($t, $k)
+val $t = "GRONSFELD"
+val $k = "0123"
+val $enc = Rosetta::Gronsfeld::encode($t, $k)
 assert_eq $enc, "GSQQSGGOD", "encode with Gronsfeld"
 assert_eq Rosetta::Gronsfeld::decode($enc, $k), "GRONSFELD", "decode with Gronsfeld"
 

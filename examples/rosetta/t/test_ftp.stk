@@ -2,7 +2,7 @@
 # Rosetta Code: FTP
 
 fn Rosetta::FTP::new() {
-    my %files = ("/pub/readme.txt" => "hello", "/pub/data.csv" => "1,2,3")
+    val %files = ("/pub/readme.txt" => "hello", "/pub/data.csv" => "1,2,3")
     { connected => 0, cwd => "/", files => \%files }
 }
 
@@ -21,7 +21,7 @@ fn Rosetta::FTP::get($ftp, $path) {
     exists $ftp->{files}{$path} ? $ftp->{files}{$path} : "missing"
 }
 
-my $ftp = Rosetta::FTP::new()
+val $ftp = Rosetta::FTP::new()
 
 assert_eq Rosetta::FTP::connect($ftp, "ftp.example.com"), 1, "connect succeeds for known host"
 assert_eq Rosetta::FTP::cwd($ftp, "/pub"), "/pub", "cwd changes after connect"

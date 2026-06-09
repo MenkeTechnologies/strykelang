@@ -17,15 +17,15 @@ class AdvancedLRUCache {
     }
 
     fn set($key, $val) {
-        my $c = $self->cache()
-        my $o = $self->order()
-        my $t = $self->timestamps()
+        var $c = $self->cache()
+        var $o = $self->order()
+        var $t = $self->timestamps()
         
         if (exists $c->{$key}) {
             $self->_remove_from_order($key)
             $o = $self->order()
         } elsif (len(@$o) >= $self->max_size()) {
-            my $oldest = shift @$o
+            val $oldest = shift @$o
             delete $c->{$oldest}
             delete $t->{$oldest}
         }
@@ -36,15 +36,15 @@ class AdvancedLRUCache {
     }
 
     fn get($key) {
-        my $c = $self->cache()
-        my $t = $self->timestamps()
+        val $c = $self->cache()
+        val $t = $self->timestamps()
         
         if (!exists $c->{$key}) {
             return undef
         }
         
         if ($self->ttl() > 0) {
-            my $age = time() - $t->{$key}
+            val $age = time() - $t->{$key}
             if ($age > $self->ttl()) {
                 $self->delete($key)
                 return undef
@@ -52,16 +52,16 @@ class AdvancedLRUCache {
         }
         
         $self->_remove_from_order($key)
-        my $o = $self->order()
+        val $o = $self->order()
         push @$o, $key
         
-        my $res = $c->{$key}
+        val $res = $c->{$key}
         return $res
     }
 
     fn delete($key) {
-        my $c = $self->cache()
-        my $t = $self->timestamps()
+        val $c = $self->cache()
+        val $t = $self->timestamps()
         if (exists $c->{$key}) {
             $self->_remove_from_order($key)
             delete $c->{$key}
@@ -70,13 +70,13 @@ class AdvancedLRUCache {
     }
 
     fn size() {
-        my $c = $self->cache()
+        val $c = $self->cache()
         return len(keys %$c)
     }
 
     fn _remove_from_order($key) {
-        my $o = $self->order()
-        my @new_o = ()
+        val $o = $self->order()
+        var @new_o = ()
         ~> @$o ep {
             if (_ ne $key) { push @new_o, _ }
         }
@@ -85,10 +85,10 @@ class AdvancedLRUCache {
 
     fn cleanup() {
         if ($self->ttl() == 0) { return }
-        my $now = time()
-        my $c = $self->cache()
-        my $t = $self->timestamps()
-        my @ks = keys %$c
+        val $now = time()
+        val $c = $self->cache()
+        val $t = $self->timestamps()
+        val @ks = keys %$c
         ~> @ks ep {
             if ($now - $t->{_} > $self->ttl()) {
                 $self->delete(_)

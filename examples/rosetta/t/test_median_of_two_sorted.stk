@@ -3,29 +3,29 @@
 
 fn Rosetta::Median2::find($a, $b) {
     if (len(@$a) > len(@$b)) {
-        my $tmp = $a
+        val $tmp = $a
         $a = $b
         $b = $tmp
     }
-    my $m = len(@$a)
-    my $n = len(@$b)
-    my $half = int(($m + $n + 1) / 2)
-    my $lo = 0
-    my $hi = $m
-    my $inf = 1e18
+    val $m = len(@$a)
+    val $n = len(@$b)
+    val $half = int(($m + $n + 1) / 2)
+    var $lo = 0
+    var $hi = $m
+    val $inf = 1e18
     while ($lo <= $hi) {
-        my $i = int(($lo + $hi) / 2)
-        my $j = $half - $i
-        my $a_left = $i == 0 ? -$inf : $a->[$i - 1]
-        my $a_right = $i == $m ? $inf : $a->[$i]
-        my $b_left = $j == 0 ? -$inf : $b->[$j - 1]
-        my $b_right = $j == $n ? $inf : $b->[$j]
+        val $i = int(($lo + $hi) / 2)
+        val $j = $half - $i
+        val $a_left = $i == 0 ? -$inf : $a->[$i - 1]
+        val $a_right = $i == $m ? $inf : $a->[$i]
+        val $b_left = $j == 0 ? -$inf : $b->[$j - 1]
+        val $b_right = $j == $n ? $inf : $b->[$j]
         if ($a_left <= $b_right && $b_left <= $a_right) {
             if (($m + $n) % 2 == 1) {
                 return $a_left > $b_left ? $a_left : $b_left
             }
-            my $left_max = $a_left > $b_left ? $a_left : $b_left
-            my $right_min = $a_right < $b_right ? $a_right : $b_right
+            val $left_max = $a_left > $b_left ? $a_left : $b_left
+            val $right_min = $a_right < $b_right ? $a_right : $b_right
             return ($left_max + $right_min) / 2.0
         }
         if ($a_left > $b_right) {
@@ -60,8 +60,8 @@ assert_ok Rosetta::Median2::close(Rosetta::Median2::find([1], [2]), 1.5), "[1] [
 assert_ok Rosetta::Median2::close(Rosetta::Median2::find([3], [3]), 3), "[3] [3] -> 3"
 
 # Larger arrays
-my $big_a = [1, 5, 9, 13, 17]
-my $big_b = [2, 6, 10, 14, 18]
+val $big_a = [1, 5, 9, 13, 17]
+val $big_b = [2, 6, 10, 14, 18]
 assert_ok Rosetta::Median2::close(Rosetta::Median2::find($big_a, $big_b), 9.5), "5+5 elements -> 9.5"
 
 test_run

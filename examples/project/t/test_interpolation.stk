@@ -25,18 +25,18 @@ assert_eq Project::Interpolation::adjacent_scalars("", "bar"), "bar", "empty adj
 # ARRAY AND HASH INTERPOLATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-my @arr = (10, 20, 30, 40, 50)
+val @arr = (10, 20, 30, 40, 50)
 assert_eq Project::Interpolation::array_element_interp(@arr), "First: 10, Last: 50", "array element interp"
 
-my %person = (name => "Alice", age => 30)
-my $person_name = $person{name}
-my $person_age = $person{age}
+val %person = (name => "Alice", age => 30)
+val $person_name = $person{name}
+val $person_age = $person{age}
 assert_eq "Name: $person_name, Age: $person_age", "Name: Alice, Age: 30", "hash value interp"
 
-my $ref = +{ key => "value" }
+val $ref = +{ key => "value" }
 assert_eq Project::Interpolation::nested_ref_interp($ref), "Value: value", "nested ref interp"
 
-my $aref = [100, 200, 300]
+val $aref = [100, 200, 300]
 assert_eq Project::Interpolation::array_ref_elem_interp($aref), "Element: 100", "array ref elem interp"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -75,7 +75,7 @@ assert_eq Project::Interpolation::qq_operator_interp("World"), "Hello, World!", 
 # HEREDOC STYLE
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $heredoc = Project::Interpolation::heredoc_style()
+val $heredoc = Project::Interpolation::heredoc_style()
 assert_contains $heredoc, "line1", "heredoc line1"
 assert_contains $heredoc, "line2", "heredoc line2"
 assert_contains $heredoc, "line3", "heredoc line3"
@@ -111,7 +111,7 @@ assert_eq Project::Interpolation::concat_vs_interp("", "bar"), 1, "concat equals
 
 assert_eq Project::Interpolation::template_basic("Bob", 25, "NYC"), "My name is Bob, I am 25 years old, and I live in NYC.", "template basic"
 
-my @fruits = qw(apple banana cherry)
+val @fruits = qw(apple banana cherry)
 assert_eq Project::Interpolation::template_with_loop(@fruits), "Items: apple, banana, cherry", "template with loop"
 
 assert_eq Project::Interpolation::build_table_row("a", "b", "c"), "| a | b | c |", "table row"
@@ -149,36 +149,36 @@ assert_eq Project::Interpolation::sprintf_multiple("Alice", 30), "Alice is 30 ye
 # INLINE INTERPOLATION TESTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-my $name = "test"
+val $name = "test"
 assert_eq "name: $name", "name: test", "inline interp"
 
-my $x = 10
-my $y = 20
+val $x = 10
+var $y = 20
 assert_eq "$x + $y = " . ($x + $y), "10 + 20 = 30", "mixed interp concat"
 
-my @nums = (1, 2, 3)
-my $first = $nums[0]
+val @nums = (1, 2, 3)
+val $first = $nums[0]
 assert_eq "first is $first", "first is 1", "array access interp"
 
-my %data = (key => "value")
-my $val = $data{key}
+val %data = (key => "value")
+val $val = $data{key}
 assert_eq "key = $val", "key = value", "hash access interp"
 
-my $msg = "outer"
-my $inner = fn {
-    my $msg = "inner"
+val $msg = "outer"
+val $inner = fn {
+    val $msg = "inner"
     "from closure: $msg"
 }
 assert_eq $inner(), "from closure: inner", "closure interp"
 assert_eq "outer: $msg", "outer: outer", "outer scope preserved"
 
-my $multiline = "first
+val $multiline = "first
 second
 third"
 assert_contains $multiline, "first", "multiline first"
 assert_contains $multiline, "second", "multiline second"
 
-my $special = "tab:\there"
+val $special = "tab:\there"
 assert_contains $special, "\t", "tab char"
 
 test_run

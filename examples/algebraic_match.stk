@@ -16,7 +16,7 @@ fn Demo::handle($sig) {
     }
 }
 
-for my $s (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) {
+for val $s (Sig::Hup, Sig::Int, Sig::Term, Sig::Kill) {
     p "  handler: ", Demo::handle($s)
 }
 
@@ -33,7 +33,7 @@ fn Demo::http_status($code) {
         _   => "Unknown ($code)",
     }
 }
-for my $c (200, 204, 404, 500, 418) {
+for val $c (200, 204, 404, 500, 418) {
     printf "  %d → %s\n", $c, Demo::http_status($c)
 }
 
@@ -56,8 +56,8 @@ p "  Div(8,3)  = ", Demo::eval2(Op::Div, 8, 3)
 
 p ""
 p "── Match composes with pipe-forward ───────────────────"
-my @codes = (200, 201, 404, 500, 200, 503)
-my @categorized = @codes |> map {
+val @codes = (200, 201, 404, 500, 200, 503)
+val @categorized = @codes |> map {
     match (_) {
         200 => "ok",
         201 => "ok",
@@ -72,7 +72,7 @@ p "  categorised: ", join(", ", @categorized)
 
 p ""
 p "── Match as an expression — bind the result ───────────"
-my $cat = match (200) {
+val $cat = match (200) {
     200 => "ok",
     404 => "miss",
     500 => "crash",

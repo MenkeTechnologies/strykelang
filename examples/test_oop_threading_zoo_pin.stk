@@ -21,7 +21,7 @@ class Pkg impl HasWeight {
 
 fn mkp($id, $kg, $zone) { Pkg->new(id => $id, kg => $kg, zone => $zone) }
 
-my @pkgs = (
+val @pkgs = (
     mkp("P01",  1.0, "A"),
     mkp("P02",  2.5, "A"),
     mkp("P03",  4.0, "B"),
@@ -35,67 +35,67 @@ my @pkgs = (
 )
 
 # ─── ~> baseline ────────────────────────────────────────────────────────
-my $total_kg = ~> @pkgs map { _->weight() } sum
+val $total_kg = ~> @pkgs map { _->weight() } sum
 $total_kg |> aeq 58.5, "~> total kg"
 
-my $heavy_cnt = ~> @pkgs grep { _->heavy() } map { 1 } sum
+val $heavy_cnt = ~> @pkgs grep { _->heavy() } map { 1 } sum
 $heavy_cnt |> aeq 6, "~> heavy count"
 
 # ─── ~p> chunk-parallel sum of fees ─────────────────────────────────────
-my @fees = ~> @pkgs map { _->fee() }
-my $par_fees = ~p> @fees sum
+val @fees = ~> @pkgs map { _->fee() }
+val $par_fees = ~p> @fees sum
 $par_fees |> aeq (58.5 * 2.5), "~p> fee total"
 
 # ─── ~p> count via map { 1 } ||> sum ────────────────────────────────────
-my @weights = ~> @pkgs map { _->weight() }
-my $par_count = ~p> @weights map { 1 } ||> sum
+val @weights = ~> @pkgs map { _->weight() }
+val $par_count = ~p> @weights map { 1 } ||> sum
 $par_count |> aeq 10, "~p> map-1 count"
 
 # ─── ~p> sum of squares of weights ──────────────────────────────────────
-my @sq_w = ~> @pkgs map { my $w = _->weight(); $w * $w }
-my $sumsq = ~p> @sq_w sum
+val @sq_w = ~> @pkgs map { val $w = _->weight(); $w * $w }
+val $sumsq = ~p> @sq_w sum
 ($sumsq > 467 && $sumsq < 469) |> aeq 1, "~p> sum of sq ~ 468"
 
 # ─── ~s> streaming map of label() ───────────────────────────────────────
-my @labels = ~s> @pkgs map { _->label() }
+val @labels = ~s> @pkgs map { _->label() }
 (len @labels) |> aeq 10, "~s> 10 labels"
 
 # Streaming with filter
-my @c_zone_labels = ~s> @pkgs grep { _->zone() eq "C" } map { _->label() }
+val @c_zone_labels = ~s> @pkgs grep { _->zone() eq "C" } map { _->label() }
 (len @c_zone_labels) |> aeq 3, "~s> 3 C-zone labels"
 
 # Stream of fees for heavy packages
-my @heavy_fees = ~s> @pkgs grep { _->heavy() } map { _->fee() }
+val @heavy_fees = ~s> @pkgs grep { _->heavy() } map { _->fee() }
 (len @heavy_fees) |> aeq 6, "~s> 6 heavy fees"
 
 # ─── ~>> thread-last with custom multi-arg builder fn ────────────────────
 fn by_zone($z, @ps) {
-    my @r = ()
-    for my $p (@ps) {
+    var @r = ()
+    for val $p (@ps) {
         if ($p->zone() eq $z) { push @r, $p }
     }
     \@r
 }
-my $zone_b = ~>> @pkgs by_zone("B")
+val $zone_b = ~>> @pkgs by_zone("B")
 (len @{$zone_b}) |> aeq 4, "~>> zone B count"
 
 fn over_kg($lim, @ps) {
-    my @r = ()
-    for my $p (@ps) {
+    var @r = ()
+    for val $p (@ps) {
         if ($p->weight() > $lim) { push @r, $p->id() }
     }
     \@r
 }
-my $over5 = ~>> @pkgs over_kg(5)
+val $over5 = ~>> @pkgs over_kg(5)
 json_encode($over5) |> aeq '["P04","P05","P06","P09","P10"]', "~>> over_kg 5"
 
 # ─── ~>> chained join via intermediate ──────────────────────────────────
 fn ids_of(@ps) {
-    my @r = ()
-    for my $p (@ps) { push @r, $p->id() }
+    var @r = ()
+    for val $p (@ps) { push @r, $p->id() }
     \@r
 }
-my $ids = ~>> @pkgs ids_of
+val $ids = ~>> @pkgs ids_of
 join(",", @{$ids}) |> aeq "P01,P02,P03,P04,P05,P06,P07,P08,P09,P10", "~>> ids_of"
 
 # ─── Class with internal ~p> + ~>> pipelines ───────────────────────────
@@ -107,22 +107,22 @@ class Depot {
     fn count   = len @{$self->inv}
 
     fn total_weight {
-        my @ws = ~> @{$self->inv} map { _->weight() }
+        val @ws = ~> @{$self->inv} map { _->weight() }
         ~p> @ws sum
     }
 
     fn total_fee {
-        my @fs = ~> @{$self->inv} map { _->fee() }
+        val @fs = ~> @{$self->inv} map { _->fee() }
         ~p> @fs sum
     }
 
     fn ids_in_zone($z) {
-        my @r = ~> @{$self->inv} grep { _->zone() eq $z } map { _->id() } sort
+        val @r = ~> @{$self->inv} grep { _->zone() eq $z } map { _->id() } sort
         \@r
     }
 
     fn streaming_labels {
-        my @ls = ~s> @{$self->inv} map { _->label() }
+        val @ls = ~s> @{$self->inv} map { _->label() }
         \@ls
     }
 
@@ -131,69 +131,69 @@ class Depot {
     }
 }
 
-my $depot = Depot->new(name => "main", inv => [])
+val $depot = Depot->new(name => "main", inv => [])
 $depot->add($_) for @pkgs
 $depot->count() |> aeq 10, "depot count"
 
 $depot->total_weight() |> aeq 58.5, "depot total_weight via ~p>"
 $depot->total_fee()    |> aeq (58.5 * 2.5), "depot total_fee via ~p>"
 
-my $az = $depot->ids_in_zone("A")
+val $az = $depot->ids_in_zone("A")
 join(",", @{$az}) |> aeq "P01,P02,P07", "depot A-zone ids"
-my $bz = $depot->ids_in_zone("B")
+val $bz = $depot->ids_in_zone("B")
 join(",", @{$bz}) |> aeq "P03,P04,P08,P10", "depot B-zone ids"
-my $cz = $depot->ids_in_zone("C")
+val $cz = $depot->ids_in_zone("C")
 join(",", @{$cz}) |> aeq "P05,P06,P09", "depot C-zone ids"
 
-my $sl = $depot->streaming_labels()
+val $sl = $depot->streaming_labels()
 (len @{$sl}) |> aeq 10, "depot streaming 10"
 
 $depot->heavy_count() |> aeq 6, "depot heavy 6"
 
 # ─── ~>> threading into class instance method via wrapper fn ────────────
 fn depot_load($d, @ps) {
-    for my $p (@ps) { $d->add($p) }
+    for val $p (@ps) { $d->add($p) }
     $d
 }
-my $d2 = Depot->new(name => "north", inv => [])
-my $loaded = ~>> @pkgs depot_load($d2)
+val $d2 = Depot->new(name => "north", inv => [])
+val $loaded = ~>> @pkgs depot_load($d2)
 $loaded->count() |> aeq 10, "~>> depot_load count"
 $loaded->total_weight() |> aeq 58.5, "~>> depot_load weight"
 
 # ─── ~s> consumed for partial pipeline (no aggregation) ─────────────────
-my @label_zone = ~s> @pkgs map { _->id() . "/" . _->zone() }
+val @label_zone = ~s> @pkgs map { _->id() . "/" . _->zone() }
 $label_zone[0] |> aeq "P01/A", "~s> label_zone first"
 $label_zone[-1] |> aeq "P10/B", "~s> label_zone last"
 
 # ─── ~p> on slice via intermediate ──────────────────────────────────────
-my @first_half = @pkgs[0:4]
-my @fh_w = ~> @first_half map { _->weight() }
-my $fh_sum = ~p> @fh_w sum
+val @first_half = @pkgs[0:4]
+val @fh_w = ~> @first_half map { _->weight() }
+val $fh_sum = ~p> @fh_w sum
 $fh_sum |> aeq 22, "~p> first-half sum"
 
 # ─── Mix ~> + ~>> + ~p> in one test ────────────────────────────────────
 # step 1 ~> filter heavies; step 2 ~>> through ids_of; step 3 ~p> count via map-1
-my @h = ~> @pkgs grep { _->heavy() }
-my $h_ids = ~>> @h ids_of
-my $h_count = ~p> @{$h_ids} map { 1 } ||> sum
+val @h = ~> @pkgs grep { _->heavy() }
+val $h_ids = ~>> @h ids_of
+val $h_count = ~p> @{$h_ids} map { 1 } ||> sum
 $h_count |> aeq 6, "mixed ~>/~>>/~p> heavy count"
 
 # ─── ~>> with sort wrapper ──────────────────────────────────────────────
 fn sort_by_weight_desc(@ps) {
-    my @s = sort { _1->weight() <=> _->weight() } @ps
+    val @s = sort { _1->weight() <=> _->weight() } @ps
     \@s
 }
-my $sorted = ~>> @pkgs sort_by_weight_desc
+val $sorted = ~>> @pkgs sort_by_weight_desc
 ${$sorted}[0]->id() |> aeq "P06", "~>> heaviest P06"
 ${$sorted}[-1]->id() |> aeq "P01", "~>> lightest P01"
 
 # ─── Streaming over generated range ─────────────────────────────────────
-my @cubes = ~s> (1:8) map { _ * _ * _ }
+val @cubes = ~s> (1:8) map { _ * _ * _ }
 join(",", @cubes) |> aeq "1,8,27,64,125,216,343,512", "~s> cubes 1:8"
 
 # ─── ~p> sum over generated range ───────────────────────────────────────
-my @range_sq = ~> (1:20) map { _ * _ }
-my $range_sumsq = ~p> @range_sq sum
+val @range_sq = ~> (1:20) map { _ * _ }
+val $range_sumsq = ~p> @range_sq sum
 $range_sumsq |> aeq 2870, "~p> sum squares 1:20"
 
 aeq 1, 1, "assert_eq"

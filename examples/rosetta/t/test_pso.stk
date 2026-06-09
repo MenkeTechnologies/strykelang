@@ -2,15 +2,15 @@
 # Rosetta Code: Particle Swarm Optimization
 
 fn Rosetta::PSO::solve {
-    my $num_particles = 20
-    my @particles
-    my $g_best_pos = [100.0, 100.0]
-    my $g_best_val = 20000.0
+    val $num_particles = 20
+    var @particles
+    var $g_best_pos = [100.0, 100.0]
+    var $g_best_val = 20000.0
     
-    for my $i (1:$num_particles) {
-        my $px = rand(20) - 10
-        my $py = rand(20) - 10
-        my $p = {
+    for val $i (1:$num_particles) {
+        val $px = rand(20) - 10
+        val $py = rand(20) - 10
+        val $p = {
             pos => [$px, $py],
             vel => [0.0, 0.0],
             best_pos => [$px, $py],
@@ -23,15 +23,15 @@ fn Rosetta::PSO::solve {
         push @particles, $p
     }
     
-    my $w = 0.5; my $c1 = 1.0; my $c2 = 1.0
-    for my $iter (1:50) {
-        for my $p (@particles) {
-            for my $d (0:1) {
-                my $r1 = rand(); my $r2 = rand()
+    val $w = 0.5; val $c1 = 1.0; val $c2 = 1.0
+    for val $iter (1:50) {
+        for var $p (@particles) {
+            for val $d (0:1) {
+                val $r1 = rand(); val $r2 = rand()
                 $p->{vel}->[$d] = $w * $p->{vel}->[$d] + $c1 * $r1 * ($p->{best_pos}->[$d] - $p->{pos}->[$d]) + $c2 * $r2 * ($g_best_pos->[$d] - $p->{pos}->[$d])
                 $p->{pos}->[$d] = $p->{pos}->[$d] + $p->{vel}->[$d]
             }
-            my $v = $p->{pos}->[0] * $p->{pos}->[0] + $p->{pos}->[1] * $p->{pos}->[1]
+            val $v = $p->{pos}->[0] * $p->{pos}->[0] + $p->{pos}->[1] * $p->{pos}->[1]
             if ($v < $p->{best_val}) {
                 $p->{best_val} = $v
                 $p->{best_pos} = [$p->{pos}->[0], $p->{pos}->[1]]
@@ -45,7 +45,7 @@ fn Rosetta::PSO::solve {
     $g_best_val
 }
 
-my $best = Rosetta::PSO::solve()
+val $best = Rosetta::PSO::solve()
 assert_ok $best < 0.1, "PSO converged to approx 0"
 
 test_run

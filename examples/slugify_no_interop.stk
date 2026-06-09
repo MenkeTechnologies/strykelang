@@ -16,7 +16,7 @@
 #      stryke --no-interop examples/slugify_no_interop.stk "Hello, World!"
 
 fn Slug::make($title) {
-    my $s = lc($title)
+    var $s = lc($title)
     # Replace any run of non-[a-z0-9] with a single dash.
     $s =~ s/[^a-z0-9]+/-/g
     # Strip leading + trailing dashes.
@@ -31,7 +31,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — (input, expected slug).
-my @cases = (
+val @cases = (
     +{ title => "Hello World",            slug => "hello-world" },
     +{ title => "Hello, World!",          slug => "hello-world" },
     +{ title => "  Leading and Trailing  ", slug => "leading-and-trailing" },
@@ -46,10 +46,10 @@ my @cases = (
 )
 
 p "── Slugify demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Slug::make($c->{title})
-    my $ok  = ($got eq $c->{slug})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Slug::make($c->{title})
+    val $ok  = ($got eq $c->{slug})
     $fail++ unless $ok
     printf "  %-30s -> %-30s %s\n",
         "\"" . $c->{title} . "\"",
@@ -63,8 +63,8 @@ die "$fail / " . len(@cases) . " slug cases failed" if $fail > 0
 #   * Any non-empty result matches /^[a-z0-9-]+$/.
 #   * No leading or trailing dash.
 #   * Case-fold idempotency: lc($x) and uc($x) slugify to the same thing.
-for my $c (@cases) {
-    my $s = Slug::make($c->{title})
+for val $c (@cases) {
+    val $s = Slug::make($c->{title})
     next if len($s) == 0
     die "slug \"$s\" has illegal chars" unless $s =~ /^[a-z0-9-]+$/
     die "slug starts with dash"         if substr($s, 0, 1) eq "-"

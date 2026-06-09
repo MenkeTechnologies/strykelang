@@ -26,13 +26,13 @@ fn Demo::Win::stringify($wins) {
     join(";", map { join(",", @$_) } @$wins)
 }
 
-my @w3 = sliding_window([1, 2, 3, 4, 5], 3)
+val @w3 = sliding_window([1, 2, 3, 4, 5], 3)
 Demo::Win::stringify(\@w3) |> assert_eq("1,2,3;2,3,4;3,4,5", "size-3 windows")
 
-my @w2 = sliding_window([10, 20, 30, 40], 2)
+val @w2 = sliding_window([10, 20, 30, 40], 2)
 Demo::Win::stringify(\@w2) |> assert_eq("10,20;20,30;30,40", "size-2 windows")
 
-my @ww = sliding_window([1, 2], 5)
+val @ww = sliding_window([1, 2], 5)
 len(@ww) |> assert_eq(0, "window > len returns empty")
 
 test_run

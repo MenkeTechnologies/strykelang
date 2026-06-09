@@ -29,10 +29,10 @@ fn Dice::roll1($sides) {
 # Stryke's regex engine doesn't support lookahead split, so we
 # tokenise manually: scan for +/- and slice on the boundaries.
 fn Dice::split_terms($e) {
-    my @terms
-    my $sign = "+"
-    my $buf  = ""
-    for my $ch (split(//, $e)) {
+    var @terms
+    var $sign = "+"
+    var $buf  = ""
+    for val $ch (split(//, $e)) {
         if ($ch eq "+" || $ch eq "-") {
             push @terms, +{ sign => $sign, body => $buf } if len($buf) > 0
             $sign = $ch
@@ -46,18 +46,18 @@ fn Dice::split_terms($e) {
 }
 
 fn Dice::roll($expr) {
-    my $e = $expr
+    var $e = $expr
     $e =~ s/\s+//g
-    my $total = 0
-    my @rolls
-    for my $t (Dice::split_terms($e)) {
-        my $s = ($t->{sign} eq "-") ? -1 : 1
-        my $p = $t->{body}
+    var $total = 0
+    var @rolls
+    for val $t (Dice::split_terms($e)) {
+        val $s = ($t->{sign} eq "-") ? -1 : 1
+        val $p = $t->{body}
         if ($p =~ /^(\d*)d(\d+)$/) {
-            my $count = len($1) > 0 ? (0 + $1) : 1
-            my $sides = 0 + $2
+            val $count = len($1) > 0 ? (0 + $1) : 1
+            val $sides = 0 + $2
             for (1:$count) {
-                my $r = Dice::roll1($sides)
+                val $r = Dice::roll1($sides)
                 push @rolls, +{ sides => $sides, value => $r, sign => $s }
                 $total += $s * $r
             }
@@ -73,16 +73,16 @@ fn Dice::roll($expr) {
 
 # Compute min/max bounds for a notation without actually rolling.
 fn Dice::bounds($expr) {
-    my $e = $expr
+    var $e = $expr
     $e =~ s/\s+//g
-    my $min = 0
-    my $max = 0
-    for my $t (Dice::split_terms($e)) {
-        my $s = ($t->{sign} eq "-") ? -1 : 1
-        my $p = $t->{body}
+    var $min = 0
+    var $max = 0
+    for val $t (Dice::split_terms($e)) {
+        val $s = ($t->{sign} eq "-") ? -1 : 1
+        val $p = $t->{body}
         if ($p =~ /^(\d*)d(\d+)$/) {
-            my $count = len($1) > 0 ? (0 + $1) : 1
-            my $sides = 0 + $2
+            val $count = len($1) > 0 ? (0 + $1) : 1
+            val $sides = 0 + $2
             if ($s == 1) {
                 $min += $count
                 $max += $count * $sides
@@ -101,13 +101,13 @@ fn Dice::bounds($expr) {
 srand(42)  # deterministic for the demo / self-test
 
 if (len(@ARGV) >= 1) {
-    my $r = Dice::roll($ARGV[0])
+    val $r = Dice::roll($ARGV[0])
     p $r->{total}
     exit 0
 }
 
 # Demo + self-test on bounds invariants.
-my @cases = (
+val @cases = (
     +{ expr => "1d6"      },
     +{ expr => "2d6"      },
     +{ expr => "1d20"     },
@@ -118,12 +118,12 @@ my @cases = (
 )
 
 p "── Dice-notation demo (seed=42, 5 rolls each) ──"
-my $fail = 0
-for my $c (@cases) {
-    my $bnd = Dice::bounds($c->{expr})
+var $fail = 0
+for val $c (@cases) {
+    val $bnd = Dice::bounds($c->{expr})
     printf "  %-12s bounds=[%4d..%4d]  rolls:", $c->{expr}, $bnd->{min}, $bnd->{max}
     for (1:5) {
-        my $r = Dice::roll($c->{expr})
+        val $r = Dice::roll($c->{expr})
         printf " %d", $r->{total}
         if ($r->{total} < $bnd->{min} || $r->{total} > $bnd->{max}) {
             $fail++
@@ -135,12 +135,12 @@ die "$fail rolls fell outside bounds" if $fail > 0
 
 # Individual face-value invariant: every d6 roll must be in [1..6].
 for (1:200) {
-    my $f = Dice::roll1(6)
+    val $f = Dice::roll1(6)
     die "d6 out of range: $f" unless $f >= 1 && $f <= 6
 }
 # d20 likewise.
 for (1:200) {
-    my $f = Dice::roll1(20)
+    val $f = Dice::roll1(20)
     die "d20 out of range: $f" unless $f >= 1 && $f <= 20
 }
 

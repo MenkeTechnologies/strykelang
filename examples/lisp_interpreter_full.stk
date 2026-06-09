@@ -20,7 +20,7 @@ fn Lisp::tokenize($s) {
     $s =~ s/'([\w:-]+)/ ( quote $1 ) /g
     $s =~ s/\(/ ( /g
     $s =~ s/\)/ ) /g
-    my @toks = $s |> split(/\s+/) |> greps { len(_) > 0 } |> collect
+    val @toks = $s |> split(/\s+/) |> greps { len(_) > 0 } |> collect
     \@toks
 }
 
@@ -28,10 +28,10 @@ fn Lisp::tokenize($s) {
 
 fn Lisp::parse_atoms($toks) {
     die "Unexpected EOF" if len(@$toks) == 0
-    my $t = shift @$toks
+    var $t = shift @$toks
     
     if ($t eq "(") {
-        my @list
+        var @list
         while ($toks->[0] ne ")") {
             push @list, Lisp::parse_atoms $toks
         }
@@ -67,18 +67,18 @@ fn Lisp::Env::set($env, $key, $val) {
 # ── Builtins ────────────────────────────────────────────────────────────────
 
 fn Lisp::Env::std {
-    my $e = Lisp::Env::new()
+    var $e = Lisp::Env::new()
     $e->{binds} = +{
-        "+"      => fn { my $s = 0; $s += _ for @_; $s },
+        "+"      => fn { var $s = 0; $s += _ for @_; $s },
         "-"      => fn { _0 - _1 },
-        "*"      => fn { my $p = 1; $p *= _ for @_; $p },
+        "*"      => fn { var $p = 1; $p *= _ for @_; $p },
         "/"      => fn { _0 / _1 },
         "="      => fn { _0 == _1 ? 1 : 0 },
         "<"      => fn { _0 < _1 ? 1 : 0 },
         ">"      => fn { _0 > _1 ? 1 : 0 },
         "list"   => fn { [ @_ ] },
         "car"    => fn { _0->[0] },
-        "cdr"    => fn { my @c = @{_0}; shift @c; \@c },
+        "cdr"    => fn { var @c = @{_0}; shift @c; \@c },
         "cons"   => fn { [ _0, @{_1} ] },
         "len"    => fn { len @{_0} },
         "p"      => fn { p @_; _[-1] },
@@ -101,38 +101,38 @@ fn Lisp::eval($x, $env) {
         
         return $x if len(@$x) == 0 # Empty list is nil
         
-        my ($op, @args) = @$x
+        val ($op, @args) = @$x
         
         # Special Forms
         if ($op eq "quote") {
             return $args[0]
         } elsif ($op eq "if") {
-            my ($test, $conseq, $alt) = @args
+            val ($test, $conseq, $alt) = @args
             $x = Lisp::eval($test, $env) ? $conseq : $alt
             next # TCO-like tail jump
         } elsif ($op eq "define") {
-            my ($var, $val) = @args
+            val ($var, $val) = @args
             Lisp::Env::set $env, $var, Lisp::eval($val, $env)
             return $var
         } elsif ($op eq "lambda") {
-            my ($params, $body) = @args
+            val ($params, $body) = @args
             return fn {
-                my $new_env = Lisp::Env::new $env
-                for (my $i = 0; $i < len(@$params); $i++) {
+                val $new_env = Lisp::Env::new $env
+                for (var $i = 0; $i < len(@$params); $i++) {
                     Lisp::Env::set $new_env, $params->[$i], $_[$i]
                 }
                 Lisp::eval $body, $new_env
             }
         } elsif ($op eq "begin") {
-            for (my $i = 0; $i < (len @args) - 1; $i++) {
+            for (var $i = 0; $i < (len @args) - 1; $i++) {
                 Lisp::eval $args[$i], $env
             }
             $x = $args[-1]
             next # TCO-like tail jump
         } else {
             # Function call
-            my $proc = Lisp::eval $op, $env
-            my @vals = @args |> maps { Lisp::eval _, $env } |> collect
+            val $proc = Lisp::eval $op, $env
+            val @vals = @args |> maps { Lisp::eval _, $env } |> collect
             return $proc(@vals)
         }
     }
@@ -151,7 +151,7 @@ fn Lisp::str($exp) {
 # ── Internal Tests ───────────────────────────────────────────────────────────
 
 fn test_lisp {
-    my $env = Lisp::Env::std()
+    val $env = Lisp::Env::std()
     
     fn eval_s($s, $e) = Lisp::eval(Lisp::parse_atoms(Lisp::tokenize($s)), $e)
     
@@ -177,9 +177,9 @@ test_lisp()
 
 p ""
 p "── Interactive Lisp Demo ──"
-my $global_env = Lisp::Env::std()
+val $global_env = Lisp::Env::std()
 
-my @scripts = (
+val @scripts = (
     "(define pi 3.14159)",
     "(define area (lambda (r) (* pi (* r r))))",
     "(p (list 'Area 'of 'circle 'with 'radius '10: (area 10)))",
@@ -189,10 +189,10 @@ my @scripts = (
     "(p (list 'Range '5-10: (range 5 10)))"
 )
 
-for my $code (@scripts) {
+for val $code (@scripts) {
     p "Lisp> $code"
-    my $ast = Lisp::parse_atoms Lisp::tokenize $code
-    my $res = Lisp::eval $ast, $global_env
+    val $ast = Lisp::parse_atoms Lisp::tokenize $code
+    val $res = Lisp::eval $ast, $global_env
     p "  => #{Lisp::str $res}"
 }
 

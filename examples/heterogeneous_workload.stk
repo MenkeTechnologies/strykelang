@@ -13,12 +13,12 @@
 
 p "── heterogeneous workload (4 workers, 4 different jobs) ──"
 
-my @workers = congregation(4)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(4)
+val @sorted_workers = sort { _ <=> _1 } @workers
 printf "spawned %d workers: %s\n", len(@workers), join(",", @sorted_workers)
 
 # Define 4 distinct jobs. Each is (name, code-as-string).
-my @jobs = (
+val @jobs = (
     ["factorial(10)",       "my \$f = 1; for my \$i (1:10) { \$f *= \$i } \$f"],
     ["fibonacci(20)",       "my \@f = (0, 1); for my \$i (2:20) { push \@f, \$f[\$i-1] + \$f[\$i-2] } \$f[20]"],
     ["sum_of_squares(100)", "my \$s = 0; for my \$i (1:100) { \$s += \$i * \$i } \$s"],
@@ -26,27 +26,27 @@ my @jobs = (
 )
 
 # Scatter one job per worker (unary pray, one worker handle each).
-my %results
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $name = $jobs[$i][0]
-    my $code = $jobs[$i][1]
-    my $div = pray $code, $w
-    my %reply = annex $div
+var %results
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $name = $jobs[$i][0]
+    val $code = $jobs[$i][1]
+    val $div = pray $code, $w
+    val %reply = annex $div
     $results{$w} = [$name, $reply{$w}]
 }
 
 p "── results ──"
-for my $w (@sorted_workers) {
-    my ($name, $value) = @{$results{$w}}
+for val $w (@sorted_workers) {
+    val ($name, $value) = @{$results{$w}}
     printf "  worker %d: %-25s = %s\n", $w, $name, $value
 }
 
 # Sanity checks against known values.
-my $fac_w = $sorted_workers[0]
-my $fib_w = $sorted_workers[1]
-my $sos_w = $sorted_workers[2]
-my $pri_w = $sorted_workers[3]
+val $fac_w = $sorted_workers[0]
+val $fib_w = $sorted_workers[1]
+val $sos_w = $sorted_workers[2]
+val $pri_w = $sorted_workers[3]
 p $results{$fac_w}[1] eq "3628800" ? "✓ 10! = 3628800" : "✗ factorial wrong"
 p $results{$fib_w}[1] eq "6765"    ? "✓ fib(20) = 6765" : "✗ fibonacci wrong"
 p $results{$sos_w}[1] eq "338350"  ? "✓ Σi² for 1..100 = 338350" : "✗ sum_of_squares wrong"

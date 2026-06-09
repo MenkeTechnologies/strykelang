@@ -5,7 +5,7 @@
 #
 # Usage:
 #   require "perl_pty_class.stk"
-#   my $h = PtyHandle::spawn("ssh user@host")
+#   val $h = PtyHandle::spawn("ssh user@host")
 #   $h->expect(qr/password:/, 30)
 #   $h->send("hunter2\n")
 #   $h->close()
@@ -30,9 +30,9 @@ class PtyHandle {
     # Returns the value of `do->()` for the first matching branch, or
     # undef on timeout / EOF.
     fn branch($branches, $timeout) {
-        my $hit = pty_expect_table($self->raw, $branches, $timeout // 30)
+        val $hit = pty_expect_table($self->raw, $branches, $timeout // 30)
         return undef unless defined $hit
-        my $action = $hit->{action}
+        val $action = $hit->{action}
         return $hit->{matched} unless ref($action) eq "CODE"
         $action->($hit->{matched})
     }

@@ -12,7 +12,7 @@ fn Rosetta::Reflect::source_for($registry, $name) {
     exists $registry->{$name} ? $registry->{$name} : "missing"
 }
 
-my $registry = Rosetta::Reflect::registry()
+val $registry = Rosetta::Reflect::registry()
 
 assert_eq Rosetta::Reflect::source_for($registry, "Rosetta::Reflect::hello"), 'fn Rosetta::Reflect::hello() { "hello" }', "source is returned for known function"
 assert_eq Rosetta::Reflect::source_for($registry, "Rosetta::Reflect::sum") =~ /\$a \+ \$b/, 1, "source text includes function body"

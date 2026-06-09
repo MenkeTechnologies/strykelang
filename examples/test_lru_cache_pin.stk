@@ -7,7 +7,7 @@ fn Lru::new($cap) {
 }
 
 fn Lru::_touch($c, $key) {
-    my @rest = grep { _ ne $key } @{$c->{order}}
+    var @rest = grep { _ ne $key } @{$c->{order}}
     push @rest, $key
     $c->{order} = \@rest
 }
@@ -25,7 +25,7 @@ fn Lru::put($c, $key, $val) {
         return
     }
     while (len(@{$c->{order}}) >= $c->{cap}) {
-        my $evict = shift @{$c->{order}}
+        val $evict = shift @{$c->{order}}
         delete $c->{map}{$evict}
     }
     $c->{map}{$key} = $val
@@ -36,7 +36,7 @@ fn Lru::size($c) { len(@{$c->{order}}) }
 
 fn Lru::keys_ordered($c) { [@{$c->{order}}] }
 
-my $c = Lru::new(3)
+val $c = Lru::new(3)
 
 Lru::put($c, "a", 1)
 Lru::put($c, "b", 2)
@@ -61,7 +61,7 @@ Lru::get($c, "a") |> aeq 100, "a updated"
 Lru::size($c)     |> aeq 3,   "size unchanged on update"
 
 # Heavy churn
-my $c2 = Lru::new(2)
+val $c2 = Lru::new(2)
 Lru::put($c2, _, _ * 10) for 1:10
 Lru::size($c2) |> aeq 2, "stress cap 2"
 join(",", @{Lru::keys_ordered($c2)}) |> aeq "9,10", "last two keys"
@@ -69,7 +69,7 @@ Lru::get($c2, 10) |> aeq 100, "key 10 = 100"
 !defined(Lru::get($c2, 1)) |> aok "key 1 evicted"
 
 # Cap=1 edge case
-my $c3 = Lru::new(1)
+val $c3 = Lru::new(1)
 Lru::put($c3, "x", 1)
 Lru::put($c3, "y", 2)
 !defined(Lru::get($c3, "x")) |> aok "cap1 evicts on insert"

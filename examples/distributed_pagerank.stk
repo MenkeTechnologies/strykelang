@@ -13,7 +13,7 @@
 p "── distributed PageRank (1 iteration) ──"
 
 # 6-node directed graph. Edges by source: adj[src] = [dst, dst, ...].
-my @adj = (
+var @adj = (
     [1, 2],         # node 0 → 1, 2
     [2],            # node 1 → 2
     [0, 3],         # node 2 → 0, 3
@@ -21,36 +21,36 @@ my @adj = (
     [3, 5],         # node 4 → 3, 5
     [0, 4],         # node 5 → 0, 4
 )
-my $n = len(@adj)
-my $damp = 0.85
+var $n = len(@adj)
+var $damp = 0.85
 
 # Initial rank: uniform.
-my @rank = (1.0 / $n) x $n
+var @rank = (1.0 / $n) x $n
 printf "graph: %d nodes  ·  damping: %.2f  ·  initial uniform rank: %.4f\n",
     $n, $damp, 1.0 / $n
 
-my @workers = congregation(3)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(3)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard nodes across workers. Each worker computes new rank for its
 # assigned nodes given the CURRENT rank vector (passed via prayer).
-my $rank_json = to_json(\@rank)
-my $adj_json = to_json(\@adj)
-my $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
-my %new_ranks
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $rank_json = to_json(\@rank)
+val $adj_json = to_json(\@adj)
+val $per = int(($n + len(@sorted_workers) - 1) / len(@sorted_workers))
+var %new_ranks
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = $n - 1 if $end >= $n
     next if $start >= $n
-    my $code = "
+    val $code = "
         my \$rank = from_json(q{$rank_json});
         my \$adj = from_json(q{$adj_json});
         my \$n = len(\@\$rank);
         my \$damp = $damp;
         my \$base = (1.0 - \$damp) / \$n;
-        my %nr;
+        var %nr;
         for my \$v ($start:$end) {
             my \$sum = 0.0;
             for my \$u (0:\$n - 1) {
@@ -65,23 +65,23 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json(\\%nr)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
-    my $partial = from_json($reply{$w})
-    for my $k (keys %$partial) {
+    val $div = pray $code, $w
+    val %reply = annex $div
+    val $partial = from_json($reply{$w})
+    for val $k (keys %$partial) {
         $new_ranks{$k} = $partial->{$k}
     }
 }
 
 # Assemble updated rank vector.
-my @new_rank
-for my $v (0:$n - 1) {
+var @new_rank
+for val $v (0:$n - 1) {
     push @new_rank, $new_ranks{$v}
 }
 
 p "── updated ranks (after 1 iteration) ──"
-my $sum = 0
-for my $v (0:$n - 1) {
+var $sum = 0
+for val $v (0:$n - 1) {
     printf "  node %d: %.4f\n", $v, $new_rank[$v]
     $sum += $new_rank[$v]
 }

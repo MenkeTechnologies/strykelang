@@ -9,7 +9,7 @@ fn Rosetta::Murmur::rotl32($x, $r) {
 }
 
 fn Rosetta::Murmur::fmix32($h) {
-    my $x = Rosetta::Murmur::u32($h)
+    var $x = Rosetta::Murmur::u32($h)
     $x = Rosetta::Murmur::u32($x ^ ($x >> 16))
     $x = Rosetta::Murmur::u32($x * 0x85ebca6b)
     $x = Rosetta::Murmur::u32($x ^ ($x >> 13))
@@ -19,16 +19,16 @@ fn Rosetta::Murmur::fmix32($h) {
 }
 
 fn Rosetta::Murmur::hash($text, $seed) {
-    my @bytes = $text |> chars() |> map {ord}
-    my $len = len(@bytes)
-    my $nblocks = int($len / 4)
-    my $h1 = Rosetta::Murmur::u32($seed)
-    my $c1 = 0xcc9e2d51
-    my $c2 = 0x1b873593
+    val @bytes = $text |> chars() |> map {ord}
+    val $len = len(@bytes)
+    val $nblocks = int($len / 4)
+    var $h1 = Rosetta::Murmur::u32($seed)
+    val $c1 = 0xcc9e2d51
+    val $c2 = 0x1b873593
 
-    for my $i (0:$nblocks - 1) {
-        my $b = $i * 4
-        my $k1 = $bytes[$b] | ($bytes[$b + 1] << 8) | ($bytes[$b + 2] << 16) | ($bytes[$b + 3] << 24)
+    for val $i (0:$nblocks - 1) {
+        val $b = $i * 4
+        var $k1 = $bytes[$b] | ($bytes[$b + 1] << 8) | ($bytes[$b + 2] << 16) | ($bytes[$b + 3] << 24)
         $k1 = Rosetta::Murmur::u32($k1 * $c1)
         $k1 = Rosetta::Murmur::rotl32($k1, 15)
         $k1 = Rosetta::Murmur::u32($k1 * $c2)
@@ -39,9 +39,9 @@ fn Rosetta::Murmur::hash($text, $seed) {
     }
 
     # Tail
-    my $tail_start = $nblocks * 4
-    my $rem = $len - $tail_start
-    my $k1 = 0
+    val $tail_start = $nblocks * 4
+    val $rem = $len - $tail_start
+    var $k1 = 0
     if ($rem == 3) { $k1 ^= ($bytes[$tail_start + 2] << 16) }
     if ($rem >= 2) { $k1 ^= ($bytes[$tail_start + 1] << 8) }
     if ($rem >= 1) {

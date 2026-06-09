@@ -2,10 +2,10 @@
 # Run: stryke --no-interop examples/bioinformatics_primer.stk
 
 p "--- Bio ---"
-my $s = "ATGGCCTAC"
-my $rc = $s |> dna_reverse_complement
-my $pt = $s |> dna_translate
-my $gc = $s |> dna_gc_content
+val $s = "ATGGCCTAC"
+val $rc = $s |> dna_reverse_complement
+val $pt = $s |> dna_translate
+val $gc = $s |> dna_gc_content
 
 $rc   |> aeq "GTAGGCCAT", "rc"
 $pt   |> aeq "MAY",       "pt"

@@ -14,7 +14,7 @@
 
 # ── question bank ──────────────────────────────────────────────────
 
-my @questions = (
+val @questions = (
     +{ id => 1, question => "Capital of France?",          answer => "Paris",     points => 5, mode => "ci" },
     +{ id => 2, question => "2 + 2 = ?",                    answer => "4",         points => 3, mode => "exact" },
     +{ id => 3, question => "Largest planet?",              answer => "Jupiter",   points => 5, mode => "ci" },
@@ -26,7 +26,7 @@ my @questions = (
 
 # ── students with answers ──────────────────────────────────────────
 
-my @submissions = (
+val @submissions = (
     +{ student => "alice",
        answers => +{ 1 => "Paris", 2 => "4", 3 => "Jupiter", 4 => "12", 5 => "1776", 6 => "blue whale", 7 => "78" } },
     +{ student => "bob",
@@ -45,7 +45,7 @@ my @submissions = (
 
 fn Demo::Grader::is_correct($q, $answer) {
     return 0 unless defined $answer
-    my $mode = $q->{mode}
+    val $mode = $q->{mode}
     if ($mode eq "exact") {
         return $answer eq $q->{answer} ? 1 : 0
     } elsif ($mode eq "ci") {
@@ -58,24 +58,24 @@ fn Demo::Grader::is_correct($q, $answer) {
 
 # ── grade everyone ─────────────────────────────────────────────────
 
-my %scores
-my %per_question_correct   # qid -> count correct
-my %per_question_total
-my $td_scores = t_digest(100)
-my $tk_hard = topk(3)
-my $hll_dist = hll(14)
+var %scores
+var %per_question_correct   # qid -> count correct
+var %per_question_total
+val $td_scores = t_digest(100)
+val $tk_hard = topk(3)
+val $hll_dist = hll(14)
 
-for my $q (@questions) {
+for val $q (@questions) {
     $per_question_correct{$q->{id}} = 0
     $per_question_total{$q->{id}}   = 0
 }
 
-for my $sub (@submissions) {
-    my $student = $sub->{student}
-    my $score = 0
-    my $right = 0
-    for my $q (@questions) {
-        my $ans = $sub->{answers}->{$q->{id}}
+for val $sub (@submissions) {
+    val $student = $sub->{student}
+    var $score = 0
+    var $right = 0
+    for val $q (@questions) {
+        val $ans = $sub->{answers}->{$q->{id}}
         $per_question_total{$q->{id}}++
         if (Demo::Grader::is_correct($q, $ans)) {
             $score += $q->{points}
@@ -90,17 +90,17 @@ for my $sub (@submissions) {
 
 # ── leaderboard ────────────────────────────────────────────────────
 
-my $max_score = 0
+var $max_score = 0
 $max_score += _->{points} for @questions
 
 printf "── leaderboard (max possible: %d points) ──────────────\n",
     $max_score
 printf "  %-10s %6s %6s %6s\n", "student", "score", "right", "%"
-my @ranked = sort {
+val @ranked = sort {
     $scores{_1}->{score} <=> $scores{_}->{score}
 } keys %scores
-for my $s (@ranked) {
-    my $r = $scores{$s}
+for val $s (@ranked) {
+    val $r = $scores{$s}
     printf "  %-10s %6d %6d %5.0f%%\n",
         $s, $r->{score}, $r->{right}, 100.0 * $r->{score} / $max_score
 }
@@ -109,17 +109,17 @@ for my $s (@ranked) {
 
 p ""
 p "── per-question error rate (hardest questions first) ──"
-my @question_difficulty = sort {
+val @question_difficulty = sort {
     ($per_question_total{_1->{id}} - $per_question_correct{_1->{id}})
     <=>
     ($per_question_total{_->{id}} - $per_question_correct{_->{id}})
 } @questions
-for my $q (@question_difficulty) {
-    my $wrong = $per_question_total{$q->{id}} - $per_question_correct{$q->{id}}
-    my $rate = 100.0 * $wrong / $per_question_total{$q->{id}}
+for val $q (@question_difficulty) {
+    val $wrong = $per_question_total{$q->{id}} - $per_question_correct{$q->{id}}
+    val $rate = 100.0 * $wrong / $per_question_total{$q->{id}}
     printf "  Q%d: %.0f%% wrong (%d/%d)  '%s'\n",
         $q->{id}, $rate, $wrong, $per_question_total{$q->{id}}, $q->{question}
-    for my $i (1:$wrong) {
+    for val $i (1:$wrong) {
         topk_add($tk_hard, "Q$q->{id}")
     }
 }
@@ -136,8 +136,8 @@ printf "  p90 : %d\n", ~> td_quantile($td_scores, 0.90) int
 
 p ""
 p "── TopK hardest questions (sketch) ──────────────────"
-my @hits = topk_top($tk_hard)
-for my $h (@hits) {
+val @hits = topk_top($tk_hard)
+for val $h (@hits) {
     printf "  %-5s : %d incorrect\n", $h->[0], $h->[1]
 }
 
@@ -145,8 +145,8 @@ for my $h (@hits) {
 
 p ""
 p "── overall stats ────────────────────────────────────"
-my $perfect = grep { $scores{_}->{score} == $max_score } keys %scores
-my $passed  = grep { $scores{_}->{score} >= $max_score * 0.6 } keys %scores
+val $perfect = grep { $scores{_}->{score} == $max_score } keys %scores
+val $passed  = grep { $scores{_}->{score} >= $max_score * 0.6 } keys %scores
 printf "  total students : %d\n", len(keys %scores)
 printf "  perfect scores : %d\n", $perfect
 printf "  passed (60%%+) : %d\n", $passed
@@ -156,8 +156,8 @@ printf "  passed (60%%+) : %d\n", $passed
 p ""
 p "── HLL distinct correct (student × question) ────────"
 printf "  HLL : %d\n", hll_count($hll_dist)
-my $exact = 0
-for my $s (keys %scores) {
+var $exact = 0
+for val $s (keys %scores) {
     $exact += $scores{$s}->{right}
 }
 printf "  exact : %d (sum of `right` across all students)\n", $exact

@@ -21,26 +21,26 @@ fn Rosetta::Russian::table() {
 }
 
 fn Rosetta::Russian::to_metres($value, $unit) {
-    my $t = Rosetta::Russian::table()
+    val $t = Rosetta::Russian::table()
     return undef unless exists $t->{$unit}
     $value * $t->{$unit}
 }
 
 fn Rosetta::Russian::from_metres($metres, $unit) {
-    my $t = Rosetta::Russian::table()
+    val $t = Rosetta::Russian::table()
     return undef unless exists $t->{$unit}
     $metres / $t->{$unit}
 }
 
 fn Rosetta::Russian::break_down($metres) {
-    my $t = Rosetta::Russian::table()
-    my %order = (versta => 0, sazhen => 1, arshin => 2, piad => 3, vershok => 4, diuym => 5)
-    my @units = sort { $order{_} <=> $order{$b} } keys %$t
-    my $remaining = $metres
-    my %parts
-    for my $u (@units) {
+    val $t = Rosetta::Russian::table()
+    val %order = (versta => 0, sazhen => 1, arshin => 2, piad => 3, vershok => 4, diuym => 5)
+    val @units = sort { $order{_} <=> $order{$b} } keys %$t
+    var $remaining = $metres
+    var %parts
+    for val $u (@units) {
         next if $remaining < $t->{$u}
-        my $count = int($remaining / $t->{$u})
+        val $count = int($remaining / $t->{$u})
         $parts{$u} = $count
         $remaining -= $count * $t->{$u}
     }
@@ -58,9 +58,9 @@ assert_near Rosetta::Russian::to_metres(500, "sazhen"), Rosetta::Russian::to_met
     1e-9, "500 sazhen = 1 versta"
 
 # Round-trip
-for my $unit ("diuym", "vershok", "piad", "arshin", "sazhen", "versta") {
-    my $m = Rosetta::Russian::to_metres(7, $unit)
-    my $back = Rosetta::Russian::from_metres($m, $unit)
+for val $unit ("diuym", "vershok", "piad", "arshin", "sazhen", "versta") {
+    val $m = Rosetta::Russian::to_metres(7, $unit)
+    val $back = Rosetta::Russian::from_metres($m, $unit)
     assert_near $back, 7, 1e-9, sprintf("round-trip 7 %s", $unit)
 }
 
@@ -68,15 +68,15 @@ for my $unit ("diuym", "vershok", "piad", "arshin", "sazhen", "versta") {
 assert_ok !defined(Rosetta::Russian::to_metres(1, "foot")), "unknown unit rejected"
 
 # Break down
-my $bd = Rosetta::Russian::break_down(1500)
+val $bd = Rosetta::Russian::break_down(1500)
 assert_eq $bd->{versta}, 1, "1500 m has 1 versta"
-my $bd2 = Rosetta::Russian::break_down(1066.8)
+val $bd2 = Rosetta::Russian::break_down(1066.8)
 assert_eq $bd2->{versta}, 1, "exact 1 versta"
 # Break-down sums to a value at most equal to the original
-my $bd3 = Rosetta::Russian::break_down(2.5)
-my $sum = 0
-my $t = Rosetta::Russian::table()
-for my $u (keys %$bd3) { $sum += $bd3->{$u} * $t->{$u} }
+val $bd3 = Rosetta::Russian::break_down(2.5)
+var $sum = 0
+val $t = Rosetta::Russian::table()
+for val $u (keys %$bd3) { $sum += $bd3->{$u} * $t->{$u} }
 assert_ok $sum <= 2.5 + 1e-9, "break-down sum ≤ original"
 assert_ok $sum > 0, "break-down sum positive"
 

@@ -2,7 +2,7 @@
 # Rosetta Code: Paraffins
 
 fn Rosetta::Paraffins::counts() {
-    my %counts = (
+    val %counts = (
         1 => 1,
         2 => 1,
         3 => 1,
@@ -12,7 +12,7 @@ fn Rosetta::Paraffins::counts() {
     \%counts
 }
 
-my $counts = Rosetta::Paraffins::counts()
+val $counts = Rosetta::Paraffins::counts()
 
 assert_eq $counts->{1}, 1, "methane has one isomer"
 assert_eq $counts->{4}, 2, "butane has two isomers"

@@ -4,30 +4,30 @@
 # using `├──`, `│  `, `└──`, and `   ` connectors.
 
 fn Rosetta::TreeViz::render($node) {
-    my @lines = ($node->{name})
+    val @lines = ($node->{name})
     Rosetta::TreeViz::render_children(\@lines, $node->{children}, "")
     join("\n", @lines)
 }
 
 fn Rosetta::TreeViz::render_children($lines, $children, $prefix) {
     return unless defined $children
-    my $n = len(@$children)
-    for my $i (0:$n - 1) {
-        my $is_last = ($i == $n - 1)
-        my $branch  = $is_last ? "└── " : "├── "
-        my $next    = $is_last ? "    " : "│   "
-        my $child   = $children->[$i]
+    val $n = len(@$children)
+    for val $i (0:$n - 1) {
+        val $is_last = ($i == $n - 1)
+        val $branch  = $is_last ? "└── " : "├── "
+        val $next    = $is_last ? "    " : "│   "
+        val $child   = $children->[$i]
         push @$lines, $prefix . $branch . $child->{name}
         Rosetta::TreeViz::render_children($lines, $child->{children}, $prefix . $next)
     }
 }
 
 # Single node
-my $leaf = { name => "root", children => [] }
+val $leaf = { name => "root", children => [] }
 assert_eq Rosetta::TreeViz::render($leaf), "root", "leaf root"
 
 # Two-level tree
-my $two = {
+val $two = {
     name => "root",
     children => [
         { name => "a", children => [] },
@@ -39,7 +39,7 @@ assert_eq Rosetta::TreeViz::render($two),
     "two-child tree"
 
 # Three-level tree
-my $three = {
+val $three = {
     name => "root",
     children => [
         { name => "a", children => [
@@ -54,7 +54,7 @@ assert_eq Rosetta::TreeViz::render($three),
     "three-level tree"
 
 # Asymmetric tree
-my $asym = {
+val $asym = {
     name => "X",
     children => [
         { name => "Y", children => [] },
@@ -65,7 +65,7 @@ my $asym = {
         ]},
     ],
 }
-my $out = Rosetta::TreeViz::render($asym)
+val $out = Rosetta::TreeViz::render($asym)
 assert_ok index($out, "├── Y") >= 0, "Y as branch"
 assert_ok index($out, "└── Z") >= 0, "Z as last"
 assert_ok index($out, "    └── P") >= 0, "P deep"

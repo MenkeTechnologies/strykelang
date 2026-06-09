@@ -31,18 +31,18 @@ p "── Raft Leader Election Simulator ─────────────
 
 # ── 1. Cluster ─────────────────────────────────────────────────────
 
-my $N        = 5            # nodes
-my $T_min    = 15           # min election timeout (ticks)
-my $T_max    = 30           # max election timeout (ticks)
-my $T_hb     = 5            # leader heartbeat interval (ticks)
-my $max_tick = 500          # safety cap
+val $N        = 5            # nodes
+val $T_min    = 15           # min election timeout (ticks)
+val $T_max    = 30           # max election timeout (ticks)
+val $T_hb     = 5            # leader heartbeat interval (ticks)
+val $max_tick = 500          # safety cap
 
 srand 99                    # reproducible — change for different runs
 
 fn Raft::rand_timeout = $T_min + int(rand() * ($T_max - $T_min + 1))
 
-my @nodes
-for my $i (0:$N - 1) {
+var @nodes
+for val $i (0:$N - 1) {
     push @nodes, +{
         id          => $i,
         state       => "follower",   # follower | candidate | leader
@@ -54,15 +54,15 @@ for my $i (0:$N - 1) {
     }
 }
 
-my $majority = int($N / 2) + 1
+val $majority = int($N / 2) + 1
 
 # ── 2. RPC simulators ─────────────────────────────────────────────
 
 # RequestVote: candidate `c_id` (term `c_term`) asks every other node.
 # Returns the number of votes granted.
 fn Raft::request_vote($cluster, $c_id, $c_term) {
-    my $granted = 0
-    for my $peer (@$cluster) {
+    var $granted = 0
+    for var $peer (@$cluster) {
         next if $peer->{id} == $c_id
         # Higher-term RPC always steps the peer down to follower
         if ($c_term > $peer->{term}) {
@@ -82,7 +82,7 @@ fn Raft::request_vote($cluster, $c_id, $c_term) {
 
 # Heartbeat: leader resets every follower's election timer.
 fn Raft::heartbeat($cluster, $leader_id, $leader_term) {
-    for my $peer (@$cluster) {
+    for var $peer (@$cluster) {
         next if $peer->{id} == $leader_id
         if ($leader_term >= $peer->{term}) {
             $peer->{term}      = $leader_term
@@ -95,15 +95,15 @@ fn Raft::heartbeat($cluster, $leader_id, $leader_term) {
 
 # ── 3. Tick loop ──────────────────────────────────────────────────
 
-my @history          # list of "tick: NN: <event>"
-my $current_leader   # id, or undef
-my $leader_elected_at
+var @history          # list of "tick: NN: <event>"
+var $current_leader   # id, or undef
+var $leader_elected_at
 
 fn Raft::record = push @history, sprintf("t=%03d %s", _, _1)
 
-for my $tick (1:$max_tick) {
+for val $tick (1:$max_tick) {
     # Decrement timers / advance state machine.
-    for my $node (@nodes) {
+    for var $node (@nodes) {
         if ($node->{state} eq "leader") {
             $node->{last_hb_at}++
             if ($node->{last_hb_at} >= $T_hb) {
@@ -121,7 +121,7 @@ for my $tick (1:$max_tick) {
                 $node->{timer}     = Raft::rand_timeout()
                 Raft::record $tick, "node $node->{id} → candidate, term=$node->{term}"
 
-                my $granted = Raft::request_vote \@nodes, $node->{id}, $node->{term}
+                val $granted = Raft::request_vote \@nodes, $node->{id}, $node->{term}
                 $node->{votes} += $granted
                 Raft::record $tick, "  node $node->{id} got $node->{votes} vote(s) of $N"
 
@@ -139,7 +139,7 @@ for my $tick (1:$max_tick) {
 
     # Stop once a leader has been stable for 3 heartbeats.
     if (defined $current_leader) {
-        my $L = $nodes[$current_leader]
+        val $L = $nodes[$current_leader]
         last if $L->{state} eq "leader" && $tick - $leader_elected_at >= 3 * $T_hb
     }
 }
@@ -151,15 +151,15 @@ p "Election timeout range : [$T_min, $T_max] ticks"
 p "Heartbeat interval     : $T_hb ticks"
 p ""
 p "── Election history (first 25 events) ─────────────────"
-for my $i (0:24) {
+for val $i (0:24) {
     last if $i >= len @history
     p "  $history[$i]"
 }
 
 p ""
 p "── Final state ───────────────────────────────────────"
-for my $n (@nodes) {
-    my $tag = $n->{state} eq "leader" ? "★" : " "
+for val $n (@nodes) {
+    val $tag = $n->{state} eq "leader" ? "★" : " "
     printf "  %s node %d  state=%-10s term=%d  voted_for=%s\n",
         $tag, $n->{id}, $n->{state}, $n->{term}, ($n->{voted_for} // "-")
 }
@@ -170,20 +170,20 @@ p ""
 
 defined($current_leader) |> aok "a leader was elected"
 
-my @leaders_now = grep { _->{state} eq "leader" } @nodes
+val @leaders_now = grep { _->{state} eq "leader" } @nodes
 len(@leaders_now) |> aeq 1, "exactly one leader at end of run"
 
-my $leader = $leaders_now[0]
+val $leader = $leaders_now[0]
 $leader->{votes} >= $majority |> aok "leader had ≥ majority votes when elected"
 
 # All non-leaders agree on the leader's term (≤ — leader can be ahead due to step-up)
-my $bad_term = 0
+var $bad_term = 0
 $bad_term++ for grep { _->{state} ne "leader" && _->{term} > $leader->{term} } @nodes
 $bad_term |> aeq 0, "no follower has a term greater than the leader"
 
 # History must include both candidate and elected events for this run
-my $had_candidate = grep { /candidate/ } @history
-my $had_elected   = grep { /LEADER/    } @history
+val $had_candidate = grep { /candidate/ } @history
+val $had_elected   = grep { /LEADER/    } @history
 $had_candidate > 0 |> aok "history records at least one candidate event"
 $had_elected   > 0 |> aok "history records at least one election win"
 

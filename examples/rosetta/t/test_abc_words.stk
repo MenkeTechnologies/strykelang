@@ -2,23 +2,23 @@
 # Rosetta Code: ABC words
 
 fn Rosetta::ABCWords::is_abc($word) {
-    my $w = lc($word)
-    my $pos_a = index($w, "a")
-    my $pos_b = index($w, "b")
-    my $pos_c = index($w, "c")
+    val $w = lc($word)
+    val $pos_a = index($w, "a")
+    val $pos_b = index($w, "b")
+    val $pos_c = index($w, "c")
     
     return 0 if $pos_a < 0 || $pos_b < 0 || $pos_c < 0
     $pos_a < $pos_b && $pos_b < $pos_c
 }
 
-my @test_words = ("abacus", "back", "cabin", "abc", "bac", "acb", "a_b_c", "aardvark", "brice")
+val @test_words = ("abacus", "back", "cabin", "abc", "bac", "acb", "a_b_c", "aardvark", "brice")
 # abacus: a at 0, b at 1, c at 3. 0 < 1 < 3. Yes.
 # back: a at 1, b at 0. No.
 # cabin: a at 1, b at 2, c at 0. No.
 # aardvark: no c. No.
 # brice: no a. No.
 
-my @abc = @test_words |> grep {Rosetta::ABCWords::is_abc}
+val @abc = @test_words |> grep {Rosetta::ABCWords::is_abc}
 assert_eq join(",", @abc), "abacus,abc,a_b_c", "find abc words"
 
 # Piped version

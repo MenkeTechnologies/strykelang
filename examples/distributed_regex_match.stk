@@ -12,7 +12,7 @@
 
 p "── distributed regex match ──"
 
-my @corpus = (
+val @corpus = (
     "POST /login HTTP/1.1",
     "GET /index.html HTTP/1.1",
     "POST /api/v1/users HTTP/1.1",
@@ -22,28 +22,28 @@ my @corpus = (
     "GET /api/v1/status HTTP/1.1",
     "POST /api/v1/events HTTP/1.1",
 )
-my $pattern = "^P.*\\/api"   # matches POST/PUT lines to /api
+val $pattern = "^P.*\\/api"   # matches POST/PUT lines to /api
 
 printf "corpus: %d lines  ·  pattern: /%s/\n", len(@corpus), $pattern
 
-my @workers = congregation(4)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation(4)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the corpus. Each worker returns the indices that matched.
-my $per = int((len(@corpus) + len(@sorted_workers) - 1) / len(@sorted_workers))
-my @all_matches
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $per
-    my $end = $start + $per - 1
+val $per = int((len(@corpus) + len(@sorted_workers) - 1) / len(@sorted_workers))
+var @all_matches
+for var $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $per
+    var $end = $start + $per - 1
     $end = len(@corpus) - 1 if $end >= len(@corpus)
     next if $start >= len(@corpus)
-    my @shard
-    for my $r ($start:$end) { push @shard, $corpus[$r] }
-    my $shard_json = to_json(\@shard)
-    my $code = "
+    var @shard
+    for val $r ($start:$end) { push @shard, $corpus[$r] }
+    val $shard_json = to_json(\@shard)
+    val $code = "
         my \$arr = from_json(q{$shard_json});
-        my %matches;
+        var %matches;
         for my \$local_idx (0:len(\@\$arr) - 1) {
             my \$line = \$arr->[\$local_idx];
             if (\$line =~ /$pattern/) {
@@ -52,10 +52,10 @@ for my $i (0:len(@sorted_workers) - 1) {
         }
         to_json(\\%matches)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
-    my $h = from_json($reply{$w})
-    for my $k (keys %$h) {
+    val $div = pray $code, $w
+    val %reply = annex $div
+    val $h = from_json($reply{$w})
+    for val $k (keys %$h) {
         push @all_matches, [0 + $k, $h->{$k}]
     }
 }
@@ -63,8 +63,8 @@ for my $i (0:len(@sorted_workers) - 1) {
 @all_matches = sort { _->[0] <=> _1->[0] } @all_matches
 
 p "── matched lines ──"
-for my $m (@all_matches) {
-    my ($idx, $line) = @$m
+for val $m (@all_matches) {
+    val ($idx, $line) = @$m
     printf "  doc %d: %s\n", $idx, $line
 }
 printf "%d lines matched out of %d\n", len(@all_matches), len(@corpus)

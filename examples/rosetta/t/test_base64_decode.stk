@@ -2,24 +2,24 @@
 # Rosetta Code: Base64 decode
 
 fn Rosetta::Base64Decode::custom($str) {
-    my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    my %vals
-    my @alpha_chars = $alphabet |> chars
-    for my $i (0:63) { $vals{$alpha_chars[$i]} = $i }
+    val $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    var %vals
+    val @alpha_chars = $alphabet |> chars
+    for val $i (0:63) { $vals{$alpha_chars[$i]} = $i }
     
-    my @chars = $str |> chars
-    my @res
-    my $i = 0
-    my $len = len(@chars)
+    val @chars = $str |> chars
+    var @res
+    var $i = 0
+    val $len = len(@chars)
     while ($i < $len) {
         if ($chars[$i] eq "=") { last }
         
-        my $v1 = $vals{$chars[$i]}
-        my $v2 = $vals{$chars[$i+1]}
-        my $v3 = ($chars[$i+2] eq "=") ? 0 : $vals{$chars[$i+2]}
-        my $v4 = ($chars[$i+3] eq "=") ? 0 : $vals{$chars[$i+3]}
+        val $v1 = $vals{$chars[$i]}
+        val $v2 = $vals{$chars[$i+1]}
+        val $v3 = ($chars[$i+2] eq "=") ? 0 : $vals{$chars[$i+2]}
+        val $v4 = ($chars[$i+3] eq "=") ? 0 : $vals{$chars[$i+3]}
         
-        my $n = ($v1 << 18) | ($v2 << 12) | ($v3 << 6) | $v4
+        val $n = ($v1 << 18) | ($v2 << 12) | ($v3 << 6) | $v4
         
         push @res, chr(($n >> 16) & 255)
         if ($chars[$i+2] ne "=") { push @res, chr(($n >> 8) & 255) }

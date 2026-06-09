@@ -5,7 +5,7 @@
 
 # ── Pipelines ──────────────────────────────────────────────────────────────
 
-my @list = (1:10)
+val @list = (1:10)
 ~> @list filter { _ % 2 == 0 } map { _ * _ } |> sum |> aeq 220, "Complex pipeline"
 
 # ── AI Primitives (Mocked) ──────────────────────────────────────────────────
@@ -24,7 +24,7 @@ Pin::Features::target_fn(2) |> aeq 25, "AOP around + proceed"
 
 # ── Nested Implicit Parameters ─────────────────────────────────────────────
 
-my $matrix_sum = 0
+var $matrix_sum = 0
 # Use map (list materializing) to ensure side effects happen
 (1:2) |> map {
     (1:2) |> map { $matrix_sum += _< + _ }
@@ -32,7 +32,7 @@ my $matrix_sum = 0
 $matrix_sum |> aeq 12, "Nested loops with implicit _"
 
 # Sigil-free implicit nested
-my $s2 = 0
+var $s2 = 0
 (1:1) |> map {
     (2:2) |> map {
         (3:3) |> map { $s2 = _ + _< + _<< }
@@ -42,7 +42,7 @@ $s2 |> aeq 6, "Triple nested implicit _ variants"
 
 # ── Parallel Collection Ops ────────────────────────────────────────────────
 
-my @input = (1, 1, 2, 3, 3, 4)
+val @input = (1, 1, 2, 3, 3, 4)
 ~> @input puniq |> sort |> join(",") |> aeq "1,2,3,4", "puniq + sort"
 
 (1:100) |> pany { _ > 90 } |> aok "pany short-circuit"

@@ -41,13 +41,13 @@
 # fans out all writes first, then collects replies (see the parallel
 # `eval_all` fan-out in strykelang/controller.rs).
 
-my $port = $ENV{PORT} // 9999
+var $port = $ENV{PORT} // 9999
 
 # Spawn three named agents. The leading `sleep 1` lets the main thread
 # bind the controller listener before each agent's `connect()` runs —
 # without it, agents would race the controller and `agent(...)` would
 # return 1 (connection refused) for whichever lost the race.
-for my $name (qw(worker-a worker-b worker-c)) {
+for val $name (qw(worker-a worker-b worker-c)) {
     spawn {
         sleep 1
         agent("localhost:$port", $name)

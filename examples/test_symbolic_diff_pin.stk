@@ -3,20 +3,20 @@
 package SymbolicDiff
 
 fn tokenize($s) {
-    my $str = $s
+    var $str = $s
     $str =~ s/([\+\-\*\/\^\(\)])/ $1 /g
     $str =~ s/(sin|cos|log)/ $1 /g
-    my @tokens = split /\s+/, $str
-    my @clean = grep { len(_) > 0 } @tokens
-    my $res = [ @clean ]; return $res
+    val @tokens = split /\s+/, $str
+    val @clean = grep { len(_) > 0 } @tokens
+    val $res = [ @clean ]; return $res
 }
 
 fn parse_expr($tk) {
-    my $node = SymbolicDiff::parse_mul_div($tk)
+    var $node = SymbolicDiff::parse_mul_div($tk)
     while ((len @$tk) > 0) {
-        my $t = $tk->[0]
+        val $t = $tk->[0]
         if (defined $t && ($t eq "+" || $t eq "-")) {
-            my $op = shift @$tk; my $right = SymbolicDiff::parse_mul_div($tk)
+            val $op = shift @$tk; val $right = SymbolicDiff::parse_mul_div($tk)
             $node = { type => "op", op => $op, left => $node, right => $right }
         } else { last }
     }
@@ -24,11 +24,11 @@ fn parse_expr($tk) {
 }
 
 fn parse_mul_div($tk) {
-    my $node = SymbolicDiff::parse_pow($tk)
+    var $node = SymbolicDiff::parse_pow($tk)
     while ((len @$tk) > 0) {
-        my $t = $tk->[0]
+        val $t = $tk->[0]
         if (defined $t && ($t eq "*" || $t eq "/")) {
-            my $op = shift @$tk; my $right = SymbolicDiff::parse_pow($tk)
+            val $op = shift @$tk; val $right = SymbolicDiff::parse_pow($tk)
             $node = { type => "op", op => $op, left => $node, right => $right }
         } else { last }
     }
@@ -36,11 +36,11 @@ fn parse_mul_div($tk) {
 }
 
 fn parse_pow($tk) {
-    my $node = SymbolicDiff::parse_atom($tk)
+    var $node = SymbolicDiff::parse_atom($tk)
     while ((len @$tk) > 0) {
-        my $t = $tk->[0]
+        val $t = $tk->[0]
         if (defined $t && $t eq "^") {
-            shift @$tk; my $right = parse_atom($tk)
+            shift @$tk; val $right = parse_atom($tk)
             $node = { type => "op", op => "^", left => $node, right => $right }
         } else { last }
     }
@@ -49,15 +49,15 @@ fn parse_pow($tk) {
 
 fn parse_atom($tk) {
     if ((len @$tk) == 0) { return undef }
-    my $t = shift @$tk
+    val $t = shift @$tk
     if (!defined $t) { return undef }
     if ($t eq "(") {
-        my $node = SymbolicDiff::parse_expr($tk)
+        val $node = SymbolicDiff::parse_expr($tk)
         if ((len @$tk) > 0 && $tk->[0] eq ")") { shift @$tk }
         return $node
     }
     if ($t eq "sin" || $t eq "cos" || $t eq "log") {
-        my $arg = SymbolicDiff::parse_atom($tk)
+        val $arg = SymbolicDiff::parse_atom($tk)
         return { type => "fn", op => $t, arg => $arg }
     }
     if ($t =~ /^\d+$/) { return { type => "num", val => int($t) } }
@@ -66,35 +66,35 @@ fn parse_atom($tk) {
 
 fn diff($node, $v) {
     if (!defined $node || ref($node) ne "HASH") { return { type => "num", val => 0 } }
-    my $type = $node->{type}
+    val $type = $node->{type}
     if ($type eq "num") { return { type => "num", val => 0 } }
     if ($type eq "var") { return { type => "num", val => ($node->{val} eq $v ? 1 : 0) } }
     if ($type eq "op") {
-        my $op = $node->{op}; my $l = $node->{left}; my $r = $node->{right}
+        val $op = $node->{op}; val $l = $node->{left}; val $r = $node->{right}
         if ($op eq "+" || $op eq "-") { return { type => "op", op => $op, left => SymbolicDiff::diff($l, $v), right => SymbolicDiff::diff($r, $v) } }
         if ($op eq "*") {
-            my $ld = SymbolicDiff::diff($l, $v); my $rd = SymbolicDiff::diff($r, $v)
+            val $ld = SymbolicDiff::diff($l, $v); val $rd = SymbolicDiff::diff($r, $v)
             return { type => "op", op => "+", left => { type => "op", op => "*", left => $ld, right => $r }, right => { type => "op", op => "*", left => $l, right => $rd } }
         }
         if ($op eq "/") {
-            my $ld = SymbolicDiff::diff($l, $v); my $rd = SymbolicDiff::diff($r, $v)
-            my $num = { type => "op", op => "-", left => { type => "op", op => "*", left => $ld, right => $r }, right => { type => "op", op => "*", left => $l, right => $rd } }
-            my $den = { type => "op", op => "^", left => $r, right => { type => "num", val => 2 } }
+            val $ld = SymbolicDiff::diff($l, $v); val $rd = SymbolicDiff::diff($r, $v)
+            val $num = { type => "op", op => "-", left => { type => "op", op => "*", left => $ld, right => $r }, right => { type => "op", op => "*", left => $l, right => $rd } }
+            val $den = { type => "op", op => "^", left => $r, right => { type => "num", val => 2 } }
             return { type => "op", op => "/", left => $num, right => $den }
         }
         if ($op eq "^") {
             if (defined $r && ref($r) eq "HASH" && $r->{type} eq "num") {
-                my $n = $r->{val}; my $pow = { type => "op", op => "^", left => $l, right => { type => "num", val => $n - 1 } }
-                my $mul1 = { type => "op", op => "*", left => { type => "num", val => $n }, right => $pow }
+                val $n = $r->{val}; val $pow = { type => "op", op => "^", left => $l, right => { type => "num", val => $n - 1 } }
+                val $mul1 = { type => "op", op => "*", left => { type => "num", val => $n }, right => $pow }
                 return { type => "op", op => "*", left => $mul1, right => SymbolicDiff::diff($l, $v) }
             }
         }
     }
     if ($type eq "fn") {
-        my $op = $node->{op}; my $arg = $node->{arg}; my $ad = SymbolicDiff::diff($arg, $v)
+        val $op = $node->{op}; val $arg = $node->{arg}; val $ad = SymbolicDiff::diff($arg, $v)
         if ($op eq "sin") { return { type => "op", op => "*", left => { type => "fn", op => "cos", arg => $arg }, right => $ad } }
         if ($op eq "cos") {
-            my $ns = { type => "op", op => "*", left => { type => "num", val => -1 }, right => { type => "fn", op => "sin", arg => $arg } }
+            val $ns = { type => "op", op => "*", left => { type => "num", val => -1 }, right => { type => "fn", op => "sin", arg => $arg } }
             return { type => "op", op => "*", left => $ns, right => $ad }
         }
         if ($op eq "log") { return { type => "op", op => "*", left => { type => "op", op => "/", left => { type => "num", val => 1 }, right => $arg }, right => $ad } }
@@ -104,14 +104,14 @@ fn diff($node, $v) {
 
 fn simplify($node) {
     if (!defined $node || ref($node) ne "HASH") { return $node }
-    my $type = $node->{type}
+    val $type = $node->{type}
     if ($type eq "num" || $type eq "var") { return $node }
-    if ($type eq "fn") { my $as = SymbolicDiff::simplify($node->{arg}); return { type => "fn", op => $node->{op}, arg => $as } }
+    if ($type eq "fn") { val $as = SymbolicDiff::simplify($node->{arg}); return { type => "fn", op => $node->{op}, arg => $as } }
     if ($type eq "op") {
-        my $ls = SymbolicDiff::simplify($node->{left}); my $rs = SymbolicDiff::simplify($node->{right}); my $op = $node->{op}
+        val $ls = SymbolicDiff::simplify($node->{left}); val $rs = SymbolicDiff::simplify($node->{right}); val $op = $node->{op}
         if (defined $ls && defined $rs && ref($ls) eq "HASH" && ref($rs) eq "HASH") {
             if ($ls->{type} eq "num" && $rs->{type} eq "num") {
-                my $lv = $ls->{val}; my $rv = $rs->{val}
+                val $lv = $ls->{val}; val $rv = $rs->{val}
                 return { type => "num", val => ($lv + $rv) } if $op eq "+"
                 return { type => "num", val => ($lv - $rv) } if $op eq "-"
                 return { type => "num", val => ($lv * $rv) } if $op eq "*"
@@ -134,21 +134,21 @@ fn simplify($node) {
 
 fn to_string($node) {
     if (!defined $node || ref($node) ne "HASH") { return "" }
-    my $type = $node->{type}
+    val $type = $node->{type}
     if ($type eq "num") { return "#{$node->{val}}" }
     if ($type eq "var") { return $node->{val} }
-    if ($type eq "fn") { my $inner = SymbolicDiff::to_string($node->{arg}); return "#{$node->{op}}(#{$inner})" }
-    my $ls = SymbolicDiff::to_string($node->{left}); my $rs = SymbolicDiff::to_string($node->{right})
+    if ($type eq "fn") { val $inner = SymbolicDiff::to_string($node->{arg}); return "#{$node->{op}}(#{$inner})" }
+    val $ls = SymbolicDiff::to_string($node->{left}); val $rs = SymbolicDiff::to_string($node->{right})
     "(#{$ls} #{$node->{op}} #{$rs})"
 }
 
 package main
 
 fn run_diff($s) {
-    my $tk = SymbolicDiff::tokenize($s)
-    my $ast = SymbolicDiff::parse_expr($tk)
-    my $d = SymbolicDiff::diff($ast, "x")
-    my $sd = $d
+    val $tk = SymbolicDiff::tokenize($s)
+    val $ast = SymbolicDiff::parse_expr($tk)
+    val $d = SymbolicDiff::diff($ast, "x")
+    var $sd = $d
     for (1:3) { $sd = SymbolicDiff::simplify($sd) }
     SymbolicDiff::to_string($sd)
 }

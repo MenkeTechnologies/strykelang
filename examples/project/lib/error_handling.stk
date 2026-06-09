@@ -4,13 +4,13 @@
 # CONST VARIABLES (compile-time constants)
 # ══════════════════════════════════════════════════════════════════════════════
 
-const my $PI = 3.14159265358979
-const my $E = 2.71828182845905
-const my $GOLDEN_RATIO = 1.61803398874989
-const my $MAX_RETRIES = 3
-const my $TIMEOUT_SECONDS = 30
-const my $APP_NAME = "StrykeDemo"
-const my $VERSION = "1.0.0"
+const val $PI = 3.14159265358979
+const val $E = 2.71828182845905
+const val $GOLDEN_RATIO = 1.61803398874989
+const val $MAX_RETRIES = 3
+const val $TIMEOUT_SECONDS = 30
+const val $APP_NAME = "StrykeDemo"
+const val $VERSION = "1.0.0"
 
 fn Project::ErrorHandling::get_pi { $PI }
 fn Project::ErrorHandling::get_e { $E }
@@ -37,7 +37,7 @@ fn Project::ErrorHandling::exponential_growth($initial, $rate, $time) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ErrorHandling::try_catch_basic {
-    my $result
+    var $result
     try {
         $result = 42
     } catch ($e) {
@@ -47,7 +47,7 @@ fn Project::ErrorHandling::try_catch_basic {
 }
 
 fn Project::ErrorHandling::try_catch_with_die {
-    my $caught = 0
+    var $caught = 0
     try {
         die "intentional error"
     } catch ($e) {
@@ -57,7 +57,7 @@ fn Project::ErrorHandling::try_catch_with_die {
 }
 
 fn Project::ErrorHandling::try_catch_error_message {
-    my $msg = ""
+    var $msg = ""
     try {
         die "specific error message"
     } catch ($e) {
@@ -67,7 +67,7 @@ fn Project::ErrorHandling::try_catch_error_message {
 }
 
 fn Project::ErrorHandling::try_catch_nested {
-    my $result = ""
+    var $result = ""
     try {
         try {
             die "inner"
@@ -82,7 +82,7 @@ fn Project::ErrorHandling::try_catch_nested {
 }
 
 fn Project::ErrorHandling::try_catch_no_error {
-    my $value = 0
+    var $value = 0
     try {
         $value = 100
     } catch ($e) {
@@ -92,7 +92,7 @@ fn Project::ErrorHandling::try_catch_no_error {
 }
 
 fn Project::ErrorHandling::safe_divide_try($a, $b) {
-    my $result
+    var $result
     try {
         die "division by zero" if $b == 0
         $result = $a / $b
@@ -103,7 +103,7 @@ fn Project::ErrorHandling::safe_divide_try($a, $b) {
 }
 
 fn Project::ErrorHandling::try_catch_finally_pattern {
-    my @log
+    var @log
     try {
         push @log, "try"
         die "oops"
@@ -133,7 +133,7 @@ fn Project::ErrorHandling::try_catch_return_from_catch {
 }
 
 fn Project::ErrorHandling::multiple_try_catch {
-    my $count = 0
+    var $count = 0
     try { die "1" } catch ($e) { $count++ }
     try { die "2" } catch ($e) { $count++ }
     try { $count += 10 } catch ($e) { $count-- }
@@ -145,12 +145,12 @@ fn Project::ErrorHandling::multiple_try_catch {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ErrorHandling::eval_success {
-    my $result = eval { 42 }
+    val $result = eval { 42 }
     $result
 }
 
 fn Project::ErrorHandling::eval_with_die {
-    my $result = eval { die "error message" }
+    val $result = eval { die "error message" }
     defined($result) ? "defined" : "undef"
 }
 
@@ -166,8 +166,8 @@ fn Project::ErrorHandling::eval_clears_error {
 }
 
 fn Project::ErrorHandling::eval_nested {
-    my $outer = eval {
-        my $inner = eval { die "inner" }
+    val $outer = eval {
+        val $inner = eval { die "inner" }
         "outer ok"
     }
     $outer
@@ -178,7 +178,7 @@ fn Project::ErrorHandling::eval_nested {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ErrorHandling::die_in_eval {
-    my $caught = 0
+    var $caught = 0
     eval {
         die "intentional"
         $caught = -1
@@ -187,8 +187,8 @@ fn Project::ErrorHandling::die_in_eval {
 }
 
 fn Project::ErrorHandling::die_with_object {
-    my $obj = {code => 500, msg => "error"}
-    my $result = eval { die $obj }
+    val $obj = {code => 500, msg => "error"}
+    val $result = eval { die $obj }
     ref($@) eq "HASH" ? 1 : 0
 }
 
@@ -197,7 +197,7 @@ fn Project::ErrorHandling::die_with_object {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ErrorHandling::try_catch_pattern {
-    my $result = eval {
+    val $result = eval {
         die "oops"
     }
     if ($@) {
@@ -207,7 +207,7 @@ fn Project::ErrorHandling::try_catch_pattern {
 }
 
 fn Project::ErrorHandling::safe_division($a, $b) {
-    my $result = eval {
+    val $result = eval {
         die "division by zero" if $b == 0
         $a / $b
     }
@@ -218,7 +218,7 @@ fn Project::ErrorHandling::safe_division($a, $b) {
 }
 
 fn Project::ErrorHandling::with_cleanup {
-    my $cleaned = 0
+    var $cleaned = 0
     eval {
         die "error"
     }
@@ -235,7 +235,7 @@ fn Project::ErrorHandling::inner_throws {
 }
 
 fn Project::ErrorHandling::outer_catches {
-    my $result = eval { Project::ErrorHandling::inner_throws() }
+    val $result = eval { Project::ErrorHandling::inner_throws() }
     $@ =~ /from inner/ ? 1 : 0
 }
 

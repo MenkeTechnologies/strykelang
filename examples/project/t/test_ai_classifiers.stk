@@ -5,31 +5,31 @@ require "./lib/ai/classifiers.stk"
 
 # ── 1. Euclidean Distance ─────────────────────────────────────────
 
-my $p1 = [1, 1];
-my $p2 = [4, 5];
+val $p1 = [1, 1];
+val $p2 = [4, 5];
 assert_eq AI::Math::euclidean_distance($p1, $p2), 5, "Euclidean distance calculation";
 
 # ── 2. KNN Classifier ─────────────────────────────────────────────
 
-my $data = [
+val $data = [
     [1, 1],
     [2, 2],
     [8, 8],
     [9, 9],
 ];
-my $labels = ["A", "A", "B", "B"];
+val $labels = ["A", "A", "B", "B"];
 
-my $knn = KNNClassifier(k => 3);
+val $knn = KNNClassifier(k => 3);
 $knn->fit($data, $labels);
 
 # Predict a point close to class A
-my $point_A = [3, 3];
-my $prediction_A = $knn->predict($point_A);
+val $point_A = [3, 3];
+val $prediction_A = $knn->predict($point_A);
 assert_eq $prediction_A, "A", "Predict point close to class A";
 
 # Predict a point close to class B
-my $point_B = [7, 7];
-my $prediction_B = $knn->predict($point_B);
+val $point_B = [7, 7];
+val $prediction_B = $knn->predict($point_B);
 assert_eq $prediction_B, "B", "Predict point close to class B";
 
 test_run

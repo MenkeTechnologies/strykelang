@@ -13,7 +13,7 @@
 
 # ── source data (inline CSV) ───────────────────────────────────────────
 
-my $orders_csv = "id,country,status,amount\n" .
+val $orders_csv = "id,country,status,amount\n" .
                  "1,US,completed,120\n" .
                  "2,US,pending,80\n"   .
                  "3,DE,completed,200\n" .
@@ -28,27 +28,27 @@ my $orders_csv = "id,country,status,amount\n" .
 # deref unfolds it into a flat array so `grep`/`map` see each row
 # rather than the wrapping ref.
 
-my @rows = @{from_csv($orders_csv)}
+val @rows = @{from_csv($orders_csv)}
 printf "loaded %d rows from CSV\n", len @rows
 
-my @completed = grep { _->{status} eq "completed" } @rows
+val @completed = grep { _->{status} eq "completed" } @rows
 printf "kept %d completed rows\n", len @completed
 
 # ── aggregate into a CMS (heavy-hitter sketch) by country ──────────────
 
-my $cms_orders = cms(2048, 5)
-my $cms_amount = cms(2048, 5)
-my $hll = hll(14)
+val $cms_orders = cms(2048, 5)
+val $cms_amount = cms(2048, 5)
+val $hll = hll(14)
 
-for my $row (@completed) {
+for val $row (@completed) {
     cms_add($cms_orders, $row->{country})
     cms_add($cms_amount, $row->{country}, $row->{amount})
     hll_add($hll, $row->{id})
 }
 
 p "── per-country order counts (via CMS) ──"
-my @countries = ("US", "DE", "FR", "JP")   # JP absent in data — should report 0
-for my $c (@countries) {
+val @countries = ("US", "DE", "FR", "JP")   # JP absent in data — should report 0
+for val $c (@countries) {
     printf "  %-3s : %d orders  %d total amount\n",
         $c, cms_count($cms_orders, $c), cms_count($cms_amount, $c)
 }
@@ -57,10 +57,10 @@ printf "distinct order ids seen (HLL est) : %d\n", hll_count($hll)
 
 # ── persist to rkyv KV ─────────────────────────────────────────────────
 
-my $store = "/tmp/etl_pipeline_demo.rkyv"
+val $store = "/tmp/etl_pipeline_demo.rkyv"
 unlink($store)
-my $db = kv_open($store)
-for my $c (@countries) {
+val $db = kv_open($store)
+for val $c (@countries) {
     kv_put($db, "totals:" . $c, +{
         orders => cms_count($cms_orders, $c),
         amount => cms_count($cms_amount, $c),
@@ -72,13 +72,13 @@ printf "wrote %d keys to %s\n", kv_len($db), $store
 
 # ── reopen + emit JSON report ──────────────────────────────────────────
 
-my $db2 = kv_open($store)
-my $report = +{
+val $db2 = kv_open($store)
+val $report = +{
     generated_at  => time(),
     distinct_ids  => kv_get($db2, "summary:hll_distinct"),
     countries     => +{},
 }
-for my $c (@countries) {
+for val $c (@countries) {
     $report->{countries}->{$c} = kv_get($db2, "totals:" . $c)
 }
 p "── JSON report ──"

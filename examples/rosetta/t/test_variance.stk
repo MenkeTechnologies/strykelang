@@ -4,19 +4,19 @@
 # Sample variance:     sum((x - mean)^2) / (n - 1) (Bessel-corrected).
 
 fn Rosetta::Variance::mean(@xs) {
-    my $sum = ~> @xs reduce { _0 + _1 }
+    val $sum = ~> @xs reduce { _0 + _1 }
     $sum / len(@xs)
 }
 
 fn Rosetta::Variance::population(@xs) {
-    my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
+    val $m = Rosetta::Variance::mean(@xs)
+    val $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
     $ss / len(@xs)
 }
 
 fn Rosetta::Variance::sample(@xs) {
-    my $m = Rosetta::Variance::mean(@xs)
-    my $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
+    val $m = Rosetta::Variance::mean(@xs)
+    val $ss = ~> @xs map { (_ - $m) ** 2 } reduce { _0 + _1 }
     $ss / (len(@xs) - 1)
 }
 
@@ -29,14 +29,14 @@ assert_eq Rosetta::Variance::population(7, 7, 7, 7), 0, "constant pop var"
 assert_eq Rosetta::Variance::sample(7, 7, 7, 7),     0, "constant sample var"
 
 # Mean-zero symmetric → easy to verify.
-my @sym = (-2, -1, 0, 1, 2)
+val @sym = (-2, -1, 0, 1, 2)
 assert_eq Rosetta::Variance::mean(@sym), 0, "mean(-2:2) = 0"
 assert_eq Rosetta::Variance::population(@sym), 2, "pop var"
-my $s = Rosetta::Variance::sample(@sym)
+val $s = Rosetta::Variance::sample(@sym)
 assert_ok abs($s - 2.5) < 1e-12, "sample var = pop * n/(n-1)"
 
 # Standard deviation matches sqrt(pop var).
-my $sd = Rosetta::Variance::stddev(@sym)
+val $sd = Rosetta::Variance::stddev(@sym)
 assert_ok abs($sd - sqrt(2)) < 1e-12, "stddev = sqrt(2)"
 
 # Classic two-three-four example: var of (2,4,4,4,5,5,7,9) is 4.

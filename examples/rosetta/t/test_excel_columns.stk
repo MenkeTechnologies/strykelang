@@ -2,9 +2,9 @@
 # Rosetta Code: Excel column name
 
 fn Rosetta::ExcelColumns::to_name($n) {
-    my $name = ""
+    var $name = ""
     while ($n > 0) {
-        my $rem = ($n - 1) % 26
+        val $rem = ($n - 1) % 26
         $name = chr(65 + $rem) . $name
         $n = int(($n - $rem) / 26)
     }
@@ -12,7 +12,7 @@ fn Rosetta::ExcelColumns::to_name($n) {
 }
 
 fn Rosetta::ExcelColumns::from_name($name) {
-    my $n = 0
+    var $n = 0
     # Use streaming pipe to process characters
     ~> split("", $name) ep {
         $n = $n * 26 + ord(_) - 64

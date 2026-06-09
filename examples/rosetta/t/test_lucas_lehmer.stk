@@ -5,10 +5,10 @@ fn Rosetta::LucasLehmer::check($p) {
     if ($p == 2) { return 1 }
     if ($p % 2 == 0 || $p < 2) { return 0 } # Not prime if even or < 2
     
-    my $m = (2**$p) - 1
-    my $s = 4
+    val $m = (2**$p) - 1
+    var $s = 4
     
-    for my $i (1:$p-2) {
+    for val $i (1:$p-2) {
         $s = ($s * $s - 2) % $m
     }
     $s == 0

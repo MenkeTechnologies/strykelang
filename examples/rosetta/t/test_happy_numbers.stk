@@ -2,15 +2,15 @@
 # Rosetta Code: Happy Numbers
 
 fn Rosetta::HappyNumbers::sum_sq_digits($n) {
-    my $sum = 0
-    my @digits = "$n" |> chars
+    var $sum = 0
+    val @digits = "$n" |> chars
     ~> @digits ep { $sum = $sum + (int(_)**2) }
     $sum
 }
 
 fn Rosetta::HappyNumbers::check($n) {
-    my %seen
-    my $curr = $n
+    var %seen
+    var $curr = $n
     while ($curr != 1 && !$seen{$curr}) {
         $seen{$curr} = 1
         $curr = Rosetta::HappyNumbers::sum_sq_digits($curr)
@@ -19,8 +19,8 @@ fn Rosetta::HappyNumbers::check($n) {
 }
 
 fn Rosetta::HappyNumbers::generate($count) {
-    my @happy
-    my $n = 1
+    var @happy
+    var $n = 1
     while (len(@happy) < $count) {
         if (Rosetta::HappyNumbers::check($n)) {
             push @happy, $n
@@ -39,7 +39,7 @@ assert_ok Rosetta::HappyNumbers::check(19), "19 is happy"
 assert_ok !Rosetta::HappyNumbers::check(2), "2 is not happy"
 assert_ok !Rosetta::HappyNumbers::check(4), "4 is not happy"
 
-my @first8 = Rosetta::HappyNumbers::generate(8)
+val @first8 = Rosetta::HappyNumbers::generate(8)
 assert_eq join(",", @first8), "1,7,10,13,19,23,28,31", "first 8 happy numbers"
 
 test_run

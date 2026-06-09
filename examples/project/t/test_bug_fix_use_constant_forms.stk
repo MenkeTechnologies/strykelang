@@ -13,13 +13,13 @@ PI |> assert_eq(3.14, "single scalar constant")
 
 # 2. Single list constant — used to collapse to last operand (`3`).
 use constant ARR => (1, 2, 3)
-my @a = ARR
+val @a = ARR
 "@a" |> assert_eq("1 2 3", "list constant preserved")
 len(@a) |> assert_eq(3, "list constant has 3 elements")
 
 # Larger list with mixed types.
 use constant MIX => ("alpha", 42, 3.14, "omega")
-my @m = MIX
+val @m = MIX
 len(@m)          |> assert_eq(4, "mixed list len")
 $m[0]            |> assert_eq("alpha", "mixed list head")
 $m[3]            |> assert_eq("omega", "mixed list tail")

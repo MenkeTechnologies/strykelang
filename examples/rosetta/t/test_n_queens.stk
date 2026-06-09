@@ -6,11 +6,11 @@ fn Rosetta::NQueens::solve_recursive($ld, $cols, $rd, $all) {
         return 1
     }
     
-    my $count = 0
-    my $poss = $all & ~($ld | $cols | $rd)
+    var $count = 0
+    var $poss = $all & ~($ld | $cols | $rd)
     
     while ($poss > 0) {
-        my $bit = $poss & -$poss
+        val $bit = $poss & -$poss
         $poss = $poss - $bit
         $count = $count + Rosetta::NQueens::solve_recursive(($ld | $bit) << 1, $cols | $bit, ($rd | $bit) >> 1, $all)
     }
@@ -19,7 +19,7 @@ fn Rosetta::NQueens::solve_recursive($ld, $cols, $rd, $all) {
 
 fn Rosetta::NQueens::solve($n) {
     if ($n == 0) { return 0 }
-    my $all = (1 << $n) - 1
+    val $all = (1 << $n) - 1
     Rosetta::NQueens::solve_recursive(0, 0, 0, $all)
 }
 

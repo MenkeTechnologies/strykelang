@@ -5,7 +5,7 @@
 # offline and isn't flaky on third-party outages.
 
 fn Rosetta::WebScraping::scrape($url) {
-    my $html = fetch($url)
+    val $html = fetch($url)
     if ($html =~ /<title>(.*?)<\/title>/i) {
         return $1
     }
@@ -13,8 +13,8 @@ fn Rosetta::WebScraping::scrape($url) {
 }
 
 fn Rosetta::WebScraping::demo() {
-    my $port = 9872
-    my $base = "http://127.0.0.1:$port"
+    val $port = 9872
+    val $base = "http://127.0.0.1:$port"
 
     # Background server that returns a small HTML doc with a known title.
     async {
@@ -29,7 +29,7 @@ fn Rosetta::WebScraping::demo() {
     sleep 0.2
 
     "Fetching $base and scraping title..." |> p
-    my $title = Rosetta::WebScraping::scrape($base)
+    val $title = Rosetta::WebScraping::scrape($base)
     "Scraped title: $title" |> p
 
     assert_ok defined($title),               "Title should be defined"

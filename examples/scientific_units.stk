@@ -2,8 +2,8 @@
 # Run: stryke --no-interop examples/scientific_units.stk
 
 p "--- Units ---"
-my $f = unit_temperature(37, "c", "f") |> round
-my $j = unit_energy(1, "kwh", "j")
+val $f = unit_temperature(37, "c", "f") |> round
+val $j = unit_energy(1, "kwh", "j")
 
 $f |> aeq 99,      "tmp"
 $j |> aeq 3600000, "erg"

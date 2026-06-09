@@ -3,11 +3,11 @@
 package DPLL
 
 fn simplify($clauses, $literal) {
-    my @new_clauses
-    for my $clause (@$clauses) {
-        my $keep = 1
-        my @new_clause
-        for my $l_val (@$clause) {
+    var @new_clauses
+    for val $clause (@$clauses) {
+        var $keep = 1
+        var @new_clause
+        for val $l_val (@$clause) {
             if ($l_val == $literal) {
                 $keep = 0; last
             } elsif ($l_val == -$literal) {
@@ -23,38 +23,38 @@ fn simplify($clauses, $literal) {
 
 fn solve($clauses, $assignment) {
     return $assignment if (len @$clauses) == 0
-    for my $clause (@$clauses) { return undef if (len @$clause) == 0 }
+    for val $clause (@$clauses) { return undef if (len @$clause) == 0 }
     
-    for my $clause (@$clauses) {
+    for val $clause (@$clauses) {
         if ((len @$clause) == 1) {
-            my $l_val = $clause->[0]
-            my $new_assignment = { %$assignment }
+            val $l_val = $clause->[0]
+            var $new_assignment = { %$assignment }
             $new_assignment->{abs($l_val)} = ($l_val > 0 ? 1 : 0)
-            my $new_clauses = DPLL::simplify($clauses, $l_val)
+            val $new_clauses = DPLL::simplify($clauses, $l_val)
             return DPLL::solve($new_clauses, $new_assignment)
         }
     }
     
-    my $first_clause = $clauses->[0]
-    my $l_val = $first_clause->[0]
-    my $var = abs($l_val)
+    val $first_clause = $clauses->[0]
+    val $l_val = $first_clause->[0]
+    val $var = abs($l_val)
     
-    my $assign_t = { %$assignment }; $assign_t->{$var} = 1
-    my $res_t = DPLL::solve(DPLL::simplify($clauses, $var), $assign_t)
+    var $assign_t = { %$assignment }; $assign_t->{$var} = 1
+    val $res_t = DPLL::solve(DPLL::simplify($clauses, $var), $assign_t)
     return $res_t if defined $res_t
     
-    my $assign_f = { %$assignment }; $assign_f->{$var} = 0
+    var $assign_f = { %$assignment }; $assign_f->{$var} = 0
     return DPLL::solve(DPLL::simplify($clauses, -$var), $assign_f)
 }
 
 package main
 
-my $unsat = [[1, 2], [-1, 2], [1, -2], [-1, -2]]
-my $res1 = DPLL::solve($unsat, {})
+val $unsat = [[1, 2], [-1, 2], [1, -2], [-1, -2]]
+val $res1 = DPLL::solve($unsat, {})
 defined($res1) |> aeq 0, "unsat is undef"
 
-my $sat = [[1, -2], [-1, 2, 3], [-3]]
-my $res2 = DPLL::solve($sat, {})
+val $sat = [[1, -2], [-1, 2, 3], [-3]]
+val $res2 = DPLL::solve($sat, {})
 defined($res2) |> aeq 1, "sat is defined"
 $res2->{3} |> aeq 0, "x3 is 0"
 $res2->{1} |> aeq $res2->{2}, "x1 == x2"

@@ -8,15 +8,15 @@ fn Rosetta::Semord::reverse_str($s) {
 }
 
 fn Rosetta::Semord::pairs($words) {
-    my %set = map { _ => 1 } @$words
-    my %seen
-    my @out
-    for my $w (@$words) {
-        my $r = Rosetta::Semord::reverse_str($w)
+    val %set = map { _ => 1 } @$words
+    var %seen
+    var @out
+    for val $w (@$words) {
+        val $r = Rosetta::Semord::reverse_str($w)
         next if $r eq $w        # palindromes excluded
         next if !exists $set{$r}
-        my @sorted = sort ($w, $r)
-        my $key = "$sorted[0]|$sorted[1]"
+        val @sorted = sort ($w, $r)
+        val $key = "$sorted[0]|$sorted[1]"
         next if exists $seen{$key}
         $seen{$key} = 1
         push @out, [$w, $r]
@@ -34,15 +34,15 @@ assert_eq Rosetta::Semord::is_pair("level",    "level"),    0, "palindromes excl
 assert_eq Rosetta::Semord::is_pair("hello",    "world"),    0, "no relation"
 
 # Small dictionary
-my @dict = ("stressed", "desserts", "level", "lager", "regal",
+val @dict = ("stressed", "desserts", "level", "lager", "regal",
             "spans", "snaps", "loop", "pool", "wolf", "fish")
-my @ps = Rosetta::Semord::pairs(\@dict)
+val @ps = Rosetta::Semord::pairs(\@dict)
 assert_eq len(@ps), 4, "4 semordnilap pairs"
 
 # Specific pairs present
-my %got
-for my $p (@ps) {
-    my @sorted = sort @$p
+var %got
+for val $p (@ps) {
+    val @sorted = sort @$p
     $got{"$sorted[0]|$sorted[1]"} = 1
 }
 assert_eq exists($got{"desserts|stressed"}), 1, "stressed pair found"
@@ -51,8 +51,8 @@ assert_eq exists($got{"snaps|spans"}),       1, "snaps pair found"
 assert_eq exists($got{"loop|pool"}),         1, "loop pair found"
 
 # Ordering invariance: pairs(["a","b"]) == pairs(["b","a"])
-my @ab = Rosetta::Semord::pairs(["spans", "snaps"])
-my @ba = Rosetta::Semord::pairs(["snaps", "spans"])
+val @ab = Rosetta::Semord::pairs(["spans", "snaps"])
+val @ba = Rosetta::Semord::pairs(["snaps", "spans"])
 assert_eq len(@ab), 1, "ab order: 1 pair"
 assert_eq len(@ba), 1, "ba order: 1 pair"
 

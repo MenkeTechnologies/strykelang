@@ -9,24 +9,24 @@ fn Rosetta::Search::paragraphs($doc) {
 }
 
 fn Rosetta::Search::contains_all($paragraph, $words) {
-    my $lc = lc($paragraph)
-    for my $w (@$words) {
+    val $lc = lc($paragraph)
+    for val $w (@$words) {
         return 0 if index($lc, lc($w)) < 0
     }
     1
 }
 
 fn Rosetta::Search::find($doc, $words) {
-    my $paras = Rosetta::Search::paragraphs($doc)
-    my @hits
-    for my $i (0..len(@$paras) - 1) {
+    val $paras = Rosetta::Search::paragraphs($doc)
+    var @hits
+    for val $i (0..len(@$paras) - 1) {
         push @hits, $i if Rosetta::Search::contains_all($paras->[$i], $words)
     }
     @hits
 }
 
 # Tiny corpus
-my $doc =
+val $doc =
     "Lorem ipsum dolor sit amet.\n"
   . "consectetur adipiscing.\n"
   . "\n"
@@ -37,38 +37,38 @@ my $doc =
   . "FOX runs again.\n"
 
 # Paragraph splitting
-my $paras = Rosetta::Search::paragraphs($doc)
+val $paras = Rosetta::Search::paragraphs($doc)
 assert_eq len(@$paras), 3, "3 paragraphs"
 
 # Search single word
-my @h = Rosetta::Search::find($doc, ["fox"])
+val @h = Rosetta::Search::find($doc, ["fox"])
 assert_eq len(@h), 2, "fox in 2 paragraphs"
 assert_eq $h[0], 1, "first match index"
 assert_eq $h[1], 2, "second match index"
 
 # Multi-word AND search
-my @h2 = Rosetta::Search::find($doc, ["fox", "lazy"])
+val @h2 = Rosetta::Search::find($doc, ["fox", "lazy"])
 assert_eq len(@h2), 1, "fox AND lazy in 1 paragraph"
 assert_eq $h2[0], 1, "second paragraph"
 
 # Case-insensitive
-my @h3 = Rosetta::Search::find($doc, ["FOX"])
+val @h3 = Rosetta::Search::find($doc, ["FOX"])
 assert_eq len(@h3), 2, "FOX matches case-insensitively"
 
 # No match
-my @h4 = Rosetta::Search::find($doc, ["unicorn"])
+val @h4 = Rosetta::Search::find($doc, ["unicorn"])
 assert_eq len(@h4), 0, "unicorn not found"
 
 # All-words requires *every* word present
-my @h5 = Rosetta::Search::find($doc, ["fox", "ipsum"])
+val @h5 = Rosetta::Search::find($doc, ["fox", "ipsum"])
 assert_eq len(@h5), 0, "fox and ipsum never co-occur"
 
 # Empty word list matches every paragraph
-my @h6 = Rosetta::Search::find($doc, [])
+val @h6 = Rosetta::Search::find($doc, [])
 assert_eq len(@h6), 3, "empty query matches all"
 
 # Pipe form
-my @piped = Rosetta::Search::find($doc, ["fox"])
+val @piped = Rosetta::Search::find($doc, ["fox"])
 assert_eq len(@piped), 2, "pipe count"
 
 test_run

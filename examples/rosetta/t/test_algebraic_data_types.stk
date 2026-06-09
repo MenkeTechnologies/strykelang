@@ -8,8 +8,8 @@ fn Rosetta::ADT::depth($tree) {
     if (ref($tree) eq "ADT_Leaf") {
         0
     } else {
-        my $ld = Rosetta::ADT::depth($tree->left)
-        my $rd = Rosetta::ADT::depth($tree->right)
+        val $ld = Rosetta::ADT::depth($tree->left)
+        val $rd = Rosetta::ADT::depth($tree->right)
         1 + ($ld > $rd ? $ld : $rd)
     }
 }
@@ -22,7 +22,7 @@ fn Rosetta::ADT::sum($tree) {
     }
 }
 
-my $tree = ADT_Node(10, 
+val $tree = ADT_Node(10, 
     ADT_Node(20, ADT_Leaf(), ADT_Leaf()),
     ADT_Node(30, ADT_Leaf(), ADT_Leaf())
 )

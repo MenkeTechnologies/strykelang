@@ -1,11 +1,11 @@
 #!/usr/bin/env stryke
 
-fn Exercism::StackUnderflow::add { my @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] + $s[-1]] }
-fn Exercism::StackUnderflow::sub { my @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] - $s[-1]] }
-fn Exercism::StackUnderflow::mul { my @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] * $s[-1]] }
+fn Exercism::StackUnderflow::add { val @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] + $s[-1]] }
+fn Exercism::StackUnderflow::sub { val @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] - $s[-1]] }
+fn Exercism::StackUnderflow::mul { val @s = @{_}; @s < 2 and die "stack underflow"; [@s[0..$#s - 2], $s[-2] * $s[-1]] }
 
 fn Exercism::StackUnderflow::div {
-    my @s = @{_}
+    val @s = @{_}
     @s < 2 and die "stack underflow"
     $s[-1] == 0 and die "division by zero"
     [@s[0..$#s - 2], int($s[-2] / $s[-1])]
@@ -13,7 +13,7 @@ fn Exercism::StackUnderflow::div {
 
 # Catch underflow and report a friendly message.
 fn Exercism::StackUnderflow::safe_div {
-    my @s = @{_}
+    val @s = @{_}
     return "stack underflow"   if @s < 2
     return "division by zero"  if $s[-1] == 0
     [@s[0..$#s - 2], int($s[-2] / $s[-1])]

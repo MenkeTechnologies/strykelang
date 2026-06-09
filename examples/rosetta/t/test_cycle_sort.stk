@@ -2,13 +2,13 @@
 # Rosetta Code: Cycle Sort
 
 fn Rosetta::CycleSort::sort($list) {
-    my @arr = @$list
-    my $n = len(@arr)
+    var @arr = @$list
+    val $n = len(@arr)
     
-    for my $cycle_start (0:$n-2) {
-        my $item = $arr[$cycle_start]
-        my $pos = $cycle_start
-        for my $i ($cycle_start+1:$n-1) {
+    for val $cycle_start (0:$n-2) {
+        var $item = $arr[$cycle_start]
+        var $pos = $cycle_start
+        for var $i ($cycle_start+1:$n-1) {
             if ($arr[$i] < $item) {
                 $pos++
             }
@@ -25,7 +25,7 @@ fn Rosetta::CycleSort::sort($list) {
         
         while ($pos != $cycle_start) {
             $pos = $cycle_start
-            for my $i ($cycle_start+1:$n-1) {
+            for var $i ($cycle_start+1:$n-1) {
                 if ($arr[$i] < $item) {
                     $pos++
                 }
@@ -39,8 +39,8 @@ fn Rosetta::CycleSort::sort($list) {
     \@arr
 }
 
-my $data = [0, 1, 2, 2, 2, 2, 1, 9, 3, 5]
-my $sorted = Rosetta::CycleSort::sort($data)
+val $data = [0, 1, 2, 2, 2, 2, 1, 9, 3, 5]
+val $sorted = Rosetta::CycleSort::sort($data)
 assert_eq join(",", @$sorted), "0,1,1,2,2,2,2,3,5,9", "cycle sort"
 
 test_run

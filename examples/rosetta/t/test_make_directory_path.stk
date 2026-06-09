@@ -6,14 +6,14 @@
 
 fn Rosetta::MkdirP::create($path) {
     return 1 if -d $path
-    my @parts = split /\//, $path
-    my $cur = ""
+    val @parts = split /\//, $path
+    var $cur = ""
     $cur = "/" if substr($path, 0, 1) eq "/"
-    for my $p (@parts) {
+    for val $p (@parts) {
         next if length($p) == 0
         $cur = $cur eq "/" ? "/$p" : ($cur eq "" ? $p : "$cur/$p")
         next if -d $cur
-        my $r = mkdir($cur)
+        val $r = mkdir($cur)
         return 0 unless $r
     }
     1
@@ -26,22 +26,22 @@ fn Rosetta::MkdirP::cleanup($path) {
 }
 
 # Single-level make
-my $base = "/tmp/stk_mkdir_test_$$"
+val $base = "/tmp/stk_mkdir_test_$$"
 Rosetta::MkdirP::cleanup($base)
-my $base_exists_before = -d $base ? 1 : 0
+val $base_exists_before = -d $base ? 1 : 0
 assert_eq $base_exists_before, 0, "base does not exist before"
 assert_eq Rosetta::MkdirP::create($base), 1, "create base"
-my $base_exists_after = -d $base ? 1 : 0
+val $base_exists_after = -d $base ? 1 : 0
 assert_eq $base_exists_after, 1, "base exists after"
 
 # Multi-level make
-my $deep = "$base/a/b/c/d"
+val $deep = "$base/a/b/c/d"
 assert_eq Rosetta::MkdirP::create($deep), 1, "create deep path"
-my $deep_ok = -d $deep ? 1 : 0
+val $deep_ok = -d $deep ? 1 : 0
 assert_eq $deep_ok, 1, "deep dir exists"
-my $a_ok = -d "$base/a" ? 1 : 0
+val $a_ok = -d "$base/a" ? 1 : 0
 assert_eq $a_ok, 1, "intermediate /a exists"
-my $ab_ok = -d "$base/a/b" ? 1 : 0
+val $ab_ok = -d "$base/a/b" ? 1 : 0
 assert_eq $ab_ok, 1, "intermediate /a/b exists"
 
 # Idempotent: calling again on existing path returns ok
@@ -55,9 +55,9 @@ rmdir("$base/a")
 rmdir($base)
 
 # Pipe form
-my $tmp = "/tmp/stk_mkdir_pipe_$$"
+val $tmp = "/tmp/stk_mkdir_pipe_$$"
 $tmp |> Rosetta::MkdirP::create |> assert_eq(1, "pipe create")
-my $tmp_ok = -d $tmp ? 1 : 0
+val $tmp_ok = -d $tmp ? 1 : 0
 assert_eq $tmp_ok, 1, "pipe directory exists"
 rmdir($tmp)
 

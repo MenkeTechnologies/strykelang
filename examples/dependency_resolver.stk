@@ -12,7 +12,7 @@
 
 # ── package catalog ────────────────────────────────────────────────
 
-my %catalog = (
+val %catalog = (
     "app"         => +{ version => "1.0.0", deps => +{ "web" => "1.0", "db" => "2.0" } },
     "web"         => +{ version => "1.2.0", deps => +{ "http" => "0.9", "tls" => "1.5" } },
     "db"          => +{ version => "2.1.0", deps => +{ "io" => "1.0", "tls" => "1.5" } },
@@ -26,12 +26,12 @@ my %catalog = (
 # ── version compare (simplified semver) ────────────────────────────
 
 fn Demo::Dep::version_lt($v1, $v2) {
-    my @ap = split /\./, $v1
-    my @bp = split /\./, $v2
-    my $n = len(@ap) > len(@bp) ? len(@ap) : len @bp
-    for my $i (0:$n - 1) {
-        my $av = ($ap[$i] // 0) + 0
-        my $bv = ($bp[$i] // 0) + 0
+    val @ap = split /\./, $v1
+    val @bp = split /\./, $v2
+    val $n = len(@ap) > len(@bp) ? len(@ap) : len @bp
+    for val $i (0:$n - 1) {
+        val $av = ($ap[$i] // 0) + 0
+        val $bv = ($bp[$i] // 0) + 0
         return 1 if $av < $bv
         return 0 if $av > $bv
     }
@@ -49,30 +49,30 @@ mysync @order
 mysync $cycle_found = 0
 mysync @conflicts
 
-my $td_visit = t_digest(100)
+val $td_visit = t_digest(100)
 
 fn Demo::Dep::visit($pkg) {
-    my $c = $color{$pkg} // 0
+    val $c = $color{$pkg} // 0
     return if $c == 2
     if ($c == 1) {
         $cycle_found = 1
         return
     }
     $color{$pkg} = 1
-    my $t0 = now_ns()
+    val $t0 = now_ns()
     if (!exists $catalog{$pkg}) {
         push @conflicts, "missing:$pkg"
         $color{$pkg} = 2
         return
     }
-    my $info = $catalog{$pkg}
-    for my $dep (keys %{$info->{deps}}) {
-        my $required = $info->{deps}->{$dep}
+    val $info = $catalog{$pkg}
+    for val $dep (keys %{$info->{deps}}) {
+        val $required = $info->{deps}->{$dep}
         if (!exists $catalog{$dep}) {
             push @conflicts, "missing_dep:$pkg->$dep"
             next
         }
-        my $available = $catalog{$dep}->{version}
+        val $available = $catalog{$dep}->{version}
         if (!Demo::Dep::version_ge($available, $required)) {
             push @conflicts, "version:$pkg->$dep needs >=$required got $available"
         }
@@ -86,9 +86,9 @@ fn Demo::Dep::visit($pkg) {
 # ── resolve root package ───────────────────────────────────────────
 
 p "── catalog ──────────────────────────────────────────"
-for my $name (sort { _ cmp _1 } keys %catalog) {
-    my $info = $catalog{$name}
-    my $dep_str = len(keys %{$info->{deps}}) > 0
+for val $name (sort { _ cmp _1 } keys %catalog) {
+    val $info = $catalog{$name}
+    val $dep_str = len(keys %{$info->{deps}}) > 0
                 ? join(", ", map { "$_ >= " . $info->{deps}->{_} } sort keys %{$info->{deps}})
                 : "(no deps)"
     printf "  %-10s @%-7s : %s\n", $name, $info->{version}, $dep_str
@@ -100,10 +100,10 @@ Demo::Dep::visit("app")
 
 p ""
 p "── install plan (deps-first topological order) ──────"
-my $idx = 0
-for my $pkg (@order) {
+var $idx = 0
+for val $pkg (@order) {
     $idx++
-    my $info = $catalog{$pkg}
+    val $info = $catalog{$pkg}
     printf "  %2d. %-10s @ %s\n", $idx, $pkg, $info->{version}
 }
 
@@ -114,7 +114,7 @@ if (len(@conflicts) == 0 && !$cycle_found) {
     p "── resolution: OK (no conflicts) ─────────────────────"
 } else {
     p "── conflicts detected ────────────────────────────────"
-    for my $c (@conflicts) {
+    for val $c (@conflicts) {
         printf "  ! %s\n", $c
     }
     printf "  cycle: %s\n", $cycle_found ? "YES" : "no"
@@ -122,13 +122,13 @@ if (len(@conflicts) == 0 && !$cycle_found) {
 
 # ── unused packages ────────────────────────────────────────────────
 
-my %installed
+var %installed
 $installed{_} = 1 for @order
-my @unused = grep { !exists $installed{_} } keys %catalog
+val @unused = grep { !exists $installed{_} } keys %catalog
 p ""
 printf "── unused packages: %d ────────────────────────────────\n",
     len @unused
-for my $u (sort { _ cmp _1 } @unused) {
+for val $u (sort { _ cmp _1 } @unused) {
     printf "  %s\n", $u
 }
 
@@ -136,7 +136,7 @@ for my $u (sort { _ cmp _1 } @unused) {
 
 p ""
 p "── cycle-detection: inject A → B → A ────────────────"
-my %cyclic = (
+val %cyclic = (
     "A" => +{ version => "1.0", deps => +{ "B" => "1.0" } },
     "B" => +{ version => "1.0", deps => +{ "A" => "1.0" } },
 )
@@ -145,11 +145,11 @@ mysync %ccolor
 mysync @corder
 mysync $cfound = 0
 fn Demo::Dep::cyclic_visit($pkg, $graph) {
-    my $c = $ccolor{$pkg} // 0
+    val $c = $ccolor{$pkg} // 0
     return if $c == 2
     if ($c == 1) { $cfound = 1; return }
     $ccolor{$pkg} = 1
-    for my $dep (keys %{$graph->{$pkg}->{deps}}) {
+    for val $dep (keys %{$graph->{$pkg}->{deps}}) {
         Demo::Dep::cyclic_visit($dep, $graph)
     }
     $ccolor{$pkg} = 2
@@ -170,7 +170,7 @@ printf "  p99  : %.1f µs\n", td_quantile($td_visit, 0.99)
 
 p ""
 p "── HLL distinct installed packages ──────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _) for @order
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len @order

@@ -2,10 +2,10 @@
 # Rosetta Code: Balanced brackets
 
 fn Rosetta::BalancedBrackets::check($s) {
-    my $count = 0
-    my $balanced = 1
-    my @chars = chars($s)
-    for my $c (@chars) {
+    var $count = 0
+    var $balanced = 1
+    val @chars = chars($s)
+    for val $c (@chars) {
         if ($c eq "[") {
             $count++
         } elsif ($c eq "]") {

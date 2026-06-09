@@ -2,7 +2,7 @@
 # Rosetta Code: Random number generator (device)
 
 fn Rosetta::RngDevice::new() {
-    my @bytes = (17, 34, 51, 68, 85)
+    val @bytes = (17, 34, 51, 68, 85)
     { bytes => \@bytes }
 }
 
@@ -10,7 +10,7 @@ fn Rosetta::RngDevice::read_byte($dev) {
     shift @{$dev->{bytes}}
 }
 
-my $dev = Rosetta::RngDevice::new()
+val $dev = Rosetta::RngDevice::new()
 
 assert_eq Rosetta::RngDevice::read_byte($dev), 17, "first device byte read"
 assert_eq Rosetta::RngDevice::read_byte($dev), 34, "second device byte read"

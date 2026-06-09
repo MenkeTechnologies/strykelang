@@ -42,17 +42,17 @@ fn ice::gather_candidates  { undef }
 # Pull in the real ice::connect / ice::gather_candidates definitions.
 require "examples/ice_orchestrator.stk"
 
-my $mode = $ARGV[0] // "listen"
+val $mode = $ARGV[0] // "listen"
 
 if ($mode eq "listen") {
     p "[A] Gathering local candidates …"
-    my $opts = {}
+    var $opts = {}
     if (defined $ENV{TURN_SERVER}) {
         $opts->{turn_server} = $ENV{TURN_SERVER}
         $opts->{turn_user}   = $ENV{TURN_USER}
         $opts->{turn_pass}   = $ENV{TURN_PASS}
     }
-    my $cands = ice::gather_candidates($opts)
+    val $cands = ice::gather_candidates($opts)
     if ($cands->{socket} == 0) {
         p "[A] candidate gather failed"
         exit 1
@@ -67,7 +67,7 @@ if ($mode eq "listen") {
     p "[A] (Replace HOST_ADDR with your LAN ip:port if you want the direct rung tried.)"
     p "[A] Waiting for inbound (60s) …"
 
-    my $msg = udp_recv_from($cands->{socket}, 60_000)
+    val $msg = udp_recv_from($cands->{socket}, 60_000)
     if (!defined $msg) {
         p "[A] timed out — peer never reached us"
         udp_close($cands->{socket})
@@ -79,20 +79,20 @@ if ($mode eq "listen") {
     udp_close($cands->{socket})
 }
 elsif ($mode eq "connect") {
-    my $host_addr  = $ARGV[1]
-    my $srflx_addr = $ARGV[2]
-    my $relay_addr = $ARGV[3]
+    val $host_addr  = $ARGV[1]
+    val $srflx_addr = $ARGV[2]
+    val $relay_addr = $ARGV[3]
     if (!defined $host_addr) {
         p "usage: stryke examples/p2p_chat_v2.stk connect HOST_ADDR SRFLX_ADDR RELAY_ADDR"
         p "       Use '_' to skip a rung (e.g. '_' for HOST_ADDR if peer is on the public internet)."
         exit 1
     }
     # Convert "_" placeholders to undef so ice::connect skips that rung.
-    my $h = ($host_addr  eq "_") ? undef : $host_addr
-    my $s = ($srflx_addr eq "_") ? undef : $srflx_addr
-    my $r = ($relay_addr eq "_") ? undef : $relay_addr
+    var $h = ($host_addr  eq "_") ? undef : $host_addr
+    val $s = ($srflx_addr eq "_") ? undef : $srflx_addr
+    val $r = ($relay_addr eq "_") ? undef : $relay_addr
 
-    my $opts = {
+    var $opts = {
         peer_host_addr  => $h,
         peer_srflx_addr => $s,
         peer_relay_addr => $r,
@@ -104,7 +104,7 @@ elsif ($mode eq "connect") {
         $opts->{turn_pass}   = $ENV{TURN_PASS}
     }
     p "[B] Trying ice::connect ladder (direct → punch → relay) …"
-    my $conn = ice::connect($opts)
+    val $conn = ice::connect($opts)
     if (!$conn->{ok}) {
         printf "[B] No rung worked: %s\n", $conn->{reason}
         exit 1
@@ -114,13 +114,13 @@ elsif ($mode eq "connect") {
     if ($conn->{method} eq "relay") {
         # Relay path requires turn_send + turn_recv.
         turn_send($conn->{socket}, $h, 9999, "hello from B (relayed)")
-        my $reply = turn_recv($conn->{socket}, 5000)
+        val $reply = turn_recv($conn->{socket}, 5000)
         printf "[B] reply: %s\n", defined $reply ? $reply->{payload} : "(none)"
     } else {
         # Direct + punch both use udp_send_to/udp_recv_from.
-        my ($peer_ip, $peer_port) = split /:/, $h // $s
+        val ($peer_ip, $peer_port) = split /:/, $h // $s
         udp_send_to($conn->{socket}, $peer_ip, $peer_port, "hello from B!")
-        my $reply = udp_recv_from($conn->{socket}, 5000)
+        val $reply = udp_recv_from($conn->{socket}, 5000)
         printf "[B] reply: %s\n", defined $reply ? $reply->{payload} : "(none)"
     }
     udp_close($conn->{socket})

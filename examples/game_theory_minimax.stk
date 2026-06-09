@@ -14,18 +14,18 @@ p "── Game Theory Demo ─────────────────�
 # 1. Minimax
 # We have a game tree with leaf values (bottom-up):
 # [3, 5, 2, 9, 12, 5, 23, 23]
-my @leaves = (3, 5, 2, 9, 12, 5, 23, 23)
-my $depth = 3 # log2(len @leaves)
+val @leaves = (3, 5, 2, 9, 12, 5, 23, 23)
+val $depth = 3 # log2(len @leaves)
 
 p "Leaf values: #{join(', ', @leaves)}"
 
 # minimax_value(leaves, depth)
-my $opt_val = minimax_value(\@leaves, $depth)
+val $opt_val = minimax_value(\@leaves, $depth)
 p "Optimal value (Minimax): $opt_val"
 
 # 2. Alpha-Beta Pruning
 # Same result, but potentially fewer nodes visited (internal optimization)
-my $ab_val = alphabeta_value(\@leaves, $depth)
+val $ab_val = alphabeta_value(\@leaves, $depth)
 p "Optimal value (Alpha-Beta): $ab_val"
 
 # 3. Decision making simulation

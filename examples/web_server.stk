@@ -6,8 +6,8 @@
 
 # The Demo::Web::handler function receives $req
 fn Demo::Web::handler($req) {
-    my $path = $req->{path}
-    my $method = $req->{method}
+    val $path = $req->{path}
+    val $method = $req->{method}
     
     p "[LOG] $method $path from $req->{peer}"
     
@@ -18,7 +18,7 @@ fn Demo::Web::handler($req) {
             body => "<h1>Welcome to Stryke</h1><p>Running on port $req->{port}</p><a href='/api/info'>View API Info</a>"
         }
     } elsif ($path eq "/api/info") {
-        my $info = +{
+        val $info = +{
             engine  => "Stryke",
             version => "0.12.14",
             uptime  => sys_uptime(),
@@ -35,13 +35,13 @@ fn Demo::Web::handler($req) {
 }
 
 # Handler self-test (no bind) — keeps `stryke examples/web_server.stk` batch-safe.
-my $root = Demo::Web::handler(+{
+val $root = Demo::Web::handler(+{
     path => "/", method => "GET", peer => "test", port => 1,
 })
 die "root status" unless $root->{status} == 200
 die "root body"   unless $root->{body} =~ /Welcome to Stryke/
 
-my $info = Demo::Web::handler(+{
+val $info = Demo::Web::handler(+{
     path => "/api/info", method => "GET", peer => "test", port => 1,
 })
 die "info status" unless $info->{status} == 200
@@ -52,10 +52,10 @@ die "404" if defined Demo::Web::handler(+{
 })
 
 # Blocking server only when a port is passed on the CLI.
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "port|p=i" => { help => "listen port (positional numeric argv also accepted)" },
 }) }
-my $port = $opts{port} // (len(@ARGV) && $ARGV[0] =~ /^\d+$/ ? 0 + $ARGV[0] : 0)
+val $port = $opts{port} // (len(@ARGV) && $ARGV[0] =~ /^\d+$/ ? 0 + $ARGV[0] : 0)
 if ($port) {
     p "Starting Stryke server on port $port..."
     serve($port, \&Demo::Web::handler)

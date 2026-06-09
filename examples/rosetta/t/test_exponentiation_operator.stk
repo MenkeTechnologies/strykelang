@@ -2,7 +2,7 @@
 # Rosetta Code: Exponentiation operator
 
 fn Rosetta::Exp::int_pow($base, $exp) {
-    my $r = 1
+    var $r = 1
     while ($exp > 0) {
         if ($exp % 2 == 1) { $r *= $base }
         $base *= $base
@@ -31,7 +31,7 @@ assert_ok abs(Rosetta::Exp::float_pow(2, 0.5) - 1.41421356) < 1e-7, "fp sqrt 2"
 assert_ok abs(Rosetta::Exp::float_pow(10, 3) - 1000) < 1e-9, "fp 10^3"
 
 # Pipeline form
-my $r = 2 |> Rosetta::Exp::int_pow(16)
+val $r = 2 |> Rosetta::Exp::int_pow(16)
 assert_eq $r, 65536, "pipe 2^16"
 
 test_run

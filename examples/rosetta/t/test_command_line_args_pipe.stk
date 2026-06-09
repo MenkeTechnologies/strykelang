@@ -12,7 +12,7 @@ fn Rosetta::Args::count() {
 # In a test environment, @ARGV might be empty unless we mock it.
 # We'll just verify the functions exist and return expected types.
 
-my @args = Rosetta::Args::get()
+val @args = Rosetta::Args::get()
 (len @args) |> assert_eq(Rosetta::Args::count(), "Arg count matches")
 
 test_run

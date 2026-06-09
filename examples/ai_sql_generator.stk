@@ -22,13 +22,13 @@ ai_mock_install('(?i)Convert to SQL: Top 5 products by price',
 fn SqlGen::generate($request) {
     p "Request: $request"
     
-    my $schema = +{
+    val $schema = +{
         sql        => "string",
         tables     => "array",
         complexity => "int"
     }
 
-    my $res = ai("Convert to SQL: $request", 
+    val $res = ai("Convert to SQL: $request", 
         schema => $schema,
         system => "You are a SQL expert. Return ONLY valid JSON matching the schema.")
 
@@ -43,8 +43,8 @@ fn SqlGen::generate($request) {
 
 p "── AI SQL Generator ────────────────────────────────────"
 
-my $r1 = SqlGen::generate("Show me all users who are active")
-my $r2 = SqlGen::generate("Top 5 products by price")
+val $r1 = SqlGen::generate("Show me all users who are active")
+val $r2 = SqlGen::generate("Top 5 products by price")
 
 # ── 4. Tests ───────────────────────────────────────────────────────
 

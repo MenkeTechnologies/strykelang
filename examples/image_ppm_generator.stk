@@ -11,27 +11,27 @@
 
 p "--- PPM Image Generator ---"
 
-my $width = 256
-my $height = 256
-my $max_color = 255
+val $width = 256
+val $height = 256
+val $max_color = 255
 
 # 1. Start building the PPM header (P3 = ASCII color)
-my $ppm_data = "P3\n$width $height\n$max_color\n"
+var $ppm_data = "P3\n$width $height\n$max_color\n"
 
 # 2. Generate pixels (Gradient effect)
 p "Generating #{ $width * $height } pixels..."
-for my $y (0 : $height - 1) {
-    for my $x (0 : $width - 1) {
-        my $r = $x % 256
-        my $g = $y % 256
-        my $bl = ($x + $y) % 256
+for val $y (0 : $height - 1) {
+    for val $x (0 : $width - 1) {
+        val $r = $x % 256
+        val $g = $y % 256
+        val $bl = ($x + $y) % 256
         $ppm_data .= "$r $g $bl  "
     }
     $ppm_data .= "\n"
 }
 
 # 3. Save to file
-my $filename = "#{ temp_dir() }stryke_gradient.ppm"
+val $filename = "#{ temp_dir() }stryke_gradient.ppm"
 spurt $filename, $ppm_data
 p "Saved to $filename"
 
@@ -39,7 +39,7 @@ p "Saved to $filename"
 
 (-f $filename) |> aok "file exists"
 
-my $content = c"$filename"
+val $content = c"$filename"
 ($content[0:1] eq "P3") |> aok "PPM header check"
 
 unlink $filename

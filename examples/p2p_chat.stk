@@ -35,17 +35,17 @@
 #
 #   [B] Got reply: hello from A!
 
-my $mode = $ARGV[0] // "listen"
+val $mode = $ARGV[0] // "listen"
 
 if ($mode eq "listen") {
     p "[A] Bound local socket; classifying NAT type via 3 STUN servers …"
-    my $sock = udp_open()
+    val $sock = udp_open()
     if ($sock == 0) { p "[A] bind failed"; exit 1 }
 
     # Detect symmetric NAT BEFORE doing anything else — if we're behind
     # one, hole-punching won't work and we should bail with a useful
     # message rather than letting the peer hammer us for 30s.
-    my $nat = stun_classify($sock)
+    val $nat = stun_classify($sock)
     printf "[A] NAT type: %s (succeeded %d/%d)\n",
         $nat->{nat_type}, $nat->{succeeded}, $nat->{queried}
     if ($nat->{nat_type} eq "symmetric") {
@@ -59,7 +59,7 @@ if ($mode eq "listen") {
         p "[A] uncertain. Proceeding anyway, but punch may fail."
     }
 
-    my $info = stun($sock)
+    val $info = stun($sock)
     if (!defined $info) {
         p "[A] STUN query failed — check internet connectivity"
         udp_close($sock)
@@ -74,7 +74,7 @@ if ($mode eq "listen") {
     # in one call. `udp_recv_from` returns { payload, src_ip, src_port }
     # so we can reply via udp_send_to without needing them to send their
     # address in-band.
-    my $first = udp_recv_from($sock, 60_000)
+    val $first = udp_recv_from($sock, 60_000)
     if (!defined $first) {
         p "[A] Timed out — peer never punched, or NAT blocked the bombards"
         udp_close($sock)
@@ -89,8 +89,8 @@ if ($mode eq "listen") {
 
     # Keep the conversation going for a few rounds so the peer can see
     # bidirectional flow.
-    for my $i (1:3) {
-        my $reply = udp_recv_from($sock, 5_000)
+    for val $i (1:3) {
+        val $reply = udp_recv_from($sock, 5_000)
         if (!defined $reply) { last }
         printf "[A] %d/3 — peer said: %s\n", $i, $reply->{payload}
         udp_send_to($sock, $reply->{src_ip}, $reply->{src_port}, "round $i ack")
@@ -99,17 +99,17 @@ if ($mode eq "listen") {
     udp_close($sock)
 }
 elsif ($mode eq "connect") {
-    my $peer_ip   = $ARGV[1]
-    my $peer_port = $ARGV[2]
+    val $peer_ip   = $ARGV[1]
+    val $peer_port = $ARGV[2]
     if (!defined $peer_ip || !defined $peer_port) {
         p "usage: stryke p2p_chat.stk connect <peer-ip> <peer-port>"
         exit 1
     }
     printf "[B] Bound local socket; punching %s:%d …\n", $peer_ip, $peer_port
-    my $sock = udp_open()
+    val $sock = udp_open()
     if ($sock == 0) { p "[B] bind failed"; exit 1 }
 
-    my $r = punch($sock, $peer_ip, $peer_port, {
+    val $r = punch($sock, $peer_ip, $peer_port, {
         timeout_ms  => 30_000,
         interval_ms => 100,
         payload     => "hello from B!",
@@ -123,8 +123,8 @@ elsif ($mode eq "connect") {
 
         # Now the punch is open in both directions. Listen for the peer's
         # reply and bounce a few rounds.
-        for my $i (1:3) {
-            my $reply = udp_recv_from($sock, 5_000)
+        for val $i (1:3) {
+            val $reply = udp_recv_from($sock, 5_000)
             if (!defined $reply) {
                 p "[B] No reply (timed out on round $i)"
                 last

@@ -2,11 +2,11 @@
 # Rosetta Code: Van Eck sequence
 
 fn Rosetta::VanEck::generate($n) {
-    my @seq = (0)
-    my %last_seen
-    for my $i (0:$n-2) {
-        my $val = $seq[$i]
-        my $next_val = 0
+    var @seq = (0)
+    var %last_seen
+    for val $i (0:$n-2) {
+        val $val = $seq[$i]
+        var $next_val = 0
         if (exists $last_seen{$val}) {
             $next_val = $i - $last_seen{$val}
         }
@@ -16,7 +16,7 @@ fn Rosetta::VanEck::generate($n) {
     \@seq
 }
 
-my $res = Rosetta::VanEck::generate(10)
+val $res = Rosetta::VanEck::generate(10)
 assert_eq join(",", @$res), "0,0,1,0,2,0,2,2,1,6", "van eck first 10"
 
 # Using |> and ~>

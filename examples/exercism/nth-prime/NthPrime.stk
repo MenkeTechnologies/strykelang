@@ -3,12 +3,12 @@
 # Return the N-th prime (1-indexed); die on N <= 0.
 fn Exercism::NthPrime::nth {
     die "there is no zeroth prime" if _ < 1
-    my $n      = _
-    my @primes = (2)
-    my $candidate = 3
+    val $n      = _
+    var @primes = (2)
+    var $candidate = 3
     while (@primes < $n) {
-        my $is_prime = 1
-        for my $p (@primes) {
+        var $is_prime = 1
+        for val $p (@primes) {
             last if $p * $p > $candidate
             if ($candidate % $p == 0) { $is_prime = 0; last }
         }

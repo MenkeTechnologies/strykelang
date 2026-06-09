@@ -14,7 +14,7 @@ assert_eq Rosetta::WoodallNumbers::woodall(2), 7, "W2 (2*4-1)"
 assert_eq Rosetta::WoodallNumbers::woodall(3), 23, "W3 (3*8-1)"
 assert_eq Rosetta::WoodallNumbers::woodall(4), 63, "W4"
 
-my @list = Rosetta::WoodallNumbers::woodall_list(5)
+val @list = Rosetta::WoodallNumbers::woodall_list(5)
 assert_eq join(",", @list), "1,7,23,63,159", "Woodall list"
 
 5 |> Rosetta::WoodallNumbers::woodall |> assert_eq(159, "pipe Rosetta::WoodallNumbers::woodall 5")

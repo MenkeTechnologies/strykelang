@@ -2,7 +2,7 @@
 # Rosetta Code: Least Common Multiple (using pipes)
 
 fn Rosetta::LCM::gcd($a, $b) {
-    my $aa = $a; my $bb = $b
+    var $aa = $a; var $bb = $b
     while ($bb != 0) {
         ($aa, $bb) = ($bb, $aa % $bb)
     }
@@ -11,7 +11,7 @@ fn Rosetta::LCM::gcd($a, $b) {
 
 fn Rosetta::LCM::compute($a, $b) {
     if ($a == 0 || $b == 0) { return 0 }
-    my $res = ($a * $b) / Rosetta::LCM::gcd($a, $b)
+    val $res = ($a * $b) / Rosetta::LCM::gcd($a, $b)
     abs($res)
 }
 

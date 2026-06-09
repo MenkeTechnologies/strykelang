@@ -10,9 +10,9 @@
 package SegTree
 
 fn new($arr) {
-    my $n = len @$arr
-    my @tree = (0) x (4 * $n)
-    my $st = { n => $n, tree => \@tree }
+    val $n = len @$arr
+    val @tree = (0) x (4 * $n)
+    val $st = { n => $n, tree => \@tree }
     _build $st, $arr, 1, 0, $n - 1
     $st
 }
@@ -23,7 +23,7 @@ fn _build($st, $arr, $node, $start, $end) {
         return
     }
     
-    my $mid = int(($start + $end) / 2)
+    val $mid = int(($start + $end) / 2)
     _build $st, $arr, 2 * $node,     $start, $mid
     _build $st, $arr, 2 * $node + 1, $mid + 1, $end
     
@@ -40,7 +40,7 @@ fn _update($st, $node, $start, $end, $idx, $val) {
         return
     }
     
-    my $mid = int(($start + $end) / 2)
+    val $mid = int(($start + $end) / 2)
     if ($idx <= $mid) {
         _update $st, 2 * $node, $start, $mid, $idx, $val
     } else {
@@ -58,9 +58,9 @@ fn _query($st, $node, $start, $end, $l, $r) {
     return 0 if $r < $start || $end < $l
     return $st->{tree}->[$node] if $l <= $start && $end <= $r
     
-    my $mid = int(($start + $end) / 2)
-    my $s1 = _query $st, 2 * $node,     $start, $mid, $l, $r
-    my $s2 = _query $st, 2 * $node + 1, $mid + 1, $end, $l, $r
+    val $mid = int(($start + $end) / 2)
+    val $s1 = _query $st, 2 * $node,     $start, $mid, $l, $r
+    val $s2 = _query $st, 2 * $node + 1, $mid + 1, $end, $l, $r
     $s1 + $s2
 }
 
@@ -68,10 +68,10 @@ package main
 
 p "── Segment Tree Demo ──"
 
-my @data = (1, 3, 5, 7, 9, 11)
+val @data = (1, 3, 5, 7, 9, 11)
 p "Data: #{join ', ', @data}"
 
-my $st = SegTree::new \@data
+val $st = SegTree::new \@data
 
 p "Range sum [1:3] (3+5+7): #{SegTree::query $st, 1, 3}"
 p "Range sum [0:5] (all):   #{SegTree::query $st, 0, 5}"

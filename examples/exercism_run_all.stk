@@ -4,10 +4,10 @@
 #
 # Usage: stryke examples/exercism_run_all.stk [--summary]
 
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "summary" => { help => "pass --summary to run_all_ci" },
 }) }
-my $runner = dirname(__FILE__) . "/run_all_ci.stk"
-my $cmd    = "$^X \"$runner\" --only=exercism"
+val $runner = dirname(__FILE__) . "/run_all_ci.stk"
+var $cmd    = "$^X \"$runner\" --only=exercism"
 $cmd .= " --summary" if $opts{summary}
 exit system($cmd) >> 8

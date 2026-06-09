@@ -6,15 +6,15 @@ fn Rosetta::Anagrams::sort_chars($s) {
 }
 
 fn Rosetta::Anagrams::check($a, $b) {
-    my $s1 = Rosetta::Anagrams::sort_chars($a)
-    my $s2 = Rosetta::Anagrams::sort_chars($b)
+    val $s1 = Rosetta::Anagrams::sort_chars($a)
+    val $s2 = Rosetta::Anagrams::sort_chars($b)
     $s1 eq $s2
 }
 
 fn Rosetta::Anagrams::find($word, @words) {
-    my $key = Rosetta::Anagrams::sort_chars($word)
-    my @res = ~> @words grep {
-        my $sc = Rosetta::Anagrams::sort_chars(_)
+    val $key = Rosetta::Anagrams::sort_chars($word)
+    val @res = ~> @words grep {
+        val $sc = Rosetta::Anagrams::sort_chars(_)
         $sc eq $key && lc(_) ne lc($word)
     }
     \@res
@@ -25,12 +25,12 @@ assert_ok Rosetta::Anagrams::check("evil", "vile"), "evil/vile"
 assert_ok Rosetta::Anagrams::check("Elvis", "lives"), "Elvis/lives (case insensitive)"
 assert_ok !Rosetta::Anagrams::check("hello", "world"), "hello/world not anagrams"
 
-my @words = qw(cat act tac dog god)
-my $cat_anagrams = Rosetta::Anagrams::find("cat", @words)
-my @sorted_cat = sort(@$cat_anagrams)
+val @words = qw(cat act tac dog god)
+val $cat_anagrams = Rosetta::Anagrams::find("cat", @words)
+val @sorted_cat = sort(@$cat_anagrams)
 assert_eq join(",", @sorted_cat), "act,tac", "anagrams of cat"
 
-my $dog_anagrams = Rosetta::Anagrams::find("dog", @words)
+val $dog_anagrams = Rosetta::Anagrams::find("dog", @words)
 assert_eq join(",", @$dog_anagrams), "god", "anagrams of dog"
 
 test_run

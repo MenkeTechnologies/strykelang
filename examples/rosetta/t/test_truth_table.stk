@@ -2,17 +2,17 @@
 # Rosetta Code: Truth tables — evaluate a boolean expression for all variable assignments
 
 fn Rosetta::Truth::eval($expr, $env) {
-    my $tokens = Rosetta::Truth::tokenize($expr)
-    my $pos    = [0]
+    val $tokens = Rosetta::Truth::tokenize($expr)
+    var $pos    = [0]
     Rosetta::Truth::parse_or($tokens, $pos, $env)
 }
 
 fn Rosetta::Truth::tokenize($s) {
-    my @out
-    my $i = 0
-    my $n = length($s)
+    var @out
+    var $i = 0
+    val $n = length($s)
     while ($i < $n) {
-        my $c = substr($s, $i, 1)
+        val $c = substr($s, $i, 1)
         if ($c eq " " || $c eq "\t") { $i += 1; next }
         if ($c eq "(" || $c eq ")" || $c eq "!" || $c eq "&" || $c eq "|") {
             push @out, $c
@@ -20,7 +20,7 @@ fn Rosetta::Truth::tokenize($s) {
             next
         }
         if ($c =~ /[A-Za-z]/) {
-            my $j = $i
+            var $j = $i
             while ($j < $n && substr($s, $j, 1) =~ /[A-Za-z0-9]/) { $j += 1 }
             push @out, substr($s, $i, $j - $i)
             $i = $j
@@ -37,26 +37,26 @@ fn Rosetta::Truth::lookahead($tokens, $pos) {
 }
 
 fn Rosetta::Truth::consume($tokens, $pos) {
-    my $t = $tokens->[$pos->[0]]
+    val $t = $tokens->[$pos->[0]]
     $pos->[0] += 1
     $t
 }
 
 fn Rosetta::Truth::parse_or($tokens, $pos, $env) {
-    my $v = Rosetta::Truth::parse_and($tokens, $pos, $env)
+    var $v = Rosetta::Truth::parse_and($tokens, $pos, $env)
     while ($pos->[0] < len(@$tokens) && $tokens->[$pos->[0]] eq "|") {
         $pos->[0] += 1
-        my $r = Rosetta::Truth::parse_and($tokens, $pos, $env)
+        val $r = Rosetta::Truth::parse_and($tokens, $pos, $env)
         $v = ($v || $r) ? 1 : 0
     }
     $v ? 1 : 0
 }
 
 fn Rosetta::Truth::parse_and($tokens, $pos, $env) {
-    my $v = Rosetta::Truth::parse_not($tokens, $pos, $env)
+    var $v = Rosetta::Truth::parse_not($tokens, $pos, $env)
     while ($pos->[0] < len(@$tokens) && $tokens->[$pos->[0]] eq "&") {
         $pos->[0] += 1
-        my $r = Rosetta::Truth::parse_not($tokens, $pos, $env)
+        val $r = Rosetta::Truth::parse_not($tokens, $pos, $env)
         $v = ($v && $r) ? 1 : 0
     }
     $v ? 1 : 0
@@ -65,16 +65,16 @@ fn Rosetta::Truth::parse_and($tokens, $pos, $env) {
 fn Rosetta::Truth::parse_not($tokens, $pos, $env) {
     if ($pos->[0] < len(@$tokens) && $tokens->[$pos->[0]] eq "!") {
         $pos->[0] += 1
-        my $v = Rosetta::Truth::parse_not($tokens, $pos, $env)
+        val $v = Rosetta::Truth::parse_not($tokens, $pos, $env)
         return $v ? 0 : 1
     }
     Rosetta::Truth::parse_atom($tokens, $pos, $env)
 }
 
 fn Rosetta::Truth::parse_atom($tokens, $pos, $env) {
-    my $t = Rosetta::Truth::consume($tokens, $pos)
+    val $t = Rosetta::Truth::consume($tokens, $pos)
     if ($t eq "(") {
-        my $v = Rosetta::Truth::parse_or($tokens, $pos, $env)
+        val $v = Rosetta::Truth::parse_or($tokens, $pos, $env)
         Rosetta::Truth::consume($tokens, $pos)   # consume ")"
         return $v
     }
@@ -82,29 +82,29 @@ fn Rosetta::Truth::parse_atom($tokens, $pos, $env) {
 }
 
 fn Rosetta::Truth::table($expr, $vars) {
-    my @rows
-    my $n = len(@$vars)
-    my $count = 1
-    for my $i (1:$n) { $count *= 2 }
-    for my $mask (0:$count-1) {
-        my %env
-        for my $i (0:$n-1) {
+    var @rows
+    val $n = len(@$vars)
+    var $count = 1
+    for val $i (1:$n) { $count *= 2 }
+    for val $mask (0:$count-1) {
+        var %env
+        for val $i (0:$n-1) {
             $env{$vars->[$i]} = ($mask >> ($n - 1 - $i)) & 1
         }
-        my $r = Rosetta::Truth::eval($expr, \%env)
+        val $r = Rosetta::Truth::eval($expr, \%env)
         push @rows, [@{[map { $env{_} } @$vars]}, $r]
     }
     \@rows
 }
 
 # Single variable: A
-my $t1 = Rosetta::Truth::table("A", ["A"])
+val $t1 = Rosetta::Truth::table("A", ["A"])
 assert_eq len(@$t1), 2, "single var: 2 rows"
 assert_eq $t1->[0]->[1], 0, "A=0 -> 0"
 assert_eq $t1->[1]->[1], 1, "A=1 -> 1"
 
 # A & B
-my $t2 = Rosetta::Truth::table("A & B", ["A", "B"])
+val $t2 = Rosetta::Truth::table("A & B", ["A", "B"])
 assert_eq len(@$t2), 4, "AND: 4 rows"
 assert_eq $t2->[0]->[2], 0, "0 & 0 = 0"
 assert_eq $t2->[1]->[2], 0, "0 & 1 = 0"
@@ -112,11 +112,11 @@ assert_eq $t2->[2]->[2], 0, "1 & 0 = 0"
 assert_eq $t2->[3]->[2], 1, "1 & 1 = 1"
 
 # A | B
-my $t3 = Rosetta::Truth::table("A | B", ["A", "B"])
+val $t3 = Rosetta::Truth::table("A | B", ["A", "B"])
 assert_eq join(",", map { _->[2] } @$t3), "0,1,1,1", "OR truth values"
 
 # (A | B) & !C
-my $t4 = Rosetta::Truth::table("(A | B) & !C", ["A", "B", "C"])
+val $t4 = Rosetta::Truth::table("(A | B) & !C", ["A", "B", "C"])
 assert_eq len(@$t4), 8, "3-var: 8 rows"
 # (0|0)&!0 = 0; (0|0)&!1 = 0; (0|1)&!0 = 1; (0|1)&!1 = 0;
 # (1|0)&!0 = 1; (1|0)&!1 = 0; (1|1)&!0 = 1; (1|1)&!1 = 0

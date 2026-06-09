@@ -2,17 +2,17 @@
 # Rosetta Code: Harmonic series
 
 fn Rosetta::Harmonic::compute($n) {
-    my $sum = 0
-    for my $i (1:$n) {
+    var $sum = 0
+    for val $i (1:$n) {
         $sum += 1 / $i
     }
     $sum
 }
 
 assert_eq Rosetta::Harmonic::compute(1), 1, "H1"
-my $h2 = Rosetta::Harmonic::compute(2)
+val $h2 = Rosetta::Harmonic::compute(2)
 assert_near $h2, 1.5, 0.0001, "H2"
-my $h4 = Rosetta::Harmonic::compute(4)
+val $h4 = Rosetta::Harmonic::compute(4)
 assert_near $h4, 2.0833, 0.001, "H4"
 
 10 |> Rosetta::Harmonic::compute |> { _ > 2.9 } |> assert_ok("pipe harmonic")

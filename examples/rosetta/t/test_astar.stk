@@ -6,33 +6,33 @@ fn Rosetta::AStar::heuristic($node, $end) {
 }
 
 fn Rosetta::AStar::solve($grid, $start, $end) {
-    my $rows = len(@$grid)
-    my $cols = len(@{$grid->[0]})
-    my $open = [[$start->[0], $start->[1], 0, Rosetta::AStar::heuristic($start, $end)]] # r, c, g, f
-    my %closed
+    val $rows = len(@$grid)
+    val $cols = len(@{$grid->[0]})
+    val $open = [[$start->[0], $start->[1], 0, Rosetta::AStar::heuristic($start, $end)]] # r, c, g, f
+    var %closed
     
     while (len(@$open) > 0) {
         # find node with min f
-        my $best_idx = 0
-        for my $i (1..len(@$open)-1) {
+        var $best_idx = 0
+        for val $i (1..len(@$open)-1) {
             if ($open->[$i][3] < $open->[$best_idx][3]) {
                 $best_idx = $i
             }
         }
-        my $curr = splice @$open, $best_idx, 1
-        my ($r, $c, $g, $f) = @$curr
+        val $curr = splice @$open, $best_idx, 1
+        val ($r, $c, $g, $f) = @$curr
         
         if ($r == $end->[0] && $c == $end->[1]) {
             return $g
         }
         
-        my $key = "$r,$c"
+        val $key = "$r,$c"
         if (exists $closed{$key}) { next }
         $closed{$key} = 1
         
-        for my $d ([0,1], [0,-1], [1,0], [-1,0]) {
-            my $nr = $r + $d->[0]
-            my $nc = $c + $d->[1]
+        for val $d ([0,1], [0,-1], [1,0], [-1,0]) {
+            val $nr = $r + $d->[0]
+            val $nc = $c + $d->[1]
             if ($nr >= 0 && $nr < $rows && $nc >= 0 && $nc < $cols) {
                 if ($grid->[$nr][$nc] == 0) {
                     push @$open, [$nr, $nc, $g + 1, $g + 1 + Rosetta::AStar::heuristic([$nr, $nc], $end)]
@@ -43,12 +43,12 @@ fn Rosetta::AStar::solve($grid, $start, $end) {
     -1
 }
 
-my $grid = [
+val $grid = [
     [0, 0, 0],
     [0, 1, 0],
     [0, 0, 0]
 ]
-my $dist = Rosetta::AStar::solve($grid, [0, 0], [2, 2])
+val $dist = Rosetta::AStar::solve($grid, [0, 0], [2, 2])
 # Path: (0,0)(1,0)(2,0)(2,1)(2,2) or similar, length 4
 assert_eq $dist, 4, "A* distance on 3x3 grid with obstacle"
 

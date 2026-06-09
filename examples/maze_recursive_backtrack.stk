@@ -22,20 +22,20 @@
 # ── direction vectors ─────────────────────────────────────────────
 # Index: 0 = N (up), 1 = E (right), 2 = S (down), 3 = W (left).
 
-my @DR  = (-1, 0, 1, 0)
-my @DC  = (0, 1, 0, -1)
-my @OPP = (2, 3, 0, 1)
+val @DR  = (-1, 0, 1, 0)
+val @DC  = (0, 1, 0, -1)
+val @OPP = (2, 3, 0, 1)
 
 # ── deterministic shuffle (Fisher–Yates with LCG seeded by (r, c)) ─
 # Deterministic so the maze layout is stable across runs — easier
 # to pin invariants without flakiness.
 
 fn Maze::shuffle($order_ref, $r, $c) {
-    my $seed = $r * 7919 + $c * 31 + 1
-    for my $i (3:1) {
+    var $seed = $r * 7919 + $c * 31 + 1
+    for val $i (3:1) {
         $seed = ($seed * 1103515245 + 12345) & 0x7FFFFFFF
-        my $j = $seed % ($i + 1)
-        my $tmp = $order_ref->[$i]
+        val $j = $seed % ($i + 1)
+        val $tmp = $order_ref->[$i]
         $order_ref->[$i] = $order_ref->[$j]
         $order_ref->[$j] = $tmp
     }
@@ -44,10 +44,10 @@ fn Maze::shuffle($order_ref, $r, $c) {
 # ── grid builders ─────────────────────────────────────────────────
 
 fn Maze::make_grid($w, $h, $init) {
-    my @g
-    for my $r (0:$h - 1) {
-        my @row
-        for my $c (0:$w - 1) { push @row, $init }
+    var @g
+    for val $r (0:$h - 1) {
+        var @row
+        for val $c (0:$w - 1) { push @row, $init }
         push @g, \@row
     }
     \@g
@@ -57,11 +57,11 @@ fn Maze::make_grid($w, $h, $init) {
 
 fn Maze::carve($r, $c, $grid, $visited, $w, $h) {
     $visited->[$r]->[$c] = 1
-    my @order = (0, 1, 2, 3)
+    val @order = (0, 1, 2, 3)
     Maze::shuffle(\@order, $r, $c)
-    for my $d (@order) {
-        my $nr = $r + $DR[$d]
-        my $nc = $c + $DC[$d]
+    for val $d (@order) {
+        val $nr = $r + $DR[$d]
+        val $nc = $c + $DC[$d]
         next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
         next if $visited->[$nr]->[$nc]
         # Knock down both walls between (r,c) and (nr,nc).
@@ -76,24 +76,24 @@ fn Maze::carve($r, $c, $grid, $visited, $w, $h) {
 # bottom border.
 
 fn Maze::render($grid, $w, $h) {
-    my $out = ""
+    var $out = ""
     # Top border of the whole maze.
     $out .= "+"
-    for my $c (0:$w - 1) { $out .= ($grid->[0]->[$c] & 1) ? "---+" : "   +" }
+    for val $c (0:$w - 1) { $out .= ($grid->[0]->[$c] & 1) ? "---+" : "   +" }
     $out .= "\n"
 
-    for my $r (0:$h - 1) {
+    for val $r (0:$h - 1) {
         # Body line: west wall of leftmost cell, then each cell's
         # interior + east wall.
         $out .= ($grid->[$r]->[0] & 8) ? "|" : " "
-        for my $c (0:$w - 1) {
+        for val $c (0:$w - 1) {
             $out .= "   "
             $out .= ($grid->[$r]->[$c] & 2) ? "|" : " "
         }
         $out .= "\n"
         # South-wall divider row.
         $out .= "+"
-        for my $c (0:$w - 1) {
+        for val $c (0:$w - 1) {
             $out .= ($grid->[$r]->[$c] & 4) ? "---+" : "   +"
         }
         $out .= "\n"
@@ -104,19 +104,19 @@ fn Maze::render($grid, $w, $h) {
 # ── BFS shortest-path length to confirm reachability ─────────────
 
 fn Maze::bfs_distance($grid, $w, $h, $sr, $sc, $er, $ec) {
-    my $dist = Maze::make_grid($w, $h, -1)
+    val $dist = Maze::make_grid($w, $h, -1)
     $dist->[$sr]->[$sc] = 0
-    my @queue = ([$sr, $sc])
+    var @queue = ([$sr, $sc])
     while (len(@queue) > 0) {
-        my $cur = shift @queue
-        my $r = $cur->[0]
-        my $c = $cur->[1]
+        val $cur = shift @queue
+        val $r = $cur->[0]
+        val $c = $cur->[1]
         return $dist->[$r]->[$c] if $r == $er && $c == $ec
-        my $cell = $grid->[$r]->[$c]
-        for my $d (0:3) {
+        val $cell = $grid->[$r]->[$c]
+        for val $d (0:3) {
             next if ($cell >> $d) & 1   # wall in this direction
-            my $nr = $r + $DR[$d]
-            my $nc = $c + $DC[$d]
+            val $nr = $r + $DR[$d]
+            val $nc = $c + $DC[$d]
             next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
             next if $dist->[$nr]->[$nc] >= 0
             $dist->[$nr]->[$nc] = $dist->[$r]->[$c] + 1
@@ -128,10 +128,10 @@ fn Maze::bfs_distance($grid, $w, $h, $sr, $sc, $er, $ec) {
 
 # ── run ───────────────────────────────────────────────────────────
 
-my $W = 12
-my $H = 8
-my $grid = Maze::make_grid($W, $H, 0xF)      # all walls intact
-my $visited = Maze::make_grid($W, $H, 0)
+val $W = 12
+val $H = 8
+val $grid = Maze::make_grid($W, $H, 0xF)      # all walls intact
+val $visited = Maze::make_grid($W, $H, 0)
 
 Maze::carve(0, 0, $grid, $visited, $W, $H)
 
@@ -140,19 +140,19 @@ print Maze::render($grid, $W, $H)
 
 # ── invariant 1: every cell got visited ──────────────────────────
 
-my $visited_count = 0
-for my $row (@$visited) {
-    for my $v (@$row) { $visited_count++ if $v }
+var $visited_count = 0
+for val $row (@$visited) {
+    for val $v (@$row) { $visited_count++ if $v }
 }
 die "expected #{$W * $H} visited cells, got #{$visited_count}" unless $visited_count == $W * $H
 
 # ── invariant 2: a perfect maze has exactly (W*H - 1) carved walls
 #                 between cells (forms a spanning tree). ──────────
 
-my $carved = 0
-for my $r (0:$H - 1) {
-    for my $c (0:$W - 1) {
-        my $cell = $grid->[$r]->[$c]
+var $carved = 0
+for val $r (0:$H - 1) {
+    for val $c (0:$W - 1) {
+        val $cell = $grid->[$r]->[$c]
         # Each cell stores its own four wall bits; sum the missing
         # walls to the east and to the south, only — each interior
         # wall is shared between two cells, so counting two sides
@@ -165,32 +165,32 @@ die "spanning-tree edge count: got #{$carved}, want #{$W * $H - 1}" unless $carv
 
 # ── invariant 3: BFS reaches the opposite corner ─────────────────
 
-my $d = Maze::bfs_distance($grid, $W, $H, 0, 0, $H - 1, $W - 1)
+val $d = Maze::bfs_distance($grid, $W, $H, 0, 0, $H - 1, $W - 1)
 die "opposite corner unreachable" unless $d > 0
 
 # ── invariant 4: every cell is reachable from (0, 0) ─────────────
 
-my $reach = Maze::make_grid($W, $H, -1)
+val $reach = Maze::make_grid($W, $H, -1)
 $reach->[0]->[0] = 0
-my @q = ([0, 0])
+var @q = ([0, 0])
 while (len(@q) > 0) {
-    my $cur = shift @q
-    my $r = $cur->[0]
-    my $c = $cur->[1]
-    my $cell = $grid->[$r]->[$c]
-    for my $dir (0:3) {
+    val $cur = shift @q
+    val $r = $cur->[0]
+    val $c = $cur->[1]
+    val $cell = $grid->[$r]->[$c]
+    for val $dir (0:3) {
         next if ($cell >> $dir) & 1
-        my $nr = $r + $DR[$dir]
-        my $nc = $c + $DC[$dir]
+        val $nr = $r + $DR[$dir]
+        val $nc = $c + $DC[$dir]
         next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
         next if $reach->[$nr]->[$nc] >= 0
         $reach->[$nr]->[$nc] = $reach->[$r]->[$c] + 1
         push @q, [$nr, $nc]
     }
 }
-my $reached = 0
-for my $row (@$reach) {
-    for my $v (@$row) { $reached++ if $v >= 0 }
+var $reached = 0
+for val $row (@$reach) {
+    for val $v (@$row) { $reached++ if $v >= 0 }
 }
 die "BFS reached #{$reached} cells, expected #{$W * $H}" unless $reached == $W * $H
 
@@ -198,17 +198,17 @@ die "BFS reached #{$reached} cells, expected #{$W * $H}" unless $reached == $W *
 #                 east wall down, cell (r,c+1) must have its west
 #                 wall down. ─────────────────────────────────────
 
-for my $r (0:$H - 1) {
-    for my $c (0:$W - 2) {
-        my $east_open  = !(($grid->[$r]->[$c]     >> 1) & 1)
-        my $west_open  = !(($grid->[$r]->[$c + 1] >> 3) & 1)
+for val $r (0:$H - 1) {
+    for val $c (0:$W - 2) {
+        val $east_open  = !(($grid->[$r]->[$c]     >> 1) & 1)
+        val $west_open  = !(($grid->[$r]->[$c + 1] >> 3) & 1)
         die "E/W wall asymmetry at (#{$r}, #{$c})" unless $east_open == $west_open
     }
 }
-for my $r (0:$H - 2) {
-    for my $c (0:$W - 1) {
-        my $south_open = !(($grid->[$r]->[$c]     >> 2) & 1)
-        my $north_open = !(($grid->[$r + 1]->[$c] >> 0) & 1)
+for val $r (0:$H - 2) {
+    for val $c (0:$W - 1) {
+        val $south_open = !(($grid->[$r]->[$c]     >> 2) & 1)
+        val $north_open = !(($grid->[$r + 1]->[$c] >> 0) & 1)
         die "N/S wall asymmetry at (#{$r}, #{$c})" unless $south_open == $north_open
     }
 }

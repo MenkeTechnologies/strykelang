@@ -2,34 +2,34 @@
 # Rosetta Code: Abbreviation, easy
 
 fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
-    my @commands = $commands_str |> split(/\s+/)
-    my %abbrevs
+    val @commands = $commands_str |> split(/\s+/)
+    var %abbrevs
     
     @commands |> map {
-        my $last_upper = -1
-        for (my $i = 0; $i < length(_); $i++) {
+        var $last_upper = -1
+        for (var $i = 0; $i < length(_); $i++) {
             if (substr(_, $i, 1) =~ /[A-Z]/) {
                 $last_upper = $i
             }
         }
 
-        my $full = lc(_)
-        my $min_len = $last_upper + 1
+        val $full = lc(_)
+        val $min_len = $last_upper + 1
         
         if ($min_len == 0 && length($full) > 0) {
             $abbrevs{$full} = $full
         } else {
-            for (my $i = $min_len; $i <= length($full); $i++) {
-                my $abbr = substr($full, 0, $i)
+            for (var $i = $min_len; $i <= length($full); $i++) {
+                val $abbr = substr($full, 0, $i)
                 $abbrevs{$abbr} = $full
             }
         }
     }
     
-    my @input_words = $input_str |> split(/\s+/)
-    my @results
+    val @input_words = $input_str |> split(/\s+/)
+    var @results
     @input_words |> map {
-        my $word = lc(_)
+        val $word = lc(_)
         if (exists $abbrevs{$word}) {
             push @results, $abbrevs{$word}
         } else {
@@ -39,9 +39,9 @@ fn Rosetta::Abbreviation::solve($commands_str, $input_str) {
     join(" ", @results)
 }
 
-my $commands = "Add ALTer  BAckup Bottom  CLeAn cLOse CoPy Delete Help iNsert List Move Quit Edit Replace REtrieve Save SHow Table Type"
-my $input = "re fORe ba TAB"
-my $expected = "retrieve *error* backup table"
+val $commands = "Add ALTer  BAckup Bottom  CLeAn cLOse CoPy Delete Help iNsert List Move Quit Edit Replace REtrieve Save SHow Table Type"
+val $input = "re fORe ba TAB"
+val $expected = "retrieve *error* backup table"
 
 assert_eq(Rosetta::Abbreviation::solve($commands, $input), $expected, "abbreviation easy test")
 

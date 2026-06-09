@@ -9,14 +9,14 @@ fn Rosetta::Directory::demonstrate($dir_path) {
     }
 
     # Create the directory
-    my $success = mkdir($dir_path)
+    val $success = mkdir($dir_path)
     
     if (!$success) {
         die "Failed to create directory $dir_path"
     }
 
     # Check that it was created
-    my $exists = -d $dir_path
+    val $exists = -d $dir_path
     
     # Clean up after test
     rmdir($dir_path)
@@ -24,8 +24,8 @@ fn Rosetta::Directory::demonstrate($dir_path) {
     $exists
 }
 
-my $test_dir = "/tmp/stryke_test_dir_creation"
-my $result = Rosetta::Directory::demonstrate($test_dir)
+val $test_dir = "/tmp/stryke_test_dir_creation"
+val $result = Rosetta::Directory::demonstrate($test_dir)
 
 assert_ok $result, "directory was successfully created and detected"
 assert_ok !(-d $test_dir), "directory was successfully cleaned up"

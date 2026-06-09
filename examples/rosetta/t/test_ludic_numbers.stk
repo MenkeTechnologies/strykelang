@@ -2,14 +2,14 @@
 # Rosetta Code: Ludic numbers
 
 fn Rosetta::Ludic::generate($n) {
-    my @ludics = (1)
-    my @nums = (2:$n)
+    var @ludics = (1)
+    var @nums = (2:$n)
     while (len(@nums) > 0) {
-        my $skip = shift @nums
+        val $skip = shift @nums
         push @ludics, $skip
         if (len(@nums) == 0) { last }
-        my @next_nums = ()
-        for my $i (0..len(@nums)-1) {
+        var @next_nums = ()
+        for val $i (0..len(@nums)-1) {
             if (($i + 1) % $skip != 0) {
                 push @next_nums, $nums[$i]
             }
@@ -20,10 +20,10 @@ fn Rosetta::Ludic::generate($n) {
     \@ludics
 }
 
-my $res = Rosetta::Ludic::generate(25)
+val $res = Rosetta::Ludic::generate(25)
 assert_eq join(",", @$res), "1,2,3,5,7,11,13,17,23,25", "Ludic up to 25"
 
-my $res2 = Rosetta::Ludic::generate(200)
+val $res2 = Rosetta::Ludic::generate(200)
 assert_eq $res2->[24], 107, "25th Ludic is 107"
 
 test_run

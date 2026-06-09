@@ -1,19 +1,19 @@
 #!/usr/bin/env stryke
 require "./NeedForSpeed.stk"
 
-my $race = Exercism::NeedForSpeed::new_race("Demo", 1000)
+val $race = Exercism::NeedForSpeed::new_race("Demo", 1000)
 assert_eq $race->{title}, "Demo", "title"
 
-my $car = Exercism::NeedForSpeed::new_car("Speedy", "red")
+val $car = Exercism::NeedForSpeed::new_car("Speedy", "red")
 assert_eq $car->{nickname}, "Speedy", "nickname"
 assert_eq Exercism::NeedForSpeed::display_distance($car), "0 meters", "0 m"
 assert_eq Exercism::NeedForSpeed::display_battery($car),  "Battery at 100%", "100%"
 
-my $c2 = Exercism::NeedForSpeed::drive($car)
+val $c2 = Exercism::NeedForSpeed::drive($car)
 assert_eq $c2->{distance_driven_in_meters}, 20, "drove 20"
 assert_eq $c2->{battery_percentage},        99, "battery 99"
 
-my $r2 = Exercism::NeedForSpeed::add_car($race, $car)
+val $r2 = Exercism::NeedForSpeed::add_car($race, $car)
 assert_eq len(@{$r2->{cars}}), 1, "one car"
 
 test_run

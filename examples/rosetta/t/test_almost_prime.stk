@@ -2,9 +2,9 @@
 # Rosetta Code: Almost prime
 
 fn Rosetta::AlmostPrime::count_factors($n) {
-    my $count = 0
-    my $d = 2
-    my $temp = $n
+    var $count = 0
+    var $d = 2
+    var $temp = $n
     while ($temp > 1) {
         while ($temp % $d == 0) {
             $count++

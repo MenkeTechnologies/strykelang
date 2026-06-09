@@ -2,17 +2,17 @@
 # Rosetta Code: Sequence: nth number with exactly n divisors
 
 fn Rosetta::NthNumberWithNDivisors::count_divisors($n) {
-    my $count = 0
-    for my $i (1:$n) {
+    var $count = 0
+    for val $i (1:$n) {
         if ($n % $i == 0) { $count++ }
     }
     $count
 }
 
 fn Rosetta::NthNumberWithNDivisors::solve($n) {
-    my $i = 1
-    my $found = 0
-    my $res = 0
+    var $i = 1
+    var $found = 0
+    var $res = 0
     while (!$found) {
         if (Rosetta::NthNumberWithNDivisors::count_divisors($i) == $n) {
             $res = $i

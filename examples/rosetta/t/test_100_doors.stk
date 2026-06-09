@@ -6,25 +6,25 @@ fn Rosetta::OneHundredDoors::solve($n) {
     # It is toggled for every divisor it has.
     # Numbers with an odd number of divisors are perfect squares.
     ~> 1:$n pgrep {
-        my @divs = grep { _< % _ == 0 } 1:_
+        val @divs = grep { _< % _ == 0 } 1:_
         len(@divs) % 2 == 1
     }
 }
 
 fn Rosetta::OneHundredDoors::solve_optimized($n) {
     ~> 1:$n pgrep {
-        my $s = sqrt(_)
+        val $s = sqrt(_)
         $s == int($s)
     }
 }
 
-my @result = Rosetta::OneHundredDoors::solve(100)
+val @result = Rosetta::OneHundredDoors::solve(100)
 assert_eq join(",", @result), "1,4,9,16,25,36,49,64,81,100", "100 doors puzzle"
 
-my @opt = Rosetta::OneHundredDoors::solve_optimized(100)
+val @opt = Rosetta::OneHundredDoors::solve_optimized(100)
 assert_eq join(",", @opt), "1,4,9,16,25,36,49,64,81,100", "optimized (perfect squares)"
 
-my @small = Rosetta::OneHundredDoors::solve(10)
+val @small = Rosetta::OneHundredDoors::solve(10)
 assert_eq join(",", @small), "1,4,9", "10 doors"
 
 test_run

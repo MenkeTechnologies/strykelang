@@ -19,14 +19,14 @@ fn _node($k) {
 }
 
 fn _rot_right($t) {
-    my $l = $t->{left}
+    var $l = $t->{left}
     $t->{left} = $l->{right}
     $l->{right} = $t
     $l
 }
 
 fn _rot_left($t) {
-    my $r = $t->{right}
+    var $r = $t->{right}
     $t->{right} = $r->{left}
     $r->{left} = $t
     $r
@@ -63,7 +63,7 @@ fn _inorder($t, $out) {
 }
 
 fn inorder($t) {
-    my @out = ()
+    val @out = ()
     TP::_inorder($t, \@out)
     \@out
 }
@@ -75,8 +75,8 @@ fn size($t) {
 
 fn height($t) {
     return 0 if !defined $t
-    my $hl = TP::height($t->{left})
-    my $hr = TP::height($t->{right})
+    val $hl = TP::height($t->{left})
+    val $hr = TP::height($t->{right})
     1 + ($hl > $hr ? $hl : $hr)
 }
 
@@ -97,8 +97,8 @@ fn _check_heap($t) {
 package main;
 
 p "=== Treap Demo ==="
-my $t = undef
-for my $k (5, 2, 8, 1, 7, 3, 9, 4, 6) {
+var $t = undef
+for val $k (5, 2, 8, 1, 7, 3, 9, 4, 6) {
     $t = TP::insert($t, $k)
 }
 p "size:   " . TP::size($t)

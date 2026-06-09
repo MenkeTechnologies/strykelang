@@ -8,7 +8,7 @@ fn Exercism::CommunityGarden::list_registrations($g) {
 }
 
 fn Exercism::CommunityGarden::register($g, $name) {
-    my $id = $g->{next_id}++
+    var $id = $g->{next_id}++
     $g->{plots}{$id} = { plot_id => $id, registered_to => $name }
     $g->{plots}{$id}
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Rolling hash — Rabin-Karp polynomial hash with O(1) window slide
 
 fn Rosetta::RollingHash::pow_mod($b, $e, $m) {
-    my $r = 1
+    var $r = 1
     $b = $b % $m
     while ($e > 0) {
         if ($e & 1) { $r = ($r * $b) % $m }
@@ -13,8 +13,8 @@ fn Rosetta::RollingHash::pow_mod($b, $e, $m) {
 }
 
 fn Rosetta::RollingHash::hash($s, $base, $mod) {
-    my $h = 0
-    for my $i (0..length($s) - 1) {
+    var $h = 0
+    for val $i (0..length($s) - 1) {
         $h = ($h * $base + ord(substr($s, $i, 1))) % $mod
     }
     $h
@@ -22,38 +22,38 @@ fn Rosetta::RollingHash::hash($s, $base, $mod) {
 
 # Slide window: drop leading char, append next
 fn Rosetta::RollingHash::roll($prev_hash, $drop, $add, $base, $mod, $win_len) {
-    my $top = Rosetta::RollingHash::pow_mod($base, $win_len - 1, $mod)
-    my $h = ($prev_hash - ord($drop) * $top) % $mod
+    val $top = Rosetta::RollingHash::pow_mod($base, $win_len - 1, $mod)
+    var $h = ($prev_hash - ord($drop) * $top) % $mod
     $h = ($h + $mod) % $mod
     ($h * $base + ord($add)) % $mod
 }
 
-my $base = 257
-my $mod = 1_000_000_007
+val $base = 257
+val $mod = 1_000_000_007
 
 # Recompute matches roll
-my $a = Rosetta::RollingHash::hash("HELLO", $base, $mod)
-my $b = Rosetta::RollingHash::hash("ELLOW", $base, $mod)
-my $rolled = Rosetta::RollingHash::roll($a, "H", "W", $base, $mod, 5)
+val $a = Rosetta::RollingHash::hash("HELLO", $base, $mod)
+val $b = Rosetta::RollingHash::hash("ELLOW", $base, $mod)
+val $rolled = Rosetta::RollingHash::roll($a, "H", "W", $base, $mod, 5)
 assert_eq $rolled, $b, "rolling 'HELLO' -> 'ELLOW' matches recompute"
 
 # Many slides over a string
-my $text = "ABCDEFGHIJ"
-my $win = 3
-my $h = Rosetta::RollingHash::hash(substr($text, 0, $win), $base, $mod)
-for my $i (1..length($text) - $win) {
-    my $drop = substr($text, $i - 1, 1)
-    my $add = substr($text, $i + $win - 1, 1)
+val $text = "ABCDEFGHIJ"
+val $win = 3
+var $h = Rosetta::RollingHash::hash(substr($text, 0, $win), $base, $mod)
+for val $i (1..length($text) - $win) {
+    val $drop = substr($text, $i - 1, 1)
+    val $add = substr($text, $i + $win - 1, 1)
     $h = Rosetta::RollingHash::roll($h, $drop, $add, $base, $mod, $win)
-    my $direct = Rosetta::RollingHash::hash(substr($text, $i, $win), $base, $mod)
+    val $direct = Rosetta::RollingHash::hash(substr($text, $i, $win), $base, $mod)
     assert_eq $h, $direct, "slide window at i=$i hash matches direct"
 }
 
 # Different strings should usually have different hashes (no collisions on this set)
-my %seen
-my @samples = ("cat", "bat", "dog", "log", "hat", "rat", "the", "and", "abc", "xyz")
-for my $s (@samples) {
-    my $hh = Rosetta::RollingHash::hash($s, $base, $mod)
+var %seen
+val @samples = ("cat", "bat", "dog", "log", "hat", "rat", "the", "and", "abc", "xyz")
+for val $s (@samples) {
+    val $hh = Rosetta::RollingHash::hash($s, $base, $mod)
     assert_ok !exists($seen{$hh}), "no collision for '$s'"
     $seen{$hh} = $s
 }

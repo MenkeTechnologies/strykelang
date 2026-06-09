@@ -2,36 +2,36 @@
 # t/test_datetime_advanced.stk — date/time operations
 
 # Today, yesterday, tomorrow (return days since epoch)
-my $today = today
+val $today = today
 assert_gt $today, 0, "today > 0"
 
-my $yesterday = yesterday
+val $yesterday = yesterday
 assert_eq $yesterday, $today - 1, "yesterday = today - 1"
 
-my $tomorrow = tomorrow
+val $tomorrow = tomorrow
 assert_eq $tomorrow, $today + 1, "tomorrow = today + 1"
 
 # Weekend/weekday (returns 0 or 1 based on day of week)
-my $is_wkend = is_weekend
-my $is_wkday = is_weekday
+val $is_wkend = is_weekend
+val $is_wkday = is_weekday
 assert_ok defined $is_wkend, "is_weekend returns defined"
 assert_ok defined $is_wkday, "is_weekday returns defined"
 assert_ok ($is_wkend + $is_wkday) == 1, "either weekend or weekday"
 
 # Time functions
-my $now = time
+val $now = time
 assert_gt $now, 1600000000, "time > 2020"
-my $ms = now_ms
+val $ms = now_ms
 assert_gt $ms, 1600000000000, "now_ms > 2020 in ms"
-my $us = now_us
+val $us = now_us
 assert_gt $us, 1600000000000000, "now_us > 2020 in us"
-my $ns = now_ns
+val $ns = now_ns
 assert_gt $ns, 0, "now_ns > 0"
 
 # Epoch
-my $epoch = unix_epoch
+val $epoch = unix_epoch
 assert_gt $epoch, 1600000000, "epoch > 2020"
-my $epoch_ms = unix_epoch_ms
+val $epoch_ms = unix_epoch_ms
 assert_gt $epoch_ms, 1600000000000, "epoch_ms > 2020"
 
 # Leap year

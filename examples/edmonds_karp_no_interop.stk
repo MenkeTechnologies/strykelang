@@ -15,12 +15,12 @@
 # ── BFS in residual graph, returns parent[] or undef if unreachable ─
 
 fn Ek::bfs($cap, $n, $src, $sink) {
-    my @parent = (-1) x $n
+    var @parent = (-1) x $n
     $parent[$src] = $src
-    my @queue = ($src)
+    var @queue = ($src)
     while (len(@queue) > 0) {
-        my $u = shift @queue
-        for my $v (0:$n - 1) {
+        val $u = shift @queue
+        for val $v (0:$n - 1) {
             if ($parent[$v] == -1 && $cap->[$u]->[$v] > 0) {
                 $parent[$v] = $u
                 if ($v == $sink) {
@@ -36,30 +36,30 @@ fn Ek::bfs($cap, $n, $src, $sink) {
 # ── full Edmonds-Karp loop ────────────────────────────────────────
 
 fn Ek::max_flow($cap_in, $src, $sink) {
-    my $n = len(@$cap_in)
+    val $n = len(@$cap_in)
     # Deep-copy the capacity matrix so we don't mutate the caller's.
-    my @cap
-    for my $row (@$cap_in) {
-        my @r = @$row
+    var @cap
+    for val $row (@$cap_in) {
+        val @r = @$row
         push @cap, \@r
     }
-    my $flow = 0
-    my $iters = 0
+    var $flow = 0
+    var $iters = 0
     while (1) {
-        my $par = Ek::bfs(\@cap, $n, $src, $sink)
+        val $par = Ek::bfs(\@cap, $n, $src, $sink)
         last unless defined $par
         # Bottleneck along the path from src to sink.
-        my $bottle = 1_000_000_000
-        my $v = $sink
+        var $bottle = 1_000_000_000
+        var $v = $sink
         while ($v != $src) {
-            my $u = $par->[$v]
+            val $u = $par->[$v]
             $bottle = $cap[$u]->[$v] if $cap[$u]->[$v] < $bottle
             $v = $u
         }
         # Update residuals: subtract on forward edge, add on backward.
         $v = $sink
         while ($v != $src) {
-            my $u = $par->[$v]
+            val $u = $par->[$v]
             $cap[$u]->[$v] = $cap[$u]->[$v] - $bottle
             $cap[$v]->[$u] = $cap[$v]->[$u] + $bottle
             $v = $u
@@ -73,12 +73,12 @@ fn Ek::max_flow($cap_in, $src, $sink) {
 # ── helper: rebuild a fresh capacity matrix from an edge list ─────
 
 fn Ek::from_edges($n, $edges) {
-    my @m
-    for my $i (0:$n - 1) {
-        my @row = (0) x $n
+    var @m
+    for val $i (0:$n - 1) {
+        val @row = (0) x $n
         push @m, \@row
     }
-    for my $e (@$edges) {
+    for val $e (@$edges) {
         $m[$e->[0]]->[$e->[1]] = $e->[2]
     }
     \@m
@@ -86,7 +86,7 @@ fn Ek::from_edges($n, $edges) {
 
 # ── primary test cases ────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "CLRS 6-node textbook",
         n     => 6,
@@ -158,9 +158,9 @@ my @cases = (
 p "── Edmonds-Karp max-flow demo ────────────────────────"
 printf "  %-32s  %3s  %3s  %3s  %5s  %5s\n", "case", "n", "src", "snk", "iters", "flow"
 printf "  %-32s  %3s  %3s  %3s  %5s  %5s\n", "--------------------------------", "---", "---", "---", "-----", "-----"
-for my $c (@cases) {
-    my $cap = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
+for val $c (@cases) {
+    val $cap = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
     printf "  %-32s  %3d  %3d  %3d  %5d  %5d  %s\n",
         $c->{name}, $c->{n}, $c->{src}, $c->{sink},
         $r->{iters}, $r->{flow},
@@ -169,28 +169,28 @@ for my $c (@cases) {
 
 # ── invariant 1: flow matches known optimum on every case ─────────
 
-for my $c (@cases) {
-    my $cap = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
+for val $c (@cases) {
+    val $cap = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
     die "flow #{$r->{flow}} != known optimum #{$c->{flow}} on \"#{$c->{name}}\"" unless $r->{flow} == $c->{flow}
 }
 
 # ── invariant 2: # of augmenting-path iterations bounded by V·E ────
 
-for my $c (@cases) {
-    my $cap = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
-    my $bound = $c->{n} * len(@{$c->{edges}}) + 1
+for val $c (@cases) {
+    val $cap = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
+    val $bound = $c->{n} * len(@{$c->{edges}}) + 1
     die "iters #{$r->{iters}} > V·E+1 #{$bound} on \"#{$c->{name}}\"" unless $r->{iters} <= $bound
 }
 
 # ── invariant 3: residual capacity from src ≥ 0 (no over-augment) ─
 
-for my $c (@cases) {
-    my $cap = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
-    for my $u (0:$c->{n} - 1) {
-        for my $v (0:$c->{n} - 1) {
+for val $c (@cases) {
+    val $cap = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap, $c->{src}, $c->{sink})
+    for val $u (0:$c->{n} - 1) {
+        for val $v (0:$c->{n} - 1) {
             die "negative residual cap[#{$u}][#{$v}] = #{$r->{residual}->[$u]->[$v]} on \"#{$c->{name}}\"" unless $r->{residual}->[$u]->[$v] >= 0
         }
     }
@@ -200,18 +200,18 @@ for my $c (@cases) {
 # net flow in = net flow out (forward cap consumed - backward cap consumed
 # is implicit via the residual symmetry).
 
-for my $c (@cases) {
-    my $cap_orig = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap_orig, $c->{src}, $c->{sink})
-    my $res = $r->{residual}
+for val $c (@cases) {
+    val $cap_orig = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap_orig, $c->{src}, $c->{sink})
+    val $res = $r->{residual}
     # f(u, v) = cap_orig[u][v] - cap_residual[u][v] (only forward edges).
-    for my $node (0:$c->{n} - 1) {
+    for val $node (0:$c->{n} - 1) {
         next if $node == $c->{src} || $node == $c->{sink}
-        my $in = 0
-        my $out = 0
-        for my $other (0:$c->{n} - 1) {
-            my $f_in  = $cap_orig->[$other]->[$node] - $res->[$other]->[$node]
-            my $f_out = $cap_orig->[$node]->[$other] - $res->[$node]->[$other]
+        var $in = 0
+        var $out = 0
+        for val $other (0:$c->{n} - 1) {
+            val $f_in  = $cap_orig->[$other]->[$node] - $res->[$other]->[$node]
+            val $f_out = $cap_orig->[$node]->[$other] - $res->[$node]->[$other]
             $in  += $f_in  if $f_in  > 0
             $out += $f_out if $f_out > 0
         }
@@ -221,13 +221,13 @@ for my $c (@cases) {
 
 # ── invariant 5: total out-flow from source == reported flow ──────
 
-for my $c (@cases) {
-    my $cap_orig = Ek::from_edges($c->{n}, $c->{edges})
-    my $r = Ek::max_flow($cap_orig, $c->{src}, $c->{sink})
-    my $res = $r->{residual}
-    my $out = 0
-    for my $v (0:$c->{n} - 1) {
-        my $f = $cap_orig->[$c->{src}]->[$v] - $res->[$c->{src}]->[$v]
+for val $c (@cases) {
+    val $cap_orig = Ek::from_edges($c->{n}, $c->{edges})
+    val $r = Ek::max_flow($cap_orig, $c->{src}, $c->{sink})
+    val $res = $r->{residual}
+    var $out = 0
+    for val $v (0:$c->{n} - 1) {
+        val $f = $cap_orig->[$c->{src}]->[$v] - $res->[$c->{src}]->[$v]
         $out += $f if $f > 0
     }
     die "src out-flow #{$out} != reported #{$r->{flow}} on \"#{$c->{name}}\"" unless $out == $r->{flow}
@@ -235,9 +235,9 @@ for my $c (@cases) {
 
 # ── invariant 6: zero-iteration disconnected case has zero flow ───
 
-my $dis = $cases[4]
-my $cap_dis = Ek::from_edges($dis->{n}, $dis->{edges})
-my $r_dis = Ek::max_flow($cap_dis, $dis->{src}, $dis->{sink})
+val $dis = $cases[4]
+val $cap_dis = Ek::from_edges($dis->{n}, $dis->{edges})
+val $r_dis = Ek::max_flow($cap_dis, $dis->{src}, $dis->{sink})
 die "disconnected must have 0 flow"  unless $r_dis->{flow}  == 0
 die "disconnected must take 0 iters" unless $r_dis->{iters} == 0
 

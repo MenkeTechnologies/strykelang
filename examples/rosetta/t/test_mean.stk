@@ -13,7 +13,7 @@ fn Rosetta::Mean::geometric(@nums) {
     if (!@nums) {
         0
     } else {
-        my $product = @nums |> reduce { _0 * _1 }
+        val $product = @nums |> reduce { _0 * _1 }
         $product ** (1 / len(@nums))
     }
 }
@@ -22,7 +22,7 @@ fn Rosetta::Mean::harmonic(@nums) {
     if (!@nums) {
         0
     } else {
-        my $sum = @nums |> map { 1 / _ } |> reduce { _0 + _1 }
+        val $sum = @nums |> map { 1 / _ } |> reduce { _0 + _1 }
         len(@nums) / $sum
     }
 }
@@ -31,10 +31,10 @@ assert_eq Rosetta::Mean::arithmetic(1, 2, 3, 4, 5), 3, "mean 1:5"
 assert_eq Rosetta::Mean::arithmetic(10, 20, 30), 20, "mean 10,20,30"
 assert_eq Rosetta::Mean::arithmetic(5), 5, "mean single"
 
-my $gm = Rosetta::Mean::geometric(1, 2, 4, 8)
+val $gm = Rosetta::Mean::geometric(1, 2, 4, 8)
 assert_ok abs($gm - 2.828) < 0.01, "geometric mean"
 
-my $hm = Rosetta::Mean::harmonic(1, 2, 4)
+val $hm = Rosetta::Mean::harmonic(1, 2, 4)
 assert_ok abs($hm - 1.714) < 0.01, "harmonic mean"
 
 test_run

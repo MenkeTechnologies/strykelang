@@ -10,8 +10,8 @@ fn Rosetta::Kruskal::find_set($parent, $i) {
 }
 
 fn Rosetta::Kruskal::union_sets($parent, $rank, $x, $y) {
-    my $xroot = Rosetta::Kruskal::find_set($parent, $x)
-    my $yroot = Rosetta::Kruskal::find_set($parent, $y)
+    val $xroot = Rosetta::Kruskal::find_set($parent, $x)
+    val $yroot = Rosetta::Kruskal::find_set($parent, $y)
     if ($rank->{$xroot} < $rank->{$yroot}) {
         $parent->{$xroot} = $yroot
     } elsif ($rank->{$xroot} > $rank->{$yroot}) {
@@ -23,20 +23,20 @@ fn Rosetta::Kruskal::union_sets($parent, $rank, $x, $y) {
 }
 
 fn Rosetta::Kruskal::solve($n, $edges) {
-    my @sorted_edges = sort { _0->[2] <=> _1->[2] } @$edges
-    my $parent = {}
-    my $rank = {}
-    for my $i (0:$n-1) {
+    val @sorted_edges = sort { _0->[2] <=> _1->[2] } @$edges
+    var $parent = {}
+    var $rank = {}
+    for val $i (0:$n-1) {
         $parent->{$i} = "$i"
         $rank->{$i} = 0
     }
     
-    my @mst = ()
-    for my $e (@sorted_edges) {
-        my $u = $e->[0]
-        my $v = $e->[1]
-        my $root_u = Rosetta::Kruskal::find_set($parent, $u)
-        my $root_v = Rosetta::Kruskal::find_set($parent, $v)
+    var @mst = ()
+    for val $e (@sorted_edges) {
+        val $u = $e->[0]
+        val $v = $e->[1]
+        val $root_u = Rosetta::Kruskal::find_set($parent, $u)
+        val $root_v = Rosetta::Kruskal::find_set($parent, $v)
         if ($root_u ne $root_v) {
             push @mst, $e
             Rosetta::Kruskal::union_sets($parent, $rank, $root_u, $root_v)
@@ -45,17 +45,17 @@ fn Rosetta::Kruskal::solve($n, $edges) {
     \@mst
 }
 
-my $edges = [
+val $edges = [
     [0, 1, 10],
     [0, 2, 6],
     [0, 3, 5],
     [1, 3, 15],
     [2, 3, 4]
 ]
-my $mst = Rosetta::Kruskal::solve(4, $edges)
+val $mst = Rosetta::Kruskal::solve(4, $edges)
 # MST should be [2,3,4], [0,3,5], [0,1,10]
 # Total weight: 4 + 5 + 10 = 19
-my $total_w = 0
+var $total_w = 0
 ~> @$mst ep { $total_w += _->[2] }
 assert_eq $total_w, 19, "MST total weight"
 

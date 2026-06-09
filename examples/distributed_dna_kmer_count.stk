@@ -8,62 +8,62 @@
 #
 # CI-safe: pure loopback fork, synthetic input. Clean under --no-interop.
 
-my $k = $ARGV[0] // 3
-my $n_workers = $ARGV[1] // 4
+val $k = $ARGV[0] // 3
+val $n_workers = $ARGV[1] // 4
 
 printf "── distributed DNA k-mer count (k=%d) ──\n", $k
 
 # Synthetic DNA sequence (deterministic). Real workloads slurp from FASTA.
-my @bases = ('A', 'C', 'G', 'T')
-my $seq = ""
-for my $i (0:299) {
+val @bases = ('A', 'C', 'G', 'T')
+var $seq = ""
+for val $i (0:299) {
     $seq .= $bases[($i * 7 + 11) % 4]
 }
 printf "sequence: %d bases (synthetic)\n", len($seq)
 
-my @workers = congregation($n_workers)
-my @sorted_workers = sort { _ <=> _1 } @workers
+val @workers = congregation($n_workers)
+val @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the sequence by overlapping windows so k-mers at shard boundaries
 # aren't lost. Each worker gets [start, end+k-1).
-my $shard_size = int((len($seq) + $n_workers - 1) / $n_workers)
-my %counts_per_worker
-for my $i (0:len(@sorted_workers) - 1) {
-    my $w = $sorted_workers[$i]
-    my $start = $i * $shard_size
-    my $end = $start + $shard_size + $k - 2
+val $shard_size = int((len($seq) + $n_workers - 1) / $n_workers)
+var %counts_per_worker
+for val $i (0:len(@sorted_workers) - 1) {
+    val $w = $sorted_workers[$i]
+    val $start = $i * $shard_size
+    var $end = $start + $shard_size + $k - 2
     $end = len($seq) - 1 if $end >= len($seq)
     next if $start + $k > len($seq)
-    my $shard_seq = substr($seq, $start, $end - $start + 1)
-    my $code = "
+    val $shard_seq = substr($seq, $start, $end - $start + 1)
+    val $code = "
         my \$s = q{$shard_seq};
-        my %kc;
+        var %kc;
         my \$lim = len(\$s) - $k;
         for my \$i (0:\$lim) { \$kc{substr(\$s, \$i, $k)}++ }
         to_json(\\%kc)
     "
-    my $div = pray $code, $w
-    my %reply = annex $div
+    val $div = pray $code, $w
+    val %reply = annex $div
     $counts_per_worker{$w} = from_json($reply{$w})
 }
 
 # Aggregate across workers (with naive overlap dedup — real impls use
 # minimizer-based partitioning to avoid double counting; this demo
 # under-counts boundary k-mers slightly, accepted tradeoff for clarity).
-my %fleet
-for my $sid (keys %counts_per_worker) {
-    my $h = $counts_per_worker{$sid}
-    for my $mer (keys %$h) {
+var %fleet
+for val $sid (keys %counts_per_worker) {
+    val $h = $counts_per_worker{$sid}
+    for val $mer (keys %$h) {
         $fleet{$mer} = ($fleet{$mer} // 0) + $h->{$mer}
     }
 }
 
 # Print top-10 k-mers by count.
-my @sorted_mers = sort { $fleet{_1} <=> $fleet{_} || _ cmp _1 } keys %fleet
-my $shown = len(@sorted_mers) < 10 ? len(@sorted_mers) : 10
+val @sorted_mers = sort { $fleet{_1} <=> $fleet{_} || _ cmp _1 } keys %fleet
+val $shown = len(@sorted_mers) < 10 ? len(@sorted_mers) : 10
 p "── top k-mers by count ──"
-for my $i (0:$shown - 1) {
-    my $m = $sorted_mers[$i]
+for val $i (0:$shown - 1) {
+    val $m = $sorted_mers[$i]
     printf "  %s  %d\n", $m, $fleet{$m}
 }
 printf "fleet vocab: %d distinct %d-mers seen\n", len(keys %fleet), $k

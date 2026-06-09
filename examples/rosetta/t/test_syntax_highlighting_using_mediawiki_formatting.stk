@@ -2,12 +2,12 @@
 # Rosetta Code: Syntax highlighting using Mediawiki formatting
 
 fn Rosetta::Mediawiki::highlight($code) {
-    my $out = $code
+    var $out = $code
     $out =~ s/\b(fn|my|return)\b/<span class="kw">$1<\/span>/g
     "<syntaxhighlight lang=\"perl\">$out</syntaxhighlight>"
 }
 
-my $html = Rosetta::Mediawiki::highlight('fn demo() { my $x = 1; return $x }')
+val $html = Rosetta::Mediawiki::highlight('fn demo() { val $x = 1; return $x }')
 
 assert_eq $html =~ /<syntaxhighlight lang="perl">/, 1, "wrapper tag emitted"
 assert_eq $html =~ /<span class="kw">fn<\/span>/, 1, "function keyword highlighted"

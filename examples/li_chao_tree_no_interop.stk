@@ -41,9 +41,9 @@ fn Li::insert_at($t, $idx, $lo, $hi, $line) {
         $t->{nodes}->{$idx} = $line
         return
     }
-    my $mid = int(($lo + $hi) / 2)
-    my $cur = $t->{nodes}->{$idx}
-    my $new_better_at_mid = Li::eval_line($line, $mid) < Li::eval_line($cur, $mid)
+    val $mid = int(($lo + $hi) / 2)
+    val $cur = $t->{nodes}->{$idx}
+    val $new_better_at_mid = Li::eval_line($line, $mid) < Li::eval_line($cur, $mid)
     if ($new_better_at_mid) {
         $t->{nodes}->{$idx} = $line
         $line = $cur
@@ -65,18 +65,18 @@ fn Li::query($t, $x) {
 }
 
 fn Li::query_at($t, $idx, $lo, $hi, $x) {
-    my $INF = 1_000_000_000_000
+    val $INF = 1_000_000_000_000
     return $INF unless exists $t->{nodes}->{$idx}
-    my $val = Li::eval_line($t->{nodes}->{$idx}, $x)
+    val $val = Li::eval_line($t->{nodes}->{$idx}, $x)
     if ($lo == $hi) {
         return $val
     }
-    my $mid = int(($lo + $hi) / 2)
+    val $mid = int(($lo + $hi) / 2)
     if ($x <= $mid) {
-        my $left = Li::query_at($t, 2 * $idx, $lo, $mid, $x)
+        val $left = Li::query_at($t, 2 * $idx, $lo, $mid, $x)
         $left < $val ? $left : $val
     } else {
-        my $right = Li::query_at($t, 2 * $idx + 1, $mid + 1, $hi, $x)
+        val $right = Li::query_at($t, 2 * $idx + 1, $mid + 1, $hi, $x)
         $right < $val ? $right : $val
     }
 }
@@ -84,10 +84,10 @@ fn Li::query_at($t, $idx, $lo, $hi, $x) {
 # ── O(n) brute force min over a line set at point x ──────────────
 
 fn Li::brute_min($lines, $x) {
-    my $INF = 1_000_000_000_000
-    my $best = $INF
-    for my $line (@$lines) {
-        my $v = Li::eval_line($line, $x)
+    val $INF = 1_000_000_000_000
+    var $best = $INF
+    for val $line (@$lines) {
+        val $v = Li::eval_line($line, $x)
         $best = $v if $v < $best
     }
     $best
@@ -95,7 +95,7 @@ fn Li::brute_min($lines, $x) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "two crossing lines",
         lines => [[1, 0], [-1, 10]],
@@ -137,14 +137,14 @@ my @cases = (
 p "── Li Chao tree demo ─────────────────────────────────"
 printf "  %-26s  %s\n", "case", "x → min y"
 printf "  %-26s  %s\n", "--------------------------", "---------"
-for my $c (@cases) {
-    my $t = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) {
+for val $c (@cases) {
+    val $t = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) {
         Li::insert($t, $line)
     }
-    my @results
-    for my $x (@{$c->{queries}}) {
-        my $y = Li::query($t, $x)
+    var @results
+    for val $x (@{$c->{queries}}) {
+        val $y = Li::query($t, $x)
         push @results, "(#{$x},#{$y})"
     }
     printf "  %-26s  %s\n", $c->{name}, join(" ", @results)
@@ -152,65 +152,65 @@ for my $c (@cases) {
 
 # ── invariant 1: Li Chao query matches brute on every (case, x) ───
 
-for my $c (@cases) {
-    my $t = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) {
+for val $c (@cases) {
+    val $t = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) {
         Li::insert($t, $line)
     }
-    for my $x (@{$c->{queries}}) {
-        my $li = Li::query($t, $x)
-        my $br = Li::brute_min($c->{lines}, $x)
+    for val $x (@{$c->{queries}}) {
+        val $li = Li::query($t, $x)
+        val $br = Li::brute_min($c->{lines}, $x)
         die "(\"#{$c->{name}}\", x=#{$x}): Li #{$li} != brute #{$br}" unless $li == $br
     }
 }
 
 # ── invariant 2: dense sweep across full range matches brute ──────
 
-for my $c (@cases) {
-    my $t = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) {
+for val $c (@cases) {
+    val $t = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) {
         Li::insert($t, $line)
     }
-    for my $x ($c->{range}->[0]:$c->{range}->[1]) {
-        my $li = Li::query($t, $x)
-        my $br = Li::brute_min($c->{lines}, $x)
+    for val $x ($c->{range}->[0]:$c->{range}->[1]) {
+        val $li = Li::query($t, $x)
+        val $br = Li::brute_min($c->{lines}, $x)
         die "sweep (\"#{$c->{name}}\", x=#{$x}): Li #{$li} != brute #{$br}" unless $li == $br
     }
 }
 
 # ── invariant 3: insertion order doesn't change query results ─────
 
-for my $c (@cases) {
-    my $t1 = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) { Li::insert($t1, $line) }
-    my $t2 = Li::new($c->{range}->[0], $c->{range}->[1])
-    my @reversed = rev @{$c->{lines}}
-    for my $line (@reversed) { Li::insert($t2, $line) }
-    for my $x (@{$c->{queries}}) {
+for val $c (@cases) {
+    val $t1 = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) { Li::insert($t1, $line) }
+    val $t2 = Li::new($c->{range}->[0], $c->{range}->[1])
+    val @reversed = rev @{$c->{lines}}
+    for val $line (@reversed) { Li::insert($t2, $line) }
+    for val $x (@{$c->{queries}}) {
         die "order changes result on \"#{$c->{name}}\" at x=#{$x}" unless Li::query($t1, $x) == Li::query($t2, $x)
     }
 }
 
 # ── invariant 4: a single-line tree returns exactly that line ─────
 
-for my $line ([3, 7], [-2, 5], [0, 42]) {
-    my $t = Li::new(-100, 100)
+for val $line ([3, 7], [-2, 5], [0, 42]) {
+    val $t = Li::new(-100, 100)
     Li::insert($t, $line)
-    for my $x (-100, -10, 0, 10, 50, 100) {
-        my $expected = Li::eval_line($line, $x)
+    for val $x (-100, -10, 0, 10, 50, 100) {
+        val $expected = Li::eval_line($line, $x)
         die "single-line query: got #{Li::query($t, $x)} want #{$expected}" unless Li::query($t, $x) == $expected
     }
 }
 
 # ── invariant 5: query at endpoint matches one of the inserted lines ─
 
-for my $c (@cases) {
-    my $t = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) { Li::insert($t, $line) }
-    for my $endpoint ($c->{range}->[0], $c->{range}->[1]) {
-        my $q = Li::query($t, $endpoint)
-        my $found = 0
-        for my $line (@{$c->{lines}}) {
+for val $c (@cases) {
+    val $t = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) { Li::insert($t, $line) }
+    for val $endpoint ($c->{range}->[0], $c->{range}->[1]) {
+        val $q = Li::query($t, $endpoint)
+        var $found = 0
+        for val $line (@{$c->{lines}}) {
             $found = 1 if Li::eval_line($line, $endpoint) == $q
         }
         die "query at endpoint #{$endpoint} on \"#{$c->{name}}\" doesn't match any line" unless $found
@@ -219,25 +219,25 @@ for my $c (@cases) {
 
 # ── invariant 6: tree depth ≤ ⌈log₂ range⌉ + 1 (no infinite recursion) ─
 
-for my $c (@cases) {
-    my $t = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) { Li::insert($t, $line) }
+for val $c (@cases) {
+    val $t = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) { Li::insert($t, $line) }
     # Max node index is at most 2^(depth+1) − 1; check no index exceeds
     # 2^25 (way above what's reachable for our range sizes).
-    for my $k (keys %{$t->{nodes}}) {
+    for val $k (keys %{$t->{nodes}}) {
         die "node idx #{$k} unreasonably large on \"#{$c->{name}}\"" unless $k < 1 << 25
     }
 }
 
 # ── invariant 7: adding a strictly dominated line doesn't change result ─
 
-for my $c (@cases) {
-    my $t1 = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) { Li::insert($t1, $line) }
-    my $t2 = Li::new($c->{range}->[0], $c->{range}->[1])
-    for my $line (@{$c->{lines}}) { Li::insert($t2, $line) }
+for val $c (@cases) {
+    val $t1 = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) { Li::insert($t1, $line) }
+    val $t2 = Li::new($c->{range}->[0], $c->{range}->[1])
+    for val $line (@{$c->{lines}}) { Li::insert($t2, $line) }
     Li::insert($t2, [0, 999_999_999])   # always huge → never selected
-    for my $x (@{$c->{queries}}) {
+    for val $x (@{$c->{queries}}) {
         die "dominated-line addition changed result on \"#{$c->{name}}\" at x=#{$x}" unless Li::query($t1, $x) == Li::query($t2, $x)
     }
 }

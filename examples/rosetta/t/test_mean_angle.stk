@@ -2,18 +2,18 @@
 # Rosetta Code: Averages/Mean angle
 
 fn Rosetta::MeanAngle::compute(@deg_angles) {
-    my $sum_sin = 0
-    my $sum_cos = 0
-    my $pi = 3.14159265358979323846
+    var $sum_sin = 0
+    var $sum_cos = 0
+    val $pi = 3.14159265358979323846
     
-    for my $deg (@deg_angles) {
-        my $rad = $deg * $pi / 180
+    for val $deg (@deg_angles) {
+        val $rad = $deg * $pi / 180
         $sum_sin += sin($rad)
         $sum_cos += cos($rad)
     }
     
-    my $mean_rad = atan2($sum_sin, $sum_cos)
-    my $mean_deg = $mean_rad * 180 / $pi
+    val $mean_rad = atan2($sum_sin, $sum_cos)
+    var $mean_deg = $mean_rad * 180 / $pi
     
     # Normalize to [0, 360)
     while ($mean_deg < 0) { $mean_deg += 360 }

@@ -5,8 +5,8 @@
 fn Trie::new() { +{ children => +{}, terminal => 0 } }
 
 fn Trie::insert($t, $word) {
-    my $node = $t
-    for my $c (split(//, $word)) {
+    var $node = $t
+    for val $c (split(//, $word)) {
         $node->{children}{$c} ||= Trie::new()
         $node = $node->{children}{$c}
     }
@@ -14,8 +14,8 @@ fn Trie::insert($t, $word) {
 }
 
 fn Trie::contains($t, $word) {
-    my $node = $t
-    for my $c (split(//, $word)) {
+    var $node = $t
+    for val $c (split(//, $word)) {
         return 0 unless exists $node->{children}{$c}
         $node = $node->{children}{$c}
     }
@@ -23,8 +23,8 @@ fn Trie::contains($t, $word) {
 }
 
 fn Trie::has_prefix($t, $prefix) {
-    my $node = $t
-    for my $c (split(//, $prefix)) {
+    var $node = $t
+    for val $c (split(//, $prefix)) {
         return 0 unless exists $node->{children}{$c}
         $node = $node->{children}{$c}
     }
@@ -33,32 +33,32 @@ fn Trie::has_prefix($t, $prefix) {
 
 fn Trie::_collect($node, $prefix, $out) {
     push @$out, $prefix if $node->{terminal}
-    for my $c (sort keys %{$node->{children}}) {
+    for val $c (sort keys %{$node->{children}}) {
         Trie::_collect($node->{children}{$c}, $prefix . $c, $out)
     }
 }
 
 fn Trie::complete($t, $prefix) {
-    my $node = $t
-    for my $c (split(//, $prefix)) {
+    var $node = $t
+    for val $c (split(//, $prefix)) {
         return [] unless exists $node->{children}{$c}
         $node = $node->{children}{$c}
     }
-    my @out
+    val @out
     Trie::_collect($node, $prefix, \@out)
     \@out
 }
 
 fn Trie::count_words($t) {
-    my $n = $t->{terminal} ? 1 : 0
-    for my $c (keys %{$t->{children}}) {
+    var $n = $t->{terminal} ? 1 : 0
+    for val $c (keys %{$t->{children}}) {
         $n += Trie::count_words($t->{children}{$c})
     }
     $n
 }
 
-my $t = Trie::new()
-my @words = qw(apple app apricot banana band ban bandana bandit)
+val $t = Trie::new()
+val @words = qw(apple app apricot banana band ban bandana bandit)
 Trie::insert($t, _) for @words
 
 Trie::contains($t, "apple")    |> aok "contains apple"
@@ -73,13 +73,13 @@ Trie::has_prefix($t, "band")  |> aok "prefix band"
 !Trie::has_prefix($t, "cat")  |> aok "prefix cat absent"
 
 # Completion
-my $apr = Trie::complete($t, "ap")
+val $apr = Trie::complete($t, "ap")
 join(",", @$apr) |> aeq "app,apple,apricot", "complete ap"
 
-my $bnd = Trie::complete($t, "band")
+val $bnd = Trie::complete($t, "band")
 join(",", @$bnd) |> aeq "band,bandana,bandit", "complete band"
 
-my $bn = Trie::complete($t, "ban")
+val $bn = Trie::complete($t, "ban")
 join(",", @$bn) |> aeq "ban,banana,band,bandana,bandit", "complete ban"
 
 # Word count = unique inserted words
@@ -90,7 +90,7 @@ Trie::insert($t, "apple")
 Trie::count_words($t) |> aeq 8, "still 8 after dup insert"
 
 # Empty trie
-my $e = Trie::new()
+val $e = Trie::new()
 Trie::count_words($e) |> aeq 0, "empty trie"
 !Trie::contains($e, "anything") |> aok "empty contains nothing"
 join(",", @{Trie::complete($e, "x")}) |> aeq "", "empty completion"

@@ -2,17 +2,17 @@
 # Rosetta Code: K-d tree
 
 fn Rosetta::KDTree::build($points, $depth) {
-    my $n = len(@$points)
+    val $n = len(@$points)
     return undef if $n == 0
     
-    my $k = len(@{$points->[0]})
-    my $axis = $depth % $k
+    val $k = len(@{$points->[0]})
+    val $axis = $depth % $k
     
-    my @sorted = sort { _0->[$axis] <=> _1->[$axis] } @$points
-    my $mid = $n / 2 | 0
+    val @sorted = sort { _0->[$axis] <=> _1->[$axis] } @$points
+    val $mid = $n / 2 | 0
     
-    my @left = @sorted[0 : $mid - 1]
-    my @right = @sorted[$mid + 1 : $n - 1]
+    val @left = @sorted[0 : $mid - 1]
+    val @right = @sorted[$mid + 1 : $n - 1]
     
     {
         point => $sorted[$mid],
@@ -22,8 +22,8 @@ fn Rosetta::KDTree::build($points, $depth) {
 }
 
 fn Rosetta::KDTree::sq_dist($p1, $p2) {
-    my $d = 0
-    for (my $i = 0; $i < len(@$p1); $i++) {
+    var $d = 0
+    for (var $i = 0; $i < len(@$p1); $i++) {
         $d += ($p1->[$i] - $p2->[$i]) ** 2
     }
     $d
@@ -32,19 +32,19 @@ fn Rosetta::KDTree::sq_dist($p1, $p2) {
 fn Rosetta::KDTree::nearest($node, $target, $depth, $best) {
     return $best if !defined $node
     
-    my $d = Rosetta::KDTree::sq_dist($node->{point}, $target)
-    my $best_d = Rosetta::KDTree::sq_dist($best, $target)
+    val $d = Rosetta::KDTree::sq_dist($node->{point}, $target)
+    var $best_d = Rosetta::KDTree::sq_dist($best, $target)
     
     if ($d < $best_d) {
         $best = $node->{point}
         $best_d = $d
     }
     
-    my $k = len(@$target)
-    my $axis = $depth % $k
+    val $k = len(@$target)
+    val $axis = $depth % $k
     
-    my $nearer
-    my $further
+    var $nearer
+    var $further
     if ($target->[$axis] < $node->{point}->[$axis]) {
         $nearer = $node->{left}
         $further = $node->{right}
@@ -63,11 +63,11 @@ fn Rosetta::KDTree::nearest($node, $target, $depth, $best) {
     $best
 }
 
-my @points = ([2,3], [5,4], [9,6], [4,7], [8,1], [7,2])
-my $tree = Rosetta::KDTree::build(\@points, 0)
+val @points = ([2,3], [5,4], [9,6], [4,7], [8,1], [7,2])
+val $tree = Rosetta::KDTree::build(\@points, 0)
 
-my $target = [9, 2]
-my $near = Rosetta::KDTree::nearest($tree, $target, 0, $points[0])
+val $target = [9, 2]
+val $near = Rosetta::KDTree::nearest($tree, $target, 0, $points[0])
 assert_eq join(",", @$near), "8,1", "nearest to (9,2) is (8,1)"
 
 test_run

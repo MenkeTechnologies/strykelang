@@ -29,8 +29,8 @@ fn Bv::uf_find($parent, $x) {
 }
 
 fn Bv::uf_union($parent, $rank, $x, $y) {
-    my $rx = Bv::uf_find($parent, $x)
-    my $ry = Bv::uf_find($parent, $y)
+    val $rx = Bv::uf_find($parent, $x)
+    val $ry = Bv::uf_find($parent, $y)
     return 0 if $rx == $ry
     if ($rank->[$rx] < $rank->[$ry]) {
         $parent->[$rx] = $ry
@@ -46,22 +46,22 @@ fn Bv::uf_union($parent, $rank, $x, $y) {
 # ── Borůvka's algorithm: returns +{ cost, edges } ────────────────
 
 fn Bv::boruvka($n, $edges) {
-    my @parent = (0:$n - 1)
-    my @rank   = (0)  x $n
-    my $components = $n
-    my $total = 0
-    my @mst_edges
-    my $rounds = 0
+    val @parent = (0:$n - 1)
+    val @rank   = (0)  x $n
+    var $components = $n
+    var $total = 0
+    var @mst_edges
+    var $rounds = 0
     while ($components > 1) {
         $rounds++
-        my $INF = 1_000_000_000
-        my @cheapest = (-1) x $n   # cheapest[c] = edge index for component c
-        my @cheap_w  = ($INF) x $n
-        my $m = len(@$edges)
-        for my $i (0:$m - 1) {
-            my $e = $edges->[$i]
-            my $ra = Bv::uf_find(\@parent, $e->[0])
-            my $rb = Bv::uf_find(\@parent, $e->[1])
+        val $INF = 1_000_000_000
+        var @cheapest = (-1) x $n   # cheapest[c] = edge index for component c
+        var @cheap_w  = ($INF) x $n
+        val $m = len(@$edges)
+        for val $i (0:$m - 1) {
+            val $e = $edges->[$i]
+            val $ra = Bv::uf_find(\@parent, $e->[0])
+            val $rb = Bv::uf_find(\@parent, $e->[1])
             next if $ra == $rb
             if ($e->[2] < $cheap_w[$ra]) {
                 $cheap_w[$ra]  = $e->[2]
@@ -72,10 +72,10 @@ fn Bv::boruvka($n, $edges) {
                 $cheapest[$rb] = $i
             }
         }
-        my $progress = 0
-        for my $c (0:$n - 1) {
+        var $progress = 0
+        for val $c (0:$n - 1) {
             next if $cheapest[$c] == -1
-            my $e = $edges->[$cheapest[$c]]
+            val $e = $edges->[$cheapest[$c]]
             if (Bv::uf_union(\@parent, \@rank, $e->[0], $e->[1])) {
                 $total += $e->[2]
                 push @mst_edges, [$e->[0], $e->[1], $e->[2]]
@@ -94,12 +94,12 @@ fn Bv::boruvka($n, $edges) {
 # ── Kruskal for cross-validation ─────────────────────────────────
 
 fn Bv::kruskal($n, $edges) {
-    my @sorted = sort { _0->[2] <=> _1->[2] } @$edges
-    my @parent = (0:$n - 1)
-    my @rank   = (0)  x $n
-    my $total = 0
-    my $kept = 0
-    for my $e (@sorted) {
+    val @sorted = sort { _0->[2] <=> _1->[2] } @$edges
+    val @parent = (0:$n - 1)
+    val @rank   = (0)  x $n
+    var $total = 0
+    var $kept = 0
+    for val $e (@sorted) {
         if (Bv::uf_union(\@parent, \@rank, $e->[0], $e->[1])) {
             $total += $e->[2]
             $kept++
@@ -110,7 +110,7 @@ fn Bv::kruskal($n, $edges) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "single edge",
         n     => 2,
@@ -170,8 +170,8 @@ my @cases = (
 p "── Borůvka MST demo ──────────────────────────────────"
 printf "  %-30s  %3s  %5s  %6s  %s\n", "case", "n", "cost", "rounds", "edges-kept"
 printf "  %-30s  %3s  %5s  %6s  %s\n", "------------------------------", "---", "-----", "------", "----------"
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
     printf "  %-30s  %3d  %5d  %6d  %d  %s\n",
         $c->{name}, $c->{n}, $r->{cost}, $r->{rounds}, len(@{$r->{edges}}),
         $r->{cost} == $c->{cost} ? "" : "FAIL want=#{$c->{cost}}"
@@ -179,40 +179,40 @@ for my $c (@cases) {
 
 # ── invariant 1: Borůvka cost matches expected ────────────────────
 
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
     die "Borůvka cost #{$r->{cost}} != expected #{$c->{cost}} on \"#{$c->{name}}\"" unless $r->{cost} == $c->{cost}
 }
 
 # ── invariant 2: Borůvka agrees with Kruskal ──────────────────────
 
-for my $c (@cases) {
-    my $bv = Bv::boruvka($c->{n}, $c->{edges})
-    my $k = Bv::kruskal($c->{n}, $c->{edges})
+for val $c (@cases) {
+    val $bv = Bv::boruvka($c->{n}, $c->{edges})
+    val $k = Bv::kruskal($c->{n}, $c->{edges})
     die "Borůvka #{$bv->{cost}} != Kruskal #{$k->{cost}} on \"#{$c->{name}}\"" unless $bv->{cost} == $k->{cost}
 }
 
 # ── invariant 3: MST has (n − components) edges ───────────────────
 
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
-    my $k = Bv::kruskal($c->{n}, $c->{edges})
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
+    val $k = Bv::kruskal($c->{n}, $c->{edges})
     die "MST edge count #{len(@{$r->{edges}})} != Kruskal #{$k->{edge_count}} on \"#{$c->{name}}\"" unless len(@{$r->{edges}}) == $k->{edge_count}
 }
 
 # ── invariant 4: every MST edge is in the original edge set ───────
 
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
-    my %edge_set
-    for my $e (@{$c->{edges}}) {
-        my $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
-        my $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
+    var %edge_set
+    for val $e (@{$c->{edges}}) {
+        val $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
+        val $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
         $edge_set{"#{$u},#{$v},#{$e->[2]}"} = 1
     }
-    for my $e (@{$r->{edges}}) {
-        my $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
-        my $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
+    for val $e (@{$r->{edges}}) {
+        val $u = $e->[0] < $e->[1] ? $e->[0] : $e->[1]
+        val $v = $e->[0] < $e->[1] ? $e->[1] : $e->[0]
         die "MST edge (#{$u}, #{$v}, #{$e->[2]}) not in input on \"#{$c->{name}}\"" unless exists $edge_set{"#{$u},#{$v},#{$e->[2]}"}
     }
 }
@@ -220,8 +220,8 @@ for my $c (@cases) {
 # ── invariant 5: round count is O(log n) — strictly ≤ ⌈log₂ n⌉ + 1 ─
 
 fn Bv::ceil_log2($n) {
-    my $r = 0
-    my $v = 1
+    var $r = 0
+    var $v = 1
     while ($v < $n) {
         $r++
         $v *= 2
@@ -229,26 +229,26 @@ fn Bv::ceil_log2($n) {
     $r
 }
 
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
-    my $bound = Bv::ceil_log2($c->{n}) + 1
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
+    val $bound = Bv::ceil_log2($c->{n}) + 1
     die "Borůvka rounds #{$r->{rounds}} > ⌈log₂ #{$c->{n}}⌉ + 1 = #{$bound} on \"#{$c->{name}}\"" unless $r->{rounds} <= $bound
 }
 
 # ── invariant 6: connected graph → exactly 1 component remaining ──
 
-for my $c (@cases) {
+for val $c (@cases) {
     next if $c->{name} eq "disconnected (2 components)"
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
     die "connected graph has #{$r->{components}} components on \"#{$c->{name}}\"" unless $r->{components} == 1
 }
 
 # ── invariant 7: MST cost ≤ Σ all edge weights ───────────────────
 
-for my $c (@cases) {
-    my $r = Bv::boruvka($c->{n}, $c->{edges})
-    my $sum = 0
-    for my $e (@{$c->{edges}}) { $sum += $e->[2] }
+for val $c (@cases) {
+    val $r = Bv::boruvka($c->{n}, $c->{edges})
+    var $sum = 0
+    for val $e (@{$c->{edges}}) { $sum += $e->[2] }
     die "MST cost #{$r->{cost}} > Σ edges #{$sum} on \"#{$c->{name}}\"" unless $r->{cost} <= $sum
 }
 

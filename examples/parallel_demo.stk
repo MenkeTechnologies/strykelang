@@ -1,21 +1,21 @@
 #!/usr/bin/env stryke
 
-my @data = 1:100
-my @doubled = @data |> pmap { _ * 2 }
+val @data = 1:100
+val @doubled = @data |> pmap { _ * 2 }
 
 p "pmap: first 10 doubled = ", join(", ", @doubled[0:9])
 
-my @evens = @data |> pgrep _ % 2 == 0
+val @evens = @data |> pgrep _ % 2 == 0
 p "pgrep: ", len(@evens), " even numbers found"
 
-my @sorted = @data |> rev |> psort { _ <=> _1 }
+val @sorted = @data |> rev |> psort { _ <=> _1 }
 p "psort: first 10 = ", join(", ", @sorted[0:9])
 
 p "pfor: processing..."
-pfor { my $square = _ * _ } @data
+pfor { val $square = _ * _ } @data
 p "pfor: done"
 
-my @result = @data |> pgrep { _ % 3 == 0 } |> pmap { _ ** 2 }
+val @result = @data |> pgrep { _ % 3 == 0 } |> pmap { _ ** 2 }
 p "chained: squares of multiples of 3 = ", join(", ", @result[0:4]), "..."
 
 p "All parallel operations completed successfully!"

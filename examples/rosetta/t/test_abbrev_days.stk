@@ -2,11 +2,11 @@
 # Rosetta Code: Abbreviated Sunday names
 
 fn Rosetta::AbbrevDays::get() {
-    my @days = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+    val @days = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
     @days |> map { substr(_, 0, 3) }
 }
 
-my @abbrev = Rosetta::AbbrevDays::get()
+val @abbrev = Rosetta::AbbrevDays::get()
 assert_eq join(",", @abbrev), "Sun,Mon,Tue,Wed,Thu,Fri,Sat", "abbrev days"
 
 test_run

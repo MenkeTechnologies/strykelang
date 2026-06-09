@@ -17,7 +17,7 @@ assert_eq Rosetta::Rot13::rot13("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstu
 assert_eq Rosetta::Rot13::rot13("123!@#"), "123!@#", "non-alpha unchanged"
 assert_eq Rosetta::Rot13::rot13(""), "", "empty string"
 
-my $original = "Why did the chicken cross the road?"
+val $original = "Why did the chicken cross the road?"
 assert_eq Rosetta::Rot13::rot13(Rosetta::Rot13::rot13($original)), $original, "rot13 is self-inverse"
 
 test_run

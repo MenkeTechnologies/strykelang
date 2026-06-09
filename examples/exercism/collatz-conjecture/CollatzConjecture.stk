@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 fn Exercism::CollatzConjecture::steps {
     die "Only positive integers are allowed" if _ < 1
-    my $c = 0
+    var $c = 0
     (_ = _ % 2 ? 3 * _ + 1 : _ / 2, $c++) while _ > 1
     $c
 }

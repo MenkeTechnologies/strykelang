@@ -2,13 +2,13 @@
 # Rosetta Code: Deepcopy
 
 fn Rosetta::Deepcopy::demo() {
-    my $orig = {
+    val $orig = {
         a => 1,
         b => [2, 3, { c => 4 }],
         d => { e => 5 }
     }
 
-    my $copy = deep_clone($orig)
+    val $copy = deep_clone($orig)
 
     # Verify equality
     assert_ok deep_equal($orig, $copy), "initial copy is equal"

@@ -3,32 +3,32 @@
 package Simplex
 
 fn solve($c, $A, $rhs) {
-    my $num_vars = len @$c
-    my $num_constraints = len @$A
+    val $num_vars = len @$c
+    val $num_constraints = len @$A
 
-    my $tableau = []
+    val $tableau = []
     
-    my $obj_row = []
-    for my $v (@$c) { push @$obj_row, -$v }
+    val $obj_row = []
+    for val $v (@$c) { push @$obj_row, -$v }
     for (0 : $num_constraints) { push @$obj_row, 0.0 }
     push @$tableau, $obj_row
 
-    for my $i (0 : $num_constraints - 1) {
-        my $row = []
-        for my $v (@{$A->[$i]}) { push @$row, $v }
-        for my $j (0 : $num_constraints - 1) { push @$row, ($i == $j ? 1.0 : 0.0) }
+    for val $i (0 : $num_constraints - 1) {
+        val $row = []
+        for val $v (@{$A->[$i]}) { push @$row, $v }
+        for val $j (0 : $num_constraints - 1) { push @$row, ($i == $j ? 1.0 : 0.0) }
         push @$row, $rhs->[$i]
         push @$tableau, $row
     }
 
-    my $cols = (len @{$tableau->[0]}) - 1
+    val $cols = (len @{$tableau->[0]}) - 1
 
     while (1) {
-        my $pivot_col = -1
-        my $min_val = -1e-9
-        my $obj = $tableau->[0]
+        var $pivot_col = -1
+        var $min_val = -1e-9
+        val $obj = $tableau->[0]
         
-        for my $j (0 : $cols - 1) {
+        for val $j (0 : $cols - 1) {
             if ($obj->[$j] < $min_val) {
                 $min_val = $obj->[$j]
                 $pivot_col = $j
@@ -37,13 +37,13 @@ fn solve($c, $A, $rhs) {
 
         last if $pivot_col == -1
 
-        my $pivot_row = -1
-        my $min_ratio = 1e18
+        var $pivot_row = -1
+        var $min_ratio = 1e18
         
-        for my $i (1 : $num_constraints) {
-            my $val = $tableau->[$i]->[$pivot_col]
+        for val $i (1 : $num_constraints) {
+            val $val = $tableau->[$i]->[$pivot_col]
             if ($val > 1e-9) {
-                my $ratio = $tableau->[$i]->[$cols] / $val
+                val $ratio = $tableau->[$i]->[$cols] / $val
                 if ($ratio < $min_ratio) {
                     $min_ratio = $ratio
                     $pivot_row = $i
@@ -53,27 +53,27 @@ fn solve($c, $A, $rhs) {
 
         return undef if $pivot_row == -1
 
-        my $pivot_val = $tableau->[$pivot_row]->[$pivot_col]
-        for my $j (0 : $cols) { $tableau->[$pivot_row]->[$j] /= $pivot_val }
+        val $pivot_val = $tableau->[$pivot_row]->[$pivot_col]
+        for val $j (0 : $cols) { $tableau->[$pivot_row]->[$j] /= $pivot_val }
 
-        for my $i (0 : $num_constraints) {
+        for val $i (0 : $num_constraints) {
             if ($i != $pivot_row) {
-                my $factor = $tableau->[$i]->[$pivot_col]
-                for my $j (0 : $cols) {
+                val $factor = $tableau->[$i]->[$pivot_col]
+                for val $j (0 : $cols) {
                     $tableau->[$i]->[$j] -= $factor * $tableau->[$pivot_row]->[$j]
                 }
             }
         }
     }
 
-    my @solution = (0.0) x $num_vars
-    for my $j (0 : $num_vars - 1) {
-        my $one_count = 0
-        my $one_row = -1
-        my $other_count = 0
+    var @solution = (0.0) x $num_vars
+    for val $j (0 : $num_vars - 1) {
+        var $one_count = 0
+        var $one_row = -1
+        var $other_count = 0
         
-        for my $i (1 : $num_constraints) {
-            my $val = $tableau->[$i]->[$j]
+        for val $i (1 : $num_constraints) {
+            val $val = $tableau->[$i]->[$j]
             if (abs($val - 1.0) < 1e-9) {
                 $one_count++
                 $one_row = $i
@@ -92,11 +92,11 @@ fn solve($c, $A, $rhs) {
 
 package main
 
-my @c = (3.0, 2.0)
-my $A = [[2.0, 1.0], [2.0, 3.0], [3.0, 1.0]]
-my @b = (18.0, 42.0, 24.0)
+val @c = (3.0, 2.0)
+val $A = [[2.0, 1.0], [2.0, 3.0], [3.0, 1.0]]
+val @b = (18.0, 42.0, 24.0)
 
-my $res = Simplex::solve(\@c, $A, \@b)
+val $res = Simplex::solve(\@c, $A, \@b)
 
 (abs($res->{max_value} - 33.0) < 1e-5) |> aeq 1, "max_value matches 33.0"
 (abs($res->{solution}->[0] - 3.0) < 1e-5) |> aeq 1, "solution x = 3.0"

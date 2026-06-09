@@ -16,7 +16,7 @@
 
 # Returns the list of moves [from, to] that solve N disks.
 fn Hanoi::solve($n) {
-    my @moves
+    val @moves
     Hanoi::recur($n, "A", "C", "B", \@moves)
     \@moves
 }
@@ -38,13 +38,13 @@ fn Hanoi::recur($n, $src, $dst, $aux, $log) {
 # This SIMULATES the moves and returns the final peg state — used to
 # verify that the solver's move-list is physically valid.
 fn Hanoi::simulate($n, $moves) {
-    my %peg = ( A => [rev 1:$n], B => [], C => [] )
-    for my $m (@$moves) {
-        my ($src, $dst) = @$m
+    val %peg = ( A => [rev 1:$n], B => [], C => [] )
+    for val $m (@$moves) {
+        val ($src, $dst) = @$m
         die "illegal: src empty"       unless len(@{$peg{$src}}) > 0
-        my $disk = pop @{$peg{$src}}
+        val $disk = pop @{$peg{$src}}
         if (len(@{$peg{$dst}}) > 0) {
-            my $top = $peg{$dst}[-1]
+            val $top = $peg{$dst}[-1]
             die "illegal: $disk on $top" unless $disk < $top
         }
         push @{$peg{$dst}}, $disk
@@ -55,18 +55,18 @@ fn Hanoi::simulate($n, $moves) {
 p "── Towers of Hanoi demo ──"
 
 # For N = 1..10, count moves = 2^N - 1.
-for my $n (1:10) {
-    my $moves = Hanoi::solve($n)
-    my $expected = 2 ** $n - 1
-    my $got = len(@$moves)
+for val $n (1:10) {
+    val $moves = Hanoi::solve($n)
+    val $expected = 2 ** $n - 1
+    val $got = len(@$moves)
     die "N=$n: expected $expected moves, got $got" unless $got == $expected
 }
 p "  N=1..10: move counts match 2^N - 1  OK"
 
 # For N=5, simulate the moves and check final state: all 5 disks on C,
 # stacked 5,4,3,2,1 (bottom to top).
-my $moves5 = Hanoi::solve(5)
-my $final = Hanoi::simulate(5, $moves5)
+val $moves5 = Hanoi::solve(5)
+val $final = Hanoi::simulate(5, $moves5)
 die "A should be empty" unless len(@{$final->{A}}) == 0
 die "B should be empty" unless len(@{$final->{B}}) == 0
 die "C should have 5"   unless len(@{$final->{C}}) == 5
@@ -74,14 +74,14 @@ die "C bottom→top must be 5,4,3,2,1" unless join(",", @{$final->{C}}) eq "5,4,
 p "  N=5 simulated: all 5 disks land on C, correctly stacked  OK"
 
 # Every move-from must be a different peg from move-to.
-my $moves7 = Hanoi::solve(7)
-for my $m (@$moves7) {
+val $moves7 = Hanoi::solve(7)
+for val $m (@$moves7) {
     die "self-move detected" if $m->[0] eq $m->[1]
 }
 p "  N=7: no self-moves in the 127-move plan  OK"
 
 # Edge case: N=0 yields zero moves.
-my $zero = Hanoi::solve(0)
+val $zero = Hanoi::solve(0)
 die "N=0 should be 0 moves" unless len(@$zero) == 0
 
 p ""

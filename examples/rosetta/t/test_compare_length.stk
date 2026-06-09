@@ -19,11 +19,11 @@ assert_eq Rosetta::CompareLength::cmp_len("ab", "abc"), -1, "ab < abc"
 assert_eq Rosetta::CompareLength::cmp_len("abc", "ab"), 1,  "abc > ab"
 assert_eq Rosetta::CompareLength::cmp_len("xy", "ab"), 0,   "tie"
 
-my @sorted = Rosetta::CompareLength::sort_by_length("ccc","a","bb","dddd")
+val @sorted = Rosetta::CompareLength::sort_by_length("ccc","a","bb","dddd")
 assert_eq join(",", @sorted), "a,bb,ccc,dddd", "sorted by length"
 
 # pipeline form
-my @descending = ("alpha","beta","gammaring","delta")
+val @descending = ("alpha","beta","gammaring","delta")
     |> sort { len(_1) <=> len(_) }
 assert_eq $descending[0], "gammaring", "longest via pipe"
 

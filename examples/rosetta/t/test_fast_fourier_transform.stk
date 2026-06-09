@@ -3,11 +3,11 @@
 
 # Implementation of Cooley-Tukey FFT algorithm
 fn Rosetta::FFT::fft(@x) {
-    my $n = len(@x)
+    val $n = len(@x)
     return @x if $n <= 1
     
-    my (@even, @odd)
-    for (my $i = 0; $i < $n; $i++) {
+    var (@even, @odd)
+    for (var $i = 0; $i < $n; $i++) {
         if ($i % 2 == 0) { push @even, $x[$i] }
         else { push @odd, $x[$i] }
     }
@@ -15,10 +15,10 @@ fn Rosetta::FFT::fft(@x) {
     @even = Rosetta::FFT::fft(@even)
     @odd = Rosetta::FFT::fft(@odd)
     
-    my @res
+    var @res
     for (0..($n - 1)) { push @res, 0 }
     
-    for (my $k = 0; $k < $n / 2; $k++) {
+    for (var $k = 0; $k < $n / 2; $k++) {
         # Stryke doesn't have complex numbers, we'll just show the structure
         # or use real-valued DFT if that's acceptable.
         # Since I can't easily do complex math without a lib, 
@@ -33,17 +33,17 @@ fn Rosetta::FFT::fft(@x) {
 
 # Let's try implementing 1D DFT with real and imaginary parts as separate arrays.
 fn Rosetta::FFT::dft(@x_real) {
-    my $n = len(@x_real)
-    my @re
-    my @im
+    val $n = len(@x_real)
+    var @re
+    var @im
     
-    my $PI = 3.14159265358979
+    val $PI = 3.14159265358979
     
-    for (my $k = 0; $k < $n; $k++) {
-        my $sum_re = 0
-        my $sum_im = 0
-        for (my $t = 0; $t < $n; $t++) {
-            my $angle = 2 * $PI * $t * $k / $n
+    for (var $k = 0; $k < $n; $k++) {
+        var $sum_re = 0
+        var $sum_im = 0
+        for (var $t = 0; $t < $n; $t++) {
+            val $angle = 2 * $PI * $t * $k / $n
             $sum_re += $x_real[$t] * cos($angle)
             $sum_im -= $x_real[$t] * sin($angle)
         }
@@ -53,8 +53,8 @@ fn Rosetta::FFT::dft(@x_real) {
     (\@re, \@im)
 }
 
-my @input = (1, 1, 1, 1, 0, 0, 0, 0)
-my ($re, $im) = Rosetta::FFT::dft(@input)
+val @input = (1, 1, 1, 1, 0, 0, 0, 0)
+val ($re, $im) = Rosetta::FFT::dft(@input)
 
 # Check DC component (sum of input)
 assert_eq $re->[0], 4, "DFT DC component matches sum"

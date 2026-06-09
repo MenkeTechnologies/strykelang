@@ -6,16 +6,16 @@
 # Run: stryke --no-interop examples/json_parser.stk
 
 fn JP::parse($s) {
-    my $st = +{ src => $s, pos => 0, n => len($s) }
+    var $st = +{ src => $s, pos => 0, n => len($s) }
     JP::_ws($st)
-    my $v = JP::_value($st)
+    val $v = JP::_value($st)
     JP::_ws($st)
     $v
 }
 
 fn JP::_ws($st) {
     while ($st->{pos} < $st->{n}) {
-        my $c = substr($st->{src}, $st->{pos}, 1)
+        val $c = substr($st->{src}, $st->{pos}, 1)
         last if $c ne " " && $c ne "\t" && $c ne "\n" && $c ne "\r"
         $st->{pos} = $st->{pos} + 1
     }
@@ -27,14 +27,14 @@ fn JP::_peek($st) {
 }
 
 fn JP::_take($st) {
-    my $c = substr($st->{src}, $st->{pos}, 1)
+    val $c = substr($st->{src}, $st->{pos}, 1)
     $st->{pos} = $st->{pos} + 1
     $c
 }
 
 fn JP::_value($st) {
     JP::_ws($st)
-    my $c = JP::_peek($st)
+    val $c = JP::_peek($st)
     return JP::_string($st)  if $c eq '"'
     return JP::_array($st)   if $c eq "["
     return JP::_object($st)  if $c eq "{"
@@ -47,12 +47,12 @@ fn JP::_value($st) {
 
 fn JP::_string($st) {
     JP::_take($st)  # consume opening "
-    my $out = ""
+    var $out = ""
     while ($st->{pos} < $st->{n}) {
-        my $c = JP::_take($st)
+        val $c = JP::_take($st)
         return $out if $c eq '"'
         if ($c eq "\\") {
-            my $esc = JP::_take($st)
+            val $esc = JP::_take($st)
             if    ($esc eq "n")  { $out = $out . "\n" }
             elsif ($esc eq "t")  { $out = $out . "\t" }
             elsif ($esc eq "r")  { $out = $out . "\r" }
@@ -68,26 +68,26 @@ fn JP::_string($st) {
 }
 
 fn JP::_number($st) {
-    my $start = $st->{pos}
+    val $start = $st->{pos}
     $st->{pos} = $st->{pos} + 1 if JP::_peek($st) eq "-"
     while ($st->{pos} < $st->{n}) {
-        my $c = JP::_peek($st)
+        val $c = JP::_peek($st)
         last unless ($c ge "0" && $c le "9") || $c eq "."
         $st->{pos} = $st->{pos} + 1
     }
-    my $raw = substr($st->{src}, $start, $st->{pos} - $start)
+    val $raw = substr($st->{src}, $start, $st->{pos} - $start)
     ($raw =~ /\./) ? ($raw + 0.0) : ($raw + 0)
 }
 
 fn JP::_array($st) {
     JP::_take($st)  # [
-    my @out = ()
+    var @out = ()
     JP::_ws($st)
     if (JP::_peek($st) eq "]") { JP::_take($st); return \@out }
     while (1) {
         push @out, JP::_value($st)
         JP::_ws($st)
-        my $c = JP::_take($st)
+        val $c = JP::_take($st)
         return \@out if $c eq "]"
         die "expected , or ]" if $c ne ","
         JP::_ws($st)
@@ -96,32 +96,32 @@ fn JP::_array($st) {
 
 fn JP::_object($st) {
     JP::_take($st)  # {
-    my %out = ()
+    var %out = ()
     JP::_ws($st)
     if (JP::_peek($st) eq "}") { JP::_take($st); return \%out }
     while (1) {
         JP::_ws($st)
-        my $key = JP::_string($st)
+        val $key = JP::_string($st)
         JP::_ws($st)
         die "expected :" if JP::_take($st) ne ":"
-        my $val = JP::_value($st)
+        val $val = JP::_value($st)
         $out{$key} = $val
         JP::_ws($st)
-        my $c = JP::_take($st)
+        val $c = JP::_take($st)
         return \%out if $c eq "}"
         die "expected , or }" if $c ne ","
     }
 }
 
 p "=== JSON Parser Demo ==="
-my $v1 = JP::parse('{"name":"Alice","age":30,"tags":["a","b"],"active":true,"meta":null}')
+val $v1 = JP::parse('{"name":"Alice","age":30,"tags":["a","b"],"active":true,"meta":null}')
 p "name: " . $v1->{name}
 p "age:  " . $v1->{age}
 p "tags: " . join(",", @{$v1->{tags}})
 p "active: " . $v1->{active}
 p "meta defined? " . (defined $v1->{meta} ? 1 : 0)
 
-my $v2 = JP::parse('[1, 2, [3, 4, [5]], "six"]')
+val $v2 = JP::parse('[1, 2, [3, 4, [5]], "six"]')
 p "nested 0: " . $v2->[0]
 p "nested deep: " . $v2->[2]->[2]->[0]
 p "nested str:  " . $v2->[3]

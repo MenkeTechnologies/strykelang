@@ -51,7 +51,7 @@ class TreeNode {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::NestedOop::points_in_array {
-    my @points = (
+    val @points = (
         Point(1, 2),
         Point(3, 4),
         Point(5, 6),
@@ -64,8 +64,8 @@ fn Project::NestedOop::points_in_arrayref {
 }
 
 fn Project::NestedOop::sum_point_coords(@points) {
-    my $sum = 0
-    for my $p (@points) {
+    var $sum = 0
+    for val $p (@points) {
         $sum += $p->x + $p->y
     }
     $sum
@@ -155,9 +155,9 @@ fn Project::NestedOop::status_workflow {
 }
 
 fn Project::NestedOop::count_priority($tasks, $target) {
-    my $count = 0
-    for my $t (@$tasks) {
-        my $matches = match ($t->priority) {
+    var $count = 0
+    for val $t (@$tasks) {
+        val $matches = match ($t->priority) {
             Priority::Critical() => match ($target) { Priority::Critical() => 1, _ => 0 }
             Priority::High() => match ($target) { Priority::High() => 1, _ => 0 }
             Priority::Medium() => match ($target) { Priority::Medium() => 1, _ => 0 }
@@ -225,8 +225,8 @@ fn Project::NestedOop::filter_by_department($roster, $dept) {
 }
 
 fn Project::NestedOop::total_salary($roster) {
-    my $sum = 0
-    for my $e (@$roster) {
+    var $sum = 0
+    for val $e (@$roster) {
         $sum += $e->salary
     }
     $sum
@@ -295,9 +295,9 @@ fn Project::NestedOop::nested_points {
 }
 
 fn Project::NestedOop::sum_nested_points($grid) {
-    my $sum = 0
-    for my $row (@$grid) {
-        for my $p (@$row) {
+    var $sum = 0
+    for val $row (@$grid) {
+        for val $p (@$row) {
             $sum += $p->x + $p->y
         }
     }
@@ -334,17 +334,17 @@ fn Project::NestedOop::team_structure {
 }
 
 fn Project::NestedOop::count_team_members($structure) {
-    my $total = 0
-    for my $team (keys %$structure) {
+    var $total = 0
+    for val $team (keys %$structure) {
         $total += len(@{$structure->{$team}})
     }
     $total
 }
 
 fn Project::NestedOop::get_oldest_in_team($structure, $team) {
-    my @members = @{$structure->{$team}}
-    my $oldest = $members[0]
-    for my $m (@members) {
+    val @members = @{$structure->{$team}}
+    var $oldest = $members[0]
+    for val $m (@members) {
         if ($m->age > $oldest->age) {
             $oldest = $m
         }
@@ -368,8 +368,8 @@ class Team {
     fn size { len(@{$self->members}) }
 
     fn avg_age {
-        my $sum = 0
-        for my $m (@{$self->members}) {
+        var $sum = 0
+        for val $m (@{$self->members}) {
             $sum += $m->age
         }
         $sum / $self->size()
@@ -382,20 +382,20 @@ class Graph {
 
     fn add_node($id) {
         push @{$self->nodes}, $id
-        my $e = $self->edges
+        var $e = $self->edges
         $e->{$id} = []
         $self
     }
 
     fn add_edge($from, $to) {
-        my $e = $self->edges
-        my $arr = $e->{$from}
+        val $e = $self->edges
+        val $arr = $e->{$from}
         push @$arr, $to
         $self
     }
 
     fn neighbors($id) {
-        my $e = $self->edges
+        val $e = $self->edges
         @{$e->{$id}}
     }
 
@@ -456,8 +456,8 @@ fn Project::NestedOop::tree_depth($node) {
     if (!defined($node)) {
         return 0
     }
-    my $left_depth = Project::NestedOop::tree_depth($node->left)
-    my $right_depth = Project::NestedOop::tree_depth($node->right)
+    val $left_depth = Project::NestedOop::tree_depth($node->left)
+    val $right_depth = Project::NestedOop::tree_depth($node->right)
     1 + ($left_depth > $right_depth ? $left_depth : $right_depth)
 }
 
@@ -511,10 +511,10 @@ fn Project::NestedOop::project_board {
 }
 
 fn Project::NestedOop::move_task($board, $task_id, $from_col, $to_col) {
-    my @from_tasks = @{$board->{$from_col}}
-    my @remaining
-    my $moved_task
-    for my $t (@from_tasks) {
+    val @from_tasks = @{$board->{$from_col}}
+    var @remaining
+    var $moved_task
+    for val $t (@from_tasks) {
         if ($t->id == $task_id) {
             $moved_task = $t
         } else {
@@ -527,10 +527,10 @@ fn Project::NestedOop::move_task($board, $task_id, $from_col, $to_col) {
 }
 
 fn Project::NestedOop::count_tasks_by_priority($board, $priority) {
-    my $count = 0
-    for my $col (keys %$board) {
-        for my $t (@{$board->{$col}}) {
-            my $matches = match ($t->priority) {
+    var $count = 0
+    for val $col (keys %$board) {
+        for val $t (@{$board->{$col}}) {
+            val $matches = match ($t->priority) {
                 Priority::Critical() => match ($priority) { Priority::Critical() => 1, _ => 0 }
                 Priority::High() => match ($priority) { Priority::High() => 1, _ => 0 }
                 Priority::Medium() => match ($priority) { Priority::Medium() => 1, _ => 0 }
@@ -548,9 +548,9 @@ fn Project::NestedOop::count_tasks_by_priority($board, $priority) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::NestedOop::matrix_of_points {
-    my @matrix
-    for my $i (0:2) {
-        my @row
+    var @matrix
+    for val $i (0:2) {
+        var @row
         ~> 0:2 ep {
             push @row, Point($i, _)
         }
@@ -560,8 +560,8 @@ fn Project::NestedOop::matrix_of_points {
 }
 
 fn Project::NestedOop::flatten_point_matrix($matrix) {
-    my @flat
-    for my $row (@$matrix) {
+    var @flat
+    for val $row (@$matrix) {
         ~> @$row ep {
             push @flat, _
         }
@@ -591,8 +591,8 @@ fn Project::NestedOop::get_regional_employee($offices, $region, $office) {
 }
 
 fn Project::NestedOop::total_regional_salary($offices, $region) {
-    my $sum = 0
-    for my $office (keys %{$offices->{$region}}) {
+    var $sum = 0
+    for val $office (keys %{$offices->{$region}}) {
         $sum += $offices->{$region}{$office}->salary
     }
     $sum
@@ -611,9 +611,9 @@ fn Project::NestedOop::mixed_struct_types {
 }
 
 fn Project::NestedOop::process_mixed($items) {
-    my @results
-    for my $item (@$items) {
-        my $result = match ($item->{type}) {
+    var @results
+    for val $item (@$items) {
+        val $result = match ($item->{type}) {
             "point" => "Point(" . $item->{data}->x . "," . $item->{data}->y . ")"
             "person" => "Person:" . $item->{data}->name
             "task" => "Task#" . $item->{data}->id
@@ -643,8 +643,8 @@ fn Project::NestedOop::sort_by_age($people) {
 }
 
 fn Project::NestedOop::partition_by_age($people, $threshold) {
-    my @young
-    my @old
+    var @young
+    var @old
     ~> @$people ep {
         if (_->age < $threshold) {
             push @young, _

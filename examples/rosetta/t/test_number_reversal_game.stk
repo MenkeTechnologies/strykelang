@@ -2,35 +2,35 @@
 # Rosetta Code: Number reversal game
 
 fn Rosetta::NumberReversal::solve(@items) {
-    my $start = join("", @items)
+    val $start = join("", @items)
     
-    my @target_arr = sort { _ <=> _1 } @items
-    my $target = join("", @target_arr)
+    val @target_arr = sort { _ <=> _1 } @items
+    val $target = join("", @target_arr)
     
     return 0 if $start eq $target
     
-    my @queue = ( { state => $start, moves => 0 } )
-    my %visited
+    var @queue = ( { state => $start, moves => 0 } )
+    var %visited
     $visited{$start} = 1
     
-    my $head = 0
+    var $head = 0
     while ($head < len(@queue)) {
-        my $curr = $queue[$head]
+        val $curr = $queue[$head]
         $head++
         
-        my $state = $curr->{state}
-        my $moves = $curr->{moves}
+        val $state = $curr->{state}
+        val $moves = $curr->{moves}
         
-        for my $i (2 .. length($state)) {
-            my $prefix = substr($state, 0, $i)
-            my $suffix = substr($state, $i)
+        for val $i (2 .. length($state)) {
+            val $prefix = substr($state, 0, $i)
+            val $suffix = substr($state, $i)
             
             # Reverse prefix
-            my @p_chars = split("", $prefix)
-            my @p_rev
-            for my $c (@p_chars) { unshift @p_rev, $c }
+            val @p_chars = split("", $prefix)
+            var @p_rev
+            for val $c (@p_chars) { unshift @p_rev, $c }
             
-            my $next_state = join("", @p_rev) . $suffix
+            val $next_state = join("", @p_rev) . $suffix
             
             if ($next_state eq $target) {
                 return $moves + 1
@@ -46,21 +46,21 @@ fn Rosetta::NumberReversal::solve(@items) {
 }
 
 # Test with a small list
-my @jumbled = (2, 1, 4, 3, 5)
-my $moves = Rosetta::NumberReversal::solve(@jumbled)
+val @jumbled = (2, 1, 4, 3, 5)
+val $moves = Rosetta::NumberReversal::solve(@jumbled)
 
 assert_ok $moves > 0, "Found a solution in $moves moves"
 
 # Another test
-my @jumbled2 = (5, 4, 3, 2, 1)
-my $moves2 = Rosetta::NumberReversal::solve(@jumbled2)
+val @jumbled2 = (5, 4, 3, 2, 1)
+val $moves2 = Rosetta::NumberReversal::solve(@jumbled2)
 assert_eq $moves2, 1, "Reversing all takes 1 move"
 
 # Test 3
-my @jumbled3 = (3, 1, 2)
+val @jumbled3 = (3, 1, 2)
 # target 1, 2, 3
 # 3 1 2 -> rev 2 -> 1 3 2 -> rev 3 -> 2 3 1 -> rev 2 -> 3 2 1 -> rev 3 -> 1 2 3 (Wait, 3 1 2 -> rev 3 -> 2 1 3 -> rev 2 -> 1 2 3 = 2 moves)
-my $moves3 = Rosetta::NumberReversal::solve(@jumbled3)
+val $moves3 = Rosetta::NumberReversal::solve(@jumbled3)
 assert_eq $moves3, 2, "3 1 2 takes 2 moves"
 
 test_run

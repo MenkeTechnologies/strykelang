@@ -17,12 +17,12 @@
 # Run: stryke --no-interop examples/kmp_no_interop.stk
 
 fn KMP::failure_table($pat) {
-    my @pc = split(//, $pat)
-    my $m  = len(@pc)
+    val @pc = split(//, $pat)
+    val $m  = len(@pc)
     return [] if $m == 0
-    my @f  = (0) x $m
-    my $k  = 0
-    for my $i (1:$m - 1) {
+    var @f  = (0) x $m
+    var $k  = 0
+    for val $i (1:$m - 1) {
         while ($k > 0 && $pc[$k] ne $pc[$i]) {
             $k = $f[$k - 1]
         }
@@ -33,15 +33,15 @@ fn KMP::failure_table($pat) {
 }
 
 fn KMP::find_all($haystack, $pat) {
-    my @needles
-    my @hc = split(//, $haystack)
-    my @pc = split(//, $pat)
-    my $n = len(@hc)
-    my $m = len(@pc)
+    var @needles
+    val @hc = split(//, $haystack)
+    val @pc = split(//, $pat)
+    val $n = len(@hc)
+    val $m = len(@pc)
     return \@needles if $m == 0 || $m > $n
-    my $fail_ref = KMP::failure_table($pat)
-    my $q = 0
-    for my $i (0:$n - 1) {
+    val $fail_ref = KMP::failure_table($pat)
+    var $q = 0
+    for val $i (0:$n - 1) {
         while ($q > 0 && $pc[$q] ne $hc[$i]) {
             $q = $fail_ref->[$q - 1]
         }
@@ -55,13 +55,13 @@ fn KMP::find_all($haystack, $pat) {
 }
 
 fn KMP::first($haystack, $pat) {
-    my $all = KMP::find_all($haystack, $pat)
+    val $all = KMP::find_all($haystack, $pat)
     len(@$all) > 0 ? $all->[0] : -1
 }
 
 # Demo grid — (haystack, pattern, expected first-match index,
 # expected total occurrences).
-my @cases = (
+val @cases = (
     +{ hay => "ABABDABACDABABCABAB", pat => "ABABCABAB",  first => 10, count => 1  },
     +{ hay => "AAAAAA",              pat => "AA",         first =>  0, count => 5  },  # overlapping
     +{ hay => "GCATCGCAGAGAGTATACAGTACG", pat => "GCAGAGAG", first => 5, count => 1 },
@@ -75,12 +75,12 @@ my @cases = (
 )
 
 p "── KMP substring-search demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $first = KMP::first($c->{hay}, $c->{pat})
-    my $all   = KMP::find_all($c->{hay}, $c->{pat})
-    my $cnt   = len(@$all)
-    my $ok    = ($first == $c->{first} && $cnt == $c->{count})
+var $fail = 0
+for val $c (@cases) {
+    val $first = KMP::first($c->{hay}, $c->{pat})
+    val $all   = KMP::find_all($c->{hay}, $c->{pat})
+    val $cnt   = len(@$all)
+    val $ok    = ($first == $c->{first} && $cnt == $c->{count})
     $fail++ unless $ok
     printf "  hay=%-26s pat=%-10s first=%-3d cnt=%-2d expect=(%d,%d)  %s\n",
         "\"" . $c->{hay} . "\"",
@@ -91,18 +91,18 @@ for my $c (@cases) {
 die "$fail / " . len(@cases) . " KMP cases failed" if $fail > 0
 
 # Cross-check: KMP::first must agree with stryke's builtin index().
-for my $c (@cases) {
+for val $c (@cases) {
     next if len($c->{pat}) == 0   # builtin behaves differently on empty pat
-    my $kmp = KMP::first($c->{hay}, $c->{pat})
-    my $idx = index($c->{hay}, $c->{pat})
+    val $kmp = KMP::first($c->{hay}, $c->{pat})
+    val $idx = index($c->{hay}, $c->{pat})
     die "KMP::first disagrees with builtin index" unless $kmp == $idx
 }
 
 # Hits are sorted and distinct.
-for my $c (@cases) {
-    my $hits = KMP::find_all($c->{hay}, $c->{pat})
+for val $c (@cases) {
+    val $hits = KMP::find_all($c->{hay}, $c->{pat})
     next if len(@$hits) < 2
-    for my $i (1:len(@$hits) - 1) {
+    for val $i (1:len(@$hits) - 1) {
         die "hits not sorted" unless $hits->[$i] > $hits->[$i - 1]
     }
 }

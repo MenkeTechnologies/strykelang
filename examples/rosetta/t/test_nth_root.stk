@@ -4,8 +4,8 @@
 fn Rosetta::NthRoot::compute($x, $n) {
     if ($x == 0) { 0 }
     else {
-        my $guess = $x / $n
-        my $prev = 0
+        var $guess = $x / $n
+        var $prev = 0
         while (abs($guess - $prev) > 0.00000001) {
             $prev = $guess
             $guess = (($n - 1) * $guess + $x / ($guess ** ($n - 1))) / $n
@@ -14,13 +14,13 @@ fn Rosetta::NthRoot::compute($x, $n) {
     }
 }
 
-my $r1 = Rosetta::NthRoot::compute(2, 2)
+val $r1 = Rosetta::NthRoot::compute(2, 2)
 assert_near $r1, 1.41421356, 0.000001, "sqrt(2)"
 
-my $r2 = Rosetta::NthRoot::compute(125, 3)
+val $r2 = Rosetta::NthRoot::compute(125, 3)
 assert_near $r2, 5, 0.000001, "cbrt(125)"
 
-my $r3 = Rosetta::NthRoot::compute(625, 4)
+val $r3 = Rosetta::NthRoot::compute(625, 4)
 assert_near $r3, 5, 0.000001, "4th root of 625"
 
 test_run
