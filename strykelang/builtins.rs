@@ -4877,37 +4877,11 @@ pub(crate) fn try_builtin(
         "syscall" => Some(builtin_syscall(args)),
         "alarm" => Some(builtin_alarm(args)),
         "sleep" => Some(builtin_sleep(args)),
-        // GUI automation — pyautogui equivalent via `enigo`.
-        // See `strykelang/builtins_gui.rs` for the full surface.
-        "mouse_move" => Some(crate::builtins_gui::builtin_mouse_move(args)),
-        "mouse_move_rel" => Some(crate::builtins_gui::builtin_mouse_move_rel(args)),
-        "mouse_pos" => Some(crate::builtins_gui::builtin_mouse_pos(args)),
-        "mouse_click" => Some(crate::builtins_gui::builtin_mouse_click(args)),
-        "mouse_down" => Some(crate::builtins_gui::builtin_mouse_down(args)),
-        "mouse_up" => Some(crate::builtins_gui::builtin_mouse_up(args)),
-        "mouse_scroll" => Some(crate::builtins_gui::builtin_mouse_scroll(args)),
-        "key_press" => Some(crate::builtins_gui::builtin_key_press(args)),
-        "key_down" => Some(crate::builtins_gui::builtin_key_down(args)),
-        "key_up" => Some(crate::builtins_gui::builtin_key_up(args)),
-        "key_type" => Some(crate::builtins_gui::builtin_key_type(args)),
-        "key_hotkey" => Some(crate::builtins_gui::builtin_key_hotkey(args)),
-        "screen_size" => Some(crate::builtins_gui::builtin_screen_size(args)),
-        // mouse_size aliases screen_size for pyautogui's `size()` spelling.
-        "mouse_size" => Some(crate::builtins_gui::builtin_screen_size(args)),
-        "on_screen" => Some(crate::builtins_gui::builtin_on_screen(args)),
-        "mouse_drag" => Some(crate::builtins_gui::builtin_mouse_drag(args)),
-        "mouse_drag_rel" => Some(crate::builtins_gui::builtin_mouse_drag_rel(args)),
-        "mouse_right_click" => Some(crate::builtins_gui::builtin_mouse_right_click(args)),
-        "mouse_middle_click" => Some(crate::builtins_gui::builtin_mouse_middle_click(args)),
-        "mouse_double_click" => Some(crate::builtins_gui::builtin_mouse_double_click(args)),
-        "mouse_triple_click" => Some(crate::builtins_gui::builtin_mouse_triple_click(args)),
-        "mouse_vscroll" => Some(crate::builtins_gui::builtin_mouse_scroll(args)),
-        "mouse_hscroll" => Some(crate::builtins_gui::builtin_mouse_hscroll(args)),
-        "keyboard_keys" => Some(crate::builtins_gui::builtin_keyboard_keys(args)),
-        "pixel" => Some(crate::builtins_gui::builtin_pixel(args)),
-        "pixel_matches_color" => Some(crate::builtins_gui::builtin_pixel_matches_color(args)),
-        "screenshot" => Some(crate::builtins_gui::builtin_screenshot(args)),
-        "screenshot_region" => Some(crate::builtins_gui::builtin_screenshot_region(args)),
+        // GUI automation (mouse/keyboard/screen/pixel/screenshot) is no longer
+        // a core builtin — it ships as the opt-in `stryke-gui` cdylib package.
+        // Install with `s pkg install -g github.com/MenkeTechnologies/stryke-gui`,
+        // then `use GUI; GUI::mouse_move($x, $y)`. Keeps the core binary free of
+        // the X11/Wayland/PipeWire system-lib deps that `enigo`/`xcap` pulled in.
         "times" => Some(builtin_times()),
         "time" => Some(builtin_time()),
         "proceed" => Some(builtin_proceed(interp, line)),
