@@ -3065,6 +3065,62 @@ mod tests {
         assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
     }
 
+    /// L1+L4 regression — `use GUI; GUI::mouse_pos()` from a script
+    /// outside any project must NOT fire UndefinedSubroutine under the
+    /// IDE LSP's strict-vars path. The bug shipped through v0.16.32 +
+    /// v0.16.33: `resolve_require_path_from_file` was correct but
+    /// `StmtKind::Use` in `collect_declarations_stmt` only called
+    /// `declare_sub(module)` — it never chased the resolved file, so
+    /// the GUI:: sub declarations never landed in the analyzer's
+    /// scope. Added `follow_require(module)` in v0.16.34 to mirror
+    /// what `require Foo::Bar` does.
+    #[test]
+    fn analyzer_chases_use_into_installed_package() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("analyze-use-chase");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        fake_installed_pkg(
+            &store,
+            "gui",
+            "1.0.0",
+            "GUI",
+            &["mouse_pos", "keyboard_keys"],
+        );
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // Script sits in a non-project tempdir so neither arm 1
+        // (project lib/) nor arm 2 (lockfile) can hit. Arm 3
+        // (installed.toml) is the only candidate.
+        let script_dir = tempdir("analyze-use-script");
+        let script_path = script_dir.join("main.stk");
+        let text = "use GUI\nmy ($x, $y) = GUI::mouse_pos()\nmy @k = GUI::keyboard_keys()\n";
+        std::fs::write(&script_path, text).unwrap();
+
+        let program = crate::parse_with_file(text, script_path.to_str().unwrap())
+            .expect("script should parse");
+        // Mirror what the IDE LSP's compute_diagnostics does:
+        // analyze_program_with_strict(program, path, true).
+        let result = crate::static_analysis::analyze_program_with_strict(
+            &program,
+            script_path.to_str().unwrap(),
+            true,
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        if let Err(e) = result {
+            panic!(
+                "linter should accept GUI::* calls after `use GUI` chases into \
+                 the installed package, but got: kind={:?} message={}",
+                e.kind, e.message
+            );
+        }
+    }
+
     /// L2 — hover_markdown_for_word chases `use GUI` into the store
     /// file and surfaces the `## …` doc block declared above the sub.
     #[test]
