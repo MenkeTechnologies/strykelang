@@ -37,9 +37,6 @@ pub mod builtins_games_ml_chem;
 pub mod builtins_geom;
 /// `builtins_github` submodule.
 pub mod builtins_github;
-/// `builtins_gui` submodule — pyautogui-equivalent mouse/keyboard
-/// automation backed by the `enigo` crate.
-pub mod builtins_gui;
 /// `builtins_iter` submodule.
 pub mod builtins_iter;
 /// `builtins_linalg_graph_date` submodule.
