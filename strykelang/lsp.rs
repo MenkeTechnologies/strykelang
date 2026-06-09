@@ -1422,15 +1422,40 @@ pub(crate) fn doc_comments_above(text: &str, decl_line_0based: usize) -> Option<
     let lines: Vec<&str> = text.lines().collect();
     let mut collected: Vec<String> = Vec::new();
     let mut i = decl_line_0based as i64 - 1;
+    // Allow exactly ONE blank line between the doc block and the decl —
+    // the conventional rustdoc / markdown style where module / fn docs sit
+    // a paragraph above the `package Foo` or `fn foo` line:
+    //
+    //     ## Module-level docs.
+    //     ## More docs.
+    //                                ← blank separator (this used to break it)
+    //     package Foo
+    //
+    // Without the allowance, hover on `Foo` walked straight to a non-`##`
+    // line and returned None, so every package / fn that put a blank
+    // separator before its declaration lost its hover docs. Permission
+    // resets on the first `##` line so the walker can't be silently extended
+    // past an unrelated paragraph.
+    let mut allow_blank_separator = true;
     while i >= 0 {
         let line = lines.get(i as usize).copied().unwrap_or("");
         let trimmed = line.trim_start();
+        if trimmed.is_empty() {
+            if !allow_blank_separator {
+                break;
+            }
+            allow_blank_separator = false;
+            i -= 1;
+            continue;
+        }
         if !trimmed.starts_with("##") {
             break;
         }
-        // Strip leading `##` (with optional single space). `### …`
-        // stays as `# …` — caller renders as markdown so the extra
-        // `#` becomes a heading marker.
+        // Once we've consumed any real content, the allowance is exhausted.
+        allow_blank_separator = false;
+        // Strip leading `##` (with optional single space). `### …` stays as
+        // `# …` — caller renders as markdown so the extra `#` becomes a
+        // heading marker.
         let body = trimmed.strip_prefix("##").unwrap_or(trimmed);
         let body = body.strip_prefix(' ').unwrap_or(body);
         collected.push(body.to_string());
@@ -12323,6 +12348,77 @@ mod rename_hover_tests {
         let text = "fn foo() {}\n";
         assert!(super::doc_comments_above(text, 0).is_none());
         assert!(super::doc_comments_above("fn foo() {}\n", 0).is_none());
+    }
+
+    /// The conventional rustdoc/markdown layout — docs are a paragraph
+    /// ABOVE the decl line, separated by a blank line. v0.16.36 added a
+    /// single-blank-line allowance so this layout is hover-discoverable.
+    /// Before the fix, hover on `Foo` returned None because the walker
+    /// stopped at the blank line.
+    #[test]
+    fn doc_comments_above_traverses_single_blank_line_separator() {
+        // Layout:
+        //   line 0: "## Module docs."
+        //   line 1: "## More."
+        //   line 2: ""             ← blank separator
+        //   line 3: "package Foo"  ← decl_line_0based = 3
+        let text = "## Module docs.\n## More.\n\npackage Foo\n";
+        let doc = super::doc_comments_above(text, 3)
+            .expect("walker should traverse the single blank separator");
+        assert!(
+            doc.contains("Module docs."),
+            "first ## line should be in doc: {}",
+            doc
+        );
+        assert!(
+            doc.contains("More."),
+            "second ## line should be in doc: {}",
+            doc
+        );
+    }
+
+    /// Pin the guard — TWO blank lines must stop the walker (otherwise
+    /// the walker could silently pull in an unrelated `##` block sitting
+    /// further up in the file).
+    #[test]
+    fn doc_comments_above_stops_at_two_consecutive_blank_lines() {
+        // Layout:
+        //   line 0: "## Stale unrelated doc."
+        //   line 1: ""
+        //   line 2: ""             ← second blank, walker must stop here
+        //   line 3: "package Foo"
+        let text = "## Stale unrelated doc.\n\n\npackage Foo\n";
+        assert!(
+            super::doc_comments_above(text, 3).is_none(),
+            "two blanks should prevent doc capture"
+        );
+    }
+
+    /// Same layout the user's stryke-gui `lib/GUI.stk` v0.2.2 ships with:
+    /// file-level `##` docs at the top, one blank, then `package GUI`.
+    /// Pre-v0.16.36 the package hover returned None — this test pins
+    /// the v0.16.36 behavior where the file header surfaces.
+    #[test]
+    fn hover_for_package_surfaces_file_header_doc_block() {
+        let text = "## lib/GUI.stk — GUI automation for stryke (`use GUI`).\n\
+                    ##\n\
+                    ## Thin wrapper around the cdylib's gui__* exports.\n\
+                    \n\
+                    package GUI\n\
+                    \n\
+                    fn GUI::mouse_pos { 1 }\n";
+        let h = hover_markdown_for_word("GUI", text, "a.stk")
+            .expect("hover should resolve the GUI package");
+        assert!(
+            h.contains("GUI automation"),
+            "package hover must surface the file header docs: {}",
+            h
+        );
+        assert!(
+            h.contains("Thin wrapper around the cdylib"),
+            "package hover must surface the multi-line doc body: {}",
+            h
+        );
     }
 
     #[test]
