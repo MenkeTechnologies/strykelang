@@ -18390,24 +18390,6 @@ impl Parser {
             | "trix" | "true_range" | "twap" | "ulcer_index"
             | "volatility_annualized" | "volatility_realized" | "vwap" | "williams_r"
             | "wma"
-            // ── GUI automation (pyautogui-equivalent) ──
-            // Mouse + keyboard + screen, dispatched from
-            // builtins_gui.rs via the BUILTIN_ARMS scan. Registered
-            // here so the parser recognizes them as known builtins
-            // (avoids "Undefined subroutine" under `-c` syntax-check
-            // and lets the reflection registry / %b / %all surface
-            // them).
-            | "mouse_move" | "mouse_move_rel"
-            | "mouse_pos" | "mouse_size" | "screen_size" | "on_screen"
-            | "mouse_click" | "mouse_right_click" | "mouse_middle_click"
-            | "mouse_double_click" | "mouse_triple_click"
-            | "mouse_down" | "mouse_up"
-            | "mouse_drag" | "mouse_drag_rel"
-            | "mouse_scroll" | "mouse_vscroll" | "mouse_hscroll"
-            | "key_press" | "key_down" | "key_up"
-            | "key_type" | "key_hotkey" | "keyboard_keys"
-            | "pixel" | "pixel_matches_color"
-            | "screenshot" | "screenshot_region"
             => Some(name),
             _ => None,
         }

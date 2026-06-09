@@ -77,10 +77,6 @@ jobs:
         if: contains(matrix.target, 'musl') && !matrix.use_cross
         run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Install Linux GUI deps (wayland + X11 + pipewire + EGL for xcap)
-        if: contains(matrix.target, 'linux') && !matrix.use_cross
-        uses: ./.github/actions/install-linux-deps
-
       - name: Install native deps for aarch64-linux-gnu (build toolchain)
         if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
         run: |
