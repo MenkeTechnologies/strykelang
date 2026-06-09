@@ -1886,7 +1886,91 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
             return Some(direct);
         }
     }
+
+    // Also try the stryke convention `<root>/lib/<First>/<Rest>.stk` for
+    // `use Foo::Bar::Baz` (the existing arm above uses the Perl `.pm`
+    // suffix). The runtime resolver at `pkg::commands::resolve_module`
+    // arm 1 uses `.stk`; mirror it here so the analyzer accepts both.
+    if !spec.starts_with("./") && !spec.starts_with("../") {
+        let segments: Vec<&str> = spec.split("::").collect();
+        if !segments.is_empty() && !segments.iter().any(|s| s.is_empty()) {
+            let mut local_stk = project_root.join("lib");
+            for s in &segments[..segments.len() - 1] {
+                local_stk = local_stk.join(s);
+            }
+            local_stk = local_stk.join(format!("{}.stk", segments[segments.len() - 1]));
+            if local_stk.exists() {
+                return Some(local_stk);
+            }
+        }
+    }
+
+    // ── Arm 2: project lockfile → store ───────────────────────────────
+    // When the script lives in a stryke project, `stryke.lock` pins
+    // exact versions of every declared dep. Mirrors arm 2 of the
+    // runtime resolver (`pkg::commands::resolve_module`).
+    let segments: Vec<&str> = spec.split("::").collect();
+    if !segments.is_empty() && !segments.iter().any(|s| s.is_empty()) {
+        if let Some(stryke_root) = crate::pkg::commands::find_project_root(Path::new(file)) {
+            let lock_path = stryke_root.join(crate::pkg::commands::LOCKFILE_FILE);
+            if lock_path.is_file() {
+                if let Ok(lf) = crate::pkg::lockfile::Lockfile::from_path(&lock_path) {
+                    let pkg_name = segments[0].to_lowercase();
+                    if let Some(entry) = lf.find(&pkg_name) {
+                        if let Ok(store) = crate::pkg::store::Store::user_default() {
+                            let store_pkg = store.package_dir(&entry.name, &entry.version);
+                            let resolved = build_pkg_lib_path(&store_pkg, &segments);
+                            if resolved.is_file() {
+                                return Some(resolved);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Arm 3: global `~/.stryke/installed.toml` → store ──────────
+        // Lets standalone scripts run outside any project still see
+        // installed-package subs without a stryke.lock. Mirrors arm 3
+        // of `pkg::commands::resolve_module`. Same precedence as
+        // runtime: arm 1 / arm 2 must miss before this fires, so a
+        // project-local `lib/Foo.stk` shadowing a globally pinned
+        // package is honored.
+        if let Ok(store) = crate::pkg::store::Store::user_default() {
+            if let Ok(idx) = crate::pkg::store::InstalledIndex::load_from(&store) {
+                let pkg_name = segments[0].to_lowercase();
+                if let Some(entry) = idx.find(&pkg_name) {
+                    let store_pkg = store.package_dir(&entry.name, &entry.version);
+                    let resolved = build_pkg_lib_path(&store_pkg, &segments);
+                    if resolved.is_file() {
+                        return Some(resolved);
+                    }
+                }
+            }
+        }
+    }
+
     None
+}
+
+/// Build the `<store_pkg>/lib/<rest>.stk` path for a `use Foo::Bar::Baz`
+/// segment list. Mirrors `pkg::commands::resolve_module`'s
+/// `segments_to_path` logic: `["GUI"]` → `lib/GUI.stk`,
+/// `["GUI", "Mouse"]` → `lib/Mouse.stk`,
+/// `["GUI", "Sub", "Mouse"]` → `lib/Sub/Mouse.stk`. The first segment
+/// is the package name (already used as the index lookup key) and
+/// drops out of the path for multi-segment specs.
+fn build_pkg_lib_path(store_pkg: &Path, segments: &[&str]) -> PathBuf {
+    debug_assert!(!segments.is_empty());
+    let mut p = store_pkg.join("lib");
+    if segments.len() == 1 {
+        p.join(format!("{}.stk", segments[0]))
+    } else {
+        for s in &segments[1..segments.len() - 1] {
+            p = p.join(s);
+        }
+        p.join(format!("{}.stk", segments[segments.len() - 1]))
+    }
 }
 
 /// Walk UP from `start_dir` looking for an ancestor that has a `lib/`
