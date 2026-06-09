@@ -6,7 +6,7 @@ Every example pair is **DO / DON'T** with one-line rationale. The DON'T side is 
 
 ---
 
-## 0. The nine hard rules
+## 0. The ten hard rules
 
 Every other idiom is downstream of these. If a piece of stryke code violates any of them, it is wrong style, full stop.
 
@@ -19,6 +19,7 @@ Every other idiom is downstream of these. If a piece of stryke code violates any
 7. **Implicit return — never `return` on the tail expression.** The last expression in any `fn` body, arrow-block, or expression-position block IS the return value. `return` is **only** correct as an early-return guard (`return undef if $err`). Writing `return $x` at the bottom of a body is noise.
 8. **No parens on fn calls unless precedence demands them.** stryke calls take args list-operator-style. `p "hello"`, `len @a`, `uc rev "abc"` — paren-less. Add parens **only** when the call is followed by an operator that would re-bind (`len(@a) > 1`), when nesting needs disambiguation, or when an empty arg list is the intent (`time()`).
 9. **No trailing `1` (or any sentinel truthy value) at the end of a library / module file.** That's Perl 5's `package returns true` ritual — `require` there demanded the last evaluated expression be truthy, so every `.pm` ended in `1;`. stryke `use`/`import` resolution does not consult the file's tail expression, so the `1` is pure noise inherited from CPAN muscle memory. Library files end at the last `fn` (or `class` / `const`) definition. `--no-interop` rejects a bare-integer tail expression in module position.
+10. **`val` for immutable, `var` for mutable — never bare `my` in new code.** stryke flips Perl 5's mutable-by-default `my` into Scala/Kotlin-style immutable-by-default: `val` marks the binding *frozen* at compile time (reassignment, push/pop, `$x[i] =`, `$h{k} =`, `delete $h{k}` all error at compile time, not run time); `var` is the mutable counterpart. Both desugar to `my` in the AST — same scope, same bytecode, same slot allocation — so the cost is zero. Default to `val`; reach for `var` only when you actually mutate. `val` also accepts a type annotation (`val $port : Int = 8080`). `for val $x (LIST)` and `for var $x (LIST)` both work — use `for val` unless the loop body reassigns the iterator (almost never). Bare `my` stays valid for CPAN ports (it's what Perl 5 spells), but new stryke code wrong-on-style; `--no-interop` rejects it.
 
 ```stryke
 # RIGHT — fn, p, pipeline, no semicolons, implicit params, expression-body, implicit return
@@ -467,7 +468,7 @@ The plain block is what list builtins accept. Use it when the closure is the blo
 |---|---|---|
 | `~> @xs >{ _ * 2 } sum` | `~> @xs { _ * 2 } sum` | `~>` stages need either `name`, `name(args)`, `>{...}`, or `name { … }`. A bare `{}` doesn't parse as a stage. |
 | `~> @xs map { _ * 2 } sum` | always-`>{}` style | `map { … }` is the block-arg stage form, equally valid in `~>`. Pick `>{}` for standalone closures, `name { … }` when calling a builtin. |
-| `my $f = fn { _ * 2 }` | `my $f = >{ _ * 2 }` | **Arrow-block is not a value.** Bare `>{ }` outside threading errors with "Not a code reference". |
+| `val $f = fn { _ * 2 }` | `my $f = >{ _ * 2 }` | **Arrow-block is not a value.** Bare `>{ }` outside threading errors with "Not a code reference". |
 
 ### `fn { … }` / `fn name = …` — anonymous and named function values
 
@@ -475,8 +476,8 @@ For storing a closure in a variable or returning one, use `fn`. Anonymous `fn { 
 
 | DO | DON'T | Why |
 |---|---|---|
-| `my $f = fn { _ * 2 }` | `my $f = sub { $_[0] * 2 }` | `fn` opens the topic-var protocol; `sub` doesn't. |
-| `my $f = fn { _ * 2 }` | `my $f = >{ _ * 2 }` | `>{ }` is threading-only — error outside `~>`. |
+| `val $f = fn { _ * 2 }` | `my $f = sub { $_[0] * 2 }` | `fn` opens the topic-var protocol; `sub` doesn't. |
+| `val $f = fn { _ * 2 }` | `my $f = >{ _ * 2 }` | `>{ }` is threading-only — error outside `~>`. |
 | `fn double = _ * 2` (top-level) | `fn double { return _ * 2 }` | Expression-bodied named fn (rule 6) + implicit return (rule 7). |
 
 ### Outer chain `_<` — one `<` per closure level
@@ -511,9 +512,9 @@ stryke statement-terminates on newline. Trailing `;` is noise that adds a charac
 
 | DO | DON'T | Why |
 |---|---|---|
-| `my $x = 1` | `my $x = 1;` | Newline already terminates. |
+| `val $x = 1` | `my $x = 1;` | Newline already terminates; `val` over bare `my` (rule 10). |
 | `p $x` | `p $x;` | Same. |
-| `for my $i (1:10) { p $i }` | `for my $i (1..10) { p $i; }` | Both sides; range too. |
+| `for val $i (1:10) { p $i }` | `for my $i (1..10) { p $i; }` | Both sides; range too. |
 
 **The only legitimate `;`** is **separating statements on the same line** — almost always inside a C-style `for` header:
 
@@ -569,7 +570,7 @@ my %sm = (a => 1, b => 2)
 
 | DO | DON'T | Why |
 |---|---|---|
-| `my $sum = sum(@xs)` | `my $sum = @xs ? sum(@xs) : 0` | Trust the builtin's empty-list contract. |
+| `val $sum = sum(@xs)` | `my $sum = @xs ? sum(@xs) : 0` | Trust the builtin's empty-list contract. |
 | `die "bad input" if $n < 0` | check + return undef + caller checks for undef | `die` is cheap; failure paths are explicit. |
 | direct call | guard with `if defined $obj && ref $obj && $obj->can('method')` | Trust internal code. Validate at boundaries (user input, network), nowhere else. |
 
