@@ -1464,7 +1464,7 @@ pub(crate) fn package_decl_line(text: &str, name: &str) -> Option<usize> {
     None
 }
 
-fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
+pub(crate) fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
     // Sigil-prefixed identifiers are variables, not builtins. Don't let
     // `$pass`/`@pass`/`%pass` fall through to `doc_for_label("pass")` —
     // that returned the `pass` builtin card and confused users. Try to
@@ -10306,7 +10306,7 @@ fn completions(
 /// installed-package completion path — `use<TAB>` should list installable
 /// packages, not bareword builtins. `byte_col` is the cursor's byte
 /// offset inside `line_text`.
-fn line_completion_is_use_context(line_text: &str, byte_col: usize) -> bool {
+pub(crate) fn line_completion_is_use_context(line_text: &str, byte_col: usize) -> bool {
     let prefix = &line_text[..byte_col.min(line_text.len())];
     let trimmed = prefix.trim_start();
     for kw in &["use ", "require "] {
@@ -10330,7 +10330,7 @@ fn line_completion_is_use_context(line_text: &str, byte_col: usize) -> bool {
 /// when present; otherwise falls back to scanning the first `lib/*.stk`
 /// for a `package X` declaration. Cheap — `installed.toml` is small and
 /// each manifest read is one TOML parse.
-fn installed_package_completions(filter: &str) -> Vec<CompletionItem> {
+pub(crate) fn installed_package_completions(filter: &str) -> Vec<CompletionItem> {
     let mut out = Vec::new();
     let store = match crate::pkg::store::Store::user_default() {
         Ok(s) => s,
