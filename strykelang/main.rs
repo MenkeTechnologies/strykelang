@@ -1338,7 +1338,7 @@ fn main() {
     if args.len() >= 2 && args[1] == "remove" {
         process::exit(stryke::pkg::commands::cmd_remove(&args[2..]));
     }
-    if args.len() >= 2 && args[1] == "install" {
+    if args.len() >= 2 && matches!(args[1].as_str(), "install" | "i") {
         let rest = &args[2..];
         if rest.iter().any(|a| a == "-g" || a == "--global") {
             let filtered: Vec<String> = rest
