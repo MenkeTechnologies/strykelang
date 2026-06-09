@@ -2281,13 +2281,13 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  new NAME                  scaffold project at ./NAME/");
         println!("  install [--offline]       resolve deps + write stryke.lock (alias: i)");
         println!("  install -g SPEC           install a package globally (PATH | gh:owner/repo | github.com/...)");
-        println!("  uninstall -g NAME         drop a global pin + its launchers");
+        println!("  uninstall -g NAME         drop a global pin + its launchers (alias: un)");
         println!("  use -g NAME@VERSION       switch which installed version a standalone `use` resolves to");
-        println!("  list -g                   list global packages, launchers, and orphans");
+        println!("  list -g                   list global packages, launchers, and orphans (alias: ls)");
         println!("  gc -g [--dry-run]         delete ~/.stryke/store/ entries no longer pinned");
         println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
         println!("  remove NAME               drop a dep from stryke.toml");
-        println!("  update [NAME]             re-resolve and rewrite stryke.lock");
+        println!("  update [NAME]             re-resolve and rewrite stryke.lock (alias: up, upgrade)");
         println!("  outdated                  report deps drifted from their lock pin");
         println!("  audit                     check lockfile against advisory feed");
         println!("  tree                      print resolved dep graph");
@@ -2295,7 +2295,7 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  vendor                    snapshot store deps to ./vendor/");
         println!("  clean [--all]             wipe target/ (and optionally global caches)");
         println!("  search NAME               registry query (registry not deployed)");
-        println!("  publish [--dry-run]       publish to registry (registry not deployed)");
+        println!("  publish [--dry-run]       publish to registry (registry not deployed) (alias: pub)");
         println!("  yank VERSION              yank a version (registry not deployed)");
         println!("  run SCRIPT [ARGS...]      run a [scripts] entry");
         println!();
@@ -2329,7 +2329,7 @@ pub fn dispatch(args: &[String]) -> i32 {
                 cmd_install(&args[1..])
             }
         }
-        "uninstall" => {
+        "uninstall" | "un" => {
             if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
                 let filtered: Vec<String> = args[1..]
                     .iter()
@@ -2342,7 +2342,7 @@ pub fn dispatch(args: &[String]) -> i32 {
                 1
             }
         }
-        "list" => {
+        "list" | "ls" => {
             if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
                 let filtered: Vec<String> = args[1..]
                     .iter()
@@ -2383,13 +2383,13 @@ pub fn dispatch(args: &[String]) -> i32 {
         }
         "tree" => cmd_tree(&args[1..]),
         "info" => cmd_info(&args[1..]),
-        "update" => cmd_update(&args[1..]),
+        "update" | "up" | "upgrade" => cmd_update(&args[1..]),
         "outdated" => cmd_outdated(&args[1..]),
         "audit" => cmd_audit(&args[1..]),
         "vendor" => cmd_vendor(&args[1..]),
         "clean" => cmd_clean(&args[1..]),
         "search" => cmd_search(&args[1..]),
-        "publish" => cmd_publish(&args[1..]),
+        "publish" | "pub" => cmd_publish(&args[1..]),
         "yank" => cmd_yank(&args[1..]),
         "run" => cmd_run_script(&args[1..]),
         other => {
