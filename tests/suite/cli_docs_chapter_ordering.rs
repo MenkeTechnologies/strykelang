@@ -156,13 +156,14 @@ fn toc_starts_with_doc_categories_in_declared_order() {
         eprintln!("skip: stryke binary not built");
         return;
     };
-    // The first five DOC_CATEGORIES chapters should appear, in order,
-    // as the first five chapters of the TOC. (Locking the full list
-    // would couple the test to every future chapter add — five is
+    // The first four DOC_CATEGORIES chapters should appear, in order,
+    // as the first four chapters of the TOC. (Locking the full list
+    // would couple the test to every future chapter add — four is
     // enough to catch the "interleaved alphabetical" regression.)
+    // GUI Automation was removed in v0.16.31 along with enigo/xcap;
+    // it now ships as the stryke-gui cdylib package.
     let want = [
         "Parallel Primitives",
-        "GUI Automation",
         "Shared State & Concurrency",
         "Pipeline & Pipe-Forward",
         "Streaming Iterators",
