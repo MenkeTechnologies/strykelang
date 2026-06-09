@@ -12,13 +12,15 @@
 #   s disasm [--jit] FILE                    — disassemble bytecode
 #   s profile [--flame] [--json] FILE        — run with profiling
 #   s bench [FILE|DIR]                       — run benchmark files
-#   s test [FILE|DIR]                        — run test files
+#   s test [FILE|DIR]                        — run test files (alias: t)
 #   s init [NAME]                            — scaffold project in cwd (stryke.toml + lib/, t/, benches/)
 #   s new NAME                               — scaffold a new project at ./NAME/
-#   s install [--offline]                    — resolve manifest, populate stryke.lock + ~/.stryke/store
+#   s install [--offline]                    — resolve manifest, populate stryke.lock + ~/.stryke/store (alias: i)
 #   s install -g SPEC                        — global install (PATH | gh:owner/repo | github.com/.../@VER)
-#   s uninstall -g NAME                      — drop a global pin + its launchers
-#   s list -g                                — list global packages, launchers, orphans
+#   s uninstall -g NAME                      — drop a global pin + its launchers (alias: un)
+#   s list -g                                — list global packages, launchers, orphans (alias: ls)
+#   s update [NAME] [--offline]              — re-resolve manifest + rewrite stryke.lock (alias: up, upgrade)
+#   s publish [--dry-run]                    — push package to registry (alias: pub)
 #   s use -g NAME@VERSION                    — switch which installed version `use Foo` resolves to
 #   s gc -g [--dry-run]                      — delete store entries no longer pinned
 #   s add NAME[@VER] [flags]                 — add a dep to stryke.toml; reruns install
@@ -303,6 +305,26 @@ _stryke_info() {
     '1:dep name:_stryke_pkg_dep_names'
 }
 
+# `s update [NAME] [--offline]` — re-resolve manifest deps and rewrite
+# stryke.lock. Optional NAME limits the update to a single dep. Aliased
+# as `up` / `upgrade` (npm-style shorthands).
+_stryke_update() {
+  _arguments -s -S \
+    '--offline[only use cached packages; never fetch]' \
+    '(-h --help)'{-h,--help}'[show s update usage]' \
+    '1:dep name to update (optional):_stryke_pkg_dep_names'
+}
+
+# `s publish [--dry-run] [--registry=URL]` — push the package to the
+# registry (endpoint not deployed yet — command emits a clear stub).
+# Aliased as `pub`.
+_stryke_publish() {
+  _arguments -s -S \
+    '--dry-run[verify without pushing]' \
+    '--registry=[alternate registry URL]:url:' \
+    '(-h --help)'{-h,--help}'[show s publish usage]'
+}
+
 # `s pkg <subcommand>` — dispatcher mirror for the package commands above.
 _stryke_pkg() {
   local curcontext="$curcontext" state line
@@ -322,6 +344,11 @@ _stryke_pkg() {
         'un:alias for uninstall'
         'list:list global packages, launchers, orphans (alias: ls; requires -g)'
         'ls:alias for list'
+        'update:re-resolve manifest + rewrite stryke.lock (alias: up, upgrade)'
+        'up:alias for update'
+        'upgrade:alias for update'
+        'publish:push package to registry (alias: pub)'
+        'pub:alias for publish'
         'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
         'gc:delete store entries no longer pinned (requires -g)'
         'add:add a dep to stryke.toml'
@@ -344,6 +371,9 @@ _stryke_pkg() {
         remove)    _stryke_remove ;;
         tree)      _stryke_tree ;;
         info)      _stryke_info ;;
+        test|t)    _stryke_test ;;
+        update|up|upgrade) _stryke_update ;;
+        publish|pub) _stryke_publish ;;
       esac
       ;;
   esac
@@ -549,7 +579,8 @@ _stryke() {
         'build:compile script/project into standalone binary'
         'run:run ./main.stk or specified script'
         'prun:run multiple files in parallel'
-        'test:run tests in t/'
+        'test:run tests in t/ (alias: t)'
+        't:alias for test'
         'bench:run benchmarks in bench/'
         'check:parse + compile without executing'
         'disasm:disassemble bytecode'
@@ -564,6 +595,11 @@ _stryke() {
         'un:alias for uninstall'
         'list:list global packages, launchers, orphans (alias: ls; requires -g)'
         'ls:alias for list'
+        'update:re-resolve manifest + rewrite stryke.lock (alias: up, upgrade)'
+        'up:alias for update'
+        'upgrade:alias for update'
+        'publish:push package to registry (alias: pub)'
+        'pub:alias for publish'
         'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
         'gc:delete store entries no longer pinned (requires -g)'
         'add:add a dep to stryke.toml'
@@ -595,7 +631,7 @@ _stryke() {
         disasm)    _stryke_disasm ;;
         profile)   _stryke_profile ;;
         bench)     _stryke_bench ;;
-        test)      _stryke_test ;;
+        test|t)    _stryke_test ;;
         init)      _stryke_init ;;
         new)       _stryke_new ;;
         install|i) _stryke_install ;;
@@ -607,6 +643,8 @@ _stryke() {
         remove)    _stryke_remove ;;
         tree)      _stryke_tree ;;
         info)      _stryke_info ;;
+        update|up|upgrade) _stryke_update ;;
+        publish|pub) _stryke_publish ;;
         pkg)       _stryke_pkg ;;
         repl)      _stryke_repl ;;
         run)       _stryke_run ;;
