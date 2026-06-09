@@ -541,11 +541,23 @@ fn current_binary_mtime_secs() -> Option<i64> {
     })
 }
 
-/// Default shard path: `~/.stryke/scripts.rkyv`.
+/// Default shard path: `~/.stryke/scripts.rkyv` (native stryke dialect).
 pub fn default_cache_path() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join(".stryke/scripts.rkyv")
+}
+
+/// Compat shard path: `~/.stryke/scripts.compat.rkyv`. Parser/compiler output
+/// for the same source differs by `--compat` (statement-terminator rule,
+/// prototype-vs-signature dispatcher, reserved-name shadowing, …) so compat
+/// runs route to a separate shard — otherwise a `--compat` entry can be
+/// returned to a native run and vice versa, hiding the real behavior the user
+/// is trying to test.
+pub fn compat_cache_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .join(".stryke/scripts.compat.rkyv")
 }
 
 /// `STRYKE_CACHE=0|false|no` disables the cache entirely.
@@ -556,10 +568,10 @@ pub fn cache_enabled() -> bool {
     )
 }
 
-// ── Process-global cache (lazy-initialized) ──────────────────────────────────
+// ── Process-global caches (lazy-initialized, one per dialect) ────────────────
 
-/// Process-wide `ScriptCache` rooted at `default_cache_path()`. `None` when the
-/// cache is disabled or the path could not be opened.
+/// Native-dialect shard. `None` when the cache is disabled or the path could
+/// not be opened.
 pub static CACHE: once_cell::sync::Lazy<Option<ScriptCache>> = once_cell::sync::Lazy::new(|| {
     if !cache_enabled() {
         return None;
@@ -567,9 +579,28 @@ pub static CACHE: once_cell::sync::Lazy<Option<ScriptCache>> = once_cell::sync::
     ScriptCache::open(&default_cache_path()).ok()
 });
 
+/// Compat-dialect shard. Initialized lazily — opened only when a `--compat`
+/// invocation actually hits the cache.
+pub static CACHE_COMPAT: once_cell::sync::Lazy<Option<ScriptCache>> =
+    once_cell::sync::Lazy::new(|| {
+        if !cache_enabled() {
+            return None;
+        }
+        ScriptCache::open(&compat_cache_path()).ok()
+    });
+
+/// Pick the right shard for the current mode flags.
+fn active_cache() -> Option<&'static ScriptCache> {
+    if crate::compat_mode() {
+        CACHE_COMPAT.as_ref()
+    } else {
+        CACHE.as_ref()
+    }
+}
+
 /// Try to load a cached script by source path. Returns `None` on any miss.
 pub fn try_load(path: &Path) -> Option<CachedScript> {
-    let cache = CACHE.as_ref()?;
+    let cache = active_cache()?;
     let canonical = path.canonicalize().ok()?;
     let path_str = canonical.to_string_lossy();
     let (mtime_s, mtime_ns) = file_mtime(&canonical)?;
@@ -578,7 +609,7 @@ pub fn try_load(path: &Path) -> Option<CachedScript> {
 
 /// Store a compiled script in the cache.
 pub fn try_save(path: &Path, program: &Program, chunk: &Chunk) -> StrykeResult<()> {
-    let Some(cache) = CACHE.as_ref() else {
+    let Some(cache) = active_cache() else {
         return Ok(());
     };
     let canonical = match path.canonicalize() {
