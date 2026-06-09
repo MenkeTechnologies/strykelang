@@ -480,13 +480,21 @@ pub fn try_vm_execute(
     program: &ast::Program,
     interp: &mut VMHelper,
 ) -> Option<StrykeResult<StrykeValue>> {
+    // Claim the cache sidebands BEFORE `prepare_program_top_level` runs. Top-level `use Module`
+    // resolves via `require_execute` → `parse_and_run_module_in_file` → recursive
+    // `try_vm_execute(module_program)`; if we left the slots on `interp`, the inner call would
+    // see the outer script's `cache_script_path` / `cached_chunk` and save the module's
+    // program+chunk under the outer script's key — every cache hit afterward would run the
+    // module's body instead of the script's.
+    let cached_chunk_local = interp.cached_chunk.take();
+    let cache_path_local = interp.cache_script_path.take();
+
     if let Err(e) = interp.prepare_program_top_level(program) {
         return Some(Err(e));
     }
 
-    // Fast path: chunk loaded from the bytecode cache hit. Consume the slot with `.take()` so a
-    // subsequent re-entry (e.g. nested `do FILE`) does not reuse a stale chunk.
-    if let Some(chunk) = interp.cached_chunk.take() {
+    // Fast path: chunk loaded from the bytecode cache hit.
+    if let Some(chunk) = cached_chunk_local {
         return Some(run_compiled_chunk(chunk, interp));
     }
 
@@ -516,7 +524,7 @@ pub fn try_vm_execute(
     };
 
     // Save to the bytecode cache (mtime-based, skips lex/parse/compile on 2+ runs)
-    if let Some(path) = interp.cache_script_path.take() {
+    if let Some(path) = cache_path_local {
         let _ = script_cache::try_save(&path, program, &chunk);
     }
     Some(run_compiled_chunk(chunk, interp))

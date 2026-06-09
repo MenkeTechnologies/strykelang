@@ -325,6 +325,7 @@ mod runtime_quality_batch3;
 mod runtime_quality_batch4;
 mod scope_pin;
 mod scoping;
+mod script_cache_use_module;
 mod scriptable_controller_pin;
 mod semantic_edge;
 mod serialization;
