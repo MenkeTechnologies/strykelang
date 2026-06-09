@@ -318,8 +318,10 @@ _stryke_pkg() {
         'new:scaffold project at ./NAME/'
         'install:resolve deps + write stryke.lock (alias: i; with -g: install a package globally)'
         'i:alias for install'
-        'uninstall:drop a global pin + its launchers (requires -g)'
-        'list:list global packages, launchers, orphans (requires -g)'
+        'uninstall:drop a global pin + its launchers (alias: un; requires -g)'
+        'un:alias for uninstall'
+        'list:list global packages, launchers, orphans (alias: ls; requires -g)'
+        'ls:alias for list'
         'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
         'gc:delete store entries no longer pinned (requires -g)'
         'add:add a dep to stryke.toml'
@@ -334,8 +336,8 @@ _stryke_pkg() {
         init)      _stryke_init ;;
         new)       _stryke_new ;;
         install|i) _stryke_install ;;
-        uninstall) _stryke_uninstall ;;
-        list)      _stryke_list ;;
+        uninstall|un) _stryke_uninstall ;;
+        list|ls)   _stryke_list ;;
         use)       _stryke_use ;;
         gc)        _stryke_gc ;;
         add)       _stryke_add ;;
@@ -558,8 +560,10 @@ _stryke() {
         'new:scaffold a new project at ./NAME/'
         'install:resolve deps + write stryke.lock (alias: i; with -g: install a package globally)'
         'i:alias for install'
-        'uninstall:drop a global pin + its launchers (requires -g)'
-        'list:list global packages, launchers, orphans (requires -g)'
+        'uninstall:drop a global pin + its launchers (alias: un; requires -g)'
+        'un:alias for uninstall'
+        'list:list global packages, launchers, orphans (alias: ls; requires -g)'
+        'ls:alias for list'
         'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
         'gc:delete store entries no longer pinned (requires -g)'
         'add:add a dep to stryke.toml'
@@ -595,8 +599,8 @@ _stryke() {
         init)      _stryke_init ;;
         new)       _stryke_new ;;
         install|i) _stryke_install ;;
-        uninstall) _stryke_uninstall ;;
-        list)      _stryke_list ;;
+        uninstall|un) _stryke_uninstall ;;
+        list|ls)   _stryke_list ;;
         use)       _stryke_use ;;
         gc)        _stryke_gc ;;
         add)       _stryke_add ;;
