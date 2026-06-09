@@ -2279,7 +2279,7 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("Subcommands:");
         println!("  init [NAME]               scaffold project in cwd");
         println!("  new NAME                  scaffold project at ./NAME/");
-        println!("  install [--offline]       resolve deps + write stryke.lock");
+        println!("  install [--offline]       resolve deps + write stryke.lock (alias: i)");
         println!("  install -g SPEC           install a package globally (PATH | gh:owner/repo | github.com/...)");
         println!("  uninstall -g NAME         drop a global pin + its launchers");
         println!("  use -g NAME@VERSION       switch which installed version a standalone `use` resolves to");
@@ -2313,7 +2313,10 @@ pub fn dispatch(args: &[String]) -> i32 {
         },
         "add" => cmd_add(&args[1..]),
         "remove" => cmd_remove(&args[1..]),
-        "install" => {
+        // `s i` is a convenience alias for `s install` (matches `cargo install`'s
+        // implicit shorthand). All flag behavior (`-g`, `--offline`, etc.) is
+        // identical — we just dispatch to the same handler.
+        "install" | "i" => {
             // Detect `-g` for global install; falls through to lock-driven install otherwise.
             if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
                 let filtered: Vec<String> = args[1..]
