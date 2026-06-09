@@ -352,6 +352,10 @@ pub const KEYWORDS: &[&str] = &[
     "next",
     "redo",
     "use",
+    // `import` — alias for `use`. Parses identically (same `parse_use`
+    // path, same StmtKind variants). Lets Python/JS-shaped scripts spell
+    // `import Foo;` while keeping `use Foo;` working.
+    "import",
     "no",
     "require",
     "package",

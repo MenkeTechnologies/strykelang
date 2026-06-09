@@ -4686,7 +4686,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "state" => "Declare a persistent lexical variable that retains its value across calls to the enclosing subroutine. Unlike `my`, which reinitializes on each call, `state` initializes only once — the first time execution reaches the declaration — and preserves the value for all subsequent calls. This is perfect for counters, caches, and memoization without resorting to globals or closures over external variables. In stryke, `state` variables are per-thread when used inside `~> { }` or `fan` blocks; they are not shared across workers.\n\n```perl\nfn ctr {\n    state $n = 0\n    ++$n\n}\np ctr() for 1:5   # 1 2 3 4 5\nfn cache_lookup($x) {\n    state %cache\n    $cache{$x} //= expensive($x)\n}\n```\n\nRequires `use feature 'state'` in standard Perl, but is always available in stryke.",
         "sub" => "**`sub` is a Perl 5 idiom that stryke rejects under `--no-interop`.** Use `fn` instead — it opens the stryke topic-variable protocol (`_`, `_0`, `_1`, `_<`) and supports expression-bodied one-liners (`fn name = expr`).\n\n```perl\n# WRONG (legacy Perl 5)\nsub double { my $x = shift; $x * 2 }\nsub area($w, $h) { return $w * $h }\n\n# RIGHT (stryke)\nfn double = _ * 2                         # expression-bodied\nfn area($w, $h) = $w * $h                 # named params, one-liner\nfn shout { my $s = _; uc($s) . \"!\" }   # block body, multi-statement\n```\n\nIn `--compat` mode `sub` still parses for Perl-5 ports, but **all new stryke code should use `fn`**.\n\nSee also: `fn`, `_`, `_0`, `_1`, style-guide §0 rule 1.",
         "package" => "Set the current package namespace for all subsequent declarations. Package names are conventionally `CamelCase` with `::` separators (e.g. `Math::Utils`). All unqualified function and `our` variable names are installed into the current package. In stryke, packages work identically to standard Perl — they provide namespace isolation but are not classes by themselves (use `struct` or `bless` for OOP). Switching packages mid-file is allowed but discouraged; prefer one package per file.\n\n```perl\npackage Math::Utils\nfn calc_fact($n) { $n <= 1 ? 1 : $n * calc_fact($n - 1) }\nfn calc_fib($n) { $n < 2 ? $n : calc_fib($n - 1) + calc_fib($n - 2) }\npackage main\np Math::Utils::calc_fact(10)   # 3628800\n```",
-        "use" => "Load and import a user module at compile time: `use Module qw(func);`. Stryke list utilities (`sum`, `max`, `uniq`, `reduce`, …), error helpers (`croak`, `confess`, `carp`), and serialization (`json_encode`, `json_decode`, `ddump`) are all native bare-name builtins — no import needed.\n\n```perl\nuse My::Project::Helpers qw(normalize_path canonicalize)\n\nmy @vals = 1:10\np sum(@vals)   # 55\np max(@vals)   # 10\np normalize_path(\"/tmp/../etc\")\n```",
+        "use" | "import" => "Load and import a user module at compile time: `use Module qw(func);` (or the alias `import Module qw(func);`). Stryke list utilities (`sum`, `max`, `uniq`, `reduce`, …), error helpers (`croak`, `confess`, `carp`), and serialization (`json_encode`, `json_decode`, `ddump`) are all native bare-name builtins — no import needed.\n\n```perl\nuse My::Project::Helpers qw(normalize_path canonicalize)\nimport My::Project::Helpers qw(normalize_path canonicalize)   # same statement\n\nmy @vals = 1:10\np sum(@vals)   # 55\np max(@vals)   # 10\np normalize_path(\"/tmp/../etc\")\n```",
         "no" => "Unimport a module or pragma: `no strict 'refs';`.\n\n```perl\nno warnings 'experimental'\ngiven ($x) { when (1) { p \"one\" } }\n```",
         "require" => "Load a user module at runtime: `require Module;`. JSON / YAML / TOML decoding is built in (`json_decode`, `yaml_decode`, `toml_decode`) — no module load needed.\n\n```perl\nrequire My::Plugin::Loader\nmy $loader = My::Plugin::Loader::init()\np $loader->status\n\n# Built-in: no require needed\nmy $data = json_decode($text)\np $data->{name}\n```",
         "return" => "Return a value from a subroutine.\n\n```perl\nfn pin_val($v, $lo, $hi) {\n    return $lo if $v < $lo\n    return $hi if $v > $hi\n    $v\n}\n```",
@@ -9478,8 +9478,8 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     (
         "Declarations",
         &[
-            "my", "var", "val", "our", "local", "state", "fn", "package", "use", "no", "require",
-            "BEGIN", "END",
+            "my", "var", "val", "our", "local", "state", "fn", "package", "use", "import", "no",
+            "require", "BEGIN", "END",
         ],
     ),
     (
@@ -10331,7 +10331,7 @@ fn completions(
 pub(crate) fn line_completion_is_use_context(line_text: &str, byte_col: usize) -> bool {
     let prefix = &line_text[..byte_col.min(line_text.len())];
     let trimmed = prefix.trim_start();
-    for kw in &["use ", "require "] {
+    for kw in &["use ", "import ", "require "] {
         if let Some(rest) = trimmed.strip_prefix(kw) {
             // Whatever comes after the keyword must be all bareword
             // characters (letters, digits, `_`, `::`) — no parens, no
@@ -11102,6 +11102,11 @@ fn push_snippet_completions(filter: &str, items: &mut Vec<CompletionItem>) {
             "use",
             "use ${1:Module}${2: qw(${3:imports})};\n",
             "use statement (snippet)",
+        ),
+        (
+            "import",
+            "import ${1:Module}${2: qw(${3:imports})};\n",
+            "import statement (alias for `use`)",
         ),
         (
             "strict",

@@ -5204,7 +5204,7 @@ fn run_bench_subcommand(argv0: &str, args: &[String]) -> i32 {
         let start = std::time::Instant::now();
         let output = process::Command::new(&exe)
             .arg(&script_abs)
-            .args(&args[1..])
+            .args(args.get(1..).unwrap_or(&[]))
             .current_dir(project_root)
             .stderr(process::Stdio::piped())
             .stdout(process::Stdio::piped())

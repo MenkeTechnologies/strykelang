@@ -3114,6 +3114,7 @@ impl Lexer {
                     | "foreach"
                     | "elsif"
                     | "use"
+                    | "import"
                     | "no"
                     | "require"
                     | "eval"

@@ -503,7 +503,7 @@ impl Parser {
         matches!(
             self.peek(),
             Token::Ident(ref kw) if matches!(kw.as_str(),
-                "use" | "no" | "my" | "our" | "local" | "sub" | "struct" | "enum"
+                "use" | "import" | "no" | "my" | "our" | "local" | "sub" | "struct" | "enum"
                 | "if" | "unless" | "while" | "until" | "for" | "foreach" | "loop"
                 | "return" | "last" | "next" | "redo" | "package" | "require"
                 | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
@@ -915,7 +915,10 @@ impl Parser {
                 "our" => self.parse_my_our_local("our", false)?,
                 "local" => self.parse_my_our_local("local", false)?,
                 "package" => self.parse_package()?,
-                "use" => self.parse_use()?,
+                // `import` is a syntactic alias for `use` — same parse,
+                // same AST node. Lets `import Foo qw(bar);` work for
+                // users coming from Python/JS spellings.
+                "use" | "import" => self.parse_use()?,
                 "no" => self.parse_no()?,
                 "return" => self.parse_return()?,
                 "last" => {
@@ -6323,7 +6326,13 @@ impl Parser {
 
     fn parse_use(&mut self) -> StrykeResult<Statement> {
         let line = self.peek_line();
-        self.advance(); // 'use'
+        // Capture the keyword (`use` or its alias `import`) so error
+        // messages point at the spelling the user actually typed.
+        let kw_name = match self.peek() {
+            Token::Ident(s) if s == "import" => "import",
+            _ => "use",
+        };
+        self.advance(); // 'use' / 'import'
         let (tok, tok_line) = self.advance();
         match tok {
             Token::Float(v) => {
@@ -6344,7 +6353,7 @@ impl Parser {
                     })
                 } else {
                     Err(self.syntax_err(
-                        format!("Expected ';' after use VERSION (got {:?})", self.peek()),
+                        format!("Expected ';' after {} VERSION (got {:?})", kw_name, self.peek()),
                         line,
                     ))
                 }
@@ -6424,7 +6433,7 @@ impl Parser {
                 })
             }
             other => Err(self.syntax_err(
-                format!("Expected module name or version after use, got {:?}", other),
+                format!("Expected module name or version after {}, got {:?}", kw_name, other),
                 tok_line,
             )),
         }
@@ -14184,7 +14193,7 @@ impl Parser {
             // of `is_known_bareword`, which is the right call: var/val are
             // not callable barewords (`map { val }` should not be promoted
             // to `val($_)`).
-            | "my" | "our" | "local" | "use" | "no"
+            | "my" | "our" | "local" | "use" | "import" | "no"
             | "sub" | "if" | "unless" | "while" | "until"
             | "for" | "foreach" | "last" | "next" | "redo" | "goto"
             | "not" | "and" | "or"
@@ -18465,6 +18474,7 @@ impl Parser {
         "enum",
         "trait",
         "use",
+        "import",
         "no",
         "require",
         "package",
