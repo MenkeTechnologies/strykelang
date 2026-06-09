@@ -140,6 +140,12 @@ pub struct InstalledPackage {
     /// Where the install came from — `github:owner/repo`, `path+file://...`,
     /// etc. Recorded for `s list -g` display + future upgrade paths.
     pub source: String,
+    /// `[ffi].namespace` from the installed manifest, lowercased. Empty when
+    /// the package has no `[ffi]` section. Bridges `use GUI` (lookup key
+    /// `"gui"`) to a store entry whose package name is unrelated (e.g.
+    /// `stryke-gui`). Resolver tries name match first, then namespace match.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub namespace: String,
 }
 
 impl InstalledIndex {
@@ -208,18 +214,56 @@ impl InstalledIndex {
         self.packages.iter().find(|p| p.name == name)
     }
 
+    /// Find an installed package by `[ffi].namespace` (case-insensitive). Used
+    /// by the resolver when `use Foo` doesn't match any `[package].name` —
+    /// bridges `use GUI` → store entry `stryke-gui@*` where the package name
+    /// (matches the repo / dir) is unrelated to the `use` namespace. The
+    /// stored `namespace` keeps the manifest's exact casing (e.g. `"GUI"`);
+    /// matching is case-insensitive so `use GUI` and `use gui` both land.
+    pub fn find_by_namespace(&self, namespace: &str) -> Option<&InstalledPackage> {
+        self.packages
+            .iter()
+            .find(|p| !p.namespace.is_empty() && p.namespace.eq_ignore_ascii_case(namespace))
+    }
+
     /// Insert or overwrite the entry for `name`. Multiple installs of the
     /// same package (e.g. `s pkg install -g <url>` after a previous install)
     /// collapse to one entry — the latest install always wins.
-    pub fn upsert(&mut self, name: impl Into<String>, version: impl Into<String>, source: impl Into<String>) {
+    pub fn upsert(
+        &mut self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        source: impl Into<String>,
+    ) {
+        self.upsert_with_namespace(name, version, source, "");
+    }
+
+    /// `upsert` plus an `[ffi].namespace` value to record on the entry. Used
+    /// by the install path so the resolver can later route `use GUI` to a
+    /// store entry whose package name (matching the repo/dir) differs from
+    /// the namespace.
+    pub fn upsert_with_namespace(
+        &mut self,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        source: impl Into<String>,
+        namespace: impl Into<String>,
+    ) {
         let name = name.into();
         let version = version.into();
         let source = source.into();
+        let namespace = namespace.into();
         if let Some(slot) = self.packages.iter_mut().find(|p| p.name == name) {
             slot.version = version;
             slot.source = source;
+            slot.namespace = namespace;
         } else {
-            self.packages.push(InstalledPackage { name, version, source });
+            self.packages.push(InstalledPackage {
+                name,
+                version,
+                source,
+                namespace,
+            });
         }
     }
 

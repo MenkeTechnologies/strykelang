@@ -1192,7 +1192,12 @@ impl Parser {
         // statement, not a postfix modifier.  This prevents semicolon-less
         // code like `my $x = "val"\nif ($x) { ... }` from being mis-parsed
         // as `my $x = "val" if ($x) { ... }`.
-        if self.peek_line() > self.prev_line() {
+        //
+        // Disabled in `--compat`: Perl 5 source is whitespace-insensitive
+        // between statements (terminated by `;`), so multi-line postfix
+        // modifiers like Test.pm's `print ... \n  if defined &X;` must
+        // attach to the prior statement.
+        if !crate::compat_mode() && self.peek_line() > self.prev_line() {
             self.eat(&Token::Semicolon);
             return Ok(stmt);
         }
@@ -1429,8 +1434,9 @@ impl Parser {
 
     fn maybe_postfix_modifier(&mut self, expr: Expr) -> StrykeResult<Statement> {
         let line = expr.line;
-        // Implicit semicolon: modifier keyword on a new line starts a new statement.
-        if self.peek_line() > self.prev_line() {
+        // Implicit semicolon: modifier keyword on a new line starts a new
+        // statement. Disabled in `--compat` — see `parse_stmt_postfix_modifier`.
+        if !crate::compat_mode() && self.peek_line() > self.prev_line() {
             return Ok(Statement {
                 label: None,
                 kind: StmtKind::Expression(expr),
@@ -4648,6 +4654,19 @@ impl Parser {
                     self.advance();
                     s.push('%');
                 }
+                // Bare `%` outside hash-sigil context (e.g. `sub f ($;%)`,
+                // `sub f (\[$@%])`). The lexer falls back to `Token::Percent`
+                // (the modulo operator) when no identifier follows.
+                Token::Percent => {
+                    self.advance();
+                    s.push('%');
+                }
+                // Bare `*` — typeglob slurp in prototypes: `sub f (*)`,
+                // `sub f (\*)`.
+                Token::Star => {
+                    self.advance();
+                    s.push('*');
+                }
                 Token::Plus => {
                     self.advance();
                     s.push('+');
@@ -4672,10 +4691,26 @@ impl Parser {
     }
 
     fn sub_signature_list_starts_here(&self) -> bool {
+        // Signature parameters use identifier names ($foo, @args, %opts).
+        // Any sigil followed by a non-identifier char is a Perl special
+        // variable ($;, $,, $., $!, $@, $_, $$, $), …) and indicates
+        // legacy-prototype context, not signature context. The lexer
+        // greedily consumes `$;` as `ScalarVar(";")`, `$,` as
+        // `ScalarVar(",")`, etc., so this check has to run on the
+        // captured name, not on the raw bytes.
+        fn is_ident_name(name: &str) -> bool {
+            let mut chars = name.chars();
+            match chars.next() {
+                Some(c) if c.is_ascii_alphabetic() || c == '_' => {
+                    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+                }
+                _ => false,
+            }
+        }
         match self.peek() {
             Token::LBrace | Token::LBracket => true,
-            Token::ScalarVar(name) if name != "$$" && name != ")" => true,
-            Token::ArrayVar(_) | Token::HashVar(_) => true,
+            Token::ScalarVar(name) => is_ident_name(name),
+            Token::ArrayVar(name) | Token::HashVar(name) => is_ident_name(name),
             _ => false,
         }
     }

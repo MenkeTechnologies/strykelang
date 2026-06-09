@@ -747,11 +747,19 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
         return Ok(None);
     }
 
+    // The `.stk` wrapper is the source-of-truth — if it exists at any tier,
+    // resolution succeeds. The companion cdylib (when `[ffi]` is declared) is
+    // best-effort: a missing or unloadable cdylib does NOT abort resolution
+    // here, because that would silently send a real local hit down to @INC
+    // (the caller in `vm_helper::try_resolve_via_lockfile` does
+    // `resolve_module(...).unwrap_or_default()`). The first FFI call into an
+    // unregistered export will surface the load failure at the actual call
+    // site with a clear message, which is the right layer to report it.
+
     // 1. Project-local `lib/`.
     let local = root.join("lib").join(segments_to_path(&segments));
     if local.is_file() {
-        // Project may declare [ffi] for its own cdylib in stryke.toml.
-        try_load_ffi_for(root)?;
+        let _ = try_load_ffi_for(root);
         return Ok(Some(local));
     }
 
@@ -770,7 +778,7 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
                 store_pkg.join("lib").join(segments_to_path(&segments[1..]))
             };
             if nested_path.is_file() {
-                try_load_ffi_for(&store_pkg)?;
+                let _ = try_load_ffi_for(&store_pkg);
                 return Ok(Some(nested_path));
             }
         }
@@ -782,9 +790,18 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
     //    doesn't pin this package, look it up here. This is the path that
     //    makes `s install -g github.com/MenkeTechnologies/stryke-gui` →
     //    standalone `use GUI` work.
+    //
+    // Lookup order: try `[package].name` first (the common case where the
+    // import name matches the package name, e.g. `use Stryke::AWS` → entry
+    // `stryke-aws`). On miss, fall back to `[ffi].namespace` — bridges
+    // `use GUI` (lookup key `"gui"`) to an entry whose canonical name is
+    // `stryke-gui` (matches the repo) but whose namespace is `GUI`.
     if let Ok(idx) = InstalledIndex::load_or_default() {
         let pkg_name = segments[0].to_lowercase();
-        if let Some(entry) = idx.find(&pkg_name) {
+        let entry = idx
+            .find(&pkg_name)
+            .or_else(|| idx.find_by_namespace(&pkg_name));
+        if let Some(entry) = entry {
             let store = Store::user_default()?;
             let store_pkg = store.package_dir(&entry.name, &entry.version);
             let nested_path = if segments.len() == 1 {
@@ -793,7 +810,7 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
                 store_pkg.join("lib").join(segments_to_path(&segments[1..]))
             };
             if nested_path.is_file() {
-                try_load_ffi_for(&store_pkg)?;
+                let _ = try_load_ffi_for(&store_pkg);
                 return Ok(Some(nested_path));
             }
         }
@@ -1440,7 +1457,12 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
                 );
             }
         }
-        idx.upsert(&pkg.name, &pkg.version, &source);
+        let namespace = manifest
+            .ffi
+            .as_ref()
+            .map(|f| f.namespace.clone())
+            .unwrap_or_default();
+        idx.upsert_with_namespace(&pkg.name, &pkg.version, &source, &namespace);
         if let Err(e) = idx.save() {
             eprintln!("s install -g: write installed.toml: {}", e);
             return 1;
@@ -1916,7 +1938,11 @@ pub fn cmd_use_global(args: &[String]) -> i32 {
         .find(&name)
         .map(|p| p.source.clone())
         .unwrap_or_else(|| format!("local-pin:store/{}@{}", name, version));
-    idx.upsert(&name, &version, &source);
+    let namespace = idx
+        .find(&name)
+        .map(|p| p.namespace.clone())
+        .unwrap_or_default();
+    idx.upsert_with_namespace(&name, &version, &source, &namespace);
     if let Err(e) = idx.save_to(&store) {
         eprintln!("s use -g: write installed.toml: {}", e);
         return 1;
