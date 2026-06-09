@@ -1577,11 +1577,119 @@ fn install_global_from_path(
         .package
         .as_ref()
         .ok_or("manifest missing [package]")?;
+
+    // For `[ffi]` packages, the cdylib must end up at `lib/lib<name>.<ext>`
+    // in the store (production layout — what GH-shipped tarballs always
+    // contain). Source trees may or may not have it pre-built:
+    //
+    //   * `lib/lib<name>.<ext>`           — already in production layout; copied via the
+    //                                       filtered subtree pass below.
+    //   * `target/release/lib<name>.<ext>` — dev built; staged into dst/lib/ after copy.
+    //   * neither                         — run `cargo build --release` here, then stage.
+    let ffi_stage = ensure_ffi_cdylib(&abs, &manifest)?;
+
     let dst = store
-        .install_path_dep(&pkg.name, &pkg.version, &abs)
+        .install_path_dep(&pkg.name, &pkg.version, &abs, &manifest)
         .map_err(|e| e.to_string())?;
+
+    // Stage the freshly-built (or target/-located) cdylib into dst/lib/ when
+    // the source's lib/ didn't already have it. Mirrors the GH layout so
+    // try_load_ffi_for finds the lib at candidate (1) — no fallback to
+    // target/ needed once installed.
+    if let Some((built_lib, lib_filename)) = ffi_stage {
+        let dst_lib_dir = dst.join("lib");
+        std::fs::create_dir_all(&dst_lib_dir)
+            .map_err(|e| format!("create {}: {}", dst_lib_dir.display(), e))?;
+        let dst_lib = dst_lib_dir.join(&lib_filename);
+        if !dst_lib.is_file() {
+            std::fs::copy(&built_lib, &dst_lib).map_err(|e| {
+                format!(
+                    "stage cdylib {} -> {}: {}",
+                    built_lib.display(),
+                    dst_lib.display(),
+                    e
+                )
+            })?;
+            eprintln!("  staged {} -> {}", built_lib.display(), dst_lib.display());
+        }
+    }
+
     let source = format!("path+file://{}", abs.display());
     Ok((manifest, dst, source))
+}
+
+/// For `[ffi]` packages, locate the cdylib in the source tree or build it
+/// via `cargo build --release` if absent. Returns `Some((built_path,
+/// dll_filename))` when a build was needed or the lib lives outside
+/// `lib/` — the caller stages the file into `dst/lib/`. Returns `None`
+/// when the package has no `[ffi]` section or when `lib/<filename>` is
+/// already present in source (the filtered subtree copy handles it).
+fn ensure_ffi_cdylib(
+    src: &Path,
+    manifest: &Manifest,
+) -> Result<Option<(PathBuf, String)>, String> {
+    let Some(ffi) = manifest.ffi.as_ref() else {
+        return Ok(None);
+    };
+    if ffi.lib_name.is_empty() {
+        return Ok(None);
+    }
+    let lib_filename = format!(
+        "{}{}{}",
+        std::env::consts::DLL_PREFIX,
+        ffi.lib_name,
+        std::env::consts::DLL_SUFFIX
+    );
+
+    let in_lib = src.join("lib").join(&lib_filename);
+    if in_lib.is_file() {
+        // Already in production layout — install_path_dep's subtree pass
+        // copies it as part of `lib/`.
+        return Ok(None);
+    }
+
+    let release_built = src.join("target/release").join(&lib_filename);
+    if release_built.is_file() {
+        return Ok(Some((release_built, lib_filename)));
+    }
+
+    // Nothing built yet. Need a Cargo.toml at the source root to drive the
+    // build — error clearly when absent so the user knows they're missing
+    // the cdylib crate, not the toolchain.
+    let cargo_toml = src.join("Cargo.toml");
+    if !cargo_toml.is_file() {
+        return Err(format!(
+            "[ffi] declared but cdylib `{}` not found and no Cargo.toml at {} \
+             to build it (looked under lib/ and target/release/)",
+            lib_filename,
+            src.display()
+        ));
+    }
+
+    eprintln!("  building cdylib: cargo build --release ({})", src.display());
+    let status = std::process::Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .current_dir(src)
+        .status()
+        .map_err(|e| format!("spawn cargo: {}", e))?;
+    if !status.success() {
+        return Err(format!(
+            "cargo build --release failed (exit {:?}) in {}",
+            status.code(),
+            src.display()
+        ));
+    }
+
+    if !release_built.is_file() {
+        return Err(format!(
+            "cargo build --release succeeded but `{}` was not produced at {} \
+             — check `[lib].name` in Cargo.toml matches `[ffi].lib-name` in stryke.toml",
+            lib_filename,
+            release_built.display()
+        ));
+    }
+    Ok(Some((release_built, lib_filename)))
 }
 
 fn install_global_from_github(

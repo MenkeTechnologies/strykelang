@@ -13,7 +13,21 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+use super::manifest::Manifest;
 use super::{PkgError, PkgResult};
+
+/// Manifest filename — duplicated from `commands::MANIFEST_FILE` so `store`
+/// stays free of `commands` imports (which would be a cycle).
+const MANIFEST_FILE: &str = "stryke.toml";
+
+/// Subtrees copied wholesale from a path-dep into the store. Mirrors the
+/// canonical release-tarball layout: `lib/` (stk modules + cdylib in
+/// production layout), `bin/` (script launchers).
+const PACKAGE_SUBTREES: &[&str] = &["lib", "bin"];
+
+/// Root-level metadata files copied if present. Matched case-insensitively
+/// by ASCII-uppercased prefix.
+const PACKAGE_META_PREFIXES: &[&str] = &["README", "LICENSE", "LICENCE", "CHANGELOG"];
 
 /// Filename of the global installed-package index.
 pub const INSTALLED_FILE: &str = "installed.toml";
@@ -95,17 +109,86 @@ impl Store {
         self.package_dir(name, version).is_dir()
     }
 
-    /// Recursively copy a directory tree into the store as `name@version`. Used
-    /// for path deps where the source is a local directory the user maintains.
+    /// Copy a path-dep into the store as `name@version` using the canonical
+    /// release-tarball layout, so `s install -g .` produces the same on-disk
+    /// shape as `s install -g github.com/<owner>/<repo>`. Only these are
+    /// copied (everything else — `target/`, `.git/`, `vendor/`, `tests/`,
+    /// editor scratch — stays out of the store):
+    ///
+    /// * `stryke.toml` (required)
+    /// * `lib/` and `bin/` subtrees (recursive)
+    /// * `README*`, `LICENSE*`, `LICENCE*`, `CHANGELOG*` files at the root
+    /// * any `manifest.bin[*]` path that lives outside `lib/` or `bin/`
+    ///
     /// Existing destination is removed first so re-installs see fresh content.
-    pub fn install_path_dep(&self, name: &str, version: &str, src: &Path) -> PkgResult<PathBuf> {
+    pub fn install_path_dep(
+        &self,
+        name: &str,
+        version: &str,
+        src: &Path,
+        manifest: &Manifest,
+    ) -> PkgResult<PathBuf> {
         let dst = self.package_dir(name, version);
         if dst.exists() {
             std::fs::remove_dir_all(&dst)
                 .map_err(|e| PkgError::Io(format!("clear {}: {}", dst.display(), e)))?;
         }
         std::fs::create_dir_all(&dst)?;
-        copy_dir(src, &dst)?;
+
+        let toml_src = src.join(MANIFEST_FILE);
+        let toml_dst = dst.join(MANIFEST_FILE);
+        std::fs::copy(&toml_src, &toml_dst)
+            .map_err(|e| PkgError::Io(format!("copy {}: {}", toml_src.display(), e)))?;
+
+        for sub in PACKAGE_SUBTREES {
+            let from = src.join(sub);
+            if from.is_dir() {
+                let to = dst.join(sub);
+                std::fs::create_dir_all(&to)?;
+                copy_dir(&from, &to)?;
+            }
+        }
+
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            let name_str = file_name.to_string_lossy().to_ascii_uppercase();
+            if PACKAGE_META_PREFIXES
+                .iter()
+                .any(|p| name_str.starts_with(p))
+            {
+                let from = entry.path();
+                if from.is_file() {
+                    std::fs::copy(&from, dst.join(&file_name))
+                        .map_err(|e| PkgError::Io(format!("copy {}: {}", from.display(), e)))?;
+                }
+            }
+        }
+
+        // `[bin]` entries outside lib/ and bin/ — uncommon but supported by
+        // the manifest schema. Anything under lib/ or bin/ is already covered
+        // by the subtree pass.
+        for entry_path in manifest.bin.values() {
+            let rel = Path::new(entry_path);
+            let first_seg = rel
+                .components()
+                .next()
+                .and_then(|c| c.as_os_str().to_str())
+                .unwrap_or("");
+            if PACKAGE_SUBTREES.contains(&first_seg) {
+                continue;
+            }
+            let from = src.join(rel);
+            if from.is_file() {
+                let to = dst.join(rel);
+                if let Some(parent) = to.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::copy(&from, &to)
+                    .map_err(|e| PkgError::Io(format!("copy {}: {}", from.display(), e)))?;
+            }
+        }
+
         Ok(dst)
     }
 }
@@ -408,9 +491,66 @@ mod tests {
         .unwrap();
         let s = Store::at(&store_root);
         s.ensure_layout().unwrap();
-        let dst = s.install_path_dep("foo", "0.1.0", &src).unwrap();
+        let manifest = Manifest::default();
+        let dst = s
+            .install_path_dep("foo", "0.1.0", &src, &manifest)
+            .unwrap();
         assert!(dst.is_dir());
         assert!(dst.join("lib/Foo.stk").is_file());
         assert!(dst.join("stryke.toml").is_file());
+    }
+
+    /// `s install -g .` from a working repo must NOT drag `target/`, `.git/`,
+    /// `vendor/`, or test fixtures into the store — the GH install only ships
+    /// the curated tarball, and the local path now matches that file set.
+    #[test]
+    fn install_path_dep_excludes_build_artifacts() {
+        let store_root = tempdir();
+        let src = tempdir();
+        std::fs::write(
+            src.join("stryke.toml"),
+            "[package]\nname = \"stryke-arrow\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(src.join("lib")).unwrap();
+        std::fs::write(src.join("lib/Arrow.stk"), b"sub arrow { 1 }").unwrap();
+        std::fs::write(src.join("README.md"), b"# stryke-arrow\n").unwrap();
+        std::fs::write(src.join("LICENSE"), b"MIT\n").unwrap();
+
+        // Cruft that must stay out of the store.
+        std::fs::create_dir_all(src.join("target/release")).unwrap();
+        std::fs::write(src.join("target/release/garbage.rlib"), b"junk").unwrap();
+        std::fs::create_dir_all(src.join(".git")).unwrap();
+        std::fs::write(src.join(".git/HEAD"), b"ref: refs/heads/main\n").unwrap();
+        std::fs::create_dir_all(src.join("vendor/foo")).unwrap();
+        std::fs::write(src.join("vendor/foo/big.bin"), b"vendor").unwrap();
+        std::fs::create_dir_all(src.join("tests")).unwrap();
+        std::fs::write(src.join("tests/fixture.stk"), b"# fixture").unwrap();
+        std::fs::write(src.join(".DS_Store"), b"junk").unwrap();
+        std::fs::write(src.join("Cargo.toml"), b"[package]\nname=\"x\"\n").unwrap();
+
+        let s = Store::at(&store_root);
+        s.ensure_layout().unwrap();
+        let manifest = Manifest::default();
+        let dst = s
+            .install_path_dep("stryke-arrow", "0.1.0", &src, &manifest)
+            .unwrap();
+
+        // Store dir name is the package's exact authored name.
+        assert!(dst.ends_with("store/stryke-arrow@0.1.0"));
+
+        // Canonical layout present.
+        assert!(dst.join("stryke.toml").is_file());
+        assert!(dst.join("lib/Arrow.stk").is_file());
+        assert!(dst.join("README.md").is_file());
+        assert!(dst.join("LICENSE").is_file());
+
+        // Cruft absent.
+        assert!(!dst.join("target").exists(), "target/ leaked into store");
+        assert!(!dst.join(".git").exists(), ".git/ leaked into store");
+        assert!(!dst.join("vendor").exists(), "vendor/ leaked into store");
+        assert!(!dst.join("tests").exists(), "tests/ leaked into store");
+        assert!(!dst.join(".DS_Store").exists(), ".DS_Store leaked");
+        assert!(!dst.join("Cargo.toml").exists(), "Cargo.toml leaked");
     }
 }
