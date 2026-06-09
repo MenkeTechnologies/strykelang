@@ -424,7 +424,10 @@ impl<'a> Resolver<'a> {
         }
 
         let integrity = integrity_for_directory(src)?;
-        let dst = self.store.install_path_dep(name, &version, src)?;
+        let manifest_for_copy = nested.clone().unwrap_or_default();
+        let dst = self
+            .store
+            .install_path_dep(name, &version, src, &manifest_for_copy)?;
         installed.push((name.to_string(), version.clone(), dst.clone()));
 
         let mut transitive: Vec<String> = Vec::new();
