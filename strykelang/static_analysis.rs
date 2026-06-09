@@ -112,7 +112,7 @@ impl StaticAnalyzer {
         ] {
             global.declare_scalar(name);
         }
-        Self {
+        let mut a = Self {
             scopes: vec![global],
             errors: Vec::new(),
             file: file.to_string(),
@@ -123,7 +123,15 @@ impl StaticAnalyzer {
             type_methods: HashMap::new(),
             type_parents: HashMap::new(),
             current_class: None,
-        }
+        };
+        // Pre-declare every `[ffi].exports` name from the nearest sibling
+        // stryke.toml. cdylib packages (stryke-gui, stryke-aws, etc.) ship
+        // a thin .stk wrapper that calls FFI symbols (`gui__mouse_pos`)
+        // registered at runtime via dlopen — those aren't declared in the
+        // .stk source anywhere. Without this pre-pass the analyzer flags
+        // every `gui__*` call in lib/GUI.stk as UndefinedSubroutine.
+        a.declare_ffi_exports_for(Path::new(file));
+        a
     }
 
     fn push_scope(&mut self) {
@@ -530,6 +538,12 @@ impl StaticAnalyzer {
         let Ok(program) = crate::parse_module_with_file(&src, &file_str) else {
             return;
         };
+        // Same FFI-export pre-pass as the entry-file constructor — when
+        // chasing into `~/.stryke/store/gui@<ver>/lib/GUI.stk`, declare
+        // every `[ffi].exports` symbol from the sibling stryke.toml so
+        // the `gui__mouse_pos("…")` bareword calls inside GUI.stk's
+        // bodies don't fire UndefinedSubroutine.
+        self.declare_ffi_exports_for(&target);
         // Save and restore the caller's package — required files routinely
         // contain their own `package …;` declarations that shouldn't leak.
         let saved_pkg = std::mem::replace(&mut self.current_package, "main".to_string());
@@ -541,6 +555,41 @@ impl StaticAnalyzer {
 
     fn resolve_require_path(&self, spec: &str) -> Option<PathBuf> {
         resolve_require_path_from_file(&self.file, spec)
+    }
+
+    /// Pre-declare every name in `[ffi].exports` from the nearest
+    /// `stryke.toml` (within 3 directory levels of `file_path`). cdylib
+    /// packages register these as stryke-callable functions at runtime
+    /// via `rust_ffi::load_cdylib` — they have no source declaration in
+    /// the .stk wrapper, so without this pre-pass the analyzer flags
+    /// every `gui__*` / `aws__*` / `redis__*` bareword call inside the
+    /// wrapper as `UndefinedSubroutine`.
+    ///
+    /// Search order:
+    ///   `<file_dir>/stryke.toml`            (rare — .stk at pkg root)
+    ///   `<file_dir>/../stryke.toml`         (standard `lib/X.stk` layout)
+    ///   `<file_dir>/../../stryke.toml`      (nested `lib/Foo/Bar.stk`)
+    ///
+    /// Silent on every miss (no manifest, no `[ffi]` table, parse fail) —
+    /// the entry path is hot (called per analyzed file + per chase target),
+    /// noise would obscure real diagnostics.
+    fn declare_ffi_exports_for(&mut self, file_path: &Path) {
+        let mut dir = file_path.parent().map(Path::to_path_buf);
+        for _ in 0..3 {
+            let Some(d) = dir.as_ref() else { break };
+            let manifest_path = d.join("stryke.toml");
+            if manifest_path.is_file() {
+                if let Ok(m) = crate::pkg::manifest::Manifest::from_path(&manifest_path) {
+                    if let Some(ffi) = m.ffi {
+                        for export in &ffi.exports {
+                            self.declare_sub(export);
+                        }
+                    }
+                }
+                return;
+            }
+            dir = d.parent().map(Path::to_path_buf);
+        }
     }
 
     fn analyze_stmt(&mut self, stmt: &Statement) {

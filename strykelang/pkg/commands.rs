@@ -3121,6 +3121,75 @@ mod tests {
         }
     }
 
+    /// L5 — when the analyzer chases into a cdylib package's `lib/X.stk`
+    /// wrapper, the wrapper's body calls FFI exports (`gui__mouse_pos`,
+    /// `gui__keyboard_keys`, etc.) that have no .stk-side declaration —
+    /// they're `#[no_mangle] extern "C" fn`s in the cdylib registered
+    /// at runtime by `rust_ffi::load_cdylib`. v0.16.34 read the sibling
+    /// stryke.toml's `[ffi].exports` and pre-declares each export as a
+    /// known sub before walking the file's statements. Without this
+    /// pre-pass every `gui__*` bareword call would fire as
+    /// UndefinedSubroutine inside the IDE LSP's strict-vars path.
+    #[test]
+    fn analyzer_pre_declares_ffi_exports_when_chasing_into_package() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("analyze-ffi-exports");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+
+        // Hand-craft a fake gui package with a .stk wrapper whose body
+        // calls FFI exports. fake_installed_pkg's default wrapper only
+        // declares `fn`s — overwrite it with one that calls `gui__*`
+        // names from inside each sub body so the analyzer has to walk
+        // those call sites with strict mode on.
+        let pkg = store.package_dir("gui", "1.0.0");
+        std::fs::create_dir_all(pkg.join("lib")).unwrap();
+        std::fs::write(
+            pkg.join("stryke.toml"),
+            "[package]\nname=\"gui\"\nversion=\"1.0.0\"\n\n\
+             [ffi]\nlib-name=\"x\"\nnamespace=\"GUI\"\n\
+             exports=[\"gui__mouse_pos\", \"gui__keyboard_keys\"]\n",
+        )
+        .unwrap();
+        std::fs::write(
+            pkg.join("lib/GUI.stk"),
+            "package GUI\n\n\
+             fn GUI::mouse_pos { gui__mouse_pos(\"{}\") }\n\
+             fn GUI::keyboard_keys { gui__keyboard_keys(\"{}\") }\n",
+        )
+        .unwrap();
+
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // User's script — outside any project, so arm 3 fires.
+        let script_dir = tempdir("analyze-ffi-script");
+        let script_path = script_dir.join("main.stk");
+        let text = "use GUI\nmy ($x, $y) = GUI::mouse_pos()\n";
+        std::fs::write(&script_path, text).unwrap();
+
+        let program = crate::parse_with_file(text, script_path.to_str().unwrap())
+            .expect("script should parse");
+        let result = crate::static_analysis::analyze_program_with_strict(
+            &program,
+            script_path.to_str().unwrap(),
+            true,
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        if let Err(e) = result {
+            panic!(
+                "linter should pre-declare [ffi].exports when chasing into the \
+                 cdylib package — gui__mouse_pos / gui__keyboard_keys must NOT \
+                 fire UndefinedSubroutine. Got: kind={:?} message={}",
+                e.kind, e.message
+            );
+        }
+    }
+
     /// L2 — hover_markdown_for_word chases `use GUI` into the store
     /// file and surfaces the `## …` doc block declared above the sub.
     #[test]
