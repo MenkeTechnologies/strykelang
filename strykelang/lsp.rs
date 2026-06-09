@@ -10232,7 +10232,28 @@ fn completions(
             visit_stmt_for_index(stmt, &mut pkg, &mut idx);
         }
         idx.arrays.insert("_".to_string());
+
+        // Walk `use Foo::Bar` / `require "./lib/x.stk"` directives and
+        // run the same indexer over each chased file. Resolution chains
+        // through the 3-arm path resolver in static_analysis.rs
+        // (project lib/ → stryke.lock → installed.toml), so `use GUI`
+        // pulls every `fn GUI::*` declared in
+        // `~/.stryke/store/gui@<ver>/lib/GUI.stk` into the
+        // `subs_qualified` set. Lets `GUI::<TAB>` enumerate the
+        // installed library's surface.
+        walk_required_files(&program, &path, |_target_path, _src, child| {
+            let mut child_pkg = String::from("main");
+            for stmt in &child.statements {
+                visit_stmt_for_index(stmt, &mut child_pkg, &mut idx);
+            }
+            true
+        });
     }
+
+    // Detect `^\s*use\s+\w*$` (or `require`) — completion right after the
+    // keyword should suggest installed package namespaces, not bareword
+    // builtins. `use<TAB>` and `use Gui<TAB>` both land here.
+    let is_use_line_context = line_completion_is_use_context(line_text, byte_col);
 
     let mut items: Vec<CompletionItem> = match &mode {
         LineCompletionMode::Scalar(f) => sigil_completions(f, '$', &idx.scalars, "scalar", pos),
@@ -10242,10 +10263,20 @@ fn completions(
             hash_key_completions(receiver, partial, &idx)
         }
         LineCompletionMode::Bare(f) => {
-            if let Some((pkg_p, partial)) = split_qualified_prefix(f) {
+            if is_use_line_context {
+                installed_package_completions(f)
+            } else if let Some((pkg_p, partial)) = split_qualified_prefix(f) {
                 qualified_sub_completions(&pkg_p, &partial, &idx)
             } else {
-                bare_completions(f, &idx)
+                let mut bare = bare_completions(f, &idx);
+                // Surface installed package namespaces in bareword
+                // completions too — typing `Gui<TAB>` without a prior
+                // `use GUI` still resolves to `GUI` from the global
+                // index. The walk above wouldn't pull anything from
+                // an un-imported package (no `use` to chase), so seed
+                // installed namespaces here.
+                bare.extend(installed_package_completions(f));
+                bare
             }
         }
     };
@@ -10268,6 +10299,106 @@ fn completions(
     // (filter="s" → 1115, filter="p" → 688) survives in full.
     items.truncate(30000);
     Some(CompletionResponse::Array(items))
+}
+
+/// Return `true` when the cursor is in the position right after a
+/// `use ` / `require ` keyword (`^\s*(use|require)\s+\w*$`). Drives the
+/// installed-package completion path — `use<TAB>` should list installable
+/// packages, not bareword builtins. `byte_col` is the cursor's byte
+/// offset inside `line_text`.
+fn line_completion_is_use_context(line_text: &str, byte_col: usize) -> bool {
+    let prefix = &line_text[..byte_col.min(line_text.len())];
+    let trimmed = prefix.trim_start();
+    for kw in &["use ", "require "] {
+        if let Some(rest) = trimmed.strip_prefix(kw) {
+            // Whatever comes after the keyword must be all bareword
+            // characters (letters, digits, `_`, `::`) — no parens, no
+            // strings, no operators. Filters out `use strict;` (already
+            // typed) and `use overload '+' => ...`.
+            return rest
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == ':');
+        }
+    }
+    false
+}
+
+/// Return CompletionItems for every package in `~/.stryke/installed.toml`
+/// whose namespace starts with `filter`. Each item inserts the namespace
+/// verbatim so `use <TAB>` → `use GUI` and `Gui<TAB>` → `GUI`.
+/// Namespace comes from each package's `stryke.toml [ffi].namespace`
+/// when present; otherwise falls back to scanning the first `lib/*.stk`
+/// for a `package X` declaration. Cheap — `installed.toml` is small and
+/// each manifest read is one TOML parse.
+fn installed_package_completions(filter: &str) -> Vec<CompletionItem> {
+    let mut out = Vec::new();
+    let store = match crate::pkg::store::Store::user_default() {
+        Ok(s) => s,
+        Err(_) => return out,
+    };
+    let idx = match crate::pkg::store::InstalledIndex::load_from(&store) {
+        Ok(i) => i,
+        Err(_) => return out,
+    };
+    let lc_filter = filter.to_lowercase();
+    for pkg in &idx.packages {
+        let store_pkg = store.package_dir(&pkg.name, &pkg.version);
+        let namespace = read_namespace_from_pkg(&store_pkg).unwrap_or_else(|| pkg.name.clone());
+        // Case-insensitive prefix match so `gui<TAB>` and `Gui<TAB>` both
+        // complete to `GUI`.
+        if !filter.is_empty() && !namespace.to_lowercase().starts_with(&lc_filter) {
+            continue;
+        }
+        out.push(CompletionItem {
+            label: namespace.clone(),
+            kind: Some(CompletionItemKind::MODULE),
+            detail: Some(format!("installed package {}@{}", pkg.name, pkg.version)),
+            insert_text: Some(namespace),
+            documentation: None,
+            ..Default::default()
+        });
+    }
+    out
+}
+
+/// Read the stryke-side namespace declared by a globally-installed
+/// package. Prefers `[ffi].namespace` from `stryke.toml`; falls back to
+/// the first `package X` line in any `lib/*.stk` file. Returns `None`
+/// when no namespace can be inferred.
+fn read_namespace_from_pkg(store_pkg: &std::path::Path) -> Option<String> {
+    if let Ok(m) = crate::pkg::manifest::Manifest::from_path(&store_pkg.join("stryke.toml")) {
+        if let Some(ffi) = m.ffi {
+            if !ffi.namespace.is_empty() {
+                return Some(ffi.namespace);
+            }
+        }
+    }
+    let lib_dir = store_pkg.join("lib");
+    let entries = std::fs::read_dir(&lib_dir).ok()?;
+    for ent in entries.flatten() {
+        let name = ent.file_name();
+        let name_str = name.to_str().unwrap_or("");
+        if !name_str.ends_with(".stk") {
+            continue;
+        }
+        let Ok(src) = std::fs::read_to_string(ent.path()) else {
+            continue;
+        };
+        for line in src.lines() {
+            let t = line.trim_start();
+            if let Some(rest) = t.strip_prefix("package") {
+                let first = rest
+                    .trim_start()
+                    .split(|c: char| c.is_whitespace() || c == ';' || c == '{')
+                    .next()
+                    .unwrap_or("");
+                if !first.is_empty() {
+                    return Some(first.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Where the cursor sits w.r.t. string / comment context. Drives the
