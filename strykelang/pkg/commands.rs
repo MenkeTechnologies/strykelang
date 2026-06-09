@@ -2786,4 +2786,319 @@ mod tests {
         let r = resolve_module(&root, "Foo::Bar").unwrap();
         assert!(r.is_none());
     }
+
+    // ── Library-resolution tests (L1, L4) ─────────────────────────────
+    //
+    // These prove the three IDE-facing surfaces — linter, completion,
+    // hover — all see installed-package subs through the same 3-arm
+    // resolver (`static_analysis::resolve_require_path_from_file`,
+    // `lsp::installed_package_completions`, `lsp::hover_markdown_for_word`).
+    // STRYKE_HOME-mutating tests grab STRYKE_HOME_MUTEX so parallel
+    // execution doesn't race on the process-global env var.
+
+    /// Create a fake installed package at `<STRYKE_HOME>/store/<name>@<ver>/`
+    /// with a single `lib/<Name>.stk` declaring the supplied sub names.
+    /// Each sub gets a `## doc-line` directly above it so doc extraction
+    /// has content to surface. Returns the store package path.
+    fn fake_installed_pkg(
+        store: &Store,
+        name: &str,
+        version: &str,
+        namespace: &str,
+        subs: &[&str],
+    ) -> PathBuf {
+        let pkg = store.package_dir(name, version);
+        std::fs::create_dir_all(pkg.join("lib")).unwrap();
+        let mut stk = format!("package {}\n\n", namespace);
+        for s in subs {
+            stk.push_str(&format!("## Mock docstring for {}::{}.\n", namespace, s));
+            stk.push_str(&format!("fn {}::{} {{ 1 }}\n\n", namespace, s));
+        }
+        std::fs::write(pkg.join("lib").join(format!("{}.stk", namespace)), stk).unwrap();
+        std::fs::write(
+            pkg.join(MANIFEST_FILE),
+            format!(
+                "[package]\nname=\"{}\"\nversion=\"{}\"\n\n\
+                 [ffi]\nlib-name=\"x\"\nnamespace=\"{}\"\nexports=[]\n",
+                name, version, namespace
+            ),
+        )
+        .unwrap();
+        pkg
+    }
+
+    /// L1a — resolve_require_path_from_file finds an installed-package
+    /// .stk file via the global pin when no local file resolves.
+    #[test]
+    fn resolve_require_path_resolves_installed_package() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("resolve-installed");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        let pkg_dir = fake_installed_pkg(&store, "gui", "1.0.0", "GUI", &["mouse_pos"]);
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // Script file lives in a directory with no stryke.toml — arm 1 + 2
+        // miss, arm 3 (installed.toml) should fire.
+        let script_dir = tempdir("resolve-script");
+        let script_path = script_dir.join("script.stk");
+        std::fs::write(&script_path, "use GUI\n").unwrap();
+
+        let resolved = crate::static_analysis::resolve_require_path_from_file(
+            script_path.to_str().unwrap(),
+            "GUI",
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(resolved.as_deref(), Some(pkg_dir.join("lib/GUI.stk").as_path()));
+    }
+
+    /// L1b — project-local `lib/GUI.stk` shadows the globally-pinned
+    /// store entry (matches `resolve_module` arm 1 → wins over arm 3).
+    #[test]
+    fn resolve_require_path_local_shadows_installed() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("resolve-shadow");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        fake_installed_pkg(&store, "gui", "1.0.0", "GUI", &["mouse_pos"]);
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // Project with its own lib/GUI.stk that takes priority.
+        let proj = tempdir("resolve-proj");
+        std::fs::write(
+            proj.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(proj.join("lib")).unwrap();
+        let local_gui = proj.join("lib/GUI.stk");
+        std::fs::write(&local_gui, "package GUI\nfn GUI::local_only { 1 }\n").unwrap();
+
+        let script_path = proj.join("main.stk");
+        std::fs::write(&script_path, "use GUI\n").unwrap();
+
+        let resolved = crate::static_analysis::resolve_require_path_from_file(
+            script_path.to_str().unwrap(),
+            "GUI",
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        // Resolved path must be the project-local file, NOT the store.
+        assert_eq!(
+            resolved.as_deref().and_then(|p| p.canonicalize().ok()),
+            local_gui.canonicalize().ok()
+        );
+    }
+
+    /// L1c — project lockfile (arm 2) wins over global pin (arm 3) when
+    /// both name the same package but at different versions.
+    #[test]
+    fn resolve_require_path_lockfile_wins_over_global_pin() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("resolve-lock");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        let pinned = fake_installed_pkg(&store, "gui", "0.2.0", "GUI", &["mouse_pos"]);
+        let _newer = fake_installed_pkg(&store, "gui", "0.1.0", "GUI", &["mouse_pos"]);
+
+        // Global pin says 0.2.0, project lockfile pins 0.1.0.
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "0.2.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let proj = tempdir("resolve-lock-proj");
+        std::fs::write(
+            proj.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            proj.join(LOCKFILE_FILE),
+            "version = 1\nstryke = \"0.0.0\"\nresolved = \"2026-01-01T00:00:00Z\"\n\n\
+             [[package]]\nname=\"gui\"\nversion=\"0.1.0\"\nsource=\"path+file:///x\"\n\
+             integrity=\"sha256-0\"\nfeatures=[]\ndeps=[]\n",
+        )
+        .unwrap();
+
+        let script_path = proj.join("main.stk");
+        std::fs::write(&script_path, "use GUI\n").unwrap();
+
+        let resolved = crate::static_analysis::resolve_require_path_from_file(
+            script_path.to_str().unwrap(),
+            "GUI",
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        // Must be the 0.1.0 store entry (lockfile wins), NOT the 0.2.0
+        // global pin.
+        let expected_v01 = store.package_dir("gui", "0.1.0").join("lib/GUI.stk");
+        let pinned_v02 = pinned.join("lib/GUI.stk");
+        assert_eq!(resolved.as_deref(), Some(expected_v01.as_path()));
+        assert_ne!(resolved.as_deref(), Some(pinned_v02.as_path()));
+    }
+
+    /// L4a — installed_package_completions surfaces every entry in
+    /// installed.toml when no filter is supplied.
+    #[test]
+    fn installed_package_completions_lists_all_when_unfiltered() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("compl-all");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        fake_installed_pkg(&store, "gui", "1.0.0", "GUI", &[]);
+        fake_installed_pkg(&store, "aws", "1.0.0", "AWS", &[]);
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.upsert("aws", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let items = crate::lsp::installed_package_completions("");
+        std::env::remove_var("STRYKE_HOME");
+
+        let labels: Vec<String> = items.iter().map(|c| c.label.clone()).collect();
+        assert!(labels.iter().any(|l| l == "GUI"), "got: {:?}", labels);
+        assert!(labels.iter().any(|l| l == "AWS"), "got: {:?}", labels);
+    }
+
+    /// L4b — case-insensitive prefix match: typing `gu` or `Gu` both
+    /// match the `GUI` namespace.
+    #[test]
+    fn installed_package_completions_case_insensitive_prefix() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("compl-prefix");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        fake_installed_pkg(&store, "gui", "1.0.0", "GUI", &[]);
+        fake_installed_pkg(&store, "aws", "1.0.0", "AWS", &[]);
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.upsert("aws", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let lower = crate::lsp::installed_package_completions("gu");
+        let upper = crate::lsp::installed_package_completions("Gu");
+        std::env::remove_var("STRYKE_HOME");
+
+        assert_eq!(lower.len(), 1);
+        assert_eq!(lower[0].label, "GUI");
+        assert_eq!(upper.len(), 1);
+        assert_eq!(upper[0].label, "GUI");
+    }
+
+    /// L4c — when no stryke.toml `[ffi].namespace` is declared, the
+    /// completion falls back to scanning the first `lib/*.stk` for a
+    /// `package X` line.
+    #[test]
+    fn installed_package_completions_falls_back_to_package_decl() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("compl-fallback");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        let pkg = store.package_dir("mypkg", "1.0.0");
+        std::fs::create_dir_all(pkg.join("lib")).unwrap();
+        // Manifest WITHOUT an [ffi] section — namespace must come from
+        // the `package MyPkg` line in the lib file.
+        std::fs::write(
+            pkg.join(MANIFEST_FILE),
+            "[package]\nname=\"mypkg\"\nversion=\"1.0.0\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            pkg.join("lib/MyPkg.stk"),
+            "package MyPkg\nfn MyPkg::hello { 1 }\n",
+        )
+        .unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("mypkg", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let items = crate::lsp::installed_package_completions("");
+        std::env::remove_var("STRYKE_HOME");
+
+        let labels: Vec<String> = items.iter().map(|c| c.label.clone()).collect();
+        assert!(labels.iter().any(|l| l == "MyPkg"), "got: {:?}", labels);
+    }
+
+    /// L4d — `use Gui|` and `require Foo|` both register as use-context
+    /// (drives `use<TAB>` → installed-package mode).
+    #[test]
+    fn line_completion_is_use_context_recognizes_keywords() {
+        let line = "use Gui";
+        assert!(crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "require Foo";
+        assert!(crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "    use Foo::Bar";
+        assert!(crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "use ";
+        assert!(crate::lsp::line_completion_is_use_context(line, line.len()));
+    }
+
+    /// L4e — non-use lines or use-with-arguments (e.g. `use overload '+'`)
+    /// must NOT trigger use-context. Otherwise sigil completion or
+    /// string-arg edits get hijacked.
+    #[test]
+    fn line_completion_is_use_context_rejects_non_use_and_args() {
+        let line = "my $x = 1";
+        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "use overload '+'";
+        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "GUI::mouse_pos";
+        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        let line = "p use_count";
+        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+    }
+
+    /// L2 — hover_markdown_for_word chases `use GUI` into the store
+    /// file and surfaces the `## …` doc block declared above the sub.
+    #[test]
+    fn hover_chases_use_directive_into_store() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("hover-cross");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        fake_installed_pkg(&store, "gui", "1.0.0", "GUI", &["mouse_pos"]);
+        let mut idx = InstalledIndex::new();
+        idx.upsert("gui", "1.0.0", "test");
+        idx.save_to(&store).unwrap();
+
+        // Script lives in a non-project dir.
+        let script_dir = tempdir("hover-script");
+        let script_path = script_dir.join("main.stk");
+        let text = "use GUI\n";
+        std::fs::write(&script_path, text).unwrap();
+
+        let hover = crate::lsp::hover_markdown_for_word(
+            "GUI::mouse_pos",
+            text,
+            script_path.to_str().unwrap(),
+        );
+        std::env::remove_var("STRYKE_HOME");
+
+        let md = hover.expect("hover should resolve `GUI::mouse_pos` cross-file");
+        // Doc block from fake_installed_pkg is "Mock docstring for GUI::mouse_pos."
+        assert!(
+            md.contains("Mock docstring for GUI::mouse_pos"),
+            "hover did not include the chased doc: {}",
+            md
+        );
+    }
 }
