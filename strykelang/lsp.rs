@@ -1555,9 +1555,7 @@ pub(crate) fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Opt
         let child_map = collect_sub_fqn_map(child);
         if let Some(ln) = resolve_sub_decl_line(&child_map, word) {
             let decl_0 = ln.saturating_sub(1);
-            let header = format!(
-                "Subroutine `{word}` — declared in `{target_path}` at line {ln}."
-            );
+            let header = format!("Subroutine `{word}` — declared in `{target_path}` at line {ln}.");
             cross_file_hit = Some(format_with_doc_comments(src, decl_0, header));
             return false;
         }
@@ -7800,9 +7798,8 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
     (
         "Shared State & Concurrency",
         &[
-            "mysync", "varsync", "oursync",
-            "async", "spawn", "await", "pchannel", "pselect", "barrier", "ppool",
-            "deque", "heap", "set",
+            "mysync", "varsync", "oursync", "async", "spawn", "await", "pchannel", "pselect",
+            "barrier", "ppool", "deque", "heap", "set",
         ],
     ),
     (

@@ -1805,15 +1805,17 @@ pub fn cmd_uninstall_global(args: &[String]) -> i32 {
                     if launcher.exists() {
                         match std::fs::remove_file(&launcher) {
                             Ok(_) => {
+                                // Per-launcher write to `removed_anything` was
+                                // redundant — line 1830 unconditionally sets
+                                // it to true once we reach this arm (the
+                                // package IS in the index, so the unpin
+                                // counts as success even if zero launchers
+                                // existed). Keep the visible eprintln, drop
+                                // the dead assignment that clippy flags.
                                 eprintln!("  removed launcher {}", launcher.display());
-                                removed_anything = true;
                             }
                             Err(e) => {
-                                eprintln!(
-                                    "s uninstall -g: remove {}: {}",
-                                    launcher.display(),
-                                    e
-                                );
+                                eprintln!("s uninstall -g: remove {}: {}", launcher.display(), e);
                                 return 1;
                             }
                         }
@@ -1826,7 +1828,11 @@ pub fn cmd_uninstall_global(args: &[String]) -> i32 {
             eprintln!("s uninstall -g: write installed.toml: {}", e);
             return 1;
         }
-        eprintln!("  unpinned {} (store entry kept at {})", name, store_pkg.display());
+        eprintln!(
+            "  unpinned {} (store entry kept at {})",
+            name,
+            store_pkg.display()
+        );
         removed_anything = true;
     } else {
         // No pin — fall back to single-launcher removal for packages that
@@ -1927,10 +1933,7 @@ pub fn cmd_use_global(args: &[String]) -> i32 {
             );
         }
         Some(_) => {
-            eprintln!(
-                "\x1b[32m✓ {} pin already at {}\x1b[0m",
-                name, version
-            );
+            eprintln!("\x1b[32m✓ {} pin already at {}\x1b[0m", name, version);
         }
         None => {
             eprintln!(
@@ -2283,11 +2286,15 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  install -g SPEC           install a package globally (PATH | gh:owner/repo | github.com/...)");
         println!("  uninstall -g NAME         drop a global pin + its launchers (alias: un)");
         println!("  use -g NAME@VERSION       switch which installed version a standalone `use` resolves to");
-        println!("  list -g                   list global packages, launchers, and orphans (alias: ls)");
+        println!(
+            "  list -g                   list global packages, launchers, and orphans (alias: ls)"
+        );
         println!("  gc -g [--dry-run]         delete ~/.stryke/store/ entries no longer pinned");
         println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
         println!("  remove NAME               drop a dep from stryke.toml");
-        println!("  update [NAME]             re-resolve and rewrite stryke.lock (alias: up, upgrade)");
+        println!(
+            "  update [NAME]             re-resolve and rewrite stryke.lock (alias: up, upgrade)"
+        );
         println!("  outdated                  report deps drifted from their lock pin");
         println!("  audit                     check lockfile against advisory feed");
         println!("  tree                      print resolved dep graph");
@@ -2295,7 +2302,9 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  vendor                    snapshot store deps to ./vendor/");
         println!("  clean [--all]             wipe target/ (and optionally global caches)");
         println!("  search NAME               registry query (registry not deployed)");
-        println!("  publish [--dry-run]       publish to registry (registry not deployed) (alias: pub)");
+        println!(
+            "  publish [--dry-run]       publish to registry (registry not deployed) (alias: pub)"
+        );
         println!("  yank VERSION              yank a version (registry not deployed)");
         println!("  run SCRIPT [ARGS...]      run a [scripts] entry");
         println!();
@@ -2487,10 +2496,7 @@ mod tests {
         idx.upsert("aws", "0.1.0", "test");
 
         let orphans = scan_orphan_store_dirs(&store, &idx);
-        let names: Vec<(String, String)> = orphans
-            .into_iter()
-            .map(|(n, v, _)| (n, v))
-            .collect();
+        let names: Vec<(String, String)> = orphans.into_iter().map(|(n, v, _)| (n, v)).collect();
         assert_eq!(
             names,
             vec![
@@ -2552,7 +2558,11 @@ mod tests {
         std::env::remove_var("STRYKE_HOME");
 
         assert_eq!(rc, 1, "must fail when the version isn't in the store");
-        assert_eq!(reloaded.find("gui").unwrap().version, "0.1.0", "pin must be untouched");
+        assert_eq!(
+            reloaded.find("gui").unwrap().version,
+            "0.1.0",
+            "pin must be untouched"
+        );
     }
 
     #[test]
@@ -2857,7 +2867,10 @@ mod tests {
         );
         std::env::remove_var("STRYKE_HOME");
 
-        assert_eq!(resolved.as_deref(), Some(pkg_dir.join("lib/GUI.stk").as_path()));
+        assert_eq!(
+            resolved.as_deref(),
+            Some(pkg_dir.join("lib/GUI.stk").as_path())
+        );
     }
 
     /// L1b — project-local `lib/GUI.stk` shadows the globally-pinned
@@ -3059,13 +3072,25 @@ mod tests {
     #[test]
     fn line_completion_is_use_context_rejects_non_use_and_args() {
         let line = "my $x = 1";
-        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        assert!(!crate::lsp::line_completion_is_use_context(
+            line,
+            line.len()
+        ));
         let line = "use overload '+'";
-        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        assert!(!crate::lsp::line_completion_is_use_context(
+            line,
+            line.len()
+        ));
         let line = "GUI::mouse_pos";
-        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        assert!(!crate::lsp::line_completion_is_use_context(
+            line,
+            line.len()
+        ));
         let line = "p use_count";
-        assert!(!crate::lsp::line_completion_is_use_context(line, line.len()));
+        assert!(!crate::lsp::line_completion_is_use_context(
+            line,
+            line.len()
+        ));
     }
 
     /// L1+L4 regression — `use GUI; GUI::mouse_pos()` from a script
@@ -3243,8 +3268,7 @@ mod tests {
         let text = "use GUI\n";
         std::fs::write(&script_path, text).unwrap();
 
-        let hover =
-            crate::lsp::hover_markdown_for_word("GUI", text, script_path.to_str().unwrap());
+        let hover = crate::lsp::hover_markdown_for_word("GUI", text, script_path.to_str().unwrap());
         std::env::remove_var("STRYKE_HOME");
 
         let md = hover.expect("hover should resolve the GUI package via cross-file chase");
