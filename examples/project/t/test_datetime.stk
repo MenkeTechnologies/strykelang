@@ -2,13 +2,13 @@
 # t/test_datetime.stk — date and time utilities
 
 # Current time (just verify they return something reasonable)
-my $now = time
+val $now = time
 assert_gt $now, 0, "time() returns positive"
-my $now_ms = now_ms
+val $now_ms = now_ms
 assert_gt $now_ms, 0, "now_ms returns positive"
-my $now_us = now_us
+val $now_us = now_us
 assert_gt $now_us, 0, "now_us returns positive"
-my $epoch = unix_epoch
+val $epoch = unix_epoch
 assert_gt $epoch, 1600000000, "epoch after 2020"
 
 # Leap year detection

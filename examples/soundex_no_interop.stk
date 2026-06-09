@@ -28,7 +28,7 @@
 # Run: stryke --no-interop examples/soundex_no_interop.stk
 #      stryke --no-interop examples/soundex_no_interop.stk Robert
 
-my %CODE = (
+val %CODE = (
     B => 1, F => 1, P => 1, V => 1,
     C => 2, G => 2, J => 2, K => 2, Q => 2, S => 2, X => 2, Z => 2,
     D => 3, T => 3,
@@ -39,23 +39,23 @@ my %CODE = (
 
 fn Soundex::code($name) {
     return "" if len($name) == 0
-    my $up = uc($name)
+    var $up = uc($name)
     $up =~ s/[^A-Z]//g
     return "" if len($up) == 0
 
-    my $first = substr($up, 0, 1)
-    my $rest  = substr($up, 1)
+    val $first = substr($up, 0, 1)
+    val $rest  = substr($up, 1)
 
     # Map every letter (including the first, transiently) to its digit
     # so we can collapse duplicates that span the first char.
-    my @digits
-    for my $ch (split(//, $up)) {
+    var @digits
+    for val $ch (split(//, $up)) {
         push @digits, exists $CODE{$ch} ? $CODE{$ch} : 0  # 0 stands for "vowel/HWY"
     }
 
     # Collapse consecutive duplicate digits.
-    my @collapsed
-    for my $i (0:len(@digits) - 1) {
+    var @collapsed
+    for val $i (0:len(@digits) - 1) {
         push @collapsed, $digits[$i] if $i == 0 || $digits[$i] != $digits[$i - 1]
     }
 
@@ -77,7 +77,7 @@ if (len(@ARGV) >= 1) {
 
 # Demo: classic Soundex test cases from the literature. The codes are
 # from the National Archives reference (US census methodology).
-my @cases = (
+val @cases = (
     +{ name => "Robert",    code => "R163" },
     +{ name => "Rupert",    code => "R163" },  # collides with Robert
     +{ name => "Rubin",     code => "R150" },
@@ -98,10 +98,10 @@ my @cases = (
 )
 
 p "── Soundex demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got = Soundex::code($c->{name})
-    my $ok  = ($got eq $c->{code})
+var $fail = 0
+for val $c (@cases) {
+    val $got = Soundex::code($c->{name})
+    val $ok  = ($got eq $c->{code})
     $fail++ unless $ok
     printf "  %-14s -> %s  expect %s  %s\n",
         $c->{name}, $got, $c->{code}, $ok ? "" : "FAIL"

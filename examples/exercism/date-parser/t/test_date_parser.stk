@@ -7,7 +7,7 @@ assert_eq Exercism::DateParser::day_names(),    '(Monday|Tuesday|Wednesday|Thurs
 assert_eq Exercism::DateParser::capture_year(), "(?<year>\\d{4})", "capture year"
 
 # Smoke-test the capture works in a real match.
-my $re = Exercism::DateParser::capture_day_name() . " " . Exercism::DateParser::capture_month_name() . " " .
+val $re = Exercism::DateParser::capture_day_name() . " " . Exercism::DateParser::capture_month_name() . " " .
          Exercism::DateParser::capture_day() . ", " . Exercism::DateParser::capture_year()
 "Monday January 15, 2024" =~ /^$re$/
 assert_eq $+{day_name},   "Monday",  "Monday captured"

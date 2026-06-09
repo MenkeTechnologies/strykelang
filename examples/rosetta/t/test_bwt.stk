@@ -2,26 +2,26 @@
 # Rosetta Code: Burrows-Wheeler transform
 
 fn Rosetta::BWT::transform($text) {
-    my $len = length($text)
+    val $len = length($text)
     return "" if $len == 0
     
-    my @chars = $text |> chars()
+    val @chars = $text |> chars()
     
     # Create all rotations
-    my @rotations = ~> 0:($len - 1) map {
-        my @rot
-        for (my $j = 0; $j < $len; $j++) {
+    val @rotations = ~> 0:($len - 1) map {
+        var @rot
+        for (var $j = 0; $j < $len; $j++) {
             push @rot, $chars[(_ + $j) % $len]
         }
         join("", @rot)
     }
     
     # Sort rotations lexically
-    my @sorted_rotations = sort(@rotations)
+    val @sorted_rotations = sort(@rotations)
     
     # Take the last character of each sorted rotation
-    my $bwt = ""
-    for my $rot (@sorted_rotations) {
+    var $bwt = ""
+    for val $rot (@sorted_rotations) {
         $bwt .= substr($rot, -1, 1)
     }
     
@@ -29,14 +29,14 @@ fn Rosetta::BWT::transform($text) {
 }
 
 fn Rosetta::BWT::inverse($bwt) {
-    my $len = length($bwt)
+    val $len = length($bwt)
     return "" if $len == 0
     
-    my @bwt_chars = $bwt |> chars()
-    my @table = map { "" } 1:$len
+    val @bwt_chars = $bwt |> chars()
+    var @table = map { "" } 1:$len
     
-    for (my $i = 0; $i < $len; $i++) {
-        for (my $j = 0; $j < $len; $j++) {
+    for (var $i = 0; $i < $len; $i++) {
+        for (var $j = 0; $j < $len; $j++) {
             $table[$j] = $bwt_chars[$j] . $table[$j]
         }
         @table = sort(@table)
@@ -50,8 +50,8 @@ fn Rosetta::BWT::inverse($bwt) {
     # Wait, BWT requires an EOF marker like '$' to be reversible uniquely.
     # Let's assume the string contains a unique '$' marker.
     
-    my $res = ""
-    for my $row (@table) {
+    var $res = ""
+    for val $row (@table) {
         if (substr($row, -1, 1) eq "\$") {
             $res = $row
             last
@@ -60,13 +60,13 @@ fn Rosetta::BWT::inverse($bwt) {
     $res
 }
 
-my $t1 = "^BANANA\$"
-my $bwt1 = Rosetta::BWT::transform($t1)
+val $t1 = "^BANANA\$"
+val $bwt1 = Rosetta::BWT::transform($t1)
 assert_eq $bwt1, "ANNB^AA\$", "BWT transform"
 assert_eq Rosetta::BWT::inverse($bwt1), $t1, "BWT inverse"
 
-my $t2 = "^abracadabra\$"
-my $bwt2 = Rosetta::BWT::transform($t2)
+val $t2 = "^abracadabra\$"
+val $bwt2 = Rosetta::BWT::transform($t2)
 assert_eq Rosetta::BWT::inverse($bwt2), $t2, "BWT inverse abracadabra"
 
 test_run

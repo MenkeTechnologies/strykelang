@@ -7,11 +7,11 @@ fn Rosetta::RootedTrees::assemble($remaining, $parts, $last, $out) {
         return
     }
 
-    for my $size (1:$remaining) {
-        my $subs = Rosetta::RootedTrees::trees($size)
-        for my $sub (@$subs) {
+    for val $size (1:$remaining) {
+        val $subs = Rosetta::RootedTrees::trees($size)
+        for val $sub (@$subs) {
             next if defined($last) && $last ne "" && $sub lt $last
-            my @next = (@$parts, $sub)
+            val @next = (@$parts, $sub)
             Rosetta::RootedTrees::assemble($remaining - $size, \@next, $sub, $out)
         }
     }
@@ -19,12 +19,12 @@ fn Rosetta::RootedTrees::assemble($remaining, $parts, $last, $out) {
 
 fn Rosetta::RootedTrees::trees($n) {
     return ["()"] if $n == 1
-    my @raw
-    my $start = []
+    val @raw
+    val $start = []
     Rosetta::RootedTrees::assemble($n - 1, $start, undef, \@raw)
-    my %seen
-    for my $s (@raw) { $seen{$s} = 1 }
-    my @sorted = sort keys %seen
+    var %seen
+    for val $s (@raw) { $seen{$s} = 1 }
+    val @sorted = sort keys %seen
     \@sorted
 }
 

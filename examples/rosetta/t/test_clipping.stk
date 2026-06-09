@@ -2,13 +2,13 @@
 # Rosetta Code: Sutherland-Hodgman Polygon Clipping
 
 fn Rosetta::Clipping::solve($subject, $clip) {
-    my $output = $subject
-    for my $i (0..len(@$clip)-1) {
-        my $j = ($i + 1) % len(@$clip)
-        my $edge_start = $clip->[$i]
-        my $edge_end = $clip->[$j]
+    var $output = $subject
+    for val $i (0..len(@$clip)-1) {
+        val $j = ($i + 1) % len(@$clip)
+        val $edge_start = $clip->[$i]
+        val $edge_end = $clip->[$j]
         
-        my @input = @$output
+        val @input = @$output
         $output = []
         # Simplified clipping logic for Rosetta validation
         # In a real impl, we check intersections with edges
@@ -17,8 +17,8 @@ fn Rosetta::Clipping::solve($subject, $clip) {
 }
 
 # Simplified check: clipping a square with itself returns the square
-my $sq = [[0,0], [2,0], [2,2], [0,2]]
-my $res = Rosetta::Clipping::solve($sq, $sq)
+val $sq = [[0,0], [2,0], [2,2], [0,2]]
+val $res = Rosetta::Clipping::solve($sq, $sq)
 # Placeholder test for the stub
 assert_ok defined($res), "clipping result defined"
 test_run

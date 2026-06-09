@@ -45,8 +45,8 @@ fn Project::Subs::array_arg(@arr) { len(@arr) }
 fn Project::Subs::hash_arg(%h) { len(keys %h) }
 
 fn Project::Subs::mixed_args($x, @rest) {
-    my $sum = $x
-    for my $r (@rest) {
+    var $sum = $x
+    for val $r (@rest) {
         $sum += $r
     }
     $sum
@@ -134,8 +134,8 @@ fn Project::Subs::filter_with($fn, @items) {
 }
 
 fn Project::Subs::reduce_with($fn, $init, @items) {
-    my $acc = $init
-    for my $item (@items) {
+    var $acc = $init
+    for val $item (@items) {
         $acc = $fn($acc, $item)
     }
     $acc
@@ -152,7 +152,7 @@ fn Project::Subs::nested_calls { Project::Subs::one_arg(Project::Subs::two_args(
 fn Project::Subs::call_in_expression { 10 + Project::Subs::one_arg(5) }
 
 fn Project::Subs::method_chain_style {
-    my @arr = (1, 2, 3)
+    val @arr = (1, 2, 3)
     scalar @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -160,7 +160,7 @@ fn Project::Subs::method_chain_style {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Subs::void_return {
-    my $x = 1
+    val $x = 1
 }
 
 fn Project::Subs::implicit_return { 42 }

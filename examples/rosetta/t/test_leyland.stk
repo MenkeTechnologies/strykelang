@@ -2,10 +2,10 @@
 # Rosetta Code: Leyland numbers
 
 fn Rosetta::Leyland::check($n) {
-    my $found = 0
-    my $x = 2
+    var $found = 0
+    var $x = 2
     while ($x**2 < $n && !$found) {
-        my $y = 2
+        var $y = 2
         while ($x**$y + $y**$x <= $n && !$found) {
             if ($x**$y + $y**$x == $n) {
                 $found = 1

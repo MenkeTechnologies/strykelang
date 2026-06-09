@@ -2,7 +2,7 @@
 # Rosetta Code: Miller-Rabin primality test
 
 fn MillerRabin::power($a, $b, $m) {
-    my $res = 1
+    var $res = 1
     $a %= $m
     while ($b > 0) {
         if ($b % 2 == 1) { $res = ($res * $a) % $m }
@@ -16,19 +16,19 @@ fn Rosetta::MillerRabin::miller_rabin($n, $k) {
     if ($n == 2 || $n == 3) { return 1 }
     if ($n < 2 || $n % 2 == 0) { return 0 }
     
-    my $d = $n - 1
-    my $s = 0
+    var $d = $n - 1
+    var $s = 0
     while ($d % 2 == 0) {
         $d = int($d / 2)
         $s++
     }
     
-    for my $i (1:$k) {
-        my $a = 2 + int(rand($n - 4))
-        my $x = MillerRabin::power($a, $d, $n)
+    for val $i (1:$k) {
+        val $a = 2 + int(rand($n - 4))
+        var $x = MillerRabin::power($a, $d, $n)
         if ($x == 1 || $x == $n - 1) { next }
-        my $composite = 1
-        for my $r (1:$s-1) {
+        var $composite = 1
+        for val $r (1:$s-1) {
             $x = ($x * $x) % $n
             if ($x == $n - 1) {
                 $composite = 0

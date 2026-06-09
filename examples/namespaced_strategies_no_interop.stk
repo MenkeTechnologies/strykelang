@@ -24,11 +24,11 @@ fn Rewrite::y($text)  { join "", grep { /\d/ } split //, $text }   # keep only d
 
 p "── stages ──"
 
-my $input = "the foo and the bar walked into a bar at 42 Foo Lane"
+val $input = "the foo and the bar walked into a bar at 42 Foo Lane"
 
 # ── 1. Direct calls ──────────────────────────────────────────────────────────
-my $s_only  = Rewrite::s($input)
-my $m_only  = Rewrite::m($input)
+val $s_only  = Rewrite::s($input)
+val $m_only  = Rewrite::m($input)
 p "  Rewrite::s applied: $s_only"
 p "  Rewrite::m applied: $m_only"
 
@@ -36,14 +36,14 @@ die "expected `foo` rewritten" unless $s_only =~ /FOO/
 die "expected `bar` rewritten" unless $m_only =~ /BAR/
 
 # ── 2. Compose two via `~>` thread macro ─────────────────────────────────────
-my $rewritten = ~> $input Rewrite::s Rewrite::m
+val $rewritten = ~> $input Rewrite::s Rewrite::m
 p "  ~> input Rewrite::s Rewrite::m → $rewritten"
 die "expected both rewrites applied" unless $rewritten =~ /FOO.*BAR.*BAR/
 
 # ── 3. Compose three more — uc, reverse, vowel-strip ────────────────────────
-my $shouted = ~> $input Rewrite::qq
-my $reverse = ~> $input Rewrite::qx
-my $devow   = ~> $input Rewrite::qr
+val $shouted = ~> $input Rewrite::qq
+val $reverse = ~> $input Rewrite::qx
+val $devow   = ~> $input Rewrite::qr
 p "  qq (uc):     $shouted"
 p "  qx (rev):    $reverse"
 p "  qr (devow):  $devow"
@@ -53,15 +53,15 @@ die "qx must equal reverse" unless $reverse eq rev $input
 die "qr must strip vowels" unless $devow !~ /[aeiou]/
 
 # ── 4. tr / y as namespaced names (lexer must not eat `///` body) ───────────
-my $up   = Rewrite::tr($input)
-my $nums = Rewrite::y($input)
+val $up   = Rewrite::tr($input)
+val $nums = Rewrite::y($input)
 p "  tr → $up"
 p "  y  → $nums"
 die "tr must produce uppercase" unless $up eq uc $input
 die "y must keep only digits"   unless $nums eq "42"
 
 # ── 5. Build a full pipeline via thread macro ────────────────────────────────
-my $pipeline = ~> $input Rewrite::s Rewrite::m Rewrite::qq Rewrite::qr
+val $pipeline = ~> $input Rewrite::s Rewrite::m Rewrite::qq Rewrite::qr
 p ""
 p "  pipeline: s → m → qq → qr"
 p "  result:   $pipeline"

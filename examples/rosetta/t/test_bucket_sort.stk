@@ -4,38 +4,38 @@
 fn Rosetta::BucketSort::solve($arr, $bucket_count) {
     return $arr if len(@$arr) <= 1
     
-    my $min = $arr->[0]
-    my $max = $arr->[0]
-    for my $x (@$arr) {
+    var $min = $arr->[0]
+    var $max = $arr->[0]
+    for val $x (@$arr) {
         $min = $x if $x < $min
         $max = $x if $x > $max
     }
     
     if ($min == $max) { return $arr }
     
-    my $buckets = [ ~> 1:$bucket_count map { [] } ]
-    my $range = $max - $min
+    val $buckets = [ ~> 1:$bucket_count map { [] } ]
+    val $range = $max - $min
     
-    for my $x (@$arr) {
-        my $idx = int(($x - $min) / $range * ($bucket_count - 1))
+    for val $x (@$arr) {
+        val $idx = int(($x - $min) / $range * ($bucket_count - 1))
         push @{$buckets->[$idx]}, $x
     }
     
-    my @res
-    for my $b (@$buckets) {
+    var @res
+    for val $b (@$buckets) {
         # Sort each bucket (using built-in sort)
-        my @sorted_b = sort { _0 <=> _1 } @$b
+        val @sorted_b = sort { _0 <=> _1 } @$b
         push @res, @sorted_b
     }
     \@res
 }
 
-my @data = (0.42, 0.32, 0.33, 0.52, 0.37, 0.47, 0.51)
-my $sorted = Rosetta::BucketSort::solve(\@data, 5)
+val @data = (0.42, 0.32, 0.33, 0.52, 0.37, 0.47, 0.51)
+val $sorted = Rosetta::BucketSort::solve(\@data, 5)
 assert_eq join(",", @$sorted), "0.32,0.33,0.37,0.42,0.47,0.51,0.52", "bucket sort floats"
 
-my @data2 = (5, 3, 8, 1, 2, 7, 4, 6)
-my $sorted2 = Rosetta::BucketSort::solve(\@data2, 3)
+val @data2 = (5, 3, 8, 1, 2, 7, 4, 6)
+val $sorted2 = Rosetta::BucketSort::solve(\@data2, 3)
 assert_eq join(",", @$sorted2), "1,2,3,4,5,6,7,8", "bucket sort ints"
 
 test_run

@@ -2,7 +2,7 @@
 require "./Form.stk"
 
 fn j($a) { join(",", @{$a}) }
-fn jcheck($a) { my $r = $a; ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
+fn jcheck($a) { val $r = $a; ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
 
 assert_eq Exercism::CityOffice::blanks(0),                "",            "zero blanks"
 assert_eq Exercism::CityOffice::blanks(5),                "XXXXX",       "five blanks"

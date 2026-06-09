@@ -2,10 +2,10 @@
 # Rosetta Code: Monte Carlo methods
 
 fn Rosetta::MonteCarlo::pi_sequential($samples) {
-    my $inside = 0
-    for my $i (1:$samples) {
-        my $x = rand()
-        my $y = rand()
+    var $inside = 0
+    for val $i (1:$samples) {
+        val $x = rand()
+        val $y = rand()
         if ($x * $x + $y * $y <= 1.0) {
             $inside++
         }
@@ -14,35 +14,35 @@ fn Rosetta::MonteCarlo::pi_sequential($samples) {
 }
 
 fn Rosetta::MonteCarlo::pi_parallel($samples, $workers) {
-    my $chunk = int($samples / $workers)
-    my @results = ~> 1:$workers pmap {
-        my $inside = 0
+    val $chunk = int($samples / $workers)
+    val @results = ~> 1:$workers pmap {
+        var $inside = 0
         srand(_ + now_ns)
-        for my $i (1:$chunk) {
-            my $x = rand()
-            my $y = rand()
+        for val $i (1:$chunk) {
+            val $x = rand()
+            val $y = rand()
             if ($x * $x + $y * $y <= 1.0) {
                 $inside++
             }
         }
         $inside
     }
-    my $total_inside = 0
-    for my $v (@results) {
+    var $total_inside = 0
+    for val $v (@results) {
         $total_inside += $v
     }
     4.0 * $total_inside / ($chunk * $workers)
 }
 
-my $pi_seq = Rosetta::MonteCarlo::pi_sequential(100000)
+val $pi_seq = Rosetta::MonteCarlo::pi_sequential(100000)
 assert_ok $pi_seq > 3.1 && $pi_seq < 3.2, "Sequential MC Pi is approximately Pi: $pi_seq"
 
-my $pi_par = Rosetta::MonteCarlo::pi_parallel(100000, 4)
+val $pi_par = Rosetta::MonteCarlo::pi_parallel(100000, 4)
 assert_ok $pi_par > 3.1 && $pi_par < 3.2, "Parallel MC Pi is approximately Pi: $pi_par"
 
 # Pipeline version: using the dedicated pmap_reduce builtin
-my $inside_pipe = 0 + (1:10000 |> pmap_reduce { srand(_ + now_ns); my $x = rand(); my $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
-my $pi_pipe = 4.0 * $inside_pipe / 10000
+val $inside_pipe = 0 + (1:10000 |> pmap_reduce { srand(_ + now_ns); val $x = rand(); val $y = rand(); ($x*$x + $y*$y <= 1.0) ? 1 : 0 } { $a + $b })
+val $pi_pipe = 4.0 * $inside_pipe / 10000
 assert_ok $pi_pipe > 3.0 && $pi_pipe < 3.3, "Pipeline MC Pi is approximately Pi: $pi_pipe"
 
 test_run

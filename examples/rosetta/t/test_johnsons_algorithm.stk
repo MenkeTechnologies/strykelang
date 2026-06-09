@@ -2,42 +2,42 @@
 # Rosetta Code: Johnson's algorithm
 
 fn Rosetta::Johnson::bellman_ford($nodes, $edges, $source) {
-    my %dist
-    for my $n (@$nodes) { $dist{$n} = 1e15 }
+    var %dist
+    for val $n (@$nodes) { $dist{$n} = 1e15 }
     $dist{$source} = 0
 
-    for my $iter (1 .. len(@$nodes) - 1) {
-        for my $e (@$edges) {
-            my ($u, $v, $w) = @$e
+    for val $iter (1 .. len(@$nodes) - 1) {
+        for val $e (@$edges) {
+            var ($u, $v, $w) = @$e
             if ($dist{$u} < 1e15 && $dist{$u} + $w < $dist{$v}) {
                 $dist{$v} = $dist{$u} + $w
             }
         }
     }
 
-    for my $e (@$edges) {
-        my ($u, $v, $w) = @$e
+    for val $e (@$edges) {
+        var ($u, $v, $w) = @$e
         return undef if $dist{$u} < 1e15 && $dist{$u} + $w < $dist{$v}
     }
     \%dist
 }
 
 fn Rosetta::Johnson::dijkstra($graph, $start) {
-    my %dist
-    my @q = keys %$graph
-    for my $n (@q) { $dist{$n} = 1e15 }
+    var %dist
+    var @q = keys %$graph
+    for val $n (@q) { $dist{$n} = 1e15 }
     $dist{$start} = 0
 
     while (len(@q) > 0) {
-        my $best = 0
-        for my $i (1 .. len(@q) - 1) {
+        var $best = 0
+        for val $i (1 .. len(@q) - 1) {
             $best = $i if $dist{$q[$i]} < $dist{$q[$best]}
         }
-        my $u = splice(@q, $best, 1)
+        val $u = splice(@q, $best, 1)
         last if $dist{$u} >= 1e15
-        for my $edge (@{$graph->{$u}}) {
-            my ($v, $w) = @$edge
-            my $alt = $dist{$u} + $w
+        for val $edge (@{$graph->{$u}}) {
+            var ($v, $w) = @$edge
+            val $alt = $dist{$u} + $w
             $dist{$v} = $alt if $alt < $dist{$v}
         }
     }
@@ -45,25 +45,25 @@ fn Rosetta::Johnson::dijkstra($graph, $start) {
 }
 
 fn Rosetta::Johnson::solve($nodes, $edges) {
-    my @aug_nodes = (@$nodes, "__q")
-    my @aug_edges = @$edges
-    for my $n (@$nodes) { push @aug_edges, ["__q", $n, 0] }
+    val @aug_nodes = (@$nodes, "__q")
+    var @aug_edges = @$edges
+    for val $n (@$nodes) { push @aug_edges, ["__q", $n, 0] }
 
-    my $h = Rosetta::Johnson::bellman_ford(\@aug_nodes, \@aug_edges, "__q")
+    val $h = Rosetta::Johnson::bellman_ford(\@aug_nodes, \@aug_edges, "__q")
     return undef if !defined $h
 
-    my $graph = {}
-    for my $n (@$nodes) { $graph->{$n} = [] }
-    for my $e (@$edges) {
-        my ($u, $v, $w) = @$e
+    var $graph = {}
+    for val $n (@$nodes) { $graph->{$n} = [] }
+    for val $e (@$edges) {
+        val ($u, $v, $w) = @$e
         push @{$graph->{$u}}, [$v, $w + $h->{$u} - $h->{$v}]
     }
 
-    my $all = {}
-    for my $u (@$nodes) {
-        my $d = Rosetta::Johnson::dijkstra($graph, $u)
-        my $row = {}
-        for my $v (@$nodes) {
+    var $all = {}
+    for val $u (@$nodes) {
+        val $d = Rosetta::Johnson::dijkstra($graph, $u)
+        var $row = {}
+        for val $v (@$nodes) {
             $row->{$v} = $d->{$v} >= 1e15 ? 1e15 : $d->{$v} - $h->{$u} + $h->{$v}
         }
         $all->{$u} = $row
@@ -71,8 +71,8 @@ fn Rosetta::Johnson::solve($nodes, $edges) {
     $all
 }
 
-my @nodes = qw(a b c d)
-my @edges = (
+val @nodes = qw(a b c d)
+val @edges = (
     ["a", "b", 1],
     ["a", "c", 4],
     ["b", "c", -2],
@@ -81,7 +81,7 @@ my @edges = (
     ["d", "b", 1],
 )
 
-my $dist = Rosetta::Johnson::solve(\@nodes, \@edges)
+val $dist = Rosetta::Johnson::solve(\@nodes, \@edges)
 
 assert_eq $dist->{a}{a}, 0, "distance a->a"
 assert_eq $dist->{a}{c}, -1, "distance a->c"

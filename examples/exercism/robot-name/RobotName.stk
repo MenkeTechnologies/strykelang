@@ -1,10 +1,10 @@
 #!/usr/bin/env stryke
-my %_USED
+var %_USED
 
 fn Exercism::RobotName::_random = sprintf("%s%03d", ~> 1:2 map { chr(ord("A") + int(rand 26)) } join(""), int(rand 1000))
 
 fn Exercism::RobotName::_unique {
-    my $n = Exercism::RobotName::_random()
+    var $n = Exercism::RobotName::_random()
     while ($_USED{$n}) { $n = Exercism::RobotName::_random() }
     $_USED{$n} = 1
     $n

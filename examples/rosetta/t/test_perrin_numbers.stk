@@ -6,11 +6,11 @@ fn Rosetta::Perrin::compute($n) {
     elsif ($n == 1) { 0 }
     elsif ($n == 2) { 2 }
     else {
-        my $p0 = 3
-        my $p1 = 0
-        my $p2 = 2
-        for my $i (3:$n) {
-            my $p3 = $p1 + $p0
+        var $p0 = 3
+        var $p1 = 0
+        var $p2 = 2
+        for val $i (3:$n) {
+            val $p3 = $p1 + $p0
             ($p0, $p1, $p2) = ($p1, $p2, $p3)
         }
         $p2
@@ -29,7 +29,7 @@ assert_eq Rosetta::Perrin::compute(4), 2, "P4 (2+0)"
 assert_eq Rosetta::Perrin::compute(5), 5, "P5 (3+2)"
 assert_eq Rosetta::Perrin::compute(10), 17, "P10"
 
-my @list = Rosetta::Perrin::list(6)
+val @list = Rosetta::Perrin::list(6)
 assert_eq join(",", @list), "3,0,2,3,2,5,5", "Perrin list"
 
 10 |> Rosetta::Perrin::compute |> assert_eq(17, "pipe perrin")

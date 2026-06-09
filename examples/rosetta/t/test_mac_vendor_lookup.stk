@@ -2,17 +2,17 @@
 # Rosetta Code: MAC vendor lookup
 
 fn Rosetta::MAC::normalize($mac) {
-    my @chars = grep { _ ne ":" && _ ne "-" } split //, uc($mac)
+    val @chars = grep { _ ne ":" && _ ne "-" } split //, uc($mac)
     join("", @chars)
 }
 
 fn Rosetta::MAC::lookup($table, $mac) {
-    my $norm = Rosetta::MAC::normalize($mac)
-    my $oui = substr($norm, 0, 6)
+    val $norm = Rosetta::MAC::normalize($mac)
+    val $oui = substr($norm, 0, 6)
     exists $table->{$oui} ? $table->{$oui} : "Unknown"
 }
 
-my %table = (
+val %table = (
     "00163E" => "Apple",
     "3C5A37" => "Google",
     "F4F5E8" => "Cisco",

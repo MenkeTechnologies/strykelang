@@ -9,9 +9,9 @@ fn Rosetta::IsPrime::is_prime($n) {
     } elsif ($n % 2 == 0) {
         0
     } else {
-        my $i = 3
-        my $limit = sqrt($n)
-        my $res = 1
+        var $i = 3
+        val $limit = sqrt($n)
+        var $res = 1
         while ($i <= $limit) {
             if ($n % $i == 0) {
                 $res = 0
@@ -24,9 +24,9 @@ fn Rosetta::IsPrime::is_prime($n) {
 }
 
 fn Rosetta::SmarandacheWellin::smarandache_wellin($n) {
-    my $count = 0
-    my $p = 2
-    my $s = ""
+    var $count = 0
+    var $p = 2
+    var $s = ""
     while ($count < $n) {
         if (Rosetta::IsPrime::is_prime($p)) {
             $s = $s . $p

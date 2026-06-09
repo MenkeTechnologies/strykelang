@@ -2,14 +2,14 @@
 # Rosetta Code: Suffix tree
 
 fn Rosetta::SuffixTree::build($s) {
-    my $tree = {}
-    my @chars = $s |> chars()
-    my $n = len(@chars)
+    val $tree = {}
+    val @chars = $s |> chars()
+    val $n = len(@chars)
     
-    for (my $i = 0; $i < $n; $i++) {
-        my $curr = $tree
-        for (my $j = $i; $j < $n; $j++) {
-            my $c = $chars[$j]
+    for (var $i = 0; $i < $n; $i++) {
+        var $curr = $tree
+        for (var $j = $i; $j < $n; $j++) {
+            val $c = $chars[$j]
             $curr->{$c} = {} if !exists $curr->{$c}
             $curr = $curr->{$c}
         }
@@ -19,15 +19,15 @@ fn Rosetta::SuffixTree::build($s) {
 }
 
 fn Rosetta::SuffixTree::has_substring($tree, $sub) {
-    my $curr = $tree
-    for my $c ($sub |> chars()) {
+    var $curr = $tree
+    for val $c ($sub |> chars()) {
         return 0 if !exists $curr->{$c}
         $curr = $curr->{$c}
     }
     1
 }
 
-my $t = Rosetta::SuffixTree::build("banana")
+val $t = Rosetta::SuffixTree::build("banana")
 # Suffixes:
 # banana
 # anana

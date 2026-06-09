@@ -6,8 +6,8 @@
 
 fn Rosetta::HofstadterConway::sequence($n) {
     return [] if $n < 1
-    my @a = (undef, 1, 1)   # 1-indexed; index 0 unused
-    for my $i (3:$n) {
+    var @a = (undef, 1, 1)   # 1-indexed; index 0 unused
+    for val $i (3:$n) {
         push @a, $a[$a[$i - 1]] + $a[$i - $a[$i - 1]]
     }
     \@a
@@ -15,26 +15,26 @@ fn Rosetta::HofstadterConway::sequence($n) {
 
 fn Rosetta::HofstadterConway::ratio_max_below($limit) {
     # Compute max |a(n)/n - 1/2| over n ≤ limit and report (max, n)
-    my $a = Rosetta::HofstadterConway::sequence($limit)
-    my $max = 0
-    my $idx = 0
-    for my $n (1:$limit) {
-        my $r = abs($a->[$n] / $n - 0.5)
+    val $a = Rosetta::HofstadterConway::sequence($limit)
+    var $max = 0
+    var $idx = 0
+    for val $n (1:$limit) {
+        val $r = abs($a->[$n] / $n - 0.5)
         if ($r > $max) { $max = $r; $idx = $n }
     }
     [$max, $idx]
 }
 
 # OEIS A004001 first 30 terms
-my $a = Rosetta::HofstadterConway::sequence(30)
-my @first30 = @{$a}[1:30]
+val $a = Rosetta::HofstadterConway::sequence(30)
+val @first30 = @{$a}[1:30]
 assert_eq join(",", @first30),
     "1,1,2,2,3,4,4,4,5,6,7,7,8,8,8,8,9,10,11,12,12,13,14,14,15,15,15,16,16,16",
     "first 30 terms of A004001"
 
 # Self-referential property
-for my $n (3:20) {
-    my $expected = $a->[$a->[$n - 1]] + $a->[$n - $a->[$n - 1]]
+for val $n (3:20) {
+    val $expected = $a->[$a->[$n - 1]] + $a->[$n - $a->[$n - 1]]
     assert_eq $a->[$n], $expected, sprintf("a(%d) self-consistent", $n)
 }
 
@@ -42,7 +42,7 @@ for my $n (3:20) {
 50 |> Rosetta::HofstadterConway::sequence |> fn { $_->[20] } |> assert_eq(12, "pipe a(20) = 12")
 
 # Mallows ratio shrinks past 1024 (max ratio at small n ≤ 0.5)
-my $r = Rosetta::HofstadterConway::ratio_max_below(1024)
+val $r = Rosetta::HofstadterConway::ratio_max_below(1024)
 assert_ok $r->[0] <= 0.5, "max ratio drift bounded by 0.5"
 assert_ok $r->[1] >= 1, "ratio peak occurs at a real index"
 

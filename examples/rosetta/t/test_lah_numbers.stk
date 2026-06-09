@@ -3,8 +3,8 @@
 # (number of ways to partition n objects into k ordered nonempty subsets).
 
 fn Rosetta::Lah::factorial($n) {
-    my $r = 1
-    for my $i (2:$n) { $r *= $i }
+    var $r = 1
+    for val $i (2:$n) { $r *= $i }
     $r
 }
 
@@ -15,10 +15,10 @@ fn Rosetta::Lah::value($n, $k) {
     return Rosetta::Lah::factorial($n) if $k == 1
     return 1 if $n == $k
     # L(n,k) = (n!/k!) * C(n-1,k-1)
-    my $a = Rosetta::Lah::factorial($n)
-    my $b = Rosetta::Lah::factorial($k)
-    my $num = $a
-    my $denom = $b
+    val $a = Rosetta::Lah::factorial($n)
+    val $b = Rosetta::Lah::factorial($k)
+    var $num = $a
+    var $denom = $b
     # C(n-1,k-1) = (n-1)! / ((k-1)! * (n-k)!)
     $num   *= Rosetta::Lah::factorial($n - 1)
     $denom *= Rosetta::Lah::factorial($k - 1) * Rosetta::Lah::factorial($n - $k)
@@ -45,14 +45,14 @@ assert_eq Rosetta::Lah::value(4, 3), 12, "L(4,3)"
 assert_eq Rosetta::Lah::value(4, 4), 1,  "L(4,4)"
 
 # Row sums: A000262 - 1,1,3,13,73,501
-my @row_sums
-for my $n (0:5) {
-    my $sum = 0
+var @row_sums
+for val $n (0:5) {
+    var $sum = 0
     if ($n == 0) {
         $sum = 1
     } else {
-        for my $k (1:$n) {
-            my $v = Rosetta::Lah::value($n, $k)
+        for val $k (1:$n) {
+            val $v = Rosetta::Lah::value($n, $k)
             $sum += $v
         }
     }

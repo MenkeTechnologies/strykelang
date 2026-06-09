@@ -6,17 +6,17 @@ fn Rosetta::ConvexHull::cross_product($o, $a, $b) {
 }
 
 fn Rosetta::ConvexHull::solve($points) {
-    my $n = len(@$points)
+    val $n = len(@$points)
     return $points if $n <= 2
     
     # Sort points lexicographically
-    my @sorted = sort {
+    val @sorted = sort {
         $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1]
     } @$points
     
     # Build lower hull
-    my @lower
-    for my $p (@sorted) {
+    var @lower
+    for val $p (@sorted) {
         while (len(@lower) >= 2 && Rosetta::ConvexHull::cross_product($lower[-2], $lower[-1], $p) <= 0) {
             pop @lower
         }
@@ -24,9 +24,9 @@ fn Rosetta::ConvexHull::solve($points) {
     }
     
     # Build upper hull
-    my @upper
-    my @rev_sorted = rev @sorted
-    for my $p (@rev_sorted) {
+    var @upper
+    val @rev_sorted = rev @sorted
+    for val $p (@rev_sorted) {
         while (len(@upper) >= 2 && Rosetta::ConvexHull::cross_product($upper[-2], $upper[-1], $p) <= 0) {
             pop @upper
         }
@@ -39,11 +39,11 @@ fn Rosetta::ConvexHull::solve($points) {
     return [@lower, @upper]
 }
 
-my @points = ([16, 3], [12, 17], [0, 6], [-4, -6], [16, 6], [16, -7], [16, -3], [17, -4], [5, 19], [19, -8], [3, 16], [12, 13], [3, -4], [17, 5], [-3, 15], [-3, -9], [0, 11], [-9, -3], [-4, -2], [12, 10])
+val @points = ([16, 3], [12, 17], [0, 6], [-4, -6], [16, 6], [16, -7], [16, -3], [17, -4], [5, 19], [19, -8], [3, 16], [12, 13], [3, -4], [17, 5], [-3, 15], [-3, -9], [0, 11], [-9, -3], [-4, -2], [12, 10])
 
-my $hull = Rosetta::ConvexHull::solve(\@points)
+val $hull = Rosetta::ConvexHull::solve(\@points)
 # Sort results for stable assertion
-my @res = sort { _0->[0] <=> _1->[0] || _0->[1] <=> _1->[1] } @$hull
+val @res = sort { _0->[0] <=> _1->[0] || _0->[1] <=> _1->[1] } @$hull
 
 assert_eq len(@res), 7, "Convex hull point count"
 # Points on the hull for this set:

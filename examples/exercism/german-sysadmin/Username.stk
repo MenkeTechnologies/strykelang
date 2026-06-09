@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my %UMLAUTS = (
+const val %UMLAUTS = (
     "ä" => "ae",
     "ö" => "oe",
     "ü" => "ue",

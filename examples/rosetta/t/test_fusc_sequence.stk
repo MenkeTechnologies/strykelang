@@ -3,8 +3,8 @@
 # fusc(0)=0, fusc(1)=1, fusc(2n)=fusc(n), fusc(2n+1)=fusc(n)+fusc(n+1)
 
 fn Rosetta::Fusc::fusc($n) {
-    my $a = 1
-    my $b = 0
+    var $a = 1
+    var $b = 0
     while ($n > 0) {
         if ($n % 2 == 0) {
             $a += $b
@@ -21,7 +21,7 @@ fn Rosetta::Fusc::first_n($count) {
 }
 
 # OEIS A002487: 0,1,1,2,1,3,2,3,1,4,3,5,2,5,3,4,1,...
-my @first17 = Rosetta::Fusc::first_n(17)
+val @first17 = Rosetta::Fusc::first_n(17)
 assert_eq join(",", @first17),
     "0,1,1,2,1,3,2,3,1,4,3,5,2,5,3,4,1",
     "first 17 fusc"

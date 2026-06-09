@@ -9,7 +9,7 @@
 # ── synthetic log corpus ───────────────────────────────────────────────
 # Common Log Format: <ip> - - [<time>] "<method> <path> HTTP/<ver>" <status> <bytes>
 
-my $log = join("\n",
+val $log = join("\n",
     '10.0.0.1 - - [15/May/2026:09:00:01 +0000] "GET /api/users HTTP/1.1" 200 1234',
     '10.0.0.5 - - [15/May/2026:09:00:02 +0000] "GET /api/items HTTP/1.1" 200 567',
     '10.0.0.1 - - [15/May/2026:09:00:03 +0000] "POST /api/users HTTP/1.1" 201 89',
@@ -23,8 +23,8 @@ my $log = join("\n",
 )
 
 p "── parse log lines ────────────────────────────────────"
-my @parsed
-for my $line (split /\n/, $log) {
+var @parsed
+for val $line (split /\n/, $log) {
     if ($line =~ /^(\S+) \S+ \S+ \[(.*?)\] "(\S+) (\S+) HTTP\/\S+" (\d+) (\d+)/) {
         push @parsed, +{
             ip     => $1,
@@ -42,12 +42,12 @@ printf "  parsed %d log lines\n", len @parsed
 
 p ""
 p "── aggregate via Count-Min + HyperLogLog ──────────────"
-my $ip_hits    = cms(2048, 5)
-my $ip_bytes   = cms(2048, 5)
-my $ip_distinct = hll(14)
-my $errors     = cms(2048, 5)
+val $ip_hits    = cms(2048, 5)
+val $ip_bytes   = cms(2048, 5)
+val $ip_distinct = hll(14)
+val $errors     = cms(2048, 5)
 
-for my $rec (@parsed) {
+for val $rec (@parsed) {
     cms_add($ip_hits,  $rec->{ip})
     cms_add($ip_bytes, $rec->{ip}, $rec->{bytes})
     hll_add($ip_distinct, $rec->{ip})
@@ -55,12 +55,12 @@ for my $rec (@parsed) {
     cms_add($errors, "4xx") if $rec->{status} >= 400 && $rec->{status} < 500
 }
 
-my @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
+val @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
 printf "  distinct IPs (HLL) : %d  (truth: %d)\n", hll_count($ip_distinct), len @ips
 printf "  4xx errors         : %d\n", cms_count($errors, "4xx")
 printf "  5xx errors         : %d\n", cms_count($errors, "5xx")
 p "  per-IP stats:"
-for my $ip (@ips) {
+for val $ip (@ips) {
     printf "    %-10s  hits=%d  bytes=%d\n",
         $ip, cms_count($ip_hits, $ip), cms_count($ip_bytes, $ip)
 }
@@ -69,9 +69,9 @@ for my $ip (@ips) {
 
 p ""
 p "── top paths via SpaceSaving ──────────────────────────"
-my $top_paths = topk(5)
+val $top_paths = topk(5)
 topk_add($top_paths, _->{path}) for @parsed
-for my $row (topk_heavies($top_paths)) {
+for val $row (topk_heavies($top_paths)) {
     printf "    %-15s × %d\n", $row->[0], $row->[1]
 }
 
@@ -79,9 +79,9 @@ for my $row (topk_heavies($top_paths)) {
 
 p ""
 p "── status histogram via hash + pipe ───────────────────"
-my %status
+var %status
 $status{_->{status}}++ for @parsed
-for my $s (sort { _ <=> _1 } keys %status) {
+for val $s (sort { _ <=> _1 } keys %status) {
     printf "    %d  ×  %d\n", $s, $status{$s}
 }
 
@@ -89,11 +89,11 @@ for my $s (sort { _ <=> _1 } keys %status) {
 
 p ""
 p "── persist aggregate to rkyv KV ───────────────────────"
-my $path = "/tmp/log_analyzer_demo.rkyv"
+val $path = "/tmp/log_analyzer_demo.rkyv"
 unlink($path)
-my $db = kv_open($path)
+val $db = kv_open($path)
 
-for my $ip (@ips) {
+for val $ip (@ips) {
     kv_put($db, "ip:" . $ip, +{
         hits  => cms_count($ip_hits,  $ip),
         bytes => cms_count($ip_bytes, $ip),
@@ -113,8 +113,8 @@ printf "  wrote %d keys to %s\n", kv_len($db), $path
 
 p ""
 p "── reopen + JSON report ───────────────────────────────"
-my $db2 = kv_open($path)
-my $summary = kv_get($db2, "summary")
+val $db2 = kv_open($path)
+val $summary = kv_get($db2, "summary")
 p "  summary:"
 printf "    distinct_ips : %d\n", $summary->{distinct_ips}
 printf "    total_lines  : %d\n", $summary->{total_lines}

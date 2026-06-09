@@ -28,7 +28,7 @@ fn BS::remove    = _0 & ~(1 << _1)
 # ── popcount via Kernighan's algorithm ─────────────────────────────
 
 fn BS::popcount($x) {
-    my $c = 0
+    var $c = 0
     while ($x) {
         $x = $x & ($x - 1)
         $c++
@@ -39,9 +39,9 @@ fn BS::popcount($x) {
 # ── render set as {a, b, c} (lowest bit = element 0) ──────────────
 
 fn BS::render($x) {
-    my @members
-    my $i = 0
-    my $tmp = $x
+    var @members
+    var $i = 0
+    var $tmp = $x
     while ($tmp) {
         push @members, $i if ($tmp & 1)
         $tmp = $tmp >> 1
@@ -51,15 +51,15 @@ fn BS::render($x) {
 }
 
 fn BS::from_list($list_ref) {
-    my $s = 0
-    for my $e (@$list_ref) { $s = BS::add($s, $e) }
+    var $s = 0
+    for val $e (@$list_ref) { $s = BS::add($s, $e) }
     $s
 }
 
 # ── demo ───────────────────────────────────────────────────────────
 
-my $A = BS::from_list([0, 1, 3, 5, 7])    # {0,1,3,5,7}
-my $B = BS::from_list([1, 2, 3, 4, 5])    # {1,2,3,4,5}
+val $A = BS::from_list([0, 1, 3, 5, 7])    # {0,1,3,5,7}
+val $B = BS::from_list([1, 2, 3, 4, 5])    # {1,2,3,4,5}
 
 printf "── bit-set arithmetic demo ─────────────────────────────\n\n"
 printf "  A           = %-8b  %s\n", $A, BS::render($A)
@@ -78,28 +78,28 @@ printf "  |A ∪ B|     = %d\n", BS::popcount(BS::union($A, $B))
 # ── invariants ─────────────────────────────────────────────────────
 
 # (1) Inclusion-exclusion: |A ∪ B| = |A| + |B| − |A ∩ B|.
-my $card_u = BS::popcount(BS::union($A, $B))
-my $card_a = BS::popcount($A)
-my $card_b = BS::popcount($B)
-my $card_i = BS::popcount(BS::intersect($A, $B))
+val $card_u = BS::popcount(BS::union($A, $B))
+val $card_a = BS::popcount($A)
+val $card_b = BS::popcount($B)
+val $card_i = BS::popcount(BS::intersect($A, $B))
 die "inclusion-exclusion violated: |A∪B|=#{$card_u} != #{$card_a + $card_b - $card_i}" unless $card_u == $card_a + $card_b - $card_i
 
 # (2) De Morgan on first 8 bits: complement up to mask M of (A ∪ B)
 # equals complement(A) ∩ complement(B).
-my $M = 0xFF
-my $not_u = $M & ~BS::union($A, $B)
-my $de_morgan = ($M & ~$A) & ($M & ~$B)
+val $M = 0xFF
+val $not_u = $M & ~BS::union($A, $B)
+val $de_morgan = ($M & ~$A) & ($M & ~$B)
 die "De Morgan ¬(A ∪ B) = ¬A ∩ ¬B failed" unless $not_u == $de_morgan
 
 # (3) Symmetric difference equals (A ∪ B) \ (A ∩ B).
-my $sd = BS::symdiff($A, $B)
-my $alt = BS::diff(BS::union($A, $B), BS::intersect($A, $B))
+val $sd = BS::symdiff($A, $B)
+val $alt = BS::diff(BS::union($A, $B), BS::intersect($A, $B))
 die "A △ B != (A ∪ B) \\ (A ∩ B)" unless $sd == $alt
 
 # (4) add/remove are mutual inverses.
-for my $e (0:7) {
-    my $with = BS::add($A, $e)
-    my $back = BS::remove($with, $e)
+for val $e (0:7) {
+    val $with = BS::add($A, $e)
+    val $back = BS::remove($with, $e)
     # If e was already in A, add is a no-op then remove takes it out:
     # the round-trip lands somewhere only equal to A when e ∉ A. So
     # invariant: starting from a set that lacks e, add-then-remove
@@ -109,9 +109,9 @@ for my $e (0:7) {
 }
 
 # (5) For any A, has(A, i) ⇔ ((A >> i) & 1) ⇔ presence at popcount level.
-for my $e (0:7) {
-    my $present = (($A >> $e) & 1) == 1
-    my $h = BS::has($A, $e) == 1
+for val $e (0:7) {
+    val $present = (($A >> $e) & 1) == 1
+    val $h = BS::has($A, $e) == 1
     die "has() disagrees with bit test at e=#{$e}" unless $present == $h
 }
 

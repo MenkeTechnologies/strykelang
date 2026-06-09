@@ -3,15 +3,15 @@
 
 fn Rosetta::MergeAggregate::process($patients, $visits) {
     # 1. Join
-    my %patient_map
-    for my $p (@$patients) {
+    var %patient_map
+    for val $p (@$patients) {
         $patient_map{$p->{id}} = $p
     }
     
-    my %agg
-    for my $v (@$visits) {
-        my $id = $v->{id}
-        my $score = $v->{score}
+    var %agg
+    for val $v (@$visits) {
+        val $id = $v->{id}
+        val $score = $v->{score}
         
         if (!exists $agg{$id}) {
             $agg{$id} = {
@@ -26,10 +26,10 @@ fn Rosetta::MergeAggregate::process($patients, $visits) {
     }
     
     # 2. Aggregate (calculate average)
-    my @results
-    for my $id (sort { _ <=> _1 } keys %agg) {
-        my $data = $agg{$id}
-        my $avg = $data->{sum} / $data->{visits}
+    var @results
+    for val $id (sort { _ <=> _1 } keys %agg) {
+        val $data = $agg{$id}
+        val $avg = $data->{sum} / $data->{visits}
         push @results, {
             id => $id,
             name => $data->{name},
@@ -40,7 +40,7 @@ fn Rosetta::MergeAggregate::process($patients, $visits) {
     \@results
 }
 
-my $patients = [
+val $patients = [
     { id => 1001, last_name => "Hopper" },
     { id => 4004, last_name => "Wirth" },
     { id => 3003, last_name => "Kemeny" },
@@ -48,7 +48,7 @@ my $patients = [
     { id => 5005, last_name => "Knuth" }
 ]
 
-my $visits = [
+val $visits = [
     { id => 2002, date => "2020-09-10", score => 6.8 },
     { id => 1001, date => "2020-09-17", score => 5.5 },
     { id => 4004, date => "2020-09-24", score => 8.4 },
@@ -57,7 +57,7 @@ my $visits = [
     { id => 3003, date => "2020-10-22", score => 7.3 }
 ]
 
-my $res = Rosetta::MergeAggregate::process($patients, $visits)
+val $res = Rosetta::MergeAggregate::process($patients, $visits)
 
 assert_eq len(@$res), 4, "4 patients had visits"
 assert_eq $res->[0]->{name}, "Hopper", "First patient Hopper"

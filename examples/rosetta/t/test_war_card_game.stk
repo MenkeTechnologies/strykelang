@@ -2,17 +2,17 @@
 # Rosetta Code: War card game
 
 fn Rosetta::WarGame::play(@deck) {
-    my $half = int(len(@deck) / 2)
-    my @p1 = @deck[0:$half - 1]
-    my @p2 = @deck[$half .. len(@deck) - 1]
+    val $half = int(len(@deck) / 2)
+    var @p1 = @deck[0:$half - 1]
+    var @p2 = @deck[$half .. len(@deck) - 1]
     
-    my $turns = 0
-    my @pool
+    var $turns = 0
+    var @pool
     
     while (len(@p1) > 0 && len(@p2) > 0 && $turns < 1000) {
         $turns++
-        my $c1 = shift @p1
-        my $c2 = shift @p2
+        val $c1 = shift @p1
+        val $c2 = shift @p2
         push @pool, $c1, $c2
         
         if ($c1 > $c2) {
@@ -40,8 +40,8 @@ fn Rosetta::WarGame::play(@deck) {
 # Test with a simple deck (using numbers as card values)
 # P1: 10, 2
 # P2: 5, 8
-my @deck = (10, 2, 5, 8)
-my $winner = Rosetta::WarGame::play(@deck)
+val @deck = (10, 2, 5, 8)
+val $winner = Rosetta::WarGame::play(@deck)
 # Turn 1: 10 vs 5 -> P1 wins, pool (10,5) goes to P1
 # P1: 2, 10, 5
 # P2: 8

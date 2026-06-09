@@ -12,7 +12,7 @@ pty_strip_ansi("\x1b[31mred\x1b[0m") |> aeq "red", "ansi strip"
 # In CI/Docker environments, PTYs might be missing (ENXIO).
 # We pin that the builtin exists even if the OS call fails.
 eval {
-    my $h = pty_spawn("cat")
+    val $h = pty_spawn("cat")
     pty_send($h, "hello\n")
     pty_expect($h, qr/hello/, 1)
     pty_close($h)

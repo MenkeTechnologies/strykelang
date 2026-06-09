@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
-my @_ORD  = ("first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth")
-my @_GIFT = (
+val @_ORD  = ("first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth")
+val @_GIFT = (
     "a Partridge in a Pear Tree.",
     "two Turtle Doves,",
     "three French Hens,",
@@ -16,9 +16,9 @@ my @_GIFT = (
 )
 
 fn Exercism::TwelveDays::verse($n) {
-    my $ord = $_ORD[$n - 1]
-    my $head = "On the $ord day of Christmas my true love gave to me: "
-    my @gifts = ~> 0:$n-1 rev map { $_GIFT[_] }
+    val $ord = $_ORD[$n - 1]
+    val $head = "On the $ord day of Christmas my true love gave to me: "
+    var @gifts = ~> 0:$n-1 rev map { $_GIFT[_] }
     if ($n > 1) { $gifts[-1] = "and a Partridge in a Pear Tree." }
     $head . join(" ", @gifts)
 }

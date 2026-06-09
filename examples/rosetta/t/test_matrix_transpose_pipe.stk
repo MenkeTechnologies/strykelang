@@ -2,19 +2,19 @@
 # Rosetta Code: Matrix transposition (using zip and pipes)
 
 fn Rosetta::MatrixTranspose::solve($m) {
-    my $cols = len(@{$m->[0]})
+    val $cols = len(@{$m->[0]})
     ~> 0:$cols-1 map {
-        my $j = _
+        val $j = _
         [ ~> @$m map { _->[$j] } ]
     }
 }
 
-my @matrix = (
+val @matrix = (
     [1, 2, 3],
     [4, 5, 6]
 )
 
-my @transposed = Rosetta::MatrixTranspose::solve(\@matrix)
+val @transposed = Rosetta::MatrixTranspose::solve(\@matrix)
 # [[1, 4], [2, 5], [3, 6]]
 
 assert_eq len(@transposed), 3, "transposed has 3 rows"

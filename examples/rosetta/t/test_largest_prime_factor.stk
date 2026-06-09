@@ -2,8 +2,8 @@
 # Rosetta Code: Largest prime factor
 
 fn Rosetta::LargestPrimeFactor::solve($n) {
-    my $res = -1
-    my $temp = $n
+    var $res = -1
+    var $temp = $n
     while ($temp % 2 == 0) {
         $res = 2
         $temp = int($temp / 2)
@@ -12,7 +12,7 @@ fn Rosetta::LargestPrimeFactor::solve($n) {
         $res = 3
         $temp = int($temp / 3)
     }
-    my $i = 5
+    var $i = 5
     while ($i * $i <= $temp) {
         while ($temp % $i == 0) {
             $res = $i

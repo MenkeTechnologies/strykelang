@@ -11,8 +11,8 @@ assert_eq Rosetta::Math::is_coprime(7, 13), 1, "7 and 13 are coprime (both prime
 assert_eq Rosetta::Math::is_coprime(1, 99), 1, "1 is coprime to any number"
 
 # Using pipeline
-my @pairs = ([10, 21], [10, 15], [7, 13])
-my @res = @pairs |> map { Rosetta::Math::is_coprime(_->[0], _->[1]) }
+val @pairs = ([10, 21], [10, 15], [7, 13])
+val @res = @pairs |> map { Rosetta::Math::is_coprime(_->[0], _->[1]) }
 assert_eq join(",", @res), "1,0,1", "coprime pipeline"
 
 test_run

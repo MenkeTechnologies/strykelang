@@ -3,7 +3,7 @@
 
 fn Rosetta::Ascending::is_prime($n) {
     return 0 if $n < 2
-    my $d = 2
+    var $d = 2
     while ($d * $d <= $n) {
         return 0 if $n % $d == 0
         $d = $d + 1
@@ -12,9 +12,9 @@ fn Rosetta::Ascending::is_prime($n) {
 }
 
 fn Rosetta::Ascending::is_ascending($n) {
-    my @digits = $n |> chars
+    val @digits = $n |> chars
     return 1 if len(@digits) < 2
-    for my $i (0..len(@digits)-2) {
+    for val $i (0..len(@digits)-2) {
         if ($digits[$i] >= $digits[$i+1]) {
             return 0
         }
@@ -22,8 +22,8 @@ fn Rosetta::Ascending::is_ascending($n) {
     1
 }
 
-my @ascending
-for my $i (2:500) {
+var @ascending
+for val $i (2:500) {
     if (Rosetta::Ascending::is_ascending($i) && Rosetta::Ascending::is_prime($i)) {
         push @ascending, $i
     }

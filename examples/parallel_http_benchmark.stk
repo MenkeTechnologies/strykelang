@@ -12,7 +12,7 @@
 p "── Parallel HTTP Benchmark ─────────────────────────────"
 
 # 1. Targets
-my @targets = (
+val @targets = (
     "https://www.google.com",
     "https://www.github.com",
     "https://www.rust-lang.org",
@@ -22,11 +22,11 @@ my @targets = (
 # 2. Benchmark
 p "Checking #{len @targets} targets in parallel..."
 
-my @results = @targets |> pmap {
-    my $t1 = now_ns()
+val @results = @targets |> pmap {
+    val $t1 = now_ns()
     # http_request returns { status => ..., body => ..., headers => ... }
-    my $res = http_request(_, { timeout => 5 })
-    my $dt_ms = (now_ns() - $t1) / 1000000.0
+    val $res = http_request(_, { timeout => 5 })
+    val $dt_ms = (now_ns() - $t1) / 1000000.0
     
     +{
         url    => _,
@@ -38,7 +38,7 @@ my @results = @targets |> pmap {
 
 # 3. Report
 p "\nBenchmark Results:"
-for my $r (@results) {
+for val $r (@results) {
     printf "  %-30s | Status: %3d | Size: %8d | Time: %6.1f ms\n",
         $r->{url}, $r->{status}, $r->{size}, $r->{time}
 }

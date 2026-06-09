@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 require "./CaptainsLog.stk"
 
-my $p = Exercism::CaptainsLog::random_planet_class()
+val $p = Exercism::CaptainsLog::random_planet_class()
 assert_ok $p =~ /^[DHJKLMNRTY]$/, "valid class"
 
-my $reg = Exercism::CaptainsLog::random_ship_registry_number()
+val $reg = Exercism::CaptainsLog::random_ship_registry_number()
 assert_ok $reg =~ /^NCC-\d{4}$/, "registry shape"
 
-my $sd = Exercism::CaptainsLog::random_stardate()
+val $sd = Exercism::CaptainsLog::random_stardate()
 assert_ok $sd >= 41000 && $sd < 42000, "stardate in range"
 
 assert_eq Exercism::CaptainsLog::format_stardate(41234.5678), "41234.6", "1 dp rounding"

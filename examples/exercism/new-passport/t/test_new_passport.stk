@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 require "./NewPassport.stk"
 
-my $now = 1700000000
-my $bd25 = $now - 25 * 365 * 86400
-my $bd10 = $now - 10 * 365 * 86400
-my $bdf  = $now + 86400
+val $now = 1700000000
+val $bd25 = $now - 25 * 365 * 86400
+val $bd10 = $now - 10 * 365 * 86400
+val $bdf  = $now + 86400
 
-fn jr($a) { my $r = $a; "$r->[0]:$r->[1]" }
+fn jr($a) { val $r = $a; "$r->[0]:$r->[1]" }
 
 assert_eq jr(Exercism::NewPassport::get_new_passport($now, $bd25, "Alice")), "ok:PASS-Alice-25", "adult"
 assert_eq jr(Exercism::NewPassport::get_new_passport($now, $bd10, "Kid")),   "error:underage",   "underage"

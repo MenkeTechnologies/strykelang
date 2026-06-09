@@ -16,19 +16,19 @@
 
 # Sort a list of comparables. Stable: equal elements preserve order.
 fn Merge::sort($xs_ref) {
-    my @xs = @$xs_ref
+    val @xs = @$xs_ref
     return \@xs if len(@xs) <= 1
-    my $mid = int(len(@xs) / 2)
-    my @left  = @xs[0:$mid - 1]
-    my @right = @xs[$mid:len(@xs) - 1]
+    val $mid = int(len(@xs) / 2)
+    val @left  = @xs[0:$mid - 1]
+    val @right = @xs[$mid:len(@xs) - 1]
     Merge::merge(Merge::sort(\@left), Merge::sort(\@right))
 }
 
 # Merge two already-sorted arrayrefs into a new sorted arrayref.
 fn Merge::merge($l, $r) {
-    my @out
-    my $i = 0
-    my $j = 0
+    var @out
+    var $i = 0
+    var $j = 0
     while ($i < len(@$l) && $j < len(@$r)) {
         if ($l->[$i] <= $r->[$j]) { push @out, $l->[$i]; $i++ }
         else                      { push @out, $r->[$j]; $j++ }
@@ -38,7 +38,7 @@ fn Merge::merge($l, $r) {
     \@out
 }
 
-my @cases = (
+val @cases = (
     +{ input => [],                            sorted => []                            },
     +{ input => [42],                          sorted => [42]                          },
     +{ input => [3, 1, 2],                     sorted => [1, 2, 3]                     },
@@ -50,36 +50,36 @@ my @cases = (
 )
 
 p "── Merge sort demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got     = Merge::sort($c->{input})
-    my $got_s   = join(",", @$got)
-    my $want_s  = join(",", @{$c->{sorted}})
-    my $ok      = $got_s eq $want_s
+var $fail = 0
+for val $c (@cases) {
+    val $got     = Merge::sort($c->{input})
+    val $got_s   = join(",", @$got)
+    val $want_s  = join(",", @{$c->{sorted}})
+    val $ok      = $got_s eq $want_s
     $fail++ unless $ok
     p "  [@{$c->{input}}] → [@$got]  #{$ok ? \"\" : \"FAIL (want [$want_s])\"}"
 }
 die "#{$fail} / #{len @cases} sort cases failed" if $fail > 0
 
 # Universal invariant: output non-decreasing, length preserved.
-for my $c (@cases) {
-    my $r = Merge::sort($c->{input})
+for val $c (@cases) {
+    val $r = Merge::sort($c->{input})
     die "length changed on @{$c->{input}}" unless len(@$r) == len(@{$c->{input}})
     next if len(@$r) < 2
-    for my $i (1:len(@$r) - 1) {
+    for val $i (1:len(@$r) - 1) {
         die "non-decreasing violated at $i" unless $r->[$i] >= $r->[$i - 1]
     }
 }
 
 # Stress: shuffle 0:99 and re-sort.
-my @big = 0:99
-my @shuffled
+var @big = 0:99
+var @shuffled
 while (len(@big) > 0) {
-    my $i = int(rand @big)
+    val $i = int(rand @big)
     push @shuffled, $big[$i]
     splice @big, $i, 1
 }
-my $sorted = Merge::sort(\@shuffled)
+val $sorted = Merge::sort(\@shuffled)
 die "100-shuffle should round-trip" unless join(",", @$sorted) eq join(",", 0:99)
 
 p ""

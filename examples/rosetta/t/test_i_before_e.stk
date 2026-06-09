@@ -25,10 +25,10 @@ assert_ok  Rosetta::IBeforeE::violates("weird"),    "weird violates (ei not afte
 assert_ok  Rosetta::IBeforeE::violates("seize"),    "seize violates"
 
 # Coverage on a small list.
-my @words = ("believe","receive","ancient","weird","piece","seize","field","veil")
-my $valid = 0
-my $invalid = 0
-for my $w (@words) {
+val @words = ("believe","receive","ancient","weird","piece","seize","field","veil")
+var $valid = 0
+var $invalid = 0
+for val $w (@words) {
     if (Rosetta::IBeforeE::violates($w)) { $invalid += 1 }
     else                                  { $valid += 1 }
 }

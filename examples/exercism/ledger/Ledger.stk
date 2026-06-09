@@ -3,9 +3,9 @@
 # Render a fixed-width ledger of entries. Each entry: { date, desc, change }.
 # date: "YYYY-MM-DD", change: cents (positive credit, negative debit).
 fn Exercism::Ledger::format_entries {
-    my ($currency, $locale, $entries) = (_, _1, _2)
-    my $hdr = Exercism::Ledger::_hdr($locale)
-    my @sorted = sort {
+    val ($currency, $locale, $entries) = (_, _1, _2)
+    val $hdr = Exercism::Ledger::_hdr($locale)
+    val @sorted = sort {
         _->{date} cmp _1->{date} ||
         _->{desc} cmp _1->{desc} ||
         _->{change} <=> _1->{change}
@@ -19,25 +19,25 @@ fn Exercism::Ledger::_hdr {
 }
 
 fn Exercism::Ledger::_row {
-    my ($curr, $loc, $e) = (_, _1, _2)
-    my $d = $loc eq "en-US"
+    var ($curr, $loc, $e) = (_, _1, _2)
+    val $d = $loc eq "en-US"
           ? sprintf("%02d/%02d/%04d", (split /-/, $e->{date})[1], (split /-/, $e->{date})[2], (split /-/, $e->{date})[0])
           : sprintf("%02d-%02d-%04d", (split /-/, $e->{date})[2], (split /-/, $e->{date})[1], (split /-/, $e->{date})[0])
-    my $desc = len($e->{desc}) > 25 ? substr($e->{desc}, 0, 22) . "..." : $e->{desc}
-    my $amt  = Exercism::Ledger::_amt($curr, $loc, $e->{change})
+    val $desc = len($e->{desc}) > 25 ? substr($e->{desc}, 0, 22) . "..." : $e->{desc}
+    val $amt  = Exercism::Ledger::_amt($curr, $loc, $e->{change})
     sprintf("%-11s| %-26s| %13s", $d, $desc, $amt)
 }
 
 fn Exercism::Ledger::_amt {
-    my ($curr, $loc, $cents) = (_, _1, _2)
-    my $sym = $curr eq "USD" ? "$" : "€"
-    my $neg = $cents < 0
-    my $amt = abs($cents) / 100
-    my $i   = int($amt)
-    my $f   = int(($amt - $i) * 100 + 0.5)
-    my @rev = split //, sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr  # us style
-    my $base = sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr
-    my $body = $loc eq "en-US"
+    val ($curr, $loc, $cents) = (_, _1, _2)
+    val $sym = $curr eq "USD" ? "$" : "€"
+    val $neg = $cents < 0
+    val $amt = abs($cents) / 100
+    val $i   = int($amt)
+    val $f   = int(($amt - $i) * 100 + 0.5)
+    val @rev = split //, sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr  # us style
+    var $base = sprintf("%d", $i) =~ s/(\d)(?=(\d{3})+$)/$1,/gr
+    val $body = $loc eq "en-US"
              ? "$sym$base." . sprintf("%02d", $f)
              : "$sym " . ($base =~ s/,/./gr) . "," . sprintf("%02d", $f)
     $neg ? ($loc eq "en-US" ? "($body)" : "$body-") : ($loc eq "en-US" ? " $body " : " $body  ")

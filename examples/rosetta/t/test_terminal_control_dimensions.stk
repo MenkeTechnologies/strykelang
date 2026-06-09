@@ -3,8 +3,8 @@
 
 fn Rosetta::TerminalDimensions::get() {
     # Using system commands to get dimensions is a common fallback
-    my $cols = qx{tput cols} |> trim
-    my $rows = qx{tput lines} |> trim
+    var $cols = qx{tput cols} |> trim
+    var $rows = qx{tput lines} |> trim
     
     # Fallback for headless environments
     $cols = 80 if !defined($cols) || len($cols) == 0
@@ -13,7 +13,7 @@ fn Rosetta::TerminalDimensions::get() {
     ($cols, $rows)
 }
 
-my ($c, $r) = Rosetta::TerminalDimensions::get()
+val ($c, $r) = Rosetta::TerminalDimensions::get()
 assert_ok defined($c), "Columns defined"
 assert_ok defined($r), "Rows defined"
 

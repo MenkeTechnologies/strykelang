@@ -25,20 +25,20 @@ after "MyMath::add" {
 }
 
 p "Calling MyMath::add(10, 20)..."
-my $res = MyMath::add(10, 20)
+val $res = MyMath::add(10, 20)
 p "Result: $res"
 
 # ── 2. Reflection ──────────────────────────────────────────────────
 p "\nReflection (Introspection):"
 
 # %all contains all symbols (builtins + user-defined).
-my @bloom_builtins = keys %all |> greps { _ =~ /bloom_/ } |> collect
+val @bloom_builtins = keys %all |> greps { _ =~ /bloom_/ } |> collect
 p "Found #{len @bloom_builtins} Bloom-related symbols."
 
 # ── 3. Symbol Inspection ───────────────────────────────────────────
 p "\nSymbol Inspection:"
 # Check for a known builtin
-my $has_bloom = keys %all |> greps { _ eq "bloom_add" } |> collect |> len
+val $has_bloom = keys %all |> greps { _ eq "bloom_add" } |> collect |> len
 p "Is bloom_add in %all? ", $has_bloom ? "yes" : "no"
 
 # ── 4. Tests ───────────────────────────────────────────────────────

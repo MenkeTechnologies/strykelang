@@ -3,17 +3,17 @@
 # Pinning test for tic_tac_toe.stk demo.
 # Compliance: docs/STYLE_GUIDE.md
 
-my @LINES = (
+val @LINES = (
     [0,1,2], [3,4,5], [6,7,8],
     [0,3,6], [1,4,7], [2,5,8],
     [0,4,8], [2,4,6],
 )
 
 fn TTT::winner($board) {
-    for my $line (@LINES) {
-        my $aa  = $board->[$line->[0]]
-        my $bb = $board->[$line->[1]]
-        my $cc = $board->[$line->[2]]
+    for val $line (@LINES) {
+        val $aa  = $board->[$line->[0]]
+        val $bb = $board->[$line->[1]]
+        val $cc = $board->[$line->[2]]
         if ($aa ne "." && $aa eq $bb && $aa eq $cc) {
             return $aa
         }
@@ -22,38 +22,38 @@ fn TTT::winner($board) {
 }
 
 fn TTT::full($board) {
-    for my $cell (@$board) {
+    for val $cell (@$board) {
         return 0 if $cell eq "."
     }
     1
 }
 
 fn TTT::status($board) {
-    my $w = TTT::winner($board)
+    val $w = TTT::winner($board)
     return "win:$w" if $w ne "."
     return "draw" if TTT::full($board)
     "in_progress"
 }
 
 fn TTT::available($board) {
-    my @out = ()
-    my $n = len @$board
-    for my $i (0:$n-1) {
+    var @out = ()
+    val $n = len @$board
+    for val $i (0:$n-1) {
         push @out, $i if $board->[$i] eq "."
     }
     \@out
 }
 
 fn TTT::play($board, $pos, $mark) {
-    my @new = ()
-    for my $x (@$board) { push @new, $x }
+    var @new = ()
+    for val $x (@$board) { push @new, $x }
     $new[$pos] = $mark
     \@new
 }
 
 # ── Empty board ──────────────────────────────────────────────────────────
 
-my $empty = [".",".",".",".",".",".",".",".","."]
+val $empty = [".",".",".",".",".",".",".",".","."]
 TTT::winner($empty)  |> aeq ".",            "empty: no winner"
 TTT::full($empty)    |> aeq 0,              "empty: not full"
 TTT::status($empty)  |> aeq "in_progress",  "empty: in progress"
@@ -82,25 +82,25 @@ TTT::winner(["X","O","X","X","O","O","O","X","X"]) |> aeq ".", "draw: no winner"
 
 # ── Draw detection ───────────────────────────────────────────────────────
 
-my $draw = ["X","X","O","O","O","X","X","O","X"]
+val $draw = ["X","X","O","O","O","X","X","O","X"]
 TTT::full($draw)   |> aeq 1,      "draw: full"
 TTT::status($draw) |> aeq "draw", "draw: status"
 
 # ── Available cells ──────────────────────────────────────────────────────
 
-my $partial = ["X",".","O",".","X",".","O",".","."]
-my $avail   = TTT::available($partial)
+val $partial = ["X",".","O",".","X",".","O",".","."]
+val $avail   = TTT::available($partial)
 len(@$avail) |> aeq 5,  "5 cells available"
 join(",", @$avail) |> aeq "1,3,5,7,8", "specific positions"
 
 # ── play() is immutable (returns new board) ──────────────────────────────
 
-my $b0 = [".",".",".",".",".",".",".",".","."]
-my $b1 = TTT::play($b0, 4, "X")
+val $b0 = [".",".",".",".",".",".",".",".","."]
+val $b1 = TTT::play($b0, 4, "X")
 $b1->[4] |> aeq "X", "play sets cell"
 $b0->[4] |> aeq ".", "original unmodified"
 
-my $b2 = TTT::play($b1, 0, "O")
+val $b2 = TTT::play($b1, 0, "O")
 $b2->[0] |> aeq "O", "play 2nd move"
 $b2->[4] |> aeq "X", "first move preserved"
 
@@ -109,8 +109,8 @@ $b2->[4] |> aeq "X", "first move preserved"
 TTT::status(["X","X",".",".","O",".",".",".","."]) |> aeq "in_progress", "early game"
 
 # Winning move test
-my $almost = ["X","X",".",".","O",".",".",".","O"]
-my $win    = TTT::play($almost, 2, "X")
+val $almost = ["X","X",".",".","O",".",".",".","O"]
+val $win    = TTT::play($almost, 2, "X")
 TTT::status($win) |> aeq "win:X", "winning move"
 
 # ── Mark consistency ─────────────────────────────────────────────────────

@@ -2,7 +2,7 @@
 # Rosetta Code: Verhoeff algorithm
 
 fn Rosetta::Verhoeff::generate_tables() {
-    my @d = (
+    val @d = (
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
         [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
@@ -15,7 +15,7 @@ fn Rosetta::Verhoeff::generate_tables() {
         [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
     )
     
-    my @p = (
+    val @p = (
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
         [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
@@ -26,17 +26,17 @@ fn Rosetta::Verhoeff::generate_tables() {
         [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
     )
     
-    my @inv = (0, 4, 3, 2, 1, 5, 6, 7, 8, 9)
+    val @inv = (0, 4, 3, 2, 1, 5, 6, 7, 8, 9)
     
     (\@d, \@p, \@inv)
 }
 
 fn Rosetta::Verhoeff::validate($number) {
-    my ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
-    my @digits = $number |> chars() |> rev() |> map {int}
+    var ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
+    val @digits = $number |> chars() |> rev() |> map {int}
     
-    my $c = 0
-    for (my $i = 0; $i < len(@digits); $i++) {
+    var $c = 0
+    for (var $i = 0; $i < len(@digits); $i++) {
         $c = $d->[$c]->[$p->[$i % 8]->[$digits[$i]]]
     }
     
@@ -44,11 +44,11 @@ fn Rosetta::Verhoeff::validate($number) {
 }
 
 fn Rosetta::Verhoeff::generate_checksum($number) {
-    my ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
-    my @digits = $number |> chars() |> rev() |> map {int}
+    val ($d, $p, $inv) = Rosetta::Verhoeff::generate_tables()
+    val @digits = $number |> chars() |> rev() |> map {int}
     
-    my $c = 0
-    for (my $i = 0; $i < len(@digits); $i++) {
+    var $c = 0
+    for (var $i = 0; $i < len(@digits); $i++) {
         $c = $d->[$c]->[$p->[($i + 1) % 8]->[$digits[$i]]]
     }
     
@@ -59,7 +59,7 @@ assert_eq Rosetta::Verhoeff::validate("236"), 1, "validate 236 (example)"
 assert_eq Rosetta::Verhoeff::generate_checksum("236"), 3, "checksum of 236 is 3"
 assert_eq Rosetta::Verhoeff::validate("2363"), 1, "validate 2363"
 assert_eq Rosetta::Verhoeff::validate("12345"), 0, "validate 12345 is false"
-my $ck = Rosetta::Verhoeff::generate_checksum("12345")
+val $ck = Rosetta::Verhoeff::generate_checksum("12345")
 assert_eq Rosetta::Verhoeff::validate("12345$ck"), 1, "validate 12345 with its checksum"
 
 test_run

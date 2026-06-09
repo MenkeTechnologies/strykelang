@@ -4,11 +4,11 @@
 # and SI (K, M, G, …) families. Returns the scaled integer (or float).
 
 fn Rosetta::Suffixation::factor($suf) {
-    my %iec = (
+    val %iec = (
         Ki => 1024, Mi => 1024 ** 2, Gi => 1024 ** 3,
         Ti => 1024 ** 4, Pi => 1024 ** 5, Ei => 1024 ** 6,
     )
-    my %si = (
+    val %si = (
         K => 1e3, M => 1e6, G => 1e9, T => 1e12, P => 1e15, E => 1e18,
     )
     return $iec{$suf} if exists $iec{$suf}
@@ -18,10 +18,10 @@ fn Rosetta::Suffixation::factor($suf) {
 
 fn Rosetta::Suffixation::apply($s) {
     return undef unless $s =~ /^\s*(-?\d+(?:\.\d+)?)\s*([KMGTPE]i?)?\s*$/
-    my $val = $1 + 0
-    my $suf = $2
+    val $val = $1 + 0
+    val $suf = $2
     return $val if !defined $suf || len($suf) == 0
-    my $f = Rosetta::Suffixation::factor($suf)
+    val $f = Rosetta::Suffixation::factor($suf)
     return undef unless defined $f
     $val * $f
 }

@@ -1,20 +1,20 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Dining philosophers
 
-my @forks
-for (my $i = 0; $i < 5; $i++) {
-    my ($tx, $rx) = pchannel(1)
+var @forks
+for (var $i = 0; $i < 5; $i++) {
+    val ($tx, $rx) = pchannel(1)
     $tx->send(1) # Fork is available
     push @forks, { tx => $tx, rx => $rx }
 }
 
-my $count = 10
-my ($done_tx, $done_rx) = pchannel(5)
+val $count = 10
+val ($done_tx, $done_rx) = pchannel(5)
 
 # Create a function to spawn a philosopher, ensuring correct closure capture
 fn Rosetta::Dining::start_philosopher($id, $f1_tx, $f1_rx, $f2_tx, $f2_rx, $done_tx, $count) {
     spawn {
-        for (my $j = 0; $j < $count; $j++) {
+        for (var $j = 0; $j < $count; $j++) {
             # Think
             sleep rand(0.01)
             
@@ -38,9 +38,9 @@ fn Rosetta::Dining::start_philosopher($id, $f1_tx, $f1_rx, $f2_tx, $f2_rx, $done
     }
 }
 
-for (my $i = 0; $i < 5; $i++) {
-    my $left_idx = $i
-    my $right_idx = ($i + 1) % 5
+for (var $i = 0; $i < 5; $i++) {
+    val $left_idx = $i
+    val $right_idx = ($i + 1) % 5
     
     Rosetta::Dining::start_philosopher(
         $i,
@@ -53,13 +53,13 @@ for (my $i = 0; $i < 5; $i++) {
     )
 }
 
-my @finished
-for (my $i = 0; $i < 5; $i++) {
+var @finished
+for (var $i = 0; $i < 5; $i++) {
     push @finished, $done_rx->recv()
 }
 
 assert_eq len(@finished), 5, "all 5 philosophers finished"
-my @sorted = sort { _0 <=> _1 } @finished
+val @sorted = sort { _0 <=> _1 } @finished
 assert_eq join(",", @sorted), "0,1,2,3,4", "each philosopher finished once"
 
 test_run

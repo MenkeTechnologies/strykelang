@@ -19,53 +19,53 @@
 # ── Mo's algorithm: distinct-element count over each query range ──
 
 fn Mo::distinct_count($arr, $queries) {
-    my $n = len(@$arr)
-    my $q = len(@$queries)
-    my $block = $n > 0 ? int(sqrt($n)) : 1
+    val $n = len(@$arr)
+    val $q = len(@$queries)
+    var $block = $n > 0 ? int(sqrt($n)) : 1
     $block = 1 if $block < 1
     # Stamp each query with its index so we can restore original order.
-    my @stamped
-    for my $i (0:$q - 1) {
-        my $ql = $queries->[$i]->[0]
-        my $qr = $queries->[$i]->[1]
+    var @stamped
+    for val $i (0:$q - 1) {
+        val $ql = $queries->[$i]->[0]
+        val $qr = $queries->[$i]->[1]
         push @stamped, [$ql, $qr, $i]
     }
     @stamped = sort {
-        my $ba = int(_0->[0] / $block)
-        my $bb = int(_1->[0] / $block)
+        val $ba = int(_0->[0] / $block)
+        val $bb = int(_1->[0] / $block)
         $ba != $bb ? $ba <=> $bb : _0->[1] <=> _1->[1]
     } @stamped
-    my @ans = (0) x $q
-    my %freq
-    my $cur_l = 0
-    my $cur_r = -1
-    my $distinct = 0
-    for my $sq (@stamped) {
-        my $ql = $sq->[0]
-        my $qr = $sq->[1]
-        my $idx = $sq->[2]
+    var @ans = (0) x $q
+    var %freq
+    var $cur_l = 0
+    var $cur_r = -1
+    var $distinct = 0
+    for val $sq (@stamped) {
+        val $ql = $sq->[0]
+        val $qr = $sq->[1]
+        val $idx = $sq->[2]
         while ($cur_r < $qr) {
             $cur_r++
-            my $v = $arr->[$cur_r]
+            val $v = $arr->[$cur_r]
             $freq{$v} = 0 unless exists $freq{$v}
             $distinct++ if $freq{$v} == 0
             $freq{$v}++
         }
         while ($cur_r > $qr) {
-            my $v = $arr->[$cur_r]
+            val $v = $arr->[$cur_r]
             $freq{$v}--
             $distinct-- if $freq{$v} == 0
             $cur_r--
         }
         while ($cur_l < $ql) {
-            my $v = $arr->[$cur_l]
+            val $v = $arr->[$cur_l]
             $freq{$v}--
             $distinct-- if $freq{$v} == 0
             $cur_l++
         }
         while ($cur_l > $ql) {
             $cur_l--
-            my $v = $arr->[$cur_l]
+            val $v = $arr->[$cur_l]
             $freq{$v} = 0 unless exists $freq{$v}
             $distinct++ if $freq{$v} == 0
             $freq{$v}++
@@ -78,10 +78,10 @@ fn Mo::distinct_count($arr, $queries) {
 # ── brute O(q · n) reference ─────────────────────────────────────
 
 fn Mo::brute_distinct($arr, $queries) {
-    my @ans
-    for my $q (@$queries) {
-        my %seen
-        for my $i ($q->[0]:$q->[1]) {
+    var @ans
+    for val $q (@$queries) {
+        var %seen
+        for val $i ($q->[0]:$q->[1]) {
             $seen{$arr->[$i]} = 1
         }
         push @ans, len(keys %seen)
@@ -91,7 +91,7 @@ fn Mo::brute_distinct($arr, $queries) {
 
 # ── primary test cases ──────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name    => "all distinct",
         arr     => [1, 2, 3, 4, 5, 6, 7, 8],
@@ -127,10 +127,10 @@ my @cases = (
 p "── Mo's-algorithm distinct-count demo ────────────────"
 printf "  %-22s  %5s  %5s  %s\n", "case", "n", "q", "answers (l..r → distinct)"
 printf "  %-22s  %5s  %5s  %s\n", "----------------------", "-----", "-----", "------------------------"
-for my $c (@cases) {
-    my $r = Mo::distinct_count($c->{arr}, $c->{queries})
-    my @parts
-    for my $i (0:len(@$r) - 1) {
+for val $c (@cases) {
+    val $r = Mo::distinct_count($c->{arr}, $c->{queries})
+    var @parts
+    for val $i (0:len(@$r) - 1) {
         push @parts, "#{$c->{queries}->[$i]->[0]}..#{$c->{queries}->[$i]->[1]}→#{$r->[$i]}"
     }
     printf "  %-22s  %5d  %5d  %s\n",
@@ -140,25 +140,25 @@ for my $c (@cases) {
 
 # ── invariant 1: Mo answers agree with brute force on every case ──
 
-for my $c (@cases) {
-    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
-    my $br = Mo::brute_distinct($c->{arr}, $c->{queries})
-    my $q = len(@$mo)
-    for my $i (0:$q - 1) {
+for val $c (@cases) {
+    val $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    val $br = Mo::brute_distinct($c->{arr}, $c->{queries})
+    val $q = len(@$mo)
+    for val $i (0:$q - 1) {
         die "case \"#{$c->{name}}\" query #{$i}: mo=#{$mo->[$i]} brute=#{$br->[$i]}" unless $mo->[$i] == $br->[$i]
     }
 }
 
 # ── invariant 2: distinct count ≤ range width and ≤ alphabet size ─
 
-for my $c (@cases) {
-    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
-    my %alpha
-    for my $v (@{$c->{arr}}) { $alpha{$v} = 1 }
-    my $alpha_size = len(keys %alpha)
-    for my $i (0:len(@$mo) - 1) {
-        my $q = $c->{queries}->[$i]
-        my $width = $q->[1] - $q->[0] + 1
+for val $c (@cases) {
+    val $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    var %alpha
+    for val $v (@{$c->{arr}}) { $alpha{$v} = 1 }
+    val $alpha_size = len(keys %alpha)
+    for val $i (0:len(@$mo) - 1) {
+        val $q = $c->{queries}->[$i]
+        val $width = $q->[1] - $q->[0] + 1
         die "distinct #{$mo->[$i]} > width #{$width}" unless $mo->[$i] <= $width
         die "distinct #{$mo->[$i]} > alphabet #{$alpha_size}" unless $mo->[$i] <= $alpha_size
     }
@@ -166,43 +166,43 @@ for my $c (@cases) {
 
 # ── invariant 3: distinct count ≥ 1 for any non-empty range ───────
 
-for my $c (@cases) {
-    my $mo = Mo::distinct_count($c->{arr}, $c->{queries})
-    for my $i (0:len(@$mo) - 1) {
+for val $c (@cases) {
+    val $mo = Mo::distinct_count($c->{arr}, $c->{queries})
+    for val $i (0:len(@$mo) - 1) {
         die "distinct count must be ≥ 1, got #{$mo->[$i]}" unless $mo->[$i] >= 1
     }
 }
 
 # ── invariant 4: a query covering the full array == total distinct ─
 
-for my $c (@cases) {
-    my $n = len(@{$c->{arr}})
-    my $full = Mo::distinct_count($c->{arr}, [[0, $n - 1]])
-    my %alpha
-    for my $v (@{$c->{arr}}) { $alpha{$v} = 1 }
+for val $c (@cases) {
+    val $n = len(@{$c->{arr}})
+    val $full = Mo::distinct_count($c->{arr}, [[0, $n - 1]])
+    var %alpha
+    for val $v (@{$c->{arr}}) { $alpha{$v} = 1 }
     die "full-range distinct mismatch on \"#{$c->{name}}\"" unless $full->[0] == len(keys %alpha)
 }
 
 # ── invariant 5: a single-element range has distinct = 1 ──────────
 
-for my $c (@cases) {
-    my $n = len(@{$c->{arr}})
-    my @qs
-    for my $i (0:$n - 1) { push @qs, [$i, $i] }
-    my $r = Mo::distinct_count($c->{arr}, \@qs)
-    for my $v (@$r) {
+for val $c (@cases) {
+    val $n = len(@{$c->{arr}})
+    var @qs
+    for val $i (0:$n - 1) { push @qs, [$i, $i] }
+    val $r = Mo::distinct_count($c->{arr}, \@qs)
+    for val $v (@$r) {
         die "single-element distinct must be 1, got #{$v}" unless $v == 1
     }
 }
 
 # ── invariant 6: ordering of queries doesn't affect the answer ────
 
-for my $c (@cases) {
-    my $forward = Mo::distinct_count($c->{arr}, $c->{queries})
-    my @reverse_qs = rev @{$c->{queries}}
-    my $reverse = Mo::distinct_count($c->{arr}, \@reverse_qs)
-    my $q = len(@$forward)
-    for my $i (0:$q - 1) {
+for val $c (@cases) {
+    val $forward = Mo::distinct_count($c->{arr}, $c->{queries})
+    val @reverse_qs = rev @{$c->{queries}}
+    val $reverse = Mo::distinct_count($c->{arr}, \@reverse_qs)
+    val $q = len(@$forward)
+    for val $i (0:$q - 1) {
         die "order-dependence on \"#{$c->{name}}\": forward[#{$i}]=#{$forward->[$i]} reverse[#{$q - 1 - $i}]=#{$reverse->[$q - 1 - $i]}" unless $forward->[$i] == $reverse->[$q - 1 - $i]
     }
 }

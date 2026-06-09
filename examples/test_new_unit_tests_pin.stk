@@ -21,17 +21,17 @@ fn Math::subtract($x, $y) { $x - $y }
 # ── 2. Topic Variants and Positional Arguments ──────────────────────────────
 
 # Positional arguments _, _1
-my $add3 = fn { _ + _1 + _2 }
+val $add3 = fn { _ + _1 + _2 }
 $add3(1, 2, 3) |> aeq 6, "Positional _, _1, _2"
 
 # Outer scope topic _<
-my @r = ~> (1:2) map { 
+val @r = ~> (1:2) map { 
     ~> (10:11) map { _ + _< }
 } |> flatten
 @r |> join(",") |> aeq "11,12,12,13", "Outer scope topic _<"
 
 # Indexed outer topic _<2
-my @r2 = ~> (100:100) map {
+val @r2 = ~> (100:100) map {
     ~> (10:10) map {
         ~> (1:1) map { _ + _< + _<2 }
     }
@@ -49,7 +49,7 @@ class Point {
     }
 }
 
-my $p = Point(x => 3, y => 4)
+val $p = Point(x => 3, y => 4)
 $p->mag_sq() |> aeq 25, "Class methods"
 
 # Enums and Match
@@ -64,7 +64,7 @@ fn TrafficLight::action($c) {
 TrafficLight::action(TrafficLight::Red) |> aeq "stop", "Enum match"
 
 # Try/Catch
-my $caught = 0
+var $caught = 0
 try {
     die "error"
 } catch ($e) {
@@ -73,7 +73,7 @@ try {
 $caught |> aok "Try/Catch works"
 
 # retry
-my $tries = 0
+var $tries = 0
 retry { $tries++; die "fail" if $tries < 3; 42 } times => 5, backoff => none |> aeq 42, "retry works"
 $tries |> aeq 3, "retry count"
 
@@ -84,9 +84,9 @@ $@ |> aok "eval_timeout sets $@"
 # ── 3.5 len() for various types ─────────────────────────────────────────────
 
 len("abc") |> aeq 3, "len(string)"
-my @arr = (1, 2, 3);
+val @arr = (1, 2, 3);
 len(@arr) |> aeq 3, "len(array)"
-my %h = (a => 1, b => 2);
+val %h = (a => 1, b => 2);
 len(keys %h) |> aeq 2, "len(hash)"
 
 
@@ -122,13 +122,13 @@ ai_mock_clear()
 
 # ── 7. Native Sets ─────────────────────────────────────────────────────────
 
-my $s = set(1, 2, 2, 3)
+val $s = set(1, 2, 2, 3)
 $s->size() |> aeq 3, "Set size (deduped)"
 $s->has(2) |> aok "Set has element"
 
 # ── 8. Byte vs Codepoint coordinates ───────────────────────────────────────
 
-my $str = "a─b" # ─ is 3 bytes
+val $str = "a─b" # ─ is 3 bytes
 length($str) |> aeq 5, "Perl-compat length (bytes)"
 len($str)    |> aeq 3, "Stryke len (codepoints)"
 

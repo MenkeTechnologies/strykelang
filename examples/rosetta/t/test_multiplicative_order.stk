@@ -10,7 +10,7 @@ fn Rosetta::MultOrder::gcd($a, $b) {
 }
 
 fn Rosetta::MultOrder::pow_mod($base, $exp, $mod) {
-    my $r = 1
+    var $r = 1
     $base = $base % $mod
     while ($exp > 0) {
         $r = ($r * $base) % $mod if ($exp & 1)
@@ -22,8 +22,8 @@ fn Rosetta::MultOrder::pow_mod($base, $exp, $mod) {
 
 fn Rosetta::MultOrder::compute($a, $n) {
     return -1 if Rosetta::MultOrder::gcd($a, $n) != 1
-    my $k = 1
-    my $cur = $a % $n
+    var $k = 1
+    var $cur = $a % $n
     while ($cur != 1) {
         $cur = ($cur * $a) % $n
         $k++
@@ -47,18 +47,18 @@ assert_eq Rosetta::MultOrder::compute(2, 4), -1, "ord_4(2) undefined"
 assert_eq Rosetta::MultOrder::compute(6, 9), -1, "ord_9(6) undefined"
 
 # Property: a^ord ≡ 1 (mod n)
-my @as = (2, 3, 5, 7, 11)
-for my $a (@as) {
-    my $o = Rosetta::MultOrder::compute($a, 17)
+val @as = (2, 3, 5, 7, 11)
+for val $a (@as) {
+    val $o = Rosetta::MultOrder::compute($a, 17)
     assert_eq Rosetta::MultOrder::pow_mod($a, $o, 17), 1, sprintf("a=%d^ord ≡ 1 mod 17", $a)
 }
 
 # Property: ord divides φ(n). For n = 17 (prime), φ = 16, valid orders divide 16.
-my @divisors_of_16 = (1, 2, 4, 8, 16)
-for my $a (~> 1:16) {
-    my $o = Rosetta::MultOrder::compute($a, 17)
-    my $div_ok = 0
-    for my $d (@divisors_of_16) { $div_ok = 1 if $o == $d }
+val @divisors_of_16 = (1, 2, 4, 8, 16)
+for val $a (~> 1:16) {
+    val $o = Rosetta::MultOrder::compute($a, 17)
+    var $div_ok = 0
+    for val $d (@divisors_of_16) { $div_ok = 1 if $o == $d }
     assert_eq $div_ok, 1, sprintf("ord_17(%d) divides 16", $a)
 }
 

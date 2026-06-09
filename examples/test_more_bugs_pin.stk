@@ -3,14 +3,14 @@
 # Pinning tests for various bugs from BUGS.md
 
 # Pinning test for BUG-089: Closures capture outer-scope `my` vars by value
-my $val = 10;
+val $val = 10;
 fn Pin::MoreBugs::reader() {
-    my $local_val = $val;
+    var $local_val = $val;
     $local_val = 20; # modify local copy
     return $val; # return original outer scope value
 }
 
-my $read_val = Pin::MoreBugs::reader();
+val $read_val = Pin::MoreBugs::reader();
 
 aeq($read_val, 10, "BUG-089: closure should read the original value");
 aeq($val, 10, "BUG-089: outer scope variable should not be modified");
@@ -20,9 +20,9 @@ fn Pin::MoreBugs::call_it($code, @args) {
     $code(@args);
 }
 
-my $sum = 0;
+var $sum = 0;
 fn Pin::MoreBugs::summer(@nums) {
-    for my $n (@nums) {
+    for val $n (@nums) {
         $sum += $n;
     }
 }
@@ -30,16 +30,16 @@ fn Pin::MoreBugs::summer(@nums) {
 Pin::MoreBugs::call_it(\&Pin::MoreBugs::summer, 1, 2, 3);
 
 # According to bug, @args is flattened to a scalar count, so Pin::MoreBugs::summer receives `3` instead of `(1, 2, 3)`.
-# The loop `for my $n (3)` will execute once with $n=3.
+# The loop `for var $n (3)` will execute once with $n=3.
 aeq($sum, 3, "BUG-037: captured coderef gets scalar count of args");
 
 
 # BUG-140 (FIXED): sum() and product() now unwrap arrayref arguments instead
 # of returning 0. `sum([10,11,12])` returns 33; `product([6,7])` returns 42.
-my $s = sum([10, 11, 12]);
+val $s = sum([10, 11, 12]);
 aeq($s, 33, "BUG-140 (FIXED): sum([10, 11, 12]) unwraps arrayref");
 
-my $p = product([6, 7]);
+val $p = product([6, 7]);
 aeq($p, 42, "BUG-140 (FIXED): product([6, 7]) unwraps arrayref");
 
 test_run

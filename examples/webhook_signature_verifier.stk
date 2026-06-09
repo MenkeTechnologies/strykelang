@@ -26,8 +26,8 @@ p "── Webhook Signature Verifier ──────────────�
 # ── 1. Sender side ─────────────────────────────────────────────────
 
 fn Webhook::sign($secret, $body, $timestamp = time()) {
-    my $payload = "$timestamp.$body"
-    my $sig     = hmac_sha256 $secret, $payload
+    val $payload = "$timestamp.$body"
+    val $sig     = hmac_sha256 $secret, $payload
     +{ ts => $timestamp, sig => $sig, header => "t=$timestamp,v1=$sig" }
 }
 
@@ -35,8 +35,8 @@ fn Webhook::sign($secret, $body, $timestamp = time()) {
 
 fn Webhook::eq_constant_time($a, $b) {
     return 0 if len($a) != len($b)
-    my $diff = 0
-    for my $i (0:len($a) - 1) {
+    var $diff = 0
+    for val $i (0:len($a) - 1) {
         $diff |= ord($a[$i]) ^ ord($b[$i])
     }
     $diff == 0
@@ -44,37 +44,37 @@ fn Webhook::eq_constant_time($a, $b) {
 
 # ── 3. Receiver state — secret + seen-set for replay protection ───
 
-my %verifier = (
+val %verifier = (
     secret      => "the-quick-brown-fox-jumps",
     max_age_sec => 300,         # 5 minutes
     seen        => {},          # sig => 1, to detect replays
 )
 
 fn Webhook::parse_header($header) {
-    my %h
-    for my $pair (split /,/, $header) {
-        my ($k, $v) = split /=/, $pair, 2
+    var %h
+    for val $pair (split /,/, $header) {
+        val ($k, $v) = split /=/, $pair, 2
         $h{$k} = $v
     }
     +{ ts => $h{t} // "", sig => $h{v1} // "" }
 }
 
 fn Webhook::verify($body, $header, $now = time()) {
-    my $parsed = Webhook::parse_header $header
+    val $parsed = Webhook::parse_header $header
 
     return +{ ok => 0, reason => "malformed: missing t"  } unless len $parsed->{ts}
     return +{ ok => 0, reason => "malformed: missing v1" } unless len $parsed->{sig}
 
-    my $ts = 0 + $parsed->{ts}
+    val $ts = 0 + $parsed->{ts}
     return +{ ok => 0, reason => "non-numeric timestamp" } if $ts == 0 && $parsed->{ts} ne "0"
 
-    my $age = $now - $ts
+    val $age = $now - $ts
     return +{ ok => 0, reason => "stale: age $age sec > $verifier{max_age_sec}" } if $age > $verifier{max_age_sec}
     return +{ ok => 0, reason => "future-dated: age $age sec" } if $age < -10
 
     return +{ ok => 0, reason => "replay: signature already seen" } if $verifier{seen}{ $parsed->{sig} }
 
-    my $expected = hmac_sha256 $verifier{secret}, "$ts.$body"
+    val $expected = hmac_sha256 $verifier{secret}, "$ts.$body"
     return +{ ok => 0, reason => "signature mismatch" } \
         unless Webhook::eq_constant_time $expected, $parsed->{sig}
 
@@ -84,51 +84,51 @@ fn Webhook::verify($body, $header, $now = time()) {
 
 # ── 4. Walk through realistic scenarios ───────────────────────────
 
-my $body = '{"event":"payment.succeeded","amount":4200,"currency":"usd"}'
-my $now  = 1716572000
+val $body = '{"event":"payment.succeeded","amount":4200,"currency":"usd"}'
+val $now  = 1716572000
 
 p "Body: $body"
 p ""
 
 # ── Case 1: legitimate request, fresh timestamp
-my $signed = Webhook::sign $verifier{secret}, $body, $now - 5
+val $signed = Webhook::sign $verifier{secret}, $body, $now - 5
 p "Case 1: legitimate webhook"
 p "  header → $signed->{header}"
-my $r1 = Webhook::verify $body, $signed->{header}, $now
+val $r1 = Webhook::verify $body, $signed->{header}, $now
 p "  result → " . ($r1->{ok} ? "ACCEPTED (age $r1->{age}s)" : "REJECTED: $r1->{reason}")
 
 # ── Case 2: same legitimate request resent (replay)
 p ""
 p "Case 2: replay attack (same signature, second time)"
-my $r2 = Webhook::verify $body, $signed->{header}, $now
+val $r2 = Webhook::verify $body, $signed->{header}, $now
 p "  result → " . ($r2->{ok} ? "ACCEPTED" : "REJECTED: $r2->{reason}")
 
 # ── Case 3: tampered body, original signature
 p ""
 p "Case 3: attacker tampered the body but kept the signature"
-my $tampered = '{"event":"payment.succeeded","amount":99999999,"currency":"usd"}'
-my $signed3  = Webhook::sign $verifier{secret}, $body, $now - 10
-my $r3       = Webhook::verify $tampered, $signed3->{header}, $now
+val $tampered = '{"event":"payment.succeeded","amount":99999999,"currency":"usd"}'
+val $signed3  = Webhook::sign $verifier{secret}, $body, $now - 10
+val $r3       = Webhook::verify $tampered, $signed3->{header}, $now
 p "  result → " . ($r3->{ok} ? "ACCEPTED" : "REJECTED: $r3->{reason}")
 
 # ── Case 4: wrong secret
 p ""
 p "Case 4: signed with the wrong secret"
-my $bad = Webhook::sign "not-the-real-secret", $body, $now - 10
-my $r4  = Webhook::verify $body, $bad->{header}, $now
+val $bad = Webhook::sign "not-the-real-secret", $body, $now - 10
+val $r4  = Webhook::verify $body, $bad->{header}, $now
 p "  result → " . ($r4->{ok} ? "ACCEPTED" : "REJECTED: $r4->{reason}")
 
 # ── Case 5: stale request (older than max_age)
 p ""
 p "Case 5: stale timestamp (10 minutes old, allowed window is 5)"
-my $stale = Webhook::sign $verifier{secret}, $body, $now - 600
-my $r5    = Webhook::verify $body, $stale->{header}, $now
+val $stale = Webhook::sign $verifier{secret}, $body, $now - 600
+val $r5    = Webhook::verify $body, $stale->{header}, $now
 p "  result → " . ($r5->{ok} ? "ACCEPTED" : "REJECTED: $r5->{reason}")
 
 # ── Case 6: malformed header
 p ""
 p "Case 6: malformed header (no v1)"
-my $r6 = Webhook::verify $body, "t=$now", $now
+val $r6 = Webhook::verify $body, "t=$now", $now
 p "  result → " . ($r6->{ok} ? "ACCEPTED" : "REJECTED: $r6->{reason}")
 
 # ── 5. Tests ───────────────────────────────────────────────────────

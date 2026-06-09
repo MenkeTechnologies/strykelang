@@ -10,18 +10,18 @@ fn Tk::is_alnum($c) = $c =~ /^[A-Za-z0-9_]$/
 fn Tk::is_space($c) = $c =~ /^\s$/
 
 fn Tk::lex($src) {
-    my @toks = ()
-    my @chars = split(//, $src)
-    my $i = 0
-    my $n = len @chars
+    var @toks = ()
+    val @chars = split(//, $src)
+    var $i = 0
+    val $n = len @chars
     while ($i < $n) {
-        my $c = $chars[$i]
+        val $c = $chars[$i]
         if (Tk::is_space($c)) {
             $i++
             next
         }
         if (Tk::is_digit($c)) {
-            my $j = $i
+            var $j = $i
             while ($j < $n && Tk::is_digit($chars[$j])) {
                 $j++
             }
@@ -38,18 +38,18 @@ fn Tk::lex($src) {
             next
         }
         if (Tk::is_alpha($c)) {
-            my $j = $i
+            var $j = $i
             while ($j < $n && Tk::is_alnum($chars[$j])) {
                 $j++
             }
-            my $word = join("", @chars[$i:$j-1])
-            my $type = $word =~ /^(if|else|while|for|fn|return|true|false)$/ ? "KW" : "ID"
+            val $word = join("", @chars[$i:$j-1])
+            var $type = $word =~ /^(if|else|while|for|fn|return|true|false)$/ ? "KW" : "ID"
             push @toks, [$type, $word]
             $i = $j
             next
         }
         if ($c eq "\"") {
-            my $j = $i + 1
+            var $j = $i + 1
             while ($j < $n && $chars[$j] ne "\"") {
                 $j++
             }
@@ -98,33 +98,33 @@ Tk::vals(Tk::lex("42"))        |> aeq "42",      "single int val"
 Tk::types(Tk::lex("3.14"))     |> aeq "FLOAT",   "float"
 Tk::vals(Tk::lex("3.14"))      |> aeq "3.14",    "float val"
 
-my $t1 = Tk::lex("1 + 2")
+val $t1 = Tk::lex("1 + 2")
 Tk::types($t1) |> aeq "INT,OP,INT",  "1 + 2 types"
 Tk::vals($t1)  |> aeq "1,+,2",       "1 + 2 vals"
 
-my $t2 = Tk::lex("foo(1, 2)")
+val $t2 = Tk::lex("foo(1, 2)")
 Tk::types($t2) |> aeq "ID,PAREN,INT,PUNCT,INT,PAREN", "call types"
 Tk::vals($t2)  |> aeq "foo,(,1,,,2,)", "call vals"
 
-my $t3 = Tk::lex("if x == 10")
+val $t3 = Tk::lex("if x == 10")
 Tk::types($t3) |> aeq "KW,ID,CMP,INT", "if-equal"
 Tk::vals($t3)  |> aeq "if,x,==,10",    "if-equal vals"
 
-my $t4 = Tk::lex("a >= b")
+val $t4 = Tk::lex("a >= b")
 Tk::types($t4) |> aeq "ID,CMP,ID", "ge"
 Tk::vals($t4)  |> aeq "a,>=,b",     "ge vals"
 
-my $t5 = Tk::lex("\"hello world\"")
+val $t5 = Tk::lex("\"hello world\"")
 Tk::types($t5) |> aeq "STR",         "string"
 Tk::vals($t5)  |> aeq "hello world", "string val"
 
-my $t6 = Tk::lex("fn add(x, y) { return x + y }")
+val $t6 = Tk::lex("fn add(x, y) { return x + y }")
 Tk::types($t6) |> aeq "KW,ID,PAREN,ID,PUNCT,ID,PAREN,PUNCT,KW,ID,OP,ID,PUNCT", "fn def"
 
-my $t7 = Tk::lex("true || false && !x")
+val $t7 = Tk::lex("true || false && !x")
 Tk::vals($t7) |> aeq "true,|,|,false,&,&,!,x", "logical chars"
 
-my $t8 = Tk::lex("123 + 4.5 * x")
+val $t8 = Tk::lex("123 + 4.5 * x")
 Tk::types($t8) |> aeq "INT,OP,FLOAT,OP,ID", "mixed types"
 
 Tk::types(Tk::lex(";;,,{{}}")) |> aeq "PUNCT,PUNCT,PUNCT,PUNCT,PUNCT,PUNCT,PUNCT,PUNCT", "puncts"
@@ -136,7 +136,7 @@ Tk::vals(Tk::lex("  1  +  \t 2  \n + 3 "))
 # Counts
 fn Tk::count($toks, $type) = len grep { $_->[0] eq $type } @$toks
 
-my $big = Tk::lex("a + b * (c - d) / e + f - g")
+val $big = Tk::lex("a + b * (c - d) / e + f - g")
 Tk::count($big, "ID")    |> aeq 7, "7 ids"
 Tk::count($big, "OP")    |> aeq 6, "6 ops"
 Tk::count($big, "PAREN") |> aeq 2, "2 parens"

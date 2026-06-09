@@ -12,7 +12,7 @@ assert_eq Exercism::LargestSeriesProduct::largest_product("12345", 1),          
 assert_eq Exercism::LargestSeriesProduct::largest_product("",       0),             1,     "empty zero-window"
 assert_eq Exercism::LargestSeriesProduct::largest_product("123",    0),             1,     "zero-window"
 
-my $err = eval { Exercism::LargestSeriesProduct::largest_product("123", 4); 0 } || $@
+var $err = eval { Exercism::LargestSeriesProduct::largest_product("123", 4); 0 } || $@
 assert_ok $err =~ /smaller than/, "window too big"
 $err = eval { Exercism::LargestSeriesProduct::largest_product("1234a5", 2); 0 } || $@
 assert_ok $err =~ /only contain digits/, "non-digit"

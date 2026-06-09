@@ -2,9 +2,9 @@
 # Rosetta Code: Determine if a string has all unique characters
 
 fn Rosetta::UniqueChars::check_iterative($str) {
-    my @chars = split //, $str
-    my %seen
-    for my $c (@chars) {
+    val @chars = split //, $str
+    var %seen
+    for val $c (@chars) {
         return 0 if $seen{$c}
         $seen{$c} = 1
     }
@@ -12,8 +12,8 @@ fn Rosetta::UniqueChars::check_iterative($str) {
 }
 
 fn Rosetta::UniqueChars::check_idiomatic($str) {
-    my $len = $str |> split("") |> cnt
-    my $uniq_len = $str |> split("") |> uniq |> cnt
+    val $len = $str |> split("") |> cnt
+    val $uniq_len = $str |> split("") |> uniq |> cnt
     $len == $uniq_len
 }
 

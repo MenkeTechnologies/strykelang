@@ -10,16 +10,16 @@ fn Rosetta::Pig::roll() {
 }
 
 fn Rosetta::Pig::play($strategies, $target) {
-    my @totals = (0, 0)
-    my $turn = 0
-    my $rounds = 0
+    var @totals = (0, 0)
+    var $turn = 0
+    var $rounds = 0
     while ($totals[0] < $target && $totals[1] < $target) {
         $rounds++
-        my $banked = 0
+        var $banked = 0
         while (1) {
-            my $action = $strategies->[$turn]($totals[$turn], $totals[1 - $turn], $banked)
+            val $action = $strategies->[$turn]($totals[$turn], $totals[1 - $turn], $banked)
             last if $action eq "hold"
-            my $r = Rosetta::Pig::roll()
+            val $r = Rosetta::Pig::roll()
             if ($r == 1) { $banked = 0; last }
             $banked += $r
         }
@@ -38,19 +38,19 @@ fn Rosetta::Pig::strat_hold_at($threshold) {
 }
 
 # Roll is in 1..6
-my %seen
-for my $i (~> 1:300) { $seen{Rosetta::Pig::roll()}++ }
-for my $f (1:6) {
+var %seen
+for val $i (~> 1:300) { $seen{Rosetta::Pig::roll()}++ }
+for val $f (1:6) {
     assert_ok exists($seen{$f}) && $seen{$f} > 0, "face $f appears in 300 rolls"
 }
 
 # Player who holds at 25 vs holds at 5: 25-strategy should win majority.
-my $aggro  = Rosetta::Pig::strat_hold_at(25)
-my $conservative = Rosetta::Pig::strat_hold_at(5)
-my $aggro_wins = 0
-my $conservative_wins = 0
-for my $i (~> 1:50) {
-    my $r = Rosetta::Pig::play([$aggro, $conservative], 100)
+val $aggro  = Rosetta::Pig::strat_hold_at(25)
+val $conservative = Rosetta::Pig::strat_hold_at(5)
+var $aggro_wins = 0
+var $conservative_wins = 0
+for val $i (~> 1:50) {
+    val $r = Rosetta::Pig::play([$aggro, $conservative], 100)
     if ($r->[0][0] >= 100) { $aggro_wins++ }
     else                   { $conservative_wins++ }
 }
@@ -58,14 +58,14 @@ assert_ok $aggro_wins > $conservative_wins,
     sprintf("hold-at-25 beats hold-at-5 (%d vs %d)", $aggro_wins, $conservative_wins)
 
 # Game terminates within 10k rounds
-my $always_hold = fn ($me, $opp, $banked) { "hold" }
-my $r = Rosetta::Pig::play([$always_hold, $always_hold], 1)
+val $always_hold = fn ($me, $opp, $banked) { "hold" }
+val $r = Rosetta::Pig::play([$always_hold, $always_hold], 1)
 # With both always-hold but target=1, neither ever scores; game hits safety cap.
 # Test that it returns safely.
 assert_ok defined($r), "game returns under degenerate strategy"
 
 # At least one player accumulates score across normal play
-my $r2 = Rosetta::Pig::play([$aggro, $aggro], 100)
+val $r2 = Rosetta::Pig::play([$aggro, $aggro], 100)
 assert_ok $r2->[0][0] >= 100 || $r2->[0][1] >= 100, "someone reaches 100"
 
 # Pipe form

@@ -4,23 +4,23 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 fn WC::tokenize($s) {
-    my @words = split / +/, lc($s)
+    val @words = split / +/, lc($s)
     \@words
 }
 
 fn WC::count($s) {
-    my %freq = ()
-    for my $w (@{WC::tokenize($s)}) {
+    var %freq = ()
+    for val $w (@{WC::tokenize($s)}) {
         $freq{$w} = ($freq{$w} // 0) + 1
     }
     \%freq
 }
 
 fn WC::top($freq, $n) {
-    my @keys = keys %$freq
-    my @sorted = sort { $freq->{_1} <=> $freq->{_} } @keys
-    my @top = ()
-    for my $k (@sorted[0:$n-1]) {
+    val @keys = keys %$freq
+    val @sorted = sort { $freq->{_1} <=> $freq->{_} } @keys
+    var @top = ()
+    for val $k (@sorted[0:$n-1]) {
         push @top, [$k, $freq->{$k}]
     }
     \@top
@@ -28,19 +28,19 @@ fn WC::top($freq, $n) {
 
 # ── Tokenize ──────────────────────────────────────────────────────────────
 
-my $t1 = WC::tokenize("the quick fox")
+val $t1 = WC::tokenize("the quick fox")
 len(@$t1) |> aeq 3, "tokenize: 3 words"
 $t1->[0]  |> aeq "the",   "tokenize[0]"
 $t1->[1]  |> aeq "quick", "tokenize[1]"
 $t1->[2]  |> aeq "fox",   "tokenize[2]"
 
-my $t2 = WC::tokenize("HELLO World")
+val $t2 = WC::tokenize("HELLO World")
 $t2->[0] |> aeq "hello", "tokenize: lowercased"
 $t2->[1] |> aeq "world", "tokenize: lowercased 2"
 
 # ── Count basic ───────────────────────────────────────────────────────────
 
-my $c1 = WC::count("a b a c a b")
+val $c1 = WC::count("a b a c a b")
 $c1->{a} |> aeq 3, "count a=3"
 $c1->{b} |> aeq 2, "count b=2"
 $c1->{c} |> aeq 1, "count c=1"
@@ -48,19 +48,19 @@ len(keys %$c1) |> aeq 3, "count: 3 unique"
 
 # ── Count case-insensitive ────────────────────────────────────────────────
 
-my $c2 = WC::count("Foo foo FOO bar")
+val $c2 = WC::count("Foo foo FOO bar")
 $c2->{foo} |> aeq 3, "count case-fold foo=3"
 $c2->{bar} |> aeq 1, "count case-fold bar=1"
 
 # ── Empty input ───────────────────────────────────────────────────────────
 
-my $c3 = WC::count("")
+val $c3 = WC::count("")
 len(keys %$c3) |> aeq 0, "count empty: no words"
 
 # ── Top-N ────────────────────────────────────────────────────────────────
 
-my $freq = WC::count("the the the cat cat dog")
-my $top  = WC::top($freq, 3)
+val $freq = WC::count("the the the cat cat dog")
+val $top  = WC::top($freq, 3)
 len(@$top)    |> aeq 3,    "top-3: 3 results"
 $top->[0][0]  |> aeq "the","top: most frequent is 'the'"
 $top->[0][1]  |> aeq 3,    "top: count of 'the' = 3"
@@ -71,16 +71,16 @@ $top->[2][1]  |> aeq 1,    "top: count of 'dog' = 1"
 
 # ── Single word ───────────────────────────────────────────────────────────
 
-my $c4 = WC::count("hello")
+val $c4 = WC::count("hello")
 $c4->{hello} |> aeq 1, "single word: hello=1"
 
 # ── Sum of all frequencies = token count ──────────────────────────────────
 
-my $text  = "alpha beta gamma alpha beta alpha"
-my $f5    = WC::count($text)
-my $tok5  = WC::tokenize($text)
-my $totsum = 0
-for my $v (values %$f5) { $totsum = $totsum + $v }
+val $text  = "alpha beta gamma alpha beta alpha"
+val $f5    = WC::count($text)
+val $tok5  = WC::tokenize($text)
+var $totsum = 0
+for val $v (values %$f5) { $totsum = $totsum + $v }
 $totsum |> aeq len(@$tok5), "sum freqs == token count"
 
 test_run

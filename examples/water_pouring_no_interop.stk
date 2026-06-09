@@ -18,18 +18,18 @@
 # Generate all neighbor states from (a, b). Returns list of
 # [new_a, new_b, op_name] triples.
 fn Water::neighbors($va, $vb, $cap_a, $cap_b) {
-    my @out
+    var @out
     push @out, [$cap_a, $vb, "fill A"]  if $va < $cap_a
     push @out, [$va, $cap_b, "fill B"]  if $vb < $cap_b
     push @out, [0, $vb, "empty A"]      if $va > 0
     push @out, [$va, 0, "empty B"]      if $vb > 0
     # Pour A → B until B is full or A is empty.
     if ($va > 0 && $vb < $cap_b) {
-        my $move = $cap_b - $vb < $va ? $cap_b - $vb : $va
+        val $move = $cap_b - $vb < $va ? $cap_b - $vb : $va
         push @out, [$va - $move, $vb + $move, "A→B"]
     }
     if ($vb > 0 && $va < $cap_a) {
-        my $move = $cap_a - $va < $vb ? $cap_a - $va : $vb
+        val $move = $cap_a - $va < $vb ? $cap_a - $va : $vb
         push @out, [$va + $move, $vb - $move, "B→A"]
     }
     \@out
@@ -40,21 +40,21 @@ fn Water::neighbors($va, $vb, $cap_a, $cap_b) {
 fn Water::solve($cap_a, $cap_b, $target) {
     return [] if $target == 0
     return undef if $target > $cap_a && $target > $cap_b
-    my @queue = ( +{ state => [0, 0], path => [] } )
-    my %seen = ( "0,0" => 1 )
+    var @queue = ( +{ state => [0, 0], path => [] } )
+    var %seen = ( "0,0" => 1 )
     while (len(@queue) > 0) {
-        my $cur = shift @queue
-        my ($va, $vb) = @{$cur->{state}}
+        val $cur = shift @queue
+        val ($va, $vb) = @{$cur->{state}}
         if ($va == $target || $vb == $target) {
             return $cur->{path}
         }
-        my $nbrs = Water::neighbors($va, $vb, $cap_a, $cap_b)
-        for my $n (@$nbrs) {
-            my ($na, $nb, $op) = @$n
-            my $key = "$na,$nb"
+        val $nbrs = Water::neighbors($va, $vb, $cap_a, $cap_b)
+        for var $n (@$nbrs) {
+            val ($na, $nb, $op) = @$n
+            val $key = "$na,$nb"
             next if exists $seen{$key}
             $seen{$key} = 1
-            my @new_path = @{$cur->{path}}
+            var @new_path = @{$cur->{path}}
             push @new_path, $op
             push @queue, +{ state => [$na, $nb], path => \@new_path }
         }
@@ -65,43 +65,43 @@ fn Water::solve($cap_a, $cap_b, $target) {
 p "── Water-pouring puzzle demo ──"
 
 # Classic "Die Hard 3" puzzle: 3-gal + 5-gal jugs → 4 gallons.
-my $p1 = Water::solve(3, 5, 4)
+val $p1 = Water::solve(3, 5, 4)
 die "Die-Hard 4-gal must be solvable" unless defined $p1
 die "Die-Hard solution should be reasonable" if len(@$p1) > 8
 p "  3-gal + 5-gal → 4 gal: #{len @$p1} ops  OK"
-for my $op (@$p1) {
+for val $op (@$p1) {
     p "    $op"
 }
 
 # Reachable: 5+7 → 4 (BFS through (0,7), (4,3), etc.).
-my $p2 = Water::solve(5, 7, 4)
+val $p2 = Water::solve(5, 7, 4)
 die "5+7 → 4 must be solvable" unless defined $p2
 p "  5-gal + 7-gal → 4 gal: #{len @$p2} ops  OK"
 
 # Unreachable: 4+6 → 5 — gcd(4,6) = 2, so only even volumes reachable.
-my $p3 = Water::solve(4, 6, 5)
+val $p3 = Water::solve(4, 6, 5)
 die "4+6 → 5 must NOT be reachable (gcd=2)" if defined $p3
 p "  4-gal + 6-gal → 5 gal: correctly unreachable (gcd=2)  OK"
 
 # Target = 0 needs no ops.
-my $p4 = Water::solve(5, 7, 0)
+val $p4 = Water::solve(5, 7, 0)
 die "target 0 = 0 ops" unless defined $p4 && len(@$p4) == 0
 
 # Target equals a capacity → just fill once.
-my $p5 = Water::solve(3, 5, 5)
+val $p5 = Water::solve(3, 5, 5)
 die "target 5 = fill the 5-jug (1 op)" unless defined $p5 && len(@$p5) == 1
 
 # Target larger than both jugs → undef.
-my $p6 = Water::solve(3, 5, 10)
+val $p6 = Water::solve(3, 5, 10)
 die "target larger than capacities should fail" if defined $p6
 
 # Universal invariant: solution length is bounded by capacity product
 # (BFS visits at most (capA+1) × (capB+1) states).
-for my $case ([3, 5, 4], [5, 7, 4], [3, 5, 5]) {
-    my ($ca, $cb, $t) = @$case
-    my $p = Water::solve($ca, $cb, $t)
+for val $case ([3, 5, 4], [5, 7, 4], [3, 5, 5]) {
+    val ($ca, $cb, $t) = @$case
+    val $p = Water::solve($ca, $cb, $t)
     next unless defined $p
-    my $cap = ($ca + 1) * ($cb + 1)
+    val $cap = ($ca + 1) * ($cb + 1)
     die "solution longer than $cap" if len(@$p) > $cap
 }
 

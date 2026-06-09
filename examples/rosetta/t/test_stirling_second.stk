@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Stirling numbers of the second kind
 
-my %STIRLING_MEMO
+var %STIRLING_MEMO
 
 fn Rosetta::StirlingSecond::compute($n, $k) {
     if ($k == 1 || $k == $n) {
@@ -11,9 +11,9 @@ fn Rosetta::StirlingSecond::compute($n, $k) {
     } elsif (exists $STIRLING_MEMO{"$n,$k"}) {
         $STIRLING_MEMO{"$n,$k"}
     } else {
-        my $v1 = Rosetta::StirlingSecond::compute($n - 1, $k)
-        my $v2 = Rosetta::StirlingSecond::compute($n - 1, $k - 1)
-        my $res = $k * $v1 + $v2
+        val $v1 = Rosetta::StirlingSecond::compute($n - 1, $k)
+        val $v2 = Rosetta::StirlingSecond::compute($n - 1, $k - 1)
+        val $res = $k * $v1 + $v2
         $STIRLING_MEMO{"$n,$k"} = $res
         $res
     }

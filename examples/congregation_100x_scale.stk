@@ -22,23 +22,23 @@
 # RefCell race that previously lost 1-3 children at N>~50. Resource
 # cost: ~N child processes briefly + ~N TCP sockets on 127.0.0.1.
 
-my $n = $ARGV[0] // 100
+val $n = $ARGV[0] // 100
 
 printf "── %dx scale: spawning %d worker processes ──\n", $n, $n
 
-my @workers = congregation($n)
+val @workers = congregation($n)
 printf "spawned %d / %d workers (fork + connect + register)\n", len(@workers), $n
 
 # Scatter a non-trivial compute (sum 1..1000) so the per-worker work
 # is observable, not infinitesimal.
-my %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 30_000
+val %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 30_000
 printf "harvested %d / %d replies\n", len(keys %results), len(@workers)
 
 # Verify every worker got the same answer (= 500500).
-my $expected = 500_500
-my $matched = 0
-my $diverged = 0
-for my $sid (keys %results) {
+val $expected = 500_500
+var $matched = 0
+var $diverged = 0
+for val $sid (keys %results) {
     if ($results{$sid} eq "$expected") {
         $matched++
     } else {
@@ -56,7 +56,7 @@ p $matched == len(@workers) && $diverged == 0
     : "✗ at least one worker diverged"
 
 # Excommunicate the full fleet.
-my $stopped = excommunicate(@workers)
+val $stopped = excommunicate(@workers)
 printf "excommunicated %d workers\n", $stopped
 
 p "done"

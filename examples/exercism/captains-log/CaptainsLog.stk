@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const my @CLASSES = qw(D H J K L M N R T Y)
+const val @CLASSES = qw(D H J K L M N R T Y)
 
 fn Exercism::CaptainsLog::random_planet_class           = $CLASSES[int(rand() * len(@CLASSES))]
 fn Exercism::CaptainsLog::random_ship_registry_number   = sprintf("NCC-%d", int(rand() * 9000) + 1000)

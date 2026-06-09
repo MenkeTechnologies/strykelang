@@ -7,13 +7,13 @@
 # Run: stryke --no-interop examples/shell_tokenizer.stk
 
 fn ST::tokenize($s) {
-    my @out = ()
-    my $cur = ""
-    my $in_word = 0
-    my $i = 0
-    my $n = len $s
+    var @out = ()
+    var $cur = ""
+    var $in_word = 0
+    var $i = 0
+    val $n = len $s
     while ($i < $n) {
-        my $c = substr($s, $i, 1)
+        val $c = substr($s, $i, 1)
         if ($c eq " " || $c eq "\t" || $c eq "\n") {
             if ($in_word) {
                 push @out, $cur
@@ -38,7 +38,7 @@ fn ST::tokenize($s) {
             $i = $i + 1
             $in_word = 1
             while ($i < $n) {
-                my $cc = substr($s, $i, 1)
+                val $cc = substr($s, $i, 1)
                 last if $cc eq "'"
                 $cur = $cur . $cc
                 $i = $i + 1
@@ -50,10 +50,10 @@ fn ST::tokenize($s) {
             $i = $i + 1
             $in_word = 1
             while ($i < $n) {
-                my $cc = substr($s, $i, 1)
+                val $cc = substr($s, $i, 1)
                 last if $cc eq '"'
                 if ($cc eq "\\" && $i + 1 < $n) {
-                    my $nx = substr($s, $i + 1, 1)
+                    val $nx = substr($s, $i + 1, 1)
                     if ($nx eq '"' || $nx eq "\\" || $nx eq "n") {
                         if ($nx eq "n") {
                             $cur = $cur . "\n"
@@ -79,17 +79,17 @@ fn ST::tokenize($s) {
 }
 
 p "=== Shell Tokenizer Demo ==="
-my $line1 = "ls -la /tmp"
+val $line1 = "ls -la /tmp"
 p "in:  " . $line1
-my $t1 = ST::tokenize($line1)
-for my $tok (@$t1) { p "  tok: " . $tok }
+val $t1 = ST::tokenize($line1)
+for val $tok (@$t1) { p "  tok: " . $tok }
 
-my $line2 = "echo 'hello world' \"foo bar\" baz"
+val $line2 = "echo 'hello world' \"foo bar\" baz"
 p "in:  " . $line2
-my $t2 = ST::tokenize($line2)
-for my $tok (@$t2) { p "  tok: " . $tok }
+val $t2 = ST::tokenize($line2)
+for val $tok (@$t2) { p "  tok: " . $tok }
 
-my $line3 = 'grep -e "a\"b" /etc/file\ with\ space'
+val $line3 = 'grep -e "a\"b" /etc/file\ with\ space'
 p "in:  " . $line3
-my $t3 = ST::tokenize($line3)
-for my $tok (@$t3) { p "  tok: " . $tok }
+val $t3 = ST::tokenize($line3)
+for val $tok (@$t3) { p "  tok: " . $tok }

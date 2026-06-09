@@ -3,11 +3,11 @@
 # Duval's algorithm produces all Lyndon words of length ≤ n over alphabet of size k.
 
 fn Rosetta::Lyndon::generate($n, $k) {
-    my @result
-    my @w = (-1)
+    var @result
+    var @w = (-1)
     while (len(@w) > 0) {
         $w[-1] += 1
-        my $m = len(@w)
+        val $m = len(@w)
         push @result, [@w] if $m == $n
         # Repeat the prefix to reach length n
         while (len(@w) < $n) {
@@ -22,29 +22,29 @@ fn Rosetta::Lyndon::generate($n, $k) {
 }
 
 fn Rosetta::Lyndon::to_string($word) {
-    my $s = ""
-    for my $d (@$word) { $s .= chr(ord("a") + $d) }
+    var $s = ""
+    for val $d (@$word) { $s .= chr(ord("a") + $d) }
     $s
 }
 
 # Lyndon words of length n=1..4 over alphabet 2 (binary)
-my $b3 = Rosetta::Lyndon::generate(3, 2)
-my @s3 = map {Rosetta::Lyndon::to_string} @$b3
+val $b3 = Rosetta::Lyndon::generate(3, 2)
+var @s3 = map {Rosetta::Lyndon::to_string} @$b3
 @s3 = sort @s3
 assert_eq join(",", @s3), "aab,abb", "Lyndon length-3 binary"
 
 # Length 4 binary: aaab, aabb, abbb
-my $b4 = Rosetta::Lyndon::generate(4, 2)
-my @s4 = sort map {Rosetta::Lyndon::to_string} @$b4
+val $b4 = Rosetta::Lyndon::generate(4, 2)
+val @s4 = sort map {Rosetta::Lyndon::to_string} @$b4
 assert_eq join(",", @s4), "aaab,aabb,abbb", "Lyndon length-4 binary"
 
 # Length 5 binary: aaaab, aaabb, aabab, aabbb, ababb, abbbb
-my $b5 = Rosetta::Lyndon::generate(5, 2)
+val $b5 = Rosetta::Lyndon::generate(5, 2)
 assert_eq len(@$b5), 6, "Lyndon length-5 binary count"
 
 # Length 3 ternary: alphabet abc, expected: aab, aac, abb, abc, acb, acc, bbc, bcc
-my $t3 = Rosetta::Lyndon::generate(3, 3)
-my @st3 = sort map {Rosetta::Lyndon::to_string} @$t3
+val $t3 = Rosetta::Lyndon::generate(3, 3)
+val @st3 = sort map {Rosetta::Lyndon::to_string} @$t3
 assert_eq join(",", @st3), "aab,aac,abb,abc,acb,acc,bbc,bcc", "Lyndon length-3 ternary"
 
 # Necklace counting formula: for n=4, k=2 → 3 (matches output above)
@@ -52,24 +52,24 @@ assert_eq len(@$b4), 3, "ternary 3"
 
 # Empty alphabet edge: length n, k=1 — only "aaa...a" but that's not strictly Lyndon (it's a power).
 # Duval generates only proper Lyndon words; for k=1 the result is empty when n>1.
-my $k1n3 = Rosetta::Lyndon::generate(3, 1)
+val $k1n3 = Rosetta::Lyndon::generate(3, 1)
 assert_eq len(@$k1n3), 0, "k=1, n=3: no Lyndon words"
 
 # Each generated word's lex rotations are all >=
 fn Rosetta::Lyndon::is_strict_lyndon($word) {
-    my $n = len(@$word)
+    val $n = len(@$word)
     return 1 if $n == 1
-    my $orig = join(",", @$word)
-    for my $i (1:$n-1) {
-        my @rot
-        for my $j (0:$n-1) { push @rot, $word->[($j + $i) % $n] }
-        my $r = join(",", @rot)
+    val $orig = join(",", @$word)
+    for val $i (1:$n-1) {
+        var @rot
+        for val $j (0:$n-1) { push @rot, $word->[($j + $i) % $n] }
+        val $r = join(",", @rot)
         return 0 if $r le $orig
     }
     1
 }
 
-for my $w (@$b5) {
+for val $w (@$b5) {
     assert_ok Rosetta::Lyndon::is_strict_lyndon($w),
         "verify: " . Rosetta::Lyndon::to_string($w) . " is Lyndon"
 }

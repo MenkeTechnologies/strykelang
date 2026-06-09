@@ -1,15 +1,15 @@
 # lib/data.stk — data processing: pipelines, aggregation, grouping
 
 fn Project::Data::word_freq_map {
-    my $freq = {}
+    val $freq = {}
     $freq->{_}++ for @_
     $freq
 }
 
 fn Project::Data::group_records ($key, @records) {
-    my $groups = {}
-    for my $r (@records) {
-        my $k = $r->{$key} // "unknown"
+    var $groups = {}
+    for val $r (@records) {
+        val $k = $r->{$key} // "unknown"
         $groups->{$k} = [] unless exists $groups->{$k}
         push @{$groups->{$k}}, $r
     }
@@ -17,9 +17,9 @@ fn Project::Data::group_records ($key, @records) {
 }
 
 fn Project::Data::summarize_list (@data) {
-    my $n = scalar @data
+    val $n = scalar @data
     return {} unless $n
-    my $total = sum(@data)
+    val $total = sum(@data)
     {
         count  => $n,
         sum    => $total,
@@ -32,7 +32,7 @@ fn Project::Data::summarize_list (@data) {
 
 # Build a hash from parallel key/value arrays
 fn Project::Data::zip_to_hash ($keys, $vals) {
-    my $h = {}
+    var $h = {}
     ~> 0..len(@$keys) - 1 ep {
         $h->{$keys->[_]} = $vals->[_]
     }
@@ -41,8 +41,8 @@ fn Project::Data::zip_to_hash ($keys, $vals) {
 
 # Partition an array into two: [matching, non-matching]
 fn Project::Data::split_by_pred ($pred, @items) {
-    my $yes = []
-    my $no = []
+    val $yes = []
+    val $no = []
     ~> @items ep {
         local _ = _
         if ($pred(_)) {
@@ -56,9 +56,9 @@ fn Project::Data::split_by_pred ($pred, @items) {
 
 # Running total of a numeric array
 fn Project::Data::running_total (@data) {
-    my @result
-    my $acc = 0
-    for my $v (@data) {
+    var @result
+    var $acc = 0
+    for val $v (@data) {
         $acc += $v
         push @result, $acc
     }

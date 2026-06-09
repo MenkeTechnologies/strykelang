@@ -2,21 +2,21 @@
 # Rosetta Code: Base64 encode
 
 fn Rosetta::Base64::custom_encode($str) {
-    my $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    my @chars = $str |> chars
-    my @res
+    val $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    val @chars = $str |> chars
+    var @res
     
-    my $i = 0
-    my $len = len(@chars)
+    var $i = 0
+    val $len = len(@chars)
     while ($i < $len) {
-        my $b1 = ord(@chars[$i])
-        my $b2 = 0
-        my $b3 = 0
+        val $b1 = ord(@chars[$i])
+        var $b2 = 0
+        var $b3 = 0
         
         if ($i + 1 < $len) { $b2 = ord(@chars[$i+1]) }
         if ($i + 2 < $len) { $b3 = ord(@chars[$i+2]) }
         
-        my $n = ($b1 << 16) | ($b2 << 8) | $b3
+        val $n = ($b1 << 16) | ($b2 << 8) | $b3
         
         push @res, substr($alphabet, ($n >> 18) & 63, 1)
         push @res, substr($alphabet, ($n >> 12) & 63, 1)

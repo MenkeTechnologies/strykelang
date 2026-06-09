@@ -27,31 +27,31 @@ fn Fc::twice($f) {
 }
 
 # Compose: (x+1) o (x*2) applied to 3 → 7
-my $inc      = fn ($n) { $n + 1 }
-my $double   = fn ($n) { $n * 2 }
-my $tostr    = fn ($n) { "n=$n" }
+val $inc      = fn ($n) { $n + 1 }
+val $double   = fn ($n) { $n * 2 }
+val $tostr    = fn ($n) { "n=$n" }
 
-my $double_then_inc = Fc::compose($inc, $double)
+val $double_then_inc = Fc::compose($inc, $double)
 $double_then_inc(3) |> aeq 7, "compose inc∘double on 3"
 
-my $inc_then_double = Fc::pipe2($inc, $double)
+val $inc_then_double = Fc::pipe2($inc, $double)
 $inc_then_double(3) |> aeq 8, "pipe2 inc;double on 3"
 
 # Const
-my $always42 = Fc::const(42)
+val $always42 = Fc::const(42)
 $always42()  |> aeq 42, "const no args"
 
 # Flip
-my $sub = fn ($x, $y) { $x - $y }
-my $flipped = Fc::flip($sub)
+val $sub = fn ($x, $y) { $x - $y }
+val $flipped = Fc::flip($sub)
 $sub(10, 3)     |> aeq 7,  "sub 10-3"
 $flipped(10, 3) |> aeq -7, "flipped 3-10"
 
 # Curry
-my $add = fn ($x, $y) { $x + $y }
-my $cadd = Fc::curry2($add)
+val $add = fn ($x, $y) { $x + $y }
+val $cadd = Fc::curry2($add)
 $cadd(5)(3) |> aeq 8, "curry add 5 3"
-my $add10 = $cadd(10)
+val $add10 = $cadd(10)
 $add10(7)  |> aeq 17, "partial add10 7"
 $add10(-3) |> aeq 7,  "partial add10 -3"
 
@@ -60,19 +60,19 @@ Fc::twice($inc)(5)    |> aeq 7,  "twice inc on 5"
 Fc::twice($double)(3) |> aeq 12, "twice double on 3"
 
 # Compose into a multi-step pipeline applied to a collection
-my $process = Fc::compose($tostr, Fc::compose($inc, $double))
+val $process = Fc::compose($tostr, Fc::compose($inc, $double))
 join(",", map { $process(_) } 1, 2, 3) |> aeq "n=3,n=5,n=7", "pipeline over list"
 
 # Composing pure functions with stdlib pipelines
 fn Fc::sq($n) { $n * $n }
-my $sumsq = fn (@xs) { sum(map { Fc::sq(_) } @xs) }
+val $sumsq = fn (@xs) { sum(map { Fc::sq(_) } @xs) }
 $sumsq(1, 2, 3, 4)  |> aeq 30,  "sum of squares 1..4"
 $sumsq(0)           |> aeq 0,   "sum of squares 0"
 
 # Builtin memoize
 mysync $count = 0
-my $slow = fn ($n) { $count++; $n * 2 }
-my $fast = memoize($slow)
+val $slow = fn ($n) { $count++; $n * 2 }
+val $fast = memoize($slow)
 $fast(5) |> aeq 10, "memoize first call"
 $fast(5) |> aeq 10, "memoize repeated"
 $fast(7) |> aeq 14, "memoize new arg"

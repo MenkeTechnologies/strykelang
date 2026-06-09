@@ -4,7 +4,7 @@
 # Recurrence: c(n, k) = (n-1) * c(n-1, k) + c(n-1, k-1)
 #   with c(0, 0) = 1, c(n, 0) = c(0, k) = 0 for n, k > 0.
 
-my %STIRLING1_MEMO
+var %STIRLING1_MEMO
 
 fn Rosetta::StirlingFirst::compute($n, $k) {
     if ($n == 0 && $k == 0) {
@@ -14,9 +14,9 @@ fn Rosetta::StirlingFirst::compute($n, $k) {
     } elsif (exists $STIRLING1_MEMO{"$n,$k"}) {
         $STIRLING1_MEMO{"$n,$k"}
     } else {
-        my $v1 = Rosetta::StirlingFirst::compute($n - 1, $k)
-        my $v2 = Rosetta::StirlingFirst::compute($n - 1, $k - 1)
-        my $res = ($n - 1) * $v1 + $v2
+        val $v1 = Rosetta::StirlingFirst::compute($n - 1, $k)
+        val $v2 = Rosetta::StirlingFirst::compute($n - 1, $k - 1)
+        val $res = ($n - 1) * $v1 + $v2
         $STIRLING1_MEMO{"$n,$k"} = $res
         $res
     }

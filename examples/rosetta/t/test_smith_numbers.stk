@@ -2,21 +2,21 @@
 # Rosetta Code: Smith numbers
 
 fn Rosetta::SmithNumbers::sum_digits($n) {
-    my @digits = ~> "$n" chars map {int}
-    my $sum = 0
-    for my $d (@digits) { $sum += $d }
+    val @digits = ~> "$n" chars map {int}
+    var $sum = 0
+    for val $d (@digits) { $sum += $d }
     $sum
 }
 
 fn Rosetta::SmithNumbers::check($n) {
     # Must be composite
-    my @factors = prime_factors($n)
+    val @factors = prime_factors($n)
     if (len(@factors) < 2) {
         0
     } else {
-        my $sum_n = Rosetta::SmithNumbers::sum_digits($n)
-        my $sum_f = 0
-        for my $f (@factors) {
+        val $sum_n = Rosetta::SmithNumbers::sum_digits($n)
+        var $sum_f = 0
+        for val $f (@factors) {
             $sum_f += Rosetta::SmithNumbers::sum_digits($f)
         }
         $sum_n == $sum_f

@@ -14,17 +14,17 @@
 # ── tokenizer ────────────────────────────────────────────────────────
 
 fn Demo::Expr::tokenize($src) {
-    my @tokens
-    my $i = 0
-    my $n = len $src
+    var @tokens
+    var $i = 0
+    val $n = len $src
     while ($i < $n) {
-        my $c = substr($src, $i, 1)
+        val $c = substr($src, $i, 1)
         if ($c eq " " || $c eq "\t" || $c eq "\n") {
             $i++
             next
         }
         if ($c =~ /[0-9]/) {
-            my $j = $i
+            var $j = $i
             while ($j < $n && substr($src, $j, 1) =~ /[0-9]/) {
                 $j++
             }
@@ -58,7 +58,7 @@ fn Demo::Expr::peek() {
 }
 
 fn Demo::Expr::advance() {
-    my $t = Demo::Expr::peek()
+    var $t = Demo::Expr::peek()
     $pos++
     $t
 }
@@ -69,7 +69,7 @@ fn Demo::Expr::advance() {
 # factor := NUMBER | '-' factor | '(' expr ')'
 
 fn Demo::Expr::parse_factor() {
-    my $t = Demo::Expr::peek()
+    val $t = Demo::Expr::peek()
     die "Unexpected end of input\n" unless defined $t
     if ($t->{kind} eq "num") {
         Demo::Expr::advance()
@@ -77,13 +77,13 @@ fn Demo::Expr::parse_factor() {
     }
     if ($t->{kind} eq "op" && $t->{value} eq "-") {
         Demo::Expr::advance()
-        my $operand = Demo::Expr::parse_factor()
+        val $operand = Demo::Expr::parse_factor()
         return +{ kind => "neg", operand => $operand }
     }
     if ($t->{kind} eq "lparen") {
         Demo::Expr::advance()
-        my $inner = Demo::Expr::parse_expr()
-        my $rp = Demo::Expr::peek()
+        val $inner = Demo::Expr::parse_expr()
+        val $rp = Demo::Expr::peek()
         die "Expected ')'\n" unless defined($rp) && $rp->{kind} eq "rparen"
         Demo::Expr::advance()
         return $inner
@@ -92,28 +92,28 @@ fn Demo::Expr::parse_factor() {
 }
 
 fn Demo::Expr::parse_term() {
-    my $left = Demo::Expr::parse_factor()
+    var $left = Demo::Expr::parse_factor()
     while (1) {
-        my $t = Demo::Expr::peek()
+        val $t = Demo::Expr::peek()
         last unless defined $t
         last unless $t->{kind} eq "op"
         last unless ($t->{value} eq "*" || $t->{value} eq "/")
         Demo::Expr::advance()
-        my $right = Demo::Expr::parse_factor()
+        val $right = Demo::Expr::parse_factor()
         $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
     }
     $left
 }
 
 fn Demo::Expr::parse_expr() {
-    my $left = Demo::Expr::parse_term()
+    var $left = Demo::Expr::parse_term()
     while (1) {
-        my $t = Demo::Expr::peek()
+        val $t = Demo::Expr::peek()
         last unless defined $t
         last unless $t->{kind} eq "op"
         last unless ($t->{value} eq "+" || $t->{value} eq "-")
         Demo::Expr::advance()
-        my $right = Demo::Expr::parse_term()
+        val $right = Demo::Expr::parse_term()
         $left = +{ kind => "bin", op => $t->{value}, left => $left, right => $right }
     }
     $left
@@ -122,7 +122,7 @@ fn Demo::Expr::parse_expr() {
 fn Demo::Expr::parse($src) {
     $tokens = Demo::Expr::tokenize($src)
     $pos = 0
-    my $ast = Demo::Expr::parse_expr()
+    val $ast = Demo::Expr::parse_expr()
     die "Trailing tokens after parse\n" if $pos < len @$tokens
     $ast
 }
@@ -130,7 +130,7 @@ fn Demo::Expr::parse($src) {
 # ── tree-walking evaluator ───────────────────────────────────────────
 
 fn Demo::Expr::eval_ast($ast) {
-    my $k = $ast->{kind}
+    val $k = $ast->{kind}
     if ($k eq "num") {
         return $ast->{value}
     }
@@ -138,8 +138,8 @@ fn Demo::Expr::eval_ast($ast) {
         return -Demo::Expr::eval_ast($ast->{operand})
     }
     if ($k eq "bin") {
-        my $l = Demo::Expr::eval_ast($ast->{left})
-        my $r = Demo::Expr::eval_ast($ast->{right})
+        val $l = Demo::Expr::eval_ast($ast->{left})
+        val $r = Demo::Expr::eval_ast($ast->{right})
         return $l + $r if $ast->{op} eq "+"
         return $l - $r if $ast->{op} eq "-"
         return $l * $r if $ast->{op} eq "*"
@@ -155,15 +155,15 @@ mysync $eval_lat = t_digest(100)
 
 around "Demo::Expr::eval_ast" {
     $eval_calls = $eval_calls + 1
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
     td_add($eval_lat, (now_ns() - $t0) / 1000.0)
     $r
 }
 
 # ── test cases ────────────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     ["3 + 4",                       7],
     ["10 - 4",                      6],
     ["2 * 3 + 4",                  10],
@@ -179,17 +179,17 @@ my @cases = (
 )
 
 p "── parsed and evaluated expressions ─────────────────"
-my $passed = 0
-for my $c (@cases) {
-    my $src      = $c->[0]
-    my $expected = $c->[1]
-    my $ast = eval { Demo::Expr::parse($src) }
+var $passed = 0
+for val $c (@cases) {
+    val $src      = $c->[0]
+    val $expected = $c->[1]
+    val $ast = eval { Demo::Expr::parse($src) }
     if ($@) {
         printf "  %-30s -> parse error: %s", $src, $@
         next
     }
-    my $got = Demo::Expr::eval_ast($ast)
-    my $ok = $got == $expected ? "ok" : "FAIL"
+    val $got = Demo::Expr::eval_ast($ast)
+    val $ok = $got == $expected ? "ok" : "FAIL"
     $passed++ if $got == $expected
     printf "  %-30s = %-6d (expected %d)  %s\n",
         $src, $got, $expected, $ok
@@ -211,11 +211,11 @@ printf "  p99 per-call latency : %.1f µs\n", td_quantile($eval_lat, 0.99)
 
 p ""
 p "── error handling on invalid input ──────────────────"
-my @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
-for my $src (@bad) {
-    my $r = eval { Demo::Expr::parse($src) }
+val @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
+for val $src (@bad) {
+    val $r = eval { Demo::Expr::parse($src) }
     if ($@) {
-        my $msg = $@
+        var $msg = $@
         $msg =~ s/\n$//
         printf "  %-15s -> error: %s\n", $src, $msg
     } else {

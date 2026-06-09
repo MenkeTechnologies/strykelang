@@ -3,15 +3,15 @@
 
 fn Rosetta::SievePritchard::is_prime_basic($n) {
     if ($n < 2) { return 0 }
-    for my $i (2..sqrt($n)) {
+    for val $i (2..sqrt($n)) {
         if ($n % $i == 0) { return 0 }
     }
     1
 }
 
 fn Rosetta::SievePritchard::solve($limit) {
-    my @primes = ()
-    my $p = 2
+    var @primes = ()
+    var $p = 2
     while ($p <= $limit) {
         if (Rosetta::SievePritchard::is_prime_basic($p)) {
             push @primes, $p
@@ -21,7 +21,7 @@ fn Rosetta::SievePritchard::solve($limit) {
     \@primes
 }
 
-my $res = Rosetta::SievePritchard::solve(30)
+val $res = Rosetta::SievePritchard::solve(30)
 assert_eq join(",", @$res), "2,3,5,7,11,13,17,19,23,29", "primes up to 30"
 
 test_run

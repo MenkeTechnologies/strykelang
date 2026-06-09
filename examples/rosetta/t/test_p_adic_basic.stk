@@ -6,8 +6,8 @@
 fn Rosetta::PAdic::valuation($n, $p) {
     return 1e308 if $n == 0     # convention: v_p(0) = ∞
     return undef if $p < 2
-    my $v = 0
-    my $x = abs($n)
+    var $v = 0
+    var $x = abs($n)
     while ($x % $p == 0) { $x = int($x / $p); $v++ }
     $v
 }
@@ -19,9 +19,9 @@ fn Rosetta::PAdic::norm($n, $p) {
 
 fn Rosetta::PAdic::digits($n, $p, $count) {
     # Return the first `count` p-adic digits of a non-negative integer.
-    my @d
-    my $x = abs($n)
-    for my $i (~> 1:$count) {
+    var @d
+    var $x = abs($n)
+    for val $i (~> 1:$count) {
         push @d, $x % $p
         $x = int($x / $p)
     }
@@ -43,25 +43,25 @@ assert_eq   Rosetta::PAdic::norm(0, 2),  0,         "|0|_p = 0"
 
 # Triangle inequality (strong / ultrametric):
 # |a + b|_p ≤ max(|a|_p, |b|_p)
-my $a = 24
-my $b = 18
-my $sum = Rosetta::PAdic::norm($a + $b, 2)
-my $best = Rosetta::PAdic::norm($a, 2)
-my $other = Rosetta::PAdic::norm($b, 2)
+val $a = 24
+val $b = 18
+val $sum = Rosetta::PAdic::norm($a + $b, 2)
+var $best = Rosetta::PAdic::norm($a, 2)
+val $other = Rosetta::PAdic::norm($b, 2)
 $best = $other if $other > $best
 assert_ok $sum <= $best + 1e-12, "ultrametric inequality"
 
 # Multiplicativity: |a · b|_p = |a|_p · |b|_p
-my $prod = Rosetta::PAdic::norm($a * $b, 3)
-my $expected = Rosetta::PAdic::norm($a, 3) * Rosetta::PAdic::norm($b, 3)
+val $prod = Rosetta::PAdic::norm($a * $b, 3)
+val $expected = Rosetta::PAdic::norm($a, 3) * Rosetta::PAdic::norm($b, 3)
 assert_near $prod, $expected, 1e-12, "multiplicative"
 
 # 2-adic digits of 13: 13 = 1101₂
-my @d = Rosetta::PAdic::digits(13, 2, 6)
+val @d = Rosetta::PAdic::digits(13, 2, 6)
 assert_eq join(",", @d), "1,0,1,1,0,0", "13 in base 2"
 
 # 3-adic digits of 17: 17 = 122₃
-my @d3 = Rosetta::PAdic::digits(17, 3, 5)
+val @d3 = Rosetta::PAdic::digits(17, 3, 5)
 assert_eq join(",", @d3), "2,2,1,0,0", "17 in base 3"
 
 # Pipe form

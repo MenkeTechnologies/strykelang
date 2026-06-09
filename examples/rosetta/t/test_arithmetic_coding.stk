@@ -2,16 +2,16 @@
 # Rosetta Code: Arithmetic coding
 
 fn Rosetta::ArithmeticCoding::get_probs($text) {
-    my @chars = $text |> chars
-    my %count
-    for my $c (@chars) { $count{$c} = $count{$c} + 1 }
+    val @chars = $text |> chars
+    var %count
+    for val $c (@chars) { $count{$c} = $count{$c} + 1 }
     
-    my @sorted_chars = sort(keys %count)
-    my %probs
-    my $curr = 0
-    my $total = len(@chars)
-    for my $c (@sorted_chars) {
-        my $p = $count{$c} / $total
+    val @sorted_chars = sort(keys %count)
+    var %probs
+    var $curr = 0
+    val $total = len(@chars)
+    for val $c (@sorted_chars) {
+        val $p = $count{$c} / $total
         $probs{$c} = { low => $curr, high => $curr + $p }
         $curr = $curr + $p
     }
@@ -19,12 +19,12 @@ fn Rosetta::ArithmeticCoding::get_probs($text) {
 }
 
 fn Rosetta::ArithmeticCoding::encode($text, $probs) {
-    my $low = 0
-    my $high = 1
-    my @chars = $text |> chars
-    for my $c (@chars) {
-        my $range = $high - $low
-        my $p = $probs->{$c}
+    var $low = 0
+    var $high = 1
+    val @chars = $text |> chars
+    for val $c (@chars) {
+        val $range = $high - $low
+        val $p = $probs->{$c}
         $high = $low + $range * $p->{high}
         $low = $low + $range * $p->{low}
     }
@@ -32,11 +32,11 @@ fn Rosetta::ArithmeticCoding::encode($text, $probs) {
 }
 
 fn Rosetta::ArithmeticCoding::decode($val, $probs, $len) {
-    my $res = ""
-    my $v = $val
-    for my $i (1:$len) {
-        for my $c (sort(keys %$probs)) {
-            my $p = $probs->{$c}
+    var $res = ""
+    var $v = $val
+    for val $i (1:$len) {
+        for val $c (sort(keys %$probs)) {
+            val $p = $probs->{$c}
             if ($v >= $p->{low} && $v < $p->{high}) {
                 $res = $res . $c
                 $v = ($v - $p->{low}) / ($p->{high} - $p->{low})
@@ -47,10 +47,10 @@ fn Rosetta::ArithmeticCoding::decode($val, $probs, $len) {
     $res
 }
 
-my $input = "WIKI"
-my $probs = Rosetta::ArithmeticCoding::get_probs($input)
-my $encoded = Rosetta::ArithmeticCoding::encode($input, $probs)
-my $decoded = Rosetta::ArithmeticCoding::decode($encoded, $probs, 4)
+val $input = "WIKI"
+val $probs = Rosetta::ArithmeticCoding::get_probs($input)
+val $encoded = Rosetta::ArithmeticCoding::encode($input, $probs)
+val $decoded = Rosetta::ArithmeticCoding::decode($encoded, $probs, 4)
 
 assert_eq $decoded, $input, "Arithmetic encode/decode 'WIKI'"
 

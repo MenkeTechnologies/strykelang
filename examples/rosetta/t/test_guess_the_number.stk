@@ -2,8 +2,8 @@
 # Rosetta Code: Guess the number
 
 fn Rosetta::GuessNumber::play($secret, @guesses) {
-    my @results
-    for my $guess (@guesses) {
+    var @results
+    for val $guess (@guesses) {
         if ($guess < $secret) {
             push @results, "Too low"
         } elsif ($guess > $secret) {
@@ -16,8 +16,8 @@ fn Rosetta::GuessNumber::play($secret, @guesses) {
     \@results
 }
 
-my $secret = 42
-my $res = Rosetta::GuessNumber::play($secret, (10, 50, 42))
+val $secret = 42
+val $res = Rosetta::GuessNumber::play($secret, (10, 50, 42))
 
 assert_eq $res->[0], "Too low", "First guess too low"
 assert_eq $res->[1], "Too high", "Second guess too high"

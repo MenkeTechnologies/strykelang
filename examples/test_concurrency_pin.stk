@@ -6,7 +6,7 @@
 # ── Async / Await ──────────────────────────────────────────────────────────
 
 async { sleep(0.1); 42 } |> await |> aeq 42, "async/await basic"
-async { my $t = async { 10 }; (await $t) + 20 } |> await |> aeq 30, "nested async/await"
+async { var $t = async { 10 }; (await $t) + 20 } |> await |> aeq 30, "nested async/await"
 
 # ── Channels ───────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ pselect($rx_a, $rx_b)->[0] |> aeq "B", "pselect value B"
 
 # ── Parallel Filesystem / IO ───────────────────────────────────────────────
 
-my $tmp = tempdir()
+val $tmp = tempdir()
 spurt "$tmp/a.txt", "line1\nline2\n"
 
 oursync $count = 0

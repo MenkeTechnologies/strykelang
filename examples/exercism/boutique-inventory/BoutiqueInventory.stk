@@ -8,16 +8,16 @@ fn Exercism::BoutiqueInventory::update_names($inv, $old, $new) {
 }
 
 fn Exercism::BoutiqueInventory::increase_quantity($item, $by) {
-    my %new_sizes
-    for my $sz (keys %{$item->{quantity_by_size}}) {
+    var %new_sizes
+    for val $sz (keys %{$item->{quantity_by_size}}) {
         $new_sizes{$sz} = $item->{quantity_by_size}{$sz} + $by
     }
     +{ %{$item}, quantity_by_size => \%new_sizes }
 }
 
 fn Exercism::BoutiqueInventory::total_quantity($item) {
-    my $sizes = $item->{quantity_by_size}
-    my $s = 0
+    val $sizes = $item->{quantity_by_size}
+    var $s = 0
     $s += $sizes->{$_} for keys %{$sizes}
     $s
 }

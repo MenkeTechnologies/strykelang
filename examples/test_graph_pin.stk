@@ -4,7 +4,7 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 # Adjacency list as hash: { u => [v, w, ...] }
-my %g = (
+val %g = (
     A => ['B', 'C'],
     B => ['A', 'D'],
     C => ['A', 'D'],
@@ -15,13 +15,13 @@ my %g = (
 # ── BFS ────────────────────────────────────────────────────────────────────
 
 fn Gr::bfs($g, $start) {
-    my @q = ($start)
-    my %seen = ($start => 1)
-    my @order = ()
+    var @q = ($start)
+    var %seen = ($start => 1)
+    var @order = ()
     while (len(@q)) {
-        my $u = shift @q
+        val $u = shift @q
         push @order, $u
-        for my $v (@{$g->{$u}}) {
+        for val $v (@{$g->{$u}}) {
             next if $seen{$v}
             $seen{$v} = 1
             push @q, $v
@@ -39,11 +39,11 @@ len(@{Gr::bfs(\%g, 'A')})       |> aeq 5, "bfs visits 5"
 fn Gr::dfs($g, $u, $seen, $order) {
     $seen->{$u} = 1
     push @$order, $u
-    for my $v (@{$g->{$u}}) { Gr::dfs($g, $v, $seen, $order) unless $seen->{$v} }
+    for val $v (@{$g->{$u}}) { Gr::dfs($g, $v, $seen, $order) unless $seen->{$v} }
 }
 
-my %s = ()
-my @o = ()
+val %s = ()
+val @o = ()
 Gr::dfs(\%g, 'A', \%s, \@o)
 join(",", @o) |> aeq "A,B,D,C,E", "dfs from A"
 
@@ -51,15 +51,15 @@ join(",", @o) |> aeq "A,B,D,C,E", "dfs from A"
 
 fn Gr::shortest($g, $src, $dst) {
     return [$src] if $src eq $dst
-    my @q = ([$src])
-    my %seen = ($src => 1)
+    var @q = ([$src])
+    var %seen = ($src => 1)
     while (len(@q)) {
-        my $path = shift @q
-        my $u = $path->[-1]
-        for my $v (@{$g->{$u}}) {
+        val $path = shift @q
+        val $u = $path->[-1]
+        for val $v (@{$g->{$u}}) {
             next if $seen{$v}
             $seen{$v} = 1
-            my @np = (@$path, $v)
+            val @np = (@$path, $v)
             return \@np if $v eq $dst
             push @q, \@np
         }
@@ -72,7 +72,7 @@ len(@{Gr::shortest(\%g, 'A', 'D')})        |> aeq 3, "shortest len A->D"
 
 # ── Topological sort (DAG) ─────────────────────────────────────────────────
 
-my %dag = (
+val %dag = (
     A => ['B', 'C'],
     B => ['D'],
     C => ['D'],
@@ -81,18 +81,18 @@ my %dag = (
 )
 
 fn Gr::toposort($g) {
-    my %in = ()
-    for my $u (keys %$g) {
+    var %in = ()
+    for val $u (keys %$g) {
         $in{$u} //= 0
-        for my $v (@{$g->{$u}}) { $in{$v} = ($in{$v} // 0) + 1 }
+        for val $v (@{$g->{$u}}) { $in{$v} = ($in{$v} // 0) + 1 }
     }
-    my @q = sort grep { $in{$_} == 0 } keys %in
-    my @order = ()
+    var @q = sort grep { $in{$_} == 0 } keys %in
+    var @order = ()
     while (len(@q)) {
-        my $u = shift @q
+        val $u = shift @q
         push @order, $u
-        my @next = ()
-        for my $v (@{$g->{$u}}) {
+        var @next = ()
+        for val $v (@{$g->{$u}}) {
             $in{$v}--
             push @next, $v if $in{$v} == 0
         }
@@ -105,7 +105,7 @@ join(",", @{Gr::toposort(\%dag)}) |> aeq "A,B,C,D,E", "topo sort"
 
 # ── Dijkstra (weighted) ────────────────────────────────────────────────────
 
-my %wg = (
+val %wg = (
     A => [['B', 1], ['C', 4]],
     B => [['C', 2], ['D', 5]],
     C => [['D', 1]],
@@ -113,24 +113,24 @@ my %wg = (
 )
 
 fn Gr::dij($g, $src) {
-    my %dist = map { $_ => 1e18 } keys %$g
+    var %dist = map { $_ => 1e18 } keys %$g
     $dist{$src} = 0
-    my %done = ()
+    var %done = ()
     while (1) {
-        my @rem = grep { !$done{$_} } keys %dist
+        val @rem = grep { !$done{$_} } keys %dist
         last unless len(@rem)
-        my ($u) = sort { $dist{_} <=> $dist{_1} } @rem
+        val ($u) = sort { $dist{_} <=> $dist{_1} } @rem
         last if $dist{$u} == 1e18
         $done{$u} = 1
-        for my $e (@{$g->{$u}}) {
-            my ($v, $w) = @$e
+        for val $e (@{$g->{$u}}) {
+            val ($v, $w) = @$e
             $dist{$v} = $dist{$u} + $w if $dist{$u} + $w < $dist{$v}
         }
     }
     \%dist
 }
 
-my $d = Gr::dij(\%wg, 'A')
+val $d = Gr::dij(\%wg, 'A')
 $d->{A} |> aeq 0, "dij A->A"
 $d->{B} |> aeq 1, "dij A->B"
 $d->{C} |> aeq 3, "dij A->C"
@@ -139,17 +139,17 @@ $d->{D} |> aeq 4, "dij A->D"
 # ── Cycle detection (DFS) ──────────────────────────────────────────────────
 
 fn Gr::has_cycle($g) {
-    my %col = ()
+    var %col = ()
     fn Gr::_visit($g, $u, $col) {
         $col->{$u} = 'g'
-        for my $v (@{$g->{$u}}) {
+        for val $v (@{$g->{$u}}) {
             return 1 if ($col->{$v} // '') eq 'g'
             return 1 if !$col->{$v} && Gr::_visit($g, $v, $col)
         }
         $col->{$u} = 'b'
         0
     }
-    for my $u (keys %$g) {
+    for val $u (keys %$g) {
         return 1 if !$col{$u} && Gr::_visit($g, $u, \%col)
     }
     0
@@ -157,30 +157,30 @@ fn Gr::has_cycle($g) {
 
 Gr::has_cycle(\%dag) |> aeq 0, "DAG: no cycle"
 
-my %cyc = ( A => ['B'], B => ['C'], C => ['A'] )
+val %cyc = ( A => ['B'], B => ['C'], C => ['A'] )
 Gr::has_cycle(\%cyc) |> aok "cycle: detected"
 
 # ── Connected components ───────────────────────────────────────────────────
 
 fn Gr::components($g) {
-    my %seen = ()
-    my @comps = ()
-    for my $start (sort keys %$g) {
+    var %seen = ()
+    var @comps = ()
+    for val $start (sort keys %$g) {
         next if $seen{$start}
-        my @c = @{Gr::bfs($g, $start)}
-        my @new = grep { !$seen{$_} } @c
+        val @c = @{Gr::bfs($g, $start)}
+        val @new = grep { !$seen{$_} } @c
         $seen{$_} = 1 for @new
         push @comps, [sort @new] if len(@new)
     }
     \@comps
 }
 
-my %multi = (
+val %multi = (
     A => ['B'], B => ['A'],
     C => ['D'], D => ['C'],
     E => [],
 )
-my $c = Gr::components(\%multi)
+val $c = Gr::components(\%multi)
 len(@$c)                |> aeq 3, "3 components"
 join("|", map { join(",", @$_) } @$c) |> aeq "A,B|C,D|E", "components contents"
 

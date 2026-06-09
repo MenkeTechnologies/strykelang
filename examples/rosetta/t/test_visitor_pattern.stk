@@ -5,7 +5,7 @@
 # over the same expression tree.
 
 fn Rosetta::Visitor::accept($node, $visitor) {
-    my $kind = $node->{kind}
+    val $kind = $node->{kind}
     return undef unless exists $visitor->{$kind}
     $visitor->{$kind}($node, $visitor)
 }
@@ -14,13 +14,13 @@ fn Rosetta::Visitor::sum_visitor() {
     {
         num => fn ($n, $v) { $n->{value} },
         add => fn ($n, $v) {
-            my $l = Rosetta::Visitor::accept($n->{left},  $v)
-            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            val $l = Rosetta::Visitor::accept($n->{left},  $v)
+            val $r = Rosetta::Visitor::accept($n->{right}, $v)
             $l + $r
         },
         mul => fn ($n, $v) {
-            my $l = Rosetta::Visitor::accept($n->{left},  $v)
-            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            val $l = Rosetta::Visitor::accept($n->{left},  $v)
+            val $r = Rosetta::Visitor::accept($n->{right}, $v)
             $l * $r
         },
         neg => fn ($n, $v) {
@@ -33,24 +33,24 @@ fn Rosetta::Visitor::render_visitor() {
     {
         num => fn ($n, $v) { "$n->{value}" },
         add => fn ($n, $v) {
-            my $l = Rosetta::Visitor::accept($n->{left},  $v)
-            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            val $l = Rosetta::Visitor::accept($n->{left},  $v)
+            val $r = Rosetta::Visitor::accept($n->{right}, $v)
             "($l + $r)"
         },
         mul => fn ($n, $v) {
-            my $l = Rosetta::Visitor::accept($n->{left},  $v)
-            my $r = Rosetta::Visitor::accept($n->{right}, $v)
+            val $l = Rosetta::Visitor::accept($n->{left},  $v)
+            val $r = Rosetta::Visitor::accept($n->{right}, $v)
             "($l * $r)"
         },
         neg => fn ($n, $v) {
-            my $o = Rosetta::Visitor::accept($n->{operand}, $v)
+            val $o = Rosetta::Visitor::accept($n->{operand}, $v)
             "(-$o)"
         },
     }
 }
 
 # Build (3 + 4) * (-2)
-my $tree = {
+val $tree = {
     kind => "mul",
     left => {
         kind  => "add",
@@ -64,25 +64,25 @@ my $tree = {
 }
 
 # Sum visitor evaluates the tree
-my $sum_v = Rosetta::Visitor::sum_visitor()
+val $sum_v = Rosetta::Visitor::sum_visitor()
 assert_eq Rosetta::Visitor::accept($tree, $sum_v), -14, "(3+4) * -2 = -14"
 
 # Render visitor produces an infix string
-my $ren_v = Rosetta::Visitor::render_visitor()
+val $ren_v = Rosetta::Visitor::render_visitor()
 assert_eq Rosetta::Visitor::accept($tree, $ren_v), "((3 + 4) * (-2))", "rendered tree"
 
 # Same tree, different operation — that's polymorphism by visitor.
 # Add a constant-folding scenario via a third visitor.
-my $count_v = {
+val $count_v = {
     num => fn ($n, $v) { 1 },
     add => fn ($n, $v) {
-        my $l = Rosetta::Visitor::accept($n->{left}, $v)
-        my $r = Rosetta::Visitor::accept($n->{right}, $v)
+        val $l = Rosetta::Visitor::accept($n->{left}, $v)
+        val $r = Rosetta::Visitor::accept($n->{right}, $v)
         $l + $r + 1
     },
     mul => fn ($n, $v) {
-        my $l = Rosetta::Visitor::accept($n->{left}, $v)
-        my $r = Rosetta::Visitor::accept($n->{right}, $v)
+        val $l = Rosetta::Visitor::accept($n->{left}, $v)
+        val $r = Rosetta::Visitor::accept($n->{right}, $v)
         $l + $r + 1
     },
     neg => fn ($n, $v) {
@@ -93,7 +93,7 @@ my $count_v = {
 assert_eq Rosetta::Visitor::accept($tree, $count_v), 6, "node count = 6"
 
 # Subtree
-my $sub = $tree->{left}
+val $sub = $tree->{left}
 assert_eq Rosetta::Visitor::accept($sub, $sum_v), 7,        "(3+4) = 7"
 assert_eq Rosetta::Visitor::accept($sub, $ren_v), "(3 + 4)","(3+4) rendered"
 

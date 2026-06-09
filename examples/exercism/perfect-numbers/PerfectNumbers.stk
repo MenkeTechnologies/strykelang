@@ -3,8 +3,8 @@
 fn Exercism::PerfectNumbers::classify {
     return ["error", "Classification is only possible for natural numbers."] if _ < 1
     return ["ok", "deficient"] if _ == 1
-    my $n    = _
-    my $half = int($n / 2)
-    my $sum  = ~> 1:$half greps { $n % _ == 0 } sum
+    val $n    = _
+    val $half = int($n / 2)
+    val $sum  = ~> 1:$half greps { $n % _ == 0 } sum
     ["ok", $sum == $n ? "perfect" : $sum < $n ? "deficient" : "abundant"]
 }

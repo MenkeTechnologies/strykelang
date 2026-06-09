@@ -16,14 +16,14 @@ fn Rosetta::Events::on($emitter, $event, $callback) {
 
 fn Rosetta::Events::emit($emitter, $event, $data) {
     if (exists $emitter->{listeners}->{$event}) {
-        for my $cb (@{$emitter->{listeners}->{$event}}) {
+        for val $cb (@{$emitter->{listeners}->{$event}}) {
             $cb($data)
         }
     }
 }
 
-my $emitter = RosettaEventsEmitter(+{})
-my $out = +{ received => undef }
+val $emitter = RosettaEventsEmitter(+{})
+var $out = +{ received => undef }
 Rosetta::Events::on($emitter, "test", fn { $out->{received} = _ })
 Rosetta::Events::emit($emitter, "test", "Hello Events")
 

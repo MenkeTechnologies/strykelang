@@ -3,9 +3,9 @@
 
 fn Rosetta::TerminalColor::demo() {
     # Using ANSI escape codes for colored text
-    my $red = "\e[31m"
-    my $green = "\e[32m"
-    my $reset = "\e[0m"
+    val $red = "\e[31m"
+    val $green = "\e[32m"
+    val $reset = "\e[0m"
     
     # We can also use builtins if available, but ANSI is standard
     p "${red}Red Text${reset}"

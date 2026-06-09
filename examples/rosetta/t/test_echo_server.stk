@@ -6,11 +6,11 @@ fn Rosetta::EchoServer::demo() {
     # However, testing a blocking network server in a unit test is difficult.
     # We will show the idiomatic structure.
     
-    # my $server = socket(AF_INET, SOCK_STREAM, 0);
+    # val $server = socket(AF_INET, SOCK_STREAM, 0);
     # bind($server, sockaddr_in(12345, INADDR_ANY));
     # listen($server, 5);
-    # while (my $client = accept($server)) {
-    #     my $buf = read($client, 1024);
+    # while (val $client = accept($server)) {
+    #     val $buf = read($client, 1024);
     #     write($client, $buf);
     #     close($client);
     # }

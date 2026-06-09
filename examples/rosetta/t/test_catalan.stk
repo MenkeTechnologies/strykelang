@@ -5,7 +5,7 @@ fn Rosetta::Catalan::compute($n) {
     if ($n == 0) {
         1
     } else {
-        my $prev = Rosetta::Catalan::compute($n - 1)
+        val $prev = Rosetta::Catalan::compute($n - 1)
         (2 * (2 * $n - 1) * $prev) / ($n + 1)
     }
 }
@@ -19,7 +19,7 @@ assert_eq Rosetta::Catalan::compute(1), 1, "C1"
 assert_eq Rosetta::Catalan::compute(3), 5, "C3"
 assert_eq Rosetta::Catalan::compute(10), 16796, "C10"
 
-my @list = Rosetta::Catalan::list(5)
+val @list = Rosetta::Catalan::list(5)
 assert_eq join(",", @list), "1,1,2,5,14,42", "catalan list first 6"
 
 5 |> Rosetta::Catalan::compute |> assert_eq(42, "pipe catalan 5")

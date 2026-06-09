@@ -2,11 +2,11 @@
 # Rosetta Code: Coin change — minimum number of coins to make a target amount
 
 fn Rosetta::CoinChange::min_coins($coins, $amount) {
-    my $inf = $amount + 1
-    my @dp = ($inf) x ($amount + 1)
+    val $inf = $amount + 1
+    var @dp = ($inf) x ($amount + 1)
     $dp[0] = 0
-    for my $a (1:$amount) {
-        for my $c (@$coins) {
+    for val $a (1:$amount) {
+        for val $c (@$coins) {
             if ($c <= $a && $dp[$a - $c] + 1 < $dp[$a]) {
                 $dp[$a] = $dp[$a - $c] + 1
             }

@@ -18,9 +18,9 @@
 # In-place shuffle of an arrayref. Returns the (now-shuffled) ref so
 # call sites can chain.
 fn Shuffle::knuth($r) {
-    my $n = len(@$r)
-    for (my $i = $n - 1; $i > 0; $i--) {
-        my $j = int(rand $i + 1)
+    val $n = len(@$r)
+    for (var $i = $n - 1; $i > 0; $i--) {
+        var $j = int(rand $i + 1)
         ($r->[$i], $r->[$j]) = ($r->[$j], $r->[$i])
     }
     $r
@@ -28,7 +28,7 @@ fn Shuffle::knuth($r) {
 
 # Non-mutating variant: deep-copy first, then in-place shuffle the copy.
 fn Shuffle::shuffled($r) {
-    my @copy = @$r
+    val @copy = @$r
     Shuffle::knuth(\@copy)
     \@copy
 }
@@ -38,8 +38,8 @@ p "── Knuth shuffle demo ──"
 srand(42)   # deterministic across runs
 
 # Length and element-set must be preserved by a shuffle.
-my @orig = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-my $sh = Shuffle::shuffled(\@orig)
+val @orig = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+val $sh = Shuffle::shuffled(\@orig)
 die "length changed by shuffle" unless len(@$sh) == len(@orig)
 die "elements changed by shuffle" unless join(",", sort { _ <=> _1 } @$sh) eq join(",", @orig)
 p "  shuffle preserves length + multiset  OK"
@@ -52,28 +52,28 @@ p "  shuffle of [] and [42] is identity  OK"
 # Statistical fairness: shuffle a 4-element array N times, count how
 # often each permutation appears. With N=24000 and 24 perms, each
 # should appear ~1000 times. Allow ±35% (loose for low-bias sanity).
-my $N = 24000
-my %freq
+val $N = 24000
+var %freq
 for (1:$N) {
-    my $p = Shuffle::shuffled([1, 2, 3, 4])
+    val $p = Shuffle::shuffled([1, 2, 3, 4])
     $freq{join(",", @$p)}++
 }
 die "should see all 24 permutations" unless len(keys %freq) == 24
-my $expected = $N / 24
-my $low  = int($expected * 0.65)
-my $high = int($expected * 1.35)
-for my $k (keys %freq) {
-    my $count = $freq{$k}
+val $expected = $N / 24
+val $low  = int($expected * 0.65)
+val $high = int($expected * 1.35)
+for val $k (keys %freq) {
+    val $count = $freq{$k}
     die "perm $k count $count out of [$low, $high]" unless $count >= $low && $count <= $high
 }
 p "  fairness: all 24 perms within ±35% of expected #{$expected}  OK"
 
 # In-place vs deep-copy: knuth() mutates, shuffled() doesn't.
-my @a = (1, 2, 3, 4, 5)
-my $before = join(",", @a)
-my $r = Shuffle::shuffled(\@a)
+val @a = (1, 2, 3, 4, 5)
+val $before = join(",", @a)
+val $r = Shuffle::shuffled(\@a)
 die "shuffled() must NOT mutate input" unless join(",", @a) eq $before
-my $r2 = Shuffle::knuth(\@a)
+val $r2 = Shuffle::knuth(\@a)
 die "knuth() MUST mutate input"        if     join(",", @a) eq $before
 p "  in-place vs non-mutating contract held  OK"
 

@@ -34,15 +34,15 @@ fn Kap::step($n) = (0 + Kap::descending($n)) - (0 + Kap::ascending($n))
 # Repunits (1111, 2222, ...) have one distinct digit — Kaprekar's
 # routine sends them to 0 and stays there. Filter them out.
 fn Kap::has_two_distinct($n) {
-    my %s
-    for my $d (Kap::digits($n)) { $s{$d} = 1 }
+    var %s
+    for val $d (Kap::digits($n)) { $s{$d} = 1 }
     len(%s) >= 2
 }
 
 # Iteration count until fixed point 6174 (or -1 if it never gets there).
 fn Kap::iters_to_6174($n) {
-    my $cur = $n
-    my $k = 0
+    var $cur = $n
+    var $k = 0
     while ($cur != 6174) {
         return -1 if $k > 20
         $cur = Kap::step($cur)
@@ -53,19 +53,19 @@ fn Kap::iters_to_6174($n) {
 
 # ── examples table ────────────────────────────────────────────────
 
-my @samples = (1234, 6589, 9998, 1000, 2345, 7531)
+val @samples = (1234, 6589, 9998, 1000, 2345, 7531)
 
 printf "── Kaprekar trace for selected n ───────────────────\n\n"
 printf "  %5s   %8s   %8s   %8s   %s\n", "n", "desc", "asc", "diff", "step"
 printf "  %5s   %8s   %8s   %8s   %s\n", "-----", "--------", "--------", "--------", "----"
 
-for my $n (@samples) {
-    my $cur = $n
-    my $k = 0
+for val $n (@samples) {
+    var $cur = $n
+    var $k = 0
     while ($cur != 6174 && $k < 10) {
-        my $dsc = Kap::descending($cur)
-        my $asc = Kap::ascending($cur)
-        my $diff = (0 + $dsc) - (0 + $asc)
+        val $dsc = Kap::descending($cur)
+        val $asc = Kap::ascending($cur)
+        val $diff = (0 + $dsc) - (0 + $asc)
         printf "  %5d   %8s   %8s   %8d   #%d\n", $cur, $dsc, $asc, $diff, $k + 1
         $cur = $diff
         $k++
@@ -76,11 +76,11 @@ for my $n (@samples) {
 # ── invariant 1: every 4-digit n with ≥ 2 distinct digits converges
 #                 to 6174 in at most 7 iterations. ────────────────
 
-my $max_iters = 0
-my $checked = 0
-for my $n (1000:9999) {
+var $max_iters = 0
+var $checked = 0
+for val $n (1000:9999) {
     next unless Kap::has_two_distinct($n)
-    my $k = Kap::iters_to_6174($n)
+    val $k = Kap::iters_to_6174($n)
     die "n=$n: never converged" unless $k >= 0
     die "n=$n: took $k > 7 iterations" unless $k <= 7
     $max_iters = $k if $k > $max_iters
@@ -93,7 +93,7 @@ die "6174 must be fixed under one Kap step" unless Kap::step(6174) == 6174
 
 # ── invariant 3: repunits go to 0 in one step ─────────────────────
 
-for my $n (1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999) {
+for val $n (1111, 2222, 3333, 4444, 5555, 6666, 7777, 8888, 9999) {
     die "repunit $n must collapse to 0" unless Kap::step($n) == 0
 }
 

@@ -6,8 +6,8 @@ fn Rosetta::LongPrimes::is_long($p) {
     return 0 if $p < 7
     return 0 if !is_prime($p)
     return 0 if $p == 2 || $p == 5
-    my $r = 1
-    for my $k (1:$p-2) {
+    var $r = 1
+    for val $k (1:$p-2) {
         $r = ($r * 10) % $p
         return 0 if $r == 1
     }
@@ -19,7 +19,7 @@ fn Rosetta::LongPrimes::list($limit) {
 }
 
 # OEIS A001913: 7, 17, 19, 23, 29, 47, 59, 61, 97, 109, 113, 131, 149, 167, 179, 181, ...
-my @under_200 = Rosetta::LongPrimes::list(200)
+val @under_200 = Rosetta::LongPrimes::list(200)
 assert_eq join(",", @under_200),
     "7,17,19,23,29,47,59,61,97,109,113,131,149,167,179,181,193",
     "long primes < 200"

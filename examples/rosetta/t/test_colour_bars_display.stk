@@ -2,29 +2,29 @@
 # Rosetta Code: Colour bars/Display
 
 fn Rosetta::ColourBars::row($width) {
-    my @bars = qw(K R G B M C Y W)
-    my $bar_w = int($width / len(@bars))
-    my $line = ""
-    for my $bar (@bars) {
+    val @bars = qw(K R G B M C Y W)
+    val $bar_w = int($width / len(@bars))
+    var $line = ""
+    for val $bar (@bars) {
         $line .= $bar x $bar_w
     }
     $line
 }
 
 fn Rosetta::ColourBars::render($width, $height) {
-    my $line = Rosetta::ColourBars::row($width)
-    my @rows = ~> 1:$height map { $line }
+    val $line = Rosetta::ColourBars::row($width)
+    val @rows = ~> 1:$height map { $line }
     \@rows
 }
 
 fn Rosetta::ColourBars::unique($text) {
-    my %seen
-    for my $ch (split //, $text) { $seen{$ch} = 1 if $ch =~ /[A-Z]/ }
+    var %seen
+    for val $ch (split //, $text) { $seen{$ch} = 1 if $ch =~ /[A-Z]/ }
     len(keys %seen)
 }
 
-my $bars = Rosetta::ColourBars::render(32, 4)
-my $joined = join("\n", @$bars)
+val $bars = Rosetta::ColourBars::render(32, 4)
+val $joined = join("\n", @$bars)
 
 assert_eq len(@$bars), 4, "4 display rows"
 assert_eq len($bars->[0]), 32, "8 equal bars fill width 32"

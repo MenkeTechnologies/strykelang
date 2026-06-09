@@ -2,14 +2,14 @@
 # Rosetta Code: Z-algorithm
 
 fn Rosetta::ZAlgorithm::compute($s) {
-    my @chars = chars($s)
-    my $n = len(@chars)
-    my @z = ~> 0:$n-1 map { 0 }
-    my ($l, $r) = (0, 0)
+    val @chars = chars($s)
+    val $n = len(@chars)
+    var @z = ~> 0:$n-1 map { 0 }
+    var ($l, $r) = (0, 0)
     
-    for (my $i = 1; $i < $n; $i++) {
+    for (var $i = 1; $i < $n; $i++) {
         if ($i <= $r) {
-            my $min = $z[$i - $l] < $r - $i + 1 ? $z[$i - $l] : $r - $i + 1
+            val $min = $z[$i - $l] < $r - $i + 1 ? $z[$i - $l] : $r - $i + 1
             $z[$i] = $min
         }
         while ($i + $z[$i] < $n && $chars[$z[$i]] eq $chars[$i + $z[$i]]) {
@@ -24,11 +24,11 @@ fn Rosetta::ZAlgorithm::compute($s) {
 }
 
 fn Rosetta::ZAlgorithm::search($text, $pattern) {
-    my $concat = $pattern . "\$" . $text
-    my $z = Rosetta::ZAlgorithm::compute($concat)
-    my $plen = len($pattern)
-    my @indices
-    for (my $i = 0; $i < len(@$z); $i++) {
+    val $concat = $pattern . "\$" . $text
+    val $z = Rosetta::ZAlgorithm::compute($concat)
+    val $plen = len($pattern)
+    var @indices
+    for (var $i = 0; $i < len(@$z); $i++) {
         if ($z->[$i] == $plen) {
             push @indices, $i - $plen - 1
         }
@@ -36,14 +36,14 @@ fn Rosetta::ZAlgorithm::search($text, $pattern) {
     \@indices
 }
 
-my $z1 = Rosetta::ZAlgorithm::compute("aabcaabx")
+val $z1 = Rosetta::ZAlgorithm::compute("aabcaabx")
 # p "DEBUG: " . join(",", @$z1)
 assert_eq join(",", @$z1), "0,1,0,0,3,1,0,0", "Z-array for aabcaabx"
 
-my $matches = Rosetta::ZAlgorithm::search("baabaa", "aab")
+val $matches = Rosetta::ZAlgorithm::search("baabaa", "aab")
 assert_eq join(",", @$matches), "1", "Pattern aab in baabaa"
 
-my $matches2 = Rosetta::ZAlgorithm::search("ababa", "aba")
+val $matches2 = Rosetta::ZAlgorithm::search("ababa", "aba")
 assert_eq join(",", @$matches2), "0,2", "Pattern aba in ababa"
 
 test_run

@@ -2,12 +2,12 @@
 # Rosetta Code: Experimental Verification of the NKTg Law Using NASA Neptune Data (2023–2024)
 
 fn Rosetta::NKTgNeptune::score($vals) {
-    my $sum = 0
-    for my $v (@$vals) { $sum += log(1 + $v) }
+    var $sum = 0
+    for val $v (@$vals) { $sum += log(1 + $v) }
     $sum
 }
 
-my @vals = (10, 11, 12, 13)
+val @vals = (10, 11, 12, 13)
 
 assert_eq int(Rosetta::NKTgNeptune::score(\@vals) * 1000), 10086, "neptune score is stable"
 assert_eq len(@vals), 4, "dataset contains four samples"

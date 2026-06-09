@@ -2,20 +2,20 @@
 # Rosetta Code: Spearman's rank correlation coefficient
 
 fn Rosetta::Stats::rank(@data) {
-    my $n = cnt(@data)
-    my @indices = sort { $data[_] <=> $data[_1] } 0:($n - 1)
+    val $n = cnt(@data)
+    val @indices = sort { $data[_] <=> $data[_1] } 0:($n - 1)
     
-    my @ranks = (0) x $n
-    my $i = 0
+    var @ranks = (0) x $n
+    var $i = 0
     while ($i < $n) {
-        my $j = $i
+        var $j = $i
         while ($j < $n - 1 && $data[$indices[$j+1]] == $data[$indices[$j]]) {
             $j++
         }
         
         # Average rank for ties
-        my $avg_rank = ($i + $j) / 2.0 + 1
-        for (my $k = $i; $k <= $j; $k++) {
+        val $avg_rank = ($i + $j) / 2.0 + 1
+        for (var $k = $i; $k <= $j; $k++) {
             $ranks[$indices[$k]] = $avg_rank
         }
         $i = $j + 1
@@ -24,39 +24,39 @@ fn Rosetta::Stats::rank(@data) {
 }
 
 fn Rosetta::Stats::pearson($x, $y) {
-    my $mx = avg(@$x)
-    my $my = avg(@$y)
-    my @dx = ~> @$x map { _ - $mx }
-    my @dy = ~> @$y map { _ - $my }
-    my $num = ~> 0:len(@dx)-1 map { $dx[_] * $dy[_] } sum
-    my $dx2 = ~> @dx map { _ ** 2 } sum
-    my $dy2 = ~> @dy map { _ ** 2 } sum
+    val $mx = avg(@$x)
+    val $my = avg(@$y)
+    val @dx = ~> @$x map { _ - $mx }
+    val @dy = ~> @$y map { _ - $my }
+    val $num = ~> 0:len(@dx)-1 map { $dx[_] * $dy[_] } sum
+    val $dx2 = ~> @dx map { _ ** 2 } sum
+    val $dy2 = ~> @dy map { _ ** 2 } sum
     return 0 if $dx2 == 0 || $dy2 == 0
     $num / sqrt($dx2 * $dy2)
 }
 
 fn Rosetta::Stats::spearman($x, $y) {
-    my $rx = Rosetta::Stats::rank(@$x)
-    my $ry = Rosetta::Stats::rank(@$y)
+    val $rx = Rosetta::Stats::rank(@$x)
+    val $ry = Rosetta::Stats::rank(@$y)
     Rosetta::Stats::pearson($rx, $ry)
 }
 
-my $x = [10, 20, 30, 40, 50]
-my $y = [2, 1, 4, 3, 5]
+val $x = [10, 20, 30, 40, 50]
+val $y = [2, 1, 4, 3, 5]
 
 # Ranks of x: 1, 2, 3, 4, 5
 # Ranks of y: 2, 1, 4, 3, 5
 # Pearson of ranks: 0.8
-my $rho = Rosetta::Stats::spearman($x, $y)
+val $rho = Rosetta::Stats::spearman($x, $y)
 assert_ok abs($rho - 0.8) < 1e-10, "Spearman rho for (1:5) example"
 
 # Perfect correlation
-my $x2 = [1, 2, 3]
-my $y2 = [10, 20, 30]
+val $x2 = [1, 2, 3]
+val $y2 = [10, 20, 30]
 assert_ok abs(Rosetta::Stats::spearman($x2, $y2) - 1.0) < 1e-10, "Perfect Spearman correlation"
 
 # Perfect inverse correlation
-my $y3 = [30, 20, 10]
+val $y3 = [30, 20, 10]
 assert_ok abs(Rosetta::Stats::spearman($x2, $y3) - (-1.0)) < 1e-10, "Perfect inverse Spearman correlation"
 
 test_run

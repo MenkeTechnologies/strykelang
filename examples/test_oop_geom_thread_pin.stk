@@ -36,14 +36,14 @@ class Tri impl Geom {
     b: Float = 1.0
     c: Float = 1.0
     fn area {
-        my $s = ($self->a + $self->b + $self->c) / 2
+        val $s = ($self->a + $self->b + $self->c) / 2
         sqrt($s * ($s - $self->a) * ($s - $self->b) * ($s - $self->c))
     }
     fn perimeter = $self->a + $self->b + $self->c
     fn kind      = "tri"
 }
 
-my @shapes = (
+val @shapes = (
     Sq->new(side => 2.0),
     Sq->new(side => 3.0),
     Rc->new(w => 4.0, h => 5.0),
@@ -54,60 +54,60 @@ my @shapes = (
     Tri->new(a => 5.0, b => 12.0, c => 13.0),
 )
 
-fn aprox($x, $y) { my $d = $x - $y; if ($d < 0) { $d = -$d }; $d < 0.0001 }
+fn aprox($x, $y) { var $d = $x - $y; if ($d < 0) { $d = -$d }; $d < 0.0001 }
 
 # ── ~> total area across polymorphic shapes ──────────────────────────
-my $total_area = ~> @shapes map { _->area() } sum |> id
-my $expect_area = 4 + 9 + 20 + 14 + 3.141592653589793 + 9*3.141592653589793 + 6 + 30
+val $total_area = ~> @shapes map { _->area() } sum |> id
+val $expect_area = 4 + 9 + 20 + 14 + 3.141592653589793 + 9*3.141592653589793 + 6 + 30
 aprox($total_area, $expect_area) |> aeq 1, "total area"
 
 # ── ~> total perimeter ───────────────────────────────────────────────
-my $total_per = ~> @shapes map { _->perimeter() } sum |> id
-my $expect_per = 8 + 12 + 18 + 18 + 2*3.141592653589793 + 6*3.141592653589793 + 12 + 30
+val $total_per = ~> @shapes map { _->perimeter() } sum |> id
+val $expect_per = 8 + 12 + 18 + 18 + 2*3.141592653589793 + 6*3.141592653589793 + 12 + 30
 aprox($total_per, $expect_per) |> aeq 1, "total perimeter"
 
 # ── ~> count squares via grep on kind() method ───────────────────────
-my $n_sq = ~> @shapes grep { _->kind() eq "square" } len
+val $n_sq = ~> @shapes grep { _->kind() eq "square" } len
 $n_sq |> aeq 2, "2 squares"
 
-my $n_ci = ~> @shapes grep { _->kind() eq "circle" } len
+val $n_ci = ~> @shapes grep { _->kind() eq "circle" } len
 $n_ci |> aeq 2, "2 circles"
 
 # ── ~> sort by area desc, take first kind ────────────────────────────
-my @by_area_desc = ~> @shapes sort { _1->area() <=> _->area() }
+val @by_area_desc = ~> @shapes sort { _1->area() <=> _->area() }
 $by_area_desc[0]->kind() |> aeq "tri", "biggest tri"
 $by_area_desc[-1]->kind() |> aeq "circle", "smallest circle"
 
 # ── ~> unique kinds (sorted) ─────────────────────────────────────────
-my @kinds = ~> @shapes map { _->kind() } uniq sort
+val @kinds = ~> @shapes map { _->kind() } uniq sort
 join(",", @kinds) |> aeq "circle,rect,square,tri", "4 kinds"
 
 # ── ~> average area ──────────────────────────────────────────────────
-my $avg_area = (~> @shapes map { _->area() } sum) / (len @shapes)
+val $avg_area = (~> @shapes map { _->area() } sum) / (len @shapes)
 ($avg_area > 14 && $avg_area < 15) |> aeq 1, "avg area ~14.3"
 
 # ── ->> thread-last fed into a custom builder ────────────────────────
 fn build_summary(@gs) {
-    my $ar = 0
-    my $pe = 0
-    for my $g (@gs) {
+    var $ar = 0
+    var $pe = 0
+    for val $g (@gs) {
         $ar += $g->area()
         $pe += $g->perimeter()
     }
     { area => $ar, peri => $pe, count => len @gs }
 }
 
-my $summary = ~>> @shapes build_summary |> id
+val $summary = ~>> @shapes build_summary |> id
 $summary->{"count"} |> aeq 8, "summary count"
 ($summary->{"area"} - $expect_area) |> aprox 0 |> aeq 1, "summary area"
 ($summary->{"peri"} - $expect_per)  |> aprox 0 |> aeq 1, "summary peri"
 
 # ── ~p> parallel sum across raw side lengths ─────────────────────────
-my @lens = (3, 4, 5, 6, 7, 8, 9, 10)
-my $par_sum = ~p> @lens sum
+val @lens = (3, 4, 5, 6, 7, 8, 9, 10)
+val $par_sum = ~p> @lens sum
 $par_sum |> aeq 52, "~p> sum"
-my @dbl = ~> @lens map { _ * 2 }
-my $par_dbl = ~> @dbl sum
+val @dbl = ~> @lens map { _ * 2 }
+val $par_dbl = ~> @dbl sum
 $par_dbl |> aeq 104, "~> mapped sum"
 
 # ── Polygon class wrapping a shape list w/ ~> internal methods ───────
@@ -121,25 +121,25 @@ class Scene {
     fn total_area    { ~> @{$self->items} map { _->area() } sum }
     fn total_per     { ~> @{$self->items} map { _->perimeter() } sum }
     fn biggest       {
-        my @s = ~> @{$self->items} sort { _1->area() <=> _->area() }
+        val @s = ~> @{$self->items} sort { _1->area() <=> _->area() }
         $s[0]
     }
     fn smallest      {
-        my @s = ~> @{$self->items} sort { _->area() <=> _1->area() }
+        val @s = ~> @{$self->items} sort { _->area() <=> _1->area() }
         $s[0]
     }
     fn kinds_sorted  {
-        my @k = ~> @{$self->items} map { _->kind() } uniq sort
+        val @k = ~> @{$self->items} map { _->kind() } uniq sort
         \@k
     }
     fn of_kind($k)   {
-        my @f = ~> @{$self->items} grep { _->kind() eq $k }
+        val @f = ~> @{$self->items} grep { _->kind() eq $k }
         \@f
     }
     fn par_area      { ~p> @{$self->items} map { _->area() } sum }
 }
 
-my $scene = Scene->new(name => "main", items => [])
+val $scene = Scene->new(name => "main", items => [])
 $scene->add($_) for @shapes
 $scene->n() |> aeq 8, "scene n=8"
 
@@ -154,20 +154,20 @@ join(",", @{$scene->kinds_sorted()}) |> aeq "circle,rect,square,tri", "scene kin
 aprox($scene->par_area(), $expect_area) |> aeq 1, "scene par_area"
 
 # ── Composed: ~> with arrow-block stage calling method ───────────────
-my @aspect_per_rect = ~> @shapes grep { _->kind() eq "rect" } map { >{ _->w / _->h } }
+val @aspect_per_rect = ~> @shapes grep { _->kind() eq "rect" } map { >{ _->w / _->h } }
 $aspect_per_rect[0] |> aeq (4.0/5.0), "rect1 aspect"
 $aspect_per_rect[1] |> aeq (2.0/7.0), "rect2 aspect"
 
 # ── Per-kind grouped area via for-loop populated from ~> sort ────────
-my @by_kind_then_area = ~> @shapes sort { _->kind() cmp _1->kind() }
-my @ordered_kinds = ()
+val @by_kind_then_area = ~> @shapes sort { _->kind() cmp _1->kind() }
+var @ordered_kinds = ()
 push @ordered_kinds, $_->kind() for @by_kind_then_area
 $ordered_kinds[0] |> aeq "circle", "kind sort first"
 $ordered_kinds[-1] |> aeq "tri",    "kind sort last"
 
 # ── Sum area per kind via hash + ~> map fanout ───────────────────────
-my %by_kind_area = ()
-for my $g (@shapes) {
+var %by_kind_area = ()
+for val $g (@shapes) {
     $by_kind_area{$g->kind()} //= 0
     $by_kind_area{$g->kind()} = $by_kind_area{$g->kind()} + $g->area()
 }
@@ -184,11 +184,11 @@ kind_area("rect")   |> aeq 34, "fn kind_area rect"
 kind_area("tri")    |> aeq 36, "fn kind_area tri"
 
 # ── Max perimeter overall via ~> + max ───────────────────────────────
-my $max_per = ~> @shapes map { _->perimeter() } max
+val $max_per = ~> @shapes map { _->perimeter() } max
 $max_per |> aeq 30, "max perimeter"
 
 # ── Min area among triangles ─────────────────────────────────────────
-my $min_tri_area = ~> @shapes grep { _->kind() eq "tri" } map { _->area() } min
+val $min_tri_area = ~> @shapes grep { _->kind() eq "tri" } map { _->area() } min
 $min_tri_area |> aeq 6, "min tri area"
 
 # ── Heron formula sanity for first tri ───────────────────────────────
@@ -196,8 +196,8 @@ $shapes[6]->area() |> aeq 6, "3-4-5 tri area"
 $shapes[7]->area() |> aeq 30, "5-12-13 tri area"
 
 # ── Pipeline result fed into method ──────────────────────────────────
-my @big_shapes = ~> @shapes grep { _->area() > 10 }
-my $scene2 = Scene->new(name => "big", items => [])
+val @big_shapes = ~> @shapes grep { _->area() > 10 }
+val $scene2 = Scene->new(name => "big", items => [])
 $scene2->add($_) for @big_shapes
 $scene2->n() |> aeq 4, "4 big shapes"
 $scene2->total_area() |> aeq (20 + 14 + 9*3.141592653589793 + 30), "big total"

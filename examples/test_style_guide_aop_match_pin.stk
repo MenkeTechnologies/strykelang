@@ -37,7 +37,7 @@ $after_results[1] |> aeq 49, "after captured return 7² = 49"
 fn Svc::raw($x) { $x }
 
 around "Svc::raw" {
-    my $orig = proceed()
+    val $orig = proceed()
     "[wrapped: $orig]"
 }
 Svc::raw("foo") |> aeq "[wrapped: foo]", "around wraps return value"
@@ -74,16 +74,16 @@ parse_dim("invalid") |> aeq "?", "match regex fallthrough"
 
 # ── Set — `set()` builtin + sigil ops (|=, &=) ─────────────────────────────
 
-my $s1 = set(1, 2, 3, 4)
-my $s2 = set(3, 4, 5, 6)
+val $s1 = set(1, 2, 3, 4)
+val $s2 = set(3, 4, 5, 6)
 $s1->size |> aeq 4, "set size after dedup"
 
 # Union via | operator overload on Set.
-my $u = $s1 | $s2
+val $u = $s1 | $s2
 $u->size |> aeq 6, "set union has 6 unique elements"
 
 # Intersection.
-my $i = $s1 & $s2
+val $i = $s1 & $s2
 $i->size |> aeq 2, "set intersection has 2 elements (3,4)"
 
 # Contains check.
@@ -92,7 +92,7 @@ $s1->contains(99) |> aeq 0, "set does not contain 99"
 
 # ── Deque — fast head + tail operations ────────────────────────────────────
 
-my $dq = deque()
+val $dq = deque()
 $dq->push_back(1)
 $dq->push_back(2)
 $dq->push_back(3)
@@ -104,7 +104,7 @@ $dq->len |> aeq 2, "deque len after 2 pops = 2"
 
 # ── Heap — priority queue via comparator block ─────────────────────────────
 
-my $pq = heap { _0 <=> _1 }      # min-heap (style-compliant _0/_1)
+val $pq = heap { _0 <=> _1 }      # min-heap (style-compliant _0/_1)
 $pq->push(5)
 $pq->push(1)
 $pq->push(3)
@@ -113,7 +113,7 @@ $pq->pop |> aeq 1, "min-heap pops smallest first"
 $pq->pop |> aeq 2, "min-heap pops next smallest"
 
 # Max-heap by reversing comparator.
-my $max = heap { _1 <=> _0 }
+val $max = heap { _1 <=> _0 }
 $max->push(5)
 $max->push(1)
 $max->push(3)

@@ -19,7 +19,7 @@ fn N::lcm      = _ * _1 / N::gcd(_, _1)
 fn N::gcd_list = @{_} |> reduce { N::gcd(_, _1) }
 fn N::lcm_list = @{_} |> reduce { N::lcm(_, _1) }
 
-my @pair_cases = (
+val @pair_cases = (
     +{ a => 48,  b => 18,  gcd =>  6,   lcm => 144  },
     +{ a => 100, b => 75,  gcd => 25,   lcm => 300  },
     +{ a => 7,   b => 13,  gcd =>  1,   lcm =>  91  },  # coprime
@@ -31,18 +31,18 @@ my @pair_cases = (
 )
 
 p "── GCD / LCM demo ──"
-my $fail = 0
-for my $c (@pair_cases) {
-    my $g  = N::gcd $c->{a}, $c->{b}
-    my $l  = N::lcm $c->{a}, $c->{b}
-    my $ok = $g == $c->{gcd} && $l == $c->{lcm}
+var $fail = 0
+for var $c (@pair_cases) {
+    val $g  = N::gcd $c->{a}, $c->{b}
+    val $l  = N::lcm $c->{a}, $c->{b}
+    val $ok = $g == $c->{gcd} && $l == $c->{lcm}
     $fail++ unless $ok
     p "  gcd(#{$c->{a}},#{$c->{b}})=#{$g}  lcm=#{$l}  expect g=#{$c->{gcd}} l=#{$c->{lcm}}  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "#{$fail} / #{len @pair_cases} GCD/LCM cases failed" if $fail > 0
 
 # Reduce across a list — gcd_list/lcm_list.
-my @list_cases = (
+val @list_cases = (
     +{ xs => [12, 18, 24],          gcd =>  6,   lcm =>  72  },
     +{ xs => [4, 6, 8, 10],         gcd =>  2,   lcm => 120  },
     +{ xs => [7, 11, 13],           gcd =>  1,   lcm => 1001 },  # pairwise coprime
@@ -52,12 +52,12 @@ my @list_cases = (
 
 p ""
 p "── GCD / LCM over a list ──"
-for my $c (@list_cases) {
-    my $g  = N::gcd_list $c->{xs}
-    my $l  = N::lcm_list $c->{xs}
-    my $ok = $g == $c->{gcd} && $l == $c->{lcm}
+for val $c (@list_cases) {
+    val $g  = N::gcd_list $c->{xs}
+    val $l  = N::lcm_list $c->{xs}
+    val $ok = $g == $c->{gcd} && $l == $c->{lcm}
     $fail++ unless $ok
-    my @xs = @{$c->{xs}}
+    val @xs = @{$c->{xs}}
     p "  list=[@xs]  gcd=#{$g}  lcm=#{$l}  expect g=#{$c->{gcd}} l=#{$c->{lcm}}  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "#{$fail} aggregate failures" if $fail > 0
@@ -66,8 +66,8 @@ die "#{$fail} aggregate failures" if $fail > 0
 #   * gcd(a, b) divides both a and b
 #   * lcm(a, b) is divisible by both a and b
 #   * gcd(a, b) * lcm(a, b) == a * b   (when both > 0)
-for my $c (@pair_cases) {
-    my ($x, $y, $g, $l) = ($c->{a}, $c->{b}, $c->{gcd}, $c->{lcm})
+for val $c (@pair_cases) {
+    val ($x, $y, $g, $l) = ($c->{a}, $c->{b}, $c->{gcd}, $c->{lcm})
     next if $x == 0 || $y == 0
     die "gcd doesn't divide a"  unless $x % $g == 0
     die "gcd doesn't divide b"  unless $y % $g == 0

@@ -19,7 +19,7 @@ p "── network-introspect: NAT traversal builtin set ─────"
 p ""
 
 # Names we care about — the v1-v1.4 NAT traversal stack.
-my @groups = (
+val @groups = (
     +{ title => "1. Network probes",
        names => [qw(kick udp_send)] },
     +{ title => "2. Persistent UDP socket pool",
@@ -34,15 +34,15 @@ my @groups = (
        names => [qw(mark provenance unmark)] },
 )
 
-my $total_documented = 0
-for my $g (@groups) {
+var $total_documented = 0
+for val $g (@groups) {
     printf "── %s ───────────────────────\n", $g->{title}
-    for my $name (@{$g->{names}}) {
-        my $exists  = exists $b{$name}
-        my $cat     = $exists ? ($b{$name} // "(no category)") : "(missing!)"
-        my $doc     = $d{$name} // "(no LSP doc)"
+    for val $name (@{$g->{names}}) {
+        val $exists  = exists $b{$name}
+        val $cat     = $exists ? ($b{$name} // "(no category)") : "(missing!)"
+        val $doc     = $d{$name} // "(no LSP doc)"
         # Trim the doc to the first sentence-ish for compactness.
-        my $snip = $doc
+        var $snip = $doc
         if (length($snip) > 88) {
             $snip = substr($snip, 0, 85) . "..."
         }
@@ -65,7 +65,7 @@ printf "  registry stats — primaries: %d, aliases: %d, docs: %d\n",
 
 # Quick free-text grep example — show that you can find related builtins
 # via the %d doc index. Lifted from reflection_search.stk's pattern.
-my @hole_punch_mentions = sort grep {
+val @hole_punch_mentions = sort grep {
     defined $d{$_} && $d{$_} =~ /hole.punch|relay|NAT/i
 } keys %b
 printf "\n  builtins mentioning hole-punch / relay / NAT: %d\n",

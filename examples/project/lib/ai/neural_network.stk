@@ -25,13 +25,13 @@ class NeuralNetwork {
     bias_o = undef
 
     fn Self.new($input_nodes, $hidden_nodes, $output_nodes) {
-        my $weights_ih = Matrix::new($hidden_nodes, $input_nodes)
-        my $weights_ho = Matrix::new($output_nodes, $hidden_nodes)
+        val $weights_ih = Matrix::new($hidden_nodes, $input_nodes)
+        val $weights_ho = Matrix::new($output_nodes, $hidden_nodes)
         $weights_ih->randomize()
         $weights_ho->randomize()
 
-        my $bias_h = Matrix::new($hidden_nodes, 1)
-        my $bias_o = Matrix::new($output_nodes, 1)
+        val $bias_h = Matrix::new($hidden_nodes, 1)
+        val $bias_o = Matrix::new($output_nodes, 1)
         $bias_h->randomize()
         $bias_o->randomize()
 
@@ -47,23 +47,23 @@ class NeuralNetwork {
     }
 
     fn predict($inputs_array) {
-        my $inputs = Matrix::from_array([$inputs_array])
+        val $inputs = Matrix::from_array([$inputs_array])
 
-        my $hidden_weighted_sum = Matrix::from_array(
+        val $hidden_weighted_sum = Matrix::from_array(
             [matrix_mul($self->weights_ih->to_array(), $inputs->to_array())]
         )
-        my $hidden_sum_with_bias = Matrix::from_array(
+        val $hidden_sum_with_bias = Matrix::from_array(
             [matrix_add($hidden_weighted_sum->to_array(), $self->bias_h->to_array())]
         )
-        my $hidden_outputs = $hidden_sum_with_bias->map(\&sigmoid2)
+        val $hidden_outputs = $hidden_sum_with_bias->map(\&sigmoid2)
 
-        my $output_weighted_sum = Matrix::from_array(
+        val $output_weighted_sum = Matrix::from_array(
             [matrix_mul($self->weights_ho->to_array(), $hidden_outputs->to_array())]
         )
-        my $output_sum_with_bias = Matrix::from_array(
+        val $output_sum_with_bias = Matrix::from_array(
             [matrix_add($output_weighted_sum->to_array(), $self->bias_o->to_array())]
         )
-        my $outputs = $output_sum_with_bias->map(\&sigmoid2)
+        val $outputs = $output_sum_with_bias->map(\&sigmoid2)
 
         $outputs->to_array()
     }

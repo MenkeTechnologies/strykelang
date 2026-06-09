@@ -3,26 +3,26 @@
 package KD;
 
 fn sort_by_axis($pts, $idxs, $axis) {
-    my @sorted = sort { $pts->[_]->[$axis] <=> $pts->[_1]->[$axis] } @$idxs
+    val @sorted = sort { $pts->[_]->[$axis] <=> $pts->[_1]->[$axis] } @$idxs
     \@sorted
 }
 
 fn build_rec($pts, $idxs, $axis) {
-    my $n = len(@$idxs)
+    val $n = len(@$idxs)
     return undef if $n == 0
     if ($n == 1) {
         return { idx => $idxs->[0], axis => $axis, left => undef, right => undef }
     }
-    my $sorted = sort_by_axis($pts, $idxs, $axis)
-    my $mid = int($n / 2)
-    my @left_i = ()
-    my @right_i = ()
-    for my $i (0:$mid-1) { push @left_i, $sorted->[$i] }
-    my $median = $sorted->[$mid]
+    val $sorted = sort_by_axis($pts, $idxs, $axis)
+    val $mid = int($n / 2)
+    var @left_i = ()
+    var @right_i = ()
+    for val $i (0:$mid-1) { push @left_i, $sorted->[$i] }
+    val $median = $sorted->[$mid]
     if ($mid + 1 <= $n - 1) {
-        for my $i ($mid+1:$n-1) { push @right_i, $sorted->[$i] }
+        for val $i ($mid+1:$n-1) { push @right_i, $sorted->[$i] }
     }
-    my $next_axis = 1 - $axis
+    val $next_axis = 1 - $axis
     {
         idx => $median,
         axis => $axis,
@@ -32,28 +32,28 @@ fn build_rec($pts, $idxs, $axis) {
 }
 
 fn build($pts) {
-    my @idxs = ()
-    for my $i (0:(len(@$pts))-1) { push @idxs, $i }
+    var @idxs = ()
+    for val $i (0:(len(@$pts))-1) { push @idxs, $i }
     { pts => $pts, root => build_rec($pts, \@idxs, 0) }
 }
 
 fn sq_dist($p, $q) {
-    my $dx = $p->[0] - $q->[0]
-    my $dy = $p->[1] - $q->[1]
+    val $dx = $p->[0] - $q->[0]
+    val $dy = $p->[1] - $q->[1]
     $dx * $dx + $dy * $dy
 }
 
 fn nearest_rec($node, $pts, $target, $best) {
     return $best if !defined $node
-    my $here = $pts->[$node->{idx}]
-    my $d2 = sq_dist($here, $target)
+    val $here = $pts->[$node->{idx}]
+    val $d2 = sq_dist($here, $target)
     if (!defined $best || $d2 < $best->{dist2}) {
         $best = { idx => $node->{idx}, dist2 => $d2 }
     }
-    my $axis = $node->{axis}
-    my $diff = $target->[$axis] - $here->[$axis]
-    my $near
-    my $far
+    val $axis = $node->{axis}
+    val $diff = $target->[$axis] - $here->[$axis]
+    var $near
+    var $far
     if ($diff < 0) {
         $near = $node->{left}
         $far = $node->{right}
@@ -75,14 +75,14 @@ fn nearest($tree, $target) {
 
 fn range_rec($node, $pts, $xlo, $xhi, $ylo, $yhi, $out) {
     return if !defined $node
-    my $here = $pts->[$node->{idx}]
+    val $here = $pts->[$node->{idx}]
     if ($here->[0] >= $xlo && $here->[0] <= $xhi
         && $here->[1] >= $ylo && $here->[1] <= $yhi) {
         push @$out, $node->{idx}
     }
-    my $axis = $node->{axis}
-    my $lo = ($axis == 0 ? $xlo : $ylo)
-    my $hi = ($axis == 0 ? $xhi : $yhi)
+    val $axis = $node->{axis}
+    val $lo = ($axis == 0 ? $xlo : $ylo)
+    val $hi = ($axis == 0 ? $xhi : $yhi)
     if ($lo <= $here->[$axis]) {
         range_rec($node->{left}, $pts, $xlo, $xhi, $ylo, $yhi, $out)
     }
@@ -92,19 +92,19 @@ fn range_rec($node, $pts, $xlo, $xhi, $ylo, $yhi, $out) {
 }
 
 fn range($tree, $xlo, $xhi, $ylo, $yhi) {
-    my @out = ()
+    val @out = ()
     range_rec($tree->{root}, $tree->{pts}, $xlo, $xhi, $ylo, $yhi, \@out)
-    my @sorted = sort { _ <=> _1 } @out
+    val @sorted = sort { _ <=> _1 } @out
     \@sorted
 }
 
 # Brute-force nearest neighbor — linear scan over all points.
 fn brute_nearest($pts, $target) {
     return undef if len(@$pts) == 0
-    my $best_i = 0
-    my $best_d = sq_dist($pts->[0], $target)
-    for my $i (1:(len(@$pts))-1) {
-        my $d = sq_dist($pts->[$i], $target)
+    var $best_i = 0
+    var $best_d = sq_dist($pts->[0], $target)
+    for val $i (1:(len(@$pts))-1) {
+        val $d = sq_dist($pts->[$i], $target)
         if ($d < $best_d) {
             $best_d = $d
             $best_i = $i
@@ -114,9 +114,9 @@ fn brute_nearest($pts, $target) {
 }
 
 fn brute_range($pts, $xlo, $xhi, $ylo, $yhi) {
-    my @out = ()
-    for my $i (0:(len(@$pts))-1) {
-        my $p = $pts->[$i]
+    var @out = ()
+    for val $i (0:(len(@$pts))-1) {
+        val $p = $pts->[$i]
         push @out, $i if $p->[0] >= $xlo && $p->[0] <= $xhi
                       && $p->[1] >= $ylo && $p->[1] <= $yhi
     }
@@ -126,52 +126,52 @@ fn brute_range($pts, $xlo, $xhi, $ylo, $yhi) {
 package main;
 
 # --- Empty tree ---
-my $t0 = KD::build([])
+val $t0 = KD::build([])
 (defined $t0->{root}) |> aeq 0, "empty root undef"
 (defined KD::nearest($t0, [0,0])) |> aeq 0, "empty nearest undef"
 len(@{KD::range($t0, 0, 10, 0, 10)}) |> aeq 0, "empty range"
 
 # --- Single point ---
-my $t1 = KD::build([[3, 5]])
-my $n1 = KD::nearest($t1, [10, 10])
+val $t1 = KD::build([[3, 5]])
+val $n1 = KD::nearest($t1, [10, 10])
 $n1->{idx} |> aeq 0, "single nearest idx"
 $n1->{dist2} |> aeq (49 + 25), "single nearest dist2"
-my $r1 = KD::range($t1, 0, 10, 0, 10)
+val $r1 = KD::range($t1, 0, 10, 0, 10)
 len(@$r1) |> aeq 1, "single inside range len"
 $r1->[0] |> aeq 0, "single inside range idx"
 len(@{KD::range($t1, 100, 200, 100, 200)}) |> aeq 0, "single outside range"
 
 # --- Canonical 6-point example ---
-my $pts = [[2,3],[5,4],[9,6],[4,7],[8,1],[7,2]]
-my $t = KD::build($pts)
+val $pts = [[2,3],[5,4],[9,6],[4,7],[8,1],[7,2]]
+var $t = KD::build($pts)
 
 # Nearest to (9,2) should be (8,1) at dist² = 1+1=2
-my $n = KD::nearest($t, [9, 2])
+val $n = KD::nearest($t, [9, 2])
 $n->{idx} |> aeq 4, "canon nearest idx"
 $n->{dist2} |> aeq 2, "canon nearest dist2"
 
 # Nearest to a point that IS in the set
-my $ne = KD::nearest($t, [5, 4])
+val $ne = KD::nearest($t, [5, 4])
 $ne->{idx} |> aeq 1, "exact-match nearest idx"
 $ne->{dist2} |> aeq 0, "exact-match dist2 = 0"
 
 # Range query
-my $rg = KD::range($t, 4, 9, 1, 5)
+val $rg = KD::range($t, 4, 9, 1, 5)
 len(@$rg) |> aeq 3, "range count"
 $rg->[0] |> aeq 1, "range idx 1 (5,4)"
 $rg->[1] |> aeq 4, "range idx 4 (8,1)"
 $rg->[2] |> aeq 5, "range idx 5 (7,2)"
 
 # Range that includes everything
-my $rg_all = KD::range($t, 0, 100, 0, 100)
+val $rg_all = KD::range($t, 0, 100, 0, 100)
 len(@$rg_all) |> aeq 6, "full range = 6"
 
 # Range that excludes everything
-my $rg_none = KD::range($t, 100, 200, 100, 200)
+val $rg_none = KD::range($t, 100, 200, 100, 200)
 len(@$rg_none) |> aeq 0, "empty range"
 
 # Tight range — only (4,7)
-my $rg_tight = KD::range($t, 4, 4, 7, 7)
+val $rg_tight = KD::range($t, 4, 4, 7, 7)
 len(@$rg_tight) |> aeq 1, "tight range size"
 $rg_tight->[0] |> aeq 3, "tight range idx"
 
@@ -184,52 +184,52 @@ count_nodes($t->{root}) |> aeq 6, "tree node count"
 
 # --- Tree axes alternate (root.axis=0, children.axis=1, …) ---
 $t->{root}->{axis} |> aeq 0, "root axis = 0"
-my $lc = $t->{root}->{left}
-my $rc = $t->{root}->{right}
+val $lc = $t->{root}->{left}
+val $rc = $t->{root}->{right}
 ($lc->{axis} == 1 || !defined $lc) |> aeq 1, "left child axis"
 ($rc->{axis} == 1 || !defined $rc) |> aeq 1, "right child axis"
 
 # --- Stress: random 100 points, 50 random queries ---
-my $seed = 4242
-my @rpts = ()
-for my $i (1:100) {
+var $seed = 4242
+var @rpts = ()
+for val $i (1:100) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $x = ($seed % 1000) - 500
+    val $x = ($seed % 1000) - 500
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $y = ($seed % 1000) - 500
+    val $y = ($seed % 1000) - 500
     push @rpts, [$x, $y]
 }
-my $tr = KD::build(\@rpts)
+val $tr = KD::build(\@rpts)
 count_nodes($tr->{root}) |> aeq 100, "stress tree size"
 
 # Nearest-neighbor stress vs brute
-my $nn_ok = 1
-for my $q (1:50) {
+var $nn_ok = 1
+for val $q (1:50) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $qx = ($seed % 1200) - 600
+    val $qx = ($seed % 1200) - 600
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $qy = ($seed % 1200) - 600
-    my $kd = KD::nearest($tr, [$qx, $qy])
-    my $bf = KD::brute_nearest(\@rpts, [$qx, $qy])
+    val $qy = ($seed % 1200) - 600
+    val $kd = KD::nearest($tr, [$qx, $qy])
+    val $bf = KD::brute_nearest(\@rpts, [$qx, $qy])
     # Different idx allowed only if dist2 ties
     $nn_ok = 0 if $kd->{dist2} != $bf->{dist2}
 }
 $nn_ok |> aeq 1, "stress: kd nearest == brute nearest (dist2)"
 
 # Range-query stress vs brute
-my $rg_ok = 1
-for my $q (1:20) {
+var $rg_ok = 1
+for val $q (1:20) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $cx = ($seed % 800) - 400
+    val $cx = ($seed % 800) - 400
     $seed = ($seed * 1103515245 + 12345) % 2147483648
-    my $cy = ($seed % 800) - 400
-    my $kd_r = KD::range($tr, $cx - 100, $cx + 100, $cy - 100, $cy + 100)
-    my $bf_r = KD::brute_range(\@rpts, $cx - 100, $cx + 100, $cy - 100, $cy + 100)
+    val $cy = ($seed % 800) - 400
+    val $kd_r = KD::range($tr, $cx - 100, $cx + 100, $cy - 100, $cy + 100)
+    val $bf_r = KD::brute_range(\@rpts, $cx - 100, $cx + 100, $cy - 100, $cy + 100)
     # brute_range returns indices in encounter order; sort for comparison
-    my @bf_sorted = sort { _ <=> _1 } @$bf_r
+    val @bf_sorted = sort { _ <=> _1 } @$bf_r
     $rg_ok = 0 if len(@$kd_r) != len(@bf_sorted)
     if (len(@$kd_r) > 0) {
-        for my $i (0:(len(@$kd_r))-1) {
+        for val $i (0:(len(@$kd_r))-1) {
             $rg_ok = 0 if $kd_r->[$i] != $bf_sorted[$i]
         }
     }

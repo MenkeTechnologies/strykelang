@@ -4,12 +4,12 @@
 #   - real ternary search to maximize a unimodal function
 
 fn Rosetta::Ternary::find($arr, $target) {
-    my $lo = 0
-    my $hi = len(@$arr) - 1
+    var $lo = 0
+    var $hi = len(@$arr) - 1
     while ($lo <= $hi) {
-        my $third = int(($hi - $lo) / 3)
-        my $m1 = $lo + $third
-        my $m2 = $hi - $third
+        val $third = int(($hi - $lo) / 3)
+        val $m1 = $lo + $third
+        val $m2 = $hi - $third
         if ($arr->[$m1] == $target) { return $m1 }
         if ($arr->[$m2] == $target) { return $m2 }
         if ($target < $arr->[$m1]) {
@@ -27,10 +27,10 @@ fn Rosetta::Ternary::find($arr, $target) {
 # f($x) = -($x - 3)^2 + 9, peak at x = 3, value 9
 fn Rosetta::Ternary::peak_quad($lo, $hi, $eps) {
     while ($hi - $lo > $eps) {
-        my $m1 = $lo + ($hi - $lo) / 3.0
-        my $m2 = $hi - ($hi - $lo) / 3.0
-        my $f1 = -(($m1 - 3) ** 2) + 9
-        my $f2 = -(($m2 - 3) ** 2) + 9
+        val $m1 = $lo + ($hi - $lo) / 3.0
+        val $m2 = $hi - ($hi - $lo) / 3.0
+        val $f1 = -(($m1 - 3) ** 2) + 9
+        val $f2 = -(($m2 - 3) ** 2) + 9
         if ($f1 < $f2) {
             $lo = $m1
         } else {
@@ -40,7 +40,7 @@ fn Rosetta::Ternary::peak_quad($lo, $hi, $eps) {
     ($lo + $hi) / 2.0
 }
 
-my @sorted = (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21)
+val @sorted = (1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21)
 assert_eq Rosetta::Ternary::find(\@sorted, 11), 5, "find 11 -> idx 5"
 assert_eq Rosetta::Ternary::find(\@sorted, 1), 0, "first"
 assert_eq Rosetta::Ternary::find(\@sorted, 21), 10, "last"
@@ -50,7 +50,7 @@ assert_eq Rosetta::Ternary::find([42], 42), 0, "single match"
 assert_eq Rosetta::Ternary::find([42], 7), -1, "single miss"
 
 # Real-valued unimodal peak
-my $x_star = Rosetta::Ternary::peak_quad(0.0, 6.0, 1e-7)
+val $x_star = Rosetta::Ternary::peak_quad(0.0, 6.0, 1e-7)
 assert_ok abs($x_star - 3.0) < 1e-5, "peak of -(x-3)^2 + 9 at x=3"
 
 test_run

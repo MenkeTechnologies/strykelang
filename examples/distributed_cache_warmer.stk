@@ -14,11 +14,11 @@
 
 p "── distributed cache warmer ──"
 
-my @workers = congregation(3)
+val @workers = congregation(3)
 printf "spawned %d workers\n", len(@workers)
 
 # Master pushes the cache key set to all workers as %gift.
-my %seed_keys = (
+val %seed_keys = (
     user_count => "expensive_compute",
     item_count => "expensive_compute",
     order_count => "expensive_compute",
@@ -28,9 +28,9 @@ bestow(\%seed_keys, @workers)
 printf "bestowed %d cache keys to all workers\n", len(keys %seed_keys)
 
 # Each worker computes its cache and returns it inline as JSON.
-my %caches = harvest "
+val %caches = harvest "
 our %gift;
-my %built;
+var %built;
 for my \$k (keys %gift) {
     \$built{\$k} = len(\$k) * 100;
 }
@@ -38,17 +38,17 @@ to_json(\\%built)
 ", @workers, 10_000
 
 p "── per-worker cache contents ──"
-my $first_sid = (sort { _ <=> _1 } keys %caches)[0]
-my $first_cache = from_json($caches{$first_sid})
-for my $k (sort keys %$first_cache) {
+val $first_sid = (sort { _ <=> _1 } keys %caches)[0]
+val $first_cache = from_json($caches{$first_sid})
+for val $k (sort keys %$first_cache) {
     printf "  %s = %s\n", $k, $first_cache->{$k}
 }
 
 # Verify all workers got identical cache contents.
-my $all_same = 1
-for my $sid (keys %caches) {
-    my $c = from_json($caches{$sid})
-    for my $k (keys %$first_cache) {
+var $all_same = 1
+for val $sid (keys %caches) {
+    val $c = from_json($caches{$sid})
+    for val $k (keys %$first_cache) {
         $all_same = 0 unless ($c->{$k} // -1) == $first_cache->{$k}
     }
 }

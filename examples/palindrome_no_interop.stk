@@ -19,20 +19,20 @@ fn Pal::strict($s) {
 }
 
 fn Pal::lenient($s) {
-    my $clean = lc($s)
+    var $clean = lc($s)
     $clean =~ s/[^a-z0-9]//g
     Pal::strict($clean)
 }
 
 if (len(@ARGV) >= 1) {
-    my $s = $ARGV[0]
+    val $s = $ARGV[0]
     printf "  strict : %s\n", Pal::strict($s)         ? "YES" : "NO"
     printf "  lenient: %s\n", Pal::lenient($s) ? "YES" : "NO"
     exit 0
 }
 
 # Demo grid — paired (input, strict, lenient).
-my @cases = (
+val @cases = (
     +{ s => "racecar",                          strict => 1, lenient => 1 },
     +{ s => "hello",                            strict => 0, lenient => 0 },
     +{ s => "",                                 strict => 1, lenient => 1 },
@@ -50,11 +50,11 @@ my @cases = (
 
 p "── Palindrome demo ──"
 printf "  %-40s %-8s %-8s\n", "input", "strict", "lenient"
-my $fail = 0
-for my $c (@cases) {
-    my $st = Pal::strict($c->{s})         ? 1 : 0
-    my $le = Pal::lenient($c->{s}) ? 1 : 0
-    my $ok = ($st == $c->{strict} && $le == $c->{lenient})
+var $fail = 0
+for val $c (@cases) {
+    val $st = Pal::strict($c->{s})         ? 1 : 0
+    val $le = Pal::lenient($c->{s}) ? 1 : 0
+    val $ok = ($st == $c->{strict} && $le == $c->{lenient})
     $fail++ unless $ok
     printf "  %-40s %-8s %-8s %s\n",
         "\"" . $c->{s} . "\"",

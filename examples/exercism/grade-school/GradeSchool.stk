@@ -5,8 +5,8 @@ fn Exercism::GradeSchool::add($s, $student, $g) {
 }
 
 fn Exercism::GradeSchool::roster($s, $g) {
-    my @gs
+    var @gs
     if (defined $g) { @gs = ($g) }
-    else { my %seen; @gs = ~> values %{$s->{roster}} sort { _ <=> _1 } fi { !$seen{_}++ } }
+    else { var %seen; @gs = ~> values %{$s->{roster}} sort { _ <=> _1 } fi { !$seen{_}++ } }
     [~> @gs map { [~> keys %{$s->{roster}} fi { $s->{roster}{_} == _< } sort] }]
 }

@@ -2,12 +2,12 @@
 # Rosetta Code: 2048 Game Logic
 
 fn Rosetta::Game2048::slide_row($row) {
-    my @non_zero
-    for my $v (@$row) { if ($v != 0) { push @non_zero, $v } }
+    var @non_zero
+    for val $v (@$row) { if ($v != 0) { push @non_zero, $v } }
     
-    my @res
-    my $i = 0
-    my $len = len(@non_zero)
+    var @res
+    var $i = 0
+    val $len = len(@non_zero)
     while ($i < $len) {
         if ($i + 1 < $len && $non_zero[$i] == $non_zero[$i+1]) {
             push @res, $non_zero[$i] * 2
@@ -22,15 +22,15 @@ fn Rosetta::Game2048::slide_row($row) {
 }
 
 fn Rosetta::Game2048::move_left($grid) {
-    my @new_grid
-    for my $row (@$grid) {
+    var @new_grid
+    for val $row (@$grid) {
         push @new_grid, Rosetta::Game2048::slide_row($row)
     }
     \@new_grid
 }
 
-my $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
-my $res = Rosetta::Game2048::move_left($g1)
+val $g1 = [[2, 2, 0, 0], [2, 0, 2, 0], [2, 2, 2, 2], [4, 4, 8, 8]]
+val $res = Rosetta::Game2048::move_left($g1)
 
 assert_eq join(",", @{$res->[0]}), "4,0,0,0", "row 2,2,0,0 -> 4,0,0,0"
 assert_eq join(",", @{$res->[1]}), "4,0,0,0", "row 2,0,2,0 -> 4,0,0,0"

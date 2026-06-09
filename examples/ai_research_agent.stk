@@ -35,11 +35,11 @@ tool fn get_version($pkg: string) "Get the current version of a package" {
 
 p "── AI Research Agent ───────────────────────────────────"
 
-my $prompt = "Research the latest features of Rust and tell me the current version of rust."
+val $prompt = "Research the latest features of Rust and tell me the current version of rust."
 
 # The bare `ai` call auto-attaches every `tool fn` in scope
 # plus we can pass built-in tools explicitly.
-my $report = ai($prompt,
+val $report = ai($prompt,
     tools => [
         web_search_tool(),
         fetch_url_tool(),

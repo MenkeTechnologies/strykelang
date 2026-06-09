@@ -5,7 +5,7 @@
 
 fn Rosetta::Legendre::pow_mod($base, $exp, $mod) {
     return 0 if $mod == 1
-    my $r = 1
+    var $r = 1
     $base = $base % $mod
     while ($exp > 0) {
         if ($exp & 1) { $r = ($r * $base) % $mod }
@@ -17,7 +17,7 @@ fn Rosetta::Legendre::pow_mod($base, $exp, $mod) {
 
 fn Rosetta::Legendre::symbol($k, $p) {
     return 0 if $k % $p == 0
-    my $r = Rosetta::Legendre::pow_mod($k, int(($p - 1) / 2), $p)
+    val $r = Rosetta::Legendre::pow_mod($k, int(($p - 1) / 2), $p)
     $r == $p - 1 ? -1 : $r
 }
 
@@ -40,10 +40,10 @@ assert_eq Rosetta::Legendre::symbol(7, 13), -1, "(7/13) = -1"
 assert_eq Rosetta::Legendre::symbol(10, 13), 1, "(10/13) = 1"
 
 # Multiplicativity: (ab/p) = (a/p)*(b/p)
-my $a = Rosetta::Legendre::symbol(2, 13)
-my $b = Rosetta::Legendre::symbol(7, 13)
-my $ab = Rosetta::Legendre::symbol(14, 13)
-my $prod = $a * $b
+val $a = Rosetta::Legendre::symbol(2, 13)
+val $b = Rosetta::Legendre::symbol(7, 13)
+val $ab = Rosetta::Legendre::symbol(14, 13)
+val $prod = $a * $b
 assert_eq $ab, $prod, "Legendre multiplicative mod 13"
 
 test_run

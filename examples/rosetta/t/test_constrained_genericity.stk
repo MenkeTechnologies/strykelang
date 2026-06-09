@@ -3,7 +3,7 @@
 
 fn Rosetta::Generic::process($obj) {
     # In Stryke, we can use eval to catch method call failures on objects.
-    my $res
+    var $res
     eval {
         $res = $obj->calculate()
     };
@@ -21,13 +21,13 @@ class Subtractor {
     # No calculate method
 }
 
-my $a = Adder()
-my $s = Subtractor()
+val $a = Adder()
+val $s = Subtractor()
 
 assert_eq Rosetta::Generic::process($a), 42, "Works with Adder"
 
 # Test failure case
-my $ok = 1
+var $ok = 1
 eval {
     Rosetta::Generic::process($s)
 };

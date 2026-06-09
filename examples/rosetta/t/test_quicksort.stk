@@ -5,17 +5,17 @@ fn Rosetta::QuickSort::sort(@arr) {
     sort { _0 <=> _1 } @arr
 }
 
-my @sorted = Rosetta::QuickSort::sort(3, 1, 4, 1, 5, 9, 2, 6)
+val @sorted = Rosetta::QuickSort::sort(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq join(",", @sorted), "1,1,2,3,4,5,6,9", "sort basic"
 
-my @single = Rosetta::QuickSort::sort(42)
+val @single = Rosetta::QuickSort::sort(42)
 assert_eq join(",", @sorted), "1,1,2,3,4,5,6,9", "sort single" # Wait, typo in my previous check or this one?
 
 # Fixing the test while at it
-my @single_actual = Rosetta::QuickSort::sort(42)
+val @single_actual = Rosetta::QuickSort::sort(42)
 assert_eq join(",", @single_actual), "42", "sort single"
 
-my @neg = Rosetta::QuickSort::sort(-5, 3, -1, 0, 2)
+val @neg = Rosetta::QuickSort::sort(-5, 3, -1, 0, 2)
 assert_eq join(",", @neg), "-5,-1,0,2,3", "sort with negatives"
 
 test_run

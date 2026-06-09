@@ -2,17 +2,17 @@
 # Rosetta Code: Rosetta Code/Rank languages by popularity
 
 fn Rosetta::RankPopularity::rank($rows) {
-    my @sorted = sort { _1->{popularity} <=> _->{popularity} || _->{language} cmp _1->{language} } @$rows
+    val @sorted = sort { _1->{popularity} <=> _->{popularity} || _->{language} cmp _1->{language} } @$rows
     \@sorted
 }
 
-my @rows = (
+val @rows = (
     { language => "Python", popularity => 99.0 },
     { language => "Rust", popularity => 81.5 },
     { language => "Ruby", popularity => 70.2 },
 )
 
-my $ranked = Rosetta::RankPopularity::rank(\@rows)
+val $ranked = Rosetta::RankPopularity::rank(\@rows)
 
 assert_eq join(",", map { $_->{language} } @$ranked), "Python,Rust,Ruby", "languages sort by popularity descending"
 assert_eq $ranked->[2]{popularity}, 70.2, "lowest popularity appears last"

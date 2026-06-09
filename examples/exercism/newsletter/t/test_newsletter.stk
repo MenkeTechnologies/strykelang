@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 require "./Newsletter.stk"
 
-my $emails = Exercism::Newsletter::read_emails("alice\@x.com\nbob\@y.com\n  carol\@z.com  \n\n")
+val $emails = Exercism::Newsletter::read_emails("alice\@x.com\nbob\@y.com\n  carol\@z.com  \n\n")
 assert_eq join(",", @{$emails}), "alice\@x.com,bob\@y.com,carol\@z.com", "three trimmed"
 
-my @log
+val @log
 Exercism::Newsletter::send_newsletter($emails, \@log, fn { _ =~ /alice/ ? "ok" : "fail" })
 assert_eq join(",", @log), "alice\@x.com", "only alice logged"
 
-my @log2
+val @log2
 Exercism::Newsletter::send_newsletter($emails, \@log2, fn { "ok" })
 assert_eq join(",", @log2), "alice\@x.com,bob\@y.com,carol\@z.com", "all logged"
 

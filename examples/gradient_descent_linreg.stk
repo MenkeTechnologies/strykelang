@@ -18,41 +18,41 @@ p "── Linear Regression — mini-batch GD ───────────�
 
 # ── 1. Synthetic dataset ───────────────────────────────────────────
 
-my $TRUE_W = 3.0
-my $TRUE_B = 7.0
-my $N      = 1000
-my $sigma  = 1.5
+val $TRUE_W = 3.0
+val $TRUE_B = 7.0
+val $N      = 1000
+val $sigma  = 1.5
 
 srand 42  # reproducible
 
 fn Linreg::gauss($s) {
-    my $u1 = rand()
-    my $u2 = rand()
+    var $u1 = rand()
+    val $u2 = rand()
     $u1 = 1e-10 if $u1 < 1e-10
     sqrt(-2.0 * log($u1)) * cos(2.0 * 3.14159265358979 * $u2) * $s
 }
 
-my @xs
-my @ys
+var @xs
+var @ys
 for (1:$N) {
-    my $x = (rand() - 0.5) * 20    # x ∈ [-10, 10]
-    my $y = $TRUE_W * $x + $TRUE_B + Linreg::gauss($sigma)
+    val $x = (rand() - 0.5) * 20    # x ∈ [-10, 10]
+    val $y = $TRUE_W * $x + $TRUE_B + Linreg::gauss($sigma)
     push @xs, $x
     push @ys, $y
 }
 
 # Pre-capture arrayrefs — pmap_reduce workers reach these through lexical
 # closure more reliably than via the array variables themselves.
-my $XS = \@xs
-my $YS = \@ys
+val $XS = \@xs
+val $YS = \@ys
 
 # ── 2. Loss + gradient helpers ─────────────────────────────────────
 
 fn Linreg::loss($w, $b, $xs, $ys) {
-    my $n = len @$xs
-    my $s = 0
-    for my $i (0:$n - 1) {
-        my $err = $w * $xs->[$i] + $b - $ys->[$i]
+    val $n = len @$xs
+    var $s = 0
+    for val $i (0:$n - 1) {
+        val $err = $w * $xs->[$i] + $b - $ys->[$i]
         $s += $err * $err
     }
     $s / $n
@@ -60,31 +60,31 @@ fn Linreg::loss($w, $b, $xs, $ys) {
 
 # ── 3. Mini-batch SGD with parallel per-batch gradient ────────────
 
-my $w      = 0.0
-my $b      = 0.0
-my $lr     = 0.01
-my $epochs = 120
-my $bs     = 200
+var $w      = 0.0
+var $b      = 0.0
+val $lr     = 0.01
+val $epochs = 120
+val $bs     = 200
 
-my @indices = 0:$N - 1
-my $initial_loss = Linreg::loss $w, $b, $XS, $YS
+val @indices = 0:$N - 1
+val $initial_loss = Linreg::loss $w, $b, $XS, $YS
 printf "epoch  loss        w       b\n"
 printf "%5d  %8.4f  %6.4f  %6.4f\n", 0, $initial_loss, $w, $b
 
 fn Linreg::shuffle($arr) {
-    for my $i (rev(1:len(@$arr) - 1)) {
-        my $j = int(rand() * ($i + 1))
+    for var $i (rev(1:len(@$arr) - 1)) {
+        var $j = int(rand() * ($i + 1))
         ($arr->[$i], $arr->[$j]) = ($arr->[$j], $arr->[$i])
     }
 }
 
-for my $epoch (1:$epochs) {
+for val $epoch (1:$epochs) {
     Linreg::shuffle \@indices
 
-    my @batches
-    my $start = 0
+    var @batches
+    var $start = 0
     while ($start < $N) {
-        my $end = $start + $bs - 1
+        var $end = $start + $bs - 1
         $end = $N - 1 if $end > $N - 1
         push @batches, [ @indices[$start:$end] ]
         $start += $bs
@@ -92,11 +92,11 @@ for my $epoch (1:$epochs) {
 
     # NOTE: trailing `;` required — pmap_reduce otherwise greedily consumes
     # the following statement as a third block argument.
-    my $grads = @batches |> pmap_reduce {
-        my $sum_dw = 0
-        my $sum_db = 0
-        for my $i (@$_) {
-            my $err = $w * $XS->[$i] + $b - $YS->[$i]
+    val $grads = @batches |> pmap_reduce {
+        var $sum_dw = 0
+        var $sum_db = 0
+        for val $i (@$_) {
+            val $err = $w * $XS->[$i] + $b - $YS->[$i]
             $sum_dw += 2 * $err * $XS->[$i]
             $sum_db += 2 * $err
         }
@@ -105,17 +105,17 @@ for my $epoch (1:$epochs) {
         [ _->[0] + _1->[0], _->[1] + _1->[1], _->[2] + _1->[2] ]
     };
 
-    my $count = $grads->[2]
+    val $count = $grads->[2]
     $w -= $lr * ($grads->[0] / $count)
     $b -= $lr * ($grads->[1] / $count)
 
     if ($epoch % 15 == 0 || $epoch == $epochs) {
-        my $l = Linreg::loss $w, $b, $XS, $YS
+        val $l = Linreg::loss $w, $b, $XS, $YS
         printf "%5d  %8.4f  %6.4f  %6.4f\n", $epoch, $l, $w, $b
     }
 }
 
-my $final_loss = Linreg::loss $w, $b, $XS, $YS
+val $final_loss = Linreg::loss $w, $b, $XS, $YS
 
 p ""
 printf "True w/b   : %.4f / %.4f\n", $TRUE_W, $TRUE_B

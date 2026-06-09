@@ -5,7 +5,7 @@
 
 # ── 1. Sets ───────────────────────────────────────────────────────────────
 
-my $s = set(10, 20, 20, 30)
+val $s = set(10, 20, 20, 30)
 len($s) |> aeq 3, "set() deduplicates"
 $s->has(10) |> aok "set->has(present)"
 $s->has(99) |> maps { !_ } |> aok "set->has(absent)"
@@ -23,13 +23,13 @@ $v_global |> aeq 50, "oursync + pmap atomic increment"
 # ── 3. Threading Macros & Count ───────────────────────────────────────────
 
 # ~s> in scalar context returns the count of items
-my $count = ~s> (1:5) map { _ * 2 }
+val $count = ~s> (1:5) map { _ * 2 }
 len($count) |> aeq 5, "~s> in scalar context len is count"
 # Stringification of the result is the joined items
 "$count" |> aeq "246810", "~s> in scalar context stringified is joined"
 
 # ||> switch from parallel to sequential
-my $res = ~p> "abc" letters freq ||> values |> sum
+val $res = ~p> "abc" letters freq ||> values |> sum
 $res |> aeq 3, "~p> + ||> + sum"
 
 # ── 4. Special Variables & $& ─────────────────────────────────────────────
@@ -39,8 +39,8 @@ $& |> aeq "stryke", "match variable $&"
 
 # ── 5. File I/O Primitives ────────────────────────────────────────────────
 
-my $tmp = tempdir()
-my $f = "$tmp/test.txt"
+val $tmp = tempdir()
+val $f = "$tmp/test.txt"
 spurt $f, "line1\nline2"
 c"$f" |> aeq "line1\nline2", "c\"path\" slurp-as-quote"
 
@@ -49,7 +49,7 @@ join("|", lines(c"$f")) |> aeq "line1|line2", "lines() split"
 
 # ── 6. Lvalue vec() ───────────────────────────────────────────────────────
 
-my $bits = ""
+var $bits = ""
 vec($bits, 0, 8) = 65
 $bits |> aeq "A", "lvalue vec() assigns char"
 
@@ -61,13 +61,13 @@ len(chr(-1)) |> aeq 0, "chr(<0) returns empty"
 chr(0x41) |> aeq "A", "chr(0x41) is A"
 
 # ref in numeric context is 0 (PARITY-041)
-my $r = [1, 2, 3]
+val $r = [1, 2, 3]
 ($r + 0) |> aeq 0, "arrayref in numeric context is 0"
 
 # ── 8. Design Choice: Closure capture by value (DESIGN-001) ───────────────
 
-my $captured = 10
-my $f_val = fn { $captured }
+var $captured = 10
+val $f_val = fn { $captured }
 $captured = 20
 $f_val() |> aeq 10, "closure captures by value (DESIGN-001)"
 

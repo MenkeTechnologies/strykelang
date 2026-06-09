@@ -11,7 +11,7 @@
 
 # ── recipe database ────────────────────────────────────────────────
 
-my @recipes = (
+val @recipes = (
     +{
         name => "Pasta Marinara",
         tags => ["vegetarian"],
@@ -59,7 +59,7 @@ my @recipes = (
 # ── helper: does recipe have tag? ──────────────────────────────────
 
 fn Demo::Recipe::has_tag($recipe, $tag) {
-    for my $t (@{$recipe->{tags}}) {
+    for val $t (@{$recipe->{tags}}) {
         return 1 if $t eq $tag
     }
     0
@@ -68,8 +68,8 @@ fn Demo::Recipe::has_tag($recipe, $tag) {
 # ── plan: choose recipes for the week ──────────────────────────────
 
 p "── recipe catalog ───────────────────────────────────"
-for my $r (@recipes) {
-    my $tags = len(@{$r->{tags}}) > 0
+for val $r (@recipes) {
+    val $tags = len(@{$r->{tags}}) > 0
              ? "[" . join(",", @{$r->{tags}}) . "]"
              : "[none]"
     printf "  %-22s %s  %d kcal\n", $r->{name}, $tags, $r->{kcal}
@@ -77,10 +77,10 @@ for my $r (@recipes) {
 
 # ── vegetarian-only plan (5 meals) ─────────────────────────────────
 
-my @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
+val @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
 p ""
 printf "── vegetarian recipes (%d) ───────────────────────────\n", len @veg
-for my $r (@veg) {
+for val $r (@veg) {
     printf "  - %s\n", $r->{name}
 }
 
@@ -88,29 +88,29 @@ for my $r (@veg) {
 
 p ""
 p "── 5-meal weekly plan (varied tags) ─────────────────"
-my @plan = (
+val @plan = (
     $recipes[0],   # Pasta Marinara
     $recipes[3],   # Salmon Teriyaki
     $recipes[6],   # Lentil Soup
     $recipes[4],   # Greek Salad
     $recipes[2],   # Vegan Buddha Bowl
 )
-for my $r (@plan) {
+for val $r (@plan) {
     printf "  - %s (%d kcal)\n", $r->{name}, $r->{kcal}
 }
 
 # ── aggregate shopping list ────────────────────────────────────────
 
-my %shopping
-my $hll_ingredients = hll(14)
-my $tk_common = topk(5)
+var %shopping
+val $hll_ingredients = hll(14)
+val $tk_common = topk(5)
 
-for my $r (@plan) {
-    for my $ing (keys %{$r->{ingredients}}) {
-        my $qty = $r->{ingredients}->{$ing}
+for val $r (@plan) {
+    for val $ing (keys %{$r->{ingredients}}) {
+        val $qty = $r->{ingredients}->{$ing}
         $shopping{$ing} = ($shopping{$ing} // 0) + $qty
         hll_add($hll_ingredients, $ing)
-        for my $i (1:int($qty / 10)) {
+        for val $i (1:int($qty / 10)) {
             topk_add($tk_common, $ing)
         }
     }
@@ -118,17 +118,17 @@ for my $r (@plan) {
 
 p ""
 p "── aggregated shopping list ─────────────────────────"
-for my $ing (sort { $shopping{_1} <=> $shopping{_} } keys %shopping) {
+for val $ing (sort { $shopping{_1} <=> $shopping{_} } keys %shopping) {
     printf "  %-12s %4d g\n", $ing, $shopping{$ing}
 }
 
 # ── nutrient rollup ────────────────────────────────────────────────
 
-my $total_kcal = 0
-my $total_protein = 0
-my $total_carbs = 0
-my $total_fat = 0
-for my $r (@plan) {
+var $total_kcal = 0
+var $total_protein = 0
+var $total_carbs = 0
+var $total_fat = 0
+for val $r (@plan) {
     $total_kcal    += $r->{kcal}
     $total_protein += $r->{protein}
     $total_carbs   += $r->{carbs}
@@ -147,7 +147,7 @@ printf "  daily avg kcal : %.0f\n", $total_kcal / 5
 
 p ""
 p "── per-recipe kcal distribution (t-digest) ──────────"
-my $td_kcal = t_digest(100)
+val $td_kcal = t_digest(100)
 td_add($td_kcal, _->{kcal}) for @recipes
 printf "  p10  : %d\n", ~> td_quantile($td_kcal, 0.10) int
 printf "  p50  : %d\n", ~> td_quantile($td_kcal, 0.50) int
@@ -164,8 +164,8 @@ printf "  exact : %d\n", len(keys %shopping)
 
 p ""
 p "── most-bought ingredient (TopK) ────────────────────"
-my @hits = topk_top($tk_common)
-for my $h (@hits) {
+val @hits = topk_top($tk_common)
+for val $h (@hits) {
     printf "  %-12s : ~%d g\n", $h->[0], $h->[1] * 10
 }
 
@@ -173,12 +173,12 @@ for my $h (@hits) {
 
 p ""
 p "── recipe-tag distribution ──────────────────────────"
-my %by_tag
-for my $r (@recipes) {
-    for my $t (@{$r->{tags}}) {
+var %by_tag
+for val $r (@recipes) {
+    for val $t (@{$r->{tags}}) {
         $by_tag{$t}++
     }
 }
-for my $t (sort { $by_tag{_1} <=> $by_tag{_} } keys %by_tag) {
+for val $t (sort { $by_tag{_1} <=> $by_tag{_} } keys %by_tag) {
     printf "  %-15s : %d recipes\n", $t, $by_tag{$t}
 }

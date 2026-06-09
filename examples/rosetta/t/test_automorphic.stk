@@ -2,11 +2,11 @@
 # Rosetta Code: Automorphic numbers
 
 fn Rosetta::Automorphic::check($n) {
-    my $sq = $n * $n
-    my $s_n = "$n"
-    my $s_sq = "$sq"
-    my $len = length($s_n)
-    my $end = substr($s_sq, length($s_sq) - $len)
+    val $sq = $n * $n
+    val $s_n = "$n"
+    val $s_sq = "$sq"
+    val $len = length($s_n)
+    val $end = substr($s_sq, length($s_sq) - $len)
     $end eq $s_n
 }
 

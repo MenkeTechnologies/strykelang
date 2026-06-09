@@ -12,8 +12,8 @@
 mysync @diffs
 
 fn Demo::JD::diff($lhs, $rhs, $path) {
-    my $rl = ref $lhs
-    my $rr = ref $rhs
+    val $rl = ref $lhs
+    val $rr = ref $rhs
     if ($rl eq "" && $rr eq "") {
         if (!defined($lhs) && !defined($rhs)) {
             return
@@ -36,11 +36,11 @@ fn Demo::JD::diff($lhs, $rhs, $path) {
         return
     }
     if ($rl =~ /HASH/) {
-        my %all_keys
+        var %all_keys
         $all_keys{_} = 1 for keys %$lhs
         $all_keys{_} = 1 for keys %$rhs
-        for my $k (sort { _ cmp _1 } keys %all_keys) {
-            my $kp = $path eq "" ? $k : "$path.$k"
+        for val $k (sort { _ cmp _1 } keys %all_keys) {
+            val $kp = $path eq "" ? $k : "$path.$k"
             if (exists $lhs->{$k} && !exists $rhs->{$k}) {
                 push @diffs, +{ op => "remove", path => $kp, old => $lhs->{$k} }
             } elsif (!exists $lhs->{$k} && exists $rhs->{$k}) {
@@ -52,11 +52,11 @@ fn Demo::JD::diff($lhs, $rhs, $path) {
         return
     }
     if ($rl =~ /ARRAY/) {
-        my $ll = len @$lhs
-        my $lr = len @$rhs
-        my $maxlen = $ll > $lr ? $ll : $lr
-        for my $i (0:$maxlen - 1) {
-            my $ip = "$path\[$i\]"
+        val $ll = len @$lhs
+        val $lr = len @$rhs
+        val $maxlen = $ll > $lr ? $ll : $lr
+        for val $i (0:$maxlen - 1) {
+            val $ip = "$path\[$i\]"
             if ($i >= $ll) {
                 push @diffs, +{ op => "add", path => $ip, value => $rhs->[$i] }
             } elsif ($i >= $lr) {
@@ -75,11 +75,11 @@ fn Demo::JD::diff($lhs, $rhs, $path) {
 
 # ── instrument with t-digest ─────────────────────────────────────────
 
-my $td_lat = t_digest(100)
+val $td_lat = t_digest(100)
 
 fn Demo::JD::diff_root($lhs, $rhs) {
     @diffs = ()
-    my $t0 = now_ns()
+    val $t0 = now_ns()
     Demo::JD::diff($lhs, $rhs, "")
     td_add($td_lat, (now_ns() - $t0) / 1000.0)
     \@diffs
@@ -87,7 +87,7 @@ fn Demo::JD::diff_root($lhs, $rhs) {
 
 # ── sample data ────────────────────────────────────────────────────
 
-my $old_doc = +{
+val $old_doc = +{
     user => +{
         name => "alice",
         age  => 30,
@@ -104,7 +104,7 @@ my $old_doc = +{
     counts => +{ likes => 42, posts => 8 },
 }
 
-my $new_doc = +{
+val $new_doc = +{
     user => +{
         name => "alice",
         age  => 31,                    # changed
@@ -124,15 +124,15 @@ my $new_doc = +{
 }
 
 p "── computing diff between old and new ──────────────"
-my $diffs = Demo::JD::diff_root($old_doc, $new_doc)
+val $diffs = Demo::JD::diff_root($old_doc, $new_doc)
 
 # ── render report ──────────────────────────────────────────────────
 
 p ""
 printf "── %d differences found ───────────────────────────────\n",
     len @$diffs
-for my $d (@$diffs) {
-    my $op = $d->{op}
+for val $d (@$diffs) {
+    val $op = $d->{op}
     if    ($op eq "add") {
         printf "  + %-30s  %s\n", $d->{path}, $d->{value}
     } elsif ($op eq "remove") {
@@ -148,9 +148,9 @@ for my $d (@$diffs) {
 
 p ""
 p "── per-op rollup ────────────────────────────────────"
-my %ops
+var %ops
 $ops{_->{op}}++ for @$diffs
-for my $op (sort { _ cmp _1 } keys %ops) {
+for val $op (sort { _ cmp _1 } keys %ops) {
     printf "  %-12s : %d\n", $op, $ops{$op}
 }
 
@@ -158,14 +158,14 @@ for my $op (sort { _ cmp _1 } keys %ops) {
 
 p ""
 p "── most-affected top-level branches (TopK) ──────────"
-my $tk = topk(3)
-for my $d (@$diffs) {
-    my @segs = split /\./, $d->{path}
+val $tk = topk(3)
+for val $d (@$diffs) {
+    val @segs = split /\./, $d->{path}
     next if len(@segs) == 0
     topk_add($tk, $segs[0])
 }
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-20s : %d changes\n", $h->[0], $h->[1]
 }
 
@@ -175,10 +175,10 @@ for my $h (@hits) {
 
 p ""
 p "── determinism check ────────────────────────────────"
-my $r1 = Demo::JD::diff_root($old_doc, $new_doc)
-my $n1 = len @$r1
-my $r2 = Demo::JD::diff_root($old_doc, $new_doc)
-my $n2 = len @$r2
+val $r1 = Demo::JD::diff_root($old_doc, $new_doc)
+val $n1 = len @$r1
+val $r2 = Demo::JD::diff_root($old_doc, $new_doc)
+val $n2 = len @$r2
 printf "  diff(old, new) call 1 : %d changes\n", $n1
 printf "  diff(old, new) call 2 : %d changes\n", $n2
 printf "  deterministic         : %s\n", ($n1 == $n2) ? "YES" : "no"
@@ -187,7 +187,7 @@ printf "  deterministic         : %s\n", ($n1 == $n2) ? "YES" : "no"
 
 p ""
 p "── no-op: diff(old, old) ────────────────────────────"
-my $self_diff = Demo::JD::diff_root($old_doc, $old_doc)
+val $self_diff = Demo::JD::diff_root($old_doc, $old_doc)
 printf "  changes when comparing identical docs : %d (expected 0)\n",
     len @$self_diff
 

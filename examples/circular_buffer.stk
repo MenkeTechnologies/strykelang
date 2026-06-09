@@ -5,8 +5,8 @@
 # Run: stryke --no-interop examples/circular_buffer.stk
 
 fn CB::new($cap) {
-    my @buf = ()
-    for my $i (0:$cap-1) { push @buf, undef }
+    var @buf = ()
+    for val $i (0:$cap-1) { push @buf, undef }
     +{ cap => $cap, buf => \@buf, head => 0, tail => 0, n => 0 }
 }
 
@@ -22,7 +22,7 @@ fn CB::push($cb, $x) {
 
 fn CB::shift($cb) {
     return undef if $cb->{n} == 0
-    my $v = $cb->{buf}->[$cb->{head}]
+    val $v = $cb->{buf}->[$cb->{head}]
     $cb->{head} = ($cb->{head} + 1) % $cb->{cap}
     $cb->{n} = $cb->{n} - 1
     $v
@@ -38,9 +38,9 @@ fn CB::is_full($cb)  { $cb->{n} == $cb->{cap} ? 1 : 0 }
 fn CB::is_empty($cb) { $cb->{n} == 0 ? 1 : 0 }
 
 fn CB::to_array($cb) {
-    my @out = ()
-    my $i = $cb->{head}
-    for my $k (0:$cb->{n}-1) {
+    var @out = ()
+    var $i = $cb->{head}
+    for val $k (0:$cb->{n}-1) {
         push @out, $cb->{buf}->[$i]
         $i = ($i + 1) % $cb->{cap}
     }
@@ -48,16 +48,16 @@ fn CB::to_array($cb) {
 }
 
 p "=== Circular Buffer (cap=3) ==="
-my $cb = CB::new(3)
+val $cb = CB::new(3)
 CB::push($cb, "a")
 CB::push($cb, "b")
 CB::push($cb, "c")
-my $a1 = CB::to_array($cb)
+val $a1 = CB::to_array($cb)
 p "after push a,b,c: " . join(",", @$a1)
 CB::push($cb, "d")
-my $a2 = CB::to_array($cb)
+val $a2 = CB::to_array($cb)
 p "after push d (overwrite): " . join(",", @$a2)
-my $v = CB::shift($cb)
+val $v = CB::shift($cb)
 p "shift -> " . $v
-my $a3 = CB::to_array($cb)
+val $a3 = CB::to_array($cb)
 p "remaining: " . join(",", @$a3)

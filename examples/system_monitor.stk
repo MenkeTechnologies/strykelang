@@ -21,13 +21,13 @@ stress_metrics_record("api_call", 1, path => "/home",  status => "200")
 stress_metrics_record("api_call", 1, path => "/login", status => "403")
 
 # 3. Analyze the metrics
-my $json = stress_metrics_json()
-my $samples = from_json($json)
+val $json = stress_metrics_json()
+val $samples = from_json($json)
 
 p "Total samples in buffer: #{ len @$samples }"
 
 # Filter and count using pipelines
-my @logins = @$samples |> greps { _->{labels}->{path} eq "/login" } |> collect
+val @logins = @$samples |> greps { _->{labels}->{path} eq "/login" } |> collect
 p "Login attempts: #{ len @logins }"
 
 # ── 4. Tests ───────────────────────────────────────────────────────

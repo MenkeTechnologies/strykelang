@@ -5,9 +5,9 @@
 
 # Build n-gram transition table from words.
 fn Mk::train(@words) {
-    my %model = ()
-    for my $i (0:(len @words) - 2) {
-        my $key = $words[$i]
+    val %model = ()
+    for val $i (0:(len @words) - 2) {
+        val $key = $words[$i]
         push @{$model{$key}}, $words[$i + 1]
     }
     \%model
@@ -17,14 +17,14 @@ fn Mk::train(@words) {
 fn Mk::choose($succ, $seed) = $succ->[$seed % (len $succ)]
 
 fn Mk::generate($model, $start, $n, $seed) {
-    my @out = ($start)
-    my $cur = $start
+    var @out = ($start)
+    var $cur = $start
     mysync $r = $seed
     for (1:$n) {
-        my $succ = $model->{$cur}
+        val $succ = $model->{$cur}
         last if !$succ
         $r = ($r * 1103515245 + 12345) % 2147483648
-        my $next = Mk::choose($succ, $r)
+        val $next = Mk::choose($succ, $r)
         push @out, $next
         $cur = $next
     }
@@ -34,14 +34,14 @@ fn Mk::generate($model, $start, $n, $seed) {
 # Count distinct successors per state
 fn Mk::successors($model, $key) {
     return [] if !$model->{$key}
-    my %seen = ()
+    var %seen = ()
     $seen{$_} = 1 for @{$model->{$key}}
-    my @r = sort keys %seen
+    val @r = sort keys %seen
     \@r
 }
 
-my @corpus = ("the", "cat", "sat", "on", "the", "mat", "the", "cat", "ran", "the", "dog", "sat")
-my $m = Mk::train(@corpus)
+val @corpus = ("the", "cat", "sat", "on", "the", "mat", "the", "cat", "ran", "the", "dog", "sat")
+val $m = Mk::train(@corpus)
 
 # After "the": cat, mat, cat, dog → distinct {cat, dog, mat}
 join(",", @{Mk::successors($m, "the")}) |> aeq "cat,dog,mat", "succ(the)"
@@ -55,19 +55,19 @@ len $m->{"the"} |> aeq 4, "the has 4 transitions"
 len $m->{"cat"} |> aeq 2, "cat has 2 transitions"
 
 # Deterministic generation
-my $g1 = Mk::generate($m, "the", 5, 1)
+val $g1 = Mk::generate($m, "the", 5, 1)
 (len @$g1) >= 1 |> aeq 1, "gen returns at least start"
 $g1->[0] |> aeq "the", "starts with the"
 
 # Test that succ choices are always valid
-my $g2 = Mk::generate($m, "the", 10, 42)
-my $valid = 1
-for my $i (0:(len @$g2) - 2) {
-    my $w = $g2->[$i]
-    my $nx = $g2->[$i + 1]
-    my $ok = 0
+val $g2 = Mk::generate($m, "the", 10, 42)
+var $valid = 1
+for val $i (0:(len @$g2) - 2) {
+    val $w = $g2->[$i]
+    val $nx = $g2->[$i + 1]
+    var $ok = 0
     if ($m->{$w}) {
-        for my $s (@{$m->{$w}}) {
+        for val $s (@{$m->{$w}}) {
             $ok = 1 if $s eq $nx
         }
     }
@@ -77,16 +77,16 @@ $valid |> aeq 1, "all transitions valid"
 
 # Character-level n-gram
 fn Mk::train_chars($s, $k) {
-    my %model = ()
-    my @c = split(//, $s)
-    for my $i (0:(len @c) - $k - 1) {
-        my $key = join("", @c[$i:$i + $k - 1])
+    val %model = ()
+    val @c = split(//, $s)
+    for val $i (0:(len @c) - $k - 1) {
+        val $key = join("", @c[$i:$i + $k - 1])
         push @{$model{$key}}, $c[$i + $k]
     }
     \%model
 }
 
-my $cm = Mk::train_chars("abracadabra", 2)
+val $cm = Mk::train_chars("abracadabra", 2)
 
 # bigrams in "abracadabra":
 # ab→r, br→a, ra→c, ac→a, ca→d, ad→a, da→b, ab→r, br→a
@@ -98,8 +98,8 @@ join(",", @{$cm->{"da"}}) |> aeq "b",    "da→b"
 
 # Sentence-counting via bigram model (count_pairs)
 fn Mk::pair_count($model) {
-    my $sum = 0
-    for my $k (keys %$model) {
+    var $sum = 0
+    for val $k (keys %$model) {
         $sum += len $model->{$k}
     }
     $sum

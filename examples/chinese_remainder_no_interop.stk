@@ -21,9 +21,9 @@
 
 fn Crt::ext_gcd($ax, $bx) {
     return +{ g => $ax, x => 1, y => 0 } if $bx == 0
-    my $q = int($ax / $bx)
-    my $r = $ax - $q * $bx
-    my $sub = Crt::ext_gcd($bx, $r)
+    val $q = int($ax / $bx)
+    val $r = $ax - $q * $bx
+    val $sub = Crt::ext_gcd($bx, $r)
     +{
         g => $sub->{g},
         x => $sub->{y},
@@ -34,9 +34,9 @@ fn Crt::ext_gcd($ax, $bx) {
 # ── modular inverse via extended Euclidean ───────────────────────
 
 fn Crt::mod_inverse($ax, $m) {
-    my $r = Crt::ext_gcd($ax, $m)
+    val $r = Crt::ext_gcd($ax, $m)
     die "no inverse: gcd(#{$ax}, #{$m}) = #{$r->{g}}" unless $r->{g} == 1
-    my $inv = $r->{x} % $m
+    var $inv = $r->{x} % $m
     $inv += $m if $inv < 0
     $inv
 }
@@ -45,7 +45,7 @@ fn Crt::mod_inverse($ax, $m) {
 
 fn Crt::gcd($ax, $bx) {
     while ($bx) {
-        my $t = $bx
+        val $t = $bx
         $bx = $ax % $bx
         $ax = $t
     }
@@ -55,24 +55,24 @@ fn Crt::gcd($ax, $bx) {
 # ── solve the system; returns +{ x, modulus } ────────────────────
 
 fn Crt::solve($residues, $moduli) {
-    my $k = len(@$moduli)
+    val $k = len(@$moduli)
     die "residue/modulus length mismatch" unless len(@$residues) == $k
     # Pairwise-coprime check.
-    for my $i (0:$k - 1) {
-        for my $j ($i + 1:$k - 1) {
-            my $g = Crt::gcd($moduli->[$i], $moduli->[$j])
+    for val $i (0:$k - 1) {
+        for val $j ($i + 1:$k - 1) {
+            val $g = Crt::gcd($moduli->[$i], $moduli->[$j])
             die "moduli #{$moduli->[$i]} and #{$moduli->[$j]} not coprime (gcd=#{$g})" unless $g == 1
         }
     }
-    my $N = 1
-    for my $m (@$moduli) {
+    var $N = 1
+    for val $m (@$moduli) {
         $N *= $m
     }
-    my $x = 0
-    for my $i (0:$k - 1) {
-        my $ni = $moduli->[$i]
-        my $Ni = int($N / $ni)
-        my $yi = Crt::mod_inverse($Ni % $ni, $ni)
+    var $x = 0
+    for val $i (0:$k - 1) {
+        val $ni = $moduli->[$i]
+        val $Ni = int($N / $ni)
+        val $yi = Crt::mod_inverse($Ni % $ni, $ni)
         $x = ($x + $residues->[$i] * $Ni * $yi) % $N
     }
     $x = $x % $N
@@ -82,7 +82,7 @@ fn Crt::solve($residues, $moduli) {
 
 # ── primary test cases ───────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name => "classic Sun Tzu",
         a    => [2, 3, 2],
@@ -137,9 +137,9 @@ my @cases = (
 p "── Chinese Remainder Theorem demo ────────────────────"
 printf "  %-26s  %-26s  %-26s  %8s\n", "case", "residues", "moduli", "x"
 printf "  %-26s  %-26s  %-26s  %8s\n", "--------------------------", "--------------------------", "--------------------------", "--------"
-for my $c (@cases) {
-    my $r = Crt::solve($c->{a}, $c->{m})
-    my $ok = $r->{x} == $c->{x} && $r->{modulus} == $c->{N}
+for val $c (@cases) {
+    val $r = Crt::solve($c->{a}, $c->{m})
+    val $ok = $r->{x} == $c->{x} && $r->{modulus} == $c->{N}
     printf "  %-26s  %-26s  %-26s  %8d  %s\n",
         $c->{name},
         "[" . join(", ", @{$c->{a}}) . "]",
@@ -150,55 +150,55 @@ for my $c (@cases) {
 
 # ── invariant 1: solver matches the closed-form expected answer ───
 
-for my $c (@cases) {
-    my $r = Crt::solve($c->{a}, $c->{m})
+for val $c (@cases) {
+    val $r = Crt::solve($c->{a}, $c->{m})
     die "x #{$r->{x}} != expected #{$c->{x}} on \"#{$c->{name}}\"" unless $r->{x} == $c->{x}
     die "N #{$r->{modulus}} != expected #{$c->{N}} on \"#{$c->{name}}\"" unless $r->{modulus} == $c->{N}
 }
 
 # ── invariant 2: x mod n_i == a_i for every congruence ────────────
 
-for my $c (@cases) {
-    my $r = Crt::solve($c->{a}, $c->{m})
-    my $k = len(@{$c->{a}})
-    for my $i (0:$k - 1) {
-        my $got = $r->{x} % $c->{m}->[$i]
+for val $c (@cases) {
+    val $r = Crt::solve($c->{a}, $c->{m})
+    val $k = len(@{$c->{a}})
+    for val $i (0:$k - 1) {
+        val $got = $r->{x} % $c->{m}->[$i]
         die "x mod #{$c->{m}->[$i]} = #{$got}, want #{$c->{a}->[$i]} on \"#{$c->{name}}\"" unless $got == $c->{a}->[$i]
     }
 }
 
 # ── invariant 3: 0 ≤ x < N (canonical representative) ─────────────
 
-for my $c (@cases) {
-    my $r = Crt::solve($c->{a}, $c->{m})
+for val $c (@cases) {
+    val $r = Crt::solve($c->{a}, $c->{m})
     die "x #{$r->{x}} out of [0, #{$r->{modulus}}) on \"#{$c->{name}}\"" unless $r->{x} >= 0 && $r->{x} < $r->{modulus}
 }
 
 # ── invariant 4: N == ∏ moduli ────────────────────────────────────
 
-for my $c (@cases) {
-    my $r = Crt::solve($c->{a}, $c->{m})
-    my $prod = 1
-    for my $m (@{$c->{m}}) { $prod *= $m }
+for val $c (@cases) {
+    val $r = Crt::solve($c->{a}, $c->{m})
+    var $prod = 1
+    for val $m (@{$c->{m}}) { $prod *= $m }
     die "N #{$r->{modulus}} != ∏ moduli #{$prod} on \"#{$c->{name}}\"" unless $r->{modulus} == $prod
 }
 
 # ── invariant 5: extended Euclidean returns valid Bezout pair ─────
 # a·x + b·y == gcd(a, b).
 
-for my $pair ([10, 6], [12, 18], [17, 5], [100, 75], [1, 1], [97, 13]) {
-    my $r = Crt::ext_gcd($pair->[0], $pair->[1])
-    my $g = Crt::gcd($pair->[0], $pair->[1])
+for val $pair ([10, 6], [12, 18], [17, 5], [100, 75], [1, 1], [97, 13]) {
+    val $r = Crt::ext_gcd($pair->[0], $pair->[1])
+    val $g = Crt::gcd($pair->[0], $pair->[1])
     die "ext_gcd g #{$r->{g}} != gcd #{$g} on (#{$pair->[0]}, #{$pair->[1]})" unless $r->{g} == $g
-    my $lhs = $pair->[0] * $r->{x} + $pair->[1] * $r->{y}
+    val $lhs = $pair->[0] * $r->{x} + $pair->[1] * $r->{y}
     die "Bezout: #{$pair->[0]}·#{$r->{x}} + #{$pair->[1]}·#{$r->{y}} = #{$lhs}, want #{$r->{g}}" unless $lhs == $r->{g}
 }
 
 # ── invariant 6: mod_inverse round-trip — a · a⁻¹ ≡ 1 (mod m) ─────
 
-for my $pair ([3, 7], [5, 12], [7, 26], [10, 17], [4, 9], [11, 100]) {
-    my $inv = Crt::mod_inverse($pair->[0], $pair->[1])
-    my $prod = ($pair->[0] * $inv) % $pair->[1]
+for val $pair ([3, 7], [5, 12], [7, 26], [10, 17], [4, 9], [11, 100]) {
+    val $inv = Crt::mod_inverse($pair->[0], $pair->[1])
+    val $prod = ($pair->[0] * $inv) % $pair->[1]
     die "#{$pair->[0]} · inv = #{$prod}, want 1 (mod #{$pair->[1]})" unless $prod == 1
 }
 

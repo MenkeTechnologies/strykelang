@@ -7,17 +7,17 @@ fn Pq::new() { +{ heap => [] } }
 fn Pq::size($q) { len(@{$q->{heap}}) }
 
 fn Pq::_swap($h, $i, $j) {
-    my $t = $h->[$i]
+    val $t = $h->[$i]
     $h->[$i] = $h->[$j]
     $h->[$j] = $t
 }
 
 fn Pq::push($q, $val) {
-    my $h = $q->{heap}
+    val $h = $q->{heap}
     push @$h, $val
-    my $i = len(@$h) - 1
+    var $i = len(@$h) - 1
     while ($i > 0) {
-        my $parent = int(($i - 1) / 2)
+        val $parent = int(($i - 1) / 2)
         last if $h->[$parent] <= $h->[$i]
         Pq::_swap($h, $i, $parent)
         $i = $parent
@@ -27,18 +27,18 @@ fn Pq::push($q, $val) {
 fn Pq::peek($q) { $q->{heap}[0] }
 
 fn Pq::pop($q) {
-    my $h = $q->{heap}
+    var $h = $q->{heap}
     return undef if len(@$h) == 0
-    my $top = $h->[0]
-    my $last = pop @$h
+    val $top = $h->[0]
+    val $last = pop @$h
     if (len(@$h) > 0) {
         $h->[0] = $last
-        my $i = 0
-        my $n = len(@$h)
+        var $i = 0
+        val $n = len(@$h)
         while (1) {
-            my $l = 2 * $i + 1
-            my $r = 2 * $i + 2
-            my $sm = $i
+            val $l = 2 * $i + 1
+            val $r = 2 * $i + 2
+            var $sm = $i
             $sm = $l if $l < $n && $h->[$l] < $h->[$sm]
             $sm = $r if $r < $n && $h->[$r] < $h->[$sm]
             last if $sm == $i
@@ -50,12 +50,12 @@ fn Pq::pop($q) {
 }
 
 fn Pq::drain($q) {
-    my @out
+    var @out
     push @out, Pq::pop($q) while Pq::size($q) > 0
     \@out
 }
 
-my $q = Pq::new()
+val $q = Pq::new()
 Pq::size($q) |> aeq 0, "empty size"
 
 Pq::push($q, 5)
@@ -74,28 +74,28 @@ Pq::pop($q) |> aeq 3, "pop 3"
 Pq::size($q) |> aeq 3, "size after 3 pops"
 
 # Drain remainder
-my $rest = Pq::drain($q)
+val $rest = Pq::drain($q)
 join(",", @$rest) |> aeq "5,7,9", "drain rest sorted"
 
 # Heap-sort: push everything, drain into sorted array
-my $q2 = Pq::new()
+val $q2 = Pq::new()
 Pq::push($q2, _) for 42, 17, 8, 99, 23, 5, 61, 30, 1, 88
-my $sorted = Pq::drain($q2)
+val $sorted = Pq::drain($q2)
 join(",", @$sorted) |> aeq "1,5,8,17,23,30,42,61,88,99", "heap sort"
 
 # Stress: insert 100 ints, drain, ensure ascending
-my $q3 = Pq::new()
+val $q3 = Pq::new()
 Pq::push($q3, int(rand() * 1000)) for 1:100
-my $out = Pq::drain($q3)
+val $out = Pq::drain($q3)
 len(@$out) |> aeq 100, "stress size"
-my $ascending = 1
-for my $i (1:99) {
+var $ascending = 1
+for val $i (1:99) {
     $ascending = 0 if $out->[$i] < $out->[$i - 1]
 }
 $ascending |> aok "stress ascending"
 
 # Empty pop returns undef
-my $q4 = Pq::new()
+val $q4 = Pq::new()
 !defined(Pq::pop($q4)) |> aok "pop empty undef"
 
 test_run

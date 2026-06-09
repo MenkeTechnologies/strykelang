@@ -33,7 +33,7 @@ ai_mock_install("(?i)summarize lua",         "Lua is a lightweight embeddable sc
 ai_mock_install("(?i)summarize javascript",  "JavaScript runs in browsers and Node.js runtimes.")
 ai_mock_install("(?i)summarize zig",         "Zig is a modern systems language without hidden control flow.")
 
-my @prompts = (
+val @prompts = (
     "summarize rust",       "summarize perl",
     "summarize python",     "summarize ruby",
     "summarize go",         "summarize lua",
@@ -43,22 +43,22 @@ my @prompts = (
 # ── Serial baseline ────────────────────────────────────────────────────
 
 p "── serial: map { ai \$_ } @prompts ────────────────────"
-my $t1 = now_ns()
-my @serial = map { ai _ } @prompts
-my $serial_ms = (now_ns() - $t1) / 1e6
+val $t1 = now_ns()
+val @serial = map { ai _ } @prompts
+val $serial_ms = (now_ns() - $t1) / 1e6
 printf "  %d prompts, %.2f ms wall\n", len(@serial), $serial_ms
 
 # ── Parallel via pmap ─────────────────────────────────────────────────
 
 p "── parallel: pmap { ai \$_ } @prompts ─────────────────"
-my $t2 = now_ns()
-my @parallel = pmap { ai _ } @prompts
-my $parallel_ms = (now_ns() - $t2) / 1e6
+val $t2 = now_ns()
+val @parallel = pmap { ai _ } @prompts
+val $parallel_ms = (now_ns() - $t2) / 1e6
 printf "  %d prompts, %.2f ms wall\n", len(@parallel), $parallel_ms
 
 # Results match in both modes (order preserved by pmap).
-my $match = 1
-for my $i (0:len(@serial)-1) {
+var $match = 1
+for val $i (0:len(@serial)-1) {
     $match = 0 if $serial[$i] ne $parallel[$i]
 }
 printf "  results identical: %s\n", ($match ? "yes" : "no")
@@ -66,19 +66,19 @@ printf "  results identical: %s\n", ($match ? "yes" : "no")
 # ── Show the answers (first 3) ────────────────────────────────────────
 
 p "── sample answers ────────────────────────────────────"
-for my $i (0:2) {
+for val $i (0:2) {
     printf "  %-22s : %s\n", $prompts[$i], $parallel[$i]
 }
 
 # ── Cross-feature: feed answers into a Bloom for "seen-summary" set ───
 
 p "── compose: bloom over generated answers ─────────────"
-my $seen = bloom_filter(10_000, 0.001)
+val $seen = bloom_filter(10_000, 0.001)
 bloom_add($seen, _) for @parallel
 
 # Re-running the same prompts shouldn't add new bloom entries (mocks
 # are deterministic). Show membership of one known answer.
-my $hit = bloom_contains($seen, "Rust is a memory-safe systems language.")
+val $hit = bloom_contains($seen, "Rust is a memory-safe systems language.")
 printf "  bloom contains 'Rust ...' : %s\n", ($hit ? "yes" : "no")
 
 p "── note ──────────────────────────────────────────────"

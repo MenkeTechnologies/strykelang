@@ -2,20 +2,20 @@
 # Rosetta Code: Hash join — equi-join two record sets on a key column.
 
 fn Rosetta::HashJoin::join_on($left, $right, $lkey, $rkey) {
-    my %index
+    var %index
     ~> @$right ep {
-        my $k = _->{$rkey}
+        val $k = _->{$rkey}
         $index{$k} = [] if !exists $index{$k}
         push @{$index{$k}}, _
     }
-    my @out
-    for my $row (@$left) {
-        my $k = $row->{$lkey}
+    var @out
+    for val $row (@$left) {
+        val $k = $row->{$lkey}
         next if !exists $index{$k}
-        for my $r (@{$index{$k}}) {
-            my %merged
-            for my $kk (keys %$row) { $merged{$kk} = $row->{$kk} }
-            for my $kk (keys %$r)   { $merged{$kk} = $r->{$kk} }
+        for val $r (@{$index{$k}}) {
+            var %merged
+            for val $kk (keys %$row) { $merged{$kk} = $row->{$kk} }
+            for val $kk (keys %$r)   { $merged{$kk} = $r->{$kk} }
             push @out, \%merged
         }
     }
@@ -23,14 +23,14 @@ fn Rosetta::HashJoin::join_on($left, $right, $lkey, $rkey) {
 }
 
 # Rosetta canonical example: Age x Name -> joined records
-my $A = [
+val $A = [
     { age => 27, name => "Jonah" },
     { age => 18, name => "Alan" },
     { age => 28, name => "Glory" },
     { age => 18, name => "Popeye" },
     { age => 28, name => "Alan" }
 ]
-my $B = [
+val $B = [
     { name => "Jonah", nemesis => "Whales" },
     { name => "Jonah", nemesis => "Spiders" },
     { name => "Alan",  nemesis => "Ghosts" },
@@ -38,31 +38,31 @@ my $B = [
     { name => "Glory", nemesis => "Buffy" }
 ]
 
-my $joined = Rosetta::HashJoin::join_on($A, $B, "name", "name")
+val $joined = Rosetta::HashJoin::join_on($A, $B, "name", "name")
 
 # Popeye has no match → not in output. Glory has 1 match. Jonah has 2. Alan has 2 (×2 rows in A) = 4.
 # Total = 1 + 2 + 2 + 2 = 7
 assert_eq len(@$joined), 7, "7 joined rows total"
 
 # Check that Glory's row exists with both age and nemesis
-my @glory = grep { _->{name} eq "Glory" } @$joined
+val @glory = grep { _->{name} eq "Glory" } @$joined
 assert_eq len(@glory), 1, "exactly one Glory row"
 assert_eq $glory[0]->{age}, 28, "Glory age 28"
 assert_eq $glory[0]->{nemesis}, "Buffy", "Glory's nemesis"
 
 # Alan with age 18 has 2 nemeses
-my @alan18 = grep { _->{name} eq "Alan" && _->{age} == 18 } @$joined
+val @alan18 = grep { _->{name} eq "Alan" && _->{age} == 18 } @$joined
 assert_eq len(@alan18), 2, "Alan(18) joined twice"
 
 # No-match exclusion
-my @popeye = grep { _->{name} eq "Popeye" } @$joined
+val @popeye = grep { _->{name} eq "Popeye" } @$joined
 assert_eq len(@popeye), 0, "Popeye dropped"
 
 # Empty inputs
-my $r0 = Rosetta::HashJoin::join_on([], $B, "name", "name")
+val $r0 = Rosetta::HashJoin::join_on([], $B, "name", "name")
 assert_eq len(@$r0), 0, "empty left"
 
-my $r1 = Rosetta::HashJoin::join_on($A, [], "name", "name")
+val $r1 = Rosetta::HashJoin::join_on($A, [], "name", "name")
 assert_eq len(@$r1), 0, "empty right"
 
 test_run

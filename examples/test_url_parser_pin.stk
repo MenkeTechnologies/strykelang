@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 fn Url::parse($url) {
-    my %u = (
+    var %u = (
         scheme   => "",
         host     => "",
         port     => "",
@@ -9,24 +9,24 @@ fn Url::parse($url) {
         query    => "",
         fragment => "",
     )
-    my $s = $url
-    my $col = index($s, "://")
+    var $s = $url
+    val $col = index($s, "://")
     if ($col >= 0) {
         $u{scheme} = substr($s, 0, $col)
         $s = substr($s, $col + 3)
     }
-    my $hash = index($s, "#")
+    val $hash = index($s, "#")
     if ($hash >= 0) {
         $u{fragment} = substr($s, $hash + 1)
         $s = substr($s, 0, $hash)
     }
-    my $q = index($s, "?")
+    val $q = index($s, "?")
     if ($q >= 0) {
         $u{query} = substr($s, $q + 1)
         $s = substr($s, 0, $q)
     }
-    my $slash = index($s, "/")
-    my $hostpart = ""
+    val $slash = index($s, "/")
+    var $hostpart = ""
     if ($slash >= 0) {
         $hostpart = substr($s, 0, $slash)
         $u{path}  = substr($s, $slash)
@@ -34,7 +34,7 @@ fn Url::parse($url) {
         $hostpart = $s
         $u{path}  = ""
     }
-    my $colon = index($hostpart, ":")
+    val $colon = index($hostpart, ":")
     if ($colon >= 0) {
         $u{host} = substr($hostpart, 0, $colon)
         $u{port} = substr($hostpart, $colon + 1)
@@ -45,14 +45,14 @@ fn Url::parse($url) {
 }
 
 fn Url::query_params($url_obj) {
-    my %params = ()
+    var %params = ()
     return \%params if $url_obj->{query} eq ""
-    my @pairs = split /&/, $url_obj->{query}
-    for my $kv (@pairs) {
-        my $eq = index($kv, "=")
+    val @pairs = split /&/, $url_obj->{query}
+    for val $kv (@pairs) {
+        val $eq = index($kv, "=")
         if ($eq >= 0) {
-            my $k = substr($kv, 0, $eq)
-            my $v = substr($kv, $eq + 1)
+            val $k = substr($kv, 0, $eq)
+            val $v = substr($kv, $eq + 1)
             $params{$k} = $v
         } else {
             $params{$kv} = ""
@@ -62,7 +62,7 @@ fn Url::query_params($url_obj) {
 }
 
 # Full URL
-my $u = Url::parse("https://example.com:8080/path/to/page?a=1&b=two#frag")
+val $u = Url::parse("https://example.com:8080/path/to/page?a=1&b=two#frag")
 $u->{scheme}   |> aeq "https",       "scheme https"
 $u->{host}     |> aeq "example.com", "host"
 $u->{port}     |> aeq "8080",        "port"
@@ -71,54 +71,54 @@ $u->{query}    |> aeq "a=1&b=two",   "query"
 $u->{fragment} |> aeq "frag",        "fragment"
 
 # No port
-my $u2 = Url::parse("http://example.com/x")
+val $u2 = Url::parse("http://example.com/x")
 $u2->{port} |> aeq "", "no port"
 $u2->{host} |> aeq "example.com", "host w/o port"
 $u2->{path} |> aeq "/x", "path"
 
 # No path
-my $u3 = Url::parse("https://example.com")
+val $u3 = Url::parse("https://example.com")
 $u3->{path}  |> aeq "", "no path"
 $u3->{host}  |> aeq "example.com", "host"
 $u3->{query} |> aeq "", "no query"
 
 # Just path (relative-ish - no scheme)
-my $u4 = Url::parse("example.com/foo?x=1")
+val $u4 = Url::parse("example.com/foo?x=1")
 $u4->{scheme} |> aeq "", "no scheme"
 $u4->{host}   |> aeq "example.com", "host without scheme"
 $u4->{path}   |> aeq "/foo", "path"
 $u4->{query}  |> aeq "x=1", "query"
 
 # Fragment only
-my $u5 = Url::parse("http://a.com/#section")
+val $u5 = Url::parse("http://a.com/#section")
 $u5->{fragment} |> aeq "section", "fragment only"
 $u5->{query}    |> aeq "", "no query w/ fragment"
 
 # Query params
-my $u6 = Url::parse("http://a.com/p?foo=bar&baz=qux&empty=")
-my $p = Url::query_params($u6)
+val $u6 = Url::parse("http://a.com/p?foo=bar&baz=qux&empty=")
+val $p = Url::query_params($u6)
 $p->{foo}   |> aeq "bar", "p.foo"
 $p->{baz}   |> aeq "qux", "p.baz"
 $p->{empty} |> aeq "",    "p.empty"
 
 # No-equals param treated as empty
-my $u7 = Url::parse("http://a.com/?flag&x=1")
-my $p2 = Url::query_params($u7)
+val $u7 = Url::parse("http://a.com/?flag&x=1")
+val $p2 = Url::query_params($u7)
 $p2->{flag} |> aeq "", "flag no value"
 $p2->{x}    |> aeq "1", "x=1"
 
 # Empty query gives empty hash
-my $u8 = Url::parse("http://a.com/")
-my $p3 = Url::query_params($u8)
+val $u8 = Url::parse("http://a.com/")
+val $p3 = Url::query_params($u8)
 len(keys %$p3) |> aeq 0, "empty params"
 
 # Order of parsing: fragment before query
-my $u9 = Url::parse("http://a.com/p?q=1#frag")
+val $u9 = Url::parse("http://a.com/p?q=1#frag")
 $u9->{query}    |> aeq "q=1", "query before frag"
 $u9->{fragment} |> aeq "frag", "frag after query"
 
 # FTP-ish scheme
-my $ua = Url::parse("ftp://files.example.com:21/dir/file.txt")
+val $ua = Url::parse("ftp://files.example.com:21/dir/file.txt")
 $ua->{scheme} |> aeq "ftp", "ftp scheme"
 $ua->{port}   |> aeq "21", "ftp port"
 $ua->{path}   |> aeq "/dir/file.txt", "ftp path"

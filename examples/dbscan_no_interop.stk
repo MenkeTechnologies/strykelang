@@ -18,14 +18,14 @@
 # Run: stryke --no-interop examples/dbscan_no_interop.stk
 
 fn DBSCAN::dist($p1, $p2) {
-    my $dx = $p1->{x} - $p2->{x}
-    my $dy = $p1->{y} - $p2->{y}
+    val $dx = $p1->{x} - $p2->{x}
+    val $dy = $p1->{y} - $p2->{y}
     sqrt($dx * $dx + $dy * $dy)
 }
 
 fn DBSCAN::region_query($points, $p, $eps) {
-    my @neighbors
-    for my $q (@$points) {
+    var @neighbors
+    for val $q (@$points) {
         push @neighbors, $q if DBSCAN::dist($p, $q) <= $eps
     }
     \@neighbors
@@ -34,14 +34,14 @@ fn DBSCAN::region_query($points, $p, $eps) {
 # Returns +{ clusters => { id => [pts] }, noise => [pts] }.
 # Labels: 0 = unvisited, -1 = noise, >0 = cluster id.
 fn DBSCAN::solve($points, $eps, $min_pts) {
-    my $c = 0
-    my %label
-    for my $p (@$points) { $label{$p->{id}} = 0 }
+    var $c = 0
+    var %label
+    for val $p (@$points) { $label{$p->{id}} = 0 }
 
-    for my $p (@$points) {
+    for val $p (@$points) {
         next if $label{$p->{id}} != 0
 
-        my $neighbors = DBSCAN::region_query($points, $p, $eps)
+        val $neighbors = DBSCAN::region_query($points, $p, $eps)
         if (len(@$neighbors) < $min_pts) {
             $label{$p->{id}} = -1
             next
@@ -52,27 +52,27 @@ fn DBSCAN::solve($points, $eps, $min_pts) {
 
         # BFS the density-reachable hull. @seed_set is the work
         # queue; %in_seed prevents re-enqueueing the same point.
-        my @seed_set
-        my %in_seed
-        for my $n (@$neighbors) {
+        var @seed_set
+        var %in_seed
+        for val $n (@$neighbors) {
             if ($n->{id} ne $p->{id}) {
                 push @seed_set, $n
                 $in_seed{$n->{id}} = 1
             }
         }
 
-        my $head = 0
+        var $head = 0
         while ($head < len(@seed_set)) {
-            my $q = $seed_set[$head++]
+            val $q = $seed_set[$head++]
 
             # Promote previously-noise points to border points.
             $label{$q->{id}} = $c if $label{$q->{id}} == -1
             next if $label{$q->{id}} != 0
 
             $label{$q->{id}} = $c
-            my $qn = DBSCAN::region_query($points, $q, $eps)
+            val $qn = DBSCAN::region_query($points, $q, $eps)
             next if len(@$qn) < $min_pts
-            for my $r (@$qn) {
+            for val $r (@$qn) {
                 if ($label{$r->{id}} == 0 && !$in_seed{$r->{id}}) {
                     push @seed_set, $r
                     $in_seed{$r->{id}} = 1
@@ -81,10 +81,10 @@ fn DBSCAN::solve($points, $eps, $min_pts) {
         }
     }
 
-    my %clusters
-    my @noise
-    for my $p (@$points) {
-        my $l = $label{$p->{id}}
+    var %clusters
+    var @noise
+    for val $p (@$points) {
+        val $l = $label{$p->{id}}
         if ($l == -1) {
             push @noise, $p
         } elsif ($l > 0) {
@@ -97,7 +97,7 @@ fn DBSCAN::solve($points, $eps, $min_pts) {
 
 p "── DBSCAN clustering demo ──"
 
-my @points = (
+val @points = (
     # tight cluster around (1,1)
     +{ id => "A", x => 1.0, y => 1.0 },
     +{ id => "B", x => 1.1, y => 1.0 },
@@ -110,14 +110,14 @@ my @points = (
     +{ id => "G", x => 10.0, y => 10.0 },
 )
 
-my $res = DBSCAN::solve(\@points, 0.5, 2)
-my $clusters = $res->{clusters}
+val $res = DBSCAN::solve(\@points, 0.5, 2)
+val $clusters = $res->{clusters}
 p "Clusters found: #{len(keys %$clusters)}"
-for my $id (~> keys(%$clusters) sort) {
-    my @names = ~> @{$clusters->{$id}} maps { _->{id} }
+for val $id (~> keys(%$clusters) sort) {
+    val @names = ~> @{$clusters->{$id}} maps { _->{id} }
     p "  Cluster #{$id}: [ #{join ', ', @names} ]"
 }
 
-my @noise_names = ~> @{$res->{noise}} maps { _->{id} }
+val @noise_names = ~> @{$res->{noise}} maps { _->{id} }
 p "Noise points: [ #{join ', ', @noise_names} ]"
 p "Done."

@@ -17,19 +17,19 @@
 #      stryke --no-interop examples/first_unique_no_interop.stk leetcode
 
 fn FirstU::find($s) {
-    my @c = split //, $s
-    my %seen
+    val @c = split //, $s
+    var %seen
     $seen{_}++ for @c
-    my $r = 0:len(@c) - 1 |> first { $seen{$c[_]} == 1 }
+    val $r = 0:len(@c) - 1 |> first { $seen{$c[_]} == 1 }
     defined $r ? $r : -1
 }
 
 # Pipe-chain variant — grep+head instead of first+default.
 fn FirstU::pipe_find($s) {
-    my @c = split //, $s
-    my %seen
+    val @c = split //, $s
+    var %seen
     $seen{_}++ for @c
-    my @hits = 0:len(@c) - 1 |> grep { $seen{$c[_]} == 1 }
+    val @hits = 0:len(@c) - 1 |> grep { $seen{$c[_]} == 1 }
     len(@hits) > 0 ? $hits[0] : -1
 }
 
@@ -38,7 +38,7 @@ if (len(@ARGV) >= 1) {
     exit 0
 }
 
-my @cases = (
+val @cases = (
     +{ s => "leetcode",     idx =>  0 },
     +{ s => "loveleetcode", idx =>  2 },
     +{ s => "aabb",         idx => -1 },
@@ -51,11 +51,11 @@ my @cases = (
 )
 
 p "── First unique character demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got1 = FirstU::find      $c->{s}
-    my $got2 = FirstU::pipe_find $c->{s}
-    my $ok   = $got1 == $c->{idx} && $got2 == $c->{idx}
+var $fail = 0
+for val $c (@cases) {
+    val $got1 = FirstU::find      $c->{s}
+    val $got2 = FirstU::pipe_find $c->{s}
+    val $ok   = $got1 == $c->{idx} && $got2 == $c->{idx}
     $fail++ unless $ok
     p "  \"$c->{s}\" -> #{$got1} (pipe #{$got2})  expect #{$c->{idx}}  #{$ok ? \"\" : \"FAIL\"}"
 }
@@ -63,12 +63,12 @@ die "$fail / #{len @cases} cases failed" if $fail > 0
 
 # Universal invariant: if a unique char exists, that char appears
 # exactly once. One-line pipe-chain count.
-for my $c (@cases) {
-    my $i = FirstU::find $c->{s}
+for val $c (@cases) {
+    val $i = FirstU::find $c->{s}
     next if $i == -1
-    my $s     = $c->{s}
-    my $ch    = $s[$i]
-    my $count = split(//, $s) |> grep { _ eq $ch } |> len
+    val $s     = $c->{s}
+    val $ch    = $s[$i]
+    val $count = split(//, $s) |> grep { _ eq $ch } |> len
     die "first-unique result not actually unique" unless $count == 1
 }
 

@@ -10,7 +10,7 @@
 
 # ── sample DNA sequence (synthetic) ────────────────────────────────
 
-my $dna = "ATGAAACCTGCAGGCCCTGGGTAAGTCATGGCTCCTGAATAGTTTAAACCG" .
+val $dna = "ATGAAACCTGCAGGCCCTGGGTAAGTCATGGCTCCTGAATAGTTTAAACCG" .
           "ATGGCCATTGGCAAGTTGCATGCTAGCTGAACGCATGAGCAACGTCCATAA" .
           "CGTGCTACGACGCATAGCCTAGCATGCAGCGTAGACGCATCAGTGCATGTC"
 
@@ -19,13 +19,13 @@ printf "── DNA sequence: %d bases ──────────────
 
 # ── GC content ──────────────────────────────────────────────────────
 
-my $ng = 0
-my $nc = 0
-my $na = 0
-my $nt = 0
-my $other = 0
-for my $i (0:len($dna) - 1) {
-    my $ch = substr($dna, $i, 1)
+var $ng = 0
+var $nc = 0
+var $na = 0
+var $nt = 0
+var $other = 0
+for val $i (0:len($dna) - 1) {
+    val $ch = substr($dna, $i, 1)
     if    ($ch eq "G") { $ng++ }
     elsif ($ch eq "C") { $nc++ }
     elsif ($ch eq "A") { $na++ }
@@ -33,8 +33,8 @@ for my $i (0:len($dna) - 1) {
     else               { $other++ }
 }
 
-my $total = $na + $nc + $ng + $nt
-my $gc_pct = 100.0 * ($ng + $nc) / $total
+val $total = $na + $nc + $ng + $nt
+val $gc_pct = 100.0 * ($ng + $nc) / $total
 
 p ""
 p "── nucleotide composition ───────────────────────────"
@@ -46,14 +46,14 @@ printf "  GC content : %.1f%%\n", $gc_pct
 
 # ── codon frequency ─────────────────────────────────────────────────
 
-my %codon_count
-my $td_scan = t_digest(100)
-my $tk_codons = topk(5)
+var %codon_count
+val $td_scan = t_digest(100)
+val $tk_codons = topk(5)
 
-my $i = 0
+var $i = 0
 while ($i + 3 <= len($dna)) {
-    my $t0 = now_ns()
-    my $codon = substr($dna, $i, 3)
+    val $t0 = now_ns()
+    val $codon = substr($dna, $i, 3)
     $codon_count{$codon} = ($codon_count{$codon} // 0) + 1
     topk_add($tk_codons, $codon)
     td_add($td_scan, (now_ns() - $t0) / 1000.0)
@@ -63,9 +63,9 @@ while ($i + 3 <= len($dna)) {
 p ""
 printf "── codon frequencies (top 10 of %d distinct) ──────────\n",
     len(keys %codon_count)
-my @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_} } keys %codon_count
-my $shown = 0
-for my $codon (@sorted_codons) {
+val @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_} } keys %codon_count
+var $shown = 0
+for val $codon (@sorted_codons) {
     last if $shown >= 10
     printf "  %s : %d\n", $codon, $codon_count{$codon}
     $shown++
@@ -73,18 +73,18 @@ for my $codon (@sorted_codons) {
 
 # ── reverse complement ──────────────────────────────────────────────
 
-my %complement = (A => "T", T => "A", G => "C", C => "G")
+val %complement = (A => "T", T => "A", G => "C", C => "G")
 
 fn Demo::Genome::reverse_complement($seq) {
-    my $rc = ""
-    for my $i (rev(0:len($seq) - 1)) {
-        my $ch = substr($seq, $i, 1)
+    var $rc = ""
+    for val $i (rev(0:len($seq) - 1)) {
+        val $ch = substr($seq, $i, 1)
         $rc .= ($complement{$ch} // "N")
     }
     $rc
 }
 
-my $rc = Demo::Genome::reverse_complement($dna)
+val $rc = Demo::Genome::reverse_complement($dna)
 p ""
 p "── reverse complement (first 60 bases) ──────────────"
 printf "  orig : %s\n", substr($dna, 0, 60)
@@ -95,18 +95,18 @@ printf "  rc length : %d (must match input)\n", len $rc
 
 p ""
 p "── open reading frames (ATG..STOP) ───────────────────"
-my @orfs
-for my $frame (0:2) {
-    my $j = $frame
+var @orfs
+for val $frame (0:2) {
+    var $j = $frame
     while ($j + 3 <= len($dna)) {
-        my $codon = substr($dna, $j, 3)
+        val $codon = substr($dna, $j, 3)
         if ($codon eq "ATG") {
             # Look for stop codon.
-            my $k = $j + 3
+            var $k = $j + 3
             while ($k + 3 <= len($dna)) {
-                my $next = substr($dna, $k, 3)
+                val $next = substr($dna, $k, 3)
                 if ($next eq "TAA" || $next eq "TAG" || $next eq "TGA") {
-                    my $orf_len = $k + 3 - $j
+                    val $orf_len = $k + 3 - $j
                     if ($orf_len >= 30) {   # minimum length filter
                         push @orfs, +{
                             frame => $frame,
@@ -127,8 +127,8 @@ for my $frame (0:2) {
 
 @orfs = sort { _1->{length} <=> _->{length} } @orfs
 printf "  found %d ORFs (≥30 bases)\n", len @orfs
-my $orf_shown = 0
-for my $orf (@orfs) {
+var $orf_shown = 0
+for val $orf (@orfs) {
     last if $orf_shown >= 5
     printf "  frame=%d start=%-3d end=%-3d length=%-3d stop=%s\n",
         $orf->{frame}, $orf->{start}, $orf->{end},
@@ -140,8 +140,8 @@ for my $orf (@orfs) {
 
 p ""
 p "── HLL distinct codons ──────────────────────────────"
-my $hll = hll(14)
-for my $codon (keys %codon_count) {
+val $hll = hll(14)
+for val $codon (keys %codon_count) {
     hll_add($hll, $codon)
 }
 printf "  HLL distinct codons : %d\n", hll_count($hll)
@@ -151,8 +151,8 @@ printf "  exact               : %d (max 64)\n", len(keys %codon_count)
 
 p ""
 p "── TopK most-frequent codons ────────────────────────"
-my @hits = topk_top($tk_codons)
-for my $h (@hits) {
+val @hits = topk_top($tk_codons)
+for val $h (@hits) {
     printf "  %s : %d hits\n", $h->[0], $h->[1]
 }
 

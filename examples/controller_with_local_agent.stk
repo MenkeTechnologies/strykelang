@@ -21,7 +21,7 @@
 #
 # Override the port with PORT=N if 9999 is busy.
 
-my $port = $ENV{PORT} // 9999
+var $port = $ENV{PORT} // 9999
 
 # Spawn the agent first so it can race ahead and connect once the controller
 # binds. The `sleep 1` gives the controller's listener time to come up — agent

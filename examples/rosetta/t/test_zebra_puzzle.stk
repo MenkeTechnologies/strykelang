@@ -5,11 +5,11 @@
 
 fn Rosetta::Zebra::permutations($items) {
     return [[]] if len(@$items) == 0
-    my @out
-    for my $i (0..len(@$items) - 1) {
-        my @rest = (@$items[0:$i - 1], @$items[$i + 1..len(@$items) - 1])
-        my $sub = Rosetta::Zebra::permutations(\@rest)
-        for my $tail (@$sub) {
+    var @out
+    for var $i (0..len(@$items) - 1) {
+        val @rest = (@$items[0:$i - 1], @$items[$i + 1..len(@$items) - 1])
+        val $sub = Rosetta::Zebra::permutations(\@rest)
+        for val $tail (@$sub) {
             push @out, [$items->[$i], @$tail]
         }
     }
@@ -18,8 +18,8 @@ fn Rosetta::Zebra::permutations($items) {
 
 fn Rosetta::Zebra::adjacent($a, $b, $arr) {
     # Returns 1 iff $a and $b are at adjacent indices in $arr.
-    my ($ia, $ib) = (-1, -1)
-    for my $i (0..len(@$arr) - 1) {
+    var ($ia, $ib) = (-1, -1)
+    for var $i (0..len(@$arr) - 1) {
         $ia = $i if $arr->[$i] eq $a
         $ib = $i if $arr->[$i] eq $b
     }
@@ -28,8 +28,8 @@ fn Rosetta::Zebra::adjacent($a, $b, $arr) {
 }
 
 fn Rosetta::Zebra::right_of($a, $b, $arr) {
-    my ($ia, $ib) = (-1, -1)
-    for my $i (0..len(@$arr) - 1) {
+    var ($ia, $ib) = (-1, -1)
+    for val $i (0..len(@$arr) - 1) {
         $ia = $i if $arr->[$i] eq $a
         $ib = $i if $arr->[$i] eq $b
     }
@@ -37,34 +37,34 @@ fn Rosetta::Zebra::right_of($a, $b, $arr) {
 }
 
 fn Rosetta::Zebra::index_of($v, $arr) {
-    for my $i (0..len(@$arr) - 1) { return $i if $arr->[$i] eq $v }
+    for val $i (0..len(@$arr) - 1) { return $i if $arr->[$i] eq $v }
     -1
 }
 
 fn Rosetta::Zebra::solve() {
-    my @colours = ("red", "green", "ivory", "yellow", "blue")
-    my @nats    = ("English", "Spaniard", "Ukrainian", "Norwegian", "Japanese")
-    my @drinks  = ("coffee", "tea", "milk", "orange juice", "water")
-    my @smokes  = ("Old Gold", "Kools", "Chesterfields", "Lucky Strike", "Parliaments")
-    my @pets    = ("dog", "snails", "fox", "horse", "zebra")
+    val @colours = ("red", "green", "ivory", "yellow", "blue")
+    val @nats    = ("English", "Spaniard", "Ukrainian", "Norwegian", "Japanese")
+    val @drinks  = ("coffee", "tea", "milk", "orange juice", "water")
+    val @smokes  = ("Old Gold", "Kools", "Chesterfields", "Lucky Strike", "Parliaments")
+    val @pets    = ("dog", "snails", "fox", "horse", "zebra")
 
-    my $col_perms = Rosetta::Zebra::permutations(\@colours)
-    my $nat_perms = Rosetta::Zebra::permutations(\@nats)
+    val $col_perms = Rosetta::Zebra::permutations(\@colours)
+    val $nat_perms = Rosetta::Zebra::permutations(\@nats)
 
-    for my $col (@$col_perms) {
+    for val $col (@$col_perms) {
         next unless Rosetta::Zebra::right_of("green", "ivory", $col)
-        for my $nat (@$nat_perms) {
+        for val $nat (@$nat_perms) {
             next unless Rosetta::Zebra::index_of("Norwegian", $nat) == 0
             next unless Rosetta::Zebra::index_of("English",   $nat)
                      == Rosetta::Zebra::index_of("red",       $col)
-            for my $drink (@{Rosetta::Zebra::permutations(\@drinks)}) {
+            for val $drink (@{Rosetta::Zebra::permutations(\@drinks)}) {
                 next unless $drink->[2] eq "milk"
                 next unless Rosetta::Zebra::index_of("coffee", $drink)
                          == Rosetta::Zebra::index_of("green",  $col)
                 next unless Rosetta::Zebra::index_of("Ukrainian", $nat)
                          == Rosetta::Zebra::index_of("tea",       $drink)
-                for my $smoke (@{Rosetta::Zebra::permutations(\@smokes)}) {
-                    for my $pet (@{Rosetta::Zebra::permutations(\@pets)}) {
+                for val $smoke (@{Rosetta::Zebra::permutations(\@smokes)}) {
+                    for val $pet (@{Rosetta::Zebra::permutations(\@pets)}) {
                         next unless Rosetta::Zebra::index_of("Old Gold", $smoke)
                                  == Rosetta::Zebra::index_of("snails",  $pet)
                         next unless Rosetta::Zebra::index_of("Kools",   $smoke)
@@ -75,11 +75,11 @@ fn Rosetta::Zebra::solve() {
                                  == Rosetta::Zebra::index_of("Parliaments", $smoke)
                         next unless Rosetta::Zebra::index_of("Spaniard", $nat)
                                  == Rosetta::Zebra::index_of("dog",      $pet)
-                        my $cd = abs(Rosetta::Zebra::index_of("Chesterfields", $smoke) - Rosetta::Zebra::index_of("fox", $pet))
+                        val $cd = abs(Rosetta::Zebra::index_of("Chesterfields", $smoke) - Rosetta::Zebra::index_of("fox", $pet))
                         next unless $cd == 1
-                        my $kd = abs(Rosetta::Zebra::index_of("Kools", $smoke) - Rosetta::Zebra::index_of("horse", $pet))
+                        val $kd = abs(Rosetta::Zebra::index_of("Kools", $smoke) - Rosetta::Zebra::index_of("horse", $pet))
                         next unless $kd == 1
-                        my $nb = abs(Rosetta::Zebra::index_of("Norwegian", $nat) - Rosetta::Zebra::index_of("blue", $col))
+                        val $nb = abs(Rosetta::Zebra::index_of("Norwegian", $nat) - Rosetta::Zebra::index_of("blue", $col))
                         next unless $nb == 1
                         return {
                             colours => $col,
@@ -97,10 +97,10 @@ fn Rosetta::Zebra::solve() {
 }
 
 # permutations() sanity
-my $p3 = Rosetta::Zebra::permutations([1, 2, 3])
+val $p3 = Rosetta::Zebra::permutations([1, 2, 3])
 assert_eq len(@$p3), 6, "3! = 6"
 
-my $p4 = Rosetta::Zebra::permutations([1, 2, 3, 4])
+val $p4 = Rosetta::Zebra::permutations([1, 2, 3, 4])
 assert_eq len(@$p4), 24, "4! = 24"
 
 # adjacent / right_of helpers
@@ -113,7 +113,7 @@ assert_eq Rosetta::Zebra::right_of("a", "b", ["a","b","c"]),  0, "a not right of
 assert_eq Rosetta::Zebra::index_of("c", ["a","b","c"]),  2, "index_of c"
 
 # Solve the puzzle and verify the canonical answer
-my $sol = Rosetta::Zebra::solve()
+val $sol = Rosetta::Zebra::solve()
 assert_ok defined($sol), "puzzle has a solution"
 
 # Norwegian lives in the first house

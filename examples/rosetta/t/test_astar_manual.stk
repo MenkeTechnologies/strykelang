@@ -6,25 +6,25 @@ fn Rosetta::AStarManual::dist($a, $b) {
 }
 
 fn Rosetta::AStarManual::solve($start, $goal, $grid) {
-    my @open = ($start)
-    my %g_score; my %f_score; my %parent
-    my $sk = join(",", @$start)
+    var @open = ($start)
+    var %g_score; var %f_score; var %parent
+    val $sk = join(",", @$start)
     $g_score{$sk} = 0
     $f_score{$sk} = Rosetta::AStarManual::dist($start, $goal)
     
     while (len(@open) > 0) {
         # Find node in open with lowest f_score
-        my $mi = 0
-        for my $i (1..len(@open)-1) {
-            my $ki = join(",", @{$open[$i]})
-            my $kmi = join(",", @{$open[$mi]})
+        var $mi = 0
+        for val $i (1..len(@open)-1) {
+            val $ki = join(",", @{$open[$i]})
+            val $kmi = join(",", @{$open[$mi]})
             if ($f_score{$ki} < $f_score{$kmi}) { $mi = $i }
         }
-        my $curr = splice(@open, $mi, 1)
-        my $ck = join(",", @$curr)
+        var $curr = splice(@open, $mi, 1)
+        val $ck = join(",", @$curr)
         
         if ($ck eq join(",", @$goal)) {
-            my @path = ($curr)
+            var @path = ($curr)
             while (exists $parent{join(",", @$curr)}) {
                 $curr = $parent{join(",", @$curr)}
                 unshift @path, $curr
@@ -32,14 +32,14 @@ fn Rosetta::AStarManual::solve($start, $goal, $grid) {
             return \@path
         }
         
-        my ($r, $c) = @$curr
-        for my $move ([-1,0], [1,0], [0,-1], [0,1]) {
-            my $nr = $r + $move->[0]
-            my $nc = $c + $move->[1]
+        val ($r, $c) = @$curr
+        for val $move ([-1,0], [1,0], [0,-1], [0,1]) {
+            val $nr = $r + $move->[0]
+            val $nc = $c + $move->[1]
             if ($nr >= 0 && $nr < 5 && $nc >= 0 && $nc < 5 && $grid->[$nr]->[$nc] == 0) {
-                my $neighbor = [$nr, $nc]
-                my $nk = join(",", @$neighbor)
-                my $tg = $g_score{$ck} + 1
+                val $neighbor = [$nr, $nc]
+                val $nk = join(",", @$neighbor)
+                val $tg = $g_score{$ck} + 1
                 if (!exists $g_score{$nk} || $tg < $g_score{$nk}) {
                     $parent{$nk} = $curr
                     $g_score{$nk} = $tg
@@ -53,7 +53,7 @@ fn Rosetta::AStarManual::solve($start, $goal, $grid) {
 }
 
 # 0 is clear, 1 is wall
-my $grid = [
+val $grid = [
     [0, 0, 0, 0, 0],
     [0, 1, 1, 1, 0],
     [0, 0, 0, 1, 0],
@@ -61,7 +61,7 @@ my $grid = [
     [0, 0, 0, 1, 0]
 ]
 
-my $path = Rosetta::AStarManual::solve([0,0], [4,4], $grid)
+val $path = Rosetta::AStarManual::solve([0,0], [4,4], $grid)
 assert_ok defined($path), "A* path found"
 assert_eq len(@$path), 9, "A* path length is 9"
 

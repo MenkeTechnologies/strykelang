@@ -6,19 +6,19 @@
 fn Exercism::RelativeDistance::degree_of_separation($tree, $from, $to) {
     return 0 if $from eq $to
     # Build bidirectional adjacency from parent → children.
-    my %adj
-    for my $parent (keys %{$tree}) {
-        for my $child (@{$tree->{$parent}}) {
+    val %adj
+    for val $parent (keys %{$tree}) {
+        for val $child (@{$tree->{$parent}}) {
             push @{$adj{$parent}}, $child
             push @{$adj{$child}},  $parent
         }
     }
     # BFS.
-    my %seen = ($from => 0)
-    my @q    = ($from)
+    var %seen = ($from => 0)
+    var @q    = ($from)
     while (@q) {
-        my $cur = shift @q
-        for my $n (@{$adj{$cur} // []}) {
+        val $cur = shift @q
+        for val $n (@{$adj{$cur} // []}) {
             next if exists $seen{$n}
             $seen{$n} = $seen{$cur} + 1
             return $seen{$n} if $n eq $to

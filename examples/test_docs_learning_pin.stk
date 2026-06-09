@@ -9,7 +9,7 @@ TestNamespace::multiply(4, 5) |> aeq 20, "namespaced function multiply"
 
 # 2. Structs
 struct PointTest { x => Float, y => Float }
-my $pt = PointTest(x => 1.5, y => 2.5)
+val $pt = PointTest(x => 1.5, y => 2.5)
 $pt->x |> aeq 1.5, "struct field access x"
 $pt->y |> aeq 2.5, "struct field access y"
 $pt->x(3.0)
@@ -17,7 +17,7 @@ $pt->x |> aeq 3.0, "struct field setter"
 
 # 3. Enums
 enum ResultStatus { Ok => Int, Err => Str }
-my $ok_res = ResultStatus::Ok(42)
+val $ok_res = ResultStatus::Ok(42)
 $ok_res |> str |> aeq "ResultStatus::Ok(42)", "enum stringify with data"
 
 # 4. Chained Comparisons (Raku-style)

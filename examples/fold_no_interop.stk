@@ -16,22 +16,22 @@
 # left-fold convention.
 
 # Sum of 1..10 = 55
-my $sum = (1:10) |> reduce { _ + _1 }
+val $sum = (1:10) |> reduce { _ + _1 }
 p "sum 1..10 = $sum (expect 55)"
 die "sum off" unless $sum == 55
 
 # Product 1..6 = 720 (= 6!)
-my $prod = (1:6) |> reduce { _ * _1 }
+val $prod = (1:6) |> reduce { _ * _1 }
 p "6!   = $prod (expect 720)"
 die "fact 6 off" unless $prod == 720
 
 # Maximum of an unsorted list, by folding with the bigger-of-two pick.
-my $mx = (3, -1, 4, 1, 5, 9, 2, 6) |> reduce { _ > _1 ? _ : _1 }
+val $mx = (3, -1, 4, 1, 5, 9, 2, 6) |> reduce { _ > _1 ? _ : _1 }
 p "max  = $mx (expect 9)"
 die "max off" unless $mx == 9
 
 # Concat 26 lowercase letters into "a".."z" without a temp var.
-my $alphabet = ("a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
+val $alphabet = ("a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
                 "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
                 "u", "v", "w", "x", "y", "z")
               |> reduce { _ . _1 }
@@ -41,13 +41,13 @@ die "alphabet off" unless len($alphabet) == 26
 # Difference fold (left-fold non-commutative op): 100 - 1 - 2 - 3 - 4
 # = 90. Demonstrates the order: `_` is the accumulator built up so
 # far, `_1` is the next element.
-my $diff = (100, 1, 2, 3, 4) |> reduce { _ - _1 }
+val $diff = (100, 1, 2, 3, 4) |> reduce { _ - _1 }
 p "diff = $diff (expect 90)"
 die "diff off" unless $diff == 90
 
 # Count occurrences via grep + len — a simple alternative to a fold
 # when you only need a single count, not a per-key map.
-my $a_count = ("a", "b", "a", "c", "a", "b") |> grep { _ eq "a" } |> len
+val $a_count = ("a", "b", "a", "c", "a", "b") |> grep { _ eq "a" } |> len
 p "a-count = $a_count (expect 3)"
 die "count off" unless $a_count == 3
 

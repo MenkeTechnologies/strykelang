@@ -3,8 +3,8 @@
 # n is inconsummate if there's no positive integer x such that x / digit_sum(x) == n.
 
 fn Rosetta::Inconsummate::digit_sum($n) {
-    my $s = 0
-    my $x = $n
+    var $s = 0
+    var $x = $n
     while ($x > 0) { $s += $x % 10; $x = int($x / 10) }
     $s
 }
@@ -13,17 +13,17 @@ fn Rosetta::Inconsummate::digit_sum($n) {
 # x = n*ds(x). Search reasonable range; for first 50 incons. range below 5000 is enough.
 fn Rosetta::Inconsummate::is_inconsummate($n) {
     return 0 if $n < 1
-    my $limit = $n * 81 + 10  # 81 ≈ digit_sum max for 9-digit, sufficient buffer
-    for my $x (1:$limit) {
-        my $ds = Rosetta::Inconsummate::digit_sum($x)
+    val $limit = $n * 81 + 10  # 81 ≈ digit_sum max for 9-digit, sufficient buffer
+    for val $x (1:$limit) {
+        val $ds = Rosetta::Inconsummate::digit_sum($x)
         return 0 if $ds > 0 && $x == $n * $ds
     }
     1
 }
 
 fn Rosetta::Inconsummate::first_n($count) {
-    my @res
-    my $n = 1
+    var @res
+    var $n = 1
     while (len(@res) < $count) {
         push @res, $n if Rosetta::Inconsummate::is_inconsummate($n)
         $n += 1
@@ -32,7 +32,7 @@ fn Rosetta::Inconsummate::first_n($count) {
 }
 
 # OEIS A003635: 62, 63, 65, 75, 84, 95, 161, 173, 195, 216, ...
-my @first10 = Rosetta::Inconsummate::first_n(10)
+val @first10 = Rosetta::Inconsummate::first_n(10)
 assert_eq join(",", @first10),
     "62,63,65,75,84,95,161,173,195,216",
     "first 10 inconsummate"

@@ -23,8 +23,8 @@ fn rank_of($h) {
 fn merge_h($ha, $hb) {
     return $hb if !defined $ha
     return $ha if !defined $hb
-    my $lo
-    my $hi
+    var $lo
+    var $hi
     if ($ha->{val} <= $hb->{val}) {
         $lo = $ha
         $hi = $hb
@@ -32,11 +32,11 @@ fn merge_h($ha, $hb) {
         $lo = $hb
         $hi = $ha
     }
-    my $new_right = merge_h($lo->{right}, $hi)
-    my $rl = rank_of($lo->{left})
-    my $rr = rank_of($new_right)
-    my $left
-    my $right
+    val $new_right = merge_h($lo->{right}, $hi)
+    val $rl = rank_of($lo->{left})
+    val $rr = rank_of($new_right)
+    var $left
+    var $right
     if ($rl >= $rr) {
         $left = $lo->{left}
         $right = $new_right
@@ -73,8 +73,8 @@ fn heap_size($h) {
 
 # Build from arrayref by repeated insert.
 fn from_array($arr) {
-    my $h = undef
-    for my $v (@$arr) {
+    var $h = undef
+    for val $v (@$arr) {
         $h = insert($h, $v)
     }
     $h
@@ -82,8 +82,8 @@ fn from_array($arr) {
 
 # Drain to sorted array.
 fn drain($h) {
-    my @out = ()
-    my $cur = $h
+    var @out = ()
+    var $cur = $h
     while (defined $cur) {
         push @out, find_min($cur)
         $cur = delete_min($cur)
@@ -93,13 +93,13 @@ fn drain($h) {
 
 package main;
 
-my $ha = LH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
+val $ha = LH::from_array([5, 2, 8, 1, 9, 3, 7, 4, 6])
 p "heap_size: " . LH::heap_size($ha)
 p "min: " . LH::find_min($ha)
-my $sorted = LH::drain($ha)
+val $sorted = LH::drain($ha)
 p "drain: @$sorted"
 
-my $h1 = LH::from_array([10, 30, 50])
-my $h2 = LH::from_array([20, 40, 60])
-my $m = LH::merge_h($h1, $h2)
+val $h1 = LH::from_array([10, 30, 50])
+val $h2 = LH::from_array([20, 40, 60])
+val $m = LH::merge_h($h1, $h2)
 p "merged drain: @{LH::drain($m)}"

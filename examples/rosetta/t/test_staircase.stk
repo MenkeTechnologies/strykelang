@@ -5,9 +5,9 @@ fn Rosetta::Staircase::staircase($n) {
     if ($n < 2) {
         1
     } else {
-        my $a = 1
-        my $b = 1
-        for my $i (2:$n) {
+        var $a = 1
+        var $b = 1
+        for val $i (2:$n) {
             ($a, $b) = ($b, $a + $b)
         }
         $b

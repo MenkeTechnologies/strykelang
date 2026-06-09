@@ -31,17 +31,17 @@ fn Chip8::init {
 
 fn Chip8::step($s) {
     # Fetch opcode (2 bytes)
-    my $op = ($s->{memory}->[$s->{pc}] << 8) | $s->{memory}->[$s->{pc} + 1]
+    val $op = ($s->{memory}->[$s->{pc}] << 8) | $s->{memory}->[$s->{pc} + 1]
     # p sprintf("PC: %04X, OP: %04X", $s->{pc}, $op)
     $s->{pc} += 2
     
-    my $n   = $op & 0x000F
-    my $nn  = $op & 0x00FF
-    my $nnn = $op & 0x0FFF
-    my $x   = ($op & 0x0F00) >> 8
-    my $y   = ($op & 0x00F0) >> 4
+    val $n   = $op & 0x000F
+    val $nn  = $op & 0x00FF
+    val $nnn = $op & 0x0FFF
+    val $x   = ($op & 0x0F00) >> 8
+    val $y   = ($op & 0x00F0) >> 4
     
-    my $kind = $op & 0xF000
+    val $kind = $op & 0xF000
     p "OP: " . sprintf("%04X", $op) . " KIND: " . sprintf("%04X", $kind)
     if ($kind == 0) {
         if ($nn == 224) { $s->{display} = [(0) x (64 * 32)] } # CLS 0x00E0
@@ -60,15 +60,15 @@ fn Chip8::step($s) {
 # ── Graphics ─────────────────────────────────────────────────────────────────
 
 fn Chip8::draw($s, $vx, $vy, $height) {
-    my $x = $s->{v}->[$vx] % 64
-    my $y = $s->{v}->[$vy] % 32
+    val $x = $s->{v}->[$vx] % 64
+    val $y = $s->{v}->[$vy] % 32
     $s->{v}->[0xF] = 0
     
-    for my $row (0 : $height - 1) {
-        my $sprite = $s->{memory}->[$s->{i} + $row]
-        for my $col (0 : 7) {
+    for val $row (0 : $height - 1) {
+        val $sprite = $s->{memory}->[$s->{i} + $row]
+        for val $col (0 : 7) {
             if (($sprite & (0x80 >> $col)) != 0) {
-                my $idx = (($y + $row) % 32) * 64 + (($x + $col) % 64)
+                val $idx = (($y + $row) % 32) * 64 + (($x + $col) % 64)
                 if ($s->{display}->[$idx] == 1) { $s->{v}->[0xF] = 1 }
                 $s->{display}->[$idx] ^= 1
             }
@@ -77,9 +77,9 @@ fn Chip8::draw($s, $vx, $vy, $height) {
 }
 
 fn Chip8::render($s) {
-    for my $y (0 : 31) {
-        my $line = ""
-        for my $x (0 : 63) {
+    for val $y (0 : 31) {
+        var $line = ""
+        for val $x (0 : 63) {
             $line .= $s->{display}->[$y * 64 + $x] ? "█" : " "
         }
         p $line
@@ -97,8 +97,8 @@ fn Chip8::load_demo($s) {
     # 1206 -> JP 0x206 (infinite loop)
     # Sprite data (4 bytes) at 0x208: F0, 90, 90, F0 (box)
     
-    my @prog = (0x60, 0x0A, 0x61, 0x0A, 0xA2, 0x08, 0xD0, 0x14, 0x12, 0x06, 0xF0, 0x90, 0x90, 0xF0)
-    for my $i (0 : len(@prog) - 1) {
+    val @prog = (0x60, 0x0A, 0x61, 0x0A, 0xA2, 0x08, 0xD0, 0x14, 0x12, 0x06, 0xF0, 0x90, 0x90, 0xF0)
+    for val $i (0 : len(@prog) - 1) {
         $s->{memory}->[0x200 + $i] = $prog[$i]
     }
 }
@@ -106,7 +106,7 @@ fn Chip8::load_demo($s) {
 # ── Internal Tests ───────────────────────────────────────────────────────────
 
 fn test_chip8 {
-    my $s = Chip8::init()
+    val $s = Chip8::init()
     # Test LD Vx, byte
     $s->{memory}->[0x200] = 0x62
     $s->{memory}->[0x201] = 0x42
@@ -127,7 +127,7 @@ fn test_chip8 {
 
 test_chip8()
 
-my $vm = Chip8::init()
+val $vm = Chip8::init()
 Chip8::load_demo $vm
 
 p "Running CHIP-8 Demo (Draw Box at 10,10)..."

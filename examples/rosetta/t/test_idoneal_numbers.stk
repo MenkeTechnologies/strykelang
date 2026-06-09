@@ -8,13 +8,13 @@
 fn Rosetta::Idoneal::is_idoneal($n) {
     # Try every triple a < b < c with a*b + a*c + b*c == n.
     # If any exist, n is NOT idoneal.
-    for my $a (1..int($n / 3)) {
-        for my $b ($a + 1..int(($n - $a * $a) / (2 * $a + 1))) {
-            my $rem = $n - $a * $b
-            my $denom = $a + $b
+    for val $a (1..int($n / 3)) {
+        for val $b ($a + 1..int(($n - $a * $a) / (2 * $a + 1))) {
+            val $rem = $n - $a * $b
+            val $denom = $a + $b
             next if $denom == 0 || $rem <= 0
             next if $rem % $denom != 0
-            my $c = int($rem / $denom)
+            val $c = int($rem / $denom)
             return 0 if $c > $b
         }
     }
@@ -27,10 +27,10 @@ fn Rosetta::Idoneal::list($limit) {
 
 # Euler's 65 known idoneal numbers begin: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13,
 # 15, 16, 18, 21, 22, 24, 25, 28, 30, 33, 37, 40, 42, 45, 48, 57, 58, 60, 70, ...
-my @first10 = Rosetta::Idoneal::list(10)
+val @first10 = Rosetta::Idoneal::list(10)
 assert_eq join(",", @first10), "1,2,3,4,5,6,7,8,9,10", "idoneal up to 10"
 
-my @first_30 = Rosetta::Idoneal::list(30)
+val @first_30 = Rosetta::Idoneal::list(30)
 assert_eq join(",", @first_30),
     "1,2,3,4,5,6,7,8,9,10,12,13,15,16,18,21,22,24,25,28,30",
     "idoneal up to 30"

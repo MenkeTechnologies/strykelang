@@ -2,10 +2,10 @@
 # Rosetta Code: Soloway's recurring rainfall
 
 fn Rosetta::Rainfall::average($mock_inputs) {
-    my $sum = 0.0
-    my $count = 0
+    var $sum = 0.0
+    var $count = 0
     
-    for my $val (@$mock_inputs) {
+    for val $val (@$mock_inputs) {
         if ($val == 999) {
             last
         }
@@ -22,14 +22,14 @@ fn Rosetta::Rainfall::average($mock_inputs) {
 }
 
 # Test cases
-my $res1 = Rosetta::Rainfall::average([10, 20, -5, 30, 999, 50])
+val $res1 = Rosetta::Rainfall::average([10, 20, -5, 30, 999, 50])
 # Valid: 10, 20, 30. (Sum 60, Count 3, Avg 20)
 assert_eq $res1, 20.0, "Average with negative and 999 terminator"
 
-my $res2 = Rosetta::Rainfall::average([999])
+val $res2 = Rosetta::Rainfall::average([999])
 assert_eq $res2, 0.0, "Average with immediate terminator"
 
-my $res3 = Rosetta::Rainfall::average([-1, -2, 999])
+val $res3 = Rosetta::Rainfall::average([-1, -2, 999])
 assert_eq $res3, 0.0, "Average with only negatives"
 
 test_run

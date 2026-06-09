@@ -2,8 +2,8 @@
 # Rosetta Code: Armstrong numbers (using pipes)
 
 fn Rosetta::ArmstrongNumbers::is_armstrong($n) {
-    my $len = len("$n")
-    my $sum = "$n" |> split(//) |> map { _ ** $len } |> sum()
+    val $len = len("$n")
+    val $sum = "$n" |> split(//) |> map { _ ** $len } |> sum()
     $sum == $n
 }
 
@@ -11,7 +11,7 @@ fn Rosetta::ArmstrongNumbers::solve($max) {
     ~> 1:$max grep {Rosetta::ArmstrongNumbers::is_armstrong}
 }
 
-my @res = Rosetta::ArmstrongNumbers::solve(500)
+val @res = Rosetta::ArmstrongNumbers::solve(500)
 
 assert_eq len(@res), 13, "There are 13 Armstrong numbers up to 500"
 assert_eq $res[0], 1, "1 is an Armstrong number"

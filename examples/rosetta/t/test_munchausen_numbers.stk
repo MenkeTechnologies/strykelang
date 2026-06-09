@@ -6,7 +6,7 @@ fn Rosetta::Munchausen::is_munchausen($n) {
         if ($d == 0) { 0 } else { $d ** $d }
     }
 
-    my $sum = ~> "$n" chars 
+    val $sum = ~> "$n" chars 
               |> map { Rosetta::Munchausen::pow(int(_)) } 
               |> reduce { _0 + _1 }
     

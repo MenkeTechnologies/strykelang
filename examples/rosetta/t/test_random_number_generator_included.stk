@@ -3,14 +3,14 @@
 
 fn Rosetta::RandomGen::demo() {
     # Generate a random float between 0 and 1
-    my $r1 = rand()
+    val $r1 = rand()
     # Generate a random float between 0 and 10
-    my $r2 = rand(10)
+    val $r2 = rand(10)
     
     ($r1, $r2)
 }
 
-my ($res1, $res2) = Rosetta::RandomGen::demo()
+val ($res1, $res2) = Rosetta::RandomGen::demo()
 assert_ok defined($res1), "Random number generated"
 assert_ok $res1 >= 0 && $res1 < 1, "rand() is between 0 and 1"
 assert_ok $res2 >= 0 && $res2 < 10, "rand(10) is between 0 and 10"

@@ -2,7 +2,7 @@
 # Rosetta Code: Balanced numbers
 
 fn Rosetta::BalancedNumbers::sum_digits($n) {
-    my @digits = ~> "$n" chars map {int}
+    val @digits = ~> "$n" chars map {int}
     if (len(@digits) == 0) {
         0
     } else {
@@ -11,14 +11,14 @@ fn Rosetta::BalancedNumbers::sum_digits($n) {
 }
 
 fn Rosetta::BalancedNumbers::check($n) {
-    my $s = "$n"
-    my $len = length($s)
-    my $half = int($len / 2)
+    val $s = "$n"
+    val $len = length($s)
+    val $half = int($len / 2)
     if ($half == 0) {
         1
     } else {
-        my $s1 = substr($s, 0, $half)
-        my $s2 = substr($s, $len - $half)
+        val $s1 = substr($s, 0, $half)
+        val $s2 = substr($s, $len - $half)
         Rosetta::BalancedNumbers::sum_digits($s1) == Rosetta::BalancedNumbers::sum_digits($s2)
     }
 }

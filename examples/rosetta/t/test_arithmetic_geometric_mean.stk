@@ -2,16 +2,16 @@
 # Rosetta Code: Arithmetic-geometric mean
 
 fn Rosetta::AGM::compute($a, $g) {
-    for my $i (1:10) {
-        my $next_a = ($a + $g) / 2
-        my $next_g = sqrt($a * $g)
+    for val $i (1:10) {
+        val $next_a = ($a + $g) / 2
+        val $next_g = sqrt($a * $g)
         $a = $next_a
         $g = $next_g
     }
     $a
 }
 
-my $res = Rosetta::AGM::compute(1, 1 / sqrt(2))
+val $res = Rosetta::AGM::compute(1, 1 / sqrt(2))
 assert_near $res, 0.847213, 0.0001, "AGM(1, 1/sqrt(2))"
 
 # Pipe

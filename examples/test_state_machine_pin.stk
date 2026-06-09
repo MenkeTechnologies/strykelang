@@ -7,8 +7,8 @@ fn Fsm::new($initial, $table) {
 }
 
 fn Fsm::feed($m, $event) {
-    my $cur = $m->{state}
-    my $next = $m->{table}{$cur}{$event}
+    val $cur = $m->{state}
+    val $next = $m->{table}{$cur}{$event}
     return 0 unless defined $next
     $m->{state} = $next
     push @{$m->{history}}, $next
@@ -16,15 +16,15 @@ fn Fsm::feed($m, $event) {
 }
 
 fn Fsm::run($m, @events) {
-    my $ok = 1
-    for my $e (@events) {
+    val $ok = 1
+    for val $e (@events) {
         $ok &&= Fsm::feed($m, $e)
     }
     $ok
 }
 
 # Traffic light: red -> green -> yellow -> red
-my $tl = Fsm::new("red", +{
+val $tl = Fsm::new("red", +{
     red    => +{ tick => "green"  },
     green  => +{ tick => "yellow" },
     yellow => +{ tick => "red"    },
@@ -42,13 +42,13 @@ Fsm::feed($tl, "explode") |> aeq 0, "invalid event rejected"
 $tl->{state} |> aeq "red", "state unchanged after invalid"
 
 # Run a sequence
-my $tl2 = Fsm::new("red", $tl->{table})
+val $tl2 = Fsm::new("red", $tl->{table})
 Fsm::run($tl2, "tick", "tick", "tick", "tick") |> aok "full cycle + 1"
 $tl2->{state} |> aeq "green", "after 4 ticks: green"
 len(@{$tl2->{history}}) |> aeq 5, "history length"
 
 # Turnstile FSM: locked/unlocked with coin/push
-my $ts = Fsm::new("locked", +{
+val $ts = Fsm::new("locked", +{
     locked   => +{ coin => "unlocked", push => "locked"   },
     unlocked => +{ coin => "unlocked", push => "locked"   },
 })
@@ -74,7 +74,7 @@ fn Vm::insert($vm, $cents) {
     }
 }
 
-my $vm = Vm::new()
+val $vm = Vm::new()
 Vm::insert($vm, 10)
 $vm->{state}     |> aeq "accepting", "vm accepting"
 $vm->{dispensed} |> aeq 0, "vm not dispensed"

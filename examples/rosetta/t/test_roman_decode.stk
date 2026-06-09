@@ -2,13 +2,13 @@
 # Rosetta Code: Roman Numerals - Decode
 
 fn Rosetta::RomanDecode::roman_decode($str) {
-    my %vals = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
-    my @chars = $str |> chars
-    my $res = 0
-    my $i = 0
+    val %vals = (I => 1, V => 5, X => 10, L => 50, C => 100, D => 500, M => 1000)
+    val @chars = $str |> chars
+    var $res = 0
+    var $i = 0
     while ($i < len(@chars)) {
-        my $v1 = $vals{@chars[$i]}
-        my $v2 = ($i + 1 < len(@chars)) ? $vals{@chars[$i+1]} : 0
+        val $v1 = $vals{@chars[$i]}
+        val $v2 = ($i + 1 < len(@chars)) ? $vals{@chars[$i+1]} : 0
         
         if ($v2 > $v1) {
             $res = $res + ($v2 - $v1)

@@ -14,8 +14,8 @@ fn rank_of($h) {
 fn merge_h($ha, $hb) {
     return $hb if !defined $ha
     return $ha if !defined $hb
-    my $lo
-    my $hi
+    var $lo
+    var $hi
     if ($ha->{val} <= $hb->{val}) {
         $lo = $ha
         $hi = $hb
@@ -23,11 +23,11 @@ fn merge_h($ha, $hb) {
         $lo = $hb
         $hi = $ha
     }
-    my $new_right = merge_h($lo->{right}, $hi)
-    my $rl = rank_of($lo->{left})
-    my $rr = rank_of($new_right)
-    my $left
-    my $right
+    val $new_right = merge_h($lo->{right}, $hi)
+    val $rl = rank_of($lo->{left})
+    val $rr = rank_of($new_right)
+    var $left
+    var $right
     if ($rl >= $rr) {
         $left = $lo->{left}
         $right = $new_right
@@ -61,16 +61,16 @@ fn heap_size($h) {
 }
 
 fn from_array($arr) {
-    my $h = undef
-    for my $v (@$arr) {
+    var $h = undef
+    for val $v (@$arr) {
         $h = insert($h, $v)
     }
     $h
 }
 
 fn drain($h) {
-    my @out = ()
-    my $cur = $h
+    var @out = ()
+    var $cur = $h
     while (defined $cur) {
         push @out, find_min($cur)
         $cur = delete_min($cur)
@@ -107,14 +107,14 @@ fn rank_ok($h) {
 package main;
 
 # --- Empty heap ---
-my $e = LH::empty()
+val $e = LH::empty()
 LH::is_empty($e) |> aeq 1, "empty is_empty"
 LH::heap_size($e) |> aeq 0, "empty size"
 (defined LH::find_min($e)) |> aeq 0, "empty find_min undef"
 (defined LH::delete_min($e)) |> aeq 0, "empty delete_min undef"
 
 # --- Single ---
-my $h1 = LH::insert(LH::empty(), 42)
+val $h1 = LH::insert(LH::empty(), 42)
 LH::is_empty($h1) |> aeq 0, "single not empty"
 LH::heap_size($h1) |> aeq 1, "single size"
 LH::find_min($h1) |> aeq 42, "single min"
@@ -124,8 +124,8 @@ LH::rank_ok($h1) |> aeq 1, "single rank ok"
 LH::is_empty(LH::delete_min($h1)) |> aeq 1, "delete-min single -> empty"
 
 # --- Inserts ---
-my $h2 = LH::empty()
-for my $v (5, 2, 8, 1, 9, 3, 7, 4, 6) {
+var $h2 = LH::empty()
+for val $v (5, 2, 8, 1, 9, 3, 7, 4, 6) {
     $h2 = LH::insert($h2, $v)
 }
 LH::heap_size($h2) |> aeq 9, "9 inserts size"
@@ -135,10 +135,10 @@ LH::leftist_ok($h2) |> aeq 1, "inserts leftist ok"
 LH::rank_ok($h2) |> aeq 1, "inserts rank ok"
 
 # --- Drain produces sorted order ---
-my $sorted = LH::drain($h2)
+val $sorted = LH::drain($h2)
 len(@$sorted) |> aeq 9, "drain len"
-my $is_sorted = 1
-for my $i (0:7) {
+var $is_sorted = 1
+for val $i (0:7) {
     $is_sorted = 0 if $sorted->[$i] > $sorted->[$i+1]
 }
 $is_sorted |> aeq 1, "drain is sorted"
@@ -146,91 +146,91 @@ $sorted->[0] |> aeq 1, "drain[0]"
 $sorted->[8] |> aeq 9, "drain[8]"
 
 # --- Drain == original sorted ---
-my @inp = (5, 2, 8, 1, 9, 3, 7, 4, 6)
-my @ref = sort { _ <=> _1 } @inp
-my $match = 1
-for my $i (0:8) {
+val @inp = (5, 2, 8, 1, 9, 3, 7, 4, 6)
+val @ref = sort { _ <=> _1 } @inp
+var $match = 1
+for val $i (0:8) {
     $match = 0 if $sorted->[$i] != $ref[$i]
 }
 $match |> aeq 1, "drain equals sorted reference"
 
 # --- Merge two heaps ---
-my $ha = LH::from_array([10, 30, 50])
-my $hb = LH::from_array([20, 40, 60])
-my $m = LH::merge_h($ha, $hb)
+val $ha = LH::from_array([10, 30, 50])
+val $hb = LH::from_array([20, 40, 60])
+val $m = LH::merge_h($ha, $hb)
 LH::heap_size($m) |> aeq 6, "merge size"
 LH::find_min($m) |> aeq 10, "merge min"
 LH::heap_ok($m) |> aeq 1, "merge heap ok"
 LH::leftist_ok($m) |> aeq 1, "merge leftist ok"
 LH::rank_ok($m) |> aeq 1, "merge rank ok"
-my $md = LH::drain($m)
+val $md = LH::drain($m)
 $md->[0] |> aeq 10, "merge drain[0]"
 $md->[5] |> aeq 60, "merge drain[5]"
 
 # --- Merge with empty (identity both sides) ---
-my $ne = LH::merge_h(LH::empty(), $ha)
+val $ne = LH::merge_h(LH::empty(), $ha)
 LH::heap_size($ne) |> aeq 3, "merge empty left = orig"
-my $en = LH::merge_h($ha, LH::empty())
+val $en = LH::merge_h($ha, LH::empty())
 LH::heap_size($en) |> aeq 3, "merge empty right = orig"
 
 # --- Duplicates ---
-my $hd = LH::from_array([3, 3, 3, 1, 1, 2])
+val $hd = LH::from_array([3, 3, 3, 1, 1, 2])
 LH::heap_size($hd) |> aeq 6, "dup size"
 LH::heap_ok($hd) |> aeq 1, "dup heap ok"
 LH::leftist_ok($hd) |> aeq 1, "dup leftist ok"
-my $dd = LH::drain($hd)
+val $dd = LH::drain($hd)
 $dd->[0] |> aeq 1, "dup drain[0]"
 $dd->[1] |> aeq 1, "dup drain[1]"
 $dd->[2] |> aeq 2, "dup drain[2]"
 $dd->[5] |> aeq 3, "dup drain[5]"
 
 # --- Negative values ---
-my $hn = LH::from_array([0, -5, 3, -10, 7, -2])
+val $hn = LH::from_array([0, -5, 3, -10, 7, -2])
 LH::find_min($hn) |> aeq -10, "neg min"
-my $dn = LH::drain($hn)
+val $dn = LH::drain($hn)
 $dn->[0] |> aeq -10, "neg drain[0]"
 $dn->[5] |> aeq 7, "neg drain[5]"
 
 # --- Stress: random sequence vs sort ---
-my $seed = 31415
-my @big = ()
-for my $i (1:200) {
+var $seed = 31415
+var @big = ()
+for val $i (1:200) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     push @big, ($seed % 1000) - 500
 }
-my $hb = LH::from_array(\@big)
+val $hb = LH::from_array(\@big)
 LH::heap_size($hb) |> aeq 200, "stress size"
 LH::heap_ok($hb) |> aeq 1, "stress heap ok"
 LH::leftist_ok($hb) |> aeq 1, "stress leftist ok"
 LH::rank_ok($hb) |> aeq 1, "stress rank ok"
 
-my $drained = LH::drain($hb)
-my @brute = sort { _ <=> _1 } @big
-my $bmatch = 1
-for my $i (0:199) {
+val $drained = LH::drain($hb)
+val @brute = sort { _ <=> _1 } @big
+var $bmatch = 1
+for val $i (0:199) {
     $bmatch = 0 if $drained->[$i] != $brute[$i]
 }
 $bmatch |> aeq 1, "stress drain == sort reference"
 
 # --- Stress: merge invariant after many randomised merges ---
-my $seed2 = 999
-my $big_h = LH::empty()
-for my $batch (1:10) {
-    my @bunch = ()
-    for my $j (1:15) {
+var $seed2 = 999
+var $big_h = LH::empty()
+for val $batch (1:10) {
+    var @bunch = ()
+    for val $j (1:15) {
         $seed2 = ($seed2 * 1103515245 + 12345) % 2147483648
         push @bunch, $seed2 % 100
     }
-    my $bh = LH::from_array(\@bunch)
+    val $bh = LH::from_array(\@bunch)
     $big_h = LH::merge_h($big_h, $bh)
 }
 LH::heap_size($big_h) |> aeq 150, "merge-stress size"
 LH::heap_ok($big_h) |> aeq 1, "merge-stress heap ok"
 LH::leftist_ok($big_h) |> aeq 1, "merge-stress leftist ok"
 LH::rank_ok($big_h) |> aeq 1, "merge-stress rank ok"
-my $msd = LH::drain($big_h)
-my $msort = 1
-for my $i (0:148) { $msort = 0 if $msd->[$i] > $msd->[$i+1] }
+val $msd = LH::drain($big_h)
+var $msort = 1
+for val $i (0:148) { $msort = 0 if $msd->[$i] > $msd->[$i+1] }
 $msort |> aeq 1, "merge-stress drain sorted"
 
 test_run

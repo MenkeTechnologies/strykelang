@@ -5,10 +5,10 @@
 # Run: stryke --no-interop examples/hashmap_chained.stk
 
 fn HM::_hash($s) {
-    my $h = 2166136261
-    my $n = len $s
-    for my $i (0:$n-1) {
-        my $c = ord(substr($s, $i, 1))
+    var $h = 2166136261
+    val $n = len $s
+    for val $i (0:$n-1) {
+        val $c = ord(substr($s, $i, 1))
         $h = ($h ^ $c)
         $h = ($h * 16777619) % 4294967296
     }
@@ -16,39 +16,39 @@ fn HM::_hash($s) {
 }
 
 fn HM::new() {
-    my @b = ()
-    for my $i (1:8) { push @b, [] }
+    var @b = ()
+    for val $i (1:8) { push @b, [] }
     +{ buckets => \@b, size => 0, cap => 8 }
 }
 
 fn HM::_bucket($hm, $k) {
-    my $h = HM::_hash($k)
+    val $h = HM::_hash($k)
     $hm->{buckets}->[$h % $hm->{cap}]
 }
 
 fn HM::get($hm, $k) {
-    my $bk = HM::_bucket($hm, $k)
-    for my $p (@$bk) {
+    val $bk = HM::_bucket($hm, $k)
+    for val $p (@$bk) {
         return $p->[1] if $p->[0] eq $k
     }
     undef
 }
 
 fn HM::has($hm, $k) {
-    my $bk = HM::_bucket($hm, $k)
-    for my $p (@$bk) {
+    val $bk = HM::_bucket($hm, $k)
+    for val $p (@$bk) {
         return 1 if $p->[0] eq $k
     }
     0
 }
 
 fn HM::_resize($hm) {
-    my $newcap = $hm->{cap} * 2
-    my @nb = ()
-    for my $i (1:$newcap) { push @nb, [] }
-    for my $bucket (@{$hm->{buckets}}) {
-        for my $p (@$bucket) {
-            my $h = HM::_hash($p->[0])
+    val $newcap = $hm->{cap} * 2
+    var @nb = ()
+    for val $i (1:$newcap) { push @nb, [] }
+    for val $bucket (@{$hm->{buckets}}) {
+        for val $p (@$bucket) {
+            val $h = HM::_hash($p->[0])
             push @{$nb[$h % $newcap]}, $p
         }
     }
@@ -57,8 +57,8 @@ fn HM::_resize($hm) {
 }
 
 fn HM::put($hm, $k, $v) {
-    my $bk = HM::_bucket($hm, $k)
-    for my $p (@$bk) {
+    val $bk = HM::_bucket($hm, $k)
+    for var $p (@$bk) {
         if ($p->[0] eq $k) {
             $p->[1] = $v
             return
@@ -72,10 +72,10 @@ fn HM::put($hm, $k, $v) {
 }
 
 fn HM::delete($hm, $k) {
-    my $bk = HM::_bucket($hm, $k)
-    my @kept = ()
-    my $removed = 0
-    for my $p (@$bk) {
+    val $bk = HM::_bucket($hm, $k)
+    var @kept = ()
+    var $removed = 0
+    for val $p (@$bk) {
         if ($p->[0] eq $k && !$removed) {
             $removed = 1
         } else {
@@ -85,18 +85,18 @@ fn HM::delete($hm, $k) {
     if ($removed) {
         $hm->{size} = $hm->{size} - 1
         # Rebuild bucket in-place
-        my $idx = HM::_hash($k) % $hm->{cap}
+        val $idx = HM::_hash($k) % $hm->{cap}
         $hm->{buckets}->[$idx] = \@kept
     }
     $removed
 }
 
 fn HM::keys($hm) {
-    my @out = ()
-    for my $bk (@{$hm->{buckets}}) {
-        for my $p (@$bk) { push @out, $p->[0] }
+    var @out = ()
+    for val $bk (@{$hm->{buckets}}) {
+        for val $p (@$bk) { push @out, $p->[0] }
     }
-    my @s = sort @out
+    val @s = sort @out
     \@s
 }
 
@@ -104,7 +104,7 @@ fn HM::size($hm) { $hm->{size} }
 fn HM::cap($hm)  { $hm->{cap} }
 
 p "=== Hashmap (chained) Demo ==="
-my $hm = HM::new()
+val $hm = HM::new()
 HM::put($hm, "alice", 1)
 HM::put($hm, "bob",   2)
 HM::put($hm, "carol", 3)
@@ -117,6 +117,6 @@ p "keys: " . join(",", @{HM::keys($hm)})
 p "size: " . HM::size($hm)
 
 # Trigger resize
-for my $i (1:20) { HM::put($hm, "k" . $i, $i) }
+for val $i (1:20) { HM::put($hm, "k" . $i, $i) }
 p "after 20 puts, size: " . HM::size($hm) . " cap: " . HM::cap($hm)
 p "k15 = " . HM::get($hm, "k15")

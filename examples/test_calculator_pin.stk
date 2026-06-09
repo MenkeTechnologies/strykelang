@@ -7,15 +7,15 @@
 # Compliance: docs/STYLE_GUIDE.md
 
 fn Cx::tokenize($src) {
-    my @toks = ()
-    my @chars = split(//, $src)
-    my $i = 0
-    my $n = len @chars
+    var @toks = ()
+    val @chars = split(//, $src)
+    var $i = 0
+    val $n = len @chars
     while ($i < $n) {
-        my $c = $chars[$i]
+        val $c = $chars[$i]
         if ($c =~ /\s/) { $i++; next }
         if ($c =~ /[0-9.]/) {
-            my $j = $i
+            var $j = $i
             while ($j < $n && $chars[$j] =~ /[0-9.]/) { $j++ }
             push @toks, ["N", join("", @chars[$i:$j-1]) + 0]
             $i = $j
@@ -33,18 +33,18 @@ fn Cx::tokenize($src) {
 
 # Parser state held as a [tokens, pos] array
 fn Cx::peek($st) = $st->[0]->[$st->[1]]
-fn Cx::next($st) { my $t = Cx::peek($st); $st->[1]++; $t }
+fn Cx::next($st) { val $t = Cx::peek($st); $st->[1]++; $t }
 fn Cx::done($st) = $st->[1] >= len $st->[0]
 
 fn Cx::factor($st) {
-    my $tk = Cx::peek($st)
+    val $tk = Cx::peek($st)
     if ($tk->[0] eq "N") {
         Cx::next($st)
         return $tk->[1]
     }
     if ($tk->[0] eq "O" && $tk->[1] eq "(") {
         Cx::next($st)
-        my $v = Cx::expr($st)
+        val $v = Cx::expr($st)
         Cx::next($st)  # consume ')'
         return $v
     }
@@ -60,24 +60,24 @@ fn Cx::factor($st) {
 }
 
 fn Cx::power($st) {
-    my $lhs = Cx::factor($st)
+    var $lhs = Cx::factor($st)
     while (!Cx::done($st)) {
-        my $tk = Cx::peek($st)
+        val $tk = Cx::peek($st)
         last if $tk->[0] ne "O" || $tk->[1] ne "^"
         Cx::next($st)
-        my $rhs = Cx::power($st)
+        val $rhs = Cx::power($st)
         $lhs = $lhs ** $rhs
     }
     $lhs
 }
 
 fn Cx::term($st) {
-    my $lhs = Cx::power($st)
+    var $lhs = Cx::power($st)
     while (!Cx::done($st)) {
-        my $tk = Cx::peek($st)
+        val $tk = Cx::peek($st)
         last if $tk->[0] ne "O" || ($tk->[1] ne "*" && $tk->[1] ne "/" && $tk->[1] ne "%")
         Cx::next($st)
-        my $rhs = Cx::power($st)
+        val $rhs = Cx::power($st)
         if    ($tk->[1] eq "*") { $lhs = $lhs * $rhs }
         elsif ($tk->[1] eq "/") { $lhs = $lhs / $rhs }
         else                    { $lhs = $lhs % $rhs }
@@ -86,12 +86,12 @@ fn Cx::term($st) {
 }
 
 fn Cx::expr($st) {
-    my $lhs = Cx::term($st)
+    var $lhs = Cx::term($st)
     while (!Cx::done($st)) {
-        my $tk = Cx::peek($st)
+        val $tk = Cx::peek($st)
         last if $tk->[0] ne "O" || ($tk->[1] ne "+" && $tk->[1] ne "-")
         Cx::next($st)
-        my $rhs = Cx::term($st)
+        val $rhs = Cx::term($st)
         if ($tk->[1] eq "+") { $lhs = $lhs + $rhs }
         else                 { $lhs = $lhs - $rhs }
     }
@@ -99,8 +99,8 @@ fn Cx::expr($st) {
 }
 
 fn Cx::calc($src) {
-    my $toks = Cx::tokenize($src)
-    my $st   = [$toks, 0]
+    val $toks = Cx::tokenize($src)
+    val $st   = [$toks, 0]
     Cx::expr($st)
 }
 

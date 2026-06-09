@@ -2,20 +2,20 @@
 # Rosetta Code: Longest palindromic substring
 
 fn Rosetta::LongestPalindromicSubstring::is_palindrome($s) {
-    my $rev = ~> $s chars rev |> join ""
+    val $rev = ~> $s chars rev |> join ""
     $s eq $rev
 }
 
 fn Rosetta::LongestPalindromicSubstring::find($s) {
-    my $len = length($s)
+    val $len = length($s)
     if ($len <= 1) { return $s }
     
-    my $max_str = substr($s, 0, 1)
-    my $max_len = 1
+    var $max_str = substr($s, 0, 1)
+    var $max_len = 1
     
-    for my $i (0:$len-1) {
-        for my $j ($i+$max_len:$len-1) {
-            my $sub = substr($s, $i, $j - $i + 1)
+    for val $i (0:$len-1) {
+        for val $j ($i+$max_len:$len-1) {
+            val $sub = substr($s, $i, $j - $i + 1)
             if (length($sub) > $max_len && Rosetta::LongestPalindromicSubstring::is_palindrome($sub)) {
                 $max_len = length($sub)
                 $max_str = $sub

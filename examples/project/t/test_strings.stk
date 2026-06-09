@@ -36,7 +36,7 @@ assert_eq count_vowels("xyz"), 0, "no vowels"
 assert_eq count_vowels("AEIOU"), 5, "all upper vowels"
 
 # Pipeline: slugify via pipe
-my $slug = "  Hello World!  " |> trim |> Project::Strings::slugify_str
+val $slug = "  Hello World!  " |> trim |> Project::Strings::slugify_str
 assert_eq $slug, "hello-world", "piped slugify"
 
 test_run

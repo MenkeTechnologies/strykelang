@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 fn Exercism::SaddlePoints::saddle_points($m) {
-    my $rows = 0 + @$m
+    val $rows = 0 + @$m
     return [] if $rows == 0
-    my $cols = 0 + @{$m->[0]}
-    my @row_max = ~> 0:$rows-1 map { max(@{$m->[_]}) }
-    my @col_min = ~> 0:$cols-1 map {
+    val $cols = 0 + @{$m->[0]}
+    val @row_max = ~> 0:$rows-1 map { max(@{$m->[_]}) }
+    val @col_min = ~> 0:$cols-1 map {
         ~> 0:$rows-1 map { $m->[_][_<] } min
     }
-    my @out
-    for my $r (0:$rows - 1) {
+    var @out
+    for val $r (0:$rows - 1) {
         ~> 0:$cols - 1 ep {
             push @out, [$r + 1, _ + 1] if $m->[$r][_] == $row_max[$r] && $m->[$r][_] == $col_min[_]
         }

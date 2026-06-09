@@ -2,17 +2,17 @@
 # Rosetta Code: Concurrent computing
 
 fn Rosetta::Concurrent::run() {
-    my $a1 = async {
+    val $a1 = async {
         sleep(rand(0.1))
         p "Enjoy"
     }
     
-    my $a2 = async {
+    val $a2 = async {
         sleep(rand(0.1))
         p "Rosetta"
     }
     
-    my $a3 = async {
+    val $a3 = async {
         sleep(rand(0.1))
         p "Code"
     }

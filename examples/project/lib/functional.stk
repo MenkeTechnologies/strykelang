@@ -2,7 +2,7 @@
 
 # ── Fn::every: returns true if all elements satisfy the predicate ─────
 fn Fn::every($pred, @list) {
-    for my $item (@list) {
+    for val $item (@list) {
         return 0 unless $pred($item)
     }
     1
@@ -10,7 +10,7 @@ fn Fn::every($pred, @list) {
 
 # ── Fn::some: returns true if at least one element satisfies the predicate ─────
 fn Fn::some($pred, @list) {
-    for my $item (@list) {
+    for val $item (@list) {
         return 1 if $pred($item)
     }
     0
@@ -18,8 +18,8 @@ fn Fn::some($pred, @list) {
 
 # ── Fn::reduce: reduces a list to a single value using an accumulator ─────
 fn Fn::reduce($func, $initial, @list) {
-    my $acc = $initial
-    for my $item (@list) {
+    var $acc = $initial
+    for val $item (@list) {
         $acc = $func($acc, $item)
     }
     $acc
@@ -27,8 +27,8 @@ fn Fn::reduce($func, $initial, @list) {
 
 # ── Fn::zip: combines two lists into a list of pairs (as array refs) ─────
 fn Fn::zip(\@a, \@b) {
-    my @result
-    my $len = len(@a) < len(@b) ? len(@a) : len(@b)
+    var @result
+    val $len = len(@a) < len(@b) ? len(@a) : len(@b)
     ~> 0:$len-1 ep {
         push @result, [$a[_], $b[_]]
     }
@@ -53,8 +53,8 @@ fn Fn::flip($f) {
 
 # ── Fn::partition: splits a list into two lists based on a predicate ─────
 fn Fn::partition($pred, @list) {
-    my $t = [];
-    my $f = [];
+    val $t = [];
+    val $f = [];
     ~> @list ep {
         if ($pred(_)) {
             push @$t, _;
@@ -72,7 +72,7 @@ fn Fn::pluck($key, @list) {
 
 # ── Fn::find: returns the first element satisfying the predicate ─────
 fn Fn::find($pred, @list) {
-    for my $item (@list) {
+    for val $item (@list) {
         return $item if $pred($item)
     }
     undef

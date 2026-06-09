@@ -1,17 +1,17 @@
 #!/usr/bin/env stryke
 require "./Transmission.stk"
 
-fn jr($a) { my $r = $a; "$r->[0]:$r->[1]" }
+fn jr($a) { val $r = $a; "$r->[0]:$r->[1]" }
 
-my $enc = Exercism::Transmission::get_transmit_sequence("hi")
+val $enc = Exercism::Transmission::get_transmit_sequence("hi")
 # Verify round-trip.
 assert_eq jr(Exercism::Transmission::decode_message($enc)), "ok:hi", "round-trip"
 
-my $enc2 = Exercism::Transmission::get_transmit_sequence("Aloha!")
+val $enc2 = Exercism::Transmission::get_transmit_sequence("Aloha!")
 assert_eq jr(Exercism::Transmission::decode_message($enc2)), "ok:Aloha!", "longer round-trip"
 
 # Corrupt the parity bit of the first pair → error.
-my @c = split //, $enc
+var @c = split //, $enc
 $c[0] = $c[0] eq "0" ? "1" : "0"
 assert_eq jr(Exercism::Transmission::decode_message(join("", @c))), "error:parity mismatch", "parity tamper detected"
 

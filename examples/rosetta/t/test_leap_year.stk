@@ -17,7 +17,7 @@ assert_ok !Rosetta::LeapYear::check(1900), "1900 is not leap (div by 100)"
 assert_ok !Rosetta::LeapYear::check(2023), "2023 is not leap"
 assert_ok !Rosetta::LeapYear::check(2100), "2100 is not leap"
 
-my @leaps = Rosetta::LeapYear::in_range(2020, 2030)
+val @leaps = Rosetta::LeapYear::in_range(2020, 2030)
 assert_eq join(",", @leaps), "2020,2024,2028", "leaps 2020-2030"
 
 test_run

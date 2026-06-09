@@ -2,7 +2,7 @@
 # Rosetta Code: Root Mean Square
 
 fn Rosetta::RootMeanSquare::root_mean_square {
-    my @nums = @_
+    val @nums = @_
     if (len(@nums) == 0) {
         0
     } else {
@@ -10,12 +10,12 @@ fn Rosetta::RootMeanSquare::root_mean_square {
     }
 }
 
-my @data = (1:10)
-my $rms = Rosetta::RootMeanSquare::root_mean_square(@data)
+val @data = (1:10)
+val $rms = Rosetta::RootMeanSquare::root_mean_square(@data)
 assert_ok abs($rms - 6.2048) < 0.001, "RMS of 1:10"
 
-my @data2 = (10, 20, 30)
-my $rms2 = Rosetta::RootMeanSquare::root_mean_square(@data2)
+val @data2 = (10, 20, 30)
+val $rms2 = Rosetta::RootMeanSquare::root_mean_square(@data2)
 assert_ok abs($rms2 - 21.602) < 0.001, "RMS of 10,20,30"
 
 test_run

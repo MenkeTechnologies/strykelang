@@ -2,12 +2,12 @@
 # Rosetta Code: Plasma effect
 
 fn Rosetta::Plasma::render($w, $h) {
-    my @rows
-    my @chars = split //, " .:-=+*#%@"
-    for my $y (0:$h - 1) {
-        my @row
-        for my $x (0:$w - 1) {
-            my $v = (($x * $x) + ($y * 3) + ($x * 5)) % len(@chars)
+    var @rows
+    val @chars = split //, " .:-=+*#%@"
+    for val $y (0:$h - 1) {
+        var @row
+        for val $x (0:$w - 1) {
+            val $v = (($x * $x) + ($y * 3) + ($x * 5)) % len(@chars)
             push @row, $chars[$v]
         }
         push @rows, join("", @row)
@@ -15,7 +15,7 @@ fn Rosetta::Plasma::render($w, $h) {
     \@rows
 }
 
-my $rows = Rosetta::Plasma::render(6, 3)
+val $rows = Rosetta::Plasma::render(6, 3)
 
 assert_eq len(@$rows), 3, "plasma render has expected height"
 assert_eq len(split //, $rows->[0]), 6, "plasma render has expected width"

@@ -5,14 +5,14 @@ fn Rosetta::LCS::compute($s1, $s2) {
     if (length($s1) == 0 || length($s2) == 0) {
         ""
     } else {
-        my $c1 = substr($s1, 0, 1)
-        my $c2 = substr($s2, 0, 1)
+        val $c1 = substr($s1, 0, 1)
+        val $c2 = substr($s2, 0, 1)
         if ($c1 eq $c2) {
-            my $rest = Rosetta::LCS::compute(substr($s1, 1), substr($s2, 1))
+            val $rest = Rosetta::LCS::compute(substr($s1, 1), substr($s2, 1))
             $c1 . $rest
         } else {
-            my $res1 = Rosetta::LCS::compute(substr($s1, 1), $s2)
-            my $res2 = Rosetta::LCS::compute($s1, substr($s2, 1))
+            val $res1 = Rosetta::LCS::compute(substr($s1, 1), $s2)
+            val $res2 = Rosetta::LCS::compute($s1, substr($s2, 1))
             length($res1) > length($res2) ? $res1 : $res2
         }
     }

@@ -2,9 +2,9 @@
 # Rosetta Code: Pinstripe/Printer
 
 fn Rosetta::Pinstripe::row($width, $stripe_w) {
-    my $line = ""
-    my @chars = (".", "#")
-    my $i = 0
+    var $line = ""
+    val @chars = (".", "#")
+    var $i = 0
     while (len($line) < $width) {
         $line .= $chars[$i % 2] x $stripe_w
         $i++
@@ -13,11 +13,11 @@ fn Rosetta::Pinstripe::row($width, $stripe_w) {
 }
 
 fn Rosetta::Pinstripe::render($width, $max_w) {
-    my @rows = ~> 1:$max_w map { Rosetta::Pinstripe::row($width, _) }
+    val @rows = ~> 1:$max_w map { Rosetta::Pinstripe::row($width, _) }
     \@rows
 }
 
-my $rows = Rosetta::Pinstripe::render(24, 4)
+val $rows = Rosetta::Pinstripe::render(24, 4)
 
 assert_eq len(@$rows), 4, "four stripe widths rendered"
 assert_eq substr($rows->[0], 0, 8), ".#.#.#.#", "1-point alternating stripes"

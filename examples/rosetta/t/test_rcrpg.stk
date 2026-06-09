@@ -15,30 +15,30 @@ fn Rosetta::RCRPG::new() {
 fn Rosetta::RCRPG::coord($xyz) { join(",", @$xyz) }
 
 fn Rosetta::RCRPG::take($game) {
-    my $key = Rosetta::RCRPG::coord($game->{pos})
+    val $key = Rosetta::RCRPG::coord($game->{pos})
     return "none" if !exists $game->{items}{$key}
-    my $item = $game->{items}{$key}
+    val $item = $game->{items}{$key}
     $game->{inventory}{$item} = 1
     delete $game->{items}{$key}
     $item
 }
 
 fn Rosetta::RCRPG::move_x($game, $dx) {
-    my @next = ($game->{pos}->[0] + $dx, $game->{pos}->[1], $game->{pos}->[2])
-    my $edge = Rosetta::RCRPG::coord($game->{pos}) . ":" . Rosetta::RCRPG::coord(\@next)
+    val @next = ($game->{pos}->[0] + $dx, $game->{pos}->[1], $game->{pos}->[2])
+    val $edge = Rosetta::RCRPG::coord($game->{pos}) . ":" . Rosetta::RCRPG::coord(\@next)
     return 0 if !exists $game->{passages}{$edge}
     $game->{pos} = \@next
     1
 }
 
 fn Rosetta::RCRPG::climb($game) {
-    my $key = Rosetta::RCRPG::coord($game->{pos})
+    val $key = Rosetta::RCRPG::coord($game->{pos})
     return 0 if !exists $game->{ladder_rooms}{$key}
     $game->{pos} = [$game->{pos}->[0], $game->{pos}->[1], $game->{pos}->[2] + 1]
     1
 }
 
-my $game = Rosetta::RCRPG::new()
+val $game = Rosetta::RCRPG::new()
 
 assert_eq Rosetta::RCRPG::take($game), "sledge", "player can pick up sledge"
 assert_eq Rosetta::RCRPG::move_x($game, 1), 1, "player can move through an existing passage"

@@ -6,11 +6,11 @@ fn Rosetta::SOAP::request($method, $arg) {
 }
 
 fn Rosetta::SOAP::response_value($xml) {
-    my @parts = split /<value>|<\/value>/, $xml
+    val @parts = split /<value>|<\/value>/, $xml
     $parts[1]
 }
 
-my $xml = Rosetta::SOAP::request("Add", 42)
+val $xml = Rosetta::SOAP::request("Add", 42)
 
 assert_eq $xml =~ /<Envelope>/, 1, "SOAP envelope generated"
 assert_eq $xml =~ /<Add>/, 1, "method wrapper generated"

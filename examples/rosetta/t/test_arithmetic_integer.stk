@@ -4,8 +4,8 @@
 fn Rosetta::ArithmeticInteger::demo() {
     "Integer Arithmetic Examples:" |> p
     
-    my $a = 17
-    my $b = 5
+    val $a = 17
+    var $b = 5
     
     "a = $a, b = $b" |> p
     
@@ -26,7 +26,7 @@ fn Rosetta::ArithmeticInteger::demo() {
     ($a >> 2) |> map { "Right shift: $a >> 2 = $_" } |> p
     
     # Assignment operators
-    my $c = $a
+    var $c = $a
     $c += $b
     "After +=: $c" |> p
     
@@ -40,7 +40,7 @@ fn Rosetta::ArithmeticInteger::demo() {
     "After /=: $c" |> p
     
     # Increment/decrement
-    my $x = 10
+    var $x = 10
     (++$x) |> map { "Pre-increment: $_" } |> p
     ($x++) |> map { "Post-increment: $_ (x is now $x)" } |> p
     (--$x) |> map { "Pre-decrement: $_" } |> p

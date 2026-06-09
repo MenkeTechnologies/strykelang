@@ -2,10 +2,10 @@
 # Rosetta Code: Bisection method
 
 fn Rosetta::BisectionMethod::solve($f, $a, $b) {
-    my $tol = 0.0001
+    val $tol = 0.0001
     
-    my $c = ($a + $b) / 2
-    my $y_c = $f($c)
+    var $c = ($a + $b) / 2
+    var $y_c = $f($c)
     
     while (abs($y_c) > $tol) {
         if ($f($a) * $y_c < 0) {
@@ -21,13 +21,13 @@ fn Rosetta::BisectionMethod::solve($f, $a, $b) {
 }
 
 # Find root of x^2 - 4 = 0 between 0 and 100
-my $f1 = fn { _**2 - 4 }
-my $root1 = Rosetta::BisectionMethod::solve($f1, 0, 100)
+val $f1 = fn { _**2 - 4 }
+val $root1 = Rosetta::BisectionMethod::solve($f1, 0, 100)
 assert_near $root1, 2, 0.001, "root of x^2-4 is 2"
 
 # Find root of cos(x) = 0 between 0 and 3
-my $f2 = fn {cos}
-my $root2 = Rosetta::BisectionMethod::solve($f2, 0, 3)
+val $f2 = fn {cos}
+val $root2 = Rosetta::BisectionMethod::solve($f2, 0, 3)
 assert_near $root2, 1.5707, 0.001, "root of cos(x) is pi/2"
 
 test_run

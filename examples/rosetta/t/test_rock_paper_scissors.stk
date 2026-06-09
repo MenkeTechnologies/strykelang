@@ -4,7 +4,7 @@
 fn Rosetta::RPS::play($p1, $p2) {
     if ($p1 eq $p2) { return "Tie" }
     
-    my %wins = (
+    val %wins = (
         "Rock" => "Scissors",
         "Paper" => "Rock",
         "Scissors" => "Paper"

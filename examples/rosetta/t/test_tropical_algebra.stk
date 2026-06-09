@@ -23,10 +23,10 @@ fn Rosetta::Tropical::pow_tr($a, $n) {
 
 fn Rosetta::Tropical::poly_eval($coeffs, $x) {
     # Σ_i (coeffs[i] ⊗ x^i) under tropical = max_i (coeffs[i] + i·x)
-    my $best
-    for my $i (0..len(@$coeffs) - 1) {
+    var $best
+    for val $i (0..len(@$coeffs) - 1) {
         next unless defined $coeffs->[$i]
-        my $v = $coeffs->[$i] + $i * $x
+        val $v = $coeffs->[$i] + $i * $x
         $best = $v if !defined $best || $v > $best
     }
     $best
@@ -47,9 +47,9 @@ assert_eq Rosetta::Tropical::mul_tr(0, 5), 5, "0 ⊗ 5 = 5 (mult identity)"
 assert_eq Rosetta::Tropical::mul_tr(-2, 5), 3, "negative ⊗"
 
 # Distributivity: (a ⊕ b) ⊗ c = (a ⊗ c) ⊕ (b ⊗ c)
-my ($a, $b, $c) = (3, 5, 4)
-my $lhs = Rosetta::Tropical::mul_tr(Rosetta::Tropical::add_tr($a, $b), $c)
-my $rhs = Rosetta::Tropical::add_tr(
+val ($a, $b, $c) = (3, 5, 4)
+val $lhs = Rosetta::Tropical::mul_tr(Rosetta::Tropical::add_tr($a, $b), $c)
+val $rhs = Rosetta::Tropical::add_tr(
     Rosetta::Tropical::mul_tr($a, $c),
     Rosetta::Tropical::mul_tr($b, $c))
 assert_eq $lhs, $rhs, "distributivity holds"

@@ -12,7 +12,7 @@
 
 $| = 1
 
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "summary"   => { help => "one line per phase; suppress per-item OK lines" },
     "only|o=s@" => { help => "phase(s): parse run demos project rosetta exercism ruby scheme (repeat or comma)" },
     "jobs|j=i"  => { help => "hint for rayon pool (logged only; ~p> uses runtime defaults)", default => 0 },
@@ -21,16 +21,16 @@ my %opts = %{ getopts({
     desc   => "Validate the entire examples/ tree in one CI pass.",
     epilog => "Env: ST, RUN_ALL_CI_JOBS, CI_JOBS",
 }) }
-my $summary = $opts{summary} // 0
+val $summary = $opts{summary} // 0
 
-my $script = realpath(__FILE__)
+var $script = realpath(__FILE__)
 $script = realpath($0) if $script eq ""
-my $ex_dir = $script ne "" ? dirname($script) : realpath(".")
-my $st     = $ENV{ST} // $^X
-my $jobs   = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
+val $ex_dir = $script ne "" ? dirname($script) : realpath(".")
+var $st     = $ENV{ST} // $^X
+var $jobs   = $opts{jobs} // $ENV{RUN_ALL_CI_JOBS} // $ENV{CI_JOBS} // 16
 $jobs = 16 if $jobs < 1
 
-my %META = map { (_ => 1) } qw(
+val %META = map { (_ => 1) } qw(
     check_no_interop
     run_no_interop_demos
     exercism_run_all
@@ -38,11 +38,11 @@ my %META = map { (_ => 1) } qw(
     p2p_chat
 )
 
-my @all_phases = qw(parse run demos project rosetta exercism ruby scheme)
+val @all_phases = qw(parse run demos project rosetta exercism ruby scheme)
 
 fn Ci::basename($path) {
-    my @parts = split m{/}, $path
-    my $file  = $parts[-1]
+    val @parts = split m{/}, $path
+    var $file  = $parts[-1]
     $file =~ s/\.stk$//
     $file
 }
@@ -90,29 +90,29 @@ fn Ci::parse_file($f) = system("$st --no-interop -c \"$f\" >/dev/null 2>&1") == 
 # poll loop, etc.) can't stall the whole pmap. `timeout(1)` exits 124
 # when the inner command exceeds the deadline — count that as a fail
 # rather than blocking forever on collect.
-my $RUN_TIMEOUT = $ENV{RUN_ALL_CI_FILE_TIMEOUT} // 60
+val $RUN_TIMEOUT = $ENV{RUN_ALL_CI_FILE_TIMEOUT} // 60
 
 # Embedded suites (ruby, scheme) are single monolithic files that walk
 # a from-scratch interpreter over hundreds of asserts — they need a
 # bigger budget than per-example files. Scheme in particular consistently
 # blew past 60s and killed CI at the scheme phase.
-my $SUITE_TIMEOUT = $ENV{RUN_ALL_CI_SUITE_TIMEOUT} // 300
+val $SUITE_TIMEOUT = $ENV{RUN_ALL_CI_SUITE_TIMEOUT} // 300
 
 fn Ci::run_file($f) = system("timeout $RUN_TIMEOUT $st --no-interop \"$f\" </dev/null >/dev/null 2>&1") == 0
 
 fn Ci::run_suite($path) {
-    my $cmd = "timeout $SUITE_TIMEOUT $st \"$path\" </dev/null"
+    val $cmd = "timeout $SUITE_TIMEOUT $st \"$path\" </dev/null"
     return system("$cmd >/dev/null 2>&1") == 0 if $summary
     system($cmd) == 0
 }
 
 fn Ci::find_test_stk($root) {
-    my $raw = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
+    val $raw = `find "$root" -type f \\( -name 'test_*.stk' -o -name 't_*.stk' \\) 2>/dev/null`
     $raw eq "" ? [] : ~> split /\n/, $raw grep { _ ne "" } sort
 }
 
 fn Ci::count_asserts($path) {
-    my $n = 0
+    var $n = 0
     for (split /\n/, slurp($path)) {
         if (_ =~ /^\s*(?:rb_test|assert_eq|assert_ok|assert_ne|assert_true|assert_false|assert_err|assert_dies)\b/) {
             $n++
@@ -134,9 +134,9 @@ fn Ci::count_tests_tree($root) = Ci::count_tests_paths(Ci::find_test_stk($root))
 # parse phase report doubled to 942/942 = 471 × 2 after the par→pmap fix
 # made the array-count visible.
 fn Ci::report_run_results($phase, $files, $oks) {
-    my @files = @$files
-    my @oks   = @$oks
-    my $bad = 0
+    val @files = @$files
+    val @oks   = @$oks
+    var $bad = 0
     for (0:len(@files) - 1) {
         if (!@oks[_]) {
             Ci::fail($phase, @files[_])
@@ -145,15 +145,15 @@ fn Ci::report_run_results($phase, $files, $oks) {
             p "  OK   @files[$_]"
         }
     }
-    my $ok = len(@files) - $bad
+    val $ok = len(@files) - $bad
     Ci::add_files($ok, len(@files))
-    my $label = $phase eq "parse" ? "--no-interop clean" : "passed"
+    val $label = $phase eq "parse" ? "--no-interop clean" : "passed"
     p "$phase: $ok/#{len(@files)} $label"
 }
 
 fn Ci::phase_parse {
     Ci::header("parse")
-    my @files = Ci::top_stk_files()
+    val @files = Ci::top_stk_files()
     die "no examples in $ex_dir" unless len(@files)
     # `par { Ci::FN }` chunks the input — block runs ONCE per chunk with
     # `_` bound to the whole chunk list, not once per element. With a bare
@@ -161,35 +161,35 @@ fn Ci::phase_parse {
     # with no args, `$f = undef`) and we lose the 1:1 input→result
     # correspondence. `pmap` gives one parallel call per input, which is
     # what `@oks[$i]` indexing needs.
-    my @oks = pmap { Ci::parse_file($_) } @files
+    val @oks = pmap { Ci::parse_file($_) } @files
     Ci::report_run_results("parse", \@files, \@oks)
 }
 
 fn Ci::phase_run {
     Ci::header("run")
-    my @files = Ci::top_stk_files()
+    val @files = Ci::top_stk_files()
     # Same fix as the parse phase — `pmap` for 1:1 input→result.
-    my @oks = pmap { Ci::run_file($_) } @files
+    val @oks = pmap { Ci::run_file($_) } @files
     Ci::report_run_results("run", \@files, \@oks)
 }
 
 fn Ci::phase_demos {
     Ci::header("demos")
-    my @files = Ci::demo_stk_files()
+    val @files = Ci::demo_stk_files()
     die "no *_no_interop.stk in $ex_dir" unless len(@files)
     # Same fix as the parse / run phases — `pmap` for 1:1 input→result.
-    my @oks = pmap { Ci::run_file($_) } @files
+    val @oks = pmap { Ci::run_file($_) } @files
     Ci::report_run_results("demos", \@files, \@oks)
 }
 
 fn Ci::run_test_tree($phase, $root, $label) {
     Ci::header($phase)
-    my @stk   = Ci::find_test_stk($root)
-    my $nf    = len(@stk)
+    val @stk   = Ci::find_test_stk($root)
+    val $nf    = len(@stk)
     die "no tests in $root" unless $nf
     p "$phase: running $nf test files..." if $summary
-    my $tests_n = Ci::count_tests_paths(@stk)
-    my $rc      = test($root, { quiet => $summary })
+    val $tests_n = Ci::count_tests_paths(@stk)
+    val $rc      = test($root, { quiet => $summary })
     Ci::add_tests($rc == 0 ? $tests_n : 0, $tests_n)
     Ci::fail($phase, "test $label exit $rc") if $rc != 0
     p "$phase: " . ($rc == 0 ? "pass ($tests_n tests)" : "FAIL")
@@ -204,9 +204,9 @@ fn Ci::run_test_tree($phase, $root, $label) {
 # it is: `test($d/t)` walks one self-contained directory; nothing shared
 # beyond the stryke worker pool inside the test runner.
 fn Ci::exercism_one($d) {
-    my $name    = (split m{/}, $d)[-1]
-    my $tests_n = Ci::count_tests_tree("$d/t")
-    my $err     = ""
+    val $name    = (split m{/}, $d)[-1]
+    val $tests_n = Ci::count_tests_tree("$d/t")
+    var $err     = ""
 
     for (glob("$d/*.stk")) {
         if (check_no_interop(_, { quiet => 1 }) != 0) {
@@ -227,20 +227,20 @@ fn Ci::exercism_one($d) {
 
 fn Ci::phase_exercism {
     Ci::header("exercism")
-    my $ex_root = "$ex_dir/exercism"
-    my @dirs    = ~> "$ex_root/*/" glob sort
+    val $ex_root = "$ex_dir/exercism"
+    val @dirs    = ~> "$ex_root/*/" glob sort
     die "no exercises in $ex_root" unless len(@dirs)
 
     # Parallel fan-out — 173 dirs across the worker pool. Each call is
     # self-contained (returns a hash, no shared-state mutation), so
     # `pmap` is the right primitive. Aggregation is serial below.
-    my @results = pmap { Ci::exercism_one($_) } @dirs
+    val @results = pmap { Ci::exercism_one($_) } @dirs
 
     # Sort by name so OK/FAIL output stays deterministic even though
     # workers finish in random order. Then walk + update counters.
-    my @sorted = sort { _->{name} cmp _1->{name} } @results
-    my $pass = 0
-    for my $r (@sorted) {
+    val @sorted = sort { _->{name} cmp _1->{name} } @results
+    var $pass = 0
+    for val $r (@sorted) {
         if ($r->{pass}) {
             Ci::add_tests($r->{tests_n}, $r->{tests_n})
             $pass++
@@ -256,8 +256,8 @@ fn Ci::phase_exercism {
 
 fn Ci::run_embedded_suite($phase, $path) {
     Ci::header($phase)
-    my $tests_n = Ci::count_asserts($path)
-    my $ok      = Ci::run_suite($path)
+    val $tests_n = Ci::count_asserts($path)
+    val $ok      = Ci::run_suite($path)
     Ci::add_tests($ok ? $tests_n : 0, $tests_n)
     Ci::fail($phase, "exit") if !$ok
     p "$phase: " . ($ok ? "pass ($tests_n tests)" : "FAIL")
@@ -277,8 +277,8 @@ fn Ci::run_phase($name) {
 
 fn Ci::print_totals() = p "totals: files $files_ok/$files_n, tests $tests_ok/$tests_n"
 
-my @only_specs = @{ $opts{only} // [] }
-my %want
+val @only_specs = @{ $opts{only} // [] }
+var %want
 if (len(@only_specs)) {
     for (@only_specs) {
         for (split /,/, _) {
@@ -291,7 +291,7 @@ if (len(@only_specs)) {
 } else {
     %want = map { (_ => 1) } @all_phases
 }
-my @phases = grep { $want{_} } @all_phases
+val @phases = grep { $want{_} } @all_phases
 die "no phases selected" unless len(@phases)
 
 p "run_all_ci: #{len(@phases)} phase(s), jobs=$jobs" unless $summary

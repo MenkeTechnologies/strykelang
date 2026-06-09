@@ -6,7 +6,7 @@
 
 # ── Basic try/catch ────────────────────────────────────────────────────────
 
-my $caught1 = 0
+var $caught1 = 0
 try {
     die "basic error"
 } catch ($e) {
@@ -16,7 +16,7 @@ $caught1 |> aok "try/catch: executes catch block"
 
 # ── Error message accessible in catch ──────────────────────────────────────
 
-my $msg = ""
+var $msg = ""
 try {
     die "specific message\n"
 } catch ($e) {
@@ -26,7 +26,7 @@ $msg |> aeq "specific message\n", "try/catch: error message accessible"
 
 # ── No-throw path skips catch ──────────────────────────────────────────────
 
-my $ok = 0
+var $ok = 0
 try {
     $ok = 42
 } catch ($e) {
@@ -36,7 +36,7 @@ $ok |> aeq 42, "try: no-throw path skips catch"
 
 # ── Finally always runs ────────────────────────────────────────────────────
 
-my $finally_ran = 0
+var $finally_ran = 0
 try {
     die "oops\n"
 } catch ($e) {
@@ -46,7 +46,7 @@ try {
 }
 $finally_ran |> aok "finally: runs after catch"
 
-my $finally2 = 0
+var $finally2 = 0
 try {
     1 + 1
 } catch ($e) {
@@ -57,8 +57,8 @@ $finally2 |> aok "finally: runs on success too"
 
 # ── Structured exceptions (hashref) ────────────────────────────────────────
 
-my $code = 0
-my $errmsg = ""
+var $code = 0
+var $errmsg = ""
 try {
     die +{ code => 404, msg => "Not Found" }
 } catch ($e) {
@@ -72,8 +72,8 @@ $errmsg |> aeq "Not Found", "structured: error msg"
 
 # ── Rethrow ────────────────────────────────────────────────────────────────
 
-my $outer_caught = 0
-my $outer_msg    = ""
+var $outer_caught = 0
+var $outer_msg    = ""
 try {
     try {
         die "inner error\n"
@@ -89,14 +89,14 @@ $outer_msg      |> aeq "inner error\n", "rethrow: message preserved"
 
 # ── Nested try/catch with different errors ──────────────────────────────────
 
-my @log = ()
+var @log = ()
 fn maybe_fail($x) {
     die "fail:#{$x}\n" if $x % 2 == 0
     $x * 10
 }
 
-for my $n (1:4) {
-    my $result = 0
+for val $n (1:4) {
+    var $result = 0
     try {
         $result = maybe_fail($n)
     } catch ($e) {
@@ -110,8 +110,8 @@ join(",", @log)
 
 # ── retry — succeed on Nth attempt ────────────────────────────────────────
 
-my $attempts = 0
-my $val = retry {
+var $attempts = 0
+val $val = retry {
     $attempts++
     die "not yet\n" if $attempts < 3
     99

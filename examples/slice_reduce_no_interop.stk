@@ -18,10 +18,10 @@
 # ── 1. variable-bound slice ────────────────────────────────────────────────
 
 p "── 1. variable-bound slice ──"
-my $arr = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-my $i = 2
-my $j = 6
-my @slice = @{$arr}[$i:$j]
+val $arr = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+val $i = 2
+val $j = 6
+val @slice = @{$arr}[$i:$j]
 p "  arr[$i:$j] = @slice"
 die "slice wrong" unless "@slice" eq "30 40 50 60 70"
 
@@ -29,10 +29,10 @@ die "slice wrong" unless "@slice" eq "30 40 50 60 70"
 
 p ""
 p "── 2. min / max / sum over slice ──"
-my $nums = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
-my $window_min = min(@{$nums}[2:7])
-my $window_max = max(@{$nums}[2:7])
-my $window_sum = sum(@{$nums}[2:7])
+val $nums = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+val $window_min = min(@{$nums}[2:7])
+val $window_max = max(@{$nums}[2:7])
+val $window_sum = sum(@{$nums}[2:7])
 printf("  arr[2:7] = (4 1 5 9 2 6)  min=%d max=%d sum=%d\n",
     $window_min, $window_max, $window_sum)
 die "min" unless $window_min == 1
@@ -43,10 +43,10 @@ die "sum" unless $window_sum == 27
 
 p ""
 p "── 3. rolling minimum (window = 3) ──"
-my $stream = [5, 3, 8, 2, 7, 9, 1, 6, 4]
-my $w = 3
-my @rolling
-for my $i (0:(len(@$stream) - $w)) {
+val $stream = [5, 3, 8, 2, 7, 9, 1, 6, 4]
+val $w = 3
+var @rolling
+for val $i (0:(len(@$stream) - $w)) {
     push @rolling, min(@{$stream}[$i:$i + $w - 1])
 }
 printf("  stream:  %s\n", join(" ", @$stream))
@@ -58,13 +58,13 @@ die "rolling" unless "@rolling" eq "3 2 2 2 1 1 1"
 p ""
 p "── 4. prefix-sum array via reduce + arrayref accumulator ──"
 fn Stat::prefix_sums($xs) {
-    my $acc = reduce {
+    val $acc = reduce {
         push @{_}, (_->[-1] // 0) + _1
         _
     } [], @$xs
     $acc
 }
-my $sums = Stat::prefix_sums([1, 2, 3, 4, 5])
+val $sums = Stat::prefix_sums([1, 2, 3, 4, 5])
 printf("  prefix_sums([1..5]) = [%s]\n", join(", ", @$sums))
 die "prefix-sums" unless "@$sums" eq "1 3 6 10 15"
 
@@ -73,8 +73,8 @@ die "prefix-sums" unless "@$sums" eq "1 3 6 10 15"
 p ""
 p "── 5. frequency hashref via reduce + hashref accumulator ──"
 fn Stat::freq_via_reduce = reduce { _->{_1}++; _ } +{}, @{_}
-my $freq = Stat::freq_via_reduce(["apple", "banana", "apple", "cherry", "banana", "apple"])
-for my $k (sort keys %$freq) {
+val $freq = Stat::freq_via_reduce(["apple", "banana", "apple", "cherry", "banana", "apple"])
+for var $k (sort keys %$freq) {
     printf("  %-10s %d\n", $k, $freq->{$k})
 }
 die "apple"  unless $freq->{apple}  == 3
@@ -86,15 +86,15 @@ die "cherry" unless $freq->{cherry} == 1
 p ""
 p "── 6. group-by via reduce + hash<key, arrayref> ──"
 fn Stat::group_by($xs, $keyfn) = reduce {
-    my $k = $keyfn(_1)
+    val $k = $keyfn(_1)
     _->{$k} //= []
     push @{_->{$k}}, _1
     _
 } +{}, @$xs
 
-my $words = ["apple", "anchor", "banana", "berry", "cherry", "cobalt"]
-my $by_first = Stat::group_by($words, fn { substr(_, 0, 1) })
-for my $k (sort keys %$by_first) {
+val $words = ["apple", "anchor", "banana", "berry", "cherry", "cobalt"]
+val $by_first = Stat::group_by($words, fn { substr(_, 0, 1) })
+for val $k (sort keys %$by_first) {
     printf("  %s: [%s]\n", $k, join(", ", @{$by_first->{$k}}))
 }
 die "group a" unless len(@{$by_first->{a}}) == 2
@@ -109,7 +109,7 @@ fn Stat::running_max($xs) = reduce {
     push @{_}, max(_->[-1] // _1, _1)
     _
 } [], @$xs
-my $rmax = Stat::running_max([3, 1, 4, 1, 5, 9, 2, 6, 5, 9, 3])
+val $rmax = Stat::running_max([3, 1, 4, 1, 5, 9, 2, 6, 5, 9, 3])
 printf("  input:        %s\n", join(" ", 3, 1, 4, 1, 5, 9, 2, 6, 5, 9, 3))
 printf("  running max:  %s\n", join(" ", @$rmax))
 die "running max" unless "@$rmax" eq "3 3 4 4 5 9 9 9 9 9 9"

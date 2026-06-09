@@ -7,10 +7,10 @@ fn Rosetta::PellLucas::compute($n) {
     } elsif ($n == 1) {
         2
     } else {
-        my $a = 2
-        my $b = 2
-        for my $i (2:$n) {
-            my $c = 2 * $b + $a
+        var $a = 2
+        var $b = 2
+        for val $i (2:$n) {
+            val $c = 2 * $b + $a
             ($a, $b) = ($b, $c)
         }
         $b

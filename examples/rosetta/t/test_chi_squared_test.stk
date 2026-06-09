@@ -11,10 +11,10 @@ fn Rosetta::ChiSquared::solve($observed, $expected) {
 # Example from Wikipedia or common source
 # 6-sided die rolled 60 times. Observed: 5, 8, 9, 12, 7, 19
 # Expected: 10, 10, 10, 10, 10, 10
-my @obs = (5, 8, 9, 12, 7, 19)
-my @exp = (10, 10, 10, 10, 10, 10)
+val @obs = (5, 8, 9, 12, 7, 19)
+val @exp = (10, 10, 10, 10, 10, 10)
 
-my $chi = Rosetta::ChiSquared::solve(\@obs, \@exp)
+val $chi = Rosetta::ChiSquared::solve(\@obs, \@exp)
 # (5-10)^2/10 = 25/10 = 2.5
 # (8-10)^2/10 = 4/10 = 0.4
 # (9-10)^2/10 = 1/10 = 0.1

@@ -21,7 +21,7 @@ fn BaseConv::digit_char($d) {
 }
 
 fn BaseConv::digit_value($ch) {
-    my $c = ord(uc($ch))
+    val $c = ord(uc($ch))
     return $c - ord("0")          if $c >= ord("0") && $c <= ord("9")
     return $c - ord("A") + 10     if $c >= ord("A") && $c <= ord("Z")
     die "not a digit char: $ch"
@@ -31,8 +31,8 @@ fn BaseConv::enc($n, $base = 10) {
     die "base out of range (2..36): $base" if $base < 2 || $base > 36
     return "-" . BaseConv::enc(-$n, $base) if $n < 0
     return "0" if $n == 0
-    my $s = ""
-    my $x = $n
+    var $s = ""
+    var $x = $n
     while ($x > 0) {
         $s = BaseConv::digit_char($x % $base) . $s
         $x = int($x / $base)
@@ -42,16 +42,16 @@ fn BaseConv::enc($n, $base = 10) {
 
 fn BaseConv::dec($s, $base = 10) {
     die "base out of range (2..36): $base" if $base < 2 || $base > 36
-    my $sign = 1
-    my $body = $s
+    var $sign = 1
+    var $body = $s
     if (substr($body, 0, 1) eq "-") {
         $sign = -1
         $body = substr($body, 1)
     }
     die "empty number" if len($body) == 0
-    my $total = 0
-    for my $ch (split(//, uc($body))) {
-        my $d = BaseConv::digit_value($ch)
+    var $total = 0
+    for val $ch (split(//, uc($body))) {
+        val $d = BaseConv::digit_value($ch)
         die "digit '$ch' >= base $base" if $d >= $base
         $total = $total * $base + $d
     }
@@ -59,14 +59,14 @@ fn BaseConv::dec($s, $base = 10) {
 }
 
 if (len(@ARGV) >= 2) {
-    my $mode = $ARGV[0]
+    val $mode = $ARGV[0]
     if ($mode eq "to") {
-        my $n    = 0 + $ARGV[1]
-        my $base = 0 + ($ARGV[2] // 10)
+        val $n    = 0 + $ARGV[1]
+        val $base = 0 + ($ARGV[2] // 10)
         p BaseConv::enc($n, $base)
     } elsif ($mode eq "from") {
-        my $s    = $ARGV[1]
-        my $base = 0 + ($ARGV[2] // 10)
+        val $s    = $ARGV[1]
+        val $base = 0 + ($ARGV[2] // 10)
         p BaseConv::dec($s, $base)
     } else {
         die "mode must be 'to' or 'from'"
@@ -76,8 +76,8 @@ if (len(@ARGV) >= 2) {
 
 # Demo grid: decimal 255 in every base 2..36.
 p "── 255 in every base 2..36 ──"
-for my $bs (2:36) {
-    my $s = BaseConv::enc(255, $bs)
+for val $bs (2:36) {
+    val $s = BaseConv::enc(255, $bs)
     printf "  base %2d: %s\n", $bs, $s
 }
 
@@ -85,9 +85,9 @@ for my $bs (2:36) {
 # the CI runner can `die` on regressions.
 p ""
 p "── Round-trip 0..200 across bases 2..36 ──"
-my $failures = 0
-for my $bs (2:36) {
-    for my $n (0:200) {
+var $failures = 0
+for val $bs (2:36) {
+    for val $n (0:200) {
         $failures++ if BaseConv::dec(BaseConv::enc($n, $bs), $bs) != $n
     }
 }

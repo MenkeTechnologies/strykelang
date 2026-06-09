@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 
 fn Exercism::StateOfTicTacToe::game_state($board) {
-    my @rows = @{$board}
-    my @flat = map { split //, $_ } @rows
-    my $x = grep { $_ eq "X" } @flat
-    my $o = grep { $_ eq "O" } @flat
-    my $x_wins = Exercism::StateOfTicTacToe::_has_win(\@flat, "X")
-    my $o_wins = Exercism::StateOfTicTacToe::_has_win(\@flat, "O")
+    val @rows = @{$board}
+    val @flat = map { split //, $_ } @rows
+    val $x = grep { $_ eq "X" } @flat
+    val $o = grep { $_ eq "O" } @flat
+    val $x_wins = Exercism::StateOfTicTacToe::_has_win(\@flat, "X")
+    val $o_wins = Exercism::StateOfTicTacToe::_has_win(\@flat, "O")
     return ["error", "Impossible board: game should have ended after the game was won"] if $x_wins && $o_wins
     return ["error", "Wrong turn order: X went twice"] if $x - $o > 1
     return ["error", "Wrong turn order: O started"]    if $o > $x
@@ -16,10 +16,10 @@ fn Exercism::StateOfTicTacToe::game_state($board) {
 }
 
 fn Exercism::StateOfTicTacToe::_has_win($flat, $p) {
-    my @lines = ([0,1,2],[3,4,5],[6,7,8],
+    val @lines = ([0,1,2],[3,4,5],[6,7,8],
                  [0,3,6],[1,4,7],[2,5,8],
                  [0,4,8],[2,4,6])
-    for my $l (@lines) {
+    for val $l (@lines) {
         return 1 if $flat->[$l->[0]] eq $p && $flat->[$l->[1]] eq $p && $flat->[$l->[2]] eq $p
     }
     0

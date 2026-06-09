@@ -2,17 +2,17 @@
 # Rosetta Code: Elementary Cellular Automaton
 
 fn Rosetta::ElementaryCellularAutomaton::solve($rule, $initial, $steps) {
-    my $curr = $initial
-    my @results = (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
+    var $curr = $initial
+    var @results = (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
     
     for (1:$steps-1) {
-        my $len = len(@$curr)
-        my $prev_gen = $curr
+        val $len = len(@$curr)
+        val $prev_gen = $curr
         $curr = [ map {
-            my $i = _
-            my $p = $prev_gen->[($i - 1 + $len) % $len]
-            my $c = $prev_gen->[$i]
-            my $a = $prev_gen->[($i + 1) % $len]
+            val $i = _
+            val $p = $prev_gen->[($i - 1 + $len) % $len]
+            val $c = $prev_gen->[$i]
+            val $a = $prev_gen->[($i + 1) % $len]
             ($rule >> (($p << 2) | ($c << 1) | $a)) & 1
         } 0:$len-1 ]
         push @results, (join("", @$curr) |> { s/0/ /gr } |> { s/1/#/gr })
@@ -21,8 +21,8 @@ fn Rosetta::ElementaryCellularAutomaton::solve($rule, $initial, $steps) {
 }
 
 # Rule 30
-my @initial = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
-my $res = Rosetta::ElementaryCellularAutomaton::solve(30, \@initial, 10)
+val @initial = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
+val $res = Rosetta::ElementaryCellularAutomaton::solve(30, \@initial, 10)
 
 # Verify some lines of Rule 30
 # Line 0: .........#.........
@@ -36,8 +36,8 @@ assert_eq $res->[2], "       ##  #       ", "Rule 30 step 2"
 assert_eq $res->[3], "      ## ####      ", "Rule 30 step 3"
 
 # Rule 90 (Sierpinski)
-my @initial90 = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
-my $res90 = Rosetta::ElementaryCellularAutomaton::solve(90, \@initial90, 5)
+val @initial90 = (0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0)
+val $res90 = Rosetta::ElementaryCellularAutomaton::solve(90, \@initial90, 5)
 assert_eq $res90->[1], "        # #        ", "Rule 90 step 1"
 assert_eq $res90->[2], "       #   #       ", "Rule 90 step 2"
 

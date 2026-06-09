@@ -5,7 +5,7 @@ fn Rosetta::Square::check($n) {
     if ($n < 0) {
         0
     } else {
-        my $root = int(sqrt($n))
+        val $root = int(sqrt($n))
         $root * $root == $n
     }
 }

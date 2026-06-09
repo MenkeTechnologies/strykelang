@@ -2,12 +2,12 @@
 # Rosetta Code: Middle three digits
 
 fn Rosetta::MiddleThreeNum::middle_three($n) {
-    my $s = abs($n) . ""
-    my $len = length($s)
+    val $s = abs($n) . ""
+    val $len = length($s)
     if ($len < 3 || $len % 2 == 0) {
         return "error"
     }
-    my $mid = int($len / 2)
+    val $mid = int($len / 2)
     substr($s, $mid - 1, 3)
 }
 

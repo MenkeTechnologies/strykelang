@@ -2,10 +2,10 @@
 # Rosetta Code: Truncatable primes
 
 fn Rosetta::TruncatablePrime::is_left($n) {
-    my $s = "$n"
+    var $s = "$n"
     if ($s =~ /0/) { 0 }
     else {
-        my $valid = 1
+        var $valid = 1
         while (length($s) > 0 && $valid) {
             if (!is_prime(int($s))) {
                 $valid = 0
@@ -17,10 +17,10 @@ fn Rosetta::TruncatablePrime::is_left($n) {
 }
 
 fn Rosetta::TruncatablePrime::is_right($n) {
-    my $s = "$n"
+    var $s = "$n"
     if ($s =~ /0/) { 0 }
     else {
-        my $valid = 1
+        var $valid = 1
         while (length($s) > 0 && $valid) {
             if (!is_prime(int($s))) {
                 $valid = 0

@@ -31,9 +31,9 @@ fn Cycle::step($x) {
 # ── reference: brute-force build the trajectory for verification ──
 
 fn Cycle::trajectory($x0, $limit) {
-    my @seq = ($x0)
-    my $cur = $x0
-    for my $i (1:$limit) {
+    var @seq = ($x0)
+    var $cur = $x0
+    for val $i (1:$limit) {
         $cur = Cycle::step($cur)
         push @seq, $cur
     }
@@ -44,15 +44,15 @@ fn Cycle::trajectory($x0, $limit) {
 
 fn Cycle::floyd($x0) {
     # Phase 1 — meet inside the cycle.
-    my $tortoise = Cycle::step($x0)
-    my $hare = Cycle::step(Cycle::step($x0))
+    var $tortoise = Cycle::step($x0)
+    var $hare = Cycle::step(Cycle::step($x0))
     while ($tortoise != $hare) {
         $tortoise = Cycle::step($tortoise)
         $hare = Cycle::step(Cycle::step($hare))
     }
 
     # Phase 2 — locate cycle entry (μ steps from x_0).
-    my $mu = 0
+    var $mu = 0
     $tortoise = $x0
     while ($tortoise != $hare) {
         $tortoise = Cycle::step($tortoise)
@@ -61,7 +61,7 @@ fn Cycle::floyd($x0) {
     }
 
     # Phase 3 — measure cycle length λ.
-    my $lambda = 1
+    var $lambda = 1
     $hare = Cycle::step($tortoise)
     while ($tortoise != $hare) {
         $hare = Cycle::step($hare)
@@ -73,25 +73,25 @@ fn Cycle::floyd($x0) {
 
 # ── run on several seeds ───────────────────────────────────────────
 
-my @seeds = (0, 2, 7, 100, 200)
+val @seeds = (0, 2, 7, 100, 200)
 printf "── Floyd cycle detection over f(x) = (x² + 1) mod 255 ──\n\n"
 printf "  %5s   %4s   %4s\n", "x_0", "μ", "λ"
 printf "  %5s   %4s   %4s\n", "─────", "────", "────"
 
-for my $x0 (@seeds) {
-    my $res = Cycle::floyd($x0)
-    my $mu = $res->[0]
-    my $lambda = $res->[1]
+for val $x0 (@seeds) {
+    val $res = Cycle::floyd($x0)
+    val $mu = $res->[0]
+    val $lambda = $res->[1]
     printf "  %5d   %4d   %4d\n", $x0, $mu, $lambda
 
     # Verify against trajectory: seq[μ + λ] must equal seq[μ].
-    my $traj = Cycle::trajectory($x0, $mu + 2 * $lambda + 5)
+    val $traj = Cycle::trajectory($x0, $mu + 2 * $lambda + 5)
     die "verification failed for x0=$x0: seq[mu+lambda] != seq[mu]" unless $traj->[$mu + $lambda] == $traj->[$mu]
 
     # And seq[μ] must NOT equal any earlier entry (μ is minimal).
     if ($mu > 0) {
-        my $entry = $traj->[$mu]
-        for my $i (0:$mu - 1) {
+        val $entry = $traj->[$mu]
+        for val $i (0:$mu - 1) {
             die "mu not minimal for x0=$x0: seq[$i] == seq[mu]" if $traj->[$i] == $entry
         }
     }
@@ -103,9 +103,9 @@ for my $x0 (@seeds) {
 # enters the cycle does so at one of the cycle's λ states, and all
 # share the same λ.
 
-my $reference_lambda = Cycle::floyd($seeds[0])->[1]
-for my $x0 (@seeds) {
-    my $lam = Cycle::floyd($x0)->[1]
+val $reference_lambda = Cycle::floyd($seeds[0])->[1]
+for val $x0 (@seeds) {
+    val $lam = Cycle::floyd($x0)->[1]
     die "lambda mismatch: x0=$x0 saw lambda=$lam vs reference $reference_lambda" unless $lam == $reference_lambda
 }
 

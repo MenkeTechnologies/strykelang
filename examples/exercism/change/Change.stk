@@ -3,14 +3,14 @@
 fn Exercism::Change::generate($coins, $target) {
     return ["error", "cannot change"] if $target < 0
     return ["ok", []] if $target == 0
-    my @sorted = sort { _ <=> _1 } @{$coins}
-    my @best
+    val @sorted = sort { _ <=> _1 } @{$coins}
+    var @best
     $best[0] = []
-    for my $amt (1..$target) {
-        for my $c (@sorted) {
+    for val $amt (1..$target) {
+        for val $c (@sorted) {
             last if $c > $amt
             next unless defined $best[$amt - $c]
-            my @cand = (@{$best[$amt - $c]}, $c)
+            val @cand = (@{$best[$amt - $c]}, $c)
             if (!defined $best[$amt] || @cand < @{$best[$amt]}) {
                 $best[$amt] = \@cand
             }

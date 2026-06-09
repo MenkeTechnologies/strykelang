@@ -50,8 +50,8 @@ class DiskMonitor extends Device impl Readable {
 
 p "--- OOP POLYMORPHISM ---"
 
-my $scanner = NetworkScanner(id => 101, name => "EdgeScanner", ip => "192.168.1.50")
-my $monitor = DiskMonitor(id => 202, name => "RootDisk", mount => "/var/log")
+val $scanner = NetworkScanner(id => 101, name => "EdgeScanner", ip => "192.168.1.50")
+var $monitor = DiskMonitor(id => 202, name => "RootDisk", mount => "/var/log")
 
 p $scanner->identify()
 p $monitor->identify()
@@ -59,13 +59,13 @@ p $monitor->identify()
 p "\n--- TRAIT-BASED DISPATCH ---"
 
 # Both implement Readable
-my @readables = ($scanner, $monitor)
-for my $r (@readables) {
-    my $data = $r->read_data()
+val @readables = ($scanner, $monitor)
+for var $r (@readables) {
+    val $data = $r->read_data()
     p "Data from ", $r->name, ": ", to_json($data)
 }
 
 p "\n--- TYPED CLASS INSTANCE ---"
-my $safe_scanner = $scanner
+val $safe_scanner = $scanner
 $safe_scanner->connect()
 $safe_scanner->disconnect()

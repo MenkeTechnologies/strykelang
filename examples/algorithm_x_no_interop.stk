@@ -16,45 +16,45 @@
 # Run: stryke --no-interop examples/algorithm_x_no_interop.stk
 
 fn AlgX::solve($X, $Y, $solution, $results) {
-    my @cols = keys %$X
+    val @cols = keys %$X
     if (len(@cols) == 0) {
-        my @copy = @$solution
+        val @copy = @$solution
         push @$results, \@copy
         return undef
     }
 
     # Knuth's S-heuristic: branch on the column with fewest rows.
-    my $min_c = $cols[0]
-    my $min_len = len @{$X->{$min_c}}
-    for my $c (@cols) {
-        my $l = len @{$X->{$c}}
+    var $min_c = $cols[0]
+    var $min_len = len @{$X->{$min_c}}
+    for val $c (@cols) {
+        val $l = len @{$X->{$c}}
         if ($l < $min_len) {
             $min_len = $l
             $min_c = $c
         }
     }
 
-    my @rows_for_c = @{$X->{$min_c}}
-    for my $r (@rows_for_c) {
+    val @rows_for_c = @{$X->{$min_c}}
+    for val $r (@rows_for_c) {
         push @$solution, $r
 
         # Shallow-copy $X so the recursive call doesn't mutate the
         # caller's matrix view.
-        my %new_X
-        for my $k (keys %$X) {
-            my @arr = @{$X->{$k}}
+        var %new_X
+        for val $k (keys %$X) {
+            val @arr = @{$X->{$k}}
             $new_X{$k} = \@arr
         }
 
         # Cover: for every column $j hit by row $r, evict every row
         # $i in that column from every OTHER column it occupies,
         # then drop $j itself.
-        for my $j (@{$Y->{$r}}) {
+        for val $j (@{$Y->{$r}}) {
             if (exists $new_X{$j}) {
-                for my $i (@{$new_X{$j}}) {
-                    for my $k (@{$Y->{$i}}) {
+                for val $i (@{$new_X{$j}}) {
+                    for val $k (@{$Y->{$i}}) {
                         if ($k ne $j && exists $new_X{$k}) {
-                            my @filtered = ~> @{$new_X{$k}} grep { _ ne $i }
+                            val @filtered = ~> @{$new_X{$k}} grep { _ ne $i }
                             $new_X{$k} = \@filtered
                         }
                     }
@@ -72,16 +72,16 @@ fn AlgX::solve($X, $Y, $solution, $results) {
 # table, then recurse. Returns an arrayref of solution arrayrefs;
 # each inner array is a set of row names that cover the universe.
 fn AlgX::exact_cover($universe, $subsets) {
-    my %X
-    for my $item (@$universe) { $X{$item} = [] }
-    for my $row (keys %$subsets) {
-        for my $item (@{$subsets->{$row}}) {
+    var %X
+    for val $item (@$universe) { $X{$item} = [] }
+    for val $row (keys %$subsets) {
+        for val $item (@{$subsets->{$row}}) {
             push @{$X{$item}}, $row
         }
     }
 
-    my @solution
-    my @results
+    val @solution
+    val @results
     AlgX::solve(\%X, $subsets, \@solution, \@results)
     \@results
 }
@@ -90,8 +90,8 @@ p "── Algorithm X (Exact Cover) demo ──"
 
 # Knuth's canonical 7-element universe with 6 subsets — unique cover
 # is {B, D, F}.
-my @universe = ("1", "2", "3", "4", "5", "6", "7")
-my %subsets = (
+val @universe = ("1", "2", "3", "4", "5", "6", "7")
+val %subsets = (
     "A" => ["1", "4", "7"],
     "B" => ["1", "4"],
     "C" => ["4", "5", "7"],
@@ -100,10 +100,10 @@ my %subsets = (
     "F" => ["2", "7"],
 )
 
-my $results = AlgX::exact_cover(\@universe, \%subsets)
+val $results = AlgX::exact_cover(\@universe, \%subsets)
 p "Solutions found: #{len @$results}"
-for my $sol (@$results) {
-    my @sorted = ~> @$sol sort { _0 cmp _1 }
+for val $sol (@$results) {
+    val @sorted = ~> @$sol sort { _0 cmp _1 }
     p "  { #{join ', ', @sorted} }"
 }
 

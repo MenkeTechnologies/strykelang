@@ -14,11 +14,11 @@
 #      stryke --no-interop examples/binary_search_no_interop.stk 42 1 5 9 42 99
 
 fn BSearch::idx($target, @xs) {
-    my $lo = 0
-    my $hi = len(@xs) - 1
+    var $lo = 0
+    var $hi = len(@xs) - 1
     while ($lo <= $hi) {
-        my $mid = ($lo + $hi) >> 1  # bit-shift avoids the int/float coerce
-        my $v   = $xs[$mid]
+        val $mid = ($lo + $hi) >> 1  # bit-shift avoids the int/float coerce
+        val $v   = $xs[$mid]
         return $mid if $v == $target
         if ($v < $target) {
             $lo = $mid + 1
@@ -30,10 +30,10 @@ fn BSearch::idx($target, @xs) {
 }
 
 if (len(@ARGV) >= 2) {
-    my $needle  = 0 + $ARGV[0]
-    my @hayargs = map { 0 + _ } @ARGV[1:]
-    my @sorted  = sort { _ <=> _1 } @hayargs
-    my $idx     = BSearch::idx($needle, @sorted)
+    val $needle  = 0 + $ARGV[0]
+    val @hayargs = map { 0 + _ } @ARGV[1:]
+    val @sorted  = sort { _ <=> _1 } @hayargs
+    val $idx     = BSearch::idx($needle, @sorted)
     if ($idx >= 0) {
         p "found $needle at sorted index $idx"
         p "  sorted: (", join(", ", @sorted), ")"
@@ -44,15 +44,15 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo grid: search for every value 0..15 in [2, 4, 6, 8, 10, 12, 14].
-my @hay = (2, 4, 6, 8, 10, 12, 14)
+val @hay = (2, 4, 6, 8, 10, 12, 14)
 p "── Binary search demo ──"
 p "haystack: (", join(", ", @hay), ")"
 p ""
 printf "  %-8s %s\n", "needle", "index"
-my @expected = (-1, -1, 0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 5, -1, 6, -1)
-my $fail = 0
-for my $n (0:15) {
-    my $got = BSearch::idx($n, @hay)
+val @expected = (-1, -1, 0, -1, 1, -1, 2, -1, 3, -1, 4, -1, 5, -1, 6, -1)
+var $fail = 0
+for val $n (0:15) {
+    val $got = BSearch::idx($n, @hay)
     $fail++ if $got != $expected[$n]
     printf "  %-8d %s\n", $n, $got == -1 ? "—" : $got
 }

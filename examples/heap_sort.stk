@@ -16,16 +16,16 @@ fn Demo::Heap::left   = 2 * _ + 1
 fn Demo::Heap::right  = 2 * _ + 2
 
 fn Demo::Heap::sift_down($arr, $start, $end) {
-    my $i = $start
+    var $i = $start
     while (Demo::Heap::left($i) <= $end) {
-        my $l = Demo::Heap::left($i)
-        my $r = Demo::Heap::right($i)
-        my $largest = $i
+        val $l = Demo::Heap::left($i)
+        val $r = Demo::Heap::right($i)
+        var $largest = $i
         if ($l <= $end && $arr->[$l] > $arr->[$largest]) { $largest = $l }
         if ($r <= $end && $arr->[$r] > $arr->[$largest]) { $largest = $r }
         last if $largest == $i
         # Swap.
-        my $tmp = $arr->[$i]
+        val $tmp = $arr->[$i]
         $arr->[$i] = $arr->[$largest]
         $arr->[$largest] = $tmp
         $i = $largest
@@ -33,9 +33,9 @@ fn Demo::Heap::sift_down($arr, $start, $end) {
 }
 
 fn Demo::Heap::heapify($arr) {
-    my $n = len @$arr
+    val $n = len @$arr
     return if $n <= 1
-    my $start = int($n / 2) - 1
+    var $start = int($n / 2) - 1
     while ($start >= 0) {
         Demo::Heap::sift_down($arr, $start, $n - 1)
         $start = $start - 1
@@ -44,10 +44,10 @@ fn Demo::Heap::heapify($arr) {
 
 fn Demo::Heap::sort($arr) {
     Demo::Heap::heapify($arr)
-    my $n = len @$arr
-    my $end = $n - 1
+    val $n = len @$arr
+    var $end = $n - 1
     while ($end > 0) {
-        my $tmp = $arr->[0]
+        val $tmp = $arr->[0]
         $arr->[0] = $arr->[$end]
         $arr->[$end] = $tmp
         $end = $end - 1
@@ -57,23 +57,23 @@ fn Demo::Heap::sort($arr) {
 
 # ── workload ───────────────────────────────────────────────────────
 
-my @input = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8)
+val @input = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5, 8, 9, 7, 9, 3, 2, 3, 8)
 printf "── input: %d elements ─────────────────────────────────\n",
     len @input
 printf "  %s\n", join(", ", @input)
 
 # ── HLL fingerprint pre-sort ───────────────────────────────────────
 
-my $hll_pre = hll(14)
+val $hll_pre = hll(14)
 hll_add($hll_pre, _) for @input
 
 # ── sort in-place ───────────────────────────────────────────────────
 
-my $td_extract = t_digest(100)
-my @work = @input
-my $t0 = now_ns()
+val $td_extract = t_digest(100)
+val @work = @input
+val $t0 = now_ns()
 Demo::Heap::sort(\@work)
-my $elapsed_us = (now_ns() - $t0) / 1000.0
+val $elapsed_us = (now_ns() - $t0) / 1000.0
 
 p ""
 p "── sorted output ────────────────────────────────────"
@@ -82,9 +82,9 @@ printf "  total heap-sort time : %.1f µs\n", $elapsed_us
 
 # ── verify against built-in sort ────────────────────────────────────
 
-my @expected = sort { _ <=> _1 } @input
-my $matches = 1
-for my $i (0:len(@work) - 1) {
+val @expected = sort { _ <=> _1 } @input
+var $matches = 1
+for val $i (0:len(@work) - 1) {
     $matches = 0 if $work[$i] != $expected[$i]
 }
 
@@ -94,7 +94,7 @@ printf "── verification: matches built-in sort = %s ────────
 
 # ── HLL fingerprint post-sort matches pre-sort ─────────────────────
 
-my $hll_post = hll(14)
+val $hll_post = hll(14)
 hll_add($hll_post, _) for @work
 
 p ""
@@ -107,22 +107,22 @@ printf "  (should be equal)\n"
 
 p ""
 p "── stress: 1000 random elements ─────────────────────"
-my @big_input
-my $seed = 12345
-for my $i (1:1000) {
+var @big_input
+var $seed = 12345
+for val $i (1:1000) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     push @big_input, $seed % 1000
 }
 
-my @big_work = @big_input
-my $t1 = now_ns()
+val @big_work = @big_input
+val $t1 = now_ns()
 Demo::Heap::sort(\@big_work)
-my $big_elapsed_ms = (now_ns() - $t1) / 1_000_000.0
+val $big_elapsed_ms = (now_ns() - $t1) / 1_000_000.0
 printf "  heap-sorted 1000 elements in %.2f ms\n", $big_elapsed_ms
 
 # Verify monotonicity.
-my $monotone = 1
-for my $i (1:len(@big_work) - 1) {
+var $monotone = 1
+for val $i (1:len(@big_work) - 1) {
     if ($big_work[$i] < $big_work[$i - 1]) {
         $monotone = 0
         last
@@ -131,9 +131,9 @@ for my $i (1:len(@big_work) - 1) {
 printf "  monotone ascending : %s\n", $monotone ? "YES" : "NO"
 
 # Compare to built-in sort.
-my @big_expected = sort { _ <=> _1 } @big_input
-my $big_matches = 1
-for my $i (0:len(@big_work) - 1) {
+val @big_expected = sort { _ <=> _1 } @big_input
+var $big_matches = 1
+for val $i (0:len(@big_work) - 1) {
     $big_matches = 0 if $big_work[$i] != $big_expected[$i]
 }
 printf "  matches built-in sort : %s\n", $big_matches ? "YES" : "NO"

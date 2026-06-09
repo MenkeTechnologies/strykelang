@@ -19,13 +19,13 @@
 fn SS::can_sum($xs, $target) {
     return 1 if $target == 0
     return 0 if $target < 0
-    my $n = len @$xs
-    my @dp
-    for my $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
-    for my $i (0:$n) { $dp[$i][0] = 1 }       # empty subset sums to 0
-    for my $i (1:$n) {
-        my $v = $xs->[$i - 1]
-        for my $j (1:$target) {
+    val $n = len @$xs
+    var @dp
+    for val $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
+    for val $i (0:$n) { $dp[$i][0] = 1 }       # empty subset sums to 0
+    for val $i (1:$n) {
+        val $v = $xs->[$i - 1]
+        for val $j (1:$target) {
             $dp[$i][$j] = $dp[$i - 1][$j]
             $dp[$i][$j] = 1 if $j >= $v && $dp[$i - 1][$j - $v] == 1
         }
@@ -38,23 +38,23 @@ fn SS::can_sum($xs, $target) {
 fn SS::find_subset($xs, $target) {
     return [] if $target == 0
     return undef if $target < 0
-    my $n = len @$xs
-    my @dp
-    for my $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
-    for my $i (0:$n) { $dp[$i][0] = 1 }
-    for my $i (1:$n) {
-        my $v = $xs->[$i - 1]
-        for my $j (1:$target) {
+    val $n = len @$xs
+    var @dp
+    for val $i (0:$n) { $dp[$i] = [(0) x ($target + 1)] }
+    for val $i (0:$n) { $dp[$i][0] = 1 }
+    for val $i (1:$n) {
+        val $v = $xs->[$i - 1]
+        for val $j (1:$target) {
             $dp[$i][$j] = $dp[$i - 1][$j]
             $dp[$i][$j] = 1 if $j >= $v && $dp[$i - 1][$j - $v] == 1
         }
     }
     return undef unless $dp[$n][$target]
     # Walk back: at each i, prefer to skip if dp[i-1][j] is true; else take.
-    my @out
-    my $j = $target
-    for (my $i = $n; $i > 0; $i--) {
-        my $v = $xs->[$i - 1]
+    var @out
+    var $j = $target
+    for (var $i = $n; $i > 0; $i--) {
+        val $v = $xs->[$i - 1]
         if ($j >= $v && $dp[$i - 1][$j - $v] == 1) {
             unshift @out, $v
             $j -= $v
@@ -65,7 +65,7 @@ fn SS::find_subset($xs, $target) {
 
 p "── Subset sum demo ──"
 
-my @cases = (
+val @cases = (
     +{ xs => [3, 34, 4, 12, 5, 2],  target =>  9, ok => 1 },  # 4+5 or 3+4+2 or ...
     +{ xs => [3, 34, 4, 12, 5, 2],  target => 30, ok => 0 },  # not reachable
     +{ xs => [1, 2, 3, 4, 5],       target => 11, ok => 1 },  # 1+2+3+5 or 2+4+5
@@ -79,21 +79,21 @@ my @cases = (
     +{ xs => [2, 4, 6, 8, 10],      target => 14, ok => 1 },  # 4+10 or 6+8 or 2+4+8
 )
 
-my $fail = 0
-for my $c (@cases) {
-    my $can     = SS::can_sum($c->{xs}, $c->{target})
-    my $witness = SS::find_subset($c->{xs}, $c->{target})
-    my $ok = $can == $c->{ok}
+var $fail = 0
+for val $c (@cases) {
+    val $can     = SS::can_sum($c->{xs}, $c->{target})
+    val $witness = SS::find_subset($c->{xs}, $c->{target})
+    var $ok = $can == $c->{ok}
     if ($c->{ok}) {
         die "find_subset returned undef" unless defined $witness
-        my $sum = 0
+        var $sum = 0
         $sum += _ for @$witness
         $ok = $ok && $sum == $c->{target}
     } else {
         $ok = $ok && !defined $witness
     }
     $fail++ unless $ok
-    my $w_s = defined $witness ? "[" . join(",", @$witness) . "]" : "undef"
+    val $w_s = defined $witness ? "[" . join(",", @$witness) . "]" : "undef"
     p "  SS([@{$c->{xs}}], #{$c->{target}}) can=#{$can} witness=$w_s  expect can=#{$c->{ok}}  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "#{$fail} / #{len @cases} subset-sum cases failed" if $fail > 0
@@ -102,15 +102,15 @@ die "#{$fail} / #{len @cases} subset-sum cases failed" if $fail > 0
 #   * can_sum(_, 0) = 1 (empty subset)
 #   * Witness subset elements all appear in input (as multiset)
 #   * Witness subset sums exactly to target
-for my $c (@cases) {
+for val $c (@cases) {
     die "can_sum(_, 0) != 1" unless SS::can_sum($c->{xs}, 0)
     next unless $c->{ok}
-    my $w = SS::find_subset($c->{xs}, $c->{target})
+    val $w = SS::find_subset($c->{xs}, $c->{target})
     next unless defined $w
     # Check witness elements are a sub-multiset of input.
-    my %avail
-    for my $v (@{$c->{xs}}) { $avail{$v}++ }
-    for my $v (@$w) {
+    var %avail
+    for val $v (@{$c->{xs}}) { $avail{$v}++ }
+    for val $v (@$w) {
         die "witness uses unavailable $v" unless $avail{$v} > 0
         $avail{$v}--
     }

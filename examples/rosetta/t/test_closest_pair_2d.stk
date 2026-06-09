@@ -6,13 +6,13 @@ fn Rosetta::ClosestPair2D::distance($p1, $p2) {
 }
 
 fn Rosetta::ClosestPair2D::brute_force($points) {
-    my $n = len(@$points)
-    my $min_d = 1e18
-    my @best_pair = ()
+    val $n = len(@$points)
+    var $min_d = 1e18
+    var @best_pair = ()
     
-    for (my $i = 0; $i < $n; $i++) {
-        for (my $j = $i + 1; $j < $n; $j++) {
-            my $d = Rosetta::ClosestPair2D::distance($points->[$i], $points->[$j])
+    for (var $i = 0; $i < $n; $i++) {
+        for (var $j = $i + 1; $j < $n; $j++) {
+            val $d = Rosetta::ClosestPair2D::distance($points->[$i], $points->[$j])
             if ($d < $min_d) {
                 $min_d = $d
                 @best_pair = ($points->[$i], $points->[$j])
@@ -24,20 +24,20 @@ fn Rosetta::ClosestPair2D::brute_force($points) {
 }
 
 fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
-    my $n = len(@$points_x)
+    val $n = len(@$points_x)
     if ($n <= 3) {
         return Rosetta::ClosestPair2D::brute_force($points_x)
     }
     
-    my $mid = $n / 2 | 0
-    my $mid_point = $points_x->[$mid]
+    val $mid = $n / 2 | 0
+    val $mid_point = $points_x->[$mid]
     
-    my @left_x = @$points_x[0 : $mid - 1]
-    my @right_x = @$points_x[$mid : $n - 1]
+    val @left_x = @$points_x[0 : $mid - 1]
+    val @right_x = @$points_x[$mid : $n - 1]
     
-    my @left_y
-    my @right_y
-    for my $p (@$points_y) {
+    var @left_y
+    var @right_y
+    for val $p (@$points_y) {
         if ($p->[0] <= $mid_point->[0]) {
             push @left_y, $p
         } else {
@@ -45,23 +45,23 @@ fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
         }
     }
     
-    my $res_left = Rosetta::ClosestPair2D::solve_rec(\@left_x, \@left_y)
-    my $res_right = Rosetta::ClosestPair2D::solve_rec(\@right_x, \@right_y)
+    val $res_left = Rosetta::ClosestPair2D::solve_rec(\@left_x, \@left_y)
+    val $res_right = Rosetta::ClosestPair2D::solve_rec(\@right_x, \@right_y)
     
-    my $best = $res_left->{dist} < $res_right->{dist} ? $res_left : $res_right
-    my $d = $best->{dist}
+    var $best = $res_left->{dist} < $res_right->{dist} ? $res_left : $res_right
+    var $d = $best->{dist}
     
-    my @strip
-    for my $p (@$points_y) {
+    var @strip
+    for val $p (@$points_y) {
         if (abs($p->[0] - $mid_point->[0]) < $d) {
             push @strip, $p
         }
     }
     
-    my $strip_len = len(@strip)
-    for (my $i = 0; $i < $strip_len; $i++) {
-        for (my $j = $i + 1; $j < $strip_len && ($strip[$j]->[1] - $strip[$i]->[1]) < $d; $j++) {
-            my $strip_d = Rosetta::ClosestPair2D::distance($strip[$i], $strip[$j])
+    val $strip_len = len(@strip)
+    for (var $i = 0; $i < $strip_len; $i++) {
+        for (var $j = $i + 1; $j < $strip_len && ($strip[$j]->[1] - $strip[$i]->[1]) < $d; $j++) {
+            val $strip_d = Rosetta::ClosestPair2D::distance($strip[$i], $strip[$j])
             if ($strip_d < $d) {
                 $d = $strip_d
                 $best = { dist => $d, pair => [$strip[$i], $strip[$j]] }
@@ -73,17 +73,17 @@ fn Rosetta::ClosestPair2D::solve_rec($points_x, $points_y) {
 }
 
 fn Rosetta::ClosestPair2D::solve($points) {
-    my @points_x = sort { _0->[0] <=> _1->[0] } @$points
-    my @points_y = sort { _0->[1] <=> _1->[1] } @$points
+    val @points_x = sort { _0->[0] <=> _1->[0] } @$points
+    val @points_y = sort { _0->[1] <=> _1->[1] } @$points
     
     Rosetta::ClosestPair2D::solve_rec(\@points_x, \@points_y)
 }
 
-my @pts = (
+val @pts = (
     [2, 3], [12, 30], [40, 50], [5, 1], [12, 10], [3, 4]
 )
 
-my $res = Rosetta::ClosestPair2D::solve(\@pts)
+val $res = Rosetta::ClosestPair2D::solve(\@pts)
 assert_ok $res->{dist} > 1.4 && $res->{dist} < 1.5, "Distance is approx 1.414"
 # Points are (2,3) and (3,4)
 

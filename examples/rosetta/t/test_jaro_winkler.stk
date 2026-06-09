@@ -2,26 +2,26 @@
 # Rosetta Code: Jaro-Winkler distance
 
 fn Rosetta::JaroWinkler::jaro($s1, $s2) {
-    my $len1 = len($s1)
-    my $len2 = len($s2)
+    val $len1 = len($s1)
+    val $len2 = len($s2)
     return 1.0 if $len1 == 0 && $len2 == 0
     return 0.0 if $len1 == 0 || $len2 == 0
     
-    my $match_distance = (max($len1, $len2) / 2 | 0) - 1
+    var $match_distance = (max($len1, $len2) / 2 | 0) - 1
     $match_distance = 0 if $match_distance < 0
     
-    my @c1 = $s1 |> chars()
-    my @c2 = $s2 |> chars()
+    val @c1 = $s1 |> chars()
+    val @c2 = $s2 |> chars()
     
-    my @m1 = map { 0 } 1:$len1
-    my @m2 = map { 0 } 1:$len2
+    var @m1 = map { 0 } 1:$len1
+    var @m2 = map { 0 } 1:$len2
     
-    my $matches = 0
-    for (my $i = 0; $i < $len1; $i++) {
-        my $start = max(0, $i - $match_distance)
-        my $end = min($len2 - 1, $i + $match_distance)
+    var $matches = 0
+    for (var $i = 0; $i < $len1; $i++) {
+        val $start = max(0, $i - $match_distance)
+        val $end = min($len2 - 1, $i + $match_distance)
         
-        for (my $j = $start; $j <= $end; $j++) {
+        for (var $j = $start; $j <= $end; $j++) {
             if (!$m2[$j] && $c1[$i] eq $c2[$j]) {
                 $m1[$i] = 1
                 $m2[$j] = 1
@@ -33,9 +33,9 @@ fn Rosetta::JaroWinkler::jaro($s1, $s2) {
     
     return 0.0 if $matches == 0
     
-    my $transpositions = 0
-    my $k = 0
-    for (my $i = 0; $i < $len1; $i++) {
+    var $transpositions = 0
+    var $k = 0
+    for (var $i = 0; $i < $len1; $i++) {
         if ($m1[$i]) {
             while (!$m2[$k]) { $k++ }
             if ($c1[$i] ne $c2[$k]) {
@@ -45,21 +45,21 @@ fn Rosetta::JaroWinkler::jaro($s1, $s2) {
         }
     }
     
-    my $t = $transpositions / 2
+    val $t = $transpositions / 2
     (1.0/3.0) * ($matches / $len1 + $matches / $len2 + ($matches - $t) / $matches)
 }
 
 fn Rosetta::JaroWinkler::solve($s1, $s2) {
-    my $j = Rosetta::JaroWinkler::jaro($s1, $s2)
-    my $p = 0.1 # scaling factor
+    val $j = Rosetta::JaroWinkler::jaro($s1, $s2)
+    val $p = 0.1 # scaling factor
     
     # Common prefix up to 4 chars
-    my $l = 0
-    my @c1 = $s1 |> chars()
-    my @c2 = $s2 |> chars()
-    my $min_len = min(min(len(@c1), len(@c2)), 4)
+    var $l = 0
+    val @c1 = $s1 |> chars()
+    val @c2 = $s2 |> chars()
+    val $min_len = min(min(len(@c1), len(@c2)), 4)
     
-    for (my $i = 0; $i < $min_len; $i++) {
+    for (var $i = 0; $i < $min_len; $i++) {
         if ($c1[$i] eq $c2[$i]) {
             $l++
         } else {
@@ -76,10 +76,10 @@ fn Rosetta::JaroWinkler::solve($s1, $s2) {
 # Oh wait, MARTHA vs MARHTA. Prefix: M, A, R. T matches H? No. So l=3.
 # JW = 0.9444 + 3 * 0.1 * (1 - 0.9444) = 0.9444 + 0.3 * 0.0556 = 0.9444 + 0.0167 = 0.9611
 
-my $res = Rosetta::JaroWinkler::solve("MARTHA", "MARHTA")
+val $res = Rosetta::JaroWinkler::solve("MARTHA", "MARHTA")
 assert_ok abs($res - 0.9611) < 0.001, "JW(MARTHA, MARHTA)"
 
-my $res2 = Rosetta::JaroWinkler::solve("DIXON", "DICKSONX")
+val $res2 = Rosetta::JaroWinkler::solve("DIXON", "DICKSONX")
 # Jaro: D-D, I-I, X-X, O-?, N-N. m=4.
 # D I X N vs D I C K S O N X
 # m=4. |s1|=5, |s2|=8.

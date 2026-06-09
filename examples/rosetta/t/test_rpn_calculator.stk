@@ -9,8 +9,8 @@ fn Rosetta::Rpn::eval_token($stack, $tok) {
         return 1
     }
     return 0 if len(@$stack) < 2
-    my $b = pop @$stack
-    my $a = pop @$stack
+    val $b = pop @$stack
+    val $a = pop @$stack
     if    ($tok eq "+") { push @$stack, $a + $b }
     elsif ($tok eq "-") { push @$stack, $a - $b }
     elsif ($tok eq "*") { push @$stack, $a * $b }
@@ -21,9 +21,9 @@ fn Rosetta::Rpn::eval_token($stack, $tok) {
 }
 
 fn Rosetta::Rpn::eval($expr) {
-    my @stack
-    my @tokens = split /\s+/, $expr
-    for my $t (@tokens) {
+    val @stack
+    val @tokens = split /\s+/, $expr
+    for val $t (@tokens) {
         next if length($t) == 0
         return undef unless Rosetta::Rpn::eval_token(\@stack, $t)
     }
@@ -32,10 +32,10 @@ fn Rosetta::Rpn::eval($expr) {
 }
 
 fn Rosetta::Rpn::trace($expr) {
-    my @stack
-    my @lines
-    my @tokens = split /\s+/, $expr
-    for my $t (@tokens) {
+    val @stack
+    var @lines
+    val @tokens = split /\s+/, $expr
+    for val $t (@tokens) {
         next if length($t) == 0
         Rosetta::Rpn::eval_token(\@stack, $t)
         push @lines, sprintf("%-3s -> %s", $t, join(" ", @stack))
@@ -65,7 +65,7 @@ assert_ok !defined(Rosetta::Rpn::eval("foo")),       "non-numeric rejected"
 assert_ok !defined(Rosetta::Rpn::eval("3 4 5 +")),   "leftover stack rejected"
 
 # Trace shows intermediate stacks
-my $tr = Rosetta::Rpn::trace("3 4 +")
+val $tr = Rosetta::Rpn::trace("3 4 +")
 assert_ok index($tr, "3   -> 3") >= 0, "trace pushes 3"
 assert_ok index($tr, "+   -> 7") >= 0, "trace adds to 7"
 

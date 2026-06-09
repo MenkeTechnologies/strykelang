@@ -20,8 +20,8 @@
 # accumulator — stryke's one-block reduce has no separate init arg.
 fn Kadane::max_sum($xs) {
     return undef if len(@$xs) == 0
-    my $st = (+{cur => 0, best => -1e18}, @$xs) |> reduce {
-        my $c = max(_1, _->{cur} + _1)
+    val $st = (+{cur => 0, best => -1e18}, @$xs) |> reduce {
+        val $c = max(_1, _->{cur} + _1)
         +{ cur => $c, best => max(_->{best}, $c) }
     }
     $st->{best}
@@ -30,14 +30,14 @@ fn Kadane::max_sum($xs) {
 # Same walk, but also tracks the [lo, hi] indices of the winning slice.
 fn Kadane::max_subarray($xs) {
     return undef if len(@$xs) == 0
-    my @indexed = 0:len(@$xs) - 1 |> maps { +{ i => _, v => $xs->[_] } }
-    my $init = +{ cur => -1e18, c_lo => 0, best => -1e18, lo => 0, hi => 0 }
-    my $st = ($init, @indexed) |> reduce {
-        my ($v, $i) = (_1->{v}, _1->{i})
-        my ($new_cur, $new_c_lo) = (_->{cur} + $v) > $v
+    val @indexed = 0:len(@$xs) - 1 |> maps { +{ i => _, v => $xs->[_] } }
+    val $init = +{ cur => -1e18, c_lo => 0, best => -1e18, lo => 0, hi => 0 }
+    val $st = ($init, @indexed) |> reduce {
+        val ($v, $i) = (_1->{v}, _1->{i})
+        val ($new_cur, $new_c_lo) = (_->{cur} + $v) > $v
             ? (_->{cur} + $v, _->{c_lo})
             : ($v, $i)
-        my ($best, $lo, $hi) = $new_cur > _->{best}
+        val ($best, $lo, $hi) = $new_cur > _->{best}
             ? ($new_cur, $new_c_lo, $i)
             : (_->{best}, _->{lo}, _->{hi})
         +{ cur => $new_cur, c_lo => $new_c_lo, best => $best, lo => $lo, hi => $hi }
@@ -45,7 +45,7 @@ fn Kadane::max_subarray($xs) {
     +{ sum => $st->{best}, lo => $st->{lo}, hi => $st->{hi} }
 }
 
-my @cases = (
+val @cases = (
     +{ xs => [-2, 1, -3, 4, -1, 2, 1, -5, 4],  sum =>  6, lo => 3, hi => 6 },  # LC #53
     +{ xs => [1],                              sum =>  1, lo => 0, hi => 0 },
     +{ xs => [5, 4, -1, 7, 8],                 sum => 23, lo => 0, hi => 4 },
@@ -57,24 +57,24 @@ my @cases = (
 )
 
 p "── Kadane max-subarray demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $r       = Kadane::max_subarray $c->{xs}
-    my $sum_ok  = $r->{sum} == $c->{sum}
-    my $idx_ok  = $r->{lo} == $c->{lo} && $r->{hi} == $c->{hi}
-    my $sum_alt = Kadane::max_sum $c->{xs}
-    my $alt_ok  = $sum_alt == $c->{sum}
-    my $ok      = $sum_ok && $idx_ok && $alt_ok
+var $fail = 0
+for val $c (@cases) {
+    val $r       = Kadane::max_subarray $c->{xs}
+    val $sum_ok  = $r->{sum} == $c->{sum}
+    val $idx_ok  = $r->{lo} == $c->{lo} && $r->{hi} == $c->{hi}
+    val $sum_alt = Kadane::max_sum $c->{xs}
+    val $alt_ok  = $sum_alt == $c->{sum}
+    val $ok      = $sum_ok && $idx_ok && $alt_ok
     $fail++ unless $ok
-    my @xs = @{$c->{xs}}
+    val @xs = @{$c->{xs}}
     p "  xs=[@xs]  sum=#{$r->{sum}} (alt #{$sum_alt})  range=[#{$r->{lo}}..#{$r->{hi}}]  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "#{$fail} / #{len @cases} Kadane cases failed" if $fail > 0
 
 # Universal invariant: the reported slice really sums to the reported total.
-for my $c (@cases) {
-    my $r   = Kadane::max_subarray $c->{xs}
-    my @sub = @{$c->{xs}}[$r->{lo} : $r->{hi}]
+for val $c (@cases) {
+    val $r   = Kadane::max_subarray $c->{xs}
+    val @sub = @{$c->{xs}}[$r->{lo} : $r->{hi}]
     die "slice sum mismatch on @{$c->{xs}}" unless sum(@sub) == $r->{sum}
     # No shorter slice can beat the best-sum we returned (sanity-check via
     # cross-impl agreement, since brute-force is O(n^2) and overkill).

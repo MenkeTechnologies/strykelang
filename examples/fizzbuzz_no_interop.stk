@@ -13,7 +13,7 @@
 # Run:  stryke --no-interop examples/FizzBuzz::classify_no_interop.stk
 #       stryke --no-interop examples/FizzBuzz::classify_no_interop.stk 30
 
-my $n = $ARGV[0] // 15
+val $n = $ARGV[0] // 15
 
 fn FizzBuzz::classify($i) {
     match ([$i % 3 == 0, $i % 5 == 0]) {
@@ -30,7 +30,7 @@ for (1:$n) {
 
 # `pmap` to fan the same work across cores — overkill for FizzBuzz::classify but
 # the syntax is the point. `_` is the per-item topic.
-my @parallel = pmap {FizzBuzz::classify} 1:$n
+val @parallel = pmap {FizzBuzz::classify} 1:$n
 p ""
 p "parallel run produced ", len(@parallel), " labels"
 p "first 5: ", join(", ", @parallel[0:4])

@@ -12,18 +12,18 @@
 
 # ── synthesize 3 clusters of 2D points ───────────────────────────────
 
-my @cluster_centers = ([10, 10], [40, 30], [25, 50])
-my @points
+val @cluster_centers = ([10, 10], [40, 30], [25, 50])
+var @points
 
 # Helper: integer Gaussian-ish point near a center.
 fn Demo::Km::near($cx, $cy, $spread) {
-    my $dx = (rand() - 0.5) * 2 * $spread
-    my $dy = (rand() - 0.5) * 2 * $spread
+    val $dx = (rand() - 0.5) * 2 * $spread
+    val $dy = (rand() - 0.5) * 2 * $spread
     [$cx + $dx, $cy + $dy]
 }
 
-for my $c (@cluster_centers) {
-    for my $i (1:20) {
+for val $c (@cluster_centers) {
+    for val $i (1:20) {
         push @points, Demo::Km::near($c->[0], $c->[1], 5)
     }
 }
@@ -33,26 +33,26 @@ printf "── %d points across %d ground-truth clusters ───────�
 
 # ── k-means main loop ────────────────────────────────────────────────
 
-my $K = 3
-my @centroids
+val $K = 3
+var @centroids
 # Seed centroids with first K points (deterministic-ish for demo).
-for my $i (0:$K - 1) {
+for val $i (0:$K - 1) {
     push @centroids, [$points[$i]->[0], $points[$i]->[1]]
 }
 
 fn Demo::Km::distance_sq($p1, $p2) {
-    my $dx = $p1->[0] - $p2->[0]
-    my $dy = $p1->[1] - $p2->[1]
+    val $dx = $p1->[0] - $p2->[0]
+    val $dy = $p1->[1] - $p2->[1]
     $dx * $dx + $dy * $dy
 }
 
 fn Demo::Km::assign_clusters($points_ref, $centroids_ref) {
-    my @assignments
-    for my $p (@$points_ref) {
-        my $best = 0
-        my $best_d = Demo::Km::distance_sq($p, $centroids_ref->[0])
-        for my $k (1:len(@$centroids_ref) - 1) {
-            my $d = Demo::Km::distance_sq($p, $centroids_ref->[$k])
+    var @assignments
+    for val $p (@$points_ref) {
+        var $best = 0
+        var $best_d = Demo::Km::distance_sq($p, $centroids_ref->[0])
+        for val $k (1:len(@$centroids_ref) - 1) {
+            val $d = Demo::Km::distance_sq($p, $centroids_ref->[$k])
             if ($d < $best_d) {
                 $best = $k
                 $best_d = $d
@@ -64,22 +64,22 @@ fn Demo::Km::assign_clusters($points_ref, $centroids_ref) {
 }
 
 fn Demo::Km::recompute_centroids($points_ref, $assignments_ref, $k) {
-    my @sums_x
-    my @sums_y
-    my @counts
-    for my $i (0:$k - 1) {
+    var @sums_x
+    var @sums_y
+    var @counts
+    for val $i (0:$k - 1) {
         $sums_x[$i] = 0
         $sums_y[$i] = 0
         $counts[$i] = 0
     }
-    for my $idx (0:len(@$points_ref) - 1) {
-        my $cl = $assignments_ref->[$idx]
+    for val $idx (0:len(@$points_ref) - 1) {
+        val $cl = $assignments_ref->[$idx]
         $sums_x[$cl] += $points_ref->[$idx]->[0]
         $sums_y[$cl] += $points_ref->[$idx]->[1]
         $counts[$cl]++
     }
-    my @new_cents
-    for my $i (0:$k - 1) {
+    var @new_cents
+    for val $i (0:$k - 1) {
         if ($counts[$i] > 0) {
             push @new_cents, [$sums_x[$i] / $counts[$i], $sums_y[$i] / $counts[$i]]
         } else {
@@ -89,24 +89,24 @@ fn Demo::Km::recompute_centroids($points_ref, $assignments_ref, $k) {
     \@new_cents
 }
 
-my $td_iter = t_digest(100)
-my $max_iter = 20
-my $converged_at = -1
+val $td_iter = t_digest(100)
+val $max_iter = 20
+var $converged_at = -1
 
 p ""
 p "── centroid evolution ─────────────────────────────"
-for my $iter (1:$max_iter) {
-    my $t0 = now_ns()
-    my $assn = Demo::Km::assign_clusters(\@points, \@centroids)
-    my $new_cents = Demo::Km::recompute_centroids(\@points, $assn, $K)
-    my $moved = 0
-    for my $i (0:$K - 1) {
+for val $iter (1:$max_iter) {
+    val $t0 = now_ns()
+    val $assn = Demo::Km::assign_clusters(\@points, \@centroids)
+    val $new_cents = Demo::Km::recompute_centroids(\@points, $assn, $K)
+    var $moved = 0
+    for val $i (0:$K - 1) {
         $moved += Demo::Km::distance_sq($centroids[$i], $new_cents->[$i])
     }
     @centroids = @$new_cents
     td_add($td_iter, (now_ns() - $t0) / 1000.0)
     printf "  iter %2d: centroids = ", $iter
-    for my $c (@centroids) {
+    for val $c (@centroids) {
         printf "(%5.1f, %5.1f) ", $c->[0], $c->[1]
     }
     printf "moved²=%6.2f\n", $moved
@@ -122,13 +122,13 @@ printf "── converged at iter %d ──────────────�
 
 # ── final assignments ───────────────────────────────────────────────
 
-my $final_assn = Demo::Km::assign_clusters(\@points, \@centroids)
-my %cluster_count
+val $final_assn = Demo::Km::assign_clusters(\@points, \@centroids)
+var %cluster_count
 $cluster_count{_}++ for @$final_assn
 
 p ""
 p "── cluster sizes ───────────────────────────────────"
-for my $k (sort { _ <=> _1 } keys %cluster_count) {
+for val $k (sort { _ <=> _1 } keys %cluster_count) {
     printf "  cluster %d : %d points (centroid %.1f, %.1f)\n",
         $k, $cluster_count{$k}, $centroids[$k]->[0], $centroids[$k]->[1]
 }
@@ -137,29 +137,29 @@ for my $k (sort { _ <=> _1 } keys %cluster_count) {
 
 p ""
 p "── ASCII scatter (60x20, x:0-60, y:0-60) ────────────"
-my @grid
-for my $row (0:19) {
+var @grid
+for val $row (0:19) {
     $grid[$row] = []
-    for my $col (0:59) {
+    for val $col (0:59) {
         $grid[$row]->[$col] = " "
     }
 }
-for my $idx (0:len(@points) - 1) {
-    my $p = $points[$idx]
-    my $row = int($p->[1] / 3)
-    my $col = int($p->[0])
+for val $idx (0:len(@points) - 1) {
+    val $p = $points[$idx]
+    val $row = int($p->[1] / 3)
+    val $col = int($p->[0])
     next if $row < 0 || $row > 19 || $col < 0 || $col > 59
-    my $cluster = $final_assn->[$idx]
+    val $cluster = $final_assn->[$idx]
     $grid[$row]->[$col] = ("A", "B", "C")[$cluster]
 }
 # Mark centroids with `*`.
-for my $c (@centroids) {
-    my $row = int($c->[1] / 3)
-    my $col = int($c->[0])
+for val $c (@centroids) {
+    val $row = int($c->[1] / 3)
+    val $col = int($c->[0])
     next if $row < 0 || $row > 19 || $col < 0 || $col > 59
     $grid[$row]->[$col] = "*"
 }
-for my $row (rev(0:19)) {
+for val $row (rev(0:19)) {
     p "  " . join("", @{$grid[$row]})
 }
 
@@ -167,7 +167,7 @@ for my $row (rev(0:19)) {
 
 p ""
 p "── HLL distinct-cluster sanity ──────────────────────"
-my $hll = hll(14)
+val $hll = hll(14)
 hll_add($hll, _) for @$final_assn
 printf "  HLL distinct clusters : %d\n", hll_count($hll)
 printf "  expected              : %d\n", $K

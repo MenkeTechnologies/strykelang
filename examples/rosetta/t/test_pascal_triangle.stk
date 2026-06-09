@@ -2,27 +2,27 @@
 # Rosetta Code: Pascal's Triangle
 
 fn Rosetta::PascalTriangle::next_row($prev) {
-    my @p = @$prev
-    my @mid
-    for my $i (0..len(@p)-2) {
+    val @p = @$prev
+    var @mid
+    for val $i (0..len(@p)-2) {
         push @mid, $p[$i] + $p[$i+1]
     }
-    my @res = (1, @mid, 1)
+    val @res = (1, @mid, 1)
     \@res
 }
 
 fn Rosetta::PascalTriangle::generate($n) {
-    my @rows = ([1])
-    for my $i (1:$n-1) {
+    var @rows = ([1])
+    for val $i (1:$n-1) {
         push @rows, Rosetta::PascalTriangle::next_row($rows[-1])
     }
     \@rows
 }
 
 fn Rosetta::PascalTriangle::to_str($n) {
-    my $p = Rosetta::PascalTriangle::generate($n)
-    my @rows
-    for my $row (@$p) {
+    val $p = Rosetta::PascalTriangle::generate($n)
+    var @rows
+    for val $row (@$p) {
         push @rows, join(",", @$row)
     }
     join(";", @rows)

@@ -14,7 +14,7 @@ assert_eq Rosetta::Carol::compute(2), 7, "C2"
 assert_eq Rosetta::Carol::compute(3), 47, "C3"
 assert_eq Rosetta::Carol::compute(4), 223, "C4"
 
-my @list = Rosetta::Carol::list(4)
+val @list = Rosetta::Carol::list(4)
 assert_eq join(",", @list), "-1,7,47,223", "Carol list"
 
 4 |> Rosetta::Carol::compute |> assert_eq(223, "pipe Carol")

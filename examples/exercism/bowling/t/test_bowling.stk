@@ -2,8 +2,8 @@
 require "./Bowling.stk"
 
 fn play($rolls) {
-    my $g = Exercism::Bowling::new()
-    for my $r (@{$rolls}) { $g = Exercism::Bowling::roll($g, $r) }
+    var $g = Exercism::Bowling::new()
+    for val $r (@{$rolls}) { $g = Exercism::Bowling::roll($g, $r) }
     $g
 }
 

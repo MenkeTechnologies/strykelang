@@ -18,21 +18,21 @@
 #      stryke --no-interop examples/base64_no_interop.stk encode "Hello"
 #      stryke --no-interop examples/base64_no_interop.stk decode SGVsbG8=
 
-my $ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-my @ALPHA = split(//, $ALPHABET)
-my %REVERSE
-for my $i (0:63) { $REVERSE{$ALPHA[$i]} = $i }
+val $ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+val @ALPHA = split(//, $ALPHABET)
+var %REVERSE
+for val $i (0:63) { $REVERSE{$ALPHA[$i]} = $i }
 
 fn B64::encode($s) {
-    my @bytes = map {ord} split(//, $s)
-    my $n = len(@bytes)
-    my $out = ""
-    my $i = 0
+    val @bytes = map {ord} split(//, $s)
+    val $n = len(@bytes)
+    var $out = ""
+    var $i = 0
     while ($i < $n) {
-        my $b1 = $bytes[$i]
-        my $b2 = $i + 1 < $n ? $bytes[$i + 1] : 0
-        my $b3 = $i + 2 < $n ? $bytes[$i + 2] : 0
-        my $combined = ($b1 << 16) | ($b2 << 8) | $b3
+        val $b1 = $bytes[$i]
+        val $b2 = $i + 1 < $n ? $bytes[$i + 1] : 0
+        val $b3 = $i + 2 < $n ? $bytes[$i + 2] : 0
+        val $combined = ($b1 << 16) | ($b2 << 8) | $b3
         $out .= $ALPHA[($combined >> 18) & 0x3f]
         $out .= $ALPHA[($combined >> 12) & 0x3f]
         $out .= ($i + 1 < $n) ? $ALPHA[($combined >> 6) & 0x3f] : "="
@@ -43,15 +43,15 @@ fn B64::encode($s) {
 }
 
 fn B64::decode($s) {
-    my @chars = grep { _ ne "=" } split(//, $s)
-    my $out = ""
-    my $i = 0
+    val @chars = grep { _ ne "=" } split(//, $s)
+    var $out = ""
+    var $i = 0
     while ($i < len(@chars)) {
-        my $s1 = $REVERSE{$chars[$i]}     // 0
-        my $s2 = $i + 1 < len(@chars) ? ($REVERSE{$chars[$i + 1]} // 0) : 0
-        my $s3 = $i + 2 < len(@chars) ? ($REVERSE{$chars[$i + 2]} // 0) : 0
-        my $s4 = $i + 3 < len(@chars) ? ($REVERSE{$chars[$i + 3]} // 0) : 0
-        my $combined = ($s1 << 18) | ($s2 << 12) | ($s3 << 6) | $s4
+        val $s1 = $REVERSE{$chars[$i]}     // 0
+        val $s2 = $i + 1 < len(@chars) ? ($REVERSE{$chars[$i + 1]} // 0) : 0
+        val $s3 = $i + 2 < len(@chars) ? ($REVERSE{$chars[$i + 2]} // 0) : 0
+        val $s4 = $i + 3 < len(@chars) ? ($REVERSE{$chars[$i + 3]} // 0) : 0
+        val $combined = ($s1 << 18) | ($s2 << 12) | ($s3 << 6) | $s4
         $out .= chr(($combined >> 16) & 0xff)
         $out .= chr(($combined >>  8) & 0xff) if $i + 2 < len(@chars)
         $out .= chr( $combined        & 0xff) if $i + 3 < len(@chars)
@@ -61,7 +61,7 @@ fn B64::decode($s) {
 }
 
 if (len(@ARGV) >= 2) {
-    my ($mode, $arg) = @ARGV
+    val ($mode, $arg) = @ARGV
     if    ($mode eq "encode") { p B64::encode($arg) }
     elsif ($mode eq "decode") { p B64::decode($arg) }
     else  { die "mode must be 'encode' or 'decode'" }
@@ -70,7 +70,7 @@ if (len(@ARGV) >= 2) {
 
 # Demo grid — every case round-trips through encode then decode.
 # Pairs taken from RFC 4648 §10 test vectors.
-my @cases = (
+val @cases = (
     +{ plain => "",        b64 => ""         },
     +{ plain => "f",       b64 => "Zg=="     },
     +{ plain => "fo",      b64 => "Zm8="     },
@@ -82,12 +82,12 @@ my @cases = (
 )
 
 p "── Base64 demo (RFC 4648 test vectors) ──"
-my $fail = 0
-for my $c (@cases) {
-    my $enc       = B64::encode($c->{plain})
-    my $roundtrip = B64::decode($enc)
-    my $ok_enc    = ($enc eq $c->{b64})
-    my $ok_rt     = ($roundtrip eq $c->{plain})
+var $fail = 0
+for val $c (@cases) {
+    val $enc       = B64::encode($c->{plain})
+    val $roundtrip = B64::decode($enc)
+    val $ok_enc    = ($enc eq $c->{b64})
+    val $ok_rt     = ($roundtrip eq $c->{plain})
     $fail++ unless $ok_enc && $ok_rt
     printf "  %-20s -> %-25s round-trip=%s  %s\n",
         "\"" . $c->{plain} . "\"",

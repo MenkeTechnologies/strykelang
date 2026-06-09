@@ -9,7 +9,7 @@ fn Rosetta::LCG::next($state, $a, $c, $m) {
 }
 
 fn Rosetta::LCG::sequence($seed, $a, $c, $m, $n) {
-    my $curr = $seed
+    var $curr = $seed
     # Use serial map to generate a sequence of length $n
     # We use a serial pipeline to ensure the state update is correct.
     1:$n |> map { $curr = ($a * $curr + $c) % $m }
@@ -17,11 +17,11 @@ fn Rosetta::LCG::sequence($seed, $a, $c, $m, $n) {
 
 # Parameters for BSD libc rand()
 # m = 2^31, a = 1103515245, c = 12345
-my $bsd_m = 2**31
-my $bsd_a = 1103515245
-my $bsd_c = 12345
+val $bsd_m = 2**31
+val $bsd_a = 1103515245
+val $bsd_c = 12345
 
-my @bsd = Rosetta::LCG::sequence(0, $bsd_a, $bsd_c, $bsd_m, 5)
+val @bsd = Rosetta::LCG::sequence(0, $bsd_a, $bsd_c, $bsd_m, 5)
 assert_eq $bsd[0], 12345, "BSD step 1"
 assert_eq $bsd[1], 1406932606, "BSD step 2"
 assert_eq $bsd[2], 654583775, "BSD step 3"
@@ -30,11 +30,11 @@ assert_eq $bsd[4], 229283573, "BSD step 5"
 
 # Parameters for Microsoft Visual C++ rand()
 # m = 2^31, a = 214013, c = 2531011
-my $msvc_m = 2**31
-my $msvc_a = 214013
-my $msvc_c = 2531011
+val $msvc_m = 2**31
+val $msvc_a = 214013
+val $msvc_c = 2531011
 
-my @msvc = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 5)
+val @msvc = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 5)
 assert_eq $msvc[0], 2531011, "MSVC step 1"
 assert_eq $msvc[1], 505908858, "MSVC step 2"
 assert_eq $msvc[2], 1391876949, "MSVC step 3"
@@ -42,7 +42,7 @@ assert_eq $msvc[3], 159719620, "MSVC step 4"
 assert_eq $msvc[4], 580340855, "MSVC step 5"
 
 # Using pipeline to sum the first 10 numbers of MSVC LCG
-my $sum = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 10) |> reduce { _0 + _1 }
+val $sum = Rosetta::LCG::sequence(0, $msvc_a, $msvc_c, $msvc_m, 10) |> reduce { _0 + _1 }
 assert_eq $sum, 8768759433, "Sum of first 10 MSVC numbers"
 
 test_run

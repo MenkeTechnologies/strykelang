@@ -4,19 +4,19 @@ fn Exercism::SimpleLinkedList::data       { _->{data} }
 fn Exercism::SimpleLinkedList::next       { _->{next} }
 
 fn Exercism::SimpleLinkedList::from_array($vs) {
-    my $h
+    var $h
     $h = Exercism::SimpleLinkedList::new(_, $h) for rev(@$vs)
     $h
 }
 
 fn Exercism::SimpleLinkedList::to_array($n) {
-    my @o
+    var @o
     while (defined $n) { push @o, $n->{data}; $n = $n->{next} }
     \@o
 }
 
 fn Exercism::SimpleLinkedList::reverse_list($n) {
-    my $p
-    while (defined $n) { my $x = $n->{next}; $n->{next} = $p; $p = $n; $n = $x }
+    var $p
+    while (defined $n) { val $x = $n->{next}; $n->{next} = $p; $p = $n; $n = $x }
     $p
 }

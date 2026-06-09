@@ -21,8 +21,8 @@
 # Reduce-fold candidate walk — seed `{cand, count}` is prepended so
 # stryke's one-block reduce uses head-of-list as the accumulator.
 fn BM::candidate($xs_ref) {
-    my $state = (+{cand => undef, count => 0}, @$xs_ref) |> reduce {
-        my ($cand, $count) = (_->{cand}, _->{count})
+    val $state = (+{cand => undef, count => 0}, @$xs_ref) |> reduce {
+        val ($cand, $count) = (_->{cand}, _->{count})
         +{
             cand  => $count == 0 ? _1 : $cand,
             count => $count == 0 ? 1
@@ -34,12 +34,12 @@ fn BM::candidate($xs_ref) {
 
 fn BM::majority($xs_ref) {
     return undef if len(@$xs_ref) == 0
-    my $cand = BM::candidate $xs_ref
-    my $hits = @$xs_ref |> grep { _ eq $cand } |> len
+    val $cand = BM::candidate $xs_ref
+    val $hits = @$xs_ref |> grep { _ eq $cand } |> len
     $hits > len(@$xs_ref) / 2 ? $cand : undef
 }
 
-my @cases = (
+val @cases = (
     +{ xs => [3, 2, 3],                          maj => 3      },  # LC 169 #1
     +{ xs => [2, 2, 1, 1, 1, 2, 2],              maj => 2      },  # LC 169 #2
     +{ xs => [1, 2, 3, 4],                       maj => undef  },  # no majority
@@ -51,25 +51,25 @@ my @cases = (
 )
 
 p "── Boyer-Moore majority demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $got    = BM::majority $c->{xs}
-    my $got_s  = defined $got      ? $got      : "—"
-    my $want_s = defined $c->{maj} ? $c->{maj} : "—"
-    my $ok = (!defined $got && !defined $c->{maj}) ||
+var $fail = 0
+for val $c (@cases) {
+    val $got    = BM::majority $c->{xs}
+    val $got_s  = defined $got      ? $got      : "—"
+    val $want_s = defined $c->{maj} ? $c->{maj} : "—"
+    val $ok = (!defined $got && !defined $c->{maj}) ||
              (defined $got && defined $c->{maj} && $got eq $c->{maj})
     $fail++ unless $ok
-    my @xs = @{$c->{xs}}
+    val @xs = @{$c->{xs}}
     p "  xs=[@xs]  got=#{$got_s}  expect=#{$want_s}  #{$ok ? \"\" : \"FAIL\"}"
 }
 die "$fail / #{len @cases} majority cases failed" if $fail > 0
 
 # Universal invariant: if BM::majority returns a value, that value
 # really appears more than n/2 times. One-line pipe-chain count.
-for my $c (@cases) {
-    my $m = BM::majority $c->{xs}
+for val $c (@cases) {
+    val $m = BM::majority $c->{xs}
     next unless defined $m
-    my $hits = @{$c->{xs}} |> grep { _ eq $m } |> len
+    val $hits = @{$c->{xs}} |> grep { _ eq $m } |> len
     die "returned $m but doesn't dominate" unless $hits > len(@{$c->{xs}}) / 2
 }
 

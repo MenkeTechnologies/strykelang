@@ -3,7 +3,7 @@
 
 require "./lib/binary_tree.stk"
 
-my $root = Project::BinaryTree::bst_new(10)
+val $root = Project::BinaryTree::bst_new(10)
 $root->insert(5)
 $root->insert(15)
 $root->insert(2)
@@ -18,7 +18,7 @@ assert_ok $root->search(20), "found right leaf"
 assert_false $root->search(100), "not found"
 
 # ── in_order ─────
-my $vals_ref = $root->in_order()
+val $vals_ref = $root->in_order()
 assert_eq join(",", @$vals_ref), "2,5,7,10,12,15,20", "in_order traversal sorted"
 
 test_run

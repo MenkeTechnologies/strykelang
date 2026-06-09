@@ -1,34 +1,34 @@
 #!/usr/bin/env stryke
 
-const my @DISCOUNTS = (0, 0, 0.05, 0.10, 0.20, 0.25)  # by group size
-const my $UNIT      = 800                              # 8.00 in cents
+const val @DISCOUNTS = (0, 0, 0.05, 0.10, 0.20, 0.25)  # by group size
+const val $UNIT      = 800                              # 8.00 in cents
 
 # Optimal price (in cents) for a basket of book IDs (1..5).
 fn Exercism::BookStore::total($books) {
     return 0 unless @{$books}
     # Count copies per title, then peel off groups by decreasing distinct-count.
-    my %count
+    var %count
     $count{$_}++ for @{$books}
-    my @copies = sort { _1 <=> _ } values %count
-    my @groups
+    var @copies = sort { _1 <=> _ } values %count
+    var @groups
     while ($copies[0] > 0) {
-        my $size = 0
-        for my $i (0..$#copies) {
+        var $size = 0
+        for val $i (0..$#copies) {
             if ($copies[$i] > 0) { $copies[$i]--; $size++ }
         }
         push @groups, $size
     }
     # Pair 5+3 (savings) instead of 4+4 — convert as many (5,3) pairs as possible.
-    my $fives  = grep { $_ == 5 } @groups
-    my $threes = grep { $_ == 3 } @groups
-    my $swap   = $fives < $threes ? $fives : $threes
+    val $fives  = grep { $_ == 5 } @groups
+    val $threes = grep { $_ == 3 } @groups
+    val $swap   = $fives < $threes ? $fives : $threes
     # Each swap turns one 5 + one 3 into two 4s.
-    my @final
-    my %tally
+    val @final
+    var %tally
     $tally{$_}++ for @groups
     $tally{5} -= $swap; $tally{3} -= $swap; $tally{4} += 2 * $swap
-    my $cents = 0
-    for my $size (keys %tally) {
+    var $cents = 0
+    for val $size (keys %tally) {
         next unless $tally{$size}
         $cents += $tally{$size} * $size * $UNIT * (1 - $DISCOUNTS[$size])
     }

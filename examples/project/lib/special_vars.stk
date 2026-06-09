@@ -5,7 +5,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::default_in_for {
-    my @r = ()
+    var @r = ()
     for (1, 2, 3) {
         push @r, _
     }
@@ -13,12 +13,12 @@ fn Project::SpecialVars::default_in_for {
 }
 
 fn Project::SpecialVars::default_in_map {
-    my @a = (1, 2, 3)
+    val @a = (1, 2, 3)
     join(",", map { _ * 2 } @a)
 }
 
 fn Project::SpecialVars::default_in_grep {
-    my @a = (1, 2, 3, 4, 5)
+    val @a = (1, 2, 3, 4, 5)
     len(grep { _ > 2 } @a)
 }
 
@@ -43,32 +43,32 @@ fn Project::SpecialVars::default_in_subst {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::args_count {
-    my $inner = fn { len(@_) }
+    val $inner = fn { len(@_) }
     $inner(1, 2, 3)
 }
 
 fn Project::SpecialVars::args_first {
-    my $inner = fn { _0 }
+    val $inner = fn { _0 }
     $inner("first", "second")
 }
 
 fn Project::SpecialVars::args_all {
-    my $inner = fn { join(",", @_) }
+    val $inner = fn { join(",", @_) }
     $inner(1, 2, 3)
 }
 
 fn Project::SpecialVars::args_shift_style {
-    my $inner = fn {
-        my $a = shift
-        my $b = shift
+    val $inner = fn {
+        val $a = shift
+        val $b = shift
         $a + $b
     }
     $inner(10, 20)
 }
 
 fn Project::SpecialVars::args_modify {
-    my $inner = fn { _0 = 999; 1 }
-    my $x = 1
+    val $inner = fn { _0 = 999; 1 }
+    val $x = 1
     $inner($x)
     # Note: whether $x is modified depends on aliasing semantics
     1
@@ -88,13 +88,13 @@ fn Project::SpecialVars::env_home {
 
 fn Project::SpecialVars::env_set_get {
     $ENV{STRYKE_TEST_VAR} = "test_value"
-    my $val = $ENV{STRYKE_TEST_VAR}
+    val $val = $ENV{STRYKE_TEST_VAR}
     delete $ENV{STRYKE_TEST_VAR}
     $val eq "test_value" ? 1 : 0
 }
 
 fn Project::SpecialVars::test_env_keys {
-    my @keys = keys %ENV
+    val @keys = keys %ENV
     len(@keys) > 5 ? 1 : 0
 }
 
@@ -147,7 +147,7 @@ fn Project::SpecialVars::error_cleared {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::errno_after_bad_open {
-    eval { open(my $fh, "<", "/nonexistent/file/path") }
+    eval { open(val $fh, "<", "/nonexistent/file/path") }
     defined($!) ? 1 : 0
 }
 
@@ -196,7 +196,7 @@ fn Project::SpecialVars::capture_multiple {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::list_separator {
-    my @a = (1, 2, 3)
+    val @a = (1, 2, 3)
     local $" = "-"
     "@a" eq "1-2-3" ? 1 : 0
 }
@@ -234,12 +234,12 @@ fn Project::SpecialVars::file_name {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::array_last_index {
-    my @a = (1, 2, 3, 4, 5)
+    val @a = (1, 2, 3, 4, 5)
     $#a == 4 ? 1 : 0
 }
 
 fn Project::SpecialVars::array_last_index_modify {
-    my @a = (1, 2, 3)
+    val @a = (1, 2, 3)
     $#a = 5
     len(@a) == 6 ? 1 : 0
 }

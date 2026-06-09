@@ -2,8 +2,8 @@
 # Rosetta Code: Count set bits (Manual)
 
 fn Rosetta::BitCount::solve($n) {
-    my $count = 0
-    my $curr = $n
+    var $count = 0
+    var $curr = $n
     while ($curr > 0) {
         $curr = $curr & ($curr - 1)
         $count = $count + 1

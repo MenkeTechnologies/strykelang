@@ -55,7 +55,7 @@ Cmb::partitions(5) |> aeq 7,  "p(5)"
 Cmb::partitions(6) |> aeq 11, "p(6)"
 
 # Pascal's triangle row
-fn Cmb::pascal_row { my @r = (0:_) |> maps { Cmb::nCr(_<, _) }; \@r }
+fn Cmb::pascal_row { val @r = (0:_) |> maps { Cmb::nCr(_<, _) }; \@r }
 join(" ", @{Cmb::pascal_row(4)}) |> aeq "1 4 6 4 1",        "pascal 4"
 join(" ", @{Cmb::pascal_row(6)}) |> aeq "1 6 15 20 15 6 1", "pascal 6"
 

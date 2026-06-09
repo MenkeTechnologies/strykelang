@@ -7,7 +7,7 @@ fn new($k) {
 }
 
 fn observe($mg, $x) {
-    my $c = $mg->{counters}
+    var $c = $mg->{counters}
     if (exists $c->{$x}) {
         $c->{$x} = $c->{$x} + 1
         return
@@ -16,12 +16,12 @@ fn observe($mg, $x) {
         $c->{$x} = 1
         return
     }
-    my @drop = ()
-    for my $key (keys %$c) {
+    var @drop = ()
+    for val $key (keys %$c) {
         $c->{$key} = $c->{$key} - 1
         push @drop, $key if $c->{$key} <= 0
     }
-    for my $key (@drop) {
+    for val $key (@drop) {
         delete $c->{$key}
     }
 }
@@ -31,14 +31,14 @@ fn candidates($mg) {
 }
 
 fn heavy_hitters($mg, $stream) {
-    my $n = len(@$stream)
-    my $thresh = int($n / $mg->{k})
-    my %true = ()
-    for my $x (@$stream) {
+    val $n = len(@$stream)
+    val $thresh = int($n / $mg->{k})
+    var %true = ()
+    for val $x (@$stream) {
         $true{$x} = ($true{$x} // 0) + 1
     }
-    my @out = ()
-    for my $cand (@{candidates($mg)}) {
+    var @out = ()
+    for val $cand (@{candidates($mg)}) {
         push @out, $cand if ($true{$cand} // 0) > $thresh
     }
     \@out
@@ -46,14 +46,14 @@ fn heavy_hitters($mg, $stream) {
 
 # Brute-force reference: true heavy hitters (freq > n/k)
 fn brute_heavy($stream, $k) {
-    my $n = len(@$stream)
-    my $thresh = int($n / $k)
-    my %f = ()
-    for my $x (@$stream) {
+    val $n = len(@$stream)
+    val $thresh = int($n / $k)
+    var %f = ()
+    for val $x (@$stream) {
         $f{$x} = ($f{$x} // 0) + 1
     }
-    my @out = ()
-    for my $key (sort keys %f) {
+    var @out = ()
+    for val $key (sort keys %f) {
         push @out, $key if $f{$key} > $thresh
     }
     \@out
@@ -62,106 +62,106 @@ fn brute_heavy($stream, $k) {
 package main;
 
 # --- Empty stream ---
-my $m0 = MG::new(3)
+val $m0 = MG::new(3)
 len(@{MG::candidates($m0)}) |> aeq 0, "empty candidates"
 len(@{MG::heavy_hitters($m0, [])}) |> aeq 0, "empty heavy"
 
 # --- Single dominant element ---
-my $s1 = ["a","a","a","a","a","b","c"]
-my $m1 = MG::new(3)
-for my $x (@$s1) { MG::observe($m1, $x) }
-my $h1 = MG::heavy_hitters($m1, $s1)
+val $s1 = ["a","a","a","a","a","b","c"]
+val $m1 = MG::new(3)
+for val $x (@$s1) { MG::observe($m1, $x) }
+val $h1 = MG::heavy_hitters($m1, $s1)
 len(@$h1) |> aeq 1, "single heavy count"
 $h1->[0] |> aeq "a", "single heavy id"
 
 # --- No heavy hitters: all unique ---
-my $s2 = ["a","b","c","d","e","f","g","h","i","j"]
-my $m2 = MG::new(3)
-for my $x (@$s2) { MG::observe($m2, $x) }
+val $s2 = ["a","b","c","d","e","f","g","h","i","j"]
+val $m2 = MG::new(3)
+for val $x (@$s2) { MG::observe($m2, $x) }
 len(@{MG::heavy_hitters($m2, $s2)}) |> aeq 0, "no heavy with unique"
 
 # --- Canonical example: a appears > n/3 ---
-my $s3 = ["a","b","a","c","a","d","a","b","a","c","a","b","a"]
-my $m3 = MG::new(3)
-for my $x (@$s3) { MG::observe($m3, $x) }
-my $h3 = MG::heavy_hitters($m3, $s3)
+val $s3 = ["a","b","a","c","a","d","a","b","a","c","a","b","a"]
+val $m3 = MG::new(3)
+for val $x (@$s3) { MG::observe($m3, $x) }
+val $h3 = MG::heavy_hitters($m3, $s3)
 len(@$h3) |> aeq 1, "canonical heavy count"
 $h3->[0] |> aeq "a", "canonical heavy id"
 
 # --- Two heavy hitters with k=4 (both appear > n/4) ---
 # n=22, threshold=5, so each must appear >=6 times
-my $s4 = ["a","a","a","a","a","a","b","b","b","b","b","b","c","d","e","f","g","h","i","j","k","l"]
-my $m4 = MG::new(4)
-for my $x (@$s4) { MG::observe($m4, $x) }
-my $h4 = MG::heavy_hitters($m4, $s4)
+val $s4 = ["a","a","a","a","a","a","b","b","b","b","b","b","c","d","e","f","g","h","i","j","k","l"]
+val $m4 = MG::new(4)
+for val $x (@$s4) { MG::observe($m4, $x) }
+val $h4 = MG::heavy_hitters($m4, $s4)
 len(@$h4) |> aeq 2, "two heavy count"
 $h4->[0] |> aeq "a", "two heavy a"
 $h4->[1] |> aeq "b", "two heavy b"
 
 # --- Candidates are a superset of heavy hitters ---
-my %incand = ()
-for my $c (@{MG::candidates($m4)}) { $incand{$c} = 1 }
-my $cover = 1
-for my $h (@$h4) { $cover = 0 unless exists $incand{$h} }
+var %incand = ()
+for val $c (@{MG::candidates($m4)}) { $incand{$c} = 1 }
+var $cover = 1
+for val $h (@$h4) { $cover = 0 unless exists $incand{$h} }
 $cover |> aeq 1, "candidates cover heavy"
 
 # --- Numeric stream ---
 # n=35; threshold=int(35/3)=11. 7 appears 20 (>11), 3 appears 12 (>11), fillers 1 each.
-my $s5 = []
-for my $i (1:20) { push @$s5, 7 }
-for my $i (1:12) { push @$s5, 3 }
-for my $i (1:3)  { push @$s5, ($i + 100) }
-my $m5 = MG::new(3)
-for my $x (@$s5) { MG::observe($m5, $x) }
-my $h5 = MG::heavy_hitters($m5, $s5)
+val $s5 = []
+for val $i (1:20) { push @$s5, 7 }
+for val $i (1:12) { push @$s5, 3 }
+for val $i (1:3)  { push @$s5, ($i + 100) }
+val $m5 = MG::new(3)
+for val $x (@$s5) { MG::observe($m5, $x) }
+val $h5 = MG::heavy_hitters($m5, $s5)
 len(@$h5) |> aeq 2, "numeric heavy count"
-my %h5set = ()
-for my $v (@$h5) { $h5set{$v} = 1 }
+var %h5set = ()
+for val $v (@$h5) { $h5set{$v} = 1 }
 (exists $h5set{7}) |> aeq 1, "7 in heavy"
 (exists $h5set{3}) |> aeq 1, "3 in heavy"
 
 # --- Verification rejects false positives ---
 # Construct a case where a non-heavy element ends up as a candidate
-my $s6 = ["a","b","a","b","c","d","e","f","g","h","i","j","k","l"]
-my $m6 = MG::new(3)
-for my $x (@$s6) { MG::observe($m6, $x) }
-my $h6 = MG::heavy_hitters($m6, $s6)
+val $s6 = ["a","b","a","b","c","d","e","f","g","h","i","j","k","l"]
+val $m6 = MG::new(3)
+for val $x (@$s6) { MG::observe($m6, $x) }
+val $h6 = MG::heavy_hitters($m6, $s6)
 # n=14, threshold=int(14/3)=4. Nothing appears > 4 times.
 len(@$h6) |> aeq 0, "no false-positive heavy"
 
 # --- Stress: random stream with planted heavy hitter ---
-my @big = ()
-my $seed = 9001
-for my $i (1:300) {
+var @big = ()
+var $seed = 9001
+for val $i (1:300) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     push @big, "x" . ($seed % 50)
 }
 # Plant 120 copies of 'HOT' (clearly > n/3 = 140? actually 420/3 = 140, so push more)
-for my $i (1:200) { push @big, "HOT" }
-my $mb = MG::new(3)
-for my $x (@big) { MG::observe($mb, $x) }
-my $hb = MG::heavy_hitters($mb, \@big)
-my $brute = MG::brute_heavy(\@big, 3)
+for val $i (1:200) { push @big, "HOT" }
+val $mb = MG::new(3)
+for val $x (@big) { MG::observe($mb, $x) }
+val $hb = MG::heavy_hitters($mb, \@big)
+val $brute = MG::brute_heavy(\@big, 3)
 len(@$hb) |> aeq len(@$brute), "stress heavy count matches brute"
-my $eq = 1
-my $hi = (len(@$hb)) - 1
-for my $i (0:$hi) {
+var $eq = 1
+val $hi = (len(@$hb)) - 1
+for val $i (0:$hi) {
     $eq = 0 if $hb->[$i] ne $brute->[$i]
 }
 $eq |> aeq 1, "stress heavy ids match brute"
 
 # Brute should include HOT
-my $has_hot = 0
-for my $v (@$brute) { $has_hot = 1 if $v eq "HOT" }
+var $has_hot = 0
+for val $v (@$brute) { $has_hot = 1 if $v eq "HOT" }
 $has_hot |> aeq 1, "stress brute contains HOT"
 
-my $mg_has_hot = 0
-for my $v (@$hb) { $mg_has_hot = 1 if $v eq "HOT" }
+var $mg_has_hot = 0
+for val $v (@$hb) { $mg_has_hot = 1 if $v eq "HOT" }
 $mg_has_hot |> aeq 1, "stress mg contains HOT"
 
 # --- Counter cap: |counters| < k always ---
-my $cap_ok = 1
-for my $i (1:50) {
+var $cap_ok = 1
+for val $i (1:50) {
     MG::observe($mb, "extra$i")
     $cap_ok = 0 if len(keys %{$mb->{counters}}) >= $mb->{k}
 }

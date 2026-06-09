@@ -5,14 +5,14 @@ fn Exercism::BeerSong::verse {
     } elsif (_ == 1) {
         "1 bottle of beer on the wall, 1 bottle of beer.\nTake it down and pass it around, no more bottles of beer on the wall."
     } else {
-        my $next = _ - 1
-        my $plural = $next > 1 ? "s" : ""
+        val $next = _ - 1
+        val $plural = $next > 1 ? "s" : ""
         "$_ bottles of beer on the wall, $_ bottles of beer.\nTake one down and pass it around, $next bottle$plural of beer on the wall."
     }
 }
 
 fn Exercism::BeerSong::sing {
-    my $top    = _->{bottles}
-    my $bottom = $top - _->{verses} + 1
+    val $top    = _->{bottles}
+    val $bottom = $top - _->{verses} + 1
     ~> $bottom:$top rev map { Exercism::BeerSong::verse } join("\n\n")
 }

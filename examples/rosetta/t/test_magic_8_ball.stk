@@ -28,14 +28,14 @@ fn Rosetta::Magic8::answers() {
 }
 
 fn Rosetta::Magic8::shake() {
-    my $a = Rosetta::Magic8::answers()
+    val $a = Rosetta::Magic8::answers()
     $a->[int(rand(20))]
 }
 
 fn Rosetta::Magic8::category($answer) {
-    my %positive = map { _ => 1 } @{Rosetta::Magic8::answers()}[0:9]
-    my %neutral  = map { _ => 1 } @{Rosetta::Magic8::answers()}[10:14]
-    my %negative = map { _ => 1 } @{Rosetta::Magic8::answers()}[15:19]
+    val %positive = map { _ => 1 } @{Rosetta::Magic8::answers()}[0:9]
+    val %neutral  = map { _ => 1 } @{Rosetta::Magic8::answers()}[10:14]
+    val %negative = map { _ => 1 } @{Rosetta::Magic8::answers()}[15:19]
     return "positive" if exists $positive{$answer}
     return "neutral"  if exists $neutral{$answer}
     return "negative" if exists $negative{$answer}
@@ -43,14 +43,14 @@ fn Rosetta::Magic8::category($answer) {
 }
 
 # 20 distinct answers exist
-my $a = Rosetta::Magic8::answers()
+val $a = Rosetta::Magic8::answers()
 assert_eq len(@$a), 20, "20 answers"
-my %unique = map { _ => 1 } @$a
+val %unique = map { _ => 1 } @$a
 assert_eq len(keys %unique), 20, "all answers distinct"
 
 # Shake produces an answer from the set
-for my $i (~> 1:50) {
-    my $r = Rosetta::Magic8::shake()
+for val $i (~> 1:50) {
+    val $r = Rosetta::Magic8::shake()
     assert_ok exists($unique{$r}), sprintf("shake #%d in answer set", $i)
 }
 
@@ -61,11 +61,11 @@ assert_eq Rosetta::Magic8::category("Very doubtful."), "negative", "very doubtfu
 assert_eq Rosetta::Magic8::category("Random unrelated string"), "unknown", "unknown answer"
 
 # Distribution sanity: every category appears across many shakes
-my %cats
-for my $i (~> 1:1000) {
+var %cats
+for val $i (~> 1:1000) {
     $cats{Rosetta::Magic8::category(Rosetta::Magic8::shake())}++
 }
-for my $c ("positive", "neutral", "negative") {
+for val $c ("positive", "neutral", "negative") {
     assert_ok exists($cats{$c}) && $cats{$c} > 0, "category $c appears"
 }
 

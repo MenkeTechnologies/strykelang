@@ -5,8 +5,8 @@ fn Rosetta::CentralBinomial::compute($n) {
     if ($n == 0) {
         1
     } else {
-        my $res = 1
-        for my $i (1:$n) {
+        var $res = 1
+        for val $i (1:$n) {
             $res = $res * ($n + $i) / $i
         }
         int($res + 0.5)

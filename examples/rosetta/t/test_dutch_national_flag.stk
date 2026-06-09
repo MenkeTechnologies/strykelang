@@ -2,8 +2,8 @@
 # Rosetta Code: Dutch National Flag Problem
 
 fn Rosetta::DNF::sort($arr_ref) {
-    my @arr = @$arr_ref
-    my ($low, $mid, $high) = (0, 0, len(@arr) - 1)
+    var @arr = @$arr_ref
+    var ($low, $mid, $high) = (0, 0, len(@arr) - 1)
     while ($mid <= $high) {
         if ($arr[$mid] == 0) {
             ($arr[$low], $arr[$mid]) = ($arr[$mid], $arr[$low])
@@ -19,12 +19,12 @@ fn Rosetta::DNF::sort($arr_ref) {
     \@arr
 }
 
-my @input = (2, 0, 1, 2, 0, 1)
-my $sorted = Rosetta::DNF::sort(\@input)
+val @input = (2, 0, 1, 2, 0, 1)
+val $sorted = Rosetta::DNF::sort(\@input)
 assert_eq join(",", @$sorted), "0,0,1,1,2,2", "sorted DNF"
 
-my @input2 = (1, 1, 0, 2, 0, 2, 1)
-my $sorted2 = Rosetta::DNF::sort(\@input2)
+val @input2 = (1, 1, 0, 2, 0, 2, 1)
+val $sorted2 = Rosetta::DNF::sort(\@input2)
 assert_eq join(",", @$sorted2), "0,0,1,1,1,2,2", "sorted DNF 2"
 
 test_run

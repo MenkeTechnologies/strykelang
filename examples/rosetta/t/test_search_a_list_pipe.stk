@@ -5,8 +5,8 @@ fn Rosetta::SearchList::contains($haystack, $needle) {
     contains_elem($needle, $haystack)
 }
 
-my @haystack = ("Zig", "Zag", "Wally", "Ronald", "Bush", "Krusty", "Charlie", "Bush", "Bo", "Maz")
-my $ref = \@haystack
+val @haystack = ("Zig", "Zag", "Wally", "Ronald", "Bush", "Krusty", "Charlie", "Bush", "Bo", "Maz")
+val $ref = \@haystack
 
 $ref |> Rosetta::SearchList::contains("Bush") |> assert_ok("Contains Bush")
 $ref |> Rosetta::SearchList::contains("Ronald") |> assert_ok("Contains Ronald")

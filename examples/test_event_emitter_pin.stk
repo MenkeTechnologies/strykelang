@@ -5,7 +5,7 @@ fn EE::new() {
 }
 
 fn EE::on($ee, $event, $cb) {
-    my $id = $ee->{next_id}
+    val $id = $ee->{next_id}
     $ee->{next_id} = $id + 1
     $ee->{listeners}->{$event} = [] unless exists $ee->{listeners}->{$event}
     push @{$ee->{listeners}->{$event}}, +{ id => $id, cb => $cb }
@@ -13,15 +13,15 @@ fn EE::on($ee, $event, $cb) {
 }
 
 fn EE::once($ee, $event, $cb) {
-    my $id = EE::on($ee, $event, $cb)
+    val $id = EE::on($ee, $event, $cb)
     $ee->{once}->{$id} = 1
     $id
 }
 
 fn EE::off($ee, $event, $id) {
     return unless exists $ee->{listeners}->{$event}
-    my @kept = ()
-    for my $l (@{$ee->{listeners}->{$event}}) {
+    var @kept = ()
+    for val $l (@{$ee->{listeners}->{$event}}) {
         push @kept, $l unless $l->{id} == $id
     }
     $ee->{listeners}->{$event} = \@kept
@@ -30,10 +30,10 @@ fn EE::off($ee, $event, $id) {
 
 fn EE::emit($ee, $event, $payload) {
     return 0 unless exists $ee->{listeners}->{$event}
-    my @ls = @{$ee->{listeners}->{$event}}
-    my $count = 0
-    my @kept = ()
-    for my $l (@ls) {
+    val @ls = @{$ee->{listeners}->{$event}}
+    var $count = 0
+    var @kept = ()
+    for val $l (@ls) {
         $l->{cb}($payload)
         $count = $count + 1
         if (exists $ee->{once}->{$l->{id}}) {
@@ -52,12 +52,12 @@ fn EE::count($ee, $event) {
 }
 
 # Empty emit
-my $b0 = EE::new()
+val $b0 = EE::new()
 EE::emit($b0, "x", 1)  |> aeq 0, "emit no listeners"
 EE::count($b0, "x")    |> aeq 0, "count zero"
 
 # Single listener
-my $b1 = EE::new()
+val $b1 = EE::new()
 mysync @l1 = ()
 EE::on($b1, "data", fn ($x) { push @l1, $x })
 EE::emit($b1, "data", 42) |> aeq 1, "one fired"
@@ -66,7 +66,7 @@ EE::emit($b1, "data", 7)  |> aeq 1, "one fired again"
 join(",", @l1) |> aeq "42,7", "two payloads"
 
 # Multiple listeners
-my $b2 = EE::new()
+val $b2 = EE::new()
 mysync @l2 = ()
 EE::on($b2, "ev", fn ($x) { push @l2, "A:" . $x })
 EE::on($b2, "ev", fn ($x) { push @l2, "B:" . $x })
@@ -76,7 +76,7 @@ EE::emit($b2, "ev", 5) |> aeq 3, "three fired"
 join(",", @l2) |> aeq "A:5,B:5,C:5", "all three"
 
 # once() fires only once
-my $b3 = EE::new()
+val $b3 = EE::new()
 mysync @l3 = ()
 EE::once($b3, "o", fn ($x) { push @l3, "once:" . $x })
 EE::on($b3, "o",   fn ($x) { push @l3, "perm:" . $x })
@@ -86,9 +86,9 @@ join(",", @l3) |> aeq "once:1,perm:1,perm:2", "once only fires first"
 EE::count($b3, "o") |> aeq 1, "once removed"
 
 # off removes listener
-my $b4 = EE::new()
+val $b4 = EE::new()
 mysync @l4 = ()
-my $id = EE::on($b4, "z", fn ($x) { push @l4, "1:" . $x })
+val $id = EE::on($b4, "z", fn ($x) { push @l4, "1:" . $x })
 EE::on($b4, "z",          fn ($x) { push @l4, "2:" . $x })
 EE::emit($b4, "z", "a")
 EE::off($b4, "z", $id)
@@ -97,7 +97,7 @@ join(",", @l4) |> aeq "1:a,2:a,2:b", "after off"
 EE::count($b4, "z") |> aeq 1, "one remains"
 
 # Unrelated events isolated
-my $b5 = EE::new()
+val $b5 = EE::new()
 mysync @lx = ()
 mysync @ly = ()
 EE::on($b5, "x", fn ($v) { push @lx, $v })
@@ -109,7 +109,7 @@ join(",", @lx) |> aeq "1,3", "x channel"
 join(",", @ly) |> aeq "2",   "y channel"
 
 # off non-existent id is safe
-my $b6 = EE::new()
+val $b6 = EE::new()
 EE::on($b6, "a", fn ($x) {})
 EE::off($b6, "a", 9999)
 EE::count($b6, "a") |> aeq 1, "off bad id no-op"

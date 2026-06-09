@@ -17,19 +17,19 @@ fn Rosetta::WorldCup::points_for_outcome($pair, $outcome) {
 }
 
 fn Rosetta::WorldCup::all_standings() {
-    my $pairs = Rosetta::WorldCup::all_pairs()
-    my @results
-    for my $code (0:728) {
-        my @outs
-        my $c = $code
-        for my $p (0:5) {
+    val $pairs = Rosetta::WorldCup::all_pairs()
+    var @results
+    for val $code (0:728) {
+        var @outs
+        var $c = $code
+        for val $p (0:5) {
             push @outs, $c % 3
             $c = int($c / 3)
         }
-        my @pts = (0, 0, 0, 0)
-        for my $i (0:5) {
-            my $pair = $pairs->[$i]
-            my $game = Rosetta::WorldCup::points_for_outcome($pair, $outs[$i])
+        var @pts = (0, 0, 0, 0)
+        for val $i (0:5) {
+            val $pair = $pairs->[$i]
+            val $game = Rosetta::WorldCup::points_for_outcome($pair, $outs[$i])
             $pts[$pair->[0]] += $game->[0]
             $pts[$pair->[1]] += $game->[1]
         }
@@ -39,13 +39,13 @@ fn Rosetta::WorldCup::all_standings() {
 }
 
 fn Rosetta::WorldCup::rank_distribution() {
-    my $standings = Rosetta::WorldCup::all_standings()
-    my @rank_counts = (0, 0, 0, 0)
-    for my $std (@$standings) {
-        my @sorted = sort { _1 <=> _ } @$std
-        my $team0_pts = $std->[0]
-        my $rank = 0
-        for my $i (0:3) {
+    val $standings = Rosetta::WorldCup::all_standings()
+    var @rank_counts = (0, 0, 0, 0)
+    for val $std (@$standings) {
+        val @sorted = sort { _1 <=> _ } @$std
+        val $team0_pts = $std->[0]
+        var $rank = 0
+        for val $i (0:3) {
             $rank++ if $sorted[$i] > $team0_pts
         }
         $rank_counts[$rank]++
@@ -54,54 +54,54 @@ fn Rosetta::WorldCup::rank_distribution() {
 }
 
 # Six games, every pair once
-my $pairs = Rosetta::WorldCup::all_pairs()
+val $pairs = Rosetta::WorldCup::all_pairs()
 assert_eq len(@$pairs), 6, "6 game pairs"
 
 # 3^6 = 729 total outcome tables
-my $standings = Rosetta::WorldCup::all_standings()
+val $standings = Rosetta::WorldCup::all_standings()
 assert_eq len(@$standings), 729, "729 outcome tables"
 
 # Sum of points across 4 teams in any single table lies in [12, 18]:
 # each draw contributes 2, each decisive contributes 3, over 6 games.
-my $sum_ok = 1
-for my $s (@$standings) {
-    my $sum = 0
-    for my $p (@$s) { $sum += $p }
+var $sum_ok = 1
+for val $s (@$standings) {
+    var $sum = 0
+    for val $p (@$s) { $sum += $p }
     $sum_ok = 0 if $sum < 12 || $sum > 18
 }
 assert_ok $sum_ok, "totals lie in [12, 18]"
 
 # Total = 18 only when all 6 games are decisive (2^6 = 64 outcomes).
-my $count_18 = 0
-for my $s (@$standings) {
-    my $sum = 0
-    for my $p (@$s) { $sum += $p }
+var $count_18 = 0
+for val $s (@$standings) {
+    var $sum = 0
+    for val $p (@$s) { $sum += $p }
     $count_18++ if $sum == 18
 }
 assert_eq $count_18, 64, "64 outcomes with no draws"
 
 # Total = 12 only when every game is a draw (1 outcome).
-my $count_12 = 0
-for my $s (@$standings) {
-    my $sum = 0
-    for my $p (@$s) { $sum += $p }
+var $count_12 = 0
+for val $s (@$standings) {
+    var $sum = 0
+    for val $p (@$s) { $sum += $p }
     $count_12++ if $sum == 12
 }
 assert_eq $count_12, 1, "exactly 1 all-draws outcome"
 
 # Rank distribution for team 0: each rank has 729 / something
-my $r = Rosetta::WorldCup::rank_distribution()
-my $tot = 0
-for my $c (@$r) { $tot += $c }
+val $r = Rosetta::WorldCup::rank_distribution()
+var $tot = 0
+for val $c (@$r) { $tot += $c }
 assert_eq $tot, 729, "rank counts sum to 729"
 
 # Every rank slot has at least one outcome (no rank is unreachable)
-for my $i (0:3) {
+for val $i (0:3) {
     assert_ok $r->[$i] > 0, sprintf("rank %d has > 0 outcomes", $i)
 }
 
 # Pipe form
-my $pp = Rosetta::WorldCup::all_pairs()
+val $pp = Rosetta::WorldCup::all_pairs()
 assert_eq len(@$pp), 6, "pipe pair count"
 
 test_run

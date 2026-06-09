@@ -3,8 +3,8 @@
 # Avoids native int overflow by working at the digit level; result returned as a string.
 
 fn Rosetta::LongMul::digits($s) {
-    my @d = $s |> chars
-    my @r = reverse(@d)
+    val @d = $s |> chars
+    val @r = reverse(@d)
     [map { _ + 0 } @r]
 }
 
@@ -13,16 +13,16 @@ fn Rosetta::LongMul::strip_leading_zeros($s) {
 }
 
 fn Rosetta::LongMul::multiply(_0, _1) {
-    my $sa = "$_0"
-    my $sb = "$_1"
-    my $da = Rosetta::LongMul::digits($sa)
-    my $db = Rosetta::LongMul::digits($sb)
-    my $la = len(@$da)
-    my $lb = len(@$db)
-    my @prod
-    for my $i (0:$la + $lb - 1) { $prod[$i] = 0 }
-    for my $i (0:$la - 1) {
-        for my $j (0:$lb - 1) {
+    val $sa = "$_0"
+    val $sb = "$_1"
+    val $da = Rosetta::LongMul::digits($sa)
+    val $db = Rosetta::LongMul::digits($sb)
+    val $la = len(@$da)
+    val $lb = len(@$db)
+    var @prod
+    for val $i (0:$la + $lb - 1) { $prod[$i] = 0 }
+    for val $i (0:$la - 1) {
+        for val $j (0:$lb - 1) {
             $prod[$i + $j] += $da->[$i] * $db->[$j]
             $prod[$i + $j + 1] += int($prod[$i + $j] / 10)
             $prod[$i + $j] = $prod[$i + $j] % 10

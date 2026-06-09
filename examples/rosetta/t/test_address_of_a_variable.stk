@@ -2,11 +2,11 @@
 # Rosetta Code: Address of a variable
 
 fn Rosetta::AddressOfVariable::demo() {
-    my $var = 42
+    val $var = 42
     
     # In Stryke, we can get a reference to a variable using the backslash operator.
     # Printing the reference shows the internal type and memory address.
-    my $ref = \$var
+    val $ref = \$var
     
     "Variable value: " . $var |> p
     "Variable reference (address): " . $ref |> p

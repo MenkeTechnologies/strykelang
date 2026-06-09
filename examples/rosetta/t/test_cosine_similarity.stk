@@ -2,10 +2,10 @@
 # Rosetta Code: Cosine similarity
 
 fn Rosetta::CosineSimilarity::compute($v1, $v2) {
-    my $dot = 0
-    my $mag1 = 0
-    my $mag2 = 0
-    for my $i (0..len(@$v1)-1) {
+    var $dot = 0
+    var $mag1 = 0
+    var $mag2 = 0
+    for val $i (0..len(@$v1)-1) {
         $dot += $v1->[$i] * $v2->[$i]
         $mag1 += $v1->[$i] ** 2
         $mag2 += $v2->[$i] ** 2
@@ -14,12 +14,12 @@ fn Rosetta::CosineSimilarity::compute($v1, $v2) {
     $dot / (sqrt($mag1) * sqrt($mag2))
 }
 
-my $v1 = [1, 2, 3]
-my $v2 = [1, 2, 3]
+val $v1 = [1, 2, 3]
+val $v2 = [1, 2, 3]
 assert_eq Rosetta::CosineSimilarity::compute($v1, $v2), 1.0, "Identical vectors"
 
-my $v3 = [1, 0]
-my $v4 = [0, 1]
+val $v3 = [1, 0]
+val $v4 = [0, 1]
 assert_eq Rosetta::CosineSimilarity::compute($v3, $v4), 0, "Orthogonal vectors"
 
 test_run

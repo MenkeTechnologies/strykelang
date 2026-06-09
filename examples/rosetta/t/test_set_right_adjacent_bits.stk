@@ -6,12 +6,12 @@
 # dropped.
 
 fn Rosetta::SetRight::apply($s, $k) {
-    my @bits = split //, $s
-    my $n = len(@bits)
-    my @out = (0) x $n
-    for my $i (0:$n - 1) {
+    val @bits = split //, $s
+    val $n = len(@bits)
+    var @out = (0) x $n
+    for val $i (0:$n - 1) {
         if ($bits[$i] eq "1") {
-            for my $j ($i:$i + $k) {
+            for val $j ($i:$i + $k) {
                 $out[$j] = 1 if $j < $n
             }
         }
@@ -33,8 +33,8 @@ assert_eq Rosetta::SetRight::apply("01000000000010000000001000000001000000010000
     "011110000000111100000011110000011110000111100011110011110111111111", "k=3"
 
 # Idempotence-ish: apply k=2 then k=2 again should equal apply k=2 once on the result.
-my $once  = Rosetta::SetRight::apply("0100100", 2)
-my $twice = Rosetta::SetRight::apply($once, 2)
+val $once  = Rosetta::SetRight::apply("0100100", 2)
+val $twice = Rosetta::SetRight::apply($once, 2)
 assert_eq Rosetta::SetRight::apply($once, 0), $once, "k=0 reapply identity"
 assert_ok $twice ge $once, "twice ≥ once (more 1s only)"
 

@@ -4,10 +4,10 @@
 # "87.70.140.0/22".
 
 fn Rosetta::CIDR::ip_to_int($ip) {
-    my @parts = split(/\./, $ip)
+    val @parts = split(/\./, $ip)
     return undef unless len(@parts) == 4
-    my $n = 0
-    for my $p (@parts) {
+    var $n = 0
+    for val $p (@parts) {
         return undef if $p !~ /^\d+$/ || $p < 0 || $p > 255
         $n = $n * 256 + $p
     }
@@ -15,24 +15,24 @@ fn Rosetta::CIDR::ip_to_int($ip) {
 }
 
 fn Rosetta::CIDR::int_to_ip($n) {
-    my $a = int($n / 16777216) % 256
-    my $b = int($n / 65536) % 256
-    my $c = int($n / 256) % 256
-    my $d = $n % 256
+    val $a = int($n / 16777216) % 256
+    val $b = int($n / 65536) % 256
+    val $c = int($n / 256) % 256
+    val $d = $n % 256
     "$a.$b.$c.$d"
 }
 
 fn Rosetta::CIDR::canonicalize($cidr) {
-    my @parts = split(/\//, $cidr)
+    val @parts = split(/\//, $cidr)
     return undef unless len(@parts) == 2
-    my $ip = $parts[0]
-    my $prefix = $parts[1] + 0
+    val $ip = $parts[0]
+    val $prefix = $parts[1] + 0
     return undef if $prefix < 0 || $prefix > 32
-    my $n = Rosetta::CIDR::ip_to_int($ip)
+    val $n = Rosetta::CIDR::ip_to_int($ip)
     return undef unless defined($n)
-    my $shift = 32 - $prefix
-    my $mask = $shift == 32 ? 0 : ((0xFFFFFFFF >> $shift) << $shift) & 0xFFFFFFFF
-    my $net = $n & $mask
+    val $shift = 32 - $prefix
+    val $mask = $shift == 32 ? 0 : ((0xFFFFFFFF >> $shift) << $shift) & 0xFFFFFFFF
+    val $net = $n & $mask
     Rosetta::CIDR::int_to_ip($net) . "/" . $prefix
 }
 

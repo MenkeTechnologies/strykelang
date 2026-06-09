@@ -1,14 +1,14 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Delannoy numbers (using memoization)
 
-my %memo
+var %memo
 
 fn Rosetta::Delannoy::compute($m, $n) {
     if ($m == 0 || $n == 0) { return 1 }
-    my $key = "$m,$n"
+    val $key = "$m,$n"
     if (exists $memo{$key}) { return $memo{$key} }
     
-    my $res = Rosetta::Delannoy::compute($m - 1, $n) +
+    val $res = Rosetta::Delannoy::compute($m - 1, $n) +
               Rosetta::Delannoy::compute($m, $n - 1) +
               Rosetta::Delannoy::compute($m - 1, $n - 1)
     

@@ -11,8 +11,8 @@ fn AVL::node($v) {
 }
 
 fn AVL::_update_h($n) {
-    my $lh = AVL::height($n->{left})
-    my $rh = AVL::height($n->{right})
+    val $lh = AVL::height($n->{left})
+    val $rh = AVL::height($n->{right})
     $n->{h} = 1 + ($lh > $rh ? $lh : $rh)
 }
 
@@ -21,8 +21,8 @@ fn AVL::_balance($n) {
 }
 
 fn AVL::_rot_right($y) {
-    my $x  = $y->{left}
-    my $t2 = $x->{right}
+    var $x  = $y->{left}
+    val $t2 = $x->{right}
     $x->{right} = $y
     $y->{left}  = $t2
     AVL::_update_h($y)
@@ -31,8 +31,8 @@ fn AVL::_rot_right($y) {
 }
 
 fn AVL::_rot_left($x) {
-    my $y  = $x->{right}
-    my $t2 = $y->{left}
+    var $y  = $x->{right}
+    val $t2 = $y->{left}
     $y->{left}  = $x
     $x->{right} = $t2
     AVL::_update_h($x)
@@ -50,7 +50,7 @@ fn AVL::insert($n, $v) {
         return $n
     }
     AVL::_update_h($n)
-    my $bf = AVL::_balance($n)
+    val $bf = AVL::_balance($n)
     if ($bf > 1 && $v < $n->{left}->{val})  { return AVL::_rot_right($n) }
     if ($bf < -1 && $v > $n->{right}->{val}) { return AVL::_rot_left($n) }
     if ($bf > 1 && $v > $n->{left}->{val}) {
@@ -71,24 +71,24 @@ fn AVL::contains($n, $v) {
 }
 
 fn AVL::inorder($n) {
-    my @out = ()
+    var @out = ()
     return \@out unless defined $n
-    for my $x (@{AVL::inorder($n->{left})})  { push @out, $x }
+    for val $x (@{AVL::inorder($n->{left})})  { push @out, $x }
     push @out, $n->{val}
-    for my $x (@{AVL::inorder($n->{right})}) { push @out, $x }
+    for val $x (@{AVL::inorder($n->{right})}) { push @out, $x }
     \@out
 }
 
 fn AVL::balanced($n) {
     return 1 unless defined $n
-    my $bf = AVL::_balance($n)
+    val $bf = AVL::_balance($n)
     return 0 if $bf < -1 || $bf > 1
     AVL::balanced($n->{left}) && AVL::balanced($n->{right})
 }
 
 p "=== AVL Tree Demo ==="
-my $root = undef
-for my $v (10, 20, 30, 40, 50, 25) {
+var $root = undef
+for val $v (10, 20, 30, 40, 50, 25) {
     $root = AVL::insert($root, $v)
 }
 p "inorder: " . join(",", @{AVL::inorder($root)})
@@ -98,6 +98,6 @@ p "contains 25: " . AVL::contains($root, 25)
 p "contains 99: " . AVL::contains($root, 99)
 
 # Worst-case ascending insert should still stay balanced
-my $r2 = undef
-for my $v (1:32) { $r2 = AVL::insert($r2, $v) }
+var $r2 = undef
+for val $v (1:32) { $r2 = AVL::insert($r2, $v) }
 p "after 1..32 ascending: height=" . AVL::height($r2) . " balanced=" . AVL::balanced($r2)

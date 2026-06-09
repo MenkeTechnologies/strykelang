@@ -2,19 +2,19 @@
 # Rosetta Code: Arithmetic numbers
 
 fn Rosetta::ArithmeticNumbers::get_divisors($n) {
-    my @d
-    for my $i (1:$n) {
+    var @d
+    for val $i (1:$n) {
         if ($n % $i == 0) { push @d, $i }
     }
     \@d
 }
 
 fn Rosetta::ArithmeticNumbers::check($n) {
-    my $divs_ref = Rosetta::ArithmeticNumbers::get_divisors($n)
-    my @divs = @$divs_ref
-    my $sum = 0
-    for my $d (@divs) { $sum += $d }
-    my $count = len(@divs)
+    val $divs_ref = Rosetta::ArithmeticNumbers::get_divisors($n)
+    val @divs = @$divs_ref
+    var $sum = 0
+    for val $d (@divs) { $sum += $d }
+    val $count = len(@divs)
     $sum % $count == 0
 }
 

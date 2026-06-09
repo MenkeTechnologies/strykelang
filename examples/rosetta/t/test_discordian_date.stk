@@ -11,26 +11,26 @@ fn Rosetta::Disco::is_leap($y) {
 }
 
 fn Rosetta::Disco::day_of_year($y, $m, $d) {
-    my @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    var @days = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
     $days[1] = 29 if Rosetta::Disco::is_leap($y)
-    my $doy = $d
-    for my $i (0:$m - 2) { $doy += $days[$i] }
+    var $doy = $d
+    for val $i (0:$m - 2) { $doy += $days[$i] }
     $doy
 }
 
 fn Rosetta::Disco::to_str($y, $m, $d) {
-    my @seasons = ("Chaos", "Discord", "Confusion", "Bureaucracy", "The Aftermath")
-    my @days_of_week = ("Sweetmorn", "Boomtime", "Pungenday", "Prickle-Prickle", "Setting Orange")
-    my $yold = $y + 1166
+    val @seasons = ("Chaos", "Discord", "Confusion", "Bureaucracy", "The Aftermath")
+    val @days_of_week = ("Sweetmorn", "Boomtime", "Pungenday", "Prickle-Prickle", "Setting Orange")
+    val $yold = $y + 1166
     if ($m == 2 && $d == 29 && Rosetta::Disco::is_leap($y)) {
         return sprintf("St. Tib's Day, YOLD %d", $yold)
     }
-    my $doy = Rosetta::Disco::day_of_year($y, $m, $d)
+    var $doy = Rosetta::Disco::day_of_year($y, $m, $d)
     # Skip leap day in season counting if past Feb 29
     if (Rosetta::Disco::is_leap($y) && $doy > 60) { $doy-- }
-    my $season_idx = int(($doy - 1) / 73)
-    my $sday       = (($doy - 1) % 73) + 1
-    my $dow        = (($doy - 1) % 5)
+    val $season_idx = int(($doy - 1) / 73)
+    val $sday       = (($doy - 1) % 73) + 1
+    val $dow        = (($doy - 1) % 5)
     sprintf("%s, %s %d, YOLD %d",
         $days_of_week[$dow], $seasons[$season_idx], $sday, $yold)
 }

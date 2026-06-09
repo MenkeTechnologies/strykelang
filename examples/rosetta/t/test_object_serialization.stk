@@ -2,22 +2,22 @@
 # Rosetta Code: Object serialization
 
 fn Rosetta::Serialization::demo() {
-    my $obj = +{
+    val $obj = +{
         name => "Stryke",
         features => ["parallel", "fast", "perl-compatible"],
         version => 1.0
     }
     
     # Serialize to JSON
-    my $json = to_json($obj)
+    val $json = to_json($obj)
     
     # Deserialize from JSON
-    my $recovered = from_json($json)
+    val $recovered = from_json($json)
     
     $recovered
 }
 
-my $res = Rosetta::Serialization::demo()
+val $res = Rosetta::Serialization::demo()
 assert_eq $res->{name}, "Stryke", "Name recovered"
 assert_eq $res->{features}->[0], "parallel", "Feature recovered"
 assert_eq $res->{version}, 1.0, "Version recovered"

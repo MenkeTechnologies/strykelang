@@ -6,9 +6,9 @@ fn Rosetta::LCG::next_val($x) {
     (1103515245 * $x + 12345) % 2147483648
 }
 
-my $x = 1 # seed
-my @res
-for my $i (1:5) {
+var $x = 1 # seed
+var @res
+for val $i (1:5) {
     $x = Rosetta::LCG::next_val($x)
     push @res, $x
 }

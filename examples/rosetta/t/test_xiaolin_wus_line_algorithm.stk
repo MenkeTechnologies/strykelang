@@ -2,21 +2,21 @@
 # Rosetta Code: Xiaolin Wu's line algorithm
 
 fn Rosetta::Wu::sample($x0, $y0, $x1, $y1) {
-    my @out
-    my $dx = $x1 - $x0
-    my $dy = $y1 - $y0
-    my $slope = $dy / $dx
-    for my $x ($x0:$x1) {
-        my $y = $y0 + (($x - $x0) * $slope)
-        my $base = int($y)
-        my $frac = $y - $base
+    var @out
+    val $dx = $x1 - $x0
+    val $dy = $y1 - $y0
+    val $slope = $dy / $dx
+    for val $x ($x0:$x1) {
+        val $y = $y0 + (($x - $x0) * $slope)
+        val $base = int($y)
+        val $frac = $y - $base
         push @out, "$x,$base:" . (1 - $frac)
         push @out, "$x," . ($base + 1) . ":$frac" if $frac > 0
     }
     \@out
 }
 
-my $samples = Rosetta::Wu::sample(0, 0, 4, 2)
+val $samples = Rosetta::Wu::sample(0, 0, 4, 2)
 
 assert_eq $samples->[0], "0,0:1", "line starts fully lit at first pixel"
 assert_eq $samples->[1], "1,0:0.5", "intermediate pixel gets fractional coverage"

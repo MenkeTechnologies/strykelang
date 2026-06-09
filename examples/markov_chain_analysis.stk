@@ -2,8 +2,8 @@
 # Run: stryke --no-interop examples/markov_chain_analysis.stk
 
 p "--- Markov ---"
-my $m = [0, 0, 1, 0, 1, 1, 0] |> markov_transition_matrix
-my @s = $m |> markov_stationary |> collect
+val $m = [0, 0, 1, 0, 1, 1, 0] |> markov_transition_matrix
+val @s = $m |> markov_stationary |> collect
 
 len $m |> aeq 2, "mtx"
 (sum(@s) > 0.9) |> aok "stat"

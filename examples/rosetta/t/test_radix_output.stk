@@ -5,11 +5,11 @@ fn Rosetta::RadixOutput::encode($n, $base) {
     if ($n == 0) {
         "0"
     } else {
-        my $res = ""
-        my @digits = ("0".."9", "A".."Z")
-        my $temp = $n
+        var $res = ""
+        val @digits = ("0".."9", "A".."Z")
+        var $temp = $n
         while ($temp > 0) {
-            my $rem = $temp % $base
+            val $rem = $temp % $base
             $res = $digits[$rem] . $res
             $temp = int($temp / $base)
         }

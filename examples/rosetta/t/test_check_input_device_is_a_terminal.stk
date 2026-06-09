@@ -3,7 +3,7 @@
 
 fn Rosetta::IsTerminal::check() {
     # In Stryke, we can use has_stdin_tty().
-    my $is_term = has_stdin_tty()
+    val $is_term = has_stdin_tty()
     
     "Is STDIN a terminal?" |> p
     ($is_term ? "Yes" : "No") |> p

@@ -4,10 +4,10 @@
 # 6, 7, 8, 9} — every non-zero digit appears exactly once.
 
 fn Rosetta::Penholo::is_pen($n) {
-    my $s = "$n"
+    val $s = "$n"
     return 0 if len($s) != 9
-    my %seen
-    for my $c (split //, $s) {
+    var %seen
+    for val $c (split //, $s) {
         return 0 if $c eq "0"
         return 0 if exists $seen{$c}
         $seen{$c} = 1
@@ -16,11 +16,11 @@ fn Rosetta::Penholo::is_pen($n) {
 }
 
 fn Rosetta::Penholo::squares_below($limit) {
-    my @out
-    my $k = int(sqrt($limit))
+    var @out
+    var $k = int(sqrt($limit))
     while ($k * $k > $limit) { $k-- }
-    for my $r (1:$k) {
-        my $sq = $r * $r
+    for val $r (1:$k) {
+        val $sq = $r * $r
         push @out, $sq if Rosetta::Penholo::is_pen($sq)
     }
     @out
@@ -36,15 +36,15 @@ assert_eq Rosetta::Penholo::is_pen(12345),     0, "wrong length"
 assert_eq Rosetta::Penholo::is_pen(11826 * 11826), 1, "11826² is pen"
 
 # Count of penholodigital squares ≤ 999_999_999 = 30 (well-known)
-my @all = Rosetta::Penholo::squares_below(999999999)
+val @all = Rosetta::Penholo::squares_below(999999999)
 assert_eq len(@all), 30, "30 penholodigital squares"
 assert_eq $all[0],  139854276, "smallest is 139854276"
 assert_eq $all[-1], 923187456, "largest is 923187456"
 
 # Square roots of all penholos
-my @roots = ~> @all |> map { int(sqrt(_)) }
-my $all_pos = 1
-for my $r (@roots) { $all_pos = 0 if $r * $r > 999999999 }
+val @roots = ~> @all |> map { int(sqrt(_)) }
+var $all_pos = 1
+for val $r (@roots) { $all_pos = 0 if $r * $r > 999999999 }
 assert_ok $all_pos, "every root squared still ≤ 999999999"
 
 # Pipe form

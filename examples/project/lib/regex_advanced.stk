@@ -62,13 +62,13 @@ fn Project::RegexAdvanced::capture_nested {
 }
 
 fn Project::RegexAdvanced::capture_in_subst {
-    my $s = "hello world"
+    var $s = "hello world"
     $s =~ s/(\w+) (\w+)/$2 $1/
     $s eq "world hello" ? 1 : 0
 }
 
 fn Project::RegexAdvanced::capture_digit_backrefs {
-    my $s = "hello hello"
+    val $s = "hello hello"
     $s =~ /(\w+) \1/ ? 1 : 0
 }
 
@@ -80,8 +80,8 @@ fn Project::RegexAdvanced::flag_case_insensitive { "HELLO" =~ /hello/i ? 1 : 0 }
 
 # global while match loop hangs - removed
 fn Project::RegexAdvanced::flag_global_count {
-    my $s = "aaa"
-    my @matches = $s =~ /a/g
+    val $s = "aaa"
+    val @matches = $s =~ /a/g
     scalar @matches}
 
 fn Project::RegexAdvanced::flag_multiline { "foo\nbar" =~ /^bar/m ? 1 : 0 }
@@ -93,44 +93,44 @@ fn Project::RegexAdvanced::flag_dotall { "foo\nbar" =~ /foo.bar/s ? 1 : 0 }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::RegexAdvanced::subst_simple {
-    my $s = "hello world"
+    var $s = "hello world"
     $s =~ s/world/there/
     $s
 }
 
 fn Project::RegexAdvanced::subst_global {
-    my $s = "aaa"
+    var $s = "aaa"
     $s =~ s/a/b/g
     $s
 }
 
 fn Project::RegexAdvanced::subst_case_insensitive {
-    my $s = "HELLO"
+    var $s = "HELLO"
     $s =~ s/hello/hi/i
     $s
 }
 
 fn Project::RegexAdvanced::subst_empty {
-    my $s = "hello"
+    var $s = "hello"
     $s =~ s/l//g
     $s
 }
 
 fn Project::RegexAdvanced::subst_backrefs {
-    my $s = "hello world"
+    var $s = "hello world"
     $s =~ s/(\w+)/[$1]/g
     $s
 }
 
 fn Project::RegexAdvanced::subst_no_match {
-    my $s = "hello"
-    my $count = $s =~ s/xyz/abc/
+    var $s = "hello"
+    val $count = $s =~ s/xyz/abc/
     $count == 0 ? 1 : 0
 }
 
 fn Project::RegexAdvanced::subst_returns_count {
-    my $s = "aaa"
-    my $count = $s =~ s/a/b/g
+    var $s = "aaa"
+    val $count = $s =~ s/a/b/g
     $count
 }
 
@@ -139,25 +139,25 @@ fn Project::RegexAdvanced::subst_returns_count {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::RegexAdvanced::tr_simple {
-    my $s = "hello"
+    var $s = "hello"
     $s =~ tr/a-z/A-Z/
     $s
 }
 
 fn Project::RegexAdvanced::tr_partial {
-    my $s = "hello"
+    var $s = "hello"
     $s =~ tr/aeiou/AEIOU/
     $s
 }
 
 fn Project::RegexAdvanced::tr_count {
-    my $s = "hello world"
-    my $count = $s =~ tr/o/o/
+    var $s = "hello world"
+    val $count = $s =~ tr/o/o/
     $count
 }
 
 fn Project::RegexAdvanced::tr_squeeze {
-    my $s = "heeello"
+    var $s = "heeello"
     $s =~ tr/e/e/s
     $s
 }
@@ -167,20 +167,20 @@ fn Project::RegexAdvanced::tr_squeeze {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::RegexAdvanced::split_regex_ws {
-    my @parts = split(/\s+/, "hello   world")
+    val @parts = split(/\s+/, "hello   world")
     scalar @parts}
 
 fn Project::RegexAdvanced::split_regex_delim {
-    my @parts = split(/[,;]/, "a,b;c")
+    val @parts = split(/[,;]/, "a,b;c")
     join("|", @parts)
 }
 
 fn Project::RegexAdvanced::split_regex_limit {
-    my @parts = split(/,/, "a,b,c,d", 2)
+    val @parts = split(/,/, "a,b,c,d", 2)
     scalar @parts}
 
 fn Project::RegexAdvanced::split_regex_capture {
-    my @parts = split(/(\s+)/, "a b c")
+    val @parts = split(/(\s+)/, "a b c")
     scalar @parts}
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -188,16 +188,16 @@ fn Project::RegexAdvanced::split_regex_capture {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::RegexAdvanced::match_list_context {
-    my @matches = "hello world" =~ /(\w+)/g
+    val @matches = "hello world" =~ /(\w+)/g
     scalar @matches}
 
 fn Project::RegexAdvanced::match_list_first {
-    my @matches = "hello world" =~ /(\w+)/g
+    val @matches = "hello world" =~ /(\w+)/g
     $matches[0] eq "hello" ? 1 : 0
 }
 
 fn Project::RegexAdvanced::match_list_all {
-    my @matches = "a1b2c3" =~ /(\d)/g
+    val @matches = "a1b2c3" =~ /(\d)/g
     join(",", @matches)
 }
 
@@ -251,7 +251,7 @@ fn Project::RegexAdvanced::pattern_hex { "0xFF" =~ /^0x[0-9A-Fa-f]+$/ ? 1 : 0 }
 fn Project::RegexAdvanced::pattern_word { "hello_world" =~ /^\w+$/ ? 1 : 0 }
 
 fn Project::RegexAdvanced::pattern_email_simple {
-    my $email = q{test@example.com}
+    val $email = q{test@example.com}
     $email =~ /^\S+@\S+\.\S+$/ ? 1 : 0
 }
 
@@ -294,8 +294,8 @@ fn Project::RegexAdvanced::mods_ig { "HELLO HELLO" =~ s/hello/hi/ig; _ // "" }
 fn Project::RegexAdvanced::mods_gi { "aAaA" =~ /a/gi ? 1 : 0 }
 
 fn Project::RegexAdvanced::subst_preserves_original {
-    my $s = "hello"
-    my $orig = $s
+    var $s = "hello"
+    val $orig = $s
     $s =~ s/hello/world/
     $orig eq "hello" ? 1 : 0
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
 require "./Accumulate.stk"
 
-my $sq  = _ * _
-my $up  = uc _
-my $rev = ~> _ >{split //, _} rev join ("")
+val $sq  = _ * _
+val $up  = uc _
+val $rev = ~> _ >{split //, _} rev join ("")
 
 assert_eq join(",", @{Exercism::Accumulate::accumulate([], $sq)}),                    "",            "accumulate empty"
 assert_eq join(",", @{Exercism::Accumulate::accumulate([1,2,3], $sq)}),               "1,4,9",       "accumulate squares"
@@ -11,7 +11,7 @@ assert_eq join(",", @{Exercism::Accumulate::accumulate(["Hello","world"], $up)})
 assert_eq join(",", @{Exercism::Accumulate::accumulate(["the","quick","brown","fox","etc"], $rev)}), "eht,kciuq,nworb,xof,cte", "accumulate reversed"
 
 # Recursive use
-my $r = Exercism::Accumulate::accumulate(["a","b","c"], fn($x) {
+val $r = Exercism::Accumulate::accumulate(["a","b","c"], fn($x) {
     Exercism::Accumulate::accumulate([1..3], fn($y) { $x . $y })
 })
 assert_eq join("|", map { join(",", @{_}) } @$r), "a1,a2,a3|b1,b2,b3|c1,c2,c3", "accumulate recursively"

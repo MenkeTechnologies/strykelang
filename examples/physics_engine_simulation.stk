@@ -24,7 +24,7 @@ fn Vec2::dot($v, $w)     = $v->[0] * $w->[0] + $v->[1] * $w->[1]
 fn Vec2::mag_sq($v)      = $v->[0]**2 + $v->[1]**2
 fn Vec2::mag($v)         = sqrt(Vec2::mag_sq $v)
 fn Vec2::norm($v) {
-    my $m = Vec2::mag $v
+    val $m = Vec2::mag $v
     $m > 0 ? Vec2::mul($v, 1.0 / $m) : Vec2::new($v->[0], $v->[1])
 }
 
@@ -47,7 +47,7 @@ fn Body::new($x, $y, $mass, $shape_kind, $shape_data) {
 # ── Collision Detection ──────────────────────────────────────────────────────
 
 fn Physics::collide($body1, $body2) {
-    my ($s1, $s2) = ($body1->{shape}, $body2->{shape})
+    val ($s1, $s2) = ($body1->{shape}, $body2->{shape})
     if ($s1 == ShapeKind::Circle && $s2 == ShapeKind::Circle) {
         return Physics::collide_cc($body1, $body2)
     }
@@ -58,95 +58,95 @@ fn Physics::collide($body1, $body2) {
         return Physics::collide_cb($body1, $body2)
     }
     if ($s1 == ShapeKind::Box && $s2 == ShapeKind::Circle) {
-        my $m = Physics::collide_cb($body2, $body1)
+        val $m = Physics::collide_cb($body2, $body1)
         return undef unless $m
-        my %flipped = (%$m, normal => Vec2::mul($m->{normal}, -1))
+        val %flipped = (%$m, normal => Vec2::mul($m->{normal}, -1))
         return \%flipped
     }
     undef
 }
 
 fn Physics::collide_cc($body1, $body2) {
-    my $dist_v = Vec2::sub $body2->{pos}, $body1->{pos}
-    my $dist   = Vec2::mag $dist_v
-    my $radius_sum = $body1->{data} + $body2->{data}
+    val $dist_v = Vec2::sub $body2->{pos}, $body1->{pos}
+    val $dist   = Vec2::mag $dist_v
+    val $radius_sum = $body1->{data} + $body2->{data}
     
     return undef if $dist > $radius_sum
     
-    my $normal = $dist > 0 ? Vec2::mul($dist_v, 1.0 / $dist) : Vec2::new(0, 1)
-    my %m = (normal => $normal, depth => $radius_sum - $dist)
+    val $normal = $dist > 0 ? Vec2::mul($dist_v, 1.0 / $dist) : Vec2::new(0, 1)
+    val %m = (normal => $normal, depth => $radius_sum - $dist)
     \%m
 }
 
 fn Physics::collide_bb($body1, $body2) {
     # Simple AABB
-    my $dx = abs($body1->{pos}->[0] - $body2->{pos}->[0])
-    my $dy = abs($body1->{pos}->[1] - $body2->{pos}->[1])
+    val $dx = abs($body1->{pos}->[0] - $body2->{pos}->[0])
+    val $dy = abs($body1->{pos}->[1] - $body2->{pos}->[1])
     
-    my $aw = $body1->{data}->[0] / 2
-    my $ah = $body1->{data}->[1] / 2
-    my $bw = $body2->{data}->[0] / 2
-    my $bh = $body2->{data}->[1] / 2
+    val $aw = $body1->{data}->[0] / 2
+    val $ah = $body1->{data}->[1] / 2
+    val $bw = $body2->{data}->[0] / 2
+    val $bh = $body2->{data}->[1] / 2
     
-    my $overlap_x = ($aw + $bw) - $dx
-    my $overlap_y = ($ah + $bh) - $dy
+    val $overlap_x = ($aw + $bw) - $dx
+    val $overlap_y = ($ah + $bh) - $dy
     
     return undef if $overlap_x <= 0 || $overlap_y <= 0
     
     if ($overlap_x < $overlap_y) {
-        my $nx = $body1->{pos}->[0] < $body2->{pos}->[0] ? 1 : -1
-        my %m = (normal => Vec2::new($nx, 0), depth => $overlap_x)
+        val $nx = $body1->{pos}->[0] < $body2->{pos}->[0] ? 1 : -1
+        val %m = (normal => Vec2::new($nx, 0), depth => $overlap_x)
         \%m
     } else {
-        my $ny = $body1->{pos}->[1] < $body2->{pos}->[1] ? 1 : -1
-        my %m = (normal => Vec2::new(0, $ny), depth => $overlap_y)
+        val $ny = $body1->{pos}->[1] < $body2->{pos}->[1] ? 1 : -1
+        val %m = (normal => Vec2::new(0, $ny), depth => $overlap_y)
         \%m
     }
 }
 
 fn Physics::collide_cb($circ, $box) {
     # Circle vs Box
-    my $circle_pos = $circ->{pos}
-    my $box_pos    = $box->{pos}
-    my $box_half_w = $box->{data}->[0] / 2
-    my $box_half_h = $box->{data}->[1] / 2
+    val $circle_pos = $circ->{pos}
+    val $box_pos    = $box->{pos}
+    val $box_half_w = $box->{data}->[0] / 2
+    val $box_half_h = $box->{data}->[1] / 2
     
     # Closest point on box to circle center
-    my $closest_x = clamp($circle_pos->[0], $box_pos->[0] - $box_half_w, $box_pos->[0] + $box_half_w)
-    my $closest_y = clamp($circle_pos->[1], $box_pos->[1] - $box_half_h, $box_pos->[1] + $box_half_h)
+    val $closest_x = clamp($circle_pos->[0], $box_pos->[0] - $box_half_w, $box_pos->[0] + $box_half_w)
+    val $closest_y = clamp($circle_pos->[1], $box_pos->[1] - $box_half_h, $box_pos->[1] + $box_half_h)
     
-    my $dist_v = Vec2::sub $circle_pos, Vec2::new($closest_x, $closest_y)
-    my $dist   = Vec2::mag $dist_v
+    val $dist_v = Vec2::sub $circle_pos, Vec2::new($closest_x, $closest_y)
+    val $dist   = Vec2::mag $dist_v
     
     return undef if $dist > $circ->{data}
     
-    my $normal = $dist > 0 ? Vec2::norm($dist_v) : Vec2::new(0, 1)
-    my %m = (normal => $normal, depth => $circ->{data} - $dist)
+    val $normal = $dist > 0 ? Vec2::norm($dist_v) : Vec2::new(0, 1)
+    val %m = (normal => $normal, depth => $circ->{data} - $dist)
     \%m
 }
 
 # ── Resolution ───────────────────────────────────────────────────────────────
 
 fn Physics::resolve($body1, $body2, $manifold) {
-    my $relative_vel = Vec2::sub $body2->{vel}, $body1->{vel}
-    my $vel_along_normal = Vec2::dot $relative_vel, $manifold->{normal}
+    val $relative_vel = Vec2::sub $body2->{vel}, $body1->{vel}
+    val $vel_along_normal = Vec2::dot $relative_vel, $manifold->{normal}
     
     # Do not resolve if velocities are separating
     return if $vel_along_normal > 0
     
-    my $e = min($body1->{restitution}, $body2->{restitution})
-    my $j = -(1 + $e) * $vel_along_normal
+    val $e = min($body1->{restitution}, $body2->{restitution})
+    var $j = -(1 + $e) * $vel_along_normal
     $j /= ($body1->{inv_mass} + $body2->{inv_mass})
     
-    my $impulse = Vec2::mul $manifold->{normal}, $j
+    val $impulse = Vec2::mul $manifold->{normal}, $j
     
     $body1->{vel} = Vec2::sub $body1->{vel}, Vec2::mul($impulse, $body1->{inv_mass})
     $body2->{vel} = Vec2::add $body2->{vel}, Vec2::mul($impulse, $body2->{inv_mass})
     
     # Positional Correction (anti-sinking)
-    my $percent = 0.2 # 20% to 80%
-    my $slop = 0.01
-    my $correction = Vec2::mul($manifold->{normal}, (max($manifold->{depth} - $slop, 0) / ($body1->{inv_mass} + $body2->{inv_mass})) * $percent)
+    val $percent = 0.2 # 20% to 80%
+    val $slop = 0.01
+    val $correction = Vec2::mul($manifold->{normal}, (max($manifold->{depth} - $slop, 0) / ($body1->{inv_mass} + $body2->{inv_mass})) * $percent)
     $body1->{pos} = Vec2::sub $body1->{pos}, Vec2::mul($correction, $body1->{inv_mass})
     $body2->{pos} = Vec2::add $body2->{pos}, Vec2::mul($correction, $body2->{inv_mass})
 }
@@ -154,23 +154,23 @@ fn Physics::resolve($body1, $body2, $manifold) {
 # ── World Simulation ─────────────────────────────────────────────────────────
 
 fn World::step($bodies, $dt) {
-    my $gravity = Vec2::new(0, 9.8)
+    val $gravity = Vec2::new(0, 9.8)
     
     # 1. Integrate forces (gravity) and update positions
-    for my $body (@$bodies) {
+    for var $body (@$bodies) {
         next if $body->{inv_mass} == 0
         $body->{vel} = Vec2::add $body->{vel}, Vec2::mul($gravity, $dt)
         $body->{pos} = Vec2::add $body->{pos}, Vec2::mul($body->{vel}, $dt)
     }
     
     # 2. Collision detection and resolution
-    for (my $i = 0; $i < len(@$bodies); $i++) {
-        for (my $j = $i + 1; $j < len(@$bodies); $j++) {
-            my $body1 = $bodies->[$i]
-            my $body2 = $bodies->[$j]
+    for (var $i = 0; $i < len(@$bodies); $i++) {
+        for (var $j = $i + 1; $j < len(@$bodies); $j++) {
+            val $body1 = $bodies->[$i]
+            val $body2 = $bodies->[$j]
             next if $body1->{inv_mass} == 0 && $body2->{inv_mass} == 0
             
-            my $manifold = Physics::collide $body1, $body2
+            val $manifold = Physics::collide $body1, $body2
             Physics::resolve($body1, $body2, $manifold) if $manifold
         }
     }
@@ -179,31 +179,31 @@ fn World::step($bodies, $dt) {
 # ── Visualization ────────────────────────────────────────────────────────────
 
 fn World::render($bodies, $w, $h) {
-    my @screen
+    var @screen
     for (0 : $h) { push @screen, [(" ") x $w] }
     
-    for my $body (@$bodies) {
-        my $px = int($body->{pos}->[0])
-        my $py = int($body->{pos}->[1])
+    for val $body (@$bodies) {
+        val $px = int($body->{pos}->[0])
+        val $py = int($body->{pos}->[1])
         next if $px < 0 || $px >= $w || $py < 0 || $py >= $h
         
         if ($body->{shape} == ShapeKind::Circle) {
-            my $r = int($body->{data})
-            for my $dy (-$r : $r) {
-                for my $dx (-$r : $r) {
+            val $r = int($body->{data})
+            for val $dy (-$r : $r) {
+                for val $dx (-$r : $r) {
                     next if $dx**2 + $dy**2 > $r**2
-                    my $sx = $px + $dx
-                    my $sy = $py + $dy
+                    val $sx = $px + $dx
+                    val $sy = $py + $dy
                     $screen[$sy][$sx] = "O" if $sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h
                 }
             }
         } elsif ($body->{shape} == ShapeKind::Box) {
-            my $hw = int($body->{data}->[0] / 2)
-            my $hh = int($body->{data}->[1] / 2)
-            for my $dy (-$hh : $hh) {
-                for my $dx (-$hw : $hw) {
-                    my $sx = $px + $dx
-                    my $sy = $py + $dy
+            val $hw = int($body->{data}->[0] / 2)
+            val $hh = int($body->{data}->[1] / 2)
+            for val $dy (-$hh : $hh) {
+                for val $dx (-$hw : $hw) {
+                    val $sx = $px + $dx
+                    val $sy = $py + $dy
                     $screen[$sy][$sx] = "#" if $sx >= 0 && $sx < $w && $sy >= 0 && $sy < $h
                 }
             }
@@ -211,7 +211,7 @@ fn World::render($bodies, $w, $h) {
     }
     
     p "+" . ("-" x $w) . "+"
-    for my $row (@screen) {
+    for val $row (@screen) {
         p "|" . join("", @$row) . "|"
     }
     p "+" . ("-" x $w) . "+"
@@ -220,10 +220,10 @@ fn World::render($bodies, $w, $h) {
 # ── Internal Tests ───────────────────────────────────────────────────────────
 
 fn test_physics {
-    my $c1 = Body::new(10, 10, 1, ShapeKind::Circle, 2)
-    my $c2 = Body::new(10, 13, 1, ShapeKind::Circle, 2)
+    val $c1 = Body::new(10, 10, 1, ShapeKind::Circle, 2)
+    val $c2 = Body::new(10, 13, 1, ShapeKind::Circle, 2)
     
-    my $m = Physics::collide $c1, $c2
+    val $m = Physics::collide $c1, $c2
     die "Collision fail" unless $m
     die "Normal fail"    unless $m->{normal}->[0] == 0 && $m->{normal}->[1] == 1
     die "Depth fail"     unless $m->{depth} == 1 # 2+2 - 3 = 1
@@ -235,7 +235,7 @@ fn test_physics {
 
 test_physics()
 
-my @bodies = (
+val @bodies = (
     # Static floor
     Body::new(40, 30, 0, ShapeKind::Box, [80, 2]),
     # Static walls
@@ -250,8 +250,8 @@ my @bodies = (
 )
 
 p "Simulating 2D Physics Engine (ASCII)..."
-my $dt = 0.1
-for my $step (1 : 30) {
+val $dt = 0.1
+for val $step (1 : 30) {
     World::step \@bodies, $dt
     if ($step % 10 == 0) {
         p "\nStep $step:"

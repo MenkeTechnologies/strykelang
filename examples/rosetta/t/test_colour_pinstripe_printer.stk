@@ -4,9 +4,9 @@
 fn Rosetta::ColourPinstripe::palette() { qw(K R G B M C Y W) }
 
 fn Rosetta::ColourPinstripe::row($width, $stripe_w) {
-    my @colors = Rosetta::ColourPinstripe::palette()
-    my $line = ""
-    my $i = 0
+    val @colors = Rosetta::ColourPinstripe::palette()
+    var $line = ""
+    var $i = 0
     while (len($line) < $width) {
         $line .= $colors[$i % len(@colors)] x $stripe_w
         $i++
@@ -15,11 +15,11 @@ fn Rosetta::ColourPinstripe::row($width, $stripe_w) {
 }
 
 fn Rosetta::ColourPinstripe::render($width, $max_w) {
-    my @rows = ~> 1:$max_w map { Rosetta::ColourPinstripe::row($width, _) }
+    val @rows = ~> 1:$max_w map { Rosetta::ColourPinstripe::row($width, _) }
     \@rows
 }
 
-my $rows = Rosetta::ColourPinstripe::render(32, 4)
+val $rows = Rosetta::ColourPinstripe::render(32, 4)
 
 assert_eq len(@$rows), 4, "four stripe widths rendered"
 assert_eq substr($rows->[0], 0, 8), "KRGBMCYW", "1-point pattern cycles palette"

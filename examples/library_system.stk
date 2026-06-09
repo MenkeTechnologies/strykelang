@@ -23,7 +23,7 @@ class Book {
 
 # ── 2. Library Logic (Namespaced) ──────────────────────────────────
 
-my @inventory = ()
+var @inventory = ()
 
 fn Library::add_book($title, $author) {
     push @inventory, Book->new(title => $title, author => $author)
@@ -49,8 +49,8 @@ Library::add_book("Animal Farm", "George Orwell")
 p "Total books: #{ len @inventory }"
 
 # Checkout one
-my $results_ref = Library::find_by_author("Orwell") |> collect
-my $book1984 = $results_ref->[0]
+val $results_ref = Library::find_by_author("Orwell") |> collect
+val $book1984 = $results_ref->[0]
 $book1984->checkout()
 p "Checked out: #{ $book1984->title }"
 
@@ -62,7 +62,7 @@ for (Library::list_available() |> collect) {
 # ── 4. Slicing Demo ────────────────────────────────────────────────
 
 p "\nFirst two books in inventory:"
-my @subset = @inventory[0:1]
+val @subset = @inventory[0:1]
 for (@subset) {
     p "  [#{ _->title }]"
 }

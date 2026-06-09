@@ -24,8 +24,8 @@
 # the reverse residual edge in the destination's adjacency list.
 
 fn Mcmf::new($n) {
-    my @adj
-    for my $i (0:$n - 1) { push @adj, [] }
+    var @adj
+    for val $i (0:$n - 1) { push @adj, [] }
     +{ n => $n, adj => \@adj }
 }
 
@@ -50,21 +50,21 @@ fn Mcmf::add_edge($g, $from, $to, $cap, $cost) {
 # Returns +{ found => 0/1, dist => […], parent_v => […], parent_e => […] }.
 
 fn Mcmf::spfa($g, $src, $sink) {
-    my $INF = 1_000_000_000_000
-    my $n = $g->{n}
-    my @dist     = ($INF) x $n
-    my @parent_v = (-1) x $n
-    my @parent_e = (-1) x $n
-    my @in_queue = (0)  x $n
+    val $INF = 1_000_000_000_000
+    val $n = $g->{n}
+    var @dist     = ($INF) x $n
+    var @parent_v = (-1) x $n
+    var @parent_e = (-1) x $n
+    var @in_queue = (0)  x $n
     $dist[$src] = 0
-    my @queue = ($src)
+    var @queue = ($src)
     $in_queue[$src] = 1
     while (len(@queue) > 0) {
-        my $u = shift @queue
+        val $u = shift @queue
         $in_queue[$u] = 0
-        my $adj = $g->{adj}->[$u]
-        for my $i (0:len(@$adj) - 1) {
-            my $e = $adj->[$i]
+        val $adj = $g->{adj}->[$u]
+        for val $i (0:len(@$adj) - 1) {
+            val $e = $adj->[$i]
             if ($e->{cap} > 0 && $dist[$u] + $e->{cost} < $dist[$e->{to}]) {
                 $dist[$e->{to}] = $dist[$u] + $e->{cost}
                 $parent_v[$e->{to}] = $u
@@ -87,29 +87,29 @@ fn Mcmf::spfa($g, $src, $sink) {
 # ── successive-shortest-path main loop ────────────────────────────
 
 fn Mcmf::solve($g, $src, $sink) {
-    my $flow = 0
-    my $cost = 0
+    var $flow = 0
+    var $cost = 0
     while (1) {
-        my $sp = Mcmf::spfa($g, $src, $sink)
+        val $sp = Mcmf::spfa($g, $src, $sink)
         last unless $sp->{found}
         # Bottleneck along the path src -> sink.
-        my $bottle = 1_000_000_000_000
-        my $v = $sink
+        var $bottle = 1_000_000_000_000
+        var $v = $sink
         while ($v != $src) {
-            my $u  = $sp->{parent_v}->[$v]
-            my $ei = $sp->{parent_e}->[$v]
-            my $cap = $g->{adj}->[$u]->[$ei]->{cap}
+            val $u  = $sp->{parent_v}->[$v]
+            val $ei = $sp->{parent_e}->[$v]
+            val $cap = $g->{adj}->[$u]->[$ei]->{cap}
             $bottle = $cap if $cap < $bottle
             $v = $u
         }
         # Augment.
         $v = $sink
         while ($v != $src) {
-            my $u  = $sp->{parent_v}->[$v]
-            my $ei = $sp->{parent_e}->[$v]
-            my $e  = $g->{adj}->[$u]->[$ei]
+            val $u  = $sp->{parent_v}->[$v]
+            val $ei = $sp->{parent_e}->[$v]
+            var $e  = $g->{adj}->[$u]->[$ei]
             $e->{cap} -= $bottle
-            my $back = $g->{adj}->[$e->{to}]->[$e->{rev}]
+            var $back = $g->{adj}->[$e->{to}]->[$e->{rev}]
             $back->{cap} += $bottle
             $cost += $bottle * $e->{cost}
             $v = $u
@@ -121,7 +121,7 @@ fn Mcmf::solve($g, $src, $sink) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases = (
+val @cases = (
     +{
         name  => "direct edge",
         n     => 2,
@@ -185,13 +185,13 @@ my @cases = (
 p "── min-cost max-flow demo ────────────────────────────"
 printf "  %-22s  %3s  %5s  %5s  %s\n", "case", "n", "flow", "cost", ""
 printf "  %-22s  %3s  %5s  %5s\n", "----------------------", "---", "-----", "-----"
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
-    my $ok = $r->{flow} == $c->{flow} && $r->{cost} == $c->{cost}
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    val $ok = $r->{flow} == $c->{flow} && $r->{cost} == $c->{cost}
     printf "  %-22s  %3d  %5d  %5d  %s\n",
         $c->{name}, $c->{n}, $r->{flow}, $r->{cost},
         $ok ? "" : "FAIL want=(flow=#{$c->{flow}}, cost=#{$c->{cost}})"
@@ -199,39 +199,39 @@ for my $c (@cases) {
 
 # ── invariant 1: max-flow value matches expected ──────────────────
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
     die "flow #{$r->{flow}} != expected #{$c->{flow}} on \"#{$c->{name}}\"" unless $r->{flow} == $c->{flow}
 }
 
 # ── invariant 2: cost matches expected ────────────────────────────
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
     die "cost #{$r->{cost}} != expected #{$c->{cost}} on \"#{$c->{name}}\"" unless $r->{cost} == $c->{cost}
 }
 
 # ── invariant 3: reported cost == Σ used(e) · cost(e) over forward ─
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
-    my $sum_cost = 0
-    for my $u (0:$c->{n} - 1) {
-        for my $e (@{$g->{adj}->[$u]}) {
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    var $sum_cost = 0
+    for val $u (0:$c->{n} - 1) {
+        for val $e (@{$g->{adj}->[$u]}) {
             next if $e->{orig} == 0   # skip reverse edges
-            my $used = $e->{orig} - $e->{cap}
+            val $used = $e->{orig} - $e->{cap}
             $sum_cost += $used * $e->{cost}
         }
     }
@@ -240,23 +240,23 @@ for my $c (@cases) {
 
 # ── invariant 4: flow conservation at every non-src/non-sink node ─
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
-    for my $u (0:$c->{n} - 1) {
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    for val $u (0:$c->{n} - 1) {
         next if $u == $c->{src} || $u == $c->{sink}
-        my $outflow = 0
-        for my $e (@{$g->{adj}->[$u]}) {
+        var $outflow = 0
+        for val $e (@{$g->{adj}->[$u]}) {
             next if $e->{orig} == 0
             $outflow += $e->{orig} - $e->{cap}
         }
-        my $inflow = 0
-        for my $other (0:$c->{n} - 1) {
+        var $inflow = 0
+        for val $other (0:$c->{n} - 1) {
             next if $other == $u
-            for my $e (@{$g->{adj}->[$other]}) {
+            for val $e (@{$g->{adj}->[$other]}) {
                 next if $e->{orig} == 0
                 $inflow += $e->{orig} - $e->{cap} if $e->{to} == $u
             }
@@ -267,14 +267,14 @@ for my $c (@cases) {
 
 # ── invariant 5: source out-flow == reported flow ─────────────────
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
-    my $r = Mcmf::solve($g, $c->{src}, $c->{sink})
-    my $out = 0
-    for my $e (@{$g->{adj}->[$c->{src}]}) {
+    val $r = Mcmf::solve($g, $c->{src}, $c->{sink})
+    var $out = 0
+    for val $e (@{$g->{adj}->[$c->{src}]}) {
         next if $e->{orig} == 0
         $out += $e->{orig} - $e->{cap}
     }
@@ -283,14 +283,14 @@ for my $c (@cases) {
 
 # ── invariant 6: no flow exceeds its edge's original capacity ─────
 
-for my $c (@cases) {
-    my $g = Mcmf::new($c->{n})
-    for my $e (@{$c->{edges}}) {
+for val $c (@cases) {
+    val $g = Mcmf::new($c->{n})
+    for val $e (@{$c->{edges}}) {
         Mcmf::add_edge($g, $e->[0], $e->[1], $e->[2], $e->[3])
     }
     Mcmf::solve($g, $c->{src}, $c->{sink})
-    for my $u (0:$c->{n} - 1) {
-        for my $e (@{$g->{adj}->[$u]}) {
+    for val $u (0:$c->{n} - 1) {
+        for val $e (@{$g->{adj}->[$u]}) {
             next if $e->{orig} == 0
             die "edge #{$u}->#{$e->{to}} overflowed" unless $e->{cap} >= 0 && $e->{cap} <= $e->{orig}
         }
@@ -299,7 +299,7 @@ for my $c (@cases) {
 
 # ── invariant 7: parallel-cheap-vs-expensive picks cheap first ────
 
-my $split = +{
+val $split = +{
     n     => 4,
     src   => 0,
     sink  => 3,
@@ -308,11 +308,11 @@ my $split = +{
         [0, 2, 4, 5],  [2, 3, 4, 5],
     ],
 }
-my $g_s = Mcmf::new($split->{n})
-for my $e (@{$split->{edges}}) {
+val $g_s = Mcmf::new($split->{n})
+for val $e (@{$split->{edges}}) {
     Mcmf::add_edge($g_s, $e->[0], $e->[1], $e->[2], $e->[3])
 }
-my $r_s = Mcmf::solve($g_s, $split->{src}, $split->{sink})
+val $r_s = Mcmf::solve($g_s, $split->{src}, $split->{sink})
 die "split: flow must be 8" unless $r_s->{flow} == 8
 # Cheap path 4 × (1+1) = 8; expensive path 4 × (5+5) = 40; total 48.
 die "split: cost must be 48 (cheap before expensive)" unless $r_s->{cost} == 48

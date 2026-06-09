@@ -29,7 +29,7 @@ fn Project::Regex::is_phone_like($str) {
 # ── Capture groups ─────────────────────────────────────────────────
 
 fn Project::Regex::extract_numbers($str) {
-    my @nums
+    var @nums
     while ($str =~ /(\d+)/g) {
         push @nums, $1
     }
@@ -63,31 +63,31 @@ fn Project::Regex::extract_between_parens($str) {
 # ── Substitution ───────────────────────────────────────────────────
 
 fn Project::Regex::replace_digits_with($str, $repl) {
-    my $result = $str
+    var $result = $str
     $result =~ s/\d/$repl/g
     $result
 }
 
 fn Project::Regex::trim_whitespace($str) {
-    my $result = $str
+    var $result = $str
     $result =~ s/^\s+//
     $result =~ s/\s+$//
     $result
 }
 
 fn Project::Regex::spaces_normalize($str) {
-    my $result = $str
+    var $result = $str
     $result =~ s/\s+/ /g
     $result
 }
 
 fn Project::Regex::camelcase_to_snake($str) {
-    my $result = $str
+    var $result = $str
     $result =~ s/([a-z])([A-Z])/${1}_${2}/g
     lc $result}
 
 fn Project::Regex::snake_to_camelcase($str) {
-    my $result = $str
+    var $result = $str
     $result =~ s/_([a-z])/uc($1)/ge
     $result
 }
@@ -95,17 +95,17 @@ fn Project::Regex::snake_to_camelcase($str) {
 # ── Split with regex ───────────────────────────────────────────────
 
 fn Project::Regex::split_on_whitespace($str) {
-    my @parts = split(/\s+/, $str)
+    val @parts = split(/\s+/, $str)
     @parts
 }
 
 fn Project::Regex::split_on_commas($str) {
-    my @parts = split(/\s*,\s*/, $str)
+    val @parts = split(/\s*,\s*/, $str)
     @parts
 }
 
 fn Project::Regex::split_sentences($str) {
-    my @parts = split(/[.!?]+\s*/, $str)
+    val @parts = split(/[.!?]+\s*/, $str)
     @parts
 }
 
@@ -116,7 +116,7 @@ fn Project::Regex::match_case_insensitive($str, $pattern) {
 }
 
 fn Project::Regex::count_matches($str, $pattern) {
-    my @matches = ($str =~ /$pattern/g)
+    val @matches = ($str =~ /$pattern/g)
     scalar @matches
 }
 
@@ -127,12 +127,12 @@ fn Project::Regex::match_multiline($str, $pattern) {
 # ── Character classes ──────────────────────────────────────────────
 
 fn Project::Regex::vowels_count($str) {
-    my @v = ($str =~ /[aeiouAEIOU]/g)
+    val @v = ($str =~ /[aeiouAEIOU]/g)
     scalar @v
 }
 
 fn Project::Regex::consonants_count($str) {
-    my @c = ($str =~ /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g)
+    val @c = ($str =~ /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g)
     scalar @c
 }
 
@@ -147,7 +147,7 @@ fn Project::Regex::is_hex($str) {
 # ── Anchors and boundaries ─────────────────────────────────────────
 
 fn Project::Regex::words_count($str) {
-    my @words = ($str =~ /\b\w+\b/g)
+    val @words = ($str =~ /\b\w+\b/g)
     scalar @words
 }
 
@@ -160,14 +160,14 @@ fn Project::Regex::first_line($str) {
 }
 
 fn Project::Regex::extract_lines($str) {
-    my @lines = split(/\n/, $str)
+    val @lines = split(/\n/, $str)
     @lines
 }
 
 # ── Lookahead simulation ───────────────────────────────────────────
 
 fn Project::Regex::numbers_followed_by_letter($str) {
-    my @nums
+    var @nums
     while ($str =~ /(\d+)[a-zA-Z]/g) {
         push @nums, $1
     }
@@ -175,7 +175,7 @@ fn Project::Regex::numbers_followed_by_letter($str) {
 }
 
 fn Project::Regex::words_before_colon($str) {
-    my @words
+    var @words
     while ($str =~ /(\w+):/g) {
         push @words, $1
     }
@@ -194,9 +194,9 @@ fn Project::Regex::parse_date($str) {
 
 fn Project::Regex::parse_time($str) {
     if ($str =~ /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/) {
-        my $h = $1
-        my $m = $2
-        my $s = $3 // 0
+        val $h = $1
+        val $m = $2
+        val $s = $3 // 0
         ($h, $m, $s)
     } else {
         (0, 0, 0)
@@ -204,7 +204,7 @@ fn Project::Regex::parse_time($str) {
 }
 
 fn Project::Regex::extract_urls($str) {
-    my @urls
+    var @urls
     while ($str =~ /(https?:\/\/[^\s]+)/g) {
         push @urls, $1
     }
@@ -212,13 +212,13 @@ fn Project::Regex::extract_urls($str) {
 }
 
 fn Project::Regex::mask_digits($str) {
-    my $mask = "X"
-    my $result = $str
+    val $mask = "X"
+    var $result = $str
     $result =~ s/\d/$mask/g
     $result
 }
 
 fn Project::Regex::words_reversed($str) {
-    my @words = split(/\s+/, $str)
+    val @words = split(/\s+/, $str)
     join(" ", rev @words)
 }

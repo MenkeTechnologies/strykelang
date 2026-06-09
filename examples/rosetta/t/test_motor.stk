@@ -16,7 +16,7 @@ fn Rosetta::Motor::tick($motor, $seconds) {
     $motor->{shaft}
 }
 
-my $motor = Rosetta::Motor::new()
+val $motor = Rosetta::Motor::new()
 Rosetta::Motor::set_speed($motor, 120)
 assert_eq Rosetta::Motor::tick($motor, 2), 0, "disabled motor does not move"
 Rosetta::Motor::enable($motor)

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Motzkin numbers
 
-my %memo
+var %memo
 
 fn Rosetta::Motzkin::compute($n) {
     if ($n < 2) {
@@ -9,8 +9,8 @@ fn Rosetta::Motzkin::compute($n) {
     } elsif (exists $memo{$n}) {
         $memo{$n}
     } else {
-        my $res = Rosetta::Motzkin::compute($n-1)
-        for my $i (0:$n-2) {
+        var $res = Rosetta::Motzkin::compute($n-1)
+        for val $i (0:$n-2) {
             $res += Rosetta::Motzkin::compute($i) * Rosetta::Motzkin::compute($n-2-$i)
         }
         $memo{$n} = $res

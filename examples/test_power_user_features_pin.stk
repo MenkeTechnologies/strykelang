@@ -24,7 +24,7 @@ after "Service::task" {
 
 around "Service::task" {
     $Service::aop_log .= "around_start;";
-    my $res = proceed();
+    val $res = proceed();
     $Service::aop_log .= "around_end;";
     $res
 }
@@ -36,13 +36,13 @@ intercept_list() |> grep { _->[2] eq "Service::task" } |> len |> { _ >= 3 } |> a
 
 # ── 2. Async / Await ────────────────────────────────────────────────────────
 
-my $h1 = async { sleep 0.01; 42 }
-my $h2 = spawn { sleep 0.02; 100 }
+val $h1 = async { sleep 0.01; 42 }
+val $h2 = spawn { sleep 0.02; 100 }
 await($h1) |> aeq 42, "async await result"
 await($h2) |> aeq 100, "spawn await result"
 
-my @handles = map { my $v = _; async { sleep 0.01; $v * 2 } } 1:5
-my @results = map {await} @handles
+val @handles = map { val $v = _; async { sleep 0.01; $v * 2 } } 1:5
+val @results = map {await} @handles
 @results |> join(",") |> aeq "2,4,6,8,10", "await results"
 
 # ── 3. Cryptography ─────────────────────────────────────────────────────────
@@ -50,27 +50,27 @@ my @results = map {await} @handles
 md5("stryke")    |> aeq "16d6cafb5a981c26fa498e75c5c32053", "md5"
 sha256("stryke") |> aeq "f16ec19013a7c7e1511a27927cb875ca9dc606c9902639b1bcac50be3f252612", "sha256"
 
-my $secret = "top-secret-key"
+val $secret = "top-secret-key"
 hmac_sha256($secret, "msg") |> { len(_) == 64 } |> aok "hmac_sha256 length"
 
-my $pw = "password123"
-my $h_pw = argon2_hash($pw)
+val $pw = "password123"
+val $h_pw = argon2_hash($pw)
 argon2_verify($pw, $h_pw) |> aok "argon2_verify success"
 argon2_verify("wrong", $h_pw) |> { _ == 0 } |> aok "argon2_verify failure"
 
-my $claims = { sub => "alice", role => "admin" }
-my $token = jwt_encode($claims, "jwt-key")
-my $decoded = jwt_decode($token, "jwt-key")
+val $claims = { sub => "alice", role => "admin" }
+val $token = jwt_encode($claims, "jwt-key")
+val $decoded = jwt_decode($token, "jwt-key")
 $decoded->{sub} |> aeq "alice", "jwt_decode sub"
 
 # ── 4. Codecs ───────────────────────────────────────────────────────────────
 
-my $data = { a => 1, b => [2, 3], c => { d => 4 } }
+val $data = { a => 1, b => [2, 3], c => { d => 4 } }
 to_json($data)   |> from_json   |> deep_equal($data) |> aok "JSON roundtrip"
 to_yaml($data)   |> from_yaml   |> deep_equal($data) |> aok "YAML roundtrip"
 to_toml($data)   |> from_toml   |> deep_equal($data) |> aok "TOML roundtrip"
 
-my @rows = ({id => 1, name => "a"}, {id => 2, name => "b"})
+val @rows = ({id => 1, name => "a"}, {id => 2, name => "b"})
 to_csv(\@rows) |> from_csv |> len |> aeq 2, "CSV roundtrip"
 
 # ── 5. Date and Time ────────────────────────────────────────────────────────
@@ -81,9 +81,9 @@ now_ns() |> { _ > 0 } |> aok "now_ns > 0"
 
 # ── 6. Secrets ──────────────────────────────────────────────────────────────
 
-my $s_key = secrets_random_key()
-my $plain = "sensitive data"
-my $enc = secrets_encrypt($plain, key => $s_key)
+val $s_key = secrets_random_key()
+val $plain = "sensitive data"
+val $enc = secrets_encrypt($plain, key => $s_key)
 secrets_decrypt($enc, key => $s_key) |> aeq $plain, "Secrets roundtrip"
 
 # ── 7. Stress Testing (Lightweight) ──────────────────────────────────────────
@@ -102,7 +102,7 @@ stress_mem(1e6) |> aok "stress_mem(1e6)"
 web_db_connect(":memory:")
 web_jobs_init()
 web_job_enqueue("test_job", { payload => "data" })
-my $job = web_job_dequeue()
+val $job = web_job_dequeue()
 $job->{name} |> aeq "test_job", "web_job_dequeue name"
 $job->{args}->{payload} |> aeq "data", "web_job_dequeue args"
 web_job_complete($job->{id})
@@ -114,10 +114,10 @@ aok(%all{bloom_filter}, "bloom_filter in %all")
 aok(%b{bloom_filter},   "bloom_filter in %b")
 len(%d{bloom_filter}) |> { _ > 0 } |> aok "bloom_filter has description"
 
-my @prob_cats = grep { /probabilistic/ } keys %c
+val @prob_cats = grep { /probabilistic/ } keys %c
 aok(len(@prob_cats) >= 1, "Found probabilistic category")
-my $cat = @prob_cats[0]
-my @members = @{$c{$cat}}
+val $cat = @prob_cats[0]
+val @members = @{$c{$cat}}
 aok(len(grep { _ eq "bloom_filter" } @members) >= 1, "bloom_filter in category members")
 
 test_run

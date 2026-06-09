@@ -2,22 +2,22 @@
 # Rosetta Code: Brownian tree
 
 fn Rosetta::BrownianTree::generate($size, $num_particles) {
-    my @grid
+    var @grid
     for (0..($size - 1)) {
-        my @row
+        var @row
         for (0..($size - 1)) { push @row, 0 }
         push @grid, \@row
     }
     
     # Seed at the center
-    my $cx = int($size / 2)
-    my $cy = int($size / 2)
+    val $cx = int($size / 2)
+    val $cy = int($size / 2)
     $grid[$cy]->[$cx] = 1
     
-    my $count = 0
+    var $count = 0
     while ($count < $num_particles) {
         # Release from random point on boundary
-        my ($px, $py)
+        var ($px, $py)
         if (rand() < 0.5) {
             $px = int(rand($size))
             $py = rand() < 0.5 ? 0 : $size - 1
@@ -28,8 +28,8 @@ fn Rosetta::BrownianTree::generate($size, $num_particles) {
         
         # Random walk
         while (1) {
-            my $dx = int(rand(3)) - 1
-            my $dy = int(rand(3)) - 1
+            val $dx = int(rand(3)) - 1
+            val $dy = int(rand(3)) - 1
             $px += $dx
             $py += $dy
             
@@ -38,9 +38,9 @@ fn Rosetta::BrownianTree::generate($size, $num_particles) {
             $py = 0 if $py < 0; $py = $size - 1 if $py >= $size
             
             # Check neighbors for stickiness
-            my $touches = 0
-            for (my $nx = $px - 1; $nx <= $px + 1; $nx++) {
-                for (my $ny = $py - 1; $ny <= $py + 1; $ny++) {
+            var $touches = 0
+            for (var $nx = $px - 1; $nx <= $px + 1; $nx++) {
+                for (var $ny = $py - 1; $ny <= $py + 1; $ny++) {
                     next if $nx < 0 || $nx >= $size || $ny < 0 || $ny >= $size
                     if ($grid[$ny]->[$nx] == 1) {
                         $touches = 1
@@ -57,7 +57,7 @@ fn Rosetta::BrownianTree::generate($size, $num_particles) {
             }
             
             # If it gets too far from center, just restart to save time (not strictly DLA but common optimization)
-            my $dist_sq = ($px - $cx)**2 + ($py - $cy)**2
+            val $dist_sq = ($px - $cx)**2 + ($py - $cy)**2
             if ($dist_sq > ($size/2)**2) {
                 last
             }
@@ -66,15 +66,15 @@ fn Rosetta::BrownianTree::generate($size, $num_particles) {
     \@grid
 }
 
-my $size = 20
-my $tree = Rosetta::BrownianTree::generate($size, 50)
+val $size = 20
+val $tree = Rosetta::BrownianTree::generate($size, 50)
 assert_eq len(@$tree), $size, "Tree grid height matches"
 assert_eq len(@{$tree->[0]}), $size, "Tree grid width matches"
 
 # Verify there is at least one point set
-my $found = 0
-for my $row (@$tree) {
-    for my $cell (@$row) {
+var $found = 0
+for val $row (@$tree) {
+    for val $cell (@$row) {
         $found = 1 if $cell == 1
     }
 }

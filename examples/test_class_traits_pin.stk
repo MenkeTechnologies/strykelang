@@ -6,7 +6,7 @@
 # ── Class ref() ────────────────────────────────────────────────────────────
 
 class SimpleClass { val : Int }
-my $obj_simple = SimpleClass->new(val => 10)
+val $obj_simple = SimpleClass->new(val => 10)
 ref($obj_simple) |> aeq "SimpleClass", "ref() on native class instance"
 $obj_simple->isa("SimpleClass") |> aok "isa() still works"
 
@@ -23,13 +23,13 @@ Circle->new(radius => 5)->draw() |> aeq "drawing...", "class implementing trait"
 # ── Types ──────────────────────────────────────────────────────────────────
 
 class TypeTest { items : Array = [] }
-my $tt = TypeTest->new()
+val $tt = TypeTest->new()
 ref($tt->{items}) |> aeq "ARRAY", "Array type accepts arrayref"
 
 # ── Range Flip-Flop ────────────────────────────────────────────────────────
 
-my @range_hits = ()
-for my $i (1:5) {
+var @range_hits = ()
+for val $i (1:5) {
     push @range_hits, $i if $i == 2 .. $i == 4
 }
 join(",", @range_hits) |> aeq "1,3,4,5", "range flip-flop behaves as list (pinned bug)"

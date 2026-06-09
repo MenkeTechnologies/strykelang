@@ -3,17 +3,17 @@
 # repeatedly draw the smallest pile-top via a min-heap merge.
 
 fn Rosetta::Patience::sort($list) {
-    my @arr = @$list
+    val @arr = @$list
     return [] if len(@arr) == 0
     return [@arr] if len(@arr) == 1
 
     # Deal: each card goes onto leftmost pile whose top is >= card,
     # else starts a new pile. Pile tops are non-increasing => binary search.
-    my @piles
-    for my $x (@arr) {
-        my ($lo, $hi) = (0, len(@piles))
+    var @piles
+    for val $x (@arr) {
+        var ($lo, $hi) = (0, len(@piles))
         while ($lo < $hi) {
-            my $mid = int(($lo + $hi) / 2)
+            val $mid = int(($lo + $hi) / 2)
             if ($piles[$mid][-1] < $x) { $lo = $mid + 1 } else { $hi = $mid }
         }
         if ($lo == len(@piles)) { push @piles, [$x] }
@@ -21,10 +21,10 @@ fn Rosetta::Patience::sort($list) {
     }
 
     # Merge: repeatedly pop the smallest pile-top.
-    my @out
+    var @out
     while (len(@piles) > 0) {
-        my $best = 0
-        for my $i (1..len(@piles) - 1) {
+        var $best = 0
+        for val $i (1..len(@piles) - 1) {
             if ($piles[$i][-1] < $piles[$best][-1]) { $best = $i }
         }
         push @out, pop @{$piles[$best]}
@@ -33,24 +33,24 @@ fn Rosetta::Patience::sort($list) {
     \@out
 }
 
-my $r1 = Rosetta::Patience::sort([4, 3, 6, 2, 7, 1, 5])
+val $r1 = Rosetta::Patience::sort([4, 3, 6, 2, 7, 1, 5])
 assert_eq join(",", @$r1), "1,2,3,4,5,6,7", "patience sort 7 elems"
 
-my $r2 = Rosetta::Patience::sort([])
+val $r2 = Rosetta::Patience::sort([])
 assert_eq join(",", @$r2), "", "empty"
 
-my $r3 = Rosetta::Patience::sort([42])
+val $r3 = Rosetta::Patience::sort([42])
 assert_eq join(",", @$r3), "42", "single"
 
-my $r4 = Rosetta::Patience::sort([5, 5, 5, 5])
+val $r4 = Rosetta::Patience::sort([5, 5, 5, 5])
 assert_eq join(",", @$r4), "5,5,5,5", "all equal"
 
-my $r5 = Rosetta::Patience::sort([-3, 0, -1, 7, -3, 2])
+val $r5 = Rosetta::Patience::sort([-3, 0, -1, 7, -3, 2])
 assert_eq join(",", @$r5), "-3,-3,-1,0,2,7", "negatives + dups"
 
-my @big = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
-my @native = sort { _0 <=> _1 } @big
-my $rb = Rosetta::Patience::sort(\@big)
+val @big = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+val @native = sort { _0 <=> _1 } @big
+val $rb = Rosetta::Patience::sort(\@big)
 assert_eq join(",", @$rb), join(",", @native), "15-elem matches native sort"
 
 test_run

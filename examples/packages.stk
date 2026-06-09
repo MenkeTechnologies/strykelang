@@ -42,14 +42,14 @@ fn host_of($u) {
 package Format
 
 fn align_right($s, $w) {
-    my $extra = $w - length($s)
+    val $extra = $w - length($s)
     $extra > 0 ? $s . " " x $extra : $s
 }
 
 package URL                            # ← reopened
 fn pretty($u) {
-    my $h = host_of($u) // "?"
-    my $s = scheme($u)  // "?"
+    val $h = host_of($u) // "?"
+    val $s = scheme($u)  // "?"
     Format::align_right("$s://$h", 28)
 }
 
@@ -123,13 +123,13 @@ our %catalog = (
 )
 
 fn distinct_tags_for($post_id) {
-    my $tags = $catalog{$post_id} // []
+    val $tags = $catalog{$post_id} // []
     set(@$tags)
 }
 
 fn all_distinct {
-    my $u = set()
-    for my $tags (values %catalog) {
+    var $u = set()
+    for val $tags (values %catalog) {
         $u = $u | set(@$tags)
     }
     $u
@@ -161,12 +161,12 @@ fn Mailer::Format::footer {
 package main
 
 p "── URL namespace ──────────────────────────────────────"
-my @urls = (
+val @urls = (
     "https://Example.COM/path",
     "  HTTP://A.B.C/x  ",
     "ftp://files.example.org/",
 )
-for my $u (@urls) {
+for val $u (@urls) {
     printf "  %-32s  scheme=%-6s host=%s\n",
         URL::pretty($u),
         URL::scheme($u)  // "—",
@@ -192,7 +192,7 @@ aeq $Config::env{stage}, "canary", "main can mutate Config::env"
 
 p ""
 p "── Nested namespace dispatch ──────────────────────────"
-for my $req (["GET", "/healthz"], ["POST", "/jobs"], ["DELETE", "/x"]) {
+for val $req (["GET", "/healthz"], ["POST", "/jobs"], ["DELETE", "/x"]) {
     printf "  %-6s %-10s -> %s\n",
         $req->[0], $req->[1],
         App::HTTP::Routes::dispatch(@$req)
@@ -204,14 +204,14 @@ fan 100 {
     Metric::hit()
     Metric::err() if _ % 7 == 0
 }
-my $snap = Metric::snapshot()
+val $snap = Metric::snapshot()
 printf "  hits=%d  errs=%d\n", $snap->{hits}, $snap->{errs}
 aeq $snap->{hits}, 100, "oursync hits matches fan count"
 
 p ""
 p "── Class / enum inside a package ──────────────────────"
-my $origin = Geo::Point2D->new(x => 0, y => 0)
-my $a      = Geo::Point2D->new(x => 3, y => 4)
+val $origin = Geo::Point2D->new(x => 0, y => 0)
+val $a      = Geo::Point2D->new(x => 3, y => 4)
 printf "  origin: %s\n", $origin->show
 printf "  a     : %s\n", $a->show
 printf "  enum  : %s\n", Geo::Compass::N
@@ -219,16 +219,16 @@ aeq $a->x, 3, "field accessor on Geo::Point2D"
 
 p ""
 p "── Struct inside a package ────────────────────────────"
-my $v = Geo::Vec3(x => 1.0, y => 2.0, z => 3.0)
+val $v = Geo::Vec3(x => 1.0, y => 2.0, z => 3.0)
 printf "  Geo::Vec3 : (%g, %g, %g)\n", $v->{x}, $v->{y}, $v->{z}
 aeq $v->{y}, 2.0, "Geo::Vec3 field y"
 
 p ""
 p "── set() inside a package ─────────────────────────────"
-my $u = Tags::all_distinct()
-my $s12 = Tags::shared_between("post-1", "post-2")
-my @u_els  = sort($u->elements)
-my @s_els  = sort($s12->elements)
+val $u = Tags::all_distinct()
+val $s12 = Tags::shared_between("post-1", "post-2")
+val @u_els  = sort($u->elements)
+val @s_els  = sort($s12->elements)
 printf "  all distinct : %d  (%s)\n",  len($u),   join(",", @u_els)
 printf "  shared (1,2) : %d  (%s)\n",  len($s12), join(",", @s_els)
 aeq len($u),   4, "union over Tags::catalog"

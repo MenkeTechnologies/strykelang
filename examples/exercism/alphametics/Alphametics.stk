@@ -5,34 +5,34 @@
 # multi-digit words cannot be 0. Returns hashref { letter => digit } or
 # undef when unsolvable.
 fn Exercism::Alphametics::solve($puzzle) {
-    my ($lhs, $rhs) = split /\s*==\s*/, $puzzle
-    my @addends = split /\s*\+\s*/, $lhs
-    my @words   = (@addends, $rhs)
-    my %leading_letters
+    val ($lhs, $rhs) = split /\s*==\s*/, $puzzle
+    val @addends = split /\s*\+\s*/, $lhs
+    val @words   = (@addends, $rhs)
+    var %leading_letters
     $leading_letters{substr($_, 0, 1)}++ for grep { len($_) > 1 } @words
-    my %letters
-    for my $w (@words) { $letters{$_}++ for split //, $w }
-    my @letter_list = sort keys %letters
+    var %letters
+    for val $w (@words) { $letters{$_}++ for split //, $w }
+    val @letter_list = sort keys %letters
     return undef if @letter_list > 10
-    my %map
-    my @used = (0) x 10
+    var %map
+    var @used = (0) x 10
     Exercism::Alphametics::_search(\@letter_list, \%map, \@used, \%leading_letters, \@addends, $rhs)
 }
 
 fn Exercism::Alphametics::_search($letters, $map, $used, $leading, $addends, $sum) {
     if (!@{$letters}) {
-        my $tot = 0
-        for my $w (@{$addends}) { $tot += Exercism::Alphametics::_value($w, $map) }
+        var $tot = 0
+        for val $w (@{$addends}) { $tot += Exercism::Alphametics::_value($w, $map) }
         return Exercism::Alphametics::_value($sum, $map) == $tot ? +{ %{$map} } : undef
     }
-    my $l = $letters->[0]
-    my @rest = @{$letters}[1..$#{$letters}]
-    for my $d (0..9) {
+    val $l = $letters->[0]
+    val @rest = @{$letters}[1..$#{$letters}]
+    for val $d (0..9) {
         next if $used->[$d]
         next if $d == 0 && exists $leading->{$l}
         $map->{$l} = $d
         $used->[$d] = 1
-        my $r = Exercism::Alphametics::_search(\@rest, $map, $used, $leading, $addends, $sum)
+        val $r = Exercism::Alphametics::_search(\@rest, $map, $used, $leading, $addends, $sum)
         return $r if $r
         $used->[$d] = 0
         delete $map->{$l}
@@ -41,7 +41,7 @@ fn Exercism::Alphametics::_search($letters, $map, $used, $leading, $addends, $su
 }
 
 fn Exercism::Alphametics::_value($word, $map) {
-    my $v = 0
-    for my $c (split //, $word) { $v = $v * 10 + $map->{$c} }
+    var $v = 0
+    for val $c (split //, $word) { $v = $v * 10 + $map->{$c} }
     $v
 }

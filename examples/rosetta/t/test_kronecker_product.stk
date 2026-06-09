@@ -2,18 +2,18 @@
 # Rosetta Code: Kronecker product
 
 fn Rosetta::KroneckerProduct::compute($a, $b) {
-    my $m = len(@$a)
-    my $n = len(@{$a->[0]})
-    my $p = len(@$b)
-    my $q = len(@{$b->[0]})
+    val $m = len(@$a)
+    val $n = len(@{$a->[0]})
+    val $p = len(@$b)
+    val $q = len(@{$b->[0]})
     
-    my @res = ()
-    for my $i (0:$m*$p-1) { $res[$i] = [] }
+    var @res = ()
+    for val $i (0:$m*$p-1) { $res[$i] = [] }
     
-    for my $i (0:$m-1) {
-        for my $j (0:$n-1) {
-            for my $k (0:$p-1) {
-                for my $l (0:$q-1) {
+    for val $i (0:$m-1) {
+        for val $j (0:$n-1) {
+            for val $k (0:$p-1) {
+                for val $l (0:$q-1) {
                     $res[$i*$p + $k][$j*$q + $l] = $a->[$i][$j] * $b->[$k][$l]
                 }
             }
@@ -22,9 +22,9 @@ fn Rosetta::KroneckerProduct::compute($a, $b) {
     \@res
 }
 
-my $a = [[1, 2], [3, 4]]
-my $b = [[0, 5], [6, 7]]
-my $res = Rosetta::KroneckerProduct::compute($a, $b)
+val $a = [[1, 2], [3, 4]]
+val $b = [[0, 5], [6, 7]]
+val $res = Rosetta::KroneckerProduct::compute($a, $b)
 
 # Res should be:
 # 1*0 1*5 2*0 2*5 -> 0 5 0 10

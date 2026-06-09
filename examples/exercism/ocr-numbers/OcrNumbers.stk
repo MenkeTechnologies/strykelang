@@ -1,5 +1,5 @@
 #!/usr/bin/env stryke
-my %_DIG = (
+val %_DIG = (
     " _ | ||_|   " => "0", "     |  |   " => "1", " _  _||_    " => "2",
     " _  _| _|   " => "3", "   |_|  |   " => "4", " _ |_  _|   " => "5",
     " _ |_ |_|   " => "6", " _   |  |   " => "7", " _ |_||_|   " => "8",
@@ -9,10 +9,10 @@ my %_DIG = (
 fn Exercism::OcrNumbers::convert($rows) {
     die "Number of input lines is not a multiple of four"   if len(@$rows) % 4 != 0
     die "Number of input columns is not a multiple of three" if fi { length(_) % 3 != 0 } @$rows
-    my $blocks = int(len(@$rows) / 4)
+    val $blocks = int(len(@$rows) / 4)
     ~> 0:$blocks-1 map {
-        my @block = @$rows[_*4 : _*4 + 3]
-        my $cols = int(length($block[0]) / 3)
+        val @block = @$rows[_*4 : _*4 + 3]
+        val $cols = int(length($block[0]) / 3)
         ~> 0:$cols-1 map {
             $_DIG{~> @block map { substr(_, _< * 3, 3) } join("")} // "?"
         } join("")

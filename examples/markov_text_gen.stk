@@ -13,7 +13,7 @@
 
 # ── corpus ──────────────────────────────────────────────────────────
 
-my $corpus = q{
+val $corpus = q{
     the quick brown fox jumps over the lazy dog
     the lazy dog sleeps under the warm sun
     the quick brown fox runs through the forest
@@ -27,18 +27,18 @@ my $corpus = q{
 
 # ── tokenize ────────────────────────────────────────────────────────
 
-my @tokens = split /\s+/, $corpus
+var @tokens = split /\s+/, $corpus
 @tokens = grep { len(_) > 0 } @tokens
 printf "── corpus: %d tokens, %d distinct ────────────────\n",
     len(@tokens), len(keys %{+{ map { _ => 1 } @tokens }})
 
 # ── build bigram transition table ───────────────────────────────────
 
-my %trans   # trans{prev}{next} = count
-my %totals  # totals{prev} = sum of next counts
-for my $i (0:len(@tokens) - 2) {
-    my $prev = $tokens[$i]
-    my $next = $tokens[$i + 1]
+var %trans   # trans{prev}{next} = count
+var %totals  # totals{prev} = sum of next counts
+for val $i (0:len(@tokens) - 2) {
+    val $prev = $tokens[$i]
+    val $next = $tokens[$i + 1]
     $trans{$prev} = +{} unless exists $trans{$prev}
     $trans{$prev}->{$next} = ($trans{$prev}->{$next} // 0) + 1
     $totals{$prev} = ($totals{$prev} // 0) + 1
@@ -50,29 +50,29 @@ printf "  %d distinct preceding contexts\n", len(keys %trans)
 
 fn Demo::Markov::next_token($prev) {
     return undef unless exists $trans{$prev}
-    my $follow = $trans{$prev}
-    my $total = $totals{$prev}
-    my $pick = rand() * $total
-    my $sum = 0
-    for my $candidate (keys %$follow) {
+    val $follow = $trans{$prev}
+    val $total = $totals{$prev}
+    val $pick = rand() * $total
+    var $sum = 0
+    for val $candidate (keys %$follow) {
         $sum += $follow->{$candidate}
         return $candidate if $sum >= $pick
     }
     # Fallback: last key.
-    my @keys = keys %$follow
+    val @keys = keys %$follow
     $keys[-1]
 }
 
 # ── generate sample sentences ───────────────────────────────────────
 
-my $td_gen = t_digest(100)
+val $td_gen = t_digest(100)
 
 fn Demo::Markov::generate($seed, $max_len) {
-    my @out = ($seed)
-    my $current = $seed
-    for my $i (1:$max_len) {
-        my $t0 = now_ns()
-        my $nxt = Demo::Markov::next_token($current)
+    var @out = ($seed)
+    var $current = $seed
+    for val $i (1:$max_len) {
+        val $t0 = now_ns()
+        val $nxt = Demo::Markov::next_token($current)
         td_add($td_gen, (now_ns() - $t0) / 1000.0)
         last unless defined $nxt
         push @out, $nxt
@@ -83,15 +83,15 @@ fn Demo::Markov::generate($seed, $max_len) {
 
 p ""
 p "── generated samples (bigram, seed=\"the\") ───────────"
-for my $i (1:5) {
-    my $words = Demo::Markov::generate("the", 12)
+for val $i (1:5) {
+    val $words = Demo::Markov::generate("the", 12)
     printf "  %d: %s\n", $i, join(" ", @$words)
 }
 
 p ""
 p "── generated samples (seed=\"forest\") ───────────────"
-for my $i (1:3) {
-    my $words = Demo::Markov::generate("forest", 10)
+for val $i (1:3) {
+    val $words = Demo::Markov::generate("forest", 10)
     printf "  %d: %s\n", $i, join(" ", @$words)
 }
 
@@ -99,17 +99,17 @@ for my $i (1:3) {
 
 p ""
 p "── most-common bigrams (TopK sketch) ────────────────"
-my $tk = topk(5)
-for my $prev (keys %trans) {
-    for my $next (keys %{$trans{$prev}}) {
-        my $count = $trans{$prev}->{$next}
-        for my $i (1:$count) {
+val $tk = topk(5)
+for val $prev (keys %trans) {
+    for val $next (keys %{$trans{$prev}}) {
+        val $count = $trans{$prev}->{$next}
+        for val $i (1:$count) {
             topk_add($tk, "$prev -> $next")
         }
     }
 }
-my @hits = topk_top($tk)
-for my $h (@hits) {
+val @hits = topk_top($tk)
+for val $h (@hits) {
     printf "  %-25s : %d\n", $h->[0], $h->[1]
 }
 
@@ -117,10 +117,10 @@ for my $h (@hits) {
 
 p ""
 p "── distinct bigram cardinality (HLL) ────────────────"
-my $hll = hll(14)
-my %seen_bg
-for my $prev (keys %trans) {
-    for my $next (keys %{$trans{$prev}}) {
+val $hll = hll(14)
+var %seen_bg
+for val $prev (keys %trans) {
+    for val $next (keys %{$trans{$prev}}) {
         hll_add($hll, "$prev|$next")
         $seen_bg{"$prev|$next"} = 1
     }
@@ -132,11 +132,11 @@ printf "  exact distinct       : %d\n", len(keys %seen_bg)
 
 p ""
 p "── highest-entropy contexts (most successor choices) ─"
-my @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_}}) } keys %trans
-my $shown = 0
-for my $ctx (@ctx_sorted) {
+val @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_}}) } keys %trans
+var $shown = 0
+for val $ctx (@ctx_sorted) {
     last if $shown >= 5
-    my @nexts = sort { _ cmp _1 } keys %{$trans{$ctx}}
+    val @nexts = sort { _ cmp _1 } keys %{$trans{$ctx}}
     printf "  %-12s -> %d choices: %s\n",
         $ctx, len(@nexts), join(", ", @nexts)
     $shown++

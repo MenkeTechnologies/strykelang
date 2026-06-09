@@ -18,7 +18,7 @@ assert_eq Exercism::RunLengthEncoding::decode("2a3b4c"),              "aabbbcccc
 assert_eq Exercism::RunLengthEncoding::decode("12WB12W3B24WB"),       "WWWWWWWWWWWWBWWWWWWWWWWWWBBBWWWWWWWWWWWWWWWWWWWWWWWWB", "decode complex"
 
 # round-trip
-my $orig = "zzz ZZ  zZ"
+val $orig = "zzz ZZ  zZ"
 assert_eq Exercism::RunLengthEncoding::decode(Exercism::RunLengthEncoding::encode($orig)), $orig, "round-trip"
 
 test_run

@@ -5,7 +5,7 @@
 # **scaled** (a non-trivial multiple of a smaller primitive).
 #
 # Patterns:
-#   * `0:N` range iteration with nested `for my $var (lo:hi)` loops
+#   * `0:N` range iteration with nested `for val $var (lo:hi)` loops
 #   * named packages (`Pyth::`) for helper functions — no `package main`
 #     redefinition issues under `--no-interop`
 #   * arrayref accumulator + `push @triples, [$x, $y, $c]` pattern
@@ -18,15 +18,15 @@
 
 # Returns c if (x, y) is a Pythagorean pair, else 0.
 fn Pyth::is_triple($x, $y) {
-    my $c2 = $x * $x + $y * $y
-    my $c = int(sqrt($c2))
+    val $c2 = $x * $x + $y * $y
+    val $c = int(sqrt($c2))
     return $c * $c == $c2 ? $c : 0
 }
 
 # Euclidean gcd; returns gcd(u, v) with both non-negative integers.
 fn Pyth::gcd($u, $v) {
     while ($v) {
-        my $t = $v
+        val $t = $v
         $v = $u % $v
         $u = $t
     }
@@ -35,11 +35,11 @@ fn Pyth::gcd($u, $v) {
 
 # ── enumerate triples up to MAX ─────────────────────────────────────
 
-my $max = 50
-my @triples
-for my $x (1:$max) {
-    for my $y ($x:$max) {
-        my $c = Pyth::is_triple($x, $y)
+val $max = 50
+var @triples
+for val $x (1:$max) {
+    for val $y ($x:$max) {
+        val $c = Pyth::is_triple($x, $y)
         next unless $c
         next if $c > $max
         push @triples, [$x, $y, $c]
@@ -51,11 +51,11 @@ printf "found %d triples total\n\n", len(@triples)
 
 # ── classify primitive vs scaled ────────────────────────────────────
 
-my $primitives = 0
-my $scaled = 0
-for my $t (@triples) {
-    my $g = Pyth::gcd(Pyth::gcd($t->[0], $t->[1]), $t->[2])
-    my $kind = $g == 1 ? "primitive" : "scaled (×" . $g . ")"
+var $primitives = 0
+var $scaled = 0
+for val $t (@triples) {
+    val $g = Pyth::gcd(Pyth::gcd($t->[0], $t->[1]), $t->[2])
+    val $kind = $g == 1 ? "primitive" : "scaled (×" . $g . ")"
     if ($g == 1) { $primitives++ } else { $scaled++ }
     printf "  %2d² + %2d² = %2d²   %s\n",
         $t->[0], $t->[1], $t->[2], $kind
@@ -72,21 +72,21 @@ printf "  total      : %d\n", $primitives + $scaled
 die "primitive + scaled must equal total" unless $primitives + $scaled == len(@triples)
 
 # Every triple must actually satisfy a² + b² = c².
-for my $t (@triples) {
-    my ($x, $y, $c) = ($t->[0], $t->[1], $t->[2])
+for val $t (@triples) {
+    val ($x, $y, $c) = ($t->[0], $t->[1], $t->[2])
     die "invariant broken: $x sq + $y sq != $c sq" unless $x * $x + $y * $y == $c * $c
 }
 
 # (3,4,5) is the smallest primitive — must appear when MAX ≥ 5.
-my $found_345 = 0
-for my $t (@triples) {
+var $found_345 = 0
+for val $t (@triples) {
     $found_345 = 1 if $t->[0] == 3 && $t->[1] == 4 && $t->[2] == 5
 }
 die "expected (3,4,5) among triples" unless $found_345
 
 # (6,8,10) is the smallest scaled — must appear when MAX ≥ 10.
-my $found_6810 = 0
-for my $t (@triples) {
+var $found_6810 = 0
+for val $t (@triples) {
     $found_6810 = 1 if $t->[0] == 6 && $t->[1] == 8 && $t->[2] == 10
 }
 die "expected (6,8,10) among triples" unless $found_6810

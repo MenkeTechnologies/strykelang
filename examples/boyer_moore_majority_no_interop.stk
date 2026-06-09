@@ -25,11 +25,11 @@
 # Returns +{ found => 0/1, value => v }.
 
 fn Bmv::majority($xs) {
-    my $n = len(@$xs)
+    val $n = len(@$xs)
     return +{ found => 0, value => undef } if $n == 0
-    my $cand = undef
-    my $count = 0
-    for my $v (@$xs) {
+    var $cand = undef
+    var $count = 0
+    for val $v (@$xs) {
         if ($count == 0) {
             $cand = $v
             $count = 1
@@ -40,8 +40,8 @@ fn Bmv::majority($xs) {
         }
     }
     # Verification pass.
-    my $occ = 0
-    for my $v (@$xs) {
+    var $occ = 0
+    for val $v (@$xs) {
         $occ++ if $v == $cand
     }
     if ($occ > int($n / 2)) {
@@ -54,14 +54,14 @@ fn Bmv::majority($xs) {
 # Returns the list of values that appear strictly more than n/(k+1) times.
 
 fn Bmv::k_majority($xs, $k) {
-    my $n = len(@$xs)
+    val $n = len(@$xs)
     return [] if $n == 0
     die "k must be ≥ 1" if $k < 1
-    my @cand = (undef) x $k
-    my @count = (0) x $k
-    for my $v (@$xs) {
-        my $hit = -1
-        for my $i (0:$k - 1) {
+    var @cand = (undef) x $k
+    var @count = (0) x $k
+    for val $v (@$xs) {
+        var $hit = -1
+        for val $i (0:$k - 1) {
             if ($count[$i] > 0 && defined $cand[$i] && $cand[$i] == $v) {
                 $hit = $i
                 last
@@ -70,8 +70,8 @@ fn Bmv::k_majority($xs, $k) {
         if ($hit >= 0) {
             $count[$hit]++
         } else {
-            my $slot = -1
-            for my $i (0:$k - 1) {
+            var $slot = -1
+            for val $i (0:$k - 1) {
                 if ($count[$i] == 0) {
                     $slot = $i
                     last
@@ -81,20 +81,20 @@ fn Bmv::k_majority($xs, $k) {
                 $cand[$slot] = $v
                 $count[$slot] = 1
             } else {
-                for my $i (0:$k - 1) {
+                for val $i (0:$k - 1) {
                     $count[$i]--
                 }
             }
         }
     }
     # Verification.
-    my @result
-    my %seen
-    for my $i (0:$k - 1) {
+    var @result
+    var %seen
+    for val $i (0:$k - 1) {
         next unless $count[$i] > 0 && defined $cand[$i]
         next if exists $seen{$cand[$i]}
-        my $occ = 0
-        for my $v (@$xs) {
+        var $occ = 0
+        for val $v (@$xs) {
             $occ++ if $v == $cand[$i]
         }
         if ($occ * ($k + 1) > $n) {
@@ -108,14 +108,14 @@ fn Bmv::k_majority($xs, $k) {
 # ── O(n) brute-force majority via frequency hash ─────────────────
 
 fn Bmv::brute_majority($xs) {
-    my $n = len(@$xs)
+    val $n = len(@$xs)
     return +{ found => 0, value => undef } if $n == 0
-    my %freq
-    for my $v (@$xs) {
+    var %freq
+    for val $v (@$xs) {
         $freq{$v} = 0 unless exists $freq{$v}
         $freq{$v}++
     }
-    for my $v (keys %freq) {
+    for val $v (keys %freq) {
         if ($freq{$v} > int($n / 2)) {
             return +{ found => 1, value => $v + 0 }
         }
@@ -124,14 +124,14 @@ fn Bmv::brute_majority($xs) {
 }
 
 fn Bmv::brute_k_majority($xs, $k) {
-    my $n = len(@$xs)
-    my %freq
-    for my $v (@$xs) {
+    val $n = len(@$xs)
+    var %freq
+    for val $v (@$xs) {
         $freq{$v} = 0 unless exists $freq{$v}
         $freq{$v}++
     }
-    my @out
-    for my $v (keys %freq) {
+    var @out
+    for val $v (keys %freq) {
         push @out, $v + 0 if $freq{$v} * ($k + 1) > $n
     }
     [sort { _0 <=> _1 } @out]
@@ -139,7 +139,7 @@ fn Bmv::brute_k_majority($xs, $k) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-my @cases_maj = (
+val @cases_maj = (
     +{ name => "single value",       xs => [7],                                                found => 1, value => 7 },
     +{ name => "clear majority",     xs => [3, 3, 4, 2, 3, 3, 5, 3],                           found => 1, value => 3 },
     +{ name => "exactly half (no)",  xs => [1, 1, 2, 2],                                       found => 0, value => undef },
@@ -152,7 +152,7 @@ my @cases_maj = (
     +{ name => "empty",              xs => [],                                                  found => 0, value => undef },
 )
 
-my @cases_k2 = (
+val @cases_k2 = (
     +{ name => "two 1/3-majorities", xs => [1, 1, 1, 2, 2, 2, 3, 3, 4],  k => 2 },
     +{ name => "single dominant",    xs => [5, 5, 5, 5, 1, 2, 3],         k => 2 },
     +{ name => "no 1/3-majority",    xs => [1, 2, 3, 4, 5, 6],            k => 2 },
@@ -163,28 +163,28 @@ my @cases_k2 = (
 p "── Boyer-Moore majority demo ─────────────────────────"
 printf "  %-22s  %-26s  %s\n", "case", "xs", "result"
 printf "  %-22s  %-26s  %s\n", "----------------------", "--------------------------", "------"
-for my $c (@cases_maj) {
-    my $r = Bmv::majority($c->{xs})
-    my $shown = $r->{found} ? "majority=#{$r->{value}}" : "—"
-    my $xs_str = "[" . join(",", @{$c->{xs}}) . "]"
+for val $c (@cases_maj) {
+    val $r = Bmv::majority($c->{xs})
+    val $shown = $r->{found} ? "majority=#{$r->{value}}" : "—"
+    var $xs_str = "[" . join(",", @{$c->{xs}}) . "]"
     $xs_str = substr($xs_str, 0, 24) . ".." if len($xs_str) > 26
     printf "  %-22s  %-26s  %s\n", $c->{name}, $xs_str, $shown
 }
 
 p ""
 p "── k-majority (k=2 ⇒ > n/3, k=3 ⇒ > n/4) ─────────────"
-for my $c (@cases_k2) {
-    my $r = Bmv::k_majority($c->{xs}, $c->{k})
-    my $shown = len(@$r) > 0 ? "[" . join(",", sort { _0 <=> _1 } @$r) . "]" : "—"
-    my $xs_str = "[" . join(",", @{$c->{xs}}) . "]"
+for val $c (@cases_k2) {
+    val $r = Bmv::k_majority($c->{xs}, $c->{k})
+    val $shown = len(@$r) > 0 ? "[" . join(",", sort { _0 <=> _1 } @$r) . "]" : "—"
+    var $xs_str = "[" . join(",", @{$c->{xs}}) . "]"
     $xs_str = substr($xs_str, 0, 24) . ".." if len($xs_str) > 26
     printf "  %-22s  %-26s  k=%d  %s\n", $c->{name}, $xs_str, $c->{k}, $shown
 }
 
 # ── invariant 1: majority found-status + value match expectation ──
 
-for my $c (@cases_maj) {
-    my $r = Bmv::majority($c->{xs})
+for val $c (@cases_maj) {
+    val $r = Bmv::majority($c->{xs})
     die "found mismatch on \"#{$c->{name}}\"" unless $r->{found} == $c->{found}
     if ($c->{found}) {
         die "value mismatch on \"#{$c->{name}}\": got #{$r->{value}} want #{$c->{value}}" unless $r->{value} == $c->{value}
@@ -193,9 +193,9 @@ for my $c (@cases_maj) {
 
 # ── invariant 2: majority agrees with brute frequency count ───────
 
-for my $c (@cases_maj) {
-    my $r = Bmv::majority($c->{xs})
-    my $br = Bmv::brute_majority($c->{xs})
+for val $c (@cases_maj) {
+    val $r = Bmv::majority($c->{xs})
+    val $br = Bmv::brute_majority($c->{xs})
     die "majority vs brute disagree on \"#{$c->{name}}\"" unless $r->{found} == $br->{found}
     if ($r->{found}) {
         die "majority value mismatch on \"#{$c->{name}}\"" unless $r->{value} == $br->{value}
@@ -204,49 +204,49 @@ for my $c (@cases_maj) {
 
 # ── invariant 3: every found majority truly appears > n/2 times ───
 
-for my $c (@cases_maj) {
-    my $r = Bmv::majority($c->{xs})
+for val $c (@cases_maj) {
+    val $r = Bmv::majority($c->{xs})
     next unless $r->{found}
-    my $occ = 0
-    for my $v (@{$c->{xs}}) { $occ++ if $v == $r->{value} }
+    var $occ = 0
+    for val $v (@{$c->{xs}}) { $occ++ if $v == $r->{value} }
     die "claimed majority #{$r->{value}} appears only #{$occ}/#{len(@{$c->{xs}})} times" unless $occ * 2 > len(@{$c->{xs}})
 }
 
 # ── invariant 4: when no majority exists, none reported ───────────
 
-for my $c (@cases_maj) {
+for val $c (@cases_maj) {
     next if $c->{found}
-    my $r = Bmv::majority($c->{xs})
+    val $r = Bmv::majority($c->{xs})
     die "false majority claimed on \"#{$c->{name}}\"" if $r->{found}
 }
 
 # ── invariant 5: k-majority result matches brute force ────────────
 
-for my $c (@cases_k2) {
-    my $r = Bmv::k_majority($c->{xs}, $c->{k})
-    my $br = Bmv::brute_k_majority($c->{xs}, $c->{k})
-    my @r_sorted = sort { _0 <=> _1 } @$r
+for val $c (@cases_k2) {
+    val $r = Bmv::k_majority($c->{xs}, $c->{k})
+    val $br = Bmv::brute_k_majority($c->{xs}, $c->{k})
+    val @r_sorted = sort { _0 <=> _1 } @$r
     die "k-majority count mismatch on \"#{$c->{name}}\": got #{len(@r_sorted)} want #{len(@$br)}" unless len(@r_sorted) == len(@$br)
-    for my $i (0:len(@r_sorted) - 1) {
+    for val $i (0:len(@r_sorted) - 1) {
         die "k-majority[#{$i}] mismatch on \"#{$c->{name}}\": got #{$r_sorted[$i]} want #{$br->[$i]}" unless $r_sorted[$i] == $br->[$i]
     }
 }
 
 # ── invariant 6: k-majority output size ≤ k ──────────────────────
 
-for my $c (@cases_k2) {
-    my $r = Bmv::k_majority($c->{xs}, $c->{k})
+for val $c (@cases_k2) {
+    val $r = Bmv::k_majority($c->{xs}, $c->{k})
     die "k-majority returned #{len(@$r)} > k=#{$c->{k}} on \"#{$c->{name}}\"" unless len(@$r) <= $c->{k}
 }
 
 # ── invariant 7: every k-majority value appears > n/(k+1) times ───
 
-for my $c (@cases_k2) {
-    my $r = Bmv::k_majority($c->{xs}, $c->{k})
-    my $n = len(@{$c->{xs}})
-    for my $v (@$r) {
-        my $occ = 0
-        for my $w (@{$c->{xs}}) { $occ++ if $w == $v }
+for val $c (@cases_k2) {
+    val $r = Bmv::k_majority($c->{xs}, $c->{k})
+    val $n = len(@{$c->{xs}})
+    for val $v (@$r) {
+        var $occ = 0
+        for val $w (@{$c->{xs}}) { $occ++ if $w == $v }
         die "claimed #{$c->{k}}-majority #{$v} appears #{$occ} ≤ #{$n}/(#{$c->{k}+1})" unless $occ * ($c->{k} + 1) > $n
     }
 }
@@ -254,10 +254,10 @@ for my $c (@cases_k2) {
 # ── invariant 8: prepending and appending the same value ─────────
 # preserves majority-status if the value is already the majority.
 
-my @base = (3, 3, 4, 2, 3, 3, 5, 3)
-for my $extra (3, 3, 3) {
-    my @new_xs = ($extra, @base, $extra)
-    my $r = Bmv::majority(\@new_xs)
+val @base = (3, 3, 4, 2, 3, 3, 5, 3)
+for val $extra (3, 3, 3) {
+    val @new_xs = ($extra, @base, $extra)
+    val $r = Bmv::majority(\@new_xs)
     die "majority lost after padding" unless $r->{found} && $r->{value} == 3
 }
 

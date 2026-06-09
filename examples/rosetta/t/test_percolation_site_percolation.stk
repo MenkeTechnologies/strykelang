@@ -4,26 +4,26 @@
 fn Rosetta::SitePerc::key($r, $c) { "$r,$c" }
 
 fn Rosetta::SitePerc::percolates($n, $open_sites) {
-    my %open = map { Rosetta::SitePerc::key($_->[0], $_->[1]) => 1 } @$open_sites
-    my @queue
-    for my $c (0:$n - 1) {
+    val %open = map { Rosetta::SitePerc::key($_->[0], $_->[1]) => 1 } @$open_sites
+    var @queue
+    for val $c (0:$n - 1) {
         push @queue, [0, $c] if $open{Rosetta::SitePerc::key(0, $c)}
     }
 
-    my %seen
-    my @dirs = ([1,0],[-1,0],[0,1],[0,-1])
+    var %seen
+    val @dirs = ([1,0],[-1,0],[0,1],[0,-1])
     while (len(@queue) > 0) {
-        my $cur = shift @queue
-        my ($r, $c) = @$cur
-        my $k = Rosetta::SitePerc::key($r, $c)
+        val $cur = shift @queue
+        val ($r, $c) = @$cur
+        val $k = Rosetta::SitePerc::key($r, $c)
         next if $seen{$k}
         $seen{$k} = 1
         return 1 if $r == $n - 1
-        for my $d (@dirs) {
-            my $nr = $r + $d->[0]
-            my $nc = $c + $d->[1]
+        for val $d (@dirs) {
+            val $nr = $r + $d->[0]
+            val $nc = $c + $d->[1]
             next if $nr < 0 || $nr >= $n || $nc < 0 || $nc >= $n
-            my $nk = Rosetta::SitePerc::key($nr, $nc)
+            val $nk = Rosetta::SitePerc::key($nr, $nc)
             push @queue, [$nr, $nc] if $open{$nk}
         }
     }

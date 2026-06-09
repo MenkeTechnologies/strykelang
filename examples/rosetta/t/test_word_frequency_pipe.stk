@@ -2,7 +2,7 @@
 # Rosetta Code: Word frequency (using pipes)
 
 fn Rosetta::WordFrequency::compute($text) {
-    my %freq
+    var %freq
     $text |> lc() |> split(/\W+/) |> map {
         if (_ ne "") {
             $freq{_}++
@@ -11,8 +11,8 @@ fn Rosetta::WordFrequency::compute($text) {
     %freq
 }
 
-my $text = "the quick brown fox jumps over the lazy dog"
-my %f = Rosetta::WordFrequency::compute($text)
+val $text = "the quick brown fox jumps over the lazy dog"
+val %f = Rosetta::WordFrequency::compute($text)
 
 assert_eq $f{"the"}, 2, "word 'the' appears twice"
 assert_eq $f{"fox"}, 1, "word 'fox' appears once"

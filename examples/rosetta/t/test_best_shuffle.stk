@@ -2,14 +2,14 @@
 # Rosetta Code: Best Shuffle
 
 fn Rosetta::BestShuffle::shuffle($str) {
-    my @a = $str |> chars
-    my @b = $str |> chars
-    my $len = len(@a)
+    val @a = $str |> chars
+    var @b = $str |> chars
+    val $len = len(@a)
     
-    for my $i (0:$len-1) {
-        for my $j (0:$len-1) {
+    for val $i (0:$len-1) {
+        for val $j (0:$len-1) {
             if ($a[$i] ne $b[$j] && $a[$j] ne $b[$i]) {
-                my $tmp = $b[$i]
+                val $tmp = $b[$i]
                 $b[$i] = $b[$j]
                 $b[$j] = $tmp
             }
@@ -19,18 +19,18 @@ fn Rosetta::BestShuffle::shuffle($str) {
 }
 
 fn Rosetta::BestShuffle::count_matches($s1, $s2) {
-    my @a = $s1 |> chars
-    my @b = $s2 |> chars
-    my $m = 0
-    for my $i (0..len(@a)-1) {
+    val @a = $s1 |> chars
+    val @b = $s2 |> chars
+    var $m = 0
+    for val $i (0..len(@a)-1) {
         if ($a[$i] eq $b[$i]) { $m = $m + 1 }
     }
     $m
 }
 
-my @inputs = ("abracadabra", "seesaw", "elk", "grrit")
-for my $s (@inputs) {
-    my $shuf = Rosetta::BestShuffle::shuffle($s)
+val @inputs = ("abracadabra", "seesaw", "elk", "grrit")
+for val $s (@inputs) {
+    val $shuf = Rosetta::BestShuffle::shuffle($s)
     # The best shuffle match count is usually 0 if possible
     # For "seesaw", it's 0. For "abracadabra", it's 0.
     # We just check if length matches and we minimized matches (not easy to assert absolute best, but we can check if it's reasonable)

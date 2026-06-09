@@ -5,12 +5,12 @@
 
 # BUG-005: caller(0)[3] returns the running fn's name.
 package Demo::Caller
-fn leaf { my @c = caller(0); $c[3] }
+fn leaf { val @c = caller(0); $c[3] }
 fn mid  = Demo::Caller::leaf()
 fn top  = Demo::Caller::mid()
 package main
 
-my $name = Demo::Caller::top()
+val $name = Demo::Caller::top()
 ($name =~ /leaf/) |> assert_ok("caller field 3 names the running fn")
 
 # Sanity: 4-tuple shape with package + file + line + fn.
@@ -19,7 +19,7 @@ my $name = Demo::Caller::top()
 package Demo::CallerShape
 fn probe = caller(0)
 package main
-my @frame = Demo::CallerShape::probe()
+val @frame = Demo::CallerShape::probe()
 len(@frame)        |> assert_eq(4, "caller frame is a 4-tuple")
 ($frame[2] > 0)    |> assert_ok("field 2 = line > 0")
 defined($frame[3]) |> assert_ok("field 3 = fn name (no longer undef)")
@@ -31,7 +31,7 @@ fn tag     = __PACKAGE__
 # parse-time (the BUG-256 fix). Inside `#{}` it would defer to runtime
 # and read the caller's package instead.
 fn log_msg {
-    my $pkg = __PACKAGE__
+    val $pkg = __PACKAGE__
     "$pkg: #{_0}"
 }
 package main
@@ -52,11 +52,11 @@ Demo::B::who() |> assert_eq("Demo::B", "Demo::B keeps its name")
 # Closure body also captures the defining package.
 package Demo::Closure
 fn make_logger {
-    my $pkg = __PACKAGE__
+    val $pkg = __PACKAGE__
     fn { "$pkg" . "[#{_<}]: #{_}" }
 }
 package main
-my $log = Demo::Closure::make_logger("svc")
+val $log = Demo::Closure::make_logger("svc")
 $log("hello") |> assert_eq("Demo::Closure[svc]: hello", "closure body __PACKAGE__")
 
 test_run

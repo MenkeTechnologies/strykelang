@@ -15,7 +15,7 @@ fn Rosetta::VarReset::get($env, $name) {
     exists $env->{$name} ? $env->{$name} : "undef"
 }
 
-my $env = Rosetta::VarReset::new_env()
+val $env = Rosetta::VarReset::new_env()
 Rosetta::VarReset::declare($env, "counter", 41)
 assert_eq Rosetta::VarReset::get($env, "counter"), 41, "declared variable is present"
 Rosetta::VarReset::reset($env, "counter")

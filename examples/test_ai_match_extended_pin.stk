@@ -38,7 +38,7 @@ ai_match("blueberry", "is an orange") |> aeq 0, "ai_match returns 0 on 'false'"
 # `pmap` over ai_match produces a verdict-per-item array. With mocks
 # the result is deterministic — each call routes to the same mock.
 ai_mock_install('(?is)criterion.*even', "true")
-my @verdicts = map { ai_match(_, "is even") } (2, 4, 6)
+val @verdicts = map { ai_match(_, "is even") } (2, 4, 6)
 join(",", @verdicts) |> aeq "1,1,1", "ai_match via map yields verdict array"
 
 test_run

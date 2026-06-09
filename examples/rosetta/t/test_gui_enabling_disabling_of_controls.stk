@@ -10,7 +10,7 @@ fn Rosetta::GUIEnable::toggle_agree($win, $value) {
     $win->{submit_enabled} = $value ? 1 : 0
 }
 
-my $win = Rosetta::GUIEnable::window()
+val $win = Rosetta::GUIEnable::window()
 
 assert_eq $win->{submit_enabled}, 0, "submit starts disabled"
 Rosetta::GUIEnable::toggle_agree($win, 1)

@@ -2,7 +2,7 @@
 # Rosetta Code: Remove vowels
 
 fn Rosetta::RemoveVowels::remove_vowels($str) {
-    my $modified_str = $str;
+    var $modified_str = $str;
     $modified_str =~ tr/aeiouAEIOU//d;
     $modified_str;
 }

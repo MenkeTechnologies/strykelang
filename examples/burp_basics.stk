@@ -15,12 +15,12 @@
 
 p "── burp basics ────────────────────────────────────────"
 
-my $dir = "/tmp/stryke_burp_demo"
+val $dir = "/tmp/stryke_burp_demo"
 system "rm", "-rf", $dir       # clean any prior run
 
 # 1. Write a hash literal directly. Parent dir doesn't exist yet — burp
 #    creates `$dir/`, `$dir/src/`, `$dir/docs/` automatically.
-my $n = burp {
+val $n = burp {
     "$dir/README.md"    => "# Demo\n",
     "$dir/src/main.rs"  => "fn main() { println!(\"hi\"); }\n",
     "$dir/docs/INTRO.md" => "Welcome.\n",
@@ -29,38 +29,38 @@ p "burp { ... } → wrote $n files (parent dirs created on the fly)"
 
 # 2. Round-trip via swallow: read everything back, mutate, burp.
 #    `(.)` qualifier = regular files only — skips the `src/` and `docs/` dirs.
-my %tree = swallow "$dir/**/*(.)"
+var %tree = swallow "$dir/**/*(.)"
 p "\nswallow → ", scalar keys %tree, " files re-read"
 
-for my $path (keys %tree) {
+for val $path (keys %tree) {
     $tree{$path} = uc $tree{$path}        # bytes are mutable scalars in stryke
 }
-my $m = burp \%tree                       # always pass via reference
+val $m = burp \%tree                       # always pass via reference
 p "burp \\%tree (mutated) → wrote $m files"
 
 # 3. Confirm the round-trip landed: read one file back and look at content.
-my $readme = slurp "$dir/README.md"
+val $readme = slurp "$dir/README.md"
 p "\nREADME after round-trip: ", substr($readme, 0, 20), "..."
 
 # 4. Binary-safe round-trip — pack arbitrary bytes, burp them, swallow, verify.
-my $binpath = "$dir/payload.bin"
-my %bin     = ( $binpath => pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01) )
+val $binpath = "$dir/payload.bin"
+val %bin     = ( $binpath => pack("C*", 0x00, 0xff, 0x80, 0x7f, 0x01) )
 burp \%bin
-my %back     = swallow $binpath
-my $restored = $back{(keys %back)[0]}
+val %back     = swallow $binpath
+val $restored = $back{(keys %back)[0]}
 p "\nbinary round-trip: original ", length($bin{$binpath}),
   " bytes; restored ", length($restored), " bytes"
 
 # 5. Empty hash returns 0 without touching the filesystem.
-my $z = burp {}
+val $z = burp {}
 p "\nburp {} (empty) → $z files written"
 
 # 6. Inverse-of-swallow symmetry — write the file table that swallow returned.
 #    Copy the entire demo tree under a new root, file-for-file.
-my $copy_root = "/tmp/stryke_burp_copy"
+val $copy_root = "/tmp/stryke_burp_copy"
 system "rm", "-rf", $copy_root
-my %copy = map { my $k = $_; $k =~ s{^$dir}{$copy_root}; ($k => $tree{$_}) } keys %tree
-my $c = burp \%copy
+val %copy = map { var $k = $_; $k =~ s{^$dir}{$copy_root}; ($k => $tree{$_}) } keys %tree
+val $c = burp \%copy
 p "\nrelocated $c files: $dir → $copy_root"
 
 # Cleanup

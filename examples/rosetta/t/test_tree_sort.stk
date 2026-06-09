@@ -19,18 +19,18 @@ fn Rosetta::TreeSort::inorder($n, $res) {
 }
 
 fn Rosetta::TreeSort::tree_sort($list) {
-    my $root = undef
-    for my $v (@$list) {
+    var $root = undef
+    for val $v (@$list) {
         $root = Rosetta::TreeSort::insert_node($root, $v)
     }
-    my @res
-    my $r = \@res
+    val @res
+    val $r = \@res
     Rosetta::TreeSort::inorder($root, $r)
     $r
 }
 
-my @input = (5, 3, 8, 1, 9, 2, 7, 4, 6)
-my $sorted = Rosetta::TreeSort::tree_sort(\@input)
+val @input = (5, 3, 8, 1, 9, 2, 7, 4, 6)
+val $sorted = Rosetta::TreeSort::tree_sort(\@input)
 assert_eq join(",", @$sorted), "1,2,3,4,5,6,7,8,9", "tree sort"
 
 test_run

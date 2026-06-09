@@ -18,9 +18,9 @@ fn Rosetta::Naming::classify($s) {
 fn Rosetta::Naming::convert_to_snake($s) {
     # Camel/Pascal → snake.
     return lc($s) if $s !~ /[A-Z]/
-    my @out
-    my $i = 0
-    for my $c (split //, $s) {
+    var @out
+    var $i = 0
+    for val $c (split //, $s) {
         if ($c =~ /[A-Z]/ && $i > 0) {
             push @out, "_"
         }

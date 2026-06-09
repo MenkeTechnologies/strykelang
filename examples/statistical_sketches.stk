@@ -2,10 +2,10 @@
 # Run: stryke --no-interop examples/statistical_sketches.stk
 
 p "--- Stats ---"
-my $t = tdigest_new()
+val $t = tdigest_new()
 tdigest_add $t, _ for 1:1000
-my $q = tdigest_quantile $t, 0.5
-my @s = reservoir_sample 5, 1:1e4
+val $q = tdigest_quantile $t, 0.5
+val @s = reservoir_sample 5, 1:1e4
 
 abs($q - 500) < 10 |> aok "td"
 len(@s)            |> aeq 5, "resv"

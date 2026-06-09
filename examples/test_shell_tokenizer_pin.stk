@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 
 fn ST::tokenize($s) {
-    my @out = ()
-    my $cur = ""
-    my $in_word = 0
-    my $vi = 0
-    my $vn = len $s
+    var @out = ()
+    var $cur = ""
+    var $in_word = 0
+    var $vi = 0
+    val $vn = len $s
     while ($vi < $vn) {
-        my $vc = substr($s, $vi, 1)
+        val $vc = substr($s, $vi, 1)
         if ($vc eq " " || $vc eq "\t" || $vc eq "\n") {
             if ($in_word) {
                 push @out, $cur
@@ -32,7 +32,7 @@ fn ST::tokenize($s) {
             $vi = $vi + 1
             $in_word = 1
             while ($vi < $vn) {
-                my $cc = substr($s, $vi, 1)
+                val $cc = substr($s, $vi, 1)
                 last if $cc eq "'"
                 $cur = $cur . $cc
                 $vi = $vi + 1
@@ -44,10 +44,10 @@ fn ST::tokenize($s) {
             $vi = $vi + 1
             $in_word = 1
             while ($vi < $vn) {
-                my $cc = substr($s, $vi, 1)
+                val $cc = substr($s, $vi, 1)
                 last if $cc eq '"'
                 if ($cc eq "\\" && $vi + 1 < $vn) {
-                    my $nx = substr($s, $vi + 1, 1)
+                    val $nx = substr($s, $vi + 1, 1)
                     if ($nx eq '"' || $nx eq "\\" || $nx eq "n") {
                         if ($nx eq "n") {
                             $cur = $cur . "\n"
@@ -77,85 +77,85 @@ len(@{ST::tokenize("")}) |> aeq 0, "empty"
 len(@{ST::tokenize("   ")}) |> aeq 0, "whitespace only"
 
 # Simple
-my $va = ST::tokenize("a b c")
+val $va = ST::tokenize("a b c")
 len(@$va) |> aeq 3, "three words count"
 $va->[0] |> aeq "a", "tok 0"
 $va->[1] |> aeq "b", "tok 1"
 $va->[2] |> aeq "c", "tok 2"
 
 # Tabs and multi-space
-my $vb = ST::tokenize("foo\t\tbar   baz")
+val $vb = ST::tokenize("foo\t\tbar   baz")
 len(@$vb) |> aeq 3, "tabs split"
 $vb->[0] |> aeq "foo", "tab tok0"
 $vb->[2] |> aeq "baz", "tab tok2"
 
 # Leading/trailing whitespace
-my $vc = ST::tokenize("   hello   world   ")
+val $vc = ST::tokenize("   hello   world   ")
 len(@$vc) |> aeq 2, "trim ws count"
 $vc->[0] |> aeq "hello", "trim ws 0"
 $vc->[1] |> aeq "world", "trim ws 1"
 
 # Single quotes preserve spaces
-my $vd = ST::tokenize("echo 'hello world'")
+val $vd = ST::tokenize("echo 'hello world'")
 len(@$vd) |> aeq 2, "single q count"
 $vd->[1] |> aeq "hello world", "single q content"
 
 # Double quotes preserve spaces
-my $ve = ST::tokenize('cmd "a b c"')
+val $ve = ST::tokenize('cmd "a b c"')
 len(@$ve) |> aeq 2, "double q count"
 $ve->[1] |> aeq "a b c", "double q content"
 
 # Mixed
-my $vf = ST::tokenize("a 'b c' \"d e\" f")
+val $vf = ST::tokenize("a 'b c' \"d e\" f")
 len(@$vf) |> aeq 4, "mixed count"
 $vf->[1] |> aeq "b c", "mixed q1"
 $vf->[2] |> aeq "d e", "mixed q2"
 
 # Backslash escape outside quotes
-my $vg = ST::tokenize('path\ with\ space file2')
+val $vg = ST::tokenize('path\ with\ space file2')
 len(@$vg) |> aeq 2, "esc space count"
 $vg->[0] |> aeq "path with space", "esc space"
 $vg->[1] |> aeq "file2", "esc next"
 
 # Backslash escape of quote
-my $vh = ST::tokenize('a\"b')
+val $vh = ST::tokenize('a\"b')
 len(@$vh) |> aeq 1, "esc quote count"
 $vh->[0] |> aeq 'a"b', "esc quote val"
 
 # Double-quoted with \" escape
-my $vi = ST::tokenize('"hi \"there\""')
+val $vi = ST::tokenize('"hi \"there\""')
 len(@$vi) |> aeq 1, "dq esc count"
 $vi->[0] |> aeq 'hi "there"', "dq esc val"
 
 # Double-quoted with \n
-my $vj = ST::tokenize('"line1\nline2"')
+val $vj = ST::tokenize('"line1\nline2"')
 $vj->[0] |> aeq "line1\nline2", "dq newline"
 
 # Adjacent quoted/unquoted concatenate into one word
-my $vk = ST::tokenize("ab'cd'ef")
+val $vk = ST::tokenize("ab'cd'ef")
 len(@$vk) |> aeq 1, "adjacent count"
 $vk->[0] |> aeq "abcdef", "adjacent merged"
 
-my $kk = ST::tokenize('foo"bar"baz')
+val $kk = ST::tokenize('foo"bar"baz')
 len(@$kk) |> aeq 1, "adj dq count"
 $kk->[0] |> aeq "foobarbaz", "adj dq merged"
 
 # Empty quoted string still produces token
-my $vl = ST::tokenize("a '' b")
+val $vl = ST::tokenize("a '' b")
 len(@$vl) |> aeq 3, "empty single q count"
 $vl->[1] |> aeq "", "empty single q"
 
-my $ll = ST::tokenize('a "" b')
+val $ll = ST::tokenize('a "" b')
 len(@$ll) |> aeq 3, "empty dq count"
 $ll->[1] |> aeq "", "empty dq"
 
 # Single-char tokens
-my $vm = ST::tokenize("a")
+val $vm = ST::tokenize("a")
 len(@$vm) |> aeq 1, "one char count"
 $vm->[0] |> aeq "a", "one char val"
 
 # Complex realistic line
-my $vn = ST::tokenize("grep -e 'foo bar' -- /tmp/x")
+val $vn = ST::tokenize("grep -e 'foo bar' -- /tmp/x")
 len(@$vn) |> aeq 5, "grep cmd count"
 $vn->[0] |> aeq "grep", "grep tok0"
 $vn->[1] |> aeq "-e", "grep tok1"
@@ -164,15 +164,15 @@ $vn->[3] |> aeq "--", "grep tok3"
 $vn->[4] |> aeq "/tmp/x", "grep tok4"
 
 # Backslash at end of input -> ignored
-my $vo = ST::tokenize("foo\\")
+val $vo = ST::tokenize("foo\\")
 $vo->[0] |> aeq "foo", "trailing bs"
 
 # Single quotes: backslash is literal
-my $pp = ST::tokenize("'a\\nb'")
+val $pp = ST::tokenize("'a\\nb'")
 $pp->[0] |> aeq 'a\nb', "single q backslash literal"
 
 # Round-trip count for many tokens
-my $vq = ST::tokenize("one two three four five six seven eight")
+val $vq = ST::tokenize("one two three four five six seven eight")
 len(@$vq) |> aeq 8, "eight words"
 
 test_run

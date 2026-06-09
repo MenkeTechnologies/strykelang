@@ -19,7 +19,7 @@ fn Rosetta::OLE::call($sheet, $method, @args) {
     "unknown"
 }
 
-my $sheet = Rosetta::OLE::spreadsheet()
+val $sheet = Rosetta::OLE::spreadsheet()
 Rosetta::OLE::set($sheet, "A3", 5)
 
 assert_eq Rosetta::OLE::get($sheet, "title"), "Sheet1", "property access works"

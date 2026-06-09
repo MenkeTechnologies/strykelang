@@ -5,12 +5,12 @@ fn Rosetta::PowerfulNumbers::check($n) {
     if ($n == 1) {
         1
     } else {
-        my @factors = prime_factors($n)
-        my %unique_factors
-        for my $f (@factors) { $unique_factors{$f} = 1 }
+        val @factors = prime_factors($n)
+        var %unique_factors
+        for val $f (@factors) { $unique_factors{$f} = 1 }
         
-        my $all_sq = 1
-        for my $p (keys %unique_factors) {
+        var $all_sq = 1
+        for val $p (keys %unique_factors) {
             if ($n % ($p * $p) != 0) {
                 $all_sq = 0
             }

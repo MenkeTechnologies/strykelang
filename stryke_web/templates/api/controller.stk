@@ -8,7 +8,7 @@ class {{class_name}}Controller extends ApplicationController {
     }
 
     fn show {
-        my $row = {{model}}::find(web_params()->{id})
+        val $row = {{model}}::find(web_params()->{id})
         unless (defined $row) {
             web_json(+{ error => "not_found" }, 404)
             return
@@ -17,12 +17,12 @@ class {{class_name}}Controller extends ApplicationController {
     }
 
     fn create {
-        my $row = {{model}}::create(web_params())
+        val $row = {{model}}::create(web_params())
         web_json($row, 201)
     }
 
     fn update {
-        my $id = web_params()->{id}
+        val $id = web_params()->{id}
         {{model}}::update($id, web_params())
         web_json({{model}}::find($id))
     }

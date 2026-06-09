@@ -14,15 +14,15 @@
 # tiny port list — keeps the run_all_ci demo runner happy without
 # requiring network.
 
-my $host = $ARGV[0] // "127.0.0.1"
-my $port_spec = $ARGV[1]
-my $smoke = !defined $ARGV[0]
+val $host = $ARGV[0] // "127.0.0.1"
+val $port_spec = $ARGV[1]
+val $smoke = !defined $ARGV[0]
 
 # Default ports — common service set.
-my @default_ports = (21, 22, 25, 53, 80, 110, 143, 443, 3306, 5432, 5900, 6379, 8080)
-my @smoke_ports = (1, 22)   # 1 = closed, 22 = sometimes open
+val @default_ports = (21, 22, 25, 53, 80, 110, 143, 443, 3306, 5432, 5900, 6379, 8080)
+val @smoke_ports = (1, 22)   # 1 = closed, 22 = sometimes open
 
-my @ports
+var @ports
 if ($smoke) {
     @ports = @smoke_ports
 } elsif (defined $port_spec) {
@@ -41,14 +41,14 @@ printf "── network_recon: %s × %d ports ──\n", $host, len(@ports)
 
 # Parallel probe — each fn runs in its own pmap slot.
 fn Recon::probe_port($p) {
-    my $tp = tcp_probe($host, $p, 250)
+    val $tp = tcp_probe($host, $p, 250)
     if (!$tp->{alive}) {
         return { port => $p, alive => 0 }
     }
     # Service is up — try to read its greeting.
-    my $tb = tcp_banner($host, $p, 1000, 256)
+    val $tb = tcp_banner($host, $p, 1000, 256)
     # Take the first line of the banner, strip whitespace.
-    my $first_line = (split /\r?\n/, $tb->{banner})[0] // ""
+    val $first_line = (split /\r?\n/, $tb->{banner})[0] // ""
     return {
         port       => $p,
         alive      => 1,
@@ -57,14 +57,14 @@ fn Recon::probe_port($p) {
     }
 }
 
-my @results = pmap { Recon::probe_port($_) } @ports
-my @open    = grep { $_->{alive} } @results
-my @sorted  = sort { _->{port} <=> _1->{port} } @open
+val @results = pmap { Recon::probe_port($_) } @ports
+val @open    = grep { $_->{alive} } @results
+val @sorted  = sort { _->{port} <=> _1->{port} } @open
 
 if (len(@sorted)) {
     p ""
     p "── open ports ────────────────────────────────────────"
-    for my $r (@sorted) {
+    for val $r (@sorted) {
         if (length($r->{banner}) > 0) {
             printf "  %5d  %3dms  %s\n", $r->{port}, $r->{latency_ms}, $r->{banner}
         } else {

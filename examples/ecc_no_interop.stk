@@ -18,20 +18,20 @@
 
 # Always-positive remainder, even for negative dividends.
 fn ECC::mod($n, $p) {
-    my $r = $n % $p
+    val $r = $n % $p
     $r < 0 ? $r + $p : $r
 }
 
 # Extended-Euclidean modular inverse. Returns undef if gcd != 1.
 fn ECC::mod_inv($n, $p) {
-    my $t = 0
-    my $newt = 1
-    my $r = $p
-    my $newr = ECC::mod($n, $p)
+    var $t = 0
+    var $newt = 1
+    var $r = $p
+    var $newr = ECC::mod($n, $p)
     while ($newr != 0) {
-        my $q = int($r / $newr)
-        my $tmp_t = $t - $q * $newt; $t = $newt; $newt = $tmp_t
-        my $tmp_r = $r - $q * $newr; $r = $newr; $newr = $tmp_r
+        val $q = int($r / $newr)
+        val $tmp_t = $t - $q * $newt; $t = $newt; $newt = $tmp_t
+        val $tmp_r = $r - $q * $newr; $r = $newr; $newr = $tmp_r
     }
     return undef if $r > 1
     ECC::mod($t, $p)
@@ -45,28 +45,28 @@ fn ECC::add_points($p1, $p2, $ca, $p) {
     return $p1 if $p2->{inf}
     return +{ inf => 1 } if $p1->{x} == $p2->{x} && $p1->{y} != $p2->{y}
 
-    my $m
+    var $m
     if ($p1->{x} == $p2->{x}) {
         return +{ inf => 1 } if $p1->{y} == 0
-        my $num = ECC::mod(3 * $p1->{x} * $p1->{x} + $ca, $p)
-        my $den = ECC::mod_inv(2 * $p1->{y}, $p)
+        val $num = ECC::mod(3 * $p1->{x} * $p1->{x} + $ca, $p)
+        val $den = ECC::mod_inv(2 * $p1->{y}, $p)
         $m = ECC::mod($num * $den, $p)
     } else {
-        my $num = ECC::mod($p2->{y} - $p1->{y}, $p)
-        my $den = ECC::mod_inv(ECC::mod($p2->{x} - $p1->{x}, $p), $p)
+        val $num = ECC::mod($p2->{y} - $p1->{y}, $p)
+        val $den = ECC::mod_inv(ECC::mod($p2->{x} - $p1->{x}, $p), $p)
         $m = ECC::mod($num * $den, $p)
     }
 
-    my $x3 = ECC::mod($m * $m - $p1->{x} - $p2->{x}, $p)
-    my $y3 = ECC::mod($m * ($p1->{x} - $x3) - $p1->{y}, $p)
+    val $x3 = ECC::mod($m * $m - $p1->{x} - $p2->{x}, $p)
+    val $y3 = ECC::mod($m * ($p1->{x} - $x3) - $p1->{y}, $p)
     +{ x => $x3, y => $y3, inf => 0 }
 }
 
 # Double-and-add: O(log k) point multiplications.
 fn ECC::scalar_mult($k, $pt, $ca, $p) {
-    my $res = +{ inf => 1 }
-    my $addend = +{ %$pt }
-    my $n = $k
+    var $res = +{ inf => 1 }
+    var $addend = +{ %$pt }
+    var $n = $k
     while ($n > 0) {
         $res = ECC::add_points($res, $addend, $ca, $p) if $n % 2 == 1
         $addend = ECC::add_points($addend, $addend, $ca, $p)
@@ -77,20 +77,20 @@ fn ECC::scalar_mult($k, $pt, $ca, $p) {
 
 p "── Elliptic Curve Math demo ──"
 # Curve: y^2 = x^3 + 2x + 2 mod 17. Base point order is 19.
-my $ca = 2
-my $p = 17
-my $G = +{ x => 5, y => 1, inf => 0 }
+val $ca = 2
+val $p = 17
+val $G = +{ x => 5, y => 1, inf => 0 }
 
 p "Curve: y^2 = x^3 + 2x + 2 mod 17"
 p "Base point G: (#{$G->{x}}, #{$G->{y}})"
 
-my $G2 = ECC::scalar_mult(2, $G, $ca, $p)
+val $G2 = ECC::scalar_mult(2, $G, $ca, $p)
 p "2G  = (#{$G2->{x}}, #{$G2->{y}})"
 
-my $G3 = ECC::scalar_mult(3, $G, $ca, $p)
+val $G3 = ECC::scalar_mult(3, $G, $ca, $p)
 p "3G  = (#{$G3->{x}}, #{$G3->{y}})"
 
-my $G19 = ECC::scalar_mult(19, $G, $ca, $p)
+val $G19 = ECC::scalar_mult(19, $G, $ca, $p)
 p "19G = #{ $G19->{inf} ? 'Infinity' : '(' . $G19->{x} . ', ' . $G19->{y} . ')' }"
 
 p "Done."

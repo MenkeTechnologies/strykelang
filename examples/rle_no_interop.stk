@@ -16,11 +16,11 @@
 
 fn RLE::enc($s) {
     return "" if len($s) == 0
-    my @chars = split(//, $s)
-    my $out  = ""
-    my $prev = $chars[0]
-    my $run  = 1
-    for my $i (1:len(@chars) - 1) {
+    val @chars = split(//, $s)
+    var $out  = ""
+    var $prev = $chars[0]
+    var $run  = 1
+    for val $i (1:len(@chars) - 1) {
         if ($chars[$i] eq $prev) {
             $run++
         } else {
@@ -36,11 +36,11 @@ fn RLE::enc($s) {
 fn RLE::dec($s) {
     # Walk the string by hand: pick up the digit run, then one letter,
     # then repeat. Avoids relying on /g list-capture semantics.
-    my @chars = split(//, $s)
-    my $out = ""
-    my $i = 0
+    val @chars = split(//, $s)
+    var $out = ""
+    var $i = 0
     while ($i < len(@chars)) {
-        my $num = ""
+        var $num = ""
         while ($i < len(@chars) && $chars[$i] =~ /\d/) {
             $num .= $chars[$i]
             $i++
@@ -53,7 +53,7 @@ fn RLE::dec($s) {
 }
 
 if (len(@ARGV) >= 2) {
-    my ($mode, $arg) = @ARGV
+    val ($mode, $arg) = @ARGV
     if    ($mode eq "encode") { p RLE::enc($arg) }
     elsif ($mode eq "decode") { p RLE::dec($arg) }
     else  { die "mode must be 'encode' or 'decode'" }
@@ -61,7 +61,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo grid — each input must round-trip cleanly.
-my @cases = (
+val @cases = (
     +{ s => "",                expected => ""              },
     +{ s => "a",               expected => "1a"            },
     +{ s => "aaa",             expected => "3a"            },
@@ -73,12 +73,12 @@ my @cases = (
 )
 
 p "── RLE encode / decode demo ──"
-my $fail = 0
-for my $c (@cases) {
-    my $enc       = RLE::enc($c->{s})
-    my $roundtrip = RLE::dec($enc)
-    my $ok_enc    = ($enc eq $c->{expected})
-    my $ok_rt     = ($roundtrip eq $c->{s})
+var $fail = 0
+for val $c (@cases) {
+    val $enc       = RLE::enc($c->{s})
+    val $roundtrip = RLE::dec($enc)
+    val $ok_enc    = ($enc eq $c->{expected})
+    val $ok_rt     = ($roundtrip eq $c->{s})
     $fail++ unless $ok_enc && $ok_rt
     printf "  %-15s -> %-22s (round-trip: %s)  %s\n",
         "\"" . $c->{s} . "\"",

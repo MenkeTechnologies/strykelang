@@ -2,9 +2,9 @@
 # Rosetta Code: Brilliant numbers
 
 fn Rosetta::BrilliantNumbers::get_factors($n) {
-    my @factors
-    my $d = 2
-    my $temp = $n
+    var @factors
+    var $d = 2
+    var $temp = $n
     while ($d * $d <= $temp) {
         while ($temp % $d == 0) {
             push @factors, $d
@@ -17,7 +17,7 @@ fn Rosetta::BrilliantNumbers::get_factors($n) {
 }
 
 fn Rosetta::BrilliantNumbers::check($n) {
-    my @f = Rosetta::BrilliantNumbers::get_factors($n)
+    val @f = Rosetta::BrilliantNumbers::get_factors($n)
     if (len(@f) != 2) {
         0
     } else {

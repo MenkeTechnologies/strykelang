@@ -14,7 +14,7 @@ fn Rosetta::GUIInteract::click_copy($app) {
     $app->{clicks}++
 }
 
-my $app = Rosetta::GUIInteract::app()
+val $app = Rosetta::GUIInteract::app()
 Rosetta::GUIInteract::type_text($app, "Rosetta")
 Rosetta::GUIInteract::click_copy($app)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 fn Exercism::Series::slices($args) {
-    my $s   = $args->{series}
-    my $len = $args->{sliceLength}
+    val $s   = $args->{series}
+    val $len = $args->{sliceLength}
     die "slice length cannot be zero"     if $len == 0
     die "slice length cannot be negative" if $len < 0
     die "series cannot be empty"          if $s eq ""

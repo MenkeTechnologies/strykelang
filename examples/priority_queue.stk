@@ -20,8 +20,8 @@ fn Demo::PQ::is_empty = len(@{_}) == 0
 
 fn Demo::PQ::push($pq, $prio, $item) {
     # Find insertion point via linear scan (small N).
-    my $n = len @$pq
-    my $i = 0
+    val $n = len @$pq
+    var $i = 0
     while ($i < $n && $pq->[$i]->[0] <= $prio) {
         $i++
     }
@@ -36,25 +36,25 @@ fn Demo::PQ::pop($pq) {
 # ── weighted-graph Dijkstra ─────────────────────────────────────────
 
 fn Demo::Path::dijkstra($graph, $source) {
-    my %dist
-    my %prev
+    var %dist
+    var %prev
     $dist{$source} = 0
 
-    my $pq = Demo::PQ::new()
+    val $pq = Demo::PQ::new()
     Demo::PQ::push($pq, 0, $source)
 
     while (!Demo::PQ::is_empty($pq)) {
-        my $top = Demo::PQ::pop($pq)
-        my $d  = $top->[0]
-        my $u  = $top->[1]
+        val $top = Demo::PQ::pop($pq)
+        val $d  = $top->[0]
+        val $u  = $top->[1]
 
         # Skip stale queue entries (could be re-added with lower prio).
         next if defined($dist{$u}) && $d > $dist{$u}
 
-        my $edges = $graph->{$u} // +{}
-        for my $v (keys %$edges) {
-            my $w = $edges->{$v}
-            my $alt = $d + $w
+        val $edges = $graph->{$u} // +{}
+        for val $v (keys %$edges) {
+            val $w = $edges->{$v}
+            val $alt = $d + $w
             if (!exists($dist{$v}) || $alt < $dist{$v}) {
                 $dist{$v} = $alt
                 $prev{$v} = $u
@@ -68,8 +68,8 @@ fn Demo::Path::dijkstra($graph, $source) {
 # Reconstruct path from source to target.
 fn Demo::Path::reconstruct($prev, $source, $target) {
     return undef unless exists $prev->{$target} || $source eq $target
-    my @path = ($target)
-    my $cur = $target
+    var @path = ($target)
+    var $cur = $target
     while ($cur ne $source && exists $prev->{$cur}) {
         $cur = $prev->{$cur}
         unshift @path, $cur
@@ -79,7 +79,7 @@ fn Demo::Path::reconstruct($prev, $source, $target) {
 
 # ── sample graph (US-ish city distances in miles, approximate) ──────
 
-my %graph = (
+val %graph = (
     "SF"      => +{ "Reno" => 218, "LA" => 380, "Sacramento" => 90 },
     "Sacramento" => +{ "SF" => 90, "Reno" => 130 },
     "Reno"    => +{ "SF" => 218, "Sacramento" => 130, "SLC" => 520 },
@@ -92,9 +92,9 @@ my %graph = (
 )
 
 p "── graph (weighted, undirected) ─────────────────────"
-for my $u (sort { _ cmp _1 } keys %graph) {
-    my @edges
-    for my $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
+for val $u (sort { _ cmp _1 } keys %graph) {
+    var @edges
+    for val $v (sort { _ cmp _1 } keys %{$graph{$u}}) {
         push @edges, sprintf("%s=%d", $v, $graph{$u}->{$v})
     }
     printf "  %-12s : %s\n", $u, join(", ", @edges)
@@ -104,26 +104,26 @@ for my $u (sort { _ cmp _1 } keys %graph) {
 
 mysync $pq_lat = t_digest(100)
 around "Demo::PQ::push" {
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
     td_add($pq_lat, (now_ns() - $t0) / 1000.0)
     $r
 }
 
-my $result = Demo::Path::dijkstra(\%graph, "SF")
+val $result = Demo::Path::dijkstra(\%graph, "SF")
 
 p ""
 p "── shortest distances from SF ───────────────────────"
-for my $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
+for val $city (sort { _ cmp _1 } keys %{$result->{dist}}) {
     printf "  %-12s : %d miles\n", $city, $result->{dist}->{$city}
 }
 
 p ""
 p "── reconstructed paths ──────────────────────────────"
-for my $target ("Sacramento", "Reno", "LA", "Vegas", "Denver", "Albuquerque", "SLC") {
-    my $path = Demo::Path::reconstruct($result->{prev}, "SF", $target)
+for val $target ("Sacramento", "Reno", "LA", "Vegas", "Denver", "Albuquerque", "SLC") {
+    val $path = Demo::Path::reconstruct($result->{prev}, "SF", $target)
     if (defined $path) {
-        my $dist = $result->{dist}->{$target}
+        val $dist = $result->{dist}->{$target}
         printf "  SF -> %-12s (%d mi): %s\n",
             $target, $dist, join(" -> ", @$path)
     } else {
@@ -143,10 +143,10 @@ printf "  p99  : %.1f µs\n", td_quantile($pq_lat, 0.99)
 
 p ""
 p "── PQ stress: 100 random push/pop operations ────────"
-my $stress = Demo::PQ::new()
-my $pushes = 0
-my $pops = 0
-for my $i (1:100) {
+val $stress = Demo::PQ::new()
+var $pushes = 0
+var $pops = 0
+for val $i (1:100) {
     if (rand() < 0.6 || Demo::PQ::is_empty($stress)) {
         Demo::PQ::push($stress, int(rand 1000), "item$i")
         $pushes++
@@ -159,11 +159,11 @@ printf "  100 ops: %d pushes, %d pops, %d remaining\n",
     $pushes, $pops, len @$stress
 
 # Verify PQ invariant: each pop is non-decreasing.
-my $prev = -1
-my $ok = 1
-my $popped_count = 0
+var $prev = -1
+var $ok = 1
+var $popped_count = 0
 while (!Demo::PQ::is_empty($stress)) {
-    my $top = Demo::PQ::pop($stress)
+    val $top = Demo::PQ::pop($stress)
     if ($top->[0] < $prev) {
         $ok = 0
         last

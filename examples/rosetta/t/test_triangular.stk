@@ -6,8 +6,8 @@ fn Rosetta::Triangular::compute($n) {
 }
 
 fn Rosetta::Triangular::check($n) {
-    my $val = 8 * $n + 1
-    my $root = int(sqrt($val))
+    val $val = 8 * $n + 1
+    val $root = int(sqrt($val))
     $root * $root == $val
 }
 

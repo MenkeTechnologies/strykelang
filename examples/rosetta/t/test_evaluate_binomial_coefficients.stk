@@ -12,8 +12,8 @@ fn Rosetta::Binomial::evaluate($n, $k) {
         $k = $n - $k
     }
     
-    my $res = 1
-    for (my $i = 1; $i <= $k; $i++) {
+    var $res = 1
+    for (var $i = 1; $i <= $k; $i++) {
         $res = $res * ($n - $i + 1) / $i
     }
     $res
@@ -32,7 +32,7 @@ assert_eq Rosetta::Binomial::evaluate(5, 6), 0, "C(5, 6) = 0"
 assert_eq Rosetta::Binomial::evaluate(10, 5), 252, "C(10, 5) = 252"
 
 # Piped mapping over a row of Pascal's triangle (n=4: 1 4 6 4 1)
-my @row4 = 0:4 |> map { Rosetta::Binomial::evaluate(4, _) }
+val @row4 = 0:4 |> map { Rosetta::Binomial::evaluate(4, _) }
 assert_eq join(" ", @row4), "1 4 6 4 1", "Row 4 of Pascals triangle"
 
 test_run

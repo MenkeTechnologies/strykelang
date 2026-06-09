@@ -19,38 +19,38 @@ fn Project::Huffman::adv_huffman_encode($text) {
     return ["", undef] if len($text) == 0
     
     # 1. Count frequencies
-    my %freq = ()
-    my $len = len($text)
-    for my $i (0:$len-1) {
-        my $char = substr($text, $i, 1)
+    var %freq = ()
+    val $len = len($text)
+    for val $i (0:$len-1) {
+        val $char = substr($text, $i, 1)
         $freq{$char} = ($freq{$char} // 0) + 1
     }
     
     # 2. Build Min-Heap
-    my $pq = Project::PriorityQueue::pq_min_new()
-    for my $char (keys %freq) {
-        my $node = HuffmanNode(char => $char, freq => $freq{$char})
+    val $pq = Project::PriorityQueue::pq_min_new()
+    for val $char (keys %freq) {
+        val $node = HuffmanNode(char => $char, freq => $freq{$char})
         $pq->push([$freq{$char}, $node])
     }
     
     # Special case: single character
     if ($pq->size() == 1) {
-        my $top = $pq->pop()
-        my $node = $top->[1]
-        my $root = HuffmanNode(freq => $node->freq(), left => $node)
-        my %codes = ($node->char() => "0")
+        val $top = $pq->pop()
+        val $node = $top->[1]
+        val $root = HuffmanNode(freq => $node->freq(), left => $node)
+        val %codes = ($node->char() => "0")
         return [_build_binary($text, \%codes), $root]
     }
     
     # 3. Build Huffman Tree
     while ($pq->size() > 1) {
-        my $left_pair = $pq->pop()
-        my $right_pair = $pq->pop()
+        val $left_pair = $pq->pop()
+        val $right_pair = $pq->pop()
         
-        my $left = $left_pair->[1]
-        my $right = $right_pair->[1]
+        val $left = $left_pair->[1]
+        val $right = $right_pair->[1]
         
-        my $parent = HuffmanNode(
+        val $parent = HuffmanNode(
             freq  => $left->freq() + $right->freq(),
             left  => $left,
             right => $right
@@ -58,11 +58,11 @@ fn Project::Huffman::adv_huffman_encode($text) {
         $pq->push([$parent->freq(), $parent])
     }
     
-    my $root_pair = $pq->pop()
-    my $root = $root_pair->[1]
+    val $root_pair = $pq->pop()
+    val $root = $root_pair->[1]
     
     # 4. Generate Codes
-    my %codes = ()
+    val %codes = ()
     _generate_codes($root, "", \%codes)
     
     # 5. Build Result
@@ -83,10 +83,10 @@ fn _generate_codes($node, $code, $codes_ref) {
 }
 
 fn _build_binary($text, $codes_ref) {
-    my $res = ""
-    my $len = len($text)
-    for my $i (0:$len-1) {
-        my $char = substr($text, $i, 1)
+    var $res = ""
+    val $len = len($text)
+    for val $i (0:$len-1) {
+        val $char = substr($text, $i, 1)
         $res .= $codes_ref->{$char}
     }
     return $res
@@ -96,12 +96,12 @@ fn _build_binary($text, $codes_ref) {
 fn Project::Huffman::adv_huffman_decode($binary, $root) {
     return "" if !defined($root) || len($binary) == 0
     
-    my $res = ""
-    my $curr = $root
-    my $len = len($binary)
+    var $res = ""
+    var $curr = $root
+    val $len = len($binary)
     
-    for my $i (0:$len-1) {
-        my $bit = substr($binary, $i, 1)
+    for val $i (0:$len-1) {
+        val $bit = substr($binary, $i, 1)
         if ($bit eq "0") {
             $curr = $curr->left()
         } else {

@@ -7,8 +7,8 @@ fn AVL::node($v) {
 }
 
 fn AVL::_update_h($n) {
-    my $lh = AVL::height($n->{left})
-    my $rh = AVL::height($n->{right})
+    val $lh = AVL::height($n->{left})
+    val $rh = AVL::height($n->{right})
     $n->{h} = 1 + ($lh > $rh ? $lh : $rh)
 }
 
@@ -17,8 +17,8 @@ fn AVL::_balance($n) {
 }
 
 fn AVL::_rot_right($y) {
-    my $x  = $y->{left}
-    my $t2 = $x->{right}
+    var $x  = $y->{left}
+    val $t2 = $x->{right}
     $x->{right} = $y
     $y->{left}  = $t2
     AVL::_update_h($y)
@@ -27,8 +27,8 @@ fn AVL::_rot_right($y) {
 }
 
 fn AVL::_rot_left($x) {
-    my $y  = $x->{right}
-    my $t2 = $y->{left}
+    var $y  = $x->{right}
+    val $t2 = $y->{left}
     $y->{left}  = $x
     $x->{right} = $t2
     AVL::_update_h($x)
@@ -46,7 +46,7 @@ fn AVL::insert($n, $v) {
         return $n
     }
     AVL::_update_h($n)
-    my $bf = AVL::_balance($n)
+    val $bf = AVL::_balance($n)
     if ($bf > 1 && $v < $n->{left}->{val})  { return AVL::_rot_right($n) }
     if ($bf < -1 && $v > $n->{right}->{val}) { return AVL::_rot_left($n) }
     if ($bf > 1 && $v > $n->{left}->{val}) {
@@ -67,17 +67,17 @@ fn AVL::contains($n, $v) {
 }
 
 fn AVL::inorder($n) {
-    my @out = ()
+    var @out = ()
     return \@out unless defined $n
-    for my $x (@{AVL::inorder($n->{left})})  { push @out, $x }
+    for val $x (@{AVL::inorder($n->{left})})  { push @out, $x }
     push @out, $n->{val}
-    for my $x (@{AVL::inorder($n->{right})}) { push @out, $x }
+    for val $x (@{AVL::inorder($n->{right})}) { push @out, $x }
     \@out
 }
 
 fn AVL::balanced($n) {
     return 1 unless defined $n
-    my $bf = AVL::_balance($n)
+    val $bf = AVL::_balance($n)
     return 0 if $bf < -1 || $bf > 1
     AVL::balanced($n->{left}) && AVL::balanced($n->{right})
 }
@@ -89,7 +89,7 @@ AVL::contains(undef, 5) |> aeq 0, "empty contains"
 len(@{AVL::inorder(undef)}) |> aeq 0, "empty inorder"
 
 # Single
-my $r1 = AVL::insert(undef, 42)
+val $r1 = AVL::insert(undef, 42)
 AVL::height($r1)   |> aeq 1, "single height"
 AVL::balanced($r1) |> aeq 1, "single balanced"
 AVL::contains($r1, 42) |> aeq 1, "contains 42"
@@ -97,65 +97,65 @@ AVL::contains($r1, 1)  |> aeq 0, "no 1"
 join(",", @{AVL::inorder($r1)}) |> aeq "42", "single inorder"
 
 # Duplicate insert no-op
-my $r2 = AVL::insert($r1, 42)
+val $r2 = AVL::insert($r1, 42)
 join(",", @{AVL::inorder($r2)}) |> aeq "42", "duplicate inorder"
 
 # Right-right (LL) rotation case
-my $rr = undef
-for my $v (1, 2, 3) { $rr = AVL::insert($rr, $v) }
+var $rr = undef
+for val $v (1, 2, 3) { $rr = AVL::insert($rr, $v) }
 AVL::balanced($rr) |> aeq 1, "LL balanced"
 AVL::height($rr)   |> aeq 2, "LL height 2"
 $rr->{val} |> aeq 2, "LL root is 2"
 
 # Left-left (RR rotation case)
-my $ll = undef
-for my $v (3, 2, 1) { $ll = AVL::insert($ll, $v) }
+var $ll = undef
+for val $v (3, 2, 1) { $ll = AVL::insert($ll, $v) }
 AVL::balanced($ll) |> aeq 1, "RR balanced"
 $ll->{val} |> aeq 2, "RR root is 2"
 
 # Right-left rotation
-my $rl = undef
-for my $v (1, 3, 2) { $rl = AVL::insert($rl, $v) }
+var $rl = undef
+for val $v (1, 3, 2) { $rl = AVL::insert($rl, $v) }
 $rl->{val} |> aeq 2, "RL root is 2"
 AVL::balanced($rl) |> aeq 1, "RL balanced"
 
 # Left-right rotation
-my $lr = undef
-for my $v (3, 1, 2) { $lr = AVL::insert($lr, $v) }
+var $lr = undef
+for val $v (3, 1, 2) { $lr = AVL::insert($lr, $v) }
 $lr->{val} |> aeq 2, "LR root is 2"
 AVL::balanced($lr) |> aeq 1, "LR balanced"
 
 # Inorder is sorted for arbitrary insertion order
-my $rand = undef
-for my $v (5, 3, 8, 1, 9, 4, 7, 2, 6) { $rand = AVL::insert($rand, $v) }
+var $rand = undef
+for val $v (5, 3, 8, 1, 9, 4, 7, 2, 6) { $rand = AVL::insert($rand, $v) }
 join(",", @{AVL::inorder($rand)}) |> aeq "1,2,3,4,5,6,7,8,9", "rand inorder sorted"
 AVL::balanced($rand) |> aeq 1, "rand balanced"
 
 # Ascending 1..32 stays balanced and height log-ish
-my $asc = undef
-for my $v (1:32) { $asc = AVL::insert($asc, $v) }
+var $asc = undef
+for val $v (1:32) { $asc = AVL::insert($asc, $v) }
 AVL::balanced($asc) |> aeq 1, "ascending balanced"
 (AVL::height($asc) <= 7 ? 1 : 0) |> aeq 1, "height stays small"
 len(@{AVL::inorder($asc)}) |> aeq 32, "32 elems"
 
 # Descending 32..1 stays balanced
-my $dsc = undef
-for my $v (1:32) { $dsc = AVL::insert($dsc, 33 - $v) }
+var $dsc = undef
+for val $v (1:32) { $dsc = AVL::insert($dsc, 33 - $v) }
 AVL::balanced($dsc) |> aeq 1, "descending balanced"
 (AVL::height($dsc) <= 7 ? 1 : 0) |> aeq 1, "desc height small"
 join(",", @{AVL::inorder($dsc)}->[0:4]) |> aeq "1,2,3,4,5", "desc sorted (first 5)"
 
 # Mixed contains
-for my $v (1, 5, 10, 16, 32) {
+for val $v (1, 5, 10, 16, 32) {
     AVL::contains($asc, $v) |> aeq 1, "asc contains $v"
 }
 AVL::contains($asc, 0)  |> aeq 0, "no 0"
 AVL::contains($asc, 33) |> aeq 0, "no 33"
 
 # Larger stress: 100 random-ish insertions stay balanced
-my $big = undef
-my $seed = 12345
-for my $i (1:100) {
+var $big = undef
+var $seed = 12345
+for val $i (1:100) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     $big = AVL::insert($big, $seed % 1000)
 }

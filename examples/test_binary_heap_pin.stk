@@ -5,8 +5,8 @@ package BH;
 fn new() { { data => [] } }
 
 fn _swap($self, $i, $j) {
-    my $arr = $self->{data}
-    my $t = $arr->[$i]
+    var $arr = $self->{data}
+    val $t = $arr->[$i]
     $arr->[$i] = $arr->[$j]
     $arr->[$j] = $t
 }
@@ -20,11 +20,11 @@ fn peek($self) {
 }
 
 fn push($self, $v) {
-    my $arr = $self->{data}
+    val $arr = $self->{data}
     push @$arr, $v
-    my $i = len(@$arr) - 1
+    var $i = len(@$arr) - 1
     while ($i > 0) {
-        my $parent = int(($i - 1) / 2)
+        val $parent = int(($i - 1) / 2)
         if ($arr->[$i] < $arr->[$parent]) {
             BH::_swap($self, $i, $parent)
             $i = $parent
@@ -33,18 +33,18 @@ fn push($self, $v) {
 }
 
 fn pop($self) {
-    my $arr = $self->{data}
-    my $n = len(@$arr)
+    var $arr = $self->{data}
+    val $n = len(@$arr)
     return undef if $n == 0
-    my $top = $arr->[0]
+    val $top = $arr->[0]
     if ($n == 1) { pop @$arr; return $top }
     $arr->[0] = pop @$arr
-    my $i = 0
-    my $sz = len(@$arr)
+    var $i = 0
+    val $sz = len(@$arr)
     while (1) {
-        my $l = 2 * $i + 1
-        my $r = 2 * $i + 2
-        my $smallest = $i
+        val $l = 2 * $i + 1
+        val $r = 2 * $i + 2
+        var $smallest = $i
         $smallest = $l if $l < $sz && $arr->[$l] < $arr->[$smallest]
         $smallest = $r if $r < $sz && $arr->[$r] < $arr->[$smallest]
         last if $smallest == $i
@@ -55,9 +55,9 @@ fn pop($self) {
 }
 
 fn heapsort($arr) {
-    my $h = BH::new()
-    for my $x (@$arr) { BH::push($h, $x) }
-    my @out = ()
+    val $h = BH::new()
+    for val $x (@$arr) { BH::push($h, $x) }
+    var @out = ()
     while (!BH::is_empty($h)) { push @out, BH::pop($h) }
     \@out
 }
@@ -65,14 +65,14 @@ fn heapsort($arr) {
 package main;
 
 # --- Empty heap ---
-my $h0 = BH::new()
+val $h0 = BH::new()
 BH::size($h0) |> aeq 0, "empty size"
 BH::is_empty($h0) |> aeq 1, "empty is_empty"
 (defined BH::peek($h0)) |> aeq 0, "empty peek undef"
 (defined BH::pop($h0)) |> aeq 0, "empty pop undef"
 
 # --- Single element ---
-my $h1 = BH::new()
+val $h1 = BH::new()
 BH::push($h1, 42)
 BH::size($h1) |> aeq 1, "single size"
 BH::is_empty($h1) |> aeq 0, "single not empty"
@@ -81,46 +81,46 @@ BH::pop($h1) |> aeq 42, "single pop"
 BH::size($h1) |> aeq 0, "after pop size"
 
 # --- Ordered pushes return min first ---
-my $h2 = BH::new()
-for my $v (5, 3, 8, 1, 9, 2, 7) { BH::push($h2, $v) }
+val $h2 = BH::new()
+for val $v (5, 3, 8, 1, 9, 2, 7) { BH::push($h2, $v) }
 BH::peek($h2) |> aeq 1, "peek min"
 BH::size($h2) |> aeq 7, "size after 7 pushes"
 
-my @ord = ()
+var @ord = ()
 while (!BH::is_empty($h2)) { push @ord, BH::pop($h2) }
 join(",", @ord) |> aeq "1,2,3,5,7,8,9", "drain in order"
 
 # --- Already sorted input ---
-my $h3 = BH::new()
-for my $v (1, 2, 3, 4, 5) { BH::push($h3, $v) }
-my @o3 = ()
+val $h3 = BH::new()
+for val $v (1, 2, 3, 4, 5) { BH::push($h3, $v) }
+var @o3 = ()
 while (!BH::is_empty($h3)) { push @o3, BH::pop($h3) }
 join(",", @o3) |> aeq "1,2,3,4,5", "already sorted"
 
 # --- Reverse sorted input ---
-my $h4 = BH::new()
-for my $v (5, 4, 3, 2, 1) { BH::push($h4, $v) }
-my @o4 = ()
+val $h4 = BH::new()
+for val $v (5, 4, 3, 2, 1) { BH::push($h4, $v) }
+var @o4 = ()
 while (!BH::is_empty($h4)) { push @o4, BH::pop($h4) }
 join(",", @o4) |> aeq "1,2,3,4,5", "reverse sorted"
 
 # --- Duplicates ---
-my $h5 = BH::new()
-for my $v (3, 1, 3, 1, 2, 2) { BH::push($h5, $v) }
-my @o5 = ()
+val $h5 = BH::new()
+for val $v (3, 1, 3, 1, 2, 2) { BH::push($h5, $v) }
+var @o5 = ()
 while (!BH::is_empty($h5)) { push @o5, BH::pop($h5) }
 join(",", @o5) |> aeq "1,1,2,2,3,3", "duplicates preserved"
 
 # --- Negative + zero + positive ---
-my $h6 = BH::new()
-for my $v (-3, 0, 5, -1, 4, -10) { BH::push($h6, $v) }
+val $h6 = BH::new()
+for val $v (-3, 0, 5, -1, 4, -10) { BH::push($h6, $v) }
 BH::peek($h6) |> aeq -10, "peek negative min"
-my @o6 = ()
+var @o6 = ()
 while (!BH::is_empty($h6)) { push @o6, BH::pop($h6) }
 join(",", @o6) |> aeq "-10,-3,-1,0,4,5", "negatives sorted"
 
 # --- Interleaved push/pop ---
-my $h7 = BH::new()
+val $h7 = BH::new()
 BH::push($h7, 10)
 BH::push($h7, 5)
 BH::pop($h7) |> aeq 5, "interleave pop1"
@@ -132,45 +132,45 @@ BH::pop($h7) |> aeq 10, "interleave pop4"
 BH::is_empty($h7) |> aeq 1, "interleave empty at end"
 
 # --- Larger random-ish stress ---
-my $h8 = BH::new()
-my $seed = 7
-for my $i (1:100) {
+val $h8 = BH::new()
+var $seed = 7
+for val $i (1:100) {
     $seed = ($seed * 1103515245 + 12345) % 2147483648
     BH::push($h8, $seed % 1000)
 }
 BH::size($h8) |> aeq 100, "stress size"
-my @prev = ()
-my $ok = 1
-my $last = -1
+val @prev = ()
+var $ok = 1
+var $last = -1
 while (!BH::is_empty($h8)) {
-    my $v = BH::pop($h8)
+    val $v = BH::pop($h8)
     $ok = 0 if $v < $last
     $last = $v
 }
 $ok |> aeq 1, "stress monotonic non-decreasing"
 
 # --- heapsort wrapper ---
-my $s1 = BH::heapsort([])
+val $s1 = BH::heapsort([])
 len(@$s1) |> aeq 0, "heapsort empty"
 
-my $s2 = BH::heapsort([42])
+val $s2 = BH::heapsort([42])
 join(",", @$s2) |> aeq "42", "heapsort single"
 
-my $s3 = BH::heapsort([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5])
+val $s3 = BH::heapsort([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5])
 join(",", @$s3) |> aeq "1,1,2,3,3,4,5,5,5,6,9", "heapsort classic"
 
-my $s4 = BH::heapsort([-5, 10, -10, 5, 0])
+val $s4 = BH::heapsort([-5, 10, -10, 5, 0])
 join(",", @$s4) |> aeq "-10,-5,0,5,10", "heapsort negatives"
 
 # Heapsort length preserved
-my @big = ()
-for my $i (1:50) { push @big, ($i * 7) % 23 }
-my $sb = BH::heapsort(\@big)
+var @big = ()
+for val $i (1:50) { push @big, ($i * 7) % 23 }
+val $sb = BH::heapsort(\@big)
 len(@$sb) |> aeq 50, "heapsort len preserved"
 
 # Heapsort actually sorts
-my $okb = 1
-for my $i (0:48) { $okb = 0 if $sb->[$i] > $sb->[$i + 1] }
+var $okb = 1
+for val $i (0:48) { $okb = 0 if $sb->[$i] > $sb->[$i + 1] }
 $okb |> aeq 1, "heapsort fully sorted"
 
 test_run

@@ -2,12 +2,12 @@
 # Rosetta Code: Matrix Transpose (Manual)
 
 fn Rosetta::MatrixTranspose::solve($m) {
-    my $rows = len(@$m)
-    my $cols = len(@{$m->[0]})
-    my @res
-    for my $j (0:$cols-1) {
-        my @new_row
-        for my $i (0:$rows-1) {
+    val $rows = len(@$m)
+    val $cols = len(@{$m->[0]})
+    var @res
+    for val $j (0:$cols-1) {
+        var @new_row
+        for val $i (0:$rows-1) {
             push @new_row, $m->[$i]->[$j]
         }
         push @res, [@new_row]
@@ -15,8 +15,8 @@ fn Rosetta::MatrixTranspose::solve($m) {
     \@res
 }
 
-my $m = [[1, 2, 3], [4, 5, 6]]
-my $tr = Rosetta::MatrixTranspose::solve($m)
+val $m = [[1, 2, 3], [4, 5, 6]]
+val $tr = Rosetta::MatrixTranspose::solve($m)
 
 # Expected: [[1, 4], [2, 5], [3, 6]]
 assert_eq len(@$tr), 3, "transpose rows"

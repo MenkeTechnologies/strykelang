@@ -2,24 +2,24 @@
 # Rosetta Code: FASTA format
 
 fn Rosetta::Fasta::parse($text) {
-    my %sequences
-    my @lines = split "\n", $text
-    my $current_id = undef
+    var %sequences
+    val @lines = split "\n", $text
+    var $current_id = undef
     
-    for my $line (@lines) {
+    for val $line (@lines) {
         if ($line =~ /^>(.*)/) {
             $current_id = $1
             $sequences{$current_id} = ""
         } elsif (defined $current_id) {
             # Strip whitespace
-            my $seq = $line |> trim
+            val $seq = $line |> trim
             $sequences{$current_id} .= $seq
         }
     }
     \%sequences
 }
 
-my $data = qq{
+val $data = qq{
 >Rosetta_Code
 MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKGVVVVKN
 REMEVVVELLLGAICVM
@@ -27,7 +27,7 @@ REMEVVVELLLGAICVM
 VGDGTQDNLSGAEKGVVVVKN
 }
 
-my $res = Rosetta::Fasta::parse($data)
+val $res = Rosetta::Fasta::parse($data)
 assert_eq exists $res->{Rosetta_Code}, 1, "Found Rosetta_Code"
 assert_eq len($res->{Rosetta_Code}), 77, "Rosetta_Code length matches"
 assert_eq $res->{Another_Sequence}, "VGDGTQDNLSGAEKGVVVVKN", "Another_Sequence matches"

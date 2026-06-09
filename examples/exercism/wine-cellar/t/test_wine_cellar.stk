@@ -3,7 +3,7 @@ require "./WineCellar.stk"
 
 fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 
-my $cellar = [
+val $cellar = [
     ["red",   2014, "France"],
     ["white", 2017, "Germany"],
     ["red",   2020, "Italy"],
@@ -11,7 +11,7 @@ my $cellar = [
     ["rose",  2015, "Italy"],
 ]
 
-my $colors = Exercism::WineCellar::explain_colors()
+val $colors = Exercism::WineCellar::explain_colors()
 assert_eq $colors->{white}, "Fermented without skin contact.", "white desc"
 assert_eq $colors->{red},   "Fermented with skin contact using dark-colored grapes.", "red desc"
 

@@ -2,11 +2,11 @@
 fn Exercism::Matrix::new = { string => _ }
 
 fn Exercism::Matrix::row($self, $idx) {
-    my @rows = split /\n/, $self->{string}
+    val @rows = split /\n/, $self->{string}
     [split / /, $rows[$idx - 1]]
 }
 
 fn Exercism::Matrix::column($self, $idx) {
-    my @rows = split /\n/, $self->{string}
+    val @rows = split /\n/, $self->{string}
     [map { (split / /, _)[$idx - 1] } @rows]
 }

@@ -2,8 +2,8 @@
 # Rosetta Code: First perfect square with N or more unique factors
 
 fn Rosetta::FirstSquareNFactors::factor_count($n) {
-    my $count = 0
-    my $i = 1
+    var $count = 0
+    var $i = 1
     while ($i * $i <= $n) {
         if ($n % $i == 0) {
             $count += 1
@@ -15,9 +15,9 @@ fn Rosetta::FirstSquareNFactors::factor_count($n) {
 }
 
 fn Rosetta::FirstSquareNFactors::find($k) {
-    my $i = 1
+    var $i = 1
     while (1) {
-        my $sq = $i * $i
+        val $sq = $i * $i
         return $sq if Rosetta::FirstSquareNFactors::factor_count($sq) >= $k
         $i += 1
     }

@@ -6,13 +6,13 @@ fn Rosetta::FractalTree::draw($depth, $x, $y, $angle, $len, $grid) {
     
     # Calculate end point
     # angle 0 is up, angle > 0 is right, angle < 0 is left
-    my $PI = 3.14159265
-    my $rad = $angle * $PI / 180.0
+    val $PI = 3.14159265
+    val $rad = $angle * $PI / 180.0
     
     # In ASCII, y increases downwards, so up is -cos(rad)?
     # Let's simplify: 0 is Up, 45 is Right-Up, -45 is Left-Up.
-    my $nx = int($x + $len * sin($rad) + 0.5)
-    my $ny = int($y - $len * cos($rad) + 0.5)
+    val $nx = int($x + $len * sin($rad) + 0.5)
+    val $ny = int($y - $len * cos($rad) + 0.5)
     
     # Draw line (simplified to just end point for ASCII grid)
     # Actually we should draw the segment.
@@ -25,26 +25,26 @@ fn Rosetta::FractalTree::draw($depth, $x, $y, $angle, $len, $grid) {
 
 fn Rosetta::FractalTree::line($x1, $y1, $x2, $y2, $grid) {
     # Bresenham-like or simple linear interpolation
-    my $dx = $x2 - $x1
-    my $dy = $y2 - $y1
-    my $steps = abs($dx) > abs($dy) ? abs($dx) : abs($dy)
+    val $dx = $x2 - $x1
+    val $dy = $y2 - $y1
+    val $steps = abs($dx) > abs($dy) ? abs($dx) : abs($dy)
     if ($steps == 0) {
         $grid->{$x1}{$y1} = 1
         return
     }
     
-    for (my $i = 0; $i <= $steps; $i++) {
-        my $px = int($x1 + $i * $dx / $steps + 0.5)
-        my $py = int($y1 + $i * $dy / $steps + 0.5)
+    for (var $i = 0; $i <= $steps; $i++) {
+        val $px = int($x1 + $i * $dx / $steps + 0.5)
+        val $py = int($y1 + $i * $dy / $steps + 0.5)
         if (!exists $grid->{$px}) { $grid->{$px} = {} }
         $grid->{$px}{$py} = 1
     }
 }
 
 fn Rosetta::FractalTree::to_string($grid) {
-    my $min_x = 999; my $max_x = -999; my $min_y = 999; my $max_y = -999
-    for my $x (keys %$grid) {
-        for my $y (keys %{$grid->{$x}}) {
+    var $min_x = 999; var $max_x = -999; var $min_y = 999; var $max_y = -999
+    for val $x (keys %$grid) {
+        for val $y (keys %{$grid->{$x}}) {
             $min_x = $x if $x < $min_x
             $max_x = $x if $x > $max_x
             $min_y = $y if $y < $min_y
@@ -52,9 +52,9 @@ fn Rosetta::FractalTree::to_string($grid) {
         }
     }
     
-    my $out = ""
-    for (my $y = $min_y; $y <= $max_y; $y++) {
-        for (my $x = $min_x; $x <= $max_x; $x++) {
+    var $out = ""
+    for (var $y = $min_y; $y <= $max_y; $y++) {
+        for (var $x = $min_x; $x <= $max_x; $x++) {
             $out .= ($grid->{$x}{$y} ? "*" : " ")
         }
         $out .= "\n"
@@ -62,9 +62,9 @@ fn Rosetta::FractalTree::to_string($grid) {
     $out
 }
 
-my %grid
+val %grid
 Rosetta::FractalTree::draw(4, 20, 20, 0, 5, \%grid)
-my $tree = Rosetta::FractalTree::to_string(\%grid)
+val $tree = Rosetta::FractalTree::to_string(\%grid)
 # p $tree
 
 assert_ok length($tree) > 0, "Tree generated"

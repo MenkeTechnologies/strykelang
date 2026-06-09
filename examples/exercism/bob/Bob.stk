@@ -2,8 +2,8 @@
 fn Exercism::Bob::hey {
     $s = _ =~ s/\s+//gr
     return "Fine. Be that way!" if len($s) == 0
-    my $shouting  = $s =~ /[A-Z]/ && $s !~ /[a-z]/
-    my $question  = $s =~ /\?$/
+    val $shouting  = $s =~ /[A-Z]/ && $s !~ /[a-z]/
+    val $question  = $s =~ /\?$/
     return "Calm down, I know what I'm doing!" if $shouting && $question
     return "Whoa, chill out!"                  if $shouting
     return "Sure."                             if $question

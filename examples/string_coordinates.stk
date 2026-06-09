@@ -10,41 +10,41 @@
 # non-ASCII content — this demo shows exactly when that matters.
 
 p "── ASCII-only — both systems agree ────────────────────"
-my $ascii = "hello world"
+val $ascii = "hello world"
 printf "  len(\"hello world\") : %d bytes\n",  len $ascii
 printf "  len(   \"hello world\") : %d codepts\n", len $ascii
 
 p ""
 p "── Multibyte UTF-8 — systems diverge ──────────────────"
-my $em = "hello — world";       # em dash is 3 bytes in UTF-8
+val $em = "hello — world";       # em dash is 3 bytes in UTF-8
 printf "  len('hello — world') : %d bytes\n",   len $em
 printf "  len(   'hello — world') : %d codepts\n", len $em
 
 p ""
 p "── Emoji are multi-byte sequences ─────────────────────"
-my $em2 = "🔑 keys 🔐"
+val $em2 = "🔑 keys 🔐"
 printf "  len('🔑 keys 🔐') : %d bytes\n",   len $em2
 printf "  len(   '🔑 keys 🔐') : %d codepts\n", len $em2
 
 p ""
 p "── Index vs cindex — byte vs codepoint search ─────────"
-my $cafe = "café au lait";          # é is 2 bytes in UTF-8
+val $cafe = "café au lait";          # é is 2 bytes in UTF-8
 printf "  index(  \$cafe, 'au')  : %d  (byte offset)\n",      index($cafe,  "au")
 printf "  cindex( \$cafe, 'au')  : %d  (codepoint offset)\n", cindex($cafe, "au")
 
 p ""
 p "── Slicing — Perl substr (bytes) vs stryke \$s[a:b] ────"
-my $hot = "rëd hot chïli pëppers"
+val $hot = "rëd hot chïli pëppers"
 printf "  substr(\$hot, 0, 3) : '%s'  (3 bytes)\n",         substr($hot, 0, 3)
 printf "  \$hot[0:2]          : '%s'  (3 codepoints)\n",     $hot[0:2]
 
 p ""
 p "── Iteration — for over codepoints ────────────────────"
-my $word = "🌟café🌟"
+val $word = "🌟café🌟"
 printf "  word              : %s\n", $word
 printf "  len(word)         : %d codepoints\n", len $word
-my @cps
-for my $i (0:len($word)-1) {
+var @cps
+for val $i (0:len($word)-1) {
     push @cps, $word[$i]
 }
 p "  iterated as codepoints: '", join("'·'", @cps), "'"

@@ -7,7 +7,7 @@ fn Rosetta::MachineCode::program() {
 }
 
 fn Rosetta::MachineCode::execute($memory, $a, $b) {
-    my $expect = join(",", @{Rosetta::MachineCode::program()})
+    val $expect = join(",", @{Rosetta::MachineCode::program()})
     return undef if join(",", @$memory) ne $expect
     ($a + $b) & 0xFF
 }
@@ -17,7 +17,7 @@ fn Rosetta::MachineCode::cleanup($memory) {
     $memory
 }
 
-my $mem = Rosetta::MachineCode::program()
+val $mem = Rosetta::MachineCode::program()
 assert_eq len(@$mem), 9, "opcode sequence poked into memory"
 assert_eq Rosetta::MachineCode::execute($mem, 7, 12), 19, "machine code adds 7 and 12"
 Rosetta::MachineCode::cleanup($mem)

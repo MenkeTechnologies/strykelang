@@ -5,11 +5,11 @@ fn Rosetta::PerfectPower::check($n) {
     if ($n < 4) {
         $n == 1
     } else {
-        my $found = 0
+        var $found = 0
         # Try a^b = n for b from 2 up to log2(n)
-        my $limit_b = int(log($n) / log(2) + 0.5)
-        for my $b (2:$limit_b) {
-            my $a = int($n**(1/$b) + 0.5)
+        val $limit_b = int(log($n) / log(2) + 0.5)
+        for val $b (2:$limit_b) {
+            val $a = int($n**(1/$b) + 0.5)
             if ($a**$b == $n) {
                 $found = 1
                 return 1

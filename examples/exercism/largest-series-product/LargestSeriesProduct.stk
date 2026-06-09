@@ -2,12 +2,12 @@
 fn Exercism::LargestSeriesProduct::largest_product($digits, $window) {
     die "span must not be negative"               if $window < 0
     die "digits input must only contain digits"   if $digits =~ /\D/
-    my @d = chars($digits)
+    val @d = chars($digits)
     die "span must be smaller than string length" if $window > len(@d)
     return 1 if $window == 0
     ~> 0:len(@d)-$window map {
-        my $i = _
-        my $p = 1
+        val $i = _
+        var $p = 1
         $p *= $d[$i + _] for 0:$window-1
         $p
     } max

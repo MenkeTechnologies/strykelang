@@ -16,9 +16,9 @@ fn pq_new = []
 
 fn pq_push($q, $pair) {
     push @$q, $pair
-    my $idx = (len @$q) - 1
+    var $idx = (len @$q) - 1
     while ($idx > 0) {
-        my $p = int(($idx - 1) / 2)
+        var $p = int(($idx - 1) / 2)
         last if $q->[$p]->[0] <= $q->[$idx]->[0]
         ($q->[$p], $q->[$idx]) = ($q->[$idx], $q->[$p])
         $idx = $p
@@ -27,16 +27,16 @@ fn pq_push($q, $pair) {
 
 fn pq_pop($q) {
     return undef if !@$q
-    my $res = $q->[0]
-    my $last = pop @$q
+    val $res = $q->[0]
+    val $last = pop @$q
     if (@$q) {
         $q->[0] = $last
-        my $idx = 0
-        my $n = len @$q
+        var $idx = 0
+        val $n = len @$q
         while (1) {
-            my $l = 2 * $idx + 1
-            my $r = 2 * $idx + 2
-            my $smallest = $idx
+            val $l = 2 * $idx + 1
+            val $r = 2 * $idx + 2
+            var $smallest = $idx
             $smallest = $l if $l < $n && $q->[$l]->[0] < $q->[$smallest]->[0]
             $smallest = $r if $r < $n && $q->[$r]->[0] < $q->[$smallest]->[0]
             last if $smallest == $idx
@@ -51,24 +51,24 @@ fn pq_pop($q) {
 
 # graph: adjacency list: { node => [[neighbor, weight], ...] }
 fn shortest_paths($graph, $start) {
-    my %dist
-    my %prev
-    my $pq = pq_new()
+    var %dist
+    var %prev
+    val $pq = pq_new()
     
     # Initialize start node
     $dist{$start} = 0
     pq_push $pq, [0, $start]
     
-    while (my $pair = pq_pop $pq) {
-        my ($d, $u) = @$pair
+    while (val $pair = pq_pop $pq) {
+        val ($d, $u) = @$pair
         
         # Optimization: skip if we've already found a shorter path
         next if defined $dist{$u} && $d > $dist{$u}
         
-        my $neighbors = $graph->{$u} // []
-        for my $edge (@$neighbors) {
-            my ($v, $w) = @$edge
-            my $new_d = $d + $w
+        val $neighbors = $graph->{$u} // []
+        for val $edge (@$neighbors) {
+            val ($v, $w) = @$edge
+            val $new_d = $d + $w
             
             if (!defined $dist{$v} || $new_d < $dist{$v}) {
                 $dist{$v} = $new_d
@@ -90,24 +90,24 @@ p "── Dijkstra's Shortest Path Demo ──"
 #   B --3--> C
 #   B --2--> D
 #   C --5--> D
-my %graph = (
+val %graph = (
     A => [["B", 1], ["C", 4]],
     B => [["C", 3], ["D", 2]],
     C => [["D", 5]],
 )
 
 p "Source: A"
-my $res = Dijkstra::shortest_paths \%graph, "A"
-my %dist = %{$res->{dist}}
+val $res = Dijkstra::shortest_paths \%graph, "A"
+val %dist = %{$res->{dist}}
 
-for my $node (keys %dist |> sort) {
+for val $node (keys %dist |> sort) {
     p "  Shortest dist to #{$node}: #{$dist{$node}}"
 }
 
 # Reconstruct path to D
-my $target = "D"
-my @path
-my $curr = $target
+val $target = "D"
+var @path
+var $curr = $target
 while (defined $curr) {
     push @path, $curr
     $curr = $res->{prev}->{$curr}

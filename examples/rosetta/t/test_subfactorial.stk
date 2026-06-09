@@ -7,10 +7,10 @@ fn Rosetta::Subfactorial::compute($n) {
     } elsif ($n == 1) {
         0
     } else {
-        my $s0 = 1
-        my $s1 = 0
-        for my $i (2:$n) {
-            my $s2 = ($i - 1) * ($s1 + $s0)
+        var $s0 = 1
+        var $s1 = 0
+        for val $i (2:$n) {
+            val $s2 = ($i - 1) * ($s1 + $s0)
             ($s0, $s1) = ($s1, $s2)
         }
         $s1

@@ -9,53 +9,53 @@
 package PageRank
 
 fn solve($nodes, $edges, $d, $iterations) {
-    my $n = len @$nodes
+    val $n = len @$nodes
     return {} if $n == 0
     
-    my %pr
-    my $initial_pr = 1.0 / $n
-    for my $node (@$nodes) {
+    var %pr
+    val $initial_pr = 1.0 / $n
+    for val $node (@$nodes) {
         $pr{$node} = $initial_pr
     }
     
-    my %out_degree
-    for my $node (@$nodes) { $out_degree{$node} = 0 }
+    var %out_degree
+    for val $node (@$nodes) { $out_degree{$node} = 0 }
     
-    my %incoming
-    for my $node (@$nodes) { $incoming{$node} = [] }
+    var %incoming
+    for val $node (@$nodes) { $incoming{$node} = [] }
     
-    for my $edge (@$edges) {
-        my $u = $edge->[0]
-        my $v = $edge->[1]
+    for val $edge (@$edges) {
+        val $u = $edge->[0]
+        val $v = $edge->[1]
         $out_degree{$u}++
         push @{$incoming{$v}}, $u
     }
     
-    my @sink_nodes
-    for my $node (@$nodes) {
+    var @sink_nodes
+    for val $node (@$nodes) {
         if ($out_degree{$node} == 0) {
             push @sink_nodes, $node
         }
     }
     
-    for (my $iter = 0; $iter < $iterations; $iter++) {
-        my %new_pr
-        my $sink_pr = 0.0
-        for my $sink (@sink_nodes) {
+    for (var $iter = 0; $iter < $iterations; $iter++) {
+        var %new_pr
+        var $sink_pr = 0.0
+        for val $sink (@sink_nodes) {
             $sink_pr += $pr{$sink}
         }
         
-        for my $node (@$nodes) {
-            my $sum = 0.0
-            my $inc = $incoming{$node}
-            for my $in_node (@$inc) {
+        for val $node (@$nodes) {
+            var $sum = 0.0
+            val $inc = $incoming{$node}
+            for val $in_node (@$inc) {
                 $sum += $pr{$in_node} / $out_degree{$in_node}
             }
             $sum += $sink_pr / $n
             $new_pr{$node} = (1.0 - $d) / $n + $d * $sum
         }
         
-        for my $node (@$nodes) {
+        for val $node (@$nodes) {
             $pr{$node} = $new_pr{$node}
         }
     }
@@ -67,8 +67,8 @@ package main
 
 p "── PageRank Demo ──"
 
-my @nodes = ("A", "B", "C", "D")
-my @edges = (
+val @nodes = ("A", "B", "C", "D")
+val @edges = (
     ["A", "B"],
     ["A", "C"],
     ["B", "C"],
@@ -76,10 +76,10 @@ my @edges = (
     ["D", "C"]
 )
 
-my $pr = PageRank::solve(\@nodes, \@edges, 0.85, 20)
+val $pr = PageRank::solve(\@nodes, \@edges, 0.85, 20)
 
 p "PageRanks after 20 iterations:"
-for my $node (keys %$pr |> sort) {
+for val $node (keys %$pr |> sort) {
     p "  #{$node}: #{sprintf '%.4f', $pr->{$node}}"
 }
 

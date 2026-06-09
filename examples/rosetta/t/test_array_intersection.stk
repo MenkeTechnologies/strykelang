@@ -2,23 +2,23 @@
 # Rosetta Code: Array Intersection
 
 fn Rosetta::ArrayIntersection::compute($aref, $bref) {
-    my %seen
-    for my $x (@$bref) { $seen{$x} = 1 }
-    my @res
-    for my $x (@$aref) {
+    var %seen
+    for val $x (@$bref) { $seen{$x} = 1 }
+    var @res
+    for val $x (@$aref) {
         if ($seen{$x}) { push @res, $x }
     }
     [@res]
 }
 
-my @a = (1, 2, 3, 4)
-my @b = (3, 4, 5, 6)
-my $res = Rosetta::ArrayIntersection::compute(\@a, \@b)
+val @a = (1, 2, 3, 4)
+val @b = (3, 4, 5, 6)
+val $res = Rosetta::ArrayIntersection::compute(\@a, \@b)
 assert_eq join(",", sort(@$res)), "3,4", "intersection 1"
 
-my @c = ("apple", "banana", "cherry")
-my @d = ("banana", "date")
-my $res2 = Rosetta::ArrayIntersection::compute(\@c, \@d)
+val @c = ("apple", "banana", "cherry")
+val @d = ("banana", "date")
+val $res2 = Rosetta::ArrayIntersection::compute(\@c, \@d)
 assert_eq join(",", @$res2), "banana", "intersection with strings"
 
 test_run

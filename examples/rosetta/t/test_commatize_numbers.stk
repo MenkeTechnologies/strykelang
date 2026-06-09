@@ -3,24 +3,24 @@
 # Idiomatic stryke: walk the integer part right-to-left, group by 3.
 
 fn Rosetta::Commatize::insert($n) {
-    my $s = "$n"
-    my $sign = ""
+    var $s = "$n"
+    var $sign = ""
     if ($s =~ /^-/) {
         $sign = "-"
         $s = substr($s, 1)
     }
-    my @parts = split /\./, $s
-    my $whole = $parts[0]
-    my $frac  = len(@parts) > 1 ? "." . $parts[1] : ""
+    val @parts = split /\./, $s
+    val $whole = $parts[0]
+    val $frac  = len(@parts) > 1 ? "." . $parts[1] : ""
     # Walk reversed digits with a true digit count (chars skips split's empty boundaries).
-    my @digits = $whole |> chars
-    my @rev = reverse(@digits)
-    my @grouped
-    for my $i (0 .. len(@rev) - 1) {
+    val @digits = $whole |> chars
+    val @rev = reverse(@digits)
+    var @grouped
+    for val $i (0 .. len(@rev) - 1) {
         push @grouped, "," if $i > 0 && $i % 3 == 0
         push @grouped, $rev[$i]
     }
-    my @final = reverse(@grouped)
+    val @final = reverse(@grouped)
     $sign . join("", @final) . $frac
 }
 

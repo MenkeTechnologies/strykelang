@@ -11,7 +11,7 @@
 
 # ── sample raw emails ──────────────────────────────────────────────
 
-my @raw_emails = (
+val @raw_emails = (
 q{From: alice\@example.com
 To: bob\@corp.io
 Subject: Lunch tomorrow?
@@ -59,26 +59,26 @@ Your account will be SUSPENDED. CLICK HERE to verify your password and SSN!},
 # ── parser ─────────────────────────────────────────────────────────
 
 fn Demo::Email::parse($raw) {
-    my @lines = split /\n/, $raw
-    my %headers
-    my @body_lines
-    my $in_body = 0
-    for my $line (@lines) {
+    val @lines = split /\n/, $raw
+    var %headers
+    var @body_lines
+    var $in_body = 0
+    for val $line (@lines) {
         if (!$in_body) {
             if (len($line) == 0) {
                 $in_body = 1
                 next
             }
             if ($line =~ /^([A-Za-z\-]+):\s*(.*)$/) {
-                my $name = lc $1
-                my $value = $2
+                val $name = lc $1
+                val $value = $2
                 $headers{$name} = $value
             }
         } else {
             push @body_lines, $line
         }
     }
-    my $body = join("\n", @body_lines)
+    val $body = join("\n", @body_lines)
     return +{
         headers => \%headers,
         body    => $body,
@@ -87,7 +87,7 @@ fn Demo::Email::parse($raw) {
 
 # ── spam classifier (simple keyword score) ────────────────────────
 
-my @spam_keywords = (
+val @spam_keywords = (
     "free",         "winner",       "won",          "click",
     "act now",      "limited",      "urgent",       "verify",
     "prize",        "viagra",       "cialis",       "xanax",
@@ -96,10 +96,10 @@ my @spam_keywords = (
 )
 
 fn Demo::Email::is_spammy($parsed) {
-    my $text = lc($parsed->{body} . " " . ($parsed->{headers}->{subject} // ""))
-    my $score = 0
-    my @hits
-    for my $kw (@spam_keywords) {
+    val $text = lc($parsed->{body} . " " . ($parsed->{headers}->{subject} // ""))
+    var $score = 0
+    var @hits
+    for val $kw (@spam_keywords) {
         if (index($text, lc($kw)) >= 0) {
             $score = $score + 1
             push @hits, $kw
@@ -110,15 +110,15 @@ fn Demo::Email::is_spammy($parsed) {
 
 # ── process all emails ────────────────────────────────────────────
 
-my $td_parse = t_digest(100)
-my $hll_senders = hll(14)
-my $tk_subjects = topk(3)
+val $td_parse = t_digest(100)
+val $hll_senders = hll(14)
+val $tk_subjects = topk(3)
 
-my @processed
-for my $raw (@raw_emails) {
-    my $t0 = now_ns()
-    my $parsed = Demo::Email::parse($raw)
-    my $spam = Demo::Email::is_spammy($parsed)
+var @processed
+for val $raw (@raw_emails) {
+    val $t0 = now_ns()
+    val $parsed = Demo::Email::parse($raw)
+    val $spam = Demo::Email::is_spammy($parsed)
     td_add($td_parse, (now_ns() - $t0) / 1000.0)
     hll_add($hll_senders, $parsed->{headers}->{from} // "unknown")
     topk_add($tk_subjects, $parsed->{headers}->{subject} // "(no subject)")
@@ -137,10 +137,10 @@ p ""
 p "── classification summary ───────────────────────────"
 printf "  %-3s  %-6s  %-30s  %s\n", "#", "score", "from", "subject"
 p   "  ---  ------  ------------------------------  -----"
-for my $i (0:len(@processed) - 1) {
-    my $p = $processed[$i]
-    my $h = $p->{parsed}->{headers}
-    my $label = $p->{spam}->{score} >= 4 ? "SPAM" : ($p->{spam}->{score} >= 2 ? "?" : "ok")
+for val $i (0:len(@processed) - 1) {
+    val $p = $processed[$i]
+    val $h = $p->{parsed}->{headers}
+    val $label = $p->{spam}->{score} >= 4 ? "SPAM" : ($p->{spam}->{score} >= 2 ? "?" : "ok")
     printf "  %2d.  %5d   %-30s  %s\n",
         $i + 1,
         $p->{spam}->{score},
@@ -156,12 +156,12 @@ for my $i (0:len(@processed) - 1) {
 
 p ""
 p "── per-sender breakdown ─────────────────────────────"
-my %by_sender
-for my $p (@processed) {
-    my $f = $p->{parsed}->{headers}->{from} // "(unknown)"
+var %by_sender
+for val $p (@processed) {
+    val $f = $p->{parsed}->{headers}->{from} // "(unknown)"
     $by_sender{$f}++
 }
-for my $sender (sort { $by_sender{_1} <=> $by_sender{_} } keys %by_sender) {
+for val $sender (sort { $by_sender{_1} <=> $by_sender{_} } keys %by_sender) {
     printf "  %-30s : %d messages\n", $sender, $by_sender{$sender}
 }
 
@@ -176,8 +176,8 @@ printf "  exact : %d\n", len(keys %by_sender)
 
 p ""
 p "── ham vs spam ─────────────────────────────────────"
-my $spam = grep { _->{spam}->{score} >= 4 } @processed
-my $ham  = len(@processed) - $spam
+val $spam = grep { _->{spam}->{score} >= 4 } @processed
+val $ham  = len(@processed) - $spam
 printf "  ham  : %d\n", $ham
 printf "  spam : %d\n", $spam
 printf "  spam rate : %.1f%%\n", 100.0 * $spam / len @processed

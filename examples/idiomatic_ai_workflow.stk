@@ -15,8 +15,8 @@ fn App::extract = ai_extract("Extract from: $_", schema => +{ name => "Str", lvl
 fn App::audit   = ai("Check profile for #{ _->{name} }", system => "Use tools")
 
 p "--- AI Workflow ---"
-my $p = "User is Alice, L10" |> App::extract
-my $r = $p |> App::audit
+val $p = "User is Alice, L10" |> App::extract
+val $r = $p |> App::audit
 
 p "Profile: #{ $p->{name} } (L#{ $p->{lvl} })"
 p "Audit: $r"

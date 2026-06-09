@@ -5,8 +5,8 @@ fn Rosetta::IntegerRoots::compute($n, $base) {
     if ($n == 0) { return 0 }
     if ($n == 1) { return 1 }
     
-    my $x = $n
-    my $y = int((($base - 1) * $x + $n / ($x ** ($base - 1))) / $base)
+    var $x = $n
+    var $y = int((($base - 1) * $x + $n / ($x ** ($base - 1))) / $base)
     while ($y < $x) {
         $x = $y
         $y = int((($base - 1) * $x + $n / ($x ** ($base - 1))) / $base)

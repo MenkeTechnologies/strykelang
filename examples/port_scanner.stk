@@ -21,19 +21,19 @@
 # usable in deploy gates.
 
 # Parse args.
-my $timeout_ms = 250
-my @targets
+var $timeout_ms = 250
+var @targets
 
-my $i = 0
+var $i = 0
 while ($i < len(@ARGV)) {
-    my $arg = $ARGV[$i]
+    val $arg = $ARGV[$i]
     if ($arg eq "--timeout-ms") {
         $timeout_ms = $ARGV[$i + 1] + 0
         $i += 2
     }
     elsif ($arg eq "--host") {
-        my $host = $ARGV[$i + 1]
-        my $spec = $ARGV[$i + 3]   # after --ports
+        val $host = $ARGV[$i + 1]
+        val $spec = $ARGV[$i + 3]   # after --ports
         if ($ARGV[$i + 2] ne "--ports" || !defined $spec) {
             p "usage: --host HOST --ports 80,443,5000-5010"
             exit 1
@@ -50,10 +50,10 @@ while ($i < len(@ARGV)) {
     }
     elsif ($arg eq "-") {
         # Read CSV from stdin.
-        while (my $line = readline(STDIN)) {
+        while (var $line = readline(STDIN)) {
             chomp $line
             next if $line eq "" || $line =~ /^\s*#/
-            my ($h, $p) = split /,/, $line
+            val ($h, $p) = split /,/, $line
             push @targets, [$h, $p + 0] if defined $p
         }
         $i += 1
@@ -82,11 +82,11 @@ printf "── scanning %d targets (timeout %dms) ──\n", len(@targets), $tim
 # Per-target probe — self-contained for pmap. Returns a hash with
 # status + latency.
 fn Scan::probe($tgt) {
-    my $host = $tgt->[0]
-    my $port = $tgt->[1]
-    my $t0 = now_ns()
-    my $alive = kick($host, $port, $timeout_ms)
-    my $latency_ms = (now_ns() - $t0) / 1_000_000
+    val $host = $tgt->[0]
+    val $port = $tgt->[1]
+    val $t0 = now_ns()
+    val $alive = kick($host, $port, $timeout_ms)
+    val $latency_ms = (now_ns() - $t0) / 1_000_000
     return {
         host       => $host,
         port       => $port,
@@ -96,25 +96,25 @@ fn Scan::probe($tgt) {
 }
 
 # Parallel fan-out.
-my @results = pmap { Scan::probe($_) } @targets
+val @results = pmap { Scan::probe($_) } @targets
 
 # Sort + report: open ports first, then closed.
-my @open   = grep { $_->{alive} } @results
-my @closed = grep { !$_->{alive} } @results
-my @open_sorted   = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @open
-my @closed_sorted = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @closed
+val @open   = grep { $_->{alive} } @results
+val @closed = grep { !$_->{alive} } @results
+val @open_sorted   = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @open
+val @closed_sorted = sort { _->{host} cmp _1->{host} || _->{port} <=> _1->{port} } @closed
 
 if (len(@open_sorted)) {
     p ""
     p "── open ───────────────────────────────────────────"
-    for my $r (@open_sorted) {
+    for val $r (@open_sorted) {
         printf "  %s:%d  %3dms\n", $r->{host}, $r->{port}, $r->{latency_ms}
     }
 }
 if (len(@closed_sorted)) {
     p ""
     p "── closed/unreachable ─────────────────────────────"
-    for my $r (@closed_sorted) {
+    for val $r (@closed_sorted) {
         printf "  %s:%d  (%dms)\n", $r->{host}, $r->{port}, $r->{latency_ms}
     }
 }

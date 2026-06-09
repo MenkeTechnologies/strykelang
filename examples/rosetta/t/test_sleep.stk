@@ -6,9 +6,9 @@ fn Rosetta::Sleep::wait($seconds) {
 }
 
 # Test sleeping for 1 second
-my $start_time = time()
+val $start_time = time()
 Rosetta::Sleep::wait(1)
-my $end_time = time()
+val $end_time = time()
 assert_ok $end_time - $start_time >= 1, "sleep for 1 second works"
 
 test_run

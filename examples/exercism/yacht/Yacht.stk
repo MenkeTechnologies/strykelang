@@ -1,9 +1,9 @@
 #!/usr/bin/env stryke
-my %_NUM = (ones=>1, twos=>2, threes=>3, fours=>4, fives=>5, sixes=>6)
+val %_NUM = (ones=>1, twos=>2, threes=>3, fours=>4, fives=>5, sixes=>6)
 
 fn Exercism::Yacht::score($dice, $cat) {
-    my @d = sort { _0 <=> _1 } @$dice
-    my %cnt; $cnt{_}++ for @d
+    val @d = sort { _0 <=> _1 } @$dice
+    var %cnt; $cnt{_}++ for @d
     return $cat eq "yacht"          ? (len(keys %cnt) == 1 ? 50 : 0)
          : exists $_NUM{$cat}       ? ($cnt{$_NUM{$cat}} // 0) * $_NUM{$cat}
          : $cat eq "full house"     ? (len(keys %cnt) == 2 && min(values %cnt) == 2 ? sum(@d) : 0)

@@ -12,7 +12,7 @@
 
 p "── Parallel Link Checker ───────────────────────────────"
 
-my @urls = (
+val @urls = (
     "https://google.com",
     "https://github.com",
     "https://wikipedia.org",
@@ -23,18 +23,18 @@ my @urls = (
 
 p "Checking status codes for #{len @urls} sites..."
 
-my @results = pmap {
-    my $res = eval { http_request(_, +{ timeout => 5 }) }
+val @results = pmap {
+    val $res = eval { http_request(_, +{ timeout => 5 }) }
 
     if ($@) {
-        my $err = $@ =~ s/ at .*//r
+        val $err = $@ =~ s/ at .*//r
         +{ url => _, ok => 0, status => 0, err => $err }
     } else {
         +{ url => _, ok => ($res->{status} < 400), status => $res->{status} }
     }
 } @urls
 
-for my $res (@results) {
+for val $res (@results) {
     if (ref($res) eq "HASH") {
         if ($res->{ok}) {
             p "  [OK]  #{$res->{status}} #{$res->{url}}"
@@ -49,19 +49,19 @@ for my $res (@results) {
 p ""
 p "Extracting links from wikipedia.org..."
 
-my $html = eval { fetch("https://wikipedia.org") }
+val $html = eval { fetch("https://wikipedia.org") }
 if ($@) {
     p "  Failed to fetch wikipedia: $@"
 } else {
     # match_all pattern is the FIRST argument
-    my @links = match_all('(?i)href="([^"]+)"', $html)
+    val @links = match_all('(?i)href="([^"]+)"', $html)
     
     p "Found #{len @links} links."
     p "Sample of first 5 links:"
-    for my $i (0:4) {
+    for val $i (0:4) {
         if ($links[$i]) {
             # Extract just the URL from the full match
-            my $url = $links[$i] =~ s/.*href="([^"]+)".*/$1/r
+            val $url = $links[$i] =~ s/.*href="([^"]+)".*/$1/r
             p "  - $url"
         }
     }

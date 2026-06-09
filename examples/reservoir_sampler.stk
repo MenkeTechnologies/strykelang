@@ -17,7 +17,7 @@ fn Rng::next($r) {
 }
 
 fn Rng::range($r, $lo, $hi) {
-    my $span = $hi - $lo + 1
+    val $span = $hi - $lo + 1
     $lo + (Rng::next($r) % $span)
 }
 
@@ -31,7 +31,7 @@ fn RS::offer($rs, $x) {
         push @{$rs->{buf}}, $x
         return
     }
-    my $j = Rng::range($rs->{rng}, 0, $rs->{n} - 1)
+    val $j = Rng::range($rs->{rng}, 0, $rs->{n} - 1)
     if ($j < $rs->{k}) {
         $rs->{buf}->[$j] = $x
     }
@@ -41,8 +41,8 @@ fn RS::sample($rs) { $rs->{buf} }
 fn RS::seen($rs)   { $rs->{n} }
 
 p "=== Reservoir Sampler Demo (k=5, n=20) ==="
-my $rng = Rng::new(42)
-my $rs  = RS::new(5, $rng)
-for my $i (1:20) { RS::offer($rs, $i) }
+val $rng = Rng::new(42)
+val $rs  = RS::new(5, $rng)
+for val $i (1:20) { RS::offer($rs, $i) }
 p "sampled (size=" . len(@{RS::sample($rs)}) . "): " . join(",", @{RS::sample($rs)})
 p "seen: " . RS::seen($rs)

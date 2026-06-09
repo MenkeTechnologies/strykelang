@@ -20,8 +20,8 @@ class AbstractCircle impl AbstractShape {
 }
 
 fn Rosetta::AbstractType::demo() {
-    my $s = AbstractSquare(side => 4.0)
-    my $c = AbstractCircle(radius => 3.0)
+    val $s = AbstractSquare(side => 4.0)
+    val $c = AbstractCircle(radius => 3.0)
     
     "Abstract type example (using traits):" |> p
     ("Square (side=4) area: " . $s->area()) |> p

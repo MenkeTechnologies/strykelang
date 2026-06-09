@@ -13,13 +13,13 @@
 # ── classic sieve ──────────────────────────────────────────────────
 
 fn Demo::Sieve::eratosthenes($n) {
-    my @is_prime = (1) x ($n + 1)
+    var @is_prime = (1) x ($n + 1)
     $is_prime[0] = 0
     $is_prime[1] = 0
-    my $i = 2
+    var $i = 2
     while ($i * $i <= $n) {
         if ($is_prime[$i]) {
-            my $j = $i * $i
+            var $j = $i * $i
             while ($j <= $n) {
                 $is_prime[$j] = 0
                 $j += $i
@@ -27,8 +27,8 @@ fn Demo::Sieve::eratosthenes($n) {
         }
         $i++
     }
-    my @primes
-    for my $k (2:$n) {
+    var @primes
+    for val $k (2:$n) {
         push @primes, $k if $is_prime[$k]
     }
     @primes
@@ -40,7 +40,7 @@ fn Demo::Sieve::is_prime($n) {
     return 0 if $n < 2
     return 1 if $n < 4
     return 0 if $n % 2 == 0
-    my $i = 3
+    var $i = 3
     while ($i * $i <= $n) {
         return 0 if $n % $i == 0
         $i += 2
@@ -50,18 +50,18 @@ fn Demo::Sieve::is_prime($n) {
 
 # ── sketches ──────────────────────────────────────────────────────
 
-my $td_sieve = t_digest(100)
-my $tk_last  = topk(10)
-my $hll_p    = hll(12)
-my $rb       = roaring()
+val $td_sieve = t_digest(100)
+val $tk_last  = topk(10)
+val $hll_p    = hll(12)
+val $rb       = roaring()
 
 # ── small-N classic ────────────────────────────────────────────────
 
 p "prime sieve demo"
 p "─" x 60
-my $N = 200
-my $t0 = now_ns()
-my @primes = Demo::Sieve::eratosthenes($N)
+val $N = 200
+val $t0 = now_ns()
+val @primes = Demo::Sieve::eratosthenes($N)
 td_add($td_sieve, (now_ns() - $t0) / 1000.0)
 
 printf("classic sieve N=%d -> %d primes\n", $N, len(@primes))
@@ -69,38 +69,38 @@ printf("  first 10: %s\n", join(", ", @primes[0:9]))
 printf("  last  10: %s\n", join(", ", @primes[len(@primes) - 10 : len(@primes) - 1]))
 
 # Sum of primes <= 200 — classic puzzle (expected: 4227).
-my $sum_le_200 = sum @primes
+val $sum_le_200 = sum @primes
 printf("  sum of primes <= 200: %d (expect 4227)\n", $sum_le_200)
 
 # ── parallel scan via pgrep ────────────────────────────────────────
 
-my $RANGE = 500
-my $t1 = now_ns()
-my @scan_primes = pgrep {Demo::Sieve::is_prime} (2:$RANGE)
+val $RANGE = 500
+val $t1 = now_ns()
+val @scan_primes = pgrep {Demo::Sieve::is_prime} (2:$RANGE)
 td_add($td_sieve, (now_ns() - $t1) / 1000.0)
 
 printf("\npgrep parallel scan 2..%d -> %d primes\n", $RANGE, len(@scan_primes))
 
 # ── chunk-parallel sieve ───────────────────────────────────────────
 
-my $CHUNK_BASE = 1000
-my $NCHUNKS    = 4
-my @chunks = map {
-    my $start = $CHUNK_BASE * _
-    my $end   = $CHUNK_BASE * (_ + 1) - 1
+val $CHUNK_BASE = 1000
+val $NCHUNKS    = 4
+val @chunks = map {
+    val $start = $CHUNK_BASE * _
+    val $end   = $CHUNK_BASE * (_ + 1) - 1
     [$start, $end]
 } (1:$NCHUNKS)
 
-my $t2 = now_ns()
-my @chunk_results = pmap {
-    my $lo = _->[0]
-    my $hi = _->[1]
+val $t2 = now_ns()
+val @chunk_results = pmap {
+    val $lo = _->[0]
+    val $hi = _->[1]
     [grep {Demo::Sieve::is_prime} ($lo:$hi)]
 } @chunks
 td_add($td_sieve, (now_ns() - $t2) / 1000.0)
 
-my @big_primes
-for my $cr (@chunk_results) {
+var @big_primes
+for val $cr (@chunk_results) {
     push @big_primes, @$cr
 }
 
@@ -110,34 +110,34 @@ printf("  first 5: %s\n", join(", ", @big_primes[0:4]))
 
 # ── populate sketches ──────────────────────────────────────────────
 
-my @all_primes
+var @all_primes
 push @all_primes, @primes
-for my $p (@big_primes) {
+for val $p (@big_primes) {
     push @all_primes, $p
 }
 
-for my $p (@all_primes) {
+for val $p (@all_primes) {
     rb_add($rb, $p)
     hll_add($hll_p, $p)
-    my $last = $p % 10
+    val $last = $p % 10
     topk_add($tk_last, "ends-in-$last")
 }
 
 # ── roaring bitmap density ─────────────────────────────────────────
 
-my $rb_card = rb_len($rb)
+val $rb_card = rb_len($rb)
 printf("\nroaring bitmap cardinality: %d primes encoded\n", $rb_card)
 
 # ── HLL sanity check ─────────────────────────────────────────────
 
-my $hll_n = hll_count($hll_p)
+val $hll_n = hll_count($hll_p)
 printf("HLL distinct count: %.1f vs exact: %d\n", $hll_n, len(@all_primes))
 
 # ── last-digit distribution (TopK) ────────────────────────────────
 
 p "\nlast-digit frequency among collected primes:"
-my @lds = topk_top($tk_last, 6)
-for my $p (@lds) {
+val @lds = topk_top($tk_last, 6)
+for val $p (@lds) {
     printf("  %-10s count=%d\n", $p->[0], $p->[1])
 }
 
@@ -146,27 +146,27 @@ for my $p (@lds) {
 # pgrep scan covers up to 500.
 
 p "\nprime-counting sanity:"
-my @pi_check = (
+val @pi_check = (
     [10,    4],
     [100,   25],
     [200,   46],
     [500,   95],
 )
-for my $row (@pi_check) {
-    my $lim = $row->[0]
-    my $expect = $row->[1]
+for val $row (@pi_check) {
+    val $lim = $row->[0]
+    val $expect = $row->[1]
     # Prefer classic when <= 200, else scan.
-    my @sub
-    my $source
+    var @sub
+    var $source
     if ($lim <= 200) {
         @sub = grep { _ <= $lim } @primes
         $source = "classic"
     } else {
-        for my $p (@scan_primes) { push @sub, $p if $p <= $lim }
+        for val $p (@scan_primes) { push @sub, $p if $p <= $lim }
         $source = "scan"
     }
-    my $got = len @sub
-    my $note = ($got == $expect) ? "ok" : "MISMATCH"
+    val $got = len @sub
+    val $note = ($got == $expect) ? "ok" : "MISMATCH"
     printf("  pi(%-3d) %-7s -> %-3d (expect %-3d)  %s\n",
            $lim, $source, $got, $expect, $note)
 }

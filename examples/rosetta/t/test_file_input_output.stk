@@ -2,14 +2,14 @@
 # Rosetta Code: File input/output
 
 fn Rosetta::FileIO::demo() {
-    my $file = "/tmp/rosetta_io.txt"
-    my $content = "Hello, Rosetta Code!\nLine 2"
+    val $file = "/tmp/rosetta_io.txt"
+    var $content = "Hello, Rosetta Code!\nLine 2"
     
     # Write to file
     write_file($file, $content)
     
     # Read from file
-    my $read = slurp($file)
+    val $read = slurp($file)
     
     "File Content:" |> p
     $read |> p

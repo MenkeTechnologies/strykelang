@@ -2,7 +2,7 @@
 # Rosetta Code: Solve a Hopido puzzle
 
 fn Rosetta::Hopido::sample_solution() {
-    my @rows = (
+    val @rows = (
         [0, 1, 25, 0, 17, 3, 0],
         [27, 13, 10, 7, 14, 11, 8],
         [24, 21, 18, 2, 22, 19, 16],
@@ -13,7 +13,7 @@ fn Rosetta::Hopido::sample_solution() {
     \@rows
 }
 
-my $solved = Rosetta::Hopido::sample_solution()
+val $solved = Rosetta::Hopido::sample_solution()
 
 assert_eq $solved->[0]->[1], 1, "path starts at 1 in sample solution"
 assert_eq $solved->[1]->[0], 27, "path ends at 27 in sample solution"

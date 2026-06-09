@@ -3,32 +3,32 @@
 # Pinning tests for more math bugs from BUGS.md
 
 # BUG-121 (FIXED): median_absolute_deviation now averages two middle values for even n.
-my @data = (1, 2, 100, 101);
-my $mad = median_absolute_deviation(@data);
+val @data = (1, 2, 100, 101);
+val $mad = median_absolute_deviation(@data);
 # median is (2+100)/2 = 51. Deviations: 50, 49, 49, 50. Sorted-median: (49+50)/2 = 49.5.
 aeq($mad, 49.5, "BUG-121 (FIXED): MAD even-n proper median");
 
 
 # Pinning test for BUG-122: js_divergence vs jensen_shannon_div
-my @p = (0.1, 0.9);
-my @q = (0.9, 0.1);
-my $jsd = jensen_shannon_div(@p, @q);
-my $js_div = js_div(@p, @q);
+val @p = (0.1, 0.9);
+val @q = (0.9, 0.1);
+val $jsd = jensen_shannon_div(@p, @q);
+val $js_div = js_div(@p, @q);
 
 # The bug states they differ by a factor of ln(2).
 # Let's just assert they are not equal for now.
-my $are_not_equal = abs($jsd - $js_div) > 1e-9;
+val $are_not_equal = abs($jsd - $js_div) > 1e-9;
 aok($are_not_equal, "BUG-122: js_divergence and jensen_shannon_div should not be equal");
 
 
 # Pinning test for BUG-123: chi_squared_distance vs chisquare_metric
-my @p2 = (0.1, 0.9);
-my @q2 = (0.9, 0.1);
-my $csd = chi_squared_distance(@p2, @q2);
-my $csm = chisquare_metric(@p2, @q2);
+val @p2 = (0.1, 0.9);
+val @q2 = (0.9, 0.1);
+val $csd = chi_squared_distance(@p2, @q2);
+val $csm = chisquare_metric(@p2, @q2);
 
 # The bug states they differ by a factor of 2.
-my $is_factor_of_2 = abs($csm - 2 * $csd) < 1e-9;
+val $is_factor_of_2 = abs($csm - 2 * $csd) < 1e-9;
 aok($is_factor_of_2, "BUG-123: chisquare_metric should be 2 * chi_squared_distance");
 
 

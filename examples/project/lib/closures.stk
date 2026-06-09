@@ -16,7 +16,7 @@ fn Project::Closures::accumulator_state($n) {
 fn Project::Closures::fibonacci_state {
     state $a = 0
     state $b = 1
-    my $result = $a
+    val $result = $a
     ($a, $b) = ($b, $a + $b)
     $result
 }
@@ -29,7 +29,7 @@ fn Project::Closures::unique_id {
 fn Project::Closures::memoized_factorial($n) {
     state $cache = {}
     return $cache->{$n} if exists $cache->{$n}
-    my $result = $n <= 1 ? 1 : $n * Project::Closures::memoized_factorial($n - 1)
+    val $result = $n <= 1 ? 1 : $n * Project::Closures::memoized_factorial($n - 1)
     $cache->{$n} = $result
     $result
 }
@@ -80,8 +80,8 @@ fn Project::Closures::make_multiplier($factor) {
 
 fn Project::Closures::make_counter_pair {
     mysync $count = 0
-    my $inc = fn { ++$count }
-    my $get = fn { $count }
+    val $inc = fn { ++$count }
+    val $get = fn { $count }
     ($inc, $get)
 }
 
@@ -108,7 +108,7 @@ fn Project::Closures::make_curried_multiply {
 # ── Closure over loop variable ─────────────────────────────────────
 
 fn Project::Closures::make_closures_in_loop {
-    my @fns
+    var @fns
     ~> 1:5 ep {
         push @fns, fn { _ * 10 }
     }
@@ -116,9 +116,9 @@ fn Project::Closures::make_closures_in_loop {
 }
 
 fn Project::Closures::make_closures_with_explicit_capture {
-    my @fns
-    for my $i (1:5) {
-        my $captured = $i
+    var @fns
+    for val $i (1:5) {
+        val $captured = $i
         push @fns, fn { $captured * 10 }
     }
     @fns
@@ -128,7 +128,7 @@ fn Project::Closures::make_closures_with_explicit_capture {
 
 fn Project::Closures::closure_modifies_outer {
     mysync $x = 10
-    my $modifier = fn ($delta) { $x += $delta }
+    val $modifier = fn ($delta) { $x += $delta }
     $modifier(5)
     $modifier(3)
     $x
@@ -150,7 +150,7 @@ fn Project::Closures::apply_twice($f) {
 
 fn Project::Closures::apply_n_times($f, $n) {
     fn ($x) {
-        my $result = $x
+        var $result = $x
         for (1:$n) {
             $result = $f($result)
         }
@@ -179,24 +179,24 @@ fn Project::Closures::make_toggle {
 # ── Lexical scope shadowing ────────────────────────────────────────
 
 fn Project::Closures::outer_scope_test {
-    my $x = "outer"
-    my $get_outer = fn { $x }
-    my $result1 = $get_outer()
-    my $x_inner = "inner"
-    my $get_inner = fn { $x_inner }
-    my $r2 = $get_inner()
-    my $r3 = $get_outer()
+    val $x = "outer"
+    val $get_outer = fn { $x }
+    val $result1 = $get_outer()
+    val $x_inner = "inner"
+    val $get_inner = fn { $x_inner }
+    val $r2 = $get_inner()
+    val $r3 = $get_outer()
     ($result1, $r2, $r3)
 }
 
 fn Project::Closures::shadowing_with_modification {
     mysync $val = 10
-    my $outer_mod = fn { $val *= 2 }
+    val $outer_mod = fn { $val *= 2 }
     $outer_mod()
-    my $after_outer = $val
+    val $after_outer = $val
     mysync $val_inner = 100
-    my $inner_mod = fn { $val_inner += 5 }
+    val $inner_mod = fn { $val_inner += 5 }
     $inner_mod()
-    my $inner_val = $val_inner
+    val $inner_val = $val_inner
     ($after_outer, $inner_val)
 }

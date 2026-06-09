@@ -8,33 +8,33 @@ fn Rosetta::MRG::new($seed) {
 fn Rosetta::MRG::posmod($x, $m) { (($x % $m) + $m) % $m }
 
 fn Rosetta::MRG::next_int($state) {
-    my $m1 = (2 ** 32) - 209
-    my $m2 = (2 ** 32) - 22853
+    val $m1 = (2 ** 32) - 209
+    val $m2 = (2 ** 32) - 22853
 
-    my $x1i = Rosetta::MRG::posmod(1403580 * $state->{x1}[1] - 810728 * $state->{x1}[2], $m1)
-    my $x2i = Rosetta::MRG::posmod(527612 * $state->{x2}[0] - 1370589 * $state->{x2}[2], $m2)
+    val $x1i = Rosetta::MRG::posmod(1403580 * $state->{x1}[1] - 810728 * $state->{x1}[2], $m1)
+    val $x2i = Rosetta::MRG::posmod(527612 * $state->{x2}[0] - 1370589 * $state->{x2}[2], $m2)
     $state->{x1} = [$x1i, $state->{x1}[0], $state->{x1}[1]]
     $state->{x2} = [$x2i, $state->{x2}[0], $state->{x2}[1]]
-    my $z = Rosetta::MRG::posmod($x1i - $x2i, $m1)
+    val $z = Rosetta::MRG::posmod($x1i - $x2i, $m1)
     $z + 1
 }
 
 fn Rosetta::MRG::hist5($seed, $n) {
-    my $rng = Rosetta::MRG::new($seed)
-    my $m1 = (2 ** 32) - 209
-    my $d  = $m1 + 1
-    my @h = (0, 0, 0, 0, 0)
-    for my $i (1:$n) {
-        my $x = Rosetta::MRG::next_int($rng)
-        my $bucket = int(($x * 5) / $d)
+    val $rng = Rosetta::MRG::new($seed)
+    val $m1 = (2 ** 32) - 209
+    val $d  = $m1 + 1
+    var @h = (0, 0, 0, 0, 0)
+    for val $i (1:$n) {
+        val $x = Rosetta::MRG::next_int($rng)
+        val $bucket = int(($x * 5) / $d)
         $h[$bucket]++
     }
     \@h
 }
 
-my $rng = Rosetta::MRG::new(1234567)
-my @vals
-for my $i (1:5) { push @vals, Rosetta::MRG::next_int($rng) }
+val $rng = Rosetta::MRG::new(1234567)
+var @vals
+for val $i (1:5) { push @vals, Rosetta::MRG::next_int($rng) }
 
 assert_eq join(",", @vals), "1459213977,2827710106,4245671317,3877608661,2595287583", "first five integers"
 assert_eq join(",", @{Rosetta::MRG::hist5(987654321, 100000)}), "20002,20060,19948,20059,19931", "histogram counts"

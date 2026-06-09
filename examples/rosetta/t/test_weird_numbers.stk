@@ -6,8 +6,8 @@
 
 fn Rosetta::Weird::proper_divisors($n) {
     return () if $n < 2
-    my @d = (1)
-    my $i = 2
+    var @d = (1)
+    var $i = 2
     while ($i * $i <= $n) {
         if ($n % $i == 0) {
             push @d, $i
@@ -20,12 +20,12 @@ fn Rosetta::Weird::proper_divisors($n) {
 
 fn Rosetta::Weird::sum_subset_to($target, $divisors) {
     # Subset-sum DP. Early-exit when target reached.
-    my %reachable = (0 => 1)
-    for my $d (@$divisors) {
+    var %reachable = (0 => 1)
+    for val $d (@$divisors) {
         last if exists $reachable{$target}
-        my @keys = keys %reachable
-        for my $r (@keys) {
-            my $new = $r + $d
+        val @keys = keys %reachable
+        for val $r (@keys) {
+            val $new = $r + $d
             $reachable{$new} = 1 if $new <= $target
         }
     }
@@ -33,17 +33,17 @@ fn Rosetta::Weird::sum_subset_to($target, $divisors) {
 }
 
 fn Rosetta::Weird::is($n) {
-    my @divs = Rosetta::Weird::proper_divisors($n)
-    my $s = 0
-    for my $d (@divs) { $s += $d }
+    val @divs = Rosetta::Weird::proper_divisors($n)
+    var $s = 0
+    for val $d (@divs) { $s += $d }
     return 0 if $s <= $n            # not abundant
     !Rosetta::Weird::sum_subset_to($n, \@divs)
 }
 
 # Sanity
 assert_eq join(",", Rosetta::Weird::proper_divisors(70)), "1,2,5,7,10,14,35", "divisors of 70"
-my $sum = 0
-for my $d (Rosetta::Weird::proper_divisors(70)) { $sum += $d }
+var $sum = 0
+for val $d (Rosetta::Weird::proper_divisors(70)) { $sum += $d }
 assert_eq $sum, 74, "σ*(70) = 74 > 70 → abundant"
 
 # 70 is the smallest weird number
@@ -56,7 +56,7 @@ assert_eq Rosetta::Weird::is(24),  0, "24 = 4+8+12"
 assert_eq Rosetta::Weird::is(836), 1, "836 is weird"
 
 # First few weird numbers
-my @w = ~> 2:5000 |> grep {Rosetta::Weird::is}
+val @w = ~> 2:5000 |> grep {Rosetta::Weird::is}
 assert_eq join(",", @w), "70,836,4030", "weirds ≤ 5000"
 
 # Pipe form

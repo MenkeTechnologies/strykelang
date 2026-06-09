@@ -3,20 +3,20 @@
 # Pinning tests for physics and geo bugs from BUGS.md
 
 # BUG-134 (FIXED): weber_number now returns Infinity/NaN for missing/zero sigma.
-my $weber_no_sigma = weber_number(1000, 10, 0.1);
-my $is_inf_or_nan = ($weber_no_sigma != $weber_no_sigma) || ($weber_no_sigma > 1e308);
+val $weber_no_sigma = weber_number(1000, 10, 0.1);
+val $is_inf_or_nan = ($weber_no_sigma != $weber_no_sigma) || ($weber_no_sigma > 1e308);
 aok($is_inf_or_nan, "BUG-134 (FIXED): weber_number with missing sigma returns Infinity/NaN");
 
 
 # BUG-135 (FIXED): dB_voltage now returns NaN when reference is missing/non-positive.
-my $db_no_ref = dB_voltage(1);
-my $is_nan = $db_no_ref != $db_no_ref;
+val $db_no_ref = dB_voltage(1);
+val $is_nan = $db_no_ref != $db_no_ref;
 aok($is_nan, "BUG-135 (FIXED): dB_voltage without reference returns NaN");
 
 
 # Pinning test for BUG-136: geohash_neighbor is identity at precision 6
-my $hash = "dpz8"; # length 4, precision should be enough
-my $neighbor = geohash_neighbor($hash, "n");
+val $hash = "dpz8"; # length 4, precision should be enough
+val $neighbor = geohash_neighbor($hash, "n");
 # The bug says it's an identity function for precision 6, should be for 4 too.
 aeq($hash, $neighbor, "BUG-136: geohash_neighbor should be identity at this precision");
 

@@ -2,38 +2,38 @@
 # Rosetta Code: Mayan calendar
 
 fn Rosetta::Mayan::tzolkin($days) {
-    my @names = qw(Imix Ik Akbal Kan Chicchan Cimi Manik Lamat Muluc Oc Chuen Eb Ben Ix Men Cib Caban Etznab Cauac Ahau)
-    my $num = ($days + 3) % 13 + 1
-    my $name = $names[($days + 19) % 20]
+    val @names = qw(Imix Ik Akbal Kan Chicchan Cimi Manik Lamat Muluc Oc Chuen Eb Ben Ix Men Cib Caban Etznab Cauac Ahau)
+    val $num = ($days + 3) % 13 + 1
+    val $name = $names[($days + 19) % 20]
     "$num $name"
 }
 
 fn Rosetta::Mayan::haab($days) {
-    my @months = qw(Pop Uo Zip Zotz Tzec Xul Yaxkin Mol Chen Yax Zac Ceh Mac Kankin Muan Pax Kayab Cumku Uayeb)
-    my $haab_days = ($days + 348) % 365
-    my $month_idx = int($haab_days / 20)
-    my $day = $haab_days % 20
+    val @months = qw(Pop Uo Zip Zotz Tzec Xul Yaxkin Mol Chen Yax Zac Ceh Mac Kankin Muan Pax Kayab Cumku Uayeb)
+    val $haab_days = ($days + 348) % 365
+    val $month_idx = int($haab_days / 20)
+    val $day = $haab_days % 20
     "$day $months[$month_idx]"
 }
 
 fn Rosetta::Mayan::long_count($days) {
-    my $baktun = int($days / 144000)
-    my $katun  = int($days / 7200) % 20
-    my $tun    = int($days / 360) % 20
-    my $uinal  = int($days / 20) % 18
-    my $kin    = $days % 20
+    val $baktun = int($days / 144000)
+    val $katun  = int($days / 7200) % 20
+    val $tun    = int($days / 360) % 20
+    val $uinal  = int($days / 20) % 18
+    val $kin    = $days % 20
     "$baktun.$katun.$tun.$uinal.$kin"
 }
 
 fn Rosetta::Mayan::from_gregorian($date_str) {
     # correlation constant to match 2012-12-21 as 13.0.0.0.0
-    my $c = 1856305
-    my $epoch_days = int(datetime_parse_rfc3339("${date_str}T00:00:00Z") / 86400)
-    my $days = $epoch_days + $c
+    val $c = 1856305
+    val $epoch_days = int(datetime_parse_rfc3339("${date_str}T00:00:00Z") / 86400)
+    val $days = $epoch_days + $c
     
-    my $lc = Rosetta::Mayan::long_count($days)
-    my $tz = Rosetta::Mayan::tzolkin($days)
-    my $ha = Rosetta::Mayan::haab($days)
+    val $lc = Rosetta::Mayan::long_count($days)
+    val $tz = Rosetta::Mayan::tzolkin($days)
+    val $ha = Rosetta::Mayan::haab($days)
     
     "$lc  $tz  $ha"
 }

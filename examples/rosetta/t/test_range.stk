@@ -7,11 +7,11 @@ fn Rosetta::Range::extract_ranges(@nums) {
     } else {
         @nums = sort { _0 <=> _1 } @nums
         
-        my @ranges
-        my $start = $nums[0]
-        my $end = $nums[0]
+        var @ranges
+        var $start = $nums[0]
+        var $end = $nums[0]
         
-        for my $i (1:$#nums) {
+        for val $i (1:$#nums) {
             if ($nums[$i] == $end + 1) {
                 $end = $nums[$i]
             } else {
@@ -26,8 +26,8 @@ fn Rosetta::Range::extract_ranges(@nums) {
 }
 
 fn Rosetta::Range::expand_range($spec) {
-    my @result
-    for my $part ($spec |> split /,/) {
+    var @result
+    for val $part ($spec |> split /,/) {
         if ($part =~ /^(-?\d+)-(-?\d+)$/) {
             push @result, ($1:$2)
         } else {
@@ -41,10 +41,10 @@ assert_eq Rosetta::Range::extract_ranges(1, 2, 3, 5, 7, 8, 9), "1-3,5,7-9", "ext
 assert_eq Rosetta::Range::extract_ranges(1, 3, 5, 7), "1,3,5,7", "no ranges"
 assert_eq Rosetta::Range::extract_ranges(1, 2, 3, 4, 5), "1-5", "single range"
 
-my @expanded = Rosetta::Range::expand_range("1-3,5,7-9")
+val @expanded = Rosetta::Range::expand_range("1-3,5,7-9")
 assert_eq join(",", @expanded), "1,2,3,5,7,8,9", "expand range"
 
-my @single = Rosetta::Range::expand_range("5")
+val @single = Rosetta::Range::expand_range("5")
 assert_eq join(",", @single), "5", "expand single"
 
 test_run

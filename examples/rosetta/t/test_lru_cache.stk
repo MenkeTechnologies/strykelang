@@ -11,8 +11,8 @@ fn Rosetta::LRU::get($cache, $key) {
     }
     
     # Move to back (most recently used)
-    my $order = $cache->{order}
-    for (my $i = 0; $i < len(@$order); $i++) {
+    val $order = $cache->{order}
+    for (var $i = 0; $i < len(@$order); $i++) {
         if ($order->[$i] eq $key) {
             splice(@$order, $i, 1)
             push @$order, $key
@@ -24,13 +24,13 @@ fn Rosetta::LRU::get($cache, $key) {
 }
 
 fn Rosetta::LRU::put($cache, $key, $val) {
-    my $map = $cache->{map}
-    my $order = $cache->{order}
+    var $map = $cache->{map}
+    val $order = $cache->{order}
     
     if (exists $map->{$key}) {
         $map->{$key} = $val
         # Move to back
-        for (my $i = 0; $i < len(@$order); $i++) {
+        for (var $i = 0; $i < len(@$order); $i++) {
             if ($order->[$i] eq $key) {
                 splice(@$order, $i, 1)
                 push @$order, $key
@@ -40,7 +40,7 @@ fn Rosetta::LRU::put($cache, $key, $val) {
     } else {
         if (len(@$order) >= $cache->{capacity}) {
             # Evict least recently used (first element)
-            my $lru_key = shift @$order
+            val $lru_key = shift @$order
             delete $map->{$lru_key}
         }
         $map->{$key} = $val
@@ -48,7 +48,7 @@ fn Rosetta::LRU::put($cache, $key, $val) {
     }
 }
 
-my $lru = Rosetta::LRU::new(3)
+val $lru = Rosetta::LRU::new(3)
 Rosetta::LRU::put($lru, "A", 1)
 Rosetta::LRU::put($lru, "B", 2)
 Rosetta::LRU::put($lru, "C", 3)

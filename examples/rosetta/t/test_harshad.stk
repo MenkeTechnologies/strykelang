@@ -14,8 +14,8 @@ fn Rosetta::Harshad::check($n) {
 }
 
 fn Rosetta::Harshad::generate($count) {
-    my @harshad
-    my $n = 1
+    var @harshad
+    var $n = 1
     while (len(@harshad) < $count) {
         if (Rosetta::Harshad::check($n)) {
             push @harshad, $n
@@ -36,7 +36,7 @@ assert_ok Rosetta::Harshad::check(21), "21 is harshad"
 assert_ok !Rosetta::Harshad::check(11), "11 is not harshad"
 assert_ok !Rosetta::Harshad::check(13), "13 is not harshad"
 
-my @first20 = Rosetta::Harshad::generate(20)
+val @first20 = Rosetta::Harshad::generate(20)
 assert_eq join(",", @first20), "1,2,3,4,5,6,7,8,9,10,12,18,20,21,24,27,30,36,40,42", "first 20 harshad"
 
 test_run

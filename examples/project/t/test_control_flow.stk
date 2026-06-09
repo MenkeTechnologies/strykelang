@@ -46,7 +46,7 @@ assert_eq Project::ControlFlow::for_with_last(), 55, "for with last"
 
 # ── While loops ────────────────────────────────────────────────────
 
-my @countdown = Project::ControlFlow::while_countdown(5)
+val @countdown = Project::ControlFlow::while_countdown(5)
 assert_eq len(@countdown), 5, "countdown length"
 assert_eq $countdown[0], 5, "countdown first"
 assert_eq $countdown[4], 1, "countdown last"
@@ -59,7 +59,7 @@ assert_eq Project::ControlFlow::until_example(10), 10, "until example"
 
 assert_eq Project::ControlFlow::postfix_for_sum(), 15, "postfix for sum"
 
-my @post_count = Project::ControlFlow::postfix_while_countdown()
+val @post_count = Project::ControlFlow::postfix_while_countdown()
 assert_eq len(@post_count), 5, "postfix while length"
 assert_eq $post_count[0], 5, "postfix while first"
 
@@ -107,10 +107,10 @@ assert_eq Project::ControlFlow::number_word(99), "many", "match default"
 assert_eq Project::ControlFlow::multiplication_table_sum(3), 36, "mult table 3x3"
 assert_eq Project::ControlFlow::multiplication_table_sum(1), 1, "mult table 1x1"
 
-my ($a, $b) = Project::ControlFlow::find_pair_sum(10, 1, 2, 3, 7, 8)
+val ($a, $b) = Project::ControlFlow::find_pair_sum(10, 1, 2, 3, 7, 8)
 assert_eq $a + $b, 10, "find pair sum"
 
-my @no_pair = Project::ControlFlow::find_pair_sum(100, 1, 2, 3)
+val @no_pair = Project::ControlFlow::find_pair_sum(100, 1, 2, 3)
 assert_eq len(@no_pair), 0, "find pair no match"
 
 # ── Return in various contexts ─────────────────────────────────────
@@ -123,13 +123,13 @@ assert_eq Project::ControlFlow::early_return(100), "large", "early return large"
 assert_eq Project::ControlFlow::return_from_loop(50, 75, 150, 200), 150, "return from loop found"
 assert_eq Project::ControlFlow::return_from_loop(1, 2, 3), -1, "return from loop not found"
 
-my @limited = Project::ControlFlow::return_list_from_loop(10)
+val @limited = Project::ControlFlow::return_list_from_loop(10)
 assert_eq len(@limited), 5, "return list limited"
 assert_eq $limited[0], 2, "return list first"
 
 # ── Complex control flow ───────────────────────────────────────────
 
-my @fb = fizzbuzz(15)
+val @fb = fizzbuzz(15)
 assert_eq len(@fb), 15, "fizzbuzz length"
 assert_eq $fb[0], 1, "fizzbuzz 1"
 assert_eq $fb[2], "Fizz", "fizzbuzz 3"
@@ -140,7 +140,7 @@ assert_eq Project::ControlFlow::collatz_steps(1), 0, "collatz 1"
 assert_eq Project::ControlFlow::collatz_steps(2), 1, "collatz 2"
 assert_eq Project::ControlFlow::collatz_steps(6), 8, "collatz 6"
 
-my @primes = Project::ControlFlow::find_primes(20)
+val @primes = Project::ControlFlow::find_primes(20)
 assert_eq len(@primes), 8, "primes up to 20 count"
 assert_eq $primes[0], 2, "first prime"
 assert_eq $primes[7], 19, "eighth prime"

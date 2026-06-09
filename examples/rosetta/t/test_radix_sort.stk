@@ -2,24 +2,24 @@
 # Rosetta Code: Radix Sort
 
 fn Rosetta::RadixSort::sort($list) {
-    my @arr = @$list
-    my $n = len(@arr)
+    var @arr = @$list
+    val $n = len(@arr)
     if ($n < 2) { return \@arr }
     
-    my $max = $arr[0]
-    for my $x (@arr) {
+    var $max = $arr[0]
+    for val $x (@arr) {
         if ($x > $max) { $max = $x }
     }
     
-    my $exp = 1
+    var $exp = 1
     while (int($max / $exp) > 0) {
-        my @buckets = ([], [], [], [], [], [], [], [], [], [])
-        for my $x (@arr) {
-            my $digit = int($x / $exp) % 10
+        val @buckets = ([], [], [], [], [], [], [], [], [], [])
+        for val $x (@arr) {
+            val $digit = int($x / $exp) % 10
             push @{$buckets[$digit]}, $x
         }
         @arr = ()
-        for my $i (0:9) {
+        for val $i (0:9) {
             push @arr, @{$buckets[$i]}
         }
         $exp *= 10
@@ -27,8 +27,8 @@ fn Rosetta::RadixSort::sort($list) {
     \@arr
 }
 
-my $data = [170, 45, 75, 90, 802, 24, 2, 66]
-my $sorted = Rosetta::RadixSort::sort($data)
+val $data = [170, 45, 75, 90, 802, 24, 2, 66]
+val $sorted = Rosetta::RadixSort::sort($data)
 assert_eq join(",", @$sorted), "2,24,45,66,75,90,170,802", "radix sort"
 
 test_run

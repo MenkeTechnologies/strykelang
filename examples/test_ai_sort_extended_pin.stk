@@ -7,8 +7,8 @@
 
 ai_mock_install("(?s)Sort these items by: reverse alphabetical", '[0, 1, 2]');
 
-my @items_alpha = ("zebra", "mongoose", "aardvark");
-my $sorted_alpha = ai_sort(\@items_alpha, "reverse alphabetical");
+val @items_alpha = ("zebra", "mongoose", "aardvark");
+val $sorted_alpha = ai_sort(\@items_alpha, "reverse alphabetical");
 
 join(",", @{$sorted_alpha}) |> aeq "zebra,mongoose,aardvark", "ai_sort reverse alphabetical";
 
@@ -16,8 +16,8 @@ join(",", @{$sorted_alpha}) |> aeq "zebra,mongoose,aardvark", "ai_sort reverse a
 
 ai_mock_install("(?s)Sort these items by: ascending numerical order", '[1, 2, 0]');
 
-my @items_numeric = (100, 2, 87);
-my $sorted_numeric = ai_sort(\@items_numeric, "ascending numerical order");
+val @items_numeric = (100, 2, 87);
+val $sorted_numeric = ai_sort(\@items_numeric, "ascending numerical order");
 
 join(",", @{$sorted_numeric}) |> aeq "2,87,100", "ai_sort numerical ascending";
 
@@ -25,36 +25,36 @@ join(",", @{$sorted_numeric}) |> aeq "2,87,100", "ai_sort numerical ascending";
 
 ai_mock_install("(?s)Sort these items by: age, youngest first", '[1, 0, 2]');
 
-my @items_hash = (
+val @items_hash = (
     +{ name => "Alice", age => 30 },
     +{ name => "Bob", age => 25 },
     +{ name => "Charlie", age => 35 }
 );
-my $sorted_hash = ai_sort(\@items_hash, "age, youngest first");
+val $sorted_hash = ai_sort(\@items_hash, "age, youngest first");
 
-my @sorted_names = map { $_->{name} } @{$sorted_hash};
+val @sorted_names = map { $_->{name} } @{$sorted_hash};
 join(",", @sorted_names) |> aeq "Bob,Alice,Charlie", "ai_sort by hash key";
 
 # ── AI Sort: By Multiple Hash Keys ────────────────────────────────────────
 
 ai_mock_install("(?s)Sort these items by: age ascending, then name alphabetically", '[2, 1, 0]');
 
-my @items_multi_hash = (
+val @items_multi_hash = (
     +{ name => "Charlie", age => 30 },
     +{ name => "Alice", age => 30 },
     +{ name => "Bob", age => 25 }
 );
-my $sorted_multi_hash = ai_sort(\@items_multi_hash, "age ascending, then name alphabetically");
+val $sorted_multi_hash = ai_sort(\@items_multi_hash, "age ascending, then name alphabetically");
 
-my @sorted_multi_names = map { $_->{name} } @{$sorted_multi_hash};
+val @sorted_multi_names = map { $_->{name} } @{$sorted_multi_hash};
 join(",", @sorted_multi_names) |> aeq "Bob,Alice,Charlie", "ai_sort by multiple hash keys";
 
 # ── AI Sort: Complex Criterion ───────────────────────────────────────────
 
 ai_mock_install("(?s)Sort these version strings from oldest to newest", '[1, 2, 0]');
 
-my @versions = ("1.10.2", "1.2.1", "1.9.0");
-my $sorted_versions = ai_sort(\@versions, "Sort these version strings from oldest to newest");
+val @versions = ("1.10.2", "1.2.1", "1.9.0");
+val $sorted_versions = ai_sort(\@versions, "Sort these version strings from oldest to newest");
 
 join(",", @{$sorted_versions}) |> aeq "1.2.1,1.9.0,1.10.2", "ai_sort by complex criterion";
 

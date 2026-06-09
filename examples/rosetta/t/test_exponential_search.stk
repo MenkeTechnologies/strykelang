@@ -4,7 +4,7 @@
 
 fn Rosetta::ExpSearch::binary($arr, $target, $lo, $hi) {
     while ($lo <= $hi) {
-        my $mid = int(($lo + $hi) / 2)
+        val $mid = int(($lo + $hi) / 2)
         if ($arr->[$mid] == $target) { return $mid }
         if ($arr->[$mid] < $target) {
             $lo = $mid + 1
@@ -16,18 +16,18 @@ fn Rosetta::ExpSearch::binary($arr, $target, $lo, $hi) {
 }
 
 fn Rosetta::ExpSearch::find($arr, $target) {
-    my $n = len(@$arr)
+    val $n = len(@$arr)
     return -1 if $n == 0
     return 0 if $arr->[0] == $target
-    my $i = 1
+    var $i = 1
     while ($i < $n && $arr->[$i] <= $target) {
         $i *= 2
     }
-    my $hi = $i < $n - 1 ? $i : $n - 1
+    val $hi = $i < $n - 1 ? $i : $n - 1
     Rosetta::ExpSearch::binary($arr, $target, int($i / 2), $hi)
 }
 
-my @sorted = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
+val @sorted = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
 assert_eq Rosetta::ExpSearch::find(\@sorted, 64), 6, "find 64 -> idx 6"
 assert_eq Rosetta::ExpSearch::find(\@sorted, 1), 0, "first element"
 assert_eq Rosetta::ExpSearch::find(\@sorted, 2048), 11, "last element"
@@ -39,7 +39,7 @@ assert_eq Rosetta::ExpSearch::find([42], 42), 0, "single match"
 assert_eq Rosetta::ExpSearch::find([42], 7), -1, "single miss"
 
 # Dense run
-my @dense = (10:30)
+val @dense = (10:30)
 assert_eq Rosetta::ExpSearch::find(\@dense, 25), 15, "dense find 25"
 assert_eq Rosetta::ExpSearch::find(\@dense, 30), 20, "dense last"
 

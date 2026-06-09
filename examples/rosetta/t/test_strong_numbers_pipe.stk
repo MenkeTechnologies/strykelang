@@ -2,7 +2,7 @@
 # Rosetta Code: Strong numbers (using pipes)
 
 fn Rosetta::StrongNumbers::is_strong($n) {
-    my $sum = "$n" |> split(//) |> map {fact} |> sum()
+    val $sum = "$n" |> split(//) |> map {fact} |> sum()
     $sum == $n
 }
 

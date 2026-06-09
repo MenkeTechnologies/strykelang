@@ -2,8 +2,8 @@
 # Rosetta Code: N-Queens (Manual)
 
 fn Rosetta::NQueensManual::is_safe($queens, $r, $c) {
-    for my $i (0:$r-1) {
-        my $qc = $queens->[$i]
+    for val $i (0:$r-1) {
+        val $qc = $queens->[$i]
         if ($qc == $c || abs($qc - $c) == abs($i - $r)) { return 0 }
     }
     1
@@ -15,7 +15,7 @@ fn Rosetta::NQueensManual::solve($n, $r, $queens, $count) {
         return $count
     }
     
-    for my $c (0:$n-1) {
+    for val $c (0:$n-1) {
         if (Rosetta::NQueensManual::is_safe($queens, $r, $c)) {
             $queens->[$r] = $c
             $count = Rosetta::NQueensManual::solve($n, $r + 1, $queens, $count)
@@ -25,13 +25,13 @@ fn Rosetta::NQueensManual::solve($n, $r, $queens, $count) {
 }
 
 # n=8 should have 92 solutions
-my $q8 = []
-my $res8 = Rosetta::NQueensManual::solve(8, 0, $q8, 0)
+val $q8 = []
+val $res8 = Rosetta::NQueensManual::solve(8, 0, $q8, 0)
 assert_eq $res8, 92, "8-queens solutions count"
 
 # n=4 should have 2 solutions
-my $q4 = []
-my $res4 = Rosetta::NQueensManual::solve(4, 0, $q4, 0)
+val $q4 = []
+val $res4 = Rosetta::NQueensManual::solve(4, 0, $q4, 0)
 assert_eq $res4, 2, "4-queens solutions count"
 
 test_run

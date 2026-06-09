@@ -9,7 +9,7 @@
 fn Rosetta::Sudan::f($n, $x, $y) {
     return $x + $y if $n == 0
     return $x     if $y == 0
-    my $inner = Rosetta::Sudan::f($n, $x, $y - 1)
+    val $inner = Rosetta::Sudan::f($n, $x, $y - 1)
     Rosetta::Sudan::f($n - 1, $inner, $inner + $y)
 }
 
@@ -28,8 +28,8 @@ assert_eq Rosetta::Sudan::f(1, 2, 1), 5, "F(1, 2, 1)"
 assert_eq Rosetta::Sudan::f(1, 2, 2), 12, "F(1, 2, 2) = F(0, 5, 7) = 12"
 
 # Sanity: F(0, x, y) is symmetric (commutativity of +)
-for my $x (0:4) {
-    for my $y (0:4) {
+for val $x (0:4) {
+    for val $y (0:4) {
         assert_eq Rosetta::Sudan::f(0, $x, $y),
             Rosetta::Sudan::f(0, $y, $x),
             sprintf("F(0,%d,%d) symmetric", $x, $y)

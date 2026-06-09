@@ -5,23 +5,23 @@
 # Tie-breaking: original input order.
 
 fn Rosetta::TopRank::compute($records, $group_key, $score_key, $n) {
-    my %by_group
-    my $idx = 0
-    for my $r (@$records) {
-        my $g = $r->{$group_key}
+    val %by_group
+    var $idx = 0
+    for val $r (@$records) {
+        val $g = $r->{$group_key}
         push @{$by_group{$g}}, [$idx, $r]
         $idx++
     }
-    my %out
-    for my $g (keys %by_group) {
-        my @rs = @{$by_group{$g}}
-        my @sorted = sort {
+    var %out
+    for val $g (keys %by_group) {
+        val @rs = @{$by_group{$g}}
+        val @sorted = sort {
             ($b->[1]{$score_key} <=> $a->[1]{$score_key})
             || ($a->[0] <=> $b->[0])
         } @rs
-        my @top
-        my $take = $n < len(@sorted) ? $n : len(@sorted)
-        for my $i (0:$take - 1) {
+        var @top
+        val $take = $n < len(@sorted) ? $n : len(@sorted)
+        for val $i (0:$take - 1) {
             push @top, $sorted[$i][1]
         }
         $out{$g} = \@top
@@ -30,7 +30,7 @@ fn Rosetta::TopRank::compute($records, $group_key, $score_key, $n) {
 }
 
 # Rosetta canonical employee dataset (subset)
-my @employees = (
+val @employees = (
     { name => "Tyler Bennett", id => "E10297", salary => 32000, dept => "D101" },
     { name => "John Rappl",    id => "E21437", salary => 47000, dept => "D050" },
     { name => "George Woltman",id => "E00127", salary => 53500, dept => "D101" },
@@ -47,7 +47,7 @@ my @employees = (
 )
 
 # Top 2 of each department by salary
-my $r = Rosetta::TopRank::compute(\@employees, "dept", "salary", 2)
+val $r = Rosetta::TopRank::compute(\@employees, "dept", "salary", 2)
 
 # D101: Woltman 53500, McClellan 41500
 assert_eq len(@{$r->{D101}}), 2, "D101 has 2 entries"
@@ -66,15 +66,15 @@ assert_eq $r->{D202}[1]{name}, "Claire Buckman", "D202 #2"
 assert_eq len(@{$r->{D190}}), 2, "D190 has 2 entries"
 
 # Top 1 per group
-my $top1 = Rosetta::TopRank::compute(\@employees, "dept", "salary", 1)
-for my $g ("D101", "D050", "D202", "D190") {
+val $top1 = Rosetta::TopRank::compute(\@employees, "dept", "salary", 1)
+for val $g ("D101", "D050", "D202", "D190") {
     assert_eq len(@{$top1->{$g}}), 1, sprintf("%s has 1 entry", $g)
 }
 
 # Top 100 returns all in each group
-my $all = Rosetta::TopRank::compute(\@employees, "dept", "salary", 100)
-my $total = 0
-for my $g (keys %$all) { $total += len(@{$all->{$g}}) }
+val $all = Rosetta::TopRank::compute(\@employees, "dept", "salary", 100)
+var $total = 0
+for val $g (keys %$all) { $total += len(@{$all->{$g}}) }
 assert_eq $total, len(@employees), "all 13 records returned"
 
 # Pipe form

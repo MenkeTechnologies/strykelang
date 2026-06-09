@@ -2,7 +2,7 @@
 # Rosetta Code: Solve a Numbrix puzzle
 
 fn Rosetta::Numbrix::solution() {
-    my @rows = (
+    val @rows = (
         [1, 2, 3],
         [8, 9, 4],
         [7, 6, 5],
@@ -10,7 +10,7 @@ fn Rosetta::Numbrix::solution() {
     \@rows
 }
 
-my $solved = Rosetta::Numbrix::solution()
+val $solved = Rosetta::Numbrix::solution()
 
 assert_eq join(",", @{$solved->[0]}), "1,2,3", "top row solved"
 assert_eq $solved->[1]->[1], 9, "center value solved"

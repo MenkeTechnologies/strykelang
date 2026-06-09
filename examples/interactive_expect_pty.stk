@@ -13,7 +13,7 @@ p "── Interactive PTY Automation ──────────────�
 
 # We'll automate 'bc' (the basic calculator) as a demo.
 # Many systems have 'bc' installed.
-my $pty = pty_spawn("bc", "-q")
+val $pty = pty_spawn("bc", "-q")
 
 if (!$pty) {
     p "Error: 'bc' not found or failed to spawn PTY."

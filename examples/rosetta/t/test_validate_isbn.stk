@@ -2,32 +2,32 @@
 # Rosetta Code: Validate ISBN-13 check digit
 
 fn Rosetta::ISBN::clean($s) {
-    my $cleaned = $s
+    var $cleaned = $s
     $cleaned =~ s/[\s-]//g
     $cleaned
 }
 
 fn Rosetta::ISBN::is_valid_13($raw) {
-    my $s = Rosetta::ISBN::clean($raw)
+    val $s = Rosetta::ISBN::clean($raw)
     return 0 if len($s) != 13
     return 0 if $s !~ /^\d{13}$/
-    my @ds = ~> $s chars
-    my $sum = 0
-    for my $i (0:12) {
-        my $d = int($ds[$i])
+    val @ds = ~> $s chars
+    var $sum = 0
+    for val $i (0:12) {
+        val $d = int($ds[$i])
         $sum += ($i % 2 == 0) ? $d : $d * 3
     }
     $sum % 10 == 0
 }
 
 fn Rosetta::ISBN::is_valid_10($raw) {
-    my $s = Rosetta::ISBN::clean($raw)
+    val $s = Rosetta::ISBN::clean($raw)
     return 0 if len($s) != 10
     return 0 if $s !~ /^\d{9}[\dX]$/
-    my @ds = ~> $s chars
-    my $sum = 0
-    for my $i (0:9) {
-        my $d = ($ds[$i] eq "X") ? 10 : int($ds[$i])
+    val @ds = ~> $s chars
+    var $sum = 0
+    for val $i (0:9) {
+        val $d = ($ds[$i] eq "X") ? 10 : int($ds[$i])
         $sum += $d * (10 - $i)
     }
     $sum % 11 == 0

@@ -4,10 +4,10 @@
 # Demonstrates lazy evaluation, parallel pipelines, and complex chaining.
 
 p "--- Lazy Sequential Pipeline ---"
-my @data = 1:20
+val @data = 1:20
 
 # Pipeline is lazy: nothing happens until collect is called.
-my @processed = (@data |> pipeline)
+val @processed = (@data |> pipeline)
     ->filter(fn { _ % 2 == 0 })
     ->map(fn { _ ** 2 })
     ->take(5)
@@ -17,7 +17,7 @@ p "First 5 evens squared: ", join(", ", @processed)
 
 p "\n--- Parallel Pipeline ---"
 # par_pipeline runs stages in parallel across the thread pool.
-my @results = ((1:100) |> par_pipeline)
+val @results = ((1:100) |> par_pipeline)
     ->filter(fn { sleep 0.01; _ % 3 == 0 })
     ->map(fn { sleep 0.01; _ * 10 })
     ->take(10)
@@ -27,13 +27,13 @@ p "First 10 multiples of 3 times 10: ", join(", ", @results)
 
 p "\n--- Fused Map-Reduce ---"
 # Calculate sum of squares of numbers from 1 to 1000 in parallel.
-my $sum_squares = ((1:1000) |> pmap_reduce { _ * _ } { _ + _1 })
+val $sum_squares = ((1:1000) |> pmap_reduce { _ * _ } { _ + _1 })
 
 p "Sum of squares (1:1000): $sum_squares"
 
 p "\n--- Parallel Tree Reduce ---"
 # preduce uses a tree-based reduction for maximum parallelism.
-my $max_val = 1:1000
+val $max_val = 1:1000
     |> pmap { rand(1000) }
     |> preduce { _ > _1 ? _ : _1 }
 

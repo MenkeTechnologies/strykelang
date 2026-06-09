@@ -2,10 +2,10 @@
 # Rosetta Code: Monty Hall Problem
 
 fn Rosetta::MontyHall::simulate($trials, $switch) {
-    my @results = ~> 1:$trials pmap {
+    val @results = ~> 1:$trials pmap {
         srand(_ + now_ns)
-        my $prize_door = int(rand(3))
-        my $chosen_door = int(rand(3))
+        val $prize_door = int(rand(3))
+        val $chosen_door = int(rand(3))
         
         if ($switch) {
             $chosen_door != $prize_door ? 1 : 0
@@ -13,19 +13,19 @@ fn Rosetta::MontyHall::simulate($trials, $switch) {
             $chosen_door == $prize_door ? 1 : 0
         }
     }
-    my $s = sum(@results)
+    val $s = sum(@results)
     $s
 }
 
-my $trials = 1000
-my $stay_wins = Rosetta::MontyHall::simulate($trials, 0)
-my $switch_wins = Rosetta::MontyHall::simulate($trials, 1)
+val $trials = 1000
+val $stay_wins = Rosetta::MontyHall::simulate($trials, 0)
+val $switch_wins = Rosetta::MontyHall::simulate($trials, 1)
 
 p "DEBUG: stay_wins = $stay_wins"
 p "DEBUG: trials = $trials"
 
-my $stay_rate = $stay_wins / $trials
-my $switch_rate = $switch_wins / $trials
+val $stay_rate = $stay_wins / $trials
+val $switch_rate = $switch_wins / $trials
 
 p "Stay win rate: $stay_rate ($stay_wins/$trials)"
 p "Switch win rate: $switch_rate ($switch_wins/$trials)"

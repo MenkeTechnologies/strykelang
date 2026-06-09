@@ -2,12 +2,12 @@
 # Rosetta Code: Monotonic stack — next greater element to the right
 
 fn Rosetta::MonoStack::next_greater($arr) {
-    my $n = len(@$arr)
-    my @result = (-1) x $n
-    my @stack
-    for my $i (0:$n - 1) {
+    val $n = len(@$arr)
+    var @result = (-1) x $n
+    var @stack
+    for val $i (0:$n - 1) {
         while (len(@stack) > 0 && $arr->[$stack[-1]] < $arr->[$i]) {
-            my $idx = pop @stack
+            val $idx = pop @stack
             $result[$idx] = $arr->[$i]
         }
         push @stack, $i
@@ -16,10 +16,10 @@ fn Rosetta::MonoStack::next_greater($arr) {
 }
 
 fn Rosetta::MonoStack::previous_smaller($arr) {
-    my $n = len(@$arr)
-    my @result = (-1) x $n
-    my @stack
-    for my $i (0:$n - 1) {
+    val $n = len(@$arr)
+    var @result = (-1) x $n
+    var @stack
+    for val $i (0:$n - 1) {
         while (len(@stack) > 0 && $arr->[$stack[-1]] >= $arr->[$i]) {
             pop @stack
         }
@@ -30,31 +30,31 @@ fn Rosetta::MonoStack::previous_smaller($arr) {
 }
 
 # Classic next-greater
-my $r = Rosetta::MonoStack::next_greater([2, 1, 2, 4, 3])
+val $r = Rosetta::MonoStack::next_greater([2, 1, 2, 4, 3])
 assert_eq join(",", @$r), "4,2,4,-1,-1", "next greater [2,1,2,4,3]"
 
 # Strictly decreasing -> all -1
-my $dec = Rosetta::MonoStack::next_greater([5, 4, 3, 2, 1])
+val $dec = Rosetta::MonoStack::next_greater([5, 4, 3, 2, 1])
 assert_eq join(",", @$dec), "-1,-1,-1,-1,-1", "decreasing -> all -1"
 
 # Strictly increasing -> shift
-my $inc = Rosetta::MonoStack::next_greater([1, 2, 3, 4, 5])
+val $inc = Rosetta::MonoStack::next_greater([1, 2, 3, 4, 5])
 assert_eq join(",", @$inc), "2,3,4,5,-1", "increasing -> shift left"
 
 # Single
-my $solo = Rosetta::MonoStack::next_greater([42])
+val $solo = Rosetta::MonoStack::next_greater([42])
 assert_eq join(",", @$solo), "-1", "single -> -1"
 
 # Empty
-my $empty = Rosetta::MonoStack::next_greater([])
+val $empty = Rosetta::MonoStack::next_greater([])
 assert_eq len(@$empty), 0, "empty -> empty"
 
 # Previous smaller
-my $ps = Rosetta::MonoStack::previous_smaller([3, 1, 4, 1, 5, 9, 2, 6])
+val $ps = Rosetta::MonoStack::previous_smaller([3, 1, 4, 1, 5, 9, 2, 6])
 assert_eq join(",", @$ps), "-1,-1,1,-1,1,5,1,2", "previous smaller [3,1,4,1,5,9,2,6]"
 
 # All same -> previous smaller all -1
-my $eq = Rosetta::MonoStack::previous_smaller([7, 7, 7, 7])
+val $eq = Rosetta::MonoStack::previous_smaller([7, 7, 7, 7])
 assert_eq join(",", @$eq), "-1,-1,-1,-1", "all same -> -1"
 
 test_run

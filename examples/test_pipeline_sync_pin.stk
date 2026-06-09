@@ -10,7 +10,7 @@
 # write depends on a read that must be paired (RMW, log-then-update,
 # multi-field state transitions).
 
-my $g = mutex()
+val $g = mutex()
 mysync $sum = 0
 mysync $count = 0
 fan 1000 {
@@ -27,7 +27,7 @@ $sum   |> aeq 500500, "fan 1000 → sum 1+2+...+1000 = 500500"
 # downstream API rate limits) while letting the outer iteration fan
 # out freely.
 
-my $api_gate = semaphore(4)
+val $api_gate = semaphore(4)
 mysync $live = 0
 mysync $peak = 0
 fan 50 {
@@ -44,7 +44,7 @@ fan 50 {
 # When a lock isn't critical (best-effort warmup, optional cache fill),
 # probe with try_lock and fall through if it'd block.
 
-my $cache_lock = mutex()
+val $cache_lock = mutex()
 mysync $populated = 0
 fn try_warmup_cache {
     if (mutex_try_lock($cache_lock)) {
@@ -66,9 +66,9 @@ $populated |> aeq 1, "state set by the first warmup persists"
 # `defer` runs on scope exit including panic / die / return — verify
 # the lock releases even when the block exits abnormally.
 
-my $lockfile = tempfile()
+val $lockfile = tempfile()
 fn locked_op {
-    open(my $fh, ">", $lockfile) or die
+    open(val $fh, ">", $lockfile) or die
     flock($fh, 2) or die "flock failed"
     defer { flock($fh, 8); close $fh }
     die "simulated failure"
@@ -77,7 +77,7 @@ fn locked_op {
 eval { locked_op() }
 # After the eval, the lockfile is unlocked — verify by re-acquiring
 # non-blocking. A leaked lock would make flock(LOCK_NB) return 0.
-open(my $reacquire, ">", $lockfile) or die
+open(val $reacquire, ">", $lockfile) or die
 flock($reacquire, 4) |> aeq 1, "defer released flock even though body died"
 flock($reacquire, 8)
 close $reacquire
@@ -91,7 +91,7 @@ close $reacquire
     |> aeq 330, "1:10 → squares → >25 → sum = 36+49+64+81+100 = 330"
 
 # Streaming + mutex collaboration: per-item state into a shared sink.
-my $sink_lock = mutex()
+val $sink_lock = mutex()
 mysync @collected
 ~s> (1:20) map { _ * 2 } grep { _ % 4 == 0 } ep {
     mutex_lock($sink_lock)

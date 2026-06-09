@@ -2,11 +2,11 @@
 # Rosetta Code: Display an outline as a nested table
 
 fn Rosetta::Outline::to_table($node, $depth, $res_ref) {
-    my ($label, $children) = @$node
+    val ($label, $children) = @$node
     
     if (len(@$children) == 0) {
         # Leaf node
-        my @row
+        var @row
         for (0..($depth)) { push @row, "" }
         $row[$depth] = $label
         push @$res_ref, \@row
@@ -14,8 +14,8 @@ fn Rosetta::Outline::to_table($node, $depth, $res_ref) {
     }
     
     # Non-leaf node
-    my $start_idx = len(@$res_ref)
-    for my $child (@$children) {
+    val $start_idx = len(@$res_ref)
+    for val $child (@$children) {
         Rosetta::Outline::to_table($child, $depth + 1, $res_ref)
     }
     
@@ -24,18 +24,18 @@ fn Rosetta::Outline::to_table($node, $depth, $res_ref) {
 }
 
 fn Rosetta::Outline::pretty_format($outline) {
-    my @rows
+    val @rows
     Rosetta::Outline::to_table($outline, 0, \@rows)
     
     # Determine max depth
-    my $max_d = 0
-    for my $row (@rows) { $max_d = len(@$row) if len(@$row) > $max_d }
+    var $max_d = 0
+    for val $row (@rows) { $max_d = len(@$row) if len(@$row) > $max_d }
     
-    my $out = ""
-    for my $row (@rows) {
-        my @line
-        for (my $i = 0; $i < $max_d; $i++) {
-            my $val = defined $row->[$i] ? $row->[$i] : ""
+    var $out = ""
+    for val $row (@rows) {
+        var @line
+        for (var $i = 0; $i < $max_d; $i++) {
+            val $val = defined $row->[$i] ? $row->[$i] : ""
             push @line, sprintf("%-10s", $val)
         }
         $out .= join(" | ", @line) . "\n"
@@ -43,7 +43,7 @@ fn Rosetta::Outline::pretty_format($outline) {
     $out
 }
 
-my $outline = ["Food", [
+val $outline = ["Food", [
     ["Fruit", [
         ["Apple", []],
         ["Banana", []]
@@ -53,7 +53,7 @@ my $outline = ["Food", [
     ]]
 ]]
 
-my $table = Rosetta::Outline::pretty_format($outline)
+val $table = Rosetta::Outline::pretty_format($outline)
 # p $table
 
 assert_ok index($table, "Food       | Fruit      | Apple") != -1, "First row correct"

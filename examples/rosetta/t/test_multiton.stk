@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 # Rosetta Code: Multiton
 
-my %instances;
+var %instances;
 
 class Rosetta::Multiton::Logger {
     name: Str = ""
@@ -20,9 +20,9 @@ class Rosetta::Multiton::Logger {
 }
 
 # Test the multiton
-my $log1 = Rosetta::Multiton::Logger::get("main")
-my $log2 = Rosetta::Multiton::Logger::get("worker")
-my $log3 = Rosetta::Multiton::Logger::get("main")
+val $log1 = Rosetta::Multiton::Logger::get("main")
+val $log2 = Rosetta::Multiton::Logger::get("worker")
+val $log3 = Rosetta::Multiton::Logger::get("main")
 
 assert_eq $log1->name, "main", "log1 name is main"
 assert_eq $log2->name, "worker", "log2 name is worker"

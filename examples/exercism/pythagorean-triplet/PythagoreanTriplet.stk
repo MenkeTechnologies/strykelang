@@ -2,11 +2,11 @@
 fn Exercism::PythagoreanTriplet::is_pythagorean = _ * _ + _1 * _1 == _2 * _2
 
 fn Exercism::PythagoreanTriplet::triplets_in_range($min, $max) {
-    my @out
-    for my $x ($min:$max) {
+    var @out
+    for val $x ($min:$max) {
         ~> $x:$max ep {
-            my $c2 = $x * $x + _ * _
-            my $c = int(sqrt($c2) + 0.5)
+            val $c2 = $x * $x + _ * _
+            val $c = int(sqrt($c2) + 0.5)
             push @out, [$x, _, $c] if $c <= $max && $c >= _ && $c * $c == $c2
         }
     }
@@ -14,10 +14,10 @@ fn Exercism::PythagoreanTriplet::triplets_in_range($min, $max) {
 }
 
 fn Exercism::PythagoreanTriplet::triplets_with_sum($sum) {
-    my @out
-    for my $x (1:int($sum / 3)) {
-        for my $y ($x:int(($sum - $x) / 2)) {
-            my $z = $sum - $x - $y
+    var @out
+    for val $x (1:int($sum / 3)) {
+        for val $y ($x:int(($sum - $x) / 2)) {
+            val $z = $sum - $x - $y
             push @out, [$x, $y, $z] if $x * $x + $y * $y == $z * $z
         }
     }

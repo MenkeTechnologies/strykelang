@@ -2,7 +2,7 @@
 # Rosetta Code: Joystick position
 
 fn Rosetta::Joystick::new() {
-    my @buttons = (0, 0, 0, 0)
+    val @buttons = (0, 0, 0, 0)
     { x => 0, y => 0, buttons => \@buttons }
 }
 
@@ -23,7 +23,7 @@ fn Rosetta::Joystick::snapshot($stick) {
     "x=$stick->{x} y=$stick->{y} buttons=" . join("", @{$stick->{buttons}})
 }
 
-my $stick = Rosetta::Joystick::new()
+val $stick = Rosetta::Joystick::new()
 Rosetta::Joystick::move($stick, -12, 34)
 Rosetta::Joystick::press($stick, 0)
 Rosetta::Joystick::press($stick, 2)

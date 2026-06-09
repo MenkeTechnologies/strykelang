@@ -2,23 +2,23 @@
 # Rosetta Code: Metronome
 
 fn Rosetta::Metronome::schedule($bpm, $beats) {
-    my $interval = 60.0 / $bpm
-    my @times
-    for my $i (0:$beats - 1) {
+    val $interval = 60.0 / $bpm
+    var @times
+    for val $i (0:$beats - 1) {
         push @times, $i * $interval
     }
     \@times
 }
 
 fn Rosetta::Metronome::pattern($beats_per_bar, $bars) {
-    my @out
-    for my $i (0 .. ($beats_per_bar * $bars) - 1) {
+    var @out
+    for val $i (0 .. ($beats_per_bar * $bars) - 1) {
         push @out, ($i % $beats_per_bar == 0) ? "TICK" : "tick"
     }
     join(" ", @out)
 }
 
-my $times = Rosetta::Metronome::schedule(120, 4)
+val $times = Rosetta::Metronome::schedule(120, 4)
 assert_ok abs($times->[1] - 0.5) < 1e-12, "120 BPM gives 0.5 second interval"
 assert_ok abs($times->[3] - 1.5) < 1e-12, "fourth beat timing"
 assert_eq Rosetta::Metronome::pattern(4, 2), "TICK tick tick tick TICK tick tick tick", "accented bar pattern"

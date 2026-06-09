@@ -2,7 +2,7 @@
 # Rosetta Code: Write language name in 3D ASCII
 
 fn Rosetta::ThreeDName::render($word) {
-    my $w = len($word)
+    val $w = len($word)
     [
         "   " . ("_" x $w),
         "  /" . (" " x $w) . "/|",
@@ -13,8 +13,8 @@ fn Rosetta::ThreeDName::render($word) {
     ]
 }
 
-my $art = Rosetta::ThreeDName::render("STRYKE")
-my $joined = join("\n", @$art)
+val $art = Rosetta::ThreeDName::render("STRYKE")
+val $joined = join("\n", @$art)
 
 assert_eq len(@$art), 6, "six lines of 3D ASCII"
 assert_eq $joined =~ /STRYKE/, 1, "language name is visible"

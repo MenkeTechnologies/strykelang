@@ -19,16 +19,16 @@
 # Naive O(n²) DP — clearest implementation. dp[i] = length of LIS
 # ending at index i.
 fn LIS::naive_len($xs) {
-    my $n = len @$xs
+    val $n = len @$xs
     return 0 if $n == 0
-    my @dp = (1) x $n
-    for my $i (1:$n - 1) {
-        for my $j (0:$i - 1) {
+    var @dp = (1) x $n
+    for val $i (1:$n - 1) {
+        for val $j (0:$i - 1) {
             $dp[$i] = $dp[$j] + 1 if $xs->[$j] < $xs->[$i] && $dp[$j] + 1 > $dp[$i]
         }
     }
-    my $best = $dp[0]
-    for my $v (@dp) { $best = $v if $v > $best }
+    var $best = $dp[0]
+    for val $v (@dp) { $best = $v if $v > $best }
     $best
 }
 
@@ -36,12 +36,12 @@ fn LIS::naive_len($xs) {
 # smallest possible tail of any length-(k+1) increasing subseq seen so
 # far. Binary-search-insert each element. Length of tails = LIS length.
 fn LIS::patience_len($xs) {
-    my @tails
-    for my $x (@$xs) {
-        my $lo = 0
-        my $hi = len @tails
+    var @tails
+    for val $x (@$xs) {
+        var $lo = 0
+        var $hi = len @tails
         while ($lo < $hi) {
-            my $mid = int(($lo + $hi) / 2)
+            val $mid = int(($lo + $hi) / 2)
             if ($tails[$mid] < $x) { $lo = $mid + 1 }
             else                   { $hi = $mid }
         }
@@ -53,12 +53,12 @@ fn LIS::patience_len($xs) {
 
 # Reconstruct an LIS (one of, if ties) via DP traceback.
 fn LIS::trace($xs) {
-    my $n = len @$xs
+    val $n = len @$xs
     return [] if $n == 0
-    my @dp = (1) x $n
-    my @prev = (-1) x $n
-    for my $i (1:$n - 1) {
-        for my $j (0:$i - 1) {
+    var @dp = (1) x $n
+    var @prev = (-1) x $n
+    for val $i (1:$n - 1) {
+        for val $j (0:$i - 1) {
             if ($xs->[$j] < $xs->[$i] && $dp[$j] + 1 > $dp[$i]) {
                 $dp[$i] = $dp[$j] + 1
                 $prev[$i] = $j
@@ -66,12 +66,12 @@ fn LIS::trace($xs) {
         }
     }
     # Find best end-position.
-    my $best_i = 0
-    for my $i (0:$n - 1) {
+    var $best_i = 0
+    for val $i (0:$n - 1) {
         $best_i = $i if $dp[$i] > $dp[$best_i]
     }
-    my @out
-    my $i = $best_i
+    var @out
+    var $i = $best_i
     while ($i != -1) {
         unshift @out, $xs->[$i]
         $i = $prev[$i]
@@ -81,7 +81,7 @@ fn LIS::trace($xs) {
 
 p "── LIS demo ──"
 
-my @cases = (
+val @cases = (
     +{ xs => [],                              len => 0 },
     +{ xs => [42],                            len => 1 },
     +{ xs => [1, 2, 3, 4, 5],                 len => 5 },  # already increasing
@@ -93,13 +93,13 @@ my @cases = (
     +{ xs => [-7, 10, 9, 2, 3, 4, 5],         len => 5 },  # -7, 2, 3, 4, 5
 )
 
-my $fail = 0
-for my $c (@cases) {
-    my $naive    = LIS::naive_len($c->{xs})
-    my $patience = LIS::patience_len($c->{xs})
-    my $trace    = LIS::trace($c->{xs})
-    my $tlen     = len @$trace
-    my $ok = $naive == $c->{len} && $patience == $c->{len} && $tlen == $c->{len}
+var $fail = 0
+for val $c (@cases) {
+    val $naive    = LIS::naive_len($c->{xs})
+    val $patience = LIS::patience_len($c->{xs})
+    val $trace    = LIS::trace($c->{xs})
+    val $tlen     = len @$trace
+    val $ok = $naive == $c->{len} && $patience == $c->{len} && $tlen == $c->{len}
     $fail++ unless $ok
     p "  LIS([@{$c->{xs}}]) naive=$naive patience=$patience trace=[@$trace] (len $tlen)  expect #{$c->{len}}  #{$ok ? \"\" : \"FAIL\"}"
 }
@@ -109,16 +109,16 @@ die "#{$fail} / #{len @cases} LIS cases failed" if $fail > 0
 #   * The traced subsequence is strictly increasing
 #   * The traced subsequence appears in original order in $xs
 #   * Both implementations agree on length
-for my $c (@cases) {
+for val $c (@cases) {
     next if len(@{$c->{xs}}) == 0
-    my $r = LIS::trace($c->{xs})
+    val $r = LIS::trace($c->{xs})
     next if len(@$r) < 2
-    for my $i (1:len(@$r) - 1) {
+    for val $i (1:len(@$r) - 1) {
         die "trace not strictly increasing at $i" unless $r->[$i] > $r->[$i - 1]
     }
     # In-order subsequence check.
-    my $j = 0
-    for my $v (@{$c->{xs}}) {
+    var $j = 0
+    for val $v (@{$c->{xs}}) {
         $j++ if $j < len(@$r) && $v == $r->[$j]
     }
     die "trace not a subsequence of input" unless $j == len(@$r)

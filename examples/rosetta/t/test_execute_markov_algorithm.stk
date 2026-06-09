@@ -2,20 +2,20 @@
 # Rosetta Code: Execute a Markov algorithm
 
 fn Rosetta::Markov::execute($input, @rules) {
-    my $text = $input
-    my $changed = 1
+    var $text = $input
+    var $changed = 1
     
     while ($changed) {
         $changed = 0
-        for my $rule (@rules) {
-            my ($pattern, $replacement, $terminating) = @$rule
+        for val $rule (@rules) {
+            val ($pattern, $replacement, $terminating) = @$rule
             
             # Use index to find match
-            my $pos = index($text, $pattern)
+            val $pos = index($text, $pattern)
             if ($pos != -1) {
                 # Apply rule
-                my $prefix = substr($text, 0, $pos)
-                my $suffix = substr($text, $pos + length($pattern))
+                val $prefix = substr($text, 0, $pos)
+                val $suffix = substr($text, $pos + length($pattern))
                 $text = $prefix . $replacement . $suffix
                 
                 if ($terminating) {
@@ -36,7 +36,7 @@ fn Rosetta::Markov::execute($input, @rules) {
 # orange -> apple
 # (This would loop forever if not careful)
 
-my @rules1 = (
+val @rules1 = (
     ["apple", "orange", 0],
     ["orange", "apple", 0]
 )
@@ -53,7 +53,7 @@ my @rules1 = (
 # 5. "the shop" -> "my shop"
 # 6. "a" -> "the" (terminating)
 
-my @rules_abc = (
+val @rules_abc = (
     ["A", "apple", 0],
     ["B", "bag", 0],
     ["S", "shop", 0],
@@ -62,14 +62,14 @@ my @rules_abc = (
     ["a", "the", 1]
 )
 
-my $res = Rosetta::Markov::execute("I bought a B from S", @rules_abc)
+val $res = Rosetta::Markov::execute("I bought a B from S", @rules_abc)
 # Step 1: B -> bag => "I bought a bag from S"
 # Step 2: S -> shop => "I bought a bag from shop"
 # Step 3: a -> the (terminating) => "I bought the bag from shop"
 assert_eq $res, "I bought the bag from shop", "Simple Markov execution"
 
 # Another example: Binary increment
-my @rules_inc = (
+val @rules_inc = (
     ["1e", "e0", 0],
     ["0e", "1", 1],
     ["e", "1", 1],

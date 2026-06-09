@@ -2,26 +2,26 @@
 # Rosetta Code: Knapsack problem/0-1
 
 fn Rosetta::Knapsack01::solve($items, $capacity) {
-    my $n = len(@$items)
-    my @dp
+    val $n = len(@$items)
+    var @dp
     # Initialize DP table
-    for (my $i = 0; $i <= $n; $i++) {
-        my @row
-        for (my $j = 0; $j <= $capacity; $j++) {
+    for (var $i = 0; $i <= $n; $i++) {
+        var @row
+        for (var $j = 0; $j <= $capacity; $j++) {
             push @row, 0
         }
         push @dp, \@row
     }
     
-    for (my $i = 1; $i <= $n; $i++) {
-        my $item = $items->[$i-1]
-        my $w = $item->{weight}
-        my $v = $item->{value}
+    for (var $i = 1; $i <= $n; $i++) {
+        val $item = $items->[$i-1]
+        val $w = $item->{weight}
+        val $v = $item->{value}
         
-        for (my $j = 0; $j <= $capacity; $j++) {
+        for (var $j = 0; $j <= $capacity; $j++) {
             if ($w <= $j) {
-                my $v1 = $dp[$i-1]->[$j]
-                my $v2 = $dp[$i-1]->[$j-$w] + $v
+                val $v1 = $dp[$i-1]->[$j]
+                val $v2 = $dp[$i-1]->[$j-$w] + $v
                 $dp[$i]->[$j] = $v1 > $v2 ? $v1 : $v2
             } else {
                 $dp[$i]->[$j] = $dp[$i-1]->[$j]
@@ -30,11 +30,11 @@ fn Rosetta::Knapsack01::solve($items, $capacity) {
     }
     
     # Backtrack to find items
-    my @selected
-    my $curr_w = $capacity
-    for (my $i = $n; $i > 0; $i--) {
+    var @selected
+    var $curr_w = $capacity
+    for (var $i = $n; $i > 0; $i--) {
         if ($dp[$i]->[$curr_w] != $dp[$i-1]->[$curr_w]) {
-            my $item = $items->[$i-1]
+            val $item = $items->[$i-1]
             push @selected, $item
             $curr_w -= $item->{weight}
         }
@@ -43,7 +43,7 @@ fn Rosetta::Knapsack01::solve($items, $capacity) {
     { total_value => $dp[$n]->[$capacity], items => \@selected }
 }
 
-my @items = (
+val @items = (
     { name => "map", weight => 9, value => 150 },
     { name => "compass", weight => 13, value => 35 },
     { name => "water", weight => 153, value => 200 },
@@ -68,12 +68,12 @@ my @items = (
     { name => "book", weight => 30, value => 10 }
 )
 
-my $res = Rosetta::Knapsack01::solve(\@items, 400)
+val $res = Rosetta::Knapsack01::solve(\@items, 400)
 assert_eq $res->{total_value}, 1030, "Knapsack total value"
 
-my @names = sort map { _->{name} } @{$res->{items}}
+val @names = sort map { _->{name} } @{$res->{items}}
 # Verify some key items are present
-my %has = map { _ => 1 } @names
+val %has = map { _ => 1 } @names
 assert_ok $has{"map"}, "has map"
 assert_ok $has{"suntan cream"}, "has suntan cream"
 assert_ok $has{"note-case"}, "has note-case"

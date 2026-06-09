@@ -3,16 +3,16 @@
 #
 # Usage: s examples/project/t/run.stk
 
-my $dir = dirname $0
-my @test_files = glob("$dir/test_*.stk") |> sort
-my $total = scalar @test_files
-my $failed = 0
+val $dir = dirname $0
+val @test_files = glob("$dir/test_*.stk") |> sort
+val $total = scalar @test_files
+var $failed = 0
 
 p "Running $total test files...\n"
 
 for (@test_files) {
     printf "── %s ──\n", basename(_)
-    my $exit = system("s", _)
+    val $exit = system("s", _)
     if ($exit != 0) {
         $failed++
     }

@@ -9,8 +9,8 @@ fn Rosetta::EvenNumbers::solve_parallel(@arr) {
     ~> @arr pgrep { _ % 2 == 0 }
 }
 
-my @input = 1:10
-my @expected = (2, 4, 6, 8, 10)
+val @input = 1:10
+val @expected = (2, 4, 6, 8, 10)
 
 assert_eq join(",", Rosetta::EvenNumbers::solve(@input)), join(",", @expected), "even numbers"
 assert_eq join(",", Rosetta::EvenNumbers::solve_parallel(@input)), join(",", @expected), "parallel even numbers"

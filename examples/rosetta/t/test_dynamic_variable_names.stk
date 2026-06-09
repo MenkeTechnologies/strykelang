@@ -5,8 +5,8 @@ fn Rosetta::DynamicVars::demo() {
     # In Stryke, using a hash is the idiomatic way to handle dynamic variable names
     # rather than polluting the symbol table.
     
-    my %vars
-    my $var_name = "dynamic_foo"
+    var %vars
+    val $var_name = "dynamic_foo"
     
     # Set the variable
     $vars{$var_name} = 42
@@ -15,7 +15,7 @@ fn Rosetta::DynamicVars::demo() {
     $vars{"dynamic_foo"}
 }
 
-my $val = Rosetta::DynamicVars::demo()
+val $val = Rosetta::DynamicVars::demo()
 assert_eq $val, 42, "Dynamic variable simulation works"
 
 test_run

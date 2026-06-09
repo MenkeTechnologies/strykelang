@@ -11,12 +11,12 @@ fn Rosetta::PollardRho::gcd($a, $b) {
 fn Rosetta::PollardRho::solve($n) {
     return $n if $n % 2 == 0 # Simplification for even
     
-    my $x = 2
-    my $y = 2
-    my $d = 1
-    my $c = 1
+    var $x = 2
+    var $y = 2
+    var $d = 1
+    var $c = 1
     
-    my $f = fn($v) { ($v * $v + $c) % $n }
+    val $f = fn($v) { ($v * $v + $c) % $n }
     
     while ($d == 1) {
         $x = $f($x)

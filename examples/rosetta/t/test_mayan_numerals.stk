@@ -6,11 +6,11 @@
 
 fn Rosetta::Mayan::digit($d) {
     return "∅" if $d == 0
-    my $bars  = int($d / 5)
-    my $units = $d % 5
-    my $bar_s  = "—" x $bars
-    my $unit_s = "•" x $units
-    my @parts
+    val $bars  = int($d / 5)
+    val $units = $d % 5
+    val $bar_s  = "—" x $bars
+    val $unit_s = "•" x $units
+    var @parts
     push @parts, $bar_s if len($bar_s) > 0
     push @parts, $unit_s if len($unit_s) > 0
     join(",", @parts)
@@ -18,7 +18,7 @@ fn Rosetta::Mayan::digit($d) {
 
 fn Rosetta::Mayan::digits_of($n) {
     return [0] if $n == 0
-    my @d
+    var @d
     while ($n > 0) {
         unshift @d, $n % 20
         $n = int($n / 20)
@@ -27,13 +27,13 @@ fn Rosetta::Mayan::digits_of($n) {
 }
 
 fn Rosetta::Mayan::render($n) {
-    my $d = Rosetta::Mayan::digits_of($n)
+    val $d = Rosetta::Mayan::digits_of($n)
     join("\n", map {Rosetta::Mayan::digit} @$d)
 }
 
 fn Rosetta::Mayan::from_digits($digits) {
-    my $v = 0
-    for my $d (@$digits) { $v = $v * 20 + $d }
+    var $v = 0
+    for val $d (@$digits) { $v = $v * 20 + $d }
     $v
 }
 
@@ -54,9 +54,9 @@ assert_eq join(",", @{Rosetta::Mayan::digits_of(400)}),   "1,0,0",   "400 = (1, 
 assert_eq join(",", @{Rosetta::Mayan::digits_of(4732)}),  "11,16,12","4732 = (11, 16, 12)"
 
 # Round-trip via from_digits
-my $rt_ok = 1
-for my $n (0, 1, 19, 20, 399, 400, 7999, 8000, 159999) {
-    my $back = Rosetta::Mayan::from_digits(Rosetta::Mayan::digits_of($n))
+var $rt_ok = 1
+for val $n (0, 1, 19, 20, 399, 400, 7999, 8000, 159999) {
+    val $back = Rosetta::Mayan::from_digits(Rosetta::Mayan::digits_of($n))
     $rt_ok = 0 if $back != $n
 }
 assert_ok $rt_ok, "round-trip preserves values up to 159999"

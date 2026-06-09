@@ -14,7 +14,7 @@
 p "── DataFrame Analysis ──────────────────────────────────"
 
 # 1. Create a sample dataset
-my @rows = (
+val @rows = (
     +{ dept => "Eng",   salary => 100000, tenure => 5 },
     +{ dept => "Eng",   salary => 120000, tenure => 3 },
     +{ dept => "Sales", salary => 80000,  tenure => 4 },
@@ -22,23 +22,23 @@ my @rows = (
     +{ dept => "HR",    salary => 70000,  tenure => 6 }
 )
 
-my $df = dataframe(\@rows)
+val $df = dataframe(\@rows)
 p "Initial DataFrame: #{$df->nrow} rows, #{$df->ncol} columns"
 
 # 2. Filtering
-my $senior = $df->filter(fn { 
+val $senior = $df->filter(fn { 
     (_->{dept} eq "Eng" || _->{dept} eq "Sales") && _->{tenure} > 3 
 })
 p "Senior Eng/Sales (tenure > 3): #{$senior->nrow} rows"
 
 # 3. Aggregation (Total Salary)
 # sum() on a non-grouped dataframe returns a scalar float
-my $total_sal = $df->sum("salary")
+val $total_sal = $df->sum("salary")
 p sprintf("Total Payroll: \$%.2f", $total_sal)
 
 # 4. Grouped Aggregation
 # Group by department and sum salary - returns a NEW grouped DataFrame
-my $grouped = $df->group_by("dept")->sum("salary")
+val $grouped = $df->group_by("dept")->sum("salary")
 p "Grouped aggregation result: #{$grouped->nrow} unique departments"
 
 # 5. Self-test / Assertions

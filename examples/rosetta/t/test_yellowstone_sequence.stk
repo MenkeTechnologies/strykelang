@@ -4,8 +4,8 @@
 #   gcd(k, a(n-1)) == 1 and gcd(k, a(n-2)) > 1
 
 fn Rosetta::Yellowstone::gcd($a, $b) {
-    my $x = $a
-    my $y = $b
+    var $x = $a
+    var $y = $b
     while ($y != 0) {
         ($x, $y) = ($y, $x % $y)
     }
@@ -13,13 +13,13 @@ fn Rosetta::Yellowstone::gcd($a, $b) {
 }
 
 fn Rosetta::Yellowstone::generate($count) {
-    my @seq = (1, 2, 3)
-    my %used
+    var @seq = (1, 2, 3)
+    var %used
     $used{1} = 1; $used{2} = 1; $used{3} = 1
     while (len(@seq) < $count) {
-        my $prev = $seq[-1]
-        my $prev2 = $seq[-2]
-        my $n = 4
+        val $prev = $seq[-1]
+        val $prev2 = $seq[-2]
+        var $n = 4
         while (1) {
             if (!$used{$n}
                 && Rosetta::Yellowstone::gcd($n, $prev) == 1
@@ -34,10 +34,10 @@ fn Rosetta::Yellowstone::generate($count) {
     \@seq
 }
 
-my $seq = Rosetta::Yellowstone::generate(15)
+val $seq = Rosetta::Yellowstone::generate(15)
 assert_eq join(",", @$seq), "1,2,3,4,9,8,15,14,5,6,25,12,35,16,7", "Yellowstone first 15"
 
-my $seq30 = Rosetta::Yellowstone::generate(30)
+val $seq30 = Rosetta::Yellowstone::generate(30)
 assert_eq $seq30->[29], 17, "30th Yellowstone term"
 
 test_run

@@ -6,10 +6,10 @@ fn Rosetta::SieveAtkin::compute($limit) {
     if ($limit == 2) { return ([2]) }
     if ($limit == 3) { return ([2, 3]) }
     
-    my @is_prime = (0) x ($limit + 1)
-    for my $x (1..sqrt($limit)) {
-        for my $y (1..sqrt($limit)) {
-            my $n = (4 * $x * $x) + ($y * $y)
+    var @is_prime = (0) x ($limit + 1)
+    for val $x (1..sqrt($limit)) {
+        for val $y (1..sqrt($limit)) {
+            var $n = (4 * $x * $x) + ($y * $y)
             if ($n <= $limit && ($n % 12 == 1 || $n % 12 == 5)) {
                 $is_prime[$n] = !$is_prime[$n]
             }
@@ -24,10 +24,10 @@ fn Rosetta::SieveAtkin::compute($limit) {
         }
     }
     
-    for my $n (5..sqrt($limit)) {
+    for val $n (5..sqrt($limit)) {
         if ($is_prime[$n]) {
-            my $s = $n * $n
-            my $m = $s
+            val $s = $n * $n
+            var $m = $s
             while ($m <= $limit) {
                 $is_prime[$m] = 0
                 $m = $m + $s
@@ -35,8 +35,8 @@ fn Rosetta::SieveAtkin::compute($limit) {
         }
     }
     
-    my @primes = (2, 3)
-    for my $n (5:$limit) {
+    var @primes = (2, 3)
+    for val $n (5:$limit) {
         if ($is_prime[$n]) {
             push @primes, $n
         }
@@ -44,7 +44,7 @@ fn Rosetta::SieveAtkin::compute($limit) {
     \@primes
 }
 
-my $res = Rosetta::SieveAtkin::compute(100)
+val $res = Rosetta::SieveAtkin::compute(100)
 assert_eq join(",", @$res), "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97", "Primes up to 100"
 
 test_run

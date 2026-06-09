@@ -2,9 +2,9 @@
 # Rosetta Code: Semiprime
 
 fn Rosetta::Semiprime::is_semiprime($n) {
-    my $count = 0
-    my $temp = $n
-    my $i = 2
+    var $count = 0
+    var $temp = $n
+    var $i = 2
     while ($i * $i <= $temp) {
         while ($temp % $i == 0) {
             $temp = $temp / $i

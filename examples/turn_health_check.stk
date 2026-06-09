@@ -17,9 +17,9 @@
 #
 # Output: one line per server with status / latency / relay address.
 
-my $user = $ARGV[0] // $ENV{TURN_USER}
-my $pass = $ARGV[1] // $ENV{TURN_PASS}
-my @servers = len(@ARGV) > 2 ? @ARGV[2..$#ARGV]
+val $user = $ARGV[0] // $ENV{TURN_USER}
+val $pass = $ARGV[1] // $ENV{TURN_PASS}
+val @servers = len(@ARGV) > 2 ? @ARGV[2..$#ARGV]
             : defined $ENV{TURN_SERVERS} ? split /,/, $ENV{TURN_SERVERS}
             : ()
 
@@ -51,16 +51,16 @@ p ""
 # Per-server probe: returns a hash describing the result. Self-contained
 # so it can run in pmap without sharing state with other probes.
 fn Hc::probe($server) {
-    my @parts = split /:/, $server
-    my $host  = $parts[0]
-    my $port  = len(@parts) > 1 ? $parts[1] + 0 : 3478
-    my $sock = udp_open()
+    val @parts = split /:/, $server
+    val $host  = $parts[0]
+    val $port  = len(@parts) > 1 ? $parts[1] + 0 : 3478
+    val $sock = udp_open()
     if ($sock == 0) {
         return { server => $server, ok => 0, latency_ms => 0, reason => "bind failed" }
     }
-    my $t0 = now_ns()
-    my $alloc = turn_allocate($sock, $host, $port, $user, $pass, 5000)
-    my $latency_ms = (now_ns() - $t0) / 1_000_000
+    val $t0 = now_ns()
+    val $alloc = turn_allocate($sock, $host, $port, $user, $pass, 5000)
+    val $latency_ms = (now_ns() - $t0) / 1_000_000
     if (!defined $alloc) {
         udp_close($sock)
         return {
@@ -83,12 +83,12 @@ fn Hc::probe($server) {
 }
 
 # Parallel fan-out — TURN allocations are independent across servers.
-my @results = pmap { Hc::probe($_) } @servers
-my @sorted  = sort { _->{server} cmp _1->{server} } @results
+val @results = pmap { Hc::probe($_) } @servers
+val @sorted  = sort { _->{server} cmp _1->{server} } @results
 
 # Report per-server.
-my $ok_count = 0
-for my $r (@sorted) {
+var $ok_count = 0
+for val $r (@sorted) {
     if ($r->{ok}) {
         printf "  ✓ %-30s  %4dms  relay=%s  lifetime=%ds\n",
             $r->{server}, $r->{latency_ms}, $r->{relay}, $r->{lifetime}

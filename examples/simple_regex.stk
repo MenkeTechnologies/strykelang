@@ -12,7 +12,7 @@ fn SR::_eq($pc, $tc) {
 
 fn SR::_match_star($c, $re, $j, $s, $i) {
     # Greedy: consume as many matches as possible, then backtrack.
-    my $k = $i
+    var $k = $i
     while ($k < (len $s) && SR::_eq($c, substr($s, $k, 1))) {
         $k = $k + 1
     }
@@ -24,7 +24,7 @@ fn SR::_match_star($c, $re, $j, $s, $i) {
 }
 
 fn SR::_match_here($re, $j, $s, $i) {
-    my $rl = len $re
+    val $rl = len $re
     return 1 if $j == $rl
     if ($j + 1 < $rl && substr($re, $j + 1, 1) eq "*") {
         return SR::_match_star(substr($re, $j, 1), $re, $j + 2, $s, $i)
@@ -42,8 +42,8 @@ fn SR::match($re, $s) {
     if ((len $re) > 0 && substr($re, 0, 1) eq "^") {
         return SR::_match_here($re, 1, $s, 0)
     }
-    my $i = 0
-    my $n = len $s
+    var $i = 0
+    val $n = len $s
     while (1) {
         return 1 if SR::_match_here($re, 0, $s, $i)
         last if $i >= $n
@@ -53,7 +53,7 @@ fn SR::match($re, $s) {
 }
 
 p "=== Simple Regex Demo ==="
-my @pairs = (
+val @pairs = (
     ["hello",      "hello world",   1],
     ["world",      "hello world",   1],
     ["xyz",        "hello world",   0],
@@ -69,10 +69,10 @@ my @pairs = (
     ["^a.*z\$",    "amazing buzz",  1],
     ["^a.*z\$",    "amazing buz!",  0],
 )
-for my $pair (@pairs) {
-    my $re = $pair->[0]
-    my $s = $pair->[1]
-    my $want = $pair->[2]
-    my $got = SR::match($re, $s)
+for val $pair (@pairs) {
+    var $re = $pair->[0]
+    var $s = $pair->[1]
+    val $want = $pair->[2]
+    val $got = SR::match($re, $s)
     p "match(" . $re . ", " . $s . ") = " . $got . " (want " . $want . ")"
 }

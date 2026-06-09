@@ -19,7 +19,7 @@ p "── Pub/Sub Message Bus ────────────────�
 
 # ── 1. Broker — owns the publish channel and a registry of subscribers ──
 
-my ($pub_tx, $pub_rx) = pchannel(1024)
+val ($pub_tx, $pub_rx) = pchannel(1024)
 
 # Subscriber registry: each entry = { pattern => str, tx => sender, name => str }
 mysync @subs = ()
@@ -30,14 +30,14 @@ mysync @subs = ()
 fn Bus::matches($pattern, $topic) {
     return 1 if $pattern eq "*"
     if ($pattern =~ /^([^*]+)\.\*$/) {
-        my $prefix = $1 . "."
+        val $prefix = $1 . "."
         return index($topic, $prefix) == 0
     }
     $topic eq $pattern
 }
 
 fn Bus::subscribe($name, $pattern) {
-    my ($tx, $rx) = pchannel(64)
+    var ($tx, $rx) = pchannel(64)
     push @subs, +{ name => $name, pattern => $pattern, tx => $tx }
     $rx
 }
@@ -48,14 +48,14 @@ mysync $delivered = 0
 
 spawn {
     while (1) {
-        my $msg = $pub_rx->recv()
+        var $msg = $pub_rx->recv()
         last unless defined $msg
         # sentinel: undef closes the broker; tell all subscribers to drain too
         if ($msg->{topic} eq "__shutdown__") {
             _->{tx}->send(undef) for @subs
             last
         }
-        for my $s (@subs) {
+        for val $s (@subs) {
             if (Bus::matches $s->{pattern}, $msg->{topic}) {
                 $s->{tx}->send($msg)
                 $delivered++
@@ -70,15 +70,15 @@ mysync @log = ()
 
 fn Bus::run_subscriber($name, $rx) {
     while (1) {
-        my $msg = $rx->recv()
+        val $msg = $rx->recv()
         last unless defined $msg
         push @log, "$name: " . $msg->{topic} . " " . $msg->{body}
     }
 }
 
-my $orders_rx = Bus::subscribe "orders-svc", "orders.*"
-my $audit_rx  = Bus::subscribe "audit-log",  "*"                # all topics
-my $errors_rx = Bus::subscribe "alerts",     "errors.*"
+val $orders_rx = Bus::subscribe "orders-svc", "orders.*"
+val $audit_rx  = Bus::subscribe "audit-log",  "*"                # all topics
+val $errors_rx = Bus::subscribe "alerts",     "errors.*"
 
 spawn { Bus::run_subscriber "orders-svc", $orders_rx }
 spawn { Bus::run_subscriber "audit-log",  $audit_rx  }
@@ -89,7 +89,7 @@ sleep 0.05
 
 # ── 4. Publish a stream of events ─────────────────────────────────
 
-my @events = (
+val @events = (
     +{ topic => "orders.created", body => "ord#42 user=alice"  },
     +{ topic => "orders.shipped", body => "ord#42 carrier=ups" },
     +{ topic => "errors.payment", body => "ord#42 reason=card_declined" },
@@ -119,9 +119,9 @@ p "Total dispatch operations : $delivered"
 
 # ── 6. Tests ───────────────────────────────────────────────────────
 
-my $orders_count = grep { /^orders-svc:/ } @log
-my $audit_count  = grep { /^audit-log:/ } @log
-my $alert_count  = grep { /^alerts:/ } @log
+val $orders_count = grep { /^orders-svc:/ } @log
+val $audit_count  = grep { /^audit-log:/ } @log
+val $alert_count  = grep { /^alerts:/ } @log
 
 # orders.* matches: created, shipped, refunded, cancelled = 4
 $orders_count |> aeq 4, "orders-svc saw 4 events (orders.*)"
@@ -134,7 +134,7 @@ $alert_count  |> aeq 2, "alerts saw 2 events (errors.*)"
 $delivered    |> aeq 13, "broker delivered 13 messages total"
 
 # Spot-check ordering: per-subscriber, messages preserve send order.
-my @order_msgs = grep { /^orders-svc:/ } @log
+val @order_msgs = grep { /^orders-svc:/ } @log
 $order_msgs[0] =~ /orders\.created/  |> aok "first to orders-svc is orders.created"
 $order_msgs[-1] =~ /orders\.cancelled/ |> aok "last to orders-svc is orders.cancelled"
 

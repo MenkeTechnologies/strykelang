@@ -4,7 +4,7 @@
 # canonical numeric value using the standard SI / IEC suffix maps.
 
 fn Rosetta::SiSuffix::si_factor($suffix) {
-    my %m = (
+    val %m = (
         ""  => 1,
         "K" => 1e3,  "M" => 1e6,  "G" => 1e9,
         "T" => 1e12, "P" => 1e15, "E" => 1e18,
@@ -13,7 +13,7 @@ fn Rosetta::SiSuffix::si_factor($suffix) {
 }
 
 fn Rosetta::SiSuffix::iec_factor($suffix) {
-    my %m = (
+    val %m = (
         ""    => 1,
         "Ki"  => 1024,
         "Mi"  => 1024 ** 2,
@@ -26,12 +26,12 @@ fn Rosetta::SiSuffix::iec_factor($suffix) {
 
 fn Rosetta::SiSuffix::parse($s) {
     return undef unless $s =~ /^\s*(-?\d+(?:\.\d+)?)\s*([KMGTPEkmgtpe]?i?)\s*([Bb]?)\s*$/
-    my $val = $1 + 0
-    my $prefix = $2
-    my $unit = $3
-    my $factor
+    val $val = $1 + 0
+    val $prefix = $2
+    val $unit = $3
+    var $factor
     if (length($prefix) >= 2 && substr($prefix, -1) eq "i") {
-        my $key = uc(substr($prefix, 0, 1)) . "i"
+        val $key = uc(substr($prefix, 0, 1)) . "i"
         $factor = Rosetta::SiSuffix::iec_factor($key)
     } else {
         $factor = Rosetta::SiSuffix::si_factor($prefix)

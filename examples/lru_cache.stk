@@ -29,9 +29,9 @@ class LRU {
         if (exists $self->store->{$key}) {
             $self->hits($self->hits + 1)
             # Move key to end of order list (most recently used).
-            my $ord = $self->order
-            my @new
-            for my $k (@$ord) {
+            val $ord = $self->order
+            var @new
+            for val $k (@$ord) {
                 push @new, $k unless $k eq $key
             }
             push @new, $key
@@ -43,13 +43,13 @@ class LRU {
     }
 
     fn put($key, $val) {
-        my $store = $self->store
-        my $ord = $self->order
+        var $store = $self->store
+        val $ord = $self->order
         if (exists $store->{$key}) {
             # Update existing key, move to end.
             $store->{$key} = $val
-            my @new
-            for my $k (@$ord) {
+            var @new
+            for val $k (@$ord) {
                 push @new, $k unless $k eq $key
             }
             push @new, $key
@@ -61,7 +61,7 @@ class LRU {
         push @$ord, $key
         # Evict LRU if over capacity.
         if (len(@$ord) > $self->cap) {
-            my $evict = shift @$ord
+            val $evict = shift @$ord
             delete $store->{$evict}
         }
     }
@@ -75,7 +75,7 @@ class LRU {
     }
 
     fn hit_rate {
-        my $total = $self->hits + $self->miss
+        val $total = $self->hits + $self->miss
         return 0.0 if $total == 0
         return 100.0 * $self->hits / $total
     }
@@ -87,22 +87,22 @@ mysync $get_lat = t_digest(100)
 mysync $put_lat = t_digest(100)
 
 around "LRU::get" {
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
     td_add($get_lat, (now_ns() - $t0) / 1000.0)
     $r
 }
 
 around "LRU::put" {
-    my $t0 = now_ns()
-    my $r = proceed(@INTERCEPT_ARGS)
+    val $t0 = now_ns()
+    val $r = proceed(@INTERCEPT_ARGS)
     td_add($put_lat, (now_ns() - $t0) / 1000.0)
     $r
 }
 
 # ── workload ────────────────────────────────────────────────────────
 
-my $cache = LRU(cap => 4)
+val $cache = LRU(cap => 4)
 
 p "── cache cap=4: load 5 keys (1 eviction expected) ──"
 $cache->put("a", "apple")
@@ -118,8 +118,8 @@ printf "  after 5th put: order=[%s] size=%d\n",
 
 p ""
 p "── hit / miss probes ────────────────────────────────"
-for my $k ("a", "b", "c", "d", "e", "z") {
-    my $v = $cache->get($k)
+for val $k ("a", "b", "c", "d", "e", "z") {
+    val $v = $cache->get($k)
     printf "  get(%s) = %s\n", $k, defined($v) ? $v : "MISS"
 }
 
@@ -135,7 +135,7 @@ $cache->put("f", "fig")     # cap reached → evict LRU (which is c now)
 printf "  after promotion + put: order=[%s] size=%d\n",
     $cache->dump_order, $cache->size
 
-my $c_val = $cache->get("c")
+val $c_val = $cache->get("c")
 printf "  get(c) = %s (should be MISS — evicted)\n",
     defined($c_val) ? $c_val : "MISS"
 
@@ -143,9 +143,9 @@ printf "  get(c) = %s (should be MISS — evicted)\n",
 
 p ""
 p "── update in place: put(b, ...) doesn't grow size ──"
-my $sz_before = $cache->size
+val $sz_before = $cache->size
 $cache->put("b", "BANANA-2")
-my $sz_after = $cache->size
+val $sz_after = $cache->size
 printf "  size before=%d after=%d  (must be equal)\n", $sz_before, $sz_after
 printf "  get(b) = %s\n", $cache->get("b")
 
@@ -168,11 +168,11 @@ printf "  put p99 : %.1f µs\n", td_quantile($put_lat, 0.99)
 
 p ""
 p "── stress: 100 ops on the same 4-cap cache ──────────"
-my $stress = LRU(cap => 4)
+val $stress = LRU(cap => 4)
 $stress->put("k$_", "v$_") for 0:3
-my $hits_so_far = 0
-for my $i (1:100) {
-    my $key
+val $hits_so_far = 0
+for val $i (1:100) {
+    var $key
     if ($i % 5 == 0) {
         $key = "new$i"   # 20% new key (will evict)
         $stress->put($key, "v$i")

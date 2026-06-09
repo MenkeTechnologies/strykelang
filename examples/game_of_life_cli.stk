@@ -7,12 +7,12 @@
 p "--- ASCII Game of Life ---"
 
 fn life_count($grid, $r, $c) {
-    my $count = 0
-    for my $dr (-1:1) {
-        for my $dc (-1:1) {
+    var $count = 0
+    for val $dr (-1:1) {
+        for val $dc (-1:1) {
             next if $dr == 0 && $dc == 0
-            my $nr = $r + $dr
-            my $nc = $c + $dc
+            val $nr = $r + $dr
+            val $nc = $c + $dc
             $count++ if $nr >= 0 && $nr < 5 && $nc >= 0 && $nc < 5 && $grid->[$nr][$nc]
         }
     }
@@ -20,12 +20,12 @@ fn life_count($grid, $r, $c) {
 }
 
 fn life_step($grid) {
-    my @next
-    for my $r (0:4) {
-        my @row
-        for my $c (0:4) {
-            my $n   = life_count $grid, $r, $c
-            my $alive = $grid->[$r][$c]
+    var @next
+    for val $r (0:4) {
+        var @row
+        for val $c (0:4) {
+            val $n   = life_count $grid, $r, $c
+            val $alive = $grid->[$r][$c]
             push @row, $alive ? ($n == 2 || $n == 3 ? 1 : 0)
                               : ($n == 3 ? 1 : 0)
         }
@@ -34,7 +34,7 @@ fn life_step($grid) {
     \@next
 }
 
-my $grid = [
+val $grid = [
     [0, 1, 0, 0, 0],
     [0, 0, 1, 0, 0],
     [1, 1, 1, 0, 0],
@@ -43,13 +43,13 @@ my $grid = [
 ]
 
 p "Initial Glider:"
-for my $row (@$grid) {
+for val $row (@$grid) {
     p join ' ', map { _ ? '#' : '.' } @$row
 }
 
-my $g2 = life_step $grid
+val $g2 = life_step $grid
 p "\nAfter 1 step:"
-for my $row (@$g2) {
+for val $row (@$g2) {
     p join ' ', map { _ ? '#' : '.' } @$row
 }
 

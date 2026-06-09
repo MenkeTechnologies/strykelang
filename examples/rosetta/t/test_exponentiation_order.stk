@@ -8,7 +8,7 @@ fn Rosetta::ExpOrder::check() {
     2 ** 3 ** 2
 }
 
-my $res = Rosetta::ExpOrder::check()
+val $res = Rosetta::ExpOrder::check()
 assert_eq $res, 512, "Exponentiation (**) is right-associative"
 
 test_run

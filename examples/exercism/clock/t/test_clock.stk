@@ -12,7 +12,7 @@ assert_eq Exercism::Clock::time(Exercism::Clock::new(-1, 15)),  "23:15", "negati
 assert_eq Exercism::Clock::time(Exercism::Clock::new(0, -160)), "21:20", "negative minutes"
 
 # add / subtract
-my $c = Exercism::Clock::new(10, 0)
+val $c = Exercism::Clock::new(10, 0)
 assert_eq Exercism::Clock::time(Exercism::Clock::add_minutes($c, 3)),  "10:03", "add 3 min"
 assert_eq Exercism::Clock::time(Exercism::Clock::add_minutes($c, 60)), "11:00", "add 60 min"
 assert_eq Exercism::Clock::time(Exercism::Clock::subtract_minutes($c, 30)), "09:30", "subtract 30 min"

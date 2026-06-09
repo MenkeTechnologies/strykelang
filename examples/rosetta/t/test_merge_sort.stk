@@ -6,19 +6,19 @@ fn Rosetta::MergeSort::numeric_sort(@arr) {
     sort { _0 <=> _1 } @arr
 }
 
-my @sorted = Rosetta::MergeSort::numeric_sort(38, 27, 43, 3, 9, 82, 10)
+val @sorted = Rosetta::MergeSort::numeric_sort(38, 27, 43, 3, 9, 82, 10)
 assert_eq join(",", @sorted), "3,9,10,27,38,43,82", "merge sort"
 
-my @single = Rosetta::MergeSort::numeric_sort(42)
+val @single = Rosetta::MergeSort::numeric_sort(42)
 assert_eq join(",", @single), "42", "single element"
 
-my @already = Rosetta::MergeSort::numeric_sort(1, 2, 3, 4, 5)
+val @already = Rosetta::MergeSort::numeric_sort(1, 2, 3, 4, 5)
 assert_eq join(",", @already), "1,2,3,4,5", "already sorted"
 
-my @reverse = Rosetta::MergeSort::numeric_sort(5, 4, 3, 2, 1)
+val @reverse = Rosetta::MergeSort::numeric_sort(5, 4, 3, 2, 1)
 assert_eq join(",", @reverse), "1,2,3,4,5", "reverse"
 
-my @dups = Rosetta::MergeSort::numeric_sort(3, 1, 4, 1, 5, 9, 2, 6)
+val @dups = Rosetta::MergeSort::numeric_sort(3, 1, 4, 1, 5, 9, 2, 6)
 assert_eq join(",", @dups), "1,1,2,3,4,5,6,9", "with duplicates"
 
 test_run

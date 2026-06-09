@@ -2,32 +2,32 @@
 # Rosetta Code: Logic Puzzle (Small Zebra)
 
 fn Rosetta::ZebraSmall::solve_logic {
-    my @names = ("Alice", "Beatrice", "Carol")
-    my @ages  = (10, 12, 14)
-    my @sports = ("Soccer", "Tennis", "Swim")
+    val @names = ("Alice", "Beatrice", "Carol")
+    val @ages  = (10, 12, 14)
+    val @sports = ("Soccer", "Tennis", "Swim")
     
-    for my $a1 (@ages) {
-        for my $a2 (@ages) {
+    for val $a1 (@ages) {
+        for val $a2 (@ages) {
             next if $a1 == $a2
-            for my $a3 (@ages) {
+            for val $a3 (@ages) {
                 next if $a1 == $a3 || $a2 == $a3
-                my @a = ($a1, $a2, $a3) # ages of Alice, Beatrice, Carol
+                val @a = ($a1, $a2, $a3) # ages of Alice, Beatrice, Carol
                 
                 # Rule 1: Alice is 14
                 next unless $a[0] == 14
                 # Rule 4: Carol is 10
                 next unless $a[2] == 10
                 
-                for my $s1 (@sports) {
-                    for my $s2 (@sports) {
+                for val $s1 (@sports) {
+                    for val $s2 (@sports) {
                         next if $s1 eq $s2
-                        for my $s3 (@sports) {
+                        for val $s3 (@sports) {
                             next if $s1 eq $s3 || $s2 eq $s3
-                            my @s = ($s1, $s2, $s3) # sports of Alice, Beatrice, Carol
+                            val @s = ($s1, $s2, $s3) # sports of Alice, Beatrice, Carol
                             
                             # Rule 2: The 10 year old plays Tennis
-                            my $ok2 = 0
-                            for my $i (0:2) { if ($a[$i] == 10 && $s[$i] eq "Tennis") { $ok2 = 1 } }
+                            var $ok2 = 0
+                            for val $i (0:2) { if ($a[$i] == 10 && $s[$i] eq "Tennis") { $ok2 = 1 } }
                             next unless $ok2
                             
                             # Rule 3: Beatrice doesn't play Soccer
@@ -42,9 +42,9 @@ fn Rosetta::ZebraSmall::solve_logic {
     }
 }
 
-my $res = Rosetta::ZebraSmall::solve_logic()
-my $a = $res->[0]
-my $s = $res->[1]
+val $res = Rosetta::ZebraSmall::solve_logic()
+val $a = $res->[0]
+val $s = $res->[1]
 
 assert_eq $a->[0], 14, "Alice age"
 assert_eq $a->[1], 12, "Beatrice age"
