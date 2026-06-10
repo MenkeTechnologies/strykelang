@@ -33,22 +33,28 @@ use warnings
 # `gui@*` doesn't exist. The same bridge applies under a pin —
 # `use GUI 0.3.0` lands on `stryke-gui@0.3.0/lib/GUI.stk`.
 
-# ── Syntax forms ─────────────────────────────────────────────────────
+# ── Syntax forms (all commented out) ─────────────────────────────────
 #
-# Comment these in/out (one at a time) and re-run with --ast to see
+# Uncomment one of these at a time and run with `stryke --ast` to see
 # the StmtKind::Use's `version` field flip between None and the pin.
+# They're all commented by default so this demo lint-compiles cleanly
+# without requiring a real `some@<ver>/` extraction in the store.
+#
+#   use Some::Module                        # no pin; lockfile/highest
+#   use Some::Module 2.13                   # two-segment numeric pin
+#   use Some::Module 1.0, 'foo', 'bar'      # pin + import LIST
+#   use Some::Module 2                      # bare integer pin
+#
+# To exercise the runtime resolver, drop a fake extraction:
+#
+#   mkdir -p ~/.stryke/store/some@2.13/lib
+#   echo 'package Some::Module; fn Some::Module::greet { "hi" } 1' \
+#       > ~/.stryke/store/some@2.13/lib/Module.stk
+#
+# Then a stand-alone script doing `use Some::Module 2.13` will load
+# the extraction directly. Without it the runtime errors with
+# `pinned version not in store (tried: …/some@2.13, …/stryke-some@2.13)`
+# — see the "Version-respect is strict" contract in
+# docs/PACKAGE_REGISTRY.md.
 
-# Plain `use` — no pin, follows lockfile (inside project) or
-# highest-installed (outside project).
-# use Some::Module
-
-# Two-segment numeric pin (most common Perl-5 form).
-use Some::Module 2.13
-
-# Pin plus import LIST — comma separates pin from imports.
-# use Some::Module 1.0, 'foo', 'bar'
-
-# Single-integer pin — accepted; routes to `~/.stryke/store/some@2/`.
-# use Some::Module 2
-
-print "compile-time pin recorded; runtime will error if foo\@2.13 isn't in the store\n"
+print "use_module_version_pin demo: syntax forms in the comment block above\n"
