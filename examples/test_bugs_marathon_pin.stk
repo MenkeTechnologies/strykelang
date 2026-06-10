@@ -49,7 +49,7 @@ refaddr($r1_102) != refaddr($r2_102) |> aok "BUG-102: refaddr of repeated \\&fn 
 
 val @arr_101 = (10, 20, 30)
 val ($x_101) = @arr_101
-$x_101 |> aeq 10, "BUG-101 (FIXED): my (\$x) = \@arr now binds first element (was returning count)"
+$x_101 |> aeq 10, "BUG-101 (FIXED): var (\$x) = \@arr now binds first element (was returning count)"
 
 # ── 8. to_json options (BUG-106) ──────────────────────────────────────────
 
