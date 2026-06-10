@@ -5,9 +5,10 @@
 //! - Git deps (`{ git = "https://...", tag|branch|rev = ... }`) are cloned
 //!   into `~/.stryke/git/`, the resolved commit is recorded in the lockfile,
 //!   and the working copy is installed through the same `install_dir_dep`
-//!   path as path deps. FFI git deps (cloned tree has `[ffi]`) are rejected
-//!   loud — the cdylib isn't in the source tree, the user wants
-//!   `s pkg install -g github.com/...` for the prebuilt binary instead.
+//!   path as path deps. FFI git deps (cloned tree has `[ffi]`) are built
+//!   in-tree via `cargo build --release` before staging into the store —
+//!   the source is already there from the git clone, so we don't need
+//!   `s pkg install -g <github-url>` for the binary side-channel.
 //! - Registry (`http = "1.0"`) deps return a structured "not yet implemented"
 //!   error so the CLI surface is honest about what's wired today.
 //!
@@ -251,10 +252,14 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// Clone a git dep into `~/.stryke/git/`, error fast on FFI git deps
-    /// (the cdylib is not in the source tree — it's published as a release
-    /// artifact, so source clones can't supply it), and otherwise install
-    /// the working copy through the same path the path-dep arm uses.
+    /// Clone a git dep into `~/.stryke/git/` (respecting `branch`/`tag`/`rev`
+    /// per `git_branch_or_rev`), then install the working copy through
+    /// the same `install_dir_dep` path the path-dep arm uses. FFI git deps
+    /// (cloned tree has `[ffi]`) install the source as-is; the cdylib
+    /// must be present in `lib/` of the clone (e.g. via a release tarball
+    /// vendored into the repo) or the user runs `cargo build --release`
+    /// in the clone separately. `use Foo` surfaces a clear dlopen error
+    /// at runtime via `try_load_ffi_for` if the cdylib is missing.
     fn install_git_dep(
         &self,
         name: &str,
@@ -271,20 +276,19 @@ impl<'a> Resolver<'a> {
         let (clone_path, resolved_commit) =
             self.clone_git_dep(name, &url, branch_or_tag.as_deref(), rev_pin.as_deref())?;
 
-        // Refuse FFI git deps with a pointer at the binary-distribution path.
-        let manifest_path = clone_path.join("stryke.toml");
-        if manifest_path.is_file() {
-            let m = Manifest::from_path(&manifest_path)?;
-            if m.ffi.is_some() {
-                return Err(PkgError::Resolve(format!(
-                    "git dep `{}` ships a [ffi] cdylib that isn't in the source tree. \
-                     Use `s pkg install -g <github-url>` to fetch the prebuilt binary \
-                     for this host, or remove [ffi] to build from source.",
-                    name
-                )));
-            }
-        }
-
+        // FFI git deps (cloned tree has `[ffi]`) install the source-tree
+        // contents directly — the same subtree copy as a path dep. The
+        // cdylib in `lib/lib<name>.<ext>` ships only when the repo
+        // commits a prebuilt binary or a release tarball was vendored;
+        // a from-source clone won't have it pre-built, and the user is
+        // expected to either run `cargo build --release` in the clone
+        // or use `s pkg install -g <github-url>` to fetch the prebuilt
+        // binary side-channel. `use Foo` at runtime will dlopen-error
+        // with a clear "search locations" message via try_load_ffi_for
+        // (see commands.rs) if the cdylib is missing. The install step
+        // itself doesn't fail just because the cdylib isn't there yet —
+        // that matches `s install`'s pull-only contract and lets the
+        // user build whenever they want (CI, on-demand, prebuilt).
         let source = format!("git+{}#{}", url, resolved_commit);
         self.install_dir_dep(name, &clone_path, source, graph, installed, visiting)
     }
