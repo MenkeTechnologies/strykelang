@@ -339,7 +339,7 @@ impl StaticAnalyzer {
                 self.declare_sub(name);
                 self.declare_sub(&fqn);
             }
-            StmtKind::Use { module, imports } => {
+            StmtKind::Use { module, imports, version } => {
                 self.declare_sub(module);
                 // `use Foo::Bar` mirrors `require Foo::Bar` for analyzer
                 // purposes: chase the resolved file and merge its sub
@@ -348,8 +348,12 @@ impl StaticAnalyzer {
                 // Without this, `use GUI; GUI::mouse_pos()` always lints
                 // red regardless of whether stryke-gui is installed and
                 // resolve_require_path_from_file's L1 3-arm resolver
-                // would have found it.
-                self.follow_require(module);
+                // would have found it. Threading `version` through keeps
+                // the analyzer in sync with `use Module VERSION` pins —
+                // hovers and undefined-sub diagnostics chase the
+                // pinned `<store>/<name>@<version>/` extraction, not
+                // whatever's in the global installed.toml.
+                self.follow_require_versioned(module, version.as_deref());
                 // `use constant NAME => …`, `use constant { A => 1, B => 2 }`,
                 // and `use constant NAME => (1, 2, 3)` install one sub per
                 // NAME. Recognize those name slots so the linter can resolve
@@ -683,6 +687,10 @@ impl StaticAnalyzer {
     /// chained `require`s. Silently skips any path that fails to resolve
     /// or parse — the runtime will surface the same error if it matters.
     fn follow_require(&mut self, spec: &str) {
+        self.follow_require_versioned(spec, None);
+    }
+
+    fn follow_require_versioned(&mut self, spec: &str, pin_version: Option<&str>) {
         let spec = spec.trim();
         if spec.is_empty() {
             return;
@@ -702,7 +710,7 @@ impl StaticAnalyzer {
         ) {
             return;
         }
-        let Some(target) = self.resolve_require_path(spec) else {
+        let Some(target) = self.resolve_require_path_versioned(spec, pin_version) else {
             return;
         };
         let canon = target.canonicalize().unwrap_or(target.clone());
@@ -731,8 +739,12 @@ impl StaticAnalyzer {
         self.current_package = saved_pkg;
     }
 
-    fn resolve_require_path(&self, spec: &str) -> Option<PathBuf> {
-        resolve_require_path_from_file(&self.file, spec)
+    fn resolve_require_path_versioned(
+        &self,
+        spec: &str,
+        pin_version: Option<&str>,
+    ) -> Option<PathBuf> {
+        resolve_require_path_from_file_versioned(&self.file, spec, pin_version)
     }
 
     /// Pre-declare every name in `[ffi].exports` from the nearest
@@ -2098,6 +2110,19 @@ fn is_topic_var(name: &str) -> bool {
 /// paths pass through. Shared by the static analyzer's require-follower
 /// and the LSP go-to-definition cross-file lookup.
 pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf> {
+    resolve_require_path_from_file_versioned(file, spec, None)
+}
+
+/// Version-aware variant: `pin_version = Some(v)` mirrors the runtime's
+/// `use Module VERSION` pin — the lockfile / installed-index tiers are
+/// skipped and we look up `<store>/<name>@<v>/` directly. `None`
+/// preserves the legacy 2-arm + global-index precedence so plain
+/// `use Foo` linting is unchanged.
+pub fn resolve_require_path_from_file_versioned(
+    file: &str,
+    spec: &str,
+    pin_version: Option<&str>,
+) -> Option<PathBuf> {
     let p = Path::new(spec);
     if p.is_absolute() {
         return p.exists().then(|| p.to_path_buf());
@@ -2154,6 +2179,31 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
         }
     }
 
+    // ── Arm 1b: use-site version pin (`use Module VERSION`) ───────────
+    // Direct store lookup, no lockfile / index consult — mirrors
+    // `pkg::commands::resolve_module`'s pin arm so the linter chases
+    // the *pinned* version's lib/. Skips silently on miss (analyzer
+    // is best-effort; runtime is the layer that errors on a missing
+    // pinned version).
+    let segments: Vec<&str> = spec.split("::").collect();
+    if !segments.is_empty() && !segments.iter().any(|s| s.is_empty()) {
+        if let Some(v) = pin_version {
+            if let Ok(store) = crate::pkg::store::Store::user_default() {
+                let pkg_name_lower = segments[0].to_lowercase();
+                for nm in [pkg_name_lower.clone(), format!("stryke-{}", pkg_name_lower)] {
+                    let store_pkg = store.package_dir(&nm, v);
+                    let resolved = build_pkg_lib_path(&store_pkg, &segments);
+                    if resolved.is_file() {
+                        return Some(resolved);
+                    }
+                }
+            }
+            // Pin requested but not found in store. Don't fall through
+            // — silently substituting a different version would mirror
+            // the runtime version-disrespect bug in the analyzer.
+            return None;
+        }
+    }
     // ── Arm 2: project lockfile → store ───────────────────────────────
     // When the script lives in a stryke project, `stryke.lock` pins
     // exact versions of every declared dep. Mirrors arm 2 of the
@@ -2161,7 +2211,6 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
     // `stryke-<name>` fallback bridges `use AWS` (lookup key `"aws"`)
     // to a `stryke-aws` lockfile entry — otherwise the linter can't
     // chase the import and reports every AWS::* sub as undefined.
-    let segments: Vec<&str> = spec.split("::").collect();
     if !segments.is_empty() && !segments.iter().any(|s| s.is_empty()) {
         if let Some(stryke_root) = crate::pkg::commands::find_project_root(Path::new(file)) {
             let lock_path = stryke_root.join(crate::pkg::commands::LOCKFILE_FILE);
@@ -2172,10 +2221,17 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
                     let entry = lf.find(&pkg_name).or_else(|| lf.find(&prefixed));
                     if let Some(entry) = entry {
                         if let Ok(store) = crate::pkg::store::Store::user_default() {
-                            let store_pkg = store.package_dir(&entry.name, &entry.version);
-                            let resolved = build_pkg_lib_path(&store_pkg, &segments);
-                            if resolved.is_file() {
-                                return Some(resolved);
+                            // Lockfile entries record the dep alias
+                            // (`postgres`) while the store dir uses the
+                            // canonical name (`stryke-postgres@<ver>/`).
+                            // Try both. Mirrors runtime resolver's
+                            // identical fix (see resolve_store_candidates
+                            // in pkg::commands).
+                            for store_pkg in store_dir_candidates(&store, &entry.name, &entry.version) {
+                                let resolved = build_pkg_lib_path(&store_pkg, &segments);
+                                if resolved.is_file() {
+                                    return Some(resolved);
+                                }
                             }
                         }
                     }
@@ -2183,34 +2239,47 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
             }
         }
 
-        // ── Arm 3: global `~/.stryke/installed.toml` → store ──────────
-        // Lets standalone scripts run outside any project still see
-        // installed-package subs without a stryke.lock. Mirrors arm 3
-        // of `pkg::commands::resolve_module` (including the
-        // namespace-bridge + `stryke-<name>` prefix fallbacks added
-        // in v0.16.41 / v0.16.43). Same precedence as runtime: arm 1
-        // / arm 2 must miss before this fires, so a project-local
-        // `lib/Foo.stk` shadowing a globally pinned package is honored.
+        // ── Arm 3: outside-project store scan → highest version ───────
+        // Standalone scripts (no `stryke.toml` ancestor) load the
+        // newest extraction of the named package from the store. Same
+        // contract as `pkg::commands::resolve_module`'s arm 3: scan
+        // `<store>/<canonical>@*/` for the namespace's canonical
+        // names, pick the highest semver. Mirrors so the linter
+        // chases the SAME file the runtime will load.
         if let Ok(store) = crate::pkg::store::Store::user_default() {
-            if let Ok(idx) = crate::pkg::store::InstalledIndex::load_from(&store) {
-                let pkg_name = segments[0].to_lowercase();
-                let prefixed = format!("stryke-{}", pkg_name);
-                let entry = idx
-                    .find(&pkg_name)
-                    .or_else(|| idx.find_by_namespace(&pkg_name))
-                    .or_else(|| idx.find(&prefixed));
-                if let Some(entry) = entry {
-                    let store_pkg = store.package_dir(&entry.name, &entry.version);
-                    let resolved = build_pkg_lib_path(&store_pkg, &segments);
-                    if resolved.is_file() {
-                        return Some(resolved);
-                    }
+            let names = crate::pkg::commands::canonical_store_names_for_namespace(
+                &store,
+                &segments[0].to_lowercase(),
+            );
+            if let Some((name, version)) =
+                crate::pkg::commands::scan_store_for_highest_version(&store, &names)
+            {
+                let store_pkg = store.package_dir(&name, &version);
+                let resolved = build_pkg_lib_path(&store_pkg, &segments);
+                if resolved.is_file() {
+                    return Some(resolved);
                 }
             }
         }
     }
 
     None
+}
+
+/// Same candidate list as the runtime's `pkg::commands::resolve_store_candidates`.
+/// Tries the entry name as-is, then `stryke-<name>` when not already prefixed.
+/// Covers the lockfile-records-alias / store-dir-uses-canonical split.
+fn store_dir_candidates(
+    store: &crate::pkg::store::Store,
+    name: &str,
+    version: &str,
+) -> Vec<PathBuf> {
+    let mut out = Vec::with_capacity(2);
+    out.push(store.package_dir(name, version));
+    if !name.starts_with("stryke-") {
+        out.push(store.package_dir(&format!("stryke-{}", name), version));
+    }
+    out
 }
 
 /// Build the `<store_pkg>/lib/<rest>.stk` path for a `use Foo::Bar::Baz`

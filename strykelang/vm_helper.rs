@@ -1416,6 +1416,25 @@ pub(crate) enum CaptureAllMode {
     Skip,
 }
 
+/// Result of [`VMHelper::try_resolve_via_lockfile`].
+///
+/// - `Found(path)` — store / lockfile resolution succeeded.
+/// - `NotFound` — nothing matched at any anchor; caller falls
+///   through to `@INC`. This is the normal "no project, no
+///   installed package" path.
+/// - `PinUnsatisfied(message)` — resolution *would* have hit but
+///   a pin (lockfile entry whose store dir is missing, or a
+///   use-site `use Module VERSION` whose store dir is missing)
+///   refused to fall through. The caller MUST surface this to
+///   the user as a runtime error instead of silently dropping
+///   into `@INC` — that drop-through was the version-disrespect
+///   bug ("stryke use must respect package version").
+pub(crate) enum LockfileResolution {
+    Found(std::path::PathBuf),
+    NotFound,
+    PinUnsatisfied(String),
+}
+
 impl VMHelper {
     /// `new` — see implementation.
     pub fn new() -> Self {
@@ -3226,7 +3245,11 @@ impl VMHelper {
     /// The `relpath` arg is the `@INC`-style path (`Foo/Bar.pm`) used
     /// elsewhere in `require`; it is converted to a logical name (`Foo::Bar`)
     /// for the resolver. `.pm`, `.pl`, and `.stk` suffixes are all stripped.
-    fn try_resolve_via_lockfile(script_file: &str, relpath: &str) -> Option<std::path::PathBuf> {
+    fn try_resolve_via_lockfile(
+        script_file: &str,
+        relpath: &str,
+        version: Option<&str>,
+    ) -> LockfileResolution {
         let stem = relpath
             .strip_suffix(".pm")
             .or_else(|| relpath.strip_suffix(".pl"))
@@ -3256,12 +3279,26 @@ impl VMHelper {
             anchors.push(cwd);
         }
 
+        // First anchor with a refused pin wins — once a project's
+        // lockfile or a use-site pin can't be honored, falling through
+        // to a different anchor's @INC silently substitutes a wrong
+        // version. Surface the refusal.
+        let mut pin_err: Option<String> = None;
         for anchor in anchors {
-            if let Ok(Some(found)) = crate::pkg::commands::resolve_module(&anchor, &logical) {
-                return Some(found);
+            match crate::pkg::commands::resolve_module(&anchor, &logical, version) {
+                Ok(Some(found)) => return LockfileResolution::Found(found),
+                Ok(None) => continue,
+                Err(e) => {
+                    if pin_err.is_none() {
+                        pin_err = Some(e.to_string());
+                    }
+                }
             }
         }
-        None
+        if let Some(msg) = pin_err {
+            return LockfileResolution::PinUnsatisfied(msg);
+        }
+        LockfileResolution::NotFound
     }
 
     /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully
@@ -3684,6 +3721,40 @@ impl VMHelper {
         Ok(())
     }
 
+    /// `use Module VERSION` — Perl-style version pin on a `require` call.
+    /// Same flow as [`Self::require_execute`] but threads the version
+    /// constraint down to the lockfile/store resolver so we land on
+    /// `<store>/<name>@<version>/` directly. `None` means "no pin"
+    /// and falls back to the lockfile / installed-index lookup.
+    pub(crate) fn require_execute_versioned(
+        &mut self,
+        spec: &str,
+        version: Option<&str>,
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
+        // Pragmas (strict/utf8/feature/…) have no package version; they
+        // short-circuit before any store lookup, so the pin is irrelevant.
+        // Defer to the unversioned path for that case.
+        if version.is_none() {
+            return self.require_execute(spec, line);
+        }
+        let t = spec.trim();
+        if t.is_empty() {
+            return Err(StrykeError::runtime("require: empty argument", line));
+        }
+        let p = Path::new(t);
+        if p.is_absolute() || t.starts_with("./") || t.starts_with("../") {
+            // A pin on a path-style require is meaningless — the path
+            // already names the file. Fall back to the unversioned path.
+            return self.require_execute(spec, line);
+        }
+        if Self::looks_like_version_only(t) {
+            return Ok(StrykeValue::integer(1));
+        }
+        let relpath = Self::module_spec_to_relpath(t);
+        self.require_from_inc_versioned(&relpath, version, line)
+    }
+
     /// `require EXPR` — load once, record `%INC`, return `1` on success.
     pub(crate) fn require_execute(&mut self, spec: &str, line: usize) -> StrykeResult<StrykeValue> {
         let t = spec.trim();
@@ -3821,6 +3892,15 @@ impl VMHelper {
     }
 
     fn require_from_inc(&mut self, relpath: &str, line: usize) -> StrykeResult<StrykeValue> {
+        self.require_from_inc_versioned(relpath, None, line)
+    }
+
+    fn require_from_inc_versioned(
+        &mut self,
+        relpath: &str,
+        version: Option<&str>,
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
         if self.scope.exists_hash_element("INC", relpath) {
             return Ok(StrykeValue::integer(1));
         }
@@ -3831,24 +3911,43 @@ impl VMHelper {
         // `lib/Foo/Bar.stk` and then at lockfile-pinned store entries before
         // falling through to `@INC`. See docs/PACKAGE_REGISTRY.md §"Module
         // Resolution".
-        if let Some(found) = Self::try_resolve_via_lockfile(&self.file, relpath) {
-            let code = read_file_text_perl_compat(&found).map_err(|e| {
-                StrykeError::runtime(
-                    format!("Can't open {} for reading: {}", found.display(), e),
-                    line,
-                )
-            })?;
-            let code = crate::data_section::strip_perl_end_marker(&code);
-            let abs = found.canonicalize().unwrap_or(found);
-            let abs_s = abs.to_string_lossy().into_owned();
-            self.scope
-                .set_hash_element("INC", relpath, StrykeValue::string(abs_s.clone()))?;
-            let saved_pkg = self.scope.get_scalar("__PACKAGE__");
-            let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
-            let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
-            r?;
-            self.invoke_require_hook("require__after", relpath, line)?;
-            return Ok(StrykeValue::integer(1));
+        //
+        // `version` (Some when the caller is `use Module VERSION`) pins
+        // the store lookup to `<store>/<name>@<version>/` directly —
+        // bypasses both the lockfile and the global installed.toml. An
+        // explicit pin always wins; a `None` pin defers to the
+        // lockfile/index resolution.
+        match Self::try_resolve_via_lockfile(&self.file, relpath, version) {
+            LockfileResolution::Found(found) => {
+                let code = read_file_text_perl_compat(&found).map_err(|e| {
+                    StrykeError::runtime(
+                        format!("Can't open {} for reading: {}", found.display(), e),
+                        line,
+                    )
+                })?;
+                let code = crate::data_section::strip_perl_end_marker(&code);
+                let abs = found.canonicalize().unwrap_or(found);
+                let abs_s = abs.to_string_lossy().into_owned();
+                self.scope
+                    .set_hash_element("INC", relpath, StrykeValue::string(abs_s.clone()))?;
+                let saved_pkg = self.scope.get_scalar("__PACKAGE__");
+                let r = crate::parse_and_run_module_in_file(code, self, &abs_s);
+                let _ = self.scope.set_scalar("__PACKAGE__", saved_pkg);
+                r?;
+                self.invoke_require_hook("require__after", relpath, line)?;
+                return Ok(StrykeValue::integer(1));
+            }
+            // A pin (lockfile entry whose store dir is missing, or a
+            // use-site `use Module VERSION` that didn't land) cannot
+            // fall through to `@INC` — that would silently load a
+            // different file under the pinned name. Surface the
+            // refusal as a runtime error so the user runs `s install`
+            // (or fixes the pin) instead of debugging a wrong version
+            // they didn't ask for.
+            LockfileResolution::PinUnsatisfied(msg) => {
+                return Err(StrykeError::runtime(msg, line));
+            }
+            LockfileResolution::NotFound => {}
         }
 
         // Check virtual modules first (AOT bundles).
@@ -3908,6 +4007,7 @@ impl VMHelper {
         &mut self,
         module: &str,
         imports: &[Expr],
+        version: Option<&str>,
         line: usize,
     ) -> StrykeResult<()> {
         match module {
@@ -3953,7 +4053,7 @@ impl VMHelper {
             }
             "threads" | "Thread::Pool" | "Parallel::ForkManager" => Ok(()),
             _ => {
-                self.require_execute(module, line)?;
+                self.require_execute_versioned(module, version, line)?;
                 let imports = Self::imports_after_leading_use_version(imports);
                 self.apply_module_import(module, imports, line)?;
                 Ok(())
@@ -4313,8 +4413,8 @@ impl VMHelper {
                     self.subs.insert(key, Arc::new(sub));
                 }
                 StmtKind::UsePerlVersion { .. } => {}
-                StmtKind::Use { module, imports } => {
-                    self.exec_use_stmt(module, imports, stmt.line)?;
+                StmtKind::Use { module, imports, version } => {
+                    self.exec_use_stmt(module, imports, version.as_deref(), stmt.line)?;
                 }
                 StmtKind::UseOverload { pairs } => {
                     self.install_use_overload_pairs(pairs);

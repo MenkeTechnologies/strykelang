@@ -147,7 +147,18 @@ pub enum StmtKind {
     /// `Package` variant.
     Package { name: String },
     /// `Use` variant.
-    Use { module: String, imports: Vec<Expr> },
+    ///
+    /// `version` is `Some(v)` only for the use-site override syntax
+    /// `use Foo@VERSION` — pins resolution to `<store>/<name>@<version>/`
+    /// directly, bypassing lockfile / installed-index lookups. `None`
+    /// for plain `use Foo`, which respects the project's lockfile pin
+    /// (inside a stryke project) or the global installed.toml entry
+    /// (standalone scripts).
+    Use {
+        module: String,
+        imports: Vec<Expr>,
+        version: Option<String>,
+    },
     /// `use 5.008;` / `use 5;` — Perl version requirement (no-op at runtime in stryke).
     UsePerlVersion { version: f64 },
     /// `use overload '""' => 'as_string', '+' => 'add';` — operator maps (method names in current package).
