@@ -1,5 +1,9 @@
 # t/test_file_ops.stk — file operation tests
 
+# Tests in lib/file_ops.stk use project-relative paths ("./lib/…"), so
+# we cd into the project root before loading. Robust to running from
+# any CWD.
+chdir dirname(dirname(__FILE__))
 require "./lib/file_ops.stk"
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -62,7 +62,7 @@ for (Library::list_available() |> collect) {
 # ── 4. Slicing Demo ────────────────────────────────────────────────
 
 p "\nFirst two books in inventory:"
-val @subset = @inventory[0:1]
+var @subset = @inventory[0:1]
 for (@subset) {
     p "  [#{ _->title }]"
 }

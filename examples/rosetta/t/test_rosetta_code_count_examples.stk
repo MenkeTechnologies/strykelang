@@ -18,8 +18,9 @@ fn Rosetta::Count::run($file_path) {
     ($done, $total)
 }
 
-# In this workspace, list.txt is in the current directory.
-val ($done, $total) = Rosetta::Count::run("list.txt")
+# list.txt lives at rosetta/list.txt (sibling of this t/ dir).
+val $list_path = dirname(dirname(__FILE__)) . "/list.txt"
+val ($done, $total) = Rosetta::Count::run($list_path)
 
 assert_ok $done > 0, "At least some examples are done"
 assert_ok $total >= $done, "Total is greater than done"

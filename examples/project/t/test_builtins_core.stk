@@ -72,10 +72,10 @@ assert_eq Project::BuiltinsCore::scalar_array_one(), 1, "len array one"
 
 assert_eq Project::BuiltinsCore::scalar_hash_info(), 2, "len hash info"
 
-assert_eq Project::BuiltinsCore::scalar_string(), "hello", "len string"
-assert_eq Project::BuiltinsCore::scalar_number(), 42, "len number"
+assert_eq Project::BuiltinsCore::scalar_string(), 5, "len of \"hello\""
+assert_eq Project::BuiltinsCore::scalar_number(), 1, "len of scalar 42 (stryke: 1 = single value)"
 
-assert_eq Project::BuiltinsCore::scalar_reverse_str(), "olleh", "len reverse str"
+assert_eq Project::BuiltinsCore::scalar_reverse_str(), 5, "len of rev(\"hello\")"
 assert_eq Project::BuiltinsCore::scalar_reverse_arr(), 3, "len reverse arr"
 
 assert_eq Project::BuiltinsCore::scalar_force(), 3, "len force"

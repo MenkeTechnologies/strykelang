@@ -2,7 +2,8 @@
 # Run: stryke --no-interop examples/parallel_file_hasher.stk
 
 p "--- Parallel Hash ---"
-var @r = ~> glob("examples/*.stk") \
+val $examples_dir = dirname(__FILE__)
+var @r = ~> glob("$examples_dir/*.stk") \
     head(5) \
     pmaps { [ _ => c"#{_}" |> sha256 ] } \
     collect

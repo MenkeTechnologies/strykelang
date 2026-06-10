@@ -29,7 +29,8 @@ c"$tmp" |> lines |> greps { /stryke/ } |> e p
 # 4. Zsh-style globbing with qualifiers.
 # `(.)` means files only (no directories).
 p "\nRecent .stk files in examples/ (files only):"
-var @files = glob("examples/*.stk(.)")
+val $examples_dir = dirname(__FILE__)
+var @files = glob("$examples_dir/*.stk(.)")
 for val $f (@files[0:2]) { # Slice: first 3
     p "  - $f"
 }
