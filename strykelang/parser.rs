@@ -1,7 +1,9 @@
 use crate::ast::*;
 use crate::error::{ErrorKind, StrykeError, StrykeResult};
 use crate::lexer::{Lexer, LITERAL_AT_IN_DQUOTE, LITERAL_DOLLAR_IN_DQUOTE};
-use crate::token::Token;
+use crate::token::{
+    is_frozen_decl, is_lexical_decl, is_lexical_or_our_decl, is_post_style_decl, Token,
+};
 use crate::vm_helper::VMHelper;
 
 /// True when `[` after `expr` is chained array access (`$r->{k}[0]`, `$a[1][2]`, `$$r[0]`).
@@ -847,7 +849,7 @@ impl Parser {
                     // which `val`'s own arm would have set too).
                     self.advance(); // consume "frozen"/"const"
                     if let Token::Ident(ref kw) = self.peek().clone() {
-                        if matches!(kw.as_str(), "my" | "var" | "val") {
+                        if is_lexical_decl(kw) {
                             // Accept type annotations the same way `typed
                             // my $x : Int` does — `const`/`frozen` is
                             // orthogonal to typing, and `: Type` after a
@@ -889,9 +891,9 @@ impl Parser {
                         // that here so the modifier composition matches
                         // (`typed val $x : Int = …` ≡ `const typed my $x : Int = …`).
                         let raw_kw = kw.clone();
-                        if matches!(raw_kw.as_str(), "my" | "var" | "val") {
+                        if is_lexical_decl(&raw_kw) {
                             let mut stmt = self.parse_my_our_local("my", true)?;
-                            if raw_kw == "val" {
+                            if is_frozen_decl(&raw_kw) {
                                 if let StmtKind::My(ref mut decls) = stmt.kind {
                                     for decl in decls.iter_mut() {
                                         decl.frozen = true;
@@ -3624,7 +3626,7 @@ impl Parser {
                         // "tie expects $scalar, @array, or %hash, got Ident(\"my\")".
         let mut implicit_decl: Option<Statement> = None;
         if let Token::Ident(kw) = self.peek().clone() {
-            if matches!(kw.as_str(), "my" | "var" | "val" | "our") {
+            if is_lexical_or_our_decl(&kw) {
                 let kw_line = self.peek_line();
                 self.advance(); // my / var / val / our
                                 // Read the variable being declared (must be Scalar/Array/Hash).
@@ -3645,13 +3647,13 @@ impl Parser {
                     initializer: None,
                     // `val` makes the implicit decl frozen (matches the
                     // var/val statement-form arms in parse_statement).
-                    frozen: kw == "val",
+                    frozen: is_frozen_decl(&kw),
                     type_annotation: None,
                     list_context: false,
                 }];
                 implicit_decl = Some(Statement {
                     label: None,
-                    kind: if kw == "my" || kw == "var" || kw == "val" {
+                    kind: if is_lexical_decl(&kw) {
                         StmtKind::My(decls)
                     } else {
                         StmtKind::Our(decls)
@@ -4446,8 +4448,7 @@ impl Parser {
             // `StmtKind::Foreach`'s `var` field today), keeping the surface
             // syntax consistent with the other var/val sites.
             Token::Ident(ref kw)
-                if (kw == "my" || kw == "var" || kw == "val")
-                    && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
+                if is_lexical_decl(kw) && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
             {
                 self.advance(); // 'my' / 'var' / 'val'
                 let var = self.parse_scalar_var_name()?;
@@ -4540,8 +4541,7 @@ impl Parser {
             // a sigil. Bare `foreach var (@xs) {...}` (no sigil) routes to
             // the no-decl arm and parses `var` as an expression.
             Token::Ident(ref kw)
-                if (kw == "my" || kw == "var" || kw == "val")
-                    && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
+                if is_lexical_decl(kw) && matches!(self.peek_at(1), Token::ScalarVar(_)) =>
             {
                 self.advance();
                 self.parse_scalar_var_name()?
@@ -9163,7 +9163,7 @@ impl Parser {
             // `(` for list destructuring, or a `typed` modifier. In all other
             // positions (`val =>` / `val:` / `val,` / `val)` / `val;`) they
             // are barewords and fall through to the normal expression parser.
-            let is_var_val_decl_start = matches!(kw.as_str(), "var" | "val")
+            let is_var_val_decl_start = is_post_style_decl(kw)
                 && matches!(
                     self.peek_at(1),
                     Token::ScalarVar(_)
@@ -9171,7 +9171,7 @@ impl Parser {
                         | Token::HashVar(_)
                         | Token::Star
                         | Token::LParen
-                ) || matches!(kw.as_str(), "var" | "val")
+                ) || is_post_style_decl(kw)
                     && matches!(
                         self.peek_at(1),
                         Token::Ident(ref kw) if kw == "typed"
@@ -9184,12 +9184,13 @@ impl Parser {
                 // `val` requires marking the resulting decls frozen so the
                 // expression form `if (val $x = …) { … }` matches its
                 // statement-form counterpart `if (const my $x = …) { … }`.
-                let kw_owned: String = match raw_kw.as_str() {
-                    "var" | "val" => "my".to_string(),
-                    _ => raw_kw.clone(),
+                let kw_owned: String = if is_post_style_decl(&raw_kw) {
+                    "my".to_string()
+                } else {
+                    raw_kw.clone()
                 };
-                let allow_type = matches!(raw_kw.as_str(), "val");
-                let mark_frozen = matches!(raw_kw.as_str(), "val");
+                let allow_type = is_frozen_decl(&raw_kw);
+                let mark_frozen = is_frozen_decl(&raw_kw);
                 // Parse exactly like the statement form via `parse_my_our_local`,
                 // then unwrap the resulting `StmtKind::*` back into a list of
                 // `VarDecl`s for the expression node.  This re-uses the full
@@ -11342,7 +11343,7 @@ impl Parser {
                         },
                         line,
                     })
-                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !matches!(name.as_str(), "var" | "val" | "varsync"))
+                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !is_post_style_decl(name) && name != "varsync")
                 {
                     // Blockless comparator via bare sub name: `sort my_cmp @list`
                     // Reject `var`/`val`/`varsync` here even though they aren't
@@ -12748,7 +12749,7 @@ impl Parser {
                 if paren {
                     self.advance();
                 }
-                if matches!(self.peek(), Token::Ident(ref s) if s == "my" || s == "var" || s == "val") {
+                if matches!(self.peek(), Token::Ident(ref s) if is_lexical_decl(s)) {
                     self.advance();
                     let name = self.parse_scalar_var_name()?;
                     self.expect(&Token::Comma)?;
@@ -12840,7 +12841,7 @@ impl Parser {
                 if paren {
                     self.advance();
                 }
-                if matches!(self.peek(), Token::Ident(ref s) if s == "my" || s == "var" || s == "val") {
+                if matches!(self.peek(), Token::Ident(ref s) if is_lexical_decl(s)) {
                     self.advance();
                     let hname = self.parse_scalar_var_name()?;
                     self.expect(&Token::Comma)?;

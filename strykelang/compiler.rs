@@ -9865,12 +9865,26 @@ literal line
             "expected Open builtin 3-arg, got {:?}",
             chunk.ops
         );
+        // Post-fix: `open my $fh, …` initializes `$fh` to the literal handle
+        // NAME via DeclareScalar*/DeclareScalarSlot BEFORE the Open call,
+        // not via SetScalarKeepPlain AFTER. The bool return of `open` stays
+        // on stack as the expression value (so `open(...) or die` works).
+        // SetScalarKeepPlain is no longer expected.
         assert!(
-            chunk
+            !chunk
                 .ops
                 .iter()
                 .any(|o| matches!(o, Op::SetScalarKeepPlain(_))),
-            "expected SetScalarKeepPlain after open"
+            "post-fix: SetScalarKeepPlain must NOT appear — $fh is set BEFORE open(name, mode, file). got {:?}",
+            chunk.ops
+        );
+        assert!(
+            chunk.ops.iter().any(|o| matches!(
+                o,
+                Op::DeclareScalarSlot(..) | Op::DeclareScalar(_) | Op::DeclareScalarFrozen(_)
+            )),
+            "expected $fh to be declared (slot or named), got {:?}",
+            chunk.ops
         );
         assert_last_halt(&chunk);
     }
