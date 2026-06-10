@@ -53,8 +53,8 @@ fn Pl::atom($name) {
     +{ kind => "atom", name => $name }
 }
 
-fn Pl::num($val) {
-    +{ kind => "num", val => $val }
+fn Pl::num($var) {
+    +{ kind => "num", var => $var }
 }
 
 fn Pl::var($name) {
@@ -89,7 +89,7 @@ fn Pl::cons($head, $tail) {
 
 fn Pl::list_of($items, $tail) {
     var $cur = $tail
-    for val $i (rev 0:len(@$items) - 1) {
+    for var $i (rev 0:len(@$items) - 1) {
         $cur = Pl::cons($items->[$i], $cur)
     }
     $cur
@@ -134,12 +134,12 @@ fn Pl::is_list_cons($t) {
 # during walk so output reflects current bindings.
 
 fn Pl::show_term($t, $s) {
-    val $w = Pl::walk($t, $s)
+    var $w = Pl::walk($t, $s)
     if (Pl::is_atom($w)) {
         return $w->{name}
     }
     if (Pl::is_num($w)) {
-        return "" . $w->{val}
+        return "" . $w->{var}
     }
     if (Pl::is_var($w)) {
         return "_" . $w->{id}
@@ -149,7 +149,7 @@ fn Pl::show_term($t, $s) {
     }
     # Generic compound.
     var @args
-    for val $ax (@{$w->{args}}) {
+    for var $ax (@{$w->{args}}) {
         push @args, Pl::show_term($ax, $s)
     }
     $w->{name} . "(" . join(", ", @args) . ")"
@@ -160,7 +160,7 @@ fn Pl::show_list($t, $s) {
     var $tail = "]"
     var $cur = $t
     while (1) {
-        val $w = Pl::walk($cur, $s)
+        var $w = Pl::walk($cur, $s)
         if (Pl::is_nil($w)) {
             last
         }
@@ -187,10 +187,10 @@ fn Pl::show_list($t, $s) {
 
 fn Pl::tokenize($src) {
     var @tokens
-    val $n = len($src)
+    var $n = len($src)
     var $i = 0
     while ($i < $n) {
-        val $c = substr($src, $i, 1)
+        var $c = substr($src, $i, 1)
         # Whitespace.
         if ($c eq " " || $c eq "\t" || $c eq "\n" || $c eq "\r") {
             $i++
@@ -236,22 +236,22 @@ fn Pl::tokenize($src) {
         }
         # Numbers.
         if ($c ge "0" && $c le "9") {
-            val $start = $i
+            var $start = $i
             while ($i < $n) {
-                val $d = substr($src, $i, 1)
+                var $d = substr($src, $i, 1)
                 last unless $d ge "0" && $d le "9"
                 $i++
             }
-            push @tokens, +{ kind => "num", val => int(substr($src, $start, $i - $start)) }
+            push @tokens, +{ kind => "num", var => int(substr($src, $start, $i - $start)) }
             next
         }
         # Atoms starting with lowercase or special chars. `:` is
         # allowed in atom continuation (not start) so `=:=`, `=\\=`
         # parse as a single token while `:-` keeps its arrow status.
         if (($c ge "a" && $c le "z") || $c eq "+" || $c eq "-" || $c eq "*" || $c eq "/" || $c eq "<" || $c eq ">" || $c eq "=" || $c eq "\\") {
-            val $start = $i
+            var $start = $i
             while ($i < $n) {
-                val $d = substr($src, $i, 1)
+                var $d = substr($src, $i, 1)
                 if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_" || $d eq "+" || $d eq "-" || $d eq "*" || $d eq "/" || $d eq "<" || $d eq ">" || $d eq "=" || $d eq "\\" || $d eq ":") {
                     $i++
                 } else {
@@ -263,9 +263,9 @@ fn Pl::tokenize($src) {
         }
         # Variables: uppercase letter or _.
         if (($c ge "A" && $c le "Z") || $c eq "_") {
-            val $start = $i
+            var $start = $i
             while ($i < $n) {
-                val $d = substr($src, $i, 1)
+                var $d = substr($src, $i, 1)
                 if (($d ge "a" && $d le "z") || ($d ge "A" && $d le "Z") || ($d ge "0" && $d le "9") || $d eq "_") {
                     $i++
                 } else {
@@ -344,10 +344,10 @@ fn Pl::reset_ctx($p) {
 }
 
 fn Pl::parse_term($p) {
-    val $tok = Pl::peek($p)
+    var $tok = Pl::peek($p)
     if ($tok->{kind} eq "num") {
         Pl::consume($p)
-        return Pl::num($tok->{val})
+        return Pl::num($tok->{var})
     }
     if ($tok->{kind} eq "var") {
         Pl::consume($p)
@@ -359,7 +359,7 @@ fn Pl::parse_term($p) {
     }
     if ($tok->{kind} eq "lparen") {
         Pl::consume($p)
-        val $inner = Pl::parse_term($p)
+        var $inner = Pl::parse_term($p)
         Pl::expect($p, "rparen")
         return $inner
     }
@@ -417,7 +417,7 @@ fn Pl::parse_goals($p) {
 
 fn Pl::parse_clause($p) {
     Pl::reset_ctx($p)
-    val $head = Pl::parse_term($p)
+    var $head = Pl::parse_term($p)
     var $body = []
     if (Pl::peek($p)->{kind} eq "arrow") {
         Pl::consume($p)
@@ -430,7 +430,7 @@ fn Pl::parse_clause($p) {
 fn Pl::parse_query($p) {
     Pl::reset_ctx($p)
     Pl::expect($p, "qarrow")
-    val $goals = Pl::parse_goals($p)
+    var $goals = Pl::parse_goals($p)
     Pl::expect($p, "dot")
     +{ goals => $goals, ctx => $p->{ctx} }
 }
@@ -438,7 +438,7 @@ fn Pl::parse_query($p) {
 # Parse an entire program -- sequence of clauses ending in `.`.
 
 fn Pl::parse_program($src) {
-    val $tokens = Pl::tokenize($src)
+    var $tokens = Pl::tokenize($src)
     var $p = Pl::parser_new($tokens)
     var @clauses
     while ($p->{pos} < len(@$tokens)) {
@@ -466,17 +466,17 @@ fn Pl::rename_term($t, $map) {
     }
     # Compound.
     var @new_args
-    for val $arg (@{$t->{args}}) {
+    for var $arg (@{$t->{args}}) {
         push @new_args, Pl::rename_term($arg, $map)
     }
     Pl::compound($t->{name}, \@new_args)
 }
 
 fn Pl::rename_clause($cl) {
-    val $map = +{}
-    val $new_head = Pl::rename_term($cl->{head}, $map)
+    var $map = +{}
+    var $new_head = Pl::rename_term($cl->{head}, $map)
     var @new_body
-    for val $g (@{$cl->{body}}) {
+    for var $g (@{$cl->{body}}) {
         push @new_body, Pl::rename_term($g, $map)
     }
     +{ head => $new_head, body => \@new_body }
@@ -502,10 +502,10 @@ fn Pl::walk($t, $s) {
 # has no remaining substitution chains anywhere.
 
 fn Pl::deep_walk($t, $s) {
-    val $w = Pl::walk($t, $s)
+    var $w = Pl::walk($t, $s)
     return $w unless Pl::is_compound($w)
     var @new_args
-    for val $ax (@{$w->{args}}) {
+    for var $ax (@{$w->{args}}) {
         push @new_args, Pl::deep_walk($ax, $s)
     }
     Pl::compound($w->{name}, \@new_args)
@@ -517,12 +517,12 @@ fn Pl::deep_walk($t, $s) {
 # terms.
 
 fn Pl::occurs($v_id, $t, $s) {
-    val $w = Pl::walk($t, $s)
+    var $w = Pl::walk($t, $s)
     if (Pl::is_var($w)) {
         return $w->{id} == $v_id
     }
     if (Pl::is_compound($w)) {
-        for val $ax (@{$w->{args}}) {
+        for var $ax (@{$w->{args}}) {
             return 1 if Pl::occurs($v_id, $ax, $s)
         }
     }
@@ -534,8 +534,8 @@ fn Pl::occurs($v_id, $t, $s) {
 
 fn Pl::unify($t1, $t2, $s) {
     return undef unless defined $s
-    val $u = Pl::walk($t1, $s)
-    val $v = Pl::walk($t2, $s)
+    var $u = Pl::walk($t1, $s)
+    var $v = Pl::walk($t2, $s)
     if (Pl::is_var($u) && Pl::is_var($v) && $u->{id} == $v->{id}) {
         return $s
     }
@@ -556,14 +556,14 @@ fn Pl::unify($t1, $t2, $s) {
         return undef
     }
     if (Pl::is_num($u) && Pl::is_num($v)) {
-        return $s if $u->{val} == $v->{val}
+        return $s if $u->{var} == $v->{var}
         return undef
     }
     if (Pl::is_compound($u) && Pl::is_compound($v)) {
         return undef unless $u->{name} eq $v->{name}
         return undef unless len(@{$u->{args}}) == len(@{$v->{args}})
         var $sub = $s
-        for val $i (0:len(@{$u->{args}}) - 1) {
+        for var $i (0:len(@{$u->{args}}) - 1) {
             $sub = Pl::unify($u->{args}->[$i], $v->{args}->[$i], $sub)
             return undef unless defined $sub
         }
@@ -582,19 +582,19 @@ fn Pl::unify($t1, $t2, $s) {
 # integer (or float) value. Unbound variables → error.
 
 fn Pl::arith_eval($t, $s) {
-    val $w = Pl::walk($t, $s)
+    var $w = Pl::walk($t, $s)
     if (Pl::is_num($w)) {
-        return $w->{val}
+        return $w->{var}
     }
     if (Pl::is_var($w)) {
         die "arithmetic: unbound variable _#{$w->{id}}"
     }
     if (Pl::is_compound($w)) {
-        val $name = $w->{name}
-        val $args = $w->{args}
+        var $name = $w->{name}
+        var $args = $w->{args}
         if (len(@$args) == 2) {
-            val $lhs = Pl::arith_eval($args->[0], $s)
-            val $rhs = Pl::arith_eval($args->[1], $s)
+            var $lhs = Pl::arith_eval($args->[0], $s)
+            var $rhs = Pl::arith_eval($args->[1], $s)
             return $lhs + $rhs if $name eq "+"
             return $lhs - $rhs if $name eq "-"
             return $lhs * $rhs if $name eq "*"
@@ -608,7 +608,7 @@ fn Pl::arith_eval($t, $s) {
             }
         }
         if (len(@$args) == 1) {
-            val $v = Pl::arith_eval($args->[0], $s)
+            var $v = Pl::arith_eval($args->[0], $s)
             return -$v if $name eq "-"
             return ($v < 0 ? -$v : $v) if $name eq "abs"
         }
@@ -626,21 +626,21 @@ fn Pl::builtin_table() {
     +{
         # `is(Result, Expr)`: arithmetic evaluation.
         "is/2" => fn {
-            val $args = $_[0]
-            val $s    = $_[1]
-            val $val = Pl::arith_eval($args->[1], $s)
-            Pl::unify($args->[0], Pl::num($val), $s)
+            var $args = $_[0]
+            var $s    = $_[1]
+            var $var = Pl::arith_eval($args->[1], $s)
+            Pl::unify($args->[0], Pl::num($var), $s)
         },
         # `=(X, Y)`: structural unification (already what the engine does).
         "=/2" => fn {
-            val $args = $_[0]
-            val $s    = $_[1]
+            var $args = $_[0]
+            var $s    = $_[1]
             Pl::unify($args->[0], $args->[1], $s)
         },
         # Disunification with the occurs check.
         "\\=/2" => fn {
-            val $args = $_[0]
-            val $s    = $_[1]
+            var $args = $_[0]
+            var $s    = $_[1]
             defined Pl::unify($args->[0], $args->[1], $s) ? undef : $s
         },
         # Numeric comparisons (both sides evaluated arithmetically).
@@ -664,7 +664,7 @@ fn Pl::builtin_table() {
 # Dispatch: returns either an updated substitution or undef.
 
 fn Pl::call_builtin($table, $name, $arity, $args, $s) {
-    val $key = "#{$name}/#{$arity}"
+    var $key = "#{$name}/#{$arity}"
     return -2 unless exists $table->{$key}    # -2 = "not a built-in"
     $table->{$key}->($args, $s)
 }
@@ -681,18 +681,18 @@ fn Pl::call_builtin($table, $name, $arity, $args, $s) {
 fn Pl::prove($goals, $db, $builtins, $s, $solutions, $max) {
     return if len(@$solutions) >= $max
     if (len(@$goals) == 0) {
-        val %copy = %$s
+        var %copy = %$s
         push @$solutions, \%copy
         return
     }
-    val $g = $goals->[0]
-    val @rest = @{$goals}[1:len(@$goals) - 1]
+    var $g = $goals->[0]
+    var @rest = @{$goals}[1:len(@$goals) - 1]
     # Try built-in first.
     if (Pl::is_atom($g) || Pl::is_compound($g)) {
-        val $name = $g->{name}
-        val $arity = Pl::is_atom($g) ? 0 : len(@{$g->{args}})
-        val $args = Pl::is_compound($g) ? $g->{args} : []
-        val $br = Pl::call_builtin($builtins, $name, $arity, $args, $s)
+        var $name = $g->{name}
+        var $arity = Pl::is_atom($g) ? 0 : len(@{$g->{args}})
+        var $args = Pl::is_compound($g) ? $g->{args} : []
+        var $br = Pl::call_builtin($builtins, $name, $arity, $args, $s)
         if ($br != -2) {
             return unless defined $br
             Pl::prove(\@rest, $db, $builtins, $br, $solutions, $max)
@@ -700,11 +700,11 @@ fn Pl::prove($goals, $db, $builtins, $s, $solutions, $max) {
         }
     }
     # No built-in -- try each clause whose head's functor matches.
-    for val $cl (@$db) {
-        val $renamed = Pl::rename_clause($cl)
-        val $new_s = Pl::unify($g, $renamed->{head}, $s)
+    for var $cl (@$db) {
+        var $renamed = Pl::rename_clause($cl)
+        var $new_s = Pl::unify($g, $renamed->{head}, $s)
         next unless defined $new_s
-        val @new_goals = (@{$renamed->{body}}, @rest)
+        var @new_goals = (@{$renamed->{body}}, @rest)
         Pl::prove(\@new_goals, $db, $builtins, $new_s, $solutions, $max)
         return if len(@$solutions) >= $max
     }
@@ -715,8 +715,8 @@ fn Pl::prove($goals, $db, $builtins, $s, $solutions, $max) {
 # callers typically project specific query-variable bindings.
 
 fn Pl::solve($db, $query_goals, $max) {
-    val $builtins = Pl::builtin_table()
-    val @solutions
+    var $builtins = Pl::builtin_table()
+    var @solutions
     Pl::prove($query_goals, $db, $builtins, +{}, \@solutions, $max)
     \@solutions
 }
@@ -726,9 +726,9 @@ fn Pl::solve($db, $query_goals, $max) {
 
 fn Pl::project($query_ctx, $solution) {
     var %out
-    for val $name (keys %$query_ctx) {
-        val $id = $query_ctx->{$name}
-        val $bound = Pl::var_named($name, $id)
+    for var $name (keys %$query_ctx) {
+        var $id = $query_ctx->{$name}
+        var $bound = Pl::var_named($name, $id)
         $out{$name} = Pl::show_term($bound, $solution)
     }
     \%out
@@ -738,7 +738,7 @@ fn Pl::project($query_ctx, $solution) {
 # Section 9: Standard library -- clauses written in Prolog itself
 # ═══════════════════════════════════════════════════════════════════
 
-val $STDLIB = q{
+var $STDLIB = q{
     % Membership: X is in list [X | _], or in the tail.
     member(X, cons(X, _)).
     member(X, cons(_, T)) :- member(X, T).
@@ -887,11 +887,11 @@ var @cases = (
 # ═══════════════════════════════════════════════════════════════════
 
 # Parse the stdlib once.
-val $DB = Pl::parse_program($STDLIB)
+var $DB = Pl::parse_program($STDLIB)
 
 # Drop the "malformed query" sentinel before running.
 var @to_run
-for val $c (@cases) {
+for var $c (@cases) {
     push @to_run, $c if defined $c->{expected}
 }
 
@@ -901,7 +901,7 @@ printf "  %-58s  %4s  %s\n", "--------------------------------------------------
 
 var $passed = 0
 var $failed = 0
-for val $c (@to_run) {
+for var $c (@to_run) {
     var $ok = 1
     var $count = 0
     var $first_solution_str = ""
@@ -909,20 +909,20 @@ for val $c (@to_run) {
     # via a known parse failure pattern; the only such case has
     # expected==0 AND query containing a triple ")))" mismatch.
     # We just attempt to parse + solve; on parse error we count 0.
-    val $parse_ok = 1
+    var $parse_ok = 1
     var $solutions = []
     var $q_obj
     {
-        val $src = "?- " . $c->{query} . "."
-        val $tokens = Pl::tokenize($src)
-        val $par = Pl::parser_new($tokens)
+        var $src = "?- " . $c->{query} . "."
+        var $tokens = Pl::tokenize($src)
+        var $par = Pl::parser_new($tokens)
         $q_obj = Pl::parse_query($par)
         $solutions = Pl::solve($DB, $q_obj->{goals}, 20)
     }
     $count = len(@$solutions)
     if ($count > 0 && exists $c->{first}) {
-        val $proj = Pl::project($q_obj->{ctx}, $solutions->[0])
-        for val $name (keys %{$c->{first}}) {
+        var $proj = Pl::project($q_obj->{ctx}, $solutions->[0])
+        for var $name (keys %{$c->{first}}) {
             $first_solution_str = "#{$name}=#{$proj->{$name}}"
             if ($proj->{$name} ne $c->{first}->{$name}) {
                 $ok = 0
@@ -952,49 +952,49 @@ die "#{$failed} Prolog test cases failed" if $failed > 0
 
 # Helper: run a query and return solution count.
 fn Pl::query_count($db, $src) {
-    val $tokens = Pl::tokenize("?- " . $src . ".")
-    val $par = Pl::parser_new($tokens)
-    val $q = Pl::parse_query($par)
-    val $sols = Pl::solve($db, $q->{goals}, 50)
+    var $tokens = Pl::tokenize("?- " . $src . ".")
+    var $par = Pl::parser_new($tokens)
+    var $q = Pl::parse_query($par)
+    var $sols = Pl::solve($db, $q->{goals}, 50)
     len(@$sols)
 }
 
 fn Pl::query_first_var($db, $src, $var_name) {
-    val $tokens = Pl::tokenize("?- " . $src . ".")
-    val $par = Pl::parser_new($tokens)
-    val $q = Pl::parse_query($par)
-    val $sols = Pl::solve($db, $q->{goals}, 1)
+    var $tokens = Pl::tokenize("?- " . $src . ".")
+    var $par = Pl::parser_new($tokens)
+    var $q = Pl::parse_query($par)
+    var $sols = Pl::solve($db, $q->{goals}, 1)
     return undef if len(@$sols) == 0
-    val $proj = Pl::project($q->{ctx}, $sols->[0])
+    var $proj = Pl::project($q->{ctx}, $sols->[0])
     $proj->{$var_name}
 }
 
 # ── invariant 1: append associativity (small instance) ────────────
 # append([1,2], [3,4], L1), append(L1, [5,6], L2) → L2 = [1..6].
 {
-    val $first  = Pl::query_first_var($DB, "append(cons(1, cons(2, [])), cons(3, cons(4, [])), L)", "L")
+    var $first  = Pl::query_first_var($DB, "append(cons(1, cons(2, [])), cons(3, cons(4, [])), L)", "L")
     die "append step 1 wrong: #{$first}" unless $first eq "[1, 2, 3, 4]"
-    val $second = Pl::query_first_var($DB, "append(cons(1, cons(2, cons(3, cons(4, [])))), cons(5, cons(6, [])), L)", "L")
+    var $second = Pl::query_first_var($DB, "append(cons(1, cons(2, cons(3, cons(4, [])))), cons(5, cons(6, [])), L)", "L")
     die "append step 2 wrong: #{$second}" unless $second eq "[1, 2, 3, 4, 5, 6]"
 }
 
 # ── invariant 2: reverse of reverse is identity ───────────────────
 {
-    val $r1 = Pl::query_first_var($DB, "reverse(cons(1, cons(2, cons(3, cons(4, [])))), R)", "R")
+    var $r1 = Pl::query_first_var($DB, "reverse(cons(1, cons(2, cons(3, cons(4, [])))), R)", "R")
     die "reverse step 1: #{$r1}" unless $r1 eq "[4, 3, 2, 1]"
-    val $r2 = Pl::query_first_var($DB, "reverse(cons(4, cons(3, cons(2, cons(1, [])))), R)", "R")
+    var $r2 = Pl::query_first_var($DB, "reverse(cons(4, cons(3, cons(2, cons(1, [])))), R)", "R")
     die "reverse-reverse: #{$r2}" unless $r2 eq "[1, 2, 3, 4]"
 }
 
 # ── invariant 3: factorial values ─────────────────────────────────
 for var $pair ([0, "1"], [1, "1"], [2, "2"], [3, "6"], [4, "24"], [5, "120"], [6, "720"], [7, "5040"]) {
-    val $got = Pl::query_first_var($DB, "fact(#{$pair->[0]}, F)", "F")
+    var $got = Pl::query_first_var($DB, "fact(#{$pair->[0]}, F)", "F")
     die "fact(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
 }
 
 # ── invariant 4: Fibonacci values ─────────────────────────────────
 for var $pair ([0, "0"], [1, "1"], [2, "1"], [3, "2"], [5, "5"], [8, "21"], [10, "55"]) {
-    val $got = Pl::query_first_var($DB, "fib(#{$pair->[0]}, F)", "F")
+    var $got = Pl::query_first_var($DB, "fib(#{$pair->[0]}, F)", "F")
     die "fib(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
 }
 
@@ -1002,21 +1002,21 @@ for var $pair ([0, "0"], [1, "1"], [2, "1"], [3, "2"], [5, "5"], [8, "21"], [10,
 # (Only non-negative bounds — the demo tokenizer treats `-N` as an
 # atom, not an integer literal.)
 
-for val $lh ([1, 5, 5], [3, 3, 1], [0, 10, 11], [5, 20, 16]) {
-    val $count = Pl::query_count($DB, "between(#{$lh->[0]}, #{$lh->[1]}, X)")
+for var $lh ([1, 5, 5], [3, 3, 1], [0, 10, 11], [5, 20, 16]) {
+    var $count = Pl::query_count($DB, "between(#{$lh->[0]}, #{$lh->[1]}, X)")
     die "between(#{$lh->[0]}, #{$lh->[1]}) -> #{$count} solutions, want #{$lh->[2]}" unless $count == $lh->[2]
 }
 
 # ── invariant 6: member/2 succeeds N times for an N-element list ──
-for val $n (1, 3, 5, 10) {
+for var $n (1, 3, 5, 10) {
     var @items
-    for val $i (1:$n) { push @items, "#{$i}" }
-    val $tail = "[]"
+    for var $i (1:$n) { push @items, "#{$i}" }
+    var $tail = "[]"
     var $list = $tail
-    for val $i (rev 0:$n - 1) {
+    for var $i (rev 0:$n - 1) {
         $list = "cons(#{$items[$i]}, #{$list})"
     }
-    val $count = Pl::query_count($DB, "member(X, #{$list})")
+    var $count = Pl::query_count($DB, "member(X, #{$list})")
     die "member(X, list of #{$n}) → #{$count} solutions, want #{$n}" unless $count == $n
 }
 
@@ -1024,13 +1024,13 @@ for val $n (1, 3, 5, 10) {
 # tom is the ancestor of: alice, bob (children), charlie, diane (gc),
 # eric (gc), fiona (ggc) -- 6 descendants.
 {
-    val $count = Pl::query_count($DB, "ancestor(tom, X)")
+    var $count = Pl::query_count($DB, "ancestor(tom, X)")
     die "ancestor(tom, X) → #{$count}, want 6" unless $count == 6
 }
 
 # ── invariant 8: isort produces a non-decreasing list ─────────────
 {
-    val $sorted = Pl::query_first_var(
+    var $sorted = Pl::query_first_var(
         $DB,
         "isort(cons(5, cons(2, cons(8, cons(1, cons(9, cons(3, cons(7, cons(4, cons(6, []))))))))), S)",
         "S",
@@ -1040,14 +1040,14 @@ for val $n (1, 3, 5, 10) {
 
 # ── invariant 9: unification handles structural compounds ─────────
 {
-    val $count = Pl::query_count($DB, "=(foo(X, bar, baz(Y)), foo(1, bar, baz(2)))")
+    var $count = Pl::query_count($DB, "=(foo(X, bar, baz(Y)), foo(1, bar, baz(2)))")
     die "compound unify count: #{$count}" unless $count == 1
 }
 
 # ── invariant 10: disunification rejects equal terms ──────────────
 {
-    val $eq = Pl::query_count($DB, "\\=(hello, hello)")
-    val $ne = Pl::query_count($DB, "\\=(hello, world)")
+    var $eq = Pl::query_count($DB, "\\=(hello, hello)")
+    var $ne = Pl::query_count($DB, "\\=(hello, world)")
     die "\\= equal: #{$eq}" unless $eq == 0
     die "\\= unequal: #{$ne}" unless $ne == 1
 }
@@ -1066,18 +1066,18 @@ for val $n (1, 3, 5, 10) {
 
 # ── invariant 12: arithmetic comparisons ──────────────────────────
 {
-    for val $pair ([3, 5, "<",  1], [5, 3, "<",  0], [5, 5, "<",  0],
+    for var $pair ([3, 5, "<",  1], [5, 3, "<",  0], [5, 5, "<",  0],
                   [3, 5, ">",  0], [5, 3, ">",  1], [5, 5, ">",  0],
                   [3, 5, "=<", 1], [5, 5, "=<", 1], [5, 3, "=<", 0],
                   [3, 5, ">=", 0], [5, 5, ">=", 1], [5, 3, ">=", 1]) {
-        val $got = Pl::query_count($DB, "#{$pair->[2]}(#{$pair->[0]}, #{$pair->[1]})")
+        var $got = Pl::query_count($DB, "#{$pair->[2]}(#{$pair->[0]}, #{$pair->[1]})")
         die "#{$pair->[2]}(#{$pair->[0]}, #{$pair->[1]}) → #{$got}, want #{$pair->[3]}" unless $got == $pair->[3]
     }
 }
 
 # ── invariant 13: select/3 picks each element exactly once ────────
 {
-    val $n = Pl::query_count($DB, "select(X, cons(a, cons(b, cons(c, cons(d, [])))), R)")
+    var $n = Pl::query_count($DB, "select(X, cons(a, cons(b, cons(c, cons(d, [])))), R)")
     die "select count #{$n}, want 4" unless $n == 4
 }
 
@@ -1085,7 +1085,7 @@ for val $n (1, 3, 5, 10) {
 # Try to unify X = f(X). Without occurs check this builds an
 # infinite term; with it, the unification must fail.
 {
-    val $n = Pl::query_count($DB, "=(X, foo(X))")
+    var $n = Pl::query_count($DB, "=(X, foo(X))")
     die "occurs check failed: =(X, foo(X)) gave #{$n} solutions" unless $n == 0
 }
 
@@ -1095,30 +1095,30 @@ for val $n (1, 3, 5, 10) {
                   ["cons(3, cons(1, cons(2, [])))", "3"],
                   ["cons(5, cons(2, cons(9, cons(1, cons(7, [])))))", "9"],
                   ["cons(100, cons(50, cons(75, cons(25, []))))", "100"]) {
-        val $got = Pl::query_first_var($DB, "max_list(#{$pair->[0]}, M)", "M")
+        var $got = Pl::query_first_var($DB, "max_list(#{$pair->[0]}, M)", "M")
         die "max_list(#{$pair->[0]}) = #{$got} want #{$pair->[1]}" unless $got eq $pair->[1]
     }
 }
 
 # ── invariant 16: length/2 works in both directions ───────────────
 {
-    val $forward = Pl::query_first_var($DB, "length(cons(a, cons(b, cons(c, cons(d, [])))), N)", "N")
+    var $forward = Pl::query_first_var($DB, "length(cons(a, cons(b, cons(c, cons(d, [])))), N)", "N")
     die "length forward: #{$forward}" unless $forward eq "4"
 }
 
 # ── invariant 17: tokenizer handles all the basic forms ───────────
 {
-    val $tokens = Pl::tokenize("foo(X, [1, 2 | Tail]) :- bar(X), baz.")
+    var $tokens = Pl::tokenize("foo(X, [1, 2 | Tail]) :- bar(X), baz.")
     var $kinds = ""
-    for val $tok (@$tokens) { $kinds .= $tok->{kind} . " " }
+    for var $tok (@$tokens) { $kinds .= $tok->{kind} . " " }
     die "tokenizer kinds: #{$kinds}" unless $kinds eq "atom lparen var comma lbracket num comma num pipe var rbracket rparen arrow atom lparen var rparen comma atom dot "
 }
 
 # ── invariant 18: parser produces the expected term shape ──────────
 {
-    val $tokens = Pl::tokenize("foo(bar, [1, 2]).")
-    val $par = Pl::parser_new($tokens)
-    val $cl = Pl::parse_clause($par)
+    var $tokens = Pl::tokenize("foo(bar, [1, 2]).")
+    var $par = Pl::parser_new($tokens)
+    var $cl = Pl::parse_clause($par)
     die "head functor"  unless $cl->{head}->{name} eq "foo"
     die "head arity"    unless len(@{$cl->{head}->{args}}) == 2
     die "1st arg atom"  unless Pl::is_atom($cl->{head}->{args}->[0]) && $cl->{head}->{args}->[0]->{name} eq "bar"
@@ -1130,68 +1130,68 @@ for val $n (1, 3, 5, 10) {
 # only — the demo tokenizer doesn't accept negative integer literals
 # as a single token; binary `-` works but adds noise to the test).
 
-for val $pair ([[1, 2, 3, 4, 5], 15], [[10, 20, 30], 60], [[100, 200, 300, 400], 1000]) {
+for var $pair ([[1, 2, 3, 4, 5], 15], [[10, 20, 30], 60], [[100, 200, 300, 400], 1000]) {
     var $list = "[]"
-    for val $v (rev @{$pair->[0]}) {
+    for var $v (rev @{$pair->[0]}) {
         $list = "cons(#{$v}, #{$list})"
     }
-    val $got = Pl::query_first_var($DB, "sum_list(#{$list}, S)", "S")
+    var $got = Pl::query_first_var($DB, "sum_list(#{$list}, S)", "S")
     die "sum_list(#{$list}) = #{$got} want #{$pair->[1]}" unless $got eq "#{$pair->[1]}"
 }
 
 # ── invariant 20: color/1 yields exactly 4 distinct colors ─────────
 {
-    val $count = Pl::query_count($DB, "color(X)")
+    var $count = Pl::query_count($DB, "color(X)")
     die "color count: #{$count}, want 4" unless $count == 4
 }
 
 # ── invariant 21: nonequal filter removes the constrained color ───
 {
-    val $count = Pl::query_count($DB, "color(X), nonequal(X, blue)")
+    var $count = Pl::query_count($DB, "color(X), nonequal(X, blue)")
     die "nonequal color count: #{$count}, want 3" unless $count == 3
 }
 
 # ── invariant 22: parser handles nested lists ─────────────────────
 {
-    val $tokens = Pl::tokenize("[[1, 2], [3, 4]].")
-    val $par = Pl::parser_new($tokens)
-    val $cl = Pl::parse_clause($par)
+    var $tokens = Pl::tokenize("[[1, 2], [3, 4]].")
+    var $par = Pl::parser_new($tokens)
+    var $cl = Pl::parse_clause($par)
     die "nested list head"  unless Pl::is_list_cons($cl->{head})
-    val $first = $cl->{head}->{args}->[0]
+    var $first = $cl->{head}->{args}->[0]
     die "first sub-list"    unless Pl::is_list_cons($first)
-    val $second_pair = $cl->{head}->{args}->[1]
+    var $second_pair = $cl->{head}->{args}->[1]
     die "tail is a list"    unless Pl::is_list_cons($second_pair)
 }
 
 # ── invariant 23: variables in a single clause share id ───────────
 # After parsing `p(X, X)`, both args should have the same id.
 {
-    val $tokens = Pl::tokenize("p(X, X).")
-    val $par = Pl::parser_new($tokens)
-    val $cl = Pl::parse_clause($par)
-    val $a0 = $cl->{head}->{args}->[0]
-    val $a1 = $cl->{head}->{args}->[1]
+    var $tokens = Pl::tokenize("p(X, X).")
+    var $par = Pl::parser_new($tokens)
+    var $cl = Pl::parse_clause($par)
+    var $a0 = $cl->{head}->{args}->[0]
+    var $a1 = $cl->{head}->{args}->[1]
     die "shared var id" unless $a0->{id} == $a1->{id}
 }
 
 # ── invariant 24: anonymous variables get fresh ids ───────────────
 {
-    val $tokens = Pl::tokenize("p(_, _).")
-    val $par = Pl::parser_new($tokens)
-    val $cl = Pl::parse_clause($par)
-    val $a0 = $cl->{head}->{args}->[0]
-    val $a1 = $cl->{head}->{args}->[1]
+    var $tokens = Pl::tokenize("p(_, _).")
+    var $par = Pl::parser_new($tokens)
+    var $cl = Pl::parse_clause($par)
+    var $a0 = $cl->{head}->{args}->[0]
+    var $a1 = $cl->{head}->{args}->[1]
     die "anonymous vars must have distinct ids" if $a0->{id} == $a1->{id}
 }
 
 # ── invariant 25: clause renaming gives fresh ids ─────────────────
 {
-    val $tokens = Pl::tokenize("p(X) :- q(X).")
-    val $par = Pl::parser_new($tokens)
-    val $cl = Pl::parse_clause($par)
-    val $orig_id = $cl->{head}->{args}->[0]->{id}
-    val $r1 = Pl::rename_clause($cl)
-    val $r2 = Pl::rename_clause($cl)
+    var $tokens = Pl::tokenize("p(X) :- q(X).")
+    var $par = Pl::parser_new($tokens)
+    var $cl = Pl::parse_clause($par)
+    var $orig_id = $cl->{head}->{args}->[0]->{id}
+    var $r1 = Pl::rename_clause($cl)
+    var $r2 = Pl::rename_clause($cl)
     die "rename should produce new id" if $r1->{head}->{args}->[0]->{id} == $orig_id
     die "rename should produce new id" if $r2->{head}->{args}->[0]->{id} == $orig_id
     die "two renames must differ"      if $r1->{head}->{args}->[0]->{id} == $r2->{head}->{args}->[0]->{id}

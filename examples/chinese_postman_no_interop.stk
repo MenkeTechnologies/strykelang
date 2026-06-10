@@ -24,21 +24,21 @@
 # ── Floyd-Warshall all-pairs shortest paths ──────────────────────
 
 fn Cpp::floyd($n, $edges) {
-    val $INF = 1_000_000
+    var $INF = 1_000_000
     var @d
-    for val $i (0:$n - 1) {
+    for var $i (0:$n - 1) {
         var @row = ($INF) x $n
         $row[$i] = 0
         push @d, \@row
     }
-    for val $e (@$edges) {
-        val $w = $e->[2]
+    for var $e (@$edges) {
+        var $w = $e->[2]
         $d[$e->[0]]->[$e->[1]] = $w if $w < $d[$e->[0]]->[$e->[1]]
         $d[$e->[1]]->[$e->[0]] = $w if $w < $d[$e->[1]]->[$e->[0]]
     }
-    for val $k (0:$n - 1) {
-        for val $i (0:$n - 1) {
-            for val $j (0:$n - 1) {
+    for var $k (0:$n - 1) {
+        for var $i (0:$n - 1) {
+            for var $j (0:$n - 1) {
                 if ($d[$i]->[$k] + $d[$k]->[$j] < $d[$i]->[$j]) {
                     $d[$i]->[$j] = $d[$i]->[$k] + $d[$k]->[$j]
                 }
@@ -51,25 +51,25 @@ fn Cpp::floyd($n, $edges) {
 # ── min-weight perfect matching on a small set via DP over subsets ─
 
 fn Cpp::min_match($odd, $dist) {
-    val $k = len(@$odd)
-    val $total = 1 << $k
+    var $k = len(@$odd)
+    var $total = 1 << $k
     var @dp = (1_000_000) x $total
     $dp[0] = 0
-    for val $mask (0:$total - 1) {
+    for var $mask (0:$total - 1) {
         next if $dp[$mask] >= 1_000_000
         # Find smallest unmatched index.
         var $first = -1
-        for val $i (0:$k - 1) {
+        for var $i (0:$k - 1) {
             if ((($mask >> $i) & 1) == 0) {
                 $first = $i
                 last
             }
         }
         last if $first == -1
-        for val $j ($first + 1:$k - 1) {
+        for var $j ($first + 1:$k - 1) {
             next if (($mask >> $j) & 1) == 1
-            val $new_mask = $mask | (1 << $first) | (1 << $j)
-            val $cand = $dp[$mask] + $dist->[$odd->[$first]]->[$odd->[$j]]
+            var $new_mask = $mask | (1 << $first) | (1 << $j)
+            var $cand = $dp[$mask] + $dist->[$odd->[$first]]->[$odd->[$j]]
             $dp[$new_mask] = $cand if $cand < $dp[$new_mask]
         }
     }
@@ -81,18 +81,18 @@ fn Cpp::min_match($odd, $dist) {
 fn Cpp::walk_cost($n, $edges) {
     var $sum = 0
     var @deg = (0) x $n
-    for val $e (@$edges) {
+    for var $e (@$edges) {
         $sum += $e->[2]
         $deg[$e->[0]]++
         $deg[$e->[1]]++
     }
     var @odd
-    for val $v (0:$n - 1) {
+    for var $v (0:$n - 1) {
         push @odd, $v if $deg[$v] & 1
     }
     return +{ cost => $sum, sum_edges => $sum, extra => 0, odd_count => 0 } if len(@odd) == 0
-    val $dist = Cpp::floyd($n, $edges)
-    val $extra = Cpp::min_match(\@odd, $dist)
+    var $dist = Cpp::floyd($n, $edges)
+    var $extra = Cpp::min_match(\@odd, $dist)
     +{
         cost      => $sum + $extra,
         sum_edges => $sum,
@@ -105,9 +105,9 @@ fn Cpp::walk_cost($n, $edges) {
 
 fn Cpp::eulerian_circuit($n, $edges_with_dups, $start) {
     var @adj
-    for val $i (0:$n - 1) { push @adj, [] }
+    for var $i (0:$n - 1) { push @adj, [] }
     var $idx = 0
-    for val $e (@$edges_with_dups) {
+    for var $e (@$edges_with_dups) {
         push @{$adj[$e->[0]]}, +{ to => $e->[1], id => $idx }
         push @{$adj[$e->[1]]}, +{ to => $e->[0], id => $idx }
         $idx++
@@ -116,10 +116,10 @@ fn Cpp::eulerian_circuit($n, $edges_with_dups, $start) {
     var @stack = ($start)
     var @circuit
     while (len(@stack) > 0) {
-        val $v = $stack[-1]
+        var $v = $stack[-1]
         var $found = 0
         while (len(@{$adj[$v]}) > 0) {
-            val $e = $adj[$v]->[-1]
+            var $e = $adj[$v]->[-1]
             if ($used[$e->{id}]) {
                 pop(@{$adj[$v]})
                 next
@@ -142,12 +142,12 @@ fn Cpp::eulerian_circuit($n, $edges_with_dups, $start) {
 
 fn Cpp::augmented_edges($n, $edges, $odd_pairs, $dist) {
     var @aug = @$edges
-    for val $pair (@$odd_pairs) {
+    for var $pair (@$odd_pairs) {
         # We just add a direct edge with the shortest-path weight as
         # placeholder (any actual path in original graph would work
         # for circuit existence; the demo's invariants check only the
         # cost, so this is sufficient).
-        val $w = $dist->[$pair->[0]]->[$pair->[1]]
+        var $w = $dist->[$pair->[0]]->[$pair->[1]]
         push @aug, [$pair->[0], $pair->[1], $w]
     }
     \@aug
@@ -156,25 +156,25 @@ fn Cpp::augmented_edges($n, $edges, $odd_pairs, $dist) {
 # ── reconstruct min-matching as explicit pairs via the same DP ────
 
 fn Cpp::match_pairs($odd, $dist) {
-    val $k = len(@$odd)
-    val $total = 1 << $k
+    var $k = len(@$odd)
+    var $total = 1 << $k
     var @dp = (1_000_000) x $total
     var @choice = (-1) x $total
     $dp[0] = 0
-    for val $mask (0:$total - 1) {
+    for var $mask (0:$total - 1) {
         next if $dp[$mask] >= 1_000_000
         var $first = -1
-        for val $i (0:$k - 1) {
+        for var $i (0:$k - 1) {
             if ((($mask >> $i) & 1) == 0) {
                 $first = $i
                 last
             }
         }
         last if $first == -1
-        for val $j ($first + 1:$k - 1) {
+        for var $j ($first + 1:$k - 1) {
             next if (($mask >> $j) & 1) == 1
-            val $new_mask = $mask | (1 << $first) | (1 << $j)
-            val $cand = $dp[$mask] + $dist->[$odd->[$first]]->[$odd->[$j]]
+            var $new_mask = $mask | (1 << $first) | (1 << $j)
+            var $cand = $dp[$mask] + $dist->[$odd->[$first]]->[$odd->[$j]]
             if ($cand < $dp[$new_mask]) {
                 $dp[$new_mask] = $cand
                 $choice[$new_mask] = $j
@@ -185,14 +185,14 @@ fn Cpp::match_pairs($odd, $dist) {
     var $mask = $total - 1
     while ($mask > 0) {
         var $first = -1
-        for val $i (0:$k - 1) {
+        for var $i (0:$k - 1) {
             if ((($mask >> $i) & 1) == 1) {
                 $first = $i
                 last
             }
         }
         last if $first == -1
-        val $j = $choice[$mask]
+        var $j = $choice[$mask]
         push @pairs, [$odd->[$first], $odd->[$j]]
         $mask = $mask & ~((1 << $first) | (1 << $j))
     }
@@ -253,8 +253,8 @@ $cases[4]->{cost} = 20
 p "── Chinese-postman demo ──────────────────────────────"
 printf "  %-30s  %3s  %5s  %5s  %5s\n", "case", "n", "sum", "extra", "cost"
 printf "  %-30s  %3s  %5s  %5s  %5s\n", "------------------------------", "---", "-----", "-----", "-----"
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
     printf "  %-30s  %3d  %5d  %5d  %5d  %s\n",
         $c->{name}, $c->{n}, $r->{sum_edges}, $r->{extra}, $r->{cost},
         $r->{cost} == $c->{cost} ? "" : "FAIL want=#{$c->{cost}}"
@@ -262,39 +262,39 @@ for val $c (@cases) {
 
 # ── invariant 1: walk cost matches expected ───────────────────────
 
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
     die "cost #{$r->{cost}} != expected #{$c->{cost}} on \"#{$c->{name}}\"" unless $r->{cost} == $c->{cost}
 }
 
 # ── invariant 2: cost == sum + extra ──────────────────────────────
 
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
     die "cost decomposition broken on \"#{$c->{name}}\"" unless $r->{cost} == $r->{sum_edges} + $r->{extra}
 }
 
 # ── invariant 3: even number of odd-degree vertices ──────────────
 
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
     die "odd count #{$r->{odd_count}} is itself odd on \"#{$c->{name}}\"" if $r->{odd_count} & 1
 }
 
 # ── invariant 4: Eulerian (no odd vertices) ⇒ extra = 0 ─────────
 
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
     next if $r->{odd_count} > 0
     die "Eulerian graph has extra > 0 on \"#{$c->{name}}\"" unless $r->{extra} == 0
 }
 
 # ── invariant 5: Floyd-Warshall is symmetric on undirected graphs ─
 
-for val $c (@cases) {
-    val $dist = Cpp::floyd($c->{n}, $c->{edges})
-    for val $i (0:$c->{n} - 1) {
-        for val $j (0:$c->{n} - 1) {
+for var $c (@cases) {
+    var $dist = Cpp::floyd($c->{n}, $c->{edges})
+    for var $i (0:$c->{n} - 1) {
+        for var $j (0:$c->{n} - 1) {
             die "dist asymmetric on \"#{$c->{name}}\" at (#{$i}, #{$j})" unless $dist->[$i]->[$j] == $dist->[$j]->[$i]
         }
     }
@@ -302,11 +302,11 @@ for val $c (@cases) {
 
 # ── invariant 6: triangle inequality on Floyd distances ───────────
 
-for val $c (@cases) {
-    val $dist = Cpp::floyd($c->{n}, $c->{edges})
-    for val $i (0:$c->{n} - 1) {
-        for val $j (0:$c->{n} - 1) {
-            for val $k (0:$c->{n} - 1) {
+for var $c (@cases) {
+    var $dist = Cpp::floyd($c->{n}, $c->{edges})
+    for var $i (0:$c->{n} - 1) {
+        for var $j (0:$c->{n} - 1) {
+            for var $k (0:$c->{n} - 1) {
                 next if $dist->[$i]->[$k] >= 1_000_000 || $dist->[$k]->[$j] >= 1_000_000
                 die "triangle inequality broken on \"#{$c->{name}}\" at (#{$i}, #{$k}, #{$j})" unless $dist->[$i]->[$j] <= $dist->[$i]->[$k] + $dist->[$k]->[$j]
             }
@@ -316,26 +316,26 @@ for val $c (@cases) {
 
 # ── invariant 7: augmenting + Hierholzer closes back to start ─────
 
-for val $c (@cases) {
-    val $r = Cpp::walk_cost($c->{n}, $c->{edges})
-    val $dist = Cpp::floyd($c->{n}, $c->{edges})
+for var $c (@cases) {
+    var $r = Cpp::walk_cost($c->{n}, $c->{edges})
+    var $dist = Cpp::floyd($c->{n}, $c->{edges})
     var @odd
     var @deg = (0) x $c->{n}
-    for val $e (@{$c->{edges}}) { $deg[$e->[0]]++; $deg[$e->[1]]++ }
-    for val $v (0:$c->{n} - 1) { push @odd, $v if $deg[$v] & 1 }
+    for var $e (@{$c->{edges}}) { $deg[$e->[0]]++; $deg[$e->[1]]++ }
+    for var $v (0:$c->{n} - 1) { push @odd, $v if $deg[$v] & 1 }
     var $pairs = []
     if (len(@odd) > 0) {
         $pairs = Cpp::match_pairs(\@odd, $dist)
     }
-    val $aug = Cpp::augmented_edges($c->{n}, $c->{edges}, $pairs, $dist)
+    var $aug = Cpp::augmented_edges($c->{n}, $c->{edges}, $pairs, $dist)
     # Pick any vertex with at least one incident edge as start.
     var $start = 0
-    for val $v (0:$c->{n} - 1) {
+    for var $v (0:$c->{n} - 1) {
         var $has = 0
-        for val $e (@$aug) { $has = 1 if $e->[0] == $v || $e->[1] == $v }
+        for var $e (@$aug) { $has = 1 if $e->[0] == $v || $e->[1] == $v }
         if ($has) { $start = $v; last }
     }
-    val $circuit = Cpp::eulerian_circuit($c->{n}, $aug, $start)
+    var $circuit = Cpp::eulerian_circuit($c->{n}, $aug, $start)
     die "circuit empty on \"#{$c->{name}}\"" unless len(@$circuit) > 0
     die "circuit doesn't close on \"#{$c->{name}}\": #{$circuit->[0]} != #{$circuit->[-1]}" unless $circuit->[0] == $circuit->[-1]
     # Circuit edges + 1 vertex == circuit length.
