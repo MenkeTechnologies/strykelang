@@ -3,8 +3,8 @@
 #
 # Usage: s examples/project/t/run.stk
 
-val $dir = dirname $0
-val @test_files = glob("$dir/test_*.stk") |> sort
+val $dir = dirname __FILE__
+var @test_files = glob("$dir/test_*.stk") |> sort
 val $total = len @test_files
 var $failed = 0
 
