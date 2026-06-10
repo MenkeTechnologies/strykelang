@@ -257,7 +257,7 @@ fn Project::ArraysExtended::arr_length {
 
 fn Project::ArraysExtended::arr_last_index {
     val @xa = (1, 2, 3, 4, 5)
-    $#a
+    $#xa
 }
 
 fn Project::ArraysExtended::arr_wantarray_context {
@@ -340,7 +340,7 @@ fn Project::ArraysExtended::arr_all_match {
 fn Project::ArraysExtended::arr_index_of {
     val @xa = qw(a b c d e)
     var $idx = -1
-    for val $i (0:$#a) {
+    for val $i (0:$#xa) {
         if ($xa[$i] eq "c") {
             $idx = $i
             last
@@ -360,7 +360,7 @@ fn Project::ArraysExtended::arr_zip {
     val @xa = (1, 2, 3)
     val @xb = qw(a b c)
     var @result
-    for val $i (0:$#a) {
+    for val $i (0:$#xa) {
         push @result, $xa[$i], $xb[$i]
     }
     @result
