@@ -8,11 +8,20 @@
 //! end-to-end pipeline.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 use stryke::pkg::commands::{find_project_root, resolve_module};
 use stryke::pkg::lockfile::{integrity_for_directory, Lockfile};
 use stryke::pkg::manifest::{DepSpec, Manifest, PackageMeta};
 use stryke::pkg::resolver::Resolver;
 use stryke::pkg::store::Store;
+
+/// `STRYKE_HOME` is a process-global env var that the resolver / store
+/// honor for `Store::user_default()`. Any test that mutates it races
+/// every other STRYKE_HOME-mutating test under `cargo test`'s default
+/// parallel runner. Grab this mutex for the whole duration of such a
+/// test; release happens automatically on scope exit. Mirrors the
+/// `STRYKE_HOME_MUTEX` in the `pkg::commands::tests` unit module.
+static STRYKE_HOME_MUTEX: Mutex<()> = Mutex::new(());
 
 fn tempdir(tag: &str) -> PathBuf {
     let pid = std::process::id();
@@ -158,7 +167,11 @@ fn registry_dep_returns_unimplemented_diagnostic() {
 }
 
 #[test]
-fn git_dep_with_unreachable_url_fails_clone() {
+fn non_github_git_dep_rejected_with_rewrite_hint() {
+    // Post-d480adc6 `s install` no longer source-clones — it fetches
+    // prebuilt release tarballs from github.com. A `git = "…"` dep
+    // that doesn't point at github.com must be rejected up front
+    // with a hint to rewrite as `github = "OWNER/REPO"` or `path`.
     let project = tempdir("project");
     let mut manifest = Manifest {
         package: Some(PackageMeta {
@@ -186,8 +199,9 @@ fn git_dep_with_unreachable_url_fails_clone() {
     };
     let err = r.resolve().unwrap_err();
     let msg = err.to_string();
-    assert!(msg.contains("git clone"), "got: {}", msg);
+    assert!(msg.contains("github.com"), "got: {}", msg);
     assert!(msg.contains("lib"), "got: {}", msg);
+    assert!(msg.contains("github = "), "rewrite hint missing; got: {}", msg);
 }
 
 #[test]
@@ -211,6 +225,7 @@ fn module_resolution_via_lockfile_finds_store_path() {
     // Run the resolver to populate the store + lockfile.
     let store_root = tempdir("store");
     let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
     std::env::set_var("STRYKE_HOME", &store_root);
     let manifest = Manifest::from_path(&project.join("stryke.toml")).unwrap();
     let r = Resolver {
@@ -285,6 +300,7 @@ fn install_fake_store_pkg(store: &Store, name: &str, version: &str, file_name: &
 fn use_site_pin_overrides_lockfile_inside_project() {
     let store_root = tempdir("store");
     let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
     std::env::set_var("STRYKE_HOME", &store_root);
     install_fake_store_pkg(&store, "foo", "1.0", "Foo", "# foo v1.0\n");
     install_fake_store_pkg(&store, "foo", "2.0", "Foo", "# foo v2.0\n");
@@ -336,6 +352,7 @@ fn use_site_pin_overrides_lockfile_inside_project() {
 fn outside_project_resolver_picks_highest_semver() {
     let store_root = tempdir("highstore");
     let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
     std::env::set_var("STRYKE_HOME", &store_root);
     // Lexicographic vs numeric distinction: `1.99` is text-greater
     // than `2.0`, so a lexicographic compare would pick the wrong
@@ -366,6 +383,7 @@ fn outside_project_resolver_picks_highest_semver() {
 fn analyzer_mirrors_runtime_for_use_site_pin() {
     let store_root = tempdir("mirrorstore");
     let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
     std::env::set_var("STRYKE_HOME", &store_root);
     install_fake_store_pkg(&store, "foo", "1.0", "Foo", "# foo v1.0\n");
     install_fake_store_pkg(&store, "foo", "2.0", "Foo", "# foo v2.0\n");
@@ -406,6 +424,7 @@ fn analyzer_mirrors_runtime_for_use_site_pin() {
 fn use_site_pin_bridges_stryke_prefix() {
     let store_root = tempdir("bridgestore");
     let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
     std::env::set_var("STRYKE_HOME", &store_root);
     install_fake_store_pkg(&store, "stryke-gui", "0.3.0", "GUI", "# gui v0.3.0\n");
 
