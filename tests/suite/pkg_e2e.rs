@@ -223,7 +223,7 @@ fn module_resolution_via_lockfile_finds_store_path() {
     let lock_body = lf.to_toml_string().unwrap();
     std::fs::write(project.join("stryke.lock"), lock_body).unwrap();
 
-    let resolved = resolve_module(&project, "mylib::Greet")
+    let resolved = resolve_module(&project, "mylib::Greet", None)
         .unwrap()
         .expect("resolved");
     let canonical_resolved = resolved.canonicalize().unwrap();
@@ -237,7 +237,7 @@ fn module_resolution_via_lockfile_finds_store_path() {
     // Also verify the project-local lib/ takes precedence when present.
     std::fs::create_dir_all(project.join("lib")).unwrap();
     std::fs::write(project.join("lib/Local.stk"), "1\n").unwrap();
-    let local = resolve_module(&project, "Local")
+    let local = resolve_module(&project, "Local", None)
         .unwrap()
         .expect("resolved");
     assert!(local.ends_with("lib/Local.stk"), "got {:?}", local);
