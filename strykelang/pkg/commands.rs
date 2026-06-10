@@ -764,12 +764,17 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
     }
 
     // 2. Lockfile-driven store lookup. Use the (lower-cased) first segment as
-    //    the package name; remaining segments become the in-package path.
+    //    the package name; remaining segments become the in-package path. Fall
+    //    back to `stryke-<name>` so `use GUI` bridges to a `stryke-gui` entry
+    //    even when the lockfile dep key is the prefixed canonical name.
     let lock_path = root.join(LOCKFILE_FILE);
     if lock_path.is_file() {
         let lock = Lockfile::from_path(&lock_path)?;
         let pkg_name = segments[0].to_lowercase();
-        if let Some(entry) = lock.find(&pkg_name) {
+        let entry = lock
+            .find(&pkg_name)
+            .or_else(|| lock.find(&format!("stryke-{}", pkg_name)));
+        if let Some(entry) = entry {
             let store = Store::user_default()?;
             let store_pkg = store.package_dir(&entry.name, &entry.version);
             let nested_path = if segments.len() == 1 {
@@ -795,12 +800,17 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
     // import name matches the package name, e.g. `use Stryke::AWS` → entry
     // `stryke-aws`). On miss, fall back to `[ffi].namespace` — bridges
     // `use GUI` (lookup key `"gui"`) to an entry whose canonical name is
-    // `stryke-gui` (matches the repo) but whose namespace is `GUI`.
+    // `stryke-gui` (matches the repo) but whose namespace is `GUI`. Final
+    // fallback: try `stryke-<name>` directly — bridges legacy installs whose
+    // index entry was written before the namespace field was populated, so
+    // `use GUI` still finds `stryke-gui@*` even with an empty namespace.
     if let Ok(idx) = InstalledIndex::load_or_default() {
         let pkg_name = segments[0].to_lowercase();
+        let prefixed = format!("stryke-{}", pkg_name);
         let entry = idx
             .find(&pkg_name)
-            .or_else(|| idx.find_by_namespace(&pkg_name));
+            .or_else(|| idx.find_by_namespace(&pkg_name))
+            .or_else(|| idx.find(&prefixed));
         if let Some(entry) = entry {
             let store = Store::user_default()?;
             let store_pkg = store.package_dir(&entry.name, &entry.version);
@@ -2932,6 +2942,37 @@ mod tests {
         .unwrap();
         let r = resolve_module(&root, "Foo::Bar").unwrap();
         assert!(r.is_none());
+    }
+
+    /// Legacy install (or first-install on a fresh machine) where the index
+    /// entry has the prefixed name `stryke-gui` but no namespace recorded.
+    /// `use GUI` must still resolve via the `stryke-<lowername>` fallback —
+    /// otherwise older machines get a Perl @INC fallback and the user sees
+    /// `Can't locate GUI.pm`.
+    #[test]
+    fn resolve_module_resolves_via_stryke_prefix_when_namespace_empty() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-prefix");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        let pkg_dir = store.package_dir("stryke-gui", "0.3.0");
+        std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+        std::fs::write(pkg_dir.join("lib/GUI.stk"), b"sub g { 1 }").unwrap();
+
+        let mut idx = InstalledIndex::new();
+        // Empty namespace simulates a legacy entry written before the
+        // install path populated the namespace field.
+        idx.upsert("stryke-gui", "0.3.0", "github:MenkeTechnologies/stryke-gui");
+        idx.save_to(&store).unwrap();
+
+        let proj = tempdir("proj-no-local-gui");
+        let r = resolve_module(&proj, "GUI").unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("GUI should resolve to stryke-gui via prefix fallback");
+        assert!(r.ends_with("store/stryke-gui@0.3.0/lib/GUI.stk"), "got {:?}", r);
     }
 
     // ── Library-resolution tests (L1, L4) ─────────────────────────────
