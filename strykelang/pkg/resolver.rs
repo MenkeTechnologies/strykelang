@@ -459,9 +459,44 @@ impl<'a> Resolver<'a> {
 
         let integrity = integrity_for_directory(src)?;
         let manifest_for_copy = nested.clone().unwrap_or_default();
+
+        // For [ffi] path deps, build the cdylib in the source tree (or
+        // pick up an existing target/release/ artifact) BEFORE copying
+        // the subtree into the store — that way `lib/lib<name>.<ext>`
+        // is in place either via the source layout (`lib/`) or via the
+        // post-copy stage step below. Without this, `use Foo` against
+        // a freshly-installed path dep would dlopen-fail at runtime
+        // because the store entry would have only `lib/*.stk` and no
+        // cdylib. Mirrors `s pkg install -g <path>`'s flow exactly.
+        let ffi_stage = super::commands::ensure_ffi_cdylib(src, &manifest_for_copy)
+            .map_err(PkgError::Resolve)?;
+
         let dst = self
             .store
             .install_path_dep(name, &version, src, &manifest_for_copy)?;
+
+        // Stage the freshly-built (or target/-located) cdylib into
+        // dst/lib/ when ensure_ffi_cdylib returned Some — the source's
+        // own lib/ didn't already have it.
+        if let Some((built_lib, lib_filename)) = ffi_stage {
+            let dst_lib_dir = dst.join("lib");
+            std::fs::create_dir_all(&dst_lib_dir).map_err(|e| {
+                PkgError::Io(format!("create {}: {}", dst_lib_dir.display(), e))
+            })?;
+            let dst_lib = dst_lib_dir.join(&lib_filename);
+            if !dst_lib.is_file() {
+                std::fs::copy(&built_lib, &dst_lib).map_err(|e| {
+                    PkgError::Io(format!(
+                        "stage cdylib {} -> {}: {}",
+                        built_lib.display(),
+                        dst_lib.display(),
+                        e
+                    ))
+                })?;
+                eprintln!("  staged {} -> {}", built_lib.display(), dst_lib.display());
+            }
+        }
+
         installed.push((name.to_string(), version.clone(), dst.clone()));
 
         let mut transitive: Vec<String> = Vec::new();
