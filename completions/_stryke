@@ -325,6 +325,84 @@ _stryke_publish() {
     '(-h --help)'{-h,--help}'[show s publish usage]'
 }
 
+# `s yank NAME@VER` — yank a published version from the registry.
+_stryke_yank() {
+  _arguments -s -S \
+    '--registry=[alternate registry URL]:url:' \
+    '(-h --help)'{-h,--help}'[show s yank usage]' \
+    '1:package spec (NAME@VERSION):'
+}
+
+# `s outdated` — list installed deps newer than stryke.lock.
+_stryke_outdated() {
+  _arguments -s -S \
+    '(-h --help)'{-h,--help}'[show s outdated usage]'
+}
+
+# `s audit` — security audit of resolved dep tree.
+_stryke_audit() {
+  _arguments -s -S \
+    '(-h --help)'{-h,--help}'[show s audit usage]'
+}
+
+# `s vendor` — populate ./vendor/ for offline / hermetic builds.
+_stryke_vendor() {
+  _arguments -s -S \
+    '(-h --help)'{-h,--help}'[show s vendor usage]'
+}
+
+# `s clean` — remove caches and build artifacts.
+_stryke_clean() {
+  _arguments -s -S \
+    '--all[also remove ~/.stryke/store entries]' \
+    '(-h --help)'{-h,--help}'[show s clean usage]'
+}
+
+# `s search QUERY` — search the registry for packages.
+_stryke_search() {
+  _arguments -s -S \
+    '--registry=[alternate registry URL]:url:' \
+    '--limit=[max number of results]:n:' \
+    '(-h --help)'{-h,--help}'[show s search usage]' \
+    '1:query:'
+}
+
+# `s agent [-c CFG] [--controller HOST:PORT] [--port N]` — worker side of
+# the distributed load-testing harness.
+_stryke_agent() {
+  _arguments -s -S \
+    '(-c --config)'{-c+,--config=}'[YAML config file]:file:_files -g "*.yml *.yaml"' \
+    '--controller=[controller host:port to connect to]:host\:port:' \
+    '--port=[explicit port for incoming control channel]:port:' \
+    '(-h --help)'{-h,--help}'[show s agent usage]'
+}
+
+# `s controller [--bind HOST] [--port N]` — REPL that drives a fleet of
+# `s agent` workers.
+_stryke_controller() {
+  _arguments -s -S \
+    '(-b --bind)'{-b+,--bind=}'[host to bind on (default 0.0.0.0)]:host:_hosts' \
+    '(-p --port)'{-p+,--port=}'[port to listen on (default 9999)]:port:' \
+    '(-h --help)'{-h,--help}'[show s controller usage]'
+}
+
+# `s ai [PROMPT|--system MSG]` — AI helper (OPENAI_API_KEY / ANTHROPIC_API_KEY).
+_stryke_ai() {
+  _arguments -s -S \
+    '--model=[model name]:name:' \
+    '--system=[system prompt]:msg:' \
+    '--stream[stream tokens to stdout]' \
+    '--json[emit raw JSON response]' \
+    '--image[treat positional as image generation prompt]' \
+    '--transcribe[transcribe audio file (positional)]' \
+    '--speak[TTS: synthesize speech from prompt]' \
+    '(-o --output)'{-o+,--output=}'[output file (for --image / --speak)]:file:_files' \
+    '--size=[image size (e.g. 1024x1024)]:size:' \
+    '--voice=[TTS voice]:voice:' \
+    '(-h --help)'{-h,--help}'[show s ai usage]' \
+    '*:prompt words:'
+}
+
 # `s pkg <subcommand>` — dispatcher mirror for the package commands above.
 _stryke_pkg() {
   local curcontext="$curcontext" state line
@@ -349,12 +427,18 @@ _stryke_pkg() {
         'upgrade:alias for update'
         'publish:push package to registry (alias: pub)'
         'pub:alias for publish'
+        'yank:yank a published version from the registry'
         'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
         'gc:delete store entries no longer pinned (requires -g)'
         'add:add a dep to stryke.toml'
         'remove:drop a dep from stryke.toml'
         'tree:print resolved dep graph'
         'info:show lockfile entry for a dep'
+        'outdated:list installed deps newer than stryke.lock'
+        'audit:security audit of resolved dep tree'
+        'vendor:vendor deps into ./vendor/ for offline builds'
+        'clean:remove caches and build artifacts'
+        'search:search the registry for packages'
       )
       _describe 'pkg subcommand' pkg_subcmds
       ;;
@@ -374,6 +458,12 @@ _stryke_pkg() {
         test|t)    _stryke_test ;;
         update|up|upgrade) _stryke_update ;;
         publish|pub) _stryke_publish ;;
+        yank)      _stryke_yank ;;
+        outdated)  _stryke_outdated ;;
+        audit)     _stryke_audit ;;
+        vendor)    _stryke_vendor ;;
+        clean)     _stryke_clean ;;
+        search)    _stryke_search ;;
       esac
       ;;
   esac
@@ -600,13 +690,20 @@ _stryke() {
         'upgrade:alias for update'
         'publish:push package to registry (alias: pub)'
         'pub:alias for publish'
-        'use:switch which installed version `use Foo` resolves to (requires -g NAME@VERSION)'
-        'gc:delete store entries no longer pinned (requires -g)'
+        'yank:yank a published version from the registry'
+        'outdated:list installed deps newer than stryke.lock'
+        'audit:security audit of resolved dep tree'
+        'vendor:vendor deps into ./vendor/ for offline builds'
+        'clean:remove caches and build artifacts'
+        'search:search the registry for packages'
         'add:add a dep to stryke.toml'
         'remove:drop a dep from stryke.toml'
         'tree:print resolved dep graph from stryke.lock'
         'info:show lockfile entry + store path for a dep'
         'pkg:package-manager subcommand dispatcher'
+        'agent:distributed load-testing agent (worker side)'
+        'controller:distributed load-testing controller REPL'
+        'ai:AI helper (prompt-driven code generation / explanation)'
         'repl:start interactive REPL'
         'lsp:start Language Server Protocol'
         'completions:emit shell completions'
@@ -637,14 +734,21 @@ _stryke() {
         install|i) _stryke_install ;;
         uninstall|un) _stryke_uninstall ;;
         list|ls)   _stryke_list ;;
-        use)       _stryke_use ;;
-        gc)        _stryke_gc ;;
         add)       _stryke_add ;;
         remove)    _stryke_remove ;;
         tree)      _stryke_tree ;;
         info)      _stryke_info ;;
         update|up|upgrade) _stryke_update ;;
         publish|pub) _stryke_publish ;;
+        yank)      _stryke_yank ;;
+        outdated)  _stryke_outdated ;;
+        audit)     _stryke_audit ;;
+        vendor)    _stryke_vendor ;;
+        clean)     _stryke_clean ;;
+        search)    _stryke_search ;;
+        agent)     _stryke_agent ;;
+        controller) _stryke_controller ;;
+        ai)        _stryke_ai ;;
         pkg)       _stryke_pkg ;;
         repl)      _stryke_repl ;;
         run)       _stryke_run ;;
