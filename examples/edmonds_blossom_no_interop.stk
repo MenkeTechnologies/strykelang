@@ -27,7 +27,7 @@
 
 fn Bl::new($n) {
     var @adj
-    for val $i (0:$n - 1) { push @adj, [] }
+    for var $i (0:$n - 1) { push @adj, [] }
     +{ n => $n, adj => \@adj }
 }
 
@@ -74,24 +74,24 @@ fn Bl::mark_path($base, $blossom, $parent, $v, $base_id, $child) {
 # Returns the endpoint of an augmenting path or -1 if none exists.
 
 fn Bl::find_path($g, $mate, $root) {
-    val $n = $g->{n}
+    var $n = $g->{n}
     var @used    = (0)  x $n
     var @parent  = (-1) x $n
     var @base    = (0:$n - 1)
     $used[$root] = 1
     var @queue = ($root)
     while (len(@queue) > 0) {
-        val $u = shift @queue
-        for val $v (@{$g->{adj}->[$u]}) {
+        var $u = shift @queue
+        for var $v (@{$g->{adj}->[$u]}) {
             next if $base[$u] == $base[$v]      # same blossom — skip
             next if $mate->[$u] == $v           # matched edge from u
             if ($v == $root || ($mate->[$v] != -1 && $parent[$mate->[$v]] != -1)) {
                 # Blossom found.
-                val $lca = Bl::lca(\@$mate, \@base, \@parent, $u, $v)
-                val @blossom = (0) x $n
+                var $lca = Bl::lca(\@$mate, \@base, \@parent, $u, $v)
+                var @blossom = (0) x $n
                 Bl::mark_path(\@base, \@blossom, \@parent, $u, $lca, $v)
                 Bl::mark_path(\@base, \@blossom, \@parent, $v, $lca, $u)
-                for val $i (0:$n - 1) {
+                for var $i (0:$n - 1) {
                     if ($blossom[$base[$i]]) {
                         $base[$i] = $lca
                         if (!$used[$i]) {
@@ -116,17 +116,17 @@ fn Bl::find_path($g, $mate, $root) {
 # ── full match: returns mate[] array (mate[v] = matched partner) ──
 
 fn Bl::match_all($g) {
-    val $n = $g->{n}
+    var $n = $g->{n}
     var @mate = (-1) x $n
-    for val $v (0:$n - 1) {
+    for var $v (0:$n - 1) {
         next unless $mate[$v] == -1
-        val $end = Bl::find_path($g, \@mate, $v)
+        var $end = Bl::find_path($g, \@mate, $v)
         next if $end == -1
         # Walk the augmenting path, flipping matched/unmatched edges.
-        val $used = $end
+        var $used = $end
         var $u = $end
         while ($u != -1) {
-            val $pv = $u
+            var $pv = $u
             # Find parent of $pv via the parent array recomputed in
             # find_path. Since we don't return the parent array here,
             # reconstruct by tracing a single augmenting BFS.
@@ -143,7 +143,7 @@ fn Bl::match_all($g) {
 # ── re-traceable augmentation: a fresh BFS keeping parent info ────
 
 fn Bl::augment($g, $mate, $root, $endpoint) {
-    val $n = $g->{n}
+    var $n = $g->{n}
     # Re-run the same BFS to recover the parent array up to endpoint.
     var @used    = (0)  x $n
     var @parent  = (-1) x $n
@@ -151,16 +151,16 @@ fn Bl::augment($g, $mate, $root, $endpoint) {
     $used[$root] = 1
     var @queue = ($root)
     while (len(@queue) > 0) {
-        val $u = shift @queue
-        for val $v (@{$g->{adj}->[$u]}) {
+        var $u = shift @queue
+        for var $v (@{$g->{adj}->[$u]}) {
             next if $base[$u] == $base[$v]
             next if $mate->[$u] == $v
             if ($v == $root || ($mate->[$v] != -1 && $parent[$mate->[$v]] != -1)) {
-                val $lca = Bl::lca($mate, \@base, \@parent, $u, $v)
-                val @blossom = (0) x $n
+                var $lca = Bl::lca($mate, \@base, \@parent, $u, $v)
+                var @blossom = (0) x $n
                 Bl::mark_path(\@base, \@blossom, \@parent, $u, $lca, $v)
                 Bl::mark_path(\@base, \@blossom, \@parent, $v, $lca, $u)
-                for val $i (0:$n - 1) {
+                for var $i (0:$n - 1) {
                     if ($blossom[$base[$i]]) {
                         $base[$i] = $lca
                         if (!$used[$i]) {
@@ -175,8 +175,8 @@ fn Bl::augment($g, $mate, $root, $endpoint) {
                     # Augment along the path endpoint → ... → root.
                     var $cur = $v
                     while ($cur != -1) {
-                        val $pv = $parent[$cur]
-                        val $ppv = $mate->[$pv]
+                        var $pv = $parent[$cur]
+                        var $ppv = $mate->[$pv]
                         $mate->[$cur] = $pv
                         $mate->[$pv] = $cur
                         $cur = $ppv
@@ -194,7 +194,7 @@ fn Bl::augment($g, $mate, $root, $endpoint) {
 
 fn Bl::match_size($mate) {
     var $cnt = 0
-    for val $v (@$mate) {
+    for var $v (@$mate) {
         $cnt++ if $v != -1
     }
     int($cnt / 2)
@@ -204,24 +204,24 @@ fn Bl::match_size($mate) {
 # Try every subset of edges and check it's a valid matching.
 
 fn Bl::brute_max($g) {
-    val $n = $g->{n}
+    var $n = $g->{n}
     var @edges
-    for val $u (0:$n - 1) {
-        for val $v (@{$g->{adj}->[$u]}) {
+    for var $u (0:$n - 1) {
+        for var $v (@{$g->{adj}->[$u]}) {
             push @edges, [$u, $v] if $u < $v
         }
     }
-    val $m = len(@edges)
+    var $m = len(@edges)
     var $best = 0
-    val $total = 1 << $m
-    for val $mask (0:$total - 1) {
+    var $total = 1 << $m
+    for var $mask (0:$total - 1) {
         var @used = (0) x $n
         var $cnt = 0
         var $valid = 1
-        for val $i (0:$m - 1) {
+        for var $i (0:$m - 1) {
             next unless ($mask >> $i) & 1
-            val $u = $edges[$i]->[0]
-            val $v = $edges[$i]->[1]
+            var $u = $edges[$i]->[0]
+            var $v = $edges[$i]->[1]
             if ($used[$u] || $used[$v]) {
                 $valid = 0
                 last
@@ -284,38 +284,38 @@ var @cases = (
 p "── Edmonds blossom matching demo ─────────────────────"
 printf "  %-34s  %3s  %5s\n", "case", "n", "max"
 printf "  %-34s  %3s  %5s\n", "----------------------------------", "---", "-----"
-for val $c (@cases) {
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+for var $c (@cases) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    val $sz = Bl::match_size($mate)
+    var $mate = Bl::match_all($g)
+    var $sz = Bl::match_size($mate)
     printf "  %-34s  %3d  %5d  %s\n", $c->{name}, $c->{n}, $sz, $sz == $c->{max} ? "" : "FAIL want=#{$c->{max}}"
 }
 
 # ── invariant 1: matching size matches expected ───────────────────
 
-for val $c (@cases) {
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+for var $c (@cases) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    val $sz = Bl::match_size($mate)
+    var $mate = Bl::match_all($g)
+    var $sz = Bl::match_size($mate)
     die "match size #{$sz} != expected #{$c->{max}} on \"#{$c->{name}}\"" unless $sz == $c->{max}
 }
 
 # ── invariant 2: mate[] is symmetric (mate[mate[v]] == v) ─────────
 
-for val $c (@cases) {
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+for var $c (@cases) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    val $n = len(@$mate)
-    for val $v (0:$n - 1) {
+    var $mate = Bl::match_all($g)
+    var $n = len(@$mate)
+    for var $v (0:$n - 1) {
         next if $mate->[$v] == -1
         die "mate symmetry broken on \"#{$c->{name}}\" at v=#{$v}" unless $mate->[$mate->[$v]] == $v
     }
@@ -323,17 +323,17 @@ for val $c (@cases) {
 
 # ── invariant 3: every matched edge is actually in the graph ──────
 
-for val $c (@cases) {
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+for var $c (@cases) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    val $n = len(@$mate)
-    for val $v (0:$n - 1) {
+    var $mate = Bl::match_all($g)
+    var $n = len(@$mate)
+    for var $v (0:$n - 1) {
         next if $mate->[$v] == -1 || $mate->[$v] < $v
         var $found = 0
-        for val $w (@{$g->{adj}->[$v]}) {
+        for var $w (@{$g->{adj}->[$v]}) {
             $found = 1 if $w == $mate->[$v]
         }
         die "matched edge (#{$v}, #{$mate->[$v]}) not in graph on \"#{$c->{name}}\"" unless $found
@@ -342,15 +342,15 @@ for val $c (@cases) {
 
 # ── invariant 4: Edmonds matches brute force on small inputs ──────
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if len(@{$c->{edges}}) > 12
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    val $sz = Bl::match_size($mate)
-    val $br = Bl::brute_max($g)
+    var $mate = Bl::match_all($g)
+    var $sz = Bl::match_size($mate)
+    var $br = Bl::brute_max($g)
     die "Edmonds #{$sz} != brute #{$br} on \"#{$c->{name}}\"" unless $sz == $br
 }
 
@@ -358,15 +358,15 @@ for val $c (@cases) {
 # (Maximal-by-edge-inclusion is necessary, not sufficient, for max
 # cardinality; combined with invariant 1 we have both.)
 
-for val $c (@cases) {
-    val $g = Bl::new($c->{n})
-    for val $e (@{$c->{edges}}) {
+for var $c (@cases) {
+    var $g = Bl::new($c->{n})
+    for var $e (@{$c->{edges}}) {
         Bl::add_edge($g, $e->[0], $e->[1])
     }
-    val $mate = Bl::match_all($g)
-    for val $u (0:$c->{n} - 1) {
+    var $mate = Bl::match_all($g)
+    for var $u (0:$c->{n} - 1) {
         next if $mate->[$u] != -1
-        for val $v (@{$g->{adj}->[$u]}) {
+        for var $v (@{$g->{adj}->[$u]}) {
             die "unmatched edge (#{$u}, #{$v}) survives — matching not maximal" if $mate->[$v] == -1 && $u != $v
         }
     }
@@ -374,20 +374,20 @@ for val $c (@cases) {
 
 # ── invariant 6: empty graph yields the empty matching ────────────
 
-val $empty = Bl::new(5)
-val $em_mate = Bl::match_all($empty)
+var $empty = Bl::new(5)
+var $em_mate = Bl::match_all($empty)
 die "empty graph matching must be 0" unless Bl::match_size($em_mate) == 0
 
 # ── invariant 7: a perfect matching exists for K4 ─────────────────
 
-val $k4 = Bl::new(4)
+var $k4 = Bl::new(4)
 Bl::add_edge($k4, 0, 1)
 Bl::add_edge($k4, 0, 2)
 Bl::add_edge($k4, 0, 3)
 Bl::add_edge($k4, 1, 2)
 Bl::add_edge($k4, 1, 3)
 Bl::add_edge($k4, 2, 3)
-val $k4_mate = Bl::match_all($k4)
+var $k4_mate = Bl::match_all($k4)
 die "K4 should have perfect matching of size 2" unless Bl::match_size($k4_mate) == 2
 
 p ""

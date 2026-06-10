@@ -25,8 +25,8 @@ var @train = (
     +{ label => "ham",  text => "looking forward to our project meeting tomorrow" },
 )
 
-val $sp_cnt = grep { _->{label} eq "spam" } @train
-val $hm_cnt = grep { _->{label} eq "ham"  } @train
+var $sp_cnt = grep { _->{label} eq "spam" } @train
+var $hm_cnt = grep { _->{label} eq "ham"  } @train
 printf "── training: %d examples (%d spam, %d ham) ────────────\n", len(@train), $sp_cnt, $hm_cnt
 
 # ── train: count word occurrences per class ────────────────────────
@@ -36,17 +36,17 @@ var %class_count   # class_count{label} = total docs of that label
 var %total_words   # total_words{label} = total word count
 var %vocab         # vocab{word} = 1
 
-for val $cls ("spam", "ham") {
+for var $cls ("spam", "ham") {
     $word_counts{$cls} = +{}
     $class_count{$cls} = 0
     $total_words{$cls} = 0
 }
 
-for val $doc (@train) {
-    val $cls = $doc->{label}
+for var $doc (@train) {
+    var $cls = $doc->{label}
     $class_count{$cls}++
     var @words = split /\s+/, lc $doc->{text}
-    for val $w (@words) {
+    for var $w (@words) {
         next if len($w) == 0
         $word_counts{$cls}->{$w} = ($word_counts{$cls}->{$w} // 0) + 1
         $total_words{$cls}++
@@ -60,23 +60,23 @@ printf "  total words: spam=%d, ham=%d\n",
 
 # ── classify: compute log-prob per class, pick max ─────────────────
 
-val $td_lat = t_digest(100)
+var $td_lat = t_digest(100)
 
 fn Demo::NB::classify($text) {
-    val $t0 = now_ns()
+    var $t0 = now_ns()
     var @words = split /\s+/, lc $text
     @words = grep { len(_) > 0 } @words
-    val $vsize = len(keys %vocab)
-    val $total = $class_count{spam} + $class_count{ham}
+    var $vsize = len(keys %vocab)
+    var $total = $class_count{spam} + $class_count{ham}
     var %log_score
-    for val $cls ("spam", "ham") {
+    for var $cls ("spam", "ham") {
         # Class prior.
-        val $log_prior = log($class_count{$cls} / $total)
+        var $log_prior = log($class_count{$cls} / $total)
         var $log_likelihood = 0.0
-        for val $w (@words) {
-            val $count = $word_counts{$cls}->{$w} // 0
+        for var $w (@words) {
+            var $count = $word_counts{$cls}->{$w} // 0
             # Laplace smoothing: (count + 1) / (total_words + vsize).
-            val $p = ($count + 1) / ($total_words{$cls} + $vsize)
+            var $p = ($count + 1) / ($total_words{$cls} + $vsize)
             $log_likelihood += log($p)
         }
         $log_score{$cls} = $log_prior + $log_likelihood
@@ -101,10 +101,10 @@ var @test = (
 printf "\n── classification of %d test messages ─────────────\n", len @test
 var $correct = 0
 var $tp = 0; var $fp = 0; var $tn = 0; var $fn = 0
-for val $msg (@test) {
-    val $pred = Demo::NB::classify($msg->{text})
-    val $true = $msg->{true_label}
-    val $tag = $pred eq $true ? "ok " : "WRONG"
+for var $msg (@test) {
+    var $pred = Demo::NB::classify($msg->{text})
+    var $true = $msg->{true_label}
+    var $tag = $pred eq $true ? "ok " : "WRONG"
     $correct++ if $pred eq $true
     if    ($true eq "spam" && $pred eq "spam") { $tp++ }
     elsif ($true eq "ham"  && $pred eq "spam") { $fp++ }
@@ -125,10 +125,10 @@ printf "  FN (spam as ham)    : %d\n", $fn
 
 p ""
 p "── metrics ──────────────────────────────────────────"
-val $accuracy  = $correct / len @test
-val $precision = ($tp + $fp) > 0 ? $tp / ($tp + $fp) : 0.0
-val $recall    = ($tp + $fn) > 0 ? $tp / ($tp + $fn) : 0.0
-val $f1        = ($precision + $recall) > 0
+var $accuracy  = $correct / len @test
+var $precision = ($tp + $fp) > 0 ? $tp / ($tp + $fp) : 0.0
+var $recall    = ($tp + $fn) > 0 ? $tp / ($tp + $fn) : 0.0
+var $f1        = ($precision + $recall) > 0
                 ? 2 * $precision * $recall / ($precision + $recall)
                 : 0.0
 printf "  accuracy  : %.1f%%\n", 100 * $accuracy
@@ -148,23 +148,23 @@ printf "  p99  : %.1f µs\n", td_quantile($td_lat, 0.99)
 p ""
 p "── top spam-indicator words (TopK by P(w|spam)/P(w|ham)) ──"
 # log-ratio: log(P(w|spam) / P(w|ham)) — higher = stronger spam signal.
-val $tk = topk(5)
-val $vsize = len(keys %vocab)
-for val $w (keys %vocab) {
-    val $sc = $word_counts{spam}->{$w} // 0
-    val $hc = $word_counts{ham}->{$w}  // 0
-    val $p_s = ($sc + 1) / ($total_words{spam} + $vsize)
-    val $p_h = ($hc + 1) / ($total_words{ham}  + $vsize)
-    val $ratio = $p_s / $p_h
+var $tk = topk(5)
+var $vsize = len(keys %vocab)
+for var $w (keys %vocab) {
+    var $sc = $word_counts{spam}->{$w} // 0
+    var $hc = $word_counts{ham}->{$w}  // 0
+    var $p_s = ($sc + 1) / ($total_words{spam} + $vsize)
+    var $p_h = ($hc + 1) / ($total_words{ham}  + $vsize)
+    var $ratio = $p_s / $p_h
     # TopK only sees integer weight; use occurrence count in spam as
     # a proxy and emit each as separate adds.
     if ($ratio > 1.5) {
-        for val $i (1:int($ratio * 10)) {
+        for var $i (1:int($ratio * 10)) {
             topk_add($tk, $w)
         }
     }
 }
 var @hits = topk_top($tk)
-for val $h (@hits) {
+for var $h (@hits) {
     printf "  %-15s\n", $h->[0]
 }

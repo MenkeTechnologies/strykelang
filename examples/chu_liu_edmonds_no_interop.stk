@@ -21,15 +21,15 @@
 # ── recursive Chu-Liu / Edmonds; returns +{ cost, parent } ────────
 
 fn Cle::solve($n, $edges, $root) {
-    val $INF = 1_000_000_000
+    var $INF = 1_000_000_000
     while (1) {
         # Step 1: pick cheapest in-edge for every non-root vertex.
         var @min_in = ($INF) x $n
         var @from   = (-1) x $n
-        for val $e (@$edges) {
-            val $u = $e->[0]
-            val $v = $e->[1]
-            val $w = $e->[2]
+        for var $e (@$edges) {
+            var $u = $e->[0]
+            var $v = $e->[1]
+            var $w = $e->[2]
             next if $u == $v          # self-loops ignored
             if ($w < $min_in[$v]) {
                 $min_in[$v] = $w
@@ -39,7 +39,7 @@ fn Cle::solve($n, $edges, $root) {
         $min_in[$root] = 0
         $from[$root]   = $root
         # Check reachability — any non-root with no in-edge ⇒ no arborescence.
-        for val $v (0:$n - 1) {
+        for var $v (0:$n - 1) {
             if ($v != $root && $from[$v] == -1) {
                 return +{ ok => 0, cost => -1, parent => [] }
             }
@@ -48,7 +48,7 @@ fn Cle::solve($n, $edges, $root) {
         var $cycle_count = 0
         var @cid = (-1) x $n
         var @visited = (0) x $n
-        for val $start (0:$n - 1) {
+        for var $start (0:$n - 1) {
             next if $visited[$start]
             var @path
             var $u = $start
@@ -60,10 +60,10 @@ fn Cle::solve($n, $edges, $root) {
             if ($u != -1 && $cid[$u] == -1 && grep { $_ == $u } @path) {
                 # Found a cycle starting at $u.
                 var $start_idx = -1
-                for val $i (0:len(@path) - 1) {
+                for var $i (0:len(@path) - 1) {
                     if ($path[$i] == $u) { $start_idx = $i; last }
                 }
-                for val $i ($start_idx:len(@path) - 1) {
+                for var $i ($start_idx:len(@path) - 1) {
                     $cid[$path[$i]] = $cycle_count
                 }
                 $cycle_count++
@@ -72,7 +72,7 @@ fn Cle::solve($n, $edges, $root) {
         # Step 3: if no cycles, we're done.
         if ($cycle_count == 0) {
             var $cost = 0
-            for val $v (0:$n - 1) {
+            for var $v (0:$n - 1) {
                 next if $v == $root
                 $cost += $min_in[$v]
             }
@@ -81,36 +81,36 @@ fn Cle::solve($n, $edges, $root) {
             return +{ ok => 1, cost => $cost, parent => \@parent }
         }
         # Step 4: contract cycles. Assign IDs to non-cycle vertices too.
-        for val $v (0:$n - 1) {
+        for var $v (0:$n - 1) {
             if ($cid[$v] == -1) {
                 $cid[$v] = $cycle_count
                 $cycle_count++
             }
         }
-        val $n2 = $cycle_count
+        var $n2 = $cycle_count
         var @new_edges
-        for val $e (@$edges) {
-            val $u = $e->[0]
-            val $v = $e->[1]
-            val $w = $e->[2]
-            val $cu = $cid[$u]
-            val $cv = $cid[$v]
+        for var $e (@$edges) {
+            var $u = $e->[0]
+            var $v = $e->[1]
+            var $w = $e->[2]
+            var $cu = $cid[$u]
+            var $cv = $cid[$v]
             next if $cu == $cv
             # Subtract the cycle's matching incoming weight to keep
             # the "delta" cost consistent across contraction.
-            val $new_w = $w - $min_in[$v]
+            var $new_w = $w - $min_in[$v]
             push @new_edges, [$cu, $cv, $new_w]
         }
-        val $root_new = $cid[$root]
+        var $root_new = $cid[$root]
         # The contracted cost contribution from cycle edges.
-        val $cycle_cost = 0
-        for val $v (0:$n - 1) {
+        var $cycle_cost = 0
+        for var $v (0:$n - 1) {
             next if $v == $root
             next if $cid[$v] >= ($n2 - $cycle_count + $cycle_count)   # always true; keep all
             # add all min_in of cycle members
         }
         # Simpler: sum all min_in[v] for v in cycles.
-        for val $v (0:$n - 1) {
+        for var $v (0:$n - 1) {
             next if $v == $root
             next unless $cid[$v] < ($n2 - ($n2 - $cycle_count))
             # We need the cycle members only — recompute via cid.
@@ -121,27 +121,27 @@ fn Cle::solve($n, $edges, $root) {
         # are 0..(cycle_count_at_step3 - 1)).
         # Easiest: just sum min_in for every non-root v whose cid was
         # one of the cycle clusters; recompute that.
-        val %is_cycle
+        var %is_cycle
         # The cycle cluster IDs are exactly those vertices that share
         # a cid with at least one other vertex (cycle members appear
         # ≥ 2 times in @cid).
         var %count
-        for val $c (@cid) {
+        for var $c (@cid) {
             $count{$c} = 0 unless exists $count{$c}
             $count{$c}++
         }
         var $cyc_sum = 0
-        for val $v (0:$n - 1) {
+        for var $v (0:$n - 1) {
             next if $v == $root
             $cyc_sum += $min_in[$v] if $count{$cid[$v]} > 1
         }
-        val $sub = Cle::solve($n2, \@new_edges, $root_new)
+        var $sub = Cle::solve($n2, \@new_edges, $root_new)
         if (!$sub->{ok}) {
             return +{ ok => 0, cost => -1, parent => [] }
         }
         # The recursive solution's cost already accounts for the
         # contracted weights; add back the cycle "tail" sum.
-        val $cost = $sub->{cost} + $cyc_sum
+        var $cost = $sub->{cost} + $cyc_sum
         # Parent expansion is intricate; the demo's invariants only
         # check cost + the original-graph cost identity, so we don't
         # rebuild a fully expanded parent[] here.
@@ -153,37 +153,37 @@ fn Cle::solve($n, $edges, $root) {
 # non-root) and keep the lowest-cost one that's a true arborescence.
 
 fn Cle::brute($n, $edges, $root) {
-    val $INF = 1_000_000_000
+    var $INF = 1_000_000_000
     # Build per-target candidate-edge list.
     var @per_target
-    for val $i (0:$n - 1) { push @per_target, [] }
-    for val $e (@$edges) {
+    for var $i (0:$n - 1) { push @per_target, [] }
+    for var $e (@$edges) {
         push @{$per_target[$e->[1]]}, $e
     }
     # Each non-root v picks ONE candidate; total = product of sizes.
     var @order
-    for val $v (0:$n - 1) {
+    for var $v (0:$n - 1) {
         push @order, $v if $v != $root
     }
     var $best = $INF
     var @stack = ([0, []])   # [order_idx, parent_choices_so_far]
     while (len(@stack) > 0) {
-        val $top = pop(@stack)
-        val $idx = $top->[0]
-        val $choices = $top->[1]
+        var $top = pop(@stack)
+        var $idx = $top->[0]
+        var $choices = $top->[1]
         if ($idx == len(@order)) {
             # Verify arborescence: starting from any non-root vertex,
             # following parent edges must reach root within n steps.
             var %parent
             var $cost = 0
-            for val $i (0:len(@order) - 1) {
-                val $v = $order[$i]
-                val $e = $choices->[$i]
+            for var $i (0:len(@order) - 1) {
+                var $v = $order[$i]
+                var $e = $choices->[$i]
                 $parent{$v} = $e->[0]
                 $cost += $e->[2]
             }
             var $ok = 1
-            for val $v (@order) {
+            for var $v (@order) {
                 var $cur = $v
                 var $steps = 0
                 while ($cur != $root && $steps <= $n) {
@@ -197,8 +197,8 @@ fn Cle::brute($n, $edges, $root) {
             $best = $cost if $ok && $cost < $best
             next
         }
-        val $v = $order[$idx]
-        for val $e (@{$per_target[$v]}) {
+        var $v = $order[$idx]
+        for var $e (@{$per_target[$v]}) {
             var @new_choices = @$choices
             push @new_choices, $e
             push @stack, [$idx + 1, \@new_choices]
@@ -269,9 +269,9 @@ var @cases = (
 p "── Chu-Liu / Edmonds min-arborescence demo ───────────"
 printf "  %-32s  %3s  %5s\n", "case", "n", "cost"
 printf "  %-32s  %3s  %5s\n", "--------------------------------", "---", "-----"
-for val $c (@cases) {
-    val $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
-    val $rep = $r->{ok} ? $r->{cost} : -1
+for var $c (@cases) {
+    var $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
+    var $rep = $r->{ok} ? $r->{cost} : -1
     printf "  %-32s  %3d  %5d  %s\n",
         $c->{name}, $c->{n}, $rep,
         $rep == $c->{cost} ? "" : "FAIL want=#{$c->{cost}}"
@@ -279,8 +279,8 @@ for val $c (@cases) {
 
 # ── invariant 1: arborescence cost matches expected ───────────────
 
-for val $c (@cases) {
-    val $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
+for var $c (@cases) {
+    var $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
     if ($c->{cost} == -1) {
         die "expected unreachable on \"#{$c->{name}}\"" if $r->{ok}
     } else {
@@ -291,10 +291,10 @@ for val $c (@cases) {
 
 # ── invariant 2: Chu-Liu agrees with brute force on small inputs ──
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if $c->{n} > 5 || len(@{$c->{edges}}) > 10
-    val $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
-    val $br = Cle::brute($c->{n}, $c->{edges}, $c->{root})
+    var $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
+    var $br = Cle::brute($c->{n}, $c->{edges}, $c->{root})
     if ($r->{ok}) {
         die "Cle #{$r->{cost}} != brute #{$br} on \"#{$c->{name}}\"" unless $r->{cost} == $br
     } else {
@@ -304,23 +304,23 @@ for val $c (@cases) {
 
 # ── invariant 3: adding extra expensive edges never decreases cost ─
 
-for val $c (@cases) {
+for var $c (@cases) {
     next unless $c->{cost} >= 0
     var @expanded = @{$c->{edges}}
     push @expanded, [0, $c->{n} - 1, 9999]
     push @expanded, [$c->{n} - 1, 0, 9999]
-    val $r = Cle::solve($c->{n}, \@expanded, $c->{root})
+    var $r = Cle::solve($c->{n}, \@expanded, $c->{root})
     next unless $r->{ok}
     die "expensive-edge addition reduced cost on \"#{$c->{name}}\"" if $r->{cost} < $c->{cost}
 }
 
 # ── invariant 4: cost ≥ (n − 1) × min(edge weight) when ok ─────────
 
-for val $c (@cases) {
-    val $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
+for var $c (@cases) {
+    var $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
     next unless $r->{ok}
     var $min_w = 1_000_000_000
-    for val $e (@{$c->{edges}}) {
+    for var $e (@{$c->{edges}}) {
         $min_w = $e->[2] if $e->[2] < $min_w
     }
     die "cost #{$r->{cost}} < lower bound (n-1)·min_w = #{($c->{n} - 1) * $min_w} on \"#{$c->{name}}\"" unless $r->{cost} >= ($c->{n} - 1) * $min_w
@@ -328,11 +328,11 @@ for val $c (@cases) {
 
 # ── invariant 5: cost ≤ sum of all edge weights (trivial upper bound) ─
 
-for val $c (@cases) {
-    val $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
+for var $c (@cases) {
+    var $r = Cle::solve($c->{n}, $c->{edges}, $c->{root})
     next unless $r->{ok}
     var $sum = 0
-    for val $e (@{$c->{edges}}) { $sum += $e->[2] }
+    for var $e (@{$c->{edges}}) { $sum += $e->[2] }
     die "cost #{$r->{cost}} > Σ edges #{$sum} on \"#{$c->{name}}\"" unless $r->{cost} <= $sum
 }
 
