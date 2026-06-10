@@ -21046,6 +21046,42 @@ mod tests {
         }
     }
 
+    /// `use Foo 1.0.0` — three-segment semver doesn't parse today
+    /// because the lexer treats `1.0` as a `Float`, then chokes on
+    /// the next `.0`. This test pins the current limitation so a
+    /// future parser change that adds v-string or string-literal
+    /// pin support updates the test alongside. Workaround for
+    /// users today: pin to a 2-segment version (`use Foo 1.0`) or
+    /// rely on the lockfile / highest-installed scan.
+    #[test]
+    fn parse_use_module_three_segment_version_rejected() {
+        let parsed = std::panic::catch_unwind(|| parse_ok("use Foo 1.0.0"));
+        assert!(
+            parsed.is_err(),
+            "3-segment version pins are NOT supported today; if this passes \
+             the parser was extended — update the test (and probably the \
+             resolver's pin-arm too)"
+        );
+    }
+
+    /// `use Foo "1.0.0"` parses cleanly but the string becomes an
+    /// IMPORT, not a version pin. Documents the current Perl 5
+    /// semantics — Perl's `use Module VERSION LIST` grammar only
+    /// recognises a numeric VERSION; a quoted string in that slot
+    /// is treated as part of the import list. Pinned in case a
+    /// future change conflates the two.
+    #[test]
+    fn parse_use_module_string_literal_is_import_not_version() {
+        let p = parse_ok(r#"use Foo "1.0.0""#);
+        match &p.statements[0].kind {
+            StmtKind::Use { version, imports, .. } => {
+                assert_eq!(version.as_deref(), None, "string literal must not become version pin");
+                assert!(!imports.is_empty(), "string literal must reach the import list");
+            }
+            other => panic!("expected Use, got {:?}", other),
+        }
+    }
+
     #[test]
     fn parse_no_statement() {
         let p = parse_ok("no warnings");
