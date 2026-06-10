@@ -208,6 +208,8 @@ pub fn cmd_add(args: &[String]) -> i32 {
         println!("  NAME[@VER]                                registry dep");
         println!("  github.com/OWNER/REPO[@TAG]               github git dep (tracks main without @TAG)");
         println!("  https://github.com/OWNER/REPO[.git][@TAG] github git dep (full URL form)");
+        println!("  ./PATH | ../PATH | /ABS/PATH | ~/PATH     local path dep");
+        println!("  EXISTING_DIRECTORY                        local path dep (auto-detected)");
         println!();
         println!("Flags:");
         println!("  --dev            add as a [dev-deps] entry instead of [deps]");
@@ -222,6 +224,8 @@ pub fn cmd_add(args: &[String]) -> i32 {
         println!("  stryke add mylib --path=../mylib");
         println!("  stryke add github.com/MenkeTechnologies/stryke-parquet");
         println!("  stryke add github.com/MenkeTechnologies/stryke-aws@v0.2.0");
+        println!("  stryke add ../sibling-pkg");
+        println!("  stryke add /work/vendored/mylib");
         return 0;
     }
     let parsed = match parse_add_args(args) {
@@ -374,6 +378,29 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
         });
     }
 
+    // Bare path positional → path dep. Matches when the positional
+    // either starts with a path sigil (`/`, `./`, `../`, `~/`) or
+    // resolves to an existing directory. The dep's local name is its
+    // own `[package].name` if a stryke.toml is present, otherwise the
+    // last path component. Explicit `--path=DIR` still wins (it's the
+    // documented override and may legitimately point at a different
+    // directory than the positional argument).
+    if path_override.is_none() {
+        if let Some(local) = parse_local_path_arg(raw) {
+            let spec = DepSpec::Detailed(DetailedDep {
+                path: Some(local.path_for_manifest),
+                features,
+                default_features: true,
+                ..DetailedDep::default()
+            });
+            return Ok(AddArgs {
+                name: local.name,
+                spec,
+                kind,
+            });
+        }
+    }
+
     let (name, version) = match raw.split_once('@') {
         Some((n, v)) => (n.to_string(), Some(v.to_string())),
         None => (raw.to_string(), None),
@@ -403,6 +430,109 @@ struct GithubShorthand {
     name: String,
     git_url: String,
     tag: Option<String>,
+}
+
+struct LocalPathArg {
+    name: String,
+    /// The exact string that lands in `stryke.toml`'s `path = "..."`
+    /// field. Relative inputs (`../mylib`, `./vendored`) are preserved
+    /// as-typed so the manifest stays portable across hosts; absolute
+    /// inputs land as absolute. `~/` is expanded so the manifest never
+    /// contains a literal tilde (which the resolver wouldn't expand).
+    path_for_manifest: String,
+}
+
+/// Recognize a bare positional that names a local directory dependency
+/// (`./mylib`, `../foo/bar`, `/abs/path`, `~/projects/mylib`, or any
+/// existing-on-disk directory). The dep's local name comes from the
+/// directory's `stryke.toml`'s `[package].name` when present, otherwise
+/// the last path component. Returns `None` for anything that doesn't
+/// look path-shaped AND isn't an existing directory — those fall
+/// through to the registry / version-spec path so `s add http@1.0`
+/// still works.
+fn parse_local_path_arg(raw: &str) -> Option<LocalPathArg> {
+    // Reject obvious non-paths early: a `@VER` suffix never appears on
+    // path positionals (versions for path deps come from the dep's own
+    // [package].version), and a `:` is a URL marker (file://, http://).
+    if raw.contains('@') || raw.contains(':') {
+        return None;
+    }
+
+    let sigil_path = raw.starts_with("./")
+        || raw.starts_with("../")
+        || raw.starts_with('/')
+        || raw.starts_with("~/")
+        || raw == "."
+        || raw == "..";
+
+    // Expand `~/` so on-disk lookups + the manifest entry both work.
+    // We resolve `~` only when it's the first path component; embedded
+    // `~` elsewhere is not a tilde (e.g. could be in a vendor dirname).
+    let expanded: String = if raw == "~" {
+        std::env::var("HOME").ok()?
+    } else if let Some(rest) = raw.strip_prefix("~/") {
+        let home = std::env::var("HOME").ok()?;
+        format!("{}/{}", home.trim_end_matches('/'), rest)
+    } else {
+        raw.to_string()
+    };
+
+    let candidate = Path::new(&expanded);
+    let exists_as_dir = candidate.is_dir();
+
+    // Path-shaped sigils are accepted even when the directory doesn't
+    // yet exist (helps with `s add ../about-to-create`); non-sigil
+    // names only become path deps when they already exist on disk
+    // (avoids treating `serde` as a path because there happens to be
+    // a `./serde` symlink — well, that IS a path, but if there is a
+    // local `./serde` dir the user almost certainly meant it).
+    if !sigil_path && !exists_as_dir {
+        return None;
+    }
+
+    // The name is the package's own [package].name when stryke.toml is
+    // present and parseable; otherwise the last path component.
+    let derived_name = candidate
+        .file_name()
+        .and_then(|s| s.to_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        // `..` and `.` have no file_name; fall back to the canonicalized
+        // basename in those cases.
+        .or_else(|| {
+            candidate
+                .canonicalize()
+                .ok()
+                .and_then(|c| c.file_name().map(|s| s.to_string_lossy().into_owned()))
+        })?;
+
+    let name = if exists_as_dir {
+        let manifest_path = candidate.join(MANIFEST_FILE);
+        if manifest_path.is_file() {
+            Manifest::from_path(&manifest_path)
+                .ok()
+                .and_then(|m| m.package.map(|p| p.name))
+                .unwrap_or(derived_name)
+        } else {
+            derived_name
+        }
+    } else {
+        derived_name
+    };
+
+    // For the manifest path string: preserve relative form as typed
+    // (skip tilde expansion when the input was relative — already not
+    // tilde-prefixed), and emit the expanded form for `~/` inputs.
+    let path_for_manifest = if raw.starts_with("~/") || raw == "~" {
+        expanded
+    } else {
+        raw.to_string()
+    };
+
+    Some(LocalPathArg {
+        name,
+        path_for_manifest,
+    })
 }
 
 /// Recognize `github.com/OWNER/REPO[.git][@TAG]` and `https://github.com/...`
@@ -3810,6 +3940,166 @@ mod tests {
         match parsed.spec {
             DepSpec::Version(v) => assert_eq!(v, "1.0"),
             other => panic!("expected DepSpec::Version, got {:?}", other),
+        }
+    }
+
+    // === parse_local_path_arg ===========================================
+    //
+    // `s add ./mylib` and friends should write a path dep, not a registry
+    // dep. These pin both the sigil-driven cases (where the directory
+    // doesn't have to exist — useful for "about to create") and the
+    // exists-on-disk auto-detection (where bare names like `mylib`
+    // become path deps when there's a `./mylib` next to the cwd).
+
+    #[test]
+    fn local_path_arg_relative_dot_slash() {
+        let lp =
+            parse_local_path_arg("./mylib").expect("./mylib should parse as path");
+        assert_eq!(lp.name, "mylib");
+        assert_eq!(lp.path_for_manifest, "./mylib");
+    }
+
+    #[test]
+    fn local_path_arg_relative_parent() {
+        let lp =
+            parse_local_path_arg("../sibling").expect("../sibling should parse as path");
+        assert_eq!(lp.name, "sibling");
+        assert_eq!(lp.path_for_manifest, "../sibling");
+    }
+
+    #[test]
+    fn local_path_arg_absolute_nonexistent_still_accepted() {
+        // Absolute sigil is enough to disambiguate — the directory
+        // doesn't need to exist yet at the moment of `s add`.
+        let lp = parse_local_path_arg("/tmp/will-create-later")
+            .expect("absolute sigil should parse as path");
+        assert_eq!(lp.name, "will-create-later");
+        assert_eq!(lp.path_for_manifest, "/tmp/will-create-later");
+    }
+
+    #[test]
+    fn local_path_arg_tilde_expands_in_manifest() {
+        let home = std::env::var("HOME").expect("HOME set in test env");
+        let lp = parse_local_path_arg("~/projects/mylib")
+            .expect("~/PATH should parse as path");
+        assert_eq!(lp.name, "mylib");
+        assert_eq!(
+            lp.path_for_manifest,
+            format!("{}/projects/mylib", home.trim_end_matches('/'))
+        );
+    }
+
+    #[test]
+    fn local_path_arg_reads_pkg_name_when_manifest_present() {
+        // When the targeted directory has a stryke.toml with
+        // [package].name, that name takes precedence over the
+        // directory basename. Common when the dep dir is `crates/foo`
+        // but the package is named `foo-lib`.
+        let d = tempdir("path-arg-name");
+        let pkg_dir = d.join("crates").join("foo");
+        std::fs::create_dir_all(&pkg_dir).unwrap();
+        std::fs::write(
+            pkg_dir.join(MANIFEST_FILE),
+            "[package]\nname=\"foo-lib\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+
+        let raw = pkg_dir.to_str().unwrap();
+        let lp = parse_local_path_arg(raw).expect("existing dir should parse as path");
+        assert_eq!(lp.name, "foo-lib");
+        assert_eq!(lp.path_for_manifest, raw);
+    }
+
+    #[test]
+    fn local_path_arg_existing_dir_without_sigil_auto_detected() {
+        // No sigil, but the directory exists — auto-detect as path.
+        let d = tempdir("path-arg-bare-existing");
+        let pkg_dir = d.join("mylib");
+        std::fs::create_dir_all(&pkg_dir).unwrap();
+        std::fs::write(
+            pkg_dir.join(MANIFEST_FILE),
+            "[package]\nname=\"mylib\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+
+        let lp =
+            parse_local_path_arg(pkg_dir.to_str().unwrap()).expect("existing dir → path dep");
+        assert_eq!(lp.name, "mylib");
+    }
+
+    #[test]
+    fn local_path_arg_rejects_registry_names() {
+        // Plain crate-style names without a sigil and without an
+        // existing on-disk dir must NOT be parsed as paths (the user
+        // wants the registry path → `DepSpec::Version("*")`).
+        assert!(parse_local_path_arg("serde").is_none());
+        assert!(parse_local_path_arg("stryke-arrow").is_none());
+    }
+
+    #[test]
+    fn local_path_arg_rejects_version_suffixed_names() {
+        // `http@1.0` is a registry version, not a path.
+        assert!(parse_local_path_arg("http@1.0").is_none());
+        assert!(parse_local_path_arg("./mylib@1.0").is_none());
+    }
+
+    #[test]
+    fn local_path_arg_rejects_url_like_shapes() {
+        // URLs contain `:` — those go to git/github paths, not local.
+        assert!(parse_local_path_arg("file:///tmp/mylib").is_none());
+        assert!(parse_local_path_arg("https://example.com/mylib").is_none());
+    }
+
+    #[test]
+    fn parse_add_args_relative_path_becomes_path_dep() {
+        let args = vec!["./mylib".to_string()];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "mylib");
+        match parsed.spec {
+            DepSpec::Detailed(d) => {
+                assert_eq!(d.path.as_deref(), Some("./mylib"));
+                assert!(d.git.is_none());
+                assert!(d.version.is_none());
+            }
+            other => panic!("expected DepSpec::Detailed path dep, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_add_args_absolute_path_becomes_path_dep() {
+        let args = vec!["/work/vendored/mylib".to_string()];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "mylib");
+        match parsed.spec {
+            DepSpec::Detailed(d) => {
+                assert_eq!(d.path.as_deref(), Some("/work/vendored/mylib"));
+            }
+            other => panic!("expected DepSpec::Detailed path dep, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_add_args_path_override_flag_wins_over_positional_path() {
+        // User passes BOTH a path-shaped positional AND --path= — the
+        // explicit flag wins, but the positional's NAME is still
+        // extracted from itself (since it was being treated as a
+        // local path sigil even before the override). With both
+        // path-shapes, the flag's directory is the source of truth.
+        let args = vec![
+            "./aaa".to_string(),
+            "--path=../bbb".to_string(),
+        ];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        // `./aaa` is detected as a github-shorthand miss → falls through
+        // to the standard path/features/version branches below. With
+        // --path=../bbb set, the branch becomes "path dep with version
+        // = None, path = ../bbb". The name comes from the @-split of
+        // `./aaa`, which yields `./aaa` as the manifest key.
+        // (The path-positional auto-detection above is gated by
+        // `path_override.is_none()`, so --path takes priority.)
+        match parsed.spec {
+            DepSpec::Detailed(d) => assert_eq!(d.path.as_deref(), Some("../bbb")),
+            other => panic!("expected DepSpec::Detailed path dep, got {:?}", other),
         }
     }
 }
