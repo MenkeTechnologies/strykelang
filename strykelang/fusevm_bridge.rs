@@ -3184,6 +3184,16 @@ fn value_from_fusevm(v: &fusevm::Value) -> StrykeValue {
 mod tests {
     use super::*;
     use crate::bytecode::Op;
+    use std::sync::Mutex;
+
+    /// Serializes tests that mutate `FUSEVM_JIT_CACHE_DIR` (a process-global
+    /// env var). Cargo runs tests in parallel by default; without this lock,
+    /// test A's `set_var` can race with test B's `remove_var` so test A's
+    /// run_linear_segment writes blobs to the wrong dir and the blob-count
+    /// assertion fails. The race was reproducible on Ubuntu CI but rare on
+    /// macOS due to slightly different parallel-test ordering; hold this
+    /// guard for the entirety of any test that touches that env var.
+    static CACHE_DIR_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     // `Op::Mod` is now eligible: it lowers to `Extended(STK_MOD_FLOOR)` and runs
     // on fusevm with Perl *floored* semantics (sign of divisor). Cover both signs
@@ -4496,6 +4506,7 @@ mod tests {
     // across different operand strings, and the result is still correct.
     #[test]
     fn string_concat_segment_produces_stable_disk_cache_entry() {
+        let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
         let seg = vec![
             Op::GetScalarSlot(0),
             Op::GetScalarSlot(1),
@@ -4567,6 +4578,7 @@ mod tests {
     // called with thousands of distinct args would spill one cache file per arg combo.
     #[test]
     fn integer_arg_segment_produces_stable_disk_cache_entry() {
+        let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
         let seg = vec![
             Op::GetScalarSlot(0),
             Op::GetScalarSlot(1),
@@ -4632,6 +4644,7 @@ mod tests {
     // makes string compares genuinely disk-cacheable.
     #[test]
     fn string_compare_segment_produces_stable_disk_cache_entry() {
+        let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
         let seg = vec![
             Op::GetScalarSlot(0),
             Op::GetScalarSlot(1),
@@ -4639,8 +4652,8 @@ mod tests {
         ];
 
         // Unique temp cache dir so we only ever count OUR op_hash's blobs (other
-        // concurrently-running tests may also write here once the env var is set,
-        // but they use different op_hashes, so filtering by prefix stays race-safe).
+        // concurrently-running tests using the same env var are serialized by
+        // CACHE_DIR_ENV_LOCK above).
         let dir = std::env::temp_dir().join(format!(
             "stryke_strcache_{}_{}",
             std::process::id(),
