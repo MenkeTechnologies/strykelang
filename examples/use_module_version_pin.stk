@@ -1,0 +1,54 @@
+# use_module_version_pin.stk — demo: Perl-style per-module version pin
+#
+# `use Module VERSION` (Perl 5's `use Module VERSION LIST` grammar)
+# captures the numeric first arg as a version pin and routes resolution
+# directly to `~/.stryke/store/<name>@<VERSION>/lib/...`.
+#
+# Run with:
+#   stryke --ast examples/use_module_version_pin.stk    # see the parsed version field
+#   stryke examples/use_module_version_pin.stk          # see the pin-not-in-store error
+#
+# Real usage: any `use Foo X.Y` whose extraction is present in
+# `~/.stryke/store/foo@X.Y/` loads it; otherwise the runtime errors
+# rather than silently substituting a different version. That's the
+# "stryke use must respect package version" contract.
+
+use strict
+use warnings
+
+# ── Resolution-order cheat sheet ─────────────────────────────────────
+#
+# For every `use Foo` (with or without VERSION), the resolver tries:
+#
+#   1. Project-local `lib/Foo.stk` — live edits always win.
+#   2. Use-site pin `use Foo 2.13` — direct store lookup at
+#      `~/.stryke/store/foo@2.13/lib/Foo.stk`. Missing → hard error.
+#   3. Inside a project, `stryke.lock` pin — authoritative; missing
+#      → hard error (no silent fall-through to global).
+#   4. Outside a project, scan `~/.stryke/store/foo@*/` and pick the
+#      HIGHEST semver (`2.0 > 1.99`, `0.10.0 > 0.3.0`).
+#   5. `@INC` system paths.
+#
+# Namespace bridge: `use GUI` (no pin) finds `stryke-gui@*` if
+# `gui@*` doesn't exist. The same bridge applies under a pin —
+# `use GUI 0.3.0` lands on `stryke-gui@0.3.0/lib/GUI.stk`.
+
+# ── Syntax forms ─────────────────────────────────────────────────────
+#
+# Comment these in/out (one at a time) and re-run with --ast to see
+# the StmtKind::Use's `version` field flip between None and the pin.
+
+# Plain `use` — no pin, follows lockfile (inside project) or
+# highest-installed (outside project).
+# use Some::Module
+
+# Two-segment numeric pin (most common Perl-5 form).
+use Some::Module 2.13
+
+# Pin plus import LIST — comma separates pin from imports.
+# use Some::Module 1.0, 'foo', 'bar'
+
+# Single-integer pin — accepted; routes to `~/.stryke/store/some@2/`.
+# use Some::Module 2
+
+print "compile-time pin recorded; runtime will error if foo\@2.13 isn't in the store\n"
