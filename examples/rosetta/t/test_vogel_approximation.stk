@@ -19,7 +19,7 @@ fn Rosetta::Vogel::solve($costs, $supply, $demand) {
     while (cnt(keys %row_active) > 0 && cnt(keys %col_active) > 0) {
         var %row_penalties
         for val $r (keys %row_active) {
-            val @c
+            var @c
             for var $c (keys %col_active) { push @c, $costs->[$r]->[$c] }
             val @sorted = sort { _0 <=> _1 } @c
             if (len(@sorted) > 1) {
