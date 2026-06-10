@@ -69,7 +69,11 @@ fn tokenize(template: &str) -> Result<Vec<Token>, String> {
                         break;
                     }
                 }
-                Repeat::Count(n.max(1))
+                // Perl-pack parity: an explicit count of 0 means "zero items".
+                // Pre-fix `.max(1)` silently coerced this to 1 — `pack "C0", 1, 2`
+                // emitted one byte, and `pack "x0"` emitted a NUL. Perl emits 0
+                // bytes in both cases.
+                Repeat::Count(n)
             }
             _ => Repeat::One,
         };
@@ -158,7 +162,7 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
             'H' => {
                 let s = take_arg(args)?.to_string();
                 let hex: String = s.chars().filter(char::is_ascii_hexdigit).collect();
-                let hex = match t.repeat {
+                let mut hex = match t.repeat {
                     Repeat::Star => hex,
                     Repeat::Count(n) => {
                         if hex.len() < n {
@@ -167,14 +171,17 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
                         hex[..n].to_string()
                     }
                     Repeat::One => {
-                        if hex.len() < 2 {
-                            return Err("hex string too short (need 2 nibbles)".into());
+                        if hex.is_empty() {
+                            return Err("hex string too short".into());
                         }
-                        hex[..2].to_string()
+                        hex[..1].to_string()
                     }
                 };
+                // Perl-pack parity: odd-length hex pads with a trailing '0' nibble
+                // (so "abc" becomes 2 bytes 0xAB 0xC0). Pre-fix this errored out,
+                // breaking otherwise-valid odd-length round-trips.
                 if hex.len() % 2 != 0 {
-                    return Err("hex length must be even".into());
+                    hex.push('0');
                 }
                 let mut i = 0;
                 while i < hex.len() {
@@ -260,7 +267,15 @@ fn pack_impl(template: &str, args: &mut &[StrykeValue]) -> Result<Vec<u8>, Strin
                     _ => repeat_fixed(t.repeat, 1)?,
                 };
                 for _ in 0..count {
-                    let mut v = take_arg(args)?.to_int() as u64;
+                    // Perl-pack parity: pack 'w' on a negative integer errors with
+                    // "Cannot compress negative numbers in pack". Pre-fix the
+                    // `as u64` cast sign-laundered -1 to 0xFFFFFFFFFFFFFFFF and
+                    // silently encoded ~10 BER bytes.
+                    let signed = take_arg(args)?.to_int();
+                    if signed < 0 {
+                        return Err("Cannot compress negative numbers in pack".into());
+                    }
+                    let mut v = signed as u64;
                     let mut ber = Vec::new();
                     ber.push((v & 0x7f) as u8);
                     v >>= 7;
@@ -534,6 +549,11 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<StrykeValue>, String> 
                 }
             }
             'H' => {
+                // Perl-pack parity: 'H' emits LOWERCASE hex (`%02x`, not `%02X`).
+                // Repeat::One reads 1 byte but emits only 1 hex char (the high
+                // nibble); Repeat::Count(n) emits exactly n chars. Pre-fix used
+                // uppercase and emitted 2 chars for Repeat::One — breaking
+                // byte-identical round-trips and case-sensitive consumers.
                 let nbytes = match t.repeat {
                     Repeat::Star => data.len().saturating_sub(pos),
                     Repeat::Count(n) => n.div_ceil(2),
@@ -547,12 +567,12 @@ fn unpack_impl(template: &str, data: &[u8]) -> Result<Vec<StrykeValue>, String> 
                 pos = end;
                 let mut hex = String::with_capacity(chunk.len() * 2);
                 for &b in chunk {
-                    hex.push_str(&format!("{:02X}", b));
+                    hex.push_str(&format!("{:02x}", b));
                 }
-                if let Repeat::Count(n) = t.repeat {
-                    if hex.len() > n {
-                        hex.truncate(n);
-                    }
+                match t.repeat {
+                    Repeat::Count(n) if hex.len() > n => hex.truncate(n),
+                    Repeat::One if hex.len() > 1 => hex.truncate(1),
+                    _ => {}
                 }
                 out.push(StrykeValue::string(hex));
             }
@@ -886,9 +906,13 @@ mod tests {
 
     #[test]
     fn pack_h_one_nibble_pair() {
+        // Perl-pack parity: `H` (no count = Repeat::One) reads ONE nibble, not
+        // two. Pre-fix this took 2 chars and emitted 0xff; Perl emits 0xf0 (the
+        // high nibble of the lone nibble).
+        //   perl -e 'printf "%v02X\n", pack("H", "ff")'  → F0
         assert_eq!(
             pack_bytes("H", &[StrykeValue::string("ff".into())]),
-            vec![255]
+            vec![0xf0]
         );
     }
 
@@ -901,20 +925,13 @@ mod tests {
     }
 
     #[test]
-    fn pack_h_rejects_odd_hex_length() {
-        let e = perl_pack(
-            &[
-                StrykeValue::string("H".into()),
-                StrykeValue::string("f".into()),
-            ],
-            0,
-        )
-        .expect_err("short hex");
-        assert!(
-            e.message.contains("nibble") || e.message.contains("even"),
-            "{}",
-            e.message
-        );
+    fn pack_h_pads_odd_hex_length_with_trailing_zero_nibble() {
+        // FIXED for Perl-pack parity: odd-length hex pads with a trailing '0'
+        // nibble (so "abc" produces 2 bytes 0xAB 0xC0). Pre-fix this errored
+        // with "hex length must be even".
+        //   perl -e 'printf "%v02X\n", pack("H*", "abc")'  → AB.C0
+        let bytes = pack_bytes("H*", &[StrykeValue::string("abc".into())]);
+        assert_eq!(bytes, vec![0xab, 0xc0]);
     }
 
     #[test]
@@ -1187,13 +1204,16 @@ mod tests {
 
     #[test]
     fn test_unpack_h_star_odd_nibbles() {
-        // H5 on 3 bytes should give 5 hex chars
+        // Perl-pack parity: `H` emits LOWERCASE hex. Pre-fix the implementation
+        // used `{:02X}` (uppercase) — broke byte-identical round-trips through
+        // pack/unpack. perl -e 'print unpack("H*", pack("C3", 0xde, 0xad, 0xbe))'
+        // → deadbe (not DEADBE).
         let data = vec![0xDE, 0xAD, 0xBE];
         let v = unpack_vals("H5", &data);
-        assert_eq!(v[0].to_string(), "DEADB");
+        assert_eq!(v[0].to_string(), "deadb");
 
         let v2 = unpack_vals("H*", &data);
-        assert_eq!(v2[0].to_string(), "DEADBE");
+        assert_eq!(v2[0].to_string(), "deadbe");
     }
 
     #[test]
