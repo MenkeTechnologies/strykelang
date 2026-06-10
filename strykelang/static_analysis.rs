@@ -1966,7 +1966,10 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
     // ── Arm 2: project lockfile → store ───────────────────────────────
     // When the script lives in a stryke project, `stryke.lock` pins
     // exact versions of every declared dep. Mirrors arm 2 of the
-    // runtime resolver (`pkg::commands::resolve_module`).
+    // runtime resolver (`pkg::commands::resolve_module`). The
+    // `stryke-<name>` fallback bridges `use AWS` (lookup key `"aws"`)
+    // to a `stryke-aws` lockfile entry — otherwise the linter can't
+    // chase the import and reports every AWS::* sub as undefined.
     let segments: Vec<&str> = spec.split("::").collect();
     if !segments.is_empty() && !segments.iter().any(|s| s.is_empty()) {
         if let Some(stryke_root) = crate::pkg::commands::find_project_root(Path::new(file)) {
@@ -1974,7 +1977,9 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
             if lock_path.is_file() {
                 if let Ok(lf) = crate::pkg::lockfile::Lockfile::from_path(&lock_path) {
                     let pkg_name = segments[0].to_lowercase();
-                    if let Some(entry) = lf.find(&pkg_name) {
+                    let prefixed = format!("stryke-{}", pkg_name);
+                    let entry = lf.find(&pkg_name).or_else(|| lf.find(&prefixed));
+                    if let Some(entry) = entry {
                         if let Ok(store) = crate::pkg::store::Store::user_default() {
                             let store_pkg = store.package_dir(&entry.name, &entry.version);
                             let resolved = build_pkg_lib_path(&store_pkg, &segments);
@@ -1990,14 +1995,20 @@ pub fn resolve_require_path_from_file(file: &str, spec: &str) -> Option<PathBuf>
         // ── Arm 3: global `~/.stryke/installed.toml` → store ──────────
         // Lets standalone scripts run outside any project still see
         // installed-package subs without a stryke.lock. Mirrors arm 3
-        // of `pkg::commands::resolve_module`. Same precedence as
-        // runtime: arm 1 / arm 2 must miss before this fires, so a
-        // project-local `lib/Foo.stk` shadowing a globally pinned
-        // package is honored.
+        // of `pkg::commands::resolve_module` (including the
+        // namespace-bridge + `stryke-<name>` prefix fallbacks added
+        // in v0.16.41 / v0.16.43). Same precedence as runtime: arm 1
+        // / arm 2 must miss before this fires, so a project-local
+        // `lib/Foo.stk` shadowing a globally pinned package is honored.
         if let Ok(store) = crate::pkg::store::Store::user_default() {
             if let Ok(idx) = crate::pkg::store::InstalledIndex::load_from(&store) {
                 let pkg_name = segments[0].to_lowercase();
-                if let Some(entry) = idx.find(&pkg_name) {
+                let prefixed = format!("stryke-{}", pkg_name);
+                let entry = idx
+                    .find(&pkg_name)
+                    .or_else(|| idx.find_by_namespace(&pkg_name))
+                    .or_else(|| idx.find(&prefixed));
+                if let Some(entry) = entry {
                     let store_pkg = store.package_dir(&entry.name, &entry.version);
                     let resolved = build_pkg_lib_path(&store_pkg, &segments);
                     if resolved.is_file() {

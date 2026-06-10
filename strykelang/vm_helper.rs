@@ -3213,22 +3213,20 @@ impl VMHelper {
     }
 
     /// Lockfile- and pin-driven module resolution (RFC §"Module Resolution").
-    /// Walks up from `cwd` for `stryke.toml`; if found, asks
-    /// [`crate::pkg::commands::resolve_module`] to look in `lib/` then the
-    /// lockfile-pinned store. When no project root is reachable, still
-    /// invokes `resolve_module(&cwd, &logical)` so the global pin arm
-    /// (`~/.stryke/installed.toml` → store) fires for standalone scripts
-    /// run outside any project — the exact path `use GUI` from a one-off
-    /// script takes after `s pkg install -g github.com/.../stryke-gui`.
+    /// Tries the script's project root first (walked up from `script_file`'s
+    /// directory), then the cwd's project root, then cwd itself. The first
+    /// anchor whose `resolve_module` returns `Some` wins.
+    ///
+    /// Anchoring at the script's directory (not just cwd) means `s main.stk`
+    /// from a sibling directory still finds the project-local `lib/Foo.stk`
+    /// and the project's `stryke.lock`. Previously this used cwd only, so
+    /// `s --lint /abs/path/proj/main.stk` from /tmp would skip arms 1 and 2
+    /// entirely and only hit arm 3 (global installed.toml).
     ///
     /// The `relpath` arg is the `@INC`-style path (`Foo/Bar.pm`) used
     /// elsewhere in `require`; it is converted to a logical name (`Foo::Bar`)
-    /// for the resolver. Both `.pm` and `.stk` variants are tried — stryke
-    /// source uses `.stk`.
-    fn try_resolve_via_lockfile(relpath: &str) -> Option<std::path::PathBuf> {
-        let cwd = std::env::current_dir().ok()?;
-        let project_root = crate::pkg::commands::find_project_root(&cwd);
-
+    /// for the resolver. `.pm`, `.pl`, and `.stk` suffixes are all stripped.
+    fn try_resolve_via_lockfile(script_file: &str, relpath: &str) -> Option<std::path::PathBuf> {
         let stem = relpath
             .strip_suffix(".pm")
             .or_else(|| relpath.strip_suffix(".pl"))
@@ -3236,12 +3234,34 @@ impl VMHelper {
             .unwrap_or(relpath);
         let logical = stem.replace('/', "::");
 
-        // Anchor at the project root when we have one (so the local `lib/`
-        // arm of resolve_module is checked); otherwise anchor at cwd, which
-        // skips both project-local and lockfile arms and falls straight
-        // through to the global installed.toml arm.
-        let anchor = project_root.unwrap_or(cwd);
-        crate::pkg::commands::resolve_module(&anchor, &logical).unwrap_or_default()
+        let mut anchors: Vec<std::path::PathBuf> = Vec::new();
+        if !script_file.is_empty()
+            && script_file != "-e"
+            && script_file != "-"
+            && script_file != "repl"
+        {
+            let script_dir = std::path::Path::new(script_file)
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_else(|| std::path::PathBuf::from("."));
+            if let Some(root) = crate::pkg::commands::find_project_root(&script_dir) {
+                anchors.push(root);
+            }
+            anchors.push(script_dir);
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            if let Some(root) = crate::pkg::commands::find_project_root(&cwd) {
+                anchors.push(root);
+            }
+            anchors.push(cwd);
+        }
+
+        for anchor in anchors {
+            if let Ok(Some(found)) = crate::pkg::commands::resolve_module(&anchor, &logical) {
+                return Some(found);
+            }
+        }
+        None
     }
 
     /// `sub name` in `package P` → stash key `P::name`. `sub Q::name { }` is already fully
@@ -3811,7 +3831,7 @@ impl VMHelper {
         // `lib/Foo/Bar.stk` and then at lockfile-pinned store entries before
         // falling through to `@INC`. See docs/PACKAGE_REGISTRY.md §"Module
         // Resolution".
-        if let Some(found) = Self::try_resolve_via_lockfile(relpath) {
+        if let Some(found) = Self::try_resolve_via_lockfile(&self.file, relpath) {
             let code = read_file_text_perl_compat(&found).map_err(|e| {
                 StrykeError::runtime(
                     format!("Can't open {} for reading: {}", found.display(), e),
