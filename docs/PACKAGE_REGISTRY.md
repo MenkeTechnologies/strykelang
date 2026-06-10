@@ -68,9 +68,12 @@ Only `stryke.toml`, `stryke.lock`, and `main.stk` are required. Everything else 
   git/                      # cloned git deps
     github.com-user-mylib-abc123/
   index/                    # registry index mirror (sparse, like cargo's)
+  installed.toml            # global pin index — one entry per package name
 ```
 
 Paths are human-readable (`name@version`) rather than nix-style hash paths. Hash-pinning happens in the lockfile, not the directory name — you get nix's reproducibility without nix's opaque paths.
+
+**`installed.toml`** records which packages were *explicitly installed* (via `s install -g` or as a transitive dep of `s install` from any project). One entry per name — `s install -g foo@2.0` after `s install -g foo@1.0` overwrites the pin to `2.0`. The store keeps both `foo@1.0/` and `foo@2.0/` extractions; only the pin moves. Used as `s gc -g`'s keep-list and as the `s use -g` switch point. **Not consulted by `use Foo` outside a project** — that path scans the store for the highest installed version, so the resolver isn't tied to whatever was installed last.
 
 ## Manifest: stryke.toml
 
@@ -209,9 +212,17 @@ s search http                # query registry
 s info http                  # package metadata
 
 # Global tools
-s install -g mytool
-s uninstall -g mytool
-s list -g
+s install -g mytool                                  # extract pkg into ~/.stryke/store and pin in installed.toml
+s install -g github.com/OWNER/REPO[@TAG]             # github-release tarball, host triple
+s install -g ./PATH                                  # path-dep global install
+s uninstall -g mytool                                # remove store dir + installed.toml entry
+s use -g mytool@VERSION                              # switch the installed.toml pin to a different version
+                                                     # already in store (no fetch)
+s list -g                                            # print installed.toml — what `use Foo` resolves to outside a project
+s gc -g [--dry-run]                                  # remove every store dir not pinned by installed.toml.
+                                                     # Project lockfiles are not consulted —
+                                                     # a removed entry re-extracts on the next `s install`.
+s info http                                          # lockfile entry + store path + description / license / repo
 
 # Workspace
 s vendor                     # opt-in, materialize deps to ./vendor/
