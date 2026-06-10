@@ -11,7 +11,7 @@ use super::lockfile::Lockfile;
 use super::manifest::{DepSpec, DetailedDep, Manifest, PackageMeta};
 use super::resolver::Resolver;
 use super::store::{InstalledIndex, Store};
-use super::PkgResult;
+use super::{PkgError, PkgResult};
 
 /// Filename of the project manifest.
 pub const MANIFEST_FILE: &str = "stryke.toml";
@@ -782,7 +782,78 @@ pub fn cmd_install(args: &[String]) -> i32 {
         lf.packages.len(),
         if lf.packages.len() == 1 { "" } else { "s" }
     );
+
+    // Pin every just-resolved package into ~/.stryke/installed.toml so
+    // `use Foo` from outside the project (or before any `s install -g`)
+    // still resolves via the global index. This matches the principle
+    // "any install action should leave the global index reflecting the
+    // packages present in the store"; users running `s install` from
+    // a project expect downstream tooling (the linter, `stryke -e`,
+    // standalone scripts) to see those packages too.
+    sync_installed_index_from_resolution(&store, &outcome.installed);
     0
+}
+
+/// Pull each resolved package's canonical name + version + source +
+/// namespace from its store-extracted `stryke.toml` and upsert into the
+/// global `~/.stryke/installed.toml`. Silent best-effort: failures
+/// surface as one stderr warning each and don't abort `s install`
+/// (the lockfile is already on disk; the global pin is a convenience).
+fn sync_installed_index_from_resolution(
+    store: &Store,
+    installed: &[(String, String, std::path::PathBuf)],
+) {
+    if installed.is_empty() {
+        return;
+    }
+    let mut idx = match InstalledIndex::load_from(store) {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("s install: load installed.toml (skipping global pin): {}", e);
+            return;
+        }
+    };
+    let mut updated = 0usize;
+    for (lock_name, version, store_path) in installed {
+        // Try both candidate dirs (alias and prefixed) — same reason
+        // as resolve_store_candidates: lockfiles record the alias while
+        // store dirs use the canonical name.
+        let candidates = resolve_store_candidates(store, lock_name, version);
+        let real_store_dir = candidates
+            .iter()
+            .find(|p| p.is_dir())
+            .cloned()
+            .unwrap_or_else(|| store_path.clone());
+        let manifest_path = real_store_dir.join(MANIFEST_FILE);
+        let Ok(m) = Manifest::from_path(&manifest_path) else {
+            continue;
+        };
+        let Some(pkg) = m.package.as_ref() else {
+            continue;
+        };
+        let namespace = m
+            .ffi
+            .as_ref()
+            .map(|f| f.namespace.clone())
+            .unwrap_or_default();
+        // Re-use the lockfile's source URL when present; for now derive
+        // a placeholder from name@version. The pin is keyed on
+        // (name, version), so the source string is informational.
+        let source = format!("local-install:{}@{}", pkg.name, pkg.version);
+        idx.upsert_with_namespace(&pkg.name, &pkg.version, &source, &namespace);
+        updated += 1;
+    }
+    if updated > 0 {
+        if let Err(e) = idx.save() {
+            eprintln!("s install: write installed.toml: {}", e);
+            return;
+        }
+        eprintln!(
+            "\x1b[32m✓ pinned {} package{} in ~/.stryke/installed.toml\x1b[0m",
+            updated,
+            if updated == 1 { "" } else { "s" }
+        );
+    }
 }
 
 /// `s tree` — print the resolved dep graph from the lockfile in a human-friendly
@@ -984,9 +1055,26 @@ pub fn load_project(root: &Path) -> PkgResult<(Manifest, Option<Lockfile>)> {
 /// 1. `<root>/lib/Foo/Bar.stk` exists.
 /// 2. The lockfile has an entry for the lower-cased first segment (`foo`),
 ///    and `~/.stryke/store/foo@VERSION/lib/Bar.stk` exists.
+/// 3. The global `installed.toml` has an entry and the store dir exists.
 ///
-/// Returns `Ok(None)` if neither resolved (caller falls through to `@INC`).
-pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathBuf>> {
+/// `pin_version` (Perl-style `use Module VERSION` from the parser) is the
+/// override: when `Some(v)`, the resolver looks up `<store>/<name>@<v>/`
+/// directly and skips both the lockfile and the global index. An explicit
+/// pin **always wins** — inside or outside a project. When `None`, the
+/// lockfile-then-index precedence applies.
+///
+/// Returns `Ok(None)` if nothing resolved (caller falls through to `@INC`).
+/// Returns `Err(...)` only when a pin can't be honored — either a use-site
+/// `use Module VERSION` whose store dir is missing, or a lockfile entry
+/// whose pinned version is missing from the store. In both cases falling
+/// through silently would let a *different* version satisfy the load,
+/// which is the "stryke use must respect package version" bug. Surfacing
+/// the miss forces the user to run `s install` instead.
+pub fn resolve_module(
+    root: &Path,
+    logical_name: &str,
+    pin_version: Option<&str>,
+) -> PkgResult<Option<PathBuf>> {
     let segments: Vec<&str> = logical_name.split("::").collect();
     if segments.is_empty() {
         return Ok(None);
@@ -1001,17 +1089,53 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
     // unregistered export will surface the load failure at the actual call
     // site with a clear message, which is the right layer to report it.
 
-    // 1. Project-local `lib/`.
+    // 1. Project-local `lib/`. The use-site pin doesn't apply here —
+    //    local lib/ is whatever's in the project's tree; pinning it to
+    //    a different version is meaningless. Local hits always win
+    //    (live edits should never be shadowed by a store version).
     let local = root.join("lib").join(segments_to_path(&segments));
     if local.is_file() {
         let _ = try_load_ffi_for(root);
         return Ok(Some(local));
     }
 
-    // 2. Lockfile-driven store lookup. Use the (lower-cased) first segment as
-    //    the package name; remaining segments become the in-package path. Fall
-    //    back to `stryke-<name>` so `use GUI` bridges to a `stryke-gui` entry
-    //    even when the lockfile dep key is the prefixed canonical name.
+    // 2a. Use-site pin (`use Module VERSION`) — direct store lookup,
+    //     no lockfile / index consult. Inside or outside a project.
+    //     Standalone scripts that want a specific version write
+    //     `use Module 1.2` and land directly on `<store>/<name>@1.2/`.
+    if let Some(v) = pin_version {
+        let store = Store::user_default()?;
+        let pkg_name_lower = segments[0].to_lowercase();
+        let names_to_try = [pkg_name_lower.clone(), format!("stryke-{}", pkg_name_lower)];
+        let mut tried: Vec<PathBuf> = Vec::with_capacity(names_to_try.len());
+        for nm in names_to_try.iter() {
+            let store_pkg = store.package_dir(nm, v);
+            tried.push(store_pkg.clone());
+            let nested_path = if segments.len() == 1 {
+                store_pkg.join("lib").join(format!("{}.stk", segments[0]))
+            } else {
+                store_pkg.join("lib").join(segments_to_path(&segments[1..]))
+            };
+            if nested_path.is_file() {
+                let _ = try_load_ffi_for(&store_pkg);
+                return Ok(Some(nested_path));
+            }
+        }
+        let probed = tried
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(PkgError::Other(format!(
+            "use {} {}: pinned version not in store (tried: {})",
+            logical_name, v, probed
+        )));
+    }
+
+    // 2b. Lockfile-driven store lookup. Use the (lower-cased) first segment as
+    //     the package name; remaining segments become the in-package path. Fall
+    //     back to `stryke-<name>` so `use GUI` bridges to a `stryke-gui` entry
+    //     even when the lockfile dep key is the prefixed canonical name.
     let lock_path = root.join(LOCKFILE_FILE);
     if lock_path.is_file() {
         let lock = Lockfile::from_path(&lock_path)?;
@@ -1021,57 +1145,172 @@ pub fn resolve_module(root: &Path, logical_name: &str) -> PkgResult<Option<PathB
             .or_else(|| lock.find(&format!("stryke-{}", pkg_name)));
         if let Some(entry) = entry {
             let store = Store::user_default()?;
-            let store_pkg = store.package_dir(&entry.name, &entry.version);
-            let nested_path = if segments.len() == 1 {
-                store_pkg.join("lib").join(format!("{}.stk", segments[0]))
-            } else {
-                store_pkg.join("lib").join(segments_to_path(&segments[1..]))
-            };
-            if nested_path.is_file() {
-                let _ = try_load_ffi_for(&store_pkg);
-                return Ok(Some(nested_path));
+            // Lockfiles often record the dep alias (`name = "postgres"`)
+            // while the store directory uses the canonical package name
+            // (`stryke-postgres@<ver>/`). Try the alias path first, then
+            // fall back to the prefixed canonical form so deps installed
+            // before the alias-vs-canonical convention shake-out still
+            // resolve. Same path the analyzer uses (kept in sync).
+            for store_pkg in resolve_store_candidates(&store, &entry.name, &entry.version) {
+                let nested_path = if segments.len() == 1 {
+                    store_pkg.join("lib").join(format!("{}.stk", segments[0]))
+                } else {
+                    store_pkg.join("lib").join(segments_to_path(&segments[1..]))
+                };
+                if nested_path.is_file() {
+                    let _ = try_load_ffi_for(&store_pkg);
+                    return Ok(Some(nested_path));
+                }
             }
+            // Lockfile pinned the version but the store has no
+            // extraction at that version. Refuse to fall through to
+            // the global index — silently picking a different version
+            // would violate the lockfile pin. Surface the mismatch so
+            // the user runs `s install`.
+            return Err(PkgError::Other(format!(
+                "use {}: stryke.lock pins {}@{} but store has no extraction at that version \
+                 (run `s install`)",
+                logical_name, entry.name, entry.version
+            )));
         }
     }
 
-    // 3. Global pin file. `~/.stryke/installed.toml` records every
-    //    `s pkg install -g`-installed package. When the script runs outside
-    //    a project (no walking up to a stryke.toml) or the project's lock
-    //    doesn't pin this package, look it up here. This is the path that
-    //    makes `s install -g github.com/MenkeTechnologies/stryke-gui` →
-    //    standalone `use GUI` work.
+    // 3. Outside-project / unpinned global lookup. The script runs
+    //    outside any stryke project (no `stryke.toml` ancestor) or the
+    //    project's lockfile doesn't pin this package. The contract here
+    //    is "latest installed version" — scan the store for every
+    //    `<canonical>@*/` extraction matching the namespace and pick
+    //    the highest semver. This is robust against InstalledIndex
+    //    drift (`upsert` records last-installed, not highest-installed),
+    //    and matches the LSP's version-completion behavior.
     //
-    // Lookup order: try `[package].name` first (the common case where the
-    // import name matches the package name, e.g. `use Stryke::AWS` → entry
-    // `stryke-aws`). On miss, fall back to `[ffi].namespace` — bridges
-    // `use GUI` (lookup key `"gui"`) to an entry whose canonical name is
-    // `stryke-gui` (matches the repo) but whose namespace is `GUI`. Final
-    // fallback: try `stryke-<name>` directly — bridges legacy installs whose
-    // index entry was written before the namespace field was populated, so
-    // `use GUI` still finds `stryke-gui@*` even with an empty namespace.
-    if let Ok(idx) = InstalledIndex::load_or_default() {
-        let pkg_name = segments[0].to_lowercase();
-        let prefixed = format!("stryke-{}", pkg_name);
-        let entry = idx
-            .find(&pkg_name)
-            .or_else(|| idx.find_by_namespace(&pkg_name))
-            .or_else(|| idx.find(&prefixed));
-        if let Some(entry) = entry {
-            let store = Store::user_default()?;
-            let store_pkg = store.package_dir(&entry.name, &entry.version);
-            let nested_path = if segments.len() == 1 {
-                store_pkg.join("lib").join(format!("{}.stk", segments[0]))
-            } else {
-                store_pkg.join("lib").join(segments_to_path(&segments[1..]))
-            };
-            if nested_path.is_file() {
-                let _ = try_load_ffi_for(&store_pkg);
-                return Ok(Some(nested_path));
-            }
+    // Canonical name discovery: same 3-arm logic as the LSP —
+    // `[package].name` direct match, `[ffi].namespace` match, then
+    // `stryke-<lowername>` prefix fallback. Each arm contributes
+    // names to scan for; we union them and let the scan pick the
+    // highest version across all matches.
+    let store = Store::user_default()?;
+    let canonical_names = canonical_store_names_for_namespace(&store, &segments[0].to_lowercase());
+    if let Some((name, version)) = scan_store_for_highest_version(&store, &canonical_names) {
+        let store_pkg = store.package_dir(&name, &version);
+        let nested_path = if segments.len() == 1 {
+            store_pkg.join("lib").join(format!("{}.stk", segments[0]))
+        } else {
+            store_pkg.join("lib").join(segments_to_path(&segments[1..]))
+        };
+        if nested_path.is_file() {
+            let _ = try_load_ffi_for(&store_pkg);
+            return Ok(Some(nested_path));
         }
     }
 
     Ok(None)
+}
+
+/// Resolve a lowercased `use Foo` first segment to every store-name it
+/// might be extracted under. Three sources, unioned + deduped:
+///
+/// 1. `<ns>` itself — the bare namespace (e.g. `gui`).
+/// 2. `stryke-<ns>` — the prefixed canonical name used by every
+///    `stryke-*` ecosystem package.
+/// 3. `installed.toml` entries whose `[package].name` matches the
+///    namespace OR whose `[ffi].namespace` matches — bridges
+///    `use GUI` to a `stryke-gui` extraction regardless of how the
+///    name was recorded.
+///
+/// Returns the union so `scan_store_for_highest_version` can pick the
+/// best version across all of them — important when both `gui@0.9` and
+/// `stryke-gui@1.2` exist on disk from different install paths.
+pub(crate) fn canonical_store_names_for_namespace(store: &Store, namespace_lc: &str) -> Vec<String> {
+    let mut names = Vec::new();
+    names.push(namespace_lc.to_string());
+    names.push(format!("stryke-{}", namespace_lc));
+    if let Ok(idx) = InstalledIndex::load_from(store) {
+        for pkg in &idx.packages {
+            let name_lc = pkg.name.to_lowercase();
+            let pkg_ns_lc = pkg.namespace.to_lowercase();
+            if name_lc == namespace_lc
+                || pkg_ns_lc == namespace_lc
+                || name_lc == format!("stryke-{}", namespace_lc)
+            {
+                names.push(pkg.name.clone());
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// Walk `<store>/` and pick the highest-version extraction whose
+/// directory name is `<candidate>@<version>/` for any candidate in
+/// `names`. Returns `(canonical_name, version_string)` for the
+/// winner. Versions are compared as dotted-integer tuples so
+/// `2.0` > `1.99` and `1.0` < `1.0.1` order the way humans expect.
+///
+/// Non-semver-looking versions (e.g. `dev`, `0.1-pre`) sort as zero
+/// in the numeric comparison and lose to anything with real numbers,
+/// matching the LSP's completion ranking.
+pub(crate) fn scan_store_for_highest_version(
+    store: &Store,
+    names: &[String],
+) -> Option<(String, String)> {
+    let store_dir = store.store_dir();
+    let entries = std::fs::read_dir(&store_dir).ok()?;
+    let mut best: Option<(String, String, Vec<u64>)> = None;
+    for ent in entries.flatten() {
+        let dirname = ent.file_name().to_string_lossy().into_owned();
+        let Some((pkg, ver)) = dirname.rsplit_once('@') else {
+            continue;
+        };
+        if !names.iter().any(|n| n == pkg) {
+            continue;
+        }
+        let tuple = parse_version_tuple(ver);
+        let take = match &best {
+            None => true,
+            Some((_, _, cur)) => tuple.cmp(cur) == std::cmp::Ordering::Greater,
+        };
+        if take {
+            best = Some((pkg.to_string(), ver.to_string(), tuple));
+        }
+    }
+    best.map(|(n, v, _)| (n, v))
+}
+
+/// Parse a `"1.2.3"`-ish version string into a numeric tuple for
+/// total-ordered comparison. Non-numeric tail segments collapse to
+/// `0`, so `1.0` < `1.0.1` and `1.2-rc1` reads as `[1, 2, 0]` for
+/// the purpose of "highest version" ranking. This is intentionally
+/// simple — semver pre-release / build metadata semantics live in a
+/// separate sort layer that the package manager owns, not the
+/// resolver. The resolver only needs "newest wins" deterministically.
+fn parse_version_tuple(ver: &str) -> Vec<u64> {
+    ver.split('.')
+        .map(|p| {
+            // Strip non-digit tail (e.g. `0-pre` → `0`) before parsing.
+            let head: String = p.chars().take_while(|c| c.is_ascii_digit()).collect();
+            head.parse::<u64>().unwrap_or(0)
+        })
+        .collect()
+}
+
+/// Build the list of plausible `<store>/<name>@<version>/` paths for a
+/// resolver entry. Tries the entry name as-is first, then `stryke-<name>`
+/// when the entry isn't already prefixed. Covers the legacy split where
+/// lockfile/installed.toml entries record the dep alias (`postgres`) but
+/// the store directory is the canonical package name (`stryke-postgres`).
+fn resolve_store_candidates(
+    store: &Store,
+    name: &str,
+    version: &str,
+) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::with_capacity(2);
+    out.push(store.package_dir(name, version));
+    if !name.starts_with("stryke-") {
+        out.push(store.package_dir(&format!("stryke-{}", name), version));
+    }
+    out
 }
 
 /// Side-load the package's `[ffi]` cdylib (if declared) into the FFI registry.
@@ -3173,7 +3412,7 @@ mod tests {
         .unwrap();
         std::fs::create_dir_all(root.join("lib/Foo")).unwrap();
         std::fs::write(root.join("lib/Foo/Bar.stk"), "# bar").unwrap();
-        let r = resolve_module(&root, "Foo::Bar").unwrap().unwrap();
+        let r = resolve_module(&root, "Foo::Bar", None).unwrap().unwrap();
         assert!(r.ends_with("lib/Foo/Bar.stk"), "got {:?}", r);
     }
 
@@ -3185,7 +3424,7 @@ mod tests {
             "[package]\nname=\"x\"\nversion=\"0.1.0\"\n",
         )
         .unwrap();
-        let r = resolve_module(&root, "Foo::Bar").unwrap();
+        let r = resolve_module(&root, "Foo::Bar", None).unwrap();
         assert!(r.is_none());
     }
 
@@ -3213,11 +3452,198 @@ mod tests {
         idx.save_to(&store).unwrap();
 
         let proj = tempdir("proj-no-local-gui");
-        let r = resolve_module(&proj, "GUI").unwrap();
+        let r = resolve_module(&proj, "GUI", None).unwrap();
         std::env::remove_var("STRYKE_HOME");
 
         let r = r.expect("GUI should resolve to stryke-gui via prefix fallback");
         assert!(r.ends_with("store/stryke-gui@0.3.0/lib/GUI.stk"), "got {:?}", r);
+    }
+
+    /// "stryke use must respect package version" — use-site `use Foo 1.0`
+    /// outside any project must land on `<store>/foo@1.0/` directly,
+    /// even when the global installed.toml records a different version.
+    #[test]
+    fn resolve_module_pin_version_lands_on_exact_store_dir() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-pin-exact");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Two versions on disk; installed.toml pins the newer one.
+        for v in ["1.0", "2.0"] {
+            let pkg_dir = store.package_dir("foo", v);
+            std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+            std::fs::write(
+                pkg_dir.join("lib/Foo.stk"),
+                format!("# foo {}\n", v).as_bytes(),
+            )
+            .unwrap();
+        }
+        let mut idx = InstalledIndex::new();
+        idx.upsert("foo", "2.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let proj = tempdir("proj-pin-exact");
+        let r = resolve_module(&proj, "Foo", Some("1.0")).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("Foo 1.0 should resolve directly to foo@1.0");
+        assert!(
+            r.ends_with("store/foo@1.0/lib/Foo.stk"),
+            "use-site pin must bypass installed.toml; got {:?}",
+            r
+        );
+    }
+
+    /// Pin requested but the version isn't in the store — resolver
+    /// MUST refuse to fall through to a different version. The whole
+    /// point of the pin is "this version or nothing".
+    #[test]
+    fn resolve_module_pin_version_missing_errors_not_substitutes() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-pin-missing");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Only 2.0 in store; user pins 1.0 which doesn't exist.
+        let pkg_dir = store.package_dir("foo", "2.0");
+        std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+        std::fs::write(pkg_dir.join("lib/Foo.stk"), b"# foo 2.0\n").unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("foo", "2.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let proj = tempdir("proj-pin-missing");
+        let r = resolve_module(&proj, "Foo", Some("1.0"));
+        std::env::remove_var("STRYKE_HOME");
+
+        assert!(
+            r.is_err(),
+            "missing pin must error, not silently substitute 2.0; got {:?}",
+            r
+        );
+    }
+
+    /// Outside-project resolution must pick the HIGHEST version of the
+    /// package in the store — not whatever installed.toml last
+    /// upserted, and not the lexicographically-largest dir name.
+    /// `2.0` beats `1.99` (numeric tuple compare).
+    #[test]
+    fn resolve_module_outside_project_picks_highest_version() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-highest");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        for v in ["1.99", "2.0", "0.5"] {
+            let pkg_dir = store.package_dir("foo", v);
+            std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+            std::fs::write(
+                pkg_dir.join("lib/Foo.stk"),
+                format!("# foo {}\n", v).as_bytes(),
+            )
+            .unwrap();
+        }
+        // No installed.toml entry — proves the scan path is what
+        // picks the version, not the index.
+
+        let proj = tempdir("proj-highest");
+        let r = resolve_module(&proj, "Foo", None).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("foo should resolve to highest version on disk");
+        assert!(
+            r.ends_with("store/foo@2.0/lib/Foo.stk"),
+            "expected foo@2.0 (highest), got {:?}",
+            r
+        );
+    }
+
+    /// Highest-version scan must respect canonical-name mapping —
+    /// `use GUI` should pick the highest `stryke-gui@*/` even though
+    /// the bare `gui@*/` form doesn't exist on disk.
+    #[test]
+    fn resolve_module_highest_version_bridges_stryke_prefix() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-bridge-highest");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        for v in ["0.3.0", "0.10.0", "0.2.0"] {
+            let pkg_dir = store.package_dir("stryke-gui", v);
+            std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+            std::fs::write(
+                pkg_dir.join("lib/GUI.stk"),
+                format!("# gui {}\n", v).as_bytes(),
+            )
+            .unwrap();
+        }
+
+        let proj = tempdir("proj-bridge-highest");
+        let r = resolve_module(&proj, "GUI", None).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("GUI should bridge to stryke-gui and pick highest");
+        assert!(
+            r.ends_with("store/stryke-gui@0.10.0/lib/GUI.stk"),
+            "0.10.0 > 0.3.0 numerically — got {:?}",
+            r
+        );
+    }
+
+    /// Lockfile pins a version whose store dir is missing. Resolver MUST
+    /// error rather than silently fall through to the global index —
+    /// that fall-through was the version-disrespect bug.
+    #[test]
+    fn resolve_module_lockfile_pin_missing_errors_not_substitutes() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-lock-missing");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Global has foo@2.0 (latest install). Project lockfile pins
+        // foo@1.0 but the store doesn't have that extracted.
+        let pkg_dir = store.package_dir("foo", "2.0");
+        std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+        std::fs::write(pkg_dir.join("lib/Foo.stk"), b"# foo 2.0\n").unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert("foo", "2.0", "test");
+        idx.save_to(&store).unwrap();
+
+        let proj = tempdir("proj-lock-missing");
+        std::fs::write(
+            proj.join(MANIFEST_FILE),
+            "[package]\nname=\"x\"\nversion=\"0.1.0\"\n[deps]\nfoo = \"1.0\"\n",
+        )
+        .unwrap();
+        let mut lf = Lockfile::new();
+        lf.packages.push(super::super::lockfile::LockedPackage {
+            name: "foo".into(),
+            version: "1.0".into(),
+            source: "registry+test".into(),
+            integrity: "sha256-deadbeef".into(),
+            features: vec![],
+            deps: vec![],
+        });
+        std::fs::write(
+            proj.join(LOCKFILE_FILE),
+            lf.to_toml_string().unwrap(),
+        )
+        .unwrap();
+
+        let r = resolve_module(&proj, "Foo", None);
+        std::env::remove_var("STRYKE_HOME");
+
+        assert!(
+            r.is_err(),
+            "lockfile pin missing in store must error, not silently use foo@2.0; got {:?}",
+            r
+        );
     }
 
     // ── Library-resolution tests (L1, L4) ─────────────────────────────

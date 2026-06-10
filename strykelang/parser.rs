@@ -6445,6 +6445,31 @@ impl Parser {
                 // string" error pointing at the next-line statement.
                 // The legitimate multi-line form uses `,` to continue.
                 let on_same_line = self.peek_line() == tok_line;
+                // Perl-style version pin: `use Some::Module 2.13` — a
+                // numeric literal in the FIRST import slot is the
+                // package-version requirement, not an import argument.
+                // Matches Perl 5's `use Module VERSION LIST` grammar:
+                // the resolver pins to `<store>/<name>@<VERSION>/`
+                // directly (bypassing lockfile / installed.toml).
+                // Distinct from the bare `use VERSION` form a few
+                // arms up, which is handled by `UsePerlVersion`. A
+                // trailing `, LIST` is still consumed as imports.
+                let mut version: Option<String> = None;
+                if on_same_line {
+                    match self.peek().clone() {
+                        Token::Integer(n) => {
+                            self.advance();
+                            version = Some(n.to_string());
+                            self.eat(&Token::Comma);
+                        }
+                        Token::Float(v) => {
+                            self.advance();
+                            version = Some(format_version_float(v));
+                            self.eat(&Token::Comma);
+                        }
+                        _ => {}
+                    }
+                }
                 if on_same_line
                     && !matches!(self.peek(), Token::Semicolon | Token::Eof)
                     && !self.next_is_new_statement_start(tok_line)
@@ -6465,6 +6490,7 @@ impl Parser {
                     kind: StmtKind::Use {
                         module: full_name,
                         imports,
+                        version,
                     },
                     line,
                 })
@@ -20602,6 +20628,28 @@ impl Parser {
     }
 }
 
+/// Stringify a Perl-style `use Module VERSION` float pin so the resolver
+/// gets the literal the user typed (`"2.13"`), not an f64-roundtrip
+/// `"2.13000000000000034"`. We only have the parsed `f64` here — the
+/// lexer collapses the source slice into `Token::Float(v)` — so format
+/// shortest round-trippable decimal via Rust's `{}`. For `2.13` /
+/// `0.20` / `1.0` this matches the source; for genuinely-imprecise
+/// f64s it gives the nearest representation, which still resolves
+/// store dirs whose names were generated through the same path.
+fn format_version_float(v: f64) -> String {
+    let s = format!("{}", v);
+    // Trailing `.0` on whole numbers — `1.0` should stay `1.0` so a
+    // store entry `pkg@1.0/` matches, but `2` should not become `2.0`.
+    // Rust's default formatter already preserves the `.0` for floats
+    // (`format!("{}", 1.0_f64)` → `"1"` on stable, hence the explicit
+    // re-add). Without this, `use Foo 1.0` would pin to `Foo@1` which
+    // never matches `Foo@1.0/` on disk.
+    if !s.contains('.') && !s.contains('e') && !s.contains('E') {
+        return format!("{}.0", s);
+    }
+    s
+}
+
 fn merge_expr_list(parts: Vec<Expr>) -> Expr {
     if parts.len() == 1 {
         parts.into_iter().next().unwrap()
@@ -20930,6 +20978,53 @@ mod tests {
     fn parse_use_statement() {
         let p = parse_ok("use strict");
         assert_eq!(p.statements.len(), 1);
+    }
+
+    /// `use Module VERSION` — Perl-style version pin captures the
+    /// numeric first arg as `StmtKind::Use::version`, not an import.
+    #[test]
+    fn parse_use_module_version_pin() {
+        let p = parse_ok("use Some::Module 2.13");
+        assert_eq!(p.statements.len(), 1);
+        match &p.statements[0].kind {
+            StmtKind::Use { module, imports, version } => {
+                assert_eq!(module, "Some::Module");
+                assert!(imports.is_empty(), "version must not leak into imports");
+                assert_eq!(version.as_deref(), Some("2.13"));
+            }
+            other => panic!("expected Use, got {:?}", other),
+        }
+    }
+
+    /// `use Module VERSION, LIST` — version pin AND import list both
+    /// captured. Comma between the two is consumed by parse_use.
+    /// `parse_expression` consumes its own comma-list, so the imports
+    /// vec ends up with a single list-expr — the point of this test is
+    /// the version pin survives the LIST tail, not the import shape.
+    #[test]
+    fn parse_use_module_version_then_imports() {
+        let p = parse_ok("use Some::Module 1.0, 'foo', 'bar'");
+        assert_eq!(p.statements.len(), 1);
+        match &p.statements[0].kind {
+            StmtKind::Use { module, imports, version } => {
+                assert_eq!(module, "Some::Module");
+                assert_eq!(version.as_deref(), Some("1.0"));
+                assert!(!imports.is_empty(), "import LIST must reach the imports vec");
+            }
+            other => panic!("expected Use, got {:?}", other),
+        }
+    }
+
+    /// Plain `use Foo` — no version, no imports. version field is None.
+    #[test]
+    fn parse_use_module_no_version() {
+        let p = parse_ok("use Foo");
+        match &p.statements[0].kind {
+            StmtKind::Use { version, .. } => {
+                assert_eq!(version.as_deref(), None);
+            }
+            other => panic!("expected Use, got {:?}", other),
+        }
     }
 
     #[test]

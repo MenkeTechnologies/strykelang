@@ -3125,7 +3125,7 @@ impl Compiler {
                 let idx = self.chunk.add_use_overload(pairs.clone());
                 self.chunk.emit(Op::UseOverload(idx), line);
             }
-            StmtKind::Use { module, imports } => {
+            StmtKind::Use { module, imports, .. } => {
                 // `use Env '@PATH'` declares variables that must be visible to strict checking.
                 if module == "Env" {
                     Self::register_env_imports(
