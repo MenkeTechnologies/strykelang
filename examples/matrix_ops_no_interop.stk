@@ -16,7 +16,7 @@ fn new($rows, $cols) {
 }
 
 fn identity($n) {
-    var $m = new $n, $n
+    var $m = Matrix::new($n, $n)
     for val $i (0 : $n - 1) {
         $m->[$i]->[$i] = 1.0
     }
@@ -26,7 +26,7 @@ fn identity($n) {
 fn transpose($m) {
     val $r = len @$m
     val $c = len @{$m->[0]}
-    val $res = new $c, $r
+    val $res = Matrix::new($c, $r)
     for val $i (0 : $r - 1) {
         for val $j (0 : $c - 1) {
             $res->[$j]->[$i] = $m->[$i]->[$j]
@@ -43,7 +43,7 @@ fn multiply($m1, $m2) {
     
     return undef if $c1 != $r2
     
-    val $res = new $r1, $c2
+    val $res = Matrix::new($r1, $c2)
     for val $i (0 : $r1 - 1) {
         for val $j (0 : $c2 - 1) {
             var $sum = 0.0
@@ -59,8 +59,8 @@ fn multiply($m1, $m2) {
 # Gaussian Elimination to solve mat_a * x = mat_b
 fn solve($a_orig, $b_orig) {
     val $n = len @$a_orig
-    var $mat_a = new $n, $n
-    var $mat_b = new $n, len(@{$b_orig->[0]})
+    var $mat_a = Matrix::new($n, $n)
+    var $mat_b = Matrix::new($n, len(@{$b_orig->[0]}))
     
     for val $i (0 : $n - 1) {
         for val $j (0 : $n - 1) { $mat_a->[$i]->[$j] = $a_orig->[$i]->[$j] }
@@ -95,7 +95,7 @@ fn solve($a_orig, $b_orig) {
         }
     }
     
-    val $x = new $n, len(@{$mat_b->[0]})
+    val $x = Matrix::new($n, len(@{$mat_b->[0]}))
     for val $i (rev 0 : $n - 1) {
         for val $j (0 : (len @{$mat_b->[0]}) - 1) {
             var $sum = $mat_b->[$i]->[$j]
@@ -110,8 +110,12 @@ fn solve($a_orig, $b_orig) {
 
 fn invert($m) {
     val $n = len @$m
-    val $id = identity $n
-    solve $m, $id
+    val $id = Matrix::identity($n)
+    # Use fully-qualified name + parens — bare `solve` resolves to stryke's
+    # matrix_solve builtin (alias) which expects (matrix, vector), not
+    # (matrix, matrix); and the bareword call form was dropping the second
+    # arg in some contexts.
+    Matrix::solve($m, $id)
 }
 
 fn display($m, $label) {

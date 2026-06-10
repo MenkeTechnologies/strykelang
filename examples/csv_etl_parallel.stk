@@ -175,7 +175,7 @@ p "  " . ("-" x 65)
 
 for val $key (sort keys %$agg) {
     val ($region, $cat) = split /\|/, $key
-    val $r = $agg->{$key}
+    var $r = $agg->{$key}
     printf "%-9s %-12s %6d %7d %12.2f %12.2f\n",
         $region, $cat, $r->{rows}, $r->{units}, $r->{revenue}, $r->{profit}
 }
@@ -183,7 +183,7 @@ for val $key (sort keys %$agg) {
 p ""
 p "── Region ranking by profit ──────────────────────────"
 for val $i (0:len(@ranked) - 1) {
-    val $r = $by_region{ $ranked[$i] }
+    var $r = $by_region{ $ranked[$i] }
     printf "  %d. %-9s rows=%d profit=%.2f\n", $i + 1, $ranked[$i], $r->{rows}, $r->{profit}
 }
 
