@@ -25,10 +25,6 @@ const MANIFEST_FILE: &str = "stryke.toml";
 /// production layout), `bin/` (script launchers).
 const PACKAGE_SUBTREES: &[&str] = &["lib", "bin"];
 
-/// Root-level metadata files copied if present. Matched case-insensitively
-/// by ASCII-uppercased prefix.
-const PACKAGE_META_PREFIXES: &[&str] = &["README", "LICENSE", "LICENCE", "CHANGELOG"];
-
 /// Filename of the global installed-package index.
 pub const INSTALLED_FILE: &str = "installed.toml";
 
@@ -110,15 +106,23 @@ impl Store {
     }
 
     /// Copy a path-dep into the store as `name@version` using the canonical
-    /// release-tarball layout, so `s install -g .` produces the same on-disk
-    /// shape as `s install -g github.com/<owner>/<repo>`. Only these are
-    /// copied (everything else — `target/`, `.git/`, `vendor/`, `tests/`,
-    /// editor scratch — stays out of the store):
+    /// release-tarball layout, so `s install -g .` produces a byte-for-byte
+    /// equivalent on-disk shape to `s install -g github.com/<owner>/<repo>`.
+    /// Exactly three things land in the store and nothing else (no
+    /// `target/`, `.git/`, `vendor/`, `tests/`, root-level `README*` /
+    /// `LICENSE*` / `CHANGELOG*`, editor scratch, or out-of-tree `[bin]`
+    /// paths — the GitHub release tarball doesn't ship those either):
     ///
     /// * `stryke.toml` (required)
-    /// * `lib/` and `bin/` subtrees (recursive)
-    /// * `README*`, `LICENSE*`, `LICENCE*`, `CHANGELOG*` files at the root
-    /// * any `manifest.bin[*]` path that lives outside `lib/` or `bin/`
+    /// * `lib/` subtree (recursive, if present)
+    /// * `bin/` subtree (recursive, if present)
+    ///
+    /// Packages with `[bin]` entries pointing outside `bin/` are rejected by
+    /// the release-tarball staging step (every shipped binary lives under
+    /// `bin/<name>.stk`); the path install enforces the same rule by simply
+    /// not copying anything outside the canonical subtrees, so an
+    /// out-of-tree `[bin]` path becomes a no-op at install time rather than
+    /// a store-layout divergence.
     ///
     /// Existing destination is removed first so re-installs see fresh content.
     pub fn install_path_dep(
@@ -126,7 +130,7 @@ impl Store {
         name: &str,
         version: &str,
         src: &Path,
-        manifest: &Manifest,
+        _manifest: &Manifest,
     ) -> PkgResult<PathBuf> {
         let dst = self.package_dir(name, version);
         if dst.exists() {
@@ -146,46 +150,6 @@ impl Store {
                 let to = dst.join(sub);
                 std::fs::create_dir_all(&to)?;
                 copy_dir(&from, &to)?;
-            }
-        }
-
-        for entry in std::fs::read_dir(src)? {
-            let entry = entry?;
-            let file_name = entry.file_name();
-            let name_str = file_name.to_string_lossy().to_ascii_uppercase();
-            if PACKAGE_META_PREFIXES
-                .iter()
-                .any(|p| name_str.starts_with(p))
-            {
-                let from = entry.path();
-                if from.is_file() {
-                    std::fs::copy(&from, dst.join(&file_name))
-                        .map_err(|e| PkgError::Io(format!("copy {}: {}", from.display(), e)))?;
-                }
-            }
-        }
-
-        // `[bin]` entries outside lib/ and bin/ — uncommon but supported by
-        // the manifest schema. Anything under lib/ or bin/ is already covered
-        // by the subtree pass.
-        for entry_path in manifest.bin.values() {
-            let rel = Path::new(entry_path);
-            let first_seg = rel
-                .components()
-                .next()
-                .and_then(|c| c.as_os_str().to_str())
-                .unwrap_or("");
-            if PACKAGE_SUBTREES.contains(&first_seg) {
-                continue;
-            }
-            let from = src.join(rel);
-            if from.is_file() {
-                let to = dst.join(rel);
-                if let Some(parent) = to.parent() {
-                    std::fs::create_dir_all(parent)?;
-                }
-                std::fs::copy(&from, &to)
-                    .map_err(|e| PkgError::Io(format!("copy {}: {}", from.display(), e)))?;
             }
         }
 
@@ -542,10 +506,13 @@ mod tests {
         // Canonical layout present.
         assert!(dst.join("stryke.toml").is_file());
         assert!(dst.join("lib/Arrow.stk").is_file());
-        assert!(dst.join("README.md").is_file());
-        assert!(dst.join("LICENSE").is_file());
 
-        // Cruft absent.
+        // Cruft absent. README / LICENSE / CHANGELOG are part of "cruft"
+        // because the GitHub release tarball doesn't ship them either —
+        // `s install -g .` must produce a byte-for-byte equivalent store
+        // layout to `s install -g github.com/...`.
+        assert!(!dst.join("README.md").exists(), "README.md leaked");
+        assert!(!dst.join("LICENSE").exists(), "LICENSE leaked");
         assert!(!dst.join("target").exists(), "target/ leaked into store");
         assert!(!dst.join(".git").exists(), ".git/ leaked into store");
         assert!(!dst.join("vendor").exists(), "vendor/ leaked into store");
