@@ -277,7 +277,7 @@ fn Ci::run_phase($name) {
 
 fn Ci::print_totals() = p "totals: files $files_ok/$files_n, tests $tests_ok/$tests_n"
 
-val @only_specs = @{ $opts{only} // [] }
+var @only_specs = @{ $opts{only} // [] }
 var %want
 if (len(@only_specs)) {
     for (@only_specs) {
