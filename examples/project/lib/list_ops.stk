@@ -5,61 +5,61 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::map_double {
-    val @a = (1, 2, 3, 4, 5)
-    val @r = map { _ * 2 } @a
+    val @xa = (1, 2, 3, 4, 5)
+    val @r = map { _ * 2 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_square {
-    val @a = (1, 2, 3, 4)
-    val @r = map { _ * _ } @a
+    val @xa = (1, 2, 3, 4)
+    val @r = map { _ * _ } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_string {
-    val @a = qw(a b c)
-    val @r = map {uc} @a
+    val @xa = qw(a b c)
+    val @r = map {uc} @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_length {
-    val @a = qw(one two three)
-    val @r = map {len} @a
+    val @xa = qw(one two three)
+    val @r = map {len} @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_empty {
-    val @a = ()
-    val @r = map { _ * 2 } @a
-    scalar @r}
+    val @xa = ()
+    val @r = map { _ * 2 } @xa
+    len @r}
 
 fn Project::ListOps::map_to_hash_key {
-    val @a = qw(a b c)
-    val @r = map { _ => 1 } @a
-    scalar @r}
+    val @xa = qw(a b c)
+    val @r = map { _ => 1 } @xa
+    len @r}
 
 fn Project::ListOps::map_conditional {
-    val @a = (1, 2, 3, 4, 5)
-    val @r = map { _ > 2 ? _ : 0 } @a
+    val @xa = (1, 2, 3, 4, 5)
+    val @r = map { _ > 2 ? _ : 0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_chained {
-    val @a = (1, 2, 3)
-    val @r = map { _ + 1 } map { _ * 2 } @a
+    val @xa = (1, 2, 3)
+    val @r = map { _ + 1 } map { _ * 2 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_with_index {
-    val @a = qw(a b c)
+    val @xa = qw(a b c)
     var $i = 0
-    val @r = map { val $x = "$_$i"; $i++; $x } @a
+    val @r = map { val $x = "$_$i"; $i++; $x } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_flatten {
-    val @a = (1, 2, 3)
-    val @r = map { (_, _ * 10) } @a
+    val @xa = (1, 2, 3)
+    val @r = map { (_, _ * 10) } @xa
     join(",", @r)
 }
 
@@ -68,57 +68,57 @@ fn Project::ListOps::map_flatten {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::grep_positive {
-    val @a = (-2, -1, 0, 1, 2)
-    val @r = grep { _ > 0 } @a
+    val @xa = (-2, -1, 0, 1, 2)
+    val @r = grep { _ > 0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::grep_even {
-    val @a = (1, 2, 3, 4, 5, 6)
-    val @r = grep { _ % 2 == 0 } @a
+    val @xa = (1, 2, 3, 4, 5, 6)
+    val @r = grep { _ % 2 == 0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::grep_string_match {
-    val @a = qw(apple banana cherry date)
-    val @r = grep { /a/ } @a
+    val @xa = qw(apple banana cherry date)
+    val @r = grep { /a/ } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::grep_defined {
-    val @a = (1, undef, 2, undef, 3)
-    val @r = grep {defined} @a
+    val @xa = (1, undef, 2, undef, 3)
+    val @r = grep {defined} @xa
     join(",", @r)
 }
 
 fn Project::ListOps::grep_true {
-    val @a = (0, 1, "", "hello", undef)
-    val @r = grep { _ } @a
-    scalar @r}
+    val @xa = (0, 1, "", "hello", undef)
+    val @r = grep { _ } @xa
+    len @r}
 
 fn Project::ListOps::grep_empty {
-    val @a = ()
-    val @r = grep { _ > 0 } @a
-    scalar @r}
+    val @xa = ()
+    val @r = grep { _ > 0 } @xa
+    len @r}
 
 fn Project::ListOps::grep_none_match {
-    val @a = (1, 2, 3)
-    val @r = grep { _ > 10 } @a
-    scalar @r}
+    val @xa = (1, 2, 3)
+    val @r = grep { _ > 10 } @xa
+    len @r}
 
 fn Project::ListOps::grep_all_match {
-    val @a = (10, 20, 30)
-    val @r = grep { _ > 5 } @a
-    scalar @r}
+    val @xa = (10, 20, 30)
+    val @r = grep { _ > 5 } @xa
+    len @r}
 
 fn Project::ListOps::grep_count {
-    val @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    len(grep { _ % 2 == 0 } @a)
+    val @xa = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    len(grep { _ % 2 == 0 } @xa)
 }
 
 fn Project::ListOps::grep_chained {
-    val @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    val @r = grep { _ > 3 } grep { _ % 2 == 0 } @a
+    val @xa = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    val @r = grep { _ > 3 } grep { _ % 2 == 0 } @xa
     join(",", @r)
 }
 
@@ -127,68 +127,68 @@ fn Project::ListOps::grep_chained {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::sort_numeric {
-    val @a = (3, 1, 4, 1, 5, 9, 2, 6)
-    val @r = sort { $a <=> $b } @a
+    val @xa = (3, 1, 4, 1, 5, 9, 2, 6)
+    val @r = sort { _0 <=> _1 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_numeric_desc {
-    val @a = (3, 1, 4, 1, 5)
-    val @r = sort { $b <=> $a } @a
+    val @xa = (3, 1, 4, 1, 5)
+    val @r = sort { _1 <=> _0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_string {
-    val @a = qw(banana apple cherry)
-    val @r = sort @a
+    val @xa = qw(banana apple cherry)
+    val @r = sort @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_string_cmp {
-    val @a = qw(banana Apple cherry)
-    val @r = sort { $a cmp $b } @a
+    val @xa = qw(banana Apple cherry)
+    val @r = sort { _0 cmp _1 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_string_desc {
-    val @a = qw(apple banana cherry)
-    val @r = sort { $b cmp $a } @a
+    val @xa = qw(apple banana cherry)
+    val @r = sort { _1 cmp _0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_case_insensitive {
-    val @a = qw(Banana apple Cherry)
-    val @r = sort { lc($a) cmp lc($b) } @a
+    val @xa = qw(Banana apple Cherry)
+    val @r = sort { lc(_0) cmp lc(_1) } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_by_length {
-    val @a = qw(a bb ccc dd e)
-    val @r = sort { len($a) <=> len($b) } @a
+    val @xa = qw(a bb ccc dd e)
+    val @r = sort { len(_0) <=> len(_1) } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_empty {
-    val @a = ()
-    val @r = sort @a
-    scalar @r}
+    val @xa = ()
+    val @r = sort @xa
+    len @r}
 
 fn Project::ListOps::sort_single {
-    val @a = (42)
-    val @r = sort @a
+    val @xa = (42)
+    val @r = sort @xa
     $r[0]
 }
 
 fn Project::ListOps::sort_stable_check {
-    val @a = (3, 1, 4, 1, 5)
-    val @r = sort { $a <=> $b } @a
+    val @xa = (3, 1, 4, 1, 5)
+    val @r = sort { _0 <=> _1 } @xa
     $r[0] == 1 && $r[1] == 1 ? 1 : 0
 }
 
 fn Project::ListOps::sort_preserves_original {
-    val @a = (3, 1, 2)
-    val @r = sort { $a <=> $b } @a
-    $a[0]
+    val @xa = (3, 1, 2)
+    val @r = sort { _0 <=> _1 } @xa
+    $xa[0]
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -196,20 +196,20 @@ fn Project::ListOps::sort_preserves_original {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::reverse_array {
-    val @a = (1, 2, 3, 4, 5)
-    val @r = rev(@a)
+    val @xa = (1, 2, 3, 4, 5)
+    val @r = rev(@xa)
     join(",", @r)
 }
 
 fn Project::ListOps::reverse_array_empty {
-    val @a = ()
-    val @r = rev(@a)
-    scalar @r
+    val @xa = ()
+    val @r = rev(@xa)
+    len @r
 }
 
 fn Project::ListOps::reverse_array_single {
-    val @a = (42)
-    val @r = rev(@a)
+    val @xa = (42)
+    val @r = rev(@xa)
     $r[0]
 }
 
@@ -218,14 +218,14 @@ fn Project::ListOps::reverse_string_scalar {
 }
 
 fn Project::ListOps::reverse_preserves {
-    val @a = (1, 2, 3)
-    val @r = rev(@a)
-    $a[0]
+    val @xa = (1, 2, 3)
+    val @r = rev(@xa)
+    $xa[0]
 }
 
 fn Project::ListOps::reverse_twice {
-    val @a = (1, 2, 3)
-    val @r = rev(rev(@a))
+    val @xa = (1, 2, 3)
+    val @r = rev(rev(@xa))
     join(",", @r)
 }
 
@@ -234,48 +234,48 @@ fn Project::ListOps::reverse_twice {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::join_comma {
-    val @a = (1, 2, 3)
-    join(",", @a)
+    val @xa = (1, 2, 3)
+    join(",", @xa)
 }
 
 fn Project::ListOps::join_space {
-    val @a = qw(hello world)
-    join(" ", @a)
+    val @xa = qw(hello world)
+    join(" ", @xa)
 }
 
 fn Project::ListOps::join_empty_sep {
-    val @a = qw(a b c)
-    join("", @a)
+    val @xa = qw(a b c)
+    join("", @xa)
 }
 
 fn Project::ListOps::join_empty_array {
-    val @a = ()
-    join(",", @a)
+    val @xa = ()
+    join(",", @xa)
 }
 
 fn Project::ListOps::join_single {
-    val @a = (42)
-    join(",", @a)
+    val @xa = (42)
+    join(",", @xa)
 }
 
 fn Project::ListOps::join_multi_char {
-    val @a = (1, 2, 3)
-    join(" - ", @a)
+    val @xa = (1, 2, 3)
+    join(" - ", @xa)
 }
 
 fn Project::ListOps::join_with_undef {
-    val @a = (1, undef, 3)
-    join(",", @a)
+    val @xa = (1, undef, 3)
+    join(",", @xa)
 }
 
 fn Project::ListOps::join_mixed_types {
-    val @a = (1, "hello", 3.14)
-    join("|", @a)
+    val @xa = (1, "hello", 3.14)
+    join("|", @xa)
 }
 
 fn Project::ListOps::join_newline {
-    val @a = qw(line1 line2 line3)
-    val $s = join("\n", @a)
+    val @xa = qw(line1 line2 line3)
+    val $s = join("\n", @xa)
     length $s}
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -289,7 +289,7 @@ fn Project::ListOps::split_comma {
 
 fn Project::ListOps::split_space {
     val @r = split(/ /, "hello world")
-    scalar @r}
+    len @r}
 
 fn Project::ListOps::split_re {
     val @r = split(/\s+/, "a  b   c")
@@ -298,7 +298,7 @@ fn Project::ListOps::split_re {
 
 fn Project::ListOps::split_limit {
     val @r = split(/,/, "a,b,c,d", 2)
-    scalar @r}
+    len @r}
 
 fn Project::ListOps::split_limit_rest {
     val @r = split(/,/, "a,b,c,d", 2)
@@ -307,15 +307,15 @@ fn Project::ListOps::split_limit_rest {
 
 fn Project::ListOps::split_no_match {
     val @r = split(/x/, "hello")
-    scalar @r}
+    len @r}
 
 fn Project::ListOps::split_empty_string {
     val @r = split(/,/, "")
-    scalar @r}
+    len @r}
 
 fn Project::ListOps::split_trailing_empty {
     val @r = split(/,/, "a,b,")
-    scalar @r}
+    len @r}
 
 fn Project::ListOps::split_multiple_delim {
     val @r = split(/[,;]/, "a,b;c")
@@ -324,39 +324,39 @@ fn Project::ListOps::split_multiple_delim {
 
 fn Project::ListOps::split_at_start {
     val @r = split(/,/, ",a,b")
-    scalar @r}
+    len @r}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PUSH
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::push_single {
-    var @a = (1, 2)
-    push @a, 3
-    join(",", @a)
+    var @xa = (1, 2)
+    push @xa, 3
+    join(",", @xa)
 }
 
 fn Project::ListOps::push_multiple {
-    var @a = (1)
-    push @a, 2, 3, 4
-    join(",", @a)
+    var @xa = (1)
+    push @xa, 2, 3, 4
+    join(",", @xa)
 }
 
 fn Project::ListOps::push_returns {
-    var @a = (1, 2)
-    push @a, 3
+    var @xa = (1, 2)
+    push @xa, 3
 }
 
 fn Project::ListOps::push_empty {
-    var @a = ()
-    push @a, 1
-    scalar @a}
+    var @xa = ()
+    push @xa, 1
+    len @xa}
 
 fn Project::ListOps::push_array {
-    var @a = (1, 2)
-    val @b = (3, 4)
-    push @a, @b
-    join(",", @a)
+    var @xa = (1, 2)
+    val @xb = (3, 4)
+    push @xa, @xb
+    join(",", @xa)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -364,26 +364,26 @@ fn Project::ListOps::push_array {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::pop_returns {
-    var @a = (1, 2, 3)
-    pop @a
+    var @xa = (1, 2, 3)
+    pop @xa
 }
 
 fn Project::ListOps::pop_modifies {
-    var @a = (1, 2, 3)
-    pop @a
-    join(",", @a)
+    var @xa = (1, 2, 3)
+    pop @xa
+    join(",", @xa)
 }
 
 fn Project::ListOps::pop_empty {
-    var @a = ()
-    val $r = pop @a
+    var @xa = ()
+    val $r = pop @xa
     defined($r) ? 1 : 0
 }
 
 fn Project::ListOps::pop_single {
-    var @a = (42)
-    val $r = pop @a
-    $r == 42 && len(@a) == 0 ? 1 : 0
+    var @xa = (42)
+    val $r = pop @xa
+    $r == 42 && len(@xa) == 0 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -391,26 +391,26 @@ fn Project::ListOps::pop_single {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::shift_returns {
-    var @a = (1, 2, 3)
-    shift @a
+    var @xa = (1, 2, 3)
+    shift @xa
 }
 
 fn Project::ListOps::shift_modifies {
-    var @a = (1, 2, 3)
-    shift @a
-    join(",", @a)
+    var @xa = (1, 2, 3)
+    shift @xa
+    join(",", @xa)
 }
 
 fn Project::ListOps::shift_empty {
-    var @a = ()
-    val $r = shift @a
+    var @xa = ()
+    val $r = shift @xa
     defined($r) ? 1 : 0
 }
 
 fn Project::ListOps::shift_single {
-    var @a = (42)
-    val $r = shift @a
-    $r == 42 && len(@a) == 0 ? 1 : 0
+    var @xa = (42)
+    val $r = shift @xa
+    $r == 42 && len(@xa) == 0 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -418,64 +418,64 @@ fn Project::ListOps::shift_single {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::unshift_single {
-    var @a = (2, 3)
-    unshift @a, 1
-    join(",", @a)
+    var @xa = (2, 3)
+    unshift @xa, 1
+    join(",", @xa)
 }
 
 fn Project::ListOps::unshift_multiple {
-    var @a = (4)
-    unshift @a, 1, 2, 3
-    join(",", @a)
+    var @xa = (4)
+    unshift @xa, 1, 2, 3
+    join(",", @xa)
 }
 
 fn Project::ListOps::unshift_returns {
-    var @a = (2, 3)
-    unshift @a, 1
+    var @xa = (2, 3)
+    unshift @xa, 1
 }
 
 fn Project::ListOps::unshift_empty {
-    var @a = ()
-    unshift @a, 1
-    scalar @a}
+    var @xa = ()
+    unshift @xa, 1
+    len @xa}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPLICE
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::splice_remove {
-    var @a = (1, 2, 3, 4, 5)
-    val @r = splice(@a, 1, 2)
+    var @xa = (1, 2, 3, 4, 5)
+    val @r = splice(@xa, 1, 2)
     join(",", @r)
 }
 
 fn Project::ListOps::splice_remove_result {
-    var @a = (1, 2, 3, 4, 5)
-    splice(@a, 1, 2)
-    join(",", @a)
+    var @xa = (1, 2, 3, 4, 5)
+    splice(@xa, 1, 2)
+    join(",", @xa)
 }
 
 fn Project::ListOps::splice_insert {
-    var @a = (1, 4, 5)
-    splice(@a, 1, 0, 2, 3)
-    join(",", @a)
+    var @xa = (1, 4, 5)
+    splice(@xa, 1, 0, 2, 3)
+    join(",", @xa)
 }
 
 fn Project::ListOps::splice_replace {
-    var @a = (1, 2, 3, 4, 5)
-    splice(@a, 1, 2, "a", "b", "c")
-    join(",", @a)
+    var @xa = (1, 2, 3, 4, 5)
+    splice(@xa, 1, 2, "a", "b", "c")
+    join(",", @xa)
 }
 
 fn Project::ListOps::splice_to_end {
-    var @a = (1, 2, 3, 4, 5)
-    val @r = splice(@a, 2)
+    var @xa = (1, 2, 3, 4, 5)
+    val @r = splice(@xa, 2)
     join(",", @r)
 }
 
 fn Project::ListOps::splice_negative {
-    var @a = (1, 2, 3, 4, 5)
-    val @r = splice(@a, -2)
+    var @xa = (1, 2, 3, 4, 5)
+    val @r = splice(@xa, -2)
     join(",", @r)
 }
 
@@ -484,20 +484,20 @@ fn Project::ListOps::splice_negative {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::list_in_scalar {
-    val @a = (1, 2, 3)
-    val $count = @a
+    val @xa = (1, 2, 3)
+    val $count = @xa
     $count
 }
 
 fn Project::ListOps::list_in_scalar_grep {
-    val @a = (1, 2, 3, 4, 5)
-    val $count = grep { _ > 2 } @a
+    val @xa = (1, 2, 3, 4, 5)
+    val $count = grep { _ > 2 } @xa
     $count
 }
 
 fn Project::ListOps::list_in_scalar_map {
-    val @a = (1, 2, 3)
-    val $count = map { _ * 2 } @a
+    val @xa = (1, 2, 3)
+    val $count = map { _ * 2 } @xa
     $count
 }
 
@@ -506,45 +506,45 @@ fn Project::ListOps::list_in_scalar_map {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::map_grep_combo {
-    val @a = (1, 2, 3, 4, 5, 6)
-    val @r = map { _ * 2 } grep { _ % 2 == 0 } @a
+    val @xa = (1, 2, 3, 4, 5, 6)
+    val @r = map { _ * 2 } grep { _ % 2 == 0 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_grep_combo {
-    val @a = (5, 2, 8, 1, 9, 3)
-    val @r = sort { $a <=> $b } grep { _ > 2 } @a
+    val @xa = (5, 2, 8, 1, 9, 3)
+    val @r = sort { _0 <=> _1 } grep { _ > 2 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::map_sort_combo {
-    val @a = (3, 1, 2)
-    val @r = sort { $a <=> $b } map { _ * 10 } @a
+    val @xa = (3, 1, 2)
+    val @r = sort { _0 <=> _1 } map { _ * 10 } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::reverse_sort_combo {
-    val @a = (3, 1, 4, 1, 5)
-    val @r = rev(sort { $a <=> $b } @a)
+    val @xa = (3, 1, 4, 1, 5)
+    val @r = rev(sort { _0 <=> _1 } @xa)
     join(",", @r)
 }
 
 fn Project::ListOps::join_map_combo {
-    val @a = (1, 2, 3)
-    join("-", map { _ * 2 } @a)
+    val @xa = (1, 2, 3)
+    join("-", map { _ * 2 } @xa)
 }
 
 fn Project::ListOps::split_join_round {
     val $s = "a,b,c"
-    val @a = split(/,/, $s)
-    join(",", @a)
+    val @xa = split(/,/, $s)
+    join(",", @xa)
 }
 
 fn Project::ListOps::transform_pipeline {
-    val @a = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-    val @r = sort { $b <=> $a }
+    val @xa = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    val @r = sort { _1 <=> _0 }
             map { _ * _ }
-            grep { _ % 2 == 0 } @a
+            grep { _ % 2 == 0 } @xa
     join(",", @r)
 }
 
@@ -553,41 +553,41 @@ fn Project::ListOps::transform_pipeline {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::reduce_sum {
-    val @a = (1, 2, 3, 4, 5)
+    val @xa = (1, 2, 3, 4, 5)
     var $sum = 0
-    $sum += _ for @a
+    $sum += _ for @xa
     $sum
 }
 
 fn Project::ListOps::reduce_product {
-    val @a = (1, 2, 3, 4, 5)
+    val @xa = (1, 2, 3, 4, 5)
     var $prod = 1
-    $prod *= _ for @a
+    $prod *= _ for @xa
     $prod
 }
 
 fn Project::ListOps::reduce_max {
-    var @a = (3, 1, 4, 1, 5, 9, 2, 6)
-    var $max = $a[0]
-    for val $x (@a) {
+    var @xa = (3, 1, 4, 1, 5, 9, 2, 6)
+    var $max = $xa[0]
+    for val $x (@xa) {
         $max = $x if $x > $max
     }
     $max
 }
 
 fn Project::ListOps::reduce_min {
-    var @a = (3, 1, 4, 1, 5, 9, 2, 6)
-    var $min = $a[0]
-    for val $x (@a) {
+    var @xa = (3, 1, 4, 1, 5, 9, 2, 6)
+    var $min = $xa[0]
+    for val $x (@xa) {
         $min = $x if $x < $min
     }
     $min
 }
 
 fn Project::ListOps::reduce_concat {
-    val @a = qw(a b c)
+    val @xa = qw(a b c)
     var $s = ""
-    $s .= _ for @a
+    $s .= _ for @xa
     $s
 }
 
@@ -596,36 +596,36 @@ fn Project::ListOps::reduce_concat {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::ListOps::map_returns_empty {
-    val @a = (1, 2, 3)
-    val @r = map { () } @a
-    scalar @r}
+    val @xa = (1, 2, 3)
+    val @r = map { () } @xa
+    len @r}
 
 fn Project::ListOps::grep_regex_match {
-    val @a = qw(foo bar baz qux)
-    val @r = grep { /^b/ } @a
+    val @xa = qw(foo bar baz qux)
+    val @r = grep { /^b/ } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::sort_with_undef {
-    val @a = (3, 1, 2)
-    val @r = sort { ($a // 0) <=> ($b // 0) } @a
+    val @xa = (3, 1, 2)
+    val @r = sort { (_0 // 0) <=> (_1 // 0) } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::nested_map {
-    val @a = (1, 2)
-    val @r = map { val $x = _; map { $x * _ } (1, 2, 3) } @a
+    val @xa = (1, 2)
+    val @r = map { val $x = _; map { $x * _ } (1, 2, 3) } @xa
     join(",", @r)
 }
 
 fn Project::ListOps::first_match {
-    val @a = (1, 2, 3, 4, 5)
-    val @r = grep { _ > 2 } @a
+    val @xa = (1, 2, 3, 4, 5)
+    val @r = grep { _ > 2 } @xa
     $r[0]
 }
 
 fn Project::ListOps::last_match {
-    val @a = (1, 2, 3, 4, 5)
-    val @r = grep { _ > 2 } @a
+    val @xa = (1, 2, 3, 4, 5)
+    val @r = grep { _ > 2 } @xa
     $r[-1]
 }

@@ -2,20 +2,20 @@
 # Demo + regression test for BUG-086 — Perl's `use constant` now
 # accepts every documented form:
 #
-#   use constant NAME => VALUE                  (single, scalar)
+#   use constant NAME => VALUE                  (single, len)
 #   use constant NAME => (V1, V2, V3)           (single, list)
 #   use constant { NAME1 => V1, NAME2 => V2 }   (multi via hashref)
 #   use constant NAME => [V1, V2, V3]           (single, arrayref — already worked)
 
-# 1. Single scalar constant (the only form that already worked).
+# 1. Single len constant (the only form that already worked).
 use constant PI => 3.14
-PI |> assert_eq(3.14, "single scalar constant")
+PI |> assert_eq(3.14, "single len constant")
 
 # 2. Single list constant — used to collapse to last operand (`3`).
 use constant ARR => (1, 2, 3)
-val @a = ARR
-"@a" |> assert_eq("1 2 3", "list constant preserved")
-len(@a) |> assert_eq(3, "list constant has 3 elements")
+val @xa = ARR
+"@xa" |> assert_eq("1 2 3", "list constant preserved")
+len(@xa) |> assert_eq(3, "list constant has 3 elements")
 
 # Larger list with mixed types.
 use constant MIX => ("alpha", 42, 3.14, "omega")

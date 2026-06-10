@@ -5,16 +5,16 @@ require "./lib/collections.stk"
 
 # ── Set operations ───────────────────────────────────────────────────
 
-val @a = (1, 2, 3, 4)
-val @b = (3, 4, 5, 6)
+val @xa = (1, 2, 3, 4)
+val @xb = (3, 4, 5, 6)
 
-val @union = Project::Collections::union_sets(\@a, \@b)
+val @union = Project::Collections::union_sets(\@xa, \@xb)
 assert_eq len(@union), 6, "set union size"
 
-val @inter = Project::Collections::intersect_sets(\@a, \@b)
+val @inter = Project::Collections::intersect_sets(\@xa, \@xb)
 assert_eq len(@inter), 2, "set intersect size"
 
-val @diff = Project::Collections::diff_sets(\@a, \@b)
+val @diff = Project::Collections::diff_sets(\@xa, \@xb)
 assert_eq len(@diff), 2, "set diff size"
 
 # Built-in set()

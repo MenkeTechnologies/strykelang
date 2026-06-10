@@ -188,7 +188,7 @@ assert_eq Project::ArraysExtended::arr_length(), 5, "length"
 assert_eq Project::ArraysExtended::arr_last_index(), 4, "last index"
 
 val @ctx = Project::ArraysExtended::arr_wantarray_context()
-assert_eq $ctx[0], 3, "wantarray scalar"
+assert_eq $ctx[0], 3, "wantarray len"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UNIQUE AND DEDUPE
@@ -226,7 +226,7 @@ assert_eq join(",", @zipped), "1,a,2,b,3,c", "zip values"
 
 # Empty array operations
 val @e = ()
-assert_eq len(@e), 0, "empty scalar"
+assert_eq len(@e), 0, "empty len"
 assert_eq join(",", @e), "", "empty join"
 
 # Single element
@@ -238,9 +238,9 @@ assert_eq $s[-1], 42, "single neg access"
 assert_eq @e ? 1 : 0, 0, "empty array false"
 assert_eq @s ? 1 : 0, 1, "nonempty array true"
 
-# Array assignment from scalar
+# Array assignment from len
 val @from_scalar = (5)
-assert_eq len(@from_scalar), 1, "from scalar count"
+assert_eq len(@from_scalar), 1, "from len count"
 
 # Nested array flattening
 val @n1 = (1, 2)

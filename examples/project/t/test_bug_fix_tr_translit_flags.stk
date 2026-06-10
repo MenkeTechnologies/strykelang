@@ -3,17 +3,17 @@
 # and `tr///s` (squeeze) flags used to be silently dropped.
 
 # /c (complement): count of non-matched characters. The `tr///` return
-# value is the integer count; assign to a scalar to capture it.
-var $a = "abcde123"
-val $digit_cnt    = ($a =~ tr/0-9//)
-val $nondigit_cnt = ($a =~ tr/0-9//c)
+# value is the integer count; assign to a len to capture it.
+var $va = "abcde123"
+val $digit_cnt    = ($va =~ tr/0-9//)
+val $nondigit_cnt = ($va =~ tr/0-9//c)
 $digit_cnt    |> assert_eq(3, "count digits")
 $nondigit_cnt |> assert_eq(5, "count non-digits with /c")
 
 # /c with /d: keep complement, delete the rest.
-var $b = "Hello, World!"
-$b =~ tr/A-Za-z//cd
-$b |> assert_eq("HelloWorld", "tr/A-Za-z//cd keeps alphas")
+var $vb = "Hello, World!"
+$vb =~ tr/A-Za-z//cd
+$vb |> assert_eq("HelloWorld", "tr/A-Za-z//cd keeps alphas")
 
 # /s (squeeze): collapse consecutive matched chars to one.
 var $c = "aaabbbccc"

@@ -68,17 +68,17 @@ fn Project::MathAdvanced::adv_factorial($n) {
 }
 
 # ── Project::MathAdvanced::adv_gcd: greatest common divisor (iterative) ─────
-fn Project::MathAdvanced::adv_gcd($a, $b) {
-    while ($b) {
-        ($a, $b) = ($b, $a % $b)
+fn Project::MathAdvanced::adv_gcd($va, $vb) {
+    while ($vb) {
+        ($va, $vb) = ($vb, $va % $vb)
     }
-    $a
+    $va
 }
 
 # ── Project::MathAdvanced::adv_lcm: least common multiple ─────
-fn Project::MathAdvanced::adv_lcm($a, $b) {
-    return 0 if $a == 0 || $b == 0
-    val $res = abs($a * $b) / Project::MathAdvanced::adv_gcd($a, $b)
+fn Project::MathAdvanced::adv_lcm($va, $vb) {
+    return 0 if $va == 0 || $vb == 0
+    val $res = abs($va * $vb) / Project::MathAdvanced::adv_gcd($va, $vb)
     return $res
 }
 
@@ -139,7 +139,7 @@ fn Project::MathAdvanced::adv_mean(@nums) {
 fn Project::MathAdvanced::adv_median(@nums) {
     val $n = len(@nums)
     return 0 if $n == 0
-    val @sorted = sort { $a <=> $b } @nums
+    val @sorted = sort { _0 <=> _1 } @nums
     if ($n % 2 == 1) {
         return $sorted[int($n / 2)]
     } else {
@@ -190,9 +190,9 @@ fn Project::MathAdvanced::adv_linear_regression($x_ref, $y_ref) {
     }
     
     val $m = ($n * $sum_xy - $sum_x * $sum_y) / ($n * $sum_xx - $sum_x * $sum_x)
-    val $b = ($sum_y - $m * $sum_x) / $n
+    val $vb = ($sum_y - $m * $sum_x) / $n
     
-    return [$m, $b]
+    return [$m, $vb]
 }
 
 # ── Project::MathAdvanced::adv_weighted_mean: weighted mean of values and weights ─────

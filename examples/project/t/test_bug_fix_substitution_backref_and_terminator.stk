@@ -48,9 +48,9 @@ $octal =~ s/x/\010/    # \010 = octal 0o10 = 0x08 = backspace
 ord($octal) |> assert_eq(8, "\\010 is octal 8 (backspace)")
 
 # `\1` followed by a non-digit stays a single-digit backref.
-var $a = "abc"
-$a =~ s/(.)/\1z/g
-$a |> assert_eq("azbzcz", "single-digit backref handles trailing letter")
+var $va = "abc"
+$va =~ s/(.)/\1z/g
+$va |> assert_eq("azbzcz", "single-digit backref handles trailing letter")
 
 # `\N` form inside an interpolated qr// stays through to the replacement
 # layer (sanity: regex compile shouldn't barf).

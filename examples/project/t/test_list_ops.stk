@@ -55,7 +55,7 @@ assert_eq Project::ListOps::sort_preserves_original(), 3, "sort preserves origin
 assert_eq Project::ListOps::reverse_array(), "5,4,3,2,1", "reverse array"
 assert_eq Project::ListOps::reverse_array_empty(), 0, "reverse array empty"
 assert_eq Project::ListOps::reverse_array_single(), 42, "reverse array single"
-assert_eq Project::ListOps::reverse_string_scalar(), "olleh", "reverse string scalar"
+assert_eq Project::ListOps::reverse_string_scalar(), "olleh", "reverse string len"
 assert_eq Project::ListOps::reverse_preserves(), 1, "reverse preserves"
 assert_eq Project::ListOps::reverse_twice(), "1,2,3", "reverse twice"
 
@@ -142,9 +142,9 @@ assert_eq Project::ListOps::splice_negative(), "4,5", "splice negative"
 # WANTARRAY IN LIST OPS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::ListOps::list_in_scalar(), 3, "list in scalar"
-assert_eq Project::ListOps::list_in_scalar_grep(), 3, "list in scalar grep"
-assert_eq Project::ListOps::list_in_scalar_map(), 3, "list in scalar map"
+assert_eq Project::ListOps::list_in_scalar(), 3, "list in len"
+assert_eq Project::ListOps::list_in_scalar_grep(), 3, "list in len grep"
+assert_eq Project::ListOps::list_in_scalar_map(), 3, "list in len map"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # COMBINED OPERATIONS

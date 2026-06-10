@@ -19,18 +19,18 @@ fn Project::Benchmarks::bench_string_concat {
 fn Project::Benchmarks::bench_array_push {
     var @arr
     bench { push @arr, 42 } 100
-    scalar @arr
+    len @arr
 }
 
 fn Project::Benchmarks::bench_hash_insert {
     var %h
     var $i = 0
     bench { $h{$i++} = "value" } 100
-    scalar keys %h
+    len keys %h
 }
 
 fn Project::Benchmarks::bench_function_call {
-    fn add($a, $b) { $a + $b }
+    fn add($va, $vb) { $va + $vb }
     bench { add(3, 4) } 1000
 }
 

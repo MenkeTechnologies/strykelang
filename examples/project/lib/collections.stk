@@ -2,29 +2,29 @@
 
 # ── Set operations ───────────────────────────────────────────────────
 
-fn Project::Collections::union_sets ($a, $b) {
+fn Project::Collections::union_sets ($va, $vb) {
     var @combined
-    ~> @$a ep { push @combined, _ }
-    ~> @$b ep { push @combined, _ }
+    ~> @$va ep { push @combined, _ }
+    ~> @$vb ep { push @combined, _ }
     val @result = uniq(@combined)
     @result
 }
 
-fn Project::Collections::intersect_sets ($a, $b) {
+fn Project::Collections::intersect_sets ($va, $vb) {
     var $in_b = {}
-    ~> @$b ep { $in_b->{_} = 1 }
+    ~> @$vb ep { $in_b->{_} = 1 }
     var @result
-    ~> @$a ep {
+    ~> @$va ep {
         push @result, _ if exists $in_b->{_}
     }
     @result
 }
 
-fn Project::Collections::diff_sets ($a, $b) {
+fn Project::Collections::diff_sets ($va, $vb) {
     var $in_b = {}
-    ~> @$b ep { $in_b->{_} = 1 }
+    ~> @$vb ep { $in_b->{_} = 1 }
     var @result
-    ~> @$a ep {
+    ~> @$va ep {
         push @result, _ unless exists $in_b->{_}
     }
     @result
@@ -95,10 +95,10 @@ fn Project::Collections::count_occurrences (@items) {
 # Split an array into groups of N
 fn Project::Collections::split_chunks ($n, @items) {
     var @chunks
-    while (scalar @items) {
+    while (len @items) {
         var @group
         for val $i (1:$n) {
-            last unless scalar @items
+            last unless len @items
             push @group, shift @items
         }
         push @chunks, [@group]

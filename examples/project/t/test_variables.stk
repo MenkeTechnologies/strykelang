@@ -6,10 +6,10 @@ require "./lib/variables.stk"
 # SCALAR VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::Variables::scalar_int(), 42, "scalar int"
-assert_near Project::Variables::scalar_float(), 3.14, 0.001, "scalar float"
-assert_eq Project::Variables::scalar_string(), "hello", "scalar string"
-assert_eq Project::Variables::scalar_undef(), 0, "scalar undef"
+assert_eq Project::Variables::scalar_int(), 42, "len int"
+assert_near Project::Variables::scalar_float(), 3.14, 0.001, "len float"
+assert_eq Project::Variables::scalar_string(), "hello", "len string"
+assert_eq Project::Variables::scalar_undef(), 0, "len undef"
 
 assert_eq Project::Variables::scalar_assign_chain(), 15, "assign chain"
 assert_eq Project::Variables::scalar_multiple_assign(), 6, "multiple assign"
@@ -36,7 +36,7 @@ assert_eq Project::Variables::array_last_index(), 4, "array last index"
 assert_eq Project::Variables::array_modify(), 20, "array modify"
 assert_eq Project::Variables::array_extend(), 6, "array extend"
 assert_eq Project::Variables::array_flatten(), 4, "array flatten"
-assert_eq Project::Variables::array_in_scalar(), 5, "array in scalar"
+assert_eq Project::Variables::array_in_scalar(), 5, "array in len"
 assert_eq Project::Variables::array_slice(), "20,40", "array slice"
 assert_eq Project::Variables::array_range_slice(), "2,3,4,5", "array range slice"
 
@@ -63,8 +63,8 @@ assert_eq Project::Variables::hash_from_array(), 2, "hash from list"
 # REFERENCES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::Variables::scalar_ref(), 42, "scalar ref"
-assert_eq Project::Variables::scalar_ref_modify(), 20, "scalar ref modify"
+assert_eq Project::Variables::scalar_ref(), 42, "len ref"
+assert_eq Project::Variables::scalar_ref_modify(), 20, "len ref modify"
 
 assert_eq Project::Variables::array_ref_literal(), 2, "array ref literal"
 assert_eq Project::Variables::array_ref_from_array(), 3, "array ref from array"
@@ -78,7 +78,7 @@ assert_eq Project::Variables::nested_array_ref(), 4, "nested array ref"
 assert_eq Project::Variables::nested_hash_ref(), "value", "nested hash ref"
 assert_eq Project::Variables::mixed_nested(), 92, "mixed nested"
 
-assert_eq Project::Variables::ref_type_scalar(), "SCALAR", "ref type scalar"
+assert_eq Project::Variables::ref_type_scalar(), "SCALAR", "ref type len"
 assert_eq Project::Variables::ref_type_array(), "ARRAY", "ref type array"
 assert_eq Project::Variables::ref_type_hash(), "HASH", "ref type hash"
 assert_eq Project::Variables::ref_type_anon_array(), "ARRAY", "ref type anon array"
@@ -134,9 +134,9 @@ assert_eq Project::Variables::autoviv_mixed(), "Alice", "autoviv mixed"
 # SIGIL COERCION
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::Variables::array_to_scalar_count(), 5, "array to scalar"
-assert_eq Project::Variables::hash_to_scalar(), 1, "hash to scalar"
-assert_eq Project::Variables::scalar_force(), 3, "scalar force"
+assert_eq Project::Variables::array_to_scalar_count(), 5, "array to len"
+assert_eq Project::Variables::hash_to_scalar(), 1, "hash to len"
+assert_eq Project::Variables::scalar_force(), 3, "len force"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # VARIABLE OPERATIONS

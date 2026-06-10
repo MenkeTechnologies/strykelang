@@ -344,8 +344,8 @@ fn Project::Numeric::infinity_check {
 fn Project::Numeric::negative_zero { -0 == 0 ? 1 : 0 }
 
 fn Project::Numeric::precision_test {
-    val $a = 0.1 + 0.2
-    $a > 0.29 && $a < 0.31 ? 1 : 0
+    val $va = 0.1 + 0.2
+    $va > 0.29 && $va < 0.31 ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -353,22 +353,22 @@ fn Project::Numeric::precision_test {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Numeric::sum_array {
-    val @a = (1, 2, 3, 4, 5)
+    val @xa = (1, 2, 3, 4, 5)
     var $sum = 0
-    $sum += _ for @a
+    $sum += _ for @xa
     $sum
 }
 
 fn Project::Numeric::product_array {
-    val @a = (1, 2, 3, 4, 5)
+    val @xa = (1, 2, 3, 4, 5)
     var $prod = 1
-    $prod *= _ for @a
+    $prod *= _ for @xa
     $prod
 }
 
 fn Project::Numeric::average_array {
-    val @a = (2, 4, 6, 8, 10)
+    val @xa = (2, 4, 6, 8, 10)
     var $sum = 0
-    $sum += _ for @a
-    $sum / len(@a)
+    $sum += _ for @xa
+    $sum / len(@xa)
 }

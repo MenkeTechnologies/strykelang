@@ -78,8 +78,8 @@ fn reduce_fn($fn, $init, @items) {
     $acc
 }
 
-val $add_fn = fn($a, $b) { $a + $b }
-val $mul_fn = fn($a, $b) { $a * $b }
+val $add_fn = fn($va, $vb) { $va + $vb }
+val $mul_fn = fn($va, $vb) { $va * $vb }
 
 assert_eq reduce_fn($add_fn, 0, 1, 2, 3, 4, 5), 15, "reduce sum"
 assert_eq reduce_fn($mul_fn, 1, 1, 2, 3, 4, 5), 120, "reduce product"

@@ -9,7 +9,7 @@ class HuffmanNode {
     right: HuffmanNode = undef;
 
     # ── Internal Comparison for MinPriorityQueue ─────
-    # MinPriorityQueue uses $a->[0] < $b->[0] for array refs.
+    # MinPriorityQueue uses $va->[0] < $vb->[0] for array refs.
     # We will push [freq, node_ref] into the PQ.
 }
 

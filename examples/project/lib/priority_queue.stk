@@ -43,18 +43,18 @@ class PriorityQueue {
     }
 
     # ── Internal Comparison ─────
-    fn _less($a, $b) {
-        if (ref($a) eq "ARRAY") {
-            return $a->[0] < $b->[0] ? 1 : 0
+    fn _less($va, $vb) {
+        if (ref($va) eq "ARRAY") {
+            return $va->[0] < $vb->[0] ? 1 : 0
         }
-        return $a < $b ? 1 : 0
+        return $va < $vb ? 1 : 0
     }
 
-    fn _greater($a, $b) {
-        if (ref($a) eq "ARRAY") {
-            return $a->[0] > $b->[0] ? 1 : 0
+    fn _greater($va, $vb) {
+        if (ref($va) eq "ARRAY") {
+            return $va->[0] > $vb->[0] ? 1 : 0
         }
-        return $a > $b ? 1 : 0
+        return $va > $vb ? 1 : 0
     }
 
     fn _bubble_up($idx) {

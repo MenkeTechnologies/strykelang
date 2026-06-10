@@ -14,10 +14,10 @@ fn Project::Closures::accumulator_state($n) {
 }
 
 fn Project::Closures::fibonacci_state {
-    state $a = 0
-    state $b = 1
-    val $result = $a
-    ($a, $b) = ($b, $a + $b)
+    state $va = 0
+    state $vb = 1
+    val $result = $va
+    ($va, $vb) = ($vb, $va + $vb)
     $result
 }
 
@@ -96,10 +96,10 @@ fn Project::Closures::make_nested_adder($outer) {
 }
 
 fn Project::Closures::make_curried_multiply {
-    fn ($a) {
-        fn ($b) {
+    fn ($va) {
+        fn ($vb) {
             fn ($c) {
-                $a * $b * $c
+                $va * $vb * $c
             }
         }
     }

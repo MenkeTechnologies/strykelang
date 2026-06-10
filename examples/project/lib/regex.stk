@@ -117,7 +117,7 @@ fn Project::Regex::match_case_insensitive($str, $pattern) {
 
 fn Project::Regex::count_matches($str, $pattern) {
     val @matches = ($str =~ /$pattern/g)
-    scalar @matches
+    len @matches
 }
 
 fn Project::Regex::match_multiline($str, $pattern) {
@@ -128,12 +128,12 @@ fn Project::Regex::match_multiline($str, $pattern) {
 
 fn Project::Regex::vowels_count($str) {
     val @v = ($str =~ /[aeiouAEIOU]/g)
-    scalar @v
+    len @v
 }
 
 fn Project::Regex::consonants_count($str) {
     val @c = ($str =~ /[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g)
-    scalar @c
+    len @c
 }
 
 fn Project::Regex::is_alphanumeric($str) {
@@ -148,7 +148,7 @@ fn Project::Regex::is_hex($str) {
 
 fn Project::Regex::words_count($str) {
     val @words = ($str =~ /\b\w+\b/g)
-    scalar @words
+    len @words
 }
 
 fn Project::Regex::first_line($str) {

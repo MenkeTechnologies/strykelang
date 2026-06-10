@@ -25,11 +25,11 @@ fn Project::Memoization::make_cached_adder {
     var %cache
     mysync $calls = 0
 
-    val $add = fn($a, $b) {
-        val $key = "$a,$b"
+    val $add = fn($va, $vb) {
+        val $key = "$va,$vb"
         unless (exists $cache{$key}) {
             $calls++
-            $cache{$key} = $a + $b
+            $cache{$key} = $va + $vb
         }
         $cache{$key}
     }

@@ -82,7 +82,7 @@ fn Project::RegexAdvanced::flag_case_insensitive { "HELLO" =~ /hello/i ? 1 : 0 }
 fn Project::RegexAdvanced::flag_global_count {
     val $s = "aaa"
     val @matches = $s =~ /a/g
-    scalar @matches}
+    len @matches}
 
 fn Project::RegexAdvanced::flag_multiline { "foo\nbar" =~ /^bar/m ? 1 : 0 }
 
@@ -168,7 +168,7 @@ fn Project::RegexAdvanced::tr_squeeze {
 
 fn Project::RegexAdvanced::split_regex_ws {
     val @parts = split(/\s+/, "hello   world")
-    scalar @parts}
+    len @parts}
 
 fn Project::RegexAdvanced::split_regex_delim {
     val @parts = split(/[,;]/, "a,b;c")
@@ -177,11 +177,11 @@ fn Project::RegexAdvanced::split_regex_delim {
 
 fn Project::RegexAdvanced::split_regex_limit {
     val @parts = split(/,/, "a,b,c,d", 2)
-    scalar @parts}
+    len @parts}
 
 fn Project::RegexAdvanced::split_regex_capture {
     val @parts = split(/(\s+)/, "a b c")
-    scalar @parts}
+    len @parts}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MATCH IN LIST CONTEXT
@@ -189,7 +189,7 @@ fn Project::RegexAdvanced::split_regex_capture {
 
 fn Project::RegexAdvanced::match_list_context {
     val @matches = "hello world" =~ /(\w+)/g
-    scalar @matches}
+    len @matches}
 
 fn Project::RegexAdvanced::match_list_first {
     val @matches = "hello world" =~ /(\w+)/g

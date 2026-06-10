@@ -57,7 +57,7 @@ fn Project::Types::ret_struct_named { Person(name => "Alice", age => 30, email =
 fn Project::Types::ret_struct_typed { Config(host => "localhost", port => 8080, debug => 0) }
 
 fn Project::Types::make_point($x, $y, $z) { Vec3($x, $y, $z) }
-fn Project::Types::make_person($n, $a) { Person(name => $n, age => $a, email => "$n@test.com") }
+fn Project::Types::make_person($n, $va) { Person(name => $n, age => $va, email => "$n@test.com") }
 
 # ── Enums ────────────────────────────────────────────────────────────
 

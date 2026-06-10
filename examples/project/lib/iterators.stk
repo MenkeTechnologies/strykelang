@@ -133,11 +133,11 @@ fn Project::Iterators::range_ascending {
 
 fn Project::Iterators::range_single {
     val @r = (5:5)
-    scalar @r}
+    len @r}
 
 fn Project::Iterators::range_empty {
     val @r = (5:1)
-    scalar @r}
+    len @r}
 
 fn Project::Iterators::range_negative {
     val @r = (-2:2)
@@ -286,12 +286,12 @@ fn Project::Iterators::grep_first {
 
 fn Project::Iterators::sort_numeric_iter {
     val @arr = (3, 1, 4, 1, 5)
-    join(",", sort { $a <=> $b } @arr)
+    join(",", sort { _0 <=> _1 } @arr)
 }
 
 fn Project::Iterators::sort_reverse_iter {
     val @arr = (1, 2, 3)
-    join(",", rev sort { $a <=> $b } @arr)
+    join(",", rev sort { _0 <=> _1 } @arr)
 }
 
 fn Project::Iterators::sort_string_iter {
@@ -301,7 +301,7 @@ fn Project::Iterators::sort_string_iter {
 
 fn Project::Iterators::sort_by_field {
     val @arr = ({n => 3}, {n => 1}, {n => 2})
-    val @sorted = sort { $a->{n} <=> $b->{n} } @arr
+    val @sorted = sort { _0->{n} <=> _1->{n} } @arr
     $sorted[0]->{n}
 }
 

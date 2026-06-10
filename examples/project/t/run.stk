@@ -5,7 +5,7 @@
 
 val $dir = dirname $0
 val @test_files = glob("$dir/test_*.stk") |> sort
-val $total = scalar @test_files
+val $total = len @test_files
 var $failed = 0
 
 p "Running $total test files...\n"

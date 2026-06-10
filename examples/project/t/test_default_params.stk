@@ -7,8 +7,8 @@ require "./lib/default_params.stk"
 # SCALAR DEFAULTS
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::DefaultParams::scalar_default(10), 52, "scalar default used"
-assert_eq Project::DefaultParams::scalar_default(10, 5), 15, "scalar default overridden"
+assert_eq Project::DefaultParams::scalar_default(10), 52, "len default used"
+assert_eq Project::DefaultParams::scalar_default(10, 5), 15, "len default overridden"
 
 assert_eq Project::DefaultParams::scalar_default_expr(5), 15, "default expr uses earlier param"
 assert_eq Project::DefaultParams::scalar_default_expr(5, 3), 8, "default expr overridden"

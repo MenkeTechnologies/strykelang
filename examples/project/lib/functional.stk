@@ -26,28 +26,28 @@ fn Fn::reduce($func, $initial, @list) {
 }
 
 # ── Fn::zip: combines two lists into a list of pairs (as array refs) ─────
-fn Fn::zip(\@a, \@b) {
+fn Fn::zip(\@xa, \@xb) {
     var @result
-    val $len = len(@a) < len(@b) ? len(@a) : len(@b)
+    val $len = len(@xa) < len(@xb) ? len(@xa) : len(@xb)
     ~> 0:$len-1 ep {
-        push @result, [$a[_], $b[_]]
+        push @result, [$xa[_], $xb[_]]
     }
     @result
 }
 
 # ── Fn::curry2: curries a function of 2 arguments ─────
 fn Fn::curry2($f) {
-    fn ($a) {
-        fn ($b) {
-            $f($a, $b)
+    fn ($va) {
+        fn ($vb) {
+            $f($va, $vb)
         }
     }
 }
 
 # ── Fn::flip: flips the first two arguments of a function ─────
 fn Fn::flip($f) {
-    fn ($a, $b) {
-        $f($b, $a)
+    fn ($va, $vb) {
+        $f($vb, $va)
     }
 }
 

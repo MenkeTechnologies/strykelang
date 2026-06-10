@@ -42,7 +42,7 @@ assert_eq Project::Subs::default_string("Alice"), "Hello, Alice!", "default stri
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::Subs::array_arg(1, 2, 3), 3, "array arg count"
-# Project::Subs::array_arg() with no args returns 1 due to @arr getting scalar context
+# Project::Subs::array_arg() with no args returns 1 due to @arr getting len context
 val $empty_arr_count = Project::Subs::array_arg()
 assert_eq $empty_arr_count >= 0, 1, "array arg empty non-neg"
 
@@ -51,13 +51,13 @@ assert_eq Project::Subs::hash_arg(a => 1, b => 2), 2, "hash arg count"
 assert_eq Project::Subs::mixed_args(10, 1, 2, 3), 16, "mixed args"
 assert_eq Project::Subs::mixed_args(10), 10, "mixed args no rest"
 
-assert_eq Project::Subs::scalar_and_array("items", "a", "b", "c"), "items: a,b,c", "scalar and array"
+assert_eq Project::Subs::scalar_and_array("items", "a", "b", "c"), "items: a,b,c", "len and array"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RETURN VALUES
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::Subs::return_scalar(), 42, "return scalar"
+assert_eq Project::Subs::return_scalar(), 42, "return len"
 
 val @ret_arr = Project::Subs::return_array()
 assert_eq len(@ret_arr), 3, "return array count"

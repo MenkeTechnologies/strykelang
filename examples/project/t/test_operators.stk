@@ -275,7 +275,7 @@ assert_eq $swapped[0], 2, "swap a"
 assert_eq $swapped[1], 1, "swap b"
 
 assert_eq Project::Operators::comma_operator(), 3, "comma op"
-assert_eq Project::Operators::list_in_scalar(), 5, "list in scalar"
+assert_eq Project::Operators::list_in_scalar(), 5, "list in len"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPECIAL OPERATORS

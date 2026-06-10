@@ -103,7 +103,7 @@ p "Grid initialized with ", len(@grid_nodes), " nodes."
 p "Running parallel resonance calibration..."
 val @resonance_scores = @grid_nodes |> pmap {
     { id => _->id, score => _->total_connectivity() }
-} |> psort { $b->{score} <=> $a->{score} };
+} |> psort { _1->{score} <=> _0->{score} };
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 4. RECURSIVE ARCHITECTURE ANALYSIS
@@ -148,7 +148,7 @@ val $final_report = (1:500)
         for val $x (@{_}) { $sum += $x }
         $sum / (len(@{_}) || 1)
     }
-    |> psort { $b <=> $a }                        # Sort descending
+    |> psort { _1 <=> _0 }                        # Sort descending
     |> take_while(fn { _ > 350 })                # Only high intensity
     |> join " | ";
 

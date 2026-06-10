@@ -112,13 +112,13 @@ assert_eq $config1->get("database"), "prod.db", "singleton value"
 # ── Method Overloading via Dispatch ────────────────────────────────────
 
 class MathUtil {
-    fn Self.add($a, $b) {
-        if (ref($a) eq "ARRAY" && ref($b) eq "ARRAY") {
-            MathUtil::add_arrays($a, $b)
-        } elsif ($a =~ /^\d+$/ && $b =~ /^\d+$/) {
-            $a + $b
+    fn Self.add($va, $vb) {
+        if (ref($va) eq "ARRAY" && ref($vb) eq "ARRAY") {
+            MathUtil::add_arrays($va, $vb)
+        } elsif ($va =~ /^\d+$/ && $vb =~ /^\d+$/) {
+            $va + $vb
         } else {
-            "$a$b"  # string concat
+            "$va$vb"  # string concat
         }
     }
 

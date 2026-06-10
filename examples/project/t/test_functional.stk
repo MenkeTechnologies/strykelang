@@ -22,9 +22,9 @@ val $multiply = fn ($acc, $val) { $acc * $val }
 assert_eq Fn::reduce($multiply, 1, 1, 2, 3, 4), 24, "reduce product"
 
 # ── Fn::zip ────────────────────────────────────────────────────────────
-val @a = (1, 2, 3)
-val @b = ("a", "b", "c")
-val @zipped = Fn::zip(@a, @b)
+val @xa = (1, 2, 3)
+val @xb = ("a", "b", "c")
+val @zipped = Fn::zip(@xa, @xb)
 assert_eq len(@zipped), 3, "zip length"
 assert_eq $zipped[0]->[0], 1, "zip 0-0"
 assert_eq $zipped[0]->[1], "a", "zip 0-1"

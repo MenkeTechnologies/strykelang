@@ -7,11 +7,11 @@ require "./lib/interpolation.stk"
 # BASIC SCALAR INTERPOLATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::Interpolation::simple_scalar_interp("World"), "Hello, World!", "simple scalar"
-assert_eq Project::Interpolation::simple_scalar_interp("Stryke"), "Hello, Stryke!", "simple scalar 2"
+assert_eq Project::Interpolation::simple_scalar_interp("World"), "Hello, World!", "simple len"
+assert_eq Project::Interpolation::simple_scalar_interp("Stryke"), "Hello, Stryke!", "simple len 2"
 assert_eq Project::Interpolation::simple_scalar_interp(""), "Hello, !", "empty string interp"
 
-assert_eq Project::Interpolation::scalar_in_sentence(5), "Found 5 items", "scalar in sentence"
+assert_eq Project::Interpolation::scalar_in_sentence(5), "Found 5 items", "len in sentence"
 assert_eq Project::Interpolation::scalar_in_sentence(0), "Found 0 items", "zero in sentence"
 assert_eq Project::Interpolation::scalar_in_sentence(100), "Found 100 items", "100 in sentence"
 

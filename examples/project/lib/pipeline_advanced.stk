@@ -7,7 +7,7 @@
 # }
 
 fn Project::PipelineAdvanced::flip($fn) {
-    fn($a, $b) { $fn($b, $a) }
+    fn($va, $vb) { $fn($vb, $va) }
 }
 
 # fn partial($fn, $first) {
@@ -19,26 +19,26 @@ fn Project::PipelineAdvanced::partial_right($fn, $last) {
 }
 
 fn Project::PipelineAdvanced::curry2($fn) {
-    fn($a) {
-        fn($b) {
-            $fn($a, $b)
+    fn($va) {
+        fn($vb) {
+            $fn($va, $vb)
         }
     }
 }
 
 fn Project::PipelineAdvanced::curry3($fn) {
-    fn($a) {
-        fn($b) {
+    fn($va) {
+        fn($vb) {
             fn($c) {
-                $fn($a, $b, $c)
+                $fn($va, $vb, $c)
             }
         }
     }
 }
 
 fn Project::PipelineAdvanced::uncurry2($fn) {
-    fn($a, $b) {
-        $fn($a)($b)
+    fn($va, $vb) {
+        $fn($va)($vb)
     }
 }
 
@@ -221,12 +221,12 @@ fn Project::PipelineAdvanced::count_if($pred, @items) {
 #     @chunks
 # }
 
-# fn interleave($a, $b) {
+# fn interleave($va, $vb) {
 #     var @result
-#     val $len = len(@$a) > len(@$b) ? len(@$a) : len(@$b)
+#     val $len = len(@$va) > len(@$vb) ? len(@$va) : len(@$vb)
 #     for val $i (0..$len-1) {
-#         push @result, $a->[$i] if $i < len(@$a)
-#         push @result, $b->[$i] if $i < len(@$b)
+#         push @result, $va->[$i] if $i < len(@$va)
+#         push @result, $vb->[$i] if $i < len(@$vb)
 #     }
 #     @result
 # }

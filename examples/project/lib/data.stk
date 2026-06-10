@@ -17,7 +17,7 @@ fn Project::Data::group_records ($key, @records) {
 }
 
 fn Project::Data::summarize_list (@data) {
-    val $n = scalar @data
+    val $n = len @data
     return {} unless $n
     val $total = sum(@data)
     {

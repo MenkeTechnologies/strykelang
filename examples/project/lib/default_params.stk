@@ -13,11 +13,11 @@ fn Project::DefaultParams::scalar_default_string($prefix, $suffix = "!") { "$pre
 
 fn Project::DefaultParams::scalar_typed_default($x, $y: Int = 100) { $x + $y }
 
-fn Project::DefaultParams::multiple_defaults($a, $b = 10, $c = 20) { $a + $b + $c }
+fn Project::DefaultParams::multiple_defaults($va, $vb = 10, $c = 20) { $va + $vb + $c }
 
 fn Project::DefaultParams::default_uses_var($base, $mult = $base) { $base + $mult }
 
-fn Project::DefaultParams::default_with_ternary($a, $b = $a > 0 ? 1 : -1) { $a * $b }
+fn Project::DefaultParams::default_with_ternary($va, $vb = $va > 0 ? 1 : -1) { $va * $vb }
 
 fn Project::DefaultParams::default_call_fn($x, $y = Project::DefaultParams::get_default_value()) { $x + $y }
 fn Project::DefaultParams::get_default_value { 99 }
@@ -62,12 +62,12 @@ fn Project::DefaultParams::check_in_range($x, $min, $max) {
     $min <= $x <= $max
 }
 
-fn Project::DefaultParams::three_way_check($a, $b, $c) {
-    $a < $b < $c
+fn Project::DefaultParams::three_way_check($va, $vb, $c) {
+    $va < $vb < $c
 }
 
-fn Project::DefaultParams::descending_check($a, $b, $c) {
-    $a > $b > $c
+fn Project::DefaultParams::descending_check($va, $vb, $c) {
+    $va > $vb > $c
 }
 
 fn Project::DefaultParams::mixed_compare($x) {
@@ -78,8 +78,8 @@ fn Project::DefaultParams::string_range($s) {
     "a" le $s le "z"
 }
 
-fn Project::DefaultParams::chained_four($a, $b, $c, $d) {
-    $a < $b < $c < $d
+fn Project::DefaultParams::chained_four($va, $vb, $c, $d) {
+    $va < $vb < $c < $d
 }
 
 1

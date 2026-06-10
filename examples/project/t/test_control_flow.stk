@@ -107,8 +107,8 @@ assert_eq Project::ControlFlow::number_word(99), "many", "match default"
 assert_eq Project::ControlFlow::multiplication_table_sum(3), 36, "mult table 3x3"
 assert_eq Project::ControlFlow::multiplication_table_sum(1), 1, "mult table 1x1"
 
-val ($a, $b) = Project::ControlFlow::find_pair_sum(10, 1, 2, 3, 7, 8)
-assert_eq $a + $b, 10, "find pair sum"
+val ($va, $vb) = Project::ControlFlow::find_pair_sum(10, 1, 2, 3, 7, 8)
+assert_eq $va + $vb, 10, "find pair sum"
 
 val @no_pair = Project::ControlFlow::find_pair_sum(100, 1, 2, 3)
 assert_eq len(@no_pair), 0, "find pair no match"

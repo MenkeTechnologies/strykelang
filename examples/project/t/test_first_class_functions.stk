@@ -14,11 +14,11 @@
 
 val $double = fn($x) { $x * 2 }
 val $square = fn($x) { $x * $x }
-val $add = fn($a, $b) { $a + $b }
+val $add = fn($va, $vb) { $va + $vb }
 
-assert_eq $double(5), 10, "fn in scalar: double"
-assert_eq $square(4), 16, "fn in scalar: square"
-assert_eq $add(3, 7), 10, "fn in scalar: add"
+assert_eq $double(5), 10, "fn in len: double"
+assert_eq $square(4), 16, "fn in len: square"
+assert_eq $add(3, 7), 10, "fn in len: add"
 
 # Reassign function to different variable
 var $f = $double
@@ -88,8 +88,8 @@ assert_eq $fn_hash{triple}(4), 12, "added fn to hash"
 val $nested = {
     math => {
         basic => {
-            add => fn($a, $b) { $a + $b },
-            sub => fn($a, $b) { $a - $b },
+            add => fn($va, $vb) { $va + $vb },
+            sub => fn($va, $vb) { $va - $vb },
         },
         advanced => {
             pow => fn($base, $exp) {
@@ -120,7 +120,7 @@ assert_eq $nested->{string}{ops}[2]("abc"), "cba", "nested array fn: reverse"
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn apply_fn($fn, $x) { $fn($x) }
-fn apply_fn2($fn, $a, $b) { $fn($a, $b) }
+fn apply_fn2($fn, $va, $vb) { $fn($va, $vb) }
 fn apply_fn_twice($fn, $x) { $fn($fn($x)) }
 fn apply_fn_n_times($fn, $x, $n) {
     var $result = $x
@@ -129,7 +129,7 @@ fn apply_fn_n_times($fn, $x, $n) {
 }
 
 assert_eq apply_fn(fn($x) { $x * 3 }, 7), 21, "fn as arg: apply"
-assert_eq apply_fn2(fn($a, $b) { $a - $b }, 10, 3), 7, "fn as arg: apply2"
+assert_eq apply_fn2(fn($va, $vb) { $va - $vb }, 10, 3), 7, "fn as arg: apply2"
 assert_eq apply_fn_twice(fn($x) { $x + 1 }, 5), 7, "fn as arg: Project::Closures::apply_twice"
 assert_eq apply_fn_n_times(fn($x) { $x * 2 }, 1, 10), 1024, "fn as arg: Project::Closures::apply_n_times"
 
@@ -163,9 +163,9 @@ fn List::fold($fn, $init, @list) {
     for val $x (@list) { $acc = $fn($acc, $x) }
     $acc
 }
-val $sum = List::fold(fn($a, $b) { $a + $b }, 0, 1, 2, 3, 4, 5)
+val $sum = List::fold(fn($va, $vb) { $va + $vb }, 0, 1, 2, 3, 4, 5)
 assert_eq $sum, 15, "custom reduce: sum"
-val $product = List::fold(fn($a, $b) { $a * $b }, 1, 1, 2, 3, 4, 5)
+val $product = List::fold(fn($va, $vb) { $va * $vb }, 1, 1, 2, 3, 4, 5)
 assert_eq $product, 120, "custom reduce: product"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -300,19 +300,19 @@ assert_eq $stack->{size}(), 2, "closure stack: size after pop"
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::PipelineAdvanced::curry2($fn) {
-    fn($a) { fn($b) { $fn($a, $b) } }
+    fn($va) { fn($vb) { $fn($va, $vb) } }
 }
 
 fn Project::PipelineAdvanced::curry3($fn) {
-    fn($a) { fn($b) { fn($c) { $fn($a, $b, $c) } } }
+    fn($va) { fn($vb) { fn($c) { $fn($va, $vb, $c) } } }
 }
 
-val $curried_add = Project::PipelineAdvanced::curry2(fn($a, $b) { $a + $b })
+val $curried_add = Project::PipelineAdvanced::curry2(fn($va, $vb) { $va + $vb })
 val $add5_curried = $curried_add(5)
 assert_eq $add5_curried(3), 8, "curried add: 5+3"
 assert_eq $curried_add(10)(20), 30, "curried add: 10+20"
 
-val $curried_sum3 = Project::PipelineAdvanced::curry3(fn($a, $b, $c) { $a + $b + $c })
+val $curried_sum3 = Project::PipelineAdvanced::curry3(fn($va, $vb, $c) { $va + $vb + $c })
 assert_eq $curried_sum3(1)(2)(3), 6, "curried sum3: 1+2+3"
 
 # Partial application helper
@@ -320,7 +320,7 @@ fn partial_left($fn, $first) {
     fn { $fn($first, @_) }
 }
 
-val $div = fn($a, $b) { $a / $b }
+val $div = fn($va, $vb) { $va / $vb }
 val $half = partial_left($div, 1)
 # Note: partial_left puts first arg first, so half(x) = 1/x... let's fix:
 fn Project::PipelineAdvanced::partial_right($fn, $last) {
@@ -337,20 +337,20 @@ class Calculator {
     operation: Any = undef
     
     fn set_op($op) { $self->operation($op) }
-    fn calc($a, $b) { 
+    fn calc($va, $vb) { 
         val $op = $self->operation()
-        $op($a, $b)
+        $op($va, $vb)
     }
 }
 
 val $calc = Calculator()
-$calc->set_op(fn($a, $b) { $a + $b })
+$calc->set_op(fn($va, $vb) { $va + $vb })
 assert_eq $calc->calc(3, 4), 7, "fn in class field: add"
 
-$calc->set_op(fn($a, $b) { $a * $b })
+$calc->set_op(fn($va, $vb) { $va * $vb })
 assert_eq $calc->calc(3, 4), 12, "fn in class field: mul"
 
-$calc->set_op(fn($a, $b) { $a ** $b })
+$calc->set_op(fn($va, $vb) { $va ** $vb })
 assert_eq $calc->calc(2, 10), 1024, "fn in class field: pow"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -380,10 +380,10 @@ assert_eq $iife_with_arg, 49, "IIFE with arg"
 
 # IIFE for scoped computation
 val $computed = fn {
-    val $a = 10
-    val $b = 20
+    val $va = 10
+    val $vb = 20
     val $c = 30
-    $a + $b + $c
+    $va + $vb + $c
 }()
 assert_eq $computed, 60, "IIFE for scoped computation"
 
@@ -464,7 +464,7 @@ fn memoize_fn($fn) {
     }
 }
 
-# Use arrayref to track call count (scalar capture limitation)
+# Use arrayref to track call count (len capture limitation)
 val $calls = [0]
 val $expensive = fn($x) {
     $calls->[0]++

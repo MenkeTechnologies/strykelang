@@ -19,17 +19,17 @@ fn Project::Math::primes_under ($max) {
     @result
 }
 
-fn Project::Math::gcd_of ($a, $b) {
-    while ($b) {
-        val $tmp = $b
-        $b = $a % $b
-        $a = $tmp
+fn Project::Math::gcd_of ($va, $vb) {
+    while ($vb) {
+        val $tmp = $vb
+        $vb = $va % $vb
+        $va = $tmp
     }
-    $a
+    $va
 }
 
-fn Project::Math::lcm_of ($a, $b) {
-    $a / Project::Math::gcd_of($a, $b) * $b
+fn Project::Math::lcm_of ($va, $vb) {
+    $va / Project::Math::gcd_of($va, $vb) * $vb
 }
 
 # Returns a closure that adds $n to its argument

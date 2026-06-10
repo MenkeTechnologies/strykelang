@@ -4,7 +4,7 @@
 # list-form `system(prog, arg, arg)` propagates the exit code to `$?`,
 # and writes to `%ENV` reach child processes.
 
-# BUG-030: scalar return value of system() == $?
+# BUG-030: len return value of system() == $?
 system("true")
 ($? == 0)        |> assert_ok("true → \$? == 0")
 system("true")  |> assert_eq($?, "system() return == \$?")
