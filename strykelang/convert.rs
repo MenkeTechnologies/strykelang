@@ -340,11 +340,12 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                 format!("use {}", version)
             }
         }
-        StmtKind::Use { module, imports } => {
+        StmtKind::Use { module, imports, version } => {
+            let ver = version.as_deref().map(|v| format!(" {}", v)).unwrap_or_default();
             if imports.is_empty() {
-                format!("use {}", module)
+                format!("use {}{}", module, ver)
             } else {
-                format!("use {} {}", module, convert_expr_list(imports))
+                format!("use {}{} {}", module, ver, convert_expr_list(imports))
             }
         }
         StmtKind::UseOverload { pairs } => {

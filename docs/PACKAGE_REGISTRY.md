@@ -247,11 +247,16 @@ Resolved relative to the current file. Unaffected by the package manager — wor
 **Namespaced `use`** (for external deps):
 ```stryke
 use Foo::Bar
+use Foo::Bar 2.13          # Perl-style version pin — use-site override
 ```
 Resolution order:
 1. `lib/Foo/Bar.stk` (project-local).
-2. Look up `foo` in `stryke.lock`, load `~/.stryke/store/foo@{version}/lib/Bar.stk`.
-3. `@INC` system paths.
+2. **Use-site pin** (`use Foo VERSION`): load `~/.stryke/store/foo@{VERSION}/lib/Bar.stk` directly — skips lockfile + global index. Inside or outside a project.
+3. Look up `foo` in `stryke.lock`, load `~/.stryke/store/foo@{version}/lib/Bar.stk`.
+4. Global `~/.stryke/installed.toml` → store path (standalone scripts with no `stryke.toml`).
+5. `@INC` system paths.
+
+**Version respect is strict.** A use-site pin or lockfile entry whose store dir is missing produces a hard error rather than silently substituting whatever the global index has. If `stryke.lock` pins `foo@1.0` but the store only has `foo@2.0`, `use Foo` refuses — run `s install` instead of loading the wrong version under the right name.
 
 Lock file is the index — name → version → store path. No symlink farm, no hoisted phantom deps, no "which copy of `lodash` did I actually get."
 
