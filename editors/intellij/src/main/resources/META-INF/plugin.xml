@@ -169,6 +169,14 @@
             secondary="false"
             icon="com.menketechnologies.stryke.StrykeIcons.FILE"
             factoryClass="com.menketechnologies.stryke.toolwindow.StrykeReflectionToolWindowFactory"/>
+
+        <!-- Surface every `~/.stryke/store/<pkg>@<ver>/lib/` directory
+             as a SyntheticLibrary so files there are indexed by the IDE
+             and goto-definition can land on declarations defined in
+             store packages (e.g. `use Foo::Bar` → store source). Also
+             populates the "External Libraries" node in Project view. -->
+        <additionalLibraryRootsProvider
+            implementation="com.menketechnologies.stryke.lib.StrykeAdditionalLibraryRootsProvider"/>
     </extensions>
 
     <actions>

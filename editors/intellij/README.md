@@ -74,6 +74,7 @@ The `stryke` (or `st`) binary must be on `$PATH`, or configured under *Settings 
 | Brace matching | `{` / `}`, `(` / `)`, `[` / `]` via `StrykeBraceMatcher.kt` |
 | Comments | Cmd/Ctrl-`/` for `#` line comments via `StrykeCommenter.kt`. Stryke's only multi-line comment form is POD `=pod ... =cut` which requires column-0 markers; IntelliJ's block-comment action would land them mid-expression, so the platform's block-comment binding routes to multi-line `#` instead. |
 | Quote handler | `"`, `'`, `` ` ``, regex `/…/` and `m{…}` / `qr//` auto-pair |
+| External Libraries | Every `~/.stryke/store/<pkg>@<ver>/lib/` directory surfaces under *Project view → External Libraries* (`stryke: <pkg>@<ver>` per entry) via `StrykeAdditionalLibraryRootsProvider`. Files are indexed by the IDE — Cmd-B / Find Usages / Recent Files all see them. Honors `$STRYKE_HOME`. Auto-refreshed via VFS watch on the store root. |
 
 ### Lexer coverage
 
@@ -108,7 +109,7 @@ The LSP server is in-process inside the `stryke` binary — `stryke --lsp` (or `
 |------------|-----------------|
 | `completion` | trigger chars `$` `@` `%` `:` `_` plus all letters; `resolveProvider`; **60+ snippet templates** keyed by prefix |
 | `hover` | full markdown cards from `lsp_docs_domains.rs`; category-stub fallback for any `%stryke::builtins` entry without a hand card |
-| `definition` / `declaration` / `references` / `documentHighlight` | cross-file via the server's `SymbolTable` |
+| `definition` / `declaration` / `references` / `documentHighlight` | cross-file via the server's `SymbolTable`. **Package-name jump-to-decl** chases `use Foo::Bar` / `Foo::Bar::func()` references through `resolve_require_path_from_file` (arm 1: project `lib/` → arm 2: `stryke.lock` → arm 3: global `~/.stryke/installed.toml`) so Cmd-B on a package whose decl lives in `~/.stryke/store/<pkg>@<ver>/lib/<Pkg>.stk` lands on the `package Foo::Bar` line. |
 | `documentSymbol` | every `sub` / `fn` / `class` / `struct` / `enum` / `trait` / `package` decl, plus top-level `my` / `our` |
 | `foldingRange` | every `{ … }` block, POD `=pod` … `=cut`, 3+ consecutive `#` comment runs |
 | `rename` (with `prepareRename`) | scalars / arrays / hashes / subs / functions / types / packages; cross-file for package symbols (see [§0x08](#0x08-refactor--rename)) |
@@ -357,6 +358,8 @@ editors/intellij/
     │   │   └── StrykeRenameHandler.kt
     │   ├── navigate/
     │   │   └── StrykeGotoDeclarationHandler.kt       # Cmd-click + Cmd-B
+    │   ├── lib/
+    │   │   └── StrykeAdditionalLibraryRootsProvider.kt  # SyntheticLibrary per ~/.stryke/store/<pkg>@<ver>/lib/
     │   ├── run/
     │   │   ├── StrykeRunConfigurationType.kt
     │   │   ├── StrykeRunConfigurationOptions.kt
