@@ -38,22 +38,22 @@ for val $i (0:len(@sorted_workers) - 1) {
     $end = $n - 1 if $end >= $n
     next if $start >= $n
     val $code = "
-        my \$bodies = from_json(q{$bodies_json});
+        var \$bodies = from_json(q{$bodies_json});
         var %acc;
-        my \$n = len(\@\$bodies);
-        my \$g = $g;
-        for my \$i ($start:$end) {
-            my \$ax = 0.0;
-            my \$ay = 0.0;
-            my \$bi = \$bodies->[\$i];
-            for my \$j (0:\$n - 1) {
+        var \$n = len(\@\$bodies);
+        var \$g = $g;
+        for var \$i ($start:$end) {
+            var \$ax = 0.0;
+            var \$ay = 0.0;
+            var \$bi = \$bodies->[\$i];
+            for var \$j (0:\$n - 1) {
                 next if \$j == \$i;
-                my \$bj = \$bodies->[\$j];
-                my \$dx = \$bj->[0] - \$bi->[0];
-                my \$dy = \$bj->[1] - \$bi->[1];
-                my \$r2 = \$dx * \$dx + \$dy * \$dy + 0.01;  # softening
-                my \$r = sqrt(\$r2);
-                my \$f = \$g * \$bj->[2] / \$r2;
+                var \$bj = \$bodies->[\$j];
+                var \$dx = \$bj->[0] - \$bi->[0];
+                var \$dy = \$bj->[1] - \$bi->[1];
+                var \$r2 = \$dx * \$dx + \$dy * \$dy + 0.01;  # softening
+                var \$r = sqrt(\$r2);
+                var \$f = \$g * \$bj->[2] / \$r2;
                 \$ax += \$f * \$dx / \$r;
                 \$ay += \$f * \$dy / \$r;
             }

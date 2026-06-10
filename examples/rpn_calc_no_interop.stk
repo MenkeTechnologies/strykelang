@@ -6,7 +6,7 @@
 #
 # Stryke choices:
 #   * `fn` (not `sub`), `p` (not `say`), `len` (not `scalar`)
-#   * `push` / `pop` on a `my @stack` accumulator
+#   * `push` / `pop` on a `var @stack` accumulator
 #   * if/elsif chain on the operator token (the portable stryke
 #     dispatch shape — see also temperature_converter / state_machine)
 #   * `die` for input errors; outer `eval { ... }` catches them

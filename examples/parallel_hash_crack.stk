@@ -43,9 +43,9 @@ var %found
 for val $w (@sorted_workers) {
     var ($s, $e, $h) = split /,/, $ranges{$w}
     val $code = "
-        my \$start = $s; my \$end = $e; my \$target = '$h';
-        my \$ans = 'no';
-        for my \$k (\$start:\$end - 1) {
+        var \$start = $s; var \$end = $e; var \$target = '$h';
+        var \$ans = 'no';
+        for var \$k (\$start:\$end - 1) {
             if (sha256('key-' . \$k) eq \$target) { \$ans = \$k; last }
         }
         \$ans

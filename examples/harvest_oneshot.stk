@@ -17,7 +17,7 @@ printf "spawned %d workers\n", len(@workers)
 
 # Each worker computes the sum of 1..1000 and returns it. Same compute
 # on every worker so we can verify identical answers.
-val %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 5_000
+val %results = harvest "var \$s = 0; for var \$i (1:1000) { \$s += \$i } \$s", @workers, 5_000
 
 p "── per-worker results ──"
 for val $sid (sort { _ <=> _1 } keys %results) {

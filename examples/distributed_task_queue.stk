@@ -43,9 +43,9 @@ for val $w (@sorted_workers) {
     }
     val $job_json = to_json(\@worker_jobs)
     val $code = "
-        my \$arr = from_json(q{$job_json});
-        my \@out;
-        for my \$j (\@\$arr) {
+        var \$arr = from_json(q{$job_json});
+        var \@out;
+        for var \$j (\@\$arr) {
             push \@out, \$j * \$j;
         }
         to_json(\\\@out)

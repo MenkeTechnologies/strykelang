@@ -23,7 +23,7 @@ printf "spawned %d workers\n", len(@workers)
 
 # Each worker counts words in the text (passed inline in the prayer).
 val $text_escaped = $text
-val $code = "my \$t = q{$text_escaped}; var %counts; for my \$w (split /\\s+/, \$t) { \$counts{\$w}++ } to_json(\\%counts)"
+val $code = "var \$t = q{$text_escaped}; var %counts; for var \$w (split /\\s+/, \$t) { \$counts{\$w}++ } to_json(\\%counts)"
 val $div = pray $code, @workers
 val %replies = annex $div
 

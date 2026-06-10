@@ -44,18 +44,18 @@ for val $i (0:len(@sorted_workers) - 1) {
     for val $r ($start:$end) { push @shard, $points[$r] }
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$pts = from_json(q{$shard_json});
-        my \$cs  = from_json(q{$centroids_json});
-        my \@cnt = (0) x len(\@\$cs);
-        my \@sx  = (0) x len(\@\$cs);
-        my \@sy  = (0) x len(\@\$cs);
-        for my \$p (\@\$pts) {
-            my \$best = 0;
-            my \$best_d = 1e18;
-            for my \$ci (0:len(\@\$cs) - 1) {
-                my \$dx = \$p->[0] - \$cs->[\$ci][0];
-                my \$dy = \$p->[1] - \$cs->[\$ci][1];
-                my \$d = \$dx * \$dx + \$dy * \$dy;
+        var \$pts = from_json(q{$shard_json});
+        var \$cs  = from_json(q{$centroids_json});
+        var \@cnt = (0) x len(\@\$cs);
+        var \@sx  = (0) x len(\@\$cs);
+        var \@sy  = (0) x len(\@\$cs);
+        for var \$p (\@\$pts) {
+            var \$best = 0;
+            var \$best_d = 1e18;
+            for var \$ci (0:len(\@\$cs) - 1) {
+                var \$dx = \$p->[0] - \$cs->[\$ci][0];
+                var \$dy = \$p->[1] - \$cs->[\$ci][1];
+                var \$d = \$dx * \$dx + \$dy * \$dy;
                 if (\$d < \$best_d) { \$best = \$ci; \$best_d = \$d }
             }
             \$cnt[\$best]++;

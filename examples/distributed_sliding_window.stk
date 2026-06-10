@@ -36,13 +36,13 @@ for val $i (0:len(@sorted_workers) - 1) {
     for val $r ($start:$end) { push @shard, $series[$r] }
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
-        my \$w = $window;
-        my \@out;
-        my \$lim = len(\@\$arr) - \$w;
-        for my \$i (0:\$lim) {
-            my \$s = 0;
-            for my \$j (0:\$w - 1) { \$s += \$arr->[\$i + \$j] }
+        var \$arr = from_json(q{$shard_json});
+        var \$w = $window;
+        var \@out;
+        var \$lim = len(\@\$arr) - \$w;
+        for var \$i (0:\$lim) {
+            var \$s = 0;
+            for var \$j (0:\$w - 1) { \$s += \$arr->[\$i + \$j] }
             push \@out, \$s;
         }
         to_json(\\\@out)

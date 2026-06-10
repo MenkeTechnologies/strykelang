@@ -41,10 +41,10 @@ for val $i (0:len(@sorted_workers) - 1) {
     val @shard = @wordlist[$start:$end]
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
-        my \$target = '$target_hash';
-        my \$ans = 'no';
-        for my \$word (\@\$arr) {
+        var \$arr = from_json(q{$shard_json});
+        var \$target = '$target_hash';
+        var \$ans = 'no';
+        for var \$word (\@\$arr) {
             if (sha256('salt::' . \$word) eq \$target) { \$ans = \$word; last }
         }
         \$ans
