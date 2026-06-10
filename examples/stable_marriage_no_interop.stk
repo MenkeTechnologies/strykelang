@@ -31,7 +31,7 @@ fn solve($men_prefs, $women_prefs) {
     
     # Pre-calculate woman rankings for O(1) preference check
     # maps man -> rank in her list
-    my %women_ranks
+    var %women_ranks
     for val $w (keys %$women_prefs) {
         val $p = $women_prefs->{$w}
         $women_ranks{$w} = {}

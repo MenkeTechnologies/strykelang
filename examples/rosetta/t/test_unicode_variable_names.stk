@@ -3,7 +3,7 @@
 
 fn Rosetta::UnicodeVars::demo() {
     # Stryke supports Unicode in identifiers
-    my $π = 3.14159
+    val $π = 3.14159
     val $r = 2
     val $area = $π * ($r ** 2)
     

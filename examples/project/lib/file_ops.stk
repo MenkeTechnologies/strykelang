@@ -183,14 +183,14 @@ fn Project::FileOps::dirname_root { dirname("/foo") }
 fn Project::FileOps::open_read_close {
     val $tmpfile = "/tmp/stryke_open_test_$$.txt"
     spurt($tmpfile, "hello from file")
-    open(my $fh, "<", $tmpfile)
+    open(var $fh, "<", $tmpfile)
     val $line = <$fh>
     close $fh    unlink $tmpfile    $line =~ /hello/ ? 1 : 0
 }
 
 fn Project::FileOps::open_write_close {
     val $tmpfile = "/tmp/stryke_write_test_$$.txt"
-    open(my $fh, ">", $tmpfile)
+    open(var $fh, ">", $tmpfile)
     print $fh "written via handle"
     close $fh    val $content = slurp $tmpfile
     unlink $tmpfile    $content =~ /written/ ? 1 : 0
@@ -199,7 +199,7 @@ fn Project::FileOps::open_write_close {
 fn Project::FileOps::open_append {
     val $tmpfile = "/tmp/stryke_append_test_$$.txt"
     spurt($tmpfile, "first\n")
-    open(my $fh, ">>", $tmpfile)
+    open(var $fh, ">>", $tmpfile)
     p $fh "second"
     close $fh    val $content = slurp $tmpfile
     unlink $tmpfile    $content =~ /first/ && $content =~ /second/ ? 1 : 0
