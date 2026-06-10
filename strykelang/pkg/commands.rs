@@ -1879,7 +1879,7 @@ fn install_global_from_path(
 /// `lib/` — the caller stages the file into `dst/lib/`. Returns `None`
 /// when the package has no `[ffi]` section or when `lib/<filename>` is
 /// already present in source (the filtered subtree copy handles it).
-fn ensure_ffi_cdylib(
+pub(crate) fn ensure_ffi_cdylib(
     src: &Path,
     manifest: &Manifest,
 ) -> Result<Option<(PathBuf, String)>, String> {
