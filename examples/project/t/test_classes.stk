@@ -4,11 +4,11 @@
 require "./lib/classes.stk"
 
 # ── Basic Class & Construction ─────────────────────────────────────
-val $a = Animal(name => "Leo", age => 5)
-assert_eq $a->name, "Leo", "animal name"
-assert_eq $a->age, 5, "animal age"
-assert_eq $a->speak(), "Animal sound", "animal speak"
-assert_eq $a->to_str(), "Leo (5)", "animal to_str"
+val $va = Animal(name => "Leo", age => 5)
+assert_eq $va->name, "Leo", "animal name"
+assert_eq $va->age, 5, "animal age"
+assert_eq $va->speak(), "Animal sound", "animal speak"
+assert_eq $va->to_str(), "Leo (5)", "animal to_str"
 
 # ── Inheritance & Overriding ───────────────────────────────────────
 val $d = Dog(name => "Rex", age => 3, breed => "Labrador")
@@ -39,7 +39,7 @@ assert_eq $v->get_secret(), "newpass", "field via setter"
 assert_true $d->isa("Dog"), "dog isa Dog"
 assert_true $d->isa("Animal"), "dog isa Animal (parent)"
 assert_true $rd->isa("Robot"), "robodog isa Robot (multiple)"
-assert_true $a->does("Speakable"), "animal does Speakable trait"
+assert_true $va->does("Speakable"), "animal does Speakable trait"
 
 # ── Traits & Polymorphism ──────────────────────────────────────────
 val $sq = Square(side => 10.0)

@@ -20,7 +20,7 @@ fn Project::HashesExtended::hash_keys {
 
 fn Project::HashesExtended::hash_values {
     val %h = (a => 1, b => 2, c => 3)
-    sort { $a <=> $b } values %h
+    sort { _0 <=> _1 } values %h
 }
 
 fn Project::HashesExtended::hash_keys_count {
@@ -189,7 +189,7 @@ fn Project::HashesExtended::hash_iterate_sorted {
 fn Project::HashesExtended::hash_to_array {
     val %h = (a => 1, b => 2)
     val @arr = %h
-    scalar @arr}
+    len @arr}
 
 fn Project::HashesExtended::array_to_hash {
     val @arr = qw(a 1 b 2 c 3)
@@ -238,12 +238,12 @@ fn Project::HashesExtended::hash_merge_override {
 fn Project::HashesExtended::hash_grep_keys {
     val %h = (apple => 1, banana => 2, apricot => 3, cherry => 4)
     val @keys = grep { /^a/ } keys %h
-    scalar @keys}
+    len @keys}
 
 fn Project::HashesExtended::hash_grep_values {
     val %h = (a => 1, b => 2, c => 3, d => 4)
     val @big = grep { $h{_} > 2 } keys %h
-    scalar @big}
+    len @big}
 
 fn Project::HashesExtended::hash_vals_map {
     val %h = (a => 1, b => 2)

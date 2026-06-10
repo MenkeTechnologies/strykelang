@@ -71,14 +71,14 @@ val @single_sorted = sort (42)
 assert_eq $single_sorted[0], 42, "sort single"
 
 val @unsorted = (5, 2, 8, 1, 9, 3, 7, 4, 6)
-val @sorted_nums = sort { $a <=> $b } @unsorted
+val @sorted_nums = sort { _0 <=> _1 } @unsorted
 assert_eq len(@sorted_nums), 9, "sort count"
 assert_eq $sorted_nums[0], 1, "sort first"
 assert_eq $sorted_nums[4], 5, "sort middle"
 assert_eq $sorted_nums[8], 9, "sort last"
 
 val @descending = (10, 9, 8, 7, 6, 5, 4, 3, 2, 1)
-val @sorted_desc = sort { $a <=> $b } @descending
+val @sorted_desc = sort { _0 <=> _1 } @descending
 assert_eq $sorted_desc[0], 1, "sort desc first"
 assert_eq $sorted_desc[9], 10, "sort desc last"
 

@@ -10,9 +10,9 @@ val $s = "$c"
 ($s =~ /^CODE\(0x[0-9a-f]+\)$/) |> assert_ok("CODE(0x<hex>) shape")
 
 # Distinct closures get distinct addresses.
-val $a = fn { 1 }
-val $b = fn { 1 }
-("$a" ne "$b") |> assert_ok("two anon closures stringify distinctly")
+val $va = fn { 1 }
+val $vb = fn { 1 }
+("$va" ne "$vb") |> assert_ok("two anon closures stringify distinctly")
 
 # Named-sub coderef via `\&name` also hex.
 fn named_one = 1

@@ -7,7 +7,7 @@
 fn Project::Subs::no_args { 42 }
 fn Project::Subs::one_arg($x) { $x * 2 }
 fn Project::Subs::two_args($x, $y) { $x + $y }
-fn Project::Subs::three_args($a, $b, $c) { $a * $b + $c }
+fn Project::Subs::three_args($va, $vb, $c) { $va * $vb + $c }
 
 fn Project::Subs::explicit_return($x) {
     return $x * 2
@@ -31,7 +31,7 @@ fn Project::Subs::multiple_returns($x) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Subs::with_default($x, $y) { $y //= 10; $x + $y }
-fn Project::Subs::all_defaults($a, $b, $c) { $a //= 1; $b //= 2; $c //= 3; $a + $b + $c }
+fn Project::Subs::all_defaults($va, $vb, $c) { $va //= 1; $vb //= 2; $c //= 3; $va + $vb + $c }
 
 fn Project::Subs::default_expr($x, $y) { $y //= $x * 2; $x + $y }
 
@@ -73,7 +73,7 @@ fn Project::Subs::return_in_context {
     if (wantarray()) {
         return (1, 2, 3)
     }
-    return "scalar"
+    return "len"
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -153,7 +153,7 @@ fn Project::Subs::call_in_expression { 10 + Project::Subs::one_arg(5) }
 
 fn Project::Subs::method_chain_style {
     val @arr = (1, 2, 3)
-    scalar @arr}
+    len @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPECIAL CASES

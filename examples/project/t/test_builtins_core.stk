@@ -6,10 +6,10 @@ require "./lib/builtins_core.stk"
 # DEFINED
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::BuiltinsCore::defined_scalar_set(), 1, "defined scalar set"
-assert_eq Project::BuiltinsCore::defined_scalar_zero(), 1, "defined scalar zero"
-assert_eq Project::BuiltinsCore::defined_scalar_empty(), 1, "defined scalar empty"
-assert_eq Project::BuiltinsCore::defined_scalar_undef(), 0, "defined scalar undef"
+assert_eq Project::BuiltinsCore::defined_scalar_set(), 1, "defined len set"
+assert_eq Project::BuiltinsCore::defined_scalar_zero(), 1, "defined len zero"
+assert_eq Project::BuiltinsCore::defined_scalar_empty(), 1, "defined len empty"
+assert_eq Project::BuiltinsCore::defined_scalar_undef(), 0, "defined len undef"
 assert_eq Project::BuiltinsCore::defined_after_undef(), 0, "defined after undef"
 
 assert_eq Project::BuiltinsCore::defined_array_elem_exists(), 1, "defined array elem exists"
@@ -28,7 +28,7 @@ assert_eq Project::BuiltinsCore::defined_sub_result(), 1, "defined sub result"
 # REF
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::BuiltinsCore::ref_scalar(), "SCALAR", "ref scalar"
+assert_eq Project::BuiltinsCore::ref_scalar(), "SCALAR", "ref len"
 assert_eq Project::BuiltinsCore::ref_array(), "ARRAY", "ref array"
 assert_eq Project::BuiltinsCore::ref_hash(), "HASH", "ref hash"
 assert_eq Project::BuiltinsCore::ref_code(), "CODE", "ref code"
@@ -66,27 +66,27 @@ assert_eq Project::BuiltinsCore::length_concat(), 6, "length concat"
 # SCALAR
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::BuiltinsCore::scalar_array_count(), 5, "scalar array count"
-assert_eq Project::BuiltinsCore::scalar_array_empty(), 0, "scalar array empty"
-assert_eq Project::BuiltinsCore::scalar_array_one(), 1, "scalar array one"
+assert_eq Project::BuiltinsCore::scalar_array_count(), 5, "len array count"
+assert_eq Project::BuiltinsCore::scalar_array_empty(), 0, "len array empty"
+assert_eq Project::BuiltinsCore::scalar_array_one(), 1, "len array one"
 
-assert_eq Project::BuiltinsCore::scalar_hash_info(), 2, "scalar hash info"
+assert_eq Project::BuiltinsCore::scalar_hash_info(), 2, "len hash info"
 
-assert_eq Project::BuiltinsCore::scalar_string(), "hello", "scalar string"
-assert_eq Project::BuiltinsCore::scalar_number(), 42, "scalar number"
+assert_eq Project::BuiltinsCore::scalar_string(), "hello", "len string"
+assert_eq Project::BuiltinsCore::scalar_number(), 42, "len number"
 
-assert_eq Project::BuiltinsCore::scalar_reverse_str(), "olleh", "scalar reverse str"
-assert_eq Project::BuiltinsCore::scalar_reverse_arr(), 3, "scalar reverse arr"
+assert_eq Project::BuiltinsCore::scalar_reverse_str(), "olleh", "len reverse str"
+assert_eq Project::BuiltinsCore::scalar_reverse_arr(), 3, "len reverse arr"
 
-assert_eq Project::BuiltinsCore::scalar_force(), 3, "scalar force"
+assert_eq Project::BuiltinsCore::scalar_force(), 3, "len force"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # WANTARRAY
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::BuiltinsCore::wantarray_in_scalar(), "scalar", "wantarray in scalar"
+assert_eq Project::BuiltinsCore::wantarray_in_scalar(), "len", "wantarray in len"
 assert_eq Project::BuiltinsCore::wantarray_in_list(), "list", "wantarray in list"
-assert_eq Project::BuiltinsCore::wantarray_nested(), "scalar", "wantarray nested"
+assert_eq Project::BuiltinsCore::wantarray_nested(), "len", "wantarray nested"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CALLER
@@ -123,7 +123,7 @@ assert_eq Project::BuiltinsCore::delete_array_elem(), 3, "delete array elem"
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::BuiltinsCore::undef_returns(), 0, "undef returns"
-assert_eq Project::BuiltinsCore::undef_scalar(), 0, "undef scalar"
+assert_eq Project::BuiltinsCore::undef_scalar(), 0, "undef len"
 assert_eq Project::BuiltinsCore::undef_in_list(), 0, "undef in list"
 assert_eq Project::BuiltinsCore::undef_comparison(), 1, "undef comparison"
 

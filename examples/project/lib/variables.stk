@@ -10,8 +10,8 @@ fn Project::Variables::scalar_string { val $x = "hello"; $x }
 fn Project::Variables::scalar_undef { val $x; defined($x) ? 1 : 0 }
 
 fn Project::Variables::scalar_assign_chain {
-    val $a = val $b = val $c = 5
-    $a + $b + $c
+    val $va = val $vb = val $c = 5
+    $va + $vb + $c
 }
 
 fn Project::Variables::scalar_multiple_assign {
@@ -42,64 +42,64 @@ fn Project::Variables::scalar_interpolate_expr {
 # ARRAY VARIABLES
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Variables::array_literal { val @a = (1, 2, 3); @a }
-fn Project::Variables::array_empty { val @a = (); len(@a) }
-fn Project::Variables::array_single { val @a = (42); $a[0] }
+fn Project::Variables::array_literal { val @xa = (1, 2, 3); @xa }
+fn Project::Variables::array_empty { val @xa = (); len(@xa) }
+fn Project::Variables::array_single { val @xa = (42); $xa[0] }
 
 fn Project::Variables::array_access {
-    val @a = (10, 20, 30, 40, 50)
-    $a[2]
+    val @xa = (10, 20, 30, 40, 50)
+    $xa[2]
 }
 
 fn Project::Variables::array_negative_index {
-    val @a = (1, 2, 3, 4, 5)
-    $a[-1]
+    val @xa = (1, 2, 3, 4, 5)
+    $xa[-1]
 }
 
 fn Project::Variables::array_length {
-    val @a = (1, 2, 3, 4, 5)
-    scalar @a
+    val @xa = (1, 2, 3, 4, 5)
+    len @xa
 }
 
 fn Project::Variables::array_last_index {
-    val @a = (1, 2, 3, 4, 5)
+    val @xa = (1, 2, 3, 4, 5)
     $#a
 }
 
 fn Project::Variables::array_modify {
-    var @a = (1, 2, 3)
-    $a[1] = 20
-    $a[1]
+    var @xa = (1, 2, 3)
+    $xa[1] = 20
+    $xa[1]
 }
 
 fn Project::Variables::array_extend {
-    var @a = (1, 2, 3)
-    $a[5] = 6
-    scalar @a
+    var @xa = (1, 2, 3)
+    $xa[5] = 6
+    len @xa
 }
 
 fn Project::Variables::array_flatten {
-    val @a = (1, 2)
-    val @b = (3, 4)
-    val @c = (@a, @b)
-    scalar @c
+    val @xa = (1, 2)
+    val @xb = (3, 4)
+    val @c = (@xa, @xb)
+    len @c
 }
 
 fn Project::Variables::array_in_scalar {
-    val @a = (1, 2, 3, 4, 5)
-    val $count = @a
+    val @xa = (1, 2, 3, 4, 5)
+    val $count = @xa
     $count
 }
 
 fn Project::Variables::array_slice {
-    val @a = (10, 20, 30, 40, 50)
-    val @s = @a[1, 3]
+    val @xa = (10, 20, 30, 40, 50)
+    val @s = @xa[1, 3]
     join(",", @s)
 }
 
 fn Project::Variables::array_range_slice {
-    val @a = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    val @s = @a[2:5]
+    val @xa = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    val @s = @xa[2:5]
     join(",", @s)
 }
 
@@ -141,7 +141,7 @@ fn Project::Variables::hash_keys {
 
 fn Project::Variables::hash_values {
     val %h = (a => 1, b => 2, c => 3)
-    val @v = sort { $a <=> $b } values %h
+    val @v = sort { _0 <=> _1 } values %h
     join(",", @v)
 }
 
@@ -153,10 +153,10 @@ fn Project::Variables::hash_slice {
 
 fn Project::Variables::hash_exists {
     val %h = (a => 1, b => undef)
-    val $a = exists $h{a} ? 1 : 0
-    val $b = exists $h{b} ? 1 : 0
+    val $va = exists $h{a} ? 1 : 0
+    val $vb = exists $h{b} ? 1 : 0
     val $c = exists $h{c} ? 1 : 0
-    "$a$b$c"
+    "$va$vb$c"
 }
 
 fn Project::Variables::hash_delete_val {
@@ -201,8 +201,8 @@ fn Project::Variables::array_ref_literal {
 }
 
 fn Project::Variables::array_ref_from_array {
-    val @a = (1, 2, 3)
-    val $ref = \@a
+    val @xa = (1, 2, 3)
+    val $ref = \@xa
     $ref->[2]
 }
 
@@ -259,8 +259,8 @@ fn Project::Variables::ref_type_scalar {
 }
 
 fn Project::Variables::ref_type_array {
-    val @a = (1, 2, 3)
-    ref(\@a)
+    val @xa = (1, 2, 3)
+    ref(\@xa)
 }
 
 fn Project::Variables::ref_type_hash {
@@ -300,12 +300,12 @@ fn Project::Variables::lexical_scope {
 }
 
 fn Project::Variables::nested_scope {
-    val $a = 1
+    val $va = 1
     {
-        val $b = 2
+        val $vb = 2
         {
             val $c = 3
-            $a + $b + $c
+            $va + $vb + $c
         }
     }
 }
@@ -362,13 +362,13 @@ fn Project::Variables::argv_like {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Var::Test::list_decl {
-    val ($a, $b, $c) = (1, 2, 3)
-    $a + $b + $c
+    val ($va, $vb, $c) = (1, 2, 3)
+    $va + $vb + $c
 }
 
 fn Var::Test::array_decl {
     val @arr = (1, 2, 3)
-    scalar @arr
+    len @arr
 }
 
 fn Var::Test::hash_decl {
@@ -378,9 +378,9 @@ fn Var::Test::hash_decl {
 
 fn Var::Test::mixed_init {
     val $x = 1
-    val @a = (2, 3)
+    val @xa = (2, 3)
     val %h = (k => 4)
-    $x + $a[0] + $h{k}
+    $x + $xa[0] + $h{k}
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -393,9 +393,9 @@ fn Project::Variables::autoviv_hash {
 }
 
 fn Project::Variables::autoviv_array {
-    var @a
-    $a[2] = ["x", "y", "z", "nested"]
-    $a[2][3]
+    var @xa
+    $xa[2] = ["x", "y", "z", "nested"]
+    $xa[2][3]
 }
 
 fn Project::Variables::autoviv_mixed {
@@ -408,8 +408,8 @@ fn Project::Variables::autoviv_mixed {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Variables::array_to_scalar_count {
-    val @a = (1, 2, 3, 4, 5)
-    val $count = @a
+    val @xa = (1, 2, 3, 4, 5)
+    val $count = @xa
     $count
 }
 
@@ -420,8 +420,8 @@ fn Project::Variables::hash_to_scalar {
 }
 
 fn Project::Variables::scalar_force {
-    val @a = (1, 2, 3)
-    scalar @a
+    val @xa = (1, 2, 3)
+    len @xa
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -429,10 +429,10 @@ fn Project::Variables::scalar_force {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Variables::defined_check {
-    val $a = 42
-    val $b
-    val $da = defined($a) ? 1 : 0
-    val $db = defined($b) ? 1 : 0
+    val $va = 42
+    val $vb
+    val $da = defined($va) ? 1 : 0
+    val $db = defined($vb) ? 1 : 0
     "$da$db"
 }
 
@@ -443,13 +443,13 @@ fn Project::Variables::undef_var {
 }
 
 fn Project::Variables::ref_check {
-    val $scalar = 42
+    val $len = 42
     val @array = (1, 2)
     val %hash = (a => 1)
     val $aref = [1, 2]
     val $href = {a => 1}
 
-    val $r1 = ref(\$scalar)
+    val $r1 = ref(\$len)
     val $r2 = ref(\@array)
     val $r3 = ref(\%hash)
     val $r4 = ref $aref

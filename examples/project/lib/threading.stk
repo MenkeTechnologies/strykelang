@@ -70,7 +70,7 @@ fn Project::Threading::arrow_thread_chain {
 
 fn Project::Threading::arrow_thread_to_array {
     val @result = ~> (1:10) grep { _ > 5 } map { _ * 2 }
-    scalar @result
+    len @result
 }
 
 fn Project::Threading::arrow_thread_string_join {
@@ -131,10 +131,10 @@ fn Project::Threading::pipeline_multi_step {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Threading::threading_comparison {
-    val $a = ~> (1:5) sum
-    val $b = ~> (1:5) sum
+    val $va = ~> (1:5) sum
+    val $vb = ~> (1:5) sum
     val $c = (1:5) |> sum
-    $a == $b && $b == $c ? 1 : 0
+    $va == $vb && $vb == $c ? 1 : 0
 }
 
 fn Project::Threading::threading_vs_traditional {

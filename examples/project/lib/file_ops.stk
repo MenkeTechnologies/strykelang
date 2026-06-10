@@ -43,7 +43,7 @@ fn Project::FileOps::spew_multiline {
     spurt($tmpfile, "line1\nline2\nline3\n")
     val $content = slurp $tmpfile
     unlink $tmpfile    val @lines = split(/\n/, $content)
-    scalar @lines}
+    len @lines}
 
 fn Project::FileOps::spew_empty {
     val $tmpfile = "/tmp/stryke_test_empty_$$.txt"
@@ -87,11 +87,11 @@ fn Project::FileOps::glob_test_files {
 
 fn Project::FileOps::glob_no_match {
     val @files = glob("./nonexistent/*.xyz")
-    scalar @files}
+    len @files}
 
 fn Project::FileOps::glob_single {
     val @files = glob("./lib/file_ops.stk")
-    scalar @files}
+    len @files}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STAT
@@ -109,7 +109,7 @@ fn Project::FileOps::stat_size {
 
 fn Project::FileOps::stat_missing {
     val @s = stat("/nonexistent/file")
-    scalar @s}
+    len @s}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UNLINK
@@ -214,7 +214,7 @@ fn Project::FileOps::lines_count {
     spurt($tmpfile, "line1\nline2\nline3")
     val $content = slurp $tmpfile
     val @lines = split(/\n/, $content)
-    unlink $tmpfile    scalar @lines}
+    unlink $tmpfile    len @lines}
 
 fn Project::FileOps::lines_content {
     val $tmpfile = "/tmp/stryke_lines2_$$.txt"

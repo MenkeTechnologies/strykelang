@@ -71,8 +71,8 @@ class Maybe {
     }
 }
 
-fn Math::safe_divide($a, $b) {
-    $b == 0 ? Maybe::none() : Maybe::some($a / $b)
+fn Math::safe_divide($va, $vb) {
+    $vb == 0 ? Maybe::none() : Maybe::some($va / $vb)
 }
 
 val $result = Maybe::some(10)
@@ -96,12 +96,12 @@ fn Fn::partial($func, $arg1) {
 }
 
 fn Fn::flip($func) {
-    fn ($a, $b, @rest) {
-        $func($b, $a, @rest)
+    fn ($va, $vb, @rest) {
+        $func($vb, $va, @rest)
     }
 }
 
-val $subtract = fn ($a, $b) { $a - $b }
+val $subtract = fn ($va, $vb) { $va - $vb }
 val $subtract_from_10 = Fn::partial($subtract, 10)
 assert_eq $subtract_from_10(3), 7, "partial application"
 

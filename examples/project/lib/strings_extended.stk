@@ -5,10 +5,10 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_length($s) { length($s) }
-fn Project::StringsExtended::str_reverse($s) { scalar(rev($s)) }
+fn Project::StringsExtended::str_reverse($s) { len(rev($s)) }
 fn Project::StringsExtended::str_repeat($s, $n) { $s x $n }
 
-fn Project::StringsExtended::str_concat_two($a, $b) { $a . $b }
+fn Project::StringsExtended::str_concat_two($va, $vb) { $va . $vb }
 fn Project::StringsExtended::str_concat_many(@parts) { join("", @parts) }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -275,13 +275,13 @@ fn Project::StringsExtended::str_tr_squeeze($s) {
 # COMPARISON
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::StringsExtended::str_eq_op($a, $b) { $a eq $b ? 1 : 0 }
-fn Project::StringsExtended::str_ne_op($a, $b) { $a ne $b ? 1 : 0 }
-fn Project::StringsExtended::str_lt_op($a, $b) { $a lt $b ? 1 : 0 }
-fn Project::StringsExtended::str_gt_op($a, $b) { $a gt $b ? 1 : 0 }
-fn Project::StringsExtended::str_le_op($a, $b) { $a le $b ? 1 : 0 }
-fn Project::StringsExtended::str_ge_op($a, $b) { $a ge $b ? 1 : 0 }
-fn Project::StringsExtended::str_cmp_op($a, $b) { $a cmp $b }
+fn Project::StringsExtended::str_eq_op($va, $vb) { $va eq $vb ? 1 : 0 }
+fn Project::StringsExtended::str_ne_op($va, $vb) { $va ne $vb ? 1 : 0 }
+fn Project::StringsExtended::str_lt_op($va, $vb) { $va lt $vb ? 1 : 0 }
+fn Project::StringsExtended::str_gt_op($va, $vb) { $va gt $vb ? 1 : 0 }
+fn Project::StringsExtended::str_le_op($va, $vb) { $va le $vb ? 1 : 0 }
+fn Project::StringsExtended::str_ge_op($va, $vb) { $va ge $vb ? 1 : 0 }
+fn Project::StringsExtended::str_cmp_op($va, $vb) { $va cmp $vb }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # UTILITY FUNCTIONS
@@ -301,7 +301,7 @@ fn Project::StringsExtended::str_count_char($s, $char) {
 fn Project::StringsExtended::str_word_count($s) {
     var @words = split(/\s+/, $s)
     @words = grep { length(_) > 0 } @words
-    scalar @words}
+    len @words}
 
 fn Project::StringsExtended::str_lines($s) {
     val @lines = split(/\n/, $s)

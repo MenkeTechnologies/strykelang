@@ -3,10 +3,10 @@
 # ── Newline as statement terminator ──────────────────────────────────
 
 fn Project::Parsing::multi_stmt_newlines {
-    val $a = 1
-    val $b = 2
+    val $va = 1
+    val $vb = 2
     val $c = 3
-    $a + $b + $c
+    $va + $vb + $c
 }
 
 fn Project::Parsing::chained_assignments {
@@ -31,11 +31,11 @@ fn Project::Parsing::postfix_inc_newline {
 }
 
 fn Project::Parsing::mixed_inc_dec {
-    var $a = 10
-    ++$a
-    $a--
-    ++$a
-    $a
+    var $va = 10
+    ++$va
+    $va--
+    ++$va
+    $va
 }
 
 # ── Method calls without parens ──────────────────────────────────────
@@ -91,37 +91,37 @@ fn Project::Parsing::nested_access_newlines {
 # ── Binary operators that could be unary ─────────────────────────────
 
 fn Project::Parsing::binary_plus_newlines {
-    val $a = 10
-    val $b = 20
-    $a + $b
+    val $va = 10
+    val $vb = 20
+    $va + $vb
 }
 
 fn Project::Parsing::binary_minus_newlines {
-    val $a = 30
-    val $b = 10
-    $a - $b
+    val $va = 30
+    val $vb = 10
+    $va - $vb
 }
 
 fn Project::Parsing::unary_minus_newlines {
-    val $a = 5
-    val $b = -$a
-    $b
+    val $va = 5
+    val $vb = -$va
+    $vb
 }
 
 fn Project::Parsing::mixed_plus_minus {
-    val $a = 10
-    val $b = -5
-    val $c = $a + $b
-    val $d = $a - $b
+    val $va = 10
+    val $vb = -5
+    val $c = $va + $vb
+    val $d = $va - $vb
     $c + $d
 }
 
 # ── Modulo vs hash deref ─────────────────────────────────────────────
 
 fn Project::Parsing::modulo_newlines {
-    val $a = 17
-    val $b = 5
-    $a % $b
+    val $va = 17
+    val $vb = 5
+    $va % $vb
 }
 
 fn Project::Parsing::hash_after_modulo {
@@ -169,7 +169,7 @@ fn Project::Parsing::call_with_parens {
 
 fn Project::Parsing::call_without_parens {
     val @nums = (3, 1, 4, 1, 5)
-    val $len = scalar @nums
+    val $len = len @nums
     $len
 }
 
@@ -182,9 +182,9 @@ fn Project::Parsing::nested_calls {
 # ── String operations ────────────────────────────────────────────────
 
 fn Project::Parsing::string_concat_newlines {
-    val $a = "Hello"
-    val $b = "World"
-    val $c = $a . " " . $b
+    val $va = "Hello"
+    val $vb = "World"
+    val $c = $va . " " . $vb
     $c
 }
 
@@ -218,10 +218,10 @@ fn Project::Parsing::regex_subst_newlines {
 # ── List operations ──────────────────────────────────────────────────
 
 fn Project::Parsing::list_ops_newlines {
-    val @a = (1, 2, 3)
-    val @b = (4, 5, 6)
-    val @c = (@a, @b)
-    scalar @c
+    val @xa = (1, 2, 3)
+    val @xb = (4, 5, 6)
+    val @c = (@xa, @xb)
+    len @c
 }
 
 fn Project::Parsing::push_pop_newlines {
@@ -258,17 +258,17 @@ fn Project::Parsing::nested_ternary_multiline($n) {
 # ── Complex expressions ──────────────────────────────────────────────
 
 fn Project::Parsing::complex_expr {
-    val $a = 2
-    val $b = 3
+    val $va = 2
+    val $vb = 3
     val $c = 4
-    val $result = $a * $b + $c * ($a + $b)
+    val $result = $va * $vb + $c * ($va + $vb)
     $result
 }
 
 fn Project::Parsing::complex_with_calls {
     val @nums = (1, 2, 3, 4, 5)
     val $total = sum(@nums)
-    val $count = scalar @nums
+    val $count = len @nums
     val $avg = $total / $count
     val $max_val = max(@nums)
     val $result = $avg * $max_val
