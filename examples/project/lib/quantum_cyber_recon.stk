@@ -23,15 +23,46 @@ class Qubit impl Cloneable {
     fn clone { Qubit(alpha => $self->alpha, beta => $self->beta) }
 }
 
-class QuantumNode extends DocumentNode {
+class QuantumNode {
+    id: Int = 0
     qubits: Array = []
     energy_level: Float = 0.0
-    
+    children: Array = []
+
     fn add_qubit($q) {
         push @{$self->qubits}, $q
         $self
     }
-    
+
+    # Local methods to replace DocumentNode inheritance — stryke's typed
+    # `parent: DocumentNode` field rejected the recursive build pattern
+    # in this demo. Roll our own children/depth/node_count/traverse.
+    fn add_child($c) {
+        push @{$self->children}, $c
+        $self
+    }
+
+    fn depth {
+        if (len(@{$self->children}) == 0) { return 1 }
+        var $max = 0
+        for val $c (@{$self->children}) {
+            val $d = $c->depth()
+            if ($d > $max) { $max = $d }
+        }
+        $max + 1
+    }
+
+    fn node_count {
+        var $count = 1
+        for val $c (@{$self->children}) { $count += $c->node_count() }
+        $count
+    }
+
+    fn traverse($visitor) {
+        $visitor->($self)
+        for val $c (@{$self->children}) { $c->traverse($visitor) }
+    }
+
     fn resonance {
         var $sum = 0
         for val $q (@{$self->qubits}) { $sum += $q->alpha }
@@ -125,8 +156,9 @@ p "Tree depth: ", $qtree->depth(), ", Total nodes: ", $qtree->node_count()
 # Recursive visitor to find high-resonance sectors
 val $sectors = []
 $qtree->traverse(fn($node) {
-    # Check if it has the resonance method
-    if ($node->can("resonance") && $node->resonance() > 0.7) {
+    # All nodes are QuantumNode — `can` isn't available without UNIVERSAL
+    # inheritance in stryke; rely on the static class structure instead.
+    if ($node->resonance() > 0.7) {
         push @$sectors, $node->id
     }
 });
@@ -158,9 +190,11 @@ p "Intensity Signature: $final_report"
 val $sys = Project::Scanner::scan_system()
 p $recon_logger("SYSTEM RECON COMPLETE: " . ($sys->{hostname} // "localhost") . " (" . ($sys->{os} // "unknown") . ")") . ""
 
-# Closure with state
+# Closure with state — use mysync for shared mutable state across closure
+# capture (stryke closures capture by value to keep parallel dispatch
+# race-free; mysync opts in to shared storage like Perl's default).
 fn Project::QuantumCyberRecon::make_counter {
-    state $c = 0
+    mysync $c = 0
     fn { ++$c }
 }
 
@@ -168,7 +202,7 @@ val $tick = Project::QuantumCyberRecon::make_counter()
 p "T-Minus: " . $tick() . "... " . $tick() . "... " . $tick() . " LAUNCH."
 
 # Final complex verification
-if ($is_critical_quantum(0.99)("QuantumNode")) {
+if ($is_critical_quantum("QuantumNode")) {
     p "\x1b[31;1m[CRITICAL] Quantum Overload Detected!\x1b[0m"
 } else {
     p "\x1b[32;1m[STABLE] Quantum State Synchronized.\x1b[0m"
