@@ -221,11 +221,19 @@ s audit                       # security check (future)
 
 When stryke encounters `use Foo::Bar`:
 
-1. `lib/Foo/Bar.stk` — project source
-2. `vendor/foo/lib/Bar.stk` — dependency
-3. `@INC` paths — system/site libs
+1. `lib/Foo/Bar.stk` — project source. Live edits always win.
+2. **Use-site pin** `use Foo::Bar 1.2` — load `~/.stryke/store/foo@1.2/lib/Bar.stk` directly. Skips lockfile and store-scan. Pin missing → hard error.
+3. **Inside project**: `stryke.lock` entry → `~/.stryke/store/foo@{locked_version}/lib/Bar.stk`. Lockfile pin missing in store → hard error.
+4. **Outside project**: scan `~/.stryke/store/foo@*/` (including `stryke-foo@*/` and namespace-bridged canonical names) and pick the HIGHEST version by numeric semver tuple (`2.0 > 1.99`, `0.10.0 > 0.3.0`).
+5. `@INC` paths — system/site libs.
 
-The resolver maps package names to vendor paths automatically.
+The resolver maps package names to store paths automatically.
+
+**Version-respect contract.** When a pin (use-site `use Foo VERSION` or a `stryke.lock` entry) can't be satisfied by an existing store extraction, the resolver returns a hard error rather than substituting a different version. Loading a different file under the pinned name is treated as a correctness bug, not a convenience.
+
+**Outside-project default.** Standalone scripts get "newest installed" automatically — independent of `installed.toml`. `installed.toml` tracks which packages were `-g`-installed; the store can contain many versions of the same package from different installs. The resolver always picks the newest unless the user pins.
+
+Syntax: `use Module VERSION` follows Perl 5's `use Module VERSION LIST` grammar — a numeric literal in the first import slot becomes the version pin; everything after is the import list. Strings, barewords, and qw-lists in that slot are imports as before.
 
 ### Deduplication
 
