@@ -2754,6 +2754,25 @@ impl Compiler {
                     self.chunk.patch_jump_here(j);
                 }
                 self.emit_pop_frame(line);
+                // The foreach pushed a runtime frame for `__foreach_list__`/
+                // `__foreach_i__`/$var slot isolation, and popped it above.
+                // Clear the compiler-side slot mappings for those names —
+                // otherwise a sibling `val $var = …` AFTER the loop emits a
+                // name-based `DeclareScalarFrozen($var)` (writes via
+                // `set_scalar_raw` into the now-popped frame's slot table),
+                // while subsequent reads still resolve through the stale
+                // `scalar_slot($var)` cache and emit `GetScalarSlot(N)`
+                // against the wrong frame — observed in `Bsgs::dlog`
+                // where the inner `val $j = $tab{$gamma}` after a
+                // `for val $j (…)` would silently leave $j undef.
+                if let Some(layer) = self.scope_stack.last_mut() {
+                    if var != "_" {
+                        layer.scalar_slots.remove(var);
+                    }
+                    layer.scalar_slots.remove("__foreach_i__");
+                    layer.declared_scalars.remove(var);
+                    layer.declared_arrays.remove("__foreach_list__");
+                }
             }
             StmtKind::DoWhile { body, condition } => {
                 let loop_start = self.chunk.len();
