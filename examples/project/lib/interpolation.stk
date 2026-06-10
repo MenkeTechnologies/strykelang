@@ -8,8 +8,8 @@ fn Project::Interpolation::scalar_in_sentence($count) {
     "Found $count items"
 }
 
-fn Project::Interpolation::multiple_scalars($a, $b, $c) {
-    "$a + $b = $c"
+fn Project::Interpolation::multiple_scalars($va, $vb, $c) {
+    "$va + $vb = $c"
 }
 
 fn Project::Interpolation::adjacent_scalars($x, $y) {
@@ -136,9 +136,9 @@ fn Project::Interpolation::zero_interp {
     "zero: $z"
 }
 
-fn Project::Interpolation::concat_vs_interp($a, $b) {
-    val $interp = "$a$b"
-    val $concat = $a . $b
+fn Project::Interpolation::concat_vs_interp($va, $vb) {
+    val $interp = "$va$vb"
+    val $concat = $va . $vb
     $interp eq $concat ? 1 : 0
 }
 

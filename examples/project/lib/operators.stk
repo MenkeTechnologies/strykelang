@@ -4,112 +4,112 @@
 # ARITHMETIC OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::add_int($a, $b) { $a + $b }
-fn Project::Operators::sub_int($a, $b) { $a - $b }
-fn Project::Operators::mul_int($a, $b) { $a * $b }
-fn Project::Operators::div_int($a, $b) { $a / $b }
-fn Project::Operators::mod_int($a, $b) { $a % $b }
-fn Project::Operators::pow_int($a, $b) { $a ** $b }
-fn Project::Operators::neg_int($a) { -$a }
+fn Project::Operators::add_int($va, $vb) { $va + $vb }
+fn Project::Operators::sub_int($va, $vb) { $va - $vb }
+fn Project::Operators::mul_int($va, $vb) { $va * $vb }
+fn Project::Operators::div_int($va, $vb) { $va / $vb }
+fn Project::Operators::mod_int($va, $vb) { $va % $vb }
+fn Project::Operators::pow_int($va, $vb) { $va ** $vb }
+fn Project::Operators::neg_int($va) { -$va }
 
-fn Project::Operators::add_float($a, $b) { $a + $b }
-fn Project::Operators::sub_float($a, $b) { $a - $b }
-fn Project::Operators::mul_float($a, $b) { $a * $b }
-fn Project::Operators::div_float($a, $b) { $a / $b }
+fn Project::Operators::add_float($va, $vb) { $va + $vb }
+fn Project::Operators::sub_float($va, $vb) { $va - $vb }
+fn Project::Operators::mul_float($va, $vb) { $va * $vb }
+fn Project::Operators::div_float($va, $vb) { $va / $vb }
 
-fn Project::Operators::int_div($a, $b) { int($a / $b) }
+fn Project::Operators::int_div($va, $vb) { int($va / $vb) }
 
-fn Project::Operators::mixed_arithmetic($a, $b, $c) {
-    $a + $b * $c
+fn Project::Operators::mixed_arithmetic($va, $vb, $c) {
+    $va + $vb * $c
 }
 
-fn Project::Operators::parenthesized($a, $b, $c) {
-    ($a + $b) * $c
+fn Project::Operators::parenthesized($va, $vb, $c) {
+    ($va + $vb) * $c
 }
 
-fn Project::Operators::chained_ops($a, $b, $c, $d) {
-    $a + $b - $c + $d
+fn Project::Operators::chained_ops($va, $vb, $c, $d) {
+    $va + $vb - $c + $d
 }
 
-fn Project::Operators::complex_expr($a, $b, $c) {
-    ($a ** 2 + $b ** 2) / $c
+fn Project::Operators::complex_expr($va, $vb, $c) {
+    ($va ** 2 + $vb ** 2) / $c
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # NUMERIC COMPARISON OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::num_eq($a, $b) { $a == $b ? 1 : 0 }
-fn Project::Operators::num_ne($a, $b) { $a != $b ? 1 : 0 }
-fn Project::Operators::num_lt($a, $b) { $a < $b ? 1 : 0 }
-fn Project::Operators::num_le($a, $b) { $a <= $b ? 1 : 0 }
-fn Project::Operators::num_gt($a, $b) { $a > $b ? 1 : 0 }
-fn Project::Operators::num_ge($a, $b) { $a >= $b ? 1 : 0 }
+fn Project::Operators::num_eq($va, $vb) { $va == $vb ? 1 : 0 }
+fn Project::Operators::num_ne($va, $vb) { $va != $vb ? 1 : 0 }
+fn Project::Operators::num_lt($va, $vb) { $va < $vb ? 1 : 0 }
+fn Project::Operators::num_le($va, $vb) { $va <= $vb ? 1 : 0 }
+fn Project::Operators::num_gt($va, $vb) { $va > $vb ? 1 : 0 }
+fn Project::Operators::num_ge($va, $vb) { $va >= $vb ? 1 : 0 }
 
-fn Project::Operators::cmp_spaceship($a, $b) { $a <=> $b }
+fn Project::Operators::cmp_spaceship($va, $vb) { $va <=> $vb }
 
-fn Project::Operators::compare_chain($a, $b, $c) {
-    ($a < $b) && ($b < $c) ? 1 : 0
+fn Project::Operators::compare_chain($va, $vb, $c) {
+    ($va < $vb) && ($vb < $c) ? 1 : 0
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STRING COMPARISON OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::str_eq($a, $b) { $a eq $b ? 1 : 0 }
-fn Project::Operators::str_ne($a, $b) { $a ne $b ? 1 : 0 }
-fn Project::Operators::str_lt($a, $b) { $a lt $b ? 1 : 0 }
-fn Project::Operators::str_le($a, $b) { $a le $b ? 1 : 0 }
-fn Project::Operators::str_gt($a, $b) { $a gt $b ? 1 : 0 }
-fn Project::Operators::str_ge($a, $b) { $a ge $b ? 1 : 0 }
+fn Project::Operators::str_eq($va, $vb) { $va eq $vb ? 1 : 0 }
+fn Project::Operators::str_ne($va, $vb) { $va ne $vb ? 1 : 0 }
+fn Project::Operators::str_lt($va, $vb) { $va lt $vb ? 1 : 0 }
+fn Project::Operators::str_le($va, $vb) { $va le $vb ? 1 : 0 }
+fn Project::Operators::str_gt($va, $vb) { $va gt $vb ? 1 : 0 }
+fn Project::Operators::str_ge($va, $vb) { $va ge $vb ? 1 : 0 }
 
-fn Project::Operators::str_cmp($a, $b) { $a cmp $b }
+fn Project::Operators::str_cmp($va, $vb) { $va cmp $vb }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGICAL OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::logical_and($a, $b) { $a && $b }
-fn Project::Operators::logical_or($a, $b) { $a || $b }
-fn Project::Operators::logical_not($a) { !$a ? 1 : 0 }
+fn Project::Operators::logical_and($va, $vb) { $va && $vb }
+fn Project::Operators::logical_or($va, $vb) { $va || $vb }
+fn Project::Operators::logical_not($va) { !$va ? 1 : 0 }
 
-fn Project::Operators::low_prec_and($a, $b) { $a and $b }
-fn Project::Operators::low_prec_or($a, $b) { $a or $b }
-fn Project::Operators::low_prec_not($a) { not $a ? 1 : 0 }
+fn Project::Operators::low_prec_and($va, $vb) { $va and $vb }
+fn Project::Operators::low_prec_or($va, $vb) { $va or $vb }
+fn Project::Operators::low_prec_not($va) { not $va ? 1 : 0 }
 
-fn Project::Operators::defined_or($a, $b) { $a // $b }
+fn Project::Operators::defined_or($va, $vb) { $va // $vb }
 
-fn Project::Operators::short_circuit_and($a) {
+fn Project::Operators::short_circuit_and($va) {
     var $side_effect = 0
-    $a && ($side_effect = 1)
+    $va && ($side_effect = 1)
     $side_effect
 }
 
-fn Project::Operators::short_circuit_or($a) {
+fn Project::Operators::short_circuit_or($va) {
     var $side_effect = 0
-    $a || ($side_effect = 1)
+    $va || ($side_effect = 1)
     $side_effect
 }
 
-fn Project::Operators::nested_logical($a, $b, $c) {
-    ($a && $b) || $c
+fn Project::Operators::nested_logical($va, $vb, $c) {
+    ($va && $vb) || $c
 }
 
-fn Project::Operators::complex_logical($a, $b, $c, $d) {
-    ($a && $b) || ($c && $d)
+fn Project::Operators::complex_logical($va, $vb, $c, $d) {
+    ($va && $vb) || ($c && $d)
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BITWISE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::bitwise_and($a, $b) { $a & $b }
-fn Project::Operators::bitwise_or($a, $b) { $a | $b }
-fn Project::Operators::bitwise_xor($a, $b) { $a ^ $b }
-fn Project::Operators::bitwise_not($a) { ~$a }
+fn Project::Operators::bitwise_and($va, $vb) { $va & $vb }
+fn Project::Operators::bitwise_or($va, $vb) { $va | $vb }
+fn Project::Operators::bitwise_xor($va, $vb) { $va ^ $vb }
+fn Project::Operators::bitwise_not($va) { ~$va }
 
-fn Project::Operators::left_shift($a, $n) { $a << $n }
-fn Project::Operators::right_shift($a, $n) { $a >> $n }
+fn Project::Operators::left_shift($va, $n) { $va << $n }
+fn Project::Operators::right_shift($va, $n) { $va >> $n }
 
 fn Project::Operators::bit_mask($val, $mask) { $val & $mask }
 fn Project::Operators::set_bit($val, $bit) { $val | (1 << $bit) }
@@ -121,11 +121,11 @@ fn Project::Operators::test_bit($val, $bit) { ($val & (1 << $bit)) ? 1 : 0 }
 # STRING OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::str_concat($a, $b) { $a . $b }
-fn Project::Operators::concat_three($a, $b, $c) { $a . $b . $c }
+fn Project::Operators::str_concat($va, $vb) { $va . $vb }
+fn Project::Operators::concat_three($va, $vb, $c) { $va . $vb . $c }
 fn Project::Operators::repeat_str($s, $n) { $s x $n }
 
-fn Project::Operators::concat_with_space($a, $b) { $a . " " . $b }
+fn Project::Operators::concat_with_space($va, $vb) { $va . " " . $vb }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ASSIGNMENT OPERATORS
@@ -256,22 +256,22 @@ fn Project::Operators::nested_ternary($n) {
     $n < 0 ? "negative" : $n == 0 ? "zero" : "positive"
 }
 
-fn Project::Operators::ternary_with_ops($a, $b) {
-    $a > $b ? $a - $b : $b - $a
+fn Project::Operators::ternary_with_ops($va, $vb) {
+    $va > $vb ? $va - $vb : $vb - $va
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RANGE OPERATORS
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::Operators::incl_range($a, $b) {
-    val @r = $a:$b
+fn Project::Operators::incl_range($va, $vb) {
+    val @r = $va:$vb
     @r
 }
 
-fn Project::Operators::range_sum($a, $b) {
+fn Project::Operators::range_sum($va, $vb) {
     var $sum = 0
-    for val $i ($a:$b) {
+    for val $i ($va:$vb) {
         $sum += $i
     }
     $sum
@@ -282,8 +282,8 @@ fn Project::Operators::range_char {
     join("", @chars)
 }
 
-fn Project::Operators::range_reverse($a, $b) {
-    val @r = rev($a:$b)
+fn Project::Operators::range_reverse($va, $vb) {
+    val @r = rev($va:$vb)
     @r
 }
 
@@ -292,14 +292,14 @@ fn Project::Operators::range_reverse($a, $b) {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Operators::list_assign {
-    var ($a, $b, $c) = (1, 2, 3)
-    $a + $b + $c
+    var ($va, $vb, $c) = (1, 2, 3)
+    $va + $vb + $c
 }
 
 fn Project::Operators::list_swap {
-    var ($a, $b) = (1, 2)
-    ($a, $b) = ($b, $a)
-    ($a, $b)
+    var ($va, $vb) = (1, 2)
+    ($va, $vb) = ($vb, $va)
+    ($va, $vb)
 }
 
 fn Project::Operators::comma_operator {
@@ -311,7 +311,7 @@ fn Project::Operators::comma_operator {
 
 fn Project::Operators::list_in_scalar {
     val @arr = (1, 2, 3, 4, 5)
-    scalar @arr}
+    len @arr}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SPECIAL OPERATORS

@@ -91,11 +91,11 @@ fn Project::ErrorHandling::try_catch_no_error {
     $value
 }
 
-fn Project::ErrorHandling::safe_divide_try($a, $b) {
+fn Project::ErrorHandling::safe_divide_try($va, $vb) {
     var $result
     try {
-        die "division by zero" if $b == 0
-        $result = $a / $b
+        die "division by zero" if $vb == 0
+        $result = $va / $vb
     } catch ($e) {
         $result = undef
     }
@@ -206,10 +206,10 @@ fn Project::ErrorHandling::try_catch_pattern {
     return "success: $result"
 }
 
-fn Project::ErrorHandling::safe_division($a, $b) {
+fn Project::ErrorHandling::safe_division($va, $vb) {
     val $result = eval {
-        die "division by zero" if $b == 0
-        $a / $b
+        die "division by zero" if $vb == 0
+        $va / $vb
     }
     if ($@) {
         return undef

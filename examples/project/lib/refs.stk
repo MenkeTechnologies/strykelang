@@ -21,7 +21,7 @@ fn Project::Refs::make_array_ref {
 }
 
 fn Project::Refs::array_ref_length($aref) {
-    scalar @$aref
+    len @$aref
 }
 
 fn Project::Refs::array_ref_element($aref, $idx) {
@@ -164,7 +164,7 @@ fn Project::Refs::alias_test {
     val $ref1 = \@arr
     val $ref2 = $ref1
     push @$ref2, 4
-    scalar @arr
+    len @arr
 }
 
 fn Project::Refs::modify_alias {
@@ -225,8 +225,8 @@ fn Project::Refs::list_to_array($head) {
 # ── WeakRef-like patterns ──────────────────────────────────────────
 
 fn Project::Refs::circular_safe {
-    var $a = { name => "A" }
-    val $b = { name => "B" }
-    $a->{ref} = $b
-    $a->{name} . "-" . $b->{name}
+    var $va = { name => "A" }
+    val $vb = { name => "B" }
+    $va->{ref} = $vb
+    $va->{name} . "-" . $vb->{name}
 }

@@ -44,8 +44,8 @@ fn Project::ControlFlow::ternary_nested($n) {
     $n > 0 ? "positive" : $n < 0 ? "negative" : "zero"
 }
 
-fn Project::ControlFlow::ternary_expr($a, $b) {
-    ($a > $b) ? $a - $b : $b - $a
+fn Project::ControlFlow::ternary_expr($va, $vb) {
+    ($va > $vb) ? $va - $vb : $vb - $va
 }
 
 # ── Postfix conditionals ───────────────────────────────────────────
@@ -216,18 +216,18 @@ fn Project::ControlFlow::classify_char_given($c) {
     }
 }
 
-fn Project::ControlFlow::nested_given($a, $b) {
+fn Project::ControlFlow::nested_given($va, $vb) {
     var $result
-    given ($a) {
+    given ($va) {
         when (1) {
-            given ($b) {
+            given ($vb) {
                 when (1) { $result = "1-1" }
                 when (2) { $result = "1-2" }
                 default  { $result = "1-?" }
             }
         }
         when (2) {
-            given ($b) {
+            given ($vb) {
                 when (1) { $result = "2-1" }
                 default  { $result = "2-?" }
             }
@@ -269,7 +269,7 @@ fn Project::ControlFlow::multiplication_table_sum($size) {
 }
 
 fn Project::ControlFlow::find_pair_sum($target, @nums) {
-    val $len = scalar @nums
+    val $len = len @nums
     for val $i (0:$len-2) {
         for val $j ($i+1:$len-1) {
             if ($nums[$i] + $nums[$j] == $target) {

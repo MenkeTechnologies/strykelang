@@ -193,7 +193,7 @@ assert_eq $qw_res[0], "one", "qw first"
 # INTERPOLATION
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::StringsExtended::str_interp_scalar(), "Hello, Alice!", "interp scalar"
+assert_eq Project::StringsExtended::str_interp_scalar(), "Hello, Alice!", "interp len"
 assert_eq Project::StringsExtended::str_interp_array_elem(), "Second: b", "interp array elem"
 assert_eq Project::StringsExtended::str_interp_hash_elem(), "Key: value", "interp hash elem"
 assert_eq Project::StringsExtended::str_interp_braces(), "testing", "interp braces"

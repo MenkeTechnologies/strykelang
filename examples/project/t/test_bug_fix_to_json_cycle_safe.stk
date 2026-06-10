@@ -4,9 +4,9 @@
 # via an Arc-pointer visited set and emits `null` for back-edges.
 
 # Direct self-reference.
-var $a = { name => "root" }
-$a->{self} = $a
-val $j_a = to_json($a)
+var $va = { name => "root" }
+$va->{self} = $va
+val $j_a = to_json($va)
 ($j_a =~ /"name":"root"/)  |> assert_ok("root field preserved")
 ($j_a =~ /"self":null/)    |> assert_ok("back-edge serialized as null")
 

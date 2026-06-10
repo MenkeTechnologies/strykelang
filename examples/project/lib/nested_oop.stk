@@ -80,7 +80,7 @@ fn Project::NestedOop::filter_points_in_quadrant(@points) {
 }
 
 fn Project::NestedOop::sort_points_by_x(@points) {
-    sort { $a->x <=> $b->x } @points
+    sort { _0->x <=> _1->x } @points
 }
 
 fn Project::NestedOop::tasks_in_array {
@@ -639,7 +639,7 @@ fn Project::NestedOop::filter_adults($people) {
 }
 
 fn Project::NestedOop::sort_by_age($people) {
-    [sort { $a->age <=> $b->age } @$people]
+    [sort { _0->age <=> _1->age } @$people]
 }
 
 fn Project::NestedOop::partition_by_age($people, $threshold) {

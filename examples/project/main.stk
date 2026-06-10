@@ -66,8 +66,8 @@ if ($git->{is_repo}) {
     p "  \x1b[33mCOMMITS\x1b[0m  " . $git->{total_commits}
     p "  \x1b[33mFILES\x1b[0m    " . $git->{total_files}
     p "  \x1b[33mAUTHORS\x1b[0m"
-    for val $a (@{$git->{top_authors}}) {
-        printf "    \x1b[35m%-20s\x1b[0m %d commits\n", $a->{name}, $a->{commits}
+    for val $va (@{$git->{top_authors}}) {
+        printf "    \x1b[35m%-20s\x1b[0m %d commits\n", $va->{name}, $va->{commits}
     }
     p "  \x1b[33mRECENT\x1b[0m"
     for val $c (@{$git->{recent}}) {

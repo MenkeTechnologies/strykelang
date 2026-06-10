@@ -8,9 +8,9 @@ val @flat = Project::CollectionsExtended::ext_flatten(1, [2, [3, 4]], 5)
 assert_eq join(",", @flat), "1,2,3,4,5", "Project::CollectionsExtended::ext_flatten"
 
 # ── Project::CollectionsExtended::ext_zip ─────
-val @a = (1, 2, 3)
-val @b = ("a", "b", "c")
-val @zipped = Project::CollectionsExtended::ext_zip(\@a, \@b)
+val @xa = (1, 2, 3)
+val @xb = ("a", "b", "c")
+val @zipped = Project::CollectionsExtended::ext_zip(\@xa, \@xb)
 assert_eq len(@zipped), 3, "zip count"
 assert_eq $zipped[0][0], 1, "zip 0 a"
 assert_eq $zipped[0][1], "a", "zip 0 b"

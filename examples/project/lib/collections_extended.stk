@@ -15,12 +15,12 @@ fn Project::CollectionsExtended::ext_flatten(@items) {
 
 # ── Project::CollectionsExtended::ext_zip: zips two lists into a list of pairs ─────
 fn Project::CollectionsExtended::ext_zip($a_ref, $b_ref) {
-    val @a = @$a_ref
-    val @b = @$b_ref
+    val @xa = @$a_ref
+    val @xb = @$b_ref
     var @res = ()
-    val $len = len(@a) < len(@b) ? len(@a) : len(@b)
+    val $len = len(@xa) < len(@xb) ? len(@xa) : len(@xb)
     ~> 0:$len-1 ep {
-        push @res, [$a[_], $b[_]]
+        push @res, [$xa[_], $xb[_]]
     }
     @res
 }
