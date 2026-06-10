@@ -269,6 +269,159 @@ fn missing_package_or_workspace_fails_validation() {
     assert!(m.validate().is_err());
 }
 
+/// Helper for the version-pin tests: drop a fake `<store>/<name>@<ver>/lib/<Name>.stk`
+/// extraction containing the supplied body. No FFI manifest — these
+/// tests exercise resolver paths only, not cdylib load.
+fn install_fake_store_pkg(store: &Store, name: &str, version: &str, file_name: &str, body: &str) {
+    let pkg = store.package_dir(name, version);
+    std::fs::create_dir_all(pkg.join("lib")).unwrap();
+    std::fs::write(pkg.join("lib").join(format!("{}.stk", file_name)), body).unwrap();
+}
+
+/// `use Module VERSION` (Perl-style pin) at the use site must override
+/// the lockfile pin and land on the EXACT pinned store extraction —
+/// not the lockfile-resolved version, not the global newest.
+#[test]
+fn use_site_pin_overrides_lockfile_inside_project() {
+    let store_root = tempdir("store");
+    let store = Store::at(&store_root);
+    std::env::set_var("STRYKE_HOME", &store_root);
+    install_fake_store_pkg(&store, "foo", "1.0", "Foo", "# foo v1.0\n");
+    install_fake_store_pkg(&store, "foo", "2.0", "Foo", "# foo v2.0\n");
+
+    let project = tempdir("pinproject");
+    std::fs::write(
+        project.join("stryke.toml"),
+        "[package]\nname=\"app\"\nversion=\"0.1.0\"\n[deps]\nfoo = \"1.0\"\n",
+    )
+    .unwrap();
+    // Lockfile pins v1.0, but use-site pin says v2.0 → v2.0 wins.
+    let mut lf = Lockfile::new();
+    lf.packages.push(stryke::pkg::lockfile::LockedPackage {
+        name: "foo".into(),
+        version: "1.0".into(),
+        source: "test".into(),
+        integrity: "sha256-x".into(),
+        features: vec![],
+        deps: vec![],
+    });
+    std::fs::write(project.join("stryke.lock"), lf.to_toml_string().unwrap()).unwrap();
+
+    let resolved = resolve_module(&project, "Foo", Some("2.0"))
+        .unwrap()
+        .expect("use-site pin should resolve");
+    assert!(
+        resolved.ends_with("foo@2.0/lib/Foo.stk"),
+        "use-site pin must win over lockfile pin; got {:?}",
+        resolved
+    );
+
+    // Same lockfile, no pin → respects the lockfile (v1.0).
+    let resolved_no_pin = resolve_module(&project, "Foo", None)
+        .unwrap()
+        .expect("unpinned should follow lockfile");
+    assert!(
+        resolved_no_pin.ends_with("foo@1.0/lib/Foo.stk"),
+        "unpinned must follow stryke.lock; got {:?}",
+        resolved_no_pin
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}
+
+/// Outside-project end-to-end: three versions of a package in the
+/// store, no `stryke.toml`, no `installed.toml`. Resolver must pick
+/// the highest semver — 2.0 beats 1.99, 0.10.0 beats 0.3.0.
+#[test]
+fn outside_project_resolver_picks_highest_semver() {
+    let store_root = tempdir("highstore");
+    let store = Store::at(&store_root);
+    std::env::set_var("STRYKE_HOME", &store_root);
+    // Lexicographic vs numeric distinction: `1.99` is text-greater
+    // than `2.0`, so a lexicographic compare would pick the wrong
+    // one. The resolver uses numeric tuple compare.
+    for v in ["1.99", "2.0", "0.5"] {
+        install_fake_store_pkg(&store, "foo", v, "Foo", &format!("# foo v{}\n", v));
+    }
+
+    let proj = tempdir("noproject");
+    // No stryke.toml — outside-project path.
+    let resolved = resolve_module(&proj, "Foo", None)
+        .unwrap()
+        .expect("outside-project should resolve to highest");
+    assert!(
+        resolved.ends_with("foo@2.0/lib/Foo.stk"),
+        "2.0 > 1.99 numerically; got {:?}",
+        resolved
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}
+
+/// Static-analyzer mirror — `resolve_require_path_from_file_versioned`
+/// must find the SAME file the runtime resolver would load for a
+/// `use Module VERSION` pin. Drift between the two would mean the
+/// linter chases one file and the runtime loads another.
+#[test]
+fn analyzer_mirrors_runtime_for_use_site_pin() {
+    let store_root = tempdir("mirrorstore");
+    let store = Store::at(&store_root);
+    std::env::set_var("STRYKE_HOME", &store_root);
+    install_fake_store_pkg(&store, "foo", "1.0", "Foo", "# foo v1.0\n");
+    install_fake_store_pkg(&store, "foo", "2.0", "Foo", "# foo v2.0\n");
+
+    let proj = tempdir("mirrorproj");
+    let script_path = proj.join("script.stk");
+    std::fs::write(&script_path, "use Foo 2.0;\n").unwrap();
+
+    let runtime_hit = resolve_module(&proj, "Foo", Some("2.0")).unwrap();
+    let analyzer_hit =
+        stryke::static_analysis::resolve_require_path_from_file_versioned(
+            script_path.to_str().unwrap(),
+            "Foo",
+            Some("2.0"),
+        );
+
+    let runtime_path = runtime_hit.expect("runtime should resolve");
+    let analyzer_path = analyzer_hit.expect("analyzer should resolve");
+    assert_eq!(
+        runtime_path.canonicalize().unwrap(),
+        analyzer_path.canonicalize().unwrap(),
+        "linter and runtime must point at the same file under a pin"
+    );
+    assert!(
+        runtime_path.ends_with("foo@2.0/lib/Foo.stk"),
+        "both should land on the pinned version; got {:?}",
+        runtime_path
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}
+
+/// `use Module VERSION` with the namespace bridge: `use GUI 0.3.0`
+/// should land on `<store>/stryke-gui@0.3.0/` because the bare `gui`
+/// name doesn't have an extraction. Matches the lockfile / index
+/// fallbacks' namespace-bridge behavior.
+#[test]
+fn use_site_pin_bridges_stryke_prefix() {
+    let store_root = tempdir("bridgestore");
+    let store = Store::at(&store_root);
+    std::env::set_var("STRYKE_HOME", &store_root);
+    install_fake_store_pkg(&store, "stryke-gui", "0.3.0", "GUI", "# gui v0.3.0\n");
+
+    let proj = tempdir("bridgeproj");
+    let resolved = resolve_module(&proj, "GUI", Some("0.3.0"))
+        .unwrap()
+        .expect("use-site pin should bridge to stryke-<name>");
+    assert!(
+        resolved.ends_with("stryke-gui@0.3.0/lib/GUI.stk"),
+        "GUI 0.3.0 must find stryke-gui@0.3.0; got {:?}",
+        resolved
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}
+
 #[test]
 fn lockfile_canonicalize_sorts_packages_alphabetically() {
     let mut lf = Lockfile::new();
