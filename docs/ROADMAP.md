@@ -5,8 +5,8 @@
 This document outlines the path to mass worldwide adoption. ✅ marks shipped, ⏳ marks deferred or in-progress, ⏭️ marks future phases not started.
 
 ## Phase 1 — Foundations — ✅ MOSTLY SHIPPED
-1. ✅ Package registry MVP: parse stryke.toml, set up ~/.stryke/store/, local path deps.
-2. ✅ CLI surface: s new, s init, s add, s remove, s install (plus update, outdated, audit, vendor, clean, run, install -g).
+1. ✅ Package registry MVP: parse stryke.toml, set up ~/.stryke/store/, local path deps + git deps (`s add github.com/OWNER/REPO[@TAG]` shorthand, branch/tag/rev pinning, in-process clone, FFI cdylib packages installed source-as-is).
+2. ✅ CLI surface: s new, s init, s add (auto-detects github URL / local path / registry name), s remove, s install (plus update, outdated, audit, vendor, clean, run, install -g).
 3. ✅ AOT binary output via Cranelift: native ELF/Mach-O/PE.
 4. ✅ s bench harness.
 5. ✅ s fmt + s check basics.
