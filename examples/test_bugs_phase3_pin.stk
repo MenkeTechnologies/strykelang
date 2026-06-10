@@ -41,7 +41,7 @@ Pin::BugsPhase3::test_slurp(1, 2, 3) |> aeq 2, 'my ($s, @rest) = @_ correctly ta
 
 val @items = (10, 20, 30)
 val ($x_single) = @items
-$x_single |> aeq 10, "my (\$x) = \@arr binds first element (FIXED, was returning count)"
+$x_single |> aeq 10, "var (\$x) = \@arr binds first element (FIXED, was returning count)"
 
 # ── Filehandle Bugs ───────────────────────────────────────────────────────
 
