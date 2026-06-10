@@ -35,7 +35,7 @@ for val $i (0:len(@sorted_workers) - 1) {
     next if $start >= len(@input)
     val @shard = @input[$start:$end]
     val $shard_json = to_json(\@shard)
-    val $code = "my \$arr = from_json(q{$shard_json}); my \@sorted = sort { _ <=> _1 } \@\$arr; to_json(\\\@sorted)"
+    val $code = "var \$arr = from_json(q{$shard_json}); var \@sorted = sort { _ <=> _1 } \@\$arr; to_json(\\\@sorted)"
     val $div = pray $code, $w
     val %reply = annex $div
     val $sorted_json = $reply{$w}

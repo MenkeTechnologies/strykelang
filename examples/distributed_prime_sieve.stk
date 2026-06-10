@@ -38,14 +38,14 @@ for val $i (0:len(@sorted_workers) - 1) {
     var ($start, $end) = split /,/, $shards{$w}
     # Trial-division prime check inside the worker.
     val $code = "
-        my \$start = $start;
-        my \$end = $end;
-        my \$count = 0;
-        for my \$n (\$start:\$end - 1) {
+        var \$start = $start;
+        var \$end = $end;
+        var \$count = 0;
+        for var \$n (\$start:\$end - 1) {
             next if \$n < 2;
-            my \$is_prime = 1;
-            my \$lim = int(sqrt(\$n));
-            for my \$d (2:\$lim) {
+            var \$is_prime = 1;
+            var \$lim = int(sqrt(\$n));
+            for var \$d (2:\$lim) {
                 if (\$n % \$d == 0) { \$is_prime = 0; last }
             }
             \$count++ if \$is_prime;

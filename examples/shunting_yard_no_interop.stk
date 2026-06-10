@@ -8,7 +8,7 @@
 # Stryke choices:
 #   * `fn`, `p`, `printf`, `len`
 #   * Hash table for operator precedence; another for left/right assoc
-#   * Stack via `push`/`pop` on `my @ops`
+#   * Stack via `push`/`pop` on `var @ops`
 #   * `split /\s+/` for tokenisation
 #   * Built-in `die` invariants for every demo case
 #

@@ -35,10 +35,10 @@ for val $i (0:len(@sorted_workers) - 1) {
     $end = $n - 1 if $end >= $n
     next if $start >= $n
     val $code = "
-        my \$edges = from_json(q{$edges_json});
+        var \$edges = from_json(q{$edges_json});
         var %deg;
-        for my \$v ($start:$end) { \$deg{\$v} = 0 }
-        for my \$e (\@\$edges) {
+        for var \$v ($start:$end) { \$deg{\$v} = 0 }
+        for var \$e (\@\$edges) {
             my (\$src, \$dst) = \@\$e;
             if (\$dst >= $start && \$dst <= $end) {
                 \$deg{\$dst}++;

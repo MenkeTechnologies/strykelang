@@ -38,9 +38,9 @@ for val $i (0:len(@sorted_workers) - 1) {
     val @shard = @data[$start:$end]
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
-        my \@sorted = sort { _1 <=> _ } \@\$arr;
-        my \@top = \@sorted[0:$k - 1];
+        var \$arr = from_json(q{$shard_json});
+        var \@sorted = sort { _1 <=> _ } \@\$arr;
+        var \@top = \@sorted[0:$k - 1];
         to_json(\\\@top)
     "
     val $div = pray $code, $w
