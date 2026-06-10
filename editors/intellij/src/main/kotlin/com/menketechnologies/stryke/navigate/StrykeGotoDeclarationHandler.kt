@@ -141,6 +141,15 @@ class StrykeGotoDeclarationHandler : GotoDeclarationHandler {
             return
         }
         ApplicationManager.getApplication().invokeLater {
+            // The user can close the tab / switch files in the gap
+            // between `selfTarget` returning on the pooled thread and
+            // this EDT runnable firing. Any access to a disposed
+            // editor (caretModel, component, ...) throws
+            // TraceableDisposable$DisposalException — bail silently.
+            if (editor.isDisposed) {
+                dbg("ABORT: editor disposed before EDT dispatch")
+                return@invokeLater
+            }
             // Restore the caret to where the user pressed Cmd-B BEFORE
             // firing ShowUsages. The platform's earlier navigate(self-
             // target) call may have shifted the caret to the leaf's
