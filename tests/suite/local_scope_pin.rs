@@ -247,16 +247,22 @@ fn for_loop_my_var_iterates() {
 // ── Loop var doesn't pollute outer scope ─────────────────────────
 
 #[test]
-fn loop_var_clobbers_outer_my_per_bug_233() {
-    // BUG-233 manifestation: `for my $x` inside a scope that already
-    // has `my $x` clobbers the outer to undef rather than shadowing.
+fn loop_var_shadows_outer_my_post_bug_233_fix() {
+    // BUG-233 was: `for my $x` inside a scope that already has
+    // `my $x` clobbered the outer to undef instead of shadowing.
+    // Root-caused in 4da50f5aa6 — foreach compiler emitted PopFrame
+    // but left a stale `$x → slot N` entry in scope_layer.scalar_slots,
+    // so later reads of the outer `$x` hit a slot in the popped
+    // foreach frame instead of the file frame. Fix clears the
+    // loop-var slot mapping after emit_pop_frame.
+    //
+    // Pinned-as-fixed: outer $x must retain 100 across the loop.
     let code = r#"
         my $x = 100;
         for my $x (1, 2, 3) {
             # No-op body.
         }
-        # Outer is undef per BUG-233; original 100 lost.
-        !defined($x) ? 1 : 0
+        $x == 100 ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -330,17 +336,17 @@ fn closure_captures_ref_writes_visible() {
 // ── Looping shadow ─────────────────────────────────────────────────
 
 #[test]
-fn loop_var_clobbers_outer_per_bug_233_collected() {
-    // BUG-233: outer $x is clobbered, but the collected loop values
-    // are correct.
+fn loop_var_shadows_outer_post_bug_233_fix_collected() {
+    // Companion to loop_var_shadows_outer_my_post_bug_233_fix —
+    // both the collected loop values AND the outer $x must be
+    // intact after the foreach exits.
     let code = r#"
         my $x = 10;
         my @seen;
         for my $x (1, 2, 3) {
             push @seen, $x;
         }
-        # Outer $x lost; collection preserved.
-        (!defined($x) && join(",", @seen) eq "1,2,3") ? 1 : 0
+        ($x == 10 && join(",", @seen) eq "1,2,3") ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
