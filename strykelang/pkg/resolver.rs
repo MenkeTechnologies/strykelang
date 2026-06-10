@@ -2,13 +2,18 @@
 //! - Path deps (`{ path = "../lib" }`) are read from the filesystem, hashed,
 //!   copied into the store, and pinned in the lockfile.
 //! - Workspace member deps work the same as path deps.
+//! - GitHub-release deps (`{ github = "OWNER/REPO" [, version = "..."] }`)
+//!   download the prebuilt release tarball for the host triple (auto-
+//!   detected, override via `STRYKE_TARGET`), SHA-256 verify it, and
+//!   extract into the store. This is the canonical path for binary-only
+//!   FFI packages (stryke-arrow, stryke-aws, ...) whose cdylib needs
+//!   platform libs at build time and can't be reproduced from a clone.
 //! - Git deps (`{ git = "https://...", tag|branch|rev = ... }`) are cloned
 //!   into `~/.stryke/git/`, the resolved commit is recorded in the lockfile,
 //!   and the working copy is installed through the same `install_dir_dep`
-//!   path as path deps. FFI git deps (cloned tree has `[ffi]`) are built
-//!   in-tree via `cargo build --release` before staging into the store —
-//!   the source is already there from the git clone, so we don't need
-//!   `s pkg install -g <github-url>` for the binary side-channel.
+//!   path as path deps. Source-only deps land here — e.g. a pure-stryke
+//!   library hosted on github without release tarballs, or a private
+//!   non-github git URL.
 //! - Registry (`http = "1.0"`) deps return a structured "not yet implemented"
 //!   error so the CLI surface is honest about what's wired today.
 //!
@@ -243,6 +248,7 @@ impl<'a> Resolver<'a> {
                 Ok(())
             }
             DepSource::Git => self.install_git_dep(name, spec, graph, installed, visiting),
+            DepSource::GitHub => self.install_github_dep(name, spec, graph, installed, visiting),
             DepSource::Registry => Err(PkgError::Resolve(format!(
                 "registry dep `{}` is not supported in this stryke version yet \
                  (RFC phases 7–8 — see docs/PACKAGE_REGISTRY.md). Use `path = \"...\"` \
@@ -255,11 +261,11 @@ impl<'a> Resolver<'a> {
     /// Clone a git dep into `~/.stryke/git/` (respecting `branch`/`tag`/`rev`
     /// per `git_branch_or_rev`), then install the working copy through
     /// the same `install_dir_dep` path the path-dep arm uses. FFI git deps
-    /// (cloned tree has `[ffi]`) install the source as-is; the cdylib
-    /// must be present in `lib/` of the clone (e.g. via a release tarball
-    /// vendored into the repo) or the user runs `cargo build --release`
-    /// in the clone separately. `use Foo` surfaces a clear dlopen error
-    /// at runtime via `try_load_ffi_for` if the cdylib is missing.
+    /// (cloned tree has `[ffi]`) error fast with a pointer at the
+    /// `github = "OWNER/REPO"` field (or `s pkg install -g`) — the cdylib
+    /// needs platform libs at build time and can't be produced from a
+    /// source clone in `s install`. Pure-source git deps (no [ffi]) work
+    /// here as a path-dep would.
     fn install_git_dep(
         &self,
         name: &str,
@@ -276,21 +282,106 @@ impl<'a> Resolver<'a> {
         let (clone_path, resolved_commit) =
             self.clone_git_dep(name, &url, branch_or_tag.as_deref(), rev_pin.as_deref())?;
 
-        // FFI git deps (cloned tree has `[ffi]`) install the source-tree
-        // contents directly — the same subtree copy as a path dep. The
-        // cdylib in `lib/lib<name>.<ext>` ships only when the repo
-        // commits a prebuilt binary or a release tarball was vendored;
-        // a from-source clone won't have it pre-built, and the user is
-        // expected to either run `cargo build --release` in the clone
-        // or use `s pkg install -g <github-url>` to fetch the prebuilt
-        // binary side-channel. `use Foo` at runtime will dlopen-error
-        // with a clear "search locations" message via try_load_ffi_for
-        // (see commands.rs) if the cdylib is missing. The install step
-        // itself doesn't fail just because the cdylib isn't there yet —
-        // that matches `s install`'s pull-only contract and lets the
-        // user build whenever they want (CI, on-demand, prebuilt).
+        // Refuse FFI git deps — `s install` can't produce a cdylib from a
+        // source clone (the build needs platform libs + the rust
+        // toolchain). Point the user at the github-release path, which
+        // downloads the prebuilt artifact for the host triple.
+        let manifest_path = clone_path.join("stryke.toml");
+        if manifest_path.is_file() {
+            let m = Manifest::from_path(&manifest_path)?;
+            if m.ffi.is_some() {
+                return Err(PkgError::Resolve(format!(
+                    "git dep `{}` ships a [ffi] cdylib that needs the prebuilt \
+                     release binary. Rewrite this dep as \
+                     `{{ github = \"OWNER/REPO\" }}` so `s install` fetches \
+                     the release tarball for this host triple, or use \
+                     `s pkg install -g <github-url>` for a one-off global install.",
+                    name
+                )));
+            }
+        }
+
         let source = format!("git+{}#{}", url, resolved_commit);
         self.install_dir_dep(name, &clone_path, source, graph, installed, visiting)
+    }
+
+    /// `{ github = "OWNER/REPO" [, version = "..."] }` — fetch the
+    /// prebuilt release tarball for the host triple. Delegates to the
+    /// shared `install_global_from_github` helper in `pkg::commands`
+    /// which already implements the same download → SHA-256 → extract
+    /// → rename-into-store pipeline used by `s pkg install -g github.com/...`.
+    fn install_github_dep(
+        &self,
+        name: &str,
+        spec: &DepSpec,
+        graph: &mut BTreeMap<String, ResolvedDep>,
+        installed: &mut Vec<(String, String, PathBuf)>,
+        visiting: &mut BTreeSet<String>,
+    ) -> PkgResult<()> {
+        let owner_repo = spec.github().ok_or_else(|| {
+            PkgError::Resolve(format!("github dep `{}` missing OWNER/REPO", name))
+        })?;
+        let (owner, repo) = owner_repo.split_once('/').ok_or_else(|| {
+            PkgError::Resolve(format!(
+                "github dep `{}`: expected `OWNER/REPO`, got `{}`",
+                name, owner_repo
+            ))
+        })?;
+        if owner.is_empty() || repo.is_empty() {
+            return Err(PkgError::Resolve(format!(
+                "github dep `{}`: empty owner or repo in `{}`",
+                name, owner_repo
+            )));
+        }
+        let pinned = spec.pinned_release_version().map(str::to_string);
+
+        let (manifest, dst, source) = super::commands::install_global_from_github(
+            &self.store,
+            owner,
+            repo,
+            pinned.as_deref(),
+        )
+        .map_err(PkgError::Resolve)?;
+
+        let pkg = manifest
+            .package
+            .as_ref()
+            .ok_or_else(|| PkgError::Resolve(format!("github dep `{}`: tarball missing [package]", name)))?;
+        let version = pkg.version.clone();
+        let integrity = integrity_for_directory(&dst)?;
+        let key = format!("{}@{}", name, version);
+        if graph.contains_key(&key) {
+            return Ok(());
+        }
+        installed.push((name.to_string(), version.clone(), dst.clone()));
+
+        // Recurse into transitive deps — a github-released package may
+        // declare its own [deps] table in the bundled stryke.toml.
+        let mut transitive: Vec<String> = Vec::new();
+        for (sub_name, sub_spec) in &manifest.deps {
+            self.walk_dep(sub_name, sub_spec, &dst, graph, installed, visiting)?;
+            let sub_version = graph
+                .values()
+                .find(|d| &d.name == sub_name)
+                .map(|d| d.version.clone())
+                .unwrap_or_else(|| "0.0.0".to_string());
+            transitive.push(format!("{}@{}", sub_name, sub_version));
+        }
+        transitive.sort();
+        transitive.dedup();
+
+        graph.insert(
+            key,
+            ResolvedDep {
+                name: name.to_string(),
+                version,
+                source,
+                integrity,
+                deps: transitive,
+                features: Vec::new(),
+            },
+        );
+        Ok(())
     }
 
     /// `git clone --depth 1` (or full clone for arbitrary `rev`) into
