@@ -5,7 +5,7 @@ fn Rosetta::Entropy::shannon($s) {
     val $len = len($s)
     if ($len == 0) { return 0 }
     var $counts = {}
-    val @chars = ~> $s chars
+    var @chars = ~> $s chars
     for val $c (@chars) {
         $counts->{$c} = ($counts->{$c} || 0) + 1
     }

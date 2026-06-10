@@ -50,7 +50,7 @@ die "simulate matches (41, 3)"       unless Josephus::simulate(41, 3) == 30
 p "  N=41, k=3: survivor at index 30 (Roman tradition)  OK"
 
 # A few more known cases (OEIS / classical).
-val @cases = (
+var @cases = (
     +{ n =>  1, k => 2, ans => 0 },
     +{ n =>  2, k => 2, ans => 0 },
     +{ n =>  3, k => 2, ans => 2 },

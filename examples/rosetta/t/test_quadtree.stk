@@ -79,7 +79,7 @@ fn Rosetta::Quad::format_points($pts) {
 
 # Insert points and verify
 val $q = Rosetta::Quad::new(0, 0, 100, 100, 4)
-val @points = ([10, 10], [50, 50], [80, 20], [70, 90], [25, 25],
+var @points = ([10, 10], [50, 50], [80, 20], [70, 90], [25, 25],
               [60, 40], [90, 90], [5, 95], [95, 5], [40, 60])
 for val $p (@points) { Rosetta::Quad::insert($q, $p->[0], $p->[1]) }
 

@@ -12,7 +12,7 @@
 
 # ── training corpus (labeled) ────────────────────────────────────────
 
-val @train = (
+var @train = (
     +{ label => "spam", text => "win free money click here to claim your prize" },
     +{ label => "spam", text => "free viagra and prize money click now buy now" },
     +{ label => "spam", text => "limited time offer winner click here free shipping" },
@@ -45,7 +45,7 @@ for val $cls ("spam", "ham") {
 for val $doc (@train) {
     val $cls = $doc->{label}
     $class_count{$cls}++
-    val @words = split /\s+/, lc $doc->{text}
+    var @words = split /\s+/, lc $doc->{text}
     for val $w (@words) {
         next if len($w) == 0
         $word_counts{$cls}->{$w} = ($word_counts{$cls}->{$w} // 0) + 1
@@ -87,7 +87,7 @@ fn Demo::NB::classify($text) {
 
 # ── test corpus ─────────────────────────────────────────────────────
 
-val @test = (
+var @test = (
     +{ true_label => "spam", text => "click here to win free money" },
     +{ true_label => "spam", text => "limited time winner claim your prize today" },
     +{ true_label => "spam", text => "free viagra offer click now" },
@@ -164,7 +164,7 @@ for val $w (keys %vocab) {
         }
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-15s\n", $h->[0]
 }

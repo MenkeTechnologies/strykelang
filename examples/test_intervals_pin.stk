@@ -27,7 +27,7 @@ Iv::intersect([1, 3], [5, 7]) |> aeq undef, "no intersect"
 # Merge overlapping intervals
 fn merge_intervals($ivs) {
     return [] if len(@$ivs) == 0
-    val @sorted = sort { _->[0] <=> _1->[0] } @$ivs
+    var @sorted = sort { _->[0] <=> _1->[0] } @$ivs
     var @out = ([$sorted[0][0], $sorted[0][1]])
     for val $iv (@sorted[1:$#sorted]) {
         var $last = $out[-1]
@@ -80,7 +80,7 @@ fmt_ivs(insert_interval([], [5,7]))                                   |> aeq "[5
 
 # Min meeting rooms: sweep starts vs ends
 fn min_meeting_rooms($ivs) {
-    val @starts = sort { _ <=> _1 } maps { _->[0] } @$ivs
+    var @starts = sort { _ <=> _1 } maps { _->[0] } @$ivs
     val @ends   = sort { _ <=> _1 } maps { _->[1] } @$ivs
     var $rooms = 0
     var $best  = 0

@@ -61,7 +61,7 @@ fn KMP::first($haystack, $pat) {
 
 # Demo grid — (haystack, pattern, expected first-match index,
 # expected total occurrences).
-val @cases = (
+var @cases = (
     +{ hay => "ABABDABACDABABCABAB", pat => "ABABCABAB",  first => 10, count => 1  },
     +{ hay => "AAAAAA",              pat => "AA",         first =>  0, count => 5  },  # overlapping
     +{ hay => "GCATCGCAGAGAGTATACAGTACG", pat => "GCAGAGAG", first => 5, count => 1 },

@@ -3,7 +3,7 @@
 
 fn Rosetta::WordCount::solve($s) {
     var $counts = {}
-    val @words = split /\s+/, $s
+    var @words = split /\s+/, $s
     for val $w (@words) {
         if ($w ne "") { $counts->{$w} = $counts->{$w} + 1 }
     }

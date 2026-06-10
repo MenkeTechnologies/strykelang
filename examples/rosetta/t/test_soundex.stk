@@ -17,7 +17,7 @@ fn Rosetta::Soundex::compute($name) {
     
     val $first_code = $codes{$first} ? $codes{$first} : ""
     
-    val @rest_codes = ~> @chars[1:$#chars] map {
+    var @rest_codes = ~> @chars[1:$#chars] map {
         $codes{_} ? $codes{_} : ""
     } |> grep { _ ne "" }
     

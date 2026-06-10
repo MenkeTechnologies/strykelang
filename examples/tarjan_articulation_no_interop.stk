@@ -162,7 +162,7 @@ fn Art::brute_bridges($g) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "single edge",
         n     => 2,
@@ -261,7 +261,7 @@ for val $c (@cases) {
     }
     val $r = Art::find($g)
     val @got = sort { _0 <=> _1 } @{$r->{art_points}}
-    val @want = sort { _0 <=> _1 } @{$c->{arts}}
+    var @want = sort { _0 <=> _1 } @{$c->{arts}}
     die "art count mismatch on \"#{$c->{name}}\": #{len(@got)} vs #{len(@want)}" unless len(@got) == len(@want)
     for val $i (0:len(@want) - 1) {
         die "art[#{$i}] got=#{$got[$i]} want=#{$want[$i]} on \"#{$c->{name}}\"" unless $got[$i] == $want[$i]

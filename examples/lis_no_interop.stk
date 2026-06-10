@@ -81,7 +81,7 @@ fn LIS::trace($xs) {
 
 p "── LIS demo ──"
 
-val @cases = (
+var @cases = (
     +{ xs => [],                              len => 0 },
     +{ xs => [42],                            len => 1 },
     +{ xs => [1, 2, 3, 4, 5],                 len => 5 },  # already increasing

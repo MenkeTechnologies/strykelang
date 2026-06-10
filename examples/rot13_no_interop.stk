@@ -33,7 +33,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — each plaintext paired with its expected ROT13 form.
-val @cases = (
+var @cases = (
     +{ plain => "Hello",     cipher => "Uryyb"     },
     +{ plain => "Uryyb",     cipher => "Hello"     },  # self-inverse
     +{ plain => "ROT13",     cipher => "EBG13"     },

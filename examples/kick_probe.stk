@@ -16,7 +16,7 @@ p "── 1. kick(): TCP service-health sweep ───────────�
 # A typical service-mesh probe: walk a list of (host, port) pairs and
 # report alive/dead. The `kick(host, port, 500)` returns 1 in <500ms if
 # the port answers, 0 otherwise.
-val @services = (
+var @services = (
     ["localhost",  22,   "ssh"],
     ["localhost",  80,   "http"],
     ["localhost",  443,  "https"],

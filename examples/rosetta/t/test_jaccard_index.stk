@@ -8,13 +8,13 @@ fn Rosetta::JaccardIndex::compute($a_ref, $b_ref) {
     for val $x (@$b_ref) { $set_b{$x} = 1 }
     
     var $intersection = 0
-    val @keys_a = keys %set_a
+    var @keys_a = keys %set_a
     for val $k (@keys_a) {
         if (exists $set_b{$k}) { $intersection++ }
     }
     
     var $union = len(@keys_a)
-    val @keys_b = keys %set_b
+    var @keys_b = keys %set_b
     for val $k (@keys_b) {
         if (!exists $set_a{$k}) { $union++ }
     }

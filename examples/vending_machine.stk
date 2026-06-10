@@ -27,7 +27,7 @@ val %inv = (
 
 # ── coin denominations (cents, descending — greedy works) ───────────
 
-val @denoms = (100, 25, 10, 5, 1)
+var @denoms = (100, 25, 10, 5, 1)
 val %coin_name = (100 => "dollar", 25 => "quarter", 10 => "dime", 5 => "nickel", 1 => "penny")
 
 # ── sketches ──────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ fn Demo::VM::transact($payment, $slot, $cust_id) {
 
 # ── transaction script ────────────────────────────────────────────
 
-val @txs = (
+var @txs = (
     [200, "A1", "C001"],   # cola
     [200, "A2", "C002"],   # lemon-lime
     [500, "B1", "C003"],   # chips, big change
@@ -169,7 +169,7 @@ for val $slot (sort keys %inv) {
 # ── slot popularity (CMS) ──────────────────────────────────────────
 
 p "\nslot demand (CMS estimated):"
-val @ranked = sort { cms_count($cms_pop, _1) <=> cms_count($cms_pop, _) } keys %inv
+var @ranked = sort { cms_count($cms_pop, _1) <=> cms_count($cms_pop, _) } keys %inv
 for val $slot (@ranked[0:4]) {
     val $est = cms_count($cms_pop, $slot)
     printf("  %-3s  est_purchases=%d\n", $slot, $est)

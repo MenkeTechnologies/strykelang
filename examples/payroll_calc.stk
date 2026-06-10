@@ -11,7 +11,7 @@
 
 # ── tax brackets (simplified) ──────────────────────────────────────
 
-val @federal_brackets = (
+var @federal_brackets = (
     +{ upto => 12000,  rate => 0.10 },
     +{ upto => 45000,  rate => 0.12 },
     +{ upto => 100000, rate => 0.22 },
@@ -98,7 +98,7 @@ fn Demo::PR::compute($emp) {
 
 # ── sample employees (biweekly period) ─────────────────────────────
 
-val @employees = (
+var @employees = (
     +{ name => "alice",  hourly_rate => 32.50, hours => 80, state => "CA", misc_deduction => 150 },
     +{ name => "bob",    hourly_rate => 18.00, hours => 80, state => "NY", misc_deduction => 75  },
     +{ name => "carol",  hourly_rate => 45.00, hours => 90, state => "TX", misc_deduction => 100 },
@@ -111,7 +111,7 @@ val @employees = (
 printf "── processing %d paychecks (biweekly) ────────────────\n",
     len @employees
 
-val @results = map {Demo::PR::compute} @employees
+var @results = map {Demo::PR::compute} @employees
 
 # ── per-employee report ────────────────────────────────────────────
 
@@ -155,7 +155,7 @@ printf "  total net    : \$%.2f\n", $total_net
 
 p ""
 p "── TopK earners (by net pay tier) ───────────────────"
-val @hits = topk_top($tk_top)
+var @hits = topk_top($tk_top)
 for val $h (@hits) {
     printf "  %-8s : ~\$%d\n", $h->[0], $h->[1] * 100
 }

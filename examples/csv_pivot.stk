@@ -59,7 +59,7 @@ for val $row (@{$rows_back}) {
 
 # ── stable axis order ───────────────────────────────────────────────
 
-val @regions = sort { _ cmp _1 } keys %pivot
+var @regions = sort { _ cmp _1 } keys %pivot
 # Months: explicit calendar order, not lexical.
 var @months  = ("Jan", "Feb", "Mar")
 @months = grep { exists $col_total{_} } @months
@@ -128,7 +128,7 @@ var %by_product
 for val $row (@{$rows_back}) {
     $by_product{$row->{product}} = ($by_product{$row->{product}} // 0) + ($row->{amount} + 0)
 }
-val @products = sort { $by_product{_1} <=> $by_product{_} } keys %by_product
+var @products = sort { $by_product{_1} <=> $by_product{_} } keys %by_product
 for val $p (@products) {
     printf "  %-8s : %8.2f (%5.1f%%)\n",
         $p, $by_product{$p}, 100.0 * $by_product{$p} / $grand_total
@@ -140,7 +140,7 @@ p ""
 p "── TopK regions by sales count (TopK sketch) ────────"
 mysync $tk = topk(3)
 topk_add($tk, _->{region}) for @{$rows_back}
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $h (@top) {
     printf "  %-10s : %d records\n", $h->[0], $h->[1]
 }

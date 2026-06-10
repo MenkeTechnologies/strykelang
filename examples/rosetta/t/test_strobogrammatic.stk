@@ -3,7 +3,7 @@
 
 fn Rosetta::Strobogrammatic::is_strobogrammatic($n) {
     val $s = "$n"
-    val @chars = chars($s)
+    var @chars = chars($s)
     var $res_s = ""
     var $valid = 1
     for val $c (@chars) {

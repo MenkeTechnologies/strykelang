@@ -121,7 +121,7 @@ fn Lst::ref_range_sum($arr, $l, $r) {
 
 # ── test workloads ───────────────────────────────────────────────
 
-val @workloads = (
+var @workloads = (
     +{
         name => "small mixed",
         init => [1, 2, 3, 4, 5, 6, 7, 8],
@@ -276,7 +276,7 @@ for val $w (@workloads) {
 
 # ── invariant 6: applying an op then its negation cancels out ─────
 
-val @init = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3)
+var @init = (3, 1, 4, 1, 5, 9, 2, 6, 5, 3)
 val $cancel_tree = Lst::new(\@init)
 Lst::range_add($cancel_tree, 2, 7, 42)
 Lst::range_add($cancel_tree, 2, 7, -42)

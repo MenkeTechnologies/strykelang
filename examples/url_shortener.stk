@@ -87,7 +87,7 @@ fn Demo::Short::expand($short) {
 
 # ── workload ───────────────────────────────────────────────────────
 
-val @urls = (
+var @urls = (
     "https://example.com/article/about-us",
     "https://example.com/article/products",
     "https://docs.example.com/getting-started",
@@ -124,7 +124,7 @@ for val $i (1:100) {
 
 p ""
 p "── click counts (sorted) ────────────────────────────"
-val @sorted = sort { $click_count{_1} <=> $click_count{_} } keys %click_count
+var @sorted = sort { $click_count{_1} <=> $click_count{_} } keys %click_count
 for val $s (@sorted) {
     next if $click_count{$s} == 0
     val $url = $short_to_long{$s}
@@ -136,7 +136,7 @@ for val $s (@sorted) {
 
 p ""
 p "── TopK most-clicked (sketch) ────────────────────────"
-val @hits = topk_top($tk_clicks)
+var @hits = topk_top($tk_clicks)
 for val $h (@hits) {
     printf "  short/%s : %d clicks\n", $h->[0], $h->[1]
 }

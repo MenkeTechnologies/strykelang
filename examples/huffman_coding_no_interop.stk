@@ -91,7 +91,7 @@ fn Huff::decode($bits, $root) {
 
 p "── Huffman coding demo ──"
 
-val @messages = (
+var @messages = (
     "aaaabbc",
     "abcdef",
     "hello world",
@@ -110,7 +110,7 @@ for val $msg (@messages) {
     die "round-trip failed on '$msg': decoded='$dec'" unless $dec eq $msg
 
     # Prefix-free invariant: no code is a prefix of another.
-    val @code_list = values %$codes
+    var @code_list = values %$codes
     for val $i (0:len(@code_list) - 1) {
         for val $j (0:len(@code_list) - 1) {
             next if $i == $j

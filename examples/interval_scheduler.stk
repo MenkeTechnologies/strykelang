@@ -6,7 +6,7 @@
 # Run: stryke --no-interop examples/interval_scheduler.stk
 
 fn IS::schedule($intervals) {
-    val @sorted = sort { _->[1] <=> _1->[1] } @$intervals
+    var @sorted = sort { _->[1] <=> _1->[1] } @$intervals
     var @chosen = ()
     var $last_end = -9999999999
     for val $iv (@sorted) {

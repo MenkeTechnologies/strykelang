@@ -70,7 +70,7 @@ if (len(@ARGV) >= 2) {
 
 # Demo grid — every case round-trips through encode then decode.
 # Pairs taken from RFC 4648 §10 test vectors.
-val @cases = (
+var @cases = (
     +{ plain => "",        b64 => ""         },
     +{ plain => "f",       b64 => "Zg=="     },
     +{ plain => "fo",      b64 => "Zm8="     },

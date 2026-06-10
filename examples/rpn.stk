@@ -52,7 +52,7 @@ p " Stryke RPN Calculator Demo"
 p "═══════════════════════════════════════════════"
 p ""
 
-val @progs = (
+var @progs = (
     "3 4 +",
     "10 2 -",
     "6 7 *",

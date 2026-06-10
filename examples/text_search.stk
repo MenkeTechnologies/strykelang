@@ -11,7 +11,7 @@
 
 # ── tiny corpus ───────────────────────────────────────────────────────
 
-val @docs = (
+var @docs = (
     "Rust is a systems programming language focused on safety and speed",
     "Perl is famous for its expressive text processing and regex support",
     "Stryke is a Rust language that supersets Perl and adds parallel JIT",
@@ -34,7 +34,7 @@ fn Demo::IR::tokenize($s) {
 
 # ── document length + avg ────────────────────────────────────────────
 
-val @tokens_per_doc = map {Demo::IR::tokenize} @docs
+var @tokens_per_doc = map {Demo::IR::tokenize} @docs
 val @doc_lengths    = map { len(@{_}) } @tokens_per_doc
 val $avgdl          = sum(@doc_lengths) / len @doc_lengths
 printf "  total terms: %d, avg doc length: %.1f\n",
@@ -102,7 +102,7 @@ val $N = len @docs
 
 mysync $query_log = topk(3)
 
-val @queries = (
+var @queries = (
     "rust language",
     "regex parallel",
     "bytecode vm",
@@ -130,7 +130,7 @@ for val $q (@queries) {
 
 p ""
 p "── top queries (TopK telemetry) ─────────────────────"
-val @top = topk_top($query_log)
+var @top = topk_top($query_log)
 for val $h (@top) {
     printf "  %s : %d\n", $h->[0], $h->[1]
 }

@@ -40,7 +40,7 @@ fn Demo::Snake::play_one() {
         $steps = $steps + 1
         val $head = $snake[-1]
         # Greedy: pick direction that gets closer to fruit + doesn't hit body.
-        val @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+        var @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
         var $best_dir = undef
         var $best_dist = 99999
         for val $d (@dirs) {
@@ -134,7 +134,7 @@ printf "  mean : %.2f\n", $total_score / $N
 
 p ""
 p "── most-common score buckets (TopK) ─────────────────"
-val @hits = topk_top($tk_scores)
+var @hits = topk_top($tk_scores)
 for val $h (@hits) {
     printf "  %-10s : %d games\n", $h->[0], $h->[1]
 }

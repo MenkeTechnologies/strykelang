@@ -14,7 +14,7 @@
 p "── heterogeneous workload (4 workers, 4 different jobs) ──"
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 printf "spawned %d workers: %s\n", len(@workers), join(",", @sorted_workers)
 
 # Define 4 distinct jobs. Each is (name, code-as-string).

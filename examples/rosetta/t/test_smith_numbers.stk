@@ -2,7 +2,7 @@
 # Rosetta Code: Smith numbers
 
 fn Rosetta::SmithNumbers::sum_digits($n) {
-    val @digits = ~> "$n" chars map {int}
+    var @digits = ~> "$n" chars map {int}
     var $sum = 0
     for val $d (@digits) { $sum += $d }
     $sum
@@ -10,7 +10,7 @@ fn Rosetta::SmithNumbers::sum_digits($n) {
 
 fn Rosetta::SmithNumbers::check($n) {
     # Must be composite
-    val @factors = prime_factors($n)
+    var @factors = prime_factors($n)
     if (len(@factors) < 2) {
         0
     } else {

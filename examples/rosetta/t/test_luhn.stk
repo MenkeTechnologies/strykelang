@@ -2,7 +2,7 @@
 # Rosetta Code: Luhn Test (Credit Card Validation)
 
 fn Rosetta::Luhn::check($num) {
-    val @all_digits = split //, "$num"
+    var @all_digits = split //, "$num"
     var @digits
     for val $d (@all_digits) {
         next unless $d =~ /\d/

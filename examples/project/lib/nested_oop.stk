@@ -51,7 +51,7 @@ class TreeNode {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::NestedOop::points_in_array {
-    val @points = (
+    var @points = (
         Point(1, 2),
         Point(3, 4),
         Point(5, 6),
@@ -342,7 +342,7 @@ fn Project::NestedOop::count_team_members($structure) {
 }
 
 fn Project::NestedOop::get_oldest_in_team($structure, $team) {
-    val @members = @{$structure->{$team}}
+    var @members = @{$structure->{$team}}
     var $oldest = $members[0]
     for val $m (@members) {
         if ($m->age > $oldest->age) {
@@ -511,7 +511,7 @@ fn Project::NestedOop::project_board {
 }
 
 fn Project::NestedOop::move_task($board, $task_id, $from_col, $to_col) {
-    val @from_tasks = @{$board->{$from_col}}
+    var @from_tasks = @{$board->{$from_col}}
     var @remaining
     var $moved_task
     for val $t (@from_tasks) {

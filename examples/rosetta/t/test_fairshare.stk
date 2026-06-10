@@ -26,7 +26,7 @@ assert_eq join(",", @t3),
     "k=3 first 12"
 
 # 5-ary
-val @t5 = Rosetta::Fair::sequence(5, 25)
+var @t5 = Rosetta::Fair::sequence(5, 25)
 # Counts of each digit should each be 5 (uniform distribution at this size).
 var %cnt
 for val $v (@t5) { $cnt{$v} = ($cnt{$v} // 0) + 1 }

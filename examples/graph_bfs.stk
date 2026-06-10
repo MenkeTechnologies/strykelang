@@ -52,7 +52,7 @@ fn Demo::BFS::shortest_path($graph, $start, $goal) {
 
 p ""
 p "── BFS shortest paths ───────────────────────────────"
-val @queries = (
+var @queries = (
     ["SF",       "Santa Cruz"],
     ["Berkeley", "San Jose"],
     ["LA",       "Fresno"],

@@ -61,7 +61,7 @@ fn QS::brute_select($arr, $k) {
 
 p "── Quickselect demo ──"
 
-val @cases = (
+var @cases = (
     +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 0, expect => 1 },  # min
     +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 1, expect => 1 },  # second smallest (dup)
     +{ arr => [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], k => 5, expect => 4 },  # median

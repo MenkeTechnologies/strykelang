@@ -706,7 +706,7 @@ fn Hm::initial_env() {
 # Each case is +{ src, expected_type }. The inferred type is
 # pretty-printed and compared string-wise.
 
-val @cases = (
+var @cases = (
     # Literals.
     +{ src => "42",              type => "int"  },
     +{ src => "true",            type => "bool" },

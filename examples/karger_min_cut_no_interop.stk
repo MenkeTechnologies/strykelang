@@ -98,7 +98,7 @@ fn Karger::brute_min_cut($edges, $n) {
 
 # ── primary cases (undirected multi-graphs as edge lists) ─────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "triangle",
         n     => 3,

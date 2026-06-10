@@ -103,7 +103,7 @@ fn Demo::Bank::transfer($from, $to, $amount) {
 
 # ── create accounts + simulate workload ─────────────────────────────
 
-val @accts = (
+var @accts = (
     Account(id => "A001", holder => "alice", balance => 1000.0),
     Account(id => "A002", holder => "bob",   balance => 500.0),
     Account(id => "A003", holder => "carol", balance => 250.0),
@@ -129,7 +129,7 @@ printf "  carol overdraw attempt: ok=%d reason=%s\n",
 
 p ""
 p "── transfers ───────────────────────────────────────"
-val @transfers = (
+var @transfers = (
     [$accts[0], $accts[1], 200.00],
     [$accts[1], $accts[2], 50.00],
     [$accts[0], $accts[2], 100.00],

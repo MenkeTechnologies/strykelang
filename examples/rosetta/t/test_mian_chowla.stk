@@ -9,7 +9,7 @@ fn Rosetta::MianChowla::mian_chowla($n) {
         while (!$found) {
             var %sums
             var $valid = 1
-            val @temp = (@a, $next)
+            var @temp = (@a, $next)
             for var $i (0..len(@temp)-1) {
                 for var $j ($i..len(@temp)-1) {
                     val $s = $temp[$i] + $temp[$j]

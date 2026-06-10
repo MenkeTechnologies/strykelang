@@ -18,7 +18,7 @@ fn Rosetta::NegativeBase::encode($n, $b) {
 }
 
 fn Rosetta::NegativeBase::decode($s, $b) {
-    val @chars = ~> $s chars
+    var @chars = ~> $s chars
     var $result = 0
     for val $c (@chars) {
         var $v

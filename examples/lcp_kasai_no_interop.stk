@@ -66,7 +66,7 @@ fn Lcp::naive_pair($s, $pa, $pb) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @strings = ("banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababab")
+var @strings = ("banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababab")
 
 p "── Kasai LCP-array demo ──────────────────────────────"
 printf "  %-18s  %4s  %s\n", "input", "len", "sa[] / lcp[]"

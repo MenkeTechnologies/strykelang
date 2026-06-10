@@ -3,7 +3,7 @@
 
 fn Rosetta::Count::run($file_path) {
     val $content = slurp($file_path)
-    val @lines = split "\n", $content
+    var @lines = split "\n", $content
     
     var $done = 0
     var $total = 0

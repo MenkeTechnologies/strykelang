@@ -123,7 +123,7 @@ around "Demo::Router::dispatch" {
 
 # ── simulate a request stream ───────────────────────────────────────
 
-val @requests = (
+var @requests = (
     ["GET",  "/users"],
     ["GET",  "/users/42"],
     ["GET",  "/users/100"],
@@ -169,7 +169,7 @@ printf "  p99  : %.1f µs\n", td_quantile($lat, 0.99)
 
 p ""
 p "── top routes (TopK) ────────────────────────────────"
-val @top = topk_top($hits)
+var @top = topk_top($hits)
 for val $h (@top) {
     printf "  %-32s : %d hit(s)\n", $h->[0], $h->[1]
 }

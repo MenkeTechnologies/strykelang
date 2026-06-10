@@ -36,7 +36,7 @@ assert_eq Rosetta::Semord::is_pair("hello",    "world"),    0, "no relation"
 # Small dictionary
 val @dict = ("stressed", "desserts", "level", "lager", "regal",
             "spans", "snaps", "loop", "pool", "wolf", "fish")
-val @ps = Rosetta::Semord::pairs(\@dict)
+var @ps = Rosetta::Semord::pairs(\@dict)
 assert_eq len(@ps), 4, "4 semordnilap pairs"
 
 # Specific pairs present

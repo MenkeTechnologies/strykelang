@@ -49,7 +49,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo table — known distances from the literature.
-val @cases = (
+var @cases = (
     +{ a => "",        b => "",        d => 0 },
     +{ a => "abc",     b => "abc",     d => 0 },
     +{ a => "kitten",  b => "sitting", d => 3 },  # classic example

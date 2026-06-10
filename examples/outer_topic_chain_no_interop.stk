@@ -18,7 +18,7 @@
 # ── 1. multiplication table (classic nested-map outer access) ──────────────
 
 p "── 5 × 5 multiplication table via nested map + _< ──"
-val @table = map { join(" ", map { sprintf("%4d", _ * _<) } 1:5) } 1:5
+var @table = map { join(" ", map { sprintf("%4d", _ * _<) } 1:5) } 1:5
 for val $row (@table) {
     p "  $row"
 }
@@ -59,7 +59,7 @@ p ""
 p "── grep inside outer map: threshold drawn from _< ──"
 val @thresholds = (10, 50, 100)
 val @data = (5, 15, 60, 99, 200, 300)
-val @hits = map {
+var @hits = map {
     [_, [grep { _ > _< } @data]]
 } @thresholds
 
@@ -98,7 +98,7 @@ val @outer_prod = map { val @v = @{_}; map { _ * _< } @v } map { _ } (3, 7)
 # Above is contrived; do the simpler outer-product form instead.
 val @v1 = (1, 2, 3, 4)
 val @v2 = (10, 100, 1000)
-val @prod = map {                  # _ = a, outer
+var @prod = map {                  # _ = a, outer
     [ map { _ * _< } @v2 ]        # _ = b, _< = a
 } @v1
 for val $row (@prod) {

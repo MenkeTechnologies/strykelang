@@ -3,10 +3,10 @@
 
 fn Rosetta::CsvToHtml::convert($csv) {
     var $html = "<table>\n"
-    val @lines = split "\n", $csv
+    var @lines = split "\n", $csv
     for val $line (@lines) {
         $html .= "  <tr>"
-        val @cols = split ",", $line
+        var @cols = split ",", $line
         for val $col (@cols) {
             $html .= "<td>" . $col . "</td>"
         }

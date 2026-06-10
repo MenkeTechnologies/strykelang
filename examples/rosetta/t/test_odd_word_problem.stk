@@ -7,7 +7,7 @@ fn Rosetta::OddWordProblem::reverse($s) {
 
 fn Rosetta::OddWordProblem::process($s) {
     val $clean = $s =~ s/\.$//r
-    val @words = split /\s+/, $clean
+    var @words = split /\s+/, $clean
     var @res
     for val $i (0..len(@words)-1) {
         if ($i % 2 == 1) {

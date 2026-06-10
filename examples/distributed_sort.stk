@@ -23,7 +23,7 @@ printf "input (%d items): %s\n", len(@input), join(",", @input)
 
 # Shard the input across workers. Each worker gets a chunk.
 val $per = int((len(@input) + $n - 1) / $n)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Each worker sorts its own shard and returns the JSON-encoded sorted array.
 var %sorted_shards
@@ -60,7 +60,7 @@ for val $sid (keys %sorted_shards) {
 printf "merged (%d items): %s\n", len(@merged), join(",", @merged)
 
 # Verify: the merged output is a sorted permutation of the input.
-val @expected = sort { _ <=> _1 } @input
+var @expected = sort { _ <=> _1 } @input
 var $matches = 1
 for val $i (0:len(@expected) - 1) {
     $matches = 0 unless $merged[$i] == $expected[$i]

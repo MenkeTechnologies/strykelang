@@ -45,12 +45,12 @@ val $hll_ch = hll(12)
 
 fn Demo::Morse::encode($text) {
     val $low = lc $text
-    val @words = split / +/, $low
+    var @words = split / +/, $low
     var @encoded_words
     for val $w (@words) {
         var @chars = split //, $w
         @chars = grep { exists $enc{_} } @chars
-        val @symbols = map { $enc{_} } @chars
+        var @symbols = map { $enc{_} } @chars
         for val $s (@symbols) {
             topk_add($tk_sym, $s)
         }
@@ -62,7 +62,7 @@ fn Demo::Morse::encode($text) {
 # ── decode helper: triple-space splits words, single-space splits chars
 
 fn Demo::Morse::decode($code) {
-    val @words = split / {3,}/, $code
+    var @words = split / {3,}/, $code
     var @out_words
     for val $w (@words) {
         val @syms = split / +/, $w
@@ -74,7 +74,7 @@ fn Demo::Morse::decode($code) {
 
 # ── corpus: classic Morse demo phrases ──────────────────────────────
 
-val @messages = (
+var @messages = (
     "SOS",
     "Hello World",
     "The quick brown fox",
@@ -121,7 +121,7 @@ p "\nround-trip: $rt_ok ok / $rt_fail mismatch (of ", len(@messages), " messages
 # ── top symbols ─────────────────────────────────────────────────────
 
 p "\ntop morse symbols (SpaceSaving k=8):"
-val @top = topk_top($tk_sym, 5)
+var @top = topk_top($tk_sym, 5)
 for val $p (@top) {
     printf("  %-7s  count=%d\n", $p->[0], $p->[1])
 }

@@ -40,7 +40,7 @@ for val $i (0:5) {
 }
 
 # Every value in (0, 1)
-val @s5 = Rosetta::VanDerCorput::sequence(50, 5)
+var @s5 = Rosetta::VanDerCorput::sequence(50, 5)
 var $bounded = 1
 for val $v (@s5) { $bounded = 0 if $v <= 0 || $v >= 1 }
 assert_ok $bounded, "every base-5 value in (0,1)"

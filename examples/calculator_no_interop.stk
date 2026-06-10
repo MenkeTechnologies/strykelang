@@ -21,7 +21,7 @@ val %PREC = ("+" => 2, "-" => 2, "*" => 3, "/" => 3, "%" => 3, "**" => 4)
 val %RIGHT_ASSOC = ("**" => 1)
 
 fn Calc::to_rpn($expr) {
-    val @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    var @toks = grep { len(_) > 0 } split(/\s+/, $expr)
     var @out
     var @ops
     for val $tok (@toks) {
@@ -93,7 +93,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — composes shunting-yard + RPN evaluator.
-val @cases = (
+var @cases = (
     +{ expr => "3 + 4",                       want =>  7    },
     +{ expr => "3 + 4 * 2",                   want => 11    },   # precedence: *, then +
     +{ expr => "( 3 + 4 ) * 2",               want => 14    },   # parens override

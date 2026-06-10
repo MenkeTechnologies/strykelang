@@ -11,7 +11,7 @@
 
 # ── document corpus ─────────────────────────────────────────────────
 
-val @docs = (
+var @docs = (
     +{ id => 1,
        title => "Rust systems programming",
        text  => "Rust is a fast, safe systems programming language with zero-cost abstractions" },
@@ -118,7 +118,7 @@ fn Demo::II::doc_by_id($id) {
 
 # ── run sample queries ─────────────────────────────────────────────
 
-val @queries = (
+var @queries = (
     [["rust"],              "or",  "rust"],
     [["parallel"],          "or",  "parallel"],
     [["rust", "parallel"],  "or",  "rust OR parallel"],
@@ -134,7 +134,7 @@ for val $q (@queries) {
     if (len(keys %$scores) == 0) {
         p "  (no results)"
     } else {
-        val @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
+        var @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
         for val $id (@ranked) {
             val $doc = Demo::II::doc_by_id($id + 0)
             printf "  doc %s  score=%d  %s\n",
@@ -167,7 +167,7 @@ for val $t (keys %index) {
         topk_add($tk, $t)
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
 }

@@ -23,7 +23,7 @@ fn Shunt::is_op($tok) {
 }
 
 fn Shunt::to_rpn($expr) {
-    val @toks = grep { len(_) > 0 } split(/\s+/, $expr)
+    var @toks = grep { len(_) > 0 } split(/\s+/, $expr)
     var @out
     var @ops
     for val $tok (@toks) {
@@ -62,7 +62,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — classic examples.
-val @cases = (
+var @cases = (
     +{ infix => "3 + 4",                 postfix => "3 4 +"                  },
     +{ infix => "3 + 4 * 2",             postfix => "3 4 2 * +"              },
     +{ infix => "( 3 + 4 ) * 2",         postfix => "3 4 + 2 *"              },

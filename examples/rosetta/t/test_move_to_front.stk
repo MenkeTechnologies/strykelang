@@ -4,7 +4,7 @@
 fn Rosetta::MoveToFront::mtf_encode($str) {
     var @alpha = ("a" .. "z")
     var @res
-    val @chars = $str |> chars
+    var @chars = $str |> chars
     for val $c (@chars) {
         var $idx = 0
         for val $i (0..len(@alpha)-1) {
@@ -19,7 +19,7 @@ fn Rosetta::MoveToFront::mtf_encode($str) {
 
 fn Rosetta::MoveToFront::mtf_decode($codes_ref) {
     var @alpha = ("a" .. "z")
-    val @codes = @$codes_ref
+    var @codes = @$codes_ref
     var $res = ""
     for val $idx (@codes) {
         val $c = $alpha[$idx]

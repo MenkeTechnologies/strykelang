@@ -180,7 +180,7 @@ fn Mc::from_edges($n, $edges) {
 
 # ── test cases ────────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "Stoer-Wagner textbook 8-node",
         n     => 8,

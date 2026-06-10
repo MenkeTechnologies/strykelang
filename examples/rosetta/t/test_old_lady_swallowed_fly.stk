@@ -21,7 +21,7 @@ fn Rosetta::OldLady::verse_block($items, $reasons) {
 }
 
 fn Rosetta::OldLady::full_song() {
-    val @creatures = ("fly", "spider", "bird", "cat", "dog", "goat", "cow", "horse")
+    var @creatures = ("fly", "spider", "bird", "cat", "dog", "goat", "cow", "horse")
     val %reasons = (
         "spider" => "That wriggled and jiggled and tickled inside her.",
     )

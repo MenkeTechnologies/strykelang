@@ -21,7 +21,7 @@ fn Project::Scanner::scan_system {
 }
 
 fn Project::Scanner::scan_disks {
-    val @raw = mounts()
+    var @raw = mounts()
     var @result
     for val $m (@raw) {
         next unless $m->{total} > 0
@@ -60,7 +60,7 @@ fn Project::Scanner::scan_interfaces {
 
 fn Project::Scanner::scan_top_processes ($n) {
     $n = 10 unless defined($n)
-    val @procs = process_list()
+    var @procs = process_list()
     return () unless @procs
     var @result
     var $count = 0

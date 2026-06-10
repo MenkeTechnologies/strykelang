@@ -6,7 +6,7 @@
 # (every single-digit number has 0 rises and 0 falls trivially.)
 
 fn Rosetta::RisesFalls::has_equal($n) {
-    val @d = split //, "$n"
+    var @d = split //, "$n"
     var $rises = 0
     var $falls = 0
     for val $i (0..len(@d) - 2) {

@@ -830,7 +830,7 @@ val $STDLIB = q{
 #   * sample is an optional check: hashref of var-name → expected
 #     printed binding for the FIRST solution.
 
-val @cases = (
+var @cases = (
     +{ query => "is(X, +(2, 3))",                expected => 1, first => +{ X => "5" } },
     +{ query => "is(X, +(*(4, 5), -(10, 3)))",   expected => 1, first => +{ X => "27" } },
     +{ query => "fact(0, X)",                    expected => 1, first => +{ X => "1" } },

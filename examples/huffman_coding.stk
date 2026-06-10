@@ -15,7 +15,7 @@
 
 # ── corpus (mix of letters) ─────────────────────────────────────────
 
-val @messages = (
+var @messages = (
     "the quick brown fox jumps over the lazy dog",
     "huffman coding is a lossless data compression algorithm",
     "stryke beats perl 5 on every benchmark we have run so far",
@@ -163,7 +163,7 @@ val %big_codes
 Demo::HC::assign_codes($btree, "", \%big_codes)
 
 p "\ncorpus-wide code table (top 12 by frequency):"
-val @by_freq = sort { $bfreq->{_1} <=> $bfreq->{_} } keys %$bfreq
+var @by_freq = sort { $bfreq->{_1} <=> $bfreq->{_} } keys %$bfreq
 for val $sym (@by_freq[0:11]) {
     val $shown = $sym eq " " ? "(space)" : $sym
     printf("  %-7s freq=%4d  code=%s\n",
@@ -182,7 +182,7 @@ printf("\ndistinct symbols: HLL=%.1f vs exact=%d\n", $hll_n, len(keys %exact_see
 # ── most-frequent symbols (TopK) ──────────────────────────────────
 
 p "\nmost-frequent symbols (SpaceSaving k=16):"
-val @top_sym = topk_top($tk_sym, 5)
+var @top_sym = topk_top($tk_sym, 5)
 for val $p (@top_sym) {
     val $shown = $p->[0] eq " " ? "(space)" : $p->[0]
     printf("  %-7s count=%d\n", $shown, $p->[1])

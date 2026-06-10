@@ -66,7 +66,7 @@ around "Demo::RL::try_acquire" {
 # ── simulate a bursty workload ──────────────────────────────────────
 
 # 4 clients, each fires 15 requests in a tight loop.
-val @clients = ("api-key-A", "api-key-B", "api-key-C", "api-key-D")
+var @clients = ("api-key-A", "api-key-B", "api-key-C", "api-key-D")
 
 p "── token bucket: capacity=5, refill=2/s ─────────────"
 p "── 4 clients, 15 requests each, all back-to-back ────"
@@ -116,7 +116,7 @@ printf "  p99  : %.1f µs\n", td_quantile($latency, 0.99)
 
 p ""
 p "── most-rejected clients (TopK) ─────────────────────"
-val @top = topk_top($rejects)
+var @top = topk_top($rejects)
 for val $h (@top) {
     printf "  %-12s : %d denials\n", $h->[0], $h->[1]
 }

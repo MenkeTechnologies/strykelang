@@ -74,7 +74,7 @@ for val $lvl (sort { _ cmp _1 } keys %by_level) {
 
 p ""
 p "── error log (first 5) ──────────────────────────────"
-val @errors = grep { _->{level} eq "ERROR" } @records
+var @errors = grep { _->{level} eq "ERROR" } @records
 var $shown = 0
 for val $e (@errors) {
     last if $shown >= 5
@@ -122,7 +122,7 @@ p ""
 p "── TopK noisiest services ───────────────────────────"
 mysync $tk = topk(3)
 topk_add($tk, _->{service}) for @records
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $h (@top) {
     printf "  %-14s : %d records\n", $h->[0], $h->[1]
 }

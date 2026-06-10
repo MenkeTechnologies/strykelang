@@ -29,7 +29,7 @@ val %hosts = (
 
 # ── ports of interest ─────────────────────────────────────────────
 
-val @port_set = (21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
+var @port_set = (21, 22, 25, 53, 80, 110, 143, 443, 465, 587, 993, 995,
                 1080, 3306, 5432, 6379, 8080, 9092, 11211)
 
 # ── sketches ──────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ val $hll_host = hll(12)
 val $bf_closed = bloom(128, 0.01)
 
 # Seed bloom with "well-known closed" ports for our network.
-val @well_known_closed = (135, 137, 139, 445)
+var @well_known_closed = (135, 137, 139, 445)
 for val $p (@well_known_closed) {
     bloom_add($bf_closed, "p:$p")
 }
@@ -115,7 +115,7 @@ p "─" x 60
 # ── parallel scan ─────────────────────────────────────────────────
 
 val $t_scan = now_ns()
-val @results = pmap {
+var @results = pmap {
     Demo::PS::probe(_->[0], _->[1])
 } @plan
 val $elapsed_us = (now_ns() - $t_scan) / 1000.0
@@ -162,7 +162,7 @@ for val $r (@results) {
 }
 
 for val $h (sort keys %by_host) {
-    val @sorted_ports = sort { _->{port} <=> _1->{port} } @{$by_host{$h}}
+    var @sorted_ports = sort { _->{port} <=> _1->{port} } @{$by_host{$h}}
     printf("  %-18s\n", $h)
     for val $r (@sorted_ports) {
         printf("      %5d  %s  (%d us)\n",
@@ -184,7 +184,7 @@ if ($n_timeout > 0) {
 # ── top banners ──────────────────────────────────────────────────
 
 p "\nmost-common banners (TopK):"
-val @bnrs = topk_top($tk_bnr, 6)
+var @bnrs = topk_top($tk_bnr, 6)
 for val $p (@bnrs) {
     printf("  %-22s count=%d\n", $p->[0], $p->[1])
 }

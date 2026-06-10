@@ -57,7 +57,7 @@ fn Cat::balanced_inner($s, $open, $close, $n) {
 p "── Catalan numbers demo ──"
 
 # OEIS A000108: 1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012
-val @expected = (1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012)
+var @expected = (1, 1, 2, 5, 14, 42, 132, 429, 1430, 4862, 16796, 58786, 208012)
 var $fail = 0
 for var $n (0:len(@expected) - 1) {
     val $dp  = Cat::dp($n)

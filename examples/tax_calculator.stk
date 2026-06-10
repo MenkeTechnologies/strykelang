@@ -91,7 +91,7 @@ fn Demo::Tax::owed($income, $brackets_ref) {
 
 # ── per-jurisdiction sweep over sample incomes ─────────────────────
 
-val @sample_incomes = (
+var @sample_incomes = (
     15000, 25000, 35000, 45000, 60000, 75000, 100000,
     150000, 250000, 500000, 1000000,
 )
@@ -150,7 +150,7 @@ printf("  p99 = \$%9.0f\n", td_quantile($td_tax, 0.99))
 # ── most-binding brackets (TopK) ──────────────────────────────────
 
 p "\nmost-binding (jurisdiction, bracket) pairs (TopK):"
-val @top = topk_top($tk_brk, 8)
+var @top = topk_top($tk_brk, 8)
 for val $p (@top) {
     printf("  %-18s hits=%d\n", $p->[0], $p->[1])
 }

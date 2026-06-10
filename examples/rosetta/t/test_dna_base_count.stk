@@ -3,7 +3,7 @@
 
 fn Rosetta::DNABaseCount::compute($dna) {
     var $counts = {A => 0, C => 0, G => 0, T => 0}
-    val @bases = ~> $dna uc chars
+    var @bases = ~> $dna uc chars
     for val $b (@bases) {
         if (exists $counts->{$b}) {
             $counts->{$b} = $counts->{$b} + 1

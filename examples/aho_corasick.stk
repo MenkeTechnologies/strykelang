@@ -29,7 +29,7 @@ fn build($patterns) {
     }
     # BFS to set fail links
     var @queue = ()
-    val @kids0 = sort keys %{$nodes[0]->{ch}}
+    var @kids0 = sort keys %{$nodes[0]->{ch}}
     for val $c (@kids0) {
         val $idx = $nodes[0]->{ch}->{$c}
         $nodes[$idx]->{fail} = 0
@@ -37,7 +37,7 @@ fn build($patterns) {
     }
     while (len(@queue) > 0) {
         val $u = shift @queue
-        val @ks = sort keys %{$nodes[$u]->{ch}}
+        var @ks = sort keys %{$nodes[$u]->{ch}}
         for val $c (@ks) {
             val $v = $nodes[$u]->{ch}->{$c}
             push @queue, $v

@@ -16,7 +16,7 @@ fn Rosetta::Dominoes::find_chain($dominoes, $current_chain, $res_ref) {
     for (var $i = 0; $i < len(@$dominoes); $i++) {
         val $d = $dominoes->[$i]
         # Try both orientations
-        val @orientations = ([$d->[0], $d->[1]], [$d->[1], $d->[0]])
+        var @orientations = ([$d->[0], $d->[1]], [$d->[1], $d->[0]])
         
         for val $o (@orientations) {
             if ($o->[0] == $last_val) {

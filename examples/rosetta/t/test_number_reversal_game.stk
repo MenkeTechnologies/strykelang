@@ -26,7 +26,7 @@ fn Rosetta::NumberReversal::solve(@items) {
             val $suffix = substr($state, $i)
             
             # Reverse prefix
-            val @p_chars = split("", $prefix)
+            var @p_chars = split("", $prefix)
             var @p_rev
             for val $c (@p_chars) { unshift @p_rev, $c }
             

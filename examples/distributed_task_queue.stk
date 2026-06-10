@@ -16,7 +16,7 @@ for val $i (1:12) {
 }
 val $n_workers = 4
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 printf "jobs: %d  ·  workers: %d  ·  per worker: %d\n",
     len(@jobs), $n_workers, len(@jobs) / $n_workers
@@ -58,7 +58,7 @@ for val $w (@sorted_workers) {
 p "── per-worker results ──"
 var $total = 0
 for val $w (@sorted_workers) {
-    val @r = @{$results{$w}}
+    var @r = @{$results{$w}}
     printf "  worker %d: %s\n", $w, join(",", @r)
     for val $v (@r) { $total += $v }
 }

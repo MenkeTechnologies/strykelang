@@ -26,15 +26,15 @@ for val $i (~> 1:50) {
 assert_ok !defined(Rosetta::Pick::one()), "empty array → undef"
 
 # Picks come from input set only
-val @set = (10, 20, 30, 40, 50)
+var @set = (10, 20, 30, 40, 50)
 val %allowed = map { _ => 1 } @set
-val @samples = Rosetta::Pick::n(\@set, 200)
+var @samples = Rosetta::Pick::n(\@set, 200)
 var $all_in = 1
 for val $s (@samples) { $all_in = 0 if !exists $allowed{$s} }
 assert_ok $all_in, "every pick belongs to source array"
 
 # Distribution sanity: every element appears at least once across 5000 picks
-val @big_samples = Rosetta::Pick::n(\@set, 5000)
+var @big_samples = Rosetta::Pick::n(\@set, 5000)
 var %seen
 for val $s (@big_samples) { $seen{$s}++ }
 var $coverage = 1

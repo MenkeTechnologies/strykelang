@@ -17,7 +17,7 @@ fn Rosetta::PrimeFactors::prime_factors($n) {
 
 fn Rosetta::Sphenic::check($n) {
     val $factors_ref = Rosetta::PrimeFactors::prime_factors($n)
-    val @factors = @$factors_ref
+    var @factors = @$factors_ref
     if (len(@factors) != 3) {
         0
     } else {

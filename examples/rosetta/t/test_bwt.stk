@@ -17,7 +17,7 @@ fn Rosetta::BWT::transform($text) {
     }
     
     # Sort rotations lexically
-    val @sorted_rotations = sort(@rotations)
+    var @sorted_rotations = sort(@rotations)
     
     # Take the last character of each sorted rotation
     var $bwt = ""

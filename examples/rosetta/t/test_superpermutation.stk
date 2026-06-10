@@ -7,7 +7,7 @@ fn Rosetta::Superperm::get_permutations(@items) {
     for val $i (0 .. len(@items) - 1) {
         var @rest = @items
         val $first = splice(@rest, $i, 1)
-        val @sub_perms = Rosetta::Superperm::get_permutations(@rest)
+        var @sub_perms = Rosetta::Superperm::get_permutations(@rest)
         for val $p (@sub_perms) {
             push @res, [$first, @$p]
         }
@@ -17,7 +17,7 @@ fn Rosetta::Superperm::get_permutations(@items) {
 
 fn Rosetta::Superperm::is_superperm($s, $n) {
     val @items = 1:$n
-    val @perms = Rosetta::Superperm::get_permutations(@items)
+    var @perms = Rosetta::Superperm::get_permutations(@items)
     
     for val $p (@perms) {
         val $p_str = join("", @$p)
@@ -30,7 +30,7 @@ fn Rosetta::Superperm::is_superperm($s, $n) {
 
 fn Rosetta::Superperm::find_short($n) {
     val @items = 1:$n
-    val @perms_refs = Rosetta::Superperm::get_permutations(@items)
+    var @perms_refs = Rosetta::Superperm::get_permutations(@items)
     var @perms
     for val $p_ref (@perms_refs) { push @perms, join("", @$p_ref) }
     

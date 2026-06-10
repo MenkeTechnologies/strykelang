@@ -59,7 +59,7 @@ fn Recon::probe_port($p) {
 
 val @results = pmap { Recon::probe_port($_) } @ports
 val @open    = grep { $_->{alive} } @results
-val @sorted  = sort { _->{port} <=> _1->{port} } @open
+var @sorted  = sort { _->{port} <=> _1->{port} } @open
 
 if (len(@sorted)) {
     p ""

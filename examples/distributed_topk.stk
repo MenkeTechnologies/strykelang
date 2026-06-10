@@ -23,7 +23,7 @@ for val $i (0:199) {
 printf "input: %d values (synthetic)\n", len(@data)
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard input across workers. Each worker gets a chunk, finds its
 # local top-K, returns the K values as JSON.

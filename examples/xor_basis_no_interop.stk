@@ -111,7 +111,7 @@ fn Xb::brute_max($vals) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ name => "trivial",          xs => [1, 2, 3],                              max => 3,  dim => 2 },
     +{ name => "duplicates only",  xs => [5, 5, 5, 5],                           max => 5,  dim => 1 },
     +{ name => "powers of 2",      xs => [1, 2, 4, 8, 16],                       max => 31, dim => 5 },
@@ -194,7 +194,7 @@ for val $c (@cases) {
     val $xb1 = Xb::new()
     for val $v (@{$c->{xs}}) { Xb::insert($xb1, $v) }
     val $xb2 = Xb::new()
-    val @rev = rev @{$c->{xs}}
+    var @rev = rev @{$c->{xs}}
     for val $v (@rev) { Xb::insert($xb2, $v) }
     die "dim differs by order on \"#{$c->{name}}\"" unless $xb1->{count} == $xb2->{count}
     die "max differs by order on \"#{$c->{name}}\"" unless Xb::max_xor($xb1) == Xb::max_xor($xb2)

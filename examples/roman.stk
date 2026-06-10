@@ -46,7 +46,7 @@ p " Stryke Roman Numerals Demo"
 p "═══════════════════════════════════════════════"
 p ""
 
-val @samples = (1, 4, 9, 14, 40, 99, 400, 944, 1994, 2024, 3999)
+var @samples = (1, 4, 9, 14, 40, 99, 400, 944, 1994, 2024, 3999)
 p "── Encode ─────────────────────────────────────"
 for val $n (@samples) {
     p "  #{$n}  →  #{Roman::encode($n)}"
@@ -54,7 +54,7 @@ for val $n (@samples) {
 
 p ""
 p "── Decode ─────────────────────────────────────"
-val @numerals = ("IV", "IX", "XL", "XC", "CD", "CM", "MCMXCIV", "MMXXIV", "MMMCMXCIX")
+var @numerals = ("IV", "IX", "XL", "XC", "CD", "CM", "MCMXCIV", "MMXXIV", "MMMCMXCIX")
 for val $s (@numerals) {
     p "  $s  →  #{Roman::decode($s)}"
 }

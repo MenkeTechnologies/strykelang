@@ -146,7 +146,7 @@ printf "  p99  : %.1f µs\n", td_quantile($tlat, 0.99)
 
 p ""
 p "── illegal transitions (audit log) ──────────────────"
-val @rejects = grep { _->{status} eq "rejected" } @$audit_log
+var @rejects = grep { _->{status} eq "rejected" } @$audit_log
 for val $r (@rejects) {
     printf "  REJECTED: %-10s --%-8s-->\n", $r->{from}, $r->{event}
 }

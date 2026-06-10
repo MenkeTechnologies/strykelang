@@ -12,7 +12,7 @@ fn Rosetta::OrderedWords::is_ordered($word) {
 }
 
 fn Rosetta::OrderedWords::longest(@words) {
-    val @ordered = grep {Rosetta::OrderedWords::is_ordered} @words
+    var @ordered = grep {Rosetta::OrderedWords::is_ordered} @words
     var $maxlen = 0
     for val $w (@ordered) {
         val $l = len($w)

@@ -40,7 +40,7 @@ fn MST::UF::union($uf, $x, $y) {
 
 # Edges are [u, v, weight]. Returns { tree => [edges...], cost => total }.
 fn MST::kruskal($n, $edges) {
-    val @sorted = sort { _->[2] <=> _1->[2] } @$edges
+    var @sorted = sort { _->[2] <=> _1->[2] } @$edges
     val $uf     = MST::UF::new($n)
     var @tree
     var $cost   = 0
@@ -58,7 +58,7 @@ p "── Kruskal MST demo ──"
 
 # Classic textbook graph (Cormen et al., Fig 23.4).
 # 9 vertices labeled 0:8, 14 edges. Expected MST weight = 37.
-val @edges = (
+var @edges = (
     [0, 1,  4], [0, 7,  8], [1, 2,  8], [1, 7, 11], [2, 3,  7],
     [2, 5,  4], [2, 8,  2], [3, 4,  9], [3, 5, 14], [4, 5, 10],
     [5, 6,  2], [6, 7,  1], [6, 8,  6], [7, 8,  7],
@@ -70,7 +70,7 @@ p "  textbook 9-vertex graph: cost=37, edges=8  OK"
 
 # 4-vertex square: edges weighted 1,2,3,4 form a cycle. MST drops the
 # heaviest edge (weight 4), so total cost = 1+2+3 = 6.
-val @sq = ([0, 1, 1], [1, 2, 2], [2, 3, 3], [3, 0, 4])
+var @sq = ([0, 1, 1], [1, 2, 2], [2, 3, 3], [3, 0, 4])
 val $r2 = MST::kruskal(4, \@sq)
 die "square MST cost should be 6" unless $r2->{cost} == 6
 die "square MST should have 3 edges" unless len(@{$r2->{tree}}) == 3

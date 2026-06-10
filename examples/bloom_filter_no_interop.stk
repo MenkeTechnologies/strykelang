@@ -45,7 +45,7 @@ package main
 p "── Bloom Filter Demo ──"
 
 val $bf = BF::new 1000, 5
-val @words = ("apple", "banana", "cherry", "date")
+var @words = ("apple", "banana", "cherry", "date")
 
 for val $w (@words) {
     BF::add $bf, $w

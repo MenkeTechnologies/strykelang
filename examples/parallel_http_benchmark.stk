@@ -22,7 +22,7 @@ val @targets = (
 # 2. Benchmark
 p "Checking #{len @targets} targets in parallel..."
 
-val @results = @targets |> pmap {
+var @results = @targets |> pmap {
     val $t1 = now_ns()
     # http_request returns { status => ..., body => ..., headers => ... }
     val $res = http_request(_, { timeout => 5 })

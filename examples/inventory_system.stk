@@ -87,7 +87,7 @@ for val $sku (sort { _ cmp _1 } keys %inventory) {
 
 # ── simulate sales workload ─────────────────────────────────────────
 
-val @sales = (
+var @sales = (
     ["WIDGET-A", 3],  ["WIDGET-A", 5],  ["WIDGET-A", 4],
     ["WIDGET-B", 10], ["WIDGET-B", 15], ["WIDGET-B", 8],  ["WIDGET-B", 12],
     ["GADGET-A", 2],  ["GADGET-A", 3],
@@ -121,7 +121,7 @@ printf "  rejected : %d\n", $rejected
 
 p ""
 p "── revenue ranking (TopK pareto) ────────────────────"
-val @by_rev = sort { _1->revenue <=> _->revenue } values %inventory
+var @by_rev = sort { _1->revenue <=> _->revenue } values %inventory
 var $total_rev = 0
 $total_rev += _->revenue for @by_rev
 var $cum = 0
@@ -145,7 +145,7 @@ printf "  → 80%% of revenue comes from %d / %d products (pareto)\n",
 
 p ""
 p "── reorder candidates ───────────────────────────────"
-val @need_reorder = grep { _->needs_reorder } values %inventory
+var @need_reorder = grep { _->needs_reorder } values %inventory
 if (len(@need_reorder) == 0) {
     p "  (none)"
 } else {
@@ -166,7 +166,7 @@ for val $tx (@txlog) {
         topk_add($topk, $tx->{sku})
     }
 }
-val @hits = topk_top($topk)
+var @hits = topk_top($topk)
 for val $h (@hits) {
     printf "  %-10s : %d units\n", $h->[0], $h->[1]
 }

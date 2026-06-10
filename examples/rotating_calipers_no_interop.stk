@@ -32,7 +32,7 @@ fn Cal::cross($o, $p1, $p2) {
 # ── Andrew's monotone-chain convex hull (CCW, no duplicate endpts) ─
 
 fn Cal::convex_hull($pts) {
-    val @sorted = sort {
+    var @sorted = sort {
         _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
     } @$pts
     val $n = len(@sorted)
@@ -125,7 +125,7 @@ fn Cal::brute_diameter($pts) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ name => "2-point line",      pts => [[0, 0], [10, 0]],                              d2 => 100 },
     +{ name => "axis-aligned 4",    pts => [[0, 0], [4, 0], [0, 3], [4, 3]],               d2 => 25  },
     +{ name => "regular triangle",  pts => [[0, 0], [4, 0], [2, 3]],                       d2 => 16  },

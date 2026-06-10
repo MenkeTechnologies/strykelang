@@ -65,7 +65,7 @@ fn Demo::Trie::complete($root, $prefix, $k) {
 
 # ── build trie from corpus ──────────────────────────────────────────
 
-val @corpus = (
+var @corpus = (
     # word, frequency weight.
     ["apple",     50], ["application", 25], ["apply",      35],
     ["approach",  20], ["approximate", 10], ["april",       8],
@@ -89,7 +89,7 @@ printf "── trie built: %d words inserted ───────────�
 
 # ── query suggestions for various prefixes ─────────────────────────
 
-val @prefixes = ("ap", "ba", "ca", "da", "z", "")
+var @prefixes = ("ap", "ba", "ca", "da", "z", "")
 
 for val $p (@prefixes) {
     val $t0 = now_ns()
@@ -135,7 +135,7 @@ printf "  exact                       : %d\n", len(keys %distinct_letters)
 
 p ""
 p "── most-queried prefixes (TopK) ─────────────────────"
-val @hits = topk_top($tk_queries)
+var @hits = topk_top($tk_queries)
 for val $h (@hits) {
     printf "  '%s' : %d queries\n", $h->[0], $h->[1]
 }

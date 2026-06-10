@@ -179,7 +179,7 @@ printf("  min ~ %.0f  p25=%.0f  p50=%.0f  p75=%.0f  max~%.0f\n",
        td_quantile($td_draws, 0.99))
 
 p "\nwinning patterns (TopK):"
-val @pats = topk_top($tk_pat, 10)
+var @pats = topk_top($tk_pat, 10)
 for val $p (@pats) {
     printf("  %-10s wins=%d\n", $p->[0], $p->[1])
 }

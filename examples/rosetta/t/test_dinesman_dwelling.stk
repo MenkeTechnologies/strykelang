@@ -23,7 +23,7 @@ fn Rosetta::Dinesman::permutations(@xs) {
 }
 
 fn Rosetta::Dinesman::solve() {
-    val @floors = (1, 2, 3, 4, 5)
+    var @floors = (1, 2, 3, 4, 5)
     var @found
     for val $perm (Rosetta::Dinesman::permutations(@floors)) {
         # perm = [Baker, Cooper, Fletcher, Miller, Smith] floor numbers

@@ -88,7 +88,7 @@ fn Pat::brute_len($input) {
 
 # ── primary cases with known LIS lengths ──────────────────────────
 
-val @cases = (
+var @cases = (
     +{ name => "ascending",       input => [1, 2, 3, 4, 5, 6, 7],     len => 7 },
     +{ name => "descending",      input => [7, 6, 5, 4, 3, 2, 1],     len => 1 },
     +{ name => "classic textbook",input => [10, 22, 9, 33, 21, 50, 41, 60, 80], len => 6 },

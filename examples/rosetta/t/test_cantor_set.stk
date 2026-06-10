@@ -35,7 +35,7 @@ assert_eq Rosetta::Cantor::level(3), "# #   # #         # #   # #", "L3"
 for var $depth (0:5) {
     val $line = Rosetta::Cantor::level($depth)
     var $count = 0
-    val @cs = ~> $line chars
+    var @cs = ~> $line chars
     for val $c (@cs) { $count += 1 if $c eq "#" }
     val $expected = 2 ** $depth
     assert_eq $count, $expected, "level $depth has 2^$depth = $expected hashes"

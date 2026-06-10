@@ -5,7 +5,7 @@ fn Rosetta::MultiplicativeDigitalRoot::multiplicative_digital_root_and_persisten
     var $persistence = 0
     var $curr = $n
     while (len("$curr") > 1) {
-        val @digits = ~> "$curr" chars map {int}
+        var @digits = ~> "$curr" chars map {int}
         var $prod = 1
         for val $d (@digits) { $prod *= $d }
         $curr = $prod

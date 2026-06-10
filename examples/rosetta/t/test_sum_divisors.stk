@@ -7,7 +7,7 @@ fn Rosetta::SumDivisors::get($n) {
 }
 
 fn Rosetta::SumDivisors::sum($n) {
-    val @d = Rosetta::SumDivisors::get($n)
+    var @d = Rosetta::SumDivisors::get($n)
     var $sum = 0
     for val $v (@d) { $sum = $sum + $v }
     $sum

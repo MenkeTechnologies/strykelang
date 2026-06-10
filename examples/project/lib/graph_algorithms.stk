@@ -84,7 +84,7 @@ fn Project::GraphAlgorithms::adv_dijkstra($graph, $start) {
 fn Project::GraphAlgorithms::adv_has_cycle($graph) {
     var %visited = ()
     
-    val @nodes = keys %$graph
+    var @nodes = keys %$graph
     for val $start_node (@nodes) {
         next if exists $visited{$start_node}
         

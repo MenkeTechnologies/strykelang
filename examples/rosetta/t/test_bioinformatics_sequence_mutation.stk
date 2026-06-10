@@ -2,7 +2,7 @@
 # Rosetta Code: Bioinformatics/Sequence mutation
 
 fn Bio::mutate($seq, $rate) {
-    val @chars = split("", $seq)
+    var @chars = split("", $seq)
     var @res
     val @nucleotides = ("A", "C", "G", "T")
     

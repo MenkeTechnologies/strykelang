@@ -3,7 +3,7 @@
 
 fn Rosetta::TextProcessing1::process($text) {
     # Task: Read values and calculate averages
-    val @lines = split "\n", $text
+    var @lines = split "\n", $text
     var $total = 0
     var $count = 0
     for val $line (@lines) {

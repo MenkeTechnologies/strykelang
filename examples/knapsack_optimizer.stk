@@ -55,7 +55,7 @@ fn Demo::KS::solve($items_ref, $capacity) {
 
 # ── problem instances ─────────────────────────────────────────────
 
-val @instances = (
+var @instances = (
     {
         name     => "camping",
         capacity => 15,
@@ -168,7 +168,7 @@ printf("  p90 = %.2f\n", td_quantile($td_eff, 0.90))
 # ── most-chosen items overall ────────────────────────────────────
 
 p "\nmost-chosen items overall (TopK):"
-val @top = topk_top($tk_item, 8)
+var @top = topk_top($tk_item, 8)
 for val $p (@top) {
     printf("  %-12s count=%d\n", $p->[0], $p->[1])
 }

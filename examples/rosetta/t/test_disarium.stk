@@ -2,7 +2,7 @@
 # Rosetta Code: Disarium numbers
 
 fn Rosetta::Disarium::is_disarium($n) {
-    val @ds = split("", "$n")
+    var @ds = split("", "$n")
     var $total = 0
     for val $i (0..len(@ds)-1) {
         $total += $ds[$i] ** ($i + 1)

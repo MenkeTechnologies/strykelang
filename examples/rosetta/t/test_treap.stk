@@ -58,7 +58,7 @@ fn Rosetta::Treap::to_list($node, $list) {
 }
 
 var $root = undef
-val @keys = (5, 2, 8, 1, 9, 3, 7)
+var @keys = (5, 2, 8, 1, 9, 3, 7)
 for val $k (@keys) {
     $root = Rosetta::Treap::insert($root, $k)
 }

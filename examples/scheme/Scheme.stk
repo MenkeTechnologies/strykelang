@@ -1696,7 +1696,7 @@ fn Sch::install_builtins($env) {
         val $init = $args->[1]
         val @lists = @$args[2..(len(@$args) - 1)]
         # Materialize each list to an array so we can walk in reverse
-        val @arrs = map {Sch::sch_list_to_array} @lists
+        var @arrs = map {Sch::sch_list_to_array} @lists
         var $min_len = -1
         for val $a (@arrs) {
             $min_len = len(@$a) if $min_len < 0 || len(@$a) < $min_len
@@ -2282,7 +2282,7 @@ fn Sch::install_builtins($env) {
     # `caar`, `cadr`, `cdar`, `cddr`, `caaar`...`cddddr` — the classic
     # 28-member family of compositions. Generate them programmatically by
     # walking the name (right-to-left = inner-to-outer).
-    val @cxr_names = ("caar", "cadr", "cdar", "cddr",
+    var @cxr_names = ("caar", "cadr", "cdar", "cddr",
                      "caaar", "caadr", "cadar", "caddr",
                      "cdaar", "cdadr", "cddar", "cdddr",
                      "caaaar", "caaadr", "caadar", "caaddr",

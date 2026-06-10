@@ -129,7 +129,7 @@ fn Br::f_exp($x)   { exp($x) - 10 }                           # root: ln(10) ≈
 fn Br::f_tough($x) { ($x - 1) * ($x - 1) * ($x - 1) - 1 }    # root: 2
 fn Br::f_cos($x)   { cos($x) - $x }                           # root: ≈ 0.7390851
 
-val @cases = (
+var @cases = (
     +{ name => "linear 2x − 7",         f => \&Br::f_lin,   lo => 0.0,  hi => 10.0, root => 3.5 },
     +{ name => "√2 (x² − 2)",           f => \&Br::f_quad,  lo => 0.0,  hi => 2.0,  root => 1.41421356237310 },
     +{ name => "cubic x³ − x − 2",      f => \&Br::f_cubic, lo => 0.0,  hi => 3.0,  root => 1.52137970680457 },

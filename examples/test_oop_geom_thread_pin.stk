@@ -43,7 +43,7 @@ class Tri impl Geom {
     fn kind      = "tri"
 }
 
-val @shapes = (
+var @shapes = (
     Sq->new(side => 2.0),
     Sq->new(side => 3.0),
     Rc->new(w => 4.0, h => 5.0),

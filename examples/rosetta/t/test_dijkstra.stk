@@ -4,7 +4,7 @@
 fn Rosetta::Dijkstra::solve($graph, $start) {
     var $dist = {}
     var $prev = {}
-    val @nodes = keys %$graph
+    var @nodes = keys %$graph
     for val $n (@nodes) {
         $dist->{$n} = 1000000
         $prev->{$n} = undef

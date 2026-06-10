@@ -11,7 +11,7 @@ fn Rosetta::HITS::solve($links, $epsilon) {
         }
     }
     
-    val @all_pages = keys %pages
+    var @all_pages = keys %pages
     val $n = len(@all_pages)
     
     var %auth

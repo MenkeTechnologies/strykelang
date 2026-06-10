@@ -11,7 +11,7 @@ fn Rosetta::Commatize::insert($n) {
     val $dot = index($s, ".")
     val $int_part = $dot < 0 ? $s : substr($s, 0, $dot)
     val $rest = $dot < 0 ? "" : substr($s, $dot)
-    val @rev = rev split("", $int_part)
+    var @rev = rev split("", $int_part)
     var @grouped
     for val $i (0..len(@rev)-1) {
         push @grouped, "," if $i > 0 && $i % 3 == 0

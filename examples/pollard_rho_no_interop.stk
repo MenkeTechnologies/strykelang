@@ -87,7 +87,7 @@ fn Rho::collect($n, $out) {
 p "── Pollard's rho factorization demo ──"
 
 # Known semiprimes and composites with verifiable factors.
-val @cases = (
+var @cases = (
     +{ n =>      15, factors => [3, 5]                     },
     +{ n =>      77, factors => [7, 11]                    },
     +{ n =>     143, factors => [11, 13]                   },

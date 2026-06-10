@@ -16,9 +16,9 @@ fn Rosetta::LogisticFit::sse($points, $k, $r, $t0) {
 }
 
 fn Rosetta::LogisticFit::fit($points) {
-    val @ks = (90, 100, 110)
-    val @rs = (0.5, 0.8, 1.1)
-    val @t0s = (2, 3, 4)
+    var @ks = (90, 100, 110)
+    var @rs = (0.5, 0.8, 1.1)
+    var @t0s = (2, 3, 4)
     var $best = { k => 0, r => 0, t0 => 0, sse => 1e30 }
     for val $k (@ks) {
         for val $r (@rs) {

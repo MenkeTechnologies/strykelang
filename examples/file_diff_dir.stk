@@ -125,7 +125,7 @@ for val $path (keys %after) {
         topk_add($tk, $path)
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-30s ~%d B\n", $h->[0], $h->[1] * 100
 }

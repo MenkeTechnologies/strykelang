@@ -12,7 +12,7 @@
 
 # ── schema ──────────────────────────────────────────────────────────
 
-val @schema = (
+var @schema = (
     +{ name => "id",       type => "int",    required => 1, range => [1, 999999] },
     +{ name => "email",    type => "regex",  required => 1, pattern => "^[^@]+\\\@[^@]+\\.[a-z]+\$" },
     +{ name => "age",      type => "int",    required => 1, range => [0, 150] },
@@ -207,7 +207,7 @@ val $tk = topk(3)
 for val $e (@errors) {
     topk_add($tk, "row_" . $e->{row})
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-10s : %d errors\n", $h->[0], $h->[1]
 }
