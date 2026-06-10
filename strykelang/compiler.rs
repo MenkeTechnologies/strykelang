@@ -1794,10 +1794,20 @@ impl Compiler {
     fn emit_declare_scalar(&mut self, name_idx: u16, line: usize, frozen: bool) {
         let name = self.chunk.names[name_idx as usize].clone();
         self.register_declare(Sigil::Scalar, &name, frozen);
-        if frozen {
-            self.chunk.emit(Op::DeclareScalarFrozen(name_idx), line);
-        } else if let Some(slot) = self.assign_scalar_slot(&name) {
+        // Allocate a slot for both var and val. Pre-fix, frozen decls used
+        // the name-based `DeclareScalarFrozen` op, which shared one runtime
+        // binding across sibling blocks — two `for {…}` loops in the same
+        // function each containing `val $e = …` both bound the same `$e`,
+        // so the second loop read the first's last-iteration value instead
+        // of its own initializer. Frozen-ness is enforced at compile time
+        // via `scope_stack`'s `frozen_scalars` set, so emitting
+        // `DeclareScalarSlot` (the mutable-slot op) is safe — the compiler
+        // rejects reassignment via the same scope-tracking that catches
+        // `$e = …` after `val $e = …`.
+        if let Some(slot) = self.assign_scalar_slot(&name) {
             self.chunk.emit(Op::DeclareScalarSlot(slot, name_idx), line);
+        } else if frozen {
+            self.chunk.emit(Op::DeclareScalarFrozen(name_idx), line);
         } else {
             self.chunk.emit(Op::DeclareScalar(name_idx), line);
         }
@@ -3223,7 +3233,8 @@ impl Compiler {
             && !Self::block_has_local(block)
         {
             // When scalar slots are active, skip PushFrame/PopFrame so slot indices keep
-            // addressing the same runtime frame. New `my` decls still get fresh slot indices.
+            // addressing the same runtime frame. New `my` / `val` / `var` decls still get
+            // fresh slot indices via `assign_scalar_slot` in `emit_declare_scalar`.
             self.compile_block_inner(block)?;
         } else {
             self.push_scope_layer();
