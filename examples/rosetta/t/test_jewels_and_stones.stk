@@ -3,11 +3,11 @@
 
 fn Rosetta::JewelsAndStones::count($jewels, $stones) {
     var %j_map
-    val @j_chars = chars($jewels)
+    var @j_chars = chars($jewels)
     for val $j (@j_chars) { $j_map{$j} = 1 }
     
     var $count = 0
-    val @s_chars = chars($stones)
+    var @s_chars = chars($stones)
     for val $s (@s_chars) {
         if (exists $j_map{$s}) { $count++ }
     }

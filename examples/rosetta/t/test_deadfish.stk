@@ -4,7 +4,7 @@
 fn Rosetta::Deadfish::execute($cmd) {
     var $v = 0
     var @res
-    val @chars = chars($cmd)
+    var @chars = chars($cmd)
     for val $c (@chars) {
         if ($c eq "i") { $v++ }
         elsif ($c eq "d") { $v-- }

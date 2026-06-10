@@ -8,7 +8,7 @@
 # clouds, run a convex-hull pass first; we use Andrew's monotone chain.
 
 fn Rosetta::Calipers::convex_hull($pts) {
-    val @sorted = sort {
+    var @sorted = sort {
         _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
     } @$pts
     val $n = len(@sorted)

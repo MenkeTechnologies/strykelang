@@ -24,7 +24,7 @@ fn Rosetta::Pierpont::generate($count) {
         }
         $two *= 2
     }
-    val @primes = sort { _0 <=> _1 } grep {Rosetta::Pierpont::is_prime} @candidates
+    var @primes = sort { _0 <=> _1 } grep {Rosetta::Pierpont::is_prime} @candidates
     var @uniq
     var $last = -1
     for val $p (@primes) {

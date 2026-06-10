@@ -32,7 +32,7 @@ assert_eq exists($h{11}), 0, "11 not reachable from 1 by 2x or 3x+2"
 assert_eq exists($h{32}), 1, "32 = 2·16 present"
 
 # Closure properties on the generated set
-val @big = Rosetta::KlarnerRado::up_to(500)
+var @big = Rosetta::KlarnerRado::up_to(500)
 val %bset = map { _ => 1 } @big
 var $closure_ok = 1
 for val $x (@big) {

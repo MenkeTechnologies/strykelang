@@ -94,7 +94,7 @@ fn Bv::boruvka($n, $edges) {
 # ── Kruskal for cross-validation ─────────────────────────────────
 
 fn Bv::kruskal($n, $edges) {
-    val @sorted = sort { _0->[2] <=> _1->[2] } @$edges
+    var @sorted = sort { _0->[2] <=> _1->[2] } @$edges
     val @parent = (0:$n - 1)
     val @rank   = (0)  x $n
     var $total = 0
@@ -110,7 +110,7 @@ fn Bv::kruskal($n, $edges) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "single edge",
         n     => 2,

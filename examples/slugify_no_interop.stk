@@ -31,7 +31,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — (input, expected slug).
-val @cases = (
+var @cases = (
     +{ title => "Hello World",            slug => "hello-world" },
     +{ title => "Hello, World!",          slug => "hello-world" },
     +{ title => "  Leading and Trailing  ", slug => "leading-and-trailing" },

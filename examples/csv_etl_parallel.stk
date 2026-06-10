@@ -86,7 +86,7 @@ fn ETL::parse_row($line) {
 
 # Skip header (first row) and parse the rest in parallel.
 val @body = @raw[1:len(@raw) - 1]
-val @parsed = ~> @body pmaps { ETL::parse_row(_) } collect grep { defined _ }
+var @parsed = ~> @body pmaps { ETL::parse_row(_) } collect grep { defined _ }
 
 p "Parsed #{ len @parsed } valid rows; dropped #{ len(@body) - len(@parsed) } malformed."
 
@@ -164,7 +164,7 @@ for val $key (keys %$agg) {
     $by_region{$region}{profit}  += $r->{profit}
 }
 
-val @ranked = sort { $by_region{_1}{profit} <=> $by_region{_}{profit} } keys %by_region
+var @ranked = sort { $by_region{_1}{profit} <=> $by_region{_}{profit} } keys %by_region
 
 # ── 7. Report ─────────────────────────────────────────────────────
 
@@ -209,7 +209,7 @@ $total_profit  += $by_region{_}{profit}  for keys %by_region
 ($total_profit  > 0)                 |> aok "total profit positive"
 
 # Each ranked region should have non-zero rows
-val $all_have_rows = 1
+var $all_have_rows = 1
 $all_have_rows &&= $by_region{_}{rows} > 0 for @ranked
 $all_have_rows |> aeq 1, "every region had at least one row"
 

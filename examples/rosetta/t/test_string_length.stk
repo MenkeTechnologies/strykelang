@@ -33,7 +33,7 @@ fn Rosetta::StringLength::demo() {
     "Length: " . ($special |> len) |> p
     
     # Array of strings and their lengths
-    val @strings = ("a", "ab", "abc", "abcd")
+    var @strings = ("a", "ab", "abc", "abcd")
     "String length array:" |> p
     for val $s (@strings) {
         "  '$s' -> " . ($s |> len) |> p

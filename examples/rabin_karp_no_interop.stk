@@ -73,7 +73,7 @@ fn RK::find_brute($text, $pat) {
 
 p "── Rabin-Karp demo ──"
 
-val @cases = (
+var @cases = (
     +{ text => "abracadabra",     pat => "abra",   hits => [0, 7]    },
     +{ text => "abracadabra",     pat => "cad",    hits => [4]       },
     +{ text => "abracadabra",     pat => "z",      hits => []        },

@@ -21,7 +21,7 @@ printf "spawned %d workers\n", len(@workers)
 # Shard the range across workers. Each worker gets [start, end) chunk.
 val $chunk = int(($upper + $n_workers - 1) / $n_workers)
 var %shards
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 for val $i (0:len(@sorted_workers) - 1) {
     val $start = $i * $chunk
     var $end = $start + $chunk

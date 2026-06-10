@@ -6,7 +6,7 @@ fn Rosetta::AhoCorasick::build($patterns) {
     
     for val $p (@$patterns) {
         var $curr = 0
-        val @chars = chars($p)
+        var @chars = chars($p)
         for val $c (@chars) {
             if (!exists($trie->[$curr]->{next}->{$c})) {
                 push @$trie, { next => {}, fail => 0, output => [] }

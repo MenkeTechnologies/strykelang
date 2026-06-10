@@ -37,7 +37,7 @@ for val $k (keys %TABLE) {
 }
 
 fn Morse::encode($text) {
-    val @words = split(/\s+/, uc($text))
+    var @words = split(/\s+/, uc($text))
     var @encoded_words
     for val $w (@words) {
         next if len($w) == 0
@@ -55,10 +55,10 @@ fn Morse::encode($text) {
 
 fn Morse::decode($code) {
     # Three spaces between words, one between letters.
-    val @words = split(/   /, $code)
+    var @words = split(/   /, $code)
     var @decoded_words
     for val $w (@words) {
-        val @glyphs = split(/ /, $w)
+        var @glyphs = split(/ /, $w)
         var $word = ""
         for val $g (@glyphs) {
             $word .= $REVERSE{$g} if exists $REVERSE{$g}
@@ -78,7 +78,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo grid — each plaintext must round-trip through encode -> decode.
-val @cases = (
+var @cases = (
     +{ text => "SOS",         morse => "... --- ..."                          },
     +{ text => "HELLO",       morse => ".... . .-.. .-.. ---"                 },
     +{ text => "HI",          morse => ".... .."                              },

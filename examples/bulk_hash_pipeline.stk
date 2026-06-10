@@ -22,7 +22,7 @@ val $n = len(@tasks)
 printf "tasks: %d (input × hash algo pairs)\n", $n
 
 val @workers = congregation($n)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 var %results
 for var $i (0:len(@sorted_workers) - 1) {

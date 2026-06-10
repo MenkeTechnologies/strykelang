@@ -45,7 +45,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Reference table — known step counts from OEIS A006577.
-val @cases = (
+var @cases = (
     +{ n => 1,    s => 0 },
     +{ n => 2,    s => 1 },
     +{ n => 3,    s => 7 },

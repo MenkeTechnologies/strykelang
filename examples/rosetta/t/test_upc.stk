@@ -35,7 +35,7 @@ fn Rosetta::Upc::clean($s) {
 }
 
 # Sample valid UPCs
-val @valid = (
+var @valid = (
     "036000291452",   # Coca-Cola
     "012345678905",
     "075678164125",

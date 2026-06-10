@@ -67,7 +67,7 @@ for val $m (@{$back->{members}}) {
 
 p ""
 p "── 4. Array of instances also flattens cleanly ────────"
-val @addrs = (
+var @addrs = (
     Address->new(city => "Boston"),
     Address->new(city => "Austin"),
     Address->new(city => "Reno"),

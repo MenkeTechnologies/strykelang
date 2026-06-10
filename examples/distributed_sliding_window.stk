@@ -20,7 +20,7 @@ val $n = len(@series)
 printf "series: %d values  ·  window: %d\n", $n, $window
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard with overlap (window-1) at the right edge so per-worker
 # rolling computations don't lose boundary windows.

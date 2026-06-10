@@ -160,7 +160,7 @@ fn Router::make_req($method, $path, %opts) {
     }
 }
 
-val @cases = (
+var @cases = (
     Router::make_req("GET",    "/"),
     Router::make_req("GET",    "/users/7"),
     Router::make_req("GET",    "/orders/A100/items/X1"),

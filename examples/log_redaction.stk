@@ -90,7 +90,7 @@ fn Demo::Redact::scan($line) {
 
 # ── sample log lines (with intentional PII) ────────────────────────
 
-val @log = (
+var @log = (
     "2026-05-15 12:00:01 INFO User alice\@example.com logged in from 192.168.1.42",
     "2026-05-15 12:00:05 WARN failed login: bob\@corp.io retry count 3",
     "2026-05-15 12:00:10 INFO charge cleared: 4111-1111-1111-1111",
@@ -136,7 +136,7 @@ printf "  HLL estimate : %d\n", hll_count($hll_pii)
 
 p ""
 p "── most-common PII kinds (TopK) ─────────────────────"
-val @hits = topk_top($tk_kinds)
+var @hits = topk_top($tk_kinds)
 for val $h (@hits) {
     printf "  %-13s : %d\n", $h->[0], $h->[1]
 }

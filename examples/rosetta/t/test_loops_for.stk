@@ -12,7 +12,7 @@ fn Rosetta::LoopsFor::demo() {
     
     # For loop with array
     "2. Loop over array:" |> p
-    val @fruits = ("apple", "banana", "cherry")
+    var @fruits = ("apple", "banana", "cherry")
     for val $fruit (@fruits) {
         "   $fruit" |> p
     }

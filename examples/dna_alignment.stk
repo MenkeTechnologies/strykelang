@@ -106,7 +106,7 @@ fn Demo::DNA::traceback($seq_a, $seq_b, $trace) {
 
 # ── workload ───────────────────────────────────────────────────────
 
-val @pairs = (
+var @pairs = (
     ["GATTACA",      "GCATGCU"],
     ["AGTACGCA",     "TATGC"],
     ["ACGTACGT",     "ACGTACGT"],

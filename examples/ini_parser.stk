@@ -5,7 +5,7 @@
 # Run: stryke --no-interop examples/ini_parser.stk
 
 fn Ini::parse($text) {
-    val @lines = split /\n/, $text
+    var @lines = split /\n/, $text
     var $section = ""
     var %out = ( "" => +{} )
     for val $raw (@lines) {

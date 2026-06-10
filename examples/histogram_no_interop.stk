@@ -30,7 +30,7 @@ for val $v (@data) {
     $counts{$v}++
 }
 
-val @keys = sort { _ <=> _1 } keys %counts
+var @keys = sort { _ <=> _1 } keys %counts
 var $max  = 0
 for val $k (@keys) {
     $max = $counts{$k} if $counts{$k} > $max

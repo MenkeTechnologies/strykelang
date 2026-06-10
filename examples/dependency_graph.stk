@@ -144,7 +144,7 @@ for val $pkg (keys %deps) {
 }
 
 # Sort by dependent count, descending.
-val @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_}}) } keys %dependents
+var @by_pop = sort { len(@{$dependents{_1}}) <=> len(@{$dependents{_}}) } keys %dependents
 for val $pkg (@by_pop) {
     val $count = len(@{$dependents{$pkg}})
     next if $count == 0
@@ -162,7 +162,7 @@ for val $pkg (keys %deps) {
         topk_add($tk, $d)
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-18s : %d dependents\n", $h->[0], $h->[1]
 }

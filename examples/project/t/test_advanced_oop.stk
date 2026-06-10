@@ -173,7 +173,7 @@ class Circle extends Shape {
     }
 }
 
-val @shapes = (
+var @shapes = (
     Rectangle(width => 5, height => 4),
     Circle(radius => 3),
     Rectangle(width => 10, height => 2)

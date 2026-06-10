@@ -4,7 +4,7 @@
 
 fn Rle::encode($s) {
     return "" if $s eq ""
-    val @chars = split //, $s
+    var @chars = split //, $s
     var $out = ""
     var $prev = $chars[0]
     var $count = 1
@@ -51,7 +51,7 @@ Rle::roundtrip("WWWWWWWWWWWWBWWWWWWWWWWWWBBB") |> aeq "WWWWWWWWWWWWBWWWWWWWWWWWW
 # Variant: only-runs (skip count=1)
 fn Rle::encode_terse($s) {
     return "" if $s eq ""
-    val @chars = split //, $s
+    var @chars = split //, $s
     var $out = ""
     var $prev = $chars[0]
     var $count = 1

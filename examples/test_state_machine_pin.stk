@@ -16,7 +16,7 @@ fn Fsm::feed($m, $event) {
 }
 
 fn Fsm::run($m, @events) {
-    val $ok = 1
+    var $ok = 1
     for val $e (@events) {
         $ok &&= Fsm::feed($m, $e)
     }

@@ -237,7 +237,7 @@ fn Bl::brute_max($g) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "K3 (odd cycle)",
         n    => 3,

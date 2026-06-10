@@ -11,7 +11,7 @@ fn Rosetta::ArithmeticNumbers::get_divisors($n) {
 
 fn Rosetta::ArithmeticNumbers::check($n) {
     val $divs_ref = Rosetta::ArithmeticNumbers::get_divisors($n)
-    val @divs = @$divs_ref
+    var @divs = @$divs_ref
     var $sum = 0
     for val $d (@divs) { $sum += $d }
     val $count = len(@divs)

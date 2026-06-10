@@ -567,7 +567,7 @@ fn Project::ListOps::reduce_product {
 }
 
 fn Project::ListOps::reduce_max {
-    val @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    var @a = (3, 1, 4, 1, 5, 9, 2, 6)
     var $max = $a[0]
     for val $x (@a) {
         $max = $x if $x > $max
@@ -576,7 +576,7 @@ fn Project::ListOps::reduce_max {
 }
 
 fn Project::ListOps::reduce_min {
-    val @a = (3, 1, 4, 1, 5, 9, 2, 6)
+    var @a = (3, 1, 4, 1, 5, 9, 2, 6)
     var $min = $a[0]
     for val $x (@a) {
         $min = $x if $x < $min

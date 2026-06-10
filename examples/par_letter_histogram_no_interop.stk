@@ -31,7 +31,7 @@ val $pmacro = ~p> $text letters freq
 
 # ── 4. Cross-check: identical keys + identical values ────────────────────────
 fn Hist::assert_same($name, $h1, $h2) {
-    val @ka = sort keys %$h1
+    var @ka = sort keys %$h1
     val @kb = sort keys %$h2
     die "$name: key set differs" unless "@ka" eq "@kb"
     for val $k (@ka) {
@@ -44,7 +44,7 @@ Hist::assert_same("seq vs pmacro", $seq, $pmacro)
 
 # ── 5. Print top-5 letters ──────────────────────────────────────────────────
 p "── all three approaches converge — top-5 letters ──"
-val @top = (sort { $seq->{_1} <=> $seq->{_} } keys %$seq)[0:4]
+var @top = (sort { $seq->{_1} <=> $seq->{_} } keys %$seq)[0:4]
 for val $k (@top) {
     printf("  %s  %3d\n", $k, $seq->{$k})
 }

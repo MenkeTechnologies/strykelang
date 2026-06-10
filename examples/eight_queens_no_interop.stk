@@ -76,7 +76,7 @@ fn Queens::collect($n, $cols, $sols) {
 p "── Eight Queens demo ──"
 
 # Known solution counts for N = 1..11 (OEIS A000170).
-val @expected = (1, 0, 0, 2, 10, 4, 40, 92, 352, 724, 2680)
+var @expected = (1, 0, 0, 2, 10, 4, 40, 92, 352, 724, 2680)
 for val $i (0:len(@expected) - 1) {
     val $n   = $i + 1
     val $got = Queens::count($n)

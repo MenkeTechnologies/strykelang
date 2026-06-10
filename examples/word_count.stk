@@ -73,7 +73,7 @@ for val $line (split /\n/, $corpus) {
         topk_add($tk, $w)
     }
 }
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $h (@top) {
     printf "  %-10s : %d hits\n", $h->[0], $h->[1]
 }

@@ -32,7 +32,7 @@ class KNNClassifier {
         }
 
         val @sorted_distances = sort { $a->[0] <=> $b->[0] } @distances
-        val @neighbors = @sorted_distances[0:$self->k - 1]
+        var @neighbors = @sorted_distances[0:$self->k - 1]
 
         var %counts
         for val $neighbor (@neighbors) {

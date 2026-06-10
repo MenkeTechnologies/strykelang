@@ -25,7 +25,7 @@ printf "  workers: %d  ·  range: 0..%d  ·  target: %s...%s\n",
 printf "  (secret key planted at: %d)\n", $secret
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the key range across workers.
 val $chunk = int(($max_key + $n_workers) / $n_workers)

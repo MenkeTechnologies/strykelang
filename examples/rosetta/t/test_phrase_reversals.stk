@@ -12,7 +12,7 @@ fn Rosetta::PhraseRev::reverse_words($s) {
 }
 
 fn Rosetta::PhraseRev::reverse_each_word($s) {
-    val @ws = split /\s+/, $s
+    var @ws = split /\s+/, $s
     var @reved
     for val $w (@ws) {
         push @reved, Rosetta::PhraseRev::reverse_string($w)

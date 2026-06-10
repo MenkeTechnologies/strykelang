@@ -2,7 +2,7 @@
 # Rosetta Code: Markov Chain Text Generator
 
 fn Rosetta::MarkovChain::build($text) {
-    val @words = split(" ", $text)
+    var @words = split(" ", $text)
     var %chain
     for val $i (0..len(@words)-2) {
         val $w1 = $words[$i]

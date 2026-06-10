@@ -33,7 +33,7 @@ fn bk($isbn, $title, $author, $genre, $pages, $price, $year) {
               genre => $genre, pages => $pages, price => $price, year => $year)
 }
 
-val @lib = (
+var @lib = (
     bk("978-1", "Dune",          "Herbert",  "scifi",   688, 18.99, 1965),
     bk("978-2", "Foundation",    "Asimov",   "scifi",   255, 12.50, 1951),
     bk("978-3", "Neuromancer",   "Gibson",   "scifi",   271, 14.00, 1984),

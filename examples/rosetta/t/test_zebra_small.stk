@@ -3,8 +3,8 @@
 
 fn Rosetta::ZebraSmall::solve_logic {
     val @names = ("Alice", "Beatrice", "Carol")
-    val @ages  = (10, 12, 14)
-    val @sports = ("Soccer", "Tennis", "Swim")
+    var @ages  = (10, 12, 14)
+    var @sports = ("Soccer", "Tennis", "Swim")
     
     for val $a1 (@ages) {
         for val $a2 (@ages) {

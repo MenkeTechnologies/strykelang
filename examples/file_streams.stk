@@ -20,7 +20,7 @@ p "  lines     : ", len([split(/\n/, $contents)])
 
 p ""
 p "── Line-by-line iteration via slurp + split ───────────"
-val @lines = split(/\n/, slurp($tmp))
+var @lines = split(/\n/, slurp($tmp))
 var $i = 0
 for val $line (@lines) {
     next if len($line) == 0
@@ -51,7 +51,7 @@ printf "  examples/**/*.stk    : %d files\n", len @nested
 
 p ""
 p "── find — alt to glob with predicate logic ────────────"
-val @big_demos = find("examples", "*.stk")
+var @big_demos = find("examples", "*.stk")
 var @over_1kb
 for val $f (@big_demos) {
     push @over_1kb, $f if file_size($f) > 1024

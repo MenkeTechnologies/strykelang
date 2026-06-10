@@ -17,7 +17,7 @@
 # these would be log lines / tweets / page bodies arriving over a
 # stream.
 
-val @corpus = (
+var @corpus = (
     "the quick brown fox jumps over the lazy dog the fox",
     "stryke runs faster than perl ruby and python for this task",
     "the quick rust runtime jit compiles hot paths to native code",
@@ -42,8 +42,8 @@ printf "  %d total words across all chunks\n", $total_words
 
 p ""
 p "── per-chunk sketches (parallel) ──────────────────────"
-val @per_chunk = pmap {
-    val @words = split(/\s+/, _)
+var @per_chunk = pmap {
+    var @words = split(/\s+/, _)
     val $cms_c  = cms(2048, 5)
     # `topk(50)` per chunk so the merge has enough capacity to keep
     # accurate counts for the corpus's full vocabulary. With small k
@@ -125,7 +125,7 @@ printf "  exact distinct (small N): %d\n", len(keys %seen)
 
 p ""
 p "── determinism check (re-run produces same top word) ──"
-val @per_chunk_2 = pmap {
+var @per_chunk_2 = pmap {
     val $tk = topk(50)
     topk_add($tk, _) for split(/\s+/, _)
     $tk

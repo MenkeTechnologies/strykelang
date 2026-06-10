@@ -46,7 +46,7 @@ fn CC::count_ways($coins, $amount) {
 p "── Coin change demo ──"
 
 # Test grid — (coins, amount, min_coins, count_ways).
-val @cases = (
+var @cases = (
     +{ coins => [1, 2, 5],     amount => 11, min =>  3, ways =>  11 },  # 5+5+1
     +{ coins => [1, 2, 5],     amount =>  0, min =>  0, ways =>   1 },  # empty = 1 way
     +{ coins => [2],           amount =>  3, min => -1, ways =>   0 },  # impossible

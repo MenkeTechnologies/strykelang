@@ -56,7 +56,7 @@ fn Sql::is_null($v) {
 #   op    — operator (+, -, *, /, =, !=, <>, <, >, <=, >=)
 #   lparen, rparen, comma, dot, star, semi, eof
 
-val @SQL_KEYWORDS = (
+var @SQL_KEYWORDS = (
     "SELECT", "FROM", "WHERE", "ORDER", "BY", "ASC", "DESC", "LIMIT",
     "CREATE", "TABLE", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
     "DELETE", "INNER", "JOIN", "ON", "GROUP", "AND", "OR", "NOT",
@@ -1143,7 +1143,7 @@ p "  orders:    " . len(@{$DB->{tables}->{orders}->{rows}}) . " rows"
 #   * expected_rows is the row count for SELECTs (or undef for DDL).
 #   * expected_cells (optional) checks first-row first-column value.
 
-val @cases = (
+var @cases = (
     # ── basic SELECT * ──
     +{ sql => "SELECT * FROM customers",                                  rows => 5 },
     +{ sql => "SELECT id, name FROM customers",                           rows => 5 },

@@ -24,7 +24,7 @@ fn Rosetta::Outline::to_table($node, $depth, $res_ref) {
 }
 
 fn Rosetta::Outline::pretty_format($outline) {
-    val @rows
+    var @rows
     Rosetta::Outline::to_table($outline, 0, \@rows)
     
     # Determine max depth

@@ -5,7 +5,7 @@
 
 fn Rosetta::Multisplit::split($s, $seps) {
     var @parts
-    val @sep_sorted = sort { length(_1) <=> length(_) } @$seps
+    var @sep_sorted = sort { length(_1) <=> length(_) } @$seps
     var $i = 0
     var $start = 0
     val $n = length($s)

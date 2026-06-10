@@ -21,7 +21,7 @@ fn Case::to_snake($s) {
        |> lc
 }
 
-val @test_cases = (
+var @test_cases = (
     "snakeCase",
     "snake_case",
     "variable_10_case",

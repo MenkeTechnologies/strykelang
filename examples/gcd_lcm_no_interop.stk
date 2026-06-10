@@ -19,7 +19,7 @@ fn N::lcm      = _ * _1 / N::gcd(_, _1)
 fn N::gcd_list = @{_} |> reduce { N::gcd(_, _1) }
 fn N::lcm_list = @{_} |> reduce { N::lcm(_, _1) }
 
-val @pair_cases = (
+var @pair_cases = (
     +{ a => 48,  b => 18,  gcd =>  6,   lcm => 144  },
     +{ a => 100, b => 75,  gcd => 25,   lcm => 300  },
     +{ a => 7,   b => 13,  gcd =>  1,   lcm =>  91  },  # coprime
@@ -42,7 +42,7 @@ for var $c (@pair_cases) {
 die "#{$fail} / #{len @pair_cases} GCD/LCM cases failed" if $fail > 0
 
 # Reduce across a list — gcd_list/lcm_list.
-val @list_cases = (
+var @list_cases = (
     +{ xs => [12, 18, 24],          gcd =>  6,   lcm =>  72  },
     +{ xs => [4, 6, 8, 10],         gcd =>  2,   lcm => 120  },
     +{ xs => [7, 11, 13],           gcd =>  1,   lcm => 1001 },  # pairwise coprime

@@ -44,7 +44,7 @@ fn CMS::estimate($cms, $key) {
 
 p "=== Count-Min Sketch Demo (w=256, d=4) ==="
 val $cms = CMS::new(256, 4)
-val @stream = ("apple","banana","apple","cherry","apple","banana","apple","date","apple")
+var @stream = ("apple","banana","apple","cherry","apple","banana","apple","date","apple")
 for val $x (@stream) { CMS::add($cms, $x, 1) }
 for val $k ("apple","banana","cherry","date","ghost") {
     p "est " . $k . " = " . CMS::estimate($cms, $k)

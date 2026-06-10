@@ -76,8 +76,8 @@ p "  after insert: ", rope_to_string($r)
 
 p ""
 p "── Diff algorithms (Myers + Patience) ─────────────────"
-val @v1 = ("alpha", "beta", "gamma", "delta")
-val @v2 = ("alpha", "BETA", "gamma", "epsilon")
+var @v1 = ("alpha", "beta", "gamma", "delta")
+var @v2 = ("alpha", "BETA", "gamma", "epsilon")
 p "  myers_diff:"
 for val $op (myers_diff(\@v1, \@v2)) {
     printf "    %s %s\n", $op->[0], $op->[1]

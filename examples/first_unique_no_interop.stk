@@ -38,7 +38,7 @@ if (len(@ARGV) >= 1) {
     exit 0
 }
 
-val @cases = (
+var @cases = (
     +{ s => "leetcode",     idx =>  0 },
     +{ s => "loveleetcode", idx =>  2 },
     +{ s => "aabb",         idx => -1 },

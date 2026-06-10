@@ -22,7 +22,7 @@ fn Rosetta::Rpn::eval_token($stack, $tok) {
 
 fn Rosetta::Rpn::eval($expr) {
     val @stack
-    val @tokens = split /\s+/, $expr
+    var @tokens = split /\s+/, $expr
     for val $t (@tokens) {
         next if length($t) == 0
         return undef unless Rosetta::Rpn::eval_token(\@stack, $t)
@@ -34,7 +34,7 @@ fn Rosetta::Rpn::eval($expr) {
 fn Rosetta::Rpn::trace($expr) {
     val @stack
     var @lines
-    val @tokens = split /\s+/, $expr
+    var @tokens = split /\s+/, $expr
     for val $t (@tokens) {
         next if length($t) == 0
         Rosetta::Rpn::eval_token(\@stack, $t)

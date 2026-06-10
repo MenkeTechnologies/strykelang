@@ -11,7 +11,7 @@ unlink($path)
 
 # ── Build three documents + signatures ────────────────────────────────
 
-val @docs = (
+var @docs = (
     +{ id => "config:prod",    body => '{"db_host":"prod-db.internal","pool":20}' },
     +{ id => "config:staging", body => '{"db_host":"stage-db.internal","pool":5}' },
     +{ id => "audit:2026-05-15", body => "user=alice op=rollout build=0.14.2" },
@@ -81,7 +81,7 @@ p ""
 p "── audit aggregates via sketches ──────────────────────"
 val $signers_hll = hll(14)
 val $signer_load = cms(2048, 5)
-val @audit_log = (
+var @audit_log = (
     +{ signer => "deploy-bot",  ts => time() - 3600 },
     +{ signer => "alice",        ts => time() - 1800 },
     +{ signer => "deploy-bot",  ts => time() - 1700 },

@@ -207,23 +207,23 @@ fn Ch::clone_position($pos) {
 # ═══════════════════════════════════════════════════════════════════
 
 # Knight offsets — (file, rank) deltas.
-val @KNIGHT_DELTAS = (
+var @KNIGHT_DELTAS = (
     [-2, -1], [-2, 1], [-1, -2], [-1, 2],
     [ 1, -2], [ 1, 2], [ 2, -1], [ 2, 1],
 )
 
 # King offsets.
-val @KING_DELTAS = (
+var @KING_DELTAS = (
     [-1, -1], [-1, 0], [-1, 1],
     [ 0, -1],          [ 0, 1],
     [ 1, -1], [ 1, 0], [ 1, 1],
 )
 
 # Bishop directions.
-val @BISHOP_DIRS = ([-1, -1], [-1, 1], [1, -1], [1, 1])
+var @BISHOP_DIRS = ([-1, -1], [-1, 1], [1, -1], [1, 1])
 
 # Rook directions.
-val @ROOK_DIRS = ([-1, 0], [1, 0], [0, -1], [0, 1])
+var @ROOK_DIRS = ([-1, 0], [1, 0], [0, -1], [0, 1])
 
 # Queen = bishop + rook directions.
 val @QUEEN_DIRS = (

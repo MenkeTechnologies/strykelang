@@ -1473,7 +1473,7 @@ Sci::banner("§4 QR & least squares")
 
     # Polyfit: fit a known quadratic exactly.  3 points, degree-2 fit
     # reconstructs y = 1 + 2x + 3x².
-    val @xs = (0.0, 1.0, 2.0)
+    var @xs = (0.0, 1.0, 2.0)
     val @ys = map { 1.0 + 2.0 * $_ + 3.0 * $_ * $_ } @xs
     val $coef = QR::polyfit(\@xs, \@ys, 2)
     die "polyfit a₀" unless Sci::approx($coef->[0], 1.0, 1e-9)
@@ -1488,7 +1488,7 @@ Sci::banner("§4 QR & least squares")
 
     # Over-determined polyfit: 5 noisy points on a line, recover slope+intercept
     # close to truth.
-    val @xs2 = (0.0, 1.0, 2.0, 3.0, 4.0)
+    var @xs2 = (0.0, 1.0, 2.0, 3.0, 4.0)
     val @ys2 = (1.0, 3.05, 4.95, 7.0, 9.1)         # roughly y = 1 + 2x
     val $coef2 = QR::polyfit(\@xs2, \@ys2, 1)
     die "polyfit-line intercept" unless abs($coef2->[0] - 1.0) < 0.2
@@ -2691,9 +2691,9 @@ Sci::banner("§9 interpolation")
     # define a cubic, so every interpolator should recover the polynomial
     # exactly (modulo roundoff).
     val $true_poly = fn { 1.0 - 2.0 * _ + 3.0 * _ * _ - _ * _ * _ }
-    val @xs = (-1.0, 0.5, 1.5, 3.0)
+    var @xs = (-1.0, 0.5, 1.5, 3.0)
     val @ys = map { $true_poly->($_) } @xs
-    val @probe = (-0.7, 0.0, 1.0, 2.0, 2.7)
+    var @probe = (-0.7, 0.0, 1.0, 2.0, 2.7)
 
     for val $xq (@probe) {
         val $expected = $true_poly->($xq)
@@ -4119,7 +4119,7 @@ fn Graph::kruskal_mst($g) {
             push @edges, [$uu, $edge->[0], $edge->[1]]
         }
     }
-    val @sorted = sort { $_0->[2] <=> $_1->[2] } @edges
+    var @sorted = sort { $_0->[2] <=> $_1->[2] } @edges
     val $uf = UnionFind::new($g->{n})
     var @tree
     var $weight = 0.0
@@ -5265,12 +5265,12 @@ Sci::banner("§17 data structures")
 {
     # ── AVL: insert a sequence and verify in-order is sorted ───────
     var $root = undef
-    val @ks = (50, 30, 70, 20, 40, 60, 80, 10, 25, 35, 45)
+    var @ks = (50, 30, 70, 20, 40, 60, 80, 10, 25, 35, 45)
     for val $kk (@ks) {
         $root = AVL::insert($root, $kk, $kk * 10)
     }
     val $in_order = AVL::in_order($root)
-    val @expected_sorted = sort { $_0 <=> $_1 } @ks
+    var @expected_sorted = sort { $_0 <=> $_1 } @ks
     die "avl in-order length" unless len(@$in_order) == len(@expected_sorted)
     for val $kk (0:len(@expected_sorted) - 1) {
         die "avl in-order[#{$kk}]" unless $in_order->[$kk] == $expected_sorted[$kk]
@@ -5413,7 +5413,7 @@ fn Geom::poly_area($poly) {
 fn Geom::convex_hull($points) {
     val $n = len(@$points)
     return [@$points] if $n <= 1
-    val @sorted = sort {
+    var @sorted = sort {
         $_0->[0] <=> $_1->[0] || $_0->[1] <=> $_1->[1]
     } @$points
     var @lo_hull
@@ -5523,7 +5523,7 @@ fn Geom::closest_pair_helper($pts_x) {
     for val $pt (@$pts_x) {
         push @strip, $pt if abs($pt->[0] - $mid_x) < $d
     }
-    val @strip_y = sort { $_0->[1] <=> $_1->[1] } @strip
+    var @strip_y = sort { $_0->[1] <=> $_1->[1] } @strip
     for val $i (0:len(@strip_y) - 1) {
         for (var $j = $i + 1;
              $j < len(@strip_y) && $strip_y[$j]->[1] - $strip_y[$i]->[1] < $d;
@@ -5754,7 +5754,7 @@ fn NT::miller_rabin($n) {
         $d = int($d / 2)
         $r++
     }
-    val @witnesses = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
+    var @witnesses = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
     for val $aa (@witnesses) {
         next if $aa >= $n
         var $x = NT::modpow($aa, $d, $n)
@@ -6297,7 +6297,7 @@ fn Sort::radix_lsd($arr) {
 Sci::banner("§21 sorting & selection")
 {
     val $unsorted = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
-    val @manual = sort { $_0 <=> $_1 } @$unsorted
+    var @manual = sort { $_0 <=> $_1 } @$unsorted
 
     # ── Quicksort ────────────────────────────────────────────────
     val $qs = Sort::quicksort($unsorted)
@@ -6355,7 +6355,7 @@ Sci::banner("§21 sorting & selection")
 
     # ── Radix sort ──────────────────────────────────────────────
     val $larger = [170, 45, 75, 90, 802, 24, 2, 66]
-    val @larger_sorted = sort { $_0 <=> $_1 } @$larger
+    var @larger_sorted = sort { $_0 <=> $_1 } @$larger
     val $radix_out = Sort::radix_lsd($larger)
     for val $i (0:len(@larger_sorted) - 1) {
         die "rs[#{$i}]" unless $radix_out->[$i] == $larger_sorted[$i]
@@ -6821,11 +6821,11 @@ fn Crypto::hmac_sha256($key, $msg) {
         push @ipad, $kb[$i] ^ 0x36
         push @opad, $kb[$i] ^ 0x5c
     }
-    val @msg_bytes = unpack("C*", $msg)
+    var @msg_bytes = unpack("C*", $msg)
     var @inner_in = @ipad
     for val $bb (@msg_bytes) { push @inner_in, $bb }
     val $inner_hex   = Crypto::sha256_bytes(\@inner_in)
-    val @inner_bytes = @{Crypto::hex_to_bytes($inner_hex)}
+    var @inner_bytes = @{Crypto::hex_to_bytes($inner_hex)}
     var @outer_in = @opad
     for val $bb (@inner_bytes) { push @outer_in, $bb }
     Crypto::sha256_bytes(\@outer_in)
@@ -7648,7 +7648,7 @@ Sci::banner("§26 date/time")
     die "JD 1970-01-01" unless Date::julian_day(1970, 1, 1) == 2440588
 
     # Round trip
-    val @date_set = ([2000, 1, 1], [2024, 2, 29], [1999, 12, 31], [2100, 3, 1], [1066, 10, 14])
+    var @date_set = ([2000, 1, 1], [2024, 2, 29], [1999, 12, 31], [2100, 3, 1], [1066, 10, 14])
     for val $date_tup (@date_set) {
         val $jd_v = Date::julian_day($date_tup->[0], $date_tup->[1], $date_tup->[2])
         val $recovered = Date::from_julian_day($jd_v)
@@ -8146,7 +8146,7 @@ Sci::banner("§28 sets & sketches")
 
     # ── Bloom filter ─────────────────────────────────────────────
     val $bf = Bloom::new(1024, 4)
-    val @added = ("apple", "banana", "cherry", "date", "elderberry")
+    var @added = ("apple", "banana", "cherry", "date", "elderberry")
     for val $item (@added) { Bloom::add($bf, $item) }
     # All added items must be reported as present.
     for val $item (@added) {
@@ -8154,7 +8154,7 @@ Sci::banner("§28 sets & sketches")
     }
     # Some absent items.  False-positive rate is non-zero, so we test
     # one we're confident will be negative.
-    val @absent = ("xkcd-0123", "no-such-item-9999")
+    var @absent = ("xkcd-0123", "no-such-item-9999")
     for val $item (@absent) {
         die "bloom absent '#{$item}'" if Bloom::contains($bf, $item) &&
                                           !grep { $_ eq $item } @added
@@ -8466,7 +8466,7 @@ Sci::banner("§29 heuristic search")
 
 # Assemble text into instructions + label table.
 fn VM::assemble($src) {
-    val @lines = split /\n/, $src
+    var @lines = split /\n/, $src
     var @code
     var %labels
     for val $line (@lines) {
@@ -11865,7 +11865,7 @@ Sci::banner("§45 HMM — forward/Viterbi")
 # Parse "a.b.c.d" string into 32-bit integer (big-endian).  Each octet
 # must be 0-255.
 fn IPv4::parse($ip_str) {
-    val @parts = split /\./, $ip_str
+    var @parts = split /\./, $ip_str
     die "IPv4::parse: need 4 octets, got #{len(@parts)} from '#{$ip_str}'" unless len(@parts) == 4
     var $result = 0
     for val $part (@parts) {
@@ -12400,7 +12400,7 @@ Sci::banner("§48 SAT solver (DPLL)")
 #   TTT::alpha_beta   — minimax with αβ pruning, same return
 #   TTT::best_move    — return optimal move index for $player
 
-val @WIN_LINES = (
+var @WIN_LINES = (
     [0, 1, 2], [3, 4, 5], [6, 7, 8],      # rows
     [0, 3, 6], [1, 4, 7], [2, 5, 8],      # cols
     [0, 4, 8], [2, 4, 6],                  # diagonals
@@ -12865,7 +12865,7 @@ Sci::banner("§51 Haar wavelet + DCT")
     die "haar[3]" unless Sci::approx($h1->[3], -2.0 / sqrt(2.0), 1e-9)
 
     # ── Round-trip ─────────────────────────────────────────────
-    val @rt_inputs = ([1.0, 2.0, 3.0, 4.0], [4.0, 6.0, 10.0, 12.0],
+    var @rt_inputs = ([1.0, 2.0, 3.0, 4.0], [4.0, 6.0, 10.0, 12.0],
                       [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
     for val $rt_in (@rt_inputs) {
         val $h_coefs = Wave::haar_1d($rt_in)
@@ -12883,7 +12883,7 @@ Sci::banner("§51 Haar wavelet + DCT")
     }
 
     # Round-trip multi-level
-    val @full_inputs = ([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0],
+    var @full_inputs = ([1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0],
                         [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
     for val $full_in (@full_inputs) {
         val $h_full = Wave::haar_full($full_in)
@@ -12892,7 +12892,7 @@ Sci::banner("§51 Haar wavelet + DCT")
     }
 
     # ── DCT round-trip ─────────────────────────────────────────
-    val @dct_inputs = ([1.0, 2.0, 3.0, 4.0], [4.0, 6.0, 10.0, 12.0, 1.0, 3.0, 5.0, 7.0])
+    var @dct_inputs = ([1.0, 2.0, 3.0, 4.0], [4.0, 6.0, 10.0, 12.0, 1.0, 3.0, 5.0, 7.0])
     for val $dct_in (@dct_inputs) {
         val $dct_coefs = DCT::dct_1d($dct_in)
         val $dct_back  = DCT::idct_1d($dct_coefs)
@@ -14277,7 +14277,7 @@ Sci::banner("§61 Kalman filter")
     val $Q_1d = [[0.01]]
     val $R_1d = [[1.0]]
     var $filter = +{ x => [0.0], P => [[1000.0]] }      # uncertain prior
-    val @measurements = (10.5, 9.8, 10.2, 10.1, 9.9, 10.3, 9.7, 10.0, 10.05, 9.95)
+    var @measurements = (10.5, 9.8, 10.2, 10.1, 9.9, 10.3, 9.7, 10.0, 10.05, 9.95)
     for val $z_obs (@measurements) {
         $filter = Kalman::predict($filter, $A_1d, $Q_1d)
         $filter = Kalman::update($filter, [$z_obs], $H_1d, $R_1d)
@@ -14294,7 +14294,7 @@ Sci::banner("§61 Kalman filter")
     val $Q_cv = [[0.01, 0.0], [0.0, 0.01]]
     val $R_cv = [[0.5]]
     var $kf2 = +{ x => [0.0, 0.0], P => [[1000.0, 0.0], [0.0, 1000.0]] }
-    val @z_set = (1.1, 1.9, 3.05, 3.95, 5.1, 6.0, 7.0, 7.95, 8.95, 10.05)
+    var @z_set = (1.1, 1.9, 3.05, 3.95, 5.1, 6.0, 7.0, 7.95, 8.95, 10.05)
     for val $z_obs (@z_set) {
         $kf2 = Kalman::predict($kf2, $A_cv, $Q_cv)
         $kf2 = Kalman::update($kf2, [$z_obs], $H_cv, $R_cv)
@@ -14695,7 +14695,7 @@ Sci::banner("§64 classical DP")
 
 # Tokenize on whitespace into a set (deduplicates).
 fn Sim::token_set($s_str) {
-    val @tokens = split /\s+/, $s_str
+    var @tokens = split /\s+/, $s_str
     var %set
     for val $t_tok (@tokens) {
         next if $t_tok eq ""
@@ -14705,7 +14705,7 @@ fn Sim::token_set($s_str) {
 }
 
 fn Sim::token_bag($s_str) {
-    val @tokens = split /\s+/, $s_str
+    var @tokens = split /\s+/, $s_str
     var %bag
     for val $t_tok (@tokens) {
         next if $t_tok eq ""
@@ -15111,7 +15111,7 @@ Sci::banner("§67 sparse table RMQ")
 # Subtractive notation (IV = 4, IX = 9, XL = 40, etc.) used throughout.
 
 # Greedy: walk the value table from largest to smallest, emit characters.
-val @ROMAN_VALUES = (
+var @ROMAN_VALUES = (
     [1000, "M"],  [900, "CM"], [500, "D"], [400, "CD"],
     [100,  "C"],  [90,  "XC"], [50,  "L"], [40,  "XL"],
     [10,   "X"],  [9,   "IX"], [5,   "V"], [4,   "IV"],
@@ -15693,7 +15693,7 @@ fn Karat::mul($a_int, $b_int) {
 Sci::banner("§72 Karatsuba mul")
 {
     # ── Small cases match schoolbook ───────────────────────────
-    val @karat_pairs = ([7, 5], [12345, 67890], [99999, 99999], [-7, 13])
+    var @karat_pairs = ([7, 5], [12345, 67890], [99999, 99999], [-7, 13])
     for val $pair (@karat_pairs) {
         val $a_n = BigInt::from_int($pair->[0])
         val $b_n = BigInt::from_int($pair->[1])
@@ -18347,7 +18347,7 @@ fn KSum::three($nums_in, $target) {
     var $i = 0
     while ($i < $n - 2) {
         unless ($i > 0 && $nums[$i] == $nums[$i - 1]) {
-            val @pairs
+            var @pairs
             KSum::two_inner(\@nums, $i + 1, $n - 1, $target - $nums[$i], \@pairs)
             for val $pair (@pairs) {
                 push @triples, [$nums[$i], $pair->[0], $pair->[1]]
@@ -18369,7 +18369,7 @@ fn KSum::four($nums_in, $target) {
             var $j = $i + 1
             while ($j < $n - 2) {
                 unless ($j > $i + 1 && $nums[$j] == $nums[$j - 1]) {
-                    val @pairs
+                    var @pairs
                     KSum::two_inner(\@nums, $j + 1, $n - 1,
                                     $target - $nums[$i] - $nums[$j], \@pairs)
                     for val $pair (@pairs) {
@@ -18921,7 +18921,7 @@ fn RPN::apply($lv, $rv, $op) {
 }
 
 fn RPN::eval($tokens_in) {
-    val @toks = @$tokens_in
+    var @toks = @$tokens_in
     var @stk
     for val $t (@toks) {
         if (RPN::is_op($t)) {
@@ -18949,7 +18949,7 @@ fn Shunting::prec($op) {
 fn Shunting::is_right_assoc($op) { $op eq "^" }
 
 fn Shunting::infix_to_postfix($tokens_in) {
-    val @toks = @$tokens_in
+    var @toks = @$tokens_in
     var @out
     var @ops
     for val $t (@toks) {
@@ -20051,7 +20051,7 @@ fn WTrie::new() {
 
 fn WTrie::insert($t_root, $word) {
     var $cur = $t_root
-    val @chars = split //, $word
+    var @chars = split //, $word
     for val $ch (@chars) {
         unless (exists $cur->{children}->{$ch}) {
             $cur->{children}->{$ch} = +{ children => +{}, is_end => 0 }
@@ -20063,7 +20063,7 @@ fn WTrie::insert($t_root, $word) {
 
 fn WTrie::walk($t_root, $word) {
     var $cur = $t_root
-    val @chars = split //, $word
+    var @chars = split //, $word
     for val $ch (@chars) {
         return undef unless exists $cur->{children}->{$ch}
         $cur = $cur->{children}->{$ch}
@@ -20085,7 +20085,7 @@ fn WTrie::contains_prefix($t_root, $prefix) { WTrie::starts_with($t_root, $prefi
 # Recursive word counter (DFS counting is_end nodes).
 fn WTrie::word_count_at($node) {
     var $cnt = $node->{is_end}
-    val @children_vals = values %{$node->{children}}
+    var @children_vals = values %{$node->{children}}
     for val $ch_node (@children_vals) {
         $cnt += WTrie::word_count_at($ch_node)
     }
@@ -20102,7 +20102,7 @@ fn WTrie::wildcard_at($node, $pat_chars, $pos) {
     }
     val $ch = $pat_chars->[$pos]
     if ($ch eq ".") {
-        val @kid_keys = keys %{$node->{children}}
+        var @kid_keys = keys %{$node->{children}}
         for val $kk (@kid_keys) {
             return 1 if WTrie::wildcard_at($node->{children}->{$kk}, $pat_chars, $pos + 1)
         }
@@ -20199,7 +20199,7 @@ Sci::banner("§103 Trie + wildcard")
 # LC 322: minimum coin count.
 fn Coin::min_coins($coins_in, $amount) {
     return 0 if $amount == 0
-    val @coins = @$coins_in
+    var @coins = @$coins_in
     val $sentinel = $amount + 1                  # > any feasible coin count
     var @dp
     for val $i (0:$amount) { push @dp, $sentinel }
@@ -20220,7 +20220,7 @@ fn Coin::min_coins($coins_in, $amount) {
 # LC 518: count of distinct combinations summing to amount.
 # Outer loop on coins (not amounts) so each combination is counted once.
 fn Coin::count_ways($coins_in, $amount) {
-    val @coins = @$coins_in
+    var @coins = @$coins_in
     var @dp
     for val $i (0:$amount) { push @dp, 0 }
     $dp[0] = 1
@@ -20238,7 +20238,7 @@ fn Coin::count_ways($coins_in, $amount) {
 # Tracks the "last coin used to reach amount $a" alongside the DP.
 fn Coin::reconstruct($coins_in, $amount) {
     return [] if $amount == 0
-    val @coins = @$coins_in
+    var @coins = @$coins_in
     val $sentinel = $amount + 1
     var @dp
     var @last
@@ -21563,7 +21563,7 @@ fn MSBFS::rotting_oranges($grid_in, $w, $h) {
         val $cc = $node->[1]
         val $cd = $node->[2]
         $minutes = $cd if $cd > $minutes
-        val @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        var @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
         for val $d (@dirs) {
             val $nr = $cr + $d->[0]
             val $nc = $cc + $d->[1]
@@ -21596,7 +21596,7 @@ fn MSBFS::walls_and_gates($grid_in, $w, $h, $inf) {
         val $cr = $node->[0]
         val $cc = $node->[1]
         val $cd = $node->[2]
-        val @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        var @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
         for val $d (@dirs) {
             val $nr = $cr + $d->[0]
             val $nc = $cc + $d->[1]
@@ -21643,7 +21643,7 @@ fn MSBFS::max_distance($grid_in, $w, $h) {
         val $cc = $node->[1]
         val $cd = $node->[2]
         $best = $cd if $cd > $best
-        val @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
+        var @dirs = ([1, 0], [-1, 0], [0, 1], [0, -1])
         for val $d (@dirs) {
             val $nr = $cr + $d->[0]
             val $nc = $cc + $d->[1]
@@ -21759,7 +21759,7 @@ fn Phone::letter_helper($digits, $pos, $cur, $out_ref) {
         return
     }
     val $letters = Phone::digit_map(substr($digits, $pos, 1))
-    val @ls = split //, $letters
+    var @ls = split //, $letters
     for val $letter (@ls) {
         Phone::letter_helper($digits, $pos + 1, $cur . $letter, $out_ref)
     }
@@ -22189,7 +22189,7 @@ fn Sched::sort_by_start($starts_in, $ends_in) {
     # Build index array, sort by starts[i]
     var @idx
     for val $i (0:$n - 1) { push @idx, $i }
-    val @sorted_idx = sort { $starts[$_0] <=> $starts[$_1] } @idx
+    var @sorted_idx = sort { $starts[$_0] <=> $starts[$_1] } @idx
     var @s_out
     var @e_out
     for val $k (@sorted_idx) {
@@ -22527,7 +22527,7 @@ Sci::banner("§117 slide window str")
 #                the sum between is a multiple of k.
 
 fn PSub::count_sum_equals_k($arr_in, $kk) {
-    val @arr = @$arr_in
+    var @arr = @$arr_in
     var %prefix_count
     $prefix_count{0} = 1                       # empty prefix
     var $running = 0
@@ -22541,7 +22541,7 @@ fn PSub::count_sum_equals_k($arr_in, $kk) {
 }
 
 fn PSub::count_div_by_k($arr_in, $kk) {
-    val @arr = @$arr_in
+    var @arr = @$arr_in
     var %bucket
     $bucket{0} = 1                             # empty prefix
     var $running = 0
@@ -23101,7 +23101,7 @@ fn Wig::longest_wiggle($nums_in) {
 }
 
 fn Wig::increasing_triplet($nums_in) {
-    val @nums = @$nums_in
+    var @nums = @$nums_in
     val $huge = 1e18
     var $first  = $huge
     var $second = $huge
@@ -23128,7 +23128,7 @@ fn FrogJump::can_cross($stones_in) {
     $reach{0}->{0} = 1
     var $i = 0
     while ($i < $n) {
-        val @jumps = keys %{$reach{$i}}
+        var @jumps = keys %{$reach{$i}}
         for val $k (@jumps) {
             for val $dk (-1, 0, 1) {
                 val $step = $k + $dk

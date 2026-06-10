@@ -5,7 +5,7 @@ fn Rosetta::LZW::encode($text) {
     var %dict
     for val $i (0:255) { $dict{chr($i)} = $i }
     
-    val @chars = $text |> chars
+    var @chars = $text |> chars
     var @result
     var $w = ""
     var $dict_size = 256

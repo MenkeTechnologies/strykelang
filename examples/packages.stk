@@ -161,7 +161,7 @@ fn Mailer::Format::footer {
 package main
 
 p "── URL namespace ──────────────────────────────────────"
-val @urls = (
+var @urls = (
     "https://Example.COM/path",
     "  HTTP://A.B.C/x  ",
     "ftp://files.example.org/",

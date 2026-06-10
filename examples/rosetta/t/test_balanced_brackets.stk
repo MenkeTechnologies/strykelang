@@ -4,7 +4,7 @@
 fn Rosetta::BalancedBrackets::check($s) {
     var $count = 0
     var $balanced = 1
-    val @chars = chars($s)
+    var @chars = chars($s)
     for val $c (@chars) {
         if ($c eq "[") {
             $count++

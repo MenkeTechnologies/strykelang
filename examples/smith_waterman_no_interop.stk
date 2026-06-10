@@ -139,7 +139,7 @@ fn Sw::ungapped($s) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "Wikipedia example",
         s     => "GGTTGACTA",

@@ -8,7 +8,7 @@ fn Rosetta::WelshPowell::color($nodes, $edges) {
         $adj{$e->[0]}{$e->[1]} = 1
         $adj{$e->[1]}{$e->[0]} = 1
     }
-    val @ordered = sort {
+    var @ordered = sort {
         len(keys %{$adj{_1}}) <=> len(keys %{$adj{_0}})
     } @$nodes
     var %color

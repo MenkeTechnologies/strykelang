@@ -23,7 +23,7 @@ val @urls = (
 
 p "Checking status codes for #{len @urls} sites..."
 
-val @results = pmap {
+var @results = pmap {
     val $res = eval { http_request(_, +{ timeout => 5 }) }
 
     if ($@) {

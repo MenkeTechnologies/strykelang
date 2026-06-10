@@ -27,7 +27,7 @@ $db->exec("
 
 # 3. Insert some data with parameters
 p "Inserting sample users..."
-val @users = (
+var @users = (
     ["Alice", "alice\@example.com", 30],
     ["Bob",   "bob\@example.com",   25],
     ["Charlie", "charlie\@example.com", 35],
@@ -46,7 +46,7 @@ p "Last inserted ID: $last_id"
 # 4. Query data
 p ""
 p "Users over 30:"
-val @results = $db->query("SELECT * FROM users WHERE age > ?", 30)
+var @results = $db->query("SELECT * FROM users WHERE age > ?", 30)
 
 for val $row (@results) {
     p "  - #{$row->{name}} (#{$row->{age}}) <#{$row->{email}}>"

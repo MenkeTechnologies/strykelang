@@ -41,7 +41,7 @@ fn JP::dump($v, $indent) {
         return "[\n" . join(",\n", @parts) . "\n" . $pad . "]"
     }
     if ($r eq "HASH") {
-        val @ks = sort keys %$v
+        var @ks = sort keys %$v
         return "{}" if len(@ks) == 0
         var @parts = ()
         for val $k (@ks) {

@@ -16,7 +16,7 @@
 
 fn Roman::to($n) {
     die "out of range (1..3999): $n" if $n < 1 || $n > 3999
-    val @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+    var @vals  = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
     val @glyph = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
     var $out = ""
     var $rem = $n
@@ -32,7 +32,7 @@ fn Roman::to($n) {
 fn Roman::from($s) {
     die "not a Roman numeral: $s" unless $s =~ /^[MDCLXVI]+$/i
     val %val = (M => 1000, D => 500, C => 100, L => 50, X => 10, V => 5, I => 1)
-    val @chars = split(//, uc($s))
+    var @chars = split(//, uc($s))
     var $total = 0
     for val $i (0:len(@chars) - 1) {
         val $here = $val{$chars[$i]}

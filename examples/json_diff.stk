@@ -164,7 +164,7 @@ for val $d (@$diffs) {
     next if len(@segs) == 0
     topk_add($tk, $segs[0])
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-20s : %d changes\n", $h->[0], $h->[1]
 }

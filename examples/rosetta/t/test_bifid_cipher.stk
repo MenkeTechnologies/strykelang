@@ -29,7 +29,7 @@ fn Rosetta::Bifid::find_pos($grid, $char) {
 fn Rosetta::Bifid::encode($text, $key) {
     val $grid = Rosetta::Bifid::prepare_key($key)
     val $t = $text |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
-    val @chars = $t |> chars()
+    var @chars = $t |> chars()
     
     var @rows
     var @cols
@@ -54,7 +54,7 @@ fn Rosetta::Bifid::encode($text, $key) {
 fn Rosetta::Bifid::decode($text, $key) {
     val $grid = Rosetta::Bifid::prepare_key($key)
     val $t = $text |> uc() |> { _ =~ s/J/I/gr } |> { _ =~ s/[^A-Z]//gr }
-    val @chars = $t |> chars()
+    var @chars = $t |> chars()
     
     var @combined
     for val $c (@chars) {

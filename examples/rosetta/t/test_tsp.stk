@@ -6,7 +6,7 @@ fn Rosetta::TSP::perms($arr) {
     return [[@$arr]] if $n <= 1
     var @result
     for val $i (0:$n-1) {
-        val @rest = ~> 0:$n-1 grep { _ != $i } map { $arr->[_] }
+        var @rest = ~> 0:$n-1 grep { _ != $i } map { $arr->[_] }
         for val $p (@{ Rosetta::TSP::perms(\@rest) }) {
             push @result, [$arr->[$i], @$p]
         }

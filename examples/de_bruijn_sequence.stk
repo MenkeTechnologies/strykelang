@@ -80,7 +80,7 @@ fn DB::verify($seq_ref, $k, $n) {
 
 # ── run B(k, n) for several (k, n) pairs ───────────────────────────
 
-val @cases = ([2, 3], [2, 4], [3, 2], [2, 5])
+var @cases = ([2, 3], [2, 4], [3, 2], [2, 5])
 
 printf "── de Bruijn sequences B(k, n) ────────────────────────\n\n"
 

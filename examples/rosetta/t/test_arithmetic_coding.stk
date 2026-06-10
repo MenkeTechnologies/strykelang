@@ -2,11 +2,11 @@
 # Rosetta Code: Arithmetic coding
 
 fn Rosetta::ArithmeticCoding::get_probs($text) {
-    val @chars = $text |> chars
+    var @chars = $text |> chars
     var %count
     for val $c (@chars) { $count{$c} = $count{$c} + 1 }
     
-    val @sorted_chars = sort(keys %count)
+    var @sorted_chars = sort(keys %count)
     var %probs
     var $curr = 0
     val $total = len(@chars)
@@ -21,7 +21,7 @@ fn Rosetta::ArithmeticCoding::get_probs($text) {
 fn Rosetta::ArithmeticCoding::encode($text, $probs) {
     var $low = 0
     var $high = 1
-    val @chars = $text |> chars
+    var @chars = $text |> chars
     for val $c (@chars) {
         val $range = $high - $low
         val $p = $probs->{$c}

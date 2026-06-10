@@ -53,7 +53,7 @@ assert_eq Rosetta::Partition::with_k(5, 5),  1, "p(5,5) = 1 (1+1+1+1+1)"
 assert_eq Rosetta::Partition::with_k(5, 1),  1, "p(5,1) = 1 (just 5)"
 
 # Sum_k p(n,k) over k=1..n equals p(n)
-val @ns = (1, 5, 10, 15)
+var @ns = (1, 5, 10, 15)
 for var $n (@ns) {
     var $sum = 0
     for val $k (1:$n) {

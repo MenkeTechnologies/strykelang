@@ -29,7 +29,7 @@ p "── Section 2 — collections (List → @, Map → %) ──────�
 #   val colors: List<String> = listOf("red", "green", "blue")
 #   var counts: Map<String, Int> = mapOf("red" to 3, "blue" to 5)
 #   for (c in colors) println(c)
-val @colors = ("red", "green", "blue")
+var @colors = ("red", "green", "blue")
 val %counts = (red => 3, blue => 5)
 for val $c (@colors) {
     p "  color: $c"
@@ -76,7 +76,7 @@ p "── Section 6 — accumulator pattern (var array) ───────"
 #   var sumOfSquares = 0
 #   for (x in src) sumOfSquares += x * x
 #   println("sum of squares = \$sumOfSquares")
-val @src = (1, 2, 3, 4, 5)
+var @src = (1, 2, 3, 4, 5)
 var $sum_of_squares = 0
 for val $x (@src) { $sum_of_squares += $x * $x }
 p "  sum of squares = $sum_of_squares  (expected 55)"

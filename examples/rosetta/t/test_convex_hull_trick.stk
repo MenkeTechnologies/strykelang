@@ -54,7 +54,7 @@ fn Rosetta::CHT::query_naive($lines, $x) {
 
 # Insert lines with decreasing slope, query with increasing x.
 val $cht = Rosetta::CHT::new()
-val @lines = ([5, 10], [3, 4], [2, -2], [-1, 5])  # slopes 5, 3, 2, -1
+var @lines = ([5, 10], [3, 4], [2, -2], [-1, 5])  # slopes 5, 3, 2, -1
 for val $l (@lines) { Rosetta::CHT::add_line($cht, $l->[0], $l->[1]) }
 
 # Query at several x values; cross-check with naive scan.
@@ -79,7 +79,7 @@ assert_ok len(@{$dup->{lines}}) <= 2, "duplicate-slope dedup"
 
 # Decreasing-slope insertion sequence — verify CHT yields lower envelope.
 val $env = Rosetta::CHT::new()
-val @seq = ([10, 0], [5, 10], [1, 50])
+var @seq = ([10, 0], [5, 10], [1, 50])
 for val $l (@seq) { Rosetta::CHT::add_line($env, $l->[0], $l->[1]) }
 for val $x (~> 0:50) {
     val $hull = Rosetta::CHT::query($env, $x)

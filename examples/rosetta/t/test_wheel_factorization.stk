@@ -5,7 +5,7 @@
 fn Rosetta::Wheel::factor($n) {
     var @factors
     return \@factors if $n < 2
-    val @small = (2, 3, 5)
+    var @small = (2, 3, 5)
     for val $p (@small) {
         while ($n % $p == 0) {
             push @factors, $p

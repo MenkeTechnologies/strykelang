@@ -77,8 +77,8 @@ fn MR::is_prime_brute($n) {
 p "── Miller-Rabin primality demo ──"
 
 # Known primes and composites.
-val @known_primes = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 97, 541, 7919, 65537, 104729, 1000003)
-val @known_composites = (1, 4, 6, 8, 9, 15, 21, 25, 27, 49, 100, 561, 1105, 1729, 2465)  # includes Carmichaels
+var @known_primes = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 97, 541, 7919, 65537, 104729, 1000003)
+var @known_composites = (1, 4, 6, 8, 9, 15, 21, 25, 27, 49, 100, 561, 1105, 1729, 2465)  # includes Carmichaels
 
 for val $n (@known_primes) {
     die "$n should be prime" unless MR::is_prime($n)

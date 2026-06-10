@@ -7,7 +7,7 @@
 fn Exercism::Alphametics::solve($puzzle) {
     val ($lhs, $rhs) = split /\s*==\s*/, $puzzle
     val @addends = split /\s*\+\s*/, $lhs
-    val @words   = (@addends, $rhs)
+    var @words   = (@addends, $rhs)
     var %leading_letters
     $leading_letters{substr($_, 0, 1)}++ for grep { len($_) > 1 } @words
     var %letters

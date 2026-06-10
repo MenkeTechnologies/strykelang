@@ -16,7 +16,7 @@
 
 fn RLE::enc($s) {
     return "" if len($s) == 0
-    val @chars = split(//, $s)
+    var @chars = split(//, $s)
     var $out  = ""
     var $prev = $chars[0]
     var $run  = 1
@@ -61,7 +61,7 @@ if (len(@ARGV) >= 2) {
 }
 
 # Demo grid — each input must round-trip cleanly.
-val @cases = (
+var @cases = (
     +{ s => "",                expected => ""              },
     +{ s => "a",               expected => "1a"            },
     +{ s => "aaa",             expected => "3a"            },

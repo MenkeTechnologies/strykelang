@@ -27,7 +27,7 @@ fn BWT::transform($s) {
         val $rot = $i == 0 ? $s : $s[$i : $n - 1] . $s[0 : $i - 1]
         push @rotations, $rot
     }
-    val @sorted = ~> @rotations sort { _0 cmp _1 }
+    var @sorted = ~> @rotations sort { _0 cmp _1 }
 
     var $last_col = ""
     for val $r (@sorted) { $last_col = $last_col . $r[-1] }
@@ -45,7 +45,7 @@ fn BWT::inverse($bwt, $idx) {
 
     var @bwt_arr
     for val $i (0 : $n - 1) { push @bwt_arr, $bwt[$i] }
-    val @first_col = ~> @bwt_arr sort { _0 cmp _1 }
+    var @first_col = ~> @bwt_arr sort { _0 cmp _1 }
 
     # occ_bwt[i] / occ_first[j] = how many times that char has been
     # seen in column up to and including row i / j. LF mapping is

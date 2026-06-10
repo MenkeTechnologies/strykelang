@@ -28,7 +28,7 @@ p "── AI RAG Knowledge Base ────────────────
 
 ai_memory_clear()
 
-val @docs = (
+var @docs = (
     +{ id => "returns", content => "Our return policy is 30 days for most items. Items must be in original packaging." },
     +{ id => "shipping", content => "Standard shipping takes 3-5 business days. Express shipping is overnight." },
     +{ id => "contact", content => "Support can be reached at support@example.com or 1-800-555-0199." }

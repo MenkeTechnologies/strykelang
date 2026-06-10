@@ -7,7 +7,7 @@
 
 # ── corpus ────────────────────────────────────────────────────────────
 
-val @corpus = (
+var @corpus = (
     "the quick brown fox jumps over the lazy dog",
     "the lazy dog sleeps under the warm sun",
     "the brown fox runs fast through the forest",
@@ -26,7 +26,7 @@ p "── building bigram model ────────────────
 var %next   # word → arrayref of follow-up words (with repeats = freq)
 
 for val $sentence (@corpus) {
-    val @words = split /\s+/, $sentence
+    var @words = split /\s+/, $sentence
     for val $i (0:len(@words)-2) {
         val $w  = $words[$i]
         val $nx = $words[$i + 1]
@@ -42,11 +42,11 @@ printf "  trained on %d sentences, %d distinct words\n",
 
 p ""
 p "── sample transitions for 'the' ───────────────────────"
-val @after_the = @{$next{"the"}}
+var @after_the = @{$next{"the"}}
 printf "  after 'the': %d follow-ups\n", len @after_the
 var %freq
 for val $w (@after_the) { $freq{$w}++ }
-val @top = sort { $freq{_1} <=> $freq{_} } keys %freq
+var @top = sort { $freq{_1} <=> $freq{_} } keys %freq
 for val $w (@top[0:4]) {
     printf "    %-12s × %d\n", $w, $freq{$w}
 }

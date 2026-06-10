@@ -14,7 +14,7 @@ fn Exercism::Tournament::tally {
         elsif ($r eq "loss") { $t{$away}{w}++; $t{$home}{l}++; $t{$away}{p} += 3 }
         else                  { $t{$home}{d}++; $t{$away}{d}++; $t{$home}{p}++; $t{$away}{p}++ }
     }
-    val @teams = sort { $t{_1}{p} <=> $t{_}{p} || _ cmp _1 } keys %t
+    var @teams = sort { $t{_1}{p} <=> $t{_}{p} || _ cmp _1 } keys %t
     val $hdr = sprintf("%-31s| MP |  W |  D |  L |  P", "Team")
     var @lines = ($hdr)
     for val $name (@teams) {

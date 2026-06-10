@@ -36,7 +36,7 @@ assert_eq $p[0][0], 1913, "first prime of first pair = 1913"
 assert_eq $p[0][1], 1931, "second prime of first pair = 1931"
 
 # Several Ormiston pairs in 1..20000 — at least the famous 1913/1931
-val @p5 = Rosetta::Ormiston::pairs(20000)
+var @p5 = Rosetta::Ormiston::pairs(20000)
 assert_ok len(@p5) >= 1, "at least one Ormiston pair below 20000"
 assert_eq $p5[0]->[0], 1913, "first Ormiston first-prime is 1913"
 # Every recorded pair has the same digit-multiset by construction

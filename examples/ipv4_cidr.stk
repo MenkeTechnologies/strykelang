@@ -5,7 +5,7 @@
 # Run: stryke --no-interop examples/ipv4_cidr.stk
 
 fn IP::parse($s) {
-    val @parts = split(/\./, $s)
+    var @parts = split(/\./, $s)
     return undef if len(@parts) != 4
     var $val = 0
     for val $p (@parts) {

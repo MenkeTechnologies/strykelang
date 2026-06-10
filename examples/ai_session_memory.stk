@@ -34,7 +34,7 @@ p "  asst: $r2"
 
 p ""
 p "── history: system row + alternating user/assistant ───"
-val @hist = ai_session_history($sess)
+var @hist = ai_session_history($sess)
 printf "  %d rows total:\n", len @hist
 for val $i (0:len(@hist)-1) {
     printf "    [%d] %-9s : %s\n", $i, $hist[$i]->{role}, $hist[$i]->{content}
@@ -73,7 +73,7 @@ printf "  saved %d docs\n", ai_memory_count()
 
 p ""
 p "── recall returns FLAT array of hashref hits ──────────"
-val @hits = ai_memory_recall("Rust scripting", top_k => 3)
+var @hits = ai_memory_recall("Rust scripting", top_k => 3)
 printf "  recall yielded %d row(s) (top_k=3):\n", len @hits
 for val $h (@hits) {
     val $meta = $h->{metadata}

@@ -126,7 +126,7 @@ fn extract_lsp_blocks($path) {
     var @blocks
     for val $raw (extract_rust_strings $path) {
         next unless index($raw, '```perl') >= 0
-        val @lines = unescape_rust($raw) |> split /\n/, _
+        var @lines = unescape_rust($raw) |> split /\n/, _
         var $in_block = 0
         var $buf = ""
         for val $line (@lines) {
@@ -231,7 +231,7 @@ val @results = pmap {
     check_block $b, $idx
 } with_index @code_blocks
 
-val @failures = grep { !_->{ok} } @results
+var @failures = grep { !_->{ok} } @results
 val @oks      = grep {  _->{ok} } @results
 
 p "passed:  ", len @oks
@@ -255,7 +255,7 @@ if ($top > 0 && @failures) {
         $bucket{$first} //= 0
         $bucket{$first}++
     }
-    val @keys = sort { $bucket{$_1} <=> $bucket{$_0} } keys %bucket
+    var @keys = sort { $bucket{$_1} <=> $bucket{$_0} } keys %bucket
     var $n = 0
     for val $k (@keys) {
         last if $n >= $top

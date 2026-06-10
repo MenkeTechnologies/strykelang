@@ -3,7 +3,7 @@
 
 fn Rosetta::RPN::eval($expr) {
     var @stack
-    val @tokens = split /\s+/, $expr
+    var @tokens = split /\s+/, $expr
     for val $tok (@tokens) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
             push @stack, $tok + 0

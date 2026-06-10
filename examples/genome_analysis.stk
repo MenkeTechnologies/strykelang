@@ -63,7 +63,7 @@ while ($i + 3 <= len($dna)) {
 p ""
 printf "── codon frequencies (top 10 of %d distinct) ──────────\n",
     len(keys %codon_count)
-val @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_} } keys %codon_count
+var @sorted_codons = sort { $codon_count{_1} <=> $codon_count{_} } keys %codon_count
 var $shown = 0
 for val $codon (@sorted_codons) {
     last if $shown >= 10
@@ -151,7 +151,7 @@ printf "  exact               : %d (max 64)\n", len(keys %codon_count)
 
 p ""
 p "── TopK most-frequent codons ────────────────────────"
-val @hits = topk_top($tk_codons)
+var @hits = topk_top($tk_codons)
 for val $h (@hits) {
     printf "  %s : %d hits\n", $h->[0], $h->[1]
 }

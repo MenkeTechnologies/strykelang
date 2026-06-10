@@ -11,7 +11,7 @@
 
 # ── score events ───────────────────────────────────────────────────
 
-val @sessions = (
+var @sessions = (
     # Each session: player, score, age_in_days (lower = more recent)
     ["alice",   240, 0],   ["bob",     180, 0],   ["carol",   320, 0],
     ["dave",    150, 1],   ["alice",   180, 1],   ["eve",     200, 1],
@@ -57,7 +57,7 @@ for val $s (@sessions) {
 p ""
 p "── all-time top 10 (by total score) ─────────────────"
 printf "  %-8s %6s %6s %6s\n", "player", "total", "best", "n"
-val @top = sort { $total{_1} <=> $total{_} } keys %total
+var @top = sort { $total{_1} <=> $total{_} } keys %total
 var $shown = 0
 for val $p (@top) {
     last if $shown >= 10
@@ -70,7 +70,7 @@ for val $p (@top) {
 
 p ""
 p "── recent-bias top 5 (decay half-life: 3 days) ──────"
-val @recent_top = sort { $recent_weighted{_1} <=> $recent_weighted{_} } keys %recent_weighted
+var @recent_top = sort { $recent_weighted{_1} <=> $recent_weighted{_} } keys %recent_weighted
 $shown = 0
 for val $p (@recent_top) {
     last if $shown >= 5
@@ -106,7 +106,7 @@ p ""
 p "── TopK most-active players ─────────────────────────"
 val $tk = topk(3)
 topk_add($tk, _->[0]) for @sessions
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-8s : %d sessions\n", $h->[0], $h->[1]
 }
@@ -115,7 +115,7 @@ for val $h (@hits) {
 
 p ""
 p "── tier classification (by total score) ─────────────"
-val @tiers = (
+var @tiers = (
     [800, "Diamond"],
     [600, "Gold"],
     [400, "Silver"],

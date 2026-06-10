@@ -47,7 +47,7 @@ assert_ok abs($mean - 12.24) < 0.3, sprintf("mean ≈ 12.24 (got %.2f)", $mean)
 
 # A complete set always satisfies the campaign rules
 for val $i (~> 1:50) {
-    val @set = Rosetta::RpgAttr::generate_set()
+    var @set = Rosetta::RpgAttr::generate_set()
     assert_eq len(@set), 6, "6 attributes"
     var $set_sum = 0
     var $high_count = 0

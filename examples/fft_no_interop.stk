@@ -82,7 +82,7 @@ package main
 p "── FFT Demo ──"
 
 # Polynomial [1, 2, 3, 4] represented as complex numbers
-val @poly = (
+var @poly = (
     [1.0, 0.0],
     [2.0, 0.0],
     [3.0, 0.0],

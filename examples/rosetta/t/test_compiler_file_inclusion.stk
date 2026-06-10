@@ -9,7 +9,7 @@ fn Rosetta::Inclusion::process($path, $seen) {
     $seen->{$path} = 1
     
     val $content = slurp($path)
-    val @lines = split("\n", $content)
+    var @lines = split("\n", $content)
     
     var @processed
     for val $line (@lines) {

@@ -59,7 +59,7 @@ p $monitor->identify()
 p "\n--- TRAIT-BASED DISPATCH ---"
 
 # Both implement Readable
-val @readables = ($scanner, $monitor)
+var @readables = ($scanner, $monitor)
 for var $r (@readables) {
     val $data = $r->read_data()
     p "Data from ", $r->name, ": ", to_json($data)

@@ -13,7 +13,7 @@
 
 # ── dataset: a synthetic "orders" table ──────────────────────────────
 
-val @orders = (
+var @orders = (
     +{ id => 1,  customer => "alice", region => "us-west", amount =>  120.50, items => 3 },
     +{ id => 2,  customer => "bob",   region => "us-east", amount =>   75.00, items => 1 },
     +{ id => 3,  customer => "carol", region => "eu",      amount =>  250.00, items => 5 },
@@ -32,7 +32,7 @@ printf "── dataset: %d orders ───────────────�
 
 p ""
 p "── SELECT id,customer,amount WHERE amount > 100 ─────"
-val @big = @orders
+var @big = @orders
     |> grep { _->{amount} > 100 }
     |> sort { _1->{amount} <=> _->{amount} }   # DESC
 for val $row (@big) {
@@ -89,7 +89,7 @@ p ""
 p "── TOP 3 customers by order count (TopK sketch) ─────"
 val $tk = topk(3)
 topk_add($tk, _->{customer}) for @orders
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $hit (@top) {
     printf "  %-7s : %d orders\n", $hit->[0], $hit->[1]
 }
@@ -107,7 +107,7 @@ printf "  distinct customers (%d): %s\n",
 
 p ""
 p "── HAVING SUM(amount) > 200 ─────────────────────────"
-val @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
+var @big_customers = grep { $by_customer{_} > 200 } keys %by_customer
 for val $c (sort { $by_customer{_1} <=> $by_customer{_} } @big_customers) {
     printf "  %-7s  \$%.2f\n", $c, $by_customer{$c}
 }

@@ -14,7 +14,7 @@ fn Rosetta::LargestDivByDigits::digits($n) {
 }
 
 fn Rosetta::LargestDivByDigits::qualifies($n) {
-    val @d = Rosetta::LargestDivByDigits::digits($n)
+    var @d = Rosetta::LargestDivByDigits::digits($n)
     var %seen
     for val $x (@d) {
         return 0 if $x == 0

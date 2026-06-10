@@ -5,7 +5,7 @@ fn Rosetta::PowerfulNumbers::check($n) {
     if ($n == 1) {
         1
     } else {
-        val @factors = prime_factors($n)
+        var @factors = prime_factors($n)
         var %unique_factors
         for val $f (@factors) { $unique_factors{$f} = 1 }
         

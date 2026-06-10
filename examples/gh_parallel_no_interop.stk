@@ -19,7 +19,7 @@
 
 # ── 0. wiring check (always runs, no network needed) ─────────────────────────
 val %builtins = %stryke::builtins
-val @must_exist = qw(
+var @must_exist = qw(
     gh_get gh_user gh_org gh_repo gh_repos gh_rate_limit gh_zen
     gh_issues gh_prs gh_commits gh_branches gh_tags gh_releases
     gh_languages gh_topics gh_readme gh_search_repos
@@ -48,7 +48,7 @@ die "expected at least 100 repos" unless len(@repos) >= 100
 p ""
 p "── top-10 repos by stars (parallel detail fetch) ──"
 val @top10 = (sort { _1->{stargazers_count} <=> _->{stargazers_count} } @repos)[0:9]
-val @full = pmap { gh_repo($_->{full_name}) } @top10
+var @full = pmap { gh_repo($_->{full_name}) } @top10
 printf("  %-30s  %-12s  %5s\n", "repo", "lang", "★")
 printf("  %s\n", "─" x 55)
 for val $r (@full) {
@@ -62,7 +62,7 @@ for val $r (@full) {
 p ""
 p "── language histogram (across all repos) ──"
 val $by_lang = freq(map { _->{language} || "unknown" } @repos)
-val @sorted = sort { $by_lang->{_1} <=> $by_lang->{_} } keys %$by_lang
+var @sorted = sort { $by_lang->{_1} <=> $by_lang->{_} } keys %$by_lang
 for val $k (@sorted[0:9]) {
     printf("  %-16s  %4d\n", $k, $by_lang->{$k})
 }

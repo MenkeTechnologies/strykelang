@@ -65,7 +65,7 @@ val $bimodal = fn ($x) {
     exp(-($x + 3) ** 2 / 2) + exp(-($x - 3) ** 2 / 2)
 }
 val $r2 = Rosetta::MH::sample($bimodal, 0, 2.0, 8000)
-val @b2 = @{$r2->{chain}}[2000..len(@{$r2->{chain}}) - 1]
+var @b2 = @{$r2->{chain}}[2000..len(@{$r2->{chain}}) - 1]
 val $mean2 = Rosetta::MH::mean(\@b2)
 # Symmetric mixture has true mean 0; large σ proposal lets MH cross the
 # valley between the modes.

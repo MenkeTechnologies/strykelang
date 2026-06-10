@@ -21,7 +21,7 @@ val $n = 8
 printf "graph: %d nodes  ·  %d edges\n", $n, len(@edges)
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard nodes across workers; each computes in-degree for its
 # assigned nodes given the full edge list.

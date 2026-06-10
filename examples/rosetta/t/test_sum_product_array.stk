@@ -4,7 +4,7 @@
 fn Rosetta::SumProduct::demo() {
     "Sum and Product of Array Examples:" |> p
     
-    val @numbers = (1, 2, 3, 4, 5)
+    var @numbers = (1, 2, 3, 4, 5)
     "Array: " . join(", ", @numbers) |> p
     
     # Sum using reduce

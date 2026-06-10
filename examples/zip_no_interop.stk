@@ -37,7 +37,7 @@ fn Zip::unpair($pairs) {
 }
 
 # Pair-zip cases.
-val @pair_cases = (
+var @pair_cases = (
     +{ xs => [1, 2, 3],         ys => ["a", "b", "c"],     out => [[1,"a"],[2,"b"],[3,"c"]] },
     +{ xs => [1, 2, 3, 4],      ys => ["a", "b"],          out => [[1,"a"],[2,"b"]] },          # short ys
     +{ xs => [],                ys => [1, 2],              out => [] },                          # empty
@@ -57,7 +57,7 @@ for var $c (@pair_cases) {
 }
 
 # N-list zip cases.
-val @n_cases = (
+var @n_cases = (
     +{ lists => [[1,2,3], ["a","b","c"], [10,20,30]], out => [[1,"a",10],[2,"b",20],[3,"c",30]] },
     +{ lists => [[1,2,3,4], ["a","b"]],                out => [[1,"a"],[2,"b"]] },
     +{ lists => [[1,2,3]],                              out => [[1],[2],[3]] },                  # 1-list zip = wrap

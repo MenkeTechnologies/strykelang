@@ -90,7 +90,7 @@ fn Demo::CB::was_copied($content) {
 
 # ── sample workload ───────────────────────────────────────────────
 
-val @copies = (
+var @copies = (
     "https://example.com/article/1",
     "alice\@corp.io",
     "555-123-4567",
@@ -146,7 +146,7 @@ for val $e (@$r3) {
 
 p ""
 p "── Bloom 'was-copied' check ─────────────────────────"
-val @probes = (
+var @probes = (
     "alice\@corp.io",     # was copied
     "https://example.com/article/1",  # was copied
     "never-copied-string-xyz",
@@ -182,7 +182,7 @@ printf "  exact : %d\n", len(keys %exact_distinct)
 
 p ""
 p "── TopK most-common content kinds ───────────────────"
-val @top_kinds = topk_top($tk_kinds)
+var @top_kinds = topk_top($tk_kinds)
 for val $h (@top_kinds) {
     printf "  %-10s : %d\n", $h->[0], $h->[1]
 }

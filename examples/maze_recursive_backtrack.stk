@@ -57,7 +57,7 @@ fn Maze::make_grid($w, $h, $init) {
 
 fn Maze::carve($r, $c, $grid, $visited, $w, $h) {
     $visited->[$r]->[$c] = 1
-    val @order = (0, 1, 2, 3)
+    var @order = (0, 1, 2, 3)
     Maze::shuffle(\@order, $r, $c)
     for val $d (@order) {
         val $nr = $r + $DR[$d]

@@ -2,7 +2,7 @@
 # Rosetta Code: Execute SNUSP
 
 fn Rosetta::Snusp::run($grid_str) {
-    val @lines = split "\n", $grid_str
+    var @lines = split "\n", $grid_str
     var @grid
     for val $l (@lines) { push @grid, [split("", $l)] }
     

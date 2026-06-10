@@ -4,7 +4,7 @@
 # Verifies dictionary lookup and Levenshtein-based suggestions.
 # Compliance: docs/STYLE_GUIDE.md
 
-val @dict = qw(
+var @dict = qw(
     the quick brown fox jumps over lazy dog
     hello world program code function variable
     stryke language syntax feature builtin range
@@ -27,7 +27,7 @@ fn Spell::suggest($word, $n) {
     for val $entry (@dict) {
         push @scored, [$entry, levenshtein($w, $entry)]
     }
-    val @sorted = sort { _->[1] <=> _1->[1] } @scored
+    var @sorted = sort { _->[1] <=> _1->[1] } @scored
     var @top = ()
     for val $pair (@sorted[0:$n-1]) {
         push @top, $pair->[0]

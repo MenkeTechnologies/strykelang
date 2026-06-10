@@ -76,7 +76,7 @@ assert_eq Rosetta::BK::levenshtein("abc", "yabd"), 2, "abc/yabd"
 
 # Build a small dictionary
 val $tree = Rosetta::BK::new()
-val @words = ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart", "car",
+var @words = ("book", "books", "boo", "boon", "cook", "cake", "cape", "cart", "car",
              "loop", "look", "took", "tool", "noon", "moon")
 for val $w (@words) { Rosetta::BK::insert($tree, $w) }
 

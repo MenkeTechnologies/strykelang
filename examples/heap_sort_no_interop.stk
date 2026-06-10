@@ -60,7 +60,7 @@ fn Heap::sorted($arr) {
 
 p "── Heap sort demo ──"
 
-val @cases = (
+var @cases = (
     +{ input => [],                          sorted => []                 },
     +{ input => [42],                        sorted => [42]               },
     +{ input => [5, 4, 3, 2, 1],             sorted => [1, 2, 3, 4, 5]    },  # reverse

@@ -121,7 +121,7 @@ fn Mcmf::solve($g, $src, $sink) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "direct edge",
         n     => 2,

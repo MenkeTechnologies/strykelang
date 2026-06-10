@@ -3,7 +3,7 @@
 
 fn Rosetta::HQ9Plus::execute($code) {
     var $accumulator = 0
-    val @lines = split "", $code
+    var @lines = split "", $code
     var $output = ""
     
     for val $char (@lines) {

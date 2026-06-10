@@ -3,7 +3,7 @@
 
 fn Rosetta::CaesarCipher::encode($str, $shift) {
     var @res
-    val @chars = $str |> chars
+    var @chars = $str |> chars
     for val $c (@chars) {
         if ($c =~ /[A-Z]/) {
             push @res, chr((ord($c) - 65 + $shift) % 26 + 65)

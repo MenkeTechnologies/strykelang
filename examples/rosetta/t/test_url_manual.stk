@@ -2,7 +2,7 @@
 # Rosetta Code: URL Encoding/Decoding (Manual)
 
 fn Rosetta::UrlEncode::url_encode($str) {
-    val @chars = $str |> chars
+    var @chars = $str |> chars
     var $res = ""
     for val $c (@chars) {
         if ($c =~ /[a-zA-Z0-9._~-]/) {

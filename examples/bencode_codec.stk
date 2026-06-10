@@ -13,7 +13,7 @@ fn BC::encode($v) {
         return $out . "e"
     }
     if ($t eq "HASH") {
-        val @ks = sort keys %$v
+        var @ks = sort keys %$v
         var $out = "d"
         for val $k (@ks) {
             $out = $out . (len $k) . ":" . $k . BC::encode($v->{$k})

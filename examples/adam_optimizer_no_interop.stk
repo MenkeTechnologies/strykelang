@@ -103,7 +103,7 @@ fn Adam::run_md_quadratic($targets, $x0_arr, $steps, $lr) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ name => "1-D quadratic, a=3, x₀=0",      target => 3.0,  start => 0.0,   steps => 500, lr => 0.1 },
     +{ name => "1-D quadratic, a=−7, x₀=5",     target => -7.0, start => 5.0,   steps => 500, lr => 0.1 },
     +{ name => "1-D quadratic, a=π̃, x₀=10",   target => 3.14, start => 10.0,  steps => 1000, lr => 0.05 },

@@ -58,7 +58,7 @@ fn Rosetta::EliasGamma::decode_list($s) {
 }
 
 # Reference table from the Wikipedia Elias gamma article.
-val @canonical = (
+var @canonical = (
     [1,  "1"],
     [2,  "010"],
     [3,  "011"],

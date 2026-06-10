@@ -25,8 +25,8 @@ fn Rosetta::MinHash::solve($str1, $str2, $num_hashes) {
         $shingles2{$s2[$i] . $s2[$i+1] . $s2[$i+2]} = 1
     }
     
-    val @k1 = keys %shingles1
-    val @k2 = keys %shingles2
+    var @k1 = keys %shingles1
+    var @k2 = keys %shingles2
     
     # Compute minhash signatures
     var @sig1

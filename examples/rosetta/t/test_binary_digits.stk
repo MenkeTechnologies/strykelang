@@ -17,7 +17,7 @@ fn Rosetta::BinaryDigits::encode($n) {
 
 fn Rosetta::BinaryDigits::decode($s) {
     var $result = 0
-    val @bits = split //, $s
+    var @bits = split //, $s
     for val $bit (@bits) {
         if ($bit =~ /[01]/) {
             $result = $result * 2 + int($bit)

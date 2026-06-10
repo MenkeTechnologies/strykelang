@@ -47,7 +47,7 @@ assert_eq Rosetta::Sedol::char_value("E"), -1, "vowel E rejected"
 assert_eq Rosetta::Sedol::char_value("Z"), 35, "Z → 35"
 
 # Rosetta canonical sample: ten SEDOLs and their check digits
-val @samples = (
+var @samples = (
     ["710889",  "9"],
     ["B0YBKJ",  "7"],
     ["406566",  "3"],

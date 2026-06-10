@@ -70,7 +70,7 @@ die "variance should decrease with N (got $var_s → $var_b)" unless $var_b < $v
 p "  variance shrinks: N=1k var=#{int($var_s * 1e6) / 1e6}, N=10k var=#{int($var_b * 1e6) / 1e6}  OK"
 
 # Estimate is always in [0, 4] (hits/total ∈ [0, 1], times 4).
-val @samples = @{MC::trials(100, 20)}
+var @samples = @{MC::trials(100, 20)}
 for val $s (@samples) {
     die "estimate out of [0, 4]: $s" if $s < 0 || $s > 4
 }

@@ -41,7 +41,7 @@ val @racers = map {
 } (1:5)
 val @done = map {await} @racers
 # Sort by recorded delay
-val @ranked = sort { _->{delay_ms} <=> _1->{delay_ms} } @done
+var @ranked = sort { _->{delay_ms} <=> _1->{delay_ms} } @done
 p "  ranking by completion time:"
 for val $row (@ranked) {
     printf "    racer %d  delay=%dms\n", $row->{id}, $row->{delay_ms}

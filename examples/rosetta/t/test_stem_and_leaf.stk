@@ -18,7 +18,7 @@ fn Rosetta::StemLeaf::build($values) {
 
 fn Rosetta::StemLeaf::render($values) {
     val $g = Rosetta::StemLeaf::build($values)
-    val @stems = sort { _ <=> _1 } keys %$g
+    var @stems = sort { _ <=> _1 } keys %$g
     var @lines
     for val $s (@stems) {
         push @lines, sprintf("%2d | %s", $s, join(" ", @{$g->{$s}}))
@@ -61,7 +61,7 @@ assert_eq $total, len(@data), "no values lost"
 # Leaves within each stem are sorted
 var $sorted_ok = 1
 for val $s (keys %$g) {
-    val @leaves = @{$g->{$s}}
+    var @leaves = @{$g->{$s}}
     for val $i (0..len(@leaves) - 2) {
         $sorted_ok = 0 if $leaves[$i] > $leaves[$i + 1]
     }

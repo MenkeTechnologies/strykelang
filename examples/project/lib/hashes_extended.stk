@@ -327,7 +327,7 @@ fn Project::HashesExtended::hash_get_or_default {
 }
 
 fn Project::HashesExtended::hash_count_by {
-    val @items = qw(a b a c a b)
+    var @items = qw(a b a c a b)
     var %counts
     for val $item (@items) {
         $counts{$item}++
@@ -336,7 +336,7 @@ fn Project::HashesExtended::hash_count_by {
 }
 
 fn Project::HashesExtended::hash_group_by {
-    val @nums = (1, 2, 3, 4, 5, 6)
+    var @nums = (1, 2, 3, 4, 5, 6)
     val %groups = (even => [], odd => [])
     for val $n (@nums) {
         val $key = $n % 2 == 0 ? "even" : "odd"

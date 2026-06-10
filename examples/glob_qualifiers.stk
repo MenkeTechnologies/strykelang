@@ -38,7 +38,7 @@ printf "  including .*  : %d\n", len @all
 
 p ""
 p "── Sort qualifiers — (oL) by Length ascending ─────────"
-val @by_len = glob("examples/*.stk(oL)")
+var @by_len = glob("examples/*.stk(oL)")
 p "  first 3 shortest names:"
 for val $f (@by_len[0:2]) { p "    $f  (", len($f) - len("examples/"), " chars after dir)" }
 

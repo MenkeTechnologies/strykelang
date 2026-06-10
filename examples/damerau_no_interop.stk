@@ -52,7 +52,7 @@ fn DL::distance($s, $t) {
     $d[$m][$n]
 }
 
-val @cases = (
+var @cases = (
     +{ s => "",         t => "",         d => 0, label => "both empty" },
     +{ s => "a",        t => "",         d => 1, label => "one empty"  },
     +{ s => "",         t => "abc",      d => 3, label => "other empty"},

@@ -135,7 +135,7 @@ for val $k (1:$N * $N - 1) {
 
 # (3) Warnsdorff must succeed from at least four common starting
 #     squares on an 8×8 board.
-val @sources = ([0, 0], [0, 7], [7, 0], [7, 7])
+var @sources = ([0, 0], [0, 7], [7, 0], [7, 7])
 var $successes = 0
 for val $s (@sources) {
     val $brd = KT::tour($N, $s->[0], $s->[1], \@DX, \@DY)

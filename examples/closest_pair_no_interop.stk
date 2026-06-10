@@ -109,7 +109,7 @@ fn Cp::brute($points) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name   => "2-point line",
         points => [[0, 0], [3, 4]],

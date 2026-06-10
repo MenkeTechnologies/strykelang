@@ -30,7 +30,7 @@ fn emp($name, $dept, $role, $base, $bonus, $years) {
     Employee->new(name => $name, dept => $dept, role => $role, base => $base, bonus => $bonus, years => $years)
 }
 
-val @team = (
+var @team = (
     emp("alice",   "eng",   "lead",     180000, 30000, 7),
     emp("bob",     "eng",   "snr",      140000, 15000, 4),
     emp("carol",   "eng",   "jnr",       95000,  5000, 1),

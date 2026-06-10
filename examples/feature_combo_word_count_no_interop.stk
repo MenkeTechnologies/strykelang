@@ -87,7 +87,7 @@ die "expected alpha count > 200" unless $par_chars->{alpha} > 200
 
 p ""
 p "── top-10 words ──"
-val @top = (sort { $seq_h->{_1} <=> $seq_h->{_} } keys %$seq_h)[0:9]
+var @top = (sort { $seq_h->{_1} <=> $seq_h->{_} } keys %$seq_h)[0:9]
 for val $w (@top) {
     printf("  %-10s %3d\n", $w, $seq_h->{$w})
 }

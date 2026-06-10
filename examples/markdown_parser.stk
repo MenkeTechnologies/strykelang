@@ -28,7 +28,7 @@ fn Demo::MD::inline($text) {
 # ── line-level parser ───────────────────────────────────────────────
 
 fn Demo::MD::parse($md) {
-    val @lines = split /\n/, $md
+    var @lines = split /\n/, $md
     var @html
     var $in_list = 0
     var @para_buf
@@ -162,7 +162,7 @@ for val $tag (keys %tags) {
         topk_add($tk, $tag)
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  <%s> : %d\n", $h->[0], $h->[1]
 }

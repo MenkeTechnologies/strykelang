@@ -2,8 +2,8 @@
 # Rosetta Code: Amb
 
 fn Rosetta::Amb::solve() {
-    val @a = (1, 2, 3)
-    val @b = (4, 5, 6)
+    var @a = (1, 2, 3)
+    var @b = (4, 5, 6)
     
     for val $x (@a) {
         for val $y (@b) {

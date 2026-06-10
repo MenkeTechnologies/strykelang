@@ -3,7 +3,7 @@
 # Stryke array slicing + iterator helpers — ergonomic list manipulation.
 
 p "── enumerate — pairs of (index, value) ────────────────"
-val @colors = ("red", "green", "blue", "yellow")
+var @colors = ("red", "green", "blue", "yellow")
 for val $row (enumerate(@colors)) {
     val ($i, $v) = @$row
     printf "  [%d] %s\n", $i, $v
@@ -69,8 +69,8 @@ p "  flat   : [", join(",", @flat), "]"
 
 p ""
 p "── zip — pair-up two arrays ───────────────────────────"
-val @letters = ("a", "b", "c", "d")
-val @ids     = (10, 20, 30, 40)
+var @letters = ("a", "b", "c", "d")
+var @ids     = (10, 20, 30, 40)
 for val $pair (zip(\@letters, \@ids)) {
     printf "    %s -> %d\n", $pair->[0], $pair->[1]
 }

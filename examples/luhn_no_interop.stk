@@ -18,7 +18,7 @@
 #      stryke --no-interop examples/luhn_no_interop.stk 4532015112830367
 
 fn Luhn::check($num) {
-    val @digits = grep { _ =~ /\d/ } split(//, "$num")
+    var @digits = grep { _ =~ /\d/ } split(//, "$num")
     return 0 if len(@digits) == 0
     var $sum = 0
     var $double = 0
@@ -44,7 +44,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — known valid + invalid card numbers from public test sets.
-val @cases = (
+var @cases = (
     # Visa test numbers (all valid).
     +{ num => "4111111111111111", ok => 1, label => "Visa test #1" },
     +{ num => "4532015112830366", ok => 1, label => "Visa test #2" },

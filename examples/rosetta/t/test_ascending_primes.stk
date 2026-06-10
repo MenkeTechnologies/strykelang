@@ -12,7 +12,7 @@ fn Rosetta::Ascending::is_prime($n) {
 }
 
 fn Rosetta::Ascending::is_ascending($n) {
-    val @digits = $n |> chars
+    var @digits = $n |> chars
     return 1 if len(@digits) < 2
     for val $i (0..len(@digits)-2) {
         if ($digits[$i] >= $digits[$i+1]) {

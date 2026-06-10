@@ -119,7 +119,7 @@ for val $i (0:len(@elves) - 1) {
 
 # ── top-3 elves via Schwartzian ───────────────────────────────────
 
-val @ranked = map { _->[1] }
+var @ranked = map { _->[1] }
              sort { _1->[0] <=> _->[0] }
              map { [$sums[_], _] }
              (0:len(@elves) - 1)
@@ -158,7 +158,7 @@ printf("  max ~ %7.0f cal\n", td_quantile($td_cal, 0.99))
 # ── most-carried food (TopK SpaceSaving) ──────────────────────────
 
 p "\nmost-carried food items (SpaceSaving k=8):"
-val @top_food = topk_top($tk_food, 5)
+var @top_food = topk_top($tk_food, 5)
 for val $p (@top_food) {
     printf("  %-12s count=%d\n", $p->[0], $p->[1])
 }

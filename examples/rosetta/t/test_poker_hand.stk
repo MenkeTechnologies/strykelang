@@ -17,8 +17,8 @@ fn Rosetta::PokerHand::card_suit($c) {
 
 fn Rosetta::PokerHand::analyze_hand(@cards) {
     val @raw_vals = ~> @cards map {Rosetta::PokerHand::card_value}
-    val @vals = sort { _0 <=> _1 } @raw_vals
-    val @suits = ~> @cards map {Rosetta::PokerHand::card_suit}
+    var @vals = sort { _0 <=> _1 } @raw_vals
+    var @suits = ~> @cards map {Rosetta::PokerHand::card_suit}
     
     var $is_flush = 0
     var %suit_counts

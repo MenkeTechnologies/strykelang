@@ -211,7 +211,7 @@ fn Str::identity($n) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "2x2 trivial",
         A    => [[1, 2], [3, 4]],

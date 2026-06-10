@@ -30,7 +30,7 @@ printf "graph: %d nodes  ·  damping: %.2f  ·  initial uniform rank: %.4f\n",
     $n, $damp, 1.0 / $n
 
 val @workers = congregation(3)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard nodes across workers. Each worker computes new rank for its
 # assigned nodes given the CURRENT rank vector (passed via prayer).

@@ -58,7 +58,7 @@ printf "  a>>2 = %s = 0x%02x\n", Bits::bin8($lhs >> 2),   $lhs >> 2
 # Popcount table.
 p ""
 p "── Popcount (set-bit count) ──"
-val @Bits::popcount_cases = (
+var @Bits::popcount_cases = (
     +{ n => 0,   c => 0 },
     +{ n => 1,   c => 1 },
     +{ n => 7,   c => 3 },
@@ -80,7 +80,7 @@ for val $c (@Bits::popcount_cases) {
 # Power-of-two table.
 p ""
 p "── Bits::is_pow2 ──"
-val @pow2_cases = (
+var @pow2_cases = (
     +{ n => 0,    p => 0 },  # 0 not a power
     +{ n => 1,    p => 1 },
     +{ n => 2,    p => 1 },

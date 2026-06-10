@@ -2,7 +2,7 @@
 # Rosetta Code: Word Wrap
 
 fn Rosetta::WordWrap::solve($text, $width) {
-    val @words = $text |> split /\s+/
+    var @words = $text |> split /\s+/
     var @lines
     var $line = ""
     

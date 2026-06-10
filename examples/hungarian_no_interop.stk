@@ -109,7 +109,7 @@ fn Hun::permute($arr, $k, $cost, $best_ref, $best_perm_ref) {
 
 # ── test matrices with known optima ────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "3x3 simple",
         cost => [

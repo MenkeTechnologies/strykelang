@@ -98,7 +98,7 @@ fn Mana::brute_longest($s) {
 
 # ── primary cases with known answers ──────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ s => "babad",            lens => 3  },   # "bab" or "aba"
     +{ s => "cbbd",             lens => 2  },   # "bb"
     +{ s => "a",                lens => 1  },

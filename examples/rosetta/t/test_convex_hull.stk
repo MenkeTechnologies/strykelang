@@ -10,7 +10,7 @@ fn Rosetta::ConvexHull::solve($points) {
     return $points if $n <= 2
     
     # Sort points lexicographically
-    val @sorted = sort {
+    var @sorted = sort {
         $a->[0] <=> $b->[0] || $a->[1] <=> $b->[1]
     } @$points
     
@@ -25,7 +25,7 @@ fn Rosetta::ConvexHull::solve($points) {
     
     # Build upper hull
     var @upper
-    val @rev_sorted = rev @sorted
+    var @rev_sorted = rev @sorted
     for val $p (@rev_sorted) {
         while (len(@upper) >= 2 && Rosetta::ConvexHull::cross_product($upper[-2], $upper[-1], $p) <= 0) {
             pop @upper

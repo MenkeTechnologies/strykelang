@@ -17,7 +17,7 @@ val $h1 = qubit_h 1.0, 0.0, 1    # new β
 p "H|0> amplitudes: α=#{ sprintf '%.4f', $h0 }, β=#{ sprintf '%.4f', $h1 }"
 
 # 2. Φ⁺ Bell pair amplitudes: 1/√2 for |00> and |11>, 0 for |01> and |10>
-val @basis = ("00", "01", "10", "11")
+var @basis = ("00", "01", "10", "11")
 p "\nBell pair Φ⁺ amplitudes:"
 for var $b (@basis) {
     val ($b0, $b1) = split //, $b

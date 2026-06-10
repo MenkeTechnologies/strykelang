@@ -63,7 +63,7 @@ fn Rosetta::Twelve::all_solutions() {
 }
 
 # Run the search — count candidate self-consistent assignments
-val @sols = Rosetta::Twelve::all_solutions()
+var @sols = Rosetta::Twelve::all_solutions()
 assert_ok len(@sols) >= 1, "at least one consistent assignment"
 
 # Verify each candidate has S1 true (the meta statement)

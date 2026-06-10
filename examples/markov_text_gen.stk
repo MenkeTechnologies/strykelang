@@ -108,7 +108,7 @@ for val $prev (keys %trans) {
         }
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-25s : %d\n", $h->[0], $h->[1]
 }
@@ -132,7 +132,7 @@ printf "  exact distinct       : %d\n", len(keys %seen_bg)
 
 p ""
 p "── highest-entropy contexts (most successor choices) ─"
-val @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_}}) } keys %trans
+var @ctx_sorted = sort { len(keys %{$trans{_1}}) <=> len(keys %{$trans{_}}) } keys %trans
 var $shown = 0
 for val $ctx (@ctx_sorted) {
     last if $shown >= 5

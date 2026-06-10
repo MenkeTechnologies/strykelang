@@ -41,7 +41,7 @@ fn Dashboard::render {
     
     p "────────────────────────────────────────────────────────"
     p "  MOUNTED DISKS:"
-    val @disks = mounts()
+    var @disks = mounts()
     for val $m (@disks) {
         next unless $m->{total} > 0
         printf "    %-15s %5.1f%% used (%s free)\n", 

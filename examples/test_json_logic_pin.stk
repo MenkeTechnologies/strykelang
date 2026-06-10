@@ -6,7 +6,7 @@ fn evaluate($rule, $data) {
     return $rule if ref($rule) ne "HASH"
     val ($op) = keys %$rule
     val $args = $rule->{$op}
-    val @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
+    var @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
     if ($op eq "var") {
         val $path = $arr_args[0]
         return $data->{$path} // $arr_args[1]

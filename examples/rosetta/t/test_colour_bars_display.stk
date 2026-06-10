@@ -2,7 +2,7 @@
 # Rosetta Code: Colour bars/Display
 
 fn Rosetta::ColourBars::row($width) {
-    val @bars = qw(K R G B M C Y W)
+    var @bars = qw(K R G B M C Y W)
     val $bar_w = int($width / len(@bars))
     var $line = ""
     for val $bar (@bars) {

@@ -22,7 +22,7 @@ fn Exercism::GottaSnatchEmAll::extra_cards {
 }
 
 fn Exercism::GottaSnatchEmAll::boring_cards {
-    val @cols = @{_}
+    var @cols = @{_}
     return [] unless @cols
     var %counts
     for val $col (@cols) { $counts{$_}++ for keys %{$col} }

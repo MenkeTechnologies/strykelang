@@ -119,7 +119,7 @@ if ($detected == 0) {
 
 p ""
 p "── TopK noisy hosts (sketch) ────────────────────────"
-val @hits = topk_top($tk_hosts)
+var @hits = topk_top($tk_hosts)
 for val $h (@hits) {
     printf "  %-7s : %d events\n", $h->[0], $h->[1]
 }

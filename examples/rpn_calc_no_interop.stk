@@ -19,7 +19,7 @@
 fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 
     var @stack
-    val @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
+    var @tokens = grep { len(_) > 0 } split(/\s+/, $expr)
     for val $tok (@tokens) {
         if ($tok =~ /^-?\d+(\.\d+)?$/) {
             push @stack, 0 + $tok
@@ -58,7 +58,7 @@ if (len(@ARGV) > 0) {
 # Demo grid — classic RPN examples paired with expected results so the
 # CI runner has a built-in self-test.
 p "── RPN calculator demo ──"
-val @cases = (
+var @cases = (
     +{ expr => "3 4 +",             want =>   7 },
     +{ expr => "5 1 2 + 4 * + 3 -", want =>  14 },
     +{ expr => "10 5 / 2 *",        want =>   4 },

@@ -47,14 +47,14 @@ assert_eq Rosetta::MultOrder::compute(2, 4), -1, "ord_4(2) undefined"
 assert_eq Rosetta::MultOrder::compute(6, 9), -1, "ord_9(6) undefined"
 
 # Property: a^ord ≡ 1 (mod n)
-val @as = (2, 3, 5, 7, 11)
+var @as = (2, 3, 5, 7, 11)
 for val $a (@as) {
     val $o = Rosetta::MultOrder::compute($a, 17)
     assert_eq Rosetta::MultOrder::pow_mod($a, $o, 17), 1, sprintf("a=%d^ord ≡ 1 mod 17", $a)
 }
 
 # Property: ord divides φ(n). For n = 17 (prime), φ = 16, valid orders divide 16.
-val @divisors_of_16 = (1, 2, 4, 8, 16)
+var @divisors_of_16 = (1, 2, 4, 8, 16)
 for val $a (~> 1:16) {
     val $o = Rosetta::MultOrder::compute($a, 17)
     var $div_ok = 0

@@ -18,7 +18,7 @@ fn Rosetta::DeptNum::solutions() {
     @sols
 }
 
-val @sols = Rosetta::DeptNum::solutions()
+var @sols = Rosetta::DeptNum::solutions()
 # Reference count: 14 solutions
 assert_eq len(@sols), 14, "14 valid (P,S,F) triples"
 

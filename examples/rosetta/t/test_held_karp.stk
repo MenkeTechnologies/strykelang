@@ -19,7 +19,7 @@ fn Rosetta::HeldKarp::solve($dist) {
     }
     for val $size (3:$n) {
         # Enumerate all subsets of {1..n-1} of size $size-1, always including 0.
-        val @subsets
+        var @subsets
         Rosetta::HeldKarp::enumerate_subsets($n - 1, $size - 1, \@subsets)
         for val $bits (@subsets) {
             val $mask = ($bits << 1) | 1   # always include city 0

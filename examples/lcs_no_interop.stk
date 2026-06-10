@@ -64,7 +64,7 @@ fn LCS::trace($s, $t) {
     join("", @out)
 }
 
-val @cases = (
+var @cases = (
     +{ s => "",          t => "",          len => 0, lcs => ""      },
     +{ s => "abc",       t => "abc",       len => 3, lcs => "abc"   },
     +{ s => "abc",       t => "def",       len => 0, lcs => ""      },

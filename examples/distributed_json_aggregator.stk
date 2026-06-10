@@ -33,7 +33,7 @@ val $n = len(@records)
 printf "records: %d JSON entries\n", $n
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard records, each worker parses + groups by status, returns
 # JSON: { "200": {count, sum}, "404": ..., "500": ... }.

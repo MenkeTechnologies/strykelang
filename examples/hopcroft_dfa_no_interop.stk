@@ -234,7 +234,7 @@ val $contains_ab = Dfa::make(
     [5],
 )
 
-val @cases = (
+var @cases = (
     +{ name => "ends in b",      dfa => $ends_in_b,   min_states => 2, alpha => ["a", "b"] },
     +{ name => "len div 3",      dfa => $div3,        min_states => 3, alpha => ["0", "1"] },
     +{ name => "contains ab",    dfa => $contains_ab, min_states => 3, alpha => ["a", "b"] },

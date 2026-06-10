@@ -122,7 +122,7 @@ assert_eq join(",", @{Rosetta::BTree::inorder($t5)}),
 
 # Random-ish input
 val $tr = Rosetta::BTree::new(4)
-val @keys = (5, 3, 8, 1, 9, 4, 7, 2, 6, 10, 0, 15, 12, 18, 11, 13, 17, 14, 16, 19)
+var @keys = (5, 3, 8, 1, 9, 4, 7, 2, 6, 10, 0, 15, 12, 18, 11, 13, 17, 14, 16, 19)
 for val $k (@keys) { Rosetta::BTree::insert($tr, $k) }
 val @sorted = sort { _0 <=> _1 } @keys
 assert_eq join(",", @{Rosetta::BTree::inorder($tr)}),

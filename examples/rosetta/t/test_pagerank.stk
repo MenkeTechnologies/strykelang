@@ -10,7 +10,7 @@ fn Rosetta::PageRank::solve($links, $d, $epsilon) {
         }
     }
     
-    val @all_pages = keys %pages
+    var @all_pages = keys %pages
     val $n = len(@all_pages)
     var %pr
     for val $p (@all_pages) { $pr{$p} = 1.0 / $n }

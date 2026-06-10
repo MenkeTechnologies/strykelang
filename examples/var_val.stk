@@ -19,9 +19,9 @@ p "  after reassign: \$name = '$name'"
 
 p ""
 p "── val — immutable lexical (== const my) ─────────────"
-val $PI = 3.14159
-val $MAX_RETRIES = 5
-val @COLORS = ("red", "green", "blue")
+var $PI = 3.14159
+var $MAX_RETRIES = 5
+var @COLORS = ("red", "green", "blue")
 val %ENDPOINTS = (api => "https://api.example.com", web => "https://www.example.com")
 p "  val \$PI = $PI"
 p "  val \$MAX_RETRIES = $MAX_RETRIES"
@@ -65,7 +65,7 @@ p "── Compile-time error: reassigning a val (commented) ──"
 p "  val \$PI = 3.14159"
 p "  \$PI = 3.14    # COMPILE ERROR: cannot assign to frozen variable \$PI"
 p "  (uncomment to see the error firsthand)"
-# val $x = 1
+# var $x = 1
 # $x = 2          # cannot assign to frozen variable `$x`
 
 p ""

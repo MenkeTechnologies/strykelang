@@ -13,7 +13,7 @@ fn Rosetta::Feig::iterate_logistic($r, $x, $iters) {
 fn Rosetta::Feig::compute() {
     # Pre-computed bifurcation parameters a_n for n=1..6 (well-known values).
     # Approximations to ~9 digits — enough for δ to stabilize to 4.669201609.
-    val @a = (
+    var @a = (
         3.0,            # a_1: stable 1->2
         3.449490,       # a_2: stable 2->4
         3.544090,       # a_3
@@ -29,7 +29,7 @@ fn Rosetta::Feig::compute() {
     @deltas
 }
 
-val @ds = Rosetta::Feig::compute()
+var @ds = Rosetta::Feig::compute()
 val $best = $ds[len(@ds) - 1]
 assert_ok abs($best - 4.669) < 0.01, "Feigenbaum δ converges to 4.669..."
 # Successive deltas should be increasing toward δ.

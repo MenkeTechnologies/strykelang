@@ -78,7 +78,7 @@ fn Project::DataStructures::aoh_modify {
 }
 
 fn Project::DataStructures::aoh_iterate {
-    val @arr = ({v => 1}, {v => 2}, {v => 3})
+    var @arr = ({v => 1}, {v => 2}, {v => 3})
     var $sum = 0
     for val $h (@arr) {
         $sum += $h->{v}
@@ -317,7 +317,7 @@ fn Project::DataStructures::sort_by_field {
 }
 
 fn Project::DataStructures::group_by_key {
-    val @items = (
+    var @items = (
         {type => "a", v => 1},
         {type => "b", v => 2},
         {type => "a", v => 3}

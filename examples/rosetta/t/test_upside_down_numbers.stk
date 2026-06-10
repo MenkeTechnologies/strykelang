@@ -9,7 +9,7 @@ fn Rosetta::UpsideDown::is($n) {
         "6" => "9", "9" => "6",
     )
     val $s = "$n"
-    val @chars = split //, $s
+    var @chars = split //, $s
     var @rev
     for val $c (rev @chars) {
         return 0 unless exists $map{$c}

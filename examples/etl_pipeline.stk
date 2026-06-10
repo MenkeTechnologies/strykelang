@@ -31,7 +31,7 @@ val $orders_csv = "id,country,status,amount\n" .
 val @rows = @{from_csv($orders_csv)}
 printf "loaded %d rows from CSV\n", len @rows
 
-val @completed = grep { _->{status} eq "completed" } @rows
+var @completed = grep { _->{status} eq "completed" } @rows
 printf "kept %d completed rows\n", len @completed
 
 # ── aggregate into a CMS (heavy-hitter sketch) by country ──────────────
@@ -47,7 +47,7 @@ for val $row (@completed) {
 }
 
 p "── per-country order counts (via CMS) ──"
-val @countries = ("US", "DE", "FR", "JP")   # JP absent in data — should report 0
+var @countries = ("US", "DE", "FR", "JP")   # JP absent in data — should report 0
 for val $c (@countries) {
     printf "  %-3s : %d orders  %d total amount\n",
         $c, cms_count($cms_orders, $c), cms_count($cms_amount, $c)

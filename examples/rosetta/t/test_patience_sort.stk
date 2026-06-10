@@ -3,7 +3,7 @@
 # repeatedly draw the smallest pile-top via a min-heap merge.
 
 fn Rosetta::Patience::sort($list) {
-    val @arr = @$list
+    var @arr = @$list
     return [] if len(@arr) == 0
     return [@arr] if len(@arr) == 1
 

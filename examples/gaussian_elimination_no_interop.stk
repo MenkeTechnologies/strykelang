@@ -169,7 +169,7 @@ fn Gauss::matmul($A, $B) {
 
 # ── primary cases with known solutions ────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "2x2 trivial",
         A    => [[2, 1], [1, 3]],

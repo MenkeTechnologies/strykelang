@@ -122,7 +122,7 @@ fn step($bodies, $size, $theta, $dt) {
 package main
 
 p "── Barnes-Hut N-Body Demo ──"
-val @body_list = (
+var @body_list = (
     { id => 1, mass => 1e12, x => -100.0, y => -100.0, vx => 0.0, vy => 0.0 },
     { id => 2, mass => 1e12, x => 100.0,  y => 100.0,  vx => 0.0, vy => 0.0 },
     { id => 3, mass => 1e12, x => -100.0, y => 100.0,  vx => 0.0, vy => 0.0 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Bulls and Cows
 
 fn Rosetta::BullsAndCows::get_score($secret, $guess) {
-    val @s = str($secret) |> chars
+    var @s = str($secret) |> chars
     val @g = str($guess) |> chars
     var $bulls = 0
     var $cows = 0

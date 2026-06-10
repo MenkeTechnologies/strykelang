@@ -51,7 +51,7 @@ for val $i (1..length($text) - $win) {
 
 # Different strings should usually have different hashes (no collisions on this set)
 var %seen
-val @samples = ("cat", "bat", "dog", "log", "hat", "rat", "the", "and", "abc", "xyz")
+var @samples = ("cat", "bat", "dog", "log", "hat", "rat", "the", "and", "abc", "xyz")
 for val $s (@samples) {
     val $hh = Rosetta::RollingHash::hash($s, $base, $mod)
     assert_ok !exists($seen{$hh}), "no collision for '$s'"

@@ -78,7 +78,7 @@ fn Demo::MB::render_row($row) {
 p "Mandelbrot — ${W}x${H} ASCII, max_iter=$MAX_ITER"
 p "─" x ($W + 2)
 val $t0 = now_ns()
-val @rows = pmap {Demo::MB::render_row} (0:$H - 1)
+var @rows = pmap {Demo::MB::render_row} (0:$H - 1)
 val $elapsed_us = (now_ns() - $t0) / 1000.0
 
 for val $r (@rows) {
@@ -111,7 +111,7 @@ printf("  p90 = %2.0f\n", td_quantile($td_iter, 0.90))
 printf("  max ~ %2.0f\n", td_quantile($td_iter, 0.99))
 
 p "\nshading character frequency (top 6):"
-val @top = topk_top($tk_ch, 6)
+var @top = topk_top($tk_ch, 6)
 for val $p (@top) {
     val $shown = $p->[0] eq " " ? "(space)" : $p->[0]
     printf("  %-7s count=%d\n", $shown, $p->[1])

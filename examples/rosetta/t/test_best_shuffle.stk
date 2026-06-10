@@ -19,7 +19,7 @@ fn Rosetta::BestShuffle::shuffle($str) {
 }
 
 fn Rosetta::BestShuffle::count_matches($s1, $s2) {
-    val @a = $s1 |> chars
+    var @a = $s1 |> chars
     val @b = $s2 |> chars
     var $m = 0
     for val $i (0..len(@a)-1) {
@@ -28,7 +28,7 @@ fn Rosetta::BestShuffle::count_matches($s1, $s2) {
     $m
 }
 
-val @inputs = ("abracadabra", "seesaw", "elk", "grrit")
+var @inputs = ("abracadabra", "seesaw", "elk", "grrit")
 for val $s (@inputs) {
     val $shuf = Rosetta::BestShuffle::shuffle($s)
     # The best shuffle match count is usually 0 if possible

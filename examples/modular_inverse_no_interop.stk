@@ -48,7 +48,7 @@ fn Mod::pow($base, $exp, $m) {
 p "── Modular inverse demo ──"
 
 # Classic textbook pairs.
-val @cases = (
+var @cases = (
     +{ a =>  3, m =>  11, inv =>  4   },  # 3·4 = 12 ≡ 1 (mod 11)
     +{ a =>  7, m =>  26, inv => 15   },  # 7·15 = 105 ≡ 1 (mod 26)
     +{ a => 17, m =>3120, inv =>2753  },  # RSA textbook (e=17, φ(n)=3120)

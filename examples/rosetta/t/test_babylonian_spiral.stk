@@ -38,7 +38,7 @@ fn Rosetta::Babylonian::points($n) {
                 next if $rem < 0
                 val $dy_abs = Rosetta::Babylonian::isqrt($rem)
                 next if $dy_abs * $dy_abs != $rem
-                val @dys = $dy_abs == 0 ? (0) : ($dy_abs, -$dy_abs)
+                var @dys = $dy_abs == 0 ? (0) : ($dy_abs, -$dy_abs)
                 for val $dy (@dys) {
                     val $cross = $ldx * $dy - $ldy * $dx
                     next if $cross <= 0

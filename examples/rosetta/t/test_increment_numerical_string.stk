@@ -35,7 +35,7 @@ fn Rosetta::IncrementString::demo() {
     "Hex '$hex_str' incremented: $hex_num (decimal)" |> p
     
     # Array of string numbers
-    val @str_numbers = ("1", "10", "100", "1000")
+    var @str_numbers = ("1", "10", "100", "1000")
     "Array increment:" |> p
     for val $s (@str_numbers) {
         val $inc = $s + 1

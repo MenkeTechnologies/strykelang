@@ -18,7 +18,7 @@ fn WC::count($s) {
 
 fn WC::top($freq, $n) {
     val @keys = keys %$freq
-    val @sorted = sort { $freq->{_1} <=> $freq->{_} } @keys
+    var @sorted = sort { $freq->{_1} <=> $freq->{_} } @keys
     var @top = ()
     for val $k (@sorted[0:$n-1]) {
         push @top, [$k, $freq->{$k}]

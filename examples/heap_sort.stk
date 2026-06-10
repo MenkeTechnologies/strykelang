@@ -70,7 +70,7 @@ hll_add($hll_pre, _) for @input
 # ── sort in-place ───────────────────────────────────────────────────
 
 val $td_extract = t_digest(100)
-val @work = @input
+var @work = @input
 val $t0 = now_ns()
 Demo::Heap::sort(\@work)
 val $elapsed_us = (now_ns() - $t0) / 1000.0
@@ -114,7 +114,7 @@ for val $i (1:1000) {
     push @big_input, $seed % 1000
 }
 
-val @big_work = @big_input
+var @big_work = @big_input
 val $t1 = now_ns()
 Demo::Heap::sort(\@big_work)
 val $big_elapsed_ms = (now_ns() - $t1) / 1_000_000.0

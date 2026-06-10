@@ -20,7 +20,7 @@ for val $i (0:50) {
 }
 
 # Non-perfect squares: must be floor(sqrt(n))
-val @cases = (
+var @cases = (
     [2, 1],     [3, 1],
     [5, 2],     [10, 3],
     [99, 9],    [100, 10],   [101, 10],

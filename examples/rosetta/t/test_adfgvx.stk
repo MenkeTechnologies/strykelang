@@ -35,7 +35,7 @@ fn Rosetta::ADFGVX::encode($text, $key_square, $keyword) {
     }
     
     # Sort columns by keyword
-    val @indices = sort { $kw[_0] cmp $kw[_1] } 0:($n - 1)
+    var @indices = sort { $kw[_0] cmp $kw[_1] } 0:($n - 1)
     
     var $res = ""
     for val $idx (@indices) {

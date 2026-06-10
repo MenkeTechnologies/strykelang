@@ -84,7 +84,7 @@ fn Demo::SG::shared($u1, $u2) {
 
 p ""
 p "── shared followees ─────────────────────────────────"
-val @pairs = (
+var @pairs = (
     ["alice", "bob"],
     ["alice", "dave"],
     ["bob",   "carol"],
@@ -132,7 +132,7 @@ for val $u (sort { _ cmp _1 } keys %all_users) {
 
 p ""
 p "── most-followed (TopK, by in-degree) ───────────────"
-val @hits = topk_top($tk_influencers)
+var @hits = topk_top($tk_influencers)
 for val $h (@hits) {
     printf "  %-8s : %d followers\n", $h->[0], $h->[1]
 }

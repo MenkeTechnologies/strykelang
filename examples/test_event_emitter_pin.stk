@@ -30,7 +30,7 @@ fn EE::off($ee, $event, $id) {
 
 fn EE::emit($ee, $event, $payload) {
     return 0 unless exists $ee->{listeners}->{$event}
-    val @ls = @{$ee->{listeners}->{$event}}
+    var @ls = @{$ee->{listeners}->{$event}}
     var $count = 0
     var @kept = ()
     for val $l (@ls) {

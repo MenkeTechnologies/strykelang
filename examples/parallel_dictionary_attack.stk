@@ -27,7 +27,7 @@ printf "  workers: %d  ·  wordlist: %d entries  ·  target: %s...%s\n",
     $n_workers, len(@wordlist), substr($target_hash, 0, 8), substr($target_hash, -8)
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the wordlist by index across workers.
 val $per = int((len(@wordlist) + $n_workers - 1) / $n_workers)

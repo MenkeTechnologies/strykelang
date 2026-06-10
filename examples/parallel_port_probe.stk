@@ -18,7 +18,7 @@ printf "spawned %d workers (one per port)\n", len(@workers)
 # Each worker probes one port. Use kick() — TCP liveness probe with
 # 250ms timeout. We pair workers with ports by sort order so we know
 # which worker got which port.
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 var %port_for_worker
 for val $i (0:len(@sorted_workers) - 1) {
     $port_for_worker{$sorted_workers[$i]} = $ports[$i]

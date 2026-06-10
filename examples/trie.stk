@@ -45,7 +45,7 @@ fn has_prefix($root, $p) {
 
 fn _collect($node, $prefix, $out) {
     push @$out, $prefix if $node->{term}
-    val @ks = sort keys %{$node->{ch}}
+    var @ks = sort keys %{$node->{ch}}
     for val $c (@ks) {
         TR::_collect($node->{ch}->{$c}, $prefix . $c, $out)
     }

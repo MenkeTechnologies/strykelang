@@ -174,7 +174,7 @@ p "result: $hits"
 # ── per-position-hit ranking ──────────────────────────────────────
 
 p "\nmost-frequently-correct positions (TopK):"
-val @top = topk_top($tk_pos, 6)
+var @top = topk_top($tk_pos, 6)
 for val $p (@top) {
     printf("  %-7s correct_gens=%d\n", $p->[0], $p->[1])
 }

@@ -6,7 +6,7 @@ fn Rosetta::InvertedIndex::create(@docs) {
     ~> 0:$#docs map {
         val $text = $docs[_]
         # Clean and split into unique words
-        val @words = $text |> lc() |> split(/\W+/) |> grep { _ ne "" }
+        var @words = $text |> lc() |> split(/\W+/) |> grep { _ ne "" }
         var %seen
         for val $w (@words) {
             if (!$seen{$w}++) {

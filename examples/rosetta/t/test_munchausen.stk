@@ -5,7 +5,7 @@ fn Rosetta::Munchausen::is_munchausen($n) {
     if ($n == 0) { 0 }
     else {
         var $sum = 0
-        val @digits = ~> "$n" chars
+        var @digits = ~> "$n" chars
         for val $d (@digits) {
             val $val = int($d)
             if ($val == 0) {

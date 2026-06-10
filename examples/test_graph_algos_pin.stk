@@ -40,7 +40,7 @@ fn Graph::dfs($g, $start) {
         next if $seen{$node}
         $seen{$node} = 1
         push @order, $node
-        val @nbs = @{$g->{$node}}
+        var @nbs = @{$g->{$node}}
         for val $nb (sort { _1 cmp _ } @nbs) {
             push @stack, $nb unless $seen{$nb}
         }

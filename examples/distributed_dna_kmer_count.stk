@@ -22,7 +22,7 @@ for val $i (0:299) {
 printf "sequence: %d bases (synthetic)\n", len($seq)
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the sequence by overlapping windows so k-mers at shard boundaries
 # aren't lost. Each worker gets [start, end+k-1).

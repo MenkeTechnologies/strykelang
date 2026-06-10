@@ -32,7 +32,7 @@ fn Rosetta::Bezout::solve_linear_congruence($a, $b, $n) {
 }
 
 # Verify Bezout identity for many a, b pairs.
-val @cases = (
+var @cases = (
     [240, 46], [99, 78], [1, 5], [12, 18],
     [97, 64], [101, 7], [12345, 6789],
     [1000, 1001], [54321, 12345]

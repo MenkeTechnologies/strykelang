@@ -17,7 +17,7 @@ fn Rosetta::Carmichael::get_factors($n) {
 
 fn Rosetta::Carmichael::check($n) {
     val $factors_ref = Rosetta::Carmichael::get_factors($n)
-    val @factors = @$factors_ref
+    var @factors = @$factors_ref
     if (len(@factors) < 2) {
         0
     } else {

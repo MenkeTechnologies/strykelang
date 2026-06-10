@@ -57,7 +57,7 @@ fn Knapsack::solve($capacity, $weights_ref, $values_ref) {  # `knapsack` is a bu
 }
 
 # Demo grid — (capacity, weights, values, expected best value).
-val @cases = (
+var @cases = (
     +{ cap => 10, w => [],            v => [],            best =>  0 },  # empty
     +{ cap =>  0, w => [1, 2],        v => [10, 20],      best =>  0 },  # zero cap
     +{ cap => 10, w => [10],          v => [5],           best =>  5 },  # exact fit

@@ -33,7 +33,7 @@ fn Project::StringsExtended::str_substr_to_end($s, $start) { substr($s, $start) 
 fn Project::StringsExtended::str_substr_negative($s, $offset) { substr($s, $offset) }
 
 fn Project::StringsExtended::str_replace_substr($s, $start, $len, $repl) {
-    val $result = $s
+    var $result = $s
     substr($result, $start, $len, $repl)
     $result
 }

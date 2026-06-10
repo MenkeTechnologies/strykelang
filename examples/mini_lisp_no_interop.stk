@@ -74,7 +74,7 @@ fn eval_v($x, $env) {
     return $x if ref($x) ne "ARRAY"
     
     # 3. List (form)
-    val @list = @$x
+    var @list = @$x
     return [] if !@list
     
     val $op = $list[0]
@@ -108,7 +108,7 @@ fn eval_v($x, $env) {
     if (ref($proc) eq "HASH") {
         # Closure application
         val $new_e = new_env $proc->{env}
-        val @params = @{$proc->{params}}
+        var @params = @{$proc->{params}}
         for val $i (0 : (len @params) - 1) {
             $new_e->{vars}->{$params[$i]} = $args[$i]
         }
@@ -144,7 +144,7 @@ p "── Mini-Lisp Interpreter Demo ──"
 val $global = Lisp::new_env undef
 Lisp::setup_env $global
 
-val @programs = (
+var @programs = (
     "(define x 10)",
     "(define square (fn (n) (* n n)))",
     "(square x)",

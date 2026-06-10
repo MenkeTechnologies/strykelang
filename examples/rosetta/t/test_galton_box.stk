@@ -31,7 +31,7 @@ fn Rosetta::Galton::expected($balls, $levels) {
     ~> @c map { $balls * _ / $denom }
 }
 
-val @bins = Rosetta::Galton::drop(10000, 8)
+var @bins = Rosetta::Galton::drop(10000, 8)
 assert_eq len(@bins), 9, "9 bins for 8 levels"
 
 var $total = 0

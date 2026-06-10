@@ -3,7 +3,7 @@
 fn Exercism::Change::generate($coins, $target) {
     return ["error", "cannot change"] if $target < 0
     return ["ok", []] if $target == 0
-    val @sorted = sort { _ <=> _1 } @{$coins}
+    var @sorted = sort { _ <=> _1 } @{$coins}
     var @best
     $best[0] = []
     for val $amt (1..$target) {

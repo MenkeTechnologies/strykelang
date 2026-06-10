@@ -19,7 +19,7 @@ fn Exercism::TwoBucket::measure($cap1, $cap2, $goal, $start) {
         val $xf12 = $b0 < $sp2 ? $b0 : $sp2
         val $sp1 = $cap1 - $b0
         val $xf21 = $b1 < $sp1 ? $b1 : $sp1
-        val @nexts = (
+        var @nexts = (
             [$cap1, $b1],
             [$b0, $cap2],
             [0, $b1],

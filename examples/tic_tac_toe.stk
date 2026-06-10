@@ -186,7 +186,7 @@ for val $outcome (sort { _ cmp _1 } keys %outcomes) {
 
 p ""
 p "── opening-move frequency (TopK) ────────────────────"
-val @hits = topk_top($tk_open)
+var @hits = topk_top($tk_open)
 for val $h (@hits) {
     printf "  %-10s : %d openings\n", $h->[0], $h->[1]
 }

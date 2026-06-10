@@ -107,7 +107,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo + self-test on bounds invariants.
-val @cases = (
+var @cases = (
     +{ expr => "1d6"      },
     +{ expr => "2d6"      },
     +{ expr => "1d20"     },

@@ -46,7 +46,7 @@ p "  count               : $distinct"
 p ""
 p "── word-frequency table via uniq + grep ───────────────"
 val @words = split(/\s+/, "alpha beta alpha gamma beta alpha")
-val @unique_words = uniq(@words)
+var @unique_words = uniq(@words)
 p "  unique tokens       : ", join(",", @unique_words)
 for val $w (@unique_words) {
     val @hits = grep { _ eq $w } @words

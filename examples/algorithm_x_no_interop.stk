@@ -16,7 +16,7 @@
 # Run: stryke --no-interop examples/algorithm_x_no_interop.stk
 
 fn AlgX::solve($X, $Y, $solution, $results) {
-    val @cols = keys %$X
+    var @cols = keys %$X
     if (len(@cols) == 0) {
         val @copy = @$solution
         push @$results, \@copy
@@ -34,7 +34,7 @@ fn AlgX::solve($X, $Y, $solution, $results) {
         }
     }
 
-    val @rows_for_c = @{$X->{$min_c}}
+    var @rows_for_c = @{$X->{$min_c}}
     for val $r (@rows_for_c) {
         push @$solution, $r
 

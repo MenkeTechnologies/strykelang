@@ -31,7 +31,7 @@ fn QuoteOps::tr2($n, $k) { $n - $k }
 fn A::B::C::s($n) { $n + 1000 }
 
 p "── single-arg quote-name UDFs ──"
-val @results = (
+var @results = (
     ["s",  QuoteOps::s(1)],
     ["m",  QuoteOps::m(1)],
     ["q",  QuoteOps::q(1)],

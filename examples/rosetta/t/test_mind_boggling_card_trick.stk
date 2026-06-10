@@ -16,7 +16,7 @@ fn Rosetta::CardTrick::deal($cards) {
 }
 
 fn Rosetta::CardTrick::place_selected_middle($piles, $selected) {
-    val @order = ((($selected + 1) % 3), $selected, (($selected + 2) % 3))
+    var @order = ((($selected + 1) % 3), $selected, (($selected + 2) % 3))
     var @out
     for val $idx (@order) { push @out, @{$piles->[$idx]} }
     \@out

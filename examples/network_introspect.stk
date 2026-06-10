@@ -19,7 +19,7 @@ p "── network-introspect: NAT traversal builtin set ─────"
 p ""
 
 # Names we care about — the v1-v1.4 NAT traversal stack.
-val @groups = (
+var @groups = (
     +{ title => "1. Network probes",
        names => [qw(kick udp_send)] },
     +{ title => "2. Persistent UDP socket pool",

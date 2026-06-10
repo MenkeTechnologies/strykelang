@@ -38,7 +38,7 @@ BF::add $b1, "stryke"
 BF::contains($b1, "stryke") |> aeq 1, "contains added item"
 
 # --- False Negatives (Should be 0) ---
-val @items = ("one", "two", "three", "four", "five")
+var @items = ("one", "two", "three", "four", "five")
 for val $it (@items) { BF::add $b1, $it }
 var $ok = 1
 for val $it (@items) { $ok = 0 if !BF::contains($b1, $it) }

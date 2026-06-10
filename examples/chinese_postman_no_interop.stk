@@ -201,7 +201,7 @@ fn Cpp::match_pairs($odd, $dist) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "K3 triangle (Eulerian)",
         n     => 3,

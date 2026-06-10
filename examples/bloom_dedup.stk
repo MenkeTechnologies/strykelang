@@ -97,7 +97,7 @@ printf "  observed FPR : %.3f%% (target: %.1f%%)\n",
 
 p ""
 p "── most-duplicated items (TopK) ─────────────────────"
-val @hits = topk_top($tk_dups)
+var @hits = topk_top($tk_dups)
 for val $h (@hits) {
     printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
 }

@@ -12,7 +12,7 @@
 
 # ── endpoints to monitor ────────────────────────────────────────────
 
-val @endpoints = (
+var @endpoints = (
     "/api/users",
     "/api/orders",
     "/api/products",
@@ -135,7 +135,7 @@ if (len(@alerts) == 0) {
 
 p ""
 p "── noisiest endpoints (TopK) ────────────────────────"
-val @hits = topk_top($tk_noisy)
+var @hits = topk_top($tk_noisy)
 for val $h (@hits) {
     printf "  %-15s : %d errors\n", $h->[0], $h->[1]
 }

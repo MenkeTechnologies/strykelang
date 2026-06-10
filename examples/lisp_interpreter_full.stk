@@ -179,7 +179,7 @@ p ""
 p "── Interactive Lisp Demo ──"
 val $global_env = Lisp::Env::std()
 
-val @scripts = (
+var @scripts = (
     "(define pi 3.14159)",
     "(define area (lambda (r) (* pi (* r r))))",
     "(p (list 'Area 'of 'circle 'with 'radius '10: (area 10)))",

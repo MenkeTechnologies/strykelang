@@ -23,7 +23,7 @@ printf "data: %d values  ·  workers: %d  ·  K: %d (1-indexed)\n",
     len(@data), $n_workers, $kth
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard data, each worker sorts its shard, returns the sorted list.
 val $per = int((len(@data) + $n_workers - 1) / $n_workers)

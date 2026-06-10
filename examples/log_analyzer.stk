@@ -55,7 +55,7 @@ for val $rec (@parsed) {
     cms_add($errors, "4xx") if $rec->{status} >= 400 && $rec->{status} < 500
 }
 
-val @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
+var @ips = ("10.0.0.1", "10.0.0.5", "10.0.0.7")
 printf "  distinct IPs (HLL) : %d  (truth: %d)\n", hll_count($ip_distinct), len @ips
 printf "  4xx errors         : %d\n", cms_count($errors, "4xx")
 printf "  5xx errors         : %d\n", cms_count($errors, "5xx")

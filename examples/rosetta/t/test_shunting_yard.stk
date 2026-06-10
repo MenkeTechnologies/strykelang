@@ -14,7 +14,7 @@ fn Rosetta::ShuntingYard::is_right_assoc($op) {
 }
 
 fn Rosetta::ShuntingYard::solve($infix) {
-    val @tokens = $infix |> split(/\s+/) |> grep { _ ne "" }
+    var @tokens = $infix |> split(/\s+/) |> grep { _ ne "" }
     var @output
     var @operators
     

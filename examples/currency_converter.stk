@@ -66,7 +66,7 @@ fn Demo::FX::fmt($amount, $code) {
 
 # ── demo: convert a sample basket ───────────────────────────────────
 
-val @basket = (
+var @basket = (
     [100,     "USD", "EUR"],
     [100,     "USD", "JPY"],
     [50,      "GBP", "USD"],
@@ -109,7 +109,7 @@ for val $row (@basket) {
 
 p "\nround-trip stability (USD -> X -> USD on \$1000):"
 val $base = 1000.0
-val @codes = sort grep { _ ne "USD" } keys %usd_per
+var @codes = sort grep { _ ne "USD" } keys %usd_per
 var @rt_errors
 for val $code (@codes) {
     val $there = Demo::FX::convert($base, "USD", $code)
@@ -137,7 +137,7 @@ p "\ncurrencies where 1 USD buys > JPY/10 units: ",
 # ── top destinations ────────────────────────────────────────────────
 
 p "\nmost-converted target (SpaceSaving k=8):"
-val @top = topk_top($tk_dst, 5)
+var @top = topk_top($tk_dst, 5)
 for val $p (@top) {
     printf("  %s  count=%d\n", $p->[0], $p->[1])
 }

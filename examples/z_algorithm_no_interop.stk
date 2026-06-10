@@ -82,7 +82,7 @@ for val $i (0:11) {
 p "  Z-array for 'aabcaabxaaaz' matches reference  OK"
 
 # Substring search test grid.
-val @cases = (
+var @cases = (
     +{ text => "abracadabra",   pat => "abra", hits => [0, 7]    },
     +{ text => "abracadabra",   pat => "cad",  hits => [4]       },
     +{ text => "abracadabra",   pat => "z",    hits => []        },

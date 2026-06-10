@@ -2,7 +2,7 @@
 # Rosetta Code: Determine if a string has all unique characters
 
 fn Rosetta::UniqueChars::check_iterative($str) {
-    val @chars = split //, $str
+    var @chars = split //, $str
     var %seen
     for val $c (@chars) {
         return 0 if $seen{$c}

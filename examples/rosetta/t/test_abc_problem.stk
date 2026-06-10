@@ -7,7 +7,7 @@ fn Rosetta::ABCProblem::check_recursive($chars_ref, $blocks_ref) {
     }
     
     var @chars = @$chars_ref
-    val @blocks = @$blocks_ref
+    var @blocks = @$blocks_ref
     val $c = shift @chars
     
     for val $i (0..len(@blocks)-1) {

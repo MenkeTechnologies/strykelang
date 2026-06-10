@@ -96,7 +96,7 @@ fn Demo::LB::report($result) {
     printf "── strategy: %s ────────────────────────────────────\n",
         $result->{name}
     # Final load = total requests handled. Need to recompute from TopK.
-    val @hits = topk_top($result->{tk_hot})
+    var @hits = topk_top($result->{tk_hot})
     printf "  %-7s %8s %8s\n", "backend", "load", "%"
     var $total_load = 0
     $total_load += _->[1] for @hits

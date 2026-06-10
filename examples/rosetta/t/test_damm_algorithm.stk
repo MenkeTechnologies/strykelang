@@ -15,7 +15,7 @@ fn Rosetta::Damm::checksum($number) {
         [2, 5, 8, 1, 4, 3, 6, 7, 9, 0]
     ]
     
-    val @digits = ~> "$number" chars
+    var @digits = ~> "$number" chars
     var $interim = 0
     for val $d (@digits) {
         $interim = $table->[$interim][$d]

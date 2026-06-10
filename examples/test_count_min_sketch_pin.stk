@@ -52,7 +52,7 @@ CMS::estimate($s, "x") |> aeq 1, "single add"
 
 # Exact small alphabet stream → small w/d collision risk; w=512,d=5 should be exact
 val $cms = CMS::new(512, 5)
-val @stream = ("a","b","a","c","a","b","a","d","a")
+var @stream = ("a","b","a","c","a","b","a","d","a")
 for val $x (@stream) { CMS::add($cms, $x, 1) }
 # Count-min is a *lower-bound-friendly upper bound*: est >= true count
 (CMS::estimate($cms, "a") >= 5 ? 1 : 0) |> aeq 1, "a est >= true"

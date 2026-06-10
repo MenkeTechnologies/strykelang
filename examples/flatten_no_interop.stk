@@ -18,7 +18,7 @@ fn Flat::flatten    = @{_} |> flat_maps { ref(_) eq "ARRAY" ? Flat::flatten(_) :
 fn Flat::leaf_count = Flat::flatten(_) |> len
 
 # Demo grid — (input, expected flat).
-val @cases = (
+var @cases = (
     +{ input => [],                        flat => []                },
     +{ input => [1, 2, 3],                 flat => [1, 2, 3]         },
     +{ input => [1, [2, 3], 4],            flat => [1, 2, 3, 4]      },

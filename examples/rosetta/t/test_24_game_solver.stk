@@ -24,7 +24,7 @@ fn Rosetta::Game24::perms(@list) {
 }
 
 fn Rosetta::Game24::solve($d) {
-    val @ops = ("+", "-", "*", "/")
+    var @ops = ("+", "-", "*", "/")
     val $perms = Rosetta::Game24::perms(@$d)
     
     for val $p (@$perms) {

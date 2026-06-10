@@ -38,7 +38,7 @@ fn Rosetta::Vlq::hex($bytes) {
 }
 
 # Canonical MIDI-spec sample table
-val @table = (
+var @table = (
     [0x00000000, "00"],
     [0x00000040, "40"],
     [0x0000007F, "7F"],

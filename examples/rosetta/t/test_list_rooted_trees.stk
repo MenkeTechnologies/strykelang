@@ -19,7 +19,7 @@ fn Rosetta::RootedTrees::assemble($remaining, $parts, $last, $out) {
 
 fn Rosetta::RootedTrees::trees($n) {
     return ["()"] if $n == 1
-    val @raw
+    var @raw
     val $start = []
     Rosetta::RootedTrees::assemble($n - 1, $start, undef, \@raw)
     var %seen

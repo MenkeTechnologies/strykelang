@@ -42,7 +42,7 @@ assert_eq $all[0],  139854276, "smallest is 139854276"
 assert_eq $all[-1], 923187456, "largest is 923187456"
 
 # Square roots of all penholos
-val @roots = ~> @all |> map { int(sqrt(_)) }
+var @roots = ~> @all |> map { int(sqrt(_)) }
 var $all_pos = 1
 for val $r (@roots) { $all_pos = 0 if $r * $r > 999999999 }
 assert_ok $all_pos, "every root squared still ≤ 999999999"

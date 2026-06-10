@@ -73,7 +73,7 @@ fn Sim::f_recip($x)   { 1.0 / $x }                                          # �
 fn Sim::f_quarter($x) { 4.0 / (1.0 + $x * $x) }                            # ∫₀^1 = π
 fn Sim::f_sharp($x)   { 1.0 / (0.01 + ($x - 0.5) * ($x - 0.5)) }           # peaked at 0.5
 
-val @cases = (
+var @cases = (
     +{
         name  => "cubic polynomial",
         f     => \&Sim::f_poly,

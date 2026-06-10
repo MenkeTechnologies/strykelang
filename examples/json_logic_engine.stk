@@ -20,7 +20,7 @@ fn evaluate($rule, $data) {
     val $args = $rule->{$op}
     
     # Ensure args is an array
-    val @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
+    var @arr_args = (ref($args) eq "ARRAY" ? @$args : ($args))
     
     # 1. Variable access
     if ($op eq "var") {
@@ -93,7 +93,7 @@ val $data = {
     role => "admin"
 }
 
-val @rules = (
+var @rules = (
     { "==" => [{ var => "temp" }, 25] },
     { "and" => [
         { ">" => [{ var => "temp" }, 20] },

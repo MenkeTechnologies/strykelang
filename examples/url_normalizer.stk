@@ -71,7 +71,7 @@ fn Demo::URL::parse_query($qs) {
 }
 
 fn Demo::URL::serialize_query($params) {
-    val @keys = sort { _ cmp _1 } keys %$params
+    var @keys = sort { _ cmp _1 } keys %$params
     var @parts
     for var $k (@keys) {
         push @parts, "$k=" . $params->{$k}
@@ -96,7 +96,7 @@ fn Demo::URL::normalize($url) {
 
 # ── sample URLs ─────────────────────────────────────────────────────
 
-val @urls = (
+var @urls = (
     "https://example.com/page?id=1&utm_source=twitter",
     "https://example.com/page?id=1",
     "HTTPS://Example.com/page?id=1",                       # case folds
@@ -126,7 +126,7 @@ for val $i (0:len(@urls) - 1) {
 
 # ── distinct via uniq ───────────────────────────────────────────────
 
-val @distinct = sort { _ cmp _1 } uniq(@normalized)
+var @distinct = sort { _ cmp _1 } uniq(@normalized)
 p ""
 printf "── %d distinct normalized URLs ────────────────────────\n", len @distinct
 for val $u (@distinct) {
@@ -178,7 +178,7 @@ for val $url (@urls) {
     val $p = Demo::URL::parse($url)
     topk_add($tk, $p->{host})
 }
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $h (@top) {
     printf "  %-30s : %d\n", $h->[0], $h->[1]
 }

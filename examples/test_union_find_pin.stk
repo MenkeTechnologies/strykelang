@@ -79,7 +79,7 @@ for val $i (1:9) {
 }
 
 # Kruskal's MST with UF: weighted edge list → spanning weight
-val @edges = (
+var @edges = (
     [1, 0, 1], [4, 0, 2], [2, 1, 2], [6, 1, 3], [3, 2, 3], [5, 2, 4], [7, 3, 4],
 )
 val $uf = Uf::new(5)

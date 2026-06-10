@@ -29,7 +29,7 @@ fn Rosetta::MadLibs::fill($template, $values) {
 }
 
 fn Rosetta::MadLibs::missing($template, $values) {
-    val @ph = Rosetta::MadLibs::placeholders($template)
+    var @ph = Rosetta::MadLibs::placeholders($template)
     var @missing
     for val $p (@ph) {
         push @missing, $p if !exists $values->{$p}

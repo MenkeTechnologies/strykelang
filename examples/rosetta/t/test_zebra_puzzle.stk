@@ -44,9 +44,9 @@ fn Rosetta::Zebra::index_of($v, $arr) {
 fn Rosetta::Zebra::solve() {
     val @colours = ("red", "green", "ivory", "yellow", "blue")
     val @nats    = ("English", "Spaniard", "Ukrainian", "Norwegian", "Japanese")
-    val @drinks  = ("coffee", "tea", "milk", "orange juice", "water")
-    val @smokes  = ("Old Gold", "Kools", "Chesterfields", "Lucky Strike", "Parliaments")
-    val @pets    = ("dog", "snails", "fox", "horse", "zebra")
+    var @drinks  = ("coffee", "tea", "milk", "orange juice", "water")
+    var @smokes  = ("Old Gold", "Kools", "Chesterfields", "Lucky Strike", "Parliaments")
+    var @pets    = ("dog", "snails", "fox", "horse", "zebra")
 
     val $col_perms = Rosetta::Zebra::permutations(\@colours)
     val $nat_perms = Rosetta::Zebra::permutations(\@nats)

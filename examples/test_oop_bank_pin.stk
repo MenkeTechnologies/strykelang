@@ -128,7 +128,7 @@ $crd->deposit(200)  |> aeq 300, "crd pay 200"
 $crd->balance()     |> aeq -300, "crd balance -300"
 
 # Polymorphic ledger walk
-val @accts = ($chk, $sav, $crd)
+var @accts = ($chk, $sav, $crd)
 val @ids = @accts |> maps { $_->id() }
 join(",", @ids) |> aeq "chk-1,sav-1,crd-1", "ids"
 

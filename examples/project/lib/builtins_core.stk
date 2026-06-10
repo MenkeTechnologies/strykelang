@@ -318,7 +318,7 @@ fn Project::BuiltinsCore::quotemeta_star { quotemeta("a*b") =~ /\\\*/ ? 1 : 0 }
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::lvalue_substr {
-    val $s = "hello world"
+    var $s = "hello world"
     substr($s, 0, 5, "hi")
     $s
 }
@@ -464,7 +464,7 @@ fn Project::BuiltinsCore::substr_negative { substr("hello", -2) }
 fn Project::BuiltinsCore::substr_neg_len { substr("hello", 1, -1) }
 
 fn Project::BuiltinsCore::substr_replace {
-    val $s = "hello"
+    var $s = "hello"
     substr($s, 1, 3, "XYZ")
     $s
 }

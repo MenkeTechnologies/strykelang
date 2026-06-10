@@ -7,7 +7,7 @@ fn Rosetta::BWT::compute($s) {
     for val $i (0:$n-1) {
         push @rotations, substr($s, $i) . substr($s, 0, $i)
     }
-    val @sorted = sort(@rotations)
+    var @sorted = sort(@rotations)
     var $res = ""
     for val $r (@sorted) {
         $res = $res . substr($r, -1)

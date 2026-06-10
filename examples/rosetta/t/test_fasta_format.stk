@@ -3,7 +3,7 @@
 
 fn Rosetta::Fasta::parse($text) {
     var %sequences
-    val @lines = split "\n", $text
+    var @lines = split "\n", $text
     var $current_id = undef
     
     for val $line (@lines) {

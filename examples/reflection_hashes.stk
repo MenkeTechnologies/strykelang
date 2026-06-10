@@ -69,7 +69,7 @@ p "  ", join(", ", @kv_names)
 
 p ""
 p "── Census by category (top 10 by member count) ────────"
-val @ranked = sort { len(@{$c{_1}}) <=> len(@{$c{_}}) } keys %c
+var @ranked = sort { len(@{$c{_1}}) <=> len(@{$c{_}}) } keys %c
 for val $cat (@ranked[0:9]) {
     printf "    %-30s : %d\n", $cat, len(@{$c{$cat}})
 }

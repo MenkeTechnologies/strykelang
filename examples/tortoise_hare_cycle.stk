@@ -73,7 +73,7 @@ fn Cycle::floyd($x0) {
 
 # ── run on several seeds ───────────────────────────────────────────
 
-val @seeds = (0, 2, 7, 100, 200)
+var @seeds = (0, 2, 7, 100, 200)
 printf "── Floyd cycle detection over f(x) = (x² + 1) mod 255 ──\n\n"
 printf "  %5s   %4s   %4s\n", "x_0", "μ", "λ"
 printf "  %5s   %4s   %4s\n", "─────", "────", "────"

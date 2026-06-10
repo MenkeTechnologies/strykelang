@@ -4,7 +4,7 @@
 # "87.70.140.0/22".
 
 fn Rosetta::CIDR::ip_to_int($ip) {
-    val @parts = split(/\./, $ip)
+    var @parts = split(/\./, $ip)
     return undef unless len(@parts) == 4
     var $n = 0
     for val $p (@parts) {

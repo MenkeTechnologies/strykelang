@@ -12,7 +12,7 @@
 
 # ── synthesize 3 clusters of 2D points ───────────────────────────────
 
-val @cluster_centers = ([10, 10], [40, 30], [25, 50])
+var @cluster_centers = ([10, 10], [40, 30], [25, 50])
 var @points
 
 # Helper: integer Gaussian-ish point near a center.

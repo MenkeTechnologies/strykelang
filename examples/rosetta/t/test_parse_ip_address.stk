@@ -7,7 +7,7 @@
 
 fn Rosetta::IP::parse_ipv4($s) {
     return undef unless $s =~ /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/
-    val @oct = ($1, $2, $3, $4)
+    var @oct = ($1, $2, $3, $4)
     for val $o (@oct) {
         return undef if $o > 255
         return undef if length("$o") > 1 && substr("$o", 0, 1) eq "0"
@@ -23,7 +23,7 @@ fn Rosetta::IP::parse_ipv6($s) {
     var $i = 0
     while (($i = index($s, "::", $i)) >= 0) { $double_count++; $i += 2 }
     return undef if $double_count > 1
-    val @parts = split /:/, $s, -1
+    var @parts = split /:/, $s, -1
     val $expected = 8
     if ($double_count == 1) {
         # split returns leading or trailing empty strings around "::"

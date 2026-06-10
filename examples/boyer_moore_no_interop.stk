@@ -39,7 +39,7 @@ fn BM::majority($xs_ref) {
     $hits > len(@$xs_ref) / 2 ? $cand : undef
 }
 
-val @cases = (
+var @cases = (
     +{ xs => [3, 2, 3],                          maj => 3      },  # LC 169 #1
     +{ xs => [2, 2, 1, 1, 1, 2, 2],              maj => 2      },  # LC 169 #2
     +{ xs => [1, 2, 3, 4],                       maj => undef  },  # no majority

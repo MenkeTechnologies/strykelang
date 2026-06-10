@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 fn Ini::parse($text) {
-    val @lines = split /\n/, $text
+    var @lines = split /\n/, $text
     var $section = ""
     var %out = ( "" => +{} )
     for val $raw (@lines) {

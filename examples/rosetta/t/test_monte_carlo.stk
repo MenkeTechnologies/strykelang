@@ -15,7 +15,7 @@ fn Rosetta::MonteCarlo::pi_sequential($samples) {
 
 fn Rosetta::MonteCarlo::pi_parallel($samples, $workers) {
     val $chunk = int($samples / $workers)
-    val @results = ~> 1:$workers pmap {
+    var @results = ~> 1:$workers pmap {
         var $inside = 0
         srand(_ + now_ns)
         for val $i (1:$chunk) {

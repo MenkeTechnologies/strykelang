@@ -91,7 +91,7 @@ fn Mo::brute_distinct($arr, $queries) {
 
 # ── primary test cases ──────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name    => "all distinct",
         arr     => [1, 2, 3, 4, 5, 6, 7, 8],

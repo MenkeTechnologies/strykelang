@@ -65,7 +65,7 @@ fn SS::find_subset($xs, $target) {
 
 p "── Subset sum demo ──"
 
-val @cases = (
+var @cases = (
     +{ xs => [3, 34, 4, 12, 5, 2],  target =>  9, ok => 1 },  # 4+5 or 3+4+2 or ...
     +{ xs => [3, 34, 4, 12, 5, 2],  target => 30, ok => 0 },  # not reachable
     +{ xs => [1, 2, 3, 4, 5],       target => 11, ok => 1 },  # 1+2+3+5 or 2+4+5

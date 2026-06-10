@@ -17,7 +17,7 @@ fn LFU::get($c, $k) {
 }
 
 fn LFU::_evict($c) {
-    val @ks = keys %{$c->{store}}
+    var @ks = keys %{$c->{store}}
     return if len(@ks) == 0
     var $best = $ks[0]
     for val $k (@ks) {

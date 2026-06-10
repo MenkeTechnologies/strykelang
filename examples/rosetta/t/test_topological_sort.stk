@@ -3,7 +3,7 @@
 
 fn Rosetta::TopologicalSort::topological_sort($graph) {
     var $in_degree = {}
-    val @nodes = keys %$graph
+    var @nodes = keys %$graph
     for val $u (@nodes) {
         $in_degree->{$u} = 0
     }

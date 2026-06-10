@@ -7,7 +7,7 @@ fn Rosetta::ISIN::is_valid($isin) {
     return 0 if len($isin) != 12
     return 0 if $isin !~ /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/
     var $digits = ""
-    val @cs = ~> $isin chars
+    var @cs = ~> $isin chars
     for val $c (@cs) {
         if ($c =~ /[A-Z]/) {
             $digits .= ord($c) - ord("A") + 10

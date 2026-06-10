@@ -78,7 +78,7 @@ $valid |> aeq 1, "all transitions valid"
 # Character-level n-gram
 fn Mk::train_chars($s, $k) {
     val %model = ()
-    val @c = split(//, $s)
+    var @c = split(//, $s)
     for val $i (0:(len @c) - $k - 1) {
         val $key = join("", @c[$i:$i + $k - 1])
         push @{$model{$key}}, $c[$i + $k]

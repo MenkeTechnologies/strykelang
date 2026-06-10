@@ -13,7 +13,7 @@
 
 # ── maze (10 rows x 20 cols) ─────────────────────────────────────────
 
-val @maze = (
+var @maze = (
     "####################",
     "#S.................#",
     "###.#####.######.###",
@@ -59,7 +59,7 @@ val $hll_visited = hll(14)
 hll_add($hll_visited, "$sr,$sc")
 
 var $end_idx = -1
-val @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+var @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
 
 var $step_count = 0
 while (len(@queue) > 0 && $end_idx < 0) {

@@ -59,7 +59,7 @@ fn _search($node, $w, $k, $out) {
     push @$out, $node->{word} if $d <= $k
     val $lo = $d - $k
     val $hi = $d + $k
-    val @keys = sort keys %{$node->{ch}}
+    var @keys = sort keys %{$node->{ch}}
     for val $dk (@keys) {
         if ($dk >= $lo && $dk <= $hi) {
             BK::_search($node->{ch}->{$dk}, $w, $k, $out)

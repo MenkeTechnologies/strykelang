@@ -53,7 +53,7 @@ fn SR::match($re, $s) {
 }
 
 p "=== Simple Regex Demo ==="
-val @pairs = (
+var @pairs = (
     ["hello",      "hello world",   1],
     ["world",      "hello world",   1],
     ["xyz",        "hello world",   0],

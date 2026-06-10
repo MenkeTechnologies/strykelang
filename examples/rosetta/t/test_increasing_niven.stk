@@ -26,7 +26,7 @@ fn Rosetta::IncNiven::first_n($count) {
 
 # Find the increasing-gap sequence: collect gaps that strictly exceed all earlier gaps.
 fn Rosetta::IncNiven::increasing_gaps($limit_count) {
-    val @nivens = Rosetta::IncNiven::first_n($limit_count)
+    var @nivens = Rosetta::IncNiven::first_n($limit_count)
     var @result   # [niven_n, gap]
     var $best_gap = -1
     for val $i (1..len(@nivens)-1) {
