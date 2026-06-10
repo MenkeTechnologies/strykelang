@@ -1,7 +1,7 @@
 # Stryke JetBrains Plugin
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![IDE](https://img.shields.io/badge/IDE-2024.2%2B-orange.svg)](https://plugins.jetbrains.com/)
+[![IDE](https://img.shields.io/badge/IDE-2025.2%2B-orange.svg)](https://plugins.jetbrains.com/)
 [![JDK](https://img.shields.io/badge/JDK-17-blue.svg)](https://adoptium.net/)
 [![Plugin SDK](https://img.shields.io/badge/IntelliJ%20Platform%20Gradle-2.16-purple.svg)](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 
@@ -402,7 +402,7 @@ The Rust side lives in:
 
 ## [0x0D] VERSION COMPATIBILITY
 
-Plugin version tracks the strykelang Cargo version. `gradle.properties` controls the supported IDE range via `pluginSinceBuild` / `pluginUntilBuild`. Currently targets `2024.2.4` SDK against builds `242..261.*` — every paid JetBrains IDE on **2024.2 +** loads it (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua). Community editions don't have the LSP API, so the plugin won't load there.
+Plugin version tracks the strykelang Cargo version. `gradle.properties` controls the supported IDE range via `pluginSinceBuild` / `pluginUntilBuild`. Currently targets `2025.2` SDK against builds `252..261.*` — every paid JetBrains IDE on **2025.2 +** loads it (RustRover, IDEA Ultimate, GoLand, PyCharm Pro, WebStorm, RubyMine, PhpStorm, CLion, Rider, DataGrip, Aqua). 2025.2 is the oldest platform with the `LspCustomization` API that RustRover 2026.1 ships; compiling against earlier platforms drops the customization hooks the LSP layer relies on. Community editions don't have the LSP API, so the plugin won't load there.
 
 ---
 
