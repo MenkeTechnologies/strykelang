@@ -7019,10 +7019,17 @@ impl Compiler {
             // ── I/O ──
             ExprKind::Open { handle, mode, file } => {
                 if let ExprKind::OpenMyHandle { name } = &handle.kind {
+                    // Same fix as Opendir below: $fh must hold the handle
+                    // NAME STRING so subsequent close($fh)/print $fh,…
+                    // resolve to the runtime's open-handle table. Pre-fix
+                    // SetScalarKeepPlain clobbered $fh with open's bool
+                    // return — handle was orphaned in the runtime table.
                     let name_idx = self.chunk.intern_name(name);
-                    self.emit_op(Op::LoadUndef, line, Some(root));
-                    self.emit_declare_scalar(name_idx, line, false);
                     let h_idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
+                    // $fh = "name"
+                    self.emit_op(Op::LoadConst(h_idx), line, Some(root));
+                    self.emit_declare_scalar(name_idx, line, false);
+                    // open("name", mode, [file]) → bool, remains on stack
                     self.emit_op(Op::LoadConst(h_idx), line, Some(root));
                     self.compile_expr(mode)?;
                     if let Some(f) = file {
@@ -7031,7 +7038,6 @@ impl Compiler {
                     } else {
                         self.emit_op(Op::CallBuiltin(BuiltinId::Open as u16, 2), line, Some(root));
                     }
-                    self.emit_op(Op::SetScalarKeepPlain(name_idx), line, Some(root));
                     return Ok(());
                 }
                 self.compile_expr(handle)?;
@@ -7080,10 +7086,25 @@ impl Compiler {
             }
             ExprKind::Opendir { handle, path } => {
                 if let ExprKind::OpendirMyHandle { name } = &handle.kind {
+                    // `opendir(my|var|val $dh, $path)` semantics: declare $dh,
+                    // initialize it to the literal handle-name string, then
+                    // call the opendir builtin with that same string as its
+                    // first arg. The runtime keys its open-dir table by that
+                    // string, so subsequent `readdir($dh)` / `closedir($dh)`
+                    // (which to_string $dh) resolve to the right handle.
+                    //
+                    // Pre-fix this emitted `SetScalarKeepPlain` AFTER the
+                    // CallBuiltin — which clobbered $dh with opendir's bool
+                    // return value, so the dir handle was orphaned in the
+                    // runtime table and readdir($dh)/readdir("1") found
+                    // nothing. The bool return must REMAIN as the expression
+                    // value so `opendir(...) or die` still works.
                     let name_idx = self.chunk.intern_name(name);
-                    self.emit_op(Op::LoadUndef, line, Some(root));
-                    self.emit_declare_scalar(name_idx, line, false);
                     let h_idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
+                    // $dh = "name"
+                    self.emit_op(Op::LoadConst(h_idx), line, Some(root));
+                    self.emit_declare_scalar(name_idx, line, false);
+                    // opendir("name", path) → bool, remains on stack
                     self.emit_op(Op::LoadConst(h_idx), line, Some(root));
                     self.compile_expr(path)?;
                     self.emit_op(
@@ -7091,7 +7112,6 @@ impl Compiler {
                         line,
                         Some(root),
                     );
-                    self.emit_op(Op::SetScalarKeepPlain(name_idx), line, Some(root));
                     return Ok(());
                 }
                 self.compile_expr(handle)?;
