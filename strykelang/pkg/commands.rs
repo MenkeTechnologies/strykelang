@@ -1257,7 +1257,7 @@ pub(crate) fn scan_store_for_highest_version(
 ) -> Option<(String, String)> {
     let store_dir = store.store_dir();
     let entries = std::fs::read_dir(&store_dir).ok()?;
-    let mut best: Option<(String, String, Vec<u64>)> = None;
+    let mut best: Option<(String, String, VersionRank)> = None;
     for ent in entries.flatten() {
         let dirname = ent.file_name().to_string_lossy().into_owned();
         let Some((pkg, ver)) = dirname.rsplit_once('@') else {
@@ -1266,33 +1266,93 @@ pub(crate) fn scan_store_for_highest_version(
         if !names.iter().any(|n| n == pkg) {
             continue;
         }
-        let tuple = parse_version_tuple(ver);
+        let rank = VersionRank::parse(ver);
         let take = match &best {
             None => true,
-            Some((_, _, cur)) => tuple.cmp(cur) == std::cmp::Ordering::Greater,
+            Some((_, _, cur)) => rank > *cur,
         };
         if take {
-            best = Some((pkg.to_string(), ver.to_string(), tuple));
+            best = Some((pkg.to_string(), ver.to_string(), rank));
         }
     }
     best.map(|(n, v, _)| (n, v))
 }
 
-/// Parse a `"1.2.3"`-ish version string into a numeric tuple for
-/// total-ordered comparison. Non-numeric tail segments collapse to
-/// `0`, so `1.0` < `1.0.1` and `1.2-rc1` reads as `[1, 2, 0]` for
-/// the purpose of "highest version" ranking. This is intentionally
-/// simple — semver pre-release / build metadata semantics live in a
-/// separate sort layer that the package manager owns, not the
-/// resolver. The resolver only needs "newest wins" deterministically.
-fn parse_version_tuple(ver: &str) -> Vec<u64> {
-    ver.split('.')
-        .map(|p| {
-            // Strip non-digit tail (e.g. `0-pre` → `0`) before parsing.
-            let head: String = p.chars().take_while(|c| c.is_ascii_digit()).collect();
-            head.parse::<u64>().unwrap_or(0)
-        })
-        .collect()
+/// Sort key for ranking `<store>/<name>@<version>/` directories by
+/// "newest wins" semantics. Total-ordered so the scan is deterministic
+/// regardless of filesystem iteration order.
+///
+/// Ordering rules, in priority:
+/// 1. Numeric tuple from the dotted prefix: `2.0 > 1.99`, `0.10 > 0.3`
+///    (numeric compare, not lexicographic).
+/// 2. Release > pre-release. A version with a `-suffix` (e.g.
+///    `1.0.0-rc1`) ranks below the same numeric prefix without one
+///    (`1.0.0`). Mirrors semver §11 — without this rule, `1.0.0` and
+///    `1.0.0-rc1` mapped to the same key and the scan returned
+///    whichever directory the filesystem happened to yield first.
+/// 3. Within pre-releases, alphabetic prefix of the suffix
+///    (`alpha < beta < rc`), then trailing number (`rc10 > rc2`).
+///    Not a full semver §11 implementation — the resolver only needs
+///    a stable total order; the package manager owns the strict
+///    semver layer.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct VersionRank {
+    /// Dotted numeric prefix as a Vec<u64>. `1.0.0` → `[1, 0, 0]`.
+    nums: Vec<u64>,
+    /// `1` for a release (no `-suffix`), `0` for any pre-release. Comes
+    /// before the suffix fields so release beats every pre-release with
+    /// the same numeric prefix.
+    is_release: u8,
+    /// Alphabetic head of the pre-release suffix (`rc` from `rc10`).
+    /// Empty for releases; lexicographic compare gives the conventional
+    /// `alpha < beta < rc` ordering.
+    suffix_alpha: String,
+    /// Trailing number in the pre-release suffix (`10` from `rc10`).
+    /// Zero when the suffix has no number (`beta` → `0`).
+    suffix_num: u64,
+}
+
+impl VersionRank {
+    pub(crate) fn parse(ver: &str) -> Self {
+        // Split numeric prefix from pre-release suffix at the first `-`.
+        // Build-metadata (`+sha…`) is not part of precedence per semver
+        // §10; strip it if present.
+        let no_build = ver.split('+').next().unwrap_or(ver);
+        let (prefix, suffix) = match no_build.split_once('-') {
+            Some((p, s)) => (p, s),
+            None => (no_build, ""),
+        };
+        let nums: Vec<u64> = prefix
+            .split('.')
+            .map(|p| {
+                let head: String = p.chars().take_while(|c| c.is_ascii_digit()).collect();
+                head.parse::<u64>().unwrap_or(0)
+            })
+            .collect();
+        let is_release = if suffix.is_empty() { 1 } else { 0 };
+        // Split suffix into alpha-head + trailing number. `rc10` →
+        // ("rc", 10); `beta` → ("beta", 0). Anything past the trailing
+        // digits is discarded — the resolver doesn't need to round-trip
+        // semver, only rank deterministically.
+        let alpha_end = suffix
+            .char_indices()
+            .find(|(_, c)| c.is_ascii_digit())
+            .map(|(i, _)| i)
+            .unwrap_or(suffix.len());
+        let suffix_alpha = suffix[..alpha_end].to_string();
+        let suffix_num = suffix[alpha_end..]
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<String>()
+            .parse::<u64>()
+            .unwrap_or(0);
+        Self {
+            nums,
+            is_release,
+            suffix_alpha,
+            suffix_num,
+        }
+    }
 }
 
 /// Build the list of plausible `<store>/<name>@<version>/` paths for a
@@ -3591,6 +3651,77 @@ mod tests {
         assert!(
             r.ends_with("store/stryke-gui@0.10.0/lib/GUI.stk"),
             "0.10.0 > 0.3.0 numerically — got {:?}",
+            r
+        );
+    }
+
+    /// Pre-release identifier loses to release (semver §11). `1.0.0-rc1`
+    /// must rank below `1.0.0`, not tie with it. Without this rule the
+    /// scan returns whichever extraction the filesystem yields first
+    /// — flaky cross-platform, flaky across `s install` orderings.
+    #[test]
+    fn resolve_module_release_wins_over_pre_release() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-prerelease");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Both extracted side-by-side. Release MUST win.
+        for v in ["1.0.0-rc1", "1.0.0", "1.0.0-beta"] {
+            let pkg_dir = store.package_dir("foo", v);
+            std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+            std::fs::write(
+                pkg_dir.join("lib/Foo.stk"),
+                format!("# foo {}\n", v).as_bytes(),
+            )
+            .unwrap();
+        }
+
+        let proj = tempdir("proj-prerelease");
+        let r = resolve_module(&proj, "Foo", None).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("foo should resolve");
+        assert!(
+            r.ends_with("foo@1.0.0/lib/Foo.stk"),
+            "release 1.0.0 must beat 1.0.0-rc1 / 1.0.0-beta; got {:?}",
+            r
+        );
+    }
+
+    /// Within pre-releases, the semver §11 ordering is `alpha < beta
+    /// < rc`. Stryke's resolver scan doesn't need full semver — it
+    /// only needs *deterministic* ranking — but the resolver should
+    /// at least keep the higher-numbered pre-release suffix on top
+    /// of the lower one (`rc2 > rc1`).
+    #[test]
+    fn resolve_module_pre_release_ordered_by_numeric_suffix() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("stryke-home-prerelease-suffix");
+        std::env::set_var("STRYKE_HOME", &home);
+
+        let store = Store::user_default().unwrap();
+        store.ensure_layout().unwrap();
+        // Only pre-releases on disk — release isn't out yet.
+        for v in ["1.0.0-rc1", "1.0.0-rc2", "1.0.0-rc10"] {
+            let pkg_dir = store.package_dir("foo", v);
+            std::fs::create_dir_all(pkg_dir.join("lib")).unwrap();
+            std::fs::write(
+                pkg_dir.join("lib/Foo.stk"),
+                format!("# foo {}\n", v).as_bytes(),
+            )
+            .unwrap();
+        }
+
+        let proj = tempdir("proj-prerelease-suffix");
+        let r = resolve_module(&proj, "Foo", None).unwrap();
+        std::env::remove_var("STRYKE_HOME");
+
+        let r = r.expect("foo should resolve to highest pre-release");
+        assert!(
+            r.ends_with("foo@1.0.0-rc10/lib/Foo.stk"),
+            "rc10 > rc2 > rc1 numerically; got {:?}",
             r
         );
     }
