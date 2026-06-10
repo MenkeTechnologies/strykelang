@@ -3643,13 +3643,15 @@ impl Parser {
                     sigil: decl_sigil,
                     name: decl_name.clone(),
                     initializer: None,
-                    frozen: false,
+                    // `val` makes the implicit decl frozen (matches the
+                    // var/val statement-form arms in parse_statement).
+                    frozen: kw == "val",
                     type_annotation: None,
                     list_context: false,
                 }];
                 implicit_decl = Some(Statement {
                     label: None,
-                    kind: if kw == "my" {
+                    kind: if kw == "my" || kw == "var" || kw == "val" {
                         StmtKind::My(decls)
                     } else {
                         StmtKind::Our(decls)
@@ -11314,9 +11316,19 @@ impl Parser {
                         },
                         line,
                     })
-                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name))
+                } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !matches!(name.as_str(), "var" | "val" | "varsync"))
                 {
                     // Blockless comparator via bare sub name: `sort my_cmp @list`
+                    // Reject `var`/`val`/`varsync` here even though they aren't
+                    // in `is_known_bareword` (by design — see the comment in
+                    // is_perl5_core). They are declarator keywords, never
+                    // sub names; treating them as a comparator would (a)
+                    // miss-parse `sort var @list` as `sort var(@list)`, and
+                    // (b) greedy-consume the next statement on the new line
+                    // — observed when `var @free_men = keys %$wp |> sort`
+                    // was followed by `var %women_ranks`, the second var
+                    // got swallowed as sort's comparator and then discarded
+                    // by `pipe_forward_apply` (Bug 2).
                     let block = self.parse_block_or_bareword_cmp_block()?;
                     let _ = self.eat(&Token::Comma);
                     let list = if self.in_pipe_rhs()
@@ -12710,7 +12722,7 @@ impl Parser {
                 if paren {
                     self.advance();
                 }
-                if matches!(self.peek(), Token::Ident(ref s) if s == "my") {
+                if matches!(self.peek(), Token::Ident(ref s) if s == "my" || s == "var" || s == "val") {
                     self.advance();
                     let name = self.parse_scalar_var_name()?;
                     self.expect(&Token::Comma)?;
