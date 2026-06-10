@@ -688,8 +688,14 @@ impl Builder {
                 self.pop_scope();
             }
             StmtKind::Package { name } => {
-                self.package_stack.push(name.clone());
+                // Declare BEFORE pushing the new package onto the stack.
+                // `declare_package_symbol` qualifies via `current_package()`,
+                // so pushing first would store `package Arrow` as
+                // `"Arrow::Arrow"` (self-qualified) — breaking cross-file
+                // goto-def, which looks up the symbol by its source-text
+                // spelling.
                 self.declare_package_symbol(name, line0, SymbolKind::Package);
+                self.package_stack.push(name.clone());
             }
             StmtKind::StructDecl { def } => {
                 self.declare_package_symbol(&def.name, line0, SymbolKind::Type);
