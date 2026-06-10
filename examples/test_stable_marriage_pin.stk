@@ -4,7 +4,7 @@ package StableMarriage
 
 fn solve($men_prefs, $women_prefs) {
     var %men_matches; var %women_matches
-    var @free_men = (keys %$men_prefs |> sort)
+    var @free_men = keys %$men_prefs |> sort
     var %women_ranks
     for val $w (keys %$women_prefs) {
         val $p = $women_prefs->{$w}

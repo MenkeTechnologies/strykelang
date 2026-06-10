@@ -27,13 +27,7 @@ fn prefers($prefs, $p1, $p2) {
 fn solve($men_prefs, $women_prefs) {
     var %men_matches
     var %women_matches
-    # Parens around the pipe expression — without them the bareword
-    # `sort` greedily consumes the next statement (`var %women_ranks`)
-    # as its arg, then SortExpr's pipe_forward_apply discards it via
-    # `list: _ => lhs`, silently losing the declaration. The analyzer
-    # then flags %women_ranks as undefined. Parser issue, not a stryke
-    # semantic limitation.
-    var @free_men = (keys %$men_prefs |> sort)
+    var @free_men = keys %$men_prefs |> sort
     
     # Pre-calculate woman rankings for O(1) preference check
     # maps man -> rank in her list
