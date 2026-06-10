@@ -147,7 +147,7 @@ fn Project::SpecialVars::error_cleared {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::SpecialVars::errno_after_bad_open {
-    eval { open(my $fh, "<", "/nonexistent/file/path") }
+    eval { open(var $fh, "<", "/nonexistent/file/path") }
     defined($!) ? 1 : 0
 }
 
