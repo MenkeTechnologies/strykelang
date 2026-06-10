@@ -254,7 +254,7 @@ Resolution order:
 1. **Project-local** `lib/Foo/Bar.stk`. Live edits always win — a local file shadows any store version.
 2. **Use-site pin** `use Foo::Bar 2.13`: load `~/.stryke/store/foo@2.13/lib/Bar.stk` directly. Skips lockfile + store-scan. Pin missing → hard error.
 3. **Inside project** (`stryke.toml` ancestor exists): look up `foo` in `stryke.lock`, load `~/.stryke/store/foo@{locked_version}/lib/Bar.stk`. Lockfile pin missing in store → hard error.
-4. **Outside project**: scan `~/.stryke/store/foo@*/` (also `stryke-foo@*/` and any namespace-bridged canonical name), pick the **HIGHEST** semver, load it. `2.0` beats `1.99`; `0.10.0` beats `0.3.0` (numeric tuple compare, not lexicographic).
+4. **Outside project**: scan `~/.stryke/store/foo@*/` (also `stryke-foo@*/` and any namespace-bridged canonical name), pick the **HIGHEST** semver, load it. `2.0` beats `1.99`; `0.10.0` beats `0.3.0` (numeric tuple compare, not lexicographic). Release beats pre-release: `1.0.0` wins over `1.0.0-rc1`. Within pre-releases, alpha-head sorts lexicographically (`alpha < beta < rc`), then trailing number (`rc10 > rc2 > rc1`). Build metadata (`+sha…`) is stripped before ranking (semver §10).
 5. `@INC` system paths.
 
 **Version respect is strict.** Whenever a pin (use-site `use Foo VERSION` or a `stryke.lock` entry) can't be satisfied by an existing store extraction, the resolver returns a hard error — never silently substitutes a different version. Loading a different file under the pinned name is a correctness bug. If `stryke.lock` pins `foo@1.0` but the store only has `foo@2.0`, `use Foo` refuses — run `s install` to populate the missing extraction.
