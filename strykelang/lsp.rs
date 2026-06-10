@@ -2037,16 +2037,22 @@ fn cross_file_goto_definition(
             ));
             return false;
         }
-        // SymbolTable path: Type (struct/enum/class/trait), Field,
-        // Our variable. Matches both bare-tail (`Point`) and qualified
-        // (`Project::Geom::Point`) needles via name_matches_cross_file.
+        // SymbolTable path: Package, Type (struct/enum/class/trait),
+        // Field, Our variable. Matches both bare-tail (`Point`) and
+        // qualified (`Project::Geom::Point`) needles via
+        // name_matches_cross_file. Package match is what lets Cmd-B on
+        // a `Foo::Bar` reference (in `use Foo::Bar`, `Foo::Bar::func()`,
+        // or just bare `Foo::Bar`) jump to the `package Foo::Bar` decl
+        // — including in store deps like
+        // `~/.stryke/store/foo@<ver>/lib/Foo/Bar.stk`.
         if let Some(table) = crate::lsp_symbols::SymbolTable::build(src, target_path) {
             // Exact-name match (handles `Pkg::Type` qualified needles
             // against stored qualified names).
             if let Some(sym) = table.symbols.iter().find(|s| {
                 matches!(
                     s.kind,
-                    crate::lsp_symbols::SymbolKind::Type
+                    crate::lsp_symbols::SymbolKind::Package
+                        | crate::lsp_symbols::SymbolKind::Type
                         | crate::lsp_symbols::SymbolKind::Field
                         | crate::lsp_symbols::SymbolKind::Our
                         | crate::lsp_symbols::SymbolKind::Format
@@ -2059,14 +2065,20 @@ fn cross_file_goto_definition(
                 ));
                 return false;
             }
-            // Qualified-name fallback: cursor on `Pkg::Variant` or
-            // `Pkg::method` — strip the last `::`-segment and look up
-            // the prefix as a Type in this required file.
+            // Qualified-name fallback: cursor on `Pkg::Variant`,
+            // `Pkg::method`, or `Pkg::Sub::Pkg` — strip the last
+            // `::`-segment and look up the prefix as a Type or
+            // Package in this required file.
             if let Some(idx) = word.rfind("::") {
                 let prefix = &word[..idx];
                 if !prefix.is_empty() {
                     if let Some(sym) = table.symbols.iter().find(|s| {
-                        s.name == prefix && matches!(s.kind, crate::lsp_symbols::SymbolKind::Type)
+                        s.name == prefix
+                            && matches!(
+                                s.kind,
+                                crate::lsp_symbols::SymbolKind::Type
+                                    | crate::lsp_symbols::SymbolKind::Package
+                            )
                     }) {
                         let uri = path_to_uri(target_path);
                         response = Some(location_link_response(
