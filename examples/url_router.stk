@@ -25,7 +25,7 @@ fn Demo::Router::register($method, $pattern, $handler) {
     # First element is empty (leading "/"); drop it.
     @raw_segs = grep { len(_) > 0 } @raw_segs
     var @parsed
-    for val $seg (@raw_segs) {
+    for var $seg (@raw_segs) {
         if (substr($seg, 0, 1) eq ":") {
             push @parsed, +{ kind => "param", name => substr($seg, 1) }
         } else {
@@ -41,18 +41,18 @@ fn Demo::Router::dispatch($method, $path) {
     var @path_segs = split /\//, $path
     @path_segs = grep { len(_) > 0 } @path_segs
 
-    for val $route (@routes) {
+    for var $route (@routes) {
         next unless $route->[0] eq $method
-        val $segs    = $route->[2]
-        val $handler = $route->[3]
+        var $segs    = $route->[2]
+        var $handler = $route->[3]
 
         next unless len(@$segs) == len @path_segs
 
         var %params
         var $ok = 1
-        for val $i (0:len(@$segs) - 1) {
-            val $rseg = $segs->[$i]
-            val $pseg = $path_segs[$i]
+        for var $i (0:len(@$segs) - 1) {
+            var $rseg = $segs->[$i]
+            var $pseg = $path_segs[$i]
             if ($rseg->{kind} eq "lit") {
                 if ($rseg->{name} ne $pseg) {
                     $ok = 0
@@ -95,7 +95,7 @@ Demo::Router::register("GET",  "/users/:id/posts/:slug",    \&Demo::Handlers::us
 Demo::Router::register("POST", "/users",                    \&Demo::Handlers::create_user)
 
 printf "── %d routes registered ──────────────────────────────\n", len @routes
-for val $r (@routes) {
+for var $r (@routes) {
     printf "  %-5s %s\n", $r->[0], $r->[1]
 }
 
@@ -107,12 +107,12 @@ mysync $lat = t_digest(100)
 mysync $hits = topk(3)
 
 around "Demo::Router::dispatch" {
-    val $method = $INTERCEPT_ARGS[0]
-    val $path   = $INTERCEPT_ARGS[1]
+    var $method = $INTERCEPT_ARGS[0]
+    var $path   = $INTERCEPT_ARGS[1]
     $req_count++
-    val $t0 = now_ns()
-    val $r = proceed(@INTERCEPT_ARGS)
-    val $us = (now_ns() - $t0) / 1000.0
+    var $t0 = now_ns()
+    var $r = proceed(@INTERCEPT_ARGS)
+    var $us = (now_ns() - $t0) / 1000.0
     td_add($lat, $us)
     if ($r->{ok}) {
         $matched++
@@ -138,10 +138,10 @@ var @requests = (
 
 p ""
 printf "── dispatching %d requests ────────────────────────────\n", len @requests
-for val $req (@requests) {
-    val $result = Demo::Router::dispatch($req->[0], $req->[1])
+for var $req (@requests) {
+    var $result = Demo::Router::dispatch($req->[0], $req->[1])
     if ($result->{ok}) {
-        val $response = $result->{handler}($result->{params})
+        var $response = $result->{handler}($result->{params})
         printf "  %-6s %-30s -> %s\n", $req->[0], $req->[1], $response
     } else {
         printf "  %-6s %-30s -> 404 Not Found\n", $req->[0], $req->[1]
@@ -170,7 +170,7 @@ printf "  p99  : %.1f µs\n", td_quantile($lat, 0.99)
 p ""
 p "── top routes (TopK) ────────────────────────────────"
 var @top = topk_top($hits)
-for val $h (@top) {
+for var $h (@top) {
     printf "  %-32s : %d hit(s)\n", $h->[0], $h->[1]
 }
 

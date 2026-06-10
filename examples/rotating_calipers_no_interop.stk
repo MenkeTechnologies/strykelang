@@ -18,8 +18,8 @@
 # ── squared 2D distance ──────────────────────────────────────────
 
 fn Cal::dist2($pa, $pb) {
-    val $dx = $pa->[0] - $pb->[0]
-    val $dy = $pa->[1] - $pb->[1]
+    var $dx = $pa->[0] - $pb->[0]
+    var $dy = $pa->[1] - $pb->[1]
     $dx * $dx + $dy * $dy
 }
 
@@ -35,18 +35,18 @@ fn Cal::convex_hull($pts) {
     var @sorted = sort {
         _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
     } @$pts
-    val $n = len(@sorted)
+    var $n = len(@sorted)
     return [@sorted] if $n < 3
     var @lo
-    for val $p (@sorted) {
+    for var $p (@sorted) {
         while (len(@lo) >= 2 && Cal::cross($lo[-2], $lo[-1], $p) <= 0) {
             pop(@lo)
         }
         push @lo, $p
     }
     var @up
-    for val $i (0:$n - 1) {
-        val $p = $sorted[$n - 1 - $i]
+    for var $i (0:$n - 1) {
+        var $p = $sorted[$n - 1 - $i]
         while (len(@up) >= 2 && Cal::cross($up[-2], $up[-1], $p) <= 0) {
             pop(@up)
         }
@@ -61,7 +61,7 @@ fn Cal::convex_hull($pts) {
 # calipers, we don't care about sign — only magnitude.
 
 fn Cal::tri_area2($pa, $pb, $pc) {
-    val $v = ($pb->[0] - $pa->[0]) * ($pc->[1] - $pa->[1]) - ($pb->[1] - $pa->[1]) * ($pc->[0] - $pa->[0])
+    var $v = ($pb->[0] - $pa->[0]) * ($pc->[1] - $pa->[1]) - ($pb->[1] - $pa->[1]) * ($pc->[0] - $pa->[0])
     $v < 0 ? -$v : $v
 }
 
@@ -69,8 +69,8 @@ fn Cal::tri_area2($pa, $pb, $pc) {
 # Returns +{ d2 => squared diameter, pa, pb }.
 
 fn Cal::diameter($pts) {
-    val $hull = Cal::convex_hull($pts)
-    val $n = len(@$hull)
+    var $hull = Cal::convex_hull($pts)
+    var $n = len(@$hull)
     if ($n == 1) {
         return +{ d2 => 0, pa => $hull->[0], pb => $hull->[0] }
     }
@@ -81,18 +81,18 @@ fn Cal::diameter($pts) {
     var $best = 0
     var $bp_a = $hull->[0]
     var $bp_b = $hull->[1]
-    for val $i (0:$n - 1) {
-        val $i_next = ($i + 1) % $n
+    for var $i (0:$n - 1) {
+        var $i_next = ($i + 1) % $n
         while (Cal::tri_area2($hull->[$i], $hull->[$i_next], $hull->[($j + 1) % $n]) > Cal::tri_area2($hull->[$i], $hull->[$i_next], $hull->[$j])) {
             $j = ($j + 1) % $n
         }
-        val $d_a = Cal::dist2($hull->[$i], $hull->[$j])
+        var $d_a = Cal::dist2($hull->[$i], $hull->[$j])
         if ($d_a > $best) {
             $best = $d_a
             $bp_a = $hull->[$i]
             $bp_b = $hull->[$j]
         }
-        val $d_b = Cal::dist2($hull->[$i_next], $hull->[$j])
+        var $d_b = Cal::dist2($hull->[$i_next], $hull->[$j])
         if ($d_b > $best) {
             $best = $d_b
             $bp_a = $hull->[$i_next]
@@ -105,14 +105,14 @@ fn Cal::diameter($pts) {
 # ── O(n²) brute force diameter ───────────────────────────────────
 
 fn Cal::brute_diameter($pts) {
-    val $n = len(@$pts)
+    var $n = len(@$pts)
     return +{ d2 => 0, pa => $pts->[0], pb => $pts->[0] } if $n < 2
     var $best = 0
     var $bp_a = $pts->[0]
     var $bp_b = $pts->[1]
-    for val $i (0:$n - 1) {
-        for val $j ($i + 1:$n - 1) {
-            val $d = Cal::dist2($pts->[$i], $pts->[$j])
+    for var $i (0:$n - 1) {
+        for var $j ($i + 1:$n - 1) {
+            var $d = Cal::dist2($pts->[$i], $pts->[$j])
             if ($d > $best) {
                 $best = $d
                 $bp_a = $pts->[$i]
@@ -144,8 +144,8 @@ var @cases = (
 p "── rotating-calipers diameter demo ───────────────────"
 printf "  %-22s  %3s  %6s  %s\n", "case", "n", "d²", "pair"
 printf "  %-22s  %3s  %6s  %s\n", "----------------------", "---", "------", "----"
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
     printf "  %-22s  %3d  %6d  (%d,%d)-(%d,%d)  %s\n",
         $c->{name}, len(@{$c->{pts}}), $r->{d2},
         $r->{pa}->[0], $r->{pa}->[1], $r->{pb}->[0], $r->{pb}->[1],
@@ -154,34 +154,34 @@ for val $c (@cases) {
 
 # ── invariant 1: rotating calipers matches expected d² ────────────
 
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
     die "d² #{$r->{d2}} != expected #{$c->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $c->{d2}
 }
 
 # ── invariant 2: rotating calipers matches O(n²) brute force ──────
 
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
-    val $br = Cal::brute_diameter($c->{pts})
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
+    var $br = Cal::brute_diameter($c->{pts})
     die "calipers #{$r->{d2}} != brute #{$br->{d2}} on \"#{$c->{name}}\"" unless $r->{d2} == $br->{d2}
 }
 
 # ── invariant 3: returned pair has the reported distance ──────────
 
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
-    val $d_check = Cal::dist2($r->{pa}, $r->{pb})
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
+    var $d_check = Cal::dist2($r->{pa}, $r->{pb})
     die "pair d² #{$d_check} != reported #{$r->{d2}} on \"#{$c->{name}}\"" unless $d_check == $r->{d2}
 }
 
 # ── invariant 4: both points of the pair are in the input ─────────
 
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
     var $found_a = 0
     var $found_b = 0
-    for val $p (@{$c->{pts}}) {
+    for var $p (@{$c->{pts}}) {
         $found_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
         $found_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
     }
@@ -191,12 +191,12 @@ for val $c (@cases) {
 
 # ── invariant 5: no pair in input is farther apart ────────────────
 
-for val $c (@cases) {
-    val $r = Cal::diameter($c->{pts})
-    val $n = len(@{$c->{pts}})
-    for val $i (0:$n - 1) {
-        for val $j ($i + 1:$n - 1) {
-            val $d = Cal::dist2($c->{pts}->[$i], $c->{pts}->[$j])
+for var $c (@cases) {
+    var $r = Cal::diameter($c->{pts})
+    var $n = len(@{$c->{pts}})
+    for var $i (0:$n - 1) {
+        for var $j ($i + 1:$n - 1) {
+            var $d = Cal::dist2($c->{pts}->[$i], $c->{pts}->[$j])
             die "found longer pair (#{$d} > #{$r->{d2}}) on \"#{$c->{name}}\"" if $d > $r->{d2}
         }
     }
@@ -204,13 +204,13 @@ for val $c (@cases) {
 
 # ── invariant 6: diameter pair endpoints lie on the convex hull ───
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if len(@{$c->{pts}}) < 3
-    val $r = Cal::diameter($c->{pts})
-    val $hull = Cal::convex_hull($c->{pts})
+    var $r = Cal::diameter($c->{pts})
+    var $hull = Cal::convex_hull($c->{pts})
     var $on_a = 0
     var $on_b = 0
-    for val $p (@$hull) {
+    for var $p (@$hull) {
         $on_a = 1 if $p->[0] == $r->{pa}->[0] && $p->[1] == $r->{pa}->[1]
         $on_b = 1 if $p->[0] == $r->{pb}->[0] && $p->[1] == $r->{pb}->[1]
     }
@@ -220,21 +220,21 @@ for val $c (@cases) {
 
 # ── invariant 7: a duplicated single point has d² = 0 ─────────────
 
-val $dup = Cal::diameter([[3, 4], [3, 4], [3, 4]])
+var $dup = Cal::diameter([[3, 4], [3, 4], [3, 4]])
 die "duplicate-only diameter must be 0" unless $dup->{d2} == 0
 
 # ── invariant 8: convex hull is CCW (sanity check) ────────────────
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if len(@{$c->{pts}}) < 3
-    val $hull = Cal::convex_hull($c->{pts})
-    val $n = len(@$hull)
+    var $hull = Cal::convex_hull($c->{pts})
+    var $n = len(@$hull)
     next if $n < 3
-    for val $i (0:$n - 1) {
-        val $p0 = $hull->[$i]
-        val $p1 = $hull->[($i + 1) % $n]
-        val $p2 = $hull->[($i + 2) % $n]
-        val $cr = Cal::cross($p0, $p1, $p2)
+    for var $i (0:$n - 1) {
+        var $p0 = $hull->[$i]
+        var $p1 = $hull->[($i + 1) % $n]
+        var $p2 = $hull->[($i + 2) % $n]
+        var $cr = Cal::cross($p0, $p1, $p2)
         die "hull not CCW at vertex #{$i} on \"#{$c->{name}}\": cross=#{$cr}" unless $cr > 0
     }
 }

@@ -22,9 +22,9 @@
 # ── direction vectors ─────────────────────────────────────────────
 # Index: 0 = N (up), 1 = E (right), 2 = S (down), 3 = W (left).
 
-val @DR  = (-1, 0, 1, 0)
-val @DC  = (0, 1, 0, -1)
-val @OPP = (2, 3, 0, 1)
+var @DR  = (-1, 0, 1, 0)
+var @DC  = (0, 1, 0, -1)
+var @OPP = (2, 3, 0, 1)
 
 # ── deterministic shuffle (Fisher–Yates with LCG seeded by (r, c)) ─
 # Deterministic so the maze layout is stable across runs — easier
@@ -32,10 +32,10 @@ val @OPP = (2, 3, 0, 1)
 
 fn Maze::shuffle($order_ref, $r, $c) {
     var $seed = $r * 7919 + $c * 31 + 1
-    for val $i (3:1) {
+    for var $i (3:1) {
         $seed = ($seed * 1103515245 + 12345) & 0x7FFFFFFF
-        val $j = $seed % ($i + 1)
-        val $tmp = $order_ref->[$i]
+        var $j = $seed % ($i + 1)
+        var $tmp = $order_ref->[$i]
         $order_ref->[$i] = $order_ref->[$j]
         $order_ref->[$j] = $tmp
     }
@@ -45,9 +45,9 @@ fn Maze::shuffle($order_ref, $r, $c) {
 
 fn Maze::make_grid($w, $h, $init) {
     var @g
-    for val $r (0:$h - 1) {
+    for var $r (0:$h - 1) {
         var @row
-        for val $c (0:$w - 1) { push @row, $init }
+        for var $c (0:$w - 1) { push @row, $init }
         push @g, \@row
     }
     \@g
@@ -59,9 +59,9 @@ fn Maze::carve($r, $c, $grid, $visited, $w, $h) {
     $visited->[$r]->[$c] = 1
     var @order = (0, 1, 2, 3)
     Maze::shuffle(\@order, $r, $c)
-    for val $d (@order) {
-        val $nr = $r + $DR[$d]
-        val $nc = $c + $DC[$d]
+    for var $d (@order) {
+        var $nr = $r + $DR[$d]
+        var $nc = $c + $DC[$d]
         next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
         next if $visited->[$nr]->[$nc]
         # Knock down both walls between (r,c) and (nr,nc).
@@ -79,21 +79,21 @@ fn Maze::render($grid, $w, $h) {
     var $out = ""
     # Top border of the whole maze.
     $out .= "+"
-    for val $c (0:$w - 1) { $out .= ($grid->[0]->[$c] & 1) ? "---+" : "   +" }
+    for var $c (0:$w - 1) { $out .= ($grid->[0]->[$c] & 1) ? "---+" : "   +" }
     $out .= "\n"
 
-    for val $r (0:$h - 1) {
+    for var $r (0:$h - 1) {
         # Body line: west wall of leftmost cell, then each cell's
         # interior + east wall.
         $out .= ($grid->[$r]->[0] & 8) ? "|" : " "
-        for val $c (0:$w - 1) {
+        for var $c (0:$w - 1) {
             $out .= "   "
             $out .= ($grid->[$r]->[$c] & 2) ? "|" : " "
         }
         $out .= "\n"
         # South-wall divider row.
         $out .= "+"
-        for val $c (0:$w - 1) {
+        for var $c (0:$w - 1) {
             $out .= ($grid->[$r]->[$c] & 4) ? "---+" : "   +"
         }
         $out .= "\n"
@@ -104,19 +104,19 @@ fn Maze::render($grid, $w, $h) {
 # ── BFS shortest-path length to confirm reachability ─────────────
 
 fn Maze::bfs_distance($grid, $w, $h, $sr, $sc, $er, $ec) {
-    val $dist = Maze::make_grid($w, $h, -1)
+    var $dist = Maze::make_grid($w, $h, -1)
     $dist->[$sr]->[$sc] = 0
     var @queue = ([$sr, $sc])
     while (len(@queue) > 0) {
-        val $cur = shift @queue
-        val $r = $cur->[0]
-        val $c = $cur->[1]
+        var $cur = shift @queue
+        var $r = $cur->[0]
+        var $c = $cur->[1]
         return $dist->[$r]->[$c] if $r == $er && $c == $ec
-        val $cell = $grid->[$r]->[$c]
-        for val $d (0:3) {
+        var $cell = $grid->[$r]->[$c]
+        for var $d (0:3) {
             next if ($cell >> $d) & 1   # wall in this direction
-            val $nr = $r + $DR[$d]
-            val $nc = $c + $DC[$d]
+            var $nr = $r + $DR[$d]
+            var $nc = $c + $DC[$d]
             next if $nr < 0 || $nr >= $h || $nc < 0 || $nc >= $w
             next if $dist->[$nr]->[$nc] >= 0
             $dist->[$nr]->[$nc] = $dist->[$r]->[$c] + 1
@@ -128,10 +128,10 @@ fn Maze::bfs_distance($grid, $w, $h, $sr, $sc, $er, $ec) {
 
 # ── run ───────────────────────────────────────────────────────────
 
-val $W = 12
-val $H = 8
-val $grid = Maze::make_grid($W, $H, 0xF)      # all walls intact
-val $visited = Maze::make_grid($W, $H, 0)
+var $W = 12
+var $H = 8
+var $grid = Maze::make_grid($W, $H, 0xF)      # all walls intact
+var $visited = Maze::make_grid($W, $H, 0)
 
 Maze::carve(0, 0, $grid, $visited, $W, $H)
 
@@ -141,8 +141,8 @@ print Maze::render($grid, $W, $H)
 # ── invariant 1: every cell got visited ──────────────────────────
 
 var $visited_count = 0
-for val $row (@$visited) {
-    for val $v (@$row) { $visited_count++ if $v }
+for var $row (@$visited) {
+    for var $v (@$row) { $visited_count++ if $v }
 }
 die "expected #{$W * $H} visited cells, got #{$visited_count}" unless $visited_count == $W * $H
 
@@ -150,9 +150,9 @@ die "expected #{$W * $H} visited cells, got #{$visited_count}" unless $visited_c
 #                 between cells (forms a spanning tree). ──────────
 
 var $carved = 0
-for val $r (0:$H - 1) {
-    for val $c (0:$W - 1) {
-        val $cell = $grid->[$r]->[$c]
+for var $r (0:$H - 1) {
+    for var $c (0:$W - 1) {
+        var $cell = $grid->[$r]->[$c]
         # Each cell stores its own four wall bits; sum the missing
         # walls to the east and to the south, only — each interior
         # wall is shared between two cells, so counting two sides
@@ -165,23 +165,23 @@ die "spanning-tree edge count: got #{$carved}, want #{$W * $H - 1}" unless $carv
 
 # ── invariant 3: BFS reaches the opposite corner ─────────────────
 
-val $d = Maze::bfs_distance($grid, $W, $H, 0, 0, $H - 1, $W - 1)
+var $d = Maze::bfs_distance($grid, $W, $H, 0, 0, $H - 1, $W - 1)
 die "opposite corner unreachable" unless $d > 0
 
 # ── invariant 4: every cell is reachable from (0, 0) ─────────────
 
-val $reach = Maze::make_grid($W, $H, -1)
+var $reach = Maze::make_grid($W, $H, -1)
 $reach->[0]->[0] = 0
 var @q = ([0, 0])
 while (len(@q) > 0) {
-    val $cur = shift @q
-    val $r = $cur->[0]
-    val $c = $cur->[1]
-    val $cell = $grid->[$r]->[$c]
-    for val $dir (0:3) {
+    var $cur = shift @q
+    var $r = $cur->[0]
+    var $c = $cur->[1]
+    var $cell = $grid->[$r]->[$c]
+    for var $dir (0:3) {
         next if ($cell >> $dir) & 1
-        val $nr = $r + $DR[$dir]
-        val $nc = $c + $DC[$dir]
+        var $nr = $r + $DR[$dir]
+        var $nc = $c + $DC[$dir]
         next if $nr < 0 || $nr >= $H || $nc < 0 || $nc >= $W
         next if $reach->[$nr]->[$nc] >= 0
         $reach->[$nr]->[$nc] = $reach->[$r]->[$c] + 1
@@ -189,8 +189,8 @@ while (len(@q) > 0) {
     }
 }
 var $reached = 0
-for val $row (@$reach) {
-    for val $v (@$row) { $reached++ if $v >= 0 }
+for var $row (@$reach) {
+    for var $v (@$row) { $reached++ if $v >= 0 }
 }
 die "BFS reached #{$reached} cells, expected #{$W * $H}" unless $reached == $W * $H
 
@@ -198,17 +198,17 @@ die "BFS reached #{$reached} cells, expected #{$W * $H}" unless $reached == $W *
 #                 east wall down, cell (r,c+1) must have its west
 #                 wall down. ─────────────────────────────────────
 
-for val $r (0:$H - 1) {
-    for val $c (0:$W - 2) {
-        val $east_open  = !(($grid->[$r]->[$c]     >> 1) & 1)
-        val $west_open  = !(($grid->[$r]->[$c + 1] >> 3) & 1)
+for var $r (0:$H - 1) {
+    for var $c (0:$W - 2) {
+        var $east_open  = !(($grid->[$r]->[$c]     >> 1) & 1)
+        var $west_open  = !(($grid->[$r]->[$c + 1] >> 3) & 1)
         die "E/W wall asymmetry at (#{$r}, #{$c})" unless $east_open == $west_open
     }
 }
-for val $r (0:$H - 2) {
-    for val $c (0:$W - 1) {
-        val $south_open = !(($grid->[$r]->[$c]     >> 2) & 1)
-        val $north_open = !(($grid->[$r + 1]->[$c] >> 0) & 1)
+for var $r (0:$H - 2) {
+    for var $c (0:$W - 1) {
+        var $south_open = !(($grid->[$r]->[$c]     >> 2) & 1)
+        var $north_open = !(($grid->[$r + 1]->[$c] >> 0) & 1)
         die "N/S wall asymmetry at (#{$r}, #{$c})" unless $south_open == $north_open
     }
 }

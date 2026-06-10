@@ -20,8 +20,8 @@
 # ── full Smith-Waterman with traceback ────────────────────────────
 
 fn Sw::align($s, $t, $match, $mismatch, $gap) {
-    val $n = len($s)
-    val $m = len($t)
+    var $n = len($s)
+    var $m = len($t)
     if ($n == 0 || $m == 0) {
         return +{
             score   => 0,
@@ -35,27 +35,27 @@ fn Sw::align($s, $t, $match, $mismatch, $gap) {
     }
     # H[i][j] table — (n+1) × (m+1), zero on borders.
     var @H
-    for val $i (0:$n) {
-        val @row = (0) x ($m + 1)
+    for var $i (0:$n) {
+        var @row = (0) x ($m + 1)
         push @H, \@row
     }
     # Traceback direction: 0=stop, 1=diag, 2=up (gap_in_t), 3=left (gap_in_s).
     var @TB
-    for val $i (0:$n) {
-        val @row = (0) x ($m + 1)
+    for var $i (0:$n) {
+        var @row = (0) x ($m + 1)
         push @TB, \@row
     }
     var $best_score = 0
     var $best_i = 0
     var $best_j = 0
-    for val $i (1:$n) {
-        val $sc = substr($s, $i - 1, 1)
-        for val $j (1:$m) {
-            val $tc = substr($t, $j - 1, 1)
-            val $diag_w = ($sc eq $tc ? $match : $mismatch)
-            val $diag = $H[$i - 1]->[$j - 1] + $diag_w
-            val $up   = $H[$i - 1]->[$j]     + $gap
-            val $left = $H[$i]->[$j - 1]     + $gap
+    for var $i (1:$n) {
+        var $sc = substr($s, $i - 1, 1)
+        for var $j (1:$m) {
+            var $tc = substr($t, $j - 1, 1)
+            var $diag_w = ($sc eq $tc ? $match : $mismatch)
+            var $diag = $H[$i - 1]->[$j - 1] + $diag_w
+            var $up   = $H[$i - 1]->[$j]     + $gap
+            var $left = $H[$i]->[$j - 1]     + $gap
             var $best = 0
             var $dir  = 0
             if ($diag > $best) { $best = $diag; $dir = 1 }
@@ -76,7 +76,7 @@ fn Sw::align($s, $t, $match, $mismatch, $gap) {
     var $i = $best_i
     var $j = $best_j
     while ($i > 0 && $j > 0 && $H[$i]->[$j] > 0) {
-        val $dir = $TB[$i]->[$j]
+        var $dir = $TB[$i]->[$j]
         if ($dir == 1) {
             $aligned_s = substr($s, $i - 1, 1) . $aligned_s
             $aligned_t = substr($t, $j - 1, 1) . $aligned_t
@@ -108,12 +108,12 @@ fn Sw::align($s, $t, $match, $mismatch, $gap) {
 # ── re-score an aligned-pair to validate the trace ────────────────
 
 fn Sw::rescore($as, $at, $match, $mismatch, $gap) {
-    val $n = len($as)
+    var $n = len($as)
     die "alignment-length mismatch" unless $n == len($at)
     var $sc = 0
-    for val $i (0:$n - 1) {
-        val $ca = substr($as, $i, 1)
-        val $cb = substr($at, $i, 1)
+    for var $i (0:$n - 1) {
+        var $ca = substr($as, $i, 1)
+        var $cb = substr($at, $i, 1)
         if ($ca eq "-" || $cb eq "-") {
             $sc += $gap
         } elsif ($ca eq $cb) {
@@ -129,9 +129,9 @@ fn Sw::rescore($as, $at, $match, $mismatch, $gap) {
 
 fn Sw::ungapped($s) {
     var $out = ""
-    val $n = len($s)
-    for val $i (0:$n - 1) {
-        val $c = substr($s, $i, 1)
+    var $n = len($s)
+    for var $i (0:$n - 1) {
+        var $c = substr($s, $i, 1)
         $out .= $c unless $c eq "-"
     }
     $out
@@ -194,9 +194,9 @@ var @cases = (
 p "── Smith-Waterman local-alignment demo ───────────────"
 printf "  %-26s  %5s  %s\n", "case", "score", "alignment"
 printf "  %-26s  %5s  %s\n", "--------------------------", "-----", "---------"
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
-    val $ok = $r->{score} == $c->{score}
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    var $ok = $r->{score} == $c->{score}
     printf "  %-26s  %5d  %s | %s  %s\n",
         $c->{name}, $r->{score}, $r->{aligned_s}, $r->{aligned_t},
         $ok ? "" : "FAIL want=#{$c->{score}}"
@@ -204,62 +204,62 @@ for val $c (@cases) {
 
 # ── invariant 1: reported score matches known optimum ─────────────
 
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
     die "score #{$r->{score}} != expected #{$c->{score}} on \"#{$c->{name}}\"" unless $r->{score} == $c->{score}
 }
 
 # ── invariant 2: re-scoring the alignment matches the reported score ─
 
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
-    val $rescored = Sw::rescore($r->{aligned_s}, $r->{aligned_t}, $c->{m}, $c->{mm}, $c->{g})
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    var $rescored = Sw::rescore($r->{aligned_s}, $r->{aligned_t}, $c->{m}, $c->{mm}, $c->{g})
     die "rescore #{$rescored} != reported #{$r->{score}} on \"#{$c->{name}}\"" unless $rescored == $r->{score}
 }
 
 # ── invariant 3: both aligned strings have the same length ────────
 
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
     die "aligned-string length mismatch on \"#{$c->{name}}\"" unless len($r->{aligned_s}) == len($r->{aligned_t})
 }
 
 # ── invariant 4: ungapped-aligned ⊂ source as a contiguous slice ──
 
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
-    val $us = Sw::ungapped($r->{aligned_s})
-    val $ut = Sw::ungapped($r->{aligned_t})
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+    var $us = Sw::ungapped($r->{aligned_s})
+    var $ut = Sw::ungapped($r->{aligned_t})
     if (len($us) > 0) {
-        val $ss = substr($c->{s}, $r->{start_s}, $r->{end_s} - $r->{start_s} + 1)
+        var $ss = substr($c->{s}, $r->{start_s}, $r->{end_s} - $r->{start_s} + 1)
         die "aligned_s ungapped \"#{$us}\" != s[start..end] \"#{$ss}\" on \"#{$c->{name}}\"" unless $us eq $ss
     }
     if (len($ut) > 0) {
-        val $ts = substr($c->{t}, $r->{start_t}, $r->{end_t} - $r->{start_t} + 1)
+        var $ts = substr($c->{t}, $r->{start_t}, $r->{end_t} - $r->{start_t} + 1)
         die "aligned_t ungapped \"#{$ut}\" != t[start..end] \"#{$ts}\" on \"#{$c->{name}}\"" unless $ut eq $ts
     }
 }
 
 # ── invariant 5: score is non-negative ─────────────────────────────
 
-for val $c (@cases) {
-    val $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
+for var $c (@cases) {
+    var $r = Sw::align($c->{s}, $c->{t}, $c->{m}, $c->{mm}, $c->{g})
     die "score #{$r->{score}} < 0 on \"#{$c->{name}}\"" unless $r->{score} >= 0
 }
 
 # ── invariant 6: a string aligned with itself scores |s| × match ──
 
-for val $s ("ACGT", "MENKE", "stryke", "X", "GATTACA") {
-    val $r = Sw::align($s, $s, 2, -1, -2)
+for var $s ("ACGT", "MENKE", "stryke", "X", "GATTACA") {
+    var $r = Sw::align($s, $s, 2, -1, -2)
     die "self-align \"#{$s}\" score #{$r->{score}} != #{2 * len($s)}" unless $r->{score} == 2 * len($s)
     die "self-align \"#{$s}\" aligned mismatch" unless $r->{aligned_s} eq $s && $r->{aligned_t} eq $s
 }
 
 # ── invariant 7: empty input → zero score, empty alignment ────────
 
-for val $pair ([["", "abc"], ["abc", ""], ["", ""]]) {
-    for val $pp (@$pair) {
-        val $r = Sw::align($pp->[0], $pp->[1], 2, -1, -2)
+for var $pair ([["", "abc"], ["abc", ""], ["", ""]]) {
+    for var $pp (@$pair) {
+        var $r = Sw::align($pp->[0], $pp->[1], 2, -1, -2)
         die "empty-input score must be 0" unless $r->{score} == 0
         die "empty-input aligned must be empty" unless $r->{aligned_s} eq "" && $r->{aligned_t} eq ""
     }

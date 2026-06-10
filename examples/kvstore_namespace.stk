@@ -7,12 +7,12 @@
 # in-memory state) — if any op rejects, everything rolls back to the
 # entry-time snapshot.
 
-val $path = "/tmp/kvstore_namespace.rkyv"
+var $path = "/tmp/kvstore_namespace.rkyv"
 unlink($path)
-val $db = kv_open($path)
+var $db = kv_open($path)
 
 # ─── insert into two "tables" via prefix ─────────────────────────────
-val $n = kv_batch($db, [
+var $n = kv_batch($db, [
     ["put", "users:alice", { age => 30, role => "admin" }],
     ["put", "users:bob",   { age => 28, role => "user"  }],
     ["put", "users:carol", { age => 41, role => "user"  }],
@@ -25,15 +25,15 @@ p "applied $n ops in one batch"
 
 # ─── scan one namespace ──────────────────────────────────────────────
 p "── users ──"
-for val $row (kv_scan($db, "users:")) {
-    var ($key, $val) = @$row
-    printf "  %-14s age=%d  role=%s\n", $key, $val->{age}, $val->{role}
+for var $row (kv_scan($db, "users:")) {
+    var ($key, $var) = @$row
+    printf "  %-14s age=%d  role=%s\n", $key, $var->{age}, $var->{role}
 }
 
 p "── logs ──"
-for val $row (kv_scan($db, "logs:")) {
-    val ($key, $val) = @$row
-    printf "  %-10s ts=%d  msg=%s\n", $key, $val->{ts}, $val->{msg}
+for var $row (kv_scan($db, "logs:")) {
+    var ($key, $var) = @$row
+    printf "  %-10s ts=%d  msg=%s\n", $key, $var->{ts}, $var->{msg}
 }
 
 # ─── atomic rollback demo: one bad op aborts the whole batch ─────────
@@ -52,7 +52,7 @@ if ($@) {
     p "  alice  exists: ", kv_exists($db, "users:alice"), "  (untouched by rollback)"
 }
 
-val $stats = kv_stats($db)
+var $stats = kv_stats($db)
 printf "\nstore: %d entries, %d commits, format v%d\n",
     $stats->{entries}, $stats->{commit_count}, $stats->{format_version}
 

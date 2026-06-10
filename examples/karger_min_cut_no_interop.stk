@@ -39,15 +39,15 @@ fn Karger::one_phase($edges_in, $n) {
     }
     var $remaining = $n
     var @edges
-    for val $e (@$edges_in) {
+    for var $e (@$edges_in) {
         push @edges, [$e->[0], $e->[1]]
     }
     while ($remaining > 2) {
         die "Karger: ran out of non-loop edges" if len(@edges) == 0
-        val $idx = int(rand() * len(@edges))
-        val $e = $edges[$idx]
-        val $ru = Karger::find(\@parent, $e->[0])
-        val $rv = Karger::find(\@parent, $e->[1])
+        var $idx = int(rand() * len(@edges))
+        var $e = $edges[$idx]
+        var $ru = Karger::find(\@parent, $e->[0])
+        var $rv = Karger::find(\@parent, $e->[1])
         if ($ru == $rv) {
             # Self-loop after earlier merges — drop and retry.
             splice(@edges, $idx, 1)
@@ -57,9 +57,9 @@ fn Karger::one_phase($edges_in, $n) {
         $remaining--
         # Remove all edges that are now self-loops.
         var @kept
-        for val $f (@edges) {
-            val $rf_a = Karger::find(\@parent, $f->[0])
-            val $rf_b = Karger::find(\@parent, $f->[1])
+        for var $f (@edges) {
+            var $rf_a = Karger::find(\@parent, $f->[0])
+            var $rf_b = Karger::find(\@parent, $f->[1])
             push @kept, $f unless $rf_a == $rf_b
         }
         @edges = @kept
@@ -71,8 +71,8 @@ fn Karger::one_phase($edges_in, $n) {
 
 fn Karger::min_cut($edges, $n, $trials) {
     var $best = 1_000_000_000
-    for val $i (1:$trials) {
-        val $c = Karger::one_phase($edges, $n)
+    for var $i (1:$trials) {
+        var $c = Karger::one_phase($edges, $n)
         $best = $c if $c < $best
     }
     $best
@@ -83,12 +83,12 @@ fn Karger::min_cut($edges, $n, $trials) {
 fn Karger::brute_min_cut($edges, $n) {
     return 0 if $n < 2
     var $best = 1_000_000_000
-    val $total = 1 << $n
-    for val $mask (1:$total - 2) {
+    var $total = 1 << $n
+    for var $mask (1:$total - 2) {
         var $cnt = 0
-        for val $e (@$edges) {
-            val $u = ($mask >> $e->[0]) & 1
-            val $v = ($mask >> $e->[1]) & 1
+        for var $e (@$edges) {
+            var $u = ($mask >> $e->[0]) & 1
+            var $v = ($mask >> $e->[1]) & 1
             $cnt++ if $u != $v
         }
         $best = $cnt if $cnt < $best
@@ -163,10 +163,10 @@ var @cases = (
 p "── Karger randomized min-cut demo ────────────────────"
 printf "  %-30s  %3s  %3s  %5s  %5s\n", "case", "n", "m", "karg", "brute"
 printf "  %-30s  %3s  %3s  %5s  %5s\n", "------------------------------", "---", "---", "-----", "-----"
-for val $c (@cases) {
-    val $trials = $c->{n} * $c->{n} * 4
-    val $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
-    val $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
+for var $c (@cases) {
+    var $trials = $c->{n} * $c->{n} * 4
+    var $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
+    var $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
     printf "  %-30s  %3d  %3d  %5d  %5d  %s\n",
         $c->{name}, $c->{n}, len(@{$c->{edges}}), $kc, $bc,
         $kc == $c->{cut} ? "" : "FAIL want=#{$c->{cut}}"
@@ -175,19 +175,19 @@ for val $c (@cases) {
 # ── invariant 1: Karger matches the known optimum on every case ───
 # (Boost trial-count so the failure probability is microscopic.)
 
-for val $c (@cases) {
-    val $trials = $c->{n} * $c->{n} * 8
-    val $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
+for var $c (@cases) {
+    var $trials = $c->{n} * $c->{n} * 8
+    var $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
     die "Karger #{$kc} != known optimum #{$c->{cut}} on \"#{$c->{name}}\"" unless $kc == $c->{cut}
 }
 
 # ── invariant 2: brute force agrees with Karger (n ≤ 8) ───────────
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if $c->{n} > 8
-    val $trials = $c->{n} * $c->{n} * 8
-    val $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
-    val $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
+    var $trials = $c->{n} * $c->{n} * 8
+    var $kc = Karger::min_cut($c->{edges}, $c->{n}, $trials)
+    var $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
     die "Karger #{$kc} != brute #{$bc} on \"#{$c->{name}}\"" unless $kc == $bc
 }
 
@@ -195,20 +195,20 @@ for val $c (@cases) {
 # (Karger's correctness lemma: contraction never SHRINKS a non-min
 # cut into something smaller than it actually is.)
 
-for val $c (@cases) {
-    val $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
-    for val $rep (1:5) {
-        val $one = Karger::one_phase($c->{edges}, $c->{n})
+for var $c (@cases) {
+    var $bc = Karger::brute_min_cut($c->{edges}, $c->{n})
+    for var $rep (1:5) {
+        var $one = Karger::one_phase($c->{edges}, $c->{n})
         die "one_phase #{$one} < true min cut #{$bc} on \"#{$c->{name}}\"" if $one < $bc
     }
 }
 
 # ── invariant 4: bridge graph (true cut = 1) is found often ───────
 
-val $bridge = $cases[3]
+var $bridge = $cases[3]
 var $hits = 0
-for val $rep (1:200) {
-    val $one = Karger::one_phase($bridge->{edges}, $bridge->{n})
+for var $rep (1:200) {
+    var $one = Karger::one_phase($bridge->{edges}, $bridge->{n})
     $hits++ if $one == 1
 }
 # Probability of finding a singleton bridge in one contraction is
@@ -218,40 +218,40 @@ die "bridge graph: no hits in 200 phases (expected ≥ 1)" unless $hits > 0
 
 # ── invariant 5: an isolated-pair graph (cut = 0) returns 0 ───────
 
-val $iso_edges = [[0, 1], [2, 3]]   # nodes 0,1 connected; 2,3 connected; no link
-val $iso_cut = Karger::brute_min_cut($iso_edges, 4)
+var $iso_edges = [[0, 1], [2, 3]]   # nodes 0,1 connected; 2,3 connected; no link
+var $iso_cut = Karger::brute_min_cut($iso_edges, 4)
 die "isolated-pair brute cut must be 0" unless $iso_cut == 0
 
 # ── invariant 6: K_n always has min cut n-1 ───────────────────────
 
-for val $n (3, 4, 5, 6) {
+for var $n (3, 4, 5, 6) {
     var @kn
-    for val $i (0:$n - 1) {
-        for val $j ($i + 1:$n - 1) {
+    for var $i (0:$n - 1) {
+        for var $j ($i + 1:$n - 1) {
             push @kn, [$i, $j]
         }
     }
-    val $bc = Karger::brute_min_cut(\@kn, $n)
+    var $bc = Karger::brute_min_cut(\@kn, $n)
     die "K#{$n} min cut must be #{$n - 1}, brute says #{$bc}" unless $bc == $n - 1
-    val $kc = Karger::min_cut(\@kn, $n, $n * $n * 8)
+    var $kc = Karger::min_cut(\@kn, $n, $n * $n * 8)
     die "K#{$n} Karger #{$kc} != #{$n - 1}" unless $kc == $n - 1
 }
 
 # ── invariant 7: cut value is invariant under edge ordering ───────
 
-for val $c (@cases) {
+for var $c (@cases) {
     var @shuffled = @{$c->{edges}}
-    val $len = len(@shuffled)
+    var $len = len(@shuffled)
     # Fisher-Yates.
-    for val $i (rev 1:$len - 1) {
-        val $j = int(rand() * ($i + 1))
-        val $t = $shuffled[$i]
+    for var $i (rev 1:$len - 1) {
+        var $j = int(rand() * ($i + 1))
+        var $t = $shuffled[$i]
         $shuffled[$i] = $shuffled[$j]
         $shuffled[$j] = $t
     }
-    val $trials = $c->{n} * $c->{n} * 8
-    val $orig = Karger::min_cut($c->{edges}, $c->{n}, $trials)
-    val $shuf = Karger::min_cut(\@shuffled, $c->{n}, $trials)
+    var $trials = $c->{n} * $c->{n} * 8
+    var $orig = Karger::min_cut($c->{edges}, $c->{n}, $trials)
+    var $shuf = Karger::min_cut(\@shuffled, $c->{n}, $trials)
     die "edge-order changed cut on \"#{$c->{name}}\": orig=#{$orig} shuf=#{$shuf}" unless $orig == $shuf
 }
 

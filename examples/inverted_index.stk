@@ -48,10 +48,10 @@ fn Demo::II::tokenize($s) {
     \@toks
 }
 
-for val $doc (@docs) {
-    val $combined = $doc->{title} . " " . $doc->{text}
-    val $toks = Demo::II::tokenize($combined)
-    for val $t (@$toks) {
+for var $doc (@docs) {
+    var $combined = $doc->{title} . " " . $doc->{text}
+    var $toks = Demo::II::tokenize($combined)
+    for var $t (@$toks) {
         $index{$t} = +{} unless exists $index{$t}
         $index{$t}->{$doc->{id}} = ($index{$t}->{$doc->{id}} // 0) + 1
     }
@@ -62,7 +62,7 @@ printf "── index built: %d docs, %d distinct terms ────────�
 
 # ── query ops ──────────────────────────────────────────────────────
 
-val $td_query = t_digest(100)
+var $td_query = t_digest(100)
 
 fn Demo::II::posting($term) {
     $index{$term} // +{}
@@ -70,9 +70,9 @@ fn Demo::II::posting($term) {
 
 fn Demo::II::query_or($terms) {
     var %scores
-    for val $t (@$terms) {
-        val $post = Demo::II::posting($t)
-        for val $doc_id (keys %$post) {
+    for var $t (@$terms) {
+        var $post = Demo::II::posting($t)
+        for var $doc_id (keys %$post) {
             $scores{$doc_id} = ($scores{$doc_id} // 0) + $post->{$doc_id}
         }
     }
@@ -81,16 +81,16 @@ fn Demo::II::query_or($terms) {
 
 fn Demo::II::query_and($terms) {
     return +{} if len(@$terms) == 0
-    val $first_post = Demo::II::posting($terms->[0])
+    var $first_post = Demo::II::posting($terms->[0])
     var %scores
-    for val $doc_id (keys %$first_post) {
+    for var $doc_id (keys %$first_post) {
         $scores{$doc_id} = $first_post->{$doc_id}
     }
     # Intersect with remaining terms.
-    for val $i (1:len(@$terms) - 1) {
-        val $post = Demo::II::posting($terms->[$i])
+    for var $i (1:len(@$terms) - 1) {
+        var $post = Demo::II::posting($terms->[$i])
         var %new
-        for val $doc_id (keys %scores) {
+        for var $doc_id (keys %scores) {
             if (exists $post->{$doc_id}) {
                 $new{$doc_id} = $scores{$doc_id} + $post->{$doc_id}
             }
@@ -101,16 +101,16 @@ fn Demo::II::query_and($terms) {
 }
 
 fn Demo::II::search($query, $mode) {
-    val $t0 = now_ns()
-    val $toks = Demo::II::tokenize($query)
-    val $scores = $mode eq "and" ? Demo::II::query_and($toks)
+    var $t0 = now_ns()
+    var $toks = Demo::II::tokenize($query)
+    var $scores = $mode eq "and" ? Demo::II::query_and($toks)
                                 : Demo::II::query_or($toks)
     td_add($td_query, (now_ns() - $t0) / 1000.0)
     $scores
 }
 
 fn Demo::II::doc_by_id($id) {
-    for val $d (@docs) {
+    for var $d (@docs) {
         return $d if $d->{id} == $id
     }
     undef
@@ -127,16 +127,16 @@ var @queries = (
     [["stryke", "language"], "and", "stryke AND language"],
 )
 
-for val $q (@queries) {
+for var $q (@queries) {
     p ""
     printf "── query: %s ────────────────────────────────\n", $q->[2]
-    val $scores = Demo::II::search(@{$q->[0]} |> join(" "), $q->[1])
+    var $scores = Demo::II::search(@{$q->[0]} |> join(" "), $q->[1])
     if (len(keys %$scores) == 0) {
         p "  (no results)"
     } else {
         var @ranked = sort { $scores->{_1} <=> $scores->{_} } keys %$scores
-        for val $id (@ranked) {
-            val $doc = Demo::II::doc_by_id($id + 0)
+        for var $id (@ranked) {
+            var $doc = Demo::II::doc_by_id($id + 0)
             printf "  doc %s  score=%d  %s\n",
                 $id, $scores->{$id}, substr($doc->{title}, 0, 50)
         }
@@ -147,9 +147,9 @@ for val $q (@queries) {
 
 p ""
 p "── index statistics ─────────────────────────────────"
-val @term_postings_sizes = map { len(keys %{$index{_}}) } keys %index
-val $max_p = max @term_postings_sizes
-val $min_p = min @term_postings_sizes
+var @term_postings_sizes = map { len(keys %{$index{_}}) } keys %index
+var $max_p = max @term_postings_sizes
+var $min_p = min @term_postings_sizes
 printf "  most-shared term : %d docs\n", $max_p
 printf "  rarest term      : %d docs (singletons)\n", $min_p
 
@@ -157,18 +157,18 @@ printf "  rarest term      : %d docs (singletons)\n", $min_p
 
 p ""
 p "── most-common terms across corpus (TopK) ───────────"
-val $tk = topk(5)
-for val $t (keys %index) {
+var $tk = topk(5)
+for var $t (keys %index) {
     var $total_freq = 0
-    for val $doc_id (keys %{$index{$t}}) {
+    for var $doc_id (keys %{$index{$t}}) {
         $total_freq += $index{$t}->{$doc_id}
     }
-    for val $i (1:$total_freq) {
+    for var $i (1:$total_freq) {
         topk_add($tk, $t)
     }
 }
 var @hits = topk_top($tk)
-for val $h (@hits) {
+for var $h (@hits) {
     printf "  %-15s : %d occurrences\n", $h->[0], $h->[1]
 }
 
@@ -176,7 +176,7 @@ for val $h (@hits) {
 
 p ""
 p "── HLL distinct terms ───────────────────────────────"
-val $hll = hll(14)
+var $hll = hll(14)
 hll_add($hll, _) for keys %index
 printf "  HLL   : %d\n", hll_count($hll)
 printf "  exact : %d\n", len(keys %index)

@@ -25,18 +25,18 @@ fn Hull::andrew($pts) {
     var @sorted = sort {
         _0->[0] != _1->[0] ? _0->[0] <=> _1->[0] : _0->[1] <=> _1->[1]
     } @$pts
-    val $n = len(@sorted)
+    var $n = len(@sorted)
     return [@sorted] if $n < 3
     var @lo
-    for val $p (@sorted) {
+    for var $p (@sorted) {
         while (len(@lo) >= 2 && Hull::cross($lo[-2], $lo[-1], $p) <= 0) {
             pop @lo
         }
         push @lo, $p
     }
     var @up
-    for val $i (0:$n - 1) {
-        val $p = $sorted[$n - 1 - $i]
+    for var $i (0:$n - 1) {
+        var $p = $sorted[$n - 1 - $i]
         while (len(@up) >= 2 && Hull::cross($up[-2], $up[-1], $p) <= 0) {
             pop @up
         }
@@ -50,12 +50,12 @@ fn Hull::andrew($pts) {
 # ── point-in-hull test via signed-area (CCW hull) ─────────────────
 
 fn Hull::point_in_or_on($hull, $q) {
-    val $n = len(@$hull)
+    var $n = len(@$hull)
     return 0 if $n < 3
-    for val $i (0:$n - 1) {
-        val $p1 = $hull->[$i]
-        val $p2 = $hull->[($i + 1) % $n]
-        val $cr = Hull::cross($p1, $p2, $q)
+    for var $i (0:$n - 1) {
+        var $p1 = $hull->[$i]
+        var $p2 = $hull->[($i + 1) % $n]
+        var $cr = Hull::cross($p1, $p2, $q)
         return 0 if $cr < 0
     }
     1
@@ -64,12 +64,12 @@ fn Hull::point_in_or_on($hull, $q) {
 # ── shoelace area for a CCW polygon ───────────────────────────────
 
 fn Hull::area($hull) {
-    val $n = len(@$hull)
+    var $n = len(@$hull)
     return 0 if $n < 3
     var $s = 0
-    for val $i (0:$n - 1) {
-        val $p1 = $hull->[$i]
-        val $p2 = $hull->[($i + 1) % $n]
+    for var $i (0:$n - 1) {
+        var $p1 = $hull->[$i]
+        var $p2 = $hull->[($i + 1) % $n]
         $s += $p1->[0] * $p2->[1] - $p1->[1] * $p2->[0]
     }
     $s / 2.0
@@ -81,12 +81,12 @@ var @square = (
     [0, 0], [4, 0], [4, 4], [0, 4],
     [1, 1], [2, 2], [3, 1], [1, 3], [2, 1], [3, 3],
 )
-val $hull1 = Hull::andrew(\@square)
+var $hull1 = Hull::andrew(\@square)
 
 p "── demo 1: square (4 corners + 6 interior chaff) ─────"
 printf "  input pts : %d\n", len(@square)
 printf "  hull pts  : %d\n", len(@$hull1)
-for val $p (@$hull1) {
+for var $p (@$hull1) {
     printf "    (%d, %d)\n", $p->[0], $p->[1]
 }
 printf "  hull area : %.2f\n", Hull::area($hull1)
@@ -99,37 +99,37 @@ var @cloud = (
     [1,  9], [9,  1], [8,  9],  [2, 2],    # near edges
     [20, 5], [-10, 5], [5, -10], [5, 20],  # extruded extrema FAR outside → the only hull vertices
 )
-val $hull2 = Hull::andrew(\@cloud)
+var $hull2 = Hull::andrew(\@cloud)
 
 p ""
 p "── demo 2: cloud with 4 extruded extrema ─────────────"
 printf "  input pts : %d\n", len(@cloud)
 printf "  hull pts  : %d\n", len(@$hull2)
-for val $p (@$hull2) {
+for var $p (@$hull2) {
     printf "    (%d, %d)\n", $p->[0], $p->[1]
 }
 
 # ── invariant 1: every consecutive triple of hull vertices ─────────
 # makes a strictly left (counter-clockwise) turn.
 
-for val $hull ($hull1, $hull2) {
-    val $n = len(@$hull)
+for var $hull ($hull1, $hull2) {
+    var $n = len(@$hull)
     next if $n < 3
-    for val $i (0:$n - 1) {
-        val $p1 = $hull->[$i]
-        val $p2 = $hull->[($i + 1) % $n]
-        val $p3 = $hull->[($i + 2) % $n]
-        val $cr = Hull::cross($p1, $p2, $p3)
+    for var $i (0:$n - 1) {
+        var $p1 = $hull->[$i]
+        var $p2 = $hull->[($i + 1) % $n]
+        var $p3 = $hull->[($i + 2) % $n]
+        var $cr = Hull::cross($p1, $p2, $p3)
         die "non-CCW turn at vertex #{$i}: cross=#{$cr}" unless $cr > 0
     }
 }
 
 # ── invariant 2: every input point lies inside or on the hull ──────
 
-for val $p (@square) {
+for var $p (@square) {
     die "square pt (#{$p->[0]}, #{$p->[1]}) not in hull1" unless Hull::point_in_or_on($hull1, $p)
 }
-for val $p (@cloud) {
+for var $p (@cloud) {
     die "cloud pt (#{$p->[0]}, #{$p->[1]}) not in hull2" unless Hull::point_in_or_on($hull2, $p)
 }
 
@@ -138,10 +138,10 @@ for val $p (@cloud) {
 die "square hull must have 4 vertices, got #{len(@$hull1)}" unless len(@$hull1) == 4
 
 var %seen
-for val $p (@$hull1) {
+for var $p (@$hull1) {
     $seen{"#{$p->[0]},#{$p->[1]}"} = 1
 }
-for val $want ("0,0", "4,0", "4,4", "0,4") {
+for var $want ("0,0", "4,0", "4,4", "0,4") {
     die "square hull missing corner $want" unless exists $seen{$want}
 }
 
@@ -153,25 +153,25 @@ die "cloud hull must have 4 vertices, got #{len(@$hull2)}" unless len(@$hull2) =
 # known square area = 16.0 for hull1.
 
 die "hull1 area must be positive (CCW)" unless Hull::area($hull1) > 0
-val $a1 = Hull::area($hull1)
+var $a1 = Hull::area($hull1)
 die "hull1 area must be 16.0, got #{$a1}" unless $a1 == 16
 
 # ── invariant 6: hull of a single point is just that point ─────────
 
-val $solo = Hull::andrew([[5, 5]])
+var $solo = Hull::andrew([[5, 5]])
 die "solo hull length" unless len(@$solo) == 1
 die "solo hull pt" unless $solo->[0]->[0] == 5 && $solo->[0]->[1] == 5
 
 # ── invariant 7: hull of two distinct points is both of them ──────
 
-val $duo = Hull::andrew([[1, 1], [3, 3]])
+var $duo = Hull::andrew([[1, 1], [3, 3]])
 die "duo hull length" unless len(@$duo) == 2
 
 # ── invariant 8: hull of 3 collinear points collapses to the ──────
 # extreme two; the middle one is on the segment so the convex hull
 # only needs the endpoints. Andrew's strict `<= 0` reject ensures it.
 
-val $coll = Hull::andrew([[0, 0], [1, 1], [2, 2]])
+var $coll = Hull::andrew([[0, 0], [1, 1], [2, 2]])
 die "collinear-3 hull must collapse to 2 endpoints, got #{len(@$coll)}" unless len(@$coll) == 2
 
 p ""

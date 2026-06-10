@@ -36,9 +36,9 @@ fn Bsgs::pow_mod($base, $exp, $m) {
 
 fn Bsgs::ext_gcd($ax, $bx) {
     return +{ g => $ax, x => 1, y => 0 } if $bx == 0
-    val $q = int($ax / $bx)
-    val $r = $ax - $q * $bx
-    val $sub = Bsgs::ext_gcd($bx, $r)
+    var $q = int($ax / $bx)
+    var $r = $ax - $q * $bx
+    var $sub = Bsgs::ext_gcd($bx, $r)
     +{
         g => $sub->{g},
         x => $sub->{y},
@@ -47,7 +47,7 @@ fn Bsgs::ext_gcd($ax, $bx) {
 }
 
 fn Bsgs::mod_inverse($ax, $m) {
-    val $r = Bsgs::ext_gcd($ax, $m)
+    var $r = Bsgs::ext_gcd($ax, $m)
     die "no inverse: gcd(#{$ax}, #{$m}) = #{$r->{g}}" unless $r->{g} == 1
     var $inv = $r->{x} % $m
     $inv += $m if $inv < 0
@@ -68,29 +68,29 @@ fn Bsgs::isqrt_ceil($n) {
 # ── core BSGS — returns +{ ok => 0/1, x => smallest non-neg } ────
 
 fn Bsgs::dlog($g, $h, $p) {
-    val $gg = $g % $p
-    val $hh = $h % $p
+    var $gg = $g % $p
+    var $hh = $h % $p
     if ($hh == 1) {
         return +{ ok => 1, x => 0 }
     }
-    val $m = Bsgs::isqrt_ceil($p - 1)
+    var $m = Bsgs::isqrt_ceil($p - 1)
     # Baby steps: tab[g^j] = j for j = 0..m-1.
     var %tab
     var $cur = 1
-    for val $j (0:$m - 1) {
+    for var $j (0:$m - 1) {
         if (!exists $tab{$cur}) {
             $tab{$cur} = $j
         }
         $cur = ($cur * $gg) % $p
     }
     # Giant step factor: (g^m)^{-1} mod p, applied each iteration to h.
-    val $gm = Bsgs::pow_mod($gg, $m, $p)
-    val $gm_inv = Bsgs::mod_inverse($gm, $p)
+    var $gm = Bsgs::pow_mod($gg, $m, $p)
+    var $gm_inv = Bsgs::mod_inverse($gm, $p)
     var $gamma = $hh
-    for val $i (0:$m - 1) {
+    for var $i (0:$m - 1) {
         if (exists $tab{$gamma}) {
-            val $j = $tab{$gamma}
-            val $x = $i * $m + $j
+            var $j = $tab{$gamma}
+            var $x = $i * $m + $j
             return +{ ok => 1, x => $x }
         }
         $gamma = ($gamma * $gm_inv) % $p
@@ -101,10 +101,10 @@ fn Bsgs::dlog($g, $h, $p) {
 # ── O(p) brute force discrete log for cross-validation ──────────
 
 fn Bsgs::brute_dlog($g, $h, $p) {
-    val $gg = $g % $p
-    val $hh = $h % $p
+    var $gg = $g % $p
+    var $hh = $h % $p
     var $cur = 1
-    for val $x (0:$p - 2) {
+    for var $x (0:$p - 2) {
         if ($cur == $hh) {
             return +{ ok => 1, x => $x }
         }
@@ -129,8 +129,8 @@ var @cases = (
 p "── baby-step / giant-step discrete-log demo ──────────"
 printf "  %5s  %6s  %6s  %6s\n", "g", "h", "p", "x"
 printf "  %5s  %6s  %6s  %6s\n", "-----", "------", "------", "------"
-for val $c (@cases) {
-    val $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+for var $c (@cases) {
+    var $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
     if ($r->{ok}) {
         printf "  %5d  %6d  %6d  %6d\n", $c->{g}, $c->{h}, $c->{p}, $r->{x}
     } else {
@@ -140,75 +140,75 @@ for val $c (@cases) {
 
 # ── invariant 1: g^x mod p equals h on every reported solution ────
 
-for val $c (@cases) {
-    val $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+for var $c (@cases) {
+    var $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
     next unless $r->{ok}
-    val $check = Bsgs::pow_mod($c->{g}, $r->{x}, $c->{p})
+    var $check = Bsgs::pow_mod($c->{g}, $r->{x}, $c->{p})
     die "g^x check failed on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check} != #{$c->{h}}" unless $check == $c->{h} % $c->{p}
 }
 
 # ── invariant 2: x is in [0, p-1) for every solution ──────────────
 
-for val $c (@cases) {
-    val $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+for var $c (@cases) {
+    var $r = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
     next unless $r->{ok}
     die "x #{$r->{x}} out of [0, #{$c->{p} - 1}) on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}})" unless $r->{x} >= 0 && $r->{x} < $c->{p} - 1
 }
 
 # ── invariant 3: BSGS agrees with brute force (small p) ───────────
 
-for val $c (@cases) {
+for var $c (@cases) {
     next if $c->{p} > 200
-    val $bs = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
-    val $br = Bsgs::brute_dlog($c->{g}, $c->{h}, $c->{p})
+    var $bs = Bsgs::dlog($c->{g}, $c->{h}, $c->{p})
+    var $br = Bsgs::brute_dlog($c->{g}, $c->{h}, $c->{p})
     die "ok mismatch on (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): bsgs=#{$bs->{ok}} brute=#{$br->{ok}}" unless $bs->{ok} == $br->{ok}
     next unless $bs->{ok}
     # Both should refer to the same element; allow x's that differ
     # by a multiple of group order — verify by g^x ≡ h instead.
-    val $check_bs = Bsgs::pow_mod($c->{g}, $bs->{x}, $c->{p})
-    val $check_br = Bsgs::pow_mod($c->{g}, $br->{x}, $c->{p})
+    var $check_bs = Bsgs::pow_mod($c->{g}, $bs->{x}, $c->{p})
+    var $check_br = Bsgs::pow_mod($c->{g}, $br->{x}, $c->{p})
     die "bsgs check failed for (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check_bs} != h" unless $check_bs == $c->{h}
     die "brute check failed for (g=#{$c->{g}}, h=#{$c->{h}}, p=#{$c->{p}}): #{$check_br} != h" unless $check_br == $c->{h}
 }
 
 # ── invariant 4: h = 1 always returns x = 0 ──────────────────────
 
-for val $p (7, 11, 13, 17, 23, 31, 41, 101, 113, 257) {
-    val $r = Bsgs::dlog(3, 1, $p)
+for var $p (7, 11, 13, 17, 23, 31, 41, 101, 113, 257) {
+    var $r = Bsgs::dlog(3, 1, $p)
     die "dlog(3, 1, #{$p}) must be ok with x=0" unless $r->{ok} && $r->{x} == 0
 }
 
 # ── invariant 5: h = g returns x = 1 ─────────────────────────────
 
-for val $p (7, 11, 13, 23, 41, 101) {
-    for val $g (2, 3, 5) {
+for var $p (7, 11, 13, 23, 41, 101) {
+    for var $g (2, 3, 5) {
         next if $g >= $p
-        val $r = Bsgs::dlog($g, $g, $p)
+        var $r = Bsgs::dlog($g, $g, $p)
         die "dlog(#{$g}, #{$g}, #{$p}) must yield x ≥ 1" unless $r->{ok} && $r->{x} >= 1
         # Verify it's a real solution (x might be 1 or > 1 for any subgroup).
-        val $check = Bsgs::pow_mod($g, $r->{x}, $p)
+        var $check = Bsgs::pow_mod($g, $r->{x}, $p)
         die "g^x != g for dlog(#{$g}, #{$g}, #{$p}): got #{$check}" unless $check == $g
     }
 }
 
 # ── invariant 6: mod_inverse round-trip: a · a⁻¹ ≡ 1 (mod p) ──────
 
-for val $pair ([5, 23], [7, 41], [3, 113], [11, 1009], [17, 257]) {
-    val $inv = Bsgs::mod_inverse($pair->[0], $pair->[1])
-    val $prod = ($pair->[0] * $inv) % $pair->[1]
+for var $pair ([5, 23], [7, 41], [3, 113], [11, 1009], [17, 257]) {
+    var $inv = Bsgs::mod_inverse($pair->[0], $pair->[1])
+    var $prod = ($pair->[0] * $inv) % $pair->[1]
     die "inverse round-trip failed on (#{$pair->[0]}, #{$pair->[1]})" unless $prod == 1
 }
 
 # ── invariant 7: dlog round-trip — for every y in [0, p-2], ──────
 # dlog(g, g^y mod p, p) recovers some x with g^x ≡ g^y (mod p).
 
-for val $p (23, 41, 113) {
-    val $g = 2
-    for val $y (0:$p - 2) {
-        val $h = Bsgs::pow_mod($g, $y, $p)
-        val $r = Bsgs::dlog($g, $h, $p)
+for var $p (23, 41, 113) {
+    var $g = 2
+    for var $y (0:$p - 2) {
+        var $h = Bsgs::pow_mod($g, $y, $p)
+        var $r = Bsgs::dlog($g, $h, $p)
         die "dlog roundtrip ok=0 on (g=#{$g}, y=#{$y}, p=#{$p})" unless $r->{ok}
-        val $check = Bsgs::pow_mod($g, $r->{x}, $p)
+        var $check = Bsgs::pow_mod($g, $r->{x}, $p)
         die "round-trip h mismatch on (g=#{$g}, y=#{$y}, p=#{$p}): #{$check} != #{$h}" unless $check == $h
     }
 }
