@@ -5426,9 +5426,16 @@ impl VMHelper {
         let path = self.resolve_stryke_path_string(path);
         match std::fs::read_dir(&path) {
             Ok(rd) => {
-                let entries: Vec<String> = rd
-                    .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
-                    .collect();
+                // Perl-compat: `readdir` returns `.` and `..` as the first
+                // two entries (mirrors POSIX `readdir(3)`). Rust's
+                // `std::fs::read_dir` strips them, so prepend them here so
+                // existing Perl idioms like
+                //     while (my $e = readdir($dh)) { next if $e eq '.' || $e eq '..'; … }
+                // keep working unchanged.
+                let mut entries: Vec<String> = vec![".".to_string(), "..".to_string()];
+                entries.extend(rd.filter_map(|e| {
+                    e.ok().map(|e| e.file_name().to_string_lossy().into_owned())
+                }));
                 self.dir_handles
                     .insert(handle.to_string(), DirHandleState { entries, pos: 0 });
                 StrykeValue::integer(1)
