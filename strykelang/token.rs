@@ -291,6 +291,60 @@ impl Token {
     }
 }
 
+/// Decl-keyword classifier — central source of truth for the
+/// `my` / `var` / `val` / `mysync` / `varsync` family.
+///
+/// These five keywords all introduce a NEW binding (block-scoped lexical
+/// or sync-aware) and the parser/compiler/lsp historically open-coded
+/// `matches!(s, "my" | "var" | …)` in dozens of places. Centralizing here
+/// means a future keyword addition (e.g. `letsync`) flips one bit in one
+/// function instead of needing to chase down every hardcoded literal.
+///
+/// `our` / `oursync` / `local` / `state` are intentionally excluded —
+/// they have distinct semantics and the parser routes them through
+/// separate StmtKinds.
+#[inline]
+pub fn is_declaration(s: &str) -> bool {
+    matches!(s, "my" | "var" | "val" | "mysync" | "varsync")
+}
+
+/// Lexical (block-scoped) decl subset: `my` / `var` / `val`. All three
+/// route through `StmtKind::My`; `val` additionally marks the binding
+/// frozen at compile time.
+#[inline]
+pub fn is_lexical_decl(s: &str) -> bool {
+    matches!(s, "my" | "var" | "val")
+}
+
+/// Lexical decl OR package-level `our`. Used in places that accept
+/// either form (e.g. for-loop iterator decl).
+#[inline]
+pub fn is_lexical_or_our_decl(s: &str) -> bool {
+    is_lexical_decl(s) || s == "our"
+}
+
+/// Modern (post-style) decl subset: `var` / `val`. Distinguished from
+/// classic Perl `my` in a few parser sites (e.g. the for-loop init
+/// where `var`/`val` are accepted in modifier position).
+#[inline]
+pub fn is_post_style_decl(s: &str) -> bool {
+    matches!(s, "var" | "val")
+}
+
+/// Parallel-aware decl: `mysync` / `varsync`. Each wraps the variable
+/// in the Rayon-shared machinery.
+#[inline]
+pub fn is_sync_decl(s: &str) -> bool {
+    matches!(s, "mysync" | "varsync")
+}
+
+/// `val` (the frozen / immutable variant). Compile-time enforced via
+/// `scope_stack.frozen_scalars`.
+#[inline]
+pub fn is_frozen_decl(s: &str) -> bool {
+    s == "val"
+}
+
 /// Resolve an identifier to a keyword token or leave as Ident.
 pub fn keyword_or_ident(word: &str) -> Token {
     match word {

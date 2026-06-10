@@ -12078,8 +12078,12 @@ mod completion_tests {
 
     #[test]
     fn identifier_span_scalar_cursor_on_sigil() {
+        // Cursor at byte 4 is on the `$` of `$foo` in "var $foo = 1;".
+        // (Pre-7a4d243fe3 the fixture was "my $foo = 1;" with cursor on
+        // sigil at byte 3 — the rename to `var` lengthened the keyword by
+        // one byte; the cursor offset must move with it.)
         let line = "var $foo = 1;";
-        let (s, e) = identifier_span_bytes(line, 3).unwrap();
+        let (s, e) = identifier_span_bytes(line, 4).unwrap();
         assert_eq!(&line[s..e], "$foo");
     }
 
