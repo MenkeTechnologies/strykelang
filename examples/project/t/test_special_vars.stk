@@ -107,7 +107,7 @@ assert_eq Project::SpecialVars::file_name(), 1, "file name"
 # ══════════════════════════════════════════════════════════════════════════════
 
 assert_eq Project::SpecialVars::array_last_index(), 1, "array last index"
-# $#a = N may not work
+# $#xa = N may not work
 # assert_eq Project::SpecialVars::array_last_index_modify(), 1, "array last index modify"
 
 # ══════════════════════════════════════════════════════════════════════════════

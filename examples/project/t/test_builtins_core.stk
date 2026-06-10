@@ -84,9 +84,9 @@ assert_eq Project::BuiltinsCore::scalar_force(), 3, "len force"
 # WANTARRAY
 # ══════════════════════════════════════════════════════════════════════════════
 
-assert_eq Project::BuiltinsCore::wantarray_in_scalar(), "len", "wantarray in len"
+assert_eq Project::BuiltinsCore::wantarray_in_scalar(), "scalar", "wantarray in scalar"
 assert_eq Project::BuiltinsCore::wantarray_in_list(), "list", "wantarray in list"
-assert_eq Project::BuiltinsCore::wantarray_nested(), "len", "wantarray nested"
+assert_eq Project::BuiltinsCore::wantarray_nested(), "scalar", "wantarray nested"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CALLER

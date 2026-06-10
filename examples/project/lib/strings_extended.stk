@@ -5,7 +5,7 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::StringsExtended::str_length($s) { length($s) }
-fn Project::StringsExtended::str_reverse($s) { len(rev($s)) }
+fn Project::StringsExtended::str_reverse($s) { rev($s) }
 fn Project::StringsExtended::str_repeat($s, $n) { $s x $n }
 
 fn Project::StringsExtended::str_concat_two($va, $vb) { $va . $vb }

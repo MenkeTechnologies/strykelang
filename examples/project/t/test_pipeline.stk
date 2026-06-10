@@ -36,7 +36,7 @@ val @dw = 1:10 |> drop_while { _ < 5 } |> collect
 assert_eq join(",", @dw), "5,6,7,8,9,10", "drop_while < 5"
 
 # Reduce
-val $product = 1:5 |> reduce { $va * $vb }
+val $product = 1:5 |> reduce { _0 * _1 }
 assert_eq $product, 120, "reduce product"
 
 # Scan (running totals)

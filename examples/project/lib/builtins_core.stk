@@ -93,7 +93,7 @@ fn Project::BuiltinsCore::scalar_force {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::BuiltinsCore::returns_context {
-    wantarray ? "list" : "len"
+    wantarray ? "list" : "scalar"
 }
 
 fn Project::BuiltinsCore::wantarray_in_scalar {
@@ -107,7 +107,7 @@ fn Project::BuiltinsCore::wantarray_in_list {
 }
 
 fn Project::BuiltinsCore::wantarray_nested {
-    val $inner = fn { wantarray ? "list" : "len" }
+    val $inner = fn { wantarray ? "list" : "scalar" }
     val $result = $inner()
     $result
 }
@@ -415,9 +415,9 @@ fn Project::BuiltinsCore::lcfirst_lower { lcfirst("hello") }
 # REVERSE
 # ══════════════════════════════════════════════════════════════════════════════
 
-fn Project::BuiltinsCore::reverse_string { len(rev("hello")) }
-fn Project::BuiltinsCore::reverse_empty { len(rev("")) }
-fn Project::BuiltinsCore::reverse_single { len(rev("x")) }
+fn Project::BuiltinsCore::reverse_string { rev("hello") }
+fn Project::BuiltinsCore::reverse_empty { rev("") }
+fn Project::BuiltinsCore::reverse_single { rev("x") }
 fn Project::BuiltinsCore::reverse_palindrome { len(rev("radar")) }
 
 fn Project::BuiltinsCore::reverse_array_count {
