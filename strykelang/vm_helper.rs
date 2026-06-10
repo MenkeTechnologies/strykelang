@@ -13433,6 +13433,11 @@ impl VMHelper {
                 line,
             )
             .into()),
+            ExprKind::OpendirMyHandle { .. } => Err(StrykeError::runtime(
+                "internal: `opendir my $dh` handle used outside opendir()",
+                line,
+            )
+            .into()),
             ExprKind::Open { handle, mode, file } => {
                 if let ExprKind::OpenMyHandle { name } = &handle.kind {
                     self.scope
@@ -13479,6 +13484,15 @@ impl VMHelper {
             },
 
             ExprKind::Opendir { handle, path } => {
+                if let ExprKind::OpendirMyHandle { name } = &handle.kind {
+                    self.scope
+                        .declare_scalar_frozen(name, StrykeValue::UNDEF, false, None)?;
+                    self.english_note_lexical_scalar(name);
+                    let p = self.eval_expr(path)?.to_string();
+                    let ret = self.opendir_handle(name, &p);
+                    self.scope.set_scalar(name, ret.clone())?;
+                    return Ok(ret);
+                }
                 let h = self.eval_expr(handle)?.to_string();
                 let p = self.eval_expr(path)?.to_string();
                 Ok(self.opendir_handle(&h, &p))

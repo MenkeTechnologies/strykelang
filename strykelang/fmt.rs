@@ -1495,6 +1495,7 @@ pub fn format_expr(e: &Expr) -> String {
         ExprKind::Chr(e) => format!("chr {}", format_expr(e)),
         ExprKind::Ord(e) => format!("ord {}", format_expr(e)),
         ExprKind::OpenMyHandle { name } => format!("my ${}", name),
+        ExprKind::OpendirMyHandle { name } => format!("my ${}", name),
         ExprKind::Open { handle, mode, file } => match file {
             Some(f) => format!(
                 "open({}, {}, {})",

@@ -1496,6 +1496,10 @@ pub enum ExprKind {
     ReadLine(Option<String>),
     /// `Eof` variant.
     Eof(Option<Box<Expr>>),
+    /// `opendir my $dh` — only valid as [`ExprKind::Opendir::handle`]; declares `$dh` and binds the handle.
+    OpendirMyHandle {
+        name: String,
+    },
     /// `Opendir` variant.
     Opendir {
         handle: Box<Expr>,

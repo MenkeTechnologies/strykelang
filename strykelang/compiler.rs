@@ -7079,6 +7079,21 @@ impl Compiler {
                 }
             }
             ExprKind::Opendir { handle, path } => {
+                if let ExprKind::OpendirMyHandle { name } = &handle.kind {
+                    let name_idx = self.chunk.intern_name(name);
+                    self.emit_op(Op::LoadUndef, line, Some(root));
+                    self.emit_declare_scalar(name_idx, line, false);
+                    let h_idx = self.chunk.add_constant(StrykeValue::string(name.clone()));
+                    self.emit_op(Op::LoadConst(h_idx), line, Some(root));
+                    self.compile_expr(path)?;
+                    self.emit_op(
+                        Op::CallBuiltin(BuiltinId::Opendir as u16, 2),
+                        line,
+                        Some(root),
+                    );
+                    self.emit_op(Op::SetScalarKeepPlain(name_idx), line, Some(root));
+                    return Ok(());
+                }
                 self.compile_expr(handle)?;
                 self.compile_expr(path)?;
                 self.emit_op(
@@ -7086,6 +7101,11 @@ impl Compiler {
                     line,
                     Some(root),
                 );
+            }
+            ExprKind::OpendirMyHandle { .. } => {
+                return Err(CompileError::Unsupported(
+                    "opendir my $dh handle expression".into(),
+                ));
             }
             ExprKind::Readdir(e) => {
                 let bid = if ctx == WantarrayCtx::List {
