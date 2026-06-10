@@ -199,10 +199,15 @@ fn default_manifest_for(name: &str) -> Manifest {
 pub fn cmd_add(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) {
         println!(
-            "usage: stryke add NAME[@VER] [--dev | --group=NAME] [--path=DIR] [--features=A,B]"
+            "usage: stryke add SPEC [--dev | --group=NAME] [--path=DIR] [--features=A,B]"
         );
         println!();
         println!("Add a dependency to stryke.toml and run `s install` to refresh stryke.lock.");
+        println!();
+        println!("SPEC may be one of:");
+        println!("  NAME[@VER]                                registry dep");
+        println!("  github.com/OWNER/REPO[@TAG]               github git dep (tracks main without @TAG)");
+        println!("  https://github.com/OWNER/REPO[.git][@TAG] github git dep (full URL form)");
         println!();
         println!("Flags:");
         println!("  --dev            add as a [dev-deps] entry instead of [deps]");
@@ -215,6 +220,8 @@ pub fn cmd_add(args: &[String]) -> i32 {
         println!("  stryke add test-utils --dev");
         println!("  stryke add criterion --group=bench");
         println!("  stryke add mylib --path=../mylib");
+        println!("  stryke add github.com/MenkeTechnologies/stryke-parquet");
+        println!("  stryke add github.com/MenkeTechnologies/stryke-aws@v0.2.0");
         return 0;
     }
     let parsed = match parse_add_args(args) {
@@ -330,6 +337,43 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
         ));
     }
     let raw = positional[0].as_str();
+
+    // github.com/OWNER/REPO[@TAG] shorthand → git dep. Supports bare
+    // (`github.com/X/Y`), full https (`https://github.com/X/Y`), and
+    // `.git`-suffixed forms. Local dep name is the repo basename (last
+    // path component, minus any `.git`). Without `@TAG` the dep tracks
+    // `main`; with `@TAG` it pins to that tag/branch via `tag = ...`.
+    // `--path=` still wins (user explicitly opted into a local copy).
+    if let Some(gh) = parse_github_shorthand(raw) {
+        let spec = if let Some(p) = path_override {
+            DepSpec::Detailed(DetailedDep {
+                path: Some(p),
+                version: gh.tag.clone(),
+                features,
+                default_features: true,
+                ..DetailedDep::default()
+            })
+        } else {
+            DepSpec::Detailed(DetailedDep {
+                git: Some(gh.git_url),
+                branch: if gh.tag.is_some() {
+                    None
+                } else {
+                    Some("main".to_string())
+                },
+                tag: gh.tag,
+                features,
+                default_features: true,
+                ..DetailedDep::default()
+            })
+        };
+        return Ok(AddArgs {
+            name: gh.name,
+            spec,
+            kind,
+        });
+    }
+
     let (name, version) = match raw.split_once('@') {
         Some((n, v)) => (n.to_string(), Some(v.to_string())),
         None => (raw.to_string(), None),
@@ -355,6 +399,51 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
     Ok(AddArgs { name, spec, kind })
 }
 
+struct GithubShorthand {
+    name: String,
+    git_url: String,
+    tag: Option<String>,
+}
+
+/// Recognize `github.com/OWNER/REPO[.git][@TAG]` and `https://github.com/...`
+/// forms. Returns `None` if the raw arg doesn't match (callers fall through
+/// to the registry / version-spec path).
+fn parse_github_shorthand(raw: &str) -> Option<GithubShorthand> {
+    let stripped = raw
+        .strip_prefix("https://")
+        .or_else(|| raw.strip_prefix("http://"))
+        .unwrap_or(raw);
+    let body = stripped.strip_prefix("github.com/")?;
+    // Must be exactly OWNER/REPO[@TAG] — no extra path components, no
+    // empty owner/repo. `body.splitn(2, '/')` separates owner from the
+    // rest so we can detect a trailing `/` (sub-path) as invalid.
+    let mut parts = body.splitn(2, '/');
+    let owner = parts.next()?;
+    let remainder = parts.next()?;
+    if owner.is_empty() || remainder.is_empty() || owner.contains('@') {
+        return None;
+    }
+    // The remainder is `REPO[.git][@TAG]`. Sub-paths beyond REPO aren't
+    // a valid git source — refuse them rather than silently truncate.
+    if remainder.contains('/') {
+        return None;
+    }
+    let (repo_with_suffix, tag) = match remainder.split_once('@') {
+        Some((r, t)) if !t.is_empty() => (r, Some(t.to_string())),
+        Some((_, _)) => return None, // trailing `@` with empty tag is malformed
+        None => (remainder, None),
+    };
+    let repo = repo_with_suffix.strip_suffix(".git").unwrap_or(repo_with_suffix);
+    if repo.is_empty() {
+        return None;
+    }
+    Some(GithubShorthand {
+        name: repo.to_string(),
+        git_url: format!("https://github.com/{}/{}", owner, repo),
+        tag,
+    })
+}
+
 fn format_dep_for_log(spec: &DepSpec) -> String {
     match spec {
         DepSpec::Version(v) => format!("\"{}\"", v),
@@ -368,6 +457,15 @@ fn format_dep_for_log(spec: &DepSpec) -> String {
             }
             if let Some(g) = &d.git {
                 bits.push(format!("git = \"{}\"", g));
+            }
+            if let Some(b) = &d.branch {
+                bits.push(format!("branch = \"{}\"", b));
+            }
+            if let Some(t) = &d.tag {
+                bits.push(format!("tag = \"{}\"", t));
+            }
+            if let Some(r) = &d.rev {
+                bits.push(format!("rev = \"{}\"", r));
             }
             if !d.features.is_empty() {
                 bits.push(format!("features = {:?}", d.features));
@@ -3557,5 +3655,161 @@ mod tests {
             "hover did not include the chased doc: {}",
             md
         );
+    }
+
+    // === parse_github_shorthand =========================================
+    //
+    // `s add github.com/OWNER/REPO[@TAG]` must produce a git dep, not a
+    // registry dep (which would fail `s install` with the RFC-phases-7-8
+    // unimplemented error). These tests pin both directions: shorthands
+    // that should be recognized, and forms that look github-ish but
+    // shouldn't quietly convert (sub-paths, http://, malformed tags).
+
+    #[test]
+    fn github_shorthand_bare_form() {
+        let gh = parse_github_shorthand("github.com/MenkeTechnologies/stryke-parquet").unwrap();
+        assert_eq!(gh.name, "stryke-parquet");
+        assert_eq!(
+            gh.git_url,
+            "https://github.com/MenkeTechnologies/stryke-parquet"
+        );
+        assert!(gh.tag.is_none());
+    }
+
+    #[test]
+    fn github_shorthand_https_form() {
+        let gh =
+            parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws").unwrap();
+        assert_eq!(gh.name, "stryke-aws");
+        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+        assert!(gh.tag.is_none());
+    }
+
+    #[test]
+    fn github_shorthand_strips_dot_git() {
+        let gh =
+            parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws.git").unwrap();
+        assert_eq!(gh.name, "stryke-aws");
+        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+    }
+
+    #[test]
+    fn github_shorthand_with_tag() {
+        let gh =
+            parse_github_shorthand("github.com/MenkeTechnologies/stryke-aws@v0.2.0").unwrap();
+        assert_eq!(gh.name, "stryke-aws");
+        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+        assert_eq!(gh.tag.as_deref(), Some("v0.2.0"));
+    }
+
+    #[test]
+    fn github_shorthand_dot_git_with_tag() {
+        let gh = parse_github_shorthand(
+            "https://github.com/MenkeTechnologies/stryke-aws.git@v0.2.0",
+        )
+        .unwrap();
+        assert_eq!(gh.name, "stryke-aws");
+        assert_eq!(gh.tag.as_deref(), Some("v0.2.0"));
+    }
+
+    #[test]
+    fn github_shorthand_rejects_non_github() {
+        // Random crate name — must fall through to registry path.
+        assert!(parse_github_shorthand("serde").is_none());
+        assert!(parse_github_shorthand("http@1.0").is_none());
+        // GitLab / other hosts — not in scope for this shorthand.
+        assert!(parse_github_shorthand("gitlab.com/foo/bar").is_none());
+        assert!(parse_github_shorthand("https://gitlab.com/foo/bar").is_none());
+    }
+
+    #[test]
+    fn github_shorthand_rejects_subpath() {
+        // `github.com/owner/repo/subdir` is not a valid git source URL;
+        // the parser must NOT silently truncate to `repo`.
+        assert!(parse_github_shorthand("github.com/owner/repo/subdir").is_none());
+        assert!(parse_github_shorthand("github.com/owner/repo/tree/main").is_none());
+    }
+
+    #[test]
+    fn github_shorthand_rejects_empty_owner_or_repo() {
+        assert!(parse_github_shorthand("github.com/").is_none());
+        assert!(parse_github_shorthand("github.com//repo").is_none());
+        assert!(parse_github_shorthand("github.com/owner/").is_none());
+        assert!(parse_github_shorthand("github.com/owner/.git").is_none());
+    }
+
+    #[test]
+    fn github_shorthand_rejects_empty_tag() {
+        // Trailing `@` with no tag is malformed (user-typo of `@<TAB>`).
+        assert!(parse_github_shorthand("github.com/owner/repo@").is_none());
+    }
+
+    // === cmd_add integration ============================================
+
+    #[test]
+    fn parse_add_args_github_shorthand_produces_git_dep() {
+        let args = vec!["github.com/MenkeTechnologies/stryke-parquet".to_string()];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "stryke-parquet");
+        match parsed.spec {
+            DepSpec::Detailed(d) => {
+                assert_eq!(
+                    d.git.as_deref(),
+                    Some("https://github.com/MenkeTechnologies/stryke-parquet")
+                );
+                assert_eq!(d.branch.as_deref(), Some("main"));
+                assert!(d.tag.is_none());
+                assert!(d.path.is_none());
+            }
+            other => panic!("expected DepSpec::Detailed git dep, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_add_args_github_shorthand_with_tag_pins_tag_not_branch() {
+        let args = vec!["github.com/MenkeTechnologies/stryke-aws@v0.2.0".to_string()];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "stryke-aws");
+        match parsed.spec {
+            DepSpec::Detailed(d) => {
+                assert_eq!(d.tag.as_deref(), Some("v0.2.0"));
+                // tag and branch are mutually exclusive — having both
+                // would make `git_branch_or_rev` pick tag silently. Force
+                // branch off when a tag is requested.
+                assert!(d.branch.is_none(), "branch must be None when tag is set");
+            }
+            other => panic!("expected DepSpec::Detailed git dep, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_add_args_path_flag_wins_over_github_shorthand() {
+        // Explicit `--path=` must still take precedence — the user opted
+        // into a local checkout even though the SPEC looks github-shaped.
+        let args = vec![
+            "github.com/MenkeTechnologies/stryke-aws".to_string(),
+            "--path=../local-aws".to_string(),
+        ];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "stryke-aws");
+        match parsed.spec {
+            DepSpec::Detailed(d) => {
+                assert_eq!(d.path.as_deref(), Some("../local-aws"));
+                assert!(d.git.is_none(), "git must be None when --path overrides");
+            }
+            other => panic!("expected DepSpec::Detailed path dep, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_add_args_registry_form_still_returns_version_spec() {
+        // Backstop the existing behavior for plain registry deps.
+        let args = vec!["http@1.0".to_string()];
+        let parsed = parse_add_args(&args).expect("parse should succeed");
+        assert_eq!(parsed.name, "http");
+        match parsed.spec {
+            DepSpec::Version(v) => assert_eq!(v, "1.0"),
+            other => panic!("expected DepSpec::Version, got {:?}", other),
+        }
     }
 }
