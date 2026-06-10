@@ -3479,8 +3479,8 @@ Cargo-shaped manifest + lockfile, hash-pinned, parallel resolver. Single binary 
 stryke new myapp                                      # scaffold project at ./myapp/
 stryke init                                           # scaffold project in cwd
 stryke add http@^1.0 json                             # registry dep
-stryke add github.com/OWNER/REPO                      # git dep — tracks main, name = REPO
-stryke add github.com/OWNER/REPO@v1.0                 # git dep pinned to tag/branch
+stryke add github.com/OWNER/REPO                      # github-release dep (latest tag, host-triple tarball)
+stryke add github.com/OWNER/REPO@v1.0                 # github-release dep pinned to a specific tag
 stryke add https://github.com/OWNER/REPO.git          # full URL form also accepted
 stryke add ./mylib                                    # path dep (relative)
 stryke add ../sibling                                 # path dep (sibling)
@@ -3549,7 +3549,7 @@ Single `stryke.lock` at the workspace root pins every member's transitive graph.
 
 Deps live globally in `~/.stryke/store/name@version/` — no `node_modules/`-shaped per-project dependency tree. Every dep is hash-pinned in the lockfile (Nix-style reproducibility, Cargo-style ergonomics). `stryke build --release` AOT-compiles the whole program — your code, every dep, the stdlib — through Cranelift to a single statically-linked native binary. SFTP-able. No interpreter needed on the target machine.
 
-**Status**: path deps + workspace deps + **git deps (github URL shorthand + full URL, branch/tag/rev pinning, in-process clone into `~/.stryke/git/`)** + full CLI surface (`new`/`init`/`add`/`remove`/`install`/`update`/`outdated`/`audit`/`tree`/`info`/`vendor`/`clean`/`run`/`install -g` etc.) are wired and tested today. `s install` reads `stryke.toml` and pulls deps from either local paths or github — including FFI git deps that ship a `[ffi]` cdylib (source-tree contents land in the store; the cdylib build is the user's `cargo build --release` step inside `~/.stryke/git/<dir>/` or the binary side-channel via `s pkg install -g <github-url>`). Registry deps + the PubGrub semver resolver land when the registry endpoint is deployed — the CLI stubs for `search`/`publish`/`yank` already exist and return clear "registry not deployed yet" diagnostics so the surface matches the RFC end-state.
+**Status**: path deps + workspace deps + **GitHub-release deps (`{ github = "OWNER/REPO" [, version = "..."] }`, downloads the prebuilt host-triple tarball with SHA-256 verification — this is the path FFI cdylib packages like the 14 `stryke-*` connectors take)** + **source-clone git deps (`{ git = "...", branch|tag|rev = ... }`, for pure-source dependencies hosted anywhere)** + full CLI surface (`new`/`init`/`add`/`remove`/`install`/`update`/`outdated`/`audit`/`tree`/`info`/`vendor`/`clean`/`run`/`install -g` etc.) are wired and tested today. `s add github.com/OWNER/REPO[@TAG]` auto-writes the `github = "..."` form; `s add ./PATH` auto-writes the `path = "..."` form. Registry deps + the PubGrub semver resolver land when the registry endpoint is deployed — the CLI stubs for `search`/`publish`/`yank` already exist and return clear "registry not deployed yet" diagnostics so the surface matches the RFC end-state.
 
 **Skipped on purpose**: install-time code execution (no `build.rs` / `postinstall`), hoisting, phantom deps, peer deps, mutable registries. The lockfile is sacred; regenerate explicitly.
 
