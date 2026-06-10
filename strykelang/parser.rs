@@ -12810,7 +12810,37 @@ impl Parser {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
-                let args = self.parse_builtin_args()?;
+                let paren = matches!(self.peek(), Token::LParen);
+                if paren {
+                    self.advance();
+                }
+                if matches!(self.peek(), Token::Ident(ref s) if s == "my" || s == "var" || s == "val") {
+                    self.advance();
+                    let hname = self.parse_scalar_var_name()?;
+                    self.expect(&Token::Comma)?;
+                    let path = self.parse_assign_expr()?;
+                    if paren {
+                        self.expect(&Token::RParen)?;
+                    }
+                    return Ok(Expr {
+                        kind: ExprKind::Opendir {
+                            handle: Box::new(Expr {
+                                kind: ExprKind::OpendirMyHandle { name: hname },
+                                line,
+                            }),
+                            path: Box::new(path),
+                        },
+                        line,
+                    });
+                }
+                let args = if paren {
+                    self.parse_arg_list()?
+                } else {
+                    self.parse_list_until_terminator()?
+                };
+                if paren {
+                    self.expect(&Token::RParen)?;
+                }
                 if args.len() != 2 {
                     return Err(self.syntax_err("opendir requires two arguments", line));
                 }
