@@ -32,7 +32,7 @@ val $qs = "$q"
     |> assert_ok("real hex digits, no `0x...` / __ANON__ placeholder")
 
 # Identity-by-string-form pattern: build a hashmap keyed by coderef string.
-val @cbs = (fn { 1 }, fn { 2 }, fn { 3 })
+var @cbs = (fn { 1 }, fn { 2 }, fn { 3 })
 var %seen
 for val $cb (@cbs) {
     $seen{"$cb"} = 1

@@ -24,7 +24,7 @@ var $g = 1.0
 printf "bodies: %d  ·  gravity G: %.2f\n", $n, $g
 
 val @workers = congregation(3)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard bodies across workers. Each worker computes acceleration for
 # its assigned bodies given the current full position list.

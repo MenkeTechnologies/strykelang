@@ -14,7 +14,7 @@
 
 # ── question bank ──────────────────────────────────────────────────
 
-val @questions = (
+var @questions = (
     +{ id => 1, question => "Capital of France?",          answer => "Paris",     points => 5, mode => "ci" },
     +{ id => 2, question => "2 + 2 = ?",                    answer => "4",         points => 3, mode => "exact" },
     +{ id => 3, question => "Largest planet?",              answer => "Jupiter",   points => 5, mode => "ci" },
@@ -26,7 +26,7 @@ val @questions = (
 
 # ── students with answers ──────────────────────────────────────────
 
-val @submissions = (
+var @submissions = (
     +{ student => "alice",
        answers => +{ 1 => "Paris", 2 => "4", 3 => "Jupiter", 4 => "12", 5 => "1776", 6 => "blue whale", 7 => "78" } },
     +{ student => "bob",
@@ -96,7 +96,7 @@ $max_score += _->{points} for @questions
 printf "── leaderboard (max possible: %d points) ──────────────\n",
     $max_score
 printf "  %-10s %6s %6s %6s\n", "student", "score", "right", "%"
-val @ranked = sort {
+var @ranked = sort {
     $scores{_1}->{score} <=> $scores{_}->{score}
 } keys %scores
 for val $s (@ranked) {
@@ -109,7 +109,7 @@ for val $s (@ranked) {
 
 p ""
 p "── per-question error rate (hardest questions first) ──"
-val @question_difficulty = sort {
+var @question_difficulty = sort {
     ($per_question_total{_1->{id}} - $per_question_correct{_1->{id}})
     <=>
     ($per_question_total{_->{id}} - $per_question_correct{_->{id}})
@@ -136,7 +136,7 @@ printf "  p90 : %d\n", ~> td_quantile($td_scores, 0.90) int
 
 p ""
 p "── TopK hardest questions (sketch) ──────────────────"
-val @hits = topk_top($tk_hard)
+var @hits = topk_top($tk_hard)
 for val $h (@hits) {
     printf "  %-5s : %d incorrect\n", $h->[0], $h->[1]
 }

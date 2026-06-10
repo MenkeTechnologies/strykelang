@@ -38,7 +38,7 @@ fn Merge::merge($l, $r) {
     \@out
 }
 
-val @cases = (
+var @cases = (
     +{ input => [],                            sorted => []                            },
     +{ input => [42],                          sorted => [42]                          },
     +{ input => [3, 1, 2],                     sorted => [1, 2, 3]                     },

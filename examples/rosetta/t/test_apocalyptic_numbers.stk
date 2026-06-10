@@ -23,7 +23,7 @@ fn Rosetta::Apoc::is_apocalyptic($n) {
 }
 
 # OEIS A007356: 157, 192, 218, 220, 222, 224, 226, 243, 245, 247, ...
-val @first_ten = (157, 192, 218, 220, 222, 224, 226, 243, 245, 247)
+var @first_ten = (157, 192, 218, 220, 222, 224, 226, 243, 245, 247)
 for val $n (@first_ten) {
     assert_ok Rosetta::Apoc::is_apocalyptic($n), "$n is apocalyptic"
 }

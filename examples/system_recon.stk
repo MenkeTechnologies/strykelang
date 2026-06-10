@@ -23,7 +23,7 @@ printf "  MAC:      %s\n", net_mac() // "N/A"
 printf "  DNS:      %s\n", join(", ", net_dns_servers())
 
 p "\n--- DISK INTEL ---"
-val @disks = mounts()
+var @disks = mounts()
 for val $m (@disks) {
     next unless $m->{total} > 0
     printf "  %-10s %5.1f%% used (%s free)\n", 

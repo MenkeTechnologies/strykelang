@@ -233,7 +233,7 @@ fn Sql::print_table(@rows) {
 
 # ── 5. Run sample queries ──────────────────────────────────────────
 
-val @queries = (
+var @queries = (
     "SELECT * FROM employees",
     "SELECT name, salary FROM employees WHERE dept = 'eng'",
     "SELECT name, salary FROM employees WHERE salary > 70000 ORDER BY salary DESC",

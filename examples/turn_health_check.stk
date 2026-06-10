@@ -84,7 +84,7 @@ fn Hc::probe($server) {
 
 # Parallel fan-out — TURN allocations are independent across servers.
 val @results = pmap { Hc::probe($_) } @servers
-val @sorted  = sort { _->{server} cmp _1->{server} } @results
+var @sorted  = sort { _->{server} cmp _1->{server} } @results
 
 # Report per-server.
 var $ok_count = 0

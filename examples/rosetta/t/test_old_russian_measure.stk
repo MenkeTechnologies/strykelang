@@ -35,7 +35,7 @@ fn Rosetta::Russian::from_metres($metres, $unit) {
 fn Rosetta::Russian::break_down($metres) {
     val $t = Rosetta::Russian::table()
     val %order = (versta => 0, sazhen => 1, arshin => 2, piad => 3, vershok => 4, diuym => 5)
-    val @units = sort { $order{_} <=> $order{$b} } keys %$t
+    var @units = sort { $order{_} <=> $order{$b} } keys %$t
     var $remaining = $metres
     var %parts
     for val $u (@units) {

@@ -124,7 +124,7 @@ if (len(@conflicts) == 0 && !$cycle_found) {
 
 var %installed
 $installed{_} = 1 for @order
-val @unused = grep { !exists $installed{_} } keys %catalog
+var @unused = grep { !exists $installed{_} } keys %catalog
 p ""
 printf "── unused packages: %d ────────────────────────────────\n",
     len @unused

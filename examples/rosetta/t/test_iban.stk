@@ -29,7 +29,7 @@ fn Rosetta::IBAN::is_valid($iban) {
     # Move first 4 chars to end, then convert letters → digits
     val $rearr = substr($s, 4) . substr($s, 0, 4)
     var $digits = ""
-    val @cs = ~> $rearr chars
+    var @cs = ~> $rearr chars
     for val $c (@cs) {
         if ($c =~ /[A-Z]/) {
             $digits .= ord($c) - ord("A") + 10

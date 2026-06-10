@@ -115,7 +115,7 @@ fn Sam::brute_contains($s, $t) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @strings = ("abc", "aab", "abcabc", "banana", "mississippi", "aaaa", "abracadabra", "stryke")
+var @strings = ("abc", "aab", "abcabc", "banana", "mississippi", "aaaa", "abracadabra", "stryke")
 
 p "── suffix-automaton demo ─────────────────────────────"
 printf "  %-14s  %4s  %6s  %6s\n", "input", "len", "states", "substr"

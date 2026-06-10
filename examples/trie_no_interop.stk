@@ -53,7 +53,7 @@ fn Trie::from_words($words) {
 
 p "── Trie demo ──"
 
-val @dict = ("apple", "app", "apricot", "banana", "band", "bandana", "cat", "car", "card", "care", "careful")
+var @dict = ("apple", "app", "apricot", "banana", "band", "bandana", "cat", "car", "card", "care", "careful")
 val $t = Trie::from_words(\@dict)
 
 # Membership round-trip — every inserted word should be contained.
@@ -85,7 +85,7 @@ fn Trie::count_with_prefix($words, $prefix) {
     len @hits
 }
 
-val @queries = ("app", "ban", "car", "z")
+var @queries = ("app", "ban", "car", "z")
 var @counts
 for val $pre (@queries) {
     push @counts, Trie::count_with_prefix(\@dict, $pre)

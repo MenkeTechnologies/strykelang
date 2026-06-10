@@ -30,7 +30,7 @@ printf "dictionary: %d words  ·  current word: %s\n", len(@dict), $current
 printf "alphabet: %s\n", $alphabet
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Each worker checks dictionary membership for its candidate set.
 # Candidates: all 1-letter changes to "cat".

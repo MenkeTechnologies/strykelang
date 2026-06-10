@@ -86,7 +86,7 @@ fn Ek::from_edges($n, $edges) {
 
 # ── primary test cases ────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "CLRS 6-node textbook",
         n     => 6,

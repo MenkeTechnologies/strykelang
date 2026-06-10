@@ -12,8 +12,8 @@ class Rosetta::Cards::Card {
 }
 
 fn Rosetta::Cards::create_deck() {
-    val @suits = qw{♣ ♦ ♥ ♠}
-    val @ranks = qw{A 2 3 4 5 6 7 8 9 10 J Q K}
+    var @suits = qw{♣ ♦ ♥ ♠}
+    var @ranks = qw{A 2 3 4 5 6 7 8 9 10 J Q K}
     
     var @deck
     for val $s (@suits) {

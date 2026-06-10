@@ -163,7 +163,7 @@ around "Demo::Expr::eval_ast" {
 
 # ── test cases ────────────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     ["3 + 4",                       7],
     ["10 - 4",                      6],
     ["2 * 3 + 4",                  10],
@@ -211,7 +211,7 @@ printf "  p99 per-call latency : %.1f µs\n", td_quantile($eval_lat, 0.99)
 
 p ""
 p "── error handling on invalid input ──────────────────"
-val @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
+var @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
 for val $src (@bad) {
     val $r = eval { Demo::Expr::parse($src) }
     if ($@) {

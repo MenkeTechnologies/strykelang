@@ -84,7 +84,7 @@ fn Wht::brute_xor_convolve($A, $B) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ name => "size 2 trivial",       a => [1, 2],          b => [3, 4]          },
     +{ name => "size 4 simple",        a => [1, 1, 1, 1],    b => [1, 0, 1, 0]    },
     +{ name => "size 4 mixed",         a => [1, 2, 3, 4],    b => [5, 6, 7, 8]    },

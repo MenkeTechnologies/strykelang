@@ -145,7 +145,7 @@ fn Demo::Order::render_invoice($result) {
 
 # ── sample orders ──────────────────────────────────────────────────
 
-val @orders = (
+var @orders = (
     +{ id => 1, state => "CA", cart => [
         +{ sku => "WIDGET-A", qty => 2 },
         +{ sku => "THINGY-A", qty => 5 },
@@ -199,7 +199,7 @@ printf "  total revenue    : %.2f\n", $total_revenue
 
 p ""
 p "── most-popular SKUs (TopK) ─────────────────────────"
-val @hits = topk_top($tk_popular)
+var @hits = topk_top($tk_popular)
 for val $h (@hits) {
     printf "  %-10s : %d orders\n", $h->[0], $h->[1]
 }

@@ -87,7 +87,7 @@ fn Bm::generate($rec, $seed, $n) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "Fibonacci (s[n] = s[n-1] + s[n-2])",
         seq  => [1, 1, 2, 3, 5, 8, 13, 21, 34, 55],

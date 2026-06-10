@@ -26,7 +26,7 @@ p "  \x1b[33mUPTIME\x1b[0m   " . $sys->{uptime}
 p "\n\x1b[36m[PHASE 2] DISK RECON\x1b[0m"
 p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
 
-val @disks = Project::Scanner::scan_disks()
+var @disks = Project::Scanner::scan_disks()
 for val $d (@disks) {
     val $bar = Project::Scanner::usage_bar($d->{use_pct}, 20)
     printf "  \x1b[33m%-12s\x1b[0m %s %5.1f%% %s\n", $d->{mount}, $bar, $d->{use_pct}, $d->{free_h}
@@ -41,7 +41,7 @@ p "  \x1b[33mMAC\x1b[0m      " . $net->{mac}
 p "  \x1b[33mGATEWAY\x1b[0m  " . $net->{gateway}
 p "  \x1b[33mDNS\x1b[0m      " . $net->{dns}
 
-val @ifaces = Project::Scanner::scan_interfaces()
+var @ifaces = Project::Scanner::scan_interfaces()
 for val $iface (@ifaces) {
     next unless $iface->{up}
     printf "  \x1b[35m%-10s\x1b[0m %s\n", $iface->{name}, $iface->{ipv4} // "no ipv4"
@@ -50,7 +50,7 @@ for val $iface (@ifaces) {
 p "\n\x1b[36m[PHASE 4] PROCESS INTEL\x1b[0m"
 p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
 
-val @procs = Project::Scanner::scan_top_processes(10)
+var @procs = Project::Scanner::scan_top_processes(10)
 printf "  \x1b[33m%-8s %-20s\x1b[0m\n", "PID", "NAME"
 for val $proc (@procs) {
     printf "  %-8s %-20s\n", $proc->{pid}, $proc->{name}
@@ -80,7 +80,7 @@ if ($git->{is_repo}) {
 p "\n\x1b[36m[PHASE 6] THREAT ANALYSIS\x1b[0m"
 p "\x1b[36m" . ("─" x 50) . "\x1b[0m"
 
-val @threats = Project::Threats::analyze_threats($sys, $net, \@disks)
+var @threats = Project::Threats::analyze_threats($sys, $net, \@disks)
 for val $t (@threats) {
     val $color = $t->{level} eq "HIGH" ? "\x1b[31m" : $t->{level} eq "WARN" ? "\x1b[33m" : "\x1b[32m"
     printf "  %s[%s]\x1b[0m %s\n", $color, $t->{level}, $t->{message}

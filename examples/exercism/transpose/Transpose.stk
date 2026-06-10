@@ -6,7 +6,7 @@
 fn Exercism::Transpose::transpose {
     val @rows = split(/\n/, _0, -1)
     # Drop trailing empty line from final newline if present.
-    val @lines = @rows
+    var @lines = @rows
     # Compute width per column: a column exists iff at least one row
     # has that index. Pad with spaces, but only on the LEFT — never
     # to the right of the longest row.

@@ -115,7 +115,7 @@ p ""
 p "── most-common words (TopK) ─────────────────────────"
 val $tk = topk(8)
 topk_add($tk, _) for @words
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %-12s : %d\n", $h->[0], $h->[1]
 }

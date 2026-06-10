@@ -33,7 +33,7 @@ fn Rosetta::NonContig::get_indices_subsequences($n) {
 }
 
 fn Rosetta::NonContig::is_contiguous($idx_sub_ref) {
-    val @indices = @$idx_sub_ref
+    var @indices = @$idx_sub_ref
     return 1 if len(@indices) <= 1
     
     # Check if they form a contiguous range: i, i+1, i+2...
@@ -47,7 +47,7 @@ fn Rosetta::NonContig::is_contiguous($idx_sub_ref) {
 
 fn Rosetta::NonContig::solve(@items) {
     val $n = len(@items)
-    val @all_idx_subs = Rosetta::NonContig::get_indices_subsequences($n)
+    var @all_idx_subs = Rosetta::NonContig::get_indices_subsequences($n)
     
     var @non_contig
     for val $idx_sub (@all_idx_subs) {

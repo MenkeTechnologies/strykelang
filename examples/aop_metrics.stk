@@ -38,7 +38,7 @@ fn Svc::flaky   { sleep 0.010; rand() < 0.3 ? "error" : "ok" }
 # ── simulate a workload ───────────────────────────────────────────────
 
 p "── simulating mixed workload ──────────────────────────"
-val @workload = (
+var @workload = (
     ("fast")    x 50,
     ("medium")  x 20,
     ("slow")    x 5,
@@ -59,7 +59,7 @@ printf "  %d total calls, %.0f ms wall\n", len(@workload), $wall_ms
 
 p ""
 p "── metrics report (sorted by total time desc) ─────────"
-val @names = sort { $metrics{_1}->{total_ns} <=> $metrics{_}->{total_ns} } keys %metrics
+var @names = sort { $metrics{_1}->{total_ns} <=> $metrics{_}->{total_ns} } keys %metrics
 
 printf "  %-15s %8s  %10s  %10s  %10s\n",
     "function", "count", "total_ms", "avg_us", "% wall"

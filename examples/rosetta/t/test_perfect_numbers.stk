@@ -21,7 +21,7 @@ fn Rosetta::PerfectNumbers::is_perfect($n) {
     if ($n < 2) {
         return 0 # Not perfect
     } else {
-        val @divs = @{ Rosetta::PerfectNumbers::divisors($n) } # Gets the list of proper divisors
+        var @divs = @{ Rosetta::PerfectNumbers::divisors($n) } # Gets the list of proper divisors
         var $sum = 0
         for val $d (@divs) { $sum += $d } # Sums the list
         return $sum == $n ? 1 : 0; # Explicitly return 1 for true, 0 for false

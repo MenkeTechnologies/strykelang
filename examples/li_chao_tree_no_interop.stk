@@ -95,7 +95,7 @@ fn Li::brute_min($lines, $x) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "two crossing lines",
         lines => [[1, 0], [-1, 10]],
@@ -184,7 +184,7 @@ for val $c (@cases) {
     val $t1 = Li::new($c->{range}->[0], $c->{range}->[1])
     for val $line (@{$c->{lines}}) { Li::insert($t1, $line) }
     val $t2 = Li::new($c->{range}->[0], $c->{range}->[1])
-    val @reversed = rev @{$c->{lines}}
+    var @reversed = rev @{$c->{lines}}
     for val $line (@reversed) { Li::insert($t2, $line) }
     for val $x (@{$c->{queries}}) {
         die "order changes result on \"#{$c->{name}}\" at x=#{$x}" unless Li::query($t1, $x) == Li::query($t2, $x)

@@ -32,7 +32,7 @@ assert_near Rosetta::LawCos::cos_angle(1, 1, 1), 0.5, 1e-12, "equilateral: 60°"
 
 # 60° triples within 1..13
 val @t60 = Rosetta::LawCos::triples_with_angle(13, 60)
-val @keys60 = map { "$_->[0],$_->[1],$_->[2]" } @t60
+var @keys60 = map { "$_->[0],$_->[1],$_->[2]" } @t60
 # At least the equilateral 1,1,1 and small (5,7,8): cos C = (25+49-64)/70 = 10/70 ≈ 0.143  no
 # Actual hits in 1..13 include: (1,1,1), (2,2,2), …, (3,8,7), (5,7,8), …
 assert_ok len(@t60) > 0, "60° triples exist"
@@ -41,7 +41,7 @@ for val $k (@keys60) { $eq111 = 1 if $k eq "1,1,1" }
 assert_ok $eq111, "equilateral 1,1,1 is a 60° triple"
 
 # 120° triples within 1..13
-val @t120 = Rosetta::LawCos::triples_with_angle(13, 120)
+var @t120 = Rosetta::LawCos::triples_with_angle(13, 120)
 assert_ok len(@t120) > 0, "120° triples exist"
 # (3, 5, 7): cos C = (9+25-49)/30 = -0.5 → 120°
 var $found357 = 0
@@ -52,7 +52,7 @@ assert_ok $found357, "(3, 5, 7) is a 120° triple"
 
 # 90° triples within 1..15 → Pythagorean triples
 val @t90 = Rosetta::LawCos::triples_with_angle(15, 90)
-val @py = map { "$_->[0],$_->[1],$_->[2]" } @t90
+var @py = map { "$_->[0],$_->[1],$_->[2]" } @t90
 assert_ok len(@t90) >= 1, "Pythagorean triples found"
 var $py345 = 0
 for val $k (@py) { $py345 = 1 if $k eq "3,4,5" }

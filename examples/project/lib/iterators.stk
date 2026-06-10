@@ -13,7 +13,7 @@ fn Project::Iterators::for_range_sum {
 }
 
 fn Project::Iterators::for_array_sum {
-    val @arr = (10, 20, 30)
+    var @arr = (10, 20, 30)
     var $sum = 0
     for val $x (@arr) {
         $sum += $x
@@ -197,7 +197,7 @@ fn Project::Iterators::test_keys_sorted {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Iterators::array_for_each {
-    val @arr = (1, 2, 3, 4, 5)
+    var @arr = (1, 2, 3, 4, 5)
     var $sum = 0
     for val $x (@arr) {
         $sum += $x
@@ -367,7 +367,7 @@ fn Project::Iterators::labeled_next {
 # ══════════════════════════════════════════════════════════════════════════════
 
 fn Project::Iterators::nested_array_iter {
-    val @matrix = ([1, 2], [3, 4], [5, 6])
+    var @matrix = ([1, 2], [3, 4], [5, 6])
     var $sum = 0
     for val $row (@matrix) {
         for val $val (@$row) {

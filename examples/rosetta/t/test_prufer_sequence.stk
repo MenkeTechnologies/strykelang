@@ -37,7 +37,7 @@ fn Rosetta::Prufer::decode($seq, $n) {
     for val $i (1:$n) { $deg{$i} = 1 }
     for val $x (@$seq) { $deg{$x}++ }
     var @edges
-    val @work = @$seq
+    var @work = @$seq
     for val $x (@work) {
         var $leaf
         for val $k (1:$n) {

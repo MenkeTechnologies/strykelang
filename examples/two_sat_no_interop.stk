@@ -136,7 +136,7 @@ fn Sat::check($n_vars, $clauses, $assign) {
 # ── primary test cases ────────────────────────────────────────────
 # Each clause is encoded as (var, negated?). Variables index from 0.
 
-val @cases = (
+var @cases = (
     +{
         name    => "trivial sat: (x0 ∨ x1)",
         n       => 2,

@@ -117,7 +117,7 @@ fn Demo::Path::render_tree($node, $children_ref, $indent, $is_last) {
     var @lines
     val $prefix = $indent . ($is_last ? "└─ " : "├─ ")
     push @lines, "$prefix$node"
-    val @kids = sort { _ cmp _1 } @{$children_ref->{$node} // []}
+    var @kids = sort { _ cmp _1 } @{$children_ref->{$node} // []}
     for val $i (0:len(@kids) - 1) {
         val $kid = $kids[$i]
         val $kid_is_last = ($i == len(@kids) - 1)

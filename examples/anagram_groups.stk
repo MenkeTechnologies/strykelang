@@ -11,7 +11,7 @@
 
 # ── word list ───────────────────────────────────────────────────────
 
-val @words = (
+var @words = (
     "eat", "tea", "tan", "ate", "nat", "bat",
     "listen", "silent", "enlist", "tinsel",
     "evil", "vile", "live", "veil", "levi",
@@ -96,7 +96,7 @@ p ""
 p "── TopK hottest anagram families (sketch) ────────────"
 val $tk = topk(5)
 topk_add($tk, Demo::Anagram::canonical(_)) for @words
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  '%s' : %d hits\n", $h->[0], $h->[1]
 }

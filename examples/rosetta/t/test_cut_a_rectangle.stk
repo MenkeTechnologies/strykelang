@@ -34,7 +34,7 @@ fn Rosetta::CutRectangle::walk($x, $y, $w, $h, $visited, $count_ref) {
     val $sy = $h - $y
     $visited->{"$sx,$sy"} = 1
     
-    val @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
+    var @dirs = ([0, 1], [0, -1], [1, 0], [-1, 0])
     for val $d (@dirs) {
         val $nx = $x + $d->[0]
         val $ny = $y + $d->[1]

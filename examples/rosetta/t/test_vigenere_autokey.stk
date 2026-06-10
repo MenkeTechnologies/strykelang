@@ -10,7 +10,7 @@ fn Rosetta::VigAuto::clean($s) {
 fn Rosetta::VigAuto::encrypt($plain, $primer) {
     val $p = Rosetta::VigAuto::clean($plain)
     val $k = Rosetta::VigAuto::clean($primer) . $p
-    val @pc = ~> $p chars
+    var @pc = ~> $p chars
     val @kc = ~> $k chars
     var $out = ""
     for val $i (0..len(@pc)-1) {
@@ -24,7 +24,7 @@ fn Rosetta::VigAuto::encrypt($plain, $primer) {
 fn Rosetta::VigAuto::decrypt($cipher, $primer) {
     val $c = Rosetta::VigAuto::clean($cipher)
     var $k = Rosetta::VigAuto::clean($primer)
-    val @cc = ~> $c chars
+    var @cc = ~> $c chars
     var $out = ""
     for val $i (0..len(@cc)-1) {
         val @kc = ~> $k chars
@@ -46,8 +46,8 @@ assert_eq Rosetta::VigAuto::decrypt("QNXEPVYTWTWP", "QUEENLY"),
     "ATTACKATDAWN", "decrypt Wikipedia example"
 
 # Round-trip
-val @primers = ("KILT", "STRIKE", "RUST", "ZEBRA")
-val @messages = (
+var @primers = ("KILT", "STRIKE", "RUST", "ZEBRA")
+var @messages = (
     "ATTACKATDAWN",
     "RUNAWAYNOWWHILEYOUSTILLCAN",
     "THISISATESTOFTHEAUTOKEYVIGENERECIPHER",

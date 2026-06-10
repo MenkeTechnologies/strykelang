@@ -222,7 +222,7 @@ fn Nfa::compile_match($pattern, $input) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ re => "a",        accept => ["a"],            reject => ["", "b", "aa"]                },
     +{ re => "abc",      accept => ["abc"],          reject => ["ab", "abcd", "abx"]          },
     +{ re => "a|b",      accept => ["a", "b"],       reject => ["", "ab", "ba", "c"]          },

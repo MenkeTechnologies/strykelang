@@ -186,7 +186,7 @@ fn Project::Operators::compound_or {
 }
 
 fn Project::Operators::compound_and {
-    val $x = 5
+    var $x = 5
     $x &&= 10
     $x
 }

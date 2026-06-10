@@ -10,11 +10,11 @@ fn Exercism::ZebraPuzzle::solve {
     val @smokes  = qw(Old_Gold Kools Chesterfields Lucky_Strike Parliaments)
     val @pets    = qw(dog snails fox horse zebra)
 
-    val @colors_perms = Exercism::ZebraPuzzle::_perms(\@colors)
-    val @nats_perms   = Exercism::ZebraPuzzle::_perms(\@nats)
-    val @drinks_perms = Exercism::ZebraPuzzle::_perms(\@drinks)
-    val @smokes_perms = Exercism::ZebraPuzzle::_perms(\@smokes)
-    val @pets_perms   = Exercism::ZebraPuzzle::_perms(\@pets)
+    var @colors_perms = Exercism::ZebraPuzzle::_perms(\@colors)
+    var @nats_perms   = Exercism::ZebraPuzzle::_perms(\@nats)
+    var @drinks_perms = Exercism::ZebraPuzzle::_perms(\@drinks)
+    var @smokes_perms = Exercism::ZebraPuzzle::_perms(\@smokes)
+    var @pets_perms   = Exercism::ZebraPuzzle::_perms(\@pets)
 
     for val $c (@colors_perms) {
         next unless Exercism::ZebraPuzzle::_right_of($c, "green", "ivory")
@@ -66,7 +66,7 @@ fn Exercism::ZebraPuzzle::_perms($arr) {
     return [[$items[0]]] if @items == 1
     var @out
     for val $i (0..$#items) {
-        val @rest = (@items[0..$i - 1], @items[$i + 1..$#items])
+        var @rest = (@items[0..$i - 1], @items[$i + 1..$#items])
         for val $sub (@{Exercism::ZebraPuzzle::_perms(\@rest)}) {
             push @out, [$items[$i], @{$sub}]
         }

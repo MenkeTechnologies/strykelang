@@ -3,7 +3,7 @@
 # n is colorful if all products of its consecutive digit substrings are distinct.
 
 fn Rosetta::Colorful::is_colorful($n) {
-    val @digits = split("", "$n")
+    var @digits = split("", "$n")
     return 0 if len(@digits) > 10   # > 10 digits forces a clash by pigeonhole
     # All single digits are unique only if no digit repeats — but actually the
     # task allows repeats among substring products if the underlying substring

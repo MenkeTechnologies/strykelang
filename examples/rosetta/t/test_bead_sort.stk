@@ -2,7 +2,7 @@
 # Rosetta Code: Bead Sort
 
 fn Rosetta::BeadSort::sort($list) {
-    val @arr = @$list
+    var @arr = @$list
     var $max = 0
     for val $x (@arr) {
         if ($x > $max) { $max = $x }

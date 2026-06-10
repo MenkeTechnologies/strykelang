@@ -104,7 +104,7 @@ while ($pos < 100) {
 }
 printf "  traced game ended in %d moves\n", $moves
 
-val @hits = topk_top($tk_landings)
+var @hits = topk_top($tk_landings)
 p "  TopK landings (this trace):"
 for val $h (@hits) {
     printf "    %-8s : %d times\n", $h->[0], $h->[1]

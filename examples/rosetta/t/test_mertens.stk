@@ -5,7 +5,7 @@ fn Rosetta::Mertens::moebius($n) {
     if ($n == 1) {
         1
     } else {
-        val @factors = prime_factors($n)
+        var @factors = prime_factors($n)
         var %counts
         var $has_square = 0
         for val $f (@factors) {

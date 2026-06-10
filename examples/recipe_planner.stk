@@ -11,7 +11,7 @@
 
 # ── recipe database ────────────────────────────────────────────────
 
-val @recipes = (
+var @recipes = (
     +{
         name => "Pasta Marinara",
         tags => ["vegetarian"],
@@ -77,7 +77,7 @@ for val $r (@recipes) {
 
 # ── vegetarian-only plan (5 meals) ─────────────────────────────────
 
-val @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
+var @veg = grep { Demo::Recipe::has_tag(_, "vegetarian") } @recipes
 p ""
 printf "── vegetarian recipes (%d) ───────────────────────────\n", len @veg
 for val $r (@veg) {
@@ -88,7 +88,7 @@ for val $r (@veg) {
 
 p ""
 p "── 5-meal weekly plan (varied tags) ─────────────────"
-val @plan = (
+var @plan = (
     $recipes[0],   # Pasta Marinara
     $recipes[3],   # Salmon Teriyaki
     $recipes[6],   # Lentil Soup
@@ -164,7 +164,7 @@ printf "  exact : %d\n", len(keys %shopping)
 
 p ""
 p "── most-bought ingredient (TopK) ────────────────────"
-val @hits = topk_top($tk_common)
+var @hits = topk_top($tk_common)
 for val $h (@hits) {
     printf "  %-12s : ~%d g\n", $h->[0], $h->[1] * 10
 }

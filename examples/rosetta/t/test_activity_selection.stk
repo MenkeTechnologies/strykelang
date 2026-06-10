@@ -2,7 +2,7 @@
 # Rosetta Code: Activity selection — greedy by earliest finish time
 
 fn Rosetta::Activity::select($activities) {
-    val @sorted = sort { _0->[1] <=> _1->[1] } @$activities
+    var @sorted = sort { _0->[1] <=> _1->[1] } @$activities
     var @chosen
     var $last_finish = -1e18
     for val $act (@sorted) {

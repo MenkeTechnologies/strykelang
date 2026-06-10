@@ -36,7 +36,7 @@ fn Rosetta::Nonoblock::recurse($lengths, $cells, $idx) {
             $next_cells--
         }
         
-        val @suffixes = Rosetta::Nonoblock::recurse($lengths, $next_cells, $idx + 1)
+        var @suffixes = Rosetta::Nonoblock::recurse($lengths, $next_cells, $idx + 1)
         for val $s (@suffixes) {
             push @res, $prefix . $s
         }

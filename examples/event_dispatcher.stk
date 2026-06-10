@@ -95,7 +95,7 @@ for val $pat (sort { _ cmp _1 } keys %subs) {
 
 # ── emit a stream of events ─────────────────────────────────────────
 
-val @events = (
+var @events = (
     ["user.created", +{ id => 1, name => "alice" }],
     ["user.created", +{ id => 2, name => "bob"   }],
     ["user.deleted", +{ id => 1 }],
@@ -150,7 +150,7 @@ printf "  exact distinct topics : %d\n", len(keys %distinct)
 
 p ""
 p "── pattern-match smoke test ─────────────────────────"
-val @cases = (
+var @cases = (
     ["user.*",       "user.created",      1],
     ["user.*",       "user.deleted",      1],
     ["user.*",       "order.placed",      0],

@@ -101,13 +101,13 @@ fn Demo::Diff::apply($source_ref, $ops_ref) {
 
 # ── Sample texts ────────────────────────────────────────────────────
 
-val @old = (
+var @old = (
     "the quick brown fox",
     "jumps over",
     "the lazy dog",
     "in the morning",
 )
-val @new = (
+var @new = (
     "the quick brown fox",
     "leaps over",
     "the sleeping dog",

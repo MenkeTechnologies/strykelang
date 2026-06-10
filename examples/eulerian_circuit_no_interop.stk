@@ -77,7 +77,7 @@ fn Euler::edge_count($adj) {
 
 # ── primary cases ─────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "triangle",
         adj   => +{ A => ["B"], B => ["C"], C => ["A"] },

@@ -76,7 +76,7 @@ fn Bx::render_cell($bits) {
 
 # ── demo ───────────────────────────────────────────────────────────
 
-val @samples = ("hello", "stryke rules", "the quick brown fox", "abcdefghij")
+var @samples = ("hello", "stryke rules", "the quick brown fox", "abcdefghij")
 
 printf "── ASCII ↔ Unicode-Braille transcoder ─────────────────\n\n"
 

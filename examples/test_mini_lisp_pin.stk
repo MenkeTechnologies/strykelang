@@ -39,7 +39,7 @@ fn eval_v($x, $env) {
         return $found->{vars}->{$x}
     }
     return $x if ref($x) ne "ARRAY"
-    val @list = @$x
+    var @list = @$x
     return [] if !@list
     val $op = $list[0]
     if ($op eq "define") {
@@ -56,7 +56,7 @@ fn eval_v($x, $env) {
     var @args; for val $i (1 : (len @list) - 1) { push @args, eval_v($list[$i], $env) }
     if (ref($proc) eq "HASH") {
         val $new_e = new_env $proc->{env}
-        val @p = @{$proc->{params}}
+        var @p = @{$proc->{params}}
         for val $i (0 : (len @p) - 1) { $new_e->{vars}->{$p[$i]} = $args[$i] }
         return eval_v $proc->{body}, $new_e
     } else { return $proc(@args) }

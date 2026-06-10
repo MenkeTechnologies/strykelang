@@ -47,7 +47,7 @@ fn Url::parse($url) {
 fn Url::query_params($url_obj) {
     var %params = ()
     return \%params if $url_obj->{query} eq ""
-    val @pairs = split /&/, $url_obj->{query}
+    var @pairs = split /&/, $url_obj->{query}
     for val $kv (@pairs) {
         val $eq = index($kv, "=")
         if ($eq >= 0) {

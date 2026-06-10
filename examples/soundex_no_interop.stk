@@ -77,7 +77,7 @@ if (len(@ARGV) >= 1) {
 
 # Demo: classic Soundex test cases from the literature. The codes are
 # from the National Archives reference (US census methodology).
-val @cases = (
+var @cases = (
     +{ name => "Robert",    code => "R163" },
     +{ name => "Rupert",    code => "R163" },  # collides with Robert
     +{ name => "Rubin",     code => "R150" },

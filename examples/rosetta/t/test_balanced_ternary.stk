@@ -24,7 +24,7 @@ fn Rosetta::BalancedTernary::encode($n) {
 
 fn Rosetta::BalancedTernary::decode($s) {
     var $res = 0
-    val @chars = ~> $s chars
+    var @chars = ~> $s chars
     for val $c (@chars) {
         val $val = ($c eq "Z" ? -1 : int($c))
         $res = $res * 3 + $val

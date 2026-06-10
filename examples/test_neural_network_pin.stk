@@ -60,7 +60,7 @@ package main
 # --- XOR test ---
 srand(42)
 val $nn = NN::new 2, 4, 1
-val @data = ( {in=>[0,0], out=>[0]}, {in=>[0,1], out=>[1]}, {in=>[1,0], out=>[1]}, {in=>[1,1], out=>[0]} )
+var @data = ( {in=>[0,0], out=>[0]}, {in=>[0,1], out=>[1]}, {in=>[1,0], out=>[1]}, {in=>[1,1], out=>[0]} )
 
 # Train
 for (1:20000) {

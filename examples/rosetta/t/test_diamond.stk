@@ -20,7 +20,7 @@ fn Rosetta::Diamond::row($char, $max_char) {
 
 fn Rosetta::Diamond::build($max_char) {
     var @rows
-    val @chars = ("A" .. $max_char)
+    var @chars = ("A" .. $max_char)
     for val $c (@chars) {
         push @rows, Rosetta::Diamond::row($c, $max_char)
     }

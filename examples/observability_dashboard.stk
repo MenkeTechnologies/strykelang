@@ -13,7 +13,7 @@
 
 # ── synthesise event stream ──────────────────────────────────────────
 
-val @services = ("api", "auth", "payment", "notify", "search")
+var @services = ("api", "auth", "payment", "notify", "search")
 val @levels   = ("ok", "ok", "ok", "ok", "ok", "ok", "ok", "warn", "error", "error")
 val @errors   = ("Timeout", "DBConnError", "RateLimit", "AuthFailed", "NotFound", "ServiceUnavailable")
 
@@ -111,7 +111,7 @@ p ""
 p "── top errors per service ───────────────────────────"
 for val $svc (@services) {
     next if $error_count{$svc} == 0
-    val @hits = topk_top($tk_err{$svc})
+    var @hits = topk_top($tk_err{$svc})
     var @parts
     for val $h (@hits) {
         push @parts, sprintf("%s(%d)", $h->[0], $h->[1])

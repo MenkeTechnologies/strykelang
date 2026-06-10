@@ -25,7 +25,7 @@ fn Rosetta::Zeckendorf::zeckendorf($n) {
     if ($n == 0) {
         return ()
     }
-    val @fibs = Rosetta::Rev::rev(Rosetta::Zeckendorf::fib_seq_until($n))
+    var @fibs = Rosetta::Rev::rev(Rosetta::Zeckendorf::fib_seq_until($n))
     var @result
     for val $fib (@fibs) {
         if ($n >= $fib) {

@@ -2,7 +2,7 @@
 # Rosetta Code: Self-descriptive numbers
 
 fn Rosetta::SelfDescriptive::check($n) {
-    val @digits = ~> "$n" chars
+    var @digits = ~> "$n" chars
     val $len = len(@digits)
     var @counts = (0) x $len
     for val $d (@digits) {

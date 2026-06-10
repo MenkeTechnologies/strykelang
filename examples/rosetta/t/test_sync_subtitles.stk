@@ -23,7 +23,7 @@ fn Rosetta::Subtitles::from_ms($ms) {
 }
 
 fn Rosetta::Subtitles::shift($srt, $offset_ms) {
-    val @lines = split "\n", $srt
+    var @lines = split "\n", $srt
     var @new_lines
     for val $line (@lines) {
         if ($line =~ /([\d:,]+)\s+-->\s+([\d:,]+)/) {

@@ -26,7 +26,7 @@ fn Rosetta::Hidato::count_fillable($grid) {
 
 fn Rosetta::Hidato::dfs($grid, $r, $c, $n, $target, $rows, $cols) {
     return 1 if $n > $target
-    val @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
+    var @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
     for val $d (@dirs) {
         val $nr = $r + $d->[0]
         val $nc = $c + $d->[1]

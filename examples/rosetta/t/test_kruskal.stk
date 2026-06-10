@@ -23,7 +23,7 @@ fn Rosetta::Kruskal::union_sets($parent, $rank, $x, $y) {
 }
 
 fn Rosetta::Kruskal::solve($n, $edges) {
-    val @sorted_edges = sort { _0->[2] <=> _1->[2] } @$edges
+    var @sorted_edges = sort { _0->[2] <=> _1->[2] } @$edges
     var $parent = {}
     var $rank = {}
     for val $i (0:$n-1) {

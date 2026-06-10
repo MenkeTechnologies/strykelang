@@ -122,7 +122,7 @@ fn Search::query($query_text, $top_k = 3) {
 for val $q ("quick fox", "lazy dog", "clever programmers", "barks yard") {
     p ""
     p "Query: \"$q\""
-    val @results = Search::query $q
+    var @results = Search::query $q
     for val $r (@results) {
         printf "  %.4f  %s — %s\n", $r->[1], $r->[0], $corpus{$r->[0]}
     }

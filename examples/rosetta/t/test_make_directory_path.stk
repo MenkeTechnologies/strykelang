@@ -6,7 +6,7 @@
 
 fn Rosetta::MkdirP::create($path) {
     return 1 if -d $path
-    val @parts = split /\//, $path
+    var @parts = split /\//, $path
     var $cur = ""
     $cur = "/" if substr($path, 0, 1) eq "/"
     for val $p (@parts) {

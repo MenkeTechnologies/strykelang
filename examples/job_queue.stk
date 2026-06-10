@@ -86,7 +86,7 @@ printf "── submitted %d jobs ───────────────�
 # children). For a true parallel queue, use `pfor` with a channel; for
 # this demo we stay sequential so latency/topk roll up correctly.
 
-val @results = map { Demo::Queue::run_with_retry(_, 5) } @jobs
+var @results = map { Demo::Queue::run_with_retry(_, 5) } @jobs
 
 # ── per-job summary ──────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ printf "  p99  : %.1f µs\n", td_quantile($latency, 0.99)
 
 p ""
 p "── slowest 3 jobs (TopK) ────────────────────────────"
-val @hits = topk_top($slowest)
+var @hits = topk_top($slowest)
 for val $h (@hits) {
     printf "  %-10s : %d (approx)\n", $h->[0], $h->[1]
 }

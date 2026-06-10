@@ -53,7 +53,7 @@ fn Kap::iters_to_6174($n) {
 
 # ── examples table ────────────────────────────────────────────────
 
-val @samples = (1234, 6589, 9998, 1000, 2345, 7531)
+var @samples = (1234, 6589, 9998, 1000, 2345, 7531)
 
 printf "── Kaprekar trace for selected n ───────────────────\n\n"
 printf "  %5s   %8s   %8s   %8s   %s\n", "n", "desc", "asc", "diff", "step"

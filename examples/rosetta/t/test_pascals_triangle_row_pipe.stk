@@ -5,7 +5,7 @@ fn Rosetta::PascalsTriangleRow::solve($n) {
     if ($n == 0) {
         return (1)
     }
-    val @prev = Rosetta::PascalsTriangleRow::solve($n - 1)
+    var @prev = Rosetta::PascalsTriangleRow::solve($n - 1)
     
     # Pipeline to construct the row: zip shifted arrays, sum pairs, prepend 1, append 1
     var @left = @prev

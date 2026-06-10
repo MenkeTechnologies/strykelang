@@ -163,7 +163,7 @@ printf "  exact (history length) : %d\n", len @population_history
 
 p ""
 p "── most-common gen population (TopK) ────────────────"
-val @hits = topk_top($tk_pop)
+var @hits = topk_top($tk_pop)
 for val $h (@hits) {
     printf "  %-12s : %d gens\n", $h->[0], $h->[1]
 }

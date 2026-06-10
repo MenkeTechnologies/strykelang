@@ -115,7 +115,7 @@ printf "── %d queries against %d-key upstream ──────────
 # ── execute workload ────────────────────────────────────────────────
 
 val $start = now_ns()
-val @results = map {Demo::Cache::lookup} @queries
+var @results = map {Demo::Cache::lookup} @queries
 val $elapsed_us = (now_ns() - $start) / 1000.0
 
 # ── per-query summary (compact) ─────────────────────────────────────

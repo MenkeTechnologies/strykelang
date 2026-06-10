@@ -2,7 +2,7 @@
 # Rosetta Code: Counting Sort
 
 fn Rosetta::CountingSort::sort($list, $min, $max) {
-    val @arr = @$list
+    var @arr = @$list
     var @count = ()
     
     for val $x (@arr) {

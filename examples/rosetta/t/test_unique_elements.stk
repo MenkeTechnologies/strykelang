@@ -2,7 +2,7 @@
 # Rosetta Code: Unique elements
 
 fn Rosetta::UniqueElements::get($arr_ref) {
-    val @arr = @$arr_ref
+    var @arr = @$arr_ref
     var %seen
     var @unique = ()
     for val $x (@arr) {

@@ -12,7 +12,7 @@
 p "── AI Data Pipeline ───────────────────────────────────"
 
 # 1. Setup sample data
-val @data = (
+var @data = (
     "The product is amazing and I love it!",
     "Worst experience ever, totally broken.",
     "It's okay, nothing special.",

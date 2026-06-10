@@ -8,7 +8,7 @@ fn Exercism::WordSearch::search {
     val @rows = map { [split //, $_] } @{$grid}
     val $h = @rows
     val $w = @rows ? @{$rows[0]} : 0
-    val @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
+    var @dirs = ([-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1])
     var %out
     for val $word (@{$words}) {
         val $len = len($word)

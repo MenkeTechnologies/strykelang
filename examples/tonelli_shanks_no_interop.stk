@@ -118,7 +118,7 @@ fn Ts::sqrt_mod($n, $p) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{ n => 0,    p => 13,    has_root => 1 },
     +{ n => 1,    p => 13,    has_root => 1 },
     +{ n => 5,    p => 41,    has_root => 1 },

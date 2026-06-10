@@ -228,7 +228,7 @@ fn Uk::distinct_substrings($tree) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @strings = ("abc", "banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababcabab")
+var @strings = ("abc", "banana", "mississippi", "abracadabra", "aaaa", "stryke", "ababcabab")
 
 p "── Ukkonen suffix-tree demo ──────────────────────────"
 printf "  %-16s  %4s  %6s  %6s  %6s\n", "input", "len", "leaves", "nodes", "subs"

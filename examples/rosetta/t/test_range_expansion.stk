@@ -2,7 +2,7 @@
 # Rosetta Code: Range expansion
 
 fn Rosetta::RangeExpansion::solve($s) {
-    val @parts = split /,/, $s
+    var @parts = split /,/, $s
     var @res
     for val $p (@parts) {
         if ($p =~ /(-?\d+)-(-?\d+)/) {

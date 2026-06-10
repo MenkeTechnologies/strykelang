@@ -131,7 +131,7 @@ for val $f (keys %flags) {
         topk_add($tk, $f)
     }
 }
-val @top = topk_top($tk)
+var @top = topk_top($tk)
 for val $h (@top) {
     printf "  %-18s : %d evaluations\n", $h->[0], $h->[1]
 }

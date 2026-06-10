@@ -76,7 +76,7 @@ printf("  sum of primes <= 200: %d (expect 4227)\n", $sum_le_200)
 
 val $RANGE = 500
 val $t1 = now_ns()
-val @scan_primes = pgrep {Demo::Sieve::is_prime} (2:$RANGE)
+var @scan_primes = pgrep {Demo::Sieve::is_prime} (2:$RANGE)
 td_add($td_sieve, (now_ns() - $t1) / 1000.0)
 
 printf("\npgrep parallel scan 2..%d -> %d primes\n", $RANGE, len(@scan_primes))
@@ -92,7 +92,7 @@ val @chunks = map {
 } (1:$NCHUNKS)
 
 val $t2 = now_ns()
-val @chunk_results = pmap {
+var @chunk_results = pmap {
     val $lo = _->[0]
     val $hi = _->[1]
     [grep {Demo::Sieve::is_prime} ($lo:$hi)]
@@ -136,7 +136,7 @@ printf("HLL distinct count: %.1f vs exact: %d\n", $hll_n, len(@all_primes))
 # ── last-digit distribution (TopK) ────────────────────────────────
 
 p "\nlast-digit frequency among collected primes:"
-val @lds = topk_top($tk_last, 6)
+var @lds = topk_top($tk_last, 6)
 for val $p (@lds) {
     printf("  %-10s count=%d\n", $p->[0], $p->[1])
 }
@@ -146,7 +146,7 @@ for val $p (@lds) {
 # pgrep scan covers up to 500.
 
 p "\nprime-counting sanity:"
-val @pi_check = (
+var @pi_check = (
     [10,    4],
     [100,   25],
     [200,   46],

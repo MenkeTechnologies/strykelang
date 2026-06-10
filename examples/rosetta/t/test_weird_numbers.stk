@@ -23,7 +23,7 @@ fn Rosetta::Weird::sum_subset_to($target, $divisors) {
     var %reachable = (0 => 1)
     for val $d (@$divisors) {
         last if exists $reachable{$target}
-        val @keys = keys %reachable
+        var @keys = keys %reachable
         for val $r (@keys) {
             val $new = $r + $d
             $reachable{$new} = 1 if $new <= $target
@@ -33,7 +33,7 @@ fn Rosetta::Weird::sum_subset_to($target, $divisors) {
 }
 
 fn Rosetta::Weird::is($n) {
-    val @divs = Rosetta::Weird::proper_divisors($n)
+    var @divs = Rosetta::Weird::proper_divisors($n)
     var $s = 0
     for val $d (@divs) { $s += $d }
     return 0 if $s <= $n            # not abundant

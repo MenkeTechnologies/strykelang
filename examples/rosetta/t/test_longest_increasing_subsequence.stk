@@ -2,7 +2,7 @@
 # Rosetta Code: Longest increasing subsequence
 
 fn Rosetta::LIS::solve($arr_ref) {
-    val @arr = @$arr_ref
+    var @arr = @$arr_ref
     val $n = len(@arr)
     if ($n == 0) { return 0 }
     var @tails = (0) x $n

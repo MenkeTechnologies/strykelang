@@ -26,7 +26,7 @@
 fn Forth::run($prog) {
     var @stack
     var $output = ""
-    val @tokens = grep { len(_) > 0 } split(/\s+/, $prog)
+    var @tokens = grep { len(_) > 0 } split(/\s+/, $prog)
 
     for val $tok (@tokens) {
         if ($tok =~ /^-?\d+$/) {
@@ -103,7 +103,7 @@ fn Forth::run($prog) {
 
 printf "── Mini-Forth core word demo ──────────────────────────\n\n"
 
-val @cases = (
+var @cases = (
     ["3 4 +",                "7",            "add"],
     ["10 3 -",               "7",            "subtract"],
     ["6 7 *",                "42",           "multiply"],

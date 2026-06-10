@@ -34,7 +34,7 @@ val $first_sid = (sort { _ <=> _1 } keys %replies)[0]
 val $h = from_json($replies{$first_sid})
 
 p "── word counts (each worker independently computed) ──"
-val @keys = sort { $h->{_1} <=> $h->{_} || _ cmp _1 } keys %$h
+var @keys = sort { $h->{_1} <=> $h->{_} || _ cmp _1 } keys %$h
 for val $k (@keys) {
     printf "  %-12s %d\n", $k, $h->{$k}
 }

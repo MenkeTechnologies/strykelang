@@ -23,7 +23,7 @@ val @words = ("alpha", "beta", "gamma", "delta", "epsilon",
              "lambda", "mu", "nu", "xi", "omicron")
 for val $i (~> 1:30) {
     val $pp = Rosetta::Passphrase::generate(\@words, 4, "-")
-    val @parts = split /-/, $pp
+    var @parts = split /-/, $pp
     assert_eq len(@parts), 4, "4-word passphrase"
     val %ws = map { _ => 1 } @words
     for val $p (@parts) {

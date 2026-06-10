@@ -11,7 +11,7 @@
 
 # ── sample raw emails ──────────────────────────────────────────────
 
-val @raw_emails = (
+var @raw_emails = (
 q{From: alice\@example.com
 To: bob\@corp.io
 Subject: Lunch tomorrow?
@@ -59,7 +59,7 @@ Your account will be SUSPENDED. CLICK HERE to verify your password and SSN!},
 # ── parser ─────────────────────────────────────────────────────────
 
 fn Demo::Email::parse($raw) {
-    val @lines = split /\n/, $raw
+    var @lines = split /\n/, $raw
     var %headers
     var @body_lines
     var $in_body = 0
@@ -87,7 +87,7 @@ fn Demo::Email::parse($raw) {
 
 # ── spam classifier (simple keyword score) ────────────────────────
 
-val @spam_keywords = (
+var @spam_keywords = (
     "free",         "winner",       "won",          "click",
     "act now",      "limited",      "urgent",       "verify",
     "prize",        "viagra",       "cialis",       "xanax",

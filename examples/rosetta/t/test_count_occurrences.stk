@@ -3,7 +3,7 @@
 
 fn Rosetta::CountOccurrences::solve($s) {
     var $counts = {}
-    val @chars = chars($s)
+    var @chars = chars($s)
     for val $c (@chars) {
         $counts->{$c} = $counts->{$c} + 1
     }

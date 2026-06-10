@@ -8,7 +8,7 @@ fn Ll::cons($h, $t) { +{ head => $h, tail => $t } }
 
 fn Ll::from_array($arr) {
     var $list = undef
-    val @indices = rev 0:len(@$arr) - 1
+    var @indices = rev 0:len(@$arr) - 1
     for val $i (@indices) {
         $list = Ll::cons($arr->[$i], $list)
     }

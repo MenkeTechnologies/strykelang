@@ -69,7 +69,7 @@ val $G = +{
 }
 
 # Reference table — (src, dst, expected BFS::path_len).
-val @cases = (
+var @cases = (
     +{ src => "A", dst => "A", dist => 0 },
     +{ src => "A", dst => "B", dist => 1 },
     +{ src => "A", dst => "C", dist => 2 },

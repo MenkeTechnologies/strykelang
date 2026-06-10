@@ -22,12 +22,12 @@ for val $i (0:39) {
     val $y = ($i * 11 + 5) % 100
     push @points, [$x, $y]
 }
-val @centroids = ([20, 20], [80, 80], [20, 80])
+var @centroids = ([20, 20], [80, 80], [20, 80])
 printf "points: %d  ·  centroids: %d  ·  workers: %d\n",
     len(@points), len(@centroids), $n_workers
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the points by index. Each worker gets a chunk; returns the
 # per-centroid (count, x_sum, y_sum) as JSON.

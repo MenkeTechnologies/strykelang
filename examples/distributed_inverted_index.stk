@@ -27,7 +27,7 @@ val @docs = (
 printf "corpus: %d documents  ·  workers: %d\n", len(@docs), $n_workers
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard documents by index. Each worker indexes its shard, returns
 # term→[doc_ids] hash as JSON. doc_ids are GLOBAL (so master can
@@ -82,7 +82,7 @@ for val $term (keys %global_index) {
 }
 
 p "── global inverted index (sample) ──"
-val @terms = sort keys %global_index
+var @terms = sort keys %global_index
 for val $term (@terms) {
     printf "  %-10s → docs %s\n", $term, join(",", @{$global_index{$term}})
 }

@@ -2,7 +2,7 @@
 # Rosetta Code: Spy numbers
 
 fn Rosetta::SpyNumbers::is_spy($n) {
-    val @digits = ~> "$n" chars map {int}
+    var @digits = ~> "$n" chars map {int}
     var $sum = 0
     var $prod = 1
     for val $d (@digits) {

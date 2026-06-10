@@ -38,7 +38,7 @@ fn Demo::Cal::overlaps($e1, $e2) {
 
 # ── sort events ────────────────────────────────────────────────────
 
-val @sorted = sort { _->{start} <=> _1->{start} } @events
+var @sorted = sort { _->{start} <=> _1->{start} } @events
 
 p "── events (chronological) ───────────────────────────"
 for val $e (@sorted) {
@@ -90,7 +90,7 @@ for val $c (@conflicts) {
     # Drop the later event.
     $dropped{$c->[1]->{title}} = 1
 }
-val @clean = grep { !exists $dropped{_->{title}} } @sorted
+var @clean = grep { !exists $dropped{_->{title}} } @sorted
 
 p ""
 p "── free slots within work day (9:00-18:00) ──────────"
@@ -165,7 +165,7 @@ for val $e (@clean) {
         topk_add($tk, sprintf("%02d:00", $h))
     }
 }
-val @hits = topk_top($tk)
+var @hits = topk_top($tk)
 for val $h (@hits) {
     printf "  %s : %d busy minutes\n", $h->[0], $h->[1]
 }

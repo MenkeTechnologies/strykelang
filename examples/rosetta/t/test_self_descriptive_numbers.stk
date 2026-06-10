@@ -3,7 +3,7 @@
 
 fn Rosetta::SelfDescriptive::check($n) {
     val $s = "$n"
-    val @d = split //, $s
+    var @d = split //, $s
     val $len = len(@d)
     var %counts
     for val $x (@d) { $counts{$x}++ }

@@ -5,7 +5,7 @@ fn Rosetta::LSystem::solve($axiom, $rules, $iters) {
     var $curr = $axiom
     for (1:$iters) {
         var $next = ""
-        val @chars = chars($curr)
+        var @chars = chars($curr)
         for val $c (@chars) {
             $next .= exists($rules->{$c}) ? $rules->{$c} : $c
         }

@@ -2,7 +2,7 @@
 # Run: stryke --no-interop examples/parallel_file_hasher.stk
 
 p "--- Parallel Hash ---"
-val @r = ~> glob("examples/*.stk") \
+var @r = ~> glob("examples/*.stk") \
     head(5) \
     pmaps { [ _ => c"#{_}" |> sha256 ] } \
     collect

@@ -54,7 +54,7 @@ fn _search($node, $w, $k, $out) {
     push @$out, $node->{word} if $d <= $k
     val $lo = $d - $k
     val $hi = $d + $k
-    val @keys = sort keys %{$node->{ch}}
+    var @keys = sort keys %{$node->{ch}}
     for val $dk (@keys) {
         if ($dk >= $lo && $dk <= $hi) {
             BK::_search($node->{ch}->{$dk}, $w, $k, $out)
@@ -145,7 +145,7 @@ $sorted |> aeq 1, "results sorted"
 
 # --- Equivalence with brute force on a small dictionary ---
 val $tb = BK::new()
-val @words = ("apple", "apply", "ample", "amplep", "snake", "snare", "stare", "spare", "spark")
+var @words = ("apple", "apply", "ample", "amplep", "snake", "snare", "stare", "spare", "spark")
 for val $w (@words) { BK::add($tb, $w) }
 
 # Brute force: for each query / k, compute true matches

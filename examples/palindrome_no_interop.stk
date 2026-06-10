@@ -32,7 +32,7 @@ if (len(@ARGV) >= 1) {
 }
 
 # Demo grid — paired (input, strict, lenient).
-val @cases = (
+var @cases = (
     +{ s => "racecar",                          strict => 1, lenient => 1 },
     +{ s => "hello",                            strict => 0, lenient => 0 },
     +{ s => "",                                 strict => 1, lenient => 1 },

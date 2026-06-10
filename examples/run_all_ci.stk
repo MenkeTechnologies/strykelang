@@ -238,7 +238,7 @@ fn Ci::phase_exercism {
 
     # Sort by name so OK/FAIL output stays deterministic even though
     # workers finish in random order. Then walk + update counters.
-    val @sorted = sort { _->{name} cmp _1->{name} } @results
+    var @sorted = sort { _->{name} cmp _1->{name} } @results
     var $pass = 0
     for val $r (@sorted) {
         if ($r->{pass}) {

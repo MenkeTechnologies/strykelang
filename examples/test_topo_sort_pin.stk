@@ -20,7 +20,7 @@ fn Topo::sort($edges, $nodes) {
     while (len(@queue) > 0) {
         val $n = shift @queue
         push @order, $n
-        val @nexts = sort @{$adj{$n}}
+        var @nexts = sort @{$adj{$n}}
         for val $m (@nexts) {
             $indeg{$m} = $indeg{$m} - 1
             push @queue, $m if $indeg{$m} == 0

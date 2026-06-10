@@ -3,7 +3,7 @@
 
 fn Rosetta::SelfDescriptive::check($n) {
     val $s = str($n)
-    val @chars = split //, $s
+    var @chars = split //, $s
     val $len = len(@chars)
 
     for val $i (0:$len-1) {

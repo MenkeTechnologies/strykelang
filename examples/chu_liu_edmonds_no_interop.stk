@@ -209,7 +209,7 @@ fn Cle::brute($n, $edges, $root) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name  => "single edge",
         n     => 2,

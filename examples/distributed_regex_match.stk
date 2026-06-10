@@ -27,7 +27,7 @@ val $pattern = "^P.*\\/api"   # matches POST/PUT lines to /api
 printf "corpus: %d lines  ·  pattern: /%s/\n", len(@corpus), $pattern
 
 val @workers = congregation(4)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard the corpus. Each worker returns the indices that matched.
 val $per = int((len(@corpus) + len(@sorted_workers) - 1) / len(@sorted_workers))

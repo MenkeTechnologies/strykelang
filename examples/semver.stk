@@ -23,7 +23,7 @@ fn parse($s) {
         $pre = substr($rest, $dash + 1)
         $rest = substr($rest, 0, $dash)
     }
-    val @nums = split(/\./, $rest)
+    var @nums = split(/\./, $rest)
     return undef if len(@nums) != 3
     for val $nn (@nums) {
         return undef if $nn !~ /^\d+$/
@@ -108,7 +108,7 @@ for val $s ("1.2.3", "1.0.0-alpha", "1.0.0-rc.1", "1.0.0", "2.0.0+build.42") {
     p $s . " -> " . SV::format($v)
 }
 
-val @pairs = (
+var @pairs = (
     ["1.0.0", "2.0.0"],
     ["1.0.0", "1.0.0"],
     ["1.0.0-alpha", "1.0.0"],

@@ -49,7 +49,7 @@ fn Rosetta::Utf8::format_hex($bytes) {
 }
 
 # Encoding (rosetta canonical samples)
-val @samples = (
+var @samples = (
     [0x0041,   "41",          "A"],
     [0x00F6,   "C3 B6",       "ö"],
     [0x0416,   "D0 96",       "Ж (Cyrillic Zhe)"],

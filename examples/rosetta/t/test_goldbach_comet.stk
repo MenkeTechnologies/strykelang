@@ -22,7 +22,7 @@ fn Rosetta::Goldbach::primes_up_to($N) {
 
 fn Rosetta::Goldbach::g_of_n($n) {
     val $tgt = 2 * $n
-    val @primes = Rosetta::Goldbach::primes_up_to($tgt)
+    var @primes = Rosetta::Goldbach::primes_up_to($tgt)
     var %is_p
     for val $p (@primes) { $is_p{$p} = 1 }
     var $count = 0

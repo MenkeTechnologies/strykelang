@@ -139,7 +139,7 @@ fn Bmv::brute_k_majority($xs, $k) {
 
 # ── primary cases ────────────────────────────────────────────────
 
-val @cases_maj = (
+var @cases_maj = (
     +{ name => "single value",       xs => [7],                                                found => 1, value => 7 },
     +{ name => "clear majority",     xs => [3, 3, 4, 2, 3, 3, 5, 3],                           found => 1, value => 3 },
     +{ name => "exactly half (no)",  xs => [1, 1, 2, 2],                                       found => 0, value => undef },
@@ -152,7 +152,7 @@ val @cases_maj = (
     +{ name => "empty",              xs => [],                                                  found => 0, value => undef },
 )
 
-val @cases_k2 = (
+var @cases_k2 = (
     +{ name => "two 1/3-majorities", xs => [1, 1, 1, 2, 2, 2, 3, 3, 4],  k => 2 },
     +{ name => "single dominant",    xs => [5, 5, 5, 5, 1, 2, 3],         k => 2 },
     +{ name => "no 1/3-majority",    xs => [1, 2, 3, 4, 5, 6],            k => 2 },
@@ -225,7 +225,7 @@ for val $c (@cases_maj) {
 for val $c (@cases_k2) {
     val $r = Bmv::k_majority($c->{xs}, $c->{k})
     val $br = Bmv::brute_k_majority($c->{xs}, $c->{k})
-    val @r_sorted = sort { _0 <=> _1 } @$r
+    var @r_sorted = sort { _0 <=> _1 } @$r
     die "k-majority count mismatch on \"#{$c->{name}}\": got #{len(@r_sorted)} want #{len(@$br)}" unless len(@r_sorted) == len(@$br)
     for val $i (0:len(@r_sorted) - 1) {
         die "k-majority[#{$i}] mismatch on \"#{$c->{name}}\": got #{$r_sorted[$i]} want #{$br->[$i]}" unless $r_sorted[$i] == $br->[$i]

@@ -109,7 +109,7 @@ fn Pipeline::tokenize  = _ |> Pipeline::normalize |> chars |> len
 
 p ""
 p "── compose multiple expr-bodied fns into a pipeline ──"
-val @inputs = ("  Hello, World!  ", "FOO BAR BAZ", "")
+var @inputs = ("  Hello, World!  ", "FOO BAR BAZ", "")
 for val $s (@inputs) {
     printf("  [%-20s] → norm=[%s] chars=%d\n",
         $s, Pipeline::normalize($s), Pipeline::tokenize($s))

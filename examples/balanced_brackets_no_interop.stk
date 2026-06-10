@@ -37,7 +37,7 @@ if (len(@ARGV) >= 1) {
 
 # Demo table — each row is (input, expected). Lines mix bracket kinds
 # and free text.
-val @cases = (
+var @cases = (
     +{ s => "()",                ok => 1 },
     +{ s => "[]",                ok => 1 },
     +{ s => "{}",                ok => 1 },

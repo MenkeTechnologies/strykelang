@@ -30,7 +30,7 @@ printf "matrix A: %dx%d  ·  vector v: %d elements\n", $dim, $dim, len(@v)
 printf "v = (%s)\n", join(",", @v)
 
 val @workers = congregation($n_workers)
-val @sorted_workers = sort { _ <=> _1 } @workers
+var @sorted_workers = sort { _ <=> _1 } @workers
 
 # Shard rows across workers — each worker gets a band of rows to
 # compute. Worker returns the per-row dot products as JSON.

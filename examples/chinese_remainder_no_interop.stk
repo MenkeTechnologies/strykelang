@@ -82,7 +82,7 @@ fn Crt::solve($residues, $moduli) {
 
 # ── primary test cases ───────────────────────────────────────────
 
-val @cases = (
+var @cases = (
     +{
         name => "classic Sun Tzu",
         a    => [2, 3, 2],

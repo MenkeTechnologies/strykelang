@@ -114,7 +114,7 @@ p "── A* pathfinding demo ──"
 #   . . # . .
 #   . . # . .
 # Optimal start (0,0) → goal (0,4) detours through (2,2).
-val @grid1 = (
+var @grid1 = (
     "..#..",
     "..#..",
     ".....",
@@ -129,7 +129,7 @@ die "path len 9 expected, got #{len @$path1}" unless len(@$path1) == 9
 p "  5x5 with wall: A* finds 9-cell optimal detour  OK"
 
 # Fully open 3x3 — straight diagonal-ish path (Manhattan).
-val @open_grid = (
+var @open_grid = (
     "...",
     "...",
     "...",

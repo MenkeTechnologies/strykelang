@@ -51,7 +51,7 @@ fn Rosetta::SCS::compute($s1, $s2) {
 
 fn Rosetta::SCS::is_supersequence($scs, $sub) {
     val @cs = ~> $sub chars
-    val @ss = ~> $scs chars
+    var @ss = ~> $scs chars
     var $i = 0
     for val $c (@ss) {
         if ($i < len(@cs) && $c eq $cs[$i]) { $i += 1 }

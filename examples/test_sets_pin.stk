@@ -48,7 +48,7 @@ Set::size(Set::inter($E, $A)) |> aeq 0, "∅∩A = ∅"
 Set::subset($E, $A)           |> aok    "∅ ⊆ A"
 
 fn Set::power($s) {
-    val @items = sort keys %$s
+    var @items = sort keys %$s
     var @out = ([])
     for val $x (@items) {
         push @out, map { [@$_, $x] } @out

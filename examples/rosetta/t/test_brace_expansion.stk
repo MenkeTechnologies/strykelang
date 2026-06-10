@@ -44,7 +44,7 @@ fn Rosetta::BraceExp::expand($s) {
     val $pre  = substr($s, 0, $from)
     val $body = substr($s, $from + 1, $to - $from - 1)
     val $post = substr($s, $to + 1)
-    val @alts = Rosetta::BraceExp::split_alts($body)
+    var @alts = Rosetta::BraceExp::split_alts($body)
     return ($s) if len(@alts) < 2
     var @out
     for val $alt (@alts) {

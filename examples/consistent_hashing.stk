@@ -44,7 +44,7 @@ fn CH::remove($ch, $node) {
 }
 
 fn CH::lookup($ch, $key) {
-    val @sorted = @{$ch->{sorted}}
+    var @sorted = @{$ch->{sorted}}
     return undef if len(@sorted) == 0
     val $h = CH::hash($key)
     for val $rh (@sorted) {

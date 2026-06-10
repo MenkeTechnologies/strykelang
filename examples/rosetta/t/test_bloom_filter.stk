@@ -24,14 +24,14 @@ fn Rosetta::BloomFilter::hashes($s, $size) {
 }
 
 fn Rosetta::BloomFilter::add($item, $bf) {
-    val @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
+    var @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
     for val $i (@indices) {
         $bf->{bitset}->[$i] = 1
     }
 }
 
 fn Rosetta::BloomFilter::check($item, $bf) {
-    val @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
+    var @indices = Rosetta::BloomFilter::hashes($item, $bf->{size})
     for val $i (@indices) {
         return 0 if $bf->{bitset}->[$i] == 0
     }

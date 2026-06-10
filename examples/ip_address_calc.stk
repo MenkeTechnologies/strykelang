@@ -65,7 +65,7 @@ fn Demo::IP::host_count($cidr) {
 
 val $td_calc = t_digest(100)
 
-val @inputs = (
+var @inputs = (
     "192.168.1.0/24",
     "10.0.0.0/8",
     "172.16.0.0/12",
@@ -109,7 +109,7 @@ fn Demo::IP::contains($cidr, $ip_n) {
 
 p ""
 p "── subnet containment tests ─────────────────────────"
-val @probes = (
+var @probes = (
     ["192.168.1.42", "192.168.1.0/24"],
     ["192.168.2.42", "192.168.1.0/24"],
     ["10.5.5.5",     "10.0.0.0/8"],

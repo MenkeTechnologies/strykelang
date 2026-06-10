@@ -203,7 +203,7 @@ printf "  exact : %d\n", len(keys %distinct_names)
 
 p ""
 p "── TopK most-common types (sketch) ──────────────────"
-val @hits = topk_top($tk_types)
+var @hits = topk_top($tk_types)
 for val $h (@hits) {
     printf "  %-8s : %d\n", $h->[0], $h->[1]
 }

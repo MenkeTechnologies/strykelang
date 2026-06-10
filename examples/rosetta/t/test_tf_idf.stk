@@ -2,7 +2,7 @@
 # Rosetta Code: TF-IDF
 
 fn Rosetta::TFIDF::tf($term, $doc) {
-    val @words = split(/\s+/, lc($doc))
+    var @words = split(/\s+/, lc($doc))
     var $count = 0
     for val $w (@words) {
         $count++ if $w eq $term
@@ -14,7 +14,7 @@ fn Rosetta::TFIDF::idf($term, $docs) {
     val $num_docs = len(@$docs)
     var $count = 0
     for val $doc (@$docs) {
-        val @words = split(/\s+/, lc($doc))
+        var @words = split(/\s+/, lc($doc))
         var $found = 0
         for val $w (@words) {
             if ($w eq $term) { $found = 1; last }

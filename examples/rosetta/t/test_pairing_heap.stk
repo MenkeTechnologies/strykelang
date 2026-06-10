@@ -81,7 +81,7 @@ assert_ok !defined Rosetta::Pairing::extract_min($h), "extract empty undef"
 assert_eq $h->{count}, 0, "empty count = 0"
 
 # Heap-sort
-val @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
+var @input = (50, 17, 23, 5, 88, 32, 11, 99, 3, 67, 41, 8, 76, 29, 14)
 val $hb = Rosetta::Pairing::new()
 for val $v (@input) { Rosetta::Pairing::insert($hb, $v) }
 var @sorted_via_heap
