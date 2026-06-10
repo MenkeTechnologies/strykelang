@@ -258,14 +258,12 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    /// Clone a git dep into `~/.stryke/git/` (respecting `branch`/`tag`/`rev`
-    /// per `git_branch_or_rev`), then install the working copy through
-    /// the same `install_dir_dep` path the path-dep arm uses. FFI git deps
-    /// (cloned tree has `[ffi]`) error fast with a pointer at the
-    /// `github = "OWNER/REPO"` field (or `s pkg install -g`) — the cdylib
-    /// needs platform libs at build time and can't be produced from a
-    /// source clone in `s install`. Pure-source git deps (no [ffi]) work
-    /// here as a path-dep would.
+    /// Handle a `{ git = "..." }` dep. `s install` never source-clones —
+    /// it downloads the prebuilt release tarball. github URLs route
+    /// straight to `install_from_github_release`. Non-github git URLs
+    /// have no release-tarball convention defined yet and error fast
+    /// with a pointer at the `{ github = "OWNER/REPO" }` or `{ path = "..." }`
+    /// rewrites.
     fn install_git_dep(
         &self,
         name: &str,
@@ -278,38 +276,30 @@ impl<'a> Resolver<'a> {
             .git()
             .ok_or_else(|| PkgError::Resolve(format!("git dep `{}` missing url", name)))?
             .to_string();
-        let (branch_or_tag, rev_pin) = git_branch_or_rev(spec);
-        let (clone_path, resolved_commit) =
-            self.clone_git_dep(name, &url, branch_or_tag.as_deref(), rev_pin.as_deref())?;
 
-        // Refuse FFI git deps — `s install` can't produce a cdylib from a
-        // source clone (the build needs platform libs + the rust
-        // toolchain). Point the user at the github-release path, which
-        // downloads the prebuilt artifact for the host triple.
-        let manifest_path = clone_path.join("stryke.toml");
-        if manifest_path.is_file() {
-            let m = Manifest::from_path(&manifest_path)?;
-            if m.ffi.is_some() {
-                return Err(PkgError::Resolve(format!(
-                    "git dep `{}` ships a [ffi] cdylib that needs the prebuilt \
-                     release binary. Rewrite this dep as \
-                     `{{ github = \"OWNER/REPO\" }}` so `s install` fetches \
-                     the release tarball for this host triple, or use \
-                     `s pkg install -g <github-url>` for a one-off global install.",
-                    name
-                )));
-            }
-        }
+        let Some((owner, repo)) = parse_github_url(&url) else {
+            return Err(PkgError::Resolve(format!(
+                "git dep `{}` URL `{}` is not a github.com URL — `s install` \
+                 doesn't source-clone, it downloads prebuilt release tarballs. \
+                 Rewrite as `{{ github = \"OWNER/REPO\" }}` for github-hosted \
+                 packages or `{{ path = \"...\" }}` for local checkouts.",
+                name, url
+            )));
+        };
 
-        let source = format!("git+{}#{}", url, resolved_commit);
-        self.install_dir_dep(name, &clone_path, source, graph, installed, visiting)
+        // Pull the release-tarball path. The tag pin (if any) comes from
+        // the spec's `tag` field. `branch` is ignored — releases live at
+        // tags, not branch tips. `rev` is also unused for release fetch.
+        let pinned = match spec {
+            DepSpec::Detailed(d) => d.tag.as_deref(),
+            _ => None,
+        };
+        self.install_from_github_release(name, &owner, &repo, pinned, graph, installed, visiting)
     }
 
     /// `{ github = "OWNER/REPO" [, version = "..."] }` — fetch the
     /// prebuilt release tarball for the host triple. Delegates to the
-    /// shared `install_global_from_github` helper in `pkg::commands`
-    /// which already implements the same download → SHA-256 → extract
-    /// → rename-into-store pipeline used by `s pkg install -g github.com/...`.
+    /// shared `install_global_from_github` helper in `pkg::commands`.
     fn install_github_dep(
         &self,
         name: &str,
@@ -334,14 +324,36 @@ impl<'a> Resolver<'a> {
             )));
         }
         let pinned = spec.pinned_release_version().map(str::to_string);
-
-        let (manifest, dst, source) = super::commands::install_global_from_github(
-            &self.store,
+        self.install_from_github_release(
+            name,
             owner,
             repo,
             pinned.as_deref(),
+            graph,
+            installed,
+            visiting,
         )
-        .map_err(PkgError::Resolve)?;
+    }
+
+    /// Shared release-tarball installer used by both `install_github_dep`
+    /// (explicit `github = "X/Y"` form) and the github-URL branch of
+    /// `install_git_dep` (auto-route from `git = "https://github.com/X/Y"`).
+    /// Calls `install_global_from_github` to download + verify + extract,
+    /// then threads the result through the standard graph/installed/lockfile
+    /// bookkeeping.
+    fn install_from_github_release(
+        &self,
+        name: &str,
+        owner: &str,
+        repo: &str,
+        pinned: Option<&str>,
+        graph: &mut BTreeMap<String, ResolvedDep>,
+        installed: &mut Vec<(String, String, PathBuf)>,
+        visiting: &mut BTreeSet<String>,
+    ) -> PkgResult<()> {
+        let (manifest, dst, source) =
+            super::commands::install_global_from_github(&self.store, owner, repo, pinned)
+                .map_err(PkgError::Resolve)?;
 
         let pkg = manifest
             .package
@@ -382,79 +394,6 @@ impl<'a> Resolver<'a> {
             },
         );
         Ok(())
-    }
-
-    /// `git clone --depth 1` (or full clone for arbitrary `rev`) into
-    /// `~/.stryke/git/<host>-<owner>-<repo>-<pin>/`. Idempotent — repeated
-    /// installs with the same `(url, pin)` reuse the existing checkout.
-    fn clone_git_dep(
-        &self,
-        name: &str,
-        url: &str,
-        branch_or_tag: Option<&str>,
-        rev: Option<&str>,
-    ) -> PkgResult<(PathBuf, String)> {
-        std::fs::create_dir_all(self.store.git_dir())
-            .map_err(|e| PkgError::Io(format!("create git cache dir: {}", e)))?;
-        let dir_name = git_cache_dir_name(url, branch_or_tag, rev);
-        let target = self.store.git_dir().join(&dir_name);
-
-        if !target.is_dir() {
-            use std::process::Command;
-            let mut cmd = Command::new("git");
-            cmd.arg("clone");
-            // Shallow-clone when a branch/tag/none is pinned. Arbitrary `rev`
-            // requires the full history because GitHub's HTTPS smart-protocol
-            // doesn't accept `fetch <sha>` for shallow clones.
-            if rev.is_none() {
-                cmd.args(["--depth", "1"]);
-                if let Some(bt) = branch_or_tag {
-                    cmd.args(["--branch", bt]);
-                }
-            }
-            cmd.arg(url).arg(&target);
-            let status = cmd
-                .status()
-                .map_err(|e| PkgError::Resolve(format!("git clone `{}`: {}", name, e)))?;
-            if !status.success() {
-                return Err(PkgError::Resolve(format!(
-                    "git clone `{}` exited with status {}",
-                    name, status
-                )));
-            }
-            if let Some(rev) = rev {
-                let s = Command::new("git")
-                    .arg("-C")
-                    .arg(&target)
-                    .args(["checkout", rev])
-                    .status()
-                    .map_err(|e| PkgError::Resolve(format!("git checkout `{}`: {}", rev, e)))?;
-                if !s.success() {
-                    return Err(PkgError::Resolve(format!(
-                        "git checkout `{}` exited with status {}",
-                        rev, s
-                    )));
-                }
-            }
-        }
-
-        let resolved = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&target)
-            .args(["rev-parse", "HEAD"])
-            .output()
-            .map_err(|e| PkgError::Resolve(format!("git rev-parse: {}", e)))?;
-        if !resolved.status.success() {
-            return Err(PkgError::Resolve(format!(
-                "git rev-parse HEAD failed for `{}`",
-                target.display()
-            )));
-        }
-        let commit = String::from_utf8(resolved.stdout)
-            .map_err(|e| PkgError::Resolve(format!("non-utf8 rev: {}", e)))?
-            .trim()
-            .to_string();
-        Ok((target, commit))
     }
 
     /// Pull a path-dep manifest, hash the directory, copy into the store, and
@@ -556,73 +495,36 @@ impl<'a> Resolver<'a> {
     }
 }
 
-/// Extract `branch`/`tag`/`rev` from a detailed git dep spec. Returns
-/// `(branch_or_tag, rev)`. `branch_or_tag` carries either field because they
-/// both feed `git clone --branch <X>` semantics; `rev` is treated separately
-/// since it needs a full clone + post-checkout instead of a shallow clone.
-fn git_branch_or_rev(spec: &DepSpec) -> (Option<String>, Option<String>) {
-    match spec {
-        DepSpec::Detailed(d) => {
-            let bt = d.tag.clone().or_else(|| d.branch.clone());
-            (bt, d.rev.clone())
-        }
-        _ => (None, None),
+/// Recognize `https://github.com/OWNER/REPO[.git]` (or the bare
+/// `github.com/OWNER/REPO` form, or with the `git@github.com:OWNER/REPO`
+/// SSH-style form). Returns `Some((owner, repo))` so the caller can
+/// route the dep to the release-tarball path instead of source-clone.
+/// Trailing slashes, embedded sub-paths (`/tree/main`), and missing
+/// owner/repo components fail the match — those are not bare repo URLs.
+pub(crate) fn parse_github_url(url: &str) -> Option<(String, String)> {
+    let body = if let Some(rest) = url.strip_prefix("https://github.com/") {
+        rest
+    } else if let Some(rest) = url.strip_prefix("http://github.com/") {
+        rest
+    } else if let Some(rest) = url.strip_prefix("git@github.com:") {
+        rest
+    } else if let Some(rest) = url.strip_prefix("github.com/") {
+        rest
+    } else {
+        return None;
+    };
+    let body = body.trim_end_matches('/');
+    let mut parts = body.splitn(2, '/');
+    let owner = parts.next()?;
+    let remainder = parts.next()?;
+    if owner.is_empty() || remainder.contains('/') {
+        return None;
     }
-}
-
-/// Stable per-`(url, pin)` directory name for `~/.stryke/git/`. Mirrors the
-/// shape in `PACKAGE_REGISTRY.md` §"Global Store" (`github.com-user-mylib-<hash>`)
-/// — host + owner + repo + a short hash that uniquely identifies the pin so
-/// `{ git = ..., tag = "v1" }` and `{ git = ..., tag = "v2" }` get separate
-/// clones.
-fn git_cache_dir_name(url: &str, branch_or_tag: Option<&str>, rev: Option<&str>) -> String {
-    let (host, owner, repo) = parse_git_url(url);
-    let mut hasher = sha2::Sha256::new();
-    use sha2::Digest as _;
-    hasher.update(url.as_bytes());
-    if let Some(bt) = branch_or_tag {
-        hasher.update(b"\0bt:");
-        hasher.update(bt.as_bytes());
+    let repo = remainder.strip_suffix(".git").unwrap_or(remainder);
+    if repo.is_empty() {
+        return None;
     }
-    if let Some(rev) = rev {
-        hasher.update(b"\0rev:");
-        hasher.update(rev.as_bytes());
-    }
-    let hash = hex::encode(&hasher.finalize()[..6]);
-    format!("{}-{}-{}-{}", host, owner, repo, hash)
-}
-
-/// Best-effort split of a git URL into `(host, owner, repo)` for the cache
-/// directory name. Handles the common `https://github.com/owner/repo[.git]`
-/// and `git@github.com:owner/repo[.git]` forms. Unrecognized URLs degrade to
-/// `("git", "unknown", "<sanitized-url>")` — they still hash-pin uniquely
-/// via the sha digest, the prefix is just a human-readable hint.
-fn parse_git_url(url: &str) -> (String, String, String) {
-    let trimmed = url.trim_end_matches(".git");
-    if let Some(rest) = trimmed
-        .strip_prefix("https://")
-        .or_else(|| trimmed.strip_prefix("http://"))
-        .or_else(|| trimmed.strip_prefix("git://"))
-    {
-        let mut parts = rest.splitn(3, '/');
-        let host = parts.next().unwrap_or("git").to_string();
-        let owner = parts.next().unwrap_or("unknown").to_string();
-        let repo = parts.next().unwrap_or("repo").to_string();
-        return (host, owner, repo);
-    }
-    if let Some(rest) = trimmed.strip_prefix("git@") {
-        if let Some((host, path)) = rest.split_once(':') {
-            let mut p = path.splitn(2, '/');
-            let owner = p.next().unwrap_or("unknown").to_string();
-            let repo = p.next().unwrap_or("repo").to_string();
-            return (host.to_string(), owner, repo);
-        }
-    }
-    (
-        "git".into(),
-        "unknown".into(),
-        trimmed.replace(['/', ':'], "-"),
-    )
+    Some((owner.to_string(), repo.to_string()))
 }
 
 /// Resolve a (possibly relative) dep path against the dep's containing manifest dir.
@@ -685,64 +587,53 @@ mod tests {
     }
 
     #[test]
-    fn parse_git_url_https_github() {
-        let (h, o, r) = parse_git_url("https://github.com/MenkeTechnologies/stryke-gui.git");
-        assert_eq!(h, "github.com");
+    fn parse_github_url_https_form() {
+        let (o, r) = parse_github_url("https://github.com/MenkeTechnologies/stryke-arrow").unwrap();
         assert_eq!(o, "MenkeTechnologies");
-        assert_eq!(r, "stryke-gui");
+        assert_eq!(r, "stryke-arrow");
     }
 
     #[test]
-    fn parse_git_url_ssh_form() {
-        let (h, o, r) = parse_git_url("git@github.com:foo/bar.git");
-        assert_eq!(h, "github.com");
+    fn parse_github_url_strips_dot_git() {
+        let (_, r) = parse_github_url("https://github.com/foo/bar.git").unwrap();
+        assert_eq!(r, "bar");
+    }
+
+    #[test]
+    fn parse_github_url_ssh_form() {
+        let (o, r) = parse_github_url("git@github.com:foo/bar.git").unwrap();
         assert_eq!(o, "foo");
         assert_eq!(r, "bar");
     }
 
     #[test]
-    fn parse_git_url_unknown_scheme_degrades_safely() {
-        let (h, _, _) = parse_git_url("file:///tmp/local.git");
-        // Falls into the unrecognized-bucket — the per-(url,pin) hash still
-        // disambiguates the cache dir, the prefix is just cosmetic.
-        assert_eq!(h, "git");
+    fn parse_github_url_bare_host_form() {
+        let (o, r) = parse_github_url("github.com/MenkeTechnologies/stryke-aws").unwrap();
+        assert_eq!(o, "MenkeTechnologies");
+        assert_eq!(r, "stryke-aws");
     }
 
     #[test]
-    fn git_cache_dir_name_pins_change_with_tag() {
-        let a = git_cache_dir_name("https://github.com/o/r.git", Some("v1.0"), None);
-        let b = git_cache_dir_name("https://github.com/o/r.git", Some("v2.0"), None);
-        assert_ne!(a, b, "different tags must produce different cache dirs");
-        assert!(a.starts_with("github.com-o-r-"));
-        assert!(b.starts_with("github.com-o-r-"));
+    fn parse_github_url_rejects_non_github() {
+        // Non-github URLs error out at install time — we never source-clone.
+        assert!(parse_github_url("https://gitlab.com/foo/bar").is_none());
+        assert!(parse_github_url("git://example.com/foo.git").is_none());
+        assert!(parse_github_url("file:///tmp/local.git").is_none());
     }
 
     #[test]
-    fn git_cache_dir_name_pins_change_with_rev() {
-        let a = git_cache_dir_name("https://github.com/o/r.git", None, Some("abc"));
-        let b = git_cache_dir_name("https://github.com/o/r.git", None, Some("def"));
-        assert_ne!(a, b);
+    fn parse_github_url_rejects_subpath() {
+        // `tree/main`, `releases`, etc. must not silently truncate to the repo.
+        assert!(parse_github_url("https://github.com/foo/bar/tree/main").is_none());
+        assert!(parse_github_url("https://github.com/foo/bar/releases").is_none());
     }
 
     #[test]
-    fn git_cache_dir_name_stable_across_calls() {
-        let a = git_cache_dir_name("https://github.com/o/r.git", Some("v1"), None);
-        let b = git_cache_dir_name("https://github.com/o/r.git", Some("v1"), None);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn git_branch_or_rev_picks_tag_over_branch() {
-        use crate::pkg::manifest::DetailedDep;
-        let spec = DepSpec::Detailed(DetailedDep {
-            git: Some("https://x".into()),
-            tag: Some("v1.0".into()),
-            branch: Some("main".into()),
-            ..DetailedDep::default()
-        });
-        let (bt, rev) = git_branch_or_rev(&spec);
-        assert_eq!(bt.as_deref(), Some("v1.0"));
-        assert!(rev.is_none());
+    fn parse_github_url_rejects_empty() {
+        assert!(parse_github_url("https://github.com/").is_none());
+        assert!(parse_github_url("https://github.com/foo").is_none());
+        assert!(parse_github_url("https://github.com/foo/").is_none());
+        assert!(parse_github_url("https://github.com/foo/.git").is_none());
     }
 
     fn make_path_dep(name: &str, version: &str) -> PathBuf {
