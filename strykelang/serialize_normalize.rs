@@ -52,12 +52,28 @@ pub(crate) fn register_class_def(def: Arc<ClassDef>) {
 /// local registry. Returns an empty vec if the def has parents that
 /// aren't registered (e.g. the serializer ran in an isolated context).
 fn class_field_names(def: &ClassDef) -> Vec<String> {
+    let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+    class_field_names_dedup(def, &mut visited)
+}
+
+fn class_field_names_dedup(
+    def: &ClassDef,
+    visited_classes: &mut std::collections::HashSet<String>,
+) -> Vec<String> {
     let mut names = Vec::new();
+    // Diamond-inheritance dedup: in a class graph like D→B,C; B→A; C→A, walking
+    // `extends` recursively without a visited set emits A's fields twice. The
+    // duplicated name slot then silently mis-pairs with the values vector in
+    // MRO order (which DOES deduplicate parents). Track visited parent class
+    // NAMES so the same parent's fields appear at most once in the result.
     for parent_name in &def.extends {
+        if !visited_classes.insert(parent_name.clone()) {
+            continue;
+        }
         let parent_def_opt =
             CLASS_DEFS_REGISTRY.with(|cell| cell.borrow().get(parent_name).cloned());
         if let Some(parent_def) = parent_def_opt {
-            names.extend(class_field_names(&parent_def));
+            names.extend(class_field_names_dedup(&parent_def, visited_classes));
         }
     }
     for f in &def.fields {
