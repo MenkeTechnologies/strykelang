@@ -152,6 +152,15 @@ pub struct DetailedDep {
     /// `git = "https://..."` — git dependency. Combined with `branch`/`tag`/`rev`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<String>,
+    /// `github = "OWNER/REPO"` — GitHub-release dependency. The resolver
+    /// downloads the prebuilt tarball for the host triple from the
+    /// repo's GitHub Releases (latest tag when `version` is unset),
+    /// SHA-256 verifies it, and extracts into the store. Used for FFI
+    /// cdylib packages (stryke-arrow, stryke-aws, ...) whose binary
+    /// can't be reproduced from a source clone without the platform
+    /// toolchain. Distinct from `git`, which clones the source tree.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub github: Option<String>,
     /// `branch` field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
@@ -279,6 +288,25 @@ impl DepSpec {
         }
     }
 
+    /// `OWNER/REPO`, if this is a `github = "OWNER/REPO"` spec.
+    pub fn github(&self) -> Option<&str> {
+        match self {
+            DepSpec::Detailed(d) => d.github.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// `tag = "v1.0"` or `version = "1.0"` value, used by github + git deps
+    /// to pin a release. github deps prefer `version` (matches the release
+    /// tarball filename's version segment); git deps prefer `tag`.
+    pub fn pinned_release_version(&self) -> Option<&str> {
+        match self {
+            DepSpec::Detailed(d) => d.version.as_deref().or(d.tag.as_deref()),
+            DepSpec::Version(v) => Some(v),
+            _ => None,
+        }
+    }
+
     /// Convenience: build a bare version-string spec.
     pub fn version(s: impl Into<String>) -> DepSpec {
         DepSpec::Version(s.into())
@@ -297,6 +325,7 @@ impl DepSpec {
     pub fn source(&self) -> DepSource {
         match self {
             DepSpec::Detailed(d) if d.path.is_some() => DepSource::Path,
+            DepSpec::Detailed(d) if d.github.is_some() => DepSource::GitHub,
             DepSpec::Detailed(d) if d.git.is_some() => DepSource::Git,
             _ => DepSource::Registry,
         }
@@ -310,8 +339,13 @@ pub enum DepSource {
     Registry,
     /// `Path` variant.
     Path,
-    /// `Git` variant.
+    /// `Git` variant — `git = "https://..."` source clone.
     Git,
+    /// `GitHub` variant — `github = "OWNER/REPO"` prebuilt release tarball
+    /// fetched from `https://github.com/OWNER/REPO/releases/download/...`
+    /// for the host triple. Used for binary distributions like the
+    /// `stryke-*` FFI cdylib packages.
+    GitHub,
 }
 
 #[cfg(test)]

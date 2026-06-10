@@ -206,10 +206,16 @@ pub fn cmd_add(args: &[String]) -> i32 {
         println!();
         println!("SPEC may be one of:");
         println!("  NAME[@VER]                                registry dep");
-        println!("  github.com/OWNER/REPO[@TAG]               github git dep (tracks main without @TAG)");
-        println!("  https://github.com/OWNER/REPO[.git][@TAG] github git dep (full URL form)");
+        println!("  github.com/OWNER/REPO[@TAG]               github-release dep (prebuilt tarball)");
+        println!("  https://github.com/OWNER/REPO[.git][@TAG] github-release dep (full URL form)");
         println!("  ./PATH | ../PATH | /ABS/PATH | ~/PATH     local path dep");
         println!("  EXISTING_DIRECTORY                        local path dep (auto-detected)");
+        println!();
+        println!("`s install` downloads github-release deps as prebuilt tarballs from");
+        println!("the repo's GitHub Releases (host-triple asset, SHA-256 verified). This");
+        println!("is the path FFI cdylib packages (stryke-arrow, stryke-aws, ...) take.");
+        println!("For source-only git deps (no [ffi], no release artifacts), write the");
+        println!("`{{ git = \"...\" }}` form directly in stryke.toml.");
         println!();
         println!("Flags:");
         println!("  --dev            add as a [dev-deps] entry instead of [deps]");
@@ -342,12 +348,19 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
     }
     let raw = positional[0].as_str();
 
-    // github.com/OWNER/REPO[@TAG] shorthand → git dep. Supports bare
-    // (`github.com/X/Y`), full https (`https://github.com/X/Y`), and
-    // `.git`-suffixed forms. Local dep name is the repo basename (last
-    // path component, minus any `.git`). Without `@TAG` the dep tracks
-    // `main`; with `@TAG` it pins to that tag/branch via `tag = ...`.
-    // `--path=` still wins (user explicitly opted into a local copy).
+    // github.com/OWNER/REPO[@TAG] shorthand → github-release dep. Writes
+    // `github = "OWNER/REPO"` (plus `version = "TAG"` if `@TAG` given),
+    // which routes through Resolver::install_github_dep at install time:
+    // the prebuilt release tarball for the host triple gets downloaded,
+    // SHA-256 verified, and extracted into the store. That's the path
+    // FFI cdylib packages (stryke-arrow, stryke-aws, ...) need — they
+    // can't be reproduced from a source clone without platform libs +
+    // toolchain. For source-only git deps (no [ffi], no published
+    // releases) the user writes `{ git = "..." }` directly in
+    // stryke.toml; the `s add github.com/...` shorthand defaults to the
+    // release path because that's what 99% of public GitHub-hosted
+    // stryke packages actually want. `--path=` still wins (user
+    // explicitly opted into a local copy of the source).
     if let Some(gh) = parse_github_shorthand(raw) {
         let spec = if let Some(p) = path_override {
             DepSpec::Detailed(DetailedDep {
@@ -359,13 +372,8 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
             })
         } else {
             DepSpec::Detailed(DetailedDep {
-                git: Some(gh.git_url),
-                branch: if gh.tag.is_some() {
-                    None
-                } else {
-                    Some("main".to_string())
-                },
-                tag: gh.tag,
+                github: Some(gh.owner_repo),
+                version: gh.tag,
                 features,
                 default_features: true,
                 ..DetailedDep::default()
@@ -427,8 +435,14 @@ fn parse_add_args(args: &[String]) -> Result<AddArgs, String> {
 }
 
 struct GithubShorthand {
+    /// Local manifest key — the repo basename (last path component,
+    /// minus any `.git` suffix). E.g. `stryke-parquet`.
     name: String,
-    git_url: String,
+    /// `OWNER/REPO` form that lands in the manifest's
+    /// `github = "..."` field. E.g. `MenkeTechnologies/stryke-parquet`.
+    owner_repo: String,
+    /// Optional `@TAG` portion — pins which release to download. Without
+    /// a tag the resolver fetches the latest release at install time.
     tag: Option<String>,
 }
 
@@ -569,7 +583,7 @@ fn parse_github_shorthand(raw: &str) -> Option<GithubShorthand> {
     }
     Some(GithubShorthand {
         name: repo.to_string(),
-        git_url: format!("https://github.com/{}/{}", owner, repo),
+        owner_repo: format!("{}/{}", owner, repo),
         tag,
     })
 }
@@ -587,6 +601,9 @@ fn format_dep_for_log(spec: &DepSpec) -> String {
             }
             if let Some(g) = &d.git {
                 bits.push(format!("git = \"{}\"", g));
+            }
+            if let Some(gh) = &d.github {
+                bits.push(format!("github = \"{}\"", gh));
             }
             if let Some(b) = &d.branch {
                 bits.push(format!("branch = \"{}\"", b));
@@ -1930,7 +1947,7 @@ fn ensure_ffi_cdylib(
     Ok(Some((release_built, lib_filename)))
 }
 
-fn install_global_from_github(
+pub(crate) fn install_global_from_github(
     store: &Store,
     owner: &str,
     repo: &str,
@@ -3799,10 +3816,7 @@ mod tests {
     fn github_shorthand_bare_form() {
         let gh = parse_github_shorthand("github.com/MenkeTechnologies/stryke-parquet").unwrap();
         assert_eq!(gh.name, "stryke-parquet");
-        assert_eq!(
-            gh.git_url,
-            "https://github.com/MenkeTechnologies/stryke-parquet"
-        );
+        assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-parquet");
         assert!(gh.tag.is_none());
     }
 
@@ -3811,7 +3825,7 @@ mod tests {
         let gh =
             parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws").unwrap();
         assert_eq!(gh.name, "stryke-aws");
-        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+        assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-aws");
         assert!(gh.tag.is_none());
     }
 
@@ -3820,7 +3834,7 @@ mod tests {
         let gh =
             parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws.git").unwrap();
         assert_eq!(gh.name, "stryke-aws");
-        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+        assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-aws");
     }
 
     #[test]
@@ -3828,7 +3842,7 @@ mod tests {
         let gh =
             parse_github_shorthand("github.com/MenkeTechnologies/stryke-aws@v0.2.0").unwrap();
         assert_eq!(gh.name, "stryke-aws");
-        assert_eq!(gh.git_url, "https://github.com/MenkeTechnologies/stryke-aws");
+        assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-aws");
         assert_eq!(gh.tag.as_deref(), Some("v0.2.0"));
     }
 
@@ -3877,38 +3891,47 @@ mod tests {
     // === cmd_add integration ============================================
 
     #[test]
-    fn parse_add_args_github_shorthand_produces_git_dep() {
+    fn parse_add_args_github_shorthand_produces_github_release_dep() {
         let args = vec!["github.com/MenkeTechnologies/stryke-parquet".to_string()];
         let parsed = parse_add_args(&args).expect("parse should succeed");
         assert_eq!(parsed.name, "stryke-parquet");
         match parsed.spec {
             DepSpec::Detailed(d) => {
                 assert_eq!(
-                    d.git.as_deref(),
-                    Some("https://github.com/MenkeTechnologies/stryke-parquet")
+                    d.github.as_deref(),
+                    Some("MenkeTechnologies/stryke-parquet")
                 );
-                assert_eq!(d.branch.as_deref(), Some("main"));
-                assert!(d.tag.is_none());
+                // No `version` → resolver fetches the latest release.
+                assert!(d.version.is_none());
+                // Important: must NOT write a `git` URL. That would route
+                // through install_git_dep (source clone), which is wrong
+                // for FFI packages — they need the release tarball.
+                assert!(d.git.is_none(), "github shorthand must not also set git");
+                assert!(d.branch.is_none());
                 assert!(d.path.is_none());
             }
-            other => panic!("expected DepSpec::Detailed git dep, got {:?}", other),
+            other => panic!("expected DepSpec::Detailed github dep, got {:?}", other),
         }
     }
 
     #[test]
-    fn parse_add_args_github_shorthand_with_tag_pins_tag_not_branch() {
+    fn parse_add_args_github_shorthand_with_tag_pins_version() {
         let args = vec!["github.com/MenkeTechnologies/stryke-aws@v0.2.0".to_string()];
         let parsed = parse_add_args(&args).expect("parse should succeed");
         assert_eq!(parsed.name, "stryke-aws");
         match parsed.spec {
             DepSpec::Detailed(d) => {
-                assert_eq!(d.tag.as_deref(), Some("v0.2.0"));
-                // tag and branch are mutually exclusive — having both
-                // would make `git_branch_or_rev` pick tag silently. Force
-                // branch off when a tag is requested.
-                assert!(d.branch.is_none(), "branch must be None when tag is set");
+                assert_eq!(
+                    d.github.as_deref(),
+                    Some("MenkeTechnologies/stryke-aws")
+                );
+                // `@TAG` lands in the `version` field — that's what
+                // install_global_from_github uses to construct the
+                // release-tarball URL.
+                assert_eq!(d.version.as_deref(), Some("v0.2.0"));
+                assert!(d.git.is_none());
             }
-            other => panic!("expected DepSpec::Detailed git dep, got {:?}", other),
+            other => panic!("expected DepSpec::Detailed github dep, got {:?}", other),
         }
     }
 
