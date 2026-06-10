@@ -972,9 +972,27 @@ impl Scope {
                 .map_err(|msg| StrykeError::type_error(format!("`${}`: {}", name, msg), 0))?;
         }
         if let Some(frame) = self.frames.last_mut() {
-            frame.set_scalar(name, val);
+            // Use `set_scalar_raw` instead of `set_scalar` so an existing slot
+            // that holds a closure-captured `CaptureCell` gets OVERWRITTEN with
+            // a fresh value rather than WRITTEN-THROUGH the cell. Without this,
+            // a `val $msg = "inner"` inside a closure body whose outer frame
+            // declared `val $msg = "outer"` would dispatch through `set_scalar`,
+            // find the captured `$msg` slot, see its CaptureCell, and clobber
+            // the outer's binding via the shared cell — defeating closure
+            // shadow semantics. `my $x` already avoids this because it uses
+            // slot-direct `DeclareScalarSlot` → `declare_scalar_slot` which
+            // assigns into `scalar_slots[idx]` raw.
+            frame.set_scalar_raw(name, val);
             if frozen {
                 frame.frozen_scalars.insert(name.to_string());
+            } else {
+                // Re-declaring as non-frozen unfreezes — matches the array
+                // path's behavior. Without this, a sibling top-level `{...}`
+                // block that re-binds the same name with `var` after a `val`
+                // in another block still sees the frozen flag (top-level
+                // blocks don't push a new frame, so the file frame carries
+                // the flag across blocks).
+                frame.frozen_scalars.remove(name);
             }
             if let Some(t) = ty {
                 frame.typed_scalars.insert(name.to_string(), t);
@@ -2275,6 +2293,9 @@ impl Scope {
             frame.set_hash(name, val);
             if frozen {
                 frame.frozen_hashes.insert(name.to_string());
+            } else {
+                // Re-declaring as non-frozen unfreezes — matches the array path.
+                frame.frozen_hashes.remove(name);
             }
         }
     }

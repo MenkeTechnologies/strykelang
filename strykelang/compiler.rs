@@ -933,23 +933,34 @@ impl Compiler {
 
     fn register_declare(&mut self, sigil: Sigil, name: &str, frozen: bool) {
         let layer = self.scope_stack.last_mut().expect("scope stack");
+        // Re-declaring the same name with a different mutability must REPLACE
+        // the frozen flag, not OR it. Top-level `{...}` blocks that share a
+        // slot-active layer with the file scope previously leaked block A's
+        // `val $x` frozen flag into block B's `var $x` declaration because
+        // the else branch was a no-op.
         match sigil {
             Sigil::Scalar => {
                 layer.declared_scalars.insert(name.to_string());
                 if frozen {
                     layer.frozen_scalars.insert(name.to_string());
+                } else {
+                    layer.frozen_scalars.remove(name);
                 }
             }
             Sigil::Array => {
                 layer.declared_arrays.insert(name.to_string());
                 if frozen {
                     layer.frozen_arrays.insert(name.to_string());
+                } else {
+                    layer.frozen_arrays.remove(name);
                 }
             }
             Sigil::Hash => {
                 layer.declared_hashes.insert(name.to_string());
                 if frozen {
                     layer.frozen_hashes.insert(name.to_string());
+                } else {
+                    layer.frozen_hashes.remove(name);
                 }
             }
             Sigil::Typeglob => {
