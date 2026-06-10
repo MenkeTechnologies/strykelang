@@ -177,18 +177,26 @@ s check                      # type/lint without execution
 s fmt                        # format
 s clean                      # clear local caches
 
-# Dependencies
-s install                    # install per stryke.lock
-s add http                   # add dep, update lock
-s add http@1.0.0             # exact version
-s add http --dev             # dev dep
-s add http --group=bench     # arbitrary group
+# Dependencies — registry, github, and local-path forms all accepted
+s install                                            # install per stryke.lock
+s add http                                           # registry dep, latest
+s add http@1.0.0                                     # exact version
+s add http --dev                                     # dev dep
+s add http --group=bench                             # arbitrary group
+s add github.com/OWNER/REPO                          # github git dep, tracks main
+s add github.com/OWNER/REPO@v1.2.3                   # pin tag (or branch name)
+s add https://github.com/OWNER/REPO.git              # full URL form also accepted
+s add ./mylib                                        # path dep (relative)
+s add ../sibling                                     # path dep (parent-relative)
+s add /work/vendored/mylib                           # path dep (absolute)
+s add ~/projects/mylib                               # path dep (tilde-expanded)
+s add mylib --path=../mylib                          # explicit --path override
 s remove http
-s update                     # all deps within semver
-s update http                # specific
-s tree                       # full transitive graph
-s outdated                   # what could be bumped
-s audit                      # check vuln DB
+s update                                             # all deps within semver
+s update http                                        # specific
+s tree                                               # full transitive graph
+s outdated                                           # what could be bumped
+s audit                                              # check vuln DB
 
 # Run scripts from [scripts]
 s run test
@@ -412,13 +420,30 @@ Path deps load straight from the filesystem, bypassing the store. Edits reflect 
 
 ```toml
 [deps]
-mylib = { git = "https://github.com/user/mylib" }
+mylib = { git = "https://github.com/user/mylib" }                          # tracks HEAD of default branch
 mylib = { git = "https://github.com/user/mylib", branch = "dev" }
 mylib = { git = "https://github.com/user/mylib", tag = "v1.0.0" }
 mylib = { git = "https://github.com/user/mylib", rev = "abc123" }
 ```
 
-Cloned to `~/.stryke/git/` cache, resolved to a specific commit hash recorded in the lock file. Git deps are pinned in the lock just as tightly as registry deps.
+Cloned to `~/.stryke/git/` cache (shallow `--depth 1` when a `branch`/`tag` is pinned, full clone when a `rev` is pinned), resolved to a specific commit hash recorded in `stryke.lock` as `source = "git+<url>#<sha>"`. Git deps are pinned in the lock just as tightly as registry deps.
+
+**`s add` shorthand**: typing the github URL directly writes the canonical inline-table form for you:
+
+```bash
+s add github.com/MenkeTechnologies/stryke-parquet
+# →  stryke-parquet = { git = "https://github.com/MenkeTechnologies/stryke-parquet", branch = "main" }
+
+s add github.com/MenkeTechnologies/stryke-aws@v0.2.0
+# →  stryke-aws     = { git = "https://github.com/MenkeTechnologies/stryke-aws",     tag = "v0.2.0" }
+```
+
+**FFI git deps**: a cloned tree with `[ffi]` (cdylib helper packages like `stryke-arrow` / `stryke-aws` / `stryke-postgres`) installs the source-tree contents into the store on the same `install_dir_dep` path as path deps. The cdylib (`lib/lib<name>.<ext>`) ships in the store entry only when the upstream repo commits a prebuilt binary (or a release tarball was vendored into `lib/`). For from-source clones, you have two options for producing the cdylib:
+
+1. `cargo build --release` inside `~/.stryke/git/<dir>/` — manual but explicit.
+2. `s pkg install -g https://github.com/OWNER/REPO` — fetches the prebuilt binary side-channel published by the release workflow.
+
+`use Foo` at runtime surfaces a clear "search locations" diagnostic via `try_load_ffi_for` (see `pkg/commands.rs`) if the cdylib isn't there yet, so the failure mode is debuggable.
 
 ## Registry Protocol
 
@@ -438,13 +463,13 @@ The registry rule that defines the ecosystem: **published versions are immutable
 
 1. ✅ `stryke.toml` parser (deps, scripts, bin, workspace). **SHIPPED**
 2. ✅ `~/.stryke/store/` and `~/.stryke/cache/` layout. **SHIPPED**
-3. ✅ `s install` for path deps only — proves the resolution loop. **SHIPPED**
-4. ✅ `s add` / `s remove`. **SHIPPED**
+3. ✅ `s install` for path deps — proves the resolution loop. **SHIPPED**
+4. ✅ `s add` / `s remove`. **SHIPPED** — accepts `NAME[@VER]`, `github.com/OWNER/REPO[@TAG]`, `https://github.com/...`, `./PATH` / `../PATH` / `/abs/PATH` / `~/PATH`, or any existing-on-disk directory (auto-detected). `--path=DIR` flag overrides positional auto-detection.
 5. ✅ `stryke.lock` generation with integrity hashes. **SHIPPED**
 6. ✅ Module resolution integration (lock-driven, store paths). **SHIPPED**
 7. ⏳ PubGrub semver resolver — **deferred until registry deployed**.
 8. ⏳ Parallel fetch/verify/extract — **deferred until registry deployed**.
-9. ⏳ Git deps — **deferred** (clear unimplemented error today).
+9. ✅ Git deps — **SHIPPED**. `s install` clones into `~/.stryke/git/` (shallow when `branch`/`tag` pinned, full when `rev` pinned), records `source = "git+<url>#<sha>"` in the lockfile, then installs the source-tree contents through the same `install_dir_dep` path as path deps. `[ffi]` git deps install the source as-is — the cdylib build is a separate step (`cargo build --release` in the clone or the `s pkg install -g <github-url>` binary side-channel).
 10. ⏳ Features — partial: per-package feature flags parse and round-trip; resolver-side activation lands with the registry resolver.
 11. ✅ Workspaces with shared deps inheritance. **SHIPPED** — `[workspace]` + `members = ["crates/*"]` glob + `{ workspace = true }` inheritance + single root lockfile.
 12. ✅ `s install -g` for CLI tools. **SHIPPED** — `s install -g PATH`, `s uninstall -g NAME`, `s list -g`. Launchers go to `~/.stryke/bin/`.
