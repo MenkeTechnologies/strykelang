@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 #
-# Nested `my $x = …` in conditions — the "read a row, parse a field"
+# Nested `var $x = …` in conditions — the "read a row, parse a field"
 # shape that shows up constantly in ETL / log-processing / DB-row code.
 #
 #     while (val $row = $cursor->fetch) {

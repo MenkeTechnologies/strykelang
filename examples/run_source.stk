@@ -23,13 +23,13 @@ spurt($tmp, join("\n",
     'p "  [child] running in a separate process";',
     'p "  [child] args      : ", join(",", @ARGV);',
     'p "  [child] cpid pid  : $$";',
-    'my $secret = "this stays in the child";',
+    'val $secret = "this stays in the child";',
     "",
 ))
 val $rc3 = run($tmp, "arg1", "arg2", "arg3")
 p "  parent exit code  : $rc3"
 # Predeclare `$secret` as a package global so strict-vars accepts the
-# lookup. The point of the test is that the child's `my $secret` (declared
+# lookup. The point of the test is that the child's `var $secret` (declared
 # inside the spawned interpreter) does NOT leak back into the parent —
 # `defined $secret` must return false because nothing in THIS process ever
 # assigns to it. `our` makes the symbol known to strict-vars without
@@ -95,7 +95,7 @@ val $worker = "/tmp/stryke_run_worker.stk"
 val $kvpath = "/tmp/stryke_run_kv.rkyv"
 unlink($kvpath)
 spurt($worker, join("\n",
-    'my $db = kv_open("' . $kvpath . '");',
+    'val $db = kv_open("' . $kvpath . '");',
     'kv_put($db, "from_child", "value-set-in-subprocess");',
     'kv_commit($db);',
     "",

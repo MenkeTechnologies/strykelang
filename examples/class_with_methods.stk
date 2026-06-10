@@ -50,7 +50,7 @@ p ""
 p "── refactoring + linter playground ───────────────────────"
 # Rename `balance` (Cmd+Opt+Shift+R on the field decl) → every
 # `$self->balance` body ref + every `balance => ...` constructor key
-# gets rewritten. AST-walked, no false positives — a `my %h = (balance
+# gets rewritten. AST-walked, no false positives — a `var %h = (balance
 # => 1)` elsewhere in the file does NOT get touched.
 #
 # Linter catches:

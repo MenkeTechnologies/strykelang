@@ -36,10 +36,10 @@ for val $i (0:len(@sorted_workers) - 1) {
     next if $start + $k > len($seq)
     val $shard_seq = substr($seq, $start, $end - $start + 1)
     val $code = "
-        my \$s = q{$shard_seq};
+        var \$s = q{$shard_seq};
         var %kc;
-        my \$lim = len(\$s) - $k;
-        for my \$i (0:\$lim) { \$kc{substr(\$s, \$i, $k)}++ }
+        var \$lim = len(\$s) - $k;
+        for var \$i (0:\$lim) { \$kc{substr(\$s, \$i, $k)}++ }
         to_json(\\%kc)
     "
     val $div = pray $code, $w

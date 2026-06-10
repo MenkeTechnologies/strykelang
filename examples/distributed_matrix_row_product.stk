@@ -50,12 +50,12 @@ for val $i (0:len(@sorted_workers) - 1) {
     }
     val $rows_json = to_json(\@worker_rows)
     val $code = "
-        my \$v = from_json(q{$v_json});
-        my \$rows = from_json(q{$rows_json});
-        my \@results;
-        for my \$row (\@\$rows) {
-            my \$dot = 0;
-            for my \$j (0:len(\@\$v) - 1) {
+        var \$v = from_json(q{$v_json});
+        var \$rows = from_json(q{$rows_json});
+        var \@results;
+        for var \$row (\@\$rows) {
+            var \$dot = 0;
+            for var \$j (0:len(\@\$v) - 1) {
                 \$dot += \$row->[\$j] * \$v->[\$j];
             }
             push \@results, \$dot;

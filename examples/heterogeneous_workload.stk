@@ -19,10 +19,10 @@ printf "spawned %d workers: %s\n", len(@workers), join(",", @sorted_workers)
 
 # Define 4 distinct jobs. Each is (name, code-as-string).
 val @jobs = (
-    ["factorial(10)",       "my \$f = 1; for my \$i (1:10) { \$f *= \$i } \$f"],
-    ["fibonacci(20)",       "my \@f = (0, 1); for my \$i (2:20) { push \@f, \$f[\$i-1] + \$f[\$i-2] } \$f[20]"],
-    ["sum_of_squares(100)", "my \$s = 0; for my \$i (1:100) { \$s += \$i * \$i } \$s"],
-    ["primes_below(50)",    "my \$c = 0; for my \$n (2:49) { my \$ok = 1; for my \$d (2:int(sqrt(\$n))) { if (\$n % \$d == 0) { \$ok = 0; last } } \$c++ if \$ok } \$c"],
+    ["factorial(10)",       "var \$f = 1; for var \$i (1:10) { \$f *= \$i } \$f"],
+    ["fibonacci(20)",       "var \@f = (0, 1); for var \$i (2:20) { push \@f, \$f[\$i-1] + \$f[\$i-2] } \$f[20]"],
+    ["sum_of_squares(100)", "var \$s = 0; for var \$i (1:100) { \$s += \$i * \$i } \$s"],
+    ["primes_below(50)",    "var \$c = 0; for var \$n (2:49) { var \$ok = 1; for var \$d (2:int(sqrt(\$n))) { if (\$n % \$d == 0) { \$ok = 0; last } } \$c++ if \$ok } \$c"],
 )
 
 # Scatter one job per worker (unary pray, one worker handle each).

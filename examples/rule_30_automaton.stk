@@ -12,7 +12,7 @@
 #   * named-package functions (`Rule::`) — no `package main`
 #     redefinition collisions under `--no-interop`
 #   * bitwise `<<`/`>>`/`&` for neighborhood encoding
-#   * fresh `my @next` array per generation; reassigned with `@row = @next`
+#   * fresh `var @next` array per generation; reassigned with `@row = @next`
 #   * `die unless` pins (boundary stability, symmetric rules)
 #
 # Run: stryke --no-interop examples/rule_30_automaton.stk

@@ -17,9 +17,9 @@ printf "spawned %d workers\n", len(@workers)
 val $code = "
 var %hist;
 srand(\$\$ + time);
-for my \$i (1:1000) {
-    my \$v = int(rand() * 100);
-    my \$bucket = \$v % 10;
+for var \$i (1:1000) {
+    var \$v = int(rand() * 100);
+    var \$bucket = \$v % 10;
     \$hist{\$bucket}++
 }
 to_json(\\%hist)

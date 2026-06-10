@@ -21,8 +21,8 @@ printf "spawned %d workers\n", len(@workers)
 # encoded per-event-type counts directly.
 val $simulate = "
 var %counts;
-my \@events = ('http_200', 'http_200', 'http_200', 'http_404', 'http_500', 'http_200');
-for my \$e (\@events) { \$counts{\$e}++ }
+var \@events = ('http_200', 'http_200', 'http_200', 'http_404', 'http_500', 'http_200');
+for var \$e (\@events) { \$counts{\$e}++ }
 to_json(\\%counts)
 "
 val %replies = harvest $simulate, @workers, 5_000

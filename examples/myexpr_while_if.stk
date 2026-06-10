@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 #
-# `my $x = …` in EXPRESSION position — the canonical patterns:
+# `var $x = …` in EXPRESSION position — the canonical patterns:
 #
 #   while (var $line = readline(STDIN)) { … }   # consume until EOF
 #   if    (var $row  = fetch_or_undef()) { … }  # branch on defined result
@@ -15,7 +15,7 @@
 # `defined` wrapper is unnecessary in stryke because the loop condition
 # already short-circuits on undef from `readline`.
 
-p "── while (my \$line = …) ───────────────────────────────"
+p "── while (var \$line = …) ───────────────────────────────"
 
 # A small in-memory job queue to demonstrate consumption.
 var @queue = ("alpha", "beta", "gamma", "delta")
@@ -25,7 +25,7 @@ while (val $job = shift @queue) {
 p "  drained — queue is now empty"
 
 p ""
-p "── if (my \$row = fetch()) ─────────────────────────────"
+p "── if (var \$row = fetch()) ─────────────────────────────"
 
 # A "lookup or default" pattern — the conditional declaration keeps the
 # scope tight and avoids polluting the outer block with the temporary.
@@ -39,7 +39,7 @@ for val $name (sort qw(alice bob carol)) {
 }
 
 p ""
-p "── until (my \$attempt = …) ────────────────────────────"
+p "── until (var \$attempt = …) ────────────────────────────"
 
 # Retry-with-bounded-attempts: the loop variable is scoped to the body
 # so the counter never leaks back to the caller.
@@ -52,7 +52,7 @@ p "  bailed after $tries attempts (counter intentionally NOT visible as \$hit he
 p ""
 p "── Single scalar only in expression position ──────────"
 
-# Today the compiler accepts `my $x = …` in expression position but rejects
+# Today the compiler accepts `var $x = …` in expression position but rejects
 # multi-decl or non-scalar forms (compiler.rs:8367 — `Unsupported: my/our/
 # state/local in expression context with multiple or non-scalar decls`).
 # So `if (val @rows = …)` parses but won't compile yet. The scalar form is

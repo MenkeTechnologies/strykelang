@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 # Demo: `_<` — reach the topic (`_`) of the enclosing closure without a
-# `my $outer = _` capture line. Chain `<`s for deeper levels:
+# `var $outer = _` capture line. Chain `<`s for deeper levels:
 #
 #     _      — current closure's topic
 #     _<     — one level out

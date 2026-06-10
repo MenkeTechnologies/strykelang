@@ -7,7 +7,7 @@
 #
 # Stryke choices:
 #   * `fn`, `p`, `printf`, `len`
-#   * Two rolling arrays via `my @prev` / `my @curr`; iterate row by
+#   * Two rolling arrays via `var @prev` / `var @curr`; iterate row by
 #     row swapping references each step
 #   * `min` 3-argument call (Stryke's variadic min)
 #   * `split //` for char access

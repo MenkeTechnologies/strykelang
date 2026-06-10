@@ -42,10 +42,10 @@ for var $i (0:len(@sorted_workers) - 1) {
     for val $r ($start:$end) { push @shard, $corpus[$r] }
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
+        var \$arr = from_json(q{$shard_json});
         var %matches;
-        for my \$local_idx (0:len(\@\$arr) - 1) {
-            my \$line = \$arr->[\$local_idx];
+        for var \$local_idx (0:len(\@\$arr) - 1) {
+            var \$line = \$arr->[\$local_idx];
             if (\$line =~ /$pattern/) {
                 \$matches{$start + \$local_idx} = \$line;
             }

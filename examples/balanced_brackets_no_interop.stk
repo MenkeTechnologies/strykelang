@@ -5,7 +5,7 @@
 #
 # Stryke choices:
 #   * `fn`, `p`, `printf`, `len`
-#   * Stack via `push`/`pop` on a `my @stack`
+#   * Stack via `push`/`pop` on a `var @stack`
 #   * Hash table `%pair` mapping closer → opener for O(1) lookup
 #   * `split //` for char iteration; topic `_` inside grep
 #   * `die`-on-regression invariants at the end (CI catchers)

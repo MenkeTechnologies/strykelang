@@ -31,7 +31,7 @@ printf "bestowed %d cache keys to all workers\n", len(keys %seed_keys)
 val %caches = harvest "
 our %gift;
 var %built;
-for my \$k (keys %gift) {
+for var \$k (keys %gift) {
     \$built{\$k} = len(\$k) * 100;
 }
 to_json(\\%built)

@@ -15,7 +15,7 @@ val @stage1 = congregation(2)
 printf "stage 1: spawned %d primary workers\n", len(@stage1)
 
 # Initial job: sum 1..50000 on each worker (CPU-bound).
-val $job_code = "my \$s = 0; for my \$i (1:50_000) { \$s += \$i } \$s"
+val $job_code = "var \$s = 0; for var \$i (1:50_000) { \$s += \$i } \$s"
 val %r1 = harvest $job_code, @stage1, 30_000
 printf "stage 1 result: %d workers returned %d each\n",
     len(keys %r1),

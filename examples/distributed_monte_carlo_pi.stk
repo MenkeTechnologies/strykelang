@@ -24,12 +24,12 @@ val @workers = congregation($n_workers)
 # Worker seeds with its own session_id + time so workers don't all
 # generate the same sequence (would defeat the parallelism).
 val $code = "
-my \$N = $samples_per_worker;
+var \$N = $samples_per_worker;
 srand(\$\$ + time);
-my \$hits = 0;
-for my \$i (1:\$N) {
-    my \$x = rand();
-    my \$y = rand();
+var \$hits = 0;
+for var \$i (1:\$N) {
+    var \$x = rand();
+    var \$y = rand();
     \$hits++ if (\$x * \$x + \$y * \$y) <= 1
 }
 \$hits

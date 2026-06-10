@@ -44,12 +44,12 @@ for val $i (0:len(@sorted_workers) - 1) {
     for val $r ($start:$end) { push @shard, $docs[$r] }
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
+        var \$arr = from_json(q{$shard_json});
         var %index;
-        for my \$local_idx (0:len(\@\$arr) - 1) {
-            my \$global_id = $start + \$local_idx;
-            my \$doc = \$arr->[\$local_idx];
-            for my \$term (split /\\s+/, \$doc) {
+        for var \$local_idx (0:len(\@\$arr) - 1) {
+            var \$global_id = $start + \$local_idx;
+            var \$doc = \$arr->[\$local_idx];
+            for var \$term (split /\\s+/, \$doc) {
                 if (exists \$index{\$term}) {
                     push \@{\$index{\$term}}, \$global_id;
                 } else {

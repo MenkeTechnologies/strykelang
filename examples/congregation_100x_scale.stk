@@ -31,7 +31,7 @@ printf "spawned %d / %d workers (fork + connect + register)\n", len(@workers), $
 
 # Scatter a non-trivial compute (sum 1..1000) so the per-worker work
 # is observable, not infinitesimal.
-val %results = harvest "my \$s = 0; for my \$i (1:1000) { \$s += \$i } \$s", @workers, 30_000
+val %results = harvest "var \$s = 0; for var \$i (1:1000) { \$s += \$i } \$s", @workers, 30_000
 printf "harvested %d / %d replies\n", len(keys %results), len(@workers)
 
 # Verify every worker got the same answer (= 500500).

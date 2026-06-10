@@ -49,12 +49,12 @@ for val $i (0:len(@sorted_workers) - 1) {
     for val $r ($start:$end) { push @shard, $records[$r] }
     val $shard_json = to_json(\@shard)
     val $code = "
-        my \$arr = from_json(q{$shard_json});
+        var \$arr = from_json(q{$shard_json});
         var %stats;  # status_str → [count, sum]
-        for my \$rec (\@\$arr) {
-            my \$obj = from_json(\$rec);
-            my \$st = '' . \$obj->{status};
-            my \$lat = \$obj->{latency_ms};
+        for var \$rec (\@\$arr) {
+            var \$obj = from_json(\$rec);
+            var \$st = '' . \$obj->{status};
+            var \$lat = \$obj->{latency_ms};
             if (exists \$stats{\$st}) {
                 \$stats{\$st}[0]++;
                 \$stats{\$st}[1] += \$lat;

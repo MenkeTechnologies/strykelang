@@ -25,9 +25,9 @@ var $reading = 72
 # Each worker has its own thresholds (encoded via session_id parity
 # below). The vote is the worker's classification.
 val $code = "
-my \$reading = $reading;
-my \$cold_thr = 60 + (\$\$ % 5);
-my \$hot_thr  = 80 + (\$\$ % 5);
+var \$reading = $reading;
+var \$cold_thr = 60 + (\$\$ % 5);
+var \$hot_thr  = 80 + (\$\$ % 5);
 if    (\$reading < \$cold_thr) { 'cold' }
 elsif (\$reading > \$hot_thr)  { 'hot'  }
 else                           { 'warm' }
