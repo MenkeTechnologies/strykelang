@@ -224,7 +224,7 @@ When stryke encounters `use Foo::Bar`:
 1. `lib/Foo/Bar.stk` — project source. Live edits always win.
 2. **Use-site pin** `use Foo::Bar 1.2` — load `~/.stryke/store/foo@1.2/lib/Bar.stk` directly. Skips lockfile and store-scan. Pin missing → hard error.
 3. **Inside project**: `stryke.lock` entry → `~/.stryke/store/foo@{locked_version}/lib/Bar.stk`. Lockfile pin missing in store → hard error.
-4. **Outside project**: scan `~/.stryke/store/foo@*/` (including `stryke-foo@*/` and namespace-bridged canonical names) and pick the HIGHEST version by numeric semver tuple (`2.0 > 1.99`, `0.10.0 > 0.3.0`).
+4. **Outside project**: scan `~/.stryke/store/foo@*/` (including `stryke-foo@*/` and namespace-bridged canonical names) and pick the HIGHEST version by numeric semver tuple (`2.0 > 1.99`, `0.10.0 > 0.3.0`). Release beats pre-release (`1.0.0 > 1.0.0-rc1`). Within pre-releases: alpha-head lexicographic (`alpha < beta < rc`), then trailing number (`rc10 > rc2`). Build metadata (`+sha…`) is stripped before ranking (semver §10).
 5. `@INC` paths — system/site libs.
 
 The resolver maps package names to store paths automatically.
