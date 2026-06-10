@@ -8,7 +8,8 @@ ai_mock_install('(?si).*Stryke.*', 'Stryke: terse, fast, built-in AI.')
 
 # 2. Parallel Hash Pipeline
 p "--- Hashing ---"
-val %h = ~> glob("examples/*.stk") \
+val $examples_dir = dirname(__FILE__)
+val %h = ~> glob("$examples_dir/*.stk") \
     head(5) \
     pmaps { [ _ => c"#{_}" |> sha256 ] } \
     flat_maps { @{_} } \

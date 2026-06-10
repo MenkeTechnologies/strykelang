@@ -418,7 +418,7 @@ fn Project::BuiltinsCore::lcfirst_lower { lcfirst("hello") }
 fn Project::BuiltinsCore::reverse_string { rev("hello") }
 fn Project::BuiltinsCore::reverse_empty { rev("") }
 fn Project::BuiltinsCore::reverse_single { rev("x") }
-fn Project::BuiltinsCore::reverse_palindrome { len(rev("radar")) }
+fn Project::BuiltinsCore::reverse_palindrome { rev("radar") }
 
 fn Project::BuiltinsCore::reverse_array_count {
     val @xa = (1, 2, 3, 4, 5)

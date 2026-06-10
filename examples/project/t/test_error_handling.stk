@@ -1,5 +1,6 @@
 # t/test_error_handling.stk — error handling, try/catch, const tests
 
+chdir dirname(dirname(__FILE__))
 require "./lib/error_handling.stk"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -14,13 +15,13 @@ assert_eq Project::ErrorHandling::get_timeout(), 30, "const timeout"
 assert_eq Project::ErrorHandling::get_app_name(), "StrykeDemo", "const app name"
 assert_eq Project::ErrorHandling::get_version(), "1.0.0", "const version"
 
-val $area = Project::ErrorHandling::circle_area(2)
+var $area = Project::ErrorHandling::circle_area(2)
 assert_eq int($area * 100) / 100, 12.56, "circle area"
 
-val $circ = Project::ErrorHandling::circle_circumference(1)
+var $circ = Project::ErrorHandling::circle_circumference(1)
 assert_eq int($circ * 100) / 100, 6.28, "circle circumference"
 
-val $growth = Project::ErrorHandling::exponential_growth(100, 0.1, 1)
+var $growth = Project::ErrorHandling::exponential_growth(100, 0.1, 1)
 assert_eq int($growth), 110, "exponential growth"
 
 # ══════════════════════════════════════════════════════════════════════════════
