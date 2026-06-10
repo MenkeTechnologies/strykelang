@@ -346,8 +346,11 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
         StmtKind::Package { name } => {
             let _ = write!(buf, "package {};", name);
         }
-        StmtKind::Use { module, imports } => {
+        StmtKind::Use { module, imports, version } => {
             let _ = write!(buf, "use {}", module);
+            if let Some(v) = version {
+                let _ = write!(buf, " {}", v);
+            }
             if !imports.is_empty() {
                 buf.push_str(" qw(");
                 for (i, imp) in imports.iter().enumerate() {

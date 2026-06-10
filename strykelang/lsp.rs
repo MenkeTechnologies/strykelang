@@ -10289,6 +10289,18 @@ fn completions(
     // builtins. `use<TAB>` and `use Gui<TAB>` both land here.
     let is_use_line_context = line_completion_is_use_context(line_text, byte_col);
 
+    // Detect `^\s*use\s+\w+\s+<digits/.>?$` — `use GUI <TAB>` /
+    // `use GUI 0<TAB>` — version slot follows the package. Return
+    // installed-version strings from `~/.stryke/store/<canonical>@<ver>/`
+    // directly, bypassing the bare-completion path.
+    if let Some((pkg_namespace, partial)) =
+        line_completion_use_version_context(line_text, byte_col)
+    {
+        let mut items = installed_version_completions(&pkg_namespace, &partial);
+        items.sort_by(|a, b| a.label.cmp(&b.label));
+        return Some(CompletionResponse::Array(items));
+    }
+
     let mut items: Vec<CompletionItem> = match &mode {
         LineCompletionMode::Scalar(f) => sigil_completions(f, '$', &idx.scalars, "scalar", pos),
         LineCompletionMode::Array(f) => sigil_completions(f, '@', &idx.arrays, "array", pos),
@@ -10355,6 +10367,123 @@ pub(crate) fn line_completion_is_use_context(line_text: &str, byte_col: usize) -
         }
     }
     false
+}
+
+/// Detect `^\s*(use|require|import)\s+<Package>\s+<digits-and-dots>?$`.
+/// Returns `(package_namespace, version_partial)` when the cursor sits in
+/// the version slot — `use GUI <TAB>` / `use GUI 0<TAB>` /
+/// `use Foo::Bar 1.2<TAB>`. `package_namespace` is whatever bareword the
+/// user typed after the keyword (`GUI`, `Foo::Bar`); the version
+/// completer maps it to a store entry.
+pub(crate) fn line_completion_use_version_context(
+    line_text: &str,
+    byte_col: usize,
+) -> Option<(String, String)> {
+    let prefix = &line_text[..byte_col.min(line_text.len())];
+    let trimmed = prefix.trim_start();
+    let after_kw = ["use ", "import ", "require "]
+        .iter()
+        .find_map(|kw| trimmed.strip_prefix(kw))?;
+    // First token must be a package name (bareword with optional `::`),
+    // followed by at least one space, then the (possibly-empty) partial
+    // version. Manually-split on the first run of whitespace so we don't
+    // misinterpret `use FooBar<TAB>` (single token, no version slot).
+    let split_at = after_kw.find(|c: char| c.is_whitespace())?;
+    let package = &after_kw[..split_at];
+    if package.is_empty() {
+        return None;
+    }
+    if !package
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
+    {
+        return None;
+    }
+    let rest = after_kw[split_at..].trim_start();
+    if !rest
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == '.' || c == '_')
+    {
+        return None;
+    }
+    Some((package.to_string(), rest.to_string()))
+}
+
+/// Return CompletionItems for every `~/.stryke/store/<canonical>@<ver>/`
+/// directory whose package matches `namespace` (canonical name match OR
+/// `[ffi].namespace` match) and whose version starts with `partial`. The
+/// version-completion path that lights up after `use GUI <TAB>` —
+/// matches the resolver's lookup logic so the offered versions are
+/// guaranteed to satisfy `use NAMESPACE VERSION`.
+pub(crate) fn installed_version_completions(
+    namespace: &str,
+    partial: &str,
+) -> Vec<CompletionItem> {
+    let mut out = Vec::new();
+    let store = match crate::pkg::store::Store::user_default() {
+        Ok(s) => s,
+        Err(_) => return out,
+    };
+    let store_dir = store.store_dir();
+    let Ok(entries) = std::fs::read_dir(&store_dir) else {
+        return out;
+    };
+    // First pass: identify the canonical store-name for this namespace.
+    // The resolver maps `use GUI` → installed.toml namespace match →
+    // `stryke-gui`. Mirror that lookup so the version list is scoped to
+    // ONE package, not every store entry.
+    let ns_lc = namespace.to_lowercase();
+    let canonical_names = canonical_store_names_for_namespace(&store, &ns_lc);
+    for ent in entries.flatten() {
+        let name = ent.file_name().to_string_lossy().into_owned();
+        let Some((pkg, ver)) = name.rsplit_once('@') else {
+            continue;
+        };
+        if !canonical_names.iter().any(|n| n == pkg) {
+            continue;
+        }
+        if !partial.is_empty() && !ver.starts_with(partial) {
+            continue;
+        }
+        out.push(CompletionItem {
+            label: ver.to_string(),
+            kind: Some(CompletionItemKind::VALUE),
+            detail: Some(format!("installed: {}@{}", pkg, ver)),
+            insert_text: Some(ver.to_string()),
+            documentation: None,
+            ..Default::default()
+        });
+    }
+    out
+}
+
+/// Look up every store package name that `namespace` (lower-cased) maps
+/// to. Tries three arms in parallel: bare lowercase match, namespace
+/// match via installed.toml, `stryke-<name>` prefix. Returns all hits
+/// so a namespace like `GUI` resolves to both `gui` (legacy) and
+/// `stryke-gui` (canonical) when both store dirs exist.
+fn canonical_store_names_for_namespace(
+    store: &crate::pkg::store::Store,
+    namespace_lc: &str,
+) -> Vec<String> {
+    let mut names = Vec::new();
+    names.push(namespace_lc.to_string());
+    names.push(format!("stryke-{}", namespace_lc));
+    if let Ok(idx) = crate::pkg::store::InstalledIndex::load_from(store) {
+        for pkg in &idx.packages {
+            let name_lc = pkg.name.to_lowercase();
+            let pkg_ns_lc = pkg.namespace.to_lowercase();
+            if name_lc == namespace_lc
+                || pkg_ns_lc == namespace_lc
+                || name_lc == format!("stryke-{}", namespace_lc)
+            {
+                names.push(pkg.name.clone());
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    names
 }
 
 /// Return CompletionItems for every package in `~/.stryke/installed.toml`
@@ -11485,7 +11614,7 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         }
         // `use constant NAME => value` / `use constant { A => 1, ... }`
         // — every key becomes a callable that returns the value.
-        StmtKind::Use { module, imports } if module == "constant" => {
+        StmtKind::Use { module, imports, .. } if module == "constant" => {
             collect_constant_imports(imports, idx);
         }
         StmtKind::Foreach {
