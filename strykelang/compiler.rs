@@ -1794,20 +1794,36 @@ impl Compiler {
     fn emit_declare_scalar(&mut self, name_idx: u16, line: usize, frozen: bool) {
         let name = self.chunk.names[name_idx as usize].clone();
         self.register_declare(Sigil::Scalar, &name, frozen);
-        // Allocate a slot for both var and val. Pre-fix, frozen decls used
-        // the name-based `DeclareScalarFrozen` op, which shared one runtime
-        // binding across sibling blocks — two `for {…}` loops in the same
+        // Slot-allocate for both var and val, but only INSIDE a function /
+        // nested block. Pre-fix, frozen decls used the name-based
+        // `DeclareScalarFrozen` op, which shared one runtime binding
+        // across sibling blocks — two `for {…}` loops in the same
         // function each containing `val $e = …` both bound the same `$e`,
-        // so the second loop read the first's last-iteration value instead
-        // of its own initializer. Frozen-ness is enforced at compile time
-        // via `scope_stack`'s `frozen_scalars` set, so emitting
-        // `DeclareScalarSlot` (the mutable-slot op) is safe — the compiler
-        // rejects reassignment via the same scope-tracking that catches
-        // `$e = …` after `val $e = …`.
-        if let Some(slot) = self.assign_scalar_slot(&name) {
-            self.chunk.emit(Op::DeclareScalarSlot(slot, name_idx), line);
-        } else if frozen {
+        // so the second loop read the first's last-iteration value
+        // instead of its own initializer. Frozen-ness is enforced at
+        // compile time via `scope_stack`'s `frozen_scalars` set, so
+        // emitting `DeclareScalarSlot` (the mutable-slot op) is safe —
+        // the compiler rejects reassignment via the same scope-tracking
+        // that catches `$e = …` after `val $e = …`.
+        //
+        // At TOP-LEVEL script scope (scope_stack.len() == 1), `val $K`
+        // must stay name-based (`DeclareScalarFrozen`). Top-level decls
+        // are referenced by `fn` bodies that close over them; the closure
+        // capture is by name, and after a `require` brings in such a fn,
+        // the main script's subsequent `val $r = …` slot allocations
+        // would otherwise re-use the lib's slot indices, clobbering `$K`
+        // and making the lib's fn return 0 the second time it's called.
+        let in_nested_scope = self.scope_stack.len() > 1;
+        if in_nested_scope {
+            if let Some(slot) = self.assign_scalar_slot(&name) {
+                self.chunk.emit(Op::DeclareScalarSlot(slot, name_idx), line);
+                return;
+            }
+        }
+        if frozen {
             self.chunk.emit(Op::DeclareScalarFrozen(name_idx), line);
+        } else if let Some(slot) = self.assign_scalar_slot(&name) {
+            self.chunk.emit(Op::DeclareScalarSlot(slot, name_idx), line);
         } else {
             self.chunk.emit(Op::DeclareScalar(name_idx), line);
         }

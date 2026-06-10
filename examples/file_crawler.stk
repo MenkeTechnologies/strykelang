@@ -4,12 +4,20 @@
 # High-performance parallel file system operations
 
 print cyber_banner("FILE CRAWLER")
-p "\nSearching for .stk files in the current directory..."
+
+# Crawl scope: the examples/ directory this file lives in. Pre-fix this
+# was `par_walk "."` which crawls the user's CWD recursively. From a
+# large project root (meta-repo with submodules + .git/ + target/ +
+# node_modules/) that's millions of files — the demo pegged a CPU core
+# for minutes and timed out the sweep. Anchoring to dirname(__FILE__)
+# bounds the demo to its own ~3k example files and runs in seconds.
+val $crawl_root = dirname(__FILE__)
+p "\nSearching for .stk files under $crawl_root ..."
 
 # mysync declares variables shared across parallel blocks with atomic updates
 mysync @stk_files
 
-par_walk ".", {
+par_walk $crawl_root, {
     if (_ =~ /\.stk$/) {
         push @stk_files, _
     }
@@ -17,9 +25,16 @@ par_walk ".", {
 
 p "Found ", len(@stk_files), " Stryke scripts."
 
-p "\nCounting total lines across all scripts in parallel..."
+# Demo: sample the first 50 files for line-counting + pattern search.
+# Walking ALL ~3k example .stk files would take ~minutes due to
+# per-file `par_lines` spawn overhead — for a demo, 50 files is
+# enough to show the API. Drop the cap if you want a full count.
+val $sample_n = 50
+var @sample = @stk_files[0:$sample_n - 1]
+
+p "\nCounting total lines across first ", len(@sample), " scripts in parallel..."
 mysync $total_lines = 0
-for val $file (@stk_files) {
+for val $file (@sample) {
     # par_lines uses mmap for fast line scanning
     mysync $file_lines = 0
     par_lines $file, { $file_lines++ }
@@ -27,11 +42,11 @@ for val $file (@stk_files) {
     p "  $file: $file_lines lines"
 }
 
-p "\nTOTAL CODE LINES: $total_lines"
+p "\nTOTAL CODE LINES (in sample): $total_lines"
 
-p "\nSearching for 'cyber_banner' usage in parallel..."
+p "\nSearching for 'cyber_banner' usage in first ", len(@sample), " files..."
 mysync @matches
-for val $file (@stk_files) {
+for val $file (@sample) {
     par_lines $file, {
         if (_ =~ /cyber_banner/) {
             push @matches, "$file: $_"
