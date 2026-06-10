@@ -416,11 +416,48 @@ mylib = { path = "../mylib" }
 
 Path deps load straight from the filesystem, bypassing the store. Edits reflect immediately on the next `s run`.
 
-## Git Dependencies
+## GitHub-Release Dependencies (prebuilt binary tarballs)
 
 ```toml
 [deps]
-mylib = { git = "https://github.com/user/mylib" }                          # tracks HEAD of default branch
+stryke-parquet = { github = "MenkeTechnologies/stryke-parquet" }              # latest release
+stryke-arrow   = { github = "MenkeTechnologies/stryke-arrow", version = "0.2.0" }
+```
+
+`s install` downloads the prebuilt release tarball for the host triple, SHA-256 verifies it against the `.sha256` sidecar, and extracts into `~/.stryke/store/<name>@<version>/`. URL shape:
+
+```
+https://github.com/OWNER/REPO/releases/download/<TAG>/<repo-lowercase>-<TAG>-<triple>.tar.gz
+https://github.com/OWNER/REPO/releases/download/<TAG>/<repo-lowercase>-<TAG>-<triple>.tar.gz.sha256
+```
+
+Host triple is auto-detected (`aarch64-apple-darwin` / `x86_64-apple-darwin` / `x86_64-unknown-linux-gnu` / `x86_64-pc-windows-msvc`) — override with `STRYKE_TARGET=…` for cross/musl/exotic. Without `version`, the resolver hits `https://api.github.com/repos/OWNER/REPO/releases/latest` and uses that `tag_name`.
+
+This is the path **FFI cdylib packages** take — the binary in `lib/lib<name>.<ext>` needs platform libs at build time (libpq, librdkafka, libduckdb, …) and the rust toolchain to produce, so the published release artifact is the canonical distribution. Lockfile pin:
+
+```toml
+[[package]]
+name = "stryke-parquet"
+version = "0.2.0"
+source = "github:MenkeTechnologies/stryke-parquet@v0.2.0"
+integrity = "sha256-…"
+```
+
+**`s add` shorthand**: typing the github URL directly writes the `github` field for you:
+
+```bash
+s add github.com/MenkeTechnologies/stryke-parquet
+# →  stryke-parquet = { github = "MenkeTechnologies/stryke-parquet" }
+
+s add github.com/MenkeTechnologies/stryke-aws@v0.2.0
+# →  stryke-aws     = { github = "MenkeTechnologies/stryke-aws", version = "v0.2.0" }
+```
+
+## Git Dependencies (source clone, no [ffi])
+
+```toml
+[deps]
+mylib = { git = "https://gitlab.com/user/mylib" }                           # tracks HEAD of default branch
 mylib = { git = "https://github.com/user/mylib", branch = "dev" }
 mylib = { git = "https://github.com/user/mylib", tag = "v1.0.0" }
 mylib = { git = "https://github.com/user/mylib", rev = "abc123" }
@@ -428,22 +465,7 @@ mylib = { git = "https://github.com/user/mylib", rev = "abc123" }
 
 Cloned to `~/.stryke/git/` cache (shallow `--depth 1` when a `branch`/`tag` is pinned, full clone when a `rev` is pinned), resolved to a specific commit hash recorded in `stryke.lock` as `source = "git+<url>#<sha>"`. Git deps are pinned in the lock just as tightly as registry deps.
 
-**`s add` shorthand**: typing the github URL directly writes the canonical inline-table form for you:
-
-```bash
-s add github.com/MenkeTechnologies/stryke-parquet
-# →  stryke-parquet = { git = "https://github.com/MenkeTechnologies/stryke-parquet", branch = "main" }
-
-s add github.com/MenkeTechnologies/stryke-aws@v0.2.0
-# →  stryke-aws     = { git = "https://github.com/MenkeTechnologies/stryke-aws",     tag = "v0.2.0" }
-```
-
-**FFI git deps**: a cloned tree with `[ffi]` (cdylib helper packages like `stryke-arrow` / `stryke-aws` / `stryke-postgres`) installs the source-tree contents into the store on the same `install_dir_dep` path as path deps. The cdylib (`lib/lib<name>.<ext>`) ships in the store entry only when the upstream repo commits a prebuilt binary (or a release tarball was vendored into `lib/`). For from-source clones, you have two options for producing the cdylib:
-
-1. `cargo build --release` inside `~/.stryke/git/<dir>/` — manual but explicit.
-2. `s pkg install -g https://github.com/OWNER/REPO` — fetches the prebuilt binary side-channel published by the release workflow.
-
-`use Foo` at runtime surfaces a clear "search locations" diagnostic via `try_load_ffi_for` (see `pkg/commands.rs`) if the cdylib isn't there yet, so the failure mode is debuggable.
+A git dep whose clone declares `[ffi]` errors fast — the cdylib can't be reproduced from a source clone (`s install` won't run `cargo build --release` in the clone). The diagnostic points the user at the `{ github = "OWNER/REPO" }` rewrite for FFI packages hosted on github, or at `s pkg install -g <github-url>` for a one-off global install.
 
 ## Registry Protocol
 
@@ -469,7 +491,9 @@ The registry rule that defines the ecosystem: **published versions are immutable
 6. ✅ Module resolution integration (lock-driven, store paths). **SHIPPED**
 7. ⏳ PubGrub semver resolver — **deferred until registry deployed**.
 8. ⏳ Parallel fetch/verify/extract — **deferred until registry deployed**.
-9. ✅ Git deps — **SHIPPED**. `s install` clones into `~/.stryke/git/` (shallow when `branch`/`tag` pinned, full when `rev` pinned), records `source = "git+<url>#<sha>"` in the lockfile, then installs the source-tree contents through the same `install_dir_dep` path as path deps. `[ffi]` git deps install the source as-is — the cdylib build is a separate step (`cargo build --release` in the clone or the `s pkg install -g <github-url>` binary side-channel).
+9. ✅ Git + GitHub-release deps — **SHIPPED**. Two distinct paths:
+   * **GitHub-release** (`{ github = "OWNER/REPO" [, version = "..."] }`, or the `s add github.com/OWNER/REPO[@TAG]` shorthand): downloads the prebuilt release tarball for the host triple (`STRYKE_TARGET` override available), SHA-256 verifies against the `.sha256` sidecar, extracts into `~/.stryke/store/<name>@<version>/`. Lockfile: `source = "github:OWNER/REPO@<TAG>"`. This is the path FFI cdylib packages take (stryke-arrow, stryke-aws, …).
+   * **Git source clone** (`{ git = "...", tag|branch|rev = ... }`): clones into `~/.stryke/git/` (shallow when `branch`/`tag` pinned, full when `rev` pinned), records `source = "git+<url>#<sha>"`, installs source-tree contents through the same `install_dir_dep` path as path deps. Refuses `[ffi]` clones with a pointer at the `github = "..."` rewrite — source clones can't reproduce the cdylib without the platform toolchain.
 10. ⏳ Features — partial: per-package feature flags parse and round-trip; resolver-side activation lands with the registry resolver.
 11. ✅ Workspaces with shared deps inheritance. **SHIPPED** — `[workspace]` + `members = ["crates/*"]` glob + `{ workspace = true }` inheritance + single root lockfile.
 12. ✅ `s install -g` for CLI tools. **SHIPPED** — `s install -g PATH`, `s uninstall -g NAME`, `s list -g`. Launchers go to `~/.stryke/bin/`.
