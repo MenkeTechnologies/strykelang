@@ -2634,39 +2634,57 @@ impl Parser {
                                 }
                             }
                             self.expect(&Token::RParen)?;
-                            // If no `$_` placeholder, auto-inject threaded value.
-                            // Thread-first: `t data to_file("/tmp/o.html")` → `to_file($_, "/tmp/o.html")`
-                            // Thread-last: `->> data to_file("/tmp/o.html")` → `to_file("/tmp/o.html", $_)`
-                            if !call_args.iter().any(Self::expr_contains_topic_var) {
-                                let topic = Expr {
-                                    kind: ExprKind::ScalarVar("_".to_string()),
+                            // Thread-LAST: substitute `result` (the threaded value) DIRECTLY as
+                            // the last arg of the call — `~>> @arr fold_sum(0)` becomes the
+                            // straight call `fold_sum(0, @arr)`. Pre-fix this wrapped the call
+                            // in a CodeRef whose body referenced `$_`, then invoked the coderef
+                            // with `lhs` as args. With ArrowCall flattening (`@arr` source) `$_`
+                            // bound to the first array element only — `fold_sum(0, 1)` = 1
+                            // instead of the sum 91. Inlining avoids the indirection entirely
+                            // and lets the callee's slurpy `@xs` receive the source as a list.
+                            //
+                            // Thread-FIRST keeps the CodeRef-with-$_ path because the convention
+                            // there is per-item streaming, and the existing macros (`~>` / `~s>`)
+                            // build on that.
+                            if self.thread_last_mode
+                                && !call_args.iter().any(Self::expr_contains_topic_var)
+                            {
+                                call_args.push(result);
+                                result = Expr {
+                                    kind: ExprKind::FuncCall {
+                                        name: func_name.clone(),
+                                        args: call_args,
+                                    },
                                     line: stage_line,
                                 };
-                                if self.thread_last_mode {
-                                    call_args.push(topic);
-                                } else {
+                            } else {
+                                if !call_args.iter().any(Self::expr_contains_topic_var) {
+                                    let topic = Expr {
+                                        kind: ExprKind::ScalarVar("_".to_string()),
+                                        line: stage_line,
+                                    };
                                     call_args.insert(0, topic);
                                 }
+                                let call_expr = Expr {
+                                    kind: ExprKind::FuncCall {
+                                        name: func_name.clone(),
+                                        args: call_args,
+                                    },
+                                    line: stage_line,
+                                };
+                                let code_ref = Expr {
+                                    kind: ExprKind::CodeRef {
+                                        params: vec![],
+                                        body: vec![Statement {
+                                            label: None,
+                                            kind: StmtKind::Expression(call_expr),
+                                            line: stage_line,
+                                        }],
+                                    },
+                                    line: stage_line,
+                                };
+                                result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                             }
-                            let call_expr = Expr {
-                                kind: ExprKind::FuncCall {
-                                    name: func_name.clone(),
-                                    args: call_args,
-                                },
-                                line: stage_line,
-                            };
-                            let code_ref = Expr {
-                                kind: ExprKind::CodeRef {
-                                    params: vec![],
-                                    body: vec![Statement {
-                                        label: None,
-                                        kind: StmtKind::Expression(call_expr),
-                                        line: stage_line,
-                                    }],
-                                },
-                                line: stage_line,
-                            };
-                            result = self.pipe_forward_apply(result, code_ref, stage_line)?;
                         }
                     } else {
                         // Bare function name — handle unary builtins specially
