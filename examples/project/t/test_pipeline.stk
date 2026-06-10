@@ -40,7 +40,7 @@ val $product = 1:5 |> reduce { _0 * _1 }
 assert_eq $product, 120, "reduce product"
 
 # Scan (running totals)
-val @running = 1:5 |> scan { $va + $vb } |> collect
+val @running = 1:5 |> scan { _0 + _1 } |> collect
 assert_eq len(@running), 6, "scan count"
 assert_eq $running[0], 1, "scan first"
 assert_eq $running[5], 15, "scan last"

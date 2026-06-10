@@ -14,7 +14,7 @@ fn Rosetta::Backprop::train($data, $labels, $learning_rate, $epochs) {
     val @w_h = ([rand(), rand()], [rand(), rand()])
     var @b_h = (rand(), rand())
     var @w_o = (rand(), rand())
-    var @b_o = rand()
+    var $b_o = rand()
     
     for (var $e = 0; $e < $epochs; $e++) {
         for (var $i = 0; $i < len(@$data); $i++) {

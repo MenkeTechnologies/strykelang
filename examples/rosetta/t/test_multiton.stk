@@ -7,7 +7,7 @@ class Rosetta::Multiton::Logger {
     name: Str = ""
 
     # Static method to get an instance by name
-    fn get($name) {
+    fn Self.get($name) {
         if (!exists $instances{$name}) {
             $instances{$name} = Rosetta::Multiton::Logger(name => $name)
         }

@@ -26,11 +26,15 @@ fn Fn::reduce($func, $initial, @list) {
 }
 
 # ── Fn::zip: combines two lists into a list of pairs (as array refs) ─────
-fn Fn::zip(\@xa, \@xb) {
+# Uses Perl's @_ flat-args convention. The caller passes two flat arrays
+# (which flatten when concatenated); the fn body splits them back via the
+# first array's length. For pair-aligned zipping where the arrays might
+# have different lengths, see Fn::zip_pairs which takes refs.
+fn Fn::zip(@xs) {
+    val $n = int(len(@xs) / 2)
     var @result
-    val $len = len(@xa) < len(@xb) ? len(@xa) : len(@xb)
-    ~> 0:$len-1 ep {
-        push @result, [$xa[_], $xb[_]]
+    ~> 0:$n-1 ep {
+        push @result, [$xs[_], $xs[$n + _]]
     }
     @result
 }

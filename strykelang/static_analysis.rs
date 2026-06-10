@@ -90,6 +90,13 @@ pub struct StaticAnalyzer {
     /// outside any type's body. Used to resolve `$self->X` against
     /// the right type's fields + methods.
     current_class: Option<String>,
+    /// True when the file contains a string-form `eval` or a dynamic
+    /// `require $var` whose target the analyzer can't trace. Those
+    /// constructs install subs at runtime that no static walker can
+    /// see; flagging the caller as "Undefined subroutine" would just
+    /// be noise. Set during the declaration sweep; consulted by
+    /// `is_sub_defined`.
+    has_dynamic_subs: bool,
 }
 
 impl StaticAnalyzer {
@@ -123,6 +130,7 @@ impl StaticAnalyzer {
             type_methods: HashMap::new(),
             type_parents: HashMap::new(),
             current_class: None,
+            has_dynamic_subs: false,
         };
         // Pre-declare every `[ffi].exports` name from the nearest sibling
         // stryke.toml. cdylib packages (stryke-gui, stryke-aws, etc.) ship
@@ -224,11 +232,20 @@ impl StaticAnalyzer {
         if is_special_var(name) || is_topic_var(name) {
             return true;
         }
+        // Fully-qualified package vars (`$Foo::Bar::x`) are explicit and
+        // satisfy strict-vars by definition — the package name IS the
+        // declaration site.
+        if name.contains("::") {
+            return true;
+        }
         self.scopes.iter().rev().any(|s| s.scalars.contains(name))
     }
 
     fn is_array_defined(&self, name: &str) -> bool {
         if is_special_var(name) || is_topic_var(name) {
+            return true;
+        }
+        if name.contains("::") {
             return true;
         }
         self.scopes.iter().rev().any(|s| s.arrays.contains(name))
@@ -238,12 +255,22 @@ impl StaticAnalyzer {
         if is_special_var(name) || is_topic_var(name) {
             return true;
         }
+        if name.contains("::") {
+            return true;
+        }
         self.scopes.iter().rev().any(|s| s.hashes.contains(name))
     }
 
     fn is_sub_defined(&self, name: &str) -> bool {
         // Late static binding: static::method() is always valid (runtime-resolved)
         if name.starts_with("static::") {
+            return true;
+        }
+        // String-form `eval` and dynamic `require $var` install subs the
+        // static walker can't see. When either appears in the file,
+        // every otherwise-unknown sub call is assumed installed at
+        // runtime — same laxness Perl's `no strict 'subs'` gives.
+        if self.has_dynamic_subs {
             return true;
         }
         // Compiler-generated calls emitted by parser desugaring — not
@@ -281,6 +308,13 @@ impl StaticAnalyzer {
         for stmt in &program.statements {
             self.collect_declarations_stmt(stmt);
         }
+        // Pre-pass: re-read the source and scan for string-form `eval`
+        // and dynamic `require $var`. The per-stmt declaration walker
+        // above only recurses into block-like statements; subs / loops
+        // would otherwise hide `eval "fn …"` from the dynamic-sub
+        // detector. Source-level regex is hacky but fine for this use
+        // — the alternative is a full visitor over every ExprKind arm.
+        self.scan_dynamic_sub_sources_in_source();
         for stmt in &program.statements {
             self.analyze_stmt(stmt);
         }
@@ -495,6 +529,150 @@ impl StaticAnalyzer {
                 self.collect_required_subs_from_expr(inner);
             }
             _ => {}
+        }
+    }
+
+    /// Re-read the source file and scan for `eval STRING-form` and
+    /// dynamic `require $var` patterns. When found, flip
+    /// `has_dynamic_subs` so undefined-sub diagnostics are suppressed,
+    /// and regex-extract `fn NAME` declarations from eval string
+    /// literals so explicitly-named subs still resolve cleanly.
+    fn scan_dynamic_sub_sources_in_source(&mut self) {
+        let Ok(src) = std::fs::read_to_string(&self.file) else {
+            return;
+        };
+        // Strip line comments — `# eval "fn foo"` in a comment is not
+        // a real eval. Keep newline positions intact so regex-style
+        // matches still line up; just blank out the comment tail.
+        let mut cleaned = String::with_capacity(src.len());
+        for line in src.split_inclusive('\n') {
+            if let Some(hash) = line.find('#') {
+                let before = &line[..hash];
+                // Heuristic: if the `#` is preceded by an opening
+                // string quote with no closing quote between, it's
+                // inside a string literal — keep the line as-is.
+                let dq = before.matches('"').count();
+                let sq = before.matches('\'').count();
+                if dq % 2 == 0 && sq % 2 == 0 {
+                    cleaned.push_str(before);
+                    if line.ends_with('\n') {
+                        cleaned.push('\n');
+                    }
+                    continue;
+                }
+            }
+            cleaned.push_str(line);
+        }
+        // Dynamic require: `require $var`, `require ($var)`, etc.
+        // The static walker already follows `require "..."` and
+        // `require Foo::Bar`; anything else is opaque.
+        let bytes = cleaned.as_bytes();
+        let mut i = 0;
+        while i + 8 < bytes.len() {
+            if &bytes[i..i + 7] == b"require"
+                && (i == 0 || !is_ident_byte(bytes[i - 1]))
+                && !is_ident_byte(bytes[i + 7])
+            {
+                let mut j = i + 7;
+                while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t' || bytes[j] == b'(')
+                {
+                    j += 1;
+                }
+                if j < bytes.len() && bytes[j] == b'$' {
+                    self.has_dynamic_subs = true;
+                }
+            }
+            i += 1;
+        }
+        // String-form eval: `eval "..."`, `eval '...'`, `eval(...)`
+        // where the inner arg is a quoted literal. Pull every
+        // `fn NAME` / `sub NAME` out of the literal so explicit sub
+        // names are recognized; also set `has_dynamic_subs` when the
+        // string contains interpolation or comes from a variable.
+        let mut i = 0;
+        while i + 5 < bytes.len() {
+            if &bytes[i..i + 4] == b"eval"
+                && (i == 0 || !is_ident_byte(bytes[i - 1]))
+                && !is_ident_byte(bytes[i + 4])
+            {
+                let mut j = i + 4;
+                while j < bytes.len() && (bytes[j] == b' ' || bytes[j] == b'\t' || bytes[j] == b'(')
+                {
+                    j += 1;
+                }
+                if j < bytes.len() {
+                    match bytes[j] {
+                        b'"' => {
+                            // Read until matching `"`, handling backslash escapes.
+                            let mut k = j + 1;
+                            let start = k;
+                            while k < bytes.len() && bytes[k] != b'"' {
+                                if bytes[k] == b'\\' && k + 1 < bytes.len() {
+                                    k += 2;
+                                } else {
+                                    k += 1;
+                                }
+                            }
+                            let lit = &cleaned[start..k.min(cleaned.len())];
+                            self.extract_fn_decls_from_str(lit);
+                            // Double-quoted strings interpolate — any
+                            // `$var` / `#{expr}` makes the actual
+                            // sub-name resolution opaque.
+                            if lit.contains('$') || lit.contains("#{") {
+                                self.has_dynamic_subs = true;
+                            }
+                        }
+                        b'\'' => {
+                            let mut k = j + 1;
+                            let start = k;
+                            while k < bytes.len() && bytes[k] != b'\'' {
+                                k += 1;
+                            }
+                            let lit = &cleaned[start..k.min(cleaned.len())];
+                            self.extract_fn_decls_from_str(lit);
+                        }
+                        b'{' => {} // `eval { ... }` block — analyzed normally.
+                        _ => {
+                            // `eval $code` — opaque.
+                            self.has_dynamic_subs = true;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+
+    /// Extract `fn NAME` / `sub NAME` declarations from a literal source
+    /// snippet. Used to register subs installed by `eval STRING`.
+    fn extract_fn_decls_from_str(&mut self, src: &str) {
+        for token in ["fn", "sub"] {
+            let mut rest = src;
+            while let Some(pos) = rest.find(token) {
+                let before_ok = pos == 0
+                    || !rest
+                        .as_bytes()
+                        .get(pos.saturating_sub(1))
+                        .map(|c| c.is_ascii_alphanumeric() || *c == b'_')
+                        .unwrap_or(false);
+                let after = &rest[pos + token.len()..];
+                let trimmed = after.trim_start();
+                if before_ok && after.len() > trimmed.len() {
+                    let name: String = trimmed
+                        .chars()
+                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == ':')
+                        .collect();
+                    if !name.is_empty() && !name.starts_with(':') {
+                        self.declare_sub(&name);
+                        if let Some(tail) = name.rsplit("::").next() {
+                            if tail != name {
+                                self.declare_sub(tail);
+                            }
+                        }
+                    }
+                }
+                rest = &rest[pos + token.len()..];
+            }
         }
     }
 
@@ -1589,6 +1767,15 @@ impl StaticAnalyzer {
                     self.analyze_expr(f);
                 }
             }
+            ExprKind::Opendir { handle, path } => {
+                // `opendir(my $dh, $dir)` — lexical-dirhandle declaration.
+                if let ExprKind::OpendirMyHandle { name } = &handle.kind {
+                    self.declare_scalar(name);
+                } else {
+                    self.analyze_expr(handle);
+                }
+                self.analyze_expr(path);
+            }
             ExprKind::Close(e)
             | ExprKind::Pop(e)
             | ExprKind::Shift(e)
@@ -1770,6 +1957,10 @@ impl StaticAnalyzer {
             line,
         );
     }
+}
+
+fn is_ident_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b':'
 }
 
 fn is_special_var(name: &str) -> bool {
