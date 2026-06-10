@@ -1489,7 +1489,7 @@ pub(crate) fn package_decl_line(text: &str, name: &str) -> Option<usize> {
     None
 }
 
-pub(crate) fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
+pub fn hover_markdown_for_word(word: &str, text: &str, path: &str) -> Option<String> {
     // Sigil-prefixed identifiers are variables, not builtins. Don't let
     // `$pass`/`@pass`/`%pass` fall through to `doc_for_label("pass")` —
     // that returned the `pass` builtin card and confused users. Try to
@@ -2107,13 +2107,24 @@ where
 {
     use std::collections::HashSet;
     let mut visited: HashSet<PathBuf> = HashSet::new();
-    let mut queue: Vec<(String, String)> = require_specs_from_program(program)
+    let mut queue: Vec<(String, String, Option<String>)> = require_specs_from_program(program)
         .into_iter()
-        .map(|spec| (file.to_string(), spec))
+        .map(|(spec, version)| (file.to_string(), spec, version))
         .collect();
-    while let Some((owner, spec)) = queue.pop() {
-        let Some(target) = crate::static_analysis::resolve_require_path_from_file(&owner, &spec)
-        else {
+    while let Some((owner, spec, version)) = queue.pop() {
+        // `version` carries the use-site `use Foo VERSION` pin from the
+        // parser. When `Some(_)`, the analyzer resolver lands on the
+        // EXACT pinned `<store>/<name>@<VERSION>/` extraction — hover
+        // and goto-def chase the file the runtime will actually load,
+        // not the lockfile-pinned or highest-installed default.
+        // Transitive `use` from the chased file inherits no pin from
+        // the caller — `use Foo 2.13` doesn't constrain `Foo`'s own
+        // internal `use Bar`. Each spec carries only its own pin.
+        let Some(target) = crate::static_analysis::resolve_require_path_from_file_versioned(
+            &owner,
+            &spec,
+            version.as_deref(),
+        ) else {
             continue;
         };
         let canon = target.canonicalize().unwrap_or(target.clone());
@@ -2131,8 +2142,8 @@ where
         if !keep_going {
             return;
         }
-        for spec in require_specs_from_program(&child) {
-            queue.push((target_path.clone(), spec));
+        for (spec, version) in require_specs_from_program(&child) {
+            queue.push((target_path.clone(), spec, version));
         }
     }
 }
@@ -2149,8 +2160,12 @@ fn collect_required_files(program: &crate::ast::Program, file: &str) -> Vec<(Str
 }
 
 /// Collect every static-string-form `require` spec from a program's top-
-/// level statements (including postfix-`if`/`unless` wrappers).
-fn require_specs_from_program(program: &crate::ast::Program) -> Vec<String> {
+/// level statements (including postfix-`if`/`unless` wrappers). Returns
+/// `(spec, pin_version)` pairs — `pin_version` is `Some(v)` only when
+/// the spec came from a `use Module VERSION` statement carrying a
+/// numeric Perl-style pin. `require` and unpinned `use` get `None`,
+/// which routes the chase through the unpinned resolver.
+fn require_specs_from_program(program: &crate::ast::Program) -> Vec<(String, Option<String>)> {
     let mut out = Vec::new();
     for stmt in &program.statements {
         match &stmt.kind {
@@ -2159,20 +2174,26 @@ fn require_specs_from_program(program: &crate::ast::Program) -> Vec<String> {
             // require for cross-file lookup. Standard pragmas (strict,
             // warnings, etc.) are filtered by resolve_require_path_from_file
             // (it returns None when no file resolves), so we don't
-            // re-filter them here.
-            StmtKind::Use { module, .. } => out.push(module.clone()),
+            // re-filter them here. Thread the `version` field through
+            // so a pinned `use Foo::Bar 2.13` hover / goto-def chases
+            // the EXACT pinned `<store>/<name>@2.13/` extraction.
+            StmtKind::Use {
+                module, version, ..
+            } => out.push((module.clone(), version.clone())),
             _ => {}
         }
     }
     out
 }
 
-fn collect_require_spec(expr: &crate::ast::Expr, out: &mut Vec<String>) {
+fn collect_require_spec(expr: &crate::ast::Expr, out: &mut Vec<(String, Option<String>)>) {
     use crate::ast::ExprKind;
     match &expr.kind {
         ExprKind::Require(inner) => {
             if let Some(spec) = crate::static_analysis::static_string_value(inner) {
-                out.push(spec);
+                // `require "Foo::Bar"` carries no version syntax — pin slot
+                // is exclusive to the Perl-style `use Module VERSION` form.
+                out.push((spec, None));
             }
         }
         ExprKind::PostfixIf { expr: inner, .. } | ExprKind::PostfixUnless { expr: inner, .. } => {

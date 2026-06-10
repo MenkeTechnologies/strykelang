@@ -441,6 +441,114 @@ fn use_site_pin_bridges_stryke_prefix() {
     std::env::remove_var("STRYKE_HOME");
 }
 
+/// LSP hover for a package name in `use Foo VERSION` must chase the
+/// PINNED file in the store, not whatever the unpinned resolver
+/// would have found. Without version threading in `walk_required_files`
+/// the cross-file chase landed on the highest-installed file even
+/// when the use-site explicitly pinned a different version — the
+/// IDE then showed docs / goto-def from a file the runtime would
+/// never load. Fixed by threading `Option<String>` through
+/// `require_specs_from_program` and into the versioned resolver.
+#[test]
+fn lsp_hover_on_pinned_use_lands_on_pinned_version() {
+    let store_root = tempdir("hoverpinstore");
+    let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+    std::env::set_var("STRYKE_HOME", &store_root);
+
+    // Two versions, distinct doc strings — hover must pick the
+    // pinned version's doc, not the other.
+    install_fake_store_pkg(
+        &store,
+        "foo",
+        "1.0",
+        "Foo",
+        "## v1.0 STALE_DOC_MARKER\npackage Foo\nfn Foo::greet { 1 }\n",
+    );
+    install_fake_store_pkg(
+        &store,
+        "foo",
+        "2.13",
+        "Foo",
+        "## v2.13 FRESH_DOC_MARKER\npackage Foo\nfn Foo::greet { 1 }\n",
+    );
+
+    let script_dir = tempdir("hoverpinscript");
+    let script_path = script_dir.join("main.stk");
+    let script_src = "use Foo 2.13;\nFoo::greet();\n";
+    std::fs::write(&script_path, script_src).unwrap();
+
+    let hover = stryke::lsp::hover_markdown_for_word(
+        "Foo",
+        script_src,
+        script_path.to_str().unwrap(),
+    )
+    .expect("hover should resolve Foo");
+    std::env::remove_var("STRYKE_HOME");
+
+    assert!(
+        hover.contains("FRESH_DOC_MARKER"),
+        "hover must surface the v2.13 doc; got: {}",
+        hover
+    );
+    assert!(
+        !hover.contains("STALE_DOC_MARKER"),
+        "hover must NOT surface the v1.0 doc; got: {}",
+        hover
+    );
+}
+
+/// Plain `use Foo` (no pin) outside a project must hover-land on the
+/// HIGHEST installed version — same contract as the runtime resolver.
+/// Catches drift between what the user actually loads and what their
+/// hover surfaces.
+#[test]
+fn lsp_hover_unpinned_use_outside_project_picks_highest_version() {
+    let store_root = tempdir("hoverhigheststore");
+    let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+    std::env::set_var("STRYKE_HOME", &store_root);
+
+    install_fake_store_pkg(
+        &store,
+        "bar",
+        "1.0",
+        "Bar",
+        "## v1.0 STALE_DOC_MARKER\npackage Bar\nfn Bar::run { 1 }\n",
+    );
+    install_fake_store_pkg(
+        &store,
+        "bar",
+        "2.0",
+        "Bar",
+        "## v2.0 FRESH_DOC_MARKER\npackage Bar\nfn Bar::run { 1 }\n",
+    );
+
+    let script_dir = tempdir("hoverhighestscript");
+    let script_path = script_dir.join("main.stk");
+    let script_src = "use Bar;\nBar::run();\n";
+    std::fs::write(&script_path, script_src).unwrap();
+
+    let hover = stryke::lsp::hover_markdown_for_word(
+        "Bar",
+        script_src,
+        script_path.to_str().unwrap(),
+    )
+    .expect("hover should resolve Bar");
+    std::env::remove_var("STRYKE_HOME");
+
+    assert!(
+        hover.contains("FRESH_DOC_MARKER"),
+        "hover must surface the highest-version doc (v2.0); got: {}",
+        hover
+    );
+    assert!(
+        !hover.contains("STALE_DOC_MARKER"),
+        "hover must NOT surface the older v1.0 doc; got: {}",
+        hover
+    );
+}
+
 #[test]
 fn lockfile_canonicalize_sorts_packages_alphabetically() {
     let mut lf = Lockfile::new();
