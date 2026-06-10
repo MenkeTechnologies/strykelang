@@ -235,12 +235,12 @@ fn Project::SpecialVars::file_name {
 
 fn Project::SpecialVars::array_last_index {
     val @xa = (1, 2, 3, 4, 5)
-    $#a == 4 ? 1 : 0
+    $#xa == 4 ? 1 : 0
 }
 
 fn Project::SpecialVars::array_last_index_modify {
     val @xa = (1, 2, 3)
-    $#a = 5
+    $#xa = 5
     len(@xa) == 6 ? 1 : 0
 }
 

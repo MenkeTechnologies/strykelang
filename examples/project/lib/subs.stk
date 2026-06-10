@@ -73,7 +73,7 @@ fn Project::Subs::return_in_context {
     if (wantarray()) {
         return (1, 2, 3)
     }
-    return "len"
+    return "scalar"
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

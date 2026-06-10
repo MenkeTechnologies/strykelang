@@ -20,10 +20,10 @@ assert_eq join(",", @doubled), "2,4,6,8,10", "map double"
 val @evens = grep { _ % 2 == 0 } 1:10
 assert_eq join(",", @evens), "2,4,6,8,10", "grep evens"
 
-val $sum = reduce { $va + $vb } 1:5
+val $sum = reduce { _0 + _1 } 1:5
 assert_eq $sum, 15, "reduce sum"
 
-val $product = reduce { $va * $vb } 1:5
+val $product = reduce { _0 * _1 } 1:5
 assert_eq $product, 120, "reduce product"
 
 # Pipeline operators

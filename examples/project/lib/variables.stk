@@ -63,7 +63,7 @@ fn Project::Variables::array_length {
 
 fn Project::Variables::array_last_index {
     val @xa = (1, 2, 3, 4, 5)
-    $#a
+    $#xa
 }
 
 fn Project::Variables::array_modify {
