@@ -42,7 +42,7 @@ for val $r (@rows) {
 # This entire file follows the rule; verify it programmatically by
 # checking the file's own source.
 
-val $self_path = "examples/test_style_guide_oo_regex_pin.stk"
+val $self_path = __FILE__
 val $src = c"$self_path"
 val @bad_lines = grep { /;$/ && !/^\s*#/ && !/for\s*\(/ } split(/\n/, $src)
 len(@bad_lines) |> aeq 0, "no trailing-semicolon violations in this file"

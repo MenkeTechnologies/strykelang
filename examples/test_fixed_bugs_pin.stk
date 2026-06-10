@@ -54,7 +54,7 @@ $#a_027 = 4
 @a_027[4] |> aeq undef, 'BUG-027: $#a = N pads with undef'
 
 # BUG-019: for (@arr) { _ *= 10 } aliases array element
-val @a_019 = (1, 2, 3)
+var @a_019 = (1, 2, 3)
 for (@a_019) { _ *= 10 }
 @a_019[0] |> aeq 10, "BUG-019: for loop aliases elements (0)"
 @a_019[2] |> aeq 30, "BUG-019: for loop aliases elements (2)"

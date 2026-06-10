@@ -23,7 +23,7 @@ sqrt(-1) |> tj |> aeq "NaN", "NaN stringification"
 
 # ── For In-place Mutation ─────────────────────────────────────────────────
 
-val @list = (1, 2, 3)
+var @list = (1, 2, 3)
 for (@list) { _ *= 10 }
 join(",", @list) |> aeq "10,20,30", "for loop in-place mutation"
 

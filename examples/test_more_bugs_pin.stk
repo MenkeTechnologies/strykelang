@@ -29,9 +29,11 @@ fn Pin::MoreBugs::summer(@nums) {
 
 Pin::MoreBugs::call_it(\&Pin::MoreBugs::summer, 1, 2, 3);
 
-# According to bug, @args is flattened to a scalar count, so Pin::MoreBugs::summer receives `3` instead of `(1, 2, 3)`.
-# The loop `for var $n (3)` will execute once with $n=3.
-aeq($sum, 3, "BUG-037: captured coderef gets scalar count of args");
+# BUG-037 (FIXED): captured coderef now receives args correctly, not as
+# flattened scalar count. Pin::MoreBugs::summer(@args) sees (1, 2, 3) and
+# sums to 6. Pre-fix the closure flattened @args to its count (3) and
+# the loop body ran once with $n=3, giving $sum = 3.
+aeq($sum, 6, "BUG-037 (FIXED): captured coderef passes args, not arg-count");
 
 
 # BUG-140 (FIXED): sum() and product() now unwrap arrayref arguments instead
