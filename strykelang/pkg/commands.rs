@@ -1099,6 +1099,29 @@ pub fn resolve_module(
         return Ok(Some(local));
     }
 
+    // 1b. Flat-layout namespace bridge. When this project's
+    //     `[ffi].namespace` matches segments[0] (case-insensitive), sub-
+    //     packages may live at `lib/<rest>.stk` rather than nested under
+    //     `lib/<Ns>/<rest>.stk` — every stryke-* connector ships this
+    //     way (`stryke-arrow/lib/Parquet.stk` declares
+    //     `package Arrow::Parquet`, no `lib/Arrow/` subdir). Mirrors the
+    //     global-store branch (#3) below so `s test` inside the package
+    //     dir finds its own siblings without needing `s install -g .`
+    //     after every edit.
+    if segments.len() > 1 {
+        if let Ok(manifest) = Manifest::from_path(&root.join(MANIFEST_FILE)) {
+            if let Some(ffi) = &manifest.ffi {
+                if !ffi.namespace.is_empty() && ffi.namespace.eq_ignore_ascii_case(segments[0]) {
+                    let flat = root.join("lib").join(segments_to_path(&segments[1..]));
+                    if flat.is_file() {
+                        let _ = try_load_ffi_for(root);
+                        return Ok(Some(flat));
+                    }
+                }
+            }
+        }
+    }
+
     // 2a. Use-site pin (`use Module VERSION`) — direct store lookup,
     //     no lockfile / index consult. Inside or outside a project.
     //     Standalone scripts that want a specific version write
@@ -3474,6 +3497,66 @@ mod tests {
         std::fs::write(root.join("lib/Foo/Bar.stk"), "# bar").unwrap();
         let r = resolve_module(&root, "Foo::Bar", None).unwrap().unwrap();
         assert!(r.ends_with("lib/Foo/Bar.stk"), "got {:?}", r);
+    }
+
+    /// Flat-layout namespace bridge — every `stryke-*` connector ships
+    /// `lib/<Sub>.stk` declaring `package <Ns>::<Sub>` with no
+    /// `lib/<Ns>/` subdirectory (stryke-arrow, stryke-aws, stryke-gcp,
+    /// …). `use <Ns>::<Sub>` from inside the project must chase
+    /// `lib/<Sub>.stk` via the `[ffi].namespace` match, otherwise
+    /// `stryke t` (and every reverse-dependency build) blows up with
+    /// `Can't locate <Ns>/<Sub>.pm in @INC`.
+    #[test]
+    fn resolve_module_local_lib_flat_layout_via_ffi_namespace() {
+        let root = tempdir("proj-flat");
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"stryke-arrow\"\nversion=\"0.1.0\"\n\
+             [ffi]\nlib-name=\"stryke_arrow\"\nnamespace=\"Arrow\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/Parquet.stk"), b"# parquet").unwrap();
+        let r = resolve_module(&root, "Arrow::Parquet", None)
+            .unwrap()
+            .unwrap();
+        assert!(r.ends_with("lib/Parquet.stk"), "got {:?}", r);
+    }
+
+    /// Namespace bridge must be case-insensitive — `[ffi].namespace =
+    /// "AWS"` accepts `use aws::S3` and vice-versa, matching how the
+    /// global-store branch lower-cases segments[0] for canonical_names.
+    #[test]
+    fn resolve_module_local_lib_flat_layout_case_insensitive() {
+        let root = tempdir("proj-flat-case");
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"stryke-aws\"\nversion=\"0.1.0\"\n\
+             [ffi]\nlib-name=\"stryke_aws\"\nnamespace=\"AWS\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/S3.stk"), b"# s3").unwrap();
+        let r = resolve_module(&root, "aws::S3", None).unwrap().unwrap();
+        assert!(r.ends_with("lib/S3.stk"), "got {:?}", r);
+    }
+
+    /// Namespace bridge must NOT shortcut when the first segment doesn't
+    /// match `[ffi].namespace` — otherwise `use Other::Foo` would
+    /// silently bind to this project's `lib/Foo.stk`.
+    #[test]
+    fn resolve_module_local_lib_flat_layout_only_fires_on_namespace_match() {
+        let root = tempdir("proj-flat-mismatch");
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"stryke-arrow\"\nversion=\"0.1.0\"\n\
+             [ffi]\nlib-name=\"stryke_arrow\"\nnamespace=\"Arrow\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/Parquet.stk"), b"# parquet").unwrap();
+        let r = resolve_module(&root, "Other::Parquet", None).unwrap();
+        assert!(r.is_none(), "must not bridge across namespaces: {:?}", r);
     }
 
     #[test]
