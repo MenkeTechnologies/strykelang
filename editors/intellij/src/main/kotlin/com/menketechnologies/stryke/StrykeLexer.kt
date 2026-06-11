@@ -1154,7 +1154,7 @@ class StrykeLexer : LexerBase() {
             in PHASE_KEYWORDS -> StrykeTokenTypes.PHASE_KEYWORD
             in WORD_OPERATORS -> StrykeTokenTypes.WORD_OPERATOR
             in BOOLEANS -> StrykeTokenTypes.BOOLEAN
-            "undef" -> StrykeTokenTypes.UNDEF
+            "undef", "null" -> StrykeTokenTypes.UNDEF
             in PARALLEL_BUILTINS -> StrykeTokenTypes.BUILTIN_PARALLEL
             in BUILTINS -> StrykeTokenTypes.BUILTIN
             else -> StrykeTokenTypes.IDENTIFIER
@@ -1212,7 +1212,7 @@ class StrykeLexer : LexerBase() {
 
         /** Parallel primitives — get their own color slot. */
         private val PARALLEL_BUILTINS = setOf(
-            "pmap", "pgrep", "pfor", "pforeach", "pflat_map",
+            "pmap", "pgrep", "pfor", "pforeach", "ploop", "pwhile", "pflat_map",
             "pmaps", "pgreps", "pflat_maps",
             "par_fetch", "par_each", "par_run", "par_apply",
             "channel", "spawn", "await", "async",
