@@ -19991,7 +19991,22 @@ impl Parser {
     /// literals (with `\` escapes) don't count toward depth, so
     /// `"#{"}"}"` finds the right closer. Returns `(inner, index of the
     /// closing brace)`, or `None` when unterminated.
+    ///
+    /// The quote tracker can't tell string delimiters from quote chars in
+    /// regex content — `#{ _ =~ s/"/""/gr }` has an odd quote count, so the
+    /// quote-aware pass never sees the closer. When that pass fails, retry
+    /// quote-blind (plain depth counting): a region the quote tracker calls
+    /// unterminated means the heuristic mis-read non-string quotes.
     fn scan_interp_braces(chars: &[char], start: usize) -> Option<(String, usize)> {
+        Self::scan_interp_braces_pass(chars, start, true)
+            .or_else(|| Self::scan_interp_braces_pass(chars, start, false))
+    }
+
+    fn scan_interp_braces_pass(
+        chars: &[char],
+        start: usize,
+        quote_aware: bool,
+    ) -> Option<(String, usize)> {
         let mut depth = 1usize;
         let mut quote: Option<char> = None;
         let mut esc = false;
@@ -20008,7 +20023,7 @@ impl Parser {
                 }
             } else {
                 match c {
-                    '\'' | '"' => quote = Some(c),
+                    '\'' | '"' if quote_aware => quote = Some(c),
                     '{' => depth += 1,
                     '}' => {
                         depth -= 1;
