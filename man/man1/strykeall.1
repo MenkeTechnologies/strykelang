@@ -119,7 +119,7 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 .B stryke
 is a single-binary Perl 5 interpreter written in Rust with parallel
 extensions, a Cranelift JIT, pipe-forward (\fB|>\fR), the thread macro
-(\fB~>\fR), 10,459 primary builtins in
+(\fB~>\fR), 10,435 primary builtins in
 .BR %b ,
 and an interactive REPL that doubles as a Unix shell.
 .PP
@@ -1162,7 +1162,7 @@ climbs one nesting level.
 .PP
 .RS 4
 .EX
-keys %b           # 10,459 primary builtin names → category
+keys %b           # 10,435 primary builtin names → category
 keys %a           # 641 aliases (name → primary)
 keys %all         # 11,022 = %b ∪ %a ∪ %k
 keys %k           # 85 keywords (if, sub, my, our, …)
@@ -1831,7 +1831,7 @@ The release profile uses
 .B "panic = \"abort\""
 ,
 .B "strip = true"
-to maximize per-builtin density. 44 MB binary for 10,459 primaries
+to maximize per-builtin density. 44 MB binary for 10,435 primaries
 ≈ 4.3 KB amortized per builtin.
 .SH "27. DEBUGGING"
 .PP
