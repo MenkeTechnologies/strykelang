@@ -218,3 +218,16 @@ fn qq_and_backticks_track_interp_regions() {
     "##;
     assert_eq!(eval_int(code), 1);
 }
+
+#[test]
+fn hash_brace_substitution_with_quote_chars_in_qq() {
+    // Regression: `s/"/""/gr` inside `#{…}` has an odd quote count — the
+    // quote-aware region scan must fall back to plain depth counting
+    // instead of reporting the string unterminated (broke
+    // examples/test_validation_pin.stk after the BUG-092 fix).
+    let code = r##"
+        my $s = qq("#{ "wo,rld" =~ s/"/""/gr }");
+        $s eq qq("wo,rld") ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
