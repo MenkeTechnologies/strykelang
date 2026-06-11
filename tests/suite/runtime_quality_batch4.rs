@@ -338,9 +338,9 @@ fn match_sets_digit_vars_for_groups() {
 }
 
 #[test]
-fn hex_odd_length_errors_at_runtime() {
-    use stryke::error::ErrorKind;
-    assert_eq!(eval_err_kind(r#"pack 'H', "a""#), ErrorKind::Runtime);
+fn hex_odd_length_pads_trailing_nibble() {
+    // Perl parity: pack 'H', "a" takes the high nibble, padding to 0xa0.
+    assert_eq!(eval_string(r#"unpack 'H2', pack 'H', "a""#), "a0");
 }
 
 #[test]
@@ -418,7 +418,7 @@ fn match_prematch_and_postmatch_special_vars() {
 
 #[test]
 fn unpack_h2_from_packed_byte() {
-    assert_eq!(eval_string(r#"unpack 'H2', pack 'C', 255"#), "FF");
+    assert_eq!(eval_string(r#"unpack 'H2', pack 'C', 255"#), "ff");
 }
 
 #[test]
