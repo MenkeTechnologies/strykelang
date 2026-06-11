@@ -3391,3 +3391,52 @@ When you find a new behavior worth tracking:
 When a bug is fixed, remove its entry from this file and flip the
 pinning test from "current buggy output" to "correct output" — the test
 is the regression guard going forward. Numeric IDs are not reused.
+
+## BUG-303 — `qr//` built from a hashref-derived string inside a closure matches nothing — **`bug`**
+
+A regex object compiled with `qr/$pat/` matches normally when `$pat` is a
+plain scalar, but when `$pat` was read out of a hashref subscript inside a
+closure, the resulting object matches nothing — both via `grep { /$re/ }`
+and via direct `=~ $re` in the same closure. Top-level (non-closure) use of
+the identical code works.
+
+```
+# FAILS — prints []
+s 'val $run = sub { val $a = shift; val $pat = $a->{pattern}; val $re = qr/$pat/;
+   join("|", grep { /$re/ } ("ok","ERROR bad")) }; p "[" . $run->(+{pattern => "ERROR"}) . "]"'
+
+# WORKS — plain scalar arg, same closure shape
+s 'val $run = sub { val $pat = shift; val $re = qr/$pat/;
+   join("|", grep { /$re/ } ("ok","ERROR bad")) }; p "[" . $run->("ERROR") . "]"'
+
+# WORKS — skip qr//, interpolate the string directly
+s 'val $run = sub { val $a = shift; val $pat = $a->{pattern};
+   join("|", grep { /$pat/ } ("ok","ERROR bad")) }; p "[" . $run->(+{pattern => "ERROR"}) . "]"'
+```
+
+Hit in `stryke-mcpd` `fs_grep`/`fs_find` (tool args arrive as a hashref);
+worked around there with direct `/$pat/` interpolation. Downstream guard:
+`stryke-mcpd/t/test_mcpd.stk` ("fs_grep matches pattern param"). No upstream
+pin test yet.
+
+## BUG-304 — `opendir`/`readdir` with a lexical dirhandle reads empty inside a closure — **`bug`**
+
+`opendir(my $dh, $dir)` succeeds inside a `sub { }` but the subsequent
+`readdir($dh)` returns an empty list. The identical sequence at top level
+returns the directory entries.
+
+```
+# FAILS — prints R: [] ; TOP: [.|..|a.txt]
+s 'mkdir "/tmp/od-$$"; spurt("/tmp/od-$$/a.txt", "x")
+   val $r = sub { opendir(my $dh, "/tmp/od-$$") or return "OPENFAIL";
+                  val @e = readdir($dh); closedir($dh); join("|", @e) }
+   p "R: [" . $r->() . "]"
+   opendir(my $dh3, "/tmp/od-$$"); val @e3 = readdir($dh3); closedir($dh3)
+   p "TOP: [" . join("|", @e3) . "]"'
+```
+
+`glob("$dir/*")` works inside closures and is the workaround. Shipped broken
+in `stryke-mcpd` v0.1.0 `fs_list` (returned "" for every directory) — fixed
+downstream by switching to `glob`. Downstream guard:
+`stryke-mcpd/t/test_mcpd.stk` ("fs_list sorted incl dotfiles"). No upstream
+pin test yet.
