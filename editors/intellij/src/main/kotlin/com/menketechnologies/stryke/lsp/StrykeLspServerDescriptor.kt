@@ -8,6 +8,7 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
 import com.intellij.platform.lsp.api.customization.LspCustomization
+import com.intellij.platform.lsp.api.customization.LspFormattingSupport
 import com.intellij.platform.lsp.api.customization.LspSemanticTokensSupport
 import com.menketechnologies.stryke.StrykeSettings
 import java.io.File
@@ -34,6 +35,26 @@ class StrykeLspServerDescriptor(project: Project) :
     // mapping so `$pass` inside `"..."` colors as a variable rather than
     // falling back to string-green.
     override val lspCustomization: LspCustomization = object : LspCustomization() {
+        // Reformat Code (Cmd-Opt-L) → textDocument/formatting on the stryke
+        // LSP server (`compute_formatting` → fmt::format_program).
+        //
+        // The default LspFormattingSupport only claims a file when the server
+        // DYNAMICALLY registered formatting with a documentSelector matching
+        // it (LspServerImpl.doesServerExplicitlyWantToFormatThisFile checks
+        // LspDynamicCapabilities, populated by client/registerCapability).
+        // stryke advertises formatting STATICALLY in the initialize response,
+        // so the default returns false and Reformat Code never reaches the
+        // server. Claim every supported stryke file explicitly — same pattern
+        // as JetBrains' Prisma plugin (PrismaLspServerDescriptor.kt,
+        // idea/261.23567.138).
+        override val formattingCustomizer: LspFormattingSupport = object : LspFormattingSupport() {
+            override fun shouldFormatThisFileExclusivelyByServer(
+                file: VirtualFile,
+                ideCanFormatThisFileItself: Boolean,
+                serverExplicitlyWantsToFormatThisFile: Boolean,
+            ): Boolean = isSupportedFile(file)
+        }
+
         override val semanticTokensCustomizer: LspSemanticTokensSupport = object : LspSemanticTokensSupport() {
             override fun getTextAttributesKey(
                 tokenType: String,
