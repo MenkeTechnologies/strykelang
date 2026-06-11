@@ -101,7 +101,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,431 standard library primaries** in `%b` (11,164 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,131
+- **10,435 standard library primaries** in `%b` (11,168 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,135
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -340,8 +340,17 @@ my @doubled = @data |> pmap $_ * 2 , progress => 1
 my @evens   = @data |> pgrep $_ % 2 == 0
 my @sorted  = @data |> psort { $a <=> $b }
 my $sum     = @numbers |> preduce { $a + $b }
-pfor process, @items
+pfor process, @items                  # pforeach is an alias, same as for/foreach
 my @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
+
+# ploop / pwhile — parallel loop / while: body runs as a worker loop on
+# each of N rayon workers (default thread_count()); $_ = 1-based worker id.
+# Desugar: pfor { while (COND) { BODY } } 1..N — last exits one worker.
+ploop { my $job = next_job(); last unless defined $job; handle($job) }
+ploop 4 { ... }                       # explicit worker count
+mysync $run = 1
+pwhile ($run) { $run = 0 if poll_shutdown(); step() }
+pwhile 4 ($run) { ... }               # explicit worker count
 
 # streaming parallel — lazy iterators, bounded memory, output as it completes
 range(0, 1e9) |> pmaps { expensive($_) } |> take 10 |> ep  # stops after 10 results
@@ -1116,7 +1125,7 @@ Scalars `$x`, arrays `@a`, hashes `%h`, refs `\$x`/`\@a`/`\%h`/`\&sub`, anon `[.
 `if`/`elsif`/`else`/`unless`, `while`/`until`, `do { } while/until`, C-style `for`, `foreach`, `last`/`next`/`redo` with labels, postfix `if`/`unless`/`while`/`until`/`for`, ternary, `try { } catch ($err) { } finally { }`, `given`/`when`/`default`, algebraic `match (EXPR) { PATTERN [if EXPR] => EXPR, ... }` (regex, array, hash, wildcard, literal patterns; bindings scoped per arm; exhaustive enum variant checking), `eval_timeout SECS { ... }`.
 
 #### Operators
-Arithmetic, string `.`/`x`, comparison (including **Raku-style chained comparisons** like `1 < $x < 10`), `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not`, bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
+Arithmetic, string `.`/`x`, comparison (including **Raku-style chained comparisons** like `1 < $x < 10`), `eq`/`ne`/`lt`/`gt`/`cmp`, logical `&&`/`||`/`//`/`!`/`and`/`or`/`not` (`??` / `??=` are stryke aliases for `//` / `//=`; `null` aliases `undef`), bitwise (`|`/`&` are set ops on native `Set`), assignment + compound (`+=`, `.=`, `//=`, …), regex `=~`/`!~`, range `..` / `...` (incl. flip-flop with `eof`), arrow `->`, **pipe-forward `|>`** (stryke extension — threads the LHS as the **first** argument of the RHS call; see [Extensions beyond stock Perl 5](#extensions-beyond-stock-perl-5)).
 
 #### Regex engine
 Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anchor (no `/m`) is rewritten to `(?:\n?\z)`. Match `=~`, dynamic `$str =~ $pat`, substitution `s///`, transliteration `tr///`, flags `g`/`i`/`m`/`s`/`x`/`e`/`r`, captures `$1`…`$n`, named groups → `%+`/`$+{name}`, `\Q...\E`, `quotemeta`, `m//`/`qr//`. The `/r` flag (non-destructive) returns the modified string instead of the match count — auto-injected when `s///` or `tr///` appear as pipe-forward RHS. Bare `/pat/` in statement/boolean context is `$_ =~ /pat/`.

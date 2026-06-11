@@ -399,6 +399,10 @@ pub const KEYWORDS: &[&str] = &[
     "until",
     // `loop { ... }` — Rust-style infinite loop, desugars to `while (1)`.
     "loop",
+    // `ploop [N] { ... }` — parallel `loop`, desugars to `pfor { while (1) { … } } 1..N`.
+    "ploop",
+    // `pwhile [N] (COND) { ... }` — parallel `while`, same desugar with COND.
+    "pwhile",
     "for",
     "foreach",
     "do",
@@ -510,6 +514,8 @@ pub const KEYWORDS: &[&str] = &[
     "eof",
     "defined",
     "undef",
+    // `null` — stryke alias for `undef` (JS/SQL spelling).
+    "null",
     "ref",
     "eval",
     "exec",
@@ -588,6 +594,8 @@ pub const KEYWORDS: &[&str] = &[
     "pipeline",
     "pgrep",
     "pfor",
+    // `pforeach` — alias for `pfor`, same as `for`/`foreach`.
+    "pforeach",
     "par_lines",
     "par_walk",
     "pwatch",

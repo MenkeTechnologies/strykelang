@@ -506,8 +506,8 @@ impl Parser {
             self.peek(),
             Token::Ident(ref kw) if matches!(kw.as_str(),
                 "use" | "import" | "no" | "my" | "our" | "local" | "sub" | "struct" | "enum"
-                | "if" | "unless" | "while" | "until" | "for" | "foreach" | "loop"
-                | "return" | "last" | "next" | "redo" | "package" | "require"
+                | "if" | "unless" | "while" | "until" | "for" | "foreach" | "loop" | "ploop"
+                | "pwhile" | "return" | "last" | "next" | "redo" | "package" | "require"
                 | "BEGIN" | "END" | "UNITCHECK" | "frozen" | "const" | "typed"
                 // stryke-specific declaration keywords that start a new
                 // statement on a fresh line. Without these, a bare `use
@@ -642,6 +642,11 @@ impl Parser {
                     }
                     s
                 }
+                // `ploop [N] { ... }` / `pwhile [N] (COND) { ... }` —
+                // parallel `loop` / `while` (stryke extensions; in compat
+                // mode they stay ordinary sub names).
+                "ploop" if !crate::compat_mode() => self.parse_ploop()?,
+                "pwhile" if !crate::compat_mode() => self.parse_pwhile()?,
                 "until" => {
                     let mut s = self.parse_until()?;
                     if let StmtKind::Until {
@@ -1250,7 +1255,7 @@ impl Parser {
                     ));
                 }
                 // `{ } pmap @a` / `{ } pflat_map @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix forms.
-                "pmap" | "pflat_map" | "pgrep" | "pfor" | "preduce" | "pcache" | "par" => {
+                "pmap" | "pflat_map" | "pgrep" | "pfor" | "pforeach" | "preduce" | "pcache" | "par" => {
                     let line = stmt.line;
                     let block = self.stmt_into_parallel_block(stmt)?;
                     let which = kw.as_str();
@@ -1283,7 +1288,7 @@ impl Parser {
                             progress,
                             stream: false,
                         },
-                        "pfor" => ExprKind::PForExpr {
+                        "pfor" | "pforeach" => ExprKind::PForExpr {
                             block,
                             list,
                             progress,
@@ -1854,6 +1859,7 @@ impl Parser {
                 | "pcache"
                 | "pchannel"
                 | "pfor"
+                | "pforeach"
                 | "pgrep"
                 | "pgreps"
                 | "pipeline"
@@ -3571,7 +3577,7 @@ impl Parser {
                 },
                 line,
             }),
-            "pfor" => Ok(Expr {
+            "pfor" | "pforeach" => Ok(Expr {
                 kind: ExprKind::PForExpr {
                     block,
                     list: Box::new(placeholder),
@@ -4253,6 +4259,107 @@ impl Parser {
                 label: None,
                 continue_block,
             },
+            line,
+        })
+    }
+
+    /// `ploop { BODY }` / `ploop N { BODY }` — parallel variant of `loop`:
+    /// each of N rayon workers (default `thread_count()`) runs BODY as an
+    /// infinite loop. Desugars to `pfor { while (1) { BODY } } 1..N`, so
+    /// `$_` is the 1-based worker id and `last` exits that worker's loop;
+    /// the construct finishes when every worker has exited. Shares the
+    /// existing `pfor` runtime — no new ExprKind or opcode.
+    fn parse_ploop(&mut self) -> StrykeResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // 'ploop'
+        let count = if matches!(self.peek(), Token::LBrace) {
+            None
+        } else {
+            // Primary only — `parse_assign_expr` would read the body's
+            // `{` as a hash subscript on a `$var` count (`$k {` → `$k{…}`).
+            Some(self.parse_primary()?)
+        };
+        let body = self.parse_block()?;
+        let continue_block = self.parse_optional_continue_block()?;
+        let condition = Expr {
+            kind: ExprKind::Integer(1),
+            line,
+        };
+        self.parallel_worker_loop_stmt(line, count, condition, body, continue_block)
+    }
+
+    /// `pwhile (COND) { BODY }` / `pwhile N (COND) { BODY }` — parallel
+    /// variant of `while`: each of N rayon workers (default
+    /// `thread_count()`) runs `while (COND) { BODY }`. COND re-evaluates
+    /// per worker per iteration, so a shared `mysync` flag or a draining
+    /// queue stops all workers. Same desugar family as `ploop`:
+    /// `pfor { while (COND) { BODY } } 1..N`.
+    fn parse_pwhile(&mut self) -> StrykeResult<Statement> {
+        let line = self.peek_line();
+        self.advance(); // 'pwhile'
+        let count = if matches!(self.peek(), Token::LParen) {
+            None
+        } else {
+            // Primary only — `parse_assign_expr` would swallow the
+            // following `(COND)` as a call on the count.
+            Some(self.parse_primary()?)
+        };
+        self.expect(&Token::LParen)?;
+        let mut condition = self.parse_expression()?;
+        Self::mark_match_scalar_g_for_boolean_condition(&mut condition);
+        self.expect(&Token::RParen)?;
+        let body = self.parse_block()?;
+        let continue_block = self.parse_optional_continue_block()?;
+        self.parallel_worker_loop_stmt(line, count, condition, body, continue_block)
+    }
+
+    /// Shared desugar for `ploop` / `pwhile`: wrap BODY in a
+    /// `while (condition)` worker loop and fan it out over
+    /// `pfor { … } 1..N` (N defaults to `thread_count()`), binding the
+    /// 1-based worker id to `$_`.
+    fn parallel_worker_loop_stmt(
+        &mut self,
+        line: usize,
+        count: Option<Expr>,
+        condition: Expr,
+        body: Block,
+        continue_block: Option<Block>,
+    ) -> StrykeResult<Statement> {
+        let worker_loop = Statement {
+            label: None,
+            kind: StmtKind::While {
+                condition,
+                body,
+                label: None,
+                continue_block,
+            },
+            line,
+        };
+        let list = match count {
+            Some(n) => Expr {
+                kind: ExprKind::Range {
+                    from: Box::new(Expr {
+                        kind: ExprKind::Integer(1),
+                        line,
+                    }),
+                    to: Box::new(n),
+                    exclusive: false,
+                    step: None,
+                },
+                line,
+            },
+            None => parse_expression_from_str("1..thread_count()", "<ploop>")?,
+        };
+        Ok(Statement {
+            label: None,
+            kind: StmtKind::Expression(Expr {
+                kind: ExprKind::PForExpr {
+                    block: vec![worker_loop],
+                    list: Box::new(list),
+                    progress: None,
+                },
+                line,
+            }),
             line,
         })
     }
@@ -6301,17 +6408,21 @@ impl Parser {
             // slot in a list assignment. The interpreter treats `undef`-named
             // scalar decls as throwaway: declared into a unique sink so the
             // distribute-to-decls loop advances past the slot.
-            (Token::Ident(ref kw), _) if kw == "undef" => VarDecl {
-                sigil: Sigil::Scalar,
-                // Synthesize a name that user code cannot reference. Each
-                // sink slot in a list-assign gets its own unique name so the
-                // declarations don't collide.
-                name: format!("__undef_sink_{}", self.pos),
-                initializer: None,
-                frozen: false,
-                type_annotation: None,
-                list_context: false,
-            },
+            (Token::Ident(ref kw), _)
+                if kw == "undef" || (kw == "null" && !crate::compat_mode()) =>
+            {
+                VarDecl {
+                    sigil: Sigil::Scalar,
+                    // Synthesize a name that user code cannot reference. Each
+                    // sink slot in a list-assign gets its own unique name so the
+                    // declarations don't collide.
+                    name: format!("__undef_sink_{}", self.pos),
+                    initializer: None,
+                    frozen: false,
+                    type_annotation: None,
+                    list_context: false,
+                }
+            }
             (tok, line) => {
                 return Err(self.syntax_err(
                     format!("Expected variable in declaration, got {:?}", tok),
@@ -9948,6 +10059,14 @@ impl Parser {
             name = rest.to_string();
         }
 
+        // `null` — stryke alias for `undef` (JS/SQL spelling). Normalized
+        // here so every `undef` arm (value, `undef $x`, list sink) sees the
+        // canonical name. `fn null` is blocked by RESERVED_FUNCTION_NAMES;
+        // compat mode leaves `null` as an ordinary sub name.
+        if name == "null" && !crate::compat_mode() {
+            name = "undef".to_string();
+        }
+
         match name.as_str() {
             "__FILE__" => Ok(Expr {
                 kind: ExprKind::MagicConst(MagicConstKind::File),
@@ -11561,7 +11680,7 @@ impl Parser {
                     line,
                 })
             }
-            "pfor" => {
+            "pfor" | "pforeach" => {
                 if matches!(self.peek(), Token::LParen) {
                     self.expect(&Token::LParen)?;
                     let list = self.parse_expression()?;
@@ -14342,6 +14461,11 @@ impl Parser {
             // reflection_registry. Section label kept under 40 chars
             // per build.rs:parse_section_header's length cap.)
             | "burp" | "god" | "swallow" | "ingest"
+            // ── core value aliases ─────────────────────────────────────────
+            // `null` → `undef` (JS/SQL spelling), normalized in
+            // parse_named_expr; listed here so the reflection registry and
+            // --compat gating see it.
+            | "null"
             // ── distributed / congregation ─────────────────────────────────
             // Scriptable distributed-compute primitives. Wrap the existing
             // controller.rs / agent.rs TCP+bincode infrastructure with a
@@ -14414,7 +14538,7 @@ impl Parser {
             | "proceed" | "intercept_list" | "intercept_remove" | "intercept_clear"
             // ── parallel ────────────────────────────────────────────────────
             | "pmap" | "pmap_on" | "pflat_map" | "pflat_map_on" | "pmap_chunked"
-            | "pgrep" | "pfor" | "psort" | "preduce" | "preduce_init" | "pmap_reduce"
+            | "pgrep" | "pfor" | "pforeach" | "ploop" | "pwhile" | "psort" | "preduce" | "preduce_init" | "pmap_reduce"
             | "pcache" | "pchannel" | "pselect" | "puniq" | "pfirst" | "pany"
             | "fan" | "fan_cap" | "par_lines" | "par_walk" | "par_sed"
             | "par_find_files" | "par_line_count" | "pwatch" | "par_pipeline_stream"
@@ -18572,6 +18696,9 @@ impl Parser {
         "for",
         "foreach",
         "loop",
+        "ploop",
+        "pwhile",
+        "null",
         "given",
         "when",
         "else",
@@ -19858,6 +19985,45 @@ impl Parser {
         Ok(())
     }
 
+    /// Quote-aware balanced-brace scan for `${…}` / `@{…}` / `#{…}`
+    /// interpolation bodies. `chars[start]` is the first char after the
+    /// opening `{`; depth starts at 1. `{` / `}` inside nested '…' / "…"
+    /// literals (with `\` escapes) don't count toward depth, so
+    /// `"#{"}"}"` finds the right closer. Returns `(inner, index of the
+    /// closing brace)`, or `None` when unterminated.
+    fn scan_interp_braces(chars: &[char], start: usize) -> Option<(String, usize)> {
+        let mut depth = 1usize;
+        let mut quote: Option<char> = None;
+        let mut esc = false;
+        let mut i = start;
+        while i < chars.len() {
+            let c = chars[i];
+            if let Some(q) = quote {
+                if esc {
+                    esc = false;
+                } else if c == '\\' {
+                    esc = true;
+                } else if c == q {
+                    quote = None;
+                }
+            } else {
+                match c {
+                    '\'' | '"' => quote = Some(c),
+                    '{' => depth += 1,
+                    '}' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Some((chars[start..i].iter().collect(), i));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            i += 1;
+        }
+        None
+    }
+
     fn parse_interpolated_string(&self, s: &str, line: usize) -> StrykeResult<Expr> {
         // Parse $var and @var inside double-quoted strings
         let mut parts = Vec::new();
@@ -19944,25 +20110,18 @@ impl Parser {
                     //   `${name}[idx]` / `${name}{k}` / `${$r}[i]` …    chain after `}`
                     // stryke's prior `#{expr}` form remains supported elsewhere.
                     i += 1;
-                    let mut inner = String::new();
-                    let mut depth = 1usize;
-                    while i < chars.len() && depth > 0 {
-                        match chars[i] {
-                            '{' => depth += 1,
-                            '}' => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                            }
-                            _ => {}
+                    let inner = match Self::scan_interp_braces(&chars, i) {
+                        Some((inner, close)) => {
+                            i = close + 1; // past closing `}`
+                            inner
                         }
-                        inner.push(chars[i]);
-                        i += 1;
-                    }
-                    if i < chars.len() {
-                        i += 1; // skip closing }
-                    }
+                        None => {
+                            // Unterminated: consume the rest (historical behavior).
+                            let rest: String = chars[i..].iter().collect();
+                            i = chars.len();
+                            rest
+                        }
+                    };
 
                     // Distinguish "name" from "expression". If trimmed inner starts with
                     // `$`, `\`, or contains operator/punctuation chars, treat as Perl
@@ -20453,28 +20612,11 @@ impl Parser {
                         parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                     }
                     i += 2; // `@{`
-                    let start = i;
-                    let mut depth = 1usize;
-                    while i < chars.len() && depth > 0 {
-                        match chars[i] {
-                            '{' => depth += 1,
-                            '}' => {
-                                depth -= 1;
-                                if depth == 0 {
-                                    break;
-                                }
-                            }
-                            _ => {}
-                        }
-                        i += 1;
-                    }
-                    if depth != 0 {
-                        return Err(
+                    let (inner, close) =
+                        Self::scan_interp_braces(&chars, i).ok_or_else(|| {
                             self.syntax_err("Unterminated @{ ... } in double-quoted string", line)
-                        );
-                    }
-                    let inner: String = chars[start..i].iter().collect();
-                    i += 1; // closing `}`
+                        })?;
+                    i = close + 1; // past closing `}`
                     let inner_expr = parse_expression_from_str(inner.trim(), "-e")?;
                     parts.push(StringPart::Expr(Expr {
                         kind: ExprKind::Deref {
@@ -20554,25 +20696,18 @@ impl Parser {
                     parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                 }
                 i += 2; // skip `#{`
-                let mut inner = String::new();
-                let mut depth = 1usize;
-                while i < chars.len() && depth > 0 {
-                    match chars[i] {
-                        '{' => depth += 1,
-                        '}' => {
-                            depth -= 1;
-                            if depth == 0 {
-                                break;
-                            }
-                        }
-                        _ => {}
+                let inner = match Self::scan_interp_braces(&chars, i) {
+                    Some((inner, close)) => {
+                        i = close + 1; // past closing `}`
+                        inner
                     }
-                    inner.push(chars[i]);
-                    i += 1;
-                }
-                if i < chars.len() {
-                    i += 1; // skip closing `}`
-                }
+                    None => {
+                        // Unterminated: consume the rest (historical behavior).
+                        let rest: String = chars[i..].iter().collect();
+                        i = chars.len();
+                        rest
+                    }
+                };
                 let expr = parse_block_from_str(inner.trim(), "-e", line)?;
                 parts.push(StringPart::Expr(expr));
             } else {

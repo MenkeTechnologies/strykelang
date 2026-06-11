@@ -653,7 +653,7 @@ impl Lexer {
             let s = self.read_triple_quoted_body(true)?;
             return Ok(Token::DoubleString(s));
         }
-        let s = self.read_escaped_until('"')?;
+        let s = self.read_interpolating_until('"')?;
         Ok(Token::DoubleString(s))
     }
 
@@ -733,11 +733,19 @@ impl Lexer {
     /// (`\012`, `\077`) still resolve here, matching Perl's documented
     /// "two-or-more digit escapes are octal" rule.
     fn read_substitution_replacement(&mut self, term: char) -> StrykeResult<String> {
-        self.read_escaped_until_inner(term, true)
+        self.read_escaped_until_inner(term, true, false)
     }
 
     fn read_escaped_until(&mut self, term: char) -> StrykeResult<String> {
-        self.read_escaped_until_inner(term, false)
+        self.read_escaped_until_inner(term, false, false)
+    }
+
+    /// Like [`Self::read_escaped_until`] but for interpolating bodies
+    /// (`"…"`, `qq…`, backticks): `#{…}` / `${…}` / `@{…}` expression
+    /// regions are tracked so a `"` (or whatever `term` is) inside them
+    /// does not end the string — `"ok #{"tom"}"` lexes as one token.
+    fn read_interpolating_until(&mut self, term: char) -> StrykeResult<String> {
+        self.read_escaped_until_inner(term, false, true)
     }
 
     /// Body parser for `q{…}`, `s/.../.../`, etc. When `defer_single_digit` is
@@ -749,7 +757,35 @@ impl Lexer {
         &mut self,
         term: char,
         defer_single_digit: bool,
+        interp: bool,
     ) -> StrykeResult<String> {
+        // `#{expr}` / `${expr}` / `@{expr}` interpolation-region state
+        // (`interp` mode only). While `depth > 0` the terminator does not
+        // end the string, and `{` / `}` inside nested '…' / "…" literals
+        // (with `\` escapes) don't skew the depth count. State is tracked
+        // over the chars *pushed to the body* — the downstream interpolator
+        // re-lexes that body, so its escaping rules are the ones that govern.
+        fn interp_track(c: char, depth: &mut usize, quote: &mut Option<char>, esc: &mut bool) {
+            if let Some(q) = *quote {
+                if *esc {
+                    *esc = false;
+                } else if c == '\\' {
+                    *esc = true;
+                } else if c == q {
+                    *quote = None;
+                }
+            } else {
+                match c {
+                    '\'' | '"' => *quote = Some(c),
+                    '{' => *depth += 1,
+                    '}' => *depth = depth.saturating_sub(1),
+                    _ => {}
+                }
+            }
+        }
+        let mut interp_depth = 0usize;
+        let mut interp_quote: Option<char> = None;
+        let mut interp_esc = false;
         let mut s = String::new();
         loop {
             match self.advance() {
@@ -757,7 +793,17 @@ impl Lexer {
                     Some('n') => s.push('\n'),
                     Some('t') => s.push('\t'),
                     Some('r') => s.push('\r'),
-                    Some('\\') => s.push('\\'),
+                    Some('\\') => {
+                        if interp_depth > 0 {
+                            interp_track(
+                                '\\',
+                                &mut interp_depth,
+                                &mut interp_quote,
+                                &mut interp_esc,
+                            );
+                        }
+                        s.push('\\');
+                    }
                     Some(c @ '0'..='7') => {
                         // In substitution-replacement mode, defer `\1`..`\9`
                         // (with no further octal digit) so the replacement
@@ -904,15 +950,46 @@ impl Lexer {
                             }
                         }
                     }
-                    Some(c) if c == term => s.push(c),
+                    Some(c) if c == term => {
+                        if interp_depth > 0 {
+                            interp_track(c, &mut interp_depth, &mut interp_quote, &mut interp_esc);
+                        }
+                        s.push(c);
+                    }
                     Some(c) => {
+                        if interp_depth > 0 {
+                            interp_track(
+                                '\\',
+                                &mut interp_depth,
+                                &mut interp_quote,
+                                &mut interp_esc,
+                            );
+                            interp_track(c, &mut interp_depth, &mut interp_quote, &mut interp_esc);
+                        }
                         s.push('\\');
                         s.push(c);
                     }
                     None => return Err(self.syntax_err("Unterminated string", self.line)),
                 },
-                Some(c) if c == term => break,
-                Some(c) => s.push(c),
+                Some(c) if c == term && interp_depth == 0 => break,
+                Some(c) => {
+                    if interp_depth > 0 {
+                        interp_track(c, &mut interp_depth, &mut interp_quote, &mut interp_esc);
+                    } else if interp
+                        && matches!(c, '$' | '@' | '#')
+                        && self.peek() == Some('{')
+                        && (c != '#' || !crate::compat_mode())
+                    {
+                        // `${…}` / `@{…}` always interpolate; `#{…}` is a
+                        // stryke extension, literal under --compat.
+                        interp_depth = 1;
+                        s.push(c);
+                        self.advance(); // the `{`
+                        s.push('{');
+                        continue;
+                    }
+                    s.push(c);
+                }
                 None => return Err(self.syntax_err("Unterminated string", self.line)),
             }
         }
@@ -1724,7 +1801,7 @@ impl Lexer {
             // Backtick — Perl `` `cmd` `` (qx), not a plain double-quoted string
             '`' => {
                 self.advance();
-                let cmd = self.read_escaped_until('`')?;
+                let cmd = self.read_interpolating_until('`')?;
                 self.last_was_term = true;
                 Ok(Token::BacktickString(cmd))
             }
@@ -2169,6 +2246,18 @@ impl Lexer {
             }
             '?' => {
                 self.advance();
+                // `??` / `??=` — stryke aliases for `//` / `//=` (C#/Swift
+                // null-coalescing spelling). Literal under --compat. No
+                // clash with ternary: two adjacent `?` are never valid there.
+                if self.peek() == Some('?') && !crate::compat_mode() {
+                    self.advance();
+                    self.last_was_term = false;
+                    if self.peek() == Some('=') {
+                        self.advance();
+                        return Ok(Token::DefinedOrAssign);
+                    }
+                    return Ok(Token::DefinedOr);
+                }
                 self.last_was_term = false;
                 Ok(Token::Question)
             }
@@ -2551,6 +2640,8 @@ impl Lexer {
                         };
                         let s = if matches!(delim, '(' | '[' | '{' | '<') {
                             self.read_q_qq_balanced_body(delim, close, ident == "qq")?
+                        } else if ident == "qq" {
+                            self.read_interpolating_until(close)?
                         } else {
                             self.read_escaped_until(close)?
                         };
@@ -2602,7 +2693,7 @@ impl Lexer {
                             '<' => '>',
                             c => c,
                         };
-                        let s = self.read_escaped_until(close)?;
+                        let s = self.read_interpolating_until(close)?;
                         self.last_was_term = true;
                         return Ok(Token::BacktickString(s));
                     }
@@ -3110,6 +3201,11 @@ impl Lexer {
                     // statement-start keywords (next char is `{`, never a
                     // continuation of a term).
                     | "loop"
+                    // `ploop [N] { ... }` / `pwhile [N] (COND) { ... }` —
+                    // parallel `loop` / `while`; same statement-start
+                    // treatment.
+                    | "ploop"
+                    | "pwhile"
                     | "for"
                     | "foreach"
                     | "elsif"
@@ -3145,6 +3241,7 @@ impl Lexer {
                     | "pipeline"
                     | "pgrep"
                     | "pfor"
+                    | "pforeach"
                     | "par_lines"
                     | "par_walk"
                     | "pwatch"

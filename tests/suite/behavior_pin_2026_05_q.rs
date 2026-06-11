@@ -90,19 +90,17 @@ fn hash_slice_through_hashref_via_arrow_keys_works() {
     );
 }
 
-// ── Ternary inside `@{[ ... ]}` interpolation is rejected today ────────────
+// ── Ternary inside `@{[ ... ]}` interpolation with nested `"…"` ────────────
 
 #[test]
-fn ternary_inside_interpolated_anon_array_is_rejected_today() {
-    // BUG-092: `"@{[ $x > 0 ? "pos" : "neg" ]}"` should produce "pos" or
-    // "neg". Stryke parses the inner `?` `:` poorly and errors with
-    // "Unterminated @{ ... } in double-quoted string".
-    use stryke::error::ErrorKind;
-    let kind = parse_err_kind(r#"my $x = 5; my $s = "@{[ $x > 0 ? "pos" : "neg" ]}""#);
-    assert!(
-        matches!(kind, ErrorKind::Syntax),
-        "expected syntax error, got {:?}",
-        kind
+fn ternary_inside_interpolated_anon_array_with_nested_quotes() {
+    // BUG-092 (fixed 2026-06-11): `"@{[ $x > 0 ? "pos" : "neg" ]}"` used to
+    // die with "Unterminated @{ ... } in double-quoted string" because the
+    // lexer ended the outer string at the first nested `"`. The lexer and
+    // the interpolator now scan `${…}` / `@{…}` / `#{…}` bodies quote-aware.
+    assert_eq!(
+        eval_string(r#"my $x = 5; my $s = "@{[ $x > 0 ? "pos" : "neg" ]}"; $s"#),
+        "pos"
     );
 }
 
