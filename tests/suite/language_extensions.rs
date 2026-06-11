@@ -1477,8 +1477,8 @@ fn outer_positional_topic_in_lazy_filter() {
     // enclosing function's second positional. Regression for the Hamming-style
     // pattern: `fi { _<[_] != _1<[_] }`.
     // Use a namespaced name (`Demo::hamming`) instead of bare `h` since
-    // `h` is a stryke builtin alias for `docs`. Per CLAUDE.md: "Never
-    // name UDFs after builtins — always namespace".
+    // `h` is a stryke builtin alias for `docs` — never name UDFs after
+    // builtins; always namespace.
     assert_eq!(
         eval_int(
             r#"fn Demo::hamming {

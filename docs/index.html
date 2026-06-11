@@ -681,8 +681,8 @@ scp load_test node{1:100}:/tmp/</pre>
 <span class="prompt">stryke❯</span> <span class="cmd">ls</span>
 total 408
 -rw-r--r--    1   501    20     6148 May  9 19:13 .DS_Store
-drwxr-xr-x    4   501    20      128 May 14 13:57 .claude
-drwxr-xr-x    3   501    20       96 Apr 18 23:49 .cursor
+drwxr-xr-x    4   501    20      128 May 14 13:57 docs
+drwxr-xr-x    3   501    20       96 Apr 18 23:49 examples
 
 <span class="comment"># Coreutils-shaped builtins compose with stryke pipelines:</span>
 <span class="prompt">stryke❯</span> <span class="cmd">ls() |&gt; grep { /\.rs$/ } |&gt; sort |&gt; head 5</span>
@@ -746,7 +746,7 @@ wizard
         <p>The shell-like builtins don't shadow Perl. Renamed where conflicts existed:</p>
         <ul>
           <li><code>alias</code> stays a free Perl typeglob name (<code>*alias = \&amp;original</code>); REPL alias table is <code>repl_alias</code> / <code>set_alias</code></li>
-          <li><code>do FILE</code> remains Perl's file-eval; shell-style <code>source</code> is not added (single-spelling rule per <code>CLAUDE.md</code> "no dups")</li>
+          <li><code>do FILE</code> remains Perl's file-eval; shell-style <code>source</code> is not added (single-spelling rule — no duplicate spellings)</li>
           <li>Names like <code>open</code>, <code>close</code>, <code>read</code>, <code>write</code>, <code>print</code> remain Perl 5 file-IO builtins with full Perl semantics; shell-equivalents (<code>cat</code>, <code>tee</code>, <code>spurt</code>) sit alongside as stryke extensions</li>
         </ul>
 

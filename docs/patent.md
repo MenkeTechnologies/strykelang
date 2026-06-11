@@ -410,6 +410,3 @@ Each moat is independently load-bearing; combined they defeat design-arounds acr
 - When a feature spans multiple omnibuses (e.g., a new parallel primitive that's both a fusevm runtime feature AND a stryke language builtin), file under both as cross-claim dependent material.
 - Engineering analysis here; legal claims belong to a real patent attorney specializing in compiler/runtime/language patents.
 
----
-
-**Canonical source-of-truth:** `/Users/wizard/.claude/projects/-Users-wizard-RustroverProjects-zshrs/memory/aot_patent_strategy.md` (zshrs-project memory). This file is the strykelang-repo slice, kept in sync with the canonical when significant updates land. If conflicts exist, the canonical wins; reconcile here.
