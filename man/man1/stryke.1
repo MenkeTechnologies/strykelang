@@ -225,7 +225,16 @@ Join async task; passes through non-task values.
 Parallel grep across all cores.
 .TP
 .BR pfor " {BLOCK} @list"
-Parallel foreach.
+Parallel foreach. \fBpforeach\fR is an interchangeable alias.
+.TP
+.BR ploop " [N] {BLOCK}"
+Parallel \fBloop\fR: BODY runs as an infinite loop on each of N workers
+(default \fBthread_count()\fR); \fB$_\fR is the 1-based worker id and
+\fBlast\fR exits one worker's loop.
+.TP
+.BR pwhile " [N] (COND) {BLOCK}"
+Parallel \fBwhile\fR: each of N workers runs \fIwhile (COND) { BODY }\fR,
+re-evaluating COND per iteration.
 .TP
 .BR psort " {BLOCK} @list"
 Parallel sort.

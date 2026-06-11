@@ -131,13 +131,90 @@ fn hash_brace_with_hash_value_lookup() {
 #[test]
 fn hash_brace_with_pipe_forward_chain() {
     // Per style guide §6b: pipeline reads in execution order.
-    // Note: a nested `"…"` literal *inside* `#{…}` inside a double-
-    // quoted string clashes with the outer quote scanner, so the
-    // canonical form binds the source string to a scalar first.
     let code = r##"
         my $w = "hello";
         my $s = "rev=#{$w |> rev}";
         $s eq "rev=olleh" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+// ── Nested quotes inside interpolation regions (fixed 2026-06-11) ─────
+// The lexer used to end the outer `"…"` at the first `"` inside
+// `#{…}` / `@{…}` / `${…}`, forcing the `'…'` workaround. The string
+// scanner now tracks interp regions quote-aware, so these pin the
+// direct forms.
+
+#[test]
+fn hash_brace_nested_double_quoted_literal() {
+    let code = r##"
+        my $s = "ok #{"tom"}";
+        $s eq "ok tom" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_brace_empty_double_quoted_literal() {
+    let code = r##"
+        my $s = "#{""}";
+        $s eq "" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_brace_closing_brace_inside_nested_quotes() {
+    // A `}` inside the nested `"…"` must not close the `#{…}` region.
+    let code = r##"
+        my $s = "brace #{"}"}";
+        $s eq "brace }" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_brace_ternary_with_nested_double_quotes() {
+    let code = r##"
+        my $n = 7;
+        my $s = "n is #{$n % 2 == 0 ? "even" : "odd"}";
+        $s eq "n is odd" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_brace_pipe_forward_on_nested_string_literal() {
+    let code = r##"
+        my $s = "rev=#{"hello" |> rev}";
+        $s eq "rev=olleh" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn at_brace_anon_array_with_nested_double_quotes() {
+    let code = r##"
+        my $s = "ok @{["tom"]}";
+        $s eq "ok tom" ? 1 : 0
+    "##;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn hash_brace_escaped_quote_form_still_works() {
+    // The pre-fix `\"` spelling stays valid.
+    let code = "my $s = \"got #{length(\\\"x\\\")}\";\n$s eq \"got 1\" ? 1 : 0";
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn qq_and_backticks_track_interp_regions() {
+    let code = r##"
+        my $a = qq/ok #{"tom"}/;
+        my $b = `echo #{"hi"}`;
+        chomp $b;
+        ($a eq "ok tom" && $b eq "hi") ? 1 : 0
     "##;
     assert_eq!(eval_int(code), 1);
 }

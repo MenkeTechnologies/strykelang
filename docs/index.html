@@ -151,7 +151,7 @@
             <span class="sep">/</span>
             <a href="https://docs.rs/strykelang" target="_blank" rel="noopener noreferrer">docs.rs</a>
           </nav>
-          <p class="docs-build-line" id="strykeBuildLine">stryke v0.17.5 · Server farms first · 100% TDP load testing · Distributed agents · Scriptable congregation API (28 verbs) · Cranelift JIT · 10,431 builtins (11,164 keys in %all) · LSP + DAP + JetBrains plugin</p>
+          <p class="docs-build-line" id="strykeBuildLine">stryke v0.17.5 · Server farms first · 100% TDP load testing · Distributed agents · Scriptable congregation API (28 verbs) · Cranelift JIT · 10,435 builtins (11,168 keys in %all) · LSP + DAP + JetBrains plugin</p>
           <p class="docs-build-line"><span id="strykeLoc">310,765 Rust src · 88,960 test src · 227,166 example src</span></p>
         </div>
         <div class="tutorial-toolbar">
@@ -174,7 +174,7 @@
 
     <main class="tutorial-main">
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>STRYKE — SERVER FARMS FIRST</h2>
-      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,431 builtins in %b (11,164 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
+      <p class="tutorial-subtitle"><strong>The hottest language ever created. Literally.</strong> Pin millions of servers to 100% TDP from a single REPL. Distributed load testing with <code>stryke agent</code> + <code>stryke controller</code>. Also a blazing-fast Perl 5 interpreter: NaN-boxed values, Rayon work-stealing across every CPU, bytecode VM with Cranelift Block JIT, 10,435 builtins in %b (11,168 keys in %all), and pipe-forward syntax. <strong>100% TDP — beware.</strong></p>
 
       <section class="tutorial-section">
         <h2>Quickstart</h2>
@@ -263,7 +263,7 @@ s 'p to_yaml read_json "data.json"'</pre>
           <li><strong>Parser &amp; compiler</strong> — recursive-descent parser in <code>strykelang/parser.rs</code>, producing an AST consumed by the bytecode <code>Compiler</code> (<code>strykelang/compiler.rs</code>) that feeds the VM (<code>strykelang/vm.rs</code>). 100% lowered to bytecode. Cranelift Block JIT kicks in for hot blocks (<code>strykelang/jit.rs</code>).</li>
           <li><strong>Values</strong> — <code>StrykeValue</code> is a NaN-boxed <code>u64</code>: immediates (<code>undef</code>, <code>i32</code>, raw <code>f64</code> bits) and tagged <code>Arc&lt;HeapObject&gt;</code> pointers for big ints, strings, arrays, hashes, refs, regexes, atomics, channels.</li>
           <li><strong>Regex</strong> — three-tier engine: Rust <code>regex</code> → <code>fancy-regex</code> (backrefs) → <code>pcre2</code> (PCRE-only verbs).</li>
-          <li><strong>Parallelism</strong> — every parallel builtin uses rayon work-stealing across all cores. See <code>pmap</code>, <code>pflat_map</code>, <code>pgrep</code>, <code>pfor</code>, <code>psort</code>, <code>preduce</code>, <code>pcache</code>, <code>ppool</code>, <code>fan</code>, <code>pipeline</code>, <code>par_pipeline_stream</code>, <code>pchannel</code>, <code>pselect</code>, <code>par_walk</code>, <code>par_lines</code>, <code>par_sed</code>.</li>
+          <li><strong>Parallelism</strong> — every parallel builtin uses rayon work-stealing across all cores. See <code>pmap</code>, <code>pflat_map</code>, <code>pgrep</code>, <code>pfor</code>, <code>ploop</code>, <code>pwhile</code>, <code>psort</code>, <code>preduce</code>, <code>pcache</code>, <code>ppool</code>, <code>fan</code>, <code>pipeline</code>, <code>par_pipeline_stream</code>, <code>pchannel</code>, <code>pselect</code>, <code>par_walk</code>, <code>par_lines</code>, <code>par_sed</code>.</li>
           <li><strong>Stress testing</strong> — <code>heat(60)</code> pins ALL cores to 100% TDP. <code>stryke agent</code> + <code>stryke controller</code> for distributed fleet-wide load testing. The hottest language ever created.</li>
           <li><strong>Binary size</strong> — ~44 MB stripped with LTO + O3.</li>
         </ul>
@@ -511,7 +511,7 @@ substr $s, 9, 5              <span class="comment"># "world" — byte substr</sp
           <div class="cat-card"><h4>I/O (62+)</h4><p><code>print p say printf open close eof readline read seek tell slurp input capture pager/pg/less binmode flock getc select truncate read_lines append_file to_file read_json write_json tempfile tempdir file_size file_mtime file_atime is_symlink is_readable is_writable is_executable xopen/xo</code></p></div>
           <div class="cat-card"><h4>Filesystem (84+)</h4><p><code>files/f fr dirs/d dr sym_links glob glob_par basename dirname realpath which stat lstat size copy move spurt read_bytes path_ext path_stem path_parent path_join path_split path_is_abs path_is_rel strip_prefix strip_suffix ensure_prefix ensure_suffix</code> &mdash; <strong>full zsh glob qualifier set</strong> (<code>(/)</code>, <code>(.)</code>, <code>(@)</code>, <code>(*)</code>, <code>(L+N)</code>, <code>(om[1])</code>, <code>(N)</code>, <code>(D)</code>, <code>^</code>, <code>,</code>) on every glob entry-point.</p></div>
           <div class="cat-card"><h4>Serialization</h4><p><code>to_json/tj to_csv/tc to_toml/tt to_yaml/ty to_xml/tx to_html/th to_markdown/to_md/tmd ddump/dd stringify/str json_encode/decode yaml_encode/decode toml_encode/decode xml_encode/decode json_pretty json_minify escape_json</code></p></div>
-          <div class="cat-card"><h4>Parallel (31)</h4><p><code>pmap pflat_map pgrep pfor psort preduce preduce_init pmap_reduce pmap_chunked pcache ppool pchannel pselect puniq pfirst pany fan fan_cap pipeline par_pipeline_stream glob_par par_walk par_lines par_sed par_find_files par_line_count pwatch watch</code></p></div>
+          <div class="cat-card"><h4>Parallel (31)</h4><p><code>pmap pflat_map pgrep pfor pforeach ploop pwhile psort preduce preduce_init pmap_reduce pmap_chunked pcache ppool pchannel pselect puniq pfirst pany fan fan_cap pipeline par_pipeline_stream glob_par par_walk par_lines par_sed par_find_files par_line_count pwatch watch</code></p></div>
           <div class="cat-card" style="border-color:#f55;"><h4>🔥 Stress Testing</h4><p><code>stress_cpu stress_mem stress_io stress_test heat</code> — Pin ALL cores to 100% TDP. <code>stryke agent</code> + <code>stryke controller</code> for distributed fleet-wide load testing. The hottest language ever created. Literally.</p></div>
           <div class="cat-card" style="border-color:#a0f;"><h4>⛪ Scriptable Distributed Compute</h4><p><code>congregation pray annex harvest chant lick bestow smite excommunicate interrogate</code> — 28-verb religious-themed API for fork-spawned worker pools, scatter-gather, %soul state harvest, secure-erase, in-process cathedral discovery, <code>:cloistered</code> ACL. World-first single-keyword distributed primitives.</p></div>
           <div class="cat-card"><h4>Functional (56+)</h4><p><code>reduce fold inject collect complement constantly coalesce default_to when_true when_false if_else safe_div safe_mod safe_sqrt safe_log scan accumulate keep_if reject_if group_consecutive normalize_list softmax argmax argmin juxt2 juxt3 tap_val debug_val converge iterate_n unfold</code> &hellip;</p></div>
@@ -1727,7 +1727,7 @@ editors/intellij/build/distributions/stryke-intellij-&lt;version&gt;.zip</pre>
             <tr><td>Word operators</td><td><code>and</code> / <code>or</code> / <code>not</code> / <code>xor</code> / <code>eq</code> / <code>ne</code> / <code>lt</code> / <code>gt</code> / <code>cmp</code> / <code>x</code></td></tr>
             <tr><td>Booleans</td><td><code>true</code> / <code>false</code> / <code>undef</code></td></tr>
             <tr><td>Builtins</td><td>full canonical set from <code>%stryke::builtins</code></td></tr>
-            <tr><td>Parallel builtins</td><td><code>pmap</code> / <code>pgrep</code> / <code>pfor</code> / <code>preduce</code> / <code>pforks</code> / …</td></tr>
+            <tr><td>Parallel builtins</td><td><code>pmap</code> / <code>pgrep</code> / <code>pfor</code> / <code>pforeach</code> / <code>ploop</code> / <code>pwhile</code> / <code>preduce</code> / …</td></tr>
             <tr><td>Sigil vars</td><td><code>$x</code> scalar, <code>@x</code> array, <code>%x</code> hash, <code>$!</code> / <code>$@</code> special, <code>$_</code> / <code>@_</code> topic, <code>$_0</code> / <code>$_1</code> block params</td></tr>
             <tr><td>Block-param grammar</td><td><code>_</code>, <code>_&lt;</code>, <code>_&lt;2</code>, <code>_&lt;&lt;&lt;&lt;&lt;</code>, <code>$_&lt;3</code>, <code>$_2&lt;&lt;&lt;</code> all lex as single <code>BLOCK_PARAM</code> tokens</td></tr>
             <tr><td>Package paths</td><td><code>Foo::Bar</code>, <code>Foo::Bar::baz()</code></td></tr>
@@ -1763,7 +1763,7 @@ editors/intellij/build/distributions/stryke-intellij-&lt;version&gt;.zip</pre>
           <tbody>
             <tr><td>Control flow</td><td><code>if</code> / <code>ifelse</code> / <code>ifelsif</code> / <code>elsif</code> / <code>else</code> / <code>while</code> / <code>until</code> / <code>for</code> / <code>forrange</code> / <code>foreach</code> / <code>do</code> / <code>match</code> / <code>try</code> / <code>given</code></td></tr>
             <tr><td>Declarations</td><td><code>my</code> / <code>fn</code> / <code>sub</code> / <code>class</code> / <code>struct</code> / <code>enum</code> / <code>trait</code></td></tr>
-            <tr><td>Parallel primitives</td><td><code>pmap</code> / <code>pmaps</code> / <code>pgrep</code> / <code>pfor</code> / <code>preduce</code> / <code>pforks</code> / <code>pwhile</code></td></tr>
+            <tr><td>Parallel primitives</td><td><code>pmap</code> / <code>pmaps</code> / <code>pgrep</code> / <code>pfor</code> / <code>pforeach</code> / <code>ploop</code> / <code>pwhile</code> / <code>preduce</code></td></tr>
             <tr><td>Phase blocks</td><td><code>BEGIN</code> / <code>END</code> / <code>INIT</code> / <code>CHECK</code></td></tr>
             <tr><td>Module setup</td><td><code>use</code> / <code>strict</code> / <code>shebang</code> / <code>main</code></td></tr>
             <tr><td>Scaffolds</td><td><code>web</code> / <code>svg</code> / <code>system</code> / <code>git</code> / <code>test</code></td></tr>
