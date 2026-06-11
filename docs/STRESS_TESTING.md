@@ -149,7 +149,7 @@ Key verbs (full taxonomy in [README §0x10c](../README.md#0x10c-scriptable-distr
 
 Workers maintain `our %soul` (their externally-visible state) and `our %gift` (master-pushed config). Pin tests cover scatter/gather, chant rescatter, cloistered auth rejection, and bug-fixed `\%hash` deref + cross-EVAL persistence — see `tests/suite/scriptable_controller_pin.rs`.
 
-**13 demos** in `examples/`, all clean under `--no-interop`:
+**14 demos** in `examples/`, all clean under `--no-interop`:
 
 | Demo | Pattern |
 |---|---|
@@ -161,7 +161,7 @@ Workers maintain `our %soul` (their externally-visible state) and `our %gift` (m
 | `harvest_oneshot.stk` | `pray + annex` fused into one call |
 | `bestow_then_lick.stk` | push config → read state back |
 | `pilgrimage_barrier.stk` | 3-stage BSP barrier across 4 workers |
-| `chant_late_joiners.stk` | continuous-rescatter lifecycle |
+| `congregation_chant_late_joiners.stk` | continuous-rescatter lifecycle |
 | `smite_state_reset.stk` | reset `%soul` without disconnecting |
 | `enshrine_exhume_roundtrip.stk` | JSON persist + reload + verify |
 | `cloistered_acl_demo.stk` | ACL + cathedral + apostatize |
