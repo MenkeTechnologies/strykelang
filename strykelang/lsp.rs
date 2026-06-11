@@ -5725,7 +5725,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         ".=" => "**Append-assign** (string concat). `$s .= $more` ≡ `$s = $s . $more` but more efficient for large-string accumulators (single buffer growth, not realloc per concat). Atomic on `mysync` scalars.\n\n```perl\nval $buf = \"\"\n$buf .= $line for @lines\nmysync $log = \"\"; fan 100 { $log .= \"event\\n\" }   # atomic\n```\n\nSee also: `.`, `+=`.",
         "x=" => "**Repeat-assign** (string). `$s x= 3` ≡ `$s = $s x 3`.\n\n```perl\nval $bar = \"=\"; $bar x= 40        # forty equals signs\n```\n\nSee also: `x`.",
         "||=" => "**Or-assign.** `$x ||= $default` ≡ `$x = $x || $default` — assigns the default only if `$x` is falsy. Watch out for legitimate falsy values like `0` and `\"\"`; prefer `//=` for those.\n\n```perl\n$opts{verbose} ||= 0\n$cache{$key} ||= compute($key)        # but: returns wrong thing if 0 is valid\n```\n\nSee also: `||`, `//=`.",
-        "//=" => "**Defined-or assign.** `$x //= $default` ≡ `$x = $x // $default` — assigns the default only if `$x` is `undef`. The right tool for memoization/cache-fill patterns.\n\n```perl\n$cache{$key} //= expensive_compute($key)\n$count{$word} //= 0; $count{$word}++\n```\n\nSee also: `//`, `||=`.",
+        "//=" | "??=" => "**Defined-or assign.** `??=` is an interchangeable stryke alias (C#/Swift spelling). `$x //= $default` ≡ `$x = $x // $default` — assigns the default only if `$x` is `undef`. The right tool for memoization/cache-fill patterns.\n\n```perl\n$cache{$key} //= expensive_compute($key)\n$count{$word} //= 0; $count{$word}++\n```\n\nSee also: `//`, `||=`.",
         "&&=" => "**And-assign.** `$x &&= $val` ≡ `$x = $x && $val` — assigns `$val` only if `$x` is truthy. Rare.\n\nSee also: `&&`, `||=`.",
         "|=" => "**Bitwise OR-assign.** `$x |= 0x80` sets a bit. Atomic on `mysync` scalars.\n\nSee also: `|`.",
         "&=" => "**Bitwise AND-assign.** `$x &= 0xFF` masks to low byte.\n\nSee also: `&`.",
@@ -7970,7 +7970,7 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "<", ">", "<=", ">=", "<=>", "eq", "ne", "lt", "le", "gt", "ge", "cmp", "&&", "||",
             "//", "??", "!", "and", "or", "not", "xor", "=~", "!~", "..", "...", "=>", ",", "?:", "\\",
             "&", "|", "^", "~", "<<", ">>", "=", "+=", "-=", "*=", "/=", "**=", "%=", ".=", "x=",
-            "||=", "//=", "&&=", "|=", "&=", "^=", "<<=", ">>=",
+            "||=", "//=", "??=", "&&=", "|=", "&=", "^=", "<<=", ">>=",
         ],
     ),
     (

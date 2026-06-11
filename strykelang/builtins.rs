@@ -455,6 +455,8 @@ pub const OPERATORS: &[(&str, &str)] = &[
     (">>", "bitwise"),
     (">>=", "assign"),
     ("?", "ternary"),
+    ("??", "logical"),
+    ("??=", "assign"),
     ("@", "sigil"),
     ("[", "punct"),
     ("\\", "deref"),
