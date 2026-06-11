@@ -574,3 +574,47 @@ fn lockfile_canonicalize_sorts_packages_alphabetically() {
     // Per-package deps are sorted too.
     assert_eq!(lf.packages[1].deps, vec!["alpha@1.0.0", "beta@1.0.0"]);
 }
+
+/// `s upgrade -g` end-to-end for a path-pinned package: install v1.0.0
+/// globally, bump the source dir's manifest to v2.0.0, upgrade, and verify
+/// the global pin + store entry both moved. No network — path sources only.
+#[test]
+fn upgrade_global_repins_path_package_when_version_moves() {
+    let store_root = tempdir("upgrade-store");
+    let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+    std::env::set_var("STRYKE_HOME", &store_root);
+
+    let src = make_path_dep("mytool", "1.0.0", &[("lib/Tool.stk", "# v1\n")]);
+    assert_eq!(
+        stryke::pkg::commands::cmd_install_global(&[src.display().to_string()]),
+        0
+    );
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert_eq!(idx.find("mytool").unwrap().version, "1.0.0");
+
+    // Upstream didn't move → up to date, pin unchanged, exit 0.
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert_eq!(idx.find("mytool").unwrap().version, "1.0.0");
+
+    // Bump the source dir's version → upgrade must re-copy and re-pin.
+    std::fs::write(
+        src.join("stryke.toml"),
+        "[package]\nname = \"mytool\"\nversion = \"2.0.0\"\n",
+    )
+    .unwrap();
+    std::fs::write(src.join("lib/Tool.stk"), "# v2\n").unwrap();
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert_eq!(idx.find("mytool").unwrap().version, "2.0.0");
+    let v2 = store.package_dir("mytool", "2.0.0");
+    assert!(v2.join("lib/Tool.stk").is_file());
+    assert_eq!(
+        std::fs::read_to_string(v2.join("lib/Tool.stk")).unwrap(),
+        "# v2\n"
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}

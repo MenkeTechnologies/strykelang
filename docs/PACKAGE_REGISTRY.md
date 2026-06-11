@@ -197,6 +197,8 @@ s add mylib --path=../mylib                          # explicit --path override
 s remove http
 s update                                             # all deps within semver
 s update http                                        # specific
+s upgrade                                            # bump stryke.toml pins to latest upstream, then re-resolve
+s upgrade http                                       # bump one dep's pin only
 s tree                                               # full transitive graph
 s outdated                                           # what could be bumped
 s audit                                              # check vuln DB
@@ -218,6 +220,10 @@ s install -g ./PATH                                  # path-dep global install
 s uninstall -g mytool                                # remove store dir + installed.toml entry
 s use -g mytool@VERSION                              # switch the installed.toml pin to a different version
                                                      # already in store (no fetch)
+s upgrade -g [NAME]                                  # re-pin global packages at latest upstream —
+                                                     # github pins poll the releases API, path pins
+                                                     # re-copy when the source dir's version moved;
+                                                     # local-install pins are skipped
 s list -g                                            # print installed.toml — what `use Foo` resolves to outside a project
 s gc -g [--dry-run]                                  # remove every store dir not pinned by installed.toml.
                                                      # Project lockfiles are not consulted —
@@ -515,12 +521,12 @@ The registry rule that defines the ecosystem: **published versions are immutable
    * **Git source clone** (`{ git = "...", tag|branch|rev = ... }`): clones into `~/.stryke/git/` (shallow when `branch`/`tag` pinned, full when `rev` pinned), records `source = "git+<url>#<sha>"`, installs source-tree contents through the same `install_dir_dep` path as path deps. Refuses `[ffi]` clones with a pointer at the `github = "..."` rewrite — source clones can't reproduce the cdylib without the platform toolchain.
 10. ⏳ Features — partial: per-package feature flags parse and round-trip; resolver-side activation lands with the registry resolver.
 11. ✅ Workspaces with shared deps inheritance. **SHIPPED** — `[workspace]` + `members = ["crates/*"]` glob + `{ workspace = true }` inheritance + single root lockfile.
-12. ✅ `s install -g` for CLI tools. **SHIPPED** — `s install -g PATH`, `s uninstall -g NAME`, `s list -g`. Launchers go to `~/.stryke/bin/`.
+12. ✅ `s install -g` for CLI tools. **SHIPPED** — `s install -g PATH`, `s uninstall -g NAME`, `s list -g`, `s upgrade -g [NAME]`. Launchers go to `~/.stryke/bin/`.
 13. ⏳ Sparse registry protocol + first registry deployment. **CLI stubs shipped** (`s search`, `s publish [--dry-run]`, `s yank`); endpoint deployment is the next chunk.
 14. ✅ `s publish` (dry-run), `s yank` (stub), `s audit` (stub feed). **CLI shipped, feed/endpoint deferred.**
 15. ⏳ Sigstore signing — **deferred until registry deployed**.
 
-Plus the operational commands the RFC's command list calls out: ✅ `s update`, ✅ `s outdated`, ✅ `s vendor`, ✅ `s clean`, ✅ `s run SCRIPT` (npm-style task runner from `[scripts]`).
+Plus the operational commands the RFC's command list calls out: ✅ `s update`, ✅ `s upgrade` (bump manifest pins to latest), ✅ `s outdated`, ✅ `s vendor`, ✅ `s clean`, ✅ `s run SCRIPT` (npm-style task runner from `[scripts]`).
 
 ## Non-Goals
 

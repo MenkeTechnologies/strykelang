@@ -1577,6 +1577,153 @@ pub fn cmd_update(args: &[String]) -> i32 {
     cmd_install(&[])
 }
 
+/// `s upgrade [NAME]` — in a project: move deps to their latest upstream
+/// versions, rewriting stryke.toml pins, then re-resolve via `s update`.
+///
+/// This is deliberately stronger than `s update`: `update` re-resolves
+/// within the manifest's existing constraints; `upgrade` moves the
+/// constraints themselves. Per dep kind:
+///   - `{ github = "OWNER/REPO", version = "vX" }` — fetch the latest
+///     release tag, rewrite `version` when it moved.
+///   - `{ git = "https://github.com/..." , tag = "vX" }` — same, rewriting `tag`.
+///   - unpinned github deps already float to latest on every re-resolve.
+///   - path/workspace deps track their source dir — nothing to bump.
+///   - registry deps can't be bumped until the registry endpoint is wired.
+pub fn cmd_upgrade_project(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke upgrade [NAME]");
+        println!();
+        println!("Move deps to their latest upstream versions and re-resolve. Unlike");
+        println!("`s update` (re-resolve within existing constraints), this rewrites the");
+        println!("stryke.toml pins themselves:");
+        println!("  github deps    pinned `version` bumped to the latest release tag");
+        println!("  git deps       pinned `tag` bumped (github-hosted URLs only)");
+        println!("  path deps      nothing to bump — they track their source dir");
+        println!("  registry deps  skipped until the registry endpoint is wired");
+        println!();
+        println!("NAME: when given, only that dep's pin is bumped (others stay).");
+        println!("Outside a project, use `s upgrade -g` for global packages.");
+        return 0;
+    }
+    let filter = args.iter().find(|a| !a.starts_with('-')).cloned();
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("s upgrade: cwd: {}", e);
+            return 1;
+        }
+    };
+    let root = match find_project_root(&cwd) {
+        Some(r) => r,
+        None => {
+            eprintln!("s upgrade: no stryke.toml found (use `s upgrade -g` for global packages)");
+            return 1;
+        }
+    };
+    let manifest_path = root.join(MANIFEST_FILE);
+    let mut manifest = match Manifest::from_path(&manifest_path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("s upgrade: {}", e);
+            return 1;
+        }
+    };
+
+    // Bump pins across [deps], [dev-deps], and every [groups.*] table.
+    let mut bumped = 0u32;
+    let mut failed = 0u32;
+    let mut sections: Vec<&mut IndexMap<String, DepSpec>> =
+        vec![&mut manifest.deps, &mut manifest.dev_deps];
+    sections.extend(manifest.groups.values_mut());
+    for section in sections {
+        for (name, spec) in section.iter_mut() {
+            if filter.as_deref().map_or(false, |f| name != f) {
+                continue;
+            }
+            match bump_dep_pin(name, spec) {
+                Ok(true) => bumped += 1,
+                Ok(false) => {}
+                Err(e) => {
+                    eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", name, e);
+                    failed += 1;
+                }
+            }
+        }
+    }
+
+    if bumped > 0 {
+        let body = match manifest.to_toml_string() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("s upgrade: {}", e);
+                return 1;
+            }
+        };
+        if let Err(e) = std::fs::write(&manifest_path, body) {
+            eprintln!("s upgrade: write {}: {}", manifest_path.display(), e);
+            return 1;
+        }
+    }
+    if failed > 0 {
+        return 1;
+    }
+    // Re-resolve regardless: unpinned github deps float to latest here, and
+    // path-dep integrity hashes re-pin against the current source dirs.
+    cmd_update(&[])
+}
+
+/// Bump one dep's manifest pin to the latest upstream release. Returns
+/// `Ok(true)` when the pin was rewritten, `Ok(false)` when there was nothing
+/// to bump (already latest, unpinned, path/workspace, or registry dep).
+fn bump_dep_pin(name: &str, spec: &mut DepSpec) -> Result<bool, String> {
+    let DepSpec::Detailed(d) = spec else {
+        // Bare `name = "1.0"` registry shorthand — registry not wired.
+        eprintln!("  - {} registry dep — skipped (registry not wired)", name);
+        return Ok(false);
+    };
+    // `{ github = "OWNER/REPO" }` — bump the `version` pin.
+    if let Some(owner_repo) = d.github.clone() {
+        let Some(pinned) = d.version.clone() else {
+            eprintln!("  ✓ {} unpinned github dep — floats to latest on re-resolve", name);
+            return Ok(false);
+        };
+        let (owner, repo) = parse_gh_owner_repo(&owner_repo)?;
+        let latest = fetch_latest_release_tag(&owner, &repo)?;
+        if same_version(&latest, &pinned) {
+            eprintln!("  ✓ {}@{} up to date", name, pinned);
+            return Ok(false);
+        }
+        eprintln!("  \x1b[33m{} {} → {}\x1b[0m", name, pinned, latest);
+        d.version = Some(latest);
+        return Ok(true);
+    }
+    // `{ git = "https://github.com/...", tag = "vX" }` — bump the `tag` pin.
+    if let Some(url) = d.git.clone() {
+        let Some((owner, repo)) = super::resolver::parse_github_url(&url) else {
+            eprintln!("  - {} non-github git dep — skipped (no release API)", name);
+            return Ok(false);
+        };
+        let Some(pinned) = d.tag.clone() else {
+            eprintln!("  ✓ {} unpinned git dep — floats to latest on re-resolve", name);
+            return Ok(false);
+        };
+        let latest = fetch_latest_release_tag(&owner, &repo)?;
+        if same_version(&latest, &pinned) {
+            eprintln!("  ✓ {}@{} up to date", name, pinned);
+            return Ok(false);
+        }
+        eprintln!("  \x1b[33m{} {} → {}\x1b[0m", name, pinned, latest);
+        d.tag = Some(latest);
+        return Ok(true);
+    }
+    if d.path.is_some() || d.workspace {
+        // Path/workspace deps track their source — re-resolve handles them.
+        return Ok(false);
+    }
+    eprintln!("  - {} registry dep — skipped (registry not wired)", name);
+    Ok(false)
+}
+
 /// `s outdated` — compare every dep's lockfile pin against its current
 /// upstream state. For path deps that means rehashing the source dir; if the
 /// integrity hash drifted, the dep is "outdated." Registry deps return a
@@ -2001,23 +2148,36 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
         },
     };
 
+    if let Err(msg) = finalize_global_install(&store, &manifest, &store_pkg_dir, &source) {
+        eprintln!("s install -g: {}", msg);
+        return 1;
+    }
+    0
+}
+
+/// Shared tail of every global install/upgrade: write the `[bin]` launchers,
+/// pin the package in `~/.stryke/installed.toml`, and print the success line.
+/// Called by `cmd_install_global` and per-package by `cmd_upgrade_global`.
+fn finalize_global_install(
+    store: &Store,
+    manifest: &Manifest,
+    store_pkg_dir: &Path,
+    source: &str,
+) -> Result<(), String> {
     // Launchers from [bin]. FFI-only packages may have empty [bin] — fine,
     // they're invoked via `use <namespace>` not via a CLI launcher.
     for (bin_name, entry) in &manifest.bin {
         let target = store_pkg_dir.join(entry);
         if !target.is_file() {
-            eprintln!(
-                "s install -g: bin `{}` -> {} does not exist",
+            return Err(format!(
+                "bin `{}` -> {} does not exist",
                 bin_name,
                 target.display()
-            );
-            return 1;
+            ));
         }
         let launcher = store.bin_dir().join(bin_name);
-        if let Err(e) = write_launcher(&launcher, &target) {
-            eprintln!("s install -g: write {}: {}", launcher.display(), e);
-            return 1;
-        }
+        write_launcher(&launcher, &target)
+            .map_err(|e| format!("write {}: {}", launcher.display(), e))?;
         eprintln!("  installed {} -> {}", launcher.display(), target.display());
     }
 
@@ -2025,23 +2185,14 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
     // (no project dir) can resolve `use <namespace>` to this store entry
     // — that's the resolution path resolve_module's third arm walks.
     if let Some(pkg) = manifest.package.as_ref() {
-        let mut idx = match InstalledIndex::load_or_default() {
-            Ok(i) => i,
-            Err(e) => {
-                eprintln!("s install -g: load installed.toml: {}", e);
-                return 1;
-            }
-        };
+        let mut idx =
+            InstalledIndex::load_or_default().map_err(|e| format!("load installed.toml: {}", e))?;
         // Warn loud when replacing a different pinned version so the user
         // notices the old store dir is now an orphan. Same-version reinstall
         // is silent (idempotent re-runs are normal).
         if let Some(prev) = idx.find(&pkg.name) {
             if prev.version != pkg.version {
-                let old_dir = if let Ok(s) = Store::user_default() {
-                    s.package_dir(&pkg.name, &prev.version)
-                } else {
-                    std::path::PathBuf::from(format!("{}@{}", pkg.name, prev.version))
-                };
+                let old_dir = store.package_dir(&pkg.name, &prev.version);
                 eprintln!(
                     "  \x1b[33mreplacing pinned {} {} → {}\x1b[0m  ({} kept on disk; run `s pkg gc -g` to free)",
                     pkg.name,
@@ -2056,11 +2207,9 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
             .as_ref()
             .map(|f| f.namespace.clone())
             .unwrap_or_default();
-        idx.upsert_with_namespace(&pkg.name, &pkg.version, &source, &namespace);
-        if let Err(e) = idx.save() {
-            eprintln!("s install -g: write installed.toml: {}", e);
-            return 1;
-        }
+        idx.upsert_with_namespace(&pkg.name, &pkg.version, source, &namespace);
+        idx.save()
+            .map_err(|e| format!("write installed.toml: {}", e))?;
     }
 
     let pkg_label = manifest
@@ -2082,7 +2231,187 @@ pub fn cmd_install_global(args: &[String]) -> i32 {
     if !manifest.bin.is_empty() {
         eprintln!("  (add {} to PATH)", store.bin_dir().display());
     }
-    0
+    Ok(())
+}
+
+/// A pinned package's provenance, parsed back out of the `source` string
+/// `s install -g` wrote into `~/.stryke/installed.toml`.
+enum PinnedSource {
+    /// `github:owner/repo@tag` — upgradable by asking the GitHub releases API
+    /// for the latest tag.
+    GitHub { owner: String, repo: String },
+    /// `path+file:///abs/dir` — upgradable by re-reading the source dir's
+    /// manifest and re-copying when its version moved.
+    Path(PathBuf),
+    /// `local-install:name@version` — pinned by `s install` inside a project;
+    /// there is no upstream to poll, the owning project drives it.
+    Local,
+}
+
+impl PinnedSource {
+    fn parse(source: &str) -> Option<PinnedSource> {
+        if let Some(rest) = source.strip_prefix("github:") {
+            let head = rest.split('@').next().unwrap_or(rest);
+            let (owner, repo) = parse_gh_owner_repo(head).ok()?;
+            return Some(PinnedSource::GitHub { owner, repo });
+        }
+        if let Some(p) = source.strip_prefix("path+file://") {
+            return Some(PinnedSource::Path(PathBuf::from(p)));
+        }
+        if source.starts_with("local-install:") {
+            return Some(PinnedSource::Local);
+        }
+        None
+    }
+}
+
+/// `v0.2.0` and `0.2.0` are the same version — release tags conventionally
+/// carry the `v`, manifest `[package].version` never does.
+fn same_version(a: &str, b: &str) -> bool {
+    a.trim_start_matches('v') == b.trim_start_matches('v')
+}
+
+/// `s upgrade -g [NAME]` — re-pin every globally installed package at its
+/// latest upstream version. GitHub pins poll the releases API and reinstall
+/// when the tag moved; path pins re-read the source dir's manifest and
+/// re-copy when its version moved; `local-install:` pins are skipped (the
+/// owning project's `s install` drives those). With NAME, only that package.
+pub fn cmd_upgrade_global(args: &[String]) -> i32 {
+    if args.iter().any(|a| is_help_flag(a)) {
+        println!("usage: stryke upgrade -g [NAME]");
+        println!();
+        println!("Upgrade globally installed packages (~/.stryke/installed.toml) to their");
+        println!("latest upstream versions. Per pinned source:");
+        println!("  github:owner/repo@tag    fetch latest release tag, reinstall if newer");
+        println!("  path+file:///dir         re-copy when the source dir's version moved");
+        println!("  local-install:...        skipped — re-run `s install` in that project");
+        println!();
+        println!("NAME: when given, only that package is upgraded.");
+        return 0;
+    }
+    let filter = args.iter().find(|a| !a.starts_with('-')).cloned();
+    let store = match Store::user_default() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("s upgrade -g: {}", e);
+            return 1;
+        }
+    };
+    let idx = match InstalledIndex::load_or_default() {
+        Ok(i) => i,
+        Err(e) => {
+            eprintln!("s upgrade -g: load installed.toml: {}", e);
+            return 1;
+        }
+    };
+    // Snapshot the entries up front: finalize_global_install rewrites
+    // installed.toml after each successful upgrade.
+    let entries: Vec<_> = idx
+        .packages
+        .iter()
+        .filter(|p| filter.as_deref().map_or(true, |f| p.name == f))
+        .cloned()
+        .collect();
+    if entries.is_empty() {
+        match filter {
+            Some(f) => {
+                eprintln!("s upgrade -g: `{}` is not in installed.toml", f);
+                return 1;
+            }
+            None => {
+                eprintln!("s upgrade -g: no global packages installed");
+                return 0;
+            }
+        }
+    }
+
+    let (mut upgraded, mut current, mut skipped, mut failed) = (0u32, 0u32, 0u32, 0u32);
+    for entry in &entries {
+        match PinnedSource::parse(&entry.source) {
+            Some(PinnedSource::GitHub { owner, repo }) => {
+                let latest = match fetch_latest_release_tag(&owner, &repo) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
+                        failed += 1;
+                        continue;
+                    }
+                };
+                if same_version(&latest, &entry.version) {
+                    eprintln!("  ✓ {}@{} up to date", entry.name, entry.version);
+                    current += 1;
+                    continue;
+                }
+                match install_global_from_github(&store, &owner, &repo, Some(&latest))
+                    .and_then(|(m, dir, src)| finalize_global_install(&store, &m, &dir, &src))
+                {
+                    Ok(()) => upgraded += 1,
+                    Err(e) => {
+                        eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
+                        failed += 1;
+                    }
+                }
+            }
+            Some(PinnedSource::Path(dir)) => {
+                let upstream = match Manifest::from_path(&dir.join(MANIFEST_FILE)) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        eprintln!(
+                            "  \x1b[31m✗ {}: source dir {}: {}\x1b[0m",
+                            entry.name,
+                            dir.display(),
+                            e
+                        );
+                        failed += 1;
+                        continue;
+                    }
+                };
+                let upstream_version = upstream
+                    .package
+                    .as_ref()
+                    .map(|p| p.version.clone())
+                    .unwrap_or_default();
+                if same_version(&upstream_version, &entry.version) {
+                    eprintln!("  ✓ {}@{} up to date", entry.name, entry.version);
+                    current += 1;
+                    continue;
+                }
+                match install_global_from_path(&store, &dir)
+                    .and_then(|(m, sdir, src)| finalize_global_install(&store, &m, &sdir, &src))
+                {
+                    Ok(()) => upgraded += 1,
+                    Err(e) => {
+                        eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
+                        failed += 1;
+                    }
+                }
+            }
+            Some(PinnedSource::Local) => {
+                eprintln!(
+                    "  - {}@{} pinned by a project install — re-run `s install` there",
+                    entry.name, entry.version
+                );
+                skipped += 1;
+            }
+            None => {
+                eprintln!(
+                    "  - {}@{} unrecognized source `{}` — skipped",
+                    entry.name, entry.version, entry.source
+                );
+                skipped += 1;
+            }
+        }
+    }
+
+    eprintln!(
+        "{} upgraded, {} up to date, {} skipped, {} failed",
+        upgraded, current, skipped, failed
+    );
+    if failed > 0 {
+        1
+    } else {
+        0
+    }
 }
 
 /// Parsed argument to `s install -g SPEC`.
@@ -3021,8 +3350,10 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!("  add NAME[@VER] [...]      add a dep to stryke.toml");
         println!("  remove NAME               drop a dep from stryke.toml");
         println!(
-            "  update [NAME]             re-resolve and rewrite stryke.lock (alias: up, upgrade)"
+            "  update [NAME]             re-resolve within manifest constraints, rewrite stryke.lock (alias: up)"
         );
+        println!("  upgrade [NAME]            bump stryke.toml pins to latest upstream, then re-resolve");
+        println!("  upgrade -g [NAME]         upgrade global packages to latest upstream versions");
         println!("  outdated                  report deps drifted from their lock pin");
         println!("  audit                     check lockfile against advisory feed");
         println!("  tree                      print resolved dep graph");
@@ -3120,7 +3451,20 @@ pub fn dispatch(args: &[String]) -> i32 {
         }
         "tree" => cmd_tree(&args[1..]),
         "info" => cmd_info(&args[1..]),
-        "update" | "up" | "upgrade" => cmd_update(&args[1..]),
+        "update" | "up" | "upgrade" => {
+            if args.iter().skip(1).any(|a| a == "-g" || a == "--global") {
+                let filtered: Vec<String> = args[1..]
+                    .iter()
+                    .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                    .cloned()
+                    .collect();
+                cmd_upgrade_global(&filtered)
+            } else if args[0] == "upgrade" {
+                cmd_upgrade_project(&args[1..])
+            } else {
+                cmd_update(&args[1..])
+            }
+        }
         "outdated" => cmd_outdated(&args[1..]),
         "audit" => cmd_audit(&args[1..]),
         "vendor" => cmd_vendor(&args[1..]),
@@ -3157,6 +3501,77 @@ mod tests {
         let _ = std::fs::remove_dir_all(&p);
         std::fs::create_dir_all(&p).unwrap();
         p
+    }
+
+    #[test]
+    fn pinned_source_parse_covers_all_install_writers() {
+        // Every string shape a `let source = ...` writer produces must
+        // round-trip through PinnedSource::parse.
+        match PinnedSource::parse("github:MenkeTechnologies/stryke-gui@v0.3.0") {
+            Some(PinnedSource::GitHub { owner, repo }) => {
+                assert_eq!(owner, "MenkeTechnologies");
+                assert_eq!(repo, "stryke-gui");
+            }
+            other => panic!("expected GitHub source, got {:?}", other.is_some()),
+        }
+        match PinnedSource::parse("path+file:///tmp/mytool") {
+            Some(PinnedSource::Path(p)) => assert_eq!(p, PathBuf::from("/tmp/mytool")),
+            other => panic!("expected Path source, got {:?}", other.is_some()),
+        }
+        assert!(matches!(
+            PinnedSource::parse("local-install:foo@1.0.0"),
+            Some(PinnedSource::Local)
+        ));
+        assert!(PinnedSource::parse("registry:foo@1.0.0").is_none());
+        assert!(PinnedSource::parse("").is_none());
+    }
+
+    #[test]
+    fn bump_dep_pin_no_network_paths() {
+        // Every branch that must NOT hit the GitHub API returns Ok(false).
+        let mut bare = DepSpec::Version("1.0".into());
+        assert_eq!(bump_dep_pin("http", &mut bare), Ok(false));
+
+        let mut path_dep = DepSpec::Detailed(DetailedDep {
+            path: Some("../mylib".into()),
+            ..Default::default()
+        });
+        assert_eq!(bump_dep_pin("mylib", &mut path_dep), Ok(false));
+
+        // Unpinned github dep floats on re-resolve — no API call, no rewrite.
+        let mut floating = DepSpec::Detailed(DetailedDep {
+            github: Some("owner/repo".into()),
+            ..Default::default()
+        });
+        assert_eq!(bump_dep_pin("float", &mut floating), Ok(false));
+
+        // Non-github git URL has no releases API to poll.
+        let mut gitlab = DepSpec::Detailed(DetailedDep {
+            git: Some("https://gitlab.com/owner/repo.git".into()),
+            tag: Some("v1.0".into()),
+            ..Default::default()
+        });
+        assert_eq!(bump_dep_pin("gl", &mut gitlab), Ok(false));
+    }
+
+    #[test]
+    fn same_version_normalizes_v_prefix() {
+        assert!(same_version("v0.2.0", "0.2.0"));
+        assert!(same_version("0.2.0", "v0.2.0"));
+        assert!(same_version("v1.0", "v1.0"));
+        assert!(!same_version("v0.2.0", "0.2.1"));
+    }
+
+    #[test]
+    fn upgrade_global_unknown_name_errors() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("upgrade-unknown");
+        std::env::set_var("STRYKE_HOME", &home);
+        // Empty index + explicit NAME → exit 1 (typo protection).
+        assert_eq!(cmd_upgrade_global(&["nosuchpkg".to_string()]), 1);
+        // Empty index, no NAME → nothing to do, exit 0.
+        assert_eq!(cmd_upgrade_global(&[]), 0);
+        std::env::remove_var("STRYKE_HOME");
     }
 
     #[test]
