@@ -1099,24 +1099,41 @@ pub fn resolve_module(
         return Ok(Some(local));
     }
 
-    // 1b. Flat-layout namespace bridge. When this project's
-    //     `[ffi].namespace` matches segments[0] (case-insensitive), sub-
-    //     packages may live at `lib/<rest>.stk` rather than nested under
-    //     `lib/<Ns>/<rest>.stk` — every stryke-* connector ships this
-    //     way (`stryke-arrow/lib/Parquet.stk` declares
-    //     `package Arrow::Parquet`, no `lib/Arrow/` subdir). Mirrors the
-    //     global-store branch (#3) below so `s test` inside the package
-    //     dir finds its own siblings without needing `s install -g .`
-    //     after every edit.
+    // 1b. Flat-layout namespace bridge. Stryke-* packages ship
+    //     `lib/<Sub>.stk` declaring `package <Ns>::<Sub>` with no
+    //     `lib/<Ns>/` subdir. Bridge fires when segments[0] (case-
+    //     insensitive) matches any of:
+    //       * `[ffi].namespace` — FFI packages (stryke-arrow, stryke-aws).
+    //       * `[package].name` — packages literally named after the
+    //         namespace (rare; future-proofing).
+    //       * `[package].name` minus the `stryke-` prefix — every
+    //         stryke-* pure-stryke package (stryke-utils: name =
+    //         "stryke-utils", umbrella = `Utils`).
+    //     Mirrors the global-store branch (#3) and the
+    //     `canonical_store_names_for_namespace` 3-arm logic so `s test`
+    //     inside the package dir finds its own siblings without
+    //     needing `s install -g .` after every edit.
     if segments.len() > 1 {
         if let Ok(manifest) = Manifest::from_path(&root.join(MANIFEST_FILE)) {
-            if let Some(ffi) = &manifest.ffi {
-                if !ffi.namespace.is_empty() && ffi.namespace.eq_ignore_ascii_case(segments[0]) {
-                    let flat = root.join("lib").join(segments_to_path(&segments[1..]));
-                    if flat.is_file() {
-                        let _ = try_load_ffi_for(root);
-                        return Ok(Some(flat));
-                    }
+            let seg0_lc = segments[0].to_lowercase();
+            let ns_match = manifest
+                .ffi
+                .as_ref()
+                .map(|f| !f.namespace.is_empty() && f.namespace.eq_ignore_ascii_case(segments[0]))
+                .unwrap_or(false);
+            let pkg_name_match = manifest
+                .package
+                .as_ref()
+                .map(|p| {
+                    let n = p.name.to_lowercase();
+                    n == seg0_lc || n == format!("stryke-{}", seg0_lc)
+                })
+                .unwrap_or(false);
+            if ns_match || pkg_name_match {
+                let flat = root.join("lib").join(segments_to_path(&segments[1..]));
+                if flat.is_file() {
+                    let _ = try_load_ffi_for(root);
+                    return Ok(Some(flat));
                 }
             }
         }
@@ -3557,6 +3574,46 @@ mod tests {
         std::fs::write(root.join("lib/Parquet.stk"), b"# parquet").unwrap();
         let r = resolve_module(&root, "Other::Parquet", None).unwrap();
         assert!(r.is_none(), "must not bridge across namespaces: {:?}", r);
+    }
+
+    /// Pure-stryke packages with no `[ffi]` table still need the bridge.
+    /// `stryke-utils` ships `lib/String.stk` declaring `package
+    /// Utils::String` and a top-level `[package].name = "stryke-utils"`
+    /// with no `[ffi]` block — `use Utils::String` from inside the
+    /// project must chase `lib/String.stk` via the `stryke-<ns>` name
+    /// arm. Without this, the umbrella `use Utils` triggers a chain of
+    /// `Can't locate Utils/<Sub>.pm in @INC` errors and every assertion
+    /// past `Utils::version()` fails.
+    #[test]
+    fn resolve_module_local_lib_flat_layout_via_stryke_prefix_pkg_name() {
+        let root = tempdir("proj-flat-pure");
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"stryke-utils\"\nversion=\"0.1.1\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/String.stk"), b"# string").unwrap();
+        let r = resolve_module(&root, "Utils::String", None)
+            .unwrap()
+            .unwrap();
+        assert!(r.ends_with("lib/String.stk"), "got {:?}", r);
+    }
+
+    /// Pure-stryke bridge stays scoped: an unrelated `use Foo::Bar` from
+    /// inside `stryke-utils` must NOT bind to `lib/Bar.stk`.
+    #[test]
+    fn resolve_module_local_lib_flat_layout_pkg_name_bridge_scoped() {
+        let root = tempdir("proj-flat-pure-mismatch");
+        std::fs::write(
+            root.join(MANIFEST_FILE),
+            "[package]\nname=\"stryke-utils\"\nversion=\"0.1.1\"\n",
+        )
+        .unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(root.join("lib/Bar.stk"), b"# bar").unwrap();
+        let r = resolve_module(&root, "Foo::Bar", None).unwrap();
+        assert!(r.is_none(), "must not bridge unrelated namespaces: {:?}", r);
     }
 
     #[test]
