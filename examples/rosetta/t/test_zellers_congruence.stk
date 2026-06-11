@@ -24,7 +24,7 @@ assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(1969, 7, 20)),
 assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(2000, 1, 1)),
     "Saturday", "Y2K dawn was Saturday"
 
-# 2026-04-28 (today's date in stryke world per CLAUDE.md) — Tuesday.
+# 2026-04-28 was a Tuesday.
 assert_eq Rosetta::Zeller::name(Rosetta::Zeller::day_of_week(2026, 4, 28)),
     "Tuesday", "2026-04-28 is Tuesday"
 

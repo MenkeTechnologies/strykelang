@@ -190,8 +190,8 @@ impl BloomFilter {
 
     /// Wire format: 8-byte magic + version + log2_cap + k + inserted +
     /// bit words. Versioned so future format changes don't silently
-    /// load wrong data (CLAUDE.md endgame: "Bytecode and SQLite formats
-    /// must be versioned and migration-safe").
+    /// load wrong data — on-disk formats must be versioned and
+    /// migration-safe.
     pub fn serialize(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(32 + self.bits.bits.len() * 8);
         out.extend_from_slice(b"STKBLOM\x01"); // magic + version 1
