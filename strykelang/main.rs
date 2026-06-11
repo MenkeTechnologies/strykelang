@@ -1358,6 +1358,17 @@ fn main() {
         process::exit(stryke::pkg::commands::cmd_info(&args[2..]));
     }
     if args.len() >= 2 && matches!(args[1].as_str(), "update" | "up" | "upgrade") {
+        if args[2..].iter().any(|a| a == "-g" || a == "--global") {
+            let filtered: Vec<String> = args[2..]
+                .iter()
+                .filter(|a| !matches!(a.as_str(), "-g" | "--global"))
+                .cloned()
+                .collect();
+            process::exit(stryke::pkg::commands::cmd_upgrade_global(&filtered));
+        }
+        if args[1] == "upgrade" {
+            process::exit(stryke::pkg::commands::cmd_upgrade_project(&args[2..]));
+        }
         process::exit(stryke::pkg::commands::cmd_update(&args[2..]));
     }
     if args.len() >= 2 && args[1] == "outdated" {
