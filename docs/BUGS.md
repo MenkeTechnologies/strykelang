@@ -3466,8 +3466,11 @@ s 'val $h = +{a=>1,b=>2}; p join(",", sort keys %{ +{ %$h } })'   # a,b
 
 A downstream consumer that knows the sentinel (e.g. `mcp_server_start`)
 may still expand it, which masks the bug — but any direct `$c->{name}`
-read returns undef. Hit in `stryke-mcpd` `Mcpd::Server::serve`, whose
-`map { +{ %$_, run => ... } }` produced sentinel-keyed specs that happened
-to still serve; fixed downstream by switching to `+{ (%$_, run => ...) }`.
-Downstream guard: `stryke-mcpd/t/test_mcpd.stk` ("wrap_all preserves spec
-keys"). No upstream pin test yet.
+read returns undef. The parenthesized-list and list-assignment forms
+work in simple REPL cases but were ALSO observed dropping keys when
+copying a constructed spec hash inside a compiled module, so the only
+reliable workaround is enumerating the keys explicitly:
+`+{ name => $t->{name}, ..., run => ... }`. Hit in `stryke-mcpd`
+`Mcpd::Server::serve`/`wrap_all`; fixed downstream with explicit keys.
+Downstream guard: `stryke-mcpd/t/test_mcpd.stk` ("wrap_all preserves
+spec keys"). No upstream pin test yet.
