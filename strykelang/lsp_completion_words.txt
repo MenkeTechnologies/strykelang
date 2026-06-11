@@ -18317,6 +18317,7 @@ nubb
 nuclear_magneton
 nucleation_rate_constant
 nucleolus_lp_step
+null
 null_space
 nullspace
 num_cpus
@@ -18873,6 +18874,7 @@ pflat_map_on
 pflat_maps
 pflt
 pfor
+pforeach
 pfreq
 pfrequencies
 pfrq
@@ -18965,6 +18967,7 @@ plastic_number
 plate_reverb_simple
 plethystic_substitution_value
 plnorm
+ploop
 plot_svg
 pluck
 plur
@@ -19280,6 +19283,7 @@ pwave_velocity_depth
 pwd
 pwd_str
 pweibull
+pwhile
 pwi
 pwm_score
 pyramid_volume
