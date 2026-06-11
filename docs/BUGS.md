@@ -3440,3 +3440,34 @@ in `stryke-mcpd` v0.1.0 `fs_list` (returned "" for every directory) — fixed
 downstream by switching to `glob`. Downstream guard:
 `stryke-mcpd/t/test_mcpd.stk` ("fs_list sorted incl dotfiles"). No upstream
 pin test yet.
+
+## BUG-305 — `+{ %$h, k => v }` (hash-spread plus override in a hashref literal) drops the spread keys, leaving a literal `__HASH_SPREAD__` key — **`bug`**
+
+A hashref literal that splats a hashref **and** adds explicit pairs keeps
+only the explicit pairs; the spread collapses to a single sentinel key
+named `__HASH_SPREAD__`. The spread-only form `+{ %$h }` is fine, and the
+list-assignment form `(%$h, k => v)` is fine — only the combined
+hashref-literal form is broken.
+
+```
+# BROKEN — keys are "__HASH_SPREAD__,run", name/description gone
+s 'val $h = +{name=>"x", description=>"d", run=>fn{1}}
+   val $c = +{ %$h, name=>"y" }
+   p join(",", sort keys %$c)'        # __HASH_SPREAD__,run
+
+# WORKS — parenthesized list inside the hashref literal
+s 'val $h = +{name=>"x", description=>"d"}
+   val $c = +{ (%$h, name=>"y") }
+   p join(",", sort keys %$c)'        # description,name
+
+# WORKS — splat with no override
+s 'val $h = +{a=>1,b=>2}; p join(",", sort keys %{ +{ %$h } })'   # a,b
+```
+
+A downstream consumer that knows the sentinel (e.g. `mcp_server_start`)
+may still expand it, which masks the bug — but any direct `$c->{name}`
+read returns undef. Hit in `stryke-mcpd` `Mcpd::Server::serve`, whose
+`map { +{ %$_, run => ... } }` produced sentinel-keyed specs that happened
+to still serve; fixed downstream by switching to `+{ (%$_, run => ...) }`.
+Downstream guard: `stryke-mcpd/t/test_mcpd.stk` ("wrap_all preserves spec
+keys"). No upstream pin test yet.
