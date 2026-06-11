@@ -205,10 +205,6 @@
 
       <div class="feature-grid" style="margin-top:1.2rem;">
         <div class="feature-card">
-          <h4>By Per-Year Output</h4>
-          <p>Since the first public commits in April&nbsp;2026, the tree has already crossed a quarter-million lines of production Rust &mdash; a higher sustained velocity than interpreters that historically averaged hundreds of lines per author-year of C over multi-decade lifetimes. Different orders of magnitude &mdash; different feature scope.</p>
-        </div>
-        <div class="feature-card">
           <h4>By Test Surface</h4>
           <p><code>14,001</code> <code>#[test]</code> functions + <code>20,056</code> Perl-parity cases + <code>12,955</code> <code>assert_eq</code> / <code>assert_ok</code> checks in <code>examples/rosetta</code> + <code>examples/project</code>. The cross-implementation parity suite is the critical part — only mature dynamic langs ship one (Perl, Ruby, Python) and stryke is the only one running its parity suite against another implementation (perl) on every CI cycle.</p>
         </div>
@@ -577,24 +573,6 @@
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// STARTUP BANNER</h3>
       <p>The banner is computed at REPL launch from live reflection — never hard-coded. Numbers shift as builtins land or get removed.</p>
-<pre style="font-size:11px;line-height:1.4;">
- ███████╗████████╗██████╗ ██╗   ██╗██╗  ██╗███████╗
- ██╔════╝╚══██╔══╝██╔══██╗╚██╗ ██╔╝██║ ██╔╝██╔════╝
- ███████╗   ██║   ██████╔╝ ╚████╔╝ █████╔╝ █████╗
- ╚════██║   ██║   ██╔══██╗  ╚██╔╝  ██╔═██╗ ██╔══╝
- ███████║   ██║   ██║  ██║   ██║   ██║  ██╗███████╗
- ╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚══════╝
- ┌────────────────────────────────────────────────────────────────┐
- │ SYSTEM  status: ONLINE // os: macos arch: aarch64 pid: 30386   │
- │ CORES   18    MEM  56.2 / 64.0 GiB available                   │
- ├────────────────────────────────────────────────────────────────┤
- │ %b  builtins   10296  %a  aliases    641    %all 11022         │
- │ %k  keywords   85     %o  operators  70     %v   97            │
- │ %pc perl5 core 185    %e  stryke ext 10111  %d   4255          │
- │ %c  categories 307    %p  primaries  8805                      │
- └────────────────────────────────────────────────────────────────┘
-  &gt;&gt; PARALLEL PERL5 INTERPRETER // RUST-POWERED v0.16.39 &lt;&lt;
-</pre>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// SHELL-LIKE BUILTINS (NO FORK, NO EXEC)</h3>
       <div class="feature-grid">
