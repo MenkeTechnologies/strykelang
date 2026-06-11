@@ -154,10 +154,10 @@ fn pack_v_unsigned_le_roundtrip() {
 }
 
 #[test]
-fn unpack_h_star_hex_digits_uppercase() {
+fn unpack_h_star_hex_digits_lowercase() {
     assert_eq!(
         eval_string(r#"my $b = pack 'C', 255; unpack 'H*', $b"#),
-        "FF"
+        "ff"
     );
 }
 

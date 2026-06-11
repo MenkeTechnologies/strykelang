@@ -73,10 +73,10 @@ fn pack_i_unpack_i_roundtrip() {
 }
 
 #[test]
-fn unpack_h_star_hex_digits_uppercase() {
+fn unpack_h_star_hex_digits_lowercase() {
     assert_eq!(
         eval_string(r#"my $b = pack 'H*', "a1"; unpack 'H*', $b"#),
-        "A1"
+        "a1"
     );
 }
 
