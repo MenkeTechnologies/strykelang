@@ -4,8 +4,8 @@
 //! ~28 builtin fns; that's ~2,300+ functions previously uncovered by
 //! `tests/suite/`. Generating per-fn behavioural tests for every one
 //! would be 1) impractical (many take 4–8 domain-specific args with
-//! tight numeric tolerances) and 2) noise per CLAUDE.md "no generic
-//! tests that waste time". This file instead pins a single critical
+//! tight numeric tolerances) and 2) generic-test noise that wastes
+//! time without catching bugs. This file instead pins a single critical
 //! anti-crash property: **every Wolfram builtin must handle an empty
 //! argv without panicking** — either return an error (`StrykeResult::
 //! Err(_)`) or a sensible default value. Panics (index-out-of-bounds,

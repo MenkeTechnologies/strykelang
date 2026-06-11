@@ -2,8 +2,8 @@
 //! clean under `stryke --no-interop`. CI runs the same coverage via
 //! `examples/run_all_ci.stk` (single orchestrator in the `stryke-test` job).
 //!
-//! Rationale per CLAUDE.md: `--no-interop` is the bot firewall — it
-//! enforces stryke idioms at parse time (no `scalar`, no `length`,
+//! Rationale: `--no-interop` enforces stryke idioms at parse time (no
+//! `scalar`, no `length`,
 //! no `reverse`, no `$a`/`$b` magic). Demos are the public face of
 //! the language; they must showcase idiomatic stryke, not Perl
 //! transliterations.
