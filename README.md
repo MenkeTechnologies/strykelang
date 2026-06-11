@@ -101,7 +101,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,431 standard library primaries** in `%b` (11,163 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,131
+- **10,431 standard library primaries** in `%b` (11,164 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,131
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -218,7 +218,7 @@ GolfScript, Pyth, 05AB1E, Jelly — these are shorter but are write-only puzzles
 | `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
 | Typed structs/enums/classes | **yes** | no | native | native | no | no | native |
 | JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
-| Single binary | **33MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
+| Single binary | **44MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
 
 ---
 
@@ -2276,7 +2276,7 @@ stryke build app.stk -o /usr/local/bin/app   # explicit output path
 **Under the hood** ([`strykelang/aot.rs`](strykelang/aot.rs)): trailer layout is `[zstd payload][u64 compressed_len][u64 uncompressed_len][u32 version][u32 reserved][8B magic b"STRYKEAOT"]`. ELF / Mach-O loaders ignore bytes past the mapped segments so the embedded payload is invisible to the OS loader. The `b"STRYKEAOT"` magic plus version byte lets a future pre-compiled-bytecode payload ship alongside v1 without breaking already-shipped binaries.
 
 ```sh
-# 13 MB binary, no external runtime required:
+# 44 MB binary, no external runtime required:
 $ stryke build hello.stk -o hello
 stryke build: wrote hello
 $ file hello
@@ -2629,7 +2629,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 **`eval` example session:**
 
 ```text
-stryke controller v0.14.30
+stryke controller v0.17.5
 > status
 node-01    16   64GB         idle      120s
 node-02    16   64GB         idle      118s
@@ -2793,7 +2793,7 @@ profess "renderfarm";                          # blocks in agent loop
 
 ### Live demos
 
-13 demos under `examples/`, all CI-safe (loopback fork only, no network) and clean under `--no-interop`:
+14 demos under `examples/`, all CI-safe (loopback fork only, no network) and clean under `--no-interop`:
 
 | Demo | What it shows |
 |---|---|
@@ -2805,7 +2805,7 @@ profess "renderfarm";                          # blocks in agent loop
 | `harvest_oneshot.stk` | The ergonomic shape (`harvest $code, @workers` = `pray + annex` fused) |
 | `bestow_then_lick.stk` | Master pushes config via `bestow`, reads worker state back via `lick` |
 | `pilgrimage_barrier.stk` | 3-stage BSP barrier across 4 workers |
-| `chant_late_joiners.stk` | `chant`/`amen` continuous-rescatter lifecycle |
+| `congregation_chant_late_joiners.stk` | `chant`/`amen` continuous-rescatter lifecycle |
 | `smite_state_reset.stk` | Reset workers' `%soul` without disconnecting (vs `excommunicate`) |
 | `enshrine_exhume_roundtrip.stk` | Persist hash to disk as JSON, exhume back, verify identity |
 | `cloistered_acl_demo.stk` | `:cloistered` ACL + cathedral inspection + `apostatize` cleanup |
