@@ -3474,6 +3474,92 @@ impl<'a> VM<'a> {
         Ok(())
     }
 
+    /// `Op::GotoSub` — Perl `goto &sub`: replace the current sub frame with a call to the
+    /// named sub, passing the live `@_` through unchanged. The replaced frame's `return_ip`
+    /// and wantarray context carry over, so the original caller sees the target's return
+    /// value (and the target's `wantarray` reports the goto-ing sub's calling context).
+    fn vm_goto_sub(&mut self, name_idx: u16) -> StrykeResult<()> {
+        let line = self.line();
+        // Snapshot @_ and the goto-ing sub's own calling context before teardown.
+        let args = self.interp.scope.get_array("_");
+        let cur_want = self.interp.wantarray_kind;
+        let Some(frame) = self.call_stack.last() else {
+            return Err(StrykeError::runtime(
+                "Can't goto subroutine outside a subroutine",
+                line,
+            ));
+        };
+        if frame.block_region {
+            // Perl gotos out of the whole enclosing sub from inside a map/grep/sort
+            // block; that deep unwind is not modeled in bytecode.
+            return Err(if self.call_stack.iter().any(|f| !f.block_region) {
+                StrykeError::runtime(
+                    "Can't goto subroutine from a sort sub (or similar callback)",
+                    line,
+                )
+            } else {
+                StrykeError::runtime("Can't goto subroutine outside a subroutine", line)
+            });
+        }
+        let name = self.names[name_idx as usize].clone();
+        let entry_opt = if !crate::compat_mode()
+            && !name.contains("::")
+            && crate::builtins::is_callable_spelling(&name)
+        {
+            None
+        } else {
+            self.find_sub_entry(name_idx)
+        };
+        if !frame.jit_trampoline_return {
+            // Tear down the current frame exactly like Op::Return, then re-dispatch with
+            // the restored ip: the new frame's return_ip becomes the original caller's.
+            let frame = self.call_stack.pop().expect("checked above");
+            if let Some(t0) = frame.sub_profiler_start {
+                if let Some(p) = &mut self.interp.profiler {
+                    p.exit_sub(t0.elapsed());
+                }
+            }
+            self.interp.debugger_leave_sub();
+            self.interp.wantarray_kind = frame.saved_wantarray;
+            self.stack.truncate(frame.stack_base);
+            self.interp.pop_scope_to_depth(frame.scope_depth);
+            self.interp.current_sub_stack.pop();
+            self.ip = frame.return_ip;
+        }
+        // For a JIT-trampoline frame the goto frame cannot be replaced (its return goes
+        // through `jit_trampoline_out`, not `return_ip`); dispatch a plain nested call —
+        // the `ReturnValue` op emitted right after `GotoSub` returns the target's value.
+        match entry_opt {
+            Some((_, true)) => {
+                // stack-args callee reads raw stack slots via GetArg(n): push @_ elements
+                // individually. Empty @_ pushes one UNDEF so the argc==0 topic-default
+                // hook in vm_dispatch_user_call does not substitute $_ (shift-only callees
+                // see undef either way). >255 args cannot be encoded in the u8 argc.
+                if args.len() > u8::MAX as usize {
+                    return Err(StrykeError::runtime(
+                        format!("goto &{}: too many arguments for optimized sub", name),
+                        line,
+                    ));
+                }
+                let argc = if args.is_empty() {
+                    self.push(StrykeValue::UNDEF);
+                    1
+                } else {
+                    let n = args.len() as u8;
+                    for v in args {
+                        self.push(v);
+                    }
+                    n
+                };
+                self.vm_dispatch_user_call(name_idx, entry_opt, argc, cur_want.as_byte(), None)
+            }
+            _ => {
+                self.push(StrykeValue::array(args));
+                self.vm_dispatch_user_call(name_idx, entry_opt, 1, cur_want.as_byte(), None)
+            }
+        }
+    }
+
     #[inline]
     fn push_binop_with_overload<F>(
         &mut self,
@@ -5208,6 +5294,10 @@ impl<'a> VM<'a> {
                             self.find_sub_entry(*name_idx)
                         };
                         self.vm_dispatch_user_call(*name_idx, entry_opt, *argc, *wa, None)?;
+                        Ok(())
+                    }
+                    Op::GotoSub(name_idx) => {
+                        self.vm_goto_sub(*name_idx)?;
                         Ok(())
                     }
                     Op::CallStaticSubId(sid, name_idx, argc, wa) => {
