@@ -223,7 +223,8 @@ s use -g mytool@VERSION                              # switch the installed.toml
 s upgrade -g [NAME]                                  # re-pin global packages at latest upstream —
                                                      # github pins poll the releases API, path pins
                                                      # re-copy when the source dir's version moved;
-                                                     # local-install pins are skipped
+                                                     # legacy local-install rows are pruned (project
+                                                     # deps are pinned by their stryke.lock)
 s list -g                                            # print installed.toml — what `use Foo` resolves to outside a project
 s gc -g [--dry-run]                                  # remove every store dir not pinned by installed.toml.
                                                      # Project lockfiles are not consulted —

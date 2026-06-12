@@ -783,77 +783,11 @@ pub fn cmd_install(args: &[String]) -> i32 {
         if lf.packages.len() == 1 { "" } else { "s" }
     );
 
-    // Pin every just-resolved package into ~/.stryke/installed.toml so
-    // `use Foo` from outside the project (or before any `s install -g`)
-    // still resolves via the global index. This matches the principle
-    // "any install action should leave the global index reflecting the
-    // packages present in the store"; users running `s install` from
-    // a project expect downstream tooling (the linter, `stryke -e`,
-    // standalone scripts) to see those packages too.
-    sync_installed_index_from_resolution(&store, &outcome.installed);
+    // Project installs deliberately do NOT touch ~/.stryke/installed.toml.
+    // The global index belongs to `s install -g` exclusively; project deps
+    // are pinned by the project's own stryke.lock. Standalone scripts still
+    // resolve `use Foo` against the store via the highest-semver scan.
     0
-}
-
-/// Pull each resolved package's canonical name + version + source +
-/// namespace from its store-extracted `stryke.toml` and upsert into the
-/// global `~/.stryke/installed.toml`. Silent best-effort: failures
-/// surface as one stderr warning each and don't abort `s install`
-/// (the lockfile is already on disk; the global pin is a convenience).
-fn sync_installed_index_from_resolution(
-    store: &Store,
-    installed: &[(String, String, std::path::PathBuf)],
-) {
-    if installed.is_empty() {
-        return;
-    }
-    let mut idx = match InstalledIndex::load_from(store) {
-        Ok(i) => i,
-        Err(e) => {
-            eprintln!("s install: load installed.toml (skipping global pin): {}", e);
-            return;
-        }
-    };
-    let mut updated = 0usize;
-    for (lock_name, version, store_path) in installed {
-        // Try both candidate dirs (alias and prefixed) — same reason
-        // as resolve_store_candidates: lockfiles record the alias while
-        // store dirs use the canonical name.
-        let candidates = resolve_store_candidates(store, lock_name, version);
-        let real_store_dir = candidates
-            .iter()
-            .find(|p| p.is_dir())
-            .cloned()
-            .unwrap_or_else(|| store_path.clone());
-        let manifest_path = real_store_dir.join(MANIFEST_FILE);
-        let Ok(m) = Manifest::from_path(&manifest_path) else {
-            continue;
-        };
-        let Some(pkg) = m.package.as_ref() else {
-            continue;
-        };
-        let namespace = m
-            .ffi
-            .as_ref()
-            .map(|f| f.namespace.clone())
-            .unwrap_or_default();
-        // Re-use the lockfile's source URL when present; for now derive
-        // a placeholder from name@version. The pin is keyed on
-        // (name, version), so the source string is informational.
-        let source = format!("local-install:{}@{}", pkg.name, pkg.version);
-        idx.upsert_with_namespace(&pkg.name, &pkg.version, &source, &namespace);
-        updated += 1;
-    }
-    if updated > 0 {
-        if let Err(e) = idx.save() {
-            eprintln!("s install: write installed.toml: {}", e);
-            return;
-        }
-        eprintln!(
-            "\x1b[32m✓ pinned {} package{} in ~/.stryke/installed.toml\x1b[0m",
-            updated,
-            if updated == 1 { "" } else { "s" }
-        );
-    }
 }
 
 /// `s tree` — print the resolved dep graph from the lockfile in a human-friendly
@@ -2268,8 +2202,9 @@ enum PinnedSource {
     /// `path+file:///abs/dir` — upgradable by re-reading the source dir's
     /// manifest and re-copying when its version moved.
     Path(PathBuf),
-    /// `local-install:name@version` — pinned by `s install` inside a project;
-    /// there is no upstream to poll, the owning project drives it.
+    /// `local-install:name@version` — legacy row written by project installs
+    /// back when they pinned into the global index. Project deps belong to
+    /// their project's stryke.lock; these rows are pruned on upgrade.
     Local,
 }
 
@@ -2299,8 +2234,10 @@ fn same_version(a: &str, b: &str) -> bool {
 /// `s upgrade -g [NAME]` — re-pin every globally installed package at its
 /// latest upstream version. GitHub pins poll the releases API and reinstall
 /// when the tag moved; path pins re-read the source dir's manifest and
-/// re-copy when its version moved; `local-install:` pins are skipped (the
-/// owning project's `s install` drives those). With NAME, only that package.
+/// re-copy when its version moved. Legacy `local-install:` rows (written by
+/// project installs before they stopped touching the global index) are
+/// pruned — project deps belong to their project's stryke.lock, not here.
+/// With NAME, only that package.
 pub fn cmd_upgrade_global(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) {
         println!("usage: stryke upgrade -g [NAME]");
@@ -2309,7 +2246,8 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         println!("latest upstream versions. Per pinned source:");
         println!("  github:owner/repo@tag    fetch latest release tag, reinstall if newer");
         println!("  path+file:///dir         re-copy when the source dir's version moved");
-        println!("  local-install:...        skipped — re-run `s install` in that project");
+        println!("  local-install:...        pruned — legacy project-install rows; project");
+        println!("                           deps are pinned by their stryke.lock, not here");
         println!();
         println!("NAME: when given, only that package is upgraded.");
         return 0;
@@ -2350,8 +2288,7 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         }
     }
 
-    let total = entries.len();
-    let (mut upgraded, mut current, mut pinned, mut skipped, mut failed) =
+    let (mut upgraded, mut current, mut pruned, mut skipped, mut failed) =
         (0u32, 0u32, 0u32, 0u32, 0u32);
     for entry in &entries {
         match PinnedSource::parse(&entry.source) {
@@ -2418,11 +2355,30 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                 }
             }
             Some(PinnedSource::Local) => {
-                eprintln!(
-                    "  ✓ {}@{} at its project pin — re-run `s install` there to move it",
-                    entry.name, entry.version
-                );
-                pinned += 1;
+                // Written by project installs before they stopped touching
+                // the global index. Project deps live in their project's
+                // stryke.lock; the store entry stays (standalone `use Foo`
+                // still resolves via the highest-semver store scan).
+                match InstalledIndex::load_or_default() {
+                    Ok(mut idx) => {
+                        if idx.remove(&entry.name) {
+                            if let Err(e) = idx.save() {
+                                eprintln!("  \x1b[31m✗ {}: write installed.toml: {}\x1b[0m", entry.name, e);
+                                failed += 1;
+                                continue;
+                            }
+                        }
+                        eprintln!(
+                            "  - {}@{} legacy project-install row pruned (project deps live in stryke.lock)",
+                            entry.name, entry.version
+                        );
+                        pruned += 1;
+                    }
+                    Err(e) => {
+                        eprintln!("  \x1b[31m✗ {}: load installed.toml: {}\x1b[0m", entry.name, e);
+                        failed += 1;
+                    }
+                }
             }
             None => {
                 eprintln!(
@@ -2434,16 +2390,14 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         }
     }
 
-    // Project-pinned entries are current at their pin — count them as up to
-    // date so the totals add up to every installed package.
+    // Total = packages the global index actually manages after pruning.
+    let total = upgraded + current + skipped + failed;
     let mut summary = format!(
         "{} installed: {} upgraded, {} up to date",
-        total,
-        upgraded,
-        current + pinned
+        total, upgraded, current
     );
-    if pinned > 0 {
-        summary.push_str(&format!(" ({} project-pinned)", pinned));
+    if pruned > 0 {
+        summary.push_str(&format!(", {} legacy project rows pruned", pruned));
     }
     if skipped > 0 {
         summary.push_str(&format!(", {} skipped", skipped));
@@ -3614,6 +3568,27 @@ mod tests {
         assert_eq!(cmd_upgrade_global(&["nosuchpkg".to_string()]), 1);
         // Empty index, no NAME → nothing to do, exit 0.
         assert_eq!(cmd_upgrade_global(&[]), 0);
+        std::env::remove_var("STRYKE_HOME");
+    }
+
+    #[test]
+    fn upgrade_global_prunes_legacy_local_install_rows() {
+        let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+        let home = tempdir("upgrade-prune");
+        std::env::set_var("STRYKE_HOME", &home);
+        let store = Store::at(&home);
+        store.ensure_layout().unwrap();
+        let mut idx = InstalledIndex::new();
+        idx.upsert_with_namespace("stryke-arrow", "0.2.1", "local-install:stryke-arrow@0.2.1", "Arrow");
+        idx.save().unwrap();
+
+        // The legacy project-install row is pruned, not upgraded or counted.
+        assert_eq!(cmd_upgrade_global(&[]), 0);
+        let idx = InstalledIndex::load_or_default().unwrap();
+        assert!(
+            idx.find("stryke-arrow").is_none(),
+            "legacy local-install row must be pruned from installed.toml"
+        );
         std::env::remove_var("STRYKE_HOME");
     }
 
