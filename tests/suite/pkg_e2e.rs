@@ -618,3 +618,44 @@ fn upgrade_global_repins_path_package_when_version_moves() {
 
     std::env::remove_var("STRYKE_HOME");
 }
+
+/// Upstream package rename: the index entry is recorded under the OLD name,
+/// the reinstall pins the NEW manifest name. Without dropping the old entry
+/// it stays outdated forever and `s upgrade -g` re-"upgrades" on every run
+/// (the polars → stryke-polars loop). The stale alias must be removed.
+#[test]
+fn upgrade_global_drops_stale_entry_after_upstream_rename() {
+    let store_root = tempdir("upgrade-rename-store");
+    let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+    std::env::set_var("STRYKE_HOME", &store_root);
+
+    let src = make_path_dep("oldname", "1.0.0", &[("lib/Tool.stk", "# v1\n")]);
+    assert_eq!(
+        stryke::pkg::commands::cmd_install_global(&[src.display().to_string()]),
+        0
+    );
+
+    // Upstream renames the package and bumps the version.
+    std::fs::write(
+        src.join("stryke.toml"),
+        "[package]\nname = \"newname\"\nversion = \"2.0.0\"\n",
+    )
+    .unwrap();
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert!(
+        idx.find("oldname").is_none(),
+        "stale alias entry must be dropped after rename"
+    );
+    assert_eq!(idx.find("newname").unwrap().version, "2.0.0");
+
+    // Second run must be a no-op — no perpetual re-upgrade loop.
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert!(idx.find("oldname").is_none());
+    assert_eq!(idx.find("newname").unwrap().version, "2.0.0");
+
+    std::env::remove_var("STRYKE_HOME");
+}
