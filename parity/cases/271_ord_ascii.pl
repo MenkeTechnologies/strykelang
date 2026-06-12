@@ -1,1 +1,0 @@
-print ord("A"), "\n";
