@@ -3474,3 +3474,30 @@ reliable workaround is enumerating the keys explicitly:
 `Mcpd::Server::serve`/`wrap_all`; fixed downstream with explicit keys.
 Downstream guard: `stryke-mcpd/t/test_mcpd.stk` ("wrap_all preserves
 spec keys"). No upstream pin test yet.
+
+## BUG-306 — splatting a hash *variable* into a call drops its keys when the callee is a store-loaded package fn — **`bug`**
+
+Passing connection/option args by splatting a hash variable
+(`Mongo::count($tgt, %o)`) loses the hash's keys when the called function
+was loaded from an installed package (`use Mongo`), so the callee falls
+back to defaults. Passing the SAME pairs inline
+(`Mongo::count($tgt, uri => $u, filter => $f)`) works. Building the hash
+from a slurpy `%opts` param, or as a fresh `var %o = (...)`, makes no
+difference — the splat is what fails.
+
+```
+# FAILS — count connects to the default host, not $u (keys dropped)
+fn Mongo::exists ($t, $f, %opts) { var %o = %opts; $o{filter} = $f; Mongo::count($t, %o) }
+
+# WORKS — same args, inline pairs
+fn Mongo::exists ($t, $f, %opts) { Mongo::count($t, filter => $f, uri => $opts{uri}) }
+```
+
+Reproduced live (stryke-mongo against a throwaway mongod): the splat form
+made `count` time out on `127.0.0.1:27017` despite `uri => :57017` being
+in the hash; the inline form connected correctly. Same family as BUG-305
+(hashref-literal spread). Worked around downstream in stryke-mongo
+(exists / find_value / collection_exists) and stryke-postgres
+(table_exists) by forwarding connection opts as explicit inline pairs.
+Downstream guard: `stryke-mongo/t/test_stryke_mongo_surface.stk` plus the
+live data tests. No upstream pin test yet.
