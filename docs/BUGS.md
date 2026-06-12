@@ -3501,3 +3501,40 @@ in the hash; the inline form connected correctly. Same family as BUG-305
 (table_exists) by forwarding connection opts as explicit inline pairs.
 Downstream guard: `stryke-mongo/t/test_stryke_mongo_surface.stk` plus the
 live data tests. No upstream pin test yet.
+
+## BUG-307 — an array variable holding a `key => $arrayref` pair drops that pair when flattened into a store-loaded package fn — **`bug`**
+
+Sibling of BUG-306, but the dropped thing is a *pair built into an array
+variable*, not a splatted hash. Accumulating call args into an array
+(`var @fwd = (...); push @fwd, bind => $aref`) and then flattening that
+array into a store-loaded package fn (`Pkg::query_scalar($sql, @fwd)`)
+loses the `bind` pair whose value is an arrayref — the callee sees zero
+params. String-valued pairs in the same `@fwd` (e.g. `url => $str`)
+survive, so the call still connects; only the arrayref-valued pair
+vanishes. Passing the SAME pair as an inline literal in the call
+expression works.
+
+```
+# FAILS — query runs with 0 params → "expected 1 parameters but got 0"
+fn Postgres::count ($t, $w, %opts) {
+    var @fwd = Postgres::_conn(\%opts)
+    push @fwd, bind => $opts{bind} if defined $opts{bind}
+    Postgres::query_scalar($sql, @fwd)
+}
+
+# WORKS — bind pair inline in the call, not via the @fwd variable
+fn Postgres::count ($t, $w, %opts) {
+    defined($opts{bind})
+        ? Postgres::query_scalar($sql, Postgres::_conn(\%opts), bind => $opts{bind})
+        : Postgres::query_scalar($sql, Postgres::_conn(\%opts))
+}
+```
+
+Reproduced live (stryke-postgres against a throwaway postgres):
+`count`/`exists` with `bind => [..]` failed with "expected 1 parameters
+but got 0"; the same call with the bind pair inline succeeded. The
+top-level (non-store-loaded) form `my @fwd = (url => $u, bind => $a);
+query_scalar($sql, @fwd)` works — only the store-loaded-callee context
+drops it, which is why it shares BUG-306's signature. Worked around
+downstream in stryke-postgres `count` (its doc had claimed bind support
+that never actually worked) and `exists`. No upstream pin test yet.
