@@ -3538,3 +3538,26 @@ query_scalar($sql, @fwd)` works — only the store-loaded-callee context
 drops it, which is why it shares BUG-306's signature. Worked around
 downstream in stryke-postgres `count` (its doc had claimed bind support
 that never actually worked) and `exists`. No upstream pin test yet.
+
+## BUG-308 — `count_by { } @arr` evaluates the block's `$_` as empty when `@arr` came from `map` — **`bug`**
+
+The `count_by { BLOCK } @list` builtin binds the block's `$_` per element
+correctly for a literal / `qw()` list, but NOT for an array produced by
+`map` (or any op that leaves its elements aliased to the outer `$_`): the
+block sees an empty (or stale-last) `$_`, so every element buckets into a
+single key.
+
+```
+my @a = map { $_ } qw(x y x);   count_by { $_ } @a   # => {"":3}        WRONG
+my @b = qw(x y x);              count_by { $_ } @b   # => {"x":2,"y":1}  ok
+my @a = map { uc } qw(x y x);   count_by { $_ } @a   # => {"":3}        WRONG
+```
+
+A manual tally over the SAME map-built array works
+(`my %f; $f{$_}++ for @a` → `{"x":2,"y":1}`), so the array contents are
+fine — it's `count_by`'s per-element `$_` binding that fails when the
+elements are still aliased to the producing `map`'s `$_`. Reproduced live
+against the released stryke binary. Worked around downstream in
+`stryke-utils/examples/word_frequency.stk` by replacing the
+`count_by { $_ } @words` (over a grep/map/split-built `@words`) with a
+plain `$freq{$_}++ for @words` tally. No upstream pin test yet.
