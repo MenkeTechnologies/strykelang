@@ -2234,6 +2234,31 @@ fn finalize_global_install(
     Ok(())
 }
 
+/// After an upgrade reinstall, the fresh pin lands under the manifest's
+/// `[package].name`. When the index entry that triggered the upgrade was
+/// recorded under a DIFFERENT name (the package was renamed upstream, e.g.
+/// `polars` → `stryke-polars`), that old entry would survive forever and
+/// re-trigger an "upgrade" on every run — drop it.
+fn drop_stale_alias_entry(entry_name: &str, manifest: &Manifest) -> Result<(), String> {
+    let Some(pkg) = manifest.package.as_ref() else {
+        return Ok(());
+    };
+    if pkg.name == entry_name {
+        return Ok(());
+    }
+    let mut idx =
+        InstalledIndex::load_or_default().map_err(|e| format!("load installed.toml: {}", e))?;
+    if idx.remove(entry_name) {
+        idx.save()
+            .map_err(|e| format!("write installed.toml: {}", e))?;
+        eprintln!(
+            "  dropped stale pin `{}` (package is named `{}` upstream)",
+            entry_name, pkg.name
+        );
+    }
+    Ok(())
+}
+
 /// A pinned package's provenance, parsed back out of the `source` string
 /// `s install -g` wrote into `~/.stryke/installed.toml`.
 enum PinnedSource {
@@ -2325,7 +2350,9 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         }
     }
 
-    let (mut upgraded, mut current, mut skipped, mut failed) = (0u32, 0u32, 0u32, 0u32);
+    let total = entries.len();
+    let (mut upgraded, mut current, mut pinned, mut skipped, mut failed) =
+        (0u32, 0u32, 0u32, 0u32, 0u32);
     for entry in &entries {
         match PinnedSource::parse(&entry.source) {
             Some(PinnedSource::GitHub { owner, repo }) => {
@@ -2342,9 +2369,12 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                     current += 1;
                     continue;
                 }
-                match install_global_from_github(&store, &owner, &repo, Some(&latest))
-                    .and_then(|(m, dir, src)| finalize_global_install(&store, &m, &dir, &src))
-                {
+                match install_global_from_github(&store, &owner, &repo, Some(&latest)).and_then(
+                    |(m, dir, src)| {
+                        finalize_global_install(&store, &m, &dir, &src)?;
+                        drop_stale_alias_entry(&entry.name, &m)
+                    },
+                ) {
                     Ok(()) => upgraded += 1,
                     Err(e) => {
                         eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
@@ -2376,9 +2406,10 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                     current += 1;
                     continue;
                 }
-                match install_global_from_path(&store, &dir)
-                    .and_then(|(m, sdir, src)| finalize_global_install(&store, &m, &sdir, &src))
-                {
+                match install_global_from_path(&store, &dir).and_then(|(m, sdir, src)| {
+                    finalize_global_install(&store, &m, &sdir, &src)?;
+                    drop_stale_alias_entry(&entry.name, &m)
+                }) {
                     Ok(()) => upgraded += 1,
                     Err(e) => {
                         eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
@@ -2388,10 +2419,10 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
             }
             Some(PinnedSource::Local) => {
                 eprintln!(
-                    "  - {}@{} pinned by a project install — re-run `s install` there",
+                    "  ✓ {}@{} at its project pin — re-run `s install` there to move it",
                     entry.name, entry.version
                 );
-                skipped += 1;
+                pinned += 1;
             }
             None => {
                 eprintln!(
@@ -2403,10 +2434,22 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         }
     }
 
-    eprintln!(
-        "{} upgraded, {} up to date, {} skipped, {} failed",
-        upgraded, current, skipped, failed
+    // Project-pinned entries are current at their pin — count them as up to
+    // date so the totals add up to every installed package.
+    let mut summary = format!(
+        "{} installed: {} upgraded, {} up to date",
+        total,
+        upgraded,
+        current + pinned
     );
+    if pinned > 0 {
+        summary.push_str(&format!(" ({} project-pinned)", pinned));
+    }
+    if skipped > 0 {
+        summary.push_str(&format!(", {} skipped", skipped));
+    }
+    summary.push_str(&format!(", {} failed", failed));
+    eprintln!("{}", summary);
     if failed > 0 {
         1
     } else {
