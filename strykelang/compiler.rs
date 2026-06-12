@@ -1765,6 +1765,9 @@ impl Compiler {
                 | Op::PopArray(idx)
                 | Op::ShiftArray(idx)
                 | Op::ArrayLen(idx) => *idx == underscore_idx,
+                // `goto &sub` reads the live `@_` from the scope at runtime, so the
+                // sub must keep the real `@_` array (no stack-args conversion).
+                Op::GotoSub(_) => true,
                 _ => false,
             }
         };
@@ -2826,9 +2829,20 @@ impl Compiler {
                 }
             }
             StmtKind::Goto { target } => {
+                // `goto &sub` (named target): Perl tail call — replace the current sub frame
+                // with a call to the target, passing `@_` through unchanged. `Op::GotoSub`
+                // performs the frame replacement at runtime; the trailing `ReturnValue` is
+                // only reached when replacement is not possible (JIT trampoline frame), where
+                // the VM falls back to a plain nested call + return of its value.
+                if let ExprKind::SubroutineRef(name) = &target.kind {
+                    let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
+                    self.chunk.emit(Op::GotoSub(name_idx), line);
+                    self.chunk.emit(Op::ReturnValue, line);
+                    return Ok(());
+                }
                 // `goto LABEL` where LABEL is a compile-time-known bareword/string: emit a
                 // forward `Jump(0)` and record it for patching when the current goto-scope
-                // exits. `goto &sub` and `goto $expr` (dynamic target) stay Unsupported.
+                // exits. `goto $expr` (dynamic target) stays Unsupported.
                 if !self.try_emit_goto_label(target, line) {
                     return Err(CompileError::Unsupported(
                         "goto with dynamic or sub-ref target".into(),

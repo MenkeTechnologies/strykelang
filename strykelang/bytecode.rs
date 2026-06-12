@@ -340,6 +340,11 @@ pub enum Op {
     /// (entry IP + stack-args); `name_idx` duplicates the stash pool index for closure restore / JIT
     /// (same as in the table; kept in the opcode so JIT does not need the side table).
     CallStaticSubId(u16, u16, u8, u8),
+    /// `goto &sub` — replace the current sub frame with a call to the named sub (name index),
+    /// passing the current `@_` through unchanged and keeping the original caller's `return_ip`
+    /// and wantarray context (Perl tail-call semantics). Always followed by a `ReturnValue`
+    /// fallback op (only reached when frame replacement is not possible, e.g. JIT trampoline).
+    GotoSub(u16),
     /// `Return` variant.
     Return,
     /// `ReturnValue` variant.

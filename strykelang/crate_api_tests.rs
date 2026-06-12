@@ -4716,6 +4716,85 @@ fn try_vm_execute_sub_body_goto_forward() {
     assert_eq!(out.unwrap().expect("vm").to_int(), 10);
 }
 
+/// `goto &sub` (Perl tail call): the target replaces the goto-ing sub's frame and receives
+/// the live `@_` unchanged; the original caller sees the target's return value.
+#[test]
+fn try_vm_execute_goto_sub_passes_args() {
+    let p = parse(
+        r#"no strict 'vars'
+        fn Gt::target { $_[0] + $_[1] }
+        fn Gt::bouncer { goto &Gt::target }
+        Gt::bouncer(3, 7)"#,
+    )
+    .expect("parse");
+    let mut i = VMHelper::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "`goto &sub` should compile to Op::GotoSub");
+    assert_eq!(out.unwrap().expect("vm").to_int(), 10, "@_ must pass through");
+}
+
+/// `shift` before `goto &sub` mutates `@_`; the target must see the shortened list. This also
+/// pins the stack-args peephole exclusion: a shift-only sub containing `Op::GotoSub` must keep
+/// the real `@_` array (no `GetArg` conversion), or the goto would read the caller's stack.
+#[test]
+fn try_vm_execute_goto_sub_after_shift_sees_modified_args() {
+    let p = parse(
+        r#"no strict 'vars'
+        fn Gt::rest { join(",", @_) }
+        fn Gt::eat_one { my $first = shift; goto &Gt::rest }
+        Gt::eat_one(10, 20, 30)"#,
+    )
+    .expect("parse");
+    let mut i = VMHelper::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "shift + `goto &sub` should compile");
+    assert_eq!(
+        out.unwrap().expect("vm").to_string(),
+        "20,30",
+        "target must see @_ after the shift, not the original arg list"
+    );
+}
+
+/// Chained `goto &sub` (a → b → c) keeps replacing frames; the value comes back to the
+/// original call site.
+#[test]
+fn try_vm_execute_goto_sub_chained() {
+    let p = parse(
+        r#"no strict 'vars'
+        fn Gt::final_dest { "got:" . $_[0] }
+        fn Gt::middle { goto &Gt::final_dest }
+        fn Gt::start { goto &Gt::middle }
+        Gt::start("chain")"#,
+    )
+    .expect("parse");
+    let mut i = VMHelper::new();
+    let out = try_vm_execute(&p, &mut i);
+    assert!(out.is_some(), "chained `goto &sub` should compile");
+    assert_eq!(out.unwrap().expect("vm").to_string(), "got:chain");
+}
+
+/// `goto &sub` outside any subroutine dies like Perl 5.
+#[test]
+fn try_vm_execute_goto_sub_outside_sub_errors() {
+    let p = parse(
+        r#"no strict 'vars'
+        fn Gt::t2 { 1 }
+        goto &Gt::t2"#,
+    )
+    .expect("parse");
+    let mut i = VMHelper::new();
+    let out = try_vm_execute(&p, &mut i);
+    let err = out
+        .expect("top-level `goto &sub` should compile (error is runtime)")
+        .expect_err("must die at runtime");
+    assert!(
+        err.to_string()
+            .contains("Can't goto subroutine outside a subroutine"),
+        "got: {}",
+        err
+    );
+}
+
 /// Backward `goto LABEL` (label defined before the goto): compiler must emit a backward jump
 /// to the already-seen label IP. Guarded by a conditional wrap inside the label block so the
 /// test actually terminates; the wrap uses a statement-level `if` (not postfix) because
