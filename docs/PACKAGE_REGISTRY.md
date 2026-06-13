@@ -221,10 +221,14 @@ s uninstall -g mytool                                # remove store dir + instal
 s use -g mytool@VERSION                              # switch the installed.toml pin to a different version
                                                      # already in store (no fetch)
 s upgrade -g [NAME]                                  # re-pin global packages at latest upstream —
-                                                     # github pins poll the releases API, path pins
-                                                     # re-copy when the source dir's version moved;
-                                                     # legacy local-install rows are pruned (project
-                                                     # deps are pinned by their stryke.lock)
+                                                     # github pins poll the releases API; path pins
+                                                     # whose manifest declares a github `repository`
+                                                     # also poll it and re-pin to github when the
+                                                     # release is strictly newer than the local tree;
+                                                     # purely-local path pins re-copy when the source
+                                                     # version moved OR the working tree changed since
+                                                     # the last install; legacy local-install rows are
+                                                     # pruned (project deps pinned by their stryke.lock)
 s list -g                                            # print installed.toml — what `use Foo` resolves to outside a project
 s gc -g [--dry-run]                                  # remove every store dir not pinned by installed.toml.
                                                      # Project lockfiles are not consulted —
