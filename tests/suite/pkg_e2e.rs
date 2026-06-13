@@ -619,6 +619,55 @@ fn upgrade_global_repins_path_package_when_version_moves() {
     std::env::remove_var("STRYKE_HOME");
 }
 
+/// `s upgrade -g` for a path-pinned package whose working tree changed but
+/// whose version string did NOT move (the common active-development case):
+/// the store copy must be refreshed even though the pin stays at the same
+/// version. Without this, edits to `lib/*.stk` between releases are silently
+/// never picked up. No network — path source only.
+#[test]
+fn upgrade_global_refreshes_path_package_on_same_version_content_change() {
+    let store_root = tempdir("upgrade-refresh-store");
+    let store = Store::at(&store_root);
+    let _g = STRYKE_HOME_MUTEX.lock().unwrap();
+    std::env::set_var("STRYKE_HOME", &store_root);
+
+    let src = make_path_dep("mytool", "1.0.0", &[("lib/Tool.stk", "# v1\n")]);
+    assert_eq!(
+        stryke::pkg::commands::cmd_install_global(&[src.display().to_string()]),
+        0
+    );
+    let v1 = store.package_dir("mytool", "1.0.0");
+    assert_eq!(
+        std::fs::read_to_string(v1.join("lib/Tool.stk")).unwrap(),
+        "# v1\n"
+    );
+
+    // Edit the source content WITHOUT bumping the version. Sleep first so the
+    // rewritten file's mtime is strictly after the install (defends against
+    // coarse filesystem mtime granularity).
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(src.join("lib/Tool.stk"), "# edited, same version\n").unwrap();
+
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+
+    // Pin unchanged at 1.0.0, but the store copy now reflects the edit.
+    let idx = stryke::pkg::store::InstalledIndex::load_from(&store).unwrap();
+    assert_eq!(idx.find("mytool").unwrap().version, "1.0.0");
+    assert_eq!(
+        std::fs::read_to_string(v1.join("lib/Tool.stk")).unwrap(),
+        "# edited, same version\n"
+    );
+
+    // A second upgrade with no further edits is a no-op (up to date).
+    assert_eq!(stryke::pkg::commands::cmd_upgrade_global(&[]), 0);
+    assert_eq!(
+        std::fs::read_to_string(v1.join("lib/Tool.stk")).unwrap(),
+        "# edited, same version\n"
+    );
+
+    std::env::remove_var("STRYKE_HOME");
+}
+
 /// Upstream package rename: the index entry is recorded under the OLD name,
 /// the reinstall pins the NEW manifest name. Without dropping the old entry
 /// it stays outdated forever and `s upgrade -g` re-"upgrades" on every run
