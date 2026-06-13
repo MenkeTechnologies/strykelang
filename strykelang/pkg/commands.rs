@@ -2231,10 +2231,66 @@ fn same_version(a: &str, b: &str) -> bool {
     a.trim_start_matches('v') == b.trim_start_matches('v')
 }
 
+/// Newest modification time anywhere under `root` (recursive). `None` when
+/// the path doesn't exist or can't be stat'd. Directories contribute their
+/// own mtime too so a freshly emptied subtree still registers.
+fn newest_mtime(root: &Path) -> Option<std::time::SystemTime> {
+    let meta = std::fs::symlink_metadata(root).ok()?;
+    if !meta.is_dir() {
+        return meta.modified().ok();
+    }
+    let mut newest = meta.modified().ok();
+    if let Ok(rd) = std::fs::read_dir(root) {
+        for e in rd.flatten() {
+            if let Some(t) = newest_mtime(&e.path()) {
+                newest = Some(match newest {
+                    Some(n) if n >= t => n,
+                    _ => t,
+                });
+            }
+        }
+    }
+    newest
+}
+
+/// True when a `path+file://` source's canonical install inputs are newer
+/// than the copy currently in the store (or the store copy is missing).
+/// Lets `s upgrade -g` re-sync a live local checkout whose working tree
+/// changed without a version bump. The store's files are stamped with the
+/// install time by `std::fs::copy`, so the newest store mtime is a faithful
+/// "last installed at" threshold; any source edit afterward reads as newer.
+/// Inputs mirror what `install_global_from_path` actually stages: the
+/// manifest, the `lib/` and `bin/` subtrees, and a dev-built cdylib under
+/// `target/release/`.
+fn path_source_changed(store: &Store, src: &Path, manifest: &Manifest, name: &str, version: &str) -> bool {
+    let store_dir = store.package_dir(name, version);
+    let Some(installed_at) = newest_mtime(&store_dir) else {
+        return true; // not in the store — must (re)install
+    };
+    let mut inputs = vec![src.join(MANIFEST_FILE), src.join("lib"), src.join("bin")];
+    if let Some(ffi) = manifest.ffi.as_ref() {
+        if !ffi.lib_name.is_empty() {
+            let dll = format!(
+                "{}{}{}",
+                std::env::consts::DLL_PREFIX,
+                ffi.lib_name,
+                std::env::consts::DLL_SUFFIX
+            );
+            inputs.push(src.join("target/release").join(dll));
+        }
+    }
+    inputs
+        .iter()
+        .filter_map(|p| newest_mtime(p))
+        .any(|t| t > installed_at)
+}
+
 /// `s upgrade -g [NAME]` — re-pin every globally installed package at its
 /// latest upstream version. GitHub pins poll the releases API and reinstall
 /// when the tag moved; path pins re-read the source dir's manifest and
-/// re-copy when its version moved. Legacy `local-install:` rows (written by
+/// re-copy when its version moved OR its working tree changed since the last
+/// install (a live local checkout rarely bumps its version per edit). Legacy
+/// `local-install:` rows (written by
 /// project installs before they stopped touching the global index) are
 /// pruned — project deps belong to their project's stryke.lock, not here.
 /// With NAME, only that package.
@@ -2245,7 +2301,8 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         println!("Upgrade globally installed packages (~/.stryke/installed.toml) to their");
         println!("latest upstream versions. Per pinned source:");
         println!("  github:owner/repo@tag    fetch latest release tag, reinstall if newer");
-        println!("  path+file:///dir         re-copy when the source dir's version moved");
+        println!("  path+file:///dir         re-copy when the version moved, or when the");
+        println!("                           working tree changed since the last install");
         println!("  local-install:...        pruned — legacy project-install rows; project");
         println!("                           deps are pinned by their stryke.lock, not here");
         println!();
@@ -2288,8 +2345,8 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
         }
     }
 
-    let (mut upgraded, mut current, mut pruned, mut skipped, mut failed) =
-        (0u32, 0u32, 0u32, 0u32, 0u32);
+    let (mut upgraded, mut refreshed, mut current, mut pruned, mut skipped, mut failed) =
+        (0u32, 0u32, 0u32, 0u32, 0u32, 0u32);
     for entry in &entries {
         match PinnedSource::parse(&entry.source) {
             Some(PinnedSource::GitHub { owner, repo }) => {
@@ -2338,7 +2395,60 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                     .as_ref()
                     .map(|p| p.version.clone())
                     .unwrap_or_default();
-                if same_version(&upstream_version, &entry.version) {
+                // A package installed from a local `stryke.toml` still tracks
+                // the GitHub repo its manifest declares. Poll that repo: when
+                // its latest release is strictly newer than BOTH the installed
+                // version and the local working-tree version, the published
+                // release wins — upgrade from GitHub and re-pin to `github:`.
+                // (If the local checkout is ahead, the dev is working past the
+                // last release; the local re-sync below keeps the path pin.)
+                // A failed poll is non-fatal: fall through to the local sync.
+                if let Some((owner, repo)) = upstream
+                    .package
+                    .as_ref()
+                    .and_then(|p| parse_github_repo(&p.repository))
+                {
+                    if let Ok(latest) = fetch_latest_release_tag(&owner, &repo) {
+                        let installed_rank =
+                            VersionRank::parse(entry.version.trim_start_matches('v'));
+                        let local_rank =
+                            VersionRank::parse(upstream_version.trim_start_matches('v'));
+                        let latest_rank = VersionRank::parse(latest.trim_start_matches('v'));
+                        if latest_rank > installed_rank && latest_rank > local_rank {
+                            match install_global_from_github(&store, &owner, &repo, Some(&latest))
+                                .and_then(|(m, gdir, src)| {
+                                    finalize_global_install(&store, &m, &gdir, &src)?;
+                                    drop_stale_alias_entry(&entry.name, &m)
+                                }) {
+                                Ok(()) => {
+                                    eprintln!(
+                                        "  ⬆ {}@{} -> {} from github:{}/{}",
+                                        entry.name, entry.version, latest, owner, repo
+                                    );
+                                    upgraded += 1;
+                                }
+                                Err(e) => {
+                                    eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
+                                    failed += 1;
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                }
+                // A `path+file://` source is a live local checkout. Version
+                // bumps are the explicit upgrade signal, but during active
+                // development the working tree changes far more often than the
+                // version string does — so when the version matches, re-copy
+                // anyway if any canonical install input (stryke.toml, lib/,
+                // bin/, or a dev-built target/release cdylib) is newer than
+                // what's currently in the store. Without this, edits that
+                // don't bump the version (e.g. an updated `lib/*.stk`) are
+                // silently never picked up by `s upgrade -g`.
+                let bumped = !same_version(&upstream_version, &entry.version);
+                if !bumped
+                    && !path_source_changed(&store, &dir, &upstream, &entry.name, &entry.version)
+                {
                     eprintln!("  ✓ {}@{} up to date", entry.name, entry.version);
                     current += 1;
                     continue;
@@ -2347,7 +2457,17 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                     finalize_global_install(&store, &m, &sdir, &src)?;
                     drop_stale_alias_entry(&entry.name, &m)
                 }) {
-                    Ok(()) => upgraded += 1,
+                    Ok(()) => {
+                        if bumped {
+                            upgraded += 1;
+                        } else {
+                            eprintln!(
+                                "  ↻ {}@{} refreshed (source changed, version unchanged)",
+                                entry.name, upstream_version
+                            );
+                            refreshed += 1;
+                        }
+                    }
                     Err(e) => {
                         eprintln!("  \x1b[31m✗ {}: {}\x1b[0m", entry.name, e);
                         failed += 1;
@@ -2391,11 +2511,14 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
     }
 
     // Total = packages the global index actually manages after pruning.
-    let total = upgraded + current + skipped + failed;
+    let total = upgraded + refreshed + current + skipped + failed;
     let mut summary = format!(
         "{} installed: {} upgraded, {} up to date",
         total, upgraded, current
     );
+    if refreshed > 0 {
+        summary.push_str(&format!(", {} refreshed", refreshed));
+    }
     if pruned > 0 {
         summary.push_str(&format!(", {} legacy project rows pruned", pruned));
     }
@@ -2469,6 +2592,35 @@ fn split_version_suffix(arg: &str) -> (&str, Option<String>) {
         }
     }
     (arg, None)
+}
+
+/// Parse a manifest `repository` URL into a GitHub `(owner, repo)` pair, or
+/// `None` when it isn't a recognizable GitHub URL. Used by `s upgrade -g` so a
+/// package globally installed from a local `stryke.toml` still tracks the
+/// releases of the GitHub repo its manifest points at. Handles the https/http,
+/// scheme-less, `gh:`, and `git@`/`ssh://` SSH forms; `parse_gh_owner_repo`
+/// strips any trailing `/` or `.git`.
+fn parse_github_repo(url: &str) -> Option<(String, String)> {
+    let url = url.trim();
+    if url.is_empty() {
+        return None;
+    }
+    if let Some(rest) = url.strip_prefix("git@github.com:") {
+        return parse_gh_owner_repo(rest).ok();
+    }
+    for prefix in [
+        "gh:",
+        "https://github.com/",
+        "http://github.com/",
+        "git://github.com/",
+        "ssh://git@github.com/",
+        "github.com/",
+    ] {
+        if let Some(rest) = url.strip_prefix(prefix) {
+            return parse_gh_owner_repo(rest).ok();
+        }
+    }
+    None
 }
 
 fn parse_gh_owner_repo(s: &str) -> Result<(String, String), String> {
@@ -3557,6 +3709,42 @@ mod tests {
         assert!(same_version("0.2.0", "v0.2.0"));
         assert!(same_version("v1.0", "v1.0"));
         assert!(!same_version("v0.2.0", "0.2.1"));
+    }
+
+    #[test]
+    fn parse_github_repo_recognizes_url_forms() {
+        let want = Some(("MenkeTechnologies".to_string(), "stryke-office".to_string()));
+        assert_eq!(
+            parse_github_repo("https://github.com/MenkeTechnologies/stryke-office"),
+            want
+        );
+        assert_eq!(
+            parse_github_repo("https://github.com/MenkeTechnologies/stryke-office.git"),
+            want
+        );
+        assert_eq!(
+            parse_github_repo("http://github.com/MenkeTechnologies/stryke-office/"),
+            want
+        );
+        assert_eq!(
+            parse_github_repo("github.com/MenkeTechnologies/stryke-office"),
+            want
+        );
+        assert_eq!(
+            parse_github_repo("gh:MenkeTechnologies/stryke-office"),
+            want
+        );
+        assert_eq!(
+            parse_github_repo("git@github.com:MenkeTechnologies/stryke-office.git"),
+            want
+        );
+        // Non-GitHub and empty inputs yield None.
+        assert_eq!(parse_github_repo(""), None);
+        assert_eq!(
+            parse_github_repo("https://gitlab.com/owner/repo"),
+            None
+        );
+        assert_eq!(parse_github_repo("not a url"), None);
     }
 
     #[test]
