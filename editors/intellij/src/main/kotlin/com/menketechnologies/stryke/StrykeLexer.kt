@@ -659,13 +659,40 @@ class StrykeLexer : LexerBase() {
             tokenType = StrykeTokenTypes.SCALAR_VAR
             return
         }
-        // ${...} / @{...} / %{...} block-deref — treat the whole thing as a variable.
+        // ${...} / @{...} / %{...} block-deref.
+        //
+        // Two shapes share the `@{` opener and must be told apart:
+        //   - Simple symbolic deref — `@{name}`, `${main::cfg}`, `@{ $ref }`:
+        //     the braces wrap a bare variable name, so colour the whole run
+        //     as one variable token.
+        //   - Block deref — `@{ EXPR }` where EXPR is arbitrary code (calls,
+        //     strings, nested `{}`, `->{key}`). Lumping that as one variable
+        //     and scanning to the first `}` breaks on the first brace inside
+        //     a string literal (e.g. `@{ f("{}")->{k} }` stopped inside the
+        //     `"{}"`). Emit ONLY the sigil here and let the normal dispatcher
+        //     lex the interior — `{`, the inner expression, `->{key}`, and the
+        //     closing `}` all tokenise naturally, so braces inside strings or
+        //     nested derefs no longer terminate the run prematurely.
         if (buf[p] == '{') {
-            p++
-            while (p < endOffset && buf[p] != '}' && buf[p] != '\n') p++
-            if (p < endOffset) p++
-            tokenEnd = p; pos = p
-            tokenType = varKind(sigil)
+            var q = p + 1
+            while (q < endOffset && (buf[q] == ' ' || buf[q] == '\t')) q++
+            val nameStart = q
+            while (q < endOffset &&
+                (buf[q] == '_' || buf[q] == ':' || buf[q] == '$' ||
+                    buf[q] == '@' || buf[q] == '%' || buf[q].isLetterOrDigit())
+            ) q++
+            val nameEnd = q
+            while (q < endOffset && (buf[q] == ' ' || buf[q] == '\t')) q++
+            val simpleDeref = nameEnd > nameStart && q < endOffset && buf[q] == '}'
+            if (simpleDeref) {
+                q++ // consume the closing `}`
+                tokenEnd = q; pos = q
+                tokenType = varKind(sigil)
+                return
+            }
+            // Block deref: emit the lone sigil; the `{ ... }` lexes as code.
+            tokenEnd = p0 + 1; pos = p0 + 1
+            tokenType = StrykeTokenTypes.OPERATOR
             return
         }
         // Punctuation specials — single char tail.
