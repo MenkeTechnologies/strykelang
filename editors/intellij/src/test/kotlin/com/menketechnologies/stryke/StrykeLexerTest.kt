@@ -824,4 +824,53 @@ class StrykeLexerTest {
             has(toks, StrykeTokenTypes.SCALAR_VAR, "\$main::^W"),
         )
     }
+
+    // ── code-context block-deref `@{ EXPR }` (the user-reported bug) ──
+
+    @Test
+    fun simple_array_block_deref_is_one_array_var_token() {
+        // `@{name}` and `@{ $ref }` wrap a bare symbolic name — still
+        // lumped into a single ARRAY_VAR token.
+        val toks = lex("@{name}")
+        assertTrue(
+            "expected ARRAY_VAR `@{name}`: $toks",
+            has(toks, StrykeTokenTypes.ARRAY_VAR, "@{name}"),
+        )
+        val spaced = lex("@{ \$ref }")
+        assertTrue(
+            "expected ARRAY_VAR `@{ \$ref }`: $spaced",
+            has(spaced, StrykeTokenTypes.ARRAY_VAR, "@{ \$ref }"),
+        )
+    }
+
+    @Test
+    fun complex_array_block_deref_does_not_swallow_inner_string() {
+        // Regression: `@{ f("{}")->{k} }` used to scan to the FIRST `}` —
+        // which lives inside the `"{}"` string literal — swallowing the
+        // sigil + half the line into one ARRAY_VAR token and wrecking all
+        // downstream highlighting. The interior must now lex as code.
+        val src = "@{ GUI::_decode(\"displays\", gui__displays(\"{}\"))->{displays} }"
+        val toks = lex(src)
+        // No ARRAY_VAR token may start with `@{` — the block-deref opener
+        // is emitted as a lone `@` sigil, not a fused variable run.
+        assertTrue(
+            "no fused `@{...}` ARRAY_VAR token: $toks",
+            toks.none { it.first == StrykeTokenTypes.ARRAY_VAR && it.second.startsWith("@{") },
+        )
+        // The string literals inside the block lex as their own STRING
+        // tokens rather than being absorbed into a variable run.
+        assertTrue(
+            "expected STRING `\"displays\"` inside the block: $toks",
+            has(toks, StrykeTokenTypes.STRING, "\"displays\""),
+        )
+        assertTrue(
+            "expected STRING `\"{}\"` inside the block: $toks",
+            has(toks, StrykeTokenTypes.STRING, "\"{}\""),
+        )
+        // The block opener is a lone `@` sigil.
+        assertTrue(
+            "expected lone `@` sigil opener: $toks",
+            has(toks, StrykeTokenTypes.OPERATOR, "@"),
+        )
+    }
 }
