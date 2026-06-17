@@ -210,6 +210,93 @@ fn die_explicit_stdin_read_shows_stdin_in_message() {
     assert!(stderr.contains(", <STDIN> line 1."), "stderr={stderr:?}");
 }
 
+/// `END {}` runs **once** after the whole `-n` loop, not once per input line. Regression for
+/// the compiled END region being re-executed on every line (END aggregation fired per-line).
+#[test]
+fn line_mode_n_end_block_fires_once_not_per_line() {
+    let exe = stryke_exe();
+    let mut child = Command::new(exe)
+        .args(["-ne", r#"END { print "END\n" }"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn stryke");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"a\nb\nc\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "END\n");
+}
+
+/// The canonical aggregation idiom: accumulate per line in main, emit the total once in `END`.
+/// `1+2+3+4 = 10`, printed a single time after the loop.
+#[test]
+fn line_mode_n_end_aggregation_emits_total_once() {
+    let exe = stryke_exe();
+    let mut child = Command::new(exe)
+        .args(["-ne", r#"$s += $_; END { print "$s\n" }"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn stryke");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"1\n2\n3\n4\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "10\n");
+}
+
+/// Multiple `END {}` blocks run once each in reverse (LIFO) declaration order under `-n`,
+/// same as Perl: last declared runs first.
+#[test]
+fn line_mode_n_multiple_end_blocks_run_lifo_once_each() {
+    let exe = stryke_exe();
+    let mut child = Command::new(exe)
+        .args(["-ne", r#"END { print "E1\n" } END { print "E2\n" }"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn stryke");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"a\nb\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "E2\nE1\n");
+}
+
+/// Non-line `-e`: multiple `END {}` blocks also run reverse (LIFO), once each — same compiler
+/// path as line mode, so the ordering must match Perl here too.
+#[test]
+fn plain_e_multiple_end_blocks_run_lifo() {
+    let exe = stryke_exe();
+    let out = Command::new(exe)
+        .args(["-e", r#"END { print "1\n" } END { print "2\n" } END { print "3\n" }"#])
+        .stdout(Stdio::piped())
+        .output()
+        .expect("run stryke");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "3\n2\n1\n");
+}
+
 /// `warn` uses the same input-line suffix as `die` under `-n` (matches Perl 5).
 #[test]
 fn warn_line_mode_includes_diamond_input_line_in_message() {
