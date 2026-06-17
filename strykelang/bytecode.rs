@@ -1338,6 +1338,11 @@ pub struct Chunk {
     /// Instruction pointer where the main program body starts (after BEGIN/CHECK/INIT phase blocks).
     /// Used by `-n`/`-p` line mode to re-execute only the body per input line.
     pub body_start_ip: usize,
+    /// Instruction pointer where the main body ends and the compiled `END` blocks begin
+    /// (or the final `Halt` when there are no `END` blocks). Under `-n`/`-p` the per-line
+    /// loop runs `body_start_ip..body_end_ip` (main only); `END` runs once after the loop
+    /// from `body_end_ip`. Without this split `END` aggregation would fire once per input line.
+    pub body_end_ip: usize,
     /// `struct Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
     pub struct_defs: Vec<StructDef>,
     /// `enum Name { ... }` definitions in this chunk (registered on the interpreter at VM start).
@@ -1445,6 +1450,7 @@ impl Chunk {
             lvalues: Vec::new(),
             ast_eval_exprs: Vec::new(),
             body_start_ip: 0,
+            body_end_ip: 0,
             struct_defs: Vec::new(),
             enum_defs: Vec::new(),
             class_defs: Vec::new(),

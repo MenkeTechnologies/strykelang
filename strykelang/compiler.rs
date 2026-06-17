@@ -1422,12 +1422,20 @@ impl Compiler {
         // Resolve all forward `goto LABEL` against labels recorded in the main scope.
         self.exit_goto_scope()?;
 
+        // Record where the main body ends / END blocks begin. Under `-n`/`-p` the per-line
+        // loop runs only `body_start_ip..body_end_ip`; END runs once after the loop. Without
+        // this boundary the compiled END region would be re-executed on every input line.
+        self.chunk.body_end_ip = self.chunk.ops.len();
+
         // END blocks run after main, before halt (same order as Perl phase blocks).
         if !self.end_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_END), 0);
         }
-        for block in &self.end_blocks.clone() {
-            self.compile_block(block)?;
+        // Perl runs END blocks in reverse declaration order (LIFO): the last `END {}` seen runs
+        // first, same as CHECK/UNITCHECK above. (BEGIN/INIT stay FIFO.)
+        let end_rev: Vec<Block> = self.end_blocks.iter().rev().cloned().collect();
+        for block in end_rev {
+            self.compile_block(&block)?;
         }
 
         self.chunk.emit(Op::Halt, 0);
