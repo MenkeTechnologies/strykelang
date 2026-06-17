@@ -697,7 +697,8 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) ->
     interp.prepare_program_top_level(program)?;
     let comp = compiler::Compiler::new()
         .with_source_file(interp.file.clone())
-        .with_strict_vars(interp.strict_vars);
+        .with_strict_vars(interp.strict_vars)
+        .with_line_mode(true);
     let mut chunk = match comp.compile_program(program) {
         Ok(chunk) => chunk,
         Err(compiler::CompileError::Frozen { line, detail }) => {

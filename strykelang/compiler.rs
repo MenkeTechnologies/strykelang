@@ -215,6 +215,12 @@ pub struct Compiler {
     /// compile because `use strict` is resolved in `prepare_program_top_level` before the VM
     /// compile begins.
     strict_vars: bool,
+    /// `-n`/`-p` line mode. When set, `END` blocks are compiled into a separate region placed
+    /// AFTER the main body's `Halt` (not before it), so per-line execution stops at the main
+    /// `Halt` and never runs `END`; the line driver runs the `END` region once after the loop
+    /// via [`crate::bytecode::Chunk::line_mode_end_ip`]. In normal mode `END` stays inline
+    /// before the single `Halt` so it runs once at program end.
+    line_mode: bool,
     /// True while compiling a deferred sort/reduce block in the 4th pass. `$a` and `$b`
     /// inside such blocks must use name-based access — `set_sort_pair` writes by name,
     /// so a slot allocation from any outer `my $a`/`my $b` (which the deferred pass sees
@@ -332,6 +338,7 @@ impl Compiler {
             loop_stack: Vec::new(),
             goto_ctx_stack: Vec::new(),
             strict_vars: false,
+            line_mode: false,
             force_name_for_sort_pair: false,
             sort_pair_block_indices: std::collections::HashSet::new(),
             sub_body_block_indices: std::collections::HashSet::new(),
@@ -371,6 +378,14 @@ impl Compiler {
     /// `prepare_program_top_level` (which processes `use strict` before main body execution).
     pub fn with_strict_vars(mut self, v: bool) -> Self {
         self.strict_vars = v;
+        self
+    }
+
+    /// Compile for `-n`/`-p` line mode: `END` blocks go into a separate region after the main
+    /// `Halt` so the per-line loop never runs them; the driver runs that region once after the
+    /// loop. See [`Self::line_mode`].
+    pub fn with_line_mode(mut self, v: bool) -> Self {
+        self.line_mode = v;
         self
     }
 
@@ -1503,23 +1518,36 @@ impl Compiler {
         // Resolve all forward `goto LABEL` against labels recorded in the main scope.
         self.exit_goto_scope()?;
 
-        // Record where the main body ends / END blocks begin. Under `-n`/`-p` the per-line
-        // loop runs only `body_start_ip..body_end_ip`; END runs once after the loop. Without
-        // this boundary the compiled END region would be re-executed on every input line.
-        self.chunk.body_end_ip = self.chunk.ops.len();
-
-        // END blocks run after main, before halt (same order as Perl phase blocks).
-        if !self.end_blocks.is_empty() {
-            self.chunk.emit(Op::SetGlobalPhase(GP_END), 0);
-        }
         // Perl runs END blocks in reverse declaration order (LIFO): the last `END {}` seen runs
         // first, same as CHECK/UNITCHECK above. (BEGIN/INIT stay FIFO.)
         let end_rev: Vec<Block> = self.end_blocks.iter().rev().cloned().collect();
-        for block in end_rev {
-            self.compile_block(&block)?;
-        }
 
-        self.chunk.emit(Op::Halt, 0);
+        if self.line_mode {
+            // `-n`/`-p`: end the per-line body with its own `Halt` FIRST, so per-line execution
+            // stops here and never falls into `END`. Then place the `END` region AFTER that
+            // `Halt`, recording its entry IP — the line driver runs it once after the loop via
+            // `run_end_blocks`. Capturing the IP after the main `Halt` keeps it stable: the only
+            // ops appended afterwards are deferred block/sub bodies (reached by jump, not
+            // fall-through), so no relocation can invalidate it.
+            self.chunk.emit(Op::Halt, 0);
+            if !end_rev.is_empty() {
+                self.chunk.line_mode_end_ip = Some(self.chunk.ops.len());
+                self.chunk.emit(Op::SetGlobalPhase(GP_END), 0);
+                for block in end_rev {
+                    self.compile_block(&block)?;
+                }
+                self.chunk.emit(Op::Halt, 0);
+            }
+        } else {
+            // Normal mode: END blocks run after main, before the single Halt (Perl phase order).
+            if !self.end_blocks.is_empty() {
+                self.chunk.emit(Op::SetGlobalPhase(GP_END), 0);
+            }
+            for block in end_rev {
+                self.compile_block(&block)?;
+            }
+            self.chunk.emit(Op::Halt, 0);
+        }
 
         // Third pass: compile sub bodies after Halt
         let mut entries: Vec<(String, Vec<Statement>, String, Vec<crate::ast::SubSigParam>)> =
