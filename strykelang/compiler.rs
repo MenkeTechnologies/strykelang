@@ -598,6 +598,58 @@ impl Compiler {
         layer.declared_our_scalars.insert(bare_name.to_string());
     }
 
+    /// Per-phase-block accumulation of the `our` (package-global) declarations that appear
+    /// textually **before** each phase block, in source order (aligned with `begin_blocks`
+    /// etc.). Used to satisfy `use strict 'vars'` for phase blocks, which compile out of
+    /// source order (grouped by phase) and would otherwise not see an `our` declared earlier
+    /// in the main body. Perl: `our $x; BEGIN { $x }` is fine; `BEGIN { $x } our $x;` errors —
+    /// hence the textual-position accumulation rather than a whole-program union.
+    fn collect_phase_our_predecls(program: &Program) -> [Vec<Vec<(Sigil, String)>>; 4] {
+        let mut acc: Vec<(Sigil, String)> = Vec::new();
+        let mut begin = Vec::new();
+        let mut unitcheck = Vec::new();
+        let mut check = Vec::new();
+        let mut init = Vec::new();
+        for stmt in &program.statements {
+            match &stmt.kind {
+                StmtKind::Our(decls) | StmtKind::OurSync(decls) => {
+                    for d in decls {
+                        acc.push((d.sigil, d.name.clone()));
+                    }
+                }
+                StmtKind::Begin(_) => begin.push(acc.clone()),
+                StmtKind::UnitCheck(_) => unitcheck.push(acc.clone()),
+                StmtKind::Check(_) => check.push(acc.clone()),
+                StmtKind::Init(_) => init.push(acc.clone()),
+                _ => {}
+            }
+        }
+        [begin, unitcheck, check, init]
+    }
+
+    /// Register `our`-declared names (from [`Self::collect_phase_our_predecls`]) into the current
+    /// scope layer so a phase block compiled before its main-body declaration passes strict-vars.
+    fn register_our_predecls(&mut self, names: &[(Sigil, String)]) {
+        for (sigil, name) in names {
+            match sigil {
+                Sigil::Scalar => self.register_declare_our_scalar(name),
+                Sigil::Array => {
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.declared_arrays.insert(name.clone());
+                        layer.declared_our_arrays.insert(name.clone());
+                    }
+                }
+                Sigil::Hash => {
+                    if let Some(layer) = self.scope_stack.last_mut() {
+                        layer.declared_hashes.insert(name.clone());
+                        layer.declared_our_hashes.insert(name.clone());
+                    }
+                }
+                Sigil::Typeglob => {}
+            }
+        }
+    }
+
     /// `our $x` — package stash binding; no slot indices (bare `$x` maps to `main::x` / `Pkg::x`).
     fn emit_declare_our_scalar(&mut self, bare_name: &str, line: usize, frozen: bool) {
         let stash = self.qualify_stash_scalar_name(bare_name);
@@ -1304,31 +1356,60 @@ impl Compiler {
             .last()
             .map(|s| matches!(s.kind, StmtKind::TryCatch { .. }))
             .unwrap_or(false);
+        // Strict-vars: a top-level `our $x` declares a package global visible to phase blocks
+        // that appear textually AFTER it (Perl). Phase blocks compile here out of source order
+        // (grouped by phase), so pre-register, per block, the `our` names declared before it.
+        // Snapshot the file scope first and restore it afterward so these registrations don't
+        // leak into the main body, where `our` must still be declared before use, in order.
+        let [begin_pre, unitcheck_pre, check_pre, init_pre] =
+            Self::collect_phase_our_predecls(program);
+        let strict_snapshot = self.scope_stack.last().cloned();
+
         // BEGIN blocks run before main (same order as Perl phase blocks).
         if !self.begin_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_START), 0);
         }
-        for block in &self.begin_blocks.clone() {
+        for (i, block) in self.begin_blocks.clone().iter().enumerate() {
+            if let Some(pre) = begin_pre.get(i) {
+                self.register_our_predecls(pre);
+            }
             self.compile_block(block)?;
         }
         // Perl: `${^GLOBAL_PHASE}` stays **`START`** during UNITCHECK blocks.
-        let unit_check_rev: Vec<Block> = self.unit_check_blocks.iter().rev().cloned().collect();
-        for block in unit_check_rev {
+        let unit_check_rev: Vec<(usize, Block)> =
+            self.unit_check_blocks.iter().cloned().enumerate().rev().collect();
+        for (i, block) in unit_check_rev {
+            if let Some(pre) = unitcheck_pre.get(i) {
+                self.register_our_predecls(pre);
+            }
             self.compile_block(&block)?;
         }
         if !self.check_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_CHECK), 0);
         }
-        let check_rev: Vec<Block> = self.check_blocks.iter().rev().cloned().collect();
-        for block in check_rev {
+        let check_rev: Vec<(usize, Block)> =
+            self.check_blocks.iter().cloned().enumerate().rev().collect();
+        for (i, block) in check_rev {
+            if let Some(pre) = check_pre.get(i) {
+                self.register_our_predecls(pre);
+            }
             self.compile_block(&block)?;
         }
         if !self.init_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_INIT), 0);
         }
-        let inits = self.init_blocks.clone();
-        for block in inits {
-            self.compile_block(&block)?;
+        for (i, block) in self.init_blocks.clone().iter().enumerate() {
+            if let Some(pre) = init_pre.get(i) {
+                self.register_our_predecls(pre);
+            }
+            self.compile_block(block)?;
+        }
+
+        // Restore file scope so phase-block predecls don't leak into the main body.
+        if let Some(snap) = strict_snapshot {
+            if let Some(last) = self.scope_stack.last_mut() {
+                *last = snap;
+            }
         }
         self.chunk.emit(Op::SetGlobalPhase(GP_RUN), 0);
         // Record where the main body starts — used by `-n`/`-p` to re-execute only the body per line.
@@ -1977,6 +2058,34 @@ impl Compiler {
         } else {
             for decl in decls {
                 let frozen = allow_frozen && decl.frozen;
+                // `our $x;` / `our @a;` / `our %h;` with NO initializer aliases the package
+                // variable without resetting it: a BEGIN-phase write to the same stash must
+                // survive (Perl — a bare `our` declaration never clobbers). Register the name
+                // for resolution and `strict 'vars'`, but emit no runtime store. (With an
+                // initializer, `our $x = ...;` assigns and resets, same as Perl.)
+                if !is_my && decl.initializer.is_none() && decl.type_annotation.is_none() {
+                    match decl.sigil {
+                        Sigil::Scalar => {
+                            self.register_declare_our_scalar(&decl.name);
+                            continue;
+                        }
+                        Sigil::Array => {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_arrays.insert(decl.name.clone());
+                                layer.declared_our_arrays.insert(decl.name.clone());
+                            }
+                            continue;
+                        }
+                        Sigil::Hash => {
+                            if let Some(layer) = self.scope_stack.last_mut() {
+                                layer.declared_hashes.insert(decl.name.clone());
+                                layer.declared_our_hashes.insert(decl.name.clone());
+                            }
+                            continue;
+                        }
+                        Sigil::Typeglob => {} // falls through to the typeglob error below
+                    }
+                }
                 match decl.sigil {
                     Sigil::Scalar => {
                         if let Some(init) = &decl.initializer {

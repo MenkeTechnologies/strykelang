@@ -169,3 +169,27 @@ fn array_binding_exists_handles_main_prefix() {
     };
     assert_eq!(out.trim(), "both");
 }
+
+#[test]
+fn push_to_main_qualified_array_autovivifies_under_bare_key() {
+    // Regression: `push @main::a, ...` hit `Scope::get_array_mut`, which autovivified the
+    // missing array under the raw `"main::a"` key while the frame getter canonicalizes to
+    // `"a"` — so the re-lookup missed and `unwrap()` panicked. `canon_main!` on the mut
+    // accessor makes the push key and the read key agree.
+    let Some(out) = run_e(r#"push @main::a, 1, 2, 3; print "@a (@main::a)""#) else {
+        eprintln!("skip: stryke binary not built");
+        return;
+    };
+    assert_eq!(out.trim(), "1 2 3 (1 2 3)");
+}
+
+#[test]
+fn write_to_main_qualified_hash_element_autovivifies_under_bare_key() {
+    // Same class of bug as the array push, via `Scope::get_hash_mut`: `$main::h{k} = ...`
+    // panicked autovivifying under `"main::h"`. Now reads through both `%h` and `%main::h`.
+    let Some(out) = run_e(r#"$main::h{k} = "v"; print "$h{k} $main::h{k}""#) else {
+        eprintln!("skip: stryke binary not built");
+        return;
+    };
+    assert_eq!(out.trim(), "v v");
+}
