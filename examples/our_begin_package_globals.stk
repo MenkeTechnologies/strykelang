@@ -1,0 +1,63 @@
+#!/usr/bin/env stryke
+use strict;
+
+# our + BEGIN package-global parity (v0.17.11)
+# Compliance: docs/STYLE_GUIDE.md
+#
+# Demonstrates three Perl-parity fixes around `our`-declared package globals and
+# the compile-time BEGIN phase. Each `aok`/`aeq` below fails on the pre-fix build.
+
+# ── 1. A bare `our` (no initializer) preserves compile-time BEGIN writes ──────
+#
+# BEGIN runs at compile time, before the main body. A bare `our $x;` only aliases
+# the package var — it must NOT reset it — so the BEGIN write survives. (Pre-fix
+# the no-init declaration emitted a runtime store that wiped the BEGIN write.)
+
+our $boot_log
+BEGIN { $main::boot_log .= "[boot]" }
+$boot_log .= "[run]"
+$boot_log |> aeq "[boot][run]", "bare our \$x: BEGIN write survives into main"
+
+our @events
+BEGIN { push @main::events, "init" }
+push @events, "ready"
+join(",", @events) |> aeq "init,ready", "bare our \@a: BEGIN push survives into main"
+
+our %config
+BEGIN { $main::config{source} = "compile-time" }
+$config{source} |> aeq "compile-time", "bare our %h: BEGIN write survives into main"
+
+# ── 2. Contrast: `our $x = INIT` resets at run time, AFTER BEGIN (Perl parity) ─
+#
+# With an initializer the `= "fresh"` assignment runs in the main body, after the
+# compile-time BEGIN, so it overwrites the BEGIN append. Matches Perl exactly.
+
+our $reset_me = "fresh"
+BEGIN { $main::reset_me .= "[from-begin]" }
+$reset_me |> aeq "fresh", "our \$x = INIT runs after BEGIN, so the initializer wins"
+
+# ── 3. Writing through a fully-qualified name autovivifies (was a panic) ──────
+#
+# `@main::a` ≡ `@a`, `%main::h` ≡ `%h`. Pushing / assigning through the qualified
+# spelling when the container does not exist yet must autovivify it — pre-fix this
+# panicked (`unwrap() on None`) because the write key and read key disagreed.
+
+push @main::queue, 10, 20, 30
+join(",", @main::queue) |> aeq "10,20,30", "push \@main::queue autovivifies (was: panic)"
+
+$main::lookup{alpha} = "A"
+$main::lookup{alpha} |> aeq "A", "\$main::lookup{k}= autovivifies (was: panic)"
+
+# ── 4. Under `use strict`, an `our` declared before a BEGIN is visible to it ───
+#
+# Phase blocks compile out of source order (grouped by phase), so a BEGIN that
+# references an `our` declared earlier in the main body used to throw a false
+# "Global symbol requires explicit package name" error. This whole file runs
+# under `use strict`, so every assertion above already exercises the fix; this
+# one pins the value the BEGIN writes through the strict-declared name.
+
+our $threshold
+BEGIN { $threshold = 7 }
+$threshold |> aeq 7, "use strict: our before BEGIN is visible inside BEGIN"
+
+test_run
