@@ -1640,29 +1640,6 @@ Tests: `postfix_for_on_my_at_assign_is_rejected_today`,
 Severity: **bug**.
 
 
-## BUG-078 — BEGIN blocks run but their writes to package vars are lost
-
-```sh
-$ stryke -e '
-our $log = "";
-BEGIN { $main::log .= "B:" }
-$log .= "M:";
-print "[$log]"'
-[M:]                        # B: lost
-```
-
-When BEGIN's `print`/`die` side effect is observed via stdout/stderr, it
-runs as expected. But mutating `our`-declared globals from inside BEGIN
-does not persist into the main body. Probably the BEGIN block's
-compilation phase resets after main-body parsing assigns the initial
-value.
-
-Tests: `begin_block_mutations_to_package_vars_lost_today`,
-`begin_runs_before_main_code_in_declaration_order` (the parse-only check).
-
-Severity: **bug**.
-
-
 ## BUG-081 — `use integer` pragma is not honored
 
 ```sh
