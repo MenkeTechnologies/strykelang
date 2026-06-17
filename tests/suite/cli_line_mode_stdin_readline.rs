@@ -256,6 +256,33 @@ fn line_mode_n_end_aggregation_emits_total_once() {
     assert_eq!(String::from_utf8_lossy(&out.stdout), "10\n");
 }
 
+/// Regression: a `do { } if` block inside a loop in the per-line body must not crash with
+/// "BlockReturnValue with empty call stack". The do-block's bytecode is relocated after the
+/// main `Halt`; an earlier IP-arithmetic split of the line-mode chunk mis-pointed the post-loop
+/// `END` runner into that relocated block body. (No `END` block here, so nothing runs after the
+/// loop.) Two input lines × `for (1..2)` ⇒ four `F:` lines, no trailing garbage.
+#[test]
+fn line_mode_n_do_block_in_loop_does_not_crash_post_loop() {
+    let exe = stryke_exe();
+    let mut child = Command::new(exe)
+        .args(["-lne", r#"for (1..2){ do{print "F:$_"} if m{(\S+)} }"#])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn stryke");
+    let mut stdin = child.stdin.take().expect("stdin");
+    stdin.write_all(b"x y\nz w\n").expect("write stdin");
+    drop(stdin);
+    let out = child.wait_with_output().expect("wait");
+    assert!(
+        out.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "F:1\nF:2\nF:1\nF:2\n");
+}
+
 /// Multiple `END {}` blocks run once each in reverse (LIFO) declaration order under `-n`,
 /// same as Perl: last declared runs first.
 #[test]

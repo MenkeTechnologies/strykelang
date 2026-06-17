@@ -6680,23 +6680,23 @@ impl VMHelper {
 
     /// Run the compiled `END` region **once** after the `-n`/`-p` line loop.
     ///
-    /// The per-line loop ([`Self::process_line`]) caps each line's execution at
-    /// [`crate::bytecode::Chunk::body_end_ip`], so the `END` blocks compiled into the
-    /// line-mode chunk are never run during the loop. Here we run them exactly once by
-    /// resuming the pristine chunk from `body_end_ip` to its final `Halt`. This keeps `END`
-    /// execution on the VM (no tree-walker divergence) and matches Perl: `END` fires once at
-    /// program exit, not per input line.
+    /// In line mode the `END` region is compiled AFTER the per-line body's `Halt` (see
+    /// `Compiler::with_line_mode`), so [`Self::process_line`] stops at the main `Halt` and never
+    /// runs `END` during the loop. Here we run it exactly once by resuming the pristine chunk at
+    /// [`crate::bytecode::Chunk::line_mode_end_ip`] (`None` when the program has no `END` blocks).
+    /// This keeps `END` execution on the VM (no tree-walker divergence) and matches Perl: `END`
+    /// fires once at program exit, not per input line.
     pub fn run_end_blocks(&mut self) -> StrykeResult<()> {
         let Some(chunk) = self.line_mode_chunk.take() else {
             return Ok(());
         };
-        // No `END` region: `body_end_ip` points at the final `Halt`, so running from there is a
-        // no-op. Skip the VM spin-up entirely when there is nothing past the main body.
-        if chunk.body_end_ip < chunk.ops.len() {
+        // `line_mode_end_ip` is `Some` only when the program has `END` blocks; the region sits
+        // after the per-line `Halt`, so we resume the pristine chunk there and run it once.
+        if let Some(end_ip) = chunk.line_mode_end_ip {
             let vm_jit = self.vm_jit_enabled && self.profiler.is_none();
             let mut vm = crate::vm::VM::new(&chunk, self);
             vm.set_jit_enabled(vm_jit);
-            vm.ip = chunk.body_end_ip;
+            vm.ip = end_ip;
             let _ = vm.execute()?;
         }
         self.line_mode_chunk = Some(chunk);
@@ -21794,18 +21794,15 @@ impl VMHelper {
         _program: &Program,
         is_last_input_line: bool,
     ) -> StrykeResult<Option<String>> {
-        let mut chunk = self
+        // Per input line, run the main body. The compiled chunk ends the main body with a
+        // `Halt`; in line mode any `END` region is placed AFTER that `Halt`, so per-line
+        // execution stops at the main body and never runs `END` (which fires once after the
+        // loop via `run_end_blocks`).
+        let chunk = self
             .line_mode_chunk
             .as_ref()
             .expect("process_line called without compiled chunk — execute() must run first")
             .clone();
-        // Per input line, run only the main body — stop before the compiled `END` region by
-        // capping it with `Halt` at `body_end_ip`. `END` runs once after the loop via
-        // `run_line_mode_end` on the pristine `line_mode_chunk`. (The original chunk is left
-        // intact: this mutates only the per-line clone.)
-        if chunk.body_end_ip < chunk.ops.len() {
-            chunk.ops[chunk.body_end_ip] = crate::bytecode::Op::Halt;
-        }
         crate::run_line_body(&chunk, self, line_str, is_last_input_line)
     }
 }
