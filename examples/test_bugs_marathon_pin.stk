@@ -56,13 +56,21 @@ $x_101 |> aeq 10, "BUG-101 (FIXED): var (\$x) = \@arr now binds first element (w
 # to_json treats second arg as array element, not options hashref
 to_json({a => 1}, {pretty => 1}) |> aeq '[{"a":1},{"pretty":1}]', "BUG-106: to_json treats options as array element"
 
-# ── 9. BEGIN mutations lost (BUG-078) ─────────────────────────────────────
+# ── 9. our + BEGIN: init resets, bare alias preserves (Perl parity) ───────────
 
-our $log_78 = ""
-BEGIN { $main::log_78 .= "B" }
-$log_78 .= "M"
-# It seems in some contexts it stringifies to SCALAR(0x...)M
-$log_78 |> maps { _ =~ /SCALAR\(0x\w+\)M/ || _ eq "M" } |> aok "BUG-078: BEGIN mutations lost (or stringified bug)"
+# `our $x = "";` runs the `= ""` at run time, after the compile-time BEGIN write,
+# so the BEGIN "B" is reset and only "M" remains (Perl: M).
+our $log_init = ""
+BEGIN { $main::log_init .= "B" }
+$log_init .= "M"
+$log_init |> maps { _ eq "M" } |> aok "our \$x = '' resets after BEGIN (Perl: M)"
+
+# `our $x;` (no initializer) only aliases the package var, so the BEGIN write
+# survives into the main body (Perl: BM).
+our $log_bare
+BEGIN { $main::log_bare .= "B" }
+$log_bare .= "M"
+$log_bare |> maps { _ eq "BM" } |> aok "bare our \$x preserves BEGIN write (Perl: BM)"
 
 # ── 10. List-form system (BUG-031 FIXED) ──────────────────────────────────
 
