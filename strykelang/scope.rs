@@ -1946,6 +1946,11 @@ impl Scope {
     }
     /// `get_array_mut` — see implementation.
     pub fn get_array_mut(&mut self, name: &str) -> Result<&mut Vec<StrykeValue>, StrykeError> {
+        // `@main::a` ≡ `@a`: canonicalize to the bare key so the autoviv push below uses the
+        // same key the frame getter looks up by (which strips `main::`). Without this, a
+        // qualified `@main::a` pushes a `"main::a"` entry that the re-lookup — canonicalized to
+        // `"a"` — never finds, panicking on `unwrap()`.
+        canon_main!(name);
         // Note: can't return &mut into a Mutex. Callers needing atomic array
         // mutation should use atomic_array_mutate instead. For non-atomic arrays:
         if self.find_atomic_array(name).is_some() {
@@ -2389,6 +2394,9 @@ impl Scope {
         &mut self,
         name: &str,
     ) -> Result<&mut IndexMap<String, StrykeValue>, StrykeError> {
+        // `%main::h` ≡ `%h`: canonicalize so the autoviv push uses the same key the frame
+        // getter looks up by. Mirrors `get_array_mut` — see the note there.
+        canon_main!(name);
         if self.find_atomic_hash(name).is_some() {
             return Err(StrykeError::runtime(
                 "get_hash_mut: use atomic path for mysync hashes",

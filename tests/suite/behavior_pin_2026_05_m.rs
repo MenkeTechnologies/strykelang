@@ -7,10 +7,10 @@ use crate::common::*;
 // ── BEGIN / INIT / CHECK / END phaser order ─────────────────────────────────
 
 #[test]
-fn begin_block_mutations_to_package_vars_lost_today() {
-    // BUG-078: BEGIN executes (you can see its prints when run via CLI), but
-    // its writes to `our`-declared package variables do not persist into
-    // the main body's compilation phase. The `$log` reset at the top wins.
+fn our_with_initializer_resets_package_var_after_begin_write_like_perl() {
+    // `our $log = "";` runs the `= ""` assignment at run time, AFTER the compile-time
+    // BEGIN writes — so the reset wins and the BEGIN-phase appends are discarded. Perl
+    // does the same here (verified: `perl -e 'our $log=""; BEGIN{...}'` → "M1:M2:").
     let out = eval_string(
         r#"our $log = "";
            BEGIN { $main::log .= "B1:" }
@@ -20,6 +20,21 @@ fn begin_block_mutations_to_package_vars_lost_today() {
            $log"#,
     );
     assert_eq!(out, "M1:M2:");
+}
+
+#[test]
+fn our_without_initializer_preserves_begin_phase_writes_like_perl() {
+    // `our $log;` (no initializer) aliases the package var WITHOUT resetting it, so
+    // compile-time BEGIN writes survive into the main body. Perl: "B1:B2:M1:M2:".
+    let out = eval_string(
+        r#"our $log;
+           BEGIN { $main::log .= "B1:" }
+           $log .= "M1:";
+           BEGIN { $main::log .= "B2:" }
+           $log .= "M2:";
+           $log"#,
+    );
+    assert_eq!(out, "B1:B2:M1:M2:");
 }
 
 #[test]
@@ -508,6 +523,32 @@ fn use_strict_with_my_declaration_compiles() {
         "use strict + my should parse"
     );
     assert_eq!(eval_int("use strict; my $x = 5; $x"), 5);
+}
+
+#[test]
+fn use_strict_our_before_begin_is_visible_to_begin() {
+    // Phase blocks compile out of source order (grouped by phase), so an `our $x` declared in
+    // the main body before a BEGIN must still satisfy `use strict 'vars'` inside that BEGIN.
+    // Perl: `our $x; BEGIN { $x = 7 }` compiles and runs.
+    assert_eq!(eval_int("use strict; our $x; BEGIN { $x = 7 } $x"), 7);
+    // With an initializer, strict still passes (the BEGIN reference compiles) but the runtime
+    // `= 0` runs after BEGIN and resets — so the value is 0, matching Perl.
+    assert_eq!(eval_int("use strict; our $x = 0; BEGIN { $x = 7 } $x"), 0);
+    assert_eq!(
+        eval_string("use strict; our @a; BEGIN { push @a, 5 } \"@a\""),
+        "5"
+    );
+}
+
+#[test]
+fn use_strict_our_after_begin_is_still_a_strict_error() {
+    // The visibility is textual: an `our $x` declared AFTER a BEGIN that references `$x` does
+    // NOT satisfy strict inside that BEGIN — same as a never-declared global. Perl errors here
+    // too, so this must not become lenient just because the var is declared later in the file.
+    assert_eq!(
+        eval_err_kind("use strict; BEGIN { $x = 7 } our $x;"),
+        eval_err_kind("use strict; $undeclared_after_begin_xyz;"),
+    );
 }
 
 // ── Heredoc inside a sub returns body ──────────────────────────────────────
