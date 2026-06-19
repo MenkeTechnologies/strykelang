@@ -86,7 +86,7 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
-/// Preset for stryke glob (via [`StrykeGlobOptsGuard`] + `zsh::glob::glob`): full
+/// Preset for stryke glob (via [`StrykeGlobOptsGuard`] + `zsh::glob::glob_path`): full
 /// extended glob, bare-qualifier shorthand on (`*(/)` works without `(#q.../)`),
 /// `nullglob` so a no-match returns an empty list (Perl `glob` semantics) instead
 /// of echoing the literal pattern back. `globstarshort` makes `**.stk` match every
@@ -112,7 +112,7 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
     let results = {
         let _lock = ZSH_GLOB_GLOBAL_MUTEX.lock();
         let _opts = StrykeGlobOptsGuard::new();
-        zsh::glob::glob(&normalized)
+        zsh::glob::glob_path(&normalized)
     };
     // zshrs emits absolute paths even when called with a relative pattern;
     // strip the cwd prefix so the user sees what they asked for. Leading-`./`
@@ -1162,7 +1162,7 @@ pub fn glob_par_patterns_with_progress(patterns: &[String], progress: bool) -> S
 }
 
 fn glob_par_patterns_inner(patterns: &[String], progress: Option<&PmapProgress>) -> StrykeValue {
-    // Parallelize across patterns. Each pattern goes through `zsh::glob::glob`
+    // Parallelize across patterns. Each pattern goes through `zsh::glob::glob_path`
     // single-threaded so the full qualifier machinery is available; intra-
     // pattern parallelism is sacrificed in exchange for `(/)`, `(.)`, `(om)`,
     // `(L+N)`, etc. World-first: zsh glob qualifiers in a scripting language.
