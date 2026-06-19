@@ -1005,25 +1005,30 @@ pub fn swallow_to_hash(pattern: &str) -> io::Result<StrykeValue> {
     } else {
         vec![pattern.to_string()]
     };
+    let (_, qual) = zsh::glob::split_qualifier(pattern);
+    let strict = qual.is_some();
     let mut out: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
     for p in &paths {
-        let meta = std::fs::metadata(p)?;
-        if !meta.is_file() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("swallow: not a regular file: {}", p),
-            ));
+        // Same policy as `slurp`: a plain wildcard sweep skips matches it can't
+        // read as a regular file (dangling symlink, vanished file, directory) —
+        // a bad reference is skipped, not a fatal hole; a qualifier glob is an
+        // explicit selection and stays strict.
+        let entry = slurp_glob_entry(p, strict, |p| {
+            let canon = std::fs::canonicalize(p)?.to_string_lossy().into_owned();
+            let bytes = read_file_bytes(p)?;
+            Ok((canon, StrykeValue::bytes(bytes)))
+        })?;
+        if let Some((canon, val)) = entry {
+            out.insert(canon, val);
         }
-        let canon = std::fs::canonicalize(p)?.to_string_lossy().into_owned();
-        let bytes = read_file_bytes(p)?;
-        out.insert(canon, StrykeValue::bytes(bytes));
     }
     Ok(StrykeValue::hash(out))
 }
 
 /// Streaming sibling of [`swallow_to_hash`]: pre-resolves the glob match set
-/// (same zsh engine, same hard-fail-on-non-regular policy, same canonicalize),
-/// then defers the bytes read until each `next_item()` call. Only one file's
+/// (same zsh engine, same plain-sweep-skips / qualifier-strict policy, same
+/// canonicalize), then defers the bytes read until each `next_item()` call.
+/// Only one file's
 /// bytes are resident at any time — useful when iterating directories whose
 /// concatenated contents would not fit in memory.
 ///
@@ -1060,25 +1065,29 @@ impl crate::value::StrykeIterator for IngestIterator {
 
 /// `ingest PATTERN` — same surface as [`swallow_to_hash`] but returns a lazy
 /// iterator instead of materializing a hash. Path discovery + stat +
-/// canonicalize are eager (so qualifier support is identical to swallow/slurp
-/// and non-regular matches hard-fail immediately); file content reads are
-/// deferred to per-iteration `next_item()` calls via [`IngestIterator`].
+/// canonicalize are eager (so qualifier support is identical to swallow/slurp,
+/// and a plain sweep skips matches it can't stat as a regular file while a
+/// qualifier glob stays strict); file content reads are deferred to
+/// per-iteration `next_item()` calls via [`IngestIterator`].
 pub fn ingest_iterator(pattern: &str) -> io::Result<StrykeValue> {
     let raw_paths: Vec<String> = if pattern_is_glob(pattern) {
         stryke_glob(pattern)
     } else {
         vec![pattern.to_string()]
     };
+    let (_, qual) = zsh::glob::split_qualifier(pattern);
+    let strict = qual.is_some();
     let mut canon: Vec<String> = Vec::with_capacity(raw_paths.len());
     for p in &raw_paths {
-        let meta = std::fs::metadata(p)?;
-        if !meta.is_file() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("ingest: not a regular file: {}", p),
-            ));
+        // Same policy as `slurp`/`swallow`: a plain wildcard sweep skips matches
+        // it can't stat as a regular file (dangling symlink, vanished file,
+        // directory); a qualifier glob is an explicit selection and stays strict.
+        let resolved = slurp_glob_entry(p, strict, |p| {
+            std::fs::canonicalize(p).map(|c| c.to_string_lossy().into_owned())
+        })?;
+        if let Some(c) = resolved {
+            canon.push(c);
         }
-        canon.push(std::fs::canonicalize(p)?.to_string_lossy().into_owned());
     }
     Ok(StrykeValue::iterator(Arc::new(IngestIterator::new(canon))))
 }
@@ -1673,6 +1682,30 @@ mod tests {
         let pat = format!("{}/*.txt", dir.display());
         let out = read_file_text_or_glob(&pat).expect("plain sweep must not fail on a dangling link");
         assert_eq!(out, "hello");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn swallow_and_ingest_skip_dangling_symlink_in_plain_sweep() {
+        // swallow/ingest share slurp's policy: a plain wildcard sweep skips a
+        // bad reference (dangling symlink) rather than aborting the per-file
+        // result with `not a regular file` / `os error 2`.
+        use std::os::unix::fs::symlink;
+        let dir = std::env::temp_dir().join(format!("stryke_swallow_dangling_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("real.txt"), b"hello").unwrap();
+        symlink(dir.join("does_not_exist"), dir.join("dead.txt")).unwrap();
+        let pat = format!("{}/*.txt", dir.display());
+
+        let hash = swallow_to_hash(&pat).expect("swallow must skip the dangling link");
+        let keys: Vec<String> = hash.as_hash_map().unwrap().keys().cloned().collect();
+        assert_eq!(keys.len(), 1, "only the real file survives: {:?}", keys);
+        assert!(keys[0].ends_with("real.txt"));
+
+        // ingest pre-resolves the same match set without aborting.
+        ingest_iterator(&pat).expect("ingest must skip the dangling link");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

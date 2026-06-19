@@ -711,6 +711,12 @@ CLI argument error.
 .TP
 .B 130
 Interrupted by SIGINT.
+.TP
+.B 141
+Terminated by SIGPIPE (128+13) when a downstream reader closes the pipe early
+(e.g.\& \fBs '... p' | head\fR). stryke restores the default SIGPIPE disposition
+at startup, so it exits silently like \fBawk\fR(1) / \fBperl\fR(1) instead of
+raising a "Broken pipe" runtime error.
 .SH SEE ALSO
 .BR perl (1),
 .BR awk (1),
@@ -721,7 +727,7 @@ Interrupted by SIGINT.
 https://github.com/MenkeTechnologies/strykelang
 .br
 .B Full reference:
-\fIhttps://stryke.menketech.com/reference.html\fR (10,176 topics)
+\fIhttps://stryke.menketech.com/reference.html\fR (10,322 topics)
 .br
 .B Engineering report:
 \fIhttps://stryke.menketech.com/report.html\fR

@@ -1938,6 +1938,9 @@ Killed by SIGKILL.
 .TP
 .B 139
 Segfault.
+.TP
+.B 141
+Terminated by SIGPIPE (128+13) when a downstream reader closes the pipe early.
 .SH "30. SIGNALS"
 .PP
 Signal handlers register via
@@ -1950,6 +1953,14 @@ $SIG{TERM} = "IGNORE";
 $SIG{__DIE__} = sub { ... };
 .EE
 .RE
+.PP
+The default SIGPIPE disposition is restored at startup (the Rust runtime
+otherwise ignores it), so writing to a closed downstream pipe \(em
+.B s '... p' | head
+\(em terminates stryke silently like
+.BR awk (1) /
+.BR perl (1)
+rather than raising a "Broken pipe" runtime error.
 .SH "31. BUGS"
 .PP
 Known parity gaps tracked in
@@ -1977,7 +1988,7 @@ inheritance interaction) may diverge; full list:
 .UR https://github.com/MenkeTechnologies/strykelang
 .UE
 .br
-.B Full reference (10,176 topics):
+.B Full reference (10,322 topics):
 .UR https://stryke.menketech.com/reference.html
 .UE
 .br
