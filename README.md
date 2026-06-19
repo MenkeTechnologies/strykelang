@@ -1475,15 +1475,17 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # `swallow` is the per-file hash sibling of `slurp` — returns
   # `{ canonical_abspath => raw_bytes }`. Always bytes (works for binary
   # files); keys are absolute paths with symlinks flattened via
-  # `fs::canonicalize`. Same hard-fail rule on non-regular matches.
+  # `fs::canonicalize`. Same match policy as slurp: a plain sweep skips
+  # bad references (dangling symlinks, vanished files, dirs); a qualifier
+  # glob stays strict.
   my %src = swallow "src/**/*.rs"   # every Rust source file, raw bytes
   my %imgs = swa "assets/**/*.{png,jpg}"
   my %safe = swallow "missing*(N)"  # (N) null-glob → empty hash
 
   # `ingest` is the streaming variant of `swallow` — yields
   # `[abspath, bytes]` one file at a time so only one file's bytes are
-  # resident at any moment. Same eager glob expansion (full qualifier
-  # support, hard-fail on non-regular up-front), but file reads are
+  # resident at any moment. Same eager glob expansion + match policy
+  # (plain sweep skips bad references, qualifier glob strict), but file reads are
   # deferred to each iteration step. For-loops over an ingest iterator
   # pull lazily (no `to_list()` materialisation); use `|>` pipes or
   # explicit `->next` driving the same way.
@@ -2044,7 +2046,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **780 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **783 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
