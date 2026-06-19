@@ -22,7 +22,7 @@ fn div_ll = _0 / _1
 # a bounded channel. Items flow concurrently. Output order is non-
 # deterministic; the macro's value is item count.
 
-mysync @out
+varsync @out
 ~s> (1:5) map { _ * 10 } map { _ + 1 } ep { push @out, _ }
 val @sorted = sort { _ <=> _1 } @out
 $sorted[0]  |> aeq 11, "~s> 1:5 map *10 map +1 ep → first sorted = 11"
@@ -48,12 +48,12 @@ var @captured
 @captured |> sum |> aeq 15, "e { push } captures all five"
 
 # pmaps — streaming parallel map, lazy iterator.
-mysync $sum = 0
+varsync $sum = 0
 pmaps { _ * 2 } (1:100) |> e { $sum += _ }
 $sum |> aeq 10100, "pmaps + e accumulates 2*(1+..+100) = 10100"
 
 # pgreps — streaming parallel filter.
-mysync $kept = 0
+varsync $kept = 0
 pgreps { _ % 3 == 0 } (1:100) |> e { $kept++ }
 $kept |> aeq 33, "pgreps multiples-of-3 in 1:100 = 33"
 

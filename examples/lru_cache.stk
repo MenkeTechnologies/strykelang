@@ -83,8 +83,8 @@ class LRU {
 
 # ── AOP instrumentation: per-op latency + hit observation ───────────
 
-mysync $get_lat = t_digest(100)
-mysync $put_lat = t_digest(100)
+varsync $get_lat = t_digest(100)
+varsync $put_lat = t_digest(100)
 
 around "LRU::get" {
     val $t0 = now_ns()

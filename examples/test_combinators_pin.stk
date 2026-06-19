@@ -36,7 +36,7 @@ $add5(3) |> aeq 8,  "curry add5(3)"
 $add5(10)|> aeq 15, "curry add5(10)"
 
 fn Fn::memoize($f) {
-    mysync %cache = ()
+    varsync %cache = ()
     fn($x) {
         if (!exists $cache{$x}) {
             $cache{$x} = $f($x)
@@ -45,7 +45,7 @@ fn Fn::memoize($f) {
     }
 }
 
-mysync $calls = 0
+varsync $calls = 0
 val $slow = fn { $calls++; _ * _ }
 val $fast = Fn::memoize($slow)
 $fast(5) |> aeq 25, "memo 5²"
@@ -88,7 +88,7 @@ join(",", @{$j(5)}) |> aeq "6,10,-5", "juxt(inc,dbl,neg)(5)"
 
 fn Fn::tap($f) = fn { $f(_); _ }
 
-mysync @log = ()
+varsync @log = ()
 val $tap = Fn::tap(fn { push @log, _ })
 $tap(10) |> aeq 10, "tap returns input"
 $tap(20) |> aeq 20, "tap returns input 2"

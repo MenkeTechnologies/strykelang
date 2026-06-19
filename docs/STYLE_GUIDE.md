@@ -424,7 +424,7 @@ Streaming variants (`pmaps`, `pgreps`, `pflat_maps`, `maps`, `greps`, `flat_maps
 | DO | DON'T | Why |
 |---|---|---|
 | `pmaps { f(_) } @xs` | spawn threads manually | `pmaps` rides rayon work-stealing; correct + faster. |
-| `mysync $count = 0` | shared mutex by hand | `mysync` and `oursync` are the stryke-shared-state primitive; lockless reads, lock-on-write. |
+| `varsync $count = 0` | shared mutex by hand | `varsync` and `oursync` are the stryke-shared-state primitive; lockless reads, lock-on-write. |
 | `pchannel` | hand-rolled mpsc | Built-in unbounded channel with select. |
 | `barrier($n)` | hand-rolled CountdownLatch | One call. |
 

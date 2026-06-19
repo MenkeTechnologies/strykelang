@@ -12,9 +12,9 @@ $s->has(99) |> maps { !_ } |> aok "set->has(absent)"
 
 # ── 2. Sync Variables & Parallelism ───────────────────────────────────────
 
-mysync $v_sync = 0
+varsync $v_sync = 0
 (1:100) |> pmap { $v_sync++ }
-$v_sync |> aeq 100, "mysync + pmap atomic increment"
+$v_sync |> aeq 100, "varsync + pmap atomic increment"
 
 oursync $v_global = 0
 (1:50) |> pmap { $v_global++ }

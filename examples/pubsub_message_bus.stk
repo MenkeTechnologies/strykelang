@@ -9,7 +9,7 @@
 # Demonstrates:
 #   * `pchannel` for typed inter-thread message passing.
 #   * `spawn { … }` for detached worker threads.
-#   * `mysync` for race-free shared counters / collected output.
+#   * `varsync` for race-free shared counters / collected output.
 #   * Topic-pattern routing (`orders.*` matches `orders.created`).
 #   * Graceful shutdown via sentinel-value broadcast.
 #
@@ -22,7 +22,7 @@ p "── Pub/Sub Message Bus ────────────────�
 val ($pub_tx, $pub_rx) = pchannel(1024)
 
 # Subscriber registry: each entry = { pattern => str, tx => sender, name => str }
-mysync @subs = ()
+varsync @subs = ()
 
 # Patterns are tiny — match by prefix (`orders.*` → starts-with `orders.`)
 # or wildcard (`*` → match anything). Avoids the regex-caching quirks that
@@ -44,7 +44,7 @@ fn Bus::subscribe($name, $pattern) {
 
 # ── 2. Broker thread — fans messages out to matching subscribers ──
 
-mysync $delivered = 0
+varsync $delivered = 0
 
 spawn {
     while (1) {
@@ -66,7 +66,7 @@ spawn {
 
 # ── 3. Subscribers — each is its own worker thread ──
 
-mysync @log = ()
+varsync @log = ()
 
 fn Bus::run_subscriber($name, $rx) {
     while (1) {

@@ -16678,8 +16678,8 @@ Sci::banner("§79 skip list")
 # Shared counter for node-identity comparison.  Stryke hash-refs
 # don't expose stable numeric addresses (`$a == $b` returns 1 for any
 # two refs), so each node gets a unique id field set at construction.
-# `mysync` is stryke's shared-mutable primitive for closure capture.
-mysync $LLIST_ID_COUNTER = 0
+# `varsync` is stryke's shared-mutable primitive for closure capture.
+varsync $LLIST_ID_COUNTER = 0
 
 fn LList::make_node($val) {
     $LLIST_ID_COUNTER++

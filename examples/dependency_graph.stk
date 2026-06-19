@@ -39,9 +39,9 @@ for val $pkg (sort { _ cmp _1 } keys %deps) {
 
 # ── topological sort via DFS ────────────────────────────────────────
 
-mysync %color   # white=0 (default), gray=1, black=2
-mysync @order
-mysync $cycle_found = 0
+varsync %color   # white=0 (default), gray=1, black=2
+varsync @order
+varsync $cycle_found = 0
 
 fn Demo::Topo::visit($node) {
     val $c = $color{$node} // 0

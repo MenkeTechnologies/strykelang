@@ -2,7 +2,7 @@
 
 # Feature-flag system demo. Each flag has a rollout percentage. Users
 # are bucketed sticky-deterministically via a hash of (user_id, flag).
-# Evaluation telemetry is recorded via mysync counters + sketches.
+# Evaluation telemetry is recorded via varsync counters + sketches.
 #
 # Patterns:
 #   * sha-style bucket hash → modulo 100 = percentage
@@ -42,10 +42,10 @@ fn Demo::FF::bucket($user, $flag) {
 
 # ── evaluation ─────────────────────────────────────────────────────
 
-mysync %hll_per_flag    # flag -> HLL of users who hit
-mysync %enabled_count   # flag -> count of "enabled" evaluations
-mysync %total_count     # flag -> count of total evaluations
-mysync $td_eval = t_digest(100)
+varsync %hll_per_flag    # flag -> HLL of users who hit
+varsync %enabled_count   # flag -> count of "enabled" evaluations
+varsync %total_count     # flag -> count of total evaluations
+varsync $td_eval = t_digest(100)
 
 for val $f (keys %flags) {
     $hll_per_flag{$f} = hll(14)

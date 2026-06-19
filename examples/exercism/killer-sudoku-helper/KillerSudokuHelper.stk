@@ -18,7 +18,7 @@ fn Exercism::KillerSudokuHelper::_pick($size, $sum, $next, $acc, $out) {
 }
 
 fn Exercism::KillerSudokuHelper::filter($combos, $excluded) {
-    val %ex = map { $_ => 1 } @{$excluded}
+    val %ex = map { _ => 1 } @{$excluded}
     var @out
     for val $c (@{$combos}) {
         var $bad = 0

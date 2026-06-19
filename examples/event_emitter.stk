@@ -57,7 +57,7 @@ fn EE::count($ee, $event) {
 
 p "=== Event Emitter Demo ==="
 val $bus = EE::new()
-mysync @log = ()
+varsync @log = ()
 EE::on($bus, "data", fn ($x) { push @log, "A:" . $x })
 EE::on($bus, "data", fn ($x) { push @log, "B:" . $x })
 EE::once($bus, "data", fn ($x) { push @log, "ONCE:" . $x })

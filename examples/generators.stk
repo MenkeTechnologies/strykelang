@@ -6,8 +6,8 @@
 p "--- Infinite Fibonacci Generator ---"
 
 val $fib_gen = gen {
-    mysync $fa = 0
-    mysync $fb = 1
+    varsync $fa = 0
+    varsync $fb = 1
     while (1) {
         yield $fa
         val $tmp = $fa + $fb

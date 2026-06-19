@@ -58,11 +58,11 @@ fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta($_) } sort
 
 fn Ci::demo_stk_files = ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
 
-mysync @failures
-mysync $files_ok = 0
-mysync $files_n  = 0
-mysync $tests_ok = 0
-mysync $tests_n  = 0
+varsync @failures
+varsync $files_ok = 0
+varsync $files_n  = 0
+varsync $tests_ok = 0
+varsync $tests_n  = 0
 
 fn Ci::add_files($ok, $n) {
     $files_ok += $ok

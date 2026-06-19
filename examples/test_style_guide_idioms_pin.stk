@@ -51,7 +51,7 @@ fn halve = _ / 2
 
 # ── § 7.5 `~p>` chunk-parallel — basic sum (regression: WantarrayCtx::List) ─
 
-mysync $expected = (1:1000) |> sum
+varsync $expected = (1:1000) |> sum
 ~p> (1:1000) sum |> aeq $expected, "~p> sum matches sequential sum"
 
 # Map then sum across chunks — the WantarrayCtx::List fix lives here.

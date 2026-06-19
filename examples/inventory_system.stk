@@ -52,7 +52,7 @@ fn Demo::Inv::add_product($sku, $name, $price, $stock, $reorder) {
 
 # ── transaction log for AOP ──────────────────────────────────────────
 
-mysync @txlog
+varsync @txlog
 val $td_lat = t_digest(100)
 
 fn Demo::Inv::record_sale($sku, $qty) {

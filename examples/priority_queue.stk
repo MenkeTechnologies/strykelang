@@ -102,7 +102,7 @@ for val $u (sort { _ cmp _1 } keys %graph) {
 
 # ── compute shortest paths from SF ──────────────────────────────────
 
-mysync $pq_lat = t_digest(100)
+varsync $pq_lat = t_digest(100)
 around "Demo::PQ::push" {
     val $t0 = now_ns()
     val $r = proceed(@INTERCEPT_ARGS)

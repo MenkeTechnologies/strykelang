@@ -6,7 +6,7 @@
 #
 # Patterns:
 #   * regex replacement via `=~ s///g` per-line
-#   * audit channel via mysync hash counters
+#   * audit channel via varsync hash counters
 #   * sketch (HLL) for distinct PII items seen
 #   * t-digest for per-line scan latency
 #   * TopK for most-redacted kinds
@@ -31,10 +31,10 @@ val %replacements = (
 
 # ── audit channels ──────────────────────────────────────────────────
 
-mysync %redaction_count
-mysync $hll_pii = hll(14)
-mysync $td_lat = t_digest(100)
-mysync $tk_kinds = topk(5)
+varsync %redaction_count
+varsync $hll_pii = hll(14)
+varsync $td_lat = t_digest(100)
+varsync $tk_kinds = topk(5)
 
 for val $k (keys %patterns) {
     $redaction_count{$k} = 0

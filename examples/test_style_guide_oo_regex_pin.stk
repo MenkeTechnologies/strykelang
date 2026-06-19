@@ -32,7 +32,7 @@ $by_len[-1] |> aeq "banana", "longest last by len"
 
 # `_<` outer-chain: reach the enclosing topic from a nested closure.
 var @rows = ([1, 2, 3], [4, 5, 6], [7, 8, 9])
-mysync @grand
+varsync @grand
 for val $r (@rows) {
     push @grand, map { _ + $r->[0] } @{$r}
 }

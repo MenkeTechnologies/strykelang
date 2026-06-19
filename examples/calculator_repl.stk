@@ -56,8 +56,8 @@ fn Demo::Calc::tokenize($src) {
 
 # ── parser state ───────────────────────────────────────────────────
 
-mysync $tokens
-mysync $pos
+varsync $tokens
+varsync $pos
 
 fn Demo::Calc::peek() {
     return undef if $pos >= len @$tokens
@@ -72,10 +72,10 @@ fn Demo::Calc::advance() {
 
 # ── recursive-descent: expr → term { (+|-) term }* ────────────────
 
-mysync %vars
-mysync @history
-mysync $trace_enabled = 0
-mysync $td_eval = t_digest(100)
+varsync %vars
+varsync @history
+varsync $trace_enabled = 0
+varsync $td_eval = t_digest(100)
 
 fn Demo::Calc::parse_factor() {
     val $t = Demo::Calc::peek()

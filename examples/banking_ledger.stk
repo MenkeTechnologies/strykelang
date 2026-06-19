@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 
 # Banking ledger demo: account class, transaction log, atomic
-# transfers, audit log via mutex-coordinated mysync. Patterns:
+# transfers, audit log via mutex-coordinated varsync. Patterns:
 #   * Account as OOP class with balance derivation from tx log
 #   * Transactions immutable hashrefs with type + amount
 #   * Transfer pattern: debit + credit in single fn (no auto-commit)
@@ -60,7 +60,7 @@ class Account {
 
 # ── transfer: atomic debit-then-credit ──────────────────────────────
 
-mysync @audit
+varsync @audit
 val $td_lat = t_digest(100)
 
 fn Demo::Bank::transfer($from, $to, $amount) {

@@ -6,16 +6,16 @@
 # breaker half-opens (try one call); a success closes it back.
 #
 # Patterns:
-#   * mysync hash for breaker state (closed/open/half_open)
+#   * varsync hash for breaker state (closed/open/half_open)
 #   * sliding window of recent outcomes (success / fail)
 #   * t-digest for per-outcome latency (success p99 vs fail p99)
 #   * AOP `around` for outcome observation (free fn — avoids BUG-222)
 
 # ── breaker state ────────────────────────────────────────────────────
 
-mysync $bstate = "closed"     # closed | open | half_open
-mysync @recent_outcomes       # 1 = success, 0 = failure
-mysync $opened_at = 0          # ns timestamp when breaker opened
+varsync $bstate = "closed"     # closed | open | half_open
+varsync @recent_outcomes       # 1 = success, 0 = failure
+varsync $opened_at = 0          # ns timestamp when breaker opened
 
 val $window     = 10            # outcomes to remember
 val $threshold  = 0.5           # >= 50% failures → open
@@ -72,8 +72,8 @@ fn Demo::Cb::record_outcome($ok) {
 
 # ── instrumented downstream (intentionally flaky) ───────────────────
 
-mysync $succ_lat = t_digest(100)
-mysync $fail_lat = t_digest(100)
+varsync $succ_lat = t_digest(100)
+varsync $fail_lat = t_digest(100)
 
 fn Demo::Cb::call_downstream($flake_rate) {
     val $t0 = now_ns()
@@ -90,12 +90,12 @@ fn Demo::Cb::call_downstream($flake_rate) {
 
 # ── guarded call ────────────────────────────────────────────────────
 
-mysync $allowed = 0
-mysync $rejected = 0
-mysync $upstream_ok = 0
-mysync $upstream_fail = 0
-mysync @audit
-mysync %state_transitions
+varsync $allowed = 0
+varsync $rejected = 0
+varsync $upstream_ok = 0
+varsync $upstream_fail = 0
+varsync @audit
+varsync %state_transitions
 
 fn Demo::Cb::call($flake_rate) {
     val $prev_state = $bstate

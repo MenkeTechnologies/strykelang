@@ -77,7 +77,7 @@ join(",", @{Pl::integ($q)})     |> aeq "0,1,-0.5","∫q dx"
 
 # Power: pⁿ via repeated mul
 fn Pl::pow($p, $n) {
-    mysync $r = [1]
+    varsync $r = [1]
     for (1:$n) {
         $r = Pl::mul($r, $p)
     }
@@ -97,9 +97,9 @@ fn Pl::lagrange(@pts) {
     val @xs = map { $_->[0] } @pts
     val @ys = map { $_->[1] } @pts
     val $n  = (len @pts)
-    mysync $sum = [0]
+    varsync $sum = [0]
     for val $i (0:$n-1) {
-        mysync $term = [$ys[$i]]
+        varsync $term = [$ys[$i]]
         for val $j (0:$n-1) {
             next if $j == $i
             val $denom = $xs[$i] - $xs[$j]

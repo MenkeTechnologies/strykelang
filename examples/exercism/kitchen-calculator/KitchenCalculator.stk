@@ -1,6 +1,6 @@
 #!/usr/bin/env stryke
 
-const val %CONV = (
+val %CONV = (
     cup         => 240,
     fluid_ounce => 30,
     teaspoon    => 5,

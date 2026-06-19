@@ -94,8 +94,8 @@ Pubsub::publish($bus2, "n", 10)
 Pubsub::publish($bus2, "n", 2)
 "@$log2" |> aeq "7 10", "filtered subscribe"
 
-# Counter via mysync (closure capturing shared counter)
-mysync $hits = 0
+# Counter via varsync (closure capturing shared counter)
+varsync $hits = 0
 val $bus3 = Pubsub::new()
 Pubsub::subscribe($bus3, "tap", fn { $hits++ })
 Pubsub::publish($bus3, "tap", "x")

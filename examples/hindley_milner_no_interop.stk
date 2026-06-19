@@ -52,7 +52,7 @@
 # A type scheme is +{ kind => "scheme", quants => [id, ...], body => T }
 # where `quants` lists the universally quantified tvar ids.
 
-mysync $FRESH_TVAR_ID = 0
+varsync $FRESH_TVAR_ID = 0
 
 fn Hm::fresh_tvar_id() {
     $FRESH_TVAR_ID++

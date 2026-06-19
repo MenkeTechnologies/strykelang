@@ -19,7 +19,7 @@ fn Mk::choose($succ, $seed) = $succ->[$seed % (len $succ)]
 fn Mk::generate($model, $start, $n, $seed) {
     var @out = ($start)
     var $cur = $start
-    mysync $r = $seed
+    varsync $r = $seed
     for (1:$n) {
         val $succ = $model->{$cur}
         last if !$succ

@@ -58,7 +58,7 @@ EE::count($b0, "x")    |> aeq 0, "count zero"
 
 # Single listener
 val $b1 = EE::new()
-mysync @l1 = ()
+varsync @l1 = ()
 EE::on($b1, "data", fn ($x) { push @l1, $x })
 EE::emit($b1, "data", 42) |> aeq 1, "one fired"
 join(",", @l1) |> aeq "42", "got payload"
@@ -67,7 +67,7 @@ join(",", @l1) |> aeq "42,7", "two payloads"
 
 # Multiple listeners
 val $b2 = EE::new()
-mysync @l2 = ()
+varsync @l2 = ()
 EE::on($b2, "ev", fn ($x) { push @l2, "A:" . $x })
 EE::on($b2, "ev", fn ($x) { push @l2, "B:" . $x })
 EE::on($b2, "ev", fn ($x) { push @l2, "C:" . $x })
@@ -77,7 +77,7 @@ join(",", @l2) |> aeq "A:5,B:5,C:5", "all three"
 
 # once() fires only once
 val $b3 = EE::new()
-mysync @l3 = ()
+varsync @l3 = ()
 EE::once($b3, "o", fn ($x) { push @l3, "once:" . $x })
 EE::on($b3, "o",   fn ($x) { push @l3, "perm:" . $x })
 EE::emit($b3, "o", 1)
@@ -87,7 +87,7 @@ EE::count($b3, "o") |> aeq 1, "once removed"
 
 # off removes listener
 val $b4 = EE::new()
-mysync @l4 = ()
+varsync @l4 = ()
 val $id = EE::on($b4, "z", fn ($x) { push @l4, "1:" . $x })
 EE::on($b4, "z",          fn ($x) { push @l4, "2:" . $x })
 EE::emit($b4, "z", "a")
@@ -98,8 +98,8 @@ EE::count($b4, "z") |> aeq 1, "one remains"
 
 # Unrelated events isolated
 val $b5 = EE::new()
-mysync @lx = ()
-mysync @ly = ()
+varsync @lx = ()
+varsync @ly = ()
 EE::on($b5, "x", fn ($v) { push @lx, $v })
 EE::on($b5, "y", fn ($v) { push @ly, $v })
 EE::emit($b5, "x", 1)

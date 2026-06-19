@@ -4,7 +4,7 @@
 # renders the solution, reports stats. Patterns:
 #   * 9x9 grid as 1D arrayref (81 cells) for compact iteration
 #   * row/col/box constraint checks via index math
-#   * mysync counter for try-count telemetry
+#   * varsync counter for try-count telemetry
 #   * t-digest for per-cell try-latency
 
 # ── puzzle (0 = empty) ──────────────────────────────────────────────
@@ -67,7 +67,7 @@ fn Demo::Sudoku::is_valid($grid, $idx, $val) {
 
 # ── backtracking solver ────────────────────────────────────────────
 
-mysync $try_count = 0
+varsync $try_count = 0
 val $td_try = t_digest(100)
 
 fn Demo::Sudoku::solve($grid) {

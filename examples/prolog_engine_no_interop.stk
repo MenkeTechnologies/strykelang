@@ -42,7 +42,7 @@
 # the same source variable name in different clause instantiations
 # don't accidentally unify. `Pl::fresh_var_id()` doles them out.
 
-mysync $FRESH_ID = 0
+varsync $FRESH_ID = 0
 
 fn Pl::next_id() {
     $FRESH_ID++

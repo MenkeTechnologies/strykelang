@@ -7,7 +7,7 @@
 # Patterns:
 #   * task as hashref with closure callback
 #   * priority-queue-like next-run sort
-#   * mysync for cross-task counter state
+#   * varsync for cross-task counter state
 #   * t-digest for per-task duration
 
 # ── task registry ──────────────────────────────────────────────────
@@ -27,8 +27,8 @@ fn Demo::Sched::register($name, $cadence, $callback) {
 
 # ── tick: advance virtual clock and fire ready tasks ───────────────
 
-mysync $total_fires = 0
-mysync $now_virtual = 0
+varsync $total_fires = 0
+varsync $now_virtual = 0
 
 fn Demo::Sched::tick($delta) {
     $now_virtual = $now_virtual + $delta
@@ -51,7 +51,7 @@ fn Demo::Sched::tick($delta) {
 
 # ── register a few tasks ───────────────────────────────────────────
 
-mysync @log
+varsync @log
 
 Demo::Sched::register("heartbeat", 5, fn($task, $now) {
     push @log, "[t=${now}s] heartbeat ping"

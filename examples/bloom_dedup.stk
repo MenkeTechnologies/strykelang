@@ -17,11 +17,11 @@ val $capacity = 10000
 val $fpr_target = 0.01
 val $bloom = bloom_filter($capacity, $fpr_target)
 
-mysync %exact            # ground truth set
-mysync $true_positives = 0
-mysync $false_positives = 0
-mysync $true_negatives  = 0
-mysync $duplicates_skipped = 0
+varsync %exact            # ground truth set
+varsync $true_positives = 0
+varsync $false_positives = 0
+varsync $true_negatives  = 0
+varsync $duplicates_skipped = 0
 
 val $td_check = t_digest(100)
 val $tk_dups = topk(5)

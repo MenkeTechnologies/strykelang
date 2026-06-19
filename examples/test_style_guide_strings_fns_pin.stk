@@ -97,10 +97,10 @@ val @twiced = pmap { _ * 2 } 1:100
 val @evens_par = pgrep { _ % 2 == 0 } 1:100
 @evens_par |> sum |> aeq 2550, "pgrep evens 1:100 = 2+4+..+100 = 2550"
 
-# pfor: void parallel for, side-effects via mysync / atomic.
-mysync $counter = 0
+# pfor: void parallel for, side-effects via varsync / atomic.
+varsync $counter = 0
 pfor { $counter++ } 1:5000
-$counter |> aeq 5000, "pfor + mysync counter"
+$counter |> aeq 5000, "pfor + varsync counter"
 
 # ── Builtin-name shadowing — namespaced fn ok, bare not ────────────────────
 # `fn helper` is fine because nothing called `helper` exists in %b.

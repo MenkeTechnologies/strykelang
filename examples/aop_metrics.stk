@@ -6,11 +6,11 @@
 # no advice matches (per-call cost is glob-match + Vec lookup).
 
 # ── set up shared metrics store ────────────────────────────────────────
-# `mysync` so the advice closures can mutate the shared map without
+# `varsync` so the advice closures can mutate the shared map without
 # stryke complaining about "cannot modify outer-scope from inside a
 # closure" (the default capture-by-value rule).
 
-mysync %metrics
+varsync %metrics
 
 # ── instrument every Svc::* function in one shot ──────────────────────
 

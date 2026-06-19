@@ -4,7 +4,7 @@
 #
 # This example demonstrates:
 #   * `pmap` for parallel exploration.
-#   * `mysync` for shared thread-safe state (visited set).
+#   * `varsync` for shared thread-safe state (visited set).
 #   * Regular expressions for link extraction.
 #   * Network I/O with `http_request`.
 #   * Terse, pipelined implementation.
@@ -14,7 +14,7 @@
 p "── Parallel Web Crawler ────────────────────────────────"
 
 # Thread-safe shared state for visited URLs
-mysync %visited
+varsync %visited
 
 fn Crawler::crawl($url, $depth) {
     return if $depth <= 0
