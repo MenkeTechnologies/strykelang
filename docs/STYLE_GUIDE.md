@@ -198,7 +198,16 @@ Builtin-shadowing is a hard rule — `fn close`, `fn log`, `fn cos`, `fn open` e
 |---|---|---|
 | `1:10` | `1..10` | `:` is the stryke polymorphic range; works for ints, chars, dates, IPs, romans. |
 | `'a':'z'` | `'a'..'z'` | Same operator, type-inferred from literals. |
-| `1:100:5` | `range(1, 100, 5)` | Optional step is third colon; same syntax. |
+| `1:100:5` | — | Optional step is the third colon. |
+
+**Eager `:` vs lazy `range()` — both valid, different semantics.** The colon
+range is **eager**: `1:N` materializes the whole list at once. The `range()`
+builtin is the **lazy** counterpart: `range(start, end[, step])` yields values
+on demand, so `range(1, 1e9) |> take 3` is instant and constant-memory where
+`(1:1e9) |> take 3` builds a billion-element list first. They are two range
+forms with different evaluation, not a right/wrong pair — reach for `range()`
+when you want laziness (very large or streamed spans, early `take`, pipeline
+chains) and `:` for ordinary eager spans.
 
 ---
 
