@@ -1463,8 +1463,12 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   my @recent = glob "**(om[1])"    # most recently modified, take 1
   my @safe = glob "doesnotexist*(N)"  # NULL_GLOB — empty list, no error
 
-  # `c()` is a slurp; non-regular results are a hard error, by design —
-  # asking to read a directory is always a bug:
+  # `c()` is a slurp. A plain wildcard sweep skips matches it can't read as
+  # a regular file (dangling symlink, vanished file, directory) the way
+  # `grep -r` does — one bad entry never aborts the sweep:
+  c "**.rs"   # OK: every .rs file's contents; incidental bad matches skipped
+  # A qualifier glob is an explicit selection, so it stays strict — asking to
+  # read a directory is always a bug:
   c "**(.)"   # OK: concatenated contents of every file recursively
   c "**(/)"   # ERROR: "slurp: not a regular file: ./sub"
 
