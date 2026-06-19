@@ -1134,6 +1134,18 @@ fn emit_profiler_report(
 }
 
 fn main() {
+    // Restore the default SIGPIPE disposition. The Rust runtime sets SIGPIPE to
+    // SIG_IGN at startup, which turns a closed downstream pipe into an io::Error
+    // that `println!`/stdout writes escalate to a panic ("failed printing to
+    // stdout: Broken pipe", exit 101). Every real Unix filter — awk, perl, grep —
+    // takes the default action and dies quietly when the reader goes away. stryke
+    // absorbs awk's one-liner role, so `s '...' | head` (or quitting a pager) is
+    // the canonical case; reset to SIG_DFL so we terminate silently like them.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+
     // AOT: if the running binary carries an embedded script trailer, execute it and
     // exit. Bypasses clap, flags, REPL — the embedded binary behaves like a plain native
     // program: all command-line args become `@ARGV` for the embedded script. The probe

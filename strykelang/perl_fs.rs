@@ -191,18 +191,59 @@ pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
             format!("no files matched glob: {}", path),
         ));
     }
+    let strict = qual.is_some();
     let mut out = String::new();
     for p in &paths {
-        let meta = std::fs::metadata(p)?;
-        if !meta.is_file() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("slurp: not a regular file: {}", p),
-            ));
+        match slurp_glob_entry(p, strict, |p| read_file_text_perl_compat(p))? {
+            Some(s) => out.push_str(&s),
+            None => continue,
         }
-        out.push_str(&read_file_text_perl_compat(p)?);
     }
     Ok(out)
+}
+
+/// Shared per-entry policy for slurp-over-a-glob. A qualifier glob (`**(/)`) is
+/// an explicit selection, so `strict` hard-fails on any non-regular or
+/// unreadable match (and the error now names the offending path). A plain
+/// wildcard sweep (`**.rs`) is broad and incidental: a dangling symlink,
+/// vanished file, or directory caught by the pattern is skipped (logged at
+/// debug) so one bad entry can't abort the whole sweep — matching `grep -r` /
+/// `cat`-over-a-glob. Returns `Ok(None)` for a skipped entry.
+fn slurp_glob_entry<T>(
+    p: &str,
+    strict: bool,
+    read: impl FnOnce(&str) -> io::Result<T>,
+) -> io::Result<Option<T>> {
+    let meta = match std::fs::metadata(p) {
+        Ok(m) => m,
+        Err(e) => {
+            if strict {
+                return Err(io::Error::new(e.kind(), format!("{}: {}", p, e)));
+            }
+            tracing::debug!("slurp: skipping unreadable glob match {}: {}", p, e);
+            return Ok(None);
+        }
+    };
+    if !meta.is_file() {
+        if strict {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("not a regular file: {}", p),
+            ));
+        }
+        tracing::debug!("slurp: skipping non-regular glob match: {}", p);
+        return Ok(None);
+    }
+    match read(p) {
+        Ok(v) => Ok(Some(v)),
+        Err(e) => {
+            if strict {
+                return Err(io::Error::new(e.kind(), format!("{}: {}", p, e)));
+            }
+            tracing::debug!("slurp: skipping unreadable glob match {}: {}", p, e);
+            Ok(None)
+        }
+    }
 }
 
 /// Bytes-faithful slurp: matches Perl's default byte-string semantics. Returns the
@@ -224,16 +265,13 @@ pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
             format!("no files matched glob: {}", path),
         ));
     }
+    let strict = qual.is_some();
     let mut out = Vec::new();
     for p in &paths {
-        let meta = std::fs::metadata(p)?;
-        if !meta.is_file() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("slurp: not a regular file: {}", p),
-            ));
+        match slurp_glob_entry(p, strict, |p| std::fs::read(p))? {
+            Some(bytes) => out.extend_from_slice(&bytes),
+            None => continue,
         }
-        out.extend_from_slice(&std::fs::read(p)?);
     }
     Ok(Arc::new(out))
 }
@@ -1616,6 +1654,26 @@ mod tests {
         assert!(s.starts_with("ok"));
         assert_eq!(&s[2..], "\u{00ff}\u{00fe}\u{0080}\n");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn slurp_glob_skips_dangling_symlink_in_plain_sweep() {
+        // A plain wildcard sweep that incidentally matches a broken symlink
+        // must skip it and keep reading the real files — one dead entry can't
+        // abort the whole `c("**.rs")`-style sweep. Regression for the
+        // `slurp: No such file or directory (os error 2)` that std::fs::metadata
+        // raised when it followed a dangling link.
+        use std::os::unix::fs::symlink;
+        let dir = std::env::temp_dir().join(format!("stryke_slurp_dangling_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("real.txt"), b"hello").unwrap();
+        symlink(dir.join("does_not_exist"), dir.join("dead.txt")).unwrap();
+        let pat = format!("{}/*.txt", dir.display());
+        let out = read_file_text_or_glob(&pat).expect("plain sweep must not fail on a dangling link");
+        assert_eq!(out, "hello");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
