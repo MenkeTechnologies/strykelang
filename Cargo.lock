@@ -5092,7 +5092,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.17.13"
+version = "0.17.14"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -7070,9 +7070,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.11.29"
+version = "0.11.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6397539941a28931c5dc631c364fb90f2626bc424a30365f74d0e8f1a8d2a1c6"
+checksum = "7dd77927322b2d49a352fddbf9a2b6c3e0ea5848c074bee13874f98f5c010d6b"
 dependencies = [
  "atty",
  "bincode",
@@ -7094,13 +7094,11 @@ dependencies = [
  "nix 0.29.0",
  "notify",
  "notify-debouncer-mini",
- "nu-ansi-term",
  "once_cell",
  "os_pipe",
  "parking_lot",
  "rand 0.8.6",
  "rayon",
- "reedline",
  "regex",
  "regex-lite",
  "rkyv",
@@ -7124,9 +7122,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.11.29"
+version = "0.11.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7703dd52109c72187b7adbb5d45110a7ebbd9f85173d1fca796406795333effb"
+checksum = "0b015f08cd0f67d96161a403373fc30aa9f4f2687cab7b2b37a41c07b27b26f4"
 dependencies = [
  "atty",
  "axum",
