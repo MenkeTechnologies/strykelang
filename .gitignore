@@ -18,3 +18,18 @@
 
 # Downloaded fonts for scripts/reference_pdf.sh
 docs/.fonts/
+
+# Paid products — companion book + reference manual/PDF + their build pipeline —
+# live in the private menke-books repo. Never track them here. The free docs
+# landing page (docs/index.html) and the public gen-docs binary stay tracked;
+# docs/reference.html is a local gen-docs artifact and is intentionally ignored.
+docs/book.md
+docs/book.tex
+docs/book.pdf
+docs/reference.html
+docs/reference.tex
+docs/reference.pdf
+scripts/book_pdf.sh
+scripts/reference_pdf.sh
+scripts/pdf_theme_lib.sh
+scripts/reference_pdf_theme.tex
