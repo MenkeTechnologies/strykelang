@@ -30,6 +30,15 @@ mkdir "$dir/dir.txt"                             # directory caught by the patte
 
 c"$dir/*.txt" |> aeq "hello", "plain sweep skips dangling symlink + dir, returns real content"
 
+# ── 1b. swallow / ingest share the same skip policy ───────────────────────────
+#
+# The per-file hash (`swallow`) and streaming (`ingest`) siblings of slurp skip
+# the same bad references in a plain sweep — a dangling symlink or a directory
+# is dropped, not fatal — so one dead entry never holes a per-file result.
+
+swallow "$dir/*.txt" |> len |> aeq 1, "swallow skips dangling symlink + dir (only real file kept)"
+ingest  "$dir/*.txt" |> len |> aeq 1, "ingest skips dangling symlink + dir"
+
 # ── 2. A qualifier glob stays strict (explicit selection) ─────────────────────
 #
 # `(/)` selects directories on purpose, so slurping it is a user error and we
