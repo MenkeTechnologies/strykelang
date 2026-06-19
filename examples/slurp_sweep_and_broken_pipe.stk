@@ -1,5 +1,4 @@
 #!/usr/bin/env stryke
-use strict;
 
 # slurp glob-sweep tolerance + stdout broken-pipe handling (v0.17.13)
 # Compliance: docs/STYLE_GUIDE.md
@@ -8,16 +7,16 @@ use strict;
 #
 #     s '~> c("**.rs") letters freq bar_chart p'   # ... | head
 #
-# 1. A plain wildcard sweep (`c("**.rs")`) that incidentally matched a dangling
+# 1. A plain wildcard sweep (c("**.rs")) that incidentally matched a dangling
 #    symlink aborted the whole slurp with a path-less
 #    "slurp: No such file or directory (os error 2)".
-# 2. Piping stryke's output into `head` (or quitting a pager) panicked with
+# 2. Piping stryke output into `head` (or quitting a pager) panicked with
 #    "failed printing to stdout: Broken pipe" because the Rust runtime ignores
 #    SIGPIPE.
 #
 # This file proves both, self-contained, with aeq/aok assertions.
 
-my $dir = tempdir()
+val $dir = tempdir()
 
 # ── 1. Plain sweep skips matches it can't read as a regular file ──────────────
 #
@@ -25,35 +24,35 @@ my $dir = tempdir()
 # directory) keeps reading the real files instead of aborting — the way
 # `grep -r` does. One dead entry no longer kills the sweep.
 
-spew("$dir/real.txt", "hello")
-symlink("$dir/does_not_exist", "$dir/dead.txt")   # dangling: stat() would ENOENT
-mkdir("$dir/dir.txt")                             # directory caught by the pattern
+spurt "$dir/real.txt", "hello"
+symlink "$dir/does_not_exist", "$dir/dead.txt"   # dangling: stat() would ENOENT
+mkdir "$dir/dir.txt"                             # directory caught by the pattern
 
-c("$dir/*.txt") |> aeq "hello", "plain sweep skips dangling symlink + dir, returns real content"
+c"$dir/*.txt" |> aeq "hello", "plain sweep skips dangling symlink + dir, returns real content"
 
 # ── 2. A qualifier glob stays strict (explicit selection) ─────────────────────
 #
 # `(/)` selects directories on purpose, so slurping it is a user error and we
 # hard-fail with the offending path named. `eval` captures the die into $@.
 
-eval { c("$dir/*(/)") }
-aok index($@, "not a regular file") >= 0, "qualifier glob hard-fails on a directory (named): $@"
+eval { c"$dir/*(/)" }
+aok $@ =~ /not a regular file/, "qualifier glob hard-fails on a directory (named): $@"
 
 # ── 3. Writing to a closed downstream pipe does not panic ─────────────────────
 #
 # Self-invoke a producer that prints far more than the reader takes, redirect
-# ONLY the producer's stderr to a file, and pipe stdout into `head -1` so the
+# ONLY the producer stderr to a file, and pipe stdout into `head -1` so the
 # pipe closes after one line. With SIGPIPE reset to SIG_DFL the producer dies
 # silently (empty stderr); the pre-fix build left a Rust panic backtrace there.
 
-my $prod = "$dir/producer.stk"
-spew($prod, qq{for (1:200000) { print "x\\n" }\n})
+val $prod = "$dir/producer.stk"
+spurt $prod, qq{for (1:200000) { p "x" }\n}
 
-my $errf = "$dir/producer_stderr.txt"
+val $errf = "$dir/producer_stderr.txt"
 qx{ $^X $prod 2>$errf | head -1 }
-my $err = (-e $errf) ? c($errf) : ""
+val $err = -e $errf ? c"$errf" : ""
 
-aok index($err, "panicked") < 0, "broken pipe: producer does not panic (SIG_DFL, like awk/perl)"
-aok index($err, "Broken pipe") < 0, "broken pipe: no EPIPE error leaked to stderr"
+aok $err !~ /panicked/, "broken pipe: producer does not panic (SIG_DFL, like awk/perl)"
+aok $err !~ /Broken pipe/, "broken pipe: no EPIPE error leaked to stderr"
 
 test_run
