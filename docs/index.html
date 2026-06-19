@@ -602,7 +602,7 @@ val %results = harvest "render_frame()", @workers, 30_000
 excommunicate(@workers)
 
 <span class="comment"># Or split scatter/gather, with a coderef closure body</span>
-val $div     = pray sub { 2 + $_ }, @workers
+val $div     = pray fn { 2 + _ }, @workers
 val %results = annex $div
 
 <span class="comment"># Continuous chant — fires at current AND future joiners (late-join auto-receive)</span>
@@ -794,14 +794,14 @@ mcp_server "filesystem" {
           <tbody>
             <tr><td><code>ai $prompt, opts...</code></td><td>Single-shot or auto-routed agent loop / vision / PDF / structured output</td></tr>
             <tr><td><code>tool fn name(...) "doc" { }</code></td><td>Declare an agent-callable tool — auto-schemas signature, auto-attaches to <code>ai()</code></td></tr>
-            <tr><td><code>stream_prompt $p, on_chunk =&gt; sub { }</code></td><td>SSE streaming with callback or iterator-context for-loop</td></tr>
+            <tr><td><code>stream_prompt $p, on_chunk =&gt; fn { }</code></td><td>SSE streaming with callback or iterator-context for-loop</td></tr>
             <tr><td><code>ai_filter / ai_map / ai_classify / ai_match / ai_sort / ai_dedupe</code></td><td>Collection ops — one batched call across the list</td></tr>
             <tr><td><code>embed</code> / <code>vec_cosine</code> / <code>vec_search</code></td><td>Embeddings + cosine retrieval</td></tr>
             <tr><td><code>ai_memory_save / recall / forget</code></td><td>Sqlite-backed RAG memory</td></tr>
             <tr><td><code>mcp_connect("stdio:...")</code> / <code>mcp_connect("https://...")</code></td><td>MCP client (stdio + streamable HTTP)</td></tr>
             <tr><td><code>mcp_server "name" { tool ... }</code></td><td>Programmatic MCP server in-process</td></tr>
             <tr><td><code>ai_session_*</code></td><td>Multi-turn chat with auto-history</td></tr>
-            <tr><td><code>ai_budget($usd, sub { })</code></td><td>Scoped USD cap; errors if block exceeds</td></tr>
+            <tr><td><code>ai_budget($usd, fn { })</code></td><td>Scoped USD cap; errors if block exceeds</td></tr>
             <tr><td><code>ai_batch(\@prompts)</code></td><td>Anthropic batch API at 50% cost</td></tr>
             <tr><td><code>ai_pmap(\@items, "instruction", cluster =&gt; $c)</code></td><td>Distributed AI across cluster nodes</td></tr>
             <tr><td><code>ai_transcribe "audio.mp3"</code> / <code>ai_speak $text</code></td><td>Whisper transcription / OpenAI TTS</td></tr>

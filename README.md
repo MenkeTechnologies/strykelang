@@ -2719,7 +2719,7 @@ excommunicate(@workers);                      # clean shutdown
 `pray` accepts a string OR a coderef (closure body is deparsed and shipped — closure captures not supported in v1):
 
 ```perl
-my $div = pray sub { 2 + $_ }, @workers;       # coderef form
+my $div = pray fn { 2 + _ }, @workers;         # coderef form
 my $div = pray "2 + 3", @workers;              # string form
 ```
 
@@ -3635,7 +3635,7 @@ for my $chunk in stream_prompt("write a haiku") { print $chunk }   # iter-contex
 | Memory / RAG | `ai_memory_save/recall/forget/count/clear` — sqlite-backed embedding store, cosine retrieval |
 | Vector ops | `vec_cosine`, `vec_search`, `vec_topk` |
 | Multimodal | `ai_vision` (image), `ai_pdf` (document) |
-| Cost / cache | `ai_cost`, `ai_cache_get/set/clear`, `ai_history`, `ai_budget($usd, sub { ... })` scoped cap |
+| Cost / cache | `ai_cost`, `ai_cache_get/set/clear`, `ai_history`, `ai_budget($usd, fn { ... })` scoped cap |
 | Mock / test | `ai_mock_install`, `STRYKE_AI_MODE=mock-only` for CI |
 | Convenience | `ai_summarize`, `ai_translate`, `ai_extract`, `ai_template`, `ai_last_thinking` |
 | Audio | `ai_transcribe "audio.mp3"` (Whisper), `ai_speak "text", voice => "alloy"` (OpenAI TTS) |
@@ -3690,16 +3690,16 @@ pty_close($h);
 
 # Table form (Tcl `expect { ... }` block, in stryke):
 my $tag = pty_expect_table($h, [
-    +{ re => qr/password:/, do => sub { pty_send($h, "$pw\n"); "ok" } },
-    +{ re => qr/yes\/no/,   do => sub { pty_send($h, "yes\n"); "confirmed" } },
-    +{ re => qr/denied/,    do => sub { die "auth failed" } },
+    +{ re => qr/password:/, do => fn { pty_send($h, "$pw\n"); "ok" } },
+    +{ re => qr/yes\/no/,   do => fn { pty_send($h, "yes\n"); "confirmed" } },
+    +{ re => qr/denied/,    do => fn { die "auth failed" } },
 ], 30);
 
 # Method-form sugar (require "perl_pty_class.stk"):
 my $h = PtyHandle::spawn("ssh host");
 $h->expect(qr/password:/, 30);
 $h->send("$pw\n");
-$h->branch([+{re => qr/\$ /, do => sub { "shell ready" }}], 30);
+$h->branch([+{re => qr/\$ /, do => fn { "shell ready" }}], 30);
 $h->interact();   # raw-mode handoff, Ctrl-] to detach
 $h->close();
 ```
