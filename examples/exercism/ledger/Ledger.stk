@@ -2,8 +2,7 @@
 
 # Render a fixed-width ledger of entries. Each entry: { date, desc, change }.
 # date: "YYYY-MM-DD", change: cents (positive credit, negative debit).
-fn Exercism::Ledger::format_entries {
-    val ($currency, $locale, $entries) = (_, _1, _2)
+fn Exercism::Ledger::format_entries($currency, $locale, $entries) {
     val $hdr = Exercism::Ledger::_hdr($locale)
     val @sorted = sort {
         _->{date} cmp _1->{date} ||
@@ -13,13 +12,10 @@ fn Exercism::Ledger::format_entries {
     join "\n", $hdr, map { Exercism::Ledger::_row($currency, $locale, $_) } @sorted
 }
 
-fn Exercism::Ledger::_hdr {
-    _ eq "en-US" ? "Date       | Description               | Change       "
+fn Exercism::Ledger::_hdr = _ eq "en-US" ? "Date       | Description               | Change       "
                   : "Datum      | Beschrijving              | Verandering  "
-}
 
-fn Exercism::Ledger::_row {
-    var ($curr, $loc, $e) = (_, _1, _2)
+fn Exercism::Ledger::_row($curr, $loc, $e) {
     val $d = $loc eq "en-US"
           ? sprintf("%02d/%02d/%04d", (split /-/, $e->{date})[1], (split /-/, $e->{date})[2], (split /-/, $e->{date})[0])
           : sprintf("%02d-%02d-%04d", (split /-/, $e->{date})[2], (split /-/, $e->{date})[1], (split /-/, $e->{date})[0])
@@ -28,8 +24,7 @@ fn Exercism::Ledger::_row {
     sprintf("%-11s| %-26s| %13s", $d, $desc, $amt)
 }
 
-fn Exercism::Ledger::_amt {
-    val ($curr, $loc, $cents) = (_, _1, _2)
+fn Exercism::Ledger::_amt($curr, $loc, $cents) {
     val $sym = $curr eq "USD" ? "$" : "€"
     val $neg = $cents < 0
     val $amt = abs($cents) / 100

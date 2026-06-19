@@ -8,7 +8,7 @@
 
 fn Svc::greet($name) { "hello, $name" }
 
-mysync @before_calls
+varsync @before_calls
 before "Svc::greet" {
     push @before_calls, $INTERCEPT_ARGS[0]
 }
@@ -21,7 +21,7 @@ $before_calls[1] |> aeq "bob",   "before captured arg #1 = bob"
 
 fn Svc::compute($n) { $n * $n }
 
-mysync @after_results
+varsync @after_results
 after "Svc::compute" {
     push @after_results, $INTERCEPT_RESULT
 }

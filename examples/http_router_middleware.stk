@@ -60,7 +60,7 @@ fn Router::match_pattern($compiled, $path) {
 # ── 2. Router registry ────────────────────────────────────────────
 
 var @routes      # list of { method, pattern, compiled, handler }
-mysync @middlewares = ()
+varsync @middlewares = ()
 
 fn Router::register($method, $pattern, $handler) {
     val $c = Router::compile_pattern $pattern
@@ -99,7 +99,7 @@ fn Router::dispatch($req) {
 
 # ── 4. Middleware: logger, auth, rate-limit ─────────────────────
 
-mysync @access_log = ()
+varsync @access_log = ()
 
 Router::use fn {
     var ($req, $next) = (_, _1)
@@ -116,7 +116,7 @@ Router::use fn {
     $next($req)
 }
 
-mysync %rate
+varsync %rate
 Router::use fn {
     val ($req, $next) = (_, _1)
     val $ip = $req->{ip} // "unknown"

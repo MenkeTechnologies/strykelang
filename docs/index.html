@@ -420,7 +420,7 @@ x |&gt; f |&gt; g(2)  # g(f(x), 2)
 
 # real pipeline — count words per file, top 10 longest:
 f("*.txt") |&gt; map { [_, slurp(_) |&gt; split(/\s+/) |&gt; scalar] }
-            |&gt; sort { $b-&gt;[1] &lt;=&gt; $a-&gt;[1] }
+            |&gt; sort { _1-&gt;[1] &lt;=&gt; _-&gt;[1] }
             |&gt; take(10)
             |&gt; dd</pre>
         <p>Precedence sits between <code>?:</code> and <code>||</code>, so <code>x + 1 |&gt; f || y</code> parses as <code>f(x + 1) || y</code>.</p>
@@ -1544,13 +1544,13 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
         <h3>Completion</h3>
         <p>Every identifier category the editor expects:</p>
         <ul>
-          <li><strong>Sigil variables</strong> — declared via <code>my</code> / <code>our</code> / <code>state</code> / <code>local</code> / <code>mysync</code> / <code>oursync</code>, <code>foreach my $x</code>, sub signature params, <code>open(my $fh, …)</code> filehandle decls.</li>
+          <li><strong>Sigil variables</strong> — declared via <code>my</code> / <code>our</code> / <code>state</code> / <code>local</code> / <code>varsync</code> / <code>oursync</code>, <code>foreach my $x</code>, sub signature params, <code>open(my $fh, …)</code> filehandle decls.</li>
           <li><strong>Subs</strong> — bare and qualified, with <strong>suffix-only <code>insertText</code></strong> for qualified completions (typing <code>Demo::│</code> produces <code>Demo::handle</code>, not <code>Demo::Demo::handle</code>).</li>
           <li><strong>User-declared Types</strong> — classes (<code>CompletionItemKind::CLASS</code>), structs (STRUCT), enums (ENUM), traits (INTERFACE), plus every enum variant as a qualified <code>EnumName::Variant</code>.</li>
           <li><strong>Constants</strong> from <code>use constant NAME =&gt; …</code> and the <code>use constant { A =&gt; 1, B =&gt; 2 }</code> hash form.</li>
           <li><strong>Loop labels</strong> for <code>last LOOP</code> / <code>next LOOP</code> / <code>redo LOOP</code>.</li>
           <li><strong>Hash-key completion driven by builtin return schemas</strong>. <code>my $info = pool_info(); $info-&gt;{<em>cursor</em>}</code> lists the actual keys <code>pool_info</code> returns (<code>cpus</code>, <code>rayon_threads</code>, <code>arch</code>, <code>os</code>, <code>perf_cores</code>, <code>eff_cores</code>). Same registry covers <code>par_bench</code>, <code>stress_test</code>, <code>cache_stats</code>, <code>uname</code>, <code>audio_info</code>, <code>id3_read</code>, <code>git_log</code>, <code>git_show</code>, <code>git_status</code>, <code>git_branches</code>, <code>git_blame</code>, <code>git_authors</code>, <code>du_tree</code>, <code>process_list</code>, <code>net_interfaces</code>, <code>perfview</code>, <code>mounts</code>, <code>html_parse</code>, <code>css_select</code>, <code>xml_parse</code>, <code>xpath</code>. <code>foreach my $row (git_log()) { $row-&gt;{<em>cursor</em>} }</code> also resolves through the loop-var binding.</li>
-          <li>Stryke keywords (<code>fn</code>, <code>class</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>match</code>, <code>mysync</code>, <code>frozen</code>, …) and ~10k builtins from <code>%all</code>.</li>
+          <li>Stryke keywords (<code>fn</code>, <code>class</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>match</code>, <code>varsync</code>, <code>frozen</code>, …) and ~10k builtins from <code>%all</code>.</li>
           <li><strong>In-progress parse recovery</strong> — cursor inside a fragment that breaks the parse (<code>Demo::│</code>) retries with the cursor's line blanked so the rest of the file still indexes.</li>
           <li>Trigger characters include <code>{</code> so <code>$h-&gt;{</code> / <code>$h{</code> auto-popup the relevant key set.</li>
         </ul>

@@ -41,8 +41,8 @@ www             IN CNAME blog
 
 # ── parse + validate ───────────────────────────────────────────────
 
-mysync @records
-mysync @errors
+varsync @records
+varsync @errors
 val $td_parse = t_digest(100)
 val $tk_types = topk(5)
 

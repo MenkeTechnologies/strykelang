@@ -92,10 +92,10 @@ len(keys %h) |> aeq 2, "len(hash)"
 
 # ── 4. Parallel Primitives ──────────────────────────────────────────────────
 
-# pmap and mysync
-mysync $sum = 0
+# pmap and varsync
+varsync $sum = 0
 (1:100) |> pfor { $sum += _ }
-$sum |> aeq 5050, "pfor + mysync"
+$sum |> aeq 5050, "pfor + varsync"
 
 # pgrep
 (1:10) |> pgrep { _ % 2 == 0 } |> len |> aeq 5, "pgrep length"

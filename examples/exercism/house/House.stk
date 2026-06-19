@@ -14,10 +14,8 @@ val @_PARTS = (
     ["horse and the hound and the horn", "belonged to"],
 )
 
-fn Exercism::House::_phrase($idx) {
+fn Exercism::House::_phrase($idx) =
     ~> 0:$idx map { $_PARTS[_] } rev map { join(" that ", @{_}) } join(" the ")
-}
 
-fn Exercism::House::recite($from, $to) {
+fn Exercism::House::recite($from, $to) =
     ~> $from:$to map { "This is the #{Exercism::House::_phrase(_ - 1)}." } join("\n")
-}

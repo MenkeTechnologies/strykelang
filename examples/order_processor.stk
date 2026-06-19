@@ -7,7 +7,7 @@
 #   * discount rules (free-shipping threshold, percent-off codes)
 #   * t-digest for per-order processing latency
 #   * sketch (HLL) for distinct-product cardinality
-#   * audit log via mysync
+#   * audit log via varsync
 
 # ── product catalogue ──────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ val $standard_shipping = 7.99
 
 # ── core processor ─────────────────────────────────────────────────
 
-mysync @audit
+varsync @audit
 val $td_proc = t_digest(100)
 val $hll_skus = hll(14)
 val $tk_popular = topk(3)

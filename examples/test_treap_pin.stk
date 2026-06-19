@@ -2,7 +2,7 @@
 
 package TP;
 
-mysync $rng = 12345
+varsync $rng = 12345
 
 fn _rand() {
     $rng = ($rng * 1103515245 + 12345) % 2147483648

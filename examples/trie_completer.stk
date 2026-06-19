@@ -77,8 +77,8 @@ var @corpus = (
     ["data",      45], ["database",    33], ["datacenter",  19],
 )
 
-mysync $td_query = t_digest(100)
-mysync $tk_queries = topk(3)
+varsync $td_query = t_digest(100)
+varsync $tk_queries = topk(3)
 
 val $root = Demo::Trie::make_node()
 for val $entry (@corpus) {

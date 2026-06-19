@@ -7,9 +7,9 @@
 #   2. RateLimiter (token-bucket) for retry rate-capping
 #   3. t-digest for per-attempt latency
 #   4. CMS for success/failure counts
-#   5. `mysync` for cross-closure shared state
+#   5. `varsync` for cross-closure shared state
 
-mysync $attempts = 0
+varsync $attempts = 0
 val $lat = t_digest(100)
 val $outcomes = cms(2048, 5)
 

@@ -8,7 +8,7 @@
 #
 # Showcases:
 #   * pfor for fan-out parallel execution
-#   * mysync for cross-closure shared mutable state
+#   * varsync for cross-closure shared mutable state
 #   * AOP `around` for transparent latency observability
 #   * t-digest for p50/p95/p99 percentile reporting
 #   * retry loop with linear backoff
@@ -54,9 +54,9 @@ fn Demo::Queue::run_with_retry($job, $max_attempts) {
 
 # ── instrumentation: AOP `around` records latency ────────────────────
 
-mysync $latency = t_digest(100)
-mysync $slowest = topk(3)
-mysync $exec_count = 0
+varsync $latency = t_digest(100)
+varsync $slowest = topk(3)
+varsync $exec_count = 0
 
 around "Demo::Queue::execute" {
     val $t0 = now_ns()

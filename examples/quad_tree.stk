@@ -7,7 +7,7 @@
 
 package QT;
 
-mysync $CAP = 4
+varsync $CAP = 4
 
 fn new($x, $y, $w, $h) {
     {

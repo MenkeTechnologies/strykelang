@@ -44,10 +44,10 @@ fn Demo::Dep::version_ge($v1, $v2) {
 
 # ── topological sort via DFS ───────────────────────────────────────
 
-mysync %color    # white=0, gray=1, black=2
-mysync @order
-mysync $cycle_found = 0
-mysync @conflicts
+varsync %color    # white=0, gray=1, black=2
+varsync @order
+varsync $cycle_found = 0
+varsync @conflicts
 
 val $td_visit = t_digest(100)
 
@@ -141,9 +141,9 @@ val %cyclic = (
     "B" => +{ version => "1.0", deps => +{ "A" => "1.0" } },
 )
 # Local cycle visit (separate state).
-mysync %ccolor
-mysync @corder
-mysync $cfound = 0
+varsync %ccolor
+varsync @corder
+varsync $cfound = 0
 fn Demo::Dep::cyclic_visit($pkg, $graph) {
     val $c = $ccolor{$pkg} // 0
     return if $c == 2

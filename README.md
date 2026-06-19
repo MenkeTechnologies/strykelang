@@ -36,7 +36,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x01\] Install](#0x01-install)
 - [\[0x02\] Usage](#0x02-usage)
 - [\[0x03\] Parallel Primitives](#0x03-parallel-primitives)
-- [\[0x04\] Shared State (`mysync`)](#0x04-shared-state-mysync)
+- [\[0x04\] Shared State (`varsync`)](#0x04-shared-state-varsync)
 - [\[0x05\] Native Data Scripting](#0x05-native-data-scripting)
 - [\[0x06\] Async / Trace / Timer](#0x06-async--trace--timer)
 - [\[0x06b\] AOP — Before / After / Around Advice](#0x06b-aop--before--after--around-advice)
@@ -328,7 +328,7 @@ echo a:b:c | stryke -aF: -ne 'print $F[1]'  # auto-split
 
 ## [0x03] PARALLEL PRIMITIVES
 
-Each parallel block runs in its own interpreter context with **captured lexical scope** — no data races. Use `mysync` for shared counters. Optional `progress => 1` enables an animated stderr bar (TTY) or per-item log lines (non-TTY).
+Each parallel block runs in its own interpreter context with **captured lexical scope** — no data races. Use `varsync` for shared counters. Optional `progress => 1` enables an animated stderr bar (TTY) or per-item log lines (non-TTY).
 
 ```perl
 # map / grep / sort / fold / for in parallel (list can be piped in)
@@ -338,8 +338,8 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 #   pmap double, @list                 # bare-fn form (sub double { $_0 * 2 })
 my @doubled = @data |> pmap $_ * 2 , progress => 1
 my @evens   = @data |> pgrep $_ % 2 == 0
-my @sorted  = @data |> psort { $a <=> $b }
-my $sum     = @numbers |> preduce { $a + $b }
+my @sorted  = @data |> psort { _ <=> _1 }
+my $sum     = @numbers |> preduce { _ + _1 }
 pfor process, @items                  # pforeach is an alias, same as for/foreach
 my @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
 
@@ -348,7 +348,7 @@ my @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
 # Desugar: pfor { while (COND) { BODY } } 1..N — last exits one worker.
 ploop { my $job = next_job(); last unless defined $job; handle($job) }
 ploop 4 { ... }                       # explicit worker count
-mysync $run = 1
+varsync $run = 1
 pwhile ($run) { $run = 0 if poll_shutdown(); step() }
 pwhile 4 ($run) { ... }               # explicit worker count
 
@@ -358,7 +358,7 @@ range(0, 1e6) |> pgreps { is_prime($_) } |> ep              # parallel filter, s
 range(0, 1e6) |> pflat_maps { [$_, $_ * 10] } |> ep         # parallel flat-map, streaming
 
 # fused map+reduce, chunked map, memoized map, init fold
-my $sum2     = @nums |> pmap_reduce { $_ * 2 } { $a + $b }
+my $sum2     = @nums |> pmap_reduce { _ * 2 } { _ + _1 }
 my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 }
 my @once     = @inputs |> pcache expensive
 my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc }
@@ -424,7 +424,7 @@ my $cluster = cluster(["build1:8", "build2:16"])
 my @r = @huge |> pmap_on $cluster heavy
 ```
 
-**Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`mysync` aggregates are rejected at runtime; `mysync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
+**Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`varsync` aggregates are rejected at runtime; `varsync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
 
 **Nested implicit-param matrix `_N<<<<<`** — *world-first*. Every **block-form** closure iter (`grep { ... }`, `map { ... }`, `sort { ... }`, `~> @arr map { ... }`, `fi { ... }`, etc.) shifts an outer-topic chain across all positional slots, up to 5 frames back. Read the previous topic with `_<`, two back with `_<<`, up to five back with `_<<<<<`. Same for every positional slot: `_1<<`, `_2<<<<<`, etc. No other language has this — Clojure `%`, Scala `_`, Ruby `_1`, Swift `$0`, Raku `$^a` all stop at the current scope.
 
@@ -502,7 +502,7 @@ A user writing `$_ = ...` or `$_< = ...` inside a block mutates **only the curre
 | `\|$x\|` block param | NO — frame-local | param binding lives in callee frame |
 | `my $x` inside a block | NO — frame-local | new lexical binding in current frame |
 | `my $x` outer + inner closure writes `$x` | rejected at compile time | DESIGN-001 (closures capture by value) |
-| `mysync $x` outer + inner closure writes `$x` | YES — explicit `Arc<Mutex>` opt-in | shared cell, atomic compound ops |
+| `varsync $x` outer + inner closure writes `$x` | YES — explicit `Arc<Mutex>` opt-in | shared cell, atomic compound ops |
 | `our $x` | YES — package-global by design | symbol table, not lexical |
 | `$_`, `$_<`, `$_<<`, `$_<<<`, `$_<<<<`, `$_<<<<<` | NO — frame-local | `Frame::set_scalar_raw` bypasses CaptureCell write-through |
 | `$_0`, `$_1`, … `$_N` and `$_N<+` chain forms | NO — frame-local | same path as topic-chain writes |
@@ -511,27 +511,27 @@ Implementation: `strykelang/scope.rs::Scope::set_scalar` recognizes topic-varian
 
 ---
 
-## [0x04] SHARED STATE (`mysync`)
+## [0x04] SHARED STATE (`varsync`)
 
-`mysync` declares variables backed by `Arc<Mutex>` shared across parallel blocks. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle — fully atomic.
+`varsync` declares variables backed by `Arc<Mutex>` shared across parallel blocks. Compound ops (`++`, `+=`, `.=`, `|=`, `&=`) hold the lock for the full read-modify-write cycle — fully atomic.
 
 ```perl
-mysync $counter = 0
+varsync $counter = 0
 fan 10000 { $counter++ }  # always exactly 10000
 print $counter
 
-mysync @results
+varsync @results
 (1..100) |> pfor { push @results, $_ * $_ }
 
-mysync %histogram
+varsync %histogram
 (0..999) |> pfor { $histogram{$_ % 10} += 1 }
 
 # deque() and heap(...) already use Arc<Mutex<...>> internally
-mysync $q  = deque()
-mysync $pq = heap { $a <=> $b }
+varsync $q  = deque()
+varsync $pq = heap { _ <=> _1 }
 ```
 
-For `mysync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `mysync`, each thread gets an independent copy.
+For `varsync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `varsync`, each thread gets an independent copy.
 
 ---
 
@@ -869,7 +869,7 @@ $s->has(2)  # 1 / 0  (also ->contains / ->member)
 $s->size  # count (->len / ->count)
 my @v = $s->values  # array in insertion order
 
-# mysync: compound |= and &= update shared sets (see [0x04])
+# varsync: compound |= and &= update shared sets (see [0x04])
 ```
 
 ---
@@ -882,8 +882,8 @@ my $data = async { "https://example.com/" |> fetch }
 my $file = spawn { "big.csv" |> \&slurp }
 print await($data), await($file)
 
-# trace mysync mutations to stderr (under fan, lines tagged with worker index)
-mysync $counter = 0
+# trace varsync mutations to stderr (under fan, lines tagged with worker index)
+varsync $counter = 0
 trace { fan 10 { $counter++ } }
 
 # timer / bench — wall-clock millis; bench returns "min/mean/p99"
@@ -1209,7 +1209,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Inline Rust FFI** ([\[0x0E\]](#0x0e-inline-rust-ffi-rust---)): `rust { pub extern "C" fn ... }` blocks compile to a cdylib on first run, dlopen + register as Perl-callable subs.
 - **Bytecode cache** ([\[0x0F\]](#0x0f-bytecode-cache-rkyv)): single rkyv shard at `~/.stryke/scripts.rkyv` — `mmap` + zero-copy `ArchivedHashMap` lookup skips lex/parse/compile on warm starts. Disable with `STRYKE_CACHE=0`.
 - **Language server** ([\[0x11\]](#0x11-language-server-stryke-lsp)): `stryke lsp` runs an LSP server over stdio with diagnostics, hover, completion.
-- `mysync` shared state ([\[0x04\]](#0x04-shared-state-mysync)).
+- `varsync` shared state ([\[0x04\]](#0x04-shared-state-varsync)).
 - `frozen my` (or `const my` — same thing, more familiar spelling), `typed my`, `struct`, `enum`, `class` (full OOP with `extends`/`impl`), `trait`, algebraic `match`, `try/catch/finally`, `eval_timeout`, `retry`, `rate_limit`, `every`, `gen { ... yield }`.
 - **Raku-style chained comparisons** — `1 < $x < 10` desugars to `(1 < $x) && ($x < 10)` at parse time. Works with all comparison operators (`<`, `<=`, `>`, `>=`, `lt`, `le`, `gt`, `ge`) and chains of any length.
 - **Default parameter values** — `fn greet($name = "world")`, `fn range(@vals = (1,2,3))`, `fn config(%opts = (debug => 0))`. Defaults evaluated at call time when argument not provided.
@@ -2035,7 +2035,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 - **Lexer** ([`strykelang/lexer.rs`](strykelang/lexer.rs)) — context-sensitive tokenizer for Perl's ambiguous syntax (regex vs division, hash vs modulo, heredocs, interpolation).
 - **Parser** ([`strykelang/parser.rs`](strykelang/parser.rs)) — recursive descent + Pratt precedence climbing.
-- **Compiler / VM** ([`strykelang/compiler.rs`](strykelang/compiler.rs), [`strykelang/vm.rs`](strykelang/vm.rs)) — 100% lowered to bytecode. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `mysync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
+- **Compiler / VM** ([`strykelang/compiler.rs`](strykelang/compiler.rs), [`strykelang/vm.rs`](strykelang/vm.rs)) — 100% lowered to bytecode. Compiled subs use slot ops for frame-local `my` scalars (O(1)). Lowering covers `BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END` with `Op::SetGlobalPhase`, `varsync`, `tie`, scalar compound assigns via `Scope::atomic_mutate`, regex values, named-sub coderefs, folds, `pcache`, `pselect`, `par_lines`, `par_walk`, `par_sed`, `pwatch`, `each`, four-arg `substr`, dynamic `keys`/`values`/`delete`/`exists`, etc.
 - **Block JIT** ([`strykelang/jit.rs`](strykelang/jit.rs)) — Cranelift Block JIT with cached `OwnedTargetIsa`, tiered after `STRYKE_JIT_SUB_INVOKES` (default 50) VM invocations. Block JIT validates a CFG, joins typed `i64`/`f64` slots at merges, and compiles hot loops to native code. Disable with `--no-jit` / `STRYKE_NO_JIT=1`.
 - **fusevm bridge** ([`strykelang/fusevm_bridge.rs`](strykelang/fusevm_bridge.rs)) — Tier-0 JIT that lowers string-bearing segments (compares, concat, length/ord/hex/oct, index/rindex, crypt, substr/x-repeat with literal strings, sprintf with literal format, `length($s) [op] N`, mixed-kind chains like `length($s) >= $min`, etc.) to [fusevm](https://github.com/MenkeTechnologies/fusevm)'s Cranelift block JIT. Strykelang's own block JIT handles pure-int segments; the fusevm bridge covers everything string-bearing through an abstract-stack analyzer with per-slot kind inference. Both `try_fusevm_subroutine` (sub-call dispatch) and `try_fusevm_block_region` (map/grep/sort/foreach inline blocks) feed the bridge. Disk-cache safe via `STK_VAL_LOAD_CONST` (runtime constants resolution that hashes the constant *index* + helper id, never the per-process heap-pointer bits).
 - **Per-sub fusevm caches** — `sub_fusevm_meta: Vec<Option<Option<FusevmSubElig>>>` keyed by sub-entry IP (and reused by block-region starts). First call to a hot sub runs 13+ `segment_is_*` detectors and builds the fusevm chunk via `build_chunk`; subsequent calls hit `OnceCell<Arc<fusevm::Chunk>>` for O(1) dispatch. Bench (10M-iter best-of-3, str-bearing micro-benches): chunk cache delivers 9–18% on top of the eligibility cache (cmp `−17.6%`, length `−9.3%`, concat `−12.9%`, sprintf `−8.8%`, index `−11.3%`).
@@ -2531,7 +2531,7 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 
 - **Unix only** — hardcoded `ssh`, hardcoded POSIX dlopen path. Windows would need a similar shim.
 - **JSON-marshalled values** — `serde_json` round-trip loses bigints, blessed refs, and other heap-only `StrykeValue` payloads. The supported types are: undef, bool, i64, f64, string, array, hash. Anything outside that returns an error from `pmap_on`.
-- **`mysync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
+- **`varsync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
 - **No streaming results** — the dispatcher buffers the full result vector before returning. For huge fan-outs this is the next thing to fix (likely via `pchannel` integration).
 - **No SSH connection pool across calls** — each `pmap_on` invocation builds fresh sessions. Subsequent `pmap_on` calls in the same script reconnect from scratch.
 
@@ -3342,13 +3342,13 @@ spec:
 - **Cross-file require resolution**. `require "./lib/Foo/Bar.stk"` walks up from the source file looking for the project root (any ancestor with a sibling `lib/` directory) — the classic Perl/CPAN layout. Subs, classes, traits, enums, constants declared in required files all join the active completion + diagnostics index.
 - **Hover docs** for builtins (`pmap`, `cluster`, `fetch_json`, `dataframe`, …) — including the parallel and cluster primitives from sections [\[0x03\]](#0x03-parallel-primitives) and [\[0x10\]](#0x10-distributed-pmap_on--d-over-ssh-cluster), every Perl special variable (`$!`, `$@`, `$_`, `@_`, `@ARGV`, `%ENV`, `$1`..`$9`, `$^A`..`$^X`, `@+`/`@-`, …), the `__NAME__` compile-time tokens (`__END__`, `__DATA__`, `__FILE__`, `__LINE__`, `__PACKAGE__`, `__SUB__`), every phase block (`BEGIN`/`UNITCHECK`/`CHECK`/`INIT`/`END`/`BUILD`), and the reflection-hash short aliases (`%a`/`%b`/`%c`/`%d`/`%e`/`%k`/`%o`/`%p`/`%pc`/`%v`, `%parameters`, `%limits`, `%term`). Hash-returning builtins like `pool_info()` ship full key tables in their hover doc. Hover is suppressed inside string literals (`"length"` doesn't pop the `length` builtin) but still fires inside `#{ EXPR }` interpolations.
 - **Completion** covering every identifier category the editor expects to see:
-  - Sigil variables (`$scalar`, `@array`, `%hash`) — declared via `my` / `our` / `state` / `local` / `mysync` / `oursync`, `foreach my $x`, sub signature params, `open(my $fh, …)` filehandle decls
+  - Sigil variables (`$scalar`, `@array`, `%hash`) — declared via `my` / `our` / `state` / `local` / `varsync` / `oursync`, `foreach my $x`, sub signature params, `open(my $fh, …)` filehandle decls
   - Subs — bare and qualified, with **suffix-only `insertText`** for qualified completions (typing `Demo::│` produces `Demo::handle`, not `Demo::Demo::handle`)
   - User-declared **Types** — classes (`CompletionItemKind::CLASS`), structs (STRUCT), enums (ENUM), traits (INTERFACE), plus every enum variant as a qualified `EnumName::Variant`
   - Constants from `use constant NAME => …` and the `use constant { A => 1, B => 2 }` hash form
   - **Loop labels** for `last LOOP` / `next LOOP` / `redo LOOP` references
   - **Hash-key completion driven by builtin return schemas** — `my $info = pool_info(); $info->{<tab>}` lists the actual keys `pool_info` returns (`cpus`, `rayon_threads`, `arch`, `os`, `perf_cores`, `eff_cores`). Same registry covers `par_bench`, `stress_test`, `cache_stats`, `uname`, `audio_info`, `id3_read`, `git_log`, `git_show`, `git_status`, `git_branches`, `git_blame`, `git_authors`, `du_tree`, `process_list`, `net_interfaces`, `perfview`, `mounts`, `html_parse`, `css_select`, `xml_parse`, `xpath`. `foreach my $row (git_log()) { $row->{<tab>} }` also resolves through the loop-var binding.
-  - Stryke keywords (`fn`, `class`, `struct`, `enum`, `trait`, `match`, `mysync`, `frozen`, …) and ~10k builtins from `%all`
+  - Stryke keywords (`fn`, `class`, `struct`, `enum`, `trait`, `match`, `varsync`, `frozen`, …) and ~10k builtins from `%all`
   - **`use Module VERSION` version slot** — `use GUI <TAB>` / `use Foo 1<TAB>` lists every installed version directly from `~/.stryke/store/<canonical>@<ver>/`. Honors the namespace bridge (`use GUI` finds versions of `stryke-gui`) and prefix-filters on what the user typed (`1<TAB>` shows only `1.x` versions). The list comes from the same store-scan the resolver uses, so any offered version is guaranteed to satisfy `use Module VERSION` at runtime.
   - **In-progress parse recovery** — when the cursor sits inside a fragment that breaks the parse (`Demo::│`), the LSP retries with the cursor's line blanked so completion still indexes the rest of the file
   - **Trigger characters** include `{` so `$h->{` / `$h{` auto-popup the relevant key set
