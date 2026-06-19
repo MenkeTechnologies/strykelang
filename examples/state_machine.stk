@@ -34,8 +34,8 @@ Demo::FSM::add("pending", "cancel",   "cancelled", $allow)
 
 # ── core transition function ──────────────────────────────────────────
 
-mysync %state_visits          # state -> count
-mysync %transition_latency_us # event -> running sum of µs
+varsync %state_visits          # state -> count
+varsync %transition_latency_us # event -> running sum of µs
 
 fn Demo::FSM::transition($from, $event, $ctx) {
     return undef unless exists $transitions{$from}
@@ -47,8 +47,8 @@ fn Demo::FSM::transition($from, $event, $ctx) {
 
 # ── instrumented variant ─────────────────────────────────────────────
 
-mysync $audit_log = []
-mysync $tlat = t_digest(100)
+varsync $audit_log = []
+varsync $tlat = t_digest(100)
 
 around "Demo::FSM::transition" {
     val $from  = $INTERCEPT_ARGS[0]

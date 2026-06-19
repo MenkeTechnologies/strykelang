@@ -100,7 +100,7 @@ fn Demo::IR::search($query, $k, $idx_ref, $lengths_ref, $avgdl, $N) {
 val $lengths_ref = \@doc_lengths
 val $N = len @docs
 
-mysync $query_log = topk(3)
+varsync $query_log = topk(3)
 
 var @queries = (
     "rust language",
@@ -139,7 +139,7 @@ for val $h (@top) {
 
 p ""
 p "── distinct term cardinality (HLL) ──────────────────"
-mysync $hll = hll(14)
+varsync $hll = hll(14)
 for val $toks (@tokens_per_doc) {
     hll_add($hll, _) for @{$toks}
 }

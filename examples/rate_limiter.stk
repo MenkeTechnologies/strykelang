@@ -5,7 +5,7 @@
 # the bucket is empty, the request is rejected (or queued).
 #
 # Patterns:
-#   * mysync hash-of-hashes for per-client bucket state
+#   * varsync hash-of-hashes for per-client bucket state
 #   * elapsed-time refill math via now_ns
 #   * AOP `around` for audit log without touching the limiter body
 #   * t-digest for inter-request latency
@@ -14,7 +14,7 @@
 # ── per-client bucket state ──────────────────────────────────────────
 # buckets{client} = { tokens => N, last_refill_ns => T }
 
-mysync %buckets
+varsync %buckets
 
 val $capacity     = 5        # max tokens per bucket
 val $refill_per_s = 2        # tokens refilled per second
@@ -44,10 +44,10 @@ fn Demo::RL::try_acquire($client) {
 
 # ── AOP instrumentation: count allows/denies, latency ───────────────
 
-mysync $allowed = 0
-mysync $denied  = 0
-mysync $latency = t_digest(100)
-mysync $rejects = topk(3)
+varsync $allowed = 0
+varsync $denied  = 0
+varsync $latency = t_digest(100)
+varsync $rejects = topk(3)
 
 around "Demo::RL::try_acquire" {
     val $client = $INTERCEPT_ARGS[0]

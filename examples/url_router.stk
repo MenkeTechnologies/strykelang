@@ -101,10 +101,10 @@ for var $r (@routes) {
 
 # ── AOP instrumentation: per-request audit + latency ────────────────
 
-mysync $req_count = 0
-mysync $matched   = 0
-mysync $lat = t_digest(100)
-mysync $hits = topk(3)
+varsync $req_count = 0
+varsync $matched   = 0
+varsync $lat = t_digest(100)
+varsync $hits = topk(3)
 
 around "Demo::Router::dispatch" {
     var $method = $INTERCEPT_ARGS[0]

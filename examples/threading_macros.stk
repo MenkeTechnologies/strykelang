@@ -54,8 +54,8 @@ val @log = ("INFO ok", "ERROR oops", "WARN slow", "ERROR bad", "INFO done")
 val $errs = ~s> [@log] grep { /ERROR/ } map { uc }
 p "  log errors: $errs"
 
-# Streaming with mysync counter for shared state across workers.
-mysync $accum = 0
+# Streaming with varsync counter for shared state across workers.
+varsync $accum = 0
 val $n = ~s> [10, 20, 30, 40, 50] map { $accum += _; _ }
 p "  shared accumulator: $accum across $n items"
 

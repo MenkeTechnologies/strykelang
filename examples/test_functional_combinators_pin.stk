@@ -70,7 +70,7 @@ $sumsq(1, 2, 3, 4)  |> aeq 30,  "sum of squares 1..4"
 $sumsq(0)           |> aeq 0,   "sum of squares 0"
 
 # Builtin memoize
-mysync $count = 0
+varsync $count = 0
 val $slow = fn ($n) { $count++; $n * 2 }
 val $fast = memoize($slow)
 $fast(5) |> aeq 10, "memoize first call"

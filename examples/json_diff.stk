@@ -9,7 +9,7 @@
 
 # ── recursive diff ──────────────────────────────────────────────────
 
-mysync @diffs
+varsync @diffs
 
 fn Demo::JD::diff($lhs, $rhs, $path) {
     val $rl = ref $lhs

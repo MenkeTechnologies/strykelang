@@ -9,23 +9,23 @@
 
 # ── L0: in-process memo (hash) ───────────────────────────────────────
 
-mysync %l0
-mysync $l0_hits   = 0
-mysync $l0_misses = 0
+varsync %l0
+varsync $l0_hits   = 0
+varsync $l0_misses = 0
 
 # ── L1: Bloom filter for negative answers ────────────────────────────
 
-mysync $bloom = bloom_filter(10000, 0.01)
-mysync $negatives_cached = 0
-mysync $bloom_skips      = 0
+varsync $bloom = bloom_filter(10000, 0.01)
+varsync $negatives_cached = 0
+varsync $bloom_skips      = 0
 
 # ── L2: rkyv KV store (persistent) ───────────────────────────────────
 
 val $kv_path = "/tmp/cache_layered_demo.rkyv"
 unlink $kv_path if -e $kv_path
-mysync $kv = kv_open($kv_path)
-mysync $l2_hits   = 0
-mysync $l2_misses = 0
+varsync $kv = kv_open($kv_path)
+varsync $l2_hits   = 0
+varsync $l2_misses = 0
 
 # ── L3: simulated upstream ("slow database") ─────────────────────────
 # 10 known keys; everything else returns undef.
@@ -43,7 +43,7 @@ val %upstream = (
     user_jack    => "Jack Norris, age 40",
 )
 
-mysync $upstream_calls = 0
+varsync $upstream_calls = 0
 
 fn Demo::Cache::upstream_fetch($key) {
     $upstream_calls++
@@ -178,7 +178,7 @@ unlink $kv_path
 
 p ""
 p "── AOP instrumentation: upstream latency ────────────"
-mysync $upstream_latency = t_digest(100)
+varsync $upstream_latency = t_digest(100)
 around "Demo::Cache::upstream_fetch" {
     val $t0 = now_ns()
     val $r = proceed(@INTERCEPT_ARGS)

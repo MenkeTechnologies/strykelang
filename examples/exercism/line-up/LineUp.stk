@@ -5,5 +5,5 @@ const val @SUFFIX = ("th","st","nd","rd","th","th","th","th","th","th")
 fn Exercism::LineUp::format($name, $n) {
     val $last2 = $n % 100
     val $suf   = $last2 >= 11 && $last2 <= 13 ? "th" : $SUFFIX[$n % 10]
-    "Hello, #{$name}! You are the #{$n}#{$suf} in line."
+    "Hello, $name! You are the $n$suf in line."
 }

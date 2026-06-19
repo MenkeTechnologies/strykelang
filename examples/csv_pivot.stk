@@ -138,7 +138,7 @@ for val $p (@products) {
 
 p ""
 p "── TopK regions by sales count (TopK sketch) ────────"
-mysync $tk = topk(3)
+varsync $tk = topk(3)
 topk_add($tk, _->{region}) for @{$rows_back}
 var @top = topk_top($tk)
 for val $h (@top) {
@@ -149,7 +149,7 @@ for val $h (@top) {
 
 p ""
 p "── distinct cardinality (HLL) ───────────────────────"
-mysync $hll = hll(14)
+varsync $hll = hll(14)
 hll_add($hll, _->{product}) for @{$rows_back}
 printf "  HLL distinct products : %d\n", hll_count($hll)
 printf "  exact distinct        : %d\n", len @products

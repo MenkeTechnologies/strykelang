@@ -52,7 +52,7 @@ val $csv_text = q{id,email,age,score,status
 
 # ── validation logic ───────────────────────────────────────────────
 
-mysync @errors
+varsync @errors
 val $td_lat = t_digest(100)
 
 fn Demo::CV::is_int($s) {

@@ -49,8 +49,8 @@ fn Demo::Expr::tokenize($src) {
 
 # ── parser state ─────────────────────────────────────────────────────
 
-mysync $tokens
-mysync $pos
+varsync $tokens
+varsync $pos
 
 fn Demo::Expr::peek() {
     return undef if $pos >= len @$tokens
@@ -150,8 +150,8 @@ fn Demo::Expr::eval_ast($ast) {
 
 # ── AOP-instrument: count visits + record per-call latency ───────────
 
-mysync $eval_calls = 0
-mysync $eval_lat = t_digest(100)
+varsync $eval_calls = 0
+varsync $eval_lat = t_digest(100)
 
 around "Demo::Expr::eval_ast" {
     $eval_calls = $eval_calls + 1

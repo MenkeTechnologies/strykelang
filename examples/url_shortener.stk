@@ -38,12 +38,12 @@ fn Demo::Short::to_base36($n) {
 val $kv_path = "/tmp/stryke_shortener.rkyv"
 unlink $kv_path if -e $kv_path
 val $kv = kv_open($kv_path)
-mysync %short_to_long   # short_id -> long_url
-mysync %click_count
+varsync %short_to_long   # short_id -> long_url
+varsync %click_count
 
 val $td_shorten = t_digest(100)
 val $tk_clicks = topk(3)
-mysync $collisions = 0
+varsync $collisions = 0
 
 fn Demo::Short::shorten($long_url) {
     val $t0 = now_ns()

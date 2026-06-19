@@ -35,7 +35,7 @@ mutex_unlock($m)
 # ── Mutex: protect a compound read-modify-write across parallel workers ────
 
 val $g = mutex()
-mysync $counter = 0
+varsync $counter = 0
 fan 10000 {
     mutex_lock($g)
     defer { mutex_unlock($g) }
@@ -66,8 +66,8 @@ $s2 |> sem_permits |> aeq 0, "two acquires drain to zero"
 # ── Semaphore: bound concurrent workers ────────────────────────────────────
 
 val $gate = semaphore(4)
-mysync $in_flight = 0
-mysync $peak_in_flight = 0
+varsync $in_flight = 0
+varsync $peak_in_flight = 0
 fan 40 {
     sem_acquire($gate)
     defer { sem_release($gate) }

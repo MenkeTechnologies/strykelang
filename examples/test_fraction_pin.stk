@@ -74,7 +74,7 @@ Fr::show(Fr::harmonic(5)) |> aeq "137/60","H5"
 # Geometric: r + r² + ... + rⁿ in fractions; r = 1/2
 fn Fr::geom($r, $n) {
     var $acc  = Fr::new(0, 1)
-    mysync $pow = Fr::new(1, 1)
+    varsync $pow = Fr::new(1, 1)
     for val $k (1:$n) {
         $pow = Fr::mul($pow, $r)
         $acc = Fr::add($acc, $pow)
