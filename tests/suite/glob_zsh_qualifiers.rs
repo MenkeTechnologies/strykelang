@@ -101,3 +101,37 @@ fn glob_size_qualifier_filters_by_byte_count() {
         std::fs::remove_dir_all(&dir).ok();
     });
 }
+
+// Regression: zshrs 0.11.47's `glob_path` only matches glob-TOKENIZED
+// metacharacters, so a raw `*` reached the matcher as a literal and the pattern
+// echoed back instead of expanding (and `haswilds` on the raw pattern returned
+// false, so the glob was misclassified as a plain path upstream). A plain
+// (qualifier-free) wildcard must expand to the real entries — see
+// `perl_fs::stryke_glob` / `raw_haswilds`.
+#[test]
+fn glob_plain_wildcard_expands_not_echoes() {
+    with_global_flags(|| {
+        let dir = fixture_dir("plainwild");
+        let p = dir.to_str().unwrap();
+        let code = format!(r#"chdir("{p}"); my @f = glob("*.txt"); join(",", sort @f)"#);
+        let out = eval_locked(&code).to_string();
+        assert_eq!(out, "file1.txt,file2.txt", "got {out}");
+        assert!(!out.contains('*'), "pattern echoed instead of expanded: {out}");
+        std::fs::remove_dir_all(&dir).ok();
+    });
+}
+
+// Regression companion: a plain wildcard with no match yields an empty list
+// (Perl nullglob), not the literal pattern echoed back. 0.11.47's
+// `globdata_glob` dropped the `gf_nullglob` empty-result guard, so the
+// suppression lives in `perl_fs::stryke_glob`.
+#[test]
+fn glob_plain_wildcard_no_match_is_empty() {
+    with_global_flags(|| {
+        let dir = fixture_dir("plainwildempty");
+        let p = dir.to_str().unwrap();
+        let code = format!(r#"chdir("{p}"); my @f = glob("*.nomatch-xyz"); scalar(@f)"#);
+        assert_eq!(eval_int_locked(&code), 0);
+        std::fs::remove_dir_all(&dir).ok();
+    });
+}

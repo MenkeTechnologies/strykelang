@@ -86,12 +86,25 @@ pub fn read_file_text_perl_compat(path: impl AsRef<Path>) -> io::Result<String> 
     Ok(decode_utf8_or_latin1(&bytes))
 }
 
+/// `haswilds` on a raw (untokenized) pattern. zshrs 0.11.47's `haswilds`
+/// recognizes only glob-TOKENIZED metacharacters (`Star` = U+0087, etc.); 0.11.29
+/// also matched bare `*` / `?` / `[`. strykelang hands the glob engine raw
+/// patterns, so without tokenizing a copy first every glob is misclassified as a
+/// literal path and returned verbatim instead of being expanded.
+pub(crate) fn raw_haswilds(pattern: &str) -> bool {
+    let mut tok = pattern.to_string();
+    zsh::glob::tokenize(&mut tok);
+    zsh::ported::pattern::haswilds(&tok)
+}
+
 /// Preset for stryke glob (via [`StrykeGlobOptsGuard`] + `zsh::glob::glob_path`): full
 /// extended glob, bare-qualifier shorthand on (`*(/)` works without `(#q.../)`),
-/// `nullglob` so a no-match returns an empty list (Perl `glob` semantics) instead
-/// of echoing the literal pattern back. `globstarshort` makes `**.stk` match every
-/// `.stk` file at any depth; `braceccl` enables `{a,b,c}` / `{abc}` brace expansion
-/// — wired through zshrs's global option store like stock zsh.
+/// `nullglob` requested so a no-match yields an empty list (Perl `glob` semantics);
+/// since 0.11.47's `glob_path` no longer honors that on its own, the empty-on-no-match
+/// guarantee is enforced by the post-pass below that drops the echoed pattern.
+/// `globstarshort` makes `**.stk` match every `.stk` file at any depth; `braceccl`
+/// enables `{a,b,c}` / `{abc}` brace expansion — wired through zshrs's global option
+/// store like stock zsh.
 pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
     // zshrs glob fails to match wildcards behind a `./` directory segment
     // (works for literal filenames but not patterns like `./lib/*.stk`,
@@ -109,10 +122,47 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
     };
     let normalized = stripped_leading.replace("/./", "/");
     let is_relative_pattern = !std::path::Path::new(&normalized).is_absolute();
+
+    // zshrs 0.11.47's `glob_path` is a thin wrapper over `globdata_glob`, whose
+    // matcher recognizes only glob-TOKENIZED metacharacters (`Star` = U+0087,
+    // etc.) as wildcards — the production prefork path hands it token bytes. A
+    // raw `*` reaches the matcher as a literal char, matches nothing, and the
+    // pattern echoes back (0.11.46's standalone `glob_path` matched raw strings;
+    // the 0.11.47 rewrite dropped that tolerance). Tokenize before delegating so
+    // the matcher sees real wildcards. EXCEPTION: a trailing `(...)` qualifier
+    // stays raw — `parse_qualifiers` scans for a literal `)` (a tokenized
+    // `Outpar` is invisible to it), and the qualifier-driven walk already
+    // handles raw `**`/`*` correctly, so tokenizing a qualifier pattern would
+    // strip its `**` recursion.
+    let has_qual = zsh::glob::split_qualifier(&normalized).1.is_some();
+    let glob_arg = if has_qual {
+        normalized.clone()
+    } else {
+        let mut tok = normalized.clone();
+        zsh::glob::tokenize(&mut tok);
+        tok
+    };
     let results = {
         let _lock = ZSH_GLOB_GLOBAL_MUTEX.lock();
         let _opts = StrykeGlobOptsGuard::new();
-        zsh::glob::glob_path(&normalized)
+        zsh::glob::glob_path(&glob_arg)
+    };
+
+    // `globdata_glob` echoes the literal (untokenized) pattern back on no-match
+    // instead of honoring nullglob — the 0.11.47 port dropped the `gf_nullglob`
+    // empty-result guard from the c:1872-1888 terminal block, so the
+    // ordinary-string fallback fires even with `nullglob` set. stryke wants Perl
+    // nullglob semantics (empty list on no match), so when the sole "match" is
+    // the pattern itself echoed back AND the pattern actually globs (has a
+    // wildcard or qualifier — a literal path legitimately equals its own match),
+    // suppress it.
+    let results = if results.len() == 1
+        && results[0] == normalized
+        && (has_qual || zsh::ported::pattern::haswilds(&glob_arg))
+    {
+        Vec::new()
+    } else {
+        results
     };
     // zshrs emits absolute paths even when called with a relative pattern;
     // strip the cwd prefix so the user sees what they asked for. Leading-`./`
@@ -180,7 +230,7 @@ pub(crate) fn stryke_glob(pattern: &str) -> Vec<String> {
 /// a silent empty.
 pub fn read_file_text_or_glob(path: &str) -> io::Result<String> {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    let is_glob = qual.is_some() || zsh::ported::pattern::haswilds(stripped);
+    let is_glob = qual.is_some() || raw_haswilds(stripped);
     if !is_glob {
         return read_file_text_perl_compat(path);
     }
@@ -254,7 +304,7 @@ fn slurp_glob_entry<T>(
 /// for binary files without changing text-file behaviour.
 pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    let is_glob = qual.is_some() || zsh::ported::pattern::haswilds(stripped);
+    let is_glob = qual.is_some() || raw_haswilds(stripped);
     if !is_glob {
         return read_file_bytes(path);
     }
@@ -282,9 +332,7 @@ pub fn read_bytes_or_glob(path: &str) -> io::Result<Arc<Vec<u8>>> {
 /// pattern-parsing logic of its own.
 fn pattern_is_glob(path: &str) -> bool {
     let (stripped, qual) = zsh::glob::split_qualifier(path);
-    qual.is_some()
-        || zsh::ported::pattern::haswilds(stripped)
-        || zsh::glob::hasbraces(stripped, true)
+    qual.is_some() || raw_haswilds(stripped) || zsh::glob::hasbraces(stripped, true)
 }
 
 /// Like [`BufRead::read_line`] but decodes with [`decode_utf8_or_latin1_read_until`] (no U+FFFD).
