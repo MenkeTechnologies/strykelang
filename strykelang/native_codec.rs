@@ -3271,6 +3271,280 @@ fn deburr_letter(c: char) -> Option<&'static str> {
     })
 }
 
+// ── shlex: shell quoting + word splitting ──
+
+/// `shell_quote($s)` — quote a string so it survives unchanged through a POSIX
+/// shell. Mirrors Python `shlex.quote`: a value made only of safe characters is
+/// returned bare; anything else is single-quoted with embedded `'` escaped as
+/// `'\''`. Empty string becomes `''`.
+pub(crate) fn shell_quote(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    Ok(StrykeValue::string(shell_quote_str(&text)))
+}
+
+fn shell_quote_str(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    let safe = s
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c));
+    if safe {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+/// `shell_split($s)` / `shellwords($s)` — split a command line into an array of
+/// words honoring single quotes, double quotes, and backslash escapes (POSIX
+/// `shlex.split`). Dies on an unterminated quote. Performs no expansion —
+/// `$VAR`, globs, and backticks are treated literally.
+pub(crate) fn shell_split(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    let words =
+        shell_split_str(&text).map_err(|e| StrykeError::runtime(format!("shell_split: {e}"), 0))?;
+    Ok(StrykeValue::array(
+        words.into_iter().map(StrykeValue::string).collect(),
+    ))
+}
+
+fn shell_split_str(s: &str) -> Result<Vec<String>, &'static str> {
+    let mut words = Vec::new();
+    let mut cur = String::new();
+    let mut started = false; // an empty quoted token still emits ""
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            c if c.is_whitespace() => {
+                if started {
+                    words.push(std::mem::take(&mut cur));
+                    started = false;
+                }
+            }
+            '\\' => {
+                started = true;
+                if let Some(n) = chars.next() {
+                    cur.push(n);
+                } else {
+                    return Err("trailing backslash");
+                }
+            }
+            '\'' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        Some('\'') => break,
+                        Some(ch) => cur.push(ch),
+                        None => return Err("unterminated single quote"),
+                    }
+                }
+            }
+            '"' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        Some('"') => break,
+                        // Inside double quotes a backslash escapes only `"` and
+                        // `\`; before anything else it stays literal (POSIX).
+                        Some('\\') => match chars.peek() {
+                            Some('"') | Some('\\') => cur.push(chars.next().unwrap()),
+                            _ => cur.push('\\'),
+                        },
+                        Some(ch) => cur.push(ch),
+                        None => return Err("unterminated double quote"),
+                    }
+                }
+            }
+            _ => {
+                started = true;
+                cur.push(c);
+            }
+        }
+    }
+    if started {
+        words.push(cur);
+    }
+    Ok(words)
+}
+
+// ── NDJSON / JSON Lines ──
+
+/// `from_jsonl($s)` — parse newline-delimited JSON (one value per line) into an
+/// array. Blank lines are skipped. The streaming-friendly format used by logs,
+/// `jq`, and data pipelines.
+pub(crate) fn from_jsonl(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    let mut out = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        out.push(crate::native_data::json_decode(line)?);
+    }
+    Ok(StrykeValue::array(out))
+}
+
+/// `to_jsonl(@items)` — serialize a list to newline-delimited JSON, one compact
+/// value per line (trailing newline included). Inverse of `from_jsonl`.
+pub(crate) fn to_jsonl(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // `to_jsonl(\@rows)`/`to_jsonl([..])` (single arrayref) or `to_jsonl(@rows)`
+    // (flattened list). A lone arrayref is expanded; any other lone value is one row.
+    let items: Vec<StrykeValue> = if args.len() == 1 {
+        if let Some(a) = args[0].as_array_ref() {
+            a.read().clone()
+        } else {
+            args[0].as_array_vec().unwrap_or_else(|| vec![args[0].clone()])
+        }
+    } else {
+        args.to_vec()
+    };
+    let mut out = String::new();
+    for v in &items {
+        out.push_str(&crate::native_data::json_encode(v)?);
+        out.push('\n');
+    }
+    Ok(StrykeValue::string(out))
+}
+
+// ── INI config ──
+
+/// `from_ini($s)` — parse an INI document into a hashref. Pre-section keys land
+/// at the top level; each `[section]` becomes a nested hashref. `;` and `#`
+/// start comments. Keys split on the first `=` or `:`; surrounding whitespace
+/// is trimmed.
+pub(crate) fn from_ini(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    let root: Arc<RwLock<IndexMap<String, StrykeValue>>> =
+        Arc::new(RwLock::new(IndexMap::new()));
+    let mut current: Option<Arc<RwLock<IndexMap<String, StrykeValue>>>> = None;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            let name = line[1..line.len() - 1].trim().to_string();
+            let sect: Arc<RwLock<IndexMap<String, StrykeValue>>> =
+                Arc::new(RwLock::new(IndexMap::new()));
+            root.write()
+                .insert(name, StrykeValue::hash_ref(Arc::clone(&sect)));
+            current = Some(sect);
+            continue;
+        }
+        let split_at = line.find('=').or_else(|| line.find(':'));
+        if let Some(i) = split_at {
+            let key = line[..i].trim().to_string();
+            let val = line[i + 1..].trim().to_string();
+            let target = current.as_ref().unwrap_or(&root);
+            target.write().insert(key, StrykeValue::string(val));
+        }
+    }
+    Ok(StrykeValue::hash_ref(root))
+}
+
+/// `to_ini(\%h)` — serialize a hashref to INI text. Scalar top-level entries are
+/// emitted as global `key=value` lines first; nested hashref entries become
+/// `[section]` blocks. Inverse of `from_ini`.
+pub(crate) fn to_ini(v: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let map = v
+        .as_hash_ref()
+        .ok_or_else(|| StrykeError::runtime("to_ini: expected a hash reference", 0))?;
+    let entries: Vec<(String, StrykeValue)> =
+        map.read().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let mut out = String::new();
+    // Globals (scalar values) first.
+    for (k, val) in &entries {
+        if val.as_hash_ref().is_none() {
+            out.push_str(&format!("{k}={}\n", val.to_string()));
+        }
+    }
+    // Then sections (hashref values).
+    for (k, val) in &entries {
+        if let Some(sect) = val.as_hash_ref() {
+            out.push_str(&format!("[{k}]\n"));
+            for (kk, vv) in sect.read().iter() {
+                out.push_str(&format!("{kk}={}\n", vv.to_string()));
+            }
+        }
+    }
+    Ok(StrykeValue::string(out))
+}
+
+// ── base64url (URL-safe, no padding) ──
+
+/// `base64url_encode($s)` — RFC 4648 §5 URL-safe base64 with no `=` padding
+/// (`-`/`_` instead of `+`/`/`). The form used in JWTs and URL tokens.
+/// Delegates to the byte-level [`base64url_encode`] helper.
+pub(crate) fn base64url_encode_val(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let bytes = s
+        .as_bytes_arc()
+        .map(|b| (*b).clone())
+        .unwrap_or_else(|| s.to_string().into_bytes());
+    Ok(StrykeValue::string(base64url_encode(&bytes)))
+}
+
+/// `base64url_decode($s)` — decode URL-safe base64, with or without padding.
+/// Delegates to the byte-level [`base64url_decode`] helper.
+pub(crate) fn base64url_decode_val(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let bytes = base64url_decode(&s.to_string())?;
+    Ok(StrykeValue::string(
+        String::from_utf8_lossy(&bytes).into_owned(),
+    ))
+}
+
+// ── relative time ──
+
+/// `time_ago($epoch)` — render a Unix timestamp relative to now: `"3 hours
+/// ago"`, `"in 2 days"`, `"just now"`. `from_now` is an alias.
+pub(crate) fn time_ago(epoch: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let then = epoch.to_number();
+    if !then.is_finite() {
+        return Err(StrykeError::runtime("time_ago: non-finite epoch", 0));
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
+    let diff = now - then;
+    let future = diff < 0.0;
+    let secs = diff.abs();
+    let (n, unit) = if secs < 10.0 {
+        return Ok(StrykeValue::string("just now".to_string()));
+    } else if secs < 60.0 {
+        (secs, "second")
+    } else if secs < 3600.0 {
+        (secs / 60.0, "minute")
+    } else if secs < 86_400.0 {
+        (secs / 3600.0, "hour")
+    } else if secs < 604_800.0 {
+        (secs / 86_400.0, "day")
+    } else if secs < 2_629_800.0 {
+        (secs / 604_800.0, "week")
+    } else if secs < 31_557_600.0 {
+        (secs / 2_629_800.0, "month")
+    } else {
+        (secs / 31_557_600.0, "year")
+    };
+    let n = n.floor() as i64;
+    let plural = if n == 1 { "" } else { "s" };
+    let out = if future {
+        format!("in {n} {unit}{plural}")
+    } else {
+        format!("{n} {unit}{plural} ago")
+    };
+    Ok(StrykeValue::string(out))
+}
+
 fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
         .ok()
