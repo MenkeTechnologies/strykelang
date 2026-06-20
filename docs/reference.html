@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.14 · 10322 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.15 · 10336 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -303,7 +303,7 @@
         <li><a href="#ch-parallel-i-o">Parallel I/O</a> <span class="chapter-count">8</span></li>
         <li><a href="#ch-cli-args">CLI / Args</a> <span class="chapter-count">1</span></li>
         <li><a href="#ch-file-i-o">File I/O</a> <span class="chapter-count">38</span></li>
-        <li><a href="#ch-strings">Strings</a> <span class="chapter-count">26</span></li>
+        <li><a href="#ch-strings">Strings</a> <span class="chapter-count">28</span></li>
         <li><a href="#ch-arrays-hashes">Arrays &amp; Hashes</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-control-flow">Control Flow</a> <span class="chapter-count">17</span></li>
         <li><a href="#ch-error-handling">Error Handling</a> <span class="chapter-count">8</span></li>
@@ -312,10 +312,10 @@
         <li><a href="#ch-cluster-distributed">Cluster / Distributed</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-scriptable-distributed-compute-congregation">Scriptable Distributed Compute (congregation)</a> <span class="chapter-count">29</span></li>
         <li><a href="#ch-provenance-lineage">Provenance / Lineage</a> <span class="chapter-count">3</span></li>
-        <li><a href="#ch-datetime">Datetime</a> <span class="chapter-count">15</span></li>
+        <li><a href="#ch-datetime">Datetime</a> <span class="chapter-count">18</span></li>
         <li><a href="#ch-math">Math</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-file-system">File System</a> <span class="chapter-count">35</span></li>
-        <li><a href="#ch-process">Process</a> <span class="chapter-count">21</span></li>
+        <li><a href="#ch-process">Process</a> <span class="chapter-count">24</span></li>
         <li><a href="#ch-pack-binary">Pack / Binary</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-logging">Logging</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-charts-svg">Charts (SVG)</a> <span class="chapter-count">19</span></li>
@@ -332,7 +332,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8579</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8585</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -8284,7 +8284,27 @@ p $^A
     </section>
     <section class="tutorial-section" id="ch-strings">
       <h2>Strings</h2>
-      <p class="chapter-meta">26 topics</p>
+      <p class="chapter-meta">28 topics</p>
+      <article class="doc-entry" id="doc-template">
+        <h3><a class="doc-anchor" href="#doc-template">#</a> <code>template</code></h3>
+        <p>Render a Mustache-subset template at runtime against a hashref of variables. Unlike compile-time <code>#{}</code> interpolation, the template is a value — it can be read from a file, config, or built dynamically. <code>{{key}}</code> interpolates (empty if missing); <code>{{#key}}…{{/key}}</code> is a section (array repeats the block with <code>{{.}}</code> as the element; truthy hashref renders once in its scope; falsy/empty skips); <code>{{^key}}…{{/key}}</code> is inverted; <code>{{!…}}</code> is a comment.</p>
+        <pre><code class="lang-perl">p template(&quot;Hi {{name}}!&quot;, {name =&gt; &quot;Ada&quot;})            # Hi Ada!
+val $rows = [{n=&gt;&quot;a&quot;}, {n=&gt;&quot;b&quot;}]
+p template(&quot;{{#rows}}- {{n}}\n{{/rows}}&quot;, {rows =&gt; $rows})
+# - a
+# - b
+p template(&quot;{{^items}}empty{{/items}}&quot;, {items =&gt; []})  # empty
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-deburr">
+        <h3><a class="doc-anchor" href="#doc-deburr">#</a> <code>deburr</code></h3>
+        <p>Fold accented Latin letters to their basic-ASCII forms and strip combining diacritical marks — <code>déjà vu</code> becomes <code>deja vu</code>, <code>Œuvre</code> becomes <code>Oeuvre</code>, <code>straße</code> becomes <code>strasse</code>. Covers the Latin-1 Supplement and Latin Extended-A blocks (the same table as lodash <code>deburr</code>). Use it to normalize text before slugifying, indexing, or fuzzy-matching.</p>
+        <pre><code class="lang-perl">p deburr(&quot;déjà vu&quot;)          # deja vu
+p deburr(&quot;Crème brûlée&quot;)      # Creme brulee
+p deburr(&quot;Œuvre, Æsop, ßeta&quot;) # Oeuvre, Aesop, sseta
+val $slug = deburr($title) |&gt; lc |&gt; s/\s+/-/gr
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-chomp">
         <h3><a class="doc-anchor" href="#doc-chomp">#</a> <code>chomp</code></h3>
         <p><code>chomp STRING</code> — remove the trailing record separator (usually <code>\n</code>) from a string in place and return the number of characters removed.</p>
@@ -9654,7 +9674,7 @@ unmark($req)                            # we&#39;re done tracing; drop the entry
     </section>
     <section class="tutorial-section" id="ch-datetime">
       <h2>Datetime</h2>
-      <p class="chapter-meta">15 topics</p>
+      <p class="chapter-meta">18 topics</p>
       <article class="doc-entry" id="doc-datetime-utc">
         <h3><a class="doc-anchor" href="#doc-datetime-utc">#</a> <code>datetime_utc</code></h3>
         <p>Return the current UTC date and time as an ISO 8601 string (e.g. <code>2026-04-15T12:30:00Z</code>). This is the simplest way to get a portable, unambiguous timestamp for logging, file naming, or serialization. The returned string always ends with <code>Z</code> indicating UTC, so there is no timezone ambiguity.</p>
@@ -9742,6 +9762,28 @@ p $yesterday
 var $deadline = datetime_add_seconds($now, 7 * 86400) # +1 week
 p &quot;due by $deadline&quot;
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-strptime">
+        <h3><a class="doc-anchor" href="#doc-strptime">#</a> <code>strptime</code></h3>
+        <p>Parse a datetime string against an arbitrary <code>strftime</code>-style format and return UTC epoch seconds. The inverse of <code>datetime_strftime</code>. Unlike <code>datetime_parse_local</code> / <code>datetime_parse_rfc3339</code>, you supply the format explicitly, so it handles non-ISO inputs — web-server log stamps, <code>date(1)</code> output, custom report dates. If the format carries no time component the time is <code>00:00:00</code>; the instant is read as UTC.</p>
+        <pre><code class="lang-perl">p strptime(&quot;15/Jun/2026:14:30:00&quot;, &quot;%d/%b/%Y:%H:%M:%S&quot;)   # 1781274600
+p strptime(&quot;2026-06-15&quot;, &quot;%Y-%m-%d&quot;)                       # midnight UTC
+# parse nginx access-log timestamps
+val $epoch = strptime($stamp, &quot;%d/%b/%Y:%H:%M:%S %z&quot;)
+p datetime_strftime(&quot;%Y-%m-%d&quot;, $epoch)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-time-ago">
+        <h3><a class="doc-anchor" href="#doc-time-ago">#</a> <code>time_ago</code></h3>
+        <p>Render a Unix timestamp relative to the current time: <code>&quot;3 hours ago&quot;</code>, <code>&quot;in 2 days&quot;</code> (future), or <code>&quot;just now&quot;</code> (under 10s). <code>from_now</code> is an alias. Buckets by second/minute/hour/day/week/month/year with singular/plural agreement.</p>
+        <pre><code class="lang-perl">p time_ago(time() - 7200)           # 2 hours ago
+p time_ago(time() + 86400)          # in 1 day
+p time_ago(strptime($stamp, &quot;%Y-%m-%d %H:%M:%S&quot;))
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-now">
+        <h3><a class="doc-anchor" href="#doc-from-now">#</a> <code>from_now</code></h3>
+        <p>Alias for <code>time_ago</code> — render a Unix timestamp relative to now (<code>&quot;in 2 days&quot;</code> / <code>&quot;3 hours ago&quot;</code>).</p>
       </article>
       <article class="doc-entry" id="doc-elapsed">
         <h3><a class="doc-anchor" href="#doc-elapsed">#</a> <code>elapsed</code></h3>
@@ -10310,7 +10352,27 @@ for (@dirs) { p &quot;_-&gt;{path}: _-&gt;{size}&quot; }
     </section>
     <section class="tutorial-section" id="ch-process">
       <h2>Process</h2>
-      <p class="chapter-meta">21 topics</p>
+      <p class="chapter-meta">24 topics</p>
+      <article class="doc-entry" id="doc-shell-quote">
+        <h3><a class="doc-anchor" href="#doc-shell-quote">#</a> <code>shell_quote</code></h3>
+        <p>Quote a string so it survives unchanged through a POSIX shell (Python <code>shlex.quote</code>). Safe values pass through bare; anything with spaces or metacharacters is single-quoted with embedded <code>&#39;</code> escaped as <code>&#39;\&#39;&#39;</code>. Empty string becomes <code>&#39;&#39;</code>. Use it to build shell command lines safely from untrusted data.</p>
+        <pre><code class="lang-perl">p shell_quote(&quot;plain&quot;)              # plain
+p shell_quote(&quot;a b&quot;)                # &#39;a b&#39;
+p shell_quote(&quot;it&#39;s&quot;)               # &#39;it&#39;\&#39;&#39;s&#39;
+val $cmd = &quot;grep &quot; . shell_quote($pat) . &quot; file.txt&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-shell-split">
+        <h3><a class="doc-anchor" href="#doc-shell-split">#</a> <code>shell_split</code></h3>
+        <p>Split a command line into words honoring single quotes, double quotes, and backslash escapes (POSIX <code>shlex.split</code>); <code>shellwords</code> is an alias. Returns an array. Dies on an unterminated quote. Performs no expansion — <code>$VAR</code>, globs, and backticks are literal.</p>
+        <pre><code class="lang-perl">p shell_split(q{cmd -x &#39;a b&#39; &quot;c d&quot;})   # (cmd, -x, a b, c d)
+val @argv = shell_split($line)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-shellwords">
+        <h3><a class="doc-anchor" href="#doc-shellwords">#</a> <code>shellwords</code></h3>
+        <p>Alias for <code>shell_split</code> — POSIX word-split a command line into an array, honoring quotes and backslash escapes.</p>
+      </article>
       <article class="doc-entry" id="doc-system">
         <h3><a class="doc-anchor" href="#doc-system">#</a> <code>system</code></h3>
         <p>Execute a command in a subshell and wait for it to complete, returning the exit status. A return value of <code>0</code> means success; non-zero indicates failure. The exit status is encoded as <code>$? &gt;&gt; 8</code> for the actual exit code. Use backticks or <code>capture</code> if you need the command&#39;s output.</p>
@@ -13129,7 +13191,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8579 topics</p>
+      <p class="chapter-meta">8585 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -16257,6 +16319,19 @@ banner(1) |&gt; spurt &quot;/tmp/welcome.txt&quot;  # write to file (no ANSI whe
         <h3><a class="doc-anchor" href="#doc-base58check-encode">#</a> <code>base58check_encode</code></h3>
         <p><code>base58check_encode(payload) → string</code> — Bitcoin Base58Check: append <code>sha256d(payload)[..4]</code> then encode in Base58.</p>
         <pre><code class="lang-perl">p base58check_encode(&quot;hello&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base64url-decode">
+        <h3><a class="doc-anchor" href="#doc-base64url-decode">#</a> <code>base64url_decode</code></h3>
+        <p>Decode URL-safe base64 (<code>-</code>/<code>_</code> alphabet), accepting input with or without <code>=</code> padding. Inverse of <code>base64url_encode</code>.</p>
+        <pre><code class="lang-perl">p base64url_decode(&quot;aGk_Pg&quot;)        # hi?&gt;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-base64url-encode">
+        <h3><a class="doc-anchor" href="#doc-base64url-encode">#</a> <code>base64url_encode</code></h3>
+        <p>RFC 4648 §5 URL-safe base64 with no <code>=</code> padding (<code>-</code>/<code>_</code> instead of <code>+</code>/<code>/</code>). The encoding used in JWT segments and URL/path tokens. Pair with <code>base64url_decode</code>.</p>
+        <pre><code class="lang-perl">p base64url_encode(&quot;hi?&gt;&quot;)          # aGk_Pg
+val $tok = base64url_encode($json_header)
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-base91-decode">
@@ -30103,6 +30178,22 @@ p strftime(&quot;%FT%TZ&quot;, 1700000000)
         <h3><a class="doc-anchor" href="#doc-from-hex">#</a> <code>from_hex</code></h3>
         <p><code>from_hex</code> — construct from hex representation. Category: *base conversion*.</p>
         <pre><code class="lang-perl">p from_hex $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-ini">
+        <h3><a class="doc-anchor" href="#doc-from-ini">#</a> <code>from_ini</code></h3>
+        <p>Parse an INI document into a hashref. Pre-section keys land at the top level; each <code>[section]</code> becomes a nested hashref. <code>;</code> and <code>#</code> start comments; keys split on the first <code>=</code> or <code>:</code>. Inverse of <code>to_ini</code>.</p>
+        <pre><code class="lang-perl">val %cfg = %{ from_ini(read_file(&quot;app.ini&quot;)) }
+p $cfg{database}{host}
+p $cfg{debug}              # a global (pre-section) key
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-from-jsonl">
+        <h3><a class="doc-anchor" href="#doc-from-jsonl">#</a> <code>from_jsonl</code></h3>
+        <p>Parse newline-delimited JSON (JSON Lines / NDJSON — one value per line) into an array. Blank lines are skipped. The streaming format used by logs, <code>jq</code>, and data pipelines. Inverse of <code>to_jsonl</code>.</p>
+        <pre><code class="lang-perl">val @rows = from_jsonl(read_file(&quot;events.ndjson&quot;))
+p scalar @rows
+p $rows[0]{user}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-from-oct">
@@ -60503,6 +60594,15 @@ var %freq = @words |&gt; map { _, 1 } |&gt; to_hash
         <pre><code class="lang-perl">p to_hex $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-to-ini">
+        <h3><a class="doc-anchor" href="#doc-to-ini">#</a> <code>to_ini</code></h3>
+        <p>Serialize a hashref to INI text. Scalar top-level entries become global <code>key=value</code> lines (emitted first); nested hashref entries become <code>[section]</code> blocks. Inverse of <code>from_ini</code>.</p>
+        <pre><code class="lang-perl">print to_ini({debug =&gt; 1, server =&gt; {port =&gt; 8080}})
+# debug=1
+# [server]
+# port=8080
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-to-int">
         <h3><a class="doc-anchor" href="#doc-to-int">#</a> <code>to_int</code></h3>
         <p><code>to_int</code> — convert input to int form. Category: *conversion / utility*.</p>
@@ -60513,6 +60613,15 @@ var %freq = @words |&gt; map { _, 1 } |&gt; to_hash
         <h3><a class="doc-anchor" href="#doc-to-int-each">#</a> <code>to_int_each</code></h3>
         <p><code>to_int_each</code> — convert input to int each form. Category: *trivial numeric helpers*.</p>
         <pre><code class="lang-perl">p to_int_each $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-to-jsonl">
+        <h3><a class="doc-anchor" href="#doc-to-jsonl">#</a> <code>to_jsonl</code></h3>
+        <p>Serialize a list to newline-delimited JSON — one compact value per line, trailing newline included. Accepts a flattened list or a single arrayref. Inverse of <code>from_jsonl</code>.</p>
+        <pre><code class="lang-perl">val @rows = ({id =&gt; 1}, {id =&gt; 2})
+print to_jsonl(@rows)
+# {&quot;id&quot;:1}
+# {&quot;id&quot;:2}
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-to-oct">
