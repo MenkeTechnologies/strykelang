@@ -788,9 +788,17 @@ pub fn run_line_body(
     interp.line_mode_eof_pending = is_last_input_line;
     let result: StrykeResult<Option<String>> = (|| {
         interp.line_number += 1;
+        interp.nr += 1;
         interp
             .scope
             .set_topic(value::StrykeValue::string(line_str.to_string()));
+
+        // awk record vars. `$NR` (cumulative) is served from `interp.nr` by
+        // `get_special_var`; here we expose `$FNR` (per-file) as a plain scalar
+        // mirroring `interp.line_number`, which `main.rs` zeroes at each file.
+        interp
+            .scope
+            .set_scalar("FNR", value::StrykeValue::integer(interp.line_number))?;
 
         if interp.auto_split {
             let sep = interp.field_separator.as_deref().unwrap_or(" ");
@@ -799,6 +807,10 @@ pub fn run_line_body(
                 .split(line_str)
                 .map(|s| value::StrykeValue::string(s.to_string()))
                 .collect();
+            // awk NF — the field count for the current record.
+            interp
+                .scope
+                .set_scalar("NF", value::StrykeValue::integer(fields.len() as i64))?;
             interp.scope.set_array("F", fields)?;
         }
 

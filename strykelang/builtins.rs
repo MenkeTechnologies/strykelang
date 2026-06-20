@@ -545,6 +545,9 @@ pub const SPECIAL_VARS: &[(&str, &str)] = &[
     ("$?", "error"),
     ("$@", "error"),
     ("$ARGV", "args"),
+    ("$FNR", "record"),
+    ("$NF", "record"),
+    ("$NR", "record"),
     ("$\\", "io"),
     ("$^A", "io"),
     ("$^C", "caret"),
@@ -5961,6 +5964,15 @@ pub(crate) fn try_builtin(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),
         )),
+        "strptime" => Some(crate::native_codec::strptime(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "template" => Some(crate::native_codec::template(
+            args.first().unwrap_or(&undef),
+            args.get(1).unwrap_or(&undef),
+        )),
+        "deburr" => Some(crate::native_codec::deburr(args.first().unwrap_or(&undef))),
         "datetime_add_seconds" => Some(crate::native_codec::datetime_add_seconds(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),
@@ -31646,6 +31658,10 @@ fn builtin_lsp_completion_words(
         "$^S",
         // ARGV current-input scalar
         "$ARGV",
+        // awk record vars (populated in the -n/-p loop)
+        "$NR",
+        "$NF",
+        "$FNR",
         // stryke version (mirrored from %stryke::VERSION)
         "$stryke::VERSION",
         // Punctuation arrays

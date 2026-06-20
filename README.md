@@ -215,7 +215,7 @@ GolfScript, Pyth, 05AB1E, Jelly — these are shorter but are write-only puzzles
 | Regex engine | **3-tier** | PCRE | Onigmo | `re` | ERE | PCRE | — |
 | Data viz (spark/bars/flame) | **yes** | no | no | no | no | no | no |
 | Clipboard (clip/paste) | **yes** | no | no | no | no | no | `clip` |
-| `$NR`/`$NF` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
+| `$NR`/`$NF`/`$FNR` AWK compat | **yes** | `-MEnglish` | no | no | native | no | no |
 | Typed structs/enums/classes | **yes** | no | native | native | no | no | native |
 | JIT compiler | **Cranelift** | no | YJIT | no | no | no | no |
 | Single binary | **44MB** | system pkg | system pkg | system pkg | system pkg | 3MB | 50MB+ |
@@ -548,7 +548,7 @@ For `varsync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `
 | **Crypto** | `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `md5`, `hmac`, `hmac_sha256`, `crc32`, `uuid`, `base64_encode/decode`, `hex_encode/decode` |
 | **Steganography** ([`image`](https://crates.io/crates/image), `sha2`, `crc32fast`) — world-first polymorphic stego builtin | `hide(CARRIER, SECRET [, KEY])` / `reveal(STEGO [, KEY])` / `hide_capacity(CARRIER)` — auto-dispatches PNG LSB (R/G/B, alpha skipped) for `\x89PNG` bytes vs zero-width-char text stego (U+200B/U+200C between visible chars) for everything else. 4-byte length + 4-byte CRC32 envelope catches tampering. Optional KEY enables SHA-256(key‖counter)-derived XOR mask on the secret. |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
-| **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `elapsed` |
+| **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `strptime`, `elapsed` |
 | **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int` |
 | **Cyberpunk Terminal Art** | `cyber_city` (neon cityscape), `cyber_grid` (synthwave perspective grid), `cyber_rain`/`matrix_rain` (digital rain), `cyber_glitch`/`glitch_text` (text corruption), `cyber_banner`/`neon_banner` (block-letter banners), `cyber_circuit` (circuit board), `cyber_skull`, `cyber_eye` — all output ANSI-colored Unicode art |
 
@@ -1140,7 +1140,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | Array | `push`, `pop`, `shift`, `unshift`, `splice`, `splice_last` (last removed — `--no-interop` replacement for `scalar splice`), `rev` (string / list reverse), `sort`, `map`, `grep`, `filter`, `reduce`, `fold`, `fore`, `e`, `preduce`, `len`/`cnt`/`count` (element count — replaces `scalar @a`), `partition`, `min_by`, `max_by`, `zip_with`, `interleave`, `frequencies`, `tally`, `count_by`, `pluck`, `grep_v`, `head`, `tail`, `first` |
 | Hash | `keys`, `values`, `each`, `delete`, `exists`, `select_keys`, `top`, `deep_clone`/`dclone`, `deep_merge`/`dmerge`, `deep_equal`/`deq` |
 | Functional | `compose`/`comp`, `partial`, `curry`, `memoize`/`memo`, `once`, `constantly`, `complement`, `juxt`, `fnil` |
-| String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case` |
+| String | `chomp`, `chop`, `length`, `substr`, `index`, `rindex`, `split`, `join`, `sprintf`, `printf`, `uc`/`lc`/`ucfirst`/`lcfirst`, `chr`, `ord`, `hex`, `oct`, `crypt`, `fc`, `pos`, `study`, `quotemeta`, `trim`, `lines`, `words`, `chars`, `digits`, `numbers`, `graphemes`, `columns`, `sentences`, `paragraphs`, `sections`, `snake_case`, `camel_case`, `kebab_case`, `template` |
 | Binary | `pack`, `unpack` (subset `A a N n V v C Q q Z H x w i I l L s S f d` + `*`), `unpack_first` / `unpack1` / `up1` (first decoded element — `--no-interop` replacement for `scalar unpack`), `vec` |
 | Numeric | `abs`, `int`, `sqrt`, `squared`/`sq`, `cubed`/`cb`, `expt(B,E)`, `sin`, `cos`, `atan2`, `exp`, `log`, `rand`, `srand`, `avg`, `stddev`, `clamp`, `normalize`, `range(N, M)` (lazy bidirectional) |
 | I/O | `print`, `p`, `printf`, `open` (incl. `open my $fh`, files, `-\|` / `\|-` pipes), `close`, `eof`, `readline`, `read`, `seek`, `tell`, `sysopen`, `sysread`/`syswrite`/`sysseek`, handle methods `->print/->p/->printf/->getline/->close/->eof/->getc/->flush`, `slurp`, `swallow`/`swa` (glob → hash `{abspath => bytes}`), `ingest`/`ing` (streaming `[path, bytes]` iterator), `burp` (inverse of swallow — hash → files, mkdir -p), `input`, backticks/`qx{}`, `capture` (structured: `->stdout/->stderr/->exit`), `pager`/`pg`/`less` (pipes value into `$PAGER`; TTY-gated), `binmode`, `fileno`, `flock`, `getc`, `select`, `truncate`, `formline`, `read_lines`, `append_file`, `to_file`, `read_json`, `write_json`, `tempfile`, `tempdir`, `xopen`/`xo` (system open — `open` on macOS, `xdg-open` on Linux), `clip`/`clipboard`/`pbcopy` (copy to clipboard), `paste`/`pbpaste` (read clipboard) |
@@ -1166,7 +1166,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 | DSP / Signal | `convolution`, `autocorrelation`, `fft_magnitude`, `zero_crossings`, `peak_detect` |
 | Algorithms | `next_permutation`, `is_balanced_parens`, `eval_rpn`, `merge_sorted`, `binary_insert`, `reservoir_sample`, `run_length_encode_str`, `run_length_decode_str`, `range_expand`, `range_compress`, `group_consecutive_by`, `histogram`, `bucket`, `clamp_array`, `normalize_range` |
 | Validation | `luhn_check`, `is_valid_hex_color`, `is_valid_cidr`, `is_valid_mime`, `is_valid_cron`, `is_valid_latitude`, `is_valid_longitude` |
-| Text | `ngrams`, `bigrams`, `trigrams`, `char_frequencies`, `is_anagram`, `is_pangram`, `mask_string`, `chunk_string`, `camel_to_snake`, `snake_to_camel`, `collapse_whitespace`, `remove_vowels`, `remove_consonants`, `strip_html`, `metaphone`, `double_metaphone`, `initials`, `acronym`, `superscript`, `subscript`, `leetspeak`, `zalgo`, `sort_words`, `unique_words`, `word_frequencies`, `string_distance`, `string_multiply` |
+| Text | `ngrams`, `bigrams`, `trigrams`, `char_frequencies`, `is_anagram`, `is_pangram`, `mask_string`, `chunk_string`, `camel_to_snake`, `snake_to_camel`, `collapse_whitespace`, `remove_vowels`, `remove_consonants`, `strip_html`, `metaphone`, `double_metaphone`, `initials`, `acronym`, `superscript`, `subscript`, `leetspeak`, `zalgo`, `sort_words`, `unique_words`, `word_frequencies`, `string_distance`, `string_multiply`, `deburr` |
 | Misc | `fizzbuzz`, `roman_numeral_list`, `look_and_say`, `gray_code_sequence`, `sierpinski`, `mandelbrot_char`, `game_of_life_step`, `tower_of_hanoi`, `pascals_triangle`, `truth_table`, `base_convert`, `roman_add`, `haversine`, `bearing`, `bmi`, `bac_estimate` |
 
 #### Perl-compat highlights
@@ -1175,6 +1175,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`use overload`** — `'op' => 'method'` or `\&handler`; binary dispatch with `(invocant, other)`, `nomethod`, unary `neg`/`bool`/`abs`, `""` for stringification, `fallback => 1`.
 - **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
 - **`$.`** — undef until first successful read, then last-read line count.
+- **AWK record vars** (`-n`/`-p` loop) — `$NR` is the cumulative record number across all input files; `$FNR` is the per-file record number (resets at each file, like `$.`); `$NF` is the field count under `-a` autosplit. Available without `-MEnglish`; disabled under `--compat`.
 - **`print`/`p`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
 - **Bareword statement** — `name;` calls a scwub with `@_ = ($_)`.
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.

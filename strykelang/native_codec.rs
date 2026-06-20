@@ -3001,6 +3001,276 @@ pub(crate) fn datetime_parse_local(
     Ok(StrykeValue::float(secs))
 }
 
+/// `strptime($s, $fmt)` — parse `$s` against an arbitrary `strftime`-style
+/// format and return UTC epoch seconds (float). The inverse of
+/// [`datetime_strftime`]. Unlike `datetime_parse_local`/`_rfc3339` this takes
+/// the format explicitly, so it handles non-ISO inputs — Apache/nginx log
+/// stamps, `date(1)` output, custom report dates. If `$fmt` carries no time
+/// component the time is taken as `00:00:00`; the instant is interpreted as
+/// UTC (use `datetime_parse_local` for zone-aware local parsing).
+pub(crate) fn strptime(s: &StrykeValue, fmt: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    let f = fmt.to_string();
+    let text = text.trim();
+    let naive = NaiveDateTime::parse_from_str(text, &f)
+        .ok()
+        .or_else(|| {
+            NaiveDate::parse_from_str(text, &f)
+                .ok()
+                .and_then(|d| d.and_hms_opt(0, 0, 0))
+        })
+        .ok_or_else(|| {
+            StrykeError::runtime(format!("strptime: cannot parse {text:?} with format {f:?}"), 0)
+        })?;
+    let utc = Utc.from_utc_datetime(&naive);
+    let secs = utc.timestamp() as f64 + f64::from(utc.timestamp_subsec_nanos()) / 1e9;
+    Ok(StrykeValue::float(secs))
+}
+
+/// `template($tmpl, \%vars)` — render a Mustache-subset template at runtime.
+/// Unlike stryke's compile-time `#{}` interpolation, the template string is a
+/// value, so it can come from a file, config, or be built dynamically — the
+/// codegen / report / config-emit case.
+///
+/// Supported tags:
+///   - `{{key}}`        — interpolate `$vars{key}` (empty string if missing)
+///   - `{{#key}}…{{/key}}` — section: array → repeat block per element
+///     (`{{.}}` is the element; if it's a hashref its keys are in scope);
+///     truthy hashref → render once with that hashref as context;
+///     other truthy → render once; falsy/missing/empty-array → skip
+///   - `{{^key}}…{{/key}}` — inverted: render only when key is falsy/missing/empty
+///   - `{{!comment}}`   — dropped
+pub(crate) fn template(tmpl: &StrykeValue, vars: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let t = tmpl.to_string();
+    let out = render_template(&t, vars)?;
+    Ok(StrykeValue::string(out))
+}
+
+/// Look up `key` in the current context. `.` resolves to the context itself
+/// (the current section element); any other key derefs a hashref context.
+fn template_lookup(ctx: &StrykeValue, key: &str) -> Option<StrykeValue> {
+    if key == "." {
+        return Some(ctx.clone());
+    }
+    // Context is normally a hashref (`{ ... }`); `hash_get` only sees a bare
+    // Hash, so deref the ref first, then fall back for a bare Hash.
+    if let Some(h) = ctx.as_hash_ref() {
+        return h.read().get(key).cloned();
+    }
+    ctx.hash_get(key)
+}
+
+fn render_template(t: &str, ctx: &StrykeValue) -> StrykeResult<String> {
+    let b = t.as_bytes();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < b.len() {
+        // Literal run up to the next `{{`.
+        match t[i..].find("{{") {
+            None => {
+                out.push_str(&t[i..]);
+                break;
+            }
+            Some(rel) => {
+                out.push_str(&t[i..i + rel]);
+                i += rel;
+            }
+        }
+        // At a `{{` — find the closing `}}`.
+        let close = t[i + 2..]
+            .find("}}")
+            .ok_or_else(|| StrykeError::runtime("template: unterminated {{ tag", 0))?;
+        let tag = t[i + 2..i + 2 + close].trim();
+        let after_tag = i + 2 + close + 2;
+        match tag.as_bytes().first() {
+            Some(b'!') => {
+                i = after_tag; // comment
+            }
+            Some(b'#') | Some(b'^') => {
+                let inverted = tag.starts_with('^');
+                let name = tag[1..].trim();
+                let (block, next) = template_section_body(t, after_tag, name)?;
+                let val = template_lookup(ctx, name);
+                if inverted {
+                    if template_is_empty(val.as_ref()) {
+                        out.push_str(&render_template(block, ctx)?);
+                    }
+                } else if let Some(v) = val {
+                    if let Some(arr) = v.as_array_ref() {
+                        let items: Vec<StrykeValue> = arr.read().clone();
+                        for item in &items {
+                            out.push_str(&render_template(block, item)?);
+                        }
+                    } else if v.as_hash_ref().is_some() {
+                        out.push_str(&render_template(block, &v)?);
+                    } else if v.is_true() {
+                        out.push_str(&render_template(block, ctx)?);
+                    }
+                }
+                i = next;
+            }
+            Some(b'/') => {
+                // Stray close tag with no open — treat as literal-free skip.
+                i = after_tag;
+            }
+            _ => {
+                if let Some(v) = template_lookup(ctx, tag) {
+                    out.push_str(&v.to_string());
+                }
+                i = after_tag;
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// True when a section value should be treated as empty (skipped by `#`,
+/// rendered by `^`): missing, falsy, or an empty array.
+fn template_is_empty(v: Option<&StrykeValue>) -> bool {
+    match v {
+        None => true,
+        Some(v) => {
+            if let Some(arr) = v.as_array_ref() {
+                arr.read().is_empty()
+            } else {
+                !v.is_true()
+            }
+        }
+    }
+}
+
+/// Given the index just past a `{{#name}}`/`{{^name}}` open tag, return the
+/// inner block and the index just past the matching `{{/name}}`. Nesting is
+/// tracked by depth over all section tags so nested sections close correctly.
+fn template_section_body<'a>(
+    t: &'a str,
+    start: usize,
+    _name: &str,
+) -> StrykeResult<(&'a str, usize)> {
+    let mut depth = 1usize;
+    let mut j = start;
+    while j < t.len() {
+        let rel = match t[j..].find("{{") {
+            Some(r) => r,
+            None => break,
+        };
+        let open = j + rel;
+        let close = t[open + 2..]
+            .find("}}")
+            .ok_or_else(|| StrykeError::runtime("template: unterminated {{ tag", 0))?;
+        let tag = t[open + 2..open + 2 + close].trim();
+        let after = open + 2 + close + 2;
+        match tag.as_bytes().first() {
+            Some(b'#') | Some(b'^') => depth += 1,
+            Some(b'/') => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok((&t[start..open], after));
+                }
+            }
+            _ => {}
+        }
+        j = after;
+    }
+    Err(StrykeError::runtime("template: unclosed section", 0))
+}
+
+/// `deburr($s)` — fold Latin-1 Supplement and Latin Extended-A letters to
+/// their basic-Latin equivalents and strip combining diacritical marks
+/// (`déjà vu` → `deja vu`). Faithful port of lodash 4's `_deburredLetters`
+/// table + combining-mark strip. Useful for slug/search normalization.
+pub(crate) fn deburr(s: &StrykeValue) -> StrykeResult<StrykeValue> {
+    let text = s.to_string();
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if let Some(rep) = deburr_letter(c) {
+            out.push_str(rep);
+        } else if matches!(c, '\u{0300}'..='\u{036F}' | '\u{FE20}'..='\u{FE2F}') {
+            // combining diacritical mark — drop it
+        } else {
+            out.push(c);
+        }
+    }
+    Ok(StrykeValue::string(out))
+}
+
+/// lodash `_deburredLetters` map: Latin-1 Supplement (U+00C0–U+00FF) and
+/// Latin Extended-A (U+0100–U+017F) → ASCII transliteration.
+fn deburr_letter(c: char) -> Option<&'static str> {
+    Some(match c {
+        // ── Latin-1 Supplement ──
+        'À' | 'Á' | 'Â' | 'Ã' | 'Ä' | 'Å' => "A",
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => "a",
+        'Ç' => "C",
+        'ç' => "c",
+        'Ð' => "D",
+        'ð' => "d",
+        'È' | 'É' | 'Ê' | 'Ë' => "E",
+        'è' | 'é' | 'ê' | 'ë' => "e",
+        'Ì' | 'Í' | 'Î' | 'Ï' => "I",
+        'ì' | 'í' | 'î' | 'ï' => "i",
+        'Ñ' => "N",
+        'ñ' => "n",
+        'Ò' | 'Ó' | 'Ô' | 'Õ' | 'Ö' | 'Ø' => "O",
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' => "o",
+        'Ù' | 'Ú' | 'Û' | 'Ü' => "U",
+        'ù' | 'ú' | 'û' | 'ü' => "u",
+        'Ý' => "Y",
+        'ý' | 'ÿ' => "y",
+        'Æ' => "Ae",
+        'æ' => "ae",
+        'Þ' => "Th",
+        'þ' => "th",
+        'ß' => "ss",
+        // ── Latin Extended-A ──
+        'Ā' | 'Ă' | 'Ą' => "A",
+        'ā' | 'ă' | 'ą' => "a",
+        'Ć' | 'Ĉ' | 'Ċ' | 'Č' => "C",
+        'ć' | 'ĉ' | 'ċ' | 'č' => "c",
+        'Ď' | 'Đ' => "D",
+        'ď' | 'đ' => "d",
+        'Ē' | 'Ĕ' | 'Ė' | 'Ę' | 'Ě' => "E",
+        'ē' | 'ĕ' | 'ė' | 'ę' | 'ě' => "e",
+        'Ĝ' | 'Ğ' | 'Ġ' | 'Ģ' => "G",
+        'ĝ' | 'ğ' | 'ġ' | 'ģ' => "g",
+        'Ĥ' | 'Ħ' => "H",
+        'ĥ' | 'ħ' => "h",
+        'Ĩ' | 'Ī' | 'Ĭ' | 'Į' | 'İ' => "I",
+        'ĩ' | 'ī' | 'ĭ' | 'į' | 'ı' => "i",
+        'Ĵ' => "J",
+        'ĵ' => "j",
+        'Ķ' => "K",
+        'ķ' | 'ĸ' => "k",
+        'Ĺ' | 'Ļ' | 'Ľ' | 'Ŀ' | 'Ł' => "L",
+        'ĺ' | 'ļ' | 'ľ' | 'ŀ' | 'ł' => "l",
+        'Ń' | 'Ņ' | 'Ň' | 'Ŋ' => "N",
+        'ń' | 'ņ' | 'ň' | 'ŋ' => "n",
+        'Ō' | 'Ŏ' | 'Ő' => "O",
+        'ō' | 'ŏ' | 'ő' => "o",
+        'Ŕ' | 'Ŗ' | 'Ř' => "R",
+        'ŕ' | 'ŗ' | 'ř' => "r",
+        'Ś' | 'Ŝ' | 'Ş' | 'Š' => "S",
+        'ś' | 'ŝ' | 'ş' | 'š' => "s",
+        'Ţ' | 'Ť' | 'Ŧ' => "T",
+        'ţ' | 'ť' | 'ŧ' => "t",
+        'Ũ' | 'Ū' | 'Ŭ' | 'Ů' | 'Ű' | 'Ų' => "U",
+        'ũ' | 'ū' | 'ŭ' | 'ů' | 'ű' | 'ų' => "u",
+        'Ŵ' => "W",
+        'ŵ' => "w",
+        'Ŷ' | 'Ÿ' => "Y",
+        'ŷ' => "y",
+        'Ź' | 'Ż' | 'Ž' => "Z",
+        'ź' | 'ż' | 'ž' => "z",
+        'Ĳ' => "IJ",
+        'ĳ' => "ij",
+        'Œ' => "Oe",
+        'œ' => "oe",
+        'ŉ' => "'n",
+        'ſ' => "s",
+        _ => return None,
+    })
+}
+
 fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
     NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
         .ok()

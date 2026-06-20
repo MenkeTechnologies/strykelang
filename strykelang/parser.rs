@@ -14587,6 +14587,7 @@ impl Parser {
             | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt" | "pow" | "pw"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "pfrequencies" | "pfreq"
+            | "template" | "deburr"
             | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
@@ -14718,7 +14719,7 @@ impl Parser {
             | "datetime_format_tz" | "datetime_add_seconds"
             | "datetime_from_epoch"
             | "datetime_parse_rfc3339" | "datetime_parse_local"
-            | "datetime_strftime"
+            | "datetime_strftime" | "strptime"
             | "dateseq" | "dategrep" | "dateround" | "datesort"
             // ── jwt ─────────────────────────────────────────────────────────
             | "jwt_encode" | "jwt_decode" | "jwt_decode_unsafe"
