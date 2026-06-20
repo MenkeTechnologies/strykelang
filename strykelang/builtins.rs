@@ -5973,6 +5973,23 @@ pub(crate) fn try_builtin(
             args.get(1).unwrap_or(&undef),
         )),
         "deburr" => Some(crate::native_codec::deburr(args.first().unwrap_or(&undef))),
+        "shell_quote" => Some(crate::native_codec::shell_quote(args.first().unwrap_or(&undef))),
+        "shell_split" | "shellwords" => {
+            Some(crate::native_codec::shell_split(args.first().unwrap_or(&undef)))
+        }
+        "from_jsonl" => Some(crate::native_codec::from_jsonl(args.first().unwrap_or(&undef))),
+        "to_jsonl" => Some(crate::native_codec::to_jsonl(args)),
+        "from_ini" => Some(crate::native_codec::from_ini(args.first().unwrap_or(&undef))),
+        "to_ini" => Some(crate::native_codec::to_ini(args.first().unwrap_or(&undef))),
+        "base64url_encode" => {
+            Some(crate::native_codec::base64url_encode_val(args.first().unwrap_or(&undef)))
+        }
+        "base64url_decode" => {
+            Some(crate::native_codec::base64url_decode_val(args.first().unwrap_or(&undef)))
+        }
+        "time_ago" | "from_now" => {
+            Some(crate::native_codec::time_ago(args.first().unwrap_or(&undef)))
+        }
         "datetime_add_seconds" => Some(crate::native_codec::datetime_add_seconds(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),

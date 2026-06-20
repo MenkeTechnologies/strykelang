@@ -334,6 +334,7 @@ mod scriptable_controller_pin;
 mod semantic_edge;
 mod serialization;
 mod shell_repl;
+mod shlex_jsonl_ini_b64url;
 mod sketch_correctness_pin;
 mod sketches;
 mod sketches_extra_pin;
