@@ -124,6 +124,12 @@ Slurp all input at once (alias for \fB-0777\fR).
 .B -i\fR[\fIextension\fR]
 Edit \fB<>\fR files in place; backup if extension supplied; multiple files
 processed in parallel.
+.PP
+Inside the \fB-n\fR/\fB-p\fR loop the AWK record variables are available
+without \fB-MEnglish\fR: \fB$NR\fR is the cumulative record number across
+all input files, \fB$FNR\fR resets to 1 at each file boundary (like
+\fB$.\fR), and \fB$NF\fR is the field count under \fB-a\fR. All are
+disabled under \fB--compat\fR.
 .SH MODULES & PATHS
 .TP
 .B -M \fIMODULE\fR
