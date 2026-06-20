@@ -616,8 +616,13 @@ pub struct VMHelper {
     pub env_materialized: bool,
     /// $0
     pub program_name: String,
-    /// Current line number $. (global increment; see `handle_line_numbers` for per-handle)
+    /// Current line number $. (global increment; see `handle_line_numbers` for per-handle).
+    /// In the `-n`/`-p` loop this is the per-file record number (awk `FNR`) — it is
+    /// reset to 0 at each input-file boundary in `main.rs`.
     pub line_number: i64,
+    /// Cumulative record number across all input files in the `-n`/`-p` loop (awk `NR`).
+    /// Unlike `line_number` it is never reset at a file boundary.
+    pub nr: i64,
     /// Last handle key used for `$.` (e.g. `STDIN`, `FH`, `ARGV:path`).
     pub last_readline_handle: String,
     /// Bracket text for `die` / `warn` after a stdin read: `"<>"` (diamond / `-n` queue) vs `"<STDIN>"`.
@@ -1567,6 +1572,7 @@ impl VMHelper {
             env_materialized: false,
             program_name: "stryke".to_string(),
             line_number: 0,
+            nr: 0,
             last_readline_handle: String::new(),
             last_stdin_die_bracket: "<STDIN>".to_string(),
             handle_line_numbers: HashMap::new(),
@@ -1923,6 +1929,7 @@ impl VMHelper {
             env_materialized: self.env_materialized,
             program_name: self.program_name.clone(),
             line_number: 0,
+            nr: 0,
             last_readline_handle: String::new(),
             last_stdin_die_bracket: "<STDIN>".to_string(),
             handle_line_numbers: HashMap::new(),
@@ -16075,7 +16082,13 @@ impl VMHelper {
         // AWK-style aliases always available (no `-MEnglish` needed) — disabled in --compat
         let name = if !crate::compat_mode() {
             match name {
-                "NR" => ".",
+                // awk `NR` is the cumulative record number across all input
+                // files — served from `nr`, which (unlike `$.` / `line_number`)
+                // is never reset at a file boundary. `$FNR` (a plain scalar) is
+                // the per-file counter.
+                "NR" => {
+                    return StrykeValue::integer(self.nr);
+                }
                 "RS" => "/",
                 "OFS" => ",",
                 "ORS" => "\\",
