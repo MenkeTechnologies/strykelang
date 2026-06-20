@@ -45,7 +45,7 @@ p My::Deep::Utils::add(10, 20)  # 30
 
 ## Why this matters
 
-Stryke has 10,438 builtins. Common names are taken:
+Stryke has 10,449 builtins. Common names are taken:
 
 - `sum`, `min`, `max`, `avg`, `mean`
 - `map`, `grep`, `filter`, `reduce`

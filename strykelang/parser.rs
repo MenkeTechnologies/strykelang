@@ -14588,6 +14588,9 @@ impl Parser {
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "pfrequencies" | "pfreq"
             | "template" | "deburr"
+            | "shell_quote" | "shell_split" | "shellwords"
+            | "from_jsonl" | "to_jsonl" | "from_ini" | "to_ini"
+            | "base64url_encode" | "base64url_decode"
             | "interleave" | "ddump" | "stringify" | "str" | "top"
             | "to_json" | "to_csv" | "to_toml" | "to_yaml" | "to_xml"
             | "to_html" | "to_markdown" | "to_table" | "xopen"
@@ -14719,7 +14722,7 @@ impl Parser {
             | "datetime_format_tz" | "datetime_add_seconds"
             | "datetime_from_epoch"
             | "datetime_parse_rfc3339" | "datetime_parse_local"
-            | "datetime_strftime" | "strptime"
+            | "datetime_strftime" | "strptime" | "time_ago" | "from_now"
             | "dateseq" | "dategrep" | "dateround" | "datesort"
             // ── jwt ─────────────────────────────────────────────────────────
             | "jwt_encode" | "jwt_decode" | "jwt_decode_unsafe"
