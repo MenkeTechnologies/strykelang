@@ -1,0 +1,23 @@
+#!/usr/bin/env stryke
+# zsh ARRAY parameter expansion in stryke double-quoted strings — the full
+# grammar, delegated to zshrs's paramsubst engine (zero reimplementation).
+
+var @langs = ("clojure", "racket", "scala", "perl", "scala")
+
+# subscripts (zsh is 1-indexed) and slices
+p "first:   ${langs[1]}"
+p "last2:   ${langs[4,5]}"
+p "all:     ${langs[@]}"
+
+# subscript flags
+p "index:   ${langs[(i)scala]}"      # index of first 'scala'
+p "rmatch:  ${langs[(r)rac*]}"       # reverse-subscript glob match
+
+# array-wide flags
+p "sorted:  ${(o)langs}"             # ascending
+p "rsorted: ${(O)langs}"             # descending
+p "unique:  ${(u)langs}"             # dedup, order-preserving
+p "joined:  ${(j:/:)langs}"          # join with '/'
+
+# array operators
+p "without: ${langs:#scala}"         # drop every element equal to 'scala'

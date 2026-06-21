@@ -5277,6 +5277,53 @@ fn zsh_param_expansion_subscripts_and_flags() {
 }
 
 #[test]
+fn zsh_param_expansion_array_flags_and_ops() {
+    // Array-wide flags and the `:#` filter — bridged as `\@a` so the list does
+    // not flatten into the call's argument pairs.
+    assert_eq!(
+        run_str(r#"my @a = ("b","A","c","a"); "${(o)a}""#),
+        "A a b c" // ascending, ASCII (capitals first)
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("b","A","c","a"); "${(O)a}""#),
+        "c b a A" // descending
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("x","y","z"); "${(j:/:)a}""#),
+        "x/y/z" // join
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("a","b","a","c"); "${(u)a}""#),
+        "a b c" // unique, order-preserving
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("a","b","c"); "${a:#b}""#),
+        "a c" // drop elements equal to 'b'
+    );
+}
+
+#[test]
+fn zsh_param_expansion_hashes() {
+    // Bareword `[key]` subscript → bridged as `\%h` (associative array).
+    assert_eq!(
+        run_str(r#"my %h = (x => "1", y => "2"); "${h[x]}""#),
+        "1"
+    );
+    // `(k)` / `(v)` flags expand keys / values. Order is hash-order; assert
+    // membership rather than a fixed sequence.
+    let keys = run_str(r#"my %h = (x => "1", y => "2"); "${(k)h}""#);
+    assert!(
+        keys.contains('x') && keys.contains('y'),
+        "keys: {keys}"
+    );
+    let vals = run_str(r#"my %h = (x => "1", y => "2"); "${(v)h}""#);
+    assert!(
+        vals.contains('1') && vals.contains('2'),
+        "vals: {vals}"
+    );
+}
+
+#[test]
 fn perl_brace_interpolation_still_works_alongside_zsh() {
     // The zsh routing must not disturb plain Perl `${name}` interpolation.
     assert_eq!(run_str(r#"my $name = "world"; "hi ${name}!""#), "hi world!");
