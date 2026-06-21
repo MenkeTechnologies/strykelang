@@ -56,6 +56,10 @@ pub(crate) struct Cli {
     #[arg(long = "fmt")]
     format_source: bool,
 
+    /// Transpile the input file from zsh to stryke on stdout and exit (no execution)
+    #[arg(long = "from-zsh")]
+    from_zsh: bool,
+
     /// Wall-clock profile: per-line + per-sub timings on stderr (VM: opcode-level lines; JIT off)
     #[arg(long = "profile")]
     profile: bool,
@@ -379,6 +383,7 @@ fn print_cyberpunk_help() {
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
+    println!("  --from-zsh             {G}//{N} Transpile a zsh script to stryke on stdout and exit");
     println!(
         "  --explain CODE         {G}//{N} Print expanded hint for an error code (e.g. E0001) and exit"
     );
@@ -1881,6 +1886,18 @@ fn main() {
 
     let (program_text, data_opt) = stryke::data_section::split_data_section(&raw_script);
     let code = strip_shebang_and_extract(&program_text, cli.extract.is_some());
+
+    // `--from-zsh`: transpile the raw source (treated as zsh) to stryke and exit,
+    // before any Perl/stryke parsing. External commands/pipelines become
+    // `system("...")`; unsupported constructs are reported on stderr.
+    if cli.from_zsh {
+        let (stryke_src, warnings) = stryke::zsh_convert::convert_zsh(&code);
+        for w in &warnings {
+            eprintln!("stryke --from-zsh: {}", w);
+        }
+        print!("{}", stryke_src);
+        return;
+    }
 
     let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
@@ -3439,7 +3456,10 @@ fn run_convert_subcommand(args: &[String]) -> i32 {
         eprintln!("usage: stryke convert [-i] [-d DELIM] FILE...");
         return 2;
     }
-    let opts = stryke::convert::ConvertOptions { output_delim };
+    let opts = stryke::convert::ConvertOptions {
+        output_delim,
+        ..Default::default()
+    };
     let mut errors = 0;
     for f in &files {
         let code = match std::fs::read_to_string(f) {

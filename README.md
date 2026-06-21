@@ -277,6 +277,7 @@ stryke prun *.stk                            # run multiple files in parallel
 stryke -j 4 *.stk                             # run multiple files in parallel (4 threads)
 stryke convert app.pl                        # convert Perl to stryke syntax with |> pipes
 stryke deconvert app.stk                     # convert stryke back to Perl syntax
+stryke --from-zsh script.zsh                 # transpile a zsh script to stryke (AST → AST)
 stryke app.stk                                # warm starts skip parse + compile via ~/.stryke/scripts.rkyv ([0x0F])
 ```
 
@@ -965,6 +966,7 @@ stryke-specific long flags:
 | `--disasm` / `--disassemble` | Print bytecode disassembly to stderr before VM execution |
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
+| `--from-zsh` | Transpile a zsh script to idiomatic stryke on stdout and exit (in-process zsh AST → stryke AST; externals → `system`, builtins → native, `val`/`var` declarations) |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
 | `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`stryke --flame x.stk > flame.svg`) |
 | `--record` | Record one row per stryke run (wall-clock, exit code, argv) to `~/.stryke/perf.sqlite`. Inherits to child processes via `STRYKE_RECORD=1` env, so `s --record t TESTS...` records one row per test file. Query via the `perfview` builtin. |
