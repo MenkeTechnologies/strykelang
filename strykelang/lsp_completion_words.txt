@@ -25,6 +25,9 @@ $>
 $?
 $@
 $ARGV
+$FNR
+$NF
+$NR
 $\
 $^A
 $^C
@@ -47,6 +50,9 @@ $^X
 $_
 $`
 $main::ARGV
+$main::FNR
+$main::NF
+$main::NR
 $main::_
 $main::~
 $stryke::VERSION
@@ -694,6 +700,8 @@ CORE::base58check_decode
 CORE::base58check_encode
 CORE::base64_decode
 CORE::base64_encode
+CORE::base64url_decode
+CORE::base64url_encode
 CORE::base85_decode
 CORE::base85_encode
 CORE::base91_decode
@@ -2512,6 +2520,7 @@ CORE::debruijn
 CORE::debruijn_sequence
 CORE::debug_object
 CORE::debug_val
+CORE::deburr
 CORE::debye_huckel
 CORE::debye_huckel_activity
 CORE::debye_huckel_screening_factor
@@ -3616,7 +3625,10 @@ CORE::from_csv
 CORE::from_csv_line
 CORE::from_digits
 CORE::from_hex
+CORE::from_ini
 CORE::from_json
+CORE::from_jsonl
+CORE::from_now
 CORE::from_oct
 CORE::from_pairs
 CORE::from_toml
@@ -4744,6 +4756,7 @@ CORE::imex_euler_step
 CORE::imex_theta_split
 CORE::impedance_rlc
 CORE::implicit_euler
+CORE::import
 CORE::impulse
 CORE::impulse_response_n
 CORE::impulse_response_step
@@ -7167,6 +7180,7 @@ CORE::nubb
 CORE::nuclear_magneton
 CORE::nucleation_rate_constant
 CORE::nucleolus_lp_step
+CORE::null
 CORE::null_space
 CORE::nullspace
 CORE::num_cpus
@@ -7721,6 +7735,7 @@ CORE::pflat_map_on
 CORE::pflat_maps
 CORE::pflt
 CORE::pfor
+CORE::pforeach
 CORE::pfreq
 CORE::pfrequencies
 CORE::pfrq
@@ -7813,6 +7828,7 @@ CORE::plastic_number
 CORE::plate_reverb_simple
 CORE::plethystic_substitution_value
 CORE::plnorm
+CORE::ploop
 CORE::plot_svg
 CORE::pluck
 CORE::plur
@@ -8126,6 +8142,7 @@ CORE::pwave_velocity_depth
 CORE::pwd
 CORE::pwd_str
 CORE::pweibull
+CORE::pwhile
 CORE::pwi
 CORE::pwm_score
 CORE::pyramid_volume
@@ -9258,6 +9275,9 @@ CORE::sharpe_annualized
 CORE::sharpe_ratio
 CORE::sharpen_kernel
 CORE::shear_tensor_step
+CORE::shell_quote
+CORE::shell_split
+CORE::shellwords
 CORE::shepherd_voltage_step
 CORE::sherwood_number_step
 CORE::shi_int
@@ -9866,6 +9886,7 @@ CORE::strmul
 CORE::strong_pseudoprime
 CORE::strongly_connected
 CORE::strouhal_full
+CORE::strptime
 CORE::strsm
 CORE::struve_h
 CORE::struve_h0
@@ -10087,6 +10108,7 @@ CORE::tema
 CORE::temp_dir
 CORE::tempdir
 CORE::tempfile
+CORE::template
 CORE::template_match
 CORE::tempo_to_ms
 CORE::tempo_to_ms_per_beat
@@ -10165,6 +10187,7 @@ CORE::tie
 CORE::tied
 CORE::tile_xyz_to_lat_lng
 CORE::time
+CORE::time_ago
 CORE::time_dilation
 CORE::time_sig_subdivision
 CORE::timer
@@ -10203,9 +10226,11 @@ CORE::to_float_each
 CORE::to_hash
 CORE::to_hex
 CORE::to_html
+CORE::to_ini
 CORE::to_int
 CORE::to_int_each
 CORE::to_json
+CORE::to_jsonl
 CORE::to_markdown
 CORE::to_md
 CORE::to_oct
@@ -11225,6 +11250,7 @@ CORE::zipmap
 CORE::ziv_lempel_estimate
 CORE::zlexcount
 CORE::zodiac_sign
+CORE::zpexpand
 CORE::zpk2sos_step
 CORE::zpk2tf_step
 CORE::zrangebyscore
@@ -11816,6 +11842,8 @@ base58check_decode
 base58check_encode
 base64_decode
 base64_encode
+base64url_decode
+base64url_encode
 base85_decode
 base85_encode
 base91_decode
@@ -13640,6 +13668,7 @@ debruijn
 debruijn_sequence
 debug_object
 debug_val
+deburr
 debye_huckel
 debye_huckel_activity
 debye_huckel_screening_factor
@@ -14754,7 +14783,10 @@ from_csv
 from_csv_line
 from_digits
 from_hex
+from_ini
 from_json
+from_jsonl
+from_now
 from_oct
 from_pairs
 from_toml
@@ -15887,6 +15919,7 @@ imex_theta_split
 impedance_rlc
 impl
 implicit_euler
+import
 impulse
 impulse_response_n
 impulse_response_step
@@ -20418,6 +20451,9 @@ sharpe_annualized
 sharpe_ratio
 sharpen_kernel
 shear_tensor_step
+shell_quote
+shell_split
+shellwords
 shepherd_voltage_step
 sherwood_number_step
 shi_int
@@ -21027,6 +21063,7 @@ strmul
 strong_pseudoprime
 strongly_connected
 strouhal_full
+strptime
 strsm
 struct
 struve_h
@@ -21249,6 +21286,7 @@ tema
 temp_dir
 tempdir
 tempfile
+template
 template_match
 tempo_to_ms
 tempo_to_ms_per_beat
@@ -21327,6 +21365,7 @@ tie
 tied
 tile_xyz_to_lat_lng
 time
+time_ago
 time_dilation
 time_sig_subdivision
 timer
@@ -21365,9 +21404,11 @@ to_float_each
 to_hash
 to_hex
 to_html
+to_ini
 to_int
 to_int_each
 to_json
+to_jsonl
 to_markdown
 to_md
 to_oct
@@ -22398,6 +22439,7 @@ zipmap
 ziv_lempel_estimate
 zlexcount
 zodiac_sign
+zpexpand
 zpk2sos_step
 zpk2tf_step
 zrangebyscore
