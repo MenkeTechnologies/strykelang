@@ -494,6 +494,31 @@ system("ls -la $name | grep foo")</pre>
       </section>
 
       <section class="tutorial-section">
+        <h2>zsh parameter expansion in strings <em>(world-first)</em></h2>
+        <p>stryke is the first language outside zsh itself to support the full zsh <code>${ … }</code> parameter-expansion grammar <strong>inside its double-quoted strings</strong>. No other scripting language does this — Bash subset re-implementations exist, but stryke runs the real grammar by <strong>delegating to the embedded zshrs <code>paramsubst</code> engine</strong> (the same single-source-of-truth model as <code>glob</code>): zero reimplementation, every operator and flag from <code>man zshexpn</code>.</p>
+        <p>Supported inside <code>"…"</code>:</p>
+        <ul>
+          <li><strong>defaults / alternates:</strong> <code>${x:-d}</code>, <code>${x:=d}</code>, <code>${x:?msg}</code>, <code>${x:+alt}</code></li>
+          <li><strong>trim:</strong> <code>${x#pat}</code> / <code>${x##pat}</code> (prefix), <code>${x%pat}</code> / <code>${x%%pat}</code> (suffix)</li>
+          <li><strong>substitution:</strong> <code>${x/pat/repl}</code>, <code>${x//pat/repl}</code></li>
+          <li><strong>length:</strong> <code>${#x}</code> &nbsp;·&nbsp; <strong>flags:</strong> <code>${(U)x}</code>, <code>${(L)x}</code>, …</li>
+          <li><strong>subscripts &amp; subscript flags:</strong> <code>${a[2]}</code>, <code>${a[2,4]}</code> (slice), <code>${a[(i)val]}</code> (index-of), <code>${a[(r)pat]}</code> (reverse-subscript match)</li>
+        </ul>
+<pre>val $f = "archive.tar.gz"
+p "${f%%.*}"          <span class="comment"># archive</span>
+p "${f##*.}"          <span class="comment"># gz</span>
+p "${(U)f}"           <span class="comment"># ARCHIVE.TAR.GZ</span>
+
+var @a = ("alpha", "beta", "gamma")
+p "${a[2]}"           <span class="comment"># beta   (zsh 1-indexed)</span>
+p "${a[(i)gamma]}"    <span class="comment"># 3      (index-of flag)</span>
+
+val $name = ""
+p "deploy to ${name:-staging}"   <span class="comment"># deploy to staging</span></pre>
+        <p>Gated to stryke mode: under <code>--compat</code>, <code>${ … }</code> keeps pure Perl 5 semantics, so Perl <code>${name}</code> / <code>${$ref}</code> / <code>${EXPR}</code> are untouched. This is also what makes the <a href="#">zsh → stryke transpiler</a> able to pass <code>${ … }</code> through verbatim — the runtime expands it natively.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>String coordinates — bytes vs codepoints</h2>
         <p>Stryke runs string code in two coordinate systems. <strong>Perl 5 builtins stay byte-indexed</strong> for binary-protocol and <code>.pm</code>-source compat. <strong>Stryke extensions are codepoint-indexed</strong> so search positions and slice bounds line up. They are never auto-converted — pick one coordinate system per expression and keep it consistent.</p>
 

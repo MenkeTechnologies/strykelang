@@ -1891,7 +1891,8 @@ fn main() {
     // before any Perl/stryke parsing. External commands/pipelines become
     // `system("...")`; unsupported constructs are reported on stderr.
     if cli.from_zsh {
-        let (stryke_src, warnings) = stryke::zsh_convert::convert_zsh(&code);
+        let ns = stryke::zsh_convert::namespace_from_path(&filename);
+        let (stryke_src, warnings) = stryke::zsh_convert::convert_zsh(&code, &ns);
         for w in &warnings {
             eprintln!("stryke --from-zsh: {}", w);
         }

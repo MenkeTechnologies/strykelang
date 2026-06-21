@@ -4294,6 +4294,7 @@ pub(crate) fn try_builtin(
         "re_escape" => Some(builtin_re_escape(interp, args)),
         "re_split_limit" => Some(builtin_re_split_limit(args)),
         "glob_to_regex" => Some(builtin_glob_to_regex(interp, args)),
+        "zpexpand" => Some(builtin_zpexpand(args)),
         "is_regex_valid" => Some(builtin_is_regex_valid(interp, args)),
         // ── More process/system ──
         "cwd" | "pwd_str" => Some(builtin_cwd()),
@@ -35436,6 +35437,74 @@ fn builtin_glob_to_regex(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResul
     re.push('$');
     Ok(StrykeValue::string(re))
 }
+
+/// `zpexpand(TEMPLATE, name1, val1, …)` — expand a zsh `${…}` parameter
+/// expansion via zshrs's real `paramsubst`. Bridges the passed name/value pairs
+/// into zshrs's parameter table, then runs the expansion. World-first: zsh
+/// parameter-expansion semantics outside zsh, by delegating to the zshrs engine
+/// (single source of truth — no reimplementation).
+fn builtin_zpexpand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    // `paramtab()` is a single global store, so the set-then-expand pair must be
+    // atomic across threads (stryke may call this under Rayon). Serialize it.
+    static ZPEXPAND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = ZPEXPAND_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    // stryke never runs zshrs's `setupvals`/`parseargs`, so two process globals
+    // sit at zeroed defaults that make param expansion silently no-op:
+    //   * EXECOPT (option `exec`) off → `setsparam`/`assignstrvalue` bail at the
+    //     top (`if (unset(EXECOPT)) return;`), so the value never persists;
+    //   * the char-classification table (`inittyptab`) is empty → `fetchvalue`
+    //     can't parse the identifier and returns None even for a set param.
+    // Bring both up once (idempotent).
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        zsh::ported::options::opt_state_set("exec", true);
+        zsh::ported::utils::inittyptab();
+    });
+    // Mirror zshrs's own `psubst_one` test recipe: clear any stale error flag
+    // first, or `paramsubst` short-circuits to empty.
+    zsh::utils::errflag.store(0, std::sync::atomic::Ordering::Relaxed);
+    let template = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let mut i = 1;
+    while i + 1 < args.len() {
+        let name = args[i].to_string();
+        // Bridge the stryke value into zshrs's parameter table: an array (passed
+        // by reference `\@name` to avoid list flattening) goes in via
+        // `setaparam` so subscripts / `(i)`/`(r)`/`(k)` flags work; a scalar via
+        // `setsparam`.
+        let arr_elems = args[i + 1]
+            .as_array_ref()
+            .map(|r| r.read().iter().map(|e| e.to_string()).collect::<Vec<_>>())
+            .or_else(|| {
+                args[i + 1]
+                    .as_array_vec()
+                    .map(|v| v.iter().map(|e| e.to_string()).collect())
+            });
+        match arr_elems {
+            Some(v) => {
+                zsh::ported::params::setaparam(&name, v);
+            }
+            None => {
+                zsh::ported::params::setsparam(&name, &args[i + 1].to_string());
+            }
+        }
+        i += 2;
+    }
+    let mut ret_flags: i32 = 0;
+    let (full, _pos, nodes) =
+        zsh::ported::subst::paramsubst(&template, 0, false, 0i32, &mut ret_flags);
+    // A slice / array-valued expansion (`${arr[2,4]}`, `${arr[@]}`) returns
+    // multiple nodes — join them with a space, the way a scalar interpolation of
+    // an array does. Otherwise use the scalar form.
+    let out = if nodes.len() > 1 {
+        nodes.join(" ")
+    } else if !full.is_empty() {
+        full
+    } else {
+        nodes.into_iter().next().unwrap_or_default()
+    };
+    Ok(StrykeValue::string(out))
+}
+
 /// `is_regex_valid` — Test whether the argument is regex valid. Returns 1 (true) or 0 (false). Defaults to `$_`.
 fn builtin_is_regex_valid(interp: &VMHelper, args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     Ok(bool_iv(
