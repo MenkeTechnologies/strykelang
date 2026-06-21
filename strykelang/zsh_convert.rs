@@ -50,6 +50,12 @@
 //! brace groups `{ … }` are inlined (subshell environment isolation is not
 //! preserved, with a warning).
 //!
+//! Every user-defined function is emitted under a file-derived namespace —
+//! `log() { … }` in `deploy.zsh` becomes `fn deploy::log { … }` and calls become
+//! `deploy::log(...)`. This is required: a function whose name collides with a
+//! stryke builtin (`log`, `sum`, …) cannot be redefined in `package main`, and
+//! an unqualified call resolves to the builtin instead of the script's function.
+//!
 //! Control-flow and stack builtins map natively: `return [v]`, `break` → `last`,
 //! `continue` → `next`, `exit [n]`, `shift` → `shift @ARGV`/`@_`, `pushd`/`popd`,
 //! `pwd` → `cwd`; `:`/`true` are dropped as no-ops.
@@ -91,6 +97,13 @@ struct Ctx {
     /// Names of functions defined anywhere in the script — a call to one of
     /// these becomes a native stryke call, not `system(...)`.
     funcs: HashSet<String>,
+    /// Namespace (package) every user-defined function is emitted under — both
+    /// its definition (`fn FILE::name`) and its calls (`FILE::name(...)`).
+    /// Derived from the source filename. A namespace is required because a
+    /// function name colliding with a stryke builtin (`log`, `sum`, …) cannot be
+    /// redefined in `package main`, and an unqualified call resolves to the
+    /// builtin rather than the script's function.
+    ns: String,
 }
 
 impl Ctx {
@@ -100,7 +113,13 @@ impl Ctx {
             scopes: Vec::new(),
             fn_depth: 0,
             funcs: HashSet::new(),
+            ns: String::new(),
         }
+    }
+
+    /// Namespace-qualified name for a user-defined function.
+    fn fn_name(&self, name: &str) -> String {
+        format!("{}::{}", self.ns, name)
     }
 
     fn warn(&mut self, w: impl Into<String>) {
@@ -130,14 +149,36 @@ impl Ctx {
     }
 }
 
-/// Convert zsh `src` to stryke source. Returns `(stryke_source, warnings)`.
-pub fn convert_zsh(src: &str) -> (String, Vec<String>) {
+/// Derive a valid stryke package name from the source path: the file stem with
+/// non-identifier characters replaced by `_` (e.g. `my-deploy.zsh` → `my_deploy`,
+/// stdin `-` → `zsh`).
+pub fn namespace_from_path(path: &str) -> String {
+    let stem = std::path::Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .filter(|s| *s != "-" && !s.is_empty())
+        .unwrap_or("zsh");
+    let mut ns: String = stem
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .collect();
+    if ns.chars().next().map_or(true, |c| !c.is_ascii_alphabetic() && c != '_') {
+        ns.insert(0, 'z');
+    }
+    ns
+}
+
+/// Convert zsh `src` to stryke source. `namespace` is the package every
+/// user-defined function is emitted under (see [`namespace_from_path`]).
+/// Returns `(stryke_source, warnings)`.
+pub fn convert_zsh(src: &str, namespace: &str) -> (String, Vec<String>) {
     let zprog: ZshProgram = {
         let _guard = PARSE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         zsh::ported::parse::parse_init(src);
         zsh::ported::parse::parse()
     };
     let mut ctx = Ctx::new();
+    ctx.ns = namespace.to_string();
     // Pre-collect every function name so calls resolve to native stryke calls
     // (even forward references) instead of being shelled out via `system`.
     collect_funcs(&zprog.lists, &mut ctx.funcs);
@@ -358,7 +399,7 @@ fn map_funcdef(z: &ZshFuncDef, ctx: &mut Ctx) -> Vec<Statement> {
         .iter()
         .map(|name| {
             st(StmtKind::SubDecl {
-                name: name.clone(),
+                name: ctx.fn_name(name),
                 params: Vec::new(),
                 body: body.clone(),
                 prototype: None,
@@ -691,9 +732,9 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
         })),
         // `:` and `true` are deliberate no-ops — drop them silently.
         ":" | "true" => None,
-        // A call to a function defined in the script → native stryke call.
+        // A call to a function defined in the script → native, namespaced call.
         _ if ctx.funcs.contains(&head) => Some(ex(ExprKind::FuncCall {
-            name: head.clone(),
+            name: ctx.fn_name(&head),
             args: rest.iter().map(|w| word_to_expr(w, in_fn)).collect(),
         })),
         _ if is_builtin(&head) => {
@@ -822,6 +863,9 @@ fn scalar_value_expr(v: &str, in_fn: bool) -> Expr {
     if let Some(cmd) = whole_cmdsub(v) {
         return ex(ExprKind::Qx(Box::new(ex(ExprKind::String(cmd)))));
     }
+    // Parameter expansions (`${y:-d}`, `${f#*.}`, `${(U)x}`, …) flow through
+    // `word_to_expr` as raw `${ … }` text — stryke's double-quoted string parser
+    // expands them natively via zshrs.
     word_to_expr(v, in_fn)
 }
 
@@ -1183,6 +1227,14 @@ fn interp_parts(w: &str, in_fn: bool) -> Vec<StringPart> {
                         i += 2 + close + 1;
                         continue;
                     }
+                    // Any other `${ … }` parameter expansion (`:-`, `#`, `%`,
+                    // `/`, `(flags)`, subscripts, `${#x}`, …) → pass the raw zsh
+                    // form straight through. stryke's double-quoted string parser
+                    // expands it natively via zshrs's `paramsubst` (see
+                    // `parser.rs::zsh_param_form`), so no special lowering here.
+                    lit.push_str(&format!("${{{}}}", name));
+                    i += 2 + close + 1;
+                    continue;
                 }
             } else if next.is_ascii_alphabetic() || next == b'_' {
                 let start = i + 1;
@@ -1470,7 +1522,7 @@ mod tests {
     use super::*;
 
     fn conv(src: &str) -> String {
-        convert_zsh(src).0
+        convert_zsh(src, "t").0
     }
 
     #[test]
@@ -1607,7 +1659,7 @@ mod tests {
     fn control_flow_builtins_map_natively() {
         // `return`/`break`/`continue` previously fell through to a warning and
         // were dropped — they are core control flow and must convert.
-        assert!(conv("fn() {\nreturn 5\n}\n").contains("return 5"));
+        assert!(conv("helper() {\nreturn 5\n}\n").contains("return 5"));
         let loops = conv("for f in a b\ndo\nbreak\ncontinue\ndone\n");
         assert!(loops.contains("last"), "break → last:\n{loops}");
         assert!(loops.contains("next"), "continue → next:\n{loops}");
@@ -1623,7 +1675,7 @@ mod tests {
         assert!(conv("popd\n").contains("popd("), "popd");
         assert!(conv("pwd\n").contains("cwd("), "pwd → cwd");
         // `:` / `true` are no-ops: emitted as nothing, no warning.
-        let noop = convert_zsh(":\ntrue\n");
+        let noop = convert_zsh(":\ntrue\n", "t");
         assert!(noop.1.is_empty(), "no warnings for no-ops: {:?}", noop.1);
     }
 
@@ -1639,13 +1691,36 @@ mod tests {
 
     #[test]
     fn user_function_call_is_native() {
-        // A call to a script-defined function is a stryke call, not system().
+        // A call to a script-defined function is a native, namespaced stryke
+        // call, not system(). The namespace (`t::`) is derived from the file.
         let out = conv("greet() {\necho hi\n}\ngreet world\n");
+        assert!(out.contains("fn t::greet"), "namespaced definition:\n{out}");
         assert!(
-            out.contains("greet(\"world\")") || out.contains("greet \"world\""),
-            "native call:\n{out}"
+            out.contains("t::greet(\"world\")") || out.contains("t::greet \"world\""),
+            "namespaced call:\n{out}"
         );
         assert!(!out.contains("system(\"greet"), "must not shell out:\n{out}");
+    }
+
+    #[test]
+    fn colliding_function_name_is_namespaced() {
+        // `log` is a stryke builtin — defining it in `package main` is an error,
+        // and an unqualified `log` call resolves to the builtin. The namespace
+        // makes both the definition and the call resolve to the script's `log`.
+        let out = conv("log() {\necho hi\n}\nlog start\n");
+        assert!(out.contains("fn t::log"), "namespaced def:\n{out}");
+        assert!(
+            out.contains("t::log(\"start\")") || out.contains("t::log \"start\""),
+            "namespaced call:\n{out}"
+        );
+    }
+
+    #[test]
+    fn namespace_from_path_sanitizes() {
+        assert_eq!(namespace_from_path("/x/deploy.zsh"), "deploy");
+        assert_eq!(namespace_from_path("my-deploy.sh"), "my_deploy");
+        assert_eq!(namespace_from_path("-"), "zsh");
+        assert_eq!(namespace_from_path("/x/9lives.zsh"), "z9lives");
     }
 
     #[test]

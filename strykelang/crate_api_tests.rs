@@ -5241,3 +5241,43 @@ fn run_foreach_accumulator() {
 fn run_while_counter() {
     assert_eq!(run_int("my $i = 0; while ($i < 5) { $i = $i + 1; } $i"), 5);
 }
+
+fn run_str(code: &str) -> String {
+    run(code).expect("run").to_string()
+}
+
+#[test]
+fn zsh_param_expansion_scalar_forms_in_dq_string() {
+    // World-first: zsh `${ … }` parameter expansion inside stryke double-quoted
+    // strings, delegated to the embedded zshrs `paramsubst` engine.
+    assert_eq!(run_str(r#"my $f = "a.tar.gz"; "${f##*.}""#), "gz");
+    assert_eq!(run_str(r#"my $f = "a.tar.gz"; "${f%%.*}""#), "a");
+    assert_eq!(run_str(r#"my $f = "a.tar.gz"; "${f#*.}""#), "tar.gz");
+    assert_eq!(run_str(r#"my $x = "hi"; "${(U)x}""#), "HI");
+    assert_eq!(run_str(r#"my $x = "HI"; "${(L)x}""#), "hi");
+    assert_eq!(run_str(r#"my $y = ""; "${y:-default}""#), "default");
+    assert_eq!(run_str(r#"my $f = "x.txt"; "${f/x/y}""#), "y.txt");
+    assert_eq!(run_str(r#"my $s = "hello"; "${#s}""#), "5");
+}
+
+#[test]
+fn zsh_param_expansion_subscripts_and_flags() {
+    assert_eq!(
+        run_str(r#"my @a = ("alpha","beta","gamma"); "${a[2]}""#),
+        "beta"
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("alpha","beta","gamma"); "${a[2,3]}""#),
+        "beta gamma"
+    );
+    assert_eq!(
+        run_str(r#"my @a = ("alpha","beta","gamma"); "${a[(i)beta]}""#),
+        "2"
+    );
+}
+
+#[test]
+fn perl_brace_interpolation_still_works_alongside_zsh() {
+    // The zsh routing must not disturb plain Perl `${name}` interpolation.
+    assert_eq!(run_str(r#"my $name = "world"; "hi ${name}!""#), "hi world!");
+}
