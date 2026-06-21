@@ -461,7 +461,7 @@ for val $row (kv_scan($db, "users:")) {
         <p>Surface: <code>kv_open</code>, <code>kv_put</code>, <code>kv_get</code>, <code>kv_del</code>, <code>kv_exists</code>, <code>kv_keys</code>, <code>kv_scan</code>, <code>kv_len</code>, <code>kv_commit</code>, <code>kv_batch</code>, <code>kv_close</code>, <code>kv_stats</code>.</p>
       </section>
 
-      <section class="tutorial-section">
+      <section class="tutorial-section" id="transpiler">
         <h2>zsh → stryke transpiler <em>(world-first)</em></h2>
         <p><code>stryke --from-zsh script.zsh</code> rewrites a zsh script into idiomatic stryke. It is not a text or regex munger: stryke <strong>embeds the zshrs parser</strong>, parses the script into a real zsh AST in-process, maps that tree node-for-node onto the stryke AST, and emits source through the same converter that powers the Perl&nbsp;→&nbsp;stryke path. No subprocess, no JSON hand-off, no string heuristics — one program holding both grammars and translating between two ASTs. Existing shell transpilers (bash2py, sh→awk one-liners, etc.) operate on token streams or text; cross-language <em>AST-to-AST</em> conversion driven by the target language's own embedded parser for the source language is the novel primitive.</p>
         <p>The translation is structural and classifies every command:</p>
@@ -523,7 +523,7 @@ p "${(k)conf}"        <span class="comment"># host port         (keys)</span>
 
 val $name = ""
 p "deploy to ${name:-staging}"   <span class="comment"># deploy to staging</span></pre>
-        <p>Gated to stryke mode: under <code>--compat</code>, <code>${ … }</code> keeps pure Perl 5 semantics, so Perl <code>${name}</code> / <code>${$ref}</code> / <code>${EXPR}</code> are untouched. This is also what makes the <a href="#">zsh → stryke transpiler</a> able to pass <code>${ … }</code> through verbatim — the runtime expands it natively.</p>
+        <p>Gated to stryke mode: under <code>--compat</code>, <code>${ … }</code> keeps pure Perl 5 semantics, so Perl <code>${name}</code> / <code>${$ref}</code> / <code>${EXPR}</code> are untouched. This is also what makes the <a href="#transpiler">zsh → stryke transpiler</a> able to pass <code>${ … }</code> through verbatim — the runtime expands it natively.</p>
         <h3>Explicit control — <code>zpexpand</code></h3>
         <p>The string sugar handles the unambiguous common case. A couple of forms are statically ambiguous — <code>${#x}</code> (string length of a scalar vs. element count of an array) and a positional like <code>${1:-d}</code> — so the parser picks the scalar reading. For full control, call the <code>zpexpand</code> builtin directly and pass each variable with its <strong>real type</strong>, so zshrs sees pure zsh semantics. Arrays must be passed <strong>by reference</strong> (<code>\@arr</code>) so the list doesn't flatten into the name/value pairs.</p>
 <pre>var @arr = (1, 2, 3, 4)
@@ -1650,42 +1650,52 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
 
       <section class="tutorial-section">
         <h2>CLI flags (common)</h2>
+        <p>All stock <code>perl</code> flags are supported: <code>-0</code>, <code>-a</code>, <code>-c</code>, <code>-C</code>, <code>-d</code>, <code>-D</code>, <code>-e</code>, <code>-E</code>, <code>-f</code>, <code>-F</code>, <code>-g</code>, <code>-h</code>, <code>-i</code>, <code>-I</code>, <code>-l</code>, <code>-m</code>, <code>-M</code>, <code>-n</code>, <code>-p</code>, <code>-s</code>, <code>-S</code>, <code>-t</code>, <code>-T</code>, <code>-u</code>, <code>-U</code>, <code>-v</code>, <code>-V</code>, <code>-w</code>, <code>-W</code>, <code>-x</code>, <code>-X</code>. Perl-style single-dash (<code>-version</code>, <code>-help</code>) and GNU-style double-dash (<code>--version</code>, <code>--help</code>) long forms both work. Bundled switches expand: <code>-Mstrict</code> &rarr; <code>-M strict</code>, <code>-I/tmp</code> &rarr; <code>-I /tmp</code>, <code>-V:version</code> &rarr; <code>-V version</code>, <code>-lane</code> &rarr; <code>-l -a -n -e</code>.</p>
 <pre>-e CODE                // one-line program (multiple -e's allowed)
 -E CODE                // like -e, but enables all optional features
 -c                     // syntax check only
+-n / -p / -i           // stdin line-mode + in-place edit
+-j N / --threads N     // number of parallel rayon threads
 --lint / --check       // parse + compile bytecode without running
---disasm               // print bytecode disassembly before VM run
+--disasm / --disassemble  // print bytecode disassembly before VM run
 --ast                  // dump parsed AST as JSON and exit
 --fmt                  // pretty-print parsed Perl to stdout and exit
---profile              // wall-clock profile stderr (flamegraph-ready)
---flame                // flamegraph: terminal bars (TTY) or SVG
+--from-zsh             // transpile a zsh script to stryke on stdout and exit
+--profile              // wall-clock profile: per-line + per-sub timings on stderr
+--flame                // flamegraph: terminal bars (TTY) or SVG when piped
+--record               // record each run (wall-clock, exit, argv) to ~/.stryke/perf.sqlite
 --no-jit               // disable Cranelift JIT (bytecode interpreter only)
 --compat               // Perl 5 strict-compat: disable all stryke extensions
--n / -p / -i           // stdin line-mode + in-place edit
--j N                   // parallel threads for multi-file execution
+--no-interop           // reject Perl-isms; force idiomatic stryke (fn/p/rev/len)
+--explain CODE         // print expanded hint for an error code (e.g. E0001)
 --script               // force script lookup when name conflicts with builtin
 -d -- SCRIPT           // TTY debugger (perl -d style REPL on stdin/stderr)
 --dap                  // DAP server over stdio (Debug Adapter Protocol)
 --dap HOST:PORT        // DAP server over TCP (JetBrains plugin transport)
 --lsp                  // LSP server over stdio (semantic tokens, hover, ...)
+--remote-worker        // persistent cluster worker over stdio
+--remote-worker-v1     // legacy one-shot cluster worker over stdio
 
 // Subcommands
 s build SCRIPT -o OUT  // AOT compile to standalone binary
 s build --project DIR  // bundle project (main.stk + lib/) into binary
+s docs [TOPIC]         // interactive reference book (vim-style nav)
+s serve [PORT] [FILE]  // HTTP server (default port 8000): static / script / -e
 s check FILE...        // parse + compile without executing (CI/editor)
 s disasm FILE          // disassemble bytecode
-s profile FILE         // run with profiling (--flame for SVG)
+s profile FILE         // run with profiling (--flame for SVG, --json, -o FILE)
 s fmt -i FILE...       // format source files in place
-s bench                // run benchmarks from bench/ or benches/
+s minify -i FILE...    // strip comments/POD/blanks, collapse to one line
+s bench [FILE|DIR]     // run benchmarks from bench/ or benches/
 s test                 // run tests from t/
-s init NAME            // scaffold new project (lib/, bench/, t/)
+s init NAME            // scaffold new project (main.stk, lib/, bench/, t/)
 s repl --load FILE     // REPL with pre-loaded file
-s lsp                  // language server over stdio
+s lsp                  // language server over stdio (same as --lsp)
 s completions zsh      // emit shell completions
 s ast FILE             // dump AST as JSON
 s prun FILE...         // run multiple files in parallel
-s convert FILE...      // convert Perl to stryke syntax
-s deconvert FILE...    // convert stryke back to Perl
+s convert -i FILE...   // convert Perl to stryke syntax (|> pipes)
+s deconvert -i FILE... // convert stryke back to Perl
 s --remote-worker      // worker process for distributed cluster</pre>
 
         <h3>Command Resolution Hierarchy</h3>
@@ -1713,6 +1723,32 @@ s faf                       <span class="comment"># fire_and_forget alias (same 
 
 <span class="comment"># Force script when name conflicts</span>
 s --script basename         <span class="comment"># run ./basename script, not builtin</span></pre>
+
+        <h3><code>getopts</code> — parse your own script's argv</h3>
+        <p>The flags above are <em>stryke's own</em> CLI switches. To parse the argv of a script <em>you</em> wrote, stryke ships a <code>getopts</code> builtin shaped after Perl's <code>Getopt::Long</code>. It returns a hashref of canonical-name &rarr; value and removes consumed options from <code>@ARGV</code>, leaving the positional arguments behind. Called with just a SPECS list it operates on <code>@ARGV</code> directly — no <code>\@ARGV</code> boilerplate.</p>
+<pre>my %opts = %{ getopts([
+    "verbose|v",         <span class="comment"># bool flag (present = 1)</span>
+    "file|f=s",          <span class="comment"># required string</span>
+    "count|n=i",         <span class="comment"># required int</span>
+    "rate=f",            <span class="comment"># required float</span>
+    "out:s",             <span class="comment"># optional string ("" if absent)</span>
+    "tag|t=s@",          <span class="comment"># repeatable → arrayref</span>
+    "define|D=s%",       <span class="comment"># --define key=val → hashref</span>
+    "debug+",            <span class="comment"># incremental: -ddd → 3</span>
+    "color!",            <span class="comment"># negatable: --no-color → 0</span>
+]) };
+
+<span class="comment"># Hash form lets each spec carry a default:</span>
+my %opts = %{ getopts({
+    "verbose|v" =&gt; 0,
+    "count|n=i" =&gt; 10,
+    "tag|t=s@"  =&gt; [],
+}) };
+
+<span class="comment"># Explicit-array-ref form (parse a list other than @ARGV):</span>
+my @args = ("--verbose", "file.txt");
+my %opts = %{ getopts(\@args, [ "verbose|v" ]) };</pre>
+        <p>Spec language is a subset of <code>Getopt::Long</code>: <code>name</code> (bool), <code>n|name</code> (aliases, first is canonical), <code>=s</code> / <code>=i</code> / <code>=f</code> (required string / int / float), <code>:s</code> (optional), <code>=s@</code> (repeatable arrayref), <code>=s%</code> (<code>key=val</code> hashref), <code>+</code> (incremental count), <code>!</code> (negatable via <code>--no-NAME</code>).</p>
       </section>
 
       <section class="tutorial-section" id="editor-tooling" style="border: 2px solid #b967ff; background: linear-gradient(135deg, rgba(185,103,255,0.08) 0%, transparent 50%);">
