@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.15 · 10336 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.20 · 10337 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -332,7 +332,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8585</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8586</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -13191,7 +13191,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8585 topics</p>
+      <p class="chapter-meta">8586 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -64536,6 +64536,19 @@ p zigzag_encode(1)   # 2
         <p><code>zodiac_sign(month, day) → string</code> — Western tropical zodiac sign for a given month/day.</p>
         <pre><code class="lang-perl">p zodiac_sign(7, 15)  # Cancer
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-zpexpand">
+        <h3><a class="doc-anchor" href="#doc-zpexpand">#</a> <code>zpexpand</code></h3>
+        <p><code>zpexpand(TEMPLATE, name, value, …)</code> — run a zsh <code>${ … }</code> <strong>parameter expansion</strong> and return the result. World-first: zsh parameter-expansion semantics outside zsh, backed by <code>zsh::ported::subst::paramsubst</code> from zshrs — single source of truth, zero stryke-side reimplementation, so every operator and flag from <code>man zshexpn</code> works.</p>
+        <p>Normally you don&#39;t call this directly: stryke&#39;s double-quoted strings expand <code>${ … }</code> natively (<code>&quot;${(U)x}&quot;</code>, <code>&quot;${f##*.}&quot;</code>, <code>&quot;${a[2]}&quot;</code>), lowering to <code>zpexpand</code> for you. Call it explicitly for the cases the string sugar can&#39;t disambiguate at parse time, supplying each referenced variable&#39;s <strong>real type</strong> so zshrs sees pure zsh semantics:</p>
+        <pre><code class="lang-perl">var @arr = (1, 2, 3, 4)
+p zpexpand(&#39;${#arr}&#39;, &quot;arr&quot;, \@arr)     # 4   — array element count (not string length)
+p zpexpand(&#39;${arr[1]}&#39;, &quot;arr&quot;, \@arr)   # 1   — pure zsh 1-indexing
+val $f = &quot;deploy.sh&quot;
+p zpexpand(&#39;${1:-stage}&#39;, &quot;1&quot;, $f)       # deploy.sh — explicit positional, not capture $1
+</code></pre>
+        <p><strong>Argument convention:</strong> the first argument is the raw <code>${ … }</code> template (single-quote it so stryke doesn&#39;t pre-interpolate); the rest are <code>name, value</code> pairs bridged into zshrs&#39;s parameter table. <strong>Pass arrays by reference</strong> (<code>\@arr</code>, not <code>@arr</code>) so the list does not flatten into the pairs — <code>setaparam</code> then makes it a zsh array; scalars go in via <code>setsparam</code>. Supports defaults (<code>:-</code>/<code>:=</code>/<code>:?</code>/<code>:+</code>), trim (<code>#</code>/<code>##</code>/<code>%</code>/<code>%%</code>), substitution (<code>/</code>//<code>), length (</code>${#x}<code>), flags (</code>(U)<code>/</code>(L)<code>/…), and subscripts + subscript flags (</code>${a[2,4]}<code>, </code>${a[(i)v]}<code>, </code>${a[(r)pat]}`).</p>
+        <p>See also: <code>glob</code> (the same zshrs-delegation model for filename generation).</p>
       </article>
       <article class="doc-entry" id="doc-zpk2sos-step">
         <h3><a class="doc-anchor" href="#doc-zpk2sos-step">#</a> <code>zpk2sos_step</code></h3>
