@@ -20146,12 +20146,22 @@ impl Parser {
                     // `$`, `\`, or contains operator/punctuation chars, treat as Perl
                     // expression and emit a scalar deref. Otherwise, plain variable name.
                     let trimmed = inner.trim();
-                    let is_expr = trimmed.starts_with('$')
+                    if !crate::compat_mode() && zsh_param_form(trimmed) {
+                        // zsh parameter expansion (`${x:-d}`, `${x#p}`, `${(U)x}`,
+                        // `${#x}`, …) — world-first: stryke supports the full zsh
+                        // `${ … }` grammar inside double-quoted strings by
+                        // delegating to zshrs's `paramsubst` engine at runtime via
+                        // the `zpexpand` builtin (no reimplementation). Gated off
+                        // under `--compat`, where `${ … }` keeps pure Perl 5
+                        // semantics.
+                        parts.push(StringPart::Expr(build_zpexpand_expr(trimmed, line)));
+                    } else {
+                    let mut base: Expr = if trimmed.starts_with('$')
                         || trimmed.starts_with('\\')
                         || trimmed.starts_with('@')   // `${@arr}` rare but valid
                         || trimmed.starts_with('%')   // `${%h}`   rare but valid
-                        || trimmed.contains(['(', '+', '-', '*', '/', '.', '?', '&', '|']);
-                    let mut base: Expr = if is_expr {
+                        || trimmed.contains(['(', '+', '-', '*', '/', '.', '?', '&', '|'])
+                    {
                         // Re-parse the inner content as a Perl expression. Wrap in
                         // `Deref { kind: Sigil::Scalar }` to dereference the resulting
                         // scalar reference (Perl: `${$r}` ≡ `$$r`).
@@ -20182,6 +20192,7 @@ impl Parser {
                     // chains thereafter.
                     base = self.interp_chain_subscripts(&chars, &mut i, base, line);
                     parts.push(StringPart::Expr(base));
+                    }
                 } else if chars[i] == '^' {
                     // `$^V`, `$^O`, … — name stored as `^V`, `^O`, … (see [`Interpreter::get_special_var`]).
                     let mut name = String::from("^");
@@ -23232,4 +23243,145 @@ mod tests {
         parse_ok("my $h = +{n=>10}; my @list = ($h->{n} += 5, $h->{n} += 5)");
         parse_ok("my $h = +{n=>10}; my $double = ($h->{n} -= 1) * 2");
     }
+}
+
+// ── zsh parameter expansion inside double-quoted strings ─────────────────────
+// Detection + lowering for `${ … }` zsh parameter-expansion forms. The actual
+// expansion is performed at runtime by zshrs's `paramsubst` (via the `zpexpand`
+// builtin) — these helpers only recognize the form and gather which variables
+// to bridge. Gated off under `--compat` at the call site.
+
+/// True when a `${ … }` body is a zsh parameter expansion rather than a Perl
+/// `${name}` / `${$ref}` / `${EXPR}`: a `(flags)name` or `${#name}` length
+/// prefix, or a name immediately followed by a zsh operator (`:`, `#`, `%`, `/`).
+fn zsh_param_form(body: &str) -> bool {
+    let b = body.as_bytes();
+    if b.is_empty() || b[0] == b'$' || b[0] == b'\\' {
+        return false;
+    }
+    if b[0] == b'(' {
+        // `(flags)name` — flags then an identifier / positional / `$`.
+        if let Some(rp) = body.find(')') {
+            return body[rp + 1..]
+                .bytes()
+                .next()
+                .map_or(false, |c| c.is_ascii_alphanumeric() || c == b'_' || c == b'$');
+        }
+        return false;
+    }
+    if b[0] == b'#' {
+        // `${#name}` length.
+        return body[1..]
+            .bytes()
+            .next()
+            .map_or(false, |c| c.is_ascii_alphanumeric() || c == b'_');
+    }
+    let mut i = 0;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i == 0 {
+        return false;
+    }
+    // `[` → subscript / subscript-flag form (`${arr[2]}`, `${arr[(r)pat]}`).
+    matches!(b.get(i), Some(b':') | Some(b'#') | Some(b'%') | Some(b'/') | Some(b'['))
+}
+
+/// Lower a zsh `${ body }` form to `zpexpand('${body}', "name", $name, …)` — the
+/// raw template (single-quoted so stryke leaves it intact) plus each referenced
+/// variable so the builtin can bridge their values into zshrs's parameter table.
+fn build_zpexpand_expr(body: &str, line: usize) -> Expr {
+    let mut args = vec![Expr {
+        kind: ExprKind::String(format!("${{{}}}", body)),
+        line,
+    }];
+    // A name with a `[…]` subscript is an array — bridge it as `@name` so the
+    // subscript / subscript-flag (`(i)`,`(r)`,…) has an array to index.
+    let arrays = subscripted_names(body);
+    for name in zsh_referenced_params(body) {
+        args.push(Expr {
+            kind: ExprKind::String(name.clone()),
+            line,
+        });
+        // Arrays are passed by reference (`\@name`, lowered to `ScalarRef`) so
+        // the list does not flatten into the call's argument pairs; the builtin
+        // derefs them.
+        let val = if arrays.contains(&name) {
+            ExprKind::ScalarRef(Box::new(Expr {
+                kind: ExprKind::ArrayVar(name),
+                line,
+            }))
+        } else {
+            ExprKind::ScalarVar(name)
+        };
+        args.push(Expr { kind: val, line });
+    }
+    Expr {
+        kind: ExprKind::FuncCall {
+            name: "zpexpand".to_string(),
+            args,
+        },
+        line,
+    }
+}
+
+/// Names that appear with a `[` subscript in a `${ … }` body (so they must be
+/// bridged as arrays).
+fn subscripted_names(body: &str) -> Vec<String> {
+    let b = body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i].is_ascii_alphabetic() || b[i] == b'_' {
+            let s = i;
+            while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+                i += 1;
+            }
+            if b.get(i) == Some(&b'[') {
+                out.push(body[s..i].to_string());
+            }
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Variables referenced by a `${ … }` body: the leading parameter (after any
+/// `(flags)` / `#` prefix) plus every `$name` mentioned in the operator/word.
+fn zsh_referenced_params(inner: &str) -> Vec<String> {
+    let b = inner.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = inner.find(')') {
+            i = rp + 1;
+        }
+    }
+    while i < b.len() && b[i] == b'#' {
+        i += 1;
+    }
+    let s = i;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i > s {
+        out.push(inner[s..i].to_string());
+    }
+    while i < b.len() {
+        if b[i] == b'$' && i + 1 < b.len() && (b[i + 1].is_ascii_alphabetic() || b[i + 1] == b'_') {
+            let ds = i + 1;
+            let mut de = ds;
+            while de < b.len() && (b[de].is_ascii_alphanumeric() || b[de] == b'_') {
+                de += 1;
+            }
+            out.push(inner[ds..de].to_string());
+            i = de;
+        } else {
+            i += 1;
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
