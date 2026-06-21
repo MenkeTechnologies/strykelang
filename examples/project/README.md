@@ -59,7 +59,7 @@ s test examples/project/t
 - **Process**: `process_list`
 - **Git** (libgit2): `git_root`, `git_branches`, `git_log`, `git_files`, `git_authors`
 - **Enums**: `enum ThreatLevel { HIGH, WARN, OK }`
-- **Functions**: `fn scan_system`, `fn analyze_threats`, `fn generate_report`
+- **Functions**: `fn Project::Scanner::scan_system`, `fn Project::Threats::analyze_threats`, `fn Project::Reporter::generate_report`
 - **PDF generation**: `to_pdf`
 - **Terminal art**: `cyber_banner`, colored output with ANSI
 - **Testing**: `assert_eq`, `assert_gt`, `assert_ok`, `assert_contains`, `test_run`

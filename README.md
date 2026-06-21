@@ -2645,7 +2645,7 @@ stryke controller --bind 10.0.0.1    # specific interface
 **`eval` example session:**
 
 ```text
-stryke controller v0.17.9
+stryke controller v0.17.16
 > status
 node-01    16   64GB         idle      120s
 node-02    16   64GB         idle      118s

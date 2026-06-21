@@ -37,7 +37,7 @@
 
   ## Distributed-compute API (congregation/pray/annex) — Tier 5 deferrals
 
-  These limitations live alongside the 28-verb scriptable distributed API
+  These limitations live alongside the 29-verb scriptable distributed API
   (see README §0x10c). All are real architectural changes, not workaround
   candidates. Tracking here so future sessions don't re-discover them.
 

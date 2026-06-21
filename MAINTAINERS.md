@@ -18,7 +18,7 @@ _To be populated when the maintainer team is assembled._
 | Handle | Role | Areas |
 |---|---|---|
 | (TBD) | Lead maintainer | release management, CI |
-| (TBD) | Builtins / runtime | `builtins.rs`, `interpreter.rs`, `vm.rs` |
+| (TBD) | Builtins / runtime | `builtins.rs`, `vm_helper.rs`, `vm.rs` |
 | (TBD) | Parser / compiler | `parser.rs`, `compiler.rs`, `ast.rs` |
 | (TBD) | Parallel / cluster | `par_*`, `cluster.rs`, `agent.rs`, `controller.rs` |
 | (TBD) | LSP / docs | `lsp.rs`, `docs/` |
