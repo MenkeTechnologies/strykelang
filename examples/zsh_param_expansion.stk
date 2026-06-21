@@ -1,0 +1,37 @@
+#!/usr/bin/env stryke
+# zsh parameter expansion inside stryke double-quoted strings (world-first
+# outside zsh). The full `${ … }` grammar is delegated to zshrs's `paramsubst`
+# engine — zero reimplementation. Gated off under `--compat`.
+
+val $file = "archive.tar.gz"
+val $name = ""
+
+# ── defaults / alternates ──────────────────────────────────────────────
+p "env:     ${name:-staging}"        # staging  (unset/empty → default)
+
+# ── trim: prefix (#/##) and suffix (%/%%), shortest vs longest ─────────
+p "base:    ${file%%.*}"             # archive
+p "ext:     ${file##*.}"             # gz
+p "noext:   ${file%.*}"              # archive.tar
+
+# ── substitution ───────────────────────────────────────────────────────
+p "swap:    ${file/tar/zip}"         # archive.zip.gz
+
+# ── length + case flags ────────────────────────────────────────────────
+p "len:     ${#file}"                # 14
+p "upper:   ${(U)file}"              # ARCHIVE.TAR.GZ
+
+# ── subscripts + subscript flags (zsh arrays are 1-indexed) ────────────
+var @langs = ("clojure", "racket", "scala", "perl")
+p "first:   ${langs[1]}"             # clojure
+p "slice:   ${langs[2,3]}"           # racket scala
+p "indexof: ${langs[(i)scala]}"      # 3
+
+# ── explicit escape hatch: zpexpand ─────────────────────────────────────
+# For statically-ambiguous forms (`${#x}` length-vs-count, positional
+# defaults), call zpexpand with each variable's real type — arrays BY
+# REFERENCE (\@arr) so the list doesn't flatten into the name/value pairs.
+p "count:   ", zpexpand('${#langs}', "langs", \@langs)   # 4 (array element count)
+
+# Under --compat, `${ … }` keeps pure Perl semantics:
+#   stryke --compat examples/zsh_param_expansion.stk   # ${...} is Perl, not zsh
