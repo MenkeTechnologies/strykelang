@@ -639,6 +639,35 @@ class StrykeLexer : LexerBase() {
         tokenType = StrykeTokenTypes.HEREDOC
     }
 
+    /**
+     * Mirror of the parser's `zsh_param_form`: is a `${ … }` body a zsh
+     * parameter expansion (`${x:-d}`, `${x#p}`, `${(U)x}`, `${#x}`, `${a[2]}`)
+     * rather than a Perl `${name}` / `${$ref}` / `${EXPR}` / `${Pkg::var}`?
+     */
+    private fun isZshParamForm(body: String): Boolean {
+        if (body.isEmpty()) return false
+        val c0 = body[0]
+        if (c0 == '$' || c0 == '\\') return false
+        if (c0 == '(') {
+            val rp = body.indexOf(')')
+            if (rp < 0 || rp + 1 >= body.length) return false
+            val a = body[rp + 1]
+            return a == '_' || a == '$' || a.isLetterOrDigit()
+        }
+        if (c0 == '#') {
+            val a = body.getOrNull(1) ?: return false
+            return a == '_' || a.isLetterOrDigit()
+        }
+        var i = 0
+        while (i < body.length && (body[i] == '_' || body[i].isLetterOrDigit())) i++
+        if (i == 0) return false
+        return when (body.getOrNull(i)) {
+            ':' -> body.getOrNull(i + 1) != ':' // `:-` etc., not `::` (Perl package)
+            '#', '%', '/', '[' -> true
+            else -> false
+        }
+    }
+
     private fun consumeSigilVar(sigil: Char) {
         val p0 = pos
         var p = pos + 1
@@ -674,6 +703,32 @@ class StrykeLexer : LexerBase() {
         //     closing `}` all tokenise naturally, so braces inside strings or
         //     nested derefs no longer terminate the run prematurely.
         if (buf[p] == '{') {
+            // zsh parameter expansion — `${x:-d}`, `${x#p}`, `${(U)x}`, `${#x}`,
+            // `${arr[2]}`, … . stryke expands these at runtime via zshrs; here we
+            // colour the whole `${ … }` run as one token (balanced braces) so
+            // operators / `[` / `(` / `#` inside don't fragment or trip the
+            // comment path. Only for `$` (not `@`/`%`).
+            if (sigil == '$') {
+                var d = 1
+                var r = p + 1
+                while (r < endOffset && d > 0) {
+                    when (buf[r]) {
+                        '{' -> d++
+                        '}' -> d--
+                        '\n' -> break
+                    }
+                    if (d == 0) break
+                    r++
+                }
+                if (d == 0 && r < endOffset) {
+                    val body = buf.subSequence(p + 1, r).toString()
+                    if (isZshParamForm(body)) {
+                        tokenEnd = r + 1; pos = r + 1
+                        tokenType = StrykeTokenTypes.SCALAR_VAR
+                        return
+                    }
+                }
+            }
             var q = p + 1
             while (q < endOffset && (buf[q] == ' ' || buf[q] == '\t')) q++
             val nameStart = q

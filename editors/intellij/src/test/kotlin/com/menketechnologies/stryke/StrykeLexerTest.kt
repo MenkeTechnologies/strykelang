@@ -909,4 +909,32 @@ class StrykeLexerTest {
             has(toks, StrykeTokenTypes.OPERATOR, "@"),
         )
     }
+
+    @Test
+    fun zsh_param_expansion_forms_lex_as_one_var_token() {
+        // zsh `${ … }` forms inside a DQ string are coloured as a single
+        // SCALAR_VAR run (balanced braces) so operators / `[` / `(` / `#`
+        // inside don't fragment the line or trip the comment path.
+        for (form in listOf("\${x:-d}", "\${f##*.}", "\${(U)x}", "\${#a}", "\${arr[2]}", "\${a[(i)v]}")) {
+            val toks = lex("\"pre $form post\"")
+            assertTrue(
+                "$form must lex as one SCALAR_VAR: $toks",
+                has(toks, StrykeTokenTypes.SCALAR_VAR, form),
+            )
+            assertTrue(
+                "no BAD token for $form: $toks",
+                toks.none { it.first == StrykeTokenTypes.BAD },
+            )
+        }
+    }
+
+    @Test
+    fun perl_package_deref_in_string_not_treated_as_zsh() {
+        // `${main::cfg}` is a Perl package-qualified var, not a zsh `:` operator.
+        val toks = lex("\"v=\${main::cfg}\"")
+        assertTrue(
+            "package deref must stay a variable token: $toks",
+            toks.any { it.first == StrykeTokenTypes.SCALAR_VAR && it.second.contains("main::cfg") },
+        )
+    }
 }
