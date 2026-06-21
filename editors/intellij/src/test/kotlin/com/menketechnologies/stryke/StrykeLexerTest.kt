@@ -311,6 +311,42 @@ class StrykeLexerTest {
     }
 
     @Test
+    fun keyword_sets_match_authoritative_list() {
+        // These keywords were previously missing from the lexer's keyword sets
+        // and fell through to BUILTIN / IDENTIFIER coloring. They are all in the
+        // language's authoritative `%k` keyword table.
+        val decls = lex("import const frozen typed oursync")
+        for (kw in listOf("import", "const", "frozen", "typed", "oursync")) {
+            assertTrue(
+                "$kw must be DECL_KEYWORD: $decls",
+                has(decls, StrykeTokenTypes.DECL_KEYWORD, kw),
+            )
+        }
+        val ctrl = lex("continue goto defer match")
+        for (kw in listOf("continue", "goto", "defer", "match")) {
+            assertTrue(
+                "$kw must be CONTROL_KEYWORD: $ctrl",
+                has(ctrl, StrykeTokenTypes.CONTROL_KEYWORD, kw),
+            )
+        }
+        // `match` is a keyword, not a builtin.
+        assertTrue(
+            "match must NOT be BUILTIN: $ctrl",
+            ctrl.none { it.first == StrykeTokenTypes.BUILTIN && it.second == "match" },
+        )
+        val conc = lex("mysync varsync")
+        assertTrue("mysync parallel: $conc", has(conc, StrykeTokenTypes.BUILTIN_PARALLEL, "mysync"))
+        assertTrue("varsync parallel: $conc", has(conc, StrykeTokenTypes.BUILTIN_PARALLEL, "varsync"))
+        val magic = lex("__FILE__ __LINE__ __PACKAGE__")
+        for (mc in listOf("__FILE__", "__LINE__", "__PACKAGE__")) {
+            assertTrue(
+                "$mc must be KEYWORD: $magic",
+                has(magic, StrykeTokenTypes.KEYWORD, mc),
+            )
+        }
+    }
+
+    @Test
     fun sigil_vars_outside_strings_classified() {
         val toks = lex("\$x @arr %h")
         assertTrue("SCALAR_VAR \$x: $toks", has(toks, StrykeTokenTypes.SCALAR_VAR, "\$x"))

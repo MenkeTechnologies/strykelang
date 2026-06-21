@@ -1179,6 +1179,7 @@ class StrykeLexer : LexerBase() {
             in FN_KEYWORDS -> StrykeTokenTypes.FN_KEYWORD
             in CONTROL_KEYWORDS -> StrykeTokenTypes.CONTROL_KEYWORD
             in PHASE_KEYWORDS -> StrykeTokenTypes.PHASE_KEYWORD
+            in MAGIC_CONSTANTS -> StrykeTokenTypes.KEYWORD
             in WORD_OPERATORS -> StrykeTokenTypes.WORD_OPERATOR
             in BOOLEANS -> StrykeTokenTypes.BOOLEAN
             "undef", "null" -> StrykeTokenTypes.UNDEF
@@ -1217,7 +1218,9 @@ class StrykeLexer : LexerBase() {
         )
 
         private val DECL_KEYWORDS = setOf(
-            "my", "var", "val", "our", "local", "state", "use", "no", "package", "require",
+            "my", "var", "val", "our", "oursync", "local", "state",
+            "const", "frozen", "typed",
+            "use", "no", "import", "package", "require",
             "has", "pub", "priv", "in", "is", "as",
         )
         private val FN_KEYWORDS = setOf(
@@ -1225,11 +1228,16 @@ class StrykeLexer : LexerBase() {
         )
         private val CONTROL_KEYWORDS = setOf(
             "return", "if", "elsif", "else", "unless", "while", "until", "loop",
-            "for", "foreach", "do", "last", "next", "redo", "given", "when", "default",
-            "die", "eval", "try", "catch", "finally",
+            "for", "foreach", "do", "last", "next", "redo", "continue", "goto",
+            "given", "when", "default", "match",
+            "die", "eval", "try", "catch", "finally", "defer",
         )
         private val PHASE_KEYWORDS = setOf(
             "BEGIN", "END", "INIT", "CHECK", "UNITCHECK", "BUILD", "DESTROY",
+        )
+        /** Compile-time magic constants — `__FILE__`, `__LINE__`, … */
+        private val MAGIC_CONSTANTS = setOf(
+            "__FILE__", "__LINE__", "__PACKAGE__", "__SUB__", "__DATA__", "__END__",
         )
         private val WORD_OPERATORS = setOf(
             "and", "or", "not", "xor", "cmp",
@@ -1242,7 +1250,7 @@ class StrykeLexer : LexerBase() {
             "pmap", "pgrep", "pfor", "pforeach", "ploop", "pwhile", "pflat_map",
             "pmaps", "pgreps", "pflat_maps",
             "par_fetch", "par_each", "par_run", "par_apply",
-            "channel", "spawn", "await", "async",
+            "channel", "spawn", "await", "async", "mysync", "varsync",
         )
 
         private val BUILTINS = setOf(
@@ -1257,7 +1265,7 @@ class StrykeLexer : LexerBase() {
             "jwt_encode", "jwt_decode", "sha256", "sha512", "md5", "hmac",
             "ai", "embedding", "complete",
             "time", "sleep", "log_json", "set", "pipeline", "to_set", "uniq",
-            "regex", "match", "subst", "lc", "uc", "lcfirst", "ucfirst", "sprintf",
+            "regex", "subst", "lc", "uc", "lcfirst", "ucfirst", "sprintf",
             "int", "abs", "sqrt", "exp", "log", "sin", "cos", "tan", "atan2", "rand",
             "srand", "min", "max", "sum", "mean", "median", "stddev", "variance",
             "snake_case", "sc", "camel_case", "cc", "pascal_case", "kebab_case",
