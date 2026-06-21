@@ -337,8 +337,8 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 #   pmap { $_ * 2 } @list              # block form  ($_ = element)
 #   pmap $_ * 2, @list                 # expression form
 #   pmap double, @list                 # bare-fn form (sub double { $_0 * 2 })
-my @doubled = @data |> pmap $_ * 2 , progress => 1
-my @evens   = @data |> pgrep $_ % 2 == 0
+val @doubled = @data |> pmap $_ * 2 , progress => 1
+val @evens   = @data |> pgrep $_ % 2 == 0
 my @sorted  = @data |> psort { _ <=> _1 }
 my $sum     = @numbers |> preduce { _ + _1 }
 pfor process, @items                  # pforeach is an alias, same as for/foreach
@@ -354,26 +354,26 @@ pwhile ($run) { $run = 0 if poll_shutdown(); step() }
 pwhile 4 ($run) { ... }               # explicit worker count
 
 # streaming parallel — lazy iterators, bounded memory, output as it completes
-range(0, 1e9) |> pmaps { expensive($_) } |> take 10 |> ep  # stops after 10 results
-range(0, 1e6) |> pgreps { is_prime($_) } |> ep              # parallel filter, streaming
-range(0, 1e6) |> pflat_maps { [$_, $_ * 10] } |> ep         # parallel flat-map, streaming
+range(0, 1e9) |> pmaps { expensive(_) } |> take 10 |> ep  # stops after 10 results
+range(0, 1e6) |> pgreps { is_prime(_) } |> ep              # parallel filter, streaming
+range(0, 1e6) |> pflat_maps { [_, _ * 10] } |> ep         # parallel flat-map, streaming
 
 # fused map+reduce, chunked map, memoized map, init fold
 my $sum2     = @nums |> pmap_reduce { _ * 2 } { _ + _1 }
-my @squared  = @million |> pmap_chunked 1000 { $_ ** 2 }
+val @squared  = @million |> pmap_chunked 1000 { _ ** 2 }
 my @once     = @inputs |> pcache expensive
 my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc }
 
 # fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
 fan 8, work  # bare-fn form: fan N, FUNC
 fan work, progress => 1  # uses rayon pool size (`stryke -j`)
-fan 8 { work($_) }  # block form
-fan { work($_) }  # block form, pool-sized
+fan 8 { work(_) }  # block form
+fan { work(_) }  # block form, pool-sized
 my @r = fan_cap 8, compute  # capture results in index order
-my @r = fan_cap 8 { $_ * $_ }  # block form, capture
+my @r = fan_cap 8 { _ * _ }  # block form, capture
 
 # pipelines — sequential or rayon-backed; same chain methods
-my @r = (@data |> pipeline)->filter({ $_ > 10 })->map({ $_ * 2 })->take(100)->collect
+my @r = (@data |> pipeline)->filter({ _ > 10 })->map({ _ * 2 })->take(100)->collect
 ### or 
 my @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collect
 my @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect
@@ -387,7 +387,7 @@ my $n = par_pipeline(
 )
 
 # multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
-my @r = ((1..1_000) |> par_pipeline_stream)->filter({ $_ > 500 })->map({ $_ * 2 })->collect()
+my @r = ((1..1_000) |> par_pipeline_stream)->filter({ _ > 500 })->map({ _ * 2 })->collect()
 ## or
 my @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect
 
@@ -402,7 +402,7 @@ fan 3 { $sync->wait; p "all arrived" }
 
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
 my $pool = ppool(4)
-$pool->submit({ heavy_work($_) }) for @tasks
+$pool->submit({ heavy_work(_) }) for @tasks
 my @results = $pool->collect()
 
 # parallel file IO
@@ -487,7 +487,7 @@ deep("alpha", "beta", "gamma")
 
 # fan / fan_cap also rebind topic per worker:
 $_ = 100
-my @r = fan_cap 3 { $_< }                      # (100, 100, 100)
+val @r = fan_cap 3 { $_< }                      # (100, 100, 100)
 fan_cap 1 { $_ = "inner"; "$_< $_" }           # "outer inner"
 $_ = 50; ~> 10 >{ $_ + $_< }                   # 60
 ```
