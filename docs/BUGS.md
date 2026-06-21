@@ -29,9 +29,9 @@ Pin test: `cosine_distance_zero_operand_is_unit_bx` in
 
 ## BUG-122 — `js_divergence` / `js_div` vs `jensen_shannon_div` disagree (nats vs bits) — **`bug`**
 
-`js_divergence` (in `math_wolfram3.rs`) builds KL terms with **natural**
+`js_divergence` (in `math_wolfram_vector_calculus_optimization.rs`) builds KL terms with **natural**
 logarithms. `jensen_shannon_div` is wired to `kullback_jensen_div`
-(`math_wolfram40.rs`), which uses **log2** in each KL term. The two therefore
+(`math_wolfram_information_theory_signal_rl.rs`), which uses **log2** in each KL term. The two therefore
 differ by a factor of **`ln 2`** for the same distributions even though docs
 refer to both as Jensen–Shannon-style quantities.
 
@@ -46,8 +46,8 @@ Pin tests: `jensen_shannon_div_triple_bx`, `js_divergence_triple_nats_bx` in
 ## BUG-123 — `chi_squared_distance` vs `chisquare_metric` differ by a factor of **2** — **`bug`**
 
 Both walk the elementwise \(\sum_i (p_i-q_i)^2/(p_i+q_i)\)
-pattern, but `chi_squared_distance` (`math_wolfram4.rs`) multiplies by
-**`0.5`** while `chisquare_metric` (`math_wolfram40.rs`) omits it. Names
+pattern, but `chi_squared_distance` (`math_wolfram_autodiff_ode_glm.rs`) multiplies by
+**`0.5`** while `chisquare_metric` (`math_wolfram_information_theory_signal_rl.rs`) omits it. Names
 give no indication which convention applies.
 
 Pins: `chisquare_metric_axis_pair_by`, `chisquare_metric_equals_twice_chi_squared_distance_by`
@@ -66,8 +66,8 @@ Pin test: `csiszar_phi_div_coin_pair_by` in
 
 ## BUG-125 — `relative_entropy_kl` measures KL in **bits**; `kl_divergence` / `kl_div` use **nats** — **`bug`**
 
-`builtin_relative_entropy_kl` (`math_wolfram40.rs`) uses `(p/q).log2()`.
-The older `builtin_kl_divergence` path (`math_wolfram3.rs`) uses `.ln()`
+`builtin_relative_entropy_kl` (`math_wolfram_information_theory_signal_rl.rs`) uses `(p/q).log2()`.
+The older `builtin_kl_divergence` path (`math_wolfram_vector_calculus_optimization.rs`) uses `.ln()`
 throughout. Multiply the former by \(\ln 2\) to reproduce the latter for the
 same \(P,Q\).
 
@@ -197,7 +197,7 @@ in **`tests/suite/behavior_pin_2026_05_cg.rs`**.
 
 ## BUG-137 — **`box_blur_kernel`** first argument is **half-width radius `r`**, output side **`2r+1`** — **`polish`**
 
-`builtin_box_blur_kernel` computes **`n = 2·r + 1`** from `args.first()` as an integer **radius** (`math_wolfram14.rs`). Callers
+`builtin_box_blur_kernel` computes **`n = 2·r + 1`** from `args.first()` as an integer **radius** (`math_wolfram_geographic_projections_filters.rs`). Callers
 supplying **`box_blur_kernel(7)`** expecting a **\(7\times7\)** stencil actually materialize a **\(15\times15\)** (**`2·7+1`**) kernel.
 The entry value is **`1 / n²`** (uniform norm).
 
@@ -364,7 +364,7 @@ Pins: **`uri_resolve_byte_vector_absolute_uri_cq`**, **`uri_resolve_plain_string
 
 ## BUG-165 — **`string_take_while` / `string_drop_while`** filter a **leading prefix** against an **allowed-char set**, not a Perl predicate — **`polish`**
 
-Both builtins (`math_wolfram11.rs`: **`builtin_string_take_while`**, **`builtin_string_drop_while`**) treat the
+Both builtins (`math_wolfram_sequences_crypto_linear_stats.rs`: **`builtin_string_take_while`**, **`builtin_string_drop_while`**) treat the
 second operand as a string of characters to match from the start of the first string (greedy charset scan).
 They are **not** list-style **`take_while { … }`** callback filters; passing a code ref or expecting regex-like
 behaviour will not work.
@@ -388,7 +388,7 @@ Pins: **`dsp_hamming_window_four_stringify_cs`**, **`string_hamming_distance_bit
 
 ## BUG-171 — **`ml_binary_cross_entropy(Y, P)`** returns **`inf`** when **`P ≤ 0`** or **`P ≥ 1`** — **`polish`**
 
-**`builtin_ml_binary_cross_entropy`** (**`math_wolfram45.rs`**) guards **`ln P`** / **`ln(1−P)`** by rejecting **`p <= 0`** or **`p >= 1`**
+**`builtin_ml_binary_cross_entropy`** (**`math_wolfram_ml_activations_optimizers_samplers.rs`**) guards **`ln P`** / **`ln(1−P)`** by rejecting **`p <= 0`** or **`p >= 1`**
 with **`inf`**, so “certain” probabilities (**`1`**, **`0`**) are not admissible even though the analytic limit is finite on one
 branch. Use **`P`** in **`(0, 1)`** (e.g. **`1 - ε`**) near the boundary.
 
@@ -425,7 +425,7 @@ Pins: **`base_convert_decimal_string_to_hex_cx`**, **`base_convert_two_arg_numer
 
 ## BUG-177 — **`graph_density`** expects an **adjacency list**, not **`(|V|, |E|)`** scalars — **`polish`**
 
-**`builtin_graph_density`** (**`math_wolfram13.rs`**) calls **`parse_adj_list`** on **`args.first()`** only. **`graph_density(4, 3)`** does **not**
+**`builtin_graph_density`** (**`math_wolfram_graphs_strings_calendars_tax.rs`**) calls **`parse_adj_list`** on **`args.first()`** only. **`graph_density(4, 3)`** does **not**
 compute **3 / C(4, 2)**; the second argument is ignored and the numeric **`4`** is not a valid graph shell, so the density collapses to **0**
 (**`n < 2`** guard or empty parse). Pass **Adjacency lists** like **`[[1], [0, 2], [1]]`**.
 
@@ -515,7 +515,7 @@ Pins: **`rbinom_two_arg_interprets_prob_as_size_bug190_de`** in **`tests/suite/b
 
 ## BUG-191 — **`numerical_gradient`** supplies **`$_[0]`** as the coordinate **arrayref**; **`my ($x) = @_`** treats **`$x`** as the **ref** — **`polish`**
 
-**`builtin_numerical_gradient`** (**`math_wolfram3.rs`**) perturbs each coordinate and invokes the user sub via **`call_user_n`**, passing the current position vector for Perl as **`$_[0]`** (**`ARRAY`**). Writing **`sub { my ($x) = @_; … }`** binds **`$x`** to that **reference**. Numeric uses of **`$x`** apply **ref numification** (here **`· + ·`** drives **`length`/`1`**-style behavior), not the float **`xᵢ`**, so **`f(x+h) ≈ f(x−h)`** and the central difference reports **0**. Correct pattern: **`sub { my $a = $_[0]; my @y = @$a; … }`** (or index **`$_[0][$i]`** explicitly).
+**`builtin_numerical_gradient`** (**`math_wolfram_vector_calculus_optimization.rs`**) perturbs each coordinate and invokes the user sub via **`call_user_n`**, passing the current position vector for Perl as **`$_[0]`** (**`ARRAY`**). Writing **`sub { my ($x) = @_; … }`** binds **`$x`** to that **reference**. Numeric uses of **`$x`** apply **ref numification** (here **`· + ·`** drives **`length`/`1`**-style behavior), not the float **`xᵢ`**, so **`f(x+h) ≈ f(x−h)`** and the central difference reports **0**. Correct pattern: **`sub { my $a = $_[0]; my @y = @$a; … }`** (or index **`$_[0][$i]`** explicitly).
 
 Pins: **`numerical_gradient_my_x_at_wrong_grad_bug191_de`**, **`numerical_gradient_arrayref_callback_de`** in **`tests/suite/behavior_pin_2026_05_de.rs`**.
 
@@ -533,7 +533,7 @@ Pins: **`black_scholes_call_put_spot_strike_time_rate_vol_bug193_dg`**, **`bscal
 
 ## BUG-195 — **`romberg_quad`** is a **Richardson / trapezoid combine step** `(4^m·T_{n,m-1} − T_{n-1,m-1})/(4^m − 1)`, **not** `romberg(f, a, b, …)` integration — **`polish`**
 
-**`builtin_romberg_quad`** (**`math_wolfram72.rs`**) ignores a callback and operates on **three scalars** already extracted from the Romberg table. Passing **`sub { … }`** as in **`romberg`** silently numifies to garbage / defaults. Use **`romberg`** for interval quadrature; use **`romberg_quad(t_n_mm1, t_nm1_mm1, m)`** only for the explicit extrapolation step.
+**`builtin_romberg_quad`** (**`math_wolfram_numpy_scipy_array_special.rs`**) ignores a callback and operates on **three scalars** already extracted from the Romberg table. Passing **`sub { … }`** as in **`romberg`** silently numifies to garbage / defaults. Use **`romberg`** for interval quadrature; use **`romberg_quad(t_n_mm1, t_nm1_mm1, m)`** only for the explicit extrapolation step.
 
 Pins: **`romberg_integrate_vs_quad_combine_bug195_dg`** in **`tests/suite/behavior_pin_2026_05_dg.rs`**.
 
@@ -545,25 +545,25 @@ Pins: **`chinese_remainder_buckets_vs_flat_scalars_bug196_dh`** in **`tests/suit
 
 ## BUG-197 — **`simplex_volume_3d`** is an alias of **`tetrahedron_volume`** and does **not** unpack a **4×3** point matrix — **`polish`**
 
-**`builtin_simplex_volume_3d`** (**`math_wolfram28.rs`**) forwards **`args`** unchanged to **`builtin_tetrahedron_volume`**, which reads **`args[0..3]`** as **three 3-vectors** (`vec3` each) and leaves **`d`** at the default **`(0,0,0)`** when a **single** nested **`[[p0],[p1],[p2],[p3]]`** matrix is passed. **`simplex_volume_3d([[…]])`** therefore returns **`0`** for the unit simplex. Pass **four** operands: **`tetrahedron_volume([0,0,0], [1,0,0], [0,1,0], [0,0,1])`**.
+**`builtin_simplex_volume_3d`** (**`math_wolfram_geometry_topology_mesh_spatial.rs`**) forwards **`args`** unchanged to **`builtin_tetrahedron_volume`**, which reads **`args[0..3]`** as **three 3-vectors** (`vec3` each) and leaves **`d`** at the default **`(0,0,0)`** when a **single** nested **`[[p0],[p1],[p2],[p3]]`** matrix is passed. **`simplex_volume_3d([[…]])`** therefore returns **`0`** for the unit simplex. Pass **four** operands: **`tetrahedron_volume([0,0,0], [1,0,0], [0,1,0], [0,0,1])`**.
 
 Pins: **`tetrahedron_volume_unit_simplex_dh`**, **`simplex_volume_3d_matrix_arg_yields_zero_bug197_dh`** in **`tests/suite/behavior_pin_2026_05_dh.rs`**.
 
 ## BUG-199 — **`graph_is_tree`**, **`graph_density`, …** use **`parse_adj_list`** — treat operands as **neighbor-index lists**, not 0/1 **adjacency matrices** — **`polish`**
 
-**`parse_adj_list`** (**`math_wolfram2.rs`**) walks each top-level row with **`arg_to_vec`** and **`to_number`**, producing **lists of neighbor indices**. A “matrix” **`[[0, 1], [1, 0]]`** is **not** interpreted as “no self-loop, one cross-edge”: row **0** becomes neighbors **`{0, 1}`** (including a **self-loop**), so **`edges ≠ n−1`** and **`graph_is_tree`** returns **`0`**. **\(K_2\)** as a path must be **`[[1], [0]]`**.
+**`parse_adj_list`** (**`math_wolfram_number_theory_combinatorics.rs`**) walks each top-level row with **`arg_to_vec`** and **`to_number`**, producing **lists of neighbor indices**. A “matrix” **`[[0, 1], [1, 0]]`** is **not** interpreted as “no self-loop, one cross-edge”: row **0** becomes neighbors **`{0, 1}`** (including a **self-loop**), so **`edges ≠ n−1`** and **`graph_is_tree`** returns **`0`**. **\(K_2\)** as a path must be **`[[1], [0]]`**.
 
 Pins: **`graph_tree_count_edges_max_degree_bug199_matrix_vs_list_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
 
 ## BUG-200 — **`snowball_stem_english`** consumes **Unicode codepoint integers**, not **Perl strings** — **`polish`**
 
-**`builtin_snowball_stem_english`** (**`math_wolfram69.rs`**) calls **`b69_to_codepoints`** on **`args[0]`**. A string like **`"running"`** does not unpack into letters here, so the stem collapses to a bogus numeric **`0`** in **`stringify`**. Pass **`[114, 117, …]`** / the codepoint form the helper expects.
+**`builtin_snowball_stem_english`** (**`math_wolfram_computational_linguistics_morphology.rs`**) calls **`b69_to_codepoints`** on **`args[0]`**. A string like **`"running"`** does not unpack into letters here, so the stem collapses to a bogus numeric **`0`** in **`stringify`**. Pass **`[114, 117, …]`** / the codepoint form the helper expects.
 
 Pins: **`snowball_stem_english_codepoints_not_string_bug200_di`** in **`tests/suite/behavior_pin_2026_05_di.rs`**.
 
 ## BUG-204 — **`db_simhash_bit`** reads like **bit index** but implements **scalar sign** — **`polish`**
 
-**`builtin_db_simhash_bit`** (**`math_wolfram48.rs`**) returns **`1`** when **`args[0] ≥ 0`** and **`0`** when negative — a **two-level sign quantization**, not a **bit position** extracted from a 64-bit hash word (as the name / inline doc “**bit index**” suggests). Real SimHash combines per-feature hashed bits; this helper is closer to **`signbit` / per-dimension thresholding**.
+**`builtin_db_simhash_bit`** (**`math_wolfram_database_consensus_sketches.rs`**) returns **`1`** when **`args[0] ≥ 0`** and **`0`** when negative — a **two-level sign quantization**, not a **bit position** extracted from a 64-bit hash word (as the name / inline doc “**bit index**” suggests). Real SimHash combines per-feature hashed bits; this helper is closer to **`signbit` / per-dimension thresholding**.
 
 Pins: **`db_simhash_positive_is_one_bug204_dl`**, **`db_simhash_negative_is_zero_bug204_dl`** in **`tests/suite/behavior_pin_2026_05_dl.rs`**.
 

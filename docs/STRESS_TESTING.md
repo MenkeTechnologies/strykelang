@@ -120,9 +120,9 @@ max_duration = 3600 # max seconds per stress session
 name = "node-01"    # optional, defaults to hostname
 ```
 
-### Scriptable Distributed Compute (28-verb religious-vocab API)
+### Scriptable Distributed Compute (29-verb religious-vocab API)
 
-The REPL controller above is for human-typed interactive sessions. **Scripts** drive the same TCP+bincode infrastructure via a 28-verb religious-themed builtin API — scatter work, gather results, manage worker state, all from inside a `.stk` file:
+The REPL controller above is for human-typed interactive sessions. **Scripts** drive the same TCP+bincode infrastructure via a 29-verb religious-themed builtin API — scatter work, gather results, manage worker state, all from inside a `.stk` file:
 
 ```perl
 my @workers = congregation(4);                # fork 4 agents locally, wait for them to register
@@ -406,7 +406,7 @@ spec:
 
 ```
 $ stryke master --bind 0.0.0.0:9999
-stryke master v0.9.0
+stryke master v0.17.16
 listening on 0.0.0.0:9999
 agents: 0
 

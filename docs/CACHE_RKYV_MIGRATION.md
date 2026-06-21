@@ -60,14 +60,14 @@ Per the project framing: stryke is the second-priority project after zshrs, and 
 | Concurrency | SQLite WAL multi-reader | `flock` on `scripts.rkyv.lock` for exclusive writes; lockless reads |
 | Process state | One `Connection` per `Mutex<ScriptCache>` | One `Mmap` per `parking_lot::Mutex<Option<MmappedShard>>`, lazy-initialized |
 
-The public API (`try_load`, `try_save`, `stats`, `clear`, `evict_stale`, `list_scripts`, `ScriptCache::open` / `get` / `put`) is preserved byte-for-byte. The only call-site rename was `Interpreter::sqlite_cache_script_path` → `cache_script_path`. The env var `STRYKE_SQLITE_CACHE` → `STRYKE_CACHE`. `bytecode.rs:1067` still uses `crate::script_cache::constants_pool_codec` to serialize `Vec<StrykeValue>` constants in the inner bincode blob (the `StrykeValue` Arc-shared graph still isn't trivially rkyv-archivable).
+The public API (`try_load`, `try_save`, `stats`, `clear`, `evict_stale`, `list_scripts`, `ScriptCache::open` / `get` / `put`) is preserved byte-for-byte. The only call-site rename was `Interpreter::sqlite_cache_script_path` → `cache_script_path`. The env var `STRYKE_SQLITE_CACHE` → `STRYKE_CACHE`. `bytecode.rs:1310` still uses `crate::script_cache::constants_pool_codec` to serialize `Vec<StrykeValue>` constants in the inner bincode blob (the `StrykeValue` Arc-shared graph still isn't trivially rkyv-archivable).
 
 ## Measured results
 
-Bench harness: `strykelang/cache_bench.rs`, runs both implementations side-by-side in one process against an identical 100-script corpus. Reproduce with:
+Bench harness: `benches/cache_bench.rs`, runs both implementations side-by-side in one process against an identical 100-script corpus. Reproduce with:
 
 ```sh
-cargo test --release --lib bench_rkyv_vs_sqlite -- --nocapture --ignored
+cargo bench --bench cache_bench
 ```
 
 Hardware: macOS aarch64 (M-series), filesystem cache warm.

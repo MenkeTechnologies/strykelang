@@ -38,7 +38,7 @@ independent of the (much larger) interpreter build.
 | `s_web g migration NAME field:type…` | `rails g migration` | ✅ schema-change migration (runner lands PASS 4) |
 | `s_web g scaffold NAME field:type…` | `rails g scaffold` | ✅ model + migration + 7-action controller + 5 ERB views |
 | `s_web s [-p PORT]` | `rails server` | ✅ shells out to `stryke bin/server` |
-| `s_web routes` | `rails routes` | ⚠️ pending `Router::dump_table` builtin |
+| `s_web routes` | `rails routes` | ✅ shells out to `stryke`, prints `web_routes_table()` |
 | `s_web db migrate` | `rails db:migrate` | ✅ runs all pending `up` blocks against `db/$ENV.sqlite3` |
 | `s_web db rollback` | `rails db:rollback` | ✅ unwinds the latest applied migration via its `down` block |
 | `s_web db seed` | `rails db:seed` | ✅ requires `db/seeds.stk` against the configured DB |
@@ -104,9 +104,6 @@ Remaining work:
 - **Strong params + form errors** — controllers currently pass the raw
   `web_params()` to the model. Need a `permit` helper to whitelist
   fields, plus a `$model->{errors}` slot the form templates can render.
-- **`s_web routes`** — needs `web_routes_table` exposed via the CLI;
-  currently the builtin exists but the subcommand still shells out
-  empty-handed.
 - **Encrypted credentials** — `config/credentials.stk.enc` + master.key.
 - **`s_web new --api`** — skip views/helpers/layout for API-only apps.
 - **Asset pipeline** — embed CSS/JS at build time (per WEB_FRAMEWORK.md).
@@ -152,7 +149,7 @@ Wall time: ~0.45s scaffold + migrations.
 
 | Flag | What it does |
 |---|---|
-| `--app PRESET` | Bulk-scaffold from a preset (`blog`, `ecommerce`, `saas`, `social`, `cms`, `forum`, `crm`, `helpdesk`, `everything`) |
+| `--app PRESET` | Bulk-scaffold from a preset (`blog`, `ecommerce`, `saas`, `social`, `cms`, `forum`, `crm`, `helpdesk`, `amazon`, `facebook`, `learning`, `everything`) |
 | `--app "Name:f:t Other:f:t"` | Inline resource list (whitespace-separated `Name:field:type,…`) |
 | `--theme NAME` | CSS theme: `simple`, `dark`, `pico`, `bootstrap`, `tailwind`, `cyberpunk`, `synthwave`, `terminal`, `matrix` |
 | `--auth` | User model + sessions + signup/login/logout pages |
@@ -216,7 +213,7 @@ field lists. Each is hand-curated to match the real product:
 | `forum` | 10 | Categories, Topics, Posts, Reactions, Subscriptions, Badges, Reports |
 | `crm` | 10 | Accounts, Contacts, Leads, Opportunities, Activities, Notes, Tasks, Pipelines |
 | `helpdesk` | 8 | Customers, Tickets, Replies, KnowledgeArticles, SLAs, Tags |
-| `everything` | ~80 | Every preset above unioned + dedup'd |
+| `everything` | ~108 | Every preset above unioned + dedup'd |
 
 ### Cyberpunk theme family
 

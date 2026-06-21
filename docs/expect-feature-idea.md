@@ -1,6 +1,6 @@
 # Expect-style Interactive Automation for Stryke — **PHASES 1-4 SHIPPED**
 
-**Status:** PTY/expect runtime is fully wired in `strykelang/perl_pty.rs`. `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact` all dispatch through `builtins.rs`. Method-form sugar (`PtyHandle::spawn`/`->expect`/`->send`/`->branch`/`->interact`/`->close`) lives in `examples/` — `require "perl_pty_class.stk"` in your script. Phase 5 (cluster fanout polish + Windows ConPTY) remains deferred.
+**Status:** PTY/expect runtime is fully wired in `strykelang/perl_pty.rs`. `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact` all dispatch through `builtins.rs`. Method-form sugar (`PtyHandle::spawn`/`->expect`/`->send`/`->branch`/`->interact`/`->close`) lives in `strykelang/perl_pty_class.stk` — `require "perl_pty_class.stk"` in your script. Phase 5 (cluster fanout polish + Windows ConPTY) remains deferred.
 
 ## The Gap
 
@@ -113,14 +113,14 @@ Stryke could be the first language with native expect-style primitives in terse,
 ## Phases 1–4 — SHIPPED
 
 Status: Unix-only. ConPTY (Windows) deferred. Implementation lives in
-`strykelang/perl_pty.rs` (~700 LoC) plus a thin wrapper class at
+`strykelang/perl_pty.rs` (~1135 LoC) plus a thin wrapper class at
 `strykelang/perl_pty_class.stk` (~40 LoC of stryke).
 
 ### Final syntax (NOT the operator-overloaded proposal)
 
 The original sketch with `~` for expect and `>>` for send was rejected
 because the parser already triple-uses `~` (BitNot, range separator,
-char-index suppression via `parser.rs:131 suppress_tilde_range`) and
+char-index suppression via `parser.rs:148 suppress_tilde_range`) and
 `>>` is bitwise shift + open-mode token. Adding a fourth meaning would
 add another parser counter and a typo trap with `~>` (thread-macro).
 

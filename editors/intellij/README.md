@@ -11,7 +11,7 @@
 
 ## `[BUILT FOR STRYKE]`
 
-A JetBrains-platform plugin that drives the LSP and DAP servers compiled into the `stryke` binary. Hand-rolled lexer with **48 color slots**, semantic-token overlay from the LSP, **~25,000** hover-card-backed identifiers spanning every builtin / keyword / operator / Perl5-compat / extension / parallel primitive / sketch / phase block, full breakpoint-debugger over DAP with recursive variable expansion + per-frame Evaluate dialog, a **9-tab** reflection tool window fed by `%stryke::*` reflection hashes, **60+ snippet templates** keyed by completion prefix, Extract Variable / Constant / Function refactors plus Shift-F6 cross-file rename, run configs that auto-create from any `.stk` file. Talks to the in-tree `strykelang/lsp_extras.rs` + `strykelang/dap.rs` over JSON-RPC; no upstream `lsp-server` / `dap-types` crates anywhere in the build.
+A JetBrains-platform plugin that drives the LSP and DAP servers compiled into the `stryke` binary. Hand-rolled lexer with **48 color slots**, semantic-token overlay from the LSP, **~25,000** hover-card-backed identifiers spanning every builtin / keyword / operator / Perl5-compat / extension / parallel primitive / sketch / phase block, full breakpoint-debugger over DAP with recursive variable expansion + per-frame Evaluate dialog, a **9-tab** reflection tool window fed by `%stryke::*` reflection hashes, **60+ snippet templates** keyed by completion prefix, Extract Variable / Constant / Function refactors plus Shift-F6 cross-file rename, run configs that auto-create from any `.stk` file. Talks to the in-tree `strykelang/lsp.rs` (+ `strykelang/lsp_extras.rs`) and `strykelang/dap.rs` over JSON-RPC; the DAP side carries no `dap-types` crate.
 
 ### [`strykelang`](https://github.com/MenkeTechnologies/strykelang) · [`Reference`](https://menketechnologies.github.io/strykelang/reference.html) · [`zshrs`](https://github.com/MenkeTechnologies/zshrs) · [`fusevm`](https://github.com/MenkeTechnologies/fusevm)
 
@@ -44,7 +44,7 @@ stryke ships an **LSP server** and **DAP debug adapter** built into the `stryke`
 
 - Spawns the LSP / DAP servers on demand, frames JSON-RPC over stdio / TCP, and renders responses through the IDE's native UI affordances (gutter breakpoints, intentions popup, refactor menu, code-folding handles, semantic-tokens layer, reflection tool window).
 - Adds **zero new language code paths**. Everything the user sees in the editor comes from one of three sources: the hand-rolled `StrykeLexer.kt` (instant first-paint highlighting), the `textDocument/semanticTokens` overlay (LSP-driven full classification), or the `%stryke::*` reflection hashes serialized by `st -e 'p tj({%stryke::*})'` for the tool window.
-- No upstream `lsp-server` / `lsp-types` / `dap-types` / `lsp4ij` dependencies anywhere on the Rust side. JetBrains' own `LspServerSupportProvider` is the only LSP4J consumer; everything else is hand-framed JSON-RPC on top of `serde_json`. Same on the DAP side.
+- The LSP side uses the `lsp-server` + `lsp-types` crates (`Cargo.toml`; `lsp.rs` drives the `Connection::stdio()` loop). The DAP side has no `dap-types` / `lsp4ij` dependency — it is hand-framed `Content-Length` JSON-RPC on top of `serde_json` (`dap.rs`). JetBrains' own `LspServerSupportProvider` is the only LSP4J consumer.
 
 Compiled `editors/intellij/build/distributions/stryke-intellij-<v>.zip` is self-contained: only Kotlin stdlib + IntelliJ Platform classes at runtime.
 
@@ -135,7 +135,7 @@ Tab walks the `${1:...}` placeholders to the final `${0}` cursor:
 
 ### Transport
 
-- **Stdio**, Content-Length-framed JSON-RPC. Hand-rolled framer on top of `serde_json` — no `lsp-server` / `lsp-types` crates.
+- **Stdio**, Content-Length-framed JSON-RPC via the `lsp-server` crate's `Connection::stdio()` loop, with message types from `lsp-types`.
 - Optional `STRYKE_LSP_LOG=<path>` env var dumps every request/response for debugging.
 - Server log lives at `~/.stryke/stryke.log` (see [§0x0A](#0x0a-logs)).
 
@@ -230,7 +230,7 @@ Plugin side (`com.menketechnologies.stryke.dap`):
 
 Stryke side (`strykelang/dap.rs` + `strykelang/debugger.rs`):
 
-- `Debugger` state machine (breakpoints, step modes, call depth) shared between TTY and DAP front-ends. Step-over depends on `enter_sub` / `leave_sub` being called at every VM call dispatch site (`vm.rs:2192..` and `vm_helper.rs:19216..`) so `call_depth` matches the program's logical call stack — without these hooks step-over drops into UDFs instead of skipping them.
+- `Debugger` state machine (breakpoints, step modes, call depth) shared between TTY and DAP front-ends. Step-over depends on `debugger_enter_sub` / `debugger_leave_sub` (which call the `Debugger`'s `enter_sub` / `leave_sub`) being invoked at every VM call dispatch site (`vm.rs:3078..` and `vm_helper.rs:19980..`) so `call_depth` matches the program's logical call stack — without these hooks step-over drops into UDFs instead of skipping them.
 - Same-line guard tracks both `last_stop_line` and `last_stop_depth` (`debugger.rs:38..`). Without the depth half, step-in fires on the same source line as the call site (first opcode of the call setup has the same line as `my $r = foo()`), requiring two clicks to actually enter `foo`.
 - `set_topic` for implicit `for (@arr) { … }` loops so `$_` / `$_0` / `_` / `_0` all alias.
 - Snapshot capture (`capture_locals_with_map`) walks the scope, builds per-variable refs for hashes / arrays / structs / classes / enums / sets / sketches, recursively expanding their children into a `var_ref_map` (depth 12, count 2000) so the DAP `variables` request resolves any ref to its rows.
@@ -252,7 +252,7 @@ Cross-file rename fires when the symbol is package-scoped (sub, type, `our`, pac
 
 Hovering on the `format` key in `$opts{format}` or the `exec` selector in `$db->exec` does NOT show the `format` / `exec` builtin card — those identifiers are hash keys / method selectors, not builtin references.
 
-Implementation: plugin handler in `StrykeRenameHandler.kt`; server-side rename in `strykelang/lsp_extras.rs::rename`.
+Implementation: plugin handler in `StrykeRenameHandler.kt`; server-side rename in `strykelang/lsp.rs::rename_symbol`.
 
 ---
 
@@ -392,11 +392,12 @@ The Rust side lives in:
 
 | Module | Purpose |
 |--------|---------|
-| `strykelang/lsp_extras.rs` | LSP server (`stryke --lsp`) — hover, completion, codeAction, rename, semanticTokens, foldingRange, signatureHelp, diagnostics, formatting |
+| `strykelang/lsp.rs` | LSP server (`stryke --lsp`) — `Connection::stdio()` dispatch loop, hover, completion, definition / references, rename, documentSymbol, diagnostics |
+| `strykelang/lsp_extras.rs` | Additional LSP capabilities — semanticTokens, signatureHelp, codeAction, foldingRange, formatting |
 | `strykelang/dap.rs` + `strykelang/debugger.rs` | DAP server (`stryke --dap HOST:PORT`) — breakpoints, stepping, scopes, variables (recursive), evaluate |
 | `strykelang/lsp_docs_domains.rs` | Hover-card bodies grouped by domain (math, IO, string, regex, parallel, sketches, …) |
 | `strykelang/fmt.rs` | Formatter (`stryke --fmt`) — same engine `textDocument/formatting` invokes |
-| `strykelang/reflection.rs` | Builds the `%stryke::*` hashes that the reflection tool window serializes via `st -e 'p tj({%stryke::*})'` |
+| `strykelang/vm_helper.rs` | `ensure_reflection_hashes` builds the `%stryke::*` hashes that the reflection tool window serializes via `st -e 'p tj({%stryke::*})'` |
 
 ---
 

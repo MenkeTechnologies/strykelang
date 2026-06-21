@@ -676,7 +676,7 @@ Benchmark files live next to the code they benchmark (e.g., `benches/web/router_
 
 Goal: prove the perf model.
 
-- ✅ HTTP/1.1 server (`web_serve`).
+- ✅ HTTP/1.1 server (`serve`).
 - ✅ Radix-trie router compiled from the routing DSL (`web_route`/`web_resources`/`web_root`).
 - ✅ Request/response abstractions (`web_request`, `web_render`, `web_set_header`, `web_status`, `web_params`).
 - ✅ Middleware (logger, security headers, ETag short-circuit, CSRF token).
@@ -694,7 +694,7 @@ Goal: real apps shippable.
 - ✅ ERB templates (`<%= %>` / `<% %>` / `<%# %>` / `<%- -%>`) + layouts + `web_render_partial`.
 - ✅ Background jobs (database backend) — `web_jobs_init` creates the SQLite `jobs` table; `web_job_enqueue`/`dequeue`/`complete`/`fail` plus `web_jobs_list`/`web_jobs_stats`/`web_job_purge` for inspection.
 - ⏳ WebSockets — deferred. ✅ SSE wired (`web_sse_event`, `web_render_stream`).
-- ✅ Generators for model/controller/resource/migration/scaffold/api/auth/admin/mailer/job/channel/docker/ci/pwa.
+- ✅ Generators for model/controller/migration/scaffold/app/api/auth/admin/mailer/job/channel/docker/ci/pwa.
 - ✅ Encrypted secrets — `secrets_encrypt`/`secrets_decrypt` (AES-256-GCM), `secrets_random_key` for fresh keys, `secrets_kdf` for PBKDF2 password derivation.
 - ✅ Security middleware (CSRF token meta + cookie, CSP/HSTS via `web_security_headers`).
 - ✅ Embedded static assets pipeline (`web_static`).
@@ -737,7 +737,7 @@ These get answered as we build. Not blockers, but worth flagging.
 ## Resolved Decisions
 
 - **Template syntax — UPDATED** — Shipped form is ERB-style: `<%= expr %>` for HTML-escaped output, `<%== expr %>` for raw output, `<% stryke_code %>` for control flow, `<%# comment %>` for comments, `<%- -%>` for whitespace trimming. The original `#{ expr }` proposal was superseded by ERB during Phase 1 to keep visual parity with Rails templates. Templates are stryke code with HTML interpolation. Resolved 2026-05-01.
-- **Default database for dev/test** — SQLite. Postgres/MySQL accessed via runtime builtins (`web_db_open`/`web_db_query`). The ORM chain API works against any of the three; SQLite is what `s_web new` wires by default so a fresh app boots without needing a running Postgres. Resolved 2026-05-01.
+- **Default database for dev/test** — SQLite. Postgres/MySQL accessed via runtime builtins (`web_db_connect`/`web_db_query`). The ORM chain API works against any of the three; SQLite is what `s_web new` wires by default so a fresh app boots without needing a running Postgres. Resolved 2026-05-01.
 
 ## Naming
 
