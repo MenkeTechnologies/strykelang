@@ -462,6 +462,38 @@ for val $row (kv_scan($db, "users:")) {
       </section>
 
       <section class="tutorial-section">
+        <h2>zsh → stryke transpiler <em>(world-first)</em></h2>
+        <p><code>stryke --from-zsh script.zsh</code> rewrites a zsh script into idiomatic stryke. It is not a text or regex munger: stryke <strong>embeds the zshrs parser</strong>, parses the script into a real zsh AST in-process, maps that tree node-for-node onto the stryke AST, and emits source through the same converter that powers the Perl&nbsp;→&nbsp;stryke path. No subprocess, no JSON hand-off, no string heuristics — one program holding both grammars and translating between two ASTs. Existing shell transpilers (bash2py, sh→awk one-liners, etc.) operate on token streams or text; cross-language <em>AST-to-AST</em> conversion driven by the target language's own embedded parser for the source language is the novel primitive.</p>
+        <p>The translation is structural and classifies every command:</p>
+        <ul>
+          <li><strong>builtins → native stryke</strong> — <code>echo</code>/<code>print</code> → <code>p</code>, <code>printf</code>, <code>cd</code> → <code>chdir</code>; <code>return</code>/<code>break</code>/<code>continue</code>/<code>exit</code>/<code>shift</code>/<code>pushd</code>/<code>popd</code>/<code>pwd</code> map to their stryke forms.</li>
+          <li><strong>external commands &amp; pipelines → <code>system("…")</code></strong> — only externals reach the shell; scalar <code>$vars</code> flow in via stryke interpolation, redirections (<code>&gt;</code>, <code>&gt;&gt;</code>, <code>2&gt;&amp;1</code>, <code>&lt;</code>, …) are reconstructed.</li>
+          <li><strong>control flow</strong> — <code>if</code>/<code>elif</code>, <code>while</code>/<code>until</code>, <code>for … in</code>, C-style <code>for ((;;))</code>, <code>case</code> → <code>if</code>/<code>elsif</code>, <code>foo() { }</code> → <code>fn</code>.</li>
+          <li><strong>declarations</strong> — first write becomes a declaration, later writes a reassignment; <code>val</code> for write-once, <code>var</code> for mutated (per-scope mutation analysis) — never bare <code>my</code>.</li>
+          <li><strong>parameters &amp; arithmetic</strong> — <code>$1</code> → <code>$ARGV[0]</code> / <code>$_[0]</code>, <code>$@</code> → <code>@ARGV</code>; <code>$(( … ))</code> / <code>(( … ))</code> / <code>let</code> rewritten by sigil-prefixing identifiers; <code>$(cmd)</code> / <code>`cmd`</code> → <code>qx</code>.</li>
+        </ul>
+        <p>Unsupported constructs are skipped with a warning to stderr — never silently mistranslated.</p>
+<pre><span class="comment"># input.zsh</span>
+name=world
+count=0
+greeting="hello $name"
+for f in a b c; do
+  count=1
+  echo $f
+done
+ls -la $name | grep foo</pre>
+<pre><span class="comment"># stryke --from-zsh input.zsh</span>
+val $name = "world"
+var $count = 0
+val $greeting = "hello $name"
+for $f (qw(a b c)) {
+    $count = 1
+    p "$f"
+}
+system("ls -la $name | grep foo")</pre>
+      </section>
+
+      <section class="tutorial-section">
         <h2>String coordinates — bytes vs codepoints</h2>
         <p>Stryke runs string code in two coordinate systems. <strong>Perl 5 builtins stay byte-indexed</strong> for binary-protocol and <code>.pm</code>-source compat. <strong>Stryke extensions are codepoint-indexed</strong> so search positions and slice bounds line up. They are never auto-converted — pick one coordinate system per expression and keep it consistent.</p>
 

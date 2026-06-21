@@ -78,6 +78,8 @@ pub mod compiler;
 pub mod controller;
 /// `convert` submodule.
 pub mod convert;
+/// `zsh_convert` submodule — zsh source → stryke source transpiler.
+pub mod zsh_convert;
 mod crypt_util;
 /// `dap` submodule.
 pub mod dap;

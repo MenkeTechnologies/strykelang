@@ -21,6 +21,7 @@ const INDENT: &str = "    ";
 
 thread_local! {
     static OUTPUT_DELIM: RefCell<Option<char>> = const { RefCell::new(None) };
+    static VAL_VAR_DECLS: RefCell<bool> = const { RefCell::new(false) };
 }
 
 /// Options for the convert module.
@@ -28,6 +29,10 @@ thread_local! {
 pub struct ConvertOptions {
     /// Custom delimiter for s///, tr///, m// patterns (e.g., '|', '#', '!').
     pub output_delim: Option<char>,
+    /// Render `My` declarations with `val`/`var` keywords instead of `my`:
+    /// an all-frozen group becomes `val` (immutable), otherwise `var`. Used by
+    /// the zsh→stryke transpiler, which never emits bare `my` (style rule 10).
+    pub val_var_decls: bool,
 }
 
 fn get_output_delim() -> Option<char> {
@@ -36,6 +41,26 @@ fn get_output_delim() -> Option<char> {
 
 fn set_output_delim(delim: Option<char>) {
     OUTPUT_DELIM.with(|d| *d.borrow_mut() = delim);
+}
+
+fn val_var_decls_enabled() -> bool {
+    VAL_VAR_DECLS.with(|d| *d.borrow())
+}
+
+fn set_val_var_decls(on: bool) {
+    VAL_VAR_DECLS.with(|d| *d.borrow_mut() = on);
+}
+
+/// Keyword for a `My` declaration group. Default `my`; in val/var mode an
+/// all-frozen group is `val` (immutable), otherwise `var` (mutable).
+fn decl_keyword(decls: &[VarDecl]) -> &'static str {
+    if !val_var_decls_enabled() {
+        "my"
+    } else if !decls.is_empty() && decls.iter().all(|d| d.frozen) {
+        "val"
+    } else {
+        "var"
+    }
 }
 
 /// Choose the output delimiter: custom if set, else the original from the AST.
@@ -53,8 +78,10 @@ pub fn convert_program(p: &Program) -> String {
 /// Convert a parsed Perl program to stryke syntax with custom options.
 pub fn convert_program_with_options(p: &Program, opts: &ConvertOptions) -> String {
     set_output_delim(opts.output_delim);
+    set_val_var_decls(opts.val_var_decls);
     let body = convert_statements(&p.statements, 0);
     set_output_delim(None);
+    set_val_var_decls(false);
     format!("#!/usr/bin/env stryke\n{}", body)
 }
 
@@ -385,7 +412,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             .as_ref()
             .map(|x| format!("redo {}", x))
             .unwrap_or_else(|| "redo".to_string()),
-        StmtKind::My(decls) => format!("my {}", convert_var_decls(decls)),
+        StmtKind::My(decls) => format!("{} {}", decl_keyword(decls), convert_var_decls(decls)),
         StmtKind::Our(decls) => format!("our {}", convert_var_decls(decls)),
         StmtKind::Local(decls) => format!("local {}", convert_var_decls(decls)),
         StmtKind::State(decls) => format!("state {}", convert_var_decls(decls)),
@@ -586,7 +613,7 @@ fn convert_statement_body(s: &Statement) -> String {
         .unwrap_or_default();
     let body = match &s.kind {
         StmtKind::Expression(e) => convert_expr_top(e),
-        StmtKind::My(decls) => format!("my {}", convert_var_decls(decls)),
+        StmtKind::My(decls) => format!("{} {}", decl_keyword(decls), convert_var_decls(decls)),
         _ => convert_statement(s, 0).trim().to_string(),
     };
     format!("{}{}", lab, body)
@@ -1682,6 +1709,7 @@ mod tests {
         let p = parse(code).expect("parse failed");
         let opts = ConvertOptions {
             output_delim: Some(delim),
+            ..Default::default()
         };
         let out = convert_program_with_options(&p, &opts);
         out.strip_prefix("#!/usr/bin/env stryke\n")
