@@ -1506,7 +1506,7 @@ fn extract_variable_action(
         range,
         selection,
         "extracted",
-        "Extract to variable (`my $name = …`)",
+        "Extract to variable (`var $name = …`)",
         false,
     )
 }
@@ -2308,7 +2308,7 @@ fn extract_constant_action(
         range,
         selection,
         "EXTRACTED",
-        "Extract to constant (`frozen my $NAME = …`)",
+        "Extract to constant (`val $NAME = …`)",
         true,
     )
 }
@@ -2356,13 +2356,12 @@ fn extract_to_local(
     } else {
         selection.to_string()
     };
-    // Stryke `frozen` modifier comes BEFORE `my`, not after. The
-    // reverse order (`my frozen $X = …`) fails to parse — pinned by
-    // `extract_constant_uses_frozen_my_order`.
+    // Idiomatic stryke (style guide rule 10): `val` for an immutable constant,
+    // `var` for a mutable variable — never bare `my`.
     let decl = if frozen {
-        format!("{leading_ws}frozen my ${placeholder} = {decl_rhs}\n")
+        format!("{leading_ws}val ${placeholder} = {decl_rhs}\n")
     } else {
-        format!("{leading_ws}my ${placeholder} = {decl_rhs}\n")
+        format!("{leading_ws}var ${placeholder} = {decl_rhs}\n")
     };
     let insert = TextEdit {
         range: Range {
@@ -2962,8 +2961,8 @@ mod tests {
         // Original source: `my $msg = "hello world"` — the user selects
         // the inner literal `hello world` (between but not including
         // the `"` chars). Without wrapping, the decl becomes
-        // `my $extracted = hello world` which is invalid syntax.
-        // The fix must produce `my $extracted = "hello world"`.
+        // `var $extracted = hello world` which is invalid syntax.
+        // The fix must produce `var $extracted = "hello world"`.
         let src = "my $msg = \"hello world\"\n";
         // `"` at col 10, `hello world` runs col 11..22.
         let actions = code_actions(src, range(0, 11, 0, 22));
@@ -2980,7 +2979,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"hello world\"\n"),
@@ -2997,7 +2996,7 @@ mod tests {
     #[test]
     fn extract_variable_inside_double_quoted_preserves_interpolation() {
         // Selecting `hello $name ` from `"hello $name world"` should
-        // produce `my $extracted = "hello $name "` so the original
+        // produce `var $extracted = "hello $name "` so the original
         // interpolation continues to work via the new decl.
         let src = "my $msg = \"hello $name world\"\n";
         // `hello $name ` runs col 11..23.
@@ -3015,7 +3014,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"hello $name \"\n"),
@@ -3271,10 +3270,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_constant_uses_frozen_my_order() {
-        // Stryke syntax: `frozen my $X = val`, NOT `my frozen $X = val`
-        // (which fails to parse with "Expected variable in declaration,
-        // got Ident(\"frozen\")"). Pin the correct order.
+    fn extract_constant_uses_val_keyword() {
+        // Idiomatic stryke (style guide rule 10): an extracted constant is
+        // immutable, so the decl must use `val`, never bare `my`.
         let src = "my $s = \"dispatcher\"\n";
         // Select `dispatcher` (between the quotes), cols 9..19.
         let actions = code_actions(src, range(0, 9, 0, 19));
@@ -3294,13 +3292,13 @@ mod tests {
             .find(|e| e.new_text.contains("EXTRACTED"))
             .unwrap();
         assert!(
-            decl.new_text.starts_with("frozen my $EXTRACTED"),
-            "decl must start with `frozen my`, not `my frozen`: {:?}",
+            decl.new_text.starts_with("val $EXTRACTED"),
+            "decl must start with `val`, not `my`/`frozen my`: {:?}",
             decl.new_text
         );
         assert!(
-            !decl.new_text.contains("my frozen"),
-            "must NOT use invalid `my frozen` order: {:?}",
+            !decl.new_text.contains("my "),
+            "must NOT use bare `my` for a constant: {:?}",
             decl.new_text
         );
     }
@@ -3323,7 +3321,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= 1 + 2\n"),
@@ -3340,8 +3338,8 @@ mod tests {
     #[test]
     fn extract_variable_of_bare_scalar_inside_string_does_not_double_wrap() {
         // Selecting JUST `$name` from `"$name is here"` is already a
-        // valid expression — the decl should be `my $extracted = $name`
-        // (NOT `my $extracted = "$name"` which would force scalar
+        // valid expression — the decl should be `var $extracted = $name`
+        // (NOT `var $extracted = "$name"` which would force scalar
         // stringification on non-string values).
         let src = "my $msg = \"$name is here\"\n";
         // `$name` runs col 11..16.
@@ -3359,7 +3357,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= $name\n"),
@@ -3391,7 +3389,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"ls -la\"\n"),
@@ -3425,7 +3423,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= total\n"),
@@ -3455,7 +3453,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= $foo\n"),
@@ -3467,7 +3465,7 @@ mod tests {
     #[test]
     fn extract_variable_on_caret_inside_string_snaps_to_string_word() {
         // Caret inside `"one two three"` on the word `two` — extract
-        // just `two` as `my $extracted = "two"`.
+        // just `two` as `var $extracted = "two"`.
         let src = "my $s = \"one two three\"\n";
         // `two` runs cols 13..16; caret at col 14.
         let actions = code_actions(src, range(0, 14, 0, 14));
@@ -3484,7 +3482,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"two\"\n"),
@@ -3513,7 +3511,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= $var\n"),
@@ -3526,7 +3524,7 @@ mod tests {
     fn extract_variable_extracts_word_from_backtick_command() {
         // User's exact case: `` my $r = `ls file` ``, extract `file`.
         // Result must be:
-        //   my $extracted = "file"
+        //   var $extracted = "file"
         //   my $r = `ls $extracted`
         let src = "my $r = `ls file`\n";
         // `file` runs col 12..16 (between the backticks).
@@ -3544,7 +3542,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"file\"\n"),
@@ -3562,7 +3560,7 @@ mod tests {
     #[test]
     fn extract_variable_inside_backtick_preserves_interpolation_via_string() {
         // Selecting `ls $dir | wc -l` from `` `ls $dir | wc -l` `` ⇒
-        // `my $extracted = "ls $dir | wc -l"` — the string interpolates
+        // `var $extracted = "ls $dir | wc -l"` — the string interpolates
         // `$dir` at decl time, then the surrounding `` `$extracted` ``
         // interpolates the resulting command string and runs it,
         // preserving command-at-original-site behavior.
@@ -3582,7 +3580,7 @@ mod tests {
         let (_uri, edits) = changes.iter().next().unwrap();
         let decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             decl.new_text.contains("= \"ls $dir | wc -l\"\n"),
@@ -3610,7 +3608,7 @@ mod tests {
         assert_eq!(edits.len(), 2, "two edits emitted");
         let new_decl = edits
             .iter()
-            .find(|e| e.new_text.starts_with("my "))
+            .find(|e| e.new_text.starts_with("var "))
             .unwrap();
         assert!(
             new_decl.new_text.contains("$extracted"),
