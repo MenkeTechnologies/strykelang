@@ -23283,8 +23283,14 @@ fn zsh_param_form(body: &str) -> bool {
     if i == 0 {
         return false;
     }
-    // `[` → subscript / subscript-flag form (`${arr[2]}`, `${arr[(r)pat]}`).
-    matches!(b.get(i), Some(b':') | Some(b'#') | Some(b'%') | Some(b'/') | Some(b'['))
+    match b.get(i) {
+        // `:-`/`:=`/`:?`/`:+`/`:off` — but NOT `::` (Perl package qualifier, e.g.
+        // `${main::cfg}`, which must stay Perl interpolation).
+        Some(b':') => b.get(i + 1) != Some(&b':'),
+        // `#`/`##` trim, `%`/`%%` trim, `/`//` substitution, `[…]` subscript.
+        Some(b'#') | Some(b'%') | Some(b'/') | Some(b'[') => true,
+        _ => false,
+    }
 }
 
 /// Lower a zsh `${ body }` form to `zpexpand('${body}', "name", $name, …)` — the
