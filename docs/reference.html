@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.20 · 10337 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.22 · 10339 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -332,7 +332,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8586</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8588</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -13191,7 +13191,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8586 topics</p>
+      <p class="chapter-meta">8588 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -13442,6 +13442,22 @@ try { dangerous_call() } catch ($e) { warn &quot;caught: $e&quot; }
 }
 </code></pre>
         <p>See also: <code>@ARGV</code> (the list of files), <code>$.</code> (line number).</p>
+      </article>
+      <article class="doc-entry" id="doc-nf">
+        <h3><a class="doc-anchor" href="#doc-nf">#</a> <code>$NF</code></h3>
+        <p><code>$NF</code> — awk-compat: the number of fields produced by the most recent autosplit of an input line into <code>@F</code> (<code>-a</code> flag). Equivalent to <code>scalar @F</code>. stryke exposes both for one-liner familiarity to awk users.</p>
+        <pre><code class="lang-perl"># stryke -F: -nae &#39;p &quot;$NF fields: @F&quot;&#39; /etc/passwd
+# Equivalent to awk &#39;{ print NF&quot; fields: &quot;$0 }&#39;
+</code></pre>
+        <p>See also: <code>$NR</code>, <code>@F</code>, <code>-a</code> / <code>-F</code> command-line flags, awk-compat one-liner mode.</p>
+      </article>
+      <article class="doc-entry" id="doc-nr">
+        <h3><a class="doc-anchor" href="#doc-nr">#</a> <code>$NR</code></h3>
+        <p><code>$NR</code> — awk-compat: the current input record number. Equivalent to <code>$.</code> (current line of the most recently read filehandle). stryke exposes both for one-liner familiarity to awk users. <code>$.</code>-based code and <code>$NR</code>-based code can be mixed in the same one-liner.</p>
+        <pre><code class="lang-perl"># stryke -nae &#39;p &quot;$NR: $_&quot; if /TODO/&#39;
+# Equivalent to awk &#39;/TODO/ { print NR&quot;: &quot;$0 }&#39;
+</code></pre>
+        <p>See also: <code>$.</code>, <code>$NF</code>, <code>@F</code>, <code>-a</code> / <code>-F</code>, <code>-n</code> / <code>-p</code>.</p>
       </article>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$\</code></h3>
