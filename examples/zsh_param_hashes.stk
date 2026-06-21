@@ -1,0 +1,18 @@
+#!/usr/bin/env stryke
+# zsh HASH (associative array) parameter expansion in stryke double-quoted
+# strings — delegated to zshrs's paramsubst engine (zero reimplementation).
+
+var %conf = (host => "localhost", port => "5432", user => "admin")
+
+# element access by bareword key
+p "host:  ${conf[host]}"
+p "port:  ${conf[port]}"
+
+# whole-hash flags
+p "keys:  ${(k)conf}"                # all keys
+p "vals:  ${(v)conf}"                # all values
+p "pairs: ${(kv)conf}"               # interleaved key value …
+
+# combine with a scalar form on the extracted value
+var %ver = (major => "0", minor => "17")
+p "semver: ${ver[major]}.${ver[minor]}"

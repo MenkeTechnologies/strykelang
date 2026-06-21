@@ -503,6 +503,8 @@ system("ls -la $name | grep foo")</pre>
           <li><strong>substitution:</strong> <code>${x/pat/repl}</code>, <code>${x//pat/repl}</code></li>
           <li><strong>length:</strong> <code>${#x}</code> &nbsp;·&nbsp; <strong>flags:</strong> <code>${(U)x}</code>, <code>${(L)x}</code>, …</li>
           <li><strong>subscripts &amp; subscript flags:</strong> <code>${a[2]}</code>, <code>${a[2,4]}</code> (slice), <code>${a[(i)val]}</code> (index-of), <code>${a[(r)pat]}</code> (reverse-subscript match)</li>
+          <li><strong>array-wide flags &amp; operators:</strong> <code>${(o)a}</code> / <code>${(O)a}</code> (sort), <code>${(u)a}</code> (unique), <code>${(j:/:)a}</code> (join), <code>${a:#pat}</code> (drop matching)</li>
+          <li><strong>associative arrays (hashes):</strong> <code>${h[key]}</code> (element), <code>${(k)h}</code> (keys), <code>${(v)h}</code> (values), <code>${(kv)h}</code> (pairs)</li>
         </ul>
 <pre>val $f = "archive.tar.gz"
 p "${f%%.*}"          <span class="comment"># archive</span>
@@ -512,6 +514,12 @@ p "${(U)f}"           <span class="comment"># ARCHIVE.TAR.GZ</span>
 var @a = ("alpha", "beta", "gamma")
 p "${a[2]}"           <span class="comment"># beta   (zsh 1-indexed)</span>
 p "${a[(i)gamma]}"    <span class="comment"># 3      (index-of flag)</span>
+p "${(o)a}"           <span class="comment"># alpha beta gamma  (sorted)</span>
+p "${(j:/:)a}"        <span class="comment"># alpha/beta/gamma  (joined)</span>
+
+var %conf = (host => "localhost", port => "5432")
+p "${conf[host]}"     <span class="comment"># localhost         (hash element)</span>
+p "${(k)conf}"        <span class="comment"># host port         (keys)</span>
 
 val $name = ""
 p "deploy to ${name:-staging}"   <span class="comment"># deploy to staging</span></pre>

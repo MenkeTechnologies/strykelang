@@ -23301,22 +23301,22 @@ fn build_zpexpand_expr(body: &str, line: usize) -> Expr {
         kind: ExprKind::String(format!("${{{}}}", body)),
         line,
     }];
-    // A name with a `[…]` subscript is an array — bridge it as `@name` so the
-    // subscript / subscript-flag (`(i)`,`(r)`,…) has an array to index.
-    let arrays = subscripted_names(body);
+    // Bridge each referenced variable at its real type, by reference so the
+    // value does not flatten into the call's argument pairs: hashes (`(k)`/`(v)`
+    // flags, `${h[key]}` bareword subscript) as `\%name`, arrays (`[…]`
+    // subscripts, array flags/operators) as `\@name`, everything else `$name`.
+    let arrays = array_names(body);
+    let hashes = hash_names(body);
     for name in zsh_referenced_params(body) {
         args.push(Expr {
             kind: ExprKind::String(name.clone()),
             line,
         });
-        // Arrays are passed by reference (`\@name`, lowered to `ScalarRef`) so
-        // the list does not flatten into the call's argument pairs; the builtin
-        // derefs them.
-        let val = if arrays.contains(&name) {
-            ExprKind::ScalarRef(Box::new(Expr {
-                kind: ExprKind::ArrayVar(name),
-                line,
-            }))
+        let referent = |kind: ExprKind| ExprKind::ScalarRef(Box::new(Expr { kind, line }));
+        let val = if hashes.contains(&name) {
+            referent(ExprKind::HashVar(name))
+        } else if arrays.contains(&name) {
+            referent(ExprKind::ArrayVar(name))
         } else {
             ExprKind::ScalarVar(name)
         };
@@ -23331,9 +23331,62 @@ fn build_zpexpand_expr(body: &str, line: usize) -> Expr {
     }
 }
 
-/// Names that appear with a `[` subscript in a `${ … }` body (so they must be
-/// bridged as arrays).
+/// Names that must be bridged as zsh arrays: any `[`-subscripted name, plus the
+/// main parameter when the body uses array-oriented flags (`(o)`/`(O)` sort,
+/// `(u)` unique, `(n)` numeric, `(a)`, `(j:…)` join, `(@)`) or an array operator
+/// (`${a:#pat}`, `${a:|b}`, `${a:*b}`, `${a:^b}`). zshrs's `paramsubst` handles
+/// all of these — they just need an array, not a scalar, bridged in.
+fn array_names(body: &str) -> Vec<String> {
+    let mut out = subscripted_names(body);
+    let b = body.as_bytes();
+    let mut i = 0;
+    let mut array_flags = false;
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = body.find(')') {
+            array_flags = body[1..rp]
+                .bytes()
+                .any(|c| matches!(c, b'o' | b'O' | b'u' | b'n' | b'a' | b'j' | b'@'));
+            i = rp + 1;
+        }
+    }
+    while i < b.len() && b[i] == b'#' {
+        i += 1;
+    }
+    let s = i;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i > s {
+        let rest = &body[i..];
+        let array_op = rest.starts_with(":#")
+            || rest.starts_with(":|")
+            || rest.starts_with(":*")
+            || rest.starts_with(":^");
+        if array_flags || array_op {
+            out.push(body[s..i].to_string());
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Names whose `[` subscript is array-like — the key starts with a digit, `-`
+/// (negative index), `(` (subscript flag), `@`/`*` (whole array), or `$` (var
+/// index). A bareword key (`${h[beta]}`) is a hash, handled by [`hash_names`].
 fn subscripted_names(body: &str) -> Vec<String> {
+    subscript_names_where(body, |c| {
+        c.is_ascii_digit() || matches!(c, b'-' | b'(' | b'@' | b'*' | b'$')
+    })
+}
+
+/// Names with a bareword `[key]` subscript (`${h[beta]}`) — these are hashes.
+fn hash_subscript_names(body: &str) -> Vec<String> {
+    subscript_names_where(body, |c| c.is_ascii_alphabetic() || c == b'_')
+}
+
+/// Names followed by `[` whose first subscript byte satisfies `key_is`.
+fn subscript_names_where(body: &str, key_is: impl Fn(u8) -> bool) -> Vec<String> {
     let b = body.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
@@ -23344,12 +23397,46 @@ fn subscripted_names(body: &str) -> Vec<String> {
                 i += 1;
             }
             if b.get(i) == Some(&b'[') {
-                out.push(body[s..i].to_string());
+                if let Some(&k) = b.get(i + 1) {
+                    if key_is(k) {
+                        out.push(body[s..i].to_string());
+                    }
+                }
             }
         } else {
             i += 1;
         }
     }
+    out
+}
+
+/// Names that must be bridged as zsh associative arrays (hashes): a bareword
+/// `[key]` subscript, or the main parameter under a `(k)`/`(v)`/`(K)`/`(V)` flag.
+fn hash_names(body: &str) -> Vec<String> {
+    let mut out = hash_subscript_names(body);
+    let b = body.as_bytes();
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = body.find(')') {
+            let hash_flags = body[1..rp]
+                .bytes()
+                .any(|c| matches!(c, b'k' | b'v' | b'K' | b'V'));
+            if hash_flags {
+                let mut i = rp + 1;
+                while i < b.len() && b[i] == b'#' {
+                    i += 1;
+                }
+                let s = i;
+                while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+                    i += 1;
+                }
+                if i > s {
+                    out.push(body[s..i].to_string());
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
     out
 }
 

@@ -35467,25 +35467,28 @@ fn builtin_zpexpand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut i = 1;
     while i + 1 < args.len() {
         let name = args[i].to_string();
-        // Bridge the stryke value into zshrs's parameter table: an array (passed
-        // by reference `\@name` to avoid list flattening) goes in via
-        // `setaparam` so subscripts / `(i)`/`(r)`/`(k)` flags work; a scalar via
-        // `setsparam`.
-        let arr_elems = args[i + 1]
+        // Bridge the stryke value into zshrs's parameter table by its real type,
+        // passed by reference (`\%h` / `\@a`) so lists/hashes don't flatten into
+        // the argument pairs: a hash → `sethparam` (flat key,value pairs) so
+        // `(k)`/`(v)`/`${h[key]}` work; an array → `setaparam` so subscripts,
+        // slices, and `(o)`/`(u)`/`(j:…)`/`:#` work; anything else → `setsparam`.
+        let val = &args[i + 1];
+        if let Some(h) = val.as_hash_ref() {
+            let g = h.read();
+            let mut kv = Vec::with_capacity(g.len() * 2);
+            for (k, v) in g.iter() {
+                kv.push(k.clone());
+                kv.push(v.to_string());
+            }
+            zsh::ported::params::sethparam(&name, kv);
+        } else if let Some(elems) = val
             .as_array_ref()
             .map(|r| r.read().iter().map(|e| e.to_string()).collect::<Vec<_>>())
-            .or_else(|| {
-                args[i + 1]
-                    .as_array_vec()
-                    .map(|v| v.iter().map(|e| e.to_string()).collect())
-            });
-        match arr_elems {
-            Some(v) => {
-                zsh::ported::params::setaparam(&name, v);
-            }
-            None => {
-                zsh::ported::params::setsparam(&name, &args[i + 1].to_string());
-            }
+            .or_else(|| val.as_array_vec().map(|v| v.iter().map(|e| e.to_string()).collect()))
+        {
+            zsh::ported::params::setaparam(&name, elems);
+        } else {
+            zsh::ported::params::setsparam(&name, &val.to_string());
         }
         i += 2;
     }
