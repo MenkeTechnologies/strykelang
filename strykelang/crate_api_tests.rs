@@ -5280,4 +5280,10 @@ fn zsh_param_expansion_subscripts_and_flags() {
 fn perl_brace_interpolation_still_works_alongside_zsh() {
     // The zsh routing must not disturb plain Perl `${name}` interpolation.
     assert_eq!(run_str(r#"my $name = "world"; "hi ${name}!""#), "hi world!");
+    // `${Pkg::var}` (Perl package qualifier, `::`) must stay Perl, not be
+    // mis-read as a zsh `:` operator.
+    assert_eq!(
+        run_str(r#"package main; our $cfg = "ok"; "v=${main::cfg}""#),
+        "v=ok"
+    );
 }
