@@ -216,7 +216,7 @@ Five underlying bugs discovered and fixed at root rather than papered over:
 
 1. **`\%hash` on `our` hashes derefed to empty.** `promote_hash_to_shared` / `promote_array_to_shared` compared the raw incoming `name` against `frame.hashes` / `frame.arrays` keys, but the entries are canonically stored without the `main::` prefix. A call like `promote_hash_to_shared("main::h")` failed to find the actual `"h"` entry and returned an empty `Arc`. Fix: strip `main::` at entry to both functions (matches the canonicalization done in every other scope path).
 2. **`our %hash` didn't persist across EVAL boundaries.** `declare_hash` stored into the innermost lexical frame regardless of whether the name was package-qualified, so an `our %soul = (...)` in EVAL 1 was destroyed when the script's lexical frame popped — EVAL 2's `our %soul` saw nothing. Additionally, `Op::DeclareHash` clobbered with empty when handling the no-initializer form (`our %h;`), wiping any data set by a prior EVAL. Fix: route package-qualified declarations to frame[0]; treat the no-initializer DeclareHash form as a declare-only op that preserves existing data. Same root cause in `declare_array_frozen` (post-canon check on `name.contains("::")` was always false for `main::`-prefixed names) — fixed in parallel.
-3. **`bestow`/`enshrine` rejected hashref arguments.** The `as_hash_map()` helper at `value.rs:1446` only matches `HeapObject::Hash` — bare hash values, NOT hashref-wrapped hashes. So `bestow(\%h, @workers)` and `enshrine(\%h, $path)` errored with "first argument must be a hash" even though `\%h` is the natural Perl idiom. Fix: both builtins now try `as_hash_map()` first then fall back to `as_hash_ref().map(|r| r.read().clone())`.
+3. **`bestow`/`enshrine` rejected hashref arguments.** The `as_hash_map()` helper at `value.rs:1476` only matches `HeapObject::Hash` — bare hash values, NOT hashref-wrapped hashes. So `bestow(\%h, @workers)` and `enshrine(\%h, $path)` errored with "first argument must be a hash" even though `\%h` is the natural Perl idiom. Fix: both builtins now try `as_hash_map()` first then fall back to `as_hash_ref().map(|r| r.read().clone())`.
 4. **`lick`/`peruse`/`interrogate`/`exhume` returned bare hash VALUES for nested objects.** `json_value_to_stryke` (and `builtin_exhume`) returned `StrykeValue::hash(map)` — when stored in an outer hash (lick/peruse/interrogate-agents do per-session-id), `$h{$sid}` was bare hash → `ref()` returned "" and `$h{$sid}->{k}` didn't work; stringification gave flat concatenation. Fix: return `hash_ref` / `array_ref` so nested complex values are first-class refs the caller can subscript. Same pattern that interrogate(PID) already used.
 5. **`congregation(N>~50)` lost 1-3 children to a fork-stdio race.** The background `accept_loop` thread runs `eprintln!("[agent connected] ...")` on every successful HELLO. With 100+ tight `fork()` calls in `builtin_congregation`, sometimes the main thread forked while accept_loop held `std::io::stderr`'s RefCell — child inherits a borrowed RefCell, panics on first stdio call. Fix: new `Controller.quiet_accept: AtomicBool` toggled by `congregation`/`anoint` during bulk fork (silences the per-agent eprintln); restored after `welcome()` returns. Also: scale the welcome timeout with N: `2 + (N/10).max(1)` seconds (was hardcoded 5s). Tested clean at 100 + 250 workers.
 
@@ -245,13 +245,13 @@ Test verification: `cargo test --test integration -- suite::demos_no_interop sui
 
 ### The Gap
 
-The infrastructure already exists in `strykelang/controller.rs` (788 lines) + `strykelang/agent.rs` (938 lines):
+The infrastructure already exists in `strykelang/controller.rs` (1448 lines) + `strykelang/agent.rs` (1017 lines):
 
-- TCP listener daemon (`controller.rs:498` `run_controller`)
-- Persistent outbound-connecting agents (`agent.rs:446` `run_agent`)
-- Bincode-framed wire protocol: `[u64 LE length][u8 kind][bincode payload]` (`agent.rs:30-46`)
-- Message types: `AgentHello`, `AgentHelloAck`, `EvalCommand`, `EvalResult`, `FireCommand`, `WorkloadType`, `AgentState` (`controller.rs:33-36`)
-- Stryke builtins exposed: `controller()` (`builtins.rs:13015`), `agent()` (`builtins.rs:13041`)
+- TCP listener daemon (`controller.rs:610` `run_controller`)
+- Persistent outbound-connecting agents (`agent.rs:512` `run_agent`)
+- Bincode-framed wire protocol: `[u64 LE length][u8 kind][bincode payload]` (`agent.rs:28`)
+- Message types: `AgentHello`, `AgentHelloAck`, `EvalCommand`, `EvalResult`, `FireCommand`, `WorkloadType`, `AgentState` (defined in `agent.rs`, imported at `controller.rs:28-31`)
+- Stryke builtins exposed: `controller()` (`builtins.rs:5327`), `agent()` (`builtins.rs:5328`)
 
 **Blocker:** both builtins block in their daemon loops. Scripts can launch them but cannot programmatically scatter work, collect results, or coordinate from inside a `.stk` file:
 
@@ -303,7 +303,7 @@ A 26-verb vocabulary mapped onto the existing controller/agent transport. Master
 
 **Noun:** `congregation` — the typed roster handle (PID array under the hood).
 
-**Bless is reserved** — `bless` is Perl 5 core (`parser.rs:13862`'s `is_perl5_core` list) and unavailable. `bestow` is the master→workers push verb instead.
+**Bless is reserved** — `bless` is Perl 5 core (`parser.rs:14364`'s `is_perl5_core` list) and unavailable. `bestow` is the master→workers push verb instead.
 
 ### IPC and Process Worker Pool
 
@@ -416,10 +416,10 @@ The 26 verbs are stryke builtins. Each is a thin layer over a refactored `Contro
 
 | Today | What needs to exist |
 |---|---|
-| `pub fn run_controller(bind, port) -> i32` blocks in REPL (`controller.rs:498`) | `Controller::spawn(bind, port) -> ControllerHandle` — returns immediately, listener thread runs in background |
+| `pub fn run_controller(bind, port) -> i32` blocks in REPL (`controller.rs:610`) | `Controller::spawn(bind, port) -> ControllerHandle` — returns immediately, listener thread runs in background |
 | Operations driven only by REPL command parsing | Method API: `scatter(code, &[agent_id]) -> DivinationId`, `gather(div, timeout) -> HashMap<agent_id, StrykeValue>`, `terminate(&[agent_id])`, `shutdown()` |
 | `EvalCommand` / `EvalResult` only fired by REPL | Wired through `Controller::scatter`/`gather` so script-callable builtins use them |
-| `builtin_controller` blocks (`builtins.rs:13026`) | Replace with non-blocking handle-returning variants for each verb |
+| `builtin_controller` blocks (`builtins.rs:13094`) | Replace with non-blocking handle-returning variants for each verb |
 
 **End-to-end scriptable example:**
 
@@ -444,7 +444,7 @@ bow {                                                           # enter receive 
 
 **Tier 0 — minimum viable first slice (proves the architecture works):**
 
-1. Refactor `controller.rs:498` into `Controller::spawn` + method API (non-blocking)
+1. Refactor `controller.rs:610` into `Controller::spawn` + method API (non-blocking)
 2. Keep existing REPL alive as a separate binary mode (`stryke controller --repl`) — don't break what works
 3. Add 4 builtins: `ordain`, `muster`, `pray`, `annex` — minimum end-to-end scriptable scatter-gather
 4. One example script: `examples/distributed_render.stk`

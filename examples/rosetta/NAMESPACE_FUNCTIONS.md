@@ -95,21 +95,23 @@ fn Cache::set($key, $val) { ... }    # GOOD
 
 ## Reserved Words
 
-These names cannot be used as function names at all (even namespaced) — they are lexer-level operators or language keywords:
+These bare names cannot be used as function names — they are lexer-level operators or language keywords:
 
 ```
 y tr s m q qq qw qx qr
-if unless while until for foreach given when else elsif
+if unless while until for foreach loop ploop pwhile null given when else elsif
 do eval return last next redo goto
-my our local state sub fn class struct enum trait
-use no require package BEGIN END CHECK INIT UNITCHECK
+my var val our local state sub fn class struct enum trait
+use import no require package BEGIN END CHECK INIT UNITCHECK
 and or not x eq ne lt gt le ge cmp
 ```
 
-Attempting `fn y { }` or `fn Foo::goto { }` produces:
+Attempting `fn goto { }` produces:
 ```
-`y` is a reserved word and cannot be used as a function name
+`goto` is a reserved word and cannot be used as a function name
 ```
+
+Namespaced spellings escape this — a name containing `::` is exempt, so `fn Foo::goto($x) { ... }` is accepted and callable as `Foo::goto(...)`.
 
 ## Summary
 
