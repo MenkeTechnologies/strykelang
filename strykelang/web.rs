@@ -19,7 +19,7 @@ use crate::error::StrykeError;
 use crate::value::StrykeValue;
 use crate::vm_helper::{FlowOrError, VMHelper};
 use indexmap::IndexMap;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use regex::Regex;
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -2483,17 +2483,27 @@ impl VMHelper {
         Ok(body)
     }
 
-    /// Compile + evaluate ERB. Recognised tags:
+    /// Compile + evaluate the unified template engine. One engine handles two
+    /// tag families in the same template (EJS-shaped — code blocks plus
+    /// interpolation):
     ///
     /// ```text
-    /// <%# comment %>     dropped
-    /// <% stmt %>         executed for side effects (no output)
-    /// <%= expr %>        evaluated and stringified into output
-    /// <%- ... -%>        same as above with whitespace trimming
+    /// CODE (stryke, ERB):                DATA (Mustache):
+    ///   <% stmt %>   run, no output        {{ key }}            interpolate (raw)
+    ///   <%= expr %>  eval -> output (raw)   {{# key }}…{{/ key }}  section / loop
+    ///   <%- … -%>    same, trim whitespace  {{^ key }}…{{/ key }}  inverted
+    ///   <%# … %>     comment                {{! comment }}       comment
     /// ```
     ///
-    /// Locals are installed as `my $name = $value` in a child scope so
-    /// the views can reference them as plain scalars.
+    /// `<%=` is intentionally *not* HTML-escaped (unlike stock EJS) so the
+    /// thousands of existing `<%= web_h($x) %>` views keep working — reach for
+    /// `web_h(...)` explicitly when escaping is wanted. `{{ key }}` data tags
+    /// resolve against the locals hashref (`$__tc0`); `{{# }}` sections walk it
+    /// via `web_tmpl_section`, with `{{.}}` bound to the current element.
+    ///
+    /// Locals are installed as `my $name = $value` in a child scope so the
+    /// views can reference them as plain scalars from `<% %>` code, and the
+    /// whole locals map is bound as the `$__tc0` data context for `{{ }}`.
     pub(crate) fn render_erb(
         &mut self,
         src: &str,
@@ -2505,25 +2515,47 @@ impl VMHelper {
         for (k, v) in locals {
             self.scope.declare_scalar(k, v.clone());
         }
+        // Root data context for `{{ }}` tags — the locals as one hashref.
+        self.scope.declare_scalar(
+            "__tc0",
+            StrykeValue::hash_ref(Arc::new(RwLock::new(locals.clone()))),
+        );
         let result = self.render_erb_inner(src, line);
         self.scope_pop_hook();
         result
     }
 
     fn render_erb_inner(&mut self, src: &str, line: usize) -> Result<String> {
-        // Two-pass compile: walk segments → build one stryke program that
-        // appends to `$__erb_buf`, then run that program once. This is
-        // how ERB / EJS / Jinja avoid the multi-tag control-flow problem
-        // (a `for { ... }` opens in one tag and closes in another).
+        // Compile segments → one stryke program that appends to `$__erb_buf`,
+        // then run it once. Compiling (rather than interpreting tag-by-tag) is
+        // what lets a `for { … }` open in one `<%` tag and close in another —
+        // and lets `{{# }}` data sections interleave with `<% %>` code.
         let mut program = String::with_capacity(src.len() * 2 + 64);
         program.push_str("my $__erb_buf = \"\";\n");
+        // Compile-time stack of data-context variable indices for `{{ }}`
+        // tags. `$__tc0` is declared by `render_erb`; each `{{# }}` binds a
+        // fresh `$__tcN` for its element, `{{^ }}` reuses the enclosing one.
+        let mut ctx_stack: Vec<usize> = vec![0];
+        let mut next_ctx: usize = 1;
         let mut i = 0;
         let bytes = src.as_bytes();
         while i < bytes.len() {
-            if let Some(open) = find_substr(bytes, i, b"<%") {
-                if open > i {
-                    append_text_segment(&mut program, &src[i..open]);
+            let erb = find_substr(bytes, i, b"<%");
+            let mus = find_substr(bytes, i, b"{{");
+            let open = match (erb, mus) {
+                (Some(a), Some(b)) => a.min(b),
+                (Some(a), None) => a,
+                (None, Some(b)) => b,
+                (None, None) => {
+                    append_text_segment(&mut program, &src[i..]);
+                    break;
                 }
+            };
+            if open > i {
+                append_text_segment(&mut program, &src[i..open]);
+            }
+            if Some(open) == erb {
+                // ── `<% … %>` stryke code (ERB semantics, unchanged) ──
                 let mut tag_start = open + 2;
                 let mut kind = ErbKind::Stmt;
                 if tag_start < bytes.len() && bytes[tag_start] == b'#' {
@@ -2539,9 +2571,7 @@ impl VMHelper {
                         tag_start += 1;
                     }
                     // Trim trailing whitespace+newline from the program's
-                    // last text-append literal — `<%-` swallows it. We
-                    // approximate by trimming the program string itself
-                    // when the prior segment ended with a literal-append.
+                    // last text-append literal — `<%-` swallows it.
                     trim_trailing_ws_in_last_append(&mut program);
                 }
                 let close = find_substr(bytes, tag_start, b"%>")
@@ -2569,10 +2599,55 @@ impl VMHelper {
                 }
                 i = after;
             } else {
-                if i < bytes.len() {
-                    append_text_segment(&mut program, &src[i..]);
+                // ── `{{ … }}` Mustache data tag ──
+                let close = find_substr(bytes, open + 2, b"}}").ok_or_else(|| {
+                    StrykeError::runtime("template: unterminated {{ tag", line)
+                })?;
+                let tag = src[open + 2..close].trim();
+                let after = close + 2;
+                let cur = format!("$__tc{}", ctx_stack.last().copied().unwrap_or(0));
+                match tag.as_bytes().first() {
+                    Some(b'!') => {} // comment — dropped
+                    Some(b'#') | Some(b'^') => {
+                        let inverted = tag.starts_with('^');
+                        let name = tag[1..].trim();
+                        if inverted {
+                            // Render once, in the enclosing context, when the
+                            // key is falsy / missing / empty.
+                            program.push_str(&format!(
+                                "if (web_tmpl_empty({}, {})) {{\n",
+                                cur,
+                                sq(name)
+                            ));
+                            let top = ctx_stack.last().copied().unwrap_or(0);
+                            ctx_stack.push(top);
+                        } else {
+                            let idx = next_ctx;
+                            next_ctx += 1;
+                            program.push_str(&format!(
+                                "for my $__tc{} (@{{ web_tmpl_section({}, {}) }}) {{\n",
+                                idx,
+                                cur,
+                                sq(name)
+                            ));
+                            ctx_stack.push(idx);
+                        }
+                    }
+                    Some(b'/') => {
+                        program.push_str("}\n");
+                        if ctx_stack.len() > 1 {
+                            ctx_stack.pop();
+                        }
+                    }
+                    _ => {
+                        program.push_str(&format!(
+                            "$__erb_buf .= web_tmpl_get({}, {});\n",
+                            cur,
+                            sq(tag)
+                        ));
+                    }
                 }
-                break;
+                i = after;
             }
         }
         program.push_str("$__erb_buf\n");
@@ -3537,6 +3612,100 @@ fn find_substr(haystack: &[u8], from: usize, needle: &[u8]) -> Option<usize> {
         i += 1;
     }
     None
+}
+
+/// Emit a stryke single-quoted string literal for `s`. Single quotes don't
+/// interpolate `#{}`, so a `{{ }}` key (or text segment) reaches the compiled
+/// program verbatim. Only `\` and `'` need escaping inside single quotes.
+fn sq(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '\'' => out.push_str("\\'"),
+            other => out.push(other),
+        }
+    }
+    out.push('\'');
+    out
+}
+
+// ── `{{ }}` data builtins ──────────────────────────────────────────────
+//
+// The unified engine compiles `{{ }}` tags into calls to these three pure
+// builtins. They carry the Mustache *data* semantics, reusing the lookup +
+// emptiness helpers in `native_codec` so behaviour matches the old standalone
+// `template()` byte-for-byte.
+
+/// `web_tmpl_get(ctx, "key")` — interpolate a `{{ key }}` tag: look `key` up
+/// in `ctx` and stringify, empty string when missing. `.` is the context.
+pub(crate) fn web_tmpl_get(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    let undef = StrykeValue::UNDEF;
+    let ctx = args.first().unwrap_or(&undef);
+    let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let v = crate::native_codec::template_lookup(ctx, &key);
+    Ok(StrykeValue::string(
+        v.map(|v| v.to_string()).unwrap_or_default(),
+    ))
+}
+
+/// `web_tmpl_section(ctx, "key")` — return the list of element-contexts a
+/// `{{# key }}` section iterates: an array's elements; a single-element list
+/// holding a truthy hashref; the enclosing `ctx` for any other truthy scalar
+/// (renders the block once); empty for falsy / missing / empty-array.
+pub(crate) fn web_tmpl_section(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    let undef = StrykeValue::UNDEF;
+    let ctx = args.first().unwrap_or(&undef);
+    let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let items: Vec<StrykeValue> = match crate::native_codec::template_lookup(ctx, &key) {
+        Some(v) => {
+            if let Some(arr) = v.as_array_ref() {
+                arr.read().clone()
+            } else if v.as_hash_ref().is_some() {
+                vec![v]
+            } else if v.is_true() {
+                vec![ctx.clone()]
+            } else {
+                vec![]
+            }
+        }
+        None => vec![],
+    };
+    Ok(StrykeValue::array_ref(Arc::new(RwLock::new(items))))
+}
+
+/// `web_tmpl_empty(ctx, "key")` — truthy (1) when a `{{^ key }}` inverted
+/// section should render: `key` is falsy, missing, or an empty array.
+pub(crate) fn web_tmpl_empty(args: &[StrykeValue], _line: usize) -> Result<StrykeValue> {
+    let undef = StrykeValue::UNDEF;
+    let ctx = args.first().unwrap_or(&undef);
+    let key = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+    let v = crate::native_codec::template_lookup(ctx, &key);
+    let empty = crate::native_codec::template_is_empty(v.as_ref());
+    Ok(StrykeValue::integer(i64::from(empty)))
+}
+
+/// Builtin entry: `template($tmpl, \%vars)`. Renders a template string at
+/// runtime through the unified engine — `{{ key }}`/`{{# }}` data tags plus
+/// `<% %>`/`<%= %>` stryke code, in any string (codegen, config, reports,
+/// email bodies — not just web views). `$vars` is the data context; its
+/// top-level keys are also visible as scalars to `<% %>` code.
+pub(crate) fn template_dispatch(
+    interp: &mut VMHelper,
+    args: &[StrykeValue],
+    line: usize,
+) -> Result<StrykeValue> {
+    let tmpl = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let locals = args
+        .get(1)
+        .and_then(|v| {
+            v.as_hash_map()
+                .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))
+        })
+        .unwrap_or_default();
+    let out = interp.render_erb(&tmpl, &locals, line)?;
+    Ok(StrykeValue::string(out))
 }
 
 fn http_status_text(status: u16) -> &'static str {

@@ -3027,28 +3027,16 @@ pub(crate) fn strptime(s: &StrykeValue, fmt: &StrykeValue) -> StrykeResult<Stryk
     Ok(StrykeValue::float(secs))
 }
 
-/// `template($tmpl, \%vars)` — render a Mustache-subset template at runtime.
-/// Unlike stryke's compile-time `#{}` interpolation, the template string is a
-/// value, so it can come from a file, config, or be built dynamically — the
-/// codegen / report / config-emit case.
-///
-/// Supported tags:
-///   - `{{key}}`        — interpolate `$vars{key}` (empty string if missing)
-///   - `{{#key}}…{{/key}}` — section: array → repeat block per element
-///     (`{{.}}` is the element; if it's a hashref its keys are in scope);
-///     truthy hashref → render once with that hashref as context;
-///     other truthy → render once; falsy/missing/empty-array → skip
-///   - `{{^key}}…{{/key}}` — inverted: render only when key is falsy/missing/empty
-///   - `{{!comment}}`   — dropped
-pub(crate) fn template(tmpl: &StrykeValue, vars: &StrykeValue) -> StrykeResult<StrykeValue> {
-    let t = tmpl.to_string();
-    let out = render_template(&t, vars)?;
-    Ok(StrykeValue::string(out))
-}
+// The runtime template engine moved to `web.rs` — `template($tmpl, \%vars)`
+// now compiles to a single stryke program (the same compile-to-program core
+// the ERB `<% %>` view engine uses), so `{{ }}` data tags and `<% %>` code
+// blocks share one engine. These two pure helpers carry the Mustache *data*
+// semantics (lookup + section emptiness) and are called from the compiled
+// program via the `web_tmpl_*` builtins.
 
 /// Look up `key` in the current context. `.` resolves to the context itself
 /// (the current section element); any other key derefs a hashref context.
-fn template_lookup(ctx: &StrykeValue, key: &str) -> Option<StrykeValue> {
+pub(crate) fn template_lookup(ctx: &StrykeValue, key: &str) -> Option<StrykeValue> {
     if key == "." {
         return Some(ctx.clone());
     }
@@ -3060,73 +3048,9 @@ fn template_lookup(ctx: &StrykeValue, key: &str) -> Option<StrykeValue> {
     ctx.hash_get(key)
 }
 
-fn render_template(t: &str, ctx: &StrykeValue) -> StrykeResult<String> {
-    let b = t.as_bytes();
-    let mut out = String::new();
-    let mut i = 0;
-    while i < b.len() {
-        // Literal run up to the next `{{`.
-        match t[i..].find("{{") {
-            None => {
-                out.push_str(&t[i..]);
-                break;
-            }
-            Some(rel) => {
-                out.push_str(&t[i..i + rel]);
-                i += rel;
-            }
-        }
-        // At a `{{` — find the closing `}}`.
-        let close = t[i + 2..]
-            .find("}}")
-            .ok_or_else(|| StrykeError::runtime("template: unterminated {{ tag", 0))?;
-        let tag = t[i + 2..i + 2 + close].trim();
-        let after_tag = i + 2 + close + 2;
-        match tag.as_bytes().first() {
-            Some(b'!') => {
-                i = after_tag; // comment
-            }
-            Some(b'#') | Some(b'^') => {
-                let inverted = tag.starts_with('^');
-                let name = tag[1..].trim();
-                let (block, next) = template_section_body(t, after_tag, name)?;
-                let val = template_lookup(ctx, name);
-                if inverted {
-                    if template_is_empty(val.as_ref()) {
-                        out.push_str(&render_template(block, ctx)?);
-                    }
-                } else if let Some(v) = val {
-                    if let Some(arr) = v.as_array_ref() {
-                        let items: Vec<StrykeValue> = arr.read().clone();
-                        for item in &items {
-                            out.push_str(&render_template(block, item)?);
-                        }
-                    } else if v.as_hash_ref().is_some() {
-                        out.push_str(&render_template(block, &v)?);
-                    } else if v.is_true() {
-                        out.push_str(&render_template(block, ctx)?);
-                    }
-                }
-                i = next;
-            }
-            Some(b'/') => {
-                // Stray close tag with no open — treat as literal-free skip.
-                i = after_tag;
-            }
-            _ => {
-                if let Some(v) = template_lookup(ctx, tag) {
-                    out.push_str(&v.to_string());
-                }
-                i = after_tag;
-            }
-        }
-    }
-    Ok(out)
-}
-
 /// True when a section value should be treated as empty (skipped by `#`,
 /// rendered by `^`): missing, falsy, or an empty array.
-fn template_is_empty(v: Option<&StrykeValue>) -> bool {
+pub(crate) fn template_is_empty(v: Option<&StrykeValue>) -> bool {
     match v {
         None => true,
         Some(v) => {
@@ -3137,42 +3061,6 @@ fn template_is_empty(v: Option<&StrykeValue>) -> bool {
             }
         }
     }
-}
-
-/// Given the index just past a `{{#name}}`/`{{^name}}` open tag, return the
-/// inner block and the index just past the matching `{{/name}}`. Nesting is
-/// tracked by depth over all section tags so nested sections close correctly.
-fn template_section_body<'a>(
-    t: &'a str,
-    start: usize,
-    _name: &str,
-) -> StrykeResult<(&'a str, usize)> {
-    let mut depth = 1usize;
-    let mut j = start;
-    while j < t.len() {
-        let rel = match t[j..].find("{{") {
-            Some(r) => r,
-            None => break,
-        };
-        let open = j + rel;
-        let close = t[open + 2..]
-            .find("}}")
-            .ok_or_else(|| StrykeError::runtime("template: unterminated {{ tag", 0))?;
-        let tag = t[open + 2..open + 2 + close].trim();
-        let after = open + 2 + close + 2;
-        match tag.as_bytes().first() {
-            Some(b'#') | Some(b'^') => depth += 1,
-            Some(b'/') => {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok((&t[start..open], after));
-                }
-            }
-            _ => {}
-        }
-        j = after;
-    }
-    Err(StrykeError::runtime("template: unclosed section", 0))
 }
 
 /// `deburr($s)` — fold Latin-1 Supplement and Latin Extended-A letters to

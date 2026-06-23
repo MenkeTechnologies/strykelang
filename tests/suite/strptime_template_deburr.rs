@@ -98,6 +98,48 @@ fn template_nested_sections() {
     );
 }
 
+// ── unified engine: {{ }} data + <% %> stryke code in one template ────
+
+#[test]
+fn template_erb_expr_evaluates() {
+    // `<%= expr %>` evaluates a stryke expression into the output.
+    assert_eq!(eval_string(r#"template("<%= 2 + 3 %>", {})"#), "5");
+}
+
+#[test]
+fn template_erb_expr_is_raw_not_html_escaped() {
+    // Divergence from stock EJS: `<%=` does NOT auto-escape — `web_h` is
+    // explicit. Pins that compat decision so a future change can't silently
+    // break existing `<%= web_h($x) %>` views by double-escaping.
+    assert_eq!(eval_string(r#"template("<%= '<b>' %>", {})"#), "<b>");
+}
+
+#[test]
+fn template_erb_code_block_loops() {
+    // `<% stmt %>` runs stryke; control flow spans tags (open in one, close
+    // in another) around literal text + an `<%= %>` expr. Single-quote the
+    // template so the outer interpreter doesn't interpolate `$i` itself.
+    assert_eq!(
+        eval_string(r#"template('<% for val $i (1:3) { %>[<%= $i %>]<% } %>', {})"#),
+        "[1][2][3]",
+    );
+}
+
+#[test]
+fn template_mixes_data_tag_and_code_scalar() {
+    // `{{name}}` data tag and `<%= $lang %>` code-scalar (a top-level data
+    // key exposed as a scalar) coexist in the same template.
+    assert_eq!(
+        eval_string(r#"template('Hi {{name}}, <%= $lang %>!', {name => "Ada", lang => "stryke"})"#),
+        "Hi Ada, stryke!",
+    );
+}
+
+#[test]
+fn template_erb_comment_is_dropped() {
+    assert_eq!(eval_string(r#"template("a<%# ignore %>b", {})"#), "ab");
+}
+
 // ── deburr ───────────────────────────────────────────────────────────
 
 #[test]
