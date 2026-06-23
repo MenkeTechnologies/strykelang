@@ -146,7 +146,7 @@ fn scaffold_project(project_dir: &Path, name: &str) -> i32 {
 
     let test_path = project_dir.join("t/test_main.stk");
     if !test_path.exists() {
-        let body = "#!/usr/bin/env stryke\n\nuse Test\n\nok 1, \"it works\"\n\ndone_testing()\n";
+        let body = "#!/usr/bin/env stryke\n\nassert_ok 1, \"it works\"\n\ntest_run\n";
         if let Err(e) = std::fs::write(&test_path, body) {
             eprintln!("s init: write {}: {}", test_path.display(), e);
             return 1;
