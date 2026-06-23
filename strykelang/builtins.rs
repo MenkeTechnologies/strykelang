@@ -38976,12 +38976,52 @@ fn builtin_from_toml(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     parse_toml(&s)
 }
 
+/// Strip a TOML trailing `#` comment from one line, honoring quoting: a `#`
+/// inside a basic (`"…"`) or literal (`'…'`) string is data, not a comment
+/// (e.g. `url = "http://host/path#frag"`). Returns the line up to the first
+/// unquoted `#`, or the whole line when there is none.
+fn strip_toml_inline_comment(line: &str) -> &str {
+    let bytes = line.as_bytes();
+    let mut in_basic = false;
+    let mut in_literal = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_basic {
+            // Backslash escapes the next byte inside a basic string.
+            if c == b'\\' {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_basic = false;
+            }
+        } else if in_literal {
+            // Literal strings have no escapes — only a closing quote ends them.
+            if c == b'\'' {
+                in_literal = false;
+            }
+        } else {
+            match c {
+                b'"' => in_basic = true,
+                b'\'' => in_literal = true,
+                b'#' => return &line[..i],
+                _ => {}
+            }
+        }
+        i += 1;
+    }
+    line
+}
+
 fn parse_toml(s: &str) -> StrykeResult<StrykeValue> {
     let hash: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
     let hash = Arc::new(RwLock::new(hash));
     let mut current_section: Option<String> = None;
     for line in s.lines() {
-        let trimmed = line.trim();
+        // Drop any trailing `# comment` first so it survives neither in
+        // section headers (`[s] # c`) nor in values (`k = 1 # c`).
+        let trimmed = strip_toml_inline_comment(line).trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }

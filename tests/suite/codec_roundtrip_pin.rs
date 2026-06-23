@@ -164,6 +164,39 @@ fn toml_roundtrip_nested_table() {
     assert_eq!(eval_int(code), 1);
 }
 
+#[test]
+fn toml_strips_inline_comment_after_value() {
+    // `key = val  # comment` — the trailing comment must not bleed into the
+    // parsed value (port stays an int, name stays the bare string).
+    let code = r#"
+        my $t = "port = 8080  # the server port\nname = \"app\"  # display name\n";
+        my $h = from_toml($t);
+        ($h->{port} == 8080 && $h->{name} eq "app") ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn toml_keeps_hash_inside_quoted_string() {
+    // A `#` inside a quoted string is data, not a comment — must survive.
+    let code = r#"
+        my $t = "url = \"http://h/p#frag\"  # trailing comment\n";
+        my $h = from_toml($t);
+        ($h->{url} eq "http://h/p#frag") ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn toml_strips_comment_after_section_header() {
+    let code = r#"
+        my $t = "[server]  # config block\nport = 9090\n";
+        my $h = from_toml($t);
+        ($h->{server}->{port} == 9090) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
 // ── CSV ──────────────────────────────────────────────────────────────
 
 #[test]
