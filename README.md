@@ -2050,7 +2050,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **789 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **789 top-level .stk programs** plus **1349 Rosetta-Code tasks** and **173 Exercism solutions** — 2.3k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
