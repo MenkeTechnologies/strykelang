@@ -7070,9 +7070,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7de73b4be43a50fb42ce128cecf63c5922a2190b29d4c71e7b5955f51474be02"
+checksum = "767e3f8e6ebe2927fb39b7782d4fec6767f8522f2068303739e2a411768a0e64"
 dependencies = [
  "atty",
  "bincode",
@@ -7122,9 +7122,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03b874b54ffc3b1a5953ab42b6e3a3c9da15a32ff160770175c66f820c6a4fc1"
+checksum = "38c80abdaa419bfc6cc7dcb1f4ddd160027e89d59005483f6820b33713e1d683"
 dependencies = [
  "atty",
  "axum",
