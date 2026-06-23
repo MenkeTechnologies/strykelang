@@ -1,0 +1,59 @@
+#!/usr/bin/env stryke
+
+# template_code_blocks.stk — dropping real stryke code into a template.
+#
+# The unified template() builtin runs two code tags inline:
+#   <% stryke statements %>   — run for side effects, emit nothing
+#   <%= stryke expression %>  — evaluate and write the result into the output
+# Statements can open a block in one tag and close it in another, so loops
+# and conditionals wrap literal text and <%= %> output. Data passed to
+# template() is visible to the code as $scalars (e.g. $users, $n).
+#
+# Run:  stryke --no-interop examples/template_code_blocks.stk
+#
+# Templates use q{…} so this script's parser passes the embedded $vars and
+# stryke through verbatim.
+
+fn dbl($x) { $x * 2 }
+
+# ── <% for %> loop with <%= field %> output (hashref deref) ──────────
+template(q{<% for val $u (@$users) { %>[<%= $u->{name} %>:<%= $u->{age} %>]<% } %>},
+         +{ users => [+{ name => "Ada", age => 36 }, +{ name => "Bob", age => 40 }] })
+    |> aeq "[Ada:36][Bob:40]", "for loop over hashes, deref fields in <%= %>"
+
+# ── <% %> mutable accumulator carried across tags ───────────────────
+template(q{<% var $sum = 0 %><% for val $n (@$nums) { %><% $sum = $sum + $n %><% } %>total=<%= $sum %>},
+         +{ nums => [10, 20, 30] })
+    |> aeq "total=60", "accumulator: a var declared and mutated across <% %> tags"
+
+# ── <% if / elsif / else %> spanning tags around literal text ───────
+template(q{<% for val $g (@$grades) { %><% if ($g >= 90) { %>A<% } elsif ($g >= 80) { %>B<% } else { %>C<% } %><% } %>},
+         +{ grades => [95, 85, 70] })
+    |> aeq "ABC", "if / elsif / else classifies each grade"
+
+# ── Nested <% for %> loops, inner and outer loop vars ───────────────
+template(q{<% for val $row (@$grid) { %><% for val $c (@$row) { %><%= $c %><% } %>;<% } %>},
+         +{ grid => [[1, 2], [3, 4]] })
+    |> aeq "12;34;", "nested loops over a grid"
+
+# ── A 1-based index counter built in code ───────────────────────────
+template(q{<% var $i = 0 %><% for val $x (@$xs) { %><% $i = $i + 1 %><%= $i %>:<%= $x %> <% } %>},
+         +{ xs => ["a", "b", "c"] })
+    |> aeq "1:a 2:b 3:c ", "counter incremented each iteration"
+
+# ── <%= %> expression: ternary + builtins ───────────────────────────
+template(q{<%= $n > 2 ? uc("big") : "small" %>}, +{ n => 5 })
+    |> aeq "BIG", "ternary and a builtin inside <%= %>"
+
+template(q{<%= join("/", @$parts) %>}, +{ parts => ["usr", "local", "bin"] })
+    |> aeq "usr/local/bin", "builtin call over a data array in <%= %>"
+
+# ── <%= %> calling a script-defined fn ──────────────────────────────
+template(q{<%= dbl($n) %>x}, +{ n => 21 }) |> aeq "42x", "<%= %> calls a user fn"
+
+# ── Data {{ }} and code <% %> interleaved in one template ───────────
+template(q{<% for val $u (@$users) { %>{{label}} <%= $u->{name} %>; <% } %>},
+         +{ label => "user", users => [+{ name => "Ada" }, +{ name => "Bob" }] })
+    |> aeq "user Ada; user Bob; ", "{{data}} tag re-emitted each code-loop pass"
+
+test_run

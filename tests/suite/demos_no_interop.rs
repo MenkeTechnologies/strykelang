@@ -345,3 +345,5 @@ demo_runs_no_interop!(
 demo_runs_no_interop!(demo_sql_engine, "examples/sql_engine_no_interop.stk");
 demo_runs_no_interop!(demo_var_val, "examples/var_val.stk");
 demo_runs_no_interop!(demo_var_val_kotlin_port, "examples/var_val_kotlin_port.stk");
+demo_runs_no_interop!(demo_template_builtin, "examples/template_builtin.stk");
+demo_runs_no_interop!(demo_template_code_blocks, "examples/template_code_blocks.stk");
