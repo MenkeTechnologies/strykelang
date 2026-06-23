@@ -14587,7 +14587,8 @@ impl Parser {
             | "squared" | "sq" | "square" | "cubed" | "cb" | "cube" | "expt" | "pow" | "pw"
             | "normalize" | "snake_case" | "camel_case" | "kebab_case"
             | "frequencies" | "freq" | "pfrequencies" | "pfreq"
-            | "template" | "deburr"
+            | "template" | "web_tmpl_get" | "web_tmpl_section" | "web_tmpl_empty"
+            | "deburr"
             | "shell_quote" | "shell_split" | "shellwords"
             | "from_jsonl" | "to_jsonl" | "from_ini" | "to_ini"
             | "base64url_encode" | "base64url_decode"
@@ -15252,6 +15253,7 @@ impl Parser {
             | "json_pretty" | "json_minify" | "escape_json" | "json_escape"
             // ── process / env ───────────────────────────────────────────────
             | "cmd_exists" | "env_get" | "env_has" | "env_keys"
+            | "zpexpand"
             | "argc" | "script_name"
             | "has_stdin_tty" | "has_stdout_tty" | "has_stderr_tty"
             // ── id helpers ──────────────────────────────────────────────────
