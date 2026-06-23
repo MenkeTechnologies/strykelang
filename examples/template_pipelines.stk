@@ -1,0 +1,75 @@
+#!/usr/bin/env stryke
+
+# template_pipelines.stk — big templates that thread data through stryke's
+# pipe-forward (|>) and thread-first (~>) operators inside <%= %>.
+#
+#   |>  pipe-forward / thread-last:  LHS becomes the LAST arg of each stage
+#                                    val |> f(a)  ==  f(a, val)
+#   ~>  thread-first macro (prefix): ~> VALUE stage stage …, threaded value
+#                                    is the FIRST arg; |> terminates the macro
+#                                    ~> 10 div(2)  ==  div(10, 2)
+#
+# Both run anywhere a stryke expression is valid, including <%= %>. Use `_`
+# (and `_1`) for stage params; `rev` not `reverse` under --no-interop.
+#
+# Run:  stryke --no-interop examples/template_pipelines.stk
+
+# ── Focused: |> pipe-forward inside <%= %> ───────────────────────────
+template(q{<%= 5 |> sqrt |> int %>}, +{}) |> aeq "2", "|> scalar pipeline"
+
+template(q{<%= "hello world" |> split / / |> map { uc _ } |> join "-" %>}, +{})
+    |> aeq "HELLO-WORLD", "|> split / map / join"
+
+template(q{<%= (1:10) |> grep { _ % 2 == 0 } |> sum %>}, +{})
+    |> aeq "30", "|> range / grep / sum"
+
+template(q{<%= @$xs |> map { _ * _ } |> join "," %>}, +{ xs => [1, 2, 3, 4] })
+    |> aeq "1,4,9,16", "|> over a data array"
+
+# ── Focused: ~> thread-first macro inside <%= %> ─────────────────────
+template(q{<%= ~> "hi" uc %>}, +{}) |> aeq "HI", "~> single stage"
+
+template(q{<%= ~> @$xs map { _ * 2 } grep { _ > 4 } |> join "," %>}, +{ xs => [1, 2, 3, 4] })
+    |> aeq "6,8", "~> stages then |> terminator"
+
+# ── Big template #1: an invoice report ──────────────────────────────
+val $items = [
+    +{ name => "Widget", price => 250, qty => 4 },
+    +{ name => "Gadget", price => 125, qty => 2 },
+    +{ name => "Gizmo",  price => 500, qty => 1 },
+]
+template(q{INVOICE {{number}} — {{customer}}
+<% for val $it (@$items) { %>  <%= $it->{name} %> x<%= $it->{qty} %> @ <%= $it->{price} %> = <%= $it->{price} * $it->{qty} %>
+<% } %>items=<%= @$items |> len %> subtotal=<%= ~> @$items map { _->{price} * _->{qty} } |> sum %>
+prices desc: <%= @$items |> map { _->{price} } |> sort |> rev |> join ", " %>
+names: <%= ~> @$items map { _->{name} } |> join ", " %>
+max line: <%= ~> @$items map { _->{price} * _->{qty} } |> max %>},
+         +{ number => "A-100", customer => "Acme", items => $items })
+    |> aeq q{INVOICE A-100 — Acme
+  Widget x4 @ 250 = 1000
+  Gadget x2 @ 125 = 250
+  Gizmo x1 @ 500 = 500
+items=3 subtotal=1750
+prices desc: 500, 250, 125
+names: Widget, Gadget, Gizmo
+max line: 1000}, "big invoice template: loop + |> and ~> aggregates"
+
+# ── Big template #2: a ranked leaderboard ───────────────────────────
+val $players = [
+    +{ name => "Ada", score => 90 },
+    +{ name => "Bob", score => 75 },
+    +{ name => "Cy",  score => 88 },
+]
+template(q{# {{event}} Leaderboard
+<% var $rank = 0 %><% for val $p (@$players) { %><% $rank = $rank + 1 %>#<%= $rank %> <%= $p->{name} %> (<%= $p->{score} %>)
+<% } %>top: <%= ~> @$players map { _->{score} } |> max %>  total: <%= ~> @$players map { _->{score} } |> sum %>  n: <%= @$players |> len %>
+roster: <%= @$players |> map { _->{name} } |> sort |> join " · " %>},
+         +{ event => "Spring", players => $players })
+    |> aeq q{# Spring Leaderboard
+#1 Ada (90)
+#2 Bob (75)
+#3 Cy (88)
+top: 90  total: 253  n: 3
+roster: Ada · Bob · Cy}, "big leaderboard template: rank counter + pipelines"
+
+test_run

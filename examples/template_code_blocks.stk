@@ -14,7 +14,7 @@
 # Templates use q{…} so this script's parser passes the embedded $vars and
 # stryke through verbatim.
 
-fn dbl($x) { $x * 2 }
+fn dbl = _ * 2
 
 # ── <% for %> loop with <%= field %> output (hashref deref) ──────────
 template(q{<% for val $u (@$users) { %>[<%= $u->{name} %>:<%= $u->{age} %>]<% } %>},
@@ -42,14 +42,14 @@ template(q{<% var $i = 0 %><% for val $x (@$xs) { %><% $i = $i + 1 %><%= $i %>:<
     |> aeq "1:a 2:b 3:c ", "counter incremented each iteration"
 
 # ── <%= %> expression: ternary + builtins ───────────────────────────
-template(q{<%= $n > 2 ? uc("big") : "small" %>}, +{ n => 5 })
+template(q{<%= $n > 2 ? uc "big" : "small" %>}, +{ n => 5 })
     |> aeq "BIG", "ternary and a builtin inside <%= %>"
 
-template(q{<%= join("/", @$parts) %>}, +{ parts => ["usr", "local", "bin"] })
+template(q{<%= join "/", @$parts %>}, +{ parts => ["usr", "local", "bin"] })
     |> aeq "usr/local/bin", "builtin call over a data array in <%= %>"
 
 # ── <%= %> calling a script-defined fn ──────────────────────────────
-template(q{<%= dbl($n) %>x}, +{ n => 21 }) |> aeq "42x", "<%= %> calls a user fn"
+template(q{<%= dbl $n %>x}, +{ n => 21 }) |> aeq "42x", "<%= %> calls a user fn"
 
 # ── Data {{ }} and code <% %> interleaved in one template ───────────
 template(q{<% for val $u (@$users) { %>{{label}} <%= $u->{name} %>; <% } %>},
