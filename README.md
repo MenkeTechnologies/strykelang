@@ -101,7 +101,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,449 standard library primaries** in `%b` (11,182 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,149
+- **10,453 standard library primaries** in `%b` (11,186 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,149
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -2050,7 +2050,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **783 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **789 top-level .stk programs** plus **1648 Rosetta-Code tasks** and **346 Exercism solutions** — 2.9k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
