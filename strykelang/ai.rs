@@ -1617,10 +1617,17 @@ impl VMHelper {
                         let name = block["name"].as_str().unwrap_or("").to_string();
                         let input = block["input"].clone();
                         let output = self.invoke_tool(tools, &name, input, line)?;
+                        // Anthropic requires tool_result.content to be a string (or an
+                        // array of content blocks); a bare number/bool/object 400s. Match
+                        // the OpenAI path: pass strings through, JSON-stringify the rest.
+                        let output_str = match output {
+                            serde_json::Value::String(s) => s,
+                            v => v.to_string(),
+                        };
                         tool_results.push(serde_json::json!({
                             "type": "tool_result",
                             "tool_use_id": id,
-                            "content": output,
+                            "content": output_str,
                         }));
                     }
                     _ => {}
