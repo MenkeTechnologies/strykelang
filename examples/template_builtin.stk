@@ -1,0 +1,53 @@
+#!/usr/bin/env stryke
+
+# template_builtin.stk — the built-in unified template() engine.
+#
+# One engine, two tag families in the same string (EJS-shaped):
+#   DATA (Mustache):  {{key}}  {{#sec}}…{{/sec}}  {{^inv}}…{{/inv}}  {{.}}  {{!c}}
+#   CODE (stryke):    <% stmt %>   <%= expr %>   <%- … -%>   <%# … %>
+# Unlike the hand-rolled examples/template_engine.stk, this is the native
+# `template($tmpl, \%vars)` builtin — the same engine the web view layer runs.
+#
+# Run:  stryke --no-interop examples/template_builtin.stk
+#
+# Templates that carry `$vars` or live code use q{…} so this script's own
+# parser leaves them untouched; data-only templates use plain quotes.
+
+# ── DATA: {{key}} interpolation ──────────────────────────────────────
+template("Hi {{name}}!", +{ name => "Ada" }) |> aeq "Hi Ada!", "interpolate"
+template("[{{missing}}]", +{}) |> aeq "[]", "missing key renders empty"
+
+# ── DATA: {{#key}}…{{/key}} sections ─────────────────────────────────
+template("{{#xs}}[{{.}}]{{/xs}}", +{ xs => [1, 2, 3] })
+    |> aeq "[1][2][3]", "section over array, {{.}} is the element"
+
+val @us = (+{ n => "A" }, +{ n => "B" })
+template("{{#us}}{{n}};{{/us}}", +{ us => \@us })
+    |> aeq "A;B;", "section over hashes scopes keys"
+
+template("{{^xs}}none{{/xs}}", +{ xs => [] })
+    |> aeq "none", "inverted section renders when empty"
+
+template("a{{! drop me }}b", +{}) |> aeq "ab", "comment is dropped"
+
+template("{{#rows}}({{#cs}}{{.}}{{/cs}}){{/rows}}",
+         +{ rows => [+{ cs => [1, 2] }, +{ cs => [3] }] })
+    |> aeq "(12)(3)", "nested sections"
+
+# ── CODE: <%= expr %> and <% stmt %> stryke ──────────────────────────
+template(q{<%= 2 + 3 %>}, +{}) |> aeq "5", "code expression evaluates"
+
+template(q{<% for val $i (1:3) { %>[<%= $i %>]<% } %>}, +{})
+    |> aeq "[1][2][3]", "code loop opens and closes across tags"
+
+template(q{<% if (1) { %>yes<% } %>}, +{})
+    |> aeq "yes", "code conditional"
+
+template(q{<%= "<b>" %>}, +{})
+    |> aeq "<b>", "<%= is raw, not HTML-escaped (call web_h to escape)"
+
+# ── DATA + CODE in one template; data keys are $scalars to code ──────
+template(q{Total <%= $n %>: {{#xs}}{{.}} {{/xs}}}, +{ xs => [1, 2, 3], n => 3 })
+    |> aeq "Total 3: 1 2 3 ", "data tag and code scalar in one template"
+
+test_run
