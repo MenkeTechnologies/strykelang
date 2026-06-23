@@ -1,19 +1,30 @@
 #!/usr/bin/env zsh
-# bump.sh — bump version, sync all Cargo.toml files, publish all crates
+# bump.sh — bump the strykelang version everywhere, commit, tag, push, publish.
 #
 # Usage:
-#   ./scripts/bump.sh patch    # 0.8.8 → 0.8.9
-#   ./scripts/bump.sh minor    # 0.8.8 → 0.9.0
-#   ./scripts/bump.sh major    # 0.8.8 → 1.0.0
+#   ./scripts/bump.sh patch    # 0.17.22 → 0.17.23
+#   ./scripts/bump.sh minor    # 0.17.22 → 0.18.0
+#   ./scripts/bump.sh major    # 0.17.22 → 1.0.0
 #   ./scripts/bump.sh 1.2.3    # set exact version
+#
+# Version strings live in six tracked files (this is the full set the
+# `bump vX.Y.Z` commits touch). Cargo.lock is synced by the verify build,
+# not hand-edited. Pushing the `vX.Y.Z` tag triggers .github/workflows/
+# release.yml (GitHub Release + cross-platform binaries); crates.io is the
+# `cargo publish` step here. strykelang is the only published crate — the
+# old compsys/zsh sub-crates are gone.
 
 set -e
 
 ROOT="$(builtin cd "$(dirname "$0")/.." && pwd)"
 builtin cd "$ROOT"
 
-# ── parse current version ──
+# ── parse current version (package version is the first `version = ` line) ──
 CURRENT=$(perl -ne 'if (/^version\s*=\s*"(\d+\.\d+\.\d+)"/) { print $1; exit }' Cargo.toml)
+if [[ -z "$CURRENT" ]]; then
+  echo "could not read current version from Cargo.toml" >&2
+  exit 1
+fi
 MAJOR=${CURRENT%%.*}
 _rest=${CURRENT#*.}
 MINOR=${_rest%%.*}
@@ -36,39 +47,43 @@ esac
 NEW="${MAJOR}.${MINOR}.${PATCH}"
 echo "bumping $CURRENT → $NEW"
 
-# ── update all version references ──
-# root Cargo.toml: package version + workspace.package.version
+# ── update version strings ──
+# Cargo.toml: the anchored package `version` line only (leaves the unrelated
+# [workspace.package] version untouched).
 perl -pi -e "s/^version = \"\\Q$CURRENT\\E\"/version = \"$NEW\"/" Cargo.toml
 
-# compsys and zsh dep versions in root Cargo.toml
-perl -pi -e "s/(compsys = \\{ path = \"compsys\", version = \")\\Q$CURRENT\\E/\${1}$NEW/" Cargo.toml
-perl -pi -e "s/(zsh = \\{ path = \"zsh\", version = \")\\Q$CURRENT\\E/\${1}$NEW/" Cargo.toml
+# Docs build-lines (`stryke vX.Y.Z · …`) and man-page titles (`stryke X.Y.Z`).
+# Each file carries exactly one occurrence of the exact version triple.
+DOC_FILES=(docs/index.html docs/reference.html man/man1/stryke.1 man/man1/strykeall.1)
+for f in $DOC_FILES; do
+  perl -pi -e "s/\\Q$CURRENT\\E/$NEW/g" "$f"
+done
 
-# zsh/Cargo.toml: compsys dep version
-perl -pi -e "s/(compsys = \\{ path = \"\\.\\.\/compsys\", version = \")\\Q$CURRENT\\E/\${1}$NEW/" zsh/Cargo.toml
+echo "  Cargo.toml:          $NEW"
+echo "  docs/index.html:     $NEW"
+echo "  docs/reference.html: $NEW"
+echo "  man/man1/stryke.1:   $NEW"
+echo "  man/man1/strykeall.1: $NEW"
 
-echo "  Cargo.toml package: $NEW"
-echo "  workspace.package:  $NEW"
-echo "  compsys dep:        $NEW"
-echo "  zsh dep:            $NEW"
-echo "  zsh→compsys dep:    $NEW"
-
-# ── verify it builds ──
+# ── verify build (also rewrites Cargo.lock to the new version) ──
 echo ""
 echo "building..."
-cargo build 2>&1 | grep -E '^error' && { echo "BUILD FAILED"; exit 1; }
+cargo build || { echo "BUILD FAILED"; exit 1; }
 echo "build ok"
 
-# ── publish in order ──
+# ── commit, tag, push (the tag push triggers release.yml) ──
 echo ""
-echo "publishing compsys v$NEW..."
-cargo publish --allow-dirty -p compsys 2>&1 | tail -1
+echo "committing + tagging v$NEW..."
+git add Cargo.toml Cargo.lock $DOC_FILES
+git commit -m "bump v$NEW"
+git tag "v$NEW"
+git push origin HEAD
+git push origin "v$NEW"
 
-echo "publishing zsh v$NEW..."
-cargo publish --allow-dirty -p zsh 2>&1 | tail -1
-
-echo "publishing strykelang v$NEW..."
-cargo publish --allow-dirty -p strykelang 2>&1 | tail -1
+# ── publish to crates.io (strykelang only) ──
+echo ""
+echo "publishing strykelang v$NEW to crates.io..."
+cargo publish
 
 # ── install locally ──
 echo ""
@@ -76,4 +91,4 @@ echo "installing locally..."
 cargo install --path . --force
 
 echo ""
-echo "done: strykelang v$NEW published and installed"
+echo "done: strykelang v$NEW committed, tagged, pushed, published, installed"
