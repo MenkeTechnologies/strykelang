@@ -5969,10 +5969,10 @@ pub(crate) fn try_builtin(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),
         )),
-        "template" => Some(crate::native_codec::template(
-            args.first().unwrap_or(&undef),
-            args.get(1).unwrap_or(&undef),
-        )),
+        "template" => Some(crate::web::template_dispatch(interp, args, line)),
+        "web_tmpl_get" => Some(crate::web::web_tmpl_get(args, line)),
+        "web_tmpl_section" => Some(crate::web::web_tmpl_section(args, line)),
+        "web_tmpl_empty" => Some(crate::web::web_tmpl_empty(args, line)),
         "deburr" => Some(crate::native_codec::deburr(args.first().unwrap_or(&undef))),
         "shell_quote" => Some(crate::native_codec::shell_quote(args.first().unwrap_or(&undef))),
         "shell_split" | "shellwords" => {
