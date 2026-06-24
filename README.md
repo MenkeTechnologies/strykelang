@@ -2052,7 +2052,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **789 top-level .stk programs** plus **1349 Rosetta-Code tasks** and **173 Exercism solutions** — 2.3k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **790 top-level .stk programs** plus **1349 Rosetta-Code tasks** and **173 Exercism solutions** — 2.3k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
@@ -2581,6 +2581,8 @@ Typed containers are enforced whether or not `--static` is on, at every write: d
 stryke --static script.stk        # whole program must be statically typed
 stryke script.stk                 # opt-in typing only (default)
 ```
+
+Demo: [`examples/static_typing_demo.stk`](examples/static_typing_demo.stk) — return types, `List<T>` / `Map<K, V>` containers, nested generics, every-write enforcement, and inference. Runs under both plain `stryke` and `stryke --static`.
 
 ---
 

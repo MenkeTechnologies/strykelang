@@ -1,0 +1,58 @@
+#!/usr/bin/env stryke
+
+# Static typing: parametric containers, return types, and --static mode.
+#
+# Run normally to see runtime enforcement of typed containers and return types:
+#   stryke examples/static_typing_demo.stk
+#
+# Run with --static to additionally REQUIRE a type (or inferable initializer)
+# on every parameter, return type, and variable declaration, with
+# statically-known mismatches rejected before the program runs:
+#   stryke --static examples/static_typing_demo.stk
+
+# ── Return types (Kotlin colon): fn name(...): Type ──────────────────────────
+fn add($x: Int, $y: Int): Int { $x + $y }
+
+# Anonymous fn with a return type.
+val $label = fn ($v: Float) : Str { sprintf "value=%.2f", $v }
+
+p "Return types:"
+printf "  add(40, 2)      = %d\n", add(40, 2)
+printf "  label(3.14159)  = %s\n", $label->(3.14159)
+
+# A sub whose body yields the wrong type aborts at the return boundary.
+fn mislabel($n: Int) : Str { $n + 1 }   # returns Int, declares Str
+eval { mislabel(7) }
+p "  return-type guard: $@" if $@
+
+# ── Parametric containers: List<T> and Map<K, V> ─────────────────────────────
+p "\nTyped containers:"
+var @names : List<Str>      = ("ann", "bob", "cy")
+var %ages  : Map<Str, Int>  = (ann => 30, bob => 41)
+
+printf "  names = %s\n", join(", ", @names)
+printf "  ages{ann} = %d\n", $ages{ann}
+
+# Every write is checked: declaration, reassignment, push, and element store.
+eval { push @names, 99 }                 # Int into List<Str>
+p "  list push guard: $@" if $@
+
+eval { $ages{cy} = "old" }               # Str into Map<Str, Int> value
+p "  map value guard: $@" if $@
+
+# Valid writes go through untouched.
+push @names, "dee"
+$ages{cy} = 22
+printf "  after valid writes: %d names, %d ages\n", scalar(@names), scalar(keys %ages)
+
+# ── Nested generics: Map<Str, List<Int>> ─────────────────────────────────────
+p "\nNested generics:"
+var %scores : Map<Str, List<Int>> = (ann => [90, 85], bob => [70, 95])
+val @ann_scores = @{ $scores{ann} }
+printf "  scores{ann} = %s\n", join(", ", @ann_scores)
+
+# ── Inference (no annotation needed when the initializer is concrete) ─────────
+p "\nType inference:"
+var $count = add(2, 3)        # Int inferred from the call's declared return type
+var $tag   = "ready"          # Str inferred from the literal
+printf "  count=%d tag=%s\n", $count, $tag
