@@ -334,9 +334,16 @@ class StrykeLexerTest {
             "match must NOT be BUILTIN: $ctrl",
             ctrl.none { it.first == StrykeTokenTypes.BUILTIN && it.second == "match" },
         )
+        // `mysync` / `varsync` are declaration keywords (the sync-aware `my` / `var`
+        // family per token.rs:308), highlighted like `var` / `val`, not parallel builtins.
         val conc = lex("mysync varsync")
-        assertTrue("mysync parallel: $conc", has(conc, StrykeTokenTypes.BUILTIN_PARALLEL, "mysync"))
-        assertTrue("varsync parallel: $conc", has(conc, StrykeTokenTypes.BUILTIN_PARALLEL, "varsync"))
+        assertTrue("mysync decl: $conc", has(conc, StrykeTokenTypes.DECL_KEYWORD, "mysync"))
+        assertTrue("varsync decl: $conc", has(conc, StrykeTokenTypes.DECL_KEYWORD, "varsync"))
+        // Kotlin-flavored collection constructors ("fake kotlin") color as builtins.
+        val kt = lex("listOf mapOf setOf mutableListOf arrayOf sortedSetOf")
+        for (b in listOf("listOf", "mapOf", "setOf", "mutableListOf", "arrayOf", "sortedSetOf")) {
+            assertTrue("$b must be BUILTIN: $kt", has(kt, StrykeTokenTypes.BUILTIN, b))
+        }
         val magic = lex("__FILE__ __LINE__ __PACKAGE__")
         for (mc in listOf("__FILE__", "__LINE__", "__PACKAGE__")) {
             assertTrue(

@@ -18829,6 +18829,14 @@ impl Parser {
             | "trix" | "true_range" | "twap" | "ulcer_index"
             | "volatility_annualized" | "volatility_realized" | "vwap" | "williams_r"
             | "wma"
+            // ── kotlin collections ──
+            // Kotlin stdlib collection constructors. List / array / sequence
+            // variants build a stryke array; map / set variants build a hash /
+            // set. See builtins.rs::builtin_kotlin_list / _map / _set.
+            | "listOf" | "listOfNotNull" | "mutableListOf" | "arrayListOf" | "emptyList"
+            | "arrayOf" | "arrayOfNulls" | "emptyArray" | "sequenceOf" | "emptySequence"
+            | "mapOf" | "mutableMapOf" | "hashMapOf" | "linkedMapOf" | "sortedMapOf" | "emptyMap"
+            | "setOf" | "mutableSetOf" | "hashSetOf" | "linkedSetOf" | "sortedSetOf" | "emptySet"
             => Some(name),
             _ => None,
         }

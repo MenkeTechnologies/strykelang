@@ -4830,6 +4830,23 @@ pub(crate) fn try_builtin(
         "nth" => Some(builtin_nth(args)),
         "to_set" => Some(builtin_to_set(args)),
         "to_hash" => Some(builtin_to_hash(args)),
+        // ── Kotlin collection constructors ──
+        // Factory fns mirroring Kotlin's stdlib so stryke written in Kotlin
+        // idiom (alongside `var` / `val` / `varsync`) runs natively. List /
+        // array / sequence variants all yield a stryke array; map / set
+        // variants yield a hash / set. `sorted*` orders by key.
+        "listOf" | "mutableListOf" | "arrayListOf" | "arrayOf" | "sequenceOf"
+        | "emptyList" | "emptyArray" | "emptySequence" => Some(builtin_kotlin_list(args)),
+        "listOfNotNull" => Some(builtin_kotlin_list_not_null(args)),
+        "arrayOfNulls" => Some(builtin_array_of_nulls(args)),
+        "mapOf" | "mutableMapOf" | "hashMapOf" | "linkedMapOf" | "emptyMap" => {
+            Some(builtin_kotlin_map(args, false))
+        }
+        "sortedMapOf" => Some(builtin_kotlin_map(args, true)),
+        "setOf" | "mutableSetOf" | "hashSetOf" | "linkedSetOf" | "emptySet" => {
+            Some(builtin_kotlin_set(args, false))
+        }
+        "sortedSetOf" => Some(builtin_kotlin_set(args, true)),
         "enumerate" | "en" => Some(builtin_enumerate(args)),
         "chunk" | "chk" => Some(builtin_chunk(args)),
         "dedup" | "dup" => Some(builtin_dedup(args)),
@@ -18893,6 +18910,67 @@ fn builtin_to_hash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         i += 2;
     }
     Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map))))
+}
+
+/// `listOf E…` / `mutableListOf` / `arrayListOf` / `arrayOf` / `sequenceOf`
+/// and their `empty*` zero-arg forms — Kotlin list/array constructors. Each
+/// returns a stryke array of the given elements (empty when called with none).
+fn builtin_kotlin_list(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    Ok(StrykeValue::array(args.to_vec()))
+}
+
+/// `listOfNotNull E…` — Kotlin's null-filtering list constructor. Drops any
+/// `undef` element (stryke's `null` / undefined).
+fn builtin_kotlin_list_not_null(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    Ok(StrykeValue::array(
+        args.iter().filter(|v| !v.is_undef()).cloned().collect(),
+    ))
+}
+
+/// `arrayOfNulls N` — Kotlin's fixed-size null-filled array constructor.
+/// Returns an array of `N` `undef` elements.
+fn builtin_array_of_nulls(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let n = args.first().map_or(0, StrykeValue::to_int).max(0) as usize;
+    Ok(StrykeValue::array(vec![StrykeValue::UNDEF; n]))
+}
+
+/// `mapOf …` / `mutableMapOf` / `hashMapOf` / `linkedMapOf` / `sortedMapOf`
+/// and `emptyMap` — Kotlin map constructors. Accepts flat `k, v, k, v …` or
+/// `[k, v]` array pairs (mirroring `to_hash`). `sorted` orders entries by key.
+fn builtin_kotlin_map(args: &[StrykeValue], sorted: bool) -> StrykeResult<StrykeValue> {
+    use parking_lot::RwLock;
+    let mut map: indexmap::IndexMap<String, StrykeValue> = indexmap::IndexMap::new();
+    let mut i = 0;
+    while i < args.len() {
+        if let Some(aref) = args[i].as_array_ref() {
+            let pair = aref.read();
+            if pair.len() >= 2 {
+                map.insert(pair[0].to_string(), pair[1].clone());
+                i += 1;
+                continue;
+            }
+        }
+        let key = args[i].to_string();
+        let val = args.get(i + 1).cloned().unwrap_or(StrykeValue::UNDEF);
+        map.insert(key, val);
+        i += 2;
+    }
+    if sorted {
+        map.sort_keys();
+    }
+    Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map))))
+}
+
+/// `setOf E…` / `mutableSetOf` / `hashSetOf` / `linkedSetOf` / `sortedSetOf`
+/// and `emptySet` — Kotlin set constructors. De-duplicates elements;
+/// `sorted` orders them by stringified value first.
+fn builtin_kotlin_set(args: &[StrykeValue], sorted: bool) -> StrykeResult<StrykeValue> {
+    if !sorted {
+        return Ok(crate::value::set_from_elements(args.iter().cloned()));
+    }
+    let mut items = args.to_vec();
+    items.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+    Ok(crate::value::set_from_elements(items))
 }
 
 /// `pluck KEY, LIST_OF_HASHREFS` — extract one key from each hashref in a list.

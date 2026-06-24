@@ -1273,7 +1273,7 @@ class StrykeLexer : LexerBase() {
         )
 
         private val DECL_KEYWORDS = setOf(
-            "my", "var", "val", "our", "oursync", "local", "state",
+            "my", "var", "val", "mysync", "varsync", "our", "oursync", "local", "state",
             "const", "frozen", "typed",
             "use", "no", "import", "package", "require",
             "has", "pub", "priv", "in", "is", "as",
@@ -1305,7 +1305,7 @@ class StrykeLexer : LexerBase() {
             "pmap", "pgrep", "pfor", "pforeach", "ploop", "pwhile", "pflat_map",
             "pmaps", "pgreps", "pflat_maps",
             "par_fetch", "par_each", "par_run", "par_apply",
-            "channel", "spawn", "await", "async", "mysync", "varsync",
+            "channel", "spawn", "await", "async",
         )
 
         private val BUILTINS = setOf(
@@ -1339,6 +1339,13 @@ class StrykeLexer : LexerBase() {
             "key_type", "key_hotkey", "keyboard_keys",
             "pixel", "pixel_matches_color",
             "screenshot", "screenshot_region",
+            // ── Kotlin-flavored collection constructors ("fake kotlin") ──
+            // Highlight Kotlin's stdlib factory fns so stryke written in
+            // Kotlin idiom (alongside `var` / `val` / `varsync`) reads natively.
+            "listOf", "listOfNotNull", "mutableListOf", "arrayListOf", "emptyList",
+            "mapOf", "mutableMapOf", "hashMapOf", "linkedMapOf", "sortedMapOf", "emptyMap",
+            "setOf", "mutableSetOf", "hashSetOf", "linkedSetOf", "sortedSetOf", "emptySet",
+            "arrayOf", "arrayOfNulls", "emptyArray", "sequenceOf", "emptySequence",
         )
         private val REGEX_ANCHORS = setOf(',', '(', '=', ';', '{', '|', '&', '~', '!', '?')
         private val SPECIAL_VAR_CHARS = setOf(
