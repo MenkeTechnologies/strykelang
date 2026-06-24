@@ -53,8 +53,8 @@ fn Ci::is_meta($path) = exists $META{Ci::basename($path)}
 # auto-bind the topic to a positional `($path)` parameter the way Perl's
 # `grep { fn $_ }` shorthand would. Without `($_)` here the meta files
 # `check_no_interop`, `run_no_interop_demos`, `exercism_run_all`, and
-# `run_all_ci` slipped through the filter (caught by user 2026-05-26).
-fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta($_) } sort
+# `run_all_ci` slipped through the filter
+fn Ci::top_stk_files = ~> glob("$ex_dir/*.stk") grep { !Ci::is_meta(_) } sort
 
 fn Ci::demo_stk_files = ~> glob("$ex_dir/*_no_interop.stk") grep { _ =~ /_no_interop\.stk$/ && !Ci::is_meta } sort
 
