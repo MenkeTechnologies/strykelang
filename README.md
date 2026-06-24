@@ -44,6 +44,7 @@ The 2nd fastest dynamic language runtime ever benchmarked for singlethreaded —
 - [\[0x08\] Supported Perl Features](#0x08-supported-perl-features)
 - [\[0x08a\] `--no-interop` Mode](#0x08a---no-interop-mode)
 - [\[0x08b\] String Coordinates — Bytes vs Codepoints](#0x08b-string-coordinates--bytes-vs-codepoints)
+- [\[0x08c\] `--static` Mode](#0x08c---static-mode)
 - [\[0x09\] Architecture](#0x09-architecture)
 - [\[0x0A\] Examples](#0x0a-examples)
 - [\[0x0B\] Benchmarks](#0x0b-benchmarks)
@@ -550,7 +551,7 @@ For `varsync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `
 | **Steganography** ([`image`](https://crates.io/crates/image), `sha2`, `crc32fast`) — world-first polymorphic stego builtin | `hide(CARRIER, SECRET [, KEY])` / `reveal(STEGO [, KEY])` / `hide_capacity(CARRIER)` — auto-dispatches PNG LSB (R/G/B, alpha skipped) for `\x89PNG` bytes vs zero-width-char text stego (U+200B/U+200C between visible chars) for everything else. 4-byte length + 4-byte CRC32 envelope catches tampering. Optional KEY enables SHA-256(key‖counter)-derived XOR mask on the secret. |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `strptime`, `time_ago`, `elapsed` |
-| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int` |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int`, parametric containers `List<Str>` / `Map<Int, Str>`, return types `fn add($x: Int): Int`, `--static` mandatory typing ([\[0x08c\]](#0x08c---static-mode)) |
 | **Cyberpunk Terminal Art** | `cyber_city` (neon cityscape), `cyber_grid` (synthwave perspective grid), `cyber_rain`/`matrix_rain` (digital rain), `cyber_glitch`/`glitch_text` (text corruption), `cyber_banner`/`neon_banner` (block-letter banners), `cyber_circuit` (circuit board), `cyber_skull`, `cyber_eye` — all output ANSI-colored Unicode art |
 
 ```perl
@@ -972,6 +973,7 @@ stryke-specific long flags:
 | `--record` | Record one row per stryke run (wall-clock, exit code, argv) to `~/.stryke/perf.sqlite`. Inherits to child processes via `STRYKE_RECORD=1` env, so `s --record t TESTS...` records one row per test file. Query via the `perfview` builtin. |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
 | `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--static` | Mandatory static typing (Kotlin-style): every function parameter, return type, and variable declaration must be typed or inferable; statically-known type mismatches abort before the program runs. See [\[0x08c\]](#0x08c---static-mode) |
 | `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a---no-interop-mode) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
 | `--lsp` | Language server over stdio ([\[0x11\]](#0x11-language-server-stryke-lsp)) |
@@ -2538,6 +2540,47 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 - **`varsync` / atomic capture is rejected** — shared state across remote workers can't honour the cross-process mutex semantics in v1. Use the result list and aggregate locally.
 - **No streaming results** — the dispatcher buffers the full result vector before returning. For huge fan-outs this is the next thing to fix (likely via `pchannel` integration).
 - **No SSH connection pool across calls** — each `pmap_on` invocation builds fresh sessions. Subsequent `pmap_on` calls in the same script reconnect from scratch.
+
+---
+
+## [0x08c] `--static` MODE
+
+stryke's type system is opt-in by default — `typed my $x : Int`, typed struct/class fields, and typed `fn` parameters are checked at runtime when present, ignored when absent. `--static` makes typing **mandatory** for the whole program, modelled on Kotlin: every function parameter, every return type, and every variable declaration must carry a type (or, for variables, an initializer the type can be inferred from). Statically-known mismatches abort **before the program runs**; everything else is enforced at runtime by the same `check_value` path that backs opt-in typing.
+
+`--static` applies to the main program only — imported `.pm` modules keep their own (possibly untyped) contract. It also disables the bytecode cache so a non-static cached chunk can never bypass the typing pass.
+
+### Type syntax (Kotlin angle brackets)
+
+```stryke
+fn add($x: Int, $y: Int): Int { $x + $y }      # typed params + return type
+var $n: Int = 5                                # typed scalar
+var $m = 5                                      # OK: Int inferred from initializer
+val @names: List<Str> = ("ann", "bob")         # element-typed array
+var %ages: Map<Str, Int> = (ann => 30)         # key/value-typed hash
+var %nested: Map<Str, List<Int>> = ()          # generics nest
+```
+
+- `List<T>` is the canonical element-typed array (`Array<T>` is an alias). Bare `Array` carries no element check.
+- `Map<K, V>` is the canonical key/value-typed hash (`Hash<K, V>` is an alias); both require exactly two type arguments. Bare `Hash` carries no key/value check.
+- Return types use the Kotlin colon: `fn name(...): Type { }`. A capitalized type name after the closing paren is a return type; a lowercase identifier (`: lvalue`) stays an attribute.
+
+### Enforcement
+
+| Construct | Without `--static` | With `--static` |
+| --- | --- | --- |
+| `fn f($x)` (untyped param) | allowed | **rejected** — param needs a type |
+| `fn f($x: Int)` (no return type) | allowed | **rejected** — return type required |
+| `var $x` (no type, no init) | allowed | **rejected** — type or initializer required |
+| `var $x = 5` | `Any` | OK — `Int` inferred |
+| `val $y: Int = "hi"` | runtime type error | **rejected at parse time** |
+| `push @a, 5` on `List<Str>` | — | type error (runtime, both modes once `@a` is typed) |
+
+Typed containers are enforced whether or not `--static` is on, at every write: declaration, whole-value reassignment, `push`, and element store (`$a[i] = ...` / `$h{k} = ...`). `--static` adds the *requirement* that everything be typed plus the parse-time rejection of statically-known mismatches.
+
+```bash
+stryke --static script.stk        # whole program must be statically typed
+stryke script.stk                 # opt-in typing only (default)
+```
 
 ---
 

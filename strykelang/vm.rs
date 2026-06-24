@@ -35,6 +35,8 @@ struct ParallelBlockVmShared {
     constants: Arc<Vec<StrykeValue>>,
     lines: Arc<Vec<usize>>,
     sub_entries: Vec<(u16, usize, bool)>,
+    sub_return_types: Vec<(u16, crate::ast::PerlTypeName)>,
+    container_types: Vec<crate::ast::PerlTypeName>,
     static_sub_calls: Vec<(usize, bool, u16)>,
     blocks: Vec<Block>,
     code_ref_sigs: Vec<Vec<SubSigParam>>,
@@ -87,6 +89,8 @@ impl ParallelBlockVmShared {
             constants: Arc::clone(&vm.constants),
             lines: Arc::clone(&vm.lines),
             sub_entries: vm.sub_entries.clone(),
+            sub_return_types: vm.sub_return_types.clone(),
+            container_types: vm.container_types.clone(),
             static_sub_calls: vm.static_sub_calls.clone(),
             blocks: vm.blocks.clone(),
             code_ref_sigs: vm.code_ref_sigs.clone(),
@@ -143,6 +147,8 @@ impl ParallelBlockVmShared {
             ops: Arc::clone(&self.ops),
             lines: Arc::clone(&self.lines),
             sub_entries: self.sub_entries.clone(),
+            sub_return_types: self.sub_return_types.clone(),
+            container_types: self.container_types.clone(),
             static_sub_calls: self.static_sub_calls.clone(),
             blocks: self.blocks.clone(),
             code_ref_sigs: self.code_ref_sigs.clone(),
@@ -271,6 +277,10 @@ struct CallFrame {
     block_region: bool,
     /// Wall-clock start for [`crate::profiler::Profiler::exit_sub`] (paired with `enter_sub` on `Call`).
     sub_profiler_start: Option<std::time::Instant>,
+    /// Declared return type (`fn f(): Type`) of the sub this frame is running,
+    /// if any. Checked against the returned value at `Op::Return` /
+    /// `Op::ReturnValue` before it is pushed to the caller.
+    return_type: Option<crate::ast::PerlTypeName>,
 }
 
 /// Stack-based bytecode virtual machine.
@@ -417,6 +427,11 @@ pub struct VM<'a> {
     lines: Arc<Vec<usize>>,
     /// `sub_entries` field.
     sub_entries: Vec<(u16, usize, bool)>,
+    /// Declared return types for compiled named subs (see
+    /// [`Chunk::sub_return_types`]); enforced at `Op::Return`/`Op::ReturnValue`.
+    sub_return_types: Vec<(u16, crate::ast::PerlTypeName)>,
+    /// Parametric container types for `DeclareArrayTyped`/`DeclareHashTyped`.
+    container_types: Vec<crate::ast::PerlTypeName>,
     /// See [`Chunk::static_sub_calls`] (`Op::CallStaticSubId`).
     static_sub_calls: Vec<(usize, bool, u16)>,
     /// `blocks` field.
@@ -581,6 +596,8 @@ impl<'a> VM<'a> {
             ops: Arc::new(chunk.ops.clone()),
             lines: Arc::new(chunk.lines.clone()),
             sub_entries: chunk.sub_entries.clone(),
+            sub_return_types: chunk.sub_return_types.clone(),
+            container_types: chunk.container_types.clone(),
             static_sub_calls: chunk.static_sub_calls.clone(),
             blocks: chunk.blocks.clone(),
             code_ref_sigs: chunk.code_ref_sigs.clone(),
@@ -722,6 +739,7 @@ impl<'a> VM<'a> {
             jit_trampoline_return: false,
             block_region: true,
             sub_profiler_start: None,
+            return_type: None,
         });
         self.interp.scope_push_hook();
         self.interp.wantarray_kind = WantarrayCtx::Scalar;
@@ -2213,6 +2231,7 @@ impl<'a> VM<'a> {
                                 closure_env: None,
                                 prototype: None,
                                 fib_like: None,
+                                return_type: None,
                             },
                         )));
                     } else {
@@ -3052,6 +3071,12 @@ impl<'a> VM<'a> {
         let name = name_owned.as_str();
         let argc = argc_u8 as usize;
         let want = WantarrayCtx::from_byte(wa_byte);
+        // Declared return type (`fn f(): Type`) for this sub, enforced at return.
+        let ret_ty = self
+            .sub_return_types
+            .iter()
+            .find(|(n, _)| *n == name_idx)
+            .map(|(_, t)| t.clone());
 
         // AOP advice path: at least one matching intercept and no re-entrancy guard for `name`.
         // Mirrors zshrs `run_intercepts` (exec.rs:14656-14759). The fast-path skip below is the
@@ -3123,6 +3148,7 @@ impl<'a> VM<'a> {
                     jit_trampoline_return: false,
                     block_region: false,
                     sub_profiler_start: sub_prof_t0,
+                    return_type: ret_ty.clone(),
                 });
                 self.interp.wantarray_kind = want;
                 self.interp.scope_push_hook();
@@ -3155,6 +3181,7 @@ impl<'a> VM<'a> {
                     jit_trampoline_return: false,
                     block_region: false,
                     sub_profiler_start: sub_prof_t0,
+                    return_type: ret_ty.clone(),
                 });
                 self.interp.wantarray_kind = want;
                 self.interp.scope_push_hook();
@@ -4033,6 +4060,33 @@ impl<'a> VM<'a> {
                         self.interp
                             .scope
                             .declare_array_frozen(n, val.to_list(), true);
+                        Ok(())
+                    }
+                    Op::DeclareArrayTyped(idx, ty_idx, frozen) => {
+                        let val = self.pop();
+                        let n = names[*idx as usize].to_string();
+                        let ty = self.container_types[*ty_idx as usize].clone();
+                        self.interp
+                            .scope
+                            .declare_array_typed(&n, val.to_list(), *frozen, ty)
+                            .map_err(|e| e.at_line(self.line()))?;
+                        Ok(())
+                    }
+                    Op::DeclareHashTyped(idx, ty_idx, frozen) => {
+                        let val = self.pop();
+                        let n = names[*idx as usize].to_string();
+                        let ty = self.container_types[*ty_idx as usize].clone();
+                        let items = val.to_list();
+                        let mut map = IndexMap::new();
+                        let mut i = 0;
+                        while i + 1 < items.len() {
+                            map.insert(items[i].to_string(), items[i + 1].clone());
+                            i += 2;
+                        }
+                        self.interp
+                            .scope
+                            .declare_hash_typed(&n, map, *frozen, ty)
+                            .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
                     Op::GetArrayElem(idx) => {
@@ -5336,6 +5390,14 @@ impl<'a> VM<'a> {
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
                             self.interp.current_sub_stack.pop();
+                            if let Some(ref ty) = frame.return_type {
+                                ty.check_value(&StrykeValue::UNDEF).map_err(|msg| {
+                                    StrykeError::type_error(
+                                        format!("return value: {}", msg),
+                                        self.line(),
+                                    )
+                                })?;
+                            }
                             if frame.jit_trampoline_return {
                                 self.jit_trampoline_out = Some(StrykeValue::UNDEF);
                             } else {
@@ -5387,6 +5449,14 @@ impl<'a> VM<'a> {
                             self.stack.truncate(frame.stack_base);
                             self.interp.pop_scope_to_depth(frame.scope_depth);
                             self.interp.current_sub_stack.pop();
+                            if let Some(ref ty) = frame.return_type {
+                                ty.check_value(&val).map_err(|msg| {
+                                    StrykeError::type_error(
+                                        format!("return value: {}", msg),
+                                        self.line(),
+                                    )
+                                })?;
+                            }
                             if frame.jit_trampoline_return {
                                 self.jit_trampoline_out = Some(val);
                             } else {
@@ -7326,6 +7396,7 @@ impl<'a> VM<'a> {
                             closure_env: Some(captured),
                             prototype: None,
                             fib_like: None,
+                            return_type: None,
                         })));
                         Ok(())
                     }
@@ -9784,6 +9855,7 @@ impl<'a> VM<'a> {
                             closure_env,
                             prototype: rs.prototype.clone(),
                             fib_like: None,
+                            return_type: rs.return_type.clone(),
                         };
                         sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
                         self.interp.subs.insert(key, Arc::new(sub));
@@ -9953,6 +10025,12 @@ impl<'a> VM<'a> {
             }
             self.interp.debugger_enter_sub(nm_owned.as_str());
         }
+        let ret_ty = self.sub_entry_name_idx(entry_ip).and_then(|nidx| {
+            self.sub_return_types
+                .iter()
+                .find(|(n, _)| *n == nidx)
+                .map(|(_, t)| t.clone())
+        });
         self.call_stack.push(CallFrame {
             return_ip: 0,
             stack_base,
@@ -9961,6 +10039,7 @@ impl<'a> VM<'a> {
             jit_trampoline_return: true,
             block_region: false,
             sub_profiler_start: sub_prof_t0,
+            return_type: ret_ty,
         });
         self.interp.wantarray_kind = want;
         self.interp.scope_push_hook();

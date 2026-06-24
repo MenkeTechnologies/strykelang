@@ -263,6 +263,7 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
             params,
             body,
             prototype,
+            return_type,
         } => {
             let sig = if !params.is_empty() {
                 format!(
@@ -279,10 +280,15 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                     .map(|p| format!(" ({})", p))
                     .unwrap_or_default()
             };
+            let ret = return_type
+                .as_ref()
+                .map(|t| format!(": {}", t.display_name()))
+                .unwrap_or_default();
             format!(
-                "fn {}{} {{\n{}\n{}}}",
+                "fn {}{}{} {{\n{}\n{}}}",
                 name,
                 sig,
+                ret,
                 format_block_indent(body, depth + 1),
                 prefix
             )
@@ -796,16 +802,20 @@ pub fn format_expr(e: &Expr) -> String {
                 .join(", ");
             format!("{{{}}}", inner)
         }
-        ExprKind::CodeRef { params, body } => {
+        ExprKind::CodeRef { params, body, return_type } => {
+            let ret = return_type
+                .as_ref()
+                .map(|t| format!(": {}", t.display_name()))
+                .unwrap_or_default();
             if params.is_empty() {
-                format!("fn {{ {} }}", format_block_inline(body))
+                format!("fn{} {{ {} }}", ret, format_block_inline(body))
             } else {
                 let sig = params
                     .iter()
                     .map(format_sub_sig_param)
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("fn ({}) {{ {} }}", sig, format_block_inline(body))
+                format!("fn ({}){} {{ {} }}", sig, ret, format_block_inline(body))
             }
         }
         ExprKind::SubroutineRef(name) => format!("&{}", name),

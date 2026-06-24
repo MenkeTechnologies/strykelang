@@ -1585,7 +1585,7 @@ impl StaticAnalyzer {
                     self.analyze_expr(v);
                 }
             }
-            ExprKind::CodeRef { params, body } => {
+            ExprKind::CodeRef { params, body, .. } => {
                 self.push_scope();
                 for p in params {
                     self.declare_param(p);

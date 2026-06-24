@@ -158,6 +158,12 @@ struct Frame {
     frozen_hashes: HashSet<String>,
     /// `typed my $x : Int` — runtime type checks on assignment.
     typed_scalars: HashMap<String, PerlTypeName>,
+    /// `var @a : List<T>` — runtime element-type checks on whole-array
+    /// assignment and element writes.
+    typed_arrays: HashMap<String, PerlTypeName>,
+    /// `var %h : Map<K, V>` — runtime key/value-type checks on whole-hash
+    /// assignment and element writes.
+    typed_hashes: HashMap<String, PerlTypeName>,
     /// Arrays promoted to shared Arc-backed storage by `\@arr`.
     /// When a ref is taken, both the scope and the ref share the same Arc,
     /// so mutations through either path are visible. Re-declaration removes the entry.
@@ -195,6 +201,8 @@ impl Frame {
         self.frozen_arrays.clear();
         self.frozen_hashes.clear();
         self.typed_scalars.clear();
+        self.typed_arrays.clear();
+        self.typed_hashes.clear();
         self.shared_arrays.clear();
         self.shared_hashes.clear();
         self.atomic_arrays.clear();
@@ -226,6 +234,8 @@ impl Frame {
             shared_arrays: Vec::new(),
             shared_hashes: Vec::new(),
             typed_scalars: HashMap::new(),
+            typed_arrays: HashMap::new(),
+            typed_hashes: HashMap::new(),
             atomic_arrays: Vec::new(),
             atomic_hashes: Vec::new(),
             local_restores: Vec::new(),
@@ -1723,6 +1733,79 @@ impl Scope {
             }
         }
     }
+    /// Declare a typed array (`var @a : List<T>` / `val @a : List<T>`). Checks
+    /// the initializer against `ty`, declares the array, and records the type so
+    /// later whole-array assignments and element writes are checked too.
+    pub fn declare_array_typed(
+        &mut self,
+        name: &str,
+        val: Vec<StrykeValue>,
+        frozen: bool,
+        ty: PerlTypeName,
+    ) -> Result<(), StrykeError> {
+        let as_val = StrykeValue::array(val.clone());
+        ty.check_value(&as_val)
+            .map_err(|msg| StrykeError::type_error(format!("`@{}`: {}", name, msg), 0))?;
+        self.declare_array_frozen(name, val, frozen);
+        let stripped = name.strip_prefix("main::").unwrap_or(name);
+        let idx = if name.contains("::") {
+            0
+        } else {
+            self.frames.len().saturating_sub(1)
+        };
+        if let Some(frame) = self.frames.get_mut(idx) {
+            frame.typed_arrays.insert(stripped.to_string(), ty);
+        }
+        Ok(())
+    }
+
+    /// Declare a typed hash (`var %h : Map<K, V>` / `val %h : Map<K, V>`).
+    pub fn declare_hash_typed(
+        &mut self,
+        name: &str,
+        val: IndexMap<String, StrykeValue>,
+        frozen: bool,
+        ty: PerlTypeName,
+    ) -> Result<(), StrykeError> {
+        let as_val = StrykeValue::hash(val.clone());
+        ty.check_value(&as_val)
+            .map_err(|msg| StrykeError::type_error(format!("`%{}`: {}", name, msg), 0))?;
+        self.declare_hash_frozen(name, val, frozen);
+        let stripped = name.strip_prefix("main::").unwrap_or(name);
+        let idx = if name.contains("::") {
+            0
+        } else {
+            self.frames.len().saturating_sub(1)
+        };
+        if let Some(frame) = self.frames.get_mut(idx) {
+            frame.typed_hashes.insert(stripped.to_string(), ty);
+        }
+        Ok(())
+    }
+
+    /// Look up the declared element type of a typed array, searching inner
+    /// frames outward. Returns `None` for untyped arrays.
+    fn array_type_of(&self, name: &str) -> Option<PerlTypeName> {
+        let stripped = name.strip_prefix("main::").unwrap_or(name);
+        for frame in self.frames.iter().rev() {
+            if let Some(t) = frame.typed_arrays.get(stripped) {
+                return Some(t.clone());
+            }
+        }
+        None
+    }
+
+    /// Look up the declared key/value type of a typed hash.
+    fn hash_type_of(&self, name: &str) -> Option<PerlTypeName> {
+        let stripped = name.strip_prefix("main::").unwrap_or(name);
+        for frame in self.frames.iter().rev() {
+            if let Some(t) = frame.typed_hashes.get(stripped) {
+                return Some(t.clone());
+            }
+        }
+        None
+    }
+
     /// `get_array` — see implementation.
     pub fn get_array(&self, name: &str) -> Vec<StrykeValue> {
         // `@main::X` aliases the bare `@X` because `main` is the default
@@ -1971,6 +2054,14 @@ impl Scope {
     /// Push to array — works for both regular and atomic arrays.
     pub fn push_to_array(&mut self, name: &str, val: StrykeValue) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
+        // Typed array (`var @a: List<T>`) — pushed element must match `T`.
+        if let Some(PerlTypeName::List(elem)) = self.array_type_of(name) {
+            if !matches!(*elem, PerlTypeName::Any) {
+                elem.check_value(&val).map_err(|msg| {
+                    StrykeError::type_error(format!("`@{}` element: {}", name, msg), 0)
+                })?;
+            }
+        }
         if let Some(aa) = self.find_atomic_array(name) {
             aa.0.lock().push(val);
             return Ok(());
@@ -2112,6 +2203,12 @@ impl Scope {
     }
     /// `set_array` — see implementation.
     pub fn set_array(&mut self, name: &str, val: Vec<StrykeValue>) -> Result<(), StrykeError> {
+        // Typed array (`var @a: List<T>`) — whole-array assignment must satisfy
+        // the declared element type.
+        if let Some(ty) = self.array_type_of(name) {
+            ty.check_value(&StrykeValue::array(val.clone()))
+                .map_err(|msg| StrykeError::type_error(format!("`@{}`: {}", name, msg), 0))?;
+        }
         if let Some(aa) = self.find_atomic_array(name) {
             *aa.0.lock() = val;
             return Ok(());
@@ -2173,6 +2270,15 @@ impl Scope {
         val: StrykeValue,
     ) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
+        // Typed array element write (`$a[i] = v`, `push @a, v`) must satisfy the
+        // declared element type.
+        if let Some(PerlTypeName::List(elem)) = self.array_type_of(name) {
+            if !matches!(*elem, PerlTypeName::Any) {
+                elem.check_value(&val).map_err(|msg| {
+                    StrykeError::type_error(format!("`@{}` element: {}", name, msg), 0)
+                })?;
+            }
+        }
         if let Some(aa) = self.find_atomic_array(name) {
             let mut arr = aa.0.lock();
             let idx = if index < 0 {
@@ -2417,6 +2523,12 @@ impl Scope {
         name: &str,
         val: IndexMap<String, StrykeValue>,
     ) -> Result<(), StrykeError> {
+        // Typed hash (`var %h: Map<K, V>`) — whole-hash assignment must satisfy
+        // the declared key/value types.
+        if let Some(ty) = self.hash_type_of(name) {
+            ty.check_value(&StrykeValue::hash(val.clone()))
+                .map_err(|msg| StrykeError::type_error(format!("`%{}`: {}", name, msg), 0))?;
+        }
         if let Some(ah) = self.find_atomic_hash(name) {
             *ah.0.lock() = val;
             return Ok(());
@@ -2507,6 +2619,20 @@ impl Scope {
         val: StrykeValue,
     ) -> Result<(), StrykeError> {
         let val = self.resolve_container_binding_ref(val);
+        // Typed hash (`var %h: Map<K, V>`) — key and value of an element write
+        // must satisfy the declared types.
+        if let Some(PerlTypeName::Map(kt, vt)) = self.hash_type_of(name) {
+            if !matches!(*kt, PerlTypeName::Any | PerlTypeName::Str) {
+                kt.check_key(key).map_err(|msg| {
+                    StrykeError::type_error(format!("`%{}` key: {}", name, msg), 0)
+                })?;
+            }
+            if !matches!(*vt, PerlTypeName::Any) {
+                vt.check_value(&val).map_err(|msg| {
+                    StrykeError::type_error(format!("`%{}` value: {}", name, msg), 0)
+                })?;
+            }
+        }
         // `$SIG{INT} = \&h` — lazily install the matching signal hook. Until Perl code touches
         // `%SIG`, the POSIX default stays in place so Ctrl-C terminates immediately.
         if name == "SIG" {

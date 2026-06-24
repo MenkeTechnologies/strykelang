@@ -20,6 +20,9 @@ pub struct RuntimeSubDecl {
     pub body: Block,
     /// `prototype` field.
     pub prototype: Option<String>,
+    /// Declared return type from `fn name(...): Type { }`. Enforced on return.
+    #[serde(default)]
+    pub return_type: Option<crate::ast::PerlTypeName>,
 }
 
 /// AOP advice registered at runtime (`before|after|around "<glob>" { ... }`).
@@ -118,6 +121,10 @@ pub enum Op {
     DeclareArray(u16),
     /// `DeclareArrayFrozen` variant.
     DeclareArrayFrozen(u16),
+    /// `var @a : List<T>` — name pool index, [`Chunk::container_types`] index, frozen flag.
+    DeclareArrayTyped(u16, u16, bool),
+    /// `var %h : Map<K, V>` — name pool index, [`Chunk::container_types`] index, frozen flag.
+    DeclareHashTyped(u16, u16, bool),
     /// `GetArrayElem` variant.
     GetArrayElem(u16), // stack: [index] → value
     /// `SetArrayElem` variant.
@@ -1322,6 +1329,15 @@ pub struct Chunk {
     /// When `uses_stack_args` is true, the Call op leaves arguments on the value
     /// stack and the sub reads them via `GetArg(idx)` instead of `shift @_`.
     pub sub_entries: Vec<(u16, usize, bool)>,
+    /// Declared return types for compiled named subs (`fn f(): Type { }`),
+    /// keyed by the sub's interned (qualified) name index. Consulted by the VM
+    /// at `Op::Return` / `Op::ReturnValue` to enforce the return type.
+    #[serde(default)]
+    pub sub_return_types: Vec<(u16, crate::ast::PerlTypeName)>,
+    /// Parametric container types (`List<T>`, `Map<K, V>`) for
+    /// `DeclareArrayTyped` / `DeclareHashTyped`, indexed by the op's second operand.
+    #[serde(default)]
+    pub container_types: Vec<crate::ast::PerlTypeName>,
     /// AST blocks for map/grep/sort/parallel operations.
     /// Referenced by block-based opcodes via u16 index.
     pub blocks: Vec<Block>,
@@ -1444,6 +1460,8 @@ impl Chunk {
             op_ast_expr: Vec::new(),
             ast_expr_pool: Vec::new(),
             sub_entries: Vec::new(),
+            sub_return_types: Vec::new(),
+            container_types: Vec::new(),
             blocks: Vec::new(),
             block_bytecode_ranges: Vec::new(),
             static_sub_calls: Vec::new(),
@@ -1696,6 +1714,18 @@ impl Chunk {
         }
         let idx = self.names.len() as u16;
         self.names.push(name.to_string());
+        idx
+    }
+
+    /// Intern a parametric container type (`List<T>` / `Map<K, V>`) into the
+    /// `container_types` pool, returning its index for `DeclareArrayTyped` /
+    /// `DeclareHashTyped`.
+    pub fn intern_container_type(&mut self, ty: &crate::ast::PerlTypeName) -> u16 {
+        if let Some(idx) = self.container_types.iter().position(|t| t == ty) {
+            return idx as u16;
+        }
+        let idx = self.container_types.len() as u16;
+        self.container_types.push(ty.clone());
         idx
     }
 

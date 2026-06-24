@@ -244,6 +244,9 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
             params,
             body,
             prototype,
+            // Return types are a stryke extension; standard Perl 5 has no syntax
+            // for them, so deparse drops them.
+            return_type: _,
         } => {
             buf.push_str("sub ");
             buf.push_str(name);
@@ -843,7 +846,7 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             }
             buf.push('}');
         }
-        ExprKind::CodeRef { params, body } => {
+        ExprKind::CodeRef { params, body, .. } => {
             if crate::compat_mode() {
                 buf.push_str("sub");
             } else {

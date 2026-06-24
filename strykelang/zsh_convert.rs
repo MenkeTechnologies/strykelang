@@ -403,6 +403,7 @@ fn map_funcdef(z: &ZshFuncDef, ctx: &mut Ctx) -> Vec<Statement> {
                 params: Vec::new(),
                 body: body.clone(),
                 prototype: None,
+                return_type: None,
             })
         })
         .collect()

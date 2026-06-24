@@ -335,6 +335,7 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
             params,
             body,
             prototype,
+            return_type,
         } => {
             let sig = if !params.is_empty() {
                 format!(
@@ -351,10 +352,15 @@ fn convert_statement(s: &Statement, depth: usize) -> String {
                     .map(|p| format!(" ({})", p))
                     .unwrap_or_default()
             };
+            let ret = return_type
+                .as_ref()
+                .map(|t| format!(": {}", t.display_name()))
+                .unwrap_or_default();
             format!(
-                "fn {}{} {{\n{}\n{}}}",
+                "fn {}{}{} {{\n{}\n{}}}",
                 name,
                 sig,
+                ret,
                 convert_block(body, depth + 1),
                 pfx
             )
@@ -1267,16 +1273,20 @@ fn convert_expr_direct(e: &Expr, top: bool) -> String {
                 .join(", ");
             format!("{{{}}}", inner)
         }
-        ExprKind::CodeRef { params, body } => {
+        ExprKind::CodeRef { params, body, return_type } => {
+            let ret = return_type
+                .as_ref()
+                .map(|t| format!(": {}", t.display_name()))
+                .unwrap_or_default();
             if params.is_empty() {
-                format!("fn {{\n{}\n}}", convert_block(body, 0))
+                format!("fn{} {{\n{}\n}}", ret, convert_block(body, 0))
             } else {
                 let sig = params
                     .iter()
                     .map(fmt::format_sub_sig_param)
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("fn ({}) {{\n{}\n}}", sig, convert_block(body, 0))
+                format!("fn ({}){} {{\n{}\n}}", sig, ret, convert_block(body, 0))
             }
         }
 

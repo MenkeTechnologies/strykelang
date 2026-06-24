@@ -419,6 +419,16 @@ impl Parser {
         tok
     }
 
+    /// Overwrite the current token in place (does NOT advance). Used to split a
+    /// `>>` shift token into a single `>` when closing nested generic types
+    /// (`Map<Str, List<Int>>`) — the first `>` close rewrites the `>>` to `>`,
+    /// leaving the remaining `>` for the enclosing generic to consume.
+    fn replace_current(&mut self, tok: Token) {
+        if let Some(slot) = self.tokens.get_mut(self.pos) {
+            slot.0 = tok;
+        }
+    }
+
     /// Line number of the most recently consumed token (the token at `pos - 1`).
     fn prev_line(&self) -> usize {
         if self.pos > 0 {
@@ -774,7 +784,9 @@ impl Parser {
                             self.peek_line(),
                         ));
                     }
-                    self.parse_my_our_local("my", false)?
+                    // `true` → Kotlin-style type annotations (`var x: Int`,
+                    // `var @a: List<Str>`) are parsed into `type_annotation`.
+                    self.parse_my_our_local("my", true)?
                 }
                 "val" if matches!(
                     self.peek_at(1),
@@ -1079,6 +1091,7 @@ impl Parser {
                                     kind: ExprKind::CodeRef {
                                         params: vec![],
                                         body,
+                                        return_type: None,
                                     },
                                     line: inner_line,
                                 };
@@ -1100,6 +1113,7 @@ impl Parser {
                                 kind: ExprKind::CodeRef {
                                     params: vec![],
                                     body,
+                                    return_type: None,
                                 },
                                 line: inner_line,
                             };
@@ -1355,6 +1369,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -2135,6 +2150,7 @@ impl Parser {
             kind: ExprKind::CodeRef {
                 params: vec![],
                 body,
+                return_type: None,
             },
             line,
         };
@@ -2345,6 +2361,7 @@ impl Parser {
                         kind: ExprKind::CodeRef {
                             params: vec![],
                             body: stmts,
+                            return_type: None,
                         },
                         line: stage_line,
                     };
@@ -2362,7 +2379,7 @@ impl Parser {
                     let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                     let body = self.parse_block()?;
                     let code_ref = Expr {
-                        kind: ExprKind::CodeRef { params, body },
+                        kind: ExprKind::CodeRef { params, body, return_type: None },
                         line: stage_line,
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
@@ -2374,7 +2391,7 @@ impl Parser {
                     self.parse_sub_attributes()?;
                     let body = self.parse_fn_eq_body_or_block(false)?;
                     let code_ref = Expr {
-                        kind: ExprKind::CodeRef { params, body },
+                        kind: ExprKind::CodeRef { params, body, return_type: None },
                         line: stage_line,
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
@@ -2686,6 +2703,7 @@ impl Parser {
                                             kind: StmtKind::Expression(call_expr),
                                             line: stage_line,
                                         }],
+                                        return_type: None,
                                     },
                                     line: stage_line,
                                 };
@@ -2929,6 +2947,7 @@ impl Parser {
                                 kind: StmtKind::Expression(wrapped),
                                 line: body_line,
                             }],
+                            return_type: None,
                         },
                         line: body_line,
                     }
@@ -2969,6 +2988,7 @@ impl Parser {
                         kind: StmtKind::Expression(result),
                         line: body_line,
                     }],
+                    return_type: None,
                 },
                 line: _line,
             });
@@ -3620,6 +3640,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -3869,6 +3890,7 @@ impl Parser {
             kind: ExprKind::CodeRef {
                 params: vec![],
                 body: vec![if_stmt],
+                return_type: None,
             },
             line,
         };
@@ -4202,6 +4224,7 @@ impl Parser {
                 kind: ExprKind::CodeRef {
                     params: vec![],
                     body: block,
+                    return_type: None,
                 },
                 line: inner_line,
             })),
@@ -4874,30 +4897,10 @@ impl Parser {
                         ));
                     }
                     self.advance();
+                    // `$x: Type` — full type grammar incl. generics (`List<Int>`,
+                    // `Map<Str, Int>`), routed through the shared type parser.
                     let ty = if self.eat(&Token::Colon) {
-                        match self.peek() {
-                            Token::Ident(ref tname) => {
-                                let tname = tname.clone();
-                                self.advance();
-                                Some(match tname.as_str() {
-                                    "Int" => PerlTypeName::Int,
-                                    "Str" => PerlTypeName::Str,
-                                    "Float" => PerlTypeName::Float,
-                                    "Bool" => PerlTypeName::Bool,
-                                    "Array" => PerlTypeName::Array,
-                                    "Hash" => PerlTypeName::Hash,
-                                    "Ref" => PerlTypeName::Ref,
-                                    "Any" => PerlTypeName::Any,
-                                    _ => PerlTypeName::Struct(tname),
-                                })
-                            }
-                            _ => {
-                                return Err(self.syntax_err(
-                                    "expected type name after `:` in sub signature",
-                                    self.peek_line(),
-                                ));
-                            }
-                        }
+                        Some(self.parse_type_name()?)
                     } else {
                         None
                     };
@@ -5122,6 +5125,7 @@ impl Parser {
                 }
                 self.declared_subs.insert(name.clone());
                 let (params, prototype) = self.parse_sub_sig_or_prototype_opt()?;
+                let return_type = self.parse_return_type_opt()?;
                 self.parse_sub_attributes()?;
                 let body = self.parse_fn_eq_body_or_block(is_sub_keyword)?;
                 Ok(Statement {
@@ -5131,6 +5135,7 @@ impl Parser {
                         params,
                         body,
                         prototype,
+                        return_type,
                     },
                     line,
                 })
@@ -5145,12 +5150,17 @@ impl Parser {
                 }
                 // Statement-level anonymous sub: `fn { }`, `sub () { }`, `sub :lvalue { }`
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
+                let return_type = self.parse_return_type_opt()?;
                 self.parse_sub_attributes()?;
                 let body = self.parse_fn_eq_body_or_block(is_sub_keyword)?;
                 Ok(Statement {
                     label: None,
                     kind: StmtKind::Expression(Expr {
-                        kind: ExprKind::CodeRef { params, body },
+                        kind: ExprKind::CodeRef {
+                            params,
+                            body,
+                            return_type,
+                        },
                         line,
                     }),
                     line,
@@ -5305,6 +5315,7 @@ impl Parser {
                 } else {
                     Vec::new()
                 };
+                let return_type = self.parse_return_type_opt()?;
                 let body = if is_sub_keyword {
                     self.parse_block()?
                 } else {
@@ -5314,6 +5325,7 @@ impl Parser {
                     name: method_name,
                     params,
                     body,
+                    return_type,
                 });
                 // Optional trailing comma/semicolon after method
                 self.eat(&Token::Comma);
@@ -5584,6 +5596,7 @@ impl Parser {
                 } else {
                     Vec::new()
                 };
+                let return_type = self.parse_return_type_opt()?;
 
                 // Body: `{ ... }`, or `= expr` (same rules as top-level `fn`), or omitted (abstract)
                 let body = if let Some(b) = self.try_parse_fn_assign_shorthand_body()? {
@@ -5601,6 +5614,7 @@ impl Parser {
                     visibility,
                     is_static,
                     is_final: method_is_final,
+                    return_type,
                 });
                 self.eat(&Token::Comma);
                 self.eat(&Token::Semicolon);
@@ -5729,6 +5743,7 @@ impl Parser {
             } else {
                 Vec::new()
             };
+            let return_type = self.parse_return_type_opt()?;
 
             // Body: `{ ... }`, `= expr`, or omitted (required method)
             let body = if let Some(b) = self.try_parse_fn_assign_shorthand_body()? {
@@ -5746,6 +5761,7 @@ impl Parser {
                 visibility,
                 is_static: false,
                 is_final: false,
+                return_type,
             });
 
             self.eat(&Token::Comma);
@@ -6251,6 +6267,7 @@ impl Parser {
                             kind: StmtKind::Expression(val),
                             line: val_line,
                         }],
+                        return_type: None,
                     },
                     line: val_line,
                 };
@@ -6432,9 +6449,38 @@ impl Parser {
         };
         if allow_type_annotation && self.eat(&Token::Colon) {
             let ty = self.parse_type_name()?;
-            if decl.sigil != Sigil::Scalar {
+            // Validate the type shape matches the sigil: scalars take any scalar
+            // type, `@` arrays take `List<T>`/`Array`, `%` hashes take
+            // `Map<K, V>`/`Hash`. This keeps `var @a: Int` (a category error)
+            // from silently parsing.
+            let shape_ok = match decl.sigil {
+                Sigil::Scalar => !matches!(
+                    ty,
+                    PerlTypeName::List(_)
+                        | PerlTypeName::Map(_, _)
+                        | PerlTypeName::Array
+                        | PerlTypeName::Hash
+                ),
+                Sigil::Array => {
+                    matches!(ty, PerlTypeName::List(_) | PerlTypeName::Array)
+                }
+                Sigil::Hash => {
+                    matches!(ty, PerlTypeName::Map(_, _) | PerlTypeName::Hash)
+                }
+                Sigil::Typeglob => false,
+            };
+            if !shape_ok {
                 return Err(self.syntax_err(
-                    "`: Type` is only valid for scalar declarations (typed my $name : Int)",
+                    format!(
+                        "type `{}` does not match the `{}` declaration (use List<T> for @, Map<K, V> for %, a scalar type for $)",
+                        ty.display_name(),
+                        match decl.sigil {
+                            Sigil::Scalar => "$",
+                            Sigil::Array => "@",
+                            Sigil::Hash => "%",
+                            Sigil::Typeglob => "*",
+                        }
+                    ),
                     self.peek_line(),
                 ));
             }
@@ -6444,21 +6490,130 @@ impl Parser {
     }
 
     fn parse_type_name(&mut self) -> StrykeResult<PerlTypeName> {
-        match self.advance() {
-            (Token::Ident(name), _) => match name.as_str() {
-                "Int" => Ok(PerlTypeName::Int),
-                "Str" => Ok(PerlTypeName::Str),
-                "Float" => Ok(PerlTypeName::Float),
-                "Bool" => Ok(PerlTypeName::Bool),
-                "Array" => Ok(PerlTypeName::Array),
-                "Hash" => Ok(PerlTypeName::Hash),
-                "Ref" => Ok(PerlTypeName::Ref),
-                "Any" => Ok(PerlTypeName::Any),
-                _ => Ok(PerlTypeName::Struct(name)),
-            },
-            (tok, err_line) => Err(self.syntax_err(
-                format!("Expected type name after `:`, got {:?}", tok),
-                err_line,
+        let (name, line) = match self.advance() {
+            (Token::Ident(name), line) => (name, line),
+            (tok, err_line) => {
+                return Err(self.syntax_err(
+                    format!("Expected type name after `:`, got {:?}", tok),
+                    err_line,
+                ))
+            }
+        };
+        // Parametric generics use Kotlin angle brackets: `List<T>`, `Map<K, V>`.
+        // `<` here is unambiguous — type names never appear in expression
+        // position, so this is the only place `<` after an ident means a
+        // generic open, not `less-than`.
+        if matches!(self.peek(), Token::NumLt | Token::StrLt) {
+            return self.parse_generic_type_args(&name, line);
+        }
+        Ok(Self::simple_type_name(&name))
+    }
+
+    /// Parse an optional Kotlin-style return type `): Type` after a sub
+    /// signature: `fn add($x: Int, $y: Int): Int { }`. The colon is shared with
+    /// Perl attribute syntax (`sub f :lvalue { }`), so a return type is
+    /// recognized only when the colon is followed by a **capitalized** type
+    /// name (`Int`, `Str`, `List`, `Map`, a struct/class/enum name, …);
+    /// lowercase identifiers (`lvalue`, `method`, …) stay on the attribute path.
+    fn parse_return_type_opt(&mut self) -> StrykeResult<Option<PerlTypeName>> {
+        if !matches!(self.peek(), Token::Colon) {
+            return Ok(None);
+        }
+        let is_type = matches!(
+            self.peek_at(1),
+            Token::Ident(name) if name.chars().next().is_some_and(|c| c.is_ascii_uppercase())
+        );
+        if !is_type {
+            return Ok(None);
+        }
+        self.advance(); // consume `:`
+        Ok(Some(self.parse_type_name()?))
+    }
+
+    /// Map a bare (non-generic) type identifier to its [`PerlTypeName`].
+    /// Unknown capitalized names become `Struct(name)` (nominal struct/class/enum).
+    fn simple_type_name(name: &str) -> PerlTypeName {
+        match name {
+            "Int" => PerlTypeName::Int,
+            "Str" => PerlTypeName::Str,
+            "Float" => PerlTypeName::Float,
+            "Bool" => PerlTypeName::Bool,
+            "Array" | "List" => PerlTypeName::Array,
+            "Hash" | "Map" => PerlTypeName::Hash,
+            "Ref" => PerlTypeName::Ref,
+            "Any" => PerlTypeName::Any,
+            _ => PerlTypeName::Struct(name.to_string()),
+        }
+    }
+
+    /// Parse `<T>` / `<K, V>` after a generic head (`List`, `Array`, `Hash`,
+    /// `Map`). The opening `<` is the current token. Handles nested generics
+    /// whose closing `>` were lexed as `>>` / `>>>` (shift tokens) via a
+    /// pending-close counter, the standard C++/Kotlin approach.
+    fn parse_generic_type_args(
+        &mut self,
+        head: &str,
+        line: usize,
+    ) -> StrykeResult<PerlTypeName> {
+        self.advance(); // consume `<`
+        let mut args = Vec::new();
+        loop {
+            args.push(self.parse_type_name()?);
+            if self.eat(&Token::Comma) {
+                continue;
+            }
+            break;
+        }
+        self.expect_generic_close(line)?;
+        match head {
+            "List" | "Array" => {
+                if args.len() != 1 {
+                    return Err(self.syntax_err(
+                        format!("List<T> takes exactly one type argument, got {}", args.len()),
+                        line,
+                    ));
+                }
+                Ok(PerlTypeName::List(Box::new(args.into_iter().next().unwrap())))
+            }
+            "Map" | "Hash" => {
+                if args.len() != 2 {
+                    return Err(self.syntax_err(
+                        format!(
+                            "Map<K, V> takes exactly two type arguments, got {}",
+                            args.len()
+                        ),
+                        line,
+                    ));
+                }
+                let mut it = args.into_iter();
+                let k = it.next().unwrap();
+                let v = it.next().unwrap();
+                Ok(PerlTypeName::Map(Box::new(k), Box::new(v)))
+            }
+            other => Err(self.syntax_err(
+                format!("`{}` is not a generic type (only List<T> / Map<K, V>)", other),
+                line,
+            )),
+        }
+    }
+
+    /// Consume a single generic-close `>`. The lexer produces `>>` / `>>>`
+    /// (`ShiftRight`) when two/three generics close together, so split a shift
+    /// token into one close plus a re-injected remainder.
+    fn expect_generic_close(&mut self, line: usize) -> StrykeResult<()> {
+        match self.peek().clone() {
+            Token::NumGt | Token::StrGt => {
+                self.advance();
+                Ok(())
+            }
+            Token::ShiftRight => {
+                // `>>` closes this generic and leaves one `>` pending.
+                self.replace_current(Token::NumGt);
+                Ok(())
+            }
+            tok => Err(self.syntax_err(
+                format!("Expected `>` to close generic type, got {:?}", tok),
+                line,
             )),
         }
     }
@@ -8406,7 +8561,7 @@ impl Parser {
         // get the bare Block (`Vec<Statement>`) for the `par_reduce`
         // extract slot.
         let extract_block: Block = match chunk_chain.kind {
-            ExprKind::CodeRef { params: _, body } => body,
+            ExprKind::CodeRef { params: _, body, .. } => body,
             _ => vec![Statement {
                 label: None,
                 kind: StmtKind::Expression(chunk_chain),
@@ -8478,7 +8633,7 @@ impl Parser {
         let chunk_chain = chunk_chain?;
 
         let extract_block: Block = match chunk_chain.kind {
-            ExprKind::CodeRef { params: _, body } => body,
+            ExprKind::CodeRef { params: _, body, .. } => body,
             _ => vec![Statement {
                 label: None,
                 kind: StmtKind::Expression(chunk_chain),
@@ -9392,6 +9547,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: stmts,
+                        return_type: None,
                     },
                     line: inner_line,
                 };
@@ -9830,6 +9986,7 @@ impl Parser {
                             kind: ExprKind::CodeRef {
                                 params: vec![],
                                 body: stmts,
+                                return_type: None,
                             },
                             line,
                         })
@@ -12299,6 +12456,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -12320,6 +12478,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -12693,6 +12852,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -12747,6 +12907,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -12780,6 +12941,7 @@ impl Parser {
                     kind: ExprKind::CodeRef {
                         params: vec![],
                         body: block,
+                        return_type: None,
                     },
                     line,
                 };
@@ -12798,6 +12960,7 @@ impl Parser {
                         kind: ExprKind::CodeRef {
                             params: vec![],
                             body: block,
+                            return_type: None,
                         },
                         line,
                     };
@@ -13142,6 +13305,7 @@ impl Parser {
                         kind: ExprKind::CodeRef {
                             params: vec![],
                             body: block,
+                            return_type: None,
                         },
                         line,
                     }
@@ -13566,7 +13730,7 @@ impl Parser {
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
-                    kind: ExprKind::CodeRef { params, body },
+                    kind: ExprKind::CodeRef { params, body, return_type: None },
                     line,
                 })
             }
@@ -13576,7 +13740,7 @@ impl Parser {
                 self.parse_sub_attributes()?;
                 let body = self.parse_fn_eq_body_or_block(false)?;
                 Ok(Expr {
-                    kind: ExprKind::CodeRef { params, body },
+                    kind: ExprKind::CodeRef { params, body, return_type: None },
                     line,
                 })
             }
@@ -20790,7 +20954,7 @@ impl Parser {
             // Anonymous sub: `use overload "+" => sub { ... };` — promote the
             // anon body into a synthetic top-level SubDecl so the overload
             // table can hold the name like the named-sub case. (PARITY-012)
-            ExprKind::CodeRef { params, body } => {
+            ExprKind::CodeRef { params, body, return_type } => {
                 let id = self.next_overload_anon_id;
                 self.next_overload_anon_id = self.next_overload_anon_id.saturating_add(1);
                 let name = format!("__overload_anon_{}", id);
@@ -20801,6 +20965,7 @@ impl Parser {
                         params: params.clone(),
                         body: body.clone(),
                         prototype: None,
+                        return_type: return_type.clone(),
                     },
                     line: e.line,
                 });
@@ -20874,6 +21039,7 @@ pub fn parse_block_from_str(s: &str, file: &str, line: usize) -> StrykeResult<Ex
         kind: ExprKind::CodeRef {
             params: vec![],
             body: stmts,
+            return_type: None,
         },
         line: inner_line,
     };
@@ -21021,7 +21187,7 @@ mod tests {
             StmtKind::My(decls) => {
                 let init = decls[0].initializer.as_ref().expect("initializer");
                 match &init.kind {
-                    ExprKind::CodeRef { params, body } => {
+                    ExprKind::CodeRef { params, body, .. } => {
                         assert_eq!(params.len(), 1);
                         assert_eq!(body.len(), 1);
                     }

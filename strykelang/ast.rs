@@ -143,6 +143,10 @@ pub enum StmtKind {
         /// Subroutine prototype text from `sub foo ($$) { }` (excluding parens).
         /// `None` when using structured [`SubSigParam`] signatures instead.
         prototype: Option<String>,
+        /// Declared return type from `fn foo(...): Type { }` (Kotlin spelling).
+        /// `None` when no return type was written. Required under `--static`.
+        #[serde(default)]
+        return_type: Option<PerlTypeName>,
     },
     /// `Package` variant.
     Package { name: String },
@@ -286,12 +290,20 @@ pub enum PerlTypeName {
     Float,
     /// `Bool` variant.
     Bool,
-    /// `Array` variant.
+    /// `Array` variant — bare `@` array, no element type (`List<Any>`).
     Array,
-    /// `Hash` variant.
+    /// `Hash` variant — bare `%` hash, no key/value type (`Map<Any, Any>`).
     Hash,
     /// `Ref` variant.
     Ref,
+    /// Element-typed array: `List<T>` (Kotlin spelling; `Array<T>` is an alias).
+    /// Every element must satisfy the inner type. Bare `Array` ≡ `List(Any)`.
+    List(Box<PerlTypeName>),
+    /// Key/value-typed hash: `Map<K, V>` (Kotlin spelling; `Hash<K, V>` is an alias).
+    /// Keys stringify (Perl semantics): `Int`/`Float` keys are checked against the
+    /// key's string form parsing as that type; `Str`/`Any` always pass. Bare
+    /// `Hash` ≡ `Map(Any, Any)`.
+    Map(Box<PerlTypeName>, Box<PerlTypeName>),
     /// Struct-typed field: `field => Point` where Point is a struct name.
     Struct(String),
     /// Enum-typed field: `field => Color` where Color is an enum name.
@@ -321,6 +333,9 @@ pub struct StructMethod {
     pub params: Vec<SubSigParam>,
     /// `body` field.
     pub body: Block,
+    /// Declared return type from `fn name(...): Type { }`. Required under `--static`.
+    #[serde(default)]
+    pub return_type: Option<PerlTypeName>,
 }
 
 /// Single variant in an enum definition.
@@ -405,6 +420,11 @@ pub struct ClassMethod {
     pub visibility: Visibility,
     /// `is_static` field.
     pub is_static: bool,
+    /// Declared return type from `fn name(...): Type { }`. Required under `--static`.
+    /// Always serialized (no skip) so it stays ahead of the trailing
+    /// `skip_serializing_if` `is_final` field — bincode decode is positional.
+    #[serde(default)]
+    pub return_type: Option<PerlTypeName>,
     /// `is_final` field.
     #[serde(default, skip_serializing_if = "is_false")]
     pub is_final: bool,
@@ -553,7 +573,9 @@ impl PerlTypeName {
             Self::Hash => Some(5),
             Self::Ref => Some(6),
             Self::Any => Some(7),
-            Self::Struct(_) | Self::Enum(_) => None,
+            // Parametric / nominal types can't fit in a single byte — they use
+            // the chunk type-table (parametric) or name-pool (nominal) path.
+            Self::List(_) | Self::Map(_, _) | Self::Struct(_) | Self::Enum(_) => None,
         }
     }
 
@@ -568,6 +590,8 @@ impl PerlTypeName {
             Self::Hash => "Hash".to_string(),
             Self::Ref => "Ref".to_string(),
             Self::Any => "Any".to_string(),
+            Self::List(elem) => format!("List<{}>", elem.display_name()),
+            Self::Map(k, v) => format!("Map<{}, {}>", k.display_name(), v.display_name()),
             Self::Struct(name) => name.clone(),
             Self::Enum(name) => name.clone(),
         }
@@ -682,7 +706,82 @@ impl PerlTypeName {
                     Err(format!("expected enum {}, got {}", name, v.type_name()))
                 }
             }
+            Self::List(elem) => {
+                // Accept a plain array or an ARRAY ref; every element must match
+                // the inner type. `Any` element short-circuits to the bare
+                // shape check (equivalent to `Array`).
+                let items = if let Some(a) = v.as_array_vec() {
+                    a
+                } else if let Some(r) = v.as_array_ref() {
+                    r.read().clone()
+                } else {
+                    return Err(format!("expected {}, got {}", self.display_name(), v.type_name()));
+                };
+                if matches!(**elem, Self::Any) {
+                    return Ok(());
+                }
+                for (i, it) in items.iter().enumerate() {
+                    elem.check_value(it)
+                        .map_err(|m| format!("{} element [{}]: {}", self.display_name(), i, m))?;
+                }
+                Ok(())
+            }
+            Self::Map(key_ty, val_ty) => {
+                // Accept a plain hash or a HASH ref. Keys stringify (Perl), so
+                // the key type is checked against the key's string form; the
+                // value type is checked structurally like any other value.
+                let pairs = if let Some(h) = v.as_hash_map() {
+                    h
+                } else if let Some(r) = v.as_hash_ref() {
+                    r.read().clone()
+                } else {
+                    return Err(format!("expected {}, got {}", self.display_name(), v.type_name()));
+                };
+                let any_key = matches!(**key_ty, Self::Any | Self::Str);
+                let any_val = matches!(**val_ty, Self::Any);
+                for (k, val) in pairs.iter() {
+                    if !any_key {
+                        key_ty.check_key(k).map_err(|m| {
+                            format!("{} key {:?}: {}", self.display_name(), k, m)
+                        })?;
+                    }
+                    if !any_val {
+                        val_ty.check_value(val).map_err(|m| {
+                            format!("{} value at key {:?}: {}", self.display_name(), k, m)
+                        })?;
+                    }
+                }
+                Ok(())
+            }
             Self::Any => Ok(()),
+        }
+    }
+
+    /// Check a hash key (always stored as a `String` in stryke) against this
+    /// type used as a `Map` key type. Keys stringify in Perl, so `Int`/`Float`
+    /// are satisfied when the key text parses as that numeric type; `Str`/`Bool`/
+    /// `Any` always pass; composite types can never be a key.
+    pub fn check_key(&self, key: &str) -> Result<(), String> {
+        match self {
+            Self::Str | Self::Bool | Self::Any => Ok(()),
+            Self::Int => {
+                if key.trim().parse::<i64>().is_ok() {
+                    Ok(())
+                } else {
+                    Err(format!("expected Int key, got {:?}", key))
+                }
+            }
+            Self::Float => {
+                if key.trim().parse::<f64>().is_ok() {
+                    Ok(())
+                } else {
+                    Err(format!("expected Float key, got {:?}", key))
+                }
+            }
+            other => Err(format!(
+                "{} cannot be a Map key type",
+                other.display_name()
+            )),
         }
     }
 }
@@ -889,6 +988,10 @@ pub enum ExprKind {
     CodeRef {
         params: Vec<SubSigParam>,
         body: Block,
+        /// Declared return type from `fn(...): Type { }` (anonymous fn). `None`
+        /// when no return type was written. Required under `--static`.
+        #[serde(default)]
+        return_type: Option<PerlTypeName>,
     },
     /// Unary `&name` — invoke subroutine `name` (Perl `&foo` / `&Foo::bar`).
     SubroutineRef(String),

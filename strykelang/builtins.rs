@@ -26423,6 +26423,7 @@ fn builtin_comp(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> 
         )]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(composed)))
 }
@@ -26456,6 +26457,7 @@ fn builtin_partial(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValu
         ]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(partial_sub)))
 }
@@ -26470,6 +26472,7 @@ fn builtin_constantly(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         closure_env: Some(vec![("__const_val__".to_string(), value)]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(const_sub)))
 }
@@ -26496,6 +26499,7 @@ fn builtin_complement(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeV
         closure_env: Some(vec![("__complement_fn__".to_string(), f)]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(compl_sub)))
 }
@@ -26529,6 +26533,7 @@ fn builtin_fnil(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> 
         ]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(fnil_sub)))
 }
@@ -26559,6 +26564,7 @@ fn builtin_juxt(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> 
         )]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(juxt_sub)))
 }
@@ -43523,6 +43529,7 @@ fn builtin_memoize(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValu
         ]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(memo_sub)))
 }
@@ -43556,6 +43563,7 @@ fn builtin_curry(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue>
         ]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(curry_sub)))
 }
@@ -43583,6 +43591,7 @@ fn builtin_once(args: &[StrykeValue], line: usize) -> StrykeResult<StrykeValue> 
         ]),
         prototype: None,
         fib_like: None,
+        return_type: None,
     };
     Ok(StrykeValue::code_ref(Arc::new(once_sub)))
 }

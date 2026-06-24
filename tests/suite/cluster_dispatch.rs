@@ -128,6 +128,7 @@ fn perl_items_to_json_rejects_code_reference_items() {
         closure_env: None,
         prototype: None,
         fib_like: None,
+        return_type: None,
     }));
     let err = perl_items_to_json(&[cb]).expect_err("CODE items cannot be marshalled to JSON");
     assert!(
