@@ -234,6 +234,7 @@ mod jwt_and_log;
 mod keys_values_pin;
 mod keyword_hash_keys_extended;
 mod kick_pin;
+mod kotlin_collections;
 mod kv_extra_pin;
 mod kv_stress_pin;
 mod kvstore;

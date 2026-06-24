@@ -523,6 +523,9 @@ CORE::arma_order_select
 CORE::arma_yw_fit
 CORE::armstrong_q
 CORE::arpad_predict
+CORE::arrayListOf
+CORE::arrayOf
+CORE::arrayOfNulls
 CORE::array_agg
 CORE::array_difference
 CORE::array_intersection
@@ -3107,6 +3110,11 @@ CORE::emissivity_grey_body
 CORE::emitted_long_wave
 CORE::emojinum
 CORE::empc
+CORE::emptyArray
+CORE::emptyList
+CORE::emptyMap
+CORE::emptySequence
+CORE::emptySet
 CORE::empty_clj
 CORE::empty_count
 CORE::en
@@ -4287,6 +4295,8 @@ CORE::has_stderr_tty
 CORE::has_stdin_tty
 CORE::has_stdout_tty
 CORE::hascyc
+CORE::hashMapOf
+CORE::hashSetOf
 CORE::hash_2d_int
 CORE::hash_combine
 CORE::hash_delete
@@ -5778,6 +5788,8 @@ CORE::lines_from
 CORE::lineweaver_burk
 CORE::linf_norm
 CORE::link
+CORE::linkedMapOf
+CORE::linkedSetOf
 CORE::linking_number_two
 CORE::linreg
 CORE::linspace
@@ -5786,6 +5798,8 @@ CORE::liouville
 CORE::liouville_lambda
 CORE::liquefaction_potential_index
 CORE::lis
+CORE::listOf
+CORE::listOfNotNull
 CORE::list_coloring_step
 CORE::list_compact
 CORE::list_count
@@ -6071,6 +6085,7 @@ CORE::manning_velocity
 CORE::mannwhitneyu
 CORE::manpage
 CORE::map
+CORE::mapOf
 CORE::map_bp
 CORE::map_chars
 CORE::map_indexed
@@ -6763,6 +6778,9 @@ CORE::murmur3_128
 CORE::murmur3_32
 CORE::murmurhash3_x32
 CORE::muster
+CORE::mutableListOf
+CORE::mutableMapOf
+CORE::mutableSetOf
 CORE::mutation_bit_flip_prob
 CORE::mutation_rate
 CORE::mutex
@@ -9207,6 +9225,7 @@ CORE::sents
 CORE::seq
 CORE::seq_fn
 CORE::seq_logo_information
+CORE::sequenceOf
 CORE::sequence_identity_pct
 CORE::sequence_shannon_info
 CORE::sequence_similarity_pct
@@ -9217,6 +9236,7 @@ CORE::serve
 CORE::servo_position_velocity
 CORE::servo_torque_step
 CORE::set
+CORE::setOf
 CORE::set_alias
 CORE::set_at
 CORE::set_cover_greedy_step
@@ -9560,6 +9580,8 @@ CORE::sort_by_cached_key
 CORE::sort_on
 CORE::sort_words
 CORE::sorted
+CORE::sortedMapOf
+CORE::sortedSetOf
 CORE::sorted_by_length
 CORE::sorted_desc
 CORE::sorted_nums
@@ -10929,6 +10951,9 @@ CORE::web_text
 CORE::web_text_area
 CORE::web_text_field
 CORE::web_time_ago_in_words
+CORE::web_tmpl_empty
+CORE::web_tmpl_get
+CORE::web_tmpl_section
 CORE::web_token_consume
 CORE::web_token_for
 CORE::web_truncate
@@ -11664,6 +11689,9 @@ arma_yw_fit
 armstrong_q
 around
 arpad_predict
+arrayListOf
+arrayOf
+arrayOfNulls
 array_agg
 array_difference
 array_intersection
@@ -14259,6 +14287,11 @@ emissivity_grey_body
 emitted_long_wave
 emojinum
 empc
+emptyArray
+emptyList
+emptyMap
+emptySequence
+emptySet
 empty_clj
 empty_count
 en
@@ -15449,6 +15482,8 @@ has_stderr_tty
 has_stdin_tty
 has_stdout_tty
 hascyc
+hashMapOf
+hashSetOf
 hash_2d_int
 hash_combine
 hash_delete
@@ -16942,6 +16977,8 @@ lines_from
 lineweaver_burk
 linf_norm
 link
+linkedMapOf
+linkedSetOf
 linking_number_two
 linreg
 linspace
@@ -16950,6 +16987,8 @@ liouville
 liouville_lambda
 liquefaction_potential_index
 lis
+listOf
+listOfNotNull
 list_coloring_step
 list_compact
 list_count
@@ -17239,6 +17278,7 @@ manning_velocity
 mannwhitneyu
 manpage
 map
+mapOf
 map_bp
 map_chars
 map_indexed
@@ -17931,6 +17971,9 @@ murmur3_128
 murmur3_32
 murmurhash3_x32
 muster
+mutableListOf
+mutableMapOf
+mutableSetOf
 mutation_bit_flip_prob
 mutation_rate
 mutex
@@ -20383,6 +20426,7 @@ sents
 seq
 seq_fn
 seq_logo_information
+sequenceOf
 sequence_identity_pct
 sequence_shannon_info
 sequence_similarity_pct
@@ -20393,6 +20437,7 @@ serve
 servo_position_velocity
 servo_torque_step
 set
+setOf
 set_alias
 set_at
 set_cover_greedy_step
@@ -20736,6 +20781,8 @@ sort_by_cached_key
 sort_on
 sort_words
 sorted
+sortedMapOf
+sortedSetOf
 sorted_by_length
 sorted_desc
 sorted_nums
@@ -22114,6 +22161,9 @@ web_text
 web_text_area
 web_text_field
 web_time_ago_in_words
+web_tmpl_empty
+web_tmpl_get
+web_tmpl_section
 web_token_consume
 web_token_for
 web_truncate
