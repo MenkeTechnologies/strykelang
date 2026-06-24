@@ -92,7 +92,7 @@ $s1->contains(99) |> aeq 0, "set does not contain 99"
 
 # ── Deque — fast head + tail operations ────────────────────────────────────
 
-val $dq = deque()
+var $dq = deque()                 # `var`: the deque is mutated below (val forbids it)
 $dq->push_back(1)
 $dq->push_back(2)
 $dq->push_back(3)
@@ -104,7 +104,7 @@ $dq->len |> aeq 2, "deque len after 2 pops = 2"
 
 # ── Heap — priority queue via comparator block ─────────────────────────────
 
-val $pq = heap { _0 <=> _1 }      # min-heap (style-compliant _0/_1)
+var $pq = heap { _0 <=> _1 }      # `var`: the heap is mutated below (val forbids it)
 $pq->push(5)
 $pq->push(1)
 $pq->push(3)
@@ -113,7 +113,7 @@ $pq->pop |> aeq 1, "min-heap pops smallest first"
 $pq->pop |> aeq 2, "min-heap pops next smallest"
 
 # Max-heap by reversing comparator.
-val $max = heap { _1 <=> _0 }
+var $max = heap { _1 <=> _0 }     # `var`: mutated below
 $max->push(5)
 $max->push(1)
 $max->push(3)

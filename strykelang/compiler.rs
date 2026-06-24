@@ -6453,6 +6453,33 @@ impl Compiler {
                 args,
                 super_call,
             } => {
+                // `val $q = deque()/heap(...)` — a frozen binding forbids the
+                // in-place mutating methods of its collection, mirroring frozen
+                // `@`/`%` (which reject `push`/element-store). Caught at compile
+                // time, like array/hash frozen-mutation, so it fires on every
+                // execution path (the runtime dispatch only has the value, not
+                // the variable name).
+                if matches!(
+                    method.as_str(),
+                    "push_back" | "push_front" | "pop_back" | "pop_front" | "push" | "pop"
+                ) {
+                    if let ExprKind::ScalarVar(name) = &object.kind {
+                        for layer in self.scope_stack.iter().rev() {
+                            if layer.declared_scalars.contains(name) {
+                                if layer.frozen_scalars.contains(name) {
+                                    return Err(CompileError::Frozen {
+                                        line,
+                                        detail: format!(
+                                            "cannot modify frozen collection `${}` (declared with `val`)",
+                                            name
+                                        ),
+                                    });
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 self.compile_expr(object)?;
                 for arg in args {
                     self.compile_expr_ctx(arg, WantarrayCtx::List)?;

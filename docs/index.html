@@ -1683,6 +1683,7 @@ var $q: Deque&lt;Int&gt; = deque()                   // element-typed deque</pre
           <tr><td><code>push @a, 5</code> on <code>List&lt;Str&gt;</code></td><td colspan="2">type error at the write (runtime, both modes once <code>@a</code> is typed)</td></tr>
         </table>
         <p>Typed containers are enforced whether or not <code>--static</code> is on, at every write — declaration, whole-value reassignment, <code>push</code>, and element store (<code>$a[i] = ...</code> / <code>$h{k} = ...</code>). <code>--static</code> adds the <em>requirement</em> that everything be typed, plus parse-time rejection of statically-known mismatches.</p>
+        <p>Declaring a collection with <code>val</code> (instead of <code>var</code>) makes it <strong>immutable</strong>: <code>push</code>/element-store on a <code>val</code> <code>@</code>/<code>%</code>, and the in-place mutating methods (<code>push_back</code>/<code>pop_front</code>/<code>push</code>/<code>pop</code>/…) on a <code>val</code> <code>Heap</code>/<code>Deque</code>, are rejected. Use <code>var</code> for a collection you intend to mutate.</p>
 <pre>stryke --static script.stk     // whole program must be statically typed
 stryke script.stk              // opt-in typing only (default)</pre>
         <p>Runnable demo: <code>examples/static_typing_demo.stk</code> — return types, <code>List&lt;T&gt;</code> / <code>Map&lt;K, V&gt;</code> containers, nested generics, every-write enforcement, and inference. Runs under both plain <code>stryke</code> and <code>stryke --static</code>.</p>

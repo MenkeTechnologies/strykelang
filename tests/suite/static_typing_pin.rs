@@ -240,3 +240,41 @@ fn set_of_struct_accepts_instances() {
         4
     );
 }
+
+// ── `val` collections are immutable (no in-place mutation) ───────────────────
+
+#[test]
+fn val_deque_mutation_rejected() {
+    // `val` forbids the in-place mutating methods of the collection it holds.
+    assert_eq!(
+        eval_err_kind("val $q = deque(); $q->push_back(1)"),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn val_heap_mutation_rejected() {
+    assert_eq!(
+        eval_err_kind("val $h = heap { $a <=> $b }; $h->push(1)"),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn val_deque_pop_rejected() {
+    assert_eq!(
+        eval_err_kind("val $q = deque(); $q->pop_front"),
+        ErrorKind::Runtime
+    );
+}
+
+#[test]
+fn var_deque_mutation_allowed() {
+    assert_eq!(eval_int("var $q = deque(); $q->push_back(1); $q->len"), 1);
+}
+
+#[test]
+fn val_deque_read_methods_allowed() {
+    // Read-only methods on a `val` collection are fine.
+    assert_eq!(eval_int("val $q = deque(); $q->len"), 0);
+}
