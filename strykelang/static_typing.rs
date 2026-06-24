@@ -255,14 +255,13 @@ impl Checker {
     /// holders so nested anon fns / initializers are reached.
     fn check_expr(&self, e: &Expr) -> StrykeResult<()> {
         match &e.kind {
-            ExprKind::CodeRef { params, body, return_type } => {
-                self.check_params(params, "fn", e.line)?;
-                if return_type.is_none() {
-                    return Err(self.err(
-                        "anonymous fn must declare a return type (`fn(...): Type`)",
-                        e.line,
-                    ));
-                }
+            ExprKind::CodeRef { body, .. } => {
+                // Anonymous code blocks (`fn { }`, and the desugared forms of
+                // `eval { }`, `do { }`, `map`/`grep`/`sort` blocks, pipeline
+                // stages, …) are all `CodeRef`s and are indistinguishable here.
+                // Requiring a return type on them would reject ordinary block
+                // syntax, so `--static` only mandates types on *named* subs and
+                // methods. Their bodies are still walked for nested decls.
                 self.check_block(body)?;
             }
             ExprKind::BinOp { left, right, .. } => {

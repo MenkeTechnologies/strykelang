@@ -158,9 +158,12 @@ fn static_literal_type_mismatch_rejected() {
 }
 
 #[test]
-fn static_anonymous_fn_requires_return_type() {
+fn static_allows_anonymous_and_eval_blocks() {
+    // Anonymous `fn` / `eval` / `map` blocks all desugar to CodeRef and are NOT
+    // required to declare a return type — only named subs and methods are.
     with_global_flags(|| {
-        assert!(parse_static("var $f = fn($x: Int) { $x } p \"x\"").is_err());
+        assert!(parse_static("var $f = fn($x: Int) { $x } p \"x\"").is_ok());
+        assert!(parse_static("var @a: List<Int> = (1, 2); eval { push @a, 3 } p \"x\"").is_ok());
     });
 }
 
