@@ -1649,6 +1649,37 @@ p $d-&gt;isa("Cat")                      <span class="comment"># ""  (false)</sp
       </section>
 
       <section class="tutorial-section">
+        <h2>Static typing — <code>--static</code></h2>
+        <p>stryke's type system is opt-in by default: <code>typed my $x : Int</code>, typed struct/class fields, and typed <code>fn</code> parameters are checked at runtime when present and ignored when absent. <code>--static</code> makes typing <strong>mandatory</strong> for the whole program, modelled on Kotlin: every function parameter, every return type, and every variable declaration must carry a type (or, for variables, an initializer the type can be inferred from). Statically-known mismatches abort <strong>before the program runs</strong>; everything else is enforced at runtime by the same <code>check_value</code> path that backs opt-in typing. <code>--static</code> applies to the main program only (imported <code>.pm</code> modules keep their own contract) and disables the bytecode cache so a non-static cached chunk can never bypass the typing pass.</p>
+        <h3>Type syntax (Kotlin angle brackets)</h3>
+<pre>fn add($x: Int, $y: Int): Int { $x + $y }      // typed params + return type
+var $n: Int = 5                                // typed scalar
+var $m = 5                                     // OK: Int inferred from initializer
+val @names: List&lt;Str&gt; = ("ann", "bob")         // element-typed array
+var %ages: Map&lt;Str, Int&gt; = (ann =&gt; 30)         // key/value-typed hash
+var %nested: Map&lt;Str, List&lt;Int&gt;&gt; = ()           // generics nest</pre>
+        <ul>
+          <li><code>List&lt;T&gt;</code> is the element-typed array (<code>Array&lt;T&gt;</code> is an alias). Bare <code>Array</code> carries no element check.</li>
+          <li><code>Map&lt;K, V&gt;</code> is the key/value-typed hash (<code>Hash&lt;K, V&gt;</code> is an alias); both require exactly two type arguments. Bare <code>Hash</code> carries no key/value check.</li>
+          <li>Return types use the Kotlin colon: <code>fn name(...): Type</code>. A capitalized type name after the close-paren is a return type; a lowercase identifier (<code>: lvalue</code>) stays a sub attribute.</li>
+        </ul>
+        <h3>Enforcement</h3>
+        <table>
+          <tr><th>Construct</th><th>Without <code>--static</code></th><th>With <code>--static</code></th></tr>
+          <tr><td><code>fn f($x)</code> (untyped param)</td><td>allowed</td><td><strong>rejected</strong> — param needs a type</td></tr>
+          <tr><td><code>fn f($x: Int)</code> (no return type)</td><td>allowed</td><td><strong>rejected</strong> — return type required</td></tr>
+          <tr><td><code>var $x</code> (no type, no init)</td><td>allowed</td><td><strong>rejected</strong> — type or initializer required</td></tr>
+          <tr><td><code>var $x = 5</code></td><td><code>Any</code></td><td>OK — <code>Int</code> inferred</td></tr>
+          <tr><td><code>val $y: Int = "hi"</code></td><td>runtime type error</td><td><strong>rejected at parse time</strong></td></tr>
+          <tr><td><code>push @a, 5</code> on <code>List&lt;Str&gt;</code></td><td colspan="2">type error at the write (runtime, both modes once <code>@a</code> is typed)</td></tr>
+        </table>
+        <p>Typed containers are enforced whether or not <code>--static</code> is on, at every write — declaration, whole-value reassignment, <code>push</code>, and element store (<code>$a[i] = ...</code> / <code>$h{k} = ...</code>). <code>--static</code> adds the <em>requirement</em> that everything be typed, plus parse-time rejection of statically-known mismatches.</p>
+<pre>stryke --static script.stk     // whole program must be statically typed
+stryke script.stk              // opt-in typing only (default)</pre>
+        <p>Runnable demo: <code>examples/static_typing_demo.stk</code> — return types, <code>List&lt;T&gt;</code> / <code>Map&lt;K, V&gt;</code> containers, nested generics, every-write enforcement, and inference. Runs under both plain <code>stryke</code> and <code>stryke --static</code>.</p>
+      </section>
+
+      <section class="tutorial-section">
         <h2>CLI flags (common)</h2>
         <p>All stock <code>perl</code> flags are supported: <code>-0</code>, <code>-a</code>, <code>-c</code>, <code>-C</code>, <code>-d</code>, <code>-D</code>, <code>-e</code>, <code>-E</code>, <code>-f</code>, <code>-F</code>, <code>-g</code>, <code>-h</code>, <code>-i</code>, <code>-I</code>, <code>-l</code>, <code>-m</code>, <code>-M</code>, <code>-n</code>, <code>-p</code>, <code>-s</code>, <code>-S</code>, <code>-t</code>, <code>-T</code>, <code>-u</code>, <code>-U</code>, <code>-v</code>, <code>-V</code>, <code>-w</code>, <code>-W</code>, <code>-x</code>, <code>-X</code>. Perl-style single-dash (<code>-version</code>, <code>-help</code>) and GNU-style double-dash (<code>--version</code>, <code>--help</code>) long forms both work. Bundled switches expand: <code>-Mstrict</code> &rarr; <code>-M strict</code>, <code>-I/tmp</code> &rarr; <code>-I /tmp</code>, <code>-V:version</code> &rarr; <code>-V version</code>, <code>-lane</code> &rarr; <code>-l -a -n -e</code>.</p>
 <pre>-e CODE                // one-line program (multiple -e's allowed)
