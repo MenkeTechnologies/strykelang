@@ -202,6 +202,7 @@ mod sort_fast;
 pub mod special_vars;
 /// `static_analysis` submodule.
 pub mod static_analysis;
+pub mod static_typing;
 /// `stego` submodule.
 pub mod stego;
 /// `stress` submodule.
@@ -289,6 +290,23 @@ pub fn set_compat_mode(on: bool) {
 #[inline]
 pub fn compat_mode() -> bool {
     COMPAT_MODE.load(Ordering::Relaxed)
+}
+
+/// When `true` (`--static`), mandatory static typing is enforced: every
+/// function parameter, return type, and variable declaration must be typed (or
+/// inferable), and statically-known type mismatches abort before the program
+/// runs. Off by default — stryke's opt-in typing still works without it.
+static STATIC_MODE: AtomicBool = AtomicBool::new(false);
+
+/// Enable `--static`: mandatory static typing everywhere.
+pub fn set_static_mode(on: bool) {
+    STATIC_MODE.store(on, Ordering::Relaxed);
+}
+
+/// Returns `true` when `--static` is active.
+#[inline]
+pub fn static_mode() -> bool {
+    STATIC_MODE.load(Ordering::Relaxed)
 }
 
 /// Enable bigint pragma (`use bigint;`) — integer overflow promotes to
@@ -394,7 +412,13 @@ fn parse_with_file_inner(code: &str, file: &str, is_module: bool) -> StrykeResul
     let mut parser = parser::Parser::new_with_file(tokens, file);
     parser.bare_positional_indices = bare_positional_indices;
     parser.parsing_module = is_module;
-    parser.parse_program()
+    let program = parser.parse_program()?;
+    // `--static`: enforce mandatory typing on the main program only. Imported
+    // `.pm` modules keep their own (possibly untyped) contract.
+    if static_mode() && !is_module {
+        static_typing::check(&program)?;
+    }
+    Ok(program)
 }
 
 /// Parse and execute a string of Perl code within an existing interpreter.
@@ -653,6 +677,7 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> StrykeRe
                     closure_env: None,
                     prototype: None,
                     fib_like: None,
+                    return_type: m.return_type.clone(),
                 });
                 interp.subs.insert(fq, sub);
             }
@@ -757,6 +782,7 @@ pub fn compile_and_run_prelude(program: &ast::Program, interp: &mut VMHelper) ->
                     closure_env: None,
                     prototype: None,
                     fib_like: None,
+                    return_type: m.return_type.clone(),
                 });
                 interp.subs.insert(fq, sub);
             }

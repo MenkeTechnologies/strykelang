@@ -1550,27 +1550,37 @@ impl Compiler {
         }
 
         // Third pass: compile sub bodies after Halt
-        let mut entries: Vec<(String, Vec<Statement>, String, Vec<crate::ast::SubSigParam>)> =
-            Vec::new();
+        let mut entries: Vec<(
+            String,
+            Vec<Statement>,
+            String,
+            Vec<crate::ast::SubSigParam>,
+            Option<crate::ast::PerlTypeName>,
+        )> = Vec::new();
         let mut pending_pkg = String::new();
         for stmt in &program.statements {
             match &stmt.kind {
                 StmtKind::Package { name } => pending_pkg = name.clone(),
                 StmtKind::SubDecl {
-                    name, body, params, ..
+                    name,
+                    body,
+                    params,
+                    return_type,
+                    ..
                 } => {
                     entries.push((
                         name.clone(),
                         body.clone(),
                         pending_pkg.clone(),
                         params.clone(),
+                        return_type.clone(),
                     ));
                 }
                 _ => {}
             }
         }
 
-        for (name, body, sub_pkg, params) in &entries {
+        for (name, body, sub_pkg, params, return_type) in &entries {
             let saved_pkg = self.current_package.clone();
             self.current_package = sub_pkg.clone();
             self.push_scope_layer_with_slots();
@@ -1591,6 +1601,10 @@ impl Compiler {
                 if e.0 == name_idx {
                     e.1 = entry_ip;
                 }
+            }
+            // Record the declared return type so the VM can enforce it at return.
+            if let Some(rt) = return_type {
+                self.chunk.sub_return_types.push((name_idx, rt.clone()));
             }
             // Each sub body gets its own `goto LABEL` scope: labels are not visible across
             // different subs or between a sub and the main program.
@@ -2006,6 +2020,38 @@ impl Compiler {
         }
     }
 
+    /// Emit a typed array declaration (`var @a: List<T>`). The element type is
+    /// interned into the chunk's container-type pool; the VM checks the value
+    /// and records the type for later element-write enforcement.
+    fn emit_declare_array_typed(
+        &mut self,
+        name_idx: u16,
+        ty: &crate::ast::PerlTypeName,
+        line: usize,
+        frozen: bool,
+    ) {
+        let name = self.chunk.names[name_idx as usize].clone();
+        self.register_declare(Sigil::Array, &name, frozen);
+        let ty_idx = self.chunk.intern_container_type(ty);
+        self.chunk
+            .emit(Op::DeclareArrayTyped(name_idx, ty_idx, frozen), line);
+    }
+
+    /// Emit a typed hash declaration (`var %h: Map<K, V>`).
+    fn emit_declare_hash_typed(
+        &mut self,
+        name_idx: u16,
+        ty: &crate::ast::PerlTypeName,
+        line: usize,
+        frozen: bool,
+    ) {
+        let name = self.chunk.names[name_idx as usize].clone();
+        self.register_declare(Sigil::Hash, &name, frozen);
+        let ty_idx = self.chunk.intern_container_type(ty);
+        self.chunk
+            .emit(Op::DeclareHashTyped(name_idx, ty_idx, frozen), line);
+    }
+
     fn compile_var_declarations(
         &mut self,
         decls: &[VarDecl],
@@ -2153,7 +2199,14 @@ impl Compiler {
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
-                        self.emit_declare_array(name_idx, line, frozen);
+                        // `var @a: List<T>` — element-typed array (parametric
+                        // only; bare `Array` carries no element check).
+                        match (is_my, &decl.type_annotation) {
+                            (true, Some(ty @ crate::ast::PerlTypeName::List(_))) => {
+                                self.emit_declare_array_typed(name_idx, ty, line, frozen);
+                            }
+                            _ => self.emit_declare_array(name_idx, line, frozen),
+                        }
                         if !is_my {
                             if let Some(layer) = self.scope_stack.last_mut() {
                                 layer.declared_arrays.insert(decl.name.clone());
@@ -2173,7 +2226,12 @@ impl Compiler {
                         } else {
                             self.chunk.emit(Op::LoadUndef, line);
                         }
-                        self.emit_declare_hash(name_idx, line, frozen);
+                        match (is_my, &decl.type_annotation) {
+                            (true, Some(ty @ crate::ast::PerlTypeName::Map(_, _))) => {
+                                self.emit_declare_hash_typed(name_idx, ty, line, frozen);
+                            }
+                            _ => self.emit_declare_hash(name_idx, line, frozen),
+                        }
                         if !is_my {
                             if let Some(layer) = self.scope_stack.last_mut() {
                                 layer.declared_hashes.insert(decl.name.clone());
@@ -3142,6 +3200,7 @@ impl Compiler {
                 params,
                 body,
                 prototype,
+                return_type,
             } => {
                 let idx = self.chunk.runtime_sub_decls.len();
                 if idx > u16::MAX as usize {
@@ -3154,6 +3213,7 @@ impl Compiler {
                     params: params.clone(),
                     body: body.clone(),
                     prototype: prototype.clone(),
+                    return_type: return_type.clone(),
                 });
                 self.chunk.emit(Op::RuntimeSubDecl(idx as u16), line);
             }
@@ -7791,7 +7851,7 @@ impl Compiler {
                 self.emit_op(Op::MakeHash((pairs.len() * 2) as u16), line, Some(root));
                 self.emit_op(Op::MakeHashRef, line, Some(root));
             }
-            ExprKind::CodeRef { body, params } => {
+            ExprKind::CodeRef { body, params, .. } => {
                 let block_idx = self.add_deferred_block(body.clone());
                 self.sub_body_block_indices.insert(block_idx);
                 // Stash params alongside the block index so the 4th-pass

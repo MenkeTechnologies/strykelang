@@ -271,6 +271,7 @@ mod tests {
             closure_env: None,
             prototype: None,
             fib_like: None,
+            return_type: None,
         };
         let pat = detect_fib_like_recursive_add(&ps).expect("detect");
         assert_eq!(pat.base_k, 1);

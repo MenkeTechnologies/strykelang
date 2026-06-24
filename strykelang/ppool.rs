@@ -252,6 +252,7 @@ mod tests {
             prototype: None,
             closure_env: None,
             fib_like: None,
+            return_type: None,
         }));
 
         for i in 1..=5 {

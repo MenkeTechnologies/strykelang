@@ -192,6 +192,11 @@ pub(crate) struct Cli {
     #[arg(long = "compat")]
     compat: bool,
 
+    /// Mandatory static typing: require types on all params, return types, and
+    /// variable declarations (Kotlin-style); abort on type mismatches
+    #[arg(long = "static")]
+    static_typing: bool,
+
     /// No Perl interop: reject Perl-isms (sub/say/reverse), force idiomatic stryke
     #[arg(long = "no-interop")]
     no_interop: bool,
@@ -396,6 +401,9 @@ fn print_cyberpunk_help() {
     println!("  --no-jit               {G}//{N} Disable Cranelift JIT (bytecode interpreter only)");
     println!(
         "  --compat               {G}//{N} Perl 5 strict-compat: disable all stryke extensions"
+    );
+    println!(
+        "  --static               {G}//{N} Mandatory static typing: require types everywhere (Kotlin-style)"
     );
     println!(
         "  --no-interop           {G}//{N} Reject Perl-isms (sub/say/reverse, $a/$b), force idiomatic stryke ($_0/$_1)"
@@ -1695,6 +1703,9 @@ fn main() {
     }
     if cli.no_interop {
         stryke::set_no_interop_mode(true);
+    }
+    if cli.static_typing {
+        stryke::set_static_mode(true);
     }
 
     if cli.help {

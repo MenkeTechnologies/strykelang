@@ -2022,15 +2022,33 @@ impl Lexer {
                     self.last_was_term = true;
                     return Ok(Token::Diamond);
                 }
-                if self.peek().is_some_and(|c| c.is_uppercase()) {
+                // `<IDENT>` is readline (`<STDIN>`) in term-expected position
+                // (after `=`, `(`, `while`, … — `last_was_term` false) OR when
+                // separated from the preceding term by whitespace (`rev
+                // <STDIN>`, `print <FH>`). A `<` glued directly onto a complete
+                // term with NO space (`List<Int>`, `Map<Str, Int>`) is a stryke
+                // generic open: emit `NumLt` and let the identifier lex on its
+                // own. This keeps readline and angle-bracket generics from
+                // colliding — generics are always written glued, readline after
+                // a function is conventionally spaced.
+                let space_before_lt = after_lt >= 2
+                    && self
+                        .input
+                        .get(after_lt - 2)
+                        .is_some_and(|c| c.is_whitespace());
+                if (!self.last_was_term || space_before_lt)
+                    && self.peek().is_some_and(|c| c.is_uppercase())
+                {
+                    let save = self.pos;
                     let name = self.read_identifier();
                     if self.peek() == Some('>') {
                         self.advance();
                         self.last_was_term = true;
                         return Ok(Token::ReadLine(name));
                     }
-                    // Not a readline, put back — this is tricky, we'll handle as less-than
-                    // followed by ident. For simplicity, return the ident separately.
+                    // Not a readline — rewind so the identifier lexes as its own
+                    // token after this `<` (less-than / generic open).
+                    self.pos = save;
                     self.last_was_term = false;
                     return Ok(Token::NumLt);
                 }

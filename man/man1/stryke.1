@@ -86,6 +86,13 @@ Disable Cranelift JIT (bytecode interpreter only).
 .B --compat
 Perl 5 strict-compat: disable all stryke extensions.
 .TP
+.B --static
+Mandatory static typing (Kotlin-style): require a type on every function
+parameter, return type, and variable declaration (or an inferable
+initializer); abort before running on statically-known type mismatches.
+Parametric container types \fBList<T>\fR / \fBMap<K, V>\fR and return types
+\fBfn add($x: Int): Int\fR are enforced. Applies to the main program only.
+.TP
 .B --no-interop
 Reject Perl-isms (\fBsub\fR, \fBsay\fR, \fBreverse\fR, \fB$a\fR/\fB$b\fR);
 force idiomatic stryke (\fB$_0\fR/\fB$_1\fR).

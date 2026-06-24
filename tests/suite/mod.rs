@@ -350,6 +350,7 @@ mod sprintf_width_precision_combo_pin;
 mod state_var_pin;
 mod statement_modifier_pin;
 mod stego_pin;
+mod static_typing_pin;
 mod streaming_parallel_variants;
 mod string_concat_pin;
 mod string_coordinates_pin;

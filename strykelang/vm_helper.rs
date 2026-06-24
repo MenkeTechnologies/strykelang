@@ -1894,6 +1894,7 @@ impl VMHelper {
                     prototype: None,
                     closure_env: None,
                     fib_like: None,
+                    return_type: None,
                 }),
             );
         }
@@ -4254,6 +4255,7 @@ impl VMHelper {
                     prototype: None,
                     closure_env: None,
                     fib_like: None,
+                    return_type: None,
                 }),
             );
             return Ok(());
@@ -4295,6 +4297,7 @@ impl VMHelper {
                 prototype: None,
                 closure_env: None,
                 fib_like: None,
+                return_type: None,
             }),
         );
         Ok(())
@@ -4406,6 +4409,7 @@ impl VMHelper {
                     params,
                     body,
                     prototype,
+                    return_type,
                 } => {
                     let key = self.qualify_sub_key(name);
                     let mut sub = StrykeSub {
@@ -4415,6 +4419,7 @@ impl VMHelper {
                         closure_env: None,
                         prototype: prototype.clone(),
                         fib_like: None,
+                        return_type: return_type.clone(),
                     };
                     sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
                     self.subs.insert(key, Arc::new(sub));
@@ -8235,6 +8240,7 @@ impl VMHelper {
                 params,
                 body,
                 prototype,
+                return_type,
             } => {
                 let key = self.qualify_sub_key(name);
                 let captured = self.scope.capture();
@@ -8250,6 +8256,7 @@ impl VMHelper {
                     closure_env,
                     prototype: prototype.clone(),
                     fib_like: None,
+                    return_type: return_type.clone(),
                 };
                 sub.fib_like = crate::fib_like_tail::detect_fib_like_recursive_add(&sub);
                 self.subs.insert(key, Arc::new(sub));
@@ -8384,6 +8391,7 @@ impl VMHelper {
                             closure_env: None,
                             prototype: None,
                             fib_like: None,
+                            return_type: m.return_type.clone(),
                         });
                         self.subs.insert(fq, sub);
                     }
@@ -10127,7 +10135,7 @@ impl VMHelper {
                 }
                 Ok(StrykeValue::hash_ref(Arc::new(RwLock::new(map))))
             }
-            ExprKind::CodeRef { params, body } => {
+            ExprKind::CodeRef { params, body, return_type } => {
                 let captured = self.scope.capture();
                 Ok(StrykeValue::code_ref(Arc::new(StrykeSub {
                     name: "__ANON__".to_string(),
@@ -10136,6 +10144,7 @@ impl VMHelper {
                     closure_env: Some(captured),
                     prototype: None,
                     fib_like: None,
+                    return_type: return_type.clone(),
                 })))
             }
             ExprKind::SubroutineRef(name) => self.call_named_sub(name, vec![], line, ctx),
@@ -11404,6 +11413,7 @@ impl VMHelper {
                                     closure_env: None,
                                     prototype: None,
                                     fib_like: None,
+                                    return_type: None,
                                 })));
                             } else {
                                 return Ok(StrykeValue::UNDEF);
@@ -18346,6 +18356,7 @@ impl VMHelper {
             closure_env: None,
             prototype: None,
             fib_like: None,
+            return_type: None,
         })
     }
 
@@ -18358,6 +18369,7 @@ impl VMHelper {
             closure_env: Some(captured),
             prototype: None,
             fib_like: None,
+            return_type: None,
         })
     }
 
@@ -19878,6 +19890,7 @@ impl VMHelper {
                         ]),
                         prototype: None,
                         fib_like: None,
+                        return_type: None,
                     };
                     Some(Ok(StrykeValue::code_ref(Arc::new(curry_sub))))
                 }
@@ -19906,6 +19919,25 @@ impl VMHelper {
             }
             _ => None,
         }
+    }
+
+    /// Enforce a sub's declared return type (`fn f(): Type { }`) against the
+    /// value it actually returns. No-op when the sub has no declared return
+    /// type. Errors as a type error wrapped in [`FlowOrError`].
+    fn check_sub_return_type(
+        sub: &StrykeSub,
+        v: &StrykeValue,
+        line: usize,
+    ) -> Result<(), FlowOrError> {
+        if let Some(ref ty) = sub.return_type {
+            ty.check_value(v).map_err(|msg| {
+                FlowOrError::Error(StrykeError::type_error(
+                    format!("{}: return value: {}", sub.name, msg),
+                    line,
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     pub(crate) fn call_sub(
@@ -20016,8 +20048,14 @@ impl VMHelper {
         self.scope_pop_hook();
         self.current_sub_stack.pop();
         match result {
-            Ok(v) => Ok(v),
-            Err(FlowOrError::Flow(Flow::Return(v))) => Ok(v),
+            Ok(v) => {
+                Self::check_sub_return_type(sub, &v, _line)?;
+                Ok(v)
+            }
+            Err(FlowOrError::Flow(Flow::Return(v))) => {
+                Self::check_sub_return_type(sub, &v, _line)?;
+                Ok(v)
+            }
             Err(FlowOrError::Flow(Flow::GotoSub(target_name))) => {
                 // goto &sub — tail call: look up target and call with same @_
                 let goto_args = goto_args.unwrap_or_default();

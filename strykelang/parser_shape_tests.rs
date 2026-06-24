@@ -420,7 +420,7 @@ fn shape_fn_anon_eq_body_with_sig() {
     };
     assert!(matches!(
         init.kind,
-        ExprKind::CodeRef { ref params, ref body } if !params.is_empty() && body.len() == 1
+        ExprKind::CodeRef { ref params, ref body, .. } if !params.is_empty() && body.len() == 1
     ));
 }
 

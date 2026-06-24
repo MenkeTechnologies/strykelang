@@ -51,7 +51,7 @@ use crate::value::StrykeValue;
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
 pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 /// Bumped on incompatible rkyv schema changes.
-pub const SHARD_FORMAT_VERSION: u32 = 1;
+pub const SHARD_FORMAT_VERSION: u32 = 2;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.
@@ -560,12 +560,15 @@ pub fn compat_cache_path() -> PathBuf {
         .join(".stryke/scripts.compat.rkyv")
 }
 
-/// `STRYKE_CACHE=0|false|no` disables the cache entirely.
+/// `STRYKE_CACHE=0|false|no` disables the cache entirely. `--static` also
+/// disables it so a non-static cached chunk can never bypass the static-typing
+/// pass (which runs at parse time, before a cache hit would reach the parser).
 pub fn cache_enabled() -> bool {
-    !matches!(
-        std::env::var("STRYKE_CACHE").as_deref(),
-        Ok("0") | Ok("false") | Ok("no")
-    )
+    !crate::static_mode()
+        && !matches!(
+            std::env::var("STRYKE_CACHE").as_deref(),
+            Ok("0") | Ok("false") | Ok("no")
+        )
 }
 
 // ── Process-global caches (lazy-initialized, one per dialect) ────────────────

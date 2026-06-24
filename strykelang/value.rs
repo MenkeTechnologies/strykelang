@@ -848,6 +848,10 @@ pub struct StrykeSub {
     /// When set, [`Interpreter::call_sub`](crate::vm_helper::VMHelper::call_sub) may evaluate
     /// this sub with an explicit stack instead of recursive scope frames.
     pub fib_like: Option<FibLikeRecAddPattern>,
+    /// Declared return type from `fn foo(...): Type { }`. When `Some`, the
+    /// return value is checked against it (enforced for typed subs, and
+    /// required under `--static`).
+    pub return_type: Option<crate::ast::PerlTypeName>,
 }
 
 /// Operations queued on a [`StrykeValue::pipeline`](crate::value::StrykeValue::pipeline) value until `collect()`.
@@ -4941,6 +4945,7 @@ mod tests {
                 closure_env: None,
                 prototype: None,
                 fib_like: None,
+                return_type: None,
             }))
             .to_number(),
             0.0
@@ -5049,6 +5054,7 @@ mod tests {
             closure_env: None,
             prototype: None,
             fib_like: None,
+            return_type: None,
         }));
         let s = c.to_string();
         assert!(s.starts_with("CODE(0x"), "got {:?}", s);
