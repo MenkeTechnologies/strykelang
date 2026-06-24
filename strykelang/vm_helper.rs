@@ -11362,6 +11362,29 @@ impl VMHelper {
                 super_call,
             } => {
                 let obj = self.eval_expr(object)?;
+                // `val $x = deque()/heap(...)` — a frozen binding forbids
+                // in-place mutation of the collection it holds, mirroring frozen
+                // `@`/`%` arrays/hashes (which reject `push`/element-store). The
+                // mutating methods are dispatched on the shared `Arc<Mutex<...>>`
+                // value, so the frozen check has to happen here where the
+                // invocant variable name is still known.
+                if matches!(
+                    method.as_str(),
+                    "push_back" | "push_front" | "pop_back" | "pop_front" | "push" | "pop"
+                ) {
+                    if let ExprKind::ScalarVar(name) = &object.kind {
+                        if self.scope.is_scalar_frozen(name)
+                            && (obj.as_deque().is_some() || obj.as_heap_pq().is_some())
+                        {
+                            let kind = if obj.as_deque().is_some() { "deque" } else { "heap" };
+                            return Err(StrykeError::runtime(
+                                format!("cannot modify frozen {} `${}`", kind, name),
+                                line,
+                            )
+                            .into());
+                        }
+                    }
+                }
                 let mut arg_vals = vec![obj.clone()];
                 for a in args {
                     arg_vals.push(self.eval_expr(a)?);

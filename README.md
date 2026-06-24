@@ -2586,6 +2586,8 @@ var $q: Deque<Int> = deque()                   # element-typed deque
 
 Typed containers are enforced whether or not `--static` is on, at every write: declaration, whole-value reassignment, `push`, and element store (`$a[i] = ...` / `$h{k} = ...`). `--static` adds the *requirement* that everything be typed plus the parse-time rejection of statically-known mismatches.
 
+Declaring a collection with `val` (instead of `var`) makes it **immutable**: `push`/element-store on a `val` `@`/`%`, and the in-place mutating methods (`push_back`/`push_front`/`pop_back`/`pop_front`/`push`/`pop`) on a `val` `Heap`/`Deque`, are rejected. Use `var` for a collection you intend to mutate.
+
 ```bash
 stryke --static script.stk        # whole program must be statically typed
 stryke script.stk                 # opt-in typing only (default)
