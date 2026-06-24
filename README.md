@@ -289,10 +289,10 @@ stryke app.stk                                # warm starts skip parse + compile
 A newline ends a statement, so you do not need a trailing `;` on each line. Use semicolons only when you put more than one statement on the same physical line.
 
 ```perl
-my $answer = 40 + 2
+val $answer = 40 + 2
 p $answer                       # 42 — one statement per line, no `;` required
 
-my $x = 1; my $y = 2; p $x + $y # 3 — same line needs `;` between statements
+val $x = 1; val $y = 2; p $x + $y # 3 — same line needs `;` between statements
 ```
 
 #### Interactive REPL
@@ -340,15 +340,15 @@ Each parallel block runs in its own interpreter context with **captured lexical 
 #   pmap double, @list                 # bare-fn form (sub double { $_0 * 2 })
 val @doubled = @data |> pmap $_ * 2 , progress => 1
 val @evens   = @data |> pgrep $_ % 2 == 0
-my @sorted  = @data |> psort { _ <=> _1 }
-my $sum     = @numbers |> preduce { _ + _1 }
+val @sorted  = @data |> psort { _ <=> _1 }
+val $sum     = @numbers |> preduce { _ + _1 }
 pfor process, @items                  # pforeach is an alias, same as for/foreach
-my @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
+val @hashes  = pmap sha256, @blobs, progress => 1  # bare-fn
 
 # ploop / pwhile — parallel loop / while: body runs as a worker loop on
 # each of N rayon workers (default thread_count()); $_ = 1-based worker id.
 # Desugar: pfor { while (COND) { BODY } } 1..N — last exits one worker.
-ploop { my $job = next_job(); last unless defined $job; handle($job) }
+ploop { val $job = next_job(); last unless defined $job; handle($job) }
 ploop 4 { ... }                       # explicit worker count
 varsync $run = 1
 pwhile ($run) { $run = 0 if poll_shutdown(); step() }
@@ -360,27 +360,27 @@ range(0, 1e6) |> pgreps { is_prime(_) } |> ep              # parallel filter, st
 range(0, 1e6) |> pflat_maps { [_, _ * 10] } |> ep         # parallel flat-map, streaming
 
 # fused map+reduce, chunked map, memoized map, init fold
-my $sum2     = @nums |> pmap_reduce { _ * 2 } { _ + _1 }
+val $sum2     = @nums |> pmap_reduce { _ * 2 } { _ + _1 }
 val @squared  = @million |> pmap_chunked 1000 { _ ** 2 }
-my @once     = @inputs |> pcache expensive
-my $hist     = @words |> preduce_init {}, { my ($acc, $x) = @_; $acc->{$x}++; $acc }
+val @once     = @inputs |> pcache expensive
+val $hist     = @words |> preduce_init {}, { val ($acc, $x) = @_; $acc->{$x}++; $acc }
 
 # fan — run a block or fn N times in parallel ($_/$_0 = index 0..N-1)
 fan 8, work  # bare-fn form: fan N, FUNC
 fan work, progress => 1  # uses rayon pool size (`stryke -j`)
 fan 8 { work(_) }  # block form
 fan { work(_) }  # block form, pool-sized
-my @r = fan_cap 8, compute  # capture results in index order
-my @r = fan_cap 8 { _ * _ }  # block form, capture
+val @r = fan_cap 8, compute  # capture results in index order
+val @r = fan_cap 8 { _ * _ }  # block form, capture
 
 # pipelines — sequential or rayon-backed; same chain methods
-my @r = (@data |> pipeline)->filter({ _ > 10 })->map({ _ * 2 })->take(100)->collect
+val @r = (@data |> pipeline)->filter({ _ > 10 })->map({ _ * 2 })->take(100)->collect
 ### or 
-my @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collect
-my @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect
+val @r = @data |> pipeline |> filter $_ > 10 |> map $_ * 2 |> take 100 |> collect
+val @r = @data |> par_pipeline |> filter  $_ > 10 |> map $_ * 2 |> collect
 
 # multi-stage: batch (each stage drains list before next)
-my $n = par_pipeline(
+val $n = par_pipeline(
     source  => { readline(STDIN) },
     stages  => [ parse_json, transform ],
     workers => [4, 2],
@@ -388,31 +388,31 @@ my $n = par_pipeline(
 )
 
 # multi-stage: streaming (bounded crossbeam channels, concurrent stages, order NOT preserved)
-my @r = ((1..1_000) |> par_pipeline_stream)->filter({ _ > 500 })->map({ _ * 2 })->collect()
+val @r = ((1..1_000) |> par_pipeline_stream)->filter({ _ > 500 })->map({ _ * 2 })->collect()
 ## or
-my @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect
+val @r = (1..1_000) |> par_pipeline_stream |> filter $_ > 500 |> map $_ * 2 |> collect
 
 # channels + Go-style select
-my ($tx, $rx) = pchannel(128)  # bounded; pchannel() is unbounded
-my ($val, $idx) = pselect($rx1, $rx2)
-my ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5)  # $i == -1 on timeout
+val ($tx, $rx) = pchannel(128)  # bounded; pchannel() is unbounded
+val ($val, $idx) = pselect($rx1, $rx2)
+val ($v, $i)     = pselect($rx1, $rx2, timeout => 0.5)  # $i == -1 on timeout
 
 # barrier — N workers rendezvous
-my $sync = barrier(3)
+val $sync = barrier(3)
 fan 3 { $sync->wait; p "all arrived" }
 
 # persistent thread pool (avoids per-task spawn from pmap/pfor)
-my $pool = ppool(4)
+val $pool = ppool(4)
 $pool->submit({ heavy_work(_) }) for @tasks
-my @results = $pool->collect()
+val @results = $pool->collect()
 
 # parallel file IO
-my @logs = "**/*.log" |> glob_par  # rayon recursive glob
+val @logs = "**/*.log" |> glob_par  # rayon recursive glob
 par_lines "./big.log", { p if /ERROR/ }  # mmap + chunked line scan
 par_walk  ".", { p if /\.rs$/ }  # parallel directory walk
 par_sed qr/\bfoo\b/, "bar", @paths  # parallel in-place sed (returns # changed)
-my @rs = par_find_files "src", "*.rs"  # parallel recursive file search by glob
-my $n  = par_line_count @rs  # parallel line count across files
+val @rs = par_find_files "src", "*.rs"  # parallel recursive file search by glob
+val $n  = par_line_count @rs  # parallel line count across files
 
 # native file watcher (notify crate: inotify/kqueue/FSEvents)
 watch  "/tmp/x", p
@@ -422,8 +422,8 @@ pwatch "logs/*", heavy
 stryke -j 8 -e '@data |> pmap heavy'
 
 # distributed pmap over an SSH worker pool — see [0x10] for details
-my $cluster = cluster(["build1:8", "build2:16"])
-my @r = @huge |> pmap_on $cluster heavy
+val $cluster = cluster(["build1:8", "build2:16"])
+val @r = @huge |> pmap_on $cluster heavy
 ```
 
 **Parallel capture safety** — workers set `Scope::parallel_guard` after restoring captured lexicals. Assignments to captured non-`varsync` aggregates are rejected at runtime; `varsync`, package-qualified names, and topics (`$_`/`$a`/`$b`) are allowed. `pmap`/`pgrep` treat block failures as `undef`/false; use `pfor` when failures must abort.
@@ -520,7 +520,7 @@ Implementation: `strykelang/scope.rs::Scope::set_scalar` recognizes topic-varian
 ```perl
 varsync $counter = 0
 fan 10000 { $counter++ }  # always exactly 10000
-print $counter
+p $counter
 
 varsync @results
 (1..100) |> pfor { push @results, $_ * $_ }
@@ -551,25 +551,25 @@ For `varsync` scalars holding a `Set`, `|`/`&` are union/intersection. Without `
 | **Steganography** ([`image`](https://crates.io/crates/image), `sha2`, `crc32fast`) — world-first polymorphic stego builtin | `hide(CARRIER, SECRET [, KEY])` / `reveal(STEGO [, KEY])` / `hide_capacity(CARRIER)` — auto-dispatches PNG LSB (R/G/B, alpha skipped) for `\x89PNG` bytes vs zero-width-char text stego (U+200B/U+200C between visible chars) for everything else. 4-byte length + 4-byte CRC32 envelope catches tampering. Optional KEY enables SHA-256(key‖counter)-derived XOR mask on the secret. |
 | **Compression** ([`flate2`](https://crates.io/crates/flate2), [`zstd`](https://crates.io/crates/zstd)) | `gzip`, `gunzip`, `zstd`, `zstd_decode` |
 | **Time** ([`chrono`](https://crates.io/crates/chrono), [`chrono-tz`](https://crates.io/crates/chrono-tz)) | `datetime_utc`, `datetime_from_epoch`, `datetime_parse_rfc3339`, `datetime_strftime`, `datetime_now_tz`, `datetime_format_tz`, `datetime_parse_local`, `datetime_add_seconds`, `strptime`, `time_ago`, `elapsed` |
-| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed my $x : Int`, parametric containers `List<Str>` / `Map<Int, Str>`, return types `fn add($x: Int): Int`, `--static` mandatory typing ([\[0x08c\]](#0x08c---static-mode)) |
+| **Structs / Enums / Classes / Types** | `struct Point { x => Float }`, `enum Color { Red, Green }` (exhaustive `match`), `class Dog extends Animal { breed: Str; fn bark { } }`, `abstract class`/`final class`, `trait Printable { fn to_str }` (enforced, default method inheritance), `pub`/`priv`/`prot` visibility, `static count: Int`, `BUILD`/`DESTROY`, `final fn`, `methods()`/`superclass()`/`does()`, `static::method()`, `typed val $x : Int`, parametric containers `List<Str>` / `Map<Int, Str>`, return types `fn add($x: Int): Int`, `--static` mandatory typing ([\[0x08c\]](#0x08c---static-mode)) |
 | **Cyberpunk Terminal Art** | `cyber_city` (neon cityscape), `cyber_grid` (synthwave perspective grid), `cyber_rain`/`matrix_rain` (digital rain), `cyber_glitch`/`glitch_text` (text corruption), `cyber_banner`/`neon_banner` (block-letter banners), `cyber_circuit` (circuit board), `cyber_skull`, `cyber_eye` — all output ANSI-colored Unicode art |
 
 ```perl
-my $data = "https://api.example.com/users/1" |> fetch_json
+val $data = "https://api.example.com/users/1" |> fetch_json
 p $data->{name}
 
 # Built-in HTTP server — one-liner web API
 serve 8080, fn ($req) {
     # $req = { method, path, query, headers, body, peer }
-    my $data = +{ path => $req->{path}, method => $req->{method} }
+    val $data = +{ path => $req->{path}, method => $req->{method} }
     status => 200, body => json_encode($data)
 }
 # or with workers: serve 8080, $handler, { workers => 16 }
 # JSON content-type auto-detected; undef returns 404
 
-my @rows = "data.csv" |> csv_read
-my $df   = "data.csv" |> dataframe
-my $db   = "app.db" |> sqlite
+val @rows = "data.csv" |> csv_read
+val $df   = "data.csv" |> dataframe
+val $db   = "app.db" |> sqlite
 $db->exec("CREATE TABLE t (id INTEGER, name TEXT)")
 
 # ─── Structs ────────────────────────────────────────────────────────
@@ -579,10 +579,10 @@ struct Point { x => Float = 0.0, y => Float = 0.0 }  # with defaults
 struct Pair { key, value }  # untyped (Any)
 
 # Construction: function-call, positional, or traditional ->new
-my $p = Point(x => 1.5, y => 2.0)  # function-call with named args
-my $p = Point(1.5, 2.0)  # positional (declaration order)
-my $p = Point->new(x => 1.5, y => 2.0)  # traditional OO style
-my $p = Point()  # uses defaults if defined
+val $p = Point(x => 1.5, y => 2.0)  # function-call with named args
+val $p = Point(1.5, 2.0)  # positional (declaration order)
+val $p = Point->new(x => 1.5, y => 2.0)  # traditional OO style
+val $p = Point()  # uses defaults if defined
 
 # Field access: getter (0 args) or setter (1 arg)
 p $p->x  # 1.5 — getter
@@ -597,22 +597,22 @@ struct Circle {
         Circle(radius => $self->radius * $factor)
     }
 }
-my $c = Circle(radius => 5)
+val $c = Circle(radius => 5)
 p $c->area  # 78.53975
 p $c->scale(2)  # Circle(radius => 10)
 
 # Built-in methods
-my $q = $p->with(y => 5)  # functional update — new instance
-my $h = $p->to_hash  # { x => 3.0, y => 5 }
-my @f = $p->fields  # (x, y)
-my $c = $p->clone  # deep copy
+val $q = $p->with(y => 5)  # functional update — new instance
+val $h = $p->to_hash  # { x => 3.0, y => 5 }
+val @f = $p->fields  # (x, y)
+val $c = $p->clone  # deep copy
 
 # Smart stringify — print shows struct name and fields
 p $p  # Point(x => 3, y => 2)
 
 # Structural equality — compares all fields
-my $a = Point(1, 2)
-my $b = Point(1, 2)
+val $a = Point(1, 2)
+val $b = Point(1, 2)
 p $a == $b  # 1 (equal)
 # ────────────────────────────────────────────────────────────────────
 
@@ -623,9 +623,9 @@ enum Maybe { None, Some => Any }  # Some carries any value
 enum Result { Ok => Int, Err => Str }  # typed data per variant
 
 # Construction: Enum::Variant() syntax
-my $c = Color::Red()  # unit variant
-my $m = Maybe::Some(42)  # variant with data
-my $r = Result::Err("not found")  # typed variant
+val $c = Color::Red()  # unit variant
+val $m = Maybe::Some(42)  # variant with data
+val $r = Result::Err("not found")  # typed variant
 
 # Smart stringify — shows enum name, variant, and data
 p $c  # Color::Red
@@ -638,8 +638,8 @@ p $r  # Result::Err(not found)
 # Color::Red(42)  # ERROR: does not take data
 
 # Exhaustive enum matching — all variants must be covered or use `_` catch-all
-my $light = Light::On()
-my $s = match ($light) {
+val $light = Light::On()
+val $s = match ($light) {
     Light::On()  => "on",
     Light::Off() => "off",
 }
@@ -676,8 +676,8 @@ class Dog extends Animal {
 }
 
 # Construction: named or positional
-my $dog = Dog(name => "Rex", age => 5, breed => "Lab")
-my $dog = Dog("Rex", 5, "Lab")  # positional
+val $dog = Dog(name => "Rex", age => 5, breed => "Lab")
+val $dog = Dog("Rex", 5, "Lab")  # positional
 
 # Field access: getter (0 args) or setter (1 arg)
 p $dog->name        # Rex
@@ -712,10 +712,10 @@ p $dog->isa("Animal")  # 1
 p $dog->isa("Cat")     # "" (false)
 
 # Built-in methods (same as struct)
-my @f = $dog->fields()       # (name, age, breed)
-my $h = $dog->to_hash()      # { name => "Rex", ... }
-my $d2 = $dog->with(age => 1) # functional update
-my $d3 = $dog->clone()       # deep copy
+val @f = $dog->fields()       # (name, age, breed)
+val $h = $dog->to_hash()      # { name => "Rex", ... }
+val $d2 = $dog->with(age => 1) # functional update
+val $d3 = $dog->clone()       # deep copy
 
 # Smart stringify
 p $dog  # Dog(name => Rex, age => 5, breed => Lab)
@@ -750,8 +750,8 @@ class Counter {
     name: Str
     fn BUILD { Counter::count(Counter::count() + 1) }
 }
-my $a = Counter(name => "a")
-my $b = Counter(name => "b")
+val $a = Counter(name => "a")
+val $b = Counter(name => "b")
 p Counter::count()  # 2
 
 # BUILD constructor hook — runs after field init, parent BUILD first
@@ -764,7 +764,7 @@ class Logger {
 class Resource {
     fn DESTROY { p "cleanup" }
 }
-my $r = Resource()
+val $r = Resource()
 $r->destroy()  # prints "cleanup"
 
 # Trait enforcement — required methods checked at class definition
@@ -802,8 +802,8 @@ class Secure {
 }
 
 # Reflection: methods(), superclass()
-my @m = $dog->methods()     # ("speak", "bark", ...)
-my @p = $dog->superclass()  # ("Animal")
+val @m = $dog->methods()     # ("speak", "bark", ...)
+val @p = $dog->superclass()  # ("Animal")
 
 # Late static binding: static::method() resolves to runtime class
 class Base {
@@ -824,17 +824,17 @@ class Vec2 {
     fn op_eq($other) { $self->x == $other->x && $self->y == $other->y }
     fn stringify { "(" . $self->x . "," . $self->y . ")" }
 }
-my $v = Vec2(x => 1, y => 2) + Vec2(x => 3, y => 4)
+val $v = Vec2(x => 1, y => 2) + Vec2(x => 3, y => 4)
 p $v  # (4,6)
 # Supported: op_add op_sub op_mul op_div op_mod op_pow op_concat
 #            op_eq op_ne op_lt op_gt op_le op_ge op_spaceship op_cmp
 #            op_neg op_bool op_abs op_numify stringify
 # ────────────────────────────────────────────────────────────────────
 
-typed my $n : Int = 42
+typed val $n : Int = 42
 
 # Typed fn parameters — runtime type checking on call
-my $add = fn ($a: Int, $b: Int) { $a + $b }
+val $add = fn ($a: Int, $b: Int) { $a + $b }
 p $add->(3, 4)  # 7
 # $add->("x", 1)  # ERROR: sub parameter $a: expected Int
 
@@ -842,15 +842,15 @@ fn greet ($name: Str) { "Hello, $name!" }
 p greet("world")  # Hello, world!
 
 # stringify/str — convert any value to a parseable stryke literal
-my $data = {a => [1, 2], b => "hello"}
-my $s = str $data  # +{a => [1, 2], b => "hello"}
-my $copy = eval $s  # round-trip via eval
+val $data = {a => [1, 2], b => "hello"}
+val $s = str $data  # +{a => [1, 2], b => "hello"}
+val $copy = eval $s  # round-trip via eval
 p $copy->{a}[0]  # 1
 
 # stringify works with functions (first-class serialization)
-my $f = fn ($x: Int) { $x * 2 }
+val $f = fn ($x: Int) { $x * 2 }
 p str $f  # fn ($x: Int) { $x * 2; }
-my $f2 = eval str $f  # round-trip: deserialize back to callable
+val $f2 = eval str $f  # round-trip: deserialize back to callable
 p $f2->(21)  # 42
 
 # streaming range — bidirectional lazy iterator
@@ -863,13 +863,13 @@ range(5, 1) |> e p                          # 5 4 3 2 1
 Native sets deduplicate by value (internal canonical keys; insertion order preserved for `->values`). Use the **`set(LIST)`** builtin or **`Set->new(LIST)`**; **`|>`** can supply the list. **`|`** / **`&`** are union / intersection when either side is a set (otherwise bitwise int ops).
 
 ```perl
-my $s = set(1, 2, 2, 3)  # 3 members
-my $t = (1, 1, 2, 4) |> set
-my $u = $s | $t  # union
-my $i = $s & $t  # intersection
+val $s = set(1, 2, 2, 3)  # 3 members
+val $t = (1, 1, 2, 4) |> set
+val $u = $s | $t  # union
+val $i = $s & $t  # intersection
 $s->has(2)  # 1 / 0  (also ->contains / ->member)
 $s->size  # count (->len / ->count)
-my @v = $s->values  # array in insertion order
+val @v = $s->values  # array in insertion order
 
 # varsync: compound |= and &= update shared sets (see [0x04])
 ```
@@ -880,8 +880,8 @@ my @v = $s->values  # array in insertion order
 
 ```perl
 # async / spawn / await — lightweight structured concurrency
-my $data = async { "https://example.com/" |> fetch }
-my $file = spawn { "big.csv" |> \&slurp }
+val $data = async { "https://example.com/" |> fetch }
+val $file = spawn { "big.csv" |> \&slurp }
 print await($data), await($file)
 
 # trace varsync mutations to stderr (under fan, lines tagged with worker index)
@@ -889,8 +889,8 @@ varsync $counter = 0
 trace { fan 10 { $counter++ } }
 
 # timer / bench — wall-clock millis; bench returns "min/mean/p99"
-my $ms     = timer heavy_work
-my $report = bench heavy_work 1000
+val $ms     = timer heavy_work
+val $report = bench heavy_work 1000
 
 # eval_timeout — runs block on a worker thread; recv_timeout on main
 eval_timeout 5 slow
@@ -901,8 +901,8 @@ rate_limit(10, "1s") hit_api
 every "500ms" tick
 
 # generators — lazy `yield` values
-my $g = gen { yield $_ for 1..5 }
-my $next = $g->next  # [value, more]
+val $g = gen { yield $_ for 1..5 }
+val $next = $g->next  # [value, more]
 ```
 
 ---
@@ -920,9 +920,9 @@ after "fetch" { warn "fetch returned $INTERCEPT_RESULT in ${INTERCEPT_MS}ms" }
 
 # Around — wraps. Must call proceed() to invoke the original.
 around "expensive" {
-    my $cached = cache_get($INTERCEPT_ARGS[0]);
+    val $cached = cache_get($INTERCEPT_ARGS[0]);
     return $cached if defined $cached;
-    my $r = proceed();
+    val $r = proceed();
     cache_put($INTERCEPT_ARGS[0], $r);
     $r
 }
@@ -932,7 +932,7 @@ before "log_*"  { ... }     # any sub starting with log_
 before "*"       { ... }     # every sub call
 
 # Management
-my @list = intercept_list();   # [[id, kind, pattern], ...]
+val @list = intercept_list();   # [[id, kind, pattern], ...]
 intercept_remove($id);         # by id
 intercept_clear();             # drop all
 ```
@@ -1009,7 +1009,7 @@ For parsing your *own* script's argv (`@ARGV`), stryke ships a `getopts` builtin
 When called with just SPECS, `getopts` operates on `@ARGV` directly — no `\@ARGV` boilerplate needed:
 
 ```perl
-my %opts = %{ getopts([
+val %opts = %{ getopts([
     "verbose|v",         # bool flag (present = 1)
     "file|f=s",          # required string
     "count|n=i",         # required int
@@ -1022,15 +1022,15 @@ my %opts = %{ getopts([
 ]) };
 
 # Hash form lets each spec carry a default:
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "verbose|v" => 0,
     "count|n=i" => 10,
     "tag|t=s@"  => [],
 }) };
 
 # Explicit-array-ref form (parse a list other than @ARGV):
-my @args = ("--verbose", "file.txt");
-my %opts = %{ getopts(\@args, [ "verbose|v" ]) };
+val @args = ("--verbose", "file.txt");
+val %opts = %{ getopts(\@args, [ "verbose|v" ]) };
 ```
 
 The first argument is interpreted as follows: an array ref of spec strings or a hash ref of specs → operates on `@ARGV`; an array ref *followed by* a SPECS argument → explicit-argv form. The two-arg `(SPECS, META)` form is recognised when the second argument is a hash ref containing only `prog`/`desc`/`epilog` keys (see auto-help below).
@@ -1069,7 +1069,7 @@ Defaults when an option is absent: bool / negatable bool / counter → `0`; `=s@
 The hash form also accepts a hashref *value* carrying per-option metadata (`help`, `default`, `required`, `metavar`). When any spec has a `help` string and the user hasn't claimed their own `--help`/`-h`, `getopts` intercepts `--help`/`-h` in the input, prints a formatted usage block to stdout, and `exit(0)`s.
 
 ```perl
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "verbose|v" => { help => "enable verbose output" },
     "file|f=s"  => { help => "output path", default => "out.txt" },
     "count|n=i" => { help => "iterations", required => 1 },
@@ -1094,7 +1094,7 @@ Metadata keys (D1 form):
 Scalar and hashref values can be mixed in the same spec hash — a bare scalar value is still treated as the `default`:
 
 ```perl
-my %opts = %{ getopts({
+val %opts = %{ getopts({
     "verbose|v" => 0,                                # default only (legacy form)
     "file|f=s"  => { help => "output path" },        # D1 metadata
 }) };
@@ -1189,11 +1189,11 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`chunked` / `windowed` / `fold`** — Use **pipe-forward**: **`LIST |> chunked(N)`**, **`LIST |> windowed(N)`**, **`LIST |> fold { BLOCK }`** (same for **`reduce`**). `fold` is an alias for `reduce`. List context → arrayrefs per chunk/window or the folded value; scalar context → chunk/window count where applicable.
 
   ```perl
-  my @pairs = (1, 2, 3, 4) |> chunked(2)  # ([1,2], [3,4])
-  my @slide = (1, 2, 3) |> windowed(2)  # ([1,2], [2,3])
-  my @pipe  = (10, 20, 30) |> chunked(2)  # ([10,20], [30])
-  my $sum   = (1, 2, 3, 4) |> fold { $a + $b }  # same as reduce
-  my $cat   = qw(a b c) |> fold { $a . $b }
+  val @pairs = (1, 2, 3, 4) |> chunked(2)  # ([1,2], [3,4])
+  val @slide = (1, 2, 3) |> windowed(2)  # ([1,2], [2,3])
+  val @pipe  = (10, 20, 30) |> chunked(2)  # ([10,20], [30])
+  val $sum   = (1, 2, 3, 4) |> fold { $a + $b }  # same as reduce
+  val $cat   = qw(a b c) |> fold { $a . $b }
   ```
 - **`use strict`** — refs/subs/vars modes (per-mode `use strict 'refs'` etc.). `strict refs` rejects symbolic derefs at runtime; `strict vars` requires a visible binding.
 - **`BEGIN` / `UNITCHECK` / `CHECK` / `INIT` / `END`** — Perl order; `${^GLOBAL_PHASE}` matches Perl.
@@ -1222,25 +1222,25 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **Functional composition** — `compose`, `partial`, `curry`, `memoize`, `once`, `constantly`, `complement`, `juxt`, `fnil`:
 
   ```perl
-  my $f = compose(fn { $_ + 1 }, fn { $_ * 2 })
+  val $f = compose(fn { $_ + 1 }, fn { $_ * 2 })
   $f(5)  # 11 (double then inc)
 
-  my $add5 = partial(fn { $_[0] + $_[1] }, 5)
+  val $add5 = partial(fn { $_[0] + $_[1] }, 5)
   $add5(3)  # 8
 
-  my $cadd = curry(fn { $_[0] + $_[1] }, 2)
+  val $cadd = curry(fn { $_[0] + $_[1] }, 2)
   $cadd(1)(2)  # 3
 
-  my $fib = memoize(fn { ... })  # cached by args
-  my $init = once(fn { expensive_setup() })  # called at most once
+  val $fib = memoize(fn { ... })  # cached by args
+  val $init = once(fn { expensive_setup() })  # called at most once
   ```
 - **Deep structure utilities** — `deep_clone`/`dclone`, `deep_merge`/`dmerge`, `deep_equal`/`deq`, `tally`:
 
   ```perl
-  my $b = deep_clone($a)  # recursive deep copy
-  my $m = deep_merge(\%a, \%b)  # recursive hash merge
+  val $b = deep_clone($a)  # recursive deep copy
+  val $m = deep_merge(\%a, \%b)  # recursive hash merge
   deep_equal([1,2,{x=>3}], [1,2,{x=>3}])  # 1 (structural eq)
-  my $t = tally("a","b","a")  # {a => 2, b => 1}
+  val $t = tally("a","b","a")  # {a => 2, b => 1}
   ```
 - **Bare `_` as topic shorthand** — in any expression position, bare `_` is equivalent to `$_`. Inspired by Raku's WhateverCode and Scala's placeholder syntax. Enables ultra-concise blocks: `map{_*2}` instead of `map{$_ * 2}`. The sigil-free form compresses better — no spaces needed around `_` when adjacent to operators.
 - **Outer topic `$_<`** — access the enclosing scope's `$_` from nested blocks; up to 5 levels (`$_<` through `$_<<<<<`, or the indexed form `$_<5`). See [\[0x03\]](#0x03-parallel-primitives).
@@ -1249,7 +1249,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   ```perl
   # chain HTTP fetch → JSON decode → jq filter
-  my @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title'
+  val @titles = $url |> fetch_json |> json_decode |> json_jq '.articles[].title'
 
   # blockless list pipelines — no braces needed for simple expressions
   files |> filter /[a-e]/ |> e -f $_ && system("cat $_")
@@ -1332,18 +1332,18 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   1 .. 10 |> grep_v "^[35]$" |> ddump |> p  # removes 3 and 5
 
   # ── hash manipulation ──────────────────────────────────────────────
-  my $h = {a => 1, b => 2, c => 3}
+  val $h = {a => 1, b => 2, c => 3}
   $h |> select_keys "a", "c" |> ddump |> p  # { a => 1, c => 3 }
 
   # ── pluck key from list of hashrefs ────────────────────────────────
-  my @people = ({name=>"Alice",age=>30}, {name=>"Bob",age=>25})
+  val @people = ({name=>"Alice",age=>30}, {name=>"Bob",age=>25})
   @people |> pluck "name" |> ddump |> p  # ("Alice", "Bob")
 
   # ── serialization ──────────────────────────────────────────────────
-  my $data = {a => 1, b => [2,3]}
+  val $data = {a => 1, b => [2,3]}
   $data |> to_json |> p  # {"a":1,"b":[2,3]}
   @people |> to_csv |> p  # CSV with headers
-  my $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}}
+  val $cfg = {title => "My App", package => {name => "myapp", version => "1.0"}}
   $cfg |> to_toml |> p  # TOML with [package] table
   $data |> to_yaml |> p  # YAML with --- header
   $data |> to_xml  |> p  # XML with <root> wrapper
@@ -1384,10 +1384,10 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   fr |> cnt |> gauge($_, 500) |> p  # file count vs target
 
   # spinner — animated braille spinner while block runs
-  my $r = spinner "loading" { sleep 2; 42 }  # returns block result
-  my $data = spinner "fetching" { fetch_json($url) }  # wrap any slow operation
+  val $r = spinner "loading" { sleep 2; 42 }  # returns block result
+  val $data = spinner "fetching" { fetch_json($url) }  # wrap any slow operation
   # spinner_start / spinner_stop — manual control for multi-step work
-  my $s = spinner_start("processing")
+  val $s = spinner_start("processing")
   do_step1(); do_step2(); do_step3()
   spinner_stop($s)
 
@@ -1396,7 +1396,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   cat("Cargo.toml") |> words |> freq |> tbl |> clip  # table → clipboard
 
   # combine charts: same data, multiple views
-  my %f = %{cat("Cargo.toml") |> words |> freq}
+  val %f = %{cat("Cargo.toml") |> words |> freq}
   %f |> bars |> p  # horizontal bars
   %f |> histo |> p  # vertical histogram
   %f |> tbl |> p  # aligned table
@@ -1416,44 +1416,44 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 
   # ── stringify / str — parseable stryke literals ──────────────────────
   $data |> str |> p  # +{a => 1, b => [2, 3]}
-  my $fn = fn { $_ * 2 }
+  val $fn = fn { $_ * 2 }
   $fn |> str |> p  # fn { $_ * 2; }
   range(1, 3) |> str |> p  # (1, 2, 3)
   # round-trip: str -> eval -> callable
-  my $f = fn ($x: Int) { $x + 1 }
-  my $f2 = $f |> str |> eval
+  val $f = fn ($x: Int) { $x + 1 }
+  val $f2 = $f |> str |> eval
   $f2->(5) |> p  # 6
 
   # ── partition / min_by / max_by / zip_with ─────────────────────────
-  my ($yes, $no) = partition { $_ > 5 } 1..10
-  my $smallest = min_by { length } @words
-  my $largest  = max_by { length } @words
-  my @sums = zip_with { $_0 + $_1 } [1,2,3], [10,20,30]  # 11 22 33
+  val ($yes, $no) = partition { $_ > 5 } 1..10
+  val $smallest = min_by { length } @words
+  val $largest  = max_by { length } @words
+  val @sums = zip_with { $_0 + $_1 } [1,2,3], [10,20,30]  # 11 22 33
 
   # ── pretty-print (indented dump) ───────────────────────────────────
-  my $nested = {key => [1, {nested => "val"}]}
+  val $nested = {key => [1, {nested => "val"}]}
   $nested |> ddump |> p
 
   # ── write to file (returns content for further piping) ─────────────
-  my $text = "hello\nworld\n"
+  val $text = "hello\nworld\n"
   $text |> to_file "/tmp/out.txt"
 
   # ── file I/O helpers ────────────────────────────────────────────────
-  my @lines = read_lines "/tmp/out.txt"  # slurp file → list of lines
+  val @lines = read_lines "/tmp/out.txt"  # slurp file → list of lines
   append_file "/tmp/out.txt", "extra\n"  # append to file
-  my $tmp = tempfile()  # create temp file, returns path
-  my $dir = tempdir()  # create temp directory, returns path
+  val $tmp = tempfile()  # create temp file, returns path
+  val $dir = tempdir()  # create temp directory, returns path
 
   # ── JSON file I/O ──────────────────────────────────────────────────
   write_json "/tmp/data.json", {a => 1, b => 2}  # write hash as JSON file
-  my $obj = read_json "/tmp/data.json"  # read JSON file → hashref
+  val $obj = read_json "/tmp/data.json"  # read JSON file → hashref
 
   # ── interleave ─────────────────────────────────────────────────────
-  my @merged = interleave [1,2,3], [10,20,30]  # (1,10,2,20,3,30)
+  val @merged = interleave [1,2,3], [10,20,30]  # (1,10,2,20,3,30)
 
   # ── glob_match / which_all ──────────────────────────────────────────
   p glob_match "*.txt", "readme.txt"  # 1 (matches)
-  my @bins = which_all "perl"  # all paths for "perl" in $PATH
+  val @bins = which_all "perl"  # all paths for "perl" in $PATH
 
   # ── zsh glob qualifiers — world's first in a scripting language ────
   # Stryke imports the full zshrs glob engine (zsh-compatible). Every
@@ -1461,13 +1461,13 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # `swallow`/`swa`, `ingest`/`ing`, `pwatch`, `par_find_files`,
   # `<*.txt>`, … — applies the qualifiers without a single line of
   # stryke-side parsing. Source of truth is `zsh::glob` from `../zshrs`.
-  my @dirs = glob "**(/)"          # directories only, recursive
-  my @files = glob "**(.)"         # regular files only, recursive
-  my @links = glob "**(@)"         # symlinks only
-  my @exec = glob "**(*)"          # executable files
-  my @big = glob "**(L+1024)"      # files larger than 1024 bytes
-  my @recent = glob "**(om[1])"    # most recently modified, take 1
-  my @safe = glob "doesnotexist*(N)"  # NULL_GLOB — empty list, no error
+  val @dirs = glob "**(/)"          # directories only, recursive
+  val @files = glob "**(.)"         # regular files only, recursive
+  val @links = glob "**(@)"         # symlinks only
+  val @exec = glob "**(*)"          # executable files
+  val @big = glob "**(L+1024)"      # files larger than 1024 bytes
+  val @recent = glob "**(om[1])"    # most recently modified, take 1
+  val @safe = glob "doesnotexist*(N)"  # NULL_GLOB — empty list, no error
 
   # `c()` is a slurp. A plain wildcard sweep skips matches it can't read as
   # a regular file (dangling symlink, vanished file, directory) the way
@@ -1484,9 +1484,9 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # `fs::canonicalize`. Same match policy as slurp: a plain sweep skips
   # bad references (dangling symlinks, vanished files, dirs); a qualifier
   # glob stays strict.
-  my %src = swallow "src/**/*.rs"   # every Rust source file, raw bytes
-  my %imgs = swa "assets/**/*.{png,jpg}"
-  my %safe = swallow "missing*(N)"  # (N) null-glob → empty hash
+  val %src = swallow "src/**/*.rs"   # every Rust source file, raw bytes
+  val %imgs = swa "assets/**/*.{png,jpg}"
+  val %safe = swallow "missing*(N)"  # (N) null-glob → empty hash
 
   # `ingest` is the streaming variant of `swallow` — yields
   # `[abspath, bytes]` one file at a time so only one file's bytes are
@@ -1495,20 +1495,20 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # deferred to each iteration step. For-loops over an ingest iterator
   # pull lazily (no `to_list()` materialisation); use `|>` pipes or
   # explicit `->next` driving the same way.
-  for my $pair (ingest "data/**/*.bin") {
-      my ($path, $bytes) = @$pair
+  for val $pair (ingest "data/**/*.bin") {
+      val ($path, $bytes) = @$pair
       # process one file's bytes, then they go out of scope
   }
-  my $it = ing "logs/*.log"; while (my $p = $it->next->[0]) { ... }
+  val $it = ing "logs/*.log"; while (val $p = $it->next->[0]) { ... }
 
   # `burp` is the inverse of `swallow` — take a `{path => content}` hash
   # and write each entry. Parent directories are created automatically,
   # so the canonical swallow → mutate → burp round-trip works even when
   # the destination tree doesn't yet exist. Pass via hashref (`\%h` or
   # inline `{ ... }`); returns the integer count of files written.
-  my %src = swallow "src/**/*.rs"
-  for my $p (keys %src) { $src{$p} = uc $src{$p} }
-  my $n = burp \%src                          # in-place update
+  var %src = swallow "src/**/*.rs"
+  for val $p (keys %src) { $src{$p} = uc $src{$p} }
+  val $n = burp \%src                          # in-place update
   burp { "out/README.md" => "# Hello\n", "out/src/main.rs" => "..." }
   ```
 
@@ -1539,15 +1539,15 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   **Coderef-in-block-position** — wherever a `{ BLOCK }` is accepted (`grep`, `map`, `sort`, `first`, `any`, `all`, `none`, `take_while`, `drop_while`, `reject`, `partition`, `min_by`, `max_by`, plus their pipe-forward variants), a coderef-shaped expression also works directly. Runtime check: if the EXPR evaluates to a code ref, it is called with the current element(s) as positional args; otherwise the value's truthiness drives filtering (or its result becomes the mapped value, comparator integer, etc.). Eliminates the `{ $f($_) }` / `{ $f->($_) }` boilerplate.
 
   ```perl
-  my $is_big = fn ($x) { $x > 3 }
-  my @r = grep $is_big, @l                # was: grep { $is_big->($_) } @l
-  my @r = @l |> grep $is_big              # pipe-forward variant
-  my @r = first $is_big, @l               # tier-2 builtin, no parens, no block
-  my @r = take_while $is_big, @l
+  val $is_big = fn ($x) { $x > 3 }
+  val @r = grep $is_big, @l                # was: grep { $is_big->($_) } @l
+  val @r = @l |> grep $is_big              # pipe-forward variant
+  val @r = first $is_big, @l               # tier-2 builtin, no parens, no block
+  val @r = take_while $is_big, @l
 
   # Sort comparators receive ($a, $b) positionally — no $a/$b global magic:
-  my $cmp = fn ($a, $b) { $b <=> $a }     # or fn { _0 <=> _1 } using positional aliases
-  my @s = sort $cmp @l                    # descending
+  val $cmp = fn ($a, $b) { $b <=> $a }     # or fn { _0 <=> _1 } using positional aliases
+  val @s = sort $cmp @l                    # descending
   ```
 
   **Threading (`~>`) excluded** — whitespace-delimited stages can't disambiguate `~> @l grep $f` from "two stages", so threading still requires `{ $f(_) }`. Use `|>` for the bare-coderef form, or stay with `{ }` blocks under `~>`.
@@ -1700,7 +1700,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   # Perl 5: needs CPAN modules, verbose method chains
   use String::CamelCase qw(camelize decamelize)
   use JSON
-  my $s = " hello world "
+  var $s = " hello world "
   $s =~ s/^\s+|\s+$//g  # trim
   $s = uc($s)
   $s = reverse($s)
@@ -1835,14 +1835,14 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   fn double($x) { $x * 2 }
   p double(21)                    # 42
 
-  my $f = fn { _ * 2 }
+  val $f = fn { _ * 2 }
   p $f->(21)                      # 42
 
   # implicit zero-arg coderef — at top-level, RHS starting with bare `_` / `_N`
   # auto-wraps as `fn { ... }`. Inside any block, `_` is still the topic.
-  my $g = _ * 2
+  val $g = _ * 2
   p $g->(21)                      # 42
-  my $h = _ + _1
+  val $h = _ + _1
   p $h->(3, 4)                    # 7
   ```
 
@@ -1867,34 +1867,34 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   ~> (1..10) grep { $_0 % 2 == 0 } map { $_0 * $_0 } sum p  # 220
 
   # Multi-arg anonymous subs: $_0, $_1, ... $_N
-  my $add3 = fn { $_0 + $_1 + $_2 }
+  val $add3 = fn { $_0 + $_1 + $_2 }
   p $add3->(1, 2, 3)  # 6
 
-  my $mul5 = fn { $_0 * $_1 * $_2 * $_3 * $_4 }
+  val $mul5 = fn { $_0 * $_1 * $_2 * $_3 * $_4 }
   p $mul5->(1, 2, 3, 4, 5)  # 120
 
-  my $concat = fn { "$_0-$_1-$_2-$_3" }
+  val $concat = fn { "$_0-$_1-$_2-$_3" }
   p $concat->("a", "b", "c", "d")  # a-b-c-d
 
   # Direct access via @_ still works
-  my $join_args = fn { join("-", @_) }
+  val $join_args = fn { join("-", @_) }
   p $join_args->("x", "y", "z")  # x-y-z
 
   # Using $_0 closures with |> pipes
-  my $double = fn { $_0 * 2 }
-  my $triple = fn { $_0 * 3 }
+  val $double = fn { $_0 * 2 }
+  val $triple = fn { $_0 * 3 }
   5 |> $double |> $triple |> p               # 30
 
   # Using $_0/$_1 closures in reduce
-  my $add = fn { $_0 + $_1 }
+  val $add = fn { $_0 + $_1 }
   (1..5) |> reduce { $add->($_0, $_1) } |> p # 15
 
   # Using $_0/$_1/$_2 closure
-  my $mul3 = fn { $_0 * $_1 * $_2 }
+  val $mul3 = fn { $_0 * $_1 * $_2 }
   p $mul3->(2, 3, 4)  # 24
 
   # Using $_0/$_1 closure as comparator
-  my $cmp = fn { $_0 <=> $_1 }
+  val $cmp = fn { $_0 <=> $_1 }
   (5,2,8,1) |> sort { $cmp->($_0, $_1) } |> join "," |> p  # 1,2,5,8
 
   # User-defined functions in ~> (bare stage, no block needed)
@@ -2000,7 +2000,7 @@ Stryke runs string code in two coordinate systems. Perl 5 builtins stay byte-ind
 Concrete example:
 
 ```perl
-my $s = "hello ─ world"     # `─` is 3 bytes / 1 codepoint
+val $s = "hello ─ world"     # `─` is 3 bytes / 1 codepoint
 length $s                    # 15 (bytes)
 len    $s                    # 13 (codepoints)
 index  $s, "world"           # 9  (byte position — past the 3-byte `─`)
@@ -2111,7 +2111,7 @@ STRYKE_AI_MODE=mock-only stryke examples/ai_rag_simple.stk
 
 ```sh
 # Sets: dedupe + union / intersection
-stryke 'my $a = set(1,2,2,3); my $b = set(2,3,4); p len($a | $b), " ", len($a & $b)'
+stryke 'val $a = set(1,2,2,3); val $b = set(2,3,4); p len($a | $b), " ", len($a & $b)'
 
 # Threaded pipeline — count primes in 1..100 in parallel
 stryke '~> (1:100) pgreps { is_prime _ } collect sort { _ <=> _1 } |> ep'
@@ -2120,7 +2120,7 @@ stryke '~> (1:100) pgreps { is_prime _ } collect sort { _ <=> _1 } |> ep'
 stryke '~> glob("*.stk") pmaps { [ _ => sha256(c"#{_}") ] } collect |> ep'
 
 # Sketch algebra — Bloom union
-stryke 'my $a = bloom_new(1024); my $b = bloom_new(1024);
+stryke 'val $a = bloom_new(1024); val $b = bloom_new(1024);
         bloom_add($a, $_) for 1:50;
         bloom_add($b, $_) for 30:80;
         p bloom_count($a + $b)'
@@ -2417,7 +2417,7 @@ Distribute a `pmap`-style fan-out across many machines via SSH. The dispatcher s
 
 ```perl
 # Build the worker pool. Each spec maps to one or more `ssh HOST STRYKE --remote-worker` lanes.
-my $cluster = cluster([
+val $cluster = cluster([
     "build1:8",                          # 8 slots on build1, default `stryke` from PATH
     "alice@build2:16",                   # 16 slots, ssh as alice
     "build3:4:/usr/local/bin/stryke",        # 4 slots, custom remote stryke path
@@ -2425,10 +2425,10 @@ my $cluster = cluster([
     { timeout => 30, retries => 2, connect_timeout => 5 },  # trailing tunables
 ])
 
-my @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) }
+val @hashes = @big_files |> pmap_on $cluster { slurp_raw |> sha_256) }
 
 # pflat_map_on for one-to-many mapping
-my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp }
+val @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp }
 ```
 
 #### Distributed thread macro `~d>`
@@ -2436,14 +2436,14 @@ my @lines = @log_paths |> pflat_map_on $cluster { split /\n/, slurp }
 `~d>` is `~p>` (the parallel-chunk thread-first macro) but with each chunk shipped to a cluster worker instead of a local rayon thread. Same chunk-block surface — stages operate on `@_` (the chunk's elements) and the results merge in source order via the existing `pmap_on` dispatcher (one persistent ssh process per slot, JOB frames over a shared work queue, per-job retry budget).
 
 ```perl
-my $cluster = cluster("build1:8", "build2:16")
+val $cluster = cluster("build1:8", "build2:16")
 
 # Distributed equivalent of `~p> @big_files map { sha_256(slurp_raw($_)) }`:
-my @hashes = ~d> on $cluster @big_files map { sha_256(slurp_raw($_)) }
+val @hashes = ~d> on $cluster @big_files map { sha_256(slurp_raw($_)) }
 
 # Source-order is preserved even though chunks finish out of order on remote
 # workers — the dispatcher tracks per-chunk seq numbers and merges by index.
-my @doubled = ~d> on $cluster 1:1_000_000 map { $_ * 2 }
+val @doubled = ~d> on $cluster 1:1_000_000 map { $_ * 2 }
 say "$doubled[0] .. $doubled[-1]"        # 2 .. 2000000
 ```
 
@@ -2545,7 +2545,7 @@ stryke --remote-worker-v1                # legacy one-shot session for compat te
 
 ## [0x08c] `--static` MODE
 
-stryke's type system is opt-in by default — `typed my $x : Int`, typed struct/class fields, and typed `fn` parameters are checked at runtime when present, ignored when absent. `--static` makes typing **mandatory** for the whole program, modelled on Kotlin: every function parameter, every return type, and every variable declaration must carry a type (or, for variables, an initializer the type can be inferred from). Statically-known mismatches abort **before the program runs**; everything else is enforced at runtime by the same `check_value` path that backs opt-in typing.
+stryke's type system is opt-in by default — `typed val $x : Int`, typed struct/class fields, and typed `fn` parameters are checked at runtime when present, ignored when absent. `--static` makes typing **mandatory** for the whole program, modelled on Kotlin: every function parameter, every return type, and every variable declaration must carry a type (or, for variables, an initializer the type can be inferred from). Statically-known mismatches abort **before the program runs**; everything else is enforced at runtime by the same `check_value` path that backs opt-in typing.
 
 `--static` applies to the main program only — imported `.pm` modules keep their own (possibly untyped) contract. It also disables the bytecode cache so a non-static cached chunk can never bypass the typing pass.
 
@@ -2654,7 +2654,7 @@ This isn't application performance testing. This is **infrastructure validation*
 Combine with `cluster` + `pmap_on` for fleet-wide stress:
 
 ```stk
-my $c = cluster(["node1:16", "node2:16", "node3:16"])
+val $c = cluster(["node1:16", "node2:16", "node3:16"])
 
 # Pin 48 cores across 3 servers for 60 seconds
 1:48 |> pmap_on $c { heat(60) }
@@ -2663,7 +2663,7 @@ my $c = cluster(["node1:16", "node2:16", "node3:16"])
 Or use the built-in `stress_test` with cluster:
 
 ```stk
-my $r = stress_test($c, 60)
+val $r = stress_test($c, 60)
 p "Total hashes: $r->{cpu_hashes}"
 p "Workers: $r->{workers}"
 ```
@@ -2742,8 +2742,8 @@ The CLI subcommands `stryke controller` and `stryke agent` are mirrored by the *
 
 ```perl
 # examples/agent_become.stk — script equivalent of `stryke agent`
-my $addr = $ENV{CONTROLLER_ADDR} // "localhost:9999"
-my $name = $ENV{AGENT_NAME}      // $ENV{HOSTNAME} // "anonymous"
+val $addr = $ENV{CONTROLLER_ADDR} // "localhost:9999"
+val $name = $ENV{AGENT_NAME}      // $ENV{HOSTNAME} // "anonymous"
 exit agent($addr, $name)
 
 # examples/controller_with_local_agent.stk — controller + local agent in one process
@@ -2770,17 +2770,17 @@ The controller/agent REPL at [0x10b] is for human-typed interactive load testing
 ### Minimum-viable use
 
 ```perl
-my @workers = congregation(4);                # fork 4 agents locally, wait for them to register
-my $div     = pray "compute()", @workers;     # scatter EVAL frames in parallel, return divination
-my %results = annex $div;                     # block-and-gather hash keyed by session-id
+val @workers = congregation(4);                # fork 4 agents locally, wait for them to register
+val $div     = pray "compute()", @workers;     # scatter EVAL frames in parallel, return divination
+val %results = annex $div;                     # block-and-gather hash keyed by session-id
 excommunicate(@workers);                      # clean shutdown
 ```
 
 `pray` accepts a string OR a coderef (closure body is deparsed and shipped — closure captures not supported in v1):
 
 ```perl
-my $div = pray fn { 2 + _ }, @workers;         # coderef form
-my $div = pray "2 + 3", @workers;              # string form
+val $div = pray fn { 2 + _ }, @workers;         # coderef form
+val $div = pray "2 + 3", @workers;              # string form
 ```
 
 ### Full verb taxonomy
@@ -2847,7 +2847,7 @@ Open by default. To restrict membership to anointed-only workers, the master cal
 `chant` is the fire-and-forget cousin of `pray` — it registers an ongoing prayer that fires at every current agent AND at every new agent that joins later (via the accept-loop hook). Use for state distribution (`bestow`-like config push to current + future workers):
 
 ```perl
-my $vigil = chant("our %config = (max_depth => 8); 'ok'", @workers);
+val $vigil = chant("our %config = (max_depth => 8); 'ok'", @workers);
 # ... new workers can join via profess(); they auto-receive the chant on join ...
 amen($vigil);                                  # stop the rescatter
 ```
@@ -2860,7 +2860,7 @@ amen($vigil);                                  # stop the rescatter
 # Master:
 ordain "renderfarm", "0.0.0.0", 9999;
 welcome 4, 30_000;                             # wait for 4 slaves
-my %frames = harvest "render_frame()", muster();
+val %frames = harvest "render_frame()", muster();
 
 # Slave (in any process, including a forked child):
 profess "renderfarm";                          # blocks in agent loop
@@ -2923,8 +2923,8 @@ See [`docs/killer-features-brainstorm.md`](docs/killer-features-brainstorm.md) "
 **World-first** for scripting languages: no major scripting language (Perl, Python, Ruby, JavaScript, Lua, PHP) ships automatic value-lineage tracking as a first-class builtin. Closest analogs are research dataflow languages (LIO, Adapton) which surface lineage as a type-system feature, never as a plain `provenance($x)` call. Stryke ships the trio as a normal dispatch builtin with O(1) HashMap-keyed lookup and zero overhead until any value is marked.
 
 ```perl
-my $config = mark({ host => "prod", retries => 3 })       # tag the Arc
-my $p      = provenance($config)
+val $config = mark({ host => "prod", retries => 3 })       # tag the Arc
+val $p      = provenance($config)
 # { origin => "HASH entries=2", origin_line => 1, ops => [] }
 unmark($config)                                            # reclaim ledger entry
 ```
@@ -2952,14 +2952,14 @@ Convenience builtins over standard socket calls. Both capabilities exist in ever
 
 ```perl
 # TCP service-health sweep — 250 ms per probe, returns 1 / 0.
-for my $pair (([ "db",  5432 ], [ "redis", 6379 ], [ "api", 8080 ])) {
+for val $pair (([ "db",  5432 ], [ "redis", 6379 ], [ "api", 8080 ])) {
     printf "  %-6s :%d  %s\n", $pair->[0], $pair->[1],
         kick($pair->[0], $pair->[1], 250) ? "UP" : "down"
 }
 
 # Wake-on-LAN magic packet, 3× for reliability.
-my @mac_bytes = map { hex($_) } split /:/, "aa:bb:cc:dd:ee:ff"
-my @packet = (0xff) x 6
+val @mac_bytes = map { hex($_) } split /:/, "aa:bb:cc:dd:ee:ff"
+var @packet = (0xff) x 6
 push @packet, @mac_bytes for 1:16
 udp_send("255.255.255.255", 9, pack("C*", @packet), 3)
 ```
@@ -2979,17 +2979,17 @@ Stryke-to-stryke communication between two hosts behind arbitrary NATs, no infra
 
 ```perl
 # Side A (any host, runs first):
-my $sock = udp_open()
-my $info = stun($sock)                       # → { public_ip, public_port }
+val $sock = udp_open()
+val $info = stun($sock)                       # → { public_ip, public_port }
 printf "Tell peer to: stryke peer.stk %s %d\n",
     $info->{public_ip}, $info->{public_port}
-my $first = udp_recv($sock, 60_000)          # wait for peer's bombards
+val $first = udp_recv($sock, 60_000)          # wait for peer's bombards
 p "Peer connected: $first"
 udp_close($sock)
 
 # Side B (peer host):
-my $sock = udp_open()
-my $r = punch($sock, $peer_ip, $peer_port, { payload => "hello!" })
+val $sock = udp_open()
+val $r = punch($sock, $peer_ip, $peer_port, { payload => "hello!" })
 if ($r->{established}) {
     printf "Connected in %d bombards (%dms)\n", $r->{bombards}, $r->{latency_ms}
     p "Peer replied: $r->{peer_msg}"
@@ -3027,20 +3027,20 @@ RFC 8656 client implemented in-tree (~600 lines, no third-party network crate �
 
 ```perl
 # Side A (the listener):
-my $sock = udp_open()
-my $alloc = turn_allocate($sock, "turn.example.com", 3478, "alice", "hunter2")
+val $sock = udp_open()
+val $alloc = turn_allocate($sock, "turn.example.com", 3478, "alice", "hunter2")
 printf "Tell peer my relay is: %s:%d\n", $alloc->{relay_ip}, $alloc->{relay_port}
-while (defined(my $msg = turn_recv($sock, 0))) {
+while (defined(val $msg = turn_recv($sock, 0))) {
     p "from $msg->{peer_ip}:$msg->{peer_port}: $msg->{payload}"
     turn_send($sock, $msg->{peer_ip}, $msg->{peer_port}, "ack")
 }
 
 # Side B (the sender):
-my $sock = udp_open()
-my $alloc = turn_allocate($sock, "turn.example.com", 3478, "bob", "trustno1")
+val $sock = udp_open()
+val $alloc = turn_allocate($sock, "turn.example.com", 3478, "bob", "trustno1")
 turn_permission($sock, $peer_relay_ip)
 turn_send($sock, $peer_relay_ip, $peer_relay_port, "hello via turn!")
-my $reply = turn_recv($sock, 5_000)
+val $reply = turn_recv($sock, 5_000)
 ```
 
 | Builtin | Signature | Returns |
@@ -3079,15 +3079,15 @@ Sibling to `kick` (which returns `1`/`0`) — pick by what you need:
 
 ```perl
 # SSH version sniff across a fleet.
-for my $host (qw(web1 web2 db1)) {
-    my $r = tcp_banner($host, 22, 500)
+for val $host (qw(web1 web2 db1)) {
+    val $r = tcp_banner($host, 22, 500)
     printf "  %-8s %s\n", $host, $1 if $r->{alive} && $r->{banner} =~ /^SSH-(\S+)/
 }
 
 # Find the authoritative WHOIS server for a TLD, then chase the refer:
-my $iana = whois_query("example.com")
-my ($registry) = $iana =~ /^refer:\s+(\S+)/m
-my $detail = whois_query("example.com", $registry // "whois.verisign-grs.com")
+val $iana = whois_query("example.com")
+val ($registry) = $iana =~ /^refer:\s+(\S+)/m
+val $detail = whois_query("example.com", $registry // "whois.verisign-grs.com")
 ```
 
 Demo: [`examples/network_recon.stk`](examples/network_recon.stk) chains `tcp_probe` + `tcp_banner` via `pmap` for parallel asset discovery + service fingerprinting.
@@ -3140,12 +3140,12 @@ These are real bumps I hit while building the NAT-traversal stack — surfacing 
 
 | Pitfall | Symptom | What to do instead |
 |---|---|---|
-| **Postfix `for` after `printf`/`print`** | `printf "..." for @arr` fails with `Expected LParen, got ArrayVar(...)` | Use explicit block form: `for my $x (@arr) { printf "...", $x }` |
+| **Postfix `for` after `printf`/`print`** | `printf "..." for @arr` fails with `Expected LParen, got ArrayVar(...)` | Use explicit block form: `for val $x (@arr) { printf "...", $x }` |
 | **Postfix `if` after `printf`** | Same parse failure as above | Same fix — wrap in explicit `if (...) { ... }` block |
 | **`$tx->clone` on pchannel** | "Can't call method on non-object" | Multi-producer channels aren't supported; use a different shape (multiple receivers, or one producer fanning to N consumers) |
-| **String return → provenance lost** | `mark({...}); my $j = to_json(...); provenance($j) → undef` | Wrap the string in a one-key hashref: `mark({ payload => to_json(...) })`. VM re-Arcs scalar string returns, breaking ptr-keyed lookup. Document in [provenance v1 limits](strykelang/provenance.rs#L40). |
+| **String return → provenance lost** | `mark({...}); val $j = to_json(...); provenance($j) → undef` | Wrap the string in a one-key hashref: `mark({ payload => to_json(...) })`. VM re-Arcs scalar string returns, breaking ptr-keyed lookup. Document in [provenance v1 limits](strykelang/provenance.rs#L40). |
 | **`grep { Pkg::fn }` doesn't auto-bind `$_`** | All elements pass / fail uniformly (predicate sees `$path = undef`) | Pass explicitly: `grep { Pkg::fn($_) } @list` |
-| **`fn($a, @b, @c)` slurps** | Second `@arr` param always empty; first `@arr` contains both | Pass arrayrefs + deref inside: `fn ... ($a, $b, $c) { my @b = @$b; my @c = @$c; ... }` |
+| **`fn($a, @b, @c)` slurps** | Second `@arr` param always empty; first `@arr` contains both | Pass arrayrefs + deref inside: `fn ... ($a, $b, $c) { val @b = @$b; val @c = @$c; ... }` |
 | **`mark(\@arr)` vs `mark([...])`** | `\@arr` produces a fresh SCALARREF Arc per access → provenance lookup misses | Use anonymous arrayrefs (`mark([10, 20])`) or hashrefs — they have stable Arc identity. `\@arr` operator semantics are subtle |
 | **`pack "a*"` for variable-length string** | `pack: 'A' and 'a' do not support '*'` | Concat: `pack("a4 n", $magic, $len) . $payload` — stryke's pack is stricter than Perl's |
 | **`par { Pkg::fn }` is chunked, not 1:1** | Result count = worker thread count, not input count | Use `pmap { Pkg::fn($_) } @list` for 1-result-per-input. `par` runs BLOCK once per chunk with `_` = whole chunk list |
@@ -3205,22 +3205,22 @@ Demos showing each shape: [`p2p_chat.stk`](examples/p2p_chat.stk) (raw primitive
 Decision tree for stryke-to-stryke P2P over the open internet — what to call, in what order, what each return value means:
 
 ```perl
-my $sock = udp_open()                          # 1. Bind a UDP socket once
+val $sock = udp_open()                          # 1. Bind a UDP socket once
                                                 #    (used for STUN + the data path)
 
-my $nat = stun_classify($sock)                 # 2. Detect NAT type (~3-server query)
+val $nat = stun_classify($sock)                 # 2. Detect NAT type (~3-server query)
 if ($nat->{nat_type} eq "symmetric") {         #    Symmetric → hole-punching can't work
     die "need TURN — see turn_allocate below"  #    (room for a TURN fallback here)
 }
 
-my $me = stun($sock)                           # 3. Discover OWN public address
+val $me = stun($sock)                           # 3. Discover OWN public address
 printf "my address: %s:%d — send this to peer\n",
     $me->{public_ip}, $me->{public_port}
 # ... exchange addresses with peer via email/paste/IRC/anything ...
-my $peer_ip   = "203.0.113.45"
-my $peer_port = 51234
+val $peer_ip   = "203.0.113.45"
+val $peer_port = 51234
 
-my $r = punch($sock, $peer_ip, $peer_port,     # 4. Hole-punch the peer
+val $r = punch($sock, $peer_ip, $peer_port,     # 4. Hole-punch the peer
     { timeout_ms => 5000 })
 if (!$r->{established}) {
     die "punch failed — peer NAT too restrictive; need TURN"
@@ -3229,7 +3229,7 @@ printf "connected: %s\n", $r->{peer_msg}      # 5. Bidirectional flow establishe
 
 # Now send/recv as normal UDP via the same socket:
 udp_send_to($sock, $peer_ip, $peer_port, "hello")
-my $reply = udp_recv_from($sock, 5000)        # → { payload, src_ip, src_port }
+val $reply = udp_recv_from($sock, 5000)        # → { payload, src_ip, src_port }
 p "peer said: $reply->{payload}"
 udp_close($sock)
 ```
@@ -3260,7 +3260,7 @@ The v1.3 primitives (`udp_open` / `stun` / `stun_classify` / `punch` / `turn_*`)
 ```perl
 require "examples/ice_orchestrator.stk"
 
-my $conn = ice::connect({
+val $conn = ice::connect({
     peer_host_addr   => "192.0.2.50:9000",      # try direct first
     peer_srflx_addr  => "203.0.113.45:51234",   # peer's STUN-discovered
     peer_relay_addr  => "198.51.100.99:49000",  # peer's TURN allocation
@@ -3407,13 +3407,13 @@ spec:
   - User-declared **Types** — classes (`CompletionItemKind::CLASS`), structs (STRUCT), enums (ENUM), traits (INTERFACE), plus every enum variant as a qualified `EnumName::Variant`
   - Constants from `use constant NAME => …` and the `use constant { A => 1, B => 2 }` hash form
   - **Loop labels** for `last LOOP` / `next LOOP` / `redo LOOP` references
-  - **Hash-key completion driven by builtin return schemas** — `my $info = pool_info(); $info->{<tab>}` lists the actual keys `pool_info` returns (`cpus`, `rayon_threads`, `arch`, `os`, `perf_cores`, `eff_cores`). Same registry covers `par_bench`, `stress_test`, `cache_stats`, `uname`, `audio_info`, `id3_read`, `git_log`, `git_show`, `git_status`, `git_branches`, `git_blame`, `git_authors`, `du_tree`, `process_list`, `net_interfaces`, `perfview`, `mounts`, `html_parse`, `css_select`, `xml_parse`, `xpath`. `foreach my $row (git_log()) { $row->{<tab>} }` also resolves through the loop-var binding.
+  - **Hash-key completion driven by builtin return schemas** — `val $info = pool_info(); $info->{<tab>}` lists the actual keys `pool_info` returns (`cpus`, `rayon_threads`, `arch`, `os`, `perf_cores`, `eff_cores`). Same registry covers `par_bench`, `stress_test`, `cache_stats`, `uname`, `audio_info`, `id3_read`, `git_log`, `git_show`, `git_status`, `git_branches`, `git_blame`, `git_authors`, `du_tree`, `process_list`, `net_interfaces`, `perfview`, `mounts`, `html_parse`, `css_select`, `xml_parse`, `xpath`. `foreach val $row (git_log()) { $row->{<tab>} }` also resolves through the loop-var binding.
   - Stryke keywords (`fn`, `class`, `struct`, `enum`, `trait`, `match`, `varsync`, `frozen`, …) and ~10k builtins from `%all`
   - **`use Module VERSION` version slot** — `use GUI <TAB>` / `use Foo 1<TAB>` lists every installed version directly from `~/.stryke/store/<canonical>@<ver>/`. Honors the namespace bridge (`use GUI` finds versions of `stryke-gui`) and prefix-filters on what the user typed (`1<TAB>` shows only `1.x` versions). The list comes from the same store-scan the resolver uses, so any offered version is guaranteed to satisfy `use Module VERSION` at runtime.
   - **In-progress parse recovery** — when the cursor sits inside a fragment that breaks the parse (`Demo::│`), the LSP retries with the cursor's line blanked so completion still indexes the rest of the file
   - **Trigger characters** include `{` so `$h->{` / `$h{` auto-popup the relevant key set
 - **Semantic tokens** for server-driven syntax coloring — keywords, builtins (with `defaultLibrary` modifier), sigil variables, pipe operators, regex literals, numbers, strings, comments — beyond what any client-side lexer can know
-- **Goto / References / Rename** — package-aware. Rename of struct/class/enum/trait fields and methods is AST-based with no textual fallback (so `my %h = (width => 1)` is not mistaken for a field reference when renaming `width`). The server defensively strips a `::` qualifier from `newName` so clients that send the full prefilled identifier (e.g. `TrafficLight::Stop` when renaming a variant) still produce the correct bare replacement. Cross-file rename walks the require graph BFS-style.
+- **Goto / References / Rename** — package-aware. Rename of struct/class/enum/trait fields and methods is AST-based with no textual fallback (so `val %h = (width => 1)` is not mistaken for a field reference when renaming `width`). The server defensively strips a `::` qualifier from `newName` so clients that send the full prefilled identifier (e.g. `TrafficLight::Stop` when renaming a variant) still produce the correct bare replacement. Cross-file rename walks the require graph BFS-style.
 - **Code actions** — *Extract Variable / Constant / Parameter / Function* (Cmd-Opt-V / Cmd-Opt-C / Cmd-Opt-P / Cmd-Opt-M), Wrap-in-`p`, toggle line comment. Extract works on caret-only (no manual selection needed) and inside double-quoted strings / backticks.
 - **Signature help** — parameter hints derived from the same doc strings that drive hover; active-parameter tracking as you type past commas
 
@@ -3518,13 +3518,13 @@ stryke '$c{"array / list"} |> e p'
 stryke 'keys %all |> less'
 
 # frequency table: how many ops per category?
-stryke 'my %f; $f{$b{$_}}++ for keys %b; dd \%f'
+stryke 'val %f; $f{$b{$_}}++ for keys %b; dd \%f'
 
 # find every documented op mentioning "parallel"
 stryke 'keys %d |> grep { $d{$_} =~ /parallel/i } |> sort |> p'
 
 # catalog the full reflection surface
-stryke 'for my $h (qw(b k all pc e a d c p)) {
+stryke 'for val $h (qw(b k all pc e a d c p)) {
          printf "%%%-4s %d\n", $h, scalar keys %$h
        }'
 ```
@@ -3674,12 +3674,12 @@ cd mega && bin/server
 `ai` is a builtin like `print` — two letters, ubiquitous, unlimited power. Full design + phase-by-phase status in [`docs/AI_PRIMITIVES.md`](docs/AI_PRIMITIVES.md).
 
 ```stryke
-my $r = ai "summarize this", $document       # bare call
-my $r = ai "research X", tools => [...]      # auto-routes to agent loop
-my $r = ai "describe", image => "/img.jpg"   # vision
-my $r = ai "extract", schema => +{...}       # structured output
-my $r = ai "...", pdf => "/contract.pdf"     # document input
-for my $chunk in stream_prompt("write a haiku") { print $chunk }   # iter-context streaming
+val $r = ai "summarize this", $document       # bare call
+val $r = ai "research X", tools => [...]      # auto-routes to agent loop
+val $r = ai "describe", image => "/img.jpg"   # vision
+val $r = ai "extract", schema => +{...}       # structured output
+val $r = ai "...", pdf => "/contract.pdf"     # document input
+for val $chunk in stream_prompt("write a haiku") { print $chunk }   # iter-context streaming
 ```
 
 | Surface | Builtins |
@@ -3730,7 +3730,7 @@ tool fn create_post($title: string, $body: string) "Create a post" {
     Post::create(+{ title => $title, body => $body })
 }
 
-my $reply = ai("create a post titled 'Hello' from alice@x.io with body 'World'");
+val $reply = ai("create a post titled 'Hello' from alice@x.io with body 'World'");
 ```
 
 ---
@@ -3740,23 +3740,23 @@ my $reply = ai("create a post titled 'Hello' from alice@x.io with body 'World'")
 PTY-driven interactive scripting — the modern Tcl/Expect successor. Full design + phase status in [`docs/expect-feature-idea.md`](docs/expect-feature-idea.md).
 
 ```stryke
-my $h = pty_spawn("ssh user@host");
+val $h = pty_spawn("ssh user@host");
 pty_expect($h, qr/password:/, 30);
 pty_send($h, "hunter2\n");
 pty_expect($h, qr/\$ /, 30);
 pty_send($h, "uptime\n");
-my $out = pty_expect($h, qr/\$ /, 30);
+val $out = pty_expect($h, qr/\$ /, 30);
 pty_close($h);
 
 # Table form (Tcl `expect { ... }` block, in stryke):
-my $tag = pty_expect_table($h, [
+val $tag = pty_expect_table($h, [
     +{ re => qr/password:/, do => fn { pty_send($h, "$pw\n"); "ok" } },
     +{ re => qr/yes\/no/,   do => fn { pty_send($h, "yes\n"); "confirmed" } },
     +{ re => qr/denied/,    do => fn { die "auth failed" } },
 ], 30);
 
 # Method-form sugar (require "perl_pty_class.stk"):
-my $h = PtyHandle::spawn("ssh host");
+val $h = PtyHandle::spawn("ssh host");
 $h->expect(qr/password:/, 30);
 $h->send("$pw\n");
 $h->branch([+{re => qr/\$ /, do => fn { "shell ready" }}], 30);
@@ -3778,9 +3778,9 @@ $h->close();
 Combined with `pmap_on` cluster dispatch you get parallel SSH automation across N hosts:
 
 ```stryke
-my $cluster = cluster(["host1:8", "host2:8", "host3:8"]);
+val $cluster = cluster(["host1:8", "host2:8", "host3:8"]);
 pmap_on $cluster @hosts -> $host {
-    my $h = pty_spawn("ssh $host");
+    val $h = pty_spawn("ssh $host");
     pty_expect($h, qr/password:/, 10);
     pty_send($h, "$passwords{$host}\n");
     pty_expect($h, qr/\$ /, 30);
