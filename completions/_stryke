@@ -616,6 +616,7 @@ _stryke() {
     '--remote-worker[persistent cluster worker over stdio]' \
     '--remote-worker-v1[legacy one-shot cluster worker over stdio]' \
     '--compat[Perl 5 strict-compat: disable all stryke extensions]' \
+    '--static[mandatory static typing: require types everywhere (Kotlin-style)]' \
     '--script[force arg to be a script file (skip code detection)]' \
     '*-e+[one line of program (several allowed)]:code:' \
     '*-E+[like -e but enables all optional features]:code:' \
