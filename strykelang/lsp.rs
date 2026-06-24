@@ -149,7 +149,18 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
             "version": env!("CARGO_PKG_VERSION"),
         }
     });
-    conn.initialize_finish(init_id, init_result)?;
+    // Send the InitializeResult ourselves instead of `conn.initialize_finish()`.
+    // lsp-server's `initialize_finish` requires the VERY NEXT message to be the
+    // `initialized` notification and returns a `ProtocolError` — killing the
+    // process — on anything else. `vscode-languageclient` sends `$/setTrace`
+    // and/or `workspace/didChangeConfiguration` BEFORE `initialized`, so the
+    // strict handshake crashed the server mid-init under VS Code ("connection
+    // got disposed"), while JetBrains (which sends `initialized` first) worked.
+    // rust-analyzer takes this same manual approach: respond, then let the main
+    // loop absorb `initialized` like any other notification (dispatch_notification
+    // ignores it).
+    let resp = Response::new_ok(init_id, init_result);
+    conn.sender.send(resp.into()).expect("lsp channel");
     crate::slog_info!("lsp", "initialize complete, entering message loop");
 
     let mut docs: HashMap<String, String> = HashMap::new();
