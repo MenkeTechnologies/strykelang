@@ -6575,6 +6575,20 @@ impl Parser {
                 }
                 Ok(PerlTypeName::List(Box::new(args.into_iter().next().unwrap())))
             }
+            "Set" | "Heap" | "Deque" => {
+                if args.len() != 1 {
+                    return Err(self.syntax_err(
+                        format!("{}<T> takes exactly one type argument, got {}", head, args.len()),
+                        line,
+                    ));
+                }
+                let inner = Box::new(args.into_iter().next().unwrap());
+                Ok(match head {
+                    "Set" => PerlTypeName::Set(inner),
+                    "Heap" => PerlTypeName::Heap(inner),
+                    _ => PerlTypeName::Deque(inner),
+                })
+            }
             "Map" | "Hash" => {
                 if args.len() != 2 {
                     return Err(self.syntax_err(

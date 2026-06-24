@@ -1657,10 +1657,19 @@ var $n: Int = 5                                // typed scalar
 var $m = 5                                     // OK: Int inferred from initializer
 val @names: List&lt;Str&gt; = ("ann", "bob")         // element-typed array
 var %ages: Map&lt;Str, Int&gt; = (ann =&gt; 30)         // key/value-typed hash
-var %nested: Map&lt;Str, List&lt;Int&gt;&gt; = ()           // generics nest</pre>
+var %nested: Map&lt;Str, List&lt;Int&gt;&gt; = ()           // generics nest
+
+struct Point { x =&gt; Int, y =&gt; Int }
+var $p: Point = Point(x=&gt;1, y=&gt;2)              // struct-typed scalar
+var @path: List&lt;Point&gt; = (Point(x=&gt;0, y=&gt;0))   // list of structs/classes
+var $seen: Set&lt;Int&gt; = set(1, 2, 3)             // element-typed set
+var $pq: Heap&lt;Str&gt; = heap { $a cmp $b }        // element-typed priority queue
+var $q: Deque&lt;Int&gt; = deque()                   // element-typed deque</pre>
         <ul>
           <li><code>List&lt;T&gt;</code> is the element-typed array (<code>Array&lt;T&gt;</code> is an alias). Bare <code>Array</code> carries no element check.</li>
           <li><code>Map&lt;K, V&gt;</code> is the key/value-typed hash (<code>Hash&lt;K, V&gt;</code> is an alias); both require exactly two type arguments. Bare <code>Hash</code> carries no key/value check.</li>
+          <li><strong>Value-type containers</strong> <code>Set&lt;T&gt;</code>, <code>Heap&lt;T&gt;</code>, <code>Deque&lt;T&gt;</code> are scalar-held (the value is a set / priority queue / deque) and check every member against <code>T</code>.</li>
+          <li><strong>Nominal element types</strong> — any struct, class, or enum name is a type: <code>Point</code>, <code>List&lt;Point&gt;</code>, <code>Map&lt;Str, Dog&gt;</code>, <code>Set&lt;Color&gt;</code>. A <code>List&lt;Point&gt;</code> rejects a non-<code>Point</code> element.</li>
           <li>Return types use the Kotlin colon: <code>fn name(...): Type</code>. A capitalized type name after the close-paren is a return type; a lowercase identifier (<code>: lvalue</code>) stays a sub attribute.</li>
         </ul>
         <h3>Enforcement</h3>

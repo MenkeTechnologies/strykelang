@@ -2558,10 +2558,19 @@ var $m = 5                                      # OK: Int inferred from initiali
 val @names: List<Str> = ("ann", "bob")         # element-typed array
 var %ages: Map<Str, Int> = (ann => 30)         # key/value-typed hash
 var %nested: Map<Str, List<Int>> = ()          # generics nest
+
+struct Point { x => Int, y => Int }
+var $p: Point = Point(x=>1, y=>2)              # struct-typed scalar
+var @path: List<Point> = (Point(x=>0, y=>0))   # list of structs/classes
+var $seen: Set<Int> = set(1, 2, 3)             # element-typed set
+var $pq: Heap<Str> = heap { $a cmp $b }        # element-typed priority queue
+var $q: Deque<Int> = deque()                   # element-typed deque
 ```
 
 - `List<T>` is the canonical element-typed array (`Array<T>` is an alias). Bare `Array` carries no element check.
 - `Map<K, V>` is the canonical key/value-typed hash (`Hash<K, V>` is an alias); both require exactly two type arguments. Bare `Hash` carries no key/value check.
+- **Value-type containers** `Set<T>`, `Heap<T>`, `Deque<T>` are scalar-held (the value is a set / priority queue / deque) and check every member against `T`.
+- **Nominal element types** — any struct, class, or enum name is a type: `Point`, `List<Point>`, `Map<Str, Dog>`, `Set<Color>`. A `List<Point>` rejects a non-`Point` element; a `var $p: Point` rejects a non-`Point` value.
 - Return types use the Kotlin colon: `fn name(...): Type { }`. A capitalized type name after the closing paren is a return type; a lowercase identifier (`: lvalue`) stays an attribute.
 
 ### Enforcement

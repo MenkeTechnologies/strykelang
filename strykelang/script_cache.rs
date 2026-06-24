@@ -51,7 +51,7 @@ use crate::value::StrykeValue;
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
 pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 /// Bumped on incompatible rkyv schema changes.
-pub const SHARD_FORMAT_VERSION: u32 = 2;
+pub const SHARD_FORMAT_VERSION: u32 = 3;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.

@@ -3947,6 +3947,16 @@ impl<'a> VM<'a> {
                             .map_err(|e| e.at_line(self.line()))?;
                         Ok(())
                     }
+                    Op::DeclareScalarTypedContainer(idx, ty_idx, frozen) => {
+                        let val = self.pop();
+                        let n = names[*idx as usize].to_string();
+                        let ty = self.container_types[*ty_idx as usize].clone();
+                        self.interp
+                            .scope
+                            .declare_scalar_frozen(&n, val, *frozen, Some(ty))
+                            .map_err(|e| e.at_line(self.line()))?;
+                        Ok(())
+                    }
                     Op::DeclareScalarTypedUser(name_idx, type_idx, flag) => {
                         let val = self.pop();
                         let n = names[*name_idx as usize].as_str();

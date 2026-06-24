@@ -172,3 +172,71 @@ fn static_does_not_affect_untyped_program_without_flag() {
     // Same untyped program runs normally when `--static` is off.
     assert_eq!(eval_int("fn add($x, $y) { $x + $y } add(40, 2)"), 42);
 }
+
+// ── Parametric value-type containers: Set<T> / Heap<T> / Deque<T> ─────────────
+
+#[test]
+fn typed_set_good_runs() {
+    assert_eq!(eval_int("var $s: Set<Int> = set(1, 2, 3); 7"), 7);
+}
+
+#[test]
+fn typed_set_wrong_member_is_type_error() {
+    assert_eq!(
+        eval_err_kind("var $s: Set<Int> = set(1, \"x\", 3); 1"),
+        ErrorKind::Type
+    );
+}
+
+#[test]
+fn typed_heap_decl_ok() {
+    assert_eq!(eval_int("var $h: Heap<Int> = heap { $a <=> $b }; 5"), 5);
+}
+
+#[test]
+fn typed_deque_decl_ok() {
+    assert_eq!(eval_int("var $d: Deque<Str> = deque(); 9"), 9);
+}
+
+#[test]
+fn typed_container_shape_mismatch_is_type_error() {
+    // A Set value assigned to a Heap<Int> scalar — wrong container shape.
+    assert_eq!(
+        eval_err_kind("var $h: Heap<Int> = set(1, 2); 1"),
+        ErrorKind::Type
+    );
+}
+
+// ── Nominal element types: List<STRUCT> / Set<STRUCT> / STRUCT scalar ─────────
+
+#[test]
+fn list_of_struct_accepts_instances() {
+    assert_eq!(
+        eval_int("struct Pt { x => Int } var @ps: List<Pt> = (Pt(x=>1), Pt(x=>2)); scalar(@ps)"),
+        2
+    );
+}
+
+#[test]
+fn list_of_struct_rejects_non_struct() {
+    assert_eq!(
+        eval_err_kind("struct Pt { x => Int } var @ps: List<Pt> = (\"nope\"); 1"),
+        ErrorKind::Type
+    );
+}
+
+#[test]
+fn struct_typed_scalar_ok() {
+    assert_eq!(
+        eval_int("struct Pt { x => Int } var $p: Pt = Pt(x=>5); $p->{x}"),
+        5
+    );
+}
+
+#[test]
+fn set_of_struct_accepts_instances() {
+    assert_eq!(
+        eval_int("struct Pt { x => Int } var $s: Set<Pt> = set(Pt(x=>1)); 4"),
+        4
+    );
+}
