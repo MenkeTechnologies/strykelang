@@ -59,11 +59,17 @@ for f in $DOC_FILES; do
   perl -pi -e "s/\\Q$CURRENT\\E/$NEW/g" "$f"
 done
 
+# IntelliJ plugin: the `pluginVersion` line tracks the crate version so the
+# published plugin zip and the language ship in lockstep.
+GRADLE_PROPS=editors/intellij/gradle.properties
+perl -pi -e "s/^pluginVersion=\\Q$CURRENT\\E\$/pluginVersion=$NEW/" "$GRADLE_PROPS"
+
 echo "  Cargo.toml:          $NEW"
 echo "  docs/index.html:     $NEW"
 echo "  docs/reference.html: $NEW"
 echo "  man/man1/stryke.1:   $NEW"
 echo "  man/man1/strykeall.1: $NEW"
+echo "  $GRADLE_PROPS: $NEW"
 
 # ── verify build (also rewrites Cargo.lock to the new version) ──
 echo ""
@@ -78,7 +84,7 @@ echo "committing + tagging v$NEW..."
 # under `docs/`, which carries .gitignore entries (docs/.fonts/, docs/book.*,
 # *.tex/*.pdf). Without -f, `git add docs/...` prints "paths are ignored" and
 # exits non-zero, which `set -e` turns into an abort before the commit.
-git add -f Cargo.toml Cargo.lock $DOC_FILES
+git add -f Cargo.toml Cargo.lock $DOC_FILES "$GRADLE_PROPS"
 git commit -m "bump v$NEW"
 git tag "v$NEW"
 git push origin HEAD
