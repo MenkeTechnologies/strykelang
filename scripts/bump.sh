@@ -74,7 +74,11 @@ echo "build ok"
 # ── commit, tag, push (the tag push triggers release.yml) ──
 echo ""
 echo "committing + tagging v$NEW..."
-git add Cargo.toml Cargo.lock $DOC_FILES
+# `-f` (force): docs/index.html and docs/reference.html are tracked but live
+# under `docs/`, which carries .gitignore entries (docs/.fonts/, docs/book.*,
+# *.tex/*.pdf). Without -f, `git add docs/...` prints "paths are ignored" and
+# exits non-zero, which `set -e` turns into an abort before the commit.
+git add -f Cargo.toml Cargo.lock $DOC_FILES
 git commit -m "bump v$NEW"
 git tag "v$NEW"
 git push origin HEAD
