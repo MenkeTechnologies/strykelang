@@ -1747,6 +1747,34 @@ impl StrykeValue {
         })
         .flatten()
     }
+    /// Snapshot of a `Set<T>` value's members (the `PerlSet` map values), for
+    /// runtime element-type checks. `None` when the value is not a set.
+    #[inline]
+    pub fn as_set_values(&self) -> Option<Vec<StrykeValue>> {
+        self.with_heap(|h| match h {
+            HeapObject::Set(s) => Some(s.values().cloned().collect()),
+            _ => None,
+        })
+        .flatten()
+    }
+    /// Snapshot of a `Heap<T>` value's items. `None` when not a heap.
+    #[inline]
+    pub fn as_heap_items(&self) -> Option<Vec<StrykeValue>> {
+        self.with_heap(|h| match h {
+            HeapObject::Heap(h) => Some(h.lock().items.clone()),
+            _ => None,
+        })
+        .flatten()
+    }
+    /// Snapshot of a `Deque<T>` value's items. `None` when not a deque.
+    #[inline]
+    pub fn as_deque_items(&self) -> Option<Vec<StrykeValue>> {
+        self.with_heap(|h| match h {
+            HeapObject::Deque(d) => Some(d.lock().iter().cloned().collect()),
+            _ => None,
+        })
+        .flatten()
+    }
     /// `as_pipeline` — see implementation.
     #[inline]
     pub fn as_pipeline(&self) -> Option<Arc<Mutex<PipelineInner>>> {

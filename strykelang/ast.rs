@@ -304,6 +304,14 @@ pub enum PerlTypeName {
     /// key's string form parsing as that type; `Str`/`Any` always pass. Bare
     /// `Hash` ≡ `Map(Any, Any)`.
     Map(Box<PerlTypeName>, Box<PerlTypeName>),
+    /// Element-typed set: `Set<T>` — a [`crate::value::PerlSet`] value whose
+    /// every member must satisfy the inner type. Scalar-held.
+    Set(Box<PerlTypeName>),
+    /// Element-typed priority queue: `Heap<T>` — a [`crate::value::PerlHeap`]
+    /// value whose every item must satisfy the inner type. Scalar-held.
+    Heap(Box<PerlTypeName>),
+    /// Element-typed double-ended queue: `Deque<T>`. Scalar-held.
+    Deque(Box<PerlTypeName>),
     /// Struct-typed field: `field => Point` where Point is a struct name.
     Struct(String),
     /// Enum-typed field: `field => Color` where Color is an enum name.
@@ -575,7 +583,13 @@ impl PerlTypeName {
             Self::Any => Some(7),
             // Parametric / nominal types can't fit in a single byte — they use
             // the chunk type-table (parametric) or name-pool (nominal) path.
-            Self::List(_) | Self::Map(_, _) | Self::Struct(_) | Self::Enum(_) => None,
+            Self::List(_)
+            | Self::Map(_, _)
+            | Self::Set(_)
+            | Self::Heap(_)
+            | Self::Deque(_)
+            | Self::Struct(_)
+            | Self::Enum(_) => None,
         }
     }
 
@@ -592,6 +606,9 @@ impl PerlTypeName {
             Self::Any => "Any".to_string(),
             Self::List(elem) => format!("List<{}>", elem.display_name()),
             Self::Map(k, v) => format!("Map<{}, {}>", k.display_name(), v.display_name()),
+            Self::Set(elem) => format!("Set<{}>", elem.display_name()),
+            Self::Heap(elem) => format!("Heap<{}>", elem.display_name()),
+            Self::Deque(elem) => format!("Deque<{}>", elem.display_name()),
             Self::Struct(name) => name.clone(),
             Self::Enum(name) => name.clone(),
         }
@@ -749,6 +766,42 @@ impl PerlTypeName {
                         val_ty.check_value(val).map_err(|m| {
                             format!("{} value at key {:?}: {}", self.display_name(), k, m)
                         })?;
+                    }
+                }
+                Ok(())
+            }
+            Self::Set(elem) => {
+                let items = v.as_set_values().ok_or_else(|| {
+                    format!("expected {}, got {}", self.display_name(), v.type_name())
+                })?;
+                if !matches!(**elem, Self::Any) {
+                    for it in &items {
+                        elem.check_value(it)
+                            .map_err(|m| format!("{} member: {}", self.display_name(), m))?;
+                    }
+                }
+                Ok(())
+            }
+            Self::Heap(elem) => {
+                let items = v.as_heap_items().ok_or_else(|| {
+                    format!("expected {}, got {}", self.display_name(), v.type_name())
+                })?;
+                if !matches!(**elem, Self::Any) {
+                    for it in &items {
+                        elem.check_value(it)
+                            .map_err(|m| format!("{} item: {}", self.display_name(), m))?;
+                    }
+                }
+                Ok(())
+            }
+            Self::Deque(elem) => {
+                let items = v.as_deque_items().ok_or_else(|| {
+                    format!("expected {}, got {}", self.display_name(), v.type_name())
+                })?;
+                if !matches!(**elem, Self::Any) {
+                    for it in &items {
+                        elem.check_value(it)
+                            .map_err(|m| format!("{} item: {}", self.display_name(), m))?;
                     }
                 }
                 Ok(())

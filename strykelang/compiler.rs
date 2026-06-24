@@ -1986,6 +1986,22 @@ impl Compiler {
             }
             return;
         }
+        // Parametric container value in a scalar (`Set<T>` / `Heap<T>` /
+        // `Deque<T>` — and `List<T>`/`Map<K,V>` if ever bound to a scalar):
+        // encode the full type through the chunk container-type pool.
+        if matches!(
+            ty,
+            crate::ast::PerlTypeName::Set(_)
+                | crate::ast::PerlTypeName::Heap(_)
+                | crate::ast::PerlTypeName::Deque(_)
+                | crate::ast::PerlTypeName::List(_)
+                | crate::ast::PerlTypeName::Map(_, _)
+        ) {
+            let ty_idx = self.chunk.intern_container_type(ty);
+            self.chunk
+                .emit(Op::DeclareScalarTypedContainer(name_idx, ty_idx, frozen), line);
+            return;
+        }
         // User-defined type — encode the name through the name pool.
         let (type_name, is_enum) = match ty {
             crate::ast::PerlTypeName::Struct(n) => (n.clone(), false),

@@ -125,6 +125,9 @@ pub enum Op {
     DeclareArrayTyped(u16, u16, bool),
     /// `var %h : Map<K, V>` — name pool index, [`Chunk::container_types`] index, frozen flag.
     DeclareHashTyped(u16, u16, bool),
+    /// `var $s : Set<T>` / `Heap<T>` / `Deque<T>` — a scalar holding a parametric
+    /// container value. name pool index, [`Chunk::container_types`] index, frozen flag.
+    DeclareScalarTypedContainer(u16, u16, bool),
     /// `GetArrayElem` variant.
     GetArrayElem(u16), // stack: [index] → value
     /// `SetArrayElem` variant.
