@@ -21,6 +21,44 @@ use crate::bytecode::{Chunk, Op};
 use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
+use std::sync::Arc;
+
+/// strykelang Extended-op IDs handled by [`native_ext_handler`] on the
+/// fusevm-only path. These operate on **native fusevm Values** (distinct from
+/// the i64-handle Extended ops in [`crate::fusevm_bridge`]).
+mod nops {
+    /// Perl `.` string concatenation (pops 2, pushes the concatenated string).
+    pub const CONCAT: u16 = 0;
+}
+
+/// Stringify a fusevm Value the way strykelang stringifies a scalar, by routing
+/// through `StrykeValue`'s `Display` (so float formatting etc. match vm.rs).
+fn stryke_display(v: &fusevm::Value) -> String {
+    match v {
+        fusevm::Value::Int(n) => StrykeValue::integer(*n).to_string(),
+        fusevm::Value::Float(f) => StrykeValue::float(*f).to_string(),
+        fusevm::Value::Str(s) => (**s).clone(),
+        other => fusevm_to_stryke(other)
+            .map(|sv| sv.to_string())
+            .unwrap_or_default(),
+    }
+}
+
+/// Extension handler for strykelang's native-value Extended ops, installed on
+/// the fusevm-only VM. Each op delegates to strykelang's own value semantics so
+/// results match vm.rs.
+fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
+    match id {
+        nops::CONCAT => {
+            let b = vm.pop();
+            let a = vm.pop();
+            let mut s = stryke_display(&a);
+            s.push_str(&stryke_display(&b));
+            vm.push(fusevm::Value::Str(Arc::new(s)));
+        }
+        _ => {}
+    }
+}
 
 /// Convert a stryke constant to a native fusevm Value, if it is in the Phase-1
 /// subset (integer/float). Heap values (strings/arrays/hashes/closures/…) return
@@ -28,8 +66,10 @@ use crate::vm_helper::VMHelper;
 fn const_to_fusevm(v: &StrykeValue) -> Option<fusevm::Value> {
     if let Some(i) = v.as_integer() {
         Some(fusevm::Value::Int(i))
+    } else if let Some(f) = v.as_float() {
+        Some(fusevm::Value::Float(f))
     } else {
-        v.as_float().map(fusevm::Value::Float)
+        v.as_str().map(|s| fusevm::Value::Str(Arc::new(s)))
     }
 }
 
@@ -38,6 +78,7 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
     match v {
         fusevm::Value::Int(n) => Some(StrykeValue::integer(*n)),
         fusevm::Value::Float(f) => Some(StrykeValue::float(*f)),
+        fusevm::Value::Str(s) => Some(StrykeValue::string((**s).clone())),
         _ => None,
     }
 }
@@ -84,6 +125,11 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
             }
+            // Perl `.` concatenation → native-value Extended op (handler
+            // stringifies scalars via strykelang's Display).
+            Op::Concat => {
+                b.emit(fusevm::Op::Extended(nops::CONCAT, 0), 0);
+            }
             // End of the top-level program: stop lowering and let fusevm return
             // the value left on the stack.
             Op::Return | Op::Halt => break,
@@ -94,6 +140,7 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
 
     let fchunk = b.build();
     let mut vm = fusevm::VM::new(fchunk);
+    vm.set_extension_handler(Box::new(native_ext_handler));
     match vm.run() {
         fusevm::VMResult::Ok(v) => match fusevm_to_stryke(&v) {
             Some(sv) => Some(Ok(sv)),
@@ -131,11 +178,29 @@ mod tests {
         assert_eq!(nat.as_integer(), Some(expect), "native value for `{code}`");
     }
 
+    /// Native path must agree with vm.rs on string-valued results.
+    fn assert_parity_str(code: &str, expect: &str) {
+        let vm = crate::run(code).expect("vm run");
+        assert_eq!(vm.as_str().as_deref(), Some(expect), "vm.rs value for `{code}`");
+        let nat = native(code)
+            .unwrap_or_else(|| panic!("`{code}` not covered by native path"))
+            .expect("native run");
+        assert_eq!(nat.as_str().as_deref(), Some(expect), "native value for `{code}`");
+    }
+
     #[test]
     fn native_integer_arithmetic_matches_vm() {
         assert_parity_int("1 + 2 * 3", 7);
         assert_parity_int("10 - 4 - 3", 3);
         assert_parity_int("2 * 3 * 4", 24);
         assert_parity_int("-(2 + 3)", -5);
+    }
+
+    #[test]
+    fn native_scalar_concat_matches_vm() {
+        assert_parity_str("\"a\" . \"b\"", "ab");
+        assert_parity_str("\"x\" . 3", "x3");
+        assert_parity_str("1 . 2", "12");
+        assert_parity_str("\"sum=\" . (2 + 3)", "sum=5");
     }
 }
