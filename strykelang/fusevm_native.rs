@@ -47,6 +47,10 @@ mod nops {
     pub const SPACESHIP: u16 = 13;
     /// Perl `!` logical-not (pops 1, pushes Int 1/0).
     pub const LOG_NOT: u16 = 14;
+    /// Normalize top-of-stack to Perl truthiness as Int 1/0, so fusevm's
+    /// conditional jumps branch using strykelang's `is_true` (fusevm's native
+    /// truthiness differs for values like the string "0").
+    pub const TRUTHY: u16 = 15;
 }
 
 /// Numeric comparison matching strykelang's `int_cmp`: exact integer compare
@@ -152,6 +156,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             let a = pop_stryke(vm);
             vm.push(fusevm::Value::Int(if a.is_true() { 0 } else { 1 }));
         }
+        nops::TRUTHY => {
+            let a = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(if a.is_true() { 1 } else { 0 }));
+        }
         _ => {}
     }
 }
@@ -185,7 +193,13 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
 /// vars/closures/host yet) but threaded for later phases.
 pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeResult<StrykeValue>> {
     let mut b = fusevm::ChunkBuilder::new();
+    // Map each source op index to the fusevm op index its lowering starts at, so
+    // jump targets (absolute source indices) can be remapped after lowering.
+    let mut src_to_dst: Vec<usize> = Vec::with_capacity(chunk.ops.len() + 1);
+    // (fusevm jump op index, source target index) pairs, patched in pass 2.
+    let mut jump_fixups: Vec<(usize, usize)> = Vec::new();
     for op in &chunk.ops {
+        src_to_dst.push(b.current_pos());
         match op {
             Op::Nop => {
                 b.emit(fusevm::Op::Nop, 0);
@@ -268,12 +282,40 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             Op::LogNot => {
                 b.emit(fusevm::Op::Extended(nops::LOG_NOT, 0), 0);
             }
-            // End of the top-level program: stop lowering and let fusevm return
-            // the value left on the stack.
-            Op::Return | Op::Halt => break,
-            // Anything else is outside the Phase-1 subset → fall back to vm.rs.
+            // End of the top-level program: a frameless fusevm Return halts the
+            // VM and yields the value left on the stack.
+            Op::Return | Op::Halt => {
+                b.emit(fusevm::Op::Return, 0);
+            }
+            // Control flow (pop variants). Emit the fusevm jump with a
+            // placeholder target recorded for fixup. Conditional jumps first
+            // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
+            // since fusevm's native truthiness differs from strykelang's.
+            // The Keep variants (`&&`/`||`/ternary short-circuit) peek and are
+            // not yet covered → they hit `_ => return None` and fall back.
+            Op::Jump(t) => {
+                let pos = b.emit(fusevm::Op::Jump(0), 0);
+                jump_fixups.push((pos, *t));
+            }
+            Op::JumpIfFalse(t) => {
+                b.emit(fusevm::Op::Extended(nops::TRUTHY, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
+                jump_fixups.push((pos, *t));
+            }
+            Op::JumpIfTrue(t) => {
+                b.emit(fusevm::Op::Extended(nops::TRUTHY, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfTrue(0), 0);
+                jump_fixups.push((pos, *t));
+            }
+            // Anything else is outside the covered subset → fall back to vm.rs.
             _ => return None,
         }
+    }
+    // End sentinel so a jump to "one past the last op" resolves to program end.
+    src_to_dst.push(b.current_pos());
+    for (pos, target) in jump_fixups {
+        let dst = *src_to_dst.get(target)?;
+        b.patch_jump(pos, dst);
     }
 
     let fchunk = b.build();
@@ -371,5 +413,15 @@ mod tests {
         assert_parity_int("3 <=> 1", 1);
         assert_parity_int("!0", 1);
         assert_parity_int("!5", 0);
+    }
+
+    #[test]
+    fn native_if_else_control_flow_matches_vm() {
+        assert_parity_int("if (1 < 2) { 10 } else { 20 }", 10);
+        assert_parity_int("if (2 < 1) { 10 } else { 20 }", 20);
+        // Perl truthiness: the string "0" is false (fusevm's native truthiness
+        // would treat it true) — exercises the TRUTHY normalization.
+        assert_parity_int("if (\"0\") { 1 } else { 2 }", 2);
+        assert_parity_int("if (\"x\") { 1 } else { 2 }", 1);
     }
 }
