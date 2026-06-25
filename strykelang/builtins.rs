@@ -4875,7 +4875,7 @@ pub(crate) fn try_builtin(
         "dedup" | "dup" => Some(builtin_dedup(args)),
         "range" => Some(builtin_range(args)),
         "list_count" | "list_size" => Some(builtin_list_count(interp, args)),
-        "count" | "len" | "cnt" => Some(builtin_count_size_cnt(interp, args)),
+        "count" | "len" | "cnt" | "l" => Some(builtin_count_size_cnt(interp, args)),
         "size" => Some(builtin_file_size(interp, args)),
         "read_lines" | "rl" => Some(builtin_read_lines(interp, args, line)),
         "append_file" | "af" => Some(builtin_append_file(args, line)),

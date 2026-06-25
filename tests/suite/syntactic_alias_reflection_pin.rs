@@ -48,6 +48,41 @@ fn funccall_aliases_resolve_in_a_not_b() {
 }
 
 #[test]
+fn block_keyword_short_aliases_resolve() {
+    // gr/so/rd are the GrepExpr/SortExpr/ReduceExpr short forms wired through
+    // the recognizer gates; `l` is the short form of `len`. All resolve in %a.
+    for (alias, primary) in [("gr", "grep"), ("so", "sort"), ("rd", "reduce"), ("l", "len")] {
+        assert_alias(alias, primary);
+    }
+}
+
+#[test]
+fn gr_so_rd_l_are_callable() {
+    // Previously phantom — recognized in a dispatch arm but rejected at the
+    // gate, so they errored `Undefined subroutine`. Now they evaluate.
+    assert_eq!(
+        eval_int(r#"my @g = gr { _ > 2 } (1, 2, 3, 4); (len(@g) == 2) ? 1 : 0"#),
+        1,
+        "gr should filter like grep"
+    );
+    assert_eq!(
+        eval_int(r#"my @s = so { $a <=> $b } (3, 1, 2); ($s[0] == 1 && $s[2] == 3) ? 1 : 0"#),
+        1,
+        "so should sort like sort"
+    );
+    assert_eq!(
+        eval_int(r#"((1:5 |> rd { $a + $b }) == 15) ? 1 : 0"#),
+        1,
+        "rd should reduce like reduce"
+    );
+    assert_eq!(
+        eval_int(r#"my @a = (10, 20, 30); (l(@a) == 3 && l(@a) == len(@a)) ? 1 : 0"#),
+        1,
+        "l should count like len"
+    );
+}
+
+#[test]
 fn primaries_stay_primaries() {
     // The canonical targets must remain `%b` primaries (and out of `%a`).
     let code = r#"
