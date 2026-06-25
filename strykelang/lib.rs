@@ -66,6 +66,9 @@ pub mod bytecode;
 /// `fusevm_bridge` submodule: translates strykelang bytecode to the shared
 /// [`fusevm`] runtime, making strykelang a fusevm frontend (opt-in JIT tier).
 pub mod fusevm_bridge;
+/// `fusevm_native` submodule: Phase 1 of retiring `vm.rs`/`jit.rs` — runs whole
+/// programs on `fusevm::VM` with native Values (opt-in via STRYKE_FUSEVM_ONLY).
+pub mod fusevm_native;
 /// `capture` submodule.
 pub mod capture;
 /// `cli_runners` submodule.
@@ -560,6 +563,15 @@ pub fn try_vm_execute(
 /// [`try_vm_execute`]. Pulled out so the rkyv-cache fast path does not duplicate
 /// the flip-flop / BEGIN-END / struct-def wiring every VM run depends on.
 fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> StrykeResult<StrykeValue> {
+    // Phase 1 of the vm.rs→fusevm migration: when STRYKE_FUSEVM_ONLY is set, run
+    // the whole program on fusevm with native Values. Returns None (falls through
+    // to the legacy VM below) for any program outside the covered op subset, so
+    // this never silently diverges from vm.rs.
+    if std::env::var_os("STRYKE_FUSEVM_ONLY").is_some() {
+        if let Some(result) = crate::fusevm_native::try_run_native(&chunk, interp) {
+            return result;
+        }
+    }
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
     if interp.disasm_bytecode {
