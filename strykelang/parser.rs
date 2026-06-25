@@ -14623,6 +14623,27 @@ impl Parser {
         )
     }
 
+    /// Syntactic-builtin alias spellings whose canonical primary comes from an
+    /// AST enum (`GrepExpr` / `ReduceExpr`), not a `FuncCall { name: "…" }`
+    /// literal — so `build.rs`'s FuncCall-arm scan can't read the primary off
+    /// the dispatch arm. This is the source of truth for those alias→primary
+    /// pairs in `%aliases` (`%a`). `build.rs` reads it as `(alias, primary)`
+    /// rows, folds them into the alias map, and demotes each alias spelling out
+    /// of `%builtins` (`%b`) so it stops masquerading as its own primary.
+    ///
+    /// Every pair is pinned by `tests/suite/syntactic_alias_reflection_pin.rs`,
+    /// which asserts both the `%a` mapping and (for pure aliases) eval-identity
+    /// with the primary. Keep the long form as the primary.
+    ///
+    /// Consumed only by `build.rs` (read as source text), never at runtime —
+    /// hence `#[allow(dead_code)]`.
+    #[allow(dead_code)]
+    pub(crate) const KEYWORD_BUILTIN_ALIASES: &[(&str, &str)] = &[
+        ("fi", "filter"),
+        ("fold", "reduce"),
+        ("inject", "reduce"),
+    ];
+
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
     /// Used by `--compat` to reject extensions at parse time.
     fn stryke_extension_name(name: &str) -> Option<&str> {
@@ -14742,6 +14763,7 @@ impl Parser {
             // ── slow-trickle emitter ───────────────────────────────────────
             | "weep"
             // ── functional / iterator ───────────────────────────────────────
+            | "greps" | "par"
             | "fore" | "e" | "ep" | "flat_map" | "flat_maps" | "maps" | "filter" | "fi" | "find_all" | "reduce" | "fold"
             | "inject" | "collect" | "uniq" | "distinct" | "any" | "all" | "none"
             | "first" | "detect" | "find" | "find_index" | "firstidx" | "first_index"
