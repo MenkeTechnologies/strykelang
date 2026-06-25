@@ -57,9 +57,33 @@ fn block_keyword_short_aliases_resolve() {
         ("rd", "reduce"),
         ("l", "len"),
         ("sp", "split"),
+        ("j", "join"),
+        ("rv", "reverse"),
+        ("sm", "sum"),
+        ("mn", "min"),
+        ("mx", "max"),
     ] {
         assert_alias(alias, primary);
     }
+}
+
+#[test]
+fn golf_aliases_are_callable() {
+    assert_eq!(
+        eval_int(r#"(j(",", "a", "b", "c") eq "a,b,c") ? 1 : 0"#),
+        1,
+        "j should join like join"
+    );
+    assert_eq!(
+        eval_int(r#"my @r = rv(1, 2, 3); ($r[0] == 3 && $r[2] == 1) ? 1 : 0"#),
+        1,
+        "rv should reverse like reverse"
+    );
+    assert_eq!(
+        eval_int(r#"(sm(1, 2, 3, 4) == 10 && mn(3, 1, 2) == 1 && mx(3, 1, 2) == 3) ? 1 : 0"#),
+        1,
+        "sm/mn/mx should aggregate like sum/min/max"
+    );
 }
 
 #[test]

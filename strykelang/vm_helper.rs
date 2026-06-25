@@ -16558,6 +16558,9 @@ impl VMHelper {
             "med" => "median",
             "std" => "stddev",
             "var" => "variance",
+            "sm" => "sum",
+            "mn" => "min",
+            "mx" => "max",
             other => other,
         };
         // List builtins like `sum`, `min`, `uniq` operate on a list — an empty
@@ -16594,8 +16597,8 @@ impl VMHelper {
             | "sample" | "chunked" | "chk" | "windowed" | "win" | "zip" | "zp" | "zip_shortest"
             | "zip_longest" | "mesh" | "mesh_shortest" | "mesh_longest" | "any" | "all"
             | "none" | "notall" | "first" | "fst" | "find_index" | "firstidx" | "first_index"
-            | "reduce" | "rd" | "reductions" | "sum" | "sum0" | "product" | "min" | "max"
-            | "minstr" | "maxstr" | "mean" | "median" | "med" | "mode" | "stddev" | "std"
+            | "reduce" | "rd" | "reductions" | "sum" | "sm" | "sum0" | "product" | "min" | "mn"
+            | "max" | "mx" | "minstr" | "maxstr" | "mean" | "median" | "med" | "mode" | "stddev" | "std"
             | "variance" | "var" | "pairs" | "unpairs" | "pairkeys" | "pairvalues" | "pairgrep"
             | "pairmap" | "pairfirst" | "blessed" | "refaddr" | "reftype" | "looks_like_number"
             | "weaken" | "unweaken" | "isweak" | "set_subname" | "subname"

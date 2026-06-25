@@ -1745,6 +1745,7 @@ impl Parser {
                 | "index"
                 | "int"
                 | "join"
+                | "j"
                 | "keys"
                 | "lcfirst"
                 | "lc"
@@ -2608,7 +2609,7 @@ impl Parser {
                     } else if matches!(self.peek(), Token::LParen) {
                         // Special handling for join(sep) and split(pattern) in thread context.
                         // These take the threaded list/string as their data argument, not as $_.
-                        if func_name == "join" {
+                        if func_name == "join" || func_name == "j" {
                             self.advance(); // consume `(`
                             let separator = self.parse_assign_expr()?;
                             self.expect(&Token::RParen)?;
@@ -11298,7 +11299,7 @@ impl Parser {
                     line,
                 })
             }
-            "join" => {
+            "join" | "j" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -14652,6 +14653,11 @@ impl Parser {
         ("rd", "reduce"),
         ("l", "len"),
         ("sp", "split"),
+        ("j", "join"),
+        ("rv", "reverse"),
+        ("sm", "sum"),
+        ("mn", "min"),
+        ("mx", "max"),
     ];
 
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
