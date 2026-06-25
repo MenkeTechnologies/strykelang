@@ -282,11 +282,32 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             Op::LogNot => {
                 b.emit(fusevm::Op::Extended(nops::LOG_NOT, 0), 0);
             }
-            // End of the top-level program: a frameless fusevm Return halts the
-            // VM and yields the value left on the stack.
-            Op::Return | Op::Halt => {
-                b.emit(fusevm::Op::Return, 0);
+            // Scalar locals: strykelang stores them in `interp.scope` slots; on
+            // the native path they live in the fusevm frame's slots instead
+            // (self-consistent within the run — Declare/Set/Get use the same
+            // storage). `set_slot` auto-grows, so no pre-sizing is needed. The
+            // declared name is only symbolic and is dropped.
+            Op::DeclareScalarSlot(slot, _name) => {
+                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
             }
+            Op::GetScalarSlot(slot) => {
+                b.emit(fusevm::Op::GetSlot(*slot as u16), 0);
+            }
+            Op::SetScalarSlot(slot) => {
+                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
+            }
+            // Keep variant peeks (assignment used as an expression): dup, store.
+            Op::SetScalarSlotKeep(slot) => {
+                b.emit(fusevm::Op::Dup, 0);
+                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
+            }
+            // Top-level terminator: emit nothing and let the chunk end
+            // naturally (fusevm returns the value left on the stack when
+            // `ip >= len`). Emitting a fusevm `Return` here is wrong — at the
+            // root frame it pops the frame and resets ip, re-running the whole
+            // program. Jumps to the terminator resolve to body-end via
+            // `src_to_dst`, which also ends the run.
+            Op::Return | Op::Halt => {}
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -423,5 +444,13 @@ mod tests {
         // would treat it true) — exercises the TRUTHY normalization.
         assert_parity_int("if (\"0\") { 1 } else { 2 }", 2);
         assert_parity_int("if (\"x\") { 1 } else { 2 }", 1);
+    }
+
+    #[test]
+    fn native_scalar_variables_match_vm() {
+        assert_parity_int("my $x = 5; $x + 1", 6);
+        assert_parity_int("my $x = 5; my $y = 10; $x + $y", 15);
+        assert_parity_int("my $x = 5; $x = $x * 2; $x", 10);
+        assert_parity_str("my $s = \"hi\"; $s . \"!\"", "hi!");
     }
 }
