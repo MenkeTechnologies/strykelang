@@ -27,7 +27,7 @@ stryke, s \- highly parallel Perl 5 interpreter with shell-grade REPL
 is a single-binary Perl 5 interpreter written in Rust, with parallel
 extensions (pmap / pgrep / pfor / psort / preduce), a Cranelift JIT,
 pipe-forward (\fB|>\fR) syntax, the thread macro (\fB~>\fR), and a
-shell-grade REPL exposing 10,475 builtins as immediately-callable
+shell-grade REPL exposing 10,453 builtins as immediately-callable
 barewords (no \fBuse\fR / \fBrequire\fR / \fBimport\fR).
 .PP
 The binary is invoked as \fBs\fR by default; \fBstryke\fR and \fBst\fR
@@ -608,13 +608,13 @@ hashes, queryable at the REPL with \fBkeys %\fIHASH\fR:
 .PP
 .RS 4
 .B %b
-.RB "\(em " "10,475 primary builtins (callable-only)"
+.RB "\(em " "10,453 primary builtins (callable-only)"
 .br
 .B %a
-.RB "\(em " "643 aliases (name \(-> primary)"
+.RB "\(em " "668 aliases (name \(-> primary)"
 .br
 .B %all
-.RB "\(em " "11,208 keys: %b + %a + %k"
+.RB "\(em " "11,211 keys: %b + %a + %k"
 .br
 .B %k
 .RB "\(em " "90 keywords (if/while/sub/...)"

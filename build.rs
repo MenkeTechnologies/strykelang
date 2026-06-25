@@ -43,6 +43,49 @@ fn main() {
     // `pairs` / etc. Fold them into the extension category list with
     // a uniform "list / aggregate" bucket.
     ext_cats.extend(extract_list_builtin_names(&list_builtins_src));
+
+    // Syntactic-builtin aliases (`fi`→`filter`, `nums`→`numbers`, …). These
+    // dispatch through the parser's `FuncCall`/`GrepExpr` arms, never through
+    // `try_builtin`, so without this they'd masquerade as standalone primaries
+    // in `%b` (or vanish entirely) instead of resolving in `%a`. Source of
+    // truth is the dispatch itself: `extract_funccall_aliases` reads each arm's
+    // `name:` literal, `KEYWORD_BUILTIN_ALIASES` supplies the enum-family pairs.
+    let mut raw_aliases = extract_funccall_aliases(&parser_src);
+    raw_aliases.extend(extract_two_col_const(&parser_src, "KEYWORD_BUILTIN_ALIASES"));
+    // `count`/`len`/`cnt`/`size` are a contested synonym cluster with no
+    // uncontested primary (dispatch impl-name is `count`, STYLE_GUIDE §5 picks
+    // `len`). Leave the cluster exactly as it is today — every other family has
+    // a clear long-form primary, so only this one is excluded.
+    const ALIAS_EXCLUDE: &[&str] = &["len", "cnt", "count", "size"];
+    // Names that serve as a canonical (`name:` target) anywhere are real
+    // primaries and must never be demoted, even when they also appear on some
+    // other arm's LHS (e.g. `len` on the `count` arm). `try_builtin` first-slot
+    // primaries are protected too: a name like `uid` is a real builtin AND a
+    // FuncCall alias of `uuid` — context-dependent, so it stays a primary.
+    let mut canonical_set: std::collections::HashSet<String> =
+        raw_aliases.iter().map(|(_, p)| p.clone()).collect();
+    for arm in &arms {
+        if let Some(primary) = arm.first() {
+            canonical_set.insert(primary.clone());
+        }
+    }
+    // Resolve to a deduped alias→primary map (`BTreeMap` → deterministic,
+    // sorted emit). Later rows win, so the `KEYWORD_BUILTIN_ALIASES` supplement
+    // (appended last) overrides any FuncCall-arm collision.
+    let mut alias_to_primary: std::collections::BTreeMap<String, String> =
+        std::collections::BTreeMap::new();
+    for (alias, primary) in &raw_aliases {
+        if alias == primary
+            || ALIAS_EXCLUDE.contains(&alias.as_str())
+            || ALIAS_EXCLUDE.contains(&primary.as_str())
+            || canonical_set.contains(alias)
+        {
+            continue;
+        }
+        alias_to_primary.insert(alias.clone(), primary.clone());
+    }
+    let syn_alias_set: std::collections::HashSet<String> =
+        alias_to_primary.keys().cloned().collect();
     // Descriptions: /// doc comments from builtins.rs (primary source for ~1100 fns)
     // merged with hand-written lsp.rs entries (keywords, operators, reflection hashes).
     let mut descriptions = extract_builtin_doc_comments(&builtins_src, &arms);
@@ -63,6 +106,7 @@ fn main() {
     // the extension table with an "uncategorized" category so `%e`
     // covers everything actually callable.
     let mut core_pairs: Vec<(String, String)> = core_cats.clone();
+    core_pairs.retain(|(n, _)| !syn_alias_set.contains(n)); // alias → `%a`, not core `%b`
     core_pairs.sort();
     core_pairs.dedup_by(|a, b| a.0 == b.0);
 
@@ -75,13 +119,16 @@ fn main() {
         if core_set.contains(name.as_str()) {
             continue; // keep core / extension disjoint
         }
+        if syn_alias_set.contains(name) {
+            continue; // alias spelling — belongs in `%a`, not `%b`
+        }
         if ext_seen.insert(name.clone()) {
             ext_pairs.push((name.clone(), cat.clone()));
         }
     }
     for arm in &arms {
         if let Some(primary) = arm.first() {
-            if core_set.contains(primary.as_str()) {
+            if core_set.contains(primary.as_str()) || syn_alias_set.contains(primary) {
                 continue;
             }
             if ext_seen.insert(primary.clone()) {
@@ -122,7 +169,27 @@ fn main() {
             }
         }
     }
+    // Syntactic-builtin aliases join `%all`, inheriting their primary's
+    // category (so `$all{fi}` returns `filter`'s category). Drop any whose
+    // primary isn't a known callable — a stale arm would otherwise leak an
+    // uncategorized spelling into the registry.
+    for (alias, primary) in &alias_to_primary {
+        let Some(cat) = primary_to_cat.get(primary) else {
+            continue;
+        };
+        if all_seen.insert(alias.clone()) {
+            all_pairs.push((alias.clone(), cat.clone()));
+        }
+    }
     all_pairs.sort();
+
+    // Only keep alias pairs whose primary is a real callable — mirrors the
+    // `%all` guard above so `SYNTACTIC_ALIASES`, `%a`, and `%all` agree.
+    let syn_alias_pairs: Vec<(String, String)> = alias_to_primary
+        .iter()
+        .filter(|(_, p)| primary_to_cat.contains_key(*p))
+        .map(|(a, p)| (a.clone(), p.clone()))
+        .collect();
 
     // Merged `%b` (name → category) is just the concatenation: core first,
     // then extensions. Sort once more to keep `keys %b` alphabetical.
@@ -169,6 +236,16 @@ fn main() {
     body.push_str("pub(crate) const ALL_CATEGORY_MAP: &[(&str, &str)] = &[\n");
     for (n, c) in &all_pairs {
         body.push_str(&format!("    ({:?}, {:?}),\n", n, c));
+    }
+    body.push_str("];\n\n");
+
+    // `SYNTACTIC_ALIASES` — alias spelling → primary for builtins dispatched
+    // through the parser's `FuncCall`/`GrepExpr` arms (not `try_builtin`).
+    // `aliases_hash_map` merges these into `%a` alongside the `BUILTIN_ARMS`
+    // aliases so `$a{fi}` == `"filter"`, `$a{nums}` == `"numbers"`, etc.
+    body.push_str("pub(crate) const SYNTACTIC_ALIASES: &[(&str, &str)] = &[\n");
+    for (a, p) in &syn_alias_pairs {
+        body.push_str(&format!("    ({:?}, {:?}),\n", a, p));
     }
     body.push_str("];\n\n");
 
@@ -308,6 +385,82 @@ fn extract_list_builtin_names(src: &str) -> Vec<(String, String)> {
         extract_quoted(line, &mut names);
         for n in names {
             out.push((n, "list / aggregate".to_string()));
+        }
+    }
+    out
+}
+
+/// Scan `parser.rs` for `"a" | "b" | … => ExprKind::FuncCall { name: "X", … }`
+/// dispatch arms and return `(spelling, canonical)` for every LHS spelling,
+/// where `canonical` is the literal `name:` the arm dispatches to. This IS the
+/// alias source of truth — the parser's own dispatch decides that `nums` means
+/// `numbers`, so reflection reads it straight off the arm and never drifts.
+///
+/// Skips arms whose `name:` is a non-literal (`name: name.to_string()`, used by
+/// the pass-through fallback) — those carry no canonical. Every alias arm in
+/// the source has its LHS and `=> ExprKind::FuncCall {` on one line, so a
+/// line-anchored scan is sufficient; the `name:` literal is matched within the
+/// next few lines of the same arm body.
+fn extract_funccall_aliases(src: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let lines: Vec<&str> = src.lines().collect();
+    for (i, line) in lines.iter().enumerate() {
+        let Some(arrow) = line.find("=> ExprKind::FuncCall {") else {
+            continue;
+        };
+        let mut names = Vec::new();
+        extract_quoted(&line[..arrow], &mut names);
+        names.retain(|n| is_valid_builtin_name(n));
+        if names.is_empty() {
+            continue;
+        }
+        // Canonical = first `name: "…"` literal within this arm body (look a
+        // few lines ahead; bail on the non-literal pass-through form).
+        let mut canonical: Option<String> = None;
+        for probe in lines.iter().skip(i).take(5) {
+            if let Some(pos) = probe.find("name:") {
+                let rest = probe[pos + "name:".len()..].trim_start();
+                if let Some(stripped) = rest.strip_prefix('"') {
+                    if let Some(end) = stripped.find('"') {
+                        canonical = Some(stripped[..end].to_string());
+                    }
+                }
+                break; // first `name:` decides — literal or pass-through
+            }
+        }
+        let Some(canonical) = canonical else { continue };
+        if !is_valid_builtin_name(&canonical) {
+            continue;
+        }
+        for n in names {
+            out.push((n, canonical.clone()));
+        }
+    }
+    out
+}
+
+/// Parse a `pub(crate) const NAME: &[(&str, &str)] = &[ ("a","b"), … ]` table
+/// of two-column rows from `src` and return each `(col0, col1)` pair. Used for
+/// `KEYWORD_BUILTIN_ALIASES` (the enum-family alias supplement the FuncCall
+/// scan can't see). Each non-comment row carries exactly two quoted strings.
+fn extract_two_col_const(src: &str, const_name: &str) -> Vec<(String, String)> {
+    let Some(start) = src.find(const_name) else {
+        return Vec::new();
+    };
+    let after = &src[start..];
+    let Some(rel) = after.find("= &[") else {
+        return Vec::new();
+    };
+    let body_start = start + rel + "= &[".len();
+    let bytes = src.as_bytes();
+    let body_end = find_matching_close(bytes, body_start, b'[', b']');
+    let body = &src[body_start..body_end];
+    let mut out = Vec::new();
+    for line in body.lines() {
+        let mut names = Vec::new();
+        extract_quoted(line, &mut names);
+        if names.len() == 2 {
+            out.push((names[0].clone(), names[1].clone()));
         }
     }
     out

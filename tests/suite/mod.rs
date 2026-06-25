@@ -163,6 +163,7 @@ mod cluster_dispatch;
 mod cmp_operators_pin;
 mod cnt_count_aliases_pin;
 mod codec_roundtrip_pin;
+mod syntactic_alias_reflection_pin;
 mod codecs_crypto_extra_pin;
 mod coderef_pin;
 mod collections;
