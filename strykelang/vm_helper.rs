@@ -11139,7 +11139,7 @@ impl VMHelper {
                     v
                 } else if matches!(
                     dispatch_name,
-                    "count" | "size" | "cnt" | "len" | "list_count" | "list_size"
+                    "count" | "size" | "cnt" | "len" | "l" | "list_count" | "list_size"
                 ) {
                     // Count-family: preserve the "user wrote 1 syntactic arg" signal.
                     // Flattening the lone operand here collapses `count(@empty)` to a

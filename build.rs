@@ -54,8 +54,10 @@ fn main() {
     raw_aliases.extend(extract_two_col_const(&parser_src, "KEYWORD_BUILTIN_ALIASES"));
     // `count`/`len`/`cnt`/`size` are a contested synonym cluster with no
     // uncontested primary (dispatch impl-name is `count`, STYLE_GUIDE §5 picks
-    // `len`). Leave the cluster exactly as it is today — every other family has
-    // a clear long-form primary, so only this one is excluded.
+    // `len`). These four must stay `%b` primaries, so they're excluded *as
+    // aliases* (never demoted). The check is alias-side only: a NEW short alias
+    // pointing INTO the cluster (`l`→`len`) is still allowed — it adds a
+    // spelling to `%a` without demoting any cluster member.
     const ALIAS_EXCLUDE: &[&str] = &["len", "cnt", "count", "size"];
     // Names that serve as a canonical (`name:` target) anywhere are real
     // primaries and must never be demoted, even when they also appear on some
@@ -77,7 +79,6 @@ fn main() {
     for (alias, primary) in &raw_aliases {
         if alias == primary
             || ALIAS_EXCLUDE.contains(&alias.as_str())
-            || ALIAS_EXCLUDE.contains(&primary.as_str())
             || canonical_set.contains(alias)
         {
             continue;

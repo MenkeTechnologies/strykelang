@@ -3288,6 +3288,7 @@ impl Lexer {
                     | "list_size"
                     | "count"
                     | "len"
+                    | "l"
                     | "size"
                     | "cnt"
                     | "zip"

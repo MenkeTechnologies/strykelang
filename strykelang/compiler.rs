@@ -6163,7 +6163,7 @@ impl Compiler {
                         self.emit_op(Op::CallBuiltin(BuiltinId::Pipe as u16, 2), line, Some(root));
                     }
                     "uniq" | "distinct" | "flatten" | "set" | "with_index" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "len" | "sum" | "sum0"
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "l" | "sum" | "sum0"
                     | "product" | "min" | "max" | "mean" | "median" | "mode" | "stddev"
                     | "variance" => {
                         // Fast path for `len @arr` / `cnt @arr` / `count @arr` and the deref
@@ -6172,7 +6172,7 @@ impl Compiler {
                         // idiomatic stryke spelling is no slower than the Perl-compat one.
                         if matches!(
                             name.as_str(),
-                            "count" | "cnt" | "size" | "len" | "list_count" | "list_size"
+                            "count" | "cnt" | "size" | "len" | "l" | "list_count" | "list_size"
                         ) && args.len() == 1
                         {
                             match &args[0].kind {

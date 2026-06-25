@@ -1736,6 +1736,7 @@ impl Parser {
                 | "par_sed"
                 | "glob"
                 | "god"
+                | "gr"
                 | "grep"
                 | "greps"
                 | "heap"
@@ -1825,6 +1826,7 @@ impl Parser {
                 | "size"
                 | "cnt"
                 | "len"
+                | "l"
                 | "all"
                 | "any"
                 | "none"
@@ -1902,6 +1904,7 @@ impl Parser {
                 | "rand"
                 | "readdir"
                 | "readlink"
+                | "rd"
                 | "reduce"
                 | "fold"
                 | "inject"
@@ -1931,6 +1934,7 @@ impl Parser {
                 | "swallow"
                 | "ingest"
                 | "sockets"
+                | "so"
                 | "sort"
                 | "splice"
                 | "splice_last"
@@ -3112,7 +3116,7 @@ impl Parser {
             "chomp" => ExprKind::Chomp(Box::new(arg)),
             "chop" => ExprKind::Chop(Box::new(arg)),
             "length" => ExprKind::Length(Box::new(arg)),
-            "len" | "cnt" => ExprKind::FuncCall {
+            "len" | "cnt" | "l" => ExprKind::FuncCall {
                 name: "count".to_string(),
                 args: vec![arg],
             },
@@ -7305,7 +7309,7 @@ impl Parser {
                 let dispatch_name: &str = name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "len" | "with_index" | "shuffle"
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "l" | "with_index" | "shuffle"
                     | "shuffled" | "frequencies" | "freq" | "pfrequencies" | "pfreq"
                     | "interleave" | "ddump" | "stringify" | "str" | "lines" | "words"
                     | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
@@ -11458,9 +11462,9 @@ impl Parser {
                 }
                 self.parse_algebraic_match_expr(line)
             }
-            "grep" | "greps" | "filter" | "fi" | "find_all" => {
+            "grep" | "greps" | "filter" | "fi" | "find_all" | "gr" => {
                 let keyword = match name.as_str() {
-                    "grep" => crate::ast::GrepBuiltinKeyword::Grep,
+                    "grep" | "gr" => crate::ast::GrepBuiltinKeyword::Grep,
                     "greps" => crate::ast::GrepBuiltinKeyword::Greps,
                     "filter" | "fi" => crate::ast::GrepBuiltinKeyword::Filter,
                     "find_all" => crate::ast::GrepBuiltinKeyword::FindAll,
@@ -11566,7 +11570,7 @@ impl Parser {
                     }
                 }
             }
-            "sort" => {
+            "sort" | "so" => {
                 use crate::ast::SortComparator;
                 if matches!(self.peek(), Token::LBrace) {
                     let block = self.parse_block()?;
@@ -11715,7 +11719,7 @@ impl Parser {
                     })
                 }
             }
-            "reduce" | "fold" | "inject" => {
+            "reduce" | "fold" | "inject" | "rd" => {
                 let (block, list) = self.parse_block_list()?;
                 Ok(Expr {
                     kind: ExprKind::ReduceExpr {
@@ -12602,7 +12606,7 @@ impl Parser {
                     line,
                 })
             }
-            "list_count" | "list_size" | "count" | "len" | "cnt" => {
+            "list_count" | "list_size" | "count" | "len" | "cnt" | "l" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -14642,6 +14646,10 @@ impl Parser {
         ("fi", "filter"),
         ("fold", "reduce"),
         ("inject", "reduce"),
+        ("gr", "grep"),
+        ("so", "sort"),
+        ("rd", "reduce"),
+        ("l", "len"),
     ];
 
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
