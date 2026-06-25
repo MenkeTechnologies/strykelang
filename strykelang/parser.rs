@@ -1941,6 +1941,7 @@ impl Parser {
                 | "splice1"
                 | "spl_last"
                 | "split"
+                | "sp"
                 | "sprintf"
                 | "sqrt"
                 | "srand"
@@ -2620,7 +2621,7 @@ impl Parser {
                                 line: stage_line,
                             };
                             result = self.pipe_forward_apply(result, stage, stage_line)?;
-                        } else if func_name == "split" {
+                        } else if func_name == "split" || func_name == "sp" {
                             self.advance(); // consume `(`
                             let pattern = self.parse_assign_expr()?;
                             let limit = if self.eat(&Token::Comma) {
@@ -11320,7 +11321,7 @@ impl Parser {
                     line,
                 })
             }
-            "split" => {
+            "split" | "sp" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -14650,6 +14651,7 @@ impl Parser {
         ("so", "sort"),
         ("rd", "reduce"),
         ("l", "len"),
+        ("sp", "split"),
     ];
 
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
