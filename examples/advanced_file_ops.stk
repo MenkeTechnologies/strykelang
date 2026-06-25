@@ -24,7 +24,7 @@ p "Slurped content (length: #{len $content})"
 
 # 3. Lazy line iteration with filtering.
 p "Lines matching 'stryke':"
-c"$tmp" |> lines |> greps { /stryke/ } |> e p
+~> c"$tmp" lines grep { /stryke/ } ep
 
 # 4. Zsh-style globbing with qualifiers.
 # `(.)` means files only (no directories).
