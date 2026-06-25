@@ -51,7 +51,13 @@ fn funccall_aliases_resolve_in_a_not_b() {
 fn block_keyword_short_aliases_resolve() {
     // gr/so/rd are the GrepExpr/SortExpr/ReduceExpr short forms wired through
     // the recognizer gates; `l` is the short form of `len`. All resolve in %a.
-    for (alias, primary) in [("gr", "grep"), ("so", "sort"), ("rd", "reduce"), ("l", "len")] {
+    for (alias, primary) in [
+        ("gr", "grep"),
+        ("so", "sort"),
+        ("rd", "reduce"),
+        ("l", "len"),
+        ("sp", "split"),
+    ] {
         assert_alias(alias, primary);
     }
 }
@@ -79,6 +85,11 @@ fn gr_so_rd_l_are_callable() {
         eval_int(r#"my @a = (10, 20, 30); (l(@a) == 3 && l(@a) == len(@a)) ? 1 : 0"#),
         1,
         "l should count like len"
+    );
+    assert_eq!(
+        eval_int(r#"my @p = sp(",", "a,b,c"); (len(@p) == 3 && $p[1] eq "b") ? 1 : 0"#),
+        1,
+        "sp should split like split"
     );
 }
 

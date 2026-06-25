@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~479k Rust lines (production + tests + tooling) + ~227k .stk lines, 13,450 tests, 10,453 builtins (11,215 keys in %all), 347 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
+  <meta name="description" content="strykelang — Engineering report. Parallel Perl 5 interpreter in Rust: ~479k Rust lines (production + tests + tooling) + ~227k .stk lines, 13,450 tests, 10,453 builtins (11,216 keys in %all), 347 VM opcodes, 20k parity cases. LSP + DAP debugger + JetBrains plugin.">
   <title>strykelang &mdash; Engineering Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,7 +92,7 @@
       <!-- SECTION 1: EXECUTIVE SUMMARY           -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">&gt;_</span>EXECUTIVE SUMMARY</h2>
-      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 347-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>350k production Rust lines + 227k .stk lines + 10,453 builtins (11,215 keys in %all) + 1,349 Rosetta tasks + 173 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
+      <p class="tutorial-subtitle">strykelang is a single-binary Perl 5 implementation written in Rust. The interpreter compiles source to a 347-opcode bytecode, runs it on a register+stack hybrid VM, and JITs hot blocks through Cranelift to native code. Parallel primitives (<code>pmap</code>, <code>pgrep</code>, <code>pflat_map</code>, <code>pfor</code>) ride on rayon work-stealing. Synchronization spans the full stack: <code>mysync</code> / <code>oursync</code> for lockless atomic shared state, <code>mutex()</code> + <code>semaphore($n)</code> with <code>parking_lot::Mutex</code> + <code>Condvar</code> for explicit blocking critical sections / bounded concurrency, and POSIX <code>flock($fh, OP)</code> for cross-process advisory file locks. Pipe-forward (<code>|&gt;</code>) and the thread macro (<code>~&gt;</code>) extend Perl 5 syntax with Clojure / Racket / Scala threading semantics. Editor tooling rides on the same binary &mdash; <code>stryke --lsp</code> for Language Server Protocol, <code>stryke --dap</code> for Debug Adapter Protocol (line breakpoints, step over/into/out, recursive variable drill-down) &mdash; consumed by a first-class JetBrains plugin under <code>editors/intellij/</code>. <strong>350k production Rust lines + 227k .stk lines + 10,453 builtins (11,216 keys in %all) + 1,349 Rosetta tasks + 173 Exercism solutions</strong> &mdash; matching surface coverage that took dynamic languages with multi-decade histories.</p>
 
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-val">479,076</div><div class="stat-label">Rust Lines</div></div>
@@ -210,7 +210,7 @@
         </div>
         <div class="feature-card">
           <h4>By Built-in Capability</h4>
-          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 10,453 builtins (11,215 spellings) vs ~80&ndash;250 for the reference set.</p>
+          <p>Things in stryke's binary that the reference set doesn't ship in-binary: Cranelift JIT, distributed-compute primitive (<code>cluster</code>/<code>pmap_on</code>), package manager (<code>s pkg</code>), web framework, language-level AI (<code>ai</code>/<code>tool fn</code>/MCP), AOT static-binary deployment (<code>s build</code>). Encyclopedic-stdlib axis: 10,453 builtins (11,216 spellings) vs ~80&ndash;250 for the reference set.</p>
         </div>
         <div class="feature-card">
           <h4>Rosetta Code Completion</h4>
@@ -241,12 +241,12 @@
       <table class="file-table">
         <thead><tr><th>Toolchain</th><th class="num">Builtins</th><th class="num">Install Size</th><th class="num">Bytes / Builtin</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>11,215</strong></td><td class="num"><strong>44 MB</strong></td><td class="num"><strong>~4.0 KB</strong></td></tr>
+          <tr><td style="color:var(--accent);"><strong>stryke</strong> (single static binary)</td><td class="num"><strong>11,216</strong></td><td class="num"><strong>44 MB</strong></td><td class="num"><strong>~4.0 KB</strong></td></tr>
           <tr><td>Wolfram Engine v14 (free tier)</td><td class="num">~7,000</td><td class="num">~5&ndash;6 GB</td><td class="num">~750 KB</td></tr>
           <tr><td>MATLAB R2025a + toolboxes</td><td class="num">thousands</td><td class="num">30+ GB</td><td class="num">n/a</td></tr>
         </tbody>
       </table>
-      <p style="margin-top:8px;">~175&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with 11,125 callable spellings (10,453 builtins + 672 aliases) plus 90 keywords reflected in <code>%all</code> (11,215 keys total). Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "11,125 callable names + 44 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
+      <p style="margin-top:8px;">~175&times; denser than Wolfram per builtin/byte. The single-binary qualifier matters: no kernel boot, no paclet manager, no licensing daemon, no GUI runtime, no <code>library()</code> resolution &mdash; <code>~/.cargo/bin/s</code> is one statically-linked Rust binary that cold-starts in &lt;10 ms with 11,126 callable spellings (10,453 builtins + 673 aliases) plus 90 keywords reflected in <code>%all</code> (11,216 keys total). Caveat: bytes-per-builtin is partly apples-to-oranges &mdash; Wolfram's GBs include datasets, image / video native code, and the Wolfram Notebook GUI. The defensible composite claim is "11,126 callable names + 44 MB single binary + sub-10 ms cold start", which no other language clears simultaneously.</p>
 
       <hr class="section-rule">
 
@@ -254,12 +254,12 @@
       <!-- SECTION 2: SUBSYSTEM BREAKDOWN          -->
       <!-- ═══════════════════════════════════════ -->
       <h2 class="tutorial-title"><span class="step-hash">#</span>SUBSYSTEM BREAKDOWN</h2>
-      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 31.8% &mdash; the language ships with 10,453 primaries in <code>%b</code> (11,215 keys in <code>%all</code> = 10,453 primaries + 672 aliases + 90 keywords) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / sync (mutex / semaphore / flock) / HTTP / database / network / AI / web / math / physics / chemistry / biology / signal / finance domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is ~17.6% of the Rust slice.</p>
+      <p class="tutorial-subtitle">Source partitioned by role. Builtins dominate at 31.8% &mdash; the language ships with 10,453 primaries in <code>%b</code> (11,216 keys in <code>%all</code> = 10,453 primaries + 673 aliases + 90 keywords) spanning string / array / hash / regex / I/O / process / OO / format / pack / crypto / codec / parallel / sync (mutex / semaphore / flock) / HTTP / database / network / AI / web / math / physics / chemistry / biology / signal / finance domains. Core pipeline (lexer&rarr;parser&rarr;compiler&rarr;VM&rarr;JIT) is ~17.6% of the Rust slice.</p>
 
       <table class="file-table">
         <thead><tr><th>Subsystem</th><th>Key Files</th><th class="num">Lines</th><th class="num">%</th><th style="min-width:120px;">Share</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins*, list_builtins, math_wolfram*</code></td><td class="num">152,547</td><td class="num">31.8%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:31.8%"></div></div></td><td>10,453 builtins in %b / 11,215 keys in %all: string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
+          <tr><td style="color:var(--accent);">Builtins</td><td><code>builtins*, list_builtins, math_wolfram*</code></td><td class="num">152,547</td><td class="num">31.8%</td><td><div class="bar-wrap"><div class="bar-fill magenta" style="width:31.8%"></div></div></td><td>10,453 builtins in %b / 11,216 keys in %all: string, array, hash, regex, math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, I/O, file, process, OO, format, pack, crypto, codec, network, HTTP, JWT</td></tr>
           <tr><td style="color:var(--accent);">VM &amp; Compiler</td><td><code>vm, compiler, bytecode</code></td><td class="num">24,408</td><td class="num">5.1%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:5.1%"></div></div></td><td>347-opcode bytecode, register+stack VM, AST&rarr;bytecode compiler with constant folding / register allocation / peephole, opcode disassembler</td></tr>
           <tr><td style="color:var(--accent);">VM Runtime State (vm_helper)</td><td><code>vm_helper</code></td><td class="num">22,746</td><td class="num">4.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:4.7%"></div></div></td><td>Persistent state container for the bytecode VM: scope graph, sub table, error context, debugger hooks, special variables (<code>$_</code>, <code>$!</code>, <code>$/</code>, &hellip;), reflection-hash population, package-stash refresh, AOP intercept registry, I/O handle map. <strong>Not a tree-walking interpreter</strong> &mdash; stryke has none. The absence is pinned by <code>tests/tree_walker_absent_aop.rs</code> as an architectural invariant.</td></tr>
           <tr><td style="color:var(--accent);">Parser</td><td><code>parser, ast, token</code></td><td class="num">27,089</td><td class="num">5.7%</td><td><div class="bar-wrap"><div class="bar-fill cyan" style="width:5.7%"></div></div></td><td>Recursive-descent parser, 212 <code>parse_*</code> functions, AST variants across multiple enums, operator precedence climbing (or/and/not at lowest tier per <code>perlop</code>), heredocs, prototype parsing, builtin-name whitelist</td></tr>
@@ -297,7 +297,7 @@
         <thead><tr><th>File</th><th class="num">Lines</th><th>Role</th></tr></thead>
         <tbody>
           <tr><td>strykelang/math_wolfram*.rs</td><td class="num">58,803</td><td>82 batch files (math_wolfram, math_wolfram2&hellip;82) <code>include!</code>'d into builtins.rs: 4,893 fns spanning Wolfram-class math, physics, chemistry, biology, signal, finance, ML, geometry, special functions, calendrical, astronomy, BLAS/LAPACK, sabermetrics, Excel/financial, GIS, robotics/control, actuarial, epidemiology, archive/encoding, music theory, geology, logic/SAT/SMT, compilers/parsing, linguistics, Postgres SQL/JSON, Redis, scipy.special, economics/game theory</td></tr>
-          <tr><td>strykelang/builtins.rs</td><td class="num">43,786</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 10,453 builtins in %b (11,215 keys in %all)</td></tr>
+          <tr><td>strykelang/builtins.rs</td><td class="num">43,786</td><td>Core builtin dispatch table covering string/array/hash/regex/math/I/O/file/process/OO domains; routes 10,453 builtins in %b (11,216 keys in %all)</td></tr>
           <tr><td>strykelang/parser.rs</td><td class="num">23,231</td><td>Recursive-descent parser; precedence climbing, heredocs; whitelists every builtin spelling</td></tr>
           <tr><td>strykelang/vm_helper.rs</td><td class="num">22,746</td><td>Runtime: scope graph, evaluation context, error reporter, debugger hooks (used by both <code>-d</code> TTY REPL and <code>--dap</code> server), special-variable handling, reflection-hash population, package-stash refresh</td></tr>
           <tr><td>strykelang/lsp.rs</td><td class="num">13,270</td><td>LSP server core — hover, completion (hash-key from builtin schemas, type/enum/constant/loop-label categories, qualified-suffix insertText, parse-error recovery, <code>{</code> trigger), diagnostics, semantic tokens, signature help, code actions (Extract V/C/P/M, caret-only, inside-string aware), goto/refs/rename (package-aware, AST-only field rename, defensive <code>::</code>-strip on newName, cross-file via require graph), document symbols. Hover suppressed inside string literals.</td></tr>
@@ -358,7 +358,7 @@
                   │   builtins.rs     │
                   │   (43,786)        │
                   │   10,453 builtins  │
-                  │   11,215 spellings │
+                  │   11,216 spellings │
                   │   + extended      │
                   │   (12,643)        │
                   │   + math_wolfram* │
@@ -384,8 +384,8 @@
 
       <div class="stat-grid" style="grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));">
         <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">10,453</div><div class="stat-label">Builtins (Primary)</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">672</div><div class="stat-label">Aliases</div></div>
-        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">11,215</div><div class="stat-label">Keys in %all</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">673</div><div class="stat-label">Aliases</div></div>
+        <div class="stat-card" style="border-top-color:var(--accent);"><div class="stat-val accent">11,216</div><div class="stat-label">Keys in %all</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">186</div><div class="stat-label">Perl 5 Core</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">10,249</div><div class="stat-label">Stryke Extensions</div></div>
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">4,371</div><div class="stat-label">LSP Descriptions</div></div>
@@ -393,7 +393,7 @@
         <div class="stat-card" style="border-top-color:var(--cyan);"><div class="stat-val">317</div><div class="stat-label">Categories</div></div>
       </div>
 
-      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">118 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 672-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation. Disjoint union: <code>keys %a + keys %b + keys %k == keys %all</code>.</p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:0.5rem;">118 hot builtins are reachable through dedicated <code>BuiltinId</code> opcodes in <code>bytecode.rs</code> &mdash; the rest go through the generic dispatch table. The 673-alias overhead exists so canonical Perl spellings (<code>localtime</code>), abbreviations (<code>tj</code>), and stryke-style snake_case alternatives all coexist without disambiguation. Disjoint union: <code>keys %a + keys %b + keys %k == keys %all</code>.</p>
 
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--accent);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// CATEGORIES</h3>
       <div class="mapping-grid">
@@ -637,7 +637,7 @@
       <h3 style="font-family:'Orbitron',sans-serif;font-size:11px;color:var(--cyan);letter-spacing:1.5px;margin:1.5rem 0 0.5rem;">// LSP SERVER &mdash; <code>stryke --lsp</code></h3>
       <ul>
         <li><strong>Hover</strong> over any of 4,255 documented builtins &rarr; category + signature + description from the live <code>%stryke::descriptions</code> / <code>%stryke::categories</code> hashes</li>
-        <li><strong>Completion</strong> with the full builtin set (every spelling in <code>%all</code> &mdash; 11,215 keys including 672 aliases and 90 keywords)</li>
+        <li><strong>Completion</strong> with the full builtin set (every spelling in <code>%all</code> &mdash; 11,216 keys including 673 aliases and 90 keywords)</li>
         <li><strong>Semantic tokens</strong> &mdash; keywords, builtins, sigils, types, regex flags get distinct categories so themes can paint them independently</li>
         <li><strong>Signature help</strong> on function-call cursor; <strong>code actions</strong> for common diagnostics</li>
         <li><strong>Go-to-definition</strong> for user subs, classes, structs, enums</li>
@@ -666,7 +666,7 @@
         <li><strong><code>.stk</code> file association</strong> with 44-slot color scheme. Keywords, sigils, builtins, types, regex bodies/flags, heredocs, sub names, class fields, all paintable independently.</li>
         <li><strong>LSP client</strong> consuming <code>stryke --lsp</code> &mdash; semantic tokens, completion, hover, signature help, code actions.</li>
         <li><strong>DAP debugger</strong> consuming <code>stryke --dap HOST:PORT</code> (TCP transport keeps <code>OSProcessHandler</code> stdout/stderr free for the program's own <code>p</code>/<code>print</code> output).</li>
-        <li><strong>Reflection tool window</strong> &mdash; 9 tabs on the live <code>%stryke::*</code> hashes (≈11k builtin names, 672 aliases, 90 keywords, 318 categories, 4,386 descriptions, 8,937 primaries, 10,267 extensions, 186 perl_compats). Left single-click opens the docs popup; right-click inserts at cursor.</li>
+        <li><strong>Reflection tool window</strong> &mdash; 9 tabs on the live <code>%stryke::*</code> hashes (≈11k builtin names, 673 aliases, 90 keywords, 318 categories, 4,386 descriptions, 8,937 primaries, 10,267 extensions, 186 perl_compats). Left single-click opens the docs popup; right-click inserts at cursor.</li>
         <li><strong>Run configurations + gutter run icons</strong> &mdash; execute, debug, or profile any <code>.stk</code> file with one click.</li>
       </ul>
 
@@ -778,7 +778,7 @@
     </main>
 
     <footer style="text-align:center;padding:2rem;font-size:10px;color:var(--text-muted);font-family:'Orbitron',sans-serif;letter-spacing:2px;">
-      STRYKELANG ENGINEERING REPORT &middot; 479,076 RUST LINES &middot; 227,213 STRYKE LINES &middot; 13,450 TESTS &middot; 10,453 BUILTINS / 11,215 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
+      STRYKELANG ENGINEERING REPORT &middot; 479,076 RUST LINES &middot; 227,213 STRYKE LINES &middot; 13,450 TESTS &middot; 10,453 BUILTINS / 11,216 SPELLINGS &middot; 347 VM OPCODES &middot; LSP &middot; DAP DEBUGGER &middot; JETBRAINS PLUGIN &middot; MENKETECHNOLOGIES
     </footer>
   </div>
 
