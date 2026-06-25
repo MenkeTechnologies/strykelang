@@ -62,9 +62,48 @@ fn block_keyword_short_aliases_resolve() {
         ("sm", "sum"),
         ("mn", "min"),
         ("mx", "max"),
+        ("pu", "push"),
+        ("po", "pop"),
+        ("sh", "shift"),
+        ("un", "unshift"),
+        ("ss", "substr"),
+        ("ix", "index"),
+        ("uf", "ucfirst"),
+        ("lf", "lcfirst"),
     ] {
         assert_alias(alias, primary);
     }
+}
+
+#[test]
+fn array_and_string_golf_aliases_are_callable() {
+    // push/pop/shift/unshift mutate @a; substr/index/ucfirst/lcfirst on strings.
+    assert_eq!(
+        eval_int(
+            r#"my @a = (1, 2); pu(@a, 3); my $p = po(@a);
+               ($p == 3 && len(@a) == 2) ? 1 : 0"#
+        ),
+        1,
+        "pu/po should push/pop"
+    );
+    assert_eq!(
+        eval_int(
+            r#"my @a = (1, 2, 3); my $s = sh(@a); un(@a, 0);
+               ($s == 1 && $a[0] == 0 && len(@a) == 3) ? 1 : 0"#
+        ),
+        1,
+        "sh/un should shift/unshift"
+    );
+    assert_eq!(
+        eval_int(r#"(ss("stryke", 0, 3) eq "str" && ix("stryke", "y") == 3) ? 1 : 0"#),
+        1,
+        "ss/ix should substr/index"
+    );
+    assert_eq!(
+        eval_int(r#"(uf("abc") eq "Abc" && lf("ABC") eq "aBC") ? 1 : 0"#),
+        1,
+        "uf/lf should ucfirst/lcfirst"
+    );
 }
 
 #[test]

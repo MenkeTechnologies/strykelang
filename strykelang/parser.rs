@@ -1743,11 +1743,13 @@ impl Parser {
                 | "hex"
                 | "inc"
                 | "index"
+                | "ix"
                 | "int"
                 | "join"
                 | "j"
                 | "keys"
                 | "lcfirst"
+                | "lf"
                 | "lc"
                 | "length"
                 | "link"
@@ -1891,6 +1893,7 @@ impl Parser {
                 | "pflat_map"
                 | "pflat_maps"
                 | "pop"
+                | "po"
                 | "pos"
                 | "ppool"
                 | "preduce_init"
@@ -1901,6 +1904,7 @@ impl Parser {
                 | "pr"
                 | "psort"
                 | "push"
+                | "pu"
                 | "pwatch"
                 | "rand"
                 | "readdir"
@@ -1930,6 +1934,7 @@ impl Parser {
                 | "scalar"
                 | "seekdir"
                 | "shift"
+                | "sh"
                 | "sin"
                 | "slurp"
                 | "swallow"
@@ -1949,6 +1954,7 @@ impl Parser {
                 | "stat"
                 | "study"
                 | "substr"
+                | "ss"
                 | "symlink"
                 | "sym_links"
                 | "system"
@@ -1956,11 +1962,13 @@ impl Parser {
                 | "timer"
                 | "trace"
                 | "ucfirst"
+                | "uf"
                 | "uc"
                 | "undef"
                 | "umask"
                 | "unlink"
                 | "unshift"
+                | "un"
                 | "utime"
                 | "values"
                 | "wantarray"
@@ -3112,8 +3120,8 @@ impl Parser {
             // String functions
             "uc" => ExprKind::Uc(Box::new(arg)),
             "lc" => ExprKind::Lc(Box::new(arg)),
-            "ucfirst" | "ufc" => ExprKind::Ucfirst(Box::new(arg)),
-            "lcfirst" | "lfc" => ExprKind::Lcfirst(Box::new(arg)),
+            "ucfirst" | "ufc" | "uf" => ExprKind::Ucfirst(Box::new(arg)),
+            "lcfirst" | "lfc" | "lf" => ExprKind::Lcfirst(Box::new(arg)),
             "fc" => ExprKind::Fc(Box::new(arg)),
             "chomp" => ExprKind::Chomp(Box::new(arg)),
             "chop" => ExprKind::Chop(Box::new(arg)),
@@ -3153,8 +3161,8 @@ impl Parser {
             "keys" => ExprKind::Keys(Box::new(arg)),
             "values" => ExprKind::Values(Box::new(arg)),
             "each" => ExprKind::Each(Box::new(arg)),
-            "pop" => ExprKind::Pop(Box::new(arg)),
-            "shift" => ExprKind::Shift(Box::new(arg)),
+            "pop" | "po" => ExprKind::Pop(Box::new(arg)),
+            "shift" | "sh" => ExprKind::Shift(Box::new(arg)),
             "reverse" => {
                 if crate::no_interop_mode() {
                     return Err(self.syntax_err(
@@ -10765,7 +10773,7 @@ impl Parser {
                     line,
                 })
             }
-            "lcfirst" => {
+            "lcfirst" | "lf" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10775,7 +10783,7 @@ impl Parser {
                     line,
                 })
             }
-            "ucfirst" => {
+            "ucfirst" | "uf" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10894,7 +10902,7 @@ impl Parser {
                     line,
                 })
             }
-            "push" => {
+            "push" | "pu" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10925,7 +10933,7 @@ impl Parser {
                     line,
                 })
             }
-            "pop" => {
+            "pop" | "po" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10935,7 +10943,7 @@ impl Parser {
                     line,
                 })
             }
-            "shift" => {
+            "shift" | "sh" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -10945,7 +10953,7 @@ impl Parser {
                     line,
                 })
             }
-            "unshift" => {
+            "unshift" | "un" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11345,7 +11353,7 @@ impl Parser {
                     line,
                 })
             }
-            "substr" => {
+            "substr" | "ss" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11360,7 +11368,7 @@ impl Parser {
                     line,
                 })
             }
-            "index" => {
+            "index" | "ix" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -14658,6 +14666,14 @@ impl Parser {
         ("sm", "sum"),
         ("mn", "min"),
         ("mx", "max"),
+        ("pu", "push"),
+        ("po", "pop"),
+        ("sh", "shift"),
+        ("un", "unshift"),
+        ("ss", "substr"),
+        ("ix", "index"),
+        ("uf", "ucfirst"),
+        ("lf", "lcfirst"),
     ];
 
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
