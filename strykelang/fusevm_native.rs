@@ -29,6 +29,18 @@ use std::sync::Arc;
 mod nops {
     /// Perl `.` string concatenation (pops 2, pushes the concatenated string).
     pub const CONCAT: u16 = 0;
+    /// String comparisons (`eq ne lt gt le ge`); each pops 2, pushes Int 1/0.
+    pub const STR_EQ: u16 = 1;
+    pub const STR_NE: u16 = 2;
+    pub const STR_LT: u16 = 3;
+    pub const STR_GT: u16 = 4;
+    pub const STR_LE: u16 = 5;
+    pub const STR_GE: u16 = 6;
+}
+
+/// Pop a fusevm Value and view it as a StrykeValue (scalars only on this path).
+fn pop_stryke(vm: &mut fusevm::VM) -> StrykeValue {
+    fusevm_to_stryke(&vm.pop()).unwrap_or(StrykeValue::UNDEF)
 }
 
 /// Stringify a fusevm Value the way strykelang stringifies a scalar, by routing
@@ -55,6 +67,23 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             let mut s = stryke_display(&a);
             s.push_str(&stryke_display(&b));
             vm.push(fusevm::Value::Str(Arc::new(s)));
+        }
+        // String comparisons delegate to StrykeValue::str_eq / str_cmp (the same
+        // methods vm.rs uses), so results match exactly. Push Perl bool (Int 1/0).
+        nops::STR_EQ | nops::STR_NE | nops::STR_LT | nops::STR_GT | nops::STR_LE
+        | nops::STR_GE => {
+            use std::cmp::Ordering;
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            let truth = match id {
+                nops::STR_EQ => a.str_eq(&b),
+                nops::STR_NE => !a.str_eq(&b),
+                nops::STR_LT => a.str_cmp(&b) == Ordering::Less,
+                nops::STR_GT => a.str_cmp(&b) == Ordering::Greater,
+                nops::STR_LE => matches!(a.str_cmp(&b), Ordering::Less | Ordering::Equal),
+                _ => matches!(a.str_cmp(&b), Ordering::Greater | Ordering::Equal),
+            };
+            vm.push(fusevm::Value::Int(if truth { 1 } else { 0 }));
         }
         _ => {}
     }
@@ -130,6 +159,24 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             Op::Concat => {
                 b.emit(fusevm::Op::Extended(nops::CONCAT, 0), 0);
             }
+            Op::StrEq => {
+                b.emit(fusevm::Op::Extended(nops::STR_EQ, 0), 0);
+            }
+            Op::StrNe => {
+                b.emit(fusevm::Op::Extended(nops::STR_NE, 0), 0);
+            }
+            Op::StrLt => {
+                b.emit(fusevm::Op::Extended(nops::STR_LT, 0), 0);
+            }
+            Op::StrGt => {
+                b.emit(fusevm::Op::Extended(nops::STR_GT, 0), 0);
+            }
+            Op::StrLe => {
+                b.emit(fusevm::Op::Extended(nops::STR_LE, 0), 0);
+            }
+            Op::StrGe => {
+                b.emit(fusevm::Op::Extended(nops::STR_GE, 0), 0);
+            }
             // End of the top-level program: stop lowering and let fusevm return
             // the value left on the stack.
             Op::Return | Op::Halt => break,
@@ -202,5 +249,16 @@ mod tests {
         assert_parity_str("\"x\" . 3", "x3");
         assert_parity_str("1 . 2", "12");
         assert_parity_str("\"sum=\" . (2 + 3)", "sum=5");
+    }
+
+    #[test]
+    fn native_string_compares_match_vm() {
+        assert_parity_int("\"a\" eq \"a\"", 1);
+        assert_parity_int("\"a\" eq \"b\"", 0);
+        assert_parity_int("\"a\" ne \"b\"", 1);
+        assert_parity_int("\"a\" lt \"b\"", 1);
+        assert_parity_int("\"b\" gt \"a\"", 1);
+        assert_parity_int("\"a\" le \"a\"", 1);
+        assert_parity_int("\"b\" ge \"a\"", 1);
     }
 }
