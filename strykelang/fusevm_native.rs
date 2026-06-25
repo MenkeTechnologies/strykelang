@@ -36,6 +36,58 @@ mod nops {
     pub const STR_GT: u16 = 4;
     pub const STR_LE: u16 = 5;
     pub const STR_GE: u16 = 6;
+    /// Numeric comparisons (`== != < > <= >=`); each pops 2, pushes Int 1/0.
+    pub const NUM_EQ: u16 = 7;
+    pub const NUM_NE: u16 = 8;
+    pub const NUM_LT: u16 = 9;
+    pub const NUM_GT: u16 = 10;
+    pub const NUM_LE: u16 = 11;
+    pub const NUM_GE: u16 = 12;
+    /// `<=>` numeric spaceship (pops 2, pushes Int -1/0/1).
+    pub const SPACESHIP: u16 = 13;
+    /// Perl `!` logical-not (pops 1, pushes Int 1/0).
+    pub const LOG_NOT: u16 = 14;
+}
+
+/// Numeric comparison matching strykelang's `int_cmp`: exact integer compare
+/// when both operands are integers, else a float compare via `to_number`.
+fn num_cmp(a: &StrykeValue, b: &StrykeValue, id: u16) -> bool {
+    if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+        match id {
+            nops::NUM_EQ => x == y,
+            nops::NUM_NE => x != y,
+            nops::NUM_LT => x < y,
+            nops::NUM_GT => x > y,
+            nops::NUM_LE => x <= y,
+            _ => x >= y,
+        }
+    } else {
+        let (x, y) = (a.to_number(), b.to_number());
+        match id {
+            nops::NUM_EQ => x == y,
+            nops::NUM_NE => x != y,
+            nops::NUM_LT => x < y,
+            nops::NUM_GT => x > y,
+            nops::NUM_LE => x <= y,
+            _ => x >= y,
+        }
+    }
+}
+
+/// `<=>`: integer compare when both are integers, else float (matches vm.rs).
+fn spaceship(a: &StrykeValue, b: &StrykeValue) -> i64 {
+    if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+        (x > y) as i64 - (x < y) as i64
+    } else {
+        let (x, y) = (a.to_number(), b.to_number());
+        if x < y {
+            -1
+        } else if x > y {
+            1
+        } else {
+            0
+        }
+    }
 }
 
 /// Pop a fusevm Value and view it as a StrykeValue (scalars only on this path).
@@ -84,6 +136,21 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
                 _ => matches!(a.str_cmp(&b), Ordering::Greater | Ordering::Equal),
             };
             vm.push(fusevm::Value::Int(if truth { 1 } else { 0 }));
+        }
+        nops::NUM_EQ | nops::NUM_NE | nops::NUM_LT | nops::NUM_GT | nops::NUM_LE
+        | nops::NUM_GE => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(if num_cmp(&a, &b, id) { 1 } else { 0 }));
+        }
+        nops::SPACESHIP => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(spaceship(&a, &b)));
+        }
+        nops::LOG_NOT => {
+            let a = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(if a.is_true() { 0 } else { 1 }));
         }
         _ => {}
     }
@@ -177,6 +244,30 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             Op::StrGe => {
                 b.emit(fusevm::Op::Extended(nops::STR_GE, 0), 0);
             }
+            Op::NumEq => {
+                b.emit(fusevm::Op::Extended(nops::NUM_EQ, 0), 0);
+            }
+            Op::NumNe => {
+                b.emit(fusevm::Op::Extended(nops::NUM_NE, 0), 0);
+            }
+            Op::NumLt => {
+                b.emit(fusevm::Op::Extended(nops::NUM_LT, 0), 0);
+            }
+            Op::NumGt => {
+                b.emit(fusevm::Op::Extended(nops::NUM_GT, 0), 0);
+            }
+            Op::NumLe => {
+                b.emit(fusevm::Op::Extended(nops::NUM_LE, 0), 0);
+            }
+            Op::NumGe => {
+                b.emit(fusevm::Op::Extended(nops::NUM_GE, 0), 0);
+            }
+            Op::Spaceship => {
+                b.emit(fusevm::Op::Extended(nops::SPACESHIP, 0), 0);
+            }
+            Op::LogNot => {
+                b.emit(fusevm::Op::Extended(nops::LOG_NOT, 0), 0);
+            }
             // End of the top-level program: stop lowering and let fusevm return
             // the value left on the stack.
             Op::Return | Op::Halt => break,
@@ -260,5 +351,25 @@ mod tests {
         assert_parity_int("\"b\" gt \"a\"", 1);
         assert_parity_int("\"a\" le \"a\"", 1);
         assert_parity_int("\"b\" ge \"a\"", 1);
+    }
+
+    #[test]
+    fn native_numeric_compares_match_vm() {
+        assert_parity_int("1 < 2", 1);
+        assert_parity_int("2 < 1", 0);
+        assert_parity_int("3 == 3", 1);
+        assert_parity_int("3 != 4", 1);
+        assert_parity_int("5 >= 5", 1);
+        assert_parity_int("2 <= 1", 0);
+        assert_parity_int("1.5 < 2.5", 1);
+    }
+
+    #[test]
+    fn native_spaceship_and_lognot_match_vm() {
+        assert_parity_int("1 <=> 2", -1);
+        assert_parity_int("2 <=> 2", 0);
+        assert_parity_int("3 <=> 1", 1);
+        assert_parity_int("!0", 1);
+        assert_parity_int("!5", 0);
     }
 }
