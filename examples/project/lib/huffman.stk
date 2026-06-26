@@ -27,7 +27,7 @@ fn Project::Huffman::adv_huffman_encode($text) {
     }
     
     # 2. Build Min-Heap
-    val $pq = Project::PriorityQueue::pq_min_new()
+    var $pq = Project::PriorityQueue::pq_min_new()
     for val $char (keys %freq) {
         val $node = HuffmanNode(char => $char, freq => $freq{$char})
         $pq->push([$freq{$char}, $node])

@@ -58,7 +58,7 @@ fn Project::GraphAlgorithms::adv_dijkstra($graph, $start) {
     }
     $dist{$start} = 0
     
-    val $pq = Project::PriorityQueue::pq_min_new()
+    var $pq = Project::PriorityQueue::pq_min_new()
     $pq->push([0, $start])
     
     while (!$pq->is_empty()) {

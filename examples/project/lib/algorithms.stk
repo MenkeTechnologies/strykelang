@@ -106,7 +106,7 @@ require "./lib/priority_queue.stk"
 fn Project::Algorithms::heap_sort(@list) {
     return @list if len(@list) <= 1
     
-    val $pq = Project::PriorityQueue::pq_new()
+    var $pq = Project::PriorityQueue::pq_new()
     ~> @list ep {
         $pq->push(_)
     }
