@@ -139,6 +139,13 @@ mod nops {
     /// `printf FMT, ARGS` to the default handle. Extended `arg` = total argc
     /// (format string + values). Args are pushed in source order beforehand.
     pub const PRINTF: u16 = 53;
+    /// `scalar EXPR` — coerce the TOS to scalar context (array→len, etc.).
+    pub const VALUE_SCALAR_CONTEXT: u16 = 54;
+    /// `$h{k} = v` returning the assigned value. Preceded by `LoadInt(name_idx)`;
+    /// value then key are below it on the stack.
+    pub const SET_HASH_ELEM_KEEP: u16 = 55;
+    /// `reverse LIST` — reverse a list (or wrap an iterator in RevIterator).
+    pub const REVERSE_LIST: u16 = 56;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -415,6 +422,11 @@ fn spaceship(a: &StrykeValue, b: &StrykeValue) -> i64 {
     }
 }
 
+/// Reflection hashes are frozen builtins (mirrors vm.rs `is_reflection_hash`).
+fn is_reflection_hash(name: &str) -> bool {
+    matches!(name, "b" | "pc" | "e" | "a" | "d" | "c" | "p" | "all") || name.starts_with("stryke::")
+}
+
 /// Pop a fusevm Value and view it as a StrykeValue (scalars only on this path).
 fn pop_stryke(vm: &mut fusevm::VM) -> StrykeValue {
     fusevm_to_stryke(&vm.pop()).unwrap_or(StrykeValue::UNDEF)
@@ -674,6 +686,47 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
         nops::PRINTF => do_printf(vm, arg as usize),
+        nops::VALUE_SCALAR_CONTEXT => {
+            let v = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&v.scalar_context()));
+        }
+        nops::SET_HASH_ELEM_KEEP => {
+            let idx = vm.pop().to_int();
+            let key = pop_stryke(vm).to_string();
+            let val = pop_stryke(vm);
+            let name = host_name(idx);
+            let val_keep = val.clone();
+            let r = with_interp(|i| -> Result<(), StrykeError> {
+                if i.scope.is_hash_frozen(&name) || is_reflection_hash(&name) {
+                    return Err(StrykeError::syntax(
+                        format!("cannot modify frozen hash `%{}`", name),
+                        0,
+                    ));
+                }
+                i.touch_env_hash(&name);
+                i.scope.set_hash_element(&name, &key, val)
+            });
+            match r {
+                Ok(()) => vm.push(stryke_to_fusevm(&val_keep)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::REVERSE_LIST => {
+            let val = pop_stryke(vm);
+            if val.is_iterator() {
+                let rev = StrykeValue::iterator(std::sync::Arc::new(
+                    crate::value::RevIterator::new(val.into_iterator()),
+                ));
+                vm.push(stryke_to_fusevm(&rev));
+            } else {
+                let mut items = val.to_list();
+                items.reverse();
+                vm.push(stryke_to_fusevm(&StrykeValue::array(items)));
+            }
+        }
         nops::RANGE => {
             let to = pop_stryke(vm);
             let from = pop_stryke(vm);
@@ -1148,6 +1201,16 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::ARRAY_LEN, 0), 0);
             }
+            Op::ValueScalarContext => {
+                b.emit(fusevm::Op::Extended(nops::VALUE_SCALAR_CONTEXT, 0), 0);
+            }
+            Op::ReverseListOp => {
+                b.emit(fusevm::Op::Extended(nops::REVERSE_LIST, 0), 0);
+            }
+            Op::SetHashElemKeep(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SET_HASH_ELEM_KEEP, 0), 0);
+            }
             Op::PushFrame => {
                 b.emit(fusevm::Op::Extended(nops::PUSH_FRAME, 0), 0);
             }
@@ -1605,6 +1668,18 @@ mod tests {
             "sub myfac { my $n = shift; return $n <= 1 ? 1 : $n * myfac($n - 1) } myfac(5)",
             120,
         );
+    }
+
+    #[test]
+    fn native_scalar_reverse_hashkeep_match_vm() {
+        // ValueScalarContext: scalar(@a) → length.
+        assert_parity_int("my @a = (10, 20, 30); scalar(@a)", 3);
+        // ReverseListOp: reverse a list.
+        assert_parity_str("join(\",\", reverse(1, 2, 3))", "3,2,1");
+        assert_parity_str("join(\",\", reverse(1..5))", "5,4,3,2,1");
+        // SetHashElemKeep: `$h{k} = v` returns the assigned value.
+        assert_parity_int("my %h = (); my $x = ($h{a} = 7); $x", 7);
+        assert_parity_int("my %h = (); $h{a} = 5; $h{a}", 5);
     }
 
     #[test]
