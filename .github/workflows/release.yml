@@ -100,24 +100,34 @@ jobs:
         run: |
           sudo swapoff -a || true
           sudo rm -f /swapfile
-          sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 status=progress
+          sudo dd if=/dev/zero of=/swapfile bs=1M count=12288 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
           free -h
           swapon --show
 
-      - name: Set aarch64-linux-gnu RUSTFLAGS (link-time memory budget)
-        # --no-keep-memory + --reduce-memory-overheads cut the linker's
-        # peak RSS at the cost of ~20% link time. debuginfo=0 drops
-        # debug sections from release binaries (already stripped in
-        # the Package step). codegen-units=1 trades a small wall-clock
-        # hit for a single LLVM module that links cleaner.
+      - name: Set aarch64-linux-gnu release profile (link-time memory budget)
+        # The 463k-LOC tree's release profile uses `lto = "fat"` +
+        # `codegen-units = 1` (Cargo.toml). Fat LTO holds the WHOLE
+        # program's LLVM IR in memory and optimizes it as a single
+        # module — peak RSS exceeds the ubuntu-24.04-arm runner's ~7 GB
+        # RAM and OOM-kills rustc mid-link ("runner lost communication").
+        # A system-linker swap (mold/lld) does NOT help: the memory is
+        # spent in LLVM's LTO pass, not the final `ld` invocation.
+        #
+        # Override ONLY this target to `lto = "thin"` + `codegen-units = 16`:
+        # thin LTO optimizes each module independently (parallel, bounded
+        # peak memory) and gives ~95% of fat-LTO runtime perf. The
+        # --no-keep-memory / --reduce-memory-overheads flags still trim the
+        # final link's RSS; debug=0 drops debug sections (binary is
+        # stripped in Package anyway).
         if: matrix.target == 'aarch64-unknown-linux-gnu' && !matrix.use_cross
         run: |
           {
             echo 'CARGO_PROFILE_RELEASE_DEBUG=0'
-            echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1'
+            echo 'CARGO_PROFILE_RELEASE_LTO=thin'
+            echo 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16'
             echo 'RUSTFLAGS=-C link-arg=-Wl,--no-keep-memory -C link-arg=-Wl,--reduce-memory-overheads'
           } >> "$GITHUB_ENV"
 
@@ -252,40 +262,55 @@ jobs:
 
       - name: Update formula
         shell: bash
+        env:
+          MAC_ARM:   ${{ steps.sha.outputs.aarch64_apple_darwin }}
+          MAC_INTEL: ${{ steps.sha.outputs.x86_64_apple_darwin }}
+          LIN_ARM:   ${{ steps.sha.outputs.aarch64_unknown_linux_gnu }}
+          LIN_INTEL: ${{ steps.sha.outputs.x86_64_unknown_linux_gnu }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           cd tap
-          cat > Formula/stryke.rb << 'FORMULA'
+
+          # A `bottle` block (`on_arm`/`on_intel`) for a target whose build
+          # leg failed would otherwise be written with an empty sha256,
+          # producing a formula that errors on `brew install` for that
+          # platform. Emit a block ONLY when its sha is present; skip the
+          # platform otherwise so the formula stays valid everywhere else.
+          dl="https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}"
+
+          # macOS arm is the primary target — a missing binary there is a
+          # release failure, not a platform to silently drop.
+          if [ -z "$MAC_ARM" ]; then
+            echo "::error::aarch64-apple-darwin binary missing — refusing to ship a broken formula" >&2
+            exit 1
+          fi
+
+          block() {  # $1=os_guard ($2=arm sha) ($3=intel sha) $4=arm target $5=intel target
+            local guard="$1" arm_sha="$2" intel_sha="$3" arm_t="$4" intel_t="$5"
+            [ -z "$arm_sha$intel_sha" ] && return 0
+            echo "  on_${guard} do"
+            if [ -n "$arm_sha" ]; then
+              printf '    on_arm do\n      url "%s/stryke-v%s-%s.tar.gz"\n      sha256 "%s"\n    end\n' "$dl" "$VERSION" "$arm_t" "$arm_sha"
+            fi
+            if [ -n "$intel_sha" ]; then
+              printf '    on_intel do\n      url "%s/stryke-v%s-%s.tar.gz"\n      sha256 "%s"\n    end\n' "$dl" "$VERSION" "$intel_t" "$intel_sha"
+            fi
+            echo "  end"
+            echo
+          }
+
+          {
+            cat << 'HEAD'
           class Stryke < Formula
             desc "The 2nd fastest dynamic language — parallel Perl 5 interpreter in Rust"
             homepage "https://github.com/MenkeTechnologies/strykelang"
             license "MIT"
-          FORMULA
-          cat >> Formula/stryke.rb << EOF
-            version "${VERSION}"
-
-            on_macos do
-              on_arm do
-                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-aarch64-apple-darwin.tar.gz"
-                sha256 "${{ steps.sha.outputs.aarch64_apple_darwin }}"
-              end
-              on_intel do
-                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-x86_64-apple-darwin.tar.gz"
-                sha256 "${{ steps.sha.outputs.x86_64_apple_darwin }}"
-              end
-            end
-
-            on_linux do
-              on_arm do
-                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz"
-                sha256 "${{ steps.sha.outputs.aarch64_unknown_linux_gnu }}"
-              end
-              on_intel do
-                url "https://github.com/MenkeTechnologies/strykelang/releases/download/v${VERSION}/stryke-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
-                sha256 "${{ steps.sha.outputs.x86_64_unknown_linux_gnu }}"
-              end
-            end
-
+          HEAD
+            echo "  version \"${VERSION}\""
+            echo
+            block macos "$MAC_ARM" "$MAC_INTEL" aarch64-apple-darwin x86_64-apple-darwin
+            block linux "$LIN_ARM" "$LIN_INTEL" aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu
+            cat << 'TAIL'
             def install
               bin.install "stryke"
               bin.install "st"
@@ -296,7 +321,8 @@ jobs:
               assert_match "hello", shell_output("#{bin}/s -e 'print \"hello\"'")
             end
           end
-          EOF
+          TAIL
+          } > Formula/stryke.rb
 
       - name: Push formula update
         run: |
