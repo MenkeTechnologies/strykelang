@@ -117,6 +117,12 @@ mod nops {
     /// `LoadInt(builtin_id)`; the Extended `arg` is the argument count.
     /// Delegates to the shared `exec_builtin` dispatcher.
     pub const CALL_BUILTIN: u16 = 43;
+    /// Block-builtins. SORT_NOBLOCK sorts a list (string order). MAP_INT_MUL
+    /// (preceded by `LoadInt(k)`) maps `$_*k` over a list. GREP_BLOCK (preceded
+    /// by `LoadInt(block_idx)`) filters a list by running a block per element.
+    pub const SORT_NOBLOCK: u16 = 44;
+    pub const MAP_INT_MUL: u16 = 45;
+    pub const GREP_BLOCK: u16 = 46;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -602,6 +608,62 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
+        nops::SORT_NOBLOCK => {
+            let mut items = pop_stryke(vm).to_list();
+            items.sort_by_key(|a| a.to_string());
+            vm.push(stryke_to_fusevm(&StrykeValue::array(items)));
+        }
+        nops::MAP_INT_MUL => {
+            let k = vm.pop().to_int();
+            let list = pop_stryke(vm).to_list();
+            let result: Vec<StrykeValue> =
+                list.iter().map(|item| StrykeValue::integer(item.to_int().wrapping_mul(k))).collect();
+            vm.push(stryke_to_fusevm(&StrykeValue::array(result)));
+        }
+        nops::GREP_BLOCK => {
+            let block_idx = vm.pop().to_int() as usize;
+            let list = pop_stryke(vm).to_list();
+            let block = with_chunk(|c| c.blocks.get(block_idx).cloned());
+            let Some(block) = block else {
+                set_native_err(StrykeError::runtime("grep: bad block index", 0));
+                vm.push(fusevm::Value::Undef);
+                return;
+            };
+            let r = with_interp(|i| -> Result<Vec<StrykeValue>, StrykeError> {
+                let saved = i.scope.save_topic_chain();
+                let mut result = Vec::new();
+                for item in list {
+                    i.scope.set_topic(item.clone());
+                    let val = match i.exec_block(&block) {
+                        Ok(v) => v,
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                            i.scope.restore_topic_chain(saved);
+                            return Err(e);
+                        }
+                        Err(_) => {
+                            i.scope.restore_topic_chain(saved);
+                            return Err(StrykeError::runtime("grep: unexpected control flow", 0));
+                        }
+                    };
+                    let keep = match val.as_regex() {
+                        Some(re) => re.is_match(&item.to_string()),
+                        None => val.is_true(),
+                    };
+                    if keep {
+                        result.push(item);
+                    }
+                }
+                i.scope.restore_topic_chain(saved);
+                Ok(result)
+            });
+            match r {
+                Ok(items) => vm.push(stryke_to_fusevm(&StrykeValue::array(items))),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         nops::CALL_BUILTIN => {
             let id = vm.pop().to_int() as u16;
             let argc = arg as usize;
@@ -1154,6 +1216,18 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*id as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::CALL_BUILTIN, *argc), 0);
             }
+            // Block-builtins.
+            Op::SortNoBlock => {
+                b.emit(fusevm::Op::Extended(nops::SORT_NOBLOCK, 0), 0);
+            }
+            Op::MapIntMul(k) => {
+                b.emit(fusevm::Op::LoadInt(*k), 0);
+                b.emit(fusevm::Op::Extended(nops::MAP_INT_MUL, 0), 0);
+            }
+            Op::GrepWithBlock(block_idx) => {
+                b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GREP_BLOCK, 0), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1349,6 +1423,13 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_sort_map_grep_match_vm() {
+        assert_parity_str("join(\",\", sort(3, 1, 2))", "1,2,3");
+        assert_parity_str("join(\",\", map { $_ * 2 } (1, 2, 3))", "2,4,6");
+        assert_parity_str("join(\",\", grep { $_ > 1 } (1, 2, 3))", "2,3");
     }
 
     #[test]
