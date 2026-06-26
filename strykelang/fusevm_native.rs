@@ -184,6 +184,21 @@ mod nops {
     pub const STRING_REPEAT: u16 = 72;
     /// `reverse SCALAR` — reverse the characters of the stringified TOS.
     pub const REVERSE_SCALAR: u16 = 73;
+    // ── Array mutation + ref/hash construction ──
+    /// `push @name, VAL` (flattens an array value). Preceded by `LoadInt(name_idx)`.
+    pub const PUSH_ARRAY: u16 = 74;
+    /// `pop @name` → element. Preceded by `LoadInt(name_idx)`.
+    pub const POP_ARRAY: u16 = 75;
+    /// `shift @name` → element. Preceded by `LoadInt(name_idx)`.
+    pub const SHIFT_ARRAY: u16 = 76;
+    /// `[ … ]` array ref from the TOS list value.
+    pub const MAKE_ARRAY_REF: u16 = 77;
+    /// `{ … }` hash ref from the TOS list value (k/v pairs).
+    pub const MAKE_HASH_REF: u16 = 78;
+    /// `\$x` scalar ref from the TOS.
+    pub const MAKE_SCALAR_REF: u16 = 79;
+    /// `%(…)` hash from the top `arg` stack values (k/v pairs); `arg` = item count.
+    pub const MAKE_HASH: u16 = 80;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -852,6 +867,102 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 };
                 interp.scope.set_scalar_slot(sum_slot, new_v);
             });
+        }
+        nops::PUSH_ARRAY => {
+            let idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let name = host_name(idx);
+            let r = with_interp(|i| -> Result<(), StrykeError> {
+                if i.scope.is_array_frozen(&name) {
+                    return Err(StrykeError::syntax(
+                        format!("cannot modify frozen array `@{}`", name),
+                        0,
+                    ));
+                }
+                if let Some(items) = val.as_array_vec() {
+                    for item in items {
+                        i.scope.push_to_array(&name, item)?;
+                    }
+                } else {
+                    i.scope.push_to_array(&name, val)?;
+                }
+                Ok(())
+            });
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
+        nops::POP_ARRAY | nops::SHIFT_ARRAY => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let is_shift = id == nops::SHIFT_ARRAY;
+            let r = with_interp(|i| -> Result<StrykeValue, StrykeError> {
+                if i.scope.is_array_frozen(&name) {
+                    return Err(StrykeError::syntax(
+                        format!("cannot modify frozen array `@{}`", name),
+                        0,
+                    ));
+                }
+                if is_shift {
+                    i.scope.shift_from_array(&name)
+                } else {
+                    i.scope.pop_from_array(&name)
+                }
+            });
+            match r {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::MAKE_ARRAY_REF => {
+            let val = pop_stryke(vm);
+            let val = with_interp(|i| i.scope.resolve_container_binding_ref(val));
+            let arr = if let Some(a) = val.as_array_vec() { a } else { vec![val] };
+            vm.push(stryke_to_fusevm(&StrykeValue::array_ref(Arc::new(
+                parking_lot::RwLock::new(arr),
+            ))));
+        }
+        nops::MAKE_HASH_REF => {
+            let val = pop_stryke(vm);
+            let map = if let Some(h) = val.as_hash_map() {
+                h
+            } else {
+                let items = val.to_list();
+                let mut m = IndexMap::new();
+                let mut i = 0;
+                while i + 1 < items.len() {
+                    m.insert(items[i].to_string(), items[i + 1].clone());
+                    i += 2;
+                }
+                m
+            };
+            vm.push(stryke_to_fusevm(&StrykeValue::hash_ref(Arc::new(
+                parking_lot::RwLock::new(map),
+            ))));
+        }
+        nops::MAKE_SCALAR_REF => {
+            let val = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&StrykeValue::scalar_ref(Arc::new(
+                parking_lot::RwLock::new(val),
+            ))));
+        }
+        nops::MAKE_HASH => {
+            let n = vm.pop().to_int().max(0) as usize;
+            let mut items: Vec<StrykeValue> = Vec::with_capacity(n);
+            for _ in 0..n {
+                items.push(pop_stryke(vm));
+            }
+            items.reverse();
+            let mut map = IndexMap::new();
+            let mut i = 0;
+            while i + 1 < items.len() {
+                map.insert(items[i].to_string(), items[i + 1].clone());
+                i += 2;
+            }
+            vm.push(stryke_to_fusevm(&StrykeValue::hash(map)));
         }
         nops::STR_CMP => {
             let b = pop_stryke(vm);
@@ -1626,6 +1737,32 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::Dup => {
                 b.emit(fusevm::Op::Dup, 0);
             }
+            // Array mutation + ref/hash construction.
+            Op::PushArray(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::PUSH_ARRAY, 0), 0);
+            }
+            Op::PopArray(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::POP_ARRAY, 0), 0);
+            }
+            Op::ShiftArray(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SHIFT_ARRAY, 0), 0);
+            }
+            Op::MakeArrayRef => {
+                b.emit(fusevm::Op::Extended(nops::MAKE_ARRAY_REF, 0), 0);
+            }
+            Op::MakeHashRef => {
+                b.emit(fusevm::Op::Extended(nops::MAKE_HASH_REF, 0), 0);
+            }
+            Op::MakeScalarRef => {
+                b.emit(fusevm::Op::Extended(nops::MAKE_SCALAR_REF, 0), 0);
+            }
+            Op::MakeHash(n) => {
+                b.emit(fusevm::Op::LoadInt(*n as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAKE_HASH, 0), 0);
+            }
             // Scalar locals: strykelang stores them in `interp.scope` slots; on
             // the native path they live in the fusevm frame's slots instead
             // (self-consistent within the run — Declare/Set/Get use the same
@@ -2043,6 +2180,22 @@ mod tests {
         assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
         assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
         assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+    }
+
+    #[test]
+    fn native_array_mut_and_refs_match_vm() {
+        assert_parity_str("my @a = (1, 2); push @a, 3; push @a, (4, 5); join(\",\", @a)", "1,2,3,4,5");
+        assert_parity_int("my @a = (1, 2, 3); pop @a", 3);
+        assert_parity_int("my @a = (1, 2, 3); shift @a", 1);
+        assert_parity_str("my @a = (1, 2, 3); pop @a; join(\",\", @a)", "1,2");
+        assert_parity_str("my @a = (5, 6, 7); shift @a; join(\",\", @a)", "6,7");
+        // MakeHash literal → element read.
+        assert_parity_int("my %h = (a => 1, b => 2, c => 3); $h{c}", 3);
+        // Ref construction, observed via ref() so it runs natively (deref ops are
+        // a later phase). `\42` form exercises MakeScalarRef (not BindingRef).
+        assert_parity_str("ref([1, 2, 3])", "ARRAY");
+        assert_parity_str("ref({ a => 1 })", "HASH");
+        assert_parity_str("ref(\\42)", "SCALAR");
     }
 
     #[test]
