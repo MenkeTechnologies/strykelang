@@ -99,6 +99,10 @@ mod nops {
     pub const SLOT_SET: u16 = 36;
     pub const SLOT_SET_KEEP: u16 = 37;
     pub const SLOT_DECLARE: u16 = 38;
+    /// `=~` match. Preceded by `LoadInt(pat_idx), LoadInt(flags_idx),
+    /// LoadInt(scalar_g), LoadInt(pos_key_idx)`; delegates to
+    /// `interp.regex_match_execute` (which also sets `$1`/`$&`/etc.).
+    pub const REGEX_MATCH: u16 = 39;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -603,6 +607,48 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 }
             }
         }
+        nops::REGEX_MATCH => {
+            let pos_key_idx = vm.pop().to_int();
+            let scalar_g = vm.pop().to_int() != 0;
+            let flags_idx = vm.pop().to_int();
+            let pat_idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let pattern =
+                with_chunk(|c| c.constants.get(pat_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default());
+            let flags =
+                with_chunk(|c| c.constants.get(flags_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default());
+            if val.is_iterator() {
+                // Iterators aren't produced by any covered op yet, so this is
+                // unreachable; error loudly rather than risk a silent divergence.
+                set_native_err(StrykeError::runtime(
+                    "regex match on an iterator is not yet supported on the native path",
+                    0,
+                ));
+                vm.push(fusevm::Value::Undef);
+            } else {
+                let pos_key = if pos_key_idx == u16::MAX as i64 {
+                    "_".to_string()
+                } else {
+                    with_chunk(|c| {
+                        c.constants.get(pos_key_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_else(|| "_".into())
+                    })
+                };
+                let s = val.into_string();
+                let r =
+                    with_interp(|i| i.regex_match_execute(s, &pattern, &flags, scalar_g, &pos_key, 0));
+                match r {
+                    Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                        set_native_err(e);
+                        vm.push(fusevm::Value::Undef);
+                    }
+                    Err(_) => {
+                        set_native_err(StrykeError::runtime("=~: unexpected control flow", 0));
+                        vm.push(fusevm::Value::Undef);
+                    }
+                }
+            }
+        }
         // Scalar slots in interp.scope (so closures can capture `my` locals).
         nops::SLOT_GET => {
             let slot = vm.pop().to_int() as u8;
@@ -967,6 +1013,13 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::ArrowCall(wa) => {
                 b.emit(fusevm::Op::Extended(nops::ARROW_CALL, *wa), 0);
             }
+            Op::RegexMatch(pat_idx, flags_idx, scalar_g, pos_key_idx) => {
+                b.emit(fusevm::Op::LoadInt(*pat_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*flags_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*scalar_g as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*pos_key_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::REGEX_MATCH, 0), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1155,6 +1208,14 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_regex_match_matches_vm() {
+        assert_parity_int("my $x = \"hello\"; $x =~ /ell/ ? 1 : 0", 1);
+        assert_parity_int("\"hello\" =~ /xyz/ ? 1 : 0", 0);
+        assert_parity_int("\"abc123\" =~ /\\d+/ ? 1 : 0", 1);
+        assert_parity_int("\"Hello\" =~ /hello/i ? 1 : 0", 1); // case-insensitive flag
     }
 
     #[test]
