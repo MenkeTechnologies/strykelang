@@ -16577,7 +16577,7 @@ impl VMHelper {
         }
     }
 
-    fn call_named_sub(
+    pub(crate) fn call_named_sub(
         &mut self,
         name: &str,
         args: Vec<StrykeValue>,

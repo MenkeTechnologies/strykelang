@@ -83,6 +83,10 @@ mod nops {
     /// the argument count.
     pub const PRINT: u16 = 30;
     pub const SAY: u16 = 31;
+    /// Static user-sub call. Preceded by `LoadInt(name_idx), LoadInt(argc),
+    /// LoadInt(wantarray)`; delegates the whole call (scopes, param binding,
+    /// recursion) to the interp via `call_named_sub`.
+    pub const CALL_SUB: u16 = 32;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -537,6 +541,31 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
+        nops::CALL_SUB => {
+            let _wa = vm.pop().to_int(); // wantarray byte (scalar context assumed)
+            let argc = vm.pop().to_int().max(0) as usize;
+            let name_idx = vm.pop().to_int();
+            let mut args: Vec<StrykeValue> = Vec::with_capacity(argc);
+            for _ in 0..argc {
+                args.push(pop_stryke(vm));
+            }
+            args.reverse(); // pops are last-to-first → source order
+            let name = host_name(name_idx);
+            let r = with_interp(|i| {
+                i.call_named_sub(&name, args, 0, crate::vm_helper::WantarrayCtx::Scalar)
+            });
+            match r {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime("call: unexpected control flow", 0));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         _ => {}
     }
 }
@@ -576,6 +605,9 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
     let mut src_to_dst: Vec<usize> = Vec::with_capacity(chunk.ops.len() + 1);
     // (fusevm jump op index, source target index) pairs, patched in pass 2.
     let mut jump_fixups: Vec<(usize, usize)> = Vec::new();
+    // Halt jump indices, patched to end-of-chunk (so a top-level Halt skips any
+    // sub bodies appended after it rather than falling through into them).
+    let mut halt_fixups: Vec<usize> = Vec::new();
     for op in &chunk.ops {
         src_to_dst.push(b.current_pos());
         match op {
@@ -768,13 +800,25 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
                 jump_fixups.push((pos, *target));
             }
-            // Top-level terminator: emit nothing and let the chunk end
-            // naturally (fusevm returns the value left on the stack when
-            // `ip >= len`). Emitting a fusevm `Return` here is wrong — at the
-            // root frame it pops the frame and resets ip, re-running the whole
-            // program. Jumps to the terminator resolve to body-end via
-            // `src_to_dst`, which also ends the run.
-            Op::Return | Op::Halt => {}
+            // Top-level terminator. Jump to end-of-chunk so any sub bodies
+            // appended after Halt are skipped (they run via call delegation, not
+            // by falling through). A plain fusevm `Return` is wrong here: at the
+            // root frame it pops the frame and resets ip, re-running everything.
+            Op::Halt => {
+                let pos = b.emit(fusevm::Op::Jump(0), 0);
+                halt_fixups.push(pos);
+            }
+            // Sub-body terminators: the body runs via call delegation (vm.rs),
+            // so in the fusevm chunk it's unreachable — emit nothing.
+            Op::Return | Op::ReturnValue => {}
+            // Static user-sub call: push name index, argc, wantarray, then the
+            // Extended op delegates the whole call to the interp.
+            Op::CallStaticSubId(_sid, name_idx, argc, wa) => {
+                b.emit(fusevm::Op::LoadInt(*name_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*argc as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*wa as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::CALL_SUB, 0), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -800,10 +844,15 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
         }
     }
     // End sentinel so a jump to "one past the last op" resolves to program end.
-    src_to_dst.push(b.current_pos());
+    let end = b.current_pos();
+    src_to_dst.push(end);
     for (pos, target) in jump_fixups {
         let dst = *src_to_dst.get(target)?;
         b.patch_jump(pos, dst);
+    }
+    // Halt jumps go to end-of-chunk (skipping any appended sub bodies).
+    for pos in halt_fixups {
+        b.patch_jump(pos, end);
     }
 
     let fchunk = b.build();
@@ -842,10 +891,14 @@ mod tests {
     /// program is outside the covered subset.
     fn native(code: &str) -> Option<StrykeResult<StrykeValue>> {
         let program = crate::parse(code).expect("parse");
+        let mut interp = VMHelper::new();
+        // Mirror the real path (try_vm_execute): register top-level declarations
+        // (subs, etc.) before running, so call delegation can resolve them.
+        interp.prepare_program_top_level(&program).expect("prepare");
         let chunk = crate::compiler::Compiler::new()
             .compile_program(&program)
             .expect("compile");
-        try_run_native(&chunk, &mut VMHelper::new())
+        try_run_native(&chunk, &mut interp)
     }
 
     /// Native path must agree with the normal vm.rs path on the returned value
@@ -953,6 +1006,18 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_function_calls_match_vm() {
+        assert_parity_int("fn add($a, $b) { $a + $b } add(2, 3)", 5);
+        assert_parity_int("fn dbl($n) { $n * 2 } dbl(21)", 42);
+        assert_parity_int("fn add($a, $b) { $a + $b } add(2, 3) + add(10, 20)", 35);
+        // recursion (non-builtin name)
+        assert_parity_int(
+            "fn myfact($n) { if ($n <= 1) { 1 } else { $n * myfact($n - 1) } } myfact(5)",
+            120,
+        );
     }
 
     #[test]
