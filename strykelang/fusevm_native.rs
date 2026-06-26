@@ -56,6 +56,67 @@ mod nops {
     pub const DIV: u16 = 16;
     pub const MOD: u16 = 17;
     pub const POW: u16 = 18;
+    /// Name-scoped scalars (globals / package / special vars). Each is preceded
+    /// by a `LoadInt(name_idx)` so the handler can resolve the name; they
+    /// delegate to the interp via the host below.
+    pub const GET_SCALAR: u16 = 19;
+    pub const SET_SCALAR: u16 = 20;
+    pub const DECLARE_SCALAR: u16 = 21;
+    /// "Plain" scalar access — direct `scope.get_scalar`/`set_scalar` (no
+    /// special-var resolution); what the compiler emits for ordinary names.
+    pub const GET_SCALAR_PLAIN: u16 = 22;
+    pub const SET_SCALAR_PLAIN: u16 = 23;
+    pub const SET_SCALAR_KEEP_PLAIN: u16 = 24;
+}
+
+// ── Interp host ─────────────────────────────────────────────────────────────
+// The structural keystone for the heap/call/name-scoped half of the migration:
+// a thread-local view of the live `VMHelper` + the chunk's name table, set for
+// the duration of the native run. Handlers reach interp state (scopes, special
+// vars, overloads, …) through `with_interp`, mirroring awkrs's `CURRENT_RT` and
+// zshrs's `CURRENT_EXECUTOR`. The guard brackets `vm.run()` exactly (the run is
+// synchronous), so no aliasing or leak occurs.
+thread_local! {
+    static CURRENT_INTERP: std::cell::Cell<*mut VMHelper> =
+        const { std::cell::Cell::new(std::ptr::null_mut()) };
+    static CURRENT_NAMES: std::cell::Cell<*const Vec<String>> =
+        const { std::cell::Cell::new(std::ptr::null()) };
+}
+
+struct HostGuard;
+impl HostGuard {
+    fn enter(interp: &mut VMHelper, names: &Vec<String>) -> Self {
+        CURRENT_INTERP.with(|c| c.set(interp as *mut VMHelper));
+        CURRENT_NAMES.with(|c| c.set(names as *const Vec<String>));
+        HostGuard
+    }
+}
+impl Drop for HostGuard {
+    fn drop(&mut self) {
+        CURRENT_INTERP.with(|c| c.set(std::ptr::null_mut()));
+        CURRENT_NAMES.with(|c| c.set(std::ptr::null()));
+    }
+}
+
+/// Run `f` against the live interp. The host guard is always active while the
+/// native VM runs, so the pointer is non-null inside any handler.
+fn with_interp<R>(f: impl FnOnce(&mut VMHelper) -> R) -> R {
+    let p = CURRENT_INTERP.with(|c| c.get());
+    debug_assert!(!p.is_null(), "with_interp outside a HostGuard scope");
+    // SAFETY: set from a live `&mut VMHelper` by `HostGuard::enter`, cleared on
+    // drop; the guard brackets the synchronous run so no aliasing occurs.
+    f(unsafe { &mut *p })
+}
+
+/// Resolve a name-pool index to its name (chunk.names), via the host.
+fn host_name(idx: i64) -> String {
+    let p = CURRENT_NAMES.with(|c| c.get());
+    if p.is_null() {
+        return String::new();
+    }
+    // SAFETY: set to the live chunk's names for the run's duration.
+    let names = unsafe { &*p };
+    names.get(idx as usize).cloned().unwrap_or_default()
 }
 
 thread_local! {
@@ -236,6 +297,67 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             let a = pop_stryke(vm);
             vm.push(stryke_to_fusevm(&crate::value::compat_pow(&a, &b)));
         }
+        // Name-scoped scalars — delegate to the interp (special-var resolution,
+        // mutability checks, scope storage) via the host so semantics match
+        // vm.rs exactly. `name_idx` was pushed by a preceding LoadInt.
+        nops::GET_SCALAR => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let v = with_interp(|i| i.get_special_var(&name));
+            vm.push(stryke_to_fusevm(&v));
+        }
+        nops::SET_SCALAR => {
+            let idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let name = host_name(idx);
+            let r = with_interp(|i| {
+                i.maybe_invalidate_regex_capture_memo(&name);
+                i.set_special_var(&name, &val)
+            });
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
+        nops::DECLARE_SCALAR => {
+            let idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let name = host_name(idx);
+            let r = with_interp(|i| i.scope.declare_scalar_frozen(&name, val, false, None));
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
+        nops::GET_SCALAR_PLAIN => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let v = with_interp(|i| i.scope.get_scalar(&name));
+            vm.push(stryke_to_fusevm(&v));
+        }
+        nops::SET_SCALAR_PLAIN => {
+            let idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let name = host_name(idx);
+            let r = with_interp(|i| {
+                i.maybe_invalidate_regex_capture_memo(&name);
+                i.scope.set_scalar(&name, val)
+            });
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
+        nops::SET_SCALAR_KEEP_PLAIN => {
+            let idx = vm.pop().to_int();
+            // KEEP: leave the assigned value on the stack (peek, don't pop).
+            let val = fusevm_to_stryke(vm.peek()).unwrap_or(StrykeValue::UNDEF);
+            let name = host_name(idx);
+            let r = with_interp(|i| {
+                i.maybe_invalidate_regex_capture_memo(&name);
+                i.scope.set_scalar(&name, val)
+            });
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
         _ => {}
     }
 }
@@ -267,7 +389,7 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
 /// `Some(result)` when the whole program is in the covered subset, else `None`
 /// (the caller then runs it on `crate::vm`). `interp` is unused in Phase 1 (no
 /// vars/closures/host yet) but threaded for later phases.
-pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeResult<StrykeValue>> {
+pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResult<StrykeValue>> {
     let mut b = fusevm::ChunkBuilder::new();
     // Map each source op index to the fusevm op index its lowering starts at, so
     // jump targets (absolute source indices) can be remapped after lowering.
@@ -316,6 +438,32 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             }
             Op::Pow => {
                 b.emit(fusevm::Op::Extended(nops::POW, 0), 0);
+            }
+            // Name-scoped scalars: push the name index, then the Extended op
+            // resolves + delegates to the interp via the host.
+            Op::GetScalar(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GET_SCALAR, 0), 0);
+            }
+            Op::SetScalar(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SET_SCALAR, 0), 0);
+            }
+            Op::DeclareScalar(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::DECLARE_SCALAR, 0), 0);
+            }
+            Op::GetScalarPlain(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GET_SCALAR_PLAIN, 0), 0);
+            }
+            Op::SetScalarPlain(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SET_SCALAR_PLAIN, 0), 0);
+            }
+            Op::SetScalarKeepPlain(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SET_SCALAR_KEEP_PLAIN, 0), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
@@ -452,7 +600,13 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
     let mut vm = fusevm::VM::new(fchunk);
     vm.set_extension_handler(Box::new(native_ext_handler));
     NATIVE_ERR.with(|c| *c.borrow_mut() = None);
-    let outcome = vm.run();
+    // Make the live interp + name table reachable from handlers for the run's
+    // duration. The guard brackets `vm.run()` exactly (synchronous), so the raw
+    // pointers it stores are valid throughout and cleared on drop.
+    let outcome = {
+        let _host = HostGuard::enter(interp, &chunk.names);
+        vm.run()
+    };
     // A runtime error raised inside the handler (e.g. division by zero) takes
     // precedence over the VM's own result.
     if let Some(e) = NATIVE_ERR.with(|c| c.borrow_mut().take()) {
@@ -589,6 +743,16 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_name_scoped_scalars_match_vm() {
+        // `our`/package/global scalars go through the interp host (scope), not
+        // fusevm frame slots like `my` locals do.
+        assert_parity_int("our $x = 5; $x + 1", 6);
+        assert_parity_int("$x = 5; $x + 1", 6);
+        assert_parity_int("$g = 3; $g * 2", 6);
+        assert_parity_int("$a = 4; $b = 10; $a + $b", 14);
     }
 
     #[test]
