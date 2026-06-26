@@ -79,6 +79,64 @@ mod nops {
     /// map in the interp scope; GET_HASH_ELEM reads `name{key}`.
     pub const DECLARE_HASH: u16 = 28;
     pub const GET_HASH_ELEM: u16 = 29;
+    /// I/O: `print` / `say` to the default handle. The Extended `arg` carries
+    /// the argument count.
+    pub const PRINT: u16 = 30;
+    pub const SAY: u16 = 31;
+}
+
+/// `print`/`say` to the default handle, delegated to the interp so output goes
+/// through the exact same sink (`write_formatted_print`), stringification
+/// (`stringify_value`), and `$,`/`$\` (ofs/ors) that vm.rs uses → identical
+/// output. `say` appends a newline and requires the `say` feature.
+fn do_print(vm: &mut fusevm::VM, argc: usize, say: bool) {
+    let mut args: Vec<StrykeValue> = Vec::with_capacity(argc);
+    for _ in 0..argc {
+        args.push(pop_stryke(vm));
+    }
+    args.reverse(); // pops are last-to-first → restore source order
+    let r: Result<(), StrykeError> = with_interp(|i| {
+        if say && (i.feature_bits & crate::vm_helper::FEAT_SAY) == 0 {
+            return Err(StrykeError::runtime(
+                "say() is disabled (enable with use feature 'say' or use feature ':5.10')",
+                0,
+            ));
+        }
+        let ofs = i.ofs.clone();
+        let ors = i.ors.clone();
+        let stringify = |i: &mut VMHelper, v: StrykeValue| -> Result<String, StrykeError> {
+            match i.stringify_value(v, 0) {
+                Ok(s) => Ok(s),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => Err(e),
+                Err(_) => Err(StrykeError::runtime("print: unexpected control flow", 0)),
+            }
+        };
+        let mut output = String::new();
+        if args.is_empty() {
+            let topic = i.scope.get_scalar("_");
+            output.push_str(&stringify(i, topic)?);
+        } else {
+            for (idx, arg) in args.iter().enumerate() {
+                if idx > 0 && !ofs.is_empty() {
+                    output.push_str(&ofs);
+                }
+                for item in arg.to_list() {
+                    output.push_str(&stringify(i, item)?);
+                }
+            }
+        }
+        if say {
+            output.push('\n');
+        }
+        output.push_str(&ors);
+        let dph = i.default_print_handle.clone();
+        let handle = i.resolve_io_handle_name(&dph);
+        i.write_formatted_print(&handle, &output, 0)
+    });
+    if let Err(e) = r {
+        set_native_err(e);
+    }
+    // `print`/`say` are void in strykelang (leave nothing on the stack).
 }
 
 /// Index a string by Unicode char (negative-from-end), as strykelang's array
@@ -254,7 +312,7 @@ fn stryke_display(v: &fusevm::Value) -> String {
 /// Extension handler for strykelang's native-value Extended ops, installed on
 /// the fusevm-only VM. Each op delegates to strykelang's own value semantics so
 /// results match vm.rs.
-fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
+fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
     match id {
         nops::CONCAT => {
             let b = vm.pop();
@@ -477,6 +535,8 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             });
             vm.push(stryke_to_fusevm(&v));
         }
+        nops::PRINT => do_print(vm, arg as usize, false),
+        nops::SAY => do_print(vm, arg as usize, true),
         _ => {}
     }
 }
@@ -605,6 +665,15 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::GetHashElem(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_HASH_ELEM, 0), 0);
+            }
+            // print/say to the DEFAULT handle only (the common case); a named
+            // handle (`print $fh ...`) falls back to vm.rs for now. The arg
+            // count rides in the Extended op's `arg` byte.
+            Op::Print(None, argc) => {
+                b.emit(fusevm::Op::Extended(nops::PRINT, *argc), 0);
+            }
+            Op::Say(None, argc) => {
+                b.emit(fusevm::Op::Extended(nops::SAY, *argc), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
@@ -884,6 +953,15 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_string_interpolation_matches_vm() {
+        // Interpolation compiles to LoadConst + GetScalar + Concat — already
+        // covered by existing ops; this pins that they compose correctly.
+        assert_parity_str("my $x = 5; \"sum: $x\"", "sum: 5");
+        assert_parity_str("my $n = 3; \"n=${n}!\"", "n=3!");
+        assert_parity_str("my $a = 2; my $b = 3; \"$a+$b\"", "2+3");
     }
 
     #[test]
