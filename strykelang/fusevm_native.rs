@@ -87,6 +87,18 @@ mod nops {
     /// LoadInt(wantarray)`; delegates the whole call (scopes, param binding,
     /// recursion) to the interp via `call_named_sub`.
     pub const CALL_SUB: u16 = 32;
+    /// Closures. MAKE_CODEREF (preceded by `LoadInt(block_idx), LoadInt(sig_idx)`)
+    /// builds an anon sub capturing the current scope → registry handle.
+    /// ARROW_CALL (`$f->(args)`) calls the coderef; `arg` carries wantarray.
+    pub const MAKE_CODEREF: u16 = 33;
+    pub const ARROW_CALL: u16 = 34;
+    /// Scalar slots backed by `interp.scope` (not fusevm frame slots), so that
+    /// closures capturing `my` locals see them via `scope.capture()`. Each is
+    /// preceded by `LoadInt(slot)` (and `LoadInt(name_idx)` for DECLARE).
+    pub const SLOT_GET: u16 = 35;
+    pub const SLOT_SET: u16 = 36;
+    pub const SLOT_SET_KEEP: u16 = 37;
+    pub const SLOT_DECLARE: u16 = 38;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -185,22 +197,27 @@ fn array_elem_value(i: &mut VMHelper, n: &str, index: i64) -> StrykeValue {
 thread_local! {
     static CURRENT_INTERP: std::cell::Cell<*mut VMHelper> =
         const { std::cell::Cell::new(std::ptr::null_mut()) };
-    static CURRENT_NAMES: std::cell::Cell<*const Vec<String>> =
+    static CURRENT_CHUNK: std::cell::Cell<*const Chunk> =
         const { std::cell::Cell::new(std::ptr::null()) };
+    /// Registry of non-scalar StrykeValues (closures, refs, regexes, objects)
+    /// that fusevm's native `Value` can't hold. They ride the fusevm stack as
+    /// `Value::NativeFn(id)` indices into this per-run table.
+    static REGISTRY: std::cell::RefCell<Vec<StrykeValue>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 struct HostGuard;
 impl HostGuard {
-    fn enter(interp: &mut VMHelper, names: &Vec<String>) -> Self {
+    fn enter(interp: &mut VMHelper, chunk: &Chunk) -> Self {
         CURRENT_INTERP.with(|c| c.set(interp as *mut VMHelper));
-        CURRENT_NAMES.with(|c| c.set(names as *const Vec<String>));
+        CURRENT_CHUNK.with(|c| c.set(chunk as *const Chunk));
         HostGuard
     }
 }
 impl Drop for HostGuard {
     fn drop(&mut self) {
         CURRENT_INTERP.with(|c| c.set(std::ptr::null_mut()));
-        CURRENT_NAMES.with(|c| c.set(std::ptr::null()));
+        CURRENT_CHUNK.with(|c| c.set(std::ptr::null()));
     }
 }
 
@@ -214,15 +231,31 @@ fn with_interp<R>(f: impl FnOnce(&mut VMHelper) -> R) -> R {
     f(unsafe { &mut *p })
 }
 
+/// Run `f` against the live chunk (for names / blocks / code_ref_sigs).
+fn with_chunk<R>(f: impl FnOnce(&Chunk) -> R) -> R {
+    let p = CURRENT_CHUNK.with(|c| c.get());
+    debug_assert!(!p.is_null(), "with_chunk outside a HostGuard scope");
+    // SAFETY: set to the live chunk for the run's duration.
+    f(unsafe { &*p })
+}
+
 /// Resolve a name-pool index to its name (chunk.names), via the host.
 fn host_name(idx: i64) -> String {
-    let p = CURRENT_NAMES.with(|c| c.get());
-    if p.is_null() {
-        return String::new();
-    }
-    // SAFETY: set to the live chunk's names for the run's duration.
-    let names = unsafe { &*p };
-    names.get(idx as usize).cloned().unwrap_or_default()
+    with_chunk(|c| c.names.get(idx as usize).cloned().unwrap_or_default())
+}
+
+/// Stash a non-scalar StrykeValue, returning its registry id (for NativeFn).
+fn reg_put(v: StrykeValue) -> u16 {
+    REGISTRY.with(|r| {
+        let mut r = r.borrow_mut();
+        r.push(v);
+        (r.len() - 1) as u16
+    })
+}
+
+/// Retrieve a registry value by id.
+fn reg_get(id: u16) -> StrykeValue {
+    REGISTRY.with(|r| r.borrow().get(id as usize).cloned().unwrap_or(StrykeValue::UNDEF))
 }
 
 thread_local! {
@@ -243,14 +276,18 @@ fn set_native_err(e: StrykeError) {
 
 /// Convert a StrykeValue back to a native fusevm Value (scalar subset).
 fn stryke_to_fusevm(v: &StrykeValue) -> fusevm::Value {
-    if let Some(i) = v.as_integer() {
+    if v.is_undef() {
+        fusevm::Value::Undef
+    } else if let Some(i) = v.as_integer() {
         fusevm::Value::Int(i)
     } else if let Some(f) = v.as_float() {
         fusevm::Value::Float(f)
     } else if let Some(s) = v.as_str() {
         fusevm::Value::Str(Arc::new(s))
     } else {
-        fusevm::Value::Undef
+        // Non-scalar (closure / ref / regex / object): stash in the registry and
+        // carry it as a NativeFn handle.
+        fusevm::Value::NativeFn(reg_put(v.clone()))
     }
 }
 
@@ -566,6 +603,97 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 }
             }
         }
+        // Scalar slots in interp.scope (so closures can capture `my` locals).
+        nops::SLOT_GET => {
+            let slot = vm.pop().to_int() as u8;
+            let v = with_interp(|i| i.scope.get_scalar_slot(slot));
+            vm.push(stryke_to_fusevm(&v));
+        }
+        nops::SLOT_SET => {
+            let slot = vm.pop().to_int() as u8;
+            let val = pop_stryke(vm);
+            with_interp(|i| i.scope.set_scalar_slot(slot, val));
+        }
+        nops::SLOT_SET_KEEP => {
+            let slot = vm.pop().to_int() as u8;
+            // KEEP: leave the value on the stack (peek), store a copy.
+            let val = fusevm_to_stryke(vm.peek()).unwrap_or(StrykeValue::UNDEF);
+            with_interp(|i| i.scope.set_scalar_slot(slot, val));
+        }
+        nops::SLOT_DECLARE => {
+            let name_idx = vm.pop().to_int();
+            let slot = vm.pop().to_int() as u8;
+            let val = pop_stryke(vm);
+            let name = if name_idx == u16::MAX as i64 {
+                None
+            } else {
+                Some(host_name(name_idx))
+            };
+            with_interp(|i| i.scope.declare_scalar_slot(slot, val, name.as_deref()));
+        }
+        nops::MAKE_CODEREF => {
+            let sig_idx = vm.pop().to_int() as usize;
+            let block_idx = vm.pop().to_int() as usize;
+            let parts = with_chunk(|c| {
+                (c.blocks.get(block_idx).cloned(), c.code_ref_sigs.get(sig_idx).cloned())
+            });
+            match parts {
+                (Some(block), Some(params)) => {
+                    let captured = with_interp(|i| i.scope.capture());
+                    let coderef = StrykeValue::code_ref(Arc::new(crate::value::StrykeSub {
+                        name: "__ANON__".to_string(),
+                        params,
+                        body: block,
+                        closure_env: Some(captured),
+                        prototype: None,
+                        fib_like: None,
+                        return_type: None,
+                    }));
+                    vm.push(stryke_to_fusevm(&coderef));
+                }
+                _ => {
+                    set_native_err(StrykeError::runtime("MakeCodeRef: bad block/sig index", 0));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARROW_CALL => {
+            let want = crate::vm_helper::WantarrayCtx::from_byte(arg);
+            // Multiple args ride as a Value::Array (built by MakeArray); a single
+            // arg rides as a scalar. Flatten either to the arg list.
+            let args_raw = vm.pop();
+            let args: Vec<StrykeValue> = match args_raw {
+                fusevm::Value::Array(items) => {
+                    items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect()
+                }
+                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
+            };
+            let mut callee = pop_stryke(vm);
+            // Auto-deref a scalar ref so `$f->()` works when $f holds a ref.
+            if let Some(inner) = callee.as_scalar_ref() {
+                callee = inner.read().clone();
+            }
+            if let Some(sub) = callee.as_code_ref() {
+                let r = with_interp(|i| i.call_sub(&sub, args, want, 0));
+                match r {
+                    Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                        set_native_err(e);
+                        vm.push(fusevm::Value::Undef);
+                    }
+                    Err(_) => {
+                        set_native_err(StrykeError::runtime("->: unexpected control flow", 0));
+                        vm.push(fusevm::Value::Undef);
+                    }
+                }
+            } else {
+                set_native_err(StrykeError::runtime(
+                    "Not a CODE reference in arrow call",
+                    0,
+                ));
+                vm.push(fusevm::Value::Undef);
+            }
+        }
         _ => {}
     }
 }
@@ -590,6 +718,7 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
         fusevm::Value::Float(f) => Some(StrykeValue::float(*f)),
         fusevm::Value::Str(s) => Some(StrykeValue::string((**s).clone())),
         fusevm::Value::Undef => Some(StrykeValue::UNDEF),
+        fusevm::Value::NativeFn(id) => Some(reg_get(*id)),
         _ => None,
     }
 }
@@ -762,39 +891,48 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             // (self-consistent within the run — Declare/Set/Get use the same
             // storage). `set_slot` auto-grows, so no pre-sizing is needed. The
             // declared name is only symbolic and is dropped.
-            Op::DeclareScalarSlot(slot, _name) => {
-                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
+            Op::DeclareScalarSlot(slot, name_idx) => {
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*name_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_DECLARE, 0), 0);
             }
             Op::GetScalarSlot(slot) => {
-                b.emit(fusevm::Op::GetSlot(*slot as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
             }
             Op::SetScalarSlot(slot) => {
-                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
             }
-            // Keep variant peeks (assignment used as an expression): dup, store.
             Op::SetScalarSlotKeep(slot) => {
-                b.emit(fusevm::Op::Dup, 0);
-                b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_SET_KEEP, 0), 0);
             }
             // Fused superinstructions (loops/compound-assign). Lowered to their
             // unfused universal-op equivalents — correct, and fusevm's block JIT
             // re-fuses these very patterns to machine code.
             Op::AddAssignSlotSlotVoid(d, s) => {
-                b.emit(fusevm::Op::GetSlot(*d as u16), 0);
-                b.emit(fusevm::Op::GetSlot(*s as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*d as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
+                b.emit(fusevm::Op::LoadInt(*s as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
                 b.emit(fusevm::Op::Add, 0);
-                b.emit(fusevm::Op::SetSlot(*d as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*d as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
             }
             Op::PreIncSlotVoid(s) => {
-                b.emit(fusevm::Op::GetSlot(*s as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*s as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
                 b.emit(fusevm::Op::LoadInt(1), 0);
                 b.emit(fusevm::Op::Add, 0);
-                b.emit(fusevm::Op::SetSlot(*s as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*s as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
             }
             // `slot < int` then conditional jump. The NUM_LT Extended op yields
             // Int 0/1, so JumpIfFalse needs no TRUTHY normalization here.
             Op::SlotLtIntJumpIfFalse(slot, int, target) => {
-                b.emit(fusevm::Op::GetSlot(*slot as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
                 b.emit(fusevm::Op::LoadInt(*int as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::NUM_LT, 0), 0);
                 let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
@@ -808,9 +946,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 let pos = b.emit(fusevm::Op::Jump(0), 0);
                 halt_fixups.push(pos);
             }
-            // Sub-body terminators: the body runs via call delegation (vm.rs),
-            // so in the fusevm chunk it's unreachable — emit nothing.
-            Op::Return | Op::ReturnValue => {}
+            // Sub/closure-body terminators: those bodies run via call delegation
+            // (the interp), so in the fusevm chunk they're unreachable after the
+            // Halt jump — emit nothing.
+            Op::Return | Op::ReturnValue | Op::BlockReturnValue => {}
             // Static user-sub call: push name index, argc, wantarray, then the
             // Extended op delegates the whole call to the interp.
             Op::CallStaticSubId(_sid, name_idx, argc, wa) => {
@@ -818,6 +957,15 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*argc as i64), 0);
                 b.emit(fusevm::Op::LoadInt(*wa as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::CALL_SUB, 0), 0);
+            }
+            // Closures: build the coderef (block + sig indices), call via arrow.
+            Op::MakeCodeRef(block_idx, sig_idx) => {
+                b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*sig_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAKE_CODEREF, 0), 0);
+            }
+            Op::ArrowCall(wa) => {
+                b.emit(fusevm::Op::Extended(nops::ARROW_CALL, *wa), 0);
             }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
@@ -859,11 +1007,12 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
     let mut vm = fusevm::VM::new(fchunk);
     vm.set_extension_handler(Box::new(native_ext_handler));
     NATIVE_ERR.with(|c| *c.borrow_mut() = None);
-    // Make the live interp + name table reachable from handlers for the run's
-    // duration. The guard brackets `vm.run()` exactly (synchronous), so the raw
-    // pointers it stores are valid throughout and cleared on drop.
+    REGISTRY.with(|r| r.borrow_mut().clear());
+    // Make the live interp + chunk (names / blocks / code_ref_sigs) reachable
+    // from handlers for the run's duration. The guard brackets `vm.run()`
+    // exactly (synchronous), so the raw pointers are valid throughout.
     let outcome = {
-        let _host = HostGuard::enter(interp, &chunk.names);
+        let _host = HostGuard::enter(interp, chunk);
         vm.run()
     };
     // A runtime error raised inside the handler (e.g. division by zero) takes
@@ -1006,6 +1155,14 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_closures_match_vm() {
+        assert_parity_int("my $f = fn($x) { $x * 2 }; $f->(21)", 42);
+        assert_parity_int("my $add = fn($a, $b) { $a + $b }; $add->(2, 3)", 5);
+        // closure capturing a lexical
+        assert_parity_int("my $n = 10; my $g = fn($x) { $x + $n }; $g->(5)", 15);
     }
 
     #[test]
