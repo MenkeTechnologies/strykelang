@@ -127,6 +127,9 @@ mod nops {
     pub const RANGE: u16 = 47;
     /// `@name` whole-array read → list value. Preceded by `LoadInt(name_idx)`.
     pub const GET_ARRAY: u16 = 48;
+    /// `map { BLOCK } LIST` (generic block body). Preceded by `LoadInt(block_idx)`;
+    /// the Extended `arg` carries the flat-map peel flag (0 = map, 1 = flat_map).
+    pub const MAP_BLOCK: u16 = 49;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -635,6 +638,41 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let result: Vec<StrykeValue> =
                 list.iter().map(|item| StrykeValue::integer(item.to_int().wrapping_mul(k))).collect();
             vm.push(stryke_to_fusevm(&StrykeValue::array(result)));
+        }
+        nops::MAP_BLOCK => {
+            let peel = arg != 0;
+            let block_idx = vm.pop().to_int() as usize;
+            let list = pop_stryke(vm).to_list();
+            let block = with_chunk(|c| c.blocks.get(block_idx).cloned());
+            let Some(block) = block else {
+                set_native_err(StrykeError::runtime("map: bad block index", 0));
+                vm.push(fusevm::Value::Undef);
+                return;
+            };
+            let r = with_interp(|i| -> Result<Vec<StrykeValue>, StrykeError> {
+                let saved = i.scope.save_topic_chain();
+                let mut result = Vec::new();
+                for item in list {
+                    i.scope.set_topic(item);
+                    match i.exec_block_with_tail(&block, crate::vm_helper::WantarrayCtx::List) {
+                        Ok(val) => result.extend(val.map_flatten_outputs(peel)),
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                            i.scope.restore_topic_chain(saved);
+                            return Err(e);
+                        }
+                        Err(_) => {}
+                    }
+                }
+                i.scope.restore_topic_chain(saved);
+                Ok(result)
+            });
+            match r {
+                Ok(items) => vm.push(stryke_to_fusevm(&StrykeValue::array(items))),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
         }
         nops::GREP_BLOCK => {
             let block_idx = vm.pop().to_int() as usize;
@@ -1251,6 +1289,14 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GREP_BLOCK, 0), 0);
             }
+            Op::MapWithBlock(block_idx) => {
+                b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAP_BLOCK, 0), 0);
+            }
+            Op::FlatMapWithBlock(block_idx) => {
+                b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAP_BLOCK, 1), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1446,6 +1492,14 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_map_with_block_matches_vm() {
+        assert_parity_str("join(\",\", map { $_ * $_ } (1..4))", "1,4,9,16");
+        assert_parity_str("join(\",\", map { $_ + 10 } (1, 2, 3))", "11,12,13");
+        assert_parity_str("join(\",\", map { ($_, $_ * 2) } (1, 2))", "1,2,2,4");
+        assert_parity_str("join(\",\", map { uc($_) } (\"a\", \"b\"))", "A,B");
     }
 
     #[test]
