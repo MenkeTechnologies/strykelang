@@ -130,6 +130,8 @@ mod nops {
     /// `map { BLOCK } LIST` (generic block body). Preceded by `LoadInt(block_idx)`;
     /// the Extended `arg` carries the flat-map peel flag (0 = map, 1 = flat_map).
     pub const MAP_BLOCK: u16 = 49;
+    /// `scalar(@name)` array length → integer. Preceded by `LoadInt(name_idx)`.
+    pub const ARRAY_LEN: u16 = 50;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -572,6 +574,12 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let name = host_name(idx);
             let arr = with_interp(|i| i.scope.get_array(&name));
             vm.push(stryke_to_fusevm(&StrykeValue::array(arr)));
+        }
+        nops::ARRAY_LEN => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let len = with_interp(|i| i.scope.array_len(&name));
+            vm.push(fusevm::Value::Int(len as i64));
         }
         nops::GET_ARRAY_ELEM => {
             let idx = vm.pop().to_int();
@@ -1084,6 +1092,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_ARRAY, 0), 0);
             }
+            Op::ArrayLen(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::ARRAY_LEN, 0), 0);
+            }
             Op::GetArrayElem(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_ARRAY_ELEM, 0), 0);
@@ -1500,6 +1512,13 @@ mod tests {
         assert_parity_str("join(\",\", map { $_ + 10 } (1, 2, 3))", "11,12,13");
         assert_parity_str("join(\",\", map { ($_, $_ * 2) } (1, 2))", "1,2,2,4");
         assert_parity_str("join(\",\", map { uc($_) } (\"a\", \"b\"))", "A,B");
+    }
+
+    #[test]
+    fn native_array_len_matches_vm() {
+        assert_parity_int("my @a = (5, 6, 7); my $n = @a; $n", 3);
+        assert_parity_int("my @a = (\"x\", \"y\", \"z\", \"w\"); my $n = @a; $n", 4);
+        assert_parity_int("my @a = (); my $n = @a; $n", 0);
     }
 
     #[test]
