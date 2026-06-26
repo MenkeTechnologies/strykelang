@@ -157,6 +157,11 @@ mod nops {
     pub const PUSH_INT_RANGE_TO_ARRAY_LOOP: u16 = 60;
     /// `for $k (keys %h) { $sum += $h{$k} }`. Preceded by `LoadInt(sum_slot), LoadInt(h_name_idx)`.
     pub const SUM_HASH_VALUES_TO_SLOT: u16 = 61;
+    /// `sort { $a <=> $b } LIST` (recognized magic comparator). Preceded by
+    /// `LoadInt(tag)` (0=num, 1=str, 2=num-rev, 3=str-rev); list below it.
+    pub const SORT_WITH_BLOCK_FAST: u16 = 62;
+    /// `++$name` (named scalar pre-increment). Preceded by `LoadInt(name_idx)`.
+    pub const PRE_INC: u16 = 63;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -826,6 +831,40 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 interp.scope.set_scalar_slot(sum_slot, new_v);
             });
         }
+        nops::SORT_WITH_BLOCK_FAST => {
+            let tag = vm.pop().to_int();
+            let mut items = pop_stryke(vm).to_list();
+            let mode = match tag {
+                0 => crate::sort_fast::SortBlockFast::Numeric,
+                1 => crate::sort_fast::SortBlockFast::String,
+                2 => crate::sort_fast::SortBlockFast::NumericRev,
+                3 => crate::sort_fast::SortBlockFast::StringRev,
+                _ => crate::sort_fast::SortBlockFast::Numeric,
+            };
+            items.sort_by(|a, b| crate::sort_fast::sort_magic_cmp(a, b, mode));
+            vm.push(stryke_to_fusevm(&StrykeValue::array(items)));
+        }
+        nops::PRE_INC => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let r = with_interp(|i| -> Result<StrykeValue, StrykeError> {
+                if i.scope.is_scalar_frozen(&name) {
+                    return Err(StrykeError::syntax(
+                        format!("cannot assign to frozen variable `${}`", name),
+                        0,
+                    ));
+                }
+                let en = i.english_scalar_name(&name).to_string();
+                i.scope.atomic_mutate(&en, |v| StrykeValue::integer(v.to_int() + 1))
+            });
+            match r {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         nops::REVERSE_LIST => {
             let val = pop_stryke(vm);
             if val.is_iterator() {
@@ -1354,6 +1393,14 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*h_name_idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::SUM_HASH_VALUES_TO_SLOT, 0), 0);
             }
+            Op::SortWithBlockFast(tag) => {
+                b.emit(fusevm::Op::LoadInt(*tag as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SORT_WITH_BLOCK_FAST, 0), 0);
+            }
+            Op::PreInc(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::PRE_INC, 0), 0);
+            }
             Op::PushFrame => {
                 b.emit(fusevm::Op::Extended(nops::PUSH_FRAME, 0), 0);
             }
@@ -1839,6 +1886,20 @@ mod tests {
              my $sum = 0; for my $k (keys %h) { $sum = $sum + $h{$k} } $sum",
             12,
         );
+    }
+
+    #[test]
+    fn native_sort_with_block_fast_matches_vm() {
+        assert_parity_str("join(\",\", sort { $a <=> $b } (3, 1, 2, 10, 5))", "1,2,3,5,10");
+        assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
+        assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
+        assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+    }
+
+    #[test]
+    fn native_pre_inc_matches_vm() {
+        assert_parity_int("my $x = 5; ++$x; $x", 6);
+        assert_parity_int("my $x = 0; ++$x; ++$x; ++$x; $x", 3);
     }
 
     #[test]
