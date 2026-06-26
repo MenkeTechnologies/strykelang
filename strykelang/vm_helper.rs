@@ -1014,7 +1014,9 @@ pub(crate) struct ModuleExportLists {
     pub export_ok: Vec<String>,
 }
 
-/// Shell command for `open(H, "-|", cmd)` / `open(H, "|-", cmd)` (list form not yet supported).
+/// Shell command for the two-arg / single-string pipe form `open(H, "cmd |")` and
+/// `open(H, "-|", "cmd string")`. The list form (`open(H, "-|", "cmd", @args)`) execs
+/// the argv directly without a shell — see [`VMHelper::open_pipe_list_execute`].
 fn piped_shell_command(cmd: &str) -> Command {
     if cfg!(windows) {
         let mut c = Command::new("cmd");
@@ -4645,6 +4647,63 @@ impl VMHelper {
             }
         }
         Ok(StrykeValue::io_handle(handle_return))
+    }
+
+    /// List-form pipe open: `open($fh, "-|", "cmd", @args)` / `open($fh, "|-", @cmd)`.
+    /// Unlike the two-arg `"cmd |"` form, the argv is exec'd directly with NO
+    /// shell — matching Perl 5, which avoids shell-injection and word-splitting.
+    pub(crate) fn open_pipe_list_execute(
+        &mut self,
+        handle_name: String,
+        mode: &str,
+        argv: Vec<String>,
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
+        let Some((program, rest)) = argv.split_first() else {
+            return Err(StrykeError::runtime(
+                "open: list-form pipe needs at least a command",
+                line,
+            ));
+        };
+        let mut cmd = Command::new(program);
+        cmd.args(rest);
+        match mode {
+            "-|" => {
+                cmd.stdout(Stdio::piped());
+                let mut child = cmd.spawn().map_err(|e| {
+                    self.apply_io_error_to_errno(&e);
+                    StrykeError::runtime(format!("Can't open pipe from command: {}", e), line)
+                })?;
+                let stdout = child
+                    .stdout
+                    .take()
+                    .ok_or_else(|| StrykeError::runtime("pipe: child has no stdout", line))?;
+                self.input_handles
+                    .insert(handle_name.clone(), BufReader::new(Box::new(stdout)));
+                self.pipe_children.insert(handle_name.clone(), child);
+            }
+            "|-" => {
+                cmd.stdin(Stdio::piped());
+                let mut child = cmd.spawn().map_err(|e| {
+                    self.apply_io_error_to_errno(&e);
+                    StrykeError::runtime(format!("Can't open pipe to command: {}", e), line)
+                })?;
+                let stdin = child
+                    .stdin
+                    .take()
+                    .ok_or_else(|| StrykeError::runtime("pipe: child has no stdin", line))?;
+                self.output_handles
+                    .insert(handle_name.clone(), Box::new(stdin));
+                self.pipe_children.insert(handle_name.clone(), child);
+            }
+            _ => {
+                return Err(StrykeError::runtime(
+                    format!("open: list-form pipe requires mode '-|' or '|-', got '{}'", mode),
+                    line,
+                ));
+            }
+        }
+        Ok(StrykeValue::io_handle(handle_name))
     }
 
     /// `group_by` / `chunk_by` — consecutive runs where the key (block or `EXPR` with `$_`)
@@ -23413,6 +23472,28 @@ pub(crate) fn exec_builtin(this: &mut VMHelper, id: u16, args: Vec<StrykeValue>,
                 }
                 let handle_name = args[0].to_string();
                 let mode_s = args[1].to_string();
+                // List-form pipe: `open($fh, "-|", "cmd", @args)` / `open($fh, "|-", @cmd)`.
+                // Detected by an explicit pipe mode plus a command given as a list
+                // — either an array value or 2+ trailing args. Single-string 3-arg
+                // pipes keep the existing `sh -c` behavior.
+                let is_pipe = mode_s == "-|" || mode_s == "|-";
+                let as_argv = |v: &StrykeValue| -> Option<Vec<StrykeValue>> {
+                    v.as_array_vec()
+                        .or_else(|| v.as_array_ref().map(|r| r.read().clone()))
+                };
+                let list_command =
+                    args.len() > 3 || (args.len() == 3 && as_argv(&args[2]).is_some());
+                if is_pipe && list_command {
+                    let mut argv: Vec<String> = Vec::new();
+                    for a in &args[2..] {
+                        if let Some(items) = as_argv(a) {
+                            argv.extend(items.iter().map(|v| v.to_string()));
+                        } else {
+                            argv.push(a.to_string());
+                        }
+                    }
+                    return this.open_pipe_list_execute(handle_name, &mode_s, argv, line);
+                }
                 let file_opt = args.get(2).map(|v| v.to_string());
                 this
                     .open_builtin_execute(handle_name, mode_s, file_opt, line)

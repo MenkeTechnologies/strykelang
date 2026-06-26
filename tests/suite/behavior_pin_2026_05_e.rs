@@ -401,10 +401,9 @@ fn pipe_open_read_string_form_captures_subprocess_stdout() {
 }
 
 #[test]
-fn pipe_open_read_list_form_drops_args_today() {
-    // BUG-036: `open my $fh, "-|", "echo", "hi"` ignores the extra argument
-    // and runs `echo` with no args (so reads just "\n"). Perl runs `echo hi`
-    // without involving a shell.
+fn pipe_open_read_list_form_runs_argv_directly() {
+    // BUG-036 (FIXED): `open my $fh, "-|", "echo", "hi"` execs the argv
+    // directly (no shell, no word-splitting), matching Perl — `echo hi`.
     assert_eq!(
         eval_string(
             r#"open my $fh, "-|", "echo", "hi" or die;
@@ -412,7 +411,37 @@ fn pipe_open_read_list_form_drops_args_today() {
                close $fh;
                $l"#
         ),
-        "\n"
+        "hi\n"
+    );
+}
+
+#[test]
+fn pipe_open_read_list_form_no_shell_interpretation() {
+    // The list form does NOT pass args through a shell, so metacharacters are
+    // literal — `echo "a; echo B"` prints the whole string, not two commands.
+    assert_eq!(
+        eval_string(
+            r#"open my $fh, "-|", "echo", "a; echo B" or die;
+               my $l = <$fh>;
+               close $fh;
+               $l"#
+        ),
+        "a; echo B\n"
+    );
+}
+
+#[test]
+fn pipe_open_read_list_form_array_argv() {
+    // A single array argument is the list-pipe form too: `@cmd` is exec'd.
+    assert_eq!(
+        eval_string(
+            r#"my @cmd = ("printf", "%d", 7);
+               open my $fh, "-|", @cmd or die;
+               my $l = <$fh>;
+               close $fh;
+               $l"#
+        ),
+        "7"
     );
 }
 
