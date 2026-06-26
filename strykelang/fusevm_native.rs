@@ -103,6 +103,11 @@ mod nops {
     /// LoadInt(scalar_g), LoadInt(pos_key_idx)`; delegates to
     /// `interp.regex_match_execute` (which also sets `$1`/`$&`/etc.).
     pub const REGEX_MATCH: u16 = 39;
+    /// `s///` substitution. Preceded by `LoadInt(pat), LoadInt(repl),
+    /// LoadInt(flags), LoadInt(lvalue_idx)`; delegates to
+    /// `interp.regex_subst_execute`, which writes the result back to the lvalue
+    /// and returns the substitution count.
+    pub const REGEX_SUBST: u16 = 40;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -649,6 +654,47 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 }
             }
         }
+        nops::REGEX_SUBST => {
+            let lvalue_idx = vm.pop().to_int();
+            let flags_idx = vm.pop().to_int();
+            let repl_idx = vm.pop().to_int();
+            let pat_idx = vm.pop().to_int();
+            let val = pop_stryke(vm);
+            let (pattern, replacement, flags, target) = with_chunk(|c| {
+                (
+                    c.constants.get(pat_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
+                    c.constants.get(repl_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
+                    c.constants.get(flags_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
+                    c.lvalues.get(lvalue_idx as usize).cloned(),
+                )
+            });
+            if val.is_iterator() {
+                set_native_err(StrykeError::runtime(
+                    "s/// on an iterator is not yet supported on the native path",
+                    0,
+                ));
+                vm.push(fusevm::Value::Undef);
+            } else if let Some(target) = target {
+                let s = val.into_string();
+                let r = with_interp(|i| {
+                    i.regex_subst_execute(s, &pattern, &replacement, &flags, &target, 0)
+                });
+                match r {
+                    Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                    Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                        set_native_err(e);
+                        vm.push(fusevm::Value::Undef);
+                    }
+                    Err(_) => {
+                        set_native_err(StrykeError::runtime("s///: unexpected control flow", 0));
+                        vm.push(fusevm::Value::Undef);
+                    }
+                }
+            } else {
+                set_native_err(StrykeError::runtime("s///: bad lvalue index", 0));
+                vm.push(fusevm::Value::Undef);
+            }
+        }
         // Scalar slots in interp.scope (so closures can capture `my` locals).
         nops::SLOT_GET => {
             let slot = vm.pop().to_int() as u8;
@@ -1020,6 +1066,13 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*pos_key_idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::REGEX_MATCH, 0), 0);
             }
+            Op::RegexSubst(pat_idx, repl_idx, flags_idx, lvalue_idx) => {
+                b.emit(fusevm::Op::LoadInt(*pat_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*repl_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*flags_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*lvalue_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::REGEX_SUBST, 0), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1208,6 +1261,13 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_regex_subst_matches_vm() {
+        assert_parity_str("my $s = \"foo\"; $s =~ s/o/0/g; $s", "f00");
+        assert_parity_str("my $s = \"hello\"; $s =~ s/l/L/; $s", "heLlo");
+        assert_parity_int("my $s = \"aaa\"; my $n = ($s =~ s/a/b/g); $n", 3);
     }
 
     #[test]
