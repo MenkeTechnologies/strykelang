@@ -3,7 +3,7 @@
 
 require "./lib/priority_queue.stk"
 
-val $pq = Project::PriorityQueue::pq_new()
+var $pq = Project::PriorityQueue::pq_new()
 assert_ok $pq->is_empty(), "pq is empty initially"
 
 $pq->push(10)
