@@ -146,6 +146,17 @@ mod nops {
     pub const SET_HASH_ELEM_KEEP: u16 = 55;
     /// `reverse LIST` — reverse a list (or wrap an iterator in RevIterator).
     pub const REVERSE_LIST: u16 = 56;
+    // ── JIT-fused counted-loop superops (de-fused onto host scope methods) ──
+    /// `grep { $_ % M == R } LIST`. Preceded by `LoadInt(M), LoadInt(R)`.
+    pub const GREP_INT_MOD_EQ: u16 = 57;
+    /// `while $i<lim { $sum+=$i; $i+=1 }`. Preceded by `LoadInt(sum_slot), LoadInt(i_slot), LoadInt(limit)`.
+    pub const ACCUM_SUM_LOOP: u16 = 58;
+    /// `while $i<lim { $s.=CONST; $i+=1 }`. Preceded by `LoadInt(const_idx), LoadInt(s_slot), LoadInt(i_slot), LoadInt(limit)`.
+    pub const CONCAT_CONST_SLOT_LOOP: u16 = 59;
+    /// `while $i<lim { push @arr,$i; $i+=1 }`. Preceded by `LoadInt(name_idx), LoadInt(i_slot), LoadInt(limit)`.
+    pub const PUSH_INT_RANGE_TO_ARRAY_LOOP: u16 = 60;
+    /// `for $k (keys %h) { $sum += $h{$k} }`. Preceded by `LoadInt(sum_slot), LoadInt(h_name_idx)`.
+    pub const SUM_HASH_VALUES_TO_SLOT: u16 = 61;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -714,6 +725,107 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 }
             }
         }
+        nops::GREP_INT_MOD_EQ => {
+            let r = vm.pop().to_int();
+            let m = vm.pop().to_int();
+            let list = pop_stryke(vm).to_list();
+            let mut result = Vec::new();
+            for item in list {
+                if item.to_int() % m == r {
+                    result.push(item);
+                }
+            }
+            vm.push(stryke_to_fusevm(&StrykeValue::array(result)));
+        }
+        nops::ACCUM_SUM_LOOP => {
+            let limit = vm.pop().to_int();
+            let i_slot = vm.pop().to_int() as u8;
+            let sum_slot = vm.pop().to_int() as u8;
+            with_interp(|interp| {
+                let mut sum = interp.scope.get_scalar_slot(sum_slot).to_int();
+                let mut i = interp.scope.get_scalar_slot(i_slot).to_int();
+                while i < limit {
+                    sum = sum.wrapping_add(i);
+                    i = i.wrapping_add(1);
+                }
+                interp.scope.set_scalar_slot(sum_slot, StrykeValue::integer(sum));
+                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(i));
+            });
+        }
+        nops::CONCAT_CONST_SLOT_LOOP => {
+            let limit = vm.pop().to_int();
+            let i_slot = vm.pop().to_int() as u8;
+            let s_slot = vm.pop().to_int() as u8;
+            let const_idx = vm.pop().to_int() as usize;
+            let rhs = with_chunk(|c| {
+                c.constants.get(const_idx).map(|v| v.as_str_or_empty()).unwrap_or_default()
+            });
+            with_interp(|interp| {
+                let i_cur = interp.scope.get_scalar_slot(i_slot).to_int();
+                if i_cur < limit {
+                    let n_iters = (limit - i_cur) as usize;
+                    if !interp.scope.scalar_slot_concat_repeat_inplace(s_slot, &rhs, n_iters) {
+                        interp.scope.scalar_slot_concat_repeat_slow(s_slot, &rhs, n_iters);
+                    }
+                }
+                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(limit));
+            });
+        }
+        nops::PUSH_INT_RANGE_TO_ARRAY_LOOP => {
+            let limit = vm.pop().to_int();
+            let i_slot = vm.pop().to_int() as u8;
+            let name_idx = vm.pop().to_int();
+            let name = host_name(name_idx);
+            let r = with_interp(|interp| -> Result<(), StrykeError> {
+                let i_cur = interp.scope.get_scalar_slot(i_slot).to_int();
+                if i_cur < limit {
+                    if interp.scope.is_array_frozen(&name) {
+                        return Err(StrykeError::syntax(
+                            format!("cannot modify frozen array `@{}`", name),
+                            0,
+                        ));
+                    }
+                    interp.scope.push_int_range_to_array(&name, i_cur, limit)?;
+                }
+                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(limit));
+                Ok(())
+            });
+            if let Err(e) = r {
+                set_native_err(e);
+            }
+        }
+        nops::SUM_HASH_VALUES_TO_SLOT => {
+            let h_idx = vm.pop().to_int();
+            let sum_slot = vm.pop().to_int() as u8;
+            let h_name = host_name(h_idx);
+            with_interp(|interp| {
+                interp.touch_env_hash(&h_name);
+                let cur = interp.scope.get_scalar_slot(sum_slot);
+                let mut int_acc: i64 = cur.as_integer().unwrap_or(0);
+                let mut float_acc: f64 = 0.0;
+                let mut is_int = cur.as_integer().is_some();
+                if !is_int {
+                    float_acc = cur.to_number();
+                }
+                interp.scope.for_each_hash_value(&h_name, |v| {
+                    if is_int {
+                        if let Some(x) = v.as_integer() {
+                            int_acc = int_acc.wrapping_add(x);
+                            return;
+                        }
+                        float_acc = int_acc as f64;
+                        is_int = false;
+                    }
+                    float_acc += v.to_number();
+                });
+                let new_v = if is_int {
+                    StrykeValue::integer(int_acc)
+                } else {
+                    StrykeValue::float(float_acc)
+                };
+                interp.scope.set_scalar_slot(sum_slot, new_v);
+            });
+        }
         nops::REVERSE_LIST => {
             let val = pop_stryke(vm);
             if val.is_iterator() {
@@ -1211,6 +1323,37 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::SET_HASH_ELEM_KEEP, 0), 0);
             }
+            // JIT-fused counted-loop superops, de-fused onto the same host scope
+            // methods vm.rs uses (operands pushed via LoadInt; see nops docs).
+            Op::GrepIntModEq(m, r) => {
+                b.emit(fusevm::Op::LoadInt(*m), 0);
+                b.emit(fusevm::Op::LoadInt(*r), 0);
+                b.emit(fusevm::Op::Extended(nops::GREP_INT_MOD_EQ, 0), 0);
+            }
+            Op::AccumSumLoop(sum_slot, i_slot, limit) => {
+                b.emit(fusevm::Op::LoadInt(*sum_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*i_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*limit as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::ACCUM_SUM_LOOP, 0), 0);
+            }
+            Op::ConcatConstSlotLoop(const_idx, s_slot, i_slot, limit) => {
+                b.emit(fusevm::Op::LoadInt(*const_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*s_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*i_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*limit as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::CONCAT_CONST_SLOT_LOOP, 0), 0);
+            }
+            Op::PushIntRangeToArrayLoop(name_idx, i_slot, limit) => {
+                b.emit(fusevm::Op::LoadInt(*name_idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*i_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*limit as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::PUSH_INT_RANGE_TO_ARRAY_LOOP, 0), 0);
+            }
+            Op::SumHashValuesToSlot(sum_slot, h_name_idx) => {
+                b.emit(fusevm::Op::LoadInt(*sum_slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*h_name_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SUM_HASH_VALUES_TO_SLOT, 0), 0);
+            }
             Op::PushFrame => {
                 b.emit(fusevm::Op::Extended(nops::PUSH_FRAME, 0), 0);
             }
@@ -1668,6 +1811,40 @@ mod tests {
             "sub myfac { my $n = shift; return $n <= 1 ? 1 : $n * myfac($n - 1) } myfac(5)",
             120,
         );
+    }
+
+    #[test]
+    fn native_fused_counted_loops_match_vm() {
+        // JIT-fused counted-loop superops. The `for (my $i=0; $i<N; $i=$i+1)`
+        // shape with the body reduced to a single accumulate is what the peephole
+        // fuses; each is de-fused onto the host scope method vm.rs uses.
+        // AccumSumLoop:
+        assert_parity_int(
+            "my $sum = 0; for (my $i = 0; $i < 100; $i = $i + 1) { $sum = $sum + $i } $sum",
+            4950,
+        );
+        // ConcatConstSlotLoop:
+        assert_parity_int(
+            "my $s = \"\"; for (my $i = 0; $i < 7; $i = $i + 1) { $s .= \"ab\" } length($s)",
+            14,
+        );
+        // PushIntRangeToArrayLoop:
+        assert_parity_str(
+            "my @a; for (my $i = 0; $i < 5; $i = $i + 1) { push @a, $i } join(\",\", @a)",
+            "0,1,2,3,4",
+        );
+        // SumHashValuesToSlot:
+        assert_parity_int(
+            "my %h; for (my $i = 0; $i < 4; $i = $i + 1) { $h{$i} = $i * 2 } \
+             my $sum = 0; for my $k (keys %h) { $sum = $sum + $h{$k} } $sum",
+            12,
+        );
+    }
+
+    #[test]
+    fn native_grep_int_mod_eq_matches_vm() {
+        assert_parity_str("join(\",\", grep { $_ % 2 == 0 } (1..10))", "2,4,6,8,10");
+        assert_parity_str("join(\",\", grep { $_ % 3 == 1 } (1..12))", "1,4,7,10");
     }
 
     #[test]
