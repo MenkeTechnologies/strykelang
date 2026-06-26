@@ -301,6 +301,30 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
                 b.emit(fusevm::Op::Dup, 0);
                 b.emit(fusevm::Op::SetSlot(*slot as u16), 0);
             }
+            // Fused superinstructions (loops/compound-assign). Lowered to their
+            // unfused universal-op equivalents — correct, and fusevm's block JIT
+            // re-fuses these very patterns to machine code.
+            Op::AddAssignSlotSlotVoid(d, s) => {
+                b.emit(fusevm::Op::GetSlot(*d as u16), 0);
+                b.emit(fusevm::Op::GetSlot(*s as u16), 0);
+                b.emit(fusevm::Op::Add, 0);
+                b.emit(fusevm::Op::SetSlot(*d as u16), 0);
+            }
+            Op::PreIncSlotVoid(s) => {
+                b.emit(fusevm::Op::GetSlot(*s as u16), 0);
+                b.emit(fusevm::Op::LoadInt(1), 0);
+                b.emit(fusevm::Op::Add, 0);
+                b.emit(fusevm::Op::SetSlot(*s as u16), 0);
+            }
+            // `slot < int` then conditional jump. The NUM_LT Extended op yields
+            // Int 0/1, so JumpIfFalse needs no TRUTHY normalization here.
+            Op::SlotLtIntJumpIfFalse(slot, int, target) => {
+                b.emit(fusevm::Op::GetSlot(*slot as u16), 0);
+                b.emit(fusevm::Op::LoadInt(*int as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::NUM_LT, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
+                jump_fixups.push((pos, *target));
+            }
             // Top-level terminator: emit nothing and let the chunk end
             // naturally (fusevm returns the value left on the stack when
             // `ip >= len`). Emitting a fusevm `Return` here is wrong — at the
@@ -452,5 +476,16 @@ mod tests {
         assert_parity_int("my $x = 5; my $y = 10; $x + $y", 15);
         assert_parity_int("my $x = 5; $x = $x * 2; $x", 10);
         assert_parity_str("my $s = \"hi\"; $s . \"!\"", "hi!");
+    }
+
+    #[test]
+    fn native_while_loops_match_vm() {
+        assert_parity_int(
+            "my $s = 0; my $i = 1; while ($i <= 10) { $s = $s + $i; $i = $i + 1 } $s",
+            55,
+        );
+        // if-with-comparison compiles to the fused SlotLtIntJumpIfFalse.
+        assert_parity_int("my $x = 1; if ($x < 5) { $x = 9 } $x", 9);
+        assert_parity_int("my $x = 7; if ($x < 5) { $x = 9 } $x", 7);
     }
 }
