@@ -6758,6 +6758,73 @@ impl VMHelper {
         self.exec_block_with_tail(block, WantarrayCtx::Void)
     }
 
+    /// Parallel `pmap { BLOCK } LIST` over `items`: capture this interp's subs +
+    /// scope, fan the block out across a rayon worker per item (each a fresh
+    /// `VMHelper` seeded from the capture), and collect outputs in source order.
+    /// `flat_outputs` flattens each block result (flat-map). Shared by the AST
+    /// evaluator (`PMapExpr`) and the bytecode→fusevm native path (`PMapWithBlock`)
+    /// so both produce identical results.
+    pub(crate) fn pmap_block(
+        &mut self,
+        items: Vec<StrykeValue>,
+        block: &Block,
+        flat_outputs: bool,
+        show_progress: bool,
+    ) -> StrykeValue {
+        let block = block.clone();
+        let subs = self.subs.clone();
+        let (scope_capture, atomic_arrays, atomic_hashes) = self.scope.capture_with_atomics();
+        let pmap_progress = PmapProgress::new(show_progress, items.len());
+        if flat_outputs {
+            let mut indexed: Vec<(usize, Vec<StrykeValue>)> = items
+                .into_par_iter()
+                .enumerate()
+                .map(|(i, item)| {
+                    let mut local_interp = VMHelper::new();
+                    local_interp.subs = subs.clone();
+                    local_interp.scope.restore_capture(&scope_capture);
+                    local_interp
+                        .scope
+                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
+                    local_interp.scope.set_topic(item);
+                    let val = match local_interp.exec_block(&block) {
+                        Ok(val) => val,
+                        Err(_) => StrykeValue::UNDEF,
+                    };
+                    let chunk = val.map_flatten_outputs(true);
+                    pmap_progress.tick();
+                    (i, chunk)
+                })
+                .collect();
+            pmap_progress.finish();
+            indexed.sort_by_key(|(i, _)| *i);
+            StrykeValue::array(indexed.into_iter().flat_map(|(_, v)| v).collect())
+        } else {
+            let results: Vec<StrykeValue> = items
+                .into_par_iter()
+                .map(|item| {
+                    let mut local_interp = VMHelper::new();
+                    local_interp.subs = subs.clone();
+                    local_interp.scope.restore_capture(&scope_capture);
+                    local_interp
+                        .scope
+                        .restore_atomics(&atomic_arrays, &atomic_hashes);
+                    local_interp.enable_parallel_guard();
+                    local_interp.scope.set_topic(item);
+                    let val = match local_interp.exec_block(&block) {
+                        Ok(val) => val,
+                        Err(_) => StrykeValue::UNDEF,
+                    };
+                    pmap_progress.tick();
+                    val
+                })
+                .collect();
+            pmap_progress.finish();
+            StrykeValue::array(results)
+        }
+    }
+
     /// Run a block; the **last** statement is evaluated in `tail` wantarray (Perl `do { }` / `eval { }` value).
     /// Non-final statements stay void context.
     pub(crate) fn exec_block_with_tail(&mut self, block: &Block, tail: WantarrayCtx) -> ExecResult {
@@ -12070,62 +12137,7 @@ impl VMHelper {
                     )));
                 }
                 let items = list_val.to_list();
-                let block = block.clone();
-                let subs = self.subs.clone();
-                let (scope_capture, atomic_arrays, atomic_hashes) =
-                    self.scope.capture_with_atomics();
-                let pmap_progress = PmapProgress::new(show_progress, items.len());
-
-                if *flat_outputs {
-                    let mut indexed: Vec<(usize, Vec<StrykeValue>)> = items
-                        .into_par_iter()
-                        .enumerate()
-                        .map(|(i, item)| {
-                            let mut local_interp = VMHelper::new();
-                            local_interp.subs = subs.clone();
-                            local_interp.scope.restore_capture(&scope_capture);
-                            local_interp
-                                .scope
-                                .restore_atomics(&atomic_arrays, &atomic_hashes);
-                            local_interp.enable_parallel_guard();
-                            local_interp.scope.set_topic(item);
-                            let val = match local_interp.exec_block(&block) {
-                                Ok(val) => val,
-                                Err(_) => StrykeValue::UNDEF,
-                            };
-                            let chunk = val.map_flatten_outputs(true);
-                            pmap_progress.tick();
-                            (i, chunk)
-                        })
-                        .collect();
-                    pmap_progress.finish();
-                    indexed.sort_by_key(|(i, _)| *i);
-                    let results: Vec<StrykeValue> =
-                        indexed.into_iter().flat_map(|(_, v)| v).collect();
-                    Ok(StrykeValue::array(results))
-                } else {
-                    let results: Vec<StrykeValue> = items
-                        .into_par_iter()
-                        .map(|item| {
-                            let mut local_interp = VMHelper::new();
-                            local_interp.subs = subs.clone();
-                            local_interp.scope.restore_capture(&scope_capture);
-                            local_interp
-                                .scope
-                                .restore_atomics(&atomic_arrays, &atomic_hashes);
-                            local_interp.enable_parallel_guard();
-                            local_interp.scope.set_topic(item);
-                            let val = match local_interp.exec_block(&block) {
-                                Ok(val) => val,
-                                Err(_) => StrykeValue::UNDEF,
-                            };
-                            pmap_progress.tick();
-                            val
-                        })
-                        .collect();
-                    pmap_progress.finish();
-                    Ok(StrykeValue::array(results))
-                }
+                Ok(self.pmap_block(items, block, *flat_outputs, show_progress))
             }
             ExprKind::PMapChunkedExpr {
                 chunk_size,
