@@ -136,6 +136,9 @@ mod nops {
     pub const PUSH_FRAME: u16 = 51;
     /// Pop a lexical scope frame (block / loop body exit).
     pub const POP_FRAME: u16 = 52;
+    /// `printf FMT, ARGS` to the default handle. Extended `arg` = total argc
+    /// (format string + values). Args are pushed in source order beforehand.
+    pub const PRINTF: u16 = 53;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -190,6 +193,43 @@ fn do_print(vm: &mut fusevm::VM, argc: usize, say: bool) {
         set_native_err(e);
     }
     // `print`/`say` are void in strykelang (leave nothing on the stack).
+}
+
+/// `printf FMT, ARGS` to the default handle, mirroring vm.rs's `Printf`: the
+/// first arg is the format string, remaining args are flattened (array splice),
+/// formatted via `perl_sprintf_stringify`, and routed through the same
+/// `write_formatted_print` sink. Like `do_print`, void on the stack.
+fn do_printf(vm: &mut fusevm::VM, argc: usize) {
+    let mut args: Vec<StrykeValue> = Vec::with_capacity(argc);
+    for _ in 0..argc {
+        args.push(pop_stryke(vm));
+    }
+    args.reverse(); // pops are last-to-first → restore source order
+    let r: Result<(), StrykeError> = with_interp(|i| {
+        let (fmt, rest) = match args.split_first() {
+            Some((f, r)) => (f.to_string(), r),
+            None => return Err(StrykeError::runtime("printf requires a format string", 0)),
+        };
+        let mut flat = Vec::new();
+        for a in rest {
+            if let Some(items) = a.as_array_vec() {
+                flat.extend(items);
+            } else {
+                flat.push(a.clone());
+            }
+        }
+        let s = match i.perl_sprintf_stringify(&fmt, &flat, 0) {
+            Ok(s) => s,
+            Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+            Err(_) => return Err(StrykeError::runtime("printf: unexpected control flow", 0)),
+        };
+        let dph = i.default_print_handle.clone();
+        let handle = i.resolve_io_handle_name(&dph);
+        i.write_formatted_print(&handle, &s, 0)
+    });
+    if let Err(e) = r {
+        set_native_err(e);
+    }
 }
 
 /// Index a string by Unicode char (negative-from-end), as strykelang's array
@@ -633,6 +673,7 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
+        nops::PRINTF => do_printf(vm, arg as usize),
         nops::RANGE => {
             let to = pop_stryke(vm);
             let from = pop_stryke(vm);
@@ -1122,6 +1163,9 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::Say(None, argc) => {
                 b.emit(fusevm::Op::Extended(nops::SAY, *argc), 0);
             }
+            Op::Printf(None, argc) => {
+                b.emit(fusevm::Op::Extended(nops::PRINTF, *argc), 0);
+            }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
             }
@@ -1527,6 +1571,17 @@ mod tests {
         // Range-built array length (regression: DeclareArray must flatten a
         // registry-handled list, not store it as one nested element).
         assert_parity_int("my @a = (1..10); my $n = @a; $n", 10);
+    }
+
+    #[test]
+    fn native_sprintf_format_matches_vm() {
+        // sprintf shares perl_sprintf_stringify with the Printf op (printf output
+        // itself is binary-verified; this pins the format logic with assertions).
+        assert_parity_str("sprintf(\"%d-%s\", 5, \"x\")", "5-x");
+        assert_parity_str("sprintf(\"%05.2f\", 3.14159)", "03.14");
+        assert_parity_str("sprintf(\"%x %o %b\", 255, 8, 5)", "ff 10 101");
+        assert_parity_str("sprintf(\"%-5s|\", \"hi\")", "hi   |");
+        assert_parity_str("sprintf(\"%d %d %d\", 1, 2, 3)", "1 2 3");
     }
 
     #[test]
