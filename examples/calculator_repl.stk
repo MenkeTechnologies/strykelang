@@ -188,16 +188,21 @@ fn Demo::Calc::eval_ast($ast) {
 
 fn Demo::Calc::eval($src) {
     val $t0 = now_ns()
-    val $ast = eval { Demo::Calc::parse($src) }
-    if ($@) {
+    var $ast
+    try {
+        $ast = Demo::Calc::parse($src)
+    } catch ($e) {
         td_add($td_eval, (now_ns() - $t0) / 1000.0)
-        return +{ ok => 0, error => $@ }
+        return +{ ok => 0, error => $e }
     }
-    val $v = eval { Demo::Calc::eval_ast($ast) }
+    var $v
+    try {
+        $v = Demo::Calc::eval_ast($ast)
+    } catch ($e) {
+        td_add($td_eval, (now_ns() - $t0) / 1000.0)
+        return +{ ok => 0, error => $e }
+    }
     td_add($td_eval, (now_ns() - $t0) / 1000.0)
-    if ($@) {
-        return +{ ok => 0, error => $@ }
-    }
     push @history, $v
     +{ ok => 1, value => $v }
 }

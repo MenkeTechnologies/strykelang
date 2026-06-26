@@ -128,9 +128,10 @@ fn WFC::run($width, $height) {
         val $idx = $cell->{y} * $width + $cell->{x}
         
         # Propagate
-        eval { WFC::Grid::propagate $grid, $idx, $width, $height }
-        if ($@) {
-            p "Backtracking/Contradiction: $@"
+        try {
+            WFC::Grid::propagate $grid, $idx, $width, $height
+        } catch ($e) {
+            p "Backtracking/Contradiction: $e"
             return undef # Simplified: just fail on contradiction for this demo
         }
     }

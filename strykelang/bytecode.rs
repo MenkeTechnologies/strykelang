@@ -2408,6 +2408,18 @@ impl Chunk {
                 }
                 Op::SlotLtIntJumpIfFalse(_, _, t) => *t = remap[*t],
                 Op::SlotIncLtIntJumpBack(_, _, t) => *t = remap[*t],
+                Op::TryPush {
+                    catch_ip,
+                    finally_ip,
+                    after_ip,
+                    ..
+                } => {
+                    *catch_ip = remap[*catch_ip];
+                    *after_ip = remap[*after_ip];
+                    if let Some(f) = finally_ip {
+                        *f = remap[*f];
+                    }
+                }
                 _ => {}
             }
         }

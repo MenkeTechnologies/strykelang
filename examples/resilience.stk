@@ -6,15 +6,16 @@
 # 1. Retry with backoff.
 p "--- Resilience: Retrying unstable operation ---"
 var $tries = 0
-eval {
+try {
     retry {
         $tries++
         p "  Attempt $tries..."
         die "Network error" if $tries < 3
     } times => 3, backoff => linear, delay => 0.1
+    p "  Succeeded on attempt $tries"
+} catch ($e) {
+    p "  Failed after 3 tries: $e"
 }
-if ($@) { p "  Failed after 3 tries: $@" }
-else    { p "  Succeeded on attempt $tries" }
 
 # 2. Benchmarking.
 p "\n--- Performance: Benchmarking sort algorithms ---"
@@ -28,15 +29,16 @@ p "Sort Benchmark (10 iterations): $report"
 
 # 3. Timeout Control.
 p "\n--- Control: Executing with timeout ---"
-eval {
+try {
     eval_timeout 0.5 {
         p "  Starting slow task..."
         sleep 2
         p "  This should NOT be printed"
     }
-}
-if ($@ =~ /timeout/) {
-    p "  Task timed out as expected."
+} catch ($e) {
+    if ($e =~ /timeout/) {
+        p "  Task timed out as expected."
+    }
 }
 
 # 4. High-resolution timing.

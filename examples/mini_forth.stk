@@ -138,19 +138,16 @@ die "`.` should leave stack empty" unless len(@{$r->{stack}}) == 0
 # ── error pins ─────────────────────────────────────────────────────
 
 # Division by zero must die.
-var $caught
-eval { Forth::run("5 0 /") }
-$caught = $@
+var $caught = ""
+try { Forth::run("5 0 /") } catch ($e) { $caught = $e }
 die "division by zero not caught" unless $caught =~ /division/
 
 # Unknown word must die.
-eval { Forth::run("1 2 nosuchword") }
-$caught = $@
+try { Forth::run("1 2 nosuchword") } catch ($e) { $caught = $e }
 die "unknown word not caught" unless $caught =~ /unknown/
 
 # Stack underflow on binary op must die.
-eval { Forth::run("5 +") }
-$caught = $@
+try { Forth::run("5 +") } catch ($e) { $caught = $e }
 die "stack underflow not caught" unless $caught =~ /underflow/
 
 p ""

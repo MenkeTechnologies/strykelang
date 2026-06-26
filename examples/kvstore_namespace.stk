@@ -37,15 +37,14 @@ for var $row (kv_scan($db, "logs:")) {
 }
 
 # ─── atomic rollback demo: one bad op aborts the whole batch ─────────
-eval {
+try {
     kv_batch($db, [
         ["put", "users:dave",    { age => 99 }],
         ["put", "users:eve",     { age => 22 }],
         ["NUKE_EVERYTHING", "*"],                # unknown op kind → throws
         ["put", "users:fingers", { age => 12 }],
     ])
-}
-if ($@) {
+} catch ($e) {
     p "batch rejected — store unchanged:"
     p "  dave   exists: ", kv_exists($db, "users:dave")
     p "  eve    exists: ", kv_exists($db, "users:eve")

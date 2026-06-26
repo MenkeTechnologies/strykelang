@@ -30,8 +30,9 @@ val $r = Rectangle(width => 4, height => 5)
 p "rectangle area = " . $r->area    # 20
 
 # A bad input fires the die from BUILD before the object escapes.
-val $bad = eval { Rectangle(width => -1, height => 5) }
-p "rejected bad rect: $@" if $@
+try { Rectangle(width => -1, height => 5) } catch ($e) {
+    p "rejected bad rect: $e"
+}
 
 # ─────────────────────────────────────────────────────────────────────────
 # 2. BUILD chain — parent runs before child.

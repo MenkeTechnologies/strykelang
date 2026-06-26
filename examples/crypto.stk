@@ -49,9 +49,8 @@ p ""
 p "── Bad-tampering JWT — verify fails ───────────────────"
 val $bad = substr($token, 0, -3) . "AAA";    # corrupt last 3 chars
 var $err = 0
-eval { jwt_decode($bad, "jwt-secret") }
-$err = 1 if $@
-p "  tampered token rejects (eval `\$@` set): $err"
+try { jwt_decode($bad, "jwt-secret") } catch ($e) { $err = 1 }
+p "  tampered token rejects (catch fires): $err"
 
 p ""
 p "── Cross-feature: HMAC-tagged + KV-stored manifest ────"

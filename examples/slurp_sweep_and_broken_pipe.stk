@@ -42,10 +42,11 @@ ingest  "$dir/*.txt" |> len |> aeq 1, "ingest skips dangling symlink + dir"
 # ── 2. A qualifier glob stays strict (explicit selection) ─────────────────────
 #
 # `(/)` selects directories on purpose, so slurping it is a user error and we
-# hard-fail with the offending path named. `eval` captures the die into $@.
+# hard-fail with the offending path named. `try/catch` captures the die into $e.
 
-eval { c"$dir/*(/)" }
-aok $@ =~ /not a regular file/, "qualifier glob hard-fails on a directory (named): $@"
+var $err = ""
+try { c"$dir/*(/)" } catch ($e) { $err = $e }
+aok $err =~ /not a regular file/, "qualifier glob hard-fails on a directory (named): $err"
 
 # ── 3. Writing to a closed downstream pipe does not panic ─────────────────────
 #
