@@ -27,7 +27,7 @@ p "  return-type guard: $@" if $@
 
 # ── Parametric containers: List<T> and Map<K, V> ─────────────────────────────
 p "\nTyped containers:"
-var @names : List<Str>      = ("ann", "bob", "cy")
+var @names : List<Str>      = listOf("ann", "bob", "cy")
 var %ages  : Map<Str, Int>  = (ann => 30, bob => 41)
 
 printf "  names = %s\n", join(", ", @names)
@@ -43,7 +43,7 @@ p "  map value guard: $@" if $@
 # Valid writes go through untouched.
 push @names, "dee"
 $ages{cy} = 22
-printf "  after valid writes: %d names, %d ages\n", scalar(@names), scalar(keys %ages)
+printf "  after valid writes: %d names, %d ages\n", len(@names), ~> %ages keys len
 
 # ── Nested generics: Map<Str, List<Int>> ─────────────────────────────────────
 p "\nNested generics:"
