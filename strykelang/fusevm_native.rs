@@ -597,16 +597,13 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::DECLARE_HASH => {
             let idx = vm.pop().to_int();
-            let raw = vm.pop();
+            // Mirror vm.rs `DeclareHash`: `val.to_list()` flattens a fusevm Array,
+            // unwraps a registry-handled list (Range/map), or wraps a scalar —
+            // uniformly. A manual fusevm-Value match would nest a registry handle.
+            let val = pop_stryke(vm);
             let name = host_name(idx);
-            let is_undef = matches!(raw, fusevm::Value::Undef);
-            let items: Vec<StrykeValue> = match raw {
-                fusevm::Value::Array(v) => {
-                    v.iter().map(|x| fusevm_to_stryke(x).unwrap_or(StrykeValue::UNDEF)).collect()
-                }
-                fusevm::Value::Undef => Vec::new(),
-                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
-            };
+            let is_undef = val.is_undef();
+            let items: Vec<StrykeValue> = if is_undef { Vec::new() } else { val.to_list() };
             with_interp(|i| {
                 // `our %h;` (undef initializer, package-qualified) preserves
                 // existing data; everything else folds the k/v pairs into a map.
@@ -934,14 +931,9 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::ARROW_CALL => {
             let want = crate::vm_helper::WantarrayCtx::from_byte(arg);
             // Multiple args ride as a Value::Array (built by MakeArray); a single
-            // arg rides as a scalar. Flatten either to the arg list.
-            let args_raw = vm.pop();
-            let args: Vec<StrykeValue> = match args_raw {
-                fusevm::Value::Array(items) => {
-                    items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect()
-                }
-                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
-            };
+            // arg rides as a scalar. Mirror vm.rs `ArrowCall`'s `args_val.to_list()`
+            // so a registry-handled list (`$f->(@arr)`) flattens rather than nesting.
+            let args: Vec<StrykeValue> = pop_stryke(vm).to_list();
             let mut callee = pop_stryke(vm);
             // Auto-deref a scalar ref so `$f->()` works when $f holds a ref.
             if let Some(inner) = callee.as_scalar_ref() {
@@ -1535,6 +1527,18 @@ mod tests {
         // Range-built array length (regression: DeclareArray must flatten a
         // registry-handled list, not store it as one nested element).
         assert_parity_int("my @a = (1..10); my $n = @a; $n", 10);
+    }
+
+    #[test]
+    fn native_list_flatten_into_hash_and_call_matches_vm() {
+        // DeclareHash must flatten a registry-handled list (Range) into k/v pairs.
+        assert_parity_int("my %h = (1..6); $h{3}", 4);
+        // ArrowCall must flatten `@arr` into the call's @_ rather than nesting it.
+        assert_parity_int(
+            "my $f = sub { my $n = 0; for my $x (@_) { $n = $n + $x } return $n }; \
+             my @a = (1..4); $f->(@a)",
+            10,
+        );
     }
 
     #[test]
