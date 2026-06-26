@@ -162,6 +162,9 @@ mod nops {
     pub const SORT_WITH_BLOCK_FAST: u16 = 62;
     /// `++$name` (named scalar pre-increment). Preceded by `LoadInt(name_idx)`.
     pub const PRE_INC: u16 = 63;
+    /// `pmap { BLOCK } LIST` (parallel map). Preceded by `LoadInt(block_idx)`;
+    /// the progress flag then the list are below it on the stack.
+    pub const PMAP_BLOCK: u16 = 64;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -931,6 +934,19 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 }
             }
         }
+        nops::PMAP_BLOCK => {
+            let block_idx = vm.pop().to_int() as usize;
+            let list = pop_stryke(vm).to_list();
+            let progress = pop_stryke(vm).is_true();
+            let block = with_chunk(|c| c.blocks.get(block_idx).cloned());
+            let Some(block) = block else {
+                set_native_err(StrykeError::runtime("pmap: bad block index", 0));
+                vm.push(fusevm::Value::Undef);
+                return;
+            };
+            let result = with_interp(|i| i.pmap_block(list, &block, false, progress));
+            vm.push(stryke_to_fusevm(&result));
+        }
         nops::GREP_BLOCK => {
             let block_idx = vm.pop().to_int() as usize;
             let list = pop_stryke(vm).to_list();
@@ -1631,6 +1647,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::MAP_BLOCK, 1), 0);
             }
+            Op::PMapWithBlock(block_idx) => {
+                b.emit(fusevm::Op::LoadInt(*block_idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::PMAP_BLOCK, 0), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1900,6 +1920,14 @@ mod tests {
     fn native_pre_inc_matches_vm() {
         assert_parity_int("my $x = 5; ++$x; $x", 6);
         assert_parity_int("my $x = 0; ++$x; ++$x; ++$x; $x", 3);
+    }
+
+    #[test]
+    fn native_pmap_with_block_matches_vm() {
+        // Parallel map — order-preserving, so results match the sequential VM.
+        assert_parity_str("join(\",\", pmap { $_ * 2 } (1, 2, 3, 4, 5))", "2,4,6,8,10");
+        assert_parity_str("join(\",\", pmap { $_ + 1 } (1..10))", "2,3,4,5,6,7,8,9,10,11");
+        assert_parity_str("join(\",\", pmap { $_ * $_ } (1..6))", "1,4,9,16,25,36");
     }
 
     #[test]
