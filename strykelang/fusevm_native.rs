@@ -125,6 +125,8 @@ mod nops {
     pub const GREP_BLOCK: u16 = 46;
     /// `from..to` range → list (pops to, from; pushes the expanded array).
     pub const RANGE: u16 = 47;
+    /// `@name` whole-array read → list value. Preceded by `LoadInt(name_idx)`.
+    pub const GET_ARRAY: u16 = 48;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -561,6 +563,12 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
             };
             with_interp(|i| i.scope.declare_array(&name, list));
+        }
+        nops::GET_ARRAY => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            let arr = with_interp(|i| i.scope.get_array(&name));
+            vm.push(stryke_to_fusevm(&StrykeValue::array(arr)));
         }
         nops::GET_ARRAY_ELEM => {
             let idx = vm.pop().to_int();
@@ -1034,6 +1042,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::DECLARE_ARRAY, 0), 0);
             }
+            Op::GetArray(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GET_ARRAY, 0), 0);
+            }
             Op::GetArrayElem(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_ARRAY_ELEM, 0), 0);
@@ -1434,6 +1446,13 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_get_array_matches_vm() {
+        assert_parity_str("my @a = (10, 20, 30); join(\",\", @a)", "10,20,30");
+        assert_parity_str("my @a = (\"x\", \"y\"); join(\"-\", @a)", "x-y");
+        assert_parity_str("my @a = (1, 2, 3); my @b = (4, 5); join(\",\", @a) . \"|\" . join(\",\", @b)", "1,2,3|4,5");
     }
 
     #[test]
