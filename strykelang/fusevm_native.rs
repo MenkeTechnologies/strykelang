@@ -108,6 +108,11 @@ mod nops {
     /// `interp.regex_subst_execute`, which writes the result back to the lvalue
     /// and returns the substitution count.
     pub const REGEX_SUBST: u16 = 40;
+    /// Perl `++` on a slot via `perl_inc` (magic string/number increment).
+    /// INC_SLOT_VOID is `++slot` (result discarded); POST_INC_SLOT pushes the
+    /// old value then increments (`slot++`). Preceded by `LoadInt(slot)`.
+    pub const INC_SLOT_VOID: u16 = 41;
+    pub const POST_INC_SLOT: u16 = 42;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -251,6 +256,12 @@ fn with_chunk<R>(f: impl FnOnce(&Chunk) -> R) -> R {
 /// Resolve a name-pool index to its name (chunk.names), via the host.
 fn host_name(idx: i64) -> String {
     with_chunk(|c| c.names.get(idx as usize).cloned().unwrap_or_default())
+}
+
+/// The variant name of an op (Debug, without operands), for coverage tracing.
+fn op_name(op: &Op) -> String {
+    let s = format!("{op:?}");
+    s.split(|c| c == '(' || c == ' ').next().unwrap_or(&s).to_string()
 }
 
 /// Stash a non-scalar StrykeValue, returning its registry id (for NativeFn).
@@ -695,6 +706,25 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 vm.push(fusevm::Value::Undef);
             }
         }
+        // Perl `++` via perl_inc (magic increment: numbers and "az"->"ba").
+        nops::INC_SLOT_VOID => {
+            let slot = vm.pop().to_int() as u8;
+            with_interp(|i| {
+                let cur = i.scope.get_scalar_slot(slot);
+                let next = crate::vm_helper::perl_inc(&cur);
+                i.scope.set_scalar_slot(slot, next);
+            });
+        }
+        nops::POST_INC_SLOT => {
+            let slot = vm.pop().to_int() as u8;
+            let old = with_interp(|i| {
+                let old = i.scope.get_scalar_slot(slot);
+                let next = crate::vm_helper::perl_inc(&old);
+                i.scope.set_scalar_slot(slot, next);
+                old
+            });
+            vm.push(stryke_to_fusevm(&old));
+        }
         // Scalar slots in interp.scope (so closures can capture `my` locals).
         nops::SLOT_GET => {
             let slot = vm.pop().to_int() as u8;
@@ -844,6 +874,9 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             }
             Op::LoadFloat(f) => {
                 b.emit(fusevm::Op::LoadFloat(*f), 0);
+            }
+            Op::LoadUndef => {
+                b.emit(fusevm::Op::LoadUndef, 0);
             }
             Op::LoadConst(idx) => {
                 let sv = chunk.constants.get(*idx as usize)?;
@@ -1012,13 +1045,15 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*d as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
             }
+            // `++slot` uses Perl magic increment (perl_inc), not numeric +1, so
+            // string-increment (`$s++` on "az") matches vm.rs.
             Op::PreIncSlotVoid(s) => {
                 b.emit(fusevm::Op::LoadInt(*s as i64), 0);
-                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
-                b.emit(fusevm::Op::LoadInt(1), 0);
-                b.emit(fusevm::Op::Add, 0);
+                b.emit(fusevm::Op::Extended(nops::INC_SLOT_VOID, 0), 0);
+            }
+            Op::PostIncSlot(s) => {
                 b.emit(fusevm::Op::LoadInt(*s as i64), 0);
-                b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
+                b.emit(fusevm::Op::Extended(nops::POST_INC_SLOT, 0), 0);
             }
             // `slot < int` then conditional jump. The NUM_LT Extended op yields
             // Int 0/1, so JumpIfFalse needs no TRUTHY normalization here.
@@ -1028,6 +1063,23 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*int as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::NUM_LT, 0), 0);
                 let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
+                jump_fixups.push((pos, *target));
+            }
+            // `++slot; if slot < limit goto target` — the for-loop trailing
+            // increment+test+backjump, unfused.
+            Op::SlotIncLtIntJumpBack(slot, limit, target) => {
+                let s = *slot as i64;
+                b.emit(fusevm::Op::LoadInt(s), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
+                b.emit(fusevm::Op::LoadInt(1), 0);
+                b.emit(fusevm::Op::Add, 0);
+                b.emit(fusevm::Op::LoadInt(s), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_SET, 0), 0);
+                b.emit(fusevm::Op::LoadInt(s), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
+                b.emit(fusevm::Op::LoadInt(*limit as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::NUM_LT, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfTrue(0), 0);
                 jump_fixups.push((pos, *target));
             }
             // Top-level terminator. Jump to end-of-chunk so any sub bodies
@@ -1094,7 +1146,14 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 jump_fixups.push((pos, *t));
             }
             // Anything else is outside the covered subset → fall back to vm.rs.
-            _ => return None,
+            other => {
+                // Coverage measurement: STRYKE_FUSEVM_TRACE logs the first
+                // uncovered op so gaps can be ranked by frequency.
+                if std::env::var_os("STRYKE_FUSEVM_TRACE").is_some() {
+                    eprintln!("FUSEVM_UNCOVERED {}", op_name(other));
+                }
+                return None;
+            }
         }
     }
     // End sentinel so a jump to "one past the last op" resolves to program end.
@@ -1261,6 +1320,16 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_undef_and_for_loops_match_vm() {
+        assert_parity_display("my $x; $x", &crate::run("my $x; $x").unwrap().to_string());
+        // C-style for loop (trailing SlotIncLtIntJumpBack)
+        assert_parity_int(
+            "my $s = 0; for (my $i = 0; $i < 5; $i++) { $s = $s + $i } $s",
+            10,
+        );
     }
 
     #[test]

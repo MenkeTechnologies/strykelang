@@ -571,6 +571,14 @@ fn run_compiled_chunk(chunk: bytecode::Chunk, interp: &mut VMHelper) -> StrykeRe
         if let Some(result) = crate::fusevm_native::try_run_native(&chunk, interp) {
             return result;
         }
+        // Measurement mode: STRYKE_FUSEVM_STRICT makes an uncovered program a
+        // hard error instead of falling back, so native coverage is observable.
+        if std::env::var_os("STRYKE_FUSEVM_STRICT").is_some() {
+            return Err(crate::error::StrykeError::runtime(
+                "STRYKE_FUSEVM_STRICT: program not covered by the native path",
+                0,
+            ));
+        }
     }
     interp.clear_flip_flop_state();
     interp.prepare_flip_flop_vm_slots(chunk.flip_flop_slots);
