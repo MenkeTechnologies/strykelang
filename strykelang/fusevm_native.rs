@@ -123,6 +123,8 @@ mod nops {
     pub const SORT_NOBLOCK: u16 = 44;
     pub const MAP_INT_MUL: u16 = 45;
     pub const GREP_BLOCK: u16 = 46;
+    /// `from..to` range → list (pops to, from; pushes the expanded array).
+    pub const RANGE: u16 = 47;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -608,6 +610,12 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
+        nops::RANGE => {
+            let to = pop_stryke(vm);
+            let from = pop_stryke(vm);
+            let arr = crate::value::perl_list_range_expand(from, to);
+            vm.push(stryke_to_fusevm(&StrykeValue::array(arr)));
+        }
         nops::SORT_NOBLOCK => {
             let mut items = pop_stryke(vm).to_list();
             items.sort_by_key(|a| a.to_string());
@@ -1217,6 +1225,9 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::Extended(nops::CALL_BUILTIN, *argc), 0);
             }
             // Block-builtins.
+            Op::Range => {
+                b.emit(fusevm::Op::Extended(nops::RANGE, 0), 0);
+            }
             Op::SortNoBlock => {
                 b.emit(fusevm::Op::Extended(nops::SORT_NOBLOCK, 0), 0);
             }
@@ -1423,6 +1434,14 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_range_matches_vm() {
+        assert_parity_str("join(\",\", 1..5)", "1,2,3,4,5");
+        assert_parity_str("join(\",\", 3..3)", "3");
+        assert_parity_str("join(\",\", 5..1)", "");
+        assert_parity_str("join(\"-\", 0..3)", "0-1-2-3");
     }
 
     #[test]
