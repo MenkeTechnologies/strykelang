@@ -199,6 +199,18 @@ mod nops {
     pub const MAKE_SCALAR_REF: u16 = 79;
     /// `%(…)` hash from the top `arg` stack values (k/v pairs); `arg` = item count.
     pub const MAKE_HASH: u16 = 80;
+    // ── Reference deref ──
+    /// `$r->[i]` array-element deref. Stack: ref, index.
+    pub const ARROW_ARRAY: u16 = 81;
+    /// `$r->{k}` hash-element deref. Stack: ref, key.
+    pub const ARROW_HASH: u16 = 82;
+    /// `scalar(@$r)` array-deref length → integer. Stack: ref.
+    pub const ARRAY_DEREF_LEN: u16 = 83;
+    /// `\$name` binding ref to a named scalar. Preceded by `LoadInt(name_idx)`.
+    pub const MAKE_SCALAR_BINDING_REF: u16 = 84;
+    /// Pop the TOS and push Int(1) if defined (not UNDEF), else Int(0). Used to
+    /// decompose `JumpIfDefinedKeep` (the `//` short-circuit).
+    pub const DEFINED: u16 = 85;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -546,6 +558,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let a = pop_stryke(vm);
             vm.push(fusevm::Value::Int(if a.is_true() { 1 } else { 0 }));
         }
+        nops::DEFINED => {
+            let a = pop_stryke(vm);
+            vm.push(fusevm::Value::Int(if a.is_undef() { 0 } else { 1 }));
+        }
         // `/` — integer quotient when both are integers and divisible, else
         // float; matches vm.rs's Div closure. Records div-by-zero in the error
         // slot and pushes Undef (the run is aborted after dispatch).
@@ -867,6 +883,58 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 };
                 interp.scope.set_scalar_slot(sum_slot, new_v);
             });
+        }
+        nops::ARROW_ARRAY => {
+            let idx = pop_stryke(vm).to_int();
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.read_arrow_array_element(r, idx, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime("arrow array: unexpected control flow", 0));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARROW_HASH => {
+            let key = pop_stryke(vm).to_string();
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.read_arrow_hash_element(r, key.as_str(), 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime("arrow hash: unexpected control flow", 0));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARRAY_DEREF_LEN => {
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.array_deref_len(r, 0)) {
+                Ok(n) => vm.push(fusevm::Value::Int(n)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime(
+                        "array deref len: unexpected control flow",
+                        0,
+                    ));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::MAKE_SCALAR_BINDING_REF => {
+            let idx = vm.pop().to_int();
+            let name = host_name(idx);
+            vm.push(stryke_to_fusevm(&StrykeValue::scalar_binding_ref(name)));
         }
         nops::PUSH_ARRAY => {
             let idx = vm.pop().to_int();
@@ -1763,6 +1831,20 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*n as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::MAKE_HASH, 0), 0);
             }
+            // Reference deref.
+            Op::ArrowArray => {
+                b.emit(fusevm::Op::Extended(nops::ARROW_ARRAY, 0), 0);
+            }
+            Op::ArrowHash => {
+                b.emit(fusevm::Op::Extended(nops::ARROW_HASH, 0), 0);
+            }
+            Op::ArrayDerefLen => {
+                b.emit(fusevm::Op::Extended(nops::ARRAY_DEREF_LEN, 0), 0);
+            }
+            Op::MakeScalarBindingRef(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAKE_SCALAR_BINDING_REF, 0), 0);
+            }
             // Scalar locals: strykelang stores them in `interp.scope` slots; on
             // the native path they live in the fusevm frame's slots instead
             // (self-consistent within the run — Declare/Set/Get use the same
@@ -1936,6 +2018,33 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::Extended(nops::TRUTHY, 0), 0);
                 let pos = b.emit(fusevm::Op::JumpIfTrue(0), 0);
                 jump_fixups.push((pos, *t));
+            }
+            // Short-circuit keep-jumps (`||`/`&&`/`//`). vm.rs semantics: peek;
+            // if the condition holds, jump KEEPING the value (it becomes the
+            // expression's result); else POP it and fall through to the RHS.
+            // fusevm's own keep-jumps never pop on fall-through and use fusevm
+            // truthiness, so decompose: Dup, compute the stryke condition, jump
+            // on it (leaving the original value), and Pop on the fall-through.
+            Op::JumpIfTrueKeep(t) => {
+                b.emit(fusevm::Op::Dup, 0);
+                b.emit(fusevm::Op::Extended(nops::TRUTHY, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfTrue(0), 0);
+                jump_fixups.push((pos, *t));
+                b.emit(fusevm::Op::Pop, 0);
+            }
+            Op::JumpIfFalseKeep(t) => {
+                b.emit(fusevm::Op::Dup, 0);
+                b.emit(fusevm::Op::Extended(nops::TRUTHY, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfFalse(0), 0);
+                jump_fixups.push((pos, *t));
+                b.emit(fusevm::Op::Pop, 0);
+            }
+            Op::JumpIfDefinedKeep(t) => {
+                b.emit(fusevm::Op::Dup, 0);
+                b.emit(fusevm::Op::Extended(nops::DEFINED, 0), 0);
+                let pos = b.emit(fusevm::Op::JumpIfTrue(0), 0);
+                jump_fixups.push((pos, *t));
+                b.emit(fusevm::Op::Pop, 0);
             }
             // Anything else is outside the covered subset → fall back to vm.rs.
             other => {
@@ -2180,6 +2289,31 @@ mod tests {
         assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
         assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
         assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+    }
+
+    #[test]
+    fn native_short_circuit_keep_jumps_match_vm() {
+        // `||` keeps the left value when truthy, else the right.
+        assert_parity_int("my $a = 0; my $b = 5; $a || $b", 5);
+        assert_parity_int("my $a = 3; $a || 99", 3);
+        // `&&` keeps the left value when falsy, else the right.
+        assert_parity_int("my $a = 1; my $b = 2; $a && $b", 2);
+        assert_parity_int("my $a = 0; $a && 99", 0);
+        // `//` keeps the left value when defined, else the right.
+        assert_parity_int("my $x; $x // 7", 7);
+        assert_parity_int("my $y = 4; $y // 99", 4);
+        // chained
+        assert_parity_int("my $a = 0; my $b = 0; my $c = 9; $a || $b || $c", 9);
+    }
+
+    #[test]
+    fn native_ref_deref_match_vm() {
+        // Now that deref ops are covered, ref construction + read round-trips natively.
+        assert_parity_int("my $r = [10, 20, 30]; $r->[1]", 20);
+        assert_parity_int("my $r = [10, 20, 30]; $r->[0] + $r->[2]", 40);
+        assert_parity_int("my $h = { a => 1, b => 2 }; $h->{b}", 2);
+        assert_parity_str("my $h = { a => \"x\", b => \"y\" }; $h->{a}", "x");
+        assert_parity_int("my $r = [1, 2, 3, 4]; scalar(@$r)", 4);
     }
 
     #[test]
