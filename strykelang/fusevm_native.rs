@@ -165,6 +165,19 @@ mod nops {
     /// `pmap { BLOCK } LIST` (parallel map). Preceded by `LoadInt(block_idx)`;
     /// the progress flag then the list are below it on the stack.
     pub const PMAP_BLOCK: u16 = 64;
+    // ── Bitwise / shift (overloaded: set ops + sketches, then integer) ──
+    /// `lv & rv` — set intersection / sketch-AND / integer AND.
+    pub const BIT_AND: u16 = 65;
+    /// `lv | rv` — set union / sketch-OR / integer OR.
+    pub const BIT_OR: u16 = 66;
+    /// `lv ^ rv` — sketch-XOR / integer XOR.
+    pub const BIT_XOR: u16 = 67;
+    /// `~a` — integer bitwise NOT.
+    pub const BIT_NOT: u16 = 68;
+    /// `a << b` — Perl left shift (`perl_shl_i64`).
+    pub const SHL: u16 = 69;
+    /// `a >> b` — Perl right shift (`perl_shr_i64`).
+    pub const SHR: u16 = 70;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -834,6 +847,60 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 interp.scope.set_scalar_slot(sum_slot, new_v);
             });
         }
+        nops::BIT_AND => {
+            let rv = pop_stryke(vm);
+            let lv = pop_stryke(vm);
+            let res = if let Some(s) = crate::value::set_intersection(&lv, &rv) {
+                s
+            } else if let Some(s) =
+                crate::sketches::try_sketch_binop(crate::sketches::SketchOp::And, &lv, &rv)
+            {
+                s
+            } else {
+                StrykeValue::integer(lv.to_int() & rv.to_int())
+            };
+            vm.push(stryke_to_fusevm(&res));
+        }
+        nops::BIT_OR => {
+            let rv = pop_stryke(vm);
+            let lv = pop_stryke(vm);
+            let res = if let Some(s) = crate::value::set_union(&lv, &rv) {
+                s
+            } else if let Some(s) =
+                crate::sketches::try_sketch_binop(crate::sketches::SketchOp::Or, &lv, &rv)
+            {
+                s
+            } else {
+                StrykeValue::integer(lv.to_int() | rv.to_int())
+            };
+            vm.push(stryke_to_fusevm(&res));
+        }
+        nops::BIT_XOR => {
+            let rv = pop_stryke(vm);
+            let lv = pop_stryke(vm);
+            let res = if let Some(s) =
+                crate::sketches::try_sketch_binop(crate::sketches::SketchOp::Xor, &lv, &rv)
+            {
+                s
+            } else {
+                StrykeValue::integer(lv.to_int() ^ rv.to_int())
+            };
+            vm.push(stryke_to_fusevm(&res));
+        }
+        nops::BIT_NOT => {
+            let a = pop_stryke(vm).to_int();
+            vm.push(fusevm::Value::Int(!a));
+        }
+        nops::SHL => {
+            let b = pop_stryke(vm).to_int();
+            let a = pop_stryke(vm).to_int();
+            vm.push(fusevm::Value::Int(crate::value::perl_shl_i64(a, b)));
+        }
+        nops::SHR => {
+            let b = pop_stryke(vm).to_int();
+            let a = pop_stryke(vm).to_int();
+            vm.push(fusevm::Value::Int(crate::value::perl_shr_i64(a, b)));
+        }
         nops::SORT_WITH_BLOCK_FAST => {
             let tag = vm.pop().to_int();
             let mut items = pop_stryke(vm).to_list();
@@ -1497,6 +1564,27 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::LogNot => {
                 b.emit(fusevm::Op::Extended(nops::LOG_NOT, 0), 0);
             }
+            // Bitwise / shift: overloaded in stryke (set ops + sketches before the
+            // integer path), so they route through Extended handlers, not fusevm's
+            // plain integer BitAnd/BitOr/… which would diverge on set/sketch values.
+            Op::BitAnd => {
+                b.emit(fusevm::Op::Extended(nops::BIT_AND, 0), 0);
+            }
+            Op::BitOr => {
+                b.emit(fusevm::Op::Extended(nops::BIT_OR, 0), 0);
+            }
+            Op::BitXor => {
+                b.emit(fusevm::Op::Extended(nops::BIT_XOR, 0), 0);
+            }
+            Op::BitNot => {
+                b.emit(fusevm::Op::Extended(nops::BIT_NOT, 0), 0);
+            }
+            Op::Shl => {
+                b.emit(fusevm::Op::Extended(nops::SHL, 0), 0);
+            }
+            Op::Shr => {
+                b.emit(fusevm::Op::Extended(nops::SHR, 0), 0);
+            }
             // Scalar locals: strykelang stores them in `interp.scope` slots; on
             // the native path they live in the fusevm frame's slots instead
             // (self-consistent within the run — Declare/Set/Get use the same
@@ -1914,6 +2002,18 @@ mod tests {
         assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
         assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
         assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+    }
+
+    #[test]
+    fn native_bitwise_shift_match_vm() {
+        assert_parity_int("12 & 10", 8);
+        assert_parity_int("12 | 10", 14);
+        assert_parity_int("12 ^ 10", 6);
+        assert_parity_int("~0", -1);
+        assert_parity_int("~5", -6);
+        assert_parity_int("1 << 10", 1024);
+        assert_parity_int("1024 >> 3", 128);
+        assert_parity_int("(255 & 0x0F) | (1 << 8)", 271);
     }
 
     #[test]
