@@ -1047,7 +1047,19 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
     // Halt jump indices, patched to end-of-chunk (so a top-level Halt skips any
     // sub bodies appended after it rather than falling through into them).
     let mut halt_fixups: Vec<usize> = Vec::new();
-    for op in &chunk.ops {
+    // Sub bodies are appended after the main region and are dead code on the
+    // native path — CALL_SUB delegates to `call_named_sub`, which runs them on
+    // the interpreter. Stop lowering at the earliest sub-body ip so sub-body-only
+    // ops (GetArg/ShiftArray/…) never need a native lowering arm. A main-region
+    // jump can never target a skipped index (subs are called, not jumped into);
+    // if one somehow did, the `src_to_dst.get(target)?` fixup aborts safely.
+    let sub_body_start = chunk.sub_entries.iter().map(|(_, ip, _)| *ip).min();
+    for (i, op) in chunk.ops.iter().enumerate() {
+        if let Some(cut) = sub_body_start {
+            if i >= cut {
+                break;
+            }
+        }
         src_to_dst.push(b.current_pos());
         match op {
             Op::Nop => {
@@ -1306,6 +1318,14 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*argc as i64), 0);
                 b.emit(fusevm::Op::LoadInt(*wa as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::CALL_SUB, 0), 0);
+            }
+            // Positional arg read (the `stack_args=true` sub-body optimization,
+            // e.g. a sub using `shift`). Sub bodies execute on the interpreter
+            // (CALL_SUB delegates to `call_named_sub`), so these appended ops are
+            // dead on the native path. A natively-reached GetArg has no call frame,
+            // which vm.rs maps to UNDEF — emit LoadUndef to match that branch.
+            Op::GetArg(_idx) => {
+                b.emit(fusevm::Op::LoadUndef, 0);
             }
             // Closures: build the coderef (block + sig indices), call via arrow.
             Op::MakeCodeRef(block_idx, sig_idx) => {
@@ -1571,6 +1591,20 @@ mod tests {
         // Range-built array length (regression: DeclareArray must flatten a
         // registry-handled list, not store it as one nested element).
         assert_parity_int("my @a = (1..10); my $n = @a; $n", 10);
+    }
+
+    #[test]
+    fn native_shift_arg_subs_match_vm() {
+        // `shift`-based subs compile with stack_args=true (GetArg ops). The sub
+        // body runs on the interpreter via CALL_SUB; the native path must lower
+        // those (dead-on-native) GetArg ops without aborting and still get the
+        // right result from the delegated call.
+        assert_parity_int("sub g { my $x = shift; return $x * 2 } g(5)", 10);
+        assert_parity_int("sub g { my $x = shift; my $y = shift; return $x + $y } g(3, 4)", 7);
+        assert_parity_int(
+            "sub myfac { my $n = shift; return $n <= 1 ? 1 : $n * myfac($n - 1) } myfac(5)",
+            120,
+        );
     }
 
     #[test]
