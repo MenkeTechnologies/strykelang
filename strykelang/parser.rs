@@ -13082,14 +13082,52 @@ impl Parser {
                     let name = self.parse_scalar_var_name()?;
                     self.expect(&Token::Comma)?;
                     let mode = self.parse_assign_expr()?;
-                    let file = if self.eat(&Token::Comma) {
-                        Some(self.parse_assign_expr()?)
-                    } else {
-                        None
-                    };
+                    // Collect every argument after the mode. The 3-arg file form
+                    // has one (`open my $fh, "<", $path`); the list-pipe form
+                    // (`open my $fh, "-|", "cmd", @args`) has several, which we
+                    // bundle into an arrayref so the runtime can exec the argv
+                    // directly without a shell.
+                    let mut rest = Vec::new();
+                    while self.eat(&Token::Comma) {
+                        rest.push(self.parse_assign_expr()?);
+                    }
                     if paren {
                         self.expect(&Token::RParen)?;
                     }
+                    let file = match rest.len() {
+                        0 => None,
+                        1 => {
+                            // A single array argument (`open $fh, "-|", @cmd`) is the
+                            // list-pipe form: wrap it so it compiles to an arrayref
+                            // value (arrays flattened) the runtime can exec directly.
+                            // A single scalar keeps the existing file / shell-pipe path.
+                            let only = rest.into_iter().next().unwrap();
+                            let is_array = matches!(
+                                only.kind,
+                                ExprKind::ArrayVar(_)
+                                    | ExprKind::Deref {
+                                        kind: crate::ast::Sigil::Array,
+                                        ..
+                                    }
+                            );
+                            if is_array {
+                                Some(Expr {
+                                    kind: ExprKind::ArrayRef(vec![only]),
+                                    line,
+                                })
+                            } else {
+                                Some(only)
+                            }
+                        }
+                        // 2+ args after the mode is the list-pipe form. Wrap in an
+                        // anonymous arrayref so it compiles to a single value (the
+                        // builtin's third arg) with arrays flattened in; the runtime
+                        // execs the argv directly without a shell.
+                        _ => Some(Expr {
+                            kind: ExprKind::ArrayRef(rest),
+                            line,
+                        }),
+                    };
                     Ok(Expr {
                         kind: ExprKind::Open {
                             handle: Box::new(Expr {

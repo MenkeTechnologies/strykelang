@@ -928,25 +928,24 @@ Tests: `multiple_heredocs_on_same_line_not_supported_today`.
 Severity: **bug**.
 
 
-## BUG-035 — `open "-|", "cmd", "arg"` list form drops the extra args
+## BUG-035 — `open "-|", "cmd", "arg"` list form — **FIXED**
 
 ```sh
 $ stryke -e 'open my $fh, "-|", "echo", "hi"; my $l = <$fh>; print "[", $l, "]"'
-[
-]                       # `echo` ran with no arg, only "\n" came back
-$ stryke -e 'open my $fh, "-|", "echo hi"; my $l = <$fh>; print "[", $l, "]"'
 [hi
-]                       # single-string shell form works
+]
 $ perl   -e 'open my $fh, "-|", "echo", "hi"; my $l = <$fh>; print "[", $l, "]"'
 [hi
 ]
 ```
 
-Tests: `pipe_open_read_string_form_captures_subprocess_stdout`,
-`pipe_open_read_list_form_drops_args_today`.
+The list-pipe forms `open($fh, "-|", "cmd", @args)` and `open($fh, "|-", @cmd)`
+now exec the argv directly with NO shell — matching Perl, so shell
+metacharacters are literal and there is no word-splitting / injection. A single
+array argument (`open($fh, "-|", @cmd)`) is treated as the list form; a single
+string (`open($fh, "-|", "cmd string")`) keeps the `sh -c` shell form.
 
-Severity: **bug**. The list form is the safe (no-shell-quoting) idiom and
-should be preferred.
+Severity: ~~**bug**~~ resolved.
 
 
 ## BUG-036 — `$obj->can("method")` returns a coderef that doesn't actually invoke
