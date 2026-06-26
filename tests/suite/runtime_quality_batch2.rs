@@ -412,8 +412,10 @@ fn qq_paren_delimiter() {
 }
 
 #[test]
-fn split_single_space_preserves_empty_fields_between_runs() {
-    assert_eq!(eval_string(r#"join(",", split(" ", "  a  b"))"#), ",,a,,b");
+fn split_single_space_string_is_awk_mode() {
+    // Perl awk-mode: the *string* " " (not the `/ /` regex) strips leading
+    // whitespace and splits on `\s+`, so no leading empties and runs collapse.
+    assert_eq!(eval_string(r#"join(",", split(" ", "  a  b"))"#), "a,b");
 }
 
 #[test]

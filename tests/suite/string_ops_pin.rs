@@ -337,20 +337,21 @@ fn split_then_join_roundtrip() {
 }
 
 #[test]
-fn split_on_whitespace_special_pattern_does_not_collapse() {
-    // Stryke divergence: Perl's `split(" ", ...)` is a special form
-    // that strips leading whitespace and collapses runs. Stryke
-    // treats `" "` as a literal single-space delimiter, yielding
-    // empty fields between runs. BUG-221.
-    //
-    // Workaround: use `/\s+/` and grep out empties, or just /\s+/
-    // with `split` which works correctly.
+fn split_on_whitespace_special_pattern_collapses() {
+    // BUG-221 (FIXED): Perl's `split(" ", ...)` is the awk-mode special form —
+    // the string `" "` strips leading whitespace and collapses whitespace runs.
+    // Stryke now matches; the `/ /` regex form keeps literal-space semantics.
+    let awk = r#"
+        my @parts = split(" ", "  hello   world  ");
+        (len(@parts) == 2 && $parts[0] eq "hello" && $parts[1] eq "world") ? 1 : 0
+    "#;
+    assert_eq!(eval_int(awk), 1);
+
+    // The `/\s+/` regex form still yields a leading empty field (no awk strip).
     let code = r#"
         my @parts = split(/\s+/, "  hello   world  ");
         @parts = grep { len($_) > 0 } @parts;
-        (scalar(@parts) == 2
-            && $parts[0] eq "hello"
-            && $parts[1] eq "world") ? 1 : 0
+        (len(@parts) == 2 && $parts[0] eq "hello" && $parts[1] eq "world") ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }

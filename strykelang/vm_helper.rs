@@ -13388,11 +13388,17 @@ impl VMHelper {
                 // For a regex value, pull the *source* (not the Display form,
                 // which wraps an empty regex as `(?:)` and would defeat the
                 // empty-pattern branch below).  Mirrors the VM's Split path.
-                let pat = pat_val
-                    .regex_src_and_flags()
-                    .map(|(s, _)| s)
-                    .unwrap_or_else(|| pat_val.to_string());
-                let s = self.eval_expr(string)?.to_string();
+                let (mut pat, is_regex) = match pat_val.regex_src_and_flags() {
+                    Some((src, _)) => (src, true),
+                    None => (pat_val.to_string(), false),
+                };
+                let mut s = self.eval_expr(string)?.to_string();
+                // Perl awk-mode: a single-space *string* pattern (NOT `/ /`) strips
+                // leading whitespace and splits on `\s+`. Mirrors the VM Split path.
+                if !is_regex && pat == " " {
+                    s = s.trim_start_matches(char::is_whitespace).to_string();
+                    pat = r"\s+".to_string();
+                }
                 if s.is_empty() {
                     return Ok(StrykeValue::array(vec![]));
                 }
@@ -23053,13 +23059,22 @@ pub(crate) fn exec_builtin(this: &mut VMHelper, id: u16, args: Vec<StrykeValue>,
                 // pattern semantics ("split between every character"). Pulling the
                 // source out via `regex_src_and_flags` lets us treat `//` as truly
                 // empty so the char-split branch fires.
-                let pat = pat_val
-                    .regex_src_and_flags()
-                    .map(|(s, _)| s)
-                    .unwrap_or_else(|| pat_val.to_string());
-                let s = iter.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                let (mut pat, is_regex) = match pat_val.regex_src_and_flags() {
+                    Some((src, _)) => (src, true),
+                    None => (pat_val.to_string(), false),
+                };
+                let mut s = iter.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                // Perl awk-mode: a single-space *string* pattern (NOT the `/ /`
+                // regex form) strips leading whitespace and splits on `\s+`,
+                // exactly as `split` with no pattern does. Only the string `" "`
+                // triggers this; `split / /` keeps literal single-space semantics.
+                if !is_regex && pat == " " {
+                    s = s.trim_start_matches(char::is_whitespace).to_string();
+                    pat = r"\s+".to_string();
+                }
                 // Perl 5: splitting the empty string yields the empty list for any
                 // pattern / limit (regex `split` on `""` would otherwise leave one field).
+                // After the awk-mode leading strip this also covers all-whitespace input.
                 if s.is_empty() {
                     return Ok(StrykeValue::array(vec![]));
                 }

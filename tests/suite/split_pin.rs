@@ -118,3 +118,69 @@ fn split_preserves_internal_empties() {
     "#;
     assert_eq!(eval_int(code), 1);
 }
+
+#[test]
+fn split_single_space_string_is_awk_mode() {
+    // Perl awk-mode: the *string* " " strips leading whitespace and
+    // splits on runs of whitespace — no leading empty, runs collapsed.
+    // Contrast `split(/ /, ...)` / `split(/\s+/, ...)` which do not.
+    let code = r#"
+        my @r = split(" ", "  a   b  c ");
+        len(@r) == 3 && $r[0] eq "a" && $r[1] eq "b" && $r[2] eq "c" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_single_space_string_collapses_tabs_and_newlines() {
+    // awk-mode splits on `\s+`, not just literal spaces.
+    let code = r#"
+        my @r = split(" ", "\ta\tb\n");
+        len(@r) == 2 && $r[0] eq "a" && $r[1] eq "b" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_single_space_string_positive_limit_keeps_remainder() {
+    // Leading strip applies, then LIMIT caps fields; the tail keeps its
+    // internal and trailing whitespace verbatim.
+    let code = r#"
+        my @r = split(" ", "  a   b  c ", 2);
+        len(@r) == 2 && $r[0] eq "a" && $r[1] eq "b  c " ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_single_space_string_negative_limit_keeps_trailing_empty() {
+    // Negative LIMIT preserves the trailing empty produced by the
+    // final whitespace run, just like Perl.
+    let code = r#"
+        my @r = split(" ", "  a   b  c ", -1);
+        join("|", @r) eq "a|b|c|" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_single_space_string_all_whitespace_yields_empty() {
+    // After the leading strip an all-whitespace string is empty → empty list.
+    let code = r#"
+        my @r = split(" ", "    ");
+        len(@r)
+    "#;
+    assert_eq!(eval_int(code), 0);
+}
+
+#[test]
+fn split_space_regex_is_not_awk_mode() {
+    // `split(/ /, ...)` keeps literal single-space semantics: leading
+    // whitespace yields empty fields, runs are NOT collapsed. Guards
+    // against the awk-mode branch leaking into the regex path.
+    let code = r#"
+        my @r = split(/ /, "  a b");
+        len(@r) == 4 && $r[0] eq "" && $r[1] eq "" && $r[2] eq "a" && $r[3] eq "b" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
