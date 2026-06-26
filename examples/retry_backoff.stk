@@ -38,10 +38,16 @@ around "Backend::*" {
         # caller; here we just continue and let the retry budget run out.)
         next unless rl_try_take($rl, 1)
         val $t1 = now_ns()
-        val $ret = eval { proceed() }
+        var $ret
+        var $failed = 0
+        try {
+            $ret = proceed()
+        } catch ($e) {
+            $failed = 1
+        }
         val $dt_us = (now_ns() - $t1) / 1000.0
         td_add($lat, $dt_us)
-        if ($@) {
+        if ($failed) {
             cms_add($outcomes, "failure")
             sleep $delay_ms / 1000.0
             $delay_ms *= 2

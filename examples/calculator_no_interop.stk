@@ -10,7 +10,7 @@
 #   * Hash tables for precedence + associativity
 #   * Stack-based RPN with `push` / `pop`
 #   * if/elsif on operator tokens (the portable stryke dispatch shape)
-#   * `eval { ... }` to catch `die` from the converter / evaluator
+#   * `try { ... } catch` to handle `die` from the converter / evaluator
 #   * Built-in `die` invariants — every demo case has an expected value
 #
 # Run: stryke --no-interop examples/calculator_no_interop.stk
@@ -83,9 +83,11 @@ fn Calc::run($expr) {
 
 if (len(@ARGV) >= 1) {
     val $expr = join(" ", @ARGV)
-    val $r = eval { Calc::run($expr) }
-    if ($@) {
-        p "error: $@"
+    var $r
+    try {
+        $r = Calc::run($expr)
+    } catch ($e) {
+        p "error: $e"
         exit 1
     }
     printf "%s  =  %s\n", $expr, $r
@@ -110,9 +112,11 @@ var @cases = (
 p "── Full infix calculator demo (shunt + RPN) ──"
 var $fail = 0
 for val $c (@cases) {
-    val $got = eval { Calc::run($c->{expr}) }
-    if ($@) {
-        printf "  %-30s -> ERROR: %s\n", $c->{expr}, $@
+    var $got
+    try {
+        $got = Calc::run($c->{expr})
+    } catch ($e) {
+        printf "  %-30s -> ERROR: %s\n", $c->{expr}, $e
         $fail++
         next
     }

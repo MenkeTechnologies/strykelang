@@ -15,13 +15,12 @@ typed val $risk   : Float = Demo::Typed::calculate_risk($level, $impact)
 
 printf "Threat Level: %d, Impact: %.1f, Total Risk: %.2f\n", $level, $impact, $risk
 
-# Type mismatch will throw a runtime error (catch via eval).
+# Type mismatch will throw a runtime error (caught with try/catch).
 p "\nTesting type safety..."
-eval {
+try {
     typed val $bad_level : Int = "very high"  # should fail
-}
-if ($@) {
-    p "Caught expected type error: $@"
+} catch ($e) {
+    p "Caught expected type error: $e"
 }
 
 # Pipeline with typed transformations.

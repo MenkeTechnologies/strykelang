@@ -9,7 +9,7 @@
 #   * `push` / `pop` on a `var @stack` accumulator
 #   * if/elsif chain on the operator token (the portable stryke
 #     dispatch shape — see also temperature_converter / state_machine)
-#   * `die` for input errors; outer `eval { ... }` catches them
+#   * `die` for input errors; outer `try { ... } catch` handles them
 #   * String split on `\s+` for whitespace tokenisation
 #
 # Run: stryke --no-interop examples/rpn_calc_no_interop.stk
@@ -46,9 +46,11 @@ fn RPN::eval($expr) {  # `rpn` itself is a stryke builtin — namespace ours
 
 if (len(@ARGV) > 0) {
     val $expr = join(" ", @ARGV)
-    val $result = eval { RPN::eval($expr) }
-    if ($@) {
-        p "error: $@"
+    var $result
+    try {
+        $result = RPN::eval($expr)
+    } catch ($e) {
+        p "error: $e"
         exit 1
     }
     p "$expr  =>  $result"
@@ -68,11 +70,16 @@ var @cases = (
 )
 var $fail = 0
 for val $c (@cases) {
-    val $r = eval { RPN::eval($c->{expr}) }
-    if ($@) {
-        printf "  %-30s -> error: %s\n", $c->{expr}, $@
+    var $r
+    var $ran = 0
+    try {
+        $r = RPN::eval($c->{expr})
+        $ran = 1
+    } catch ($e) {
+        printf "  %-30s -> error: %s\n", $c->{expr}, $e
         $fail++
-    } else {
+    }
+    if ($ran) {
         val $ok = ($r == $c->{want})
         $fail++ unless $ok
         printf "  %-30s -> %s   %s\n", $c->{expr}, $r, $ok ? "" : "FAIL"

@@ -46,6 +46,51 @@ fn test_try_catch_basic() {
 }
 
 #[test]
+fn test_try_catch_after_for_loop() {
+    // Regression: a `for` loop preceding `try/catch` emits a Nop that
+    // `compact_nops` removes, shifting op indices. `TryPush`'s catch_ip /
+    // after_ip / finally_ip were not remapped, so `catch_ip` landed one op
+    // past `CatchReceive` — the catch var came back empty and the value
+    // stack/scope for later code was corrupted.
+    let code = r#"
+        my $keep = "HANDLE";
+        for my $i (1..2) { my $x = $i; }
+        my $got = "none";
+        try {
+            die "boom";
+        } catch ($e) {
+            $got = "caught:$e";
+        }
+        "$got|$keep";
+    "#;
+    let out = run(code).expect("run").to_string();
+    assert!(out.contains("caught:boom"), "catch var lost after for loop: {out}");
+    assert!(out.ends_with("|HANDLE"), "outer var corrupted after for loop: {out}");
+}
+
+#[test]
+fn test_try_catch_finally_after_for_loop() {
+    // Same remap bug, exercising the finally_ip path.
+    let code = r#"
+        my @log;
+        for my $i (1..3) { push @log, $i; }
+        my $got = "none";
+        try {
+            die "kaboom";
+        } catch ($e) {
+            $got = "c:$e";
+        } finally {
+            push @log, "fin";
+        }
+        "$got|" . join(",", @log);
+    "#;
+    let out = run(code).expect("run").to_string();
+    assert!(out.contains("c:kaboom"), "catch var lost: {out}");
+    assert!(out.contains("fin"), "finally did not run: {out}");
+    assert!(out.contains("1,2,3"), "loop body corrupted: {out}");
+}
+
+#[test]
 fn test_division_by_zero_error() {
     let code = r#"
         eval { 1 / 0 };

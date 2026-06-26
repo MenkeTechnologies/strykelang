@@ -183,9 +183,11 @@ var $passed = 0
 for val $c (@cases) {
     val $src      = $c->[0]
     val $expected = $c->[1]
-    val $ast = eval { Demo::Expr::parse($src) }
-    if ($@) {
-        printf "  %-30s -> parse error: %s", $src, $@
+    var $ast
+    try {
+        $ast = Demo::Expr::parse($src)
+    } catch ($e) {
+        printf "  %-30s -> parse error: %s", $src, $e
         next
     }
     val $got = Demo::Expr::eval_ast($ast)
@@ -213,12 +215,16 @@ p ""
 p "── error handling on invalid input ──────────────────"
 var @bad = ("1 + ", "((1 + 2)", "1 +", "1 ** 2")
 for val $src (@bad) {
-    val $r = eval { Demo::Expr::parse($src) }
-    if ($@) {
-        var $msg = $@
+    var $ok = 0
+    try {
+        Demo::Expr::parse($src)
+        $ok = 1
+    } catch ($e) {
+        var $msg = $e
         $msg =~ s/\n$//
         printf "  %-15s -> error: %s\n", $src, $msg
-    } else {
+    }
+    if ($ok) {
         printf "  %-15s -> parsed OK (unexpected!)\n", $src
     }
 }

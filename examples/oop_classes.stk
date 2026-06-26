@@ -32,8 +32,9 @@ val $r = Rectangle(width => 4, height => 5)
 printf "  4x5 rect: area=%.0f\n", $r->area
 
 # Bad input fires the die from BUILD.
-eval { Rectangle(width => -1, height => 5) }
-p "  invariant fires: $@" if $@
+try { Rectangle(width => -1, height => 5) } catch ($e) {
+    p "  invariant fires: $e"
+}
 
 p ""
 p "── extends — single inheritance + super-call ──────────"

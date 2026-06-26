@@ -4,7 +4,7 @@
 #
 # This example demonstrates:
 #   * Parallel map (`pmap`) for concurrent HTTP requests.
-#   * Error handling using `eval { ... }`.
+#   * Error handling using `try { ... } catch`.
 #   * Regular expressions for extracting links from HTML.
 #   * Handling network timeouts and errors gracefully.
 #
@@ -24,14 +24,15 @@ val @urls = (
 p "Checking status codes for #{len @urls} sites..."
 
 var @results = pmap {
-    val $res = eval { http_request(_, +{ timeout => 5 }) }
-
-    if ($@) {
-        val $err = $@ =~ s/ at .*//r
-        +{ url => _, ok => 0, status => 0, err => $err }
-    } else {
-        +{ url => _, ok => ($res->{status} < 400), status => $res->{status} }
+    var $out
+    try {
+        val $res = http_request(_, +{ timeout => 5 })
+        $out = +{ url => _, ok => ($res->{status} < 400), status => $res->{status} }
+    } catch ($e) {
+        val $err = $e =~ s/ at .*//r
+        $out = +{ url => _, ok => 0, status => 0, err => $err }
     }
+    $out
 } @urls
 
 for val $res (@results) {
@@ -49,13 +50,18 @@ for val $res (@results) {
 p ""
 p "Extracting links from wikipedia.org..."
 
-val $html = eval { fetch("https://wikipedia.org") }
-if ($@) {
-    p "  Failed to fetch wikipedia: $@"
-} else {
+var $html
+var $fetch_ok = 0
+try {
+    $html = fetch("https://wikipedia.org")
+    $fetch_ok = 1
+} catch ($e) {
+    p "  Failed to fetch wikipedia: $e"
+}
+if ($fetch_ok) {
     # match_all pattern is the FIRST argument
     val @links = match_all('(?i)href="([^"]+)"', $html)
-    
+
     p "Found #{len @links} links."
     p "Sample of first 5 links:"
     for val $i (0:4) {

@@ -22,8 +22,7 @@ printf "  label(3.14159)  = %s\n", $label->(3.14159)
 
 # A sub whose body yields the wrong type aborts at the return boundary.
 fn mislabel($n: Int) : Str { $n + 1 }   # returns Int, declares Str
-eval { mislabel(7) }
-p "  return-type guard: $@" if $@
+try { mislabel(7) } catch ($e) { p "  return-type guard: $e" }
 
 # ── Parametric containers: List<T> and Map<K, V> ─────────────────────────────
 p "\nTyped containers:"
@@ -34,11 +33,13 @@ printf "  names = %s\n", join(", ", @names)
 printf "  ages{ann} = %d\n", $ages{ann}
 
 # Every write is checked: declaration, reassignment, push, and element store.
-eval { push @names, 99 }                 # Int into List<Str>
-p "  list push guard: $@" if $@
+try { push @names, 99 } catch ($e) {     # Int into List<Str>
+    p "  list push guard: $e"
+}
 
-eval { $ages{cy} = "old" }               # Str into Map<Str, Int> value
-p "  map value guard: $@" if $@
+try { $ages{cy} = "old" } catch ($e) {   # Str into Map<Str, Int> value
+    p "  map value guard: $e"
+}
 
 # Valid writes go through untouched.
 push @names, "dee"

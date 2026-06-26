@@ -26,8 +26,13 @@ fn Crawler::crawl($url, $depth) {
     p "  [Depth $depth] Crawling: $url"
     
     # Fetch content with timeout
-    val $res = eval { http_request($url, +{ timeout => 5 }) }
-    return if $@ || $res->{status} >= 400
+    var $res
+    try {
+        $res = http_request($url, +{ timeout => 5 })
+    } catch ($e) {
+        return
+    }
+    return if $res->{status} >= 400
     
     # Extract links (unique, absolute https only)
     # match_all pattern is the FIRST argument
