@@ -178,6 +178,12 @@ mod nops {
     pub const SHL: u16 = 69;
     /// `a >> b` — Perl right shift (`perl_shr_i64`).
     pub const SHR: u16 = 70;
+    /// `a cmp b` — string three-way compare → -1 / 0 / 1.
+    pub const STR_CMP: u16 = 71;
+    /// `str x n` — string repeat.
+    pub const STRING_REPEAT: u16 = 72;
+    /// `reverse SCALAR` — reverse the characters of the stringified TOS.
+    pub const REVERSE_SCALAR: u16 = 73;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -846,6 +852,27 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 };
                 interp.scope.set_scalar_slot(sum_slot, new_v);
             });
+        }
+        nops::STR_CMP => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            let c = match a.str_cmp(&b) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Greater => 1,
+                std::cmp::Ordering::Equal => 0,
+            };
+            vm.push(fusevm::Value::Int(c));
+        }
+        nops::STRING_REPEAT => {
+            let n = pop_stryke(vm).to_int();
+            let val = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&StrykeValue::string(val.repeat_value(n))));
+        }
+        nops::REVERSE_SCALAR => {
+            let val = pop_stryke(vm);
+            let items = val.to_list();
+            let s: String = items.iter().map(|v| v.to_string()).collect();
+            vm.push(stryke_to_fusevm(&StrykeValue::string(s.chars().rev().collect())));
         }
         nops::BIT_AND => {
             let rv = pop_stryke(vm);
@@ -1585,6 +1612,20 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::Shr => {
                 b.emit(fusevm::Op::Extended(nops::SHR, 0), 0);
             }
+            // `cmp` / `x` / `reverse SCALAR`. Dup maps to fusevm's native Dup
+            // (matches dup_stack: scalars clone, registry-handled refs share).
+            Op::StrCmp => {
+                b.emit(fusevm::Op::Extended(nops::STR_CMP, 0), 0);
+            }
+            Op::StringRepeat => {
+                b.emit(fusevm::Op::Extended(nops::STRING_REPEAT, 0), 0);
+            }
+            Op::ReverseScalarOp => {
+                b.emit(fusevm::Op::Extended(nops::REVERSE_SCALAR, 0), 0);
+            }
+            Op::Dup => {
+                b.emit(fusevm::Op::Dup, 0);
+            }
             // Scalar locals: strykelang stores them in `interp.scope` slots; on
             // the native path they live in the fusevm frame's slots instead
             // (self-consistent within the run — Declare/Set/Get use the same
@@ -2002,6 +2043,18 @@ mod tests {
         assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
         assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
         assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+    }
+
+    #[test]
+    fn native_strcmp_repeat_reverse_match_vm() {
+        assert_parity_int("\"abc\" cmp \"abd\"", -1);
+        assert_parity_int("\"abc\" cmp \"abc\"", 0);
+        assert_parity_int("\"abd\" cmp \"abc\"", 1);
+        assert_parity_str("\"ab\" x 3", "ababab");
+        assert_parity_str("\"-\" x 5", "-----");
+        assert_parity_str("reverse(\"hello\")", "olleh");
+        // Dup: `$x ** 2` style reuse / chained ops exercise stack duplication.
+        assert_parity_int("my $x = 6; $x * $x", 36);
     }
 
     #[test]
