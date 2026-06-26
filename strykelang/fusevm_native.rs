@@ -67,6 +67,45 @@ mod nops {
     pub const GET_SCALAR_PLAIN: u16 = 22;
     pub const SET_SCALAR_PLAIN: u16 = 23;
     pub const SET_SCALAR_KEEP_PLAIN: u16 = 24;
+    /// Arrays. MAKE_ARRAY pops a count then that many values (flattening nested
+    /// arrays, Perl list semantics) into a fusevm `Value::Array`. DECLARE_ARRAY
+    /// stores it in the interp scope by name. GET_ARRAY_ELEM reads `name[index]`
+    /// with strykelang's indexing sugar. All preceded by their `LoadInt` args.
+    pub const MAKE_ARRAY: u16 = 25;
+    pub const DECLARE_ARRAY: u16 = 26;
+    pub const GET_ARRAY_ELEM: u16 = 27;
+}
+
+/// Index a string by Unicode char (negative-from-end), as strykelang's array
+/// sugar does. Out of range → UNDEF.
+fn char_index(s: &str, index: i64) -> StrykeValue {
+    let cnt = s.chars().count() as i64;
+    let i = if index < 0 { index + cnt } else { index };
+    if i >= 0 && i < cnt {
+        s.chars()
+            .nth(i as usize)
+            .map(|c| StrykeValue::string(c.to_string()))
+            .unwrap_or(StrykeValue::UNDEF)
+    } else {
+        StrykeValue::UNDEF
+    }
+}
+
+/// `name[index]` with strykelang's sugar — mirrors vm.rs's GetArrayElem exactly
+/// (same scope methods), so behavior can't diverge. (Temporary twin of the vm.rs
+/// arm; removed when vm.rs is deleted at the end of the migration.)
+fn array_elem_value(i: &mut VMHelper, n: &str, index: i64) -> StrykeValue {
+    if let Some(real) = n.strip_prefix("__topicstr__") {
+        let s = i.scope.get_scalar(real).to_string();
+        return char_index(&s, index);
+    }
+    if !crate::compat_mode() && i.scope.scalar_binding_exists(n) && i.scope.get_array(n).is_empty() {
+        let s = i.scope.get_scalar(n).to_string();
+        if !s.is_empty() {
+            return char_index(&s, index);
+        }
+    }
+    i.scope.get_array_element(n, index)
 }
 
 // ── Interp host ─────────────────────────────────────────────────────────────
@@ -358,6 +397,42 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
                 set_native_err(e);
             }
         }
+        nops::MAKE_ARRAY => {
+            let n = vm.pop().to_int().max(0) as usize;
+            let mut vals: Vec<fusevm::Value> = Vec::with_capacity(n);
+            for _ in 0..n {
+                vals.push(vm.pop());
+            }
+            vals.reverse(); // pops are last-to-first → restore source order
+            // Perl list flatten: splice nested arrays in place.
+            let mut flat: Vec<fusevm::Value> = Vec::with_capacity(n);
+            for v in vals {
+                match v {
+                    fusevm::Value::Array(inner) => flat.extend(inner),
+                    other => flat.push(other),
+                }
+            }
+            vm.push(fusevm::Value::Array(flat));
+        }
+        nops::DECLARE_ARRAY => {
+            let idx = vm.pop().to_int();
+            let arr = vm.pop();
+            let name = host_name(idx);
+            let list: Vec<StrykeValue> = match arr {
+                fusevm::Value::Array(items) => {
+                    items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect()
+                }
+                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
+            };
+            with_interp(|i| i.scope.declare_array(&name, list));
+        }
+        nops::GET_ARRAY_ELEM => {
+            let idx = vm.pop().to_int();
+            let index = vm.pop().to_int();
+            let name = host_name(idx);
+            let v = with_interp(|i| array_elem_value(i, &name, index));
+            vm.push(stryke_to_fusevm(&v));
+        }
         _ => {}
     }
 }
@@ -464,6 +539,19 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::SetScalarKeepPlain(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::SET_SCALAR_KEEP_PLAIN, 0), 0);
+            }
+            // Arrays: push the count / name index, then the Extended op.
+            Op::MakeArray(n) => {
+                b.emit(fusevm::Op::LoadInt(*n as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::MAKE_ARRAY, 0), 0);
+            }
+            Op::DeclareArray(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::DECLARE_ARRAY, 0), 0);
+            }
+            Op::GetArrayElem(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GET_ARRAY_ELEM, 0), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
@@ -743,6 +831,14 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_arrays_match_vm() {
+        assert_parity_int("my @a = (1, 2, 3); $a[1]", 2);
+        assert_parity_int("my @a = (10, 20, 30); $a[0] + $a[2]", 40);
+        assert_parity_int("my @a = (1, 2, 3); $a[-1]", 3); // negative index
+        assert_parity_int("my @a = (5, 6, 7, 8); $a[3] - $a[0]", 3);
     }
 
     #[test]
