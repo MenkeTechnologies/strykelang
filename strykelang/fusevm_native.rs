@@ -132,6 +132,10 @@ mod nops {
     pub const MAP_BLOCK: u16 = 49;
     /// `scalar(@name)` array length → integer. Preceded by `LoadInt(name_idx)`.
     pub const ARRAY_LEN: u16 = 50;
+    /// Push a lexical scope frame (block / loop body entry).
+    pub const PUSH_FRAME: u16 = 51;
+    /// Pop a lexical scope frame (block / loop body exit).
+    pub const POP_FRAME: u16 = 52;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -559,14 +563,11 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::DECLARE_ARRAY => {
             let idx = vm.pop().to_int();
-            let arr = vm.pop();
+            // Mirror vm.rs `DeclareArray`: `val.to_list()` flattens a fusevm Array,
+            // unwraps a registry-handled array (e.g. from `Range`/`map`), or wraps a
+            // scalar as a one-element list — uniformly via `pop_stryke().to_list()`.
+            let list = pop_stryke(vm).to_list();
             let name = host_name(idx);
-            let list: Vec<StrykeValue> = match arr {
-                fusevm::Value::Array(items) => {
-                    items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect()
-                }
-                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
-            };
             with_interp(|i| i.scope.declare_array(&name, list));
         }
         nops::GET_ARRAY => {
@@ -580,6 +581,12 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let name = host_name(idx);
             let len = with_interp(|i| i.scope.array_len(&name));
             vm.push(fusevm::Value::Int(len as i64));
+        }
+        nops::PUSH_FRAME => {
+            with_interp(|i| i.scope_push_hook());
+        }
+        nops::POP_FRAME => {
+            with_interp(|i| i.scope_pop_hook());
         }
         nops::GET_ARRAY_ELEM => {
             let idx = vm.pop().to_int();
@@ -1096,6 +1103,12 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::ARRAY_LEN, 0), 0);
             }
+            Op::PushFrame => {
+                b.emit(fusevm::Op::Extended(nops::PUSH_FRAME, 0), 0);
+            }
+            Op::PopFrame => {
+                b.emit(fusevm::Op::Extended(nops::POP_FRAME, 0), 0);
+            }
             Op::GetArrayElem(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_ARRAY_ELEM, 0), 0);
@@ -1519,6 +1532,16 @@ mod tests {
         assert_parity_int("my @a = (5, 6, 7); my $n = @a; $n", 3);
         assert_parity_int("my @a = (\"x\", \"y\", \"z\", \"w\"); my $n = @a; $n", 4);
         assert_parity_int("my @a = (); my $n = @a; $n", 0);
+        // Range-built array length (regression: DeclareArray must flatten a
+        // registry-handled list, not store it as one nested element).
+        assert_parity_int("my @a = (1..10); my $n = @a; $n", 10);
+    }
+
+    #[test]
+    fn native_foreach_loop_matches_vm() {
+        assert_parity_int("my $s = 0; for my $i (1..10) { $s = $s + $i } $s", 55);
+        assert_parity_int("my $s = 0; for my $i (5, 10, 15) { $s = $s + $i } $s", 30);
+        assert_parity_int("my $s = 0; for my $i (1..100) { $s = $s + 1 } $s", 100);
     }
 
     #[test]
