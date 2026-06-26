@@ -113,6 +113,10 @@ mod nops {
     /// old value then increments (`slot++`). Preceded by `LoadInt(slot)`.
     pub const INC_SLOT_VOID: u16 = 41;
     pub const POST_INC_SLOT: u16 = 42;
+    /// Builtin call (`length`, `uc`, `join`, `map`, `sort`, …). Preceded by
+    /// `LoadInt(builtin_id)`; the Extended `arg` is the argument count.
+    /// Delegates to the shared `exec_builtin` dispatcher.
+    pub const CALL_BUILTIN: u16 = 43;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -598,6 +602,23 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         nops::PRINT => do_print(vm, arg as usize, false),
         nops::SAY => do_print(vm, arg as usize, true),
+        nops::CALL_BUILTIN => {
+            let id = vm.pop().to_int() as u16;
+            let argc = arg as usize;
+            let mut args: Vec<StrykeValue> = Vec::with_capacity(argc);
+            for _ in 0..argc {
+                args.push(pop_stryke(vm));
+            }
+            args.reverse();
+            let r = with_interp(|i| crate::vm_helper::exec_builtin(i, id, args, 0));
+            match r {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         nops::CALL_SUB => {
             let _wa = vm.pop().to_int(); // wantarray byte (scalar context assumed)
             let argc = vm.pop().to_int().max(0) as usize;
@@ -841,6 +862,9 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
         fusevm::Value::Str(s) => Some(StrykeValue::string((**s).clone())),
         fusevm::Value::Undef => Some(StrykeValue::UNDEF),
         fusevm::Value::NativeFn(id) => Some(reg_get(*id)),
+        fusevm::Value::Array(items) => Some(StrykeValue::array(
+            items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect(),
+        )),
         _ => None,
     }
 }
@@ -1125,6 +1149,11 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*lvalue_idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::REGEX_SUBST, 0), 0);
             }
+            // Builtin call: push the builtin id, the Extended op carries argc.
+            Op::CallBuiltin(id, argc) => {
+                b.emit(fusevm::Op::LoadInt(*id as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::CALL_BUILTIN, *argc), 0);
+            }
             // Control flow (pop variants). Emit the fusevm jump with a
             // placeholder target recorded for fixup. Conditional jumps first
             // normalize the condition to Perl truthiness (Int 0/1) via TRUTHY,
@@ -1320,6 +1349,18 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_builtins_match_vm() {
+        assert_parity_int("length(\"hello\")", 5);
+        assert_parity_str("uc(\"hi\")", "HI");
+        assert_parity_str("join(\",\", 1, 2, 3)", "1,2,3");
+        assert_parity_display("abs(-7)", &crate::run("abs(-7)").unwrap().to_string());
+        assert_parity_display("sqrt(16)", &crate::run("sqrt(16)").unwrap().to_string());
+        // multi-arg builtin taking a list (array arg) then a string result
+        assert_parity_str("join(\"-\", \"a\", \"b\", \"c\")", "a-b-c");
+        assert_parity_int("index(\"hello\", \"l\")", 2);
     }
 
     #[test]

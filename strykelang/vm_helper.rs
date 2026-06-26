@@ -1,3 +1,4 @@
+use crate::bytecode::BuiltinId;
 use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -22837,3 +22838,1181 @@ mod special_scalar_name_tests {
         assert_eq!(i.flip_flop_exclusive_left_line[0], None);
     }
 }
+
+
+// Extracted from vm.rs's VM::exec_builtin (Phase 18 of the fusevm migration):
+// the builtin dispatcher uses only `self.interp` + `self.line()`, so it lives here
+// as a free fn over `&mut VMHelper`, callable from both the interpreter and the
+// fusevm-native CallBuiltin handler. `this` is the interp; `line` was `self.line()`.
+pub(crate) fn exec_builtin(this: &mut VMHelper, id: u16, args: Vec<StrykeValue>, line: usize) -> StrykeResult<StrykeValue> {
+        let bid = BuiltinId::from_u16(id);
+        match bid {
+            Some(BuiltinId::Length) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.length_value(this.utf8_pragma)))
+            }
+            Some(BuiltinId::Defined) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(if val.is_undef() { 0 } else { 1 }))
+            }
+            Some(BuiltinId::Abs) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().abs()))
+            }
+            Some(BuiltinId::Int) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.to_number() as i64))
+            }
+            Some(BuiltinId::Sqrt) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().sqrt()))
+            }
+            Some(BuiltinId::Sin) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().sin()))
+            }
+            Some(BuiltinId::Cos) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().cos()))
+            }
+            Some(BuiltinId::Atan2) => {
+                let mut it = args.into_iter();
+                let y = it.next().unwrap_or(StrykeValue::UNDEF);
+                let x = it.next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(y.to_number().atan2(x.to_number())))
+            }
+            Some(BuiltinId::Exp) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().exp()))
+            }
+            Some(BuiltinId::Log) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::float(val.to_number().ln()))
+            }
+            Some(BuiltinId::Rand) => {
+                let upper = match args.len() {
+                    0 => 1.0,
+                    _ => args[0].to_number(),
+                };
+                Ok(StrykeValue::float(this.perl_rand(upper)))
+            }
+            Some(BuiltinId::Srand) => {
+                let seed = match args.len() {
+                    0 => None,
+                    _ => Some(args[0].to_number()),
+                };
+                Ok(StrykeValue::integer(this.perl_srand(seed)))
+            }
+            Some(BuiltinId::Crypt) => {
+                let mut it = args.into_iter();
+                let p = it.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                let salt = it.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                Ok(StrykeValue::string(crate::crypt_util::perl_crypt(
+                    &p, &salt,
+                )))
+            }
+            Some(BuiltinId::Fc) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.fc_value()))
+            }
+            Some(BuiltinId::Quotemeta) => {
+                let s = args
+                    .into_iter()
+                    .next()
+                    .map(|v| v.to_string())
+                    .unwrap_or_default();
+                Ok(StrykeValue::string(crate::perl_regex::perl_quotemeta(&s)))
+            }
+            Some(BuiltinId::Tan) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().tan(),
+            )),
+            Some(BuiltinId::Asin) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().asin(),
+            )),
+            Some(BuiltinId::Acos) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().acos(),
+            )),
+            Some(BuiltinId::Atan) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().atan(),
+            )),
+            Some(BuiltinId::Sinh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().sinh(),
+            )),
+            Some(BuiltinId::Cosh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().cosh(),
+            )),
+            Some(BuiltinId::Tanh) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().tanh(),
+            )),
+            Some(BuiltinId::Log2) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().log2(),
+            )),
+            Some(BuiltinId::Log10) => Ok(StrykeValue::float(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().log10(),
+            )),
+            Some(BuiltinId::Ceil) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().ceil() as i64,
+            )),
+            Some(BuiltinId::Floor) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().floor() as i64,
+            )),
+            // Round: 1-arg form returns Int (ties away from zero); 2-arg form
+            // (round to N places) defers to the named-dispatch path which is
+            // still in `builtins.rs`. CallBuiltin only emits the 1-arg form.
+            Some(BuiltinId::Round) => Ok(StrykeValue::integer(
+                args.into_iter().next().unwrap_or(StrykeValue::UNDEF).to_number().round() as i64,
+            )),
+            Some(BuiltinId::Pos) => {
+                let key = if args.is_empty() {
+                    "_".to_string()
+                } else {
+                    args[0].to_string()
+                };
+                Ok(this
+                    
+                    .regex_pos
+                    .get(&key)
+                    .copied()
+                    .flatten()
+                    .map(|n| StrykeValue::integer(n as i64))
+                    .unwrap_or(StrykeValue::UNDEF))
+            }
+            Some(BuiltinId::Study) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(VMHelper::study_return_value(&s.to_string()))
+            }
+            Some(BuiltinId::Chr) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(val.chr_value()))
+            }
+            Some(BuiltinId::Ord) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.ord_value()))
+            }
+            Some(BuiltinId::Hex) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.hex_value()))
+            }
+            Some(BuiltinId::Oct) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::integer(val.oct_value()))
+            }
+            Some(BuiltinId::Uc) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.uc_value()))
+            }
+            Some(BuiltinId::Lc) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.lc_value()))
+            }
+            Some(BuiltinId::Ref) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(val.ref_type())
+            }
+            Some(BuiltinId::Scalar) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(val.scalar_context())
+            }
+            Some(BuiltinId::Join) => {
+                let mut iter = args.into_iter();
+                let sep = iter.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                let list = iter.next().unwrap_or(StrykeValue::UNDEF).to_list();
+                let mut strs = Vec::with_capacity(list.len());
+                for v in list {
+                    let s = match this.stringify_value(v, line) {
+                        Ok(s) => s,
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(StrykeError::runtime(
+                                "join: unexpected control flow",
+                                line,
+                            ));
+                        }
+                    };
+                    strs.push(s);
+                }
+                Ok(StrykeValue::string(strs.join(&sep)))
+            }
+            Some(BuiltinId::Split) => {
+                let mut iter = args.into_iter();
+                let pat_val = iter.next().unwrap_or(StrykeValue::string(" ".into()));
+                // Prefer the regex source over the Display form: `qr//`'s Display is
+                // `(?:)` (matches everywhere), which is NOT the same as Perl's empty-
+                // pattern semantics ("split between every character"). Pulling the
+                // source out via `regex_src_and_flags` lets us treat `//` as truly
+                // empty so the char-split branch fires.
+                let pat = pat_val
+                    .regex_src_and_flags()
+                    .map(|(s, _)| s)
+                    .unwrap_or_else(|| pat_val.to_string());
+                let s = iter.next().unwrap_or(StrykeValue::UNDEF).to_string();
+                // Perl 5: splitting the empty string yields the empty list for any
+                // pattern / limit (regex `split` on `""` would otherwise leave one field).
+                if s.is_empty() {
+                    return Ok(StrykeValue::array(vec![]));
+                }
+                // Perl LIMIT semantics:
+                //   omitted / 0  → no truncation, strip trailing empties.
+                //   > 0          → at most LIMIT fields, keep empties up to limit.
+                //   < 0          → no truncation, keep all empties.
+                let lim_signed: Option<i64> = iter.next().map(|v| v.to_int());
+
+                let mut parts: Vec<String> = if pat.is_empty() {
+                    // Empty pattern → "split between every character" (Perl). The
+                    // regex engine would also match at the boundaries, producing
+                    // spurious empties; `s.chars()` is the right primitive.
+                    let chars: Vec<String> = s.chars().map(|c| c.to_string()).collect();
+                    match lim_signed {
+                        // LIMIT > 0 (Perl):
+                        //   n < |chars|        → first n-1 chars then the tail in one field
+                        //                        (`split //, "abcde", 3` → ("a","b","cde")).
+                        //   n == |chars|       → chars exactly, no trailing empty.
+                        //   n > |chars|        → chars + "" (Perl emits the end-of-string
+                        //                        match as a final empty when LIMIT permits).
+                        Some(l) if l > 0 => {
+                            let n = l as usize;
+                            if n < chars.len() {
+                                let mut head: Vec<String> =
+                                    chars.iter().take(n.saturating_sub(1)).cloned().collect();
+                                let tail: String = s.chars().skip(n.saturating_sub(1)).collect();
+                                head.push(tail);
+                                head
+                            } else if n == chars.len() {
+                                chars
+                            } else {
+                                let mut v = chars;
+                                v.push(String::new());
+                                v
+                            }
+                        }
+                        // LIMIT < 0 → chars + trailing empty.
+                        Some(l) if l < 0 => {
+                            let mut v = chars;
+                            v.push(String::new());
+                            v
+                        }
+                        // No limit / 0 → just the chars; the trailing-empty strip
+                        // below is a no-op (`chars()` never emits one).
+                        _ => chars,
+                    }
+                } else {
+                    let re =
+                        regex::Regex::new(&pat).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
+                    match lim_signed {
+                        Some(l) if l > 0 => {
+                            re.splitn(&s, l as usize).map(|p| p.to_string()).collect()
+                        }
+                        _ => re.split(&s).map(|p| p.to_string()).collect(),
+                    }
+                };
+
+                // Trailing-empty strip: Perl strips ONLY when LIMIT is omitted or
+                // zero. Positive LIMIT keeps trailing empties (capped at LIMIT).
+                // Negative LIMIT also keeps them.
+                let strip_trailing = matches!(lim_signed, None | Some(0));
+                if strip_trailing {
+                    while parts.last().is_some_and(|p| p.is_empty()) {
+                        parts.pop();
+                    }
+                }
+
+                Ok(StrykeValue::array(
+                    parts.into_iter().map(StrykeValue::string).collect(),
+                ))
+            }
+            Some(BuiltinId::Sprintf) => {
+                // sprintf arg list is Perl list context; flatten ranges / arrays / reverse
+                // output into individual format arguments (same splatting as printf).
+                let mut flat: Vec<StrykeValue> = Vec::with_capacity(args.len());
+                for a in args.into_iter() {
+                    if let Some(items) = a.as_array_vec() {
+                        flat.extend(items);
+                    } else {
+                        flat.push(a);
+                    }
+                }
+                let args = flat;
+                if args.is_empty() {
+                    return Ok(StrykeValue::string(String::new()));
+                }
+                let fmt = args[0].to_string();
+                let rest = &args[1..];
+                match this.perl_sprintf_stringify(&fmt, rest, line) {
+                    Ok(s) => Ok(StrykeValue::string(s)),
+                    Err(FlowOrError::Error(e)) => Err(e),
+                    Err(FlowOrError::Flow(_)) => Err(StrykeError::runtime(
+                        "sprintf: unexpected control flow",
+                        line,
+                    )),
+                }
+            }
+            Some(BuiltinId::Reverse) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(if let Some(mut a) = val.as_array_vec() {
+                    a.reverse();
+                    StrykeValue::array(a)
+                } else if let Some(s) = val.as_str() {
+                    StrykeValue::string(s.chars().rev().collect())
+                } else {
+                    StrykeValue::string(val.to_string().chars().rev().collect())
+                })
+            }
+            Some(BuiltinId::Die) => {
+                // Single-ref arg: preserve the original value (hash/array/code/blessed ref)
+                // so `$@` and `try/catch` see the ref, not a stringification.
+                if args.len() == 1 {
+                    let v = &args[0];
+                    if v.as_hash_ref().is_some()
+                        || v.as_blessed_ref().is_some()
+                        || v.as_array_ref().is_some()
+                        || v.as_code_ref().is_some()
+                    {
+                        let msg = v.to_string();
+                        this.fire_pseudosig_die(&msg, line)?;
+                        return Err(StrykeError::die_with_value(v.clone(), msg, line));
+                    }
+                }
+                let mut msg = String::new();
+                for a in &args {
+                    msg.push_str(&a.to_string());
+                }
+                if msg.is_empty() {
+                    msg = "Died".to_string();
+                }
+                if !msg.ends_with('\n') {
+                    msg.push_str(&this.die_warn_at_suffix(line));
+                    msg.push('\n');
+                }
+                this.fire_pseudosig_die(&msg, line)?;
+                Err(StrykeError::die(msg, line))
+            }
+            Some(BuiltinId::Warn) => {
+                let mut msg = String::new();
+                for a in &args {
+                    msg.push_str(&a.to_string());
+                }
+                if msg.is_empty() {
+                    msg = "Warning: something's wrong".to_string();
+                }
+                if !msg.ends_with('\n') {
+                    msg.push_str(&this.die_warn_at_suffix(line));
+                    msg.push('\n');
+                }
+                this.fire_pseudosig_warn(&msg, line)?;
+                Ok(StrykeValue::integer(1))
+            }
+            Some(BuiltinId::Exit) => {
+                let code = args
+                    .into_iter()
+                    .next()
+                    .map(|v| v.to_int() as i32)
+                    .unwrap_or(0);
+                Err(StrykeError::new(
+                    ErrorKind::Exit(code),
+                    "",
+                    line,
+                    &this.file,
+                ))
+            }
+            Some(BuiltinId::System) => {
+                // Perl's `system`:
+                //   - `system "cmd args"` (single string)  → `sh -c "cmd args"`
+                //   - `system "cmd", "arg1", "arg2", ...`  → exec the program
+                //     directly with the trailing args as argv (no shell).
+                // Return value is the encoded `$?` status word (exit_code << 8
+                // on a clean exit; raw signal number for signals), not the bare
+                // exit code, so `$rc == 0` <=> clean success and bit-twiddles
+                // like `($? >> 8)` work on the return value too.
+                let strs: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+                if strs.is_empty() {
+                    this.child_exit_status = -1;
+                    return Ok(StrykeValue::integer(-1));
+                }
+                let status = if strs.len() == 1 {
+                    std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(&strs[0])
+                        .status()
+                } else {
+                    std::process::Command::new(&strs[0])
+                        .args(&strs[1..])
+                        .status()
+                };
+                match status {
+                    Ok(s) => {
+                        this.record_child_exit_status(s);
+                        Ok(StrykeValue::integer(this.child_exit_status))
+                    }
+                    Err(e) => {
+                        this.errno = e.to_string();
+                        this.child_exit_status = -1;
+                        Ok(StrykeValue::integer(-1))
+                    }
+                }
+            }
+            Some(BuiltinId::Ssh) => this.ssh_builtin_execute(&args),
+            Some(BuiltinId::Chomp) => {
+                // Chomp modifies the variable in-place — but in CallBuiltin we get the value, not a reference.
+                // Return the number of chars removed (like Perl).
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                let s = val.to_string();
+                Ok(StrykeValue::integer(if s.ends_with('\n') { 1 } else { 0 }))
+            }
+            Some(BuiltinId::Chop) => {
+                let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                let s = val.to_string();
+                Ok(s.chars()
+                    .last()
+                    .map(|c| StrykeValue::string(c.to_string()))
+                    .unwrap_or(StrykeValue::UNDEF))
+            }
+            Some(BuiltinId::Substr) => {
+                if args.len() < 3 {
+                    let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                    let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+                    return Ok(StrykeValue::string(s.substr2_value(off)));
+                }
+                let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let off = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+                let len = args.get(2).map(|v| v.to_int()).unwrap_or(0);
+                Ok(StrykeValue::string(s.substr3_value(off, len)))
+            }
+            Some(BuiltinId::Index) => {
+                let s = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let sub = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+                if args.len() < 3 {
+                    return Ok(StrykeValue::integer(s.index_value(&sub)));
+                }
+                let s = s.to_string();
+                let sub = sub.to_string();
+                // Perl: negative POS clamps to 0; POS past end returns -1
+                // (or, for empty needle, returns POS clamped to len).
+                let pos_raw = args.get(2).map(|v| v.to_int()).unwrap_or(0);
+                let pos = if pos_raw < 0 {
+                    0usize
+                } else {
+                    (pos_raw as usize).min(s.len())
+                };
+                Ok(StrykeValue::integer(
+                    s[pos..].find(&sub).map(|i| (i + pos) as i64).unwrap_or(-1),
+                ))
+            }
+            Some(BuiltinId::Rindex) => {
+                let sv = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let subv = args.get(1).cloned().unwrap_or(StrykeValue::UNDEF);
+                if args.len() < 3 {
+                    return Ok(StrykeValue::integer(sv.rindex_value(&subv)));
+                }
+                let s = sv.to_string();
+                let sub = subv.to_string();
+                // Perl: negative POS means "search must end at or before POS";
+                // any negative value past -1 implies no possible match.
+                let result = match args.get(2) {
+                    Some(v) => {
+                        let p = v.to_int();
+                        if p < 0 {
+                            -1
+                        } else {
+                            let end = (p as usize).saturating_add(sub.len()).min(s.len());
+                            s[..end].rfind(&sub).map(|i| i as i64).unwrap_or(-1)
+                        }
+                    }
+                    None => s.rfind(&sub).map(|i| i as i64).unwrap_or(-1),
+                };
+                Ok(StrykeValue::integer(result))
+            }
+            Some(BuiltinId::Ucfirst) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.ucfirst_value()))
+            }
+            Some(BuiltinId::Lcfirst) => {
+                let s = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(s.lcfirst_value()))
+            }
+            Some(BuiltinId::Splice) => this.splice_builtin_execute(&args, line),
+            Some(BuiltinId::Unshift) => this.unshift_builtin_execute(&args, line),
+            Some(BuiltinId::Printf) => {
+                // Flatten list-context operands (ranges, arrays, `reverse`, …) so format
+                // placeholders line up with individual values instead of an array reference.
+                let mut flat: Vec<StrykeValue> = Vec::with_capacity(args.len());
+                for a in args.into_iter() {
+                    if let Some(items) = a.as_array_vec() {
+                        flat.extend(items);
+                    } else {
+                        flat.push(a);
+                    }
+                }
+                let args = flat;
+                let (fmt, rest): (String, &[StrykeValue]) = if args.is_empty() {
+                    let s = match this
+                        
+                        .stringify_value(this.scope.get_scalar("_").clone(), line)
+                    {
+                        Ok(s) => s,
+                        Err(FlowOrError::Error(e)) => return Err(e),
+                        Err(FlowOrError::Flow(_)) => {
+                            return Err(StrykeError::runtime(
+                                "printf: unexpected control flow",
+                                line,
+                            ));
+                        }
+                    };
+                    (s, &[])
+                } else {
+                    (args[0].to_string(), &args[1..])
+                };
+                let out = match this.perl_sprintf_stringify(&fmt, rest, line) {
+                    Ok(s) => s,
+                    Err(FlowOrError::Error(e)) => return Err(e),
+                    Err(FlowOrError::Flow(_)) => {
+                        return Err(StrykeError::runtime(
+                            "printf: unexpected control flow",
+                            line,
+                        ));
+                    }
+                };
+                print!("{}", out);
+                if this.output_autoflush {
+                    let _ = io::stdout().flush();
+                }
+                Ok(StrykeValue::integer(1))
+            }
+            Some(BuiltinId::Open) => {
+                if args.len() < 2 {
+                    return Err(StrykeError::runtime(
+                        "open requires at least 2 arguments",
+                        line,
+                    ));
+                }
+                let handle_name = args[0].to_string();
+                let mode_s = args[1].to_string();
+                let file_opt = args.get(2).map(|v| v.to_string());
+                this
+                    .open_builtin_execute(handle_name, mode_s, file_opt, line)
+            }
+            Some(BuiltinId::Close) => {
+                let name = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                this.close_builtin_execute(name)
+            }
+            Some(BuiltinId::Eof) => this.eof_builtin_execute(&args, line),
+            Some(BuiltinId::ReadLine) => {
+                let h = if args.is_empty() {
+                    None
+                } else {
+                    Some(args[0].to_string())
+                };
+                this.readline_builtin_execute(h.as_deref())
+            }
+            Some(BuiltinId::ReadLineList) => {
+                let h = if args.is_empty() {
+                    None
+                } else {
+                    Some(args[0].to_string())
+                };
+                this.readline_builtin_execute_list(h.as_deref())
+            }
+            Some(BuiltinId::Exec) => {
+                let cmd = args
+                    .iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let status = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .status();
+                std::process::exit(status.map(|s| s.code().unwrap_or(-1)).unwrap_or(-1));
+            }
+            Some(BuiltinId::Chdir) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                if std::env::set_current_dir(&path).is_ok() {
+                    if let Ok(c) = std::env::current_dir() {
+                        this.stryke_pwd = std::fs::canonicalize(&c).unwrap_or(c);
+                    }
+                    Ok(StrykeValue::integer(1))
+                } else {
+                    Ok(StrykeValue::integer(0))
+                }
+            }
+            Some(BuiltinId::Mkdir) => {
+                let path = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = this.resolve_stryke_path_string(&path);
+                Ok(StrykeValue::integer(
+                    if std::fs::create_dir(&path).is_ok() {
+                        1
+                    } else {
+                        0
+                    },
+                ))
+            }
+            Some(BuiltinId::Unlink) => {
+                let mut count = 0i64;
+                for a in &args {
+                    let p = this.resolve_stryke_path_string(&a.to_string());
+                    if std::fs::remove_file(&p).is_ok() {
+                        count += 1;
+                    }
+                }
+                Ok(StrykeValue::integer(count))
+            }
+            Some(BuiltinId::Rmdir) => this.builtin_rmdir_execute(&args, line),
+            Some(BuiltinId::Utime) => this.builtin_utime_execute(&args, line),
+            Some(BuiltinId::Umask) => this.builtin_umask_execute(&args, line),
+            Some(BuiltinId::Getcwd) => this.builtin_getcwd_execute(&args, line),
+            Some(BuiltinId::Pipe) => this.builtin_pipe_execute(&args, line),
+            Some(BuiltinId::Rename) => {
+                let old = this.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                let new = this.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::rename_paths(&old, &new))
+            }
+            Some(BuiltinId::Chmod) => {
+                if args.is_empty() {
+                    return Ok(StrykeValue::integer(0));
+                }
+                let mode = args[0].to_int();
+                let paths: Vec<String> = args
+                    .iter()
+                    .skip(1)
+                    .map(|v| this.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
+                Ok(StrykeValue::integer(crate::perl_fs::chmod_paths(
+                    &paths, mode,
+                )))
+            }
+            Some(BuiltinId::Chown) => {
+                if args.len() < 3 {
+                    return Ok(StrykeValue::integer(0));
+                }
+                let uid = args[0].to_int();
+                let gid = args[1].to_int();
+                let paths: Vec<String> = args
+                    .iter()
+                    .skip(2)
+                    .map(|v| this.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
+                Ok(StrykeValue::integer(crate::perl_fs::chown_paths(
+                    &paths, uid, gid,
+                )))
+            }
+            Some(BuiltinId::Stat) => {
+                let path = this.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::stat_path(&path, false))
+            }
+            Some(BuiltinId::Lstat) => {
+                let path = this.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::stat_path(&path, true))
+            }
+            Some(BuiltinId::Link) => {
+                let old = this.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                let new = this.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::link_hard(&old, &new))
+            }
+            Some(BuiltinId::Symlink) => {
+                let old = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let new = this.resolve_stryke_path_string(
+                    &args.get(1).map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::link_sym(&old, &new))
+            }
+            Some(BuiltinId::Readlink) => {
+                let path = this.resolve_stryke_path_string(
+                    &args.first().map(|v| v.to_string()).unwrap_or_default(),
+                );
+                Ok(crate::perl_fs::read_link(&path))
+            }
+            Some(BuiltinId::Glob) => {
+                // Pass user patterns through verbatim: zsh::glob runs from OS cwd,
+                // which `chdir` keeps in sync with `stryke_pwd`. Absolutising the
+                // pattern up front would turn relative-pattern results into
+                // absolute paths (breaking `glob("**(/)")` → "sub" contract,
+                // pinned in tests/suite/glob_zsh_qualifiers.rs).
+                let pats: Vec<String> = args.iter().map(|v| v.to_string()).collect();
+                Ok(crate::perl_fs::glob_patterns(&pats))
+            }
+            Some(BuiltinId::Files) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_files(&dir))
+            }
+            Some(BuiltinId::Filesf) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_filesf(&dir))
+            }
+            Some(BuiltinId::FilesfRecursive) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(StrykeValue::iterator(std::sync::Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, true),
+                )))
+            }
+            Some(BuiltinId::Dirs) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_dirs(&dir))
+            }
+            Some(BuiltinId::DirsRecursive) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(StrykeValue::iterator(std::sync::Arc::new(
+                    crate::value::FsWalkIterator::new(&dir, false),
+                )))
+            }
+            Some(BuiltinId::SymLinks) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_sym_links(&dir))
+            }
+            Some(BuiltinId::Sockets) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_sockets(&dir))
+            }
+            Some(BuiltinId::Pipes) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_pipes(&dir))
+            }
+            Some(BuiltinId::BlockDevices) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_block_devices(&dir))
+            }
+            Some(BuiltinId::CharDevices) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_char_devices(&dir))
+            }
+            Some(BuiltinId::Executables) => {
+                let dir = if args.is_empty() {
+                    this.resolve_stryke_path_string(".")
+                } else {
+                    this.resolve_stryke_path_string(&args[0].to_string())
+                };
+                Ok(crate::perl_fs::list_executables(&dir))
+            }
+            Some(BuiltinId::GlobPar) => {
+                let pats: Vec<String> = args
+                    .iter()
+                    .map(|v| this.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
+                Ok(crate::perl_fs::glob_par_patterns(&pats))
+            }
+            Some(BuiltinId::GlobParProgress) => {
+                let progress = args.last().map(|v| v.is_true()).unwrap_or(false);
+                let pats: Vec<String> = args[..args.len().saturating_sub(1)]
+                    .iter()
+                    .map(|v| this.resolve_stryke_path_string(&v.to_string()))
+                    .collect();
+                Ok(crate::perl_fs::glob_par_patterns_with_progress(
+                    &pats, progress,
+                ))
+            }
+            Some(BuiltinId::ParSed) => this.builtin_par_sed(&args, line, false),
+            Some(BuiltinId::ParSedProgress) => this.builtin_par_sed(&args, line, true),
+            Some(BuiltinId::Opendir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let path = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.opendir_handle(&handle, &path))
+            }
+            Some(BuiltinId::Readdir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.readdir_handle(&handle))
+            }
+            Some(BuiltinId::ReaddirList) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.readdir_handle_list(&handle))
+            }
+            Some(BuiltinId::Closedir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.closedir_handle(&handle))
+            }
+            Some(BuiltinId::Rewinddir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.rewinddir_handle(&handle))
+            }
+            Some(BuiltinId::Telldir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                Ok(this.telldir_handle(&handle))
+            }
+            Some(BuiltinId::Seekdir) => {
+                let handle = args.first().map(|v| v.to_string()).unwrap_or_default();
+                let pos = args.get(1).map(|v| v.to_int().max(0) as usize).unwrap_or(0);
+                Ok(this.seekdir_handle(&handle, pos))
+            }
+            Some(BuiltinId::Slurp) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let path = this.resolve_stryke_path_string(&path);
+                crate::perl_fs::read_bytes_or_glob(&path)
+                    .map(StrykeValue::bytes)
+                    .map_err(|e| StrykeError::runtime(format!("slurp: {}", e), line))
+            }
+            Some(BuiltinId::Swallow) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let path = this.resolve_stryke_path_string(&path);
+                crate::perl_fs::swallow_to_hash(&path)
+                    .map_err(|e| StrykeError::runtime(format!("swallow: {}", e), line))
+            }
+            Some(BuiltinId::Ingest) => {
+                let path = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let path = this.resolve_stryke_path_string(&path);
+                crate::perl_fs::ingest_iterator(&path)
+                    .map_err(|e| StrykeError::runtime(format!("ingest: {}", e), line))
+            }
+            Some(BuiltinId::Burp) => {
+                let v = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                crate::perl_fs::burp_hash_to_disk(&v)
+                    .map(StrykeValue::integer)
+                    .map_err(|e| StrykeError::runtime(format!("burp: {}", e), line))
+            }
+            Some(BuiltinId::God) => {
+                let v = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::string(crate::god::god_dump(&v)))
+            }
+            Some(BuiltinId::Capture) => {
+                let cmd = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                crate::capture::run_capture(this, &cmd, line)
+            }
+            Some(BuiltinId::Ppool) => {
+                let n = args
+                    .first()
+                    .map(|v| v.to_int().max(0) as usize)
+                    .unwrap_or(1);
+                crate::ppool::create_pool(n)
+            }
+            Some(BuiltinId::Wantarray) => Ok(match this.wantarray_kind {
+                crate::vm_helper::WantarrayCtx::Void => StrykeValue::UNDEF,
+                crate::vm_helper::WantarrayCtx::Scalar => StrykeValue::integer(0),
+                crate::vm_helper::WantarrayCtx::List => StrykeValue::integer(1),
+            }),
+            Some(BuiltinId::FetchUrl) => {
+                let url = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                ureq::get(&url)
+                    .call()
+                    .map_err(|e| StrykeError::runtime(format!("fetch_url: {}", e), line))
+                    .and_then(|r| {
+                        r.into_string()
+                            .map(StrykeValue::string)
+                            .map_err(|e| StrykeError::runtime(format!("fetch_url: {}", e), line))
+                    })
+            }
+            Some(BuiltinId::Pchannel) => {
+                if args.is_empty() {
+                    Ok(crate::pchannel::create_pair())
+                } else if args.len() == 1 {
+                    let n = args[0].to_int().max(1) as usize;
+                    Ok(crate::pchannel::create_bounded_pair(n))
+                } else {
+                    Err(StrykeError::runtime(
+                        "pchannel() takes 0 or 1 arguments (capacity)",
+                        line,
+                    ))
+                }
+            }
+            Some(BuiltinId::Pselect) => crate::pchannel::pselect_recv(&args, line),
+            Some(BuiltinId::DequeNew) => {
+                if !args.is_empty() {
+                    return Err(StrykeError::runtime("deque() takes no arguments", line));
+                }
+                Ok(StrykeValue::deque(Arc::new(Mutex::new(VecDeque::new()))))
+            }
+            Some(BuiltinId::HeapNew) => {
+                if args.len() != 1 {
+                    return Err(StrykeError::runtime(
+                        "heap() expects one comparator sub",
+                        line,
+                    ));
+                }
+                let a0 = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                if let Some(sub) = a0.as_code_ref() {
+                    Ok(StrykeValue::heap(Arc::new(Mutex::new(PerlHeap {
+                        items: Vec::new(),
+                        cmp: Arc::clone(&sub),
+                    }))))
+                } else {
+                    Err(StrykeError::runtime(
+                        "heap() requires a code reference",
+                        line,
+                    ))
+                }
+            }
+            Some(BuiltinId::BarrierNew) => {
+                let n = args
+                    .first()
+                    .map(|v| v.to_int().max(1) as usize)
+                    .unwrap_or(1);
+                Ok(StrykeValue::barrier(PerlBarrier(Arc::new(Barrier::new(n)))))
+            }
+            Some(BuiltinId::ClusterNew) => {
+                // `cluster(HOST...)` — accepts one operand (flattened) or
+                // multiple (each is a slot spec). Same surface as the
+                // tree-walker arm in `vm_helper.rs` `call_named_sub`'s
+                // "cluster" case so `pmap_on` / `~d>` see identical
+                // `RemoteCluster` values from either dispatch path.
+                let items = if args.len() == 1 {
+                    args[0].to_list()
+                } else {
+                    args.clone()
+                };
+                let c = crate::value::RemoteCluster::from_list_args(&items)
+                    .map_err(|msg| StrykeError::runtime(msg, line))?;
+                Ok(StrykeValue::remote_cluster(std::sync::Arc::new(c)))
+            }
+            Some(BuiltinId::Pipeline) => {
+                let mut items = Vec::new();
+                for v in args {
+                    if let Some(a) = v.as_array_vec() {
+                        items.extend(a);
+                    } else {
+                        items.push(v);
+                    }
+                }
+                Ok(StrykeValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+                    source: items,
+                    ops: Vec::new(),
+                    has_scalar_terminal: false,
+                    par_stream: false,
+                    streaming: false,
+                    streaming_workers: 0,
+                    streaming_buffer: 256,
+                }))))
+            }
+            Some(BuiltinId::ParPipeline) => {
+                if crate::par_pipeline::is_named_par_pipeline_args(&args) {
+                    return crate::par_pipeline::run_par_pipeline(this, &args, line);
+                }
+                let mut items = Vec::new();
+                for v in args {
+                    if let Some(a) = v.as_array_vec() {
+                        items.extend(a);
+                    } else {
+                        items.push(v);
+                    }
+                }
+                Ok(StrykeValue::pipeline(Arc::new(Mutex::new(PipelineInner {
+                    source: items,
+                    ops: Vec::new(),
+                    has_scalar_terminal: false,
+                    par_stream: true,
+                    streaming: false,
+                    streaming_workers: 0,
+                    streaming_buffer: 256,
+                }))))
+            }
+            Some(BuiltinId::ParPipelineStream) => {
+                if crate::par_pipeline::is_named_par_pipeline_args(&args) {
+                    return crate::par_pipeline::run_par_pipeline_streaming(
+                        this,
+                        &args,
+                        line,
+                    );
+                }
+                this.builtin_par_pipeline_stream_new(&args, line)
+            }
+            Some(BuiltinId::Each) => {
+                let _arg = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                Ok(StrykeValue::array(vec![]))
+            }
+            Some(BuiltinId::Readpipe) => {
+                let cmd = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                crate::capture::run_readpipe(this, &cmd, line)
+            }
+            Some(BuiltinId::ReadpipeList) => {
+                let cmd = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                let v = crate::capture::run_readpipe(this, &cmd, line)?;
+                let s = v.to_string();
+                if s.is_empty() {
+                    return Ok(StrykeValue::array(Vec::new()));
+                }
+                let mut lines = Vec::new();
+                let mut buf = String::new();
+                for c in s.chars() {
+                    buf.push(c);
+                    if c == '\n' {
+                        lines.push(StrykeValue::string(std::mem::take(&mut buf)));
+                    }
+                }
+                if !buf.is_empty() {
+                    lines.push(StrykeValue::string(buf));
+                }
+                Ok(StrykeValue::array(lines))
+            }
+            Some(BuiltinId::Eval) => {
+                let arg = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
+                this.eval_nesting += 1;
+                let out = if let Some(sub) = arg.as_code_ref() {
+                    match this.exec_block(&sub.body) {
+                        Ok(v) => {
+                            this.clear_eval_error();
+                            Ok(v)
+                        }
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                            this.set_eval_error_from_perl_error(&e);
+                            Ok(StrykeValue::UNDEF)
+                        }
+                        Err(crate::vm_helper::FlowOrError::Flow(_)) => {
+                            this.clear_eval_error();
+                            Ok(StrykeValue::UNDEF)
+                        }
+                    }
+                } else {
+                    let code = arg.to_string();
+                    match crate::parse_and_run_string(&code, this) {
+                        Ok(v) => {
+                            this.clear_eval_error();
+                            Ok(v)
+                        }
+                        Err(e) => {
+                            this.set_eval_error_from_perl_error(&e);
+                            Ok(StrykeValue::UNDEF)
+                        }
+                    }
+                };
+                this.eval_nesting -= 1;
+                out
+            }
+            Some(BuiltinId::Do) => {
+                let filename = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                match read_file_text_perl_compat(&filename) {
+                    Ok(code) => {
+                        let code = crate::data_section::strip_perl_end_marker(&code);
+                        crate::parse_and_run_string_in_file(code, this, &filename)
+                            .or(Ok(StrykeValue::UNDEF))
+                    }
+                    Err(_) => Ok(StrykeValue::UNDEF),
+                }
+            }
+            Some(BuiltinId::Require) => {
+                let name = args
+                    .into_iter()
+                    .next()
+                    .unwrap_or(StrykeValue::UNDEF)
+                    .to_string();
+                this.require_execute(&name, line)
+            }
+            Some(BuiltinId::Bless) => {
+                let ref_val = args.first().cloned().unwrap_or(StrykeValue::UNDEF);
+                let class = args
+                    .get(1)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| this.scope.get_scalar("__PACKAGE__").to_string());
+                Ok(StrykeValue::blessed(Arc::new(
+                    crate::value::BlessedRef::new_blessed(class, ref_val),
+                )))
+            }
+            Some(BuiltinId::Caller) => {
+                // Simplified caller frame: (package, file, line, subname).
+                // The sub name is the fully-qualified name of the currently
+                // executing sub so logger / decorator patterns work.
+                let sub_name = this
+                    
+                    .current_sub_stack
+                    .last()
+                    .map(|s| StrykeValue::string(s.name.clone()))
+                    .unwrap_or(StrykeValue::UNDEF);
+                let pkg = this.current_package();
+                Ok(StrykeValue::array(vec![
+                    StrykeValue::string(pkg),
+                    StrykeValue::string(this.file.clone()),
+                    StrykeValue::integer(line as i64),
+                    sub_name,
+                ]))
+            }
+            // Parallel ops (shouldn't reach here — handled by block ops)
+            Some(BuiltinId::PMap)
+            | Some(BuiltinId::PGrep)
+            | Some(BuiltinId::PFor)
+            | Some(BuiltinId::PSort)
+            | Some(BuiltinId::Fan)
+            | Some(BuiltinId::MapBlock)
+            | Some(BuiltinId::GrepBlock)
+            | Some(BuiltinId::SortBlock)
+            | Some(BuiltinId::Sort) => Ok(StrykeValue::UNDEF),
+            _ => Err(StrykeError::runtime(
+                format!("Unimplemented builtin {:?}", bid),
+                line,
+            )),
+        }
+    }
