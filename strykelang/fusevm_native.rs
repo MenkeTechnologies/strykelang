@@ -51,6 +51,40 @@ mod nops {
     /// conditional jumps branch using strykelang's `is_true` (fusevm's native
     /// truthiness differs for values like the string "0").
     pub const TRUTHY: u16 = 15;
+    /// Arithmetic that can fault or change type (`/ % **`); each pops 2, pushes
+    /// the result (or records a runtime error via the error slot).
+    pub const DIV: u16 = 16;
+    pub const MOD: u16 = 17;
+    pub const POW: u16 = 18;
+}
+
+thread_local! {
+    /// A runtime error raised inside [`native_ext_handler`] (which cannot return
+    /// a `Result`). [`try_run_native`] drains it after the run and propagates it.
+    static NATIVE_ERR: std::cell::RefCell<Option<StrykeError>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn set_native_err(e: StrykeError) {
+    NATIVE_ERR.with(|c| {
+        let mut slot = c.borrow_mut();
+        if slot.is_none() {
+            *slot = Some(e);
+        }
+    });
+}
+
+/// Convert a StrykeValue back to a native fusevm Value (scalar subset).
+fn stryke_to_fusevm(v: &StrykeValue) -> fusevm::Value {
+    if let Some(i) = v.as_integer() {
+        fusevm::Value::Int(i)
+    } else if let Some(f) = v.as_float() {
+        fusevm::Value::Float(f)
+    } else if let Some(s) = v.as_str() {
+        fusevm::Value::Str(Arc::new(s))
+    } else {
+        fusevm::Value::Undef
+    }
 }
 
 /// Numeric comparison matching strykelang's `int_cmp`: exact integer compare
@@ -160,6 +194,48 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             let a = pop_stryke(vm);
             vm.push(fusevm::Value::Int(if a.is_true() { 1 } else { 0 }));
         }
+        // `/` — integer quotient when both are integers and divisible, else
+        // float; matches vm.rs's Div closure. Records div-by-zero in the error
+        // slot and pushes Undef (the run is aborted after dispatch).
+        nops::DIV => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            let result = if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
+                if y == 0 {
+                    set_native_err(StrykeError::division_by_zero("Illegal division by zero", 0));
+                    fusevm::Value::Undef
+                } else if x % y == 0 {
+                    fusevm::Value::Int(x / y)
+                } else {
+                    fusevm::Value::Float(x as f64 / y as f64)
+                }
+            } else {
+                let d = b.to_number();
+                if d == 0.0 {
+                    set_native_err(StrykeError::division_by_zero("Illegal division by zero", 0));
+                    fusevm::Value::Undef
+                } else {
+                    fusevm::Value::Float(a.to_number() / d)
+                }
+            };
+            vm.push(result);
+        }
+        nops::MOD => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            let bi = b.to_int();
+            if bi == 0 {
+                set_native_err(StrykeError::division_by_zero("Illegal modulus zero", 0));
+                vm.push(fusevm::Value::Undef);
+            } else {
+                vm.push(fusevm::Value::Int(crate::value::perl_mod_i64(a.to_int(), bi)));
+            }
+        }
+        nops::POW => {
+            let b = pop_stryke(vm);
+            let a = pop_stryke(vm);
+            vm.push(stryke_to_fusevm(&crate::value::compat_pow(&a, &b)));
+        }
         _ => {}
     }
 }
@@ -231,6 +307,15 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
             }
             Op::Mul => {
                 b.emit(fusevm::Op::Mul, 0);
+            }
+            Op::Div => {
+                b.emit(fusevm::Op::Extended(nops::DIV, 0), 0);
+            }
+            Op::Mod => {
+                b.emit(fusevm::Op::Extended(nops::MOD, 0), 0);
+            }
+            Op::Pow => {
+                b.emit(fusevm::Op::Extended(nops::POW, 0), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
@@ -366,11 +451,18 @@ pub fn try_run_native(chunk: &Chunk, _interp: &mut VMHelper) -> Option<StrykeRes
     let fchunk = b.build();
     let mut vm = fusevm::VM::new(fchunk);
     vm.set_extension_handler(Box::new(native_ext_handler));
-    match vm.run() {
+    NATIVE_ERR.with(|c| *c.borrow_mut() = None);
+    let outcome = vm.run();
+    // A runtime error raised inside the handler (e.g. division by zero) takes
+    // precedence over the VM's own result.
+    if let Some(e) = NATIVE_ERR.with(|c| c.borrow_mut().take()) {
+        return Some(Err(e));
+    }
+    match outcome {
         fusevm::VMResult::Ok(v) => match fusevm_to_stryke(&v) {
             Some(sv) => Some(Ok(sv)),
-            // Result type outside the subset; let vm.rs handle it (the arithmetic
-            // subset has no side effects, so re-running is safe).
+            // Result type outside the subset; let vm.rs handle it (the covered
+            // ops have no side effects, so re-running is safe).
             None => None,
         },
         fusevm::VMResult::Halted => Some(Ok(StrykeValue::UNDEF)),
@@ -476,6 +568,27 @@ mod tests {
         assert_parity_int("my $x = 5; my $y = 10; $x + $y", 15);
         assert_parity_int("my $x = 5; $x = $x * 2; $x", 10);
         assert_parity_str("my $s = \"hi\"; $s . \"!\"", "hi!");
+    }
+
+    /// Native path must agree with vm.rs on the value's display form (covers
+    /// any scalar type — int, float, string).
+    fn assert_parity_display(code: &str, expect: &str) {
+        let vm = crate::run(code).expect("vm run");
+        assert_eq!(vm.to_string(), expect, "vm.rs value for `{code}`");
+        let nat = native(code)
+            .unwrap_or_else(|| panic!("`{code}` not covered by native path"))
+            .expect("native run");
+        assert_eq!(nat.to_string(), expect, "native value for `{code}`");
+    }
+
+    #[test]
+    fn native_div_mod_pow_match_vm() {
+        // Display-based (native must equal vm.rs) — avoids int-vs-float
+        // assumptions (Perl `**` yields a float; `/` is int only when divisible).
+        for code in ["10 / 2", "7 / 2", "17 % 5", "(-7) % 3", "2 ** 10", "9 ** 0.5"] {
+            let expect = crate::run(code).expect("vm run").to_string();
+            assert_parity_display(code, &expect);
+        }
     }
 
     #[test]
