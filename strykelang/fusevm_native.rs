@@ -21,6 +21,7 @@ use crate::bytecode::{Chunk, Op};
 use crate::error::{StrykeError, StrykeResult};
 use crate::value::StrykeValue;
 use crate::vm_helper::VMHelper;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 /// strykelang Extended-op IDs handled by [`native_ext_handler`] on the
@@ -74,6 +75,10 @@ mod nops {
     pub const MAKE_ARRAY: u16 = 25;
     pub const DECLARE_ARRAY: u16 = 26;
     pub const GET_ARRAY_ELEM: u16 = 27;
+    /// Hashes. DECLARE_HASH folds a flat k/v list (built via MAKE_ARRAY) into a
+    /// map in the interp scope; GET_HASH_ELEM reads `name{key}`.
+    pub const DECLARE_HASH: u16 = 28;
+    pub const GET_HASH_ELEM: u16 = 29;
 }
 
 /// Index a string by Unicode char (negative-from-end), as strykelang's array
@@ -433,6 +438,45 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
             let v = with_interp(|i| array_elem_value(i, &name, index));
             vm.push(stryke_to_fusevm(&v));
         }
+        nops::DECLARE_HASH => {
+            let idx = vm.pop().to_int();
+            let raw = vm.pop();
+            let name = host_name(idx);
+            let is_undef = matches!(raw, fusevm::Value::Undef);
+            let items: Vec<StrykeValue> = match raw {
+                fusevm::Value::Array(v) => {
+                    v.iter().map(|x| fusevm_to_stryke(x).unwrap_or(StrykeValue::UNDEF)).collect()
+                }
+                fusevm::Value::Undef => Vec::new(),
+                other => vec![fusevm_to_stryke(&other).unwrap_or(StrykeValue::UNDEF)],
+            };
+            with_interp(|i| {
+                // `our %h;` (undef initializer, package-qualified) preserves
+                // existing data; everything else folds the k/v pairs into a map.
+                if is_undef && name.contains("::") {
+                    let existing = i.scope.get_hash(&name);
+                    i.scope.declare_hash(&name, existing);
+                } else {
+                    let mut map: IndexMap<String, StrykeValue> = IndexMap::new();
+                    let mut k = 0;
+                    while k + 1 < items.len() {
+                        map.insert(items[k].to_string(), items[k + 1].clone());
+                        k += 2;
+                    }
+                    i.scope.declare_hash(&name, map);
+                }
+            });
+        }
+        nops::GET_HASH_ELEM => {
+            let idx = vm.pop().to_int();
+            let key = pop_stryke(vm).to_string();
+            let name = host_name(idx);
+            let v = with_interp(|i| {
+                i.touch_env_hash(&name);
+                i.scope.get_hash_element(&name, &key)
+            });
+            vm.push(stryke_to_fusevm(&v));
+        }
         _ => {}
     }
 }
@@ -456,6 +500,7 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
         fusevm::Value::Int(n) => Some(StrykeValue::integer(*n)),
         fusevm::Value::Float(f) => Some(StrykeValue::float(*f)),
         fusevm::Value::Str(s) => Some(StrykeValue::string((**s).clone())),
+        fusevm::Value::Undef => Some(StrykeValue::UNDEF),
         _ => None,
     }
 }
@@ -552,6 +597,14 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
             Op::GetArrayElem(idx) => {
                 b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::GET_ARRAY_ELEM, 0), 0);
+            }
+            Op::DeclareHash(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::DECLARE_HASH, 0), 0);
+            }
+            Op::GetHashElem(idx) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::GET_HASH_ELEM, 0), 0);
             }
             Op::Negate => {
                 b.emit(fusevm::Op::Negate, 0);
@@ -831,6 +884,15 @@ mod tests {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
+    }
+
+    #[test]
+    fn native_hashes_match_vm() {
+        assert_parity_int("my %h = (\"a\", 1, \"b\", 2); $h{\"a\"}", 1);
+        assert_parity_int("my %h = (\"a\", 1, \"b\", 2); $h{\"b\"}", 2);
+        assert_parity_int("my %h = (\"x\", 10); $h{\"x\"} + 5", 15);
+        // missing key → undef (display ""), checked against vm.rs
+        assert_parity_display("my %h = (\"a\", 1); $h{\"z\"}", &crate::run("my %h = (\"a\", 1); $h{\"z\"}").unwrap().to_string());
     }
 
     #[test]
