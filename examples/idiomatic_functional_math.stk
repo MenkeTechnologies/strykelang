@@ -10,11 +10,11 @@ val @res = ~> iterate({ _ * 2 }, 1) greps { _ =~ /6$/ } head(5) collect
 p "Powers of 2 ending in 6: @res"
 
 # 2. Parallel probabilistic search
-val @p = ~> (1e6 : 1e6+1000) pgreps { is_prime _ } collect
-p "Found #{len @p} primes."
+val @p = ~> (1e6 : 1e6+1000) pgreps { is_prime } collect
+p "Found #{l @p} primes."
 
 # 3. Tests
 @res[0] |> aeq 16, "pwr2 end 6"
-len @p > 0 |> aok "primes found"
+l @p > 0 |> aok "primes found"
 
 test_run
