@@ -327,7 +327,8 @@ fn array_elem_value(i: &mut VMHelper, n: &str, index: i64) -> StrykeValue {
         let s = i.scope.get_scalar(real).to_string();
         return char_index(&s, index);
     }
-    if !crate::compat_mode() && i.scope.scalar_binding_exists(n) && i.scope.get_array(n).is_empty() {
+    if !crate::compat_mode() && i.scope.scalar_binding_exists(n) && i.scope.get_array(n).is_empty()
+    {
         let s = i.scope.get_scalar(n).to_string();
         if !s.is_empty() {
             return char_index(&s, index);
@@ -396,7 +397,10 @@ fn host_name(idx: i64) -> String {
 /// The variant name of an op (Debug, without operands), for coverage tracing.
 fn op_name(op: &Op) -> String {
     let s = format!("{op:?}");
-    s.split(|c| c == '(' || c == ' ').next().unwrap_or(&s).to_string()
+    s.split(|c| c == '(' || c == ' ')
+        .next()
+        .unwrap_or(&s)
+        .to_string()
 }
 
 /// Stash a non-scalar StrykeValue, returning its registry id (for NativeFn).
@@ -410,7 +414,12 @@ fn reg_put(v: StrykeValue) -> u16 {
 
 /// Retrieve a registry value by id.
 fn reg_get(id: u16) -> StrykeValue {
-    REGISTRY.with(|r| r.borrow().get(id as usize).cloned().unwrap_or(StrykeValue::UNDEF))
+    REGISTRY.with(|r| {
+        r.borrow()
+            .get(id as usize)
+            .cloned()
+            .unwrap_or(StrykeValue::UNDEF)
+    })
 }
 
 thread_local! {
@@ -524,8 +533,7 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         }
         // String comparisons delegate to StrykeValue::str_eq / str_cmp (the same
         // methods vm.rs uses), so results match exactly. Push Perl bool (Int 1/0).
-        nops::STR_EQ | nops::STR_NE | nops::STR_LT | nops::STR_GT | nops::STR_LE
-        | nops::STR_GE => {
+        nops::STR_EQ | nops::STR_NE | nops::STR_LT | nops::STR_GT | nops::STR_LE | nops::STR_GE => {
             use std::cmp::Ordering;
             let b = pop_stryke(vm);
             let a = pop_stryke(vm);
@@ -539,8 +547,7 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             };
             vm.push(fusevm::Value::Int(if truth { 1 } else { 0 }));
         }
-        nops::NUM_EQ | nops::NUM_NE | nops::NUM_LT | nops::NUM_GT | nops::NUM_LE
-        | nops::NUM_GE => {
+        nops::NUM_EQ | nops::NUM_NE | nops::NUM_LT | nops::NUM_GT | nops::NUM_LE | nops::NUM_GE => {
             let b = pop_stryke(vm);
             let a = pop_stryke(vm);
             vm.push(fusevm::Value::Int(if num_cmp(&a, &b, id) { 1 } else { 0 }));
@@ -596,7 +603,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 set_native_err(StrykeError::division_by_zero("Illegal modulus zero", 0));
                 vm.push(fusevm::Value::Undef);
             } else {
-                vm.push(fusevm::Value::Int(crate::value::perl_mod_i64(a.to_int(), bi)));
+                vm.push(fusevm::Value::Int(crate::value::perl_mod_i64(
+                    a.to_int(),
+                    bi,
+                )));
             }
         }
         nops::POW => {
@@ -672,7 +682,7 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                 vals.push(vm.pop());
             }
             vals.reverse(); // pops are last-to-first → restore source order
-            // Perl list flatten: splice nested arrays in place.
+                            // Perl list flatten: splice nested arrays in place.
             let mut flat: Vec<fusevm::Value> = Vec::with_capacity(n);
             for v in vals {
                 match v {
@@ -806,8 +816,12 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     sum = sum.wrapping_add(i);
                     i = i.wrapping_add(1);
                 }
-                interp.scope.set_scalar_slot(sum_slot, StrykeValue::integer(sum));
-                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(i));
+                interp
+                    .scope
+                    .set_scalar_slot(sum_slot, StrykeValue::integer(sum));
+                interp
+                    .scope
+                    .set_scalar_slot(i_slot, StrykeValue::integer(i));
             });
         }
         nops::CONCAT_CONST_SLOT_LOOP => {
@@ -816,17 +830,27 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let s_slot = vm.pop().to_int() as u8;
             let const_idx = vm.pop().to_int() as usize;
             let rhs = with_chunk(|c| {
-                c.constants.get(const_idx).map(|v| v.as_str_or_empty()).unwrap_or_default()
+                c.constants
+                    .get(const_idx)
+                    .map(|v| v.as_str_or_empty())
+                    .unwrap_or_default()
             });
             with_interp(|interp| {
                 let i_cur = interp.scope.get_scalar_slot(i_slot).to_int();
                 if i_cur < limit {
                     let n_iters = (limit - i_cur) as usize;
-                    if !interp.scope.scalar_slot_concat_repeat_inplace(s_slot, &rhs, n_iters) {
-                        interp.scope.scalar_slot_concat_repeat_slow(s_slot, &rhs, n_iters);
+                    if !interp
+                        .scope
+                        .scalar_slot_concat_repeat_inplace(s_slot, &rhs, n_iters)
+                    {
+                        interp
+                            .scope
+                            .scalar_slot_concat_repeat_slow(s_slot, &rhs, n_iters);
                     }
                 }
-                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(limit));
+                interp
+                    .scope
+                    .set_scalar_slot(i_slot, StrykeValue::integer(limit));
             });
         }
         nops::PUSH_INT_RANGE_TO_ARRAY_LOOP => {
@@ -845,7 +869,9 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     }
                     interp.scope.push_int_range_to_array(&name, i_cur, limit)?;
                 }
-                interp.scope.set_scalar_slot(i_slot, StrykeValue::integer(limit));
+                interp
+                    .scope
+                    .set_scalar_slot(i_slot, StrykeValue::integer(limit));
                 Ok(())
             });
             if let Err(e) = r {
@@ -894,7 +920,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     vm.push(fusevm::Value::Undef);
                 }
                 Err(_) => {
-                    set_native_err(StrykeError::runtime("arrow array: unexpected control flow", 0));
+                    set_native_err(StrykeError::runtime(
+                        "arrow array: unexpected control flow",
+                        0,
+                    ));
                     vm.push(fusevm::Value::Undef);
                 }
             }
@@ -909,7 +938,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     vm.push(fusevm::Value::Undef);
                 }
                 Err(_) => {
-                    set_native_err(StrykeError::runtime("arrow hash: unexpected control flow", 0));
+                    set_native_err(StrykeError::runtime(
+                        "arrow hash: unexpected control flow",
+                        0,
+                    ));
                     vm.push(fusevm::Value::Undef);
                 }
             }
@@ -988,7 +1020,11 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::MAKE_ARRAY_REF => {
             let val = pop_stryke(vm);
             let val = with_interp(|i| i.scope.resolve_container_binding_ref(val));
-            let arr = if let Some(a) = val.as_array_vec() { a } else { vec![val] };
+            let arr = if let Some(a) = val.as_array_vec() {
+                a
+            } else {
+                vec![val]
+            };
             vm.push(stryke_to_fusevm(&StrykeValue::array_ref(Arc::new(
                 parking_lot::RwLock::new(arr),
             ))));
@@ -1051,7 +1087,9 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let val = pop_stryke(vm);
             let items = val.to_list();
             let s: String = items.iter().map(|v| v.to_string()).collect();
-            vm.push(stryke_to_fusevm(&StrykeValue::string(s.chars().rev().collect())));
+            vm.push(stryke_to_fusevm(&StrykeValue::string(
+                s.chars().rev().collect(),
+            )));
         }
         nops::BIT_AND => {
             let rv = pop_stryke(vm);
@@ -1131,7 +1169,8 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     ));
                 }
                 let en = i.english_scalar_name(&name).to_string();
-                i.scope.atomic_mutate(&en, |v| StrykeValue::integer(v.to_int() + 1))
+                i.scope
+                    .atomic_mutate(&en, |v| StrykeValue::integer(v.to_int() + 1))
             });
             match r {
                 Ok(v) => vm.push(stryke_to_fusevm(&v)),
@@ -1168,8 +1207,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::MAP_INT_MUL => {
             let k = vm.pop().to_int();
             let list = pop_stryke(vm).to_list();
-            let result: Vec<StrykeValue> =
-                list.iter().map(|item| StrykeValue::integer(item.to_int().wrapping_mul(k))).collect();
+            let result: Vec<StrykeValue> = list
+                .iter()
+                .map(|item| StrykeValue::integer(item.to_int().wrapping_mul(k)))
+                .collect();
             vm.push(stryke_to_fusevm(&StrykeValue::array(result)));
         }
         nops::MAP_BLOCK => {
@@ -1312,10 +1353,18 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let flags_idx = vm.pop().to_int();
             let pat_idx = vm.pop().to_int();
             let val = pop_stryke(vm);
-            let pattern =
-                with_chunk(|c| c.constants.get(pat_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default());
-            let flags =
-                with_chunk(|c| c.constants.get(flags_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default());
+            let pattern = with_chunk(|c| {
+                c.constants
+                    .get(pat_idx as usize)
+                    .map(|v| v.as_str_or_empty())
+                    .unwrap_or_default()
+            });
+            let flags = with_chunk(|c| {
+                c.constants
+                    .get(flags_idx as usize)
+                    .map(|v| v.as_str_or_empty())
+                    .unwrap_or_default()
+            });
             if val.is_iterator() {
                 // Iterators aren't produced by any covered op yet, so this is
                 // unreachable; error loudly rather than risk a silent divergence.
@@ -1329,12 +1378,16 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
                     "_".to_string()
                 } else {
                     with_chunk(|c| {
-                        c.constants.get(pos_key_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_else(|| "_".into())
+                        c.constants
+                            .get(pos_key_idx as usize)
+                            .map(|v| v.as_str_or_empty())
+                            .unwrap_or_else(|| "_".into())
                     })
                 };
                 let s = val.into_string();
-                let r =
-                    with_interp(|i| i.regex_match_execute(s, &pattern, &flags, scalar_g, &pos_key, 0));
+                let r = with_interp(|i| {
+                    i.regex_match_execute(s, &pattern, &flags, scalar_g, &pos_key, 0)
+                });
                 match r {
                     Ok(v) => vm.push(stryke_to_fusevm(&v)),
                     Err(crate::vm_helper::FlowOrError::Error(e)) => {
@@ -1356,9 +1409,18 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let val = pop_stryke(vm);
             let (pattern, replacement, flags, target) = with_chunk(|c| {
                 (
-                    c.constants.get(pat_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
-                    c.constants.get(repl_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
-                    c.constants.get(flags_idx as usize).map(|v| v.as_str_or_empty()).unwrap_or_default(),
+                    c.constants
+                        .get(pat_idx as usize)
+                        .map(|v| v.as_str_or_empty())
+                        .unwrap_or_default(),
+                    c.constants
+                        .get(repl_idx as usize)
+                        .map(|v| v.as_str_or_empty())
+                        .unwrap_or_default(),
+                    c.constants
+                        .get(flags_idx as usize)
+                        .map(|v| v.as_str_or_empty())
+                        .unwrap_or_default(),
                     c.lvalues.get(lvalue_idx as usize).cloned(),
                 )
             });
@@ -1440,7 +1502,10 @@ fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let sig_idx = vm.pop().to_int() as usize;
             let block_idx = vm.pop().to_int() as usize;
             let parts = with_chunk(|c| {
-                (c.blocks.get(block_idx).cloned(), c.code_ref_sigs.get(sig_idx).cloned())
+                (
+                    c.blocks.get(block_idx).cloned(),
+                    c.code_ref_sigs.get(sig_idx).cloned(),
+                )
             });
             match parts {
                 (Some(block), Some(params)) => {
@@ -1520,7 +1585,10 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
         fusevm::Value::Undef => Some(StrykeValue::UNDEF),
         fusevm::Value::NativeFn(id) => Some(reg_get(*id)),
         fusevm::Value::Array(items) => Some(StrykeValue::array(
-            items.iter().map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF)).collect(),
+            items
+                .iter()
+                .map(|v| fusevm_to_stryke(v).unwrap_or(StrykeValue::UNDEF))
+                .collect(),
         )),
         _ => None,
     }
@@ -1675,7 +1743,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
                 b.emit(fusevm::Op::LoadInt(*name_idx as i64), 0);
                 b.emit(fusevm::Op::LoadInt(*i_slot as i64), 0);
                 b.emit(fusevm::Op::LoadInt(*limit as i64), 0);
-                b.emit(fusevm::Op::Extended(nops::PUSH_INT_RANGE_TO_ARRAY_LOOP, 0), 0);
+                b.emit(
+                    fusevm::Op::Extended(nops::PUSH_INT_RANGE_TO_ARRAY_LOOP, 0),
+                    0,
+                );
             }
             Op::SumHashValuesToSlot(sum_slot, h_name_idx) => {
                 b.emit(fusevm::Op::LoadInt(*sum_slot as i64), 0);
@@ -2130,11 +2201,19 @@ mod tests {
     /// Native path must agree with vm.rs on string-valued results.
     fn assert_parity_str(code: &str, expect: &str) {
         let vm = crate::run(code).expect("vm run");
-        assert_eq!(vm.as_str().as_deref(), Some(expect), "vm.rs value for `{code}`");
+        assert_eq!(
+            vm.as_str().as_deref(),
+            Some(expect),
+            "vm.rs value for `{code}`"
+        );
         let nat = native(code)
             .unwrap_or_else(|| panic!("`{code}` not covered by native path"))
             .expect("native run");
-        assert_eq!(nat.as_str().as_deref(), Some(expect), "native value for `{code}`");
+        assert_eq!(
+            nat.as_str().as_deref(),
+            Some(expect),
+            "native value for `{code}`"
+        );
     }
 
     #[test]
@@ -2217,7 +2296,9 @@ mod tests {
     fn native_div_mod_pow_match_vm() {
         // Display-based (native must equal vm.rs) — avoids int-vs-float
         // assumptions (Perl `**` yields a float; `/` is int only when divisible).
-        for code in ["10 / 2", "7 / 2", "17 % 5", "(-7) % 3", "2 ** 10", "9 ** 0.5"] {
+        for code in [
+            "10 / 2", "7 / 2", "17 % 5", "(-7) % 3", "2 ** 10", "9 ** 0.5",
+        ] {
             let expect = crate::run(code).expect("vm run").to_string();
             assert_parity_display(code, &expect);
         }
@@ -2248,7 +2329,10 @@ mod tests {
         // those (dead-on-native) GetArg ops without aborting and still get the
         // right result from the delegated call.
         assert_parity_int("sub g { my $x = shift; return $x * 2 } g(5)", 10);
-        assert_parity_int("sub g { my $x = shift; my $y = shift; return $x + $y } g(3, 4)", 7);
+        assert_parity_int(
+            "sub g { my $x = shift; my $y = shift; return $x + $y } g(3, 4)",
+            7,
+        );
         assert_parity_int(
             "sub myfac { my $n = shift; return $n <= 1 ? 1 : $n * myfac($n - 1) } myfac(5)",
             120,
@@ -2285,10 +2369,22 @@ mod tests {
 
     #[test]
     fn native_sort_with_block_fast_matches_vm() {
-        assert_parity_str("join(\",\", sort { $a <=> $b } (3, 1, 2, 10, 5))", "1,2,3,5,10");
-        assert_parity_str("join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))", "10,5,3,2,1");
-        assert_parity_str("join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))", "a,b,c");
-        assert_parity_str("join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))", "c,b,a");
+        assert_parity_str(
+            "join(\",\", sort { $a <=> $b } (3, 1, 2, 10, 5))",
+            "1,2,3,5,10",
+        );
+        assert_parity_str(
+            "join(\",\", sort { $b <=> $a } (3, 1, 2, 10, 5))",
+            "10,5,3,2,1",
+        );
+        assert_parity_str(
+            "join(\",\", sort { $a cmp $b } (\"b\", \"a\", \"c\"))",
+            "a,b,c",
+        );
+        assert_parity_str(
+            "join(\",\", sort { $b cmp $a } (\"b\", \"a\", \"c\"))",
+            "c,b,a",
+        );
     }
 
     #[test]
@@ -2318,7 +2414,10 @@ mod tests {
 
     #[test]
     fn native_array_mut_and_refs_match_vm() {
-        assert_parity_str("my @a = (1, 2); push @a, 3; push @a, (4, 5); join(\",\", @a)", "1,2,3,4,5");
+        assert_parity_str(
+            "my @a = (1, 2); push @a, 3; push @a, (4, 5); join(\",\", @a)",
+            "1,2,3,4,5",
+        );
         assert_parity_int("my @a = (1, 2, 3); pop @a", 3);
         assert_parity_int("my @a = (1, 2, 3); shift @a", 1);
         assert_parity_str("my @a = (1, 2, 3); pop @a; join(\",\", @a)", "1,2");
@@ -2366,7 +2465,10 @@ mod tests {
     fn native_pmap_with_block_matches_vm() {
         // Parallel map — order-preserving, so results match the sequential VM.
         assert_parity_str("join(\",\", pmap { $_ * 2 } (1, 2, 3, 4, 5))", "2,4,6,8,10");
-        assert_parity_str("join(\",\", pmap { $_ + 1 } (1..10))", "2,3,4,5,6,7,8,9,10,11");
+        assert_parity_str(
+            "join(\",\", pmap { $_ + 1 } (1..10))",
+            "2,3,4,5,6,7,8,9,10,11",
+        );
         assert_parity_str("join(\",\", pmap { $_ * $_ } (1..6))", "1,4,9,16,25,36");
     }
 
@@ -2422,7 +2524,10 @@ mod tests {
     fn native_get_array_matches_vm() {
         assert_parity_str("my @a = (10, 20, 30); join(\",\", @a)", "10,20,30");
         assert_parity_str("my @a = (\"x\", \"y\"); join(\"-\", @a)", "x-y");
-        assert_parity_str("my @a = (1, 2, 3); my @b = (4, 5); join(\",\", @a) . \"|\" . join(\",\", @b)", "1,2,3|4,5");
+        assert_parity_str(
+            "my @a = (1, 2, 3); my @b = (4, 5); join(\",\", @a) . \"|\" . join(\",\", @b)",
+            "1,2,3|4,5",
+        );
     }
 
     #[test]
@@ -2512,7 +2617,12 @@ mod tests {
         assert_parity_int("my %h = (\"a\", 1, \"b\", 2); $h{\"b\"}", 2);
         assert_parity_int("my %h = (\"x\", 10); $h{\"x\"} + 5", 15);
         // missing key → undef (display ""), checked against vm.rs
-        assert_parity_display("my %h = (\"a\", 1); $h{\"z\"}", &crate::run("my %h = (\"a\", 1); $h{\"z\"}").unwrap().to_string());
+        assert_parity_display(
+            "my %h = (\"a\", 1); $h{\"z\"}",
+            &crate::run("my %h = (\"a\", 1); $h{\"z\"}")
+                .unwrap()
+                .to_string(),
+        );
     }
 
     #[test]

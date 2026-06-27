@@ -198,15 +198,15 @@ fn default_manifest_for(name: &str) -> Manifest {
 /// the same dep twice updates the version in place rather than duplicating.
 pub fn cmd_add(args: &[String]) -> i32 {
     if args.iter().any(|a| is_help_flag(a)) {
-        println!(
-            "usage: stryke add SPEC [--dev | --group=NAME] [--path=DIR] [--features=A,B]"
-        );
+        println!("usage: stryke add SPEC [--dev | --group=NAME] [--path=DIR] [--features=A,B]");
         println!();
         println!("Add a dependency to stryke.toml and run `s install` to refresh stryke.lock.");
         println!();
         println!("SPEC may be one of:");
         println!("  NAME[@VER]                                registry dep");
-        println!("  github.com/OWNER/REPO[@TAG]               github-release dep (prebuilt tarball)");
+        println!(
+            "  github.com/OWNER/REPO[@TAG]               github-release dep (prebuilt tarball)"
+        );
         println!("  https://github.com/OWNER/REPO[.git][@TAG] github-release dep (full URL form)");
         println!("  ./PATH | ../PATH | /ABS/PATH | ~/PATH     local path dep");
         println!("  EXISTING_DIRECTORY                        local path dep (auto-detected)");
@@ -577,7 +577,9 @@ fn parse_github_shorthand(raw: &str) -> Option<GithubShorthand> {
         Some((_, _)) => return None, // trailing `@` with empty tag is malformed
         None => (remainder, None),
     };
-    let repo = repo_with_suffix.strip_suffix(".git").unwrap_or(repo_with_suffix);
+    let repo = repo_with_suffix
+        .strip_suffix(".git")
+        .unwrap_or(repo_with_suffix);
     if repo.is_empty() {
         return None;
     }
@@ -1195,7 +1197,10 @@ pub fn resolve_module(
 /// Returns the union so `scan_store_for_highest_version` can pick the
 /// best version across all of them — important when both `gui@0.9` and
 /// `stryke-gui@1.2` exist on disk from different install paths.
-pub(crate) fn canonical_store_names_for_namespace(store: &Store, namespace_lc: &str) -> Vec<String> {
+pub(crate) fn canonical_store_names_for_namespace(
+    store: &Store,
+    namespace_lc: &str,
+) -> Vec<String> {
     let mut names = Vec::new();
     names.push(namespace_lc.to_string());
     names.push(format!("stryke-{}", namespace_lc));
@@ -1334,11 +1339,7 @@ impl VersionRank {
 /// when the entry isn't already prefixed. Covers the legacy split where
 /// lockfile/installed.toml entries record the dep alias (`postgres`) but
 /// the store directory is the canonical package name (`stryke-postgres`).
-fn resolve_store_candidates(
-    store: &Store,
-    name: &str,
-    version: &str,
-) -> Vec<std::path::PathBuf> {
+fn resolve_store_candidates(store: &Store, name: &str, version: &str) -> Vec<std::path::PathBuf> {
     let mut out = Vec::with_capacity(2);
     out.push(store.package_dir(name, version));
     if !name.starts_with("stryke-") {
@@ -1618,7 +1619,10 @@ fn bump_dep_pin(name: &str, spec: &mut DepSpec) -> Result<bool, String> {
     // `{ github = "OWNER/REPO" }` — bump the `version` pin.
     if let Some(owner_repo) = d.github.clone() {
         let Some(pinned) = d.version.clone() else {
-            eprintln!("  ✓ {} unpinned github dep — floats to latest on re-resolve", name);
+            eprintln!(
+                "  ✓ {} unpinned github dep — floats to latest on re-resolve",
+                name
+            );
             return Ok(false);
         };
         let (owner, repo) = parse_gh_owner_repo(&owner_repo)?;
@@ -1638,7 +1642,10 @@ fn bump_dep_pin(name: &str, spec: &mut DepSpec) -> Result<bool, String> {
             return Ok(false);
         };
         let Some(pinned) = d.tag.clone() else {
-            eprintln!("  ✓ {} unpinned git dep — floats to latest on re-resolve", name);
+            eprintln!(
+                "  ✓ {} unpinned git dep — floats to latest on re-resolve",
+                name
+            );
             return Ok(false);
         };
         let latest = fetch_latest_release_tag(&owner, &repo)?;
@@ -2262,7 +2269,13 @@ fn newest_mtime(root: &Path) -> Option<std::time::SystemTime> {
 /// Inputs mirror what `install_global_from_path` actually stages: the
 /// manifest, the `lib/` and `bin/` subtrees, and a dev-built cdylib under
 /// `target/release/`.
-fn path_source_changed(store: &Store, src: &Path, manifest: &Manifest, name: &str, version: &str) -> bool {
+fn path_source_changed(
+    store: &Store,
+    src: &Path,
+    manifest: &Manifest,
+    name: &str,
+    version: &str,
+) -> bool {
     let store_dir = store.package_dir(name, version);
     let Some(installed_at) = newest_mtime(&store_dir) else {
         return true; // not in the store — must (re)install
@@ -2483,7 +2496,10 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                     Ok(mut idx) => {
                         if idx.remove(&entry.name) {
                             if let Err(e) = idx.save() {
-                                eprintln!("  \x1b[31m✗ {}: write installed.toml: {}\x1b[0m", entry.name, e);
+                                eprintln!(
+                                    "  \x1b[31m✗ {}: write installed.toml: {}\x1b[0m",
+                                    entry.name, e
+                                );
                                 failed += 1;
                                 continue;
                             }
@@ -2495,7 +2511,10 @@ pub fn cmd_upgrade_global(args: &[String]) -> i32 {
                         pruned += 1;
                     }
                     Err(e) => {
-                        eprintln!("  \x1b[31m✗ {}: load installed.toml: {}\x1b[0m", entry.name, e);
+                        eprintln!(
+                            "  \x1b[31m✗ {}: load installed.toml: {}\x1b[0m",
+                            entry.name, e
+                        );
                         failed += 1;
                     }
                 }
@@ -2738,7 +2757,10 @@ pub(crate) fn ensure_ffi_cdylib(
         ));
     }
 
-    eprintln!("  building cdylib: cargo build --release ({})", src.display());
+    eprintln!(
+        "  building cdylib: cargo build --release ({})",
+        src.display()
+    );
     let status = std::process::Command::new("cargo")
         .arg("build")
         .arg("--release")
@@ -3501,7 +3523,9 @@ pub fn dispatch(args: &[String]) -> i32 {
         println!(
             "  update [NAME]             re-resolve within manifest constraints, rewrite stryke.lock (alias: up)"
         );
-        println!("  upgrade [NAME]            bump stryke.toml pins to latest upstream, then re-resolve");
+        println!(
+            "  upgrade [NAME]            bump stryke.toml pins to latest upstream, then re-resolve"
+        );
         println!("  upgrade -g [NAME]         upgrade global packages to latest upstream versions");
         println!("  outdated                  report deps drifted from their lock pin");
         println!("  audit                     check lockfile against advisory feed");
@@ -3740,10 +3764,7 @@ mod tests {
         );
         // Non-GitHub and empty inputs yield None.
         assert_eq!(parse_github_repo(""), None);
-        assert_eq!(
-            parse_github_repo("https://gitlab.com/owner/repo"),
-            None
-        );
+        assert_eq!(parse_github_repo("https://gitlab.com/owner/repo"), None);
         assert_eq!(parse_github_repo("not a url"), None);
     }
 
@@ -3767,7 +3788,12 @@ mod tests {
         let store = Store::at(&home);
         store.ensure_layout().unwrap();
         let mut idx = InstalledIndex::new();
-        idx.upsert_with_namespace("stryke-arrow", "0.2.1", "local-install:stryke-arrow@0.2.1", "Arrow");
+        idx.upsert_with_namespace(
+            "stryke-arrow",
+            "0.2.1",
+            "local-install:stryke-arrow@0.2.1",
+            "Arrow",
+        );
         idx.save().unwrap();
 
         // The legacy project-install row is pruned, not upgraded or counted.
@@ -4277,7 +4303,11 @@ mod tests {
         std::env::remove_var("STRYKE_HOME");
 
         let r = r.expect("GUI should resolve to stryke-gui via prefix fallback");
-        assert!(r.ends_with("store/stryke-gui@0.3.0/lib/GUI.stk"), "got {:?}", r);
+        assert!(
+            r.ends_with("store/stryke-gui@0.3.0/lib/GUI.stk"),
+            "got {:?}",
+            r
+        );
     }
 
     /// "stryke use must respect package version" — use-site `use Foo 1.0`
@@ -4522,11 +4552,7 @@ mod tests {
             features: vec![],
             deps: vec![],
         });
-        std::fs::write(
-            proj.join(LOCKFILE_FILE),
-            lf.to_toml_string().unwrap(),
-        )
-        .unwrap();
+        std::fs::write(proj.join(LOCKFILE_FILE), lf.to_toml_string().unwrap()).unwrap();
 
         let r = resolve_module(&proj, "Foo", None);
         std::env::remove_var("STRYKE_HOME");
@@ -5140,8 +5166,7 @@ mod tests {
 
     #[test]
     fn github_shorthand_https_form() {
-        let gh =
-            parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws").unwrap();
+        let gh = parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws").unwrap();
         assert_eq!(gh.name, "stryke-aws");
         assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-aws");
         assert!(gh.tag.is_none());
@@ -5157,8 +5182,7 @@ mod tests {
 
     #[test]
     fn github_shorthand_with_tag() {
-        let gh =
-            parse_github_shorthand("github.com/MenkeTechnologies/stryke-aws@v0.2.0").unwrap();
+        let gh = parse_github_shorthand("github.com/MenkeTechnologies/stryke-aws@v0.2.0").unwrap();
         assert_eq!(gh.name, "stryke-aws");
         assert_eq!(gh.owner_repo, "MenkeTechnologies/stryke-aws");
         assert_eq!(gh.tag.as_deref(), Some("v0.2.0"));
@@ -5166,10 +5190,9 @@ mod tests {
 
     #[test]
     fn github_shorthand_dot_git_with_tag() {
-        let gh = parse_github_shorthand(
-            "https://github.com/MenkeTechnologies/stryke-aws.git@v0.2.0",
-        )
-        .unwrap();
+        let gh =
+            parse_github_shorthand("https://github.com/MenkeTechnologies/stryke-aws.git@v0.2.0")
+                .unwrap();
         assert_eq!(gh.name, "stryke-aws");
         assert_eq!(gh.tag.as_deref(), Some("v0.2.0"));
     }
@@ -5239,10 +5262,7 @@ mod tests {
         assert_eq!(parsed.name, "stryke-aws");
         match parsed.spec {
             DepSpec::Detailed(d) => {
-                assert_eq!(
-                    d.github.as_deref(),
-                    Some("MenkeTechnologies/stryke-aws")
-                );
+                assert_eq!(d.github.as_deref(), Some("MenkeTechnologies/stryke-aws"));
                 // `@TAG` lands in the `version` field — that's what
                 // install_global_from_github uses to construct the
                 // release-tarball URL.
@@ -5294,16 +5314,14 @@ mod tests {
 
     #[test]
     fn local_path_arg_relative_dot_slash() {
-        let lp =
-            parse_local_path_arg("./mylib").expect("./mylib should parse as path");
+        let lp = parse_local_path_arg("./mylib").expect("./mylib should parse as path");
         assert_eq!(lp.name, "mylib");
         assert_eq!(lp.path_for_manifest, "./mylib");
     }
 
     #[test]
     fn local_path_arg_relative_parent() {
-        let lp =
-            parse_local_path_arg("../sibling").expect("../sibling should parse as path");
+        let lp = parse_local_path_arg("../sibling").expect("../sibling should parse as path");
         assert_eq!(lp.name, "sibling");
         assert_eq!(lp.path_for_manifest, "../sibling");
     }
@@ -5321,8 +5339,7 @@ mod tests {
     #[test]
     fn local_path_arg_tilde_expands_in_manifest() {
         let home = std::env::var("HOME").expect("HOME set in test env");
-        let lp = parse_local_path_arg("~/projects/mylib")
-            .expect("~/PATH should parse as path");
+        let lp = parse_local_path_arg("~/projects/mylib").expect("~/PATH should parse as path");
         assert_eq!(lp.name, "mylib");
         assert_eq!(
             lp.path_for_manifest,
@@ -5363,8 +5380,7 @@ mod tests {
         )
         .unwrap();
 
-        let lp =
-            parse_local_path_arg(pkg_dir.to_str().unwrap()).expect("existing dir → path dep");
+        let lp = parse_local_path_arg(pkg_dir.to_str().unwrap()).expect("existing dir → path dep");
         assert_eq!(lp.name, "mylib");
     }
 
@@ -5426,10 +5442,7 @@ mod tests {
         // extracted from itself (since it was being treated as a
         // local path sigil even before the override). With both
         // path-shapes, the flag's directory is the source of truth.
-        let args = vec![
-            "./aaa".to_string(),
-            "--path=../bbb".to_string(),
-        ];
+        let args = vec!["./aaa".to_string(), "--path=../bbb".to_string()];
         let parsed = parse_add_args(&args).expect("parse should succeed");
         // `./aaa` is detected as a github-shorthand miss → falls through
         // to the standard path/features/version branches below. With

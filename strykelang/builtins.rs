@@ -130,7 +130,10 @@ pub fn aliases_hash_map() -> indexmap::IndexMap<String, StrykeValue> {
         if primary_set.contains(*alias) {
             continue;
         }
-        m.insert((*alias).to_string(), StrykeValue::string(primary.to_string()));
+        m.insert(
+            (*alias).to_string(),
+            StrykeValue::string(primary.to_string()),
+        );
     }
     m
 }
@@ -4858,8 +4861,8 @@ pub(crate) fn try_builtin(
         // idiom (alongside `var` / `val` / `varsync`) runs natively. List /
         // array / sequence variants all yield a stryke array; map / set
         // variants yield a hash / set. `sorted*` orders by key.
-        "listOf" | "mutableListOf" | "arrayListOf" | "arrayOf" | "sequenceOf"
-        | "emptyList" | "emptyArray" | "emptySequence" => Some(builtin_kotlin_list(args)),
+        "listOf" | "mutableListOf" | "arrayListOf" | "arrayOf" | "sequenceOf" | "emptyList"
+        | "emptyArray" | "emptySequence" => Some(builtin_kotlin_list(args)),
         "listOfNotNull" => Some(builtin_kotlin_list_not_null(args)),
         "arrayOfNulls" => Some(builtin_array_of_nulls(args)),
         "mapOf" | "mutableMapOf" | "hashMapOf" | "linkedMapOf" | "emptyMap" => {
@@ -6014,23 +6017,29 @@ pub(crate) fn try_builtin(
         "web_tmpl_section" => Some(crate::web::web_tmpl_section(args, line)),
         "web_tmpl_empty" => Some(crate::web::web_tmpl_empty(args, line)),
         "deburr" => Some(crate::native_codec::deburr(args.first().unwrap_or(&undef))),
-        "shell_quote" => Some(crate::native_codec::shell_quote(args.first().unwrap_or(&undef))),
-        "shell_split" | "shellwords" => {
-            Some(crate::native_codec::shell_split(args.first().unwrap_or(&undef)))
-        }
-        "from_jsonl" => Some(crate::native_codec::from_jsonl(args.first().unwrap_or(&undef))),
+        "shell_quote" => Some(crate::native_codec::shell_quote(
+            args.first().unwrap_or(&undef),
+        )),
+        "shell_split" | "shellwords" => Some(crate::native_codec::shell_split(
+            args.first().unwrap_or(&undef),
+        )),
+        "from_jsonl" => Some(crate::native_codec::from_jsonl(
+            args.first().unwrap_or(&undef),
+        )),
         "to_jsonl" => Some(crate::native_codec::to_jsonl(args)),
-        "from_ini" => Some(crate::native_codec::from_ini(args.first().unwrap_or(&undef))),
+        "from_ini" => Some(crate::native_codec::from_ini(
+            args.first().unwrap_or(&undef),
+        )),
         "to_ini" => Some(crate::native_codec::to_ini(args.first().unwrap_or(&undef))),
-        "base64url_encode" => {
-            Some(crate::native_codec::base64url_encode_val(args.first().unwrap_or(&undef)))
-        }
-        "base64url_decode" => {
-            Some(crate::native_codec::base64url_decode_val(args.first().unwrap_or(&undef)))
-        }
-        "time_ago" | "from_now" => {
-            Some(crate::native_codec::time_ago(args.first().unwrap_or(&undef)))
-        }
+        "base64url_encode" => Some(crate::native_codec::base64url_encode_val(
+            args.first().unwrap_or(&undef),
+        )),
+        "base64url_decode" => Some(crate::native_codec::base64url_decode_val(
+            args.first().unwrap_or(&undef),
+        )),
+        "time_ago" | "from_now" => Some(crate::native_codec::time_ago(
+            args.first().unwrap_or(&undef),
+        )),
         "datetime_add_seconds" => Some(crate::native_codec::datetime_add_seconds(
             args.first().unwrap_or(&undef),
             args.get(1).unwrap_or(&undef),
@@ -35591,7 +35600,10 @@ fn builtin_zpexpand(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         } else if let Some(elems) = val
             .as_array_ref()
             .map(|r| r.read().iter().map(|e| e.to_string()).collect::<Vec<_>>())
-            .or_else(|| val.as_array_vec().map(|v| v.iter().map(|e| e.to_string()).collect()))
+            .or_else(|| {
+                val.as_array_vec()
+                    .map(|v| v.iter().map(|e| e.to_string()).collect())
+            })
         {
             zsh::ported::params::setaparam(&name, elems);
         } else {

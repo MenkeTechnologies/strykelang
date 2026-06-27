@@ -349,7 +349,11 @@ fn deparse_stmt_into(buf: &mut String, stmt: &Statement, indent: usize) {
         StmtKind::Package { name } => {
             let _ = write!(buf, "package {};", name);
         }
-        StmtKind::Use { module, imports, version } => {
+        StmtKind::Use {
+            module,
+            imports,
+            version,
+        } => {
             let _ = write!(buf, "use {}", module);
             if let Some(v) = version {
                 let _ = write!(buf, " {}", v);

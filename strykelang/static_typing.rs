@@ -71,7 +71,10 @@ impl Checker {
                 self.check_params(params, &format!("fn {}", name), line)?;
                 if return_type.is_none() {
                     return Err(self.err(
-                        format!("fn {} must declare a return type (`fn {}(...): Type`)", name, name),
+                        format!(
+                            "fn {} must declare a return type (`fn {}(...): Type`)",
+                            name, name
+                        ),
                         line,
                     ));
                 }
@@ -120,8 +123,18 @@ impl Checker {
                     self.check_block(b)?;
                 }
             }
-            StmtKind::While { condition, body, continue_block, .. }
-            | StmtKind::Until { condition, body, continue_block, .. } => {
+            StmtKind::While {
+                condition,
+                body,
+                continue_block,
+                ..
+            }
+            | StmtKind::Until {
+                condition,
+                body,
+                continue_block,
+                ..
+            } => {
                 self.check_expr(condition)?;
                 self.check_block(body)?;
                 if let Some(b) = continue_block {
@@ -132,7 +145,14 @@ impl Checker {
                 self.check_block(body)?;
                 self.check_expr(condition)?;
             }
-            StmtKind::For { init, condition, step, body, continue_block, .. } => {
+            StmtKind::For {
+                init,
+                condition,
+                step,
+                body,
+                continue_block,
+                ..
+            } => {
                 if let Some(s) = init {
                     self.check_stmt(s)?;
                 }
@@ -147,7 +167,12 @@ impl Checker {
                     self.check_block(b)?;
                 }
             }
-            StmtKind::Foreach { list, body, continue_block, .. } => {
+            StmtKind::Foreach {
+                list,
+                body,
+                continue_block,
+                ..
+            } => {
                 self.check_expr(list)?;
                 self.check_block(body)?;
                 if let Some(b) = continue_block {
@@ -214,7 +239,10 @@ impl Checker {
             if let SubSigParam::Scalar(name, ty, _) = p {
                 if ty.is_none() {
                     return Err(self.err(
-                        format!("{}: parameter `${}` must declare a type (`${}: Type`)", ctx, name, name),
+                        format!(
+                            "{}: parameter `${}` must declare a type (`${}: Type`)",
+                            ctx, name, name
+                        ),
                         line,
                     ));
                 }
@@ -227,10 +255,7 @@ impl Checker {
         let ctx = format!("{}::{}", owner, m.name);
         self.check_params(&m.params, &ctx, line)?;
         if m.return_type.is_none() {
-            return Err(self.err(
-                format!("method {} must declare a return type", ctx),
-                line,
-            ));
+            return Err(self.err(format!("method {} must declare a return type", ctx), line));
         }
         self.check_block(&m.body)
     }
@@ -239,10 +264,7 @@ impl Checker {
         let ctx = format!("{}::{}", owner, m.name);
         self.check_params(&m.params, &ctx, line)?;
         if m.return_type.is_none() {
-            return Err(self.err(
-                format!("method {} must declare a return type", ctx),
-                line,
-            ));
+            return Err(self.err(format!("method {} must declare a return type", ctx), line));
         }
         if let Some(body) = &m.body {
             self.check_block(body)?;
@@ -269,7 +291,11 @@ impl Checker {
                 self.check_expr(right)?;
             }
             ExprKind::UnaryOp { expr, .. } => self.check_expr(expr)?,
-            ExprKind::Ternary { condition, then_expr, else_expr } => {
+            ExprKind::Ternary {
+                condition,
+                then_expr,
+                else_expr,
+            } => {
                 self.check_expr(condition)?;
                 self.check_expr(then_expr)?;
                 self.check_expr(else_expr)?;

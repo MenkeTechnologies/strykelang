@@ -1,29 +1,26 @@
-use std::collections::{HashMap, VecDeque};
-use std::io::{self, Write as IoWrite};
+use std::collections::HashMap;
+use std::io::Write as IoWrite;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 
-
 use crate::ast::{BinOp, Block, Expr, MatchArm, PerlTypeName, Sigil, SubSigParam};
-use crate::bytecode::{BuiltinId, Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
+use crate::bytecode::{Chunk, Op, RuntimeSubDecl, SpliceExprEntry};
 use crate::compiler::scalar_compound_op_from_byte;
 use crate::error::{ErrorKind, StrykeError, StrykeResult};
-use crate::perl_fs::read_file_text_perl_compat;
 use crate::pmap_progress::{FanProgress, PmapProgress};
 use crate::sort_fast::{sort_magic_cmp, SortBlockFast};
 use crate::value::{
-    perl_list_range_expand, perl_shl_i64, perl_shr_i64, PerlBarrier, PerlHeap, PipelineInner,
-    PipelineOp, StrykeAsyncTask, StrykeSub, StrykeValue,
+    perl_list_range_expand, perl_shl_i64, perl_shr_i64, PipelineOp, StrykeAsyncTask, StrykeSub,
+    StrykeValue,
 };
 use crate::vm_helper::{
     fold_preduce_init_step, merge_preduce_init_partials, preduce_init_fold_identity, Flow,
     FlowOrError, VMHelper, WantarrayCtx,
 };
 use parking_lot::Mutex;
-use std::sync::Barrier;
 
 /// Stable reference for empty-stack [`VM::peek`] (not a temporary `&StrykeValue::UNDEF`).
 static PEEK_UNDEF: StrykeValue = StrykeValue::UNDEF;
@@ -1272,17 +1269,20 @@ impl<'a> VM<'a> {
         let uscore = match self.uscore_name_idx {
             Some(cached) => cached,
             None => {
-                let v = self.names.iter().position(|n| n == "_").and_then(|p| u16::try_from(p).ok());
+                let v = self
+                    .names
+                    .iter()
+                    .position(|n| n == "_")
+                    .and_then(|p| u16::try_from(p).ok());
                 self.uscore_name_idx = Some(v);
                 v
             }
         };
-        let (seg, seg_ip, arg_binds): (&[Op], usize, Vec<(u8, usize)>) = match uscore
-            .and_then(|u| crate::jit::recognize_args_unpack_prologue(full_seg, u))
-        {
-            Some((plen, binds)) => (&full_seg[plen..], ip + plen, binds),
-            None => (full_seg, ip, Vec::new()),
-        };
+        let (seg, seg_ip, arg_binds): (&[Op], usize, Vec<(u8, usize)>) =
+            match uscore.and_then(|u| crate::jit::recognize_args_unpack_prologue(full_seg, u)) {
+                Some((plen, binds)) => (&full_seg[plen..], ip + plen, binds),
+                None => (full_seg, ip, Vec::new()),
+            };
 
         // Signature subs (`sub f($x,$y){ $x + $y }`) reference their parameters by
         // name (`GetScalarPlain`), not via the `@_`-unpack prologue, so they were

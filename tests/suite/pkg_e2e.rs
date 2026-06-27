@@ -201,7 +201,11 @@ fn non_github_git_dep_rejected_with_rewrite_hint() {
     let msg = err.to_string();
     assert!(msg.contains("github.com"), "got: {}", msg);
     assert!(msg.contains("lib"), "got: {}", msg);
-    assert!(msg.contains("github = "), "rewrite hint missing; got: {}", msg);
+    assert!(
+        msg.contains("github = "),
+        "rewrite hint missing; got: {}",
+        msg
+    );
 }
 
 #[test]
@@ -393,12 +397,11 @@ fn analyzer_mirrors_runtime_for_use_site_pin() {
     std::fs::write(&script_path, "use Foo 2.0;\n").unwrap();
 
     let runtime_hit = resolve_module(&proj, "Foo", Some("2.0")).unwrap();
-    let analyzer_hit =
-        stryke::static_analysis::resolve_require_path_from_file_versioned(
-            script_path.to_str().unwrap(),
-            "Foo",
-            Some("2.0"),
-        );
+    let analyzer_hit = stryke::static_analysis::resolve_require_path_from_file_versioned(
+        script_path.to_str().unwrap(),
+        "Foo",
+        Some("2.0"),
+    );
 
     let runtime_path = runtime_hit.expect("runtime should resolve");
     let analyzer_path = analyzer_hit.expect("analyzer should resolve");
@@ -478,12 +481,9 @@ fn lsp_hover_on_pinned_use_lands_on_pinned_version() {
     let script_src = "use Foo 2.13;\nFoo::greet();\n";
     std::fs::write(&script_path, script_src).unwrap();
 
-    let hover = stryke::lsp::hover_markdown_for_word(
-        "Foo",
-        script_src,
-        script_path.to_str().unwrap(),
-    )
-    .expect("hover should resolve Foo");
+    let hover =
+        stryke::lsp::hover_markdown_for_word("Foo", script_src, script_path.to_str().unwrap())
+            .expect("hover should resolve Foo");
     std::env::remove_var("STRYKE_HOME");
 
     assert!(
@@ -529,12 +529,9 @@ fn lsp_hover_unpinned_use_outside_project_picks_highest_version() {
     let script_src = "use Bar;\nBar::run();\n";
     std::fs::write(&script_path, script_src).unwrap();
 
-    let hover = stryke::lsp::hover_markdown_for_word(
-        "Bar",
-        script_src,
-        script_path.to_str().unwrap(),
-    )
-    .expect("hover should resolve Bar");
+    let hover =
+        stryke::lsp::hover_markdown_for_word("Bar", script_src, script_path.to_str().unwrap())
+            .expect("hover should resolve Bar");
     std::env::remove_var("STRYKE_HOME");
 
     assert!(

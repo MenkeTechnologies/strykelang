@@ -409,9 +409,7 @@ fn on_disk_snapshot_covers_live_bare_names() {
         .collect();
 
     // Live bare-name callables: no sigil prefix, no `::` qualifier.
-    let live = eval_string(
-        r#"join "\n", grep { !/[\$\@\%\&:]/ } lsp_completion_words"#,
-    );
+    let live = eval_string(r#"join "\n", grep { !/[\$\@\%\&:]/ } lsp_completion_words"#);
     let missing: Vec<&str> = live
         .lines()
         .map(str::trim)

@@ -51,7 +51,10 @@ fn main() {
     // truth is the dispatch itself: `extract_funccall_aliases` reads each arm's
     // `name:` literal, `KEYWORD_BUILTIN_ALIASES` supplies the enum-family pairs.
     let mut raw_aliases = extract_funccall_aliases(&parser_src);
-    raw_aliases.extend(extract_two_col_const(&parser_src, "KEYWORD_BUILTIN_ALIASES"));
+    raw_aliases.extend(extract_two_col_const(
+        &parser_src,
+        "KEYWORD_BUILTIN_ALIASES",
+    ));
     // `count`/`len`/`cnt`/`size` are a contested synonym cluster with no
     // uncontested primary (dispatch impl-name is `count`, STYLE_GUIDE §5 picks
     // `len`). These four must stay `%b` primaries, so they're excluded *as

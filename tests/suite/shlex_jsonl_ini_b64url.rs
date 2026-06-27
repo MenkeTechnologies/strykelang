@@ -35,7 +35,10 @@ fn shell_split_honors_quotes() {
 
 #[test]
 fn shellwords_is_alias() {
-    assert_eq!(eval_string(r#"join("|", shellwords("one  two"))"#), "one|two");
+    assert_eq!(
+        eval_string(r#"join("|", shellwords("one  two"))"#),
+        "one|two"
+    );
 }
 
 #[test]

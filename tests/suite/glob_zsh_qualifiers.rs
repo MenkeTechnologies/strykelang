@@ -116,7 +116,10 @@ fn glob_plain_wildcard_expands_not_echoes() {
         let code = format!(r#"chdir("{p}"); my @f = glob("*.txt"); join(",", sort @f)"#);
         let out = eval_locked(&code).to_string();
         assert_eq!(out, "file1.txt,file2.txt", "got {out}");
-        assert!(!out.contains('*'), "pattern echoed instead of expanded: {out}");
+        assert!(
+            !out.contains('*'),
+            "pattern echoed instead of expanded: {out}"
+        );
         std::fs::remove_dir_all(&dir).ok();
     });
 }

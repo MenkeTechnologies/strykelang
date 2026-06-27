@@ -60,7 +60,9 @@ fn keywords_const_uses_known_categories() {
 
 #[test]
 fn is_stryke_keyword_true_for_canonical_keywords() {
-    for kw in ["if", "while", "my", "var", "val", "sub", "fn", "class", "BEGIN", "and"] {
+    for kw in [
+        "if", "while", "my", "var", "val", "sub", "fn", "class", "BEGIN", "and",
+    ] {
         assert!(is_stryke_keyword(kw), "{kw} should be a keyword");
     }
 }

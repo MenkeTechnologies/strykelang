@@ -8,7 +8,10 @@ use crate::common::*;
 #[test]
 fn strptime_parses_custom_format_to_epoch() {
     // 2026-06-15 00:00:00 UTC == 1781481600.
-    assert_eq!(eval_string(r#"strptime("2026-06-15", "%Y-%m-%d")"#), "1781481600");
+    assert_eq!(
+        eval_string(r#"strptime("2026-06-15", "%Y-%m-%d")"#),
+        "1781481600"
+    );
 }
 
 #[test]
@@ -59,7 +62,9 @@ fn template_section_iterates_array_with_dot() {
 #[test]
 fn template_section_over_hashref_scopes_keys() {
     assert_eq!(
-        eval_string(r#"template("{{#u}}{{first}} {{last}}{{/u}}", {u => {first => "Grace", last => "Hopper"}})"#),
+        eval_string(
+            r#"template("{{#u}}{{first}} {{last}}{{/u}}", {u => {first => "Grace", last => "Hopper"}})"#
+        ),
         "Grace Hopper",
     );
 }
@@ -82,10 +87,7 @@ fn template_inverted_skips_when_present() {
 
 #[test]
 fn template_comment_is_dropped() {
-    assert_eq!(
-        eval_string(r#"template("a{{! ignore me }}b", {})"#),
-        "ab",
-    );
+    assert_eq!(eval_string(r#"template("a{{! ignore me }}b", {})"#), "ab",);
 }
 
 #[test]
@@ -155,12 +157,18 @@ fn deburr_folds_creme_brulee() {
 #[test]
 fn deburr_expands_ligatures_and_sharp_s() {
     // Æ→Ae, œ→oe, ß→ss, Þ→Th.
-    assert_eq!(eval_string(r#"deburr("Æsop œuvre straße Þor")"#), "Aesop oeuvre strasse Thor");
+    assert_eq!(
+        eval_string(r#"deburr("Æsop œuvre straße Þor")"#),
+        "Aesop oeuvre strasse Thor"
+    );
 }
 
 #[test]
 fn deburr_leaves_ascii_untouched() {
-    assert_eq!(eval_string(r#"deburr("plain ASCII 123")"#), "plain ASCII 123");
+    assert_eq!(
+        eval_string(r#"deburr("plain ASCII 123")"#),
+        "plain ASCII 123"
+    );
 }
 
 #[test]

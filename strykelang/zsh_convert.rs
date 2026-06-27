@@ -160,9 +160,19 @@ pub fn namespace_from_path(path: &str) -> String {
         .unwrap_or("zsh");
     let mut ns: String = stem
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
-    if ns.chars().next().map_or(true, |c| !c.is_ascii_alphabetic() && c != '_') {
+    if ns
+        .chars()
+        .next()
+        .map_or(true, |c| !c.is_ascii_alphabetic() && c != '_')
+    {
         ns.insert(0, 'z');
     }
     ns
@@ -355,7 +365,9 @@ fn map_case(z: &ZshCase, ctx: &mut Ctx) -> Option<Statement> {
         for p in &arm.patterns {
             let pat = untok(p);
             if pat.contains(['*', '?', '[']) {
-                ctx.warn(format!("case glob pattern `{pat}` approximated as equality"));
+                ctx.warn(format!(
+                    "case glob pattern `{pat}` approximated as equality"
+                ));
             }
             let eq = ex(ExprKind::BinOp {
                 left: Box::new(topic.clone()),
@@ -457,10 +469,14 @@ fn map_cond_pipe(pipe: &ZshPipe, ctx: &mut Ctx) -> Expr {
             }
             // a plain command condition is true when it exits 0
             if is_builtin(&head) {
-                ctx.warn(format!("builtin `{head}` as a condition not converted precisely"));
+                ctx.warn(format!(
+                    "builtin `{head}` as a condition not converted precisely"
+                ));
             }
             ex(ExprKind::BinOp {
-                left: Box::new(ex(ExprKind::System(vec![ex(ExprKind::String(shell_stage(s)))]))),
+                left: Box::new(ex(ExprKind::System(vec![ex(ExprKind::String(
+                    shell_stage(s),
+                ))]))),
                 op: BinOp::NumEq,
                 right: Box::new(ex(ExprKind::Integer(0))),
             })
@@ -589,7 +605,10 @@ fn map_binary_test(op: &str, l: &str, r: &str, ctx: &mut Ctx) -> Expr {
         }
     };
     if (op == "==" || op == "=") && r.contains(['*', '?', '[']) {
-        ctx.warn(format!("glob match `{}` approximated as equality", untok(r)));
+        ctx.warn(format!(
+            "glob match `{}` approximated as equality",
+            untok(r)
+        ));
     }
     ex(ExprKind::BinOp {
         left: le,
@@ -690,7 +709,10 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
         })),
         "cd" | "chdir" => Some(ex(ExprKind::FuncCall {
             name: "chdir".into(),
-            args: vec![word_to_expr(&rest.first().cloned().unwrap_or_default(), in_fn)],
+            args: vec![word_to_expr(
+                &rest.first().cloned().unwrap_or_default(),
+                in_fn,
+            )],
         })),
         // Control flow — works standalone and inside `&&` / `||` chains
         // (`cmd || return 1`, `cmd && break`). stryke accepts these in
@@ -698,7 +720,10 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
         "return" => {
             let body = match rest.first() {
                 Some(w) => {
-                    format!("return {}", crate::fmt::format_expr(&scalar_value_expr(w, in_fn)))
+                    format!(
+                        "return {}",
+                        crate::fmt::format_expr(&scalar_value_expr(w, in_fn))
+                    )
                 }
                 None => "return".to_string(),
             };
@@ -710,10 +735,13 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
             rest.first().map(|w| Box::new(scalar_value_expr(w, in_fn))),
         ))),
         "shift" => {
-            let arr = rest
-                .first()
-                .cloned()
-                .unwrap_or_else(|| if in_fn { "_".into() } else { "ARGV".into() });
+            let arr = rest.first().cloned().unwrap_or_else(|| {
+                if in_fn {
+                    "_".into()
+                } else {
+                    "ARGV".into()
+                }
+            });
             Some(ex(ExprKind::FuncCall {
                 name: "shift".into(),
                 args: vec![ex(ExprKind::ArrayVar(arr))],
@@ -721,7 +749,11 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
         }
         "pushd" => Some(ex(ExprKind::FuncCall {
             name: "pushd".into(),
-            args: rest.first().map(|w| word_to_expr(w, in_fn)).into_iter().collect(),
+            args: rest
+                .first()
+                .map(|w| word_to_expr(w, in_fn))
+                .into_iter()
+                .collect(),
         })),
         "popd" => Some(ex(ExprKind::FuncCall {
             name: "popd".into(),
@@ -739,7 +771,9 @@ fn map_simple_command(s: &ZshSimple, ctx: &mut Ctx) -> Option<Expr> {
             args: rest.iter().map(|w| word_to_expr(w, in_fn)).collect(),
         })),
         _ if is_builtin(&head) => {
-            ctx.warn(format!("builtin `{head}` has no native mapping yet; skipped"));
+            ctx.warn(format!(
+                "builtin `{head}` has no native mapping yet; skipped"
+            ));
             None
         }
         _ => Some(ex(ExprKind::System(vec![system_arg(&shell_stage(s))]))),
@@ -882,9 +916,9 @@ fn map_let(s: &ZshSimple, _ctx: &mut Ctx) -> Option<Vec<Statement>> {
         s.words[1..]
             .iter()
             .map(|w| {
-                st(StmtKind::Expression(ex(ExprKind::Bareword(arith_to_stryke(
-                    &untok(w),
-                )))))
+                st(StmtKind::Expression(ex(ExprKind::Bareword(
+                    arith_to_stryke(&untok(w)),
+                ))))
             })
             .collect(),
     )
@@ -1293,9 +1327,10 @@ fn interp_parts(w: &str, in_fn: bool) -> Vec<StringPart> {
             } else if next == b'?' || next == b'$' {
                 // `$?` last exit status, `$$` pid — stryke spells both the same.
                 flush(&mut parts, &mut lit);
-                parts.push(StringPart::Expr(ex(ExprKind::Bareword(
-                    format!("${}", next as char),
-                ))));
+                parts.push(StringPart::Expr(ex(ExprKind::Bareword(format!(
+                    "${}",
+                    next as char
+                )))));
                 i += 2;
                 continue;
             } else if next == b'(' {
@@ -1395,7 +1430,9 @@ fn simple_shell_cmd(s: &ZshSimple, ctx: &mut Ctx) -> Option<String> {
                 cmd.push_str(&rd);
             }
             None => {
-                ctx.warn("heredoc / process-substitution redirection not converted; command skipped");
+                ctx.warn(
+                    "heredoc / process-substitution redirection not converted; command skipped",
+                );
                 return None;
             }
         }
@@ -1494,14 +1531,68 @@ fn is_decl_keyword(head: &str) -> bool {
 fn is_builtin(name: &str) -> bool {
     matches!(
         name,
-        "echo" | "print" | "printf" | "typeset" | "declare" | "local" | "export" | "readonly"
-            | "integer" | "float" | "read" | "cd" | "chdir" | "pwd" | "pushd" | "popd" | "dirs"
-            | "setopt" | "unsetopt" | "set" | "unset" | "shift" | "return" | "break" | "continue"
-            | "let" | "eval" | "source" | "." | "alias" | "unalias" | "true" | "false" | ":"
-            | "test" | "[" | "[[" | "exit" | "trap" | "bindkey" | "zstyle" | "autoload"
-            | "functions" | "whence" | "which" | "type" | "builtin" | "command" | "emulate"
-            | "zmodload" | "zle" | "vared" | "getopts" | "hash" | "jobs" | "kill" | "wait"
-            | "fc" | "history" | "bg" | "fg" | "disown"
+        "echo"
+            | "print"
+            | "printf"
+            | "typeset"
+            | "declare"
+            | "local"
+            | "export"
+            | "readonly"
+            | "integer"
+            | "float"
+            | "read"
+            | "cd"
+            | "chdir"
+            | "pwd"
+            | "pushd"
+            | "popd"
+            | "dirs"
+            | "setopt"
+            | "unsetopt"
+            | "set"
+            | "unset"
+            | "shift"
+            | "return"
+            | "break"
+            | "continue"
+            | "let"
+            | "eval"
+            | "source"
+            | "."
+            | "alias"
+            | "unalias"
+            | "true"
+            | "false"
+            | ":"
+            | "test"
+            | "["
+            | "[["
+            | "exit"
+            | "trap"
+            | "bindkey"
+            | "zstyle"
+            | "autoload"
+            | "functions"
+            | "whence"
+            | "which"
+            | "type"
+            | "builtin"
+            | "command"
+            | "emulate"
+            | "zmodload"
+            | "zle"
+            | "vared"
+            | "getopts"
+            | "hash"
+            | "jobs"
+            | "kill"
+            | "wait"
+            | "fc"
+            | "history"
+            | "bg"
+            | "fg"
+            | "disown"
     )
 }
 
@@ -1540,7 +1631,10 @@ mod tests {
                 .any(|p| matches!(p, StringPart::ScalarVar(n) if n == "count"))),
             other => panic!("expected InterpolatedString, got {other:?}"),
         }
-        assert!(matches!(word_to_expr("plain", false).kind, ExprKind::String(_)));
+        assert!(matches!(
+            word_to_expr("plain", false).kind,
+            ExprKind::String(_)
+        ));
     }
 
     #[test]
@@ -1577,8 +1671,14 @@ mod tests {
         // assignment is a reassignment (no second declaration keyword). `y` is
         // assigned once → `val`.
         let out = conv("x=1\ny=2\nx=3\n");
-        assert!(out.contains("var $x = 1"), "x should declare as var:\n{out}");
-        assert!(out.contains("val $y = 2"), "y should declare as val:\n{out}");
+        assert!(
+            out.contains("var $x = 1"),
+            "x should declare as var:\n{out}"
+        );
+        assert!(
+            out.contains("val $y = 2"),
+            "y should declare as val:\n{out}"
+        );
         // The reassignment line is bare `$x = 3`, not another declaration.
         assert!(out.contains("$x = 3"), "x must be reassigned:\n{out}");
         assert_eq!(
@@ -1634,15 +1734,24 @@ mod tests {
         // `x=$(( 2 + 3 ))` must produce `2 + 3`, not a quoted string.
         let out = conv("x=$(( 2 + 3 ))\n");
         assert!(out.contains("= 2 + 3"), "arith value not unwrapped:\n{out}");
-        assert!(!out.contains("\"2 + 3\""), "arith must not be stringified:\n{out}");
+        assert!(
+            !out.contains("\"2 + 3\""),
+            "arith must not be stringified:\n{out}"
+        );
     }
 
     #[test]
     fn arith_command_becomes_expression() {
         // `(( count++ ))` → `$count++` statement, not a system() call.
         let out = conv("count=0\n(( count++ ))\n");
-        assert!(out.contains("$count++"), "arith command not converted:\n{out}");
-        assert!(!out.contains("system"), "arith must not reach system:\n{out}");
+        assert!(
+            out.contains("$count++"),
+            "arith command not converted:\n{out}"
+        );
+        assert!(
+            !out.contains("system"),
+            "arith must not reach system:\n{out}"
+        );
     }
 
     #[test]
@@ -1670,8 +1779,14 @@ mod tests {
 
     #[test]
     fn stack_and_arg_builtins_map() {
-        assert!(conv("shift\n").contains("shift @ARGV"), "top-level shift → @ARGV");
-        assert!(conv("f() {\nshift\n}\n").contains("shift @_"), "in-fn shift → @_");
+        assert!(
+            conv("shift\n").contains("shift @ARGV"),
+            "top-level shift → @ARGV"
+        );
+        assert!(
+            conv("f() {\nshift\n}\n").contains("shift @_"),
+            "in-fn shift → @_"
+        );
         assert!(conv("pushd /tmp\n").contains("pushd \"/tmp\""), "pushd");
         assert!(conv("popd\n").contains("popd("), "popd");
         assert!(conv("pwd\n").contains("cwd("), "pwd → cwd");
@@ -1700,7 +1815,10 @@ mod tests {
             out.contains("t::greet(\"world\")") || out.contains("t::greet \"world\""),
             "namespaced call:\n{out}"
         );
-        assert!(!out.contains("system(\"greet"), "must not shell out:\n{out}");
+        assert!(
+            !out.contains("system(\"greet"),
+            "must not shell out:\n{out}"
+        );
     }
 
     #[test]
@@ -1729,7 +1847,10 @@ mod tests {
         // `$dir` flows into the command as stryke interpolation, not a literal
         // single-quoted `'$dir'`.
         let out = conv("ls -la $dir\n");
-        assert!(out.contains("system(\"ls -la $dir\")"), "want clean interp:\n{out}");
+        assert!(
+            out.contains("system(\"ls -la $dir\")"),
+            "want clean interp:\n{out}"
+        );
     }
 
     #[test]
@@ -1753,7 +1874,10 @@ mod tests {
         // `$(date)` must reach the shell verbatim (escaped so stryke leaves it
         // alone), not be mis-read as the `$(` special var.
         let out = conv("touch file-$(date +%s)\n");
-        assert!(out.contains("\\$(date +%s)"), "command subst must be escaped:\n{out}");
+        assert!(
+            out.contains("\\$(date +%s)"),
+            "command subst must be escaped:\n{out}"
+        );
     }
 
     #[test]
@@ -1772,7 +1896,10 @@ mod tests {
         assert!(tick.contains("qx \"date\""), "backticks → qx:\n{tick}");
         // Embedded in a string → `#{qx "cmd"}` interpolation.
         let embed = conv("echo \"today is $(date)\"\n");
-        assert!(embed.contains("#{qx \"date\"}"), "embedded $(...) → #{{qx}}:\n{embed}");
+        assert!(
+            embed.contains("#{qx \"date\"}"),
+            "embedded $(...) → #{{qx}}:\n{embed}"
+        );
     }
 
     #[test]
@@ -1787,19 +1914,47 @@ mod tests {
         use zsh::zsh_ast::ZshCond;
         let mut ctx = Ctx::new();
         let e = map_zcond(&ZshCond::Unary("-f".into(), "x".into()), &mut ctx);
-        assert!(matches!(e.kind, ExprKind::FileTest { op: 'f', .. }), "{:?}", e.kind);
+        assert!(
+            matches!(e.kind, ExprKind::FileTest { op: 'f', .. }),
+            "{:?}",
+            e.kind
+        );
     }
 
     #[test]
     fn zcond_numeric_and_string_comparisons() {
         use zsh::zsh_ast::ZshCond;
         let mut ctx = Ctx::new();
-        let n = map_zcond(&ZshCond::Binary("a".into(), "-eq".into(), "b".into()), &mut ctx);
-        assert!(matches!(n.kind, ExprKind::BinOp { op: BinOp::NumEq, .. }));
-        let s = map_zcond(&ZshCond::Binary("a".into(), "==".into(), "b".into()), &mut ctx);
-        assert!(matches!(s.kind, ExprKind::BinOp { op: BinOp::StrEq, .. }));
+        let n = map_zcond(
+            &ZshCond::Binary("a".into(), "-eq".into(), "b".into()),
+            &mut ctx,
+        );
+        assert!(matches!(
+            n.kind,
+            ExprKind::BinOp {
+                op: BinOp::NumEq,
+                ..
+            }
+        ));
+        let s = map_zcond(
+            &ZshCond::Binary("a".into(), "==".into(), "b".into()),
+            &mut ctx,
+        );
+        assert!(matches!(
+            s.kind,
+            ExprKind::BinOp {
+                op: BinOp::StrEq,
+                ..
+            }
+        ));
         let z = map_zcond(&ZshCond::Unary("-z".into(), "v".into()), &mut ctx);
-        assert!(matches!(z.kind, ExprKind::BinOp { op: BinOp::StrEq, .. }));
+        assert!(matches!(
+            z.kind,
+            ExprKind::BinOp {
+                op: BinOp::StrEq,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -1808,8 +1963,17 @@ mod tests {
         let mut ctx = Ctx::new();
         let c = ZshCond::And(
             Box::new(ZshCond::Unary("-f".into(), "a".into())),
-            Box::new(ZshCond::Not(Box::new(ZshCond::Unary("-d".into(), "b".into())))),
+            Box::new(ZshCond::Not(Box::new(ZshCond::Unary(
+                "-d".into(),
+                "b".into(),
+            )))),
         );
-        assert!(matches!(map_zcond(&c, &mut ctx).kind, ExprKind::BinOp { op: BinOp::LogAnd, .. }));
+        assert!(matches!(
+            map_zcond(&c, &mut ctx).kind,
+            ExprKind::BinOp {
+                op: BinOp::LogAnd,
+                ..
+            }
+        ));
     }
 }

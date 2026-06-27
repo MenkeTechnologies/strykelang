@@ -34,7 +34,10 @@ fn run_stdin(args: &[&str], input: &[u8]) -> String {
 #[test]
 fn nr_counts_records() {
     // No autosplit needed for NR.
-    assert_eq!(run_stdin(&["-ne", r#"print "$NR ""#], b"a\nb\nc\n"), "1 2 3 ");
+    assert_eq!(
+        run_stdin(&["-ne", r#"print "$NR ""#], b"a\nb\nc\n"),
+        "1 2 3 "
+    );
 }
 
 #[test]

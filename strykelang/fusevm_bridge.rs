@@ -245,12 +245,8 @@ fn stryke_str_compare_op(ext_id: u16, a_bits: i64, b_bits: i64) -> i64 {
         ext_ops::STK_STR_NE => (!a.str_eq(&b)) as i64,
         ext_ops::STK_STR_LT => (a.str_cmp(&b) == Ordering::Less) as i64,
         ext_ops::STK_STR_GT => (a.str_cmp(&b) == Ordering::Greater) as i64,
-        ext_ops::STK_STR_LE => {
-            matches!(a.str_cmp(&b), Ordering::Less | Ordering::Equal) as i64
-        }
-        ext_ops::STK_STR_GE => {
-            matches!(a.str_cmp(&b), Ordering::Greater | Ordering::Equal) as i64
-        }
+        ext_ops::STK_STR_LE => matches!(a.str_cmp(&b), Ordering::Less | Ordering::Equal) as i64,
+        ext_ops::STK_STR_GE => matches!(a.str_cmp(&b), Ordering::Greater | Ordering::Equal) as i64,
         ext_ops::STK_STR_CMP => match a.str_cmp(&b) {
             Ordering::Less => -1,
             Ordering::Equal => 0,
@@ -471,7 +467,9 @@ const STRYKE_STR_UNARY_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
 /// host-helper ABI and the single-operand emit/dispatch path.
 #[inline]
 fn is_stryke_str_unary_ext(ext_id: u16) -> bool {
-    STRYKE_STR_UNARY_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_STR_UNARY_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
         || is_stryke_str_unary_str_ext(ext_id)
         || is_stryke_int_str_ext(ext_id)
 }
@@ -665,7 +663,11 @@ extern "C" fn stryke_h_str_reverse(a: i64) -> i64 {
 #[inline]
 fn stryke_val_defined_op(a_bits: i64) -> i64 {
     let v = unsafe { sv_borrow(a_bits) };
-    if v.is_undef() { 0 } else { 1 }
+    if v.is_undef() {
+        0
+    } else {
+        1
+    }
 }
 extern "C" fn stryke_h_val_defined(a: i64) -> i64 {
     stryke_val_defined_op(a)
@@ -736,22 +738,31 @@ extern "C" fn stryke_h_val_sprintf2(fmt: i64, arg: i64) -> i64 {
 /// string→int helpers, but at the call site the seeder skips the
 /// `is_string_like` gate so the operand can be any type.
 const STRYKE_VAL_UNARY_INT_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
-    (ext_ops::STK_VAL_DEFINED, "stryke_val_defined", stryke_h_val_defined),
-    (ext_ops::STK_VAL_ROUND, "stryke_val_round", stryke_h_val_round),
+    (
+        ext_ops::STK_VAL_DEFINED,
+        "stryke_val_defined",
+        stryke_h_val_defined,
+    ),
+    (
+        ext_ops::STK_VAL_ROUND,
+        "stryke_val_round",
+        stryke_h_val_round,
+    ),
 ];
 
 /// Table of unary any-value→**string handle** ext ops. Same `(i64) -> i64` ABI as
 /// `STRYKE_VAL_UNARY_INT_HELPERS`, but the returned `i64` is the raw bits of an
 /// owned `StrykeValue::string` (reconstructed via `from_raw_bits`, like
 /// `STK_STR_CONCAT`), not a plain integer. Caller bypasses `is_string_like`.
-const STRYKE_VAL_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
-    (ext_ops::STK_VAL_REF, "stryke_val_ref", stryke_h_val_ref),
-];
+const STRYKE_VAL_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] =
+    &[(ext_ops::STK_VAL_REF, "stryke_val_ref", stryke_h_val_ref)];
 
 /// True for any-value unary→**string** ext id (currently just `ref`).
 #[inline]
 fn is_stryke_val_unary_str_ext(ext_id: u16) -> bool {
-    STRYKE_VAL_UNARY_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_VAL_UNARY_STR_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// Registered JIT helper id for an any-value unary→string ext op.
@@ -776,7 +787,9 @@ fn stryke_val_unary_str_op(ext_id: u16, a_bits: i64) -> i64 {
 #[inline]
 fn unary_any_str_ext_op(op: &Op) -> Option<u16> {
     use crate::bytecode::BuiltinId;
-    let Op::CallBuiltin(id, 1) = op else { return None; };
+    let Op::CallBuiltin(id, 1) = op else {
+        return None;
+    };
     if *id == BuiltinId::Ref as u16 {
         Some(ext_ops::STK_VAL_REF)
     } else {
@@ -814,7 +827,9 @@ fn stryke_val_load_const_helper_id() -> u32 {
 /// True for an any-value unary→int ext id (currently just `defined`).
 #[inline]
 fn is_stryke_val_unary_int_ext(ext_id: u16) -> bool {
-    STRYKE_VAL_UNARY_INT_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_VAL_UNARY_INT_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// Registered JIT helper id for an any-value unary→int ext op.
@@ -841,7 +856,9 @@ fn stryke_val_unary_int_op(ext_id: u16, a_bits: i64) -> i64 {
 #[inline]
 fn unary_any_int_ext_op(op: &Op) -> Option<u16> {
     use crate::bytecode::BuiltinId;
-    let Op::CallBuiltin(id, 1) = op else { return None; };
+    let Op::CallBuiltin(id, 1) = op else {
+        return None;
+    };
     if *id == BuiltinId::Defined as u16 {
         Some(ext_ops::STK_VAL_DEFINED)
     } else if *id == BuiltinId::Round as u16 {
@@ -868,18 +885,36 @@ pub(crate) fn segment_is_any_value_unary_int_eligible(seg: &[Op], _seg_start: us
 const STRYKE_STR_UNARY_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
     (ext_ops::STK_STR_UC, "stryke_str_uc", stryke_h_str_uc),
     (ext_ops::STK_STR_LC, "stryke_str_lc", stryke_h_str_lc),
-    (ext_ops::STK_STR_UCFIRST, "stryke_str_ucfirst", stryke_h_str_ucfirst),
-    (ext_ops::STK_STR_LCFIRST, "stryke_str_lcfirst", stryke_h_str_lcfirst),
+    (
+        ext_ops::STK_STR_UCFIRST,
+        "stryke_str_ucfirst",
+        stryke_h_str_ucfirst,
+    ),
+    (
+        ext_ops::STK_STR_LCFIRST,
+        "stryke_str_lcfirst",
+        stryke_h_str_lcfirst,
+    ),
     (ext_ops::STK_STR_FC, "stryke_str_fc", stryke_h_str_fc),
-    (ext_ops::STK_STR_QUOTEMETA, "stryke_str_quotemeta", stryke_h_str_quotemeta),
-    (ext_ops::STK_STR_REVERSE, "stryke_str_reverse", stryke_h_str_reverse),
+    (
+        ext_ops::STK_STR_QUOTEMETA,
+        "stryke_str_quotemeta",
+        stryke_h_str_quotemeta,
+    ),
+    (
+        ext_ops::STK_STR_REVERSE,
+        "stryke_str_reverse",
+        stryke_h_str_reverse,
+    ),
 ];
 
 /// True for a unary string→string Extended id (`uc`/`lc`/`ucfirst`/`lcfirst`), whose
 /// result is an owned string handle rather than an integer.
 #[inline]
 fn is_stryke_str_unary_str_ext(ext_id: u16) -> bool {
-    STRYKE_STR_UNARY_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_STR_UNARY_STR_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// Interpreter-side computation for a unary string→string Extended op; returns the
@@ -915,15 +950,16 @@ extern "C" fn stryke_h_str_chr(n: i64) -> i64 {
 /// `chr`. The `(i64) -> i64` helper ABI matches the unary tables, so emit/dispatch
 /// reuse the single-operand path; the distinction is the *operand* is an integer (so
 /// it is marshaled unboxed, via the integer path) rather than a string handle.
-const STRYKE_INT_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] = &[
-    (ext_ops::STK_STR_CHR, "stryke_str_chr", stryke_h_str_chr),
-];
+const STRYKE_INT_STR_HELPERS: &[(u16, &str, extern "C" fn(i64) -> i64)] =
+    &[(ext_ops::STK_STR_CHR, "stryke_str_chr", stryke_h_str_chr)];
 
 /// True for an int→string Extended id (`chr`), whose operand is an integer and whose
 /// result is an owned string handle.
 #[inline]
 fn is_stryke_int_str_ext(ext_id: u16) -> bool {
-    STRYKE_INT_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_INT_STR_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// Table of binary string+INTEGER→string ops (`(i64 str_handle, i64 int) -> i64 string
@@ -933,14 +969,24 @@ fn is_stryke_int_str_ext(ext_id: u16) -> bool {
 /// (`vm.rs`) marshals these slots per-operand (see `string_int_slot_kinds`). The result
 /// is an owned string handle reconstructed via `from_raw_bits`.
 const STRYKE_STR_INT_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
-    (ext_ops::STK_STR_SUBSTR2, "stryke_str_substr2", stryke_h_str_substr2),
-    (ext_ops::STK_STR_REPEAT, "stryke_str_repeat", stryke_h_str_repeat),
+    (
+        ext_ops::STK_STR_SUBSTR2,
+        "stryke_str_substr2",
+        stryke_h_str_substr2,
+    ),
+    (
+        ext_ops::STK_STR_REPEAT,
+        "stryke_str_repeat",
+        stryke_h_str_repeat,
+    ),
 ];
 
 /// True for a binary string+integer→string Extended id (`substr` 2-arg, `x`-repeat).
 #[inline]
 fn is_stryke_str_int_str_ext(ext_id: u16) -> bool {
-    STRYKE_STR_INT_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_STR_INT_STR_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// The registered JIT helper id for a binary string+integer→string op, if any.
@@ -968,14 +1014,18 @@ fn stryke_str_int_str_op(ext_id: u16, a_bits: i64, b: i64) -> i64 {
 /// mixed family, operand 0 marshals as a string handle and the rest as plain integers
 /// (per-operand marshaling via `string_int_slot_kinds`); the result is an owned string
 /// handle reconstructed via `from_raw_bits`.
-const STRYKE_STR_INT2_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64, i64) -> i64)] = &[
-    (ext_ops::STK_STR_SUBSTR3, "stryke_str_substr3", stryke_h_str_substr3),
-];
+const STRYKE_STR_INT2_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64, i64) -> i64)] = &[(
+    ext_ops::STK_STR_SUBSTR3,
+    "stryke_str_substr3",
+    stryke_h_str_substr3,
+)];
 
 /// True for a ternary string+integer+integer→string Extended id (`substr` 3-arg).
 #[inline]
 fn is_stryke_str_int2_str_ext(ext_id: u16) -> bool {
-    STRYKE_STR_INT2_STR_HELPERS.iter().any(|(id, _, _)| *id == ext_id)
+    STRYKE_STR_INT2_STR_HELPERS
+        .iter()
+        .any(|(id, _, _)| *id == ext_id)
 }
 
 /// The registered JIT helper id for a ternary string+int+int→string op, if any.
@@ -1009,11 +1059,31 @@ const STRYKE_STR_HELPERS: &[(u16, &str, extern "C" fn(i64, i64) -> i64)] = &[
     (ext_ops::STK_STR_LE, "stryke_str_le", stryke_h_str_le),
     (ext_ops::STK_STR_GE, "stryke_str_ge", stryke_h_str_ge),
     (ext_ops::STK_STR_CMP, "stryke_str_cmp", stryke_h_str_cmp),
-    (ext_ops::STK_STR_CONCAT, "stryke_str_concat", stryke_h_str_concat),
-    (ext_ops::STK_STR_INDEX, "stryke_str_index", stryke_h_str_index),
-    (ext_ops::STK_STR_RINDEX, "stryke_str_rindex", stryke_h_str_rindex),
-    (ext_ops::STK_STR_CRYPT, "stryke_str_crypt", stryke_h_str_crypt),
-    (ext_ops::STK_VAL_SPRINTF2, "stryke_val_sprintf2", stryke_h_val_sprintf2),
+    (
+        ext_ops::STK_STR_CONCAT,
+        "stryke_str_concat",
+        stryke_h_str_concat,
+    ),
+    (
+        ext_ops::STK_STR_INDEX,
+        "stryke_str_index",
+        stryke_h_str_index,
+    ),
+    (
+        ext_ops::STK_STR_RINDEX,
+        "stryke_str_rindex",
+        stryke_h_str_rindex,
+    ),
+    (
+        ext_ops::STK_STR_CRYPT,
+        "stryke_str_crypt",
+        stryke_h_str_crypt,
+    ),
+    (
+        ext_ops::STK_VAL_SPRINTF2,
+        "stryke_val_sprintf2",
+        stryke_h_val_sprintf2,
+    ),
 ];
 
 /// True for any binary `STK_STR_*` extension id (comparisons + concatenation +
@@ -1305,7 +1375,6 @@ fn stryke_ext_handler(vm: &mut fusevm::VM, id: u16, _arg: u8) {
     }
 }
 
-
 /// True when every op in `seg` is in the strict 1:1 universal-integer/slot subset
 /// that translates to exactly one `fusevm::Op`, and every jump target stays inside
 /// the segment `[seg_start, seg_start + seg.len()]`.
@@ -1513,10 +1582,13 @@ fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
         // Integer-only slot superinstructions: they neither consume nor produce a
         // float operand (slots are integers).
         AddAssignSlotSlotVoid(_, _) | PreIncSlotVoid(_) | AccumSumLoop(_, _, _) => {}
-        AddAssignSlotSlot(_, _) | SubAssignSlotSlot(_, _) | MulAssignSlotSlot(_, _)
-        | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => {
-            stack.push(NumTy::Int)
-        }
+        AddAssignSlotSlot(_, _)
+        | SubAssignSlotSlot(_, _)
+        | MulAssignSlotSlot(_, _)
+        | PreIncSlot(_)
+        | PreDecSlot(_)
+        | PostIncSlot(_)
+        | PostDecSlot(_) => stack.push(NumTy::Int),
         // Always-float unary built-ins (`sqrt`/`sin`/`cos`/`exp`): consume one
         // operand of any kind and produce a float.
         _ if is_float_unary_builtin(op) => {
@@ -1620,9 +1692,9 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
     // Merge an incoming type-stack into `target`, queueing it on first arrival and
     // rejecting any later mismatch.
     let merge = |state: &mut Vec<Option<Vec<NumTy>>>,
-                     work: &mut Vec<usize>,
-                     target: usize,
-                     incoming: &[NumTy]|
+                 work: &mut Vec<usize>,
+                 target: usize,
+                 incoming: &[NumTy]|
      -> bool {
         match &state[target] {
             None => {
@@ -1690,15 +1762,29 @@ fn op_stack_delta(op: &Op) -> Option<i32> {
         LoadInt(_) | LoadConst(_) | Dup | GetScalarSlot(_) | GetScalarPlain(_) => 1,
         Dup2 => 2,
         Pop | SetScalarSlot(_) | DeclareScalarSlot(_, _) => -1,
-        Swap | SetScalarSlotKeep(_) | Negate | BitNot | LogNot | Inc | Dec
-        | PreIncSlotVoid(_) | AddAssignSlotSlotVoid(_, _) | AccumSumLoop(_, _, _)
-        | SlotLtIntJumpIfFalse(_, _, _) | SlotIncLtIntJumpBack(_, _, _) | Jump(_) => 0,
-        Add | Sub | Mul | Div | Mod | Pow | BitAnd | BitOr | BitXor | Shl | Shr
-        | NumEq | NumNe | NumLt | NumGt | NumLe | NumGe | Spaceship
-        | StrEq | StrNe | StrLt | StrGt | StrLe | StrGe | StrCmp | Concat
-        | JumpIfTrue(_) | JumpIfFalse(_) => -1,
-        AddAssignSlotSlot(_, _) | SubAssignSlotSlot(_, _) | MulAssignSlotSlot(_, _)
-        | PreIncSlot(_) | PreDecSlot(_) | PostIncSlot(_) | PostDecSlot(_) => 1,
+        Swap
+        | SetScalarSlotKeep(_)
+        | Negate
+        | BitNot
+        | LogNot
+        | Inc
+        | Dec
+        | PreIncSlotVoid(_)
+        | AddAssignSlotSlotVoid(_, _)
+        | AccumSumLoop(_, _, _)
+        | SlotLtIntJumpIfFalse(_, _, _)
+        | SlotIncLtIntJumpBack(_, _, _)
+        | Jump(_) => 0,
+        Add | Sub | Mul | Div | Mod | Pow | BitAnd | BitOr | BitXor | Shl | Shr | NumEq | NumNe
+        | NumLt | NumGt | NumLe | NumGe | Spaceship | StrEq | StrNe | StrLt | StrGt | StrLe
+        | StrGe | StrCmp | Concat | JumpIfTrue(_) | JumpIfFalse(_) => -1,
+        AddAssignSlotSlot(_, _)
+        | SubAssignSlotSlot(_, _)
+        | MulAssignSlotSlot(_, _)
+        | PreIncSlot(_)
+        | PreDecSlot(_)
+        | PostIncSlot(_)
+        | PostDecSlot(_) => 1,
         // `int(x)`/`ceil(x)`/`floor(x)` pop one and push one (net 0); see
         // `is_int_returning_float_builtin`.
         _ if is_int_returning_float_builtin(op) => 0,
@@ -1795,8 +1881,9 @@ pub(crate) fn segment_is_string_compare_eligible(seg: &[Op], seg_start: usize) -
     let mut has_str_op = false;
     for op in seg {
         match op {
-            Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe
-            | Op::StrCmp => has_str_op = true,
+            Op::StrEq | Op::StrNe | Op::StrLt | Op::StrGt | Op::StrLe | Op::StrGe | Op::StrCmp => {
+                has_str_op = true
+            }
             // `LoadConst` is the literal-string case: `$x eq "literal"`,
             // `"prefix" lt $y`, chained `$a eq "y" || $a eq "n"`, etc. The
             // [`STK_VAL_LOAD_CONST`] translation pushes a borrowed handle that
@@ -2117,10 +2204,7 @@ enum AbsValue {
 /// `GetScalarSlot` in positions where the following op consumes a string
 /// handle. This keeps the seeder's `is_string_like` gate the sole guard
 /// against non-string slot values reaching string-typed helpers.
-pub(crate) fn segment_is_string_bearing_int_result_eligible(
-    seg: &[Op],
-    seg_start: usize,
-) -> bool {
+pub(crate) fn segment_is_string_bearing_int_result_eligible(seg: &[Op], seg_start: usize) -> bool {
     string_bearing_int_result_slot_kinds(seg, seg_start).is_some()
 }
 
@@ -2155,10 +2239,13 @@ pub(crate) fn string_bearing_int_result_slot_kinds(
     }
 
     // Per-slot kind, `None` = unconstrained / not seen yet.
-    let max_slot = seg.iter().filter_map(|op| match op {
-        Op::GetScalarSlot(s) => Some(*s as usize),
-        _ => None,
-    }).max();
+    let max_slot = seg
+        .iter()
+        .filter_map(|op| match op {
+            Op::GetScalarSlot(s) => Some(*s as usize),
+            _ => None,
+        })
+        .max();
     let mut slot_kinds: Vec<Option<StackKind>> = match max_slot {
         Some(m) => vec![None; m + 1],
         None => Vec::new(),
@@ -2167,11 +2254,7 @@ pub(crate) fn string_bearing_int_result_slot_kinds(
     // Constrain a popped abstract value to a required kind. If it's a
     // `SlotVar(s)`, record (or check) slot `s`'s kind; if it's `Known`, check
     // it matches the requirement.
-    fn constrain(
-        slot_kinds: &mut [Option<StackKind>],
-        v: AbsValue,
-        required: StackKind,
-    ) -> bool {
+    fn constrain(slot_kinds: &mut [Option<StackKind>], v: AbsValue, required: StackKind) -> bool {
         match v {
             AbsValue::Known(k) => k == required,
             AbsValue::SlotVar(s) => match slot_kinds[s as usize] {
@@ -2488,9 +2571,7 @@ fn translate_op_into(
             body.push(F::GetSlot(*s as u16));
         }
         // `$d += $s` (void): fusevm has the exact fused op.
-        Op::AddAssignSlotSlotVoid(d, s) => {
-            body.push(F::AddAssignSlotVoid(*d as u16, *s as u16))
-        }
+        Op::AddAssignSlotSlotVoid(d, s) => body.push(F::AddAssignSlotVoid(*d as u16, *s as u16)),
         // `$d += $s` / `-=` / `*=` (push result): compute into the slot and
         // reload the new value onto the stack.
         Op::AddAssignSlotSlot(d, s) => emit_slot_assign(body, *d, *s, F::Add),
@@ -2561,9 +2642,7 @@ fn translate_op_into(
         }
         // `chr($n)` -> int→string host-helper Extended op; the operand is an unboxed
         // integer codepoint (see `segment_is_int_to_string_eligible`).
-        _ if int_str_ext_op(op).is_some() => {
-            body.push(F::Extended(int_str_ext_op(op).unwrap(), 0))
-        }
+        _ if int_str_ext_op(op).is_some() => body.push(F::Extended(int_str_ext_op(op).unwrap(), 0)),
         // 2-arg `index`/`rindex` -> binary string→int host-helper Extended op; the two
         // operands are raw StrykeValue bit-handles (see
         // `segment_is_string_binary_int_eligible`).
@@ -2909,8 +2988,7 @@ pub(crate) fn run_linear_segment_cached(
         segment_fusevm_float_result_kind(seg, seg_start)
     };
     let float_ok = float_kind.is_some();
-    let concat_ok =
-        !int_ok && !float_ok && segment_is_string_concat_eligible(seg, seg_start);
+    let concat_ok = !int_ok && !float_ok && segment_is_string_concat_eligible(seg, seg_start);
     let str_ok = !int_ok
         && !float_ok
         && !concat_ok
@@ -3023,7 +3101,11 @@ pub(crate) fn run_linear_segment_cached(
     // fresh_arc_for_caller_to_cache) — the fresh_arc is Some only when we
     // just built it (so the caller can populate its OnceCell). Used by both
     // JIT branches below.
-    let obtain_unseeded = |seg, seg_start, slot_buf: &[i64], constants| -> Option<(
+    let obtain_unseeded = |seg,
+                           seg_start,
+                           slot_buf: &[i64],
+                           constants|
+     -> Option<(
         std::sync::Arc<fusevm::Chunk>,
         Option<std::sync::Arc<fusevm::Chunk>>,
     )> {
@@ -3049,8 +3131,16 @@ pub(crate) fn run_linear_segment_cached(
     // the raw bits of a freshly allocated, *owned* string handle, which we reconstitute
     // into exactly one owning `StrykeValue` via `from_raw_bits` (the helper
     // `mem::forget`-ed it, transferring ownership).
-    if str_ok || concat_ok || unary_ok || int_str_ok || str_int_ok || lit_str_int_ok
-        || lit_str_sprintf_ok || str_str_bin_ok || val_unary_int_ok || val_unary_str_ok
+    if str_ok
+        || concat_ok
+        || unary_ok
+        || int_str_ok
+        || str_int_ok
+        || lit_str_int_ok
+        || lit_str_sprintf_ok
+        || str_str_bin_ok
+        || val_unary_int_ok
+        || val_unary_str_ok
     {
         configure_block_jit_eager();
         let (chunk_arc, fresh) = match obtain_unseeded(seg, seg_start, slot_buf, constants) {
@@ -3065,8 +3155,14 @@ pub(crate) fn run_linear_segment_cached(
             // lit_str_int_ok returns an owned string handle (the result of
             // substr/repeat applied to a literal-string operand).
             // lit_str_sprintf_ok returns an owned string handle from sprintf.
-            if concat_ok || unary_str_ok || int_str_ok || str_int_ok || lit_str_int_ok
-                || lit_str_sprintf_ok || str_str_bin_ok || val_unary_str_ok
+            if concat_ok
+                || unary_str_ok
+                || int_str_ok
+                || str_int_ok
+                || lit_str_int_ok
+                || lit_str_sprintf_ok
+                || str_str_bin_ok
+                || val_unary_str_ok
             {
                 StrykeValue::from_raw_bits(ret as u64)
             } else {
@@ -3114,10 +3210,13 @@ pub(crate) fn run_linear_segment_cached(
                     if has_div && jit.take_awk_div_trap() {
                         return (None, fresh);
                     }
-                    return (Some(match num {
-                        fusevm::BlockNum::Float(f) => StrykeValue::float(f),
-                        fusevm::BlockNum::Int(n) => StrykeValue::float(n as f64),
-                    }), fresh);
+                    return (
+                        Some(match num {
+                            fusevm::BlockNum::Float(f) => StrykeValue::float(f),
+                            fusevm::BlockNum::Int(n) => StrykeValue::float(n as f64),
+                        }),
+                        fresh,
+                    );
                 }
             }
             // Integer/bool-result segment (e.g. a float comparison `$x < 0.5`, or a
@@ -3207,8 +3306,8 @@ mod tests {
             (-7, -3, -1),
             (-6, 3, 0),
             (10, 4, 2),
-            (5, 0, 0),    // guarded: no trap
-            (-8, -1, 0),  // guarded: no trap
+            (5, 0, 0),   // guarded: no trap
+            (-8, -1, 0), // guarded: no trap
         ];
         for (a, b, want) in cases {
             let seg = vec![Op::LoadInt(a), Op::LoadInt(b), Op::Mod];
@@ -3231,17 +3330,17 @@ mod tests {
         // `$neg ? 2*$v+1 : 2*$v` — JumpIfFalse to the else branch, then Jump to the
         // segment end carrying the result on the stack (both edges merge at depth 1).
         let ternary = vec![
-            Op::GetScalarSlot(0),  // 0: $neg
-            Op::JumpIfFalse(8),    // 1: -> else (index 8)
-            Op::LoadInt(2),        // 2
-            Op::GetScalarSlot(1),  // 3: $v
-            Op::Mul,               // 4
-            Op::LoadInt(1),        // 5
-            Op::Add,               // 6
-            Op::Jump(11),          // 7: -> end (len == 11)
-            Op::LoadInt(2),        // 8: else
-            Op::GetScalarSlot(1),  // 9: $v
-            Op::Mul,               // 10
+            Op::GetScalarSlot(0), // 0: $neg
+            Op::JumpIfFalse(8),   // 1: -> else (index 8)
+            Op::LoadInt(2),       // 2
+            Op::GetScalarSlot(1), // 3: $v
+            Op::Mul,              // 4
+            Op::LoadInt(1),       // 5
+            Op::Add,              // 6
+            Op::Jump(11),         // 7: -> end (len == 11)
+            Op::LoadInt(2),       // 8: else
+            Op::GetScalarSlot(1), // 9: $v
+            Op::Mul,              // 10
         ];
         assert!(segment_block_stack_is_consistent(&ternary, 0));
         assert!(segment_is_fusevm_eligible(&ternary, 0));
@@ -3346,8 +3445,7 @@ mod tests {
         }
 
         // Storing a float into an integer-marshaled slot is rejected.
-        let float_to_slot =
-            vec![Op::LoadFloat(2.5), Op::SetScalarSlot(0), Op::LoadInt(0)];
+        let float_to_slot = vec![Op::LoadFloat(2.5), Op::SetScalarSlot(0), Op::LoadInt(0)];
         assert!(!segment_is_fusevm_float_eligible(&float_to_slot, 0));
 
         // Float division is now eligible: strykelang `/` lowers to fusevm
@@ -3355,7 +3453,13 @@ mod tests {
         // f64) consistently in the block JIT, the interpreter, and the native disk
         // cache. `($x / 2.0) < 1.0` yields a bool: true for x=1 (0.5 < 1.0), false
         // for x=3 (1.5 < 1.0).
-        let float_div_cmp = vec![Op::GetScalarSlot(0), Op::LoadFloat(2.0), Op::Div, Op::LoadFloat(1.0), Op::NumLt];
+        let float_div_cmp = vec![
+            Op::GetScalarSlot(0),
+            Op::LoadFloat(2.0),
+            Op::Div,
+            Op::LoadFloat(1.0),
+            Op::NumLt,
+        ];
         assert!(segment_is_fusevm_float_eligible(&float_div_cmp, 0));
         for (x, want) in [(1_i64, 1_i64), (3, 0)] {
             let mut slots = [x];
@@ -3378,7 +3482,10 @@ mod tests {
         // zero", rather than silently returning the AwkDivJit sentinel.
         let mut zslots = [7_i64, 0_i64];
         let zout = run_linear_segment(&float_div, 0, &mut zslots, SubTerminator::Value, &[]);
-        assert!(zout.is_none(), "division by zero must decline to the interpreter");
+        assert!(
+            zout.is_none(),
+            "division by zero must decline to the interpreter"
+        );
 
         // Always-float exponentiation: strykelang `**` lowers to fusevm
         // `Op::PowFloat`, which raises to a power in floating point (operands
@@ -3608,7 +3715,7 @@ mod tests {
             (&foo, &bar, Op::StrEq, 0),
             (&foo, &bar, Op::StrNe, 1),
             (&foo, &foo2, Op::StrNe, 0),
-            (&bar, &foo, Op::StrLt, 1),  // "bar" < "foo"
+            (&bar, &foo, Op::StrLt, 1), // "bar" < "foo"
             (&foo, &bar, Op::StrLt, 0),
             (&foo, &bar, Op::StrGt, 1),
             (&bar, &foo, Op::StrGt, 0),
@@ -3642,11 +3749,7 @@ mod tests {
     // forget-on-return ownership transfer.
     #[test]
     fn fusevm_runs_string_concat() {
-        let seg = vec![
-            Op::GetScalarSlot(0),
-            Op::GetScalarSlot(1),
-            Op::Concat,
-        ];
+        let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::Concat];
         assert!(segment_is_string_concat_eligible(&seg, 0));
 
         let cases: &[(&str, &str)] = &[
@@ -3690,12 +3793,7 @@ mod tests {
         let seg_left = vec![Op::LoadConst(0), Op::GetScalarSlot(0), Op::Concat];
         assert!(segment_is_string_concat_eligible(&seg_left, 0));
 
-        let cases: &[(&str, &str)] = &[
-            ("foo", "bar"),
-            ("", "tail"),
-            ("head", ""),
-            ("café", "🦀"),
-        ];
+        let cases: &[(&str, &str)] = &[("foo", "bar"), ("", "tail"), ("head", ""), ("café", "🦀")];
 
         for (slot_s, literal_s) in cases {
             let slot_v = StrykeValue::string((*slot_s).to_string());
@@ -3706,35 +3804,33 @@ mod tests {
             let mut last_r = None;
             for _ in 0..32 {
                 let mut slots = [slot_v.raw_bits() as i64];
-                let out = run_linear_segment(
-                    &seg_right,
-                    0,
-                    &mut slots,
-                    SubTerminator::Value,
-                    &constants,
-                )
-                .expect("slot+literal concat must run on fusevm");
+                let out =
+                    run_linear_segment(&seg_right, 0, &mut slots, SubTerminator::Value, &constants)
+                        .expect("slot+literal concat must run on fusevm");
                 last_r = out.as_str();
             }
             let want_r = format!("{slot_s}{literal_s}");
-            assert_eq!(last_r.as_deref(), Some(want_r.as_str()), "{slot_s:?} . {literal_s:?}");
+            assert_eq!(
+                last_r.as_deref(),
+                Some(want_r.as_str()),
+                "{slot_s:?} . {literal_s:?}"
+            );
 
             // literal . slot
             let mut last_l = None;
             for _ in 0..32 {
                 let mut slots = [slot_v.raw_bits() as i64];
-                let out = run_linear_segment(
-                    &seg_left,
-                    0,
-                    &mut slots,
-                    SubTerminator::Value,
-                    &constants,
-                )
-                .expect("literal+slot concat must run on fusevm");
+                let out =
+                    run_linear_segment(&seg_left, 0, &mut slots, SubTerminator::Value, &constants)
+                        .expect("literal+slot concat must run on fusevm");
                 last_l = out.as_str();
             }
             let want_l = format!("{literal_s}{slot_s}");
-            assert_eq!(last_l.as_deref(), Some(want_l.as_str()), "{literal_s:?} . {slot_s:?}");
+            assert_eq!(
+                last_l.as_deref(),
+                Some(want_l.as_str()),
+                "{literal_s:?} . {slot_s:?}"
+            );
 
             // Operands and constants both survive (borrow-only contract).
             assert_eq!(slot_v.as_str().as_deref(), Some(*slot_s));
@@ -3778,8 +3874,14 @@ mod tests {
         let z = StrykeValue::string("z".to_string());
         let constants_lit_left = vec![StrykeValue::string("yes".to_string())];
         let mut slots = [z.raw_bits() as i64];
-        let out = run_linear_segment(&seg_lt, 0, &mut slots, SubTerminator::Value, &constants_lit_left)
-            .expect("literal-on-left compare must run on fusevm");
+        let out = run_linear_segment(
+            &seg_lt,
+            0,
+            &mut slots,
+            SubTerminator::Value,
+            &constants_lit_left,
+        )
+        .expect("literal-on-left compare must run on fusevm");
         assert_eq!(out.as_integer(), Some(1), "yes lt z");
     }
 
@@ -3880,14 +3982,8 @@ mod tests {
             let constants = vec![fmt];
             for _ in 0..8 {
                 let mut slots = [arg_v.raw_bits() as i64];
-                let out = run_linear_segment(
-                    &seg,
-                    0,
-                    &mut slots,
-                    SubTerminator::Value,
-                    &constants,
-                )
-                .unwrap_or_else(|| panic!("sprintf({fmt_str:?}, …) must run on fusevm"));
+                let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &constants)
+                    .unwrap_or_else(|| panic!("sprintf({fmt_str:?}, …) must run on fusevm"));
                 assert_eq!(
                     out.as_str().as_deref(),
                     Some(*expected),
@@ -3980,7 +4076,10 @@ mod tests {
 
         // Sanity: a non-string segment is NOT eligible (no str-typed op).
         let seg_pure_int = vec![Op::GetScalarSlot(0), Op::LoadInt(5), Op::NumGt];
-        assert!(!segment_is_string_bearing_int_result_eligible(&seg_pure_int, 0));
+        assert!(!segment_is_string_bearing_int_result_eligible(
+            &seg_pure_int,
+            0
+        ));
 
         let haystack = StrykeValue::string("haystack with needle".to_string());
         let needle = StrykeValue::string("needle".to_string());
@@ -4000,9 +4099,8 @@ mod tests {
             assert_eq!(out.as_integer(), Some(1), "needle found at offset > 0");
 
             let mut slots = [abc.raw_bits() as i64, de.raw_bits() as i64];
-            let out =
-                run_linear_segment(&seg_sum, 0, &mut slots, SubTerminator::Value, &[])
-                    .expect("length+length>N must run on fusevm");
+            let out = run_linear_segment(&seg_sum, 0, &mut slots, SubTerminator::Value, &[])
+                .expect("length+length>N must run on fusevm");
             assert_eq!(out.as_integer(), Some(0), "3 + 2 not > 10");
         }
     }
@@ -4063,7 +4161,9 @@ mod tests {
         use crate::bytecode::BuiltinId;
         // `"*" x $n` shape.
         let seg_rep = vec![Op::LoadConst(0), Op::GetScalarSlot(0), Op::StringRepeat];
-        assert!(segment_is_literal_string_int_to_string_eligible(&seg_rep, 0));
+        assert!(segment_is_literal_string_int_to_string_eligible(
+            &seg_rep, 0
+        ));
 
         // `substr("Hello, World", $n)` shape.
         let seg_sub = vec![
@@ -4071,7 +4171,9 @@ mod tests {
             Op::GetScalarSlot(0),
             Op::CallBuiltin(BuiltinId::Substr as u16, 2),
         ];
-        assert!(segment_is_literal_string_int_to_string_eligible(&seg_sub, 0));
+        assert!(segment_is_literal_string_int_to_string_eligible(
+            &seg_sub, 0
+        ));
 
         // Repeat: "*" x 5 → "*****".
         let star = StrykeValue::string("*".to_string());
@@ -4133,15 +4235,13 @@ mod tests {
         for &(off, len, want) in cases {
             for _ in 0..8 {
                 let mut slots = [off, len];
-                let out = run_linear_segment(
-                    &seg,
-                    0,
-                    &mut slots,
-                    SubTerminator::Value,
-                    &constants,
-                )
-                .expect("literal-substr-3 must run on fusevm");
-                assert_eq!(out.as_str().as_deref(), Some(want), "substr(\"...\", {off}, {len})");
+                let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &constants)
+                    .expect("literal-substr-3 must run on fusevm");
+                assert_eq!(
+                    out.as_str().as_deref(),
+                    Some(want),
+                    "substr(\"...\", {off}, {len})"
+                );
             }
         }
     }
@@ -4167,7 +4267,11 @@ mod tests {
             let mut slots = [haystack.raw_bits() as i64];
             let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &constants)
                 .expect("index-with-literal must run on fusevm");
-            assert_eq!(out.as_integer(), Some(4), "byte offset of \"needle\" in haystack");
+            assert_eq!(
+                out.as_integer(),
+                Some(4),
+                "byte offset of \"needle\" in haystack"
+            );
         }
     }
 
@@ -4259,10 +4363,7 @@ mod tests {
             (BuiltinId::Oct, "777", |v| v.oct_value()),
         ];
         for (builtin, s, want_fn) in cases {
-            let seg = vec![
-                Op::GetScalarSlot(0),
-                Op::CallBuiltin(*builtin as u16, 1),
-            ];
+            let seg = vec![Op::GetScalarSlot(0), Op::CallBuiltin(*builtin as u16, 1)];
             assert!(
                 segment_is_string_unary_eligible(&seg, 0),
                 "segment must be unary-string eligible for {builtin:?}"
@@ -4307,10 +4408,7 @@ mod tests {
             (BuiltinId::Fc, "", |v| v.fc_value()),
         ];
         for (builtin, s, want_fn) in cases {
-            let seg = vec![
-                Op::GetScalarSlot(0),
-                Op::CallBuiltin(*builtin as u16, 1),
-            ];
+            let seg = vec![Op::GetScalarSlot(0), Op::CallBuiltin(*builtin as u16, 1)];
             assert!(
                 segment_is_string_unary_eligible(&seg, 0),
                 "segment must be unary-string eligible for {builtin:?}"
@@ -4419,11 +4517,36 @@ mod tests {
             Repeat,
         }
         let cases: &[(Kind, u16, &str, i64)] = &[
-            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 0),
-            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 6),
-            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", -3),
-            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "hello world", 20),
-            (Kind::Substr, crate::bytecode::BuiltinId::Substr as u16, "café", 2),
+            (
+                Kind::Substr,
+                crate::bytecode::BuiltinId::Substr as u16,
+                "hello world",
+                0,
+            ),
+            (
+                Kind::Substr,
+                crate::bytecode::BuiltinId::Substr as u16,
+                "hello world",
+                6,
+            ),
+            (
+                Kind::Substr,
+                crate::bytecode::BuiltinId::Substr as u16,
+                "hello world",
+                -3,
+            ),
+            (
+                Kind::Substr,
+                crate::bytecode::BuiltinId::Substr as u16,
+                "hello world",
+                20,
+            ),
+            (
+                Kind::Substr,
+                crate::bytecode::BuiltinId::Substr as u16,
+                "café",
+                2,
+            ),
             (Kind::Repeat, 0, "ab", 0),
             (Kind::Repeat, 0, "ab", 1),
             (Kind::Repeat, 0, "ab", 4),
@@ -4496,7 +4619,11 @@ mod tests {
                     .expect("ternary-string+int+int→string segment must run on fusevm")
                     .as_str();
             }
-            assert_eq!(last.as_deref(), Some(want.as_str()), "substr({s:?},{off},{len})");
+            assert_eq!(
+                last.as_deref(),
+                Some(want.as_str()),
+                "substr({s:?},{off},{len})"
+            );
             assert_eq!(a.as_str().as_deref(), Some(s));
         }
     }
@@ -4507,11 +4634,7 @@ mod tests {
     #[test]
     fn string_concat_segment_produces_stable_disk_cache_entry() {
         let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
-        let seg = vec![
-            Op::GetScalarSlot(0),
-            Op::GetScalarSlot(1),
-            Op::Concat,
-        ];
+        let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::Concat];
 
         let dir = std::env::temp_dir().join(format!(
             "stryke_concatcache_{}_{}",
@@ -4563,7 +4686,10 @@ mod tests {
         std::env::remove_var("FUSEVM_JIT_CACHE_DIR");
         let _ = std::fs::remove_dir_all(&dir);
 
-        assert_eq!(after_first, 1, "concat segment must persist exactly one blob");
+        assert_eq!(
+            after_first, 1,
+            "concat segment must persist exactly one blob"
+        );
         assert_eq!(
             after_second, after_first,
             "different operands must reuse the same concat cache blob"
@@ -4579,11 +4705,7 @@ mod tests {
     #[test]
     fn integer_arg_segment_produces_stable_disk_cache_entry() {
         let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
-        let seg = vec![
-            Op::GetScalarSlot(0),
-            Op::GetScalarSlot(1),
-            Op::Add,
-        ];
+        let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::Add];
         assert!(segment_is_fusevm_eligible(&seg, 0));
 
         let dir = std::env::temp_dir().join(format!(
@@ -4631,7 +4753,10 @@ mod tests {
         std::env::remove_var("FUSEVM_JIT_CACHE_DIR");
         let _ = std::fs::remove_dir_all(&dir);
 
-        assert_eq!(after_first, 1, "integer-arg segment must persist exactly one blob");
+        assert_eq!(
+            after_first, 1,
+            "integer-arg segment must persist exactly one blob"
+        );
         assert_eq!(
             after_many, after_first,
             "distinct argument values must reuse the same cache blob (no per-arg explosion)"
@@ -4645,11 +4770,7 @@ mod tests {
     #[test]
     fn string_compare_segment_produces_stable_disk_cache_entry() {
         let _g = CACHE_DIR_ENV_LOCK.lock().unwrap();
-        let seg = vec![
-            Op::GetScalarSlot(0),
-            Op::GetScalarSlot(1),
-            Op::StrLt,
-        ];
+        let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::StrLt];
 
         // Unique temp cache dir so we only ever count OUR op_hash's blobs (other
         // concurrently-running tests using the same env var are serialized by
@@ -4720,11 +4841,7 @@ mod tests {
     // pointer is ever frozen into cached native code.
     #[test]
     fn string_compare_chunk_op_hash_is_pointer_independent() {
-        let seg = vec![
-            Op::GetScalarSlot(0),
-            Op::GetScalarSlot(1),
-            Op::StrEq,
-        ];
+        let seg = vec![Op::GetScalarSlot(0), Op::GetScalarSlot(1), Op::StrEq];
         // Two completely different operand sets → different raw pointer handles.
         let a1 = StrykeValue::string("alpha".to_string());
         let b1 = StrykeValue::string("beta".to_string());
@@ -4759,7 +4876,11 @@ mod tests {
         let b = StrykeValue::string("hello".to_string());
         for _ in 0..1000 {
             assert_eq!(
-                stryke_str_compare_op(ext_ops::STK_STR_EQ, a.raw_bits() as i64, b.raw_bits() as i64),
+                stryke_str_compare_op(
+                    ext_ops::STK_STR_EQ,
+                    a.raw_bits() as i64,
+                    b.raw_bits() as i64
+                ),
                 1
             );
         }
@@ -4874,9 +4995,9 @@ mod tests {
             Op::GetScalarSlot(0),
             Op::GetScalarSlot(1),
             Op::Add,
-            Op::DeclareScalarSlot(2, 0),      // $c = $a + $b = 10
-            Op::AddAssignSlotSlotVoid(2, 0),  // $c += $a -> 17 (void)
-            Op::SubAssignSlotSlot(2, 1),      // $c -= $b -> 14 (pushes 14)
+            Op::DeclareScalarSlot(2, 0),     // $c = $a + $b = 10
+            Op::AddAssignSlotSlotVoid(2, 0), // $c += $a -> 17 (void)
+            Op::SubAssignSlotSlot(2, 1),     // $c -= $b -> 14 (pushes 14)
             Op::Pop,
             Op::GetScalarSlot(2), // push $c = 14
         ];
@@ -4894,8 +5015,8 @@ mod tests {
             Op::LoadInt(6),
             Op::DeclareScalarSlot(0, 0), // $x = 6
             Op::LoadInt(7),
-            Op::DeclareScalarSlot(1, 0),  // $y = 7
-            Op::MulAssignSlotSlot(0, 1),  // $x *= $y -> 42 (pushes 42)
+            Op::DeclareScalarSlot(1, 0), // $y = 7
+            Op::MulAssignSlotSlot(0, 1), // $x *= $y -> 42 (pushes 42)
         ];
         let mut slots = [0_i64; 2];
         let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
@@ -4913,11 +5034,11 @@ mod tests {
             Op::LoadInt(0),
             Op::DeclareScalarSlot(0, 0), // 1: $sum = 0  (slot 0)
             Op::LoadInt(0),
-            Op::DeclareScalarSlot(1, 0),        // 3: $i = 0    (slot 1)
-            Op::SlotLtIntJumpIfFalse(1, 5, 7),  // 4: if !($i<5) goto 7 (exit)
-            Op::AddAssignSlotSlotVoid(0, 1),    // 5: body: $sum += $i
-            Op::SlotIncLtIntJumpBack(1, 5, 5),  // 6: $i++; if $i<5 goto 5
-            Op::GetScalarSlot(0),               // 7: exit: push $sum
+            Op::DeclareScalarSlot(1, 0),       // 3: $i = 0    (slot 1)
+            Op::SlotLtIntJumpIfFalse(1, 5, 7), // 4: if !($i<5) goto 7 (exit)
+            Op::AddAssignSlotSlotVoid(0, 1),   // 5: body: $sum += $i
+            Op::SlotIncLtIntJumpBack(1, 5, 5), // 6: $i++; if $i<5 goto 5
+            Op::GetScalarSlot(0),              // 7: exit: push $sum
         ];
         let mut slots = [0_i64; 2];
         let out = run_linear_segment(&seg, 0, &mut slots, SubTerminator::Value, &[])
