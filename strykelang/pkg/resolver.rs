@@ -541,10 +541,8 @@ pub(crate) fn parse_github_url(url: &str) -> Option<(String, String)> {
         rest
     } else if let Some(rest) = url.strip_prefix("git@github.com:") {
         rest
-    } else if let Some(rest) = url.strip_prefix("github.com/") {
-        rest
     } else {
-        return None;
+        url.strip_prefix("github.com/")?
     };
     let body = body.trim_end_matches('/');
     let mut parts = body.splitn(2, '/');

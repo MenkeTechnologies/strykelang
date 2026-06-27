@@ -1720,9 +1720,7 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
             }
             JumpIfTrue(t) | JumpIfFalse(t) => {
                 // Both branches pop the condition; the kind is irrelevant.
-                if stk.pop().is_none() {
-                    return None;
-                }
+                stk.pop()?;
                 let Some(tr) = rel(*t) else { return None };
                 if !merge(&mut state, &mut work, tr, &stk)
                     || !merge(&mut state, &mut work, ip + 1, &stk)

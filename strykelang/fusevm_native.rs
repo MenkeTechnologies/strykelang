@@ -397,10 +397,7 @@ fn host_name(idx: i64) -> String {
 /// The variant name of an op (Debug, without operands), for coverage tracing.
 fn op_name(op: &Op) -> String {
     let s = format!("{op:?}");
-    s.split(|c| c == '(' || c == ' ')
-        .next()
-        .unwrap_or(&s)
-        .to_string()
+    s.split(['(', ' ']).next().unwrap_or(&s).to_string()
 }
 
 /// Stash a non-scalar StrykeValue, returning its registry id (for NativeFn).
@@ -2158,12 +2155,7 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
         return Some(Err(e));
     }
     match outcome {
-        fusevm::VMResult::Ok(v) => match fusevm_to_stryke(&v) {
-            Some(sv) => Some(Ok(sv)),
-            // Result type outside the subset; let vm.rs handle it (the covered
-            // ops have no side effects, so re-running is safe).
-            None => None,
-        },
+        fusevm::VMResult::Ok(v) => fusevm_to_stryke(&v).map(Ok),
         fusevm::VMResult::Halted => Some(Ok(StrykeValue::UNDEF)),
         fusevm::VMResult::Error(e) => Some(Err(StrykeError::runtime(e, 0))),
     }
