@@ -388,7 +388,9 @@ fn print_cyberpunk_help() {
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
-    println!("  --from-zsh             {G}//{N} Transpile a zsh script to stryke on stdout and exit");
+    println!(
+        "  --from-zsh             {G}//{N} Transpile a zsh script to stryke on stdout and exit"
+    );
     println!(
         "  --explain CODE         {G}//{N} Print expanded hint for an error code (e.g. E0001) and exit"
     );

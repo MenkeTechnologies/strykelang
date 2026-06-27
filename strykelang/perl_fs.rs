@@ -1722,13 +1722,15 @@ mod tests {
         // `slurp: No such file or directory (os error 2)` that std::fs::metadata
         // raised when it followed a dangling link.
         use std::os::unix::fs::symlink;
-        let dir = std::env::temp_dir().join(format!("stryke_slurp_dangling_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("stryke_slurp_dangling_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("real.txt"), b"hello").unwrap();
         symlink(dir.join("does_not_exist"), dir.join("dead.txt")).unwrap();
         let pat = format!("{}/*.txt", dir.display());
-        let out = read_file_text_or_glob(&pat).expect("plain sweep must not fail on a dangling link");
+        let out =
+            read_file_text_or_glob(&pat).expect("plain sweep must not fail on a dangling link");
         assert_eq!(out, "hello");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1740,7 +1742,8 @@ mod tests {
         // bad reference (dangling symlink) rather than aborting the per-file
         // result with `not a regular file` / `os error 2`.
         use std::os::unix::fs::symlink;
-        let dir = std::env::temp_dir().join(format!("stryke_swallow_dangling_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("stryke_swallow_dangling_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("real.txt"), b"hello").unwrap();

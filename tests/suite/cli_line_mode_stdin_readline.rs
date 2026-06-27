@@ -312,7 +312,10 @@ fn line_mode_n_multiple_end_blocks_run_lifo_once_each() {
 fn plain_e_multiple_end_blocks_run_lifo() {
     let exe = stryke_exe();
     let out = Command::new(exe)
-        .args(["-e", r#"END { print "1\n" } END { print "2\n" } END { print "3\n" }"#])
+        .args([
+            "-e",
+            r#"END { print "1\n" } END { print "2\n" } END { print "3\n" }"#,
+        ])
         .stdout(Stdio::piped())
         .output()
         .expect("run stryke");

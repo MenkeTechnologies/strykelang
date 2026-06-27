@@ -732,7 +732,11 @@ impl PerlTypeName {
                 } else if let Some(r) = v.as_array_ref() {
                     r.read().clone()
                 } else {
-                    return Err(format!("expected {}, got {}", self.display_name(), v.type_name()));
+                    return Err(format!(
+                        "expected {}, got {}",
+                        self.display_name(),
+                        v.type_name()
+                    ));
                 };
                 if matches!(**elem, Self::Any) {
                     return Ok(());
@@ -752,15 +756,19 @@ impl PerlTypeName {
                 } else if let Some(r) = v.as_hash_ref() {
                     r.read().clone()
                 } else {
-                    return Err(format!("expected {}, got {}", self.display_name(), v.type_name()));
+                    return Err(format!(
+                        "expected {}, got {}",
+                        self.display_name(),
+                        v.type_name()
+                    ));
                 };
                 let any_key = matches!(**key_ty, Self::Any | Self::Str);
                 let any_val = matches!(**val_ty, Self::Any);
                 for (k, val) in pairs.iter() {
                     if !any_key {
-                        key_ty.check_key(k).map_err(|m| {
-                            format!("{} key {:?}: {}", self.display_name(), k, m)
-                        })?;
+                        key_ty
+                            .check_key(k)
+                            .map_err(|m| format!("{} key {:?}: {}", self.display_name(), k, m))?;
                     }
                     if !any_val {
                         val_ty.check_value(val).map_err(|m| {
@@ -831,10 +839,7 @@ impl PerlTypeName {
                     Err(format!("expected Float key, got {:?}", key))
                 }
             }
-            other => Err(format!(
-                "{} cannot be a Map key type",
-                other.display_name()
-            )),
+            other => Err(format!("{} cannot be a Map key type", other.display_name())),
         }
     }
 }

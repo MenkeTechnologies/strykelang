@@ -64,8 +64,14 @@ fn test_try_catch_after_for_loop() {
         "$got|$keep";
     "#;
     let out = run(code).expect("run").to_string();
-    assert!(out.contains("caught:boom"), "catch var lost after for loop: {out}");
-    assert!(out.ends_with("|HANDLE"), "outer var corrupted after for loop: {out}");
+    assert!(
+        out.contains("caught:boom"),
+        "catch var lost after for loop: {out}"
+    );
+    assert!(
+        out.ends_with("|HANDLE"),
+        "outer var corrupted after for loop: {out}"
+    );
 }
 
 #[test]

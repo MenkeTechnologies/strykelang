@@ -2078,8 +2078,11 @@ pub(crate) fn recognize_args_unpack_prologue(
             let tmp = *tmp;
             let mut i = 2;
             let mut binds: Vec<(u8, usize)> = Vec::new();
-            while let (Some(Op::LoadInt(k)), Some(Op::GetArrayElem(t)), Some(Op::DeclareScalarSlot(slot, _))) =
-                (seg.get(i), seg.get(i + 1), seg.get(i + 2))
+            while let (
+                Some(Op::LoadInt(k)),
+                Some(Op::GetArrayElem(t)),
+                Some(Op::DeclareScalarSlot(slot, _)),
+            ) = (seg.get(i), seg.get(i + 1), seg.get(i + 2))
             {
                 if *t != tmp || *k < 0 {
                     break;

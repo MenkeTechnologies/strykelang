@@ -246,7 +246,9 @@ impl InstalledIndex {
         copy.packages.sort_by(|a, b| a.name.cmp(&b.name));
         let mut header =
             String::from("# Auto-generated. Updated by `s pkg install -g` / `s uninstall -g`.\n");
-        header.push_str("# Hand-edit this only if you understand the impact on `use X` resolution.\n\n");
+        header.push_str(
+            "# Hand-edit this only if you understand the impact on `use X` resolution.\n\n",
+        );
         let body = toml::to_string_pretty(&copy)
             .map_err(|e| PkgError::Other(format!("serialize {}: {}", path.display(), e)))?;
         std::fs::write(&path, format!("{}{}", header, body))
@@ -456,9 +458,7 @@ mod tests {
         let s = Store::at(&store_root);
         s.ensure_layout().unwrap();
         let manifest = Manifest::default();
-        let dst = s
-            .install_path_dep("foo", "0.1.0", &src, &manifest)
-            .unwrap();
+        let dst = s.install_path_dep("foo", "0.1.0", &src, &manifest).unwrap();
         assert!(dst.is_dir());
         assert!(dst.join("lib/Foo.stk").is_file());
         assert!(dst.join("stryke.toml").is_file());

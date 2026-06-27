@@ -186,12 +186,14 @@ fn rs(s: &str) -> String {
 #[test]
 fn fusevm_concat_with_literal_in_sub_no_seeder_use_after_free() {
     assert_eq!(
-        rs(r#"sub greet { my ($name, $unused) = @_; return $name . "!"; }
+        rs(
+            r#"sub greet { my ($name, $unused) = @_; return $name . "!"; }
               my $r;
               for my $i (1..100) {
                   $r = greet("World", "x");
               }
-              $r"#),
+              $r"#
+        ),
         "World!"
     );
 }

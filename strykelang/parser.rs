@@ -766,17 +766,18 @@ impl Parser {
                 // modifier. Every other shape (`val()` / `val,` / `val =>` /
                 // `val { … }`) falls through to the default arm so the bare
                 // identifier is parsed as an expression statement.
-                "var" if matches!(
-                    self.peek_at(1),
-                    Token::ScalarVar(_)
-                        | Token::ArrayVar(_)
-                        | Token::HashVar(_)
-                        | Token::Star
-                        | Token::LParen
-                ) || matches!(
-                    self.peek_at(1),
-                    Token::Ident(ref k) if k == "typed"
-                ) =>
+                "var"
+                    if matches!(
+                        self.peek_at(1),
+                        Token::ScalarVar(_)
+                            | Token::ArrayVar(_)
+                            | Token::HashVar(_)
+                            | Token::Star
+                            | Token::LParen
+                    ) || matches!(
+                        self.peek_at(1),
+                        Token::Ident(ref k) if k == "typed"
+                    ) =>
                 {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
@@ -788,17 +789,18 @@ impl Parser {
                     // `var @a: List<Str>`) are parsed into `type_annotation`.
                     self.parse_my_our_local("my", true)?
                 }
-                "val" if matches!(
-                    self.peek_at(1),
-                    Token::ScalarVar(_)
-                        | Token::ArrayVar(_)
-                        | Token::HashVar(_)
-                        | Token::Star
-                        | Token::LParen
-                ) || matches!(
-                    self.peek_at(1),
-                    Token::Ident(ref k) if k == "typed"
-                ) =>
+                "val"
+                    if matches!(
+                        self.peek_at(1),
+                        Token::ScalarVar(_)
+                            | Token::ArrayVar(_)
+                            | Token::HashVar(_)
+                            | Token::Star
+                            | Token::LParen
+                    ) || matches!(
+                        self.peek_at(1),
+                        Token::Ident(ref k) if k == "typed"
+                    ) =>
                 {
                     if crate::compat_mode() {
                         return Err(self.syntax_err(
@@ -1269,7 +1271,8 @@ impl Parser {
                     ));
                 }
                 // `{ } pmap @a` / `{ } pflat_map @a` / `{ } pfor @a` / `do { } …` — same shapes as prefix forms.
-                "pmap" | "pflat_map" | "pgrep" | "pfor" | "pforeach" | "preduce" | "pcache" | "par" => {
+                "pmap" | "pflat_map" | "pgrep" | "pfor" | "pforeach" | "preduce" | "pcache"
+                | "par" => {
                     let line = stmt.line;
                     let block = self.stmt_into_parallel_block(stmt)?;
                     let which = kw.as_str();
@@ -2336,7 +2339,9 @@ impl Parser {
                 Token::Ident(ref kw)
                     if matches!(
                         kw.as_str(),
-                        "my" | "var" | "val" | "our"
+                        "my" | "var"
+                            | "val"
+                            | "our"
                             | "local"
                             | "state"
                             | "if"
@@ -2393,7 +2398,11 @@ impl Parser {
                     let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                     let body = self.parse_block()?;
                     let code_ref = Expr {
-                        kind: ExprKind::CodeRef { params, body, return_type: None },
+                        kind: ExprKind::CodeRef {
+                            params,
+                            body,
+                            return_type: None,
+                        },
                         line: stage_line,
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
@@ -2405,7 +2414,11 @@ impl Parser {
                     self.parse_sub_attributes()?;
                     let body = self.parse_fn_eq_body_or_block(false)?;
                     let code_ref = Expr {
-                        kind: ExprKind::CodeRef { params, body, return_type: None },
+                        kind: ExprKind::CodeRef {
+                            params,
+                            body,
+                            return_type: None,
+                        },
                         line: stage_line,
                     };
                     result = self.pipe_forward_apply(result, code_ref, stage_line)?;
@@ -6564,11 +6577,7 @@ impl Parser {
     /// `Map`). The opening `<` is the current token. Handles nested generics
     /// whose closing `>` were lexed as `>>` / `>>>` (shift tokens) via a
     /// pending-close counter, the standard C++/Kotlin approach.
-    fn parse_generic_type_args(
-        &mut self,
-        head: &str,
-        line: usize,
-    ) -> StrykeResult<PerlTypeName> {
+    fn parse_generic_type_args(&mut self, head: &str, line: usize) -> StrykeResult<PerlTypeName> {
         self.advance(); // consume `<`
         let mut args = Vec::new();
         loop {
@@ -6583,16 +6592,25 @@ impl Parser {
             "List" | "Array" => {
                 if args.len() != 1 {
                     return Err(self.syntax_err(
-                        format!("List<T> takes exactly one type argument, got {}", args.len()),
+                        format!(
+                            "List<T> takes exactly one type argument, got {}",
+                            args.len()
+                        ),
                         line,
                     ));
                 }
-                Ok(PerlTypeName::List(Box::new(args.into_iter().next().unwrap())))
+                Ok(PerlTypeName::List(Box::new(
+                    args.into_iter().next().unwrap(),
+                )))
             }
             "Set" | "Heap" | "Deque" => {
                 if args.len() != 1 {
                     return Err(self.syntax_err(
-                        format!("{}<T> takes exactly one type argument, got {}", head, args.len()),
+                        format!(
+                            "{}<T> takes exactly one type argument, got {}",
+                            head,
+                            args.len()
+                        ),
                         line,
                     ));
                 }
@@ -6619,7 +6637,10 @@ impl Parser {
                 Ok(PerlTypeName::Map(Box::new(k), Box::new(v)))
             }
             other => Err(self.syntax_err(
-                format!("`{}` is not a generic type (only List<T> / Map<K, V>)", other),
+                format!(
+                    "`{}` is not a generic type (only List<T> / Map<K, V>)",
+                    other
+                ),
                 line,
             )),
         }
@@ -6702,7 +6723,11 @@ impl Parser {
                     })
                 } else {
                     Err(self.syntax_err(
-                        format!("Expected ';' after {} VERSION (got {:?})", kw_name, self.peek()),
+                        format!(
+                            "Expected ';' after {} VERSION (got {:?})",
+                            kw_name,
+                            self.peek()
+                        ),
                         line,
                     ))
                 }
@@ -6808,7 +6833,10 @@ impl Parser {
                 })
             }
             other => Err(self.syntax_err(
-                format!("Expected module name or version after {}, got {:?}", kw_name, other),
+                format!(
+                    "Expected module name or version after {}, got {:?}",
+                    kw_name, other
+                ),
                 tok_line,
             )),
         }
@@ -7319,10 +7347,10 @@ impl Parser {
                 let dispatch_name: &str = name.strip_prefix("CORE::").unwrap_or(name.as_str());
                 match dispatch_name {
                     "puniq" | "uniq" | "distinct" | "flatten" | "set" | "list_count"
-                    | "list_size" | "count" | "size" | "cnt" | "len" | "l" | "with_index" | "shuffle"
-                    | "shuffled" | "frequencies" | "freq" | "pfrequencies" | "pfreq"
-                    | "interleave" | "ddump" | "stringify" | "str" | "lines" | "words"
-                    | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
+                    | "list_size" | "count" | "size" | "cnt" | "len" | "l" | "with_index"
+                    | "shuffle" | "shuffled" | "frequencies" | "freq" | "pfrequencies"
+                    | "pfreq" | "interleave" | "ddump" | "stringify" | "str" | "lines"
+                    | "words" | "chars" | "digits" | "letters" | "letters_uc" | "letters_lc"
                     | "punctuation" | "numbers" | "graphemes" | "columns" | "sentences"
                     | "paragraphs" | "sections" | "trim" | "avg" | "to_json" | "to_csv"
                     | "to_toml" | "to_yaml" | "to_xml" | "to_html" | "from_json" | "from_csv"
@@ -8589,7 +8617,9 @@ impl Parser {
         // get the bare Block (`Vec<Statement>`) for the `par_reduce`
         // extract slot.
         let extract_block: Block = match chunk_chain.kind {
-            ExprKind::CodeRef { params: _, body, .. } => body,
+            ExprKind::CodeRef {
+                params: _, body, ..
+            } => body,
             _ => vec![Statement {
                 label: None,
                 kind: StmtKind::Expression(chunk_chain),
@@ -8661,7 +8691,9 @@ impl Parser {
         let chunk_chain = chunk_chain?;
 
         let extract_block: Block = match chunk_chain.kind {
-            ExprKind::CodeRef { params: _, body, .. } => body,
+            ExprKind::CodeRef {
+                params: _, body, ..
+            } => body,
             _ => vec![Statement {
                 label: None,
                 kind: StmtKind::Expression(chunk_chain),
@@ -9483,7 +9515,8 @@ impl Parser {
                         | Token::HashVar(_)
                         | Token::Star
                         | Token::LParen
-                ) || is_post_style_decl(kw)
+                )
+                || is_post_style_decl(kw)
                     && matches!(
                         self.peek_at(1),
                         Token::Ident(ref kw) if kw == "typed"
@@ -13796,7 +13829,11 @@ impl Parser {
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
                 let body = self.parse_block()?;
                 Ok(Expr {
-                    kind: ExprKind::CodeRef { params, body, return_type: None },
+                    kind: ExprKind::CodeRef {
+                        params,
+                        body,
+                        return_type: None,
+                    },
                     line,
                 })
             }
@@ -13806,7 +13843,11 @@ impl Parser {
                 self.parse_sub_attributes()?;
                 let body = self.parse_fn_eq_body_or_block(false)?;
                 Ok(Expr {
-                    kind: ExprKind::CodeRef { params, body, return_type: None },
+                    kind: ExprKind::CodeRef {
+                        params,
+                        body,
+                        return_type: None,
+                    },
                     line,
                 })
             }
@@ -20436,42 +20477,42 @@ impl Parser {
                         // semantics.
                         parts.push(StringPart::Expr(build_zpexpand_expr(trimmed, line)));
                     } else {
-                    let mut base: Expr = if trimmed.starts_with('$')
+                        let mut base: Expr = if trimmed.starts_with('$')
                         || trimmed.starts_with('\\')
                         || trimmed.starts_with('@')   // `${@arr}` rare but valid
                         || trimmed.starts_with('%')   // `${%h}`   rare but valid
                         || trimmed.contains(['(', '+', '-', '*', '/', '.', '?', '&', '|'])
-                    {
-                        // Re-parse the inner content as a Perl expression. Wrap in
-                        // `Deref { kind: Sigil::Scalar }` to dereference the resulting
-                        // scalar reference (Perl: `${$r}` ≡ `$$r`).
-                        match parse_expression_from_str(trimmed, "<interp>") {
-                            Ok(e) => Expr {
-                                kind: ExprKind::Deref {
-                                    expr: Box::new(e),
-                                    kind: Sigil::Scalar,
+                        {
+                            // Re-parse the inner content as a Perl expression. Wrap in
+                            // `Deref { kind: Sigil::Scalar }` to dereference the resulting
+                            // scalar reference (Perl: `${$r}` ≡ `$$r`).
+                            match parse_expression_from_str(trimmed, "<interp>") {
+                                Ok(e) => Expr {
+                                    kind: ExprKind::Deref {
+                                        expr: Box::new(e),
+                                        kind: Sigil::Scalar,
+                                    },
+                                    line,
                                 },
+                                Err(_) => Expr {
+                                    kind: ExprKind::ScalarVar(inner.clone()),
+                                    line,
+                                },
+                            }
+                        } else {
+                            // Treat as a plain (possibly qualified) variable name.
+                            self.no_interop_check_scalar_var_name(&inner, line)?;
+                            Expr {
+                                kind: ExprKind::ScalarVar(inner),
                                 line,
-                            },
-                            Err(_) => Expr {
-                                kind: ExprKind::ScalarVar(inner.clone()),
-                                line,
-                            },
-                        }
-                    } else {
-                        // Treat as a plain (possibly qualified) variable name.
-                        self.no_interop_check_scalar_var_name(&inner, line)?;
-                        Expr {
-                            kind: ExprKind::ScalarVar(inner),
-                            line,
-                        }
-                    };
+                            }
+                        };
 
-                    // After `${…}` we may see `[idx]` / `{key}` for indexing into the
-                    // dereferenced array/hash (`${$ar}[1]`, `${$hr}{k}`), and arrow
-                    // chains thereafter.
-                    base = self.interp_chain_subscripts(&chars, &mut i, base, line);
-                    parts.push(StringPart::Expr(base));
+                        // After `${…}` we may see `[idx]` / `{key}` for indexing into the
+                        // dereferenced array/hash (`${$ar}[1]`, `${$hr}{k}`), and arrow
+                        // chains thereafter.
+                        base = self.interp_chain_subscripts(&chars, &mut i, base, line);
+                        parts.push(StringPart::Expr(base));
                     }
                 } else if chars[i] == '^' {
                     // `$^V`, `$^O`, … — name stored as `^V`, `^O`, … (see [`Interpreter::get_special_var`]).
@@ -20922,10 +20963,9 @@ impl Parser {
                         parts.push(StringPart::Literal(std::mem::take(&mut literal)));
                     }
                     i += 2; // `@{`
-                    let (inner, close) =
-                        Self::scan_interp_braces(&chars, i).ok_or_else(|| {
-                            self.syntax_err("Unterminated @{ ... } in double-quoted string", line)
-                        })?;
+                    let (inner, close) = Self::scan_interp_braces(&chars, i).ok_or_else(|| {
+                        self.syntax_err("Unterminated @{ ... } in double-quoted string", line)
+                    })?;
                     i = close + 1; // past closing `}`
                     let inner_expr = parse_expression_from_str(inner.trim(), "-e")?;
                     parts.push(StringPart::Expr(Expr {
@@ -21453,7 +21493,11 @@ mod tests {
         let p = parse_ok("use Some::Module 2.13");
         assert_eq!(p.statements.len(), 1);
         match &p.statements[0].kind {
-            StmtKind::Use { module, imports, version } => {
+            StmtKind::Use {
+                module,
+                imports,
+                version,
+            } => {
                 assert_eq!(module, "Some::Module");
                 assert!(imports.is_empty(), "version must not leak into imports");
                 assert_eq!(version.as_deref(), Some("2.13"));
@@ -21472,10 +21516,17 @@ mod tests {
         let p = parse_ok("use Some::Module 1.0, 'foo', 'bar'");
         assert_eq!(p.statements.len(), 1);
         match &p.statements[0].kind {
-            StmtKind::Use { module, imports, version } => {
+            StmtKind::Use {
+                module,
+                imports,
+                version,
+            } => {
                 assert_eq!(module, "Some::Module");
                 assert_eq!(version.as_deref(), Some("1.0"));
-                assert!(!imports.is_empty(), "import LIST must reach the imports vec");
+                assert!(
+                    !imports.is_empty(),
+                    "import LIST must reach the imports vec"
+                );
             }
             other => panic!("expected Use, got {:?}", other),
         }
@@ -21521,9 +21572,18 @@ mod tests {
     fn parse_use_module_string_literal_is_import_not_version() {
         let p = parse_ok(r#"use Foo "1.0.0""#);
         match &p.statements[0].kind {
-            StmtKind::Use { version, imports, .. } => {
-                assert_eq!(version.as_deref(), None, "string literal must not become version pin");
-                assert!(!imports.is_empty(), "string literal must reach the import list");
+            StmtKind::Use {
+                version, imports, ..
+            } => {
+                assert_eq!(
+                    version.as_deref(),
+                    None,
+                    "string literal must not become version pin"
+                );
+                assert!(
+                    !imports.is_empty(),
+                    "string literal must reach the import list"
+                );
             }
             other => panic!("expected Use, got {:?}", other),
         }
@@ -23544,10 +23604,9 @@ fn zsh_param_form(body: &str) -> bool {
     if b[0] == b'(' {
         // `(flags)name` — flags then an identifier / positional / `$`.
         if let Some(rp) = body.find(')') {
-            return body[rp + 1..]
-                .bytes()
-                .next()
-                .map_or(false, |c| c.is_ascii_alphanumeric() || c == b'_' || c == b'$');
+            return body[rp + 1..].bytes().next().map_or(false, |c| {
+                c.is_ascii_alphanumeric() || c == b'_' || c == b'$'
+            });
         }
         return false;
     }

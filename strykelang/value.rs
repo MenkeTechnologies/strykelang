@@ -1519,7 +1519,11 @@ impl StrykeValue {
     /// empty). Shared by the interpreter (`BuiltinId::Ord`) and the fusevm JIT host
     /// helper so both agree exactly.
     pub fn ord_value(&self) -> i64 {
-        self.to_string().chars().next().map(|c| c as i64).unwrap_or(0)
+        self.to_string()
+            .chars()
+            .next()
+            .map(|c| c as i64)
+            .unwrap_or(0)
     }
 
     /// `hex` builtin: parse the stringified value as hexadecimal (optional `0x`/`0X`

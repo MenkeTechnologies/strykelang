@@ -339,7 +339,11 @@ impl StaticAnalyzer {
                 self.declare_sub(name);
                 self.declare_sub(&fqn);
             }
-            StmtKind::Use { module, imports, version } => {
+            StmtKind::Use {
+                module,
+                imports,
+                version,
+            } => {
                 self.declare_sub(module);
                 // `use Foo::Bar` mirrors `require Foo::Bar` for analyzer
                 // purposes: chase the resolved file and merge its sub
@@ -2227,7 +2231,9 @@ pub fn resolve_require_path_from_file_versioned(
                             // Try both. Mirrors runtime resolver's
                             // identical fix (see resolve_store_candidates
                             // in pkg::commands).
-                            for store_pkg in store_dir_candidates(&store, &entry.name, &entry.version) {
+                            for store_pkg in
+                                store_dir_candidates(&store, &entry.name, &entry.version)
+                            {
                                 let resolved = build_pkg_lib_path(&store_pkg, &segments);
                                 if resolved.is_file() {
                                     return Some(resolved);

@@ -355,10 +355,9 @@ impl<'a> Resolver<'a> {
             super::commands::install_global_from_github(&self.store, owner, repo, pinned)
                 .map_err(PkgError::Resolve)?;
 
-        let pkg = manifest
-            .package
-            .as_ref()
-            .ok_or_else(|| PkgError::Resolve(format!("github dep `{}`: tarball missing [package]", name)))?;
+        let pkg = manifest.package.as_ref().ok_or_else(|| {
+            PkgError::Resolve(format!("github dep `{}`: tarball missing [package]", name))
+        })?;
         let version = pkg.version.clone();
         let integrity = integrity_for_directory(&dst)?;
         let key = format!("{}@{}", name, version);
@@ -480,9 +479,8 @@ impl<'a> Resolver<'a> {
         // own lib/ didn't already have it.
         if let Some((built_lib, lib_filename)) = ffi_stage {
             let dst_lib_dir = dst.join("lib");
-            std::fs::create_dir_all(&dst_lib_dir).map_err(|e| {
-                PkgError::Io(format!("create {}: {}", dst_lib_dir.display(), e))
-            })?;
+            std::fs::create_dir_all(&dst_lib_dir)
+                .map_err(|e| PkgError::Io(format!("create {}: {}", dst_lib_dir.display(), e)))?;
             let dst_lib = dst_lib_dir.join(&lib_filename);
             if !dst_lib.is_file() {
                 std::fs::copy(&built_lib, &dst_lib).map_err(|e| {

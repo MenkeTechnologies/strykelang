@@ -3020,7 +3020,10 @@ pub(crate) fn strptime(s: &StrykeValue, fmt: &StrykeValue) -> StrykeResult<Stryk
                 .and_then(|d| d.and_hms_opt(0, 0, 0))
         })
         .ok_or_else(|| {
-            StrykeError::runtime(format!("strptime: cannot parse {text:?} with format {f:?}"), 0)
+            StrykeError::runtime(
+                format!("strptime: cannot parse {text:?} with format {f:?}"),
+                0,
+            )
         })?;
     let utc = Utc.from_utc_datetime(&naive);
     let secs = utc.timestamp() as f64 + f64::from(utc.timestamp_subsec_nanos()) / 1e9;
@@ -3291,7 +3294,9 @@ pub(crate) fn to_jsonl(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
         if let Some(a) = args[0].as_array_ref() {
             a.read().clone()
         } else {
-            args[0].as_array_vec().unwrap_or_else(|| vec![args[0].clone()])
+            args[0]
+                .as_array_vec()
+                .unwrap_or_else(|| vec![args[0].clone()])
         }
     } else {
         args.to_vec()
@@ -3312,8 +3317,7 @@ pub(crate) fn to_jsonl(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// is trimmed.
 pub(crate) fn from_ini(s: &StrykeValue) -> StrykeResult<StrykeValue> {
     let text = s.to_string();
-    let root: Arc<RwLock<IndexMap<String, StrykeValue>>> =
-        Arc::new(RwLock::new(IndexMap::new()));
+    let root: Arc<RwLock<IndexMap<String, StrykeValue>>> = Arc::new(RwLock::new(IndexMap::new()));
     let mut current: Option<Arc<RwLock<IndexMap<String, StrykeValue>>>> = None;
     for raw in text.lines() {
         let line = raw.trim();
@@ -3347,8 +3351,11 @@ pub(crate) fn to_ini(v: &StrykeValue) -> StrykeResult<StrykeValue> {
     let map = v
         .as_hash_ref()
         .ok_or_else(|| StrykeError::runtime("to_ini: expected a hash reference", 0))?;
-    let entries: Vec<(String, StrykeValue)> =
-        map.read().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+    let entries: Vec<(String, StrykeValue)> = map
+        .read()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
     let mut out = String::new();
     // Globals (scalar values) first.
     for (k, val) in &entries {

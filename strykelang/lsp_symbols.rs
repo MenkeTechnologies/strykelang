@@ -744,7 +744,9 @@ impl Builder {
             // `use constant (A => 1, B => 2)` — each constant name compiles
             // to a `Sub` at runtime, so register it as such in the symbol
             // table. Rename, hover, goto-def then work uniformly.
-            StmtKind::Use { module, imports, .. } if module == "constant" => {
+            StmtKind::Use {
+                module, imports, ..
+            } if module == "constant" => {
                 for imp in imports {
                     self.declare_constants_from_import(imp, line0);
                 }

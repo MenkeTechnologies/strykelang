@@ -21,7 +21,11 @@ fn assert_alias(alias: &str, primary: &str) {
         r#"(exists $a{{"{alias}"}} && $a{{"{alias}"}} eq "{primary}"
             && !(exists $b{{"{alias}"}})) ? 1 : 0"#
     );
-    assert_eq!(eval_int(&code), 1, "{alias} should be %a alias of {primary}, not a %b primary");
+    assert_eq!(
+        eval_int(&code),
+        1,
+        "{alias} should be %a alias of {primary}, not a %b primary"
+    );
 }
 
 #[test]

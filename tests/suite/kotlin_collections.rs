@@ -35,7 +35,10 @@ fn list_of_not_null_drops_undef() {
 #[test]
 fn array_of_nulls_fills_undef() {
     assert_eq!(eval_int("len(arrayOfNulls(4))"), 4);
-    assert_eq!(eval_int("my @a = arrayOfNulls(3); defined($a[0]) ? 1 : 0"), 0);
+    assert_eq!(
+        eval_int("my @a = arrayOfNulls(3); defined($a[0]) ? 1 : 0"),
+        0
+    );
 }
 
 #[test]
@@ -46,7 +49,10 @@ fn map_of_flat_pairs() {
 
 #[test]
 fn map_of_array_pairs() {
-    assert_eq!(eval_int(r#"my $h = mapOf(["a", 7], ["b", 8]); $h->{a} + $h->{b}"#), 15);
+    assert_eq!(
+        eval_int(r#"my $h = mapOf(["a", 7], ["b", 8]); $h->{a} + $h->{b}"#),
+        15
+    );
 }
 
 #[test]
@@ -75,5 +81,8 @@ fn empty_set_is_empty() {
 
 #[test]
 fn sorted_set_orders_and_dedups() {
-    assert_eq!(eval_string("my @s = sortedSetOf(3, 1, 2, 1); join(\",\", @s)"), "1,2,3");
+    assert_eq!(
+        eval_string("my @s = sortedSetOf(3, 1, 2, 1); join(\",\", @s)"),
+        "1,2,3"
+    );
 }

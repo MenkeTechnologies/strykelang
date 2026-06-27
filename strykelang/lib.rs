@@ -63,12 +63,6 @@ pub mod builtins_validate;
 pub mod builtins_vision_ir_algorithms;
 /// `bytecode` submodule.
 pub mod bytecode;
-/// `fusevm_bridge` submodule: translates strykelang bytecode to the shared
-/// [`fusevm`] runtime, making strykelang a fusevm frontend (opt-in JIT tier).
-pub mod fusevm_bridge;
-/// `fusevm_native` submodule: Phase 1 of retiring `vm.rs`/`jit.rs` — runs whole
-/// programs on `fusevm::VM` with native Values (opt-in via STRYKE_FUSEVM_ONLY).
-pub mod fusevm_native;
 /// `capture` submodule.
 pub mod capture;
 /// `cli_runners` submodule.
@@ -81,8 +75,6 @@ pub mod compiler;
 pub mod controller;
 /// `convert` submodule.
 pub mod convert;
-/// `zsh_convert` submodule — zsh source → stryke source transpiler.
-pub mod zsh_convert;
 mod crypt_util;
 /// `dap` submodule.
 pub mod dap;
@@ -107,6 +99,12 @@ mod fib_like_tail;
 pub mod fmt;
 /// `format` submodule.
 pub mod format;
+/// `fusevm_bridge` submodule: translates strykelang bytecode to the shared
+/// [`fusevm`] runtime, making strykelang a fusevm frontend (opt-in JIT tier).
+pub mod fusevm_bridge;
+/// `fusevm_native` submodule: Phase 1 of retiring `vm.rs`/`jit.rs` — runs whole
+/// programs on `fusevm::VM` with native Values (opt-in via STRYKE_FUSEVM_ONLY).
+pub mod fusevm_native;
 /// `getopts` submodule.
 pub mod getopts;
 /// `god` submodule.
@@ -232,6 +230,8 @@ pub mod vm_helper;
 pub mod web;
 /// `web_orm` submodule.
 pub mod web_orm;
+/// `zsh_convert` submodule — zsh source → stryke source transpiler.
+pub mod zsh_convert;
 
 // Re-export shell components from the zsh crate
 pub use zsh::exec as shell_exec;

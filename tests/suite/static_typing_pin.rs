@@ -7,7 +7,7 @@
 //! `--static` cases flip the process-global `static_mode` flag and therefore
 //! hold the write lock via [`crate::common::with_global_flags`].
 
-use crate::common::{eval_int, eval_err_kind, with_global_flags};
+use crate::common::{eval_err_kind, eval_int, with_global_flags};
 use stryke::error::ErrorKind;
 
 // ── Return-type enforcement (`fn f(): Type`) ─────────────────────────────────

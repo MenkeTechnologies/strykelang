@@ -301,8 +301,15 @@ fn format_statement_indent(s: &Statement, depth: usize) -> String {
                 format!("use {}", version)
             }
         }
-        StmtKind::Use { module, imports, version } => {
-            let ver = version.as_deref().map(|v| format!(" {}", v)).unwrap_or_default();
+        StmtKind::Use {
+            module,
+            imports,
+            version,
+        } => {
+            let ver = version
+                .as_deref()
+                .map(|v| format!(" {}", v))
+                .unwrap_or_default();
             if imports.is_empty() {
                 format!("use {}{}", module, ver)
             } else {
@@ -802,7 +809,11 @@ pub fn format_expr(e: &Expr) -> String {
                 .join(", ");
             format!("{{{}}}", inner)
         }
-        ExprKind::CodeRef { params, body, return_type } => {
+        ExprKind::CodeRef {
+            params,
+            body,
+            return_type,
+        } => {
             let ret = return_type
                 .as_ref()
                 .map(|t| format!(": {}", t.display_name()))

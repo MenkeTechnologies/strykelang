@@ -2600,9 +2600,8 @@ impl VMHelper {
                 i = after;
             } else {
                 // ── `{{ … }}` Mustache data tag ──
-                let close = find_substr(bytes, open + 2, b"}}").ok_or_else(|| {
-                    StrykeError::runtime("template: unterminated {{ tag", line)
-                })?;
+                let close = find_substr(bytes, open + 2, b"}}")
+                    .ok_or_else(|| StrykeError::runtime("template: unterminated {{ tag", line))?;
                 let tag = src[open + 2..close].trim();
                 let after = close + 2;
                 let cur = format!("$__tc{}", ctx_stack.last().copied().unwrap_or(0));

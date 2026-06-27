@@ -7994,9 +7994,9 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
         &[
             "->", "new", "$", "@", "%", "+", "-", "*", "/", "**", "++", "--", ".", "x", "==", "!=",
             "<", ">", "<=", ">=", "<=>", "eq", "ne", "lt", "le", "gt", "ge", "cmp", "&&", "||",
-            "//", "??", "!", "and", "or", "not", "xor", "=~", "!~", "..", "...", "=>", ",", "?:", "\\",
-            "&", "|", "^", "~", "<<", ">>", "=", "+=", "-=", "*=", "/=", "**=", "%=", ".=", "x=",
-            "||=", "//=", "??=", "&&=", "|=", "&=", "^=", "<<=", ">>=",
+            "//", "??", "!", "and", "or", "not", "xor", "=~", "!~", "..", "...", "=>", ",", "?:",
+            "\\", "&", "|", "^", "~", "<<", ">>", "=", "+=", "-=", "*=", "/=", "**=", "%=", ".=",
+            "x=", "||=", "//=", "??=", "&&=", "|=", "&=", "^=", "<<=", ">>=",
         ],
     ),
     (
@@ -10354,8 +10354,7 @@ fn completions(
     // `use GUI 0<TAB>` — version slot follows the package. Return
     // installed-version strings from `~/.stryke/store/<canonical>@<ver>/`
     // directly, bypassing the bare-completion path.
-    if let Some((pkg_namespace, partial)) =
-        line_completion_use_version_context(line_text, byte_col)
+    if let Some((pkg_namespace, partial)) = line_completion_use_version_context(line_text, byte_col)
     {
         let mut items = installed_version_completions(&pkg_namespace, &partial);
         items.sort_by(|a, b| a.label.cmp(&b.label));
@@ -10476,10 +10475,7 @@ pub(crate) fn line_completion_use_version_context(
 /// version-completion path that lights up after `use GUI <TAB>` —
 /// matches the resolver's lookup logic so the offered versions are
 /// guaranteed to satisfy `use NAMESPACE VERSION`.
-pub(crate) fn installed_version_completions(
-    namespace: &str,
-    partial: &str,
-) -> Vec<CompletionItem> {
+pub(crate) fn installed_version_completions(namespace: &str, partial: &str) -> Vec<CompletionItem> {
     let mut out = Vec::new();
     let store = match crate::pkg::store::Store::user_default() {
         Ok(s) => s,
@@ -11685,7 +11681,9 @@ fn visit_stmt_for_index(stmt: &Statement, pkg: &mut String, idx: &mut Completion
         }
         // `use constant NAME => value` / `use constant { A => 1, ... }`
         // — every key becomes a callable that returns the value.
-        StmtKind::Use { module, imports, .. } if module == "constant" => {
+        StmtKind::Use {
+            module, imports, ..
+        } if module == "constant" => {
             collect_constant_imports(imports, idx);
         }
         StmtKind::Foreach {

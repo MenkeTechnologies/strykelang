@@ -1391,8 +1391,13 @@ impl Compiler {
             self.compile_block(block)?;
         }
         // Perl: `${^GLOBAL_PHASE}` stays **`START`** during UNITCHECK blocks.
-        let unit_check_rev: Vec<(usize, Block)> =
-            self.unit_check_blocks.iter().cloned().enumerate().rev().collect();
+        let unit_check_rev: Vec<(usize, Block)> = self
+            .unit_check_blocks
+            .iter()
+            .cloned()
+            .enumerate()
+            .rev()
+            .collect();
         for (i, block) in unit_check_rev {
             if let Some(pre) = unitcheck_pre.get(i) {
                 self.register_our_predecls(pre);
@@ -1402,8 +1407,13 @@ impl Compiler {
         if !self.check_blocks.is_empty() {
             self.chunk.emit(Op::SetGlobalPhase(GP_CHECK), 0);
         }
-        let check_rev: Vec<(usize, Block)> =
-            self.check_blocks.iter().cloned().enumerate().rev().collect();
+        let check_rev: Vec<(usize, Block)> = self
+            .check_blocks
+            .iter()
+            .cloned()
+            .enumerate()
+            .rev()
+            .collect();
         for (i, block) in check_rev {
             if let Some(pre) = check_pre.get(i) {
                 self.register_our_predecls(pre);
@@ -1998,8 +2008,10 @@ impl Compiler {
                 | crate::ast::PerlTypeName::Map(_, _)
         ) {
             let ty_idx = self.chunk.intern_container_type(ty);
-            self.chunk
-                .emit(Op::DeclareScalarTypedContainer(name_idx, ty_idx, frozen), line);
+            self.chunk.emit(
+                Op::DeclareScalarTypedContainer(name_idx, ty_idx, frozen),
+                line,
+            );
             return;
         }
         // User-defined type — encode the name through the name pool.
@@ -3386,7 +3398,9 @@ impl Compiler {
                 let idx = self.chunk.add_use_overload(pairs.clone());
                 self.chunk.emit(Op::UseOverload(idx), line);
             }
-            StmtKind::Use { module, imports, .. } => {
+            StmtKind::Use {
+                module, imports, ..
+            } => {
                 // `use Env '@PATH'` declares variables that must be visible to strict checking.
                 if module == "Env" {
                     Self::register_env_imports(
@@ -6411,7 +6425,11 @@ impl Compiler {
                     }
                     "log10" if args.len() == 1 => {
                         self.compile_expr(&args[0])?;
-                        self.emit_op(Op::CallBuiltin(BuiltinId::Log10 as u16, 1), line, Some(root));
+                        self.emit_op(
+                            Op::CallBuiltin(BuiltinId::Log10 as u16, 1),
+                            line,
+                            Some(root),
+                        );
                     }
                     "ceil" | "ceiling" if args.len() == 1 => {
                         self.compile_expr(&args[0])?;
@@ -6419,14 +6437,22 @@ impl Compiler {
                     }
                     "floor" if args.len() == 1 => {
                         self.compile_expr(&args[0])?;
-                        self.emit_op(Op::CallBuiltin(BuiltinId::Floor as u16, 1), line, Some(root));
+                        self.emit_op(
+                            Op::CallBuiltin(BuiltinId::Floor as u16, 1),
+                            line,
+                            Some(root),
+                        );
                     }
                     // round($x) (1-arg, no precision) — lowers to STK_VAL_ROUND
                     // via BuiltinId::Round. round($x, $n) (2-arg) keeps the
                     // generic name-dispatch path (returns float, different shape).
                     "round" if args.len() == 1 => {
                         self.compile_expr(&args[0])?;
-                        self.emit_op(Op::CallBuiltin(BuiltinId::Round as u16, 1), line, Some(root));
+                        self.emit_op(
+                            Op::CallBuiltin(BuiltinId::Round as u16, 1),
+                            line,
+                            Some(root),
+                        );
                     }
                     _ => {
                         // Generic sub call: args are in list context so `f(1..10)`, `f(@a)`,

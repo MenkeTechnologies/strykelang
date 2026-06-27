@@ -4730,7 +4730,11 @@ fn try_vm_execute_goto_sub_passes_args() {
     let mut i = VMHelper::new();
     let out = try_vm_execute(&p, &mut i);
     assert!(out.is_some(), "`goto &sub` should compile to Op::GotoSub");
-    assert_eq!(out.unwrap().expect("vm").to_int(), 10, "@_ must pass through");
+    assert_eq!(
+        out.unwrap().expect("vm").to_int(),
+        10,
+        "@_ must pass through"
+    );
 }
 
 /// `shift` before `goto &sub` mutates `@_`; the target must see the shortened list. This also
@@ -5305,22 +5309,13 @@ fn zsh_param_expansion_array_flags_and_ops() {
 #[test]
 fn zsh_param_expansion_hashes() {
     // Bareword `[key]` subscript → bridged as `\%h` (associative array).
-    assert_eq!(
-        run_str(r#"my %h = (x => "1", y => "2"); "${h[x]}""#),
-        "1"
-    );
+    assert_eq!(run_str(r#"my %h = (x => "1", y => "2"); "${h[x]}""#), "1");
     // `(k)` / `(v)` flags expand keys / values. Order is hash-order; assert
     // membership rather than a fixed sequence.
     let keys = run_str(r#"my %h = (x => "1", y => "2"); "${(k)h}""#);
-    assert!(
-        keys.contains('x') && keys.contains('y'),
-        "keys: {keys}"
-    );
+    assert!(keys.contains('x') && keys.contains('y'), "keys: {keys}");
     let vals = run_str(r#"my %h = (x => "1", y => "2"); "${(v)h}""#);
-    assert!(
-        vals.contains('1') && vals.contains('2'),
-        "vals: {vals}"
-    );
+    assert!(vals.contains('1') && vals.contains('2'), "vals: {vals}");
 }
 
 #[test]
