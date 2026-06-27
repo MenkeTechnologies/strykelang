@@ -4061,6 +4061,7 @@ CORE::gompertz_growth_step
 CORE::gompertz_pdf
 CORE::goto
 CORE::gouy_chapman_potential
+CORE::gr
 CORE::grade_asc
 CORE::grade_desc
 CORE::grade_down
@@ -4169,6 +4170,7 @@ CORE::greenhouse_forcing_step
 CORE::gregorian_from_fixed
 CORE::grep
 CORE::grep_v
+CORE::greps
 CORE::grepv
 CORE::grey
 CORE::grim_trigger_step
@@ -5263,6 +5265,8 @@ CORE::iterate
 CORE::iterate_n
 CORE::iv
 CORE::iv_estimator
+CORE::ix
+CORE::j
 CORE::j0
 CORE::j1
 CORE::j_date
@@ -5595,6 +5599,7 @@ CORE::kv_set
 CORE::kv_size
 CORE::kv_stats
 CORE::kwh_to_joules
+CORE::l
 CORE::l1_coherence
 CORE::l1_distance
 CORE::l1_norm
@@ -5749,6 +5754,7 @@ CORE::levy_pdf
 CORE::lewis_dot_count
 CORE::lex_keyword_classify
 CORE::lexicalized_parse
+CORE::lf
 CORE::lfilter_zi_init
 CORE::lfrm
 CORE::lfsr_galois_step
@@ -6609,6 +6615,7 @@ CORE::mmin
 CORE::mmult
 CORE::mmx
 CORE::mmxb
+CORE::mn
 CORE::mnorm
 CORE::mob
 CORE::mobius
@@ -6792,6 +6799,7 @@ CORE::mutual_information
 CORE::mutual_information_step
 CORE::mv
 CORE::mvn_pdf
+CORE::mx
 CORE::my
 CORE::myers_diff
 CORE::myerson_optimal
@@ -7534,6 +7542,7 @@ CORE::panel_random_effects
 CORE::panel_var_step
 CORE::panel_within_estimator
 CORE::pany
+CORE::par
 CORE::par_bench
 CORE::par_csv_read
 CORE::par_fetch
@@ -7863,6 +7872,7 @@ CORE::pmass
 CORE::pmt
 CORE::png_header_read
 CORE::pnorm
+CORE::po
 CORE::pochhammer
 CORE::poh_from_oh
 CORE::poincare_duality
@@ -8134,6 +8144,7 @@ CORE::pty_read
 CORE::pty_send
 CORE::pty_spawn
 CORE::pty_strip_ansi
+CORE::pu
 CORE::pubip
 CORE::public_goods_game_payoff
 CORE::pulse_pressure
@@ -8441,6 +8452,7 @@ CORE::rcauchy
 CORE::rchisq
 CORE::rcolor
 CORE::rctau
+CORE::rd
 CORE::rdcs
 CORE::rdd_estimate
 CORE::rdirichlet
@@ -8892,6 +8904,7 @@ CORE::running_variance
 CORE::runred
 CORE::runs
 CORE::runs_test
+CORE::rv
 CORE::rwald
 CORE::rweibull
 CORE::rx_gate
@@ -9265,6 +9278,7 @@ CORE::sgemm
 CORE::sgemv
 CORE::sgnum
 CORE::sgp4_propagate_step
+CORE::sh
 CORE::sh_add
 CORE::sh_clip
 CORE::sh_digest
@@ -9497,6 +9511,7 @@ CORE::slugify
 CORE::slurp
 CORE::slurp_raw
 CORE::slutsky_decompose
+CORE::sm
 CORE::sma
 CORE::small_schroder
 CORE::small_schroder_number
@@ -9529,6 +9544,7 @@ CORE::snet
 CORE::snowball_stem_english
 CORE::snowball_stem_french
 CORE::snp
+CORE::so
 CORE::sobel_diagonal_kernel
 CORE::sobel_kernel_value
 CORE::sobel_magnitude
@@ -9600,6 +9616,7 @@ CORE::soundex_phonetic
 CORE::soundex_v1
 CORE::soundex_v2
 CORE::source
+CORE::sp
 CORE::spaceship
 CORE::span
 CORE::span_fn
@@ -9724,6 +9741,7 @@ CORE::srem
 CORE::srgb_to_rgb
 CORE::srgb_to_xyz
 CORE::srton
+CORE::ss
 CORE::ssa_phi_insert
 CORE::ssh
 CORE::ssim
@@ -10531,6 +10549,7 @@ CORE::udp_recv_from
 CORE::udp_send
 CORE::udp_send_to
 CORE::ue
+CORE::uf
 CORE::ugz
 CORE::uid
 CORE::uin
@@ -10541,6 +10560,7 @@ CORE::ulid_timestamp
 CORE::ulid_ts
 CORE::ultimatum_acceptance_prob
 CORE::umask
+CORE::un
 CORE::uname
 CORE::uncertainty_position
 CORE::undef
@@ -10630,6 +10650,7 @@ CORE::uppercase
 CORE::upsample
 CORE::uptime_secs
 CORE::upto
+CORE::uq
 CORE::uqb
 CORE::uri_escape
 CORE::uri_normalize
@@ -15247,6 +15268,7 @@ gompertz_growth_step
 gompertz_pdf
 goto
 gouy_chapman_potential
+gr
 grade_asc
 grade_desc
 grade_down
@@ -15355,6 +15377,7 @@ greenhouse_forcing_step
 gregorian_from_fixed
 grep
 grep_v
+greps
 grepv
 grey
 grim_trigger_step
@@ -16451,6 +16474,8 @@ iterate
 iterate_n
 iv
 iv_estimator
+ix
+j
 j0
 j1
 j_date
@@ -16783,6 +16808,7 @@ kv_set
 kv_size
 kv_stats
 kwh_to_joules
+l
 l1_coherence
 l1_distance
 l1_norm
@@ -16938,6 +16964,7 @@ levy_pdf
 lewis_dot_count
 lex_keyword_classify
 lexicalized_parse
+lf
 lfilter_zi_init
 lfrm
 lfsr_galois_step
@@ -17802,6 +17829,7 @@ mmin
 mmult
 mmx
 mmxb
+mn
 mnorm
 mob
 mobius
@@ -17985,6 +18013,7 @@ mutual_information
 mutual_information_step
 mv
 mvn_pdf
+mx
 my
 myers_diff
 myerson_optimal
@@ -18731,6 +18760,7 @@ panel_random_effects
 panel_var_step
 panel_within_estimator
 pany
+par
 par_bench
 par_csv_read
 par_fetch
@@ -19060,6 +19090,7 @@ pmass
 pmt
 png_header_read
 pnorm
+po
 pochhammer
 poh_from_oh
 poincare_duality
@@ -19332,6 +19363,7 @@ pty_read
 pty_send
 pty_spawn
 pty_strip_ansi
+pu
 pub
 pubip
 public_goods_game_payoff
@@ -19641,6 +19673,7 @@ rcauchy
 rchisq
 rcolor
 rctau
+rd
 rdcs
 rdd_estimate
 rdirichlet
@@ -20092,6 +20125,7 @@ running_variance
 runred
 runs
 runs_test
+rv
 rwald
 rweibull
 rx_gate
@@ -20466,6 +20500,7 @@ sgemm
 sgemv
 sgnum
 sgp4_propagate_step
+sh
 sh_add
 sh_clip
 sh_digest
@@ -20698,6 +20733,7 @@ slugify
 slurp
 slurp_raw
 slutsky_decompose
+sm
 sma
 small_schroder
 small_schroder_number
@@ -20730,6 +20766,7 @@ snet
 snowball_stem_english
 snowball_stem_french
 snp
+so
 sobel_diagonal_kernel
 sobel_kernel_value
 sobel_magnitude
@@ -20801,6 +20838,7 @@ soundex_phonetic
 soundex_v1
 soundex_v2
 source
+sp
 spaceship
 span
 span_fn
@@ -20925,6 +20963,7 @@ srem
 srgb_to_rgb
 srgb_to_xyz
 srton
+ss
 ssa_phi_insert
 ssh
 ssim
@@ -21738,6 +21777,7 @@ udp_recv_from
 udp_send
 udp_send_to
 ue
+uf
 ugz
 uid
 uin
@@ -21748,6 +21788,7 @@ ulid_timestamp
 ulid_ts
 ultimatum_acceptance_prob
 umask
+un
 uname
 uncertainty_position
 undef
@@ -21837,6 +21878,7 @@ uppercase
 upsample
 uptime_secs
 upto
+uq
 uqb
 uri_escape
 uri_normalize
