@@ -19001,7 +19001,7 @@ fn builtin_kotlin_set(args: &[StrykeValue], sorted: bool) -> StrykeResult<Stryke
         return Ok(crate::value::set_from_elements(args.iter().cloned()));
     }
     let mut items = args.to_vec();
-    items.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+    items.sort_by_key(|a| a.to_string());
     Ok(crate::value::set_from_elements(items))
 }
 

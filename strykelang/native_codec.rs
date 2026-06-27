@@ -3360,7 +3360,7 @@ pub(crate) fn to_ini(v: &StrykeValue) -> StrykeResult<StrykeValue> {
     // Globals (scalar values) first.
     for (k, val) in &entries {
         if val.as_hash_ref().is_none() {
-            out.push_str(&format!("{k}={}\n", val.to_string()));
+            out.push_str(&format!("{k}={}\n", val));
         }
     }
     // Then sections (hashref values).
@@ -3368,7 +3368,7 @@ pub(crate) fn to_ini(v: &StrykeValue) -> StrykeResult<StrykeValue> {
         if let Some(sect) = val.as_hash_ref() {
             out.push_str(&format!("[{k}]\n"));
             for (kk, vv) in sect.read().iter() {
-                out.push_str(&format!("{kk}={}\n", vv.to_string()));
+                out.push_str(&format!("{kk}={}\n", vv));
             }
         }
     }
