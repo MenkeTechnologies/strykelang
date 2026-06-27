@@ -374,6 +374,59 @@ fn lsp_words_covers_on_disk_snapshot() {
     );
 }
 
+/// Reverse drift detector — the one the linter actually depends on.
+///
+/// `static_analysis.rs::builtins()` reads ONLY the on-disk snapshot;
+/// it never consults the live runtime. So a callable bare-name (no
+/// sigil, no `::`) that the runtime knows but the snapshot omits is
+/// silently flagged as an "Undefined subroutine" by `stryke check`.
+/// That is exactly how the short builtin aliases (`l`→`len`,
+/// `pu`→`push`, `gr`→`grep`, …) slipped through: they were added to
+/// `KEYWORD_BUILTIN_ALIASES` and reached `%all`/`lsp_words`, but the
+/// snapshot was never regenerated, so the linter rejected them.
+///
+/// `lsp_words_covers_on_disk_snapshot` only pins live ⊇ on-disk, which
+/// can't catch a snapshot missing live names. This pins the direction
+/// the linter cares about: on-disk bare-names ⊇ live bare-names.
+/// If it fails, regenerate the file:
+///   stryke -e 'lsp_completion_words |> e p' > strykelang/lsp_completion_words.txt
+#[test]
+fn on_disk_snapshot_covers_live_bare_names() {
+    let path_str = if std::path::Path::new("strykelang/lsp_completion_words.txt").exists() {
+        "strykelang/lsp_completion_words.txt"
+    } else if std::path::Path::new("lsp_completion_words.txt").exists() {
+        "lsp_completion_words.txt"
+    } else {
+        eprintln!("skip: lsp_completion_words.txt not on disk for this run");
+        return;
+    };
+    let on_disk: std::collections::HashSet<String> = std::fs::read_to_string(path_str)
+        .expect("read snapshot")
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|s| s.to_string())
+        .collect();
+
+    // Live bare-name callables: no sigil prefix, no `::` qualifier.
+    let live = eval_string(
+        r#"join "\n", grep { !/[\$\@\%\&:]/ } lsp_completion_words"#,
+    );
+    let missing: Vec<&str> = live
+        .lines()
+        .map(str::trim)
+        .filter(|n| !n.is_empty() && !on_disk.contains(*n))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "{} live bare-name builtin(s) missing from the linter snapshot \
+         ({path_str}); the linter will flag these as undefined subs — \
+         regenerate the file. First few: {:?}",
+        missing.len(),
+        &missing[..missing.len().min(20)],
+    );
+}
+
 // ── %all + lsp_words drift sanity ────────────────────────────────────────────
 
 /// New builtins added in this session must show up everywhere — pin
