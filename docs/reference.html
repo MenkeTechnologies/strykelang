@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.31 · 10339 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.32 · 10364 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -332,7 +332,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8588</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8613</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
@@ -8287,13 +8287,17 @@ p $^A
       <p class="chapter-meta">28 topics</p>
       <article class="doc-entry" id="doc-template">
         <h3><a class="doc-anchor" href="#doc-template">#</a> <code>template</code></h3>
-        <p>Render a Mustache-subset template at runtime against a hashref of variables. Unlike compile-time <code>#{}</code> interpolation, the template is a value — it can be read from a file, config, or built dynamically. <code>{{key}}</code> interpolates (empty if missing); <code>{{#key}}…{{/key}}</code> is a section (array repeats the block with <code>{{.}}</code> as the element; truthy hashref renders once in its scope; falsy/empty skips); <code>{{^key}}…{{/key}}</code> is inverted; <code>{{!…}}</code> is a comment.</p>
+        <p>Render a template string at runtime against a hashref of variables — one EJS-shaped engine with two tag families. DATA (Mustache): <code>{{key}}</code> interpolates (empty if missing); <code>{{#key}}…{{/key}}</code> is a section (array repeats the block with <code>{{.}}</code> as the element; truthy hashref renders once in its scope; falsy/empty skips); <code>{{^key}}…{{/key}}</code> is inverted; <code>{{!…}}</code> is a comment. CODE (stryke): <code>&lt;% stmt %&gt;</code> runs (no output), <code>&lt;%= expr %&gt;</code> evaluates into the output, <code>&lt;%- … -%&gt;</code> trims surrounding whitespace, <code>&lt;%# … %&gt;</code> is a comment. Both families work in the same template; the variables&#39; top-level keys are also visible as <code>$scalars</code> to <code>&lt;% %&gt;</code> code. <code>&lt;%=</code> is raw (not HTML-escaped) — call <code>web_h(...)</code> to escape. Same engine the web view layer uses, available in any string (codegen, config, reports, email bodies).</p>
         <pre><code class="lang-perl">p template(&quot;Hi {{name}}!&quot;, {name =&gt; &quot;Ada&quot;})            # Hi Ada!
 val $rows = [{n=&gt;&quot;a&quot;}, {n=&gt;&quot;b&quot;}]
 p template(&quot;{{#rows}}- {{n}}\n{{/rows}}&quot;, {rows =&gt; $rows})
 # - a
 # - b
 p template(&quot;{{^items}}empty{{/items}}&quot;, {items =&gt; []})  # empty
+p template(&#39;&lt;% for val $i (1:3) { %&gt;[&lt;%= $i %&gt;]&lt;% } %&gt;&#39;, {})  # [1][2][3]
+p template(&#39;total: &lt;%= $a + $b %&gt;&#39;, {a =&gt; 2, b =&gt; 3})  # total: 5
+# single-quote templates that contain `$vars` so the outer interpreter
+# does not interpolate them before `template` runs.
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-deburr">
@@ -13191,7 +13195,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8588 topics</p>
+      <p class="chapter-meta">8613 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -15688,6 +15692,24 @@ p arithser(2, 3, 10)     # 155 (2+5+8+...+29)
         <h3><a class="doc-anchor" href="#doc-arpad-predict">#</a> <code>arpad_predict</code></h3>
         <p><code>arpad_predict(rating_a, rating_b) → number</code> — A&#39;s expected win rate via Elo formula: <code>1 / (1 + 10^((rb-ra)/400))</code>.</p>
         <pre><code class="lang-perl">p arpad_predict(1900, 1500)  # 0.909
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-arraylistof">
+        <h3><a class="doc-anchor" href="#doc-arraylistof">#</a> <code>arrayListOf</code></h3>
+        <p><code>arrayListOf</code> — operation <code>arrayListOf</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p arrayListOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-arrayof">
+        <h3><a class="doc-anchor" href="#doc-arrayof">#</a> <code>arrayOf</code></h3>
+        <p><code>arrayOf</code> — operation <code>arrayOf</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p arrayOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-arrayofnulls">
+        <h3><a class="doc-anchor" href="#doc-arrayofnulls">#</a> <code>arrayOfNulls</code></h3>
+        <p><code>arrayOfNulls</code> — operation <code>arrayOfNulls</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p arrayOfNulls $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-array-agg">
@@ -27761,6 +27783,36 @@ p elu(-1)    # -0.632
         <pre><code class="lang-perl">p empc $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-emptyarray">
+        <h3><a class="doc-anchor" href="#doc-emptyarray">#</a> <code>emptyArray</code></h3>
+        <p><code>emptyArray</code> — operation <code>emptyArray</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p emptyArray $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emptylist">
+        <h3><a class="doc-anchor" href="#doc-emptylist">#</a> <code>emptyList</code></h3>
+        <p><code>emptyList</code> — operation <code>emptyList</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p emptyList $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emptymap">
+        <h3><a class="doc-anchor" href="#doc-emptymap">#</a> <code>emptyMap</code></h3>
+        <p><code>emptyMap</code> — operation <code>emptyMap</code>. Alias for <code>mapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p emptyMap $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emptysequence">
+        <h3><a class="doc-anchor" href="#doc-emptysequence">#</a> <code>emptySequence</code></h3>
+        <p><code>emptySequence</code> — operation <code>emptySequence</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p emptySequence $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-emptyset">
+        <h3><a class="doc-anchor" href="#doc-emptyset">#</a> <code>emptySet</code></h3>
+        <p><code>emptySet</code> — operation <code>emptySet</code>. Alias for <code>setOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p emptySet $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-empty-clj">
         <h3><a class="doc-anchor" href="#doc-empty-clj">#</a> <code>empty_clj</code></h3>
         <p><code>empty_clj</code> — operation <code>empty clj</code>. Category: *algebraic match*.</p>
@@ -28244,7 +28296,7 @@ p erf(2)    # ~0.995
       <article class="doc-entry" id="doc-escape-velocity">
         <h3><a class="doc-anchor" href="#doc-escape-velocity">#</a> <code>escape_velocity</code></h3>
         <p><code>escape_velocity($mass, $radius)</code> (alias <code>escvel</code>) — minimum velocity to escape gravitational field: v = √(2GM/r). Defaults to Earth values.</p>
-        <pre><code class="lang-perl">p escvel                        # ~11208 m/s (Earth)
+        <pre><code class="lang-perl">p escvel                        # ~11186 m/s (Earth)
 p escvel(1.989e30, 6.96e8)      # ~617 km/s (Sun)
 </code></pre>
       </article>
@@ -33264,6 +33316,18 @@ p harmonic(100)  # 5.1874
         <pre><code class="lang-perl">p hascyc $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-hashmapof">
+        <h3><a class="doc-anchor" href="#doc-hashmapof">#</a> <code>hashMapOf</code></h3>
+        <p><code>hashMapOf</code> — operation <code>hashMapOf</code>. Alias for <code>mapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p hashMapOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hashsetof">
+        <h3><a class="doc-anchor" href="#doc-hashsetof">#</a> <code>hashSetOf</code></h3>
+        <p><code>hashSetOf</code> — operation <code>hashSetOf</code>. Alias for <code>setOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p hashSetOf $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-hash-2d-int">
         <h3><a class="doc-anchor" href="#doc-hash-2d-int">#</a> <code>hash_2d_int</code></h3>
         <p><code>hash_2d_int(x, y) → int</code> — fast deterministic spatial hash on 32-bit integer coordinates.</p>
@@ -35636,12 +35700,6 @@ class Item impl Printable {
         <h3><a class="doc-anchor" href="#doc-inits-str">#</a> <code>inits_str</code></h3>
         <p><code>inits_str</code> — operation <code>inits str</code>. Alias for <code>initials</code>. Category: *string processing extras*.</p>
         <pre><code class="lang-perl">p inits_str $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-inject">
-        <h3><a class="doc-anchor" href="#doc-inject">#</a> <code>inject</code></h3>
-        <p><code>inject</code> — operation <code>inject</code>. Category: *functional / iterator*.</p>
-        <pre><code class="lang-perl">p inject $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-inrng">
@@ -39597,6 +39655,12 @@ p $u-&gt;{name}                           # Alice
         <pre><code class="lang-perl">p kwh_to_joules $value
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-l">
+        <h3><a class="doc-anchor" href="#doc-l">#</a> <code>l</code></h3>
+        <p><code>l</code> — operation <code>l</code>. Alias for <code>count</code>. Category: *functional / iterator*.</p>
+        <pre><code class="lang-perl">p l $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-l1-coherence">
         <h3><a class="doc-anchor" href="#doc-l1-coherence">#</a> <code>l1_coherence</code></h3>
         <p><code>l1_coherence</code> — operation <code>l1 coherence</code>. Category: *quantum mechanics deep*.</p>
@@ -40478,6 +40542,18 @@ p @$pt   # (0.5, 0.5)
         <pre><code class="lang-perl">p linf_norm $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-linkedmapof">
+        <h3><a class="doc-anchor" href="#doc-linkedmapof">#</a> <code>linkedMapOf</code></h3>
+        <p><code>linkedMapOf</code> — operation <code>linkedMapOf</code>. Alias for <code>mapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p linkedMapOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-linkedsetof">
+        <h3><a class="doc-anchor" href="#doc-linkedsetof">#</a> <code>linkedSetOf</code></h3>
+        <p><code>linkedSetOf</code> — operation <code>linkedSetOf</code>. Alias for <code>setOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p linkedSetOf $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-linking-number-two">
         <h3><a class="doc-anchor" href="#doc-linking-number-two">#</a> <code>linking_number_two</code></h3>
         <p><code>linking_number_two</code> — operation <code>linking number two</code>. Category: *econometrics*.</p>
@@ -40506,6 +40582,18 @@ p @$pt   # (0.5, 0.5)
         <h3><a class="doc-anchor" href="#doc-liquefaction-potential-index">#</a> <code>liquefaction_potential_index</code></h3>
         <p><code>liquefaction_potential_index</code> — index of <code>liquefaction potential</code>. Category: *geology, seismology, mineralogy*.</p>
         <pre><code class="lang-perl">p liquefaction_potential_index $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-listof">
+        <h3><a class="doc-anchor" href="#doc-listof">#</a> <code>listOf</code></h3>
+        <p><code>listOf</code> — operation <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p listOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-listofnotnull">
+        <h3><a class="doc-anchor" href="#doc-listofnotnull">#</a> <code>listOfNotNull</code></h3>
+        <p><code>listOfNotNull</code> — operation <code>listOfNotNull</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p listOfNotNull $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-list-coloring-step">
@@ -41826,6 +41914,12 @@ keys %main:: |&gt; sort |&gt; p                    # browse every top-level name
         <h3><a class="doc-anchor" href="#doc-manpage">#</a> <code>manpage</code></h3>
         <p><code>manpage</code> — operation <code>manpage</code>. Alias for <code>man</code>. Category: *shell-like repl (tier s)*.</p>
         <pre><code class="lang-perl">p manpage $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mapof">
+        <h3><a class="doc-anchor" href="#doc-mapof">#</a> <code>mapOf</code></h3>
+        <p><code>mapOf</code> — operation <code>mapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p mapOf $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-map-bp">
@@ -45167,6 +45261,24 @@ p powmod(3, 13, 50)    # 7
         <h3><a class="doc-anchor" href="#doc-murmurhash3-x32">#</a> <code>murmurhash3_x32</code></h3>
         <p><code>murmurhash3_x32</code> — operation <code>murmurhash3 x32</code>. Category: *misc*.</p>
         <pre><code class="lang-perl">p murmurhash3_x32 $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutablelistof">
+        <h3><a class="doc-anchor" href="#doc-mutablelistof">#</a> <code>mutableListOf</code></h3>
+        <p><code>mutableListOf</code> — operation <code>mutableListOf</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p mutableListOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutablemapof">
+        <h3><a class="doc-anchor" href="#doc-mutablemapof">#</a> <code>mutableMapOf</code></h3>
+        <p><code>mutableMapOf</code> — operation <code>mutableMapOf</code>. Alias for <code>mapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p mutableMapOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-mutablesetof">
+        <h3><a class="doc-anchor" href="#doc-mutablesetof">#</a> <code>mutableSetOf</code></h3>
+        <p><code>mutableSetOf</code> — operation <code>mutableSetOf</code>. Alias for <code>setOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p mutableSetOf $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-mutation-bit-flip-prob">
@@ -56312,6 +56424,12 @@ var @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <pre><code class="lang-perl">p seq_logo_information $x
 </code></pre>
       </article>
+      <article class="doc-entry" id="doc-sequenceof">
+        <h3><a class="doc-anchor" href="#doc-sequenceof">#</a> <code>sequenceOf</code></h3>
+        <p><code>sequenceOf</code> — operation <code>sequenceOf</code>. Alias for <code>listOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p sequenceOf $x
+</code></pre>
+      </article>
       <article class="doc-entry" id="doc-sequence-identity-pct">
         <h3><a class="doc-anchor" href="#doc-sequence-identity-pct">#</a> <code>sequence_identity_pct</code></h3>
         <p><code>sequence_identity_pct(a, b) → number</code> — percent of position-matched characters in aligned sequences.</p>
@@ -56356,6 +56474,12 @@ var @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <h3><a class="doc-anchor" href="#doc-servo-torque-step">#</a> <code>servo_torque_step</code></h3>
         <p><code>servo_torque_step</code> — single-step update of <code>servo torque</code>. Category: *robotics &amp; control*.</p>
         <pre><code class="lang-perl">p servo_torque_step $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-setof">
+        <h3><a class="doc-anchor" href="#doc-setof">#</a> <code>setOf</code></h3>
+        <p><code>setOf</code> — operation <code>setOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p setOf $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-set-at">
@@ -57886,6 +58010,18 @@ p softplus(10)  # ≈ 10
         <h3><a class="doc-anchor" href="#doc-sorted">#</a> <code>sorted</code></h3>
         <p><code>sorted</code> — operation <code>sorted</code>. Category: *file stat / path*.</p>
         <pre><code class="lang-perl">p sorted $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sortedmapof">
+        <h3><a class="doc-anchor" href="#doc-sortedmapof">#</a> <code>sortedMapOf</code></h3>
+        <p><code>sortedMapOf</code> — operation <code>sortedMapOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p sortedMapOf $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-sortedsetof">
+        <h3><a class="doc-anchor" href="#doc-sortedsetof">#</a> <code>sortedSetOf</code></h3>
+        <p><code>sortedSetOf</code> — operation <code>sortedSetOf</code>. Category: *kotlin collections*.</p>
+        <pre><code class="lang-perl">p sortedSetOf $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-sorted-by-length">
@@ -63190,6 +63326,24 @@ p wavetable_synth(\@sine, 440, 44100, 0.1)
         <h3><a class="doc-anchor" href="#doc-weave-n">#</a> <code>weave_n</code></h3>
         <p><code>weave_n</code> — operation <code>weave n</code>. Category: *iterator + string-distance extras*.</p>
         <pre><code class="lang-perl">p weave_n $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-tmpl-empty">
+        <h3><a class="doc-anchor" href="#doc-web-tmpl-empty">#</a> <code>web_tmpl_empty</code></h3>
+        <p><code>web_tmpl_empty</code> — operation <code>web tmpl empty</code>. Category: *pipeline / string helpers*.</p>
+        <pre><code class="lang-perl">p web_tmpl_empty $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-tmpl-get">
+        <h3><a class="doc-anchor" href="#doc-web-tmpl-get">#</a> <code>web_tmpl_get</code></h3>
+        <p><code>web_tmpl_get</code> — operation <code>web tmpl get</code>. Category: *pipeline / string helpers*.</p>
+        <pre><code class="lang-perl">p web_tmpl_get $x
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-web-tmpl-section">
+        <h3><a class="doc-anchor" href="#doc-web-tmpl-section">#</a> <code>web_tmpl_section</code></h3>
+        <p><code>web_tmpl_section</code> — operation <code>web tmpl section</code>. Category: *pipeline / string helpers*.</p>
+        <pre><code class="lang-perl">p web_tmpl_section $x
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-weber-number">
