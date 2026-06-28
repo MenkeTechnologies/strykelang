@@ -1324,7 +1324,9 @@ fn main() {
     }
 
     // `stryke docs [TOPIC]` subcommand: built-in documentation browser.
-    if args.len() >= 2 && args[1] == "docs" {
+    // `help` / `h` are aliases, mirroring the `docs`/`help`/`h` builtin
+    // spellings — e.g. `stryke help style` prints the style guide.
+    if args.len() >= 2 && (args[1] == "docs" || args[1] == "help" || args[1] == "h") {
         process::exit(run_doc_subcommand(&args[2..]));
     }
 
@@ -4168,6 +4170,18 @@ fn run_doc_subcommand(args: &[String]) -> i32 {
                     topic_entry_idx = Some(eidx);
                 }
                 None => {
+                    // Not a registered browsing page, but it may still
+                    // have hover/doc text (e.g. the `style-guide` /
+                    // `styleguide` aliases of the `style` topic). Render
+                    // it directly, `man`-style, before giving up.
+                    if let Some(text) = stryke::lsp::doc_text_for(&resolved) {
+                        let rendered = render_page_content(&resolved, text, C, G, D, N);
+                        print!("{}", rendered);
+                        if !rendered.ends_with('\n') {
+                            println!();
+                        }
+                        return 0;
+                    }
                     eprintln!("stryke docs: no documentation for '{}'", arg);
                     eprintln!("run 'stryke docs -h' for help");
                     return 1;

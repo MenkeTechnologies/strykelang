@@ -7782,6 +7782,17 @@ thread_local! {
 /// from the reflection `CATEGORY_MAP` so every builtin has at least a
 /// one-liner hover.
 pub fn doc_text_for(label: &str) -> Option<&'static str> {
+    // The style guide is a first-class doc topic, served verbatim from
+    // docs/STYLE_GUIDE.md so `stryke help style` / `stryke docs style`
+    // and the `help("style")` builtin all render the same source. Match
+    // before the hand-written/auto-stub paths so none of them can shadow
+    // these spellings.
+    match label {
+        "style" | "style-guide" | "styleguide" | "style_guide" => {
+            return Some(include_str!("../docs/STYLE_GUIDE.md"));
+        }
+        _ => {}
+    }
     // Hand-written entry takes priority.
     if let Some(md) = doc_for_label_text(label) {
         return Some(md);
@@ -7831,6 +7842,7 @@ pub fn doc_topics() -> Vec<&'static str> {
 /// is (chapter name, topic names); topics must match `doc_for_label_text`
 /// keys or the generator will skip them.
 pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
+    ("Style Guide", &["style"]),
     (
         "Parallel Primitives",
         &[
