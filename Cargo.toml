@@ -10,7 +10,10 @@ homepage = "https://menketechnologies.github.io/strykelang/"
 documentation = "https://docs.rs/strykelang"
 keywords = ["perl", "interpreter", "scripting", "vm", "parallel"]
 categories = ["compilers", "command-line-utilities"]
-exclude = ["/parity/", "/.github/", "/examples/", "/bench/", "/benches/", "/docs/", "/scripts/", "/vendor/", "/tools/", "/fuzz/", "/tests/", "/.github/"]
+# `/docs/` is excluded (5 MB of fonts/HTML) except STYLE_GUIDE.md, which
+# `strykelang/lsp.rs` embeds via include_str! for the `style` doc topic — it
+# must ship in the published crate or the build breaks.
+exclude = ["/parity/", "/.github/", "/examples/", "/bench/", "/benches/", "/docs/*", "/docs/.fonts/", "/docs/rfcs/", "!/docs/STYLE_GUIDE.md", "/scripts/", "/vendor/", "/tools/", "/fuzz/", "/tests/", "/.github/"]
 autobins = false
 
 [lib]
