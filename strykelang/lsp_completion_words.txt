@@ -21162,6 +21162,7 @@ stulz_min_call
 stun
 stun_classify
 sturmian_word
+style
 sub
 sub_script
 subfact
