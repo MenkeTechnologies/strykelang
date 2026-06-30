@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~479k-line Rust slice (production + tests + tooling), 10,453 builtins (11,229 keys in %all), 347-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~479k-line Rust slice (production + tests + tooling), 10,453 builtins (11,229 keys in %all), 351-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -352,7 +352,7 @@ s 'p to_yaml read_json "data.json"'</pre>
         <h3>Diagnostics &amp; tab-complete dump</h3>
         <div class="oneliner">s 'doctor'                                                  <span class="comment"># runtime health: version, flags, paths, toolchain (returns warning count)</span></div>
         <div class="oneliner">s 'health'                                                  <span class="comment"># alias of doctor</span></div>
-        <div class="oneliner">s 'lsp_words |&gt; ep'                                       <span class="comment"># every name LSP tab-complete knows about (~18k entries)</span></div>
+        <div class="oneliner">s 'lsp_words |&gt; ep'                                       <span class="comment"># every name LSP tab-complete knows about (~22k entries)</span></div>
         <div class="oneliner">s 'lsp_words |&gt; ep' &gt; strykelang/lsp_completion_words.txt   <span class="comment"># regenerate the static-analyzer / completion snapshot</span></div>
         <div class="oneliner">s 'p len(lsp_words)'                                        <span class="comment"># count: bare names + sigil globals + CORE:: + main:: + keywords</span></div>
         <div class="oneliner">s 'p now'                                                  <span class="comment"># Unix epoch seconds (alias of time)</span></div>
