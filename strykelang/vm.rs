@@ -10200,7 +10200,7 @@ pub unsafe extern "C" fn stryke_jit_call_sub(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytecode::{Chunk, Op};
+    use crate::bytecode::{BuiltinId, Chunk, Op};
     use crate::value::StrykeValue;
 
     fn run_chunk(chunk: &Chunk) -> StrykeResult<StrykeValue> {

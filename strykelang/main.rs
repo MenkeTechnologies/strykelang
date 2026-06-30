@@ -3246,9 +3246,13 @@ fn run_build_subcommand(args: &[String]) -> i32 {
     let mut project_dir: Option<String> = None;
     let mut out: Option<String> = None;
     let mut mcp_server = false;
+    let mut native = false;
     let mut i = 0usize;
     while i < args.len() {
         match args[i].as_str() {
+            "--native" | "-n" => {
+                native = true;
+            }
             "-o" | "--output" => {
                 i += 1;
                 if i >= args.len() {
@@ -3284,6 +3288,10 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 println!("no perl, no stryke, no @INC setup required.");
                 println!();
                 println!("Options:");
+                println!("  --native, -n     Compile to native machine code via fusevm's Cranelift");
+                println!("                   AOT (no embedded source). Covers the arithmetic/string/");
+                println!("                   scalar/array/hash/print subset; needs libstryke.a beside");
+                println!("                   stryke (or $STRYKE_AOT_RUNTIME_LIB).");
                 println!("  --project DIR    Bundle main.stk + lib/*.stk (excludes t/ tests)");
                 println!("  --mcp-server     Wrap as an MCP server: after running the user's");
                 println!("                   script (which calls `tool fn ...`), the binary");
@@ -3329,6 +3337,11 @@ fn run_build_subcommand(args: &[String]) -> i32 {
         script
     };
 
+    if native && project_dir.is_some() {
+        eprintln!("stryke build --native: not supported with --project (single SCRIPT only)");
+        return 2;
+    }
+
     if let Some(dir) = project_dir {
         let project_path = PathBuf::from(&dir);
         let out_path = PathBuf::from(out.unwrap_or_else(|| {
@@ -3361,7 +3374,14 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "a.out".to_string())
         }));
-        match stryke::aot::build(&script_path, &out_path) {
+        let result = if native {
+            // Native AOT: lower to a fusevm chunk, compile to a Cranelift object,
+            // link against libstryke.a. Covers the self-contained subset only.
+            stryke::aot_native::build_native(&script_path, &out_path)
+        } else {
+            stryke::aot::build(&script_path, &out_path)
+        };
+        match result {
             Ok(p) => {
                 eprintln!("stryke build: wrote {}", p.display());
                 0

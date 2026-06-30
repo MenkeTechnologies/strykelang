@@ -15,6 +15,8 @@ pub mod ai_sugar;
 pub mod aop;
 /// `aot` submodule.
 pub mod aot;
+/// `aot_native` submodule: `stryke build --native` (fusevm Cranelift AOT).
+pub mod aot_native;
 /// `ast` submodule.
 pub mod ast;
 /// `banner` submodule.
