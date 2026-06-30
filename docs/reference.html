@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.33 · 10364 topics · 166 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.33 · 10365 topics · 167 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -167,6 +167,7 @@
     <section class="tutorial-section">
       <h2>Chapters</h2>
       <ul class="chapter-index">
+        <li><a href="#ch-style-guide">Style Guide</a> <span class="chapter-count">1</span></li>
         <li><a href="#ch-parallel-primitives">Parallel Primitives</a> <span class="chapter-count">20</span></li>
         <li><a href="#ch-shared-state-concurrency">Shared State &amp; Concurrency</a> <span class="chapter-count">12</span></li>
         <li><a href="#ch-pipeline-pipe-forward">Pipeline &amp; Pipe-Forward</a> <span class="chapter-count">13</span></li>
@@ -334,6 +335,295 @@
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-other">Other</a> <span class="chapter-count">8613</span></li>
       </ul>
+    </section>
+    <section class="tutorial-section" id="ch-style-guide">
+      <h2>Style Guide</h2>
+      <p class="chapter-meta">1 topics</p>
+      <article class="doc-entry" id="doc-style">
+        <h3><a class="doc-anchor" href="#doc-style">#</a> <code>style</code></h3>
+        <p># stryke style guide</p>
+        <p>Authoritative idioms for stryke source. The principle behind every rule: <strong>min chars win</strong>. stryke is the power-user language; every design call defaults to the terser form, no newbie concessions, no optional verbosity.</p>
+        <p>Every example pair is <strong>DO / DON&#39;T</strong> with one-line rationale. The DON&#39;T side is valid stryke (so old Perl ports keep parsing) — but new code that uses it is wrong on style, and <code>--no-interop</code> rejects most of it at parse time as a forcing function.</p>
+        <p>---</p>
+        <h4>0. The ten hard rules</h4>
+        <p>Every other idiom is downstream of these. If a piece of stryke code violates any of them, it is wrong style, full stop.</p>
+        <p>1. <strong><code>fn</code> not <code>sub</code>.</strong> <code>sub</code> is Perl 5 baggage and is rejected by <code>--no-interop</code>. 2. <strong><code>p</code> not <code>print</code>, never <code>say</code>.</strong> <code>p</code> is the stryke verb, has the record separator built in, costs one character. <code>say</code> is rejected by <code>--no-interop</code>. 3. <strong>Use <code>|&gt;</code> / <code>~&gt;</code> over nested calls.</strong> <code>f(g(h(x)))</code> reads inside-out; <code>x |&gt; h |&gt; g |&gt; f</code> reads left-to-right and shows up at the call site without diving the cursor through three closing parens. <strong>Always pipeline.</strong> 4. <strong>No semicolons at end of line.</strong> stryke statement-terminates on newline. Trailing <code>;</code> is noise that visually weights every line. The only place <code>;</code> belongs is <strong>between statements on the same line</strong> (rare, e.g. C-style <code>for</code> headers): <code>for ($i = 0; $i &lt; 10; $i++)</code>. 5. <strong>Implicit closure parameters always.</strong> Never write <code>sub { my $x = shift; … }</code> or <code>fn { my ($a, $b) = @_; … }</code>. Use <code>_</code> for slot 0 and <code>_N</code> for slot N. Named params are only correct when the closure is a real top-level <code>fn</code> whose arity &gt; 2 *and* the names carry meaning. 6. <strong>Expression-bodied <code>fn</code> for one-liners.</strong> <code>fn double = _ * 2</code> over <code>fn double($a) { $a * 10 }</code> over <code>fn double { _ * 2 }</code>. No braces, no named param, implicit topic. The block form is for multi-statement bodies only. 7. <strong>Implicit return — never <code>return</code> on the tail expression.</strong> The last expression in any <code>fn</code> body, arrow-block, or expression-position block IS the return value. <code>return</code> is <strong>only</strong> correct as an early-return guard (<code>return undef if $err</code>). Writing <code>return $x</code> at the bottom of a body is noise. 8. <strong>No parens on fn calls unless precedence demands them.</strong> stryke calls take args list-operator-style. <code>p &quot;hello&quot;</code>, <code>len @a</code>, <code>uc rev &quot;abc&quot;</code> — paren-less. Add parens <strong>only</strong> when the call is followed by an operator that would re-bind (<code>len(@a) &gt; 1</code>), when nesting needs disambiguation, or when an empty arg list is the intent (<code>time()</code>). 9. <strong>No trailing <code>1</code> (or any sentinel truthy value) at the end of a library / module file.</strong> That&#39;s Perl 5&#39;s <code>package returns true</code> ritual — <code>require</code> there demanded the last evaluated expression be truthy, so every <code>.pm</code> ended in <code>1;</code>. stryke <code>use</code>/<code>import</code> resolution does not consult the file&#39;s tail expression, so the <code>1</code> is pure noise inherited from CPAN muscle memory. Library files end at the last <code>fn</code> (or <code>class</code> / <code>const</code>) definition. <code>--no-interop</code> rejects a bare-integer tail expression in module position. 10. <strong><code>val</code> for immutable, <code>var</code> for mutable — never bare <code>my</code> in new code.</strong> stryke flips Perl 5&#39;s mutable-by-default <code>my</code> into Scala/Kotlin-style immutable-by-default: <code>val</code> marks the binding *frozen* at compile time (reassignment, push/pop, <code>$x[i] =</code>, <code>$h{k} =</code>, <code>delete $h{k}</code> all error at compile time, not run time); <code>var</code> is the mutable counterpart. Both desugar to <code>my</code> in the AST — same scope, same bytecode, same slot allocation — so the cost is zero. Default to <code>val</code>; reach for <code>var</code> only when you actually mutate. <code>val</code> also accepts a type annotation (<code>val $port : Int = 8080</code>). <code>for val $x (LIST)</code> and <code>for var $x (LIST)</code> both work — use <code>for val</code> unless the loop body reassigns the iterator (almost never). Bare <code>my</code> stays valid for CPAN ports (it&#39;s what Perl 5 spells), but new stryke code wrong-on-style; <code>--no-interop</code> rejects it.</p>
+        <pre><code class="lang-stryke"># RIGHT — fn, p, pipeline, no semicolons, implicit params, expression-body, implicit return
+fn shout = uc(_) . &quot;!&quot;
+@lines |&gt; maps { trim(_) |&gt; shout } |&gt; greps { len(_) &gt; 0 } |&gt; ep
+
+# WRONG — every rule violated
+sub shout { my $s = shift; return uc($s) . &quot;!&quot;; }
+for my $line (@lines) {
+    my $trimmed = trim($line);
+    my $upper   = shout($trimmed);
+    if (length($upper) &gt; 0) {
+        print &quot;$upper\n&quot;;
+    }
+}
+</code></pre>
+        <p>The wrong version is 7× the characters and reads bottom-up because of the <code>for</code> ↔ <code>print</code> distance. Walk the violations: <code>sub</code> (rule 1), <code>print</code> (rule 2), nested <code>length(...)</code> no pipeline (rule 3), trailing <code>;</code> everywhere (rule 4), explicit <code>my $s = shift</code> not implicit <code>_</code> (rule 5), block-bodied <code>fn</code> for a one-liner (rule 6), explicit <code>return</code> on tail (rule 7). All seven, in one wrong shout-and-loop.</p>
+        <p>---</p>
+        <h4>0a. Paren-less calls — list-operator style</h4>
+        <p>stryke is a list-operator language: function args bind right of the function name without parens. <code>p &quot;hello&quot;</code>, <code>len @a</code>, <code>uc rev &quot;abc&quot;</code> are all preferred. Parens are noise unless they&#39;re earning their keep.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>p &quot;hello&quot;</code> | <code>p(&quot;hello&quot;)</code> | Single arg; parens add nothing. | | <code>p $x, $y, $z</code> | <code>p($x, $y, $z)</code> | Multi-arg works the same paren-less. | | <code>len @a</code> | <code>len(@a)</code> | Builtin call; LHS-binds. | | <code>uc rev &quot;abc&quot;</code> | <code>uc(rev(&quot;abc&quot;))</code> | Right-to-left chain reads naturally; no escape parens. | | <code>len(@a) &gt; 1</code> | <code>len @a &gt; 1</code> | <strong>Parens NEEDED</strong> — without them, <code>&gt;</code> rebinds and you get <code>len(@a &gt; 1)</code> which is <code>len(bool)</code> = 0. | | <code>len(keys %h)</code> | <code>len keys %h</code> | Same — keys&#39;s list result needs to be sealed before <code>len</code> can act on it explicitly. | | <code>time()</code> | <code>time</code> | When you genuinely want zero args, <code>()</code> makes the call-vs-bareword intent obvious. |</p>
+        <p>Three legitimate reasons to add parens: 1. <strong>Precedence</strong> — when a binary operator follows the call: <code>len(@a) &gt; 1</code>, <code>uc($s) . &quot;!&quot;</code>. 2. <strong>Disambiguation</strong> — when two adjacent unparenthesized list-ops would slurp each other&#39;s args ambiguously: <code>func1(arg1, arg2), func2(arg3)</code>. 3. <strong>Zero-arg explicit</strong> — <code>time()</code> over <code>time</code> when readers might mistake the bareword for a value lookup.</p>
+        <p>In a pipeline, parens are almost never needed because <code>|&gt;</code> / <code>~&gt;</code> already supply the staging — write <code>$x |&gt; uc |&gt; rev</code> not <code>rev(uc($x))</code> and not <code>($x) |&gt; uc() |&gt; rev()</code>.</p>
+        <p>---</p>
+        <h4>1. Output</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>p $x</code> | <code>print $x</code>, <code>print &quot;$x\n&quot;</code>, <code>say $x</code> | <code>p</code> is the canonical print-with-newline. One char vs five-to-seven. <strong><code>say</code> is rejected by <code>--no-interop</code>.</strong> | | <code>warn &quot;$msg&quot;</code> | <code>print STDERR &quot;$msg\n&quot;</code> | <code>warn</code> is the stryke-and-Perl verb for stderr. Auto-appends <code>\n</code> if the message doesn&#39;t end with one. Catchable via <code>$SIG{__WARN__}</code>. | | <code>@xs \|&gt; e p</code> | <code>for (@xs) { p $_ }</code> | Pipe-forward + <code>e</code> (each) collapses the loop to four chars after the pipe. | | <code>@xs \|&gt; ep</code> | <code>@xs \|&gt; e p</code> | <code>ep</code> = <code>e { p }</code> shorthand. <strong>Goes to stdout, NOT stderr</strong> — name is &quot;each-print&quot;, not &quot;err-print&quot;. | | <code>ddump $struct</code> | <code>use Data::Dumper; print Dumper($struct)</code> | Built-in pretty-printer; one bareword. |</p>
+        <p>---</p>
+        <h4>1a. String interpolation — <code>#{ … }</code> / <code>${ … }</code> over <code>.</code> concat</h4>
+        <p>stryke supports four interpolation forms inside double-quoted strings. <strong>Always interpolate; never build strings with <code>.</code> concatenation when interpolation reaches.</strong></p>
+        <p>| Form | Example | Use when | |---|---|---| | <code>$name</code> | <code>&quot;hello, $name!&quot;</code> | Bare scalar; the cheapest form. | | <code>${name}</code> | <code>&quot;file_${name}.txt&quot;</code> | Bare scalar <strong>with disambiguation</strong> — when adjacent chars would extend the var name (<code>${name}_v2</code>, not <code>$name_v2</code> which looks for <code>$name_v2</code>). | | <code>#{ EXPR }</code> | <code>&quot;x squared is #{$x * $x}&quot;</code>, <code>&quot;sum: #{sum @a}&quot;</code>, <code>&quot;page #{1 + $i}&quot;</code> | Ruby-style interpolation of an <strong>arbitrary expression</strong> — math, function calls, method calls, anything. The only form that&#39;s not just-a-variable. | | <code>@arr</code> | <code>&quot;items: @arr&quot;</code> | Array interpolation (joined by <code>$&quot;</code>, default <code>&quot; &quot;</code>). |</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>&quot;hello, $name!&quot;</code> | <code>&quot;hello, &quot; . $name . &quot;!&quot;</code> | Three concatenations vs zero; reads as one literal. | | <code>&quot;x squared is #{$x * $x}&quot;</code> | <code>&quot;x squared is &quot; . ($x * $x)</code> | <code>#{}</code> lets the expression sit inline; no parens-and-dots dance. | | <code>&quot;sum: #{sum @a}&quot;</code> | <code>&quot;sum: &quot; . sum(@a)</code> | Function calls work in <code>#{}</code>. | | <code>&quot;file_${name}.txt&quot;</code> | <code>&quot;file_&quot; . $name . &quot;.txt&quot;</code> | <code>${}</code> disambiguates when the next char would extend the var name. | | <code>&quot;items: @arr&quot;</code> | <code>&quot;items: &quot; . join(&quot; &quot;, @arr)</code> | Array interpolation auto-joins with <code>$&quot;</code> (default space). |</p>
+        <p><code>.</code> concat is <strong>only</strong> correct when both sides are non-string-literals (<code>$a . $b</code> joining two variables) or when computing a string lazily across statements. Inside a single string-literal context, always interpolate.</p>
+        <pre><code class="lang-stryke"># RIGHT — interpolated
+my $name = &quot;world&quot;
+p &quot;hello, $name!&quot;
+p &quot;sum is #{sum @nums}&quot;
+p &quot;page ${i}_of_${total}&quot;
+
+# WRONG — concatenated
+p &quot;hello, &quot; . $name . &quot;!&quot;
+p &quot;sum is &quot; . sum(@nums)
+p &quot;page &quot; . $i . &quot;_of_&quot; . $total
+</code></pre>
+        <p>---</p>
+        <h4>2. Topic variables</h4>
+        <p>The stryke topic system has four equivalent spellings for slot 0 — pick the shortest that reads in context.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>_</code> (bare) | <code>$_</code> | Sigil-prefixed <code>$_</code> is Perl-ism only needed inside string interpolation; bare <code>_</code> is the stryke calling card. | | <code>_1</code>, <code>_2</code> | <code>$a</code>, <code>$b</code> (outside sort/reduce blocks) | <code>$a</code>/<code>$b</code> are sort/reduce-only magic; <code>_N</code> is universal positional. | | <code>_&lt;</code> (outer) | <code>my $cap = _; …</code> | <code>_&lt;...&lt;</code> chains depth — one <code>&lt;</code> per closure level outward. | | <code>_[3]</code> | <code>substr(_, 3, 1)</code> | <code>_[N]</code> is char-of-topic; alias for <code>_!N!</code>. |</p>
+        <p><strong>Note:</strong> <code>$_[N]</code> (with <code>$</code> and <code>[]</code>) is the legacy Perl <code>@_</code> first-positional-arg, kept for compat. Don&#39;t use in new code; use <code>_N</code> for positional or named params for clarity.</p>
+        <p>---</p>
+        <h4>3. Function definition</h4>
+        <h4>Expression-bodied form (preferred)</h4>
+        <p>For one-liner functions — anything that fits on one line — use the <strong>expression-bodied</strong> form: <code>fn name = &lt;expr&gt;</code>. No braces, no named params, implicit topic.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>fn double = _ * 2</code> | <code>fn double { _ * 2 }</code> | No braces; expression body. Same length saved per definition. | | <code>fn double = _ * 2</code> | <code>fn double($a) { $a * 10 }</code> | Implicit <code>_</code> over named <code>$a</code>; brace-less form. | | <code>fn add = _0 + _1</code> | <code>fn add($a, $b) { $a + $b }</code> | <code>_N</code> over named for arity ≤ 3 unless names carry meaning. | | <code>fn shout = uc(_) . &quot;!&quot;</code> | <code>fn shout { uc(shift) . &quot;!&quot; }</code> | <code>_</code> is the topic; <code>shift</code> is Perl-ism. | | <code>fn area = _0 * _1 \|&gt; int</code> | <code>fn area($w, $h) { return int($w * $h) }</code> | Pipeline + implicit + no return keyword (last expr is the value). |</p>
+        <p>The block-bodied form (<code>fn name { … }</code>) is correct when:</p>
+        <ul>
+          <li>The body is multi-statement and won&#39;t fit on one line</li>
+          <li>Names genuinely document the role (e.g. <code>fn parse_url($scheme, $host, $port, $path)</code>)</li>
+          <li>You need explicit <code>my</code> declarations or control flow inside the function</li>
+        </ul>
+        <p>For one-liners, <strong>always prefer <code>fn name = expr</code></strong>.</p>
+        <h4>Implicit return — never write <code>return</code> unless it&#39;s an early-return</h4>
+        <p>The last expression in a <code>fn</code> body is the return value. <strong>Never write <code>return</code> for the tail expression</strong> — it&#39;s noise, and it visually hides the actual value the function produces.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>fn area = _0 * _1</code> | <code>fn area($w, $h) { return $w * $h }</code> | Tail position auto-returns. | | <code>fn classify { … last expr … }</code> | <code>fn classify { … return last_expr }</code> | Same; block bodies too. | | <code>fn find_first { for (@_) { return $_ if /good/ } undef }</code> | (no DON&#39;T) | <strong>Early-return is the only legitimate use of <code>return</code>.</strong> Use it freely for guard clauses and early exits — never for the tail. |</p>
+        <pre><code class="lang-stryke"># RIGHT — implicit return, expression-bodied where possible
+fn double = _ * 2
+fn shout  = uc(_) . &quot;!&quot;
+fn area   = _0 * _1
+
+fn classify($n) {
+    return &quot;zero&quot;     if $n == 0       # early return: legit
+    return &quot;negative&quot; if $n &lt; 0        # early return: legit
+    $n &lt; 10 ? &quot;small&quot; : &quot;big&quot;          # tail expression: NO return keyword
+}
+
+# WRONG — explicit return on tail
+fn double($x) { return $x * 2 }
+fn classify($n) {
+    if ($n == 0) { return &quot;zero&quot; }
+    if ($n &lt; 0)  { return &quot;negative&quot; }
+    return $n &lt; 10 ? &quot;small&quot; : &quot;big&quot;
+}
+</code></pre>
+        <p>The same rule applies inside arrow-blocks (<code>&gt;{ … }</code>), <code>if</code>/<code>else</code> arms, <code>match</code> arms, and any other expression-position block.</p>
+        <h4>Other rules</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>fn double = _ * 2</code> | <code>sub double { $_[0] * 2 }</code> | <code>fn</code> opens the topic-var protocol; <strong><code>sub</code> is rejected by <code>--no-interop</code></strong>. Always <code>fn</code>. | | <code>fn Rosetta::Foo::helper = …</code> | <code>fn helper = …</code> (when <code>helper</code> is a builtin) | Never shadow a builtin; namespace under <code>Module::Sub::name</code>. |</p>
+        <p>Builtin-shadowing is a hard rule — <code>fn close</code>, <code>fn log</code>, <code>fn cos</code>, <code>fn open</code> etc. all will abort when overriding the runtime function. Use a namespace (<code>MyApp::close</code>) or pick a different name.</p>
+        <p>---</p>
+        <h4>4. Ranges</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>1:10</code> | <code>1..10</code> | <code>:</code> is the stryke polymorphic range; works for ints, chars, dates, IPs, romans. | | <code>&#39;a&#39;:&#39;z&#39;</code> | <code>&#39;a&#39;..&#39;z&#39;</code> | Same operator, type-inferred from literals. | | <code>1:100:5</code> | — | Optional step is the third colon. |</p>
+        <p><strong>Eager <code>:</code> vs lazy <code>range()</code> — both valid, different semantics.</strong> The colon range is <strong>eager</strong>: <code>1:N</code> materializes the whole list at once. The <code>range()</code> builtin is the <strong>lazy</strong> counterpart: <code>range(start, end[, step])</code> yields values on demand, so <code>range(1, 1e9) |&gt; take 3</code> is instant and constant-memory where <code>(1:1e9) |&gt; take 3</code> builds a billion-element list first. They are two range forms with different evaluation, not a right/wrong pair — reach for <code>range()</code> when you want laziness (very large or streamed spans, early <code>take</code>, pipeline chains) and <code>:</code> for ordinary eager spans.</p>
+        <p>---</p>
+        <h4>5. Length / count — <code>len</code> always</h4>
+        <p><code>len</code> is the <strong>one</strong> stryke verb for length/count. It works on strings, arrays, hashes, sets, iterators, and anything else with a measurable size. Never reach for <code>length</code>, <code>scalar</code>, or <code>0 +</code> numeric coercion — they&#39;re all Perl-isms with separate type-specific quirks that <code>len</code> collapses into one bareword.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>len($s)</code> | <code>length($s)</code> | <code>length</code> is Perl 5; <code>len</code> is three chars and unifies with array/hash forms. | | <code>len(@arr)</code> | <code>scalar(@arr)</code> | <code>scalar</code> is a context-coercion verb, not a length verb — wrong tool. | | <code>len(keys %h)</code> | <code>scalar(keys %h)</code>, <code>0 + keys %h</code> | Same call shape, no implicit-numeric tricks. | | <code>len(%h)</code> | <code>scalar(keys %h)</code> | Hash → key count directly. | | <code>len($iter)</code> | manually drain the iterator and count | Lazy iterator&#39;s known-size case is one call. | | <code>unpack_first(...)</code> | <code>scalar(unpack(...))</code> | Use the explicit non-list builtin instead of forcing scalar context for first-element. |</p>
+        <p>Aliases: <code>cnt</code>, <code>count</code> — same builtin. Use <code>len</code> by default; <code>cnt</code>/<code>count</code> are accepted in code where &quot;count&quot; reads more naturally (<code>pgrep { … } |&gt; cnt</code>).</p>
+        <p><strong>Both <code>length</code> and <code>scalar</code> are rejected by <code>--no-interop</code>.</strong> There&#39;s a stryke replacement for every Perl 5 use of either:</p>
+        <p>| Perl 5 | stryke | |---|---| | <code>length $s</code> | <code>len($s)</code> | | <code>scalar @arr</code> | <code>len(@arr)</code> | | <code>scalar keys %h</code> | <code>len(keys %h)</code> or <code>len(%h)</code> | | <code>scalar(unpack ...)</code> | <code>unpack_first(...)</code> | | <code>scalar(@arr) &gt; 0</code> | <code>len(@arr) &gt; 0</code>, or just <code>@arr</code> in boolean context | | <code>0 + @arr</code> | <code>len(@arr)</code> |</p>
+        <p>---</p>
+        <h4>6. Reverse / rev</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>rev @xs</code> | <code>reverse @xs</code> | Three chars vs seven. | | <code>rev &quot;abc&quot;</code> | <code>reverse &quot;abc&quot;</code> | Same; works on scalars too. |</p>
+        <p>---</p>
+        <h4>6a. String / array slicing — <code>[N:M]</code> not <code>substr</code></h4>
+        <p>stryke uses bracket-indexing with the <code>:</code> range operator for substring extraction. <strong>Never call <code>substr</code> on a stryke value.</strong> <code>[]</code> slicing is one syntactic form for both strings and arrays.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>$s[1]</code> | <code>substr($s, 1, 1)</code> | Single-char index. | | <code>$s[1:3]</code> | <code>substr($s, 1, 3)</code> | Slice from index 1 through index 3 <strong>inclusive</strong>. | | <code>$s[-1]</code> | <code>substr($s, -1, 1)</code> | Last char. Negative indexing built in. | | <code>$s[-3:-1]</code> | <code>substr($s, -3, 3)</code> | Last three chars. | | <code>@arr[2:5]</code> | <code>@arr[2..5]</code> | Array slicing uses the same <code>:</code> range op as everywhere else. |</p>
+        <p><strong>Important semantic difference vs Perl <code>substr</code>:</strong> stryke&#39;s <code>[N:M]</code> is <strong>inclusive on both ends</strong>. <code>$s[1:3]</code> returns 3 chars (indices 1, 2, 3). Perl&#39;s <code>substr($s, 1, 3)</code> returns 3 chars starting at index 1 (length-based). Same result for that example, but the mental model is different and they diverge for any range that crosses an end:</p>
+        <pre><code class="lang-stryke">my $s = &quot;hello&quot;
+p $s[1:3]              # &quot;ell&quot;  — chars 1, 2, 3 inclusive
+p substr($s, 1, 3)     # &quot;ell&quot;  — start=1, len=3 (Perl-style; works in compat mode)
+p $s[1:99]             # &quot;ello&quot; — clamps to end gracefully; Perl would warn
+</code></pre>
+        <p><strong>Open-ended slices</strong> are supported,  so <code>$s[2:]</code> reads as &quot;from index 2 to end&quot; and <code>$s[0:N]</code> reads as &quot;from start to N&quot;:</p>
+        <pre><code class="lang-stryke">my $s = &quot;hello&quot;
+p $s[2:]              # &quot;llo&quot;  — index 2 through last
+p $s[0:2]               # &quot;hel&quot;  — start through index 2
+p $s[-3:]             # &quot;llo&quot;  — last 3 chars
+</code></pre>
+        <p>For arrays, the open-ended bracket forms also work directly:</p>
+        <pre><code class="lang-stryke">my @a = (10, 20, 30, 40, 50)
+p @a[2:]                # 30, 40, 50  — from index 2 to end
+p @a[:2]                # 10, 20, 30  — start through index 2
+</code></pre>
+        <p>---</p>
+        <h4>6b. No nested calls — pipeline everything</h4>
+        <p>Inside-out reading is the single biggest readability tax in mainstream languages. stryke&#39;s <code>|&gt;</code> and <code>~&gt;</code> collapse the indirection: every transformation reads top-to-bottom, left-to-right, in the order it executes.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>$x \|&gt; trim \|&gt; uc \|&gt; first_word</code> | <code>first_word(uc(trim($x)))</code> | Pipeline reads in execution order. | | <code>@xs \|&gt; sort \|&gt; rev \|&gt; head(3)</code> | <code>head(rev(sort(@xs)), 3)</code> | The <code>head</code> arg-position requires recoding when <code>head</code> becomes <code>nth</code>. Pipeline is rewrite-stable. | | <code>$json \|&gt; from_json \|&gt; -&gt;{ users } \|&gt; maps { _-&gt;{name} }</code> | <code>[map { $_-&gt;{name} } @{(from_json($json))-&gt;{users}}]</code> | Six chars per stage. Each stage standalone debuggable. | | <code>$h ~&gt; $key ~&gt; $default</code> (Racket-style fallback) | <code>defined $h-&gt;{$key} ? $h-&gt;{$key} : $default</code> | <code>~&gt;</code> short-circuits on undef. |</p>
+        <p><strong>Rule:</strong> if you wrote two open parens in a row (<code>f(g(</code>), refactor to a pipeline. The only exception is constructor-style call sites where the arg is a literal struct (<code>Point(1, 2)</code>).</p>
+        <p>The threading-operator family is stryke&#39;s universal-access protocol — every value, every callable, and every reflection-metadata access flows through <code>~&gt;</code> <code>~p&gt;</code> <code>~p&gt;</code> <code>~s&gt;</code> <code>~d&gt;</code> without adapter code.</p>
+        <p>---</p>
+        <h4>7. Pipeline / threading operators</h4>
+        <p>stryke ships distinct threading operators. Each has its own syntactic shape and execution semantics — they are not interchangeable.</p>
+        <h4>7.1 <code>|&gt;</code> — pipe-forward (one stage at a time)</h4>
+        <p>Single-stage pipe. LHS becomes the <strong>first</strong> argument of the RHS callable. Stages are separated by <code>|&gt;</code>. Cheap, zero-runtime-cost desugaring.</p>
+        <pre><code class="lang-stryke">&quot;hello&quot; |&gt; uc |&gt; rev |&gt; p              # OLLEH
+1:10 |&gt; grep _ &gt; 5 |&gt; map _ * 2 |&gt; e p
+$url |&gt; fetch_json |&gt; json_jq &#39;.name&#39; |&gt; p
+&quot;hello world&quot; |&gt; s/world/perl/ |&gt; p     # hello perl
+</code></pre>
+        <p>Use <code>|&gt;</code> when each stage is a single function call and you want the most explicit, line-by-line readable form. It&#39;s the day-to-day default.</p>
+        <h4>7.2 <code>~&gt;</code> — thread-first macro (Racket / Clojure <code>-&gt;</code>)</h4>
+        <p>Multi-stage thread. Source goes immediately after <code>~&gt;</code>; stages are <strong>space-separated</strong> (not arrow-separated). The threaded value is injected as the <strong>first</strong> argument of each stage. <code>|&gt;</code> terminates the macro and drops back to regular pipe-forward.</p>
+        <pre><code class="lang-stryke">~&gt; &quot;  hello  &quot; tm uc rv |&gt; p           # &quot;OLLEH&quot; (trim → uc → reverse)
+~&gt; @data grep { _ &gt; 5 } map { _ * 2 } sort { _0 &lt;=&gt; _1 } |&gt; p
+~&gt; 10 div(2) p                         # bare-fn stage: div(10, 2)
+~&gt; 10 div(_, 2) p                      # explicit `_` placeholder: div(10, 2)
+</code></pre>
+        <p>Stages can be: bare function name, <code>name(args)</code> with <code>_</code> placeholder, <code>&gt;{}</code> anonymous block, or <code>map { … }</code> / <code>grep { … }</code> / <code>sort { … }</code>. Spellings: <code>~&gt;</code>, <code>thread</code>, <code>t</code>.</p>
+        <p>Use <code>~&gt;</code> when you have ≥3 stages and want to drop one operator-character per stage; the macro form pays for itself at three calls.</p>
+        <h4>7.3 <code>-&gt;&gt;</code> / <code>~&gt;&gt;</code> — thread-last (Clojure <code>-&gt;&gt;</code>)</h4>
+        <p>Same syntax as <code>~&gt;</code>, but the threaded value goes in as the <strong>last</strong> argument — the right shape for list-consuming functions like <code>map</code>/<code>grep</code>/<code>reduce</code> whose Perl-tradition arity is <code>(block, list)</code>.</p>
+        <pre><code class="lang-stryke">fn div = _0 / _1
+-&gt;&gt; 10 div(2) p                        # div(2, 10) = 0.2  (10 → last arg)
+-&gt;&gt; 10 div(_, 2) p                     # explicit `_` overrides: div(10, 2) = 5
+
+~&gt;&gt; (1,2,3,4,5) take(3) p              # take(3, list) = (1,2,3)
+</code></pre>
+        <p>Use thread-last when the callee&#39;s natural last arg is your data — saves wrapping <code>_</code> placeholders.</p>
+        <h4>7.4 <code>~s&gt;</code> — per-item streaming pipeline</h4>
+        <p>Each stage runs as an <strong>independent worker thread</strong> connected to the next via a bounded channel. Items flow through concurrently; intermediate arrays are never materialized.</p>
+        <pre><code class="lang-stryke">~s&gt; [1, 2, 3, 4, 5] map { _ * 10 } map { _ + 1 }
+~s&gt; @lines map { json_decode } grep { _-&gt;{ok} } map { _-&gt;{val} }
+~s&gt; gen { yield_lines &quot;huge.log&quot; } map { parse } grep { /ERROR/ }
+</code></pre>
+        <p>Use <code>~s&gt;</code> when stages have <strong>uneven latencies</strong> (I/O + CPU mix) — fast stages can pull ahead while slow ones catch up. Output order is non-deterministic. <code>~s&gt;&gt;</code> is the thread-last variant. The macro&#39;s value is the count of items the last stage emitted.</p>
+        <h4>7.5 <code>~p&gt;</code> — chunk-parallel pipeline</h4>
+        <p>Splits the input into chunks, runs the <strong>whole pipeline on each chunk</strong> in parallel via rayon, auto-merges the per-chunk results. Equivalent to <code>par_reduce { stage1 |&gt; stage2 |&gt; ... } SRC</code>.</p>
+        <pre><code class="lang-stryke">~p&gt; c(&quot;**.rs&quot;) letters freq                 # histogram across all .rs files
+~p&gt; @big map { _ * 2 } sum                  # parallel map+sum, auto-summed across chunks
+~p&gt; $huge letters freq ||&gt; values |&gt; sum    # ||&gt; drops back to sequential for the merged whole
+~p&gt; $huge letters freq |then| values |&gt; sum # english-spelled equivalent of ||&gt;
+</code></pre>
+        <p>Auto-merger picks strategy from the first chunk&#39;s type: hash-of-numbers merges key-wise with <code>+</code> (canonical histogram), numeric scalars sum, arrays concat, strings concat. Use <code>||&gt;</code> or <code>|then|</code> to switch to sequential <code>~&gt;</code> mode for stages that need the merged whole. <code>~p&gt;&gt;</code> is the thread-last variant.</p>
+        <p>Use <code>~p&gt;</code> when each chunk is independent CPU work and you want all-cores utilization without writing <code>pmap</code>/<code>par_reduce</code> by hand.</p>
+        <h4>7.6 Choosing between them</h4>
+        <p>| Scenario | Pick | |---|---| | 1–2 stages, mostly readable as-is | <code>\|&gt;</code> | | 3+ stages, no I/O, one-character-per-stage cost matters | <code>~&gt;</code> | | Last-arg-is-the-data style (Perl-tradition <code>map BLOCK LIST</code>) | <code>-&gt;&gt;</code> / <code>~&gt;&gt;</code> | | I/O-heavy stages with uneven latency, want pipeline parallelism | <code>~s&gt;</code> | | CPU-heavy stages on a big collection, want chunk parallelism | <code>~p&gt;</code> |</p>
+        <h4>7.7 Stage notation forms</h4>
+        <p>Inside any <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>~s&gt;</code> / <code>~p&gt;</code> stage, four notations are accepted:</p>
+        <pre><code class="lang-stryke">~&gt; $x  uc                  # bare fn: x → uc(x)
+~&gt; $x  div(_, 2)           # placeholder: x → div(x, 2)
+~&gt; $x  &gt;{ _ * 2 + 1 }      # arrow-block: x → (x*2+1)
+~&gt; @xs map { _ * 10 } sum  # block-arg form: map { … } @xs → sum(...)
+</code></pre>
+        <p>Mix freely. The placeholder <code>_</code> is always available and overrides the implicit position when present.</p>
+        <p>---</p>
+        <h4>8. Iteration shorthand</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>@xs \|&gt; e p</code> | <code>for my $x (@xs) { p $x }</code> | <code>e</code> is each-call; <code>e p</code> = call <code>p</code> on each element. | | <code>@xs \|&gt; ep</code> | <code>@xs \|&gt; e p</code> (when chained from a pipeline) | <code>ep</code> is shorthand for <code>e { p }</code> — each-then-print. <strong>Equivalent to <code>e p</code>, both go to stdout.</strong> | | <code>pmaps { … } @xs</code> | <code>[pmap { … } @xs]</code> then iterate | <code>pmaps</code> is the streaming parallel iter — lazy, no intermediate vec. | | <code>pgreps { … } @xs</code> | <code>[pgrep { … } @xs]</code> | Streaming parallel filter; same reason. | | <code>flat_maps</code>, <code>pflat_maps</code> | <code>flat_map { … } \|&gt; e</code> | Stream variant; no list materialization. |</p>
+        <p>Streaming variants (<code>pmaps</code>, <code>pgreps</code>, <code>pflat_maps</code>, <code>maps</code>, <code>greps</code>, <code>flat_maps</code>) are the default when chaining; the array-returning forms (<code>pmap</code>, <code>pgrep</code>, <code>flat_map</code>) are only correct when you genuinely need a vec.</p>
+        <p>---</p>
+        <h4>9. File I/O</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>c&quot;path&quot;</code> | <code>slurp(&quot;path&quot;)</code>, <code>do { open my $fh, &quot;&lt;&quot;, &quot;path&quot;; local $/; &lt;$fh&gt; }</code> | <code>c&quot;…&quot;</code> is slurp-as-quote-prefix. Two extra chars over the path itself. | | <code>spurt $path, $data</code> | <code>open my $fh, &quot;&gt;&quot;, $path; print $fh $data; close $fh</code> | One builtin call. | | <code>lines(&quot;path&quot;)</code> | <code>open … while &lt;$fh&gt;</code> | Lazy line iterator. | | <code>glob(&quot;*.stk&quot;)</code> | <code>&lt;*.stk&gt;</code> | <code>&lt;&gt;</code> is reserved for stdin; use <code>glob</code> explicitly. |</p>
+        <p>---</p>
+        <h4>10. Parallelism</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>pmaps { f(_) } @xs</code> | spawn threads manually | <code>pmaps</code> rides rayon work-stealing; correct + faster. | | <code>varsync $count = 0</code> | shared mutex by hand | <code>varsync</code> and <code>oursync</code> are the stryke-shared-state primitive; lockless reads, lock-on-write. | | <code>pchannel</code> | hand-rolled mpsc | Built-in unbounded channel with select. | | <code>barrier($n)</code> | hand-rolled CountdownLatch | One call. |</p>
+        <p>When calling parallel operations from <code>pmaps</code> workers, prefer per-thread idioms (<code>set_no_interop_mode_tls</code>) over global atomics — sibling workers don&#39;t race.</p>
+        <p>---</p>
+        <h4>11. Sort / reduce blocks</h4>
+        <p><code>$a</code> and <code>$b</code> are <strong>only valid inside</strong> sort/reduce comparator blocks (the Perl-ism). Don&#39;t reference them anywhere else, and don&#39;t shadow them with <code>my $a</code> / <code>my $b</code> in regular code.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>sort { _0 cmp _1 } @xs</code> | <code>sort { $a cmp $b } @xs</code> | <code>_0</code>/<code>_1</code> is the universal positional protocol; <code>$a</code>/<code>$b</code> is comparator-block-only magic. | | <code>reduce { _0 + _1 } @xs</code> | <code>reduce { $a + $b } @xs</code> | Same. |</p>
+        <p>stryke accepts the <code>$a</code>/<code>$b</code> form for Perl 5 compat but <code>--no-interop</code> rejects it.</p>
+        <p>---</p>
+        <h4>12. Implicit closure params</h4>
+        <p>stryke&#39;s calling card. Never write named params for one-liner closures. Three syntactic homes, each with its own bracket form — pick by where the closure lives.</p>
+        <h4>Block form <code>{ … }</code> — for <code>map</code> / <code>grep</code> / <code>sort</code> / <code>reduce</code> and <code>|&gt;</code> pipelines</h4>
+        <p>The plain block is what list builtins accept. Use it when the closure is the block-arg of a builtin or any stage of a pipe-forward <code>|&gt;</code> chain.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>map { _ * 2 } @xs</code> | <code>map { $_ * 2 } @xs</code> | <code>_</code> is the bare topic; <code>$_</code> is the Perl-ism (rejected by <code>--no-interop</code>). | | <code>grep { _ &gt; 5 } @xs</code> | <code>grep { $_ &gt; 5 } @xs</code> | Same. | | <code>sort { _0 &lt;=&gt; _1 } @xs</code> | <code>sort { $a &lt;=&gt; $b } @xs</code> | Universal positional, not sort-block magic. | | <code>@xs \|&gt; maps { _ * 2 }</code> | <code>@xs \|&gt; maps &gt;{ _ * 2 }</code> | <strong><code>\|&gt;</code> uses plain <code>{ }</code>, not <code>&gt;{ }</code>.</strong> <code>&gt;{ }</code> is reserved for <code>~&gt;</code> thread macros. |</p>
+        <h4>Arrow-block <code>&gt;{ … }</code> — <strong>only inside <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>~s&gt;</code> / <code>~p&gt;</code> thread macros</strong></h4>
+        <p><code>&gt;{ }</code> is a syntactic primitive *of* the thread-macro family — it marks an anonymous-fn stage in <code>~&gt;</code> chains. Outside threading it&#39;s a parse error (&quot;Not a code reference&quot;).</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>~&gt; @xs &gt;{ _ * 2 } sum</code> | <code>~&gt; @xs { _ * 2 } sum</code> | <code>~&gt;</code> stages need either <code>name</code>, <code>name(args)</code>, <code>&gt;{...}</code>, or <code>name { … }</code>. A bare <code>{}</code> doesn&#39;t parse as a stage. | | <code>~&gt; @xs map { _ * 2 } sum</code> | always-<code>&gt;{}</code> style | <code>map { … }</code> is the block-arg stage form, equally valid in <code>~&gt;</code>. Pick <code>&gt;{}</code> for standalone closures, <code>name { … }</code> when calling a builtin. | | <code>val $f = fn { _ * 2 }</code> | <code>my $f = &gt;{ _ * 2 }</code> | <strong>Arrow-block is not a value.</strong> Bare <code>&gt;{ }</code> outside threading errors with &quot;Not a code reference&quot;. |</p>
+        <h4><code>fn { … }</code> / <code>fn name = …</code> — anonymous and named function values</h4>
+        <p>For storing a closure in a variable or returning one, use <code>fn</code>. Anonymous <code>fn { … }</code> accepts the topic protocol exactly like the block forms above.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>val $f = fn { _ * 2 }</code> | <code>my $f = sub { $_[0] * 2 }</code> | <code>fn</code> opens the topic-var protocol; <code>sub</code> doesn&#39;t. | | <code>val $f = fn { _ * 2 }</code> | <code>my $f = &gt;{ _ * 2 }</code> | <code>&gt;{ }</code> is threading-only — error outside <code>~&gt;</code>. | | <code>fn double = _ * 2</code> (top-level) | <code>fn double { return _ * 2 }</code> | Expression-bodied named fn (rule 6) + implicit return (rule 7). |</p>
+        <h4>Outer chain <code>_&lt;</code> — one <code>&lt;</code> per closure level</h4>
+        <p><code>_&lt;</code> reaches the topic of the *enclosing* closure; chain <code>&lt;</code>s for deeper. Most useful in nested <code>~&gt;</code> where each stage opens a fresh topic frame.</p>
+        <pre><code class="lang-stryke"># Multiply each element by its row index across nested rows
+~&gt; @rows enumerate map { ~&gt; _0 map { _ * _&lt;&lt; } }   # _&lt;&lt; = outer-outer topic
+
+# Capture-style: explicit `my` works but is the verbose form
+my $outer = …
+@xs |&gt; maps { _ + $outer }    # explicit lexical capture
+@xs |&gt; maps { _ + _&lt; }        # `_&lt;` reads cleaner once internalized
+</code></pre>
+        <h4>Quick reference — which bracket form?</h4>
+        <p>| Context | Form | |---|---| | <code>map</code>/<code>grep</code>/<code>sort</code>/<code>reduce</code> block-arg | <code>{ … }</code> | | Stage in <code>\|&gt;</code> pipeline (after a builtin that takes a block) | <code>{ … }</code> | | Stage in <code>~&gt;</code> / <code>~&gt;&gt;</code> / <code>~s&gt;</code> / <code>~p&gt;</code> thread macro | <code>{ … }</code> (block-arg) <strong>or</strong> <code>&gt;{ … }</code> (arrow-block) | | Stored in a variable (anon fn) | <code>fn { … }</code> | | Top-level named function | <code>fn name = …</code> (one-liner) or <code>fn name { … }</code> (multi-stmt) |</p>
+        <p>---</p>
+        <h4>12b. No semicolons at end of line</h4>
+        <p>stryke statement-terminates on newline. Trailing <code>;</code> is noise that adds a character per line and visually weights every statement equally with no payoff.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>val $x = 1</code> | <code>my $x = 1;</code> | Newline already terminates; <code>val</code> over bare <code>my</code> (rule 10). | | <code>p $x</code> | <code>p $x;</code> | Same. | | <code>for val $i (1:10) { p $i }</code> | <code>for my $i (1..10) { p $i; }</code> | Both sides; range too. |</p>
+        <p><strong>The only legitimate <code>;</code></strong> is <strong>separating statements on the same line</strong> — almost always inside a C-style <code>for</code> header:</p>
+        <pre><code class="lang-stryke">for (my $i = 0; $i &lt; 10; $i++) { … }
+</code></pre>
+        <p>Or, very rarely, a one-liner with two statements that genuinely belong glued:</p>
+        <pre><code class="lang-stryke">$count++; last if $count &gt; 100      # acceptable
+</code></pre>
+        <p>Even that is usually wrong — split to two lines unless brevity is the actual goal. <strong><code>use strict</code> / <code>--no-interop</code> will not flag trailing <code>;</code></strong> (legal Perl 5), but new stryke code that ships with them is wrong on style and will fail review.</p>
+        <p>---</p>
+        <h4>13. Multi-line expressions</h4>
+        <p>stryke terminates statements at newline (Perl/shell-like), not at <code>;</code>. Multi-line operators silently produce wrong values without explicit continuation.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>$x = a()&lt;br&gt;&amp;nbsp;&amp;nbsp;\|&gt; b()&lt;br&gt;&amp;nbsp;&amp;nbsp;\|&gt; c()</code> | use <code>\</code>&lt;br&gt;at the end of each line | Pipelines auto-continue across newlines when starting with <code>\|&gt;</code> or <code>~&gt;</code>. | | <code>$x = $a + \\&lt;br&gt;&amp;nbsp;&amp;nbsp;$b * \\&lt;br&gt;&amp;nbsp;&amp;nbsp;$c</code> | <code>$x = $a + $b * $c</code> (one line if it fits) | Use <code>\</code> for binary-op-mid-expression continuation. |</p>
+        <p>If a pipeline starts a fresh line with <code>|&gt;</code> or <code>~&gt;</code>, the parser auto-extends the previous statement. Otherwise newlines terminate.</p>
+        <p>---</p>
+        <h4>14. Hash declarations</h4>
+        <p>For hashes with <strong>more than 3 keys</strong>, one <code>key =&gt; value</code> pair per line. Makes block editing (visual select, delete, reorder) cheap.</p>
+        <pre><code class="lang-stryke">my %config = (
+    host    =&gt; &quot;localhost&quot;,
+    port    =&gt; 8080,
+    timeout =&gt; 30,
+    retries =&gt; 3,
+)
+</code></pre>
+        <p>Short hashes (≤3 keys) can stay on one line:</p>
+        <pre><code class="lang-stryke">my %sm = (a =&gt; 1, b =&gt; 2)
+</code></pre>
+        <p>---</p>
+        <h4>15. No defensive code</h4>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>val $sum = sum(@xs)</code> | <code>my $sum = @xs ? sum(@xs) : 0</code> | Trust the builtin&#39;s empty-list contract. | | <code>die &quot;bad input&quot; if $n &lt; 0</code> | check + return undef + caller checks for undef | <code>die</code> is cheap; failure paths are explicit. | | direct call | guard with <code>if defined $obj &amp;&amp; ref $obj &amp;&amp; $obj-&gt;can(&#39;method&#39;)</code> | Trust internal code. Validate at boundaries (user input, network), nowhere else. |</p>
+        <p>Don&#39;t add <code>my $foo</code> declarations inside loops just to be defensive — declare once at function top, assign inside the loop. (zsh-rule, but applies to stryke too: re-declaring <code>my</code> in a loop is wasteful and may surface as warnings under future strictness.)</p>
+        <p>---</p>
+        <h4>16. Test runner</h4>
+        <p>stryke&#39;s <code>test()</code> builtin and <code>s t</code> CLI default to the <strong>worker pool</strong> — pre-forked persistent stryke processes that fork-on-receive per test. Don&#39;t roll your own.</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>s t t/</code> | <code>for f in t/*.stk; do stryke $f; done</code> | Pool reuses warm stryke; ~5–7× faster than the shell loop. | | <code>test(&quot;t/&quot;)</code> from a stryke script | <code>system &quot;stryke test t/&quot;</code> | Builtin avoids the outer fork. | | <code>test_no_interop(&quot;t/&quot;)</code> | <code>system &quot;stryke --no-interop test t/&quot;</code> | Per-thread TLS no-interop, race-free. | | <code>s t -j 1 t/foo.stk</code> to debug | guess-and-check at full parallelism | Serial mode pinpoints which file hangs. |</p>
+        <p>See [Test Runner — Worker Pool Architecture](../README.md#0x0c-test-test-runner--worker-pool-architecture) for the topology and wire protocol.</p>
+        <p>---</p>
+        <h4>17. Strict / no-interop modes</h4>
+        <p>stryke does <strong>not</strong> enforce <code>use strict;</code> by default — that&#39;s a Perl-ism. Topic vars (<code>_N</code>, <code>$_N</code>) and special vars (<code>@ARGV</code>, <code>%ENV</code>, …) are <strong>always</strong> exempt regardless.</p>
+        <ul>
+          <li><strong><code>use strict;</code></strong> — opt-in Perl-style undefined-var enforcement. Use only in modules you&#39;re porting from CPAN.</li>
+          <li><strong><code>--no-interop</code></strong> — bot firewall. Rejects every entry in this guide&#39;s DON&#39;T column at parse time. Use in CI for new stryke code.</li>
+          <li><strong><code>--compat</code></strong> — locks stryke to stock Perl 5 syntax/builtins. Use for parity testing only.</li>
+        </ul>
+        <p>---</p>
+        <h4>18. Naming</h4>
+        <p>| Convention | Where | Example | |---|---|---| | <code>snake_case</code> | function names, variables | <code>fn parse_config</code>, <code>$line_count</code> | | <code>Module::Sub::name</code> | namespaced functions | <code>fn Rosetta::Strings::reverse_words</code> | | <code>SCREAMING_SNAKE</code> | true constants | <code>const MAX_RETRIES = 3</code> | | <code>CamelCase</code> | class / struct / enum names | <code>class HttpClient</code>, <code>enum Color</code> | | short single-letter | only as block topic / loop index | <code>for $i (1:10)</code>, <code>{ _ }</code> |</p>
+        <p><strong>Never</strong> name a function after a builtin. Always namespace if there&#39;s any chance of clash. Run <code>s &#39;p $stryke::all{your_name} // &quot;free&quot;&#39;</code> to check.</p>
+        <p>---</p>
+        <h4>19. When to break the rules</h4>
+        <p>Three legitimate reasons:</p>
+        <p>1. <strong>Porting CPAN code where line-by-line parity matters</strong> — keep the original spelling, add <code># perl-port</code> comment, don&#39;t mix idioms. 2. <strong>Code that already exists</strong> — don&#39;t refactor neighboring style mid-PR. Match the file&#39;s existing convention; queue the migration as a separate change. 3. <strong>Performance critical paths verified by benchmark</strong> — if <code>_&lt;&lt;</code> resolution shows up hot in a profile, switching to explicit lexical capture is fine. Rarely needed; profile first.</p>
+        <p>Anywhere else: stryke idioms win. The DON&#39;T column is for compat, not for new code.</p>
+      </article>
     </section>
     <section class="tutorial-section" id="ch-parallel-primitives">
       <h2>Parallel Primitives</h2>
