@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~479k-line Rust slice (production + tests + tooling), 10,453 builtins (11,229 keys in %all), 351-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
+  <meta name="description" content="stryke — the hottest language ever created. Server farms first. 100% TDP load testing, distributed agents, parallel Perl 5 interpreter in Rust. ~479k-line Rust slice (production + tests + tooling), 10,455 builtins (11,231 keys in %all), 351-opcode VM + Cranelift JIT, LSP server, DAP debugger, JetBrains plugin.">
   <title>stryke — Documentation</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -571,7 +571,7 @@ substr $s, 9, 5              <span class="comment"># "world" — byte substr</sp
 
       <section class="tutorial-section">
         <h2>Builtin categories</h2>
-        <p>10,453 primaries in <code>%b</code> (11,229 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
+        <p>10,455 primaries in <code>%b</code> (11,231 keys in <code>%all</code>, including aliases and keywords). Query them via <code>keys %stryke::builtins</code> — the table below is a navigational overview, not a full index. Run <code>s 'p scalar keys %b'</code> for the live primary count.</p>
         <!-- %b / %all counts derived from: stryke -e 'say scalar keys %b; say scalar keys %all' -->
         <div class="cat-grid">
           <div class="cat-card"><h4>Array / List (134+)</h4><p><code>map maps flat_map grep sort reverse push pop shift unshift splice reduce fold fore e first any all none take take_while drop skip_while partition min_by max_by zip zip_with interleave frequencies count_by chunk windowed enumerate shuffle uniq dedup compact flatten concat pluck grep_v with_index sorted sorted_desc sorted_nums without take_last drop_last pairwise batch rotate swap_pairs sliding_pairs run_length_encode group_consecutive permutations combinations power_set cartesian_product</code> &hellip;</p></div>
@@ -805,7 +805,7 @@ wizard
         <h3 style="color:#39ff14;">What stryke REPL Has That zsh / bash Don't</h3>
         <ul>
           <li><strong>Composable pipelines</strong> — every shell-like builtin returns a stryke value, so <code>ls() |&gt; grep { /\.rs$/ } |&gt; sort</code> works without spawning subprocesses</li>
-          <li><strong>10,453 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
+          <li><strong>10,455 builtins in scope at all times</strong> — math, crypto, AI, web, regex, parallel, codec — every primitive listed in <code>%b</code> is callable from the REPL with zero imports</li>
           <li><strong>Perl 5 syntax</strong> for everything that isn't shell muscle-memory: <code>$_</code>, <code>@ARGV</code>, <code>%ENV</code>, here-docs, regex literals, captures, <code>sub</code>, <code>my</code>, <code>local</code>, <code>our</code> all work</li>
           <li><strong>Reflection at the prompt</strong> — <code>keys %b</code> for the full builtin set, <code>keys %a</code> for aliases, <code>keys %d</code> for documented names, <code>keys %p</code> for primaries, <code>keys %k</code> for keywords, <code>keys %c</code> for category names</li>
           <li><strong>Live doc browser</strong> — <code>docs &lt;name&gt;</code> drops into a TUI hover-doc reader (j/k nav, t for ToC, / search, ]/[ for next/prev chapter)</li>
@@ -1800,7 +1800,7 @@ my %opts = %{ getopts(\@args, [ "verbose|v" ]) };</pre>
         <h3>LSP — <code>stryke --lsp</code></h3>
         <ul>
           <li><strong>Hover</strong> over any builtin → category + signature + description from <code>%stryke::descriptions</code> / <code>%stryke::categories</code> (4,255 documented names)</li>
-          <li><strong>Completion</strong> with full builtin set (every spelling in <code>%all</code> — 11,229 keys including 686 aliases and 90 keywords)</li>
+          <li><strong>Completion</strong> with full builtin set (every spelling in <code>%all</code> — 11,231 keys including 686 aliases and 90 keywords)</li>
           <li><strong>Semantic tokens</strong> — keywords, builtins, sigils, types, regex flags get distinct token categories so themes can paint them independently</li>
           <li><strong>Signature help</strong> on function-call cursor</li>
           <li><strong>Code actions</strong> — server-side fix suggestions for common diagnostics</li>
@@ -2380,7 +2380,7 @@ STRYKE_CACHE=0 stryke app.stk  <span class="comment"># disable caching for this 
             </tr>
             <tr>
               <td><strong>Encyclopedic-stdlib design axis</strong></td>
-              <td>10,453 builtins in %b / 11,229 keys in %all in 44&nbsp;MB single static binary, zero-import</td>
+              <td>10,455 builtins in %b / 11,231 keys in %all in 44&nbsp;MB single static binary, zero-import</td>
               <td>Inverts the prevailing scripting-language design philosophy — &ldquo;core minimal, libraries optional&rdquo; becomes &ldquo;core encyclopedic, libraries unnecessary.&rdquo; Shipped builtins span crypto, stats, linear algebra, networking, codecs, terminal viz, git, jq. Density: ~4.5&nbsp;KB amortized per builtin, ~175&times; denser than Wolfram Engine v14 (~5&ndash;6 GB on disk for ~7,000 builtins). The single-binary qualifier is structural, not just a packaging choice — no kernel boot, no paclet manager, no licensing daemon, no <code>library()</code> resolution.</td>
             </tr>
             <tr>
