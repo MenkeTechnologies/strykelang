@@ -354,6 +354,12 @@ thread_local! {
     /// `Value::NativeFn(id)` indices into this per-run table.
     static REGISTRY: std::cell::RefCell<Vec<StrykeValue>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    /// AOT-only: the strykelang name table, baked into the fusevm chunk and
+    /// installed here by [`aot_register`]. An AOT binary has no live strykelang
+    /// `Chunk` (so `CURRENT_CHUNK` stays null), but the covered subset only needs
+    /// the name pool, which `host_name` reads from here when set.
+    static AOT_NAMES: std::cell::Cell<*const Vec<String>> =
+        const { std::cell::Cell::new(std::ptr::null()) };
 }
 
 struct HostGuard;
@@ -389,8 +395,19 @@ fn with_chunk<R>(f: impl FnOnce(&Chunk) -> R) -> R {
     f(unsafe { &*p })
 }
 
-/// Resolve a name-pool index to its name (chunk.names), via the host.
+/// Resolve a name-pool index to its name (chunk.names), via the host. In an AOT
+/// binary there is no live strykelang `Chunk`; the name table was baked into the
+/// fusevm chunk and installed in `AOT_NAMES` by [`aot_register`], so prefer it.
 fn host_name(idx: i64) -> String {
+    let p = AOT_NAMES.with(|c| c.get());
+    if !p.is_null() {
+        // SAFETY: `p` is the leaked-'static names vec installed by `aot_register`,
+        // valid for the whole process.
+        return unsafe { &*p }
+            .get(idx as usize)
+            .cloned()
+            .unwrap_or_default();
+    }
     with_chunk(|c| c.names.get(idx as usize).cloned().unwrap_or_default())
 }
 
@@ -519,7 +536,7 @@ fn stryke_display(v: &fusevm::Value) -> String {
 /// Extension handler for strykelang's native-value Extended ops, installed on
 /// the fusevm-only VM. Each op delegates to strykelang's own value semantics so
 /// results match vm.rs.
-fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
+pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
     match id {
         nops::CONCAT => {
             let b = vm.pop();
@@ -1595,7 +1612,14 @@ fn fusevm_to_stryke(v: &fusevm::Value) -> Option<StrykeValue> {
 /// `Some(result)` when the whole program is in the covered subset, else `None`
 /// (the caller then runs it on `crate::vm`). `interp` is unused in Phase 1 (no
 /// vars/closures/host yet) but threaded for later phases.
-pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResult<StrykeValue>> {
+/// Lower a strykelang `Chunk` to a self-contained `fusevm::Chunk`, or `None` if
+/// it uses an op outside the covered subset (caller falls back to `crate::vm`).
+///
+/// The strykelang name table is copied into the fusevm chunk's `names` so an AOT
+/// binary — which has no live strykelang `Chunk` — can still resolve name-scoped
+/// Extended ops via [`aot_register`] + [`host_name`]. Shared by [`try_run_native`]
+/// (interpreter-hosted run) and [`lower_to_fusevm_aot`] (the `--native` build).
+pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
     let mut b = fusevm::ChunkBuilder::new();
     // Map each source op index to the fusevm op index its lowering starts at, so
     // jump targets (absolute source indices) can be remapped after lowering.
@@ -2137,7 +2161,18 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
         b.patch_jump(pos, end);
     }
 
-    let fchunk = b.build();
+    let mut fchunk = b.build();
+    // Bake the strykelang name table into the fusevm chunk so name-scoped
+    // Extended ops resolve in an AOT binary that has no live strykelang chunk.
+    fchunk.names = chunk.names.clone();
+    Some(fchunk)
+}
+
+/// Run `chunk` on the fusevm-only path: lower it, then execute on a fusevm `VM`
+/// with the live interpreter installed as host. `None` ⇒ outside the covered
+/// subset; the caller falls back to `crate::vm`.
+pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResult<StrykeValue>> {
+    let fchunk = lower_to_fusevm(chunk)?;
     let mut vm = fusevm::VM::new(fchunk);
     vm.set_extension_handler(Box::new(native_ext_handler));
     NATIVE_ERR.with(|c| *c.borrow_mut() = None);
@@ -2159,6 +2194,92 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
         fusevm::VMResult::Halted => Some(Ok(StrykeValue::UNDEF)),
         fusevm::VMResult::Error(e) => Some(Err(StrykeError::runtime(e, 0))),
     }
+}
+
+// ── Native AOT (`stryke build --native`) ────────────────────────────────────
+//
+// `try_run_native` runs the lowered chunk *with the live interpreter as host*.
+// An AOT binary has no interpreter and no strykelang `Chunk` — only the fusevm
+// chunk (with the baked name table) is serialized into the object. So AOT can
+// cover only the ops whose handlers need nothing beyond a fresh `VMHelper`
+// scope, the baked names, special vars, and the print sink. Anything that
+// reaches into the strykelang chunk's blocks/constants/sub bodies or the live
+// call machinery is rejected up front (`lower_to_fusevm_aot`).
+
+/// Is the Extended op `id` self-contained enough to run in an AOT binary?
+///
+/// Allowlist (default-deny, so a newly added op is AOT-ineligible until vetted).
+/// The excluded ids all need the original strykelang `Chunk` or a live
+/// interpreter at run time, neither of which an AOT process has:
+///   - `CALL_SUB`(32) — `call_named_sub` needs the sub bodies (not embedded);
+///   - `MAKE_CODEREF`(33)/`ARROW_CALL`(34) — need `chunk.blocks`/`code_ref_sigs`;
+///   - `REGEX_MATCH`(39)/`REGEX_SUBST`(40) — need patterns in `chunk.constants`;
+///   - `CALL_BUILTIN`(43) — `exec_builtin` may need interpreter/IO state;
+///   - `GREP_BLOCK`(46)/`MAP_BLOCK`(49)/`PMAP_BLOCK`(64) — need `chunk.blocks`;
+///   - `CONCAT_CONST_SLOT_LOOP`(59) — reads a string from `chunk.constants`.
+pub(crate) fn aot_safe_ext(id: u16) -> bool {
+    matches!(id, 0..=31 | 35..=38 | 41 | 42 | 44 | 45 | 47 | 48 | 50..=58 | 60..=63 | 65..=85)
+}
+
+/// Human name for an AOT-ineligible Extended op (for the rejection message).
+fn aot_unsupported_name(id: u16) -> &'static str {
+    match id {
+        32 => "user-defined subroutine call",
+        33 | 34 => "closure / coderef call",
+        39 | 40 => "regex match / substitution",
+        43 => "builtin function call",
+        46 | 49 | 64 => "block map/grep (parallel) ",
+        59 => "constant-string append loop",
+        _ => "interpreter-hosted feature",
+    }
+}
+
+/// Lower `chunk` for native AOT: like [`lower_to_fusevm`] but reject (with a
+/// clear message) any program the AOT runtime can't execute self-contained.
+pub(crate) fn lower_to_fusevm_aot(chunk: &Chunk) -> Result<fusevm::Chunk, String> {
+    let fchunk = lower_to_fusevm(chunk).ok_or_else(|| {
+        "program uses a strykelang construct the native compiler can't lower yet \
+         (only the arithmetic / string / scalar / array / hash / print subset is \
+         supported; use `stryke build` without `--native` for the rest)"
+            .to_string()
+    })?;
+    if fchunk.ops.is_empty() {
+        return Err("program compiled to an empty chunk".to_string());
+    }
+    for op in &fchunk.ops {
+        if let fusevm::Op::Extended(id, _) = op {
+            if !aot_safe_ext(*id) {
+                return Err(format!(
+                    "native AOT can't compile this program yet: it uses {} ({id}), \
+                     which needs the strykelang interpreter at run time. Use \
+                     `stryke build` (without `--native`) for full coverage.",
+                    aot_unsupported_name(*id)
+                ));
+            }
+        }
+    }
+    Ok(fchunk)
+}
+
+/// AOT runtime setup, invoked once per process by the AOT binary's
+/// `fusevm_aot_register_builtins` hook before the native driver runs. Unlike
+/// [`try_run_native`] (which borrows the live interpreter for the run's scope),
+/// an AOT binary has none, so we leak a fresh [`VMHelper`] and the baked name
+/// table for the process lifetime and point the host thread-locals at them.
+///
+/// `output_autoflush` is forced on: the binary's `main` is a C stub, so Rust's
+/// normal stdout-flush-at-exit never runs — flushing per print keeps output
+/// durable.
+pub(crate) fn aot_register(vm: &mut fusevm::VM) {
+    let mut helper = VMHelper::new();
+    helper.output_autoflush = true;
+    let interp: &'static mut VMHelper = Box::leak(Box::new(helper));
+    let names: &'static Vec<String> = Box::leak(Box::new(vm.chunk.names.clone()));
+    CURRENT_INTERP.with(|c| c.set(interp as *mut VMHelper));
+    AOT_NAMES.with(|c| c.set(names as *const Vec<String>));
+    NATIVE_ERR.with(|c| *c.borrow_mut() = None);
+    REGISTRY.with(|r| r.borrow_mut().clear());
+    vm.set_extension_handler(Box::new(native_ext_handler));
 }
 
 #[cfg(test)]
@@ -2206,6 +2327,87 @@ mod tests {
             Some(expect),
             "native value for `{code}`"
         );
+    }
+
+    /// Compile `code`, lower it for AOT, and run it through fusevm's *native*
+    /// Cranelift compiler (`run_chunk_native`) with the AOT register hook — the
+    /// exact path a `stryke build --native` binary takes, minus linking. Returns
+    /// the program value, or `None` if AOT-ineligible.
+    fn aot_native_value(code: &str) -> Option<StrykeResult<StrykeValue>> {
+        let program = crate::parse(code).expect("parse");
+        let chunk = crate::compiler::Compiler::new()
+            .compile_program(&program)
+            .expect("compile");
+        let fchunk = lower_to_fusevm_aot(&chunk).ok()?;
+        let result = fusevm::aot::run_chunk_native(&fchunk, |vm| aot_register(vm))
+            .expect("native compile/run");
+        Some(match result {
+            fusevm::VMResult::Ok(v) => fusevm_to_stryke(&v)
+                .map(Ok)
+                .unwrap_or(Ok(StrykeValue::UNDEF)),
+            fusevm::VMResult::Halted => Ok(StrykeValue::UNDEF),
+            fusevm::VMResult::Error(e) => Err(StrykeError::runtime(e, 0)),
+        })
+    }
+
+    /// The native AOT path must agree with the interpreter on integer results.
+    fn assert_aot_parity_int(code: &str, expect: i64) {
+        let vm = crate::run(code).expect("vm run");
+        assert_eq!(vm.as_integer(), Some(expect), "vm.rs value for `{code}`");
+        let nat = aot_native_value(code)
+            .unwrap_or_else(|| panic!("`{code}` not AOT-eligible"))
+            .expect("aot native run");
+        assert_eq!(nat.as_integer(), Some(expect), "aot value for `{code}`");
+    }
+
+    fn assert_aot_parity_str(code: &str, expect: &str) {
+        let vm = crate::run(code).expect("vm run");
+        let nat = aot_native_value(code)
+            .unwrap_or_else(|| panic!("`{code}` not AOT-eligible"))
+            .expect("aot native run");
+        assert_eq!(
+            nat.as_str().as_deref(),
+            Some(expect),
+            "aot value for `{code}` (vm.rs={:?})",
+            vm.as_str()
+        );
+    }
+
+    #[test]
+    fn aot_native_matches_interp_for_covered_subset() {
+        // Arithmetic, strings, comparisons, scalars, and a counted loop all run
+        // through the real fusevm native compiler and match the interpreter.
+        assert_aot_parity_int("1 + 2 * 3", 7);
+        assert_aot_parity_int("10 - 4 - 3", 3);
+        assert_aot_parity_int("my $x = 5; my $y = $x * 2; $y + 1", 11);
+        assert_aot_parity_int("3 == 3", 1);
+        assert_aot_parity_int("2 < 1", 0);
+        assert_aot_parity_int("1 <=> 2", -1);
+        assert_aot_parity_str("\"a\" . \"b\" . \"c\"", "abc");
+        assert_aot_parity_str("\"sum=\" . (2 + 3)", "sum=5");
+        assert_aot_parity_int(
+            "my $s = 0; for my $i (1..10) { $s = $s + $i } $s",
+            55,
+        );
+    }
+
+    #[test]
+    fn aot_rejects_interpreter_hosted_features() {
+        // Programs needing the live interpreter (sub calls, regex, builtins) are
+        // rejected up front by the AOT eligibility gate, not miscompiled.
+        let reject = |code: &str| {
+            let program = crate::parse(code).expect("parse");
+            let chunk = crate::compiler::Compiler::new()
+                .compile_program(&program)
+                .expect("compile");
+            assert!(
+                lower_to_fusevm_aot(&chunk).is_err(),
+                "`{code}` should be AOT-rejected"
+            );
+        };
+        reject("sub myfn { 1 } myfn()");
+        reject("my $s = \"x\"; $s =~ /x/");
+        reject("uc(\"hi\")");
     }
 
     #[test]

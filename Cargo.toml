@@ -19,6 +19,10 @@ autobins = false
 [lib]
 name = "stryke"
 path = "strykelang/lib.rs"
+# `staticlib` produces libstryke.a so `stryke build --native` can link
+# AOT-compiled objects (fusevm::aot) against strykelang's runtime into a
+# standalone executable.
+crate-type = ["lib", "staticlib"]
 
 [[bin]]
 name = "stryke"
@@ -160,7 +164,7 @@ unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
 zshrs = "0.12.3"
-fusevm = { version = "0.14.0", features = ["jit-disk-cache"] }
+fusevm = { version = "0.14.4", features = ["jit-disk-cache", "aot"] }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
