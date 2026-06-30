@@ -14802,6 +14802,12 @@ impl Parser {
             | "hide_cursor" | "cursor_hide" | "show_cursor" | "cursor_show"
             | "flash" | "visual_bell" | "alt_screen" | "enter_alt_screen"
             | "restore_screen" | "exit_alt_screen"
+            | "cursor_to" | "goto_xy" | "clear_line" | "erase_line"
+            | "clear_to_eol" | "clear_eol" | "scroll_up" | "scroll_down"
+            | "notify" | "desktop_notify" | "hyperlink" | "osc_link"
+            | "clipboard_set" | "clip_copy" | "rainbow" | "rainbow_text"
+            | "progress" | "progress_bar" | "typewriter" | "type_out"
+            | "marquee" | "scroll_text"
             | "run" | "exec_script" | "source" | "src"
             // ── Shell-like REPL (Tier A) ───────────────────────────────────
             | "rm" | "mktemp" | "mktempdir" | "whereis"

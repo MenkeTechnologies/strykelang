@@ -4195,6 +4195,18 @@ pub(crate) fn try_builtin(
         "flash" | "visual_bell" => Some(builtin_flash(args)),
         "alt_screen" | "enter_alt_screen" => Some(builtin_alt_screen()),
         "restore_screen" | "exit_alt_screen" => Some(builtin_restore_screen()),
+        "cursor_to" | "goto_xy" => Some(builtin_cursor_to(args)),
+        "clear_line" | "erase_line" => Some(builtin_clear_line()),
+        "clear_to_eol" | "clear_eol" => Some(builtin_clear_to_eol()),
+        "scroll_up" => Some(builtin_scroll_up(args)),
+        "scroll_down" => Some(builtin_scroll_down(args)),
+        "notify" | "desktop_notify" => Some(builtin_notify(args)),
+        "hyperlink" | "osc_link" => Some(builtin_hyperlink(args)),
+        "clipboard_set" | "clip_copy" => Some(builtin_clipboard_set(args)),
+        "rainbow" | "rainbow_text" => Some(builtin_rainbow(args)),
+        "progress" | "progress_bar" => Some(builtin_progress(args)),
+        "typewriter" | "type_out" => Some(builtin_typewriter(args)),
+        "marquee" | "scroll_text" => Some(builtin_marquee(args)),
         "man" | "manpage" => Some(builtin_man(args, line)),
         "run" | "exec_script" => Some(builtin_run(args, line)),
         "source" | "src" => Some(builtin_source(interp, args, line)),
@@ -25162,6 +25174,243 @@ fn builtin_alt_screen() -> StrykeResult<StrykeValue> {
 /// buffer and scrollback. Returns `1`.
 fn builtin_restore_screen() -> StrykeResult<StrykeValue> {
     emit_seq(b"\x1b[?1049l")
+}
+
+/// `cursor_to(row=1, col=1)` / `goto_xy` — move the cursor to a 1-based
+/// `(row, col)` via `\x1b[{row};{col}H` (CUP). Row 1 / col 1 is the
+/// top-left corner. Out-of-range coordinates are clamped by the terminal
+/// itself. Returns `1`.
+fn builtin_cursor_to(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let row = args.first().map(|v| v.to_int()).unwrap_or(1).max(1);
+    let col = args.get(1).map(|v| v.to_int()).unwrap_or(1).max(1);
+    let mut out = std::io::stdout().lock();
+    let _ = write!(out, "\x1b[{};{}H", row, col);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `clear_line` / `erase_line` — erase the entire line the cursor is on
+/// (`\x1b[2K`) without moving the cursor. Returns `1`.
+fn builtin_clear_line() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[2K")
+}
+
+/// `clear_to_eol` / `clear_eol` — erase from the cursor to the end of the
+/// line (`\x1b[0K`), leaving everything before the cursor intact. Returns
+/// `1`.
+fn builtin_clear_to_eol() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[0K")
+}
+
+/// `scroll_up(n=1)` — scroll the whole display up `n` lines (`\x1b[{n}S`),
+/// opening `n` blank lines at the bottom. Returns `1`.
+fn builtin_scroll_up(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let n = args.first().map(|v| v.to_int()).unwrap_or(1).clamp(1, 10_000);
+    let mut out = std::io::stdout().lock();
+    let _ = write!(out, "\x1b[{}S", n);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `scroll_down(n=1)` — scroll the whole display down `n` lines
+/// (`\x1b[{n}T`), opening `n` blank lines at the top. Returns `1`.
+fn builtin_scroll_down(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let n = args.first().map(|v| v.to_int()).unwrap_or(1).clamp(1, 10_000);
+    let mut out = std::io::stdout().lock();
+    let _ = write!(out, "\x1b[{}T", n);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `notify(TITLE, BODY="")` / `desktop_notify` — raise an OS desktop
+/// notification. macOS shells out to `osascript` (`display notification`),
+/// Linux to `notify-send`; other platforms are a no-op. Returns `1` on a
+/// successful spawn, `0` otherwise. A natural companion to `beep` when a
+/// long task finishes off-screen.
+fn builtin_notify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let title = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let body = args.get(1).map(|v| v.to_string()).unwrap_or_default();
+
+    #[cfg(target_os = "macos")]
+    let spawned = {
+        // Escape embedded double-quotes for the AppleScript string literals.
+        let t = title.replace('"', "\\\"");
+        let b = body.replace('"', "\\\"");
+        let script = format!("display notification \"{}\" with title \"{}\"", b, t);
+        std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let spawned = std::process::Command::new("notify-send")
+        .arg(&title)
+        .arg(&body)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    #[cfg(not(unix))]
+    let spawned = {
+        let _ = (&title, &body);
+        false
+    };
+
+    Ok(StrykeValue::integer(if spawned { 1 } else { 0 }))
+}
+
+/// `hyperlink(TEXT, URL=TEXT)` / `osc_link` — return `TEXT` wrapped in an
+/// OSC-8 hyperlink escape (`\x1b]8;;URL\x07TEXT\x1b]8;;\x07`) so it
+/// renders as a clickable link in terminals that support OSC-8 (iTerm2,
+/// kitty, WezTerm, GNOME Terminal, Windows Terminal). Terminals without
+/// support just show `TEXT`. With one argument, the text doubles as the
+/// URL. Returns the wrapped string.
+fn builtin_hyperlink(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let url = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| text.clone());
+    Ok(StrykeValue::string(format!(
+        "\x1b]8;;{}\x07{}\x1b]8;;\x07",
+        url, text
+    )))
+}
+
+/// `clipboard_set(TEXT)` / `clip_copy` — copy `TEXT` to the system
+/// clipboard via the OSC-52 escape (`\x1b]52;c;{base64}\x07`). Works
+/// through most modern terminals — and, crucially, over SSH, since the
+/// terminal emulator (not the remote host) performs the copy. Returns
+/// `1`. Note: some terminals require OSC-52 clipboard writes to be
+/// enabled in their settings.
+fn builtin_clipboard_set(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use base64::Engine;
+    use std::io::Write;
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let b64 = base64::engine::general_purpose::STANDARD.encode(text.as_bytes());
+    let mut out = std::io::stdout().lock();
+    let _ = write!(out, "\x1b]52;c;{}\x07", b64);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `rainbow(TEXT)` — return `TEXT` with each character wrapped in a
+/// truecolor foreground (`\x1b[38;2;r;g;bm`), the hue sweeping smoothly
+/// across the string, terminated by a reset (`\x1b[0m`). Pure string
+/// transform — print it, log it, or embed it. Whitespace is colored too
+/// (invisible, but keeps offsets simple).
+fn builtin_rainbow(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let chars: Vec<char> = text.chars().collect();
+    let n = chars.len().max(1);
+    let mut out = String::with_capacity(text.len() + n * 20);
+    for (i, ch) in chars.iter().enumerate() {
+        // Sweep hue 0..360 across the string; full-saturation HSV→RGB.
+        let h = (i as f64 / n as f64) * 360.0;
+        let (r, g, b) = hsv_to_rgb(h, 1.0, 1.0);
+        out.push_str(&format!("\x1b[38;2;{};{};{}m{}", r, g, b, ch));
+    }
+    out.push_str("\x1b[0m");
+    Ok(StrykeValue::string(out))
+}
+
+/// HSV (h in degrees, s/v in 0..1) → 8-bit RGB. Local helper for
+/// `rainbow`; no external color crate needed.
+fn hsv_to_rgb(h: f64, s: f64, v: f64) -> (u8, u8, u8) {
+    let c = v * s;
+    let hp = (h.rem_euclid(360.0)) / 60.0;
+    let x = c * (1.0 - (hp % 2.0 - 1.0).abs());
+    let (r1, g1, b1) = match hp as i32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let m = v - c;
+    (
+        ((r1 + m) * 255.0).round() as u8,
+        ((g1 + m) * 255.0).round() as u8,
+        ((b1 + m) * 255.0).round() as u8,
+    )
+}
+
+/// `progress(frac, width=40)` / `progress_bar` — return a fixed-width
+/// progress bar string like `[████████░░░░] 67%`. `frac` is clamped to
+/// `[0, 1]`; `width` is the bar's interior cell count (clamped to
+/// `[1, 1000]`). Filled cells use `█`, empty use `░`. Pure string — pair
+/// with `\r` + `clear_to_eol` to animate a single line in place.
+fn builtin_progress(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    let frac: f64 = args.first().map(|v| v.to_number()).unwrap_or(0.0).clamp(0.0, 1.0);
+    let width = args.get(1).map(|v| v.to_int()).unwrap_or(40).clamp(1, 1000) as usize;
+    let filled = (frac * width as f64).round() as usize;
+    let filled = filled.min(width);
+    let bar: String = "█".repeat(filled) + &"░".repeat(width - filled);
+    let pct = (frac * 100.0).round() as i64;
+    Ok(StrykeValue::string(format!("[{}] {}%", bar, pct)))
+}
+
+/// `typewriter(TEXT, ms=30)` / `type_out` — print `TEXT` one character at
+/// a time to stdout, pausing `ms` milliseconds between characters
+/// (clamped to `[0, 2000]`), then a trailing newline. Returns the number
+/// of characters printed. Blocking, like `seizure` / `flash`.
+fn builtin_typewriter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let ms = args.get(1).map(|v| v.to_int()).unwrap_or(30).clamp(0, 2_000);
+    let mut out = std::io::stdout().lock();
+    let mut count: i64 = 0;
+    for ch in text.chars() {
+        let _ = write!(out, "{}", ch);
+        let _ = out.flush();
+        count += 1;
+        if ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+        }
+    }
+    let _ = out.write_all(b"\n");
+    let _ = out.flush();
+    Ok(StrykeValue::integer(count))
+}
+
+/// `marquee(TEXT, secs=5, ms=120)` / `scroll_text` — scroll `TEXT`
+/// right-to-left across the terminal width on the current line for `secs`
+/// seconds, repainting every `ms` milliseconds. Hides the cursor while
+/// running and clears the line on exit. `secs` clamps to `[0, 600]`,
+/// `ms` to `[10, 5000]`. Returns the number of frames drawn. Blocking.
+fn builtin_marquee(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let text = args.first().map(|v| v.to_string()).unwrap_or_default();
+    let secs = args.get(1).map(|v| v.to_int()).unwrap_or(5).clamp(0, 600);
+    let ms = args.get(2).map(|v| v.to_int()).unwrap_or(120).clamp(10, 5_000);
+
+    let width = term_winsize().map(|(c, _)| c as usize).unwrap_or(80).max(10);
+    // Pad with `width` spaces so the text scrolls fully on and off screen.
+    let gap = " ".repeat(width);
+    let banner: Vec<char> = format!("{}{}{}", gap, text, gap).chars().collect();
+    let span = banner.len();
+
+    let mut out = std::io::stdout().lock();
+    let _ = out.write_all(b"\x1b[?25l"); // hide cursor
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(secs as u64);
+    let mut frames: i64 = 0;
+    let mut offset = 0usize;
+    while std::time::Instant::now() < deadline && span > 0 {
+        let window: String = (0..width)
+            .map(|i| banner[(offset + i) % span])
+            .collect();
+        // carriage return + erase line, then the window
+        let _ = write!(out, "\r\x1b[2K{}", window);
+        let _ = out.flush();
+        frames += 1;
+        offset = (offset + 1) % span;
+        std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+    }
+    let _ = out.write_all(b"\r\x1b[2K\x1b[?25h"); // clear line + show cursor
+    let _ = out.flush();
+    Ok(StrykeValue::integer(frames))
 }
 
 /// `man PAGE...` — spawn the OS `man(1)` command with the given page
