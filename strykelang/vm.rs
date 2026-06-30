@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::Write as IoWrite;
 use std::sync::Arc;
 
 use indexmap::IndexMap;
