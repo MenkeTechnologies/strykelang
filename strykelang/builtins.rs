@@ -4190,6 +4190,11 @@ pub(crate) fn try_builtin(
         "set_title" | "set_term_title" | "window_title" => Some(builtin_set_title(args)),
         "beep" | "ring_bell" => Some(builtin_beep()),
         "seizure" | "strobe" => Some(builtin_seizure(args)),
+        "hide_cursor" | "cursor_hide" => Some(builtin_hide_cursor()),
+        "show_cursor" | "cursor_show" => Some(builtin_show_cursor()),
+        "flash" | "visual_bell" => Some(builtin_flash(args)),
+        "alt_screen" | "enter_alt_screen" => Some(builtin_alt_screen()),
+        "restore_screen" | "exit_alt_screen" => Some(builtin_restore_screen()),
         "man" | "manpage" => Some(builtin_man(args, line)),
         "run" | "exec_script" => Some(builtin_run(args, line)),
         "source" | "src" => Some(builtin_source(interp, args, line)),
@@ -25099,6 +25104,64 @@ fn builtin_seizure(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let _ = out.write_all(b"\x1b[0m\x1b[2J\x1b[H");
     let _ = out.flush();
     Ok(StrykeValue::integer(count))
+}
+
+/// Helper: write a raw control sequence to stdout and flush. Returns `1`
+/// so the terminal-control builtins all share one tiny tail.
+fn emit_seq(seq: &[u8]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    let _ = out.write_all(seq);
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `hide_cursor` / `cursor_hide` — emit `\x1b[?25l` (DECTCEM off), hiding
+/// the text cursor. Pair with `show_cursor` around any animation so the
+/// blinking caret doesn't flicker through the frames. Returns `1`.
+fn builtin_hide_cursor() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[?25l")
+}
+
+/// `show_cursor` / `cursor_show` — emit `\x1b[?25h` (DECTCEM on),
+/// restoring the text cursor hidden by `hide_cursor`. Returns `1`.
+fn builtin_show_cursor() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[?25h")
+}
+
+/// `flash(ms=80)` / `visual_bell` — the proper visual bell: invert the
+/// whole screen (`\x1b[?5h`, DECSCNM reverse-video), pause `ms`
+/// milliseconds, then restore (`\x1b[?5l`). One clean blink, no color
+/// churn — the tame cousin of `seizure`. `ms` is clamped to `[0, 5000]`.
+/// Returns `1`.
+fn builtin_flash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let ms = args.first().map(|v| v.to_int()).unwrap_or(80).clamp(0, 5_000);
+    let mut out = std::io::stdout().lock();
+    let _ = out.write_all(b"\x1b[?5h");
+    let _ = out.flush();
+    if ms > 0 {
+        std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+    }
+    let _ = out.write_all(b"\x1b[?5l");
+    let _ = out.flush();
+    Ok(StrykeValue::integer(1))
+}
+
+/// `alt_screen` / `enter_alt_screen` — switch to the terminal's alternate
+/// screen buffer (`\x1b[?1049h`), the same full-screen takeover `vim` and
+/// `less` use. The primary buffer (and the user's scrollback) is saved
+/// untouched; call `restore_screen` to come back exactly where they left
+/// off. Returns `1`.
+fn builtin_alt_screen() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[?1049h")
+}
+
+/// `restore_screen` / `exit_alt_screen` — leave the alternate screen
+/// buffer (`\x1b[?1049l`) entered by `alt_screen`, restoring the primary
+/// buffer and scrollback. Returns `1`.
+fn builtin_restore_screen() -> StrykeResult<StrykeValue> {
+    emit_seq(b"\x1b[?1049l")
 }
 
 /// `man PAGE...` — spawn the OS `man(1)` command with the given page

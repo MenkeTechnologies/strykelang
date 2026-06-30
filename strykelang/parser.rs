@@ -14799,6 +14799,9 @@ impl Parser {
             | "history" | "repl_alias" | "repl_unalias" | "set_alias" | "unset_alias"
             | "term_size" | "term_width" | "term_height"
             | "set_title" | "beep" | "ring_bell" | "seizure" | "strobe" | "man" | "manpage"
+            | "hide_cursor" | "cursor_hide" | "show_cursor" | "cursor_show"
+            | "flash" | "visual_bell" | "alt_screen" | "enter_alt_screen"
+            | "restore_screen" | "exit_alt_screen"
             | "run" | "exec_script" | "source" | "src"
             // ── Shell-like REPL (Tier A) ───────────────────────────────────
             | "rm" | "mktemp" | "mktempdir" | "whereis"
