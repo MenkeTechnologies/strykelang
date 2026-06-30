@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.33 · 10365 topics · 167 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.33 · 10366 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -326,6 +326,7 @@
         <li><a href="#ch-date-utilities">Date Utilities</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
+        <li><a href="#ch-terminal-control">Terminal Control</a> <span class="chapter-count">7</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
         <li><a href="#ch-test-runner-worker-pool">Test Runner (worker pool)</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-ai-primitives-docs-ai-primitives-md">AI primitives (docs/AI_PRIMITIVES.md)</a> <span class="chapter-count">79</span></li>
@@ -333,7 +334,7 @@
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
         <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-other">Other</a> <span class="chapter-count">8613</span></li>
+        <li><a href="#ch-other">Other</a> <span class="chapter-count">8607</span></li>
       </ul>
     </section>
     <section class="tutorial-section" id="ch-style-guide">
@@ -11943,6 +11944,48 @@ heat()       # default 60 seconds
 </code></pre>
       </article>
     </section>
+    <section class="tutorial-section" id="ch-terminal-control">
+      <h2>Terminal Control</h2>
+      <p class="chapter-meta">7 topics</p>
+      <article class="doc-entry" id="doc-clear">
+        <h3><a class="doc-anchor" href="#doc-clear">#</a> <code>clear</code></h3>
+        <p><code>clear</code> / <code>cls</code> — emit ANSI <code>\x1b[2J\x1b[H</code> (clear screen + cursor home). Lighter than <code>reset</code> (which re-inits the terminal); <code>clear</code> is the shell muscle-memory key for &quot;give me a blank prompt.&quot;</p>
+        <pre><code class="lang-perl">clear()                              # blank the screen
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-set-title">
+        <h3><a class="doc-anchor" href="#doc-set-title">#</a> <code>set_title</code></h3>
+        <p><code>set_title(TITLE)</code> — emit the ANSI OSC sequence <code>\x1b]2;TITLE\x07</code> (sets the terminal window title in most modern terminals: macOS Terminal, iTerm2, Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses <code>OSC 2</code> rather than <code>OSC 0</code> so the icon is left untouched. Returns <code>1</code>.</p>
+        <pre><code class="lang-perl">set_title(&quot;stryke - $script_name&quot;)
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-beep">
+        <h3><a class="doc-anchor" href="#doc-beep">#</a> <code>beep</code></h3>
+        <p><code>beep</code> / <code>ring_bell</code> — emit <code>\x07</code> (BEL — ASCII 7), which most terminals interpret as an audible or visual bell depending on settings. Returns <code>1</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-seizure">
+        <h3><a class="doc-anchor" href="#doc-seizure">#</a> <code>seizure</code></h3>
+        <p><code>seizure(count=24, delay_ms=40)</code> / <code>strobe</code> — strobe the terminal: blank the screen and cycle the background through bright ANSI colors <code>count</code> times, pausing <code>delay_ms</code> ms between frames. Always restores a clean screen on exit. Returns the number of frames flashed. Cosmetic REPL party-trick in the same family as <code>beep</code> / <code>clear</code>; <code>count</code> clamps to <code>[0, 10000]</code>, <code>delay_ms</code> to <code>[0, 5000]</code>.</p>
+        <pre><code class="lang-perl">seizure()                            # 24 flashes, ~1s
+seizure(60, 20)                      # faster, longer
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-term-size">
+        <h3><a class="doc-anchor" href="#doc-term-size">#</a> <code>term_size</code></h3>
+        <p><code>term_size</code> → <code>(cols, rows)</code> of the controlling terminal via <code>TIOCGWINSZ</code> ioctl. Returns <code>(0, 0)</code> when STDOUT isn&#39;t a TTY (piped output, captured by a parent process, etc.).</p>
+        <pre><code class="lang-perl">var ($c, $r) = term_size()
+p &quot;$c x $r&quot;
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-term-width">
+        <h3><a class="doc-anchor" href="#doc-term-width">#</a> <code>term_width</code></h3>
+        <p><code>term_width</code> → integer column count of the controlling terminal (0 off-TTY).</p>
+      </article>
+      <article class="doc-entry" id="doc-term-height">
+        <h3><a class="doc-anchor" href="#doc-term-height">#</a> <code>term_height</code></h3>
+        <p><code>term_height</code> → integer row count of the controlling terminal (0 off-TTY).</p>
+      </article>
+    </section>
     <section class="tutorial-section" id="ch-testing">
       <h2>Testing</h2>
       <p class="chapter-meta">15 topics</p>
@@ -13485,7 +13528,7 @@ pty_close($h);
     </section>
     <section class="tutorial-section" id="ch-other">
       <h2>Other</h2>
-      <p class="chapter-meta">8613 topics</p>
+      <p class="chapter-meta">8607 topics</p>
       <article class="doc-entry" id="doc-">
         <h3><a class="doc-anchor" href="#doc-">#</a> <code>$!</code></h3>
         <p><code>$!</code> — the OS error from the most recent system call, in stringified form (e.g. <code>&quot;No such file or directory&quot;</code>) or as an <code>errno</code> integer in numeric context. Set by <code>open</code>, <code>close</code>, <code>chdir</code>, <code>read</code>, <code>write</code>, and other syscalls when they fail. The value persists until the next failing call, so always check it *immediately* after the failing operation — intermediate clean Perl code does not touch it, but any subsequent syscall will.</p>
@@ -16895,10 +16938,6 @@ p @$bb   # (0, 1, 5, 4)
         <p><code>beaufort</code> — operation <code>beaufort</code>. Category: *cryptography deep*.</p>
         <pre><code class="lang-perl">p beaufort $x
 </code></pre>
-      </article>
-      <article class="doc-entry" id="doc-beep">
-        <h3><a class="doc-anchor" href="#doc-beep">#</a> <code>beep</code></h3>
-        <p><code>beep</code> / <code>ring_bell</code> — emit <code>\x07</code> (BEL — ASCII 7), which most terminals interpret as an audible or visual bell depending on settings. Returns <code>1</code>.</p>
       </article>
       <article class="doc-entry" id="doc-before-n">
         <h3><a class="doc-anchor" href="#doc-before-n">#</a> <code>before_n</code></h3>
@@ -21645,12 +21684,6 @@ var $d3 = $dog-&gt;clone()        # deep copy
         <h3><a class="doc-anchor" href="#doc-clean-price">#</a> <code>clean_price</code></h3>
         <p><code>clean_price</code> — operation <code>clean price</code>. Category: *excel/sheets + bond/loan financial*.</p>
         <pre><code class="lang-perl">p clean_price $x
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-clear">
-        <h3><a class="doc-anchor" href="#doc-clear">#</a> <code>clear</code></h3>
-        <p><code>clear</code> / <code>cls</code> — emit ANSI <code>\x1b[2J\x1b[H</code> (clear screen + cursor home). Lighter than <code>reset</code> (which re-inits the terminal); <code>clear</code> is the shell muscle-memory key for &quot;give me a blank prompt.&quot;</p>
-        <pre><code class="lang-perl">clear()                              # blank the screen
 </code></pre>
       </article>
       <article class="doc-entry" id="doc-clighten">
@@ -56796,12 +56829,6 @@ var @r = @{seq_fn(5, 1, -1)}  # [5,4,3,2,1]
         <pre><code class="lang-perl">p set_subname $x
 </code></pre>
       </article>
-      <article class="doc-entry" id="doc-set-term-title">
-        <h3><a class="doc-anchor" href="#doc-set-term-title">#</a> <code>set_term_title</code></h3>
-        <p><code>set_title(TITLE)</code> — emit the ANSI OSC sequence <code>\x1b]2;TITLE\x07</code> (sets the terminal window title in most modern terminals: macOS Terminal, iTerm2, Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses <code>OSC 2</code> rather than <code>OSC 0</code> so the icon is left untouched. Returns <code>1</code>.</p>
-        <pre><code class="lang-perl">set_title(&quot;stryke - $script_name&quot;)
-</code></pre>
-      </article>
       <article class="doc-entry" id="doc-setex">
         <h3><a class="doc-anchor" href="#doc-setex">#</a> <code>setex</code></h3>
         <p><code>setex</code> — operation <code>setex</code>. Category: *redis-flavour primitives*.</p>
@@ -60626,21 +60653,6 @@ p $means{b}  # 3.5
         <p><code>tensor_trace_index</code> — index of <code>tensor trace</code>. Category: *electrochemistry, batteries, fuel cells*.</p>
         <pre><code class="lang-perl">p tensor_trace_index $x
 </code></pre>
-      </article>
-      <article class="doc-entry" id="doc-term-cols">
-        <h3><a class="doc-anchor" href="#doc-term-cols">#</a> <code>term_cols</code></h3>
-        <p><code>term_width</code> → integer column count of the controlling terminal (0 off-TTY).</p>
-      </article>
-      <article class="doc-entry" id="doc-term-dims">
-        <h3><a class="doc-anchor" href="#doc-term-dims">#</a> <code>term_dims</code></h3>
-        <p><code>term_size</code> → <code>(cols, rows)</code> of the controlling terminal via <code>TIOCGWINSZ</code> ioctl. Returns <code>(0, 0)</code> when STDOUT isn&#39;t a TTY (piped output, captured by a parent process, etc.).</p>
-        <pre><code class="lang-perl">var ($c, $r) = term_size()
-p &quot;$c x $r&quot;
-</code></pre>
-      </article>
-      <article class="doc-entry" id="doc-term-height">
-        <h3><a class="doc-anchor" href="#doc-term-height">#</a> <code>term_height</code></h3>
-        <p><code>term_height</code> → integer row count of the controlling terminal (0 off-TTY).</p>
       </article>
       <article class="doc-entry" id="doc-term-life-a-n-t">
         <h3><a class="doc-anchor" href="#doc-term-life-a-n-t">#</a> <code>term_life_a_n_t</code></h3>

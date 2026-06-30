@@ -5082,6 +5082,7 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "term_height" | "term_rows" | "tty_lines" | "tty_rows" => "`term_height` → integer row count of the controlling terminal (0 off-TTY).",
         "set_title" | "set_term_title" | "window_title" => "`set_title(TITLE)` — emit the ANSI OSC sequence `\\x1b]2;TITLE\\x07` (sets the terminal window title in most modern terminals: macOS Terminal, iTerm2, Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses `OSC 2` rather than `OSC 0` so the icon is left untouched. Returns `1`.\n\n```perl\nset_title(\"stryke - $script_name\")\n```",
         "beep" | "ring_bell" => "`beep` / `ring_bell` — emit `\\x07` (BEL — ASCII 7), which most terminals interpret as an audible or visual bell depending on settings. Returns `1`.",
+        "seizure" | "strobe" => "`seizure(count=24, delay_ms=40)` / `strobe` — strobe the terminal: blank the screen and cycle the background through bright ANSI colors `count` times, pausing `delay_ms` ms between frames. Always restores a clean screen on exit. Returns the number of frames flashed. Cosmetic REPL party-trick in the same family as `beep` / `clear`; `count` clamps to `[0, 10000]`, `delay_ms` to `[0, 5000]`.\n\n```perl\nseizure()                            # 24 flashes, ~1s\nseizure(60, 20)                      # faster, longer\n```",
 
         // ── Shell-like REPL — Tier A ──
         "rm" | "rm_file" => "`rm PATH...` — remove one or more files. Returns the count actually removed. Silently skips paths that don't exist (Perl `unlink` semantics applied to the shell-name).\n\n```perl\nrm(\"/tmp/foo\")\nrm(@stale_files)                    # bulk\n```",
@@ -9838,6 +9839,18 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "stress_io",
             "stress_test",
             "heat",
+        ],
+    ),
+    (
+        "Terminal Control",
+        &[
+            "clear",
+            "set_title",
+            "beep",
+            "seizure",
+            "term_size",
+            "term_width",
+            "term_height",
         ],
     ),
     (

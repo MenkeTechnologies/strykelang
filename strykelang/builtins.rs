@@ -4189,6 +4189,7 @@ pub(crate) fn try_builtin(
         "term_height" | "term_rows" | "tty_lines" | "tty_rows" => Some(builtin_term_height()),
         "set_title" | "set_term_title" | "window_title" => Some(builtin_set_title(args)),
         "beep" | "ring_bell" => Some(builtin_beep()),
+        "seizure" | "strobe" => Some(builtin_seizure(args)),
         "man" | "manpage" => Some(builtin_man(args, line)),
         "run" | "exec_script" => Some(builtin_run(args, line)),
         "source" | "src" => Some(builtin_source(interp, args, line)),
@@ -25061,6 +25062,43 @@ fn builtin_beep() -> StrykeResult<StrykeValue> {
     let _ = out.write_all(b"\x07");
     let _ = out.flush();
     Ok(StrykeValue::integer(1))
+}
+
+/// `seizure(count=24, delay_ms=40)` — strobe the terminal: blank the
+/// screen and cycle the background through a palette of bright ANSI
+/// colors, `count` times, pausing `delay_ms` milliseconds between
+/// frames. Always restores a clean screen (`\x1b[0m\x1b[2J\x1b[H`) on
+/// the way out, even if interrupted. Returns the number of frames
+/// flashed.
+///
+/// Purely cosmetic REPL party-trick, in the same Tier-S shell family as
+/// `beep` and `clear`. `count` is clamped to `[0, 10_000]` and
+/// `delay_ms` to `[0, 5_000]` so a stray argument can't wedge the
+/// terminal. Off a TTY it still emits the sequences (harmless when
+/// captured / piped).
+fn builtin_seizure(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
+    use std::io::Write;
+    let count = args.first().map(|v| v.to_int()).unwrap_or(24).clamp(0, 10_000);
+    let delay_ms = args.get(1).map(|v| v.to_int()).unwrap_or(40).clamp(0, 5_000);
+
+    // Bright (high-intensity) ANSI background codes: red, green, yellow,
+    // blue, magenta, cyan, white. Cycling these gives the strobe.
+    const BG: [u8; 7] = [101, 102, 103, 104, 105, 106, 107];
+
+    let mut out = std::io::stdout().lock();
+    for i in 0..count {
+        let code = BG[(i as usize) % BG.len()];
+        // background color, clear screen, cursor home
+        let _ = write!(out, "\x1b[{}m\x1b[2J\x1b[H", code);
+        let _ = out.flush();
+        if delay_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms as u64));
+        }
+    }
+    // Always leave the terminal in a sane state.
+    let _ = out.write_all(b"\x1b[0m\x1b[2J\x1b[H");
+    let _ = out.flush();
+    Ok(StrykeValue::integer(count))
 }
 
 /// `man PAGE...` — spawn the OS `man(1)` command with the given page
