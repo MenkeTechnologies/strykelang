@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.34 · 10366 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.34 · 10371 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -326,7 +326,7 @@
         <li><a href="#ch-date-utilities">Date Utilities</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-git">Git</a> <span class="chapter-count">10</span></li>
         <li><a href="#ch-system">System</a> <span class="chapter-count">13</span></li>
-        <li><a href="#ch-terminal-control">Terminal Control</a> <span class="chapter-count">7</span></li>
+        <li><a href="#ch-terminal-control">Terminal Control</a> <span class="chapter-count">12</span></li>
         <li><a href="#ch-testing">Testing</a> <span class="chapter-count">15</span></li>
         <li><a href="#ch-test-runner-worker-pool">Test Runner (worker pool)</a> <span class="chapter-count">4</span></li>
         <li><a href="#ch-ai-primitives-docs-ai-primitives-md">AI primitives (docs/AI_PRIMITIVES.md)</a> <span class="chapter-count">79</span></li>
@@ -11946,7 +11946,7 @@ heat()       # default 60 seconds
     </section>
     <section class="tutorial-section" id="ch-terminal-control">
       <h2>Terminal Control</h2>
-      <p class="chapter-meta">7 topics</p>
+      <p class="chapter-meta">12 topics</p>
       <article class="doc-entry" id="doc-clear">
         <h3><a class="doc-anchor" href="#doc-clear">#</a> <code>clear</code></h3>
         <p><code>clear</code> / <code>cls</code> — emit ANSI <code>\x1b[2J\x1b[H</code> (clear screen + cursor home). Lighter than <code>reset</code> (which re-inits the terminal); <code>clear</code> is the shell muscle-memory key for &quot;give me a blank prompt.&quot;</p>
@@ -11969,6 +11969,38 @@ heat()       # default 60 seconds
         <pre><code class="lang-perl">seizure()                            # 24 flashes, ~1s
 seizure(60, 20)                      # faster, longer
 </code></pre>
+      </article>
+      <article class="doc-entry" id="doc-flash">
+        <h3><a class="doc-anchor" href="#doc-flash">#</a> <code>flash</code></h3>
+        <p><code>flash(ms=80)</code> / <code>visual_bell</code> — the proper visual bell: invert the whole screen (<code>\x1b[?5h</code>, DECSCNM reverse-video), pause <code>ms</code> milliseconds, then restore (<code>\x1b[?5l</code>). One clean blink with no color churn — the tame cousin of <code>seizure</code>. <code>ms</code> clamps to <code>[0, 5000]</code>. Returns <code>1</code>.</p>
+        <pre><code class="lang-perl">flash()                              # quick screen blink
+flash(200)                          # longer, more emphatic
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-hide-cursor">
+        <h3><a class="doc-anchor" href="#doc-hide-cursor">#</a> <code>hide_cursor</code></h3>
+        <p><code>hide_cursor</code> / <code>cursor_hide</code> — emit <code>\x1b[?25l</code> (DECTCEM off) to hide the text cursor. Pair with <code>show_cursor</code> around any animation so the blinking caret doesn&#39;t flicker through the frames. Returns <code>1</code>.</p>
+        <pre><code class="lang-perl">hide_cursor()
+# … draw an animation …
+show_cursor()
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-show-cursor">
+        <h3><a class="doc-anchor" href="#doc-show-cursor">#</a> <code>show_cursor</code></h3>
+        <p><code>show_cursor</code> / <code>cursor_show</code> — emit <code>\x1b[?25h</code> (DECTCEM on) to restore the text cursor hidden by <code>hide_cursor</code>. Returns <code>1</code>.</p>
+      </article>
+      <article class="doc-entry" id="doc-alt-screen">
+        <h3><a class="doc-anchor" href="#doc-alt-screen">#</a> <code>alt_screen</code></h3>
+        <p><code>alt_screen</code> / <code>enter_alt_screen</code> — switch to the terminal&#39;s alternate screen buffer (<code>\x1b[?1049h</code>), the same full-screen takeover <code>vim</code> and <code>less</code> use. The primary buffer and scrollback are saved untouched; call <code>restore_screen</code> to return exactly where the user left off. Returns <code>1</code>.</p>
+        <pre><code class="lang-perl">alt_screen()
+clear()
+# … run a full-screen TUI …
+restore_screen()                    # scrollback comes back intact
+</code></pre>
+      </article>
+      <article class="doc-entry" id="doc-restore-screen">
+        <h3><a class="doc-anchor" href="#doc-restore-screen">#</a> <code>restore_screen</code></h3>
+        <p><code>restore_screen</code> / <code>exit_alt_screen</code> — leave the alternate screen buffer (<code>\x1b[?1049l</code>) entered by <code>alt_screen</code>, restoring the primary buffer and scrollback. Returns <code>1</code>.</p>
       </article>
       <article class="doc-entry" id="doc-term-size">
         <h3><a class="doc-anchor" href="#doc-term-size">#</a> <code>term_size</code></h3>

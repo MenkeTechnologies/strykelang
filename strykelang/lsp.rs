@@ -5083,6 +5083,11 @@ fn doc_for_label_text(label: &str) -> Option<&'static str> {
         "set_title" | "set_term_title" | "window_title" => "`set_title(TITLE)` — emit the ANSI OSC sequence `\\x1b]2;TITLE\\x07` (sets the terminal window title in most modern terminals: macOS Terminal, iTerm2, Alacritty, kitty, GNOME Terminal, Windows Terminal). Uses `OSC 2` rather than `OSC 0` so the icon is left untouched. Returns `1`.\n\n```perl\nset_title(\"stryke - $script_name\")\n```",
         "beep" | "ring_bell" => "`beep` / `ring_bell` — emit `\\x07` (BEL — ASCII 7), which most terminals interpret as an audible or visual bell depending on settings. Returns `1`.",
         "seizure" | "strobe" => "`seizure(count=24, delay_ms=40)` / `strobe` — strobe the terminal: blank the screen and cycle the background through bright ANSI colors `count` times, pausing `delay_ms` ms between frames. Always restores a clean screen on exit. Returns the number of frames flashed. Cosmetic REPL party-trick in the same family as `beep` / `clear`; `count` clamps to `[0, 10000]`, `delay_ms` to `[0, 5000]`.\n\n```perl\nseizure()                            # 24 flashes, ~1s\nseizure(60, 20)                      # faster, longer\n```",
+        "hide_cursor" | "cursor_hide" => "`hide_cursor` / `cursor_hide` — emit `\\x1b[?25l` (DECTCEM off) to hide the text cursor. Pair with `show_cursor` around any animation so the blinking caret doesn't flicker through the frames. Returns `1`.\n\n```perl\nhide_cursor()\n# … draw an animation …\nshow_cursor()\n```",
+        "show_cursor" | "cursor_show" => "`show_cursor` / `cursor_show` — emit `\\x1b[?25h` (DECTCEM on) to restore the text cursor hidden by `hide_cursor`. Returns `1`.",
+        "flash" | "visual_bell" => "`flash(ms=80)` / `visual_bell` — the proper visual bell: invert the whole screen (`\\x1b[?5h`, DECSCNM reverse-video), pause `ms` milliseconds, then restore (`\\x1b[?5l`). One clean blink with no color churn — the tame cousin of `seizure`. `ms` clamps to `[0, 5000]`. Returns `1`.\n\n```perl\nflash()                              # quick screen blink\nflash(200)                          # longer, more emphatic\n```",
+        "alt_screen" | "enter_alt_screen" => "`alt_screen` / `enter_alt_screen` — switch to the terminal's alternate screen buffer (`\\x1b[?1049h`), the same full-screen takeover `vim` and `less` use. The primary buffer and scrollback are saved untouched; call `restore_screen` to return exactly where the user left off. Returns `1`.\n\n```perl\nalt_screen()\nclear()\n# … run a full-screen TUI …\nrestore_screen()                    # scrollback comes back intact\n```",
+        "restore_screen" | "exit_alt_screen" => "`restore_screen` / `exit_alt_screen` — leave the alternate screen buffer (`\\x1b[?1049l`) entered by `alt_screen`, restoring the primary buffer and scrollback. Returns `1`.",
 
         // ── Shell-like REPL — Tier A ──
         "rm" | "rm_file" => "`rm PATH...` — remove one or more files. Returns the count actually removed. Silently skips paths that don't exist (Perl `unlink` semantics applied to the shell-name).\n\n```perl\nrm(\"/tmp/foo\")\nrm(@stale_files)                    # bulk\n```",
@@ -9848,6 +9853,11 @@ pub const DOC_CATEGORIES: &[(&str, &[&str])] = &[
             "set_title",
             "beep",
             "seizure",
+            "flash",
+            "hide_cursor",
+            "show_cursor",
+            "alt_screen",
+            "restore_screen",
             "term_size",
             "term_width",
             "term_height",
