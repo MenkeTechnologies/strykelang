@@ -1,12 +1,12 @@
 #!/usr/bin/env stryke
 require "./FlowerField.stk"
 
-fn j($a) { join("\n", @{$a}) }
+fn jn($a) { join("\n", @{$a}) }
 
-assert_eq j(Exercism::FlowerField::annotate([])),                       "",       "empty"
-assert_eq j(Exercism::FlowerField::annotate(["   ","   ","   "])),      "   \n   \n   ", "no flowers"
-assert_eq j(Exercism::FlowerField::annotate(["*"])),                    "*",      "single flower"
-assert_eq j(Exercism::FlowerField::annotate([" "])),                     " ",      "single empty"
-assert_eq j(Exercism::FlowerField::annotate(["*  "," * "," * "])),       "*21\n3*2\n2*2", "neighbors"
+assert_eq jn(Exercism::FlowerField::annotate([])),                       "",       "empty"
+assert_eq jn(Exercism::FlowerField::annotate(["   ","   ","   "])),      "   \n   \n   ", "no flowers"
+assert_eq jn(Exercism::FlowerField::annotate(["*"])),                    "*",      "single flower"
+assert_eq jn(Exercism::FlowerField::annotate([" "])),                     " ",      "single empty"
+assert_eq jn(Exercism::FlowerField::annotate(["*  "," * "," * "])),       "*21\n3*2\n2*2", "neighbors"
 
 test_run

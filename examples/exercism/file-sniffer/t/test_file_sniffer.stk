@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./FileSniffer.stk"
 
-fn j($a) { join(":", @{$a}) }
+fn jn($a) { join(":", @{$a}) }
 
 assert_eq Exercism::FileSniffer::type_from_extension("exe"), "application/octet-stream", "exe ext"
 assert_eq Exercism::FileSniffer::type_from_extension("bmp"), "image/bmp",                 "bmp ext"
@@ -15,7 +15,7 @@ assert_eq Exercism::FileSniffer::type_from_binary("\x89PNG\x0D\x0A\x1A\x0Adata")
 assert_eq Exercism::FileSniffer::type_from_binary("\xFF\xD8\xFFdata"),             "image/jpg",                 "JPG magic"
 assert_eq Exercism::FileSniffer::type_from_binary("GIF89a"),                       "image/gif",                 "GIF magic"
 
-assert_eq j(Exercism::FileSniffer::verify("GIF89a", "gif")), "ok:image/gif",                                              "verify match"
-assert_eq j(Exercism::FileSniffer::verify("GIF89a", "png")), "error:Warning, file format and file extension do not match.", "verify mismatch"
+assert_eq jn(Exercism::FileSniffer::verify("GIF89a", "gif")), "ok:image/gif",                                              "verify match"
+assert_eq jn(Exercism::FileSniffer::verify("GIF89a", "png")), "error:Warning, file format and file extension do not match.", "verify mismatch"
 
 test_run

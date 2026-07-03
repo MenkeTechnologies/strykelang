@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 require "./VariableLengthQuantity.stk"
 
-fn j($a)  { join(",", @{$a}) }
+fn jn($a)  { join(",", @{$a}) }
 fn jr($a) { val $r = $a; ref($r) eq 'ARRAY' && $r->[0] eq 'ok' ? "ok:" . join(",", @{$r->[1]}) : "error:" . $r->[1] }
 
-assert_eq j(Exercism::VariableLengthQuantity::encode([0])),       "0",         "0 → 1 byte"
-assert_eq j(Exercism::VariableLengthQuantity::encode([127])),     "127",       "127 → 1 byte"
-assert_eq j(Exercism::VariableLengthQuantity::encode([128])),     "129,0",     "128 → 2 bytes (0x81, 0x00)"
-assert_eq j(Exercism::VariableLengthQuantity::encode([0xff])),    "129,127",   "255 → 2 bytes"
-assert_eq j(Exercism::VariableLengthQuantity::encode([0x4000])),  "129,128,0", "0x4000 → 3 bytes"
-assert_eq j(Exercism::VariableLengthQuantity::encode([1,2,3])),   "1,2,3",     "multi"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([0])),       "0",         "0 → 1 byte"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([127])),     "127",       "127 → 1 byte"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([128])),     "129,0",     "128 → 2 bytes (0x81, 0x00)"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([0xff])),    "129,127",   "255 → 2 bytes"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([0x4000])),  "129,128,0", "0x4000 → 3 bytes"
+assert_eq jn(Exercism::VariableLengthQuantity::encode([1,2,3])),   "1,2,3",     "multi"
 
 assert_eq jr(Exercism::VariableLengthQuantity::decode([0])),         "ok:0",      "decode 0"
 assert_eq jr(Exercism::VariableLengthQuantity::decode([127])),       "ok:127",    "decode 127"

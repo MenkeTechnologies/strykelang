@@ -1,19 +1,19 @@
 #!/usr/bin/env stryke
 require "./GameOfLife.stk"
 
-fn j($a) { join("|", map { join(",", @{$_}) } @{$a}) }
+fn jn($a) { join("|", map { join(",", @{$_}) } @{$a}) }
 
 # Empty/dead.
-assert_eq j(Exercism::GameOfLife::tick([[0,0],[0,0]])), "0,0|0,0", "all dead stays"
+assert_eq jn(Exercism::GameOfLife::tick([[0,0],[0,0]])), "0,0|0,0", "all dead stays"
 
 # Block (still life).
 val $block = [[0,0,0,0],[0,1,1,0],[0,1,1,0],[0,0,0,0]]
-assert_eq j(Exercism::GameOfLife::tick($block)), j($block), "block is stable"
+assert_eq jn(Exercism::GameOfLife::tick($block)), jn($block), "block is stable"
 
 # Blinker (oscillator) — vertical → horizontal.
 val $bv = [[0,1,0],[0,1,0],[0,1,0]]
 val $bh = [[0,0,0],[1,1,1],[0,0,0]]
-assert_eq j(Exercism::GameOfLife::tick($bv)), j($bh), "blinker v → h"
-assert_eq j(Exercism::GameOfLife::tick($bh)), j($bv), "blinker h → v"
+assert_eq jn(Exercism::GameOfLife::tick($bv)), jn($bh), "blinker v → h"
+assert_eq jn(Exercism::GameOfLife::tick($bh)), jn($bv), "blinker h → v"
 
 test_run

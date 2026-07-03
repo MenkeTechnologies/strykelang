@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 require "./RationalNumbers.stk"
 
-fn j($a) { join("/", @{$a}) }
+fn jn($a) { join("/", @{$a}) }
 
-assert_eq j(Exercism::RationalNumbers::add([1,2], [2,3])),  "7/6",  "1/2 + 2/3 = 7/6"
-assert_eq j(Exercism::RationalNumbers::sub([1,2], [1,3])),  "1/6",  "1/2 - 1/3 = 1/6"
-assert_eq j(Exercism::RationalNumbers::mul([1,2], [2,3])),  "1/3",  "1/2 * 2/3 = 1/3"
-assert_eq j(Exercism::RationalNumbers::div([1,2], [2,3])),  "3/4",  "1/2 ÷ 2/3 = 3/4"
-assert_eq j(Exercism::RationalNumbers::abs([-1,-2])),       "1/2",  "abs(-1/-2)"
-assert_eq j(Exercism::RationalNumbers::reduce([4,8])),      "1/2",  "reduce 4/8"
-assert_eq j(Exercism::RationalNumbers::reduce([-4,-8])),    "1/2",  "reduce negative denom"
-assert_eq j(Exercism::RationalNumbers::pow_rational([2,3], 3)), "8/27", "(2/3)^3"
-assert_eq j(Exercism::RationalNumbers::pow_rational([1,2], -2)), "4/1", "(1/2)^-2"
+assert_eq jn(Exercism::RationalNumbers::add([1,2], [2,3])),  "7/6",  "1/2 + 2/3 = 7/6"
+assert_eq jn(Exercism::RationalNumbers::sub([1,2], [1,3])),  "1/6",  "1/2 - 1/3 = 1/6"
+assert_eq jn(Exercism::RationalNumbers::mul([1,2], [2,3])),  "1/3",  "1/2 * 2/3 = 1/3"
+assert_eq jn(Exercism::RationalNumbers::div([1,2], [2,3])),  "3/4",  "1/2 ÷ 2/3 = 3/4"
+assert_eq jn(Exercism::RationalNumbers::abs([-1,-2])),       "1/2",  "abs(-1/-2)"
+assert_eq jn(Exercism::RationalNumbers::reduce([4,8])),      "1/2",  "reduce 4/8"
+assert_eq jn(Exercism::RationalNumbers::reduce([-4,-8])),    "1/2",  "reduce negative denom"
+assert_eq jn(Exercism::RationalNumbers::pow_rational([2,3], 3)), "8/27", "(2/3)^3"
+assert_eq jn(Exercism::RationalNumbers::pow_rational([1,2], -2)), "4/1", "(1/2)^-2"
 
 test_run

@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 require "./PerfectNumbers.stk"
 
-fn j($a) { join(":", @{$a}) }
+fn jn($a) { join(":", @{$a}) }
 
-assert_eq j(Exercism::PerfectNumbers::classify(6)),    "ok:perfect",   "6 perfect"
-assert_eq j(Exercism::PerfectNumbers::classify(28)),   "ok:perfect",   "28 perfect"
-assert_eq j(Exercism::PerfectNumbers::classify(12)),   "ok:abundant",  "12 abundant"
-assert_eq j(Exercism::PerfectNumbers::classify(30)),   "ok:abundant",  "30 abundant"
-assert_eq j(Exercism::PerfectNumbers::classify(2)),    "ok:deficient", "2 deficient"
-assert_eq j(Exercism::PerfectNumbers::classify(4)),    "ok:deficient", "4 deficient"
-assert_eq j(Exercism::PerfectNumbers::classify(1)),    "ok:deficient", "1 deficient (special case)"
-assert_eq j(Exercism::PerfectNumbers::classify(0)),    "error:Classification is only possible for natural numbers.", "0 error"
-assert_eq j(Exercism::PerfectNumbers::classify(-1)),   "error:Classification is only possible for natural numbers.", "-1 error"
+assert_eq jn(Exercism::PerfectNumbers::classify(6)),    "ok:perfect",   "6 perfect"
+assert_eq jn(Exercism::PerfectNumbers::classify(28)),   "ok:perfect",   "28 perfect"
+assert_eq jn(Exercism::PerfectNumbers::classify(12)),   "ok:abundant",  "12 abundant"
+assert_eq jn(Exercism::PerfectNumbers::classify(30)),   "ok:abundant",  "30 abundant"
+assert_eq jn(Exercism::PerfectNumbers::classify(2)),    "ok:deficient", "2 deficient"
+assert_eq jn(Exercism::PerfectNumbers::classify(4)),    "ok:deficient", "4 deficient"
+assert_eq jn(Exercism::PerfectNumbers::classify(1)),    "ok:deficient", "1 deficient (special case)"
+assert_eq jn(Exercism::PerfectNumbers::classify(0)),    "error:Classification is only possible for natural numbers.", "0 error"
+assert_eq jn(Exercism::PerfectNumbers::classify(-1)),   "error:Classification is only possible for natural numbers.", "-1 error"
 
 test_run

@@ -1,25 +1,25 @@
 #!/usr/bin/env stryke
 require "./Minesweeper.stk"
 
-fn j { join("\n", @{_}) }
+fn jn { join("\n", @{_}) }
 
-assert_eq j(Exercism::Minesweeper::annotate([])),
+assert_eq jn(Exercism::Minesweeper::annotate([])),
     "",
     "no rows"
 
-assert_eq j(Exercism::Minesweeper::annotate(["   "," * "])),
+assert_eq jn(Exercism::Minesweeper::annotate(["   "," * "])),
     "111\n1*1",
     "single mine"
 
-assert_eq j(Exercism::Minesweeper::annotate(["*"])),
+assert_eq jn(Exercism::Minesweeper::annotate(["*"])),
     "*",
     "one mine"
 
-assert_eq j(Exercism::Minesweeper::annotate(["**"," "])),
+assert_eq jn(Exercism::Minesweeper::annotate(["**"," "])),
     "**\n22",
     "two corner mines"
 
-assert_eq j(Exercism::Minesweeper::annotate(["* * *"," * * "])),
+assert_eq jn(Exercism::Minesweeper::annotate(["* * *"," * * "])),
     "*3*3*\n2*3*2",
     "many mines"
 
