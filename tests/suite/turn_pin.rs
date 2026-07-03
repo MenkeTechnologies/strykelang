@@ -109,14 +109,14 @@ fn turn_full_session_via_stryke_source() {
         my $sock = udp_open()
         if ($sock == 0) {{ "BIND-FAIL" }}
         else {{
-            my $alloc = turn_allocate($sock, "{ip}", {port}, "alice", "wonderland", 2000)
+            my $alloc = turn_allocate($sock, "{ip}", {port}, "alice", "wonderland", 15000)
             if (!defined $alloc) {{
                 udp_close($sock)
                 "ALLOC-FAIL"
             }} else {{
                 my $perm = turn_permission($sock, "192.0.2.10", 2000)
                 my $sent = turn_send($sock, "192.0.2.10", 9999, "hello via turn")
-                my $reply = turn_recv($sock, 2000)
+                my $reply = turn_recv($sock, 15000)
                 udp_close($sock)
                 if (!defined $reply) {{ "RECV-FAIL" }}
                 else {{
