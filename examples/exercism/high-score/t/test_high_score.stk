@@ -1,7 +1,7 @@
 #!/usr/bin/env stryke
 require "./HighScore.stk"
 
-fn j($a) { join(",", @{$a}) }
+fn jn($a) { join(",", @{$a}) }
 
 val $s0 = Exercism::HighScore::new()
 assert_eq scalar(keys %{$s0}), 0, "new is empty"
@@ -22,6 +22,6 @@ val $s5 = Exercism::HighScore::remove_player($s4, "Bob")
 assert_eq exists($s5->{Bob}), 0, "remove_player drops key"
 
 val $s6 = Exercism::HighScore::add_player(Exercism::HighScore::add_player({}, "Bob", 5), "Alice", 10)
-assert_eq j(Exercism::HighScore::get_players($s6)), "Alice,Bob", "get_players sorted"
+assert_eq jn(Exercism::HighScore::get_players($s6)), "Alice,Bob", "get_players sorted"
 
 test_run

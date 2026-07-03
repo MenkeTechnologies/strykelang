@@ -1,13 +1,13 @@
 #!/usr/bin/env stryke
 require "./Form.stk"
 
-fn j($a) { join(",", @{$a}) }
+fn jn($a) { join(",", @{$a}) }
 fn jcheck($a) { val $r = $a; ref($r) eq 'ARRAY' ? "error:" . $r->[1] : $r }
 
 assert_eq Exercism::CityOffice::blanks(0),                "",            "zero blanks"
 assert_eq Exercism::CityOffice::blanks(5),                "XXXXX",       "five blanks"
-assert_eq j(Exercism::CityOffice::letters("Anne")),       "A,N,N,E",     "letters Anne"
-assert_eq j(Exercism::CityOffice::letters("zoo")),        "Z,O,O",       "uppercased"
+assert_eq jn(Exercism::CityOffice::letters("Anne")),       "A,N,N,E",     "letters Anne"
+assert_eq jn(Exercism::CityOffice::letters("zoo")),        "Z,O,O",       "uppercased"
 
 assert_eq jcheck(Exercism::CityOffice::check_length("hello", 10)), "ok",     "fits"
 assert_eq jcheck(Exercism::CityOffice::check_length("hello", 5)),  "ok",     "exact"

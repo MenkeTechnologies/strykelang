@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 require "./FlattenArray.stk"
 
-fn j($a) { join(",", @{$a}) }
+fn jn($a) { join(",", @{$a}) }
 
-assert_eq j(Exercism::FlattenArray::flatten([])),                       "",          "empty"
-assert_eq j(Exercism::FlattenArray::flatten([1,2,3])),                  "1,2,3",     "flat"
-assert_eq j(Exercism::FlattenArray::flatten([1,[2],3])),                "1,2,3",     "one nested"
-assert_eq j(Exercism::FlattenArray::flatten([1,[2,3],4])),              "1,2,3,4",   "two nested"
-assert_eq j(Exercism::FlattenArray::flatten([[1,2],[3,4]])),            "1,2,3,4",   "two siblings nested"
-assert_eq j(Exercism::FlattenArray::flatten([1,[2,[3,[4]]]])),          "1,2,3,4",   "deep nest"
-assert_eq j(Exercism::FlattenArray::flatten([1, undef, 3])),            "1,3",       "drop undef"
-assert_eq j(Exercism::FlattenArray::flatten([1, [undef, 2], 3])),       "1,2,3",     "drop undef inside nest"
-assert_eq j(Exercism::FlattenArray::flatten([undef, undef])),           "",          "all undef → empty"
+assert_eq jn(Exercism::FlattenArray::flatten([])),                       "",          "empty"
+assert_eq jn(Exercism::FlattenArray::flatten([1,2,3])),                  "1,2,3",     "flat"
+assert_eq jn(Exercism::FlattenArray::flatten([1,[2],3])),                "1,2,3",     "one nested"
+assert_eq jn(Exercism::FlattenArray::flatten([1,[2,3],4])),              "1,2,3,4",   "two nested"
+assert_eq jn(Exercism::FlattenArray::flatten([[1,2],[3,4]])),            "1,2,3,4",   "two siblings nested"
+assert_eq jn(Exercism::FlattenArray::flatten([1,[2,[3,[4]]]])),          "1,2,3,4",   "deep nest"
+assert_eq jn(Exercism::FlattenArray::flatten([1, undef, 3])),            "1,3",       "drop undef"
+assert_eq jn(Exercism::FlattenArray::flatten([1, [undef, 2], 3])),       "1,2,3",     "drop undef inside nest"
+assert_eq jn(Exercism::FlattenArray::flatten([undef, undef])),           "",          "all undef → empty"
 
 test_run

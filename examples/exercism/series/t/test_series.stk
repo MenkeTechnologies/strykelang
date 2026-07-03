@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 require "./Series.stk"
 
-fn j { join("|", @{Exercism::Series::slices({ series => _, sliceLength => _1 })}) }
+fn jn { join("|", @{Exercism::Series::slices({ series => _, sliceLength => _1 })}) }
 
-assert_eq j("01234", 1), "0|1|2|3|4",         "slices of one"
-assert_eq j("12", 2),    "12",                "slice length equal to series"
-assert_eq j("35", 1),    "3|5",               "slices of two"
-assert_eq j("9142", 2),  "91|14|42",          "slices of two"
-assert_eq j("01234", 2), "01|12|23|34",       "slices of two"
-assert_eq j("01234", 3), "012|123|234",       "slices of three"
-assert_eq j("01234567", 4), "0123|1234|2345|3456|4567", "slices of four"
-assert_eq j("01234", 5),    "01234",          "slices of five"
+assert_eq jn("01234", 1), "0|1|2|3|4",         "slices of one"
+assert_eq jn("12", 2),    "12",                "slice length equal to series"
+assert_eq jn("35", 1),    "3|5",               "slices of two"
+assert_eq jn("9142", 2),  "91|14|42",          "slices of two"
+assert_eq jn("01234", 2), "01|12|23|34",       "slices of two"
+assert_eq jn("01234", 3), "012|123|234",       "slices of three"
+assert_eq jn("01234567", 4), "0123|1234|2345|3456|4567", "slices of four"
+assert_eq jn("01234", 5),    "01234",          "slices of five"
 
 for val $cs ([{series=>"", sliceLength=>1}, qr/series cannot be empty/],
             [{series=>"a", sliceLength=>2}, qr/slice length cannot be greater/],

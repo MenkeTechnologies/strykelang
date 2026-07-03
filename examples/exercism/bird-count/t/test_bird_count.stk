@@ -1,15 +1,15 @@
 #!/usr/bin/env stryke
 require "./BirdCount.stk"
 
-fn j($a) { join(",", @{$a}) }
+fn jn($a) { join(",", @{$a}) }
 
 assert_eq Exercism::BirdCount::today([]),             undef, "today empty → undef"
 assert_eq Exercism::BirdCount::today([7]),            7,     "today [7] → 7"
 assert_eq Exercism::BirdCount::today([2,4,11,10,6,8]), 2,    "today head"
 
-assert_eq j(Exercism::BirdCount::increment_day_count([])),       "1",        "increment empty → [1]"
-assert_eq j(Exercism::BirdCount::increment_day_count([7])),      "8",        "increment [7] → [8]"
-assert_eq j(Exercism::BirdCount::increment_day_count([4,2,1,0,10])), "5,2,1,0,10", "increment head only"
+assert_eq jn(Exercism::BirdCount::increment_day_count([])),       "1",        "increment empty → [1]"
+assert_eq jn(Exercism::BirdCount::increment_day_count([7])),      "8",        "increment [7] → [8]"
+assert_eq jn(Exercism::BirdCount::increment_day_count([4,2,1,0,10])), "5,2,1,0,10", "increment head only"
 
 assert_eq Exercism::BirdCount::has_day_without_birds([]),       0, "empty: no zero day"
 assert_eq Exercism::BirdCount::has_day_without_birds([1,2,3]),  0, "no zeros"

@@ -1,16 +1,16 @@
 #!/usr/bin/env stryke
 require "./AllYourBase.stk"
 
-fn j { join(",", @{Exercism::AllYourBase::rebase(_, _1, _2)}) }
+fn jn { join(",", @{Exercism::AllYourBase::rebase(_, _1, _2)}) }
 
-assert_eq j([1,1,0,1,1], 2, 10),         "2,7",          "binary to decimal"
-assert_eq j([2,1,0,1,2], 3, 10),         "1,9,4",        "trinary to decimal"
-assert_eq j([1,2,3], 10, 2),             "1,1,1,1,0,1,1","decimal to binary"
-assert_eq j([3], 10, 2),                 "1,1",          "1 digit"
-assert_eq j([0], 10, 2),                 "0",            "zero in"
-assert_eq j([0,0,0], 10, 2),             "0",            "leading zeros"
-assert_eq j([2,1,0,1,2], 3, 16),         "12,2",         "trinary to hex (digit list)"
-assert_eq j([1,12,9], 16, 10),           "4,5,7",        "hex-style to decimal"
+assert_eq jn([1,1,0,1,1], 2, 10),         "2,7",          "binary to decimal"
+assert_eq jn([2,1,0,1,2], 3, 10),         "1,9,4",        "trinary to decimal"
+assert_eq jn([1,2,3], 10, 2),             "1,1,1,1,0,1,1","decimal to binary"
+assert_eq jn([3], 10, 2),                 "1,1",          "1 digit"
+assert_eq jn([0], 10, 2),                 "0",            "zero in"
+assert_eq jn([0,0,0], 10, 2),             "0",            "leading zeros"
+assert_eq jn([2,1,0,1,2], 3, 16),         "12,2",         "trinary to hex (digit list)"
+assert_eq jn([1,12,9], 16, 10),           "4,5,7",        "hex-style to decimal"
 
 var $err = eval { Exercism::AllYourBase::rebase([2], 1, 10); 0 } || $@
 assert_ok $err =~ /input base/, "input base must be >= 2"
