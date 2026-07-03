@@ -24,6 +24,8 @@
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use stryke::lsp::DOC_CATEGORIES;
+
 fn stryke_binary() -> Option<PathBuf> {
     let cands = [
         PathBuf::from("target/release/stryke"),
@@ -156,18 +158,13 @@ fn toc_starts_with_doc_categories_in_declared_order() {
         eprintln!("skip: stryke binary not built");
         return;
     };
-    // The first four DOC_CATEGORIES chapters should appear, in order,
-    // as the first four chapters of the TOC. (Locking the full list
-    // would couple the test to every future chapter add — four is
-    // enough to catch the "interleaved alphabetical" regression.)
-    // GUI Automation was removed in v0.16.31 along with enigo/xcap;
-    // it now ships as the stryke-gui cdylib package.
-    let want = [
-        "Parallel Primitives",
-        "Shared State & Concurrency",
-        "Pipeline & Pipe-Forward",
-        "Streaming Iterators",
-    ];
+    // The first four DOC_CATEGORIES chapters should appear, in order, as
+    // the first four chapters of the TOC. `want` is derived from
+    // DOC_CATEGORIES (the source of truth) rather than hand-copied, so the
+    // check locks the "TOC follows DOC_CATEGORIES order" invariant and can't
+    // silently drift when chapters are added or reordered (four is enough to
+    // catch the "interleaved alphabetical" regression).
+    let want: Vec<&str> = DOC_CATEGORIES.iter().take(4).map(|(name, _)| *name).collect();
     let got: Vec<&str> = chapters
         .iter()
         .take(want.len())
