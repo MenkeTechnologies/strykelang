@@ -9316,9 +9316,11 @@ impl Parser {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
                             let name = name.clone();
                             self.advance();
-                            // Parse full expression to handle comma operator correctly:
-                            // `$a[1, 2]` evaluates comma expr (returns last value = 2)
-                            let index = self.parse_expression()?;
+                            // Slice-aware index: closed `$a[1:3]`, open-ended
+                            // `$a[2:]` / `$a[:5]` / `$a[::2]` string/array-slice
+                            // sugar, and the Perl comma operator `$a[1, 2]`
+                            // (which evaluates to the last value).
+                            let index = self.parse_scalar_subscript_index()?;
                             self.expect(&Token::RBracket)?;
                             expr = Expr {
                                 kind: ExprKind::ArrayElement {
@@ -13880,8 +13882,10 @@ impl Parser {
                 // strip and route to char-of-string.
                 if Self::is_underscore_topic_slot(&name) {
                     if matches!(self.peek(), Token::LBracket) && self.peek_line() == line {
+                        // Slice-aware so `_[2:]` / `_[:5]` char-of-topic slices
+                        // parse the same as `$s[2:]` (see parse_scalar_subscript_index).
                         self.advance(); // [
-                        let index = self.parse_expression()?;
+                        let index = self.parse_scalar_subscript_index()?;
                         self.expect(&Token::RBracket)?;
                         return Ok(Expr {
                             kind: ExprKind::ArrayElement {
@@ -19772,6 +19776,56 @@ impl Parser {
         }
 
         Ok(from_expr)
+    }
+
+    /// Parse the index expression inside a **scalar** subscript `$s[ ... ]`
+    /// (and the topic char-index `_[ ... ]`).
+    ///
+    /// Beyond a plain index it accepts the full stryke slice grammar so the
+    /// string-slice sugar works in every form: closed `1:3`, stepped `1:9:2`,
+    /// and the open-ended `2:`, `:5`, `::2` (compiled to `SliceRange` — the VM
+    /// clamps the missing end). Falling back to `parse_expression` here (as the
+    /// callers used to) broke the open-ended forms: the colon-range parser
+    /// demands a TO endpoint and errors on the `]` of `$s[2:]`. The Perl comma
+    /// operator is preserved: `$a[1, 2]` still evaluates to the last element.
+    fn parse_scalar_subscript_index(&mut self) -> StrykeResult<Expr> {
+        // Open-start slice: `[:M]`, `[::S]`.
+        if matches!(self.peek(), Token::Colon | Token::PackageSep) {
+            return self.parse_slice_arg(false);
+        }
+        // Parse the first endpoint with colon-range suppressed so a trailing
+        // `:` before `]` (the open-ended `N:` form) doesn't make the range
+        // parser demand a TO endpoint and error on `]`.
+        self.suppress_colon_range = self.suppress_colon_range.saturating_add(1);
+        let first = self.parse_or_word();
+        self.suppress_colon_range = self.suppress_colon_range.saturating_sub(1);
+        let first = first?;
+        // Trailing `:`/`::` → slice range (closed `N:M` or open-ended `N:`).
+        if matches!(self.peek(), Token::Colon | Token::PackageSep) {
+            let line = first.line;
+            let double = matches!(self.peek(), Token::PackageSep);
+            self.advance();
+            return self.finish_slice_range(Some(Box::new(first)), double, false, line);
+        }
+        // Comma operator in subscript position: `$a[1, 2]` → last value.
+        if matches!(self.peek(), Token::Comma | Token::FatArrow) {
+            let line = first.line;
+            let mut exprs = vec![first];
+            while self.eat(&Token::Comma) || self.eat(&Token::FatArrow) {
+                if matches!(self.peek(), Token::RBracket | Token::Eof) {
+                    break;
+                }
+                exprs.push(self.parse_or_word()?);
+            }
+            if exprs.len() == 1 {
+                return Ok(exprs.pop().unwrap());
+            }
+            return Ok(Expr {
+                kind: ExprKind::List(exprs),
+                line,
+            });
+        }
+        Ok(first)
     }
 
     /// After consuming the first colon (or `::` pair), parse the rest of the slice range.
