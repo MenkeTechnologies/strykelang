@@ -9938,48 +9938,22 @@ impl VMHelper {
                 // `$_[N]` (sigil form) which keeps Perl's @_-access.
                 if let Some(real) = array.strip_prefix("__topicstr__") {
                     let s = self.scope.get_scalar(real).to_string();
-                    if let ExprKind::Range {
-                        from,
-                        to,
-                        exclusive,
-                        step,
-                    } = &index.kind
-                    {
-                        let n = s.chars().count() as i64;
-                        let mut from_i = self.eval_expr(from)?.to_int();
-                        let mut to_i = self.eval_expr(to)?.to_int();
+                    // Char-of-topic slice sugar: `_[1:3]`, `_[2:]`, `_[::-1]`.
+                    // Handles both closed `Range` and open-ended `SliceRange`.
+                    if let Some((from, to, exclusive, step)) = slice_index_endpoints(&index.kind) {
+                        let from_i = match from {
+                            Some(e) => Some(self.eval_expr(e)?.to_int()),
+                            None => None,
+                        };
+                        let to_i = match to {
+                            Some(e) => Some(self.eval_expr(e)?.to_int()),
+                            None => None,
+                        };
                         let step_i = match step {
                             Some(e) => self.eval_expr(e)?.to_int(),
                             None => 1,
                         };
-                        if from_i < 0 {
-                            from_i += n
-                        }
-                        if to_i < 0 {
-                            to_i += n
-                        }
-                        if *exclusive {
-                            to_i -= 1
-                        }
-                        let chars: Vec<char> = s.chars().collect();
-                        let mut out = String::new();
-                        if step_i > 0 {
-                            let mut i = from_i;
-                            while i <= to_i && i < n {
-                                if i >= 0 {
-                                    out.push(chars[i as usize]);
-                                }
-                                i += step_i;
-                            }
-                        } else if step_i < 0 {
-                            let mut i = from_i;
-                            while i >= to_i && i >= 0 {
-                                if i < n {
-                                    out.push(chars[i as usize]);
-                                }
-                                i += step_i;
-                            }
-                        }
+                        let out = slice_string_by_chars(&s, from_i, to_i, exclusive, step_i);
                         return Ok(StrykeValue::string(out));
                     }
                     let idx = self.eval_expr(index)?.to_int();
@@ -10000,54 +9974,29 @@ impl VMHelper {
                 // a substring with optional step. Mirrors Python `s[1:10:2]`.
                 // Detect this BEFORE collapsing the range to an int.
                 if !crate::compat_mode() && self.scope.scalar_binding_exists(array) {
-                    if let ExprKind::Range {
-                        from,
-                        to,
-                        exclusive,
-                        step,
-                    } = &index.kind
-                    {
+                    // Closed `$s[1:3]` and open-ended `$s[2:]` / `$s[:5]` / `$s[::2]`
+                    // string-slice sugar — mirrors the VM's `Op::ArraySliceRange`.
+                    if let Some((from, to, exclusive, step)) = slice_index_endpoints(&index.kind) {
                         let aname_check = self.stash_array_name_for_package(array);
                         let prefer_scalar =
                             array == "_" || self.scope.get_array(&aname_check).is_empty();
                         if prefer_scalar {
                             let s = self.scope.get_scalar(array).to_string();
                             if !s.is_empty() {
-                                let n = s.chars().count() as i64;
-                                let mut from_i = self.eval_expr(from)?.to_int();
-                                let mut to_i = self.eval_expr(to)?.to_int();
+                                let from_i = match from {
+                                    Some(e) => Some(self.eval_expr(e)?.to_int()),
+                                    None => None,
+                                };
+                                let to_i = match to {
+                                    Some(e) => Some(self.eval_expr(e)?.to_int()),
+                                    None => None,
+                                };
                                 let step_i = match step {
                                     Some(e) => self.eval_expr(e)?.to_int(),
                                     None => 1,
                                 };
-                                if from_i < 0 {
-                                    from_i += n
-                                }
-                                if to_i < 0 {
-                                    to_i += n
-                                }
-                                if *exclusive {
-                                    to_i -= 1
-                                }
-                                let chars: Vec<char> = s.chars().collect();
-                                let mut out = String::new();
-                                if step_i > 0 {
-                                    let mut i = from_i;
-                                    while i <= to_i && i < n {
-                                        if i >= 0 {
-                                            out.push(chars[i as usize]);
-                                        }
-                                        i += step_i;
-                                    }
-                                } else if step_i < 0 {
-                                    let mut i = from_i;
-                                    while i >= to_i && i >= 0 {
-                                        if i < n {
-                                            out.push(chars[i as usize]);
-                                        }
-                                        i += step_i;
-                                    }
-                                }
+                                let out =
+                                    slice_string_by_chars(&s, from_i, to_i, exclusive, step_i);
                                 return Ok(StrykeValue::string(out));
                             }
                         }
@@ -24176,4 +24125,74 @@ pub(crate) fn exec_builtin(
             line,
         )),
     }
+}
+
+/// Unwrap a slice-subscript index into `(from, to, exclusive, step)` endpoint
+/// expressions. Both the closed `Range` (`1:3`, `1:9:2`) and the open-ended
+/// `SliceRange` (`2:`, `:5`, `::2`) forms feed the string-slice sugar in the
+/// tree-walker; a `None` endpoint marks an omitted side. Returns `None` for any
+/// other index kind (plain integer / expression), which callers treat as a
+/// single-char lookup.
+pub(crate) fn slice_index_endpoints(
+    kind: &ExprKind,
+) -> Option<(Option<&Expr>, Option<&Expr>, bool, Option<&Expr>)> {
+    match kind {
+        ExprKind::Range {
+            from,
+            to,
+            exclusive,
+            step,
+        } => Some((Some(from), Some(to), *exclusive, step.as_deref())),
+        ExprKind::SliceRange { from, to, step } => {
+            Some((from.as_deref(), to.as_deref(), false, step.as_deref()))
+        }
+        _ => None,
+    }
+}
+
+/// Char-index string slice matching `Op::ArraySliceRange`'s scalar-string
+/// semantics for both closed and open-ended forms. Endpoints are `None` when
+/// omitted: for a forward step the open start defaults to `0` and the open end
+/// to the last char (inclusive); for a negative step they flip to last→first,
+/// so `s[::-1]` reverses. Negative endpoints count from the end; `exclusive`
+/// (from a `...` range) drops the final index.
+pub(crate) fn slice_string_by_chars(
+    s: &str,
+    from: Option<i64>,
+    to: Option<i64>,
+    exclusive: bool,
+    step: i64,
+) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let n = chars.len() as i64;
+    let mut from_i = from.unwrap_or(if step < 0 { n - 1 } else { 0 });
+    let mut to_i = to.unwrap_or(if step < 0 { 0 } else { n - 1 });
+    if from_i < 0 {
+        from_i += n;
+    }
+    if to_i < 0 {
+        to_i += n;
+    }
+    if exclusive {
+        to_i -= 1;
+    }
+    let mut out = String::new();
+    if step > 0 {
+        let mut i = from_i;
+        while i <= to_i && i < n {
+            if i >= 0 {
+                out.push(chars[i as usize]);
+            }
+            i += step;
+        }
+    } else if step < 0 {
+        let mut i = from_i;
+        while i >= to_i && i >= 0 {
+            if i < n {
+                out.push(chars[i as usize]);
+            }
+            i += step;
+        }
+    }
+    out
 }

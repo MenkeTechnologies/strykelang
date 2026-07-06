@@ -262,3 +262,94 @@ fn hash_slice_numeric_range_with_negative_step_aborts_on_open_end() {
         ErrorKind::Runtime
     );
 }
+
+// ── Scalar-string slice sugar `$s[...]` — open-ended forms ──
+//
+// The scalar subscript path used to parse the index with `parse_expression`,
+// which built a closed `Range` for `1:3` but errored ("Unexpected token
+// RBracket") on `2:` / `:2` because the colon-range parser demanded a TO
+// endpoint before `]`. These pin every open-ended form now that the parser
+// yields a `SliceRange` and both the VM and the tree-walker slice a string.
+
+#[test]
+fn string_slice_open_stop() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[2:]"#), "cdef");
+}
+
+#[test]
+fn string_slice_open_start() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[:3]"#), "abcd");
+}
+
+#[test]
+fn string_slice_full_reverse_double_colon_neg_one() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[::-1]"#), "fedcba");
+}
+
+#[test]
+fn string_slice_stepped() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[::2]"#), "ace");
+}
+
+#[test]
+fn string_slice_negative_open_stop() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[-2:]"#), "ef");
+}
+
+#[test]
+fn string_slice_negative_open_start() {
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[:-2]"#), "abcde");
+}
+
+#[test]
+fn string_slice_closed_still_slices() {
+    // The closed form must be untouched by the open-ended parser change.
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[1:3]"#), "bcd");
+}
+
+#[test]
+fn string_slice_comma_index_is_still_last_value() {
+    // `$s[1, 3]` is the Perl comma operator, NOT a slice — evaluates to the
+    // char at the last index. Must not be swallowed by the slice grammar.
+    assert_eq!(eval_string(r#"my $s = "abcdef"; $s[1, 3]"#), "d");
+}
+
+// ── Tree-walker path: open-ended slice inside a `map { ... }` block body ──
+//
+// `map`/`maps`/`grep` block bodies evaluate the topic via the tree-walker, not
+// the compiled VM. That path handled a closed `Range` string slice but fell
+// through to bare-`SliceRange` evaluation on open ends and panicked with
+// "open-ended slice range cannot be evaluated outside slice subscript". These
+// pin the char-of-topic slice `_[...]` across the tree-walker.
+
+#[test]
+fn topic_string_slice_open_stop_in_map() {
+    assert_eq!(
+        eval_string(r#"my @r = map { _[1:] } ("hello", "world"); join(",", @r)"#),
+        "ello,orld"
+    );
+}
+
+#[test]
+fn topic_string_slice_open_start_in_map() {
+    assert_eq!(
+        eval_string(r#"my @r = map { _[:2] } ("hello", "world"); join(",", @r)"#),
+        "hel,wor"
+    );
+}
+
+#[test]
+fn topic_string_slice_reverse_in_map() {
+    assert_eq!(
+        eval_string(r#"my @r = map { _[::-1] } ("abc", "xy"); join(",", @r)"#),
+        "cba,yx"
+    );
+}
+
+#[test]
+fn topic_string_slice_closed_in_map_unchanged() {
+    assert_eq!(
+        eval_string(r#"my @r = map { _[1:3] } ("hello", "world"); join(",", @r)"#),
+        "ell,orl"
+    );
+}
