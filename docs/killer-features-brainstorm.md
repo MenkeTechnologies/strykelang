@@ -41,7 +41,7 @@ Most "killer features" from other languages are already in Stryke:
 
 **Source:** Tcl/Expect (1990, still unmatched until now)
 
-PTY/expect runtime fully wired in `strykelang/perl_pty.rs`. Builtins: `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact`. Method-form sugar via `require "perl_pty_class.stk"`.
+PTY/expect runtime fully wired in `strykelang/perl_pty.rs`. Builtins: `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_stream`, `pty_interact`. Method-form sugar via `require "perl_pty_class.stk"`.
 
 ```stryke
 my $h = pty_spawn("ssh user@host");

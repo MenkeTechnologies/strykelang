@@ -5375,6 +5375,8 @@ pub(crate) fn try_builtin(
         #[cfg(unix)]
         "pty_close" => Some(crate::perl_pty::pty_close(args, line)),
         #[cfg(unix)]
+        "pty_stream" => Some(crate::perl_pty::pty_stream(args, line)),
+        #[cfg(unix)]
         "pty_interact" => Some(crate::perl_pty::pty_interact(args, line)),
         #[cfg(unix)]
         "pty_strip_ansi" => Some(crate::perl_pty::pty_strip_ansi(args, line)),

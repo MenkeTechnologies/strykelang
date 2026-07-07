@@ -3773,6 +3773,7 @@ $h->close();
 | `pty_expect_table($h, [+{re, do}, ...], timeout?)` | Multi-pattern dispatch — first match wins; calls the matched branch's `do` sub |
 | `pty_buffer($h)` / `pty_alive($h)` / `pty_eof($h)` | Inspection |
 | `pty_close($h)` | SIGTERM → 200ms grace → SIGKILL, returns exit status |
+| `pty_stream($h, timeout_secs?)` | Non-interactive `expect eof`: echo the child's remaining output to stdout until it exits, then reap and return exit status |
 | `pty_interact($h)` | Raw-mode handoff: `tcgetattr`/`cfmakeraw`, `select()` on stdin+master, forward both directions until EOF or Ctrl-] |
 
 Combined with `pmap_on` cluster dispatch you get parallel SSH automation across N hosts:

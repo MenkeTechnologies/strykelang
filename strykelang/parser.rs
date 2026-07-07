@@ -18688,8 +18688,8 @@ impl Parser {
             | "mcp_server_start" | "mcp_serve_registered_tools"
             // ── PTY / expect (docs/expect-feature-idea.md) ────────────
             | "pty_spawn" | "pty_send" | "pty_read" | "pty_expect" | "pty_expect_table"
-            | "pty_buffer" | "pty_alive" | "pty_eof" | "pty_close" | "pty_interact"
-            | "pty_strip_ansi" | "pty_after_eof" | "pty_pending_events"
+            | "pty_buffer" | "pty_alive" | "pty_eof" | "pty_close" | "pty_stream"
+            | "pty_interact" | "pty_strip_ansi" | "pty_after_eof" | "pty_pending_events"
             // ── Stress / telemetry extensions ─────────────────────────
             | "stress_fp" | "stress_int" | "stress_cache" | "stress_branch"
             | "stress_sort" | "stress_alloc" | "stress_mmap" | "stress_disk"
