@@ -11,6 +11,7 @@
 //!   * `pty_expect_table($h, [+{re=>qr/../, do=>sub{}}, ...], timeout_secs?)`
 //!     → return value of the matched branch's `do` sub, or undef on timeout
 //!   * `pty_close($h)`                                          → exit status
+//!   * `pty_stream($h, timeout_secs?)`                          → run to EOF, echo output, exit status
 //!   * `pty_eof($h)`  / `pty_alive($h)`                          → 0/1
 //!   * `pty_buffer($h)`                                         → unconsumed buffer
 //!   * `pty_interact($h)`                                       → handoff to user
@@ -46,7 +47,13 @@ struct PtyHandle {
     /// `expect` match yet. `expect` scans this for the regex; `read`
     /// drains it; `send` does not touch it.
     buffer: Vec<u8>,
+    /// Set once `pty_close` tears the handle down.
     closed: bool,
+    /// Set once the master fd reaches EOF on its own (the child closed the
+    /// slave tty / exited). Distinct from `closed`: EOF can arrive while the
+    /// process is still reap-able, so `pty_close` still reaps it. Drives
+    /// `pty_eof` and the `undef`-on-EOF contract of `pty_read`/`pty_expect`.
+    saw_eof: bool,
     exit_status: Option<i32>,
 }
 
@@ -167,6 +174,7 @@ pub(crate) fn pty_spawn(args: &[StrykeValue], line: usize) -> Result<StrykeValue
                 cmd: cmd_str.clone(),
                 buffer: Vec::new(),
                 closed: false,
+                saw_eof: false,
                 exit_status: None,
             };
             registry().lock().insert(id, Arc::new(Mutex::new(handle)));
@@ -307,20 +315,26 @@ pub(crate) fn pty_read(args: &[StrykeValue], line: usize) -> Result<StrykeValue>
     let fd = g.master_fd.as_raw_fd();
 
     // Drain whatever the kernel has now without waiting.
-    drain_into_buffer(fd, &mut g.buffer);
+    drain_and_mark_eof(&mut g);
 
-    // If nothing buffered, wait up to `timeout` for one read.
-    if g.buffer.is_empty() && timeout > Duration::ZERO {
+    // If nothing buffered and we haven't hit EOF, wait up to `timeout` for
+    // one read.
+    if g.buffer.is_empty() && !g.saw_eof && timeout > Duration::ZERO {
         match wait_readable(fd, timeout) {
             ReadyResult::Ready => {
-                drain_into_buffer(fd, &mut g.buffer);
+                drain_and_mark_eof(&mut g);
             }
             ReadyResult::Timeout => {}
             ReadyResult::Eof => {
-                g.closed = true;
-                return Ok(StrykeValue::UNDEF);
+                g.saw_eof = true;
             }
         }
+    }
+
+    // EOF with the buffer fully drained → undef, per the documented
+    // contract. An alive-but-idle read still returns "" (empty buffer).
+    if g.saw_eof && g.buffer.is_empty() {
+        return Ok(StrykeValue::UNDEF);
     }
 
     let bytes = std::mem::take(&mut g.buffer);
@@ -372,31 +386,71 @@ fn wait_readable(fd: RawFd, timeout: Duration) -> ReadyResult {
     ReadyResult::Ready
 }
 
-/// Read available bytes into `buffer`. Non-blocking: stops at EAGAIN.
-/// Returns `true` if any bytes were appended.
+/// Read all currently-available bytes into `buffer`. Non-blocking: loops
+/// until the kernel has no more (EAGAIN). Returns `true` if the master
+/// reached EOF — the child closed the slave tty: `read` returned 0, or a
+/// fatal read error (EIO when the Linux slave closes, or any other
+/// non-retryable errno). EAGAIN/EWOULDBLOCK is "no data right now", not EOF.
 fn drain_into_buffer(fd: RawFd, buffer: &mut Vec<u8>) -> bool {
     let mut tmp = [0u8; 4096];
-    let mut got = false;
     loop {
         let n = unsafe { libc::read(fd, tmp.as_mut_ptr() as *mut _, tmp.len()) };
         if n > 0 {
             buffer.extend_from_slice(&tmp[..n as usize]);
-            got = true;
             continue;
         }
         if n == 0 {
-            // EOF — child closed pty.
-            return got;
+            return true; // EOF — child closed pty.
         }
         let err = std::io::Error::last_os_error();
         match err.raw_os_error() {
-            Some(e) if e == libc::EAGAIN || e == libc::EWOULDBLOCK => return got,
+            Some(e) if e == libc::EAGAIN || e == libc::EWOULDBLOCK => return false,
             Some(libc::EINTR) => continue,
-            // EIO is what Linux returns when the slave side closes —
-            // treat as EOF.
-            Some(libc::EIO) => return got,
-            _ => return got,
+            // EIO (Linux slave-closed) or any other fatal read error: the
+            // stream is dead, so treat it as EOF.
+            _ => return true,
         }
+    }
+}
+
+/// Drain the master into the handle buffer and update `saw_eof`.
+///
+/// EOF is declared when `read` reports it directly (0 / EIO) **or** when the
+/// kernel has nothing more (EAGAIN) *and* the child has already exited.
+/// macOS/BSD pty masters do not reliably re-post EOF via `read()==0` once the
+/// child is gone — that signal is edge-triggered and easily missed if the
+/// buffer still holds unmatched bytes — so we fall back to process liveness,
+/// the same way pexpect gates on `isalive()`.
+fn drain_and_mark_eof(g: &mut PtyHandle) {
+    let fd = g.master_fd.as_raw_fd();
+    if drain_into_buffer(fd, &mut g.buffer) {
+        g.saw_eof = true;
+        return;
+    }
+    if !g.saw_eof && child_gone(g) {
+        g.saw_eof = true;
+    }
+}
+
+/// Non-blocking check: has the child exited? Reaps the zombie (recording the
+/// exit status) so the pid doesn't linger. Returns true once the child is no
+/// longer running (or was already reaped elsewhere).
+fn child_gone(g: &mut PtyHandle) -> bool {
+    use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+    match waitpid(g.pid, Some(WaitPidFlag::WNOHANG)) {
+        Ok(WaitStatus::StillAlive) => false,
+        Ok(WaitStatus::Exited(_, code)) => {
+            g.exit_status.get_or_insert(code);
+            true
+        }
+        Ok(WaitStatus::Signaled(_, sig, _)) => {
+            g.exit_status.get_or_insert(-(sig as i32));
+            true
+        }
+        // Stopped / Continued: process still exists, not EOF.
+        Ok(_) => false,
+        // No such child — already reaped (e.g. by pty_alive).
+        Err(_) => true,
     }
 }
 
@@ -459,10 +513,15 @@ pub(crate) fn pty_expect_table(args: &[StrykeValue], line: usize) -> Result<Stry
     let started = Instant::now();
     loop {
         let mut g = h.lock();
-        if g.closed {
-            return Ok(StrykeValue::UNDEF);
+        if !g.closed {
+            // Pull in anything already waiting (and note EOF, including the
+            // child-exited case) before matching, so we don't hang on a
+            // pattern the dead child will never print.
+            drain_and_mark_eof(&mut g);
         }
-        // Try every branch against the buffer in order; first match wins.
+        // Try every branch against the buffer in order; first match wins. A
+        // match on the current buffer wins even at EOF, so check before the
+        // EOF bail below.
         let mut hit: Option<(usize, usize, StrykeValue)> = None;
         for (re, action) in &compiled {
             if let Some(m) = re.find(&g.buffer) {
@@ -490,7 +549,12 @@ pub(crate) fn pty_expect_table(args: &[StrykeValue], line: usize) -> Result<Stry
                 ))));
             }
         }
-        // No branch matched — read more.
+        // No branch matched. If the stream is done (closed or child gone),
+        // no more data can arrive, so no branch can ever match — bail now
+        // instead of blocking for the full timeout.
+        if g.closed || g.saw_eof {
+            return Ok(StrykeValue::UNDEF);
+        }
         let elapsed = started.elapsed();
         if elapsed >= timeout {
             return Ok(StrykeValue::UNDEF);
@@ -499,19 +563,12 @@ pub(crate) fn pty_expect_table(args: &[StrykeValue], line: usize) -> Result<Stry
         let fd = g.master_fd.as_raw_fd();
         drop(g);
         match wait_readable(fd, remaining.min(Duration::from_millis(500))) {
-            ReadyResult::Ready => {
-                let mut g = h.lock();
-                let any = drain_into_buffer(fd, &mut g.buffer);
-                if !any {
-                    g.closed = true;
-                    return Ok(StrykeValue::UNDEF);
-                }
-            }
+            // Fall through in every case: the top of the loop re-drains and
+            // re-checks the branches / EOF uniformly.
+            ReadyResult::Ready => {}
             ReadyResult::Timeout => continue,
             ReadyResult::Eof => {
-                let mut g = h.lock();
-                g.closed = true;
-                return Ok(StrykeValue::UNDEF);
+                h.lock().saw_eof = true;
             }
         }
     }
@@ -527,9 +584,12 @@ fn expect_one(
     let started = Instant::now();
     loop {
         let mut g = h.lock();
-        if g.closed && g.buffer.is_empty() {
-            return Ok(StrykeValue::UNDEF);
+        if !g.closed {
+            // Drain (and note EOF, including child-exited) before matching —
+            // see pty_expect_table.
+            drain_and_mark_eof(&mut g);
         }
+        // A match on the current buffer wins even at EOF — check it first.
         let hit_range: Option<(usize, usize)> = re.find(&g.buffer).map(|m| (m.start(), m.end()));
         if let Some((start, end)) = hit_range {
             let bytes = g.buffer[start..end].to_vec();
@@ -537,6 +597,12 @@ fn expect_one(
             return Ok(StrykeValue::string(
                 String::from_utf8_lossy(&bytes).into_owned(),
             ));
+        }
+        // No match, and the stream is done (closed or child gone): no more
+        // data can ever arrive, so the pattern can never match. Bail now
+        // instead of blocking for the full timeout.
+        if g.closed || g.saw_eof {
+            return Ok(StrykeValue::UNDEF);
         }
         let elapsed = started.elapsed();
         if elapsed >= timeout {
@@ -546,19 +612,12 @@ fn expect_one(
         let fd = g.master_fd.as_raw_fd();
         drop(g);
         match wait_readable(fd, remaining.min(Duration::from_millis(500))) {
-            ReadyResult::Ready => {
-                let mut g = h.lock();
-                let any = drain_into_buffer(fd, &mut g.buffer);
-                if !any && g.buffer.is_empty() {
-                    g.closed = true;
-                    return Ok(StrykeValue::UNDEF);
-                }
-            }
+            // Fall through in every case: the top of the loop re-drains and
+            // re-checks match / EOF uniformly.
+            ReadyResult::Ready => {}
             ReadyResult::Timeout => continue,
             ReadyResult::Eof => {
-                let mut g = h.lock();
-                g.closed = true;
-                return Ok(StrykeValue::UNDEF);
+                h.lock().saw_eof = true;
             }
         }
     }
@@ -626,11 +685,13 @@ pub(crate) fn pty_eof(args: &[StrykeValue], line: usize) -> Result<StrykeValue> 
         line,
     )?;
     let g = h.lock();
-    Ok(StrykeValue::integer(if g.closed && g.buffer.is_empty() {
-        1
-    } else {
-        0
-    }))
+    Ok(StrykeValue::integer(
+        if (g.closed || g.saw_eof) && g.buffer.is_empty() {
+            1
+        } else {
+            0
+        },
+    ))
 }
 
 // ── pty_close ─────────────────────────────────────────────────────────
@@ -667,7 +728,9 @@ pub(crate) fn pty_close(args: &[StrykeValue], line: usize) -> Result<StrykeValue
             Ok(WaitStatus::Signaled(_, sig, _)) => -(sig as i32),
             _ => 0,
         };
-        h.lock().exit_status = Some(exit);
+        // Don't clobber a status already recorded when the child was reaped
+        // earlier (e.g. by `child_gone` while draining in pty_stream).
+        h.lock().exit_status.get_or_insert(exit);
     }
     if id != 0 {
         registry().lock().shift_remove(&id);
@@ -681,6 +744,69 @@ fn handle_id(v: &StrykeValue) -> Option<u64> {
         .as_hash_map()
         .or_else(|| v.as_hash_ref().map(|h| h.read().clone()))?;
     map.get("__pty_id__").map(|v| v.to_int() as u64)
+}
+
+// ── pty_stream ────────────────────────────────────────────────────────
+//
+// `pty_stream($h, $timeout?)` — the non-interactive counterpart to
+// `pty_interact`: copy the child's remaining output to our stdout until it
+// exits (EOF), then reap the child and tear the handle down. This is the
+// stryke form of Tcl's `expect eof` with `log_user 1` — run a spawned
+// command to completion while echoing what it prints.
+//
+// `$timeout` (seconds) caps the wait; 0 or omitted means "until EOF, no
+// limit". Returns the child's exit status (like `pty_close`): 0 on clean
+// exit, the exit code otherwise, `-N` for signal N, `-9` if it had to be
+// killed. Output is flushed as it arrives so progress is visible live.
+pub(crate) fn pty_stream(args: &[StrykeValue], line: usize) -> Result<StrykeValue> {
+    use std::io::Write;
+    let h = lookup(
+        args.first()
+            .ok_or_else(|| StrykeError::runtime("pty_stream: handle required", line))?,
+        line,
+    )?;
+    let timeout_secs = args.get(1).map(|v| v.to_int()).unwrap_or(0);
+    let deadline = if timeout_secs > 0 {
+        Some(Instant::now() + Duration::from_secs(timeout_secs as u64))
+    } else {
+        None
+    };
+
+    let mut stdout = std::io::stdout();
+    loop {
+        let fd;
+        {
+            let mut g = h.lock();
+            if g.closed {
+                break;
+            }
+            drain_and_mark_eof(&mut g);
+            if !g.buffer.is_empty() {
+                let bytes = std::mem::take(&mut g.buffer);
+                let _ = stdout.write_all(&bytes);
+                let _ = stdout.flush();
+            }
+            if g.saw_eof {
+                break;
+            }
+            fd = g.master_fd.as_raw_fd();
+        }
+        let budget = match deadline {
+            Some(d) => {
+                let now = Instant::now();
+                if now >= d {
+                    break;
+                }
+                d - now
+            }
+            None => Duration::from_millis(500),
+        };
+        let _ = wait_readable(fd, budget.min(Duration::from_millis(500)));
+    }
+
+    // Reap the child and remove the handle from the registry, returning its
+    // exit status.
+    pty_close(args, line)
 }
 
 // ── pty_interact ──────────────────────────────────────────────────────

@@ -8143,6 +8143,7 @@ CORE::pty_pending_events
 CORE::pty_read
 CORE::pty_send
 CORE::pty_spawn
+CORE::pty_stream
 CORE::pty_strip_ansi
 CORE::pu
 CORE::pubip
@@ -19362,6 +19363,7 @@ pty_pending_events
 pty_read
 pty_send
 pty_spawn
+pty_stream
 pty_strip_ansi
 pu
 pub

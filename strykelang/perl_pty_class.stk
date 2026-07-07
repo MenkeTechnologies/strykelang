@@ -24,6 +24,7 @@ class PtyHandle {
     fn alive                  { pty_alive($self->raw) }
     fn eof                    { pty_eof($self->raw) }
     fn close                  { pty_close($self->raw) }
+    fn stream($timeout)       { pty_stream($self->raw, $timeout // 0) }
     fn interact               { pty_interact($self->raw) }
 
     # Table form — `$h->branch([+{re=>qr/.../, do=>sub{...}}, ...], 30)`.

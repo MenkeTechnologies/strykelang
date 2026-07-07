@@ -1,6 +1,6 @@
 # Expect-style Interactive Automation for Stryke — **PHASES 1-4 SHIPPED**
 
-**Status:** PTY/expect runtime is fully wired in `strykelang/perl_pty.rs`. `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_interact` all dispatch through `builtins.rs`. Method-form sugar (`PtyHandle::spawn`/`->expect`/`->send`/`->branch`/`->interact`/`->close`) lives in `strykelang/perl_pty_class.stk` — `require "perl_pty_class.stk"` in your script. Phase 5 (cluster fanout polish + Windows ConPTY) remains deferred.
+**Status:** PTY/expect runtime is fully wired in `strykelang/perl_pty.rs`. `pty_spawn`, `pty_send`, `pty_read`, `pty_expect`, `pty_expect_table`, `pty_buffer`, `pty_alive`, `pty_eof`, `pty_close`, `pty_stream`, `pty_interact` all dispatch through `builtins.rs`. Method-form sugar (`PtyHandle::spawn`/`->expect`/`->send`/`->branch`/`->stream`/`->interact`/`->close`) lives in `strykelang/perl_pty_class.stk` — `require "perl_pty_class.stk"` in your script. Phase 5 (cluster fanout polish + Windows ConPTY) remains deferred.
 
 ## The Gap
 
@@ -205,6 +205,31 @@ in Phase 5.
 - ⏳ `pfor @hosts -> $h { my $p = pty_spawn("ssh $h"); ... }` benchmark vs Ansible — `pmap_on cluster` already works today with `pty_spawn` inside the body, so cross-host PTY automation is functional via the cluster surface; the deferred work is the dedicated benchmarking pass.
 - ✅ `pty_after_eof($h, "callback_name")` async reaper — spawns a watcher thread that flips a fired flag once the PTY closes. Drain via `pty_pending_events()` in the main loop.
 - ✅ ANSI strip (`pty_strip_ansi $text`) — VT100/xterm CSI/OSC/ESC removal. Pure logic; not a full terminal emulator but covers prompts, banners, and progress bars.
+
+### EOF detection — `pty_eof` / `pty_read` undef-on-EOF
+
+`pty_eof($h)` returns true once the child has finished **and** the buffer is
+fully drained — the standard expect/pexpect contract ("nothing left to read").
+`pty_read` returns `undef` at that point (not `""`), and `pty_expect` /
+`pty_expect_table` return `undef` immediately when the stream closes rather
+than blocking for the whole timeout on a pattern the dead child can never
+print.
+
+Implementation lives in `drain_and_mark_eof` (`perl_pty.rs`). Detecting EOF is
+subtle because a `read()` of `0` on the pty master is **edge-triggered and
+unreliable on macOS/BSD**: once the child exits, the master often returns
+`EAGAIN` on every subsequent read instead of `0`, so a naive "`read()==0` means
+EOF" check misses it whenever the final output was already buffered. The fix
+detects EOF two ways:
+
+1. `read()` returns `0`, or `EIO` (Linux slave-closed) / any other fatal errno.
+2. `read()` returns `EAGAIN` (no more data) **and** a non-blocking `waitpid`
+   shows the child has exited — the liveness fallback pexpect gates on.
+
+Draining always happens *before* the liveness check, so trailing pre-exit
+output is never dropped. A handle carries a `saw_eof` flag distinct from
+`closed` (set only by `pty_close`): EOF can arrive while the process is still
+reap-able, so `pty_close` still reaps it and no zombie leaks.
 
 ---
 
