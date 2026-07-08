@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.37 · 10383 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.37 · 10384 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -333,7 +333,7 @@
         <li><a href="#ch-mcp-model-context-protocol">MCP (Model Context Protocol)</a> <span class="chapter-count">13</span></li>
         <li><a href="#ch-web-framework-stryke-web-readme-md">Web framework (stryke_web/README.md)</a> <span class="chapter-count">112</span></li>
         <li><a href="#ch-stress-telemetry-docs-stress-testing-md">Stress / telemetry (docs/STRESS_TESTING.md)</a> <span class="chapter-count">42</span></li>
-        <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">13</span></li>
+        <li><a href="#ch-pty-expect-docs-expect-feature-idea-md">PTY / expect (docs/expect-feature-idea.md)</a> <span class="chapter-count">14</span></li>
         <li><a href="#ch-other">Other</a> <span class="chapter-count">8607</span></li>
       </ul>
     </section>
@@ -13561,7 +13561,7 @@ web_route &quot;POST /posts&quot;, &quot;posts#create&quot;
     </section>
     <section class="tutorial-section" id="ch-pty-expect-docs-expect-feature-idea-md">
       <h2>PTY / expect (docs/expect-feature-idea.md)</h2>
-      <p class="chapter-meta">13 topics</p>
+      <p class="chapter-meta">14 topics</p>
       <article class="doc-entry" id="doc-pty-spawn">
         <h3><a class="doc-anchor" href="#doc-pty-spawn">#</a> <code>pty_spawn</code></h3>
         <p><code>pty_spawn &quot;cmd args&quot;</code> or <code>pty_spawn(&quot;cmd&quot;, &quot;arg1&quot;, &quot;arg2&quot;)</code> — allocate a PTY, fork+exec the child, return a handle. Master fd is non-blocking.</p>
@@ -13613,7 +13613,7 @@ pty_close($h);
       </article>
       <article class="doc-entry" id="doc-pty-stream">
         <h3><a class="doc-anchor" href="#doc-pty-stream">#</a> <code>pty_stream</code></h3>
-        <p><code>pty_stream $h, $timeout?</code> — non-interactive <code>expect eof</code>: echo the child's remaining output to stdout until it exits (or the optional timeout), then reap it and return the exit status. Use it to run a spawned command to completion after answering its prompts.</p>
+        <p><code>pty_stream $h, $timeout?</code> — non-interactive <code>expect eof</code>: echo the child&#39;s remaining output to stdout until it exits (or the optional timeout), then reap it and return the exit status. Use for running a spawned command to completion after answering its prompts.</p>
       </article>
       <article class="doc-entry" id="doc-pty-interact">
         <h3><a class="doc-anchor" href="#doc-pty-interact">#</a> <code>pty_interact</code></h3>
