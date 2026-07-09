@@ -953,6 +953,12 @@ Builtins from inside advice bodies:
 - `intercept_remove($id)` — removes one by id; returns the count removed (0 or 1).
 - `intercept_clear()` — drops all; returns count cleared.
 
+### Embedded in zshrs — the `@`-prefix dispatch
+
+stryke is designed to embed **inside** [zshrs](https://github.com/MenkeTechnologies/zshrs): the shell is the host, stryke is its scripting layer. The contract is a single handler slot — `STRYKE_HANDLER` (`zshrs/src/lib.rs:353`), a `OnceLock<Box<dyn Fn(&str) -> i32 + Send + Sync>>`. The **fat binary** (shell + stryke linked together) registers `stryke::run` into that slot through `set_stryke_handler` (`zshrs/src/lib.rs:356`); the **thin binary** leaves it `None`, in which case `@` is an ordinary character. `try_stryke_dispatch` (`zshrs/src/lib.rs:365`) returns `Some(exit_code)` when a handler is registered and `None` otherwise, so any line the shell routes through it runs as stryke source.
+
+The wired consumer today is AOP advice bodies: a zshrs `intercept` whose body starts with `@` strips the sigil and runs the remainder as stryke (`zshrs/src/extensions/intercepts.rs:167-169`), so a shell-level pointcut can carry stryke logic instead of shell script. This is the same interception model stryke exposes as `before`/`after`/`around` above — one model, split only by which language writes the advice.
+
 ---
 
 ## [0x07] CLI FLAGS
