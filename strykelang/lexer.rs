@@ -65,6 +65,15 @@ pub struct Lexer {
     /// auto-wrap an RHS that contains free positional aliases into an
     /// implicit zero-arg coderef (so `my $f = _ * 2` ≡ `my $f = fn { _ * 2 }`).
     pub bare_positional_indices: std::collections::HashSet<usize>,
+    /// Set by [`Self::skip_whitespace_and_comments`] when it consumes a *bare*
+    /// newline (not a `\`-continuation). Consumed once at the top of
+    /// [`Self::next_token`] to clear [`Self::last_was_term`] so a statement that
+    /// starts on a fresh line is disambiguated in term position — e.g. a leading
+    /// `-s`/`-f` reads as a file-test, `/…/` as a regex, `%h` as a hash sigil —
+    /// instead of gluing to the previous line's trailing term. Matches the
+    /// parser's own newline-is-a-boundary rule (`next_is_new_statement_start`);
+    /// suppressed under `--compat`, where Perl requires `;` to end a statement.
+    saw_bare_newline: bool,
 }
 
 impl Lexer {
@@ -86,6 +95,7 @@ impl Lexer {
             suppress_m_regex: 0,
             last_was_bare_positional: false,
             bare_positional_indices: std::collections::HashSet::new(),
+            saw_bare_newline: false,
         }
     }
 
@@ -201,6 +211,11 @@ impl Lexer {
             } else if ch.is_whitespace() {
                 if ch == '\n' {
                     self.line += 1;
+                    // A bare newline (the `\`-continuation case is handled
+                    // above and never reaches here) marks a statement boundary
+                    // in stryke mode. Record it so `next_token` can drop
+                    // term-context for the token that starts the next line.
+                    self.saw_bare_newline = true;
                 }
                 self.pos += 1;
             } else {
@@ -1652,7 +1667,16 @@ impl Lexer {
     }
     /// `next_token` — see implementation.
     pub fn next_token(&mut self) -> StrykeResult<Token> {
+        self.saw_bare_newline = false;
         self.skip_whitespace_and_comments();
+        // A statement that begins on a fresh line starts in term position, so
+        // drop the previous line's trailing-term context before the disambig
+        // branches (`-X` file-test, `/` regex, `%` hash, `<` glob) run. Perl
+        // (`--compat`) has no newline-inference — it needs `;` — so keep the
+        // stale context there. Mirrors the parser's `next_is_new_statement_start`.
+        if self.saw_bare_newline && !crate::compat_mode() {
+            self.last_was_term = false;
+        }
         // Stamp the start line for [`Self::tokenize`]. Recursive calls
         // through POD / heredoc skip will overwrite this with the post-
         // skip line, so the emitted token always reports the source line
