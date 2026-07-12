@@ -7,6 +7,12 @@ pub(crate) enum StrykeSocket {
     Stream(TcpStream),
     #[allow(dead_code)]
     Udp(UdpSocket),
+    /// AF_UNIX stream — a connected Unix-domain socket. `connect($fh, "/path.sock")` opens one
+    /// when the address is an absolute path; `send`/`recv`/`shutdown` treat it like a TCP stream
+    /// (both are `Read + Write`). Talks to local daemons that bind Unix sockets (e.g. the GUI
+    /// Automation Bus at `$TMPDIR/zgui/<app>.sock`) with no external `socat`/`nc`.
+    #[cfg(unix)]
+    Unix(std::os::unix::net::UnixStream),
 }
 
 use std::io::{stderr, IsTerminal, Read, Seek, SeekFrom, Write};
@@ -42792,6 +42798,8 @@ impl VMHelper {
             StrykeSocket::Stream(sock) => sock.as_raw_fd(),
             StrykeSocket::Listener(l) => l.as_raw_fd(),
             StrykeSocket::Udp(u) => u.as_raw_fd(),
+            #[cfg(unix)]
+            StrykeSocket::Unix(u) => u.as_raw_fd(),
         })
     }
 
@@ -43298,7 +43306,22 @@ impl VMHelper {
         }
         let fh = args[0].to_string();
         let addr = args[1].to_string();
-        match TcpStream::connect(addr.trim()) {
+        let a = addr.trim();
+        // An absolute path is a Unix-domain socket; anything else is a host:port TCP address.
+        #[cfg(unix)]
+        if a.starts_with('/') {
+            return match std::os::unix::net::UnixStream::connect(a) {
+                Ok(s) => {
+                    self.socket_handles.insert(fh, StrykeSocket::Unix(s));
+                    Ok(StrykeValue::integer(1))
+                }
+                Err(e) => {
+                    self.apply_io_error_to_errno(&e);
+                    Ok(StrykeValue::integer(0))
+                }
+            };
+        }
+        match TcpStream::connect(a) {
             Ok(s) => {
                 self.socket_handles.insert(fh, StrykeSocket::Stream(s));
                 Ok(StrykeValue::integer(1))
@@ -43317,11 +43340,13 @@ impl VMHelper {
         }
         let fh = args[0].to_string();
         let data = args[1].to_string();
-        if let Some(StrykeSocket::Stream(s)) = self.socket_handles.get_mut(&fh) {
-            let n = s.write(data.as_bytes()).unwrap_or(0);
-            return Ok(StrykeValue::integer(n as i64));
-        }
-        Err(StrykeError::runtime("send: not a connected socket", line))
+        let n = match self.socket_handles.get_mut(&fh) {
+            Some(StrykeSocket::Stream(s)) => s.write(data.as_bytes()).unwrap_or(0),
+            #[cfg(unix)]
+            Some(StrykeSocket::Unix(s)) => s.write(data.as_bytes()).unwrap_or(0),
+            _ => return Err(StrykeError::runtime("send: not a connected socket", line)),
+        };
+        Ok(StrykeValue::integer(n as i64))
     }
 
     /// `recv` — Recv. Returns a string.
@@ -43332,11 +43357,13 @@ impl VMHelper {
         let fh = args[0].to_string();
         let len = args[1].to_int().max(0) as usize;
         let mut buf = vec![0u8; len];
-        if let Some(StrykeSocket::Stream(s)) = self.socket_handles.get_mut(&fh) {
-            let n = s.read(&mut buf).unwrap_or(0);
-            return Ok(StrykeValue::string(decode_utf8_or_latin1(&buf[..n])));
-        }
-        Err(StrykeError::runtime("recv: not a connected socket", line))
+        let n = match self.socket_handles.get_mut(&fh) {
+            Some(StrykeSocket::Stream(s)) => s.read(&mut buf).unwrap_or(0),
+            #[cfg(unix)]
+            Some(StrykeSocket::Unix(s)) => s.read(&mut buf).unwrap_or(0),
+            _ => return Err(StrykeError::runtime("recv: not a connected socket", line)),
+        };
+        Ok(StrykeValue::string(decode_utf8_or_latin1(&buf[..n])))
     }
 
     /// `shutdown` — Shutdown. Returns an integer.
@@ -43351,11 +43378,18 @@ impl VMHelper {
             1 => Shutdown::Write,
             _ => Shutdown::Both,
         };
-        if let Some(StrykeSocket::Stream(s)) = self.socket_handles.get_mut(&fh) {
-            let _ = s.shutdown(sh);
-            return Ok(StrykeValue::integer(1));
+        match self.socket_handles.get_mut(&fh) {
+            Some(StrykeSocket::Stream(s)) => {
+                let _ = s.shutdown(sh);
+                Ok(StrykeValue::integer(1))
+            }
+            #[cfg(unix)]
+            Some(StrykeSocket::Unix(s)) => {
+                let _ = s.shutdown(sh);
+                Ok(StrykeValue::integer(1))
+            }
+            _ => Err(StrykeError::runtime("shutdown: not a stream socket", line)),
         }
-        Err(StrykeError::runtime("shutdown: not a stream socket", line))
     }
 
     // ── seek(FH, POS, WHENCE) ──────────────────────────────────────────
