@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use lsp_server::{
     Connection, ErrorCode, ExtractError, Message, Notification, ProtocolError, Request, Response,
@@ -54,18 +54,14 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
         env!("CARGO_PKG_VERSION"),
         crate::stryke_log::current_level()
     );
+    spawn_orphan_guard();
+
     let (conn, io_threads) = Connection::stdio();
 
     let (init_id, init_params) = conn.initialize_start()?;
     let init_typed: lsp_types::InitializeParams =
         serde_json::from_value(init_params).unwrap_or_default();
     crate::slog_info!("lsp", "initialize received id={init_id}");
-    let workspace_files = scan_workspace_from_init(&init_typed);
-    crate::slog_info!(
-        "lsp.workspace",
-        "scanned {} file(s) from workspace roots",
-        workspace_files.len()
-    );
 
     let caps = ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -159,21 +155,45 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     // rust-analyzer takes this same manual approach: respond, then let the main
     // loop absorb `initialized` like any other notification (dispatch_notification
     // ignores it).
+    // Respond to `initialize` BEFORE scanning the workspace. The scan walks the
+    // whole project tree and can take many seconds on a large root (e.g. a file
+    // opened outside any small VCS root), which would blow past the client's
+    // initialize timeout and abort the connection. Responding first also lets the
+    // recv loop below start immediately, so it notices stdin EOF and exits if the
+    // client dies (rather than lingering as an orphan).
     let resp = Response::new_ok(init_id, init_result);
     conn.sender.send(resp.into()).expect("lsp channel");
     crate::slog_info!("lsp", "initialize complete, entering message loop");
 
-    let mut docs: HashMap<String, String> = HashMap::new();
-    // Workspace files are merged into the live docs map so cross-file
-    // rename / references picks them up even when the user never
-    // opened them in an editor tab. Subsequent `didOpen`/`didChange`
-    // overwrites the on-disk version with the live buffer, preserving
-    // unsaved edits.
-    for (uri, text) in workspace_files {
-        docs.insert(uri, text);
+    // Scan the workspace on a background thread; the result is dropped into this
+    // mailbox and merged into `docs` on the next loop turn. Only cross-file
+    // rename / references of *unopened* files need it, so completion/diagnostics
+    // work instantly and the scan cost is fully off the critical path.
+    let scan_mailbox: Arc<Mutex<Option<HashMap<String, String>>>> = Arc::new(Mutex::new(None));
+    {
+        let mailbox = Arc::clone(&scan_mailbox);
+        std::thread::spawn(move || {
+            let files = scan_workspace_from_init(&init_typed);
+            crate::slog_info!(
+                "lsp.workspace",
+                "scanned {} file(s) from workspace roots",
+                files.len()
+            );
+            *mailbox.lock().unwrap() = Some(files);
+        });
     }
 
+    let mut docs: HashMap<String, String> = HashMap::new();
+
     for msg in &conn.receiver {
+        // Merge a completed workspace scan before handling the message. Use
+        // `or_insert` so a file the user already opened (didOpen/didChange landed
+        // while the scan ran) keeps its live buffer instead of the on-disk copy.
+        if let Some(files) = scan_mailbox.lock().unwrap().take() {
+            for (uri, text) in files {
+                docs.entry(uri).or_insert(text);
+            }
+        }
         match msg {
             Message::Request(req) => {
                 if conn.handle_shutdown(&req)? {
@@ -193,6 +213,34 @@ pub(crate) fn run_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync>
     io_threads.join()?;
     crate::slog_info!("lsp", "io threads joined, shutting down clean");
     Ok(())
+}
+
+/// Guard against leaking as an orphan process. Every `stryke --lsp` is spawned
+/// as a child of an editor / GUI app that reaps it via kill-on-drop — but that
+/// only fires on a *graceful* client exit. A hard client death (SIGKILL, crash,
+/// force-quit, closed terminal/pane) skips the client's destructors, and if a
+/// leaked pipe fd keeps our stdin open we never see EOF either, so we would sit
+/// idle forever, reparented to pid 1. This watches for that and exits.
+fn spawn_orphan_guard() {
+    std::thread::spawn(|| {
+        // Linux: ask the kernel to SIGKILL us the instant the parent dies — no
+        // poll latency. Best-effort; the getppid poll below is the real guarantee
+        // and is the only mechanism available on macOS (no PDEATHSIG there).
+        #[cfg(target_os = "linux")]
+        // SAFETY: prctl(PR_SET_PDEATHSIG, ...) only registers a signal disposition.
+        unsafe {
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL as libc::c_ulong, 0, 0, 0);
+        }
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            // Reparented to pid 1 (init/launchd) == our spawning client died.
+            // Nothing this read-only server holds is worth leaking for; exit.
+            // SAFETY: getppid never fails and takes no arguments.
+            if unsafe { libc::getppid() } == 1 {
+                std::process::exit(0);
+            }
+        }
+    });
 }
 
 fn dispatch_request(
