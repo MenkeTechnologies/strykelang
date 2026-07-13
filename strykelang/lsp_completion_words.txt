@@ -380,6 +380,7 @@ CORE::allele_frequency
 CORE::alpha_fs
 CORE::alphabeta_value
 CORE::alt_az_to_ra_dec
+CORE::alt_screen
 CORE::alternate_case
 CORE::alternating_seq_sum
 CORE::always_false
@@ -1759,12 +1760,17 @@ CORE::clausius_clapeyron
 CORE::clausius_clapeyron_full
 CORE::clean_price
 CORE::clear
+CORE::clear_eol
+CORE::clear_line
+CORE::clear_to_eol
 CORE::clebsch_gordan
 CORE::clenshaw_curtis_quad
 CORE::cliff_delta
 CORE::clighten
 CORE::clip
+CORE::clip_copy
 CORE::clipboard
+CORE::clipboard_set
 CORE::clique_count_3
 CORE::clique_number_lower
 CORE::cloister
@@ -2270,6 +2276,9 @@ CORE::currency_split_thousands
 CORE::currency_symbol_to_code
 CORE::current_divider
 CORE::curry
+CORE::cursor_hide
+CORE::cursor_show
+CORE::cursor_to
 CORE::curve25519_mul_simple
 CORE::cusip_check
 CORE::cut
@@ -2616,6 +2625,7 @@ CORE::deroman
 CORE::des3_decrypt
 CORE::des3_encrypt
 CORE::describe
+CORE::desktop_notify
 CORE::dest_bearing
 CORE::destination_from_bearing
 CORE::destination_lat_lon
@@ -3148,6 +3158,7 @@ CORE::ensure_prefix
 CORE::ensure_suffix
 CORE::entab
 CORE::entanglement_entropy
+CORE::enter_alt_screen
 CORE::enthalpy_reaction
 CORE::entropy
 CORE::entropy_bits
@@ -3186,6 +3197,7 @@ CORE::equinox_spring
 CORE::equirectangular_project
 CORE::equivalent_potential_temp
 CORE::era_plus
+CORE::erase_line
 CORE::erdos_renyi
 CORE::erdos_renyi_random
 CORE::erf
@@ -3261,6 +3273,7 @@ CORE::exhume
 CORE::exists
 CORE::exists_key
 CORE::exit
+CORE::exit_alt_screen
 CORE::exp
 CORE::exp2
 CORE::exp_euler_step
@@ -3494,6 +3507,7 @@ CORE::fl
 CORE::flame
 CORE::flamechart
 CORE::flanger_simple
+CORE::flash
 CORE::flat_band_potential
 CORE::flat_depth
 CORE::flat_map
@@ -4060,6 +4074,7 @@ CORE::gomory_hu_step
 CORE::gompertz_growth_step
 CORE::gompertz_pdf
 CORE::goto
+CORE::goto_xy
 CORE::gouy_chapman_potential
 CORE::gr
 CORE::grade_asc
@@ -4405,6 +4420,7 @@ CORE::hicksian_demand
 CORE::hidden
 CORE::hide
 CORE::hide_capacity
+CORE::hide_cursor
 CORE::highpass_filter
 CORE::highway_hash
 CORE::hilbert_env
@@ -4678,6 +4694,7 @@ CORE::hypergeometric_2f1
 CORE::hypergeometric_pfq
 CORE::hypergeometric_pmf
 CORE::hypergeometric_u
+CORE::hyperlink
 CORE::hyperloglog
 CORE::hyperloglog_add
 CORE::hyperloglog_estimate
@@ -6120,6 +6137,7 @@ CORE::markov_transition_matrix
 CORE::markup
 CORE::markup_pct
 CORE::markup_price
+CORE::marquee
 CORE::marshallian_demand
 CORE::martyr
 CORE::mask
@@ -7174,6 +7192,7 @@ CORE::notch_filter
 CORE::note_name_from_midi
 CORE::note_name_to_midi
 CORE::note_to_freq
+CORE::notify
 CORE::now
 CORE::now_ms
 CORE::now_ns
@@ -7456,6 +7475,7 @@ CORE::os_writeback_step
 CORE::os_zero_page_optimization
 CORE::os_zram_compress_ratio
 CORE::os_zswap_compress_ratio
+CORE::osc_link
 CORE::oscillator_sawtooth
 CORE::oscillator_sine
 CORE::oscillator_square
@@ -8087,6 +8107,8 @@ CORE::productlog
 CORE::profess
 CORE::profile_hmm_score
 CORE::profit_margin_pct
+CORE::progress
+CORE::progress_bar
 CORE::proj
 CORE::projectile_max_height
 CORE::projectile_position
@@ -8335,6 +8357,8 @@ CORE::radioactive_decay
 CORE::radius_bfs
 CORE::ragone_point
 CORE::railfence_encrypt
+CORE::rainbow
+CORE::rainbow_text
 CORE::ramachandran_phi_psi
 CORE::ramanujan_sum
 CORE::ramanujan_tau
@@ -8623,6 +8647,7 @@ CORE::rest
 CORE::rest_energy
 CORE::restenergy
 CORE::restore_random_state
+CORE::restore_screen
 CORE::resultant
 CORE::resurrect
 CORE::retry
@@ -9037,6 +9062,9 @@ CORE::scompress
 CORE::score_test_stat
 CORE::scpu
 CORE::script_name
+CORE::scroll_down
+CORE::scroll_text
+CORE::scroll_up
 CORE::scrypt
 CORE::scrypt_hash
 CORE::scrypt_round
@@ -9202,6 +9230,7 @@ CORE::seifert_genus_lower
 CORE::seir_step
 CORE::seird_step
 CORE::seirs_step
+CORE::seizure
 CORE::select
 CORE::select_keys
 CORE::select_period_step
@@ -9335,6 +9364,7 @@ CORE::shorten
 CORE::shortest
 CORE::shortest_path
 CORE::shortest_path_bfs
+CORE::show_cursor
 CORE::shr
 CORE::shttp
 CORE::shuf
@@ -9924,6 +9954,7 @@ CORE::strip_prefix
 CORE::strip_suffix
 CORE::strlen
 CORE::strmul
+CORE::strobe
 CORE::strong_pseudoprime
 CORE::strongly_connected
 CORE::strouhal_full
@@ -10531,8 +10562,10 @@ CORE::ty
 CORE::type
 CORE::type_each
 CORE::type_of
+CORE::type_out
 CORE::type_redis
 CORE::typeof
+CORE::typewriter
 CORE::tz
 CORE::ubound
 CORE::ubr
@@ -10798,6 +10831,7 @@ CORE::violin
 CORE::violin_svg
 CORE::virtual_temperature_full
 CORE::vis_viva
+CORE::visual_bell
 CORE::viterbi_decode
 CORE::viterbi_pos_tag
 CORE::vlookup
@@ -11567,6 +11601,7 @@ allele_frequency
 alpha_fs
 alphabeta_value
 alt_az_to_ra_dec
+alt_screen
 alternate_case
 alternating_seq_sum
 always_false
@@ -12951,12 +12986,17 @@ clausius_clapeyron
 clausius_clapeyron_full
 clean_price
 clear
+clear_eol
+clear_line
+clear_to_eol
 clebsch_gordan
 clenshaw_curtis_quad
 cliff_delta
 clighten
 clip
+clip_copy
 clipboard
+clipboard_set
 clique_count_3
 clique_number_lower
 cloister
@@ -13465,6 +13505,9 @@ currency_split_thousands
 currency_symbol_to_code
 current_divider
 curry
+cursor_hide
+cursor_show
+cursor_to
 curve25519_mul_simple
 cusip_check
 cut
@@ -13813,6 +13856,7 @@ deroman
 des3_decrypt
 des3_encrypt
 describe
+desktop_notify
 dest_bearing
 destination_from_bearing
 destination_lat_lon
@@ -14347,6 +14391,7 @@ ensure_prefix
 ensure_suffix
 entab
 entanglement_entropy
+enter_alt_screen
 enthalpy_reaction
 entropy
 entropy_bits
@@ -14387,6 +14432,7 @@ equinox_spring
 equirectangular_project
 equivalent_potential_temp
 era_plus
+erase_line
 erdos_renyi
 erdos_renyi_random
 erf
@@ -14462,6 +14508,7 @@ exhume
 exists
 exists_key
 exit
+exit_alt_screen
 exp
 exp2
 exp_euler_step
@@ -14698,6 +14745,7 @@ fl
 flame
 flamechart
 flanger_simple
+flash
 flat_band_potential
 flat_depth
 flat_map
@@ -15268,6 +15316,7 @@ gomory_hu_step
 gompertz_growth_step
 gompertz_pdf
 goto
+goto_xy
 gouy_chapman_potential
 gr
 grade_asc
@@ -15614,6 +15663,7 @@ hicksian_demand
 hidden
 hide
 hide_capacity
+hide_cursor
 highpass_filter
 highway_hash
 hilbert_env
@@ -15887,6 +15937,7 @@ hypergeometric_2f1
 hypergeometric_pfq
 hypergeometric_pmf
 hypergeometric_u
+hyperlink
 hyperloglog
 hyperloglog_add
 hyperloglog_estimate
@@ -17335,6 +17386,7 @@ markov_transition_matrix
 markup
 markup_pct
 markup_price
+marquee
 marshallian_demand
 martyr
 mask
@@ -18391,6 +18443,7 @@ notch_filter
 note_name_from_midi
 note_name_to_midi
 note_to_freq
+notify
 now
 now_ms
 now_ns
@@ -18673,6 +18726,7 @@ os_writeback_step
 os_zero_page_optimization
 os_zram_compress_ratio
 os_zswap_compress_ratio
+osc_link
 oscillator_sawtooth
 oscillator_sine
 oscillator_square
@@ -19307,6 +19361,8 @@ productlog
 profess
 profile_hmm_score
 profit_margin_pct
+progress
+progress_bar
 proj
 projectile_max_height
 projectile_position
@@ -19557,6 +19613,8 @@ radioactive_decay
 radius_bfs
 ragone_point
 railfence_encrypt
+rainbow
+rainbow_text
 ramachandran_phi_psi
 ramanujan_sum
 ramanujan_tau
@@ -19845,6 +19903,7 @@ rest
 rest_energy
 restenergy
 restore_random_state
+restore_screen
 resultant
 resurrect
 retry
@@ -20260,6 +20319,9 @@ scompress
 score_test_stat
 scpu
 script_name
+scroll_down
+scroll_text
+scroll_up
 scrypt
 scrypt_hash
 scrypt_round
@@ -20425,6 +20487,7 @@ seifert_genus_lower
 seir_step
 seird_step
 seirs_step
+seizure
 select
 select_keys
 select_period_step
@@ -20558,6 +20621,7 @@ shorten
 shortest
 shortest_path
 shortest_path_bfs
+show_cursor
 shr
 shttp
 shuf
@@ -21148,6 +21212,7 @@ strip_prefix
 strip_suffix
 strlen
 strmul
+strobe
 strong_pseudoprime
 strongly_connected
 strouhal_full
@@ -21164,7 +21229,6 @@ stulz_min_call
 stun
 stun_classify
 sturmian_word
-style
 sub
 sub_script
 subfact
@@ -21760,9 +21824,11 @@ ty
 type
 type_each
 type_of
+type_out
 type_redis
 typed
 typeof
+typewriter
 tz
 ubound
 ubr
@@ -22031,6 +22097,7 @@ violin
 violin_svg
 virtual_temperature_full
 vis_viva
+visual_bell
 viterbi_decode
 viterbi_pos_tag
 vlookup
