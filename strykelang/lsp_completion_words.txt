@@ -5435,6 +5435,7 @@ CORE::jv
 CORE::jwt_decode
 CORE::jwt_decode_unsafe
 CORE::jwt_encode
+CORE::k
 CORE::k_core
 CORE::k_coreness
 CORE::k_from_dg
@@ -10720,6 +10721,7 @@ CORE::uuid
 CORE::uuid_v4
 CORE::uzp
 CORE::uzst
+CORE::v
 CORE::v_polynomial_eval
 CORE::vaccination_coverage_required
 CORE::vacuum_energy_density
@@ -16679,6 +16681,7 @@ jv
 jwt_decode
 jwt_decode_unsafe
 jwt_encode
+k
 k_core
 k_coreness
 k_from_dg
@@ -21983,6 +21986,7 @@ uuid
 uuid_v4
 uzp
 uzst
+v
 v_polynomial_eval
 vaccination_coverage_required
 vacuum_energy_density

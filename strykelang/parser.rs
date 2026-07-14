@@ -1751,6 +1751,7 @@ impl Parser {
                 | "join"
                 | "j"
                 | "keys"
+                | "k"
                 | "lcfirst"
                 | "lf"
                 | "lc"
@@ -1974,6 +1975,7 @@ impl Parser {
                 | "un"
                 | "utime"
                 | "values"
+                | "v"
                 | "wantarray"
                 | "warn"
                 | "watch"
@@ -3171,8 +3173,8 @@ impl Parser {
                 ExprKind::ScalarContext(Box::new(arg))
             }
             // Array/hash functions
-            "keys" => ExprKind::Keys(Box::new(arg)),
-            "values" => ExprKind::Values(Box::new(arg)),
+            "keys" | "k" => ExprKind::Keys(Box::new(arg)),
+            "values" | "v" => ExprKind::Values(Box::new(arg)),
             "each" => ExprKind::Each(Box::new(arg)),
             "pop" | "po" => ExprKind::Pop(Box::new(arg)),
             "shift" | "sh" => ExprKind::Shift(Box::new(arg)),
@@ -11085,7 +11087,7 @@ impl Parser {
                     line,
                 })
             }
-            "keys" => {
+            "keys" | "k" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -11095,7 +11097,7 @@ impl Parser {
                     line,
                 })
             }
-            "values" => {
+            "values" | "v" => {
                 if let Some(e) = self.fat_arrow_autoquote(&name, line) {
                     return Ok(e);
                 }
@@ -14757,6 +14759,8 @@ impl Parser {
         ("ix", "index"),
         ("uf", "ucfirst"),
         ("lf", "lcfirst"),
+        ("k", "keys"),
+        ("v", "values"),
     ];
 
     /// If `name` is a stryke-only extension keyword/builtin, return it; else `None`.
