@@ -5586,13 +5586,24 @@ impl<'a> VM<'a> {
                             args.push(self.pop());
                         }
                         args.reverse();
+                        // Bare `printf;` / `printf();` take the format from `$_`,
+                        // the same topic default `print` uses above (perldoc -f
+                        // printf). Only a genuinely absent format falls back —
+                        // an explicit format still wins.
                         let (fmt, rest) = match args.split_first() {
                             Some((f, r)) => (f.to_string(), r),
                             None => {
-                                return Err(StrykeError::runtime(
-                                    "printf requires a format string",
-                                    self.line(),
-                                ));
+                                let topic = self.interp.scope.get_scalar("_").clone();
+                                match self.interp.stringify_value(topic, self.line()) {
+                                    Ok(s) => (s, &args[..]),
+                                    Err(FlowOrError::Error(e)) => return Err(e),
+                                    Err(FlowOrError::Flow(_)) => {
+                                        return Err(StrykeError::runtime(
+                                            "printf: unexpected control flow",
+                                            self.line(),
+                                        ));
+                                    }
+                                }
                             }
                         };
                         // sprintf the args, then route through the handle the

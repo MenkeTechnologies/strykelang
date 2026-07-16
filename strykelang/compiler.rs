@@ -2934,6 +2934,10 @@ impl Compiler {
                     self.chunk.emit(Op::DeclareScalar(var_name), line);
                 }
 
+                // Decided once here, not per emitted iteration — see the
+                // re-declare below.
+                let fresh_lexical_per_iter = var != "_" && crate::compat_mode();
+
                 let loop_start = self.chunk.len();
                 // Check: $i < scalar @list
                 if let Some(s) = counter_slot_opt {
@@ -2952,7 +2956,23 @@ impl Compiler {
                     self.emit_get_scalar(counter_name, line, None);
                 }
                 self.chunk.emit(Op::GetArrayElem(list_name), line);
-                if let Some(s) = var_slot_opt {
+                // Perl gives `for my $x (...)` a *fresh* lexical each iteration,
+                // so closures made in different iterations capture distinct
+                // cells (`for my $i (1..4) { push @s, sub { $i } }` yields
+                // 1,2,3,4 — not 4,4,4,4). Re-declaring rebinds the slot raw,
+                // leaving any cell an earlier iteration's closure captured
+                // untouched; plain Set would write *through* that shared cell.
+                //
+                // Only --compat needs this: there `Scope::capture` shares
+                // closure storage with the outer binding, while native capture
+                // is closure-local and already snapshots per iteration. Keeping
+                // native on the cheaper Set also keeps this hot loop hot.
+                if fresh_lexical_per_iter {
+                    match var_slot_opt {
+                        Some(s) => self.chunk.emit(Op::DeclareScalarSlot(s, var_name), line),
+                        None => self.chunk.emit(Op::DeclareScalar(var_name), line),
+                    };
+                } else if let Some(s) = var_slot_opt {
                     self.chunk.emit(Op::SetScalarSlot(s), line);
                 } else {
                     self.emit_set_scalar(var_name, line, None);
@@ -4918,8 +4938,21 @@ impl Compiler {
                         }
                     }
                 }
-                self.compile_expr_ctx(value, assign_rhs_wantarray(target))?;
+                let rhs_ctx = assign_rhs_wantarray(target);
+                self.compile_expr_ctx(value, rhs_ctx)?;
                 self.compile_assign(target, line, true, Some(root))?;
+                // A *list* assignment evaluated in scalar context yields the
+                // number of RHS elements — the countof idiom `my $n = () = f()`.
+                // The count is of the right side, so a short left side doesn't
+                // cap it (`($x,$y) = (1..5)` is 5). Statements compile under
+                // Void, so this can't fire on a plain `@a = (...);`.
+                //
+                // Known edge: `() = undef` is 1 in perl but 0 here, because
+                // StackArrayLen counts via to_list(), which flattens undef to
+                // an empty list.
+                if ctx == WantarrayCtx::Scalar && rhs_ctx == WantarrayCtx::List {
+                    self.chunk.emit(Op::StackArrayLen, line);
+                }
             }
             ExprKind::CompoundAssign { target, op, value } => {
                 if let ExprKind::ScalarVar(name) = &target.kind {

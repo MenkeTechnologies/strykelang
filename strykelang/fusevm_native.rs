@@ -278,9 +278,11 @@ fn do_printf(vm: &mut fusevm::VM, argc: usize) {
     }
     args.reverse(); // pops are last-to-first → restore source order
     let r: Result<(), StrykeError> = with_interp(|i| {
+        // Bare `printf;` takes its format from `$_` (perldoc -f printf), same
+        // topic default as the VM's Op::Printf path.
         let (fmt, rest) = match args.split_first() {
             Some((f, r)) => (f.to_string(), r),
-            None => return Err(StrykeError::runtime("printf requires a format string", 0)),
+            None => (i.scope.get_scalar("_").to_string(), &args[..]),
         };
         let mut flat = Vec::new();
         for a in rest {
