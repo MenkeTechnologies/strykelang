@@ -1,6 +1,6 @@
 # Creators
 
-stryke was created by **Jacob Menke** ([MenkeTechnologies](https://github.com/MenkeTechnologies)).
+stryke was created by [MenkeTechnologies](https://github.com/MenkeTechnologies).
 
 Original synthesis (2026–): the language design, the bytecode VM (`fusevm`), the
 threading-operator family (`|>` / `~>` / `->>`), implicit-positional closure
