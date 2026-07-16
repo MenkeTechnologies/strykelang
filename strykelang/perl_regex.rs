@@ -226,6 +226,59 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => splitn_pcre2(r, s, limit),
         }
     }
+
+    /// Number of capture slots, including slot 0 (the whole match). A pattern
+    /// with no capture groups reports 1.
+    pub fn captures_len(&self) -> usize {
+        match self {
+            Self::Rust(r) => r.captures_len(),
+            Self::Fancy(r) => r.captures_len(),
+            Self::Pcre2(r) => r.captures_len(),
+        }
+    }
+
+    /// `split` with the pattern's capture groups interleaved into the field
+    /// list, as perl does: `split /(,)/, "a,b"` yields `a`, `,`, `b`. A group
+    /// that did not participate in the match yields `None` (perl's undef), so
+    /// `split /(a)|(b)/, "1a2"` yields `1`, `a`, undef, `2`.
+    ///
+    /// `limit` counts *fields* only — captures never count toward it, matching
+    /// `split /(,)/, "a,b,c", 2` → `a`, `,`, `b,c`. A limit <= 0 means "no
+    /// field cap"; the caller still owns the trailing-empty rule.
+    ///
+    /// Callers should only reach for this when `captures_len() > 1`;
+    /// `split_strings` is the cheaper path and is already well-pinned.
+    pub fn split_captures_strings(&self, s: &str, limit: Option<i64>) -> Vec<Option<String>> {
+        let ncaps = self.captures_len();
+        let field_cap = match limit {
+            Some(l) if l > 0 => Some(l as usize),
+            _ => None,
+        };
+        let mut out: Vec<Option<String>> = Vec::new();
+        let mut last = 0usize;
+        // Counts emitted fields only — captures are extra and never count
+        // toward LIMIT.
+        let mut fields = 0usize;
+        for caps in self.captures_iter(s) {
+            // The trailing remainder below is itself a field, so stop one short
+            // of the cap.
+            if field_cap.is_some_and(|cap| fields + 1 >= cap) {
+                break;
+            }
+            let m = match caps.get(0) {
+                Some(m) => m,
+                None => break,
+            };
+            fields += 1;
+            out.push(Some(s[last..m.start].to_string()));
+            for i in 1..ncaps {
+                out.push(caps.get(i).map(|g| g.text.to_string()));
+            }
+            last = m.end;
+        }
+        out.push(Some(s[last..].to_string()));
+        out
+    }
 }
 /// `CaptureIter` — see variants.
 pub enum CaptureIter<'r, 't> {
