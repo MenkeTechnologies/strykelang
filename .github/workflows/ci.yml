@@ -31,6 +31,7 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     env:
       RUST_BACKTRACE: 1
     strategy:
@@ -64,6 +65,10 @@ jobs:
   parity:
     name: Parity vs system perl
     runs-on: ubuntu-latest
+    # Without an explicit cap this inherits GitHub's 6h default, which is how the
+    # oversized _p3/_p4/_p5 corpus burned a full 6h job every run instead of
+    # failing fast. Keep a cap here so corpus growth surfaces as a quick red.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
