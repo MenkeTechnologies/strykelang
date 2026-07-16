@@ -19,9 +19,9 @@ fn scalar_var_in_double_quoted() {
 #[test]
 fn scalar_braced_disambiguation() {
     let code = r#"
-        my $name = "Jacob";
-        my $s = "${name}er";   # "Jacober"
-        $s eq "Jacober" ? 1 : 0
+        my $name = "Alice";
+        my $s = "${name}er";   # "Aliceer"
+        $s eq "Aliceer" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
@@ -29,9 +29,9 @@ fn scalar_braced_disambiguation() {
 #[test]
 fn scalar_followed_by_punctuation() {
     let code = r#"
-        my $name = "Jacob";
+        my $name = "Alice";
         my $s = "$name!";       # ! is not an ident char, no braces needed
-        $s eq "Jacob!" ? 1 : 0
+        $s eq "Alice!" ? 1 : 0
     "#;
     assert_eq!(eval_int(code), 1);
 }
