@@ -10632,8 +10632,19 @@ impl VMHelper {
                         return self.eval_expr(value);
                     }
                 }
-                let val = self.eval_expr_ctx(value, assign_rhs_wantarray(target))?;
+                let rhs_ctx = assign_rhs_wantarray(target);
+                let val = self.eval_expr_ctx(value, rhs_ctx)?;
                 self.assign_value(target, val.clone())?;
+                // A *list* assignment evaluated in scalar context yields the
+                // number of RHS elements, which is what makes the countof idiom
+                // `my $n = () = f()` work. The count is of the right side, so a
+                // short left side doesn't cap it (`($x,$y) = (1..5)` is 5) and a
+                // hash target counts flattened kv elements (`%h = (a=>1)` is 2).
+                // Scalar assignment keeps returning the assigned value.
+                if ctx == WantarrayCtx::Scalar && rhs_ctx == WantarrayCtx::List {
+                    let n = val.as_array_vec().map_or(1, |items| items.len());
+                    return Ok(StrykeValue::integer(n as i64));
+                }
                 Ok(val)
             }
             ExprKind::CompoundAssign { target, op, value } => {
@@ -13438,6 +13449,14 @@ impl VMHelper {
                     .map(|l| self.eval_expr(l).map(|v| v.to_int()))
                     .transpose()?;
                 let re = self.compile_regex(&pat, "", line)?;
+                // A pattern with capture groups interleaves them into the field
+                // list (`split /(,)/, "a,b"` → a, ",", b), and a group that
+                // didn't participate yields undef. Only that case needs the
+                // capture-aware walk; the plain path stays on the cheaper
+                // engine split.
+                if re.captures_len() > 1 {
+                    return Ok(split_captures_to_value(&re, &s, lim_opt));
+                }
                 let mut parts: Vec<String> = match lim_opt {
                     Some(l) if l > 0 => re.splitn_strings(&s, l as usize),
                     _ => re.split_strings(&s),
@@ -22246,6 +22265,36 @@ pub(crate) fn perl_inc(v: &StrykeValue) -> StrykeValue {
     StrykeValue::integer(v.to_int() + 1)
 }
 
+/// Build the field list for a `split` whose pattern has capture groups, which
+/// perl interleaves into the result. Applies perl's trailing-empty rule: it
+/// strips only when LIMIT is omitted or zero, and only empty *strings* — an
+/// undef capture is not empty and stops the strip, so `split /(,)/, "a,b,,,"`
+/// keeps its final separator.
+///
+/// Shared by the AST `SplitExpr` path and the VM `Split` builtin so the two
+/// cannot drift apart.
+fn split_captures_to_value(
+    re: &PerlCompiledRegex,
+    s: &str,
+    limit: Option<i64>,
+) -> StrykeValue {
+    let mut parts = re.split_captures_strings(s, limit);
+    if matches!(limit, None | Some(0)) {
+        while parts
+            .last()
+            .is_some_and(|p| p.as_ref().is_some_and(|t| t.is_empty()))
+        {
+            parts.pop();
+        }
+    }
+    StrykeValue::array(
+        parts
+            .into_iter()
+            .map(|p| p.map_or(StrykeValue::UNDEF, StrykeValue::string))
+            .collect(),
+    )
+}
+
 fn perl_exponent_form(rust_repr: &str, upper: bool) -> String {
     let marker = if upper { 'E' } else { 'e' };
     if let Some(pos) = rust_repr.find(marker) {
@@ -22536,6 +22585,24 @@ where
                 }
             };
 
+            // Same, but for the radix conversions, whose `#` prefix must stay
+            // ahead of the zero padding: %#010b is 0b00000101, not 000000b101.
+            // Kept separate from pad_align because %s has no prefix concept —
+            // perl renders %08s of "0xAB" as 00000xAB, padding straight through.
+            let pad_align_radix =
+                |prefix: &str, digits: &str, width: usize, left: bool, zero: bool| -> String {
+                    let body = format!("{}{}", prefix, digits);
+                    if zero && !left && width > body.len() {
+                        return format!(
+                            "{}{:0>rest$}",
+                            prefix,
+                            digits,
+                            rest = width - prefix.len()
+                        );
+                    }
+                    pad_align(&body, width, left, false)
+                };
+
             // Format a single integer with the inner spec for `%v...`. No
             // width/precision is applied here — those are deferred to the
             // joined result. Supports the common int-shape conversions.
@@ -22694,39 +22761,23 @@ where
                 }
                 'x' => {
                     let v = arg.to_int();
-                    let body = if hash && v != 0 {
-                        format!("0x{:x}", v)
-                    } else {
-                        format!("{:x}", v)
-                    };
-                    pad_align(&body, w, left_align, zero_pad)
+                    let prefix = if hash && v != 0 { "0x" } else { "" };
+                    pad_align_radix(prefix, &format!("{:x}", v), w, left_align, zero_pad)
                 }
                 'X' => {
                     let v = arg.to_int();
-                    let body = if hash && v != 0 {
-                        format!("0X{:X}", v)
-                    } else {
-                        format!("{:X}", v)
-                    };
-                    pad_align(&body, w, left_align, zero_pad)
+                    let prefix = if hash && v != 0 { "0X" } else { "" };
+                    pad_align_radix(prefix, &format!("{:X}", v), w, left_align, zero_pad)
                 }
                 'o' => {
                     let v = arg.to_int();
-                    let body = if hash && v != 0 {
-                        format!("0{:o}", v)
-                    } else {
-                        format!("{:o}", v)
-                    };
-                    pad_align(&body, w, left_align, zero_pad)
+                    let prefix = if hash && v != 0 { "0" } else { "" };
+                    pad_align_radix(prefix, &format!("{:o}", v), w, left_align, zero_pad)
                 }
                 'b' => {
                     let v = arg.to_int();
-                    let body = if hash && v != 0 {
-                        format!("0b{:b}", v)
-                    } else {
-                        format!("{:b}", v)
-                    };
-                    pad_align(&body, w, left_align, zero_pad)
+                    let prefix = if hash && v != 0 { "0b" } else { "" };
+                    pad_align_radix(prefix, &format!("{:b}", v), w, left_align, zero_pad)
                 }
                 'c' => char::from_u32(arg.to_int() as u32)
                     .map(|c| c.to_string())
@@ -23198,6 +23249,14 @@ pub(crate) fn exec_builtin(
             } else {
                 let re =
                     regex::Regex::new(&pat).unwrap_or_else(|_| regex::Regex::new(" ").unwrap());
+                // Capture groups become fields of their own (see
+                // split_captures_to_value); only that case needs the slower
+                // capture-aware walk.
+                if re.captures_len() > 1 {
+                    if let Ok(pre) = PerlCompiledRegex::compile(&pat) {
+                        return Ok(split_captures_to_value(&pre, &s, lim_signed));
+                    }
+                }
                 match lim_signed {
                     Some(l) if l > 0 => re.splitn(&s, l as usize).map(|p| p.to_string()).collect(),
                     _ => re.split(&s).map(|p| p.to_string()).collect(),
