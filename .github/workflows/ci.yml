@@ -65,14 +65,14 @@ jobs:
   parity:
     name: Parity vs system perl
     runs-on: ubuntu-latest
-    # Budget, measured on this runner: ~35m cold `cargo build --release` +
-    # ~1s per parity case (~25m for the current corpus) = ~60m. 90 leaves
-    # headroom without inheriting GitHub's 6h default, which is how the
-    # oversized _p3/_p4/_p5 corpus burned a full 6h job every run.
+    # No explicit cap — this job inherits GitHub's 6h default. Budget measured
+    # on this runner: ~35m for a cold `cargo build --release` + ~1s per parity
+    # case (~25m for the current corpus) = ~60m.
     #
-    # Do not cut this below the cold-build time: a cap that kills the build
-    # also skips rust-cache's save step, so the next run is cold again and
-    # the job can never recover on its own.
+    # If you ever add a `timeout-minutes` here, keep it well above the cold
+    # build time. A cap that kills the build also skips rust-cache's save step,
+    # so the next run starts cold and the job can never recover on its own —
+    # that feedback loop is why this job stayed red for 40+ runs.
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

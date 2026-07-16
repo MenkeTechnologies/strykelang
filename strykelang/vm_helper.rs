@@ -8268,6 +8268,9 @@ impl VMHelper {
                     self.scope_push_hook();
                     self.scope.declare_scalar(var, StrykeValue::UNDEF);
                     self.english_note_lexical_scalar(var);
+                    // Fresh lexical per iteration under --compat — see the
+                    // matching comment on the materialised-list path below.
+                    let fresh_lexical_per_iter = var != "_" && crate::compat_mode();
                     'outer_iter: loop {
                         let next = match iter.next_item() {
                             Some(v) => v,
@@ -8275,6 +8278,8 @@ impl VMHelper {
                         };
                         if var == "_" {
                             self.scope.set_topic(next);
+                        } else if fresh_lexical_per_iter {
+                            self.scope.declare_scalar(var, next);
                         } else {
                             self.scope
                                 .set_scalar(var, next)
@@ -8318,6 +8323,15 @@ impl VMHelper {
                 self.scope_push_hook();
                 self.scope.declare_scalar(var, StrykeValue::UNDEF);
                 self.english_note_lexical_scalar(var);
+                // Perl gives `for my $x (...)` a *fresh* lexical each iteration,
+                // so closures built in different iterations capture distinct
+                // cells. Only --compat needs the re-declare: there
+                // `Scope::capture` shares closure storage with the outer
+                // binding, so reusing one binding would make every closure
+                // observe the final value. Native capture is closure-local and
+                // already snapshots per iteration, so it keeps the cheaper
+                // set_scalar. Hoisted out of the loop — this is a hot path.
+                let fresh_lexical_per_iter = var != "_" && crate::compat_mode();
                 let mut i = 0usize;
                 'outer: while i < items.len() {
                     // For the implicit topic loop (`for (@list) { ... }`,
@@ -8328,6 +8342,8 @@ impl VMHelper {
                     // (`for my $x (@list)`) keep the simple scalar binding.
                     if var == "_" {
                         self.scope.set_topic(items[i].clone());
+                    } else if fresh_lexical_per_iter {
+                        self.scope.declare_scalar(var, items[i].clone());
                     } else {
                         self.scope
                             .set_scalar(var, items[i].clone())

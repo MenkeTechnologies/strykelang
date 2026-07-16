@@ -78,16 +78,38 @@ fn split_on_whitespace_regex_collapses_runs() {
 }
 
 #[test]
-fn split_capture_group_currently_not_emitted() {
-    // Stryke `split` with a capturing pattern returns only the
-    // separated fields, not the captures themselves. This pin
-    // documents the present contract; lifting it to Perl-style
-    // capture-emission would need to update this test.
+fn split_capture_group_is_emitted_perl_style() {
+    // A capturing pattern emits each capture as a field of its own, as perl
+    // does: `split /(,)/, "a,b,c"` is (a, ",", b, ",", c). This lifts the
+    // earlier pin, which documented the pre-fix contract of dropping the
+    // captures entirely — the change that pin anticipated.
     let code = r#"
         my @r = split(/(,)/, "a,b,c");
-        len(@r)
+        len(@r) == 5 && $r[0] eq "a" && $r[1] eq "," && $r[2] eq "b" && $r[3] eq "," && $r[4] eq "c" ? 1 : 0
     "#;
-    assert_eq!(eval_int(code), 3);
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_capture_group_non_participating_yields_undef() {
+    // A group that did not take part in the match yields undef, not "".
+    // `split /(a)|(b)/, "1a2"` is (1, "a", undef, 2).
+    let code = r#"
+        my @r = split(/(a)|(b)/, "1a2");
+        len(@r) == 4 && $r[1] eq "a" && !defined($r[2]) ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
+}
+
+#[test]
+fn split_capture_group_limit_counts_fields_only() {
+    // LIMIT caps fields; captures are extra and never count toward it.
+    // `split /(,)/, "a,b,c", 2` is (a, ",", "b,c").
+    let code = r#"
+        my @r = split(/(,)/, "a,b,c", 2);
+        len(@r) == 3 && $r[0] eq "a" && $r[1] eq "," && $r[2] eq "b,c" ? 1 : 0
+    "#;
+    assert_eq!(eval_int(code), 1);
 }
 
 #[test]
