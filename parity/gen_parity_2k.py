@@ -1,5 +1,30 @@
 #!/usr/bin/env python3
-"""Machine parity corpus: 1001–2000 _p2, 2001–3000 _p3, 3001–10000 _p4, 10001–20000 _p5.
+"""Machine parity corpus: 1001–2000 _p2.
+
+The payload shape is picked by `fi = hash(n) % len(FMT)`, so a range wider than
+len(FMT) buys no new coverage — it re-emits the same shapes with different integer
+literals. The _p3/_p4/_p5 ranges (2001–20000) did exactly that: 18000 files for the
+same 124 shapes the 1000-file _p2 range already covers in full, which pushed the CI
+parity job past its 6h ceiling. They were deleted; do not reintroduce them.
+
+Two traps when widening coverage:
+
+1. Only the single printf payload is observable — the ~96 species lines assign to
+   `my $v...` and are never printed, so they exercise the parser and the op but pin
+   no value. A species line can only fail parity by dying or warning.
+2. `need = TARGET_LINES - 3 - len(payload_lines)` maxes at 96, so only _SPECIES
+   slots 0..95 are ever emitted. Slots 96..146 (51 entries, 35% of the table:
+   file tests, stat, glob, open, perlvar, fork/pipe/socket, ...) are dead code —
+   appending to _species_table adds nothing. The `assert len(_SPECIES) >= 96`
+   below checks the floor, not that the tail is reachable.
+
+So widen coverage by adding FMT entries (each is a real pinned value), or by
+hand-writing a case, never by widening the id range or appending species.
+
+Distinct values matter as much as distinct shapes: FMT[34] (`sprintf("%02x", m255)`)
+only exercises the zero-pad when m255 < 16, and every m255 the _p2 range emits is
+>= 30. That single behavior class was the only thing the 18000 deleted files bought
+over _p2; it is now pinned by hand in cases/20033_sprintf_hex_zero_pad.pl.
 
 Every generated file has exactly TARGET_LINES lines. Lines 1–3 are the header. Each
 following scaffold line (until the FMT payload) is a *different* Perl statement shape:
@@ -504,11 +529,10 @@ def write_range(start: int, end: int, suffix: str, digests: dict[str, str]) -> N
 
 def main() -> None:
     d = digest_index(ROOT)
+    # 1000 ids > 124 FMT shapes, so this range already covers every shape. Do not
+    # add ranges — see the module docstring.
     write_range(1001, 2000, "_p2", d)
-    write_range(2001, 3000, "_p3", d)
-    write_range(3001, 10000, "_p4", d)
-    write_range(10001, 20000, "_p5", d)
-    print("wrote machine parity batches (_p2.._p5)")
+    print("wrote machine parity batch (_p2)")
 
 
 if __name__ == "__main__":
