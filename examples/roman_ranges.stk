@@ -8,22 +8,25 @@
 # separator selects the roman interpretation. `~` is the separator to reach for
 # whenever a range type would otherwise collide with Perl's literal ranges.
 #
+# Chains use the `~>` thread macro: source right after the arrow, space-separated
+# stages, threaded value injected as each stage's first argument.
+#
 # Run: stryke examples/roman_ranges.stk
 
 p "══ Roman ranges: ~ vs : ═════════════════════════"
 p ""
 
 # ── The collision, side by side ─────────────────────────────────────────────
-val $roman = ("I"~"V") |> join(",")
-val $chars = ("I":"V") |> join(",")
+val $roman = ~> ("I"~"V") join(",")
+val $chars = ~> ("I":"V") join(",")
 p "── Same endpoints, two meanings ────────────────"
 p "  'I'~'V'  (roman) → #{$roman}"
 p "  'I':'V'  (chars) → #{$chars}"
 p ""
 
 # ── Stepping and reverse compose with ~ ─────────────────────────────────────
-val $odds = ("I"~"X":2)  |> join(",")                  # odd numerals
-val $desc = ("X"~"I":-1) |> join(",")                  # descending
+val $odds = ~> ("I"~"X":2)  join(",")                  # odd numerals
+val $desc = ~> ("X"~"I":-1) join(",")                  # descending
 p "── Step and reverse ────────────────────────────"
 p "  'I'~'X':2   → #{$odds}"
 p "  'X'~'I':-1  → #{$desc}"
@@ -31,7 +34,7 @@ p ""
 
 # ── A larger span is just a range ───────────────────────────────────────────
 val @decades = ("X"~"C":10)                            # X, XX, ..., C
-val $decstr  = @decades |> join(" ")
+val $decstr  = ~> @decades join(" ")
 p "── Decades X..C (step 10) ──────────────────────"
 p "  #{$decstr}"
 p "  count: #{ len(@decades) }"
@@ -49,8 +52,8 @@ p ""
 
 # ── The full roman span is 1..3999 = MMMCMXCIX ──────────────────────────────
 val @all   = ("I"~"MMMCMXCIX")
-val $first = @all[0:2]   |> join(",")
-val $last  = @all[-3:-1] |> join(",")
+val $first = ~> @all[0:2]  join(",")
+val $last  = ~> @all[-3:-1] join(",")
 p "── Full roman span ─────────────────────────────"
 p "  I .. MMMCMXCIX has #{ len(@all) } numerals"
 p "  first three: #{$first}"
