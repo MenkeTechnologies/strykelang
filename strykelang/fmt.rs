@@ -888,8 +888,15 @@ pub fn format_expr(e: &Expr) -> String {
             to,
             exclusive,
             step,
+            tilde,
         } => {
-            let op = if *exclusive { "..." } else { ".." };
+            let op = if *tilde {
+                "~"
+            } else if *exclusive {
+                "..."
+            } else {
+                ".."
+            };
             if let Some(s) = step {
                 format!(
                     "{} {} {}:{}",

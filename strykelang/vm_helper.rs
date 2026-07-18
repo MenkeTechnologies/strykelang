@@ -10847,6 +10847,7 @@ impl VMHelper {
                 to,
                 exclusive,
                 step,
+                tilde,
             } => {
                 if ctx == WantarrayCtx::List {
                     let f = self.eval_expr(from)?;
@@ -10876,7 +10877,7 @@ impl VMHelper {
                         };
                         Ok(StrykeValue::array(list))
                     } else {
-                        let list = perl_list_range_expand(f, t);
+                        let list = perl_list_range_expand(f, t, *tilde);
                         Ok(StrykeValue::array(list))
                     }
                 } else {
@@ -11062,9 +11063,11 @@ impl VMHelper {
                 };
                 let list = if let Some(s) = step {
                     let sv = self.eval_expr(s)?;
-                    crate::value::perl_list_range_expand_stepped(f, t, sv)
+                    // SliceRange is always `:`-based (`@a[I:V]`), never `~`, so
+                    // roman inference is off.
+                    crate::value::perl_list_range_expand_stepped(f, t, sv, false)
                 } else {
-                    perl_list_range_expand(f, t)
+                    perl_list_range_expand(f, t, false)
                 };
                 Ok(StrykeValue::array(list))
             }
@@ -24217,6 +24220,7 @@ pub(crate) fn slice_index_endpoints(
             to,
             exclusive,
             step,
+            ..
         } => Some((Some(from), Some(to), *exclusive, step.as_deref())),
         ExprKind::SliceRange { from, to, step } => {
             Some((from.as_deref(), to.as_deref(), false, step.as_deref()))

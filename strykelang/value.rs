@@ -3757,7 +3757,15 @@ fn perl_list_range_expand_string_magic(from: StrykeValue, to: StrykeValue) -> Ve
 }
 
 /// Perl list-context `..` (`pp_flop`): numeric counting or magical string sequence.
-pub(crate) fn perl_list_range_expand(from: StrykeValue, to: StrykeValue) -> Vec<StrykeValue> {
+/// `roman_ok` = the `~` "full extension range" separator was used. Roman
+/// inference is gated on it because roman digits collide with Perl char ranges
+/// (`'I':'V'` → `I,J,…,V`; `'I'~'V'` → `I,II,III,IV,V`). All other polymorphic
+/// range types have distinct literal shapes and stay inferred under any separator.
+pub(crate) fn perl_list_range_expand(
+    from: StrykeValue,
+    to: StrykeValue,
+    roman_ok: bool,
+) -> Vec<StrykeValue> {
     if perl_list_range_pair_is_numeric(&from, &to) {
         let i = from.to_int();
         let j = to.to_int();
@@ -3767,6 +3775,15 @@ pub(crate) fn perl_list_range_expand(from: StrykeValue, to: StrykeValue) -> Vec<
             Vec::new()
         }
     } else {
+        // Roman range (`~` only): `'I'~'V'` → I,II,III,IV,V. Without a `~` this
+        // falls through to Perl magic-string increment so `'I':'V'` stays chars.
+        if roman_ok {
+            let from_str = from.to_string();
+            let to_str = to.to_string();
+            if is_roman_numeral(&from_str) && is_roman_numeral(&to_str) {
+                return roman_range_stepped(&from_str, &to_str, 1);
+            }
+        }
         perl_list_range_expand_string_magic(from, to)
     }
 }
@@ -4488,6 +4505,7 @@ pub(crate) fn perl_list_range_expand_stepped(
     from: StrykeValue,
     to: StrykeValue,
     step_val: StrykeValue,
+    roman_ok: bool,
 ) -> Vec<StrykeValue> {
     let from_str = from.to_string();
     let to_str = to.to_string();
@@ -4577,8 +4595,9 @@ pub(crate) fn perl_list_range_expand_stepped(
             return month_name_range_stepped(&from_str, &to_str, step_int);
         }
 
-        // Roman numerals
-        if is_roman_numeral(&from_str) && is_roman_numeral(&to_str) {
+        // Roman numerals — gated on the `~` separator (`roman_ok`) so roman
+        // digits under `:` / `..` stay Perl char ranges (`'X':'L'` ≠ `'X'~'L'`).
+        if roman_ok && is_roman_numeral(&from_str) && is_roman_numeral(&to_str) {
             return roman_range_stepped(&from_str, &to_str, step_int);
         }
 
@@ -4727,7 +4746,8 @@ pub(crate) fn compute_hash_slice_keys(
     } else {
         step.clone()
     };
-    let expanded = perl_list_range_expand_stepped(from.clone(), to.clone(), step_val);
+    // Hash-slice ranges are `:`-based subscripts, never `~`, so roman off.
+    let expanded = perl_list_range_expand_stepped(from.clone(), to.clone(), step_val, false);
     Ok(expanded.into_iter().map(|v| v.to_string()).collect())
 }
 
@@ -5211,6 +5231,7 @@ mod tests {
         let v = perl_list_range_expand(
             StrykeValue::string("a".into()),
             StrykeValue::string("z".into()),
+            false,
         );
         let s: String = v.iter().map(|x| x.to_string()).collect();
         assert_eq!(s, "abcdefghijklmnopqrstuvwxyz");
@@ -5222,6 +5243,7 @@ mod tests {
         let v = perl_list_range_expand(
             StrykeValue::string("9".into()),
             StrykeValue::string("11".into()),
+            false,
         );
         assert_eq!(v.len(), 3);
         assert_eq!(
@@ -5236,6 +5258,7 @@ mod tests {
         let v = perl_list_range_expand(
             StrykeValue::string("01".into()),
             StrykeValue::string("05".into()),
+            false,
         );
         assert_eq!(v.len(), 5);
         assert_eq!(
@@ -5250,6 +5273,7 @@ mod tests {
         let v = perl_list_range_expand(
             StrykeValue::string(String::new()),
             StrykeValue::string("c".into()),
+            false,
         );
         assert_eq!(v.len(), 1);
         assert_eq!(v[0].to_string(), "");
