@@ -258,6 +258,60 @@ impl Parser {
         }
     }
 
+    /// Apply a parsed thread-stage call `name(call_args)` to the threaded value.
+    /// Thread-last with no explicit `_` appends the value as the final arg;
+    /// otherwise the value binds to `$_` (inserted at position 0 when no explicit
+    /// placeholder is present). Extracted from the general `name(args)` stage
+    /// branch to keep that placeholder logic in one readable place.
+    fn thread_apply_placeholder_call(
+        &self,
+        func_name: &str,
+        mut call_args: Vec<Expr>,
+        result: Expr,
+        stage_line: usize,
+    ) -> StrykeResult<Expr> {
+        if self.thread_last_mode && !call_args.iter().any(Self::expr_contains_topic_var) {
+            call_args.push(result);
+            Ok(Expr {
+                kind: ExprKind::FuncCall {
+                    name: func_name.to_string(),
+                    args: call_args,
+                },
+                line: stage_line,
+            })
+        } else {
+            if !call_args.iter().any(Self::expr_contains_topic_var) {
+                call_args.insert(
+                    0,
+                    Expr {
+                        kind: ExprKind::ScalarVar("_".to_string()),
+                        line: stage_line,
+                    },
+                );
+            }
+            let call_expr = Expr {
+                kind: ExprKind::FuncCall {
+                    name: func_name.to_string(),
+                    args: call_args,
+                },
+                line: stage_line,
+            };
+            let code_ref = Expr {
+                kind: ExprKind::CodeRef {
+                    params: vec![],
+                    body: vec![Statement {
+                        label: None,
+                        kind: StmtKind::Expression(call_expr),
+                        line: stage_line,
+                    }],
+                    return_type: None,
+                },
+                line: stage_line,
+            };
+            self.pipe_forward_apply(result, code_ref, stage_line)
+        }
+    }
+
     /// List builtins that take `{ BLOCK }, LIST` and accept the threaded list at
     /// `args[1]` via [`Self::pipe_forward_apply`]. Used by both the pipe-forward
     /// dispatcher and `parse_thread_stage_with_block` so `~> @a NAME { ... }` and
@@ -2635,16 +2689,67 @@ impl Parser {
                         if func_name == "join" || func_name == "j" {
                             self.advance(); // consume `(`
                             let separator = self.parse_assign_expr()?;
-                            self.expect(&Token::RParen)?;
-                            let placeholder = self.pipe_placeholder_list(stage_line);
-                            let stage = Expr {
-                                kind: ExprKind::JoinExpr {
-                                    separator: Box::new(separator),
-                                    list: Box::new(placeholder),
-                                },
-                                line: stage_line,
-                            };
-                            result = self.pipe_forward_apply(result, stage, stage_line)?;
+                            if self.eat(&Token::Comma) {
+                                // Explicit data arg(s): `join(SEP, _)` marks where the
+                                // threaded value lands; `join(SEP, LIST)` supplies it
+                                // outright. Build a `JoinExpr` directly (the working join
+                                // path) — routing through the generic FuncCall helper emits
+                                // a plain `join(...)` call that doesn't resolve as the
+                                // builtin inside the thread wrapper. Forcing `expect(RParen)`
+                                // after the separator was the original bug ("Expected
+                                // RParen, got Comma").
+                                let mut rest = Vec::new();
+                                while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                                    rest.push(self.parse_assign_expr()?);
+                                    if !self.eat(&Token::Comma) {
+                                        break;
+                                    }
+                                }
+                                self.expect(&Token::RParen)?;
+                                if rest.len() == 1 && Self::expr_contains_topic_var(&rest[0]) {
+                                    // `join(SEP, _)` — the threaded value is the list, same
+                                    // as bare `join(SEP)`.
+                                    let placeholder = self.pipe_placeholder_list(stage_line);
+                                    let stage = Expr {
+                                        kind: ExprKind::JoinExpr {
+                                            separator: Box::new(separator),
+                                            list: Box::new(placeholder),
+                                        },
+                                        line: stage_line,
+                                    };
+                                    result = self.pipe_forward_apply(result, stage, stage_line)?;
+                                } else {
+                                    // `join(SEP, LIST)` / `join(SEP, a, b, ...)` — explicit
+                                    // list; the threaded value is not injected.
+                                    let list = if rest.len() == 1 {
+                                        rest.pop().unwrap()
+                                    } else {
+                                        Expr {
+                                            kind: ExprKind::List(rest),
+                                            line: stage_line,
+                                        }
+                                    };
+                                    result = Expr {
+                                        kind: ExprKind::JoinExpr {
+                                            separator: Box::new(separator),
+                                            list: Box::new(list),
+                                        },
+                                        line: stage_line,
+                                    };
+                                }
+                            } else {
+                                // Bare `join(SEP)` — the threaded value is the implicit list.
+                                self.expect(&Token::RParen)?;
+                                let placeholder = self.pipe_placeholder_list(stage_line);
+                                let stage = Expr {
+                                    kind: ExprKind::JoinExpr {
+                                        separator: Box::new(separator),
+                                        list: Box::new(placeholder),
+                                    },
+                                    line: stage_line,
+                                };
+                                result = self.pipe_forward_apply(result, stage, stage_line)?;
+                            }
                         } else if func_name == "split" || func_name == "sp" {
                             self.advance(); // consume `(`
                             let pattern = self.parse_assign_expr()?;
@@ -2686,58 +2791,16 @@ impl Parser {
                                 }
                             }
                             self.expect(&Token::RParen)?;
-                            // Thread-LAST: substitute `result` (the threaded value) DIRECTLY as
-                            // the last arg of the call — `~>> @arr fold_sum(0)` becomes the
-                            // straight call `fold_sum(0, @arr)`. Pre-fix this wrapped the call
-                            // in a CodeRef whose body referenced `$_`, then invoked the coderef
-                            // with `lhs` as args. With ArrowCall flattening (`@arr` source) `$_`
-                            // bound to the first array element only — `fold_sum(0, 1)` = 1
-                            // instead of the sum 91. Inlining avoids the indirection entirely
-                            // and lets the callee's slurpy `@xs` receive the source as a list.
-                            //
-                            // Thread-FIRST keeps the CodeRef-with-$_ path because the convention
-                            // there is per-item streaming, and the existing macros (`~>` / `~s>`)
-                            // build on that.
-                            if self.thread_last_mode
-                                && !call_args.iter().any(Self::expr_contains_topic_var)
-                            {
-                                call_args.push(result);
-                                result = Expr {
-                                    kind: ExprKind::FuncCall {
-                                        name: func_name.clone(),
-                                        args: call_args,
-                                    },
-                                    line: stage_line,
-                                };
-                            } else {
-                                if !call_args.iter().any(Self::expr_contains_topic_var) {
-                                    let topic = Expr {
-                                        kind: ExprKind::ScalarVar("_".to_string()),
-                                        line: stage_line,
-                                    };
-                                    call_args.insert(0, topic);
-                                }
-                                let call_expr = Expr {
-                                    kind: ExprKind::FuncCall {
-                                        name: func_name.clone(),
-                                        args: call_args,
-                                    },
-                                    line: stage_line,
-                                };
-                                let code_ref = Expr {
-                                    kind: ExprKind::CodeRef {
-                                        params: vec![],
-                                        body: vec![Statement {
-                                            label: None,
-                                            kind: StmtKind::Expression(call_expr),
-                                            line: stage_line,
-                                        }],
-                                        return_type: None,
-                                    },
-                                    line: stage_line,
-                                };
-                                result = self.pipe_forward_apply(result, code_ref, stage_line)?;
-                            }
+                            // Thread-LAST appends `result` as the final arg; thread-FIRST binds
+                            // it to `$_` (see `thread_apply_placeholder_call`). Inlining the
+                            // thread-last branch there lets a slurpy `@xs` param receive the
+                            // source as a list rather than binding `$_` to the first element.
+                            result = self.thread_apply_placeholder_call(
+                                &func_name,
+                                call_args,
+                                result,
+                                stage_line,
+                            )?;
                         }
                     } else {
                         // Bare function name — handle unary builtins specially
