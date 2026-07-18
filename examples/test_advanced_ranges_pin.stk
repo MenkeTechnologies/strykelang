@@ -5,8 +5,8 @@
 
 # 1. Roman Numerals (~ full-extension-range operator — roman digits collide with
 #    Perl char ranges, so `:` stays a char range and `~` selects roman).
-~> ("I"~"V":1) join(",") aeq("I,II,III,IV,V", "roman range tilde forward")
-~> ("V"~"I":-1) join(",") aeq("V,IV,III,II,I", "roman range tilde reverse")
+~> ("I"~"V"~1) join(",") aeq("I,II,III,IV,V", "roman range tilde forward")
+~> ("V"~"I"~-1) join(",") aeq("V,IV,III,II,I", "roman range tilde reverse")
 # Under `:` the same endpoints are a Perl char range, not roman:
 ~> ("I":"V") join(",") aeq("I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "roman digits under : are chars")
 
