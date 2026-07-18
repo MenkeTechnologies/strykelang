@@ -1,6 +1,6 @@
 [package]
 name = "strykelang"
-version = "0.17.44"
+version = "0.17.45"
 edition = "2021"
 description = "A highly parallel Perl 5 interpreter written in Rust"
 license = "MIT"
