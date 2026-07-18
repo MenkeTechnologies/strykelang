@@ -4878,15 +4878,27 @@ impl<'a> VM<'a> {
                     }
                     Op::ArrayStringifyListSep => {
                         let raw = self.pop();
+                        let line = self.line();
                         let v = self.interp.peel_array_ref_for_list_join(raw);
                         let sep = self.interp.list_separator.clone();
+                        // Stringify each element via `stringify_value` so blessed
+                        // objects honor their `""` overload — matching the tree-walk
+                        // interpolation path (vm_helper.rs).
                         let list = v.to_list();
-                        let joined = list
-                            .iter()
-                            .map(|x| x.to_string())
-                            .collect::<Vec<_>>()
-                            .join(&sep);
-                        self.push(StrykeValue::string(joined));
+                        let mut parts = Vec::with_capacity(list.len());
+                        for item in list {
+                            match self.interp.stringify_value(item, line) {
+                                Ok(s) => parts.push(s),
+                                Err(FlowOrError::Error(e)) => return Err(e),
+                                Err(FlowOrError::Flow(_)) => {
+                                    return Err(StrykeError::runtime(
+                                        "interpolation: unexpected control flow",
+                                        line,
+                                    ));
+                                }
+                            }
+                        }
+                        self.push(StrykeValue::string(parts.join(&sep)));
                         Ok(())
                     }
                     Op::StringRepeat => {

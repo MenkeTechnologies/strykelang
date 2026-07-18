@@ -8893,21 +8893,14 @@ impl Compiler {
                 self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }
             StringPart::Expr(e) => {
-                // Interpolation uses list/array values (`$"`), not Perl scalar(@arr) length.
-                if matches!(&e.kind, ExprKind::ArraySlice { .. })
-                    || matches!(
-                        &e.kind,
-                        ExprKind::Deref {
-                            kind: Sigil::Array,
-                            ..
-                        }
-                    )
-                {
-                    self.compile_expr_ctx(e, WantarrayCtx::List)?;
-                    self.emit_op(Op::ArrayStringifyListSep, line, parent);
-                } else {
-                    self.compile_expr(e)?;
-                }
+                // `#{ EXPR }` interpolates in LIST context and joins with `$"`
+                // (the list separator, default space) — exactly like `@{[ EXPR ]}`
+                // and `@array` interpolation. A scalar result is a 1-element list,
+                // so it stringifies unchanged (via its `""` overload when blessed);
+                // arrays and ranges join with `$"` instead of collapsing to a
+                // scalar (Perl `scalar(@arr)` length / range flip-flop).
+                self.compile_expr_ctx(e, WantarrayCtx::List)?;
+                self.emit_op(Op::ArrayStringifyListSep, line, parent);
             }
         }
         Ok(())
