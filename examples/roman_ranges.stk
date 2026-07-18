@@ -25,15 +25,15 @@ p "  'I':'V'  (chars) → #{$chars}"
 p ""
 
 # ── Stepping and reverse compose with ~ ─────────────────────────────────────
-val $odds = ~> ("I"~"X":2)  join(",")                  # odd numerals
-val $desc = ~> ("X"~"I":-1) join(",")                  # descending
+val $odds = ~> ("I"~"X"~2)  join(",")                  # odd numerals
+val $desc = ~> ("X"~"I"~-1) join(",")                  # descending
 p "── Step and reverse ────────────────────────────"
-p "  'I'~'X':2   → #{$odds}"
-p "  'X'~'I':-1  → #{$desc}"
+p "  'I'~'X'~2   → #{$odds}"
+p "  'X'~'I'~-1  → #{$desc}"
 p ""
 
 # ── A larger span is just a range ───────────────────────────────────────────
-val @decades = ("X"~"C":10)                            # X, XX, ..., C
+val @decades = ("X"~"C"~10)                            # X, XX, ..., C
 val $decstr  = ~> @decades join(" ")
 p "── Decades X..C (step 10) ──────────────────────"
 p "  #{$decstr}"

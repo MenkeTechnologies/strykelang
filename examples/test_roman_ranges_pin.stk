@@ -11,9 +11,9 @@
 
 # ── Roman under ~ ───────────────────────────────────────────────────────────
 ~> ("I"~"V")    join(",") aeq("I,II,III,IV,V", "roman forward")
-~> ("V"~"I":-1) join(",") aeq("V,IV,III,II,I", "roman reverse")
-~> ("I"~"X":2)  join(",") aeq("I,III,V,VII,IX", "roman step 2")
-~> ("X"~"C":10) join(",") aeq("X,XX,XXX,XL,L,LX,LXX,LXXX,XC,C", "roman decades")
+~> ("V"~"I"~-1) join(",") aeq("V,IV,III,II,I", "roman reverse")
+~> ("I"~"X"~2)  join(",") aeq("I,III,V,VII,IX", "roman step 2")
+~> ("X"~"C"~10) join(",") aeq("X,XX,XXX,XL,L,LX,LXX,LXXX,XC,C", "roman decades")
 
 # ── Same endpoints under `:` stay Perl character ranges ─────────────────────
 ~> ("I":"V") join(",") aeq("I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "colon is a char range")
