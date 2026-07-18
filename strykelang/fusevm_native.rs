@@ -211,6 +211,10 @@ mod nops {
     /// Pop the TOS and push Int(1) if defined (not UNDEF), else Int(0). Used to
     /// decompose `JumpIfDefinedKeep` (the `//` short-circuit).
     pub const DEFINED: u16 = 85;
+    /// Pop the TOS, list-expand it, and push the elements joined by `$"` (the
+    /// list separator). Backs `#{ EXPR }` / `@array` interpolation, which
+    /// interpolate in list context and join with `$"`.
+    pub const ARRAY_STRINGIFY_LIST_SEP: u16 = 86;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -1216,6 +1220,37 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let arr = crate::value::perl_list_range_expand(from, to, arg != 0);
             vm.push(stryke_to_fusevm(&StrykeValue::array(arr)));
         }
+        nops::ARRAY_STRINGIFY_LIST_SEP => {
+            // Mirror `Op::ArrayStringifyListSep` (vm.rs): list-expand the TOS and
+            // join with `$"`, stringifying each element via `stringify_value` so
+            // blessed `""` overloads apply. Backs `#{ EXPR }` / `@array` interp.
+            let raw = pop_stryke(vm);
+            let r = with_interp(|i| -> Result<String, StrykeError> {
+                let v = i.peel_array_ref_for_list_join(raw);
+                let sep = i.list_separator.clone();
+                let mut parts = Vec::new();
+                for item in v.to_list() {
+                    match i.stringify_value(item, 0) {
+                        Ok(s) => parts.push(s),
+                        Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
+                        Err(crate::vm_helper::FlowOrError::Flow(_)) => {
+                            return Err(StrykeError::runtime(
+                                "interpolation: unexpected control flow",
+                                0,
+                            ));
+                        }
+                    }
+                }
+                Ok(parts.join(&sep))
+            });
+            match r {
+                Ok(s) => vm.push(stryke_to_fusevm(&StrykeValue::string(s))),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         nops::SORT_NOBLOCK => {
             let mut items = pop_stryke(vm).to_list();
             items.sort_by_key(|a| a.to_string());
@@ -2070,6 +2105,9 @@ pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
             // Block-builtins.
             Op::Range(roman_ok) => {
                 b.emit(fusevm::Op::Extended(nops::RANGE, u8::from(*roman_ok)), 0);
+            }
+            Op::ArrayStringifyListSep => {
+                b.emit(fusevm::Op::Extended(nops::ARRAY_STRINGIFY_LIST_SEP, 0), 0);
             }
             Op::SortNoBlock => {
                 b.emit(fusevm::Op::Extended(nops::SORT_NOBLOCK, 0), 0);

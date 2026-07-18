@@ -36,6 +36,26 @@ fn thread_join_explicit_list_arg() {
     assert_eq!(rs(r#"~> (99) join("-", (1:3))"#), "1-2-3");
 }
 
+// `#{ EXPR }` interpolates in list context and joins with `$"` (the list
+// separator), like `@{[ EXPR ]}` and `@array`. A range or array joins; a scalar
+// (1-element list) stringifies unchanged. Regression: `#{ }` used to collapse to
+// scalar context (`#{1..3}` → flip-flop 0, `#{@a}` → count).
+#[test]
+fn interp_hashbrace_range_joins_with_list_sep() {
+    assert_eq!(rs(r#"$" = ","; "we got #{1..3}""#), "we got 1,2,3");
+    assert_eq!(rs(r#""we got #{1..3}""#), "we got 1 2 3"); // default $" is space
+}
+
+#[test]
+fn interp_hashbrace_array_joins_with_list_sep() {
+    assert_eq!(rs(r#"$" = ","; my @a = (9, 8, 7); "a=#{@a}""#), "a=9,8,7");
+}
+
+#[test]
+fn interp_hashbrace_scalar_unchanged() {
+    assert_eq!(rs(r#"my $x = 42; "x=#{$x} s=#{1 + 2}""#), "x=42 s=3");
+}
+
 // Roman ranges are gated on the `~` "full-extension-range" separator. Under
 // `:` / `..` the roman digits I V X L C D M stay Perl char ranges; only `~`
 // enables roman inference. See value.rs::perl_list_range_expand[_stepped].
