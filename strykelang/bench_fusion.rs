@@ -480,6 +480,7 @@ pub(crate) fn try_match_map_grep_scalar_fusion(
                     to,
                     exclusive,
                     step,
+                    ..
                 } => {
                     if *exclusive || step.is_some() {
                         return None;

@@ -494,10 +494,11 @@ pub enum Op {
     RuntimeErrorConst(u16),
     /// `MakeHash` variant.
     MakeHash(u16), // pop N key-value pairs, push as Hash
-    /// `Range` variant.
-    Range, // stack: [from, to] → Array
-    /// `RangeStep` variant.
-    RangeStep, // stack: [from, to, step] → Array (stepped range)
+    /// `Range` variant. Bool = `~` "full extension range" separator was used,
+    /// enabling roman-numeral inference (suppressed under `:` / `..` / `...`).
+    Range(bool), // stack: [from, to] → Array
+    /// `RangeStep` variant. Bool = `~` separator (see [`Op::Range`]).
+    RangeStep(bool), // stack: [from, to, step] → Array (stepped range)
     /// Array slice via colon range — `@arr[FROM:TO:STEP]` / `@arr[::-1]`.
     /// Stack: `[from, to, step]` — each may be `Undef` to mean "omitted" (uses array bounds).
     /// `u16` is the array name pool index. Endpoints must coerce to integer cleanly; otherwise

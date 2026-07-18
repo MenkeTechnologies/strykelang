@@ -4397,6 +4397,7 @@ impl Parser {
                     to: Box::new(n),
                     exclusive: false,
                     step: None,
+                    tilde: false,
                 },
                 line,
             },
@@ -5963,6 +5964,7 @@ impl Parser {
                             to: Box::new(last_ix),
                             exclusive: false,
                             step: None,
+                            tilde: false,
                         },
                         line,
                     };
@@ -8775,16 +8777,21 @@ impl Parser {
         // IPv6 since IPv6 already uses `:` internally; `:` would collide.
         // It also dodges `!`'s collision with the `_!N!` paired char-index
         // syntax. Single-`~` (vs `!!!` triple) keeps the surface simple.
-        let (exclusive, _colon_style) = if self.eat(&Token::RangeExclusive) {
-            (true, false)
+        // `tilde` records whether the *main* separator (between the two
+        // endpoints) was `~`. `~` is the "full extension range" separator: it
+        // enables roman-numeral inference, which `:` / `..` / `...` suppress so
+        // roman digits stay Perl char ranges (`'I':'V'` → `I,J,…,V` vs
+        // `'I'~'V'` → `I,II,III,IV,V`). A `~` step separator does not set it.
+        let (exclusive, _colon_style, tilde) = if self.eat(&Token::RangeExclusive) {
+            (true, false, false)
         } else if self.eat(&Token::Range) {
-            (false, false)
+            (false, false, false)
         } else if self.suppress_colon_range == 0 && self.eat(&Token::Colon) {
             // `1:10` short form — only valid for numeric ranges, not ternary
             // Lookahead: must be followed by something that looks like a range endpoint
-            (false, true)
+            (false, true, false)
         } else if self.suppress_tilde_range == 0 && self.eat(&Token::BitNot) {
-            (false, true)
+            (false, true, true)
         } else {
             return Ok(left);
         };
@@ -8805,6 +8812,7 @@ impl Parser {
                 to: Box::new(right),
                 exclusive,
                 step,
+                tilde,
             },
             line,
         })
@@ -19874,6 +19882,7 @@ impl Parser {
                     to: t.clone(),
                     exclusive: false,
                     step,
+                    tilde: false,
                 },
                 line,
             });

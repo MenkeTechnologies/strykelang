@@ -3805,6 +3805,7 @@ impl Compiler {
                     to,
                     exclusive,
                     step,
+                    ..
                 } = &index.kind
                 {
                     self.compile_expr(from)?;
@@ -5821,15 +5822,16 @@ impl Compiler {
                 to,
                 exclusive,
                 step,
+                tilde,
             } => {
                 if ctx == WantarrayCtx::List {
                     self.compile_expr_ctx(from, WantarrayCtx::Scalar)?;
                     self.compile_expr_ctx(to, WantarrayCtx::Scalar)?;
                     if let Some(s) = step {
                         self.compile_expr_ctx(s, WantarrayCtx::Scalar)?;
-                        self.emit_op(Op::RangeStep, line, Some(root));
+                        self.emit_op(Op::RangeStep(*tilde), line, Some(root));
                     } else {
-                        self.emit_op(Op::Range, line, Some(root));
+                        self.emit_op(Op::Range(*tilde), line, Some(root));
                     }
                 } else if let (ExprKind::Regex(lp, lf), ExprKind::Regex(rp, rf)) =
                     (&from.kind, &to.kind)
@@ -9710,7 +9712,7 @@ mod tests {
     #[test]
     fn compile_range_to_array() {
         let chunk = compile_snippet("my @a = (1..3);").expect("compile");
-        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Range)));
+        assert!(chunk.ops.iter().any(|o| matches!(o, Op::Range(_))));
         assert_last_halt(&chunk);
     }
 
@@ -9727,7 +9729,7 @@ mod tests {
             chunk.disassemble()
         );
         assert!(
-            !chunk.ops.iter().any(|o| matches!(o, Op::Range)),
+            !chunk.ops.iter().any(|o| matches!(o, Op::Range(_))),
             "did not expect list Range op in scalar if-condition:\n{}",
             chunk.disassemble()
         );

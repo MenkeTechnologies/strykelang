@@ -142,7 +142,7 @@
           <span class="sep">/</span>
           <a href="https://github.com/MenkeTechnologies/strykelang" target="_blank" rel="noopener noreferrer">GitHub</a>
         </nav>
-        <p class="docs-build-line">stryke v0.17.42 · 10384 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
+        <p class="docs-build-line">stryke v0.17.43 · 10384 topics · 168 chapters · generated from <code>strykelang/lsp.rs</code></p>
       </div>
       <div class="tutorial-toolbar">
         <button type="button" class="btn btn-secondary" id="btnTheme" title="Toggle light/dark">Theme</button>
@@ -435,7 +435,8 @@ fn classify($n) {
         <p>Builtin-shadowing is a hard rule — <code>fn close</code>, <code>fn log</code>, <code>fn cos</code>, <code>fn open</code> etc. all will abort when overriding the runtime function. Use a namespace (<code>MyApp::close</code>) or pick a different name.</p>
         <p>---</p>
         <h4>4. Ranges</h4>
-        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>1:10</code> | <code>1..10</code> | <code>:</code> is the stryke polymorphic range; works for ints, chars, dates, IPs, romans. | | <code>&#39;a&#39;:&#39;z&#39;</code> | <code>&#39;a&#39;..&#39;z&#39;</code> | Same operator, type-inferred from literals. | | <code>1:100:5</code> | — | Optional step is the third colon. |</p>
+        <p>| DO | DON&#39;T | Why | |---|---|---| | <code>1:10</code> | <code>1..10</code> | <code>:</code> is the stryke polymorphic range; works for ints, chars, dates, IPs. | | <code>&#39;a&#39;:&#39;z&#39;</code> | <code>&#39;a&#39;..&#39;z&#39;</code> | Same operator, type-inferred from literals. | | <code>1:100:5</code> | — | Optional step is the third colon. | | <code>&#39;I&#39;~&#39;V&#39;</code> | <code>&#39;I&#39;:&#39;V&#39;</code> | Roman ranges use <code>~</code>, the full-extension-range separator (see below). |</p>
+        <p><strong>Roman ranges use <code>~</code>, not <code>:</code>.</strong> Roman digits (<code>I V X L C D M</code>) collide with Perl character ranges, so under <code>:</code> / <code>..</code> / <code>...</code> they stay char ranges — <code>&#39;I&#39;:&#39;V&#39;</code> is <code>I, J, K, …, V</code> and <code>&#39;C&#39;:&#39;M&#39;</code> is <code>C, D, …, M</code> (11 letters). The <code>~</code> &quot;full-extension-range&quot; separator disambiguates: <code>&#39;I&#39;~&#39;V&#39;</code> is <code>I, II, III, IV, V</code> and <code>&#39;C&#39;~&#39;M&#39;</code> is the 901-element roman span <code>C … M</code>. Stepping works too: <code>&#39;I&#39;~&#39;X&#39;:2</code> → <code>I, III, V, VII, IX</code>. <code>~</code> is the separator to reach for whenever a range type would otherwise collide with Perl&#39;s literal (char / numeric) ranges; non-colliding types (dates, IPs, hex) infer under either separator.</p>
         <p><strong>Eager <code>:</code> vs lazy <code>range()</code> — both valid, different semantics.</strong> The colon range is <strong>eager</strong>: <code>1:N</code> materializes the whole list at once. The <code>range()</code> builtin is the <strong>lazy</strong> counterpart: <code>range(start, end[, step])</code> yields values on demand, so <code>range(1, 1e9) |&gt; take 3</code> is instant and constant-memory where <code>(1:1e9) |&gt; take 3</code> builds a billion-element list first. They are two range forms with different evaluation, not a right/wrong pair — reach for <code>range()</code> when you want laziness (very large or streamed spans, early <code>take</code>, pipeline chains) and <code>:</code> for ordinary eager spans.</p>
         <p>---</p>
         <h4>5. Length / count — <code>len</code> always</h4>

@@ -1212,7 +1212,8 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
         nops::RANGE => {
             let to = pop_stryke(vm);
             let from = pop_stryke(vm);
-            let arr = crate::value::perl_list_range_expand(from, to);
+            // `arg != 0` ⇒ `~` "full extension range" separator (roman inference).
+            let arr = crate::value::perl_list_range_expand(from, to, arg != 0);
             vm.push(stryke_to_fusevm(&StrykeValue::array(arr)));
         }
         nops::SORT_NOBLOCK => {
@@ -2067,8 +2068,8 @@ pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
                 b.emit(fusevm::Op::Extended(nops::CALL_BUILTIN, *argc), 0);
             }
             // Block-builtins.
-            Op::Range => {
-                b.emit(fusevm::Op::Extended(nops::RANGE, 0), 0);
+            Op::Range(roman_ok) => {
+                b.emit(fusevm::Op::Extended(nops::RANGE, u8::from(*roman_ok)), 0);
             }
             Op::SortNoBlock => {
                 b.emit(fusevm::Op::Extended(nops::SORT_NOBLOCK, 0), 0);

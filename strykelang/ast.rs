@@ -1129,6 +1129,12 @@ pub enum ExprKind {
         exclusive: bool,
         #[serde(default)]
         step: Option<Box<Expr>>,
+        /// `~` separator was used (stryke "full extension range"). Enables
+        /// roman-numeral inference, which is otherwise suppressed under `:` /
+        /// `..` / `...` because roman digits collide with Perl char ranges
+        /// (`'I':'V'` must stay `I,J,…,V`, while `'I'~'V'` is `I,II,III,IV,V`).
+        #[serde(default)]
+        tilde: bool,
     },
 
     /// Slice subscript range with optional endpoints — Python-style `[start:stop:step]`.

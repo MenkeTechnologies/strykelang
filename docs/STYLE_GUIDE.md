@@ -196,9 +196,19 @@ Builtin-shadowing is a hard rule — `fn close`, `fn log`, `fn cos`, `fn open` e
 
 | DO | DON'T | Why |
 |---|---|---|
-| `1:10` | `1..10` | `:` is the stryke polymorphic range; works for ints, chars, dates, IPs, romans. |
+| `1:10` | `1..10` | `:` is the stryke polymorphic range; works for ints, chars, dates, IPs. |
 | `'a':'z'` | `'a'..'z'` | Same operator, type-inferred from literals. |
 | `1:100:5` | — | Optional step is the third colon. |
+| `'I'~'V'` | `'I':'V'` | Roman ranges use `~`, the full-extension-range separator (see below). |
+
+**Roman ranges use `~`, not `:`.** Roman digits (`I V X L C D M`) collide with
+Perl character ranges, so under `:` / `..` / `...` they stay char ranges —
+`'I':'V'` is `I, J, K, …, V` and `'C':'M'` is `C, D, …, M` (11 letters). The `~`
+"full-extension-range" separator disambiguates: `'I'~'V'` is `I, II, III, IV, V`
+and `'C'~'M'` is the 901-element roman span `C … M`. Stepping works too:
+`'I'~'X':2` → `I, III, V, VII, IX`. `~` is the separator to reach for whenever a
+range type would otherwise collide with Perl's literal (char / numeric) ranges;
+non-colliding types (dates, IPs, hex) infer under either separator.
 
 **Eager `:` vs lazy `range()` — both valid, different semantics.** The colon
 range is **eager**: `1:N` materializes the whole list at once. The `range()`

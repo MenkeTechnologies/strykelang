@@ -984,9 +984,16 @@ fn deparse_expr_into(buf: &mut String, expr: &Expr) {
             to,
             exclusive,
             step,
+            tilde,
         } => {
             deparse_expr_into(buf, from);
-            buf.push_str(if *exclusive { " ... " } else { " .. " });
+            buf.push_str(if *tilde {
+                " ~ "
+            } else if *exclusive {
+                " ... "
+            } else {
+                " .. "
+            });
             deparse_expr_into(buf, to);
             if let Some(s) = step {
                 buf.push(':');

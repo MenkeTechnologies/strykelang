@@ -17,6 +17,40 @@ fn list_range_numeric_string_endpoints_say() {
     assert_eq!(rs(r#"join ",", ("9".."11");"#), "9,10,11");
 }
 
+// Roman ranges are gated on the `~` "full-extension-range" separator. Under
+// `:` / `..` the roman digits I V X L C D M stay Perl char ranges; only `~`
+// enables roman inference. See value.rs::perl_list_range_expand[_stepped].
+
+#[test]
+fn roman_range_colon_stays_char_range() {
+    // `'I':'V'` must remain a character range: I,J,K,...,V (14 letters).
+    assert_eq!(rs(r#"join ",", ("I":"V");"#), "I,J,K,L,M,N,O,P,Q,R,S,T,U,V");
+}
+
+#[test]
+fn roman_range_tilde_is_roman() {
+    // `'I'~'V'` → the roman numerals I..V.
+    assert_eq!(rs(r#"join ",", ("I"~"V");"#), "I,II,III,IV,V");
+}
+
+#[test]
+fn roman_range_tilde_stepped_is_roman() {
+    // Stepping composes with `~`: odd roman numerals I..IX.
+    assert_eq!(rs(r#"join ",", ("I"~"X":2);"#), "I,III,V,VII,IX");
+}
+
+#[test]
+fn roman_range_colon_c_to_m_is_eleven_chars() {
+    // `'C':'M'` is the 11-letter char range C..M, not the roman span 100..1000.
+    assert_eq!(ri(r#"@a = ("C":"M"); len(@a)"#), 11);
+}
+
+#[test]
+fn roman_range_tilde_c_to_m_is_full_roman_span() {
+    // `'C'~'M'` is the roman span 100..1000 = 901 elements.
+    assert_eq!(ri(r#"@a = ("C"~"M"); len(@a)"#), 901);
+}
+
 /// `@h{'a'..'c'}` — hash-slice key must be list context so the range expands into three keys
 /// instead of collapsing to a scalar flip-flop value (regression test).
 #[test]

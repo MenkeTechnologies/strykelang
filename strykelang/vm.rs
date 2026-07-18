@@ -6351,18 +6351,20 @@ impl<'a> VM<'a> {
                         self.push(StrykeValue::hash(map));
                         Ok(())
                     }
-                    Op::Range => {
+                    Op::Range(roman_ok) => {
                         let to = self.pop();
                         let from = self.pop();
-                        let arr = perl_list_range_expand(from, to);
+                        let arr = perl_list_range_expand(from, to, *roman_ok);
                         self.push(StrykeValue::array(arr));
                         Ok(())
                     }
-                    Op::RangeStep => {
+                    Op::RangeStep(roman_ok) => {
                         let step = self.pop();
                         let to = self.pop();
                         let from = self.pop();
-                        let arr = crate::value::perl_list_range_expand_stepped(from, to, step);
+                        let arr = crate::value::perl_list_range_expand_stepped(
+                            from, to, step, *roman_ok,
+                        );
                         self.push(StrykeValue::array(arr));
                         Ok(())
                     }
