@@ -164,7 +164,7 @@ unicode_names2 = "2"
 reedline = "0.47.0"
 nu-ansi-term = "0.50"
 zshrs = "0.12.3"
-fusevm = { version = "0.14.7", features = ["jit-disk-cache", "aot"] }
+fusevm = { version = "0.14.10", features = ["jit-disk-cache", "aot"] }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
