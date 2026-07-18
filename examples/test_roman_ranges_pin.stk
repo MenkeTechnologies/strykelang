@@ -5,24 +5,26 @@
 #
 # Roman digits collide with Perl character ranges, so `:` / `..` keep the Perl
 # char-range meaning and `~` selects roman. See value.rs::perl_list_range_expand.
+#
+# Assertions use the `~>` thread macro: source after the arrow, space-separated
+# stages, threaded value injected as each stage's first argument.
 
 # ── Roman under ~ ───────────────────────────────────────────────────────────
-("I"~"V")     |> join(",") |> aeq "I,II,III,IV,V", "roman forward"
-("V"~"I":-1)  |> join(",") |> aeq "V,IV,III,II,I", "roman reverse"
-("I"~"X":2)   |> join(",") |> aeq "I,III,V,VII,IX", "roman step 2"
-("X"~"C":10)  |> join(",") |> aeq "X,XX,XXX,XL,L,LX,LXX,LXXX,XC,C", "roman decades"
+~> ("I"~"V")    join(",") aeq("I,II,III,IV,V", "roman forward")
+~> ("V"~"I":-1) join(",") aeq("V,IV,III,II,I", "roman reverse")
+~> ("I"~"X":2)  join(",") aeq("I,III,V,VII,IX", "roman step 2")
+~> ("X"~"C":10) join(",") aeq("X,XX,XXX,XL,L,LX,LXX,LXXX,XC,C", "roman decades")
 
 # ── Same endpoints under `:` stay Perl character ranges ─────────────────────
-("I":"V") |> join(",") |> aeq "I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "colon is a char range"
-("C":"M") |> len        |> aeq 11, "'C':'M' is 11 chars, not the roman span"
+~> ("I":"V") join(",") aeq("I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "colon is a char range")
+~> ("C":"M") len       aeq(11, "'C':'M' is 11 chars, not the roman span")
 
 # ── Full roman span 1..3999 ─────────────────────────────────────────────────
-("I"~"MMMCMXCIX") |> len |> aeq 3999, "full roman span is 3999 numerals"
+~> ("I"~"MMMCMXCIX") len aeq(3999, "full roman span is 3999 numerals")
 
 # ── Non-colliding types are unaffected by the separator choice ──────────────
-(1:5)                       |> join(",") |> aeq "1,2,3,4,5", "int range under :"
-("a":"e")                   |> join(",") |> aeq "a,b,c,d,e", "alpha char range under :"
-("192.168.0.1":"192.168.0.3":1) |> join(",")
-    |> aeq "192.168.0.1,192.168.0.2,192.168.0.3", "ipv4 still infers under :"
+~> (1:5)     join(",") aeq("1,2,3,4,5", "int range under :")
+~> ("a":"e") join(",") aeq("a,b,c,d,e", "alpha char range under :")
+~> ("192.168.0.1":"192.168.0.3":1) join(",") aeq("192.168.0.1,192.168.0.2,192.168.0.3", "ipv4 still infers under :")
 
 test_run

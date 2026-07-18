@@ -5,25 +5,25 @@
 
 # 1. Roman Numerals (~ full-extension-range operator — roman digits collide with
 #    Perl char ranges, so `:` stays a char range and `~` selects roman).
-("I"~"V":1) |> join(",") |> aeq "I,II,III,IV,V", "roman range tilde forward"
-("V"~"I":-1) |> join(",") |> aeq "V,IV,III,II,I", "roman range tilde reverse"
+~> ("I"~"V":1) join(",") aeq("I,II,III,IV,V", "roman range tilde forward")
+~> ("V"~"I":-1) join(",") aeq("V,IV,III,II,I", "roman range tilde reverse")
 # Under `:` the same endpoints are a Perl char range, not roman:
-("I":"V") |> join(",") |> aeq "I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "roman digits under : are chars"
+~> ("I":"V") join(",") aeq("I,J,K,L,M,N,O,P,Q,R,S,T,U,V", "roman digits under : are chars")
 
 # 2. Weekdays
-("Mon":"Fri":1) |> join(",") |> aeq "Mon,Tue,Wed,Thu,Fri", "weekday range"
-("Fri":"Mon":-1) |> join(",") |> aeq "Fri,Thu,Wed,Tue,Mon", "weekday range reverse"
+~> ("Mon":"Fri":1) join(",") aeq("Mon,Tue,Wed,Thu,Fri", "weekday range")
+~> ("Fri":"Mon":-1) join(",") aeq("Fri,Thu,Wed,Tue,Mon", "weekday range reverse")
 
 # 3. Month names
-("Jan":"Mar":1) |> join(",") |> aeq "Jan,Feb,Mar", "month range"
+~> ("Jan":"Mar":1) join(",") aeq("Jan,Feb,Mar", "month range")
 
 # 4. Year-Month
-("2026-01":"2026-03":1) |> join(",") |> aeq "2026-01,2026-02,2026-03", "year-month range"
+~> ("2026-01":"2026-03":1) join(",") aeq("2026-01,2026-02,2026-03", "year-month range")
 
 # 5. Times (HH:MM)
-("10:00":"10:30":15) |> join(",") |> aeq "10:00,10:15,10:30", "time range 15m step"
+~> ("10:00":"10:30":15) join(",") aeq("10:00,10:15,10:30", "time range 15m step")
 
 # 6. IPv4
-("192.168.0.1":"192.168.0.4":1) |> join(",") |> aeq "192.168.0.1,192.168.0.2,192.168.0.3,192.168.0.4", "ipv4 range"
+~> ("192.168.0.1":"192.168.0.4":1) join(",") aeq("192.168.0.1,192.168.0.2,192.168.0.3,192.168.0.4", "ipv4 range")
 
 test_run
