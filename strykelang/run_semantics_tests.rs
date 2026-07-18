@@ -17,6 +17,25 @@ fn list_range_numeric_string_endpoints_say() {
     assert_eq!(rs(r#"join ",", ("9".."11");"#), "9,10,11");
 }
 
+// `~>` thread stage `join(SEP, _)` — explicit `_` placeholder for the joined
+// list. Regression: the thread-stage parser hardcoded `join(SEP)` to one arg
+// and any second arg tripped `expect(RParen)` ("Expected RParen, got Comma").
+#[test]
+fn thread_join_explicit_placeholder() {
+    assert_eq!(rs(r#"~> (1:3) join(",", _)"#), "1,2,3");
+}
+
+#[test]
+fn thread_join_bare_separator_still_works() {
+    assert_eq!(rs(r#"~> (1:3) join(",")"#), "1,2,3");
+}
+
+#[test]
+fn thread_join_explicit_list_arg() {
+    // `join(SEP, LIST)` — explicit list; threaded value not injected.
+    assert_eq!(rs(r#"~> (99) join("-", (1:3))"#), "1-2-3");
+}
+
 // Roman ranges are gated on the `~` "full-extension-range" separator. Under
 // `:` / `..` the roman digits I V X L C D M stay Perl char ranges; only `~`
 // enables roman inference. See value.rs::perl_list_range_expand[_stepped].
