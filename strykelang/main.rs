@@ -52,6 +52,14 @@ pub(crate) struct Cli {
     #[arg(long = "ast")]
     dump_ast: bool,
 
+    /// Print the lexer token stream for the program and exit.
+    #[arg(long = "dump-tokens")]
+    dump_tokens: bool,
+
+    /// Print the compiled fusevm bytecode ops for the program and exit.
+    #[arg(long = "dump-bytecode")]
+    dump_bytecode: bool,
+
     /// Pretty-print parsed Perl to stdout and exit (no execution)
     #[arg(long = "fmt")]
     format_source: bool,
@@ -387,6 +395,10 @@ fn print_cyberpunk_help() {
         "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
+    println!("  --dump-tokens          {G}//{N} Print the lexer token stream and exit (no execution)");
+    println!(
+        "  --dump-bytecode        {G}//{N} Print the compiled fusevm bytecode ops and exit (no execution)"
+    );
     println!("  --fmt                  {G}//{N} Pretty-print parsed Perl to stdout and exit");
     println!(
         "  --from-zsh             {G}//{N} Transpile a zsh script to stryke on stdout and exit"
@@ -1840,6 +1852,8 @@ fn main() {
         && !cli.lint
         && !cli.disasm
         && !cli.dump_ast
+        && !cli.dump_tokens
+        && !cli.dump_bytecode
         && !cli.format_source
         && !cli.profile
         && !cli.flame
@@ -1918,6 +1932,30 @@ fn main() {
     let mut full_code = module_prelude(&cli);
     full_code.push_str(&code);
 
+    // `--dump-tokens`: run the same lexer entry `parse_with_file` uses (desugar pre-pass +
+    // `Lexer::new_with_file(...).tokenize()`) and print each `(line, Token)` pair, then exit.
+    if cli.dump_tokens {
+        let desugared = if stryke::compat_mode() {
+            full_code.clone()
+        } else {
+            let s = stryke::rust_sugar::desugar_rust_blocks(&full_code);
+            stryke::ai_sugar::desugar(&s)
+        };
+        let mut lexer = stryke::lexer::Lexer::new_with_file(&desugared, &filename);
+        match lexer.tokenize() {
+            Ok(tokens) => {
+                for (tok, line) in &tokens {
+                    println!("{:>5}  {:?}", line, tok);
+                }
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+                process::exit(255);
+            }
+        }
+        return;
+    }
+
     // rkyv bytecode cache — mtime-based, skips lex/parse/compile on 2+ runs.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
     let cache_eligible = !cli.line_mode
@@ -1925,6 +1963,8 @@ fn main() {
         && !cli.lint
         && !cli.check_only
         && !cli.dump_ast
+        && !cli.dump_tokens
+        && !cli.dump_bytecode
         && !cli.format_source
         && !cli.profile
         && !cli.flame
@@ -1956,6 +1996,29 @@ fn main() {
             Ok(json) => println!("{}", json),
             Err(e) => {
                 eprintln!("stryke: failed to serialize AST to JSON: {}", e);
+                process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if cli.dump_bytecode {
+        // Compile the parsed program the same way `stryke disasm` does, but print the raw
+        // fusevm ops (`{:#?}`) instead of the formatted `.disassemble()` view, then exit.
+        let mut interp = VMHelper::new();
+        if cli.no_jit {
+            interp.vm_jit_enabled = false;
+        }
+        interp.set_file(&filename);
+        if let Err(e) = stryke::lint_program(&program, &mut interp) {
+            eprintln!("{}", e);
+            process::exit(255);
+        }
+        let comp = stryke::compiler::Compiler::new().with_source_file(filename.clone());
+        match comp.compile_program(&program) {
+            Ok(chunk) => println!("{:#?}", chunk.ops),
+            Err(e) => {
+                eprintln!("compile error: {:?}", e);
                 process::exit(1);
             }
         }
