@@ -20908,7 +20908,20 @@ impl Parser {
                     // implies `->` between consecutive subscripts (`$m[1][2]`
                     // ≡ `$m[1]->[2]`).  See `interp_chain_subscripts`.
                     base = self.interp_chain_subscripts(&chars, &mut i, base, line);
-                    parts.push(StringPart::Expr(base));
+                    // A bare `$name` (no `->` / `[…]` / `{…}` chain) interpolates
+                    // in SCALAR context: Perl does not dereference an array/hash
+                    // ref here (`"$r"` → `ARRAY(0x...)`, not its joined elements).
+                    // Routing it through `StringPart::Expr` evaluates it in list
+                    // context and peels the arrayref via `ArrayStringifyListSep`
+                    // (regression: `"$r"` printed `1 2 3`). A chained base
+                    // (ArrowDeref, ArrayElement, HashElement, …) legitimately
+                    // stays an Expr.
+                    match base.kind {
+                        ExprKind::ScalarVar(name) => {
+                            parts.push(StringPart::ScalarVar(name))
+                        }
+                        _ => parts.push(StringPart::Expr(base)),
+                    }
                 } else if chars[i].is_ascii_digit() {
                     // $0 (program name), $1…$n (regexp captures). Perl disallows $01, $02, …
                     if chars[i] == '0' {
