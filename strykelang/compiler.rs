@@ -271,6 +271,16 @@ impl Default for Compiler {
     }
 }
 
+/// A sub body held back for the post-`Halt` third pass:
+/// `(name, body, package, signature params, return type)`.
+type DeferredSubBody = (
+    String,
+    Vec<Statement>,
+    String,
+    Vec<crate::ast::SubSigParam>,
+    Option<crate::ast::PerlTypeName>,
+);
+
 impl Compiler {
     /// Array/hash slice subscripts are list context: `@a[LIST]` flattens ranges, `reverse`,
     /// `sort`, `grep`, `map`, and array variables the same way `@h{LIST}` does. Scalar
@@ -1560,13 +1570,7 @@ impl Compiler {
         }
 
         // Third pass: compile sub bodies after Halt
-        let mut entries: Vec<(
-            String,
-            Vec<Statement>,
-            String,
-            Vec<crate::ast::SubSigParam>,
-            Option<crate::ast::PerlTypeName>,
-        )> = Vec::new();
+        let mut entries: Vec<DeferredSubBody> = Vec::new();
         let mut pending_pkg = String::new();
         for stmt in &program.statements {
             match &stmt.kind {
