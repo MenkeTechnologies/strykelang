@@ -2216,6 +2216,11 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
     let fchunk = lower_to_fusevm(chunk)?;
     let mut vm = fusevm::VM::new(fchunk);
     vm.set_extension_handler(Box::new(native_ext_handler));
+    // Arm fusevm's Cranelift tiers. One flag gates both: fusevm's tiered
+    // auto-dispatch checks `tracing_jit` before it will ask `is_block_eligible`,
+    // so without this call the chunk runs on the interpreter regardless of the
+    // `jit` feature. `stryke --tiers` reports which tier a script reaches.
+    vm.enable_tracing_jit();
     NATIVE_ERR.with(|c| *c.borrow_mut() = None);
     REGISTRY.with(|r| r.borrow_mut().clear());
     // Make the live interp + chunk (names / blocks / code_ref_sigs) reachable

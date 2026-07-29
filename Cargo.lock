@@ -1870,6 +1870,25 @@ version = "0.14.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22272ebc1565d0e7403697d6b0a5a69bb4d5c43330b0822c4da90d2356183bc5"
 dependencies = [
+ "chrono",
+ "cranelift-codegen",
+ "cranelift-frontend",
+ "cranelift-jit",
+ "cranelift-module",
+ "cranelift-native",
+ "glob",
+ "libc",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "fusevm"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f56a36b5dcf9fe887e6d835fb6625728ba29196df5f8fab076131006c9f708b6"
+dependencies = [
+ "base64",
  "bincode",
  "chrono",
  "cranelift-codegen",
@@ -1881,6 +1900,7 @@ dependencies = [
  "glob",
  "libc",
  "serde",
+ "sha2",
  "tracing",
 ]
 
@@ -5168,7 +5188,7 @@ dependencies = [
  "errno",
  "fancy-regex",
  "flate2",
- "fusevm",
+ "fusevm 0.15.0",
  "git2",
  "glob",
  "hex",
@@ -7113,7 +7133,7 @@ dependencies = [
  "ctrlc",
  "dirs 5.0.1",
  "filetime",
- "fusevm",
+ "fusevm 0.14.17",
  "glob",
  "hostname",
  "indexmap",
