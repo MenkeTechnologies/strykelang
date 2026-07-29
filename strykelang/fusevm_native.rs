@@ -2385,8 +2385,8 @@ mod tests {
             .compile_program(&program)
             .expect("compile");
         let fchunk = lower_to_fusevm_aot(&chunk).ok()?;
-        let result = fusevm::aot::run_chunk_native(&fchunk, |vm| aot_register(vm))
-            .expect("native compile/run");
+        let result =
+            fusevm::aot::run_chunk_native(&fchunk, aot_register).expect("native compile/run");
         Some(match result {
             fusevm::VMResult::Ok(v) => fusevm_to_stryke(&v)
                 .map(Ok)
@@ -2431,10 +2431,7 @@ mod tests {
         assert_aot_parity_int("1 <=> 2", -1);
         assert_aot_parity_str("\"a\" . \"b\" . \"c\"", "abc");
         assert_aot_parity_str("\"sum=\" . (2 + 3)", "sum=5");
-        assert_aot_parity_int(
-            "my $s = 0; for my $i (1..10) { $s = $s + $i } $s",
-            55,
-        );
+        assert_aot_parity_int("my $s = 0; for my $i (1..10) { $s = $s + $i } $s", 55);
     }
 
     #[test]

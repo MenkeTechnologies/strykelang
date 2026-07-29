@@ -868,17 +868,14 @@ fn simulate_one_op(
     match op {
         Op::LoadInt(n) => stack.push(Cell::Const(*n)),
         Op::LoadConst(idx) => {
-            match constants.get(*idx as usize) {
-                Some(pv) => {
-                    if let Some(n) = pv.as_integer() {
-                        stack.push(Cell::Const(n));
-                    } else if let Some(f) = pv.as_float() {
-                        stack.push(Cell::ConstF(f));
-                    } else {
-                        return None;
-                    }
+            {
+                let pv = constants.get(*idx as usize)?;
+                if let Some(n) = pv.as_integer() {
+                    stack.push(Cell::Const(n));
+                } else {
+                    let f = pv.as_float()?;
+                    stack.push(Cell::ConstF(f));
                 }
-                None => return None,
             };
         }
         Op::LoadFloat(f) => {
@@ -2933,13 +2930,12 @@ fn emit_data_op(
                     n
                 };
                 stack.push((bcx.ins().iconst(types::I64, bits), JitTy::Int));
-            } else if let Some(f) = pv.as_float() {
+            } else {
+                let f = pv.as_float()?;
                 stack.push((
                     bcx.ins().f64const(Ieee64::with_bits(f.to_bits())),
                     JitTy::Float,
                 ));
-            } else {
-                return None;
             }
         }
         Op::LoadFloat(f) => {

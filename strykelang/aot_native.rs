@@ -74,8 +74,7 @@ pub fn build_native(script_path: &Path, out_path: &Path) -> Result<PathBuf, Stri
         .to_string();
 
     // Parse + compile on strykelang's own pipeline, then lower to a fusevm chunk.
-    let program =
-        crate::parse_with_file(&source, &script_name).map_err(|e| format!("{e}"))?;
+    let program = crate::parse_with_file(&source, &script_name).map_err(|e| format!("{e}"))?;
     let chunk = crate::compiler::Compiler::new()
         .with_source_file(script_name.clone())
         .compile_program(&program)
@@ -110,7 +109,15 @@ pub fn build_native(script_path: &Path, out_path: &Path) -> Result<PathBuf, Stri
         // System / brew libraries strykelang's runtime needs: bundled zsh port
         // (ncurses/termcap), compression (z/bz2/lzma), encoding (iconv), regex
         // (pcre2), and the C++ runtime.
-        for lib in ["-lncurses", "-lz", "-lbz2", "-llzma", "-liconv", "-lc++", "-lpcre2-8"] {
+        for lib in [
+            "-lncurses",
+            "-lz",
+            "-lbz2",
+            "-llzma",
+            "-liconv",
+            "-lc++",
+            "-lpcre2-8",
+        ] {
             cmd.arg(lib);
         }
         // Frameworks: CoreFoundation/Security/SystemConfiguration (net/time),
@@ -126,7 +133,13 @@ pub fn build_native(script_path: &Path, out_path: &Path) -> Result<PathBuf, Stri
         }
     } else {
         for lib in [
-            "-lncurses", "-lz", "-lbz2", "-llzma", "-lm", "-lpthread", "-ldl",
+            "-lncurses",
+            "-lz",
+            "-lbz2",
+            "-llzma",
+            "-lm",
+            "-lpthread",
+            "-ldl",
         ] {
             cmd.arg(lib);
         }

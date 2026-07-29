@@ -333,11 +333,9 @@ impl Lexer {
         }
         // Year-month form `YYYY-MM`. Reject if followed by another `-DIGIT`
         // (would be arithmetic) — caught above by the third-digit guard.
-        Some(format!("{}-{}", year, month_str)).filter(|_| {
-            // No risky trailing chars beyond what we've already consumed.
-            let _ = saved;
-            true
-        })
+        // No risky trailing chars beyond what we've already consumed.
+        let _ = saved;
+        Some(format!("{}-{}", year, month_str))
     }
 
     /// IPv6 lookahead from an arbitrary starting pos. Called from

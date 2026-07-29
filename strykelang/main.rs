@@ -399,7 +399,9 @@ fn print_cyberpunk_help() {
         "  --disasm / --disassemble {G}//{N} Print bytecode disassembly to stderr before VM run"
     );
     println!("  --ast                  {G}//{N} Dump parsed AST as JSON and exit (no execution)");
-    println!("  --dump-tokens          {G}//{N} Print the lexer token stream and exit (no execution)");
+    println!(
+        "  --dump-tokens          {G}//{N} Print the lexer token stream and exit (no execution)"
+    );
     println!(
         "  --dump-bytecode        {G}//{N} Print the compiled fusevm bytecode ops and exit (no execution)"
     );
@@ -3372,9 +3374,15 @@ fn run_build_subcommand(args: &[String]) -> i32 {
                 println!("no perl, no stryke, no @INC setup required.");
                 println!();
                 println!("Options:");
-                println!("  --native, -n     Compile to native machine code via fusevm's Cranelift");
-                println!("                   AOT (no embedded source). Covers the arithmetic/string/");
-                println!("                   scalar/array/hash/print subset; needs libstryke.a beside");
+                println!(
+                    "  --native, -n     Compile to native machine code via fusevm's Cranelift"
+                );
+                println!(
+                    "                   AOT (no embedded source). Covers the arithmetic/string/"
+                );
+                println!(
+                    "                   scalar/array/hash/print subset; needs libstryke.a beside"
+                );
                 println!("                   stryke (or $STRYKE_AOT_RUNTIME_LIB).");
                 println!("  --project DIR    Bundle main.stk + lib/*.stk (excludes t/ tests)");
                 println!("  --mcp-server     Wrap as an MCP server: after running the user's");

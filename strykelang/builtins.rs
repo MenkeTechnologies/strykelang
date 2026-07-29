@@ -25103,8 +25103,16 @@ fn builtin_beep() -> StrykeResult<StrykeValue> {
 /// captured / piped).
 fn builtin_seizure(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
-    let count = args.first().map(|v| v.to_int()).unwrap_or(24).clamp(0, 10_000);
-    let delay_ms = args.get(1).map(|v| v.to_int()).unwrap_or(40).clamp(0, 5_000);
+    let count = args
+        .first()
+        .map(|v| v.to_int())
+        .unwrap_or(24)
+        .clamp(0, 10_000);
+    let delay_ms = args
+        .get(1)
+        .map(|v| v.to_int())
+        .unwrap_or(40)
+        .clamp(0, 5_000);
 
     // Bright (high-intensity) ANSI background codes: red, green, yellow,
     // blue, magenta, cyan, white. Cycling these gives the strobe.
@@ -25156,7 +25164,11 @@ fn builtin_show_cursor() -> StrykeResult<StrykeValue> {
 /// Returns `1`.
 fn builtin_flash(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
-    let ms = args.first().map(|v| v.to_int()).unwrap_or(80).clamp(0, 5_000);
+    let ms = args
+        .first()
+        .map(|v| v.to_int())
+        .unwrap_or(80)
+        .clamp(0, 5_000);
     let mut out = std::io::stdout().lock();
     let _ = out.write_all(b"\x1b[?5h");
     let _ = out.flush();
@@ -25215,7 +25227,11 @@ fn builtin_clear_to_eol() -> StrykeResult<StrykeValue> {
 /// opening `n` blank lines at the bottom. Returns `1`.
 fn builtin_scroll_up(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
-    let n = args.first().map(|v| v.to_int()).unwrap_or(1).clamp(1, 10_000);
+    let n = args
+        .first()
+        .map(|v| v.to_int())
+        .unwrap_or(1)
+        .clamp(1, 10_000);
     let mut out = std::io::stdout().lock();
     let _ = write!(out, "\x1b[{}S", n);
     let _ = out.flush();
@@ -25226,7 +25242,11 @@ fn builtin_scroll_up(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// (`\x1b[{n}T`), opening `n` blank lines at the top. Returns `1`.
 fn builtin_scroll_down(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
-    let n = args.first().map(|v| v.to_int()).unwrap_or(1).clamp(1, 10_000);
+    let n = args
+        .first()
+        .map(|v| v.to_int())
+        .unwrap_or(1)
+        .clamp(1, 10_000);
     let mut out = std::io::stdout().lock();
     let _ = write!(out, "\x1b[{}T", n);
     let _ = out.flush();
@@ -25279,7 +25299,10 @@ fn builtin_notify(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 /// URL. Returns the wrapped string.
 fn builtin_hyperlink(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let text = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let url = args.get(1).map(|v| v.to_string()).unwrap_or_else(|| text.clone());
+    let url = args
+        .get(1)
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| text.clone());
     Ok(StrykeValue::string(format!(
         "\x1b]8;;{}\x07{}\x1b]8;;\x07",
         url, text
@@ -25351,7 +25374,11 @@ fn hsv_to_rgb(h: f64, s: f64, v: f64) -> (u8, u8, u8) {
 /// `[1, 1000]`). Filled cells use `█`, empty use `░`. Pure string — pair
 /// with `\r` + `clear_to_eol` to animate a single line in place.
 fn builtin_progress(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
-    let frac: f64 = args.first().map(|v| v.to_number()).unwrap_or(0.0).clamp(0.0, 1.0);
+    let frac: f64 = args
+        .first()
+        .map(|v| v.to_number())
+        .unwrap_or(0.0)
+        .clamp(0.0, 1.0);
     let width = args.get(1).map(|v| v.to_int()).unwrap_or(40).clamp(1, 1000) as usize;
     let filled = (frac * width as f64).round() as usize;
     let filled = filled.min(width);
@@ -25367,7 +25394,11 @@ fn builtin_progress(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
 fn builtin_typewriter(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
     let text = args.first().map(|v| v.to_string()).unwrap_or_default();
-    let ms = args.get(1).map(|v| v.to_int()).unwrap_or(30).clamp(0, 2_000);
+    let ms = args
+        .get(1)
+        .map(|v| v.to_int())
+        .unwrap_or(30)
+        .clamp(0, 2_000);
     let mut out = std::io::stdout().lock();
     let mut count: i64 = 0;
     for ch in text.chars() {
@@ -25392,9 +25423,16 @@ fn builtin_marquee(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     use std::io::Write;
     let text = args.first().map(|v| v.to_string()).unwrap_or_default();
     let secs = args.get(1).map(|v| v.to_int()).unwrap_or(5).clamp(0, 600);
-    let ms = args.get(2).map(|v| v.to_int()).unwrap_or(120).clamp(10, 5_000);
+    let ms = args
+        .get(2)
+        .map(|v| v.to_int())
+        .unwrap_or(120)
+        .clamp(10, 5_000);
 
-    let width = term_winsize().map(|(c, _)| c as usize).unwrap_or(80).max(10);
+    let width = term_winsize()
+        .map(|(c, _)| c as usize)
+        .unwrap_or(80)
+        .max(10);
     // Pad with `width` spaces so the text scrolls fully on and off screen.
     let gap = " ".repeat(width);
     let banner: Vec<char> = format!("{}{}{}", gap, text, gap).chars().collect();
@@ -25406,9 +25444,7 @@ fn builtin_marquee(args: &[StrykeValue]) -> StrykeResult<StrykeValue> {
     let mut frames: i64 = 0;
     let mut offset = 0usize;
     while std::time::Instant::now() < deadline && span > 0 {
-        let window: String = (0..width)
-            .map(|i| banner[(offset + i) % span])
-            .collect();
+        let window: String = (0..width).map(|i| banner[(offset + i) % span]).collect();
         // carriage return + erase line, then the window
         let _ = write!(out, "\r\x1b[2K{}", window);
         let _ = out.flush();
@@ -39586,7 +39622,8 @@ fn find_matching_close_tag(s: &str, open_tag: &str, close_tag: &str) -> Option<u
     let mut depth = 1;
     let mut pos = 0;
     while pos < s.len() {
-        if let Some(close_offset) = s[pos..].find(close_tag) {
+        {
+            let close_offset = s[pos..].find(close_tag)?;
             let close_abs = pos + close_offset;
             let mut open_search_end = close_abs;
             while let Some(open_offset) = s[pos..open_search_end].find(open_tag) {
@@ -39604,8 +39641,6 @@ fn find_matching_close_tag(s: &str, open_tag: &str, close_tag: &str) -> Option<u
                 return Some(close_abs);
             }
             pos = close_abs + close_tag.len();
-        } else {
-            return None;
         }
     }
     None

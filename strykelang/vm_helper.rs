@@ -12695,9 +12695,9 @@ impl VMHelper {
                     pairs.sort_by_key(|(i, _)| *i);
                     let mut out = Vec::with_capacity(n);
                     for (_, r) in pairs {
-                        match r {
-                            Ok(v) => out.push(v),
-                            Err(e) => return Err(e),
+                        {
+                            let v = r?;
+                            out.push(v)
                         }
                     }
                     return Ok(StrykeValue::array(out));
@@ -14630,15 +14630,15 @@ impl VMHelper {
         // Blessed ref overloading (existing path)
         let (class, invocant, other) = if let Some(br) = lv.as_blessed_ref() {
             (br.class.clone(), lv.clone(), rv.clone())
-        } else if let Some(br) = rv.as_blessed_ref() {
-            (br.class.clone(), rv.clone(), lv.clone())
         } else {
-            return None;
+            let br = rv.as_blessed_ref()?;
+            (br.class.clone(), rv.clone(), lv.clone())
         };
         let map = self.overload_table.get(&class)?;
         let sub_short = if let Some(s) = map.get(key) {
             s.clone()
-        } else if let Some(nm) = map.get("nomethod") {
+        } else {
+            let nm = map.get("nomethod")?;
             let fq = format!("{}::{}", class, nm);
             let sub = self.subs.get(&fq)?.clone();
             return Some(self.call_sub(
@@ -14647,8 +14647,6 @@ impl VMHelper {
                 WantarrayCtx::Scalar,
                 line,
             ));
-        } else {
-            return None;
         };
         let fq = format!("{}::{}", class, sub_short);
         let sub = self.subs.get(&fq)?.clone();
@@ -22292,11 +22290,7 @@ pub(crate) fn perl_inc(v: &StrykeValue) -> StrykeValue {
 ///
 /// Shared by the AST `SplitExpr` path and the VM `Split` builtin so the two
 /// cannot drift apart.
-fn split_captures_to_value(
-    re: &PerlCompiledRegex,
-    s: &str,
-    limit: Option<i64>,
-) -> StrykeValue {
+fn split_captures_to_value(re: &PerlCompiledRegex, s: &str, limit: Option<i64>) -> StrykeValue {
     let mut parts = re.split_captures_strings(s, limit);
     if matches!(limit, None | Some(0)) {
         while parts
@@ -22608,19 +22602,18 @@ where
             // ahead of the zero padding: %#010b is 0b00000101, not 000000b101.
             // Kept separate from pad_align because %s has no prefix concept —
             // perl renders %08s of "0xAB" as 00000xAB, padding straight through.
-            let pad_align_radix =
-                |prefix: &str, digits: &str, width: usize, left: bool, zero: bool| -> String {
-                    let body = format!("{}{}", prefix, digits);
-                    if zero && !left && width > body.len() {
-                        return format!(
-                            "{}{:0>rest$}",
-                            prefix,
-                            digits,
-                            rest = width - prefix.len()
-                        );
-                    }
-                    pad_align(&body, width, left, false)
-                };
+            let pad_align_radix = |prefix: &str,
+                                   digits: &str,
+                                   width: usize,
+                                   left: bool,
+                                   zero: bool|
+             -> String {
+                let body = format!("{}{}", prefix, digits);
+                if zero && !left && width > body.len() {
+                    return format!("{}{:0>rest$}", prefix, digits, rest = width - prefix.len());
+                }
+                pad_align(&body, width, left, false)
+            };
 
             // Format a single integer with the inner spec for `%v...`. No
             // width/precision is applied here — those are deferred to the
@@ -24207,13 +24200,15 @@ pub(crate) fn exec_builtin(
 
 /// Unwrap a slice-subscript index into `(from, to, exclusive, step)` endpoint
 /// expressions. Both the closed `Range` (`1:3`, `1:9:2`) and the open-ended
+/// The endpoints of a slice index: `(start, end, inclusive, step)`, each side
+/// `None` when omitted.
+pub(crate) type SliceEndpoints<'a> = (Option<&'a Expr>, Option<&'a Expr>, bool, Option<&'a Expr>);
+
 /// `SliceRange` (`2:`, `:5`, `::2`) forms feed the string-slice sugar in the
 /// tree-walker; a `None` endpoint marks an omitted side. Returns `None` for any
 /// other index kind (plain integer / expression), which callers treat as a
 /// single-char lookup.
-pub(crate) fn slice_index_endpoints(
-    kind: &ExprKind,
-) -> Option<(Option<&Expr>, Option<&Expr>, bool, Option<&Expr>)> {
+pub(crate) fn slice_index_endpoints(kind: &ExprKind) -> Option<SliceEndpoints<'_>> {
     match kind {
         ExprKind::Range {
             from,

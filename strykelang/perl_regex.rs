@@ -258,8 +258,9 @@ impl PerlCompiledRegex {
         let mut last = 0usize;
         // Counts emitted fields only — captures are extra and never count
         // toward LIMIT.
-        let mut fields = 0usize;
-        for caps in self.captures_iter(s) {
+        // `fields` is the count already emitted, which is exactly the iteration
+        // index: the increment below is the last thing a continuing pass does.
+        for (fields, caps) in self.captures_iter(s).enumerate() {
             // The trailing remainder below is itself a field, so stop one short
             // of the cap.
             if field_cap.is_some_and(|cap| fields + 1 >= cap) {
@@ -269,7 +270,6 @@ impl PerlCompiledRegex {
                 Some(m) => m,
                 None => break,
             };
-            fields += 1;
             out.push(Some(s[last..m.start].to_string()));
             for i in 1..ncaps {
                 out.push(caps.get(i).map(|g| g.text.to_string()));

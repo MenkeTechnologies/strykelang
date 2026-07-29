@@ -324,7 +324,7 @@ fn builtin_lin_bairstow_step(args: &[StrykeValue]) -> StrykeResult<StrykeValue> 
     }
     // Deflated polynomial coefficients are b[2..=n].
     let deflated: Vec<f64> = b[2..=n].to_vec();
-    a.truncate(0);
+    a.clear();
     Ok(StrykeValue::array(vec![
         StrykeValue::float(u),
         StrykeValue::float(v),

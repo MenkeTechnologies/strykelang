@@ -489,9 +489,9 @@ pub fn allocate(
         if n < 20 || buf[8..20] != tx1 {
             continue;
         }
-        match parse_allocate_401(&buf[..n]) {
-            Some(rn) => break rn,
-            None => return None,
+        {
+            let rn = parse_allocate_401(&buf[..n])?;
+            break rn;
         }
     };
 
@@ -508,9 +508,9 @@ pub fn allocate(
         if n < 20 || buf[8..20] != tx2 {
             continue;
         }
-        match parse_allocate_success(&buf[..n]) {
-            Some(r) => break r,
-            None => return None,
+        {
+            let r = parse_allocate_success(&buf[..n])?;
+            break r;
         }
     };
 

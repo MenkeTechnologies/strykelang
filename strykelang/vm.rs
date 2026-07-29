@@ -76,6 +76,10 @@ struct ParallelBlockVmShared {
     sub_entry_by_name: HashMap<u16, (usize, bool)>,
 }
 
+/// A rewritten op stream plus the `(narrow, wide)` slot pairs it remapped, for
+/// the fast path where every slot index still fits in a `u8`.
+type PlainSlotRemap = (Vec<Op>, Vec<(u8, u16)>);
+
 impl ParallelBlockVmShared {
     fn from_vm(vm: &VM<'_>) -> Self {
         let n = vm.ops.len().saturating_add(1);
@@ -1292,7 +1296,7 @@ impl<'a> VM<'a> {
         let base_slot = crate::jit::linear_slot_ops_max_index_seq(seg)
             .map(|m| m as usize + 1)
             .unwrap_or(0);
-        let plain_remap: Option<(Vec<Op>, Vec<(u8, u16)>)> = if base_slot <= u8::MAX as usize {
+        let plain_remap: Option<PlainSlotRemap> = if base_slot <= u8::MAX as usize {
             crate::jit::plain_scalar_read_names(seg).and_then(|pnames| {
                 if base_slot + pnames.len() <= u8::MAX as usize + 1 {
                     Some(crate::jit::remap_plain_reads_to_slots(
@@ -1682,7 +1686,7 @@ impl<'a> VM<'a> {
         let base_slot = crate::jit::linear_slot_ops_max_index_seq(full_seg)
             .map(|m| m as usize + 1)
             .unwrap_or(0);
-        let plain_remap: Option<(Vec<Op>, Vec<(u8, u16)>)> = if base_slot <= u8::MAX as usize {
+        let plain_remap: Option<PlainSlotRemap> = if base_slot <= u8::MAX as usize {
             crate::jit::plain_scalar_read_names(full_seg).and_then(|pnames| {
                 if base_slot + pnames.len() <= u8::MAX as usize + 1 {
                     Some(crate::jit::remap_plain_reads_to_slots(
@@ -6374,9 +6378,8 @@ impl<'a> VM<'a> {
                         let step = self.pop();
                         let to = self.pop();
                         let from = self.pop();
-                        let arr = crate::value::perl_list_range_expand_stepped(
-                            from, to, step, *roman_ok,
-                        );
+                        let arr =
+                            crate::value::perl_list_range_expand_stepped(from, to, step, *roman_ok);
                         self.push(StrykeValue::array(arr));
                         Ok(())
                     }

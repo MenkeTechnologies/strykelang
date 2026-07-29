@@ -522,6 +522,22 @@ struct LoadConstCtxGuard {
     prev: (*const StrykeValue, usize),
 }
 
+/// One entry of an integer-returning builtin dispatch table:
+/// `(id, name, extractor)`.
+#[cfg(test)]
+type IntCase = (
+    crate::bytecode::BuiltinId,
+    &'static str,
+    fn(&StrykeValue) -> i64,
+);
+/// The same for a string-returning builtin.
+#[cfg(test)]
+type StrCase = (
+    crate::bytecode::BuiltinId,
+    &'static str,
+    fn(&StrykeValue) -> String,
+);
+
 impl LoadConstCtxGuard {
     fn new(constants: &[StrykeValue]) -> Self {
         let prev = LOAD_CONST_CTX.with(|c| c.replace((constants.as_ptr(), constants.len())));
@@ -1713,7 +1729,7 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
         let mut stk = state[ip].clone().expect("queued ip has known state");
         match &seg[ip] {
             Jump(t) => {
-                let Some(tr) = rel(*t) else { return None };
+                let tr = rel(*t)?;
                 if !merge(&mut state, &mut work, tr, &stk) {
                     return None;
                 }
@@ -1721,7 +1737,7 @@ pub(crate) fn segment_fusevm_float_result_kind(seg: &[Op], seg_start: usize) -> 
             JumpIfTrue(t) | JumpIfFalse(t) => {
                 // Both branches pop the condition; the kind is irrelevant.
                 stk.pop()?;
-                let Some(tr) = rel(*t) else { return None };
+                let tr = rel(*t)?;
                 if !merge(&mut state, &mut work, tr, &stk)
                     || !merge(&mut state, &mut work, ip + 1, &stk)
                 {
@@ -4346,7 +4362,7 @@ mod tests {
     #[test]
     fn fusevm_runs_string_ord_hex_oct() {
         use crate::bytecode::BuiltinId;
-        let cases: &[(BuiltinId, &str, fn(&StrykeValue) -> i64)] = &[
+        let cases: &[IntCase] = &[
             (BuiltinId::Ord, "A", |v| v.ord_value()),
             (BuiltinId::Ord, "abc", |v| v.ord_value()),
             (BuiltinId::Ord, "", |v| v.ord_value()),
@@ -4387,7 +4403,7 @@ mod tests {
     #[test]
     fn fusevm_runs_string_uc_lc() {
         use crate::bytecode::BuiltinId;
-        let cases: &[(BuiltinId, &str, fn(&StrykeValue) -> String)] = &[
+        let cases: &[StrCase] = &[
             (BuiltinId::Uc, "hello", |v| v.uc_value()),
             (BuiltinId::Uc, "MiXeD", |v| v.uc_value()),
             (BuiltinId::Uc, "", |v| v.uc_value()),

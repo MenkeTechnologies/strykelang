@@ -164,7 +164,11 @@ fn toc_starts_with_doc_categories_in_declared_order() {
     // check locks the "TOC follows DOC_CATEGORIES order" invariant and can't
     // silently drift when chapters are added or reordered (four is enough to
     // catch the "interleaved alphabetical" regression).
-    let want: Vec<&str> = DOC_CATEGORIES.iter().take(4).map(|(name, _)| *name).collect();
+    let want: Vec<&str> = DOC_CATEGORIES
+        .iter()
+        .take(4)
+        .map(|(name, _)| *name)
+        .collect();
     let got: Vec<&str> = chapters
         .iter()
         .take(want.len())
