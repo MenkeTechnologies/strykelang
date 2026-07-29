@@ -518,6 +518,19 @@ fn map_zcond(c: &ZshCond, ctx: &mut Ctx) -> Expr {
             scalar_g: false,
             delim: '/',
         }),
+        // zsh's `COND_MOD` (parse.c:2634): any multi-char `-X` operator inside
+        // `[[ ]]`, e.g. `[[ -prefix foo ]]`. These are completion-context
+        // predicates that zsh's module system resolves at EVAL time — they are
+        // only meaningful inside a completion function and have no stryke
+        // equivalent, so emit a falsy literal and flag it, matching how the
+        // unary/binary fallbacks below handle an operator they cannot map.
+        ZshCond::ModCond(name, args) => {
+            let operands: String = args.iter().map(|a| format!(" {}", untok(a))).collect();
+            ctx.warn(format!(
+                "module condition `[[ {name}{operands} ]]` has no stryke equivalent; emitted as false"
+            ));
+            ex(ExprKind::Integer(0))
+        }
     }
 }
 
