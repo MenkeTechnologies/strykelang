@@ -233,6 +233,7 @@ stryke -lane 'p $F[0]'                     # bundled short switches
 stryke -c script.stk                          # syntax check
 stryke --lint script.stk                     # parse + compile (no run)
 stryke --disasm script.stk                   # bytecode listing on stderr
+stryke --tiers script.stk                    # which fusevm tier took the chunk
 stryke --ast script.stk                      # AST as JSON
 stryke --fmt script.stk                      # pretty-print parsed source
 stryke --profile script.stk                  # folded stacks + per-line/per-sub ns
@@ -971,6 +972,7 @@ stryke-specific long flags:
 | --- | --- |
 | `--lint` / `--check` | Parse + compile bytecode without running |
 | `--disasm` / `--disassemble` | Print bytecode disassembly to stderr before VM execution |
+| `--tiers` | Run it, then report which fusevm execution tier took its chunk |
 | `--ast` | Dump parsed AST as JSON and exit |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--from-zsh` | Transpile a zsh script to idiomatic stryke on stdout and exit (in-process zsh AST → stryke AST; externals → `system`, builtins → native, `val`/`var` declarations) |

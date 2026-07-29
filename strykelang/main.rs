@@ -60,6 +60,10 @@ pub(crate) struct Cli {
     #[arg(long = "dump-bytecode")]
     dump_bytecode: bool,
 
+    /// Run the program, then report which fusevm execution tier took its chunk.
+    #[arg(long = "tiers")]
+    tiers: bool,
+
     /// Pretty-print parsed Perl to stdout and exit (no execution)
     #[arg(long = "fmt")]
     format_source: bool,
@@ -1854,6 +1858,7 @@ fn main() {
         && !cli.dump_ast
         && !cli.dump_tokens
         && !cli.dump_bytecode
+        && !cli.tiers
         && !cli.format_source
         && !cli.profile
         && !cli.flame
@@ -1956,6 +1961,21 @@ fn main() {
         return;
     }
 
+    // `--tiers`: run the program, then report which fusevm execution tier took
+    // its chunk — asked of fusevm's own eligibility and cache predicates, so the
+    // answer comes from the compiler that would have done the work. The
+    // program's own output precedes the report.
+    if cli.tiers {
+        match stryke::tiers::report(&full_code) {
+            Ok(r) => println!("{r}"),
+            Err(e) => {
+                eprintln!("stryke: --tiers: {e}");
+                process::exit(1);
+            }
+        }
+        return;
+    }
+
     // rkyv bytecode cache — mtime-based, skips lex/parse/compile on 2+ runs.
     let is_one_liner = !cli.execute.is_empty() || !cli.execute_features.is_empty();
     let cache_eligible = !cli.line_mode
@@ -1965,6 +1985,7 @@ fn main() {
         && !cli.dump_ast
         && !cli.dump_tokens
         && !cli.dump_bytecode
+        && !cli.tiers
         && !cli.format_source
         && !cli.profile
         && !cli.flame

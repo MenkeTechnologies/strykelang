@@ -107,6 +107,7 @@ pub mod fusevm_bridge;
 /// `fusevm_native` submodule: Phase 1 of retiring `vm.rs`/`jit.rs` — runs whole
 /// programs on `fusevm::VM` with native Values (opt-in via STRYKE_FUSEVM_ONLY).
 pub mod fusevm_native;
+pub mod tiers;
 /// `getopts` submodule.
 pub mod getopts;
 /// `god` submodule.
