@@ -102,7 +102,7 @@ Demos: [`p2p_chat.stk`](examples/p2p_chat.stk) / [`p2p_chat_v2.stk`](examples/p2
 - **Three-tier regex** — Rust [`regex`](https://docs.rs/regex) → [`fancy-regex`](https://docs.rs/fancy-regex) (backrefs) → [`pcre2`](https://docs.rs/pcre2) (PCRE-only verbs).
 - **Bytecode VM + JIT** — match-dispatch interpreter with Cranelift block + linear-sub JIT (`strykelang/vm.rs`, `strykelang/jit.rs`).
 - **Rayon parallelism** — every parallel builtin uses work-stealing across all cores.
-- **10,487 standard library primaries** in `%b` (11,263 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,149
+- **10,488 standard library primaries** in `%b` (11,266 keys in `%all` including aliases and keywords) — largest bareword library of any language; clears Wolfram v14.3's high-band estimate (~7,300) by ~3,188
 - **44 MB single static binary** — `~/.cargo/bin/s` ships every builtin in one file, ~4.3 KB amortized per builtin, ~200&times; denser than Wolfram Engine per builtin/byte, sub-10 ms cold start
 
 ---
@@ -974,6 +974,8 @@ stryke-specific long flags:
 | `--disasm` / `--disassemble` | Print bytecode disassembly to stderr before VM execution |
 | `--tiers` | Run it, then report which fusevm execution tier took its chunk |
 | `--ast` | Dump parsed AST as JSON and exit |
+| `--dump-tokens` | Print the lexer token stream and exit (no execution) |
+| `--dump-bytecode` | Print the compiled fusevm bytecode ops and exit (no execution) |
 | `--fmt` | Pretty-print parsed Perl to stdout and exit |
 | `--from-zsh` | Transpile a zsh script to idiomatic stryke on stdout and exit (in-process zsh AST → stryke AST; externals → `system`, builtins → native, `val`/`var` declarations) |
 | `--profile` | Wall-clock profile: per-line + per-sub timings on stderr |
@@ -2060,7 +2062,7 @@ substr $s, 9, 5              # "world"  — byte substr
 
 ## [0x0A] EXAMPLES
 
-`examples/` ships **790 top-level .stk programs** plus **1349 Rosetta-Code tasks** and **173 Exercism solutions** — 2.3k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
+`examples/` ships **792 top-level .stk programs** plus **1349 Rosetta-Code tasks** and **173 Exercism solutions** — 2.3k working programs in all. Run any of them directly, run the CI sweep with `stryke examples/run_all_ci.stk`, or run all Exercism solutions with `stryke examples/exercism_run_all.stk`.
 
 ```sh
 stryke examples/fibonacci.stk
@@ -2136,7 +2138,7 @@ stryke 'val $a = bloom_new(1024); val $b = bloom_new(1024);
 
 ### Rosetta-Code coverage
 
-`examples/rosetta/` mirrors the [Rosetta Code](https://rosettacode.org) catalog as fully runnable stryke programs (one file per task) — 1648 tasks at last count. Run a single task with `stryke examples/rosetta/<task>.stk` or use the project-wide CI in `examples/run_all_ci.stk` to validate the entire corpus.
+`examples/rosetta/` mirrors the [Rosetta Code](https://rosettacode.org) catalog as fully runnable stryke programs — 1648 solution files covering all 1349 catalogued tasks (`examples/rosetta/list.txt`), since some tasks carry more than one variant. Run a single task with `stryke examples/rosetta/t/<task>.stk` or use the project-wide CI in `examples/run_all_ci.stk` to validate the entire corpus.
 
 ### Exercism
 
