@@ -101,6 +101,16 @@ Dynamic name-based dispatch (builtins + user subs). **Hardest remaining op.**
   need arms.
 - **Slots are `u8`; the Extended `arg` field is `u8`** — pass larger counts/operands
   via `LoadInt` then pop, never via `arg`.
+- **`nops` (base `0x1000`) and `fusevm_bridge::ext_ops` (base `0x0000`) are two
+  disjoint `Op::Extended` id spaces and must stay that way.** fusevm's block tier
+  decides eligibility from a *process-global* registry keyed on the raw `u16`
+  (`fusevm::jit::register_global_extension` → `global_extension_for(id)` →
+  `StrykeJitExt::can_jit(id)`), so a native id that numerically equals a bridge id
+  gets compiled as the bridge op. Both spaces used to start at 0: `Extended(32)`
+  meant `nops::CALL_SUB` natively but matched `ext_ops::STK_STR_REVERSE`
+  (`0x0020`), so `myfac(5)` returned a string handle instead of `120` and
+  `--tiers` reported sub dispatch as block-eligible. New `nops` constants are
+  `BASE + n`; never hand-write a bare number.
 - Verify an op actually fires natively before trusting a parity test (a fallback
   makes default==fusevm trivially, hiding an untested handler).
 
