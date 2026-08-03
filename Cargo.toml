@@ -169,7 +169,17 @@ nu-ansi-term = "0.50"
 # duplicate-symbol error (under `lto = "fat"`, a bare "failed to load bitcode").
 # `daemon` is re-enabled explicitly because it is a zshrs default the lib needs.
 zshrs = { version = "0.12.28", default-features = false, features = ["daemon"] }
-fusevm = { version = "0.17.0", features = ["jit", "jit-disk-cache", "aot", "ffi"] }
+# Must stay on the same minor as the fusevm `zshrs` itself depends on. fusevm
+# defines ~54 `#[no_mangle]` symbols across its aot/jit/ffi modules, and cargo
+# treats 0.x minors as semver-incompatible, so requesting a different one puts
+# two copies in the graph and every binary fails to link on duplicate symbols
+# (`ld: duplicate symbol '_fusevm_aot_powf'`; under `lto = "fat"` it degrades to
+# a bare "failed to load bitcode of module fusevm-….rcgu.o"). Published zshrs
+# 0.12.28 requires `^0.15.0`, so 0.15.0 is the only value that unifies. Moving
+# to 0.17 needs a zshrs release built against 0.17 to land on crates.io first;
+# bumping here alone reintroduces the duplicate. `cargo check --lib` does not
+# link, so it does not catch this — `cargo test`/`cargo build` does.
+fusevm = { version = "0.15.0", features = ["jit", "jit-disk-cache", "aot", "ffi"] }
 dirs = "6.0.0"
 hostname = "0.4.2"
 atty = "0.2.14"
