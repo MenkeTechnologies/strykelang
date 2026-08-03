@@ -1470,7 +1470,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1651,7 +1651,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1866,9 +1866,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "fusevm"
-version = "0.15.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f56a36b5dcf9fe887e6d835fb6625728ba29196df5f8fab076131006c9f708b6"
+checksum = "e5517df70d8cd1a68bad7275edec3a4dbdb1a7c334b12d0d6f0ce4e2a06beabd"
 dependencies = [
  "base64",
  "bincode",
@@ -2525,7 +2525,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi 0.5.2",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3317,7 +3317,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3527,7 +3527,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4523,7 +4523,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5133,7 +5133,7 @@ dependencies = [
 
 [[package]]
 name = "strykelang"
-version = "0.17.46"
+version = "0.17.47"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -5556,7 +5556,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6488,7 +6488,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7099,9 +7099,9 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "znative"
-version = "0.12.28"
+version = "0.12.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad567134ddef6e5d05d915192953eaa47f86257bca35a5612304f05567149419"
+checksum = "b2fe70e53b761b3f3b0f47810c7fc0729a98d8d880b75c4641fd87e7e75bd775"
 
 [[package]]
 name = "zopfli"
@@ -7117,9 +7117,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.12.28"
+version = "0.12.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "153bad8bfacccc7f4148e12124d193b1064a3ff2757d99eec6c2e0276a49f2e4"
+checksum = "ed5db3622499d3044bfb0786a23f55df189f5b35e3a086fb485c2b5192588a40"
 dependencies = [
  "atty",
  "bincode",
@@ -7171,9 +7171,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.12.28"
+version = "0.12.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da73c3b15ab83ee2d910fd41559c8fbea52ccd9195ff8a5289da3f044f608c8"
+checksum = "81e9be6dc34c245ec4cb29576984098c2b28e5436acb98997e5459510d87f778"
 dependencies = [
  "atty",
  "axum",
