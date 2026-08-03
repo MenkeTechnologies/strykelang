@@ -23,12 +23,19 @@ use crate::value::StrykeValue;
 /// strykelang's reserved `fusevm::Op::Extended(u16, u8)` extension-op ID space.
 ///
 /// fusevm dispatches language-specific opcodes through a per-frontend handler
-/// table keyed on the `u16` ID; strykelang owns the `0x0000..` block listed here
-/// (zshrs and awkrs own disjoint blocks in their own bridges, so no IDs collide).
-/// IDs are reserved here as strykelang's frontend surface; the universal subset
-/// that this module currently executes needs none of them, but they pin the ID
-/// space so future language-specific ops can be lowered to fusevm without
-/// renumbering.
+/// table keyed on the `u16` ID; this bridge owns the `0x0000..0x0FFF` block
+/// listed here (zshrs and awkrs own disjoint blocks in their own bridges, so no
+/// IDs collide). IDs are reserved here as strykelang's frontend surface; the
+/// universal subset that this module currently executes needs none of them, but
+/// they pin the ID space so future language-specific ops can be lowered to
+/// fusevm without renumbering.
+///
+/// strykelang has a *second* space: `fusevm_native`'s `nops`, based at
+/// `0x1000`. It must stay disjoint from this one, because `StrykeJitExt` is
+/// registered in fusevm's process-global JIT extension registry and
+/// `can_jit`/`emit_extended` see only the raw `u16` — an ID that means
+/// `CALL_SUB` to the native path but `STK_STR_REVERSE` here would be compiled
+/// as the latter. Never lower a native-path op into this block, or vice versa.
 pub mod ext_ops {
     /// Perl-style regex match (`=~`).
     pub const STK_REGEX_MATCH: u16 = 0x0000;
@@ -184,7 +191,9 @@ pub mod ext_ops {
     /// string→int (see `STK_STR_INDEX`).
     pub const STK_STR_RINDEX: u16 = 0x0019;
 
-    /// First ID reserved for strykelang; frontends must keep their blocks disjoint.
+    /// First ID of the bridge block; frontends (and strykelang's own
+    /// `fusevm_native` `nops` space, based at `0x1000`) must keep their blocks
+    /// disjoint.
     pub const STK_ID_BASE: u16 = STK_REGEX_MATCH;
 }
 

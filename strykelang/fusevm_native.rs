@@ -28,193 +28,215 @@ use std::sync::Arc;
 /// fusevm-only path. These operate on **native fusevm Values** (distinct from
 /// the i64-handle Extended ops in [`crate::fusevm_bridge`]).
 mod nops {
+    /// First id of this space; every constant below is `BASE + n`.
+    ///
+    /// fusevm's block tier decides whether an `Op::Extended(id, _)` is
+    /// compilable by asking a **process-global** registry
+    /// (`fusevm::jit::register_global_extension` → `global_extension_for(id)`),
+    /// keyed on the raw `u16` and nothing else. strykelang registers
+    /// `fusevm_bridge::StrykeJitExt` there for the *bridge* id space
+    /// (`fusevm_bridge::ext_ops`), and that registration is process-wide and
+    /// permanent once any bridge segment has run.
+    ///
+    /// Both spaces used to start at 0, so they aliased: a natively lowered
+    /// `Extended(32)` is `CALL_SUB`, but `StrykeJitExt::can_jit(32)` answers
+    /// for `ext_ops::STK_STR_REVERSE` (`0x0020`) and says yes. The block tier
+    /// then compiled a delegated user-sub call into the string-reverse helper,
+    /// so `myfac(5)` returned a NaN-boxed string handle instead of `120`, and
+    /// `--tiers` reported a chunk of `Extended` ops as fully block-eligible.
+    ///
+    /// Basing this space at `0x1000` keeps the two disjoint: `can_jit` answers
+    /// `false` for every id here, the block tier declines them, and they stay
+    /// on `native_ext_handler` where they are actually implemented.
+    pub const BASE: u16 = 0x1000;
+
     /// Perl `.` string concatenation (pops 2, pushes the concatenated string).
-    pub const CONCAT: u16 = 0;
+    pub const CONCAT: u16 = BASE;
     /// String comparisons (`eq ne lt gt le ge`); each pops 2, pushes Int 1/0.
-    pub const STR_EQ: u16 = 1;
-    pub const STR_NE: u16 = 2;
-    pub const STR_LT: u16 = 3;
-    pub const STR_GT: u16 = 4;
-    pub const STR_LE: u16 = 5;
-    pub const STR_GE: u16 = 6;
+    pub const STR_EQ: u16 = BASE + 1;
+    pub const STR_NE: u16 = BASE + 2;
+    pub const STR_LT: u16 = BASE + 3;
+    pub const STR_GT: u16 = BASE + 4;
+    pub const STR_LE: u16 = BASE + 5;
+    pub const STR_GE: u16 = BASE + 6;
     /// Numeric comparisons (`== != < > <= >=`); each pops 2, pushes Int 1/0.
-    pub const NUM_EQ: u16 = 7;
-    pub const NUM_NE: u16 = 8;
-    pub const NUM_LT: u16 = 9;
-    pub const NUM_GT: u16 = 10;
-    pub const NUM_LE: u16 = 11;
-    pub const NUM_GE: u16 = 12;
+    pub const NUM_EQ: u16 = BASE + 7;
+    pub const NUM_NE: u16 = BASE + 8;
+    pub const NUM_LT: u16 = BASE + 9;
+    pub const NUM_GT: u16 = BASE + 10;
+    pub const NUM_LE: u16 = BASE + 11;
+    pub const NUM_GE: u16 = BASE + 12;
     /// `<=>` numeric spaceship (pops 2, pushes Int -1/0/1).
-    pub const SPACESHIP: u16 = 13;
+    pub const SPACESHIP: u16 = BASE + 13;
     /// Perl `!` logical-not (pops 1, pushes Int 1/0).
-    pub const LOG_NOT: u16 = 14;
+    pub const LOG_NOT: u16 = BASE + 14;
     /// Normalize top-of-stack to Perl truthiness as Int 1/0, so fusevm's
     /// conditional jumps branch using strykelang's `is_true` (fusevm's native
     /// truthiness differs for values like the string "0").
-    pub const TRUTHY: u16 = 15;
+    pub const TRUTHY: u16 = BASE + 15;
     /// Arithmetic that can fault or change type (`/ % **`); each pops 2, pushes
     /// the result (or records a runtime error via the error slot).
-    pub const DIV: u16 = 16;
-    pub const MOD: u16 = 17;
-    pub const POW: u16 = 18;
+    pub const DIV: u16 = BASE + 16;
+    pub const MOD: u16 = BASE + 17;
+    pub const POW: u16 = BASE + 18;
     /// Name-scoped scalars (globals / package / special vars). Each is preceded
     /// by a `LoadInt(name_idx)` so the handler can resolve the name; they
     /// delegate to the interp via the host below.
-    pub const GET_SCALAR: u16 = 19;
-    pub const SET_SCALAR: u16 = 20;
-    pub const DECLARE_SCALAR: u16 = 21;
+    pub const GET_SCALAR: u16 = BASE + 19;
+    pub const SET_SCALAR: u16 = BASE + 20;
+    pub const DECLARE_SCALAR: u16 = BASE + 21;
     /// "Plain" scalar access — direct `scope.get_scalar`/`set_scalar` (no
     /// special-var resolution); what the compiler emits for ordinary names.
-    pub const GET_SCALAR_PLAIN: u16 = 22;
-    pub const SET_SCALAR_PLAIN: u16 = 23;
-    pub const SET_SCALAR_KEEP_PLAIN: u16 = 24;
+    pub const GET_SCALAR_PLAIN: u16 = BASE + 22;
+    pub const SET_SCALAR_PLAIN: u16 = BASE + 23;
+    pub const SET_SCALAR_KEEP_PLAIN: u16 = BASE + 24;
     /// Arrays. MAKE_ARRAY pops a count then that many values (flattening nested
     /// arrays, Perl list semantics) into a fusevm `Value::Array`. DECLARE_ARRAY
     /// stores it in the interp scope by name. GET_ARRAY_ELEM reads `name[index]`
     /// with strykelang's indexing sugar. All preceded by their `LoadInt` args.
-    pub const MAKE_ARRAY: u16 = 25;
-    pub const DECLARE_ARRAY: u16 = 26;
-    pub const GET_ARRAY_ELEM: u16 = 27;
+    pub const MAKE_ARRAY: u16 = BASE + 25;
+    pub const DECLARE_ARRAY: u16 = BASE + 26;
+    pub const GET_ARRAY_ELEM: u16 = BASE + 27;
     /// Hashes. DECLARE_HASH folds a flat k/v list (built via MAKE_ARRAY) into a
     /// map in the interp scope; GET_HASH_ELEM reads `name{key}`.
-    pub const DECLARE_HASH: u16 = 28;
-    pub const GET_HASH_ELEM: u16 = 29;
+    pub const DECLARE_HASH: u16 = BASE + 28;
+    pub const GET_HASH_ELEM: u16 = BASE + 29;
     /// I/O: `print` / `say` to the default handle. The Extended `arg` carries
     /// the argument count.
-    pub const PRINT: u16 = 30;
-    pub const SAY: u16 = 31;
+    pub const PRINT: u16 = BASE + 30;
+    pub const SAY: u16 = BASE + 31;
     /// Static user-sub call. Preceded by `LoadInt(name_idx), LoadInt(argc),
     /// LoadInt(wantarray)`; delegates the whole call (scopes, param binding,
     /// recursion) to the interp via `call_named_sub`.
-    pub const CALL_SUB: u16 = 32;
+    pub const CALL_SUB: u16 = BASE + 32;
     /// Closures. MAKE_CODEREF (preceded by `LoadInt(block_idx), LoadInt(sig_idx)`)
     /// builds an anon sub capturing the current scope → registry handle.
     /// ARROW_CALL (`$f->(args)`) calls the coderef; `arg` carries wantarray.
-    pub const MAKE_CODEREF: u16 = 33;
-    pub const ARROW_CALL: u16 = 34;
+    pub const MAKE_CODEREF: u16 = BASE + 33;
+    pub const ARROW_CALL: u16 = BASE + 34;
     /// Scalar slots backed by `interp.scope` (not fusevm frame slots), so that
     /// closures capturing `my` locals see them via `scope.capture()`. Each is
     /// preceded by `LoadInt(slot)` (and `LoadInt(name_idx)` for DECLARE).
-    pub const SLOT_GET: u16 = 35;
-    pub const SLOT_SET: u16 = 36;
-    pub const SLOT_SET_KEEP: u16 = 37;
-    pub const SLOT_DECLARE: u16 = 38;
+    pub const SLOT_GET: u16 = BASE + 35;
+    pub const SLOT_SET: u16 = BASE + 36;
+    pub const SLOT_SET_KEEP: u16 = BASE + 37;
+    pub const SLOT_DECLARE: u16 = BASE + 38;
     /// `=~` match. Preceded by `LoadInt(pat_idx), LoadInt(flags_idx),
     /// LoadInt(scalar_g), LoadInt(pos_key_idx)`; delegates to
     /// `interp.regex_match_execute` (which also sets `$1`/`$&`/etc.).
-    pub const REGEX_MATCH: u16 = 39;
+    pub const REGEX_MATCH: u16 = BASE + 39;
     /// `s///` substitution. Preceded by `LoadInt(pat), LoadInt(repl),
     /// LoadInt(flags), LoadInt(lvalue_idx)`; delegates to
     /// `interp.regex_subst_execute`, which writes the result back to the lvalue
     /// and returns the substitution count.
-    pub const REGEX_SUBST: u16 = 40;
+    pub const REGEX_SUBST: u16 = BASE + 40;
     /// Perl `++` on a slot via `perl_inc` (magic string/number increment).
     /// INC_SLOT_VOID is `++slot` (result discarded); POST_INC_SLOT pushes the
     /// old value then increments (`slot++`). Preceded by `LoadInt(slot)`.
-    pub const INC_SLOT_VOID: u16 = 41;
-    pub const POST_INC_SLOT: u16 = 42;
+    pub const INC_SLOT_VOID: u16 = BASE + 41;
+    pub const POST_INC_SLOT: u16 = BASE + 42;
     /// Builtin call (`length`, `uc`, `join`, `map`, `sort`, …). Preceded by
     /// `LoadInt(builtin_id)`; the Extended `arg` is the argument count.
     /// Delegates to the shared `exec_builtin` dispatcher.
-    pub const CALL_BUILTIN: u16 = 43;
+    pub const CALL_BUILTIN: u16 = BASE + 43;
     /// Block-builtins. SORT_NOBLOCK sorts a list (string order). MAP_INT_MUL
     /// (preceded by `LoadInt(k)`) maps `$_*k` over a list. GREP_BLOCK (preceded
     /// by `LoadInt(block_idx)`) filters a list by running a block per element.
-    pub const SORT_NOBLOCK: u16 = 44;
-    pub const MAP_INT_MUL: u16 = 45;
-    pub const GREP_BLOCK: u16 = 46;
+    pub const SORT_NOBLOCK: u16 = BASE + 44;
+    pub const MAP_INT_MUL: u16 = BASE + 45;
+    pub const GREP_BLOCK: u16 = BASE + 46;
     /// `from..to` range → list (pops to, from; pushes the expanded array).
-    pub const RANGE: u16 = 47;
+    pub const RANGE: u16 = BASE + 47;
     /// `@name` whole-array read → list value. Preceded by `LoadInt(name_idx)`.
-    pub const GET_ARRAY: u16 = 48;
+    pub const GET_ARRAY: u16 = BASE + 48;
     /// `map { BLOCK } LIST` (generic block body). Preceded by `LoadInt(block_idx)`;
     /// the Extended `arg` carries the flat-map peel flag (0 = map, 1 = flat_map).
-    pub const MAP_BLOCK: u16 = 49;
+    pub const MAP_BLOCK: u16 = BASE + 49;
     /// `scalar(@name)` array length → integer. Preceded by `LoadInt(name_idx)`.
-    pub const ARRAY_LEN: u16 = 50;
+    pub const ARRAY_LEN: u16 = BASE + 50;
     /// Push a lexical scope frame (block / loop body entry).
-    pub const PUSH_FRAME: u16 = 51;
+    pub const PUSH_FRAME: u16 = BASE + 51;
     /// Pop a lexical scope frame (block / loop body exit).
-    pub const POP_FRAME: u16 = 52;
+    pub const POP_FRAME: u16 = BASE + 52;
     /// `printf FMT, ARGS` to the default handle. Extended `arg` = total argc
     /// (format string + values). Args are pushed in source order beforehand.
-    pub const PRINTF: u16 = 53;
+    pub const PRINTF: u16 = BASE + 53;
     /// `scalar EXPR` — coerce the TOS to scalar context (array→len, etc.).
-    pub const VALUE_SCALAR_CONTEXT: u16 = 54;
+    pub const VALUE_SCALAR_CONTEXT: u16 = BASE + 54;
     /// `$h{k} = v` returning the assigned value. Preceded by `LoadInt(name_idx)`;
     /// value then key are below it on the stack.
-    pub const SET_HASH_ELEM_KEEP: u16 = 55;
+    pub const SET_HASH_ELEM_KEEP: u16 = BASE + 55;
     /// `reverse LIST` — reverse a list (or wrap an iterator in RevIterator).
-    pub const REVERSE_LIST: u16 = 56;
+    pub const REVERSE_LIST: u16 = BASE + 56;
     // ── JIT-fused counted-loop superops (de-fused onto host scope methods) ──
     /// `grep { $_ % M == R } LIST`. Preceded by `LoadInt(M), LoadInt(R)`.
-    pub const GREP_INT_MOD_EQ: u16 = 57;
+    pub const GREP_INT_MOD_EQ: u16 = BASE + 57;
     /// `while $i<lim { $sum+=$i; $i+=1 }`. Preceded by `LoadInt(sum_slot), LoadInt(i_slot), LoadInt(limit)`.
-    pub const ACCUM_SUM_LOOP: u16 = 58;
+    pub const ACCUM_SUM_LOOP: u16 = BASE + 58;
     /// `while $i<lim { $s.=CONST; $i+=1 }`. Preceded by `LoadInt(const_idx), LoadInt(s_slot), LoadInt(i_slot), LoadInt(limit)`.
-    pub const CONCAT_CONST_SLOT_LOOP: u16 = 59;
+    pub const CONCAT_CONST_SLOT_LOOP: u16 = BASE + 59;
     /// `while $i<lim { push @arr,$i; $i+=1 }`. Preceded by `LoadInt(name_idx), LoadInt(i_slot), LoadInt(limit)`.
-    pub const PUSH_INT_RANGE_TO_ARRAY_LOOP: u16 = 60;
+    pub const PUSH_INT_RANGE_TO_ARRAY_LOOP: u16 = BASE + 60;
     /// `for $k (keys %h) { $sum += $h{$k} }`. Preceded by `LoadInt(sum_slot), LoadInt(h_name_idx)`.
-    pub const SUM_HASH_VALUES_TO_SLOT: u16 = 61;
+    pub const SUM_HASH_VALUES_TO_SLOT: u16 = BASE + 61;
     /// `sort { $a <=> $b } LIST` (recognized magic comparator). Preceded by
     /// `LoadInt(tag)` (0=num, 1=str, 2=num-rev, 3=str-rev); list below it.
-    pub const SORT_WITH_BLOCK_FAST: u16 = 62;
+    pub const SORT_WITH_BLOCK_FAST: u16 = BASE + 62;
     /// `++$name` (named scalar pre-increment). Preceded by `LoadInt(name_idx)`.
-    pub const PRE_INC: u16 = 63;
+    pub const PRE_INC: u16 = BASE + 63;
     /// `pmap { BLOCK } LIST` (parallel map). Preceded by `LoadInt(block_idx)`;
     /// the progress flag then the list are below it on the stack.
-    pub const PMAP_BLOCK: u16 = 64;
+    pub const PMAP_BLOCK: u16 = BASE + 64;
     // ── Bitwise / shift (overloaded: set ops + sketches, then integer) ──
     /// `lv & rv` — set intersection / sketch-AND / integer AND.
-    pub const BIT_AND: u16 = 65;
+    pub const BIT_AND: u16 = BASE + 65;
     /// `lv | rv` — set union / sketch-OR / integer OR.
-    pub const BIT_OR: u16 = 66;
+    pub const BIT_OR: u16 = BASE + 66;
     /// `lv ^ rv` — sketch-XOR / integer XOR.
-    pub const BIT_XOR: u16 = 67;
+    pub const BIT_XOR: u16 = BASE + 67;
     /// `~a` — integer bitwise NOT.
-    pub const BIT_NOT: u16 = 68;
+    pub const BIT_NOT: u16 = BASE + 68;
     /// `a << b` — Perl left shift (`perl_shl_i64`).
-    pub const SHL: u16 = 69;
+    pub const SHL: u16 = BASE + 69;
     /// `a >> b` — Perl right shift (`perl_shr_i64`).
-    pub const SHR: u16 = 70;
+    pub const SHR: u16 = BASE + 70;
     /// `a cmp b` — string three-way compare → -1 / 0 / 1.
-    pub const STR_CMP: u16 = 71;
+    pub const STR_CMP: u16 = BASE + 71;
     /// `str x n` — string repeat.
-    pub const STRING_REPEAT: u16 = 72;
+    pub const STRING_REPEAT: u16 = BASE + 72;
     /// `reverse SCALAR` — reverse the characters of the stringified TOS.
-    pub const REVERSE_SCALAR: u16 = 73;
+    pub const REVERSE_SCALAR: u16 = BASE + 73;
     // ── Array mutation + ref/hash construction ──
     /// `push @name, VAL` (flattens an array value). Preceded by `LoadInt(name_idx)`.
-    pub const PUSH_ARRAY: u16 = 74;
+    pub const PUSH_ARRAY: u16 = BASE + 74;
     /// `pop @name` → element. Preceded by `LoadInt(name_idx)`.
-    pub const POP_ARRAY: u16 = 75;
+    pub const POP_ARRAY: u16 = BASE + 75;
     /// `shift @name` → element. Preceded by `LoadInt(name_idx)`.
-    pub const SHIFT_ARRAY: u16 = 76;
+    pub const SHIFT_ARRAY: u16 = BASE + 76;
     /// `[ … ]` array ref from the TOS list value.
-    pub const MAKE_ARRAY_REF: u16 = 77;
+    pub const MAKE_ARRAY_REF: u16 = BASE + 77;
     /// `{ … }` hash ref from the TOS list value (k/v pairs).
-    pub const MAKE_HASH_REF: u16 = 78;
+    pub const MAKE_HASH_REF: u16 = BASE + 78;
     /// `\$x` scalar ref from the TOS.
-    pub const MAKE_SCALAR_REF: u16 = 79;
+    pub const MAKE_SCALAR_REF: u16 = BASE + 79;
     /// `%(…)` hash from the top `arg` stack values (k/v pairs); `arg` = item count.
-    pub const MAKE_HASH: u16 = 80;
+    pub const MAKE_HASH: u16 = BASE + 80;
     // ── Reference deref ──
     /// `$r->[i]` array-element deref. Stack: ref, index.
-    pub const ARROW_ARRAY: u16 = 81;
+    pub const ARROW_ARRAY: u16 = BASE + 81;
     /// `$r->{k}` hash-element deref. Stack: ref, key.
-    pub const ARROW_HASH: u16 = 82;
+    pub const ARROW_HASH: u16 = BASE + 82;
     /// `scalar(@$r)` array-deref length → integer. Stack: ref.
-    pub const ARRAY_DEREF_LEN: u16 = 83;
+    pub const ARRAY_DEREF_LEN: u16 = BASE + 83;
     /// `\$name` binding ref to a named scalar. Preceded by `LoadInt(name_idx)`.
-    pub const MAKE_SCALAR_BINDING_REF: u16 = 84;
+    pub const MAKE_SCALAR_BINDING_REF: u16 = BASE + 84;
     /// Pop the TOS and push Int(1) if defined (not UNDEF), else Int(0). Used to
     /// decompose `JumpIfDefinedKeep` (the `//` short-circuit).
-    pub const DEFINED: u16 = 85;
+    pub const DEFINED: u16 = BASE + 85;
     /// Pop the TOS, list-expand it, and push the elements joined by `$"` (the
     /// list separator). Backs `#{ EXPR }` / `@array` interpolation, which
     /// interpolate in list context and join with `$"`.
-    pub const ARRAY_STRINGIFY_LIST_SEP: u16 = 86;
+    pub const ARRAY_STRINGIFY_LIST_SEP: u16 = BASE + 86;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -2255,8 +2277,10 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
 /// Is the Extended op `id` self-contained enough to run in an AOT binary?
 ///
 /// Allowlist (default-deny, so a newly added op is AOT-ineligible until vetted).
-/// The excluded ids all need the original strykelang `Chunk` or a live
-/// interpreter at run time, neither of which an AOT process has:
+/// Offsets are relative to `nops::BASE`; an id outside this space is not one
+/// of ours and is never AOT-safe. The excluded offsets all need the original
+/// strykelang `Chunk` or a live interpreter at run time, neither of which an
+/// AOT process has:
 ///   - `CALL_SUB`(32) — `call_named_sub` needs the sub bodies (not embedded);
 ///   - `MAKE_CODEREF`(33)/`ARROW_CALL`(34) — need `chunk.blocks`/`code_ref_sigs`;
 ///   - `REGEX_MATCH`(39)/`REGEX_SUBST`(40) — need patterns in `chunk.constants`;
@@ -2264,12 +2288,15 @@ pub fn try_run_native(chunk: &Chunk, interp: &mut VMHelper) -> Option<StrykeResu
 ///   - `GREP_BLOCK`(46)/`MAP_BLOCK`(49)/`PMAP_BLOCK`(64) — need `chunk.blocks`;
 ///   - `CONCAT_CONST_SLOT_LOOP`(59) — reads a string from `chunk.constants`.
 pub(crate) fn aot_safe_ext(id: u16) -> bool {
-    matches!(id, 0..=31 | 35..=38 | 41 | 42 | 44 | 45 | 47 | 48 | 50..=58 | 60..=63 | 65..=85)
+    let Some(off) = id.checked_sub(nops::BASE) else {
+        return false;
+    };
+    matches!(off, 0..=31 | 35..=38 | 41 | 42 | 44 | 45 | 47 | 48 | 50..=58 | 60..=63 | 65..=85)
 }
 
 /// Human name for an AOT-ineligible Extended op (for the rejection message).
 fn aot_unsupported_name(id: u16) -> &'static str {
-    match id {
+    match id.wrapping_sub(nops::BASE) {
         32 => "user-defined subroutine call",
         33 | 34 => "closure / coderef call",
         39 | 40 => "regex match / substitution",
