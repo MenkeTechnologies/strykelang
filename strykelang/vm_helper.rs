@@ -671,6 +671,13 @@ pub struct VMHelper {
     pub default_print_handle: String,
     /// Suppress stdout output (fan workers with progress bars).
     pub suppress_stdout: bool,
+    /// In-process output sink. When `Some`, everything the program writes to
+    /// STDOUT/STDERR is appended here instead of reaching the process streams —
+    /// what an embedder that owns the terminal (a TUI) needs so a `print`
+    /// cannot corrupt its display. Distinct from [`Self::suppress_stdout`],
+    /// which *discards* output: capture keeps it and hands it back. `None` (the
+    /// default) is the ordinary standalone `stryke` behaviour.
+    capture: Option<String>,
     /// Per-instance test counters for `assert_*` / `test_run` / `test_skip` (stryke
     /// `.stk` test framework). Atomics so the immutable-ref builtin signature
     /// (`fn(&VMHelper, ...)`) can mutate without changing every call site. Replaces
@@ -1596,6 +1603,7 @@ impl VMHelper {
             output_autoflush: false,
             default_print_handle: "STDOUT".to_string(),
             suppress_stdout: false,
+            capture: None,
             test_pass_count: std::sync::atomic::AtomicUsize::new(0),
             test_fail_count: std::sync::atomic::AtomicUsize::new(0),
             test_skip_count: std::sync::atomic::AtomicUsize::new(0),
@@ -1954,6 +1962,10 @@ impl VMHelper {
             output_autoflush: self.output_autoflush,
             default_print_handle: self.default_print_handle.clone(),
             suppress_stdout: self.suppress_stdout,
+            // A worker writes to the parent's streams, not into the parent's
+            // capture buffer — the buffer is not shared, so inheriting `Some`
+            // here would silently drop the worker's output.
+            capture: None,
             // Workers start with fresh test counters — they don't share with the
             // parent. The parent is responsible for aggregating across workers if
             // it cares (none of the current parallel callers do).
@@ -17394,6 +17406,62 @@ impl VMHelper {
         Ok(StrykeValue::integer(1))
     }
 
+    // ── output capture (embedding) ───────────────────────────────────────
+    //
+    // Every write a *program* makes to STDOUT/STDERR funnels through
+    // `write_out`: `print`, `say`, `printf`. Diagnostics the runtime itself
+    // emits (the banner, a crash message from `main`) deliberately do not —
+    // they belong to the process, not to the program.
+
+    /// Start capturing program output in-process. Any text already captured is
+    /// discarded, so each run starts clean.
+    ///
+    /// This is what an embedder wants instead of [`Self::suppress_stdout`]:
+    /// suppression throws the output away, capture hands it back.
+    pub fn begin_capture(&mut self) {
+        self.capture = Some(String::new());
+    }
+
+    /// Stop capturing and take everything written since [`Self::begin_capture`],
+    /// returning the empty string when capture was not on.
+    pub fn end_capture(&mut self) -> String {
+        self.capture.take().unwrap_or_default()
+    }
+
+    /// Whether output is being captured.
+    pub fn capturing(&self) -> bool {
+        self.capture.is_some()
+    }
+
+    /// Bind `$name` to `text` in the current scope, so an embedder can hand a
+    /// program its input as an ordinary scalar (`$stdin`) instead of splicing a
+    /// literal into the source and escaping it.
+    pub fn bind_scalar(&mut self, name: &str, text: &str) {
+        self.scope
+            .declare_scalar(name, StrykeValue::string(text.to_string()));
+    }
+
+    /// Write program output: into the capture buffer when capturing, else to
+    /// the process stream `stderr` selects — honouring `suppress_stdout` (which
+    /// discards STDOUT for progress-bar workers) and `$|` autoflush.
+    pub(crate) fn write_out(&mut self, output: &str, stderr: bool) {
+        if let Some(buf) = &mut self.capture {
+            buf.push_str(output);
+            return;
+        }
+        if stderr {
+            eprint!("{}", output);
+            let _ = io::stderr().flush();
+            return;
+        }
+        if !self.suppress_stdout {
+            print!("{}", output);
+            if self.output_autoflush {
+                let _ = io::stdout().flush();
+            }
+        }
+    }
+
     /// Write a fully formatted `print`/`say` record (`LIST`, optional `say` newline, `$\`) to a handle.
     /// `handle_name` must already be [`Self::resolve_io_handle_name`]-resolved.
     pub(crate) fn write_formatted_print(
@@ -17403,18 +17471,8 @@ impl VMHelper {
         line: usize,
     ) -> StrykeResult<()> {
         match handle_name {
-            "STDOUT" => {
-                if !self.suppress_stdout {
-                    print!("{}", output);
-                    if self.output_autoflush {
-                        let _ = io::stdout().flush();
-                    }
-                }
-            }
-            "STDERR" => {
-                eprint!("{}", output);
-                let _ = io::stderr().flush();
-            }
+            "STDOUT" => self.write_out(output, false),
+            "STDERR" => self.write_out(output, true),
             name => {
                 if let Some(writer) = self.output_handles.get_mut(name) {
                     let _ = writer.write_all(output.as_bytes());
@@ -17464,18 +17522,8 @@ impl VMHelper {
             }
         };
         match handle_name {
-            "STDOUT" => {
-                if !self.suppress_stdout {
-                    print!("{}", output);
-                    if self.output_autoflush {
-                        let _ = IoWrite::flush(&mut io::stdout());
-                    }
-                }
-            }
-            "STDERR" => {
-                eprint!("{}", output);
-                let _ = IoWrite::flush(&mut io::stderr());
-            }
+            "STDOUT" => self.write_out(&output, false),
+            "STDERR" => self.write_out(&output, true),
             name => {
                 if let Some(writer) = self.output_handles.get_mut(name) {
                     let _ = writer.write_all(output.as_bytes());
@@ -20556,18 +20604,8 @@ impl VMHelper {
         let handle_name =
             self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
         match handle_name.as_str() {
-            "STDOUT" => {
-                if !self.suppress_stdout {
-                    print!("{}", output);
-                    if self.output_autoflush {
-                        let _ = io::stdout().flush();
-                    }
-                }
-            }
-            "STDERR" => {
-                eprint!("{}", output);
-                let _ = io::stderr().flush();
-            }
+            "STDOUT" => self.write_out(&output, false),
+            "STDERR" => self.write_out(&output, true),
             name => {
                 if let Some(writer) = self.output_handles.get_mut(name) {
                     let _ = writer.write_all(output.as_bytes());
