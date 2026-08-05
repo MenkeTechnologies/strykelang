@@ -304,21 +304,25 @@ fn do_printf(vm: &mut fusevm::VM, argc: usize) {
     }
     args.reverse(); // pops are last-to-first → restore source order
     let r: Result<(), StrykeError> = with_interp(|i| {
-        // Bare `printf;` takes its format from `$_` (perldoc -f printf), same
-        // topic default as the VM's Op::Printf path.
-        let (fmt, rest) = match args.split_first() {
-            Some((f, r)) => (f.to_string(), r),
-            None => (i.scope.get_scalar("_").to_string(), &args[..]),
-        };
+        // One list, format off the front — flattened BEFORE the split, as in
+        // the VM's Op::Printf path, so `printf(FMT, ...)` (whose parenthesized
+        // list arrives as a single array) and `printf(@a)` both take FMT as the
+        // format rather than the whole list stringified.
         let mut flat = Vec::new();
-        for a in rest {
+        for a in &args {
             if let Some(items) = a.as_array_vec() {
                 flat.extend(items);
             } else {
                 flat.push(a.clone());
             }
         }
-        let s = match i.perl_sprintf_stringify(&fmt, &flat, 0) {
+        // Bare `printf;` takes its format from `$_` (perldoc -f printf), same
+        // topic default as the VM's Op::Printf path.
+        let (fmt, rest) = match flat.split_first() {
+            Some((f, r)) => (f.to_string(), r.to_vec()),
+            None => (i.scope.get_scalar("_").to_string(), Vec::new()),
+        };
+        let s = match i.perl_sprintf_stringify(&fmt, &rest, 0) {
             Ok(s) => s,
             Err(crate::vm_helper::FlowOrError::Error(e)) => return Err(e),
             Err(_) => return Err(StrykeError::runtime("printf: unexpected control flow", 0)),

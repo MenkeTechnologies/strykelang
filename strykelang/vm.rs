@@ -5602,16 +5602,32 @@ impl<'a> VM<'a> {
                             args.push(self.pop());
                         }
                         args.reverse();
+                        // `printf` takes ONE list and the format is its first
+                        // element (perldoc -f printf), so the list is flattened
+                        // BEFORE the format is split off. Taking args[0] first
+                        // and flattening only the rest got two forms wrong:
+                        // `printf(FMT, ...)`, where the parenthesized list
+                        // arrives as one array whose stringification became the
+                        // whole format — `printf("%s-%d\n", "b", 2)` printed
+                        // "-0\nb2" — and `printf(@a)`, for the same reason.
+                        let mut flat = Vec::new();
+                        for a in &args {
+                            if let Some(items) = a.as_array_vec() {
+                                flat.extend(items);
+                            } else {
+                                flat.push(a.clone());
+                            }
+                        }
                         // Bare `printf;` / `printf();` take the format from `$_`,
                         // the same topic default `print` uses above (perldoc -f
                         // printf). Only a genuinely absent format falls back —
                         // an explicit format still wins.
-                        let (fmt, rest) = match args.split_first() {
-                            Some((f, r)) => (f.to_string(), r),
+                        let (fmt, rest) = match flat.split_first() {
+                            Some((f, r)) => (f.to_string(), r.to_vec()),
                             None => {
                                 let topic = self.interp.scope.get_scalar("_").clone();
                                 match self.interp.stringify_value(topic, self.line()) {
-                                    Ok(s) => (s, &args[..]),
+                                    Ok(s) => (s, Vec::new()),
                                     Err(FlowOrError::Error(e)) => return Err(e),
                                     Err(FlowOrError::Flow(_)) => {
                                         return Err(StrykeError::runtime(
@@ -5625,15 +5641,7 @@ impl<'a> VM<'a> {
                         // sprintf the args, then route through the handle the
                         // same way Print does — fixes printf's silent
                         // misdirection to STDOUT.
-                        let mut flat = Vec::new();
-                        for a in rest {
-                            if let Some(items) = a.as_array_vec() {
-                                flat.extend(items);
-                            } else {
-                                flat.push(a.clone());
-                            }
-                        }
-                        let s = match self.interp.perl_sprintf_stringify(&fmt, &flat, self.line()) {
+                        let s = match self.interp.perl_sprintf_stringify(&fmt, &rest, self.line()) {
                             Ok(s) => s,
                             Err(FlowOrError::Error(e)) => return Err(e),
                             Err(FlowOrError::Flow(_)) => {
