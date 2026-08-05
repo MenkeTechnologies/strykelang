@@ -17496,6 +17496,16 @@ impl VMHelper {
         args: &[StrykeValue],
         line: usize,
     ) -> StrykeResult<StrykeValue> {
+        // One list, format off the front — as in `exec_printf`. An array value
+        // reaching here (`$fh->printf(@a)`) is its elements, not one argument.
+        let flat: Vec<StrykeValue> = args
+            .iter()
+            .flat_map(|v| match v.as_array_vec() {
+                Some(items) => items,
+                None => vec![v.clone()],
+            })
+            .collect();
+        let args = flat.as_slice();
         let (fmt, rest): (String, &[StrykeValue]) = if args.is_empty() {
             let s = match self.stringify_value(self.scope.get_scalar("_").clone(), line) {
                 Ok(s) => s,
@@ -20581,26 +20591,34 @@ impl VMHelper {
     }
 
     fn exec_printf(&mut self, handle: Option<&str>, args: &[Expr], line: usize) -> ExecResult {
-        let (fmt, rest): (String, &[Expr]) = if args.is_empty() {
+        // `printf` takes ONE list, whose first element is the format — the rest
+        // are its arguments (perldoc -f printf: "printf FILEHANDLE LIST").
+        // Evaluating args[0] separately in scalar context got two forms wrong:
+        // `printf(FMT, ...)`, where the parenthesized list arrives as a single
+        // argument and became the format in its entirety, and `printf(@a)`,
+        // where scalar context turned @a into its element count. Both work once
+        // the whole list is flattened first and the format taken off the front.
+        //
+        // The list is Perl list context throughout — `1..5`, `@arr`, `reverse`,
+        // `grep` flatten into the argument sequence; scalar context would
+        // collapse a range to a flip-flop value.
+        let mut vals = Vec::new();
+        for a in args {
+            let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
+            if let Some(items) = v.as_array_vec() {
+                vals.extend(items);
+            } else {
+                vals.push(v);
+            }
+        }
+        let (fmt, arg_vals): (String, &[StrykeValue]) = if vals.is_empty() {
             // Perl: printf with no args uses $_ as the format string.
             let s = self.stringify_value(self.scope.get_scalar("_").clone(), line)?;
             (s, &[])
         } else {
-            (self.eval_expr(&args[0])?.to_string(), &args[1..])
+            (vals[0].to_string(), &vals[1..])
         };
-        // printf arg list after the format is Perl list context — `1..5`, `@arr`, `reverse`,
-        // `grep`, etc. flatten into the format argument sequence. Scalar context collapses
-        // ranges to flip-flop values, so go through list-context eval and splat.
-        let mut arg_vals = Vec::new();
-        for a in rest {
-            let v = self.eval_expr_ctx(a, WantarrayCtx::List)?;
-            if let Some(items) = v.as_array_vec() {
-                arg_vals.extend(items);
-            } else {
-                arg_vals.push(v);
-            }
-        }
-        let output = self.perl_sprintf_stringify(&fmt, &arg_vals, line)?;
+        let output = self.perl_sprintf_stringify(&fmt, arg_vals, line)?;
         let handle_name =
             self.resolve_io_handle_name(handle.unwrap_or(self.default_print_handle.as_str()));
         match handle_name.as_str() {
