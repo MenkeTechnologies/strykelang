@@ -3537,3 +3537,113 @@ against the released stryke binary. Worked around downstream in
 `stryke-utils/examples/word_frequency.stk` by replacing the
 `count_by { $_ } @words` (over a grep/map/split-built `@words`) with a
 plain `$freq{$_}++ for @words` tally. No upstream pin test yet.
+
+## BUG-309 — `--compat` still lets a builtin shadow a user `sub` for parser-dispatched names (`f`, `d`, `p`, `rev`) — **`bug`**
+
+`--compat` now gives a user `sub` precedence over a stryke *extension* builtin
+(`Compiler::compat_user_sub_wins`), but only for names dispatched through
+`ExprKind::FuncCall`. Names the **parser** lowers to a dedicated `ExprKind`
+never reach that check, so the user's sub stays unreachable — silently, with no
+diagnostic:
+
+```perl
+sub f { return "USERSUB" }   print f(), "\n";   # perl: USERSUB
+                                                # st --compat: a directory listing
+sub p { return "USERP" }     print p(), "\n";   # perl: USERP   st --compat: 1
+sub rev { return "USERREV" } print rev(), "\n"; # perl: USERREV st --compat: (empty)
+```
+
+`f`/`filesf` → `ExprKind::Filesf` (`parser.rs` bareword match, arm `"filesf" | "f"`),
+`d`/`dirs` → `ExprKind::Dirs`, and siblings. `--dump-bytecode` shows
+`CallBuiltin(113, 0)` (`BuiltinId::Filesf`) where an `Op::Call` belongs; because
+the op is already `CallBuiltin`, `Compiler::patch_static_sub_calls` never
+reconsiders it.
+
+Fix: apply the same `compat_user_sub_wins` guard at the parser's bareword
+dispatch, falling through to the generic `FuncCall` path. Needs the set of
+declared sub names at parse time.
+
+Worst-in-class because it is silent: `sub f` in ordinary Perl returns a
+directory listing instead of the user's value.
+
+Pin tests for the half that *is* fixed:
+`tests/suite/compat_udf_shadow_extensions.rs`.
+
+## BUG-310 — bare `shift` / `pop` at file scope read `@_`, not `@ARGV` — **`parity`**
+
+Perl defaults bare `shift`/`pop` to `@ARGV` outside a sub and `@_` inside one.
+stryke always uses `@_`, so the single most common Perl argument idiom yields
+`undef` at file scope:
+
+```perl
+# script.pl X Y Z
+my $a = shift;        # perl: X          st --compat: undef
+my $c = pop;          # perl: Z          st --compat: undef
+my $b = shift @ARGV;  # perl: Y          st --compat: X   (explicit form works)
+```
+
+`@ARGV` itself is populated correctly, and `shift @ARGV` works — only the
+implicit operand is wrong. `Parser::parse_one_arg_or_argv` unconditionally
+returns `ExprKind::ArrayVar("_")` despite its name; it has no notion of whether
+it is inside a sub body, so the fix needs a sub-body depth counter on the parser.
+
+## BUG-311 — Perl's false is the empty string; stryke returns `0` — **`parity`**
+
+Every comparison/boolean operator yields `""` (numerically 0) in Perl, but `0`
+in stryke, so any program that prints or measures a comparison result diverges:
+
+```perl
+my $f = ("a" eq "b");
+print "[", $f, "]\n";      # perl: []    st --compat: [0]
+print length($f), "\n";    # perl: 0     st --compat: 1
+print((1 < 0), "\n");      # perl: (empty) st --compat: 0
+```
+
+True is `1` on both. Numeric use (`$f+0`) agrees; only the string form differs.
+Broad blast radius — it affects every `--compat` program that interpolates a
+predicate.
+
+## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
+
+Perl aliases `@_` elements to the caller's actual arguments, and aliases the
+`foreach` loop variable (including `$_`) to the array elements, so mutating
+either writes through. stryke copies:
+
+```perl
+sub bump { $_[0]++ } my $x = 5; bump($x); print "$x\n";   # perl: 6      st: 5
+my @a = (1,2,3); $_ *= 2 for @a; print "@a\n";            # perl: 2 4 6  st: 1 2 3
+```
+
+## BUG-313 — `use utf8` is ignored inside a sub body — **`parity`**
+
+`use utf8` is honored at file scope but not when it appears inside a sub, so the
+same statement gives different answers depending on where it sits — a
+context-dependent divergence:
+
+```perl
+use utf8; my $V = length("héllo"); print $V;              # perl 5  st 5   ok
+sub f { use utf8; my $V = length("héllo"); return $V }    # perl 5  st 6   WRONG
+```
+
+Same divergence in closure, loop-body, and tail position; only file scope is
+correct.
+
+## BUG-314 — `getgrent` dereferences a misaligned pointer and aborts the process — **`bug`**
+
+`builtin_getgrent` walks `gr.gr_mem` as `*mut *mut c_char`, but the value it
+reads is not 8-byte aligned, so the first `*p` is undefined behavior. Debug
+builds abort immediately on the first call (no `setgrent` needed):
+
+```
+thread 'main' panicked at strykelang/builtins.rs: misaligned pointer dereference:
+address must be a multiple of 0x8 but is 0x896842ab4
+thread caused non-unwinding panic. aborting.
+```
+
+macOS aarch64. This is the single failing case in `parity/cases`
+(`20022_grent_iter.pl`), so the corpus sits at 1516/1517. A release build would
+not abort — it would read whatever is at the misaligned address, which is worse.
+Do **not** "fix" this by switching to `read_unaligned`: that hides the symptom
+while still returning garbage. Diagnose why `gr_mem` is not a valid `char**`
+first (likely a `struct group` layout mismatch against the platform's real
+definition, which would mean the field is being read at the wrong offset).
