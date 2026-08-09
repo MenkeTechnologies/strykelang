@@ -406,34 +406,41 @@ pub fn read_logical_line_perl_compat_with_sep(
     Ok(Some(decode_utf8_or_latin1_line(&buf)))
 }
 
-/// Perl `-t` — true if the handle/path refers to a terminal ([`libc::isatty`] on Unix).
-/// Recognizes `STDIN`/`STDOUT`/`STDERR`, `/dev/stdin` (etc.), `/dev/fd/N`, small numeric fds, or opens a path and tests its fd.
-pub fn filetest_is_tty(path: &str) -> bool {
+/// Resolve the operand of Perl's `-t` to a file descriptor.
+///
+/// `-t` takes a FILEHANDLE, never a path. Perl accepts the standard handle
+/// names and a bare file-descriptor number; everything else — including a real
+/// path that happens to name a terminal-ish device (`/dev/stdin`, `/dev/fd/1`)
+/// — does not name a handle, so `-t` on it is `undef` rather than false.
+/// Verified against perl v5.42.2: `-t "/dev/stdin"`, `-t "-"`, `-t ""` and
+/// `-t "NOPEFH"` are all `undef`, while `-t "0"` and `-t "99"` are defined.
+///
+/// The descriptor form is strict: only a canonical non-negative decimal
+/// integer counts, so `"007"`, `" 1"`, `"1.0"` and `"-1"` are not handles.
+/// Callers that own a handle table should look the name up there first — this
+/// resolves only the names the runtime does not track.
+pub fn tty_fd_for_handle(name: &str) -> Option<i32> {
+    match name {
+        "STDIN" => Some(0),
+        "STDOUT" => Some(1),
+        "STDERR" => Some(2),
+        _ => name
+            .parse::<i32>()
+            .ok()
+            .filter(|&fd| fd >= 0 && fd.to_string() == name),
+    }
+}
+
+/// [`libc::isatty`] on an already-resolved descriptor.
+pub fn fd_is_tty(fd: i32) -> bool {
     #[cfg(unix)]
     {
-        use std::os::unix::io::AsRawFd;
-        if let Some(fd) = tty_fd_literal(path) {
-            return unsafe { libc::isatty(fd) != 0 };
-        }
-        if let Ok(f) = std::fs::File::open(path) {
-            return unsafe { libc::isatty(f.as_raw_fd()) != 0 };
-        }
+        unsafe { libc::isatty(fd) != 0 }
     }
     #[cfg(not(unix))]
     {
-        let _ = path;
-    }
-    false
-}
-
-#[cfg(unix)]
-fn tty_fd_literal(path: &str) -> Option<i32> {
-    match path {
-        "" | "STDIN" | "-" | "/dev/stdin" => Some(0),
-        "STDOUT" | "/dev/stdout" => Some(1),
-        "STDERR" | "/dev/stderr" => Some(2),
-        p if p.starts_with("/dev/fd/") => p.strip_prefix("/dev/fd/").and_then(|s| s.parse().ok()),
-        _ => path.parse::<i32>().ok().filter(|&n| (0..128).contains(&n)),
+        let _ = fd;
+        false
     }
 }
 
