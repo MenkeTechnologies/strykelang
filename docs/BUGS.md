@@ -3707,29 +3707,10 @@ verified to fail against a pre-change binary.
 Still open, and *not* part of this entry:
 
 * `can` returns `undef` for false, not `""` — unchanged, and already correct.
-* A user sub whose name collides with the **count-family** builtin names
-  (`count`, `size`, `cnt`, `len`, `l`, `list_count`, `list_size`) receives its
-  lone argument unflattened, so any empty list arrives as one `@_` element.
-  This is a sibling of BUG-309, and it is *not* specific to matches — a plain
-  empty array shows it too:
 
-  ```perl
-  sub cnt    { scalar @_ }   sub tally { scalar @_ }
-  my @e = ();
-  print cnt(@e);              # perl 0   st --compat 1
-  print cnt("abc" =~ /z/);    # perl 0   st --compat 1
-  print tally("abc" =~ /z/);  # perl 0   st --compat 0   (non-colliding name)
-  ```
-
-  `vm_helper.rs` `ExprKind::FuncCall` takes a count-family branch keyed purely
-  on the *name text*, before the name is resolved, and that branch deliberately
-  skips the `as_array_vec()` flatten every other argument path performs — the
-  comment explains it preserves the "user wrote one syntactic arg" signal so
-  `count(@empty)` does not collapse into a `$_`-topic zero-arg call. The bug is
-  that it fires even when the name resolves to a user sub, which under
-  `--compat` must win (per the rule established for BUG-309). The fix is to
-  gate the branch on the name actually resolving to the builtin, not to widen
-  the flattening. Matching itself is correct in every list position.
+The other item recorded here — a user sub named for a count-family builtin
+losing its arguments — turned out not to be about matching at all and is now
+fixed; see BUG-315.
 
 ## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
 
@@ -3778,3 +3759,44 @@ Do **not** "fix" this by switching to `read_unaligned`: that hides the symptom
 while still returning garbage. Diagnose why `gr_mem` is not a valid `char**`
 first (likely a `struct group` layout mismatch against the platform's real
 definition, which would mean the field is being read at the wrong offset).
+
+## BUG-315 — a user sub named for a count-family builtin lost its arguments — **`bug`** [FIXED]
+
+Under `--compat` a user `sub` beats a stryke extension builtin (the rule
+established for BUG-309). That resolution was correct, but the *argument shape*
+was decided earlier, from the name text alone, and never revisited.
+
+The count-family builtins (`count`, `size`, `cnt`, `len`, `l`, `list_count`,
+`list_size`) are dispatched with each syntactic argument preserved as one
+value rather than flattened, because the builtin dispatches on its operand's
+type — `len @arr` must see the array, not its elements, or `len stat $path`
+would flatten `@_` and count 13. A user sub of the same name is an ordinary
+Perl sub taking a flattened list, so that shape gave it exactly one `@_`
+element no matter what was passed:
+
+```perl
+sub cnt { scalar @_ }  sub tally { scalar @_ }
+my @three = (1,2,3);   my @empty = ();
+print cnt(@three);            # perl 3   st --compat 1
+print cnt(@empty);            # perl 0   st --compat 1
+print cnt("abc" =~ /nope/);   # perl 0   st --compat 1
+print tally(@three);          # perl 3   st --compat 3   (non-colliding name)
+```
+
+The collision, not the argument expression, is the cause: the identical body
+named `tally` was always right, and a plain array reproduces it with no regex.
+It was found while measuring a failed match passed as a call argument, which is
+why it was first misfiled as a list-context or parse-side matching bug — the
+match was a red herring, and a failed match merely made the wrong count
+(1 instead of 0) look like the empty-list bug next door.
+
+Fixed by gating the preserved-operand shape on the name not resolving to a user
+sub under `--compat` (`vm.rs` `preserve_operand_arrays_for_call`, applied at all
+three dispatch sites including the AOP-intercept path, and the matching branch
+in `vm_helper.rs` `ExprKind::FuncCall`). Native (non-`--compat`) dispatch is
+untouched, so `count(@arr)`, `count(@empty)`, `len("hello")` and `size(@arr)`
+keep their stryke meanings.
+
+Pinned by `parity/cases/20050_user_sub_shadows_count_family_builtin.pl`, which
+carries a non-colliding control sub alongside each colliding one so a future
+regression cannot be mistaken for a general argument-passing change.
