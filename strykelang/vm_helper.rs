@@ -6227,14 +6227,19 @@ impl VMHelper {
             // yields the empty list, scalar context Perl false. Returning the
             // scalar `0` in list context produced a one-element list holding a
             // false value, which inverts every `if (my @m = /…/g)` guard.
-            let no_match_result = if self.wantarray_kind == WantarrayCtx::List {
-                StrykeValue::array(Vec::new())
-            } else {
-                StrykeValue::perl_bool(false)
+            // Built only on the failing path so a successful `/g` match does not
+            // allocate an empty array it will never return.
+            let want_list = self.wantarray_kind == WantarrayCtx::List;
+            let no_match_result = || {
+                if want_list {
+                    StrykeValue::array(Vec::new())
+                } else {
+                    StrykeValue::perl_bool(false)
+                }
             };
             if has_groups {
                 if flat_captures.is_empty() {
-                    return Ok(no_match_result);
+                    return Ok(no_match_result());
                 }
                 if let Some(caps) = last_caps {
                     self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;
@@ -6261,7 +6266,7 @@ impl VMHelper {
                     .collect(),
             };
             if matches.is_empty() {
-                Ok(no_match_result)
+                Ok(no_match_result())
             } else {
                 if let Some(caps) = last_caps {
                     self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;

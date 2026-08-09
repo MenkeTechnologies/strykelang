@@ -3668,13 +3668,29 @@ Two follow-ups found while measuring this, both since **fixed**; measuring them
 first showed each had been characterized wrongly:
 
 * **A failed `/g` match is the empty list.** The one-element-list-holding-false
-  result was blamed on list-context matching generally. Plain list-context
-  failure was already correct (`my @m = ($s =~ /z/)` gives `scalar(@m) == 0`);
-  only `/g` returned the scalar `0`, which in list context is a one-element
-  list and inverts every `my @m = $s =~ /…/g` guard. It also made the *scalar*
-  `/g` failure `"0"` rather than `""`, which this entry's own fix had missed
-  because no case applied `length()` to it. Both now follow the non-`/g`
-  no-match branch: empty list in list context, `perl_bool(false)` in scalar.
+  result was blamed on list-context matching generally; it splits by *flag*,
+  not by construct. Plain matching was already the empty list everywhere it is
+  evaluated in list context — assignment, `push`, `return`, list literal — and
+  only `/g` returned the scalar `0` there, which as a one-element list inverts
+  every `my @m = $s =~ /…/g` guard. That is what is fixed here: both `/g`
+  no-match returns now follow the non-`/g` branch, empty list in list context
+  and `perl_bool(false)` in scalar. Fixing it also made the *scalar* `/g`
+  failure `""` rather than `"0"`, which this entry's own sweep had missed
+  because no case applied `length()` to it. Measured, `"abc" =~ /nope/`
+  per position:
+
+  | position | plain, before | `/g`, before | plain, after | `/g`, after | perl |
+  |---|---|---|---|---|---|
+  | `my @a = (…)` | 0 | 1 | 0 | 0 | 0 |
+  | `push @a, (…)` | 0 | 1 | 0 | 0 | 0 |
+  | `return (…)` | 0 | 1 | 0 | 0 | 0 |
+  | `(1, (…), 2)` | 2 | 3 | 2 | 2 | 2 |
+  | `f(…)` — call argument | 0 | 0 | 0 | 0 | 0 |
+  | `cnt(…)` — count-family name | **1** | **1** | **1** | **1** | 0 |
+
+  The last row is not a matching defect at all: it only appears when the callee
+  is named for a count-family builtin, and a plain empty array reproduces it
+  without any regex. It is listed as open below.
 * **`-t` had both cases backwards, not one.** The note said `-t` on a path
   should be `undef`; that was half of it. `-t` takes a FILEHANDLE, so it ran
   through the generic file-test path and got the *handle* cases wrong in the
@@ -3691,10 +3707,29 @@ verified to fail against a pre-change binary.
 Still open, and *not* part of this entry:
 
 * `can` returns `undef` for false, not `""` — unchanged, and already correct.
-* A match used as a **call argument** is mis-parsed: `f($s =~ /nope/)` passes
-  a glob expansion of the current directory rather than the match result, and
-  `f($s =~ /b/)` passes nothing. Assignment position (`my @m = $s =~ /…/`) is
-  correct, so this is a parse-side gap, not a matching one.
+* A user sub whose name collides with the **count-family** builtin names
+  (`count`, `size`, `cnt`, `len`, `l`, `list_count`, `list_size`) receives its
+  lone argument unflattened, so any empty list arrives as one `@_` element.
+  This is a sibling of BUG-309, and it is *not* specific to matches — a plain
+  empty array shows it too:
+
+  ```perl
+  sub cnt    { scalar @_ }   sub tally { scalar @_ }
+  my @e = ();
+  print cnt(@e);              # perl 0   st --compat 1
+  print cnt("abc" =~ /z/);    # perl 0   st --compat 1
+  print tally("abc" =~ /z/);  # perl 0   st --compat 0   (non-colliding name)
+  ```
+
+  `vm_helper.rs` `ExprKind::FuncCall` takes a count-family branch keyed purely
+  on the *name text*, before the name is resolved, and that branch deliberately
+  skips the `as_array_vec()` flatten every other argument path performs — the
+  comment explains it preserves the "user wrote one syntactic arg" signal so
+  `count(@empty)` does not collapse into a `$_`-topic zero-arg call. The bug is
+  that it fires even when the name resolves to a user sub, which under
+  `--compat` must win (per the rule established for BUG-309). The fix is to
+  gate the branch on the name actually resolving to the builtin, not to widen
+  the flattening. Matching itself is correct in every list position.
 
 ## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
 
@@ -3734,7 +3769,10 @@ thread caused non-unwinding panic. aborting.
 ```
 
 macOS aarch64. This is the single failing case in `parity/cases`
-(`20022_grent_iter.pl`), so the corpus sits at 1516/1517. A release build would
+(`20022_grent_iter.pl`), so the corpus sits one short of whatever
+`ls parity/cases/*.pl | wc -l` currently reports — the absolute pair was
+recorded here once and went stale the next time a case was added. A release
+build would
 not abort — it would read whatever is at the misaligned address, which is worse.
 Do **not** "fix" this by switching to `read_unaligned`: that hides the symptom
 while still returning garbage. Diagnose why `gr_mem` is not a valid `char**`
