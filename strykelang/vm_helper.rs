@@ -6223,9 +6223,18 @@ impl VMHelper {
                 last_caps = Some(caps);
             }
             self.scope.set_array("^CAPTURE_ALL", rows)?;
+            // A `/g` match that found nothing is a failed match: list context
+            // yields the empty list, scalar context Perl false. Returning the
+            // scalar `0` in list context produced a one-element list holding a
+            // false value, which inverts every `if (my @m = /…/g)` guard.
+            let no_match_result = if self.wantarray_kind == WantarrayCtx::List {
+                StrykeValue::array(Vec::new())
+            } else {
+                StrykeValue::perl_bool(false)
+            };
             if has_groups {
                 if flat_captures.is_empty() {
-                    return Ok(StrykeValue::integer(0));
+                    return Ok(no_match_result);
                 }
                 if let Some(caps) = last_caps {
                     self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;
@@ -6252,7 +6261,7 @@ impl VMHelper {
                     .collect(),
             };
             if matches.is_empty() {
-                Ok(StrykeValue::integer(0))
+                Ok(no_match_result)
             } else {
                 if let Some(caps) = last_caps {
                     self.apply_regex_captures(&s, 0, &re, &caps, CaptureAllMode::Skip)?;
@@ -13799,6 +13808,16 @@ impl VMHelper {
                         Err(_) => Ok(StrykeValue::UNDEF),
                     };
                 }
+                // `-t` takes a FILEHANDLE, not a path, so it neither stats nor
+                // opens its operand: it resolves a handle and asks `isatty`.
+                // An operand that names no handle is `undef` under `--compat`.
+                if *op == 't' {
+                    return Ok(match self.tty_fd_for_operand(&raw) {
+                        Some(fd) => StrykeValue::perl_bool(crate::perl_fs::fd_is_tty(fd)),
+                        None if crate::compat_mode() => StrykeValue::UNDEF,
+                        None => StrykeValue::perl_bool(false),
+                    });
+                }
                 // A file test whose `stat` failed is `undef`, not false — see
                 // [`crate::perl_fs::filetest_stat_succeeds`].
                 if crate::compat_mode() && !crate::perl_fs::filetest_stat_succeeds(&path, *op) {
@@ -13844,7 +13863,6 @@ impl VMHelper {
                     'z' => std::fs::metadata(&path)
                         .map(|m| m.len() == 0)
                         .unwrap_or(true),
-                    't' => crate::perl_fs::filetest_is_tty(&path),
                     #[cfg(unix)]
                     'p' => crate::perl_fs::filetest_is_pipe(&path),
                     #[cfg(not(unix))]

@@ -43056,6 +43056,24 @@ impl VMHelper {
         }
     }
 
+    /// Resolve a `-t` operand to a file descriptor.
+    ///
+    /// Perl's `-t` takes a FILEHANDLE, so the operand is looked up as a handle
+    /// — first in the open-handle table (lexical handles stringify to their
+    /// variable name, barewords to their own name), then against the standard
+    /// handle names and bare descriptor numbers. An operand that names no
+    /// handle resolves to `None`, which `-t` reports as `undef` under
+    /// `--compat`. See [`crate::perl_fs::tty_fd_for_handle`].
+    pub(crate) fn tty_fd_for_operand(&self, name: &str) -> Option<i32> {
+        #[cfg(unix)]
+        {
+            if let Some(f) = self.io_file_slots.get(name) {
+                return Some(f.lock().as_raw_fd());
+            }
+        }
+        crate::perl_fs::tty_fd_for_handle(name)
+    }
+
     /// `tell FILEHANDLE` / `tell` — byte offset for handles in [`VMHelper::io_file_slots`]
     /// (same underlying `File` as `sysseek`). Unseekable or unopened handles return `-1`.
     /// No-arg form uses [`VMHelper::last_readline_handle`] after `readline` / `<>` (Perl semantics).

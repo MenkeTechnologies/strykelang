@@ -7804,6 +7804,21 @@ impl<'a> VM<'a> {
                             self.push(v);
                             return Ok(());
                         }
+                        // `-t` takes a FILEHANDLE, not a path, so it neither
+                        // stats nor opens its operand: it resolves a handle and
+                        // asks `isatty`. An operand that names no handle is
+                        // `undef` under `--compat`.
+                        if op == 't' {
+                            let v = match self.interp.tty_fd_for_operand(&path) {
+                                Some(fd) => {
+                                    StrykeValue::perl_bool(crate::perl_fs::fd_is_tty(fd))
+                                }
+                                None if crate::compat_mode() => StrykeValue::UNDEF,
+                                None => StrykeValue::perl_bool(false),
+                            };
+                            self.push(v);
+                            return Ok(());
+                        }
                         // A file test whose `stat` failed is `undef`, not false —
                         // see [`crate::perl_fs::filetest_stat_succeeds`].
                         if crate::compat_mode()
@@ -7852,7 +7867,6 @@ impl<'a> VM<'a> {
                             'z' => std::fs::metadata(&path)
                                 .map(|m| m.len() == 0)
                                 .unwrap_or(true),
-                            't' => crate::perl_fs::filetest_is_tty(&path),
                             #[cfg(unix)]
                             'p' => crate::perl_fs::filetest_is_pipe(&path),
                             #[cfg(not(unix))]
