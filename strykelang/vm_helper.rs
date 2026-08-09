@@ -11285,13 +11285,22 @@ impl VMHelper {
                 } else if matches!(
                     dispatch_name,
                     "count" | "size" | "cnt" | "len" | "l" | "list_count" | "list_size"
-                ) {
+                ) && !(crate::compat_mode() && self.resolve_sub_by_name(name).is_some())
+                {
                     // Count-family: preserve the "user wrote 1 syntactic arg" signal.
                     // Flattening the lone operand here collapses `count(@empty)` to a
                     // zero-arg call, which would then fall back to `$_` topic — wrong.
                     // Pass the single evaluated value directly so the builtin's 1-arg
                     // path can dispatch on its type (string → chars, array/aref →
                     // element count via map_flatten_outputs, hash → key count, …).
+                    //
+                    // This shape is only right for the *builtin*. Under `--compat` a
+                    // user sub of the same name wins (Perl 5 semantics, BUG-309), and
+                    // it takes a normal Perl argument list, so the unflattened single
+                    // value would hand it one `@_` element for an empty list —
+                    // `sub cnt {scalar @_} cnt(@empty)` was 1 where perl gives 0. When
+                    // the name resolves to a user sub, fall through to the generic
+                    // branch that flattens like every other call.
                     let mut list_out = Vec::new();
                     if args.len() == 1 {
                         list_out.push(self.eval_expr_ctx(&args[0], WantarrayCtx::List)?);

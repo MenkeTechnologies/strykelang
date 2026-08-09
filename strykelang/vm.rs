@@ -1172,6 +1172,21 @@ impl<'a> VM<'a> {
         slots
     }
 
+    /// [`Self::call_preserve_operand_arrays`], minus any name a user sub has
+    /// taken over.
+    ///
+    /// Preserving each syntactic argument as one value is right for the stryke
+    /// builtin, which dispatches on the operand's type. It is wrong for a user
+    /// sub: under `--compat` a user sub wins over a stryke builtin (Perl 5
+    /// semantics, BUG-309) and takes an ordinary flattened Perl argument list,
+    /// so the preserved shape handed it one `@_` element for an empty list —
+    /// `sub cnt {scalar @_} cnt(@empty)` answered 1 where perl gives 0.
+    #[inline]
+    fn preserve_operand_arrays_for_call(&self, name: &str) -> bool {
+        Self::call_preserve_operand_arrays(name)
+            && !(crate::compat_mode() && self.interp.resolve_sub_by_name(name).is_some())
+    }
+
     #[inline]
     fn call_preserve_operand_arrays(name: &str) -> bool {
         // Stryke builtins are unprefixed; `CORE::` callers route to bare names.
@@ -3098,7 +3113,7 @@ impl<'a> VM<'a> {
                 .iter()
                 .any(|i| crate::aop::glob_match(&i.pattern, name))
         {
-            let preserve = Self::call_preserve_operand_arrays(name);
+            let preserve = self.preserve_operand_arrays_for_call(name);
             return self.dispatch_with_advice(&name_owned, closure_sub_hint, argc, want, preserve);
         }
 
@@ -3169,7 +3184,7 @@ impl<'a> VM<'a> {
                 }
                 self.ip = entry_ip;
             } else {
-                let args = if Self::call_preserve_operand_arrays(name) {
+                let args = if self.preserve_operand_arrays_for_call(name) {
                     self.pop_call_operands_preserved(argc)
                 } else {
                     self.pop_call_operands_flattened(argc)
@@ -3211,7 +3226,7 @@ impl<'a> VM<'a> {
                 self.ip = entry_ip;
             }
         } else {
-            let args = if Self::call_preserve_operand_arrays(name) {
+            let args = if self.preserve_operand_arrays_for_call(name) {
                 self.pop_call_operands_preserved(argc)
             } else {
                 self.pop_call_operands_flattened(argc)
