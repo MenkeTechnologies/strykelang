@@ -967,3 +967,78 @@ fn pipe_rejects_nonsense_rhs() {
     assert!(crate::parse("42 |> 1 + 2;").is_err());
     assert!(crate::parse("42 |> 99;").is_err());
 }
+
+// ── bare `shift` / `pop` default operand (BUG-310) ───────────────────────────
+//
+// Perl 5 picks the default array by enclosing *subroutine*: `@_` inside a sub
+// body (and every plain block nested in it), `@ARGV` everywhere else. These
+// assert the parsed operand directly; `parity/cases/324..327_shift_*.pl` pin
+// the end-to-end bytes against stock `perl`.
+
+/// Rendered source of `code`, so a `shift` buried in a nested block is visible.
+fn rendered(code: &str) -> String {
+    crate::fmt::format_program(&crate::parse(code).expect("parse"))
+}
+
+#[test]
+fn shape_bare_shift_pop_default_argv_at_file_scope() {
+    assert!(rendered("shift;").contains("shift @ARGV"));
+    assert!(rendered("pop;").contains("pop @ARGV"));
+    // Empty parens are the same default, not "an explicit empty operand".
+    assert!(rendered("shift();").contains("shift @ARGV"));
+    assert!(rendered("pop();").contains("pop @ARGV"));
+    // An explicit operand always wins.
+    assert!(rendered("my @a = (1); shift @a;").contains("shift @a"));
+}
+
+#[test]
+fn shape_bare_shift_pop_default_under_inside_sub() {
+    assert!(rendered("sub g { shift; }").contains("shift @_"));
+    assert!(rendered("sub g { pop; }").contains("pop @_"));
+    assert!(rendered("sub g { shift(); }").contains("shift @_"));
+    assert!(rendered("my $c = sub { shift };").contains("shift @_"));
+    assert!(rendered("fn g { shift; }").contains("shift @_"));
+}
+
+#[test]
+fn shape_bare_shift_follows_enclosing_sub_not_enclosing_block() {
+    // Blocks nested in a sub body keep `@_` …
+    for body in [
+        "map { shift } (1)",
+        "grep { shift } (1)",
+        "sort { shift; 0 } (1, 2)",
+        "eval { shift }",
+        "do { shift }",
+    ] {
+        let src = format!("sub g {{ my @r = {body}; }}");
+        assert!(rendered(&src).contains("shift @_"), "{src}");
+        assert!(!rendered(&src).contains("shift @ARGV"), "{src}");
+    }
+    // … and the same blocks at file scope take `@ARGV`.
+    for body in [
+        "map { shift } (1)",
+        "grep { shift } (1)",
+        "sort { shift; 0 } (1, 2)",
+        "eval { shift }",
+        "do { shift }",
+    ] {
+        let src = format!("my @r = {body};");
+        assert!(rendered(&src).contains("shift @ARGV"), "{src}");
+        assert!(!rendered(&src).contains("shift @_"), "{src}");
+    }
+}
+
+#[test]
+fn shape_bare_shift_in_begin_block_is_argv() {
+    // `BEGIN` / `END` are compile-phase blocks, not subroutine bodies.
+    assert!(rendered("BEGIN { shift; }").contains("shift @ARGV"));
+    assert!(rendered("END { shift; }").contains("shift @ARGV"));
+}
+
+#[test]
+fn shape_sub_body_depth_unwinds_after_the_sub_ends() {
+    // A `shift` after a sub declaration is back at file scope.
+    let r = rendered("sub g { shift; } shift;");
+    assert!(r.contains("shift @_"), "{r}");
+    assert!(r.contains("shift @ARGV"), "{r}");
+}

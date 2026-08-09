@@ -104,6 +104,16 @@ pub struct Parser {
     /// level (depth 0 — module scope) is `_` unbound, allowing `my $f = _ * 2` to
     /// parse as `my $f = fn { _ * 2 }`. Bumped in [`Self::parse_block`].
     block_depth: u32,
+    /// When > 0 we are lexically inside a **subroutine body** — a `sub`/`fn` keyword
+    /// body (named, anonymous, struct method, or pipeline `sub { }` stage). Unlike
+    /// [`Self::block_depth`], plain `{ … }` blocks (`map`/`grep`/`sort`/`eval`/`do`/
+    /// `if`/`for`/`BEGIN`) do **not** bump it, because Perl decides the default
+    /// operand of bare `shift`/`pop` by enclosing *subroutine*, not enclosing block:
+    /// `@_` inside a sub (including blocks nested in it), `@ARGV` everywhere else.
+    /// Read by [`Self::parse_one_arg_or_argv`]. A string `eval` is compiled by a
+    /// fresh [`Parser`], so it starts at 0 and defaults to `@ARGV` even when the
+    /// `eval` is executed inside a sub — which is exactly what perl does.
+    sub_body_depth: u32,
     /// When > 0, [`Self::parse_pipe_forward`] will **not** consume a trailing `|>`
     /// and leaves it for an outer parser instead. Bumped while parsing paren-less
     /// arg lists (`parse_list_until_terminator`, paren-less method args, `map`/`grep`
@@ -213,6 +223,7 @@ impl Parser {
             list_construct_close_pos: None,
             bare_positional_indices: std::collections::HashSet::new(),
             block_depth: 0,
+            sub_body_depth: 0,
             current_package: "main".to_string(),
         }
     }
@@ -2452,7 +2463,7 @@ impl Parser {
                     }
                     self.advance(); // consume `sub`
                     let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
-                    let body = self.parse_block()?;
+                    let body = self.parse_sub_body_block()?;
                     let code_ref = Expr {
                         kind: ExprKind::CodeRef {
                             params,
@@ -5164,12 +5175,29 @@ impl Parser {
     /// After `fn` + optional `(SIG)` + attrs: `{ ... }` or stryke-only `= EXPR` (see
     /// [`Self::try_parse_fn_assign_shorthand_body`]). `sub` always requires `{ ... }`.
     fn parse_fn_eq_body_or_block(&mut self, is_sub_keyword: bool) -> StrykeResult<Block> {
-        if !is_sub_keyword {
-            if let Some(block) = self.try_parse_fn_assign_shorthand_body()? {
-                return Ok(block);
+        self.sub_body_depth += 1;
+        let body = if is_sub_keyword {
+            self.parse_block()
+        } else {
+            match self.try_parse_fn_assign_shorthand_body() {
+                Ok(Some(block)) => Ok(block),
+                Ok(None) => self.parse_block(),
+                Err(e) => Err(e),
             }
-        }
-        self.parse_block()
+        };
+        self.sub_body_depth -= 1;
+        body
+    }
+
+    /// `{ … }` body of a `sub` written without the `fn` spelling (expression-position
+    /// `sub { }`, `struct` method `sub`, pipeline `sub { }` stage). Same as
+    /// [`Self::parse_block`] but marks [`Self::sub_body_depth`] so bare `shift`/`pop`
+    /// inside default to `@_` instead of `@ARGV`.
+    fn parse_sub_body_block(&mut self) -> StrykeResult<Block> {
+        self.sub_body_depth += 1;
+        let body = self.parse_block();
+        self.sub_body_depth -= 1;
+        body
     }
 
     fn parse_sub_decl(&mut self, is_sub_keyword: bool) -> StrykeResult<Statement> {
@@ -5410,7 +5438,7 @@ impl Parser {
                 };
                 let return_type = self.parse_return_type_opt()?;
                 let body = if is_sub_keyword {
-                    self.parse_block()?
+                    self.parse_sub_body_block()?
                 } else {
                     self.parse_fn_eq_body_or_block(false)?
                 };
@@ -13902,7 +13930,7 @@ impl Parser {
                 }
                 // Anonymous sub — optional prototype `sub () { }` (e.g. Carp.pm `*X = sub () { 1 }`)
                 let (params, _prototype) = self.parse_sub_sig_or_prototype_opt()?;
-                let body = self.parse_block()?;
+                let body = self.parse_sub_body_block()?;
                 Ok(Expr {
                     kind: ExprKind::CodeRef {
                         params,
@@ -19565,15 +19593,31 @@ impl Parser {
         self.parse_named_unary_arg()
     }
 
-    /// Array operand for `shift` / `pop`: default `@_`, or `shift(@a)` / `shift()` (empty parens = `@_`).
+    /// Name of the array a bare `shift` / `pop` (or the empty-paren `shift()` form)
+    /// operates on. Perl 5 picks it by enclosing *subroutine*: `@_` inside a sub body
+    /// — including `map`/`grep`/`sort`/`eval`/`do`/bare blocks nested in that body —
+    /// and `@ARGV` everywhere else, which covers file scope, `BEGIN`/`END` blocks and
+    /// the top level of a string `eval` (each compiled by a fresh [`Parser`], so the
+    /// depth restarts at 0 even when the `eval` runs inside a sub). See BUG-310.
+    fn implicit_shift_array(&self) -> &'static str {
+        if self.sub_body_depth > 0 {
+            "_"
+        } else {
+            "ARGV"
+        }
+    }
+
+    /// Array operand for `shift` / `pop`: `shift(@a)`, or the default array from
+    /// [`Self::implicit_shift_array`] for bare `shift` / empty-paren `shift()`.
     fn parse_one_arg_or_argv(&mut self) -> StrykeResult<Expr> {
         let line = self.prev_line(); // line where shift/pop keyword was
+        let implicit = self.implicit_shift_array();
         if matches!(self.peek(), Token::LParen) {
             self.advance();
             if matches!(self.peek(), Token::RParen) {
                 self.advance();
                 return Ok(Expr {
-                    kind: ExprKind::ArrayVar("_".into()),
+                    kind: ExprKind::ArrayVar(implicit.into()),
                     line: self.peek_line(),
                 });
             }
@@ -19593,7 +19637,7 @@ impl Parser {
         ) || self.peek_line() > line
         {
             Ok(Expr {
-                kind: ExprKind::ArrayVar("_".into()),
+                kind: ExprKind::ArrayVar(implicit.into()),
                 line,
             })
         } else {
