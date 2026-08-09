@@ -3664,14 +3664,37 @@ $ grep -lE 'length\(\(?[^)]*(==|<|>|eq|ne)' parity/cases/*.pl | wc -l
        0
 ```
 
-Still open, found while measuring this and *not* part of it:
+Two follow-ups found while measuring this, both since **fixed**; measuring them
+first showed each had been characterized wrongly:
 
-* A list-context match failure yields a one-element list holding the false
-  value instead of the empty list, so `f("abc" =~ /z/)` passes an argument where
-  perl passes none. Scalar context is correct.
-* `-t` on a path is `undef` in perl (it wants a filehandle); stryke returns the
-  empty-string false.
+* **A failed `/g` match is the empty list.** The one-element-list-holding-false
+  result was blamed on list-context matching generally. Plain list-context
+  failure was already correct (`my @m = ($s =~ /z/)` gives `scalar(@m) == 0`);
+  only `/g` returned the scalar `0`, which in list context is a one-element
+  list and inverts every `my @m = $s =~ /…/g` guard. It also made the *scalar*
+  `/g` failure `"0"` rather than `""`, which this entry's own fix had missed
+  because no case applied `length()` to it. Both now follow the non-`/g`
+  no-match branch: empty list in list context, `perl_bool(false)` in scalar.
+* **`-t` had both cases backwards, not one.** The note said `-t` on a path
+  should be `undef`; that was half of it. `-t` takes a FILEHANDLE, so it ran
+  through the generic file-test path and got the *handle* cases wrong in the
+  opposite direction — `-t STDIN` stat-failed to `undef` where perl gives a
+  defined `""`. Measured across 13 operand forms, 10 were wrong. `-t` now
+  resolves a handle (open-handle table, then the standard names, then a bare
+  descriptor number) and never stats or opens a path.
+
+Pinned by `parity/cases/20048_filetest_t_wants_a_filehandle.pl` and
+`20049_global_match_failure_is_the_empty_list.pl`, both of which print
+`length()` of every false so the `""`/`"0"` distinction is observable, and both
+verified to fail against a pre-change binary.
+
+Still open, and *not* part of this entry:
+
 * `can` returns `undef` for false, not `""` — unchanged, and already correct.
+* A match used as a **call argument** is mis-parsed: `f($s =~ /nope/)` passes
+  a glob expansion of the current directory rather than the match result, and
+  `f($s =~ /b/)` passes nothing. Assignment position (`my @m = $s =~ /…/`) is
+  correct, so this is a parse-side gap, not a matching one.
 
 ## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
 
