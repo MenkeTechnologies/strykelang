@@ -171,6 +171,22 @@ pub fn primary_for_alias(name: &str) -> Option<&'static str> {
     None
 }
 
+/// True when `name` is a Perl 5 **core** builtin (`print`, `length`, `push`, …)
+/// rather than a stryke extension. Backed by the same `CORE_CATEGORY_MAP` that
+/// `%stryke::perl_compats` exposes, so this predicate and that hash can never drift.
+///
+/// Used by the compiler to decide whether `--compat` should let a user `sub NAME`
+/// shadow a same-named builtin: stryke's own extension names yield to the user sub,
+/// Perl core operators do not (matching Perl, where a plain `sub print {}` does not
+/// override the named operator).
+pub fn is_perl5_core_name(name: &str) -> bool {
+    static CORE_NAMES: std::sync::OnceLock<std::collections::HashSet<&'static str>> =
+        std::sync::OnceLock::new();
+    CORE_NAMES
+        .get_or_init(|| CORE_CATEGORY_MAP.iter().map(|(n, _)| *n).collect())
+        .contains(name)
+}
+
 /// `%perl_compats` — Perl 5 core name → category. Subset of `%builtins`
 /// restricted to names from `is_perl5_core`. Disjoint from `%extensions`.
 /// Direct access for the "show me just Perl core" query. Keyword-filtered
