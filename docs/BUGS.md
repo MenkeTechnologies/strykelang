@@ -3563,6 +3563,31 @@ Fix: apply the same `compat_user_sub_wins` guard at the parser's bareword
 dispatch, falling through to the generic `FuncCall` path. Needs the set of
 declared sub names at parse time.
 
+Measured scope — every stryke extension name that is a plain identifier was
+tested as `sub NAME { "USER_NAME" } print NAME();`, scored only where stock perl
+printed the expected value:
+
+```
+scored 4903 · skipped 1 (perl disagreed) · shadowed before 104 · after 79 · fixed 25
+```
+
+The 25 the compiler guard recovered are `FuncCall`-dispatched: `all any barrier
+chunk_by chunked cluster dec drop first getcwd group_by head heap inc none pany
+par_pipeline pfirst pipeline ppool puniq ssh tail take windowed`.
+
+The 79 that remain are exactly the parser's dedicated-`ExprKind` names and are
+the whole of this bug: `async bench burp c capture cat char_devices cond d detect
+dirs dr e ep every exe executables f fan fan_cap files filesf filter find
+find_all first_index firstidx flat_map flat_maps fore fr gen glob_par god greps
+ingest maps match p par par_lines par_sed par_walk pcache pchannel pflat_map
+pflat_map_on pflat_maps pfor pforeach pgrep pgreps pipes pmap pmap_chunked
+pmap_on pmap_reduce pmaps preduce preduce_init pselect psort pwatch rate_limit
+reduce retry rev rm shuffled slurp sockets spawn spinner stdin swallow sym_links
+timer trace watch`.
+
+Note `reduce`, `filter`, `find`, `match`, and `first_index` in that list — common
+enough sub names that ordinary Perl hits this without doing anything unusual.
+
 Worst-in-class because it is silent: `sub f` in ordinary Perl returns a
 directory listing instead of the user's value.
 
