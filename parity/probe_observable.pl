@@ -148,6 +148,17 @@ my @PROBES = (
     [ 'false_match',      's', 'my $V = do { my $m = ("abc" =~ /zzz/); $m . ":" . length($m) };' ],
     [ 'false_notmatch',   's', 'my $V = do { my $m = ("abc" !~ /a/); $m . ":" . length($m) };' ],
     [ 'false_isa',        's', 'my $V = do { my $o = bless {}, "P::C"; $o->isa("Nope") . ":" . length($o->isa("Nope")) };' ],
+    # A failed match in LIST context is the empty list, not a one-element list
+    # holding the false value. Rendering `scalar(@V)` is the only way to see
+    # the difference: both forms are false in boolean context, but a
+    # one-element list makes `my @m = /…/` guards run their true branch and
+    # passes an argument to a call where perl passes none. `/g` and non-`/g`
+    # are separate probes because they took separate code paths and only the
+    # `/g` one was wrong.
+    [ 'false_match_list', 'a', 'my @V = ("abc" =~ /zzz/);' ],
+    [ 'false_match_glist','a', 'my @V = ("abc" =~ /zzz/g);' ],
+    [ 'false_match_gcap', 'a', 'my @V = ("abc" =~ /(z)(z)/g);' ],
+    [ 'false_match_gscal','s', 'my $V = do { my $m = ("abc" =~ /zzz/g); $m . ":" . length($m) };' ],
     [ 'true_is_one',      's', 'my $V = (1 == 1) . ":" . length(1 == 1);' ],
     [ 'false_numeric_use','s', 'my $V = (1 == 2) + 5;' ],
     [ 'false_sum_preds',  's', 'my $V = (1 == 2) + (2 == 2) + (3 == 3);' ],
@@ -396,6 +407,25 @@ my @PROBES = (
     [ 'pack_Z',           's', 'my $V = unpack("H*", pack("Z4", "ab"));' ],
     [ 'pack_w_free',      's', 'my $V = join(",", unpack("C*", pack("N", 1)));' ],
     [ 'pack_star',        's', 'my $V = join(",", unpack("C*", pack("A*", "hi")));' ],
+
+    # ── file tests ───────────────────────────────────────────────────────────
+    #
+    # `-t` takes a FILEHANDLE, so it has the two falsehoods the other file
+    # tests have, but split on a different axis: a handle operand is always
+    # DEFINED (1 for a terminal, "" otherwise) and a path names no handle at
+    # all, so it is undef. Testing the operand as a path inverts both halves,
+    # which is why the handle and the path forms are probed separately.
+    # Definedness and length() are rendered rather than the bare value because
+    # undef, "" and "0" all print as nothing or near-nothing on their own.
+    #
+    # These are terminal-state independent: perl and st are run the same way,
+    # so both observe the same stdin/stdout, whatever the harness was given.
+    [ 'filetest_t_handle','s', 'my $r = -t STDIN; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
+    [ 'filetest_t_stdout','s', 'my $r = -t STDOUT; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
+    [ 'filetest_t_fd',    's', 'my $d = "0"; my $r = -t $d; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
+    [ 'filetest_t_path',  's', 'my $p = $0; my $r = -t $p; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
+    [ 'filetest_t_devfd', 's', 'my $p = "/dev/fd/1"; my $r = -t $p; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
+    [ 'filetest_t_nofh',  's', 'my $p = "NOPEFH"; my $r = -t $p; my $V = defined($r) ? "def:" . length($r) : "undef";' ],
 
     # ── misc builtins ────────────────────────────────────────────────────────
     [ 'misc_lcuc_sort',   'a', 'my @V = sort { lc($a) cmp lc($b) or $a cmp $b } qw(B a A b);' ],
