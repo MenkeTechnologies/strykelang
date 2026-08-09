@@ -982,7 +982,7 @@ stryke-specific long flags:
 | `--flame` | Flamegraph: colored terminal bars when interactive, SVG when piped (`stryke --flame x.stk > flame.svg`) |
 | `--record` | Record one row per stryke run (wall-clock, exit code, argv) to `~/.stryke/perf.sqlite`. Inherits to child processes via `STRYKE_RECORD=1` env, so `s --record t TESTS...` records one row per test file. Query via the `perfview` builtin. |
 | `--no-jit` | Disable Cranelift JIT (bytecode interpreter only) |
-| `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.) |
+| `--compat` | Perl 5 strict-compatibility mode: disable all stryke extensions (`\|>`, `struct`, `enum`, `match`, `pmap`, `#{expr}`, etc.). A user `sub` also takes precedence over a same-named stryke **extension** builtin, so plain Perl that defines `sub all { … }` reaches its own sub; Perl 5 **core** operators (`print`, `length`, `sort`, …) keep winning, exactly as in Perl, where a plain `sub print { … }` does not override the named operator. `CORE::name` always means the builtin. |
 | `--static` | Mandatory static typing (Kotlin-style): every function parameter, return type, and variable declaration must be typed or inferable; statically-known type mismatches abort before the program runs. See [\[0x08c\]](#0x08c---static-mode) |
 | `--no-interop` | Reject Perl-isms (`sub`, `say`, `reverse`, `scalar`, `$a`/`$b` outside sort blocks); force idiomatic stryke (`fn`, `p`, `rev`, `len`, `$_0`/`$_1`). See [\[0x08a\]](#0x08a---no-interop-mode) |
 | `--explain CODE` | Print expanded hint for an error code (e.g. `E0001`) |
@@ -1190,6 +1190,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
 - **`$?` / `$|`** — packed POSIX status from `system`/backticks/pipe close; autoflush on print/printf.
 - **`$.`** — undef until first successful read, then last-read line count.
 - **AWK record vars** (`-n`/`-p` loop) — `$NR` is the cumulative record number across all input files; `$FNR` is the per-file record number (resets at each file, like `$.`); `$NF` is the field count under `-a` autosplit. Available without `-MEnglish`; disabled under `--compat`.
+- **UDF vs builtin precedence under `--compat`** — a user `sub` wins over a same-named stryke **extension** builtin (`sub all { … }; all()` reaches the sub, and `@_` is populated as for any call), because `--compat` exists to run unmodified Perl. Perl 5 **core** operators keep winning — a plain `sub print { … }` / `sub length { … }` does not override the named operator, matching Perl, where overriding those needs `use subs` / `CORE::GLOBAL`. `CORE::name` is always the builtin. The core/extension split is the same partition `%stryke::perl_compats` (`%pc`) and `%stryke::extensions` (`%e`) expose. Outside `--compat` the no-shadow invariant still applies: redefining a builtin is a parse error rather than a silent pick.
 - **`print`/`p`/`printf` with no args** — uses `$_` (and `printf`'s format defaults to `$_`).
 - **Bareword statement** — `name;` calls a scwub with `@_ = ($_)`.
 - **Typeglobs** — `*foo = \&bar`, `*lhs = *rhs` copies sub/scalar/array/hash/IO slots; package-qualified `*Pkg::name` supported.

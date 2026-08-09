@@ -16,6 +16,10 @@
 # `parity_summary.json` stays tracked — it feeds the docs badge.
 /parity/parity_failures.log
 
+# Per-run divergence log from `perl parity/probe_observable.pl`. Same rationale:
+# regenerated on every run, too noisy to track.
+/parity/probe_failures.log
+
 # Downloaded fonts for scripts/reference_pdf.sh
 docs/.fonts/
 
