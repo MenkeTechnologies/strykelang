@@ -3594,6 +3594,46 @@ directory listing instead of the user's value.
 Pin tests for the half that *is* fixed:
 `tests/suite/compat_udf_shadow_extensions.rs`.
 
+## BUG-318 — a rebuilt binary at the same version replays the old build's bytecode — **`bug`**
+
+`~/.stryke/scripts.compat.rkyv` is keyed on script path + mtime + package
+version + shard format version (`script_cache.rs`), so two binaries built from
+different source at the same `Cargo.toml` version share cache entries. The
+second one silently executes the first one's compiled program:
+
+```
+$ new-build --compat repro.pl        # populates the cache
+A:1,2,3
+$ old-build --compat repro.pl        # cannot parse this file at all
+A:1,2,3
+$ STRYKE_CACHE=0 old-build --compat repro.pl
+Unexpected token RParen at repro.pl line 3.
+```
+
+Both binaries report `stryke v0.17.47`. Any measurement that compares two
+builds — a parity sweep, a before/after divergence count, a bisect — reads the
+wrong build unless `STRYKE_CACHE=0` is set or the version is bumped between
+them, and the wrong answer looks exactly like a real one. `parity/run_parity.sh`
+does not set it.
+
+The mtime check catches an edited *script*; nothing catches an edited
+*interpreter*. A build fingerprint in the header (or in the entry key) would.
+
+## BUG-317 — `length(undef)` returns `0`; Perl returns `undef` — **`parity`**
+
+```perl
+my $u;
+my $l = length($u);
+print defined($l) ? "yes" : "no", "\n";   # perl: no    st --compat: yes
+print "[", (defined($l) ? $l : ""), "]\n"; # perl: []    st --compat: [0]
+```
+
+Perl distinguishes "the empty string, length 0" from "no string at all":
+`length(undef)` is `undef`, while `length("")` is `0` (both agree on the
+latter). stryke collapses the two, so `defined(length($x))` — the idiomatic
+"is this a real string?" test — is always true. Found while measuring
+`sort SUBNAME LIST`.
+
 ## BUG-316 — statement-initial `sub { … }->(ARGS)` fails to parse — **`bug`**
 
 An anonymous sub written and called in one statement parses in expression
