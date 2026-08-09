@@ -591,6 +591,26 @@ fn filetest_text_binary(path: &str, want_text: bool) -> bool {
     }
 }
 
+/// True when the `stat` behind a file test succeeded, which is what decides
+/// whether the test can answer `false` at all.
+///
+/// Perl distinguishes the two ways a file test fails. When the `stat` itself
+/// fails the test is `undef` — `-e "/nope"` and `-d "/nope"` are both undef —
+/// and when the `stat` succeeds but the predicate does not hold the test is the
+/// empty-string false, so `-d "/etc/hosts"` is `""`. Callers use this to pick
+/// between [`crate::value::StrykeValue::UNDEF`] and `perl_bool(result)`.
+///
+/// `-l` is the one path test that inspects the link rather than its target
+/// (`lstat`), so a dangling symlink is `1` for `-l` and undef for every other
+/// test.
+pub fn filetest_stat_succeeds(path: &str, op: char) -> bool {
+    if op == 'l' {
+        std::fs::symlink_metadata(path).is_ok()
+    } else {
+        std::fs::metadata(path).is_ok()
+    }
+}
+
 /// File age in fractional days since now. `which`: 'M' = mtime, 'A' = atime, 'C' = ctime.
 #[cfg(unix)]
 pub fn filetest_age_days(path: &str, which: char) -> Option<f64> {

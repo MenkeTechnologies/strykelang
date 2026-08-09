@@ -1505,6 +1505,38 @@ pub(crate) enum NumTy {
 /// Apply a single straight-line (non-control-flow) op to the abstract operand-type
 /// stack used by [`segment_is_fusevm_float_eligible`], returning `false` if the op is
 /// not float-safe or underflows. Control-flow ops are handled by the caller.
+/// True when `seg` computes a value that `--compat` must render as Perl's
+/// empty-string false, and which therefore cannot be handed to a native tier.
+///
+/// The fusevm segment tiers marshal results as plain `i64` and reconstruct them
+/// with `StrykeValue::integer`, so a false comparison would come back as `0`
+/// where perl prints nothing. `Spaceship` and `StrCmp` are deliberately absent:
+/// their `0` means "equal" and is a genuine integer, not a boolean.
+///
+/// Outside `--compat` this is always false and the tiers are unaffected.
+pub(crate) fn segment_yields_perl_bool(seg: &[Op]) -> bool {
+    use Op::*;
+    crate::compat_mode()
+        && seg.iter().any(|op| {
+            matches!(
+                op,
+                NumEq
+                    | NumNe
+                    | NumLt
+                    | NumGt
+                    | NumLe
+                    | NumGe
+                    | StrEq
+                    | StrNe
+                    | StrLt
+                    | StrGt
+                    | StrLe
+                    | StrGe
+                    | LogNot
+            )
+        })
+}
+
 fn float_apply_op(op: &Op, stack: &mut Vec<NumTy>) -> bool {
     use Op::*;
     match op {
@@ -2988,6 +3020,9 @@ pub(crate) fn run_linear_segment_cached(
     // per-branch) keeps the future addition of LoadConst-bearing eligibility
     // families a one-line change.
     let _load_const_ctx = LoadConstCtxGuard::new(constants);
+    if segment_yields_perl_bool(seg) {
+        return (None, None);
+    }
     let int_ok = segment_is_fusevm_eligible(seg, seg_start);
     // The float-operand path also reports the segment's *static* result kind
     // (`Int` for a comparison/bool, `Float` for arithmetic involving a float). We

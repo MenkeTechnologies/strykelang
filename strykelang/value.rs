@@ -1278,6 +1278,40 @@ impl StrykeValue {
     pub fn bytes(b: Arc<Vec<u8>>) -> Self {
         Self::from_heap(Arc::new(HeapObject::Bytes(b)))
     }
+
+    /// Perl's canonical false, `PL_sv_no`: the empty string in string context,
+    /// `0` in numeric context. Every Perl-visible predicate — the six numeric
+    /// and six string comparisons, `!`, `not`, `defined`, `exists`, a scalar
+    /// `=~`/`!~`, and the file tests — yields it, so `print(1 == 2)` prints
+    /// nothing at all and `length(1 == 2)` is `0`, not `1`.
+    ///
+    /// stryke's own false is the integer `0`, which is what a non-`--compat`
+    /// program keeps seeing; only `--compat` observes the Perl form. Pair with
+    /// [`Self::perl_bool`] rather than calling this directly.
+    #[inline]
+    pub fn perl_false() -> Self {
+        if crate::compat_mode() {
+            Self::string(String::new())
+        } else {
+            Self::integer(0)
+        }
+    }
+
+    /// The value a Perl-visible predicate must produce: `1` for true,
+    /// [`Self::perl_false`] for false.
+    ///
+    /// Use this at *every* site that turns a Rust `bool` into a user-visible
+    /// truth value. A predicate that hand-rolls `integer(if b { 1 } else { 0 })`
+    /// is wrong under `--compat`, and wrong only in string context, which is
+    /// exactly the shape of bug that survives a numeric-only test suite.
+    #[inline]
+    pub fn perl_bool(b: bool) -> Self {
+        if b {
+            Self::integer(1)
+        } else {
+            Self::perl_false()
+        }
+    }
     /// `array` — see implementation.
     #[inline]
     pub fn array(v: Vec<StrykeValue>) -> Self {
