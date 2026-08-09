@@ -3594,23 +3594,24 @@ directory listing instead of the user's value.
 Pin tests for the half that *is* fixed:
 `tests/suite/compat_udf_shadow_extensions.rs`.
 
-## BUG-310 — bare `shift` / `pop` at file scope read `@_`, not `@ARGV` — **`parity`**
+## BUG-316 — statement-initial `sub { … }->(ARGS)` fails to parse — **`bug`**
 
-Perl defaults bare `shift`/`pop` to `@ARGV` outside a sub and `@_` inside one.
-stryke always uses `@_`, so the single most common Perl argument idiom yields
-`undef` at file scope:
+An anonymous sub written and called in one statement parses in expression
+position but not at the start of a statement:
 
 ```perl
-# script.pl X Y Z
-my $a = shift;        # perl: X          st --compat: undef
-my $c = pop;          # perl: Z          st --compat: undef
-my $b = shift @ARGV;  # perl: Y          st --compat: X   (explicit form works)
+my $a = sub { shift }->("X");   # ok — "X"
+sub { print shift }->("X");     # Unexpected token Arrow at FILE line 1.
 ```
 
-`@ARGV` itself is populated correctly, and `shift @ARGV` works — only the
-implicit operand is wrong. `Parser::parse_one_arg_or_argv` unconditionally
-returns `ExprKind::ArrayVar("_")` despite its name; it has no notion of whether
-it is inside a sub body, so the fix needs a sub-body depth counter on the parser.
+The statement-level `sub` arm (`Parser::parse_sub_decl`, `Token::LBrace` case)
+returns the coderef as a finished statement without running the postfix
+`->`/subscript chain over it, so the `->` is left for the statement parser.
+`my $s = sub { … }; $s->(…)` is the working spelling.
+
+Surfaces most often through a string `eval`, whose whole text is statements:
+`eval 'sub { shift }->("X")'` sets `$@` instead of returning `"X"`. Found while
+measuring BUG-310; unrelated to the default-array rule.
 
 ## BUG-311 — Perl's false is the empty string; stryke returns `0` — **`parity`** [FIXED]
 
