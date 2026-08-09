@@ -6192,7 +6192,7 @@ impl VMHelper {
             }
             if start > s.len() {
                 self.regex_pos.insert(key, None);
-                return Ok(StrykeValue::integer(0));
+                return Ok(StrykeValue::perl_bool(false));
             }
             let sub = s.get(start..).unwrap_or("");
             if let Some(caps) = re.captures(sub) {
@@ -6203,7 +6203,7 @@ impl VMHelper {
                 Ok(StrykeValue::integer(1))
             } else {
                 self.regex_pos.insert(key, None);
-                Ok(StrykeValue::integer(0))
+                Ok(StrykeValue::perl_bool(false))
             }
         } else if flags.contains('g') {
             let mut rows = Vec::new();
@@ -6295,12 +6295,14 @@ impl VMHelper {
             self.regex_capture_scope_fresh = true;
             Ok(result)
         } else {
-            // No match: list context yields the empty list, scalar 0.
+            // No match: list context yields the empty list, scalar Perl false
+            // (the empty string under `--compat`, so `print("x" =~ /z/)` prints
+            // nothing rather than `0`).
             let list_context = self.wantarray_kind == WantarrayCtx::List;
             let result = if list_context {
                 StrykeValue::array(Vec::new())
             } else {
-                StrykeValue::integer(0)
+                StrykeValue::perl_bool(false)
             };
             // Memoize negative results too — they don't set capture vars, so scope_fresh stays true.
             if !list_context {
@@ -10545,7 +10547,7 @@ impl VMHelper {
                                 let s = topic.to_string();
                                 let v =
                                     self.regex_match_execute(s, pattern, flags, false, "_", rl)?;
-                                return Ok(StrykeValue::integer(if v.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::perl_bool(!v.is_true()));
                             }
                         }
                         _ => {}
@@ -10565,17 +10567,17 @@ impl VMHelper {
                         UnaryOp::LogNot => {
                             if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
                                 let pv = r?;
-                                return Ok(StrykeValue::integer(if pv.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::perl_bool(!pv.is_true()));
                             }
-                            Ok(StrykeValue::integer(if val.is_true() { 0 } else { 1 }))
+                            Ok(StrykeValue::perl_bool(!val.is_true()))
                         }
                         UnaryOp::BitNot => Ok(StrykeValue::integer(!val.to_int())),
                         UnaryOp::LogNotWord => {
                             if let Some(r) = self.try_overload_unary_dispatch("bool", &val, line) {
                                 let pv = r?;
-                                return Ok(StrykeValue::integer(if pv.is_true() { 0 } else { 1 }));
+                                return Ok(StrykeValue::perl_bool(!pv.is_true()));
                             }
-                            Ok(StrykeValue::integer(if val.is_true() { 0 } else { 1 }))
+                            Ok(StrykeValue::perl_bool(!val.is_true()))
                         }
                         UnaryOp::Ref => {
                             if let ExprKind::ScalarVar(name) = &expr.kind {
@@ -11552,7 +11554,7 @@ impl VMHelper {
                             let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
                             let mro = self.mro_linearize(&class);
                             let result = mro.iter().any(|c| c == &target);
-                            return Ok(StrykeValue::integer(if result { 1 } else { 0 }));
+                            return Ok(StrykeValue::perl_bool(result));
                         }
                         "can" => {
                             let target_method =
@@ -11579,7 +11581,7 @@ impl VMHelper {
                             let target = arg_vals.get(1).map(|v| v.to_string()).unwrap_or_default();
                             let mro = self.mro_linearize(&class);
                             let result = mro.iter().any(|c| c == &target);
-                            return Ok(StrykeValue::integer(if result { 1 } else { 0 }));
+                            return Ok(StrykeValue::perl_bool(result));
                         }
                         _ => {}
                     }
@@ -13650,10 +13652,10 @@ impl VMHelper {
                 // Perl: `defined &foo` / `defined &Pkg::name` — true iff the subroutine exists (no call).
                 if let ExprKind::SubroutineRef(name) = &expr.kind {
                     let exists = self.resolve_sub_by_name(name).is_some();
-                    return Ok(StrykeValue::integer(if exists { 1 } else { 0 }));
+                    return Ok(StrykeValue::perl_bool(exists));
                 }
                 let val = self.eval_expr(expr)?;
-                Ok(StrykeValue::integer(if val.is_undef() { 0 } else { 1 }))
+                Ok(StrykeValue::perl_bool(!val.is_undef()))
             }
             ExprKind::Ref(expr) => {
                 let val = self.eval_expr(expr)?;
@@ -13797,6 +13799,11 @@ impl VMHelper {
                         Err(_) => Ok(StrykeValue::UNDEF),
                     };
                 }
+                // A file test whose `stat` failed is `undef`, not false — see
+                // [`crate::perl_fs::filetest_stat_succeeds`].
+                if crate::compat_mode() && !crate::perl_fs::filetest_stat_succeeds(&path, *op) {
+                    return Ok(StrykeValue::UNDEF);
+                }
                 let result = match op {
                     'e' => std::path::Path::new(&path).exists(),
                     'f' => std::path::Path::new(&path).is_file(),
@@ -13870,7 +13877,7 @@ impl VMHelper {
                     'B' => crate::perl_fs::filetest_is_binary(&path),
                     _ => false,
                 };
-                Ok(StrykeValue::integer(if result { 1 } else { 0 }))
+                Ok(StrykeValue::perl_bool(result))
             }
 
             // System
@@ -14804,94 +14811,62 @@ impl VMHelper {
                 // Struct equality: compare all fields
                 if let (Some(a), Some(b)) = (lv.as_struct_inst(), rv.as_struct_inst()) {
                     if a.def.name != b.def.name {
-                        StrykeValue::integer(0)
+                        StrykeValue::perl_bool(false)
                     } else {
                         let av = a.get_values();
                         let bv = b.get_values();
                         let eq = av.len() == bv.len()
                             && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
-                        StrykeValue::integer(if eq { 1 } else { 0 })
+                        StrykeValue::perl_bool(eq)
                     }
                 } else if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a == b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a == b)
                 } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
                     // Stryke (non-compat) sugar: `==` falls back to string
                     // compare when both operands are non-numeric strings, so
                     // `"G" == "G"` is true (Perl's `0 == 0` numeric is also
                     // true here, but `"G" == "T"` is false in stryke vs
                     // also-true in Perl). See `Op::NumEq` in vm.rs.
-                    StrykeValue::integer(if lv.to_string() == rv.to_string() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_string() == rv.to_string())
                 } else {
-                    StrykeValue::integer(if lv.to_number() == rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() == rv.to_number())
                 }
             }
             BinOp::NumNe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a != b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a != b)
                 } else if !crate::compat_mode() && both_non_numeric_strings_iv(lv, rv) {
-                    StrykeValue::integer(if lv.to_string() != rv.to_string() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_string() != rv.to_string())
                 } else {
-                    StrykeValue::integer(if lv.to_number() != rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() != rv.to_number())
                 }
             }
             BinOp::NumLt => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a < b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a < b)
                 } else {
-                    StrykeValue::integer(if lv.to_number() < rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() < rv.to_number())
                 }
             }
             BinOp::NumGt => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a > b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a > b)
                 } else {
-                    StrykeValue::integer(if lv.to_number() > rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() > rv.to_number())
                 }
             }
             BinOp::NumLe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a <= b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a <= b)
                 } else {
-                    StrykeValue::integer(if lv.to_number() <= rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() <= rv.to_number())
                 }
             }
             BinOp::NumGe => {
                 if let (Some(a), Some(b)) = (lv.as_integer(), rv.as_integer()) {
-                    StrykeValue::integer(if a >= b { 1 } else { 0 })
+                    StrykeValue::perl_bool(a >= b)
                 } else {
-                    StrykeValue::integer(if lv.to_number() >= rv.to_number() {
-                        1
-                    } else {
-                        0
-                    })
+                    StrykeValue::perl_bool(lv.to_number() >= rv.to_number())
                 }
             }
             BinOp::Spaceship => {
@@ -14915,36 +14890,12 @@ impl VMHelper {
                     })
                 }
             }
-            BinOp::StrEq => StrykeValue::integer(if lv.to_string() == rv.to_string() {
-                1
-            } else {
-                0
-            }),
-            BinOp::StrNe => StrykeValue::integer(if lv.to_string() != rv.to_string() {
-                1
-            } else {
-                0
-            }),
-            BinOp::StrLt => StrykeValue::integer(if lv.to_string() < rv.to_string() {
-                1
-            } else {
-                0
-            }),
-            BinOp::StrGt => StrykeValue::integer(if lv.to_string() > rv.to_string() {
-                1
-            } else {
-                0
-            }),
-            BinOp::StrLe => StrykeValue::integer(if lv.to_string() <= rv.to_string() {
-                1
-            } else {
-                0
-            }),
-            BinOp::StrGe => StrykeValue::integer(if lv.to_string() >= rv.to_string() {
-                1
-            } else {
-                0
-            }),
+            BinOp::StrEq => StrykeValue::perl_bool(lv.to_string() == rv.to_string()),
+            BinOp::StrNe => StrykeValue::perl_bool(lv.to_string() != rv.to_string()),
+            BinOp::StrLt => StrykeValue::perl_bool(lv.to_string() < rv.to_string()),
+            BinOp::StrGt => StrykeValue::perl_bool(lv.to_string() > rv.to_string()),
+            BinOp::StrLe => StrykeValue::perl_bool(lv.to_string() <= rv.to_string()),
+            BinOp::StrGe => StrykeValue::perl_bool(lv.to_string() >= rv.to_string()),
             BinOp::StrCmp => {
                 let cmp = lv.to_string().cmp(&rv.to_string());
                 StrykeValue::integer(match cmp {
@@ -21399,24 +21350,16 @@ impl VMHelper {
                         );
                     }
                 }
-                Ok(StrykeValue::integer(
-                    if self.scope.exists_hash_element(hash, &k) {
-                        1
-                    } else {
-                        0
-                    },
+                Ok(StrykeValue::perl_bool(
+                    self.scope.exists_hash_element(hash, &k),
                 ))
             }
             ExprKind::ArrayElement { array, index } => {
                 self.check_strict_array_var(array, line)?;
                 let idx = self.eval_expr(index)?.to_int();
                 let aname = self.stash_array_name_for_package(array);
-                Ok(StrykeValue::integer(
-                    if self.scope.exists_array_element(&aname, idx) {
-                        1
-                    } else {
-                        0
-                    },
+                Ok(StrykeValue::perl_bool(
+                    self.scope.exists_array_element(&aname, idx),
                 ))
             }
             ExprKind::ArrowDeref {
@@ -21431,13 +21374,13 @@ impl VMHelper {
                 // for any missing level. (BUG-009)
                 let container = match self.eval_expr_exists_mode(inner) {
                     Ok(v) => v,
-                    Err(_) => return Ok(StrykeValue::integer(0)),
+                    Err(_) => return Ok(StrykeValue::perl_bool(false)),
                 };
                 if container.is_undef() {
-                    return Ok(StrykeValue::integer(0));
+                    return Ok(StrykeValue::perl_bool(false));
                 }
                 let yes = self.exists_arrow_hash_element(container, &k, line)?;
-                Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
+                Ok(StrykeValue::perl_bool(yes))
             }
             ExprKind::ArrowDeref {
                 expr: inner,
@@ -21453,21 +21396,21 @@ impl VMHelper {
                 }
                 let container = match self.eval_expr_exists_mode(inner) {
                     Ok(v) => v,
-                    Err(_) => return Ok(StrykeValue::integer(0)),
+                    Err(_) => return Ok(StrykeValue::perl_bool(false)),
                 };
                 if container.is_undef() {
-                    return Ok(StrykeValue::integer(0));
+                    return Ok(StrykeValue::perl_bool(false));
                 }
                 let idx = self.eval_expr(index)?.to_int();
                 let yes = self.exists_arrow_array_element(container, idx, line)?;
-                Ok(StrykeValue::integer(if yes { 1 } else { 0 }))
+                Ok(StrykeValue::perl_bool(yes))
             }
             ExprKind::SubroutineRef(name) => {
                 // `exists &name` / `exists &Pkg::name` — true when the
                 // subroutine has been declared (whether or not it's
                 // defined, mirroring Perl's `exists &subname`).
                 let resolved = self.resolve_sub_by_name(name);
-                Ok(StrykeValue::integer(if resolved.is_some() { 1 } else { 0 }))
+                Ok(StrykeValue::perl_bool(resolved.is_some()))
             }
             _ => Err(StrykeError::runtime("exists requires hash or array element", line).into()),
         }
@@ -23019,7 +22962,7 @@ pub(crate) fn exec_builtin(
         }
         Some(BuiltinId::Defined) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-            Ok(StrykeValue::integer(if val.is_undef() { 0 } else { 1 }))
+            Ok(StrykeValue::perl_bool(!val.is_undef()))
         }
         Some(BuiltinId::Abs) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);

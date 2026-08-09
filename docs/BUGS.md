@@ -3612,7 +3612,7 @@ implicit operand is wrong. `Parser::parse_one_arg_or_argv` unconditionally
 returns `ExprKind::ArrayVar("_")` despite its name; it has no notion of whether
 it is inside a sub body, so the fix needs a sub-body depth counter on the parser.
 
-## BUG-311 — Perl's false is the empty string; stryke returns `0` — **`parity`**
+## BUG-311 — Perl's false is the empty string; stryke returns `0` — **`parity`** [FIXED]
 
 Every comparison/boolean operator yields `""` (numerically 0) in Perl, but `0`
 in stryke, so any program that prints or measures a comparison result diverges:
@@ -3627,6 +3627,51 @@ print((1 < 0), "\n");      # perl: (empty) st --compat: 0
 True is `1` on both. Numeric use (`$f+0`) agrees; only the string form differs.
 Broad blast radius — it affects every `--compat` program that interpolates a
 predicate.
+
+**Fixed.** `StrykeValue::perl_bool` / `perl_false` (`strykelang/value.rs`) are
+now the single source of the value, returning `""` under `--compat` and the
+integer `0` otherwise, and every Perl-visible predicate routes through them:
+the six numeric and six string comparisons in both the tree interpreter
+(`vm_helper.rs`) and the bytecode VM (`vm.rs` `int_cmp` and the `Op::Str*`
+handlers), `!`/`not`, `defined`, `exists`, `UNIVERSAL::isa`/`DOES`, a
+scalar-context `=~`/`!~` that fails, and the file tests. `<=>` and `cmp` are
+deliberately excluded: their `0` means "equal" and is a genuine integer.
+
+Two things this cost, both worth recording:
+
+* **The native tiers cannot express it.** A JIT or fusevm region carries plain
+  `i64` and re-boxes with `StrykeValue::integer`, so a jitted `$a < $b` returned
+  `0` where perl prints nothing — and only after the sub crossed its ~50-call
+  JIT threshold, so it was invisible to every short test. Under `--compat` the
+  six numeric comparisons, the six string comparisons and `LogNot` now make a
+  region ineligible (`jit.rs` `simulate_one_op`, `fusevm_bridge.rs`
+  `segment_yields_perl_bool`), which trades native speed for the right answer in
+  compat mode only. `Spaceship`/`StrCmp` stay eligible.
+* **The file tests have two falsehoods.** `stat` failure is `undef`
+  (`-e "/nope"`), `stat` success with a false predicate is `""`
+  (`-d "/etc/hosts"`); collapsing both to `0` lost the distinction. See
+  `perl_fs::filetest_stat_succeeds`. `-l` alone stats the link (`lstat`), so a
+  dangling symlink is `1` for `-l` and `undef` for every other test.
+
+Pinned by `parity/cases/20045_false_is_empty_string.pl`,
+`20046_false_survives_hot_loop.pl` and `20047_filetest_undef_vs_false.pl`, and
+by the `false_*` probes in `parity/probe_observable.pl`. The corpus was blind to
+the whole class before — not one case in `parity/cases` applied `length()` to a
+predicate, so nothing could tell `""` from `"0"`:
+
+```
+$ grep -lE 'length\(\(?[^)]*(==|<|>|eq|ne)' parity/cases/*.pl | wc -l
+       0
+```
+
+Still open, found while measuring this and *not* part of it:
+
+* A list-context match failure yields a one-element list holding the false
+  value instead of the empty list, so `f("abc" =~ /z/)` passes an argument where
+  perl passes none. Scalar context is correct.
+* `-t` on a path is `undef` in perl (it wants a filehandle); stryke returns the
+  empty-string false.
+* `can` returns `undef` for false, not `""` — unchanged, and already correct.
 
 ## BUG-312 — `@_` aliasing and `foreach` aliasing are not implemented — **`parity`**
 

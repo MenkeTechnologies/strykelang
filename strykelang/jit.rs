@@ -1077,6 +1077,20 @@ fn simulate_one_op(
             stack.push(Cell::Dyn);
         }
         // Numeric comparisons: always produce int (0/1 or -1/0/1), even with float operands.
+        //
+        // Under `--compat` a *false* comparison is Perl's `PL_sv_no` — the empty
+        // string, not `0` (see [`StrykeValue::perl_bool`]). Native code has no
+        // way to produce that: the region carries plain `i64`, and every exit
+        // (`jit_result_to_perl`, the slot write-backs in `crate::vm`) re-boxes
+        // it with `StrykeValue::integer`, so a jitted `$a < $b` would print `0`
+        // where perl prints nothing. Decline the region instead and let the
+        // interpreter answer. `Spaceship` is exempt: its `0` is a real integer
+        // ("equal"), not a boolean, so it is unaffected.
+        Op::NumEq | Op::NumNe | Op::NumLt | Op::NumGt | Op::NumLe | Op::NumGe
+            if crate::compat_mode() =>
+        {
+            return None;
+        }
         Op::NumEq | Op::NumNe | Op::NumLt | Op::NumGt | Op::NumLe | Op::NumGe | Op::Spaceship => {
             let (a, b) = pop2_strict(stack)?;
             reject_dynstr_binop(a, b)?;
@@ -1092,6 +1106,11 @@ fn simulate_one_op(
         | Op::StrGt
         | Op::StrLe
         | Op::StrGe => {
+            return None;
+        }
+        // `!` yields the same Perl false as a comparison — decline for the same
+        // reason the comparisons above do.
+        Op::LogNot if crate::compat_mode() => {
             return None;
         }
         Op::LogNot => {

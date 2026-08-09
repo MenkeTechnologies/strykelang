@@ -342,6 +342,11 @@ struct FusevmSubElig {
 /// the result is reused across every invocation of that sub.
 fn compute_fusevm_elig(seg: &[Op], seg_ip: usize) -> Option<FusevmSubElig> {
     use crate::fusevm_bridge as fb;
+    // A segment whose result is a Perl boolean must stay in the interpreter under
+    // `--compat`; the native tiers can only return an `i64`, never `""`.
+    if fb::segment_yields_perl_bool(seg) {
+        return None;
+    }
     if fb::segment_is_fusevm_eligible(seg, seg_ip) {
         return Some(FusevmSubElig {
             dispatch: FusevmDispatch::Int,
@@ -2215,7 +2220,7 @@ impl<'a> VM<'a> {
                     let target = args.first().map(|v| v.to_string()).unwrap_or_default();
                     let mro = self.interp.mro_linearize(&class);
                     let result = mro.iter().any(|c| c == &target);
-                    self.push(StrykeValue::integer(if result { 1 } else { 0 }));
+                    self.push(StrykeValue::perl_bool(result));
                     return Ok(());
                 }
                 "can" => {
@@ -2246,7 +2251,7 @@ impl<'a> VM<'a> {
                     let target = args.first().map(|v| v.to_string()).unwrap_or_default();
                     let mro = self.interp.mro_linearize(&class);
                     let result = mro.iter().any(|c| c == &target);
-                    self.push(StrykeValue::integer(if result { 1 } else { 0 }));
+                    self.push(StrykeValue::perl_bool(result));
                     return Ok(());
                 }
                 _ => {}
@@ -4162,7 +4167,7 @@ impl<'a> VM<'a> {
                         let index = self.pop().to_int();
                         let n = names[*idx as usize].as_str();
                         let yes = self.interp.scope.exists_array_element(n, index);
-                        self.push(StrykeValue::integer(if yes { 1 } else { 0 }));
+                        self.push(StrykeValue::perl_bool(yes));
                         Ok(())
                     }
                     Op::DeleteArrayElem(idx) => {
@@ -4630,7 +4635,7 @@ impl<'a> VM<'a> {
                             }
                         }
                         let exists = self.interp.scope.exists_hash_element(n, &key);
-                        self.push(StrykeValue::integer(if exists { 1 } else { 0 }));
+                        self.push(StrykeValue::perl_bool(exists));
                         Ok(())
                     }
                     Op::ExistsArrowHashElem => {
@@ -4640,7 +4645,7 @@ impl<'a> VM<'a> {
                         let yes = vm_interp_result(
                             self.interp
                                 .exists_arrow_hash_element(container, &key, line)
-                                .map(|b| StrykeValue::integer(if b { 1 } else { 0 }))
+                                .map(StrykeValue::perl_bool)
                                 .map_err(FlowOrError::Error),
                             line,
                         )?;
@@ -4667,7 +4672,7 @@ impl<'a> VM<'a> {
                         let yes = vm_interp_result(
                             self.interp
                                 .exists_arrow_array_element(container, idx, line)
-                                .map(|b| StrykeValue::integer(if b { 1 } else { 0 }))
+                                .map(StrykeValue::perl_bool)
                                 .map_err(FlowOrError::Error),
                             line,
                         )?;
@@ -4942,18 +4947,18 @@ impl<'a> VM<'a> {
                             // Struct equality: compare all fields
                             if let (Some(sa), Some(sb)) = (a.as_struct_inst(), b.as_struct_inst()) {
                                 if sa.def.name != sb.def.name {
-                                    return Ok(StrykeValue::integer(0));
+                                    return Ok(StrykeValue::perl_bool(false));
                                 }
                                 let av = sa.get_values();
                                 let bv = sb.get_values();
                                 let eq = av.len() == bv.len()
                                     && av.iter().zip(bv.iter()).all(|(x, y)| x.struct_field_eq(y));
-                                Ok(StrykeValue::integer(if eq { 1 } else { 0 }))
+                                Ok(StrykeValue::perl_bool(eq))
                             } else {
                                 if !crate::compat_mode() && both_non_numeric_strings(a, b) {
                                     let sa = a.to_string();
                                     let sb = b.to_string();
-                                    return Ok(StrykeValue::integer(if sa == sb { 1 } else { 0 }));
+                                    return Ok(StrykeValue::perl_bool(sa == sb));
                                 }
                                 Ok(int_cmp(a, b, |x, y| x == y, |x, y| x == y))
                             }
@@ -4971,7 +4976,7 @@ impl<'a> VM<'a> {
                             if !crate::compat_mode() && both_non_numeric_strings(a, b) {
                                 let sa = a.to_string();
                                 let sb = b.to_string();
-                                return Ok(StrykeValue::integer(if sa != sb { 1 } else { 0 }));
+                                return Ok(StrykeValue::perl_bool(sa != sb));
                             }
                             Ok(int_cmp(a, b, |x, y| x != y, |x, y| x != y))
                         })
@@ -5037,26 +5042,22 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrEq, a, b, |a, b| {
-                            Ok(StrykeValue::integer(if a.str_eq(b) { 1 } else { 0 }))
+                            Ok(StrykeValue::perl_bool(a.str_eq(b)))
                         })
                     }
                     Op::StrNe => {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrNe, a, b, |a, b| {
-                            Ok(StrykeValue::integer(if !a.str_eq(b) { 1 } else { 0 }))
+                            Ok(StrykeValue::perl_bool(!a.str_eq(b)))
                         })
                     }
                     Op::StrLt => {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrLt, a, b, |a, b| {
-                            Ok(StrykeValue::integer(
-                                if a.str_cmp(b) == std::cmp::Ordering::Less {
-                                    1
-                                } else {
-                                    0
-                                },
+                            Ok(StrykeValue::perl_bool(
+                                a.str_cmp(b) == std::cmp::Ordering::Less,
                             ))
                         })
                     }
@@ -5064,12 +5065,8 @@ impl<'a> VM<'a> {
                         let b = self.pop();
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrGt, a, b, |a, b| {
-                            Ok(StrykeValue::integer(
-                                if a.str_cmp(b) == std::cmp::Ordering::Greater {
-                                    1
-                                } else {
-                                    0
-                                },
+                            Ok(StrykeValue::perl_bool(
+                                a.str_cmp(b) == std::cmp::Ordering::Greater,
                             ))
                         })
                     }
@@ -5078,14 +5075,10 @@ impl<'a> VM<'a> {
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrLe, a, b, |a, b| {
                             let o = a.str_cmp(b);
-                            Ok(StrykeValue::integer(
-                                if matches!(o, std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
-                                {
-                                    1
-                                } else {
-                                    0
-                                },
-                            ))
+                            Ok(StrykeValue::perl_bool(matches!(
+                                o,
+                                std::cmp::Ordering::Less | std::cmp::Ordering::Equal
+                            )))
                         })
                     }
                     Op::StrGe => {
@@ -5093,16 +5086,10 @@ impl<'a> VM<'a> {
                         let a = self.pop();
                         self.push_binop_with_overload(BinOp::StrGe, a, b, |a, b| {
                             let o = a.str_cmp(b);
-                            Ok(StrykeValue::integer(
-                                if matches!(
-                                    o,
-                                    std::cmp::Ordering::Greater | std::cmp::Ordering::Equal
-                                ) {
-                                    1
-                                } else {
-                                    0
-                                },
-                            ))
+                            Ok(StrykeValue::perl_bool(matches!(
+                                o,
+                                std::cmp::Ordering::Greater | std::cmp::Ordering::Equal
+                            )))
                         })
                     }
                     Op::StrCmp => {
@@ -5126,9 +5113,9 @@ impl<'a> VM<'a> {
                             self.interp.try_overload_unary_dispatch("bool", &a, line)
                         {
                             let pv = vm_interp_result(exec_res, line)?;
-                            self.push(StrykeValue::integer(if pv.is_true() { 0 } else { 1 }));
+                            self.push(StrykeValue::perl_bool(!pv.is_true()));
                         } else {
-                            self.push(StrykeValue::integer(if a.is_true() { 0 } else { 1 }));
+                            self.push(StrykeValue::perl_bool(!a.is_true()));
                         }
                         Ok(())
                     }
@@ -7817,6 +7804,14 @@ impl<'a> VM<'a> {
                             self.push(v);
                             return Ok(());
                         }
+                        // A file test whose `stat` failed is `undef`, not false —
+                        // see [`crate::perl_fs::filetest_stat_succeeds`].
+                        if crate::compat_mode()
+                            && !crate::perl_fs::filetest_stat_succeeds(&path, op)
+                        {
+                            self.push(StrykeValue::UNDEF);
+                            return Ok(());
+                        }
                         let result = match op {
                             'e' => std::path::Path::new(&path).exists(),
                             'f' => std::path::Path::new(&path).is_file(),
@@ -7890,7 +7885,7 @@ impl<'a> VM<'a> {
                             'B' => crate::perl_fs::filetest_is_binary(&path),
                             _ => false,
                         };
-                        self.push(StrykeValue::integer(if result { 1 } else { 0 }));
+                        self.push(StrykeValue::perl_bool(result));
                         Ok(())
                     }
 
@@ -10165,13 +10160,9 @@ fn int_cmp(
     float_op: fn(f64, f64) -> bool,
 ) -> StrykeValue {
     if let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) {
-        StrykeValue::integer(if int_op(&x, &y) { 1 } else { 0 })
+        StrykeValue::perl_bool(int_op(&x, &y))
     } else {
-        StrykeValue::integer(if float_op(a.to_number(), b.to_number()) {
-            1
-        } else {
-            0
-        })
+        StrykeValue::perl_bool(float_op(a.to_number(), b.to_number()))
     }
 }
 
