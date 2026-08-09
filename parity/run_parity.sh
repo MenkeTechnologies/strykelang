@@ -81,8 +81,27 @@ for f in "${cases[@]}"; do
   p_out=$(mktemp "${TMPDIR:-/tmp}/parity.pl.$$.XXXXXX")
   r_out=$(mktemp "${TMPDIR:-/tmp}/parity.st.$$.XXXXXX")
 
-  "$PERL" "$f" >"$p_out" 2>&1 || true
+  "$PERL" "$f" >"$p_out" 2>&1 && p_rc=0 || p_rc=$?
   "$ST" --compat "$f" >"$r_out" 2>&1 || true
+
+  # The oracle must have SUCCEEDED for agreement to mean anything. If perl
+  # itself dies on a case, `st` reproducing the same death byte-for-byte is
+  # two agreeing failures, not a pass — and a case that stopped working under
+  # perl (a dropped module, a changed interpreter) would otherwise go on
+  # scoring green forever. Such a case is a FAILURE that names itself, so the
+  # corpus gets fixed rather than quietly hollowed out.
+  if [[ "$p_rc" -ne 0 ]]; then
+    echo "parity FAIL: $base (oracle '$PERL' exited $p_rc)" >&2
+    {
+      echo "==== $base ===="
+      echo "--- oracle $PERL exited $p_rc; its output was ---"
+      command cat "$p_out"
+      echo
+    } >&7
+    failed=$((failed + 1))
+    command rm -f "$p_out" "$r_out"
+    continue
+  fi
 
   if ! cmp -s "$p_out" "$r_out"; then
     # Short progress line always hits stderr so the user sees forward motion.
