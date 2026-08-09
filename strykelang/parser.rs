@@ -11801,6 +11801,59 @@ impl Parser {
                         },
                         line,
                     })
+                } else if crate::compat_mode()
+                    && matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !is_post_style_decl(name) && name != "varsync")
+                {
+                    // Perl's `sort SUBNAME LIST`: a bareword directly after `sort`
+                    // is *always* the comparator's name — never the head of the
+                    // list, never the head of a blockless comparator expression.
+                    // Measured against perl 5, version 42, subversion 2:
+                    //
+                    //   sort getlist()                 -> ()   SUBNAME=getlist, LIST=()
+                    //   sort bynum getlist()           -> getlist()'s values, sorted
+                    //   sort key($a) <=> key($b), @l   -> SUBNAME=key,
+                    //                                     LIST=($a) <=> key($b), @l
+                    //
+                    // The shared `parse_block_or_bareword_cmp_block` only takes a
+                    // bareword when `,`/`;`/`}`/EOF/`|>` follows — stryke's
+                    // `psort my_cmp, @list` spelling — so `sort bynum @l` fell
+                    // through to its expression path, which then swallowed the
+                    // list and left the statement's `;` unexpected. Outside
+                    // `--compat` the stryke spellings are unchanged.
+                    let name = match self.peek().clone() {
+                        Token::Ident(n) => n,
+                        _ => unreachable!("guarded by the matches! above"),
+                    };
+                    let name_line = self.peek_line();
+                    self.advance();
+                    let block = Self::bareword_cmp_call_block(name, name_line);
+                    let _ = self.eat(&Token::Comma);
+                    let terminated = matches!(
+                        self.peek(),
+                        Token::Semicolon
+                            | Token::RBrace
+                            | Token::RParen
+                            | Token::Eof
+                            | Token::PipeForward
+                    );
+                    let list = if self.in_pipe_rhs() && terminated {
+                        self.pipe_placeholder_list(line)
+                    } else if terminated {
+                        // `sort SUBNAME` with no list — perl yields the empty list.
+                        Expr {
+                            kind: ExprKind::List(vec![]),
+                            line,
+                        }
+                    } else {
+                        self.parse_expression()?
+                    };
+                    Ok(Expr {
+                        kind: ExprKind::SortExpr {
+                            cmp: Some(SortComparator::Block(block)),
+                            list: Box::new(list),
+                        },
+                        line,
+                    })
                 } else if matches!(self.peek(), Token::Ident(ref name) if !Self::is_known_bareword(name) && !is_post_style_decl(name) && name != "varsync")
                 {
                     // Blockless comparator via bare sub name: `sort my_cmp @list`
@@ -19360,6 +19413,29 @@ impl Parser {
     /// Parse a block OR a blockless comparison expression for sort/psort/heap.
     /// Blockless: `$a <=> $b` or `$a cmp $b` or any expression → wrapped as a Block.
     /// Also accepts a bare function name: `psort my_cmp, @list`.
+    /// Comparator body for a bareword comparator name: `NAME($a, $b)`. Used by both
+    /// the `,`-separated stryke spelling (`psort my_cmp, @list`) and Perl's
+    /// `sort SUBNAME LIST`, so the two cannot drift apart.
+    fn bareword_cmp_call_block(name: String, line: usize) -> Block {
+        let body = Expr {
+            kind: ExprKind::FuncCall {
+                name,
+                args: vec![
+                    Expr {
+                        kind: ExprKind::ScalarVar("a".to_string()),
+                        line,
+                    },
+                    Expr {
+                        kind: ExprKind::ScalarVar("b".to_string()),
+                        line,
+                    },
+                ],
+            },
+            line,
+        };
+        vec![Statement::new(StmtKind::Expression(body), line)]
+    }
+
     fn parse_block_or_bareword_cmp_block(&mut self) -> StrykeResult<Block> {
         if matches!(self.peek(), Token::LBrace) {
             return self.parse_block();
@@ -19373,23 +19449,7 @@ impl Parser {
             ) {
                 let name = name.clone();
                 self.advance();
-                let body = Expr {
-                    kind: ExprKind::FuncCall {
-                        name,
-                        args: vec![
-                            Expr {
-                                kind: ExprKind::ScalarVar("a".to_string()),
-                                line,
-                            },
-                            Expr {
-                                kind: ExprKind::ScalarVar("b".to_string()),
-                                line,
-                            },
-                        ],
-                    },
-                    line,
-                };
-                return Ok(vec![Statement::new(StmtKind::Expression(body), line)]);
+                return Ok(Self::bareword_cmp_call_block(name, line));
             }
         }
         // Blockless expression: `$a <=> $b`, `$b cmp $a`, etc.
