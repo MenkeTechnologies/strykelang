@@ -34,7 +34,7 @@
 #   --perl PATH      oracle perl (default: perl)
 #   --timeout SECS   per-run timeout (default: 10)
 #   --filter REGEX   only run probes whose id matches
-#   --contexts LIST  comma-separated subset of: top,sub,closure,loop,tail
+#   --contexts LIST  comma-separated subset of: top,sub,closure,loop,tail,hot
 #   --fail-log PATH  write divergence detail here (default: parity/probe_failures.log)
 #   --json PATH      write a JSON summary here
 #   --keep-dir DIR   keep generated probe scripts in DIR instead of a temp dir
@@ -55,7 +55,11 @@ my $ST       = 'target/debug/st';
 my $PERL     = 'perl';
 my $TIMEOUT  = 10;
 my $FILTER   = '';
-my $CONTEXTS = 'top,sub,closure,loop,tail';
+my $CONTEXTS = 'top,sub,closure,loop,tail,hot';
+
+# Invocations the `hot` context performs, chosen to clear stryke's subroutine
+# JIT threshold (`STRYKE_JIT_SUB_INVOKES`, default 50) with room to spare.
+my $HOT_ITERS = 400;
 my $FAIL_LOG = 'parity/probe_failures.log';
 my $JSON_OUT = '';
 my $KEEP_DIR = '';
@@ -120,6 +124,37 @@ my @PROBES = (
     [ 'cmp_spaceship',    's', 'my $V = (5 <=> 7) . (7 <=> 5) . (5 <=> 5);' ],
     [ 'cmp_strcmp',       's', 'my $V = ("aa" cmp "bb") . ("bb" cmp "aa");' ],
     [ 'cmp_chain_eq',     's', 'my $V = ("a" eq "b") . "|" . ("c" ne "d");' ],
+
+    # ── Perl's false is PL_sv_no ─────────────────────────────────────────────
+    # The empty string in string context, 0 in numeric context. Rendering the
+    # value alone would let `""` and `"0"` be told apart, but pinning length()
+    # as well states the difference numerically, so a value that merely prints
+    # blank (undef, say) cannot be mistaken for a correct false.
+    [ 'false_numeq',      's', 'my $V = (1 == 2) . ":" . length(1 == 2);' ],
+    [ 'false_numne',      's', 'my $V = (1 != 1) . ":" . length(1 != 1);' ],
+    [ 'false_numlt',      's', 'my $V = (2 < 1) . ":" . length(2 < 1);' ],
+    [ 'false_numgt',      's', 'my $V = (1 > 2) . ":" . length(1 > 2);' ],
+    [ 'false_numle',      's', 'my $V = (2 <= 1) . ":" . length(2 <= 1);' ],
+    [ 'false_numge',      's', 'my $V = (1 >= 2) . ":" . length(1 >= 2);' ],
+    [ 'false_streq',      's', 'my $V = ("a" eq "b") . ":" . length("a" eq "b");' ],
+    [ 'false_strne',      's', 'my $V = ("a" ne "a") . ":" . length("a" ne "a");' ],
+    [ 'false_strlt',      's', 'my $V = ("b" lt "a") . ":" . length("b" lt "a");' ],
+    [ 'false_strgt',      's', 'my $V = ("a" gt "b") . ":" . length("a" gt "b");' ],
+    [ 'false_strle',      's', 'my $V = ("b" le "a") . ":" . length("b" le "a");' ],
+    [ 'false_strge',      's', 'my $V = ("a" ge "b") . ":" . length("a" ge "b");' ],
+    [ 'false_lognot',     's', 'my $V = (!1) . ":" . length(!1);' ],
+    [ 'false_defined',    's', 'my $V = defined(undef) . ":" . length(defined undef);' ],
+    [ 'false_exists',     's', 'my $V = do { my %h = (a => 1); exists($h{b}) . ":" . length(exists $h{b}) };' ],
+    [ 'false_match',      's', 'my $V = do { my $m = ("abc" =~ /zzz/); $m . ":" . length($m) };' ],
+    [ 'false_notmatch',   's', 'my $V = do { my $m = ("abc" !~ /a/); $m . ":" . length($m) };' ],
+    [ 'false_isa',        's', 'my $V = do { my $o = bless {}, "P::C"; $o->isa("Nope") . ":" . length($o->isa("Nope")) };' ],
+    [ 'true_is_one',      's', 'my $V = (1 == 1) . ":" . length(1 == 1);' ],
+    [ 'false_numeric_use','s', 'my $V = (1 == 2) + 5;' ],
+    [ 'false_sum_preds',  's', 'my $V = (1 == 2) + (2 == 2) + (3 == 3);' ],
+    [ 'false_join',       's', 'my $V = join(",", (1 == 2), (2 == 2), (3 == 4));' ],
+    # `<=>` and `cmp` are not booleans — their 0 means "equal" and must stay 0.
+    [ 'eq_spaceship_zero','s', 'my $V = (3 <=> 3) . ":" . length(3 <=> 3);' ],
+    [ 'eq_strcmp_zero',   's', 'my $V = ("a" cmp "a") . ":" . length("a" cmp "a");' ],
     [ 'ternary',          's', 'my $V = (3 > 2 ? "yes" : "no");' ],
     [ 'defined_or',       's', 'my $V = (undef // "fallback");' ],
     [ 'defined_or_zero',  's', 'my $V = (0 // "fallback");' ],
@@ -405,6 +440,22 @@ my %CONTEXT = (
     'closure' => sub { my ($s, $r) = @_; "my \$probe_ctx = sub { $s\n    return ($r); };\nprint(\$probe_ctx->(), \"\\n\");\n" },
     'loop'    => sub { my ($s, $r) = @_; "for my \$probe_iter (1 .. 2) { $s\n    print(($r), \"\\n\"); }\n" },
     'tail'    => sub { my ($s, $r) = @_; "sub probe_tail { $s\n    ($r); }\nprint(probe_tail(), \"\\n\");\n" },
+
+    # `hot` exists because every context above executes its subroutine a
+    # handful of times, and stryke only promotes a sub to its native tiers
+    # after ~50 invocations (`STRYKE_JIT_SUB_INVOKES`, default 50). So the
+    # whole compiled-tier answer — Cranelift and the fusevm segment bridge —
+    # was unreachable from this probe: a construct could be right in the
+    # interpreter and wrong once jitted and still score clean everywhere.
+    # $HOT_ITERS calls clear the threshold with margin, and only the final
+    # value is printed so the output stays one line like every other context.
+    'hot'     => sub {
+        my ($s, $r) = @_;
+        "sub probe_hot { $s\n    return ($r); }\n"
+          . "my \$probe_out;\n"
+          . "for my \$probe_iter (1 .. $HOT_ITERS) { \$probe_out = probe_hot(); }\n"
+          . "print(\$probe_out, \"\\n\");\n";
+    },
 );
 
 my @ctx_order = grep { exists $CONTEXT{$_} } split(/,/, $CONTEXTS);
