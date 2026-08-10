@@ -7564,6 +7564,54 @@ impl<'a> VM<'a> {
                         self.push(v);
                         Ok(())
                     }
+                    // ── Autovivifying base reads (lvalue subscript chains) ──
+                    // Each is the vivifying twin of the plain read above it; the
+                    // `u8` is the container kind the next subscript needs.
+                    Op::GetScalarAutoviv(idx, want) => {
+                        let n = names[*idx as usize].clone();
+                        let line = self.line();
+                        let v = self.interp.autoviv_scalar(&n, *want, line)?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::GetScalarSlotAutoviv(slot, want) => {
+                        let line = self.line();
+                        let v = self.interp.autoviv_scalar_slot(*slot, *want, line)?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::GetHashElemAutoviv(idx, want) => {
+                        let key = self.pop().to_string();
+                        let n = names[*idx as usize].clone();
+                        let line = self.line();
+                        let v = self.interp.autoviv_hash_elem(&n, &key, *want, line)?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::GetArrayElemAutoviv(idx, want) => {
+                        let i = self.pop().to_int();
+                        let n = names[*idx as usize].clone();
+                        let line = self.line();
+                        let v = self.interp.autoviv_array_elem(&n, i, *want, line)?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::ArrowHashAutoviv(want) => {
+                        let key = self.pop().to_string();
+                        let r = self.pop();
+                        let line = self.line();
+                        let v = vm_interp_result(self.interp.autoviv_arrow_hash(r, &key, *want, line), line)?;
+                        self.push(v);
+                        Ok(())
+                    }
+                    Op::ArrowArrayAutoviv(want) => {
+                        let i = self.pop().to_int();
+                        let r = self.pop();
+                        let line = self.line();
+                        let v = vm_interp_result(self.interp.autoviv_arrow_array(r, i, *want, line), line)?;
+                        self.push(v);
+                        Ok(())
+                    }
                     Op::SetArrowHash => {
                         let key = self.pop().to_string();
                         let r = self.pop();

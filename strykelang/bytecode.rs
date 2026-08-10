@@ -853,6 +853,32 @@ pub enum Op {
     ArrowArray,
     /// Dereference arrow: ->{} — stack: \[ref, key\] → value
     ArrowHash,
+    // ── Autovivifying base reads (lvalue subscript chains) ───────────────────
+    // Perl creates every intermediate level of a subscript chain the moment it
+    // is used as a container: `$h{a}{b} = 1` turns `$h{a}` into a hashref, then
+    // sets `{b}`. Each op below is the autovivifying twin of the plain read of
+    // the same name and is emitted *only* for the base links of an lvalue
+    // chain, never for an rvalue read — that split is what keeps
+    // `my $x = $h{a}{b}` from creating `$h{a}{b}` while still creating `$h{a}`.
+    //
+    // The `u8` operand is the container kind the *next* subscript needs, so an
+    // undefined slot vivifies as the right shape:
+    // `0` = hashref (next link is `->{k}`), `1` = arrayref (next link is `->[i]`).
+    // A slot that already holds a value is returned untouched, so an existing
+    // reference is never clobbered and a defined non-ref still reaches the
+    // normal type error.
+    /// Autovivifying [`Op::GetScalar`] — `$r` in `$r->{k} = …`.
+    GetScalarAutoviv(u16, u8),
+    /// Autovivifying [`Op::GetScalarSlot`] — slot-resolved `my $r`.
+    GetScalarSlotAutoviv(u8, u8),
+    /// Autovivifying [`Op::GetHashElem`] — `$h{a}` in `$h{a}{b} = …`.
+    GetHashElemAutoviv(u16, u8),
+    /// Autovivifying [`Op::GetArrayElem`] — `$A[0]` in `$A[0][1] = …`.
+    GetArrayElemAutoviv(u16, u8),
+    /// Autovivifying [`Op::ArrowHash`] — an intermediate `->{k}` link.
+    ArrowHashAutoviv(u8),
+    /// Autovivifying [`Op::ArrowArray`] — an intermediate `->[i]` link.
+    ArrowArrayAutoviv(u8),
     /// Assign to `->{}`: stack: \[value, ref, key\] (key on top) — consumes three values.
     SetArrowHash,
     /// Assign to `->[]`: stack: \[value, ref, index\] (index on top) — consumes three values.

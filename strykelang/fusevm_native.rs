@@ -237,6 +237,25 @@ mod nops {
     /// list separator). Backs `#{ EXPR }` / `@array` interpolation, which
     /// interpolate in list context and join with `$"`.
     pub const ARRAY_STRINGIFY_LIST_SEP: u16 = BASE + 86;
+
+    // ── Autovivifying base reads ─────────────────────────────────────────────
+    // Native twins of the plain reads above, backing the autovivifying ops in
+    // [`crate::bytecode::Op`]. Each pops its operands plus the "next subscript
+    // kind" byte and delegates to the same interpreter helper the VM uses, so
+    // the native path builds intermediate levels identically rather than
+    // dropping coverage for every chain that could need one.
+    /// Autovivifying [`SCALAR_GET_PLAIN`]-style named read.
+    pub const SCALAR_GET_AUTOVIV: u16 = BASE + 87;
+    /// Autovivifying [`SLOT_GET`].
+    pub const SLOT_GET_AUTOVIV: u16 = BASE + 88;
+    /// Autovivifying named-hash element read.
+    pub const HASH_ELEM_GET_AUTOVIV: u16 = BASE + 89;
+    /// Autovivifying named-array element read.
+    pub const ARRAY_ELEM_GET_AUTOVIV: u16 = BASE + 90;
+    /// Autovivifying [`ARROW_HASH`].
+    pub const ARROW_HASH_AUTOVIV: u16 = BASE + 91;
+    /// Autovivifying [`ARROW_ARRAY`].
+    pub const ARROW_ARRAY_AUTOVIV: u16 = BASE + 92;
 }
 
 /// `print`/`say` to the default handle, delegated to the interp so output goes
@@ -1548,6 +1567,96 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             });
             vm.push(stryke_to_fusevm(&old));
         }
+        // ── Autovivifying base reads ──
+        // Same interpreter helpers the VM arms use, so a chain builds its
+        // intermediate levels identically on the native path.
+        nops::SCALAR_GET_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let name_idx = vm.pop().to_int();
+            let name = host_name(name_idx as i64);
+            match with_interp(|i| i.autoviv_scalar(&name, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::SLOT_GET_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let slot = vm.pop().to_int() as u8;
+            match with_interp(|i| i.autoviv_scalar_slot(slot, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::HASH_ELEM_GET_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let name_idx = vm.pop().to_int();
+            let key = pop_stryke(vm).to_string();
+            let name = host_name(name_idx);
+            match with_interp(|i| i.autoviv_hash_elem(&name, &key, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARRAY_ELEM_GET_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let name_idx = vm.pop().to_int();
+            let idx = pop_stryke(vm).to_int();
+            let name = host_name(name_idx);
+            match with_interp(|i| i.autoviv_array_elem(&name, idx, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(e) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARROW_HASH_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let key = pop_stryke(vm).to_string();
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.autoviv_arrow_hash(r, &key, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime(
+                        "arrow hash autoviv: unexpected control flow",
+                        0,
+                    ));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
+        nops::ARROW_ARRAY_AUTOVIV => {
+            let want = vm.pop().to_int() as u8;
+            let idx = pop_stryke(vm).to_int();
+            let r = pop_stryke(vm);
+            match with_interp(|i| i.autoviv_arrow_array(r, idx, want, 0)) {
+                Ok(v) => vm.push(stryke_to_fusevm(&v)),
+                Err(crate::vm_helper::FlowOrError::Error(e)) => {
+                    set_native_err(e);
+                    vm.push(fusevm::Value::Undef);
+                }
+                Err(_) => {
+                    set_native_err(StrykeError::runtime(
+                        "arrow array autoviv: unexpected control flow",
+                        0,
+                    ));
+                    vm.push(fusevm::Value::Undef);
+                }
+            }
+        }
         // Scalar slots in interp.scope (so closures can capture `my` locals).
         nops::SLOT_GET => {
             let slot = vm.pop().to_int() as u8;
@@ -2014,6 +2123,36 @@ pub(crate) fn lower_to_fusevm(chunk: &Chunk) -> Option<fusevm::Chunk> {
             Op::GetScalarSlot(slot) => {
                 b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
                 b.emit(fusevm::Op::Extended(nops::SLOT_GET, 0), 0);
+            }
+            // Autovivifying base reads — operands then the "next subscript
+            // kind" byte, matching the pop order in the nop handlers.
+            Op::GetScalarAutoviv(idx, want) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SCALAR_GET_AUTOVIV, 0), 0);
+            }
+            Op::GetScalarSlotAutoviv(slot, want) => {
+                b.emit(fusevm::Op::LoadInt(*slot as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::SLOT_GET_AUTOVIV, 0), 0);
+            }
+            Op::GetHashElemAutoviv(idx, want) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::HASH_ELEM_GET_AUTOVIV, 0), 0);
+            }
+            Op::GetArrayElemAutoviv(idx, want) => {
+                b.emit(fusevm::Op::LoadInt(*idx as i64), 0);
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::ARRAY_ELEM_GET_AUTOVIV, 0), 0);
+            }
+            Op::ArrowHashAutoviv(want) => {
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::ARROW_HASH_AUTOVIV, 0), 0);
+            }
+            Op::ArrowArrayAutoviv(want) => {
+                b.emit(fusevm::Op::LoadInt(*want as i64), 0);
+                b.emit(fusevm::Op::Extended(nops::ARROW_ARRAY_AUTOVIV, 0), 0);
             }
             Op::SetScalarSlot(slot) => {
                 b.emit(fusevm::Op::LoadInt(*slot as i64), 0);

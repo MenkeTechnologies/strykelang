@@ -15162,6 +15162,261 @@ impl VMHelper {
         Err(StrykeError::runtime("Can't assign to non-hash reference", line).into())
     }
 
+    /// A fresh empty container of the kind the next subscript in a chain needs.
+    ///
+    /// `DerefKind::Call` has no container form; an autovivified slot that is
+    /// about to be called is left undefined so the caller reports the real
+    /// "not a CODE reference" error rather than a bogus empty hash.
+    fn fresh_autoviv_container(want: DerefKind) -> Option<StrykeValue> {
+        match want {
+            DerefKind::Hash => Some(StrykeValue::hash_ref(Arc::new(RwLock::new(IndexMap::new())))),
+            DerefKind::Array => Some(StrykeValue::array_ref(Arc::new(RwLock::new(Vec::new())))),
+            DerefKind::Call => None,
+        }
+    }
+
+    /// Decode the `u8` "next subscript kind" operand carried by the
+    /// autovivifying base-read ops: `1` = arrayref, anything else = hashref.
+    pub(crate) fn autoviv_want(code: u8) -> DerefKind {
+        if code == 1 {
+            DerefKind::Array
+        } else {
+            DerefKind::Hash
+        }
+    }
+
+    /// Autovivify a named scalar (`$r` in `$r->{k} = …`).
+    pub(crate) fn autoviv_scalar(
+        &mut self,
+        name: &str,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, StrykeError> {
+        let cur = self.scope.get_scalar(name);
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return Ok(cur);
+        };
+        if !cur.is_undef() {
+            return Ok(cur);
+        }
+        self.scope
+            .set_scalar(name, fresh.clone())
+            .map_err(|e| e.at_line(line))?;
+        Ok(fresh)
+    }
+
+    /// Autovivify a frame-local scalar slot (`my $r` in `$r->{k} = …`).
+    pub(crate) fn autoviv_scalar_slot(
+        &mut self,
+        slot: u8,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, StrykeError> {
+        let cur = self.scope.get_scalar_slot(slot);
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return Ok(cur);
+        };
+        if !cur.is_undef() {
+            return Ok(cur);
+        }
+        self.scope
+            .set_scalar_slot_checked(slot, fresh.clone(), None)
+            .map_err(|e| e.at_line(line))?;
+        Ok(fresh)
+    }
+
+    /// Autovivify `$h{key}` in a named hash (`$h{a}` in `$h{a}{b} = …`).
+    pub(crate) fn autoviv_hash_elem(
+        &mut self,
+        name: &str,
+        key: &str,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, StrykeError> {
+        self.touch_env_hash(name);
+        let cur = self.scope.get_hash_element(name, key);
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return Ok(cur);
+        };
+        if !cur.is_undef() {
+            return Ok(cur);
+        }
+        self.scope
+            .set_hash_element(name, key, fresh.clone())
+            .map_err(|e| e.at_line(line))?;
+        Ok(fresh)
+    }
+
+    /// Autovivify `$A[idx]` in a named array (`$A[0]` in `$A[0][1] = …`).
+    pub(crate) fn autoviv_array_elem(
+        &mut self,
+        name: &str,
+        idx: i64,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, StrykeError> {
+        let cur = self.scope.get_array_element(name, idx);
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return Ok(cur);
+        };
+        if !cur.is_undef() {
+            return Ok(cur);
+        }
+        self.scope
+            .set_array_element(name, idx, fresh.clone())
+            .map_err(|e| e.at_line(line))?;
+        Ok(fresh)
+    }
+
+    /// Autovivify an intermediate `->{key}` link. `container` is the parent
+    /// reference, so the write is visible through the shared handle.
+    ///
+    /// A container that is not a hash(-ref) is returned to the caller's plain
+    /// read path, which reports the same type error it always did.
+    pub(crate) fn autoviv_arrow_hash(
+        &mut self,
+        container: StrykeValue,
+        key: &str,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return self.read_arrow_hash_element(container, key, line);
+        };
+        if let Some(r) = container.as_hash_ref() {
+            if let Some(v) = r.read().get(key) {
+                if !v.is_undef() {
+                    return Ok(v.clone());
+                }
+            }
+            r.write().insert(key.to_string(), fresh.clone());
+            return Ok(fresh);
+        }
+        if let Some(name) = container.as_hash_binding_name() {
+            return self.autoviv_hash_elem(&name, key, want, line).map_err(Into::into);
+        }
+        self.read_arrow_hash_element(container, key, line)
+    }
+
+    /// Autovivify an intermediate `->[idx]` link, extending the array with
+    /// undef gaps exactly as an ordinary out-of-range element write does.
+    pub(crate) fn autoviv_arrow_array(
+        &mut self,
+        container: StrykeValue,
+        idx: i64,
+        want: u8,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
+        let Some(fresh) = Self::fresh_autoviv_container(Self::autoviv_want(want)) else {
+            return self.read_arrow_array_element(container, idx, line);
+        };
+        if let Some(r) = container.as_array_ref() {
+            {
+                let cur = r.read();
+                let ix = if idx < 0 { cur.len() as i64 + idx } else { idx };
+                if ix >= 0 {
+                    if let Some(v) = cur.get(ix as usize) {
+                        if !v.is_undef() {
+                            return Ok(v.clone());
+                        }
+                    }
+                }
+            }
+            let mut w = r.write();
+            let ix = if idx < 0 { w.len() as i64 + idx } else { idx };
+            // A negative index still below the front has no slot to create;
+            // fall through to the plain read's out-of-range behaviour.
+            if ix < 0 {
+                drop(w);
+                return self.read_arrow_array_element(container, idx, line);
+            }
+            if ix as usize >= w.len() {
+                w.resize(ix as usize + 1, StrykeValue::UNDEF);
+            }
+            w[ix as usize] = fresh.clone();
+            return Ok(fresh);
+        }
+        if let Some(name) = container.as_array_binding_name() {
+            return self.autoviv_array_elem(&name, idx, want, line).map_err(Into::into);
+        }
+        self.read_arrow_array_element(container, idx, line)
+    }
+
+    /// Evaluate `expr` as the **base of a subscript chain**, autovivifying it.
+    ///
+    /// Perl creates every intermediate level of a subscript chain the moment it
+    /// is used as a container, storing the fresh reference back into its parent
+    /// slot: `$h{a}{b} = 1` turns `$h{a}` into a hashref and then sets `{b}`.
+    /// Only the *intermediate* levels are created — the final slot is written by
+    /// the caller (lvalue) or left absent (rvalue), which is why
+    /// `my $x = $h{a}{b}` leaves `$h{a}` a hashref but `$h{a}{b}` non-existent.
+    ///
+    /// `want` is the container kind the *next* subscript requires, so the slot
+    /// this call vivifies is created as a hashref for `->{k}` and an arrayref
+    /// for `->[i]`. Recursion carries each level's own kind down the chain,
+    /// which is what makes mixed chains such as `$m{a}[0]{c}` build an arrayref
+    /// at `$m{a}` and a hashref at `$m{a}[0]`.
+    ///
+    /// A slot that already holds a value is returned untouched, so this never
+    /// clobbers an existing reference and never converts a defined non-ref into
+    /// a container — that case still reaches the caller's normal type error.
+    pub(crate) fn eval_base_autoviv(
+        &mut self,
+        expr: &Expr,
+        want: DerefKind,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
+        // Nothing to vivify into: evaluate normally and let the caller diagnose.
+        if Self::fresh_autoviv_container(want).is_none() {
+            return self.eval_expr(expr);
+        }
+        let code = match want {
+            DerefKind::Array => 1u8,
+            _ => 0u8,
+        };
+        match &expr.kind {
+            ExprKind::ScalarVar(name) => {
+                let name = name.clone();
+                self.autoviv_scalar(&name, code, line).map_err(Into::into)
+            }
+            ExprKind::HashElement { hash, key } => {
+                let hash = hash.clone();
+                let k = self.eval_expr(key)?.to_string();
+                self.autoviv_hash_elem(&hash, &k, code, line)
+                    .map_err(Into::into)
+            }
+            ExprKind::ArrayElement { array, index } => {
+                let array = array.clone();
+                let i = self.eval_expr(index)?.to_int();
+                self.autoviv_array_elem(&array, i, code, line)
+                    .map_err(Into::into)
+            }
+            // A deeper link in the same chain: vivify our own base as the kind
+            // *this* link subscripts, then vivify our slot inside it.
+            ExprKind::ArrowDeref {
+                expr: base,
+                index,
+                kind,
+            } => {
+                let container = self.eval_base_autoviv(base, *kind, line)?;
+                match kind {
+                    DerefKind::Hash => {
+                        let k = self.eval_expr(index)?.to_string();
+                        self.autoviv_arrow_hash(container, &k, code, line)
+                            .map_err(Into::into)
+                    }
+                    DerefKind::Array => {
+                        let i = self.eval_expr(index)?.to_int();
+                        self.autoviv_arrow_array(container, i, code, line)
+                            .map_err(Into::into)
+                    }
+                    DerefKind::Call => self.eval_expr(expr),
+                }
+            }
+            _ => self.eval_expr(expr),
+        }
+    }
+
     /// `$href->{key} = $val` and blessed hash slots — shared by [`Self::assign_value`] and the VM.
     pub(crate) fn assign_arrow_hash_deref(
         &mut self,
@@ -15212,6 +15467,23 @@ impl VMHelper {
                 kind: Sigil::Array | Sigil::Scalar,
             } => self.eval_expr(inner),
             _ => self.eval_expr(expr),
+        }
+    }
+
+    /// Lvalue form of [`Self::eval_arrow_array_base`]: same base selection, but
+    /// an undefined base slot is autovivified into an arrayref so that
+    /// `$h{a}[0] = 5` and `$A[0][1] = 3` build their intermediate level.
+    pub(crate) fn eval_arrow_array_base_autoviv(
+        &mut self,
+        expr: &Expr,
+        line: usize,
+    ) -> Result<StrykeValue, FlowOrError> {
+        match &expr.kind {
+            ExprKind::Deref {
+                expr: inner,
+                kind: Sigil::Array | Sigil::Scalar,
+            } => self.eval_base_autoviv(inner, DerefKind::Array, line),
+            _ => self.eval_base_autoviv(expr, DerefKind::Array, line),
         }
     }
 
@@ -15959,7 +16231,7 @@ impl VMHelper {
                 kind: DerefKind::Hash,
             } => {
                 let key = self.eval_expr(index)?.to_string();
-                let container = self.eval_expr(expr)?;
+                let container = self.eval_base_autoviv(expr, DerefKind::Hash, target.line)?;
                 self.assign_arrow_hash_deref(container, key, val, target.line)
             }
             ExprKind::ArrowDeref {
@@ -15967,7 +16239,7 @@ impl VMHelper {
                 index,
                 kind: DerefKind::Array,
             } => {
-                let container = self.eval_arrow_array_base(expr, target.line)?;
+                let container = self.eval_arrow_array_base_autoviv(expr, target.line)?;
                 if let ExprKind::List(indices) = &index.kind {
                     let vals = val.to_list();
                     let n = indices.len().min(vals.len());
@@ -21287,77 +21559,6 @@ impl VMHelper {
         }
     }
 
-    /// Evaluate a deref-chain in "exists mode" — like [`Self::eval_expr`] but
-    /// recursively walks `ArrowDeref` chains and turns undef-intermediate
-    /// derefs into undef (instead of erroring). Used by
-    /// [`Self::eval_exists_operand`] so `exists $h{x}{y}{z}` returns 0 for
-    /// any missing level. (BUG-009)
-    fn eval_expr_exists_mode(&mut self, expr: &Expr) -> Result<StrykeValue, FlowOrError> {
-        match &expr.kind {
-            ExprKind::ArrowDeref {
-                expr: inner,
-                index,
-                kind: DerefKind::Hash,
-            } => {
-                let inner_val = self.eval_expr_exists_mode(inner)?;
-                if inner_val.is_undef() {
-                    return Ok(StrykeValue::UNDEF);
-                }
-                if let Some(r) = inner_val.as_hash_ref() {
-                    let k = self.eval_expr(index)?.to_string();
-                    return Ok(r.read().get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
-                }
-                if let Some(b) = inner_val.as_blessed_ref() {
-                    let data = b.data.read();
-                    if let Some(r) = data.as_hash_ref() {
-                        let k = self.eval_expr(index)?.to_string();
-                        return Ok(r.read().get(&k).cloned().unwrap_or(StrykeValue::UNDEF));
-                    }
-                }
-                // Struct / class instance — look up the field by name and
-                // return its value. Without this, `exists $struct->{f}->{k}`
-                // soft-fails to false even when the field is a real hashref.
-                if let Some(s) = inner_val.as_struct_inst() {
-                    let k = self.eval_expr(index)?.to_string();
-                    if let Some(idx) = s.def.field_index(&k) {
-                        return Ok(s.get_field(idx).unwrap_or(StrykeValue::UNDEF));
-                    }
-                    return Ok(StrykeValue::UNDEF);
-                }
-                if let Some(c) = inner_val.as_class_inst() {
-                    let k = self.eval_expr(index)?.to_string();
-                    if let Some(idx) = c.def.field_index(&k) {
-                        return Ok(c.get_field(idx).unwrap_or(StrykeValue::UNDEF));
-                    }
-                    return Ok(StrykeValue::UNDEF);
-                }
-                Ok(StrykeValue::UNDEF)
-            }
-            ExprKind::ArrowDeref {
-                expr: inner,
-                index,
-                kind: DerefKind::Array,
-            } => {
-                let inner_val = self.eval_expr_exists_mode(inner)?;
-                if inner_val.is_undef() {
-                    return Ok(StrykeValue::UNDEF);
-                }
-                if let Some(r) = inner_val.as_array_ref() {
-                    let idx = self.eval_expr(index)?.to_int();
-                    let arr = r.read();
-                    let i = if idx < 0 {
-                        (arr.len() as i64 + idx).max(0) as usize
-                    } else {
-                        idx as usize
-                    };
-                    return Ok(arr.get(i).cloned().unwrap_or(StrykeValue::UNDEF));
-                }
-                Ok(StrykeValue::UNDEF)
-            }
-            _ => self.eval_expr(expr),
-        }
-    }
-
     pub(crate) fn eval_exists_operand(
         &mut self,
         expr: &Expr,
@@ -21400,11 +21601,13 @@ impl VMHelper {
                 kind: DerefKind::Hash,
             } => {
                 let k = self.eval_expr(index)?.to_string();
-                // Evaluate the chain in "exists mode" — undef intermediates
-                // propagate as undef instead of erroring on missing-key
-                // deref, matching Perl's `exists $h{x}{y}{z}` returning 0
-                // for any missing level. (BUG-009)
-                let container = match self.eval_expr_exists_mode(inner) {
+                // `exists` is not exempt from autovivification: the chain left
+                // of the final key is a container, so `exists $h{x}{y}{z}`
+                // creates `$h{x}` and `$h{x}{y}` and only then reports the
+                // final key absent. Vivifying also supplies the undef-tolerance
+                // the old "exists mode" walk provided, since every intermediate
+                // now exists by construction. (BUG-009)
+                let container = match self.eval_base_autoviv(inner, DerefKind::Hash, line) {
                     Ok(v) => v,
                     Err(_) => return Ok(StrykeValue::perl_bool(false)),
                 };
@@ -21426,7 +21629,9 @@ impl VMHelper {
                     )
                     .into());
                 }
-                let container = match self.eval_expr_exists_mode(inner) {
+                // Same rule as the hash arm above: the chain left of the final
+                // index is a container and is vivified.
+                let container = match self.eval_base_autoviv(inner, DerefKind::Array, line) {
                     Ok(v) => v,
                     Err(_) => return Ok(StrykeValue::perl_bool(false)),
                 };
