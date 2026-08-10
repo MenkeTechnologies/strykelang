@@ -51,7 +51,13 @@ use crate::value::StrykeValue;
 /// Magic header bytes — fail-fast if a wrong-format file is mmap'd.
 pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 /// Bumped on incompatible rkyv schema changes.
-pub const SHARD_FORMAT_VERSION: u32 = 4;
+///
+/// 5: the autovivifying base-read ops were inserted into [`crate::bytecode::Op`]
+/// ahead of `SetArrowHash`, which shifts the discriminant of every later
+/// variant. A shard written by an earlier build decodes those variants as the
+/// wrong op rather than failing, so the format version — not just the package
+/// version — has to reject it.
+pub const SHARD_FORMAT_VERSION: u32 = 5;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.

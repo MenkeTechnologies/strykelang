@@ -837,6 +837,120 @@ impl Compiler {
         }
     }
 
+    /// Emit the **base** of an lvalue subscript chain with autovivification.
+    ///
+    /// Perl creates every intermediate level of a subscript chain the moment it
+    /// is used as a container, so `$h{a}{b} = 1` must turn `$h{a}` into a
+    /// hashref before storing `{b}`. Each link is emitted as the autovivifying
+    /// twin of its plain read, carrying the kind the *next* subscript needs
+    /// (`want`: 0 = hashref, 1 = arrayref) so mixed chains such as
+    /// `$m{a}[0]{c}` build an arrayref at `$m{a}` and a hashref at `$m{a}[0]`.
+    ///
+    /// Only the base links go through here — the final subscript is still
+    /// emitted by the caller as a plain `Set…` op, which is what keeps
+    /// `$h{a}{b} = 1` from also creating a stray `{b}` on the read side.
+    /// Shapes that are not part of a subscript chain (calls, literals, `@{…}`
+    /// expansions) fall back to the ordinary rvalue emission unchanged.
+    fn compile_autoviv_base(&mut self, expr: &Expr, want: u8) -> Result<(), CompileError> {
+        let line = expr.line;
+        match &expr.kind {
+            ExprKind::ScalarVar(name) => {
+                self.check_strict_scalar_access(name, line)?;
+                let idx = self.intern_scalar_var_for_ops(name);
+                let name_s = self.chunk.names[idx as usize].clone();
+                if let Some(slot) = self.scalar_slot(&name_s) {
+                    self.emit_op(Op::GetScalarSlotAutoviv(slot, want), line, Some(expr));
+                } else if VMHelper::is_special_scalar_name_for_get(&name_s) {
+                    // Special scalars (`$@`, `$_`, `$!`, …) read through
+                    // `get_special_var`, not plain scope storage — an
+                    // autovivifying read would miss the special value, see
+                    // undef, and then overwrite the variable with a fresh empty
+                    // container. `$@->{code}` after `die {…}` is the case that
+                    // catches it. They are never the thing a chain needs to
+                    // create, so they keep the plain read.
+                    self.emit_op(Op::GetScalar(idx), line, Some(expr));
+                } else {
+                    self.emit_op(Op::GetScalarAutoviv(idx, want), line, Some(expr));
+                }
+                Ok(())
+            }
+            ExprKind::HashElement { hash, key } => {
+                self.check_strict_hash_access(hash, line)?;
+                let stash = self.hash_storage_name_for_ops(hash);
+                let idx = self.chunk.intern_name(&stash);
+                self.compile_expr(key)?;
+                self.emit_op(Op::GetHashElemAutoviv(idx, want), line, Some(expr));
+                Ok(())
+            }
+            ExprKind::ArrayElement { array, index } => {
+                self.check_strict_array_access(array, line)?;
+                let stash = self.array_storage_name_for_ops(array);
+                let idx = self
+                    .chunk
+                    .intern_name(&self.qualify_stash_array_name(&stash));
+                self.compile_expr(index)?;
+                self.emit_op(Op::GetArrayElemAutoviv(idx, want), line, Some(expr));
+                Ok(())
+            }
+            // A deeper link in the same chain: our own base must be vivified as
+            // the kind *this* link subscripts, then our slot as `want`.
+            ExprKind::ArrowDeref {
+                expr: base,
+                index,
+                kind,
+            } => match kind {
+                DerefKind::Hash => {
+                    self.compile_autoviv_base(base, 0)?;
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::ArrowHashAutoviv(want), line, Some(expr));
+                    Ok(())
+                }
+                DerefKind::Array
+                    if arrow_deref_arrow_subscript_is_plain_scalar_index(index) =>
+                {
+                    self.compile_autoviv_base(base, 1)?;
+                    self.compile_expr(index)?;
+                    self.emit_op(Op::ArrowArrayAutoviv(want), line, Some(expr));
+                    Ok(())
+                }
+                // Slice / list subscripts and `->(…)` calls are not chain links.
+                _ => self.compile_expr(expr),
+            },
+            // `$$r{k}` / `$$r[i]` — the sigil deref selects the same scalar base.
+            ExprKind::Deref {
+                expr: inner,
+                kind: Sigil::Scalar,
+            } => self.compile_autoviv_base(inner, want),
+            _ => self.compile_expr(expr),
+        }
+    }
+
+    /// Autovivifying form of [`Self::compile_arrow_array_base_expr`].
+    fn compile_arrow_array_base_expr_autoviv(&mut self, expr: &Expr) -> Result<(), CompileError> {
+        if let ExprKind::Deref {
+            expr: inner,
+            kind: Sigil::Array | Sigil::Scalar,
+        } = &expr.kind
+        {
+            self.compile_autoviv_base(inner, 1)
+        } else {
+            self.compile_autoviv_base(expr, 1)
+        }
+    }
+
+    /// Autovivifying form of [`Self::compile_arrow_hash_base_expr`].
+    fn compile_arrow_hash_base_expr_autoviv(&mut self, expr: &Expr) -> Result<(), CompileError> {
+        if let ExprKind::Deref {
+            expr: inner,
+            kind: Sigil::Scalar,
+        } = &expr.kind
+        {
+            self.compile_autoviv_base(inner, 0)
+        } else {
+            self.compile_autoviv_base(expr, 0)
+        }
+    }
+
     fn push_scope_layer(&mut self) {
         self.scope_stack.push(ScopeLayer::default());
     }
@@ -7028,7 +7142,7 @@ impl Compiler {
                         let pool = self.chunk.add_exists_expr_entry(inner.as_ref().clone());
                         self.emit_op(Op::ExistsExpr(pool), line, Some(root));
                     } else {
-                        self.compile_arrow_hash_base_expr(container)?;
+                        self.compile_arrow_hash_base_expr_autoviv(container)?;
                         self.compile_expr(index)?;
                         self.emit_op(Op::ExistsArrowHashElem, line, Some(root));
                     }
@@ -8046,7 +8160,7 @@ impl Compiler {
             // ── Derefs ──
             ExprKind::ArrowDeref { expr, index, kind } => match kind {
                 DerefKind::Array => {
-                    self.compile_arrow_array_base_expr(expr)?;
+                    self.compile_arrow_array_base_expr_autoviv(expr)?;
                     let mut used_arrow_slice = false;
                     // `$r->[$i]` with a single plain-scalar subscript is element
                     // access, not a slice — even when the parser wraps it in a
@@ -8076,7 +8190,7 @@ impl Compiler {
                     }
                 }
                 DerefKind::Hash => {
-                    self.compile_arrow_hash_base_expr(expr)?;
+                    self.compile_arrow_hash_base_expr_autoviv(expr)?;
                     self.compile_expr(index)?;
                     self.emit_op(Op::ArrowHash, line, Some(root));
                 }
@@ -9186,7 +9300,7 @@ impl Compiler {
                 index,
                 kind: DerefKind::Hash,
             } => {
-                self.compile_arrow_hash_base_expr(expr)?;
+                self.compile_arrow_hash_base_expr_autoviv(expr)?;
                 self.compile_expr(index)?;
                 if keep {
                     self.emit_op(Op::SetArrowHashKeep, line, ast);
@@ -9204,7 +9318,7 @@ impl Compiler {
                     // by the enclosing `compile_expr(value)` before `compile_assign` was called
                     // with keep = true). `SetArrowArraySlice` delegates to
                     // `Interpreter::assign_arrow_array_slice` for element-wise write.
-                    self.compile_arrow_array_base_expr(expr)?;
+                    self.compile_arrow_array_base_expr_autoviv(expr)?;
                     for ix in indices {
                         self.compile_array_slice_index_expr(ix)?;
                     }
@@ -9220,7 +9334,7 @@ impl Compiler {
                     return Ok(());
                 }
                 if arrow_deref_arrow_subscript_is_plain_scalar_index(index) {
-                    self.compile_arrow_array_base_expr(expr)?;
+                    self.compile_arrow_array_base_expr_autoviv(expr)?;
                     self.compile_expr(index)?;
                     if keep {
                         self.emit_op(Op::SetArrowArrayKeep, line, ast);
@@ -9228,7 +9342,7 @@ impl Compiler {
                         self.emit_op(Op::SetArrowArray, line, ast);
                     }
                 } else {
-                    self.compile_arrow_array_base_expr(expr)?;
+                    self.compile_arrow_array_base_expr_autoviv(expr)?;
                     self.compile_array_slice_index_expr(index)?;
                     self.emit_op(Op::SetArrowArraySlice(1), line, ast);
                     if keep {
