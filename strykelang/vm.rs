@@ -4710,6 +4710,8 @@ impl<'a> VM<'a> {
                     Op::HashKeys(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.interp.touch_env_hash(n);
+                        // Perl: `keys` resets the hash's `each` iterator.
+                        self.interp.reset_each_cursor(n);
                         let h = self.interp.scope.get_hash(n);
                         let keys: Vec<StrykeValue> =
                             h.keys().map(|k| StrykeValue::string(k.clone())).collect();
@@ -4719,6 +4721,7 @@ impl<'a> VM<'a> {
                     Op::HashKeysScalar(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.interp.touch_env_hash(n);
+                        self.interp.reset_each_cursor(n);
                         let h = self.interp.scope.get_hash(n);
                         self.push(StrykeValue::integer(h.len() as i64));
                         Ok(())
@@ -4726,6 +4729,8 @@ impl<'a> VM<'a> {
                     Op::HashValues(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.interp.touch_env_hash(n);
+                        // Perl: `values` resets the hash's `each` iterator too.
+                        self.interp.reset_each_cursor(n);
                         let h = self.interp.scope.get_hash(n);
                         let vals: Vec<StrykeValue> = h.values().cloned().collect();
                         self.push(StrykeValue::array(vals));
@@ -4734,8 +4739,27 @@ impl<'a> VM<'a> {
                     Op::HashValuesScalar(idx) => {
                         let n = names[*idx as usize].as_str();
                         self.interp.touch_env_hash(n);
+                        self.interp.reset_each_cursor(n);
                         let h = self.interp.scope.get_hash(n);
                         self.push(StrykeValue::integer(h.len() as i64));
+                        Ok(())
+                    }
+                    Op::HashEach(idx) => {
+                        let n = names[*idx as usize].as_str().to_string();
+                        let pair = match self.interp.hash_each_step(&n) {
+                            Some((k, v)) => vec![StrykeValue::string(k), v],
+                            None => Vec::new(),
+                        };
+                        self.push(StrykeValue::array(pair));
+                        Ok(())
+                    }
+                    Op::HashEachScalar(idx) => {
+                        let n = names[*idx as usize].as_str().to_string();
+                        let key = match self.interp.hash_each_step(&n) {
+                            Some((k, _)) => StrykeValue::string(k),
+                            None => StrykeValue::UNDEF,
+                        };
+                        self.push(key);
                         Ok(())
                     }
                     Op::KeysFromValue => {

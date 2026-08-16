@@ -56,10 +56,13 @@ fn values_on_hashref_deref_works() {
 
 #[test]
 fn while_each_via_separate_my_declarations() {
-    // BUG-228: `my ($k, $v) = each %h` in a while-condition fails with
-    // "VM compile error: my/our/state/local in expression context with
-    // multiple or non-scalar decls". Workaround: declare separately
-    // and assign-in-place inside the loop, or use for-loop over keys.
+    // BUG-228 (fixed): `my ($k, $v) = each %h` in a while-condition used to
+    // fail with "VM compile error: my/our/state/local in expression context
+    // with multiple or non-scalar decls". The for-keys form pinned here was
+    // the workaround; it stays pinned because it is the idiomatic stryke
+    // spelling regardless, and `while (my ($k,$v) = each %h)` now has its own
+    // coverage in `behavior_pin_2026_05_c.rs` and
+    // `compat_perl_numeric_and_subst.rs`.
     let code = r#"
         my %h = (a => 1, b => 2, c => 3);
         my $sum_k_lengths = 0;

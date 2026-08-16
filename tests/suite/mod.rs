@@ -168,6 +168,7 @@ mod coderef_pin;
 mod collections;
 mod comb_raku;
 mod comments;
+mod compat_perl_numeric_and_subst;
 mod compat_udf_shadow_extensions;
 mod completion_zsh_shim;
 mod concurrency_pin;

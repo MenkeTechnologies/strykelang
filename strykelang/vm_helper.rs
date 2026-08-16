@@ -740,6 +740,11 @@ pub struct VMHelper {
     pub perl_debug_flags: i64,
     /// Nesting depth for `eval` / `evalblock` (`$^S` is non-zero while inside eval).
     pub eval_nesting: u32,
+    /// Per-hash `each` cursor, keyed by the hash's storage name — perl keeps this
+    /// iterator inside the HV itself. The value is the index of the next entry to
+    /// hand out; `each` removes the entry when it walks off the end (returning the
+    /// empty list), and `keys` / `values` reset it, exactly as perl does.
+    pub(crate) each_cursors: HashMap<String, usize>,
     /// `$ARGV` — name of the file last opened by `<>` (empty for stdin or before first file).
     pub argv_current_file: String,
     /// Next `@ARGV` index to open for `<>` (after `ARGV` is exhausted, `<>` returns undef).
@@ -1105,6 +1110,27 @@ fn expand_perl_regex_quotemeta(pat: &str) -> String {
 /// 1. `\1`..`\9` → `${1}`..`${9}` (Perl backslash syntax).
 /// 2. `$1`..`$9`  → `${1}`..`${9}` (prevents the regex crate from treating `$1X` as the
 ///    named capture group `1X` — Perl stops numeric backrefs at the first non-digit).
+/// True when an `s///` replacement carries a Perl case/quote escape
+/// (`\U`, `\L`, `\u`, `\l`, `\Q`, `\E`), which has to be applied per match to
+/// the expanded replacement rather than to the template.
+pub(crate) fn replacement_has_case_escape(replacement: &str) -> bool {
+    let b = replacement.as_bytes();
+    let mut i = 0;
+    while i + 1 < b.len() {
+        if b[i] == b'\\' {
+            if matches!(b[i + 1], b'U' | b'L' | b'u' | b'l' | b'Q' | b'E') {
+                return true;
+            }
+            // Skip the escaped character so `\\U` (a literal backslash then a
+            // plain `U`) is not mistaken for a case escape.
+            i += 2;
+            continue;
+        }
+        i += 1;
+    }
+    false
+}
+
 pub(crate) fn normalize_replacement_backrefs(replacement: &str) -> String {
     let mut out = String::with_capacity(replacement.len() + 8);
     let mut it = replacement.chars().peekable();
@@ -1148,6 +1174,14 @@ pub(crate) fn normalize_replacement_backrefs(replacement: &str) -> String {
                 Some(&'{') => {
                     // already braced — pass through as-is
                     out.push('$');
+                }
+                Some(&'&') => {
+                    // `$&` is the whole match. Rewrite it to `${0}`, the one
+                    // spelling every backend understands (the `regex` crate's
+                    // expander has no `$&`, so it would otherwise reach the
+                    // output verbatim).
+                    it.next();
+                    out.push_str("${0}");
                 }
                 _ => out.push('$'),
             }
@@ -1626,6 +1660,7 @@ impl VMHelper {
             debug_flags: 0,
             perl_debug_flags: 0,
             eval_nesting: 0,
+            each_cursors: HashMap::new(),
             argv_current_file: String::new(),
             diamond_next_idx: 0,
             diamond_reader: None,
@@ -1991,6 +2026,7 @@ impl VMHelper {
             debug_flags: self.debug_flags,
             perl_debug_flags: self.perl_debug_flags,
             eval_nesting: self.eval_nesting,
+            each_cursors: HashMap::new(),
             argv_current_file: String::new(),
             diamond_next_idx: 0,
             diamond_reader: None,
@@ -2943,6 +2979,34 @@ impl VMHelper {
             return false;
         }
         !v.to_string().is_empty()
+    }
+
+    /// One step of Perl's [`each`](https://perldoc.perl.org/functions/each) over the
+    /// named hash: the next `(key, value)` pair in the hash's own order, or an empty
+    /// list once the entries run out. Hitting the end also clears the cursor, so a
+    /// second loop over the same hash starts from the beginning — that reset is what
+    /// makes back-to-back `while (my ($k, $v) = each %h)` loops both work.
+    pub(crate) fn hash_each_step(&mut self, hash_name: &str) -> Option<(String, StrykeValue)> {
+        self.touch_env_hash(hash_name);
+        let h = self.scope.get_hash(hash_name);
+        let cursor = self.each_cursors.entry(hash_name.to_string()).or_insert(0);
+        match h.get_index(*cursor) {
+            Some((k, v)) => {
+                *cursor += 1;
+                Some((k.clone(), v.clone()))
+            }
+            None => {
+                self.each_cursors.remove(hash_name);
+                None
+            }
+        }
+    }
+
+    /// Rewind the `each` cursor for a hash. Perl resets it whenever `keys` or
+    /// `values` is called on the hash.
+    #[inline]
+    pub(crate) fn reset_each_cursor(&mut self, hash_name: &str) {
+        self.each_cursors.remove(hash_name);
     }
 
     #[inline]
@@ -6382,6 +6446,10 @@ impl VMHelper {
         }
         let replacement = self.expand_env_braces_in_subst(replacement, line)?;
         let replacement = self.interpolate_replacement_string(&replacement);
+        // Detect the case escapes *before* `normalize_replacement_backrefs`
+        // collapses `\\` to a single backslash — otherwise a literal
+        // `s/x/a\\Ub/` would look like a `\U` after normalization.
+        let cased = replacement_has_case_escape(&replacement);
         let replacement = normalize_replacement_backrefs(&replacement);
         let last_caps = if flags.contains('g') {
             let mut rows = Vec::new();
@@ -6405,12 +6473,29 @@ impl VMHelper {
             };
             self.apply_regex_captures(&s, 0, &re, &caps, mode)?;
         }
+        // Perl case escapes in the replacement (`s/(\w+)/\u$1/`) apply to the
+        // *expanded* text of each match, so they cannot be pre-processed on the
+        // template — route those through the per-match hook instead.
         let (new_s, count) = if flags.contains('g') {
             let count = re.find_iter_count(&s);
-            (re.replace_all(&s, replacement.as_str()), count)
+            let new_s = if cased {
+                re.replace_with_hook(&s, replacement.as_str(), true, &|t| {
+                    Self::process_case_escapes(t)
+                })
+            } else {
+                re.replace_all(&s, replacement.as_str())
+            };
+            (new_s, count)
         } else {
             let count = if re.is_match(&s) { 1 } else { 0 };
-            (re.replace(&s, replacement.as_str()), count)
+            let new_s = if cased {
+                re.replace_with_hook(&s, replacement.as_str(), false, &|t| {
+                    Self::process_case_escapes(t)
+                })
+            } else {
+                re.replace(&s, replacement.as_str())
+            };
+            (new_s, count)
         };
         if flags.contains('r') {
             // /r — non-destructive: return the modified string, leave target unchanged

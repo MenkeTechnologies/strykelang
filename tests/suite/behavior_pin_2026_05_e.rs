@@ -96,15 +96,20 @@ fn nested_eval_inner_does_not_leak_to_outer() {
     assert_eq!(out, "in:inner\nout:outer\n");
 }
 
-// ── $& not interpolated in s/// replacement string today ─────────────────────
+// ── $& in an s/// replacement string ─────────────────────────────────────────
 
 #[test]
-fn dollar_amp_not_interpolated_in_replacement_today() {
-    // BUG-033: `s/(\d+)/$&/g` should expand `$&` to the matched substring.
-    // Stryke leaves `$&` literal in the replacement.
+fn dollar_amp_expands_to_the_matched_substring() {
+    // BUG-033 (fixed): `$&` used to reach the output literally, because the
+    // Rust `regex` crate's expander has no spelling for it. The replacement
+    // layer now rewrites it to `${0}`, which every backend understands.
     assert_eq!(
         eval_string(r#"my $s = "abc 123"; $s =~ s/(\d+)/$&/g; $s"#),
-        "abc $&"
+        "abc 123"
+    );
+    assert_eq!(
+        eval_string(r#"my $s = "xy"; $s =~ s/x/[$&]/; $s"#),
+        "[x]y"
     );
 }
 

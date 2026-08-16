@@ -762,10 +762,11 @@ impl Lexer {
     }
 
     /// Body parser for `q{…}`, `s/.../.../`, etc. When `defer_single_digit` is
-    /// `true`, `\1`..`\9` (followed by a non-octal-digit) are preserved
-    /// verbatim so the substitution layer can expand them as numbered
-    /// back-references (Perl's documented `s///` behavior). Multi-digit
-    /// octals (`\012`) still resolve numerically in both modes.
+    /// `true` (substitution-replacement mode), two escapes are preserved
+    /// verbatim for the substitution layer to resolve: `\1`..`\9` (followed by a
+    /// non-octal-digit), which it expands as numbered back-references, and `\\`,
+    /// which it must still be able to tell apart from a case escape such as
+    /// `\U`. Multi-digit octals (`\012`) resolve numerically in both modes.
     fn read_escaped_until_inner(
         &mut self,
         term: char,
@@ -814,6 +815,15 @@ impl Lexer {
                                 &mut interp_quote,
                                 &mut interp_esc,
                             );
+                        }
+                        // In substitution-replacement mode keep `\\` doubled, the
+                        // same deferral `\1` gets: collapsing it here makes the
+                        // literal backslash in `s/x/a\\Ub/` indistinguishable from
+                        // the case escape in `s/x/a\Ub/`. The replacement layer
+                        // (`normalize_replacement_backrefs`) collapses it instead,
+                        // after the case escapes have been recognized.
+                        if defer_single_digit {
+                            s.push('\\');
                         }
                         s.push('\\');
                     }

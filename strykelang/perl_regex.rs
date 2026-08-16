@@ -193,6 +193,36 @@ impl PerlCompiledRegex {
             Self::Pcre2(r) => replace_all_pcre2(r, s, replacement),
         }
     }
+    /// `s///` replacement that post-processes each expanded replacement.
+    ///
+    /// Perl applies `\U` / `\L` / `\u` / `\l` / `\Q` … `\E` to the *expanded*
+    /// replacement of each individual match — `s/(\w+)/\u$1/g` on `"foo bar"`
+    /// gives `"Foo Bar"`, so the case escape has to run after `$1` is
+    /// substituted and once per match. The engine-native `replace`/
+    /// `replace_all` cannot express that, so this walks the matches itself and
+    /// hands each expansion to `post`. `all == false` stops after the first
+    /// match (plain `s///`); `true` is `s///g`.
+    pub fn replace_with_hook(
+        &self,
+        s: &str,
+        replacement: &str,
+        all: bool,
+        post: &dyn Fn(&str) -> String,
+    ) -> String {
+        let mut out = String::with_capacity(s.len());
+        let mut last = 0usize;
+        for caps in self.captures_iter(s) {
+            let Some(m0) = caps.get(0) else { continue };
+            out.push_str(&s[last..m0.start]);
+            out.push_str(&post(&expand_captures(&caps, replacement)));
+            last = m0.end;
+            if !all {
+                break;
+            }
+        }
+        out.push_str(&s[last..]);
+        out
+    }
     /// `find_iter_count` — see implementation.
     pub fn find_iter_count(&self, s: &str) -> usize {
         match self {
@@ -348,6 +378,67 @@ pub fn numbered_capture_flat(caps: &PerlCaptures<'_>) -> Vec<StrykeValue> {
         }
     }
     cap_flat
+}
+
+/// Expand `$1` / `${n}` / `${name}` / `$&` / `$0` / `$$` in `replacement` against
+/// one capture set, engine-agnostically (same grammar as
+/// [`expand_pcre_substitution`], but driven by [`PerlCaptures`] so it works for
+/// the [`regex`], [`fancy_regex`] and PCRE2 backends alike).
+pub fn expand_captures(caps: &PerlCaptures<'_>, replacement: &str) -> String {
+    let mut out = String::with_capacity(replacement.len());
+    let mut it = replacement.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '$' {
+            out.push(c);
+            continue;
+        }
+        match it.peek() {
+            Some('$') => {
+                it.next();
+                out.push('$');
+            }
+            Some('&') | Some('0') => {
+                it.next();
+                if let Some(m) = caps.get(0) {
+                    out.push_str(m.text);
+                }
+            }
+            Some('{') => {
+                it.next();
+                let mut name = String::new();
+                while let Some(ch) = it.next() {
+                    if ch == '}' {
+                        break;
+                    }
+                    name.push(ch);
+                }
+                let m = match name.parse::<usize>() {
+                    Ok(idx) => caps.get(idx),
+                    Err(_) => caps.name(&name),
+                };
+                if let Some(m) = m {
+                    out.push_str(m.text);
+                }
+            }
+            Some(ch) if ch.is_ascii_digit() => {
+                let mut n = 0usize;
+                while let Some(&d) = it.peek() {
+                    if !d.is_ascii_digit() {
+                        break;
+                    }
+                    it.next();
+                    n = n
+                        .saturating_mul(10)
+                        .saturating_add((d as u8 - b'0') as usize);
+                }
+                if let Some(m) = caps.get(n) {
+                    out.push_str(m.text);
+                }
+            }
+            _ => out.push('$'),
+        }
+    }
+    out
 }
 
 fn replace_once_pcre2(re: &Arc<pcre2::bytes::Regex>, s: &str, replacement: &str) -> String {

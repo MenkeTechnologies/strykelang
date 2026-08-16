@@ -349,15 +349,29 @@ fn lcfirst_escape_lowercases_first_char_only() {
     assert_eq!(eval_string(r#"my $w = "ABC"; "\l$w end""#), "aBC end");
 }
 
-// ── \U/\L do NOT work in s/// replacement today ──────────────────────────────
+// ── \U/\L in an s/// replacement ─────────────────────────────────────────────
 
 #[test]
-fn upper_case_escape_in_substitution_is_literal_today() {
-    // BUG-055: `\U$1` in `s/.../...` replacement should uppercase $1.
-    // Stryke leaves `\U` literal.
+fn upper_case_escape_in_substitution_applies_per_match() {
+    // BUG-055 (fixed): `\U` used to reach the output literally. The escape acts
+    // on the text `$1` expanded to, once per match — so with /g every match is
+    // transformed, not just the first.
     assert_eq!(
         eval_string(r#"my $s = "abc def"; $s =~ s/\b(\w)/\U$1/g; $s"#),
-        "\\Uabc \\Udef"
+        "Abc Def"
+    );
+    assert_eq!(
+        eval_string(r#"my $s = "foo bar"; $s =~ s/(\w+)/\u$1/g; $s"#),
+        "Foo Bar"
+    );
+    assert_eq!(
+        eval_string(r#"my $s = "foo"; $s =~ s/(\w+)/\U$1\E!/; $s"#),
+        "FOO!"
+    );
+    // A literal backslash before `U` is not a case escape.
+    assert_eq!(
+        eval_string(r#"my $s = "x"; $s =~ s/x/a\\Ub/; $s"#),
+        "a\\Ub"
     );
 }
 

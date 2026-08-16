@@ -1,4 +1,10 @@
 //! `--compat` arithmetic promotes to BigInt on i64 overflow; native stryke wraps.
+//!
+//! `**` is the exception, and deliberately so: perl's `pp_pow` decides integer
+//! vs. floating point from the operand bit widths *before* multiplying, so
+//! `2**100` is an NV in perl no matter how much precision a bigint could offer.
+//! Exact `**` lives behind `use bigint;` instead — see
+//! `bigint_pragma_2_to_the_100_via_pow_op` and `compat_pow_follows_perl_not_bigint`.
 
 use std::process::Command;
 
@@ -31,11 +37,29 @@ fn compat_2_to_the_100_via_repeated_mul() {
 }
 
 #[test]
-fn compat_2_to_the_100_via_pow_op() {
+fn bigint_pragma_2_to_the_100_via_pow_op() {
+    // Exact arbitrary-precision `**` is what `use bigint;` is for.
     assert_eq!(
-        run_compat("print 2 ** 100"),
+        run_compat("use bigint; print 2 ** 100"),
         "1267650600228229401496703205376"
     );
+}
+
+#[test]
+fn compat_pow_follows_perl_not_bigint() {
+    // Without the pragma, `--compat` has to be perl: `pp_pow` only stays in
+    // integer arithmetic while `power * highbit(base) <= 64`, and otherwise
+    // calls C `pow()`, so the result is an NV printed through `%.15g`.
+    //
+    //   $ perl -e 'print 2**100'   →  1.26765060022823e+30
+    //
+    // Promoting to a bigint here is not merely a different-looking answer: it
+    // makes `9**9**9` (which perl answers `Inf` immediately) try to build an
+    // exact integer of over a gigabit.
+    assert_eq!(run_compat("print 2 ** 100"), "1.26765060022823e+30");
+    assert_eq!(run_compat("print 9 ** 9 ** 9"), "Inf");
+    // 4 * 16 == 64 — right at the limit, so this one really is exact.
+    assert_eq!(run_compat("print 10 ** 16"), "10000000000000000");
 }
 
 #[test]
@@ -82,11 +106,17 @@ fn native_mode_still_overflows_to_zero() {
 }
 
 #[test]
-fn compat_bigint_equality_with_string() {
+fn bigint_pragma_equality_with_string() {
     // Cross-type compare works because Display and PartialEq are wired up.
     assert_eq!(
-        run_compat(r#"my $x = 2 ** 64; print $x eq "18446744073709551616" ? "y" : "n""#),
+        run_compat(r#"use bigint; my $x = 2 ** 64; print $x eq "18446744073709551616" ? "y" : "n""#),
         "y"
+    );
+    // Perl says "n" here — `2**64` is an NV, so it stringifies as
+    // `1.84467440737096e+19` — and plain `--compat` has to agree.
+    assert_eq!(
+        run_compat(r#"my $x = 2 ** 64; print $x eq "18446744073709551616" ? "y" : "n""#),
+        "n"
     );
 }
 

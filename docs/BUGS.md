@@ -757,7 +757,7 @@ something other than `m` (or `s`, `tr`, `y`, `qr`, `q`, `qq`, `qw`).
 Severity: **polish**.
 
 
-## BUG-012 — `each %hash` always returns an empty list
+## BUG-012 — `each %hash` always returns an empty list — **`bug`** [FIXED]
 
 ```sh
 $ stryke -e 'my %h = (a=>1); my @kv = each %h; print scalar @kv'
@@ -771,8 +771,20 @@ lowering with "my/our/state/local in expression context with multiple or
 non-scalar decls". `keys`/`values` work correctly, so iteration is
 possible — just not in the `each` style.
 
-Tests: `each_returns_empty_list_today`,
-`while_my_pair_each_rejected_at_runtime_today`.
+Fix: `each` was a stub returning `StrykeValue::array(vec![])`. `each` is
+the one hash builtin whose state lives *inside the hash*, so it now
+compiles to a name-carrying `Op::HashEach` / `Op::HashEachScalar` the way
+`keys` / `values` do, and the interpreter keeps the cursor in
+`VMHelper::each_cursors`. Exhaustion clears the cursor (so a second loop
+starts over), and `keys` / `values` clear it too, matching perl. The
+companion `while (my ($k,$v) = …)` lowering now compiles a list
+declaration in expression context and yields the right-hand side's
+element count, which is what ends the loop.
+
+Tests: `each_yields_key_value_pairs_then_rewinds`,
+`while_my_pair_each_walks_the_whole_hash`,
+`tests/suite/compat_perl_numeric_and_subst.rs`,
+`parity/cases/332_each_hash_iterator.pl`.
 
 Severity: **bug**. Standard hash iterator; many libraries use it.
 
@@ -2669,7 +2681,7 @@ Severity: **bug** (correctness; should be a P1 fix — race-free
 counters are table stakes for any parallel framework).
 
 
-## BUG-228 — `my ($a, $b) = each %h` in expression context unsupported
+## BUG-228 — `my ($a, $b) = each %h` in expression context unsupported — **`bug`** [FIXED]
 
 ```sh
 $ s -e 'my %h = (a => 1, b => 2); while (my ($k, $v) = each %h) { print "$k=$v\n" }'
@@ -2684,8 +2696,20 @@ variable `my $x = ...` works fine.
 Workaround: declare separately, or rewrite using `for my $k (keys %h)`.
 The for-keys form is more idiomatic stryke regardless.
 
+Fix: `compile_expr` now lowers a multi-variable `my` / `our` with an
+initializer in expression context through the same list-assignment path
+the statement form uses, then pushes the temp array's length. That length
+— the number of elements the right-hand side produced — is Perl's value
+for a list assignment in scalar context, and it is what terminates
+`while (my ($k, $v) = each %h)` when `each` runs out. Truth of `$k` is
+deliberately not what the loop tests: a key of `0` or `""` is false but
+still yields a count of 2.
+
 Pin: `while_each_via_separate_my_declarations` in
-`tests/suite/hashref_iteration_pin.rs`.
+`tests/suite/hashref_iteration_pin.rs`;
+`while_my_pair_each_walks_the_whole_hash` and
+`list_declaration_in_expression_context_yields_the_rhs_element_count`
+cover the now-working form.
 
 Severity: **bug** (parity gap; affects the `each` idiom).
 
