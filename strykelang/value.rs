@@ -3325,6 +3325,28 @@ pub fn perl_shr_i64(a: i64, b: i64) -> i64 {
     }
 }
 
+/// Perl's `SvIV_please_nomg`: an NV whose value is a whole number inside the IV
+/// range is treated as an IV by `pp_add` / `pp_subtract` / `pp_multiply`, so
+/// `1e15 + 1` is the integer `1000000000000001` rather than an NV that
+/// stringifies through `%.15g` as `1e+15`. `pp_divide` has no such step, which
+/// is why `1e15 / 1` stays `1e+15`. Only active under `--compat`; native stryke
+/// keeps float operands afloat.
+#[inline]
+fn perl_iv_please(v: &StrykeValue) -> Option<i64> {
+    if let Some(i) = v.as_integer() {
+        return Some(i);
+    }
+    if !crate::compat_mode() {
+        return None;
+    }
+    let f = v.as_float()?;
+    // `fract` is NaN for infinities and NaN, so those fall through to the NV path.
+    if f.fract() != 0.0 || !(-9.223372036854776e18..9.223372036854776e18).contains(&f) {
+        return None;
+    }
+    Some(f as i64)
+}
+
 /// `--compat`-aware integer multiply. In compat mode, promotes to `BigInt` on
 /// overflow. In native mode, wraps (preserves current behavior). Either side
 /// already being a `BigInt` forces the BigInt path.
@@ -3333,7 +3355,7 @@ pub fn compat_mul(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return StrykeValue::bigint(a.to_bigint() * b.to_bigint());
     }
-    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+    let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() * b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
@@ -3351,7 +3373,7 @@ pub fn compat_add(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return StrykeValue::bigint(a.to_bigint() + b.to_bigint());
     }
-    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+    let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() + b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
@@ -3369,7 +3391,7 @@ pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     if a.as_bigint().is_some() || b.as_bigint().is_some() {
         return StrykeValue::bigint(a.to_bigint() - b.to_bigint());
     }
-    let (Some(x), Some(y)) = (a.as_integer(), b.as_integer()) else {
+    let (Some(x), Some(y)) = (perl_iv_please(a), perl_iv_please(b)) else {
         return StrykeValue::float(a.to_number() - b.to_number());
     };
     if crate::compat_mode() || crate::bigint_pragma() {
@@ -3382,27 +3404,108 @@ pub fn compat_sub(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     }
 }
 
-/// `**` (exponentiation) — under `--compat` or `use bigint;`, uses `BigInt`
-/// directly when the exponent is a non-negative integer so `2 ** 100`
-/// works. Falls through to `f64::powf` for negative or non-integer
-/// exponents (matches Perl's behavior).
+/// Perl's integer-preserving `**` branch, ported from `pp_pow` in perl's `pp.c`
+/// (the `PERL_PRESERVE_IVUV` block).
+///
+/// Perl does **not** decide "integer or NV" by trying the multiplication and
+/// checking for overflow — it decides up front from the bit width of the base:
+/// with `highbit` the smallest `h` such that `|base| < 2**h`, the integer path
+/// runs only when `power * highbit <= 64`. That is why `10**16` prints
+/// `10000000000000000` (highbit 4, `4*16 == 64`) while `2**53` prints
+/// `9.00719925474099e+15` (highbit 2, `2*53 == 106`) even though `2**53` is
+/// exactly representable as an integer.
+///
+/// Returns `None` where perl would `goto float_it` and use `pow(3)`.
+fn perl_iv_pow(base: i64, power: i64) -> Option<StrykeValue> {
+    // perl: a negative exponent can't be done in integer arithmetic.
+    if power < 0 {
+        return None;
+    }
+    let power = power as u64;
+    // `baseuok` records "base was non-negative"; `baseuv` is its magnitude.
+    let baseuok = base >= 0;
+    let baseuv = base.unsigned_abs();
+
+    // perl's binary search for `highbit` with `baseuv < 2 ** highbit`.
+    let mut highbit: u32 = 64;
+    let mut diff: u32 = 64;
+    loop {
+        diff >>= 1;
+        if diff == 0 {
+            break;
+        }
+        highbit -= diff;
+        if (baseuv >> highbit) != 0 {
+            highbit += diff;
+        }
+    }
+    // `saturating_mul` where perl relies on UV wraparound: a wrapped product
+    // would take the integer path on a result that cannot fit.
+    if power.saturating_mul(highbit as u64) > 64 {
+        return None;
+    }
+
+    // Same square-and-multiply loop perl uses once the result is known to fit.
+    let mut result: u64 = 1;
+    let mut b: u64 = baseuv;
+    let odd_power = power & 1 == 1;
+    if odd_power {
+        result = result.wrapping_mul(b);
+    }
+    let mut power = power;
+    while {
+        power >>= 1;
+        power != 0
+    } {
+        b = b.wrapping_mul(b);
+        if power & 1 == 1 {
+            result = result.wrapping_mul(b);
+        }
+    }
+
+    if baseuok || !odd_power {
+        // Answer is positive. stryke has no UV scalar, so a result above
+        // `IV_MAX` falls back to an NV exactly as perl's `SETn` would.
+        i64::try_from(result)
+            .map(StrykeValue::integer)
+            .ok()
+            .or_else(|| Some(StrykeValue::float(result as f64)))
+    } else if result <= i64::MAX as u64 {
+        Some(StrykeValue::integer(-(result as i64)))
+    } else if result == (i64::MIN as u64) {
+        // perl's explicit two's-complement `IV_MIN` special case.
+        Some(StrykeValue::integer(i64::MIN))
+    } else {
+        Some(StrykeValue::float(-(result as f64)))
+    }
+}
+
+/// `**` (exponentiation).
+///
+/// Under `use bigint;` a non-negative integer exponent is computed exactly with
+/// [`BigInt`], so `2 ** 100` is exact. Under `--compat` the operator follows
+/// perl's `pp_pow` (see [`perl_iv_pow`]): an integer result only when perl would
+/// produce one, otherwise `f64::powf` — so `2**53` stringifies as
+/// `9.00719925474099e+15` and `9**9**9` is `Inf` rather than a multi-hundred-
+/// megabyte bigint. Native stryke keeps its float-only behavior.
 #[inline]
 pub fn compat_pow(a: &StrykeValue, b: &StrykeValue) -> StrykeValue {
     let (Some(base), Some(exp)) = (a.as_integer(), b.as_integer()) else {
         return StrykeValue::float(a.to_number().powf(b.to_number()));
     };
-    let bigint_active = crate::compat_mode() || crate::bigint_pragma();
-    if !bigint_active {
-        // Native: do whatever the existing path does — fall back to float
-        // (matches Perl's default i64-overflow-to-NV behavior).
-        return StrykeValue::float((base as f64).powf(exp as f64));
+    if crate::bigint_pragma() {
+        if exp < 0 {
+            return StrykeValue::float((base as f64).powf(exp as f64));
+        }
+        use num_traits::Pow;
+        return StrykeValue::bigint(BigInt::from(base).pow(exp as u32));
     }
-    if exp < 0 {
-        return StrykeValue::float((base as f64).powf(exp as f64));
+    if crate::compat_mode() {
+        if let Some(v) = perl_iv_pow(base, exp) {
+            return v;
+        }
     }
-    use num_traits::Pow;
-    let result = BigInt::from(base).pow(exp as u32);
-    StrykeValue::bigint(result)
+    StrykeValue::float((base as f64).powf(exp as f64))
 }
 /// `set_from_elements` — see implementation.
 pub fn set_from_elements<I: IntoIterator<Item = StrykeValue>>(items: I) -> StrykeValue {
@@ -3514,7 +3617,12 @@ fn format_float(f: f64) -> String {
             "Inf".to_string()
         };
     }
-    if f.fract() == 0.0 && f.abs() < 1e16 {
+    // `%.15g` switches to scientific notation once the decimal exponent reaches
+    // the precision (15), so the integral fast path is only equivalent below
+    // 1e15: perl prints `1e15` as `1e+15`, not `1000000000000000`. It also has
+    // to stay in place for `-0.0`, which perl stringifies as `0` while C's
+    // `%.15g` gives `-0`.
+    if f.fract() == 0.0 && f.abs() < 1e15 {
         format!("{}", f as i64)
     } else {
         // Perl uses Gconvert which is sprintf("%.15g", f) on most platforms.

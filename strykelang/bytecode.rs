@@ -205,6 +205,11 @@ pub enum Op {
     HashKeysScalar(u16),
     /// Scalar `values %h` — push integer value count.
     HashValuesScalar(u16),
+    /// List `each %h` — push a 2-element `[key, value]` array, or the empty array
+    /// when the hash's iterator is exhausted (which also rewinds it).
+    HashEach(u16),
+    /// Scalar `each %h` — push the next key, or undef when exhausted.
+    HashEachScalar(u16),
     /// `keys EXPR` after operand evaluated in list context — stack: `[value]` → key list array.
     KeysFromValue,
     /// Scalar `keys EXPR` after operand — stack: `[value]` → key count.

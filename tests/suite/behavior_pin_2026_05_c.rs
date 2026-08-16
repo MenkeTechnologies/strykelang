@@ -442,32 +442,43 @@ fn list_in_scalar_context_via_scalar_keyword_takes_last() {
     assert_eq!(eval_int(r#"sub xs { (1, 2, 3) } scalar xs()"#), 3);
 }
 
-// ── `each` is currently broken ───────────────────────────────────────────────
+// ── `each` walks the hash's own iterator ─────────────────────────────────────
 
 #[test]
-fn each_returns_empty_list_today() {
-    // BUG-012: `each %h` should yield (key, value) pairs, then () to signal
-    // end. Stryke returns () on the very first call.
+fn each_yields_key_value_pairs_then_rewinds() {
+    // BUG-012 (fixed): `each %h` used to return () on the very first call.
     assert_eq!(
         eval_int(r#"my %h = (a => 1); my @kv = each %h; scalar @kv"#),
+        2
+    );
+    // Exhaustion is signalled by the empty list…
+    assert_eq!(
+        eval_int(r#"my %h = (a => 1); each %h; my @kv = each %h; scalar @kv"#),
         0
+    );
+    // …and rewinds the iterator, so the following call starts over.
+    assert_eq!(
+        eval_int(r#"my %h = (a => 1); each %h; each %h; my @kv = each %h; scalar @kv"#),
+        2
+    );
+    // `keys` rewinds a partially consumed iterator as a side effect.
+    assert_eq!(
+        eval_int(r#"my %h = (a => 1, b => 2); each %h; keys %h; my @kv = each %h; scalar @kv"#),
+        2
     );
 }
 
 #[test]
-fn while_my_pair_each_rejected_at_runtime_today() {
-    // BUG-012b: `while (my ($k, $v) = each %h)` parses fine but the VM
-    // lowering raises "my/our/state/local in expression context with multiple
-    // or non-scalar decls".
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"my %h = (a=>1); while (my ($k, $v) = each %h) {}"#);
-    assert!(
-        matches!(
-            kind,
-            ErrorKind::Runtime | ErrorKind::Type | ErrorKind::Syntax
+fn while_my_pair_each_walks_the_whole_hash() {
+    // BUG-012b (fixed): `while (my ($k, $v) = each %h)` parsed but the VM
+    // lowering raised "my/our/state/local in expression context with multiple
+    // or non-scalar decls". What ends the loop is the list assignment's
+    // element count reaching 0, not the truth of `$k`.
+    assert_eq!(
+        eval_int(
+            r#"my %h = (a=>1, b=>2, c=>3); my $n = 0; while (my ($k, $v) = each %h) { $n++ } $n"#
         ),
-        "expected error of some kind, got {:?}",
-        kind
+        3
     );
 }
 

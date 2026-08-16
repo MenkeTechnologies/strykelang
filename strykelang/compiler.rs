@@ -2237,12 +2237,20 @@ impl Compiler {
             .emit(Op::DeclareHashTyped(name_idx, ty_idx, frozen), line);
     }
 
+    /// Compile a `my` / `our` declaration list.
+    ///
+    /// Returns `Some(tmp)` — the interned name of the hidden temp array holding
+    /// the evaluated right-hand side — when this was compiled as a *list*
+    /// assignment. `ArrayLen(tmp)` is then the number of elements the RHS
+    /// produced, which is the value Perl gives a list assignment in scalar
+    /// context (`while (my ($k, $v) = each %h)` ends when that count is 0).
+    /// `None` when each declaration was compiled on its own.
     fn compile_var_declarations(
         &mut self,
         decls: &[VarDecl],
         line: usize,
         is_my: bool,
-    ) -> Result<(), CompileError> {
+    ) -> Result<Option<u16>, CompileError> {
         let allow_frozen = is_my;
         // List assignment: my ($a, $b) = (10, 20) — distribute elements
         if decls.len() > 1 && decls[0].initializer.is_some() {
@@ -2314,6 +2322,7 @@ impl Compiler {
                     }
                 }
             }
+            return Ok(Some(tmp_name));
         } else {
             for decl in decls {
                 let frozen = allow_frozen && decl.frozen;
@@ -2430,7 +2439,7 @@ impl Compiler {
                 }
             }
         }
-        Ok(())
+        Ok(None)
     }
 
     fn compile_state_declarations(
@@ -2852,8 +2861,12 @@ impl Compiler {
             }
             StmtKind::MySync(decls) => self.compile_mysync_declarations(decls, line)?,
             StmtKind::OurSync(decls) => self.compile_oursync_declarations(decls, line)?,
-            StmtKind::My(decls) => self.compile_var_declarations(decls, line, true)?,
-            StmtKind::Our(decls) => self.compile_var_declarations(decls, line, false)?,
+            StmtKind::My(decls) => {
+                self.compile_var_declarations(decls, line, true)?;
+            }
+            StmtKind::Our(decls) => {
+                self.compile_var_declarations(decls, line, false)?;
+            }
             StmtKind::State(decls) => self.compile_state_declarations(decls, line)?,
             StmtKind::If {
                 condition,
@@ -7204,8 +7217,21 @@ impl Compiler {
                 }
             }
             ExprKind::Each(e) => {
-                self.compile_expr(e)?;
-                self.emit_op(Op::CallBuiltin(BuiltinId::Each as u16, 1), line, Some(root));
+                // `each %h` needs the hash's *identity* (its iterator lives with the
+                // hash, not with a copy of its contents), so the named-hash form
+                // compiles to a name-carrying op like `keys` / `values` do.
+                if let ExprKind::HashVar(name) = &e.kind {
+                    let stash = self.hash_storage_name_for_ops(name);
+                    let idx = self.chunk.intern_name(&stash);
+                    if ctx == WantarrayCtx::List {
+                        self.emit_op(Op::HashEach(idx), line, Some(root));
+                    } else {
+                        self.emit_op(Op::HashEachScalar(idx), line, Some(root));
+                    }
+                } else {
+                    self.compile_expr(e)?;
+                    self.emit_op(Op::CallBuiltin(BuiltinId::Each as u16, 1), line, Some(root));
+                }
             }
 
             // ── Builtins that map to CallBuiltin ──
@@ -9032,6 +9058,20 @@ impl Compiler {
                             self.emit_declare_scalar(name_idx, line, false);
                         }
                     }
+                } else if decls.len() > 1
+                    && decls[0].initializer.is_some()
+                    && matches!(keyword.as_str(), "my" | "our")
+                {
+                    // `while (my ($k, $v) = each %h)` / `if (my ($a, $b) = /(x)(y)/)`.
+                    // Perl evaluates the list assignment, then yields the number of
+                    // elements the right-hand side produced — that count, not the
+                    // truth of `$k`, is what stops the `each` loop when the hash is
+                    // exhausted and `each` returns the empty list.
+                    let is_my = keyword == "my";
+                    let tmp = self
+                        .compile_var_declarations(decls, line, is_my)?
+                        .expect("multi-decl list assignment reports its temp array");
+                    self.emit_op(Op::ArrayLen(tmp), line, Some(root));
                 } else {
                     return Err(CompileError::Unsupported(
                         "my/our/state/local in expression context with multiple or non-scalar decls".into(),

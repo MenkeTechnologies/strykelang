@@ -57,7 +57,10 @@ pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 /// variant. A shard written by an earlier build decodes those variants as the
 /// wrong op rather than failing, so the format version — not just the package
 /// version — has to reject it.
-pub const SHARD_FORMAT_VERSION: u32 = 5;
+///
+/// 6: `HashEach` / `HashEachScalar` were inserted after `HashValuesScalar` for
+/// Perl's `each`, shifting every later discriminant the same way.
+pub const SHARD_FORMAT_VERSION: u32 = 6;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.

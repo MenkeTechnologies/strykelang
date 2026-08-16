@@ -274,19 +274,18 @@ fn weaken_does_not_make_isweak_true_today() {
     );
 }
 
-// ── Autovivification of nested hash/array fails today ───────────────────────
+// ── Autovivification of nested hash/array ───────────────────────────────────
 
 #[test]
-fn autoviv_hash_then_array_index_fails_today() {
-    // BUG-023: Perl auto-vivifies `$h{k}` to an arrayref on first
-    // index-assignment. Stryke errors.
-    use stryke::error::ErrorKind;
-    let kind = eval_err_kind(r#"my %h; $h{k}[0] = "first"; $h{k}[0]"#);
-    assert!(
-        matches!(kind, ErrorKind::Runtime | ErrorKind::Type),
-        "expected runtime/type error, got {:?}",
-        kind
+fn autoviv_hash_then_array_index_creates_an_arrayref() {
+    // BUG-023 (fixed in "compat: autovivify intermediate levels of a subscript
+    // chain"): `$h{k}` springs into existence as the reference kind the
+    // FOLLOWING subscript needs — here an arrayref, because `[0]` follows.
+    assert_eq!(
+        eval_string(r#"my %h; $h{k}[0] = "first"; $h{k}[0]"#),
+        "first"
     );
+    assert_eq!(eval_string(r#"my %h; $h{k}[0] = "first"; ref $h{k}"#), "ARRAY");
 }
 
 // ── given/when with arrayref pattern fails today ─────────────────────────────
