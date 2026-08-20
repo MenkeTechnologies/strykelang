@@ -1866,9 +1866,9 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "fusevm"
-version = "0.17.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5517df70d8cd1a68bad7275edec3a4dbdb1a7c334b12d0d6f0ce4e2a06beabd"
+checksum = "26d646198633747a11ba7987347e163a115e59cb14ab7f4465cdcb1f87f652e2"
 dependencies = [
  "base64",
  "bincode",
@@ -7099,9 +7099,9 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "znative"
-version = "0.12.29"
+version = "0.12.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2fe70e53b761b3f3b0f47810c7fc0729a98d8d880b75c4641fd87e7e75bd775"
+checksum = "7fb80f8f10bc3a71554f6c701989e90d76f6e23fff4154dd09c7e926d9c01b32"
 
 [[package]]
 name = "zopfli"
@@ -7117,9 +7117,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs"
-version = "0.12.29"
+version = "0.12.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed5db3622499d3044bfb0786a23f55df189f5b35e3a086fb485c2b5192588a40"
+checksum = "92289a8928e5ac9d5e7aa43f5ae8e77b8e08328cf32cf450e5ed9b28cc79b1a6"
 dependencies = [
  "atty",
  "bincode",
@@ -7171,9 +7171,9 @@ dependencies = [
 
 [[package]]
 name = "zshrs-daemon"
-version = "0.12.29"
+version = "0.12.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81e9be6dc34c245ec4cb29576984098c2b28e5436acb98997e5459510d87f778"
+checksum = "775573cacb5e479bea5b2742f05e810f612391826e226d0e87b7da27767a741a"
 dependencies = [
  "atty",
  "axum",
