@@ -11,7 +11,7 @@
 //! * Top "modeline" is rendered as part of `Prompt::render_prompt_left` so it
 //!   repaints with the buffer (no scroll-off, no flicker).
 //! * Tab pops a `ColumnarMenu` of suggestions sourced from
-//!   `stryke::lsp::builtin_completion_words` plus the live interpreter
+//!   `crate::lsp::builtin_completion_words` plus the live interpreter
 //!   binding/sub names — the same wordlist the LSP serves.
 //! * History is `~/.stryke/history` via `FileBackedHistory`.
 //! * `$obj->method` completion uses the running interpreter's blessed-scalar
@@ -34,11 +34,11 @@ use reedline::{
     PromptHistorySearchStatus, Reedline, ReedlineEvent, ReedlineMenu, Signal, Span, Suggestion, Vi,
 };
 
-use crate::Cli;
-use stryke::error::ErrorKind;
-use stryke::lsp::builtin_completion_words;
-use stryke::token::KEYWORDS;
-use stryke::vm_helper::{repl_arrow_method_completions, ReplCompletionSnapshot, VMHelper};
+use crate::cli::Cli;
+use crate::error::ErrorKind;
+use crate::lsp::builtin_completion_words;
+use crate::token::KEYWORDS;
+use crate::vm_helper::{repl_arrow_method_completions, ReplCompletionSnapshot, VMHelper};
 
 /// Builtin names not yet captured in `lsp_completion_words.txt`.
 const EXTRA_KEYWORDS: &[&str] = &["deque", "heap", "ppool", "barrier", "bench", "spawn"];
@@ -415,17 +415,17 @@ impl Prompt for StrykePrompt {
 /// sequences. Counts every char outside the `ESC[...m` codes. Used by the
 /// banner box renderer so colored content pads to the right border
 /// regardless of how many invisible color toggles it carries.
-/// Thin wrapper around `stryke::banner::print_banner` kept for backwards
+/// Thin wrapper around `crate::banner::print_banner` kept for backwards
 /// compatibility with existing `repl::print_cyberpunk_banner` callers
 /// (REPL startup, `stryke --help`). The actual rendering lives in the
 /// library so the `banner()` builtin can share the same source.
 pub fn print_cyberpunk_banner() {
-    stryke::banner::print_banner(true);
+    crate::banner::print_banner(true);
 }
 /// `run` — see implementation.
 pub fn run(cli: &Cli) {
     let mut interp = VMHelper::new();
-    crate::configure_interpreter(cli, &mut interp, "repl");
+    crate::cli::configure_interpreter(cli, &mut interp, "repl");
 
     // Show the same cyberpunk banner that `stryke --help` displays, so a
     // fresh REPL session looks like the rest of the CLI surface. Followed
@@ -435,7 +435,7 @@ pub fn run(cli: &Cli) {
     println!("\x1b[2m  type `exit` or Ctrl-D to leave the REPL — Tab for completion\x1b[0m");
     println!();
 
-    let prelude = crate::module_prelude(cli);
+    let prelude = crate::cli::module_prelude(cli);
     let static_words = build_static_completions();
     let dynamic = Arc::new(Mutex::new(interp.repl_completion_names()));
     let snapshot = Arc::new(Mutex::new(interp.repl_completion_snapshot()));
@@ -533,7 +533,7 @@ pub fn run(cli: &Cli) {
                 }
 
                 let full = format!("{}{}", prelude, trimmed);
-                let program = match stryke::parse(&full) {
+                let program = match crate::parse(&full) {
                     Ok(p) => p,
                     Err(e) => {
                         eprintln!("{}", e);

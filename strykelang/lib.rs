@@ -68,7 +68,13 @@ pub mod bytecode;
 /// `capture` submodule.
 pub mod capture;
 /// `cli_runners` submodule.
+/// `cli` submodule: the command line, callable as a library.
+pub mod cli;
 pub mod cli_runners;
+/// `hosted` submodule: running stryke inside another process.
+pub mod hosted;
+/// `repl` submodule.
+pub mod repl;
 /// `cluster` submodule.
 pub mod cluster;
 /// `compiler` submodule.
