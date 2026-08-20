@@ -751,11 +751,20 @@ pub(crate) fn native_ext_handler(vm: &mut fusevm::VM, id: u16, arg: u8) {
             let mut flat: Vec<fusevm::Value> = Vec::with_capacity(n);
             for v in vals {
                 match v {
-                    fusevm::Value::Array(inner) => flat.extend(inner),
+                    // fusevm 0.22 changed `Value::Array` to hold an
+                    // `Arc<Vec<Value>>`, so the nested list is shared rather
+                    // than owned. `try_unwrap` keeps the old move semantics
+                    // whenever this is the last reference — the common case
+                    // for a freshly built list — and only pays for a clone
+                    // when the array is genuinely still shared elsewhere.
+                    fusevm::Value::Array(inner) => match Arc::try_unwrap(inner) {
+                        Ok(owned) => flat.extend(owned),
+                        Err(shared) => flat.extend(shared.iter().cloned()),
+                    },
                     other => flat.push(other),
                 }
             }
-            vm.push(fusevm::Value::Array(flat));
+            vm.push(fusevm::Value::Array(Arc::new(flat)));
         }
         nops::DECLARE_ARRAY => {
             let idx = vm.pop().to_int();
