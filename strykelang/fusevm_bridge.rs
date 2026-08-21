@@ -3272,6 +3272,14 @@ pub(crate) fn run_linear_segment_cached(
                         Some(match num {
                             fusevm::BlockNum::Float(f) => StrykeValue::float(f),
                             fusevm::BlockNum::Int(n) => StrykeValue::float(n as f64),
+                            // fusevm 0.23 compiles a chunk ending in a
+                            // comparison instead of declining it, and reports
+                            // the result kind rather than flattening it to an
+                            // int. This is the float-kinded segment, so it
+                            // coerces exactly as the Int arm above does.
+                            fusevm::BlockNum::Bool(b) => {
+                                StrykeValue::float(if b { 1.0 } else { 0.0 })
+                            }
                         }),
                         fresh,
                     );
