@@ -183,7 +183,29 @@ pub fn enabled(lvl: Level) -> bool {
 /// Append a level-stamped line to the log. Most callers should use the
 /// `slog_*!` macros instead so the message argument is only formatted when
 /// the level is enabled.
+/// `YYYY-MM-DD HH:MM:SS` in the process's own zone, via `localtime_r`(3) +
+/// `strftime`(3) — no new dependency for what is two libc calls, and it is the
+/// same spelling the rest of the fleet's logs use.
+fn format_local(secs: i64) -> String {
+    let t = secs as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: `localtime_r` fills the `tm` we own; NULL on failure.
+    if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+        return secs.to_string();
+    }
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec
+    )
+}
+
 pub fn log_at(lvl: Level, tag: &str, msg: &str) {
+
     if !enabled(lvl) {
         return;
     }
@@ -196,17 +218,20 @@ pub fn log_at(lvl: Level, tag: &str, msg: &str) {
     // Rotation check sits inside the write lock so two threads can't
     // concurrently rotate or write past the threshold.
     rotate_if_needed(&path);
+    // Local wall-clock, not unix seconds: `tail -f ~/.stryke/stryke.log` is the
+    // documented way to watch a run, and an epoch there tells the reader
+    // nothing about when a line happened or how big the gap to the next one is.
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let secs = (ts / 1000) as i64;
+    let stamp = format_local(( ts / 1000) as i64);
     let millis = (ts % 1000) as u32;
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&path) {
         let _ = writeln!(
             f,
             "[{}.{:03}] [{:>5}] [{}] {}",
-            secs,
+            stamp,
             millis,
             lvl.as_str(),
             tag,
@@ -343,6 +368,37 @@ mod tests {
             contents.contains("[ INFO] [test] hello world"),
             "got: {contents:?}"
         );
+        let _ = std::fs::remove_file(&tmp);
+        clear_log_env();
+    }
+
+    /// The line must open with a readable local date-time, not a raw epoch:
+    /// `~/.stryke/stryke.log` is documented as something to `tail -f`, and a
+    /// number of seconds tells the reader nothing there. Guards the shape and
+    /// the year, so a clock read as 0 (1970) fails instead of passing on shape.
+    #[test]
+    fn log_line_opens_with_a_local_datetime_stamp() {
+        let _g = env_lock();
+        clear_log_env();
+        let tmp = fresh_path();
+        std::env::set_var("STRYKE_LOG_FILE", &tmp);
+        log("test", "stamped");
+        let contents = std::fs::read_to_string(&tmp).expect("log file written");
+        let stamp = contents
+            .strip_prefix('[')
+            .and_then(|s| s.split_once(']'))
+            .map(|(s, _)| s.to_string())
+            .unwrap_or_default();
+        // `2026-08-20 22:10:35.246`
+        let bytes = stamp.as_bytes();
+        assert_eq!(stamp.len(), 23, "unexpected stamp width: {stamp:?}");
+        assert!(
+            bytes[4] == b'-' && bytes[7] == b'-' && bytes[10] == b' '
+                && bytes[13] == b':' && bytes[16] == b':' && bytes[19] == b'.',
+            "not a `YYYY-MM-DD HH:MM:SS.mmm` stamp: {stamp:?}"
+        );
+        let year: i32 = stamp[..4].parse().expect("year is numeric");
+        assert!(year >= 2026, "stamp reads {year}, so the clock was not consulted");
         let _ = std::fs::remove_file(&tmp);
         clear_log_env();
     }

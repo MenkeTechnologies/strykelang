@@ -861,12 +861,26 @@ pub(crate) fn web_log(args: &[StrykeValue], _line: usize) -> Result<StrykeValue>
     Ok(StrykeValue::UNDEF)
 }
 
+/// Wall-clock stamp for a line in `log/<env>.log`: `YYYY-MM-DD HH:MM:SS` in the
+/// server's own zone. This used to print `HH:MM:SS` in UTC with no date, so a
+/// request log could not be dated at all — two entries a day apart read the
+/// same, and every time was an hour or more off the machine's clock.
 fn current_iso_time() -> String {
-    let now = unix_now();
-    let s = now % 60;
-    let m = (now / 60) % 60;
-    let h = (now / 3600) % 24;
-    format!("{:02}:{:02}:{:02}", h, m, s)
+    let t = unix_now() as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: `localtime_r` fills the `tm` we own; NULL on failure.
+    if unsafe { libc::localtime_r(&t, &mut tm) }.is_null() {
+        return unix_now().to_string();
+    }
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday,
+        tm.tm_hour,
+        tm.tm_min,
+        tm.tm_sec
+    )
 }
 
 /// `web_set_header("X-Frame-Options", "DENY")`.
