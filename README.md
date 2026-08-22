@@ -14,13 +14,11 @@
  [![Docs](https://img.shields.io/badge/docs-online-blue.svg)](https://menketechnologies.github.io/strykelang/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### `[THE FASTEST DYNAMIC LANGUAGE IN THE WORLD FOR PARALLEL OPERATIONS]`
+### `[A DYNAMIC LANGUAGE BUILT FOR PARALLEL OPERATIONS]`
 
 > *"There is more than one way to do it — in parallel."*
 >
 > *"100% TDP — beware."*
->
-> *"The hottest language ever created. Literally."*
 
 ## `[PATENT PENDING]`
 
@@ -1466,7 +1464,7 @@ Three-tier compile (Rust `regex` → `fancy-regex` → PCRE2). Perl `$` end anch
   p glob_match "*.txt", "readme.txt"  # 1 (matches)
   val @bins = which_all "perl"  # all paths for "perl" in $PATH
 
-  # ── zsh glob qualifiers — world's first in a scripting language ────
+  # ── zsh glob qualifiers ─────────────────────────────────────────
   # Stryke imports the full zshrs glob engine (zsh-compatible). Every
   # builtin that accepts a glob — `glob`, `glob_par`, `slurp`/`c`/`cat`,
   # `swallow`/`swa`, `ingest`/`ing`, `pwatch`, `par_find_files`,
@@ -2610,9 +2608,7 @@ Demo: [`examples/static_typing_demo.stk`](examples/static_typing_demo.stk) — r
 
 ## [0x10a] INFRASTRUCTURE LOAD TESTING
 
-> *"The hottest language ever created. Literally."*
-
-stryke is a **server farms first** language — the first programming language designed from the ground up for distributed infrastructure load testing. Not HTTP load testing. Not API benchmarks. **Bare metal heat.**
+stryke is a **server farms first** language — a programming language designed for distributed infrastructure load testing. Not HTTP load testing. Not API benchmarks. **Bare metal heat.**
 
 ### Stress Testing Builtins
 
@@ -2628,7 +2624,7 @@ heat(60)                 # 🔥 maximum thermal assault
 
 ### The `heat` Function
 
-The hottest function in any programming language:
+The `heat` function:
 
 ```stk
 heat(60)
