@@ -310,6 +310,26 @@ fn term_cols() -> usize {
     cols.max(40)
 }
 
+/// Read one line from stdin with a plain prompt, for when reedline cannot
+/// paint — see the `plain_input` fallback in [`run`].
+///
+/// The signal shape is reedline's so the caller's `match` is unchanged: EOF is
+/// `CtrlD`, which is what the REPL already treats as "leave".
+fn read_plain_line(cmd_count: u64) -> Signal {
+    use std::io::{BufRead, Write};
+
+    print!("stryke[{}]> ", cmd_count);
+    let _ = std::io::stdout().flush();
+
+    let mut line = String::new();
+    match std::io::stdin().lock().read_line(&mut line) {
+        // 0 bytes is end of input, not an empty line.
+        Ok(0) => Signal::CtrlD,
+        Ok(_) => Signal::Success(line.trim_end_matches(['\n', '\r']).to_string()),
+        Err(_) => Signal::CtrlD,
+    }
+}
+
 fn render_status_bar(cmd_count: u64) -> String {
     let cols = term_cols();
     let dim = NuColor::DarkGray;
@@ -497,6 +517,26 @@ pub fn run(cli: &Cli) {
         cmd_count: Arc::clone(&cmd_count),
     };
 
+    // reedline draws through crossterm, and crossterm asks the terminal where
+    // the cursor is (`ESC [ 6 n`) before it paints the first prompt. A terminal
+    // that does not answer inside its window — one whose reply was consumed by
+    // something else reading the tty, a multiplexer under load, an emulator
+    // that does not implement the report — makes `read_line` fail with
+    //
+    //     The cursor position could not be read within a normal duration
+    //
+    // That used to end the REPL on the spot: banner, one error line, back to
+    // the shell. A query the terminal was slow to answer is not a reason to
+    // refuse to run a language.
+    //
+    // So a failure is retried twice — the race is usually transient — and if
+    // the editor still cannot paint, the REPL drops to reading plain lines
+    // from stdin. No completion, no history keys, no menus, but every other
+    // thing the REPL does still works, which is the difference between a
+    // degraded prompt and no prompt at all.
+    let mut editor_failures = 0usize;
+    let mut plain_input = false;
+
     loop {
         // Refresh `%main::` / `%Pkg::` so each prompt sees the current symbol
         // table (subs / `our` declarations added on the prior line).
@@ -509,11 +549,24 @@ pub fn run(cli: &Cli) {
             *s = interp.repl_completion_snapshot();
         }
 
-        let sig = match line_editor.read_line(&prompt) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("repl: {}", e);
-                break;
+        let sig = if plain_input {
+            read_plain_line(cmd_count.lock().map(|g| *g).unwrap_or(0))
+        } else {
+            match line_editor.read_line(&prompt) {
+                Ok(s) => {
+                    editor_failures = 0;
+                    s
+                }
+                Err(e) => {
+                    editor_failures += 1;
+                    if editor_failures <= 2 {
+                        continue;
+                    }
+                    eprintln!("repl: {}", e);
+                    eprintln!("repl: line editor unavailable — reading plain lines instead");
+                    plain_input = true;
+                    continue;
+                }
             }
         };
 
