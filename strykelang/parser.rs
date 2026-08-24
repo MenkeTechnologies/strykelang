@@ -2807,10 +2807,7 @@ impl Parser {
                             // thread-last branch there lets a slurpy `@xs` param receive the
                             // source as a list rather than binding `$_` to the first element.
                             result = self.thread_apply_placeholder_call(
-                                &func_name,
-                                call_args,
-                                result,
-                                stage_line,
+                                &func_name, call_args, result, stage_line,
                             )?;
                         }
                     } else {
@@ -4880,6 +4877,15 @@ impl Parser {
                 Token::Comma => {
                     self.advance();
                     s.push(',');
+                }
+                // `$$` is the one scalar the lexer stores sigil-and-all
+                // (`ScalarVar("$$")`, the PID variable) rather than by bare
+                // name. In a prototype it is two `$` slots, so re-prefixing a
+                // sigil the way the general arm below does yields `$$$` for
+                // `sub f($$)`.
+                Token::ScalarVar(v) if v == "$$" => {
+                    self.advance();
+                    s.push_str("$$");
                 }
                 Token::ScalarVar(v) => {
                     let v = v.clone();
@@ -21021,9 +21027,7 @@ impl Parser {
                     // (ArrowDeref, ArrayElement, HashElement, …) legitimately
                     // stays an Expr.
                     match base.kind {
-                        ExprKind::ScalarVar(name) => {
-                            parts.push(StringPart::ScalarVar(name))
-                        }
+                        ExprKind::ScalarVar(name) => parts.push(StringPart::ScalarVar(name)),
                         _ => parts.push(StringPart::Expr(base)),
                     }
                 } else if chars[i].is_ascii_digit() {
@@ -21492,6 +21496,239 @@ pub fn parse_format_value_line(line: &str) -> StrykeResult<Vec<Expr>> {
         break;
     }
     Ok(exprs)
+}
+
+// ── zsh parameter expansion inside double-quoted strings ─────────────────────
+// Detection + lowering for `${ … }` zsh parameter-expansion forms. The actual
+// expansion is performed at runtime by zshrs's `paramsubst` (via the `zpexpand`
+// builtin) — these helpers only recognize the form and gather which variables
+// to bridge. Gated off under `--compat` at the call site.
+
+/// True when a `${ … }` body is a zsh parameter expansion rather than a Perl
+/// `${name}` / `${$ref}` / `${EXPR}`: a `(flags)name` or `${#name}` length
+/// prefix, or a name immediately followed by a zsh operator (`:`, `#`, `%`, `/`).
+fn zsh_param_form(body: &str) -> bool {
+    let b = body.as_bytes();
+    if b.is_empty() || b[0] == b'$' || b[0] == b'\\' {
+        return false;
+    }
+    if b[0] == b'(' {
+        // `(flags)name` — flags then an identifier / positional / `$`.
+        if let Some(rp) = body.find(')') {
+            return body[rp + 1..].bytes().next().map_or(false, |c| {
+                c.is_ascii_alphanumeric() || c == b'_' || c == b'$'
+            });
+        }
+        return false;
+    }
+    if b[0] == b'#' {
+        // `${#name}` length.
+        return body[1..]
+            .bytes()
+            .next()
+            .map_or(false, |c| c.is_ascii_alphanumeric() || c == b'_');
+    }
+    let mut i = 0;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i == 0 {
+        return false;
+    }
+    match b.get(i) {
+        // `:-`/`:=`/`:?`/`:+`/`:off` — but NOT `::` (Perl package qualifier, e.g.
+        // `${main::cfg}`, which must stay Perl interpolation).
+        Some(b':') => b.get(i + 1) != Some(&b':'),
+        // `#`/`##` trim, `%`/`%%` trim, `/`//` substitution, `[…]` subscript.
+        Some(b'#') | Some(b'%') | Some(b'/') | Some(b'[') => true,
+        _ => false,
+    }
+}
+
+/// Lower a zsh `${ body }` form to `zpexpand('${body}', "name", $name, …)` — the
+/// raw template (single-quoted so stryke leaves it intact) plus each referenced
+/// variable so the builtin can bridge their values into zshrs's parameter table.
+fn build_zpexpand_expr(body: &str, line: usize) -> Expr {
+    let mut args = vec![Expr {
+        kind: ExprKind::String(format!("${{{}}}", body)),
+        line,
+    }];
+    // Bridge each referenced variable at its real type, by reference so the
+    // value does not flatten into the call's argument pairs: hashes (`(k)`/`(v)`
+    // flags, `${h[key]}` bareword subscript) as `\%name`, arrays (`[…]`
+    // subscripts, array flags/operators) as `\@name`, everything else `$name`.
+    let arrays = array_names(body);
+    let hashes = hash_names(body);
+    for name in zsh_referenced_params(body) {
+        args.push(Expr {
+            kind: ExprKind::String(name.clone()),
+            line,
+        });
+        let referent = |kind: ExprKind| ExprKind::ScalarRef(Box::new(Expr { kind, line }));
+        let val = if hashes.contains(&name) {
+            referent(ExprKind::HashVar(name))
+        } else if arrays.contains(&name) {
+            referent(ExprKind::ArrayVar(name))
+        } else {
+            ExprKind::ScalarVar(name)
+        };
+        args.push(Expr { kind: val, line });
+    }
+    Expr {
+        kind: ExprKind::FuncCall {
+            name: "zpexpand".to_string(),
+            args,
+        },
+        line,
+    }
+}
+
+/// Names that must be bridged as zsh arrays: any `[`-subscripted name, plus the
+/// main parameter when the body uses array-oriented flags (`(o)`/`(O)` sort,
+/// `(u)` unique, `(n)` numeric, `(a)`, `(j:…)` join, `(@)`) or an array operator
+/// (`${a:#pat}`, `${a:|b}`, `${a:*b}`, `${a:^b}`). zshrs's `paramsubst` handles
+/// all of these — they just need an array, not a scalar, bridged in.
+fn array_names(body: &str) -> Vec<String> {
+    let mut out = subscripted_names(body);
+    let b = body.as_bytes();
+    let mut i = 0;
+    let mut array_flags = false;
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = body.find(')') {
+            array_flags = body[1..rp]
+                .bytes()
+                .any(|c| matches!(c, b'o' | b'O' | b'u' | b'n' | b'a' | b'j' | b'@'));
+            i = rp + 1;
+        }
+    }
+    while i < b.len() && b[i] == b'#' {
+        i += 1;
+    }
+    let s = i;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i > s {
+        let rest = &body[i..];
+        let array_op = rest.starts_with(":#")
+            || rest.starts_with(":|")
+            || rest.starts_with(":*")
+            || rest.starts_with(":^");
+        if array_flags || array_op {
+            out.push(body[s..i].to_string());
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Names whose `[` subscript is array-like — the key starts with a digit, `-`
+/// (negative index), `(` (subscript flag), `@`/`*` (whole array), or `$` (var
+/// index). A bareword key (`${h[beta]}`) is a hash, handled by [`hash_names`].
+fn subscripted_names(body: &str) -> Vec<String> {
+    subscript_names_where(body, |c| {
+        c.is_ascii_digit() || matches!(c, b'-' | b'(' | b'@' | b'*' | b'$')
+    })
+}
+
+/// Names with a bareword `[key]` subscript (`${h[beta]}`) — these are hashes.
+fn hash_subscript_names(body: &str) -> Vec<String> {
+    subscript_names_where(body, |c| c.is_ascii_alphabetic() || c == b'_')
+}
+
+/// Names followed by `[` whose first subscript byte satisfies `key_is`.
+fn subscript_names_where(body: &str, key_is: impl Fn(u8) -> bool) -> Vec<String> {
+    let b = body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i].is_ascii_alphabetic() || b[i] == b'_' {
+            let s = i;
+            while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+                i += 1;
+            }
+            if b.get(i) == Some(&b'[') {
+                if let Some(&k) = b.get(i + 1) {
+                    if key_is(k) {
+                        out.push(body[s..i].to_string());
+                    }
+                }
+            }
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Names that must be bridged as zsh associative arrays (hashes): a bareword
+/// `[key]` subscript, or the main parameter under a `(k)`/`(v)`/`(K)`/`(V)` flag.
+fn hash_names(body: &str) -> Vec<String> {
+    let mut out = hash_subscript_names(body);
+    let b = body.as_bytes();
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = body.find(')') {
+            let hash_flags = body[1..rp]
+                .bytes()
+                .any(|c| matches!(c, b'k' | b'v' | b'K' | b'V'));
+            if hash_flags {
+                let mut i = rp + 1;
+                while i < b.len() && b[i] == b'#' {
+                    i += 1;
+                }
+                let s = i;
+                while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+                    i += 1;
+                }
+                if i > s {
+                    out.push(body[s..i].to_string());
+                }
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Variables referenced by a `${ … }` body: the leading parameter (after any
+/// `(flags)` / `#` prefix) plus every `$name` mentioned in the operator/word.
+fn zsh_referenced_params(inner: &str) -> Vec<String> {
+    let b = inner.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    if b.first() == Some(&b'(') {
+        if let Some(rp) = inner.find(')') {
+            i = rp + 1;
+        }
+    }
+    while i < b.len() && b[i] == b'#' {
+        i += 1;
+    }
+    let s = i;
+    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
+        i += 1;
+    }
+    if i > s {
+        out.push(inner[s..i].to_string());
+    }
+    while i < b.len() {
+        if b[i] == b'$' && i + 1 < b.len() && (b[i + 1].is_ascii_alphabetic() || b[i + 1] == b'_') {
+            let ds = i + 1;
+            let mut de = ds;
+            while de < b.len() && (b[de].is_ascii_alphanumeric() || b[de] == b'_') {
+                de += 1;
+            }
+            out.push(inner[ds..de].to_string());
+            i = de;
+        } else {
+            i += 1;
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
 }
 
 #[cfg(test)]
@@ -23841,237 +24078,4 @@ mod tests {
         parse_ok("my $h = +{n=>10}; my @list = ($h->{n} += 5, $h->{n} += 5)");
         parse_ok("my $h = +{n=>10}; my $double = ($h->{n} -= 1) * 2");
     }
-}
-
-// ── zsh parameter expansion inside double-quoted strings ─────────────────────
-// Detection + lowering for `${ … }` zsh parameter-expansion forms. The actual
-// expansion is performed at runtime by zshrs's `paramsubst` (via the `zpexpand`
-// builtin) — these helpers only recognize the form and gather which variables
-// to bridge. Gated off under `--compat` at the call site.
-
-/// True when a `${ … }` body is a zsh parameter expansion rather than a Perl
-/// `${name}` / `${$ref}` / `${EXPR}`: a `(flags)name` or `${#name}` length
-/// prefix, or a name immediately followed by a zsh operator (`:`, `#`, `%`, `/`).
-fn zsh_param_form(body: &str) -> bool {
-    let b = body.as_bytes();
-    if b.is_empty() || b[0] == b'$' || b[0] == b'\\' {
-        return false;
-    }
-    if b[0] == b'(' {
-        // `(flags)name` — flags then an identifier / positional / `$`.
-        if let Some(rp) = body.find(')') {
-            return body[rp + 1..].bytes().next().map_or(false, |c| {
-                c.is_ascii_alphanumeric() || c == b'_' || c == b'$'
-            });
-        }
-        return false;
-    }
-    if b[0] == b'#' {
-        // `${#name}` length.
-        return body[1..]
-            .bytes()
-            .next()
-            .map_or(false, |c| c.is_ascii_alphanumeric() || c == b'_');
-    }
-    let mut i = 0;
-    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-        i += 1;
-    }
-    if i == 0 {
-        return false;
-    }
-    match b.get(i) {
-        // `:-`/`:=`/`:?`/`:+`/`:off` — but NOT `::` (Perl package qualifier, e.g.
-        // `${main::cfg}`, which must stay Perl interpolation).
-        Some(b':') => b.get(i + 1) != Some(&b':'),
-        // `#`/`##` trim, `%`/`%%` trim, `/`//` substitution, `[…]` subscript.
-        Some(b'#') | Some(b'%') | Some(b'/') | Some(b'[') => true,
-        _ => false,
-    }
-}
-
-/// Lower a zsh `${ body }` form to `zpexpand('${body}', "name", $name, …)` — the
-/// raw template (single-quoted so stryke leaves it intact) plus each referenced
-/// variable so the builtin can bridge their values into zshrs's parameter table.
-fn build_zpexpand_expr(body: &str, line: usize) -> Expr {
-    let mut args = vec![Expr {
-        kind: ExprKind::String(format!("${{{}}}", body)),
-        line,
-    }];
-    // Bridge each referenced variable at its real type, by reference so the
-    // value does not flatten into the call's argument pairs: hashes (`(k)`/`(v)`
-    // flags, `${h[key]}` bareword subscript) as `\%name`, arrays (`[…]`
-    // subscripts, array flags/operators) as `\@name`, everything else `$name`.
-    let arrays = array_names(body);
-    let hashes = hash_names(body);
-    for name in zsh_referenced_params(body) {
-        args.push(Expr {
-            kind: ExprKind::String(name.clone()),
-            line,
-        });
-        let referent = |kind: ExprKind| ExprKind::ScalarRef(Box::new(Expr { kind, line }));
-        let val = if hashes.contains(&name) {
-            referent(ExprKind::HashVar(name))
-        } else if arrays.contains(&name) {
-            referent(ExprKind::ArrayVar(name))
-        } else {
-            ExprKind::ScalarVar(name)
-        };
-        args.push(Expr { kind: val, line });
-    }
-    Expr {
-        kind: ExprKind::FuncCall {
-            name: "zpexpand".to_string(),
-            args,
-        },
-        line,
-    }
-}
-
-/// Names that must be bridged as zsh arrays: any `[`-subscripted name, plus the
-/// main parameter when the body uses array-oriented flags (`(o)`/`(O)` sort,
-/// `(u)` unique, `(n)` numeric, `(a)`, `(j:…)` join, `(@)`) or an array operator
-/// (`${a:#pat}`, `${a:|b}`, `${a:*b}`, `${a:^b}`). zshrs's `paramsubst` handles
-/// all of these — they just need an array, not a scalar, bridged in.
-fn array_names(body: &str) -> Vec<String> {
-    let mut out = subscripted_names(body);
-    let b = body.as_bytes();
-    let mut i = 0;
-    let mut array_flags = false;
-    if b.first() == Some(&b'(') {
-        if let Some(rp) = body.find(')') {
-            array_flags = body[1..rp]
-                .bytes()
-                .any(|c| matches!(c, b'o' | b'O' | b'u' | b'n' | b'a' | b'j' | b'@'));
-            i = rp + 1;
-        }
-    }
-    while i < b.len() && b[i] == b'#' {
-        i += 1;
-    }
-    let s = i;
-    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-        i += 1;
-    }
-    if i > s {
-        let rest = &body[i..];
-        let array_op = rest.starts_with(":#")
-            || rest.starts_with(":|")
-            || rest.starts_with(":*")
-            || rest.starts_with(":^");
-        if array_flags || array_op {
-            out.push(body[s..i].to_string());
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
-/// Names whose `[` subscript is array-like — the key starts with a digit, `-`
-/// (negative index), `(` (subscript flag), `@`/`*` (whole array), or `$` (var
-/// index). A bareword key (`${h[beta]}`) is a hash, handled by [`hash_names`].
-fn subscripted_names(body: &str) -> Vec<String> {
-    subscript_names_where(body, |c| {
-        c.is_ascii_digit() || matches!(c, b'-' | b'(' | b'@' | b'*' | b'$')
-    })
-}
-
-/// Names with a bareword `[key]` subscript (`${h[beta]}`) — these are hashes.
-fn hash_subscript_names(body: &str) -> Vec<String> {
-    subscript_names_where(body, |c| c.is_ascii_alphabetic() || c == b'_')
-}
-
-/// Names followed by `[` whose first subscript byte satisfies `key_is`.
-fn subscript_names_where(body: &str, key_is: impl Fn(u8) -> bool) -> Vec<String> {
-    let b = body.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < b.len() {
-        if b[i].is_ascii_alphabetic() || b[i] == b'_' {
-            let s = i;
-            while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-                i += 1;
-            }
-            if b.get(i) == Some(&b'[') {
-                if let Some(&k) = b.get(i + 1) {
-                    if key_is(k) {
-                        out.push(body[s..i].to_string());
-                    }
-                }
-            }
-        } else {
-            i += 1;
-        }
-    }
-    out
-}
-
-/// Names that must be bridged as zsh associative arrays (hashes): a bareword
-/// `[key]` subscript, or the main parameter under a `(k)`/`(v)`/`(K)`/`(V)` flag.
-fn hash_names(body: &str) -> Vec<String> {
-    let mut out = hash_subscript_names(body);
-    let b = body.as_bytes();
-    if b.first() == Some(&b'(') {
-        if let Some(rp) = body.find(')') {
-            let hash_flags = body[1..rp]
-                .bytes()
-                .any(|c| matches!(c, b'k' | b'v' | b'K' | b'V'));
-            if hash_flags {
-                let mut i = rp + 1;
-                while i < b.len() && b[i] == b'#' {
-                    i += 1;
-                }
-                let s = i;
-                while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-                    i += 1;
-                }
-                if i > s {
-                    out.push(body[s..i].to_string());
-                }
-            }
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
-/// Variables referenced by a `${ … }` body: the leading parameter (after any
-/// `(flags)` / `#` prefix) plus every `$name` mentioned in the operator/word.
-fn zsh_referenced_params(inner: &str) -> Vec<String> {
-    let b = inner.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    if b.first() == Some(&b'(') {
-        if let Some(rp) = inner.find(')') {
-            i = rp + 1;
-        }
-    }
-    while i < b.len() && b[i] == b'#' {
-        i += 1;
-    }
-    let s = i;
-    while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
-        i += 1;
-    }
-    if i > s {
-        out.push(inner[s..i].to_string());
-    }
-    while i < b.len() {
-        if b[i] == b'$' && i + 1 < b.len() && (b[i + 1].is_ascii_alphabetic() || b[i + 1] == b'_') {
-            let ds = i + 1;
-            let mut de = ds;
-            while de < b.len() && (b[de].is_ascii_alphanumeric() || b[de] == b'_') {
-                de += 1;
-            }
-            out.push(inner[ds..de].to_string());
-            i = de;
-        } else {
-            i += 1;
-        }
-    }
-    out.sort();
-    out.dedup();
-    out
 }

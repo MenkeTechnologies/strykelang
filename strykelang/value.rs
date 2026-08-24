@@ -2716,6 +2716,29 @@ impl StrykeValue {
             HeapObject::Float(_) => "FLOAT".to_string(),
         }
     }
+    /// True when this value is one of the reference kinds perl's `ref` names —
+    /// an RV in perl terms. Stryke-native container values (Set, Deque, a bare
+    /// `HeapObject::Array`, …) are deliberately excluded: they are values, not
+    /// references, and perl never sees them.
+    pub fn is_perl_reference(&self) -> bool {
+        if !nanbox::is_heap(self.0) {
+            return false;
+        }
+        matches!(
+            unsafe { self.heap_ref() },
+            HeapObject::ArrayRef(_)
+                | HeapObject::ArrayBindingRef(_)
+                | HeapObject::HashRef(_)
+                | HeapObject::HashBindingRef(_)
+                | HeapObject::ScalarRef(_)
+                | HeapObject::ScalarBindingRef(_)
+                | HeapObject::CodeRef(_)
+                | HeapObject::Regex(_, _, _)
+                | HeapObject::Blessed(_)
+                | HeapObject::IOHandle(_)
+        )
+    }
+
     /// `ref_type` — see implementation.
     pub fn ref_type(&self) -> StrykeValue {
         if !nanbox::is_heap(self.0) {
@@ -2728,9 +2751,17 @@ impl StrykeValue {
             HeapObject::HashRef(_) | HeapObject::HashBindingRef(_) => {
                 StrykeValue::string("HASH".into())
             }
-            HeapObject::ScalarRef(_) | HeapObject::ScalarBindingRef(_) => {
-                StrykeValue::string("SCALAR".into())
+            // perl's `ref` reports REF, not SCALAR, when the referent is
+            // itself a reference (`SvROK(SvRV(sv))` in pp_ref): `ref(\\1)`,
+            // `ref(\$aref)` and `ref(\$blessed)` are all "REF".
+            HeapObject::ScalarRef(r) => {
+                if r.read().is_perl_reference() {
+                    StrykeValue::string("REF".into())
+                } else {
+                    StrykeValue::string("SCALAR".into())
+                }
             }
+            HeapObject::ScalarBindingRef(_) => StrykeValue::string("SCALAR".into()),
             HeapObject::CodeRef(_) => StrykeValue::string("CODE".into()),
             HeapObject::Regex(_, _, _) => StrykeValue::string("Regexp".into()),
             HeapObject::Atomic(_) => StrykeValue::string("ATOMIC".into()),

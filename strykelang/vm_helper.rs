@@ -13767,7 +13767,7 @@ impl VMHelper {
             }
             ExprKind::Ref(expr) => {
                 let val = self.eval_expr(expr)?;
-                Ok(val.ref_type())
+                Ok(self.perl_ref_type(&val))
             }
             ExprKind::ScalarContext(expr) => {
                 let v = self.eval_expr_ctx(expr, WantarrayCtx::Scalar)?;
@@ -15087,6 +15087,23 @@ impl VMHelper {
         let new_val = StrykeValue::integer(old.to_int() + if decrement { -1 } else { 1 });
         self.assign_scalar_ref_deref(ref_val, new_val, line)?;
         Ok(old)
+    }
+
+    /// `ref EXPR` — [`StrykeValue::ref_type`] plus the one case it cannot decide
+    /// on its own.
+    ///
+    /// `\$lexical` compiles to a *binding* ref that carries only the slot name
+    /// (unlike `\@a` / `\%h`, which promote to Arc-backed storage), so the
+    /// value alone cannot tell whether the referent currently holds a
+    /// reference. perl reports "REF" in that case — `ref(\$aref)` is "REF", not
+    /// "SCALAR" — so resolve the name against the live scope here.
+    pub(crate) fn perl_ref_type(&self, val: &StrykeValue) -> StrykeValue {
+        if let Some(name) = val.as_scalar_binding_name() {
+            if self.scope.get_scalar(&name).is_perl_reference() {
+                return StrykeValue::string("REF".into());
+            }
+        }
+        val.ref_type()
     }
 
     /// `$$r = $val` — assign through a scalar reference (or special name ref); shared by
@@ -23485,7 +23502,7 @@ pub(crate) fn exec_builtin(
         }
         Some(BuiltinId::Ref) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
-            Ok(val.ref_type())
+            Ok(this.perl_ref_type(&val))
         }
         Some(BuiltinId::Scalar) => {
             let val = args.into_iter().next().unwrap_or(StrykeValue::UNDEF);
