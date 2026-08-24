@@ -161,17 +161,25 @@ jobs:
     # release pipeline wait on cosmetic lints.
     needs: [check, test, doc, parity, stryke-test, intellij-plugin]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # Per-target, because the two runner classes are not close: the Linux
+    # build finishes in ~28 min, while both macOS targets were still
+    # compiling when a flat 60 killed them. macOS gets no dependency cache
+    # (the step below is a no-op there), so every run rebuilds cranelift,
+    # wasmtime and git2 from scratch under `lto = "fat"`.
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            timeout: 60
           - os: macos-latest
             target: x86_64-apple-darwin
+            timeout: 120
           - os: macos-latest
             target: aarch64-apple-darwin
+            timeout: 120
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
