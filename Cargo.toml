@@ -168,14 +168,14 @@ nu-ansi-term = "0.50"
 # by name, and strykelang provides its own in aot_native.rs. Linking both is a
 # duplicate-symbol error (under `lto = "fat"`, a bare "failed to load bitcode").
 # `daemon` is re-enabled explicitly because it is a zshrs default the lib needs.
-zshrs = { version = "0.12.35", default-features = false, features = ["daemon"] }
+zshrs = { version = "0.12.37", default-features = false, features = ["daemon"] }
 # Must stay on the same minor as the fusevm `zshrs` itself depends on. fusevm
 # defines ~54 `#[no_mangle]` symbols across its aot/jit/ffi modules, and cargo
 # treats 0.x minors as semver-incompatible, so requesting a different one puts
 # two copies in the graph and every binary fails to link on duplicate symbols
 # (`ld: duplicate symbol '_fusevm_aot_powf'`; under `lto = "fat"` it degrades to
 # a bare "failed to load bitcode of module fusevm-….rcgu.o"). Published zshrs
-# 0.12.35 requires `^0.22.0`, so 0.22.0 is the only value that unifies — bump
+# 0.12.37 requires `^0.23.0`, so 0.23.0 is the only value that unifies — bump
 # the `zshrs` line above and this one together, never one alone. `cargo check
 # --lib` does not link, so it does not catch this — `cargo test`/`cargo build`
 # does.
