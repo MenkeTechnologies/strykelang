@@ -9,7 +9,7 @@
 //!     header: { magic, format_version, stryke_version, pointer_width, built_at_secs },
 //!     entries: `HashMap<canonical_path, ScriptEntry>`,
 //!   }
-//!   ScriptEntry { mtime_secs, mtime_nsecs, binary_mtime_at_cache, cached_at_secs,
+//!   ScriptEntry { mtime_secs, mtime_nsecs, binary_stamp_at_cache, cached_at_secs,
 //!                 program_blob: `Vec<u8>`, chunk_blob: `Vec<u8>` }
 //!
 //! Inner `program_blob` / `chunk_blob` are bincode for now — `StrykeValue`'s
@@ -22,8 +22,9 @@
 //!     lookups (`s test t` running 87 scripts) pay validation once.
 //!   - `rkyv::check_archived_root::<ScriptShard>` validates the byte image.
 //!   - Header validated for magic / format_version / stryke_version / pointer_width.
-//!   - Per-entry: source mtime must match, and `binary_mtime_at_cache` ≥ running
-//!     stryke binary's mtime (any rebuild of stryke invalidates entries silently).
+//!   - Per-entry: source mtime must match, and `binary_stamp_at_cache` must EQUAL
+//!     the running binary's stamp (mtime secs+nsecs and size), so any rebuild —
+//!     including a same-second or a rolled-back one — invalidates silently.
 //!
 //! Write path:
 //!   - `flock(LOCK_EX)` on `scripts.rkyv.lock` so concurrent writers serialize.
@@ -60,7 +61,7 @@ pub const SHARD_MAGIC: u32 = 0x53545259; // "STRY"
 ///
 /// 6: `HashEach` / `HashEachScalar` were inserted after `HashValuesScalar` for
 /// Perl's `each`, shifting every later discriminant the same way.
-pub const SHARD_FORMAT_VERSION: u32 = 6;
+pub const SHARD_FORMAT_VERSION: u32 = 7;
 
 // ── rkyv archived types ──────────────────────────────────────────────────────
 /// `ShardHeader` — see fields for layout.
@@ -86,8 +87,8 @@ pub struct ScriptEntry {
     pub mtime_secs: i64,
     /// `mtime_nsecs` field.
     pub mtime_nsecs: i64,
-    /// `binary_mtime_at_cache` field.
-    pub binary_mtime_at_cache: i64,
+    /// `binary_stamp_at_cache` field.
+    pub binary_stamp_at_cache: i64,
     /// `cached_at_secs` field.
     pub cached_at_secs: i64,
     /// `program_blob` field.
@@ -301,9 +302,9 @@ impl ScriptCache {
             return None;
         }
 
-        if let Some(bin_mtime) = current_binary_mtime_secs() {
-            let cached_bin_mtime: i64 = entry.binary_mtime_at_cache.into();
-            if cached_bin_mtime < bin_mtime {
+        if let Some(stamp) = current_binary_stamp() {
+            let cached_stamp: i64 = entry.binary_stamp_at_cache.into();
+            if cached_stamp != stamp {
                 return None;
             }
         }
@@ -345,11 +346,10 @@ impl ScriptCache {
             _ => fresh_shard(),
         };
 
-        let bin_mtime = current_binary_mtime_secs().unwrap_or(0);
         let entry = ScriptEntry {
             mtime_secs,
             mtime_nsecs,
-            binary_mtime_at_cache: bin_mtime,
+            binary_stamp_at_cache: current_binary_stamp().unwrap_or(0),
             cached_at_secs: now_secs(),
             program_blob: program_bytes,
             chunk_blob: chunk_bytes,
@@ -540,13 +540,30 @@ pub fn file_mtime(path: &Path) -> Option<(i64, i64)> {
     Some((meta.mtime(), meta.mtime_nsec()))
 }
 
-/// Mtime of the running stryke binary. Cached for the lifetime of the process.
-fn current_binary_mtime_secs() -> Option<i64> {
-    static BIN_MTIME: OnceLock<Option<i64>> = OnceLock::new();
-    *BIN_MTIME.get_or_init(|| {
+/// Identity stamp of the running stryke binary — mtime (seconds AND
+/// nanoseconds) plus size, folded into one value. Cached for the lifetime of
+/// the process.
+///
+/// The shard replays compiled bytecode, so every rebuild has to invalidate it,
+/// and the test has to be equality rather than "cached entry is at least as new
+/// as the binary". Two rebuilds slip past a newer-than test: one that lands in
+/// the same wall-clock second as the previous cache write, and one that
+/// produces an OLDER binary than the entry was written against (rebuilding
+/// after a `git stash`, switching back to a previously built binary). Both then
+/// replay the earlier build's codegen, which reads as "my compiler fix did
+/// nothing".
+fn current_binary_stamp() -> Option<i64> {
+    use std::hash::{Hash, Hasher};
+    use std::os::unix::fs::MetadataExt;
+    static BIN_STAMP: OnceLock<Option<i64>> = OnceLock::new();
+    *BIN_STAMP.get_or_init(|| {
         let exe = std::env::current_exe().ok()?;
-        let (secs, _) = file_mtime(&exe)?;
-        Some(secs)
+        let meta = std::fs::metadata(&exe).ok()?;
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        meta.mtime().hash(&mut h);
+        meta.mtime_nsec().hash(&mut h);
+        meta.size().hash(&mut h);
+        Some(h.finish() as i64)
     })
 }
 
