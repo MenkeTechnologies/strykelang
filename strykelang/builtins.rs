@@ -41697,7 +41697,11 @@ fn builtin_endpwent() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::integer(1))
 }
 
-/// `getpwent` — Getpwent. Returns an integer.
+/// `getpwent` — next passwd entry as perl's 10-element list.
+///
+/// Shares `extract_passwd`/`passwd_entry_list` with getpwnam/getpwuid so all
+/// three agree on field count and content (they used to disagree: this one
+/// invented a literal `"x"` passwd and dropped three fields).
 fn builtin_getpwent() -> StrykeResult<StrykeValue> {
     #[cfg(unix)]
     {
@@ -41705,29 +41709,8 @@ fn builtin_getpwent() -> StrykeResult<StrykeValue> {
         if pw.is_null() {
             return Ok(StrykeValue::UNDEF);
         }
-        let pw = unsafe { &*pw };
-        let name = unsafe { std::ffi::CStr::from_ptr(pw.pw_name) }
-            .to_string_lossy()
-            .to_string();
-        let uid = pw.pw_uid as i64;
-        let gid = pw.pw_gid as i64;
-        let dir = unsafe { std::ffi::CStr::from_ptr(pw.pw_dir) }
-            .to_string_lossy()
-            .to_string();
-        let shell = unsafe { std::ffi::CStr::from_ptr(pw.pw_shell) }
-            .to_string_lossy()
-            .to_string();
-        Ok(StrykeValue::array(vec![
-            StrykeValue::string(name),
-            StrykeValue::string("x".into()),
-            StrykeValue::integer(uid),
-            StrykeValue::integer(gid),
-            StrykeValue::UNDEF, // quota
-            StrykeValue::UNDEF, // comment
-            StrykeValue::UNDEF, // gcos
-            StrykeValue::string(dir),
-            StrykeValue::string(shell),
-        ]))
+        let entry = extract_passwd(unsafe { &*pw });
+        Ok(StrykeValue::array(passwd_entry_list(&entry)))
     }
     #[cfg(not(unix))]
     Ok(StrykeValue::UNDEF)
@@ -41751,7 +41734,12 @@ fn builtin_endgrent() -> StrykeResult<StrykeValue> {
     Ok(StrykeValue::integer(1))
 }
 
-/// `getgrent` — Getgrent. Returns an integer.
+/// `getgrent` — next group entry as perl's 4-element list.
+///
+/// Shares `extract_group`/`group_entry_list` with getgrnam/getgrgid; the old
+/// inline walk both invented a literal `"x"` passwd field and dereferenced
+/// `gr_mem` as an aligned `*mut *mut c_char` (see `extract_group` for why that
+/// is unsound on Darwin).
 fn builtin_getgrent() -> StrykeResult<StrykeValue> {
     #[cfg(unix)]
     {
@@ -41759,28 +41747,8 @@ fn builtin_getgrent() -> StrykeResult<StrykeValue> {
         if gr.is_null() {
             return Ok(StrykeValue::UNDEF);
         }
-        let gr = unsafe { &*gr };
-        let name = unsafe { std::ffi::CStr::from_ptr(gr.gr_name) }
-            .to_string_lossy()
-            .to_string();
-        let gid = gr.gr_gid as i64;
-        let mut members = Vec::new();
-        let mut p = gr.gr_mem;
-        while !unsafe { *p }.is_null() {
-            members.push(
-                unsafe { std::ffi::CStr::from_ptr(*p) }
-                    .to_string_lossy()
-                    .to_string(),
-            );
-            p = unsafe { p.add(1) };
-        }
-        let mem_str = members.join(" ");
-        Ok(StrykeValue::array(vec![
-            StrykeValue::string(name),
-            StrykeValue::string("x".into()),
-            StrykeValue::integer(gid),
-            StrykeValue::string(mem_str),
-        ]))
+        let entry = extract_group(unsafe { &*gr });
+        Ok(StrykeValue::array(group_entry_list(&entry)))
     }
     #[cfg(not(unix))]
     Ok(StrykeValue::UNDEF)
@@ -42323,6 +42291,14 @@ fn builtin_setpriority(args: &[StrykeValue], line: usize) -> StrykeResult<Stryke
     }
 }
 
+/// The `getpw*` return list, exactly as perl's `pp_gpwent` builds it:
+/// `(name, passwd, uid, gid, quota, comment, gcos, dir, shell, expire)` — ten
+/// elements on every platform.
+///
+/// `quota`/`comment`/`expire` are the BSD `pw_change`/`pw_class`/`pw_expire`
+/// fields where the platform has them (perl's `PWCHANGE`/`PWCLASS`/`PWEXPIRE`
+/// probes) and `undef` where it does not, which is what perl leaves in those
+/// slots when the `#ifdef`s all miss.
 #[cfg(unix)]
 fn passwd_entry_list(pw: &PasswdEntry) -> Vec<StrykeValue> {
     vec![
@@ -42330,11 +42306,14 @@ fn passwd_entry_list(pw: &PasswdEntry) -> Vec<StrykeValue> {
         StrykeValue::string(pw.passwd.clone()),
         StrykeValue::integer(pw.uid as i64),
         StrykeValue::integer(pw.gid as i64),
-        StrykeValue::string(String::new()),
-        StrykeValue::string(String::new()),
+        pw.change.map_or(StrykeValue::UNDEF, StrykeValue::integer),
+        pw.class
+            .as_ref()
+            .map_or(StrykeValue::UNDEF, |c| StrykeValue::string(c.clone())),
         StrykeValue::string(pw.gecos.clone()),
         StrykeValue::string(pw.dir.clone()),
         StrykeValue::string(pw.shell.clone()),
+        pw.expire.map_or(StrykeValue::UNDEF, StrykeValue::integer),
     ]
 }
 
@@ -42344,9 +42323,15 @@ struct PasswdEntry {
     passwd: String,
     uid: u32,
     gid: u32,
+    /// BSD `pw_change`; `None` on platforms without the field.
+    change: Option<i64>,
+    /// BSD `pw_class`; `None` on platforms without the field.
+    class: Option<String>,
     gecos: String,
     dir: String,
     shell: String,
+    /// BSD `pw_expire`; `None` on platforms without the field.
+    expire: Option<i64>,
 }
 
 #[cfg(unix)]
@@ -42357,14 +42342,41 @@ fn extract_passwd(pw: &libc::passwd) -> PasswdEntry {
         }
         unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
     };
+    // The change/class/expire trio exists only on the BSD-derived `struct
+    // passwd` (Apple, FreeBSD, DragonFly, OpenBSD, NetBSD). Elsewhere — glibc,
+    // musl — perl's PWCHANGE/PWCLASS/PWEXPIRE probes miss and the slots stay
+    // undef, which `None` reproduces.
+    #[cfg(any(
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "openbsd",
+        target_os = "netbsd"
+    ))]
+    let (change, class, expire) = (
+        Some(pw.pw_change as i64),
+        Some(s(pw.pw_class)),
+        Some(pw.pw_expire as i64),
+    );
+    #[cfg(not(any(
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "openbsd",
+        target_os = "netbsd"
+    )))]
+    let (change, class, expire): (Option<i64>, Option<String>, Option<i64>) = (None, None, None);
     PasswdEntry {
         name: s(pw.pw_name),
         passwd: s(pw.pw_passwd),
         uid: pw.pw_uid,
         gid: pw.pw_gid,
+        change,
+        class,
         gecos: s(pw.pw_gecos),
         dir: s(pw.pw_dir),
         shell: s(pw.pw_shell),
+        expire,
     }
 }
 
@@ -42429,7 +42441,13 @@ fn extract_group(gr: &libc::group) -> GroupEntry {
     if !gr.gr_mem.is_null() {
         let mut i = 0;
         loop {
-            let p = unsafe { *gr.gr_mem.add(i) };
+            // `read_unaligned`, not `*`: Darwin's Libinfo packs the member
+            // array into the same buffer as the name/passwd strings, so
+            // `gr_mem` routinely lands on a 4-byte boundary (observed
+            // 0x102bcee84 for the first `getgrent()` entry). A plain deref of
+            // `*mut *mut c_char` asserts 8-byte alignment and is UB —
+            // debug builds abort with "misaligned pointer dereference".
+            let p = unsafe { gr.gr_mem.add(i).read_unaligned() };
             if p.is_null() {
                 break;
             }
