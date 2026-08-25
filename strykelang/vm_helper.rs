@@ -6218,6 +6218,15 @@ impl VMHelper {
         // On hit AND `regex_capture_scope_fresh == true`, skip `apply_regex_captures` entirely:
         // the scope's `$&`/`$1`/... still reflect the memoized match. `regex_capture_scope_fresh`
         // is cleared by any scope write to a capture variable (see `invalidate_regex_capture_scope`).
+        //
+        // The memo must key on the INTERPOLATED pattern, not the source text.
+        // `for my $p ("a","b") { "abc" =~ /^$p/ }` presents the identical source
+        // text `^$p` and the identical haystack on both turns while `$p` changes
+        // underneath them, so a memo keyed on `^$p` replays iteration 1's answer
+        // forever. Interpolating once here also saves `compile_regex` from
+        // redoing the same scan below.
+        let interpolated = self.interpolated_pattern(pattern);
+        let pattern: &str = &interpolated;
         if !flags.contains('g') && !scalar_g {
             let memo_hit = {
                 if let Some(ref mem) = self.regex_match_memo {
@@ -6239,7 +6248,7 @@ impl VMHelper {
                     let mem = self.regex_match_memo.as_ref().expect("memo");
                     (mem.haystack.clone(), mem.result.clone())
                 };
-                let re = self.compile_regex(pattern, flags, line)?;
+                let re = self.compile_interpolated_regex(pattern, flags, line)?;
                 if let Some(caps) = re.captures(&memo_s) {
                     self.apply_regex_captures(&memo_s, 0, &re, &caps, CaptureAllMode::Empty)?;
                 }
@@ -6247,7 +6256,7 @@ impl VMHelper {
                 return Ok(memo_result);
             }
         }
-        let re = self.compile_regex(pattern, flags, line)?;
+        let re = self.compile_interpolated_regex(pattern, flags, line)?;
         if flags.contains('g') && scalar_g {
             let key = pos_key.to_string();
             let start = self.regex_pos.get(&key).copied().flatten().unwrap_or(0);
@@ -22125,6 +22134,38 @@ impl VMHelper {
     }
 
     /// Interpolate `$var` / `@var` in regex patterns (Perl double-quote-like interpolation).
+    /// True when [`Self::interpolate_regex_pattern`] would substitute anything —
+    /// an unescaped `$` followed by an identifier character or `{`.
+    ///
+    /// The guard used to be `contains('$') || contains('@')`, which fires on
+    /// every end-anchored pattern (`/^\d+$/`) and on any literal `@`. Each
+    /// false positive costs a `Vec<char>` collect plus a full re-copy of the
+    /// pattern, on every match — 32% of a 3M-iteration `/^line\d+$/` loop.
+    /// `@` never needed the test at all: the interpolator only handles `$`.
+    fn regex_pattern_interpolates(pattern: &str) -> bool {
+        let mut it = pattern.chars();
+        while let Some(c) = it.next() {
+            match c {
+                // The interpolator skips both characters of an escape pair, so
+                // `\$foo` is a literal `$foo` and must not trigger.
+                '\\' => {
+                    it.next();
+                }
+                '$' => {
+                    if it
+                        .clone()
+                        .next()
+                        .is_some_and(|n| n.is_alphanumeric() || n == '_' || n == '{')
+                    {
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
     fn interpolate_regex_pattern(&self, pattern: &str) -> String {
         let mut out = String::with_capacity(pattern.len());
         let chars: Vec<char> = pattern.chars().collect();
@@ -22176,19 +22217,36 @@ impl VMHelper {
         out
     }
 
+    /// Interpolate `pattern`'s variables, if it has any, and hand back the text
+    /// the regex engine should see. Callers that need the interpolated text for
+    /// their own keying (see [`Self::regex_match_execute`]'s memo) do this once
+    /// and then call [`Self::compile_interpolated_regex`] directly, rather than
+    /// letting `compile_regex` redo the work.
+    pub(crate) fn interpolated_pattern<'a>(&self, pattern: &'a str) -> std::borrow::Cow<'a, str> {
+        if Self::regex_pattern_interpolates(pattern) {
+            std::borrow::Cow::Owned(self.interpolate_regex_pattern(pattern))
+        } else {
+            std::borrow::Cow::Borrowed(pattern)
+        }
+    }
+
     pub(crate) fn compile_regex(
         &mut self,
         pattern: &str,
         flags: &str,
         line: usize,
     ) -> Result<Arc<PerlCompiledRegex>, FlowOrError> {
-        // Interpolate variables in the pattern: `$var`, `${var}`, `@var`
-        let pattern = if pattern.contains('$') || pattern.contains('@') {
-            std::borrow::Cow::Owned(self.interpolate_regex_pattern(pattern))
-        } else {
-            std::borrow::Cow::Borrowed(pattern)
-        };
-        let pattern = pattern.as_ref();
+        let pattern = self.interpolated_pattern(pattern);
+        self.compile_interpolated_regex(pattern.as_ref(), flags, line)
+    }
+
+    /// [`Self::compile_regex`] with interpolation already applied.
+    pub(crate) fn compile_interpolated_regex(
+        &mut self,
+        pattern: &str,
+        flags: &str,
+        line: usize,
+    ) -> Result<Arc<PerlCompiledRegex>, FlowOrError> {
         // Fast path: same regex as last call (common in loops).
         // Arc clone is cheap (ref-count increment) AND preserves the lazy DFA cache.
         let multiline = self.multiline_match;
