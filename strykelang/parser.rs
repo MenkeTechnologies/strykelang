@@ -19796,6 +19796,11 @@ impl Parser {
             return Ok(expr);
         }
         // Implicit semicolon: if next token is on a different line, don't consume it
+        // `shift`/`pop` take an ARRAY operand, so an operator can only be continuing the
+        // surrounding expression — `my $max = shift || 0;` (core `Carp::str_len_trim`),
+        // `shift or die`, `shift ? a : b`. Without these the operator was parsed as the start
+        // of the operand. `Token::DefinedOr` is listed for the same reason but does not fire
+        // yet: `shift //` still lexes the `//` as an empty regex before the parser sees it.
         if matches!(
             self.peek(),
             Token::Semicolon
@@ -19804,6 +19809,13 @@ impl Parser {
                 | Token::Eof
                 | Token::Comma
                 | Token::PipeForward
+                | Token::LogOr
+                | Token::LogAnd
+                | Token::LogOrWord
+                | Token::LogAndWord
+                | Token::DefinedOr
+                | Token::Question
+                | Token::Colon
         ) || self.peek_line() > line
         {
             Ok(Expr {
