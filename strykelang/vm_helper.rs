@@ -6259,12 +6259,18 @@ impl VMHelper {
         let re = self.compile_interpolated_regex(pattern, flags, line)?;
         if flags.contains('g') && scalar_g {
             let key = pos_key.to_string();
+            // `/c` — "don't reset pos on failure". Without it a failed
+            // iterating match rewinds to the start of the string, which is
+            // exactly what a `\G` walk uses `/gc` to avoid.
+            let keep_pos_on_failure = flags.contains('c');
             let start = self.regex_pos.get(&key).copied().flatten().unwrap_or(0);
             if start == 0 {
                 self.scope.set_array("^CAPTURE_ALL", vec![])?;
             }
             if start > s.len() {
-                self.regex_pos.insert(key, None);
+                if !keep_pos_on_failure {
+                    self.regex_pos.insert(key, None);
+                }
                 return Ok(StrykeValue::perl_bool(false));
             }
             let sub = s.get(start..).unwrap_or("");
@@ -6275,7 +6281,9 @@ impl VMHelper {
                 self.apply_regex_captures(&s, start, &re, &caps, CaptureAllMode::Append)?;
                 Ok(StrykeValue::integer(1))
             } else {
-                self.regex_pos.insert(key, None);
+                if !keep_pos_on_failure {
+                    self.regex_pos.insert(key, None);
+                }
                 Ok(StrykeValue::perl_bool(false))
             }
         } else if flags.contains('g') {

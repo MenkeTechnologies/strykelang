@@ -8436,7 +8436,16 @@ impl Compiler {
                     .chunk
                     .add_constant(StrykeValue::string(pattern.clone()));
                 let flags_idx = self.chunk.add_constant(StrykeValue::string(flags.clone()));
-                let pos_key_idx = if *scalar_g && flags.contains('g') {
+                // `m//g` iterates — advancing `pos()` and yielding a boolean —
+                // in SCALAR or VOID context, and returns the whole match list
+                // only in list context. The parser marks the boolean-condition
+                // sites (`while ($s =~ /x/g)`), but that misses every other
+                // scalar use: a bare `$s =~ /x/g;` statement, `my $ok = ($s =~
+                // /x/g)`, a `\G` walk. Those left `pos()` undef and made `\G`
+                // unusable. Context is known here, so decide it here.
+                let iterating_g =
+                    flags.contains('g') && (*scalar_g || ctx != WantarrayCtx::List);
+                let pos_key_idx = if iterating_g {
                     if let ExprKind::ScalarVar(n) = &expr.kind {
                         let stor = self.scalar_storage_name_for_ops(n);
                         self.chunk.add_constant(StrykeValue::string(stor))
@@ -8455,7 +8464,7 @@ impl Compiler {
                     self.emit_op(Op::WantarrayPush(ctx.as_byte()), line, Some(root));
                 }
                 self.emit_op(
-                    Op::RegexMatch(pat_idx, flags_idx, *scalar_g, pos_key_idx),
+                    Op::RegexMatch(pat_idx, flags_idx, iterating_g, pos_key_idx),
                     line,
                     Some(root),
                 );
