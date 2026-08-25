@@ -221,6 +221,22 @@ pub struct Compiler {
     /// via [`crate::bytecode::Chunk::line_mode_end_ip`]. In normal mode `END` stays inline
     /// before the single `Halt` so it runs once at program end.
     line_mode: bool,
+    /// File-scope `my` names (sigil-prefixed: `$x`, `@a`, `%h`) that a phase block —
+    /// `BEGIN`/`UNITCHECK`/`CHECK`/`INIT` — can see, i.e. that were declared textually
+    /// before it. Filled by [`Self::collect_phase_my_predecls`] at the top of
+    /// [`Self::compile_program`].
+    ///
+    /// Perl builds the pad while it compiles, and runs a `BEGIN` block as soon as its
+    /// enclosing statement finishes compiling, so a `my` from earlier in the same
+    /// compilation unit is already a pad entry the block closes over. The run-time
+    /// introduction (`pp_padsv` with `OPpLVAL_INTRO`) only pushes a *scope-exit* clear
+    /// (`SAVECLEARSV`) — it does not reset the slot on entry. That is why
+    /// `my $x; BEGIN { $x = "set" } print $x` prints `set` under perl.
+    ///
+    /// [`Self::compile_var_declarations`] reads this set to reproduce that: a
+    /// no-initializer file-scope `my` of a name in here introduces the lexical without
+    /// emitting a store, so the value the phase block already wrote survives.
+    phase_visible_my: HashSet<String>,
     /// True while compiling a deferred sort/reduce block in the 4th pass. `$a` and `$b`
     /// inside such blocks must use name-based access — `set_sort_pair` writes by name,
     /// so a slot allocation from any outer `my $a`/`my $b` (which the deferred pass sees
@@ -354,6 +370,7 @@ impl Compiler {
             goto_ctx_stack: Vec::new(),
             strict_vars: false,
             line_mode: false,
+            phase_visible_my: HashSet::new(),
             force_name_for_sort_pair: false,
             sort_pair_block_indices: std::collections::HashSet::new(),
             sub_body_block_indices: std::collections::HashSet::new(),
@@ -656,6 +673,101 @@ impl Compiler {
             }
         }
         [begin, unitcheck, check, init]
+    }
+
+    /// Per-phase-block accumulation of the file-scope `my` (lexical) declarations that appear
+    /// textually **before** each phase block, in source order — the `my` counterpart of
+    /// [`Self::collect_phase_our_predecls`].
+    ///
+    /// Perl's model: compilation walks the file in source order and each `my` immediately adds a
+    /// pad entry, so by the time a `BEGIN` block is compiled (at the end of its enclosing
+    /// statement) the pad holds every `my` declared above it and the block closes over those
+    /// entries. `stryke` emits phase blocks grouped by phase, ahead of the main body, so the pad
+    /// as-it-stood has to be replayed into the scope layer per block. Accumulating textually (not
+    /// as a whole-program union) is what keeps `BEGIN { $x } my $x;` an error, as in Perl.
+    ///
+    /// Returns the per-phase lists plus the union of every name any phase block can see,
+    /// sigil-prefixed (`$x` / `@a` / `%h`) for [`Compiler::phase_visible_my`].
+    fn collect_phase_my_predecls(
+        program: &Program,
+    ) -> ([Vec<Vec<(Sigil, String)>>; 4], HashSet<String>) {
+        let mut acc: Vec<(Sigil, String)> = Vec::new();
+        let mut begin = Vec::new();
+        let mut unitcheck = Vec::new();
+        let mut check = Vec::new();
+        let mut init = Vec::new();
+        let mut visible: HashSet<String> = HashSet::new();
+        let note = |acc: &Vec<(Sigil, String)>, visible: &mut HashSet<String>| {
+            for (sigil, name) in acc {
+                if let Some(k) = Self::sigil_prefixed_name(*sigil, name) {
+                    visible.insert(k);
+                }
+            }
+        };
+        for stmt in &program.statements {
+            match &stmt.kind {
+                StmtKind::My(decls) | StmtKind::MySync(decls) => {
+                    for d in decls {
+                        acc.push((d.sigil, d.name.clone()));
+                    }
+                }
+                StmtKind::Begin(_) => {
+                    note(&acc, &mut visible);
+                    begin.push(acc.clone());
+                }
+                StmtKind::UnitCheck(_) => {
+                    note(&acc, &mut visible);
+                    unitcheck.push(acc.clone());
+                }
+                StmtKind::Check(_) => {
+                    note(&acc, &mut visible);
+                    check.push(acc.clone());
+                }
+                StmtKind::Init(_) => {
+                    note(&acc, &mut visible);
+                    init.push(acc.clone());
+                }
+                _ => {}
+            }
+        }
+        ([begin, unitcheck, check, init], visible)
+    }
+
+    /// `$x` / `@a` / `%h` key for [`Compiler::phase_visible_my`]. Typeglobs have no lexical
+    /// form, so they get no key.
+    fn sigil_prefixed_name(sigil: Sigil, name: &str) -> Option<String> {
+        let s = match sigil {
+            Sigil::Scalar => '$',
+            Sigil::Array => '@',
+            Sigil::Hash => '%',
+            Sigil::Typeglob => return None,
+        };
+        Some(format!("{}{}", s, name))
+    }
+
+    /// Register `my`-declared names (from [`Self::collect_phase_my_predecls`]) into the current
+    /// scope layer so a phase block compiled ahead of the main body resolves them as lexicals
+    /// rather than failing strict-vars. Unlike [`Self::register_our_predecls`] these go only into
+    /// the plain `declared_*` sets — a lexical must keep resolving to its bare name, never to the
+    /// package stash.
+    fn register_my_predecls(&mut self, names: &[(Sigil, String)]) {
+        let Some(layer) = self.scope_stack.last_mut() else {
+            return;
+        };
+        for (sigil, name) in names {
+            match sigil {
+                Sigil::Scalar => {
+                    layer.declared_scalars.insert(name.clone());
+                }
+                Sigil::Array => {
+                    layer.declared_arrays.insert(name.clone());
+                }
+                Sigil::Hash => {
+                    layer.declared_hashes.insert(name.clone());
+                }
+                Sigil::Typeglob => {}
+            }
+        }
     }
 
     /// Register `our`-declared names (from [`Self::collect_phase_our_predecls`]) into the current
@@ -1541,6 +1653,11 @@ impl Compiler {
         // leak into the main body, where `our` must still be declared before use, in order.
         let [begin_pre, unitcheck_pre, check_pre, init_pre] =
             Self::collect_phase_our_predecls(program);
+        // Same replay for `my`: Perl's pad already holds every lexical declared above the block,
+        // so the block closes over them. See `collect_phase_my_predecls`.
+        let ([begin_my, unitcheck_my, check_my, init_my], phase_my) =
+            Self::collect_phase_my_predecls(program);
+        self.phase_visible_my = phase_my;
         let strict_snapshot = self.scope_stack.last().cloned();
 
         // BEGIN blocks run before main (same order as Perl phase blocks).
@@ -1550,6 +1667,9 @@ impl Compiler {
         for (i, block) in self.begin_blocks.clone().iter().enumerate() {
             if let Some(pre) = begin_pre.get(i) {
                 self.register_our_predecls(pre);
+            }
+            if let Some(pre) = begin_my.get(i) {
+                self.register_my_predecls(pre);
             }
             self.compile_block(block)?;
         }
@@ -1564,6 +1684,9 @@ impl Compiler {
         for (i, block) in unit_check_rev {
             if let Some(pre) = unitcheck_pre.get(i) {
                 self.register_our_predecls(pre);
+            }
+            if let Some(pre) = unitcheck_my.get(i) {
+                self.register_my_predecls(pre);
             }
             self.compile_block(&block)?;
         }
@@ -1581,6 +1704,9 @@ impl Compiler {
             if let Some(pre) = check_pre.get(i) {
                 self.register_our_predecls(pre);
             }
+            if let Some(pre) = check_my.get(i) {
+                self.register_my_predecls(pre);
+            }
             self.compile_block(&block)?;
         }
         if !self.init_blocks.is_empty() {
@@ -1589,6 +1715,9 @@ impl Compiler {
         for (i, block) in self.init_blocks.clone().iter().enumerate() {
             if let Some(pre) = init_pre.get(i) {
                 self.register_our_predecls(pre);
+            }
+            if let Some(pre) = init_my.get(i) {
+                self.register_my_predecls(pre);
             }
             self.compile_block(block)?;
         }
@@ -2065,7 +2194,7 @@ impl Compiler {
                 | Op::ArrayLen(idx) => *idx == underscore_idx,
                 // `goto &sub` reads the live `@_` from the scope at runtime, so the
                 // sub must keep the real `@_` array (no stack-args conversion).
-                Op::GotoSub(_) => true,
+                Op::GotoSub(_) | Op::GotoSubRef => true,
                 _ => false,
             }
         };
@@ -2353,6 +2482,32 @@ impl Compiler {
                         }
                         Sigil::Typeglob => {} // falls through to the typeglob error below
                     }
+                }
+                // `my $x;` at file scope, for a name some phase block can already see: introduce
+                // the lexical but emit no store. Perl allocates the pad entry at compile time, so
+                // a `BEGIN` that runs before the main body writes the very slot this statement
+                // introduces, and `pp_padsv`'s introduction registers only a scope-exit clear
+                // (`SAVECLEARSV`) — nothing resets the slot on entry. Emitting the usual
+                // `LoadUndef` + `DeclareScalar` here would wipe the phase block's write, which is
+                // what made `my $x; BEGIN { $x = "set" }` print nothing.
+                //
+                // Deliberately narrow: only a file-scope declaration (`scope_stack.len() == 1`),
+                // only with no initializer and no type/frozen qualifier, and only for a name in
+                // `phase_visible_my`. Nested scopes get a fresh runtime frame per entry so their
+                // reset is already correct, and `-n`/`-p` line mode re-runs the body per line —
+                // there the enclosing scope really does exit each iteration, so the reset must
+                // stay.
+                if is_my
+                    && decl.initializer.is_none()
+                    && decl.type_annotation.is_none()
+                    && !frozen
+                    && !self.line_mode
+                    && self.scope_stack.len() == 1
+                    && Self::sigil_prefixed_name(decl.sigil, &decl.name)
+                        .is_some_and(|k| self.phase_visible_my.contains(&k))
+                {
+                    self.register_declare(decl.sigil, &decl.name, false);
+                    continue;
                 }
                 match decl.sigil {
                     Sigil::Scalar => {
@@ -3258,6 +3413,28 @@ impl Compiler {
                 if let ExprKind::SubroutineRef(name) = &target.kind {
                     let name_idx = self.chunk.intern_name(&self.qualify_sub_key(name));
                     self.chunk.emit(Op::GotoSub(name_idx), line);
+                    self.chunk.emit(Op::ReturnValue, line);
+                    return Ok(());
+                }
+                // `goto &{EXPR}` and `goto &$coderef`: same tail call, but the target is a code
+                // ref computed at run time. The parser gives `&{EXPR}` as `DynamicSubCodeRef`
+                // and bare `&$cr` as an argument-less `IndirectCall` that would pass the
+                // caller's `@_` — under `goto` neither is a call, both are just the target, so
+                // compile the operand to a code ref and let `Op::GotoSubRef` do the frame
+                // replacement. `Exporter::export` (`goto &{as_heavy()}`) needs this.
+                let dyn_target: Option<&Expr> = match &target.kind {
+                    ExprKind::DynamicSubCodeRef(_) => Some(target.as_ref()),
+                    ExprKind::IndirectCall {
+                        target: inner,
+                        args,
+                        ampersand: true,
+                        pass_caller_arglist: true,
+                    } if args.is_empty() => Some(inner.as_ref()),
+                    _ => None,
+                };
+                if let Some(expr) = dyn_target {
+                    self.compile_expr(expr)?;
+                    self.chunk.emit(Op::GotoSubRef, line);
                     self.chunk.emit(Op::ReturnValue, line);
                     return Ok(());
                 }

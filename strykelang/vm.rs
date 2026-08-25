@@ -3613,6 +3613,88 @@ impl<'a> VM<'a> {
         }
     }
 
+    /// `Op::GotoSubRef` — Perl `goto &{EXPR}` / `goto &$coderef`: the sub-ref form of
+    /// [`Self::vm_goto_sub`]. The target code ref is already on the stack (the compiler emitted
+    /// the operand); the live `@_` and the goto-ing sub's own calling context carry over.
+    ///
+    /// The frame is torn down exactly like `Op::ReturnValue` does before the target runs, so the
+    /// goto-ing sub is really gone: `caller` inside the target reports the *original* caller, and
+    /// the target's return value is pushed onto the caller's stack with `ip` already restored to
+    /// the caller's `return_ip` — the `ReturnValue` the compiler emits after this op is then
+    /// never reached. That teardown-before-call ordering is what `Exporter::as_heavy`'s
+    /// `(caller(1))[3]` sees when `Exporter::export` gotos into `Exporter::Heavy`.
+    ///
+    /// A JIT-trampoline frame cannot be replaced (its return goes through `jit_trampoline_out`,
+    /// not `return_ip`), so there the target is dispatched as a plain nested call and the
+    /// trailing `ReturnValue` returns its value — same fallback as `vm_goto_sub`.
+    fn vm_goto_sub_ref(&mut self) -> StrykeResult<()> {
+        let line = self.line();
+        let target = self.pop();
+        // `my $cr = \&f; goto &$cr` leaves a ScalarRef around the code ref when the closure
+        // captured `$cr` — unwrap it the same way `Op::ArrowCall` does.
+        let target = match target.as_scalar_ref() {
+            Some(inner) => inner.read().clone(),
+            None => target,
+        };
+        let args = self.interp.scope.get_array("_");
+        let cur_want = self.interp.wantarray_kind;
+        let Some(frame) = self.call_stack.last() else {
+            return Err(StrykeError::runtime(
+                "Can't goto subroutine outside a subroutine",
+                line,
+            ));
+        };
+        if frame.block_region {
+            return Err(if self.call_stack.iter().any(|f| !f.block_region) {
+                StrykeError::runtime(
+                    "Can't goto subroutine from a sort sub (or similar callback)",
+                    line,
+                )
+            } else {
+                StrykeError::runtime("Can't goto subroutine outside a subroutine", line)
+            });
+        }
+        if frame.jit_trampoline_return {
+            let v = self.call_goto_target(target, args, cur_want, line)?;
+            self.push(v);
+            return Ok(());
+        }
+        let frame = self.call_stack.pop().expect("checked above");
+        if let Some(t0) = frame.sub_profiler_start {
+            if let Some(p) = &mut self.interp.profiler {
+                p.exit_sub(t0.elapsed());
+            }
+        }
+        self.interp.debugger_leave_sub();
+        self.stack.truncate(frame.stack_base);
+        self.interp.pop_scope_to_depth(frame.scope_depth);
+        self.interp.current_sub_stack.pop();
+        let v = self.call_goto_target(target, args, cur_want, line)?;
+        self.interp.wantarray_kind = frame.saved_wantarray;
+        self.push(v);
+        self.ip = frame.return_ip;
+        Ok(())
+    }
+
+    /// Invoke a `goto &{...}` target code ref with the inherited `@_` and calling context.
+    /// Mirrors `Op::IndirectCall`: higher-order-function wrappers get their own dispatch before
+    /// the ordinary body execution path.
+    fn call_goto_target(
+        &mut self,
+        target: StrykeValue,
+        args: Vec<StrykeValue>,
+        want: WantarrayCtx,
+        line: usize,
+    ) -> StrykeResult<StrykeValue> {
+        if let Some(sub) = target.as_code_ref() {
+            if let Some(hof) = self.interp.try_hof_dispatch(&sub, &args, want, line) {
+                return vm_interp_result(hof, line);
+            }
+        }
+        let r = self.interp.dispatch_indirect_call(target, args, want, line);
+        vm_interp_result(r, line)
+    }
+
     #[inline]
     fn push_binop_with_overload<F>(
         &mut self,
@@ -5406,6 +5488,10 @@ impl<'a> VM<'a> {
                     }
                     Op::GotoSub(name_idx) => {
                         self.vm_goto_sub(*name_idx)?;
+                        Ok(())
+                    }
+                    Op::GotoSubRef => {
+                        self.vm_goto_sub_ref()?;
                         Ok(())
                     }
                     Op::CallStaticSubId(sid, name_idx, argc, wa) => {
@@ -7487,7 +7573,20 @@ impl<'a> VM<'a> {
                         Ok(())
                     }
                     Op::LoadDynamicSubRef => {
-                        let name = self.pop().to_string();
+                        let v = self.pop();
+                        // `&{EXPR}` is a symbolic name lookup only when EXPR is a *string*.
+                        // When it already holds a code ref — `&{ \&t }`, `&{ $h->{cb} }`,
+                        // `goto &{as_heavy()}` — Perl calls that ref directly; stringifying it
+                        // would look up the sub literally named `CODE(0x...)`.
+                        let v = match v.as_scalar_ref() {
+                            Some(inner) => inner.read().clone(),
+                            None => v,
+                        };
+                        if v.as_code_ref().is_some() {
+                            self.push(v);
+                            return Ok(());
+                        }
+                        let name = v.to_string();
                         let line = self.line();
                         let sub = self.interp.resolve_sub_by_name(&name).ok_or_else(|| {
                             StrykeError::runtime(

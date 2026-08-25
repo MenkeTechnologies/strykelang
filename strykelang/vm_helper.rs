@@ -176,6 +176,8 @@ pub(crate) enum Flow {
     Yield(StrykeValue),
     /// `goto &sub` — tail-call: replace current sub with the named one, keeping @_.
     GotoSub(String),
+    /// `goto &{EXPR}` / `goto &$coderef` — same tail call with a run-time code-ref target.
+    GotoSubRef(StrykeValue),
 }
 
 pub(crate) type ExecResult = Result<StrykeValue, FlowOrError>;
@@ -9368,6 +9370,27 @@ impl VMHelper {
                 if let ExprKind::SubroutineRef(name) = &target.kind {
                     return Err(Flow::GotoSub(name.clone()).into());
                 }
+                // `goto &{EXPR}` / `goto &$cr`: the operand is the target, not a call. The
+                // parser gives the first as `DynamicSubCodeRef` and the second as an
+                // argument-less `&`-call that would otherwise re-invoke with the caller's `@_`.
+                let dyn_target: Option<&Expr> = match &target.kind {
+                    ExprKind::DynamicSubCodeRef(_) => Some(target.as_ref()),
+                    ExprKind::IndirectCall {
+                        target: inner,
+                        args,
+                        ampersand: true,
+                        pass_caller_arglist: true,
+                    } if args.is_empty() => Some(inner.as_ref()),
+                    _ => None,
+                };
+                if let Some(expr) = dyn_target {
+                    let v = self.eval_expr(expr)?;
+                    let v = match v.as_scalar_ref() {
+                        Some(inner) => inner.read().clone(),
+                        None => v,
+                    };
+                    return Err(Flow::GotoSubRef(v).into());
+                }
                 Err(StrykeError::runtime("goto reached outside goto-aware block", stmt.line).into())
             }
             StmtKind::EvalTimeout { timeout, body } => {
@@ -10388,7 +10411,19 @@ impl VMHelper {
                 Ok(StrykeValue::code_ref(sub))
             }
             ExprKind::DynamicSubCodeRef(expr) => {
-                let name = self.eval_expr(expr)?.to_string();
+                // `&{EXPR}` is a symbolic name lookup only when EXPR is a *string*. When it
+                // already holds a code ref — `&{ \&f }`, `&{ $h->{cb} }`, `goto &{as_heavy()}`
+                // — Perl uses that ref directly; stringifying it would look up a sub literally
+                // named `CODE(0x...)`. Mirrors `Op::LoadDynamicSubRef` in the VM.
+                let v = self.eval_expr(expr)?;
+                let v = match v.as_scalar_ref() {
+                    Some(inner) => inner.read().clone(),
+                    None => v,
+                };
+                if v.as_code_ref().is_some() {
+                    return Ok(v);
+                }
+                let name = v.to_string();
                 let sub = self.resolve_sub_by_name(&name).ok_or_else(|| {
                     StrykeError::runtime(self.undefined_subroutine_resolve_message(&name), line)
                 })?;
@@ -20577,7 +20612,10 @@ impl VMHelper {
         }
         self.debugger_leave_sub();
         // For goto &sub, capture @_ before popping the frame
-        let goto_args = if matches!(result, Err(FlowOrError::Flow(Flow::GotoSub(_)))) {
+        let goto_args = if matches!(
+            result,
+            Err(FlowOrError::Flow(Flow::GotoSub(_) | Flow::GotoSubRef(_)))
+        ) {
             Some(self.scope.get_array("_"))
         } else {
             None
@@ -20616,6 +20654,10 @@ impl VMHelper {
                     )
                     .into())
                 }
+            }
+            Err(FlowOrError::Flow(Flow::GotoSubRef(target))) => {
+                // `goto &{EXPR}` — tail call into a run-time code ref with the same `@_`.
+                self.dispatch_indirect_call(target, goto_args.unwrap_or_default(), want, _line)
             }
             Err(FlowOrError::Flow(Flow::Yield(_))) => {
                 Err(StrykeError::runtime("yield is only valid inside gen { }", 0).into())

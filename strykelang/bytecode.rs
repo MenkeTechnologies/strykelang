@@ -360,6 +360,14 @@ pub enum Op {
     /// and wantarray context (Perl tail-call semantics). Always followed by a `ReturnValue`
     /// fallback op (only reached when frame replacement is not possible, e.g. JIT trampoline).
     GotoSub(u16),
+    /// `goto &{EXPR}` / `goto &$coderef` — the sub-ref form of [`Op::GotoSub`]. Pops a code ref
+    /// (the compiled target expression) and replaces the current sub frame with a call to it,
+    /// passing the live `@_` through unchanged and keeping the original caller's `return_ip` and
+    /// wantarray context. `Exporter` is built on this (`sub export { goto &{as_heavy()} }`), so
+    /// it gates every `use Module` that goes through `Exporter::import`'s heavy path.
+    /// Like `GotoSub`, always followed by a `ReturnValue` fallback op that is only reached when
+    /// frame replacement is impossible (JIT trampoline frame).
+    GotoSubRef,
     /// `Return` variant.
     Return,
     /// `ReturnValue` variant.
