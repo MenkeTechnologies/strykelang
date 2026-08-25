@@ -2214,7 +2214,7 @@ cargo test --test integration   # tests/suite/* (runtime, readline list context,
 cargo bench --bench jit_compare # JIT vs interpreter on the same bytecode
 bash bench/run_bench.sh         # perl5 vs stryke suite (needs hyperfine)
 bash bench/run_bench_all.sh     # stryke vs perl5 vs python3 vs ruby vs julia vs raku vs luajit (needs hyperfine)
-bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (20 000+ cases)
+bash parity/run_parity.sh       # exact stdout/stderr parity vs system perl (every parity/cases/*.pl; the run prints the totals)
 ```
 
 - `Cargo.lock` is committed (CI uses `--locked`). If your global gitignore strips it, force-add updates: `git add -f Cargo.lock`.
