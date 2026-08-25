@@ -5927,6 +5927,24 @@ impl<'a> VM<'a> {
                         self.push(out);
                         Ok(())
                     }
+                    Op::ListSlice(n) => {
+                        let n = *n as usize;
+                        let idxs = self.pop_flattened_array_slice_specs(n);
+                        let src = self.pop();
+                        // Perl: a slice of an EMPTY list is the empty list. Only this case is
+                        // special — a non-empty source still yields one element per index.
+                        if src.as_array_vec().is_some_and(|v| v.is_empty()) {
+                            self.push(StrykeValue::array(Vec::new()));
+                            return Ok(());
+                        }
+                        let line = self.line();
+                        let out = vm_interp_result(
+                            self.interp.arrow_array_slice_values(src, &idxs, line),
+                            line,
+                        )?;
+                        self.push(out);
+                        Ok(())
+                    }
                     Op::SetHashSliceDeref(n) => {
                         let n = *n as usize;
                         let mut key_vals = Vec::with_capacity(n);

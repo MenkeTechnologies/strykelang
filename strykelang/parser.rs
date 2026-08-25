@@ -9471,7 +9471,26 @@ impl Parser {
                     }
                     // `$a[i]` — or chained `$r->{k}[i]` / `$a[1][2]` — or list slice `(sort ...)[0]`.
                     let line = expr.line;
-                    if matches!(expr.kind, ExprKind::ScalarVar(_)) {
+                    // A parenthesised term subscripted immediately is always a LIST SLICE, even
+                    // when the parens held a single scalar: Perl's `($scalar)[0]` is that
+                    // scalar, NOT element 0 of `@scalar`. `list_construct_close_pos` is the
+                    // checkpoint `parse_primary` records just past the closing `)`; comparing it
+                    // to the position of this `[` is the same exact-adjacency test the `x`
+                    // operator uses to tell `(LIST) x N` from `EXPR x N`. Without it the
+                    // `ScalarVar` branch below rewrote `($scalar)[0]` to `$scalar[0]`.
+                    let was_parenthesized = self.list_construct_close_pos == Some(self.pos);
+                    if was_parenthesized {
+                        self.advance();
+                        let indices = self.parse_arg_list()?;
+                        self.expect(&Token::RBracket)?;
+                        expr = Expr {
+                            kind: ExprKind::AnonymousListSlice {
+                                source: Box::new(expr),
+                                indices,
+                            },
+                            line,
+                        };
+                    } else if matches!(expr.kind, ExprKind::ScalarVar(_)) {
                         if let ExprKind::ScalarVar(ref name) = expr.kind {
                             let name = name.clone();
                             self.advance();

@@ -4420,7 +4420,7 @@ impl Compiler {
                     for index_expr in indices {
                         self.compile_array_slice_index_expr(index_expr)?;
                     }
-                    self.emit_op(Op::ArrowArraySlice(indices.len() as u16), line, Some(root));
+                    self.emit_op(Op::ListSlice(indices.len() as u16), line, Some(root));
                 }
                 if ctx != WantarrayCtx::List {
                     self.emit_op(Op::ListSliceToScalar, line, Some(root));

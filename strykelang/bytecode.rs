@@ -414,6 +414,15 @@ pub enum Op {
     /// `@$aref[i1,i2,...]` — stack: `[array_ref, spec1, …, specN]` (TOS = last spec); each spec is a
     /// scalar index or array of indices (list-context `..` / `qw`/list). Pops `N+1`; pushes elements.
     ArrowArraySlice(u16),
+    /// `(LIST)[i, …]` — a LIST slice, as opposed to [`Op::ArrowArraySlice`]'s deref slice.
+    /// Stack `[source_array, spec1, …, specN]`; pushes the selected elements.
+    ///
+    /// The one behavioural difference, and the reason this is a separate opcode: Perl says a
+    /// slice of an EMPTY list is the empty list, while a slice of a non-empty list yields one
+    /// element per index (`undef` past the end). `()[0]` and `(@empty)[0,1]` are therefore the
+    /// empty list, but `(1,2)[5]` is a one-element list holding `undef`. Emptiness is a run-time
+    /// property (`(f())[0]`), so it cannot be folded at compile time.
+    ListSlice(u16),
     /// `@$href{k1,k2} = VALUE` — stack: `[value, container, key1, …, keyN]` (TOS = last key); pops `N+2` values.
     SetHashSliceDeref(u16),
     /// `%name{k1,k2} = VALUE` — stack: `[value, key1, …, keyN]` (TOS = last key); pops `N+1`. Pool: hash name, key count.
