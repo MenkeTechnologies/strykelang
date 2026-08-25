@@ -197,8 +197,34 @@ impl Parser {
     pub fn new(tokens: Vec<(Token, usize)>) -> Self {
         Self::new_with_file(tokens, "-e")
     }
+
+    /// Every `sub NAME` / `fn NAME` in the token stream, collected before
+    /// parsing starts.
+    ///
+    /// Perl resolves a call against the whole file, not the text above it, so
+    /// `sub outer { f() } sub f { 7 }` is ordinary code. The parser is
+    /// single-pass and only learned a name when it reached the declaration, so
+    /// a forward reference to a sub whose name collides with a stryke
+    /// extension was rejected outright ("`f` is a stryke extension (disabled
+    /// by --compat)"). Seeding the set up front makes the shadow decision
+    /// independent of declaration order.
+    ///
+    /// Only the two-token `sub`/`fn` + name shape is collected — anonymous
+    /// `sub { … }`, a `sub` hash key and a `sub => …` pair all fail the match.
+    fn prescan_declared_sub_names(tokens: &[(Token, usize)]) -> std::collections::HashSet<String> {
+        let mut names = std::collections::HashSet::new();
+        for pair in tokens.windows(2) {
+            if let (Token::Ident(kw), Token::Ident(name)) = (&pair[0].0, &pair[1].0) {
+                if kw == "sub" || kw == "fn" {
+                    names.insert(name.clone());
+                }
+            }
+        }
+        names
+    }
     /// `new_with_file` — see implementation.
     pub fn new_with_file(tokens: Vec<(Token, usize)>, file: impl Into<String>) -> Self {
+        let declared_subs = Self::prescan_declared_sub_names(&tokens);
         Self {
             tokens,
             pos: 0,
@@ -209,7 +235,7 @@ impl Parser {
             suppress_scalar_hash_brace: 0,
             next_desugar_tmp: 0,
             error_file: file.into(),
-            declared_subs: std::collections::HashSet::new(),
+            declared_subs,
             suppress_parenless_call: 0,
             pending_thread_input: None,
             suppress_slash_as_div: 0,
@@ -10394,7 +10420,22 @@ impl Parser {
             name = "undef".to_string();
         }
 
-        match name.as_str() {
+        // Under `--compat` a user sub beats a stryke extension of the same
+        // name. The check above only stops the "disabled by --compat" error;
+        // dispatch still fell into the extension's own arm, and the arms that
+        // build a dedicated `ExprKind` (`f` -> `Filesf`, `d` -> `Dirs`, …)
+        // have no name left for the runtime to resolve, so the user's sub
+        // could never be reached. Route those straight to the generic
+        // function-call arm, which keeps the name and lets the runtime prefer
+        // the user sub — the same path the `cnt` / `len` / `count` family
+        // already takes.
+        let shadowed_by_user_sub = crate::compat_mode()
+            && Self::stryke_extension_name(&name).is_some()
+            && self.declared_subs.contains(&name);
+        // A name no bareword can have, so the match falls through to `_`.
+        let dispatch: &str = if shadowed_by_user_sub { "\u{0}" } else { &name };
+
+        match dispatch {
             "__FILE__" => Ok(Expr {
                 kind: ExprKind::MagicConst(MagicConstKind::File),
                 line,
